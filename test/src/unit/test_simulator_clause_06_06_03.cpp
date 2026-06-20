@@ -344,4 +344,4 @@ TEST(WiredNetResolution, WorThreeDriversAnyOneIsOne) {
   EXPECT_EQ(var->value.ToUint64(), 0x0Fu);
 }
 
-}
+}  // namespace

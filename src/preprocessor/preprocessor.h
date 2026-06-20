@@ -196,4 +196,4 @@ bool IsCompilerDirective(std::string_view name);
 bool HasUnterminatedString(std::string_view body);
 bool IsIdentChar(char c);
 
-}
+}  // namespace delta

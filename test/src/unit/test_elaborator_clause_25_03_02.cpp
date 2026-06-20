@@ -104,4 +104,4 @@ TEST(InterfaceNamedBundle, TopBindsInterfaceToModuleImplicitly) {
   EXPECT_NE(top->children[1].resolved, nullptr);
 }
 
-}
+}  // namespace

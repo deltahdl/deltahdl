@@ -52,7 +52,8 @@ TEST(AssocArrayAssignmentElaboration, AssocAssignClassIndexSameTypeOk) {
              "endmodule\n"));
 }
 
-TEST(AssocArrayAssignmentElaboration, AssocAssignClassIndexDifferentTypeRejected) {
+TEST(AssocArrayAssignmentElaboration,
+     AssocAssignClassIndexDifferentTypeRejected) {
   ElabFixture f;
   ElaborateSrc(
       "module top;\n"
@@ -145,4 +146,4 @@ TEST(AssocArrayAssignmentElaboration, AssocAssignToDynamicRejected) {
   EXPECT_TRUE(f.has_errors);
 }
 
-}
+}  // namespace

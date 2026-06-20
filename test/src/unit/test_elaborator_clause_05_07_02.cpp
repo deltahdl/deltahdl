@@ -1,6 +1,6 @@
+#include "elaborator/type_eval.h"
 #include "fixture_elaborator.h"
 #include "fixture_evaluator.h"
-#include "elaborator/type_eval.h"
 
 using namespace delta;
 
@@ -91,4 +91,4 @@ TEST(RealLiteralElaboration, UnderscoreRealElaborates) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

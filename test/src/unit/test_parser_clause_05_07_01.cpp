@@ -402,4 +402,4 @@ TEST(IntegerLiteralParsing, UnaryMinusOnBasedLiteral) {
   EXPECT_EQ(rhs->lhs->int_val, 6u);
 }
 
-}
+}  // namespace

@@ -53,9 +53,8 @@ static StrengthComponent ReduceWiredPair(StrengthComponent a,
   if (a.val == b.val) {
     return a;
   }
-  uint8_t resolved =
-      (kind == WiredLogicKind::kAnd) ? std::min(a.val, b.val)
-                                     : std::max(a.val, b.val);
+  uint8_t resolved = (kind == WiredLogicKind::kAnd) ? std::min(a.val, b.val)
+                                                    : std::max(a.val, b.val);
   return {resolved, a.level};
 }
 
@@ -103,7 +102,6 @@ NetStrength CombineWiredLogicAmbiguous(NetStrength a, NetStrength b,
 }
 
 Logic4Word ResolveWireWord(Logic4Word a, Logic4Word b) {
-
   uint64_t a_z = a.aval & a.bval;
   uint64_t b_z = b.aval & b.bval;
   uint64_t both_z = a_z & b_z;
@@ -124,7 +122,6 @@ Logic4Word ResolveWireWord(Logic4Word a, Logic4Word b) {
 }
 
 Logic4Word ResolveWandWord(Logic4Word a, Logic4Word b) {
-
   uint64_t a_z = a.aval & a.bval;
   uint64_t b_z = b.aval & b.bval;
   uint64_t both_z = a_z & b_z;
@@ -148,7 +145,6 @@ Logic4Word ResolveWandWord(Logic4Word a, Logic4Word b) {
 }
 
 Logic4Word ResolveWorWord(Logic4Word a, Logic4Word b) {
-
   uint64_t a_z = a.aval & a.bval;
   uint64_t b_z = b.aval & b.bval;
   uint64_t both_z = a_z & b_z;
@@ -365,11 +361,9 @@ static void ComputeSingleBitStrength(
     out.s0_hi = out.s0_lo = s;
   } else if (m.val == 1) {
     out.s1_hi = out.s1_lo = s;
-  } else if (m.val == 2 && (net_type == NetType::kWand ||
-                            net_type == NetType::kTriand ||
-                            net_type == NetType::kWor ||
-                            net_type == NetType::kTrior)) {
-
+  } else if (m.val == 2 &&
+             (net_type == NetType::kWand || net_type == NetType::kTriand ||
+              net_type == NetType::kWor || net_type == NetType::kTrior)) {
     out.s0_hi = out.s0_lo = s;
     out.s1_hi = out.s1_lo = s;
   }
@@ -391,7 +385,6 @@ static void ResolveStrengthBit(const std::vector<Logic4Vec>& drivers,
       max_val = bv.val;
       conflict = false;
     } else if (str == max_str && bv.val != max_val) {
-
       if (net_type == NetType::kWand || net_type == NetType::kTriand) {
         max_val = WiredAnd(max_val, bv.val);
       } else if (net_type == NetType::kWor || net_type == NetType::kTrior) {
@@ -691,7 +684,8 @@ bool InitializeUserDefinedNet(Net& net, const UserNettype& nettype,
   }
 
   // §6.7.3: a resolved nettype's resolution function is activated at least once
-  // at time zero -- even for an undriven net, where it sees an empty driver set.
+  // at time zero -- even for an undriven net, where it sees an empty driver
+  // set.
   if (nettype.resolution) {
     net.resolved->value = nettype.resolution(arena, net.drivers);
   }
@@ -717,4 +711,4 @@ Logic4Vec InitialStructNetValue(Arena& arena, uint32_t total_width,
   return value;
 }
 
-}
+}  // namespace delta

@@ -126,8 +126,8 @@ TEST(CrossCoverage, CoverageIsCoveredOverDenominator) {
 }
 
 // LRM 19.11.2: a cross whose denominator B_c + B_u is zero is reported by
-// CrossCoverageDenominatorZero. A cross with no bins has a zero denominator; one
-// with a bin does not.
+// CrossCoverageDenominatorZero. A cross with no bins has a zero denominator;
+// one with a bin does not.
 TEST(CrossCoverage, DenominatorZeroDetection) {
   CrossCover empty;
   empty.name = "empty";
@@ -268,4 +268,4 @@ TEST(CrossCoverage, ZeroDenominatorCrossDroppedFromCovergroup) {
   EXPECT_DOUBLE_EQ(CoverageDB::GetCoverage(g), 100.0);
 }
 
-}
+}  // namespace

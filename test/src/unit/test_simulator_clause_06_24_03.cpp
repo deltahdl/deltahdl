@@ -160,4 +160,4 @@ TEST(BitStreamCastSim, BitStreamSourceFourStatePropagates) {
   EXPECT_NE(var->value.words[0].bval, 0u);
 }
 
-}
+}  // namespace

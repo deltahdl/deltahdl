@@ -322,4 +322,4 @@ TEST(IpcSync, TriggeredStatePersistsAcrossSuccessiveWaitsInSameStep) {
   EXPECT_EQ(second->value.ToUint64(), 1u);
 }
 
-}
+}  // namespace

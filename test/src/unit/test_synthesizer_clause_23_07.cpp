@@ -6,7 +6,8 @@ namespace {
 
 TEST(DottedNameSynthesis, StructMemberSelectSynthesizes) {
   SynthFixture f;
-  auto* mod = ElaborateSrc(f,
+  auto* mod = ElaborateSrc(
+      f,
       "module t(input logic [15:0] s, output logic [7:0] y);\n"
       "  typedef struct packed { logic [7:0] hi; logic [7:0] lo; } pair_t;\n"
       "  pair_t p;\n"
@@ -21,7 +22,8 @@ TEST(DottedNameSynthesis, StructMemberSelectSynthesizes) {
 
 TEST(DottedNameSynthesis, NestedStructMemberSelectSynthesizes) {
   SynthFixture f;
-  auto* mod = ElaborateSrc(f,
+  auto* mod = ElaborateSrc(
+      f,
       "module t(input logic [15:0] s, output logic [7:0] y);\n"
       "  typedef struct packed { logic [7:0] x; } inner_t;\n"
       "  typedef struct packed { inner_t sub; logic [7:0] pad; } outer_t;\n"
@@ -35,4 +37,4 @@ TEST(DottedNameSynthesis, NestedStructMemberSelectSynthesizes) {
   ASSERT_NE(aig, nullptr);
 }
 
-}
+}  // namespace

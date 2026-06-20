@@ -87,4 +87,4 @@ TEST(ArgumentBindingSim, VoidFunctionAllDefaultsNoParens) {
   LowerRunAndCheck(f, design, {{"x", 99u}});
 }
 
-}
+}  // namespace

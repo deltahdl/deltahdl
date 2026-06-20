@@ -48,4 +48,4 @@ TEST(AssignmentCompatibleSimulation, EquivalentAssignmentPropagatesValue) {
   EXPECT_EQ(var->value.ToUint64(), 0x77u);
 }
 
-}
+}  // namespace

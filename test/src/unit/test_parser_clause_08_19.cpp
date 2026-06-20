@@ -161,4 +161,4 @@ TEST(ConstantClassPropertyParsing, ConstByteProperty) {
   EXPECT_NE(m->init_expr, nullptr);
 }
 
-}
+}  // namespace

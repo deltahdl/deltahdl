@@ -36,8 +36,7 @@ bool IsSynchronousAbort(AbortOperator op) {
 
 bool AbortConditionForcesTrue(AbortOperator op) {
   // §16.12.14: the accept variants make the overall evaluation true on abort.
-  return op == AbortOperator::kAcceptOn ||
-         op == AbortOperator::kSyncAcceptOn;
+  return op == AbortOperator::kAcceptOn || op == AbortOperator::kSyncAcceptOn;
 }
 
 bool AbortOperatorsMayNest() { return true; }

@@ -9,16 +9,16 @@ namespace {
 // §37.63 Process: the object model diagram draws process (with its initial,
 // final, and always members) traversing to and from module and stmt, and gives
 // the process class one property access edge - "-> always type", int:
-// vpiAlwaysType. The module<->process, process<->stmt, and stmt->scope edges are
-// the generic one-to-one/one-to-many traversals already provided by the data
-// model; the clause's only numbered Detail governs the property edge. Detail 1
-// restricts vpiAlwaysType to exactly four constants. These tests observe the
-// production code apply that restriction (the VpiIsAlwaysType guard) through the
-// public vpi_get(vpiAlwaysType) dispatch path - both the legal values it admits
-// and the values it rejects to vpiUndefined.
+// vpiAlwaysType. The module<->process, process<->stmt, and stmt->scope edges
+// are the generic one-to-one/one-to-many traversals already provided by the
+// data model; the clause's only numbered Detail governs the property edge.
+// Detail 1 restricts vpiAlwaysType to exactly four constants. These tests
+// observe the production code apply that restriction (the VpiIsAlwaysType
+// guard) through the public vpi_get(vpiAlwaysType) dispatch path - both the
+// legal values it admits and the values it rejects to vpiUndefined.
 
-// The fixture installs a context so the public vpi_get entry point runs its real
-// dispatch over the test objects.
+// The fixture installs a context so the public vpi_get entry point runs its
+// real dispatch over the test objects.
 class Process : public ::testing::Test {
  protected:
   void SetUp() override { SetGlobalVpiContext(&ctx_); }
@@ -29,8 +29,8 @@ class Process : public ::testing::Test {
 // D1 applied through the public dispatch: a process carrying one of the four
 // always types reports exactly that constant through vpi_get(vpiAlwaysType).
 // Driving all four legal constants here also exercises the admitting branch of
-// the VpiIsAlwaysType guard, since a value the guard rejected would come back as
-// vpiUndefined rather than the constant.
+// the VpiIsAlwaysType guard, since a value the guard rejected would come back
+// as vpiUndefined rather than the constant.
 TEST_F(Process, ProcessReportsItsAlwaysTypeThroughVpiGet) {
   for (int always_type :
        {vpiAlways, vpiAlwaysComb, vpiAlwaysFF, vpiAlwaysLatch}) {
@@ -46,8 +46,8 @@ TEST_F(Process, ProcessReportsItsAlwaysTypeThroughVpiGet) {
 // reports vpiUndefined rather than handing back a value outside the four. This
 // is the outcome that distinguishes the clause's restriction, applied by the
 // production guard, from simply returning the stored field - covering both an
-// unset always_type (an initial or final process) and a stored value that is not
-// one of the four.
+// unset always_type (an initial or final process) and a stored value that is
+// not one of the four.
 TEST_F(Process, ProcessWithoutALegalAlwaysTypeReportsUndefined) {
   VpiObject initial_process;
   initial_process.type = vpiInitial;  // not an always procedure; always_type 0

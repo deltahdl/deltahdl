@@ -26,9 +26,9 @@ struct SvaFixture {
 
 namespace {
 
-// §16.12.9: for the overlapped followed-by (#-#) the consequent property_expr is
-// evaluated at the end point of the antecedent match, so a matched antecedent
-// yields exactly the consequent's verdict.
+// §16.12.9: for the overlapped followed-by (#-#) the consequent property_expr
+// is evaluated at the end point of the antecedent match, so a matched
+// antecedent yields exactly the consequent's verdict.
 TEST(SvaEngine, OverlappingFollowedBy) {
   EXPECT_EQ(EvalFollowedBy(true, true, false), PropertyResult::kPass);
   EXPECT_EQ(EvalFollowedBy(true, false, false), PropertyResult::kFail);
@@ -101,4 +101,4 @@ TEST(SvaEngine, NonOverlappingFollowedByMatchesImplicationDual) {
   }
 }
 
-}
+}  // namespace

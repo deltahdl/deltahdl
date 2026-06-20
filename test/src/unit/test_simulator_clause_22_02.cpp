@@ -39,7 +39,8 @@ TEST(CompilerDirectiveSimulation, DirectiveCanBeOverridden) {
   EXPECT_EQ(result, 20u);
 }
 
-TEST(CompilerDirectiveSimulation, DirectiveInConditionalBlockAffectsSimulation) {
+TEST(CompilerDirectiveSimulation,
+     DirectiveInConditionalBlockAffectsSimulation) {
   auto result = PreprocessAndGet(
       "`define FEATURE 1\n"
       "`ifdef FEATURE\n"
@@ -67,7 +68,8 @@ TEST(CompilerDirectiveSimulation, DirectiveInCommentDoesNotAffectSimulation) {
   EXPECT_EQ(result, 42u);
 }
 
-TEST(CompilerDirectiveSimulation, MacroExpansionWithinDirectiveAffectsSimulation) {
+TEST(CompilerDirectiveSimulation,
+     MacroExpansionWithinDirectiveAffectsSimulation) {
   auto result = PreprocessAndGet(
       "`define INNER 8'd77\n"
       "`define OUTER `INNER\n"

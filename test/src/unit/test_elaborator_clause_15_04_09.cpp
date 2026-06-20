@@ -45,4 +45,4 @@ TEST(MailboxParameterizedElaborator, ParameterizedWithMethodCalls) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

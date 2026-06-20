@@ -76,12 +76,12 @@ TEST(ProceduralAssignAndControlParsing, ForkJoinAnyWithDisableFork) {
 }
 
 TEST(DisableForkParsing, DisableForkMissingSemicolon) {
-  EXPECT_TRUE(Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    disable fork\n"
-      "  end\n"
-      "endmodule\n").has_errors);
+  EXPECT_TRUE(Parse("module m;\n"
+                    "  initial begin\n"
+                    "    disable fork\n"
+                    "  end\n"
+                    "endmodule\n")
+                  .has_errors);
 }
 
-}
+}  // namespace

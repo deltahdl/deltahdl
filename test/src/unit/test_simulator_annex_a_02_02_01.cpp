@@ -148,4 +148,4 @@ TEST(NetAndVariableTypeSimulation, IntegerVectorTypeBitIsTwoState) {
   EXPECT_EQ(var->value.ToUint64() & 0xFu, 0xAu);
 }
 
-}
+}  // namespace

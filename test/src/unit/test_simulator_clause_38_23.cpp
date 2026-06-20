@@ -98,5 +98,5 @@ TEST_F(VpiIterateSim, IterateNoMatchingObjectsReturnsNull) {
   EXPECT_EQ(vpi_iterate(vpiParameter, mod), nullptr);
 }
 
-}
-}
+}  // namespace
+}  // namespace delta

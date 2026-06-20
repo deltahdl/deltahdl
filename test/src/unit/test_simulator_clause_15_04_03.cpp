@@ -61,7 +61,7 @@ TEST(IpcSync, MailboxPutAfterBlockAppendsAtTail) {
   EXPECT_EQ(mb.Num(), 2);
 
   uint64_t msg = 0;
-  mb.TryGet(msg);                               // frees a slot, removes 10
+  mb.TryGet(msg);  // frees a slot, removes 10
   EXPECT_EQ(msg, 10u);
   EXPECT_EQ(mb.Put(30), MbxPutStatus::kPlaced);  // now stored, at the tail
   EXPECT_EQ(mb.Num(), 2);
@@ -72,4 +72,4 @@ TEST(IpcSync, MailboxPutAfterBlockAppendsAtTail) {
   EXPECT_EQ(msg, 30u);  // the once-blocked message exits last
 }
 
-}
+}  // namespace

@@ -33,4 +33,4 @@ TEST(PackageReferenceLexing, ImportKeywordTokenized) {
   EXPECT_EQ(tokens[4].kind, TokenKind::kSemicolon);
 }
 
-}
+}  // namespace

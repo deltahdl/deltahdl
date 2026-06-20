@@ -37,4 +37,4 @@ TEST(DynamicArraySimulation, DeclWithInitCorrectSize) {
   EXPECT_EQ(v, 4u);
 }
 
-}
+}  // namespace

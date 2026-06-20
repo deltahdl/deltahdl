@@ -40,4 +40,4 @@ TEST(AlwaysCombSynthesis, AlwaysCombIfElseNoLatch) {
   EXPECT_TRUE(aig->latches.empty());
 }
 
-}
+}  // namespace

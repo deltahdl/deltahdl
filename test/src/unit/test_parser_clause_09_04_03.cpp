@@ -84,17 +84,17 @@ TEST(LevelSensitiveEventParsing, WaitConditionNull) {
 }
 
 TEST(LevelSensitiveEventParsing, WaitMissingLParen) {
-  EXPECT_TRUE(Parse(
-      "module m;\n"
-      "  initial wait ready a = 1;\n"
-      "endmodule\n").has_errors);
+  EXPECT_TRUE(Parse("module m;\n"
+                    "  initial wait ready a = 1;\n"
+                    "endmodule\n")
+                  .has_errors);
 }
 
 TEST(LevelSensitiveEventParsing, WaitMissingRParen) {
-  EXPECT_TRUE(Parse(
-      "module m;\n"
-      "  initial wait(ready a = 1;\n"
-      "endmodule\n").has_errors);
+  EXPECT_TRUE(Parse("module m;\n"
+                    "  initial wait(ready a = 1;\n"
+                    "endmodule\n")
+                  .has_errors);
 }
 
-}
+}  // namespace

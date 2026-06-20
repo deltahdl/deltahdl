@@ -37,9 +37,10 @@ TEST_F(DumplimitSysTask, LimitReachedStopsDumpAndInsertsComment) {
     }
   }
   auto content = ReadVcd();
-  EXPECT_NE(content.find("#10\n"), std::string::npos);     // early dump retained
-  EXPECT_NE(content.find("$comment"), std::string::npos);  // limit comment added
-  EXPECT_EQ(content.find("#400\n"), std::string::npos);    // late dumps stopped
+  EXPECT_NE(content.find("#10\n"), std::string::npos);  // early dump retained
+  EXPECT_NE(content.find("$comment"),
+            std::string::npos);                          // limit comment added
+  EXPECT_EQ(content.find("#400\n"), std::string::npos);  // late dumps stopped
 }
 
 // Only one limit comment is written: once the threshold is crossed every later
@@ -70,7 +71,8 @@ TEST_F(DumplimitSysTask, LimitCommentInsertedOnlyOnce) {
        p = content.find("Dump limit of", p + 1)) {
     ++count;
   }
-  EXPECT_EQ(count, 1u);  // marker emitted exactly once despite repeated attempts
+  EXPECT_EQ(count,
+            1u);  // marker emitted exactly once despite repeated attempts
 }
 
 // When the file stays below the configured limit the dumper behaves as if no
@@ -92,10 +94,10 @@ TEST_F(DumplimitSysTask, DumpingContinuesWhenBelowLimit) {
     vcd.DumpChangedValues(0);
   }
   auto content = ReadVcd();
-  EXPECT_EQ(content.find("$comment"), std::string::npos);   // no limit comment
-  EXPECT_NE(content.find("#100\n"), std::string::npos);     // dumping continued
+  EXPECT_EQ(content.find("$comment"), std::string::npos);  // no limit comment
+  EXPECT_NE(content.find("#100\n"), std::string::npos);    // dumping continued
   EXPECT_NE(content.find("b11111111 !"), std::string::npos);  // change written
 }
 
-}
-}
+}  // namespace
+}  // namespace delta

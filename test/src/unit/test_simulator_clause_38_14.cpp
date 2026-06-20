@@ -28,9 +28,9 @@ class VpiGetUserDataSim : public ::testing::Test {
   VpiContext vpi_ctx_;
 };
 
-// §38.14 (the first 'shall'): the routine returns the user-data value a previous
-// vpi_put_userdata() associated with the call instance. The pointer read back is
-// the very one the application stored.
+// §38.14 (the first 'shall'): the routine returns the user-data value a
+// previous vpi_put_userdata() associated with the call instance. The pointer
+// read back is the very one the application stored.
 TEST_F(VpiGetUserDataSim, ReturnsValueAssociatedByPut) {
   VpiHandle call = MakeCall(vpiSysFuncCall);
   int marker = 0;
@@ -41,8 +41,8 @@ TEST_F(VpiGetUserDataSim, ReturnsValueAssociatedByPut) {
 }
 
 // §38.14 (the second 'shall'): when no user data has ever been associated with
-// the object, the return value is NULL. The call handle is valid, so this is the
-// "no user data" case rather than a failure.
+// the object, the return value is NULL. The call handle is valid, so this is
+// the "no user data" case rather than a failure.
 TEST_F(VpiGetUserDataSim, ReturnsNullWhenNothingAssociated) {
   VpiHandle call = MakeCall(vpiSysTaskCall);
 

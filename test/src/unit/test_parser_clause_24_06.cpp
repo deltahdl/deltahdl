@@ -22,7 +22,8 @@ TEST(AnonymousProgramNameSpaceSharing, PackageItemsIncludeAnonymousMembers) {
   EXPECT_EQ(CountItemsByKind(items, ModuleItemKind::kFunctionDecl), 1u);
 }
 
-TEST(AnonymousProgramNameSpaceSharing, CompilationUnitItemsIncludeAnonymousMembers) {
+TEST(AnonymousProgramNameSpaceSharing,
+     CompilationUnitItemsIncludeAnonymousMembers) {
   auto r = Parse(
       "task outer_t(); endtask\n"
       "program;\n"
@@ -32,7 +33,8 @@ TEST(AnonymousProgramNameSpaceSharing, CompilationUnitItemsIncludeAnonymousMembe
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   EXPECT_EQ(CountItemsByKind(r.cu->cu_items, ModuleItemKind::kTaskDecl), 2u);
-  EXPECT_EQ(CountItemsByKind(r.cu->cu_items, ModuleItemKind::kFunctionDecl), 1u);
+  EXPECT_EQ(CountItemsByKind(r.cu->cu_items, ModuleItemKind::kFunctionDecl),
+            1u);
 }
 
 // §24.6 states that an anonymous program declares its items without
@@ -52,4 +54,4 @@ TEST(AnonymousProgramNameSpaceSharing,
   EXPECT_EQ(CountItemsByKind(r.cu->cu_items, ModuleItemKind::kTaskDecl), 1u);
 }
 
-}
+}  // namespace

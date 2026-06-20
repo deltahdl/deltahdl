@@ -83,4 +83,4 @@ TEST(TimeLiteralLexing, UnlistedSuffixIsNotTimeLiteral) {
   EXPECT_EQ(tokens[1].text, "cs");
 }
 
-}
+}  // namespace

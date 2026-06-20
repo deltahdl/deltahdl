@@ -23,9 +23,9 @@ struct FormatArgs {
 // §21.2.1.5: build the hierarchical name that %m expands to -- the name of the
 // design element, subroutine, named block, or labeled statement that contains
 // the system task being run. The name starts at the top-level module and walks
-// down through the chain of instance names recorded on the running process, then
-// through the active subroutine / named-block / labeled-statement scopes that
-// the statement executor tracks in lexical-nesting order.
+// down through the chain of instance names recorded on the running process,
+// then through the active subroutine / named-block / labeled-statement scopes
+// that the statement executor tracks in lexical-nesting order.
 static std::string BuildScopeHierName(SimContext* ctx) {
   if (ctx == nullptr) return "";
   // The empty instance prefix is the top level; its registered type name is the
@@ -137,19 +137,22 @@ static void ReadBit(const Logic4Vec& val, uint32_t i, bool& a, bool& b) {
   b = (val.words[w].bval & mask) != 0;
 }
 
-// §21.2.1.3: examine the bits in [lo, hi) and report which display rule applies.
-// A fully unknown range maps to a lowercase x and a fully high-impedance range
-// to a lowercase z. Any mix of states yields an uppercase character: an unknown
-// bit always wins (uppercase X), and only a high-impedance bit with no unknown
-// bit present yields uppercase Z.
+// §21.2.1.3: examine the bits in [lo, hi) and report which display rule
+// applies. A fully unknown range maps to a lowercase x and a fully
+// high-impedance range to a lowercase z. Any mix of states yields an uppercase
+// character: an unknown bit always wins (uppercase X), and only a
+// high-impedance bit with no unknown bit present yields uppercase Z.
 static XZClass ClassifyBits(const Logic4Vec& val, uint32_t lo, uint32_t hi) {
   bool has_known = false, has_x = false, has_z = false;
   for (uint32_t i = lo; i < hi; ++i) {
     bool a, b;
     ReadBit(val, i, a, b);
-    if (!b) has_known = true;
-    else if (!a) has_x = true;
-    else has_z = true;
+    if (!b)
+      has_known = true;
+    else if (!a)
+      has_x = true;
+    else
+      has_z = true;
   }
   if (!has_x && !has_z) return XZClass::kKnown;
   if (has_x && !has_z && !has_known) return XZClass::kAllX;
@@ -161,11 +164,16 @@ static XZClass ClassifyBits(const Logic4Vec& val, uint32_t lo, uint32_t hi) {
 // known group, signalling that the caller should render the ordinary value.
 static char XZDigitChar(XZClass c) {
   switch (c) {
-    case XZClass::kAllX: return 'x';
-    case XZClass::kAllZ: return 'z';
-    case XZClass::kSomeX: return 'X';
-    case XZClass::kSomeZ: return 'Z';
-    default: return 0;
+    case XZClass::kAllX:
+      return 'x';
+    case XZClass::kAllZ:
+      return 'z';
+    case XZClass::kSomeX:
+      return 'X';
+    case XZClass::kSomeZ:
+      return 'Z';
+    default:
+      return 0;
   }
 }
 
@@ -267,8 +275,7 @@ std::string FormatArg(const Logic4Vec& val, char spec) {
       // user can see what was wrong, and leave the unrecognized pair in the
       // output stream so the misuse does not silently masquerade as a
       // valid rendering of the value.
-      std::fprintf(stderr, "[deltahdl] unknown format specifier: %%%c\n",
-                   spec);
+      std::fprintf(stderr, "[deltahdl] unknown format specifier: %%%c\n", spec);
       return std::string("%") + spec;
   }
 }
@@ -388,8 +395,8 @@ static std::string FormatArgWidth(const Logic4Vec& val, char spec,
   std::string core = FormatArgMinimal(val, norm);
   if (width == 0 || core.size() >= width) return core;
 
-  char pad = (norm == 'h' || norm == 'x' || norm == 'o' || norm == 'b') ? '0'
-                                                                        : ' ';
+  char pad =
+      (norm == 'h' || norm == 'x' || norm == 'o' || norm == 'b') ? '0' : ' ';
   return std::string(width - core.size(), pad) + core;
 }
 
@@ -466,8 +473,7 @@ static bool ProcessFormatSpec(const std::string& fmt, size_t& i,
   }
   if (args.vi < args.vals.size()) {
     if (spec == 't' && args.time_format != nullptr) {
-      out += FormatTimeUnderTimeformat(args.vals[args.vi++],
-                                       *args.time_format);
+      out += FormatTimeUnderTimeformat(args.vals[args.vi++], *args.time_format);
     } else {
       out += FormatArgWidth(args.vals[args.vi++], spec, has_width, width);
     }
@@ -502,4 +508,4 @@ std::string ExtractFormatString(const Expr* first_arg) {
   return std::string(text);
 }
 
-}
+}  // namespace delta

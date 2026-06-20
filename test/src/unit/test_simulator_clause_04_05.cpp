@@ -10,7 +10,8 @@ using namespace delta;
 
 namespace {
 
-TEST(SimulationAlgorithmSim, ExecuteSimulationAdvancesThroughNonemptyTimeSlots) {
+TEST(SimulationAlgorithmSim,
+     ExecuteSimulationAdvancesThroughNonemptyTimeSlots) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<uint64_t> times;
@@ -45,7 +46,9 @@ TEST(SimulationAlgorithmSim, ExecuteSimulationStopsWhenAllTimeSlotsEmpty) {
   EXPECT_FALSE(sched.HasEvents());
 }
 
-TEST(SimulationAlgorithmSim, ExecuteTimeSlotFullRegionOrdering) { VerifyAllRegionOrder(); }
+TEST(SimulationAlgorithmSim, ExecuteTimeSlotFullRegionOrdering) {
+  VerifyAllRegionOrder();
+}
 
 TEST(SimulationAlgorithmSim, ReactiveRestartsActiveSetBeforePrePostponed) {
   Arena arena;
@@ -191,11 +194,11 @@ TEST(SimulationAlgorithmSim, UpdateEventSchedulesEvaluationOfSensitiveProcess) {
 
 TEST(SimulationAlgorithmSim, IterativeRegionsMatchLrmEnumeration) {
   constexpr Region kExpectedIterative[] = {
-      Region::kActive,       Region::kInactive,    Region::kPreNBA,
-      Region::kNBA,          Region::kPostNBA,     Region::kPreObserved,
-      Region::kObserved,     Region::kPostObserved, Region::kReactive,
-      Region::kReInactive,   Region::kPreReNBA,    Region::kReNBA,
-      Region::kPostReNBA,    Region::kPrePostponed};
+      Region::kActive,     Region::kInactive,     Region::kPreNBA,
+      Region::kNBA,        Region::kPostNBA,      Region::kPreObserved,
+      Region::kObserved,   Region::kPostObserved, Region::kReactive,
+      Region::kReInactive, Region::kPreReNBA,     Region::kReNBA,
+      Region::kPostReNBA,  Region::kPrePostponed};
   for (Region r : kExpectedIterative) {
     EXPECT_TRUE(IsIterativeRegion(r))
         << "Expected iterative region: " << static_cast<int>(r);
@@ -262,7 +265,8 @@ TEST(SimulationAlgorithmSim, ActiveInnerLoopReentersWhenNbaSchedulesActive) {
   EXPECT_EQ(order[3], "postponed");
 }
 
-TEST(SimulationAlgorithmSim, ReactiveInnerLoopReentersWhenReNbaSchedulesReactive) {
+TEST(SimulationAlgorithmSim,
+     ReactiveInnerLoopReentersWhenReNbaSchedulesReactive) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
@@ -314,4 +318,4 @@ TEST(SimulationAlgorithmSim, FutureTimeSlotCreatedDuringExecutionIsAdvancedTo) {
   EXPECT_EQ(times[1], 5u);
 }
 
-}
+}  // namespace

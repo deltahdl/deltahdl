@@ -301,4 +301,4 @@ TEST(LexicalConventionParsing, MultipleAttributesOnModule) {
   EXPECT_GE(r.cu->modules[0]->attrs.size(), 2u);
 }
 
-}
+}  // namespace

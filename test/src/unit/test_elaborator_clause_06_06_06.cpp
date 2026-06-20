@@ -65,4 +65,4 @@ TEST(SupplyNetElaboration, Supply1IsNetNotVariable) {
   EXPECT_TRUE(mod->variables.empty());
 }
 
-}
+}  // namespace

@@ -106,4 +106,4 @@ TEST(TimescalePrecedenceElaboration, MixedAcrossModuleAndInterfaceErrors) {
   EXPECT_TRUE(f.has_errors);
 }
 
-}
+}  // namespace

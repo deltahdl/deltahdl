@@ -7,15 +7,16 @@ namespace delta {
 namespace {
 
 // §37.41 Task and function declaration: the object model diagram draws a "task
-// func" object with "function" and "task" specializations. A function reaches its
-// return-capture variable through vpiReturn and carries vpiSigned/vpiSize/
+// func" object with "function" and "task" specializations. A function reaches
+// its return-capture variable through vpiReturn and carries vpiSigned/vpiSize/
 // vpiFuncType; the shared "task func" carries vpiMethod, vpiAccessType,
 // vpiVisibility, vpiVirtual, vpiAutomatic, and the DPI properties vpiDPIPure,
 // vpiDPIContext, vpiDPICStr, and vpiDPICIdentifier. The structural edges
-// (vpiLeftRange/vpiRightRange, io decl, func/task call, class defn, vpiParent) and
-// the bare figure properties are descriptive or generic; the lifetime property
-// vpiAutomatic belongs to §37.3.7 and vpiVirtual is reported generically. These
-// tests pin the twelve numbered Details that constrain the model:
+// (vpiLeftRange/vpiRightRange, io decl, func/task call, class defn, vpiParent)
+// and the bare figure properties are descriptive or generic; the lifetime
+// property vpiAutomatic belongs to §37.3.7 and vpiVirtual is reported
+// generically. These tests pin the twelve numbered Details that constrain the
+// model:
 //   1-3) vpiReturn reaches a return-capture variable, always a var, that also
 //        carries a user-defined return type for inspection;
 //   4)   vpiVisibility falls back to vpiPublicVis;
@@ -23,8 +24,8 @@ namespace {
 //   6-10) the DPI access type, pure, context, flavor, and C-identifier rules;
 //   12)  vpiSize of a function tracks its vpiReturn variable, or 0 for void.
 // Detail 11 (lifetime/memory allocation) is deferred to §37.3.7. The rules run
-// through the production dispatch in vpi.cpp (vpi_handle/vpi_get/vpi_get_str) and
-// the pure helpers it exposes.
+// through the production dispatch in vpi.cpp (vpi_handle/vpi_get/vpi_get_str)
+// and the pure helpers it exposes.
 
 // The fixture installs a context so the public vpi_get/vpi_get_str/vpi_handle
 // entry points run their real dispatch.
@@ -40,8 +41,8 @@ class TaskFuncDeclaration : public ::testing::Test {
 // for a plain scalar return. Details 1-3 collapse to one production branch: the
 // relation hands back exactly the return variable. Reading vpiType off the
 // reached handle is how a caller inspects the return type, including a
-// user-defined one (detail 2); the rule §37.41 carries is that vpiReturn reaches
-// the variable, which this exercises directly.
+// user-defined one (detail 2); the rule §37.41 carries is that vpiReturn
+// reaches the variable, which this exercises directly.
 TEST_F(TaskFuncDeclaration, FunctionReturnReachesReturnCaptureVariable) {
   VpiObject ret;
   ret.type = vpiIntVar;  // detail 3: a var object, even for a simple return
@@ -51,7 +52,7 @@ TEST_F(TaskFuncDeclaration, FunctionReturnReachesReturnCaptureVariable) {
   VpiObject fn;
   fn.type = vpiFunction;
   fn.name = "adder";  // detail 1: same name as the function
-  fn.size = 32;        // detail 1: same size as the function
+  fn.size = 32;       // detail 1: same size as the function
   fn.return_var = &ret;
 
   vpiHandle reached = VpiHandleC(vpiReturn, &fn);
@@ -64,10 +65,10 @@ TEST_F(TaskFuncDeclaration, FunctionReturnReachesReturnCaptureVariable) {
   EXPECT_EQ(vpi_get(vpiSize, reached), 32);
 }
 
-// The vpiReturn relation is gated to a function reference. A task returns nothing,
-// so even a stray return variable on a task is not reached; and because vpiReturn
-// shares its constant value with vpiImmediateAssume, the gate keeps that other
-// meaning from ever landing on this path.
+// The vpiReturn relation is gated to a function reference. A task returns
+// nothing, so even a stray return variable on a task is not reached; and
+// because vpiReturn shares its constant value with vpiImmediateAssume, the gate
+// keeps that other meaning from ever landing on this path.
 TEST_F(TaskFuncDeclaration, ReturnRelationIsGatedToFunctions) {
   VpiObject ret;
   ret.type = vpiIntVar;
@@ -78,9 +79,9 @@ TEST_F(TaskFuncDeclaration, ReturnRelationIsGatedToFunctions) {
   EXPECT_EQ(VpiHandleC(vpiReturn, &task), nullptr);
 }
 
-// Detail 4: a task or function that is not a class member reports vpiPublicVis; a
-// method reports its declared visibility, and a method that is neither local nor
-// protected also reports vpiPublicVis.
+// Detail 4: a task or function that is not a class member reports vpiPublicVis;
+// a method reports its declared visibility, and a method that is neither local
+// nor protected also reports vpiPublicVis.
 TEST_F(TaskFuncDeclaration, VisibilityFallsBackToPublic) {
   // Not a class member -> public regardless of any declared value.
   EXPECT_EQ(VpiTaskFuncVisibility(/*is_class_member=*/false, vpiLocalVis),
@@ -108,9 +109,10 @@ TEST_F(TaskFuncDeclaration, FullNameQualifiedByPackageOrClass) {
   VpiObject class_fn;
   class_fn.type = vpiFunction;
   class_fn.name = "run";
-  class_fn.full_name = VpiClassMemberFullName(/*is_static=*/true, "top", "Driver",
-                                              "run");
-  EXPECT_EQ(std::string(vpi_get_str(vpiFullName, &class_fn)), "top.Driver::run");
+  class_fn.full_name =
+      VpiClassMemberFullName(/*is_static=*/true, "top", "Driver", "run");
+  EXPECT_EQ(std::string(vpi_get_str(vpiFullName, &class_fn)),
+            "top.Driver::run");
 }
 
 // Detail 6: a DPI task or function reports vpiDPIExportAcc when it is an export
@@ -149,8 +151,8 @@ TEST_F(TaskFuncDeclaration, DpiPureReportedForPureImportFunction) {
   EXPECT_EQ(vpi_get(vpiDPIPure, &impure_fn), 0);
 }
 
-// Detail 8: vpiDPIContext reports TRUE for a context import DPI task or function
-// and FALSE otherwise.
+// Detail 8: vpiDPIContext reports TRUE for a context import DPI task or
+// function and FALSE otherwise.
 TEST_F(TaskFuncDeclaration, DpiContextReportedForContextImport) {
   VpiObject ctx_fn;
   ctx_fn.type = vpiFunction;
@@ -164,8 +166,8 @@ TEST_F(TaskFuncDeclaration, DpiContextReportedForContextImport) {
   EXPECT_EQ(vpi_get(vpiDPIContext, &plain_fn), 0);
 }
 
-// Detail 9: vpiDPICStr reports vpiDPIC for a "DPI-C" tf and vpiDPI for a "DPI" tf;
-// a tf that is not a DPI tf carries no flavor.
+// Detail 9: vpiDPICStr reports vpiDPIC for a "DPI-C" tf and vpiDPI for a "DPI"
+// tf; a tf that is not a DPI tf carries no flavor.
 TEST_F(TaskFuncDeclaration, DpiCStrDistinguishesDpiAndDpiC) {
   VpiObject dpi_c;
   dpi_c.type = vpiFunction;
@@ -198,9 +200,9 @@ TEST_F(TaskFuncDeclaration, DpiCIdentifierReportsCLinkageName) {
   EXPECT_EQ(vpi_get_str(vpiDPICIdentifier, &no_id), nullptr);
 }
 
-// Detail 12: vpiSize of a function equals the vpiSize of its return variable when
-// that size is defined and determinable without evaluating the function; a void
-// function reports 0; every other case is undefined (reported here as 0).
+// Detail 12: vpiSize of a function equals the vpiSize of its return variable
+// when that size is defined and determinable without evaluating the function; a
+// void function reports 0; every other case is undefined (reported here as 0).
 TEST_F(TaskFuncDeclaration, FunctionSizeTracksReturnVariableOrZeroForVoid) {
   // Defined and determinable -> the return variable's size.
   EXPECT_EQ(VpiFunctionSize(/*is_void_function=*/false,

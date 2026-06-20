@@ -22,10 +22,10 @@ namespace delta {
 // conjunction in addition to the constant 1 and atomic propositions.
 struct BooleanExpr {
   enum class Kind {
-    kTrue,   // the constant 1
-    kAtom,   // a named atomic proposition
-    kNot,    // !operand
-    kAnd,    // operand_a && operand_b
+    kTrue,  // the constant 1
+    kAtom,  // a named atomic proposition
+    kNot,   // !operand
+    kAnd,   // operand_a && operand_b
   };
 
   Kind kind = Kind::kTrue;
@@ -36,7 +36,8 @@ struct BooleanExpr {
 
 std::shared_ptr<const BooleanExpr> BoolTrue();
 std::shared_ptr<const BooleanExpr> BoolAtom(std::string name);
-std::shared_ptr<const BooleanExpr> BoolNot(std::shared_ptr<const BooleanExpr> a);
+std::shared_ptr<const BooleanExpr> BoolNot(
+    std::shared_ptr<const BooleanExpr> a);
 std::shared_ptr<const BooleanExpr> BoolAnd(
     std::shared_ptr<const BooleanExpr> a, std::shared_ptr<const BooleanExpr> b);
 

@@ -93,4 +93,4 @@ TEST(TimingCheckEventDefSim, RuntimeTimingCheckEntryNegedge) {
   EXPECT_EQ(mgr.GetTimingChecks()[0].ref_edge, SpecifyEdge::kNegedge);
 }
 
-}
+}  // namespace

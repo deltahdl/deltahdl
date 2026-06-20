@@ -62,4 +62,4 @@ TEST(IntegerLiteralPreprocessor, MacroSubstitutionPreservesText) {
   EXPECT_NE(result.find("16"), std::string::npos);
 }
 
-}
+}  // namespace

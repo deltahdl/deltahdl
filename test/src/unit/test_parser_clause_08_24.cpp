@@ -237,4 +237,4 @@ TEST(OutOfBlockDeclParsing, RegularTaskNoMethodClass) {
   EXPECT_TRUE(found);
 }
 
-}
+}  // namespace

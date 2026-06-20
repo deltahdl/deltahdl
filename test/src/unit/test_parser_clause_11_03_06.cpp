@@ -71,4 +71,4 @@ TEST(OperatorAndExpressionParsing, AssignWithTimingControlInExprIsRejected) {
   EXPECT_TRUE(r.has_errors);
 }
 
-}
+}  // namespace

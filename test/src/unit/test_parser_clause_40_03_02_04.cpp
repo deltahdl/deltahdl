@@ -13,4 +13,4 @@ TEST(DataReadApiParsing, CoverageMergeSystemCall) {
   )"));
 }
 
-}
+}  // namespace

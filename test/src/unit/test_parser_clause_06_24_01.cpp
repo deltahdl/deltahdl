@@ -313,4 +313,4 @@ TEST(CastOperatorParsing, UnsignedCastParses) {
   EXPECT_EQ(rhs->kind, ExprKind::kCast);
 }
 
-}
+}  // namespace

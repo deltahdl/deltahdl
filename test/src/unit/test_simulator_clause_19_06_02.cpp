@@ -47,8 +47,7 @@ TEST(Coverage, IgnoreBinsExcludesSelectedCrossProducts) {
   EXPECT_EQ(ignored.size(), 4u);
 
   auto kept = CoverageDB::ExcludeIgnoredCrossProducts(all, ignored);
-  std::vector<std::vector<size_t>> expected = {
-      {0, 0}, {0, 1}, {3, 0}, {3, 1}};
+  std::vector<std::vector<size_t>> expected = {{0, 0}, {0, 1}, {3, 0}, {3, 1}};
   EXPECT_EQ(kept, expected);
 }
 
@@ -61,8 +60,8 @@ TEST(Coverage, EmptyIgnoreSelectionLeavesProductsIntact) {
   EXPECT_EQ(kept, all);
 }
 
-// An ignore_bins select expression that selects every cross product excludes the
-// whole cross from coverage (LRM 19.6.2).
+// An ignore_bins select expression that selects every cross product excludes
+// the whole cross from coverage (LRM 19.6.2).
 TEST(Coverage, IgnoringAllProductsExcludesEverything) {
   auto all = CoverageDB::EnumerateCrossProducts({2, 2});
   auto kept = CoverageDB::ExcludeIgnoredCrossProducts(all, all);
@@ -109,4 +108,4 @@ TEST(Coverage, IgnoredProductNeverRetained) {
       /*also_in_other_cross_bin=*/false));
 }
 
-}
+}  // namespace

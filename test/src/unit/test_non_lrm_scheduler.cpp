@@ -238,4 +238,4 @@ TEST(DesignBuildingBlockParsing, SimTimeOperations) {
   EXPECT_EQ(t3.ticks, 1000u);
 }
 
-}
+}  // namespace

@@ -45,4 +45,4 @@ TEST(ExternModulePreprocessing, ExternFollowedByDefinition) {
   EXPECT_FALSE(r.cu->modules[1]->is_extern);
 }
 
-}
+}  // namespace

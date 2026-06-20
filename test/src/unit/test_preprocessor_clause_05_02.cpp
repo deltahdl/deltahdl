@@ -70,4 +70,4 @@ TEST(LexicalConventionPreprocessor, TabsAndFormfeedsAsWhitespace) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-}
+}  // namespace

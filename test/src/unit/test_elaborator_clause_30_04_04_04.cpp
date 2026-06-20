@@ -79,4 +79,4 @@ TEST(IfnoneConditionElaboration, ErrorCoexistsWithUnconditional) {
   EXPECT_TRUE(f.has_errors);
 }
 
-}
+}  // namespace

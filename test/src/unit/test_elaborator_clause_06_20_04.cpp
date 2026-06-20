@@ -173,4 +173,4 @@ TEST(LocalparamElaboration, LocalparamFollowsOverriddenParameter) {
   EXPECT_TRUE(found);
 }
 
-}
+}  // namespace

@@ -10,11 +10,11 @@ namespace {
 
 Expr* MkTimeformatCall(Arena& arena, int64_t units, int64_t precision,
                        std::string_view suffix, int64_t width) {
-  return MkSysCall(arena, "$timeformat",
-                   {MkInt(arena, static_cast<uint64_t>(units)),
-                    MkInt(arena, static_cast<uint64_t>(precision)),
-                    MkStr(arena, suffix),
-                    MkInt(arena, static_cast<uint64_t>(width))});
+  return MkSysCall(
+      arena, "$timeformat",
+      {MkInt(arena, static_cast<uint64_t>(units)),
+       MkInt(arena, static_cast<uint64_t>(precision)), MkStr(arena, suffix),
+       MkInt(arena, static_cast<uint64_t>(width))});
 }
 
 // Table 20-3 lists default values for $timeformat's arguments. With no call
@@ -133,4 +133,4 @@ TEST(TimeformatSysTask, PercentTScalesTicksToConfiguredUnit) {
   EXPECT_NE(out.find("42.00"), std::string::npos);
 }
 
-}
+}  // namespace

@@ -5,7 +5,8 @@ using namespace delta;
 namespace {
 
 // A.4.1.4 checker_instantiation ::=
-//     ps_checker_identifier name_of_instance ( [ list_of_checker_port_connections ] ) ;
+//     ps_checker_identifier name_of_instance ( [
+//     list_of_checker_port_connections ] ) ;
 // Checker instantiation shares the generic instance-parsing path
 // (ParseModuleInstList) with module/interface/program instantiation, so the
 // parsed item is recorded as kModuleInst. These tests pin every §A.4.1.4
@@ -187,10 +188,10 @@ TEST(CheckerInstantiationGrammar, PackageScopedCheckerInst) {
 
 // The trailing `;` of checker_instantiation is mandatory.
 TEST(CheckerInstantiationGrammar, Error_MissingSemicolon) {
-  EXPECT_FALSE(ParseOk(
-      "checker my_chk;\n"
-      "endchecker\n"
-      "module m; my_chk u0() endmodule\n"));
+  EXPECT_FALSE(
+      ParseOk("checker my_chk;\n"
+              "endchecker\n"
+              "module m; my_chk u0() endmodule\n"));
 }
 
 // list_of_checker_port_connections is either an all-ordered list or an
@@ -207,4 +208,4 @@ TEST(CheckerInstantiationGrammar, Error_MixedOrderedAndNamedPorts) {
   EXPECT_TRUE(r.has_errors);
 }
 
-}
+}  // namespace

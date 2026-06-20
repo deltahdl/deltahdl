@@ -103,4 +103,4 @@ TEST(TaskElaboration, RefStaticQualifierStickyInheritedAtElaboration) {
   EXPECT_TRUE(tk->func_args[1].is_ref_static);
 }
 
-}
+}  // namespace

@@ -44,4 +44,4 @@ TEST(ChargeDecayElaboration, ThirdDelayBecomesDecayTicks) {
   EXPECT_TRUE(found);
 }
 
-}
+}  // namespace

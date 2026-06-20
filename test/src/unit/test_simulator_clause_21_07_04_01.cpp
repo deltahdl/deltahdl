@@ -72,7 +72,8 @@ TEST_F(ExtendedVcdSyntaxSim, ExtendedFileReusesFourStateConstructNames) {
   EXPECT_NE(content.find("$upscope $end"), std::string::npos);
   EXPECT_NE(content.find("$enddefinitions $end"), std::string::npos);
   // The extended-only keyword command is what distinguishes this from a 4-state
-  // file, so the equivalence above is being observed on a genuine extended file.
+  // file, so the equivalence above is being observed on a genuine extended
+  // file.
   EXPECT_NE(content.find("$vcdclose #500 $end"), std::string::npos);
 }
 
@@ -124,11 +125,11 @@ TEST_F(ExtendedVcdSyntaxSim, ExtendedDumpsWholeVectorNotPartialSelection) {
 }
 
 // §21.7.4.1: port value changes are given in binary form as one of 0, 1, x, or
-// z. Exercise all four logic states on an extended writer, including the unknown
-// (x) and high-impedance (z) edge cases, confirming each maps to its value
-// character against the registration-ordered identifier codes. (The clause also
-// states a value carries strength information; the writer does not model port
-// strength, so only the binary-character rule is observed here.)
+// z. Exercise all four logic states on an extended writer, including the
+// unknown (x) and high-impedance (z) edge cases, confirming each maps to its
+// value character against the registration-ordered identifier codes. (The
+// clause also states a value carries strength information; the writer does not
+// model port strength, so only the binary-character rule is observed here.)
 TEST_F(ExtendedVcdSyntaxSim, ExtendedScalarPortValuesUseBinaryCharacters) {
   {
     VcdWriter vcd(tmp_path_);
@@ -168,11 +169,11 @@ TEST_F(ExtendedVcdSyntaxSim, ExtendedOnlyListsPortsThatChanged) {
     auto* changed = arena_.Create<Variable>();
     changed->value = MakeBits(arena_, 8, 0x3C);
     changed->prev_value = MakeBits(arena_, 8, 0x00);  // differs -> changed
-    vcd.RegisterSignal("moved", 8, changed);  // ident '!'
+    vcd.RegisterSignal("moved", 8, changed);          // ident '!'
     auto* steady = arena_.Create<Variable>();
     steady->value = MakeBits(arena_, 8, 0xA5);
     steady->prev_value = MakeBits(arena_, 8, 0xA5);  // equal -> unchanged
-    vcd.RegisterSignal("still", 8, steady);  // ident '"'
+    vcd.RegisterSignal("still", 8, steady);          // ident '"'
     vcd.EndDefinitions();
     vcd.WriteTimestamp(100);
     vcd.DumpChangedValues(0);
@@ -202,8 +203,8 @@ TEST_F(ExtendedVcdSyntaxSim, ExtendedSimulationTimesAreAbsolute) {
   EXPECT_EQ(content.find("#150"), std::string::npos);
 }
 
-// §21.7.4.1: a real number is dumped with a %.16g format so all 53 mantissa bits
-// survive. A %g-only formatter would truncate 1/3 to "0.333333".
+// §21.7.4.1: a real number is dumped with a %.16g format so all 53 mantissa
+// bits survive. A %g-only formatter would truncate 1/3 to "0.333333".
 TEST_F(ExtendedVcdSyntaxSim, ExtendedRealUsesFullPrecision) {
   {
     VcdWriter vcd(tmp_path_);

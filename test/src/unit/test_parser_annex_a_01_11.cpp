@@ -291,47 +291,47 @@ TEST(PackageItemsParsing, MultipleAnonymousPrograms) {
 }
 
 TEST(PackageItemsParsing, ErrorAnonymousProgramWithPorts) {
-  EXPECT_FALSE(ParseOk(
-      "package pkg;\n"
-      "  program(input clk);\n"
-      "  endprogram\n"
-      "endpackage\n"));
+  EXPECT_FALSE(
+      ParseOk("package pkg;\n"
+              "  program(input clk);\n"
+              "  endprogram\n"
+              "endpackage\n"));
 }
 
 TEST(PackageItemsParsing, ErrorAnonymousProgramMissingEndprogram) {
-  EXPECT_FALSE(ParseOk(
-      "package pkg;\n"
-      "  program;\n"
-      "    task t(); endtask\n"
-      "endpackage\n"));
+  EXPECT_FALSE(
+      ParseOk("package pkg;\n"
+              "  program;\n"
+              "    task t(); endtask\n"
+              "endpackage\n"));
 }
 
 TEST(PackageItemsParsing, ErrorAnonymousProgramWithName) {
-  EXPECT_FALSE(ParseOk(
-      "package pkg;\n"
-      "  program named_prog;\n"
-      "  endprogram\n"
-      "endpackage\n"));
+  EXPECT_FALSE(
+      ParseOk("package pkg;\n"
+              "  program named_prog;\n"
+              "  endprogram\n"
+              "endpackage\n"));
 }
 
 // net_declaration is not a legal anonymous_program_item.
 TEST(PackageItemsParsing, ErrorAnonymousProgramWithNetDecl) {
-  EXPECT_FALSE(ParseOk(
-      "package pkg;\n"
-      "  program;\n"
-      "    wire w;\n"
-      "  endprogram\n"
-      "endpackage\n"));
+  EXPECT_FALSE(
+      ParseOk("package pkg;\n"
+              "  program;\n"
+              "    wire w;\n"
+              "  endprogram\n"
+              "endpackage\n"));
 }
 
 // data_declaration is not a legal anonymous_program_item.
 TEST(PackageItemsParsing, ErrorAnonymousProgramWithDataDecl) {
-  EXPECT_FALSE(ParseOk(
-      "package pkg;\n"
-      "  program;\n"
-      "    int x;\n"
-      "  endprogram\n"
-      "endpackage\n"));
+  EXPECT_FALSE(
+      ParseOk("package pkg;\n"
+              "  program;\n"
+              "    int x;\n"
+              "  endprogram\n"
+              "endpackage\n"));
 }
 
 }  // namespace

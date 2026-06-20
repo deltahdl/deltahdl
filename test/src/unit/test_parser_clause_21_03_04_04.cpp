@@ -28,4 +28,4 @@ TEST(IoSystemTaskParsing, FreadWithStartCount) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

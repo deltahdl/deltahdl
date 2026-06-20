@@ -23,8 +23,8 @@ struct NexttimeIndex {
 NexttimeIndex MakeNexttimeIndex(long long value);
 
 // §16.12.10: the number of clock ticks shall be a non-negative integer constant
-// expression. All three conditions must hold: the index folds to a constant, the
-// constant is an integer, and the integer value is not negative.
+// expression. All three conditions must hold: the index folds to a constant,
+// the constant is an integer, and the integer value is not negative.
 bool IsNexttimeIndexWellFormed(const NexttimeIndex& index);
 
 }  // namespace delta

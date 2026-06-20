@@ -530,4 +530,4 @@ TEST(InterconnectParsing, StrengthSpecIsError) {
   EXPECT_FALSE(ParseOk("module m; interconnect (small) w; endmodule\n"));
 }
 
-}
+}  // namespace

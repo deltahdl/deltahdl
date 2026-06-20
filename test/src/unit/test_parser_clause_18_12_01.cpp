@@ -39,4 +39,4 @@ TEST(SubroutineCallExprParsing, StdRandomizeCall) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}
+}  // namespace

@@ -210,4 +210,4 @@ TEST(BlockingAssignParsing, IntraAssignmentEventControlForm) {
   EXPECT_NE(stmt->rhs, nullptr);
 }
 
-}
+}  // namespace

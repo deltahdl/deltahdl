@@ -154,4 +154,4 @@ TEST(TaskSim, FormalArgInheritedTypeRoundTripsFullWidth) {
   EXPECT_EQ(val, 0x5Au);
 }
 
-}
+}  // namespace

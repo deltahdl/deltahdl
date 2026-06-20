@@ -487,4 +487,4 @@ TEST(LvalueParsing, NonrangeVarLvalueWithPackageScope) {
   EXPECT_EQ(stmt->lhs->kind, ExprKind::kMemberAccess);
 }
 
-}
+}  // namespace

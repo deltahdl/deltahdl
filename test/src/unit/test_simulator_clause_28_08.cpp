@@ -229,4 +229,4 @@ TEST(SwitchProcessing, BidirectionalPropagationIgnoresControlDelaySpec) {
   EXPECT_EQ(ValOf(*np.vb), kVal1);
 }
 
-}
+}  // namespace

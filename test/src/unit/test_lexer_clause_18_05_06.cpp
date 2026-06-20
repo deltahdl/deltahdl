@@ -19,4 +19,4 @@ TEST(ConstraintIfElseLexing, ElseKeywordRecognised) {
   EXPECT_EQ(r.token.kind, TokenKind::kKwElse);
 }
 
-}
+}  // namespace

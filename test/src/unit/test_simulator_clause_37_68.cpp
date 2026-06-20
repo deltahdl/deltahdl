@@ -6,13 +6,14 @@
 namespace delta {
 namespace {
 
-// §37.68 Delay control: the object model diagram draws a delay control "#" object
-// with a vpiDelay relation (to an expression, plus the delay set reached via
-// vpi_get_delays(), §38.10) and a vpiStmt edge to a statement. The clause's sole
-// numbered Detail (D1) governs that statement edge: when the delay control is
-// associated with an assignment, the statement shall always be NULL. These tests
-// observe the production code that applies that rule (VpiDelayControlStmt) both
-// directly and through the public VpiHandleC(vpiStmt, ...) dispatch path.
+// §37.68 Delay control: the object model diagram draws a delay control "#"
+// object with a vpiDelay relation (to an expression, plus the delay set reached
+// via vpi_get_delays(), §38.10) and a vpiStmt edge to a statement. The clause's
+// sole numbered Detail (D1) governs that statement edge: when the delay control
+// is associated with an assignment, the statement shall always be NULL. These
+// tests observe the production code that applies that rule
+// (VpiDelayControlStmt) both directly and through the public
+// VpiHandleC(vpiStmt, ...) dispatch path.
 
 // The fixture installs a context so the public VpiHandleC entry point runs its
 // real dispatch over the test objects.
@@ -45,8 +46,8 @@ TEST_F(DelayControl, StandaloneDelayControlReachesItsStatement) {
   EXPECT_EQ(VpiDelayControlStmt(&delay_control), &stmt);
 }
 
-// D1 edge: a null handle and a delay control with no statement child both report
-// no statement.
+// D1 edge: a null handle and a delay control with no statement child both
+// report no statement.
 TEST_F(DelayControl, NullAndEmptyDelayControlsReportNoStatement) {
   EXPECT_EQ(VpiDelayControlStmt(nullptr), nullptr);
 

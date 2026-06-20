@@ -22,8 +22,9 @@ TEST(ExpectStatement, PendingKeepsProcessBlocked) {
 TEST(ExpectStatement, SuccessTakesPassArm) {
   EXPECT_EQ(ResolveExpectAction(PropertyResult::kPass, /*has_else=*/true),
             ExpectActionKind::kRunPass);
-  EXPECT_EQ(ResolveExpectAction(PropertyResult::kVacuousPass, /*has_else=*/false),
-            ExpectActionKind::kRunPass);
+  EXPECT_EQ(
+      ResolveExpectAction(PropertyResult::kVacuousPass, /*has_else=*/false),
+      ExpectActionKind::kRunPass);
   EXPECT_FALSE(ExpectProcessRemainsBlocked(PropertyResult::kPass));
 }
 
@@ -39,7 +40,8 @@ TEST(ExpectStatement, PendingBlocksRegardlessOfElseClause) {
 }
 
 // §16.17: success unblocks the process and runs the pass arm. A vacuous pass is
-// a success, so it likewise unblocks the process rather than keeping it waiting.
+// a success, so it likewise unblocks the process rather than keeping it
+// waiting.
 TEST(ExpectStatement, VacuousPassUnblocksProcess) {
   EXPECT_FALSE(ExpectProcessRemainsBlocked(PropertyResult::kVacuousPass));
 }
@@ -78,4 +80,4 @@ TEST(ExpectStatement, ResumesAfterObservedInReactiveRegion) {
   EXPECT_EQ(ExpectResumeRegion(), Region::kReactive);
 }
 
-}
+}  // namespace

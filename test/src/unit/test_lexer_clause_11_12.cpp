@@ -78,4 +78,4 @@ TEST(LetKeywordLexing, UntypedInLetPortTokenSequence) {
   EXPECT_EQ(tokens[5].kind, TokenKind::kRParen);
 }
 
-}
+}  // namespace

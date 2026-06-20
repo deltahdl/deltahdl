@@ -169,4 +169,4 @@ TEST(SyncDriveElab, IntraAssignDelayOnBitSelectDriveErrors) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

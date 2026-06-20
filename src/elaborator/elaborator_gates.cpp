@@ -88,12 +88,11 @@ void ValidateBidirectionalSwitchConnections(
     }
   }
 
-  bool is_resistive = (kind == GateKind::kRtran ||
-                       kind == GateKind::kRtranif0 ||
-                       kind == GateKind::kRtranif1);
+  bool is_resistive =
+      (kind == GateKind::kRtran || kind == GateKind::kRtranif0 ||
+       kind == GateKind::kRtranif1);
   if (is_resistive) {
     for (size_t i = 0; i < 2; ++i) {
-
       auto* net = TerminalNet(terms[i], mod);
       if (net && net->is_user_nettype) {
         diag.Error(item->loc,
@@ -109,10 +108,9 @@ void ValidateBidirectionalSwitchConnections(
     }
   }
 
-  bool has_control = (kind == GateKind::kTranif0 ||
-                      kind == GateKind::kTranif1 ||
-                      kind == GateKind::kRtranif0 ||
-                      kind == GateKind::kRtranif1);
+  bool has_control =
+      (kind == GateKind::kTranif0 || kind == GateKind::kTranif1 ||
+       kind == GateKind::kRtranif0 || kind == GateKind::kRtranif1);
   if (has_control && terms.size() >= 3) {
     if (auto* bad = DisallowedControlVariableKind(terms[2], mod)) {
       diag.Error(item->loc,
@@ -149,7 +147,6 @@ static std::vector<size_t> OutputOrInoutTerminalIndices(GateKind kind,
   switch (kind) {
     case GateKind::kBuf:
     case GateKind::kNot: {
-
       std::vector<size_t> outs;
       for (size_t i = 0; i + 1 < nterms; ++i) outs.push_back(i);
       return outs;
@@ -235,7 +232,6 @@ static Expr* MakeTernary(Arena& arena, Expr* cond, Expr* t, Expr* f) {
 
 static Expr* BuildNInputGateExpr(Arena& arena, GateKind kind,
                                  const std::vector<Expr*>& terminals) {
-
   std::vector<Expr*> inputs(terminals.begin() + 1, terminals.end());
   TokenKind op = TokenKind::kAmp;
   bool invert = false;
@@ -297,8 +293,7 @@ void ElaborateGateInst(ModuleItem* item, RtlirModule* mod, Arena& arena) {
     if (terms.size() < 2) return;
     auto* input = terms.back();
     for (size_t i = 0; i + 1 < terms.size(); ++i) {
-      Expr* rhs =
-          (kind == GateKind::kNot) ? WrapInvert(arena, input) : input;
+      Expr* rhs = (kind == GateKind::kNot) ? WrapInvert(arena, input) : input;
       RtlirContAssign ca;
       ca.lhs = terms[i];
       ca.rhs = rhs;
@@ -314,8 +309,7 @@ void ElaborateGateInst(ModuleItem* item, RtlirModule* mod, Arena& arena) {
     if (terms.size() != 3) return;
     auto* data = terms[1];
     auto* ctrl = terms[2];
-    bool invert =
-        (kind == GateKind::kNotif0 || kind == GateKind::kNotif1);
+    bool invert = (kind == GateKind::kNotif0 || kind == GateKind::kNotif1);
     bool conduct_on_one =
         (kind == GateKind::kBufif1 || kind == GateKind::kNotif1);
     Expr* pass = invert ? WrapInvert(arena, data) : data;
@@ -342,8 +336,7 @@ void ElaborateGateInst(ModuleItem* item, RtlirModule* mod, Arena& arena) {
     if (terms.size() != 3) return;
     auto* data = terms[1];
     auto* ctrl = terms[2];
-    bool conduct_on_one =
-        (kind == GateKind::kNmos || kind == GateKind::kRnmos);
+    bool conduct_on_one = (kind == GateKind::kNmos || kind == GateKind::kRnmos);
     Expr* hi_z = MakeHighZ(arena);
     Expr* rhs = conduct_on_one ? MakeTernary(arena, ctrl, data, hi_z)
                                : MakeTernary(arena, ctrl, hi_z, data);
@@ -427,4 +420,4 @@ void ElaborateGateInst(ModuleItem* item, RtlirModule* mod, Arena& arena) {
   mod->assigns.push_back(ca);
 }
 
-}
+}  // namespace delta

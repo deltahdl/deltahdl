@@ -272,4 +272,4 @@ TEST(TwoStateAndFourState, MultiWordFourToTwoStateZeroesXz) {
   EXPECT_EQ(dst->value.words[1].aval, 0ull);
 }
 
-}
+}  // namespace

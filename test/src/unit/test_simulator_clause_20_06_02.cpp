@@ -93,4 +93,4 @@ TEST(PrimarySim, BitsOfPackedStructTypedefMatchesMemberSum) {
   EXPECT_EQ(w_var->value.ToUint64(), 9u);
 }
 
-}
+}  // namespace

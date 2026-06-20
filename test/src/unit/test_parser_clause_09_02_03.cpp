@@ -131,4 +131,4 @@ TEST(FinalProcedureParsing, SourceLocationTracked) {
   EXPECT_NE(item->loc.file_id, FileId{});
 }
 
-}
+}  // namespace

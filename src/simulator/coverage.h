@@ -373,9 +373,9 @@ class CoverageDB {
 
   // binsof yields the bins of its expression. With bin_index < 0 the argument
   // is a coverpoint (binsof(cp)) and every bin of the coverpoint is yielded;
-  // with bin_index >= 0 the argument is a single coverpoint bin (binsof(cp.bin))
-  // and only that one bin is yielded. The yielded bins are returned as their
-  // associated value sets (LRM 19.6.1).
+  // with bin_index >= 0 the argument is a single coverpoint bin
+  // (binsof(cp.bin)) and only that one bin is yielded. The yielded bins are
+  // returned as their associated value sets (LRM 19.6.1).
   static std::vector<std::vector<int64_t>> BinsofYield(const CoverPoint* cp,
                                                        int64_t bin_index = -1);
 
@@ -446,15 +446,16 @@ class CoverageDB {
       const std::function<bool(const std::vector<int64_t>&)>& pred);
 
   // Selects, from a list of candidate bin tuples, those a select_expression
-  // keeps. Each candidate is one value set per coverpoint. When pred is null the
-  // select_expression is a bare cross_identifier, which selects every candidate
-  // bin tuple. When pred is given (a with clause) a candidate is kept only when
-  // its satisfying value tuple count meets the matches policy: every value tuple
-  // for the $ form (require_all), otherwise at least min_count, which is one
-  // when no matches clause was written. Returns the indices of the kept
-  // candidates, in order (LRM 19.6.1.2).
+  // keeps. Each candidate is one value set per coverpoint. When pred is null
+  // the select_expression is a bare cross_identifier, which selects every
+  // candidate bin tuple. When pred is given (a with clause) a candidate is kept
+  // only when its satisfying value tuple count meets the matches policy: every
+  // value tuple for the $ form (require_all), otherwise at least min_count,
+  // which is one when no matches clause was written. Returns the indices of the
+  // kept candidates, in order (LRM 19.6.1.2).
   static std::vector<size_t> SelectCrossBinTuples(
-      const std::vector<std::vector<std::vector<int64_t>>>& candidate_bin_tuples,
+      const std::vector<std::vector<std::vector<int64_t>>>&
+          candidate_bin_tuples,
       const std::function<bool(const std::vector<int64_t>&)>* pred,
       const CrossWithMatchPolicy& policy);
 
@@ -462,31 +463,31 @@ class CoverageDB {
 
   // Excludes from coverage every cross product an ignore_bins select expression
   // selects. The select expression has already been evaluated to its set of
-  // cross products by the LRM 19.6.1 machinery; this removes those products from
-  // a given set, so that all cross products satisfying the select expression are
-  // excluded from coverage. Each cross product is a tuple of chosen bin indices,
-  // one per coverpoint. The surviving products keep their original order
-  // (LRM 19.6.2).
+  // cross products by the LRM 19.6.1 machinery; this removes those products
+  // from a given set, so that all cross products satisfying the select
+  // expression are excluded from coverage. Each cross product is a tuple of
+  // chosen bin indices, one per coverpoint. The surviving products keep their
+  // original order (LRM 19.6.2).
   static std::vector<std::vector<size_t>> ExcludeIgnoredCrossProducts(
       const std::vector<std::vector<size_t>>& products,
       const std::vector<std::vector<size_t>>& ignored);
 
   // Whether a cross product selected by an ignore_bins select expression is
-  // still retained when some other cross coverage bin of the same cross includes
-  // it. Ignored cross products are excluded even if they are included in another
-  // cross coverage bin of the enclosing cross, so this always returns false
-  // regardless of the other-bin membership (LRM 19.6.2).
+  // still retained when some other cross coverage bin of the same cross
+  // includes it. Ignored cross products are excluded even if they are included
+  // in another cross coverage bin of the enclosing cross, so this always
+  // returns false regardless of the other-bin membership (LRM 19.6.2).
   static bool IgnoredCrossProductRetained(bool also_in_other_cross_bin);
 
   // --- LRM 19.6.3: specifying illegal cross products ------------------------
 
-  // Excludes from coverage every cross product an illegal_bins select expression
-  // selects. The select expression has already been evaluated to its set of
-  // cross products by the LRM 19.6.1 machinery; this removes those products from
-  // a given set, exactly as the ignore_bins case does, so that all cross
-  // products satisfying the select expression are excluded from coverage. Each
-  // cross product is a tuple of chosen bin indices, one per coverpoint; the
-  // surviving products keep their original order (LRM 19.6.3).
+  // Excludes from coverage every cross product an illegal_bins select
+  // expression selects. The select expression has already been evaluated to its
+  // set of cross products by the LRM 19.6.1 machinery; this removes those
+  // products from a given set, exactly as the ignore_bins case does, so that
+  // all cross products satisfying the select expression are excluded from
+  // coverage. Each cross product is a tuple of chosen bin indices, one per
+  // coverpoint; the surviving products keep their original order (LRM 19.6.3).
   static std::vector<std::vector<size_t>> ExcludeIllegalCrossProducts(
       const std::vector<std::vector<size_t>>& products,
       const std::vector<std::vector<size_t>>& illegal);
@@ -648,8 +649,8 @@ class CoverageDB {
   // other nondefault transition bin of the coverpoint increments on that sample
   // and none of the coverpoint's previously pending transition sequences
   // remains pending (LRM 19.5.2).
-  static bool DefaultSequenceTransitionIncrements(bool any_nondefault_incremented,
-                                                  bool any_pending);
+  static bool DefaultSequenceTransitionIncrements(
+      bool any_nondefault_incremented, bool any_pending);
 
   // --- LRM 19.5.3: automatic bin creation for integral coverage points ------
 
@@ -660,30 +661,31 @@ class CoverageDB {
 
   // Number of automatic bins N for a non-enumeration integral coverpoint: the
   // minimum of 2^M (M is the number of bits needed to represent the coverpoint)
-  // and the auto_bin_max option in effect. This same N is the denominator of the
-  // automatic-bin coverpoint coverage, MIN(auto_bin_max, 2^M) (LRM 19.11.1), so
-  // the two subclauses share this count.
+  // and the auto_bin_max option in effect. This same N is the denominator of
+  // the automatic-bin coverpoint coverage, MIN(auto_bin_max, 2^M)
+  // (LRM 19.11.1), so the two subclauses share this count.
   static uint64_t AutoBinCount(uint32_t coverpoint_bits, uint64_t auto_bin_max);
 
   // Number of automatic bins for an enumeration coverpoint: one bin per
-  // enumeration member, i.e. the cardinality of the enumeration. The auto_bin_max
-  // limit does not apply to an enumeration coverpoint (LRM 19.5.3).
+  // enumeration member, i.e. the cardinality of the enumeration. The
+  // auto_bin_max limit does not apply to an enumeration coverpoint
+  // (LRM 19.5.3).
   static uint64_t AutoBinCountEnum(uint64_t enum_cardinality);
 
-  // A sampled value is collected into an automatic bin only when it is a 2-state
-  // value; a value containing x or z is excluded. Returns true when a sample
-  // with the given unknown-bit status is eligible for an automatic bin
+  // A sampled value is collected into an automatic bin only when it is a
+  // 2-state value; a value containing x or z is excluded. Returns true when a
+  // sample with the given unknown-bit status is eligible for an automatic bin
   // (LRM 19.5.3).
   static bool AutoBinSampleIncluded(bool sample_has_xz);
 
   // Name of an automatically created bin: "auto[value]" when the bin holds a
-  // single coverage point value (low == high) and "auto[low:high]" when it spans
-  // a range of values (LRM 19.5.3).
+  // single coverage point value (low == high) and "auto[low:high]" when it
+  // spans a range of values (LRM 19.5.3).
   static std::string AutoBinName(int64_t low, int64_t high);
 
   // Name of an automatically created bin of an enumeration coverpoint. The name
-  // embeds the named constant associated with the enumerated value rather than a
-  // numeric value: "auto[NAME]" (LRM 19.5.3).
+  // embeds the named constant associated with the enumerated value rather than
+  // a numeric value: "auto[NAME]" (LRM 19.5.3).
   static std::string AutoEnumBinName(std::string_view constant_name);
 
   // --- LRM 19.5.4: wildcard specification of coverage point bins ------------
@@ -692,10 +694,10 @@ class CoverageDB {
   // matches. In a wildcard bin every x, z, or ? bit position is a wildcard that
   // matches both 0 and 1; the remaining bits must match exactly. The fixed bits
   // are supplied as `pattern` and marked by the set bits of `care_mask` (a set
-  // mask bit denotes a fixed position); the cleared mask bits within `width` are
-  // the wildcards. The result enumerates every value obtained by filling the
-  // wildcard positions with all combinations of 0 and 1, e.g. 4'b11?? yields
-  // 12, 13, 14, 15 (LRM 19.5.4).
+  // mask bit denotes a fixed position); the cleared mask bits within `width`
+  // are the wildcards. The result enumerates every value obtained by filling
+  // the wildcard positions with all combinations of 0 and 1, e.g. 4'b11??
+  // yields 12, 13, 14, 15 (LRM 19.5.4).
   static std::vector<int64_t> ExpandWildcardValue(int64_t pattern,
                                                   uint64_t care_mask,
                                                   uint32_t width);
@@ -789,7 +791,8 @@ class CoverageDB {
   // reduced to the type's width and reinterpreted as signed or unsigned. This
   // is the cast LRM 19.5.7 b requires before a bin value is compared with a
   // sampled value.
-  static int64_t CastToEffectiveType(int64_t value, CoverpointEffectiveType eff);
+  static int64_t CastToEffectiveType(int64_t value,
+                                     CoverpointEffectiveType eff);
 
   // Lowest and highest value expressible by an effective type — the closed
   // domain a bin value can occupy after the cast of LRM 19.5.7 b. A range bin
@@ -906,16 +909,16 @@ class CoverageDB {
 
   // The ref-int pair form of get_coverage()/get_inst_coverage() applied to a
   // coverpoint: reports the number of covered bins and the number of bins that
-  // participate in the coverage (the numerator and denominator of the coverpoint
-  // coverage). When the denominator is zero, zero is reported for both counts
-  // (LRM 19.11.1).
+  // participate in the coverage (the numerator and denominator of the
+  // coverpoint coverage). When the denominator is zero, zero is reported for
+  // both counts (LRM 19.11.1).
   static double GetPointCoverage(const CoverPoint* cp, int32_t& covered_bins,
                                  int32_t& total_bins);
 
   // The hit-count threshold a bin must reach to be considered covered in
-  // cumulative (type) coverage: the maximum of the at_least option values across
-  // all instances, which is the more conservative choice. With no instance
-  // values supplied the default at_least of 1 applies (LRM 19.11.1).
+  // cumulative (type) coverage: the maximum of the at_least option values
+  // across all instances, which is the more conservative choice. With no
+  // instance values supplied the default at_least of 1 applies (LRM 19.11.1).
   static uint32_t CumulativeAtLeast(
       const std::vector<uint32_t>& at_least_values);
 
@@ -924,20 +927,20 @@ class CoverageDB {
   // The number of automatically generated cross bins B_c of a cross. It is the
   // product of the bin cardinalities B_j of the crossed coverpoints — the total
   // number of cross products ∏ B_j — less the number of cross products B_b that
-  // are comprised by user-defined cross bins, since those products are accounted
-  // for by the user-defined bins rather than by auto-cross bins. A crossed
-  // coverpoint with no bins makes the product, and therefore B_c, zero (LRM
-  // 19.11.2).
+  // are comprised by user-defined cross bins, since those products are
+  // accounted for by the user-defined bins rather than by auto-cross bins. A
+  // crossed coverpoint with no bins makes the product, and therefore B_c, zero
+  // (LRM 19.11.2).
   static uint64_t CrossAutoBinCount(
       const std::vector<uint64_t>& per_point_bin_counts,
       uint64_t user_defined_cross_products);
 
   // The denominator of the cross coverage equation, B_c + B_u, where B_c is the
   // number of auto-cross bins (CrossAutoBinCount) and B_u is the number of
-  // significant user-defined cross bins — those that contribute toward coverage.
-  // Cross bins arising from ignore_bins and illegal_bins select expressions do
-  // not contribute and are excluded from B_u by the caller; only counting cross
-  // bins are passed here (LRM 19.11.2).
+  // significant user-defined cross bins — those that contribute toward
+  // coverage. Cross bins arising from ignore_bins and illegal_bins select
+  // expressions do not contribute and are excluded from B_u by the caller; only
+  // counting cross bins are passed here (LRM 19.11.2).
   static uint64_t CrossCoverageDenominator(
       const std::vector<uint64_t>& per_point_bin_counts,
       uint64_t user_defined_cross_products, uint64_t significant_user_bins);
@@ -949,10 +952,10 @@ class CoverageDB {
   // definition of B_u).
   static bool CrossBinCountsTowardCoverage(CrossSampleOutcome outcome);
 
-  // True when a cross's coverage denominator B_c + B_u is zero: the cross has no
-  // auto-cross bins and no significant user-defined cross bins. Such a cross does
-  // not contribute to the parent covergroup's coverage computation, and its own
-  // get_coverage value depends only on its weight (LRM 19.11.2).
+  // True when a cross's coverage denominator B_c + B_u is zero: the cross has
+  // no auto-cross bins and no significant user-defined cross bins. Such a cross
+  // does not contribute to the parent covergroup's coverage computation, and
+  // its own get_coverage value depends only on its weight (LRM 19.11.2).
   static bool CrossCoverageDenominatorZero(const CrossCover* cross);
 
   // The ref-int pair form of get_coverage()/get_inst_coverage() applied to a
@@ -990,7 +993,8 @@ class CoverageDB {
   // name appears among the derived covergroup's coverpoint names as excluded so
   // the covergroup average (LRM 19.11) drops it (LRM 19.4.1).
   static void ApplyDerivedCoverpointOverrides(
-      CoverGroup* base, const std::vector<std::string>& derived_coverpoint_names);
+      CoverGroup* base,
+      const std::vector<std::string>& derived_coverpoint_names);
 
   // Even when a base coverpoint no longer contributes, a cross in the base
   // covergroup that includes that coverpoint still contributes to the
@@ -1022,4 +1026,4 @@ class CoverageDB {
   std::string coverage_db_name_;
 };
 
-}
+}  // namespace delta

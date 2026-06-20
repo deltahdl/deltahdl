@@ -113,4 +113,4 @@ TEST(TimingControlOperatorLexing, ArrowVsDashGtGtDisambiguation) {
   EXPECT_EQ(tokens[1].kind, TokenKind::kDashGtGt);
 }
 
-}
+}  // namespace

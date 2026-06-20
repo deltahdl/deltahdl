@@ -42,4 +42,4 @@ TEST(DisableStatementSynthesis, RejectDisableInAlwaysFF) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-}
+}  // namespace

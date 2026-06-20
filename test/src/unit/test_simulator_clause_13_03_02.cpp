@@ -130,4 +130,4 @@ TEST(TaskMemorySim, StaticTaskStorageIsPerInstance) {
   LowerRunAndCheck(f, design, {{"a.r", 2u}, {"b.r", 2u}});
 }
 
-}
+}  // namespace

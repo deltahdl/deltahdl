@@ -57,4 +57,4 @@ TEST(AssignmentCompatibleElaboration, EnumToIntegralIsOneDirectional) {
   EXPECT_FALSE(IsAssignmentCompatible(int_t, enum_t));
 }
 
-}
+}  // namespace

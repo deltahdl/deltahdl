@@ -258,8 +258,10 @@ TEST(DeclarationListParsing, ListOfVariableDeclAssignmentsMixed) {
   int without_init = 0;
   for (auto* item : r.cu->modules[0]->items) {
     if (item->kind != ModuleItemKind::kVarDecl) continue;
-    if (item->init_expr != nullptr) with_init++;
-    else without_init++;
+    if (item->init_expr != nullptr)
+      with_init++;
+    else
+      without_init++;
   }
   EXPECT_EQ(with_init, 1);
   EXPECT_EQ(without_init, 2);
@@ -329,8 +331,7 @@ TEST(DeclarationListParsing, ListOfTypeAssignmentsSingle) {
 }
 
 TEST(DeclarationListParsing, ListOfPortIdentifiersPerElementUnpackedDim) {
-  auto r = Parse(
-      "module m(input logic a [3:0], b [1:0]); endmodule\n");
+  auto r = Parse("module m(input logic a [3:0], b [1:0]); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->modules[0]->ports.size(), 2u);
@@ -346,4 +347,4 @@ TEST(DeclarationListParsing, ListOfDefparamAssignmentsTrailingCommaErrors) {
   EXPECT_TRUE(r.has_errors);
 }
 
-}
+}  // namespace

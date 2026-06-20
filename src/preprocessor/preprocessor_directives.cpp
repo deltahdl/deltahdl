@@ -32,7 +32,8 @@ static TimescaleParseStatus ParseTimescaleComponentStatus(std::string_view text,
   for (size_t j = 0; j < i; ++j) {
     mag = mag * 10 + (trimmed[j] - '0');
   }
-  if (mag != 1 && mag != 10 && mag != 100) return TimescaleParseStatus::kInvalid;
+  if (mag != 1 && mag != 10 && mag != 100)
+    return TimescaleParseStatus::kInvalid;
   magnitude = mag;
 
   auto unit_str = TrimDirective(trimmed.substr(i));
@@ -42,7 +43,6 @@ static TimescaleParseStatus ParseTimescaleComponentStatus(std::string_view text,
 }
 
 void Preprocessor::HandleTimescale(std::string_view rest, SourceLoc loc) {
-
   auto slash = rest.find('/');
   if (slash == std::string_view::npos) {
     diag_.Error(loc, "invalid `timescale format: missing '/'");
@@ -56,8 +56,7 @@ void Preprocessor::HandleTimescale(std::string_view rest, SourceLoc loc) {
       ParseTimescaleComponentStatus(unit_part, ts.magnitude, ts.unit);
   if (unit_status == TimescaleParseStatus::kStep) {
     diag_.Error(
-        loc,
-        "step cannot be used to set or modify the time unit or precision");
+        loc, "step cannot be used to set or modify the time unit or precision");
     return;
   }
   if (unit_status != TimescaleParseStatus::kOk) {
@@ -68,8 +67,7 @@ void Preprocessor::HandleTimescale(std::string_view rest, SourceLoc loc) {
       ParseTimescaleComponentStatus(prec_part, ts.prec_magnitude, ts.precision);
   if (prec_status == TimescaleParseStatus::kStep) {
     diag_.Error(
-        loc,
-        "step cannot be used to set or modify the time unit or precision");
+        loc, "step cannot be used to set or modify the time unit or precision");
     return;
   }
   if (prec_status != TimescaleParseStatus::kOk) {
@@ -146,7 +144,6 @@ void Preprocessor::HandleUnconnectedDrive(std::string_view rest,
 }
 
 void Preprocessor::HandleLine(std::string_view rest, SourceLoc loc) {
-
   auto trimmed = TrimDirective(rest);
   size_t i = 0;
   while (i < trimmed.size() &&
@@ -351,4 +348,4 @@ void Preprocessor::HandleDefaultTriregStrength(std::string_view rest,
   has_default_trireg_strength_ = true;
 }
 
-}
+}  // namespace delta

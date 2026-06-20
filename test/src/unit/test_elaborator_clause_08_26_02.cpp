@@ -227,7 +227,8 @@ TEST(InterfaceClassImplements, InheritedNonVirtualFromBaseDoesNotSatisfy) {
 // A subclass that declares its own virtual method of the same name as a
 // non-virtual base method hides that base method, and the override is what
 // satisfies the implemented interface's pure virtual requirement.
-TEST(InterfaceClassImplements, OwnVirtualOverrideHidesNonVirtualBaseAndSatisfies) {
+TEST(InterfaceClassImplements,
+     OwnVirtualOverrideHidesNonVirtualBaseAndSatisfies) {
   EXPECT_TRUE(
       ElabOk("interface class IC;\n"
              "  pure virtual function void f();\n"
@@ -244,4 +245,4 @@ TEST(InterfaceClassImplements, OwnVirtualOverrideHidesNonVirtualBaseAndSatisfies
              "endmodule\n"));
 }
 
-}
+}  // namespace

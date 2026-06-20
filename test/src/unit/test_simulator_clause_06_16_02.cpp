@@ -69,7 +69,8 @@ TEST(StringMethods, PutcEquivalentToIndexedAssign) {
                                 {f.MakeIntLiteral(1), f.MakeIntLiteral('a')});
   EvalExpr(call, f.ctx, f.arena);
 
-  auto* lhs = MakeSelectExpr(f.arena, MakeId(f.arena, "t"), MakeInt(f.arena, 1));
+  auto* lhs =
+      MakeSelectExpr(f.arena, MakeId(f.arena, "t"), MakeInt(f.arena, 1));
   auto rhs = EvalExpr(f.MakeIntLiteral('a'), f.ctx, f.arena);
   PerformBlockingAssign(lhs, rhs, f.ctx, f.arena);
 
@@ -77,4 +78,4 @@ TEST(StringMethods, PutcEquivalentToIndexedAssign) {
   EXPECT_EQ(VecToString(via_putc->value), VecToString(via_index->value));
 }
 
-}
+}  // namespace

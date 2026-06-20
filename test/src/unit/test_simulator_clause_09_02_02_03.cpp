@@ -619,4 +619,4 @@ TEST(AlwaysLatchBasicSim, BeginEndBlockWithArithmetic) {
   EXPECT_EQ(q->value.ToUint64(), 0x30u);
 }
 
-}
+}  // namespace

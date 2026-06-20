@@ -67,4 +67,4 @@ TEST(ProgramReactiveSim, MultipleProgramInitialsAllRunInReactiveSet) {
   EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 0x55u);
 }
 
-}
+}  // namespace

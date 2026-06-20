@@ -15,4 +15,4 @@ TEST(RealConversion, AssignCompatibleRealToInt) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}
+}  // namespace

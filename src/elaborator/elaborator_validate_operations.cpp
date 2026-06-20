@@ -338,7 +338,6 @@ static bool IsRealVar(const Expr* e, const TypeMap& types) {
 
 static bool IsIllegalOnReal(TokenKind op) {
   switch (op) {
-
     case TokenKind::kEqEqEq:
     case TokenKind::kBangEqEq:
 
@@ -525,23 +524,34 @@ static bool ExprContainsHierarchicalRef(const Expr* e) {
 
 static NetType DataTypeKindToNetType(DataTypeKind kind) {
   switch (kind) {
-    case DataTypeKind::kTri: return NetType::kTri;
-    case DataTypeKind::kWand: return NetType::kWand;
-    case DataTypeKind::kWor: return NetType::kWor;
-    case DataTypeKind::kTriand: return NetType::kTriand;
-    case DataTypeKind::kTrior: return NetType::kTrior;
-    case DataTypeKind::kTri0: return NetType::kTri0;
-    case DataTypeKind::kTri1: return NetType::kTri1;
-    case DataTypeKind::kSupply0: return NetType::kSupply0;
-    case DataTypeKind::kSupply1: return NetType::kSupply1;
-    case DataTypeKind::kTrireg: return NetType::kTrireg;
-    case DataTypeKind::kUwire: return NetType::kUwire;
-    default: return NetType::kWire;
+    case DataTypeKind::kTri:
+      return NetType::kTri;
+    case DataTypeKind::kWand:
+      return NetType::kWand;
+    case DataTypeKind::kWor:
+      return NetType::kWor;
+    case DataTypeKind::kTriand:
+      return NetType::kTriand;
+    case DataTypeKind::kTrior:
+      return NetType::kTrior;
+    case DataTypeKind::kTri0:
+      return NetType::kTri0;
+    case DataTypeKind::kTri1:
+      return NetType::kTri1;
+    case DataTypeKind::kSupply0:
+      return NetType::kSupply0;
+    case DataTypeKind::kSupply1:
+      return NetType::kSupply1;
+    case DataTypeKind::kTrireg:
+      return NetType::kTrireg;
+    case DataTypeKind::kUwire:
+      return NetType::kUwire;
+    default:
+      return NetType::kWire;
   }
 }
 
 void Elaborator::ValidateAlias(const ModuleItem* item, RtlirModule* mod) {
-
   std::unordered_set<std::string_view> seen;
   for (auto* net : item->alias_nets) {
     auto name = AliasNetIdent(net);
@@ -584,10 +594,9 @@ void Elaborator::ValidateAlias(const ModuleItem* item, RtlirModule* mod) {
       if (cur_net_type != first_net_type) {
         diag_.Error(
             item->loc,
-            std::format(
-                "nets in alias statement have incompatible types; "
-                "'{}' and '{}' are different net types",
-                ident_names[0], ident_names[i]));
+            std::format("nets in alias statement have incompatible types; "
+                        "'{}' and '{}' are different net types",
+                        ident_names[0], ident_names[i]));
         break;
       }
     }
@@ -597,21 +606,26 @@ void Elaborator::ValidateAlias(const ModuleItem* item, RtlirModule* mod) {
     auto scoped_first = ScopedName(ident_names[0]);
     uint32_t first_width = 0;
     for (const auto& n : mod->nets) {
-      if (n.name == scoped_first) { first_width = n.width; break; }
+      if (n.name == scoped_first) {
+        first_width = n.width;
+        break;
+      }
     }
     for (size_t i = 1; i < ident_names.size(); ++i) {
       auto scoped = ScopedName(ident_names[i]);
       uint32_t w = 0;
       for (const auto& n : mod->nets) {
-        if (n.name == scoped) { w = n.width; break; }
+        if (n.name == scoped) {
+          w = n.width;
+          break;
+        }
       }
       if (w != first_width) {
         diag_.Error(
             item->loc,
-            std::format(
-                "nets in alias statement have different widths; "
-                "'{}' has width {} but '{}' has width {}",
-                ident_names[0], first_width, ident_names[i], w));
+            std::format("nets in alias statement have different widths; "
+                        "'{}' has width {} but '{}' has width {}",
+                        ident_names[0], first_width, ident_names[i], w));
         break;
       }
     }
@@ -623,10 +637,9 @@ void Elaborator::ValidateAlias(const ModuleItem* item, RtlirModule* mod) {
       auto b = ident_names[j];
       auto pair = (a < b) ? std::make_pair(a, b) : std::make_pair(b, a);
       if (!alias_pairs_.insert(pair).second) {
-        diag_.Error(item->loc,
-                    std::format("alias between '{}' and '{}' "
-                                "specified more than once",
-                                a, b));
+        diag_.Error(item->loc, std::format("alias between '{}' and '{}' "
+                                           "specified more than once",
+                                           a, b));
       }
     }
   }
@@ -639,8 +652,9 @@ void Elaborator::CheckAssocConcatTargetInAssign(const Stmt* s) {
   auto it = var_array_info_.find(s->lhs->text);
   if (it == var_array_info_.end()) return;
   if (!it->second.is_assoc) return;
-  diag_.Error(s->rhs->range.start,
-              "unpacked array concatenation cannot target an associative array");
+  diag_.Error(
+      s->rhs->range.start,
+      "unpacked array concatenation cannot target an associative array");
 }
 
 void Elaborator::WalkStmtsForAssocConcatTarget(const Stmt* s) {
@@ -740,7 +754,6 @@ void Elaborator::CheckArrayPatternElemTypeInAssign(const Stmt* s) {
 
   for (auto* elem : s->rhs->elements) {
     if (elem->kind == ExprKind::kReplicate) {
-
       for (auto* inner : elem->elements) {
         if (inner->kind == ExprKind::kIdentifier &&
             var_array_info_.count(inner->text)) {
@@ -1013,15 +1026,14 @@ void Elaborator::WalkExprForUnsizedInConcat(const Expr* expr) {
 void Elaborator::WalkStmtsForUnsizedInConcat(const Stmt* s) {
   if (!s) return;
 
-  bool is_array_concat_rhs =
-      s->rhs && s->rhs->kind == ExprKind::kConcatenation &&
-      s->lhs && s->lhs->kind == ExprKind::kIdentifier &&
-      (s->kind == StmtKind::kBlockingAssign ||
-       s->kind == StmtKind::kNonblockingAssign) &&
-      var_array_info_.count(s->lhs->text);
+  bool is_array_concat_rhs = s->rhs &&
+                             s->rhs->kind == ExprKind::kConcatenation &&
+                             s->lhs && s->lhs->kind == ExprKind::kIdentifier &&
+                             (s->kind == StmtKind::kBlockingAssign ||
+                              s->kind == StmtKind::kNonblockingAssign) &&
+                             var_array_info_.count(s->lhs->text);
   if (is_array_concat_rhs) {
-    for (auto* elem : s->rhs->elements)
-      WalkExprForUnsizedInConcat(elem);
+    for (auto* elem : s->rhs->elements) WalkExprForUnsizedInConcat(elem);
   } else {
     WalkExprForUnsizedInConcat(s->rhs);
   }
@@ -1082,8 +1094,7 @@ void Elaborator::CheckSelectOnConcatLvalue(const Expr* lhs) {
 void Elaborator::WalkStmtsForSelectOnConcatLvalue(const Stmt* s) {
   if (!s) return;
   if (s->kind == StmtKind::kBlockingAssign ||
-      s->kind == StmtKind::kNonblockingAssign ||
-      s->kind == StmtKind::kAssign ||
+      s->kind == StmtKind::kNonblockingAssign || s->kind == StmtKind::kAssign ||
       s->kind == StmtKind::kForce) {
     CheckSelectOnConcatLvalue(s->lhs);
   }
@@ -1135,8 +1146,7 @@ void Elaborator::CheckReplicateLvalue(const Expr* lhs) {
 void Elaborator::WalkStmtsForReplicateLvalue(const Stmt* s) {
   if (!s) return;
   if (s->kind == StmtKind::kBlockingAssign ||
-      s->kind == StmtKind::kNonblockingAssign ||
-      s->kind == StmtKind::kAssign ||
+      s->kind == StmtKind::kNonblockingAssign || s->kind == StmtKind::kAssign ||
       s->kind == StmtKind::kForce) {
     CheckReplicateLvalue(s->lhs);
   }
@@ -1191,7 +1201,6 @@ void Elaborator::WalkExprForReplicateMultiplier(const Expr* expr) {
           diag_.Error(rc->range.start,
                       "replication multiplier shall not be negative");
         } else if (*val == 0) {
-
         }
       }
     }
@@ -1211,8 +1220,7 @@ static bool IsZeroReplicate(const Expr* expr) {
   return val && *val == 0;
 }
 
-static void CheckZeroReplicateStandalone(const Expr* expr,
-                                         DiagEngine& diag) {
+static void CheckZeroReplicateStandalone(const Expr* expr, DiagEngine& diag) {
   if (!expr) return;
   if (IsZeroReplicate(expr)) {
     diag.Error(expr->range.start,
@@ -1220,7 +1228,6 @@ static void CheckZeroReplicateStandalone(const Expr* expr,
                "in which at least one operand has a positive size");
   }
   if (expr->kind == ExprKind::kConcatenation) {
-
     bool all_zero = true;
     for (const auto* elem : expr->elements) {
       if (!IsZeroReplicate(elem)) {
@@ -1248,8 +1255,7 @@ static void CheckZeroReplicateStandalone(const Expr* expr,
   CheckZeroReplicateStandalone(expr->false_expr, diag);
   for (const auto* elem : expr->elements)
     CheckZeroReplicateStandalone(elem, diag);
-  for (const auto* arg : expr->args)
-    CheckZeroReplicateStandalone(arg, diag);
+  for (const auto* arg : expr->args) CheckZeroReplicateStandalone(arg, diag);
 }
 
 static void WalkStmtsForZeroReplicateStandalone(const Stmt* s,
@@ -1260,8 +1266,7 @@ static void WalkStmtsForZeroReplicateStandalone(const Stmt* s,
   CheckZeroReplicateStandalone(s->expr, diag);
   CheckZeroReplicateStandalone(s->condition, diag);
   CheckZeroReplicateStandalone(s->assert_expr, diag);
-  for (auto* sub : s->stmts)
-    WalkStmtsForZeroReplicateStandalone(sub, diag);
+  for (auto* sub : s->stmts) WalkStmtsForZeroReplicateStandalone(sub, diag);
   WalkStmtsForZeroReplicateStandalone(s->then_branch, diag);
   WalkStmtsForZeroReplicateStandalone(s->else_branch, diag);
   WalkStmtsForZeroReplicateStandalone(s->body, diag);
@@ -1342,8 +1347,7 @@ void Elaborator::CheckStringConcatLvalue(const Expr* lhs) {
 void Elaborator::WalkStmtsForStringConcatLvalue(const Stmt* s) {
   if (!s) return;
   if (s->kind == StmtKind::kBlockingAssign ||
-      s->kind == StmtKind::kNonblockingAssign ||
-      s->kind == StmtKind::kAssign ||
+      s->kind == StmtKind::kNonblockingAssign || s->kind == StmtKind::kAssign ||
       s->kind == StmtKind::kForce) {
     CheckStringConcatLvalue(s->lhs);
   }
@@ -1391,8 +1395,7 @@ void Elaborator::WalkExprForStreamingContext(const Expr* expr,
       // protected members is illegal unless those members are accessible at
       // the streaming operator, approximated here (as in the bit-stream cast
       // rule of §6.24.3) by allowing only the current instance `this`.
-      if (elem && elem->kind == ExprKind::kIdentifier &&
-          elem->text != "this") {
+      if (elem && elem->kind == ExprKind::kIdentifier && elem->text != "this") {
         auto it = class_var_types_.find(elem->text);
         if (it != class_var_types_.end() &&
             ClassHasHiddenMember(FindClassDecl(it->second, unit_))) {
@@ -1453,7 +1456,6 @@ void Elaborator::WalkExprForStreamingContext(const Expr* expr,
     return;
   }
   if (expr->kind == ExprKind::kCast) {
-
     WalkExprForStreamingContext(expr->lhs, true);
     return;
   }
@@ -1495,15 +1497,12 @@ void Elaborator::CheckStreamingSourceTargetType(const Expr* lhs,
 void Elaborator::WalkStmtsForStreamingContext(const Stmt* s) {
   if (!s) return;
   if (s->kind == StmtKind::kBlockingAssign ||
-      s->kind == StmtKind::kNonblockingAssign ||
-      s->kind == StmtKind::kAssign ||
+      s->kind == StmtKind::kNonblockingAssign || s->kind == StmtKind::kAssign ||
       s->kind == StmtKind::kForce) {
-
     WalkExprForStreamingContext(s->lhs, true);
     WalkExprForStreamingContext(s->rhs, true);
     CheckStreamingSourceTargetType(s->lhs, s->rhs);
   } else {
-
     WalkExprForStreamingContext(s->lhs, false);
     WalkExprForStreamingContext(s->rhs, false);
   }
@@ -1693,8 +1692,7 @@ static std::string_view HierRefLeftmost(const Expr* e) {
 }
 
 static bool ExprRefersToChecker(
-    const Expr* e,
-    const std::unordered_set<std::string_view>& checker_names) {
+    const Expr* e, const std::unordered_set<std::string_view>& checker_names) {
   if (!e) return false;
   if (e->kind == ExprKind::kMemberAccess) {
     auto leftmost = HierRefLeftmost(e);
@@ -1710,8 +1708,7 @@ static bool ExprRefersToChecker(
 }
 
 static void WalkStmtsForCheckerRef(
-    const Stmt* s,
-    const std::unordered_set<std::string_view>& checker_names,
+    const Stmt* s, const std::unordered_set<std::string_view>& checker_names,
     DiagEngine& diag) {
   if (!s) return;
   if (s->lhs && ExprRefersToChecker(s->lhs, checker_names))
@@ -1745,8 +1742,7 @@ void Elaborator::ValidateHierRefIntoChecker(const ModuleDecl* decl) {
 }
 
 static bool ExprRefersToProgram(
-    const Expr* e,
-    const std::unordered_set<std::string_view>& program_names) {
+    const Expr* e, const std::unordered_set<std::string_view>& program_names) {
   if (!e) return false;
   if (e->kind == ExprKind::kMemberAccess) {
     auto leftmost = HierRefLeftmost(e);
@@ -1762,8 +1758,7 @@ static bool ExprRefersToProgram(
 }
 
 static void WalkStmtsForProgramRef(
-    const Stmt* s,
-    const std::unordered_set<std::string_view>& program_names,
+    const Stmt* s, const std::unordered_set<std::string_view>& program_names,
     DiagEngine& diag) {
   if (!s) return;
   if (s->lhs && ExprRefersToProgram(s->lhs, program_names))
@@ -1828,8 +1823,7 @@ static void CollectHierPathComponents(const Expr* e,
 }
 
 static bool ExprRefersToAutomatic(
-    const Expr* e,
-    const std::unordered_set<std::string_view>& auto_names) {
+    const Expr* e, const std::unordered_set<std::string_view>& auto_names) {
   if (!e) return false;
   if (e->kind == ExprKind::kMemberAccess) {
     std::vector<std::string_view> components;
@@ -1848,8 +1842,7 @@ static bool ExprRefersToAutomatic(
 }
 
 static void WalkStmtsForAutoRef(
-    const Stmt* s,
-    const std::unordered_set<std::string_view>& auto_names,
+    const Stmt* s, const std::unordered_set<std::string_view>& auto_names,
     DiagEngine& diag) {
   if (!s) return;
   if (s->lhs && ExprRefersToAutomatic(s->lhs, auto_names))
@@ -1860,8 +1853,7 @@ static void WalkStmtsForAutoRef(
     diag.Error(s->range.start,
                "hierarchical reference to object in automatic task or "
                "function is not permitted");
-  for (auto* child : s->children)
-    WalkStmtsForAutoRef(child, auto_names, diag);
+  for (auto* child : s->children) WalkStmtsForAutoRef(child, auto_names, diag);
   if (s->if_body) WalkStmtsForAutoRef(s->if_body, auto_names, diag);
   if (s->else_body) WalkStmtsForAutoRef(s->else_body, auto_names, diag);
 }
@@ -1887,8 +1879,7 @@ void Elaborator::ValidateHierRefToAutomatic(const ModuleDecl* decl) {
 }
 
 static bool IsProgramSubroutineCallExpr(
-    const Expr* e,
-    const std::unordered_set<std::string_view>& program_names) {
+    const Expr* e, const std::unordered_set<std::string_view>& program_names) {
   if (!e || e->kind != ExprKind::kCall) return false;
   const Expr* callee = e->lhs;
   if (!callee || callee->kind != ExprKind::kMemberAccess) return false;
@@ -1897,8 +1888,7 @@ static bool IsProgramSubroutineCallExpr(
 }
 
 static void WalkExprForProgramCall(
-    const Expr* e,
-    const std::unordered_set<std::string_view>& program_names,
+    const Expr* e, const std::unordered_set<std::string_view>& program_names,
     DiagEngine& diag, SourceLoc loc) {
   if (!e) return;
   if (IsProgramSubroutineCallExpr(e, program_names)) {
@@ -1923,8 +1913,7 @@ static void WalkExprForProgramCall(
 }
 
 static void WalkStmtForProgramCall(
-    const Stmt* s,
-    const std::unordered_set<std::string_view>& program_names,
+    const Stmt* s, const std::unordered_set<std::string_view>& program_names,
     DiagEngine& diag) {
   if (!s) return;
   auto loc = s->range.start;
@@ -1932,8 +1921,7 @@ static void WalkStmtForProgramCall(
   WalkExprForProgramCall(s->rhs, program_names, diag, loc);
   WalkExprForProgramCall(s->expr, program_names, diag, loc);
   WalkExprForProgramCall(s->condition, program_names, diag, loc);
-  for (auto* sub : s->stmts)
-    WalkStmtForProgramCall(sub, program_names, diag);
+  for (auto* sub : s->stmts) WalkStmtForProgramCall(sub, program_names, diag);
   WalkStmtForProgramCall(s->then_branch, program_names, diag);
   WalkStmtForProgramCall(s->else_branch, program_names, diag);
   WalkStmtForProgramCall(s->body, program_names, diag);
@@ -1969,4 +1957,4 @@ void Elaborator::ValidateProgramSubroutineCall(const ModuleDecl* decl) {
   }
 }
 
-}
+}  // namespace delta

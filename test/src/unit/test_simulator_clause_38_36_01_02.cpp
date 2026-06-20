@@ -23,11 +23,11 @@ namespace {
 // describe only the run-time instant at which the callback fires; the
 // registration path that accepts these objects as cbStmt targets is the one
 // established by §38.36.1.1, so the qualifying-object rule is already in force.
-// These tests observe vpi_register_cb() accepting a cbStmt callback on every one
-// of the enumerated statement-class objects.
+// These tests observe vpi_register_cb() accepting a cbStmt callback on every
+// one of the enumerated statement-class objects.
 
-// The full Table 38-6 object set. Each is a member of the statement class and so
-// qualifies as a cbStmt target.
+// The full Table 38-6 object set. Each is a member of the statement class and
+// so qualifies as a cbStmt target.
 struct StmtObject {
   int type;
   const char* label;
@@ -64,9 +64,9 @@ class VpiStmtCallbackByType : public ::testing::Test {
   void SetUp() override { SetGlobalVpiContext(&vpi_ctx_); }
   void TearDown() override { SetGlobalVpiContext(nullptr); }
 
-  // Build a handle that stands for a statement object of the given VPI type. The
-  // handle is created from a named variable and then retyped, so any object kind
-  // in Table 38-6 can be presented to vpi_register_cb().
+  // Build a handle that stands for a statement object of the given VPI type.
+  // The handle is created from a named variable and then retyped, so any object
+  // kind in Table 38-6 can be presented to vpi_register_cb().
   vpiHandle MakeHandleOfType(const char* name, int type) {
     sim_ctx_.CreateVariable(name, 1);
     vpi_ctx_.Attach(sim_ctx_);

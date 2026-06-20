@@ -69,4 +69,4 @@ TEST(InterfaceClassPartialImplementationParsing,
   EXPECT_FALSE(concrete->members[0]->is_pure_virtual);
 }
 
-}
+}  // namespace

@@ -80,4 +80,4 @@ TEST(OperatorElaboration, BinaryLogicalOrElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

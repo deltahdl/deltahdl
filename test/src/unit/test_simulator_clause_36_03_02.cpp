@@ -112,12 +112,12 @@ TEST_F(OverrideBuiltinSystf, SignedAndUnsignedCanBeOverridden) {
   EXPECT_STREQ(ru->tfname, "$unsigned");
 }
 
-// §36.3.2: $signed and $unsigned are unique in that the return width is based on
-// the width of their argument. When overridden, the PLI version shall have the
-// same return width for all instances of the system function, and that width is
-// defined by the PLI sizetf routine. Resolving the overridden name and reading
-// its sizetf-defined result width yields the same width on every query (every
-// instance), rather than varying per call.
+// §36.3.2: $signed and $unsigned are unique in that the return width is based
+// on the width of their argument. When overridden, the PLI version shall have
+// the same return width for all instances of the system function, and that
+// width is defined by the PLI sizetf routine. Resolving the overridden name and
+// reading its sizetf-defined result width yields the same width on every query
+// (every instance), rather than varying per call.
 TEST_F(OverrideBuiltinSystf, OverriddenSignedHasSameWidthForAllInstances) {
   auto fixed_width = [](const char*) -> int { return 17; };
 
@@ -141,8 +141,8 @@ TEST_F(OverrideBuiltinSystf, OverriddenSignedHasSameWidthForAllInstances) {
   EXPECT_EQ(first, second);
 }
 
-// §36.3.2 edge: the override rule keys on a system task/function name. Asking to
-// resolve a null name names nothing, so no override is found and the lookup
+// §36.3.2 edge: the override rule keys on a system task/function name. Asking
+// to resolve a null name names nothing, so no override is found and the lookup
 // reports none (the built-in, if any, would stand) rather than dereferencing.
 TEST_F(OverrideBuiltinSystf, NullNameResolvesToNothing) {
   EXPECT_EQ(vpi_ctx_.ResolveSystf(nullptr), nullptr);
@@ -168,7 +168,8 @@ TEST_F(OverrideBuiltinSystf, UserTaskApplicationOverridesBuiltinName) {
 // §36.3.2 edge: only a registration sharing the name overrides a built-in.
 // With other applications registered but none under the queried built-in name,
 // nothing claims it, so the lookup finds no override and the built-in stands.
-TEST_F(OverrideBuiltinSystf, NonMatchingRegistrationsLeaveBuiltinNameUnclaimed) {
+TEST_F(OverrideBuiltinSystf,
+       NonMatchingRegistrationsLeaveBuiltinNameUnclaimed) {
   s_vpi_systf_data other = {};
   other.type = vpiSysFunc;
   other.tfname = "$my_func";

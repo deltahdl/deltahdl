@@ -675,4 +675,4 @@ TEST(AssertionParsing, SequenceMatchedMethodWithReset) {
   ASSERT_NE(r.cu, nullptr);
 }
 
-}
+}  // namespace

@@ -111,4 +111,4 @@ TEST(PackageImportSim, LocalDeclShadowsWildcardImportValue) {
   EXPECT_EQ(f.ctx.FindVariable("qualified_ref")->value.ToUint64(), 10u);
 }
 
-}
+}  // namespace

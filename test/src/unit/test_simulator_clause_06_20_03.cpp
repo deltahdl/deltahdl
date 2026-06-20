@@ -81,4 +81,4 @@ TEST(TypeParameterSim, MultipleTypeParamsResolveCorrectly) {
   EXPECT_EQ(vy->value.ToUint64(), 0xCAFEu);
 }
 
-}
+}  // namespace

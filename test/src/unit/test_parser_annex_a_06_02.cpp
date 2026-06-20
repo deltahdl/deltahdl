@@ -159,7 +159,8 @@ TEST(ProceduralBlockSyntaxParsing, AlwaysConstruct_AlwaysFF) {
   EXPECT_EQ(item->sensitivity[1].edge, Edge::kNegedge);
 }
 
-TEST(ProceduralBlockSyntaxParsing, Integration_AlwaysFFWithBlockingAndNonblocking) {
+TEST(ProceduralBlockSyntaxParsing,
+     Integration_AlwaysFFWithBlockingAndNonblocking) {
   auto r = Parse(
       "module m;\n"
       "  always_ff @(posedge clk or negedge rst_n) begin\n"
@@ -610,7 +611,8 @@ TEST(ProceduralBlockSyntaxParsing, ProceduralRelease) {
   EXPECT_NE(stmt->lhs, nullptr);
 }
 
-TEST(ProceduralBlockSyntaxParsing, ProceduralAssignAndForceShareVariableAssignment) {
+TEST(ProceduralBlockSyntaxParsing,
+     ProceduralAssignAndForceShareVariableAssignment) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -630,7 +632,8 @@ TEST(ProceduralBlockSyntaxParsing, ProceduralAssignAndForceShareVariableAssignme
   EXPECT_EQ(stmts[3]->kind, StmtKind::kDeassign);
 }
 
-TEST(ProceduralBlockSyntaxParsing, BlockingAssignment_IncDecExpressionCrossLink) {
+TEST(ProceduralBlockSyntaxParsing,
+     BlockingAssignment_IncDecExpressionCrossLink) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -691,19 +694,17 @@ TEST(ProceduralBlockSyntaxParsing, ProceduralReleaseNet) {
 }
 
 TEST(ProceduralBlockSyntaxParsing, ErrorForceMissingRhs) {
-
-  EXPECT_FALSE(ParseOk(
-      "module m;\n"
-      "  initial begin force a; end\n"
-      "endmodule\n"));
+  EXPECT_FALSE(
+      ParseOk("module m;\n"
+              "  initial begin force a; end\n"
+              "endmodule\n"));
 }
 
 TEST(ProceduralBlockSyntaxParsing, ErrorReleaseWithExtraRhs) {
-
-  EXPECT_FALSE(ParseOk(
-      "module m;\n"
-      "  initial begin release a = b; end\n"
-      "endmodule\n"));
+  EXPECT_FALSE(
+      ParseOk("module m;\n"
+              "  initial begin release a = b; end\n"
+              "endmodule\n"));
 }
 
 TEST(ProceduralBlockSyntaxParsing, NonblockingAssignment_WithEventControl) {
@@ -733,4 +734,4 @@ TEST(ProceduralBlockSyntaxParsing, InitialConstruct_EmptyBlock) {
   EXPECT_TRUE(item->body->stmts.empty());
 }
 
-}
+}  // namespace

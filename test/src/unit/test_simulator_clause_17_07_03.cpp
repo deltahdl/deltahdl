@@ -11,9 +11,9 @@ namespace {
 // §17.7.3: change-sensitive constructs of a checker (clocking events,
 // continuous assignments) are scheduled in the Reactive region.
 TEST(CheckerSchedulingSemantics, ChangeSensitiveConstructsAreReactive) {
-  EXPECT_EQ(HomeRegionForCheckerStatement(
-                CheckerStatementKind::kChangeSensitive),
-            Region::kReactive);
+  EXPECT_EQ(
+      HomeRegionForCheckerStatement(CheckerStatementKind::kChangeSensitive),
+      Region::kReactive);
 }
 
 // §17.7.3: all blocking statements of a checker are scheduled in the Reactive

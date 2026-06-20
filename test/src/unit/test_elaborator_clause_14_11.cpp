@@ -56,8 +56,8 @@ TEST(CycleDelayElab, NestedCycleDelayWithoutDefaultClockingErrors) {
 }
 
 // §14.11: a cycle delay is not legal as an intra-assignment delay on a blocking
-// assignment. A default clocking is present so the missing-default-clocking rule
-// stays silent; the only remaining violation is the intra-assignment ##.
+// assignment. A default clocking is present so the missing-default-clocking
+// rule stays silent; the only remaining violation is the intra-assignment ##.
 TEST(CycleDelayElab, IntraAssignBlockingCycleDelayErrors) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -133,4 +133,4 @@ TEST(CycleDelayElab, SynchronousDriveWithCycleDelayNoError) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

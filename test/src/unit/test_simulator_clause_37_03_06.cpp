@@ -34,9 +34,9 @@ TEST_F(VpiObjectProtection, GetIsProtectedReportsFalseForOrdinaryObject) {
   EXPECT_EQ(vpi_get(vpiIsProtected, &net), 0);
 }
 
-// Claim: access to the vpiType property of a protected object shall be permitted
-// for all objects - vpi_get(vpiType, ...) returns the real type constant rather
-// than erroring, and leaves no error recorded.
+// Claim: access to the vpiType property of a protected object shall be
+// permitted for all objects - vpi_get(vpiType, ...) returns the real type
+// constant rather than erroring, and leaves no error recorded.
 TEST_F(VpiObjectProtection, GetTypeIsPermittedOnProtectedObject) {
   VpiObject mod;
   mod.type = vpiModule;
@@ -48,9 +48,9 @@ TEST_F(VpiObjectProtection, GetTypeIsPermittedOnProtectedObject) {
   EXPECT_EQ(VpiChkErrorC(&info), 0);
 }
 
-// Claim: access to the vpiIsProtected property of a protected object is likewise
-// permitted - it is not blocked by the protected-object guard and reports TRUE
-// without recording an error.
+// Claim: access to the vpiIsProtected property of a protected object is
+// likewise permitted - it is not blocked by the protected-object guard and
+// reports TRUE without recording an error.
 TEST_F(VpiObjectProtection, GetIsProtectedIsPermittedOnProtectedObject) {
   VpiObject mod;
   mod.type = vpiModule;
@@ -94,9 +94,9 @@ TEST_F(VpiObjectProtection, GetStrTypeIsPermittedOnProtectedObject) {
   EXPECT_EQ(VpiChkErrorC(&info), 0);
 }
 
-// Claim (string form of the general rule): a string query for any other property
-// of a protected object is an error - it records the error and supplies no
-// string (a null pointer).
+// Claim (string form of the general rule): a string query for any other
+// property of a protected object is an error - it records the error and
+// supplies no string (a null pointer).
 TEST_F(VpiObjectProtection, GetStrOtherPropertyOnProtectedObjectIsAnError) {
   VpiObject mod;
   mod.type = vpiModule;
@@ -110,12 +110,12 @@ TEST_F(VpiObjectProtection, GetStrOtherPropertyOnProtectedObjectIsAnError) {
   EXPECT_NE(info.level, 0);
 }
 
-// Claim (string form of the second permitted exception): vpiIsProtected is, like
-// vpiType, permitted on a protected object for all objects. Through vpi_get_str
-// it has no string representation (it is a Boolean), so the call hands back a
-// null pointer - but the protected-object guard must not have fired, so no error
-// is recorded. This distinguishes the permitted exception (silent null) from a
-// blocked property (null plus a recorded error).
+// Claim (string form of the second permitted exception): vpiIsProtected is,
+// like vpiType, permitted on a protected object for all objects. Through
+// vpi_get_str it has no string representation (it is a Boolean), so the call
+// hands back a null pointer - but the protected-object guard must not have
+// fired, so no error is recorded. This distinguishes the permitted exception
+// (silent null) from a blocked property (null plus a recorded error).
 TEST_F(VpiObjectProtection, GetStrIsProtectedIsPermittedOnProtectedObject) {
   VpiObject mod;
   mod.type = vpiModule;
@@ -127,10 +127,10 @@ TEST_F(VpiObjectProtection, GetStrIsProtectedIsPermittedOnProtectedObject) {
   EXPECT_EQ(VpiChkErrorC(&info), 0);
 }
 
-// Edge (boundary of the protected-object rule): the access error applies only to
-// protected objects. An ordinary object reports a non-exception property such as
-// vpiSize normally and records no error, confirming the guard keys off the
-// object's protection state rather than the property being requested.
+// Edge (boundary of the protected-object rule): the access error applies only
+// to protected objects. An ordinary object reports a non-exception property
+// such as vpiSize normally and records no error, confirming the guard keys off
+// the object's protection state rather than the property being requested.
 TEST_F(VpiObjectProtection, GetNonExceptionPropertyOnOrdinaryObjectSucceeds) {
   VpiObject reg;
   reg.type = vpiReg;

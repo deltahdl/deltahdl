@@ -353,4 +353,4 @@ TEST(CycleDelayElab, CycleDelayIdentifierWithDefaultClocking) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

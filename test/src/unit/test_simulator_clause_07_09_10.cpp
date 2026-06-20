@@ -126,4 +126,4 @@ TEST(AssocMethods, AssocArgStringKeyCallerUnchangedEndToEnd) {
   EXPECT_EQ(v, 12u);
 }
 
-}
+}  // namespace

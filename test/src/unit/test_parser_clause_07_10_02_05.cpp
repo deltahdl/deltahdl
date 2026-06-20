@@ -18,4 +18,4 @@ TEST(AggregateTypeParsing, QueuePopBack) {
   ASSERT_NE(stmt->rhs, nullptr);
 }
 
-}
+}  // namespace

@@ -61,4 +61,4 @@ TEST(UnpackedArrayConcatParsing, UnpackedArrayConcatInAssignPattern) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}
+}  // namespace

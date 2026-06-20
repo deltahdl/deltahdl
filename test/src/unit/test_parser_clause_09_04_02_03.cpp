@@ -492,4 +492,4 @@ TEST(ConditionalEventIffParsing, IffPrecedenceParenthesizedGroup) {
   EXPECT_EQ(item->sensitivity[1].iff_condition, nullptr);
 }
 
-}
+}  // namespace

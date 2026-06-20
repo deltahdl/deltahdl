@@ -458,4 +458,4 @@ TEST(StatementLabelParsing, MultipleLabelsInSequence) {
   EXPECT_EQ(body->stmts[2]->label, "step3");
 }
 
-}
+}  // namespace

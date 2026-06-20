@@ -30,4 +30,4 @@ TEST(SequentialBlockPreprocessor, MacroExpandsToSeqBlockContent) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-}
+}  // namespace

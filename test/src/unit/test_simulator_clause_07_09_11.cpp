@@ -389,4 +389,4 @@ TEST(AssocMethods, RuntimeLiteralStringKeyedReplaces) {
   EXPECT_EQ(v, 11u);
 }
 
-}
+}  // namespace

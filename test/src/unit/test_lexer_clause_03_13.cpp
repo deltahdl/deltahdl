@@ -31,4 +31,4 @@ TEST(NameSpaceLexing, DefinitionsNameSpaceKeywordsTokenized) {
   EXPECT_EQ(tokens[3].kind, TokenKind::kKwInterface);
 }
 
-}
+}  // namespace

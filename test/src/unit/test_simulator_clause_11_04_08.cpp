@@ -450,8 +450,10 @@ TEST(BitwiseTruthTable, BinaryAndAllCells) {
   for (int i = 0; i < 4; ++i) {
     for (int j = 0; j < 4; ++j) {
       auto r = Logic4And(kFour[i], kFour[j]);
-      EXPECT_EQ(r.aval & 1u, expected[i][j].aval) << "row=" << i << " col=" << j;
-      EXPECT_EQ(r.bval & 1u, expected[i][j].bval) << "row=" << i << " col=" << j;
+      EXPECT_EQ(r.aval & 1u, expected[i][j].aval)
+          << "row=" << i << " col=" << j;
+      EXPECT_EQ(r.bval & 1u, expected[i][j].bval)
+          << "row=" << i << " col=" << j;
     }
   }
 }
@@ -466,8 +468,10 @@ TEST(BitwiseTruthTable, BinaryOrAllCells) {
   for (int i = 0; i < 4; ++i) {
     for (int j = 0; j < 4; ++j) {
       auto r = Logic4Or(kFour[i], kFour[j]);
-      EXPECT_EQ(r.aval & 1u, expected[i][j].aval) << "row=" << i << " col=" << j;
-      EXPECT_EQ(r.bval & 1u, expected[i][j].bval) << "row=" << i << " col=" << j;
+      EXPECT_EQ(r.aval & 1u, expected[i][j].aval)
+          << "row=" << i << " col=" << j;
+      EXPECT_EQ(r.bval & 1u, expected[i][j].bval)
+          << "row=" << i << " col=" << j;
     }
   }
 }
@@ -482,8 +486,10 @@ TEST(BitwiseTruthTable, BinaryXorAllCells) {
   for (int i = 0; i < 4; ++i) {
     for (int j = 0; j < 4; ++j) {
       auto r = Logic4Xor(kFour[i], kFour[j]);
-      EXPECT_EQ(r.aval & 1u, expected[i][j].aval) << "row=" << i << " col=" << j;
-      EXPECT_EQ(r.bval & 1u, expected[i][j].bval) << "row=" << i << " col=" << j;
+      EXPECT_EQ(r.aval & 1u, expected[i][j].aval)
+          << "row=" << i << " col=" << j;
+      EXPECT_EQ(r.bval & 1u, expected[i][j].bval)
+          << "row=" << i << " col=" << j;
     }
   }
 }
@@ -498,8 +504,10 @@ TEST(BitwiseTruthTable, BinaryXnorAllCells) {
   for (int i = 0; i < 4; ++i) {
     for (int j = 0; j < 4; ++j) {
       auto r = Logic4Not(Logic4Xor(kFour[i], kFour[j]));
-      EXPECT_EQ(r.aval & 1u, expected[i][j].aval) << "row=" << i << " col=" << j;
-      EXPECT_EQ(r.bval & 1u, expected[i][j].bval) << "row=" << i << " col=" << j;
+      EXPECT_EQ(r.aval & 1u, expected[i][j].aval)
+          << "row=" << i << " col=" << j;
+      EXPECT_EQ(r.bval & 1u, expected[i][j].bval)
+          << "row=" << i << " col=" << j;
     }
   }
 }
@@ -548,4 +556,4 @@ TEST(BitwiseEval, BinaryXnorBothUnsignedYieldsUnsigned) {
   EXPECT_FALSE(result.is_signed);
 }
 
-}
+}  // namespace

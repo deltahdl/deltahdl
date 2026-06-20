@@ -55,4 +55,4 @@ class MtScheduler {
   std::vector<SimPartition> partitions_;
 };
 
-}
+}  // namespace delta

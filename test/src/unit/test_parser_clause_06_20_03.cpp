@@ -130,4 +130,4 @@ TEST(TypeParameterParsing, TypeParamForwardStructBody) {
   EXPECT_EQ(r.cu->modules[0]->items[0]->name, "S");
 }
 
-}
+}  // namespace

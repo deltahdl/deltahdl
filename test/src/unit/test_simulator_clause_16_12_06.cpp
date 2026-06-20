@@ -74,4 +74,4 @@ TEST(PropertyIfElse, SelectedBranchPendingResultPropagates) {
             PropertyResult::kPending);
 }
 
-}
+}  // namespace

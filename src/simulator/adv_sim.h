@@ -62,4 +62,4 @@ class SvString {
   std::string data_;
 };
 
-}
+}  // namespace delta

@@ -61,9 +61,9 @@ TEST(ClockRewrite, EventOnDistinctNameIsIndependent) {
 // §F.5.1: a sequence with no event control trivially satisfies the
 // requirement.
 TEST(ClockRewrite, UnclockedSequenceIsVacuouslyIndependent) {
-  auto seq = SeqLocalVarDecl("int", "v",
-                             SeqConcat(SeqLocalVarSampling("v"),
-                                       SeqBoolean(BoolAtom("v"))));
+  auto seq = SeqLocalVarDecl(
+      "int", "v",
+      SeqConcat(SeqLocalVarSampling("v"), SeqBoolean(BoolAtom("v"))));
   EXPECT_TRUE(ClockEventsAreLocalVariableIndependent(*seq));
 }
 
@@ -80,8 +80,8 @@ TEST(ClockRewrite, NestedClockEventReadingLocalIsDependent) {
 // buried in a branch of an or that does not itself sample the local.
 TEST(ClockRewrite, ClockInOrBranchReadingLocalIsDependent) {
   auto clocked = SeqClock(BoolAtom("v"), SeqBoolean(BoolAtom("a")));
-  auto seq = SeqLocalVarDecl(
-      "int", "v", SeqOr(clocked, SeqBoolean(BoolAtom("b"))));
+  auto seq =
+      SeqLocalVarDecl("int", "v", SeqOr(clocked, SeqBoolean(BoolAtom("b"))));
   EXPECT_FALSE(ClockEventsAreLocalVariableIndependent(*seq));
 }
 
@@ -90,8 +90,8 @@ TEST(ClockRewrite, ClockInOrBranchReadingLocalIsDependent) {
 // v appearing only as a sampled guard leaves the clock independent.
 TEST(ClockRewrite, ConstantEventLeavesGuardLocalIndependent) {
   auto clocked = SeqClock(BoolTrue(), SeqBoolean(BoolAtom("v")));
-  auto seq = SeqLocalVarDecl(
-      "int", "v", SeqConcat(SeqLocalVarSampling("v"), clocked));
+  auto seq =
+      SeqLocalVarDecl("int", "v", SeqConcat(SeqLocalVarSampling("v"), clocked));
   EXPECT_TRUE(ClockEventsAreLocalVariableIndependent(*seq));
 }
 

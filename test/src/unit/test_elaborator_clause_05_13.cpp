@@ -106,4 +106,4 @@ TEST(BuiltinMethodElaboration, StringLenNoParensElaborates) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

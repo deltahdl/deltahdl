@@ -31,4 +31,4 @@ TEST(LineDirectiveElaboration, LineBetweenModulesElaboratesCorrectly) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

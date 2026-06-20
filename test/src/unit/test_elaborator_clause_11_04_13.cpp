@@ -150,4 +150,4 @@ TEST(ExpressionSim, InsideRangeBoundaryInclusive) {
   EXPECT_EQ(vy->value.ToUint64(), 1u);
 }
 
-}
+}  // namespace

@@ -128,8 +128,7 @@ TEST(HierarchicalNameElaboration,
              "endmodule\n"));
 }
 
-TEST(HierarchicalNameElaboration,
-     HierarchicalReferenceIntoCheckerProhibited) {
+TEST(HierarchicalNameElaboration, HierarchicalReferenceIntoCheckerProhibited) {
   EXPECT_FALSE(
       ElabOk("checker my_chk;\n"
              "  logic captured;\n"
@@ -231,4 +230,4 @@ TEST(HierarchicalNameElaboration, InstanceSelectInRangeElaboratesOk) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

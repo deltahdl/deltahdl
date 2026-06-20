@@ -76,14 +76,15 @@ TEST(CoverageTransitionBins, ArrayBinNamesEmbedTransition) {
 // LRM 19.5.2: consecutive repetition is bounded; goto and nonconsecutive are
 // not, and so cannot be used with the multiple bins "[]" construct.
 TEST(CoverageTransitionBins, UnboundedRepeatRejectedForMultipleBins) {
-  EXPECT_TRUE(CoverageDB::TransitionRepeatBounded(
-      TransitionRepeatKind::kConsecutive));
+  EXPECT_TRUE(
+      CoverageDB::TransitionRepeatBounded(TransitionRepeatKind::kConsecutive));
   EXPECT_FALSE(
       CoverageDB::TransitionRepeatBounded(TransitionRepeatKind::kGoto));
   EXPECT_FALSE(CoverageDB::TransitionRepeatBounded(
       TransitionRepeatKind::kNonconsecutive));
 
-  EXPECT_TRUE(CoverageDB::MultipleBinsAllowsTransition(/*sequence_bounded=*/true));
+  EXPECT_TRUE(
+      CoverageDB::MultipleBinsAllowsTransition(/*sequence_bounded=*/true));
   EXPECT_FALSE(
       CoverageDB::MultipleBinsAllowsTransition(/*sequence_bounded=*/false));
 }

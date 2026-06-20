@@ -49,4 +49,4 @@ TEST(DesignBuildingBlockParsing, TimeValuesInDesignElement) {
   EXPECT_EQ(mod->time_prec, TimeUnit::kPs);
 }
 
-}
+}  // namespace

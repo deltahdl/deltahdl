@@ -51,40 +51,42 @@ TEST(ConstantClassPropertySim, InstanceConstantSetOnObject) {
 }
 
 TEST(ConstantClassPropertySim, GlobalConstantReadBack) {
-  EXPECT_EQ(RunAndGet(
-      "class Jumbo_Packet;\n"
-      "  const int max_size = 9 * 1024;\n"
-      "  byte payload [];\n"
-      "  function new(int size);\n"
-      "    payload = new[size > max_size ? max_size : size];\n"
-      "  endfunction\n"
-      "endclass\n"
-      "module t;\n"
-      "  int result;\n"
-      "  initial begin\n"
-      "    Jumbo_Packet p;\n"
-      "    p = new(100);\n"
-      "    result = p.max_size;\n"
-      "  end\n"
-      "endmodule\n", "result"), 9u * 1024u);
+  EXPECT_EQ(RunAndGet("class Jumbo_Packet;\n"
+                      "  const int max_size = 9 * 1024;\n"
+                      "  byte payload [];\n"
+                      "  function new(int size);\n"
+                      "    payload = new[size > max_size ? max_size : size];\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    Jumbo_Packet p;\n"
+                      "    p = new(100);\n"
+                      "    result = p.max_size;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            9u * 1024u);
 }
 
 TEST(ConstantClassPropertySim, InstanceConstantAssignedInConstructor) {
-  EXPECT_EQ(RunAndGet(
-      "class Big_Packet;\n"
-      "  const int size;\n"
-      "  function new();\n"
-      "    size = 4096;\n"
-      "  endfunction\n"
-      "endclass\n"
-      "module t;\n"
-      "  int result;\n"
-      "  initial begin\n"
-      "    Big_Packet p;\n"
-      "    p = new;\n"
-      "    result = p.size;\n"
-      "  end\n"
-      "endmodule\n", "result"), 4096u);
+  EXPECT_EQ(RunAndGet("class Big_Packet;\n"
+                      "  const int size;\n"
+                      "  function new();\n"
+                      "    size = 4096;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    Big_Packet p;\n"
+                      "    p = new;\n"
+                      "    result = p.size;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            4096u);
 }
 
 TEST(ConstantClassPropertySim, StaticGlobalConstantSharedAcrossInstances) {
@@ -102,7 +104,8 @@ TEST(ConstantClassPropertySim, StaticGlobalConstantSharedAcrossInstances) {
       "    r1 = a.VERSION;\n"
       "    r2 = b.VERSION;\n"
       "  end\n"
-      "endmodule\n", f);
+      "endmodule\n",
+      f);
   LowerRunAndCheck(f, design, {{"r1", 3u}, {"r2", 3u}});
 }
 
@@ -124,7 +127,8 @@ TEST(ConstantClassPropertySim, GlobalAndInstanceConstTogether) {
       "    r_max = p.max_size;\n"
       "    r_size = p.size;\n"
       "  end\n"
-      "endmodule\n", f);
+      "endmodule\n",
+      f);
   LowerRunAndCheck(f, design, {{"r_max", 1024u}, {"r_size", 256u}});
 }
 
@@ -146,7 +150,8 @@ TEST(ConstantClassPropertySim, InstanceConstantDifferentPerObject) {
       "    r1 = a.id;\n"
       "    r2 = b.id;\n"
       "  end\n"
-      "endmodule\n", f);
+      "endmodule\n",
+      f);
   LowerRunAndCheck(f, design, {{"r1", 10u}, {"r2", 20u}});
 }
 
@@ -171,4 +176,4 @@ TEST(ConstantClassPropertySim, ConstPropertyInitExprTracked) {
   EXPECT_FALSE(info->properties[1].is_static);
 }
 
-}
+}  // namespace

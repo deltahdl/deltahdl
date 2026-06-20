@@ -28,4 +28,4 @@ TEST(RealConversion, IntToRealAssignment) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

@@ -225,4 +225,4 @@ TEST(FunctionDeclParsing, DpiImportFunctionShortrealResultAccepted) {
   EXPECT_EQ(item->return_type.kind, DataTypeKind::kShortreal);
 }
 
-}
+}  // namespace

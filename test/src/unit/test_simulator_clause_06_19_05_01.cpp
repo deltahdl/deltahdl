@@ -33,8 +33,8 @@ TEST(EnumMethods, FirstWithNonZeroStart) {
 // unchanged.
 TEST(EnumMethods, FirstIgnoresCurrentValue) {
   EnumFixture f;
-  auto* var =
-      f.RegisterEnum("color", "color_t", {{"RED", 0}, {"GREEN", 1}, {"BLUE", 2}});
+  auto* var = f.RegisterEnum("color", "color_t",
+                             {{"RED", 0}, {"GREEN", 1}, {"BLUE", 2}});
   var->value = MakeLogic4VecVal(f.arena, 32, 2);  // currently BLUE
   auto* call = f.MakeEnumMethodCall("color", "first");
   auto result = EvalExpr(call, f.ctx, f.arena);
@@ -45,8 +45,7 @@ TEST(EnumMethods, FirstIgnoresCurrentValue) {
 // numeric value: here the first member outranks every later one.
 TEST(EnumMethods, FirstFollowsDeclarationOrderNotMinimum) {
   EnumFixture f;
-  f.RegisterEnum("level", "level_t",
-                 {{"HIGH", 100}, {"MID", 50}, {"LOW", 1}});
+  f.RegisterEnum("level", "level_t", {{"HIGH", 100}, {"MID", 50}, {"LOW", 1}});
   auto* call = f.MakeEnumMethodCall("level", "first");
   auto result = EvalExpr(call, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 100u);
@@ -61,4 +60,4 @@ TEST(EnumMethods, FirstWithSingleMember) {
   EXPECT_EQ(result.ToUint64(), 7u);
 }
 
-}
+}  // namespace

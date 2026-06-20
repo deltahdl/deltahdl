@@ -110,4 +110,4 @@ TEST(IdentifierSimulation, ParameterIdentifierFromPackageResolvesAtRuntime) {
   EXPECT_EQ(val, 11u);
 }
 
-}
+}  // namespace

@@ -300,4 +300,4 @@ TEST(LexicalConventionLexing, LineCommentEndedByCrlf) {
   EXPECT_EQ(tokens[2].kind, TokenKind::kEof);
 }
 
-}
+}  // namespace

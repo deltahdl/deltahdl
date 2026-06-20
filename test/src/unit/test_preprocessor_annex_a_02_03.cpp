@@ -41,4 +41,4 @@ TEST(DeclarationListParsing, ListOfVariableIdentifiersMultipleAnsi) {
   }
 }
 
-}
+}  // namespace

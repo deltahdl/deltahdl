@@ -55,8 +55,9 @@ TEST(SequenceProperty, StrongEqualsStrongOfFirstMatch) {
   // first_match preserves whether a nonempty match exists.
   auto nonempty_match_of_first_match = [](bool of_seq) { return of_seq; };
   for (bool has_match : {false, true}) {
-    EXPECT_EQ(EvalStrongSequenceProperty(has_match),
-              EvalStrongSequenceProperty(nonempty_match_of_first_match(has_match)));
+    EXPECT_EQ(
+        EvalStrongSequenceProperty(has_match),
+        EvalStrongSequenceProperty(nonempty_match_of_first_match(has_match)));
   }
 }
 

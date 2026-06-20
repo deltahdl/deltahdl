@@ -123,9 +123,9 @@ TEST(StaticConstraint, StaticPureOverriddenByStaticAccepted) {
              "endmodule\n"));
 }
 
-// 18.5.10: an overriding constraint that does not match the static qualification
-// of the pure constraint it overrides is an error — a static pure constraint
-// overridden by a non-static constraint.
+// 18.5.10: an overriding constraint that does not match the static
+// qualification of the pure constraint it overrides is an error — a static pure
+// constraint overridden by a non-static constraint.
 TEST(StaticConstraint, StaticPureOverriddenByNonStaticRejected) {
   EXPECT_FALSE(
       ElabOk("virtual class B;\n"
@@ -170,4 +170,4 @@ TEST(StaticConstraint, NonStaticPureOverriddenByNonStaticAccepted) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

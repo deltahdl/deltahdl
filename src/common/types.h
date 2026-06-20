@@ -214,4 +214,4 @@ class SmallVec {
   std::vector<T> heap_;
 };
 
-}
+}  // namespace delta

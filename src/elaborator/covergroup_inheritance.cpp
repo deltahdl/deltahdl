@@ -5,8 +5,8 @@
 namespace delta {
 
 bool DerivedCovergroupCanBeExtended() {
-  // §19.4.1: a derived covergroup may act as the base covergroup for inheritance
-  // in another class, so it can always be extended further.
+  // §19.4.1: a derived covergroup may act as the base covergroup for
+  // inheritance in another class, so it can always be extended further.
   return true;
 }
 
@@ -50,8 +50,8 @@ std::vector<std::string> DerivedCovergroupCoverpoints(
 
 std::vector<std::string> DerivedCovergroupArguments(
     const std::vector<std::string>& base_arguments) {
-  // §19.4.1: the derived covergroup implicitly has the same argument list as the
-  // base covergroup.
+  // §19.4.1: the derived covergroup implicitly has the same argument list as
+  // the base covergroup.
   return base_arguments;
 }
 

@@ -87,4 +87,4 @@ TEST(CheckerItemsParsing, MacroExpandsToCheckerItem) {
       HasItemOfKind(r.cu->checkers[0]->items, ModuleItemKind::kInitialBlock));
 }
 
-}
+}  // namespace

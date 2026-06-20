@@ -9,11 +9,12 @@ namespace {
 // §37.48 Clocking block: a clocking block (vpiClockingBlock) groups the default
 // input/output skews, the clocking event, and the clocking io decls
 // (vpiClockingIODecl) it contains. These tests observe the production code that
-// applies the clause's three numbered "Details" that refine traversal - vpiPrefix
-// (detail 2), vpiActual (detail 3), and an io decl's vpiExpr (detail 4) - through
-// the same-pipeline public VpiHandleC dispatch. Detail 1 only records which
-// construct the skew/edge relations target, and the figure's other relations and
-// properties are served by the generic machinery; neither refines behavior here.
+// applies the clause's three numbered "Details" that refine traversal -
+// vpiPrefix (detail 2), vpiActual (detail 3), and an io decl's vpiExpr (detail
+// 4) - through the same-pipeline public VpiHandleC dispatch. Detail 1 only
+// records which construct the skew/edge relations target, and the figure's
+// other relations and properties are served by the generic machinery; neither
+// refines behavior here.
 
 // The fixture installs a context so the public VpiHandleC entry point runs its
 // real dispatch over the test objects.
@@ -40,9 +41,9 @@ TEST_F(ClockingBlock, PrefixReachesVirtualInterfacePrefix) {
   EXPECT_EQ(VpiHandleC(vpiPrefix, &block), &vif);
 }
 
-// D2: a clocking block that is not a virtual-interface-prefixed expression has no
-// virtual interface var prefix, so vpiPrefix reports NULL rather than reaching
-// some unrelated child.
+// D2: a clocking block that is not a virtual-interface-prefixed expression has
+// no virtual interface var prefix, so vpiPrefix reports NULL rather than
+// reaching some unrelated child.
 TEST_F(ClockingBlock, PrefixIsNullWhenNotVirtualInterfacePrefixed) {
   VpiObject event_ctrl;  // an ordinary (non-vif) child of the clocking block
   event_ctrl.type = vpiEventControl;
@@ -55,9 +56,9 @@ TEST_F(ClockingBlock, PrefixIsNullWhenNotVirtualInterfacePrefixed) {
   EXPECT_EQ(VpiHandleC(vpiPrefix, &block), nullptr);
 }
 
-// D3: vpiActual of a clocking block reaches the concrete clocking block selected
-// through its virtual interface prefix when that prefix holds a value at the
-// current simulation time (its own vpiActual is bound).
+// D3: vpiActual of a clocking block reaches the concrete clocking block
+// selected through its virtual interface prefix when that prefix holds a value
+// at the current simulation time (its own vpiActual is bound).
 TEST_F(ClockingBlock, ActualReachesResolvedClockingBlockWhenPrefixHasValue) {
   VpiObject iface;  // the interface the virtual interface currently holds
   iface.type = vpiInterface;
@@ -66,7 +67,8 @@ TEST_F(ClockingBlock, ActualReachesResolvedClockingBlockWhenPrefixHasValue) {
   vif.type = vpiVirtualInterfaceVar;
   vif.actual = &iface;  // prefix has a value at the current simulation time
 
-  VpiObject resolved;  // the concrete clocking block selected through the prefix
+  VpiObject
+      resolved;  // the concrete clocking block selected through the prefix
   resolved.type = vpiClockingBlock;
 
   VpiObject block;
@@ -79,8 +81,9 @@ TEST_F(ClockingBlock, ActualReachesResolvedClockingBlockWhenPrefixHasValue) {
 }
 
 // D3: when the prefix is a virtual interface that has no value at the current
-// simulation time - its own vpiActual being NULL - the clocking block's vpiActual
-// is NULL as well, even though a resolved actual is otherwise present.
+// simulation time - its own vpiActual being NULL - the clocking block's
+// vpiActual is NULL as well, even though a resolved actual is otherwise
+// present.
 TEST_F(ClockingBlock, ActualIsNullWhenVirtualInterfacePrefixHasNoValue) {
   VpiObject vif;
   vif.type = vpiVirtualInterfaceVar;  // uninitialized: no value bound yet
@@ -153,8 +156,8 @@ TEST_F(ClockingBlock, IODeclExprIsNullWhenNothingNamed) {
 }
 
 // Edge: each clocking-block helper speaks only for its own object kind, so an
-// unrelated handle (or a null handle) reaches nothing through it. This guards the
-// dispatch from misapplying the detail rules to the wrong object.
+// unrelated handle (or a null handle) reaches nothing through it. This guards
+// the dispatch from misapplying the detail rules to the wrong object.
 TEST_F(ClockingBlock, HelpersGuardOnObjectKind) {
   VpiObject other;
   other.type = vpiModule;

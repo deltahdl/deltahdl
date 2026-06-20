@@ -9,12 +9,11 @@ namespace {
 
 TEST(KeywordSynthesis, KeywordConstructSynthesizes) {
   SynthFixture f;
-  auto* mod = ElaborateSrc(
-      f,
-      "module m;\n"
-      "  logic [7:0] a, b;\n"
-      "  assign b = a;\n"
-      "endmodule\n");
+  auto* mod = ElaborateSrc(f,
+                           "module m;\n"
+                           "  logic [7:0] a, b;\n"
+                           "  assign b = a;\n"
+                           "endmodule\n");
   ASSERT_NE(mod, nullptr);
   SynthLower synth(f.arena, f.diag);
   auto* aig = synth.Lower(mod);
@@ -23,12 +22,11 @@ TEST(KeywordSynthesis, KeywordConstructSynthesizes) {
 
 TEST(KeywordSynthesis, EscapedKeywordAsSignalSynthesizes) {
   SynthFixture f;
-  auto* mod = ElaborateSrc(
-      f,
-      "module m;\n"
-      "  logic [7:0] \\begin , result;\n"
-      "  assign result = \\begin ;\n"
-      "endmodule\n");
+  auto* mod = ElaborateSrc(f,
+                           "module m;\n"
+                           "  logic [7:0] \\begin , result;\n"
+                           "  assign result = \\begin ;\n"
+                           "endmodule\n");
   ASSERT_NE(mod, nullptr);
   SynthLower synth(f.arena, f.diag);
   auto* aig = synth.Lower(mod);
@@ -37,16 +35,15 @@ TEST(KeywordSynthesis, EscapedKeywordAsSignalSynthesizes) {
 
 TEST(KeywordSynthesis, UppercaseKeywordAsSignalSynthesizes) {
   SynthFixture f;
-  auto* mod = ElaborateSrc(
-      f,
-      "module m;\n"
-      "  logic [7:0] Begin, result;\n"
-      "  assign result = Begin;\n"
-      "endmodule\n");
+  auto* mod = ElaborateSrc(f,
+                           "module m;\n"
+                           "  logic [7:0] Begin, result;\n"
+                           "  assign result = Begin;\n"
+                           "endmodule\n");
   ASSERT_NE(mod, nullptr);
   SynthLower synth(f.arena, f.diag);
   auto* aig = synth.Lower(mod);
   ASSERT_NE(aig, nullptr);
 }
 
-}
+}  // namespace

@@ -839,4 +839,4 @@ TEST(ClassSyntaxParsing, StaticConstraintDeclaration) {
   EXPECT_EQ(r.cu->classes[0]->members[0]->kind, ClassMemberKind::kConstraint);
 }
 
-}
+}  // namespace

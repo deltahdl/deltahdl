@@ -83,7 +83,8 @@ TEST(DpiArgumentPassing, OutputValueCoercedToActualTypeOnCopyOut) {
   std::vector<DpiArgValue> actuals = {DpiArgValue::FromLongint(0)};
   rt.CallImportWithArgs("produce_int", actuals);
 
-  // The int the foreign code wrote is coerced back to the actual's longint type.
+  // The int the foreign code wrote is coerced back to the actual's longint
+  // type.
   EXPECT_EQ(actuals[0].type, DataTypeKind::kLongint);
   EXPECT_EQ(actuals[0].AsLongint(), 7);
 }
@@ -135,8 +136,8 @@ TEST(DpiArgumentPassing, InputCopyInLeavesActualUnaffected) {
   std::vector<DpiArgValue> actuals = {DpiArgValue::FromInt(5)};
   DpiArgValue result = rt.CallImportWithArgs("clobber", actuals);
 
-  EXPECT_EQ(result.AsInt(), 5);       // the callee did receive the actual
-  EXPECT_EQ(actuals[0].AsInt(), 5);   // but the actual is unaffected
+  EXPECT_EQ(result.AsInt(), 5);      // the callee did receive the actual
+  EXPECT_EQ(actuals[0].AsInt(), 5);  // but the actual is unaffected
 }
 
 // P2b edge: coercion happens only when needed. When the actual already matches

@@ -297,4 +297,4 @@ TEST(FunctionReturnValueParsing, VoidFunctionCallAsStatement) {
   EXPECT_EQ(stmt->expr->kind, ExprKind::kCall);
 }
 
-}
+}  // namespace

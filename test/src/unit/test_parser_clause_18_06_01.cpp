@@ -31,4 +31,4 @@ TEST(SubroutineCallExprParsing, RandomizeCallReturnValueUsed) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}
+}  // namespace

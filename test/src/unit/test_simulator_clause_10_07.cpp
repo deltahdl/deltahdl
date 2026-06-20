@@ -309,7 +309,8 @@ TEST(AssignmentExtensionTruncationSim, SignedWideTruncated) {
   EXPECT_EQ(var->value.ToUint64(), 0xDu);
 }
 
-TEST(AssignmentExtensionTruncationSim, RhsExpressionSignednessDeterminesExtension) {
+TEST(AssignmentExtensionTruncationSim,
+     RhsExpressionSignednessDeterminesExtension) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -592,4 +593,4 @@ TEST(AssignmentExtensionTruncationSim, WideTruncationDiscardsHighWord) {
   EXPECT_EQ(var->value.ToUint64(), 0xAu);
 }
 
-}
+}  // namespace

@@ -34,4 +34,4 @@ TEST(LevelSensitiveSequenceLexing, WaitWithDotTriggered) {
   EXPECT_EQ(tokens[5].kind, TokenKind::kRParen);
 }
 
-}
+}  // namespace

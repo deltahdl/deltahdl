@@ -172,4 +172,4 @@ TEST(PackedStructSimulation, MemberWriteUpdatesWholeVector) {
   EXPECT_EQ(v, 0xAB00u);
 }
 
-}
+}  // namespace

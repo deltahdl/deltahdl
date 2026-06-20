@@ -86,8 +86,8 @@ TEST(SvaNonvacuous, AlwaysNeedsWitnessWithoutPriorFailure) {
   EXPECT_FALSE(NonvacuousAlways(/*witness=*/true, /*prior_failure=*/true));
 }
 
-// §16.14.8(s)(t)(u): a covered clock event must witness a nonvacuous subproperty
-// attempt with the subproperty not already holding earlier.
+// §16.14.8(s)(t)(u): a covered clock event must witness a nonvacuous
+// subproperty attempt with the subproperty not already holding earlier.
 TEST(SvaNonvacuous, EventuallyNeedsWitnessWithoutPriorHold) {
   EXPECT_TRUE(NonvacuousEventually(/*witness=*/true, /*prior_hold=*/false));
   EXPECT_FALSE(NonvacuousEventually(/*witness=*/false, /*prior_hold=*/false));
@@ -99,19 +99,24 @@ TEST(SvaNonvacuous, EventuallyNeedsWitnessWithoutPriorHold) {
 // left operand to have held at every earlier clock event.
 TEST(SvaNonvacuous, UntilNonOverlappingWitnessesEitherOperand) {
   EXPECT_TRUE(NonvacuousUntil(/*overlapping=*/false, /*left_witness=*/false,
-                              /*right_witness=*/true, /*right_prior_hold=*/false,
+                              /*right_witness=*/true,
+                              /*right_prior_hold=*/false,
                               /*left_holds_all_prior=*/true));
   EXPECT_TRUE(NonvacuousUntil(/*overlapping=*/false, /*left_witness=*/true,
-                              /*right_witness=*/false, /*right_prior_hold=*/false,
+                              /*right_witness=*/false,
+                              /*right_prior_hold=*/false,
                               /*left_holds_all_prior=*/true));
   EXPECT_FALSE(NonvacuousUntil(/*overlapping=*/false, /*left_witness=*/false,
-                               /*right_witness=*/false, /*right_prior_hold=*/false,
+                               /*right_witness=*/false,
+                               /*right_prior_hold=*/false,
                                /*left_holds_all_prior=*/true));
   EXPECT_FALSE(NonvacuousUntil(/*overlapping=*/false, /*left_witness=*/true,
-                               /*right_witness=*/false, /*right_prior_hold=*/true,
+                               /*right_witness=*/false,
+                               /*right_prior_hold=*/true,
                                /*left_holds_all_prior=*/true));
   EXPECT_FALSE(NonvacuousUntil(/*overlapping=*/false, /*left_witness=*/true,
-                               /*right_witness=*/false, /*right_prior_hold=*/false,
+                               /*right_witness=*/false,
+                               /*right_prior_hold=*/false,
                                /*left_holds_all_prior=*/false));
 }
 
@@ -119,10 +124,12 @@ TEST(SvaNonvacuous, UntilNonOverlappingWitnessesEitherOperand) {
 // operand's attempt.
 TEST(SvaNonvacuous, UntilOverlappingWitnessesLeftOnly) {
   EXPECT_TRUE(NonvacuousUntil(/*overlapping=*/true, /*left_witness=*/true,
-                              /*right_witness=*/false, /*right_prior_hold=*/false,
+                              /*right_witness=*/false,
+                              /*right_prior_hold=*/false,
                               /*left_holds_all_prior=*/true));
   EXPECT_FALSE(NonvacuousUntil(/*overlapping=*/true, /*left_witness=*/false,
-                               /*right_witness=*/true, /*right_prior_hold=*/false,
+                               /*right_witness=*/true,
+                               /*right_prior_hold=*/false,
                                /*left_holds_all_prior=*/true));
 }
 
@@ -143,21 +150,24 @@ TEST(SvaNonvacuous, ImpliesNeedsTrueNonvacuousAntecedent) {
 // when the underlying attempt is nonvacuous and the condition never held across
 // the steps it was evaluated at.
 TEST(SvaNonvacuous, AbortOrDisableNeedsConditionNeverHeld) {
-  EXPECT_TRUE(NonvacuousAbortOrDisable(/*inner=*/true, /*condition_held=*/false));
-  EXPECT_FALSE(NonvacuousAbortOrDisable(/*inner=*/false, /*condition_held=*/false));
-  EXPECT_FALSE(NonvacuousAbortOrDisable(/*inner=*/true, /*condition_held=*/true));
+  EXPECT_TRUE(
+      NonvacuousAbortOrDisable(/*inner=*/true, /*condition_held=*/false));
+  EXPECT_FALSE(
+      NonvacuousAbortOrDisable(/*inner=*/false, /*condition_held=*/false));
+  EXPECT_FALSE(
+      NonvacuousAbortOrDisable(/*inner=*/true, /*condition_held=*/true));
 }
 
-// §16.14.8(af): a case property is nonvacuous when a matching or default item is
-// selected and that item's property_stmt attempt is nonvacuous.
+// §16.14.8(af): a case property is nonvacuous when a matching or default item
+// is selected and that item's property_stmt attempt is nonvacuous.
 TEST(SvaNonvacuous, CaseNeedsSelectedNonvacuousBranch) {
   EXPECT_TRUE(NonvacuousCase(/*selected=*/true, /*stmt_nonvacuous=*/true));
   EXPECT_FALSE(NonvacuousCase(/*selected=*/false, /*stmt_nonvacuous=*/true));
   EXPECT_FALSE(NonvacuousCase(/*selected=*/true, /*stmt_nonvacuous=*/false));
 }
 
-// §16.14.8: an attempt succeeds nonvacuously exactly when the property evaluates
-// to true and the attempt is nonvacuous.
+// §16.14.8: an attempt succeeds nonvacuously exactly when the property
+// evaluates to true and the attempt is nonvacuous.
 TEST(SvaNonvacuous, NonvacuousSuccessNeedsTrueAndNonvacuous) {
   EXPECT_TRUE(PropertySucceedsNonvacuously(/*property_true=*/true,
                                            /*attempt_nonvacuous=*/true));

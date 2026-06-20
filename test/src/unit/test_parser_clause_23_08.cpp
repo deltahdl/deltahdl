@@ -128,4 +128,4 @@ TEST(UpwardNameReferenceParsing, MultiComponentUpwardPathParses) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

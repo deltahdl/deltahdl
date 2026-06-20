@@ -74,4 +74,4 @@ TEST(NameSpaceSimulation, BlockNameSpaceIsolatesLocalVariables) {
   EXPECT_EQ(v2->value.ToUint64(), 2u);
 }
 
-}
+}  // namespace

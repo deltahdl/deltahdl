@@ -198,4 +198,4 @@ TEST(PackedStructTyping, AnyFourStateMember_StructIsFourState) {
   EXPECT_TRUE(mod->variables[0].is_4state);
 }
 
-}
+}  // namespace

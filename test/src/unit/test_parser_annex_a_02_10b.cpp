@@ -358,4 +358,4 @@ TEST(AssertionParsing, PropertyInstanceWithArgs) {
   ASSERT_NE(r.cu, nullptr);
 }
 
-}
+}  // namespace

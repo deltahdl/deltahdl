@@ -34,4 +34,4 @@ TEST(SubroutineCallExprParsing, TypenameDataTypeForm) {
   EXPECT_EQ(stmt->rhs->callee, "$typename");
 }
 
-}
+}  // namespace

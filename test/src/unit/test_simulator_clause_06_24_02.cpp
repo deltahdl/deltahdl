@@ -322,4 +322,4 @@ TEST(DynamicCastSim, TaskFormIntegralCastAssignsNoError) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-}
+}  // namespace

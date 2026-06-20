@@ -163,8 +163,9 @@ TEST(FunctionsInConstraints, LaterArgumentBadDirectionRejected) {
              "endmodule\n"));
 }
 
-// 18.5.11: a function with no arguments has nothing to forbid, so calling one in
-// a constraint is legal — the empty argument list is the boundary of the scan.
+// 18.5.11: a function with no arguments has nothing to forbid, so calling one
+// in a constraint is legal — the empty argument list is the boundary of the
+// scan.
 TEST(FunctionsInConstraints, NoArgumentFunctionAccepted) {
   EXPECT_TRUE(
       ElabOk("class C;\n"
@@ -176,9 +177,9 @@ TEST(FunctionsInConstraints, NoArgumentFunctionAccepted) {
              "endmodule\n"));
 }
 
-// 18.5.11: the no-modify rule reaches a rand_mode()/constraint_mode() call buried
-// inside the function body, not just one at the top level. A call nested in a
-// control-flow statement is found by the recursive body scan and rejected.
+// 18.5.11: the no-modify rule reaches a rand_mode()/constraint_mode() call
+// buried inside the function body, not just one at the top level. A call nested
+// in a control-flow statement is found by the recursive body scan and rejected.
 TEST(FunctionsInConstraints, ModeMethodCallNestedInControlFlowRejected) {
   EXPECT_FALSE(
       ElabOk("class C;\n"
@@ -195,19 +196,19 @@ TEST(FunctionsInConstraints, ModeMethodCallNestedInControlFlowRejected) {
 }
 
 // 18.5.11: the restrictions apply to every function called in the constraint,
-// including one nested as the argument of another call. An inner function with a
-// forbidden output argument is rejected even though the outer call is benign.
+// including one nested as the argument of another call. An inner function with
+// a forbidden output argument is rejected even though the outer call is benign.
 TEST(FunctionsInConstraints, NestedConstraintCallInnerFunctionChecked) {
-  EXPECT_FALSE(
-      ElabOk("class C;\n"
-             "  rand int x;\n"
-             "  rand int y;\n"
-             "  function int inner(output int a); a = 0; return a; endfunction\n"
-             "  function int outer(int a); return a; endfunction\n"
-             "  constraint c1 { x == outer(inner(y)); }\n"
-             "endclass\n"
-             "module m;\n"
-             "endmodule\n"));
+  EXPECT_FALSE(ElabOk(
+      "class C;\n"
+      "  rand int x;\n"
+      "  rand int y;\n"
+      "  function int inner(output int a); a = 0; return a; endfunction\n"
+      "  function int outer(int a); return a; endfunction\n"
+      "  constraint c1 { x == outer(inner(y)); }\n"
+      "endclass\n"
+      "module m;\n"
+      "endmodule\n"));
 }
 
 }  // namespace

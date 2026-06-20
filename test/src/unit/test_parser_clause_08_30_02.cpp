@@ -48,4 +48,4 @@ TEST(ClassParsing, WeakRefTwoInstancesSameReferent) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

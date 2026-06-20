@@ -94,7 +94,8 @@ TEST(ProcessExecutionThreadElaboration, AlwaysFFCreatesProcess) {
             RtlirProcessKind::kAlwaysFF);
 }
 
-TEST(ProcessExecutionThreadElaboration, MultipleProceduresCreateMultipleProcesses) {
+TEST(ProcessExecutionThreadElaboration,
+     MultipleProceduresCreateMultipleProcesses) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -240,4 +241,4 @@ TEST(ProcessExecutionThreadElaboration, EachContAssignCreatesOwnThread) {
   EXPECT_GE(mod->assigns.size(), 3u);
 }
 
-}
+}  // namespace

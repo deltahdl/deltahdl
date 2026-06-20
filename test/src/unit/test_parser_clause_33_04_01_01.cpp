@@ -5,25 +5,28 @@ using namespace delta;
 namespace {
 
 TEST(ConfigDesignStatement, ZeroDesignStatementsRejected) {
-  auto r = Parse("config c;\n"
-                 "endconfig\n");
+  auto r = Parse(
+      "config c;\n"
+      "endconfig\n");
   EXPECT_TRUE(r.has_errors);
 }
 
 TEST(ConfigDesignStatement, DuplicateDesignStatementsRejected) {
-  auto r = Parse("config c;\n"
-                 "  design work.top;\n"
-                 "  design work.other;\n"
-                 "endconfig\n");
+  auto r = Parse(
+      "config c;\n"
+      "  design work.top;\n"
+      "  design work.other;\n"
+      "endconfig\n");
   EXPECT_TRUE(r.has_errors);
 }
 
 TEST(ConfigDesignStatement, MultipleTopModulesInOneDesignStatement) {
   // §33.4.1.1: multiple top-level modules may be listed in a single design
   // statement.
-  auto r = Parse("config c;\n"
-                 "  design work.top_a work.top_b;\n"
-                 "endconfig\n");
+  auto r = Parse(
+      "config c;\n"
+      "  design work.top_a work.top_b;\n"
+      "endconfig\n");
   ASSERT_FALSE(r.has_errors);
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->configs.size(), 1u);
@@ -39,9 +42,10 @@ TEST(ConfigDesignStatement, BareCellNameStoredWithoutLibrary) {
   // §33.4.1.1: a design statement may name a cell without a library qualifier.
   // The parser captures the cell name and leaves the library empty for later
   // resolution.
-  auto r = Parse("config c;\n"
-                 "  design top;\n"
-                 "endconfig\n");
+  auto r = Parse(
+      "config c;\n"
+      "  design top;\n"
+      "endconfig\n");
   ASSERT_FALSE(r.has_errors);
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->configs.size(), 1u);
@@ -52,19 +56,21 @@ TEST(ConfigDesignStatement, BareCellNameStoredWithoutLibrary) {
 }
 
 TEST(ConfigDesignStatement, DesignBeforeRulesAccepted) {
-  auto r = Parse("config c;\n"
-                 "  design work.top;\n"
-                 "  default liblist work;\n"
-                 "endconfig\n");
+  auto r = Parse(
+      "config c;\n"
+      "  design work.top;\n"
+      "  default liblist work;\n"
+      "endconfig\n");
   EXPECT_FALSE(r.has_errors);
 }
 
 TEST(ConfigDesignStatement, RuleBeforeDesignRejected) {
-  auto r = Parse("config c;\n"
-                 "  default liblist work;\n"
-                 "  design work.top;\n"
-                 "endconfig\n");
+  auto r = Parse(
+      "config c;\n"
+      "  default liblist work;\n"
+      "  design work.top;\n"
+      "endconfig\n");
   EXPECT_TRUE(r.has_errors);
 }
 
-}
+}  // namespace

@@ -24,8 +24,8 @@ RandVariable MakeVar(const std::string& name, int64_t lo, int64_t hi,
 }
 
 // A membership constraint 'var inside set', referencing only 'var'. The
-// reference list lets the function-argument priority solve enforce it as soon as
-// 'var' is committed.
+// reference list lets the function-argument priority solve enforce it as soon
+// as 'var' is committed.
 ConstraintExpr InsideSet(const std::string& var, std::vector<int64_t> set) {
   ConstraintExpr c;
   c.kind = ConstraintKind::kSetMembership;
@@ -57,16 +57,16 @@ ConstraintBlock OneBlock(std::vector<ConstraintExpr> cs) {
 
 // 18.5.11: a random variable used as a function argument becomes a state
 // variable to the constraint that uses it. With y solved first (it is the
-// argument) the constraint x == 2*F(y) sees y as a fixed value: here y is pinned
-// to 2, so x is forced to 4. The function result (2*y) acts as a constant once y
-// is committed.
-TEST(FunctionsInConstraints, FunctionArgumentVariableIsStateVariableToConsumer) {
+// argument) the constraint x == 2*F(y) sees y as a fixed value: here y is
+// pinned to 2, so x is forced to 4. The function result (2*y) acts as a
+// constant once y is committed.
+TEST(FunctionsInConstraints,
+     FunctionArgumentVariableIsStateVariableToConsumer) {
   ConstraintSolver solver(101);
   solver.AddVariable(MakeVar("y", 2, 2));  // pinned argument value
   solver.AddVariable(MakeVar("x", 0, 7));
-  solver.AddConstraintBlock(OneBlock({Custom({"x", "y"}, [](const auto& v) {
-    return v.at("x") == 2 * v.at("y");
-  })}));
+  solver.AddConstraintBlock(OneBlock({Custom(
+      {"x", "y"}, [](const auto& v) { return v.at("x") == 2 * v.at("y"); })}));
   // Using y as a function argument gives it higher priority than x.
   solver.AddFunctionArgPriority({"y"}, {"x"});
   ASSERT_TRUE(solver.Solve());
@@ -75,9 +75,9 @@ TEST(FunctionsInConstraints, FunctionArgumentVariableIsStateVariableToConsumer) 
 }
 
 // 18.5.11: the argument variable is solved against only its own (higher
-// priority) constraints; the consumer's constraint is honored afterward with the
-// argument already chosen. Over many solves y always lands in its own legal set
-// and x always satisfies the relation built on F(y).
+// priority) constraints; the consumer's constraint is honored afterward with
+// the argument already chosen. Over many solves y always lands in its own legal
+// set and x always satisfies the relation built on F(y).
 TEST(FunctionsInConstraints, ArgumentSolvedFirstThenConsumerConstraintHolds) {
   ConstraintSolver solver(202);
   solver.AddVariable(MakeVar("y", 0, 8));
@@ -99,8 +99,8 @@ TEST(FunctionsInConstraints, ArgumentSolvedFirstThenConsumerConstraintHolds) {
 }
 
 // 18.5.11: priorities chain. When the constraint on x uses y as an argument and
-// the constraint on y uses z as an argument, z is highest priority, then y, then
-// x. Each is solved before the variable that consumes it, so the committed
+// the constraint on y uses z as an argument, z is highest priority, then y,
+// then x. Each is solved before the variable that consumes it, so the committed
 // upstream value flows down: z = 2 forces y = 3, which forces x = 4.
 TEST(FunctionsInConstraints, ChainedPriorityOrdersThreeVariables) {
   ConstraintSolver solver(303);
@@ -108,8 +108,10 @@ TEST(FunctionsInConstraints, ChainedPriorityOrdersThreeVariables) {
   solver.AddVariable(MakeVar("y", 0, 7));
   solver.AddVariable(MakeVar("x", 0, 7));
   solver.AddConstraintBlock(OneBlock({
-      Custom({"y", "z"}, [](const auto& v) { return v.at("y") == v.at("z") + 1; }),
-      Custom({"x", "y"}, [](const auto& v) { return v.at("x") == v.at("y") + 1; }),
+      Custom({"y", "z"},
+             [](const auto& v) { return v.at("y") == v.at("z") + 1; }),
+      Custom({"x", "y"},
+             [](const auto& v) { return v.at("x") == v.at("y") + 1; }),
   }));
   solver.AddFunctionArgPriority({"z"}, {"y"});
   solver.AddFunctionArgPriority({"y"}, {"x"});
@@ -119,10 +121,10 @@ TEST(FunctionsInConstraints, ChainedPriorityOrdersThreeVariables) {
   EXPECT_EQ(solver.GetValue("x"), 4);
 }
 
-// 18.5.11: a circular dependency created by the implicit variable ordering shall
-// result in an error. Using a in a constraint on b and b in a constraint on a
-// makes each higher priority than the other; randomize() fails outright rather
-// than solving a self-contradictory ordering.
+// 18.5.11: a circular dependency created by the implicit variable ordering
+// shall result in an error. Using a in a constraint on b and b in a constraint
+// on a makes each higher priority than the other; randomize() fails outright
+// rather than solving a self-contradictory ordering.
 TEST(FunctionsInConstraints, CircularImplicitPriorityFailsRandomize) {
   ConstraintSolver solver(404);
   solver.AddVariable(MakeVar("a", 0, 7));
@@ -137,10 +139,10 @@ TEST(FunctionsInConstraints, CircularImplicitPriorityFailsRandomize) {
 }
 
 // 18.5.11: within a prioritized set the cyclical (randc) variables are solved
-// first. A randc variable committed ahead of the priority-ordered rand variables
-// keeps its no-repeat cyclic behavior: across one full iteration it visits every
-// value in its domain exactly once, even while a function-argument priority
-// orders the rand variables alongside it.
+// first. A randc variable committed ahead of the priority-ordered rand
+// variables keeps its no-repeat cyclic behavior: across one full iteration it
+// visits every value in its domain exactly once, even while a function-argument
+// priority orders the rand variables alongside it.
 TEST(FunctionsInConstraints, RandcSolvedFirstWithinPrioritizedSet) {
   ConstraintSolver solver(505);
   RandVariable c = MakeVar("c", 0, 3, 2);
@@ -150,7 +152,8 @@ TEST(FunctionsInConstraints, RandcSolvedFirstWithinPrioritizedSet) {
   solver.AddVariable(MakeVar("x", 0, 16));
   solver.AddConstraintBlock(OneBlock({
       InsideSet("y", {1, 2, 3}),
-      Custom({"x", "y"}, [](const auto& v) { return v.at("x") <= 2 * v.at("y"); }),
+      Custom({"x", "y"},
+             [](const auto& v) { return v.at("x") <= 2 * v.at("y"); }),
   }));
   solver.AddFunctionArgPriority({"y"}, {"x"});
   std::vector<int> counts(4, 0);
@@ -179,16 +182,17 @@ TEST(FunctionsInConstraints, NoPriorityEdgesLeavesFlatSolveUnchanged) {
 
 // 18.5.11: more than one variable may share a priority. When a constraint uses
 // two variables as function arguments, both are higher priority than the
-// consumer and are gathered into the first layer, solved before it. Here y and z
-// are committed first and x == F(y) + G(z) sees both as state variables.
+// consumer and are gathered into the first layer, solved before it. Here y and
+// z are committed first and x == F(y) + G(z) sees both as state variables.
 TEST(FunctionsInConstraints, MultipleArgumentsShareOnePriorityLayer) {
   ConstraintSolver solver(707);
   solver.AddVariable(MakeVar("y", 2, 2));  // pinned argument values
   solver.AddVariable(MakeVar("z", 3, 3));
   solver.AddVariable(MakeVar("x", 0, 7));
-  solver.AddConstraintBlock(OneBlock({Custom({"x", "y", "z"}, [](const auto& v) {
-    return v.at("x") == v.at("y") + v.at("z");
-  })}));
+  solver.AddConstraintBlock(
+      OneBlock({Custom({"x", "y", "z"}, [](const auto& v) {
+        return v.at("x") == v.at("y") + v.at("z");
+      })}));
   solver.AddFunctionArgPriority({"y"}, {"x"});
   solver.AddFunctionArgPriority({"z"}, {"x"});
   ASSERT_TRUE(solver.Solve());

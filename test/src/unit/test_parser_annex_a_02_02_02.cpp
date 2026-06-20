@@ -147,7 +147,6 @@ TEST(StrengthParsing, NoDriveStrengthDefault) {
 }
 
 TEST(StrengthParsing, AllDriveStrengthForms) {
-
   auto r1 = Parse("module m; wire (weak0, pull1) w; endmodule");
   EXPECT_FALSE(r1.has_errors);
 
@@ -289,4 +288,4 @@ TEST(ChargeStrengthParsing, Large) {
   EXPECT_EQ(item->data_type.charge_strength, 4u);
 }
 
-}
+}  // namespace

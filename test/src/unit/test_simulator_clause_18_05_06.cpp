@@ -62,9 +62,10 @@ TEST(ConstraintIfElse, ThenBranchAppliedWhenConditionTrue) {
   EXPECT_LE(solver.GetValue("data"), 20);
 }
 
-// 18.5.6: when the condition is false, every constraint in the optional else set
-// shall be satisfied. With mode pinned to 0 the condition (mode == 1) fails, so
-// data must take the else branch's value rather than the then branch's range.
+// 18.5.6: when the condition is false, every constraint in the optional else
+// set shall be satisfied. With mode pinned to 0 the condition (mode == 1)
+// fails, so data must take the else branch's value rather than the then
+// branch's range.
 TEST(ConstraintIfElse, ElseBranchAppliedWhenConditionFalse) {
   ConstraintSolver solver(42);
   RandVariable vmode;
@@ -113,9 +114,9 @@ TEST(ConstraintIfElse, ElseBranchAppliedWhenConditionFalse) {
   EXPECT_EQ(solver.GetValue("data"), 99);
 }
 
-// 18.5.6: the else part is optional. When the condition is false and no else set
-// is present, nothing is imposed on the guarded variable, which is then free to
-// range over its full domain.
+// 18.5.6: the else part is optional. When the condition is false and no else
+// set is present, nothing is imposed on the guarded variable, which is then
+// free to range over its full domain.
 TEST(ConstraintIfElse, AbsentElseImposesNothing) {
   ConstraintSolver solver(7);
   RandVariable vmode;
@@ -313,8 +314,8 @@ TEST(ConstraintIfElse, ElseIfChainSelectsMatchingBranch) {
 }
 
 // 18.5.6: when the condition is true, every constraint in the then set shall be
-// satisfied. Here the surrounding constraints pin the condition true (mode == 1)
-// and pin data to 99, a value the then set's range [10,20] forbids. The
+// satisfied. Here the surrounding constraints pin the condition true (mode ==
+// 1) and pin data to 99, a value the then set's range [10,20] forbids. The
 // condition cannot be made false to escape the then set, so no assignment
 // satisfies the if constraint and the solver shall report failure.
 TEST(ConstraintIfElse, UnsatisfiableThenSetUnderForcedConditionFails) {
@@ -416,4 +417,4 @@ TEST(ConstraintIfElse, ElseSetConstrainsConditionTrue) {
   EXPECT_EQ(solver.GetValue("mode"), 1);
 }
 
-}
+}  // namespace

@@ -58,4 +58,4 @@ TEST(RecoveryTimingCheckWindow, ZeroLimitNeverViolates) {
   EXPECT_FALSE(mgr.CheckRecoveryViolation("rst", 100, "clk", 101));
 }
 
-}
+}  // namespace

@@ -35,4 +35,4 @@ TEST(UnknownPolarityParsing, FullPathWithoutOperator) {
   EXPECT_EQ(si->path.polarity, SpecifyPolarity::kNone);
 }
 
-}
+}  // namespace

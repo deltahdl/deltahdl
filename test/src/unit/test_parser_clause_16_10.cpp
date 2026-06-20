@@ -74,7 +74,8 @@ TEST(LocalVariableParsing, AssertionVariableDeclInPropertyParses) {
       "module m;\n"
       "  property p;\n"
       "    int x;\n"
-      "    @(posedge clk) (valid_in, x = pipe_in) |-> ##5 (pipe_out1 == (x+1));\n"
+      "    @(posedge clk) (valid_in, x = pipe_in) |-> ##5 (pipe_out1 == "
+      "(x+1));\n"
       "  endproperty\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -145,4 +146,4 @@ TEST(LocalVariableParsing, MultipleAssertionVariableDeclLinesAccumulate) {
   EXPECT_EQ(item->prop_seq_assert_vars[2], "z");
 }
 
-}
+}  // namespace

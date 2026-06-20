@@ -5,7 +5,6 @@
 namespace delta {
 
 AigGraph::AigGraph() {
-
   AigNode constant{};
   constant.id = 0;
   constant.fanin0 = 0;
@@ -20,7 +19,6 @@ uint32_t AigGraph::AddInput() {
 }
 
 uint32_t AigGraph::AddAnd(uint32_t lit0, uint32_t lit1) {
-
   if (lit0 == kConstFalse || lit1 == kConstFalse) {
     return kConstFalse;
   }
@@ -59,19 +57,16 @@ uint32_t AigGraph::AddAnd(uint32_t lit0, uint32_t lit1) {
 uint32_t AigGraph::AddNot(uint32_t lit) const { return lit ^ 1u; }
 
 uint32_t AigGraph::AddOr(uint32_t a, uint32_t b) {
-
   return AddNot(AddAnd(AddNot(a), AddNot(b)));
 }
 
 uint32_t AigGraph::AddXor(uint32_t a, uint32_t b) {
-
   uint32_t left = AddAnd(a, AddNot(b));
   uint32_t right = AddAnd(AddNot(a), b);
   return AddOr(left, right);
 }
 
 uint32_t AigGraph::AddMux(uint32_t sel, uint32_t a, uint32_t b) {
-
   uint32_t when_true = AddAnd(sel, a);
   uint32_t when_false = AddAnd(AddNot(sel), b);
   return AddOr(when_true, when_false);
@@ -99,4 +94,4 @@ uint32_t AigGraph::AllocNode() {
   return id;
 }
 
-}
+}  // namespace delta

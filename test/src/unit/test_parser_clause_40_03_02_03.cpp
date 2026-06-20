@@ -16,4 +16,4 @@ TEST(DataReadApiParsing, CoverageGetSystemCall) {
   )"));
 }
 
-}
+}  // namespace

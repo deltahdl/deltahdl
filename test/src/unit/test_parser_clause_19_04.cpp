@@ -44,4 +44,4 @@ TEST(SourceText, MultipleCovergroupsInClass) {
   EXPECT_EQ(cg_names[1], "cv2");
 }
 
-}
+}  // namespace

@@ -106,4 +106,4 @@ TEST(EnumMethods, PrevSingleMemberReturnsSelf) {
   EXPECT_EQ(result.ToUint64(), 5u);
 }
 
-}
+}  // namespace

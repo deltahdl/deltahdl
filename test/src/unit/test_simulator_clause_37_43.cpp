@@ -26,8 +26,8 @@ namespace {
 // PutValue) applying those rules.
 //
 // vpiActive and the frame--thread edge are shared with §37.44 (Threads): the
-// same Boolean property and the same diagram edge, woven so a frame and a thread
-// report activeness identically and reach each other consistently.
+// same Boolean property and the same diagram edge, woven so a frame and a
+// thread report activeness identically and reach each other consistently.
 
 // detail 1 (vpiActive, shared with §37.44): a frame reports whether it is the
 // active one through vpi_get(vpiActive), the same property a thread reports.
@@ -76,7 +76,8 @@ TEST(FrameModel, ParentRelationIsNullForRootAndNonFrameParents) {
 
 // detail 6 (vpiOrigin): a frame reaches the elaboration-hierarchy point it was
 // activated from. The net case covers a frame activated for a nettype's
-// user-defined resolution function. None is reported when no origin is attached.
+// user-defined resolution function. None is reported when no origin is
+// attached.
 TEST(FrameModel, OriginRelationReachesTheActivationPoint) {
   VpiObject scope;
   scope.type = vpiScope;
@@ -135,9 +136,9 @@ TEST(FrameModel, StmtTransitionReachesTheActiveStatement) {
   EXPECT_EQ(VpiFrameStmt(nullptr), nullptr);
 }
 
-// frame--thread edge (shared with §37.44): a frame reaches the thread it belongs
-// to, and §37.44's VpiThreadFrame reaches that frame back from the thread - the
-// two directions of the same diagram edge agree on the same pair.
+// frame--thread edge (shared with §37.44): a frame reaches the thread it
+// belongs to, and §37.44's VpiThreadFrame reaches that frame back from the
+// thread - the two directions of the same diagram edge agree on the same pair.
 TEST(FrameModel, ThreadEdgeIsConsistentWithThreadFrameEdge) {
   VpiObject thread;
   thread.type = vpiThread;
@@ -192,8 +193,8 @@ TEST(FrameModel, AutomaticsEmptyForNullAndNone) {
 }
 
 // detail 4: there is at most one active frame at a time in a given thread, and
-// an application reaches it with vpi_handle(vpiFrame, NULL). Before any frame is
-// made active, that query reports none.
+// an application reaches it with vpi_handle(vpiFrame, NULL). Before any frame
+// is made active, that query reports none.
 TEST(FrameModel, ActiveFrameReachedByNullFrameHandle) {
   VpiContext ctx;
   EXPECT_EQ(ctx.Handle(vpiFrame, nullptr), nullptr);

@@ -262,8 +262,9 @@ TEST(ModportDeclarationParsing, AllPortKindsMixed) {
 }
 
 // modport_tf_port's method_prototype alternative also covers the function form
-// (the task form is exercised above). This reaches the function-prototype branch
-// of the tf-port parser, recording an imported method prototype on the port.
+// (the task form is exercised above). This reaches the function-prototype
+// branch of the tf-port parser, recording an imported method prototype on the
+// port.
 TEST(ModportDeclarationParsing, ImportFunctionMethodPrototype) {
   auto r = Parse(
       "interface bus;\n"
@@ -355,4 +356,4 @@ TEST(ModportDeclarationParsing, MissingSemicolon) {
               "endinterface\n"));
 }
 
-}
+}  // namespace

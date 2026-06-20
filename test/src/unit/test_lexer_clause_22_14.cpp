@@ -118,4 +118,4 @@ TEST(KeywordVersionLexing, ConsecutiveMarkersSwitchVersion) {
   EXPECT_TRUE(found_logic);
 }
 
-}
+}  // namespace

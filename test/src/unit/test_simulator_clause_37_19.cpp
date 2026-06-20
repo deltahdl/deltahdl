@@ -14,8 +14,8 @@ namespace {
 // subclause's text defines is Detail 1, the vpiConstantSelect property. These
 // tests observe the production helper in vpi.cpp that applies that rule.
 
-// Detail 1: vpiConstantSelect of a var select is TRUE only when every one of the
-// three conditions holds - all index expressions are elaboration-time
+// Detail 1: vpiConstantSelect of a var select is TRUE only when every one of
+// the three conditions holds - all index expressions are elaboration-time
 // constants, the parent is an unpacked array with static bounds, and the parent
 // is itself a constant select. When all three hold the property is TRUE, and
 // dropping any single condition makes it FALSE.

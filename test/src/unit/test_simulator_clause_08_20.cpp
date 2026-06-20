@@ -206,27 +206,28 @@ TEST(ClassSim, FinalMethodInVTable) {
 // through a base-typed handle reaches the derived body even though the
 // override omits the keyword.
 TEST(ClassSim, ImplicitOverrideWithoutVirtualKeywordDispatches) {
-  EXPECT_EQ(RunAndGet(
-      "class Base;\n"
-      "  virtual function int compute();\n"
-      "    compute = 1;\n"
-      "  endfunction\n"
-      "endclass\n"
-      "class Derived extends Base;\n"
-      "  function int compute();\n"
-      "    compute = 2;\n"
-      "  endfunction\n"
-      "endclass\n"
-      "module t;\n"
-      "  int result;\n"
-      "  initial begin\n"
-      "    Base b;\n"
-      "    Derived d;\n"
-      "    d = new;\n"
-      "    b = d;\n"
-      "    result = b.compute();\n"
-      "  end\n"
-      "endmodule\n", "result"), 2u);
+  EXPECT_EQ(RunAndGet("class Base;\n"
+                      "  virtual function int compute();\n"
+                      "    compute = 1;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "class Derived extends Base;\n"
+                      "  function int compute();\n"
+                      "    compute = 2;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    Base b;\n"
+                      "    Derived d;\n"
+                      "    d = new;\n"
+                      "    b = d;\n"
+                      "    result = b.compute();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            2u);
 }
 
-}
+}  // namespace

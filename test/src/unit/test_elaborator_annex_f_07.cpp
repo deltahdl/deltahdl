@@ -18,7 +18,8 @@ namespace {
 // §F.7: in the worked digraph <{p1,p2,p3},{(p1,p2),(p1,p3),(p3,p1)}> the
 // nontrivial strongly connected component is {p1, p3}; p2 is reached but is not
 // on a cycle. So p1 and p3 are recursive while p2 is not.
-TEST(RecursivePropertyDependencyDigraph, RecursiveIffInStronglyConnectedComponent) {
+TEST(RecursivePropertyDependencyDigraph,
+     RecursiveIffInStronglyConnectedComponent) {
   PropertyRegistry reg;
   ModuleItem p1;
   p1.kind = ModuleItemKind::kPropertyDecl;
@@ -44,7 +45,8 @@ TEST(RecursivePropertyDependencyDigraph, RecursiveIffInStronglyConnectedComponen
 // §F.7: a recursive property can be *reached* from properties that are not
 // themselves recursive. RESTRICTION 1 is phrased over this reachability — "a
 // property from which a recursive property can be reached".
-TEST(RecursivePropertyDependencyDigraph, ReachabilityToRecursivePropertyIsTransitive) {
+TEST(RecursivePropertyDependencyDigraph,
+     ReachabilityToRecursivePropertyIsTransitive) {
   PropertyRegistry reg;
   ModuleItem rec;
   rec.kind = ModuleItemKind::kPropertyDecl;
@@ -70,7 +72,8 @@ TEST(RecursivePropertyDependencyDigraph, ReachabilityToRecursivePropertyIsTransi
 // instantiates a property from which a recursive property can be reached. Here
 // `bad` negates `mid`, which is not itself recursive but reaches the recursive
 // `rec` — so the negation is illegal.
-TEST(RecursivePropertyRestrictionEnforcement, NotOnPropertyReachingRecursiveRejected) {
+TEST(RecursivePropertyRestrictionEnforcement,
+     NotOnPropertyReachingRecursiveRejected) {
   ElabFixture f;
   Elaborate(
       "module m;\n"
@@ -90,7 +93,8 @@ TEST(RecursivePropertyRestrictionEnforcement, NotOnPropertyReachingRecursiveReje
 
 // §F.7 RESTRICTION 2: disable iff cannot be used in the declaration of a
 // recursive property.
-TEST(RecursivePropertyRestrictionEnforcement, DisableIffInRecursivePropertyRejected) {
+TEST(RecursivePropertyRestrictionEnforcement,
+     DisableIffInRecursivePropertyRejected) {
   ElabFixture f;
   Elaborate(
       "module m;\n"
@@ -137,7 +141,8 @@ TEST(RecursivePropertyRestrictionEnforcement, PositiveWeightSelfCycleAllowed) {
 // must be a formal of p, mention no formal of p, or bind to a local variable
 // formal of q. Passing an expression over p's formals to a non-local formal is
 // illegal.
-TEST(RecursivePropertyRestrictionEnforcement, RecursiveArgumentToNonLocalFormalRejected) {
+TEST(RecursivePropertyRestrictionEnforcement,
+     RecursiveArgumentToNonLocalFormalRejected) {
   ElabFixture f;
   Elaborate(
       "module m;\n"

@@ -269,4 +269,4 @@ TEST(DelayControlSim, DelayExpressionReevaluatedAtEachExecution) {
   EXPECT_EQ(f.ctx.CurrentTime().ticks, 10u);
 }
 
-}
+}  // namespace

@@ -39,8 +39,8 @@ TEST(MulticlockProperty, MulticlockedSequenceSubpropertyIsMulticlocked) {
       /*any_subproperty_is_multiclocked_sequence=*/true));
 }
 
-// §16.13.2: a property with no subproperty clocks and no multiclocked sequence is
-// not multiclocked — the leading singly clocked degenerate case.
+// §16.13.2: a property with no subproperty clocks and no multiclocked sequence
+// is not multiclocked — the leading singly clocked degenerate case.
 TEST(MulticlockProperty, NoSubpropertiesIsSinglyClocked) {
   EXPECT_FALSE(IsMulticlockedProperty(
       /*property_clock=*/"clk", /*subproperty_clocks=*/{},
@@ -59,7 +59,8 @@ TEST(MulticlockProperty, DifferingClockAfterMatchingClockIsMulticlocked) {
 // §16.13.2 edge case: a multiclocked-sequence subproperty makes the property
 // multiclocked even when no explicit subproperty clocks are listed, so the
 // sequence flag dominates the empty clock scan.
-TEST(MulticlockProperty, MulticlockedSequenceWithoutListedClocksIsMulticlocked) {
+TEST(MulticlockProperty,
+     MulticlockedSequenceWithoutListedClocksIsMulticlocked) {
   EXPECT_TRUE(IsMulticlockedProperty(
       /*property_clock=*/"clk", /*subproperty_clocks=*/{},
       /*any_subproperty_is_multiclocked_sequence=*/true));

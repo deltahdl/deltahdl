@@ -50,10 +50,10 @@ constexpr std::string_view kScope = "$root.tb.unit1";
 // Evaluates $coverage_get(coverage_type, `SV_COV_HIER, scope) through the
 // production evaluator and returns the reported value as a signed integer.
 int RunGet(SimFixture& f, int coverage_type, std::string_view scope) {
-  auto* call = MkSysCall(
-      f.arena, "$coverage_get",
-      {MkInt(f.arena, static_cast<uint64_t>(coverage_type)),
-       MkInt(f.arena, 11 /* `SV_COV_HIER */), MkStr(f.arena, scope)});
+  auto* call =
+      MkSysCall(f.arena, "$coverage_get",
+                {MkInt(f.arena, static_cast<uint64_t>(coverage_type)),
+                 MkInt(f.arena, 11 /* `SV_COV_HIER */), MkStr(f.arena, scope)});
   return static_cast<int32_t>(EvalExpr(call, f.ctx, f.arena).ToUint64());
 }
 

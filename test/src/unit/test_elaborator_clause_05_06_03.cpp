@@ -77,4 +77,4 @@ TEST(SystemNameElaboration, SystemTaskInAlwaysBlockElaborates) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

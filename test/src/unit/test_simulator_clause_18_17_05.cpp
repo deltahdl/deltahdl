@@ -374,7 +374,8 @@ TEST(RandsequenceSim, RandJoinInterleavesToDepthOne) {
   uint64_t mid = RunAndRead(src, "mid");
   // Depth 1: p and q stay adjacent in every run because `a` runs as one unit.
   EXPECT_EQ(viol, 0u);
-  // The atomic `a` unit is still genuinely interleaved, not pinned to the front.
+  // The atomic `a` unit is still genuinely interleaved, not pinned to the
+  // front.
   EXPECT_GT(mid, 0u);
 }
 

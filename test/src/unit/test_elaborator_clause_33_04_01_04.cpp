@@ -109,4 +109,4 @@ TEST(ConfigCellClause, LibQualifiedCellClauseDoesNotApplyToOtherLibraries) {
   EXPECT_EQ(bound->name, "adder");
 }
 
-}
+}  // namespace

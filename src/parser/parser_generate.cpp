@@ -4,7 +4,6 @@ namespace delta {
 
 void Parser::ParseGenerateBody(std::vector<ModuleItem*>& body,
                                std::string_view& out_label) {
-
   struct DepthGuard {
     int& d;
     explicit DepthGuard(int& d) : d(d) { ++d; }
@@ -33,7 +32,6 @@ void Parser::ParseGenerateBody(std::vector<ModuleItem*>& body,
 
   if (Match(TokenKind::kKwBegin)) {
     if (!has_gen_label && Match(TokenKind::kColon)) {
-
       if (CheckIdentifier()) {
         out_label = Consume().text;
       }
@@ -137,4 +135,4 @@ ModuleItem* Parser::ParseGenerateCase() {
   return item;
 }
 
-}
+}  // namespace delta

@@ -140,8 +140,7 @@ TEST(SdfMultipleAnnotations,
 
 // §32.5 S2 "same load" scoping: the overwriting PORT touches only its own load,
 // leaving interconnect annotations to other loads intact.
-TEST(SdfMultipleAnnotations,
-     PortDoesNotOverwriteInterconnectsToOtherLoads) {
+TEST(SdfMultipleAnnotations, PortDoesNotOverwriteInterconnectsToOtherLoads) {
   SdfFile file;
   std::string sdf = R"(
     (DELAYFILE
@@ -314,4 +313,4 @@ TEST(SdfMultipleAnnotations, IncrementIopathModifiesPriorAbsoluteAnnotation) {
   EXPECT_EQ(pd.delays[1], 66u);
 }
 
-}
+}  // namespace

@@ -56,4 +56,4 @@ TEST(MailboxTryPutParser, TryPutWithVariableExpression) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}
+}  // namespace

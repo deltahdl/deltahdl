@@ -352,4 +352,4 @@ TEST(BidirectionalSwitchControlType, Rtranif1RejectsEventControl) {
   EXPECT_TRUE(f.has_errors);
 }
 
-}
+}  // namespace

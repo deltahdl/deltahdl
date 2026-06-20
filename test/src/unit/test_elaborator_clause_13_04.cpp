@@ -427,4 +427,4 @@ TEST(FunctionElaboration, InputOnlyArgCallInContAssignOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

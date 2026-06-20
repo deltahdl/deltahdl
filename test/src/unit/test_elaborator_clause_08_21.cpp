@@ -155,7 +155,8 @@ TEST(AbstractClassElaboration, AbstractClassAddsNewPureVirtuals) {
              "endmodule\n"));
 }
 
-TEST(AbstractClassElaboration, AbstractClassAddsNewPureVirtualsNotOverriddenError) {
+TEST(AbstractClassElaboration,
+     AbstractClassAddsNewPureVirtualsNotOverriddenError) {
   EXPECT_FALSE(
       ElabOk("class Concrete;\n"
              "  function void foo(); endfunction\n"
@@ -170,4 +171,4 @@ TEST(AbstractClassElaboration, AbstractClassAddsNewPureVirtualsNotOverriddenErro
              "endmodule\n"));
 }
 
-}
+}  // namespace

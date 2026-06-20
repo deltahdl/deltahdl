@@ -25,4 +25,4 @@ TEST(LexicalConventionElaboration, StringWithHexEscapeElaborates) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

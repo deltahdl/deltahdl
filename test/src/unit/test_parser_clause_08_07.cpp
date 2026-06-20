@@ -189,4 +189,4 @@ TEST(ClassConstructorParsing, DeclarationClassNewNoArgs) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}
+}  // namespace

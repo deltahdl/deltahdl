@@ -4,9 +4,8 @@ namespace delta {
 
 static void ExpectDeferredHashZero(DiagEngine& diag, const Token& tok) {
   if (tok.text != "0") {
-    diag.Error(tok.loc,
-               "deferred immediate assertion requires #0, got #" +
-                   std::string(tok.text));
+    diag.Error(tok.loc, "deferred immediate assertion requires #0, got #" +
+                            std::string(tok.text));
   }
 }
 
@@ -88,7 +87,6 @@ Stmt* Parser::ParseImmediateAssertLike(StmtKind kind, TokenKind keyword) {
     ExpectDeferredHashZero(diag_, tok);
     stmt->is_deferred = true;
   } else if (Match(TokenKind::kKwFinal)) {
-
     stmt->is_deferred = true;
     stmt->is_final_deferred = true;
   }
@@ -135,7 +133,6 @@ Stmt* Parser::ParseImmediateCover() {
     ExpectDeferredHashZero(diag_, tok);
     stmt->is_deferred = true;
   } else if (Match(TokenKind::kKwFinal)) {
-
     stmt->is_deferred = true;
     stmt->is_final_deferred = true;
   }
@@ -195,7 +192,6 @@ ModuleItem* Parser::ParseDeferredImmediateItem(SourceLoc loc, StmtKind kind) {
 
     ExpectDeferredHashZero(diag_, tok);
   } else if (Match(TokenKind::kKwFinal)) {
-
     stmt->is_final_deferred = true;
   }
   Expect(TokenKind::kLParen);
@@ -268,7 +264,6 @@ ModuleItem* Parser::ParseCoverProperty() {
 
       ExpectDeferredHashZero(diag_, tok);
     } else if (Match(TokenKind::kKwFinal)) {
-
       stmt->is_final_deferred = true;
     }
     Expect(TokenKind::kLParen);
@@ -364,16 +359,14 @@ ModuleItem* Parser::ParsePropertyDecl() {
         }
         Consume();
       } else if (depth == 1 &&
-                 (Check(TokenKind::kKwOutput) ||
-                  Check(TokenKind::kKwInout))) {
+                 (Check(TokenKind::kKwOutput) || Check(TokenKind::kKwInout))) {
         // §16.12.19: a local variable formal argument of a named property
         // shall have direction `input`; declaring one with direction `inout`
         // or `output` is illegal. The borrowed A.2.10 production
         // property_lvar_port_direction admits only `input`, so `output` and
         // `inout` have no legal role inside a property port, with or without a
         // preceding `local`.
-        diag_.Error(CurrentLoc(),
-                    "property port direction must be 'input'");
+        diag_.Error(CurrentLoc(), "property port direction must be 'input'");
         Consume();
         saw_local = false;
       } else if (depth == 1 && Check(TokenKind::kKwInput)) {
@@ -487,8 +480,7 @@ ModuleItem* Parser::ParsePropertyDecl() {
   };
 
   while (!Check(TokenKind::kKwEndproperty) && !AtEnd()) {
-    if (in_decl_prefix &&
-        IsBuiltinTypeKwForLocalVar(CurrentToken().kind)) {
+    if (in_decl_prefix && IsBuiltinTypeKwForLocalVar(CurrentToken().kind)) {
       HarvestAssertionVariableDecl(item);
       continue;
     }
@@ -666,8 +658,10 @@ void Parser::HarvestAssertionVariableDecl(ModuleItem* item) {
     int b_depth = 1;
     Consume();
     while (b_depth > 0 && !AtEnd()) {
-      if (Check(TokenKind::kLBracket)) ++b_depth;
-      else if (Check(TokenKind::kRBracket)) --b_depth;
+      if (Check(TokenKind::kLBracket))
+        ++b_depth;
+      else if (Check(TokenKind::kRBracket))
+        --b_depth;
       Consume();
     }
   }
@@ -679,20 +673,17 @@ void Parser::HarvestAssertionVariableDecl(ModuleItem* item) {
         Consume();
         int e_depth = 0;
         while (!AtEnd()) {
-          if (Check(TokenKind::kLParen) ||
-              Check(TokenKind::kLBracket) ||
+          if (Check(TokenKind::kLParen) || Check(TokenKind::kLBracket) ||
               Check(TokenKind::kLBrace)) {
             ++e_depth;
             Consume();
-          } else if (Check(TokenKind::kRParen) ||
-                     Check(TokenKind::kRBracket) ||
+          } else if (Check(TokenKind::kRParen) || Check(TokenKind::kRBracket) ||
                      Check(TokenKind::kRBrace)) {
             if (e_depth == 0) break;
             --e_depth;
             Consume();
-          } else if (e_depth == 0 &&
-                     (Check(TokenKind::kComma) ||
-                      Check(TokenKind::kSemicolon))) {
+          } else if (e_depth == 0 && (Check(TokenKind::kComma) ||
+                                      Check(TokenKind::kSemicolon))) {
             break;
           } else {
             Consume();
@@ -769,10 +760,8 @@ ModuleItem* Parser::ParseSequenceDecl() {
     // is a fresh starter and breaks the carry.
     auto reset_after_comma = [&]() {
       bool next_is_fresh_starter =
-          Check(TokenKind::kKwLocal) ||
-          Check(TokenKind::kKwInput) ||
-          Check(TokenKind::kKwOutput) ||
-          Check(TokenKind::kKwInout) ||
+          Check(TokenKind::kKwLocal) || Check(TokenKind::kKwInput) ||
+          Check(TokenKind::kKwOutput) || Check(TokenKind::kKwInout) ||
           IsBuiltinTypeKwForLocalVar(CurrentToken().kind);
       if (next_is_fresh_starter) {
         item_saw_local = false;
@@ -807,8 +796,7 @@ ModuleItem* Parser::ParseSequenceDecl() {
         item_local_explicit_here = true;
         Consume();
       } else if (depth == 1 &&
-                 (Check(TokenKind::kKwInput) ||
-                  Check(TokenKind::kKwOutput) ||
+                 (Check(TokenKind::kKwInput) || Check(TokenKind::kKwOutput) ||
                   Check(TokenKind::kKwInout))) {
         auto dir_tok = Consume();
         if (!item_saw_local) {
@@ -859,8 +847,7 @@ ModuleItem* Parser::ParseSequenceDecl() {
   // sequence_instance reference scan used for the §16.8 cycle rule.
   bool in_decl_prefix = true;
   while (!Check(TokenKind::kKwEndsequence) && !AtEnd()) {
-    if (in_decl_prefix &&
-        IsBuiltinTypeKwForLocalVar(CurrentToken().kind)) {
+    if (in_decl_prefix && IsBuiltinTypeKwForLocalVar(CurrentToken().kind)) {
       HarvestAssertionVariableDecl(item);
       continue;
     }
@@ -914,4 +901,4 @@ Stmt* Parser::ParseExpectStmt() {
   return stmt;
 }
 
-}
+}  // namespace delta

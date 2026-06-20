@@ -50,4 +50,4 @@ TEST_F(ProgramTestParse, ExitOutsideProgramParses) {
   EXPECT_EQ(unit->modules[0]->items[0]->kind, ModuleItemKind::kInitialBlock);
 }
 
-}
+}  // namespace

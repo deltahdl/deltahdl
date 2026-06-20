@@ -62,4 +62,4 @@ TEST(DpiRuntime, RegisteredExportIsAlwaysContext) {
   EXPECT_TRUE(stored->is_context);
 }
 
-}
+}  // namespace

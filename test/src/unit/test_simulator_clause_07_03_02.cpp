@@ -115,4 +115,4 @@ TEST(TaggedUnionSimulation, VoidMemberTaggedAssignment) {
   EXPECT_EQ(v, 99u);
 }
 
-}
+}  // namespace

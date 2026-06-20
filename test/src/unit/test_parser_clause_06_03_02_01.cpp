@@ -114,4 +114,4 @@ TEST(DataTypeParsing, ChargeStrengthKeywordOnTriFails) {
   EXPECT_TRUE(r.has_errors);
 }
 
-}
+}  // namespace

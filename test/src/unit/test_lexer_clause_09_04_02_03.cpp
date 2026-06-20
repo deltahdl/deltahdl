@@ -69,4 +69,4 @@ TEST(ConditionalEventIffLexing, IffPrefixIsIdentifier) {
   EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);
 }
 
-}
+}  // namespace

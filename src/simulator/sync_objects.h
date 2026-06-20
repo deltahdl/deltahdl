@@ -39,8 +39,8 @@ struct SemaphoreObject {
   // drained by count and a positive value is returned; otherwise 0 is returned
   // and the bucket is left untouched (no blocking, unlike get()). A negative
   // count yields 0 as well, but is additionally an error — distinct from the
-  // ordinary keys-unavailable 0 — surfaced through the optional out-parameter so
-  // a caller can tell the two zero results apart.
+  // ordinary keys-unavailable 0 — surfaced through the optional out-parameter
+  // so a caller can tell the two zero results apart.
   int32_t TryGet(int32_t count = 1, bool* error = nullptr) {
     if (count < 0) {
       if (error) *error = true;
@@ -111,8 +111,9 @@ struct MailboxObject {
   }
 
   // §15.4.9: the only difference between a generic mailbox and a parameterized
-  // one is that the parameterized mailbox verifies argument types up front; this
-  // predicate is the decision a parameterized mailbox applies to a value's type.
+  // one is that the parameterized mailbox verifies argument types up front;
+  // this predicate is the decision a parameterized mailbox applies to a value's
+  // type.
   bool AcceptsType(uint32_t type) const {
     return TypesEquivalent(param_type, type);
   }
@@ -219,4 +220,4 @@ struct EventTriggeredState {
   uint64_t trigger_time_ticks = UINT64_MAX;
 };
 
-}
+}  // namespace delta

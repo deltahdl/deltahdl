@@ -134,4 +134,4 @@ TEST(ProceduralAssignmentParsing, LhsConcatenationIsAccepted) {
   EXPECT_EQ(stmts[0]->lhs->kind, ExprKind::kConcatenation);
 }
 
-}
+}  // namespace

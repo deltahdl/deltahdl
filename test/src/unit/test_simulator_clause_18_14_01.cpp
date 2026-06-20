@@ -181,7 +181,9 @@ TEST(RandomStabilityProperties, DynamicThreadSeededFromParent) {
         "  int unsigned b;\n"
         "  initial begin\n"
         "    process p = process::self();\n"
-        "    p.srandom(" + std::to_string(parent_seed) + ");\n"
+        "    p.srandom(" +
+        std::to_string(parent_seed) +
+        ");\n"
         "    fork\n"
         "      a = $urandom;\n"
         "      b = $urandom;\n"
@@ -327,4 +329,4 @@ TEST(RandomStabilityProperties, ConsecutiveObjectsFollowCreatingThreadStream) {
   EXPECT_NE(o1->rng_seed, o2->rng_seed);
 }
 
-}
+}  // namespace

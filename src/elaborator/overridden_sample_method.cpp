@@ -23,8 +23,7 @@ CovergroupNameResolution ResolveCovergroupName(bool name_is_sample_formal,
   // §19.8.1: the sample formals are searched before the enclosing scope, so a
   // match among them wins even if the enclosing scope declares the same name.
   if (name_is_sample_formal) return CovergroupNameResolution::kSampleFormal;
-  if (name_in_enclosing_scope)
-    return CovergroupNameResolution::kEnclosingScope;
+  if (name_in_enclosing_scope) return CovergroupNameResolution::kEnclosingScope;
   return CovergroupNameResolution::kUnresolved;
 }
 

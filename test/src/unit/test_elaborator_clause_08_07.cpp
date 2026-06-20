@@ -135,4 +135,4 @@ TEST(ClassConstructorElaboration, DerivedClassConstructorElaborates) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

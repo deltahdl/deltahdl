@@ -709,4 +709,4 @@ TEST(PrimitiveInstantiationParsing, GateInGenerateBlock) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}
+}  // namespace

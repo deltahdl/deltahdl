@@ -211,7 +211,8 @@ TEST(LexicalConventionLexing, EscapedIdentifierWhitespaceIsSignificant) {
   EXPECT_EQ(with_ws[2].text, "bar");
 }
 
-TEST(LexicalConventionLexing, EscapedIdentifierBodyAbsorbsStructuralDelimiters) {
+TEST(LexicalConventionLexing,
+     EscapedIdentifierBodyAbsorbsStructuralDelimiters) {
   auto r = LexOne("\\foo\"bar/*baz//qux'end ");
   EXPECT_EQ(r.token.kind, TokenKind::kEscapedIdentifier);
   EXPECT_EQ(r.token.text, "foo\"bar/*baz//qux'end");
@@ -226,4 +227,4 @@ TEST(LexicalConventionLexing, EscapedIdentifierBareBackslashAtEof) {
   EXPECT_EQ(tokens[1].kind, TokenKind::kEof);
 }
 
-}
+}  // namespace

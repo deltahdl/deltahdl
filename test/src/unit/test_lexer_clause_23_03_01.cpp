@@ -33,4 +33,4 @@ TEST(TopLevelModules, DollarRootAloneLexesSingleToken) {
   EXPECT_EQ(tokens[1].kind, TokenKind::kEof);
 }
 
-}
+}  // namespace

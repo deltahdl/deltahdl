@@ -56,4 +56,4 @@ TEST(DumpfileSysTask, DefaultsWhenArgumentOmitted) {
   EXPECT_EQ(f.ctx.GetDumpFileName(), "dump.vcd");
 }
 
-}
+}  // namespace

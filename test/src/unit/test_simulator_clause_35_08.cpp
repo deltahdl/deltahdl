@@ -80,7 +80,8 @@ TEST(DpiExportedTask, ImportedFunctionCallingExportedFunctionIsAllowed) {
 // §35.8: the prohibition is independent of the chain's context property. Even a
 // noncontext function import calling an exported task is rejected by the §35.8
 // check, which runs ahead of the §35.5.3 noncontext check.
-TEST(DpiExportedTask, NoncontextFunctionCallingExportedTaskIsRejectedByTaskRule) {
+TEST(DpiExportedTask,
+     NoncontextFunctionCallingExportedTaskIsRejectedByTaskRule) {
   DpiRuntime rt;
   DpiRtExport task_export;
   task_export.c_name = "c_task";

@@ -111,4 +111,4 @@ TEST(OverriddenMemberParsing, NonOverriddenMemberThroughBaseHandle) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

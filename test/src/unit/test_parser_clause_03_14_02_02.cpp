@@ -302,98 +302,99 @@ TEST(CompilationUnitTimeDeclarations, TimeunitAndTimeprecisionBothSet) {
 }
 
 TEST(DesignBuildingBlockParsing, DistinctTimeunitInSameModuleRejected) {
-  EXPECT_FALSE(ParseOk(
-      "module m;\n"
-      "  timeunit 1ns;\n"
-      "  logic x;\n"
-      "  timeunit 1us;\n"
-      "endmodule\n"));
+  EXPECT_FALSE(
+      ParseOk("module m;\n"
+              "  timeunit 1ns;\n"
+              "  logic x;\n"
+              "  timeunit 1us;\n"
+              "endmodule\n"));
 }
 
 TEST(DesignBuildingBlockParsing, DistinctTimeprecisionInSameModuleRejected) {
-  EXPECT_FALSE(ParseOk(
-      "module m;\n"
-      "  timeunit 1ns;\n"
-      "  timeprecision 1ps;\n"
-      "  logic x;\n"
-      "  timeprecision 10fs;\n"
-      "endmodule\n"));
+  EXPECT_FALSE(
+      ParseOk("module m;\n"
+              "  timeunit 1ns;\n"
+              "  timeprecision 1ps;\n"
+              "  logic x;\n"
+              "  timeprecision 10fs;\n"
+              "endmodule\n"));
 }
 
 TEST(DesignBuildingBlockParsing, TimeunitAfterOtherItemsWithoutPriorRejected) {
-  EXPECT_FALSE(ParseOk(
-      "module m;\n"
-      "  logic x;\n"
-      "  timeunit 1ns;\n"
-      "endmodule\n"));
+  EXPECT_FALSE(
+      ParseOk("module m;\n"
+              "  logic x;\n"
+              "  timeunit 1ns;\n"
+              "endmodule\n"));
 }
 
 TEST(DesignBuildingBlockParsing,
      TimeprecisionAfterOtherItemsWithoutPriorRejected) {
-  EXPECT_FALSE(ParseOk(
-      "module m;\n"
-      "  logic x;\n"
-      "  timeprecision 1ps;\n"
-      "endmodule\n"));
+  EXPECT_FALSE(
+      ParseOk("module m;\n"
+              "  logic x;\n"
+              "  timeprecision 1ps;\n"
+              "endmodule\n"));
 }
 
 TEST(DesignBuildingBlockParsing,
      TimeunitMatchingRepeatAfterOtherItemsAccepted) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  timeunit 1ns;\n"
-      "  logic x;\n"
-      "  timeunit 1ns;\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  timeunit 1ns;\n"
+              "  logic x;\n"
+              "  timeunit 1ns;\n"
+              "endmodule\n"));
 }
 
-TEST(DesignBuildingBlockParsing, DistinctTimeunitMagnitudeInSameModuleRejected) {
-  EXPECT_FALSE(ParseOk(
-      "module m;\n"
-      "  timeunit 1ns;\n"
-      "  logic x;\n"
-      "  timeunit 10ns;\n"
-      "endmodule\n"));
+TEST(DesignBuildingBlockParsing,
+     DistinctTimeunitMagnitudeInSameModuleRejected) {
+  EXPECT_FALSE(
+      ParseOk("module m;\n"
+              "  timeunit 1ns;\n"
+              "  logic x;\n"
+              "  timeunit 10ns;\n"
+              "endmodule\n"));
 }
 
 TEST(DesignBuildingBlockParsing, DistinctTimeunitInSameInterfaceRejected) {
-  EXPECT_FALSE(ParseOk(
-      "interface ifc;\n"
-      "  timeunit 1ns;\n"
-      "  logic x;\n"
-      "  timeunit 1us;\n"
-      "endinterface\n"));
+  EXPECT_FALSE(
+      ParseOk("interface ifc;\n"
+              "  timeunit 1ns;\n"
+              "  logic x;\n"
+              "  timeunit 1us;\n"
+              "endinterface\n"));
 }
 
 TEST(DesignBuildingBlockParsing, DistinctTimeunitInSameProgramRejected) {
-  EXPECT_FALSE(ParseOk(
-      "program p;\n"
-      "  timeunit 1ns;\n"
-      "  logic x;\n"
-      "  timeunit 1us;\n"
-      "endprogram\n"));
+  EXPECT_FALSE(
+      ParseOk("program p;\n"
+              "  timeunit 1ns;\n"
+              "  logic x;\n"
+              "  timeunit 1us;\n"
+              "endprogram\n"));
 }
 
 TEST(CompilationUnitTimeDeclarations, DistinctTimeunitInCuRejected) {
-  EXPECT_FALSE(ParseOk(
-      "timeunit 1ns;\n"
-      "module m; endmodule\n"
-      "timeunit 1us;\n"));
+  EXPECT_FALSE(
+      ParseOk("timeunit 1ns;\n"
+              "module m; endmodule\n"
+              "timeunit 1us;\n"));
 }
 
 TEST(CompilationUnitTimeDeclarations, DistinctTimeprecisionInCuRejected) {
-  EXPECT_FALSE(ParseOk(
-      "timeunit 1ns;\n"
-      "timeprecision 1ps;\n"
-      "module m; endmodule\n"
-      "timeprecision 10fs;\n"));
+  EXPECT_FALSE(
+      ParseOk("timeunit 1ns;\n"
+              "timeprecision 1ps;\n"
+              "module m; endmodule\n"
+              "timeprecision 10fs;\n"));
 }
 
 TEST(CompilationUnitTimeDeclarations,
      TimeunitAfterModuleWithoutPriorInCuRejected) {
-  EXPECT_FALSE(ParseOk(
-      "module m; endmodule\n"
-      "timeunit 1ns;\n"));
+  EXPECT_FALSE(
+      ParseOk("module m; endmodule\n"
+              "timeunit 1ns;\n"));
 }
 
 TEST(CompilationUnitTimeDeclarations, TimeunitMatchingRepeatAfterModuleInCu) {
@@ -423,35 +424,34 @@ TEST(DesignBuildingBlockParsing, TimeunitInPackageStored) {
 }
 
 TEST(DesignBuildingBlockParsing, DistinctTimeunitInSamePackageRejected) {
-  EXPECT_FALSE(ParseOk(
-      "package pkg;\n"
-      "  timeunit 1ns;\n"
-      "  parameter int x = 1;\n"
-      "  timeunit 1us;\n"
-      "endpackage\n"));
+  EXPECT_FALSE(
+      ParseOk("package pkg;\n"
+              "  timeunit 1ns;\n"
+              "  parameter int x = 1;\n"
+              "  timeunit 1us;\n"
+              "endpackage\n"));
 }
 
 TEST(DesignBuildingBlockParsing, DistinctTimeprecisionInSamePackageRejected) {
-  EXPECT_FALSE(ParseOk(
-      "package pkg;\n"
-      "  timeunit 1ns;\n"
-      "  timeprecision 1ps;\n"
-      "  parameter int x = 1;\n"
-      "  timeprecision 10fs;\n"
-      "endpackage\n"));
+  EXPECT_FALSE(
+      ParseOk("package pkg;\n"
+              "  timeunit 1ns;\n"
+              "  timeprecision 1ps;\n"
+              "  parameter int x = 1;\n"
+              "  timeprecision 10fs;\n"
+              "endpackage\n"));
 }
 
 TEST(DesignBuildingBlockParsing,
      TimeunitAfterOtherItemsWithoutPriorInPackageRejected) {
-  EXPECT_FALSE(ParseOk(
-      "package pkg;\n"
-      "  parameter int x = 1;\n"
-      "  timeunit 1ns;\n"
-      "endpackage\n"));
+  EXPECT_FALSE(
+      ParseOk("package pkg;\n"
+              "  parameter int x = 1;\n"
+              "  timeunit 1ns;\n"
+              "endpackage\n"));
 }
 
-TEST(DesignBuildingBlockParsing,
-     TimeunitMatchingRepeatInPackageAccepted) {
+TEST(DesignBuildingBlockParsing, TimeunitMatchingRepeatInPackageAccepted) {
   auto r = Parse(
       "package pkg;\n"
       "  timeunit 1ns;\n"
@@ -466,20 +466,20 @@ TEST(DesignBuildingBlockParsing,
 
 TEST(DesignBuildingBlockParsing,
      TimeunitAfterOtherItemsWithoutPriorInInterfaceRejected) {
-  EXPECT_FALSE(ParseOk(
-      "interface ifc;\n"
-      "  logic x;\n"
-      "  timeunit 1ns;\n"
-      "endinterface\n"));
+  EXPECT_FALSE(
+      ParseOk("interface ifc;\n"
+              "  logic x;\n"
+              "  timeunit 1ns;\n"
+              "endinterface\n"));
 }
 
 TEST(DesignBuildingBlockParsing,
      TimeunitAfterOtherItemsWithoutPriorInProgramRejected) {
-  EXPECT_FALSE(ParseOk(
-      "program p;\n"
-      "  logic x;\n"
-      "  timeunit 1ns;\n"
-      "endprogram\n"));
+  EXPECT_FALSE(
+      ParseOk("program p;\n"
+              "  logic x;\n"
+              "  timeunit 1ns;\n"
+              "endprogram\n"));
 }
 
 TEST(DesignBuildingBlockParsing, TimeunitMatchingRepeatInInterfaceAccepted) {
@@ -508,4 +508,4 @@ TEST(DesignBuildingBlockParsing, TimeunitMatchingRepeatInProgramAccepted) {
   EXPECT_EQ(r.cu->programs[0]->time_unit, TimeUnit::kNs);
 }
 
-}
+}  // namespace

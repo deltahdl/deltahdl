@@ -5,8 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(DissimilarNetTypePortConnectionElaboration,
-     WireToWireNoWarning) {
+TEST(DissimilarNetTypePortConnectionElaboration, WireToWireNoWarning) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module child(inout wire a);\n"
@@ -21,8 +20,7 @@ TEST(DissimilarNetTypePortConnectionElaboration,
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
-TEST(DissimilarNetTypePortConnectionElaboration,
-     WandToWandNoWarning) {
+TEST(DissimilarNetTypePortConnectionElaboration, WandToWandNoWarning) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module child(inout wand a);\n"
@@ -37,8 +35,7 @@ TEST(DissimilarNetTypePortConnectionElaboration,
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
-TEST(DissimilarNetTypePortConnectionElaboration,
-     WorToWorNoWarning) {
+TEST(DissimilarNetTypePortConnectionElaboration, WorToWorNoWarning) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module child(inout wor a);\n"
@@ -53,8 +50,7 @@ TEST(DissimilarNetTypePortConnectionElaboration,
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
-TEST(DissimilarNetTypePortConnectionElaboration,
-     TriregToTriregNoWarning) {
+TEST(DissimilarNetTypePortConnectionElaboration, TriregToTriregNoWarning) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module child(inout trireg a);\n"
@@ -69,8 +65,7 @@ TEST(DissimilarNetTypePortConnectionElaboration,
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
-TEST(DissimilarNetTypePortConnectionElaboration,
-     Tri0ToTri0NoWarning) {
+TEST(DissimilarNetTypePortConnectionElaboration, Tri0ToTri0NoWarning) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module child(inout tri0 a);\n"
@@ -85,8 +80,7 @@ TEST(DissimilarNetTypePortConnectionElaboration,
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
-TEST(DissimilarNetTypePortConnectionElaboration,
-     Tri1ToTri1NoWarning) {
+TEST(DissimilarNetTypePortConnectionElaboration, Tri1ToTri1NoWarning) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module child(inout tri1 a);\n"
@@ -309,8 +303,7 @@ TEST(DissimilarNetTypePortConnectionElaboration,
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
-TEST(DissimilarNetTypePortConnectionElaboration,
-     InternalWandExternalWorWarns) {
+TEST(DissimilarNetTypePortConnectionElaboration, InternalWandExternalWorWarns) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module child(inout wand a);\n"
@@ -325,8 +318,7 @@ TEST(DissimilarNetTypePortConnectionElaboration,
   EXPECT_GT(f.diag.WarningCount(), 0u);
 }
 
-TEST(DissimilarNetTypePortConnectionElaboration,
-     InternalWorExternalWandWarns) {
+TEST(DissimilarNetTypePortConnectionElaboration, InternalWorExternalWandWarns) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module child(inout wor a);\n"
@@ -646,4 +638,4 @@ TEST(DissimilarNetTypePortConnectionElaboration,
   EXPECT_GT(f.diag.WarningCount(), 0u);
 }
 
-}
+}  // namespace

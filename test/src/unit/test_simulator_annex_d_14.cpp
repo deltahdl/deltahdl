@@ -16,9 +16,9 @@ namespace {
 // `name[index]` naming convention the simulator uses).
 void SetupMem(SimFixture& f, const char* name, int lo, int size,
               uint32_t width) {
-  f.ctx.RegisterArray(name, {static_cast<uint32_t>(lo),
-                             static_cast<uint32_t>(size), width, false, false,
-                             false});
+  f.ctx.RegisterArray(
+      name, {static_cast<uint32_t>(lo), static_cast<uint32_t>(size), width,
+             false, false, false});
   for (int i = 0; i < size; ++i) {
     std::string nm = std::string(name) + "[" + std::to_string(lo + i) + "]";
     auto* s = f.arena.AllocString(nm.c_str(), nm.size());
@@ -138,9 +138,9 @@ TEST(OptionalSreadmemSim, AdjacentStringsAreTokenSeparated) {
   EXPECT_EQ(Cell(f, "mem", 1)->value.ToUint64(), 0x14u);
 }
 
-// Annex D.14 (C1, error): the syntax requires at least one data string after the
-// addresses. A call supplying no string has nothing to load, so the memory is
-// left unchanged.
+// Annex D.14 (C1, error): the syntax requires at least one data string after
+// the addresses. A call supplying no string has nothing to load, so the memory
+// is left unchanged.
 TEST(OptionalSreadmemSim, MissingDataStringLeavesMemoryUnchanged) {
   SimFixture f;
   SetupMem(f, "mem", 0, 4, 8);

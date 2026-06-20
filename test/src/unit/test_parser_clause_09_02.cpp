@@ -59,4 +59,4 @@ TEST(StructuredProcedureParsing, AlwaysWithStatement) {
   ASSERT_NE(item->body, nullptr);
 }
 
-}
+}  // namespace

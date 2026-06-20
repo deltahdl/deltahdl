@@ -61,4 +61,4 @@ TEST(CompilerDirectiveSynthesis, MacroIsolatedBetweenCus) {
   EXPECT_TRUE(mod2 == nullptr || f2.diag.HasErrors());
 }
 
-}
+}  // namespace

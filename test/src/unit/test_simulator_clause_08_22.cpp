@@ -61,77 +61,80 @@ TEST(ClassSim, PolymorphicUnknownMethodReturnsNull) {
 }
 
 TEST(ClassSim, E2eVirtualDispatchThroughBaseVariable) {
-  EXPECT_EQ(RunAndGet(
-      "class Base;\n"
-      "  virtual function int compute();\n"
-      "    compute = 10;\n"
-      "  endfunction\n"
-      "endclass\n"
-      "class Derived extends Base;\n"
-      "  virtual function int compute();\n"
-      "    compute = 20;\n"
-      "  endfunction\n"
-      "endclass\n"
-      "module t;\n"
-      "  int result;\n"
-      "  initial begin\n"
-      "    Base b;\n"
-      "    Derived d;\n"
-      "    d = new;\n"
-      "    b = d;\n"
-      "    result = b.compute();\n"
-      "  end\n"
-      "endmodule\n", "result"), 20u);
+  EXPECT_EQ(RunAndGet("class Base;\n"
+                      "  virtual function int compute();\n"
+                      "    compute = 10;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "class Derived extends Base;\n"
+                      "  virtual function int compute();\n"
+                      "    compute = 20;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    Base b;\n"
+                      "    Derived d;\n"
+                      "    d = new;\n"
+                      "    b = d;\n"
+                      "    result = b.compute();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            20u);
 }
 
 TEST(ClassSim, E2eVirtualDispatchThreeLevelsThroughBase) {
-  EXPECT_EQ(RunAndGet(
-      "class Grand;\n"
-      "  virtual function int level();\n"
-      "    level = 1;\n"
-      "  endfunction\n"
-      "endclass\n"
-      "class Mid extends Grand;\n"
-      "  virtual function int level();\n"
-      "    level = 2;\n"
-      "  endfunction\n"
-      "endclass\n"
-      "class Leaf extends Mid;\n"
-      "  virtual function int level();\n"
-      "    level = 3;\n"
-      "  endfunction\n"
-      "endclass\n"
-      "module t;\n"
-      "  int result;\n"
-      "  initial begin\n"
-      "    Grand g;\n"
-      "    Leaf lf;\n"
-      "    lf = new;\n"
-      "    g = lf;\n"
-      "    result = g.level();\n"
-      "  end\n"
-      "endmodule\n", "result"), 3u);
+  EXPECT_EQ(RunAndGet("class Grand;\n"
+                      "  virtual function int level();\n"
+                      "    level = 1;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "class Mid extends Grand;\n"
+                      "  virtual function int level();\n"
+                      "    level = 2;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "class Leaf extends Mid;\n"
+                      "  virtual function int level();\n"
+                      "    level = 3;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    Grand g;\n"
+                      "    Leaf lf;\n"
+                      "    lf = new;\n"
+                      "    g = lf;\n"
+                      "    result = g.level();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            3u);
 }
 
 TEST(ClassSim, E2eInheritedVirtualThroughBaseVariable) {
-  EXPECT_EQ(RunAndGet(
-      "class Base;\n"
-      "  virtual function int compute();\n"
-      "    compute = 10;\n"
-      "  endfunction\n"
-      "endclass\n"
-      "class Mid extends Base;\n"
-      "endclass\n"
-      "module t;\n"
-      "  int result;\n"
-      "  initial begin\n"
-      "    Base b;\n"
-      "    Mid m;\n"
-      "    m = new;\n"
-      "    b = m;\n"
-      "    result = b.compute();\n"
-      "  end\n"
-      "endmodule\n", "result"), 10u);
+  EXPECT_EQ(RunAndGet("class Base;\n"
+                      "  virtual function int compute();\n"
+                      "    compute = 10;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "class Mid extends Base;\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    Base b;\n"
+                      "    Mid m;\n"
+                      "    m = new;\n"
+                      "    b = m;\n"
+                      "    result = b.compute();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            10u);
 }
 
 TEST(ClassSim, E2eSelectiveOverrideThroughBaseVariable) {
@@ -238,25 +241,26 @@ TEST(ClassSim, E2eDispatchChangesOnReassignment) {
 }
 
 TEST(ClassSim, E2eAbstractBaseVariableDispatch) {
-  EXPECT_EQ(RunAndGet(
-      "virtual class BasePacket;\n"
-      "  pure virtual function int send();\n"
-      "endclass\n"
-      "class EtherPacket extends BasePacket;\n"
-      "  virtual function int send();\n"
-      "    send = 42;\n"
-      "  endfunction\n"
-      "endclass\n"
-      "module t;\n"
-      "  int result;\n"
-      "  initial begin\n"
-      "    BasePacket bp;\n"
-      "    EtherPacket ep;\n"
-      "    ep = new;\n"
-      "    bp = ep;\n"
-      "    result = bp.send();\n"
-      "  end\n"
-      "endmodule\n", "result"), 42u);
+  EXPECT_EQ(RunAndGet("virtual class BasePacket;\n"
+                      "  pure virtual function int send();\n"
+                      "endclass\n"
+                      "class EtherPacket extends BasePacket;\n"
+                      "  virtual function int send();\n"
+                      "    send = 42;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    BasePacket bp;\n"
+                      "    EtherPacket ep;\n"
+                      "    ep = new;\n"
+                      "    bp = ep;\n"
+                      "    result = bp.send();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            42u);
 }
 
-}
+}  // namespace

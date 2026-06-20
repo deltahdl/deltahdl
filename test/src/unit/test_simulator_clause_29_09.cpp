@@ -88,4 +88,4 @@ TEST(UdpLevelDominance, LevelDominatesRegardlessOfTableOrder) {
   EXPECT_EQ(state.GetOutput(), '1');
 }
 
-}
+}  // namespace

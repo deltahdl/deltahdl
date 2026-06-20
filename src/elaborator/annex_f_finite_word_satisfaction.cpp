@@ -21,12 +21,12 @@ Word CompleteWord(const Word& word, const Letter& tail, std::size_t count) {
 }
 
 // §F.5.3.2: neutral satisfaction of A by the infinite word w tail^omega, the
-// completion §F.5.3.1's NeutrallySatisfiesAssertion is asked to decide. The tail
-// is constant, so the assertion verdict is eventually independent of how many
-// tail letters are present; this materializes a growing finite prefix of the
-// tail and returns the verdict once it has held steady across a window. The cap
-// keeps the search finite and is exact for the finite assertions this model is
-// exercised on, mirroring §F.5.2's bounded witness search and §F.5.3.1's
+// completion §F.5.3.1's NeutrallySatisfiesAssertion is asked to decide. The
+// tail is constant, so the assertion verdict is eventually independent of how
+// many tail letters are present; this materializes a growing finite prefix of
+// the tail and returns the verdict once it has held steady across a window. The
+// cap keeps the search finite and is exact for the finite assertions this model
+// is exercised on, mirroring §F.5.2's bounded witness search and §F.5.3.1's
 // PrefixWithTail completion.
 bool NeutralOnCompletion(const Word& word, const Letter& tail,
                          const BooleanExpr& enabling,
@@ -58,7 +58,8 @@ bool WeaklySatisfiesByFiniteWord(const Word& word, const BooleanExpr& enabling,
   return NeutralOnCompletion(word, LetterTop(), enabling, assertion);
 }
 
-bool StronglySatisfiesByFiniteWord(const Word& word, const BooleanExpr& enabling,
+bool StronglySatisfiesByFiniteWord(const Word& word,
+                                   const BooleanExpr& enabling,
                                    const AssertionStatement& assertion) {
   // §F.5.3.2: w |=^+ A iff w _|_^omega |= A.
   return NeutralOnCompletion(word, LetterBottom(), enabling, assertion);
@@ -66,9 +67,10 @@ bool StronglySatisfiesByFiniteWord(const Word& word, const BooleanExpr& enabling
 
 FiniteWordVerdict CheckFiniteWord(const Word& word, const BooleanExpr& enabling,
                                   const AssertionStatement& assertion) {
-  // §F.5.3.2: the verdict a tool should return. Because w |=^+ A implies w |= A,
-  // which implies w |=^- A, ruling out failure, then strong, then neutral
-  // satisfaction picks out exactly one of the four conditions the standard lists.
+  // §F.5.3.2: the verdict a tool should return. Because w |=^+ A implies w |=
+  // A, which implies w |=^- A, ruling out failure, then strong, then neutral
+  // satisfaction picks out exactly one of the four conditions the standard
+  // lists.
   if (!WeaklySatisfiesByFiniteWord(word, enabling, assertion)) {
     return FiniteWordVerdict::kFails;  // not (w |=^- A)
   }

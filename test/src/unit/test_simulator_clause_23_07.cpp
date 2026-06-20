@@ -198,4 +198,4 @@ TEST(DottedNameSimulation, MemberSelectAndHierarchicalNameInSameModule) {
   EXPECT_EQ(v2->value.ToUint64(), 10u);
 }
 
-}
+}  // namespace

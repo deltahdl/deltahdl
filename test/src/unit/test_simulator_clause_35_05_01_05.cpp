@@ -67,21 +67,21 @@ DpiRuntime MakeRuntimeWithSuspendingExport(Scheduler& sched, uint64_t delay,
   return rt;
 }
 
-// R1 + R2: an imported task call routed through an exported task that performs a
-// timing control suspends the currently executing thread — it defers work to a
-// later time slot and the simulation clock advances. This is the dual of
+// R1 + R2: an imported task call routed through an exported task that performs
+// a timing control suspends the currently executing thread — it defers work to
+// a later time slot and the simulation clock advances. This is the dual of
 // §35.5.1.1, where an imported function deferred nothing and the clock stood
 // still.
-TEST(DpiReentrancy, ImportedTaskCallThroughExportedTaskSuspendsAndConsumesTime) {
+TEST(DpiReentrancy,
+     ImportedTaskCallThroughExportedTaskSuspendsAndConsumesTime) {
   Arena arena;
   Scheduler sched(arena);
   bool resumed = false;
   uint64_t resume_time = 0;
-  DpiRuntime rt = MakeRuntimeWithSuspendingExport(
-      sched, kResumeDelay, [&]() {
-        resumed = true;
-        resume_time = sched.CurrentTime().ticks;
-      });
+  DpiRuntime rt = MakeRuntimeWithSuspendingExport(sched, kResumeDelay, [&]() {
+    resumed = true;
+    resume_time = sched.CurrentTime().ticks;
+  });
 
   bool had_future_work_after_call = false;
   uint64_t horizon_after_call = 0;
@@ -135,7 +135,8 @@ TEST(DpiReentrancy, ImportedTaskCodeSimultaneouslyActiveInMultipleThreads) {
   });
 
   // One activation of the imported task: it enters its foreign code (becoming
-  // active), then calls the exported task, which suspends it until a later slot.
+  // active), then calls the exported task, which suspends it until a later
+  // slot.
   auto start_activation = [&]() {
     ++active;
     if (active > max_active) max_active = active;

@@ -13,8 +13,8 @@ namespace {
 // event, the latter only when the check has one. Detail 2 fixes the types the
 // vpiExpr iteration over a tchk returns - vpiTchkTerm for the event arguments
 // and the natural expression type for every other argument. These tests observe
-// the production code that applies those two rules through the public vpi_handle
-// and vpi_iterate dispatch.
+// the production code that applies those two rules through the public
+// vpi_handle and vpi_iterate dispatch.
 
 // The fixture installs a context so the public vpi_handle/vpi_iterate entry
 // points run their real dispatch over the test objects.
@@ -65,8 +65,8 @@ TEST_F(TimingCheck, DataTermIsNullWhenCheckHasNoDataEvent) {
   EXPECT_EQ(VpiHandleC(vpiTchkDataTerm, &tchk), nullptr);
 }
 
-// Detail 1 (scope): the vpiTchkRefTerm/vpiTchkDataTerm relations are specific to
-// a timing check. On an object that is not a tchk, asking for them does not
+// Detail 1 (scope): the vpiTchkRefTerm/vpiTchkDataTerm relations are specific
+// to a timing check. On an object that is not a tchk, asking for them does not
 // reach a stray tchk term, so the relations report NULL even when the object
 // carries a tchk term child.
 TEST_F(TimingCheck, TermRelationsApplyOnlyToTimingChecks) {

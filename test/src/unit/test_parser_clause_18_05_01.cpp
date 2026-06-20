@@ -77,4 +77,4 @@ TEST(ExternalConstraintBlockParsing, ExternalBlockRecordsClassAndName) {
   EXPECT_EQ(r.cu->external_constraints.front().constraint_name, "proto2");
 }
 
-}
+}  // namespace

@@ -72,7 +72,8 @@ TEST(ContinuousAssignSyntaxParsing, ListOfNetAssignments_Three) {
   EXPECT_EQ(cas[2]->assign_lhs->text, "e");
 }
 
-TEST(ContinuousAssignSyntaxParsing, ListOfNetAssignments_SharedStrengthAndDelay) {
+TEST(ContinuousAssignSyntaxParsing,
+     ListOfNetAssignments_SharedStrengthAndDelay) {
   auto r = Parse(
       "module m;\n"
       "  wire a, b, c, d;\n"
@@ -224,8 +225,8 @@ TEST(NetAliasSyntaxParsing, NetAliasMultipleStatements) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  size_t count = CountItemsByKind(r.cu->modules[0]->items,
-                                  ModuleItemKind::kAlias);
+  size_t count =
+      CountItemsByKind(r.cu->modules[0]->items, ModuleItemKind::kAlias);
   EXPECT_EQ(count, 2u);
 }
 
@@ -396,4 +397,4 @@ TEST(ContinuousAssignSyntaxParsing, NetAssignmentLiteralRhs) {
   EXPECT_NE(cas[0]->assign_rhs, nullptr);
 }
 
-}
+}  // namespace

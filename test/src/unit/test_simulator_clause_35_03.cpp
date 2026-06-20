@@ -117,8 +117,7 @@ TEST(DpiTwoLayers, ForeignInternalStateIsOpaqueToSvLayer) {
   // Private foreign-side state captured in the callback; the SystemVerilog
   // layer has no handle to it and can only observe the returned values.
   auto ticks = std::make_shared<int32_t>(0);
-  counter.impl =
-      [ticks](const std::vector<DpiArgValue>&) -> DpiArgValue {
+  counter.impl = [ticks](const std::vector<DpiArgValue>&) -> DpiArgValue {
     return DpiArgValue::FromInt(++(*ticks));
   };
   rt.RegisterImport(counter);

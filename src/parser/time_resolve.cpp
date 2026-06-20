@@ -15,8 +15,7 @@ bool TryParseTimeUnit(std::string_view text, TimeUnit& out) {
 bool TryParseTimeMagnitudeAndUnit(std::string_view text, int& magnitude,
                                   TimeUnit& out) {
   size_t i = 0;
-  while (i < text.size() &&
-         std::isdigit(static_cast<unsigned char>(text[i]))) {
+  while (i < text.size() && std::isdigit(static_cast<unsigned char>(text[i]))) {
     ++i;
   }
   if (i == 0) return false;
@@ -38,19 +37,15 @@ ResolvedTimescale ResolveModuleTimescale(const ModuleDecl* mod,
   ResolvedTimescale result;
 
   if (mod->has_timeunit) {
-
     result.unit = mod->time_unit;
     result.has_unit = true;
   } else if (enclosing != nullptr && enclosing->has_unit) {
-
     result.unit = enclosing->unit;
     result.has_unit = true;
   } else if (has_preproc_timescale) {
-
     result.unit = preproc_timescale.unit;
     result.has_unit = true;
   } else if (cu->has_cu_timeunit) {
-
     result.unit = cu->cu_time_unit;
     result.has_unit = true;
   }
@@ -125,4 +120,4 @@ TimeUnit ComputeGlobalTimePrecision(const CompilationUnit* cu,
   return result;
 }
 
-}
+}  // namespace delta

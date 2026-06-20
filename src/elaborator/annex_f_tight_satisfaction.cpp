@@ -24,7 +24,8 @@ namespace {
 
 // §F.5: for a letter in 2^P, a Boolean expression holds when its proposition
 // structure evaluates to true under the set of true propositions.
-bool AtomSetSatisfies(const std::set<std::string>& atoms, const BooleanExpr& b) {
+bool AtomSetSatisfies(const std::set<std::string>& atoms,
+                      const BooleanExpr& b) {
   switch (b.kind) {
     case BooleanExpr::Kind::kTrue:
       return true;

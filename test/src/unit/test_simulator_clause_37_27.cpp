@@ -9,14 +9,16 @@ namespace delta {
 namespace {
 
 // §37.27 named events: the VPI object model for a named event and a named event
-// array. The diagram's properties (vpiName/vpiFullName, vpiArray/vpiArrayMember,
-// vpiAutomatic, vpiAllocScheme), its typespec/value/parent edges, and access by
-// index are owned by the generic machinery and the cited dependency subclauses
-// (§37.3.7 lifetime and memory allocation, §37.25 typespecs, §38.19/§38.20
-// access by index, §38.34 value). The three relations that carry §37.27's own
-// normative details are exercised here through the public iterate/scan API:
-//   detail 1 - vpiWaitingProcesses reaches the threads of the waiting processes;
-//   detail 2 - vpiIndex on a named event reaches its array indices, innermost
+// array. The diagram's properties (vpiName/vpiFullName,
+// vpiArray/vpiArrayMember, vpiAutomatic, vpiAllocScheme), its
+// typespec/value/parent edges, and access by index are owned by the generic
+// machinery and the cited dependency subclauses (§37.3.7 lifetime and memory
+// allocation, §37.25 typespecs, §38.19/§38.20 access by index, §38.34 value).
+// The three relations that carry §37.27's own normative details are exercised
+// here through the public iterate/scan API:
+//   detail 1 - vpiWaitingProcesses reaches the threads of the waiting
+//   processes; detail 2 - vpiIndex on a named event reaches its array indices,
+//   innermost
 //              first, and is NULL when the named event is not an array element;
 //   detail 3 - vpiRange on a named event array walks the unpacked range
 //              declarations from leftmost to rightmost.
@@ -53,8 +55,9 @@ TEST(NamedEventModel, WaitingProcessesIterationReachesWaitingThreads) {
   EXPECT_EQ(waiting[1], &dynamic_proc);
 }
 
-// Detail 2: vpiIndex on a named event that is an array element returns its index
-// expressions, beginning with the index for the named event and working outward.
+// Detail 2: vpiIndex on a named event that is an array element returns its
+// index expressions, beginning with the index for the named event and working
+// outward.
 TEST(NamedEventModel, IndexIterationReachesArrayIndicesOutward) {
   VpiContext ctx;
 
@@ -105,9 +108,9 @@ TEST(NamedEventModel, RangeIterationWalksUnpackedRangesLeftToRight) {
 }
 
 // Details 1 and 2 select distinct targets: when a named event carries both a
-// waiting thread and an array index, vpiWaitingProcesses reaches only the thread
-// and vpiIndex reaches only the index expression - the two special relations do
-// not cross-contaminate.
+// waiting thread and an array index, vpiWaitingProcesses reaches only the
+// thread and vpiIndex reaches only the index expression - the two special
+// relations do not cross-contaminate.
 TEST(NamedEventModel, WaitingAndIndexRelationsSelectDistinctTargets) {
   VpiContext ctx;
 

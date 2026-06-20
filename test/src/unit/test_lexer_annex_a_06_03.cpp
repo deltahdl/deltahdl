@@ -36,4 +36,4 @@ TEST(BlockKeywordLexing, JoinNoneKeyword) {
   EXPECT_EQ(r.token.kind, TokenKind::kKwJoinNone);
 }
 
-}
+}  // namespace

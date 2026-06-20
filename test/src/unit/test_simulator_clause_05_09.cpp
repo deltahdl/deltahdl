@@ -140,4 +140,4 @@ TEST(LexicalConventionSim, UnpackedByteArrayLeftJustifiedPadding) {
   EXPECT_EQ(v->value.ToUint64(), 0u);
 }
 
-}
+}  // namespace

@@ -16,4 +16,4 @@ TEST(CompilerDirectiveParsing, BeginKeywords1800_2017) {
                               "`end_keywords\n"));
 }
 
-}
+}  // namespace

@@ -39,40 +39,40 @@ TEST(ArrayLiteralParsing, NestedBracesFollowDimensions) {
 
 // §5.11 — the replication operator is allowed inside an array literal.
 TEST(ArrayLiteralParsing, ReplicationParses) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  int n [1:3];\n"
-      "  initial n = '{3{4}};\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  int n [1:3];\n"
+              "  initial n = '{3{4}};\n"
+              "endmodule\n"));
 }
 
 // §5.11 — replication operators may themselves be nested within an array
 // literal (the inner brace pair belongs to the inner replication).
 TEST(ArrayLiteralParsing, NestedReplicationParses) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  int n [1:2][1:6];\n"
-      "  initial n = '{2{'{3{4, 5}}}};\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  int n [1:2][1:6];\n"
+              "  initial n = '{2{'{3{4, 5}}}};\n"
+              "endmodule\n"));
 }
 
 // §5.11 — an array literal's type may be explicitly indicated with a prefix.
 TEST(ArrayLiteralParsing, TypePrefixedArrayLiteralParses) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  typedef int triple [1:3];\n"
-      "  triple b = triple'{0, 1, 2};\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  typedef int triple [1:3];\n"
+              "  triple b = triple'{0, 1, 2};\n"
+              "endmodule\n"));
 }
 
 // §5.11 — an array literal may use an index as a key together with a default
 // key value.
 TEST(ArrayLiteralParsing, IndexAndDefaultKeyParses) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  typedef int triple [1:3];\n"
-      "  triple b = '{1:1, default:0};\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  typedef int triple [1:3];\n"
+              "  triple b = '{1:1, default:0};\n"
+              "endmodule\n"));
 }
 
-}
+}  // namespace

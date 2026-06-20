@@ -49,4 +49,4 @@ TEST(KeywordVersionPreprocessing,
   EXPECT_TRUE(found);
 }
 
-}
+}  // namespace

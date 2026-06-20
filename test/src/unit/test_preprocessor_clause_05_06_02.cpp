@@ -53,4 +53,4 @@ TEST(KeywordPreprocessor, EscapedKeywordPreservedInPreprocessor) {
   EXPECT_NE(result.find("\\begin"), std::string::npos);
 }
 
-}
+}  // namespace

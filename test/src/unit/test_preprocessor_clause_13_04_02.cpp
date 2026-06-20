@@ -20,4 +20,4 @@ TEST(FunctionLifetimePreprocessor, AutomaticFunctionLocalVar) {
   EXPECT_TRUE(item->is_automatic);
 }
 
-}
+}  // namespace

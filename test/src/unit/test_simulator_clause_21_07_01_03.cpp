@@ -22,7 +22,7 @@ TEST_F(DumpOffOnSysTask, DumpOffWritesAllXCheckpoint) {
   {
     VcdWriter vcd(tmp_path_);
     vcd.WriteHeader("1ns");
-    vcd.RegisterSignal("clk", 1, clk);   // ident '!'
+    vcd.RegisterSignal("clk", 1, clk);    // ident '!'
     vcd.RegisterSignal("data", 8, data);  // ident '"'
     vcd.EndDefinitions();
     vcd.WriteTimestamp(0);
@@ -31,7 +31,7 @@ TEST_F(DumpOffOnSysTask, DumpOffWritesAllXCheckpoint) {
   }
   auto content = ReadVcd();
   EXPECT_NE(content.find("$dumpoff"), std::string::npos);
-  EXPECT_NE(content.find("x!"), std::string::npos);    // scalar dumped as x
+  EXPECT_NE(content.find("x!"), std::string::npos);     // scalar dumped as x
   EXPECT_NE(content.find("bx \""), std::string::npos);  // vector dumped as x
 }
 
@@ -80,7 +80,8 @@ TEST_F(DumpOffOnSysTask, DumpOnResumesWithCurrentValues) {
   }
   auto content = ReadVcd();
   EXPECT_NE(content.find("$dumpon"), std::string::npos);
-  EXPECT_NE(content.find("b00111100 !"), std::string::npos);  // 0x3C current value
+  EXPECT_NE(content.find("b00111100 !"),
+            std::string::npos);  // 0x3C current value
   EXPECT_NE(content.find("#400"), std::string::npos);
 }
 
@@ -139,5 +140,5 @@ TEST_F(DumpOffOnSysTask, RepeatedSuspendResumeCycles) {
   EXPECT_EQ(count(content, "$dumpon"), 1u);
 }
 
-}
-}
+}  // namespace
+}  // namespace delta

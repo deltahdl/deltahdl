@@ -25,4 +25,4 @@ TEST(IoSystemTaskParsing, ValuePlusargsCall) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

@@ -40,24 +40,25 @@ TEST(InterfaceClassRandomizeSim, RandomizeOnInterfaceHandle) {
 }
 
 TEST(InterfaceClassRandomizeSim, RandomizeReturnValue) {
-  EXPECT_EQ(RunAndGet(
-      "interface class IC;\n"
-      "  pure virtual function void foo();\n"
-      "endclass\n"
-      "class C implements IC;\n"
-      "  rand int x;\n"
-      "  constraint c { x > 0; x < 10; }\n"
-      "  virtual function void foo();\n"
-      "  endfunction\n"
-      "endclass\n"
-      "module t;\n"
-      "  int result;\n"
-      "  initial begin\n"
-      "    C obj = new;\n"
-      "    IC iref = obj;\n"
-      "    result = iref.randomize();\n"
-      "  end\n"
-      "endmodule\n", "result"), 1u);
+  EXPECT_EQ(RunAndGet("interface class IC;\n"
+                      "  pure virtual function void foo();\n"
+                      "endclass\n"
+                      "class C implements IC;\n"
+                      "  rand int x;\n"
+                      "  constraint c { x > 0; x < 10; }\n"
+                      "  virtual function void foo();\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    C obj = new;\n"
+                      "    IC iref = obj;\n"
+                      "    result = iref.randomize();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            1u);
 }
 
 TEST(InterfaceClassRandomizeSim, InlineConstraintViaInterfaceHandleRandomizes) {
@@ -100,105 +101,109 @@ TEST(InterfaceClassRandomizeSim, InlineConstraintViaInterfaceHandleRandomizes) {
 }
 
 TEST(InterfaceClassPrePostRandomizeSim, PreRandomizeCalledBeforeRandomize) {
-  EXPECT_EQ(RunAndGet(
-      "interface class IC;\n"
-      "  pure virtual function void foo();\n"
-      "endclass\n"
-      "class C implements IC;\n"
-      "  rand int x;\n"
-      "  int pre_called;\n"
-      "  constraint c { x > 0; x < 10; }\n"
-      "  virtual function void foo();\n"
-      "  endfunction\n"
-      "  function void pre_randomize();\n"
-      "    pre_called = 1;\n"
-      "  endfunction\n"
-      "endclass\n"
-      "module t;\n"
-      "  int result;\n"
-      "  initial begin\n"
-      "    C obj = new;\n"
-      "    void'(obj.randomize());\n"
-      "    result = obj.pre_called;\n"
-      "  end\n"
-      "endmodule\n", "result"), 1u);
+  EXPECT_EQ(RunAndGet("interface class IC;\n"
+                      "  pure virtual function void foo();\n"
+                      "endclass\n"
+                      "class C implements IC;\n"
+                      "  rand int x;\n"
+                      "  int pre_called;\n"
+                      "  constraint c { x > 0; x < 10; }\n"
+                      "  virtual function void foo();\n"
+                      "  endfunction\n"
+                      "  function void pre_randomize();\n"
+                      "    pre_called = 1;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    C obj = new;\n"
+                      "    void'(obj.randomize());\n"
+                      "    result = obj.pre_called;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            1u);
 }
 
 TEST(InterfaceClassPrePostRandomizeSim, PostRandomizeCalledAfterRandomize) {
-  EXPECT_EQ(RunAndGet(
-      "interface class IC;\n"
-      "  pure virtual function void foo();\n"
-      "endclass\n"
-      "class C implements IC;\n"
-      "  rand int x;\n"
-      "  int post_called;\n"
-      "  constraint c { x > 0; x < 10; }\n"
-      "  virtual function void foo();\n"
-      "  endfunction\n"
-      "  function void post_randomize();\n"
-      "    post_called = 1;\n"
-      "  endfunction\n"
-      "endclass\n"
-      "module t;\n"
-      "  int result;\n"
-      "  initial begin\n"
-      "    C obj = new;\n"
-      "    void'(obj.randomize());\n"
-      "    result = obj.post_called;\n"
-      "  end\n"
-      "endmodule\n", "result"), 1u);
+  EXPECT_EQ(RunAndGet("interface class IC;\n"
+                      "  pure virtual function void foo();\n"
+                      "endclass\n"
+                      "class C implements IC;\n"
+                      "  rand int x;\n"
+                      "  int post_called;\n"
+                      "  constraint c { x > 0; x < 10; }\n"
+                      "  virtual function void foo();\n"
+                      "  endfunction\n"
+                      "  function void post_randomize();\n"
+                      "    post_called = 1;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    C obj = new;\n"
+                      "    void'(obj.randomize());\n"
+                      "    result = obj.post_called;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            1u);
 }
 
 TEST(InterfaceClassPrePostRandomizeSim, PreRandomizeViaInterfaceHandle) {
-  EXPECT_EQ(RunAndGet(
-      "interface class IC;\n"
-      "  pure virtual function void foo();\n"
-      "endclass\n"
-      "class C implements IC;\n"
-      "  rand int x;\n"
-      "  int pre_called;\n"
-      "  constraint c { x > 0; x < 10; }\n"
-      "  virtual function void foo();\n"
-      "  endfunction\n"
-      "  function void pre_randomize();\n"
-      "    pre_called = 1;\n"
-      "  endfunction\n"
-      "endclass\n"
-      "module t;\n"
-      "  int result;\n"
-      "  initial begin\n"
-      "    C obj = new;\n"
-      "    IC iref = obj;\n"
-      "    void'(iref.randomize());\n"
-      "    result = obj.pre_called;\n"
-      "  end\n"
-      "endmodule\n", "result"), 1u);
+  EXPECT_EQ(RunAndGet("interface class IC;\n"
+                      "  pure virtual function void foo();\n"
+                      "endclass\n"
+                      "class C implements IC;\n"
+                      "  rand int x;\n"
+                      "  int pre_called;\n"
+                      "  constraint c { x > 0; x < 10; }\n"
+                      "  virtual function void foo();\n"
+                      "  endfunction\n"
+                      "  function void pre_randomize();\n"
+                      "    pre_called = 1;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    C obj = new;\n"
+                      "    IC iref = obj;\n"
+                      "    void'(iref.randomize());\n"
+                      "    result = obj.pre_called;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            1u);
 }
 
 TEST(InterfaceClassPrePostRandomizeSim, PostRandomizeViaInterfaceHandle) {
-  EXPECT_EQ(RunAndGet(
-      "interface class IC;\n"
-      "  pure virtual function void foo();\n"
-      "endclass\n"
-      "class C implements IC;\n"
-      "  rand int x;\n"
-      "  int post_called;\n"
-      "  constraint c { x > 0; x < 10; }\n"
-      "  virtual function void foo();\n"
-      "  endfunction\n"
-      "  function void post_randomize();\n"
-      "    post_called = 1;\n"
-      "  endfunction\n"
-      "endclass\n"
-      "module t;\n"
-      "  int result;\n"
-      "  initial begin\n"
-      "    C obj = new;\n"
-      "    IC iref = obj;\n"
-      "    void'(iref.randomize());\n"
-      "    result = obj.post_called;\n"
-      "  end\n"
-      "endmodule\n", "result"), 1u);
+  EXPECT_EQ(RunAndGet("interface class IC;\n"
+                      "  pure virtual function void foo();\n"
+                      "endclass\n"
+                      "class C implements IC;\n"
+                      "  rand int x;\n"
+                      "  int post_called;\n"
+                      "  constraint c { x > 0; x < 10; }\n"
+                      "  virtual function void foo();\n"
+                      "  endfunction\n"
+                      "  function void post_randomize();\n"
+                      "    post_called = 1;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    C obj = new;\n"
+                      "    IC iref = obj;\n"
+                      "    void'(iref.randomize());\n"
+                      "    result = obj.post_called;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            1u);
 }
 
-}
+}  // namespace

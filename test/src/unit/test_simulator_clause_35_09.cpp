@@ -43,7 +43,8 @@ TEST(DpiDisableProtocol, ExportedTaskReturnsZeroWithoutDisable) {
 // §35.9: if an exported task is itself the target of a disable, its parent
 // import is not considered disabled when the task returns; the task returns 0
 // and svIsDisabledState() reports 0 as well.
-TEST(DpiDisableProtocol, ExportedTaskTargetedItselfReturnsZeroAndParentNotDisabled) {
+TEST(DpiDisableProtocol,
+     ExportedTaskTargetedItselfReturnsZeroAndParentNotDisabled) {
   ResetDisableState();
   DpiRuntime rt;
 
@@ -136,21 +137,23 @@ TEST(DpiDisableProtocol, ImportedTaskMustReturnOneWhenDisabled) {
 
   EXPECT_TRUE(rt.CheckImportedSubroutineDisableReturn(/*is_task=*/true,
                                                       /*task_return_value=*/1));
-  EXPECT_FALSE(rt.CheckImportedSubroutineDisableReturn(/*is_task=*/true,
-                                                       /*task_return_value=*/0));
+  EXPECT_FALSE(
+      rt.CheckImportedSubroutineDisableReturn(/*is_task=*/true,
+                                              /*task_return_value=*/0));
 }
 
-// §35.9 item c): a simulator shall check that an imported function returning due
-// to a disable called svAckDisabledState() first. Acknowledging satisfies the
-// check; failing to acknowledge is a protocol violation.
+// §35.9 item c): a simulator shall check that an imported function returning
+// due to a disable called svAckDisabledState() first. Acknowledging satisfies
+// the check; failing to acknowledge is a protocol violation.
 TEST(DpiDisableProtocol, ImportedFunctionMustAcknowledgeWhenDisabled) {
   ResetDisableState();
   DpiRuntime rt;
   DpiSetCurrentDisabledState(true);
 
   // Without an acknowledgement the function-return check fails.
-  EXPECT_FALSE(rt.CheckImportedSubroutineDisableReturn(/*is_task=*/false,
-                                                       /*task_return_value=*/0));
+  EXPECT_FALSE(
+      rt.CheckImportedSubroutineDisableReturn(/*is_task=*/false,
+                                              /*task_return_value=*/0));
 
   // After the function acknowledges via the named API, the check passes.
   svAckDisabledState();
@@ -292,13 +295,15 @@ TEST(DpiDisableProtocol, DisabledNoncontextImportCannotCallExport) {
 // §35.9 item b): an imported task that returns due to a disable shall return 1.
 // Any other value — not only 0 — is a protocol violation. A task returning 2
 // while a disable is in effect fails the simulator's check.
-TEST(DpiDisableProtocol, ImportedTaskReturnOtherThanOneWhenDisabledIsViolation) {
+TEST(DpiDisableProtocol,
+     ImportedTaskReturnOtherThanOneWhenDisabledIsViolation) {
   ResetDisableState();
   DpiRuntime rt;
   DpiSetCurrentDisabledState(true);
 
-  EXPECT_FALSE(rt.CheckImportedSubroutineDisableReturn(/*is_task=*/true,
-                                                       /*task_return_value=*/2));
+  EXPECT_FALSE(
+      rt.CheckImportedSubroutineDisableReturn(/*is_task=*/true,
+                                              /*task_return_value=*/2));
   ResetDisableState();
 }
 

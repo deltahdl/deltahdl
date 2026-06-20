@@ -48,4 +48,4 @@ TEST(ClassConstraintElaboration, WeakRefTwoInstancesSameReferentOk) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

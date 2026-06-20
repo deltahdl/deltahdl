@@ -22,4 +22,4 @@ EventuallyRangeBound MakeEventuallyBound(std::int64_t value);
 // §16.12.13: build the `$` upper bound — an unbounded maximum.
 EventuallyRangeBound MakeEventuallyDollar();
 
-}
+}  // namespace delta

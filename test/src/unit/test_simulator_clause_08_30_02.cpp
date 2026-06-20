@@ -73,4 +73,4 @@ TEST(ClassSim, WeakRefNullInstancesAreUnique) {
   EXPECT_EQ(wr2->Get(), kNullClassHandle);
 }
 
-}
+}  // namespace

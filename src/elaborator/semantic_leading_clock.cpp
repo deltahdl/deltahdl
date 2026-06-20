@@ -15,9 +15,7 @@ constexpr std::string_view kInheritedSentinel = "<inherited>";
 
 std::string_view InheritedSentinel() { return kInheritedSentinel; }
 
-bool IsInheritedSentinel(std::string_view s) {
-  return s == kInheritedSentinel;
-}
+bool IsInheritedSentinel(std::string_view s) { return s == kInheritedSentinel; }
 
 SemanticLeadingClock SequenceLeadingClockOfBareSequence() {
   return InheritedLeadingClock();
@@ -32,8 +30,7 @@ SemanticLeadingClock SequenceLeadingClockAfterAtC(
 }
 
 SemanticLeadingClock SequenceLeadingClockOfDelay(
-    const SemanticLeadingClock& left,
-    const SemanticLeadingClock& /*right*/) {
+    const SemanticLeadingClock& left, const SemanticLeadingClock& /*right*/) {
   // §16.16.1: m1 ##1 m2 and m1 ##0 m2 both keep m1's leading clock.
   return left;
 }

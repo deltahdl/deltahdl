@@ -25,4 +25,4 @@ void DriverUpdatePool::Release(DriverUpdate* update) {
   ++free_count_;
 }
 
-}
+}  // namespace delta

@@ -35,4 +35,4 @@ TEST(TriregElaboration, ChargeStrengthSmall) {
   EXPECT_EQ(mod->nets[0].charge_strength, Strength::kSmall);
 }
 
-}
+}  // namespace

@@ -194,4 +194,4 @@ TEST(ArrayAssignmentValidation, DynamicArrayToAssocAssignRejected) {
   EXPECT_TRUE(f.has_errors);
 }
 
-}
+}  // namespace

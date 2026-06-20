@@ -72,9 +72,9 @@ TEST(DpiOutputInoutValueChanges, InoutChangeRaisesEvent) {
   EXPECT_EQ(changes[0].new_value.AsInt(), 42);
 }
 
-// Value-change semantics: an actual the call leaves at its prior value raises no
-// event. Here the foreign code writes the inout's existing value straight back,
-// so there is no change to propagate.
+// Value-change semantics: an actual the call leaves at its prior value raises
+// no event. Here the foreign code writes the inout's existing value straight
+// back, so there is no change to propagate.
 TEST(DpiOutputInoutValueChanges, UnchangedActualRaisesNoEvent) {
   DpiRuntime rt;
   DpiRtFunction func;
@@ -164,8 +164,8 @@ TEST(DpiOutputInoutValueChanges, MixedDirectionsReportOnlyChangedOutInout) {
                DpiArg{"o", DataTypeKind::kInt, Direction::kOutput},
                DpiArg{"io", DataTypeKind::kInt, Direction::kInout}};
   func.arg_impl = [](std::vector<DpiArgValue>& a) {
-    a[0] = DpiArgValue::FromInt(123);   // input write: discarded, no event
-    a[1] = DpiArgValue::FromInt(55);    // output: changes from 8 -> 55
+    a[0] = DpiArgValue::FromInt(123);  // input write: discarded, no event
+    a[1] = DpiArgValue::FromInt(55);   // output: changes from 8 -> 55
     a[2] = DpiArgValue::FromInt(a[2].AsInt());  // inout: written back unchanged
     return DpiArgValue::FromInt(0);
   };
@@ -229,7 +229,8 @@ TEST(DpiOutputInoutValueChanges, LongintChangeDetectedAndPropagated) {
   };
   rt.RegisterImport(std::move(func));
 
-  std::vector<DpiArgValue> actuals = {DpiArgValue::FromLongint(9'000'000'000LL)};
+  std::vector<DpiArgValue> actuals = {
+      DpiArgValue::FromLongint(9'000'000'000LL)};
   std::vector<DpiArgValueChange> changes;
   rt.CallImportDetectingChanges("wide", actuals, changes);
 

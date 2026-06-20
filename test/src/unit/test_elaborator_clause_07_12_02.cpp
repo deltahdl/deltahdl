@@ -104,4 +104,4 @@ TEST(ArrayOrderingElaboration, ShuffleOnAssocArrayIsError) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

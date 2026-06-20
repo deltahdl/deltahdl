@@ -103,8 +103,7 @@ TEST(SubroutineCallElaborationSyntax, VoidClassMethodNoArgsWithoutParensOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(SubroutineCallElaborationSyntax,
-     ClassMethodAllDefaultsWithoutParensOk) {
+TEST(SubroutineCallElaborationSyntax, ClassMethodAllDefaultsWithoutParensOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "class C;\n"
@@ -119,8 +118,7 @@ TEST(SubroutineCallElaborationSyntax,
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(SubroutineCallElaborationSyntax,
-     TaskWithRequiredArgWithoutParensIsError) {
+TEST(SubroutineCallElaborationSyntax, TaskWithRequiredArgWithoutParensIsError) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -183,4 +181,4 @@ TEST(SubroutineCallElaborationSyntax,
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

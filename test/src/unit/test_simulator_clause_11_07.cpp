@@ -190,4 +190,4 @@ TEST(SignedExprSim, SystemTfCallSigned) {
   EXPECT_EQ(var->value.ToUint64(), 200u);
 }
 
-}
+}  // namespace

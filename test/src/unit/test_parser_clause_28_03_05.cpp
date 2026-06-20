@@ -144,4 +144,4 @@ TEST(GateLevelModelingParsing, GateArrayTwoUniqueArrayNamesInOneDeclaration) {
   EXPECT_NE(gates[1]->inst_range_right, nullptr);
 }
 
-}
+}  // namespace

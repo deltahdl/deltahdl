@@ -118,8 +118,7 @@ TEST(StructuredProcedureElaboration,
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(StructuredProcedureElaboration,
-     DynamicOverrideRejectedOnModuleLevelTask) {
+TEST(StructuredProcedureElaboration, DynamicOverrideRejectedOnModuleLevelTask) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -140,4 +139,4 @@ TEST(StructuredProcedureElaboration,
   EXPECT_TRUE(f.has_errors);
 }
 
-}
+}  // namespace

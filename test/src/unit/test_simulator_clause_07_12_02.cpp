@@ -296,8 +296,8 @@ TEST(ArrayOrdering, SortWithExprUsesExpression) {
   SimFixture f;
   MakeDynArray(f, "arr", {3, 1, 2});
   auto* call = MakeMethodCall(f.arena, "arr", "sort", {});
-  call->with_expr = MakeBinary(f.arena, TokenKind::kMinus,
-                               MakeInt(f.arena, 10), MakeId(f.arena, "item"));
+  call->with_expr = MakeBinary(f.arena, TokenKind::kMinus, MakeInt(f.arena, 10),
+                               MakeId(f.arena, "item"));
   bool ok = TryExecArrayMethodStmt(call, f.ctx, f.arena);
   ASSERT_TRUE(ok);
   auto* q = f.ctx.FindQueue("arr");
@@ -316,8 +316,8 @@ TEST(ArrayOrdering, RsortWithExprUsesExpression) {
   SimFixture f;
   MakeDynArray(f, "arr", {3, 1, 2});
   auto* call = MakeMethodCall(f.arena, "arr", "rsort", {});
-  call->with_expr = MakeBinary(f.arena, TokenKind::kMinus,
-                               MakeInt(f.arena, 10), MakeId(f.arena, "item"));
+  call->with_expr = MakeBinary(f.arena, TokenKind::kMinus, MakeInt(f.arena, 10),
+                               MakeId(f.arena, "item"));
   bool ok = TryExecArrayMethodStmt(call, f.ctx, f.arena);
   ASSERT_TRUE(ok);
   auto* q = f.ctx.FindQueue("arr");
@@ -328,4 +328,4 @@ TEST(ArrayOrdering, RsortWithExprUsesExpression) {
   EXPECT_EQ(q->elements[2].ToUint64(), 3u);
 }
 
-}
+}  // namespace

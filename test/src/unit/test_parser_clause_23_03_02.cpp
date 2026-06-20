@@ -13,7 +13,8 @@ TEST(ModuleInstantiationParser, MultipleWildcardPortConnectionsRejected) {
   EXPECT_TRUE(r.has_errors);
 }
 
-TEST(ModuleInstantiationParser, MixedPositionalAndNamedPortConnectionsRejected) {
+TEST(ModuleInstantiationParser,
+     MixedPositionalAndNamedPortConnectionsRejected) {
   auto r = Parse(
       "module top;\n"
       "  logic a, b;\n"
@@ -63,4 +64,4 @@ TEST(ModuleInstantiationParser, PortlessInstanceWithoutParensRejected) {
   EXPECT_TRUE(r.has_errors);
 }
 
-}
+}  // namespace

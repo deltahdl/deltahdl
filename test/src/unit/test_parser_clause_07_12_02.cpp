@@ -142,4 +142,4 @@ TEST(AggregateTypeParsing, ArrayMethodReverse) {
   EXPECT_EQ(stmt->kind, StmtKind::kExprStmt);
 }
 
-}
+}  // namespace

@@ -20,7 +20,8 @@ enum class AssertionControlTaskCategory : uint8_t {
 
 // §20.11 (Syntax 20-12): classify a system task name (including the leading
 // '$') against the assertion control task grammar.
-AssertionControlTaskCategory ClassifyAssertionControlTask(std::string_view name);
+AssertionControlTaskCategory ClassifyAssertionControlTask(
+    std::string_view name);
 
 // §20.11: convenience predicate — whether the name is any assertion control
 // system task (assert_task, assert_action_task, or $assertcontrol).

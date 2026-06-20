@@ -29,19 +29,18 @@ auto Samp(const std::string& name) { return SeqLocalVarSampling(name); }
 TEST(NeutralSatisfactionLocals, StrongUsesFourWayRelation) {
   EXPECT_TRUE(NeutrallySatisfiesWithLocals(Word{A({"a"})}, *LvStrong(Bool("a")),
                                            LocalContext{}));
-  EXPECT_FALSE(NeutrallySatisfiesWithLocals(Word{A({"b"})}, *LvStrong(Bool("a")),
-                                            LocalContext{}));
+  EXPECT_FALSE(NeutrallySatisfiesWithLocals(
+      Word{A({"b"})}, *LvStrong(Bool("a")), LocalContext{}));
   // A sampling sequence matches any single letter, so strong holds on a
   // one-letter word and fails on the empty word (no nonempty prefix).
   EXPECT_TRUE(NeutrallySatisfiesWithLocals(Word{A({"x"})}, *LvStrong(Samp("v")),
                                            LocalContext{}));
-  EXPECT_FALSE(
-      NeutrallySatisfiesWithLocals(Word{}, *LvStrong(Samp("v")),
-                                   LocalContext{}));
+  EXPECT_FALSE(NeutrallySatisfiesWithLocals(Word{}, *LvStrong(Samp("v")),
+                                            LocalContext{}));
   // The verdict does not depend on the input context's values; an unrelated
   // incoming binding does not change it.
-  EXPECT_TRUE(NeutrallySatisfiesWithLocals(
-      Word{A({"x"})}, *LvStrong(Samp("v")), LocalContext{{"u", A({"z"})}}));
+  EXPECT_TRUE(NeutrallySatisfiesWithLocals(Word{A({"x"})}, *LvStrong(Samp("v")),
+                                           LocalContext{{"u", A({"z"})}}));
   // The underlying sequence may declare a local variable.
   EXPECT_TRUE(NeutrallySatisfiesWithLocals(
       Word{A({"x"})}, *LvStrong(SeqLocalVarDecl("int", "v", Samp("v"))),
@@ -52,8 +51,8 @@ TEST(NeutralSatisfactionLocals, StrongUsesFourWayRelation) {
 // satisfies strong(R). On the empty word the universal is vacuous, so weak
 // holds where strong does not -- the defining contrast between the two.
 TEST(NeutralSatisfactionLocals, WeakIsVacuousOnEmptyWordAndCompletesPrefixes) {
-  EXPECT_TRUE(NeutrallySatisfiesWithLocals(Word{}, *LvWeak(Bool("a")),
-                                           LocalContext{}));
+  EXPECT_TRUE(
+      NeutrallySatisfiesWithLocals(Word{}, *LvWeak(Bool("a")), LocalContext{}));
   EXPECT_FALSE(NeutrallySatisfiesWithLocals(Word{}, *LvStrong(Bool("a")),
                                             LocalContext{}));
   EXPECT_TRUE(NeutrallySatisfiesWithLocals(Word{A({"a"})}, *LvWeak(Bool("a")),
@@ -70,15 +69,15 @@ TEST(NeutralSatisfactionLocals, NotNegatesOverComplementWord) {
       Word{A({"b"})}, *LvNot(LvStrong(Bool("a"))), LocalContext{}));
   EXPECT_FALSE(NeutrallySatisfiesWithLocals(
       Word{A({"a"})}, *LvNot(LvStrong(Bool("a"))), LocalContext{}));
-  // The rule is evaluated on w-bar, not w, so the T/_|_ swap is observable: over
-  // [T], P = strong(a) is checked on the complement [_|_], where _|_ |= a fails,
-  // so strong(a) fails and not holds. Were the complement not applied, strong(a)
-  // would hold on [T] (T |= a) and not would fail -- so the TRUE verdict here
-  // shows w-bar is used.
+  // The rule is evaluated on w-bar, not w, so the T/_|_ swap is observable:
+  // over [T], P = strong(a) is checked on the complement [_|_], where _|_ |= a
+  // fails, so strong(a) fails and not holds. Were the complement not applied,
+  // strong(a) would hold on [T] (T |= a) and not would fail -- so the TRUE
+  // verdict here shows w-bar is used.
   EXPECT_TRUE(NeutrallySatisfiesWithLocals(
       Word{LetterTop()}, *LvNot(LvStrong(Bool("a"))), LocalContext{}));
-  // Dually, over [_|_] the property is checked on [T], where strong(a) holds, so
-  // not fails.
+  // Dually, over [_|_] the property is checked on [T], where strong(a) holds,
+  // so not fails.
   EXPECT_FALSE(NeutrallySatisfiesWithLocals(
       Word{LetterBottom()}, *LvNot(LvStrong(Bool("a"))), LocalContext{}));
 }
@@ -94,11 +93,12 @@ TEST(NeutralSatisfactionLocals, OrAndCombineOperands) {
   auto conj = LvAnd(LvStrong(Bool("a")), LvStrong(Bool("b")));
   EXPECT_FALSE(
       NeutrallySatisfiesWithLocals(Word{A({"a"})}, *conj, LocalContext{}));
-  EXPECT_TRUE(NeutrallySatisfiesWithLocals(Word{A({"a", "b"})}, *conj,
-                                           LocalContext{}));
+  EXPECT_TRUE(
+      NeutrallySatisfiesWithLocals(Word{A({"a", "b"})}, *conj, LocalContext{}));
 }
 
-// §F.5.6.1 (nexttime): w, L_0 |= ( nexttime P ) iff |w| = 0 or w^{1.}, L_0 |= P.
+// §F.5.6.1 (nexttime): w, L_0 |= ( nexttime P ) iff |w| = 0 or w^{1.}, L_0 |=
+// P.
 TEST(NeutralSatisfactionLocals, NexttimeAdvancesOneLetter) {
   auto prop = LvNexttime(LvStrong(Bool("b")));
   EXPECT_TRUE(NeutrallySatisfiesWithLocals(Word{A({"a"}), A({"b"})}, *prop,
@@ -141,9 +141,9 @@ TEST(NeutralSatisfactionLocals, ParenIsTransparent) {
 }
 
 // §F.5.6.1 (implication): w, L_0 |= ( R |-> P ) iff for every match of R on a
-// prefix of w-bar, the consequent holds on the matching suffix under each output
-// context the antecedent yields. The antecedent may bind a local variable, whose
-// binding is threaded into the consequent.
+// prefix of w-bar, the consequent holds on the matching suffix under each
+// output context the antecedent yields. The antecedent may bind a local
+// variable, whose binding is threaded into the consequent.
 TEST(NeutralSatisfactionLocals, ImplicationThreadsAntecedentOutputs) {
   // Antecedent samples v at index 0 and the consequent holds on the suffix.
   auto holds = LvImplication(Samp("v"), LvStrong(Samp("w")));
@@ -165,20 +165,20 @@ TEST(NeutralSatisfactionLocals, ImplicationThreadsAntecedentOutputs) {
 TEST(NeutralSatisfactionLocals, PropertyDeclarationScopesTheName) {
   auto decl = LvLocalVarDecl("int", "v", LvStrong(Samp("v")));
   // Empty context: removing v is a no-op and the body holds.
-  EXPECT_TRUE(NeutrallySatisfiesWithLocals(Word{A({"x"})}, *decl,
-                                           LocalContext{}));
+  EXPECT_TRUE(
+      NeutrallySatisfiesWithLocals(Word{A({"x"})}, *decl, LocalContext{}));
   // An incoming v is hidden from the body; the body still holds on its own.
   EXPECT_TRUE(NeutrallySatisfiesWithLocals(Word{A({"x"})}, *decl,
                                            LocalContext{{"v", A({"old"})}}));
   // The body's verdict passes through the declaration when the body fails.
   auto decl_fail = LvLocalVarDecl("int", "v", LvStrong(Bool("a")));
-  EXPECT_FALSE(NeutrallySatisfiesWithLocals(Word{A({"b"})}, *decl_fail,
-                                            LocalContext{}));
+  EXPECT_FALSE(
+      NeutrallySatisfiesWithLocals(Word{A({"b"})}, *decl_fail, LocalContext{}));
   // Declarations nest.
-  auto nested = LvLocalVarDecl(
-      "int", "v", LvLocalVarDecl("int", "w", LvStrong(Samp("w"))));
-  EXPECT_TRUE(NeutrallySatisfiesWithLocals(Word{A({"x"})}, *nested,
-                                           LocalContext{}));
+  auto nested = LvLocalVarDecl("int", "v",
+                               LvLocalVarDecl("int", "w", LvStrong(Samp("w"))));
+  EXPECT_TRUE(
+      NeutrallySatisfiesWithLocals(Word{A({"x"})}, *nested, LocalContext{}));
 }
 
 // §F.5.6.1 (entry): "w |= Q iff w, {} |= Q." The context-free overload starts
@@ -186,8 +186,9 @@ TEST(NeutralSatisfactionLocals, PropertyDeclarationScopesTheName) {
 TEST(NeutralSatisfactionLocals, EmptyContextEntryPoint) {
   auto prop = LvStrong(Bool("a"));
   EXPECT_TRUE(NeutrallySatisfiesWithLocals(Word{A({"a"})}, *prop));
-  EXPECT_EQ(NeutrallySatisfiesWithLocals(Word{A({"a"})}, *prop),
-            NeutrallySatisfiesWithLocals(Word{A({"a"})}, *prop, LocalContext{}));
+  EXPECT_EQ(
+      NeutrallySatisfiesWithLocals(Word{A({"a"})}, *prop),
+      NeutrallySatisfiesWithLocals(Word{A({"a"})}, *prop, LocalContext{}));
   EXPECT_FALSE(NeutrallySatisfiesWithLocals(Word{A({"b"})}, *prop));
 }
 
@@ -195,50 +196,45 @@ TEST(NeutralSatisfactionLocals, EmptyContextEntryPoint) {
 // is never disabled, so the pass/fail verdict follows the property directly.
 TEST(NeutralSatisfactionLocals, TopLevelBarePropertyPassesAndFails) {
   auto top = LvTopProperty(LvStrong(Bool("a")));
-  EXPECT_TRUE(
-      PassesTopLevelWithLocals(Word{A({"a"})}, *top, LocalContext{}));
+  EXPECT_TRUE(PassesTopLevelWithLocals(Word{A({"a"})}, *top, LocalContext{}));
   EXPECT_FALSE(
       IsDisabledTopLevelWithLocals(Word{A({"a"})}, *top, LocalContext{}));
   EXPECT_FALSE(FailsTopLevelWithLocals(Word{A({"a"})}, *top, LocalContext{}));
   // The property fails and a bare property is never disabled, so T fails.
-  EXPECT_FALSE(
-      PassesTopLevelWithLocals(Word{A({"b"})}, *top, LocalContext{}));
+  EXPECT_FALSE(PassesTopLevelWithLocals(Word{A({"b"})}, *top, LocalContext{}));
   EXPECT_FALSE(
       IsDisabledTopLevelWithLocals(Word{A({"b"})}, *top, LocalContext{}));
   EXPECT_TRUE(FailsTopLevelWithLocals(Word{A({"b"})}, *top, LocalContext{}));
 }
 
-// §F.5.6.1 (top-level disable iff): when no letter satisfies the guard, T passes
-// iff the guarded property holds; when the guard first fires, the prefix before
-// it is completed with _|_^omega for the pass test, and the disabling test
-// compares the T^omega and _|_^omega completions.
+// §F.5.6.1 (top-level disable iff): when no letter satisfies the guard, T
+// passes iff the guarded property holds; when the guard first fires, the prefix
+// before it is completed with _|_^omega for the pass test, and the disabling
+// test compares the T^omega and _|_^omega completions.
 TEST(NeutralSatisfactionLocals, TopLevelDisableIffPassesAndDisables) {
   auto top = LvTopDisableIff(BoolAtom("g"), LvStrong(Bool("a")));
   // No guard letter: T passes exactly when the property holds.
-  EXPECT_TRUE(
-      PassesTopLevelWithLocals(Word{A({"a"})}, *top, LocalContext{}));
+  EXPECT_TRUE(PassesTopLevelWithLocals(Word{A({"a"})}, *top, LocalContext{}));
   EXPECT_FALSE(
       IsDisabledTopLevelWithLocals(Word{A({"a"})}, *top, LocalContext{}));
   // The guard fires at index 0: the empty prefix completed with _|_^omega does
   // not satisfy strong(a), so T does not pass; but the T^omega completion does
   // while the _|_^omega completion does not, so T is disabled.
-  EXPECT_FALSE(
-      PassesTopLevelWithLocals(Word{A({"g"})}, *top, LocalContext{}));
+  EXPECT_FALSE(PassesTopLevelWithLocals(Word{A({"g"})}, *top, LocalContext{}));
   EXPECT_TRUE(
       IsDisabledTopLevelWithLocals(Word{A({"g"})}, *top, LocalContext{}));
   // Pass and disabled are mutually exclusive, so a disabled T does not fail.
   EXPECT_FALSE(FailsTopLevelWithLocals(Word{A({"g"})}, *top, LocalContext{}));
-  EXPECT_FALSE(PassesTopLevelWithLocals(Word{A({"g"})}, *top, LocalContext{}) &&
-               IsDisabledTopLevelWithLocals(Word{A({"g"})}, *top,
-                                            LocalContext{}));
+  EXPECT_FALSE(
+      PassesTopLevelWithLocals(Word{A({"g"})}, *top, LocalContext{}) &&
+      IsDisabledTopLevelWithLocals(Word{A({"g"})}, *top, LocalContext{}));
 }
 
 // §F.5.6.1 (top-level paren): w, L_0 |= ( T ) iff w, L_0 |= T, for both the
 // pass and the disabling relations.
 TEST(NeutralSatisfactionLocals, TopLevelParenIsTransparent) {
   auto top = LvTopParen(LvTopProperty(LvStrong(Bool("a"))));
-  EXPECT_TRUE(
-      PassesTopLevelWithLocals(Word{A({"a"})}, *top, LocalContext{}));
+  EXPECT_TRUE(PassesTopLevelWithLocals(Word{A({"a"})}, *top, LocalContext{}));
   auto guarded =
       LvTopParen(LvTopDisableIff(BoolAtom("g"), LvStrong(Bool("a"))));
   EXPECT_TRUE(
@@ -250,16 +246,14 @@ TEST(NeutralSatisfactionLocals, TopLevelParenIsTransparent) {
 // transparent to the pass and disabling verdicts, with the declared name hidden
 // from the body.
 TEST(NeutralSatisfactionLocals, TopLevelDeclarationScopesTheName) {
-  auto top =
-      LvTopLocalVarDecl("int", "v", LvTopProperty(LvStrong(Samp("v"))));
-  EXPECT_TRUE(
-      PassesTopLevelWithLocals(Word{A({"x"})}, *top, LocalContext{}));
+  auto top = LvTopLocalVarDecl("int", "v", LvTopProperty(LvStrong(Samp("v"))));
+  EXPECT_TRUE(PassesTopLevelWithLocals(Word{A({"x"})}, *top, LocalContext{}));
   EXPECT_TRUE(PassesTopLevelWithLocals(Word{A({"x"})}, *top,
                                        LocalContext{{"v", A({"old"})}}));
   auto top_fail =
       LvTopLocalVarDecl("int", "v", LvTopProperty(LvStrong(Bool("a"))));
-  EXPECT_TRUE(FailsTopLevelWithLocals(Word{A({"b"})}, *top_fail,
-                                      LocalContext{}));
+  EXPECT_TRUE(
+      FailsTopLevelWithLocals(Word{A({"b"})}, *top_fail, LocalContext{}));
   // Disabling threads through the declaration.
   auto top_disable = LvTopLocalVarDecl(
       "int", "v", LvTopDisableIff(BoolAtom("g"), LvStrong(Bool("a"))));
@@ -306,8 +300,8 @@ TEST(NeutralSatisfactionLocals,
   EXPECT_TRUE(FailsTopLevelWithLocals(word, *top, LocalContext{}));
 }
 
-// §F.5.6.1 (implication) boundary: over the empty word the antecedent matches no
-// prefix, so the universal over matches is vacuously satisfied.
+// §F.5.6.1 (implication) boundary: over the empty word the antecedent matches
+// no prefix, so the universal over matches is vacuously satisfied.
 TEST(NeutralSatisfactionLocals, ImplicationIsVacuousOverEmptyWord) {
   auto prop = LvImplication(Samp("v"), LvStrong(Samp("w")));
   EXPECT_TRUE(NeutrallySatisfiesWithLocals(Word{}, *prop, LocalContext{}));
@@ -340,9 +334,10 @@ TEST(NeutralSatisfactionLocals, OrSatisfiedByRightOperandAlone) {
 // guard, T's verdict is exactly the guarded property's verdict. The other
 // disable iff tests cover the no-guard case with the property holding and the
 // guard-fires cases; here no letter satisfies the guard and the property fails,
-// so T does not pass, is not disabled, and therefore fails -- the failing leg of
-// the trichotomy reached through the no-guard branch.
-TEST(NeutralSatisfactionLocals, TopLevelDisableIffFailsWhenUnguardedPropertyFails) {
+// so T does not pass, is not disabled, and therefore fails -- the failing leg
+// of the trichotomy reached through the no-guard branch.
+TEST(NeutralSatisfactionLocals,
+     TopLevelDisableIffFailsWhenUnguardedPropertyFails) {
   auto top = LvTopDisableIff(BoolAtom("g"), LvStrong(Bool("a")));
   const Word word{A({"c"})};  // no 'g' guard letter, and strong(a) fails on [c]
   EXPECT_FALSE(PassesTopLevelWithLocals(word, *top, LocalContext{}));

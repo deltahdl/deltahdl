@@ -98,4 +98,4 @@ TEST(BlockStatementSimSyntax, ForkWithSingleBeginEnd) {
   EXPECT_EQ(var->value.ToUint64(), 2u);
 }
 
-}
+}  // namespace

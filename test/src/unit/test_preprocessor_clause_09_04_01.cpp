@@ -50,4 +50,4 @@ TEST(DelayControlPreprocessor, DelayControlSurvivesPreprocessor) {
   EXPECT_NE(result.find("#10"), std::string::npos);
 }
 
-}
+}  // namespace

@@ -20,4 +20,4 @@ TEST(InterfaceModport, MasterSlaveModportDeclarations) {
   EXPECT_EQ(r.cu->interfaces[0]->modports[1]->name, "slave");
 }
 
-}
+}  // namespace

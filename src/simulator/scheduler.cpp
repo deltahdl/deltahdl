@@ -76,7 +76,6 @@ bool TimeSlot::AnyIterativeNonempty() const {
 }
 
 void Scheduler::ScheduleEvent(SimTime time, Region region, Event* event) {
-
   if (time < current_time_) {
     std::fprintf(
         stderr,
@@ -129,7 +128,6 @@ void Scheduler::Run() {
 }
 
 void Scheduler::ExecuteTimeSlot(TimeSlot& slot) {
-
   ExecuteRegion(slot, Region::kPreponed);
 
   ExecuteRegion(slot, Region::kPreActive);
@@ -162,7 +160,6 @@ bool Scheduler::IterateActiveSet(TimeSlot& slot) {
 }
 
 void Scheduler::ExecuteActiveRegions(TimeSlot& slot) {
-
   for (size_t i = 0; i < kRegionCount; ++i) {
     auto r = static_cast<Region>(i);
     if (IsActiveRegionSet(r) || r == Region::kPreObserved ||
@@ -183,7 +180,6 @@ bool Scheduler::IterateReactiveSet(TimeSlot& slot) {
 }
 
 void Scheduler::ExecuteReactiveRegions(TimeSlot& slot) {
-
   for (size_t i = 0; i < kRegionCount; ++i) {
     auto r = static_cast<Region>(i);
     if (IsReactiveRegionSet(r)) {
@@ -207,4 +203,4 @@ void Scheduler::DrainQueue(EventQueue& queue) {
   }
 }
 
-}
+}  // namespace delta

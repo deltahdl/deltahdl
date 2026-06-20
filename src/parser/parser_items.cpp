@@ -126,9 +126,9 @@ bool Parser::TryParseDeclKeywordItem(std::vector<ModuleItem*>& items) {
     bool forkjoin = Match(TokenKind::kKwForkjoin);
     ModuleItem* item = nullptr;
     if (forkjoin || Check(TokenKind::kKwTask)) {
-      item = ParseTaskDecl( true);
+      item = ParseTaskDecl(true);
     } else {
-      item = ParseFunctionDecl( true);
+      item = ParseFunctionDecl(true);
     }
     item->is_extern = true;
     item->is_forkjoin = forkjoin;
@@ -598,4 +598,4 @@ void Parser::ParseImplicitTypeOrInst(std::vector<ModuleItem*>& items) {
   items.push_back(item);
 }
 
-}
+}  // namespace delta

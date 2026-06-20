@@ -32,8 +32,9 @@ TEST(PortModel, PortTypeValuesAndFormalDerivation) {
   EXPECT_TRUE(VpiIsValidPortType(vpiModportPort));
   EXPECT_FALSE(VpiIsValidPortType(vpiRefObj));
 
-  // The formal decides the type: a modport formal wins over an interface formal,
-  // an interface formal yields an interface port, and anything else is ordinary.
+  // The formal decides the type: a modport formal wins over an interface
+  // formal, an interface formal yields an interface port, and anything else is
+  // ordinary.
   EXPECT_EQ(VpiPortTypeFromFormal(/*interface=*/false, /*modport=*/false),
             vpiPort);
   EXPECT_EQ(VpiPortTypeFromFormal(/*interface=*/true, /*modport=*/false),
@@ -73,8 +74,8 @@ TEST_F(PortContext, GetDelaysOnInterfacePortIsAnError) {
 }
 
 // D3, D4, D10: vpiHighConn reaches the higher connection and vpiLowConn the
-// lower one; an unconnected instance gives a NULL highConn and a null port gives
-// a NULL lowConn.
+// lower one; an unconnected instance gives a NULL highConn and a null port
+// gives a NULL lowConn.
 TEST_F(PortContext, HighConnAndLowConnReachDesignatedConnections) {
   VpiObject high, low;
   VpiObject port;
@@ -179,9 +180,9 @@ TEST_F(PortContext, ExplicitNameResolution) {
   EXPECT_STREQ(vpi_get_str(vpiName, &named_port), "p");
 }
 
-// D8 (remaining arms, through the vpi_get_str dispatch path): a port that was not
-// explicitly named but still has a name returns that name, and a port with no
-// name at all returns NULL.
+// D8 (remaining arms, through the vpi_get_str dispatch path): a port that was
+// not explicitly named but still has a name returns that name, and a port with
+// no name at all returns NULL.
 TEST_F(PortContext, PortNameThroughVpiGetStrForInferredAndUnnamed) {
   // Not explicitly named, but a name exists -> that name is returned.
   VpiObject inferred_port;

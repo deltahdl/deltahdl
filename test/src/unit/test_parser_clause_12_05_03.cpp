@@ -136,4 +136,4 @@ TEST(CaseQualifierParsing, UnqualifiedCaseHasNoneQualifier) {
   EXPECT_EQ(stmt->qualifier, CaseQualifier::kNone);
 }
 
-}
+}  // namespace

@@ -126,7 +126,6 @@ static std::string ParseSdfPort(std::string_view& s) {
   SkipWhitespace(s);
 
   if (!s.empty() && s[0] == '(') {
-
     return "";
   }
   auto tok = NextSdfToken(s);
@@ -218,7 +217,8 @@ static ExtendedIopathDir ParseExtendedDirection(std::string_view& s) {
 static bool LooksLikeExtendedIopathDirection(std::string_view s) {
   if (s.empty() || s[0] != '(') return false;
   size_t i = 1;
-  while (i < s.size() && (std::isspace(static_cast<unsigned char>(s[i])) != 0)) {
+  while (i < s.size() &&
+         (std::isspace(static_cast<unsigned char>(s[i])) != 0)) {
     ++i;
   }
   return i < s.size() && s[i] == '(';
@@ -244,7 +244,6 @@ static SdfIopath ParseIopath(std::string_view& s) {
   SkipWhitespace(s);
   io.extended_form = LooksLikeExtendedIopathDirection(s);
   if (io.extended_form) {
-
     auto rise_dir = ParseExtendedDirection(s);
     if (rise_dir.delay_present) io.rise = rise_dir.delay;
     io.rise_delay_present = rise_dir.delay_present;
@@ -319,8 +318,10 @@ static SdfSignalRef ParseSdfSignal(std::string_view& s) {
       if (!s.empty() && s[0] == '(') {
         Expect(s, SdfTokKind::kLParen);
         auto edge_tok = NextSdfToken(s);
-        if (edge_tok.text == "posedge") ref.edge = SpecifyEdge::kPosedge;
-        else if (edge_tok.text == "negedge") ref.edge = SpecifyEdge::kNegedge;
+        if (edge_tok.text == "posedge")
+          ref.edge = SpecifyEdge::kPosedge;
+        else if (edge_tok.text == "negedge")
+          ref.edge = SpecifyEdge::kNegedge;
         auto port_tok = NextSdfToken(s);
         ref.port = std::string(port_tok.text);
         Expect(s, SdfTokKind::kRParen);
@@ -347,8 +348,8 @@ static SdfTimingCheck ParseOneTc(std::string_view& s, SdfCheckType type) {
   SdfTimingCheck tc;
   tc.check_type = type;
 
-  const bool single_signal = (type == SdfCheckType::kWidth ||
-                              type == SdfCheckType::kPeriod);
+  const bool single_signal =
+      (type == SdfCheckType::kWidth || type == SdfCheckType::kPeriod);
   auto first = ParseSdfSignal(s);
   if (single_signal) {
     tc.ref_port = first.port;
@@ -366,10 +367,9 @@ static SdfTimingCheck ParseOneTc(std::string_view& s, SdfCheckType type) {
   }
   tc.limit = ParseDelayVal(s);
 
-  const bool two_value = (type == SdfCheckType::kSetuphold ||
-                          type == SdfCheckType::kRecrem ||
-                          type == SdfCheckType::kBidirectskew ||
-                          type == SdfCheckType::kNochange);
+  const bool two_value =
+      (type == SdfCheckType::kSetuphold || type == SdfCheckType::kRecrem ||
+       type == SdfCheckType::kBidirectskew || type == SdfCheckType::kNochange);
   if (two_value) {
     SkipWhitespace(s);
     if (!s.empty() && s[0] == '(') {
@@ -395,7 +395,7 @@ static SdfInterconnect ParseInterconnectEntry(std::string_view& s) {
 }
 
 static SdfInterconnect ParseLoadOnlyInterconnect(std::string_view& s,
-                                                  SdfInterconnectKind kind) {
+                                                 SdfInterconnectKind kind) {
   SdfInterconnect ic;
   ic.kind = kind;
   ic.dst_port = ParseSdfPort(s);
@@ -432,7 +432,6 @@ static void RecordDelayEntry(SdfCell& cell, SdfDelayEntryKind kind,
 
 static void ParseDelaySection(std::string_view& s, SdfCell& cell, SdfFile& file,
                               bool increment) {
-
   while (true) {
     SkipWhitespace(s);
     if (s.empty() || s[0] == ')') break;
@@ -478,7 +477,6 @@ static void ParseDelaySection(std::string_view& s, SdfCell& cell, SdfFile& file,
       RecordDelayEntry(cell, SdfDelayEntryKind::kIopath,
                        cell.iopaths.size() - 1);
     } else if (kw.text == "COND") {
-
       std::string cond = ParseSdfConditionText(s);
       SkipWhitespace(s);
       if (!s.empty() && s[0] == '(') {
@@ -502,7 +500,6 @@ static void ParseDelaySection(std::string_view& s, SdfCell& cell, SdfFile& file,
       SkipWhitespace(s);
       if (!s.empty() && s[0] == ')') Expect(s, SdfTokKind::kRParen);
     } else if (kw.text == "CONDELSE") {
-
       SkipWhitespace(s);
       if (!s.empty() && s[0] == '(') {
         Expect(s, SdfTokKind::kLParen);
@@ -523,7 +520,6 @@ static void ParseDelaySection(std::string_view& s, SdfCell& cell, SdfFile& file,
       SkipWhitespace(s);
       if (!s.empty() && s[0] == ')') Expect(s, SdfTokKind::kRParen);
     } else {
-
       file.unannotatable.emplace_back(kw.text);
       SkipSdfParen(s);
     }
@@ -561,7 +557,6 @@ static void ParseLabelSection(std::string_view& s, SdfCell& cell,
                               SdfFile& file) {
   SkipWhitespace(s);
   if (s.empty() || s[0] != '(') {
-
     Expect(s, SdfTokKind::kRParen);
     return;
   }
@@ -647,7 +642,6 @@ bool ParseSdf(std::string_view input, SdfFile& out) {
     } else if (kw.text == "CELL") {
       out.cells.push_back(ParseCell(input, out));
     } else {
-
       SkipSdfParen(input);
     }
   }
@@ -774,7 +768,6 @@ static std::vector<SdfTcAnnotation> ExpandSdfTimingCheckTargets(
   };
   switch (tc.check_type) {
     case SdfCheckType::kSetup: {
-
       auto& s = push(TimingCheckKind::kSetup);
       s.set_limit = true;
       s.limit = v1;
@@ -784,7 +777,6 @@ static std::vector<SdfTcAnnotation> ExpandSdfTimingCheckTargets(
       break;
     }
     case SdfCheckType::kHold: {
-
       auto& h = push(TimingCheckKind::kHold);
       h.set_limit = true;
       h.limit = v1;
@@ -794,7 +786,6 @@ static std::vector<SdfTcAnnotation> ExpandSdfTimingCheckTargets(
       break;
     }
     case SdfCheckType::kSetuphold: {
-
       auto& s = push(TimingCheckKind::kSetup);
       s.set_limit = true;
       s.limit = v1;
@@ -809,7 +800,6 @@ static std::vector<SdfTcAnnotation> ExpandSdfTimingCheckTargets(
       break;
     }
     case SdfCheckType::kRecovery: {
-
       auto& r = push(TimingCheckKind::kRecovery);
       r.set_limit = true;
       r.limit = v1;
@@ -819,7 +809,6 @@ static std::vector<SdfTcAnnotation> ExpandSdfTimingCheckTargets(
       break;
     }
     case SdfCheckType::kRemoval: {
-
       auto& r = push(TimingCheckKind::kRemoval);
       r.set_limit = true;
       r.limit = v1;
@@ -829,7 +818,6 @@ static std::vector<SdfTcAnnotation> ExpandSdfTimingCheckTargets(
       break;
     }
     case SdfCheckType::kRecrem: {
-
       auto& r = push(TimingCheckKind::kRecovery);
       r.set_limit = true;
       r.limit = v1;
@@ -844,7 +832,6 @@ static std::vector<SdfTcAnnotation> ExpandSdfTimingCheckTargets(
       break;
     }
     case SdfCheckType::kSkew: {
-
       auto& s = push(TimingCheckKind::kSkew);
       s.set_limit = true;
       s.limit = v1;
@@ -854,7 +841,6 @@ static std::vector<SdfTcAnnotation> ExpandSdfTimingCheckTargets(
       break;
     }
     case SdfCheckType::kBidirectskew: {
-
       auto& fs = push(TimingCheckKind::kFullskew);
       fs.set_limit = true;
       fs.limit = v1;
@@ -863,21 +849,18 @@ static std::vector<SdfTcAnnotation> ExpandSdfTimingCheckTargets(
       break;
     }
     case SdfCheckType::kWidth: {
-
       auto& w = push(TimingCheckKind::kWidth);
       w.set_limit = true;
       w.limit = v1;
       break;
     }
     case SdfCheckType::kPeriod: {
-
       auto& p = push(TimingCheckKind::kPeriod);
       p.set_limit = true;
       p.limit = v1;
       break;
     }
     case SdfCheckType::kNochange: {
-
       auto& nc = push(TimingCheckKind::kNochange);
       nc.set_start_edge_offset = true;
       nc.start_edge_offset = static_cast<int64_t>(v1);
@@ -909,15 +892,14 @@ SdfAnnotationResult AnnotateSdfToManager(const SdfFile& file,
   }
 
   for (const auto& cell : file.cells) {
-
     if (!CellInScope(cell.instance, scope)) continue;
     std::vector<SdfDelayEntryRef> derived;
     const std::vector<SdfDelayEntryRef>* order = &cell.delay_entry_order;
-    if (order->empty() && (!cell.iopaths.empty() ||
-                            !cell.pulse_limits.empty() ||
-                            !cell.interconnects.empty())) {
+    if (order->empty() &&
+        (!cell.iopaths.empty() || !cell.pulse_limits.empty() ||
+         !cell.interconnects.empty())) {
       derived.reserve(cell.iopaths.size() + cell.pulse_limits.size() +
-                       cell.interconnects.size());
+                      cell.interconnects.size());
       for (uint32_t i = 0; i < cell.iopaths.size(); ++i) {
         derived.push_back({SdfDelayEntryKind::kIopath, i});
       }
@@ -947,14 +929,13 @@ SdfAnnotationResult AnnotateSdfToManager(const SdfFile& file,
             for (int i = 0; i < 12; ++i) pd.delays[i] = expanded[i];
           }
           if (!io.extended_form) {
-
             if (io.is_increment) {
               mgr.IncrementPathDelay(pd);
               break;
             }
 
             ApplyGlobalPulseLimits(pd, mgr.RejectPulseLimitPercent(),
-                                    mgr.ErrorPulseLimitPercent());
+                                   mgr.ErrorPulseLimitPercent());
             mgr.AddPathDelay(pd);
             break;
           }
@@ -968,18 +949,16 @@ SdfAnnotationResult AnnotateSdfToManager(const SdfFile& file,
           }
 
           ApplyGlobalPulseLimits(pd, mgr.RejectPulseLimitPercent(),
-                                  mgr.ErrorPulseLimitPercent());
+                                 mgr.ErrorPulseLimitPercent());
           if (io.rise_reject_present || io.fall_reject_present) {
-            const SdfDelayValue& src_dv = io.rise_reject_present
-                                              ? io.rise_reject
-                                              : io.fall_reject;
+            const SdfDelayValue& src_dv =
+                io.rise_reject_present ? io.rise_reject : io.fall_reject;
             const uint64_t reject = SelectMtm(src_dv, mtm);
             for (int i = 0; i < 12; ++i) pd.reject_limit[i] = reject;
           }
           if (io.rise_error_present || io.fall_error_present) {
-            const SdfDelayValue& src_dv = io.rise_error_present
-                                              ? io.rise_error
-                                              : io.fall_error;
+            const SdfDelayValue& src_dv =
+                io.rise_error_present ? io.rise_error : io.fall_error;
             const uint64_t err = SelectMtm(src_dv, mtm);
             for (int i = 0; i < 12; ++i) pd.error_limit[i] = err;
           }
@@ -990,8 +969,8 @@ SdfAnnotationResult AnnotateSdfToManager(const SdfFile& file,
           const auto& pl = cell.pulse_limits[entry.index];
 
           mgr.AddSdfPulseLimit(pl.src_port, pl.dst_port,
-                                SelectMtm(pl.reject, mtm), pl.has_error,
-                                SelectMtm(pl.error, mtm), pl.is_percent);
+                               SelectMtm(pl.reject, mtm), pl.has_error,
+                               SelectMtm(pl.error, mtm), pl.is_percent);
           break;
         }
         case SdfDelayEntryKind::kInterconnect: {
@@ -1003,8 +982,8 @@ SdfAnnotationResult AnnotateSdfToManager(const SdfFile& file,
           delay.fall = SelectMtm(ic.fall, mtm);
 
           const bool fall_supplied = ic.fall.min_val != 0 ||
-                                       ic.fall.typ_val != 0 ||
-                                       ic.fall.max_val != 0;
+                                     ic.fall.typ_val != 0 ||
+                                     ic.fall.max_val != 0;
           std::vector<SdfDelayValue> ic_vals;
           ic_vals.push_back(ic.rise);
           if (fall_supplied) ic_vals.push_back(ic.fall);
@@ -1037,7 +1016,6 @@ SdfAnnotationResult AnnotateSdfToManager(const SdfFile& file,
       }
     }
     for (const auto& tc : cell.timing_checks) {
-
       for (const auto& target : ExpandSdfTimingCheckTargets(tc, mtm)) {
         mgr.AnnotateSdfTimingCheck(target);
       }
@@ -1047,10 +1025,18 @@ SdfAnnotationResult AnnotateSdfToManager(const SdfFile& file,
 }
 
 bool ParseSdfMtmKeyword(std::string_view text, SdfMtmKeyword& out) {
-
-  if (text == "MAXIMUM") { out = SdfMtmKeyword::kMaximum; return true; }
-  if (text == "MINIMUM") { out = SdfMtmKeyword::kMinimum; return true; }
-  if (text == "TYPICAL") { out = SdfMtmKeyword::kTypical; return true; }
+  if (text == "MAXIMUM") {
+    out = SdfMtmKeyword::kMaximum;
+    return true;
+  }
+  if (text == "MINIMUM") {
+    out = SdfMtmKeyword::kMinimum;
+    return true;
+  }
+  if (text == "TYPICAL") {
+    out = SdfMtmKeyword::kTypical;
+    return true;
+  }
   if (text == "TOOL_CONTROL") {
     out = SdfMtmKeyword::kToolControl;
     return true;
@@ -1059,7 +1045,6 @@ bool ParseSdfMtmKeyword(std::string_view text, SdfMtmKeyword& out) {
 }
 
 SdfMtm ResolveSdfMtm(SdfMtmKeyword keyword, SdfMtm tool_default) {
-
   switch (keyword) {
     case SdfMtmKeyword::kMaximum:
       return SdfMtm::kMaximum;
@@ -1074,7 +1059,10 @@ SdfMtm ResolveSdfMtm(SdfMtmKeyword keyword, SdfMtm tool_default) {
 }
 
 bool ParseSdfScaleType(std::string_view text, SdfScaleType& out) {
-  if (text == "FROM_MTM") { out = SdfScaleType::kFromMtm; return true; }
+  if (text == "FROM_MTM") {
+    out = SdfScaleType::kFromMtm;
+    return true;
+  }
   if (text == "FROM_MAXIMUM") {
     out = SdfScaleType::kFromMaximum;
     return true;
@@ -1117,7 +1105,6 @@ static bool ParseRealAt(std::string_view text, std::size_t& pos, double& out) {
 }
 
 bool ParseSdfScaleFactors(std::string_view text, SdfScaleFactors& out) {
-
   out = SdfScaleFactors{};
   if (text.empty()) return true;
   std::size_t pos = 0;
@@ -1153,7 +1140,6 @@ static uint64_t RoundToTicks(double scaled) {
 
 SdfDelayValue ApplySdfScaling(SdfDelayValue value, SdfScaleType type,
                               const SdfScaleFactors& factors) {
-
   double src_min = 0.0;
   double src_typ = 0.0;
   double src_max = 0.0;
@@ -1221,36 +1207,32 @@ bool WriteSdfAnnotationLog(const SdfFile& file, std::string_view log_path) {
     const std::string prefix = cell.cell_type + "/" + cell.instance + ": ";
     for (const auto& io : cell.iopaths) {
       out << prefix << "IOPATH " << io.src_port << " -> " << io.dst_port
-          << " rise=" << io.rise.typ_val
-          << " fall=" << io.fall.typ_val << '\n';
+          << " rise=" << io.rise.typ_val << " fall=" << io.fall.typ_val << '\n';
     }
     for (const auto& ic : cell.interconnects) {
       out << prefix << "INTERCONNECT " << ic.src_port << " -> " << ic.dst_port
-          << " rise=" << ic.rise.typ_val
-          << " fall=" << ic.fall.typ_val << '\n';
+          << " rise=" << ic.rise.typ_val << " fall=" << ic.fall.typ_val << '\n';
     }
     for (const auto& pl : cell.pulse_limits) {
       out << prefix << "PATHPULSE " << pl.src_port << " -> " << pl.dst_port
-          << " reject=" << pl.reject.typ_val
-          << " error=" << pl.error.typ_val << '\n';
+          << " reject=" << pl.reject.typ_val << " error=" << pl.error.typ_val
+          << '\n';
     }
     for (const auto& tc : cell.timing_checks) {
       out << prefix << "TIMINGCHECK " << tc.data_port << " ref=" << tc.ref_port
           << " limit=" << tc.limit.typ_val << '\n';
     }
     for (const auto& sp : cell.specparams) {
-      out << prefix << "SPECPARAM " << sp.name
-          << " value=" << sp.value.typ_val << '\n';
+      out << prefix << "SPECPARAM " << sp.name << " value=" << sp.value.typ_val
+          << '\n';
     }
   }
   return true;
 }
 
 ResolvedSdfAnnotateArgs ResolveSdfAnnotateArgs(
-    std::string_view explicit_mtm_spec,
-    std::string_view explicit_scale_factors,
-    std::string_view explicit_scale_type,
-    const SdfAnnotateConfig& config) {
+    std::string_view explicit_mtm_spec, std::string_view explicit_scale_factors,
+    std::string_view explicit_scale_type, const SdfAnnotateConfig& config) {
   ResolvedSdfAnnotateArgs out;
 
   if (!config.mtm_spec.empty()) {
@@ -1277,4 +1259,4 @@ ResolvedSdfAnnotateArgs ResolveSdfAnnotateArgs(
   return out;
 }
 
-}
+}  // namespace delta

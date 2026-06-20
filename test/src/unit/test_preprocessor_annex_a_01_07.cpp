@@ -45,4 +45,4 @@ TEST(ProgramItemsParsing, MacroExpandsToProgramItem) {
       HasItemOfKind(r.cu->programs[0]->items, ModuleItemKind::kInitialBlock));
 }
 
-}
+}  // namespace

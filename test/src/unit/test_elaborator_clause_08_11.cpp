@@ -196,4 +196,4 @@ TEST(ThisElaboration, ThisInsideMemberAccessInsideTypeOpRejected) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

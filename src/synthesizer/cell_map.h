@@ -28,4 +28,4 @@ class CellMapper {
   const Liberty& lib_;
 };
 
-}
+}  // namespace delta

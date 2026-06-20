@@ -1,7 +1,7 @@
+#include <gtest/gtest.h>
+
 #include "parser/ast.h"
 #include "simulator/specify.h"
-
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -106,7 +106,7 @@ TEST(ZeroSmallestNegativeTimingLimit, RepeatedApplicationTerminates) {
 
 TEST(NegativeTimingChecks, RuntimeInteriorYieldsViolation) {
   SpecifyManager mgr;
-  mgr.AddTimingCheck(MakeSignedSetuphold( -5, 10));
+  mgr.AddTimingCheck(MakeSignedSetuphold(-5, 10));
 
   // Negative setup shifts the window to (105, 110); a data change strictly
   // inside it triggers a violation per requirement (a).
@@ -115,16 +115,16 @@ TEST(NegativeTimingChecks, RuntimeInteriorYieldsViolation) {
 
 TEST(NegativeTimingChecks, RuntimeLowerBoundaryIsExcluded) {
   SpecifyManager mgr;
-  mgr.AddTimingCheck(MakeSignedSetuphold( -5, 10));
+  mgr.AddTimingCheck(MakeSignedSetuphold(-5, 10));
 
   EXPECT_FALSE(mgr.CheckSetupholdViolation("clk", 100, "data", 105));
 }
 
 TEST(NegativeTimingChecks, RuntimeUpperBoundaryIsExcluded) {
   SpecifyManager mgr;
-  mgr.AddTimingCheck(MakeSignedSetuphold( -5, 10));
+  mgr.AddTimingCheck(MakeSignedSetuphold(-5, 10));
 
   EXPECT_FALSE(mgr.CheckSetupholdViolation("clk", 100, "data", 110));
 }
 
-}
+}  // namespace

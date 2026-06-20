@@ -84,4 +84,4 @@ TEST(PackedUnionParsing, SoftWithoutPackedKeyword) {
   EXPECT_TRUE(item->data_type.is_soft);
 }
 
-}
+}  // namespace

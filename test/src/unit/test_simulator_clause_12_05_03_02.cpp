@@ -230,8 +230,8 @@ TEST(CaseViolationMultiProcessSim, TwoProcessesCallSharedTaskCaseReportTwice) {
 // §12.5.3.2 (via §12.4.2.2): the per-caller executions are independent, so a
 // failure in one calling process does not implicate another. The first caller
 // supplies the overlapping argument (uniqueness violation) while the second
-// supplies an argument that matches exactly one item (no violation); exactly one
-// report is produced.
+// supplies an argument that matches exactly one item (no violation); exactly
+// one report is produced.
 TEST(CaseViolationMultiProcessSim, SharedTaskCaseOneCallerViolatesOtherPasses) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -297,4 +297,4 @@ TEST(CaseViolationMultiProcessSim, RetriggerFlushInOneProcessSparesOther) {
   EXPECT_EQ(f.diag.WarningCount(), 1u);
 }
 
-}
+}  // namespace

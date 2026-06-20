@@ -117,4 +117,4 @@ TEST(DeferredFlushPoints, FlushOnEmptyQueueIsSafeNoOp) {
   EXPECT_EQ(f.engine.GetDeferredReportQueue("nonexistent").Size(), 0u);
 }
 
-}
+}  // namespace

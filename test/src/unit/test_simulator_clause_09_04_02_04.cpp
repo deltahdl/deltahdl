@@ -77,4 +77,4 @@ TEST(SequenceEventSim, MultipleWaitersOnSequenceEndpoint) {
   EXPECT_EQ(v2->value.ToUint64(), 20u);
 }
 
-}
+}  // namespace

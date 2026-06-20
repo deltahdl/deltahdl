@@ -5,44 +5,30 @@
 namespace {
 
 TEST(GateDelayValidity, MaxDelaysByGateType) {
-
   struct {
     GateType gate;
     uint32_t expected;
   } const kCases[] = {
 
-      {GateType::kPullup, 0u},
-      {GateType::kPulldown, 0u},
+      {GateType::kPullup, 0u},   {GateType::kPulldown, 0u},
 
-      {GateType::kTran, 0u},
-      {GateType::kRtran, 0u},
+      {GateType::kTran, 0u},     {GateType::kRtran, 0u},
 
-      {GateType::kAnd, 2u},
-      {GateType::kNand, 2u},
-      {GateType::kOr, 2u},
-      {GateType::kNor, 2u},
-      {GateType::kXor, 2u},
-      {GateType::kXnor, 2u},
+      {GateType::kAnd, 2u},      {GateType::kNand, 2u},
+      {GateType::kOr, 2u},       {GateType::kNor, 2u},
+      {GateType::kXor, 2u},      {GateType::kXnor, 2u},
 
-      {GateType::kBuf, 2u},
-      {GateType::kNot, 2u},
+      {GateType::kBuf, 2u},      {GateType::kNot, 2u},
 
-      {GateType::kBufif0, 3u},
-      {GateType::kBufif1, 3u},
-      {GateType::kNotif0, 3u},
-      {GateType::kNotif1, 3u},
+      {GateType::kBufif0, 3u},   {GateType::kBufif1, 3u},
+      {GateType::kNotif0, 3u},   {GateType::kNotif1, 3u},
 
-      {GateType::kNmos, 3u},
-      {GateType::kPmos, 3u},
-      {GateType::kRnmos, 3u},
-      {GateType::kRpmos, 3u},
-      {GateType::kCmos, 3u},
-      {GateType::kRcmos, 3u},
+      {GateType::kNmos, 3u},     {GateType::kPmos, 3u},
+      {GateType::kRnmos, 3u},    {GateType::kRpmos, 3u},
+      {GateType::kCmos, 3u},     {GateType::kRcmos, 3u},
 
-      {GateType::kTranif0, 2u},
-      {GateType::kTranif1, 2u},
-      {GateType::kRtranif0, 2u},
-      {GateType::kRtranif1, 2u},
+      {GateType::kTranif0, 2u},  {GateType::kTranif1, 2u},
+      {GateType::kRtranif0, 2u}, {GateType::kRtranif1, 2u},
   };
   for (const auto& c : kCases) {
     EXPECT_EQ(MaxDelays(c.gate), c.expected);
@@ -67,4 +53,4 @@ TEST(GateDelayElaboration, GateWithDelayStillProducesAssign) {
   EXPECT_EQ(ca.rhs->op, TokenKind::kPipe);
 }
 
-}
+}  // namespace

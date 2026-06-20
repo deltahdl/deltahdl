@@ -97,7 +97,8 @@ TEST(ClassIndexAssocArrayElaboration, AssocArrayClassIndex_NotStringIndex) {
   EXPECT_TRUE(found);
 }
 
-TEST(ClassIndexAssocArrayElaboration, AssocArrayClassIndex_LiteralIndexIsError) {
+TEST(ClassIndexAssocArrayElaboration,
+     AssocArrayClassIndex_LiteralIndexIsError) {
   ElabFixture f;
   ElaborateSrc(
       "module top;\n"
@@ -183,4 +184,4 @@ TEST(ClassIndexAssocArrayElaboration,
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-}
+}  // namespace

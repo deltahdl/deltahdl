@@ -5,9 +5,9 @@ using namespace delta;
 namespace {
 
 // 18.5.6: constraint_expression includes the if-else form
-// "if ( expression ) constraint_set [ else constraint_set ]". A single-statement
-// then-branch with an else branch parses as a valid constraint expression
-// inside a constraint block.
+// "if ( expression ) constraint_set [ else constraint_set ]". A
+// single-statement then-branch with an else branch parses as a valid constraint
+// expression inside a constraint block.
 TEST(ConstraintIfElseParsing, IfElseFormAccepted) {
   auto r = Parse(
       "class C;\n"
@@ -71,4 +71,4 @@ TEST(ConstraintIfElseParsing, DanglingElseNestedFormAccepted) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}
+}  // namespace

@@ -614,4 +614,4 @@ TEST(CondPredicateParsing, MatchesPatternInTernaryCondition) {
   EXPECT_EQ(rhs->condition->op, TokenKind::kKwMatches);
 }
 
-}
+}  // namespace

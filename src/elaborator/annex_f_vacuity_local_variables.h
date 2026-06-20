@@ -15,16 +15,18 @@ namespace delta {
 // So the non-vacuity relation |=^non is carried over §F.5.6.1's local-variable
 // property model (LvProperty / LvTopLevelProperty) rather than §F.5.3.1's
 // no-local-variable PropertyExpr, threading an input local variable context L_0
-// (§F.5.5's LocalContext) alongside the word. The per-operator rules are exactly
-// those of §F.5.3.3:
+// (§F.5.5's LocalContext) alongside the word. The per-operator rules are
+// exactly those of §F.5.3.3:
 //
 //   * strong(R) and weak(R) are nonvacuous on every word (the context plays no
 //     role, as in §F.5.3.3);
 //   * ( P ), not P, ( P1 or P2 ), ( P1 and P2 ), ( nexttime P ), and
 //     ( P1 until P2 ) recurse per §F.5.3.3 with the context threaded inertly --
 //     a conjunction is nonvacuous when either conjunct is, and the until guard
-//     "P1 and not P2" is decided by §F.5.6.1's neutral satisfaction with locals;
-//   * ( R |-> P ) is nonvacuous when some prefix tightly satisfies the trigger R
+//     "P1 and not P2" is decided by §F.5.6.1's neutral satisfaction with
+//     locals;
+//   * ( R |-> P ) is nonvacuous when some prefix tightly satisfies the trigger
+//   R
 //     -- measured on w itself, not w-bar, as in §F.5.3.3 -- under §F.5.5's
 //     four-way relation, and the consequent is nonvacuous under an output
 //     context L_1 the antecedent yields;
@@ -37,7 +39,8 @@ namespace delta {
 
 // §F.5.6.3: non-vacuity w, L_0 |=^non P of a property under an input local
 // variable context.
-bool NonVacuouslyEvaluatesWithLocals(const Word& word, const LvProperty& property,
+bool NonVacuouslyEvaluatesWithLocals(const Word& word,
+                                     const LvProperty& property,
                                      const LocalContext& context);
 
 // §F.5.6.3: non-vacuity from no live local variables, starting the recursion
@@ -56,7 +59,8 @@ bool NonVacuouslyEvaluatesTopLevelWithLocals(const Word& word,
 // §F.5.6.3 inherits §F.5.3.3's "w satisfies P nonvacuously iff w |= P and
 // w |=^non P," realized with local variables: §F.5.6.1's neutral satisfaction
 // with locals together with this subclause's non-vacuity.
-bool SatisfiesNonVacuouslyWithLocals(const Word& word, const LvProperty& property,
+bool SatisfiesNonVacuouslyWithLocals(const Word& word,
+                                     const LvProperty& property,
                                      const LocalContext& context);
 
 // §F.5.6.3: the same nonvacuous-satisfaction test for a top-level property.

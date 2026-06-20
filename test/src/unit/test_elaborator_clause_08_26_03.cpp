@@ -140,4 +140,4 @@ TEST(InterfaceClassTypeAccess, ScopeResolutionOnParameterizedInterfaceClass) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

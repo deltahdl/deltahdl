@@ -170,4 +170,4 @@ TEST(AssocTraversal, PrevStringArgumentNeedNotBeStoredIndex) {
   EXPECT_EQ(ref->value.ToUint64(), expected);
 }
 
-}
+}  // namespace

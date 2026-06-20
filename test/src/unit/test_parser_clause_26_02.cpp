@@ -93,27 +93,27 @@ TEST(PackageDeclaration, MissingEndpackageIsError) {
 }
 
 TEST(PackageDeclaration, PackageNotAllowedInsideModule) {
-  EXPECT_FALSE(ParseOk(
-      "module m;\n"
-      "  package inner;\n"
-      "  endpackage\n"
-      "endmodule\n"));
+  EXPECT_FALSE(
+      ParseOk("module m;\n"
+              "  package inner;\n"
+              "  endpackage\n"
+              "endmodule\n"));
 }
 
 TEST(PackageDeclaration, PackageNotAllowedInsideInterface) {
-  EXPECT_FALSE(ParseOk(
-      "interface ifc;\n"
-      "  package inner;\n"
-      "  endpackage\n"
-      "endinterface\n"));
+  EXPECT_FALSE(
+      ParseOk("interface ifc;\n"
+              "  package inner;\n"
+              "  endpackage\n"
+              "endinterface\n"));
 }
 
 TEST(PackageDeclaration, PackageNotAllowedInsideProgram) {
-  EXPECT_FALSE(ParseOk(
-      "program prg;\n"
-      "  package inner;\n"
-      "  endpackage\n"
-      "endprogram\n"));
+  EXPECT_FALSE(
+      ParseOk("program prg;\n"
+              "  package inner;\n"
+              "  endpackage\n"
+              "endprogram\n"));
 }
 
 TEST(PackageDeclaration, NullItemInPackageBody) {
@@ -138,8 +138,7 @@ TEST(PackageDeclaration, LocalparamAsPackageItem) {
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->packages.size(), 1u);
   ASSERT_FALSE(r.cu->packages[0]->items.empty());
-  EXPECT_EQ(r.cu->packages[0]->items[0]->kind,
-            ModuleItemKind::kParamDecl);
+  EXPECT_EQ(r.cu->packages[0]->items[0]->kind, ModuleItemKind::kParamDecl);
 }
 
 TEST(PackageDeclaration, MissingPackageIdentifierIsError) {
@@ -168,8 +167,7 @@ TEST(PackageDeclaration, FunctionDeclarationAsPackageItem) {
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->packages.size(), 1u);
   EXPECT_FALSE(r.cu->packages[0]->items.empty());
-  EXPECT_EQ(r.cu->packages[0]->items[0]->kind,
-            ModuleItemKind::kFunctionDecl);
+  EXPECT_EQ(r.cu->packages[0]->items[0]->kind, ModuleItemKind::kFunctionDecl);
 }
 
 TEST(PackageDeclaration, TaskDeclarationAsPackageItem) {
@@ -193,8 +191,7 @@ TEST(PackageDeclaration, ClassDeclarationAsPackageItem) {
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->packages.size(), 1u);
   EXPECT_FALSE(r.cu->packages[0]->items.empty());
-  EXPECT_EQ(r.cu->packages[0]->items[0]->kind,
-            ModuleItemKind::kClassDecl);
+  EXPECT_EQ(r.cu->packages[0]->items[0]->kind, ModuleItemKind::kClassDecl);
 }
 
 TEST(PackageDeclaration, NetDeclarationAsPackageItem) {
@@ -254,4 +251,4 @@ TEST(PackageDeclaration, TimeunitsDeclarationAsPackageItem) {
   ASSERT_EQ(r.cu->packages.size(), 1u);
 }
 
-}
+}  // namespace

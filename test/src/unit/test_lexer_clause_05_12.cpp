@@ -38,4 +38,4 @@ TEST(LexicalConventionLexing, AttrFollowedByMultiply) {
   EXPECT_EQ(tokens[4].kind, TokenKind::kStar);
 }
 
-}
+}  // namespace

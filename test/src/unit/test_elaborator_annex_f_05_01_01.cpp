@@ -19,16 +19,16 @@ std::shared_ptr<const SequenceExpr> ClockedBoolean(const char* clock,
 // §F.5.1.1: T^s(b, c) = (!c[*0:$] ##1 c & b). The clock may idle, then b is
 // sampled on the cycle in which the clock holds.
 TEST(SequenceRewrite, BooleanBecomesIdleThenClockedSample) {
-  auto result = RewriteSequenceUnderClock(*SeqBoolean(BoolAtom("a")),
-                                          BoolAtom("clk"));
+  auto result =
+      RewriteSequenceUnderClock(*SeqBoolean(BoolAtom("a")), BoolAtom("clk"));
   EXPECT_TRUE(SequenceExprEqual(*result, *ClockedBoolean("clk", "a")));
 }
 
 // §F.5.1.1: T^s((1, v = e), c) = (T^s(1, c) ##0 (1, v = e)). The sampled
 // assignment fuses onto the clocked tick that the constant 1 rewrites to.
 TEST(SequenceRewrite, LocalVarSamplingFusesOntoClockedOne) {
-  auto result = RewriteSequenceUnderClock(*SeqLocalVarSampling("v"),
-                                          BoolAtom("clk"));
+  auto result =
+      RewriteSequenceUnderClock(*SeqLocalVarSampling("v"), BoolAtom("clk"));
   auto clocked_one =
       SeqConcat(SeqZeroOrMoreRepeat(SeqBoolean(BoolNot(BoolAtom("clk")))),
                 SeqBoolean(BoolAnd(BoolAtom("clk"), BoolTrue())));

@@ -50,4 +50,4 @@ TEST(AlwaysCombVsAlwaysStarSim, AlwaysStarNotSensitiveToFunctionBodyReads) {
   EXPECT_EQ(var->value.ToUint64(), 15u);
 }
 
-}
+}  // namespace

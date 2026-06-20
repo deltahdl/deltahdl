@@ -144,7 +144,8 @@ TEST(StrengthResolution, EqualStrengthPartialConflictPerBit) {
   EXPECT_EQ(var->value.words[0].bval & 0xFu, 0b0110u);
 }
 
-TEST(StrengthResolution, EqualStrengthConflictPopulatesAmbiguousResolvedStrength) {
+TEST(StrengthResolution,
+     EqualStrengthConflictPopulatesAmbiguousResolvedStrength) {
   Arena arena;
   auto* var = arena.Create<Variable>();
   var->value = MakeLogic4Vec(arena, 1);
@@ -164,7 +165,8 @@ TEST(StrengthResolution, EqualStrengthConflictPopulatesAmbiguousResolvedStrength
   EXPECT_TRUE(net.resolved_strength.IsAmbiguous());
 }
 
-TEST(StrengthResolution, EqualSupplyConflictPopulatesAmbiguousResolvedStrength) {
+TEST(StrengthResolution,
+     EqualSupplyConflictPopulatesAmbiguousResolvedStrength) {
   Arena arena;
   auto* var = arena.Create<Variable>();
   var->value = MakeLogic4Vec(arena, 1);
@@ -208,14 +210,14 @@ TEST(StrengthCombine, AmbiguousThreeSignalsFoldPreservesRange) {
   StrengthSignal pull_x{Val4::kX, StrengthLevel::kPull, StrengthLevel::kPull};
   StrengthSignal strong_x{Val4::kX, StrengthLevel::kStrong,
                           StrengthLevel::kStrong};
-  auto result =
-      CombineAmbiguous(CombineAmbiguous(weak_x, pull_x), strong_x);
+  auto result = CombineAmbiguous(CombineAmbiguous(weak_x, pull_x), strong_x);
   EXPECT_EQ(result.value, Val4::kX);
   EXPECT_EQ(result.strength0_hi, StrengthLevel::kStrong);
   EXPECT_EQ(result.strength1_hi, StrengthLevel::kStrong);
 }
 
-TEST(StrengthResolution, EqualMediumConflictPopulatesAmbiguousResolvedStrength) {
+TEST(StrengthResolution,
+     EqualMediumConflictPopulatesAmbiguousResolvedStrength) {
   Arena arena;
   auto* var = arena.Create<Variable>();
   var->value = MakeLogic4Vec(arena, 1);
@@ -405,4 +407,4 @@ TEST(AmbiguousNetStrengthCombine, CombiningWithDefaultStretchesLoToHighz) {
   EXPECT_EQ(r.s0_lo, Strength::kHighz);
 }
 
-}
+}  // namespace

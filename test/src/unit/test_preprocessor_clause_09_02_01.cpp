@@ -32,4 +32,4 @@ TEST(InitialProcedurePreprocessing, MacroExpandsToInitialBody) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}
+}  // namespace

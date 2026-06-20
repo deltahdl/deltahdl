@@ -101,4 +101,4 @@ TEST(IpcSync, SemaphorePutWakesSuspendedWaiterWhenEnoughReturned) {
   getter.h.destroy();
 }
 
-}
+}  // namespace

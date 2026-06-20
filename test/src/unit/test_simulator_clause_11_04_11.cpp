@@ -58,7 +58,8 @@ TEST(ConditionalAmbiguousCondition, XConditionWithEqualBranchesReturnsValue) {
   EXPECT_EQ(result.words[0].bval, 0u);
 }
 
-TEST(ConditionalAmbiguousCondition, XConditionCombinesDifferentBranchesBitwise) {
+TEST(ConditionalAmbiguousCondition,
+     XConditionCombinesDifferentBranchesBitwise) {
   SimFixture f;
 
   MakeVar4(f, "td", 1, 0, 1);
@@ -164,10 +165,10 @@ TEST(ShortCircuit, TernaryTrueCondSkipsFalseBranchSideEffect) {
   MakeVar(f, "c", 8, 1);
   MakeVar(f, "t", 8, 10);
   MakeVar(f, "se", 8, 99);
-  auto result = EvalExpr(
-      MakeTernary(f.arena, MakeId(f.arena, "c"), MakeId(f.arena, "t"),
-                  MakeAssignExpr(f.arena, "se", 42)),
-      f.ctx, f.arena);
+  auto result =
+      EvalExpr(MakeTernary(f.arena, MakeId(f.arena, "c"), MakeId(f.arena, "t"),
+                           MakeAssignExpr(f.arena, "se", 42)),
+               f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 10u);
   EXPECT_EQ(f.ctx.FindVariable("se")->value.ToUint64(), 99u);
 }
@@ -818,11 +819,10 @@ TEST(ConditionalAmbiguousCondition, BothBranchSideEffectsExecute) {
   MakeVar4(f, "cond", 1, 0, 1);
   MakeVar(f, "se_t", 8, 99);
   MakeVar(f, "se_f", 8, 99);
-  EvalExpr(
-      MakeTernary(f.arena, MakeId(f.arena, "cond"),
-                  MakeAssignExpr(f.arena, "se_t", 11),
-                  MakeAssignExpr(f.arena, "se_f", 22)),
-      f.ctx, f.arena);
+  EvalExpr(MakeTernary(f.arena, MakeId(f.arena, "cond"),
+                       MakeAssignExpr(f.arena, "se_t", 11),
+                       MakeAssignExpr(f.arena, "se_f", 22)),
+           f.ctx, f.arena);
   EXPECT_EQ(f.ctx.FindVariable("se_t")->value.ToUint64(), 11u);
   EXPECT_EQ(f.ctx.FindVariable("se_f")->value.ToUint64(), 22u);
 }
@@ -900,10 +900,10 @@ TEST(ConditionalAmbiguousCondition, DifferentWidthBranchesCombinedToMaxWidth) {
   MakeVar4(f, "xc", 1, 0, 1);
   MakeVar(f, "narrow", 4, 0b1111);
   MakeVar(f, "wide", 8, 0b11110000);
-  auto result = EvalExpr(
-      MakeTernary(f.arena, MakeId(f.arena, "xc"), MakeId(f.arena, "narrow"),
-                  MakeId(f.arena, "wide")),
-      f.ctx, f.arena);
+  auto result =
+      EvalExpr(MakeTernary(f.arena, MakeId(f.arena, "xc"),
+                           MakeId(f.arena, "narrow"), MakeId(f.arena, "wide")),
+               f.ctx, f.arena);
   EXPECT_EQ(result.width, 8u);
 }
 
@@ -915,10 +915,10 @@ TEST(ConditionalAmbiguousCondition, MultiBitPartialXTriggersAmbiguous) {
   cv->value.words[0].bval = 0b0010;
   MakeVar(f, "t", 4, 0b1100);
   MakeVar(f, "e", 4, 0b1010);
-  auto result = EvalExpr(
-      MakeTernary(f.arena, MakeId(f.arena, "cond"), MakeId(f.arena, "t"),
-                  MakeId(f.arena, "e")),
-      f.ctx, f.arena);
+  auto result =
+      EvalExpr(MakeTernary(f.arena, MakeId(f.arena, "cond"),
+                           MakeId(f.arena, "t"), MakeId(f.arena, "e")),
+               f.ctx, f.arena);
 
   EXPECT_EQ(result.words[0].aval, 0b1000u);
   EXPECT_EQ(result.words[0].bval, 0b0110u);
@@ -993,4 +993,4 @@ TEST(TernaryOperatorSim, CondPredicateTripleAndSecondFalse) {
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
-}
+}  // namespace

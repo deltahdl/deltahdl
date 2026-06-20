@@ -11,4 +11,4 @@ TEST(OptionalDirectiveParsing, DelayModeZero) {
   EXPECT_EQ(r.cu->delay_mode_directive, DelayModeDirective::kZero);
 }
 
-}
+}  // namespace

@@ -50,15 +50,15 @@ TEST(LoopGenerateParsing, ParameterizedModuleWithGenerate) {
 }
 
 TEST(LoopGenerateParsing, GenvarDeclaredInsideGenerateRegion) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  generate\n"
-      "    genvar i;\n"
-      "    for (i = 0; i < 2; i = i + 1) begin\n"
-      "      wire w;\n"
-      "    end\n"
-      "  endgenerate\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  generate\n"
+              "    genvar i;\n"
+              "    for (i = 0; i < 2; i = i + 1) begin\n"
+              "      wire w;\n"
+              "    end\n"
+              "  endgenerate\n"
+              "endmodule\n"));
 }
 
-}
+}  // namespace

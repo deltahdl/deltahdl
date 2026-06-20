@@ -78,8 +78,8 @@ TEST(SequenceDeclModel, BodyExprReachesSequenceExprOrMulticlock) {
   EXPECT_EQ(VpiSeqDeclBodyExpr(nullptr), nullptr);
 }
 
-// Detail 2: the vpiTypespec relation returns the formal's typespec when typed and
-// null when the formal is untyped.
+// Detail 2: the vpiTypespec relation returns the formal's typespec when typed
+// and null when the formal is untyped.
 TEST(SequenceDeclModel, FormalTypespecReportsNullWhenUntyped) {
   VpiObject typed;
   typed.type = vpiSeqFormalDecl;
@@ -94,8 +94,8 @@ TEST(SequenceDeclModel, FormalTypespecReportsNullWhenUntyped) {
   EXPECT_EQ(VpiSeqFormalTypespec(nullptr), nullptr);
 }
 
-// Detail 3: a formal's initialization expression is reached through vpiExpr; the
-// diagram draws its target as a named event or a sequence expression, and a
+// Detail 3: a formal's initialization expression is reached through vpiExpr;
+// the diagram draws its target as a named event or a sequence expression, and a
 // formal with no initialization expression reports none.
 TEST(SequenceDeclModel, FormalInitExprReachesNamedEventOrSequenceExpr) {
   VpiObject with_event;
@@ -108,7 +108,8 @@ TEST(SequenceDeclModel, FormalInitExprReachesNamedEventOrSequenceExpr) {
   VpiObject with_seq_expr;
   with_seq_expr.type = vpiSeqFormalDecl;
   VpiObject se;
-  se.type = vpiConstant;  // a sequence-expr kind (a bare expression, see §37.54)
+  se.type =
+      vpiConstant;  // a sequence-expr kind (a bare expression, see §37.54)
   with_seq_expr.children = {&se};
   EXPECT_EQ(VpiSeqFormalInitExpr(&with_seq_expr), &se);
 

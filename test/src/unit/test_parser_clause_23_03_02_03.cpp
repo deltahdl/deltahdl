@@ -25,7 +25,8 @@ TEST(ImplicitNamedPortConnectionParsing, SingleImplicitNamedPort) {
   EXPECT_EQ(item->inst_ports[0].first, "clk");
 }
 
-TEST(ImplicitNamedPortConnectionParsing, ImplicitConnectionDistinctFromEmptyExplicit) {
+TEST(ImplicitNamedPortConnectionParsing,
+     ImplicitConnectionDistinctFromEmptyExplicit) {
   auto r_implicit = Parse("module m; sub u0(.a); endmodule\n");
   auto r_explicit = Parse("module m; sub u0(.a()); endmodule\n");
   ASSERT_NE(r_implicit.cu, nullptr);
@@ -53,4 +54,4 @@ TEST(ImplicitNamedPortConnectionParsing, ImplicitNameSynthesizesSelfReference) {
   EXPECT_EQ(item->inst_ports[0].second->text, "clk");
 }
 
-}
+}  // namespace

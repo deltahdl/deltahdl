@@ -129,7 +129,8 @@ TEST(PrimitiveStrengthParsing, PullupStrength_MultipleInstances) {
   EXPECT_EQ(gates[1]->drive_strength1, 4u);
 }
 
-TEST(PrimitiveStrengthParsing, PullupStrength_SingleStrength1_MultipleInstances) {
+TEST(PrimitiveStrengthParsing,
+     PullupStrength_SingleStrength1_MultipleInstances) {
   auto r = Parse(
       "module m;\n"
       "  pullup (pull1) pu1(a), pu2(b);\n"
@@ -278,7 +279,8 @@ TEST(PrimitiveStrengthParsing, PulldownStrength_MultipleInstances) {
   EXPECT_EQ(gates[1]->drive_strength1, 2u);
 }
 
-TEST(PrimitiveStrengthParsing, PulldownStrength_SingleStrength0_MultipleInstances) {
+TEST(PrimitiveStrengthParsing,
+     PulldownStrength_SingleStrength0_MultipleInstances) {
   auto r = Parse(
       "module m;\n"
       "  pulldown (pull0) pd1(a), pd2(b);\n"
@@ -308,4 +310,4 @@ TEST(PrimitiveStrengthParsing, Error_PullupSingleStrength0) {
   EXPECT_TRUE(r.has_errors);
 }
 
-}
+}  // namespace

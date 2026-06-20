@@ -47,8 +47,7 @@ TEST(QueueOps, NegativeIndexReturnsX) {
   SimFixture f;
   MakeQueue(f, "q", {10, 20});
 
-  auto result =
-      EvalExpr(MakeSelect(f.arena, "q", 0xFFFFFFFFu), f.ctx, f.arena);
+  auto result = EvalExpr(MakeSelect(f.arena, "q", 0xFFFFFFFFu), f.ctx, f.arena);
   EXPECT_FALSE(result.IsKnown());
 }
 
@@ -365,4 +364,4 @@ TEST(QueueOps, XZIndexReadReturnsX) {
   EXPECT_FALSE(result.IsKnown());
 }
 
-}
+}  // namespace

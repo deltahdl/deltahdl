@@ -469,12 +469,12 @@ TEST(IntraAssignTimingParsing, IntraDelayNoEventsField) {
 }
 
 TEST(IntraAssignTimingParsing, IntraAssignRepeatEventMissingAt) {
-  EXPECT_TRUE(Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    a <= repeat(3) (posedge clk) b;\n"
-      "  end\n"
-      "endmodule\n").has_errors);
+  EXPECT_TRUE(Parse("module m;\n"
+                    "  initial begin\n"
+                    "    a <= repeat(3) (posedge clk) b;\n"
+                    "  end\n"
+                    "endmodule\n")
+                  .has_errors);
 }
 
-}
+}  // namespace

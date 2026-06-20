@@ -186,7 +186,6 @@ TEST(NetAndVariableTypeParsing, SigningSignedExplicit) {
 }
 
 TEST(NetAndVariableTypeParsing, SigningUnsignedExplicit) {
-
   auto r = Parse("module m; integer unsigned x; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -194,7 +193,6 @@ TEST(NetAndVariableTypeParsing, SigningUnsignedExplicit) {
 }
 
 TEST(NetAndVariableTypeParsing, ImplicitDataTypeWithPackedDim) {
-
   auto r = Parse("module m(input [7:0] a); endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -227,7 +225,6 @@ TEST(NetAndVariableTypeParsing, StructUnionUnion) {
 }
 
 TEST(NetAndVariableTypeParsing, StructUnionTagged) {
-
   auto r = Parse(
       "module m;\n"
       "  typedef union tagged { int a; bit b; } u_t;\n"
@@ -240,7 +237,6 @@ TEST(NetAndVariableTypeParsing, StructUnionTagged) {
 }
 
 TEST(NetAndVariableTypeParsing, StructUnionSoft) {
-
   auto r = Parse(
       "module m;\n"
       "  typedef union soft { int a; bit b; } u_t;\n"
@@ -640,4 +636,4 @@ TEST(NetAndVariableTypeParsing, ClassScopeTypeAccess) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}
+}  // namespace

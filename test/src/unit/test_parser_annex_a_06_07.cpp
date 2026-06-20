@@ -458,15 +458,15 @@ TEST(CaseItemParsing, CommaSeparatedItemExpressions) {
 }
 
 TEST(CaseItemParsing, DefaultColonOptional) {
-  EXPECT_TRUE(ParseOk(
-      "module t;\n"
-      "  initial begin\n"
-      "    case (sel)\n"
-      "      8'd0: x = 1;\n"
-      "      default x = 0;\n"
-      "    endcase\n"
-      "  end\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  initial begin\n"
+              "    case (sel)\n"
+              "      8'd0: x = 1;\n"
+              "      default x = 0;\n"
+              "    endcase\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
 TEST(CaseInsideItemParsing, FlagAndKeywordOnlyOnPlainCase) {
@@ -519,63 +519,63 @@ TEST(CaseInsideItemParsing, RangeListMultipleValueRanges) {
 }
 
 TEST(ValueRangeParsing, ClosedBracketRange) {
-  EXPECT_TRUE(ParseOk(
-      "module t;\n"
-      "  initial begin\n"
-      "    case (sel) inside\n"
-      "      [8'd1:8'd9]: x = 1;\n"
-      "      default: x = 0;\n"
-      "    endcase\n"
-      "  end\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  initial begin\n"
+              "    case (sel) inside\n"
+              "      [8'd1:8'd9]: x = 1;\n"
+              "      default: x = 0;\n"
+              "    endcase\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
 TEST(ValueRangeParsing, OpenLowerBoundDollar) {
-  EXPECT_TRUE(ParseOk(
-      "module t;\n"
-      "  initial begin\n"
-      "    case (sel) inside\n"
-      "      [$:8'd10]: x = 1;\n"
-      "      default: x = 0;\n"
-      "    endcase\n"
-      "  end\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  initial begin\n"
+              "    case (sel) inside\n"
+              "      [$:8'd10]: x = 1;\n"
+              "      default: x = 0;\n"
+              "    endcase\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
 TEST(ValueRangeParsing, OpenUpperBoundDollar) {
-  EXPECT_TRUE(ParseOk(
-      "module t;\n"
-      "  initial begin\n"
-      "    case (sel) inside\n"
-      "      [8'd10:$]: x = 1;\n"
-      "      default: x = 0;\n"
-      "    endcase\n"
-      "  end\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  initial begin\n"
+              "    case (sel) inside\n"
+              "      [8'd10:$]: x = 1;\n"
+              "      default: x = 0;\n"
+              "    endcase\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
 TEST(ValueRangeParsing, SymmetricTolerancePlusSlashMinus) {
-  EXPECT_TRUE(ParseOk(
-      "module t;\n"
-      "  initial begin\n"
-      "    case (sel) inside\n"
-      "      [8'd10 +/- 8'd3]: x = 1;\n"
-      "      default: x = 0;\n"
-      "    endcase\n"
-      "  end\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  initial begin\n"
+              "    case (sel) inside\n"
+              "      [8'd10 +/- 8'd3]: x = 1;\n"
+              "      default: x = 0;\n"
+              "    endcase\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
 TEST(ValueRangeParsing, PercentTolerancePlusPercentMinus) {
-  EXPECT_TRUE(ParseOk(
-      "module t;\n"
-      "  initial begin\n"
-      "    case (sel) inside\n"
-      "      [8'd100 +%- 8'd10]: x = 1;\n"
-      "      default: x = 0;\n"
-      "    endcase\n"
-      "  end\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  initial begin\n"
+              "    case (sel) inside\n"
+              "      [8'd100 +%- 8'd10]: x = 1;\n"
+              "      default: x = 0;\n"
+              "    endcase\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
 TEST(ValueRangeParsing, BareExpressionForm) {
@@ -617,29 +617,29 @@ TEST(CasePatternItemParsing, MatchesFlagSet) {
 }
 
 TEST(CasePatternItemParsing, GuardWithAmpAmpAmp) {
-  EXPECT_TRUE(ParseOk(
-      "module t;\n"
-      "  logic [7:0] sel;\n"
-      "  logic en, x;\n"
-      "  initial begin\n"
-      "    case (sel) matches\n"
-      "      8'd1 &&& en: x = 1'b1;\n"
-      "      default: x = 1'b0;\n"
-      "    endcase\n"
-      "  end\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  logic [7:0] sel;\n"
+              "  logic en, x;\n"
+              "  initial begin\n"
+              "    case (sel) matches\n"
+              "      8'd1 &&& en: x = 1'b1;\n"
+              "      default: x = 1'b0;\n"
+              "    endcase\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
 TEST(CasePatternItemParsing, DefaultColonOptionalUnderMatches) {
-  EXPECT_TRUE(ParseOk(
-      "module t;\n"
-      "  initial begin\n"
-      "    case (sel) matches\n"
-      "      8'd0: x = 1;\n"
-      "      default x = 0;\n"
-      "    endcase\n"
-      "  end\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  initial begin\n"
+              "    case (sel) matches\n"
+              "      8'd0: x = 1;\n"
+              "      default x = 0;\n"
+              "    endcase\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
 TEST(RandcaseStatementParsing, BasicThreeItems) {
@@ -681,15 +681,15 @@ TEST(RandcaseStatementParsing, SingleItem) {
 }
 
 TEST(RandcaseItemParsing, BodyMayBeNullStatement) {
-  EXPECT_TRUE(ParseOk(
-      "module t;\n"
-      "  initial begin\n"
-      "    randcase\n"
-      "      1: ;\n"
-      "      2: x = 2;\n"
-      "    endcase\n"
-      "  end\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  initial begin\n"
+              "    randcase\n"
+              "      1: ;\n"
+              "      2: x = 2;\n"
+              "    endcase\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
 TEST(RandcaseItemParsing, WeightIsExpression) {
@@ -785,4 +785,4 @@ TEST(RandcaseItemParsing, RejectsDefaultLabel) {
   EXPECT_TRUE(r.has_errors);
 }
 
-}
+}  // namespace

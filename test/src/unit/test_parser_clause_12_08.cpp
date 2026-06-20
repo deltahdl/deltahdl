@@ -167,4 +167,4 @@ TEST(JumpStatementSyntaxParsing, ReturnWithExpressionBnf) {
   ASSERT_NE(ret->expr, nullptr);
 }
 
-}
+}  // namespace

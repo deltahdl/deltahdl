@@ -22,4 +22,4 @@ TEST(ProgramControlTasksLexing, ExitWithParensLexes) {
   EXPECT_EQ(tokens[2].kind, TokenKind::kRParen);
 }
 
-}
+}  // namespace

@@ -10,7 +10,7 @@ using namespace delta;
 namespace {
 
 UdpDecl MakeCombinational(std::vector<std::vector<char>> rows,
-                         std::vector<char> outputs) {
+                          std::vector<char> outputs) {
   UdpDecl decl;
   for (size_t i = 0; i < rows.size(); ++i) {
     UdpTableRow row;
@@ -22,9 +22,8 @@ UdpDecl MakeCombinational(std::vector<std::vector<char>> rows,
 }
 
 TEST(UdpStateTable, CombinationalExplicitAllXRowProducesX) {
-  auto decl = MakeCombinational(
-      {{'0', '0'}, {'1', '1'}, {'x', 'x'}},
-      {'0', '1', 'x'});
+  auto decl =
+      MakeCombinational({{'0', '0'}, {'1', '1'}, {'x', 'x'}}, {'0', '1', 'x'});
   UdpEvalState state(decl);
   EXPECT_EQ(state.Evaluate({'x', 'x'}), 'x');
 }
@@ -38,4 +37,4 @@ TEST(UdpStateTable, UnspecifiedInputCombinationDefaultsToX) {
   EXPECT_EQ(state.Evaluate({'1', '0'}), 'x');
 }
 
-}
+}  // namespace

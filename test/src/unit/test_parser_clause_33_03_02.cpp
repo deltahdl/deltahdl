@@ -26,8 +26,9 @@ struct TempLibMapDir {
            std::to_string(seq));
     fs::create_directories(dir);
     // The loader canonicalizes the map file's directory when anchoring relative
-    // paths, so canonicalize here too (e.g. macOS resolves /var -> /private/var)
-    // to keep the paths we assert on aligned with the loader's view.
+    // paths, so canonicalize here too (e.g. macOS resolves /var ->
+    // /private/var) to keep the paths we assert on aligned with the loader's
+    // view.
     dir = fs::weakly_canonical(dir);
   }
 
@@ -155,4 +156,4 @@ TEST(LibraryMapInclude, AbsoluteIncludePathIsHonoredAsGiven) {
   EXPECT_EQ(m.LibraryForFile((away_dir / "x.av").string()), "absLib");
 }
 
-}
+}  // namespace

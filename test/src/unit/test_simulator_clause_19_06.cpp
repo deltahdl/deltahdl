@@ -211,4 +211,4 @@ TEST(Coverage, CrossEmptyWhenCoverpointHasNoEligibleBins) {
   EXPECT_TRUE(xc->bins.empty());
 }
 
-}
+}  // namespace

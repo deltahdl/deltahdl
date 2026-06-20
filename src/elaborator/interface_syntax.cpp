@@ -2,7 +2,8 @@
 
 namespace delta {
 
-bool InterfacePortHierRefIsLegal(const std::vector<InterfaceHierRefStep>& path) {
+bool InterfacePortHierRefIsLegal(
+    const std::vector<InterfaceHierRefStep>& path) {
   // A reference that names nothing cannot designate an interface instance.
   if (path.empty()) {
     return false;

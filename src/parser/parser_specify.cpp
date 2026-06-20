@@ -61,7 +61,6 @@ void Parser::ParseSpecparamDecl(std::vector<ModuleItem*>& items) {
 }
 
 void Parser::ParseSpecifyItem(std::vector<SpecifyItem*>& items) {
-
   if (Check(TokenKind::kKwPulsestyleOnevent) ||
       Check(TokenKind::kKwPulsestyleOndetect)) {
     items.push_back(ParsePulsestyleDecl());
@@ -116,8 +115,7 @@ void Parser::ParseSpecifyItem(std::vector<SpecifyItem*>& items) {
 
   diag_.Error(CurrentLoc(), "unexpected token in specify block");
   while (!AtEnd() && !Check(TokenKind::kSemicolon) &&
-         !Check(TokenKind::kKwEndspecify) &&
-         !Check(TokenKind::kKwEndmodule)) {
+         !Check(TokenKind::kKwEndspecify) && !Check(TokenKind::kKwEndmodule)) {
     Consume();
   }
   if (Check(TokenKind::kSemicolon)) Consume();
@@ -133,7 +131,6 @@ void Parser::ParseEdgeDescriptorList(
     std::vector<std::pair<char, char>>& descriptors) {
   auto list_loc = CurrentLoc();
   do {
-
     if (Check(TokenKind::kRBracket)) break;
     auto text = CurrentToken().text;
     auto tok_loc = CurrentLoc();
@@ -147,7 +144,6 @@ void Parser::ParseEdgeDescriptorList(
       Consume();
     } else if (Check(TokenKind::kIntLiteral) && text.size() == 1 &&
                IsZeroOrOne(text[0])) {
-
       char first = text[0];
       Consume();
       auto next_text = CurrentToken().text;
@@ -225,7 +221,6 @@ SpecifyTerminal Parser::ParseSpecifyTerminal() {
 
 void Parser::ParsePathPorts(std::vector<SpecifyTerminal>& ports) {
   if (Match(TokenKind::kLBrace)) {
-
     bool is_replication = false;
     if (!Check(TokenKind::kIdentifier)) {
       is_replication = true;
@@ -237,7 +232,6 @@ void Parser::ParsePathPorts(std::vector<SpecifyTerminal>& ports) {
     }
 
     if (is_replication) {
-
       ParseExpr();
       Expect(TokenKind::kLBrace);
       ports.push_back(ParseSpecifyTerminal());
@@ -525,8 +519,7 @@ SpecifyItem* Parser::ParseTimingCheck() {
 
   if (item->timing_check.check_kind == TimingCheckKind::kRecrem &&
       item->timing_check.limits.size() < 2) {
-    diag_.Error(item->loc,
-                "$recrem requires two timing_check_limit arguments");
+    diag_.Error(item->loc, "$recrem requires two timing_check_limit arguments");
   }
 
   if (item->timing_check.check_kind == TimingCheckKind::kFullskew &&
@@ -650,4 +643,4 @@ void Parser::ParseSpecparamInSpecify(std::vector<SpecifyItem*>& items) {
   Expect(TokenKind::kSemicolon);
 }
 
-}
+}  // namespace delta

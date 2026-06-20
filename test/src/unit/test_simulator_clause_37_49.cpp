@@ -34,8 +34,8 @@ TEST(AssertionModel, AssertionTypeCoversTheGroupedKinds) {
   EXPECT_FALSE(VpiIsAssertionType(vpiClockingBlock));
 }
 
-// A edge: vpiAssertion names the class, not a concrete object kind, so the class
-// selector itself is not classified as one of the grouped member kinds.
+// A edge: vpiAssertion names the class, not a concrete object kind, so the
+// class selector itself is not classified as one of the grouped member kinds.
 TEST(AssertionModel, ClassSelectorIsNotItselfAMemberKind) {
   EXPECT_FALSE(VpiIsAssertionType(vpiAssertion));
 }

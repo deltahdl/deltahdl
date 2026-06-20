@@ -67,4 +67,4 @@ TEST(NetDelayParsing, NetWithoutDelaySpecLeavesAllSlotsNull) {
   EXPECT_EQ(item->net_delay_decay, nullptr);
 }
 
-}
+}  // namespace

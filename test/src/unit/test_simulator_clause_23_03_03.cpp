@@ -51,4 +51,4 @@ TEST(PortConnectionRulesSimulation, MatchingNettypePropagatesValue) {
   EXPECT_EQ(var->value.ToUint64(), 0x5Au);
 }
 
-}
+}  // namespace

@@ -155,10 +155,10 @@ TEST(ProgramInstantiationGrammar, ParamsWithEmptyPorts) {
 }
 
 TEST(ProgramInstantiationGrammar, Error_MissingSemicolon) {
-  EXPECT_FALSE(ParseOk(
-      "program my_prog;\n"
-      "endprogram\n"
-      "module m; my_prog u0() endmodule\n"));
+  EXPECT_FALSE(
+      ParseOk("program my_prog;\n"
+              "endprogram\n"
+              "module m; my_prog u0() endmodule\n"));
 }
 
-}
+}  // namespace

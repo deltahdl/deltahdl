@@ -20,10 +20,10 @@ TEST(InitialProcedureSynthesis, RejectInitialBlock) {
 TEST(InitialProcedureSynthesis, RejectInitialWithAssignment) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f,
-      "module m;\n"
-      "  logic x;\n"
-      "  initial x = 1;\n"
-      "endmodule\n");
+                           "module m;\n"
+                           "  logic x;\n"
+                           "  initial x = 1;\n"
+                           "endmodule\n");
   ASSERT_NE(mod, nullptr);
   SynthLower synth(f.arena, f.diag);
   auto* aig = synth.Lower(mod);
@@ -31,4 +31,4 @@ TEST(InitialProcedureSynthesis, RejectInitialWithAssignment) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-}
+}  // namespace

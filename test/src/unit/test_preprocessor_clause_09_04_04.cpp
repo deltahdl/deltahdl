@@ -52,4 +52,4 @@ TEST(LevelSensitiveSequencePreprocessor, WaitTriggeredSurvivesPreprocessor) {
   EXPECT_NE(result.find("triggered"), std::string::npos);
 }
 
-}
+}  // namespace

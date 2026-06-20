@@ -177,4 +177,4 @@ TEST(DataTypeParsing, StringIndexing) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

@@ -68,8 +68,7 @@ TEST(CheckerInstantiation, DollarFormalReferencePermittedUses) {
       DollarFormalReferenceUse::kCheckerInstanceActual));
   EXPECT_TRUE(DollarFormalReferenceIsLegal(
       DollarFormalReferenceUse::kNestedCheckerDefaultArg));
-  EXPECT_FALSE(
-      DollarFormalReferenceIsLegal(DollarFormalReferenceUse::kOther));
+  EXPECT_FALSE(DollarFormalReferenceIsLegal(DollarFormalReferenceUse::kOther));
 }
 
 TEST(CheckerInstantiation, DollarActualRequiresUntypedFormalAndPermittedRefs) {

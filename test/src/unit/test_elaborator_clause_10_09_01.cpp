@@ -129,4 +129,4 @@ TEST(ArrayLiteralElaboration, BitElementNoSizeWarning) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

@@ -113,9 +113,9 @@ TEST(BnfClarificationParsing, PureVirtualMethodOk) {
               "endclass\n"));
 }
 
-// §A.10 item 1: a package_import_declaration in an ANSI module/interface/program
-// header must be followed by a parameter_port_list and/or a
-// list_of_port_declarations.
+// §A.10 item 1: a package_import_declaration in an ANSI
+// module/interface/program header must be followed by a parameter_port_list
+// and/or a list_of_port_declarations.
 TEST(BnfClarificationParsing, HeaderImportFollowedByPortListOk) {
   EXPECT_TRUE(
       ParseOk("module m import pkg::*; (input logic a);\n"
@@ -239,4 +239,4 @@ TEST(BnfClarificationParsing, ErrorRefFormalInDpiImport) {
   EXPECT_TRUE(r.has_errors);
 }
 
-}
+}  // namespace

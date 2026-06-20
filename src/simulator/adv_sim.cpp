@@ -55,4 +55,4 @@ bool AssocArray::Exists(const std::string& key) const {
 
 void AssocArray::Erase(const std::string& key) { data_.erase(key); }
 
-}
+}  // namespace delta

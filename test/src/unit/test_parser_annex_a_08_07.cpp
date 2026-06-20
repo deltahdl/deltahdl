@@ -275,4 +275,4 @@ TEST(NumberParsing, RealFracExpNoSign) {
   EXPECT_EQ(rhs->kind, ExprKind::kRealLiteral);
 }
 
-}
+}  // namespace

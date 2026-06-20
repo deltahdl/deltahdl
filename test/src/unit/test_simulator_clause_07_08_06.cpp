@@ -229,4 +229,4 @@ TEST(AssocArray, ReadMissingStringKeyWithDefaultDoesNotWarn) {
   EXPECT_EQ(f.diag.WarningCount(), before);
 }
 
-}
+}  // namespace

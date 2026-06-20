@@ -27,4 +27,4 @@ TEST(CompilerDirectiveParsing, UndefExcludesConditionalFromParse) {
   EXPECT_EQ(result.cu->modules[0]->name, "t");
 }
 
-}
+}  // namespace

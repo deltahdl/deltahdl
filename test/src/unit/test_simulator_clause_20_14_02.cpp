@@ -12,7 +12,8 @@ namespace {
 
 // Draws `n` values from a distribution function whose seed names the variable
 // `seed`, evaluating the same call repeatedly. Because the seed is an inout
-// argument the call advances it on its own, so each evaluation walks the stream.
+// argument the call advances it on its own, so each evaluation walks the
+// stream.
 std::vector<int32_t> DistStream(SimFixture& f, Expr* call, int n) {
   std::vector<int32_t> out;
   for (int i = 0; i < n; ++i) {
@@ -26,12 +27,12 @@ std::vector<int32_t> DistStream(SimFixture& f, Expr* call, int n) {
 // result through the same path as $random.
 TEST(DistributionFunctions, Returns32BitInteger) {
   SimFixture f;
-  for (auto name : {"$dist_uniform", "$dist_normal", "$dist_exponential",
-                    "$dist_poisson", "$dist_chi_square", "$dist_t",
-                    "$dist_erlang"}) {
-    auto* call = MkSysCall(
-        f.arena, name,
-        {MkInt(f.arena, 1u), MkInt(f.arena, 5u), MkInt(f.arena, 7u)});
+  for (auto name :
+       {"$dist_uniform", "$dist_normal", "$dist_exponential", "$dist_poisson",
+        "$dist_chi_square", "$dist_t", "$dist_erlang"}) {
+    auto* call =
+        MkSysCall(f.arena, name,
+                  {MkInt(f.arena, 1u), MkInt(f.arena, 5u), MkInt(f.arena, 7u)});
     auto result = EvalExpr(call, f.ctx, f.arena);
     EXPECT_EQ(result.width, 32u) << name;
   }
@@ -53,8 +54,8 @@ TEST(DistributionFunctions, UniformStaysWithinInterval) {
 }
 
 // §20.14.2 (shall): a distribution function shall always return the same value
-// given the same seed. With a literal seed each call reseeds identically, so the
-// result repeats.
+// given the same seed. With a literal seed each call reseeds identically, so
+// the result repeats.
 TEST(DistributionFunctions, SameSeedReturnsSameValue) {
   SimFixture f;
   auto make = [&]() {
@@ -84,9 +85,10 @@ TEST(DistributionFunctions, DifferentSeedsDiffer) {
   EXPECT_NE(stream_for(1u), stream_for(2u));
 }
 
-// §20.14.2: the seed is an inout argument — a value is passed in and a different
-// value is returned. A seed that names a variable is advanced by the call, so
-// the variable changes and successive draws are not pinned to one value.
+// §20.14.2: the seed is an inout argument — a value is passed in and a
+// different value is returned. A seed that names a variable is advanced by the
+// call, so the variable changes and successive draws are not pinned to one
+// value.
 TEST(DistributionFunctions, SeedIsInoutAndAdvances) {
   SimFixture f;
   MakeVar(f, "seed", 32, 1u);
@@ -143,9 +145,9 @@ TEST(DistributionFunctions, PositiveMeanIsAccepted) {
 // draws without complaint.
 TEST(DistributionFunctions, NormalAllowsNonPositiveMean) {
   SimFixture f;
-  auto* call = MkSysCall(
-      f.arena, "$dist_normal",
-      {MkInt(f.arena, 1u), MkInt(f.arena, 0u), MkInt(f.arena, 4u)});
+  auto* call =
+      MkSysCall(f.arena, "$dist_normal",
+                {MkInt(f.arena, 1u), MkInt(f.arena, 0u), MkInt(f.arena, 4u)});
   EvalExpr(call, f.ctx, f.arena);
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
@@ -173,19 +175,19 @@ TEST(DistributionFunctions, ChiSquareNonPositiveDofIsReported) {
 // §20.14.2 (shall): the same degree_of_freedom requirement applies to $dist_t.
 TEST(DistributionFunctions, TNonPositiveDofIsReported) {
   SimFixture f;
-  auto* call = MkSysCall(f.arena, "$dist_t",
-                         {MkInt(f.arena, 1u), MkInt(f.arena, 0u)});
+  auto* call =
+      MkSysCall(f.arena, "$dist_t", {MkInt(f.arena, 1u), MkInt(f.arena, 0u)});
   EvalExpr(call, f.ctx, f.arena);
   EXPECT_GE(f.diag.WarningCount(), 1u);
 }
 
-// §20.14.2 (shall): for $dist_erlang both k_stage and mean shall be greater than
-// 0, so a non-positive k_stage is reported.
+// §20.14.2 (shall): for $dist_erlang both k_stage and mean shall be greater
+// than 0, so a non-positive k_stage is reported.
 TEST(DistributionFunctions, ErlangNonPositiveKStageIsReported) {
   SimFixture f;
-  auto* call = MkSysCall(
-      f.arena, "$dist_erlang",
-      {MkInt(f.arena, 1u), MkInt(f.arena, 0u), MkInt(f.arena, 7u)});
+  auto* call =
+      MkSysCall(f.arena, "$dist_erlang",
+                {MkInt(f.arena, 1u), MkInt(f.arena, 0u), MkInt(f.arena, 7u)});
   EvalExpr(call, f.ctx, f.arena);
   EXPECT_GE(f.diag.WarningCount(), 1u);
 }
@@ -194,9 +196,9 @@ TEST(DistributionFunctions, ErlangNonPositiveKStageIsReported) {
 // with a valid k_stage a non-positive mean is the value that is reported.
 TEST(DistributionFunctions, ErlangNonPositiveMeanIsReported) {
   SimFixture f;
-  auto* call = MkSysCall(
-      f.arena, "$dist_erlang",
-      {MkInt(f.arena, 1u), MkInt(f.arena, 2u), MkInt(f.arena, 0u)});
+  auto* call =
+      MkSysCall(f.arena, "$dist_erlang",
+                {MkInt(f.arena, 1u), MkInt(f.arena, 2u), MkInt(f.arena, 0u)});
   EvalExpr(call, f.ctx, f.arena);
   EXPECT_GE(f.diag.WarningCount(), 1u);
 }
@@ -230,9 +232,9 @@ TEST(DistributionFunctions, UniformDegenerateInterval) {
 // not flagged as a real number.
 TEST(DistributionFunctions, ResultIsIntegerNotReal) {
   SimFixture f;
-  auto* call = MkSysCall(
-      f.arena, "$dist_uniform",
-      {MkInt(f.arena, 1u), MkInt(f.arena, 0u), MkInt(f.arena, 100u)});
+  auto* call =
+      MkSysCall(f.arena, "$dist_uniform",
+                {MkInt(f.arena, 1u), MkInt(f.arena, 0u), MkInt(f.arena, 100u)});
   auto result = EvalExpr(call, f.ctx, f.arena);
   EXPECT_FALSE(result.is_real);
 }

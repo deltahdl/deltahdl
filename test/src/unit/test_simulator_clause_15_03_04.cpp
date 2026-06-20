@@ -107,4 +107,4 @@ TEST(IpcSync, SemaphoreTryGetConsecutiveCalls) {
   EXPECT_EQ(sem.key_count, 3);
 }
 
-}
+}  // namespace

@@ -74,4 +74,4 @@ TEST(DpiParsing, DpiExportRejectsUnknownSpecString) {
   EXPECT_TRUE(r.has_errors);
 }
 
-}
+}  // namespace

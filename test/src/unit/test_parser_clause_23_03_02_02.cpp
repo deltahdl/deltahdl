@@ -82,4 +82,4 @@ TEST(ModuleInstantiationGrammar, NamedPortWithConcatenation) {
   EXPECT_EQ(item->inst_ports[0].second->kind, ExprKind::kConcatenation);
 }
 
-}
+}  // namespace

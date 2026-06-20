@@ -77,4 +77,4 @@ TEST(SvaEngine, FirstMatchRetainsAllWhenEveryMatchTiesOnSameTick) {
   EXPECT_EQ(fm.end_times, expected);
 }
 
-}
+}  // namespace

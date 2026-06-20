@@ -425,8 +425,7 @@ TEST(EvalOp, ReductionNorResultIsOneBit) {
 
 TEST(EvalOp, ReductionXnorResultIsOneBit) {
   SimFixture f;
-  auto* expr =
-      MakeUnary(f.arena, TokenKind::kTildeCaret, MakeInt(f.arena, 3));
+  auto* expr = MakeUnary(f.arena, TokenKind::kTildeCaret, MakeInt(f.arena, 3));
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.width, 1u);
 }
@@ -440,26 +439,25 @@ TEST(EvalOp, AllReductionsOnAllZeros) {
   EXPECT_EQ(EvalExpr(MakeUnary(f.arena, TokenKind::kAmp, id()), f.ctx, f.arena)
                 .ToUint64(),
             0u);
-  EXPECT_EQ(EvalExpr(MakeUnary(f.arena, TokenKind::kTildeAmp, id()), f.ctx,
-                     f.arena)
-                .ToUint64(),
-            1u);
   EXPECT_EQ(
-      EvalExpr(MakeUnary(f.arena, TokenKind::kPipe, id()), f.ctx, f.arena)
+      EvalExpr(MakeUnary(f.arena, TokenKind::kTildeAmp, id()), f.ctx, f.arena)
           .ToUint64(),
-      0u);
-  EXPECT_EQ(EvalExpr(MakeUnary(f.arena, TokenKind::kTildePipe, id()), f.ctx,
-                     f.arena)
+      1u);
+  EXPECT_EQ(EvalExpr(MakeUnary(f.arena, TokenKind::kPipe, id()), f.ctx, f.arena)
                 .ToUint64(),
-            1u);
+            0u);
+  EXPECT_EQ(
+      EvalExpr(MakeUnary(f.arena, TokenKind::kTildePipe, id()), f.ctx, f.arena)
+          .ToUint64(),
+      1u);
   EXPECT_EQ(
       EvalExpr(MakeUnary(f.arena, TokenKind::kCaret, id()), f.ctx, f.arena)
           .ToUint64(),
       0u);
-  EXPECT_EQ(EvalExpr(MakeUnary(f.arena, TokenKind::kTildeCaret, id()), f.ctx,
-                     f.arena)
-                .ToUint64(),
-            1u);
+  EXPECT_EQ(
+      EvalExpr(MakeUnary(f.arena, TokenKind::kTildeCaret, id()), f.ctx, f.arena)
+          .ToUint64(),
+      1u);
 }
 
 TEST(EvalOp, AllReductionsOnAllOnes) {
@@ -471,26 +469,25 @@ TEST(EvalOp, AllReductionsOnAllOnes) {
   EXPECT_EQ(EvalExpr(MakeUnary(f.arena, TokenKind::kAmp, id()), f.ctx, f.arena)
                 .ToUint64(),
             1u);
-  EXPECT_EQ(EvalExpr(MakeUnary(f.arena, TokenKind::kTildeAmp, id()), f.ctx,
-                     f.arena)
-                .ToUint64(),
-            0u);
   EXPECT_EQ(
-      EvalExpr(MakeUnary(f.arena, TokenKind::kPipe, id()), f.ctx, f.arena)
+      EvalExpr(MakeUnary(f.arena, TokenKind::kTildeAmp, id()), f.ctx, f.arena)
           .ToUint64(),
-      1u);
-  EXPECT_EQ(EvalExpr(MakeUnary(f.arena, TokenKind::kTildePipe, id()), f.ctx,
-                     f.arena)
+      0u);
+  EXPECT_EQ(EvalExpr(MakeUnary(f.arena, TokenKind::kPipe, id()), f.ctx, f.arena)
                 .ToUint64(),
-            0u);
+            1u);
+  EXPECT_EQ(
+      EvalExpr(MakeUnary(f.arena, TokenKind::kTildePipe, id()), f.ctx, f.arena)
+          .ToUint64(),
+      0u);
   EXPECT_EQ(
       EvalExpr(MakeUnary(f.arena, TokenKind::kCaret, id()), f.ctx, f.arena)
           .ToUint64(),
       0u);
-  EXPECT_EQ(EvalExpr(MakeUnary(f.arena, TokenKind::kTildeCaret, id()), f.ctx,
-                     f.arena)
-                .ToUint64(),
-            1u);
+  EXPECT_EQ(
+      EvalExpr(MakeUnary(f.arena, TokenKind::kTildeCaret, id()), f.ctx, f.arena)
+          .ToUint64(),
+      1u);
 }
 
 TEST(EvalOp, AllReductionsOnEvenOnes) {
@@ -502,26 +499,25 @@ TEST(EvalOp, AllReductionsOnEvenOnes) {
   EXPECT_EQ(EvalExpr(MakeUnary(f.arena, TokenKind::kAmp, id()), f.ctx, f.arena)
                 .ToUint64(),
             0u);
-  EXPECT_EQ(EvalExpr(MakeUnary(f.arena, TokenKind::kTildeAmp, id()), f.ctx,
-                     f.arena)
+  EXPECT_EQ(
+      EvalExpr(MakeUnary(f.arena, TokenKind::kTildeAmp, id()), f.ctx, f.arena)
+          .ToUint64(),
+      1u);
+  EXPECT_EQ(EvalExpr(MakeUnary(f.arena, TokenKind::kPipe, id()), f.ctx, f.arena)
                 .ToUint64(),
             1u);
   EXPECT_EQ(
-      EvalExpr(MakeUnary(f.arena, TokenKind::kPipe, id()), f.ctx, f.arena)
+      EvalExpr(MakeUnary(f.arena, TokenKind::kTildePipe, id()), f.ctx, f.arena)
           .ToUint64(),
-      1u);
-  EXPECT_EQ(EvalExpr(MakeUnary(f.arena, TokenKind::kTildePipe, id()), f.ctx,
-                     f.arena)
-                .ToUint64(),
-            0u);
+      0u);
   EXPECT_EQ(
       EvalExpr(MakeUnary(f.arena, TokenKind::kCaret, id()), f.ctx, f.arena)
           .ToUint64(),
       0u);
-  EXPECT_EQ(EvalExpr(MakeUnary(f.arena, TokenKind::kTildeCaret, id()), f.ctx,
-                     f.arena)
-                .ToUint64(),
-            1u);
+  EXPECT_EQ(
+      EvalExpr(MakeUnary(f.arena, TokenKind::kTildeCaret, id()), f.ctx, f.arena)
+          .ToUint64(),
+      1u);
 }
 
 TEST(EvalOp, AllReductionsOnOddOnes) {
@@ -533,26 +529,25 @@ TEST(EvalOp, AllReductionsOnOddOnes) {
   EXPECT_EQ(EvalExpr(MakeUnary(f.arena, TokenKind::kAmp, id()), f.ctx, f.arena)
                 .ToUint64(),
             0u);
-  EXPECT_EQ(EvalExpr(MakeUnary(f.arena, TokenKind::kTildeAmp, id()), f.ctx,
-                     f.arena)
+  EXPECT_EQ(
+      EvalExpr(MakeUnary(f.arena, TokenKind::kTildeAmp, id()), f.ctx, f.arena)
+          .ToUint64(),
+      1u);
+  EXPECT_EQ(EvalExpr(MakeUnary(f.arena, TokenKind::kPipe, id()), f.ctx, f.arena)
                 .ToUint64(),
             1u);
   EXPECT_EQ(
-      EvalExpr(MakeUnary(f.arena, TokenKind::kPipe, id()), f.ctx, f.arena)
+      EvalExpr(MakeUnary(f.arena, TokenKind::kTildePipe, id()), f.ctx, f.arena)
           .ToUint64(),
-      1u);
-  EXPECT_EQ(EvalExpr(MakeUnary(f.arena, TokenKind::kTildePipe, id()), f.ctx,
-                     f.arena)
-                .ToUint64(),
-            0u);
+      0u);
   EXPECT_EQ(
       EvalExpr(MakeUnary(f.arena, TokenKind::kCaret, id()), f.ctx, f.arena)
           .ToUint64(),
       1u);
-  EXPECT_EQ(EvalExpr(MakeUnary(f.arena, TokenKind::kTildeCaret, id()), f.ctx,
-                     f.arena)
-                .ToUint64(),
-            0u);
+  EXPECT_EQ(
+      EvalExpr(MakeUnary(f.arena, TokenKind::kTildeCaret, id()), f.ctx, f.arena)
+          .ToUint64(),
+      0u);
 }
 
 TEST(EvalOpXZ, AllReductionsOnAllX) {
@@ -561,27 +556,33 @@ TEST(EvalOpXZ, AllReductionsOnAllX) {
   auto id = [&]() { return MakeId(f.arena, "v"); };
 
   EXPECT_NE(EvalExpr(MakeUnary(f.arena, TokenKind::kAmp, id()), f.ctx, f.arena)
-                .words[0].bval,
+                .words[0]
+                .bval,
             0u);
   EXPECT_NE(EvalExpr(MakeUnary(f.arena, TokenKind::kPipe, id()), f.ctx, f.arena)
-                .words[0].bval,
+                .words[0]
+                .bval,
             0u);
   EXPECT_NE(
       EvalExpr(MakeUnary(f.arena, TokenKind::kCaret, id()), f.ctx, f.arena)
-          .words[0].bval,
+          .words[0]
+          .bval,
       0u);
-  EXPECT_NE(EvalExpr(MakeUnary(f.arena, TokenKind::kTildeAmp, id()), f.ctx,
-                     f.arena)
-                .words[0].bval,
-            0u);
-  EXPECT_NE(EvalExpr(MakeUnary(f.arena, TokenKind::kTildePipe, id()), f.ctx,
-                     f.arena)
-                .words[0].bval,
-            0u);
-  EXPECT_NE(EvalExpr(MakeUnary(f.arena, TokenKind::kTildeCaret, id()), f.ctx,
-                     f.arena)
-                .words[0].bval,
-            0u);
+  EXPECT_NE(
+      EvalExpr(MakeUnary(f.arena, TokenKind::kTildeAmp, id()), f.ctx, f.arena)
+          .words[0]
+          .bval,
+      0u);
+  EXPECT_NE(
+      EvalExpr(MakeUnary(f.arena, TokenKind::kTildePipe, id()), f.ctx, f.arena)
+          .words[0]
+          .bval,
+      0u);
+  EXPECT_NE(
+      EvalExpr(MakeUnary(f.arena, TokenKind::kTildeCaret, id()), f.ctx, f.arena)
+          .words[0]
+          .bval,
+      0u);
 }
 
 TEST(EvalOpXZ, AllReductionsOnAllZ) {
@@ -590,27 +591,33 @@ TEST(EvalOpXZ, AllReductionsOnAllZ) {
   auto id = [&]() { return MakeId(f.arena, "v"); };
 
   EXPECT_NE(EvalExpr(MakeUnary(f.arena, TokenKind::kAmp, id()), f.ctx, f.arena)
-                .words[0].bval,
+                .words[0]
+                .bval,
             0u);
   EXPECT_NE(EvalExpr(MakeUnary(f.arena, TokenKind::kPipe, id()), f.ctx, f.arena)
-                .words[0].bval,
+                .words[0]
+                .bval,
             0u);
   EXPECT_NE(
       EvalExpr(MakeUnary(f.arena, TokenKind::kCaret, id()), f.ctx, f.arena)
-          .words[0].bval,
+          .words[0]
+          .bval,
       0u);
-  EXPECT_NE(EvalExpr(MakeUnary(f.arena, TokenKind::kTildeAmp, id()), f.ctx,
-                     f.arena)
-                .words[0].bval,
-            0u);
-  EXPECT_NE(EvalExpr(MakeUnary(f.arena, TokenKind::kTildePipe, id()), f.ctx,
-                     f.arena)
-                .words[0].bval,
-            0u);
-  EXPECT_NE(EvalExpr(MakeUnary(f.arena, TokenKind::kTildeCaret, id()), f.ctx,
-                     f.arena)
-                .words[0].bval,
-            0u);
+  EXPECT_NE(
+      EvalExpr(MakeUnary(f.arena, TokenKind::kTildeAmp, id()), f.ctx, f.arena)
+          .words[0]
+          .bval,
+      0u);
+  EXPECT_NE(
+      EvalExpr(MakeUnary(f.arena, TokenKind::kTildePipe, id()), f.ctx, f.arena)
+          .words[0]
+          .bval,
+      0u);
+  EXPECT_NE(
+      EvalExpr(MakeUnary(f.arena, TokenKind::kTildeCaret, id()), f.ctx, f.arena)
+          .words[0]
+          .bval,
+      0u);
 }
 
 TEST(EvalOp, ReductionFirstStepWidthTwo) {
@@ -628,18 +635,18 @@ TEST(EvalOp, ReductionFirstStepWidthTwo) {
       EvalExpr(MakeUnary(f.arena, TokenKind::kCaret, id()), f.ctx, f.arena)
           .ToUint64(),
       1u);
-  EXPECT_EQ(EvalExpr(MakeUnary(f.arena, TokenKind::kTildeAmp, id()), f.ctx,
-                     f.arena)
-                .ToUint64(),
-            1u);
-  EXPECT_EQ(EvalExpr(MakeUnary(f.arena, TokenKind::kTildePipe, id()), f.ctx,
-                     f.arena)
-                .ToUint64(),
-            0u);
-  EXPECT_EQ(EvalExpr(MakeUnary(f.arena, TokenKind::kTildeCaret, id()), f.ctx,
-                     f.arena)
-                .ToUint64(),
-            0u);
+  EXPECT_EQ(
+      EvalExpr(MakeUnary(f.arena, TokenKind::kTildeAmp, id()), f.ctx, f.arena)
+          .ToUint64(),
+      1u);
+  EXPECT_EQ(
+      EvalExpr(MakeUnary(f.arena, TokenKind::kTildePipe, id()), f.ctx, f.arena)
+          .ToUint64(),
+      0u);
+  EXPECT_EQ(
+      EvalExpr(MakeUnary(f.arena, TokenKind::kTildeCaret, id()), f.ctx, f.arena)
+          .ToUint64(),
+      0u);
 }
 
-}
+}  // namespace

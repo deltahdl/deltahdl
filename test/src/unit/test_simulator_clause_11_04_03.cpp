@@ -373,11 +373,11 @@ TEST(EvalOp, PowerBaseOneAnyExponent) {
   SimFixture f;
 
   auto* e1 = MakeBinary(f.arena, TokenKind::kPower, MakeInt(f.arena, 1),
-                         MakeInt(f.arena, 100));
+                        MakeInt(f.arena, 100));
   EXPECT_EQ(EvalExpr(e1, f.ctx, f.arena).ToUint64(), 1u);
 
   auto* e2 = MakeBinary(f.arena, TokenKind::kPower, MakeInt(f.arena, 1),
-                         MakeInt(f.arena, 0));
+                        MakeInt(f.arena, 0));
   EXPECT_EQ(EvalExpr(e2, f.ctx, f.arena).ToUint64(), 1u);
 }
 
@@ -385,15 +385,15 @@ TEST(EvalOp, ModulusBasic) {
   SimFixture f;
 
   auto* e1 = MakeBinary(f.arena, TokenKind::kPercent, MakeInt(f.arena, 10),
-                         MakeInt(f.arena, 3));
+                        MakeInt(f.arena, 3));
   EXPECT_EQ(EvalExpr(e1, f.ctx, f.arena).ToUint64(), 1u);
 
   auto* e2 = MakeBinary(f.arena, TokenKind::kPercent, MakeInt(f.arena, 11),
-                         MakeInt(f.arena, 3));
+                        MakeInt(f.arena, 3));
   EXPECT_EQ(EvalExpr(e2, f.ctx, f.arena).ToUint64(), 2u);
 
   auto* e3 = MakeBinary(f.arena, TokenKind::kPercent, MakeInt(f.arena, 12),
-                         MakeInt(f.arena, 3));
+                        MakeInt(f.arena, 3));
   EXPECT_EQ(EvalExpr(e3, f.ctx, f.arena).ToUint64(), 0u);
 }
 
@@ -475,7 +475,8 @@ TEST(EvalOp, IntegralPowerNegativeExponentRuntime) {
   EXPECT_EQ(EvalSignedBin(f3, TokenKind::kPower, -1, -3).ToUint64() & 0xFFu,
             static_cast<uint64_t>(-1) & 0xFFu);
   SimFixture f4;
-  EXPECT_EQ(EvalSignedBin(f4, TokenKind::kPower, -1, -2).ToUint64() & 0xFFu, 1u);
+  EXPECT_EQ(EvalSignedBin(f4, TokenKind::kPower, -1, -2).ToUint64() & 0xFFu,
+            1u);
 }
 
-}
+}  // namespace

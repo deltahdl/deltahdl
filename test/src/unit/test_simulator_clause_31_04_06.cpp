@@ -13,9 +13,7 @@ TEST(TimingCheckCommandSim, NochangeDataInsideWindowViolates) {
   tc.ref_edge = SpecifyEdge::kPosedge;
   tc.data_signal = "data";
   mgr.AddTimingCheck(tc);
-  EXPECT_TRUE(mgr.CheckNochangeViolation("clk", 100,
-                                         200, "data",
-                                         150));
+  EXPECT_TRUE(mgr.CheckNochangeViolation("clk", 100, 200, "data", 150));
 }
 
 TEST(TimingCheckCommandSim, NochangeDataAtLeadingEdgeNoViolation) {
@@ -26,9 +24,7 @@ TEST(TimingCheckCommandSim, NochangeDataAtLeadingEdgeNoViolation) {
   tc.ref_edge = SpecifyEdge::kPosedge;
   tc.data_signal = "data";
   mgr.AddTimingCheck(tc);
-  EXPECT_FALSE(mgr.CheckNochangeViolation("clk", 100,
-                                          200, "data",
-                                          100));
+  EXPECT_FALSE(mgr.CheckNochangeViolation("clk", 100, 200, "data", 100));
 }
 
 TEST(TimingCheckCommandSim, NochangeDataAtTrailingEdgeNoViolation) {
@@ -39,9 +35,7 @@ TEST(TimingCheckCommandSim, NochangeDataAtTrailingEdgeNoViolation) {
   tc.ref_edge = SpecifyEdge::kPosedge;
   tc.data_signal = "data";
   mgr.AddTimingCheck(tc);
-  EXPECT_FALSE(mgr.CheckNochangeViolation("clk", 100,
-                                          200, "data",
-                                          200));
+  EXPECT_FALSE(mgr.CheckNochangeViolation("clk", 100, 200, "data", 200));
 }
 
 TEST(TimingCheckCommandSim, NochangePositiveStartOffsetExtendsRegion) {
@@ -54,9 +48,7 @@ TEST(TimingCheckCommandSim, NochangePositiveStartOffsetExtendsRegion) {
   tc.start_edge_offset = 20;
   mgr.AddTimingCheck(tc);
 
-  EXPECT_TRUE(mgr.CheckNochangeViolation("clk", 100,
-                                         200, "data",
-                                         90));
+  EXPECT_TRUE(mgr.CheckNochangeViolation("clk", 100, 200, "data", 90));
 }
 
 TEST(TimingCheckCommandSim, NochangeNegativeStartOffsetShrinksRegion) {
@@ -69,9 +61,7 @@ TEST(TimingCheckCommandSim, NochangeNegativeStartOffsetShrinksRegion) {
   tc.start_edge_offset = -20;
   mgr.AddTimingCheck(tc);
 
-  EXPECT_FALSE(mgr.CheckNochangeViolation("clk", 100,
-                                          200, "data",
-                                          110));
+  EXPECT_FALSE(mgr.CheckNochangeViolation("clk", 100, 200, "data", 110));
 }
 
 TEST(TimingCheckCommandSim, NochangePositiveEndOffsetExtendsRegion) {
@@ -84,9 +74,7 @@ TEST(TimingCheckCommandSim, NochangePositiveEndOffsetExtendsRegion) {
   tc.end_edge_offset = 20;
   mgr.AddTimingCheck(tc);
 
-  EXPECT_TRUE(mgr.CheckNochangeViolation("clk", 100,
-                                         200, "data",
-                                         210));
+  EXPECT_TRUE(mgr.CheckNochangeViolation("clk", 100, 200, "data", 210));
 }
 
 TEST(TimingCheckCommandSim, NochangeNegativeEndOffsetShrinksRegion) {
@@ -99,9 +87,7 @@ TEST(TimingCheckCommandSim, NochangeNegativeEndOffsetShrinksRegion) {
   tc.end_edge_offset = -20;
   mgr.AddTimingCheck(tc);
 
-  EXPECT_FALSE(mgr.CheckNochangeViolation("clk", 100,
-                                          200, "data",
-                                          190));
+  EXPECT_FALSE(mgr.CheckNochangeViolation("clk", 100, 200, "data", 190));
 }
 
 TEST(TimingCheckCommandSim, NochangeMismatchedSignalIgnored) {
@@ -137,4 +123,4 @@ TEST(TimingCheckCommandSim, NochangeOtherKindsIgnored) {
   EXPECT_FALSE(mgr.CheckNochangeViolation("clk", 100, 200, "data", 150));
 }
 
-}
+}  // namespace

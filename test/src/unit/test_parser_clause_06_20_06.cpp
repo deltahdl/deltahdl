@@ -155,4 +155,4 @@ TEST(ConstConstantParsing, ConstInitializedFromParameterReference) {
   EXPECT_NE(item->init_expr, nullptr);
 }
 
-}
+}  // namespace

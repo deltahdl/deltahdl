@@ -49,4 +49,4 @@ TEST(NamedSequenceLowering, MultipleSequencesEachGetEndPoint) {
   EXPECT_NE(f.ctx.FindVariable("__seq_second"), nullptr);
 }
 
-}
+}  // namespace

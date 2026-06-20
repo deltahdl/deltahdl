@@ -22,8 +22,8 @@ Net MakeDrivenSupplyNet(Arena& arena, NetType type, uint32_t width,
   net.type = type;
   net.resolved = var;
   net.drivers.push_back(MakeLogic4VecVal(arena, width, driver_val));
-  net.driver_strengths.push_back(DriverStrength{Strength::kStrong,
-                                                Strength::kStrong});
+  net.driver_strengths.push_back(
+      DriverStrength{Strength::kStrong, Strength::kStrong});
   return net;
 }
 
@@ -65,8 +65,8 @@ TEST(SupplyNetStrengths, Supply1WideNetIsAllOnesAtSupplyStrength) {
     uint64_t mask = ~uint64_t{0};
     if (w == value.nwords - 1) {
       uint32_t bits_in_top = kWidth - (value.nwords - 1) * 64;
-      mask = (bits_in_top == 64) ? ~uint64_t{0}
-                                 : (uint64_t{1} << bits_in_top) - 1;
+      mask =
+          (bits_in_top == 64) ? ~uint64_t{0} : (uint64_t{1} << bits_in_top) - 1;
     }
     EXPECT_EQ(value.words[w].aval & mask, mask);
     EXPECT_EQ(value.words[w].bval & mask, 0u);
@@ -75,4 +75,4 @@ TEST(SupplyNetStrengths, Supply1WideNetIsAllOnesAtSupplyStrength) {
   EXPECT_EQ(net.resolved_strength.s1_lo, Strength::kSupply);
 }
 
-}
+}  // namespace

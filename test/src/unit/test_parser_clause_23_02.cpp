@@ -55,4 +55,4 @@ TEST(ModuleDefinitions, MultipleModulesInSource) {
   EXPECT_EQ(r.cu->modules[1]->name, "b");
 }
 
-}
+}  // namespace

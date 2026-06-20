@@ -15,8 +15,8 @@ TEST(ElabSeverityTaskParsing, FatalAtModuleLevelIsElabSystemTask) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_FALSE(r.cu->modules.empty());
-  EXPECT_TRUE(HasItemOfKind(r.cu->modules[0]->items,
-                             ModuleItemKind::kElabSystemTask));
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kElabSystemTask));
 }
 
 // §20.10.1 — when called from within a procedure (here, an initial block),
@@ -30,8 +30,8 @@ TEST(ElabSeverityTaskParsing, FatalInsideInitialIsRunTime) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_FALSE(r.cu->modules.empty());
-  EXPECT_FALSE(HasItemOfKind(r.cu->modules[0]->items,
-                              ModuleItemKind::kElabSystemTask));
+  EXPECT_FALSE(
+      HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kElabSystemTask));
   auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kExprStmt);
@@ -49,8 +49,8 @@ TEST(ElabSeverityTaskParsing, ErrorInsideAlwaysIsRunTime) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_FALSE(r.cu->modules.empty());
-  EXPECT_FALSE(HasItemOfKind(r.cu->modules[0]->items,
-                              ModuleItemKind::kElabSystemTask));
+  EXPECT_FALSE(
+      HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kElabSystemTask));
 }
 
 // §20.10.1 — all four severity task names are recognized at module-item
@@ -67,7 +67,7 @@ TEST(ElabSeverityTaskParsing, AllFourSeverityNamesRecognized) {
   EXPECT_FALSE(r.has_errors);
   ASSERT_FALSE(r.cu->modules.empty());
   EXPECT_EQ(CountItemsByKind(r.cu->modules[0]->items,
-                              ModuleItemKind::kElabSystemTask),
+                             ModuleItemKind::kElabSystemTask),
             4u);
 }
 
@@ -81,8 +81,8 @@ TEST(ElabSeverityTaskParsing, InfoInsideFinalIsRunTime) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_FALSE(r.cu->modules.empty());
-  EXPECT_FALSE(HasItemOfKind(r.cu->modules[0]->items,
-                              ModuleItemKind::kElabSystemTask));
+  EXPECT_FALSE(
+      HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kElabSystemTask));
 }
 
-}
+}  // namespace

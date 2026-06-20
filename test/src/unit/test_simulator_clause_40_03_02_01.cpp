@@ -6,10 +6,10 @@
 //
 // Each test drives a real $coverage_control system-function call through the
 // simulator's expression evaluator (EvalExpr -> EvalVerifSysCall ->
-// EvalCoverageControl), so the reported status and any state change are produced
-// by the production evaluation path, not by invoking the model directly. The
-// coverage available in a scope is the one piece of state a real coverage engine
-// would supply; the tests prime it the way that engine would.
+// EvalCoverageControl), so the reported status and any state change are
+// produced by the production evaluation path, not by invoking the model
+// directly. The coverage available in a scope is the one piece of state a real
+// coverage engine would supply; the tests prime it the way that engine would.
 
 #include <gtest/gtest.h>
 
@@ -45,11 +45,11 @@ constexpr std::string_view kScope = "$root.tb.unit1";
 // integer. The coverage_type and scope_def arguments are passed as the §40.3.1
 // constants a real caller would use.
 int RunControl(SimFixture& f, int control, std::string_view scope) {
-  auto* call = MkSysCall(
-      f.arena, "$coverage_control",
-      {MkInt(f.arena, static_cast<uint64_t>(control)),
-       MkInt(f.arena, 23 /* `SV_COV_TOGGLE */),
-       MkInt(f.arena, 11 /* `SV_COV_HIER */), MkStr(f.arena, scope)});
+  auto* call =
+      MkSysCall(f.arena, "$coverage_control",
+                {MkInt(f.arena, static_cast<uint64_t>(control)),
+                 MkInt(f.arena, 23 /* `SV_COV_TOGGLE */),
+                 MkInt(f.arena, 11 /* `SV_COV_HIER */), MkStr(f.arena, scope)});
   return static_cast<int32_t>(EvalExpr(call, f.ctx, f.arena).ToUint64());
 }
 

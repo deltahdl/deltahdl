@@ -87,4 +87,4 @@ TEST(UnconnectedDriveElaboration, NoDirectiveLeavesUnconnectedInputDefault) {
   EXPECT_NE(b->connection->kind, ExprKind::kIntegerLiteral);
 }
 
-}
+}  // namespace

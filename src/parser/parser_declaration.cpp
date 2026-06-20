@@ -120,11 +120,9 @@ DataType Parser::ParseStructOrUnionBody(TokenKind kw) {
 }
 
 void Parser::ParseStructMembers(DataType& dtype) {
-
   auto open_brace_loc = CurrentLoc();
   Expect(TokenKind::kLBrace);
   while (!Check(TokenKind::kRBrace) && !AtEnd()) {
-
     auto member_attrs = ParseAttributes();
     bool is_rand = Match(TokenKind::kKwRand);
     bool is_randc = !is_rand && Match(TokenKind::kKwRandc);
@@ -193,17 +191,23 @@ ModuleItem* Parser::ParseTypedef() {
 
     DataTypeKind fwd_kind = DataTypeKind::kImplicit;
     switch (CurrentToken().kind) {
-      case TokenKind::kKwEnum:   fwd_kind = DataTypeKind::kEnum;   break;
-      case TokenKind::kKwStruct: fwd_kind = DataTypeKind::kStruct; break;
-      case TokenKind::kKwUnion:  fwd_kind = DataTypeKind::kUnion;  break;
-      default: break;
+      case TokenKind::kKwEnum:
+        fwd_kind = DataTypeKind::kEnum;
+        break;
+      case TokenKind::kKwStruct:
+        fwd_kind = DataTypeKind::kStruct;
+        break;
+      case TokenKind::kKwUnion:
+        fwd_kind = DataTypeKind::kUnion;
+        break;
+      default:
+        break;
     }
     Consume();
     if (CheckIdentifier()) {
       auto id_saved = lexer_.SavePos();
       auto id_tok = Consume();
       if (Check(TokenKind::kSemicolon)) {
-
         item->name = id_tok.text;
         item->forward_type_kind = fwd_kind;
         known_types_.insert(item->name);
@@ -235,14 +239,15 @@ ModuleItem* Parser::ParseTypedef() {
       Consume();
       int depth = 1;
       while (depth > 0 && !Check(TokenKind::kEof)) {
-        if (CurrentToken().kind == TokenKind::kLBracket) depth++;
-        else if (CurrentToken().kind == TokenKind::kRBracket) depth--;
+        if (CurrentToken().kind == TokenKind::kLBracket)
+          depth++;
+        else if (CurrentToken().kind == TokenKind::kRBracket)
+          depth--;
         if (depth > 0) Consume();
       }
       if (Check(TokenKind::kRBracket)) Consume();
     }
     if (Check(TokenKind::kDot)) {
-
       lexer_.RestorePos(saved);
       item->typedef_ifc_port = Consume().text;
       while (Check(TokenKind::kLBracket)) {
@@ -287,7 +292,6 @@ ModuleItem* Parser::ParseNettypeDecl() {
     Consume();
     auto func_name = Expect(TokenKind::kIdentifier).text;
     if (Match(TokenKind::kColonColon)) {
-
       item->nettype_resolve_func = Expect(TokenKind::kIdentifier).text;
     } else {
       item->nettype_resolve_func = func_name;
@@ -303,11 +307,9 @@ Direction Parser::ParseArgDirection(FunctionArg& arg, Direction sticky_dir,
                                     bool* was_explicit) {
   if (was_explicit) *was_explicit = true;
   auto reject_extra_direction = [&](Direction first) {
-
     while (Check(TokenKind::kKwRef) || Check(TokenKind::kKwInput) ||
            Check(TokenKind::kKwOutput) || Check(TokenKind::kKwInout)) {
-      bool involves_ref =
-          first == Direction::kRef || Check(TokenKind::kKwRef);
+      bool involves_ref = first == Direction::kRef || Check(TokenKind::kKwRef);
       if (!involves_ref) break;
       diag_.Error(CurrentLoc(),
                   "combining ref with another directional qualifier is "
@@ -415,7 +417,6 @@ std::vector<FunctionArg> Parser::ParseFunctionArgs(bool require_identifiers) {
     if (CheckIdentifier()) {
       arg.name = Consume().text;
     } else if (require_identifiers) {
-
       diag_.Error(CurrentLoc(),
                   "tf_port_item shall include a port_identifier outside of a "
                   "function_prototype or task_prototype");
@@ -474,7 +475,6 @@ void Parser::ParseFuncName(ModuleItem* item) {
 
   if (item->return_type.kind == DataTypeKind::kNamed &&
       Check(TokenKind::kColonColon)) {
-
     item->method_class = item->return_type.type_name;
     item->return_type = DataType{};
     Consume();
@@ -519,8 +519,8 @@ void Parser::ParseFuncBody(ModuleItem* item) {
     }
     if (end_name != item->name) {
       diag_.Error(end_loc, "end label '" + std::string(end_name) +
-                               "' does not match '" +
-                               std::string(item->name) + "'");
+                               "' does not match '" + std::string(item->name) +
+                               "'");
     }
   }
 }
@@ -539,7 +539,7 @@ ModuleItem* Parser::ParseFunctionDecl(bool prototype_only) {
   ParseFuncName(item);
 
   if (Check(TokenKind::kLParen)) {
-    item->func_args = ParseFunctionArgs( !prototype_only);
+    item->func_args = ParseFunctionArgs(!prototype_only);
     item->is_ansi_ports = true;
   }
   Expect(TokenKind::kSemicolon);
@@ -575,7 +575,7 @@ ModuleItem* Parser::ParseTaskDecl(bool prototype_only) {
   }
 
   if (Check(TokenKind::kLParen)) {
-    item->func_args = ParseFunctionArgs( !prototype_only);
+    item->func_args = ParseFunctionArgs(!prototype_only);
     item->is_ansi_ports = true;
   }
   Expect(TokenKind::kSemicolon);
@@ -608,7 +608,6 @@ std::vector<EventExpr> Parser::ParseEventList() {
       auto saved = lexer_.SavePos();
       Consume();
       if (IsEventExprStart(CurrentToken().kind)) {
-
         auto sub = ParseEventList();
         events.insert(events.end(), sub.begin(), sub.end());
         Expect(TokenKind::kRParen);
@@ -669,7 +668,8 @@ void Parser::ParseOldStylePortDecls(ModuleItem* item, TokenKind end_kw) {
       dir = Direction::kRef;
     }
     Consume();
-    bool is_ref_static = (dir == Direction::kRef) && Match(TokenKind::kKwStatic);
+    bool is_ref_static =
+        (dir == Direction::kRef) && Match(TokenKind::kKwStatic);
     Match(TokenKind::kKwVar);
     DataType dt = ParseDataType();
 
@@ -696,4 +696,4 @@ void Parser::ParseOldStylePortDecls(ModuleItem* item, TokenKind end_kw) {
   (void)end_kw;
 }
 
-}
+}  // namespace delta

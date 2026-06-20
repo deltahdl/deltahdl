@@ -223,4 +223,4 @@ TEST(ParallelBlockElaboration, RefArgInForkJoinAnyBlockItemInitAllowed) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

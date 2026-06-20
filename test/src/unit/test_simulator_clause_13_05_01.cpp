@@ -119,4 +119,4 @@ TEST(PassByValueSim, SameSourceBoundToTwoFormalsCopiesIndependently) {
   LowerRunAndCheck(f, design, {{"x", 7u}, {"result", 63u}});
 }
 
-}
+}  // namespace

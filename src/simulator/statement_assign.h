@@ -50,4 +50,4 @@ bool TryQueueIndexedWrite(const Expr* lhs, const Logic4Vec& rhs_val,
                           SimContext& ctx, Arena& arena);
 bool TryQueueBlockingAssign(const Stmt* stmt, SimContext& ctx, Arena& arena);
 
-}
+}  // namespace delta

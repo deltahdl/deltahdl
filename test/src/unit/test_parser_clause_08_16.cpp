@@ -95,4 +95,4 @@ TEST(ClassCastParsing, CastInConditional) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

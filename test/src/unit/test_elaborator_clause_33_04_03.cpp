@@ -242,7 +242,8 @@ TEST(ConfigParamOverride, RangeSelectBoundNonLiteralRejected) {
 }
 
 // The prohibition on calling a user-defined function reaches a call buried
-// inside a larger override expression, not only a call standing alone (§33.4.3).
+// inside a larger override expression, not only a call standing alone
+// (§33.4.3).
 TEST(ConfigParamOverride, NestedUserFunctionCallRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -312,4 +313,4 @@ TEST(ConfigParamApply, OverrideTakesPrecedenceOverDefparam) {
   EXPECT_EQ(ResolvedParam(a1, "W"), 32);
 }
 
-}
+}  // namespace

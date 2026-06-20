@@ -232,4 +232,4 @@ TEST(FilePathSpecLexing, ConsecutiveCallsWithEof) {
   EXPECT_EQ(tok2.kind, TokenKind::kEof);
 }
 
-}
+}  // namespace

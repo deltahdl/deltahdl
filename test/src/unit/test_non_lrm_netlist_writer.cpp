@@ -140,4 +140,4 @@ TEST(NetlistWriter, DispatchByFormat) {
   EXPECT_NE(edif.find("test"), std::string::npos);
 }
 
-}
+}  // namespace

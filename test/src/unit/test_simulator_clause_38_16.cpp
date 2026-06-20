@@ -89,11 +89,11 @@ TEST_F(VpiGetValueArraySim, MultiDimensionReadFollowsFastestVaryingIndex) {
   vpi_get_value_array(arr, &av, index, 5);
 
   ASSERT_NE(av.value.integers, nullptr);  // VPI allocated the storage
-  EXPECT_EQ(av.value.integers[0], 4);  // a[1][4]
-  EXPECT_EQ(av.value.integers[1], 5);  // a[1][5]
-  EXPECT_EQ(av.value.integers[2], 6);  // a[0][3]
-  EXPECT_EQ(av.value.integers[3], 7);  // a[0][4]
-  EXPECT_EQ(av.value.integers[4], 8);  // a[0][5]
+  EXPECT_EQ(av.value.integers[0], 4);     // a[1][4]
+  EXPECT_EQ(av.value.integers[1], 5);     // a[1][5]
+  EXPECT_EQ(av.value.integers[2], 6);     // a[0][3]
+  EXPECT_EQ(av.value.integers[3], 7);     // a[0][4]
+  EXPECT_EQ(av.value.integers[4], 8);     // a[0][5]
 }
 
 // §38.16: in vpiRawFourStateVal format each element occupies ngroups*2 bytes -
@@ -121,7 +121,8 @@ TEST_F(VpiGetValueArraySim, RawFourStateValEncodesAvalAndBval) {
 // 2-state element has no unknown/high-impedance bits, so the bval group comes
 // back all zero even if such bits happen to sit in the element's storage.
 TEST_F(VpiGetValueArraySim, RawFourStateValZeroesBvalForTwoStateArray) {
-  VpiHandle arr = MakeArray("t", {{0}}, 1, 8, vpiStaticArray, /*four_state=*/false);
+  VpiHandle arr =
+      MakeArray("t", {{0}}, 1, 8, vpiStaticArray, /*four_state=*/false);
   SetElem(0, 0xF0, 0xFF);  // a stray bval in storage
 
   s_vpi_arrayvalue av = {};
@@ -231,7 +232,8 @@ TEST_F(VpiGetValueArraySim, VectorValReturnsAvalAndBvalGroups) {
 }
 
 // §38.16: the vpiLongIntVal format returns one 64-bit long per element through
-// the *longints arm, retrieving the full width of an element wider than 32 bits.
+// the *longints arm, retrieving the full width of an element wider than 32
+// bits.
 TEST_F(VpiGetValueArraySim, LongIntValReturnsSixtyFourBitElements) {
   VpiHandle arr = MakeArray("li", {{0}}, 1, 64);
   SetElem(0, 0x1122334455667788ull);
@@ -327,7 +329,7 @@ TEST_F(VpiGetValueArraySim, OutOfRangeStartingIndexIsError) {
   s_vpi_arrayvalue av = {};
   av.format = vpiIntVal;
   av.value.integers = sentinel;  // non-NULL going in
-  PLI_INT32 index[1] = {5};  // no element with declared index 5 exists
+  PLI_INT32 index[1] = {5};      // no element with declared index 5 exists
   vpi_get_value_array(arr, &av, index, 2);
 
   SVpiErrorInfo info = {};

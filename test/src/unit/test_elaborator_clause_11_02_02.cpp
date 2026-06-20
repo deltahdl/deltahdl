@@ -290,4 +290,4 @@ TEST(AggregateExpr, NonEquivalentArraySliceComparisonError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-}
+}  // namespace

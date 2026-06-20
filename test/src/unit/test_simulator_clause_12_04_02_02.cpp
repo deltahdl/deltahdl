@@ -225,8 +225,8 @@ TEST(IfViolationMultiProcessSim, FunctionPriorityIfNoMatchReports) {
 
 // §12.4.2.2: when two distinct processes both call the same function, the check
 // runs once per caller and each execution is independent. Both callers pass
-// overlapping arguments, so the shared function's uniqueness check fails in each
-// calling process and the violation is reported twice.
+// overlapping arguments, so the shared function's uniqueness check fails in
+// each calling process and the violation is reported twice.
 TEST(IfViolationMultiProcessSim, TwoProcessesCallSharedFunctionReportTwice) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -302,8 +302,8 @@ TEST(IfViolationMultiProcessSim, AlwaysCombRetriggerFlushesFunctionViolation) {
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
-// §12.4.2.2 names a "task or function": the rule covers checks in either kind of
-// subroutine. A task body runs through the statement-execution path, so a
+// §12.4.2.2 names a "task or function": the rule covers checks in either kind
+// of subroutine. A task body runs through the statement-execution path, so a
 // unique-if with overlapping conditions inside a task must still queue a
 // violation against the calling process.
 TEST(IfViolationMultiProcessSim, TaskUniqueIfOverlapReportsViolation) {
@@ -346,9 +346,9 @@ TEST(IfViolationMultiProcessSim, TaskUniqueIfSingleMatchNoViolation) {
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
-// §12.4.2.2: when two distinct processes call the same task, the check runs once
-// per caller and each execution is independent, so an overlap that fails in both
-// callers is reported twice.
+// §12.4.2.2: when two distinct processes call the same task, the check runs
+// once per caller and each execution is independent, so an overlap that fails
+// in both callers is reported twice.
 TEST(IfViolationMultiProcessSim, TwoProcessesCallSharedTaskReportTwice) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -369,4 +369,4 @@ TEST(IfViolationMultiProcessSim, TwoProcessesCallSharedTaskReportTwice) {
   EXPECT_GE(f.diag.WarningCount(), 2u);
 }
 
-}
+}  // namespace

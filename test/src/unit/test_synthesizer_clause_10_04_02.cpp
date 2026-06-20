@@ -39,4 +39,4 @@ TEST(NonblockingAssignSynthesis, SwapPattern) {
   EXPECT_GE(aig->latches.size(), 2u);
 }
 
-}
+}  // namespace

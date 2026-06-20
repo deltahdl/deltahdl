@@ -1,6 +1,7 @@
 
 
 #include <gtest/gtest.h>
+
 #include "fixture_lexer.h"
 
 using namespace delta;
@@ -83,4 +84,4 @@ TEST(GateStrengthLexing, AllStrength1Keywords) {
   EXPECT_EQ(t_highz[0].kind, TokenKind::kKwHighz1);
 }
 
-}
+}  // namespace

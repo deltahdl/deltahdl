@@ -27,4 +27,4 @@ std::optional<TokenKind> LookupKeyword(
     std::string_view text,
     KeywordVersion version = KeywordVersion::kVer18002023);
 
-}
+}  // namespace delta

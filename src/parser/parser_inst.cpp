@@ -10,7 +10,6 @@ ModuleItem* Parser::ParseModuleInst(const Token& module_tok) {
 
 ModuleItem* Parser::ParseModuleInstList(const Token& module_tok,
                                         std::vector<ModuleItem*>* extra_items) {
-
   std::vector<std::pair<std::string_view, Expr*>> params;
   if (Match(TokenKind::kHash)) {
     ParseParamValueAssignment(params);
@@ -307,12 +306,10 @@ ModuleItem* Parser::ParseAlwaysBlock(AlwaysKind kind) {
   if (Check(TokenKind::kAt)) {
     Consume();
     if (Match(TokenKind::kStar)) {
-
       item->is_star_sensitivity = true;
     } else if (Check(TokenKind::kLParen)) {
       Consume();
       if (Match(TokenKind::kStar)) {
-
         item->is_star_sensitivity = true;
       } else {
         item->sensitivity = ParseEventList();
@@ -368,4 +365,4 @@ bool Parser::CheckIdentifier() {
   return Check(TokenKind::kIdentifier) || Check(TokenKind::kEscapedIdentifier);
 }
 
-}
+}  // namespace delta

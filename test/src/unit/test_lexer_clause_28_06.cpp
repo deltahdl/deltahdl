@@ -1,6 +1,7 @@
 
 
 #include <gtest/gtest.h>
+
 #include "fixture_lexer.h"
 
 using namespace delta;
@@ -46,4 +47,4 @@ TEST(TristateGateLexing, NamedGateTokenSequence) {
   EXPECT_EQ(tokens[9].kind, TokenKind::kSemicolon);
 }
 
-}
+}  // namespace

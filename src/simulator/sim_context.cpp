@@ -33,8 +33,8 @@ Variable* SimContext::FindVariable(std::string_view name) {
   std::string_view rest = name.substr(dot + 1);
   std::string p = prefix;
   while (!p.empty()) {
-    size_t last = (p.size() >= 2) ? p.find_last_of('.', p.size() - 2)
-                                  : std::string::npos;
+    size_t last =
+        (p.size() >= 2) ? p.find_last_of('.', p.size() - 2) : std::string::npos;
     if (last == std::string::npos) {
       p.clear();
     } else {
@@ -88,12 +88,11 @@ Net* SimContext::FindNet(std::string_view name) {
 
 Net* SimContext::CreateNet(std::string_view name, NetType type, uint32_t width,
                            Strength charge_strength, uint64_t decay_ticks,
-                           bool is_user_nettype,
-                           std::string_view resolve_func, bool is_signed) {
+                           bool is_user_nettype, std::string_view resolve_func,
+                           bool is_signed) {
   auto* var = CreateVariable(name, width);
   if (is_signed) var->is_signed = true;
   if (is_user_nettype) {
-
   } else if (type == NetType::kTrireg) {
     // §6.7.1: a trireg net is the exception to the default-z rule -- it holds
     // charge and defaults to x (the retained value is unknown until something
@@ -227,7 +226,8 @@ void SimContext::PopFuncName() {
 }
 
 std::string_view SimContext::CurrentFuncName() const {
-  return func_name_stack_.empty() ? std::string_view{} : func_name_stack_.back();
+  return func_name_stack_.empty() ? std::string_view{}
+                                  : func_name_stack_.back();
 }
 
 void SimContext::PushQueueRefFrame() { queue_ref_stack_.emplace_back(); }
@@ -404,9 +404,9 @@ std::string SimContext::GetRandState(ClassObject* obj) {
 
 std::string SimContext::GetRandState(Process* proc) {
   // §18.13.4: retrieve the current RNG internal state of a process. Mirror the
-  // lazy seeding the active-stream path uses so a process that has not yet drawn
-  // still reports the state keyed by its installed seed rather than a default
-  // generator.
+  // lazy seeding the active-stream path uses so a process that has not yet
+  // drawn still reports the state keyed by its installed seed rather than a
+  // default generator.
   if (!proc->rng_initialized) {
     proc->rng.seed(proc->rng_seed);
     proc->rng_initialized = true;
@@ -564,7 +564,8 @@ void SimContext::RegisterInstanceBinding(std::string_view prefix,
       std::string(library) + "." + std::string(cell);
 }
 
-std::string_view SimContext::FindInstanceBinding(std::string_view prefix) const {
+std::string_view SimContext::FindInstanceBinding(
+    std::string_view prefix) const {
   auto it = instance_bindings_.find(std::string(prefix));
   return (it != instance_bindings_.end()) ? std::string_view(it->second)
                                           : std::string_view{};
@@ -607,8 +608,8 @@ std::string SimContext::ResolveInstanceScope(std::string_view ident) const {
     std::string cand = p + std::string(ident);
     if (instance_types_.find(cand) != instance_types_.end()) return cand;
     if (p.empty()) break;
-    size_t last = (p.size() >= 2) ? p.find_last_of('.', p.size() - 2)
-                                  : std::string::npos;
+    size_t last =
+        (p.size() >= 2) ? p.find_last_of('.', p.size() - 2) : std::string::npos;
     if (last == std::string::npos) {
       p.clear();
     } else {
@@ -661,8 +662,7 @@ AssocArrayObject* SimContext::CreateAssocArray(std::string_view name,
                                                uint32_t elem_width,
                                                bool is_string_key,
                                                uint32_t index_width,
-                                               bool is_wildcard,
-                                               bool is_4state,
+                                               bool is_wildcard, bool is_4state,
                                                bool is_index_signed) {
   auto* aa = arena_.Create<AssocArrayObject>();
   aa->elem_width = elem_width;
@@ -702,7 +702,8 @@ void SimContext::EnsureStdioDescriptors() {
   mcd_channels_[0] = stdout;
 }
 
-uint32_t SimContext::OpenFile(std::string_view filename, std::string_view mode) {
+uint32_t SimContext::OpenFile(std::string_view filename,
+                              std::string_view mode) {
   EnsureStdioDescriptors();
   std::string fname(filename);
   std::string fmode(mode);
@@ -814,7 +815,6 @@ void SimContext::SetEventTriggered(std::string_view name) {
 }
 
 bool SimContext::IsEventTriggered(std::string_view name) const {
-
   auto vit = variables_.find(name);
   if (vit != variables_.end())
     return vit->second->triggered_ticks == scheduler_.CurrentTime().ticks;
@@ -1048,4 +1048,4 @@ void SimContext::MaturePendingViolations() {
   }
 }
 
-}
+}  // namespace delta

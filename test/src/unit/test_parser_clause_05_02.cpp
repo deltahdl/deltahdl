@@ -59,8 +59,8 @@ TEST(LexicalConventionParsing, BlockCommentAsSeparatorParses) {
 }
 
 TEST(LexicalConventionParsing, CrlfLineEndingsParseCorrectly) {
-  EXPECT_TRUE(
-      ParseOk("module t;\r\n  logic a;\r\n  assign a = 1'b0;\r\nendmodule\r\n"));
+  EXPECT_TRUE(ParseOk(
+      "module t;\r\n  logic a;\r\n  assign a = 1'b0;\r\nendmodule\r\n"));
 }
 
 TEST(LexicalConventionParsing, CarriageReturnAloneAsWhitespace) {
@@ -75,4 +75,4 @@ TEST(LexicalConventionParsing, LineCommentBetweenTokens) {
               "endmodule // comment\n"));
 }
 
-}
+}  // namespace

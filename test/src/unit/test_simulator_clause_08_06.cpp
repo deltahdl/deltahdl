@@ -20,7 +20,7 @@ static Expr* MkBin(Arena& a, TokenKind op, Expr* l, Expr* r) {
 
 namespace {
 
-TEST(ObjectMethodSim,SimpleMethodCall) {
+TEST(ObjectMethodSim, SimpleMethodCall) {
   SimFixture f;
   auto* type = MakeClassType(f, "Counter", {"count"});
 
@@ -39,7 +39,7 @@ TEST(ObjectMethodSim,SimpleMethodCall) {
   EXPECT_EQ(resolved->name, "get_count");
 }
 
-TEST(ObjectMethodSim,MethodWithArgs) {
+TEST(ObjectMethodSim, MethodWithArgs) {
   SimFixture f;
   auto* type = MakeClassType(f, "Adder", {"total"});
 
@@ -47,7 +47,8 @@ TEST(ObjectMethodSim,MethodWithArgs) {
   method->kind = ModuleItemKind::kFunctionDecl;
   method->name = "add";
   method->return_type.kind = DataTypeKind::kVoid;
-  method->func_args = {{Direction::kInput, false, false, false, {}, "v", nullptr, {}}};
+  method->func_args = {
+      {Direction::kInput, false, false, false, {}, "v", nullptr, {}}};
   auto* rhs = MkBin(f.arena, TokenKind::kPlus, MkId(f.arena, "total"),
                     MkId(f.arena, "v"));
   method->func_body_stmts.push_back(MakeAssign(f.arena, "total", rhs));
@@ -58,7 +59,7 @@ TEST(ObjectMethodSim,MethodWithArgs) {
   EXPECT_NE(resolved, nullptr);
 }
 
-TEST(ObjectMethodSim,MethodNotFound) {
+TEST(ObjectMethodSim, MethodNotFound) {
   SimFixture f;
   auto* type = MakeClassType(f, "Simple", {});
   auto [handle, obj] = MakeObj(f, type);
@@ -67,7 +68,7 @@ TEST(ObjectMethodSim,MethodNotFound) {
   EXPECT_EQ(resolved, nullptr);
 }
 
-TEST(ObjectMethodSim,MethodCallReturnValue) {
+TEST(ObjectMethodSim, MethodCallReturnValue) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "class Counter;\n"
@@ -91,7 +92,7 @@ TEST(ObjectMethodSim,MethodCallReturnValue) {
   LowerRunAndCheck(f, design, {{"result", 42u}});
 }
 
-TEST(ObjectMethodSim,MethodCallModifiesProperty) {
+TEST(ObjectMethodSim, MethodCallModifiesProperty) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "class Acc;\n"
@@ -120,7 +121,7 @@ TEST(ObjectMethodSim,MethodCallModifiesProperty) {
   LowerRunAndCheck(f, design, {{"result", 17u}});
 }
 
-TEST(ObjectMethodSim,MultipleMethodsSameObject) {
+TEST(ObjectMethodSim, MultipleMethodsSameObject) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "class Pair;\n"
@@ -150,4 +151,4 @@ TEST(ObjectMethodSim,MultipleMethodsSameObject) {
   LowerRunAndCheck(f, design, {{"rx", 3u}, {"ry", 4u}});
 }
 
-}
+}  // namespace

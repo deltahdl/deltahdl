@@ -87,4 +87,4 @@ TEST(IntegerLiteralSim, NegatedSizedSignedBasedDivThree) {
   EXPECT_EQ(result & 0xFFFFFFFFu, 1u);
 }
 
-}
+}  // namespace

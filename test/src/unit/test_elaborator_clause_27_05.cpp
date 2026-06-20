@@ -298,4 +298,4 @@ TEST(GenerateElaboration, GenerateIfBodyWithoutBeginEnd) {
   EXPECT_TRUE(found);
 }
 
-}
+}  // namespace

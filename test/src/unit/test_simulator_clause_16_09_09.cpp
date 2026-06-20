@@ -60,13 +60,14 @@ TEST(SvaEngine, SequenceThroughout) {
   EXPECT_FALSE(EvalThroughout(check, values));
 }
 
-// §16.9.9: the construct abbreviates `(exp)[*0:$] intersect seq`, whose `[*0:$]`
-// admits a zero-length match. Over an empty interval there is no tick at which
-// the condition could fail, so the throughout condition is vacuously held.
+// §16.9.9: the construct abbreviates `(exp)[*0:$] intersect seq`, whose
+// `[*0:$]` admits a zero-length match. Over an empty interval there is no tick
+// at which the condition could fail, so the throughout condition is vacuously
+// held.
 TEST(SvaEngine, SequenceThroughoutEmpty) {
   std::vector<uint64_t> values;
   auto check = [](uint64_t v) { return v == 1; };
   EXPECT_TRUE(EvalThroughout(check, values));
 }
 
-}
+}  // namespace

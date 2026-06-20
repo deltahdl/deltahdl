@@ -65,7 +65,8 @@ TEST_F(VpiHandleByIndexSim, HandleByIndexProtectedObjectIsAnError) {
 // §38.19: the reference object must have the access-by-index property. A
 // parameter offers no index-selected relationship, so even when it has a child
 // at the requested index the routine builds no index select and returns null.
-TEST_F(VpiHandleByIndexSim, HandleByIndexReferenceWithoutAccessByIndexReturnsNullptr) {
+TEST_F(VpiHandleByIndexSim,
+       HandleByIndexReferenceWithoutAccessByIndexReturnsNullptr) {
   auto* param = vpi_ctx_.CreateParameter("p", 0);
   vpi_ctx_.CreatePort("a", kVpiInput, param);  // gives param a child at index 0
 
@@ -73,5 +74,5 @@ TEST_F(VpiHandleByIndexSim, HandleByIndexReferenceWithoutAccessByIndexReturnsNul
   EXPECT_EQ(result, nullptr);
 }
 
-}
-}
+}  // namespace
+}  // namespace delta

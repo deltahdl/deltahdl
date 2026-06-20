@@ -88,5 +88,3 @@ TEST(Preprocessor, UndefEscapedIdentifierMacro) {
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_EQ(result.find("visible"), std::string::npos);
 }
-
-

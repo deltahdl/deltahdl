@@ -62,7 +62,7 @@ TEST_F(DumpvarsSysTask, NoArgumentsDumpsEveryVariable) {
   }
   auto content = ReadVcd();
   EXPECT_NE(content.find("$dumpvars"), std::string::npos);
-  EXPECT_NE(content.find("1!"), std::string::npos);        // clk
+  EXPECT_NE(content.find("1!"), std::string::npos);         // clk
   EXPECT_NE(content.find("b10100101"), std::string::npos);  // data
 }
 
@@ -86,7 +86,7 @@ TEST_F(DumpvarsSysTask, NamedVariableSelectsOnlyThatVariable) {
   }
   auto content = ReadVcd();
   EXPECT_NE(content.find("b10100101"), std::string::npos);  // data dumped
-  EXPECT_EQ(content.find("1!"), std::string::npos);          // clk omitted
+  EXPECT_EQ(content.find("1!"), std::string::npos);         // clk omitted
 }
 
 // The leading argument is consumed as the level count, so supplying only a
@@ -107,7 +107,7 @@ TEST_F(DumpvarsSysTask, LevelCountAloneDumpsEveryVariable) {
              f.arena);
   }
   auto content = ReadVcd();
-  EXPECT_NE(content.find("1!"), std::string::npos);        // clk
+  EXPECT_NE(content.find("1!"), std::string::npos);         // clk
   EXPECT_NE(content.find("b10100101"), std::string::npos);  // data
 }
 
@@ -148,15 +148,15 @@ TEST_F(DumpvarsSysTask, MultipleNamedVariablesSelected) {
     vcd.EndDefinitions();
     vcd.WriteTimestamp(0);
     f.ctx.SetVcdWriter(&vcd);
-    EvalExpr(MkSysCall(f.arena, "$dumpvars",
-                       {MkInt(f.arena, 0), MkId(f.arena, "a"),
-                        MkId(f.arena, "b")}),
-             f.ctx, f.arena);
+    EvalExpr(
+        MkSysCall(f.arena, "$dumpvars",
+                  {MkInt(f.arena, 0), MkId(f.arena, "a"), MkId(f.arena, "b")}),
+        f.ctx, f.arena);
   }
   auto content = ReadVcd();
   EXPECT_NE(content.find("1!"), std::string::npos);   // a dumped
   EXPECT_NE(content.find("0\""), std::string::npos);  // b dumped
-  EXPECT_EQ(content.find("1#"), std::string::npos);    // c omitted
+  EXPECT_EQ(content.find("1#"), std::string::npos);   // c omitted
 }
 
 // A scope that matches no registered variable selects nothing: the dump block
@@ -177,7 +177,7 @@ TEST_F(DumpvarsSysTask, UnknownScopeSelectsNothing) {
   }
   auto content = ReadVcd();
   EXPECT_NE(content.find("$dumpvars"), std::string::npos);  // block present
-  EXPECT_EQ(content.find("1!"), std::string::npos);          // clk not dumped
+  EXPECT_EQ(content.find("1!"), std::string::npos);         // clk not dumped
 }
 
 // With no dump file open there is nowhere to write, so the task is a harmless
@@ -210,9 +210,9 @@ TEST_F(DumpvarsSysTask, MayBeInvokedRepeatedly) {
              f.ctx, f.arena);
   }
   auto content = ReadVcd();
-  EXPECT_NE(content.find("1!"), std::string::npos);  // a from first call
+  EXPECT_NE(content.find("1!"), std::string::npos);   // a from first call
   EXPECT_NE(content.find("0\""), std::string::npos);  // b from second call
 }
 
-}
-}
+}  // namespace
+}  // namespace delta

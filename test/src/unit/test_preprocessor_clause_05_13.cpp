@@ -29,4 +29,4 @@ TEST(BuiltinMethodPreprocessor, MacroExpandsToMethodObject) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}
+}  // namespace

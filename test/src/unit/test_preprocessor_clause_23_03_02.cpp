@@ -20,4 +20,4 @@ TEST(ModuleInstantiationPreprocessor, BasicChildInstance) {
       HasItemOfKind(r.cu->modules[1]->items, ModuleItemKind::kModuleInst));
 }
 
-}
+}  // namespace

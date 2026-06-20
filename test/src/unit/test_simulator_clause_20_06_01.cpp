@@ -88,4 +88,4 @@ TEST(UtilitySystemTaskTest, TypenameNoArgsFallback) {
   EXPECT_EQ(DecodeAsciiBytes(result), "logic");
 }
 
-}
+}  // namespace

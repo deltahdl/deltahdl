@@ -24,8 +24,9 @@ TEST(ScopeResolutionPrefixParsing, ExpressionPrefixTreeStructure) {
   EXPECT_EQ(rhs->rhs->text, "val");
 }
 
-// Integration robustness: in type context the :: prefix populates scope_name and
-// type_name on the DataType — the fields the elaborator resolves per §23.7.1.
+// Integration robustness: in type context the :: prefix populates scope_name
+// and type_name on the DataType — the fields the elaborator resolves per
+// §23.7.1.
 TEST(ScopeResolutionPrefixParsing, TypePrefixPopulatesScopeName) {
   auto r = Parse(
       "module t;\n"
@@ -39,4 +40,4 @@ TEST(ScopeResolutionPrefixParsing, TypePrefixPopulatesScopeName) {
   EXPECT_EQ(dt.type_name, "my_type");
 }
 
-}
+}  // namespace

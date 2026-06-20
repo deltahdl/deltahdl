@@ -117,4 +117,4 @@ TEST(DataTypeParsing, VarDeclAssignmentIsInitializerNotContAssign) {
   }
 }
 
-}
+}  // namespace

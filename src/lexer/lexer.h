@@ -97,8 +97,8 @@ class Lexer {
   void TryRecognizeFsmStatePragma(std::string_view body, SourceLoc loc);
   void TryRecognizeFsmPartSelectPragma(
       const std::vector<std::string_view>& words, SourceLoc loc);
-  void TryRecognizeFsmConcatPragma(
-      const std::vector<std::string_view>& words, SourceLoc loc);
+  void TryRecognizeFsmConcatPragma(const std::vector<std::string_view>& words,
+                                   SourceLoc loc);
   static bool IsSimplePragmaIdentifier(std::string_view word);
   static bool ParsePartSelect(std::string_view word, std::string_view& base,
                               int& msb, int& lsb);
@@ -159,4 +159,4 @@ class Lexer {
   std::vector<FsmConcatPragma> fsm_concat_pragmas_;
 };
 
-}
+}  // namespace delta

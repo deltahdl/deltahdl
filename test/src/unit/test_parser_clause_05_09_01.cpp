@@ -53,4 +53,4 @@ TEST(LexicalConventionParsing, StringWithBackslashEscape) {
               "endmodule"));
 }
 
-}
+}  // namespace

@@ -517,7 +517,7 @@ int RunSimulation(const CliOptions& opts, delta::CompilationUnit* cu,
   return diag.HasErrors() ? 1 : 0;
 }
 
-}
+}  // namespace
 
 int main(int argc, char* argv[]) {
   CliOptions opts;

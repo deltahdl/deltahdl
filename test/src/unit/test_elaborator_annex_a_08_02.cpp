@@ -174,7 +174,8 @@ TEST(SubroutineCallExprElaboration, ScopeRandomizeWithParenIdListRejected) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(SubroutineCallExprElaboration, ClassMethodRandomizeWithParenIdListAccepted) {
+TEST(SubroutineCallExprElaboration,
+     ClassMethodRandomizeWithParenIdListAccepted) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -184,4 +185,4 @@ TEST(SubroutineCallExprElaboration, ClassMethodRandomizeWithParenIdListAccepted)
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

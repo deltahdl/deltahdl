@@ -275,8 +275,8 @@ static int32_t RoundDistResult(double r) {
 }
 
 // §N.2 rtl_dist_uniform(): rounds toward the interval and clamps the result so
-// it stays inside [start, end], handling the LONG_MAX and LONG_MIN edges the way
-// the reference does (its long is the 32-bit integer modeled here).
+// it stays inside [start, end], handling the LONG_MAX and LONG_MIN edges the
+// way the reference does (its long is the 32-bit integer modeled here).
 static int32_t RtlDistUniform(int32_t* seed, int32_t start, int32_t end) {
   if (start >= end) return start;
   int32_t i;
@@ -341,9 +341,9 @@ static void WriteBackSeed(const Expr* seed_arg, int32_t seed, SimContext& ctx,
       MakeLogic4VecVal(arena, var->value.width, static_cast<uint32_t>(seed));
 }
 
-// §20.14.2: mean, degree_of_freedom, and k_stage shall be greater than 0 for the
-// distributions that consume them. A non-positive value leaves the distribution
-// undefined, so it is reported; the draw still proceeds.
+// §20.14.2: mean, degree_of_freedom, and k_stage shall be greater than 0 for
+// the distributions that consume them. A non-positive value leaves the
+// distribution undefined, so it is reported; the draw still proceeds.
 static void RequirePositiveDistArg(const Expr* arg, SimContext& ctx,
                                    Arena& arena, std::string_view what) {
   auto v = static_cast<int32_t>(EvalExpr(arg, ctx, arena).ToUint64());
@@ -471,4 +471,4 @@ Logic4Vec EvalMathSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
   return MakeLogic4VecVal(arena, 1, 0);
 }
 
-}
+}  // namespace delta

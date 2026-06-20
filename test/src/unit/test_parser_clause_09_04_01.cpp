@@ -112,4 +112,4 @@ TEST(DelayControlParsing, IdentifierAsDelayValue) {
   EXPECT_EQ(stmt->delay->kind, ExprKind::kIdentifier);
 }
 
-}
+}  // namespace

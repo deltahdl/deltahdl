@@ -85,4 +85,4 @@ TEST(TaggedUnionParsing, TaggedUnionThreeMembers) {
   EXPECT_EQ(item->typedef_type.struct_members.size(), 3u);
 }
 
-}
+}  // namespace

@@ -180,4 +180,4 @@ TEST(DefaultLibraryBinding, TransitiveDefaultBindingAtNestedInstance) {
   EXPECT_EQ(picked_m->library, "rtlLib");
 }
 
-}
+}  // namespace

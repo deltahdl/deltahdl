@@ -44,4 +44,4 @@ TEST(StructDeclarationPreprocessor, MacroExpandsToStructDeclaration) {
   EXPECT_EQ(item->data_type.struct_members.size(), 2u);
 }
 
-}
+}  // namespace

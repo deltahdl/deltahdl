@@ -67,7 +67,8 @@ TEST(PackedArrayCanonicalRepresentation, GroupedInto32BitElements) {
 
 // C4: the first element holds the 32 least-significant bits and each successive
 // element holds the next-more-significant group.
-TEST(PackedArrayCanonicalRepresentation, FirstElementHoldsLeastSignificantBits) {
+TEST(PackedArrayCanonicalRepresentation,
+     FirstElementHoldsLeastSignificantBits) {
   svBitVecVal vec[2] = {0u, 0u};
   svPutBitselBit(vec, 0, 1);   // least-significant bit of the whole array
   svPutBitselBit(vec, 32, 1);  // first bit of the next-more-significant group

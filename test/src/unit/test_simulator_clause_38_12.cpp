@@ -104,8 +104,8 @@ TEST_F(VpiGetSystfInfoSim, NullArgumentsAreSafe) {
   s_vpi_systf_data out = {};
   out.tfname = "untouched";
 
-  vpi_get_systf_info(nullptr, &out);   // no handle
-  vpi_get_systf_info(h, nullptr);      // no destination
+  vpi_get_systf_info(nullptr, &out);  // no handle
+  vpi_get_systf_info(h, nullptr);     // no destination
   vpi_get_systf_info(nullptr, nullptr);
 
   // The destination supplied with the null-handle call was left as the caller

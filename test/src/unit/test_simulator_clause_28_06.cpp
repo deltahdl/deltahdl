@@ -13,7 +13,8 @@ namespace {
 // `y` as a string ("0", "1", "x", or "z"). This drives the real production
 // path: the elaborator lowering of the gate to a continuous assignment plus the
 // simulator's expression evaluation and net resolution — not a reference model.
-std::string DriveTristate(const char* gate, const char* data, const char* ctrl) {
+std::string DriveTristate(const char* gate, const char* data,
+                          const char* ctrl) {
   SimFixture f;
   std::string src = std::string("module t;\n  wire y;\n  logic d, c;\n  ") +
                     gate + " g(y, d, c);\n  initial begin d = " + data +
@@ -171,4 +172,4 @@ TEST(TristateGateSim, NoDelaySpecificationPropagatesImmediately) {
   EXPECT_EQ(t, 20u);
 }
 
-}
+}  // namespace

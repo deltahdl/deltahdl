@@ -22,4 +22,4 @@ TEST(StatementSimSyntax, FunctionBodyStatementExecutes) {
   LowerRunAndCheck(f, design, {{"x", 99u}});
 }
 
-}
+}  // namespace

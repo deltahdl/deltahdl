@@ -92,4 +92,4 @@ TEST(DistributionFunctionParsing, DistErlang) {
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
 }
 
-}
+}  // namespace

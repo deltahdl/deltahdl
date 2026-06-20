@@ -223,4 +223,4 @@ TEST(ClassSim, LoweredParamClassExtendsBase) {
   EXPECT_EQ(info->decl->params.size(), 1u);
 }
 
-}
+}  // namespace

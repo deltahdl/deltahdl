@@ -92,7 +92,6 @@ TEST(SpecifyPathDelaySim, MinTypMaxSelectsMaximumInMaxMode) {
 }
 
 TEST(SpecifyPathDelaySim, SingleValueIgnoresDelayMode) {
-
   for (auto mode : {DelayMode::kMin, DelayMode::kTyp, DelayMode::kMax}) {
     SimFixture f;
     f.ctx.SetDelayMode(mode);
@@ -120,7 +119,6 @@ TEST(SpecifyPathDelaySim, ClampPathDelayPositivePasses) {
 }
 
 TEST(SpecifyPathDelaySim, ExpandOneDelayFillsAllBasicSlots) {
-
   PathDelay pd;
   pd.delay_count = 1;
   pd.delays[0] = 7;
@@ -131,7 +129,6 @@ TEST(SpecifyPathDelaySim, ExpandOneDelayFillsAllBasicSlots) {
 }
 
 TEST(SpecifyPathDelaySim, ExpandTwoDelaysDistributesRiseAndFall) {
-
   PathDelay pd;
   pd.delay_count = 2;
   pd.delays[0] = 3;
@@ -146,7 +143,6 @@ TEST(SpecifyPathDelaySim, ExpandTwoDelaysDistributesRiseAndFall) {
 }
 
 TEST(SpecifyPathDelaySim, ExpandThreeDelaysAddsZColumn) {
-
   PathDelay pd;
   pd.delay_count = 3;
   pd.delays[0] = 2;
@@ -162,7 +158,6 @@ TEST(SpecifyPathDelaySim, ExpandThreeDelaysAddsZColumn) {
 }
 
 TEST(SpecifyPathDelaySim, ExpandSixDelaysKeepsIdentityForBasicSlots) {
-
   PathDelay pd;
   pd.delay_count = 6;
   pd.delays[0] = 10;
@@ -181,7 +176,6 @@ TEST(SpecifyPathDelaySim, ExpandSixDelaysKeepsIdentityForBasicSlots) {
 }
 
 TEST(SpecifyPathDelaySim, ExpandTwelveDelaysLeavesAllSlotsUntouched) {
-
   PathDelay pd;
   pd.delay_count = 12;
   for (int i = 0; i < 12; ++i) {
@@ -193,4 +187,4 @@ TEST(SpecifyPathDelaySim, ExpandTwelveDelaysLeavesAllSlotsUntouched) {
   }
 }
 
-}
+}  // namespace

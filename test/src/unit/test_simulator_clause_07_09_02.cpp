@@ -76,7 +76,6 @@ TEST(AssocMethods, DeleteNoArgOnEmptyArrayIsNoop) {
   f.ctx.CreateAssocArray("aa", 32, false);
   auto* call = MkAssocCallNoArg(f.arena, "aa", "delete");
   TryExecAssocMethodStmt(call, f.ctx, f.arena);
-
 }
 
 // §7.9.2: deleting an index that does not exist issues no warning. Observe the
@@ -107,4 +106,4 @@ TEST(AssocMethods, DeleteMissingStringKeyIssuesNoWarning) {
   EXPECT_EQ(aa->str_data.size(), 1u);
 }
 
-}
+}  // namespace

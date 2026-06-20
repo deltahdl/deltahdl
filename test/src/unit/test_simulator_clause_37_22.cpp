@@ -8,16 +8,16 @@
 namespace delta {
 namespace {
 
-// §37.22 Object range: a range object carries the bounds of one array dimension.
-// These tests observe the production helpers in vpi.cpp that apply the two
-// numbered "Details" of the clause - what an empty range stands for (detail 1)
-// and what vpiSize/vpiLeftRange/vpiRightRange report for it (detail 2). §37.17's
-// range relations are woven onto the same helpers; that weaving is exercised in
-// test_simulator_clause_37_17.cpp.
+// §37.22 Object range: a range object carries the bounds of one array
+// dimension. These tests observe the production helpers in vpi.cpp that apply
+// the two numbered "Details" of the clause - what an empty range stands for
+// (detail 1) and what vpiSize/vpiLeftRange/vpiRightRange report for it (detail
+// 2). §37.17's range relations are woven onto the same helpers; that weaving is
+// exercised in test_simulator_clause_37_17.cpp.
 
-// D1: an empty range represents an associative-array dimension, an empty dynamic
-// array or queue, and a range from a typespec for any of those. Each such
-// dimension kind classifies as empty.
+// D1: an empty range represents an associative-array dimension, an empty
+// dynamic array or queue, and a range from a typespec for any of those. Each
+// such dimension kind classifies as empty.
 TEST(ObjectRange, EmptyRangeStandsForDynamicQueueAndAssociativeDimensions) {
   EXPECT_TRUE(VpiDimensionRangeIsEmpty(VpiDimensionKind::kAssoc));
   EXPECT_TRUE(VpiDimensionRangeIsEmpty(VpiDimensionKind::kDynamic));

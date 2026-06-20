@@ -86,4 +86,4 @@ TEST(InterfaceClassSimulation, IsAWithExtendedInterfaces) {
   EXPECT_FALSE(info_a->IsA(info_c));
 }
 
-}
+}  // namespace

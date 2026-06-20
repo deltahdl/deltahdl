@@ -265,4 +265,4 @@ TEST(CmosSwitches, RcmosTerminalOrderIsOutDataNctrlPctrl) {
   EXPECT_EQ(g->gate_terminals[3]->text, "pctrl");
 }
 
-}
+}  // namespace

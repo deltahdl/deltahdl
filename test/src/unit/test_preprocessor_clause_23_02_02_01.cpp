@@ -145,21 +145,21 @@ TEST(NonAnsiStylePortDeclarations, ExplicitPortConcatSelectAndImplicit) {
 }
 
 TEST(NonAnsiStylePortDeclarations, SignednessInheritanceParses) {
-  EXPECT_TRUE(ParseWithPreprocessorOk(
-      "module test(a, b, c, d, e, f, g, h);\n"
-      "  input [7:0] a;\n"
-      "  input [7:0] b;\n"
-      "  input signed [7:0] c;\n"
-      "  input signed [7:0] d;\n"
-      "  output [7:0] e;\n"
-      "  output [7:0] f;\n"
-      "  output signed [7:0] g;\n"
-      "  output signed [7:0] h;\n"
-      "  wire signed [7:0] b;\n"
-      "  wire [7:0] c;\n"
-      "  logic signed [7:0] f;\n"
-      "  logic [7:0] g;\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseWithPreprocessorOk("module test(a, b, c, d, e, f, g, h);\n"
+                              "  input [7:0] a;\n"
+                              "  input [7:0] b;\n"
+                              "  input signed [7:0] c;\n"
+                              "  input signed [7:0] d;\n"
+                              "  output [7:0] e;\n"
+                              "  output [7:0] f;\n"
+                              "  output signed [7:0] g;\n"
+                              "  output signed [7:0] h;\n"
+                              "  wire signed [7:0] b;\n"
+                              "  wire [7:0] c;\n"
+                              "  logic signed [7:0] f;\n"
+                              "  logic [7:0] g;\n"
+                              "endmodule\n"));
 }
 
-}
+}  // namespace

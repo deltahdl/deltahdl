@@ -34,4 +34,4 @@ TEST(MailboxTryPeekElaborator, TryPeekResultAssigned) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

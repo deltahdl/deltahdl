@@ -250,4 +250,4 @@ TEST(EnumerationElaboration, EnumVectorTypedefBaseWithPackedDimAllowed) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-}
+}  // namespace

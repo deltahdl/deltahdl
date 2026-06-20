@@ -454,4 +454,4 @@ TEST(AlwaysCombParsing, AssignInAlwaysComb) {
   EXPECT_EQ(item->kind, ModuleItemKind::kAlwaysCombBlock);
 }
 
-}
+}  // namespace

@@ -47,4 +47,4 @@ TEST(ClassParsing, WeakRefGetIdInExpressionParses) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

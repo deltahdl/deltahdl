@@ -48,4 +48,4 @@ TEST(WhiteSpaceLexing, EmptyInputProducesOnlyEofToken) {
   EXPECT_EQ(tokens[0].kind, TokenKind::kEof);
 }
 
-}
+}  // namespace

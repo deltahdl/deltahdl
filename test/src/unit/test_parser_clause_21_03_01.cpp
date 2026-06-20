@@ -33,10 +33,11 @@ TEST(IoSystemTaskParsing, FopenMcdFormWithoutType) {
 TEST(IoSystemTaskParsing, FopenAcceptsAllDocumentedModeStrings) {
   for (const char* type : {"r", "rb", "w", "wb", "a", "ab", "r+", "r+b", "rb+",
                            "w+", "w+b", "wb+", "a+", "a+b", "ab+"}) {
-    std::string src = std::string("module t;\n"
-                                  "  integer fd;\n"
-                                  "  initial begin\n"
-                                  "    fd = $fopen(\"f.dat\", \"") +
+    std::string src = std::string(
+                          "module t;\n"
+                          "  integer fd;\n"
+                          "  initial begin\n"
+                          "    fd = $fopen(\"f.dat\", \"") +
                       type +
                       "\");\n"
                       "    $fclose(fd);\n"
@@ -46,4 +47,4 @@ TEST(IoSystemTaskParsing, FopenAcceptsAllDocumentedModeStrings) {
   }
 }
 
-}
+}  // namespace

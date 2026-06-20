@@ -167,4 +167,4 @@ TEST(CovergroupParsing, InoutFormalArgumentRejected) {
   )"));
 }
 
-}
+}  // namespace

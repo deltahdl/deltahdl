@@ -114,7 +114,8 @@ TEST(ImmediateAssertionStatementParsing, LabeledAssertParses) {
               "endmodule\n"));
 }
 
-TEST(ImmediateAssertionStatementParsing, AssertActionBlockAcceptsSeverityTasks) {
+TEST(ImmediateAssertionStatementParsing,
+     AssertActionBlockAcceptsSeverityTasks) {
   auto r = Parse(
       "module m;\n"
       "  initial assert(c) $info(\"ok\"); else $error(\"bad\");\n"
@@ -266,4 +267,4 @@ TEST(ImmediateAssertionStatementParsing, DeferredCoverNonZeroHashRejected) {
   EXPECT_TRUE(r.has_errors);
 }
 
-}
+}  // namespace

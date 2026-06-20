@@ -131,4 +131,4 @@ TEST(StructAssignmentSimulation, MultipleDefaults_AllApplied) {
   LowerRunAndCheck(f, design, {{"ra", 10}, {"rb", 20}, {"rc", 30}});
 }
 
-}
+}  // namespace

@@ -51,4 +51,4 @@ TEST(SetupTimingCheckWindow, ZeroLimitNeverViolates) {
   EXPECT_FALSE(mgr.CheckSetupViolation("clk", 100, "data", 101));
 }
 
-}
+}  // namespace

@@ -69,11 +69,11 @@ TEST_F(VpiHandleReleaseSim, ReleasingNullIsHarmlessAndReleaseIsIdempotent) {
   EXPECT_TRUE(vpi_ctx_.HandleReleased(mod));
 }
 
-// §37.2.2 (restart, list item 1): a simulation restart shall release all handles
-// except the handles to cbStartOfRestart and cbEndOfRestart callbacks. Driving
-// the real restart path (DispatchRestart) shows the two restart-callback handles
-// surviving while an ordinary callback handle and an ordinary object handle are
-// released.
+// §37.2.2 (restart, list item 1): a simulation restart shall release all
+// handles except the handles to cbStartOfRestart and cbEndOfRestart callbacks.
+// Driving the real restart path (DispatchRestart) shows the two
+// restart-callback handles surviving while an ordinary callback handle and an
+// ordinary object handle are released.
 TEST_F(VpiHandleReleaseSim, RestartReleasesAllButRestartCallbackHandles) {
   VpiCbData start{};
   start.reason = cbStartOfRestart;
@@ -119,10 +119,11 @@ TEST_F(VpiHandleReleaseSim, FreeingFrameObjectReleasesSubelementsAndCallbacks) {
   EXPECT_TRUE(vpi_ctx_.HandleReleased(cb));
 }
 
-// §37.2.2 (class reclaim, list item 3): reclaiming a class object's memory shall
-// release the handle to the class object, to any automatic data member, and to
-// any subelement of those automatic members, plus callbacks placed on them.
-// Static data members persist (NOTE 3) and their handles are not released.
+// §37.2.2 (class reclaim, list item 3): reclaiming a class object's memory
+// shall release the handle to the class object, to any automatic data member,
+// and to any subelement of those automatic members, plus callbacks placed on
+// them. Static data members persist (NOTE 3) and their handles are not
+// released.
 TEST_F(VpiHandleReleaseSim, ReclaimingClassObjectReleasesAutomaticNotStatic) {
   auto* class_obj = vpi_ctx_.CreateModule("obj", "obj");
 

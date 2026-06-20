@@ -54,4 +54,4 @@ TEST(SequenceConcatPreprocessor, MacroWithArgExpandsToCycleDelay) {
   EXPECT_NE(result.find("##4"), std::string::npos);
 }
 
-}
+}  // namespace

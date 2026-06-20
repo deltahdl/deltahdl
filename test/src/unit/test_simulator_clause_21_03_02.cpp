@@ -92,8 +92,8 @@ TEST(IoSystemTaskTest, FwriteRadixSuffixes) {
 
   std::string contents = ReadAll(path);
   EXPECT_NE(contents.find("ab"), std::string::npos);
-  EXPECT_NE(contents.find("10"), std::string::npos);  // 8 in octal
-  EXPECT_NE(contents.find("101"), std::string::npos); // 5 in binary
+  EXPECT_NE(contents.find("10"), std::string::npos);   // 8 in octal
+  EXPECT_NE(contents.find("101"), std::string::npos);  // 5 in binary
   std::remove(path.c_str());
 }
 
@@ -129,16 +129,16 @@ TEST(IoSystemTaskTest, FmonitorWritesToFile) {
   std::string path_b = "/tmp/deltahdl_test_fmon_b.txt";
 
   auto fda =
-      EvalExpr(MakeSysCall(f.arena, "$fopen",
-                           {MkStr(f.arena, path_a.c_str()),
-                            MkStr(f.arena, "w")}),
-               f.ctx, f.arena)
+      EvalExpr(
+          MakeSysCall(f.arena, "$fopen",
+                      {MkStr(f.arena, path_a.c_str()), MkStr(f.arena, "w")}),
+          f.ctx, f.arena)
           .ToUint64();
   auto fdb =
-      EvalExpr(MakeSysCall(f.arena, "$fopen",
-                           {MkStr(f.arena, path_b.c_str()),
-                            MkStr(f.arena, "w")}),
-               f.ctx, f.arena)
+      EvalExpr(
+          MakeSysCall(f.arena, "$fopen",
+                      {MkStr(f.arena, path_b.c_str()), MkStr(f.arena, "w")}),
+          f.ctx, f.arena)
           .ToUint64();
 
   EvalExpr(MakeSysCall(f.arena, "$fmonitor",
@@ -217,12 +217,11 @@ TEST(IoSystemTaskTest, DisplayStrobeMonitorRadixSuffixesAllDispatch) {
   for (const auto& c : cases) {
     std::string path =
         std::string("/tmp/deltahdl_test_radix_") + (c.task + 1) + ".txt";
-    auto fd =
-        EvalExpr(MakeSysCall(f.arena, "$fopen",
-                             {MkStr(f.arena, path.c_str()),
-                              MkStr(f.arena, "w")}),
-                 f.ctx, f.arena)
-            .ToUint64();
+    auto fd = EvalExpr(MakeSysCall(
+                           f.arena, "$fopen",
+                           {MkStr(f.arena, path.c_str()), MkStr(f.arena, "w")}),
+                       f.ctx, f.arena)
+                  .ToUint64();
     EvalExpr(MakeSysCall(f.arena, c.task,
                          {MakeInt(f.arena, fd), MakeInt(f.arena, c.value)}),
              f.ctx, f.arena);
@@ -326,4 +325,4 @@ TEST(IoSystemTaskTest, FdisplayMcdFansOut) {
   std::remove(path_b.c_str());
 }
 
-}
+}  // namespace

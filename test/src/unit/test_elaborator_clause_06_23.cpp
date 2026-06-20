@@ -785,4 +785,4 @@ TEST(TypeOperatorElab, AssocArrayElementInTypeArgRejected) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

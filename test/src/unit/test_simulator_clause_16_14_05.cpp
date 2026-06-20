@@ -23,7 +23,8 @@ TEST(StaticConcurrentAssertion, AssertEquivalentToAlwaysAssert) {
 }
 
 // §16.14.5: likewise, a `cover property (ps) statement_or_null` outside
-// procedural code is equivalent to `always cover property (ps) statement_or_null`.
+// procedural code is equivalent to `always cover property (ps)
+// statement_or_null`.
 TEST(StaticConcurrentAssertion, CoverEquivalentToAlwaysCover) {
   EXPECT_TRUE(StaticCoverEquivalentToAlwaysCover());
 }

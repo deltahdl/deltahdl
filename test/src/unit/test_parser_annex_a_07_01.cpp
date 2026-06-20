@@ -111,7 +111,8 @@ TEST(SpecifyBlockDeclParsing, PathDeclarationAsSpecifyItem) {
 }
 
 // specify_item ::= ... | system_timing_check
-// The specify_item dispatch routes a system timing check to a timing-check item.
+// The specify_item dispatch routes a system timing check to a timing-check
+// item.
 TEST(SpecifyBlockDeclParsing, SystemTimingCheckAsSpecifyItem) {
   auto r = Parse(
       "module m;\n"
@@ -173,4 +174,4 @@ TEST(SpecifyBlockDeclParsing, SpecifyBlockMissingEndspecifyRejected) {
   EXPECT_TRUE(r.has_errors);
 }
 
-}
+}  // namespace

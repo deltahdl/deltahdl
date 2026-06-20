@@ -33,8 +33,7 @@ TEST(TimingCheckCommandSim, PeriodElapsedBelowLimitViolates) {
   tc.limit = 50;
   mgr.AddTimingCheck(tc);
 
-  EXPECT_TRUE(mgr.CheckPeriodViolation("clk", 100,
-                                       130));
+  EXPECT_TRUE(mgr.CheckPeriodViolation("clk", 100, 130));
 }
 
 TEST(TimingCheckCommandSim, PeriodElapsedAtLimitNoViolation) {
@@ -45,8 +44,7 @@ TEST(TimingCheckCommandSim, PeriodElapsedAtLimitNoViolation) {
   tc.ref_edge = SpecifyEdge::kPosedge;
   tc.limit = 50;
   mgr.AddTimingCheck(tc);
-  EXPECT_FALSE(mgr.CheckPeriodViolation("clk", 100,
-                                        150));
+  EXPECT_FALSE(mgr.CheckPeriodViolation("clk", 100, 150));
 }
 
 TEST(TimingCheckCommandSim, PeriodSimultaneousNoViolation) {
@@ -57,8 +55,7 @@ TEST(TimingCheckCommandSim, PeriodSimultaneousNoViolation) {
   tc.ref_edge = SpecifyEdge::kPosedge;
   tc.limit = 50;
   mgr.AddTimingCheck(tc);
-  EXPECT_FALSE(mgr.CheckPeriodViolation("clk", 100,
-                                        100));
+  EXPECT_FALSE(mgr.CheckPeriodViolation("clk", 100, 100));
 }
 
 TEST(TimingCheckCommandSim, PeriodMismatchedSignalIgnored) {
@@ -69,8 +66,7 @@ TEST(TimingCheckCommandSim, PeriodMismatchedSignalIgnored) {
   tc.ref_edge = SpecifyEdge::kPosedge;
   tc.limit = 50;
   mgr.AddTimingCheck(tc);
-  EXPECT_FALSE(mgr.CheckPeriodViolation("other", 100,
-                                        130));
+  EXPECT_FALSE(mgr.CheckPeriodViolation("other", 100, 130));
 }
 
 TEST(TimingCheckCommandSim, PeriodOtherKindsIgnored) {
@@ -80,8 +76,7 @@ TEST(TimingCheckCommandSim, PeriodOtherKindsIgnored) {
   width.ref_signal = "clk";
   width.limit = 50;
   mgr.AddTimingCheck(width);
-  EXPECT_FALSE(mgr.CheckPeriodViolation("clk", 100,
-                                        130));
+  EXPECT_FALSE(mgr.CheckPeriodViolation("clk", 100, 130));
 }
 
 TEST(TimingCheckCommandSim, PeriodSimulates) {
@@ -104,4 +99,4 @@ TEST(TimingCheckCommandSim, PeriodSimulates) {
   EXPECT_EQ(var->value.ToUint64(), 77u);
 }
 
-}
+}  // namespace

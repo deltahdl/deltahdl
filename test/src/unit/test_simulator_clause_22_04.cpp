@@ -56,12 +56,12 @@ TEST(IncludeFileSimulation, IncludedMacroValueSimulatesCorrectly) {
   tmp.WriteFile("constants.svh", "`define MAGIC 8'd42\n");
 
   auto result = PreprocessAndGet(tmp,
-      "`include \"constants.svh\"\n"
-      "module t;\n"
-      "  logic [7:0] result;\n"
-      "  initial result = `MAGIC;\n"
-      "endmodule\n",
-      "result");
+                                 "`include \"constants.svh\"\n"
+                                 "module t;\n"
+                                 "  logic [7:0] result;\n"
+                                 "  initial result = `MAGIC;\n"
+                                 "endmodule\n",
+                                 "result");
   EXPECT_EQ(result, 42u);
 }
 
@@ -73,12 +73,12 @@ TEST(IncludeFileSimulation, NestedIncludeMacroSimulatesCorrectly) {
                 "`define DERIVED (`BASE + 8'd5)\n");
 
   auto result = PreprocessAndGet(tmp,
-      "`include \"derived.svh\"\n"
-      "module t;\n"
-      "  logic [7:0] result;\n"
-      "  initial result = `DERIVED;\n"
-      "endmodule\n",
-      "result");
+                                 "`include \"derived.svh\"\n"
+                                 "module t;\n"
+                                 "  logic [7:0] result;\n"
+                                 "  initial result = `DERIVED;\n"
+                                 "endmodule\n",
+                                 "result");
   EXPECT_EQ(result, 15u);
 }
 
@@ -88,12 +88,12 @@ TEST(IncludeFileSimulation, MultipleIncludesContributeToSimulation) {
   tmp.WriteFile("val_b.svh", "`define B 8'd7\n");
 
   auto result = PreprocessAndGet(tmp,
-      "`include \"val_a.svh\"\n"
-      "`include \"val_b.svh\"\n"
-      "module t;\n"
-      "  logic [7:0] result;\n"
-      "  initial result = `A + `B;\n"
-      "endmodule\n",
-      "result");
+                                 "`include \"val_a.svh\"\n"
+                                 "`include \"val_b.svh\"\n"
+                                 "module t;\n"
+                                 "  logic [7:0] result;\n"
+                                 "  initial result = `A + `B;\n"
+                                 "endmodule\n",
+                                 "result");
   EXPECT_EQ(result, 10u);
 }

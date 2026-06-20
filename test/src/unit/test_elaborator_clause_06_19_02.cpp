@@ -241,4 +241,4 @@ TEST(Elaboration, EnumRangeLrmExample) {
   EXPECT_EQ(it->second[8].value, 18);
 }
 
-}
+}  // namespace

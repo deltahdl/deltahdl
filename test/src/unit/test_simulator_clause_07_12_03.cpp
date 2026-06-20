@@ -416,4 +416,4 @@ TEST(ArrayReduction, XorIntegration) {
   EXPECT_EQ(f.ctx.FindVariable("r")->value.ToUint64(), 0xF0u);
 }
 
-}
+}  // namespace

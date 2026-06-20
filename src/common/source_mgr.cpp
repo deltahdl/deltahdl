@@ -62,4 +62,4 @@ void SourceManager::ComputeLineOffsets(FileEntry& entry) {
   }
 }
 
-}
+}  // namespace delta

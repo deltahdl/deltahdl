@@ -13,8 +13,8 @@ TEST(IoSystemTaskParsing, DumpportsallCall) {
               "endmodule\n"));
 }
 
-// §21.7.3.3: the filename argument is optional; the no-argument form checkpoints
-// every file opened by $dumpports.
+// §21.7.3.3: the filename argument is optional; the no-argument form
+// checkpoints every file opened by $dumpports.
 TEST(IoSystemTaskParsing, DumpportsallNoFilename) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -22,4 +22,4 @@ TEST(IoSystemTaskParsing, DumpportsallNoFilename) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

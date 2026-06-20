@@ -218,4 +218,4 @@ TEST(AlwaysCombSim, AlwaysCombChainedDependency) {
   EXPECT_EQ(c->value.ToUint64(), 12u);
 }
 
-}
+}  // namespace

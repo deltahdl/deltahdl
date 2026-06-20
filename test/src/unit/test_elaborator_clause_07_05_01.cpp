@@ -44,4 +44,4 @@ TEST(DynamicArrayNewValidation, SelfReferenceResizeElaborates) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

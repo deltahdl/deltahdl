@@ -18,4 +18,4 @@ TEST(SequentialBlockLexing, EndKeyword) {
   EXPECT_EQ(r.token.text, "end");
 }
 
-}
+}  // namespace

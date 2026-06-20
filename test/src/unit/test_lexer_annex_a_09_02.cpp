@@ -19,7 +19,6 @@ TEST(CommentLexing, LineCommentSkippedBetweenTokens) {
 }
 
 TEST(CommentLexing, LineCommentAtEndOfFile) {
-
   auto [tokens, errors] = LexWithDiag("x // no newline before eof");
   EXPECT_FALSE(errors);
   ASSERT_GE(tokens.size(), 2u);
@@ -28,15 +27,14 @@ TEST(CommentLexing, LineCommentAtEndOfFile) {
 }
 
 TEST(CommentLexing, LineCommentCanContainAnyAsciiPunctuation) {
-
-  auto tokens = Lex("a // !@#$%^&*()_+-=[]{};:'\"<>?,./|\\`~ // still inside\nb");
+  auto tokens =
+      Lex("a // !@#$%^&*()_+-=[]{};:'\"<>?,./|\\`~ // still inside\nb");
   ASSERT_EQ(tokens.size(), 3u);
   EXPECT_EQ(tokens[0].text, "a");
   EXPECT_EQ(tokens[1].text, "b");
 }
 
 TEST(CommentLexing, LineCommentDoesNotConsumeNewline) {
-
   auto [tokens, errors] = LexWithDiag("// first line\na");
   EXPECT_FALSE(errors);
   ASSERT_GE(tokens.size(), 2u);
@@ -46,7 +44,6 @@ TEST(CommentLexing, LineCommentDoesNotConsumeNewline) {
 }
 
 TEST(CommentLexing, EmptyLineComment) {
-
   auto tokens = Lex("a //\nb");
   ASSERT_EQ(tokens.size(), 3u);
   EXPECT_EQ(tokens[0].text, "a");
@@ -78,7 +75,6 @@ TEST(CommentLexing, BlockCommentTerminatedByStarSlash) {
 }
 
 TEST(CommentLexing, BlockCommentSpansMultipleLines) {
-
   auto [tokens, errors] = LexWithDiag("a /* line1\nline2\nline3 */ b");
   EXPECT_FALSE(errors);
   ASSERT_EQ(tokens.size(), 3u);
@@ -89,7 +85,6 @@ TEST(CommentLexing, BlockCommentSpansMultipleLines) {
 }
 
 TEST(CommentLexing, EmptyBlockComment) {
-
   auto tokens = Lex("a /**/ b");
   ASSERT_EQ(tokens.size(), 3u);
   EXPECT_EQ(tokens[0].text, "a");
@@ -97,7 +92,6 @@ TEST(CommentLexing, EmptyBlockComment) {
 }
 
 TEST(CommentLexing, BlockCommentCanContainSlashSlash) {
-
   auto tokens = Lex("a /* not // a line comment */ b");
   ASSERT_EQ(tokens.size(), 3u);
   EXPECT_EQ(tokens[0].text, "a");
@@ -105,7 +99,6 @@ TEST(CommentLexing, BlockCommentCanContainSlashSlash) {
 }
 
 TEST(CommentLexing, BlockCommentDoesNotNest) {
-
   auto tokens = Lex("a /* outer /* inner */ x");
 
   ASSERT_GE(tokens.size(), 2u);
@@ -114,7 +107,6 @@ TEST(CommentLexing, BlockCommentDoesNotNest) {
 }
 
 TEST(CommentLexing, BlockCommentCanContainAnyAsciiPunctuation) {
-
   auto tokens = Lex("a /* !@#$%^&()_+-=[]{};:'\"<>?,.|\\`~ */ b");
   ASSERT_EQ(tokens.size(), 3u);
   EXPECT_EQ(tokens[0].text, "a");
@@ -122,13 +114,11 @@ TEST(CommentLexing, BlockCommentCanContainAnyAsciiPunctuation) {
 }
 
 TEST(CommentLexing, UnterminatedBlockCommentIsAnError) {
-
   auto [tokens, errors] = LexWithDiag("a /* no closing");
   EXPECT_TRUE(errors);
 }
 
 TEST(CommentLexing, BlockCommentJoinsAdjacentTokens) {
-
   auto tokens = Lex("ab/**/cd");
   ASSERT_EQ(tokens.size(), 3u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);
@@ -138,17 +128,15 @@ TEST(CommentLexing, BlockCommentJoinsAdjacentTokens) {
 }
 
 TEST(CommentLexing, BothCommentFormsRecognized) {
-
-  auto tokens = Lex(
-      "a // line\n"
-      "/* block */ b");
+  auto tokens =
+      Lex("a // line\n"
+          "/* block */ b");
   ASSERT_EQ(tokens.size(), 3u);
   EXPECT_EQ(tokens[0].text, "a");
   EXPECT_EQ(tokens[1].text, "b");
 }
 
 TEST(CommentLexing, CommentPreservesSurroundingTokenKinds) {
-
   auto plain = Lex("module m; logic x; endmodule");
   auto with_comments =
       Lex("module /* a */ m; // line\nlogic /**/ x; endmodule // tail");
@@ -178,4 +166,4 @@ TEST(CommentLexing, BlockCommentLoneAsteriskDoesNotClose) {
   EXPECT_EQ(tokens[1].text, "b");
 }
 
-}
+}  // namespace

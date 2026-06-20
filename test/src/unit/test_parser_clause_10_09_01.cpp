@@ -223,4 +223,4 @@ TEST(ArrayLiteralParsing, TypeKeyArrayPattern) {
   ASSERT_EQ(item->init_expr->pattern_keys.size(), 2u);
 }
 
-}
+}  // namespace

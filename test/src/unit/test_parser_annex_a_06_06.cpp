@@ -350,4 +350,4 @@ TEST(ConditionalStmtBnf, CondPredicateTwoCondPatternsAroundTripleAmp) {
   EXPECT_EQ(stmt->condition->rhs->op, TokenKind::kKwMatches);
 }
 
-}
+}  // namespace

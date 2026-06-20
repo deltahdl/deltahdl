@@ -109,4 +109,4 @@ TEST(OrderedPortSimulation, MultipleOrderedPortsPropagate) {
   EXPECT_EQ(var->value.ToUint64(), 30u);
 }
 
-}
+}  // namespace

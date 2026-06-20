@@ -236,10 +236,9 @@ TEST(StreamingUnpack, SourceExactlyMatchesTargetWidth) {
   MakeVar(f, "c", 8, 0);
   MakeVar(f, "d", 8, 0);
 
-  auto* lhs = MakeStreamConcat(
-      f.arena, TokenKind::kGtGt,
-      {MakeId(f.arena, "a"), MakeId(f.arena, "b"), MakeId(f.arena, "c"),
-       MakeId(f.arena, "d")});
+  auto* lhs = MakeStreamConcat(f.arena, TokenKind::kGtGt,
+                               {MakeId(f.arena, "a"), MakeId(f.arena, "b"),
+                                MakeId(f.arena, "c"), MakeId(f.arena, "d")});
   auto* rhs = MakeInt(f.arena, 0xDEADBEEFu);
   auto* stmt = MakeStreamUnpackAssign(f.arena, lhs, rhs);
   ExecBlockingAssignImpl(stmt, f.ctx, f.arena);
@@ -286,8 +285,9 @@ TEST(StreamingUnpack, FourStateStreamPreservedInFourStateTarget) {
   src->value.words[0].bval = 0x00FFu;
   src->is_4state = true;
 
-  auto* lhs = MakeStreamConcat(f.arena, TokenKind::kGtGt,
-                               {MakeId(f.arena, "fs_a"), MakeId(f.arena, "fs_b")});
+  auto* lhs =
+      MakeStreamConcat(f.arena, TokenKind::kGtGt,
+                       {MakeId(f.arena, "fs_a"), MakeId(f.arena, "fs_b")});
   auto* stmt = MakeStreamUnpackAssign(f.arena, lhs, MakeId(f.arena, "fs_src"));
   ExecBlockingAssignImpl(stmt, f.ctx, f.arena);
 
@@ -319,8 +319,9 @@ TEST(StreamingUnpack, FourStateStreamCastIntoTwoStateTarget) {
   src->value.words[0].bval = 0x00FFu;
   src->is_4state = true;
 
-  auto* lhs = MakeStreamConcat(f.arena, TokenKind::kGtGt,
-                               {MakeId(f.arena, "us_a"), MakeId(f.arena, "us_b")});
+  auto* lhs =
+      MakeStreamConcat(f.arena, TokenKind::kGtGt,
+                       {MakeId(f.arena, "us_a"), MakeId(f.arena, "us_b")});
   auto* stmt = MakeStreamUnpackAssign(f.arena, lhs, MakeId(f.arena, "us_src"));
   ExecBlockingAssignImpl(stmt, f.ctx, f.arena);
 
@@ -370,4 +371,4 @@ TEST(StreamingUnpack, SourceWiderConsumesMsbWithMixedWidths) {
   EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 0xEFu);
 }
 
-}
+}  // namespace

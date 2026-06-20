@@ -55,4 +55,4 @@ TEST(SequenceEventPreprocessor, IfdefAroundSequenceEvent) {
   EXPECT_NE(result.find("@(abc)"), std::string::npos);
 }
 
-}
+}  // namespace

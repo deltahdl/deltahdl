@@ -89,4 +89,4 @@ TEST(OperatorElaboration, CompoundAssignmentElaborates) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

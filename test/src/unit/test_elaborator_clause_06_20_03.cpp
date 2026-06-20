@@ -204,4 +204,4 @@ TEST(TypeParameterElab, TypeParamAsTypeWithClassScopeOk) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

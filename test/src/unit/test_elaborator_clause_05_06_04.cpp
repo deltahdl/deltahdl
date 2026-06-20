@@ -48,4 +48,4 @@ TEST(CompilerDirectiveElaboration, MacroFromOneElabInvisibleInAnother) {
   EXPECT_TRUE(f2.has_errors);
 }
 
-}
+}  // namespace

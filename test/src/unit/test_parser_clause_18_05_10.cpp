@@ -28,8 +28,8 @@ TEST(StaticConstraintParsing, StaticConstraintBlockRecognized) {
   EXPECT_TRUE(m->is_static);
 }
 
-// 18.5.10: a constraint declared without the 'static' keyword is not static; the
-// qualification is recorded only when the keyword is present.
+// 18.5.10: a constraint declared without the 'static' keyword is not static;
+// the qualification is recorded only when the keyword is present.
 TEST(StaticConstraintParsing, NonStaticConstraintBlockNotStatic) {
   auto r = Parse(
       "class C;\n"
@@ -87,4 +87,4 @@ TEST(StaticConstraintParsing, NonStaticExternalBlockNotStatic) {
   EXPECT_FALSE(r.cu->external_constraints.front().is_static);
 }
 
-}
+}  // namespace

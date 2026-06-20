@@ -5,7 +5,6 @@ using namespace delta;
 namespace {
 
 TEST(StdBuiltinPackage, UserPackageNamedStdIsRejected) {
-
   EXPECT_FALSE(
       ElabOk("package std;\n"
              "  typedef int t;\n"
@@ -14,7 +13,6 @@ TEST(StdBuiltinPackage, UserPackageNamedStdIsRejected) {
 }
 
 TEST(StdBuiltinPackage, EmptyUserPackageNamedStdIsRejected) {
-
   // The `std` name is reserved for the built-in package regardless of what the
   // user package would contain: even an empty `package std` is illegal, since
   // users cannot supply declarations for the built-in package.
@@ -25,7 +23,6 @@ TEST(StdBuiltinPackage, EmptyUserPackageNamedStdIsRejected) {
 }
 
 TEST(StdBuiltinPackage, ModuleWildcardImportOfStdElaborates) {
-
   EXPECT_TRUE(
       ElabOk("module m;\n"
              "  import std::*;\n"
@@ -33,7 +30,6 @@ TEST(StdBuiltinPackage, ModuleWildcardImportOfStdElaborates) {
 }
 
 TEST(StdBuiltinPackage, StdIsImplicitlyWildcardImported) {
-
   // §26.7: every module receives an implicit wildcard import of the built-in
   // `std` package, even when the source contains no import declaration. Observe
   // the import the elaborator injects on the elaborated module.
@@ -50,4 +46,4 @@ TEST(StdBuiltinPackage, StdIsImplicitlyWildcardImported) {
   EXPECT_TRUE(has_std_wildcard);
 }
 
-}
+}  // namespace

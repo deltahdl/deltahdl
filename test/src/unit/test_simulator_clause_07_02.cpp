@@ -113,4 +113,4 @@ TEST(StructMemberAccess, MemberAccessBasic) {
   EXPECT_EQ(result.ToUint64(), 99u);
 }
 
-}
+}  // namespace

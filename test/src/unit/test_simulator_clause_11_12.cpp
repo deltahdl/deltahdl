@@ -201,8 +201,7 @@ TEST(LetExpansionSimulation, LetExpandMultipleArgs) {
   rhs->lhs = MakeId(f.arena, "b");
   rhs->rhs = MakeId(f.arena, "c");
   body->rhs = rhs;
-  auto* decl =
-      MakeLetDecl(f.arena, "sum3", body, {arg_a, arg_b, arg_c});
+  auto* decl = MakeLetDecl(f.arena, "sum3", body, {arg_a, arg_b, arg_c});
   f.ctx.RegisterLetDecl("sum3", decl);
 
   auto* call = MakeCall(
@@ -551,4 +550,4 @@ TEST(LetExpansionSimulation, EndToEndLetNamedActualLeavesDefaultInPlace) {
   EXPECT_EQ(var->value.ToUint64(), 15u);
 }
 
-}
+}  // namespace

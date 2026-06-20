@@ -22,7 +22,6 @@ void CheckAnonymousProgramItem(DiagEngine& diag, ModuleItem* item) {
 
 Parser::Parser(Lexer& lexer, Arena& arena, DiagEngine& diag)
     : lexer_(lexer), arena_(arena), diag_(diag) {
-
   known_types_.insert("process");
 
   known_types_.insert("semaphore");
@@ -33,7 +32,6 @@ Parser::Parser(Lexer& lexer, Arena& arena, DiagEngine& diag)
 
 Token Parser::CurrentToken() { return lexer_.Peek(); }
 bool Parser::Check(TokenKind kind) {
-
   auto cur = CurrentToken().kind;
   if (kind == TokenKind::kIdentifier) {
     return cur == TokenKind::kIdentifier ||
@@ -430,7 +428,6 @@ void Parser::ParseTopLevel(CompilationUnit* unit) {
 }
 
 bool Parser::TryParseCuScopeItem(CompilationUnit* unit) {
-
   if (Check(TokenKind::kKwParameter) || Check(TokenKind::kKwLocalparam)) {
     std::vector<ModuleItem*> items;
     in_cu_scope_param_ = true;
@@ -456,30 +453,27 @@ bool Parser::TryParseCuScopeItem(CompilationUnit* unit) {
     int old_unit_mag = unit->cu_time_unit_magnitude;
     TimeUnit old_prec = unit->cu_time_prec;
     int old_prec_mag = unit->cu_time_prec_magnitude;
-    bool has_other_items =
-        !unit->modules.empty() || !unit->packages.empty() ||
-        !unit->interfaces.empty() || !unit->programs.empty() ||
-        !unit->classes.empty() || !unit->udps.empty() ||
-        !unit->checkers.empty() || !unit->configs.empty() ||
-        !unit->cu_items.empty();
+    bool has_other_items = !unit->modules.empty() || !unit->packages.empty() ||
+                           !unit->interfaces.empty() ||
+                           !unit->programs.empty() || !unit->classes.empty() ||
+                           !unit->udps.empty() || !unit->checkers.empty() ||
+                           !unit->configs.empty() || !unit->cu_items.empty();
     auto loc = CurrentLoc();
     ParseTimeunitDecl(nullptr, unit);
     if (unit->has_cu_timeunit && !was_unit_set && has_other_items) {
       diag_.Error(loc,
                   "timeunit as a later item requires a matching prior "
                   "declaration in the same time scope");
-    } else if (was_unit_set &&
-               (unit->cu_time_unit != old_unit ||
-                unit->cu_time_unit_magnitude != old_unit_mag)) {
+    } else if (was_unit_set && (unit->cu_time_unit != old_unit ||
+                                unit->cu_time_unit_magnitude != old_unit_mag)) {
       diag_.Error(loc, "timeunit does not match prior declaration");
     }
     if (unit->has_cu_timeprecision && !was_prec_set && has_other_items) {
       diag_.Error(loc,
                   "timeprecision as a later item requires a matching prior "
                   "declaration in the same time scope");
-    } else if (was_prec_set &&
-               (unit->cu_time_prec != old_prec ||
-                unit->cu_time_prec_magnitude != old_prec_mag)) {
+    } else if (was_prec_set && (unit->cu_time_prec != old_prec ||
+                                unit->cu_time_prec_magnitude != old_prec_mag)) {
       diag_.Error(loc, "timeprecision does not match prior declaration");
     }
     return true;
@@ -603,7 +597,6 @@ ModuleDecl* Parser::ParseModuleDecl() {
 }
 
 bool Parser::TryParsePackageBodyItem(std::vector<ModuleItem*>& items) {
-
   if (Check(TokenKind::kKwProgram)) {
     Consume();
     Expect(TokenKind::kSemicolon);
@@ -830,4 +823,4 @@ void Parser::ParseTimeunitDecl(ModuleDecl* mod, CompilationUnit* cu,
   Expect(TokenKind::kSemicolon);
 }
 
-}
+}  // namespace delta

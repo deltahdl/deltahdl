@@ -13,14 +13,15 @@
 
 using namespace delta;
 
-// Annex N.2 gives the reference C source that defines the exact numeric behavior
-// of the probabilistic distribution system functions ($dist_uniform,
+// Annex N.2 gives the reference C source that defines the exact numeric
+// behavior of the probabilistic distribution system functions ($dist_uniform,
 // $dist_normal, $dist_exponential, $dist_poisson, $dist_chi_square, $dist_t,
-// $dist_erlang). The block below is an INDEPENDENT transcription of that source,
-// used as a golden model: the simulator's evaluator (src/simulator/eval_math.cpp)
-// must reproduce these values exactly for the same seed and arguments. Because
-// the algorithm is fully deterministic in the seed, an exact match is the
-// strongest possible evidence that production applies the §N.2 algorithm.
+// $dist_erlang). The block below is an INDEPENDENT transcription of that
+// source, used as a golden model: the simulator's evaluator
+// (src/simulator/eval_math.cpp) must reproduce these values exactly for the
+// same seed and arguments. Because the algorithm is fully deterministic in the
+// seed, an exact match is the strongest possible evidence that production
+// applies the §N.2 algorithm.
 
 namespace {
 
@@ -203,11 +204,10 @@ TEST(ProbabilisticDistributionAlgorithm, UniformFullRangeMatchesReference) {
     int32_t rseed = s;
     int32_t expected = RtlDistUniform(&rseed, INT32_MIN, INT32_MAX);
     SimFixture f;
-    int32_t got = EvalDist(
-        f, "$dist_uniform",
-        {MkInt(f.arena, static_cast<uint32_t>(s)),
-         MkInt(f.arena, static_cast<uint32_t>(INT32_MIN)),
-         MkInt(f.arena, static_cast<uint32_t>(INT32_MAX))});
+    int32_t got = EvalDist(f, "$dist_uniform",
+                           {MkInt(f.arena, static_cast<uint32_t>(s)),
+                            MkInt(f.arena, static_cast<uint32_t>(INT32_MIN)),
+                            MkInt(f.arena, static_cast<uint32_t>(INT32_MAX))});
     EXPECT_EQ(got, expected) << "seed=" << s;
   }
 }
@@ -225,9 +225,9 @@ TEST(ProbabilisticDistributionAlgorithm, NormalMatchesReference) {
   }
 }
 
-// §N.2 rtl_dist_normal: with a zero mean and a wide deviation the draw straddles
-// zero, so production must also reproduce the reference's sign-preserving
-// rounding for negative results, not only positive ones.
+// §N.2 rtl_dist_normal: with a zero mean and a wide deviation the draw
+// straddles zero, so production must also reproduce the reference's
+// sign-preserving rounding for negative results, not only positive ones.
 TEST(ProbabilisticDistributionAlgorithm, NormalSignedRoundingMatchesReference) {
   for (int32_t s : kSeeds) {
     int32_t rseed = s;
@@ -246,9 +246,9 @@ TEST(ProbabilisticDistributionAlgorithm, ExponentialMatchesReference) {
     int32_t rseed = s;
     int32_t expected = RtlDistExponential(&rseed, 25);
     SimFixture f;
-    int32_t got =
-        EvalDist(f, "$dist_exponential",
-                 {MkInt(f.arena, static_cast<uint32_t>(s)), MkInt(f.arena, 25u)});
+    int32_t got = EvalDist(
+        f, "$dist_exponential",
+        {MkInt(f.arena, static_cast<uint32_t>(s)), MkInt(f.arena, 25u)});
     EXPECT_EQ(got, expected) << "seed=" << s;
   }
 }
@@ -259,9 +259,9 @@ TEST(ProbabilisticDistributionAlgorithm, PoissonMatchesReference) {
     int32_t rseed = s;
     int32_t expected = RtlDistPoisson(&rseed, 5);
     SimFixture f;
-    int32_t got =
-        EvalDist(f, "$dist_poisson",
-                 {MkInt(f.arena, static_cast<uint32_t>(s)), MkInt(f.arena, 5u)});
+    int32_t got = EvalDist(
+        f, "$dist_poisson",
+        {MkInt(f.arena, static_cast<uint32_t>(s)), MkInt(f.arena, 5u)});
     EXPECT_EQ(got, expected) << "seed=" << s;
   }
 }
@@ -274,9 +274,9 @@ TEST(ProbabilisticDistributionAlgorithm, ChiSquareMatchesReference) {
     int32_t rseed = s;
     int32_t expected = RtlDistChiSquare(&rseed, 5);
     SimFixture f;
-    int32_t got = EvalDist(f, "$dist_chi_square",
-                           {MkInt(f.arena, static_cast<uint32_t>(s)),
-                            MkInt(f.arena, 5u)});
+    int32_t got = EvalDist(
+        f, "$dist_chi_square",
+        {MkInt(f.arena, static_cast<uint32_t>(s)), MkInt(f.arena, 5u)});
     EXPECT_EQ(got, expected) << "seed=" << s;
   }
 }
@@ -288,9 +288,9 @@ TEST(ProbabilisticDistributionAlgorithm, TMatchesReference) {
     int32_t rseed = s;
     int32_t expected = RtlDistT(&rseed, 5);
     SimFixture f;
-    int32_t got =
-        EvalDist(f, "$dist_t",
-                 {MkInt(f.arena, static_cast<uint32_t>(s)), MkInt(f.arena, 5u)});
+    int32_t got = EvalDist(
+        f, "$dist_t",
+        {MkInt(f.arena, static_cast<uint32_t>(s)), MkInt(f.arena, 5u)});
     EXPECT_EQ(got, expected) << "seed=" << s;
   }
 }
@@ -314,9 +314,9 @@ TEST(ProbabilisticDistributionAlgorithm, ErlangMatchesReference) {
 TEST(ProbabilisticDistributionAlgorithm, SeedAdvancesByReferenceLcg) {
   SimFixture f;
   MakeVar(f, "seed", 32, 1u);
-  auto* call =
-      MkSysCall(f.arena, "$dist_uniform",
-                {MkId(f.arena, "seed"), MkInt(f.arena, 0u), MkInt(f.arena, 1000u)});
+  auto* call = MkSysCall(
+      f.arena, "$dist_uniform",
+      {MkId(f.arena, "seed"), MkInt(f.arena, 0u), MkInt(f.arena, 1000u)});
   EvalExpr(call, f.ctx, f.arena);
 
   int32_t rseed = 1;
@@ -331,9 +331,9 @@ TEST(ProbabilisticDistributionAlgorithm, SeedAdvancesByReferenceLcg) {
 TEST(ProbabilisticDistributionAlgorithm, UniformDegenerateReturnsStart) {
   SimFixture f;
   for (int i = 0; i < 8; ++i) {
-    int32_t got = EvalDist(f, "$dist_uniform",
-                           {MkInt(f.arena, 13u), MkInt(f.arena, 55u),
-                            MkInt(f.arena, 55u)});
+    int32_t got = EvalDist(
+        f, "$dist_uniform",
+        {MkInt(f.arena, 13u), MkInt(f.arena, 55u), MkInt(f.arena, 55u)});
     EXPECT_EQ(got, 55);
   }
 }
@@ -354,8 +354,8 @@ TEST(ProbabilisticDistributionAlgorithm, UniformStaysInRange) {
 }
 
 // §N.2: the rtl_dist_* wrappers for exponential, poisson, chi-square, t, and
-// erlang return 0 when the argument the reference requires to be positive is not
-// (the reference's "else i = 0" branch). $dist_normal has no such guard.
+// erlang return 0 when the argument the reference requires to be positive is
+// not (the reference's "else i = 0" branch). $dist_normal has no such guard.
 TEST(ProbabilisticDistributionAlgorithm, NonPositiveArgumentReturnsZero) {
   SimFixture f;
   EXPECT_EQ(EvalDist(f, "$dist_exponential",
@@ -364,13 +364,15 @@ TEST(ProbabilisticDistributionAlgorithm, NonPositiveArgumentReturnsZero) {
   EXPECT_EQ(
       EvalDist(f, "$dist_poisson", {MkInt(f.arena, 1u), MkInt(f.arena, 0u)}),
       0);
-  EXPECT_EQ(EvalDist(f, "$dist_chi_square",
-                     {MkInt(f.arena, 1u), MkInt(f.arena, 0u)}),
+  EXPECT_EQ(
+      EvalDist(f, "$dist_chi_square", {MkInt(f.arena, 1u), MkInt(f.arena, 0u)}),
+      0);
+  EXPECT_EQ(EvalDist(f, "$dist_t", {MkInt(f.arena, 1u), MkInt(f.arena, 0u)}),
             0);
-  EXPECT_EQ(EvalDist(f, "$dist_t", {MkInt(f.arena, 1u), MkInt(f.arena, 0u)}), 0);
-  EXPECT_EQ(EvalDist(f, "$dist_erlang",
-                     {MkInt(f.arena, 1u), MkInt(f.arena, 0u), MkInt(f.arena, 7u)}),
-            0);
+  EXPECT_EQ(
+      EvalDist(f, "$dist_erlang",
+               {MkInt(f.arena, 1u), MkInt(f.arena, 0u), MkInt(f.arena, 7u)}),
+      0);
 }
 
 // §N.2 uniform(): the algorithm is fully determined by the seed, so evaluating
@@ -384,7 +386,8 @@ TEST(ProbabilisticDistributionAlgorithm, AllDistributionsAreDeterministic) {
         << name;
   };
   auto seed = [&]() { return MkInt(f.arena, 7u); };
-  twice_equal("$dist_uniform", {seed(), MkInt(f.arena, 0u), MkInt(f.arena, 99u)},
+  twice_equal("$dist_uniform",
+              {seed(), MkInt(f.arena, 0u), MkInt(f.arena, 99u)},
               {seed(), MkInt(f.arena, 0u), MkInt(f.arena, 99u)});
   twice_equal("$dist_normal", {seed(), MkInt(f.arena, 4u), MkInt(f.arena, 2u)},
               {seed(), MkInt(f.arena, 4u), MkInt(f.arena, 2u)});
@@ -412,10 +415,10 @@ TEST(ProbabilisticDistributionAlgorithm, DistributionsAreNonNegative) {
                         MkInt(f.arena, 25u)}),
               0)
         << "seed=" << s;
-    EXPECT_GE(
-        EvalDist(f, "$dist_poisson",
-                 {MkInt(f.arena, static_cast<uint32_t>(s)), MkInt(f.arena, 5u)}),
-        0)
+    EXPECT_GE(EvalDist(f, "$dist_poisson",
+                       {MkInt(f.arena, static_cast<uint32_t>(s)),
+                        MkInt(f.arena, 5u)}),
+              0)
         << "seed=" << s;
     EXPECT_GE(EvalDist(f, "$dist_chi_square",
                        {MkInt(f.arena, static_cast<uint32_t>(s)),
@@ -425,16 +428,17 @@ TEST(ProbabilisticDistributionAlgorithm, DistributionsAreNonNegative) {
   }
 }
 
-// §N.2 chi_square(): the result is a small statistic on the order of its degrees
-// of freedom, never the full-width 32-bit random the function returned before
-// the §N.2 algorithm was implemented. A loose magnitude bound observes that the
-// production code now runs the algorithm rather than echoing a raw draw.
+// §N.2 chi_square(): the result is a small statistic on the order of its
+// degrees of freedom, never the full-width 32-bit random the function returned
+// before the §N.2 algorithm was implemented. A loose magnitude bound observes
+// that the production code now runs the algorithm rather than echoing a raw
+// draw.
 TEST(ProbabilisticDistributionAlgorithm, ChiSquareIsAlgorithmicNotRawRandom) {
   for (int32_t s : kSeeds) {
     SimFixture f;
-    int32_t v = EvalDist(f, "$dist_chi_square",
-                         {MkInt(f.arena, static_cast<uint32_t>(s)),
-                          MkInt(f.arena, 5u)});
+    int32_t v = EvalDist(
+        f, "$dist_chi_square",
+        {MkInt(f.arena, static_cast<uint32_t>(s)), MkInt(f.arena, 5u)});
     EXPECT_GE(v, 0) << "seed=" << s;
     EXPECT_LT(v, 100000) << "seed=" << s;
   }

@@ -45,4 +45,4 @@ TEST(ClassParsing, ForwardTypedefParameterizedClassPreprocessor) {
   ASSERT_GE(r.cu->classes.size(), 1u);
 }
 
-}
+}  // namespace

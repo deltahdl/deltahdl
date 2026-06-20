@@ -112,4 +112,4 @@ TEST(NettypeSimulation, ResolvedNettypeNetCarriesResolveFunc) {
   EXPECT_EQ(net->resolve_func, "Tsum");
 }
 
-}
+}  // namespace

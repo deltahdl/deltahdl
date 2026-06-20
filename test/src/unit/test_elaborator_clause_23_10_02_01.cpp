@@ -25,7 +25,8 @@ TEST(OrderedListParameterAssignment, PositionalValuesMapInDeclarationOrder) {
   EXPECT_EQ(u0->params[1].resolved_value, 15);
 }
 
-TEST(OrderedListParameterAssignment, SinglePositionalValueOverridesFirstParameter) {
+TEST(OrderedListParameterAssignment,
+     SinglePositionalValueOverridesFirstParameter) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module child #(parameter int A = 1)();\n"
@@ -42,7 +43,8 @@ TEST(OrderedListParameterAssignment, SinglePositionalValueOverridesFirstParamete
   EXPECT_EQ(u0->params[0].resolved_value, 42);
 }
 
-TEST(OrderedListParameterAssignment, PartialSubsetKeepsTrailingParametersAtDeclaredDefaults) {
+TEST(OrderedListParameterAssignment,
+     PartialSubsetKeepsTrailingParametersAtDeclaredDefaults) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module child #(parameter int A = 2,\n"
@@ -95,7 +97,8 @@ TEST(OrderedListParameterAssignment, TooManyPositionalValuesRejected) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(OrderedListParameterAssignment, LocalparamInParameterPortListExcludedFromOrderedList) {
+TEST(OrderedListParameterAssignment,
+     LocalparamInParameterPortListExcludedFromOrderedList) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module child #(parameter int A = 1,\n"
@@ -125,7 +128,8 @@ TEST(OrderedListParameterAssignment, LocalparamInParameterPortListExcludedFromOr
   }
 }
 
-TEST(OrderedListParameterAssignment, OrderedListCountedAgainstNonLocalparamsOnly) {
+TEST(OrderedListParameterAssignment,
+     OrderedListCountedAgainstNonLocalparamsOnly) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module child #(parameter int A = 1,\n"
@@ -140,4 +144,4 @@ TEST(OrderedListParameterAssignment, OrderedListCountedAgainstNonLocalparamsOnly
   EXPECT_TRUE(f.has_errors);
 }
 
-}
+}  // namespace

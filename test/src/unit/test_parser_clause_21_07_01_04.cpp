@@ -16,4 +16,4 @@ TEST(IoSystemTaskParsing, DumpallNoArgs) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

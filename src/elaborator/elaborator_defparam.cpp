@@ -138,8 +138,7 @@ void Elaborator::ApplyDefparams(RtlirModule* mod, const ModuleDecl* decl) {
 
       RecomputeDependentParams(target_mod);
       applied_defparams_.insert(key);
-      early_defparam_resolutions_.push_back(
-          {mod, path_expr, param, item->loc});
+      early_defparam_resolutions_.push_back({mod, path_expr, param, item->loc});
     }
   }
 }
@@ -190,8 +189,7 @@ static void CollectLocalGenerateBlockNames(
 // to the local block instead, changing the target. We flag that collision; per
 // the LRM it is fixed by renaming the generate block.
 void Elaborator::CheckEarlyResolutionAmbiguity(
-    RtlirModule* mod,
-    const std::unordered_set<std::string_view>& top_names) {
+    RtlirModule* mod, const std::unordered_set<std::string_view>& top_names) {
   if (!mod) return;
   const auto* decl = FindModule(mod->name);
   if (!decl) return;
@@ -245,4 +243,4 @@ void Elaborator::WarnUnresolvedDefparams(RtlirModule* mod) {
   }
 }
 
-}
+}  // namespace delta

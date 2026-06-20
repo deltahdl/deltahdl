@@ -53,8 +53,8 @@ TEST(PropertyDeclModel, NullDeclarationHasNoFormals) {
 }
 
 // Detail 2: vpiArgument returns the property instance's actuals in
-// formal-declaration order, and a formal that carries a default contributes that
-// default when the instance does not provide an actual for it.
+// formal-declaration order, and a formal that carries a default contributes
+// that default when the instance does not provide an actual for it.
 TEST(PropertyDeclModel, ArgumentsFollowFormalOrderAndFillDefaults) {
   VpiObject a0;
   VpiObject a2;
@@ -86,15 +86,16 @@ TEST(PropertyDeclModel, ArgumentsPreferActualsAndDefaultTrailingFormals) {
   ASSERT_EQ(supplied.size(), 2u);
   EXPECT_EQ(supplied[1], &def1);
 
-  // Provided list shorter than the formals: the trailing formal uses its default.
+  // Provided list shorter than the formals: the trailing formal uses its
+  // default.
   auto trailing = VpiPropertyInstArguments(formals, {&a0});
   ASSERT_EQ(trailing.size(), 2u);
   EXPECT_EQ(trailing[0], &a0);
   EXPECT_EQ(trailing[1], &def1);
 }
 
-// Detail 3: the vpiTypespec relation returns the formal's typespec when typed and
-// null when the formal is untyped.
+// Detail 3: the vpiTypespec relation returns the formal's typespec when typed
+// and null when the formal is untyped.
 TEST(PropertyDeclModel, FormalTypespecReportsNullWhenUntyped) {
   VpiObject typed;
   typed.type = vpiPropFormalDecl;
@@ -109,8 +110,8 @@ TEST(PropertyDeclModel, FormalTypespecReportsNullWhenUntyped) {
   EXPECT_EQ(VpiPropFormalTypespec(nullptr), nullptr);
 }
 
-// Detail 4: a formal's initialization expression is reached through vpiExpr; the
-// diagram draws its target as a named event or a property expression, and a
+// Detail 4: a formal's initialization expression is reached through vpiExpr;
+// the diagram draws its target as a named event or a property expression, and a
 // formal with no initialization expression reports none.
 TEST(PropertyDeclModel, FormalInitExprReachesNamedEventOrPropertyExpr) {
   VpiObject with_event;
@@ -161,7 +162,8 @@ TEST(PropertyDeclModel, PropertyInstResolvesItsDeclaration) {
 
 // Diagram (property inst -- vpiArgument --> property expr | named event): an
 // argument of a property instance is a named event or a property expression
-// (reusing §37.52's property-expr classification); other kinds are not arguments.
+// (reusing §37.52's property-expr classification); other kinds are not
+// arguments.
 TEST(PropertyDeclModel, PropertyArgumentKindsAreNamedEventOrPropertyExpr) {
   EXPECT_TRUE(VpiIsPropertyArgumentType(vpiNamedEvent));
   EXPECT_TRUE(VpiIsPropertyArgumentType(vpiClockedProperty));
@@ -172,10 +174,10 @@ TEST(PropertyDeclModel, PropertyArgumentKindsAreNamedEventOrPropertyExpr) {
   EXPECT_FALSE(VpiIsPropertyArgumentType(vpiModule));
 }
 
-// Diagram (property inst -- vpiDisableCondition --> expr): a property instance's
-// disable condition reaches an expression. The disable-condition relation is
-// shared with §37.52's property specification, so its expression kinds are
-// accepted by the shared classifier.
+// Diagram (property inst -- vpiDisableCondition --> expr): a property
+// instance's disable condition reaches an expression. The disable-condition
+// relation is shared with §37.52's property specification, so its expression
+// kinds are accepted by the shared classifier.
 TEST(PropertyDeclModel, PropertyInstDisableConditionReachesAnExpression) {
   EXPECT_TRUE(VpiIsDisableConditionType(vpiExpr));
   EXPECT_TRUE(VpiIsDisableConditionType(vpiOperation));

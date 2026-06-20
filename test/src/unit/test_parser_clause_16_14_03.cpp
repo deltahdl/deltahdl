@@ -30,4 +30,4 @@ TEST(DataReadApiParsing, CoverPropertyForAssertionCoverage) {
   )"));
 }
 
-}
+}  // namespace

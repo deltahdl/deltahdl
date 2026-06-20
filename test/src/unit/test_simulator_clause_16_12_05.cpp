@@ -42,9 +42,9 @@ TEST(PropertyConjunction, BothOperandsFail) {
 // Edge case: two vacuous passes both count as holding, so the conjunction
 // holds vacuously rather than failing.
 TEST(PropertyConjunction, BothOperandsVacuous) {
-  EXPECT_EQ(
-      EvalPropertyAnd(PropertyResult::kVacuousPass, PropertyResult::kVacuousPass),
-      PropertyResult::kPass);
+  EXPECT_EQ(EvalPropertyAnd(PropertyResult::kVacuousPass,
+                            PropertyResult::kVacuousPass),
+            PropertyResult::kPass);
 }
 
 // Edge case: a failure on one side dominates a vacuous hold on the other.
@@ -70,4 +70,4 @@ TEST(PropertyConjunction, VacuousWithPassHolds) {
       PropertyResult::kPass);
 }
 
-}
+}  // namespace

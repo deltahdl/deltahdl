@@ -29,16 +29,16 @@ TEST(IfElseIfSynth, IfElseIfChainSynthesizes) {
 
 TEST(IfElseIfSynth, IfElseIfNoFinalElseSynthesizes) {
   SynthFixture f;
-  auto* mod =
-      ElaborateSrc(f,
-                   "module m(input sel1, input sel2, input [7:0] a, input [7:0] b,\n"
-                   "         output reg [7:0] y);\n"
-                   "  always_comb begin\n"
-                   "    y = 8'd0;\n"
-                   "    if (sel1) y = a;\n"
-                   "    else if (sel2) y = b;\n"
-                   "  end\n"
-                   "endmodule");
+  auto* mod = ElaborateSrc(
+      f,
+      "module m(input sel1, input sel2, input [7:0] a, input [7:0] b,\n"
+      "         output reg [7:0] y);\n"
+      "  always_comb begin\n"
+      "    y = 8'd0;\n"
+      "    if (sel1) y = a;\n"
+      "    else if (sel2) y = b;\n"
+      "  end\n"
+      "endmodule");
   ASSERT_NE(mod, nullptr);
   SynthLower synth(f.arena, f.diag);
   auto* aig = synth.Lower(mod);
@@ -46,4 +46,4 @@ TEST(IfElseIfSynth, IfElseIfNoFinalElseSynthesizes) {
   EXPECT_EQ(aig->outputs.size(), 8);
 }
 
-}
+}  // namespace

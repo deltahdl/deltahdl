@@ -225,8 +225,8 @@ TEST(EvalOpXZ, EquivalenceResultIsOneBit) {
 
   MakeVar4(f, "erw1", 4, 0b1010, 0);
   MakeVar4(f, "erw2", 4, 0b0001, 0);
-  auto* expr = MakeBinary(f.arena, TokenKind::kLtDashGt, MakeId(f.arena, "erw1"),
-                          MakeId(f.arena, "erw2"));
+  auto* expr = MakeBinary(f.arena, TokenKind::kLtDashGt,
+                          MakeId(f.arena, "erw1"), MakeId(f.arena, "erw2"));
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.width, 1u);
   EXPECT_EQ(result.ToUint64(), 1u);
@@ -701,4 +701,4 @@ TEST(BlockingAssignSim, BlockingAssignLogicalOps) {
   EXPECT_EQ(r_or->value.ToUint64(), 1u);
 }
 
-}
+}  // namespace

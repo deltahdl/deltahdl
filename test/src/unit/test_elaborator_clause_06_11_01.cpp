@@ -86,4 +86,4 @@ TEST(SimpleBitVectorType, OneDimensionalPackedLogicIsSimpleBitVectorType) {
   EXPECT_TRUE(IsSimpleBitVectorType(v));
 }
 
-}
+}  // namespace

@@ -26,4 +26,4 @@ TEST(DesignBuildingBlockSimulation, PrecisionDeterminesDelayAccuracy) {
   EXPECT_EQ(finest, coarse * 1000000u);
 }
 
-}
+}  // namespace

@@ -54,7 +54,8 @@ class SystfApplicationRoutineArguments : public ::testing::Test {
 // share the one-argument shape uniformly.
 // -----------------------------------------------------------------------------
 
-TEST_F(SystfApplicationRoutineArguments, AllThreeRoutinesTakeTheOneUserDataArgument) {
+TEST_F(SystfApplicationRoutineArguments,
+       AllThreeRoutinesTakeTheOneUserDataArgument) {
   int payload = 0;
 
   VpiSystfData data = {};
@@ -86,7 +87,8 @@ TEST_F(SystfApplicationRoutineArguments, AllThreeRoutinesTakeTheOneUserDataArgum
 // user_data - the field travels through the registry intact.
 // -----------------------------------------------------------------------------
 
-TEST_F(SystfApplicationRoutineArguments, RegisteredUserDataIsPassedToEachRoutine) {
+TEST_F(SystfApplicationRoutineArguments,
+       RegisteredUserDataIsPassedToEachRoutine) {
   int payload = 0;
 
   VpiSystfData data = {};
@@ -123,7 +125,8 @@ TEST_F(SystfApplicationRoutineArguments, RegisteredUserDataIsPassedToEachRoutine
 // confirming the argument is sourced from each record's own field.
 // -----------------------------------------------------------------------------
 
-TEST_F(SystfApplicationRoutineArguments, EachRegistrationSuppliesItsOwnUserData) {
+TEST_F(SystfApplicationRoutineArguments,
+       EachRegistrationSuppliesItsOwnUserData) {
   int payload_a = 0;
   int payload_b = 0;
 
@@ -149,8 +152,8 @@ TEST_F(SystfApplicationRoutineArguments, EachRegistrationSuppliesItsOwnUserData)
 // -----------------------------------------------------------------------------
 // §36.8.4: the argument is whatever value the registration supplied for
 // user_data. When that field is left null (no user data was supplied at
-// registration), the null is what each routine receives as its single argument -
-// the routine is still called, just with a null user_data.
+// registration), the null is what each routine receives as its single argument
+// - the routine is still called, just with a null user_data.
 // -----------------------------------------------------------------------------
 
 TEST_F(SystfApplicationRoutineArguments, NullUserDataIsPassedThroughUnchanged) {

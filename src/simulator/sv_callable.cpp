@@ -33,4 +33,4 @@ const CallFrame* SvCallableContext::CurrentFrame() const {
   return &stack_.back();
 }
 
-}
+}  // namespace delta

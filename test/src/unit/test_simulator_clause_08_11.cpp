@@ -81,59 +81,62 @@ TEST(ClassSim, PopThisOnEmptyStackIsSafe) {
 }
 
 TEST(ClassSim, ThisDisambiguatesPropertyFromArg) {
-  EXPECT_EQ(RunAndGet(
-      "class Demo;\n"
-      "  integer x;\n"
-      "  function new(integer x);\n"
-      "    this.x = x;\n"
-      "  endfunction\n"
-      "endclass\n"
-      "module t;\n"
-      "  int result;\n"
-      "  initial begin\n"
-      "    Demo d;\n"
-      "    d = new(42);\n"
-      "    result = d.x;\n"
-      "  end\n"
-      "endmodule\n", "result"), 42u);
+  EXPECT_EQ(RunAndGet("class Demo;\n"
+                      "  integer x;\n"
+                      "  function new(integer x);\n"
+                      "    this.x = x;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    Demo d;\n"
+                      "    d = new(42);\n"
+                      "    result = d.x;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            42u);
 }
 
 TEST(ClassSim, ThisPropertyReadInMethod) {
-  EXPECT_EQ(RunAndGet(
-      "class C;\n"
-      "  int data;\n"
-      "  function int get_data();\n"
-      "    return this.data;\n"
-      "  endfunction\n"
-      "endclass\n"
-      "module t;\n"
-      "  int result;\n"
-      "  initial begin\n"
-      "    C c;\n"
-      "    c = new;\n"
-      "    c.data = 55;\n"
-      "    result = c.get_data();\n"
-      "  end\n"
-      "endmodule\n", "result"), 55u);
+  EXPECT_EQ(RunAndGet("class C;\n"
+                      "  int data;\n"
+                      "  function int get_data();\n"
+                      "    return this.data;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    C c;\n"
+                      "    c = new;\n"
+                      "    c.data = 55;\n"
+                      "    result = c.get_data();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            55u);
 }
 
 TEST(ClassSim, ThisPropertyWriteInMethod) {
-  EXPECT_EQ(RunAndGet(
-      "class C;\n"
-      "  int data;\n"
-      "  function void set_data(int data);\n"
-      "    this.data = data;\n"
-      "  endfunction\n"
-      "endclass\n"
-      "module t;\n"
-      "  int result;\n"
-      "  initial begin\n"
-      "    C c;\n"
-      "    c = new;\n"
-      "    c.set_data(77);\n"
-      "    result = c.data;\n"
-      "  end\n"
-      "endmodule\n", "result"), 77u);
+  EXPECT_EQ(RunAndGet("class C;\n"
+                      "  int data;\n"
+                      "  function void set_data(int data);\n"
+                      "    this.data = data;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    C c;\n"
+                      "    c = new;\n"
+                      "    c.set_data(77);\n"
+                      "    result = c.data;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            77u);
 }
 
 TEST(ClassSim, ThisTwoObjectsIndependent) {
@@ -185,4 +188,4 @@ TEST(ClassSim, ThisMultipleProperties) {
   LowerRunAndCheck(f, design, {{"ra", 3u}, {"rb", 7u}});
 }
 
-}
+}  // namespace

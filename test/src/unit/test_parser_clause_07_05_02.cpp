@@ -33,4 +33,4 @@ TEST(DynamicArraySizeParsing, DynamicArraySizeMethod) {
   EXPECT_EQ(rhs->kind, ExprKind::kCall);
 }
 
-}
+}  // namespace

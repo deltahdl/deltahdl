@@ -26,25 +26,40 @@ GuardPredicate ConstantLeaf(GuardValue v) {
 // otherwise an ERROR operand forces ERROR; otherwise RANDOM propagates; only
 // two TRUE operands give TRUE.
 TEST(ConstraintGuard4State, ConjunctionTruthTable) {
-  EXPECT_EQ(GuardAnd(GuardValue::kFalse, GuardValue::kFalse), GuardValue::kFalse);
-  EXPECT_EQ(GuardAnd(GuardValue::kFalse, GuardValue::kTrue), GuardValue::kFalse);
-  EXPECT_EQ(GuardAnd(GuardValue::kFalse, GuardValue::kError), GuardValue::kFalse);
-  EXPECT_EQ(GuardAnd(GuardValue::kFalse, GuardValue::kRandom), GuardValue::kFalse);
+  EXPECT_EQ(GuardAnd(GuardValue::kFalse, GuardValue::kFalse),
+            GuardValue::kFalse);
+  EXPECT_EQ(GuardAnd(GuardValue::kFalse, GuardValue::kTrue),
+            GuardValue::kFalse);
+  EXPECT_EQ(GuardAnd(GuardValue::kFalse, GuardValue::kError),
+            GuardValue::kFalse);
+  EXPECT_EQ(GuardAnd(GuardValue::kFalse, GuardValue::kRandom),
+            GuardValue::kFalse);
 
-  EXPECT_EQ(GuardAnd(GuardValue::kTrue, GuardValue::kFalse), GuardValue::kFalse);
+  EXPECT_EQ(GuardAnd(GuardValue::kTrue, GuardValue::kFalse),
+            GuardValue::kFalse);
   EXPECT_EQ(GuardAnd(GuardValue::kTrue, GuardValue::kTrue), GuardValue::kTrue);
-  EXPECT_EQ(GuardAnd(GuardValue::kTrue, GuardValue::kError), GuardValue::kError);
-  EXPECT_EQ(GuardAnd(GuardValue::kTrue, GuardValue::kRandom), GuardValue::kRandom);
+  EXPECT_EQ(GuardAnd(GuardValue::kTrue, GuardValue::kError),
+            GuardValue::kError);
+  EXPECT_EQ(GuardAnd(GuardValue::kTrue, GuardValue::kRandom),
+            GuardValue::kRandom);
 
-  EXPECT_EQ(GuardAnd(GuardValue::kError, GuardValue::kFalse), GuardValue::kFalse);
-  EXPECT_EQ(GuardAnd(GuardValue::kError, GuardValue::kTrue), GuardValue::kError);
-  EXPECT_EQ(GuardAnd(GuardValue::kError, GuardValue::kError), GuardValue::kError);
-  EXPECT_EQ(GuardAnd(GuardValue::kError, GuardValue::kRandom), GuardValue::kError);
+  EXPECT_EQ(GuardAnd(GuardValue::kError, GuardValue::kFalse),
+            GuardValue::kFalse);
+  EXPECT_EQ(GuardAnd(GuardValue::kError, GuardValue::kTrue),
+            GuardValue::kError);
+  EXPECT_EQ(GuardAnd(GuardValue::kError, GuardValue::kError),
+            GuardValue::kError);
+  EXPECT_EQ(GuardAnd(GuardValue::kError, GuardValue::kRandom),
+            GuardValue::kError);
 
-  EXPECT_EQ(GuardAnd(GuardValue::kRandom, GuardValue::kFalse), GuardValue::kFalse);
-  EXPECT_EQ(GuardAnd(GuardValue::kRandom, GuardValue::kTrue), GuardValue::kRandom);
-  EXPECT_EQ(GuardAnd(GuardValue::kRandom, GuardValue::kError), GuardValue::kError);
-  EXPECT_EQ(GuardAnd(GuardValue::kRandom, GuardValue::kRandom), GuardValue::kRandom);
+  EXPECT_EQ(GuardAnd(GuardValue::kRandom, GuardValue::kFalse),
+            GuardValue::kFalse);
+  EXPECT_EQ(GuardAnd(GuardValue::kRandom, GuardValue::kTrue),
+            GuardValue::kRandom);
+  EXPECT_EQ(GuardAnd(GuardValue::kRandom, GuardValue::kError),
+            GuardValue::kError);
+  EXPECT_EQ(GuardAnd(GuardValue::kRandom, GuardValue::kRandom),
+            GuardValue::kRandom);
 }
 
 // 18.5.12 / Figure 18-3: the disjunction of two guard subexpressions. A TRUE
@@ -52,25 +67,34 @@ TEST(ConstraintGuard4State, ConjunctionTruthTable) {
 // an ERROR operand forces ERROR; otherwise RANDOM propagates; only two FALSE
 // operands give FALSE.
 TEST(ConstraintGuard4State, DisjunctionTruthTable) {
-  EXPECT_EQ(GuardOr(GuardValue::kFalse, GuardValue::kFalse), GuardValue::kFalse);
+  EXPECT_EQ(GuardOr(GuardValue::kFalse, GuardValue::kFalse),
+            GuardValue::kFalse);
   EXPECT_EQ(GuardOr(GuardValue::kFalse, GuardValue::kTrue), GuardValue::kTrue);
-  EXPECT_EQ(GuardOr(GuardValue::kFalse, GuardValue::kError), GuardValue::kError);
-  EXPECT_EQ(GuardOr(GuardValue::kFalse, GuardValue::kRandom), GuardValue::kRandom);
+  EXPECT_EQ(GuardOr(GuardValue::kFalse, GuardValue::kError),
+            GuardValue::kError);
+  EXPECT_EQ(GuardOr(GuardValue::kFalse, GuardValue::kRandom),
+            GuardValue::kRandom);
 
   EXPECT_EQ(GuardOr(GuardValue::kTrue, GuardValue::kFalse), GuardValue::kTrue);
   EXPECT_EQ(GuardOr(GuardValue::kTrue, GuardValue::kTrue), GuardValue::kTrue);
   EXPECT_EQ(GuardOr(GuardValue::kTrue, GuardValue::kError), GuardValue::kTrue);
   EXPECT_EQ(GuardOr(GuardValue::kTrue, GuardValue::kRandom), GuardValue::kTrue);
 
-  EXPECT_EQ(GuardOr(GuardValue::kError, GuardValue::kFalse), GuardValue::kError);
+  EXPECT_EQ(GuardOr(GuardValue::kError, GuardValue::kFalse),
+            GuardValue::kError);
   EXPECT_EQ(GuardOr(GuardValue::kError, GuardValue::kTrue), GuardValue::kTrue);
-  EXPECT_EQ(GuardOr(GuardValue::kError, GuardValue::kError), GuardValue::kError);
-  EXPECT_EQ(GuardOr(GuardValue::kError, GuardValue::kRandom), GuardValue::kError);
+  EXPECT_EQ(GuardOr(GuardValue::kError, GuardValue::kError),
+            GuardValue::kError);
+  EXPECT_EQ(GuardOr(GuardValue::kError, GuardValue::kRandom),
+            GuardValue::kError);
 
-  EXPECT_EQ(GuardOr(GuardValue::kRandom, GuardValue::kFalse), GuardValue::kRandom);
+  EXPECT_EQ(GuardOr(GuardValue::kRandom, GuardValue::kFalse),
+            GuardValue::kRandom);
   EXPECT_EQ(GuardOr(GuardValue::kRandom, GuardValue::kTrue), GuardValue::kTrue);
-  EXPECT_EQ(GuardOr(GuardValue::kRandom, GuardValue::kError), GuardValue::kError);
-  EXPECT_EQ(GuardOr(GuardValue::kRandom, GuardValue::kRandom), GuardValue::kRandom);
+  EXPECT_EQ(GuardOr(GuardValue::kRandom, GuardValue::kError),
+            GuardValue::kError);
+  EXPECT_EQ(GuardOr(GuardValue::kRandom, GuardValue::kRandom),
+            GuardValue::kRandom);
 }
 
 // 18.5.12 / Figure 18-3: negation passes ERROR and RANDOM through unchanged and

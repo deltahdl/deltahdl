@@ -65,4 +65,4 @@ TEST(SynthLower, ChainedTernaryPriorityMux) {
   EXPECT_EQ(aig->outputs.size(), 1);
 }
 
-}
+}  // namespace

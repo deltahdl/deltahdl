@@ -101,66 +101,44 @@ TEST(TimeskewTimingCheckWindow, OtherKindsAreIgnored) {
 }
 
 TEST(TimeskewModeOracle, TimerModeDataWithinLimitDoesNotViolate) {
-  EXPECT_FALSE(ReportsTimeskewViolation(100, 103, true,
-                                        5,
-                                        false));
+  EXPECT_FALSE(ReportsTimeskewViolation(100, 103, true, 5, false));
 }
 
 TEST(TimeskewModeOracle, TimerModeDataAtLimitDoesNotViolate) {
-  EXPECT_FALSE(ReportsTimeskewViolation(100, 105, true,
-                                        5,
-                                        false));
+  EXPECT_FALSE(ReportsTimeskewViolation(100, 105, true, 5, false));
 }
 
 TEST(TimeskewModeOracle, TimerModeDataBeyondLimitViolates) {
-  EXPECT_TRUE(ReportsTimeskewViolation(100, 106, true,
-                                       5,
-                                       false));
+  EXPECT_TRUE(ReportsTimeskewViolation(100, 106, true, 5, false));
 }
 
 TEST(TimeskewModeOracle, TimerModeNewReferenceAtLimitDoesNotViolate) {
-  EXPECT_FALSE(ReportsTimeskewViolation(100, 105, false,
-                                        5,
-                                        false));
+  EXPECT_FALSE(ReportsTimeskewViolation(100, 105, false, 5, false));
 }
 
 TEST(TimeskewModeOracle, TimerModeNewReferenceBeyondLimitViolates) {
-  EXPECT_TRUE(ReportsTimeskewViolation(100, 106, false,
-                                       5,
-                                       false));
+  EXPECT_TRUE(ReportsTimeskewViolation(100, 106, false, 5, false));
 }
 
 TEST(TimeskewModeOracle, TimerModeSimultaneousDoesNotViolate) {
-  EXPECT_FALSE(ReportsTimeskewViolation(100, 100, true,
-                                        0,
-                                        false));
+  EXPECT_FALSE(ReportsTimeskewViolation(100, 100, true, 0, false));
 }
 
 TEST(TimeskewModeOracle, EventModeDataBeyondLimitViolates) {
-  EXPECT_TRUE(ReportsTimeskewViolation(100, 106, true,
-                                       5,
-                                       true));
+  EXPECT_TRUE(ReportsTimeskewViolation(100, 106, true, 5, true));
 }
 
 TEST(TimeskewModeOracle, EventModeDataAtLimitDoesNotViolate) {
-  EXPECT_FALSE(ReportsTimeskewViolation(100, 105, true,
-                                        5,
-                                        true));
+  EXPECT_FALSE(ReportsTimeskewViolation(100, 105, true, 5, true));
 }
 
 TEST(TimeskewModeOracle, EventModeNewReferenceBeyondLimitDoesNotViolate) {
-  EXPECT_FALSE(ReportsTimeskewViolation(100, 200, false,
-                                        5,
-                                        true));
+  EXPECT_FALSE(ReportsTimeskewViolation(100, 200, false, 5, true));
 }
 
 TEST(TimeskewModeOracle, OutOfOrderEventDoesNotViolate) {
-  EXPECT_FALSE(ReportsTimeskewViolation(100, 90, true,
-                                        5,
-                                        false));
-  EXPECT_FALSE(ReportsTimeskewViolation(100, 90, true,
-                                        5,
-                                        true));
+  EXPECT_FALSE(ReportsTimeskewViolation(100, 90, true, 5, false));
+  EXPECT_FALSE(ReportsTimeskewViolation(100, 90, true, 5, true));
 }
 
-}
+}  // namespace

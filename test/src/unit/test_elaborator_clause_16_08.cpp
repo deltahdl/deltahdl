@@ -111,4 +111,4 @@ TEST(NamedSequenceDeclaration, SelfRecursiveSequenceIsError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-}
+}  // namespace

@@ -809,9 +809,9 @@ TEST(Preprocessor, DirectiveInLineCommentHidesElse) {
   EXPECT_NE(result.find("still_then"), std::string::npos);
 }
 
-// In a skipped block a `endif hidden behind // must not terminate the construct,
-// so the surrounding conditional runs to its real `endif and the text in between
-// remains excluded while text after the real `endif is emitted.
+// In a skipped block a `endif hidden behind // must not terminate the
+// construct, so the surrounding conditional runs to its real `endif and the
+// text in between remains excluded while text after the real `endif is emitted.
 TEST(Preprocessor, LineCommentEndifInSkippedBlockDoesNotTerminate) {
   PreprocFixture f;
   auto result = Preprocess(
@@ -842,4 +842,3 @@ TEST(Preprocessor, InlineConditionalInsideStringIsHidden) {
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_NE(result.find("`ifdef NOPE 1 `endif kept"), std::string::npos);
 }
-

@@ -68,4 +68,4 @@ class Lowerer {
   std::string inst_prefix_;
 };
 
-}
+}  // namespace delta

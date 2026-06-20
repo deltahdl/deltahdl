@@ -62,65 +62,68 @@ TEST(StaticMethodSimulation, StaticMethodAccessesStaticProperty) {
 }
 
 TEST(StaticMethodSimulation, StaticMethodModifiesStaticProperty) {
-  EXPECT_EQ(RunAndGet(
-      "class Counter;\n"
-      "  static int count;\n"
-      "  static function void inc();\n"
-      "    count = count + 1;\n"
-      "  endfunction\n"
-      "  static function int get();\n"
-      "    return count;\n"
-      "  endfunction\n"
-      "endclass\n"
-      "module t;\n"
-      "  int result;\n"
-      "  initial begin\n"
-      "    Counter::inc();\n"
-      "    Counter::inc();\n"
-      "    Counter::inc();\n"
-      "    result = Counter::get();\n"
-      "  end\n"
-      "endmodule\n", "result"), 3u);
+  EXPECT_EQ(RunAndGet("class Counter;\n"
+                      "  static int count;\n"
+                      "  static function void inc();\n"
+                      "    count = count + 1;\n"
+                      "  endfunction\n"
+                      "  static function int get();\n"
+                      "    return count;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    Counter::inc();\n"
+                      "    Counter::inc();\n"
+                      "    Counter::inc();\n"
+                      "    result = Counter::get();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            3u);
 }
 
 TEST(StaticMethodSimulation, StaticMethodCallsStaticMethod) {
-  EXPECT_EQ(RunAndGet(
-      "class Math;\n"
-      "  static function int double_it(int x);\n"
-      "    return x + x;\n"
-      "  endfunction\n"
-      "  static function int quad(int x);\n"
-      "    return double_it(double_it(x));\n"
-      "  endfunction\n"
-      "endclass\n"
-      "module t;\n"
-      "  int result;\n"
-      "  initial begin\n"
-      "    result = Math::quad(5);\n"
-      "  end\n"
-      "endmodule\n", "result"), 20u);
+  EXPECT_EQ(RunAndGet("class Math;\n"
+                      "  static function int double_it(int x);\n"
+                      "    return x + x;\n"
+                      "  endfunction\n"
+                      "  static function int quad(int x);\n"
+                      "    return double_it(double_it(x));\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    result = Math::quad(5);\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            20u);
 }
 
 TEST(StaticMethodSimulation, StaticMethodSharedAcrossInstances) {
-  EXPECT_EQ(RunAndGet(
-      "class Id;\n"
-      "  static int current;\n"
-      "  static function int next_id();\n"
-      "    current = current + 1;\n"
-      "    return current;\n"
-      "  endfunction\n"
-      "endclass\n"
-      "module t;\n"
-      "  int result;\n"
-      "  initial begin\n"
-      "    Id a, b;\n"
-      "    a = new;\n"
-      "    b = new;\n"
-      "    a.next_id();\n"
-      "    b.next_id();\n"
-      "    result = Id::next_id();\n"
-      "  end\n"
-      "endmodule\n", "result"), 3u);
+  EXPECT_EQ(RunAndGet("class Id;\n"
+                      "  static int current;\n"
+                      "  static function int next_id();\n"
+                      "    current = current + 1;\n"
+                      "    return current;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    Id a, b;\n"
+                      "    a = new;\n"
+                      "    b = new;\n"
+                      "    a.next_id();\n"
+                      "    b.next_id();\n"
+                      "    result = Id::next_id();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            3u);
 }
 
-}
+}  // namespace

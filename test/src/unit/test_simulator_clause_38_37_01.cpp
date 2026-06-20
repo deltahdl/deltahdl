@@ -81,7 +81,8 @@ TEST_F(VpiSystfCallbacksRegistration, RejectsIllegalCharacterName) {
 
 TEST_F(VpiSystfCallbacksRegistration, RejectsNullName) {
   // A registration carrying no tfname has no "$ + one or more characters" name
-  // at all, so the registration is refused (no callback object, nothing stored).
+  // at all, so the registration is refused (no callback object, nothing
+  // stored).
   s_vpi_systf_data data = {};
   data.type = vpiSysTask;
   data.tfname = nullptr;
@@ -135,8 +136,8 @@ TEST(VpiSystfCallbacksSim, ReturnTypeReportedForSystemFunction) {
 }
 
 TEST(VpiSystfCallbacksSim, ReturnTypeNotReportedForSystemTask) {
-  // sysfunctype shall only be used when type is vpiSysFunc, so a task reports no
-  // return-value kind even if the field happens to be populated.
+  // sysfunctype shall only be used when type is vpiSysFunc, so a task reports
+  // no return-value kind even if the field happens to be populated.
   VpiSystfData task = {};
   task.type = kVpiSysTask;
   task.sysfunctype = kVpiIntFunc;
@@ -165,7 +166,8 @@ TEST(VpiSystfCallbacksSim, SizetfCalledOnlyForSizedFunction) {
   int_func.sysfunctype = kVpiIntFunc;
   EXPECT_FALSE(VpiSystfSizetfIsCalled(int_func));
 
-  // A system task never calls sizetf, even if a sized kind is left in the field.
+  // A system task never calls sizetf, even if a sized kind is left in the
+  // field.
   VpiSystfData task = {};
   task.type = kVpiSysTask;
   task.sysfunctype = kVpiSizedFunc;
@@ -225,8 +227,8 @@ TEST(VpiSystfCallbacksSim, NonSizedFunctionDoesNotCallSizetf) {
 
 // -----------------------------------------------------------------------------
 // §38.37.1 callback applications: user_data is the only argument (PLI_BYTE8 *),
-// a null field is skipped, and compiletf/sizetf fire at build while calltf fires
-// each invocation.
+// a null field is skipped, and compiletf/sizetf fire at build while calltf
+// fires each invocation.
 // -----------------------------------------------------------------------------
 
 TEST(VpiSystfCallbacksSim, InvokePassesUserDataAsSingleArgument) {

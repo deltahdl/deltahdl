@@ -71,4 +71,4 @@ TEST(CasexStatementSynth, AlwaysCombCasexQuestionMark) {
   EXPECT_EQ(aig->outputs.size(), 2);
 }
 
-}
+}  // namespace

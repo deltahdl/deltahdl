@@ -9,7 +9,8 @@ using namespace delta;
 
 namespace {
 
-TEST(SdfInterconnectAnnotation, ParseInterconnectConstructCarriesSourceAndLoad) {
+TEST(SdfInterconnectAnnotation,
+     ParseInterconnectConstructCarriesSourceAndLoad) {
   SdfFile file;
   std::string sdf = R"(
     (DELAYFILE
@@ -120,7 +121,8 @@ TEST(SdfInterconnectAnnotation, ParsedConstructsRouteToInterconnectDelays) {
 // each individual source/load pair. Two INTERCONNECT entries that share a load
 // but name different sources are retained as distinct annotated delays (the
 // per-(source,load) keying in AddInterconnectDelay).
-TEST(SdfInterconnectAnnotation, MultipleSourcesToSameLoadCoexistAsDistinctEntries) {
+TEST(SdfInterconnectAnnotation,
+     MultipleSourcesToSameLoadCoexistAsDistinctEntries) {
   SdfFile file;
   std::string sdf = R"(
     (DELAYFILE
@@ -194,7 +196,8 @@ TEST(SdfInterconnectAnnotation, InterconnectPulseLimitsInitFromDelays) {
 // all sources on the net to the load. Annotating it after source-specific
 // INTERCONNECT entries to the same load collapses them into the single
 // from-all-sources delay (the empty-source branch of AddInterconnectDelay).
-TEST(SdfInterconnectAnnotation, PortDelayRepresentsAllSourcesReplacingPerSource) {
+TEST(SdfInterconnectAnnotation,
+     PortDelayRepresentsAllSourcesReplacingPerSource) {
   SdfFile file;
   std::string sdf = R"(
     (DELAYFILE
@@ -236,4 +239,4 @@ TEST(SdfInterconnectAnnotation, SingleValueDelayBroadcastsAcrossAllSlots) {
   }
 }
 
-}
+}  // namespace

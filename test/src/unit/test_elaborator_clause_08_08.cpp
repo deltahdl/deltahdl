@@ -133,4 +133,4 @@ TEST(TypedConstructorCallElaboration,
              "endmodule\n"));
 }
 
-}
+}  // namespace

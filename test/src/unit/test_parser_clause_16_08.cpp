@@ -209,4 +209,4 @@ TEST(SequenceDeclarationParsing, SequenceDeclCapturesInstanceRefs) {
   EXPECT_TRUE(refs_inner);
 }
 
-}
+}  // namespace

@@ -182,4 +182,4 @@ TEST(DisableForkExecution, ExecutionContinuesAfterDisableFork) {
   LowerRunAndCheck(f, design, {{"x", 0u}, {"y", 1u}});
 }
 
-}
+}  // namespace

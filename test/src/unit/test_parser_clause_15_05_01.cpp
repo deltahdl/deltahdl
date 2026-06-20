@@ -151,4 +151,4 @@ TEST(EventTriggerParser, NonblockingWithRepeatEventControl) {
   EXPECT_FALSE(stmt->events.empty());
 }
 
-}
+}  // namespace

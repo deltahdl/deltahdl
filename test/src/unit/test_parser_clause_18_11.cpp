@@ -49,8 +49,8 @@ TEST(SubroutineCallExprParsing, LiteralArgIsRejected) {
   EXPECT_TRUE(r.has_errors);
 }
 
-// 18.11: a function call yields a value through computation rather than naming a
-// property, so it is an expression and is not an acceptable randomize()
+// 18.11: a function call yields a value through computation rather than naming
+// a property, so it is an expression and is not an acceptable randomize()
 // argument.
 TEST(SubroutineCallExprParsing, FunctionCallArgIsRejected) {
   auto r = Parse(
@@ -60,4 +60,4 @@ TEST(SubroutineCallExprParsing, FunctionCallArgIsRejected) {
   EXPECT_TRUE(r.has_errors);
 }
 
-}
+}  // namespace

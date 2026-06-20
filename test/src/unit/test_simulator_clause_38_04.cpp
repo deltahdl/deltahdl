@@ -70,8 +70,8 @@ TEST_F(VpiSimControlSim, ControlSetInteractiveScope) {
 }
 
 // §38.4: vpiSetInteractiveScope retargets to a *new* scope each time it is
-// invoked, so a later call replaces the scope an earlier call established rather
-// than being ignored once a scope is set.
+// invoked, so a later call replaces the scope an earlier call established
+// rather than being ignored once a scope is set.
 TEST_F(VpiSimControlSim, ControlSetInteractiveScopeReplacesPriorScope) {
   VpiHandle first = vpi_ctx_.CreateModule("top", "top");
   EXPECT_EQ(VpiControlC(vpiSetInteractiveScope, first), 1);
@@ -107,5 +107,5 @@ TEST_F(VpiSimControlSim, ControlUnknownOpIsInert) {
   EXPECT_EQ(vpi_ctx_.InteractiveScope(), nullptr);
 }
 
-}
-}
+}  // namespace
+}  // namespace delta

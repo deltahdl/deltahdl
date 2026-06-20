@@ -22,4 +22,4 @@ TEST(GateElaboration, UnnamedGateProducesAssign) {
   EXPECT_EQ(ca.rhs->op, TokenKind::kCaret);
 }
 
-}
+}  // namespace

@@ -5,7 +5,8 @@ using namespace delta;
 namespace {
 
 // 18.5.9: only random variables are allowed in a solve...before ordering — they
-// shall be rand. Ordering two rand variables is within that rule and elaborates.
+// shall be rand. Ordering two rand variables is within that rule and
+// elaborates.
 TEST(SolveBeforeOrdering, RandVariablesAccepted) {
   EXPECT_TRUE(
       ElabOk("class C;\n"
@@ -91,8 +92,8 @@ TEST(SolveBeforeOrdering, ArraySizeMethodAccepted) {
              "module m; endmodule\n"));
 }
 
-// 18.5.9: there shall be no circular dependency in the ordering. 'solve a before
-// b' combined with 'solve b before a' forms a cycle and is an error.
+// 18.5.9: there shall be no circular dependency in the ordering. 'solve a
+// before b' combined with 'solve b before a' forms a cycle and is an error.
 TEST(SolveBeforeOrdering, CircularDependencyRejected) {
   EXPECT_FALSE(
       ElabOk("class C;\n"
@@ -128,9 +129,9 @@ TEST(SolveBeforeOrdering, AcyclicChainAccepted) {
              "module m; endmodule\n"));
 }
 
-// 18.5.9: the no-circular-dependency rule also rejects the degenerate case where
-// a variable is ordered before itself — naming the same variable on both sides
-// of one solve statement is a self-cycle.
+// 18.5.9: the no-circular-dependency rule also rejects the degenerate case
+// where a variable is ordered before itself — naming the same variable on both
+// sides of one solve statement is a self-cycle.
 TEST(SolveBeforeOrdering, SelfOrderingRejected) {
   EXPECT_FALSE(
       ElabOk("class C;\n"

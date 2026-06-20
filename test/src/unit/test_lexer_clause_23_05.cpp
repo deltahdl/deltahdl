@@ -22,4 +22,4 @@ TEST(ExternModuleLexing, ExternMacromoduleTokenSequence) {
   EXPECT_EQ(tokens[2].text, "m");
 }
 
-}
+}  // namespace

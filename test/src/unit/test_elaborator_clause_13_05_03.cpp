@@ -111,4 +111,4 @@ TEST(DefaultArgumentElaboration, DefaultRefsUndeclaredNameError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-}
+}  // namespace

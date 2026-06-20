@@ -86,4 +86,4 @@ TEST(InterfaceClassTypeAccess, TypedefWithParameterInInterfaceClass) {
   EXPECT_TRUE(r.cu->classes[0]->is_interface);
 }
 
-}
+}  // namespace

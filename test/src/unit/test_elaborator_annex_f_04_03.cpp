@@ -90,16 +90,16 @@ TEST(KappaForLocalVarRewrite, ExplicitYieldsAtCSplice) {
 TEST(Push, LocalVarDeclSiteAlwaysPrepends) {
   // §F.4.3: push(E, (t v; p)) = (t v; push(E, p)).
   EXPECT_EQ(RoutePush(PushSite::kLocalVarDeclThenProp,
-                       /*list_empty=*/false,
-                       /*right_admits_empty=*/false),
+                      /*list_empty=*/false,
+                      /*right_admits_empty=*/false),
             PushRouting::kPrependLocalVarDecl);
 }
 
 TEST(Push, SequenceAsPropertyCollapsesWhenListEmpty) {
   // §F.4.3: push(<>, r) = r when r is used as a property.
   EXPECT_EQ(RoutePush(PushSite::kSequenceAsProperty,
-                       /*list_empty=*/true,
-                       /*right_admits_empty=*/false),
+                      /*list_empty=*/true,
+                      /*right_admits_empty=*/false),
             PushRouting::kRecurseInner);
 }
 
@@ -108,8 +108,8 @@ TEST(Push, SequenceAsPropertySplicesKappaWithDelayZero) {
   // an @(c) prefix sourced from §16.16.1, then ##0 to anchor the
   // assignments at the start of the match.
   EXPECT_EQ(RoutePush(PushSite::kSequenceAsProperty,
-                       /*list_empty=*/false,
-                       /*right_admits_empty=*/false),
+                      /*list_empty=*/false,
+                      /*right_admits_empty=*/false),
             PushRouting::kAttachKappaWithDelayZero);
 }
 
@@ -118,12 +118,12 @@ TEST(Push, NonoverlappingImplicationSplitsOnEmptyAdmittingAntecedent) {
   // diverges into a two-branch rewrite — that is the cross-link to
   // §16.12.22's nondegeneracy classes.
   EXPECT_EQ(RoutePush(PushSite::kNonoverlappingImplication,
-                       /*list_empty=*/false,
-                       /*right_admits_empty=*/true),
+                      /*list_empty=*/false,
+                      /*right_admits_empty=*/true),
             PushRouting::kRecurseBothBranches);
   EXPECT_EQ(RoutePush(PushSite::kNonoverlappingImplication,
-                       /*list_empty=*/false,
-                       /*right_admits_empty=*/false),
+                      /*list_empty=*/false,
+                      /*right_admits_empty=*/false),
             PushRouting::kAttachKappaWithDelayZero);
 }
 
@@ -155,8 +155,8 @@ TEST(Push, LocalVarAssignmentPrependsThatAssignment) {
   // §F.4.3: push(E, (t v = e; p)) = (t v; push(<E, v=e>, p)) — the
   // declaration's initializer becomes a new entry in the assignment list.
   EXPECT_EQ(RoutePush(PushSite::kLocalVarAssignThenProp,
-                       /*list_empty=*/false,
-                       /*right_admits_empty=*/false),
+                      /*list_empty=*/false,
+                      /*right_admits_empty=*/false),
             PushRouting::kPrependLocalVarAssignment);
 }
 
@@ -165,8 +165,8 @@ TEST(Push, OverlappingImplicationCollapsesWhenListEmpty) {
   // list is empty, the antecedent stays put and only the consequent is
   // pushed into.
   EXPECT_EQ(RoutePush(PushSite::kOverlappingImplication,
-                       /*list_empty=*/true,
-                       /*right_admits_empty=*/false),
+                      /*list_empty=*/true,
+                      /*right_admits_empty=*/false),
             PushRouting::kRecurseInner);
 }
 
@@ -174,8 +174,8 @@ TEST(Push, NonoverlappingImplicationCollapsesWhenListEmpty) {
   // §F.4.3: push(<>, r |=> p) = r |=> push(<>, p). The empty-list branch
   // ignores the antecedent's empty-match classification.
   EXPECT_EQ(RoutePush(PushSite::kNonoverlappingImplication,
-                       /*list_empty=*/true,
-                       /*right_admits_empty=*/true),
+                      /*list_empty=*/true,
+                      /*right_admits_empty=*/true),
             PushRouting::kRecurseInner);
 }
 
@@ -198,4 +198,4 @@ TEST(Push, NotRecursesIntoInner) {
             PushRouting::kRecurseInner);
 }
 
-}
+}  // namespace

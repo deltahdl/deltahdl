@@ -244,4 +244,4 @@ TEST(ConcatenationSim, ConcatMixedWidths) {
   EXPECT_EQ(var->value.ToUint64(), 0xABCu);
 }
 
-}
+}  // namespace

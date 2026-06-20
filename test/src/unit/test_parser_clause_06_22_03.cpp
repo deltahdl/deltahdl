@@ -122,4 +122,4 @@ TEST(AssignmentCompatibleParsing, EnumDirectionalityNotSymmetric) {
   EXPECT_FALSE(IsAssignmentCompatible(i, e));
 }
 
-}
+}  // namespace

@@ -116,4 +116,4 @@ TEST(StrengthReductionNonresistive, CmosReducesSupplySourceToStrong) {
   EXPECT_EQ(y->resolved_strength.s1_hi, Strength::kStrong);
 }
 
-}
+}  // namespace

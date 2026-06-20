@@ -77,4 +77,4 @@ TEST(AssocArraySimulation, RefArgAllocatesNonexistentEntry) {
   EXPECT_EQ(v, 1u);
 }
 
-}
+}  // namespace

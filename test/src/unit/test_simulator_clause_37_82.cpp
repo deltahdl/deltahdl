@@ -26,8 +26,8 @@ class ActiveTimeFormat : public ::testing::Test {
   VpiContext ctx_;
 };
 
-// Detail 1: with no $timeformat() call recorded - the state of a fresh context -
-// vpi_handle(vpiActiveTimeFormat, NULL) returns NULL rather than reaching any
+// Detail 1: with no $timeformat() call recorded - the state of a fresh context
+// - vpi_handle(vpiActiveTimeFormat, NULL) returns NULL rather than reaching any
 // object.
 TEST_F(ActiveTimeFormat, ReturnsNullWhenTimeformatNotCalled) {
   EXPECT_EQ(VpiHandleC(vpiActiveTimeFormat, nullptr), nullptr);
@@ -45,8 +45,8 @@ TEST_F(ActiveTimeFormat, ReachesTheTimeformatCallThatSetTheFormat) {
 }
 
 // Diagram edge / detail 1 both spell the traversal with a NULL second argument:
-// the active-time-format relation originates only at the top-level reference. So
-// even with a $timeformat() call on record, asking for vpiActiveTimeFormat
+// the active-time-format relation originates only at the top-level reference.
+// So even with a $timeformat() call on record, asking for vpiActiveTimeFormat
 // relative to a concrete object must not reach that recorded call - the
 // dispatch's null-reference guard keeps the relation scoped to the top level.
 TEST_F(ActiveTimeFormat, DoesNotReachTheTimeformatCallFromANonNullReference) {

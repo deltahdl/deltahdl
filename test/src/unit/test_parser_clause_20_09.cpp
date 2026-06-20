@@ -79,4 +79,4 @@ TEST(OptionalSystemTaskExtendedParsing, CountbitsVariableControlBit) {
   EXPECT_EQ(stmt->rhs->args[2]->kind, ExprKind::kIdentifier);
 }
 
-}
+}  // namespace

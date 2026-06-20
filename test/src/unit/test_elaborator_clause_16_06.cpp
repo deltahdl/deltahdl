@@ -43,8 +43,7 @@ TEST(ConcurrentAssertionBooleanExpr,
   EXPECT_TRUE(FunctionArgKindAllowedInAssertionExpr(FunctionArgKind::kInput));
   EXPECT_TRUE(
       FunctionArgKindAllowedInAssertionExpr(FunctionArgKind::kConstRef));
-  EXPECT_FALSE(
-      FunctionArgKindAllowedInAssertionExpr(FunctionArgKind::kOutput));
+  EXPECT_FALSE(FunctionArgKindAllowedInAssertionExpr(FunctionArgKind::kOutput));
   EXPECT_FALSE(FunctionArgKindAllowedInAssertionExpr(FunctionArgKind::kInout));
   EXPECT_FALSE(FunctionArgKindAllowedInAssertionExpr(FunctionArgKind::kRef));
 }
@@ -77,4 +76,4 @@ TEST(ConcurrentAssertionBooleanExpr,
       DisableConditionRefAllowed(DisableConditionRefKind::kMatchedMethod));
 }
 
-}
+}  // namespace

@@ -65,4 +65,4 @@ TEST(SetupholdTimingCheckWindow, BothLimitsZeroNeverViolates) {
   EXPECT_FALSE(mgr.CheckSetupholdViolation("clk", 100, "data", 101));
 }
 
-}
+}  // namespace

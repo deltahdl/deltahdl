@@ -162,4 +162,4 @@ TEST(UnpackedArrayConcatElaboration, NullItemAllowedForChandleElementType) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

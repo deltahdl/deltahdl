@@ -81,4 +81,4 @@ TEST(ImplicitEventSynthesis, AlwaysStarMultipleOutputs) {
   EXPECT_TRUE(aig->latches.empty());
 }
 
-}
+}  // namespace

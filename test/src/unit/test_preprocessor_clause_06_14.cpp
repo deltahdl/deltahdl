@@ -17,4 +17,4 @@ TEST(ChandleDataType, ChandleInClass) {
             DataTypeKind::kChandle);
 }
 
-}
+}  // namespace

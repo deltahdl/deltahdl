@@ -60,7 +60,8 @@ TEST(ClockResolution, NoClockWhenNoneSpecified) {
 // §16.16(a): the default clocking event governs a sequence or property
 // declaration only when that declaration sits in a clocking block whose
 // clocking event is the default.
-TEST(ClockResolution, DefaultClockReachesDeclarationOnlyInDefaultClockingBlock) {
+TEST(ClockResolution,
+     DefaultClockReachesDeclarationOnlyInDefaultClockingBlock) {
   EXPECT_TRUE(DefaultClockAppliesToDeclaration(true));
   EXPECT_FALSE(DefaultClockAppliesToDeclaration(false));
 }
@@ -75,8 +76,7 @@ TEST(ClockResolution, ClockingBlockDeclarationRejectsExplicitClock) {
 // §16.16(b1): such a declaration takes the clocking block's event as its
 // leading clocking event.
 TEST(ClockResolution, ClockingBlockDeclarationInheritsBlockClock) {
-  EXPECT_EQ(ClockingBlockDeclarationLeadingClock("posedge clk"),
-            "posedge clk");
+  EXPECT_EQ(ClockingBlockDeclarationLeadingClock("posedge clk"), "posedge clk");
 }
 
 // §16.16(b2): a multiclocked sequence or property is not allowed inside a

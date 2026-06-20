@@ -24,4 +24,4 @@ TEST(TimeLiteralElaboration, TimeLiteralInAssignmentElaborates) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

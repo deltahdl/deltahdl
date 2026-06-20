@@ -52,7 +52,8 @@ TEST_F(ProtectDataMethodSyntaxTest,
 // Edge case: the `<string>` value of the keyword expression may contain
 // internal whitespace; the directive line is still consumed in full, with no
 // portion of the quoted value leaking into the output.
-TEST_F(ProtectDataMethodSyntaxTest, DataMethodStringArgumentWithSpacesConsumed) {
+TEST_F(ProtectDataMethodSyntaxTest,
+       DataMethodStringArgumentWithSpacesConsumed) {
   auto result =
       Preprocess("`pragma protect data_method = \"my custom cipher\"\n");
   EXPECT_FALSE(diag_.HasErrors());

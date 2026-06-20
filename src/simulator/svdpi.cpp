@@ -196,11 +196,11 @@ int svDimensions(svOpenArrayHandle h) {
   return static_cast<const svOpenArrayDesc*>(h)->n_dims;
 }
 // §H.12.4: svGetArrayPtr/svSizeOfArray expose the actual address and byte size
-// of an open array as a whole, but only when the SystemVerilog layout matches the
-// C layout. This simulator keeps open arrays in the canonical word form of
+// of an open array as a whole, but only when the SystemVerilog layout matches
+// the C layout. This simulator keeps open arrays in the canonical word form of
 // H.10.1.2 rather than a plain C array, so the whole-array layout never matches
-// C; H.12.4 then requires the address and size to be undefined, which it pins to
-// 0. Individual elements remain reachable through svGetArrElemPtr* below.
+// C; H.12.4 then requires the address and size to be undefined, which it pins
+// to 0. Individual elements remain reachable through svGetArrElemPtr* below.
 void* svGetArrayPtr(svOpenArrayHandle h) {
   (void)h;
   return nullptr;
@@ -237,8 +237,8 @@ int svUnpackedExtent(const svOpenArrayDimRange& r) {
 // Map one unpacked index, expressed in the actual argument's original
 // SystemVerilog coordinates, to its zero-based position along that dimension.
 // The element at the left bound occupies position 0 and positions advance
-// toward the right bound, independent of range direction. Returns false when the
-// index falls outside the dimension's original range.
+// toward the right bound, independent of range direction. Returns false when
+// the index falls outside the dimension's original range.
 bool svUnpackedPos(const svOpenArrayDimRange& r, int idx, int* pos) {
   int low = r.left < r.right ? r.left : r.right;
   int high = r.left > r.right ? r.left : r.right;
@@ -247,12 +247,12 @@ bool svUnpackedPos(const svOpenArrayDimRange& r, int idx, int* pos) {
   return true;
 }
 
-// Resolve up to three unpacked indices to the address of the addressed element's
-// first canonical word, row-major over the unpacked dimensions
-// (ranges[1..n_dims-1]), and report the element's word count via *words. Returns
-// nullptr when the handle is unusable, the index count does not match the
-// unpacked dimensionality, or any index is out of its original range, so callers
-// leave both operands untouched in those cases.
+// Resolve up to three unpacked indices to the address of the addressed
+// element's first canonical word, row-major over the unpacked dimensions
+// (ranges[1..n_dims-1]), and report the element's word count via *words.
+// Returns nullptr when the handle is unusable, the index count does not match
+// the unpacked dimensionality, or any index is out of its original range, so
+// callers leave both operands untouched in those cases.
 void* svElemBase(svOpenArrayHandle h, const int* idx, int n_idx,
                  size_t word_size, int* words) {
   if (h == nullptr) return nullptr;
@@ -275,12 +275,13 @@ void* svElemBase(svOpenArrayHandle h, const int* idx, int n_idx,
 // positions advance toward the right bound, row-major over the unpacked
 // dimensions (ranges[1..n_dims-1]) — the same coordinate mapping the copy
 // helpers use. Consecutive elements are desc->elem_size bytes apart, the
-// representation stride recorded when the handle was built. Returns nullptr when
-// the handle or its storage is unusable, when the index count does not match the
-// unpacked dimensionality, or when any index is outside its original range — the
-// listing's "null if index outside the range or null pointer" contract. A zero
-// elem_size signals that an element's representation differs from that of an
-// individual value of the same type, for which H.12.4 also requires nullptr.
+// representation stride recorded when the handle was built. Returns nullptr
+// when the handle or its storage is unusable, when the index count does not
+// match the unpacked dimensionality, or when any index is outside its original
+// range — the listing's "null if index outside the range or null pointer"
+// contract. A zero elem_size signals that an element's representation differs
+// from that of an individual value of the same type, for which H.12.4 also
+// requires nullptr.
 void* svElemAddr(svOpenArrayHandle h, const int* idx, int n_idx) {
   if (h == nullptr) return nullptr;
   const svOpenArrayDesc* desc = static_cast<const svOpenArrayDesc*>(h);
@@ -336,10 +337,10 @@ void svGetLogicElem(svLogicVecVal* d, svOpenArrayHandle s, const int* idx,
 // simple scalar (a single bit or logic), that element occupies one canonical
 // word whose bit 0 carries the value; the surrounding bits are not part of the
 // scalar. These helpers reuse the same element resolver as the wider copy
-// functions to locate that word from the per-call unpacked indices, then read or
-// write only bit 0. An unusable handle, a mismatched index count, or an index
-// outside its original range resolves no element, so a read returns sv_0/0 and a
-// write is a no-op, matching the guard the H.12.5 helpers apply.
+// functions to locate that word from the per-call unpacked indices, then read
+// or write only bit 0. An unusable handle, a mismatched index count, or an
+// index outside its original range resolves no element, so a read returns
+// sv_0/0 and a write is a no-op, matching the guard the H.12.5 helpers apply.
 svBit svGetBitScalarElem(svOpenArrayHandle s, const int* idx, int n) {
   int words;
   void* base = svElemBase(s, idx, n, sizeof(svBitVecVal), &words);
@@ -406,12 +407,12 @@ void svPutLogicScalarElem(svOpenArrayHandle d, svLogic value, const int* idx,
 
 }  // namespace
 
-// §H.12.4: the addresses of individual elements are always supported, regardless
-// of whether the whole array exposes a C-compatible layout. The specialized 1-,
-// 2-, and 3-dimensional entry points forward to the shared resolver, which
-// returns a null pointer for an out-of-range index, an unusable handle, a
-// mismatched index count, or an element representation that differs from an
-// individual value of the same type.
+// §H.12.4: the addresses of individual elements are always supported,
+// regardless of whether the whole array exposes a C-compatible layout. The
+// specialized 1-, 2-, and 3-dimensional entry points forward to the shared
+// resolver, which returns a null pointer for an out-of-range index, an unusable
+// handle, a mismatched index count, or an element representation that differs
+// from an individual value of the same type.
 void* svGetArrElemPtr1(svOpenArrayHandle h, int indx1) {
   int idx[1] = {indx1};
   return svElemAddr(h, idx, 1);
@@ -617,8 +618,8 @@ svScope svSetScope(svScope scope) {
 }
 
 const char* svGetNameFromScope(svScope scope) {
-  // §H.9.3: report the fully qualified name of a scope handle. Handles come from
-  // svGetScopeFromName(); an unrecognized handle resolves to an empty name
+  // §H.9.3: report the fully qualified name of a scope handle. Handles come
+  // from svGetScopeFromName(); an unrecognized handle resolves to an empty name
   // rather than dereferencing an unknown pointer.
   return delta::DpiNameFromScope(static_cast<const delta::DpiScope*>(scope));
 }
@@ -672,8 +673,8 @@ void svAckDisabledState(void) { delta::DpiAckCurrentDisable(); }
 // §H.13: retrieve the current simulation time. The caller sets time->type to
 // request the form it wants — sv_scaled_real_time for a real scaled to the time
 // unit, otherwise sv_sim_time for the 64-bit count — and this function honors
-// that selection, writing the result into the same svTimeVal. A NULL scope means
-// the time is scaled to the simulation time unit; this simulator binds no
+// that selection, writing the result into the same svTimeVal. A NULL scope
+// means the time is scaled to the simulation time unit; this simulator binds no
 // per-scope timescale to an svScope, so a non-NULL scope reports the same
 // design-wide simulation time. The value comes from the shared time source the
 // VPI time routines read, so svGetTime and vpi_get_time() always agree. Returns
@@ -688,8 +689,8 @@ int svGetTime(const svScope scope, svTimeVal* time) {
 
 // §H.13: retrieve the time unit for the scope. A NULL scope retrieves the
 // simulation time unit; with no per-scope timescale binding a non-NULL scope
-// reports that same unit. The value matches vpi_get(vpiTimeUnit) for the design.
-// Returns -1 when there is nowhere to write the result, 0 otherwise.
+// reports that same unit. The value matches vpi_get(vpiTimeUnit) for the
+// design. Returns -1 when there is nowhere to write the result, 0 otherwise.
 int svGetTimeUnit(const svScope scope, int32_t* time_unit) {
   (void)scope;
   if (time_unit == nullptr) return -1;

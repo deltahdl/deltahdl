@@ -13,10 +13,10 @@
 #include "simulator/sv_vpi_user.h"
 
 // Deliberately include the provided header a second time. A normative include
-// file must be safe to pull in more than once; the production multiple-inclusion
-// guard in sv_vpi_user.h is what makes this translation unit compile despite the
-// repeat. Compilation succeeding is itself the observation for the edge case
-// below.
+// file must be safe to pull in more than once; the production
+// multiple-inclusion guard in sv_vpi_user.h is what makes this translation unit
+// compile despite the repeat. Compilation succeeding is itself the observation
+// for the edge case below.
 #include "simulator/sv_vpi_user.h"
 
 namespace {
@@ -33,11 +33,12 @@ static_assert(std::is_same_v<decltype(vpi_iterate), vpiHandle(int, vpiHandle)>,
               "vpi_user.h must provide vpi_iterate");
 static_assert(std::is_same_v<decltype(vpi_scan), vpiHandle(vpiHandle)>,
               "vpi_user.h must provide vpi_scan");
-static_assert(std::is_same_v<decltype(vpi_get_value), void(vpiHandle, s_vpi_value*)>,
-              "vpi_user.h must provide vpi_get_value");
 static_assert(
-    std::is_same_v<decltype(vpi_handle_by_name), vpiHandle(const char*, vpiHandle)>,
-    "vpi_user.h must provide vpi_handle_by_name");
+    std::is_same_v<decltype(vpi_get_value), void(vpiHandle, s_vpi_value*)>,
+    "vpi_user.h must provide vpi_get_value");
+static_assert(std::is_same_v<decltype(vpi_handle_by_name),
+                             vpiHandle(const char*, vpiHandle)>,
+              "vpi_user.h must provide vpi_handle_by_name");
 
 TEST(VpiUserHeaderProvided, IncludeFileIsPresentAndGuarded) {
   // The normative include file was reachable to compile this translation unit,

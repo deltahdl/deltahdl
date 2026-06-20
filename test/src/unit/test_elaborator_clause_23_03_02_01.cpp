@@ -174,7 +174,8 @@ TEST(OrderedPortElaboration, BlankInputWithoutDefaultLeftUnconnected) {
   EXPECT_EQ(bindings[1].connection, nullptr);
 }
 
-TEST(OrderedPortElaboration, TrailingOmittedInputWithoutDefaultLeftUnconnected) {
+TEST(OrderedPortElaboration,
+     TrailingOmittedInputWithoutDefaultLeftUnconnected) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module child(input logic [7:0] a, input logic [7:0] b);\n"
@@ -253,4 +254,4 @@ TEST(OrderedPortElaboration, AllPortsOrderedOnPortlessModuleElaborates) {
   EXPECT_TRUE(mod->children[0].port_bindings.empty());
 }
 
-}
+}  // namespace

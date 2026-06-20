@@ -198,4 +198,4 @@ TEST_F(DpiParseTest, DpiImportEnumArgAccepted) {
   EXPECT_FALSE(diag_.HasErrors());
 }
 
-}
+}  // namespace

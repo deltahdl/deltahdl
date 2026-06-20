@@ -10,25 +10,25 @@ TEST(PropertyInstantiation, LegalAsPropertyExprWhenBodyFits) {
   // §16.12.1: an instance is legal as a property_expr provided the named
   // property's body — with actuals substituted for formals — is itself a
   // legal property_expr.
-  EXPECT_TRUE(IsPropertyInstanceLegal(
-      PropertyInstancePlacement::kAsPropertyExpr,
-      /*body_substitutable_at_placement=*/true));
+  EXPECT_TRUE(
+      IsPropertyInstanceLegal(PropertyInstancePlacement::kAsPropertyExpr,
+                              /*body_substitutable_at_placement=*/true));
 }
 
 TEST(PropertyInstantiation, LegalAsPropertySpecWhenBodyFits) {
   // §16.12.1: the same legality test applies when the instance is used as a
   // property_spec rather than a property_expr.
-  EXPECT_TRUE(IsPropertyInstanceLegal(
-      PropertyInstancePlacement::kAsPropertySpec,
-      /*body_substitutable_at_placement=*/true));
+  EXPECT_TRUE(
+      IsPropertyInstanceLegal(PropertyInstancePlacement::kAsPropertySpec,
+                              /*body_substitutable_at_placement=*/true));
 }
 
 TEST(PropertyInstantiation, RejectedWhenSubstitutionWouldBeIllegal) {
   // §16.12.1: if substituting actuals would not yield a legal property at
   // the placement, the instance is not legal.
-  EXPECT_FALSE(IsPropertyInstanceLegal(
-      PropertyInstancePlacement::kAsPropertyExpr,
-      /*body_substitutable_at_placement=*/false));
+  EXPECT_FALSE(
+      IsPropertyInstanceLegal(PropertyInstancePlacement::kAsPropertyExpr,
+                              /*body_substitutable_at_placement=*/false));
 }
 
 TEST(PropertyInstantiation, BuildingOperatorOperandRejectsDisableIff) {
@@ -41,4 +41,4 @@ TEST(PropertyInstantiation, BuildingOperatorOperandRejectsDisableIff) {
       /*named_property_has_disable_iff=*/false));
 }
 
-}
+}  // namespace

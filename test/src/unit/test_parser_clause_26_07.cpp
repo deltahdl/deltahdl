@@ -21,7 +21,6 @@ TEST(StdBuiltinPackageParsing, ModuleWildcardImportOfStd) {
 }
 
 TEST(StdBuiltinPackageParsing, StdScopeResolutionCallWithArgument) {
-
   // built_in_function_call ::= [ std :: ] function_subroutine_call. Observe
   // that the optional `std ::` prefix is captured: the callee resolves through
   // a member-access whose base is the `std` package name.
@@ -48,7 +47,6 @@ TEST(StdBuiltinPackageParsing, StdScopeResolutionCallWithArgument) {
 }
 
 TEST(StdBuiltinPackageParsing, StdScopeResolutionCallNoArguments) {
-
   // built_in_function_call ::= [ std :: ] function_subroutine_call, where the
   // call carries an empty argument list (mirrors the LRM's `std::sys_task()`
   // example). The optional `std ::` prefix must still be captured as the base
@@ -75,7 +73,6 @@ TEST(StdBuiltinPackageParsing, StdScopeResolutionCallNoArguments) {
 }
 
 TEST(StdBuiltinPackageParsing, StdScopedDataTypeInVariableDeclaration) {
-
   // built_in_data_type ::= [ std :: ] data_type_identifier. Observe that the
   // optional `std ::` prefix lands as the scope qualifier on the parsed type.
   auto r = Parse(
@@ -92,7 +89,6 @@ TEST(StdBuiltinPackageParsing, StdScopedDataTypeInVariableDeclaration) {
 }
 
 TEST(StdBuiltinPackageParsing, StdScopedDataTypeIsNotNameSpecific) {
-
   // built_in_data_type accepts any data_type_identifier after `std ::`, not a
   // hard-coded set of names. A different built-in type identifier must produce
   // the same scoped variable declaration rather than a module instantiation.
@@ -110,7 +106,6 @@ TEST(StdBuiltinPackageParsing, StdScopedDataTypeIsNotNameSpecific) {
 }
 
 TEST(StdBuiltinPackageParsing, UserPackageNamedStdParses) {
-
   auto r = Parse(
       "package std;\n"
       "  typedef int t;\n"
@@ -121,4 +116,4 @@ TEST(StdBuiltinPackageParsing, UserPackageNamedStdParses) {
   EXPECT_EQ(r.cu->packages[0]->name, "std");
 }
 
-}
+}  // namespace

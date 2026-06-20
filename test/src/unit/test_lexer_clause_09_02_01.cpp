@@ -25,4 +25,4 @@ TEST(InitialProcedureLexing, InitialFollowedByStatement) {
   EXPECT_EQ(tokens[1].kind, TokenKind::kIdentifier);
 }
 
-}
+}  // namespace

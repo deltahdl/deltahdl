@@ -153,4 +153,4 @@ TEST(ForceReleaseParsing, ReleaseConstPartSelectNet) {
   EXPECT_EQ(stmt->lhs->kind, ExprKind::kSelect);
 }
 
-}
+}  // namespace

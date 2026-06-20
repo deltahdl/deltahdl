@@ -236,8 +236,8 @@ TEST(EvalOp, InsideRangeLoBoundaryInclusive) {
   auto* inside = f.arena.Create<Expr>();
   inside->kind = ExprKind::kInside;
   inside->lhs = MakeInt(f.arena, 3);
-  inside->elements.push_back(MakeRange(f.arena, MakeInt(f.arena, 3),
-                                       MakeInt(f.arena, 7)));
+  inside->elements.push_back(
+      MakeRange(f.arena, MakeInt(f.arena, 3), MakeInt(f.arena, 7)));
   auto result = EvalExpr(inside, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 1u);
 }
@@ -247,8 +247,8 @@ TEST(EvalOp, InsideRangeHiBoundaryInclusive) {
   auto* inside = f.arena.Create<Expr>();
   inside->kind = ExprKind::kInside;
   inside->lhs = MakeInt(f.arena, 7);
-  inside->elements.push_back(MakeRange(f.arena, MakeInt(f.arena, 3),
-                                       MakeInt(f.arena, 7)));
+  inside->elements.push_back(
+      MakeRange(f.arena, MakeInt(f.arena, 3), MakeInt(f.arena, 7)));
   auto result = EvalExpr(inside, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 1u);
 }
@@ -258,8 +258,8 @@ TEST(EvalOp, InsideInvertedRangeIsEmpty) {
   auto* inside = f.arena.Create<Expr>();
   inside->kind = ExprKind::kInside;
   inside->lhs = MakeInt(f.arena, 5);
-  inside->elements.push_back(MakeRange(f.arena, MakeInt(f.arena, 10),
-                                       MakeInt(f.arena, 3)));
+  inside->elements.push_back(
+      MakeRange(f.arena, MakeInt(f.arena, 10), MakeInt(f.arena, 3)));
   auto result = EvalExpr(inside, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 0u);
 }
@@ -281,10 +281,10 @@ TEST(EvalOp, InsideOverlappingRangesMatch) {
   auto* inside = f.arena.Create<Expr>();
   inside->kind = ExprKind::kInside;
   inside->lhs = MakeInt(f.arena, 7);
-  inside->elements.push_back(MakeRange(f.arena, MakeInt(f.arena, 5),
-                                       MakeInt(f.arena, 10)));
-  inside->elements.push_back(MakeRange(f.arena, MakeInt(f.arena, 3),
-                                       MakeInt(f.arena, 8)));
+  inside->elements.push_back(
+      MakeRange(f.arena, MakeInt(f.arena, 5), MakeInt(f.arena, 10)));
+  inside->elements.push_back(
+      MakeRange(f.arena, MakeInt(f.arena, 3), MakeInt(f.arena, 8)));
   auto result = EvalExpr(inside, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 1u);
 }
@@ -318,8 +318,8 @@ TEST(EvalOpXZ, InsideOrReductionMatchOverridesAmbiguous) {
 
   inside->elements.push_back(MakeInt(f.arena, 0b0100));
 
-  inside->elements.push_back(MakeRange(f.arena, MakeInt(f.arena, 0),
-                                       MakeInt(f.arena, 15)));
+  inside->elements.push_back(
+      MakeRange(f.arena, MakeInt(f.arena, 0), MakeInt(f.arena, 15)));
 
   auto result = EvalExpr(inside, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 1u);
@@ -416,4 +416,4 @@ TEST(EvalOp, InsideFixedArrayMemberNoMatch) {
   EXPECT_EQ(result.ToUint64(), 0u);
 }
 
-}
+}  // namespace

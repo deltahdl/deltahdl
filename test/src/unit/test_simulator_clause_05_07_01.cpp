@@ -841,4 +841,4 @@ TEST(IntegerLiteralSim, UnbasedUnsizedIsOneBitInReplication) {
   EXPECT_EQ(result, 0xFu);
 }
 
-}
+}  // namespace

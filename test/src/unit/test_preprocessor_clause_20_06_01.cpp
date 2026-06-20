@@ -17,4 +17,4 @@ TEST(DataTypeParsing, TypenamePassesThroughPreprocessor) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}
+}  // namespace

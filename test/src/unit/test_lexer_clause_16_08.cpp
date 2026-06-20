@@ -28,4 +28,4 @@ TEST(SequenceDeclarationLexing, PortDirectionKeywordsRoundTrip) {
   EXPECT_EQ(tokens[2].kind, TokenKind::kKwOutput);
 }
 
-}
+}  // namespace

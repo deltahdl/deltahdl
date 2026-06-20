@@ -225,8 +225,8 @@ TEST_F(VpiGetDataSim, ReadingPastEndOfSavedDataWarnsAndZeroFills) {
 
   EXPECT_EQ(probe.ret1, 3);
   EXPECT_EQ(0, std::memcmp(probe.buf1, "ABC", 3));
-  EXPECT_EQ(probe.ret2, 0);            // nothing left to retrieve
-  EXPECT_EQ(probe.buf2[0], '\0');      // buffer zero-filled, not left as '?'
+  EXPECT_EQ(probe.ret2, 0);        // nothing left to retrieve
+  EXPECT_EQ(probe.buf2[0], '\0');  // buffer zero-filled, not left as '?'
   EXPECT_EQ(probe.buf2[1], '\0');
   EXPECT_EQ(vpi_ctx_.LastError().level, kVpiWarning);
 }

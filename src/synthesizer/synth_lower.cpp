@@ -81,7 +81,6 @@ bool SynthLower::CheckCaseSynth(const Stmt* stmt) {
 
 bool SynthLower::CheckSynthesizable(const RtlirModule* mod) {
   for (const auto& proc : mod->processes) {
-
     if (proc.kind == RtlirProcessKind::kInitial ||
         proc.kind == RtlirProcessKind::kFinal)
       continue;
@@ -304,8 +303,7 @@ static PatternBits ParsePatternLiteral(std::string_view text,
     char c = buf[j - 1];
     bool is_z = (c == 'z' || c == 'Z' || c == '?');
     bool is_x = (c == 'x' || c == 'X');
-    bool is_dc =
-        (case_kind == TokenKind::kKwCasez) ? is_z : (is_z || is_x);
+    bool is_dc = (case_kind == TokenKind::kKwCasez) ? is_z : (is_z || is_x);
     if (is_dc) {
       for (int b = 0; b < bits_per_digit && bit_pos + b < 64; ++b)
         result.dc_mask |= uint64_t{1} << (bit_pos + b);
@@ -374,9 +372,9 @@ void SynthLower::LowerCaseStmt(const Stmt* stmt, AigGraph& aig) {
 
     uint32_t match = AigGraph::kConstFalse;
     for (const auto* pat : ci.patterns) {
-      match = aig.AddOr(match, BuildPatternMatch(stmt->condition, pat, aig,
-                                                 *this, sel_width,
-                                                 stmt->case_kind));
+      match =
+          aig.AddOr(match, BuildPatternMatch(stmt->condition, pat, aig, *this,
+                                             sel_width, stmt->case_kind));
     }
     MuxCaseBits(result_bits, case_bits, match, aig);
   }
@@ -507,4 +505,4 @@ AigGraph* SynthLower::Lower(const RtlirModule* mod) {
   return aig;
 }
 
-}
+}  // namespace delta

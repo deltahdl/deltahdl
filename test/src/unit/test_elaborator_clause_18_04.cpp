@@ -93,4 +93,4 @@ TEST(RandomVariableTypes, PackedTaggedUnionRandRejected) {
              "module m; endmodule\n"));
 }
 
-}
+}  // namespace

@@ -22,8 +22,8 @@ TEST(ArrayMethodWithClause, DefaultIteratorNameIsItem) {
   SimFixture f;
   MakeDynArray(f, "arr", {10, 20, 30, 40});
 
-  auto* pred = MakeBinary(f.arena, TokenKind::kGt,
-                          MakeId(f.arena, "item"), MakeInt(f.arena, 25));
+  auto* pred = MakeBinary(f.arena, TokenKind::kGt, MakeId(f.arena, "item"),
+                          MakeInt(f.arena, 25));
   auto* call = MakeMethodCall(f.arena, "arr", "find", {});
   call->with_expr = pred;
   std::vector<Logic4Vec> out;
@@ -39,8 +39,8 @@ TEST(ArrayMethodWithClause, IteratorScopeLimitedToWithClause) {
   MakeDynArray(f, "arr", {10, 20, 30});
   MakeVar(f, "item", 32, 999);
 
-  auto* pred = MakeBinary(f.arena, TokenKind::kGt,
-                          MakeId(f.arena, "item"), MakeInt(f.arena, 15));
+  auto* pred = MakeBinary(f.arena, TokenKind::kGt, MakeId(f.arena, "item"),
+                          MakeInt(f.arena, 15));
   auto* call = MakeMethodCall(f.arena, "arr", "find", {});
   call->with_expr = pred;
   std::vector<Logic4Vec> out;
@@ -86,4 +86,4 @@ TEST(ArrayMethodWithClause, IteratorArgumentWithoutWithClauseIsError) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-}
+}  // namespace

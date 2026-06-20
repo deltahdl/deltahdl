@@ -109,4 +109,4 @@ TEST(ProgramInstantiationGrammar, ElaborationUnresolvedProgram) {
   EXPECT_EQ(top->children[0].resolved, nullptr);
 }
 
-}
+}  // namespace

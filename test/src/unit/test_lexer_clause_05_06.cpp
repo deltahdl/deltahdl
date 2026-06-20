@@ -103,4 +103,4 @@ TEST(LexicalConventionLexing, IdentifierFollowedByOperator) {
   EXPECT_EQ(tokens[2].text, "def");
 }
 
-}
+}  // namespace

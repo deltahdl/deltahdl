@@ -16,7 +16,6 @@ TEST(PliCallbackTaxonomy, RegisteredEvaluationCallbacksAreOneShot) {
 }
 
 TEST(PliCallbackTaxonomy, ValueChangeIsImmediate) {
-
   EXPECT_FALSE(IsOneShotPliCallback(kCbValueChange));
 }
 
@@ -39,7 +38,6 @@ TEST(PliCallbackRegion, CbAtStartOfSimTimeMapsToPreActive) {
 }
 
 TEST(PliCallbackRegion, CbReadWriteSynchMapsToPreNbaOrPostNba) {
-
   Region r = RegionForPliCallback(kCbReadWriteSynch);
   EXPECT_TRUE(r == Region::kPreNBA || r == Region::kPostNBA)
       << "cbReadWriteSynch must map to Pre-NBA or Post-NBA per Table 4-1";
@@ -58,7 +56,6 @@ TEST(PliCallbackRegion, CbReadOnlySynchMapsToPostponed) {
 }
 
 TEST(PliCallbackRegion, NonOneShotCallbackHasNoAssignedRegion) {
-
   EXPECT_EQ(RegionForPliCallback(kCbValueChange), Region::kCOUNT);
   EXPECT_EQ(RegionForPliCallback(kCbStmt), Region::kCOUNT);
   EXPECT_EQ(RegionForPliCallback(kCbEndOfSimulation), Region::kCOUNT);

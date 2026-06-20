@@ -57,27 +57,27 @@ TEST(ConfigSourceText, ConfigDeclarationLocalParams) {
 
 // The endconfig terminal is required to close the declaration.
 TEST(ConfigSourceText, ConfigDeclarationRequiresEndconfig) {
-  EXPECT_FALSE(ParseOk(
-      "config cfg;\n"
-      "  design top;"));
+  EXPECT_FALSE(
+      ParseOk("config cfg;\n"
+              "  design top;"));
 }
 
 // The grammar makes design_statement a mandatory member of config_declaration.
 TEST(ConfigSourceText, ConfigDeclarationRequiresDesign) {
-  EXPECT_FALSE(ParseOk(
-      "config cfg;\n"
-      "  default liblist work;\n"
-      "endconfig\n"));
+  EXPECT_FALSE(
+      ParseOk("config cfg;\n"
+              "  default liblist work;\n"
+              "endconfig\n"));
 }
 
 // config_declaration carries design_statement exactly once (it is not part of
 // the repeated config_rule_statement group), so a second design is rejected.
 TEST(ConfigSourceText, ConfigDeclarationRejectsSecondDesign) {
-  EXPECT_FALSE(ParseOk(
-      "config cfg;\n"
-      "  design lib.top;\n"
-      "  design lib.other;\n"
-      "endconfig\n"));
+  EXPECT_FALSE(
+      ParseOk("config cfg;\n"
+              "  design lib.top;\n"
+              "  design lib.other;\n"
+              "endconfig\n"));
 }
 
 // --- design_statement ------------------------------------------------------
@@ -159,17 +159,18 @@ TEST(ConfigSourceText, ConfigRuleStatementsRepeat) {
 }
 
 TEST(ConfigSourceText, ConfigRuleRequiresSemicolon) {
-  EXPECT_FALSE(ParseOk(
-      "config cfg;\n"
-      "  design top;\n"
-      "  default liblist work\n"
-      "endconfig\n"));
+  EXPECT_FALSE(
+      ParseOk("config cfg;\n"
+              "  design top;\n"
+              "  default liblist work\n"
+              "endconfig\n"));
 }
 
 // --- default_clause and liblist_clause -------------------------------------
 
 // config_rule_statement ::= default_clause liblist_clause ;
-// default_clause ::= default ; liblist_clause ::= liblist { library_identifier }
+// default_clause ::= default ; liblist_clause ::= liblist { library_identifier
+// }
 TEST(ConfigSourceText, DefaultClauseWithLiblist) {
   auto r = Parse(
       "config cfg;\n"

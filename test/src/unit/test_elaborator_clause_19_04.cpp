@@ -127,4 +127,4 @@ TEST(EmbeddedCovergroup, CoversLocalAndProtectedPropertiesOk) {
              "module m; endmodule\n"));
 }
 
-}
+}  // namespace

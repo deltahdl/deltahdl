@@ -257,4 +257,4 @@ TEST(StringConcatAndReplication, EndToEndThreeStringConcat) {
   EXPECT_EQ(VecToStr(var->value), "hello world");
 }
 
-}
+}  // namespace

@@ -91,13 +91,13 @@ TEST(ClassAssignRenameParsing, ClassContainingClassProperty) {
 }
 
 TEST(ClassAssignRenameParsing, ShallowCopyInDeclaration) {
-  EXPECT_TRUE(ParseOk(
-      "class C;\n"
-      "endclass\n"
-      "module m;\n"
-      "  C c1;\n"
-      "  initial begin C c2 = new c1; end\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("class C;\n"
+              "endclass\n"
+              "module m;\n"
+              "  C c1;\n"
+              "  initial begin C c2 = new c1; end\n"
+              "endmodule\n"));
 }
 
 TEST(ClassAssignRenameParsing, DeepChainedMemberAccess) {
@@ -137,4 +137,4 @@ TEST(ClassAssignRenameParsing, ShallowCopyExtendedClass) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

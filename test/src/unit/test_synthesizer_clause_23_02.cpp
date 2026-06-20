@@ -23,4 +23,4 @@ TEST(ModuleDefinitions, MacromoduleSynthesizes) {
   ASSERT_NE(aig, nullptr);
 }
 
-}
+}  // namespace

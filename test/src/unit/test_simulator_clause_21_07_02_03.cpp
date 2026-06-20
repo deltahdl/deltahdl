@@ -98,5 +98,5 @@ TEST_F(VcdHeaderAndScopeSim, VersionOmitsDumpfileWithoutLiteral) {
   EXPECT_EQ(content.find("$dumpfile("), std::string::npos);
 }
 
-}
-}
+}  // namespace
+}  // namespace delta

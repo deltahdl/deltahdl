@@ -215,4 +215,4 @@ TEST(ReplicationEval, OperandsEvaluatedOnceWithZeroMultiplier) {
   EXPECT_EQ(f.ctx.FindVariable("i")->value.ToUint64(), 1u);
 }
 
-}
+}  // namespace

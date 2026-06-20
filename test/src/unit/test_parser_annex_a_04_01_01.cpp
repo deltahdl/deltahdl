@@ -167,7 +167,8 @@ TEST(ModuleInstantiationGrammar, AttributeOnPortConnection) {
 // The attribute_instance prefix is also permitted on a positional (ordered)
 // connection, not only on a named one; the connection still parses as ordered.
 TEST(ModuleInstantiationGrammar, AttributeOnOrderedPortConnection) {
-  auto r = Parse("module m; sub u0((* full_case *) x, (* parallel *) y); endmodule\n");
+  auto r = Parse(
+      "module m; sub u0((* full_case *) x, (* parallel *) y); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto* item = r.cu->modules[0]->items[0];
@@ -259,8 +260,10 @@ TEST(ModuleInstantiationGrammar, OrderedPortConnectionEmptyExpression) {
   EXPECT_NE(item->inst_ports[2].second, nullptr);
 }
 
-// list_of_port_connections ::= ordered_port_connection { , ordered_port_connection }
-//                            | named_port_connection { , named_port_connection }
+// list_of_port_connections ::= ordered_port_connection { ,
+// ordered_port_connection }
+//                            | named_port_connection { , named_port_connection
+//                            }
 // The two alternatives are mutually exclusive: a single list cannot combine
 // ordered and named port connections.
 TEST(ModuleInstantiationGrammar, ErrorOrderedAndNamedPortsCannotMix) {
@@ -291,4 +294,4 @@ TEST(ModuleInstantiationGrammar, ErrorMissingSemicolon) {
   EXPECT_TRUE(r.has_errors);
 }
 
-}
+}  // namespace

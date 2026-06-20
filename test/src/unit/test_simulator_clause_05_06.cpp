@@ -100,11 +100,12 @@ TEST(IdentifierSim, IdentifierReferencesObject) {
 TEST(IdentifierSim, IdentifierExceedingMaxLengthReportsError) {
   SimFixture f;
   std::string long_id(1025, 'a');
-  ElaborateSrc("module t;\n"
-               "  logic " +
-                   long_id +
-                   ";\n"
-                   "endmodule\n",
-               f);
+  ElaborateSrc(
+      "module t;\n"
+      "  logic " +
+          long_id +
+          ";\n"
+          "endmodule\n",
+      f);
   EXPECT_TRUE(f.has_errors);
 }

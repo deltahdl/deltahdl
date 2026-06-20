@@ -72,4 +72,4 @@ TEST(SvaEngine, AndEndTimeIsTheLaterOperandEndTime) {
   EXPECT_FALSE(EvalSequenceAndMatch(false, 10, true, 12).matched);
 }
 
-}
+}  // namespace

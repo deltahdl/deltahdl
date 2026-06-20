@@ -119,4 +119,4 @@ TEST(QueueSizeSimulation, SizeTracksLiveCount) {
   EXPECT_EQ(out.ToUint64(), 0u);
 }
 
-}
+}  // namespace

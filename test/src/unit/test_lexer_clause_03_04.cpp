@@ -26,4 +26,4 @@ TEST(ProgramBlockLexing, ProgramEnclosureTokenStream) {
   EXPECT_EQ(tokens[3].kind, TokenKind::kKwEndprogram);
 }
 
-}
+}  // namespace

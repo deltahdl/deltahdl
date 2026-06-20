@@ -42,9 +42,8 @@ TEST(RewriteAlgorithm, UntypedFormalSubstitution) {
   EXPECT_EQ(ReplaceFormalReference(FormalKind::kUntyped,
                                    ActualNature::kDollarOrLvalue),
             ReferenceReplacement::kActualDirect);
-  EXPECT_EQ(
-      ReplaceFormalReference(FormalKind::kUntyped, ActualNature::kOther),
-      ReferenceReplacement::kItemCastInferredType);
+  EXPECT_EQ(ReplaceFormalReference(FormalKind::kUntyped, ActualNature::kOther),
+            ReferenceReplacement::kItemCastInferredType);
 }
 
 // §F.4.1.1 step 4: a typed, non-matching formal casts to the formal type t
@@ -65,9 +64,9 @@ TEST(RewriteAlgorithm, TypedMatchingFormalSubstitution) {
   EXPECT_EQ(ReplaceFormalReference(FormalKind::kTypedMatching,
                                    ActualNature::kSequenceMethodOperand),
             ReferenceReplacement::kItemActual);
-  EXPECT_EQ(ReplaceFormalReference(FormalKind::kTypedMatching,
-                                   ActualNature::kOther),
-            ReferenceReplacement::kParenthesizedActual);
+  EXPECT_EQ(
+      ReplaceFormalReference(FormalKind::kTypedMatching, ActualNature::kOther),
+      ReferenceReplacement::kParenthesizedActual);
 }
 
 // §F.4.1.1 step 3 (edge): the untyped formal's only special case is a `$` or
@@ -75,9 +74,9 @@ TEST(RewriteAlgorithm, TypedMatchingFormalSubstitution) {
 // operand — distinctions that belong to steps 4 and 5 — do not divert step 3,
 // which still casts through the actual's own type.
 TEST(RewriteAlgorithm, UntypedFormalCastIgnoresOtherStepsActualForms) {
-  EXPECT_EQ(ReplaceFormalReference(FormalKind::kUntyped,
-                                   ActualNature::kCastingType),
-            ReferenceReplacement::kItemCastInferredType);
+  EXPECT_EQ(
+      ReplaceFormalReference(FormalKind::kUntyped, ActualNature::kCastingType),
+      ReferenceReplacement::kItemCastInferredType);
   EXPECT_EQ(ReplaceFormalReference(FormalKind::kUntyped,
                                    ActualNature::kSequenceMethodOperand),
             ReferenceReplacement::kItemCastInferredType);
@@ -111,9 +110,9 @@ TEST(RewriteAlgorithm, TypedMatchingParenthesizesUnlessMethodOperand) {
 // resolves to the local name directly rather than to any item/cast wrapper,
 // regardless of the actual's form.
 TEST(RewriteAlgorithm, LocalVariableReferenceSubstitutesDirectly) {
-  EXPECT_EQ(ReplaceFormalReference(FormalKind::kLocalVariable,
-                                   ActualNature::kOther),
-            ReferenceReplacement::kActualDirect);
+  EXPECT_EQ(
+      ReplaceFormalReference(FormalKind::kLocalVariable, ActualNature::kOther),
+      ReferenceReplacement::kActualDirect);
   EXPECT_EQ(ReplaceFormalReference(FormalKind::kLocalVariable,
                                    ActualNature::kSequenceMethodOperand),
             ReferenceReplacement::kActualDirect);

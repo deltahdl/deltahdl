@@ -52,4 +52,4 @@ TEST(Elaborator, DelayModeDistributed_AppliesToAllFollowingModules) {
             DelayModeDirective::kDistributed);
 }
 
-}
+}  // namespace

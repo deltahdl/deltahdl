@@ -34,4 +34,4 @@ TEST(AssocArrayLastElaboration, LastOnStringKeyAssocArrayOk) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

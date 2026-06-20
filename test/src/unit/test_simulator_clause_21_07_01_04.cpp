@@ -12,8 +12,8 @@ namespace {
 // §21.7.1.4 are observed as the production task path applies them.
 class DumpallSysTask : public VcdTestBase {};
 
-// $dumpall creates a checkpoint that records the current value of every selected
-// variable, delimited by the $dumpall/$end keywords.
+// $dumpall creates a checkpoint that records the current value of every
+// selected variable, delimited by the $dumpall/$end keywords.
 TEST_F(DumpallSysTask, DumpallWritesCheckpointOfCurrentValues) {
   SimFixture f;
   auto* clk = MakeVar(f, "clk", 1, 1);
@@ -33,7 +33,7 @@ TEST_F(DumpallSysTask, DumpallWritesCheckpointOfCurrentValues) {
   EXPECT_NE(pos, std::string::npos);
   EXPECT_NE(content.find("1!"), std::string::npos);            // scalar current
   EXPECT_NE(content.find("b10100101 \""), std::string::npos);  // vector current
-  EXPECT_NE(content.find("$end", pos), std::string::npos);     // checkpoint closed
+  EXPECT_NE(content.find("$end", pos), std::string::npos);  // checkpoint closed
 }
 
 // While dumping is enabled the dumper records only the variables that change in
@@ -67,5 +67,5 @@ TEST_F(DumpallSysTask, DumpallWithoutDumpFileIsHarmless) {
   EXPECT_EQ(f.ctx.GetVcdWriter(), nullptr);
 }
 
-}
-}
+}  // namespace
+}  // namespace delta

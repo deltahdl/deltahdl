@@ -32,7 +32,8 @@ bool IsLetNonEventFormalActualLegal(bool self_determined_type_cast_compatible) {
   return self_determined_type_cast_compatible;
 }
 
-LetTypedFormalSubstitutionMode LetTypedFormalSubstitution(bool formal_is_event) {
+LetTypedFormalSubstitutionMode LetTypedFormalSubstitution(
+    bool formal_is_event) {
   // §11.12: an event formal is substituted as an event_expression; any other
   // typed formal has its actual cast to the formal's type before the actual
   // is spliced in by the rewriting algorithm (§F.4).

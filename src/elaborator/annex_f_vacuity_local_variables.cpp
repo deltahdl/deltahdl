@@ -95,9 +95,10 @@ std::size_t SequenceReach(const SequenceExpr& seq) {
   return 1;
 }
 
-// A structural bound on how far a local-variable property can reach into a word;
-// once a word's suffix lies entirely inside a constant tail this many letters
-// past the explicit prefix, extending the tail cannot change the verdict.
+// A structural bound on how far a local-variable property can reach into a
+// word; once a word's suffix lies entirely inside a constant tail this many
+// letters past the explicit prefix, extending the tail cannot change the
+// verdict.
 std::size_t PropertyReach(const LvProperty& property) {
   switch (property.kind) {
     case LvProperty::Kind::kStrong:
@@ -125,8 +126,9 @@ std::size_t PropertyReach(const LvProperty& property) {
 }
 
 // A finite materialization of a prefix followed by a constant tail (T^omega or
-// _|_^omega), padded `reach` letters past the prefix plus a margin -- enough for
-// the verdict to have stabilized for the finite properties this model handles.
+// _|_^omega), padded `reach` letters past the prefix plus a margin -- enough
+// for the verdict to have stabilized for the finite properties this model
+// handles.
 Word PrefixWithTail(const Word& prefix, const Letter& tail, std::size_t reach) {
   Word out = prefix;
   const std::size_t pad = reach + 2;
@@ -155,8 +157,8 @@ bool NonVacuousAbortShape(const Word& word, const BooleanExpr& boolean,
   if (first_b == word.size()) {
     return true;
   }
-  // (2) Some b-free prefix x leaves P unmet under one of the constant tails. The
-  // prefixes with no b-letter are exactly those of length 0..first_b.
+  // (2) Some b-free prefix x leaves P unmet under one of the constant tails.
+  // The prefixes with no b-letter are exactly those of length 0..first_b.
   const std::size_t reach = PropertyReach(operand);
   for (std::size_t len = 0; len <= first_b; ++len) {
     const Word prefix = FirstLetters(word, len);
@@ -175,8 +177,8 @@ bool NonVacuous(const Word& word, const LvProperty& property,
   switch (property.kind) {
     case LvProperty::Kind::kStrong:
     case LvProperty::Kind::kWeak:
-      // §F.5.3.3 base: w, L_0 |=^non strong(R) and weak(R) hold for every w; the
-      // context plays no role.
+      // §F.5.3.3 base: w, L_0 |=^non strong(R) and weak(R) hold for every w;
+      // the context plays no role.
       return true;
     case LvProperty::Kind::kLocalVarDecl:
       // §F.5.6.3: w, L_0 |=^non ( t v ; P ) iff w, L_0\v |=^non P. The declared
@@ -194,9 +196,10 @@ bool NonVacuous(const Word& word, const LvProperty& property,
              NonVacuous(ComplementWord(word), *property.lhs, context);
     case LvProperty::Kind::kImplication: {
       // §F.5.3.3: w, L_0 |=^non R |-> P iff there exists i >= 0 with w^{0,i}
-      // tightly satisfying the trigger R -- on w itself, not w-bar -- under some
-      // output context L_1, and w^{i.}, L_1 |=^non P. The four-way relation
-      // yields the L_1 the antecedent produces; each is threaded into P.
+      // tightly satisfying the trigger R -- on w itself, not w-bar -- under
+      // some output context L_1, and w^{i.}, L_1 |=^non P. The four-way
+      // relation yields the L_1 the antecedent produces; each is threaded into
+      // P.
       if (!property.sequence || !property.lhs) {
         return false;
       }
@@ -265,7 +268,8 @@ bool NonVacuous(const Word& word, const LvProperty& property,
 
 }  // namespace
 
-bool NonVacuouslyEvaluatesWithLocals(const Word& word, const LvProperty& property,
+bool NonVacuouslyEvaluatesWithLocals(const Word& word,
+                                     const LvProperty& property,
                                      const LocalContext& context) {
   return NonVacuous(word, property, context);
 }
@@ -291,8 +295,8 @@ bool NonVacuouslyEvaluatesTopLevelWithLocals(const Word& word,
                                   context);
     case LvTopLevelProperty::Kind::kParen:
       // A parenthesized top-level property is transparent, as for ( P ).
-      return top.inner && NonVacuouslyEvaluatesTopLevelWithLocals(
-                              word, *top.inner, context);
+      return top.inner &&
+             NonVacuouslyEvaluatesTopLevelWithLocals(word, *top.inner, context);
     case LvTopLevelProperty::Kind::kLocalVarDecl:
       // §F.5.6.3: w, L_0 |=^non ( t v ; T ) iff w, L_0\v |=^non T.
       return top.inner &&
@@ -302,7 +306,8 @@ bool NonVacuouslyEvaluatesTopLevelWithLocals(const Word& word,
   return false;
 }
 
-bool SatisfiesNonVacuouslyWithLocals(const Word& word, const LvProperty& property,
+bool SatisfiesNonVacuouslyWithLocals(const Word& word,
+                                     const LvProperty& property,
                                      const LocalContext& context) {
   // §F.5.6.3 (inheriting §F.5.3.3): w satisfies P nonvacuously iff w, L_0 |= P
   // and w, L_0 |=^non P.

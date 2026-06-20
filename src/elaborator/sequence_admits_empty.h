@@ -45,8 +45,7 @@ enum class AdmitsEmptyForm : uint8_t {
 // returns the answer for the composite form. Callers do not need to model the
 // full AST: each form's rule reduces to a Boolean predicate over the
 // children's admits_empty answers.
-bool AdmitsEmpty(AdmitsEmptyForm form,
-                 bool first_child_admits_empty,
+bool AdmitsEmpty(AdmitsEmptyForm form, bool first_child_admits_empty,
                  bool second_child_admits_empty);
 
 // §F.4.3 closes by defining `push(E, p)` (and the analogous push for
@@ -82,8 +81,6 @@ enum class PushRouting : uint8_t {
   kAttachKappaWithDelayOneToBoth,
 };
 
-PushRouting RoutePush(PushSite site,
-                      bool list_empty,
-                      bool right_admits_empty);
+PushRouting RoutePush(PushSite site, bool list_empty, bool right_admits_empty);
 
 }  // namespace delta

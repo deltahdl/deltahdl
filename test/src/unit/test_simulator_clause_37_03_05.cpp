@@ -50,10 +50,11 @@ TEST_F(ExpressionsWithSideEffects, GetValueEvaluatesTheSideEffect) {
   EXPECT_EQ(call.side_effect_count, 2);
 }
 
-// Claim A (boundary): the full evaluation is the side effect's, not every read's.
-// An expression with no side effects is read without any such evaluation, so its
-// count stays at zero.
-TEST_F(ExpressionsWithSideEffects, GetValueOnPlainExpressionEvaluatesNoSideEffect) {
+// Claim A (boundary): the full evaluation is the side effect's, not every
+// read's. An expression with no side effects is read without any such
+// evaluation, so its count stays at zero.
+TEST_F(ExpressionsWithSideEffects,
+       GetValueOnPlainExpressionEvaluatesNoSideEffect) {
   VpiObject expr;
   expr.type = vpiOperation;  // a plain operation, no side effects
 
@@ -65,10 +66,10 @@ TEST_F(ExpressionsWithSideEffects, GetValueOnPlainExpressionEvaluatesNoSideEffec
   EXPECT_FALSE(VpiExpressionHasSideEffects(&expr));
 }
 
-// Claim B (Example 1): asking for a property of an expression whose value cannot
-// be determined without evaluating a side-effecting expression - such as the
-// vpiSize of the function call ename(e) - is an error. vpi_get() refuses the
-// query, records the error, and returns vpiUndefined.
+// Claim B (Example 1): asking for a property of an expression whose value
+// cannot be determined without evaluating a side-effecting expression - such as
+// the vpiSize of the function call ename(e) - is an error. vpi_get() refuses
+// the query, records the error, and returns vpiUndefined.
 TEST_F(ExpressionsWithSideEffects, GetPropertyNeedingSideEffectEvalIsAnError) {
   VpiObject call;
   call.type = vpiFuncCall;
@@ -100,7 +101,8 @@ TEST_F(ExpressionsWithSideEffects, GetTypeIsAllowedOnSuchAnExpression) {
 // relation from an expression whose related handle cannot be determined without
 // evaluating a side-effecting expression is an error: vpi_handle() refuses it,
 // records the error, and returns a null handle.
-TEST_F(ExpressionsWithSideEffects, HandleRelationNeedingSideEffectEvalIsAnError) {
+TEST_F(ExpressionsWithSideEffects,
+       HandleRelationNeedingSideEffectEvalIsAnError) {
   VpiObject call;
   call.type = vpiFuncCall;
   call.property_needs_side_effect_eval = true;
@@ -136,11 +138,12 @@ TEST_F(ExpressionsWithSideEffects, PutValueWithSideEffectingIndexIsAnError) {
 }
 
 // Claim C (edge - "any of its index expressions"): the guard checks every index
-// expression, not just the first. A multi-dimensional select whose leading index
-// is side-effect-free but whose trailing index has side effects -
-// my_array[2][--i] - is still rejected, exercising the loop past the clean index
-// before it fires on the side-effecting one.
-TEST_F(ExpressionsWithSideEffects, PutValueWithLaterSideEffectingIndexIsAnError) {
+// expression, not just the first. A multi-dimensional select whose leading
+// index is side-effect-free but whose trailing index has side effects -
+// my_array[2][--i] - is still rejected, exercising the loop past the clean
+// index before it fires on the side-effecting one.
+TEST_F(ExpressionsWithSideEffects,
+       PutValueWithLaterSideEffectingIndexIsAnError) {
   VpiObject leading;  // the side-effect-free index 2
   leading.type = vpiConstant;
 

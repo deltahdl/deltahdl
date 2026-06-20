@@ -28,4 +28,4 @@ TEST(PureDpiImportParsing, ParserMarksPureFlagOnImport) {
   EXPECT_FALSE(items[0]->dpi_is_task);
 }
 
-}
+}  // namespace

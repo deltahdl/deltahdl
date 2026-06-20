@@ -134,4 +134,4 @@ TEST(MemInfer, RomInference) {
   EXPECT_TRUE(memories[0].write_ports.empty());
 }
 
-}
+}  // namespace

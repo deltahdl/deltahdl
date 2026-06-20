@@ -50,9 +50,12 @@ TEST(SeveritySystemTaskSim, FatalRequestsStop) {
 TEST(SeveritySystemTaskSim, FatalAllValidFinishNumbersStop) {
   for (int fn = 0; fn <= 2; ++fn) {
     SimFixture f;
-    auto src = "module t;\n"
-               "  initial $fatal(" + std::to_string(fn) + ", \"x\");\n"
-               "endmodule\n";
+    auto src =
+        "module t;\n"
+        "  initial $fatal(" +
+        std::to_string(fn) +
+        ", \"x\");\n"
+        "endmodule\n";
     auto* design = ElaborateSrc(src, f);
     ASSERT_NE(design, nullptr);
     Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -167,4 +170,4 @@ TEST(SeveritySystemTaskSim, InfoIncludesUserDefinedMessage) {
   EXPECT_EQ(f.ctx.LastSeverityMsg(), "hello world");
 }
 
-}
+}  // namespace

@@ -37,8 +37,8 @@ class VpiPutDelaysSim : public ::testing::Test {
 // delays from the caller-allocated da array, one source value per delay (mtm
 // and pulsere both off), in the order they occur in the source.
 TEST_F(VpiPutDelaysSim, SetsDelaysInSourceOrder) {
-  VpiHandle prim = MakeDelayObject(vpiPrimitive, {VpiDelayInfo{}, VpiDelayInfo{},
-                                                  VpiDelayInfo{}});
+  VpiHandle prim = MakeDelayObject(
+      vpiPrimitive, {VpiDelayInfo{}, VpiDelayInfo{}, VpiDelayInfo{}});
 
   s_vpi_time da[3] = {};
   da[0].real = 11.0;
@@ -68,7 +68,8 @@ TEST_F(VpiPutDelaysSim, SetsDelaysInSourceOrder) {
 // split across high/low; the routine reconstitutes the same magnitude a
 // vpiScaledRealTime put would have stored from the real field.
 TEST_F(VpiPutDelaysSim, TimeTypeControlsSourceFormat) {
-  VpiHandle prim = MakeDelayObject(vpiPrimitive, {VpiDelayInfo{}, VpiDelayInfo{}});
+  VpiHandle prim =
+      MakeDelayObject(vpiPrimitive, {VpiDelayInfo{}, VpiDelayInfo{}});
 
   s_vpi_time da[2] = {};
   da[0].low = 7u;  // vpiSimTime: value lives in high/low, not real
@@ -124,7 +125,8 @@ TEST_F(VpiPutDelaysSim, DelayOnlyPutPreservesPulseLimits) {
 // §38.32 (Table 38-4, row 2): with mtm_flag set and pulsere_flag clear, each
 // delay is taken from three source entries - min, then typ, then max delay.
 TEST_F(VpiPutDelaysSim, MtmFlagConsumesMinTypMax) {
-  VpiHandle prim = MakeDelayObject(vpiPrimitive, {VpiDelayInfo{}, VpiDelayInfo{}});
+  VpiHandle prim =
+      MakeDelayObject(vpiPrimitive, {VpiDelayInfo{}, VpiDelayInfo{}});
 
   // Two delays, three entries each (min:typ:max) -> six entries.
   s_vpi_time da[6] = {};

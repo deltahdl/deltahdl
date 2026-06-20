@@ -85,7 +85,8 @@ TEST(IntraAssignTimingSimulation, NbaIntraDelayDoesNotBlock) {
       "  initial begin\n"
       "    b = 8'd10;\n"
       "    a <= #5 b;\n"
-      "    c = 8'd99;\n"  // a nonblocking intra-delay does not stall the process
+      "    c = 8'd99;\n"  // a nonblocking intra-delay does not stall the
+                          // process
       "  end\n"
       "endmodule\n",
       f);
@@ -452,7 +453,7 @@ TEST(IntraAssignTimingSimulation, RepeatCountsOrEdgesSeparatelyAtSameTime) {
       "  end\n"
       "  initial begin\n"
       "    #5 phi1 = 1;\n"  // posedge phi1 and ...
-      "    phi2 = 0;\n"     // ... negedge phi2 in the same time step => two events
+      "    phi2 = 0;\n"  // ... negedge phi2 in the same time step => two events
       "  end\n"
       "endmodule\n",
       f);
@@ -480,8 +481,8 @@ TEST(IntraAssignTimingSimulation, RepeatCountsAcrossOrListOverTime) {
       "    a = repeat(2) @(posedge x or posedge y) b;\n"
       "  end\n"
       "  initial begin\n"
-      "    #5 x = 1;\n"   // first occurrence
-      "    #5 y = 1;\n"   // second occurrence, different signal, later time
+      "    #5 x = 1;\n"  // first occurrence
+      "    #5 y = 1;\n"  // second occurrence, different signal, later time
       "  end\n"
       "endmodule\n",
       f);
@@ -624,4 +625,4 @@ TEST(IntraAssignTimingSimulation, NbaRepeatEventCapturesRhs) {
   EXPECT_EQ(a->value.ToUint64(), 25u);
 }
 
-}
+}  // namespace

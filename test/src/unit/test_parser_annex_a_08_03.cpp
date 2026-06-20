@@ -440,23 +440,20 @@ TEST(ExpressionParsing, ConstantIndexedRangeMinusInPackedDimSelect) {
 }
 
 TEST(ExpressionParsing, ErrorTaggedExpressionMissingMember) {
-
-  EXPECT_FALSE(ParseOk(
-      "module m;\n"
-      "  initial x = tagged ;\n"
-      "endmodule\n"));
+  EXPECT_FALSE(
+      ParseOk("module m;\n"
+              "  initial x = tagged ;\n"
+              "endmodule\n"));
 }
 
 TEST(ExpressionParsing, ErrorBinaryOperatorMissingRhs) {
-
-  EXPECT_FALSE(ParseOk(
-      "module m;\n"
-      "  initial x = a + ;\n"
-      "endmodule\n"));
+  EXPECT_FALSE(
+      ParseOk("module m;\n"
+              "  initial x = a + ;\n"
+              "endmodule\n"));
 }
 
 TEST(ExpressionParsing, ConstantRangeReversedBounds) {
-
   auto r = Parse(
       "module m;\n"
       "  logic [0:7] x;\n"
@@ -465,4 +462,4 @@ TEST(ExpressionParsing, ConstantRangeReversedBounds) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}
+}  // namespace

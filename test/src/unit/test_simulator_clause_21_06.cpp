@@ -43,8 +43,7 @@ TEST(UtilitySystemTaskTest, TestPlusargsFromVariableIgnoresLeadingNulls) {
   // Bytes 'H','E' sit in the low half; the two high bytes are nulls that must
   // not be part of the match string.
   pat->value = MakeLogic4VecVal(f.arena, 32, ('H' << 8) | 'E');
-  auto* expr =
-      MakeSysCall(f.arena, "$test$plusargs", {MakeId(f.arena, "pat")});
+  auto* expr = MakeSysCall(f.arena, "$test$plusargs", {MakeId(f.arena, "pat")});
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 1u);
 }
@@ -72,9 +71,8 @@ TEST(UtilitySystemTaskTest, ValuePlusargsUsesFirstMatchingPlusarg) {
   f.ctx.AddPlusArg("VAL=9");
   auto* val = f.ctx.CreateVariable("val", 32);
   val->value = MakeLogic4VecVal(f.arena, 32, 0);
-  auto* expr =
-      MakeSysCall(f.arena, "$value$plusargs",
-                  {MkStr(f.arena, "VAL=%d"), MakeId(f.arena, "val")});
+  auto* expr = MakeSysCall(f.arena, "$value$plusargs",
+                           {MkStr(f.arena, "VAL=%d"), MakeId(f.arena, "val")});
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 1u);
   EXPECT_EQ(val->value.ToUint64(), 7u);
@@ -154,8 +152,8 @@ TEST(UtilitySystemTaskTest, ValuePlusargsEmptyRemainderStoresZero) {
   EXPECT_EQ(count->value.ToUint64(), 0u);
 }
 
-// §21.6: a remainder containing characters illegal for the conversion writes the
-// variable with 'bx. Here '2' is not a legal binary digit.
+// §21.6: a remainder containing characters illegal for the conversion writes
+// the variable with 'bx. Here '2' is not a legal binary digit.
 TEST(UtilitySystemTaskTest, ValuePlusargsIllegalCharsStoreX) {
   SimFixture f;
   f.ctx.AddPlusArg("FLAG=12");
@@ -176,12 +174,11 @@ TEST(UtilitySystemTaskTest, ValuePlusargsNegativeValueTruncates) {
   f.ctx.AddPlusArg("OFF=-1");
   auto* off = f.ctx.CreateVariable("off", 8);
   off->value = MakeLogic4VecVal(f.arena, 8, 0);
-  auto* expr =
-      MakeSysCall(f.arena, "$value$plusargs",
-                  {MkStr(f.arena, "OFF=%d"), MakeId(f.arena, "off")});
+  auto* expr = MakeSysCall(f.arena, "$value$plusargs",
+                           {MkStr(f.arena, "OFF=%d"), MakeId(f.arena, "off")});
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 1u);
   EXPECT_EQ(off->value.ToUint64(), 255u);
 }
 
-}
+}  // namespace

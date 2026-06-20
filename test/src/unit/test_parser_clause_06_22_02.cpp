@@ -120,4 +120,4 @@ TEST(EquivalentTypesParsing, ElementTypesEquivalentLogicAndReg) {
                                      DataTypeKind::kReg, 8, false, true));
 }
 
-}
+}  // namespace

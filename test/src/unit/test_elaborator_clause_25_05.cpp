@@ -95,7 +95,8 @@ TEST(InterfaceModportNames, ModportNamesFromCommaDeclarationResolve) {
 
 // §25.5: when the module header and the instance connection both select a
 // modport, choosing the same one is legal.
-TEST(InterfaceModportAgreement, HeaderAndConnectionSelectSameModportElaborates) {
+TEST(InterfaceModportAgreement,
+     HeaderAndConnectionSelectSameModportElaborates) {
   EXPECT_TRUE(
       ElabOk("interface bus_if;\n"
              "  logic data;\n"
@@ -164,4 +165,4 @@ TEST(InterfaceDefaultAccess, ModportlessInterfacePortPermitsMemberAccess) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

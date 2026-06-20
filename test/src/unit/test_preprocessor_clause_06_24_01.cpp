@@ -32,4 +32,4 @@ TEST(CastOperatorParsing, CastUnsigned) {
   EXPECT_EQ(rhs->text, "unsigned");
 }
 
-}
+}  // namespace

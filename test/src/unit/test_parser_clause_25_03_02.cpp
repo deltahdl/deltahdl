@@ -77,4 +77,4 @@ TEST(InterfaceInstantiationInTop, ImplicitConnectionToInterfacePort) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

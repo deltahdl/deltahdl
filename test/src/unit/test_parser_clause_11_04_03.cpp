@@ -85,4 +85,4 @@ TEST(OperatorParsing, UnaryPlusPrecedenceOverAdd) {
   EXPECT_EQ(rhs->lhs->op, TokenKind::kPlus);
 }
 
-}
+}  // namespace

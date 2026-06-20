@@ -724,8 +724,8 @@ TEST(AlwaysCombMultiDriver, IndependentStructFieldsNoConflict) {
 }
 
 TEST(AlwaysCombMultiDriver, WholeStructAndFieldConflict) {
-  // §9.2.2.2: when one always_comb drives a whole structure and another drives a
-  // field of it, the prefixes overlap, so it is an illegal multiple driver.
+  // §9.2.2.2: when one always_comb drives a whole structure and another drives
+  // a field of it, the prefixes overlap, so it is an illegal multiple driver.
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -755,4 +755,4 @@ TEST(AlwaysCombLatchWarning, NestedIncompleteIfWarnsLatch) {
   EXPECT_GE(f.diag.WarningCount(), 1u);
 }
 
-}
+}  // namespace

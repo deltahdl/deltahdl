@@ -23,9 +23,9 @@ TEST(Nondegeneracy, RuleAUsedAsPropertyRejectsEmpty) {
                                     SequenceMatchClass::kAdmitsOnlyEmpty));
   EXPECT_FALSE(IsSequenceUsageLegal(SequenceUsageContext::kAsProperty,
                                     SequenceMatchClass::kAdmitsNoMatch));
-  EXPECT_TRUE(IsSequenceUsageLegal(
-      SequenceUsageContext::kAsProperty,
-      SequenceMatchClass::kAdmitsAtLeastOneNonempty));
+  EXPECT_TRUE(
+      IsSequenceUsageLegal(SequenceUsageContext::kAsProperty,
+                           SequenceMatchClass::kAdmitsAtLeastOneNonempty));
 }
 
 TEST(Nondegeneracy, RuleBOverlappingAntecedentMustBeNondegenerate) {
@@ -61,4 +61,4 @@ TEST(Nondegeneracy, RuleCNonoverlappingAntecedentAllowsEmptyOnly) {
       SequenceMatchClass::kAdmitsAtLeastOneNonempty));
 }
 
-}
+}  // namespace

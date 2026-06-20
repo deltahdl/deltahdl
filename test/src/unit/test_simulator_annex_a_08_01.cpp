@@ -136,4 +136,4 @@ TEST(ConcatenationSim, ThreeElementConcatenationSimulates) {
   EXPECT_EQ(var->value.ToUint64(), 0xABCu);
 }
 
-}
+}  // namespace

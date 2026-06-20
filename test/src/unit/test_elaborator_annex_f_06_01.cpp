@@ -93,23 +93,23 @@ TEST(ExtendedBooleans, TriggeredFlowsActualArgumentsBackOut) {
   const Word word{A({"x"})};
   const LocalContext input{{"u", A({"z"})}};
   // V = {v}: v escapes bound to the observed letter; u is still kept.
-  EXPECT_TRUE(SameContexts(
-      TriggeredOutputs(word, /*j=*/0, *seq, NameSet{"v"}, input),
-      {LocalContext{{"u", A({"z"})}, {"v", A({"x"})}}}));
+  EXPECT_TRUE(
+      SameContexts(TriggeredOutputs(word, /*j=*/0, *seq, NameSet{"v"}, input),
+                   {LocalContext{{"u", A({"z"})}, {"v", A({"x"})}}}));
 }
 
 // §F.6.1 (triggered): D = dom(L_0) - (dom(L) & V) drops an incoming binding the
-// call overwrites, so the freshly sampled value replaces the old one rather than
-// colliding with it.
+// call overwrites, so the freshly sampled value replaces the old one rather
+// than colliding with it.
 TEST(ExtendedBooleans, TriggeredOverwritesIncomingNameAlsoSampled) {
   auto seq = Samp("v");
   const Word word{A({"x"})};
   const LocalContext input{{"v", A({"old"})}};
   // v is both incoming and sampled, and passed as an actual: D excludes v, so
   // only the new binding remains.
-  EXPECT_TRUE(SameContexts(
-      TriggeredOutputs(word, /*j=*/0, *seq, NameSet{"v"}, input),
-      {LocalContext{{"v", A({"x"})}}}));
+  EXPECT_TRUE(
+      SameContexts(TriggeredOutputs(word, /*j=*/0, *seq, NameSet{"v"}, input),
+                   {LocalContext{{"v", A({"x"})}}}));
 }
 
 // §F.6.1 (triggered): a sampled name overwritten by the body but NOT passed
@@ -120,9 +120,9 @@ TEST(ExtendedBooleans, TriggeredKeepsIncomingNameWhenNotAnActual) {
   const Word word{A({"x"})};
   const LocalContext input{{"v", A({"old"})}};
   // V = {}: dom(L) & V is empty, so D keeps v and the incoming value survives.
-  EXPECT_TRUE(SameContexts(
-      TriggeredOutputs(word, /*j=*/0, *seq, NameSet{}, input),
-      {LocalContext{{"v", A({"old"})}}}));
+  EXPECT_TRUE(
+      SameContexts(TriggeredOutputs(word, /*j=*/0, *seq, NameSet{}, input),
+                   {LocalContext{{"v", A({"old"})}}}));
 }
 
 // §F.6.1 (triggered) boundary: j must lie in 0 <= j < |w|; a point at or past
@@ -152,18 +152,20 @@ TEST(ExtendedBooleans, MatchedRejectsClockTickBeforeJ) {
   auto clk = BoolAtom("clk");
   // a triggers at i=0, but clk ticks at point 1, before j=2.
   const Word word{A({"a"}), A({"clk"}), A({"clk"})};
-  EXPECT_TRUE(MatchedOutputs(word, /*j=*/2, *seq, NameSet{}, clk, LocalContext{})
-                  .empty());
+  EXPECT_TRUE(
+      MatchedOutputs(word, /*j=*/2, *seq, NameSet{}, clk, LocalContext{})
+          .empty());
 }
 
-// §F.6.1 (matched): the trigger point i is strictly earlier than j (0 <= i < j),
-// so matched can never hold at j=0.
+// §F.6.1 (matched): the trigger point i is strictly earlier than j (0 <= i <
+// j), so matched can never hold at j=0.
 TEST(ExtendedBooleans, MatchedRequiresAStrictlyEarlierTrigger) {
   auto seq = Bool("a");
   auto clk = BoolAtom("clk");
   const Word word{A({"a"})};
-  EXPECT_TRUE(MatchedOutputs(word, /*j=*/0, *seq, NameSet{}, clk, LocalContext{})
-                  .empty());
+  EXPECT_TRUE(
+      MatchedOutputs(word, /*j=*/0, *seq, NameSet{}, clk, LocalContext{})
+          .empty());
 }
 
 // §F.6.1 (matched): the immediate case, where the trigger point is j-1 and the
@@ -216,8 +218,9 @@ TEST(ExtendedBooleans, MatchedRejectsOutOfRangePoint) {
   auto seq = Bool("a");
   auto clk = BoolAtom("clk");
   const Word word{A({"a"}), A({"clk"})};
-  EXPECT_TRUE(MatchedOutputs(word, /*j=*/2, *seq, NameSet{}, clk, LocalContext{})
-                  .empty());
+  EXPECT_TRUE(
+      MatchedOutputs(word, /*j=*/2, *seq, NameSet{}, clk, LocalContext{})
+          .empty());
 }
 
 // §F.6.1 (matched) error condition: both conjuncts are required. Here the clock
@@ -228,8 +231,9 @@ TEST(ExtendedBooleans, MatchedRequiresTriggerNotJustClock) {
   auto clk = BoolAtom("clk");
   // clk ticks once at j=1, but a never triggers at i=0 (w^0 lacks a).
   const Word word{A({}), A({"clk"})};
-  EXPECT_TRUE(MatchedOutputs(word, /*j=*/1, *seq, NameSet{}, clk, LocalContext{})
-                  .empty());
+  EXPECT_TRUE(
+      MatchedOutputs(word, /*j=*/1, *seq, NameSet{}, clk, LocalContext{})
+          .empty());
 }
 
 }  // namespace

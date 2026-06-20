@@ -51,9 +51,9 @@ TEST(ConfigLiblistClause, UnselectedLiblistFallsBackToParentLibrary) {
   SourceManager mgr;
   Arena arena;
   DiagEngine diag(mgr);
-  auto* bound = BindLeafUnderTop(mgr, arena, diag,
-                                 "config c; design top; endconfig\n", "libX",
-                                 "libY", "libY");
+  auto* bound =
+      BindLeafUnderTop(mgr, arena, diag, "config c; design top; endconfig\n",
+                       "libX", "libY", "libY");
   ASSERT_NE(bound, nullptr);
   EXPECT_EQ(bound->library, "libY");
 }
@@ -64,9 +64,9 @@ TEST(ConfigLiblistClause, ParentLibraryFallbackTracksParent) {
   SourceManager mgr;
   Arena arena;
   DiagEngine diag(mgr);
-  auto* bound = BindLeafUnderTop(mgr, arena, diag,
-                                 "config c; design top; endconfig\n", "libX",
-                                 "libY", "libX");
+  auto* bound =
+      BindLeafUnderTop(mgr, arena, diag, "config c; design top; endconfig\n",
+                       "libX", "libY", "libX");
   ASSERT_NE(bound, nullptr);
   EXPECT_EQ(bound->library, "libX");
 }
@@ -90,9 +90,9 @@ TEST(ConfigLiblistClause, ParentFallbackSkippedWhenParentLacksCell) {
   SourceManager mgr;
   Arena arena;
   DiagEngine diag(mgr);
-  auto* bound = BindLeafUnderTop(mgr, arena, diag,
-                                 "config c; design top; endconfig\n", "libA",
-                                 "libB", "libZ");
+  auto* bound =
+      BindLeafUnderTop(mgr, arena, diag, "config c; design top; endconfig\n",
+                       "libA", "libB", "libZ");
   ASSERT_NE(bound, nullptr);
   EXPECT_EQ(bound->name, "leaf");
   EXPECT_EQ(bound->library, "libA");
@@ -104,9 +104,9 @@ TEST(ConfigLiblistClause, NoParentLibraryContextSkipsFallback) {
   SourceManager mgr;
   Arena arena;
   DiagEngine diag(mgr);
-  auto* bound = BindLeafUnderTop(
-      mgr, arena, diag, "config c; design top; endconfig\n", "libA", "libB",
-      std::string_view{});
+  auto* bound =
+      BindLeafUnderTop(mgr, arena, diag, "config c; design top; endconfig\n",
+                       "libA", "libB", std::string_view{});
   ASSERT_NE(bound, nullptr);
   EXPECT_EQ(bound->name, "leaf");
 }
@@ -204,4 +204,4 @@ TEST(ConfigLiblistClause, LiblistInheritedBySubhierarchy) {
   EXPECT_EQ(leaf->library, "libB");
 }
 
-}
+}  // namespace

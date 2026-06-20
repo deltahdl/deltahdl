@@ -156,4 +156,4 @@ TEST(RealDataType, RealAndRealtimeInterchangeable) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-}
+}  // namespace

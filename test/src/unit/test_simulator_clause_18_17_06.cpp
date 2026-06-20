@@ -28,18 +28,18 @@ uint64_t RunModule(SimFixture& f, const char* src, std::string_view var) {
 TEST(RandsequenceSim, BreakTerminatesRandsequence) {
   SimFixture f;
   uint64_t x = RunModule(f,
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial begin\n"
-      "    x = 8'd0;\n"
-      "    randsequence(main)\n"
-      "      main : first second;\n"
-      "      first : { x = 8'd10; break; };\n"
-      "      second : { x = 8'd99; };\n"
-      "    endsequence\n"
-      "  end\n"
-      "endmodule\n",
-      "x");
+                         "module t;\n"
+                         "  logic [7:0] x;\n"
+                         "  initial begin\n"
+                         "    x = 8'd0;\n"
+                         "    randsequence(main)\n"
+                         "      main : first second;\n"
+                         "      first : { x = 8'd10; break; };\n"
+                         "      second : { x = 8'd99; };\n"
+                         "    endsequence\n"
+                         "  end\n"
+                         "endmodule\n",
+                         "x");
   // second is never generated, so its assignment never runs.
   EXPECT_EQ(x, 10u);
 }
@@ -72,8 +72,8 @@ TEST(RandsequenceSim, BreakResumesExecutionAfterRandsequence) {
   auto* vy = f.ctx.FindVariable("y");
   ASSERT_NE(vx, nullptr);
   ASSERT_NE(vy, nullptr);
-  EXPECT_EQ(vx->value.ToUint64(), 1u);   // b never generated
-  EXPECT_EQ(vy->value.ToUint64(), 5u);   // statement after randsequence ran
+  EXPECT_EQ(vx->value.ToUint64(), 1u);  // b never generated
+  EXPECT_EQ(vy->value.ToUint64(), 5u);  // statement after randsequence ran
 }
 
 // With no enclosing loop, break unwinds immediately: statements written after
@@ -82,18 +82,18 @@ TEST(RandsequenceSim, BreakResumesExecutionAfterRandsequence) {
 TEST(RandsequenceSim, BreakSkipsRemainingStatementsInSameCodeBlock) {
   SimFixture f;
   uint64_t x = RunModule(f,
-      "module t;\n"
-      "  int x;\n"
-      "  initial begin\n"
-      "    x = 0;\n"
-      "    randsequence(main)\n"
-      "      main : a b;\n"
-      "      a : { x = 1; break; x = 7; };\n"
-      "      b : { x = 9; };\n"
-      "    endsequence\n"
-      "  end\n"
-      "endmodule\n",
-      "x");
+                         "module t;\n"
+                         "  int x;\n"
+                         "  initial begin\n"
+                         "    x = 0;\n"
+                         "    randsequence(main)\n"
+                         "      main : a b;\n"
+                         "      a : { x = 1; break; x = 7; };\n"
+                         "      b : { x = 9; };\n"
+                         "    endsequence\n"
+                         "  end\n"
+                         "endmodule\n",
+                         "x");
   // x=1 runs; break exits the block so x=7 never runs and b never generates.
   EXPECT_EQ(x, 1u);
 }
@@ -129,8 +129,8 @@ TEST(RandsequenceSim, BreakInsideLoopTerminatesLoopNotRandsequence) {
   auto* vy = f.ctx.FindVariable("y");
   ASSERT_NE(vx, nullptr);
   ASSERT_NE(vy, nullptr);
-  EXPECT_EQ(vx->value.ToUint64(), 2u);   // loop broke at i==3, last write i==2
-  EXPECT_EQ(vy->value.ToUint64(), 7u);   // production b still generated
+  EXPECT_EQ(vx->value.ToUint64(), 2u);  // loop broke at i==3, last write i==2
+  EXPECT_EQ(vy->value.ToUint64(), 7u);  // production b still generated
 }
 
 // return aborts the current production: the remaining production items of the
@@ -141,21 +141,21 @@ TEST(RandsequenceSim, ReturnAbortsCurrentProductionAndContinuesNext) {
   // main : p q r. q is "sub { return; } tail": the return aborts q, so tail is
   // never generated, but r (the production following q in main) still is.
   uint64_t trace = RunModule(f,
-      "module t;\n"
-      "  int trace;\n"
-      "  initial begin\n"
-      "    trace = 0;\n"
-      "    randsequence(main)\n"
-      "      main : p q r;\n"
-      "      p   : { trace = trace * 10 + 1; };\n"
-      "      q   : sub { return; } tail;\n"
-      "      sub : { trace = trace * 10 + 2; };\n"
-      "      tail: { trace = trace * 10 + 8; };\n"
-      "      r   : { trace = trace * 10 + 3; };\n"
-      "    endsequence\n"
-      "  end\n"
-      "endmodule\n",
-      "trace");
+                             "module t;\n"
+                             "  int trace;\n"
+                             "  initial begin\n"
+                             "    trace = 0;\n"
+                             "    randsequence(main)\n"
+                             "      main : p q r;\n"
+                             "      p   : { trace = trace * 10 + 1; };\n"
+                             "      q   : sub { return; } tail;\n"
+                             "      sub : { trace = trace * 10 + 2; };\n"
+                             "      tail: { trace = trace * 10 + 8; };\n"
+                             "      r   : { trace = trace * 10 + 3; };\n"
+                             "    endsequence\n"
+                             "  end\n"
+                             "endmodule\n",
+                             "trace");
   // p=1, q runs sub=2 then return (tail's 8 skipped), then r=3 -> 123.
   EXPECT_EQ(trace, 123u);
 }
@@ -168,23 +168,23 @@ TEST(RandsequenceSim, ReturnContinuesWithNextProductionEachInvocation) {
   // bb aborts itself on every generation; cc must still follow it both times bb
   // is reached (once inside p1, once inside p2).
   uint64_t trace = RunModule(f,
-      "module t;\n"
-      "  int trace;\n"
-      "  initial begin\n"
-      "    trace = 0;\n"
-      "    randsequence(main)\n"
-      "      main : p1 p2;\n"
-      "      p1 : aa bb cc;\n"
-      "      p2 : aa bb cc;\n"
-      "      aa : { trace = trace * 10 + 1; };\n"
-      "      bb : { return; trace = trace * 10 + 9; };\n"
-      "      cc : { trace = trace * 10 + 3; };\n"
-      "    endsequence\n"
-      "  end\n"
-      "endmodule\n",
-      "trace");
+                             "module t;\n"
+                             "  int trace;\n"
+                             "  initial begin\n"
+                             "    trace = 0;\n"
+                             "    randsequence(main)\n"
+                             "      main : p1 p2;\n"
+                             "      p1 : aa bb cc;\n"
+                             "      p2 : aa bb cc;\n"
+                             "      aa : { trace = trace * 10 + 1; };\n"
+                             "      bb : { return; trace = trace * 10 + 9; };\n"
+                             "      cc : { trace = trace * 10 + 3; };\n"
+                             "    endsequence\n"
+                             "  end\n"
+                             "endmodule\n",
+                             "trace");
   // p1: aa=1, bb aborts (9 skipped), cc=3 -> 13; p2 repeats -> 1313.
   EXPECT_EQ(trace, 1313u);
 }
 
-}
+}  // namespace

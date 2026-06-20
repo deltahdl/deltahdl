@@ -181,30 +181,30 @@ TEST(BlockItemDeclParsing, DataDeclWithAttribute) {
 }
 
 TEST(BlockItemDeclParsing, LocalparamWithAttribute) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  initial begin\n"
-      "    (* mark *) localparam int W = 8;\n"
-      "  end\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  initial begin\n"
+              "    (* mark *) localparam int W = 8;\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
 TEST(BlockItemDeclParsing, ParameterWithAttribute) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  initial begin\n"
-      "    (* mark *) parameter int D = 4;\n"
-      "  end\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  initial begin\n"
+              "    (* mark *) parameter int D = 4;\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
 TEST(BlockItemDeclParsing, LetDeclWithAttribute) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  initial begin\n"
-      "    (* mark *) let double(x) = x * 2;\n"
-      "  end\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  initial begin\n"
+              "    (* mark *) let double(x) = x * 2;\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
 TEST(BlockItemDeclParsing, FunctionBodyBlockItem) {
@@ -225,13 +225,13 @@ TEST(BlockItemDeclParsing, FunctionBodyBlockItem) {
 }
 
 TEST(BlockItemDeclParsing, AlwaysCombBlockItem) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  always_comb begin\n"
-      "    int temp;\n"
-      "    temp = 0;\n"
-      "  end\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  always_comb begin\n"
+              "    int temp;\n"
+              "    temp = 0;\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
 TEST(BlockItemDeclParsing, MixedAlternativesInOneBlock) {
@@ -271,15 +271,15 @@ TEST(BlockItemDeclParsing, DataDeclWithVarPrefix) {
 }
 
 TEST(BlockItemDeclParsing, ImportWildcardInBlock) {
-  EXPECT_TRUE(ParseOk(
-      "package pkg;\n"
-      "  int x;\n"
-      "endpackage\n"
-      "module m;\n"
-      "  initial begin\n"
-      "    import pkg::*;\n"
-      "  end\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("package pkg;\n"
+              "  int x;\n"
+              "endpackage\n"
+              "module m;\n"
+              "  initial begin\n"
+              "    import pkg::*;\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
 TEST(BlockItemDeclParsing, LetDeclNoArgsInBlock) {
@@ -299,7 +299,6 @@ TEST(BlockItemDeclParsing, LetDeclNoArgsInBlock) {
 }
 
 TEST(BlockItemDeclParsing, MultipleAttributeInstancesOnDataDecl) {
-
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -336,4 +335,4 @@ TEST(BlockItemDeclParsing, ErrorBlockItemParameterMissingSemicolon) {
   EXPECT_TRUE(r.has_errors);
 }
 
-}
+}  // namespace

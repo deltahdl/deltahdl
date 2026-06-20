@@ -119,4 +119,4 @@ TEST(ClassObjectParsing, StaticPropertyWriteViaScope) {
       "endmodule\n");
 }
 
-}
+}  // namespace

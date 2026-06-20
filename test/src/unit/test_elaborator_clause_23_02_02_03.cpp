@@ -86,4 +86,4 @@ TEST(PortKindDataTypeDirection, ExplicitPortTakesExpressionDataType) {
   EXPECT_EQ(ports[1].width, 6u);
 }
 
-}
+}  // namespace

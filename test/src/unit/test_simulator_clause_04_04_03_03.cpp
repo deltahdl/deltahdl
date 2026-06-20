@@ -150,9 +150,10 @@ TEST(PliPreNbaSim, PreNBAReadWriteInActiveRegionSetContext) {
 }
 
 // Edge case: an event created from within a Pre-NBA callback that lands back in
-// the Pre-NBA region of the same time slot must still drain before any NBA event
-// is evaluated. Exercises the scheduler's iterative draining of the region so the
-// "create events before NBA" guarantee holds even for re-entrant scheduling.
+// the Pre-NBA region of the same time slot must still drain before any NBA
+// event is evaluated. Exercises the scheduler's iterative draining of the
+// region so the "create events before NBA" guarantee holds even for re-entrant
+// scheduling.
 TEST(PliPreNbaSim, PreNBAReentrantEventStillRunsBeforeNBA) {
   Arena arena;
   Scheduler sched(arena);

@@ -39,4 +39,4 @@ TEST(AggregateTypeParsing, AssocArrayDeletePropertySyntax) {
   ASSERT_NE(stmt, nullptr);
 }
 
-}
+}  // namespace

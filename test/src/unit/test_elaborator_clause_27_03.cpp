@@ -116,4 +116,4 @@ TEST(GenerateConstructSyntax, LoopProducesMultipleInstances) {
   EXPECT_EQ(CountVariablesNamed(r.design->top_modules[0], 'a'), 3);
 }
 
-}
+}  // namespace

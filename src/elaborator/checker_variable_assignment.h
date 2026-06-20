@@ -8,13 +8,13 @@ namespace delta {
 // §17.7.1 governs how checker variables may be assigned. The helpers here model
 // only the rules the text of §17.7.1 states directly: which assignment forms a
 // checker variable admits, the restriction that narrows an always_ff procedure
-// to nonblocking assignments, the illegality of assigning through a hierarchical
-// name, the illegality of continuous and blocking assignments to a free checker
-// variable, where a checker variable may and may not receive a value, and the
-// two allowances about the assignment's right- and left-hand sides. The
-// hierarchical-name machinery is owned by §23.6 and the triggered method by
-// §16.13.6; this file only records how §17.7.1 scopes those onto checker
-// variable assignments.
+// to nonblocking assignments, the illegality of assigning through a
+// hierarchical name, the illegality of continuous and blocking assignments to a
+// free checker variable, where a checker variable may and may not receive a
+// value, and the two allowances about the assignment's right- and left-hand
+// sides. The hierarchical-name machinery is owned by §23.6 and the triggered
+// method by §16.13.6; this file only records how §17.7.1 scopes those onto
+// checker variable assignments.
 
 // §17.7.1: the assignment forms that may target a checker variable.
 enum class CheckerVariableAssignment : uint8_t {
@@ -58,8 +58,8 @@ enum class CheckerVariableAssignmentSite : uint8_t {
 };
 
 // §17.7.1: a checker variable may not be assigned in an initial procedure, but
-// it may be initialized in its declaration. Assignment is therefore legal at the
-// declaration initializer and illegal inside an initial procedure.
+// it may be initialized in its declaration. Assignment is therefore legal at
+// the declaration initializer and illegal inside an initial procedure.
 bool CheckerVariableAssignmentSiteIsLegal(CheckerVariableAssignmentSite site);
 
 // §17.7.1: the right-hand side of a checker variable assignment may contain the

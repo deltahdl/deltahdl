@@ -23,8 +23,9 @@ TEST(AssertionSemanticsParsing, OverlapImplication) {
   EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kAssertProperty));
 }
 
-// §16.12.7: the nonoverlapped implication form `sequence_expr |=> property_expr`
-// is likewise accepted at the property level of a concurrent assertion.
+// §16.12.7: the nonoverlapped implication form `sequence_expr |=>
+// property_expr` is likewise accepted at the property level of a concurrent
+// assertion.
 TEST(AssertionSemanticsParsing, NonoverlapImplication) {
   auto r = Parse(
       "module m;\n"
@@ -35,4 +36,4 @@ TEST(AssertionSemanticsParsing, NonoverlapImplication) {
   EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kAssertProperty));
 }
 
-}
+}  // namespace

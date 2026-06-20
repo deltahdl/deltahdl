@@ -15,8 +15,8 @@ TEST(ScopeResolutionPrefixElaboration, PackagePrefixResolvesDownward) {
 }
 
 // §23.7.1 C2: a prefix that resolves by the normal scope rules (a visible class
-// name) denotes the class scope resolution operator; the qualified type resolves
-// downward in the class.
+// name) denotes the class scope resolution operator; the qualified type
+// resolves downward in the class.
 TEST(ScopeResolutionPrefixElaboration, ClassPrefixResolvesDownward) {
   EXPECT_TRUE(
       ElabOk("class C;\n"
@@ -27,4 +27,4 @@ TEST(ScopeResolutionPrefixElaboration, ClassPrefixResolvesDownward) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

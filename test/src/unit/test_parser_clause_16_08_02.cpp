@@ -175,4 +175,4 @@ TEST(SequenceLocalLvarArgumentParsing, ExplicitTypeBreaksLocalCarry) {
   EXPECT_EQ(item->prop_seq_local_lvar_directions[0], Direction::kInput);
 }
 
-}
+}  // namespace

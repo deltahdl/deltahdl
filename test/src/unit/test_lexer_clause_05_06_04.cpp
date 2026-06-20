@@ -35,4 +35,4 @@ TEST(CompilerDirectiveLexing, BacktickAtEofIsError) {
   EXPECT_TRUE(diag.HasErrors());
 }
 
-}
+}  // namespace

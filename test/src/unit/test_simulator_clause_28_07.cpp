@@ -333,4 +333,4 @@ TEST(MosSwitchSimulation, NmosControlHighZDoesNotPassDefiniteValue) {
   EXPECT_TRUE(SettledToHighZ(f, "y"));
 }
 
-}
+}  // namespace

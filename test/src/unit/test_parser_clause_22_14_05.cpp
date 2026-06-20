@@ -13,4 +13,4 @@ TEST(CompilerDirectiveParsing, BeginKeywords1364_2005) {
                               "`end_keywords\n"));
 }
 
-}
+}  // namespace

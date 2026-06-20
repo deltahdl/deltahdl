@@ -70,4 +70,4 @@ TEST(NondeterminismSim, MidStatementSuspensionInterleavesAndCounts) {
   EXPECT_EQ(sched.MidStatementSuspensionCount(), 1u);
 }
 
-}
+}  // namespace

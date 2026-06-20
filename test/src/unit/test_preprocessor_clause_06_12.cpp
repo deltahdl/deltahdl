@@ -17,4 +17,4 @@ TEST(RealDataType, ShortrealInit) {
   ASSERT_NE(item->init_expr, nullptr);
 }
 
-}
+}  // namespace

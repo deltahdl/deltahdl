@@ -79,4 +79,4 @@ TEST(TernaryMatchesParsing, MatchesChainInTernary) {
   EXPECT_EQ(stmt->rhs->condition->lhs->op, TokenKind::kAmpAmpAmp);
 }
 
-}
+}  // namespace

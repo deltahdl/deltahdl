@@ -439,4 +439,4 @@ TEST(ForceReleaseSim, ReleaseNetReturnsToGateOutputValue) {
   EXPECT_EQ(w->value.ToUint64(), 1u);
 }
 
-}
+}  // namespace

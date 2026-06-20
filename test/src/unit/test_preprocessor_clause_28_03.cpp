@@ -133,4 +133,4 @@ TEST(GateInstantiation, AllNineAlternatives) {
   EXPECT_EQ(gates.size(), 9u);
 }
 
-}
+}  // namespace

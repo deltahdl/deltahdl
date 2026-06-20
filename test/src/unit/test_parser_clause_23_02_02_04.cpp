@@ -23,10 +23,10 @@ TEST(DefaultPortValueParsing, MultiplePortsSomeWithDefaults) {
 
 TEST(DefaultPortValueParsing, OutputWithDefaultValue) {
   // The parser is direction-agnostic about defaults: it accepts a trailing
-  // "= expr" on any direction and records it. Rejecting a default on a non-input
-  // port is a semantic rule applied later by the elaborator (see §23.2.2.4 C3),
-  // so this clean parse is what makes that elaborator test a genuine observer
-  // rather than a parse-error false-pass.
+  // "= expr" on any direction and records it. Rejecting a default on a
+  // non-input port is a semantic rule applied later by the elaborator (see
+  // §23.2.2.4 C3), so this clean parse is what makes that elaborator test a
+  // genuine observer rather than a parse-error false-pass.
   auto r = Parse("module m(output logic q = 1'b0); endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -49,4 +49,4 @@ TEST(DefaultPortValueParsing, NonAnsiPortDefaultRejected) {
   EXPECT_TRUE(r.has_errors);
 }
 
-}
+}  // namespace

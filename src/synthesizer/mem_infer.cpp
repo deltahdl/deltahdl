@@ -120,7 +120,7 @@ void ScanStmt(const Stmt* stmt,
   }
 }
 
-}
+}  // namespace
 
 std::vector<InferredMemory> InferMemories(const RtlirModule* mod) {
   if (!mod) return {};
@@ -155,4 +155,4 @@ std::vector<InferredMemory> InferMemories(const RtlirModule* mod) {
   return result;
 }
 
-}
+}  // namespace delta

@@ -96,4 +96,4 @@ TEST(ArrayQueryOnType, QueryOnFixedTypedefIsLegal) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

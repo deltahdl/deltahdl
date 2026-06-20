@@ -18,8 +18,8 @@ namespace {
 //   figure   - vpiDriver/vpiLoad reach the driver/load object kinds, and a port
 //              counts only as a driver;
 //   detail 1 - for a structure, union, or class variable the relation also
-//              includes the drivers/loads of any bit/part-select of the variable
-//              and of any member nested inside it;
+//              includes the drivers/loads of any bit/part-select of the
+//              variable and of any member nested inside it;
 //   detail 2 - the variable-array recommendation is a "should", carrying no
 //              enforced behaviour, so it is not exercised here.
 
@@ -36,8 +36,9 @@ bool Contains(const std::vector<VpiHandle>& objects, VpiHandle wanted) {
 }
 
 // Figure: vpiDriver on a variable reaches every kind of driver object - a port,
-// a force, a continuous assignment, a single bit of a continuous assignment, and
-// a procedural assignment statement - while skipping children that are neither.
+// a force, a continuous assignment, a single bit of a continuous assignment,
+// and a procedural assignment statement - while skipping children that are
+// neither.
 TEST(VariableDriversAndLoads, DriverIterationReachesEveryDriverKind) {
   VpiContext ctx;
 
@@ -56,11 +57,10 @@ TEST(VariableDriversAndLoads, DriverIterationReachesEveryDriverKind) {
 
   VpiObject var;
   var.type = vpiLogicVar;
-  var.children = {&port,           &unrelated,    &force, &cont_assign,
-                  &cont_assign_bit, &assign_stmt};
+  var.children = {&port,        &unrelated,       &force,
+                  &cont_assign, &cont_assign_bit, &assign_stmt};
 
-  std::vector<VpiHandle> drivers =
-      Collect(ctx, ctx.Iterate(vpiDriver, &var));
+  std::vector<VpiHandle> drivers = Collect(ctx, ctx.Iterate(vpiDriver, &var));
   ASSERT_EQ(drivers.size(), 5u);
   EXPECT_TRUE(Contains(drivers, &port));
   EXPECT_TRUE(Contains(drivers, &force));
@@ -71,8 +71,8 @@ TEST(VariableDriversAndLoads, DriverIterationReachesEveryDriverKind) {
 }
 
 // Figure: vpiLoad reaches the load object kinds but never a port. A port drives
-// a variable only, so even though the variable carries one it is left out of the
-// load iteration while the force, continuous assignment, and assignment
+// a variable only, so even though the variable carries one it is left out of
+// the load iteration while the force, continuous assignment, and assignment
 // statement are reported.
 TEST(VariableDriversAndLoads, LoadIterationExcludesPorts) {
   VpiContext ctx;
@@ -102,8 +102,8 @@ TEST(VariableDriversAndLoads, LoadIterationExcludesPorts) {
 }
 
 // Detail 1: a structure variable's vpiDriver iteration includes the driver of
-// the whole variable, the driver of a bit/part-select of it, and the driver of a
-// member nested inside it - all three categories the detail enumerates.
+// the whole variable, the driver of a bit/part-select of it, and the driver of
+// a member nested inside it - all three categories the detail enumerates.
 TEST(VariableDriversAndLoads, AggregateDriverIncludesSelectsAndMembers) {
   VpiContext ctx;
 
@@ -138,8 +138,8 @@ TEST(VariableDriversAndLoads, AggregateDriverIncludesSelectsAndMembers) {
 }
 
 // Detail 1 (load side, class variable): the load of a member nested inside a
-// class variable is included, while the figure's port exclusion still holds even
-// for a port attached to that nested member.
+// class variable is included, while the figure's port exclusion still holds
+// even for a port attached to that nested member.
 TEST(VariableDriversAndLoads, AggregateLoadIncludesNestedMembersNotPorts) {
   VpiContext ctx;
 
@@ -158,18 +158,17 @@ TEST(VariableDriversAndLoads, AggregateLoadIncludesNestedMembersNotPorts) {
   class_var.type = vpiClassVar;
   class_var.children = {&whole_load, &member};
 
-  std::vector<VpiHandle> loads =
-      Collect(ctx, ctx.Iterate(vpiLoad, &class_var));
+  std::vector<VpiHandle> loads = Collect(ctx, ctx.Iterate(vpiLoad, &class_var));
   ASSERT_EQ(loads.size(), 2u);
   EXPECT_TRUE(Contains(loads, &whole_load));
   EXPECT_TRUE(Contains(loads, &member_load));
   EXPECT_FALSE(Contains(loads, &member_port));
 }
 
-// Detail 1 is scoped to structure/union/class variables: a plain (non-aggregate)
-// variable contributes only its own direct drivers. A driver sitting under a
-// select child of such a variable is not reached, so the descent behaviour does
-// not leak into ordinary variables.
+// Detail 1 is scoped to structure/union/class variables: a plain
+// (non-aggregate) variable contributes only its own direct drivers. A driver
+// sitting under a select child of such a variable is not reached, so the
+// descent behaviour does not leak into ordinary variables.
 TEST(VariableDriversAndLoads, NonAggregateVariableDoesNotDescend) {
   VpiContext ctx;
 
@@ -186,8 +185,7 @@ TEST(VariableDriversAndLoads, NonAggregateVariableDoesNotDescend) {
   var.type = vpiLogicVar;
   var.children = {&direct_driver, &bit_select};
 
-  std::vector<VpiHandle> drivers =
-      Collect(ctx, ctx.Iterate(vpiDriver, &var));
+  std::vector<VpiHandle> drivers = Collect(ctx, ctx.Iterate(vpiDriver, &var));
   ASSERT_EQ(drivers.size(), 1u);
   EXPECT_TRUE(Contains(drivers, &direct_driver));
   EXPECT_FALSE(Contains(drivers, &select_driver));

@@ -64,8 +64,7 @@ TEST(TightSatisfaction, OrTakesEitherOperand) {
 
 // §F.5.2: w |== (R1 intersect R2) iff w |== R1 and w |== R2.
 TEST(TightSatisfaction, IntersectRequiresBothOperands) {
-  auto seq =
-      SeqIntersect(SeqBoolean(BoolAtom("a")), SeqBoolean(BoolAtom("b")));
+  auto seq = SeqIntersect(SeqBoolean(BoolAtom("a")), SeqBoolean(BoolAtom("b")));
   EXPECT_TRUE(TightlySatisfies(Word{A({"a", "b"})}, *seq));
   EXPECT_FALSE(TightlySatisfies(Word{A({"a"})}, *seq));
 }

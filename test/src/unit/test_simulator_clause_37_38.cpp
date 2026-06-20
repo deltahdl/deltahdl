@@ -12,19 +12,20 @@ namespace {
 
 // §37.38 Constraint expression: the VPI object model for a constraint
 // expression - the group spanning an implication, a constraint if / if-else, a
-// foreach constraint, a distribution, a bare (optionally soft) expression, and a
-// soft disable. The diagram's bare relation arrows (vpiCondition to the
+// foreach constraint, a distribution, a bare (optionally soft) expression, and
+// a soft disable. The diagram's bare relation arrows (vpiCondition to the
 // condition expr, vpiElseConst to the else branch, the soft-disable expr edge,
 // the foreach distribution/variables edges) carry no clause-specific rule and
 // are served by the generic object-model and §38 traversal routines. This
-// clause's own rules are its three numbered Details, and the tests below observe
-// the production code that applies them:
+// clause's own rules are its three numbered Details, and the tests below
+// observe the production code that applies them:
 //   D1 - the variable reached from a foreach constraint via vpiVariables
 //        represents the array being indexed (the designated-pointer Handle
 //        case).
 //   D2 - the vpiLoopVars iteration returns the foreach index variables in
-//        left-to-right order, with a skipped position reported as a vpiOperation
-//        whose vpiOpType is vpiNullOp (the dedicated loop-var walk of Iterate).
+//        left-to-right order, with a skipped position reported as a
+//        vpiOperation whose vpiOpType is vpiNullOp (the dedicated loop-var walk
+//        of Iterate).
 //   D3 - the vpiConstraintExpr iteration returns the body expressions of an
 //        implication / if / if-else / foreach in the order they occur (the
 //        dedicated body-list walk of Iterate).
@@ -53,8 +54,10 @@ TEST_F(ConstraintExpression, ForeachVariablesReachesIndexedArray) {
   array.type = vpiArrayVar;  // the array the foreach iterates over
 
   VpiObject foreach;
-  foreach.type = vpiConstrForEach;
-  foreach.foreach_array = &array;
+  foreach
+    .type = vpiConstrForEach;
+  foreach
+    .foreach_array = &array;
 
   EXPECT_EQ(vpi_handle(vpiVariables, &foreach), &array);
 }
@@ -65,7 +68,8 @@ TEST_F(ConstraintExpression, ForeachVariablesReachesIndexedArray) {
 // the foreach case and still resolves through the generic walk.
 TEST_F(ConstraintExpression, ForeachVariablesIsScopedAndNullWhenAbsent) {
   VpiObject foreach;
-  foreach.type = vpiConstrForEach;  // no array attached
+  foreach
+    .type = vpiConstrForEach;  // no array attached
   EXPECT_EQ(vpi_handle(vpiVariables, &foreach), nullptr);
 
   // The foreach Handle case does not fire for a different object kind: an
@@ -90,20 +94,22 @@ TEST_F(ConstraintExpression, LoopVarsIterationOrdersVarsWithNullOpPlaceholder) {
   var_k.type = vpiIntVar;
 
   VpiObject foreach;
-  foreach.type = vpiConstrForEach;
+  foreach
+    .type = vpiConstrForEach;
   // The middle index was skipped in the foreach header (a[i, , k]); a null slot
   // marks it.
-  foreach.loop_vars = {&var_i, nullptr, &var_k};
+  foreach
+    .loop_vars = {&var_i, nullptr, &var_k};
 
   vpiHandle it = vpi_iterate(vpiLoopVars, &foreach);
   ASSERT_NE(it, nullptr);
   std::vector<vpiHandle> seen;
   while (vpiHandle h = vpi_scan(it)) seen.push_back(h);
 
-  ASSERT_EQ(seen.size(), 3u);          // every position is reported, in order
-  EXPECT_EQ(seen[0], &var_i);          // left-to-right order is preserved
+  ASSERT_EQ(seen.size(), 3u);  // every position is reported, in order
+  EXPECT_EQ(seen[0], &var_i);  // left-to-right order is preserved
   EXPECT_EQ(seen[2], &var_k);
-  EXPECT_NE(seen[1], &var_i);          // the skipped slot is a fresh placeholder
+  EXPECT_NE(seen[1], &var_i);  // the skipped slot is a fresh placeholder
   EXPECT_NE(seen[1], &var_k);
   EXPECT_EQ(vpi_get(vpiType, seen[1]), vpiOperation);
   EXPECT_EQ(vpi_get(vpiOpType, seen[1]), vpiNullOp);
@@ -117,8 +123,10 @@ TEST_F(ConstraintExpression, LoopVarsIterationWithoutSkipsAndWhenEmpty) {
   var_i.type = vpiIntVar;
 
   VpiObject foreach;
-  foreach.type = vpiConstrForEach;
-  foreach.loop_vars = {&var_i};
+  foreach
+    .type = vpiConstrForEach;
+  foreach
+    .loop_vars = {&var_i};
 
   vpiHandle it = vpi_iterate(vpiLoopVars, &foreach);
   ASSERT_NE(it, nullptr);
@@ -138,9 +146,11 @@ TEST_F(ConstraintExpression, LoopVarsIterationRepresentsEachSkipIndependently) {
   var_j.type = vpiIntVar;
 
   VpiObject foreach;
-  foreach.type = vpiConstrForEach;
+  foreach
+    .type = vpiConstrForEach;
   // The first and last indices were skipped (a[ , j, ]).
-  foreach.loop_vars = {nullptr, &var_j, nullptr};
+  foreach
+    .loop_vars = {nullptr, &var_j, nullptr};
 
   vpiHandle it = vpi_iterate(vpiLoopVars, &foreach);
   ASSERT_NE(it, nullptr);
@@ -148,8 +158,8 @@ TEST_F(ConstraintExpression, LoopVarsIterationRepresentsEachSkipIndependently) {
   while (vpiHandle h = vpi_scan(it)) seen.push_back(h);
 
   ASSERT_EQ(seen.size(), 3u);
-  EXPECT_EQ(seen[1], &var_j);              // the present index keeps its slot
-  EXPECT_NE(seen[0], seen[2]);             // each skip is its own placeholder
+  EXPECT_EQ(seen[1], &var_j);   // the present index keeps its slot
+  EXPECT_NE(seen[0], seen[2]);  // each skip is its own placeholder
   EXPECT_EQ(vpi_get(vpiType, seen[0]), vpiOperation);
   EXPECT_EQ(vpi_get(vpiOpType, seen[0]), vpiNullOp);
   EXPECT_EQ(vpi_get(vpiType, seen[2]), vpiOperation);
@@ -157,9 +167,9 @@ TEST_F(ConstraintExpression, LoopVarsIterationRepresentsEachSkipIndependently) {
 }
 
 // D3: the vpiConstraintExpr iteration returns the body expressions of a
-// container constraint expression in the order they occur. Here the container is
-// an implication whose body holds three constraint expressions; the iteration
-// hands them back in source order.
+// container constraint expression in the order they occur. Here the container
+// is an implication whose body holds three constraint expressions; the
+// iteration hands them back in source order.
 TEST_F(ConstraintExpression, ConstraintExprIterationReturnsBodyInOrder) {
   VpiObject e0;
   e0.type = vpiConstraintExpr;
@@ -187,8 +197,8 @@ TEST_F(ConstraintExpression, ConstraintExprIterationReturnsBodyInOrder) {
 // implication, a constraint if, a constraint if-else, and a foreach - so each
 // reaches its own body list through vpiConstraintExpr.
 TEST_F(ConstraintExpression, ConstraintExprIterationFiresForEachContainerKind) {
-  for (int kind : {vpiImplication, vpiConstrIf, vpiConstrIfElse,
-                   vpiConstrForEach}) {
+  for (int kind :
+       {vpiImplication, vpiConstrIf, vpiConstrIfElse, vpiConstrForEach}) {
     VpiObject body;
     body.type = vpiConstraintExpr;
 
@@ -222,9 +232,11 @@ TEST_F(ConstraintExpression, ConstraintExprIterationScopedToContainerKinds) {
 // D3: a container that holds no body expressions has nothing to walk, so its
 // vpiConstraintExpr iteration yields a null iterator even though the special
 // container walk does fire for its kind.
-TEST_F(ConstraintExpression, ConstraintExprIterationEmptyWhenContainerHasNoBody) {
+TEST_F(ConstraintExpression,
+       ConstraintExprIterationEmptyWhenContainerHasNoBody) {
   VpiObject implication;
-  implication.type = vpiImplication;  // a container kind, but with an empty body
+  implication.type =
+      vpiImplication;  // a container kind, but with an empty body
 
   EXPECT_EQ(vpi_iterate(vpiConstraintExpr, &implication), nullptr);
 }

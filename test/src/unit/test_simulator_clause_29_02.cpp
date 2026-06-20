@@ -55,7 +55,8 @@ TEST(UdpInputHighImpedanceTreatedAsX, ZInputTreatedAsXInLevelEvaluation) {
 // Edge path: the previous value handed to EvaluateWithEdge is coerced. A 'p'
 // edge admits an x->1 transition, so a z previous value (coerced to x) must
 // match it identically to an x previous value.
-TEST(UdpInputHighImpedanceTreatedAsX, ZPreviousValueTreatedAsXInEdgeEvaluation) {
+TEST(UdpInputHighImpedanceTreatedAsX,
+     ZPreviousValueTreatedAsXInEdgeEvaluation) {
   UdpBuilder b;
   b.SetSequential().AddRow({'p'}, '1');
 
@@ -77,4 +78,4 @@ TEST(UdpInputHighImpedanceTreatedAsX, ZLevelInputTreatedAsXInEdgeEvaluation) {
   EXPECT_EQ(with_x.EvaluateWithEdge({'1', 'x'}, 0, '0'), '1');
 }
 
-}
+}  // namespace

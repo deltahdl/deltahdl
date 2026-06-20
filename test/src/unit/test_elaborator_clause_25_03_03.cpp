@@ -103,4 +103,4 @@ TEST(GenericInterfaceReference, FullExampleEndToEnd) {
   EXPECT_EQ(top->children[2].module_name, "cpuMod");
 }
 
-}
+}  // namespace

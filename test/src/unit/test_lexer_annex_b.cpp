@@ -393,4 +393,4 @@ TEST(KeywordListLexing, KeywordWithLeadingUnderscoreIsIdentifier) {
   }
 }
 
-}
+}  // namespace

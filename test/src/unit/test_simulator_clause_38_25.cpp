@@ -22,8 +22,9 @@ class VpiMcdFlushSim : public ::testing::Test {
   VpiContext vpi_ctx_;
 };
 
-// §38.25 (C1, C3): the descriptor names files through its discrete channel bits,
-// so the OR of two descriptors flushes both files' output buffers in one call.
+// §38.25 (C1, C3): the descriptor names files through its discrete channel
+// bits, so the OR of two descriptors flushes both files' output buffers in one
+// call.
 TEST_F(VpiMcdFlushSim, FlushesSeveralChannelsSimultaneously) {
   char a[] = "a.txt";
   char b[] = "b.txt";

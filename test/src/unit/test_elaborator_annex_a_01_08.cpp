@@ -51,4 +51,4 @@ TEST(CheckerProcedures, CheckerWithMultipleItemsElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

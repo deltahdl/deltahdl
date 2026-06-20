@@ -191,4 +191,4 @@ TEST(IntraAssignTimingPreprocessing, NonblockingRepeatEventOperands) {
   EXPECT_NE(stmt->rhs, nullptr);
 }
 
-}
+}  // namespace

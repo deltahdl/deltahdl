@@ -22,4 +22,4 @@ TEST(AssertionSemanticsParsing, AssertPropertySimple) {
   EXPECT_TRUE(found);
 }
 
-}
+}  // namespace

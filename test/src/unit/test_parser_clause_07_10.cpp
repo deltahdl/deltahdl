@@ -69,4 +69,4 @@ TEST(QueueDeclarationParsing, QueueWithInitializer) {
   EXPECT_NE(item->init_expr, nullptr);
 }
 
-}
+}  // namespace

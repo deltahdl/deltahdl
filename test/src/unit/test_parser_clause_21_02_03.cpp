@@ -53,4 +53,4 @@ TEST(IoSystemTaskParsing, MonitorBinaryHexOctalNames) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

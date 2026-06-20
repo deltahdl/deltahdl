@@ -97,7 +97,8 @@ TEST(BlockingAssignSchedulingSim, ZeroDelayFromActiveContextRoutesToInactive) {
   EXPECT_EQ(f.scheduler.CurrentTime().ticks, 0u);
 }
 
-TEST(BlockingAssignSchedulingSim, ZeroDelayFromReactiveContextRoutesToReInactive) {
+TEST(BlockingAssignSchedulingSim,
+     ZeroDelayFromReactiveContextRoutesToReInactive) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module top;\n"
@@ -200,7 +201,8 @@ TEST(BlockingAssignSchedulingSim, ContinuesWithNextStatementAndOtherEvents) {
 // exercises the immediate (no-delay) execution path, which is dispatched
 // separately from the delayed path, so the event-enabling behavior is verified
 // on its own rather than being inferred from the delayed cases above.
-TEST(BlockingAssignSchedulingSim, ImmediateAssignNoDelayEnablesEventsOnLhsUpdate) {
+TEST(BlockingAssignSchedulingSim,
+     ImmediateAssignNoDelayEnablesEventsOnLhsUpdate) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

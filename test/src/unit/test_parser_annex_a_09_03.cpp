@@ -491,7 +491,6 @@ TEST(IdentifierSyntaxParsing, SequenceIdentifier) {
 }
 
 TEST(IdentifierSyntaxParsing, PackageScopeUnit) {
-
   ParseFixture f;
   auto* cu = ParseSrc(
       "int cu_var = 0;\n"
@@ -505,7 +504,6 @@ TEST(IdentifierSyntaxParsing, PackageScopeUnit) {
 }
 
 TEST(IdentifierSyntaxParsing, PackageScopeNamed) {
-
   ParseFixture f;
   auto* cu = ParseSrc(
       "package pkg;\n"
@@ -593,7 +591,6 @@ TEST(IdentifierSyntaxParsing, PsOrHierarchicalTfIdentifierPackageScopedCall) {
 }
 
 TEST(IdentifierSyntaxParsing, EscapedIdentifierInExpr) {
-
   ParseFixture f;
   auto* cu = ParseSrc(
       "module m;\n"
@@ -1042,4 +1039,4 @@ TEST(IdentifierSyntaxParsing, PsCovergroupIdentifierFromPackage) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-}
+}  // namespace

@@ -17,9 +17,9 @@ namespace {
 // the simulator uses), so $writemem has a memory to dump.
 void SetupMem(SimFixture& f, const char* name, int lo, int size,
               uint32_t width) {
-  f.ctx.RegisterArray(name, {static_cast<uint32_t>(lo),
-                             static_cast<uint32_t>(size), width, false, false,
-                             false});
+  f.ctx.RegisterArray(
+      name, {static_cast<uint32_t>(lo), static_cast<uint32_t>(size), width,
+             false, false, false});
   for (int i = 0; i < size; ++i) {
     std::string nm = std::string(name) + "[" + std::to_string(lo + i) + "]";
     auto* s = f.arena.AllocString(nm.c_str(), nm.size());

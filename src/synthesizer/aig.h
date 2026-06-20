@@ -52,7 +52,6 @@ class AigGraph {
   std::vector<std::pair<uint32_t, uint32_t>> latches;
 
  private:
-
   static uint64_t HashKey(uint32_t lit0, uint32_t lit1);
 
   uint32_t AllocNode();
@@ -60,4 +59,4 @@ class AigGraph {
   std::unordered_map<uint64_t, uint32_t> strash_;
 };
 
-}
+}  // namespace delta

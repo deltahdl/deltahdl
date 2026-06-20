@@ -83,4 +83,4 @@ TEST(IpcSync, MailboxTryPeekEmptyDistinctFromTypeMismatch) {
   EXPECT_EQ(mb.TryPeek(msg, kTypeString), 0);
 }
 
-}
+}  // namespace

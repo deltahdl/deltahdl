@@ -52,4 +52,4 @@ TEST(StructPatternSynth, DefaultPatternSynthesizes) {
   ASSERT_NE(aig, nullptr);
 }
 
-}
+}  // namespace

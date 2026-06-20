@@ -56,7 +56,7 @@ TEST(ExpressionElaboration, GenvarExprElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace
 TEST(VarLvaluePartSelect, VarLvaluePartSelect) {
   SimFixture f;
   auto* design = ElaborateSrc(

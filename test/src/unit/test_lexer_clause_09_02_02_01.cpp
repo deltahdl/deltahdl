@@ -25,4 +25,4 @@ TEST(GeneralPurposeAlwaysLexing, AlwaysFollowedByHash) {
   EXPECT_EQ(tokens[1].kind, TokenKind::kHash);
 }
 
-}
+}  // namespace

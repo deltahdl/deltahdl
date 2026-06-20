@@ -16,15 +16,15 @@ namespace {
 // module array -> module, program array -> param assign, interface array ->
 // instance, primitive array -> primitive, the access-by-index and name/size
 // properties) are walked by the generic object-model machinery and the
-// vpi_handle_by_index()/vpi_handle_by_multi_index() routines owned by §38.19 and
-// §38.20, so they carry no production rule of their own here. The two details
-// that do - the connection-list expr (detail 1) and the range iteration/bounds
-// (detail 2) - are exercised below, resting on the instance-array/primitive-
-// array grouping the diagram defines.
+// vpi_handle_by_index()/vpi_handle_by_multi_index() routines owned by §38.19
+// and §38.20, so they carry no production rule of their own here. The two
+// details that do - the connection-list expr (detail 1) and the range
+// iteration/bounds (detail 2) - are exercised below, resting on the
+// instance-array/primitive- array grouping the diagram defines.
 
 // The instance-array grouping the diagram draws: module, interface, and program
-// arrays plus the instance-array supertype, and a primitive array (itself a kind
-// of instance array). A non-array object kind is not in the group.
+// arrays plus the instance-array supertype, and a primitive array (itself a
+// kind of instance array). A non-array object kind is not in the group.
 TEST(InstanceArrayModel, InstanceArrayTypeClassification) {
   EXPECT_TRUE(VpiIsInstanceArrayType(vpiInstanceArray));
   EXPECT_TRUE(VpiIsInstanceArrayType(vpiModuleArray));

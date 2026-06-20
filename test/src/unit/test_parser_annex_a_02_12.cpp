@@ -100,8 +100,8 @@ TEST(LetDeclParsing, LetPortList_Multiple) {
   EXPECT_EQ(item->func_args[2].name, "d1");
 }
 
-// A.2.12 let_port_item ::= ... formal_port_identifier { variable_dimension } ...
-// A formal carrying an unpacked dimension.
+// A.2.12 let_port_item ::= ... formal_port_identifier { variable_dimension }
+// ... A formal carrying an unpacked dimension.
 TEST(LetDeclParsing, LetPortItem_VariableDimension) {
   auto r = Parse(
       "module m;\n"
@@ -204,7 +204,8 @@ TEST(LetDeclParsing, LetExpression_PackageScope) {
               "endmodule\n"));
 }
 
-// A let_declaration may appear inside a procedural block (block_item_declaration).
+// A let_declaration may appear inside a procedural block
+// (block_item_declaration).
 TEST(LetDeclParsing, LetDecl_InProceduralBlock) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -230,8 +231,9 @@ TEST(LetDeclParsing, LetFormalType_PackedVectorType) {
   EXPECT_EQ(item->func_args[0].name, "x");
 }
 
-// A.2.12 let_port_item ::= ... formal_port_identifier { variable_dimension } ...
-// The variable_dimension group repeats: a formal with two unpacked dimensions.
+// A.2.12 let_port_item ::= ... formal_port_identifier { variable_dimension }
+// ... The variable_dimension group repeats: a formal with two unpacked
+// dimensions.
 TEST(LetDeclParsing, LetPortItem_MultipleVariableDimensions) {
   auto r = Parse(
       "module m;\n"

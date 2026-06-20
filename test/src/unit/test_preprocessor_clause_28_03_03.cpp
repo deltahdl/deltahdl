@@ -54,4 +54,4 @@ TEST(GateDelayParsing, GateWithTwoDelays) {
   EXPECT_NE(item->gate_delay, nullptr);
 }
 
-}
+}  // namespace

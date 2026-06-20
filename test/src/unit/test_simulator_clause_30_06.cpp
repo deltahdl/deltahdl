@@ -1,8 +1,8 @@
-#include "simulator/specify.h"
-
 #include <gtest/gtest.h>
 
 #include <cstdint>
+
+#include "simulator/specify.h"
 
 using namespace delta;
 
@@ -26,4 +26,4 @@ TEST(MixedPathDistributedDelay, DistributedSumLargerWinsLrmExample2) {
   EXPECT_EQ(SelectEffectivePathDelay(22, 30), 30u);
 }
 
-}
+}  // namespace

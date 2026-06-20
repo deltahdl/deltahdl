@@ -85,4 +85,4 @@ TEST(OperatorParsing, UnaryReductionXnorAlt) {
   EXPECT_EQ(rhs->op, TokenKind::kCaretTilde);
 }
 
-}
+}  // namespace

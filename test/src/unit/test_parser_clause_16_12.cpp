@@ -55,66 +55,66 @@ TEST(AssertionSemanticsParsing, PropertyDeclDisableIffCounted) {
 
 // §16.12: a named property may be declared in a package.
 TEST(AssertionSemanticsParsing, PropertyDeclInPackage) {
-  EXPECT_TRUE(ParseOk(
-      "package pkg;\n"
-      "  property p_pkg;\n"
-      "    @(posedge clk) a |-> b;\n"
-      "  endproperty\n"
-      "endpackage\n"));
+  EXPECT_TRUE(
+      ParseOk("package pkg;\n"
+              "  property p_pkg;\n"
+              "    @(posedge clk) a |-> b;\n"
+              "  endproperty\n"
+              "endpackage\n"));
 }
 
 // §16.12: a named property may be declared in an interface.
 TEST(AssertionSemanticsParsing, PropertyDeclInInterface) {
-  EXPECT_TRUE(ParseOk(
-      "interface i;\n"
-      "  property p_if;\n"
-      "    @(posedge clk) a |-> b;\n"
-      "  endproperty\n"
-      "endinterface\n"));
+  EXPECT_TRUE(
+      ParseOk("interface i;\n"
+              "  property p_if;\n"
+              "    @(posedge clk) a |-> b;\n"
+              "  endproperty\n"
+              "endinterface\n"));
 }
 
 // §16.12: a named property may be declared in a program.
 TEST(AssertionSemanticsParsing, PropertyDeclInProgram) {
-  EXPECT_TRUE(ParseOk(
-      "program prg;\n"
-      "  property p_prog;\n"
-      "    @(posedge clk) a |-> b;\n"
-      "  endproperty\n"
-      "endprogram\n"));
+  EXPECT_TRUE(
+      ParseOk("program prg;\n"
+              "  property p_prog;\n"
+              "    @(posedge clk) a |-> b;\n"
+              "  endproperty\n"
+              "endprogram\n"));
 }
 
 // §16.12: a named property may be declared at compilation-unit scope.
 TEST(AssertionSemanticsParsing, PropertyDeclAtCuScope) {
-  EXPECT_TRUE(ParseOk(
-      "property p_cu;\n"
-      "  @(posedge clk) a |-> b;\n"
-      "endproperty\n"));
+  EXPECT_TRUE(
+      ParseOk("property p_cu;\n"
+              "  @(posedge clk) a |-> b;\n"
+              "endproperty\n"));
 }
 
 // §16.12: a named property may be declared in a clocking block.
 TEST(AssertionSemanticsParsing, PropertyDeclInClockingBlock) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  clocking cb @(posedge clk);\n"
-      "    property p_cb;\n"
-      "      a |-> b;\n"
-      "    endproperty\n"
-      "  endclocking\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  clocking cb @(posedge clk);\n"
+              "    property p_cb;\n"
+              "      a |-> b;\n"
+              "    endproperty\n"
+              "  endclocking\n"
+              "endmodule\n"));
 }
 
 // §16.12: a named property may be declared in a generate block.
 TEST(AssertionSemanticsParsing, PropertyDeclInGenerateBlock) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  generate\n"
-      "    if (1) begin : g\n"
-      "      property p_gen;\n"
-      "        @(posedge clk) a |-> b;\n"
-      "      endproperty\n"
-      "    end\n"
-      "  endgenerate\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  generate\n"
+              "    if (1) begin : g\n"
+              "      property p_gen;\n"
+              "        @(posedge clk) a |-> b;\n"
+              "      endproperty\n"
+              "    end\n"
+              "  endgenerate\n"
+              "endmodule\n"));
 }
 
 // §16.12 Syntax 16-16: endproperty may carry a matching identifier label.

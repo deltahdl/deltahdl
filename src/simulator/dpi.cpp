@@ -38,4 +38,4 @@ bool DpiContext::HasExport(std::string_view sv_name) const {
   return export_index_.count(sv_name) != 0;
 }
 
-}
+}  // namespace delta

@@ -29,9 +29,9 @@ bool SampleFormalUsageIsLegal(CovergroupNameContext context);
 // §19.8.1: how a name referenced inside a covergroup resolves once the sample
 // method has been overridden with formal arguments.
 enum class CovergroupNameResolution : uint8_t {
-  kSampleFormal,      // bound to a formal of the overridden sample method
-  kEnclosingScope,    // bound to a declaration in the enclosing scope
-  kUnresolved,        // not visible in either place
+  kSampleFormal,    // bound to a formal of the overridden sample method
+  kEnclosingScope,  // bound to a declaration in the enclosing scope
+  kUnresolved,      // not visible in either place
 };
 
 // §19.8.1: the formal arguments of an overridden sample method are searched

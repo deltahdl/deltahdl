@@ -90,4 +90,4 @@ TEST(EquivalentTypesElaboration, UnpackedFixedSizeArraySameSizeEquivalent) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-}
+}  // namespace

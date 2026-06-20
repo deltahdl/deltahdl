@@ -6,21 +6,22 @@
 namespace delta {
 namespace {
 
-// §37.74 For: the object model diagram for a for statement. The clause carries no
-// numbered Details, no 'shall' sentences, and no BNF - it is the diagram alone.
-// The for object draws four edges: an iteration of initialization statements
-// (vpiForInitStmt), an iteration of increment statements (vpiForIncStmt), a
-// controlling condition expression (vpiCondition), and an unlabeled edge to a
-// body statement (the generic vpiStmt relation). It also carries the
-// vpiLocalVarDecls property ("has local variables"), which is owned by §37.12 and
-// is not retested here.
+// §37.74 For: the object model diagram for a for statement. The clause carries
+// no numbered Details, no 'shall' sentences, and no BNF - it is the diagram
+// alone. The for object draws four edges: an iteration of initialization
+// statements (vpiForInitStmt), an iteration of increment statements
+// (vpiForIncStmt), a controlling condition expression (vpiCondition), and an
+// unlabeled edge to a body statement (the generic vpiStmt relation). It also
+// carries the vpiLocalVarDecls property ("has local variables"), which is owned
+// by §37.12 and is not retested here.
 //
-// Only the vpiCondition edge needs dedicated production code: the condition's own
-// type is an expression kind, not the vpiCondition relation tag, so the generic
-// child walk cannot find it - exactly as for the while/repeat (§37.66) and
-// if/if-else (§37.71) statements. The initialization and increment iterations and
-// the body edge are statement-edge children served by the generic traversal and
-// iteration. These tests observe the production paths applying each rule.
+// Only the vpiCondition edge needs dedicated production code: the condition's
+// own type is an expression kind, not the vpiCondition relation tag, so the
+// generic child walk cannot find it - exactly as for the while/repeat (§37.66)
+// and if/if-else (§37.71) statements. The initialization and increment
+// iterations and the body edge are statement-edge children served by the
+// generic traversal and iteration. These tests observe the production paths
+// applying each rule.
 
 // The fixture installs a context so the public vpi_handle/vpi_iterate entry
 // points run their real dispatch over the test objects.
@@ -31,11 +32,12 @@ class For : public ::testing::Test {
   VpiContext ctx_;
 };
 
-// Condition edge (vpiCondition -> expr): a for statement reaches its controlling
-// condition through the public vpi_handle(vpiCondition, ...) dispatch. The scan is
-// type-directed: among the initialization statement, increment statement, and body
-// - all statement-edge children - it skips every non-expression child and returns
-// the condition expression rather than the first child.
+// Condition edge (vpiCondition -> expr): a for statement reaches its
+// controlling condition through the public vpi_handle(vpiCondition, ...)
+// dispatch. The scan is type-directed: among the initialization statement,
+// increment statement, and body
+// - all statement-edge children - it skips every non-expression child and
+// returns the condition expression rather than the first child.
 TEST_F(For, ForStatementReachesConditionAmongInitIncrementAndBody) {
   VpiObject init;
   init.type = vpiForInitStmt;  // an initialization statement, listed first
@@ -54,8 +56,8 @@ TEST_F(For, ForStatementReachesConditionAmongInitIncrementAndBody) {
 }
 
 // Condition edge reports no expression when the for statement has no condition
-// child (a for loop written without a controlling expression): the scan finds no
-// expression among the statement-edge children and returns null.
+// child (a for loop written without a controlling expression): the scan finds
+// no expression among the statement-edge children and returns null.
 TEST_F(For, ForWithoutConditionReportsNoCondition) {
   VpiObject init;
   init.type = vpiForInitStmt;
@@ -86,11 +88,11 @@ TEST_F(For, ForConditionRelationIsScopedToForStatements) {
   EXPECT_EQ(VpiHandleC(vpiCondition, &not_a_for), nullptr);
 }
 
-// Initialization edge (vpiForInitStmt iteration): a for statement may carry more
-// than one initialization statement (a comma list), all reached through the
-// vpiForInitStmt iteration. They are statement-edge children served by the generic
-// type-matched iteration, which collects them in order while skipping the
-// condition, increment, and body.
+// Initialization edge (vpiForInitStmt iteration): a for statement may carry
+// more than one initialization statement (a comma list), all reached through
+// the vpiForInitStmt iteration. They are statement-edge children served by the
+// generic type-matched iteration, which collects them in order while skipping
+// the condition, increment, and body.
 TEST_F(For, ForInitializationStatementsReachedThroughVpiForInitStmt) {
   VpiObject init0;
   init0.type = vpiForInitStmt;
@@ -111,12 +113,14 @@ TEST_F(For, ForInitializationStatementsReachedThroughVpiForInitStmt) {
   ASSERT_NE(it, nullptr);
   EXPECT_EQ(ctx_.Scan(it), &init0);
   EXPECT_EQ(ctx_.Scan(it), &init1);
-  EXPECT_EQ(ctx_.Scan(it), nullptr);  // drains; condition/increment/body excluded
+  EXPECT_EQ(ctx_.Scan(it),
+            nullptr);  // drains; condition/increment/body excluded
 }
 
 // Increment edge (vpiForIncStmt iteration): symmetrically, the increment
-// statements of a for statement are reached through the vpiForIncStmt iteration,
-// collected in order and distinct from the initialization statements.
+// statements of a for statement are reached through the vpiForIncStmt
+// iteration, collected in order and distinct from the initialization
+// statements.
 TEST_F(For, ForIncrementStatementsReachedThroughVpiForIncStmt) {
   VpiObject init;
   init.type = vpiForInitStmt;
@@ -181,9 +185,9 @@ TEST_F(For, ForWithoutBodyReportsNoStatement) {
 
 // Initialization edge edge case (no init statements): a for statement written
 // without an initialization clause has an empty vpiForInitStmt iteration. The
-// generic type-matched iteration finds no init-tagged child and reports nothing,
-// even though the condition and body are present and reachable through their own
-// edges.
+// generic type-matched iteration finds no init-tagged child and reports
+// nothing, even though the condition and body are present and reachable through
+// their own edges.
 TEST_F(For, ForInitializationIterationIsEmptyWithoutInitStatements) {
   VpiObject condition;
   condition.type = vpiOperation;

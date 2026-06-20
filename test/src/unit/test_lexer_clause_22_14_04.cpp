@@ -13,8 +13,7 @@ TEST(Lexer, KeywordVersion_Noconfig_AllExcludedKeywordsRejected) {
       "include", "instance", "liblist", "library",   "use",
   };
   for (const char* kw : kExcluded) {
-    auto result =
-        LookupKeyword(kw, KeywordVersion::kVer13642001Noconfig);
+    auto result = LookupKeyword(kw, KeywordVersion::kVer13642001Noconfig);
     EXPECT_FALSE(result.has_value())
         << kw << " should be excluded in 1364-2001-noconfig";
   }
@@ -22,46 +21,43 @@ TEST(Lexer, KeywordVersion_Noconfig_AllExcludedKeywordsRejected) {
 
 TEST(Lexer, KeywordVersion_Noconfig_NonExcluded2001KeywordsRecognized) {
   const char* kKept[] = {
-      "automatic",          "endgenerate",
-      "generate",           "genvar",
-      "localparam",         "noshowcancelled",
-      "pulsestyle_ondetect", "pulsestyle_onevent",
-      "showcancelled",      "signed",
+      "automatic",
+      "endgenerate",
+      "generate",
+      "genvar",
+      "localparam",
+      "noshowcancelled",
+      "pulsestyle_ondetect",
+      "pulsestyle_onevent",
+      "showcancelled",
+      "signed",
       "unsigned",
   };
   for (const char* kw : kKept) {
-    auto result =
-        LookupKeyword(kw, KeywordVersion::kVer13642001Noconfig);
+    auto result = LookupKeyword(kw, KeywordVersion::kVer13642001Noconfig);
     EXPECT_TRUE(result.has_value())
         << kw << " should be a keyword in 1364-2001-noconfig";
   }
 }
 
 TEST(Lexer, KeywordVersion_Noconfig_Includes1364_1995Keywords) {
+  EXPECT_TRUE(LookupKeyword("module", KeywordVersion::kVer13642001Noconfig)
+                  .has_value());
   EXPECT_TRUE(
-      LookupKeyword("module", KeywordVersion::kVer13642001Noconfig)
-          .has_value());
+      LookupKeyword("wire", KeywordVersion::kVer13642001Noconfig).has_value());
   EXPECT_TRUE(
-      LookupKeyword("wire", KeywordVersion::kVer13642001Noconfig)
-          .has_value());
-  EXPECT_TRUE(
-      LookupKeyword("reg", KeywordVersion::kVer13642001Noconfig)
-          .has_value());
-  EXPECT_TRUE(
-      LookupKeyword("always", KeywordVersion::kVer13642001Noconfig)
-          .has_value());
+      LookupKeyword("reg", KeywordVersion::kVer13642001Noconfig).has_value());
+  EXPECT_TRUE(LookupKeyword("always", KeywordVersion::kVer13642001Noconfig)
+                  .has_value());
 }
 
 TEST(Lexer, KeywordVersion_Noconfig_LaterKeywordsNotRecognized) {
   EXPECT_FALSE(
-      LookupKeyword("uwire", KeywordVersion::kVer13642001Noconfig)
-          .has_value());
+      LookupKeyword("uwire", KeywordVersion::kVer13642001Noconfig).has_value());
   EXPECT_FALSE(
-      LookupKeyword("logic", KeywordVersion::kVer13642001Noconfig)
-          .has_value());
-  EXPECT_FALSE(
-      LookupKeyword("interface", KeywordVersion::kVer13642001Noconfig)
-          .has_value());
+      LookupKeyword("logic", KeywordVersion::kVer13642001Noconfig).has_value());
+  EXPECT_FALSE(LookupKeyword("interface", KeywordVersion::kVer13642001Noconfig)
+                   .has_value());
 }
 
 TEST(Lexer, KeywordVersion_Noconfig_ExcludedKeywordsStillInRegular2001) {
@@ -76,4 +72,4 @@ TEST(Lexer, KeywordVersion_Noconfig_ExcludedKeywordsStillInRegular2001) {
   }
 }
 
-}
+}  // namespace

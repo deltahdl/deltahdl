@@ -62,4 +62,4 @@ TEST(DynamicArrayDeleteSimulation, ReallocateAfterDelete) {
   EXPECT_EQ(v, 4u);
 }
 
-}
+}  // namespace

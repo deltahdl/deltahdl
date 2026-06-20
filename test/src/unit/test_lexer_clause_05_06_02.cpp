@@ -120,10 +120,10 @@ TEST(Keywords, EscapedThisIsIdentifier) {
 
 TEST(Keywords, UppercaseIsNotKeyword) {
   const char* const kSamples[] = {
-      "MODULE",  "WIRE",    "REG",     "INPUT",   "OUTPUT",  "ALWAYS",
-      "IF",      "ELSE",    "BEGIN",   "END",     "CLASS",   "LOGIC",
-      "INT",     "FUNCTION", "TASK",   "PACKAGE", "IMPORT",  "TYPEDEF",
-      "ENUM",    "STRUCT",   "INITIAL", "FINAL",  "DISABLE",
+      "MODULE", "WIRE",     "REG",     "INPUT",   "OUTPUT",  "ALWAYS",
+      "IF",     "ELSE",     "BEGIN",   "END",     "CLASS",   "LOGIC",
+      "INT",    "FUNCTION", "TASK",    "PACKAGE", "IMPORT",  "TYPEDEF",
+      "ENUM",   "STRUCT",   "INITIAL", "FINAL",   "DISABLE",
   };
   for (const char* upper : kSamples) {
     auto tokens = Lex(upper);
@@ -195,7 +195,7 @@ TEST(Keywords, UnderscoreContainingKeywordRecognized) {
 
 TEST(Keywords, UppercaseUnderscoreKeywordIsIdentifier) {
   const char* const kSamples[] = {
-      "ALWAYS_COMB", "ALWAYS_FF",   "ALWAYS_LATCH", "JOIN_ANY",
+      "ALWAYS_COMB", "ALWAYS_FF",    "ALWAYS_LATCH", "JOIN_ANY",
       "JOIN_NONE",   "S_UNTIL_WITH", "WAIT_ORDER",   "UNIQUE0",
   };
   for (const char* upper : kSamples) {
@@ -207,7 +207,7 @@ TEST(Keywords, UppercaseUnderscoreKeywordIsIdentifier) {
 
 TEST(Keywords, MixedCaseUnderscoreKeywordIsIdentifier) {
   const char* const kSamples[] = {
-      "Always_Comb", "Always_FF",   "Always_Latch", "Join_Any",
+      "Always_Comb", "Always_FF",    "Always_Latch", "Join_Any",
       "Join_None",   "S_Until_With", "Wait_Order",
   };
   for (const char* mixed : kSamples) {
@@ -219,9 +219,8 @@ TEST(Keywords, MixedCaseUnderscoreKeywordIsIdentifier) {
 
 TEST(Keywords, EscapedUnderscoreKeywordIsIdentifier) {
   const char* const kSamples[] = {
-      "always_comb",  "always_ff", "always_latch", "join_any",
-      "join_none",    "s_always",  "s_until_with", "unique0",
-      "wait_order",
+      "always_comb", "always_ff",    "always_latch", "join_any",   "join_none",
+      "s_always",    "s_until_with", "unique0",      "wait_order",
   };
   for (const char* kw : kSamples) {
     std::string escaped = std::string("\\") + kw + " ";
@@ -256,4 +255,4 @@ TEST(Keywords, EscapedKeywordWithTrailingWhitespaceTerminates) {
   EXPECT_EQ(tokens[1].kind, TokenKind::kSemicolon);
 }
 
-}
+}  // namespace

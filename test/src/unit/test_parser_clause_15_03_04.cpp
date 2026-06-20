@@ -39,4 +39,4 @@ TEST(SemaphoreTryGetParser, TryGetUsedInExpression) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}
+}  // namespace

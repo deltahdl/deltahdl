@@ -522,4 +522,4 @@ TEST(OperatorParsing, BinaryPowerMissingRhs) {
   EXPECT_TRUE(r.has_errors);
 }
 
-}
+}  // namespace

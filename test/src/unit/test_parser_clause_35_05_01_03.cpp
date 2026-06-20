@@ -69,4 +69,4 @@ TEST_F(AnnexHParseTest, DpiPureContextTaskRejected) {
   EXPECT_TRUE(diag_.HasErrors());
 }
 
-}
+}  // namespace

@@ -33,7 +33,9 @@ struct PeekWaiter {
 struct GetWaiter {
   MailboxObject& mbx;
   bool await_ready() { return !mbx.messages.empty(); }
-  void await_suspend(std::coroutine_handle<> h) { mbx.get_waiters.push_back(h); }
+  void await_suspend(std::coroutine_handle<> h) {
+    mbx.get_waiters.push_back(h);
+  }
   void await_resume() const noexcept {}
 };
 
@@ -163,7 +165,8 @@ TEST(IpcSync, MailboxPeekBlocksUntilMessagePlaced) {
   ASSERT_EQ(mb.peek_waiters.size(), 1u);
   EXPECT_TRUE(ran.empty());
 
-  EXPECT_EQ(mb.TryPut(0x55), 1);  // wakes the parked peeker via WakeGetWaiters()
+  EXPECT_EQ(mb.TryPut(0x55),
+            1);  // wakes the parked peeker via WakeGetWaiters()
   ASSERT_EQ(ran.size(), 1u);
   EXPECT_EQ(ran[0], 7);
   EXPECT_TRUE(mb.peek_waiters.empty());
@@ -196,14 +199,14 @@ TEST(IpcSync, MailboxOneMessageUnblocksMultiplePeekersAndGetter) {
   EXPECT_EQ(ran.size(), 3u);
   EXPECT_TRUE(mb.peek_waiters.empty());
   EXPECT_TRUE(mb.get_waiters.empty());
-  EXPECT_EQ(p1, 0x77u);     // both peekers copied the same message...
+  EXPECT_EQ(p1, 0x77u);  // both peekers copied the same message...
   EXPECT_EQ(p2, 0x77u);
-  EXPECT_EQ(g, 0x77u);      // ...and the getter retrieved it
-  EXPECT_EQ(mb.Num(), 0);   // only the getter removed it from the queue
+  EXPECT_EQ(g, 0x77u);     // ...and the getter retrieved it
+  EXPECT_EQ(mb.Num(), 0);  // only the getter removed it from the queue
 
   peeker1.h.destroy();
   peeker2.h.destroy();
   getter.h.destroy();
 }
 
-}
+}  // namespace

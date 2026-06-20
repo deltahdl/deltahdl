@@ -43,7 +43,8 @@ TEST_F(VpiMcdCloseSim, ClosesFileAndReturnsZeroOnSuccess) {
 }
 
 // §38.24 (C2): channels are discrete bits of the mcd, so a single call closes
-// several channels at once. Passing the OR of two descriptors closes both files.
+// several channels at once. Passing the OR of two descriptors closes both
+// files.
 TEST_F(VpiMcdCloseSim, ClosesSeveralChannelsSimultaneously) {
   char a[] = "a.txt";
   char b[] = "b.txt";
@@ -81,7 +82,8 @@ TEST_F(VpiMcdCloseSim, ReturnsUnclosedChannelsOnError) {
 TEST_F(VpiMcdCloseSim, PredefinedDescriptorOneCannotBeClosed) {
   EXPECT_EQ(vpi_mcd_close(kLsbChannel), kLsbChannel);
 
-  // Even bundled with a real channel, the LSB survives while the real one closes.
+  // Even bundled with a real channel, the LSB survives while the real one
+  // closes.
   char name[] = "real.log";
   PLI_UINT32 mcd = vpi_mcd_open(name);
   ASSERT_NE(mcd, 0u);
@@ -90,7 +92,8 @@ TEST_F(VpiMcdCloseSim, PredefinedDescriptorOneCannotBeClosed) {
 }
 
 // §38.24 (C2, C4): a single call may name channels that cannot be closed for
-// different reasons - the reserved descriptor 1 and a bit naming no open channel
+// different reasons - the reserved descriptor 1 and a bit naming no open
+// channel
 // - alongside one that can. The live channel is closed and the returned mcd is
 // the OR of every channel left open, regardless of why each was left open.
 TEST_F(VpiMcdCloseSim, ReportsAllUnclosedChannelsWhileClosingTheRest) {

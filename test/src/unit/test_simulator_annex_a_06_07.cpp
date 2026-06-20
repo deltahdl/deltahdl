@@ -389,4 +389,4 @@ TEST(CaseStatementSim, Unique0CasexOverlapViolation) {
   EXPECT_GE(f.diag.WarningCount(), 1u);
 }
 
-}
+}  // namespace

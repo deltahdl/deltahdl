@@ -63,4 +63,4 @@ TEST(ConstEval, CountbitsConstantIntDedupAndXZ) {
   EXPECT_EQ(ConstEvalInt(ParseExprFrom("$countbits(8'b10110010, 1'bz)", f)), 0);
 }
 
-}
+}  // namespace

@@ -279,4 +279,4 @@ TEST(PassSwitches, AllSixKindsParseToDistinctGateKinds) {
             nullptr);
 }
 
-}
+}  // namespace

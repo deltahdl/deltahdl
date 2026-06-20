@@ -571,4 +571,4 @@ TEST(AssertionParsing, MulticlockPropertyDeclImplication) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}
+}  // namespace

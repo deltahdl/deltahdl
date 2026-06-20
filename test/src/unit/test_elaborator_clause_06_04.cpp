@@ -293,4 +293,4 @@ TEST(SingularAggregateTypes, VirtualInterfaceIsSingular) {
   EXPECT_FALSE(IsAggregateType(dt));
 }
 
-}
+}  // namespace

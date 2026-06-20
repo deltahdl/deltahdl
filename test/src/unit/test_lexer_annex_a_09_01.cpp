@@ -21,7 +21,6 @@ TEST(AttributeTokenLexing, AttrEndToken) {
 }
 
 TEST(AttributeTokenLexing, AttrStartNotParenStar) {
-
   auto tokens = Lex("(* x *)");
   ASSERT_GE(tokens.size(), 1u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kAttrStart);
@@ -50,7 +49,6 @@ TEST(AttributeTokenLexing, AttrWithValue) {
 }
 
 TEST(AttributeTokenLexing, AttrStartNoSpaceBetweenParenStar) {
-
   auto tokens = Lex("(*foo*)");
   ASSERT_GE(tokens.size(), 3u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kAttrStart);
@@ -58,13 +56,11 @@ TEST(AttributeTokenLexing, AttrStartNoSpaceBetweenParenStar) {
 }
 
 TEST(AttributeTokenLexing, ParenStarParenNotAttribute) {
-
   auto tokens = Lex("(a * b)");
   EXPECT_NE(tokens[0].kind, TokenKind::kAttrStart);
 }
 
 TEST(AttributeTokenLexing, AttrWithStringValue) {
-
   auto tokens = Lex("(* mode = \"cla\" *)");
   ASSERT_GE(tokens.size(), 5u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kAttrStart);
@@ -73,7 +69,6 @@ TEST(AttributeTokenLexing, AttrWithStringValue) {
 }
 
 TEST(AttributeTokenLexing, AttrWithExprValueTokens) {
-
   auto tokens = Lex("(* depth = 3 + 1 *)");
   ASSERT_GE(tokens.size(), 7u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kAttrStart);
@@ -91,4 +86,4 @@ TEST(AttributeTokenLexing, AttrNameEscapedIdentifierToken) {
   EXPECT_EQ(tokens[1].text, "multi-word-name");
 }
 
-}
+}  // namespace

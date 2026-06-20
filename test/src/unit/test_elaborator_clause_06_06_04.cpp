@@ -35,4 +35,4 @@ TEST(TriregElaboration, TriregIsNetNotVariable) {
   EXPECT_TRUE(mod->variables.empty());
 }
 
-}
+}  // namespace

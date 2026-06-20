@@ -60,7 +60,8 @@ TEST(IfMatchesElaboration, RealValueWithIntegralPatternRejected) {
 // §12.6.2: the predicate is a sequential conjunction of clauses joined by
 // `&&&`, so the per-clause type check reaches a matches clause that sits to the
 // left of a Boolean filter as well.
-TEST(IfMatchesElaboration, RealValueWithIntegralPatternInGuardedClauseRejected) {
+TEST(IfMatchesElaboration,
+     RealValueWithIntegralPatternInGuardedClauseRejected) {
   SimFixture f;
   ElaborateSrc(
       "module t;\n"
@@ -78,4 +79,4 @@ TEST(IfMatchesElaboration, RealValueWithIntegralPatternInGuardedClauseRejected) 
   EXPECT_TRUE(f.has_errors);
 }
 
-}
+}  // namespace

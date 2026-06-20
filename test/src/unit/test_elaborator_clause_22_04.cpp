@@ -58,11 +58,11 @@ TEST(IncludeFileElaboration, IncludedParameterElaboratesCorrectly) {
 
   ElabFixture f;
   auto* design = ElaborateWithIncludes(tmp,
-      "`include \"params.svh\"\n"
-      "module t;\n"
-      "  parameter P = `SIZE;\n"
-      "endmodule\n",
-      f);
+                                       "`include \"params.svh\"\n"
+                                       "module t;\n"
+                                       "  parameter P = `SIZE;\n"
+                                       "endmodule\n",
+                                       f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
   auto* mod = design->top_modules[0];
@@ -85,11 +85,11 @@ TEST(IncludeFileElaboration, NestedIncludeParameterElaborates) {
 
   ElabFixture f;
   auto* design = ElaborateWithIncludes(tmp,
-      "`include \"derived.svh\"\n"
-      "module t;\n"
-      "  parameter P = `DERIVED_VAL;\n"
-      "endmodule\n",
-      f);
+                                       "`include \"derived.svh\"\n"
+                                       "module t;\n"
+                                       "  parameter P = `DERIVED_VAL;\n"
+                                       "endmodule\n",
+                                       f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
   auto* mod = design->top_modules[0];
@@ -109,14 +109,14 @@ TEST(IncludeFileElaboration, IncludedDirectiveAffectsElaboration) {
 
   ElabFixture f;
   auto* design = ElaborateWithIncludes(tmp,
-      "`include \"setup.svh\"\n"
-      "module t;\n"
-      "  parameter P = 1;\n"
-      "endmodule\n",
-      f);
+                                       "`include \"setup.svh\"\n"
+                                       "module t;\n"
+                                       "  parameter P = 1;\n"
+                                       "endmodule\n",
+                                       f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
   EXPECT_EQ(design->top_modules[0]->delay_mode, DelayModeDirective::kZero);
 }
 
-}
+}  // namespace

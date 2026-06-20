@@ -89,4 +89,4 @@ TEST(OperatorElaboration, LogicalRightShiftElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

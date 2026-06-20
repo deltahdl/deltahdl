@@ -150,4 +150,4 @@ TEST(DottedNameParsing, DottedNameOnBothSidesOfAssignment) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

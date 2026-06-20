@@ -17,4 +17,4 @@ TEST(TwoStateAndFourState, BitIsTwoState) {
   EXPECT_FALSE(Is4stateType(DataTypeKind::kBit));
 }
 
-}
+}  // namespace

@@ -417,4 +417,4 @@ TEST(PrimitiveGateTypeParsing, GateTypeKeywordIsExactMatch) {
             nullptr);
 }
 
-}
+}  // namespace

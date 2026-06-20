@@ -28,4 +28,4 @@ bool IsConstantSysFunc(std::string_view name);
 
 std::string LongestStaticPrefix(const Expr* expr, const ScopeMap& scope = {});
 
-}
+}  // namespace delta

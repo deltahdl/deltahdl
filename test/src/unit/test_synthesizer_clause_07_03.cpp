@@ -25,20 +25,19 @@ TEST(UnionDeclarationSynthesis, PackedUnionLowers) {
 
 TEST(UnionDeclarationSynthesis, SoftPackedUnionLowers) {
   SynthFixture f;
-  auto* mod = ElaborateSrc(
-      f,
-      "module m;\n"
-      "  typedef union soft packed {\n"
-      "    logic [15:0] wide;\n"
-      "    logic [7:0] narrow;\n"
-      "  } su;\n"
-      "  su u;\n"
-      "  assign u = 16'hABCD;\n"
-      "endmodule\n");
+  auto* mod = ElaborateSrc(f,
+                           "module m;\n"
+                           "  typedef union soft packed {\n"
+                           "    logic [15:0] wide;\n"
+                           "    logic [7:0] narrow;\n"
+                           "  } su;\n"
+                           "  su u;\n"
+                           "  assign u = 16'hABCD;\n"
+                           "endmodule\n");
   ASSERT_NE(mod, nullptr);
   SynthLower synth(f.arena, f.diag);
   auto* aig = synth.Lower(mod);
   ASSERT_NE(aig, nullptr);
 }
 
-}
+}  // namespace

@@ -51,10 +51,10 @@ constexpr std::string_view kScope = "$root.tb.unit1";
 // Evaluates $coverage_get_max(coverage_type, `SV_COV_HIER, scope) through the
 // production evaluator and returns the reported value as a signed integer.
 int RunGetMax(SimFixture& f, int coverage_type, std::string_view scope) {
-  auto* call = MkSysCall(
-      f.arena, "$coverage_get_max",
-      {MkInt(f.arena, static_cast<uint64_t>(coverage_type)),
-       MkInt(f.arena, 11 /* `SV_COV_HIER */), MkStr(f.arena, scope)});
+  auto* call =
+      MkSysCall(f.arena, "$coverage_get_max",
+                {MkInt(f.arena, static_cast<uint64_t>(coverage_type)),
+                 MkInt(f.arena, 11 /* `SV_COV_HIER */), MkStr(f.arena, scope)});
   return static_cast<int32_t>(EvalExpr(call, f.ctx, f.arena).ToUint64());
 }
 
@@ -63,9 +63,8 @@ int RunGetMax(SimFixture& f, int coverage_type, std::string_view scope) {
 void RunControl(SimFixture& f, int control, std::string_view scope) {
   auto* call = MkSysCall(
       f.arena, "$coverage_control",
-      {MkInt(f.arena, static_cast<uint64_t>(control)),
-       MkInt(f.arena, kToggle), MkInt(f.arena, 11 /* `SV_COV_HIER */),
-       MkStr(f.arena, scope)});
+      {MkInt(f.arena, static_cast<uint64_t>(control)), MkInt(f.arena, kToggle),
+       MkInt(f.arena, 11 /* `SV_COV_HIER */), MkStr(f.arena, scope)});
   EvalExpr(call, f.ctx, f.arena);
 }
 

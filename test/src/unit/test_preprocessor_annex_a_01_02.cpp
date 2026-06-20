@@ -35,4 +35,4 @@ TEST(SourceText, ModuleDecl) {
   EXPECT_TRUE(r.cu->modules[0]->items.empty());
 }
 
-}
+}  // namespace

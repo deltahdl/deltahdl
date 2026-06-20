@@ -102,9 +102,9 @@ TEST(AssignEvalSteps, SignedWideRhsSignExtendsAcrossWords) {
   val.is_signed = true;
   auto result = ResizeToWidth(val, 130, f.arena);
   EXPECT_EQ(result.width, 130u);
-  EXPECT_EQ(result.words[0].aval, 0u);                    // below sign bit: zero
-  EXPECT_EQ(result.words[1].aval, ~uint64_t{0} << 5);     // sign bit and above
-  EXPECT_EQ(result.words[2].aval, 0x3u);                  // top word, mask 2 bits
+  EXPECT_EQ(result.words[0].aval, 0u);                 // below sign bit: zero
+  EXPECT_EQ(result.words[1].aval, ~uint64_t{0} << 5);  // sign bit and above
+  EXPECT_EQ(result.words[2].aval, 0x3u);               // top word, mask 2 bits
 }
 
 // The unsigned counterpart on the same multi-word path zero-fills the upper

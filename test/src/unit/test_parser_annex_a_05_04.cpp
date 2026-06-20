@@ -587,4 +587,4 @@ TEST(UdpInstantiationParsing, AllStrengthKeywords) {
   }
 }
 
-}
+}  // namespace

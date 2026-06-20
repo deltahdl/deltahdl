@@ -163,4 +163,4 @@ TEST(VirtualMethodParsing, TaskInitialSpecifier) {
   EXPECT_TRUE(m->is_method_initial);
 }
 
-}
+}  // namespace

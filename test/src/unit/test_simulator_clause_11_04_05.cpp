@@ -470,4 +470,4 @@ TEST(EqualityOperatorSim, UnsignedNarrowMismatchesWiderTopBits) {
   EXPECT_EQ(y->value.ToUint64(), 0u);
 }
 
-}
+}  // namespace

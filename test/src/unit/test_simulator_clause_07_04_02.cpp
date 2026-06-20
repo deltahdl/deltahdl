@@ -33,4 +33,4 @@ TEST(UnpackedArraySimulation, RangeFormElementAccess) {
   EXPECT_EQ(v, 0x42u);
 }
 
-}
+}  // namespace

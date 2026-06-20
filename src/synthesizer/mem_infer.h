@@ -29,4 +29,4 @@ struct InferredMemory {
 
 std::vector<InferredMemory> InferMemories(const RtlirModule* mod);
 
-}
+}  // namespace delta

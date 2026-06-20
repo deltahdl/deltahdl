@@ -37,4 +37,4 @@ TEST(DisableStatementLexing, DisableFollowedByHierarchicalPath) {
   EXPECT_EQ(tokens[4].kind, TokenKind::kSemicolon);
 }
 
-}
+}  // namespace

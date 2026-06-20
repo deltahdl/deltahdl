@@ -91,4 +91,4 @@ TEST(DataTypeParsing, RangedUntypedParameterParses) {
   EXPECT_EQ(item->name, "P");
 }
 
-}
+}  // namespace

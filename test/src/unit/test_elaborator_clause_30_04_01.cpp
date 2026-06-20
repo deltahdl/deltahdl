@@ -144,4 +144,4 @@ TEST(SpecifyTerminalElaboration, VariableAsSourceErrors) {
   EXPECT_TRUE(f.has_errors);
 }
 
-}
+}  // namespace

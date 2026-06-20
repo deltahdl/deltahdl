@@ -102,10 +102,11 @@ TEST(StructLiteralElaboration, CLikeFlatLiteralForArrayOfStructsRejected) {
 TEST(StructLiteralElaboration, ReplicationStructLiteral) {
   EXPECT_TRUE(
       ElabOk("module t;\n"
-             "  typedef struct packed { logic [7:0] x; logic [7:0] y; logic [7:0] z; } xyz_t;\n"
+             "  typedef struct packed { logic [7:0] x; logic [7:0] y; logic "
+             "[7:0] z; } xyz_t;\n"
              "  xyz_t s;\n"
              "  initial s = '{3{8'hAA}};\n"
              "endmodule\n"));
 }
 
-}
+}  // namespace

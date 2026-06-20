@@ -25,8 +25,8 @@ const Stmt* RandseqStmt(ParseResult& r) {
   return stmt->kind == StmtKind::kRandsequence ? stmt : nullptr;
 }
 
-// §18.17.7: a production with no data_type_or_void and no tf_port_list assumes a
-// void return type and accepts no data — the parser records neither a return
+// §18.17.7: a production with no data_type_or_void and no tf_port_list assumes
+// a void return type and accepts no data — the parser records neither a return
 // type nor any formal arguments.
 TEST(RandseqValuePassingParse, PlainProductionHasNoTypeNoPorts) {
   auto r = Parse(
@@ -175,8 +175,8 @@ TEST(RandseqValuePassingParse, ReturnTypeAndPortsCaptured) {
   EXPECT_EQ(gen->ports[0].data_type.kind, DataTypeKind::kBit);
 }
 
-// §18.17.7: a call site may pass more than one actual argument. Each is captured
-// in the production item's argument list, in order.
+// §18.17.7: a call site may pass more than one actual argument. Each is
+// captured in the production item's argument list, in order.
 TEST(RandseqValuePassingParse, MultipleCallSiteArgumentsCaptured) {
   auto r = Parse(
       "module m;\n"

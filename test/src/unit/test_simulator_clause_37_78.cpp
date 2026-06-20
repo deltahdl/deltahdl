@@ -30,11 +30,11 @@ class ReturnStatement : public ::testing::Test {
   VpiContext ctx_;
 };
 
-// Condition edge (vpiCondition -> expr): a return statement reaches the value it
-// returns through the public vpi_handle(vpiCondition, ...) dispatch. The scan is
-// type-directed: when the return object also carries an incidental child that is
-// not an expression, the dispatch skips it and returns the value expression
-// rather than the first child.
+// Condition edge (vpiCondition -> expr): a return statement reaches the value
+// it returns through the public vpi_handle(vpiCondition, ...) dispatch. The
+// scan is type-directed: when the return object also carries an incidental
+// child that is not an expression, the dispatch skips it and returns the value
+// expression rather than the first child.
 TEST_F(ReturnStatement, ReturnReachesReturnedValueAmongOtherChildren) {
   VpiObject other;
   other.type = vpiStmt;  // not an expression, listed first
@@ -48,9 +48,9 @@ TEST_F(ReturnStatement, ReturnReachesReturnedValueAmongOtherChildren) {
   EXPECT_EQ(VpiHandleC(vpiCondition, &return_stmt), &value);
 }
 
-// Condition edge reports no expression when the return statement yields no value -
-// a return from a void function or a task. The scan finds no expression child and
-// returns null.
+// Condition edge reports no expression when the return statement yields no
+// value - a return from a void function or a task. The scan finds no expression
+// child and returns null.
 TEST_F(ReturnStatement, VoidReturnReportsNoValue) {
   VpiObject return_stmt;
   return_stmt.type = vpiReturnStmt;

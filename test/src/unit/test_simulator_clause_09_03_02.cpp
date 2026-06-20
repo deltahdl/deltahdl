@@ -186,9 +186,8 @@ TEST(ParallelBlockSimulation, JoinBlocksParentUntilAllChildrenFinish) {
       "  end\n"
       "endmodule\n",
       f);
-  LowerRunAndCheck(
-      f, design,
-      {{"snap_mid", 0u}, {"snap_after", 7u}, {"post_join", 7u}});
+  LowerRunAndCheck(f, design,
+                   {{"snap_mid", 0u}, {"snap_after", 7u}, {"post_join", 7u}});
 }
 
 TEST(ParallelBlockSimulation, JoinAnyResumesParentOnFirstFinish) {
@@ -242,4 +241,4 @@ TEST(ParallelBlockSimulation, ForkJoinNoneAllChildrenComplete) {
   EXPECT_EQ(c->value.ToUint64(), 3u);
 }
 
-}
+}  // namespace

@@ -40,7 +40,8 @@ TEST(AssertionSysControl, NullScopeAppliesGlobally) {
 // preexisting callbacks unaffected.
 TEST(AssertionSysControl, SysOffDisablesStartsKeepsAttemptsAndCallbacks) {
   AssertionApi api;
-  api.RegisterCallback(cbAssertionStart, [](const AssertionCbData&) {}, nullptr);
+  api.RegisterCallback(
+      cbAssertionStart, [](const AssertionCbData&) {}, nullptr);
   api.NoteAttemptStarted();
   api.NoteAttemptStarted();
 
@@ -51,12 +52,12 @@ TEST(AssertionSysControl, SysOffDisablesStartsKeepsAttemptsAndCallbacks) {
   EXPECT_EQ(api.CallbackCount(), 1u);
 }
 
-// §39.5.1 C5: SysKill discards attempts in progress and disables further starts;
-// callbacks unaffected.
+// §39.5.1 C5: SysKill discards attempts in progress and disables further
+// starts; callbacks unaffected.
 TEST(AssertionSysControl, SysKillDiscardsAttemptsKeepsCallbacks) {
   AssertionApi api;
-  api.RegisterCallback(cbAssertionSuccess, [](const AssertionCbData&) {},
-                       nullptr);
+  api.RegisterCallback(
+      cbAssertionSuccess, [](const AssertionCbData&) {}, nullptr);
   api.NoteAttemptStarted();
 
   api.SysControl(vpiAssertionSysKill, {});
@@ -70,8 +71,8 @@ TEST(AssertionSysControl, SysKillDiscardsAttemptsKeepsCallbacks) {
 // unaffected.
 TEST(AssertionSysControl, SysOnResumesAttempts) {
   AssertionApi api;
-  api.RegisterCallback(cbAssertionFailure, [](const AssertionCbData&) {},
-                       nullptr);
+  api.RegisterCallback(
+      cbAssertionFailure, [](const AssertionCbData&) {}, nullptr);
   api.SysControl(vpiAssertionSysOff, {});
   ASSERT_FALSE(api.AssertionsStarted());
 
@@ -85,11 +86,12 @@ TEST(AssertionSysControl, SysOnResumesAttempts) {
 // success/failure callbacks, and keeps all other callbacks.
 TEST(AssertionSysControl, SysResetRemovesOnlyStepCallbacks) {
   AssertionApi api;
-  api.RegisterCallback(cbAssertionStepSuccess, [](const AssertionCbData&) {},
-                       nullptr);
-  api.RegisterCallback(cbAssertionStepFailure, [](const AssertionCbData&) {},
-                       nullptr);
-  api.RegisterCallback(cbAssertionStart, [](const AssertionCbData&) {}, nullptr);
+  api.RegisterCallback(
+      cbAssertionStepSuccess, [](const AssertionCbData&) {}, nullptr);
+  api.RegisterCallback(
+      cbAssertionStepFailure, [](const AssertionCbData&) {}, nullptr);
+  api.RegisterCallback(
+      cbAssertionStart, [](const AssertionCbData&) {}, nullptr);
   api.NoteAttemptStarted();
   api.SysControl(vpiAssertionSysOff, {});
   api.SysControl(vpiAssertionSysDisableFailAction, {});
@@ -98,8 +100,8 @@ TEST(AssertionSysControl, SysResetRemovesOnlyStepCallbacks) {
 
   EXPECT_EQ(api.CallbackCount(), 1u);  // only the non-step callback remains
   EXPECT_EQ(api.AttemptsInProgress(), 0u);
-  EXPECT_TRUE(api.AssertionsStarted());      // back to initial running state
-  EXPECT_TRUE(api.FailActionEnabled());      // action enables restored
+  EXPECT_TRUE(api.AssertionsStarted());  // back to initial running state
+  EXPECT_TRUE(api.FailActionEnabled());  // action enables restored
   EXPECT_TRUE(api.PassActionEnabled());
 }
 
@@ -109,8 +111,9 @@ TEST(AssertionSysControl, LockBlocksStatusChangesUntilUnlock) {
   api.SysControl(vpiAssertionSysLock, {});
 
   EXPECT_TRUE(api.SysLocked());
-  EXPECT_FALSE(api.SysControl(vpiAssertionSysOff, {}));  // rejected while locked
-  EXPECT_TRUE(api.AssertionsStarted());                  // unchanged
+  EXPECT_FALSE(
+      api.SysControl(vpiAssertionSysOff, {}));  // rejected while locked
+  EXPECT_TRUE(api.AssertionsStarted());         // unchanged
 
   EXPECT_TRUE(api.SysControl(vpiAssertionSysUnlock, {}));  // unlock is allowed
   EXPECT_FALSE(api.SysLocked());
@@ -122,9 +125,10 @@ TEST(AssertionSysControl, LockBlocksStatusChangesUntilUnlock) {
 // and permits no further assertion actions.
 TEST(AssertionSysControl, SysEndRemovesAllCallbacksAndBlocksFurtherActions) {
   AssertionApi api;
-  api.RegisterCallback(cbAssertionStart, [](const AssertionCbData&) {}, nullptr);
-  api.RegisterCallback(cbAssertionStepSuccess, [](const AssertionCbData&) {},
-                       nullptr);
+  api.RegisterCallback(
+      cbAssertionStart, [](const AssertionCbData&) {}, nullptr);
+  api.RegisterCallback(
+      cbAssertionStepSuccess, [](const AssertionCbData&) {}, nullptr);
   api.NoteAttemptStarted();
 
   api.SysControl(vpiAssertionSysEnd, {});

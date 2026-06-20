@@ -21,8 +21,10 @@ namespace {
 // sites, reports each actual's size -- the formal's range follows the actual,
 // not a fixed declaration.
 TEST(DpiWysiwygOpenArray, CallSiteDeterminesOpenArrayFormalSize) {
-  SvOpenArrayHandle small = DpiRuntime::MakeOpenArrayFromActual(nullptr, 10, 32);
-  SvOpenArrayHandle large = DpiRuntime::MakeOpenArrayFromActual(nullptr, 64, 32);
+  SvOpenArrayHandle small =
+      DpiRuntime::MakeOpenArrayFromActual(nullptr, 10, 32);
+  SvOpenArrayHandle large =
+      DpiRuntime::MakeOpenArrayFromActual(nullptr, 64, 32);
 
   EXPECT_EQ(DpiRuntime::SvSize(small), 10u);
   EXPECT_EQ(DpiRuntime::SvHigh(small), 9u);
@@ -66,12 +68,12 @@ TEST(DpiWysiwygOpenArray, EmptyActualYieldsEmptyOpenArray) {
   EXPECT_EQ(DpiRuntime::SvHigh(h), 0u);
 }
 
-// §35.6.1.1: under WYSIWYG a formal that is *not* an open array is fully defined
-// by the import declaration -- the foreign function is guaranteed to receive the
-// formal's declared type, never the actual's. A wider actual (longint) bound to
-// a narrower declared formal (int) reaches the callee as the declared int, with
-// no compiler coercion blending the caller's and callee's formals: the type
-// comes solely from the import declaration site.
+// §35.6.1.1: under WYSIWYG a formal that is *not* an open array is fully
+// defined by the import declaration -- the foreign function is guaranteed to
+// receive the formal's declared type, never the actual's. A wider actual
+// (longint) bound to a narrower declared formal (int) reaches the callee as the
+// declared int, with no compiler coercion blending the caller's and callee's
+// formals: the type comes solely from the import declaration site.
 TEST(DpiWysiwygOpenArray, NonOpenFormalSeenAsDeclaredType) {
   DpiRuntime rt;
   DpiRtFunction func;
@@ -82,7 +84,7 @@ TEST(DpiWysiwygOpenArray, NonOpenFormalSeenAsDeclaredType) {
   // The callee reports the value only if it observed the declared int formal.
   func.arg_impl = [](std::vector<DpiArgValue>& a) {
     return DpiArgValue::FromInt(a[0].type == DataTypeKind::kInt ? a[0].AsInt()
-                                                               : -1);
+                                                                : -1);
   };
   rt.RegisterImport(std::move(func));
 

@@ -81,4 +81,4 @@ TEST(Signing, UnsignedTokenizesAsKeyword) {
   EXPECT_EQ(r.token.kind, TokenKind::kKwUnsigned);
 }
 
-}
+}  // namespace

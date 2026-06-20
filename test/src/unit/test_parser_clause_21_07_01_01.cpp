@@ -27,4 +27,4 @@ TEST(IoSystemTaskParsing, DumpfileExpressionArgument) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

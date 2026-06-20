@@ -45,4 +45,4 @@ TEST(VarDeclAssignmentPreprocessor, MixedInitInOneStmt) {
   EXPECT_NE(items[2]->init_expr, nullptr);
 }
 
-}
+}  // namespace

@@ -157,8 +157,7 @@ TEST(Coverage, WildcardTransitionArrayBinPerSequence) {
   db.Sample(g, {{"s", 0}});  // 00
   db.Sample(g, {{"s", 3}});  // 11 -> completes only the 00=>11 (0=>3) sequence
   for (const auto& bin : g->coverpoints[0].bins) {
-    bool is_zero_three =
-        bin.transitions.front() == std::vector<int64_t>{0, 3};
+    bool is_zero_three = bin.transitions.front() == std::vector<int64_t>{0, 3};
     EXPECT_EQ(bin.hit_count, is_zero_three ? 1u : 0u);
   }
 }
@@ -182,4 +181,4 @@ TEST(Coverage, WildcardBinsForbiddenOnRealCoverpoint) {
   EXPECT_FALSE(CoverageDB::WildcardBinsAllowed(real_cp));
 }
 
-}
+}  // namespace

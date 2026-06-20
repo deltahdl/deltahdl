@@ -143,4 +143,4 @@ char UdpEvalState::EvaluateWithEdge(const std::vector<char>& new_inputs,
   return output_;
 }
 
-}
+}  // namespace delta

@@ -37,27 +37,29 @@ TEST(InterfaceClassTypeAccess, InterfaceEnumMembersRegistered) {
 }
 
 TEST(InterfaceClassTypeAccess, ScopeResolutionParamAccess) {
-  EXPECT_EQ(RunAndGet(
-      "interface class IC;\n"
-      "  parameter int SIZE = 64;\n"
-      "  pure virtual function void foo();\n"
-      "endclass\n"
-      "module t;\n"
-      "  int result;\n"
-      "  initial result = IC::SIZE;\n"
-      "endmodule\n", "result"), 64u);
+  EXPECT_EQ(RunAndGet("interface class IC;\n"
+                      "  parameter int SIZE = 64;\n"
+                      "  pure virtual function void foo();\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial result = IC::SIZE;\n"
+                      "endmodule\n",
+                      "result"),
+            64u);
 }
 
 TEST(InterfaceClassTypeAccess, ScopeResolutionEnumValueAccess) {
-  EXPECT_EQ(RunAndGet(
-      "interface class IntfC;\n"
-      "  typedef enum {ONE, TWO, THREE} t1_t;\n"
-      "  pure virtual function t1_t funcC();\n"
-      "endclass\n"
-      "module t;\n"
-      "  int result;\n"
-      "  initial result = IntfC::TWO;\n"
-      "endmodule\n", "result"), 1u);
+  EXPECT_EQ(RunAndGet("interface class IntfC;\n"
+                      "  typedef enum {ONE, TWO, THREE} t1_t;\n"
+                      "  pure virtual function t1_t funcC();\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial result = IntfC::TWO;\n"
+                      "endmodule\n",
+                      "result"),
+            1u);
 }
 
 TEST(InterfaceClassTypeAccess, ScopeResolutionMultipleParams) {
@@ -74,7 +76,8 @@ TEST(InterfaceClassTypeAccess, ScopeResolutionMultipleParams) {
       "    r1 = IC::WIDTH;\n"
       "    r2 = IC::DEPTH;\n"
       "  end\n"
-      "endmodule\n", f);
+      "endmodule\n",
+      f);
   LowerRunAndCheck(f, design, {{"r1", 8u}, {"r2", 16u}});
 }
 
@@ -108,62 +111,66 @@ TEST(InterfaceClassTypeAccess, ImplementingClassDoesNotInheritStaticProps) {
 // extending interface class, so it can be read through the extending class
 // name with the scope resolution operator.
 TEST(InterfaceClassTypeAccess, ParamInheritedByExtendingInterfaceEndToEnd) {
-  EXPECT_EQ(RunAndGet(
-      "interface class IA;\n"
-      "  parameter int SIZE = 64;\n"
-      "  pure virtual function void fa();\n"
-      "endclass\n"
-      "interface class IB extends IA;\n"
-      "  pure virtual function void fb();\n"
-      "endclass\n"
-      "module t;\n"
-      "  int result;\n"
-      "  initial result = IB::SIZE;\n"
-      "endmodule\n", "result"), 64u);
+  EXPECT_EQ(RunAndGet("interface class IA;\n"
+                      "  parameter int SIZE = 64;\n"
+                      "  pure virtual function void fa();\n"
+                      "endclass\n"
+                      "interface class IB extends IA;\n"
+                      "  pure virtual function void fb();\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial result = IB::SIZE;\n"
+                      "endmodule\n",
+                      "result"),
+            64u);
 }
 
 // §8.26.3: typedefs (here, the enumeration constants of a member typedef) are
 // likewise inherited through extends and reachable via the extending class.
 TEST(InterfaceClassTypeAccess, EnumValueInheritedByExtendingInterfaceEndToEnd) {
-  EXPECT_EQ(RunAndGet(
-      "interface class IA;\n"
-      "  typedef enum {ONE, TWO, THREE} t1_t;\n"
-      "  pure virtual function void fa();\n"
-      "endclass\n"
-      "interface class IB extends IA;\n"
-      "  pure virtual function void fb();\n"
-      "endclass\n"
-      "module t;\n"
-      "  int result;\n"
-      "  initial result = IB::THREE;\n"
-      "endmodule\n", "result"), 2u);
+  EXPECT_EQ(RunAndGet("interface class IA;\n"
+                      "  typedef enum {ONE, TWO, THREE} t1_t;\n"
+                      "  pure virtual function void fa();\n"
+                      "endclass\n"
+                      "interface class IB extends IA;\n"
+                      "  pure virtual function void fb();\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial result = IB::THREE;\n"
+                      "endmodule\n",
+                      "result"),
+            2u);
 }
 
 // §8.26.3: the inheritance is transitive across a chain of extending interface
 // classes, so a parameter from the root is reachable through the leaf.
 TEST(InterfaceClassTypeAccess, ParamInheritedThroughChainedExtends) {
-  EXPECT_EQ(RunAndGet(
-      "interface class IA;\n"
-      "  parameter int WIDTH = 8;\n"
-      "  pure virtual function void fa();\n"
-      "endclass\n"
-      "interface class IB extends IA;\n"
-      "  pure virtual function void fb();\n"
-      "endclass\n"
-      "interface class IC extends IB;\n"
-      "  pure virtual function void fc();\n"
-      "endclass\n"
-      "module t;\n"
-      "  int result;\n"
-      "  initial result = IC::WIDTH;\n"
-      "endmodule\n", "result"), 8u);
+  EXPECT_EQ(RunAndGet("interface class IA;\n"
+                      "  parameter int WIDTH = 8;\n"
+                      "  pure virtual function void fa();\n"
+                      "endclass\n"
+                      "interface class IB extends IA;\n"
+                      "  pure virtual function void fb();\n"
+                      "endclass\n"
+                      "interface class IC extends IB;\n"
+                      "  pure virtual function void fc();\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial result = IC::WIDTH;\n"
+                      "endmodule\n",
+                      "result"),
+            8u);
 }
 
-// §8.26.3: the lowerer itself performs the extends-inheritance — after lowering,
-// the extending interface's type carries the base parameter as a static
-// property. Observing the lowered ClassTypeInfo exercises that production path
-// directly (not a hand-built type).
-TEST(InterfaceClassTypeAccess, LowererCopiesInheritedParamIntoExtendingInterface) {
+// §8.26.3: the lowerer itself performs the extends-inheritance — after
+// lowering, the extending interface's type carries the base parameter as a
+// static property. Observing the lowered ClassTypeInfo exercises that
+// production path directly (not a hand-built type).
+TEST(InterfaceClassTypeAccess,
+     LowererCopiesInheritedParamIntoExtendingInterface) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "interface class IA;\n"
@@ -174,7 +181,8 @@ TEST(InterfaceClassTypeAccess, LowererCopiesInheritedParamIntoExtendingInterface
       "  pure virtual function void fb();\n"
       "endclass\n"
       "module t;\n"
-      "endmodule\n", f);
+      "endmodule\n",
+      f);
   ASSERT_FALSE(f.has_errors);
   LowerAndRun(design, f);
   auto* ib = f.ctx.FindClassType("IB");
@@ -186,7 +194,8 @@ TEST(InterfaceClassTypeAccess, LowererCopiesInheritedParamIntoExtendingInterface
 
 // §8.26.3: typedef enumeration constants are inherited through extends too; the
 // lowered extending interface carries the base enum members.
-TEST(InterfaceClassTypeAccess, LowererCopiesInheritedEnumMembersIntoExtendingInterface) {
+TEST(InterfaceClassTypeAccess,
+     LowererCopiesInheritedEnumMembersIntoExtendingInterface) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "interface class IA;\n"
@@ -197,7 +206,8 @@ TEST(InterfaceClassTypeAccess, LowererCopiesInheritedEnumMembersIntoExtendingInt
       "  pure virtual function void fb();\n"
       "endclass\n"
       "module t;\n"
-      "endmodule\n", f);
+      "endmodule\n",
+      f);
   ASSERT_FALSE(f.has_errors);
   LowerAndRun(design, f);
   auto* ib = f.ctx.FindClassType("IB");
@@ -223,7 +233,8 @@ TEST(InterfaceClassTypeAccess, LowererDoesNotCopyParamIntoImplementingClass) {
       "  endfunction\n"
       "endclass\n"
       "module t;\n"
-      "endmodule\n", f);
+      "endmodule\n",
+      f);
   ASSERT_FALSE(f.has_errors);
   LowerAndRun(design, f);
   auto* ic = f.ctx.FindClassType("IC");
@@ -234,4 +245,4 @@ TEST(InterfaceClassTypeAccess, LowererDoesNotCopyParamIntoImplementingClass) {
   EXPECT_EQ(c->static_properties.find("SIZE"), c->static_properties.end());
 }
 
-}
+}  // namespace

@@ -69,4 +69,4 @@ TEST(GateElaboration, DriveStrengthPropagatedToContAssign) {
   EXPECT_EQ(ca.drive_strength1, 1u);
 }
 
-}
+}  // namespace

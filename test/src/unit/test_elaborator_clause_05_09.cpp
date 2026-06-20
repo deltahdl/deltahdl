@@ -39,4 +39,4 @@ TEST(LexicalConventionElaboration, EmptyStringElaborates) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

@@ -86,4 +86,4 @@ TEST(GlobalPulseLimitScaling, PropagationDelaysPreserved) {
   for (int i = 0; i < 12; ++i) EXPECT_EQ(pd.delays[i], 40u);
 }
 
-}
+}  // namespace

@@ -237,4 +237,4 @@ TEST(LvalueSim, CompoundAssignArithBitwiseShiftThroughPipeline) {
   EXPECT_EQ(f.ctx.FindVariable("shr")->value.ToUint64(), 16u);
 }
 
-}
+}  // namespace

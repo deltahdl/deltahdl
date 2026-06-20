@@ -239,7 +239,8 @@ TEST(FunctionReturnElaboration, NonvoidCallAsRhsDoesNotWarn) {
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
-TEST(FunctionReturnElaboration, ObjectWithFunctionNameInDeclaringScopeIsIllegal) {
+TEST(FunctionReturnElaboration,
+     ObjectWithFunctionNameInDeclaringScopeIsIllegal) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -275,4 +276,4 @@ TEST(FunctionReturnElaboration, SystemFunctionAllowedAsImplicitVariable) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

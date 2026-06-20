@@ -101,9 +101,8 @@ TEST(ArrayMap, MapElementTypeIsWithExpressionType) {
 TEST(ArrayMap, MapOnEmptyArrayReturnsEmpty) {
   SimFixture f;
   MakeDynArray(f, "arr", {});
-  auto* with_expr =
-      MakeBinary(f.arena, TokenKind::kPlus, MakeId(f.arena, "item"),
-                 MakeInt(f.arena, 1));
+  auto* with_expr = MakeBinary(f.arena, TokenKind::kPlus,
+                               MakeId(f.arena, "item"), MakeInt(f.arena, 1));
   auto* call = MakeMethodCall(f.arena, "arr", "map", {});
   call->with_expr = with_expr;
   std::vector<Logic4Vec> out;
@@ -120,9 +119,8 @@ TEST(ArrayMap, MapOnEmptyArrayReturnsEmpty) {
 TEST(ArrayMap, MapOnFixedSizeArray) {
   SimFixture f;
   MakeFixedArray(f, "fa", {3, 6, 9});
-  auto* with_expr =
-      MakeBinary(f.arena, TokenKind::kStar, MakeId(f.arena, "item"),
-                 MakeInt(f.arena, 2));
+  auto* with_expr = MakeBinary(f.arena, TokenKind::kStar,
+                               MakeId(f.arena, "item"), MakeInt(f.arena, 2));
   auto* call = MakeMethodCall(f.arena, "fa", "map", {});
   call->with_expr = with_expr;
   std::vector<Logic4Vec> out;
@@ -140,9 +138,8 @@ TEST(ArrayMap, MapOnFixedSizeArray) {
 TEST(ArrayMap, AssocMapPreservesKeysAndReplacesValues) {
   SimFixture f;
   MakeIntAssoc(f, "aa", {{10, 5}, {20, 15}, {30, 25}});
-  auto* with_expr =
-      MakeBinary(f.arena, TokenKind::kPlus, MakeId(f.arena, "item"),
-                 MakeInt(f.arena, 1));
+  auto* with_expr = MakeBinary(f.arena, TokenKind::kPlus,
+                               MakeId(f.arena, "item"), MakeInt(f.arena, 1));
   auto* call = MakeMethodCall(f.arena, "aa", "map", {});
   call->with_expr = with_expr;
   AssocArrayObject out;
@@ -159,9 +156,8 @@ TEST(ArrayMap, AssocMapPreservesKeysAndReplacesValues) {
 TEST(ArrayMap, AssocMapPreservesIndexType) {
   SimFixture f;
   MakeIntAssoc(f, "aa", {{1, 100}, {2, 200}}, /*index_width=*/16);
-  auto* with_expr =
-      MakeBinary(f.arena, TokenKind::kStar, MakeId(f.arena, "item"),
-                 MakeInt(f.arena, 2));
+  auto* with_expr = MakeBinary(f.arena, TokenKind::kStar,
+                               MakeId(f.arena, "item"), MakeInt(f.arena, 2));
   auto* call = MakeMethodCall(f.arena, "aa", "map", {});
   call->with_expr = with_expr;
   AssocArrayObject out;
@@ -201,9 +197,8 @@ TEST(ArrayMap, AssocMapElementTypeIsWithExpressionType) {
 TEST(ArrayMap, AssocMapOnEmptyArrayReturnsEmpty) {
   SimFixture f;
   MakeIntAssoc(f, "aa", {}, /*index_width=*/16);
-  auto* with_expr =
-      MakeBinary(f.arena, TokenKind::kPlus, MakeId(f.arena, "item"),
-                 MakeInt(f.arena, 1));
+  auto* with_expr = MakeBinary(f.arena, TokenKind::kPlus,
+                               MakeId(f.arena, "item"), MakeInt(f.arena, 1));
   auto* call = MakeMethodCall(f.arena, "aa", "map", {});
   call->with_expr = with_expr;
   AssocArrayObject out;
@@ -226,4 +221,4 @@ TEST(ArrayMap, AssocMapRequiresWithClause) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-}
+}  // namespace

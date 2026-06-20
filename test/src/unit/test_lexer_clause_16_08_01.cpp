@@ -17,4 +17,4 @@ TEST(UntypedKeyword, RecognizedAsKwUntyped) {
   EXPECT_EQ(*kind, TokenKind::kKwUntyped);
 }
 
-}
+}  // namespace

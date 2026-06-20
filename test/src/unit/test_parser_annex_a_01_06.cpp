@@ -14,10 +14,10 @@ const std::vector<ModuleItem*>& IfaceItems(ParseResult& r) {
 
 // --- interface_or_generate_item ---
 // An interface_or_generate_item is either a module_common_item (the set of
-// constructs shared with modules, defined in A.1.4) or an extern_tf_declaration.
-// These tests observe that the shared module-item parse path is reused for
-// interface bodies, so a module_common_item is accepted inside an interface and
-// records the same item kind it would in a module.
+// constructs shared with modules, defined in A.1.4) or an
+// extern_tf_declaration. These tests observe that the shared module-item parse
+// path is reused for interface bodies, so a module_common_item is accepted
+// inside an interface and records the same item kind it would in a module.
 
 TEST(InterfaceOrGenerateItem, ModuleCommonItemContinuousAssignAndProcedural) {
   auto r = Parse(
@@ -46,8 +46,8 @@ TEST(InterfaceOrGenerateItem, ModuleCommonItemElaborationSeverityTask) {
   EXPECT_TRUE(HasItemOfKind(IfaceItems(r), ModuleItemKind::kElabSystemTask));
 }
 
-// interface_or_generate_item ::= { attribute_instance } module_common_item | ...
-// The production permits a leading run of attribute_instances; the shared
+// interface_or_generate_item ::= { attribute_instance } module_common_item |
+// ... The production permits a leading run of attribute_instances; the shared
 // module-item parse path collects them and attaches them to the resulting item.
 TEST(InterfaceOrGenerateItem, AttributeInstancePrefixOnModuleCommonItem) {
   auto r = Parse(

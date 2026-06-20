@@ -97,4 +97,4 @@ TEST(NestedModuleParsing, MacroInsideNestedModule) {
             ModuleItemKind::kNestedModuleDecl);
 }
 
-}
+}  // namespace

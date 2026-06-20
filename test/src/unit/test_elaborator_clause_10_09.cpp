@@ -142,4 +142,4 @@ TEST(AssignmentPatternElaboration, ErrorLhsPatternBitCountMismatch) {
   EXPECT_TRUE(f.has_errors);
 }
 
-}
+}  // namespace

@@ -79,5 +79,5 @@ TEST_F(VpiHandleByNameSim, HierarchicalThroughProtectedScopeIsError) {
   EXPECT_EQ(vpi_ctx_.LastError().level, kVpiError);
 }
 
-}
-}
+}  // namespace
+}  // namespace delta

@@ -9,13 +9,15 @@
 namespace delta {
 namespace {
 
-// §37.28 Parameter, spec param, def param, param assign: the VPI object model for
-// parameters (vpiParameter), type parameters (vpiTypeParameter), def params, and
-// param assigns (vpiParamAssign). These tests observe the production code that
-// applies the clause's five numbered "Details":
-//   - Detail 1: vpi_get_value() of a value parameter returns its value (served by
+// §37.28 Parameter, spec param, def param, param assign: the VPI object model
+// for parameters (vpiParameter), type parameters (vpiTypeParameter), def
+// params, and param assigns (vpiParamAssign). These tests observe the
+// production code that applies the clause's five numbered "Details":
+//   - Detail 1: vpi_get_value() of a value parameter returns its value (served
+//   by
 //     §38.34's reader over the parameter's stored value).
-//   - Detail 2: vpiTypespec of a type parameter returns the typespec it has at the
+//   - Detail 2: vpiTypespec of a type parameter returns the typespec it has at
+//   the
 //     end of elaboration, without resolving typedef aliases.
 //   - Detail 3: vpiExpr of a parameter returns its default (a value parameter's
 //     default expression, a type parameter's default typespec).
@@ -33,8 +35,9 @@ class Parameter : public ::testing::Test {
   VpiContext ctx_;
 };
 
-// Figure properties: a parameter reports vpiLocalParam, and a param assign reports
-// vpiConnByName, each as a Boolean served through the public vpi_get dispatch.
+// Figure properties: a parameter reports vpiLocalParam, and a param assign
+// reports vpiConnByName, each as a Boolean served through the public vpi_get
+// dispatch.
 TEST_F(Parameter, LocalParamAndConnByNameProperties) {
   VpiObject local_param;
   local_param.type = vpiParameter;
@@ -55,8 +58,9 @@ TEST_F(Parameter, LocalParamAndConnByNameProperties) {
   EXPECT_EQ(vpi_get(vpiConnByName, &by_position), 0);
 }
 
-// D1: vpi_get_value() of a value parameter returns the value the parameter holds.
-// The reader is §38.34's; this observes it serving a vpiParameter object.
+// D1: vpi_get_value() of a value parameter returns the value the parameter
+// holds. The reader is §38.34's; this observes it serving a vpiParameter
+// object.
 TEST_F(Parameter, ValueParameterValueIsReadable) {
   Arena arena;
   Variable backing;
@@ -84,7 +88,8 @@ TEST_F(Parameter, TypeParameterTypespecReturnedWithoutAliasResolution) {
   alias_ts.type = vpiTypespec;
   alias_ts.children = {&resolved_ts};
 
-  VpiObject default_ts;  // the type parameter's default typespec (the vpiExpr end)
+  VpiObject
+      default_ts;  // the type parameter's default typespec (the vpiExpr end)
   default_ts.type = vpiTypespec;
 
   VpiObject type_param;
@@ -97,8 +102,8 @@ TEST_F(Parameter, TypeParameterTypespecReturnedWithoutAliasResolution) {
   EXPECT_EQ(VpiHandleC(vpiTypespec, &type_param), &alias_ts);
   EXPECT_NE(VpiHandleC(vpiTypespec, &type_param), &resolved_ts);
 
-  // vpiTypespec (detail 2) and vpiExpr (detail 3) are distinct relations reaching
-  // distinct typespecs.
+  // vpiTypespec (detail 2) and vpiExpr (detail 3) are distinct relations
+  // reaching distinct typespecs.
   EXPECT_EQ(VpiHandleC(vpiExpr, &type_param), &default_ts);
 }
 
@@ -122,7 +127,8 @@ TEST_F(Parameter, TypespecHelperOnlyForTypeParameter) {
 // D3: vpiExpr of a value parameter reaches its default value expression.
 TEST_F(Parameter, ValueParameterExprReachesDefaultExpression) {
   VpiObject default_expr;
-  default_expr.type = vpiOperation;  // a concrete expr kind, not literally vpiExpr
+  default_expr.type =
+      vpiOperation;  // a concrete expr kind, not literally vpiExpr
 
   VpiObject param;
   param.type = vpiParameter;
@@ -185,8 +191,8 @@ TEST_F(Parameter, ParamAssignLhsIsNullWithoutParameterChild) {
   EXPECT_EQ(VpiParamAssignLhs(&not_assign), nullptr);
 }
 
-// D5: a value parameter declared without an explicit range reports a null handle
-// for both vpiLeftRange and vpiRightRange.
+// D5: a value parameter declared without an explicit range reports a null
+// handle for both vpiLeftRange and vpiRightRange.
 TEST_F(Parameter, UnrangedValueParameterReportsNullRanges) {
   VpiObject param;
   param.type = vpiParameter;  // explicit_param_range stays false

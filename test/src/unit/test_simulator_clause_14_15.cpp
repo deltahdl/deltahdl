@@ -20,8 +20,7 @@ TEST(SyncEventSim, SampledValueUsedInSyncContext) {
 
   ClockingManager cmgr;
   SetupClockingBlock(
-      f, cmgr,
-      {"cb", Edge::kPosedge, {0}, {0}, "data", ClockingDir::kInput});
+      f, cmgr, {"cb", Edge::kPosedge, {0}, {0}, "data", ClockingDir::kInput});
 
   // §14.15: the synchronization event control uses the synchronous values --
   // the values sampled at the corresponding clocking event -- not whatever the
@@ -31,12 +30,11 @@ TEST(SyncEventSim, SampledValueUsedInSyncContext) {
   // 0xAA, while the live variable has already moved on to 0xFF.
   uint64_t sampled_at_event = 0;
   uint64_t live_at_event = 0;
-  cmgr.RegisterEdgeCallback(
-      "cb", f.ctx, f.scheduler, [&]() {
-        data->value = MakeLogic4VecVal(f.arena, 8, 0xFF);
-        sampled_at_event = cmgr.GetSampledValue("cb", "data");
-        live_at_event = data->value.ToUint64();
-      });
+  cmgr.RegisterEdgeCallback("cb", f.ctx, f.scheduler, [&]() {
+    data->value = MakeLogic4VecVal(f.arena, 8, 0xFF);
+    sampled_at_event = cmgr.GetSampledValue("cb", "data");
+    live_at_event = data->value.ToUint64();
+  });
 
   SchedulePosedge(f, clk, 10);
   f.scheduler.Run();
@@ -204,4 +202,4 @@ TEST(SyncEventSim, OutputClockingSignalHasNoSynchronousValue) {
   EXPECT_EQ(cmgr.GetSampledValue("cb", "data"), 0u);
 }
 
-}
+}  // namespace

@@ -13,14 +13,14 @@ using namespace delta;
 
 namespace {
 
-// Registers an unpacked array `name[lo .. lo+size-1]` of `width`-bit words, each
-// backed by a zero-initialized element variable, so $fread has a memory to load
-// into. The simulator names array elements `name[index]`.
+// Registers an unpacked array `name[lo .. lo+size-1]` of `width`-bit words,
+// each backed by a zero-initialized element variable, so $fread has a memory to
+// load into. The simulator names array elements `name[index]`.
 void SetupMem(SysTaskFixture& f, const char* name, int lo, int size,
               uint32_t width, bool descending = false) {
-  f.ctx.RegisterArray(name, {static_cast<uint32_t>(lo),
-                             static_cast<uint32_t>(size), width, descending,
-                             false, false});
+  f.ctx.RegisterArray(
+      name, {static_cast<uint32_t>(lo), static_cast<uint32_t>(size), width,
+             descending, false, false});
   for (int i = 0; i < size; ++i) {
     std::string nm = std::string(name) + "[" + std::to_string(lo + i) + "]";
     auto* s = f.arena.AllocString(nm.c_str(), nm.size());
@@ -56,8 +56,8 @@ void Close(SysTaskFixture& f, uint64_t fd) {
 
 // Registers a struct/union type `type` with the given fields and a
 // zero-initialized variable `var` of that type, so $fread can load into it.
-// Field entries are {name, bit_offset, width}. An unpacked type (the default) is
-// read member by member; a packed type is read as one whole value.
+// Field entries are {name, bit_offset, width}. An unpacked type (the default)
+// is read member by member; a packed type is read as one whole value.
 void SetupStruct(SysTaskFixture& f, const char* type, const char* var,
                  uint32_t total_width, bool is_union,
                  std::vector<StructFieldInfo> fields, bool is_packed = false) {
@@ -127,11 +127,10 @@ TEST(FreadBinary, StartCountIgnoredForIntegralVariable) {
   auto* var = f.ctx.CreateVariable("v", 16);
   var->value = MakeLogic4VecVal(f.arena, 16, 0);
 
-  auto result = EvalExpr(
-      MkSysCall(f.arena, "$fread",
-                {MkId(f.arena, "v"), MkInt(f.arena, fd), MkInt(f.arena, 99),
-                 MkInt(f.arena, 1)}),
-      f.ctx, f.arena);
+  auto result = EvalExpr(MkSysCall(f.arena, "$fread",
+                                   {MkId(f.arena, "v"), MkInt(f.arena, fd),
+                                    MkInt(f.arena, 99), MkInt(f.arena, 1)}),
+                         f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 2u);
   EXPECT_EQ(var->value.ToUint64(), 0x1234u);
 
@@ -171,10 +170,10 @@ TEST(FreadBinary, StartAddressSelectsFirstElement) {
   uint64_t fd = OpenRead(f, path);
   ASSERT_NE(fd, 0u);
 
-  EvalExpr(MkSysCall(f.arena, "$fread",
-                     {MkId(f.arena, "up"), MkInt(f.arena, fd),
-                      MkInt(f.arena, 12)}),
-           f.ctx, f.arena);
+  EvalExpr(
+      MkSysCall(f.arena, "$fread",
+                {MkId(f.arena, "up"), MkInt(f.arena, fd), MkInt(f.arena, 12)}),
+      f.ctx, f.arena);
   EXPECT_EQ(Cell(f, "up", 10)->value.ToUint64(), 0x00u);
   EXPECT_EQ(Cell(f, "up", 11)->value.ToUint64(), 0x00u);
   EXPECT_EQ(Cell(f, "up", 12)->value.ToUint64(), 0xAAu);
@@ -194,9 +193,9 @@ TEST(FreadBinary, DescendingMemoryLoadsTowardHighestIndex) {
   uint64_t fd = OpenRead(f, path);
   ASSERT_NE(fd, 0u);
 
-  EvalExpr(MkSysCall(f.arena, "$fread",
-                     {MkId(f.arena, "down"), MkInt(f.arena, fd),
-                      MkInt(f.arena, 12)}),
+  EvalExpr(MkSysCall(
+               f.arena, "$fread",
+               {MkId(f.arena, "down"), MkInt(f.arena, fd), MkInt(f.arena, 12)}),
            f.ctx, f.arena);
   EXPECT_EQ(Cell(f, "down", 12)->value.ToUint64(), 0x55u);
   EXPECT_EQ(Cell(f, "down", 13)->value.ToUint64(), 0x66u);
@@ -214,11 +213,10 @@ TEST(FreadBinary, CountLimitsWordsLoaded) {
   uint64_t fd = OpenRead(f, path);
   ASSERT_NE(fd, 0u);
 
-  auto result = EvalExpr(
-      MkSysCall(f.arena, "$fread",
-                {MkId(f.arena, "mem"), MkInt(f.arena, fd), MkInt(f.arena, 0),
-                 MkInt(f.arena, 2)}),
-      f.ctx, f.arena);
+  auto result = EvalExpr(MkSysCall(f.arena, "$fread",
+                                   {MkId(f.arena, "mem"), MkInt(f.arena, fd),
+                                    MkInt(f.arena, 0), MkInt(f.arena, 2)}),
+                         f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 2u);
   EXPECT_EQ(Cell(f, "mem", 0)->value.ToUint64(), 0x10u);
   EXPECT_EQ(Cell(f, "mem", 1)->value.ToUint64(), 0x20u);
@@ -237,11 +235,10 @@ TEST(FreadBinary, OmittedStartWithCount) {
   uint64_t fd = OpenRead(f, path);
   ASSERT_NE(fd, 0u);
 
-  auto result = EvalExpr(
-      MkSysCall(f.arena, "$fread",
-                {MkId(f.arena, "mem"), MkInt(f.arena, fd), nullptr,
-                 MkInt(f.arena, 3)}),
-      f.ctx, f.arena);
+  auto result = EvalExpr(MkSysCall(f.arena, "$fread",
+                                   {MkId(f.arena, "mem"), MkInt(f.arena, fd),
+                                    nullptr, MkInt(f.arena, 3)}),
+                         f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 3u);
   EXPECT_EQ(Cell(f, "mem", 0)->value.ToUint64(), 0x71u);
   EXPECT_EQ(Cell(f, "mem", 2)->value.ToUint64(), 0x73u);
@@ -271,11 +268,11 @@ TEST(FreadBinary, NineBitWordUsesTwoBytesBigEndian) {
 }
 
 // §21.3.4.4: when a word width is not a whole number of bytes, the read still
-// consumes the rounded-up number of bytes, but the bits above the word width are
-// truncated -- so not all of the file data end up in memory. Here a 9-bit word
-// consumes two bytes (0x0300) yet only the low nine bits (0x100) are retained;
-// the tenth bit present in the file is dropped, while the byte count still
-// reports both bytes as read.
+// consumes the rounded-up number of bytes, but the bits above the word width
+// are truncated -- so not all of the file data end up in memory. Here a 9-bit
+// word consumes two bytes (0x0300) yet only the low nine bits (0x100) are
+// retained; the tenth bit present in the file is dropped, while the byte count
+// still reports both bytes as read.
 TEST(FreadBinary, TruncatesBitsAboveWordWidth) {
   SysTaskFixture f;
   SetupMem(f, "mem", 0, 1, 9);
@@ -360,8 +357,7 @@ TEST(FreadBinary, UnpackedStructReadsEachMemberInDeclarationOrder) {
 // member in declaration order; only that member's bytes are consumed.
 TEST(FreadBinary, UnpackedUnionReadsOnlyFirstMember) {
   SysTaskFixture f;
-  SetupStruct(f, "u_t", "u", 8, /*is_union=*/true,
-              {{"a", 0, 8}, {"b", 0, 8}});
+  SetupStruct(f, "u_t", "u", 8, /*is_union=*/true, {{"a", 0, 8}, {"b", 0, 8}});
   std::string path = WriteBytes("union", {0xAB, 0xCD});
   uint64_t fd = OpenRead(f, path);
   ASSERT_NE(fd, 0u);

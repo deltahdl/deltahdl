@@ -241,7 +241,8 @@ TEST(ProceduralAssignDeassignSim, DeassignUnknownVarNoOp) {
   EXPECT_EQ(result, StmtResult::kDone);
 }
 
-TEST(ProceduralContinuousAssignSim, DeassignRetainsValueThenBlockingOverwrites) {
+TEST(ProceduralContinuousAssignSim,
+     DeassignRetainsValueThenBlockingOverwrites) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -262,7 +263,8 @@ TEST(ProceduralContinuousAssignSim, DeassignRetainsValueThenBlockingOverwrites) 
   EXPECT_EQ(q->value.ToUint64(), 77u);
 }
 
-TEST(ProceduralContinuousAssignSim, DeassignRetainsValueThenContinuousOverwrites) {
+TEST(ProceduralContinuousAssignSim,
+     DeassignRetainsValueThenContinuousOverwrites) {
   // After a deassign the held value persists until the variable is reassigned.
   // Besides an ordinary procedural assignment, a fresh procedural continuous
   // assignment is one of the ways that new value can be installed; here the
@@ -341,4 +343,4 @@ TEST(ProceduralContinuousAssignSim, ReAssignClearsOldRhsWatcher) {
   EXPECT_EQ(q->value.ToUint64(), 2u);
 }
 
-}
+}  // namespace

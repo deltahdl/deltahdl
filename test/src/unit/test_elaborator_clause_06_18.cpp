@@ -269,4 +269,4 @@ TEST(UserDefinedTypeElaboration, ForwardTypedefScopePrefixClass_Legal) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-}
+}  // namespace

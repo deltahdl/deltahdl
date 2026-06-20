@@ -52,4 +52,4 @@ TEST(ClassConstraintElaboration, WeakRefClearOnNullInitOk) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

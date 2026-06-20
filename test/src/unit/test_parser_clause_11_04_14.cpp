@@ -109,8 +109,9 @@ TEST(StreamingOperatorParsing, StreamingSliceSizeSimpleType) {
 }
 
 TEST(StreamingOperatorParsing, StreamExpressionWithArrayRange) {
-  // §11.4.14 BNF: stream_expression ::= expression [ with [ array_range_expression ] ].
-  // Exercises a `with` clause carrying a colon range on the stream element.
+  // §11.4.14 BNF: stream_expression ::= expression [ with [
+  // array_range_expression ] ]. Exercises a `with` clause carrying a colon
+  // range on the stream element.
   auto r = Parse(
       "module t;\n"
       "  logic [7:0] arr[0:3];\n"
@@ -186,4 +187,4 @@ TEST(StreamingOperatorParsing, StreamExpressionWithBareIndex) {
   EXPECT_EQ(with->index_end, nullptr);
 }
 
-}
+}  // namespace

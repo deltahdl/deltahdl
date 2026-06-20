@@ -63,4 +63,4 @@ TEST(IntegralIndexAssocArrayParsing, AssociativeArrayIntIndex) {
   EXPECT_EQ(item->name, "names");
 }
 
-}
+}  // namespace

@@ -9,8 +9,8 @@ using namespace delta;
 namespace {
 
 // §16.9.11: a complex sequence can be composed from simpler subsequences either
-// by referencing a named sequence by name or by detecting another sequence's end
-// point with triggered.
+// by referencing a named sequence by name or by detecting another sequence's
+// end point with triggered.
 TEST(SequenceComposition, TwoCompositionMethodsAreValid) {
   EXPECT_TRUE(IsSequenceCompositionMethodValid(
       SequenceCompositionMethod::kNamedInstanceReference));
@@ -39,17 +39,18 @@ TEST(SequenceComposition, TriggeredEndPointOperandLegality) {
       TriggeredEndPointOperandLegal(SequenceMethodOperandKind::kOther));
 }
 
-// §16.9.11: triggered returns a single-bit value testing whether the operand has
-// reached its end point; the result is independent of the operand's start point.
+// §16.9.11: triggered returns a single-bit value testing whether the operand
+// has reached its end point; the result is independent of the operand's start
+// point.
 TEST(SequenceComposition, TriggeredResultIsStartPointIndependent) {
   EXPECT_TRUE(SequenceMethodResultIsSingleBit());
   EXPECT_FALSE(SequenceMethodResultDependsOnStartPoint());
 }
 
 // §16.9.11: triggered can be used in the presence of multiple clocks, but the
-// ending clock of the sequence instance shall always be the same as the clock in
-// the context where triggered appears. This is the same rule given in §16.13.5,
-// shared through "elaborator/multiclock_endpoint.h".
+// ending clock of the sequence instance shall always be the same as the clock
+// in the context where triggered appears. This is the same rule given in
+// §16.13.5, shared through "elaborator/multiclock_endpoint.h".
 TEST(SequenceComposition, TriggeredEndingClockMatchesContextClock) {
   EXPECT_TRUE(TriggeredEndingClockMatchesContext(/*ending_clock=*/"sysclk",
                                                  /*context_clock=*/"sysclk"));

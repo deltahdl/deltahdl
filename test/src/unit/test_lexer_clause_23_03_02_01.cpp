@@ -34,4 +34,4 @@ TEST(OrderedPortLexer, BlankOrderedPortTokenSequence) {
   EXPECT_EQ(tokens[7].kind, TokenKind::kRParen);
 }
 
-}
+}  // namespace

@@ -7,14 +7,14 @@ namespace {
 
 // §36.8.1: a sizetf application returns the number of bits the system
 // function's return value is. These stubs return distinct widths so a test can
-// observe that the value the sizetf returns - not a fixed constant - becomes the
-// reported width.
+// observe that the value the sizetf returns - not a fixed constant - becomes
+// the reported width.
 int SizetfReturning12(const char*) { return 12; }
 int SizetfReturning64(const char*) { return 64; }
 
 // -----------------------------------------------------------------------------
-// §36.8.1: "The value returned by the sizetf routine shall be the number of bits
-// that the calltf routine shall provide as the return value for the system
+// §36.8.1: "The value returned by the sizetf routine shall be the number of
+// bits that the calltf routine shall provide as the return value for the system
 // function." The width a sized system function reports is exactly whatever its
 // sizetf application returns.
 // -----------------------------------------------------------------------------
@@ -49,11 +49,11 @@ TEST(SizetfApplicationRoutine, NoSizetfSpecifiedDefaultsTo32Bits) {
 }
 
 // -----------------------------------------------------------------------------
-// §36.8.1: "The sizetf routine shall not be called for user-defined system tasks
-// or for functions whose sysfunctype is set to vpiRealFunc." Whether a sizetf
-// would run is decided before any call, so a system task and a real-valued
-// function both report that the routine is not to be called - even when a sizetf
-// application is supplied in the registration.
+// §36.8.1: "The sizetf routine shall not be called for user-defined system
+// tasks or for functions whose sysfunctype is set to vpiRealFunc." Whether a
+// sizetf would run is decided before any call, so a system task and a
+// real-valued function both report that the routine is not to be called - even
+// when a sizetf application is supplied in the registration.
 // -----------------------------------------------------------------------------
 
 TEST(SizetfApplicationRoutine, NotCalledForSystemTask) {

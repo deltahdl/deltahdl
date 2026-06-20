@@ -88,4 +88,4 @@ TEST(Strength01Semantics, Strength0AndStrength1ReachNetDriver) {
   EXPECT_EQ(net->driver_strengths[0].s1, Strength::kSupply);
 }
 
-}
+}  // namespace

@@ -32,4 +32,4 @@ TEST(FinalProcedureLexing, FinalFollowedByBegin) {
   EXPECT_EQ(tokens[1].kind, TokenKind::kKwBegin);
 }
 
-}
+}  // namespace

@@ -93,4 +93,4 @@ TEST(UdpCombinational, EmptyTableAlwaysReturnsX) {
   EXPECT_EQ(state.Evaluate({'1'}), 'x');
 }
 
-}
+}  // namespace

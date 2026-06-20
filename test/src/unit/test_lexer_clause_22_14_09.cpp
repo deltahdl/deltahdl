@@ -43,12 +43,9 @@ TEST(Lexer, KeywordVersion_1800_2023_IncludesAllPriorVersions) {
 // reserved at "1800-2012" stays unreserved at "1800-2017" and "1800-2023" — no
 // previously free word is promoted to a keyword.
 TEST(Lexer, KeywordVersion_1800_2017_And_2023_AddNoNewKeywords) {
-  EXPECT_TRUE(
-      LookupKeyword("soft", KeywordVersion::kVer18002012).has_value());
-  EXPECT_TRUE(
-      LookupKeyword("soft", KeywordVersion::kVer18002017).has_value());
-  EXPECT_TRUE(
-      LookupKeyword("soft", KeywordVersion::kVer18002023).has_value());
+  EXPECT_TRUE(LookupKeyword("soft", KeywordVersion::kVer18002012).has_value());
+  EXPECT_TRUE(LookupKeyword("soft", KeywordVersion::kVer18002017).has_value());
+  EXPECT_TRUE(LookupKeyword("soft", KeywordVersion::kVer18002023).has_value());
 
   EXPECT_FALSE(
       LookupKeyword("my_signal", KeywordVersion::kVer18002012).has_value());
@@ -58,4 +55,4 @@ TEST(Lexer, KeywordVersion_1800_2017_And_2023_AddNoNewKeywords) {
       LookupKeyword("my_signal", KeywordVersion::kVer18002023).has_value());
 }
 
-}
+}  // namespace

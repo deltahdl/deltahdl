@@ -29,9 +29,9 @@ TEST(SystemTimingCheckParsing, MultipleTimingChecksInSpecifyBlock) {
 }
 
 TEST(SystemTimingCheckParsing, EveryTimingCheckRejectedInProceduralCode) {
-  const char* names[] = {"$setup",    "$hold",     "$setuphold", "$recovery",
-                         "$removal",  "$recrem",   "$skew",      "$timeskew",
-                         "$fullskew", "$period",   "$width",     "$nochange"};
+  const char* names[] = {"$setup",    "$hold",   "$setuphold", "$recovery",
+                         "$removal",  "$recrem", "$skew",      "$timeskew",
+                         "$fullskew", "$period", "$width",     "$nochange"};
   for (const char* n : names) {
     std::string src = "module m; initial ";
     src += n;
@@ -51,4 +51,4 @@ TEST(SystemTimingCheckParsing, SystemTaskRejectedInSpecifyBlock) {
   EXPECT_TRUE(r.has_errors);
 }
 
-}
+}  // namespace

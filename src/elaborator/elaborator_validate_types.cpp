@@ -194,7 +194,9 @@ static std::string_view FindConstVarRef(
       const_names.count(e->text)) {
     return e->text;
   }
-  auto walk = [&](const Expr* sub) { return FindConstVarRef(sub, const_names); };
+  auto walk = [&](const Expr* sub) {
+    return FindConstVarRef(sub, const_names);
+  };
   if (auto n = walk(e->lhs); !n.empty()) return n;
   if (auto n = walk(e->rhs); !n.empty()) return n;
   if (auto n = walk(e->base); !n.empty()) return n;
@@ -235,7 +237,6 @@ bool Elaborator::ValidateEnumLiteral(const EnumMember& member,
 }
 
 void Elaborator::ValidateEnumDecl(const DataType& dtype, SourceLoc loc) {
-
   if (!dtype.enum_base_name.empty()) {
     auto it = typedefs_.find(dtype.enum_base_name);
     if (it != typedefs_.end()) {
@@ -245,13 +246,11 @@ void Elaborator::ValidateEnumDecl(const DataType& dtype, SourceLoc loc) {
           k == DataTypeKind::kInt || k == DataTypeKind::kLongint ||
           k == DataTypeKind::kInteger || k == DataTypeKind::kTime;
       bool integer_vector = k == DataTypeKind::kLogic ||
-                            k == DataTypeKind::kReg ||
-                            k == DataTypeKind::kBit;
+                            k == DataTypeKind::kReg || k == DataTypeKind::kBit;
       if (!integer_atom && !integer_vector) {
-        diag_.Error(loc,
-                    std::format("enum base type '{}' is not an "
-                                "integer_atom_type or integer_vector_type",
-                                dtype.enum_base_name));
+        diag_.Error(loc, std::format("enum base type '{}' is not an "
+                                     "integer_atom_type or integer_vector_type",
+                                     dtype.enum_base_name));
       } else if (integer_atom && dtype.packed_dim_left != nullptr) {
         diag_.Error(loc,
                     std::format("packed dimension not permitted on enum base "
@@ -265,10 +264,10 @@ void Elaborator::ValidateEnumDecl(const DataType& dtype, SourceLoc loc) {
   bool is_2state = !Is4stateType(dtype, typedefs_);
   bool prev_had_xz = false;
 
-  uint64_t max_val = dtype.is_signed
-                         ? (base_width > 0 ? (1ULL << (base_width - 1)) - 1 : 0)
-                         : (base_width < 64 ? (1ULL << base_width) - 1
-                                            : UINT64_MAX);
+  uint64_t max_val =
+      dtype.is_signed
+          ? (base_width > 0 ? (1ULL << (base_width - 1)) - 1 : 0)
+          : (base_width < 64 ? (1ULL << base_width) - 1 : UINT64_MAX);
   int64_t signed_min = (dtype.is_signed && base_width > 0 && base_width < 64)
                            ? -(1LL << (base_width - 1))
                            : INT64_MIN;
@@ -278,13 +277,11 @@ void Elaborator::ValidateEnumDecl(const DataType& dtype, SourceLoc loc) {
   int64_t next_val = 0;
 
   for (const auto& member : dtype.enum_members) {
-
     if (!member.range_start) {
       if (!seen_names.insert(member.name).second) {
-        diag_.Error(loc,
-                    std::format("duplicate enum member name '{}'", member.name));
+        diag_.Error(
+            loc, std::format("duplicate enum member name '{}'", member.name));
       } else if (enum_member_names_.count(member.name)) {
-
         diag_.Error(loc,
                     std::format("enum member name '{}' is already declared "
                                 "in this scope",
@@ -320,11 +317,10 @@ void Elaborator::ValidateEnumDecl(const DataType& dtype, SourceLoc loc) {
       if (!prev_had_xz) {
         auto v = ConstEvalInt(member.value);
         if (v) {
-
           bool out_of_range;
           if (dtype.is_signed) {
-            out_of_range = *v < signed_min ||
-                           *v > static_cast<int64_t>(max_val);
+            out_of_range =
+                *v < signed_min || *v > static_cast<int64_t>(max_val);
           } else {
             out_of_range = *v < 0 || (base_width < 64 &&
                                       static_cast<uint64_t>(*v) > max_val);
@@ -348,20 +344,18 @@ void Elaborator::ValidateEnumDecl(const DataType& dtype, SourceLoc loc) {
         // Table 6-10: for the name[N:M] form, both bounds shall be
         // non-negative integral numbers.
         if (n < 0 || m < 0) {
-          diag_.Error(loc,
-                      std::format("enum range bounds of '{}' shall be "
-                                  "non-negative integral numbers",
-                                  member.name));
+          diag_.Error(loc, std::format("enum range bounds of '{}' shall be "
+                                       "non-negative integral numbers",
+                                       member.name));
         }
         count = (m >= n) ? (m - n + 1) : (n - m + 1);
       } else {
         // Table 6-10: for the name[N] form, N shall be a positive integral
         // number.
         if (n < 1) {
-          diag_.Error(loc,
-                      std::format("enum range count of '{}' shall be a "
-                                  "positive integral number",
-                                  member.name));
+          diag_.Error(loc, std::format("enum range count of '{}' shall be a "
+                                       "positive integral number",
+                                       member.name));
         }
         count = n;
       }
@@ -372,8 +366,7 @@ void Elaborator::ValidateEnumDecl(const DataType& dtype, SourceLoc loc) {
       for (int64_t i = 0; i < count; ++i) {
         if (!seen_values.insert(next_val + i).second) {
           diag_.Error(
-              loc,
-              std::format("duplicate enum member value {}", next_val + i));
+              loc, std::format("duplicate enum member value {}", next_val + i));
         }
       }
     }
@@ -382,8 +375,9 @@ void Elaborator::ValidateEnumDecl(const DataType& dtype, SourceLoc loc) {
     if (!prev_had_xz && next_val > 0 &&
         static_cast<uint64_t>(next_val) > max_val &&
         &member != &dtype.enum_members.back()) {
-      diag_.Error(loc, "enum auto-increment exceeds maximum representable "
-                       "value of base type");
+      diag_.Error(loc,
+                  "enum auto-increment exceeds maximum representable "
+                  "value of base type");
     }
   }
 }
@@ -506,8 +500,7 @@ void Elaborator::WalkStmtsForEnumAssign(const Stmt* s) {
         is_enum = true;
       }
     }
-    if (is_enum && s->var_init &&
-        s->var_init->kind != ExprKind::kIdentifier &&
+    if (is_enum && s->var_init && s->var_init->kind != ExprKind::kIdentifier &&
         s->var_init->kind != ExprKind::kCast) {
       diag_.Error(s->range.start,
                   "integer assigned to enum variable without cast");
@@ -535,13 +528,11 @@ void Elaborator::WalkStmtsForEnumAssign(const Stmt* s) {
 
 void Elaborator::ValidateEnumAssignments(const ModuleDecl* decl) {
   for (const auto* item : decl->items) {
-
     if (item->kind == ModuleItemKind::kVarDecl &&
         enum_var_names_.count(item->name) != 0 && item->init_expr &&
         item->init_expr->kind != ExprKind::kIdentifier &&
         item->init_expr->kind != ExprKind::kCast) {
-      diag_.Error(item->loc,
-                  "integer assigned to enum variable without cast");
+      diag_.Error(item->loc, "integer assigned to enum variable without cast");
     }
     bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
                    item->kind == ModuleItemKind::kInitialBlock;
@@ -557,9 +548,8 @@ void Elaborator::WalkStmtsForConstAssign(const Stmt* s) {
       s->kind == StmtKind::kNonblockingAssign) {
     if (s->lhs && s->lhs->kind == ExprKind::kIdentifier) {
       if (const_names_.count(s->lhs->text)) {
-        diag_.Error(
-            s->range.start,
-            std::format("assignment to constant '{}'", s->lhs->text));
+        diag_.Error(s->range.start,
+                    std::format("assignment to constant '{}'", s->lhs->text));
       }
     }
   }
@@ -654,7 +644,6 @@ void Elaborator::ResolveTypeRef(ModuleItem* item, const RtlirModule* mod) {
   auto* ref = item->data_type.type_ref_expr;
   CheckTypeRefArgInner(ref, item->loc);
   if (ref->kind != ExprKind::kIdentifier) {
-
     uint32_t w = InferTypeRefExprWidth(ref, mod);
     item->data_type.kind = DataTypeKind::kLogic;
     if (w > 1) {
@@ -830,9 +819,9 @@ void Elaborator::ValidatePackedDimRequiresPackedKeyword(const DataType& dtype,
   if (!dtype.packed_dim_left) return;
   if (dtype.is_packed || dtype.is_soft) return;
   const char* kw = (dtype.kind == DataTypeKind::kStruct) ? "struct" : "union";
-  diag_.Error(loc,
-              std::format("packed dimension on {} requires the packed keyword",
-                          kw));
+  diag_.Error(
+      loc,
+      std::format("packed dimension on {} requires the packed keyword", kw));
 }
 
 static bool IsLegalPackedMemberType(DataTypeKind kind) {
@@ -958,8 +947,7 @@ void Elaborator::ValidateUnpackedDimRange(const std::vector<Expr*>& dims,
     if (!dim) continue;
     if (dim->kind == ExprKind::kBinary && dim->op == TokenKind::kColon) {
       if (ExprContainsXZ(dim->lhs) || ExprContainsXZ(dim->rhs)) {
-        diag_.Error(loc,
-                    "unpacked dimension range shall not contain x or z");
+        diag_.Error(loc, "unpacked dimension range shall not contain x or z");
       }
     } else if (ExprContainsXZ(dim)) {
       diag_.Error(loc, "unpacked dimension range shall not contain x or z");
@@ -1001,4 +989,4 @@ void Elaborator::ValidatePackedDimOnDisallowedType(const DataType& dtype,
               "enum, or packed aggregate");
 }
 
-}
+}  // namespace delta

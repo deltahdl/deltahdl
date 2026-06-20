@@ -75,4 +75,4 @@ TEST(ProceduralContinuousAssignSim, ForceReevaluatesForEachRhsVariableChange) {
   EXPECT_EQ(a->value.ToUint64(), 30u);
 }
 
-}
+}  // namespace

@@ -187,4 +187,4 @@ TEST(ModportDeclarationParsing, ExportFunctionPrototype) {
   EXPECT_EQ(mp->ports[0].prototype->name, "compute");
 }
 
-}
+}  // namespace

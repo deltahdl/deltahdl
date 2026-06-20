@@ -63,4 +63,4 @@ TEST(SequenceDeclarationPreprocessor, MacroBodyExpandsToSequence) {
   EXPECT_NE(result.find("a ##1 b"), std::string::npos);
 }
 
-}
+}  // namespace

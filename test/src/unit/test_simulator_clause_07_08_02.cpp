@@ -130,4 +130,4 @@ TEST(StringIndexAssocArraySimulation, EndToEndEmptyStringIndex) {
   EXPECT_EQ(f.ctx.FindVariable("result")->value.ToUint64(), 7u);
 }
 
-}
+}  // namespace

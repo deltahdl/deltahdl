@@ -265,4 +265,4 @@ TEST(ChainedConstructorElaboration, ExtendsDefaultUserCtorMissingDefaultError) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

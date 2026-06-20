@@ -139,4 +139,4 @@ TEST(AttributeInstanceElaboration, AttrInstanceListPreservesOrder) {
   EXPECT_EQ(*m.attrs[2].resolved_value, 3);
 }
 
-}
+}  // namespace

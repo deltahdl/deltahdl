@@ -55,11 +55,12 @@ TEST(SyncDriveVsNba, InoutDriveDoesNotChangeSampledInput) {
 
 // §14.16.1: because a drive never writes the clocking block input directly, the
 // only way a driven value can ever reach the input is through the ordinary
-// sampling that happens at the next clocking event. This test drives an inout in
-// one cycle and confirms the input still reads the prior sampled value during
-// that cycle, then sees the driven value appear at the input only after the
-// following clocking event re-samples the (now driven) live signal. If the drive
-// had touched the input itself, the first cycle's read would already differ.
+// sampling that happens at the next clocking event. This test drives an inout
+// in one cycle and confirms the input still reads the prior sampled value
+// during that cycle, then sees the driven value appear at the input only after
+// the following clocking event re-samples the (now driven) live signal. If the
+// drive had touched the input itself, the first cycle's read would already
+// differ.
 TEST(SyncDriveVsNba, InoutInputReflectsDriveOnlyAfterNextSample) {
   ClockingSimFixture f;
   auto* clk = f.ctx.CreateVariable("clk", 1);
@@ -160,4 +161,4 @@ TEST(SyncDriveVsNba, InoutInputReadOnRhsYieldsSampledNotDrivenValue) {
   EXPECT_NE(b->value.ToUint64(), a->value.ToUint64());
 }
 
-}
+}  // namespace

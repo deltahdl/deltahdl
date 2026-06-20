@@ -15,4 +15,4 @@ TEST_F(ApiParseTest, CoverageControlSystemCall) {
   ASSERT_EQ(unit->modules.size(), 1u);
 }
 
-}
+}  // namespace

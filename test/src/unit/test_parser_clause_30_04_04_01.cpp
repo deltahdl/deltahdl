@@ -283,4 +283,4 @@ TEST(OperatorParsing, ModulePathOperandPartSelect) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}
+}  // namespace

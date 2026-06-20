@@ -50,32 +50,28 @@ TEST(CheckerInstanceScheduling, NestedStaticCheckerFollowsTopLevelAncestor) {
   // §17.3: a static checker statically instantiated inside another checker has
   // its static assertions follow the top-level ancestor's instance kind; an
   // un-nested checker keeps its own kind.
-  EXPECT_EQ(
-      EffectiveKindForStaticAssertions(
-          /*own_kind=*/CheckerInstanceKind::kStatic,
-          /*nested_inside_another_checker=*/true,
-          /*top_level_ancestor_kind=*/CheckerInstanceKind::kProcedural),
-      CheckerInstanceKind::kProcedural);
-  EXPECT_EQ(
-      EffectiveKindForStaticAssertions(
-          /*own_kind=*/CheckerInstanceKind::kStatic,
-          /*nested_inside_another_checker=*/true,
-          /*top_level_ancestor_kind=*/CheckerInstanceKind::kStatic),
-      CheckerInstanceKind::kStatic);
-  EXPECT_EQ(
-      EffectiveKindForStaticAssertions(
-          /*own_kind=*/CheckerInstanceKind::kStatic,
-          /*nested_inside_another_checker=*/false,
-          /*top_level_ancestor_kind=*/CheckerInstanceKind::kProcedural),
-      CheckerInstanceKind::kStatic);
+  EXPECT_EQ(EffectiveKindForStaticAssertions(
+                /*own_kind=*/CheckerInstanceKind::kStatic,
+                /*nested_inside_another_checker=*/true,
+                /*top_level_ancestor_kind=*/CheckerInstanceKind::kProcedural),
+            CheckerInstanceKind::kProcedural);
+  EXPECT_EQ(EffectiveKindForStaticAssertions(
+                /*own_kind=*/CheckerInstanceKind::kStatic,
+                /*nested_inside_another_checker=*/true,
+                /*top_level_ancestor_kind=*/CheckerInstanceKind::kStatic),
+            CheckerInstanceKind::kStatic);
+  EXPECT_EQ(EffectiveKindForStaticAssertions(
+                /*own_kind=*/CheckerInstanceKind::kStatic,
+                /*nested_inside_another_checker=*/false,
+                /*top_level_ancestor_kind=*/CheckerInstanceKind::kProcedural),
+            CheckerInstanceKind::kStatic);
   // Edge: when not nested, the instance's own kind is returned regardless of
   // any ancestor kind, so a procedural own kind is preserved.
-  EXPECT_EQ(
-      EffectiveKindForStaticAssertions(
-          /*own_kind=*/CheckerInstanceKind::kProcedural,
-          /*nested_inside_another_checker=*/false,
-          /*top_level_ancestor_kind=*/CheckerInstanceKind::kStatic),
-      CheckerInstanceKind::kProcedural);
+  EXPECT_EQ(EffectiveKindForStaticAssertions(
+                /*own_kind=*/CheckerInstanceKind::kProcedural,
+                /*nested_inside_another_checker=*/false,
+                /*top_level_ancestor_kind=*/CheckerInstanceKind::kStatic),
+            CheckerInstanceKind::kProcedural);
 }
 
 }  // namespace

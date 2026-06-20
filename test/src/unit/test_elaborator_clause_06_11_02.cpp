@@ -72,4 +72,4 @@ TEST(TwoStateAndFourState, LogicAndRegElaborateIdentically) {
   EXPECT_EQ(mod->variables[0].is_signed, mod->variables[1].is_signed);
 }
 
-}
+}  // namespace

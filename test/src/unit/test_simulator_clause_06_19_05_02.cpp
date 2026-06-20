@@ -40,12 +40,12 @@ TEST(EnumMethods, LastSingleMember) {
 // unlike the relative next()/prev() methods.
 TEST(EnumMethods, LastIgnoresCurrentValue) {
   EnumFixture f;
-  auto* var =
-      f.RegisterEnum("color", "color_t", {{"RED", 0}, {"GREEN", 1}, {"BLUE", 2}});
+  auto* var = f.RegisterEnum("color", "color_t",
+                             {{"RED", 0}, {"GREEN", 1}, {"BLUE", 2}});
   var->value = MakeLogic4VecVal(f.arena, 32, 1);  // hold the middle member
   auto* call = f.MakeEnumMethodCall("color", "last");
   auto result = EvalExpr(call, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 2u);
 }
 
-}
+}  // namespace

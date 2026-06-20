@@ -66,13 +66,14 @@ TEST(IdentifierElaboration, CaseMismatchedReferenceFailsToResolve) {
 TEST(IdentifierElaboration, IdentifierExceedingMaxLengthReportsError) {
   ElabFixture f;
   std::string long_id(1025, 'a');
-  ElaborateSrc("module m;\n"
-               "  logic " +
-                   long_id +
-                   ";\n"
-                   "endmodule\n",
-               f);
+  ElaborateSrc(
+      "module m;\n"
+      "  logic " +
+          long_id +
+          ";\n"
+          "endmodule\n",
+      f);
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-}
+}  // namespace

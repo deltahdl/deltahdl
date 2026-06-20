@@ -21,9 +21,8 @@ bool TerminalIsActivelyDriven(const Net& net, const Logic4Vec& drv) {
   return !net.drivers.empty() && !IsZWord(drv.words[0]);
 }
 
-void ResolveAmbiguousTerminal(Variable& terminal_var,
-                              const Logic4Vec& term_drv, bool term_is_driven,
-                              const Logic4Vec& other_drv,
+void ResolveAmbiguousTerminal(Variable& terminal_var, const Logic4Vec& term_drv,
+                              bool term_is_driven, const Logic4Vec& other_drv,
                               bool other_is_driven) {
   uint8_t t_a = term_drv.words[0].aval & 1;
   uint8_t t_b = term_drv.words[0].bval & 1;
@@ -34,7 +33,6 @@ void ResolveAmbiguousTerminal(Variable& terminal_var,
   uint8_t off_a = term_is_driven ? t_a : 1;
   uint8_t off_b = term_is_driven ? t_b : 1;
   if ((on_a != off_a || on_b != off_b) && !term_is_driven) {
-
     terminal_var.value.words[0].aval = 0;
     terminal_var.value.words[0].bval = 1;
   }
@@ -88,12 +86,10 @@ void FirstPass(std::vector<BidirSwitchInst>& switches) {
     } else if (conducts && !unknown) {
       PropagateAcrossClosedSwitch(sw);
     }
-
   }
 }
 
 void ChainPropagate(std::vector<BidirSwitchInst>& switches) {
-
   bool changed = true;
   while (changed) {
     changed = false;
@@ -114,7 +110,7 @@ void ChainPropagate(std::vector<BidirSwitchInst>& switches) {
   }
 }
 
-}
+}  // namespace
 
 bool BidirSwitchConducts(BidirSwitchKind kind, Logic4Word control) {
   uint8_t c_aval = control.aval & 1;
@@ -159,11 +155,10 @@ uint64_t BidirSwitchBuiltinControlXZDelay(const BidirSwitchDelaySpec& spec) {
   return 0;
 }
 
-void ResolveBidirSwitchNetwork(std::vector<BidirSwitchInst>& switches,
-                               Arena& ) {
+void ResolveBidirSwitchNetwork(std::vector<BidirSwitchInst>& switches, Arena&) {
   InitialiseTerminals(switches);
   FirstPass(switches);
   ChainPropagate(switches);
 }
 
-}
+}  // namespace delta

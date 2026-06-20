@@ -35,7 +35,8 @@ TEST(CastCompatibleElaboration, NonequivalentIntegralsAreCastCompatible) {
   EXPECT_TRUE(IsCastCompatible(a, b));
 }
 
-TEST(CastCompatibleElaboration, IntegralAndEnumAreCastCompatibleBothDirections) {
+TEST(CastCompatibleElaboration,
+     IntegralAndEnumAreCastCompatibleBothDirections) {
   DataType integral;
   integral.kind = DataTypeKind::kInt;
   integral.is_signed = true;
@@ -82,4 +83,4 @@ TEST(CastCompatibleElaboration, CastExpressionBetweenIntAndEnumElaborates) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-}
+}  // namespace

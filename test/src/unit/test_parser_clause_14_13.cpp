@@ -92,4 +92,4 @@ TEST(InputSamplingParse, ExplicitNonZeroInputSkew) {
   ASSERT_NE(item->clocking_signals[0].skew_delay, nullptr);
 }
 
-}
+}  // namespace

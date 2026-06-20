@@ -50,10 +50,10 @@ TEST(SubroutineCallStatementParsing, SystemTaskCallAsStatement) {
 // The terminating semicolon belongs to the subroutine_call_statement
 // production; without it the statement is rejected.
 TEST(SubroutineCallStatementParsing, TaskCallRequiresSemicolon) {
-  EXPECT_FALSE(ParseOk(
-      "module m;\n"
-      "  initial foo(1, 2)\n"
-      "endmodule\n"));
+  EXPECT_FALSE(
+      ParseOk("module m;\n"
+              "  initial foo(1, 2)\n"
+              "endmodule\n"));
 }
 
 // --- Alternative 2: void ' ( function_subroutine_call ) ; ---
@@ -77,10 +77,10 @@ TEST(SubroutineCallStatementParsing, VoidCastOfFunctionCallAsStatement) {
 
 // The semicolon is equally required for the void-cast form.
 TEST(SubroutineCallStatementParsing, VoidCastRequiresSemicolon) {
-  EXPECT_FALSE(ParseOk(
-      "module m;\n"
-      "  initial void'(compute(3))\n"
-      "endmodule\n"));
+  EXPECT_FALSE(
+      ParseOk("module m;\n"
+              "  initial void'(compute(3))\n"
+              "endmodule\n"));
 }
 
 }  // namespace

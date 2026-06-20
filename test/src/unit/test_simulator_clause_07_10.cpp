@@ -68,4 +68,4 @@ TEST(QueueAccess, ZeroIndexIsFirstAndDollarIsLast) {
   EXPECT_EQ(last->value.ToUint64(), 30u);
 }
 
-}
+}  // namespace

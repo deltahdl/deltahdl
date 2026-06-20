@@ -87,4 +87,4 @@ TEST(ContAssignDelayPreprocessor, NetDeclDelayWithInit) {
   EXPECT_EQ(item->net_delay->int_val, 5);
 }
 
-}
+}  // namespace

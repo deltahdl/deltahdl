@@ -237,4 +237,4 @@ TEST(NameSpaceElaboration, PortReintroducedAsVariableElaboratesOk) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

@@ -13,15 +13,16 @@ namespace {
 // clocking event, a disable condition and a property expression; the property
 // expr class groups operations, clocked properties, case properties and others;
 // an operation's vpiOpType is drawn from a fixed set of property operators with
-// defined operand orders and a strength flag; and a case property item groups the
-// case conditions that branch to the same property statement. The property-expr
-// classification is reused by §37.51's property-declaration model, weaving the
-// two subclauses together. These tests observe the production helpers in vpi.cpp
-// and the VpiContext methods that apply those rules.
+// defined operand orders and a strength flag; and a case property item groups
+// the case conditions that branch to the same property statement. The
+// property-expr classification is reused by §37.51's property-declaration
+// model, weaving the two subclauses together. These tests observe the
+// production helpers in vpi.cpp and the VpiContext methods that apply those
+// rules.
 
 // Diagram: the property-expr class groups the member kinds the diagram draws -
-// an operation, a multiclock sequence expression, a property instance, a clocked
-// property and a case property. Unrelated kinds are not members.
+// an operation, a multiclock sequence expression, a property instance, a
+// clocked property and a case property. Unrelated kinds are not members.
 TEST(PropertySpecModel, PropertyExprClassGroupsItsMemberKinds) {
   EXPECT_TRUE(VpiIsPropertyExprType(vpiOperation));
   EXPECT_TRUE(VpiIsPropertyExprType(vpiMulticlockSequenceExpr));
@@ -33,8 +34,8 @@ TEST(PropertySpecModel, PropertyExprClassGroupsItsMemberKinds) {
   EXPECT_FALSE(VpiIsPropertyExprType(vpiModule));
 }
 
-// Diagram edge: the property-expr class selector names the class, not a concrete
-// member kind, so it is not itself classified as a member.
+// Diagram edge: the property-expr class selector names the class, not a
+// concrete member kind, so it is not itself classified as a member.
 TEST(PropertySpecModel, PropertyExprClassSelectorIsNotItselfAMemberKind) {
   EXPECT_FALSE(VpiIsPropertyExprType(vpiPropertyExpr));
 }
@@ -45,21 +46,35 @@ TEST(PropertySpecModel, PropertyVariableValueCannotBeAccessed) {
   EXPECT_FALSE(VpiIsPropertyVariableValueAccessible());
 }
 
-// Detail 2: within a property expr vpiOpType is one of exactly the twenty listed
-// property operators.
+// Detail 2: within a property expr vpiOpType is one of exactly the twenty
+// listed property operators.
 TEST(PropertySpecModel, OpTypeSetCoversTheTwentyPropertyOperators) {
-  for (int op : {vpiAcceptOnOp, vpiAlwaysOp, vpiCompAndOp, vpiCompOrOp,
-                 vpiEventuallyOp, vpiIfElseOp, vpiIfOp, vpiIffOp, vpiImpliesOp,
-                 vpiNexttimeOp, vpiNonOverlapFollowedByOp, vpiNonOverlapImplyOp,
-                 vpiNotOp, vpiOverlapFollowedByOp, vpiOverlapImplyOp,
-                 vpiRejectOnOp, vpiSyncAcceptOnOp, vpiSyncRejectOnOp, vpiUntilOp,
+  for (int op : {vpiAcceptOnOp,
+                 vpiAlwaysOp,
+                 vpiCompAndOp,
+                 vpiCompOrOp,
+                 vpiEventuallyOp,
+                 vpiIfElseOp,
+                 vpiIfOp,
+                 vpiIffOp,
+                 vpiImpliesOp,
+                 vpiNexttimeOp,
+                 vpiNonOverlapFollowedByOp,
+                 vpiNonOverlapImplyOp,
+                 vpiNotOp,
+                 vpiOverlapFollowedByOp,
+                 vpiOverlapImplyOp,
+                 vpiRejectOnOp,
+                 vpiSyncAcceptOnOp,
+                 vpiSyncRejectOnOp,
+                 vpiUntilOp,
                  vpiUntilWithOp}) {
     EXPECT_TRUE(VpiIsPropertyExprOpType(op)) << "op=" << op;
   }
 }
 
-// Detail 2 edge: operators outside the property set (ordinary expression ops and
-// sequence-only operators) are rejected.
+// Detail 2 edge: operators outside the property set (ordinary expression ops
+// and sequence-only operators) are rejected.
 TEST(PropertySpecModel, OpTypeSetRejectsNonPropertyOperators) {
   EXPECT_FALSE(VpiIsPropertyExprOpType(vpiAddOp));
   EXPECT_FALSE(VpiIsPropertyExprOpType(vpiLogAndOp));
@@ -120,8 +135,8 @@ TEST(PropertySpecModel, AlwaysEventuallyOperandOrderAndRangeOmission) {
   EXPECT_EQ(unranged[0], &prop);
 }
 
-// Detail 3: vpiOpStrong is valid only for nexttime, always, eventually, until and
-// until_with; for every other property operator it does not apply.
+// Detail 3: vpiOpStrong is valid only for nexttime, always, eventually, until
+// and until_with; for every other property operator it does not apply.
 TEST(PropertySpecModel, OpStrongIsValidOnlyForTheStrongCapableOperators) {
   for (int op : {vpiNexttimeOp, vpiAlwaysOp, vpiEventuallyOp, vpiUntilOp,
                  vpiUntilWithOp}) {
@@ -150,7 +165,8 @@ TEST(PropertySpecModel, OperationReportsOpStrongProperty) {
 }
 
 // Detail 4: a case property item groups all case conditions that branch to the
-// same property statement; the property-expr branch is not one of the conditions.
+// same property statement; the property-expr branch is not one of the
+// conditions.
 TEST(PropertySpecModel, CaseItemGroupsConditionsBranchingToOneStatement) {
   VpiObject item;
   item.type = vpiCasePropertyItem;
@@ -167,12 +183,13 @@ TEST(PropertySpecModel, CaseItemGroupsConditionsBranchingToOneStatement) {
   EXPECT_EQ(conditions[0], &c0);
   EXPECT_EQ(conditions[1], &c1);
 
-  // The branch is reached as the item's property expression, not as a condition.
+  // The branch is reached as the item's property expression, not as a
+  // condition.
   EXPECT_EQ(VpiPropertyExprChild(&item), &branch);
 }
 
-// Detail 5: the default case item has no condition expression, so it groups none
-// and vpi_iterate() over its conditions returns null.
+// Detail 5: the default case item has no condition expression, so it groups
+// none and vpi_iterate() over its conditions returns null.
 TEST(PropertySpecModel, DefaultCaseItemHasNoConditionsAndIteratesToNull) {
   VpiContext ctx;
   VpiObject default_item;

@@ -97,5 +97,5 @@ TEST_F(VpiHandleMultiSim, InterModPathAcceptsSameSizedPortsAcrossHierarchy) {
   EXPECT_EQ(h->children[0]->type, vpiInterModPath);
 }
 
-}
-}
+}  // namespace
+}  // namespace delta

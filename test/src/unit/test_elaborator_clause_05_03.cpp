@@ -12,8 +12,7 @@ TEST(WhiteSpaceElaboration, CrlfDelimiterElaborates) {
 }
 
 TEST(WhiteSpaceElaboration, MixedWhitespaceElaborates) {
-  EXPECT_TRUE(
-      ElabOk("module \t\n\f\v t \t\n ; \f\v logic \t a ; endmodule"));
+  EXPECT_TRUE(ElabOk("module \t\n\f\v t \t\n ; \f\v logic \t a ; endmodule"));
 }
 
 TEST(WhiteSpaceElaboration, WhitespaceOnlyInputElaboratesEmpty) {
@@ -49,4 +48,4 @@ TEST(WhiteSpaceElaboration, TabsInStringLiteralElaborate) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

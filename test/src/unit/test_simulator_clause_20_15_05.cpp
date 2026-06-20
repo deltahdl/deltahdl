@@ -90,7 +90,7 @@ TEST(QExam, MaximumQueueLength) {
   uint64_t peak = 0;
   At(f, 0, [&] { Add(f, 1); });
   At(f, 1, [&] { Add(f, 1); });
-  At(f, 2, [&] { Add(f, 1); });   // occupancy peaks at 3 here
+  At(f, 2, [&] { Add(f, 1); });  // occupancy peaks at 3 here
   At(f, 3, [&] { Remove(f, 1); });
   At(f, 4, [&] { Remove(f, 1); });
   At(f, 5, [&] { peak = Exam(f, 1, 3); });
@@ -99,7 +99,8 @@ TEST(QExam, MaximumQueueLength) {
 }
 
 // §20.15.5 Table 20-10, code 2: the mean interarrival time is the average gap
-// between successive arrivals: here arrivals at t=0, 4 and 10 give (10-0)/2 = 5.
+// between successive arrivals: here arrivals at t=0, 4 and 10 give (10-0)/2
+// = 5.
 TEST(QExam, MeanInterarrivalTime) {
   SimFixture f;
   Initialize(f, 1, /*q_type=*/1, /*max_length=*/8);
@@ -121,10 +122,10 @@ TEST(QExam, ShortestWaitEver) {
   SimFixture f;
   Initialize(f, 1, /*q_type=*/1, /*max_length=*/8);
   uint64_t shortest = 0;
-  At(f, 0, [&] { Add(f, 1); });   // entry A
-  At(f, 2, [&] { Add(f, 1); });   // entry B
-  At(f, 5, [&] { Remove(f, 1); }); // removes A, wait 5
-  At(f, 6, [&] { Remove(f, 1); }); // removes B, wait 4
+  At(f, 0, [&] { Add(f, 1); });     // entry A
+  At(f, 2, [&] { Add(f, 1); });     // entry B
+  At(f, 5, [&] { Remove(f, 1); });  // removes A, wait 5
+  At(f, 6, [&] { Remove(f, 1); });  // removes B, wait 4
   At(f, 7, [&] { shortest = Exam(f, 1, 4); });
   f.scheduler.Run();
   EXPECT_EQ(shortest, 4u);
@@ -136,10 +137,10 @@ TEST(QExam, AverageWaitTime) {
   SimFixture f;
   Initialize(f, 1, /*q_type=*/1, /*max_length=*/8);
   uint64_t average = 0;
-  At(f, 0, [&] { Add(f, 1); });    // entry A
-  At(f, 4, [&] { Remove(f, 1); });  // A waits 4
-  At(f, 4, [&] { Add(f, 1); });    // entry B (same tick, after the remove)
-  At(f, 10, [&] { Remove(f, 1); }); // B waits 6
+  At(f, 0, [&] { Add(f, 1); });      // entry A
+  At(f, 4, [&] { Remove(f, 1); });   // A waits 4
+  At(f, 4, [&] { Add(f, 1); });      // entry B (same tick, after the remove)
+  At(f, 10, [&] { Remove(f, 1); });  // B waits 6
   At(f, 11, [&] { average = Exam(f, 1, 6); });
   f.scheduler.Run();
   EXPECT_EQ(average, 5u);
@@ -152,11 +153,11 @@ TEST(QExam, LongestWaitStillQueued) {
   SimFixture f;
   Initialize(f, 1, /*q_type=*/1, /*max_length=*/8);
   uint64_t with_oldest = 0, after_oldest_removed = 0;
-  At(f, 0, [&] { Add(f, 1); });   // entry A, oldest
-  At(f, 3, [&] { Add(f, 1); });   // entry B
-  At(f, 10, [&] { with_oldest = Exam(f, 1, 5); });     // A waited 10
-  At(f, 10, [&] { Remove(f, 1); });                    // remove A (FIFO)
-  At(f, 10, [&] { after_oldest_removed = Exam(f, 1, 5); }); // now B, waited 7
+  At(f, 0, [&] { Add(f, 1); });                              // entry A, oldest
+  At(f, 3, [&] { Add(f, 1); });                              // entry B
+  At(f, 10, [&] { with_oldest = Exam(f, 1, 5); });           // A waited 10
+  At(f, 10, [&] { Remove(f, 1); });                          // remove A (FIFO)
+  At(f, 10, [&] { after_oldest_removed = Exam(f, 1, 5); });  // now B, waited 7
   f.scheduler.Run();
   EXPECT_EQ(with_oldest, 10u);
   EXPECT_EQ(after_oldest_removed, 7u);

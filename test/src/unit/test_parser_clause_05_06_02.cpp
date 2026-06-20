@@ -29,4 +29,4 @@ TEST(LexicalConventionParsing, AllUppercaseUsedAsIdentifier) {
   EXPECT_TRUE(ParseOk("module m; logic MODULE; endmodule"));
 }
 
-}
+}  // namespace

@@ -65,4 +65,4 @@ TEST(QualifiedIfSynth, PriorityIfSynthesizes) {
   EXPECT_EQ(aig->outputs.size(), 1);
 }
 
-}
+}  // namespace

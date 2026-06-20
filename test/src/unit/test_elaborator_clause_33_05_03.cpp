@@ -42,15 +42,15 @@ struct TempPrecompDir {
 TEST(SeparateCompilationToolDescend, TransitiveDescentThroughLibrary) {
   TempPrecompDir tmp;
   auto path = tmp.dir / "rtlLib.dpl";
-  ASSERT_TRUE(PrecompiledLibrary::Save(
-      "module leaf;\n"
-      "endmodule\n",
-      "rtlLib", path));
-  ASSERT_TRUE(PrecompiledLibrary::Save(
-      "module mid;\n"
-      "  leaf l();\n"
-      "endmodule\n",
-      "rtlLib", path));
+  ASSERT_TRUE(
+      PrecompiledLibrary::Save("module leaf;\n"
+                               "endmodule\n",
+                               "rtlLib", path));
+  ASSERT_TRUE(
+      PrecompiledLibrary::Save("module mid;\n"
+                               "  leaf l();\n"
+                               "endmodule\n",
+                               "rtlLib", path));
 
   SourceManager mgr;
   Arena arena;
@@ -83,10 +83,10 @@ TEST(SeparateCompilationToolDescend, TransitiveDescentThroughLibrary) {
 TEST(SeparateCompilationToolDescend, BindingFailsWhenLibraryMissingCell) {
   TempPrecompDir tmp;
   auto path = tmp.dir / "rtlLib.dpl";
-  ASSERT_TRUE(PrecompiledLibrary::Save(
-      "module other;\n"
-      "endmodule\n",
-      "rtlLib", path));
+  ASSERT_TRUE(
+      PrecompiledLibrary::Save("module other;\n"
+                               "endmodule\n",
+                               "rtlLib", path));
 
   SourceManager mgr;
   Arena arena;
@@ -111,4 +111,4 @@ TEST(SeparateCompilationToolDescend, BindingFailsWhenLibraryMissingCell) {
   EXPECT_TRUE(diag.HasErrors());
 }
 
-}
+}  // namespace

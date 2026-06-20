@@ -161,4 +161,4 @@ TEST(SystemNameParsing, SystemTfCallWithClockingEvent) {
   EXPECT_EQ(expr->callee, "$past");
 }
 
-}
+}  // namespace

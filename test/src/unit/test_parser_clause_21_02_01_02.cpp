@@ -15,4 +15,4 @@ TEST(IoSystemTaskParsing, DisplayWithFormatSpecifiers) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

@@ -10,7 +10,6 @@
 namespace delta {
 
 uint32_t EvalStructMemberWidth(const StructMember& m) {
-
   if (m.packed_dim_left && m.packed_dim_right) {
     auto left = ConstEvalInt(m.packed_dim_left);
     auto right = ConstEvalInt(m.packed_dim_right);
@@ -128,7 +127,6 @@ static uint32_t EvalRangeWidth(const Expr* left_expr, const Expr* right_expr,
 }
 
 uint32_t EvalTypeWidth(const DataType& dtype) {
-
   if (dtype.packed_dim_left && dtype.packed_dim_right) {
     uint32_t w = EvalRangeWidth(dtype.packed_dim_left, dtype.packed_dim_right);
 
@@ -240,7 +238,7 @@ uint32_t EvalTypeWidth(const DataType& dtype, const TypedefMap& typedefs) {
 }
 
 uint32_t EvalTypeWidth(const DataType& dtype, const TypedefMap& typedefs,
-                        const ScopeMap& scope) {
+                       const ScopeMap& scope) {
   const auto* resolved = ResolveNamed(dtype, typedefs);
   if (resolved) return EvalTypeWidth(*resolved, typedefs, scope);
   if (dtype.packed_dim_left && dtype.packed_dim_right) {
@@ -338,7 +336,6 @@ bool IsIntegralType(DataTypeKind kind) {
 }
 
 bool IsSimpleBitVectorType(DataTypeKind kind) {
-
   switch (kind) {
     case DataTypeKind::kBit:
     case DataTypeKind::kLogic:
@@ -356,7 +353,6 @@ bool IsSimpleBitVectorType(DataTypeKind kind) {
 }
 
 bool IsSimpleBitVectorType(const DataType& dtype) {
-
   if ((dtype.kind == DataTypeKind::kStruct ||
        dtype.kind == DataTypeKind::kUnion) &&
       (dtype.is_packed || dtype.is_soft))
@@ -454,7 +450,6 @@ bool TypesEquivalent(const DataType& a, const DataType& b) {
 bool ElementTypesEquivalent(DataTypeKind a_kind, uint32_t a_width,
                             bool a_signed, bool a_4state, DataTypeKind b_kind,
                             uint32_t b_width, bool b_signed, bool b_4state) {
-
   if (CanonKind(a_kind) == CanonKind(b_kind) && a_signed == b_signed &&
       a_width == b_width && a_4state == b_4state) {
     return true;
@@ -565,7 +560,6 @@ uint32_t InferExprWidth(const Expr* expr, const TypedefMap& typedefs) {
   if (!expr) return 0;
   switch (expr->kind) {
     case ExprKind::kIntegerLiteral: {
-
       auto tick = expr->text.find('\'');
       if (tick != std::string_view::npos && tick > 0) {
         uint32_t w = 0;
@@ -594,7 +588,8 @@ uint32_t InferExprWidth(const Expr* expr, const TypedefMap& typedefs) {
     case ExprKind::kBinary: {
       if (IsOneBitResultOp(expr->op)) return 1;
       if (IsShiftOp(expr->op)) return InferExprWidth(expr->lhs, typedefs);
-      if (expr->op == TokenKind::kPower) return InferExprWidth(expr->lhs, typedefs);
+      if (expr->op == TokenKind::kPower)
+        return InferExprWidth(expr->lhs, typedefs);
       uint32_t lw = InferExprWidth(expr->lhs, typedefs);
       uint32_t rw = InferExprWidth(expr->rhs, typedefs);
       return std::max(lw, rw);
@@ -652,4 +647,4 @@ uint32_t ContextWidth(const Expr* expr, uint32_t ctx_width,
   return std::max(self_width, ctx_width);
 }
 
-}
+}  // namespace delta

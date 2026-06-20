@@ -81,4 +81,4 @@ TEST(DefaultNettypeElaboration, DirectiveControlsImplicitNetType) {
   EXPECT_TRUE(found) << "implicit net 'w' not created";
 }
 
-}
+}  // namespace

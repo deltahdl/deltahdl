@@ -68,8 +68,9 @@ TEST(StringMethods, RealtoaNegativeValue) {
 }
 
 // The text characterizes realtoa as the inverse of atoreal (§6.16.10): the real
-// representation it stores must parse back to the original value. 2.5 is exactly
-// representable at the default formatting precision, so the round trip is exact.
+// representation it stores must parse back to the original value. 2.5 is
+// exactly representable at the default formatting precision, so the round trip
+// is exact.
 TEST(StringMethods, RealtoaIsInverseOfAtoreal) {
   StringFixture f;
   auto* var = f.CreateStringVar("s", "");
@@ -88,4 +89,4 @@ TEST(StringMethods, RealtoaIsInverseOfAtoreal) {
   EXPECT_EQ(back, 2.5);
 }
 
-}
+}  // namespace

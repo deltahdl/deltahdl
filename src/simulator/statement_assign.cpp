@@ -178,7 +178,6 @@ bool WriteStructField(const Expr* lhs, const Logic4Vec& rhs_val,
   auto handle = base_var->value.ToUint64();
   auto* obj = ctx.GetClassObject(handle);
   if (obj) {
-
     auto declared = ctx.GetVariableClassType(base_name);
     if (!declared.empty()) {
       auto* declared_type = ctx.FindClassType(declared);
@@ -226,7 +225,6 @@ void WriteBitSelect(Variable* var, const Expr* lhs, const Logic4Vec& rhs_val,
       static_cast<uint32_t>(EvalExpr(lhs->index_end, ctx, arena).ToUint64());
   uint32_t w = end_val;
   if (lhs->is_part_select_plus) {
-
   } else if (lhs->is_part_select_minus) {
     lo = (idx >= w - 1) ? idx - w + 1 : 0;
   } else {
@@ -319,33 +317,46 @@ static void CopyArrayElements(std::string_view dst_name, const ArrayInfo& dst,
 static bool IsTypeKeyword(std::string_view key) {
   return key == "int" || key == "integer" || key == "logic" || key == "reg" ||
          key == "byte" || key == "shortint" || key == "longint" ||
-         key == "bit" || key == "real" || key == "shortreal" ||
-         key == "time" || key == "realtime" || key == "string";
+         key == "bit" || key == "real" || key == "shortreal" || key == "time" ||
+         key == "realtime" || key == "string";
 }
 
 static bool TypeKeyMatchesKind(std::string_view key, DataTypeKind kind) {
   switch (kind) {
-    case DataTypeKind::kInt: return key == "int";
-    case DataTypeKind::kInteger: return key == "integer";
-    case DataTypeKind::kLogic: return key == "logic";
-    case DataTypeKind::kReg: return key == "reg";
-    case DataTypeKind::kByte: return key == "byte";
-    case DataTypeKind::kShortint: return key == "shortint";
-    case DataTypeKind::kLongint: return key == "longint";
-    case DataTypeKind::kBit: return key == "bit";
-    case DataTypeKind::kReal: return key == "real";
-    case DataTypeKind::kShortreal: return key == "shortreal";
-    case DataTypeKind::kTime: return key == "time";
-    case DataTypeKind::kRealtime: return key == "realtime";
-    case DataTypeKind::kString: return key == "string";
-    default: return false;
+    case DataTypeKind::kInt:
+      return key == "int";
+    case DataTypeKind::kInteger:
+      return key == "integer";
+    case DataTypeKind::kLogic:
+      return key == "logic";
+    case DataTypeKind::kReg:
+      return key == "reg";
+    case DataTypeKind::kByte:
+      return key == "byte";
+    case DataTypeKind::kShortint:
+      return key == "shortint";
+    case DataTypeKind::kLongint:
+      return key == "longint";
+    case DataTypeKind::kBit:
+      return key == "bit";
+    case DataTypeKind::kReal:
+      return key == "real";
+    case DataTypeKind::kShortreal:
+      return key == "shortreal";
+    case DataTypeKind::kTime:
+      return key == "time";
+    case DataTypeKind::kRealtime:
+      return key == "realtime";
+    case DataTypeKind::kString:
+      return key == "string";
+    default:
+      return false;
   }
 }
 
 static Logic4Vec FindArrayKeyedValue(const Expr* rhs, uint32_t idx,
                                      uint32_t width, DataTypeKind elem_type,
                                      SimContext& ctx, Arena& arena) {
-
   for (size_t i = 0; i < rhs->pattern_keys.size(); ++i) {
     if (i >= rhs->elements.size()) break;
     auto& key = rhs->pattern_keys[i];
@@ -384,10 +395,10 @@ static void DistributePatternToArray(std::string_view arr_name,
     auto* elem = ctx.FindVariable(name);
     if (!elem) continue;
     if (named) {
-      elem->value = ResizeToWidth(
-          FindArrayKeyedValue(rhs, idx, info.elem_width, info.elem_type_kind,
-                              ctx, arena),
-          info.elem_width, arena);
+      elem->value =
+          ResizeToWidth(FindArrayKeyedValue(rhs, idx, info.elem_width,
+                                            info.elem_type_kind, ctx, arena),
+                        info.elem_width, arena);
     } else if (replicate && inner_count > 0) {
       auto val =
           EvalExpr(rhs->elements[0]->elements[i % inner_count], ctx, arena);
@@ -490,7 +501,7 @@ bool TryArrayBlockingAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
         uint32_t n = std::min(dst->size, src_size);
         for (uint32_t i = 0; i < n; ++i) {
           uint32_t di = dst->is_descending ? (dst->lo + dst->size - 1 - i)
-                                            : (dst->lo + i);
+                                           : (dst->lo + i);
           auto dn =
               std::string(stmt->lhs->text) + "[" + std::to_string(di) + "]";
           auto* dv = ctx.FindVariable(dn);
@@ -539,7 +550,7 @@ bool TryAssocIndexedWrite(const Expr* lhs, const Logic4Vec& rhs_val,
 }
 
 bool TryQueueIndexedWrite(const Expr* lhs, const Logic4Vec& rhs_val,
-                          SimContext& ctx, Arena& ) {
+                          SimContext& ctx, Arena&) {
   if (!lhs->base || lhs->base->kind != ExprKind::kIdentifier) return false;
   auto* q = ctx.FindQueue(lhs->base->text);
   if (!q || !lhs->index) return false;
@@ -554,9 +565,8 @@ bool TryQueueIndexedWrite(const Expr* lhs, const Logic4Vec& rhs_val,
   auto sz = static_cast<int64_t>(q->elements.size());
 
   if (idx == sz) {
-    bool has_room =
-        (q->max_size < 0) || (static_cast<int32_t>(q->elements.size()) <
-                              q->max_size);
+    bool has_room = (q->max_size < 0) ||
+                    (static_cast<int32_t>(q->elements.size()) < q->max_size);
     if (has_room) {
       q->elements.push_back(rhs_val);
       q->element_ids.push_back(q->AllocateId());
@@ -720,4 +730,4 @@ bool TryQueueBlockingAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   return true;
 }
 
-}
+}  // namespace delta

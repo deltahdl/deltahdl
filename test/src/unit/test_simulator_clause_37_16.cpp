@@ -11,19 +11,19 @@ namespace {
 
 // §37.16 Nets: the VPI net object model, the net counterpart of §37.17's
 // variable model. These tests observe the production helpers in vpi.cpp that
-// apply the numbered "Details" of the clause. The range relations (details 1 and
-// 26) are woven onto §37.22's range helpers, so an empty dimension behaves the
-// same here as it does there.
+// apply the numbered "Details" of the clause. The range relations (details 1
+// and 26) are woven onto §37.22's range helpers, so an empty dimension behaves
+// the same here as it does there.
 //
 // The driver/load/port iteration details (4, 6-8, 14-20, 22) describe the
-// behavior of a connectivity and force/assign engine that the VPI layer does not
-// model with a live driver graph, so they carry no production rule of their own
-// here; the ownable classification rules they rest on (e.g. detail 5, detail 11's
-// driver-iteration gate) are exercised below.
+// behavior of a connectivity and force/assign engine that the VPI layer does
+// not model with a live driver graph, so they carry no production rule of their
+// own here; the ownable classification rules they rest on (e.g. detail 5,
+// detail 11's driver-iteration gate) are exercised below.
 
 // D1: a net declared as an array with one or more unpacked ranges is an array
-// net; a packed struct/union or enum net with one or more explicit packed ranges
-// is a packed array net.
+// net; a packed struct/union or enum net with one or more explicit packed
+// ranges is a packed array net.
 TEST(NetModel, ArrayNetAndPackedArrayNetClassification) {
   EXPECT_TRUE(VpiIsArrayNet(1));
   EXPECT_TRUE(VpiIsArrayNet(2));
@@ -87,8 +87,8 @@ TEST(NetModel, PackedArrayMemberReadsPackedArrayNetParent) {
   EXPECT_FALSE(VpiNetIsPackedArrayMember(nullptr));
 }
 
-// D3: the net bits of a logic net or a bit net are reachable regardless of vector
-// expansion; no other net kind exposes net bits this way.
+// D3: the net bits of a logic net or a bit net are reachable regardless of
+// vector expansion; no other net kind exposes net bits this way.
 TEST(NetModel, NetBitsAvailableForLogicAndBitNets) {
   EXPECT_TRUE(VpiNetBitIteratorApplies(vpiNet));
   EXPECT_TRUE(VpiNetBitIteratorApplies(vpiBitNet));
@@ -142,9 +142,9 @@ TEST(NetModel, PortInstMemberQualification) {
   EXPECT_FALSE(VpiPortInstReferenceQualifies(false));
 }
 
-// D9: an implicit net reports vpiLineNo 0 and the vpiImplicitDecl property TRUE;
-// an explicitly declared net reports its declared line and FALSE. The property is
-// observed through the public vpi_get entry point.
+// D9: an implicit net reports vpiLineNo 0 and the vpiImplicitDecl property
+// TRUE; an explicitly declared net reports its declared line and FALSE. The
+// property is observed through the public vpi_get entry point.
 class NetContext : public ::testing::Test {
  protected:
   void SetUp() override { SetGlobalVpiContext(&ctx_); }
@@ -190,8 +190,9 @@ TEST(NetModel, NettypeValueAndDriverIterationGate) {
   EXPECT_FALSE(VpiNetDriverIterationSupported(vpiNettypeNetSelect));
 }
 
-// D12: vpiNetType for an interconnect net is vpiInterconnect; vpiResolvedNetType
-// for a simulated interconnect net is the resolved type of the simulated net.
+// D12: vpiNetType for an interconnect net is vpiInterconnect;
+// vpiResolvedNetType for a simulated interconnect net is the resolved type of
+// the simulated net.
 TEST(NetModel, InterconnectNetTypeAndResolvedType) {
   EXPECT_EQ(VpiInterconnectNetType(), vpiInterconnect);
   EXPECT_EQ(VpiInterconnectResolvedNetType(vpiWand), vpiWand);
@@ -215,9 +216,9 @@ TEST(NetModel, TypespecNullForInterconnectArray) {
   EXPECT_EQ(VpiNetTypespec(&interconnect_array), nullptr);
 }
 
-// D21: vpiExpanded on a net bit reports the value of the property for its parent
-// net (a scalared/default net is expanded; a vectored net is not), observed
-// through the public vpi_get entry point.
+// D21: vpiExpanded on a net bit reports the value of the property for its
+// parent net (a scalared/default net is expanded; a vectored net is not),
+// observed through the public vpi_get entry point.
 TEST_F(NetContext, ExpandedOnNetBitReadsParentNet) {
   VpiObject vectored_net;
   vectored_net.type = vpiNet;
@@ -319,8 +320,8 @@ TEST(NetModel, IndexIterationOnlyForArrayNetElement) {
 }
 
 // D26 (woven with §37.22): vpiRange returns one range per declared dimension,
-// dropping implicit element ranges; vpiLeftRange/vpiRightRange report the bounds
-// of the leftmost dimension, or NULL when there is none.
+// dropping implicit element ranges; vpiLeftRange/vpiRightRange report the
+// bounds of the leftmost dimension, or NULL when there is none.
 TEST(NetModel, RangeIterationAndLeftRightRange) {
   VpiObject lo, hi;
 
@@ -511,8 +512,8 @@ TEST(NetModel, StructUnionMemberRule) {
   EXPECT_FALSE(VpiNetStructUnionMember(&member_net));
 }
 
-// D34: for a net that is a member of a struct/union, vpiFullName and vpiDecompile
-// include the struct-name prefix while vpiName does not.
+// D34: for a net that is a member of a struct/union, vpiFullName and
+// vpiDecompile include the struct-name prefix while vpiName does not.
 TEST(NetModel, MemberNetNameForms) {
   VpiVariableNameParts parts;
   parts.top_scope = "top";

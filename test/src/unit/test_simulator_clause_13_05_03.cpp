@@ -16,7 +16,14 @@ TEST(Functions, DefaultArgumentValue) {
   func->name = "add";
   func->func_args = {
       {Direction::kInput, false, false, false, {}, "a", nullptr, {}},
-      {Direction::kInput, false, false, false, {}, "b", MakeInt(f.arena, 10), {}},
+      {Direction::kInput,
+       false,
+       false,
+       false,
+       {},
+       "b",
+       MakeInt(f.arena, 10),
+       {}},
   };
   auto* body_expr = MakeBinary(f.arena, TokenKind::kPlus, MakeId(f.arena, "a"),
                                MakeId(f.arena, "b"));
@@ -38,9 +45,30 @@ TEST(Functions, DefaultArgumentMultiple) {
   func->kind = ModuleItemKind::kFunctionDecl;
   func->name = "compute";
   func->func_args = {
-      {Direction::kInput, false, false, false, {}, "a", MakeInt(f.arena, 1), {}},
-      {Direction::kInput, false, false, false, {}, "b", MakeInt(f.arena, 2), {}},
-      {Direction::kInput, false, false, false, {}, "c", MakeInt(f.arena, 3), {}},
+      {Direction::kInput,
+       false,
+       false,
+       false,
+       {},
+       "a",
+       MakeInt(f.arena, 1),
+       {}},
+      {Direction::kInput,
+       false,
+       false,
+       false,
+       {},
+       "b",
+       MakeInt(f.arena, 2),
+       {}},
+      {Direction::kInput,
+       false,
+       false,
+       false,
+       {},
+       "c",
+       MakeInt(f.arena, 3),
+       {}},
   };
   auto* ab = MakeBinary(f.arena, TokenKind::kPlus, MakeId(f.arena, "a"),
                         MakeId(f.arena, "b"));
@@ -86,13 +114,17 @@ TEST(DefaultArgumentSim, DefaultExpressionEvaluated) {
   func->kind = ModuleItemKind::kFunctionDecl;
   func->name = "get_size";
   func->func_args = {
-      {Direction::kInput, false, false, false, {}, "size",
+      {Direction::kInput,
+       false,
+       false,
+       false,
+       {},
+       "size",
        MakeBinary(f.arena, TokenKind::kStar, MakeInt(f.arena, 8),
                   MakeInt(f.arena, 4)),
        {}},
   };
-  func->func_body_stmts.push_back(
-      MakeReturn(f.arena, MakeId(f.arena, "size")));
+  func->func_body_stmts.push_back(MakeReturn(f.arena, MakeId(f.arena, "size")));
   f.ctx.RegisterFunction("get_size", func);
 
   auto* call = MakeCall(f.arena, "get_size", {});
@@ -183,16 +215,28 @@ TEST(DefaultArgumentSim, EmptyPlaceholderUsesDefault) {
   func->kind = ModuleItemKind::kFunctionDecl;
   func->name = "calc";
   func->func_args = {
-      {Direction::kInput, false, false, false, {}, "j", MakeInt(f.arena, 0),
+      {Direction::kInput,
+       false,
+       false,
+       false,
+       {},
+       "j",
+       MakeInt(f.arena, 0),
        {}},
       {Direction::kInput, false, false, false, {}, "k", nullptr, {}},
-      {Direction::kInput, false, false, false, {}, "data",
-       MakeInt(f.arena, 1), {}},
+      {Direction::kInput,
+       false,
+       false,
+       false,
+       {},
+       "data",
+       MakeInt(f.arena, 1),
+       {}},
   };
   auto* jk = MakeBinary(f.arena, TokenKind::kPlus, MakeId(f.arena, "j"),
-                         MakeId(f.arena, "k"));
-  auto* body = MakeBinary(f.arena, TokenKind::kPlus, jk,
-                           MakeId(f.arena, "data"));
+                        MakeId(f.arena, "k"));
+  auto* body =
+      MakeBinary(f.arena, TokenKind::kPlus, jk, MakeId(f.arena, "data"));
   func->func_body_stmts.push_back(MakeReturn(f.arena, body));
   f.ctx.RegisterFunction("calc", func);
 
@@ -200,4 +244,4 @@ TEST(DefaultArgumentSim, EmptyPlaceholderUsesDefault) {
   EXPECT_EQ(EvalExpr(call, f.ctx, f.arena).ToUint64(), 6u);
 }
 
-}
+}  // namespace

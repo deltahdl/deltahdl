@@ -221,7 +221,6 @@ std::string Preprocessor::SubstituteParams(
   result.reserve(body.size());
   size_t i = 0;
   while (i < body.size()) {
-
     if (i + 3 < body.size() && body[i] == '`' && body[i + 1] == '\\' &&
         body[i + 2] == '`' && body[i + 3] == '"') {
       result += "\\\"";
@@ -250,4 +249,4 @@ std::string Preprocessor::SubstituteParams(
   return result;
 }
 
-}
+}  // namespace delta

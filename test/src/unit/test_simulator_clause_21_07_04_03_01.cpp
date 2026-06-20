@@ -42,7 +42,7 @@ Logic4Vec MakeScalarState(Arena& arena, uint64_t aval, uint64_t bval) {
 std::string PortValueChars(const std::string& content) {
   size_t p = content.find("\np");
   if (p == std::string::npos) return "";
-  size_t start = p + 2;             // skip newline and the key character p
+  size_t start = p + 2;  // skip newline and the key character p
   size_t space = content.find(' ', start);
   if (space == std::string::npos || space - start < 2) return "";
   // The last two characters before the space are the strength components.

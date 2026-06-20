@@ -13,8 +13,8 @@ namespace {
 // 18.11.1: passing null to randomize() indicates no random variables for the
 // duration of the call, so even a variable declared rand is held at its current
 // value as a state variable. Here x currently satisfies the constraint, so the
-// inline constraint checker returns 1 and leaves x untouched — a generator would
-// have drawn a fresh value, but the checker draws nothing.
+// inline constraint checker returns 1 and leaves x untouched — a generator
+// would have drawn a fresh value, but the checker draws nothing.
 TEST(InlineConstraintChecker, NullArgumentHoldsRandVariableAsState) {
   ConstraintSolver solver(42);
 
@@ -228,9 +228,9 @@ TEST(InlineConstraintChecker, NullArgumentHoldsAllVariablesAsState) {
 }
 
 // 18.11.1: a checker returns 1 when every constraint is satisfied. With no
-// constraint blocks at all there is nothing that can fail, so the inline checker
-// reports success at this boundary while still drawing no value for the rand
-// variable, which keeps its current value.
+// constraint blocks at all there is nothing that can fail, so the inline
+// checker reports success at this boundary while still drawing no value for the
+// rand variable, which keeps its current value.
 TEST(InlineConstraintChecker, NullArgumentWithNoConstraintsReturnsOne) {
   ConstraintSolver solver(99);
 
@@ -248,4 +248,4 @@ TEST(InlineConstraintChecker, NullArgumentWithNoConstraintsReturnsOne) {
   EXPECT_EQ(solver.GetValue("x"), 42);
 }
 
-}
+}  // namespace

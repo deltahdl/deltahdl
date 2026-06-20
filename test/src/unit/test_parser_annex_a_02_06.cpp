@@ -250,10 +250,10 @@ TEST(FunctionDeclParsing, FunctionDeclNoLifetime) {
 }
 
 TEST(FunctionDeclParsing, FunctionBodyWithInterfaceScope) {
-  EXPECT_TRUE(ParseOk(
-      "interface ifc;\n"
-      "  function int f(); return 0; endfunction\n"
-      "endinterface\n"));
+  EXPECT_TRUE(
+      ParseOk("interface ifc;\n"
+              "  function int f(); return 0; endfunction\n"
+              "endinterface\n"));
 }
 
 TEST(FunctionDeclParsing, FunctionImplicitReturnTypeSigned) {
@@ -270,18 +270,18 @@ TEST(FunctionDeclParsing, FunctionImplicitReturnTypeSigned) {
 }
 
 TEST(FunctionDeclParsing, FunctionNamedReturnType) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  typedef struct packed { logic [7:0] data; } my_t;\n"
-      "  function my_t f(); return '0; endfunction\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  typedef struct packed { logic [7:0] data; } my_t;\n"
+              "  function my_t f(); return '0; endfunction\n"
+              "endmodule\n"));
 }
 
 TEST(FunctionDeclParsing, FunctionPrototypeWithOverride) {
-  EXPECT_TRUE(ParseOk(
-      "class C;\n"
-      "  pure virtual function :initial void f();\n"
-      "endclass\n"));
+  EXPECT_TRUE(
+      ParseOk("class C;\n"
+              "  pure virtual function :initial void f();\n"
+              "endclass\n"));
 }
 
 TEST(FunctionDeclParsing, DpiImportTaskContext) {
@@ -328,10 +328,10 @@ TEST(FunctionDeclParsing, DpiExportTaskWithCIdentifier) {
 }
 
 TEST(FunctionDeclParsing, FunctionDynOverrideExtendsFinal) {
-  EXPECT_TRUE(ParseOk(
-      "class c;\n"
-      "  virtual function :extends :final void f(); endfunction\n"
-      "endclass\n"));
+  EXPECT_TRUE(
+      ParseOk("class c;\n"
+              "  virtual function :extends :final void f(); endfunction\n"
+              "endclass\n"));
 }
 
 TEST(FunctionDeclParsing, FunctionLifetimeAutomatic) {
@@ -417,4 +417,4 @@ TEST(FunctionDeclParsing, FunctionBodyInterfaceIdentifierPrefix) {
   EXPECT_EQ(item->name, "f");
 }
 
-}
+}  // namespace

@@ -76,4 +76,4 @@ TEST(ClassSim, WeakRefGetReturnsReferentWhenGcSparesReachable) {
   EXPECT_EQ(retrieved, obj);
 }
 
-}
+}  // namespace

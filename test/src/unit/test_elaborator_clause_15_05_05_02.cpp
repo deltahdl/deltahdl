@@ -5,10 +5,10 @@ using namespace delta;
 namespace {
 
 TEST(NamedEventElaborator, EventInitializedToNull) {
-  EXPECT_TRUE(ElabOk(
-      "module m;\n"
-      "  event ev = null;\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  event ev = null;\n"
+             "endmodule\n"));
 }
 
 TEST(NamedEventElaborator, ImperativeEventAssignNull) {
@@ -23,4 +23,4 @@ TEST(NamedEventElaborator, ImperativeEventAssignNull) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-}
+}  // namespace

@@ -137,4 +137,4 @@ TEST(InheritanceParsing, NonFinalDerivedClassIsFinalFalse) {
   EXPECT_FALSE(r.cu->classes[1]->is_final);
 }
 
-}
+}  // namespace

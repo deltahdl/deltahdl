@@ -54,4 +54,4 @@ TEST(SequenceSynthesis, CycleDelayConcatIsIgnoredBySynth) {
   EXPECT_FALSE(aig->outputs.empty());
 }
 
-}
+}  // namespace

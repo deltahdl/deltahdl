@@ -14,13 +14,13 @@ CheckerRewriteStage NextCheckerRewriteStage(CheckerRewriteStage /*stage*/) {
 
 bool CheckerAlgorithmHandlesFormal(FormalKind kind) {
   switch (kind) {
-    case FormalKind::kUntyped:          // step 3
+    case FormalKind::kUntyped:           // step 3
     case FormalKind::kTypedNonMatching:  // step 4
     case FormalKind::kTypedMatching:     // step 5
       return true;
     case FormalKind::kLocalVariable:
-      // A checker formal input argument is never a local variable; flatten_checker
-      // has no step that prepends local variable declarations.
+      // A checker formal input argument is never a local variable;
+      // flatten_checker has no step that prepends local variable declarations.
       return false;
   }
   return false;

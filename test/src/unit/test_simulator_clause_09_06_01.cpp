@@ -146,4 +146,4 @@ TEST(WaitForkSimulation, WaitForkWaitsForJoinAnyLeftoverChildren) {
   LowerRunAndCheck(f, design, {{"a", 5u}, {"b", 7u}, {"done", 7u}});
 }
 
-}
+}  // namespace

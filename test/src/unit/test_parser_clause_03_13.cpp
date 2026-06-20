@@ -151,4 +151,4 @@ TEST(NameSpaceParsing, PortNameReintroducedAsVariableInModuleScope) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

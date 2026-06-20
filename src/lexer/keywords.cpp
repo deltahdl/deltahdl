@@ -289,7 +289,7 @@ const std::unordered_map<std::string_view, KeywordVersion> kVersionMap = {
     {"1800-2023", V::kVer18002023},
 };
 
-}
+}  // namespace
 
 std::optional<KeywordVersion> ParseKeywordVersion(std::string_view spec) {
   auto it = kVersionMap.find(spec);
@@ -388,4 +388,4 @@ std::string_view TokenKindName(TokenKind kind) {
   }
 }
 
-}
+}  // namespace delta

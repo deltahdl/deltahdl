@@ -36,4 +36,4 @@ TEST(PackageImportInHeaderSim, WildcardConstantFromHeaderImport) {
   EXPECT_EQ(f.ctx.FindVariable("y")->value.ToUint64(), 7u);
 }
 
-}
+}  // namespace

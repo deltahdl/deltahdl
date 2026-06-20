@@ -152,4 +152,4 @@ TEST(UwireElaboration, UwireVectorWidth) {
   EXPECT_EQ(mod->nets[0].net_type, NetType::kUwire);
 }
 
-}
+}  // namespace

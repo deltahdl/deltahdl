@@ -34,4 +34,4 @@ TEST_F(AnnexHParseTest, UrandomAcceptsSeedArgument) {
   EXPECT_FALSE(diag_.HasErrors());
 }
 
-}
+}  // namespace

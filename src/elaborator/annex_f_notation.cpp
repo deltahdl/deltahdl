@@ -15,8 +15,7 @@ namespace {
 // forms such as b1 or R_2 resolve to b and R.
 std::string_view StripSubscript(std::string_view symbol) {
   std::size_t end = symbol.size();
-  while (end > 0 &&
-         std::isdigit(static_cast<unsigned char>(symbol[end - 1]))) {
+  while (end > 0 && std::isdigit(static_cast<unsigned char>(symbol[end - 1]))) {
     --end;
   }
   if (end > 0 && end < symbol.size() && symbol[end - 1] == '_') {

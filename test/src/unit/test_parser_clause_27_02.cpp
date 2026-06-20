@@ -49,20 +49,19 @@ TEST(GenerateBlockContent, SpecifyBlockRejectedInNestedGenerate) {
 }
 
 TEST(GenerateBlockContent, SpecifyBlockAllowedAtModuleScope) {
-  EXPECT_TRUE(ParseOk(
-      "module m(input a, output b);\n"
-      "  specify endspecify\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m(input a, output b);\n"
+              "  specify endspecify\n"
+              "endmodule\n"));
 }
 
 TEST(GenerateBlockContent, SpecifyBlockAllowedInBareGenerateRegion) {
-
-  EXPECT_TRUE(ParseOk(
-      "module m(input a, output b);\n"
-      "  generate\n"
-      "    specify endspecify\n"
-      "  endgenerate\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m(input a, output b);\n"
+              "  generate\n"
+              "    specify endspecify\n"
+              "  endgenerate\n"
+              "endmodule\n"));
 }
 
 TEST(GenerateBlockContent, SpecparamRejectedInGenerateIf) {
@@ -87,7 +86,6 @@ TEST(GenerateBlockContent, SpecparamRejectedInGenerateFor) {
 }
 
 TEST(GenerateBlockContent, SpecparamRejectedInSingleItemGenerateBody) {
-
   auto r = Parse(
       "module m;\n"
       "  if (1) specparam t = 1.0;\n"
@@ -96,10 +94,10 @@ TEST(GenerateBlockContent, SpecparamRejectedInSingleItemGenerateBody) {
 }
 
 TEST(GenerateBlockContent, SpecparamAllowedAtModuleScope) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  specparam t = 1.0;\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  specparam t = 1.0;\n"
+              "endmodule\n"));
 }
 
 TEST(GenerateBlockContent, PortDeclarationRejectedInGenerateIf) {
@@ -147,41 +145,41 @@ TEST(GenerateBlockContent, PortDeclarationRejectedInNestedGenerate) {
 }
 
 TEST(GenerateBlockContent, PortDeclarationAllowedAtModuleScope) {
-  EXPECT_TRUE(ParseOk(
-      "module m(a, b);\n"
-      "  input a;\n"
-      "  output b;\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m(a, b);\n"
+              "  input a;\n"
+              "  output b;\n"
+              "endmodule\n"));
 }
 
 TEST(GenerateBlockContent, GenerateBlockAcceptsMultipleModuleItems) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  if (1) begin\n"
-      "    wire w;\n"
-      "    logic l;\n"
-      "    assign w = l;\n"
-      "    initial begin end\n"
-      "  end\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  if (1) begin\n"
+              "    wire w;\n"
+              "    logic l;\n"
+              "    assign w = l;\n"
+              "    initial begin end\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
 TEST(GenerateBlockContent, GenerateBlockAcceptsSingleModuleItem) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  if (1) wire w;\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  if (1) wire w;\n"
+              "endmodule\n"));
 }
 
 TEST(GenerateBlockContent, GenerateBlockAcceptsNestedGenerateConstruct) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  if (1) begin\n"
-      "    if (1) begin\n"
-      "      wire w;\n"
-      "    end\n"
-      "  end\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  if (1) begin\n"
+              "    if (1) begin\n"
+              "      wire w;\n"
+              "    end\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
-}
+}  // namespace

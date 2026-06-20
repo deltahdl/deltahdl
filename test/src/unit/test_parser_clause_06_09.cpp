@@ -264,4 +264,4 @@ TEST(ScalarAndVectorDeclaration, MultidimensionalPackedArrayIsNotAVector) {
   EXPECT_FALSE(IsVector(item->data_type));
 }
 
-}
+}  // namespace

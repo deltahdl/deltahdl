@@ -116,13 +116,13 @@ TEST(SdfSpecparamReevaluation, UnrelatedNameDoesNotFireCallback) {
   EXPECT_EQ(touched, 0);
 }
 
-TEST(SdfSpecparamReevaluation, ExpressionContainingSpecparamRecomputesEachTime) {
+TEST(SdfSpecparamReevaluation,
+     ExpressionContainingSpecparamRecomputesEachTime) {
   SpecifyManager mgr;
 
   uint64_t path_delay = 0;
-  mgr.RegisterSpecparamReevaluation("cap", [&](uint64_t cap) {
-    path_delay = 14 * cap + 7;
-  });
+  mgr.RegisterSpecparamReevaluation(
+      "cap", [&](uint64_t cap) { path_delay = 14 * cap + 7; });
 
   auto annotate = [&](uint64_t cap_value) {
     SdfFile file;
@@ -145,4 +145,4 @@ TEST(SdfSpecparamReevaluation, ExpressionContainingSpecparamRecomputesEachTime) 
   EXPECT_EQ(path_delay, 147u);
 }
 
-}
+}  // namespace

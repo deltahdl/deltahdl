@@ -228,7 +228,7 @@ TEST(ConcurrentAssertionParsing, AllFiveAssertionTypes) {
       FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kCoverSequence),
       nullptr);
   ASSERT_NE(FindItemByKind(r.cu->modules[0]->items,
-                            ModuleItemKind::kRestrictProperty),
+                           ModuleItemKind::kRestrictProperty),
             nullptr);
 }
 
@@ -357,12 +357,12 @@ TEST(ExpectStatementParsing, ExpectWithActionBlock) {
 }
 
 TEST(ExpectStatementParsing, ExpectMissingCloseParen) {
-  EXPECT_TRUE(Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    expect (a |-> b ;\n"
-      "  end\n"
-      "endmodule\n").has_errors);
+  EXPECT_TRUE(Parse("module m;\n"
+                    "  initial begin\n"
+                    "    expect (a |-> b ;\n"
+                    "  end\n"
+                    "endmodule\n")
+                  .has_errors);
 }
 
 // property_formal_type ::= sequence_formal_type | property
@@ -630,7 +630,8 @@ TEST(SequenceExprParsing, GotoRepetition) {
               "endmodule\n"));
 }
 
-// assertion_variable_declaration ::= var_data_type list_of_variable_decl_assignments ;
+// assertion_variable_declaration ::= var_data_type
+// list_of_variable_decl_assignments ;
 TEST(SequenceDeclParsing, AssertionVariableDeclaration) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -638,7 +639,8 @@ TEST(SequenceDeclParsing, AssertionVariableDeclaration) {
               "endmodule\n"));
 }
 
-// property_case_item ::= expression_or_dist { , expression_or_dist } : property_expr ;
+// property_case_item ::= expression_or_dist { , expression_or_dist } :
+// property_expr ;
 //                     |  default [ : ] property_expr ;
 TEST(PropertyExprParsing, PropertyCaseItem) {
   EXPECT_TRUE(
@@ -667,7 +669,8 @@ TEST(SequenceExprParsing, SequenceInstanceWithPositionalArgs) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// sequence_list_of_arguments ::= ... { , . identifier ( [ sequence_actual_arg ] ) }
+// sequence_list_of_arguments ::= ... { , . identifier ( [ sequence_actual_arg ]
+// ) }
 TEST(SequenceExprParsing, SequenceInstanceWithNamedArgs) {
   auto r = Parse(
       "module m;\n"
@@ -738,4 +741,4 @@ TEST(SequenceExprParsing, SequenceMatchItemSubroutineCall) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}
+}  // namespace

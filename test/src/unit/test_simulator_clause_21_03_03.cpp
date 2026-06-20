@@ -104,10 +104,9 @@ TEST(StringFormatTaskTest, SformatWritesUsingSecondArgAsFormat) {
 TEST(StringFormatTaskTest, SformatLaterStringArgIsNotFormatString) {
   SimFixture f;
   auto* dest = f.ctx.CreateVariable("out", 256);
-  EvalExpr(MakeSysCall(
-               f.arena, "$sformat",
-               {MkId(f.arena, "out"), MkStr(f.arena, "tag=%s"),
-                MkStr(f.arena, "raw %d not interpreted")}),
+  EvalExpr(MakeSysCall(f.arena, "$sformat",
+                       {MkId(f.arena, "out"), MkStr(f.arena, "tag=%s"),
+                        MkStr(f.arena, "raw %d not interpreted")}),
            f.ctx, f.arena);
   EXPECT_EQ(ReadString(dest), "tag=raw %d not interpreted");
 }
@@ -143,10 +142,10 @@ TEST(StringFormatTaskTest, SformatfFormatStringFromStringVariable) {
   auto* fmt_var = f.ctx.CreateVariable("fmt", 56);
   fmt_var->value = StringToLogic4Vec(f.arena, "n=%0d");
 
-  auto result = EvalExpr(MakeSysCall(f.arena, "$sformatf",
-                                     {MkId(f.arena, "fmt"),
-                                      MakeInt(f.arena, 9)}),
-                         f.ctx, f.arena);
+  auto result =
+      EvalExpr(MakeSysCall(f.arena, "$sformatf",
+                           {MkId(f.arena, "fmt"), MakeInt(f.arena, 9)}),
+               f.ctx, f.arena);
   std::string formatted;
   uint32_t nbytes = result.width / 8;
   for (uint32_t i = nbytes; i > 0; --i) {
@@ -208,11 +207,10 @@ TEST(StringFormatTaskTest, SformatSupportsCharacterSpecifier) {
 TEST(StringFormatTaskTest, SformatConsumesArgsInOrder) {
   SimFixture f;
   auto* dest = f.ctx.CreateVariable("out", 256);
-  EvalExpr(MakeSysCall(
-               f.arena, "$sformat",
-               {MkId(f.arena, "out"), MkStr(f.arena, "a=%d, b=%s, c=%d"),
-                MakeInt(f.arena, 1), MkStr(f.arena, "two"),
-                MakeInt(f.arena, 3)}),
+  EvalExpr(MakeSysCall(f.arena, "$sformat",
+                       {MkId(f.arena, "out"),
+                        MkStr(f.arena, "a=%d, b=%s, c=%d"), MakeInt(f.arena, 1),
+                        MkStr(f.arena, "two"), MakeInt(f.arena, 3)}),
            f.ctx, f.arena);
   EXPECT_EQ(ReadString(dest), "a=1, b=two, c=3");
 }
@@ -249,4 +247,4 @@ TEST(StringFormatTaskTest, SwriteCharacterOrderingLeftToRight) {
   EXPECT_EQ(static_cast<char>(bits & 0xFF), 'D');
 }
 
-}
+}  // namespace

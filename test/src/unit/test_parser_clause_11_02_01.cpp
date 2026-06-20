@@ -329,9 +329,7 @@ TEST(ConstExpr, ReplicationWithNonConstantCountNotConstant) {
   EXPECT_FALSE(IsConstantExpr(e));
 }
 
-TEST(ConstExpr, NullExprNotConstant) {
-  EXPECT_FALSE(IsConstantExpr(nullptr));
-}
+TEST(ConstExpr, NullExprNotConstant) { EXPECT_FALSE(IsConstantExpr(nullptr)); }
 
 TEST(ConstEval, NullExprReturnsNullopt) {
   EXPECT_EQ(ConstEvalInt(nullptr), std::nullopt);
@@ -455,4 +453,4 @@ TEST(ConstExpr, BitSelectOfNonParameterNotConstant) {
   EXPECT_FALSE(IsConstantExpr(e));
 }
 
-}
+}  // namespace

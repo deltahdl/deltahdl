@@ -73,4 +73,4 @@ TEST(KeywordVersionPreprocessing, BeginKeywords1364_1995_ModuleStaysKeyword) {
   EXPECT_TRUE(found);
 }
 
-}
+}  // namespace

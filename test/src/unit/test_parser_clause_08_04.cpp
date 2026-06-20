@@ -28,7 +28,7 @@ TEST(ClassObjectParsing, ClassVariableHasNamedType) {
   EXPECT_EQ(var_item->data_type.type_name, "MyClass");
 }
 
-TEST(ClassObjectParsing,NullComparisonWithNew) {
+TEST(ClassObjectParsing, NullComparisonWithNew) {
   auto r = Parse(
       "module m;\n"
       "  class test_cls;\n"
@@ -57,7 +57,7 @@ TEST(ClassObjectParsing, ClassDeclarationParsed) {
   ASSERT_FALSE(r.cu->modules.empty());
 }
 
-TEST(ClassObjectParsing,ClassVariableNullCheck) {
+TEST(ClassObjectParsing, ClassVariableNullCheck) {
   EXPECT_TRUE(
       ParseOk("class C;\n"
               "  int x;\n"
@@ -69,7 +69,7 @@ TEST(ClassObjectParsing,ClassVariableNullCheck) {
               "endmodule\n"));
 }
 
-TEST(ClassObjectParsing,ClassVariableNew) {
+TEST(ClassObjectParsing, ClassVariableNew) {
   EXPECT_TRUE(
       ParseOk("class C;\n"
               "  int x;\n"
@@ -80,4 +80,4 @@ TEST(ClassObjectParsing,ClassVariableNew) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

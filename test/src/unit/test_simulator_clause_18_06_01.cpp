@@ -134,4 +134,4 @@ TEST(RandomizeMethod, AssignsEveryActiveVariable) {
   EXPECT_LE(vc, 110);
 }
 
-}
+}  // namespace

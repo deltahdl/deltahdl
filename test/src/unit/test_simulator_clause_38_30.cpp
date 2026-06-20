@@ -29,7 +29,8 @@ class VpiPrintfSim : public ::testing::Test {
 // its variable arguments, and shall return the number of characters printed.
 // One call exercises the conjunction (both destinations), the format expansion,
 // and the character count together.
-TEST_F(VpiPrintfSim, WritesExpandedTextToOutputChannelAndLogFileReturningCount) {
+TEST_F(VpiPrintfSim,
+       WritesExpandedTextToOutputChannelAndLogFileReturningCount) {
   PLI_BYTE8 format[] = "value=%d name=%s";
   int written = vpi_printf(format, 42, "ok");
 
@@ -62,5 +63,5 @@ TEST_F(VpiPrintfSim, EmptyFormatWritesNothingAndReturnsZero) {
   EXPECT_TRUE(vpi_ctx_.LogFileBuffer().empty());
 }
 
-}
-}
+}  // namespace
+}  // namespace delta

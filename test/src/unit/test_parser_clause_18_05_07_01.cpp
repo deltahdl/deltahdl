@@ -5,10 +5,10 @@ using namespace delta;
 
 namespace {
 
-// 18.5.7.1: 'constraint_expression ::= ... | foreach ( array_id [ loop_variables
-// ] ) constraint_set'. A foreach iterative constraint with a single loop
-// variable and a predicate over the indexed element is a well-formed constraint
-// expression and parses without error.
+// 18.5.7.1: 'constraint_expression ::= ... | foreach ( array_id [
+// loop_variables ] ) constraint_set'. A foreach iterative constraint with a
+// single loop variable and a predicate over the indexed element is a
+// well-formed constraint expression and parses without error.
 TEST(ForeachIterativeConstraint, SingleLoopVariableAccepted) {
   auto r = Parse(
       "class C;\n"
@@ -85,9 +85,9 @@ TEST(ForeachIterativeConstraint, DistinctLoopVariableAccepted) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// 18.5.7.1: a foreach iterative constraint's constraint_set may itself contain a
-// predicate, such as an implication that guards an element relation against an
-// out-of-bounds index. This well-formed sorted-array constraint — whose body
+// 18.5.7.1: a foreach iterative constraint's constraint_set may itself contain
+// a predicate, such as an implication that guards an element relation against
+// an out-of-bounds index. This well-formed sorted-array constraint — whose body
 // references the array size and adjacent indexed elements — parses without
 // error, confirming the foreach header is recognized and the constraint_set
 // after it is scanned normally.
@@ -104,7 +104,8 @@ TEST(ForeachIterativeConstraint, PredicatedForeachAccepted) {
 // and the loop-variable naming rule compares against that array's own
 // identifier (the trailing component of the reference). A loop variable that
 // matches the trailing array name is still an error.
-TEST(ForeachIterativeConstraint, HierarchicalArrayLoopVariableNameClashRejected) {
+TEST(ForeachIterativeConstraint,
+     HierarchicalArrayLoopVariableNameClashRejected) {
   auto r = Parse(
       "class C;\n"
       "  rand int arr[];\n"

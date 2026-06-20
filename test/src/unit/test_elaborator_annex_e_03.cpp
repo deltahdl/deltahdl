@@ -131,4 +131,4 @@ TEST(Elaborator, DefaultTriregStrength_ZeroValue) {
   EXPECT_TRUE(found);
 }
 
-}
+}  // namespace

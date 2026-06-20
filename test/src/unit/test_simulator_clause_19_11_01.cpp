@@ -271,4 +271,4 @@ TEST(PointCoverage, UncoveredBinsReportZeroRegardlessOfWeight) {
   EXPECT_DOUBLE_EQ(CoverageDB::GetPointCoverage(cp), 0.0);
 }
 
-}
+}  // namespace

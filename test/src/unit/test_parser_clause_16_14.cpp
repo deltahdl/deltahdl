@@ -41,7 +41,8 @@ TEST(ConcurrentAssertionStatementSyntax, AssumePropertyStatement) {
   EXPECT_NE(item->assert_expr, nullptr);
 }
 
-// cover_property_statement ::= cover property ( property_spec ) statement_or_null
+// cover_property_statement ::= cover property ( property_spec )
+// statement_or_null
 TEST(ConcurrentAssertionStatementSyntax, CoverPropertyStatement) {
   auto r = Parse(
       "module m;\n"
@@ -127,18 +128,18 @@ TEST(ProceduralConcurrentAssertion, ConcurrentAssertInAlways) {
 // interface, or a program (among other contexts). The parser accepts the
 // construct in each of these design-element contexts.
 TEST(ConcurrentAssertionPlacement, AcceptedInModuleInterfaceProgram) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  assert property (@(posedge clk) a |-> b);\n"
-      "endmodule\n"));
-  EXPECT_TRUE(ParseOk(
-      "interface i;\n"
-      "  assert property (@(posedge clk) a |-> b);\n"
-      "endinterface\n"));
-  EXPECT_TRUE(ParseOk(
-      "program p;\n"
-      "  assert property (@(posedge clk) a |-> b);\n"
-      "endprogram\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  assert property (@(posedge clk) a |-> b);\n"
+              "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("interface i;\n"
+              "  assert property (@(posedge clk) a |-> b);\n"
+              "endinterface\n"));
+  EXPECT_TRUE(
+      ParseOk("program p;\n"
+              "  assert property (@(posedge clk) a |-> b);\n"
+              "endprogram\n"));
 }
 
 // §16.14: "A property on its own is never evaluated ... It shall be used within
@@ -205,11 +206,11 @@ TEST(ConcurrentAssertionStatementSyntax, CoverSequenceWithDisableIff) {
 // restrict_property_statement terminates with a semicolon and carries no
 // action_block. Supplying an else action block is a parse error.
 TEST(ConcurrentAssertionStatementSyntax, RestrictRejectsActionBlock) {
-  EXPECT_FALSE(ParseOk(
-      "module m;\n"
-      "  restrict property (@(posedge clk) a |-> b)\n"
-      "    else $error(\"fail\");\n"
-      "endmodule\n"));
+  EXPECT_FALSE(
+      ParseOk("module m;\n"
+              "  restrict property (@(posedge clk) a |-> b)\n"
+              "    else $error(\"fail\");\n"
+              "endmodule\n"));
 }
 
 // The optional block_identifier of a concurrent_assertion_item names a cover
@@ -229,20 +230,20 @@ TEST(ConcurrentAssertionItemNaming, BlockIdentifierNamesCover) {
 // concurrent assertion statement may appear. The parser accepts the construct
 // in both.
 TEST(ConcurrentAssertionPlacement, AcceptedInGenerateBlockAndChecker) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  generate\n"
-      "    if (1) begin\n"
-      "      assert property (@(posedge clk) a |-> b);\n"
-      "    end\n"
-      "  endgenerate\n"
-      "endmodule\n"));
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  checker c;\n"
-      "    assert property (@(posedge clk) a |-> b);\n"
-      "  endchecker\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  generate\n"
+              "    if (1) begin\n"
+              "      assert property (@(posedge clk) a |-> b);\n"
+              "    end\n"
+              "  endgenerate\n"
+              "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  checker c;\n"
+              "    assert property (@(posedge clk) a |-> b);\n"
+              "  endchecker\n"
+              "endmodule\n"));
 }
 
 }  // namespace

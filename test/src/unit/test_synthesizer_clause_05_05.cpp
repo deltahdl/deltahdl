@@ -9,12 +9,11 @@ namespace {
 
 TEST(OperatorSynthesis, SingleCharOperatorSynthesizes) {
   SynthFixture f;
-  auto* mod = ElaborateSrc(
-      f,
-      "module m;\n"
-      "  logic [7:0] a, b, c;\n"
-      "  assign a = b + c;\n"
-      "endmodule\n");
+  auto* mod = ElaborateSrc(f,
+                           "module m;\n"
+                           "  logic [7:0] a, b, c;\n"
+                           "  assign a = b + c;\n"
+                           "endmodule\n");
   ASSERT_NE(mod, nullptr);
   SynthLower synth(f.arena, f.diag);
   auto* aig = synth.Lower(mod);
@@ -23,12 +22,11 @@ TEST(OperatorSynthesis, SingleCharOperatorSynthesizes) {
 
 TEST(OperatorSynthesis, DoubleCharOperatorSynthesizes) {
   SynthFixture f;
-  auto* mod = ElaborateSrc(
-      f,
-      "module m;\n"
-      "  logic [7:0] a, b;\n"
-      "  assign a = b << 1;\n"
-      "endmodule\n");
+  auto* mod = ElaborateSrc(f,
+                           "module m;\n"
+                           "  logic [7:0] a, b;\n"
+                           "  assign a = b << 1;\n"
+                           "endmodule\n");
   ASSERT_NE(mod, nullptr);
   SynthLower synth(f.arena, f.diag);
   auto* aig = synth.Lower(mod);
@@ -37,12 +35,11 @@ TEST(OperatorSynthesis, DoubleCharOperatorSynthesizes) {
 
 TEST(OperatorSynthesis, TripleCharOperatorSynthesizes) {
   SynthFixture f;
-  auto* mod = ElaborateSrc(
-      f,
-      "module m;\n"
-      "  logic [7:0] a, b;\n"
-      "  assign a = b <<< 1;\n"
-      "endmodule\n");
+  auto* mod = ElaborateSrc(f,
+                           "module m;\n"
+                           "  logic [7:0] a, b;\n"
+                           "  assign a = b <<< 1;\n"
+                           "endmodule\n");
   ASSERT_NE(mod, nullptr);
   SynthLower synth(f.arena, f.diag);
   auto* aig = synth.Lower(mod);
@@ -51,12 +48,11 @@ TEST(OperatorSynthesis, TripleCharOperatorSynthesizes) {
 
 TEST(OperatorSynthesis, UnaryOperatorSynthesizes) {
   SynthFixture f;
-  auto* mod = ElaborateSrc(
-      f,
-      "module m;\n"
-      "  logic [7:0] a, b;\n"
-      "  assign a = ~b;\n"
-      "endmodule\n");
+  auto* mod = ElaborateSrc(f,
+                           "module m;\n"
+                           "  logic [7:0] a, b;\n"
+                           "  assign a = ~b;\n"
+                           "endmodule\n");
   ASSERT_NE(mod, nullptr);
   SynthLower synth(f.arena, f.diag);
   auto* aig = synth.Lower(mod);
@@ -65,12 +61,11 @@ TEST(OperatorSynthesis, UnaryOperatorSynthesizes) {
 
 TEST(OperatorSynthesis, BinaryOperatorSynthesizes) {
   SynthFixture f;
-  auto* mod = ElaborateSrc(
-      f,
-      "module m;\n"
-      "  logic [7:0] a, b, c;\n"
-      "  assign a = b & c;\n"
-      "endmodule\n");
+  auto* mod = ElaborateSrc(f,
+                           "module m;\n"
+                           "  logic [7:0] a, b, c;\n"
+                           "  assign a = b & c;\n"
+                           "endmodule\n");
   ASSERT_NE(mod, nullptr);
   SynthLower synth(f.arena, f.diag);
   auto* aig = synth.Lower(mod);
@@ -79,13 +74,12 @@ TEST(OperatorSynthesis, BinaryOperatorSynthesizes) {
 
 TEST(OperatorSynthesis, ConditionalOperatorSynthesizes) {
   SynthFixture f;
-  auto* mod = ElaborateSrc(
-      f,
-      "module m;\n"
-      "  logic sel;\n"
-      "  logic [7:0] a, b, c;\n"
-      "  assign a = sel ? b : c;\n"
-      "endmodule\n");
+  auto* mod = ElaborateSrc(f,
+                           "module m;\n"
+                           "  logic sel;\n"
+                           "  logic [7:0] a, b, c;\n"
+                           "  assign a = sel ? b : c;\n"
+                           "endmodule\n");
   ASSERT_NE(mod, nullptr);
   SynthLower synth(f.arena, f.diag);
   auto* aig = synth.Lower(mod);
@@ -94,16 +88,15 @@ TEST(OperatorSynthesis, ConditionalOperatorSynthesizes) {
 
 TEST(OperatorSynthesis, MixedOperatorsSynthesize) {
   SynthFixture f;
-  auto* mod = ElaborateSrc(
-      f,
-      "module m;\n"
-      "  logic [7:0] a, b, c, d;\n"
-      "  assign a = (b + c) & ~d;\n"
-      "endmodule\n");
+  auto* mod = ElaborateSrc(f,
+                           "module m;\n"
+                           "  logic [7:0] a, b, c, d;\n"
+                           "  assign a = (b + c) & ~d;\n"
+                           "endmodule\n");
   ASSERT_NE(mod, nullptr);
   SynthLower synth(f.arena, f.diag);
   auto* aig = synth.Lower(mod);
   ASSERT_NE(aig, nullptr);
 }
 
-}
+}  // namespace

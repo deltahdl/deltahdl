@@ -14,7 +14,6 @@ Expr* Parser::ParseStreamingConcat(TokenKind dir) {
     auto saved = lexer_.SavePos();
     auto tok = Consume();
     if (Check(TokenKind::kLBrace)) {
-
       auto* type_id = arena_.Create<Expr>();
       type_id->kind = ExprKind::kIdentifier;
       type_id->text = tok.text;
@@ -100,4 +99,4 @@ Expr* Parser::ParseParenExpr() {
   return lhs;
 }
 
-}
+}  // namespace delta

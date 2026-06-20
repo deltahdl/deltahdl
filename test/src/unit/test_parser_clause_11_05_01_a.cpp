@@ -480,4 +480,4 @@ TEST(OperatorAndExpressionParsing, SelectOnSystemFuncResult) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

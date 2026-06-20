@@ -45,7 +45,8 @@ struct CrossQueueTypeDef {
 // §19.6.1.3: build the CrossValType struct for a cross from its coverpoints,
 // preserving one member per coverpoint, each carrying the coverpoint's name and
 // type, in declaration order.
-CrossValTypeDef BuildCrossValType(const std::vector<CrossValMember>& coverpoints);
+CrossValTypeDef BuildCrossValType(
+    const std::vector<CrossValMember>& coverpoints);
 
 // §19.6.1.3: build the CrossQueueType for a cross — an unbounded queue whose
 // element type is CrossValType.
@@ -53,9 +54,9 @@ CrossQueueTypeDef BuildCrossQueueType();
 
 // §19.6.1.3: when the range bounds for a coverpoint's type are not evident
 // (e.g., the coverpoint expression is a concatenation and no other type is
-// specified), the field type assumes the bounds [$bits(coverpoint_expression)-1:0].
-// Returns the packed two-state vector type string for a coverpoint of the given
-// bit width.
+// specified), the field type assumes the bounds
+// [$bits(coverpoint_expression)-1:0]. Returns the packed two-state vector type
+// string for a coverpoint of the given bit width.
 std::string CrossValMemberDefaultBoundType(int64_t expr_bit_width);
 
 // §19.6.1.3: the scope of the automatic type names is the cross itself; the

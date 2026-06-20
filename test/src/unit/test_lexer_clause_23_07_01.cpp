@@ -27,4 +27,4 @@ TEST(ScopeResolutionPrefixLexing, PrefixTokensDistinctFromDot) {
   EXPECT_EQ(scope_tokens[1].kind, TokenKind::kColonColon);
 }
 
-}
+}  // namespace

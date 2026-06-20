@@ -148,4 +148,4 @@ TEST(ConfigDefaultClause, CellClauseOverridesDefaultForNamedCellOnly) {
   EXPECT_EQ(mid_bound->library, "libA");
 }
 
-}
+}  // namespace

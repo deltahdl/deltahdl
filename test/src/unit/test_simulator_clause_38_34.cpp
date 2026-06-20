@@ -104,7 +104,8 @@ TEST_F(VpiPutValueSim, ReturnEventWithDelayReturnsSchedEventHandle) {
   s_vpi_time time = {};
   time.type = vpiSimTime;
   time.low = 5;
-  vpiHandle ev = vpi_put_value(h, &val, &time, vpiInertialDelay | vpiReturnEvent);
+  vpiHandle ev =
+      vpi_put_value(h, &val, &time, vpiInertialDelay | vpiReturnEvent);
   ASSERT_NE(ev, nullptr);
   EXPECT_EQ(vpi_get(vpiType, ev), vpiSchedEvent);
   EXPECT_EQ(vpi_get(vpiScheduled, ev), 1);
@@ -126,8 +127,8 @@ TEST_F(VpiPutValueSim, ReturnEventWithoutDelayReturnsNull) {
 }
 
 // §38.34: even when a delay schedules an event, the return value is NULL unless
-// the vpiReturnEvent bit mask was requested. Here a delayed put without the mask
-// returns NULL.
+// the vpiReturnEvent bit mask was requested. Here a delayed put without the
+// mask returns NULL.
 TEST_F(VpiPutValueSim, DelayWithoutReturnEventReturnsNull) {
   auto* var = sim_ctx_.CreateVariable("dn", 32);
   var->value = MakeLogic4VecVal(arena_, 32, 0);
@@ -159,7 +160,8 @@ TEST_F(VpiPutValueSim, CancelEventClearsScheduled) {
   s_vpi_time time = {};
   time.type = vpiSimTime;
   time.low = 7;
-  vpiHandle ev = vpi_put_value(h, &val, &time, vpiTransportDelay | vpiReturnEvent);
+  vpiHandle ev =
+      vpi_put_value(h, &val, &time, vpiTransportDelay | vpiReturnEvent);
   ASSERT_NE(ev, nullptr);
   ASSERT_EQ(vpi_get(vpiScheduled, ev), 1);
 
@@ -182,10 +184,12 @@ TEST_F(VpiPutValueSim, CancelAlreadyOccurredIsNotError) {
   s_vpi_time time = {};
   time.type = vpiSimTime;
   time.low = 2;
-  vpiHandle ev = vpi_put_value(h, &val, &time, vpiInertialDelay | vpiReturnEvent);
+  vpiHandle ev =
+      vpi_put_value(h, &val, &time, vpiInertialDelay | vpiReturnEvent);
   ASSERT_NE(ev, nullptr);
 
-  // Cancel once (the event leaves the queue), then cancel again: still no error.
+  // Cancel once (the event leaves the queue), then cancel again: still no
+  // error.
   vpi_put_value(ev, nullptr, nullptr, vpiCancelEvent);
   SVpiErrorInfo info = {};
   vpi_put_value(ev, nullptr, nullptr, vpiCancelEvent);
@@ -382,5 +386,5 @@ TEST_F(VpiPutValueSim, SequentialUdpAcceptsNoDelay) {
   EXPECT_EQ(var->value.words[0].aval & 1, 1u);
 }
 
-}
-}
+}  // namespace
+}  // namespace delta

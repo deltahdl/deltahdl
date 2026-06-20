@@ -1129,9 +1129,9 @@ TEST(CovergroupDeclParsing, MultipleCovergroupDecls) {
       "  endgroup\n"
       "endmodule\n");
   EXPECT_FALSE(r.has_errors);
-  EXPECT_EQ(
-      CountItemsByKind(r.cu->modules[0]->items, ModuleItemKind::kCovergroupDecl),
-      3u);
+  EXPECT_EQ(CountItemsByKind(r.cu->modules[0]->items,
+                             ModuleItemKind::kCovergroupDecl),
+            3u);
 }
 
 TEST(CovergroupDeclParsing, CovergroupWithAllSpecTypes) {
@@ -1173,4 +1173,4 @@ TEST(CovergroupDeclParsing, ErrorBlockEventMissingBeginOrEnd) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

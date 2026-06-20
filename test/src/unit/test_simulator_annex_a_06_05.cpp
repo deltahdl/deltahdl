@@ -159,4 +159,4 @@ TEST(TimingControlSimulation, TwoProcessesSynchronizeViaDelay) {
   LowerRunAndCheck(f, design, {{"x", 2u}, {"y", 2u}});
 }
 
-}
+}  // namespace

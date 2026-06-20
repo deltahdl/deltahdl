@@ -108,8 +108,8 @@ static ExecTask ExecRsProdRepeat(const Stmt* stmt, const RsProd& prod,
                                  Logic4Vec* out_value) {
   auto count = EvalExpr(prod.repeat_count, ctx, arena).ToUint64();
   for (uint64_t i = 0; i < count; ++i) {
-    auto result =
-        co_await ExecRsProduction(stmt, prod.repeat_item, ctx, arena, out_value);
+    auto result = co_await ExecRsProduction(stmt, prod.repeat_item, ctx, arena,
+                                            out_value);
     if (result == StmtResult::kBreak) co_return StmtResult::kBreak;
   }
   co_return StmtResult::kDone;
@@ -300,7 +300,8 @@ static ExecTask ExecRandJoinItems(const Stmt* stmt, const RsRule& selected,
     size_t chosen = seqs.size();
     for (size_t i = 0; i < seqs.size(); ++i) {
       if (seqs[i].Remaining() == 0) continue;
-      cumulative += std::pow(static_cast<double>(seqs[i].Remaining()), exponent);
+      cumulative +=
+          std::pow(static_cast<double>(seqs[i].Remaining()), exponent);
       if (draw < cumulative) {
         chosen = i;
         break;
@@ -378,12 +379,13 @@ static ExecTask ExecRuleProds(const Stmt* stmt, const RsRule& selected,
       int idx = ++seen_count[prod.item.name];
       Variable* var;
       if (total_count[prod.item.name] > 1) {
-        // Indexed element names are built at run time, so intern the name in the
-        // arena: the scope map keys on the string_view and needs stable storage.
-        auto name = std::string(prod.item.name) + "[" + std::to_string(idx) +
-                    "]";
-        var = ctx.CreateLocalVariable(*arena.Create<std::string>(std::move(name)),
-                                      w);
+        // Indexed element names are built at run time, so intern the name in
+        // the arena: the scope map keys on the string_view and needs stable
+        // storage.
+        auto name =
+            std::string(prod.item.name) + "[" + std::to_string(idx) + "]";
+        var = ctx.CreateLocalVariable(
+            *arena.Create<std::string>(std::move(name)), w);
       } else {
         var = ctx.CreateLocalVariable(prod.item.name, w);
       }
@@ -417,8 +419,9 @@ static ExecTask ExecRsProduction(const Stmt* stmt, const RsProductionItem& call,
   if (!production) co_return StmtResult::kDone;
 
   // §18.17.7: passing data to a production uses the same syntax as a task call.
-  // Evaluate the actual arguments in the caller's scope, before the production's
-  // own scope is entered, sizing each to its formal's declared width.
+  // Evaluate the actual arguments in the caller's scope, before the
+  // production's own scope is entered, sizing each to its formal's declared
+  // width.
   std::vector<Logic4Vec> actuals;
   actuals.reserve(call.args.size());
   for (size_t i = 0; i < call.args.size(); ++i) {
@@ -733,21 +736,28 @@ static bool CaseInsideRangeMatch(const Logic4Vec& sel, const Expr* pat,
     if (pat->op == TokenKind::kPlusPercentMinus) tol = a * b / 100;
     uint64_t lo = (a >= tol) ? a - tol : 0;
     uint64_t hi = a + tol;
-    if (lo > hi) { uint64_t t = lo; lo = hi; hi = t; }
+    if (lo > hi) {
+      uint64_t t = lo;
+      lo = hi;
+      hi = t;
+    }
     return sv >= lo && sv <= hi;
   }
 
   auto is_dollar = [](const Expr* e) {
     return e->kind == ExprKind::kIdentifier && e->text == "$";
   };
-  uint64_t lo = is_dollar(pat->index)
-                    ? 0
-                    : EvalExpr(pat->index, ctx, arena).ToUint64();
-  uint64_t hi = is_dollar(pat->index_end)
-                    ? ((sel.width >= 64) ? ~uint64_t{0}
-                                         : (uint64_t{1} << sel.width) - 1)
-                    : EvalExpr(pat->index_end, ctx, arena).ToUint64();
-  if (lo > hi) { uint64_t t = lo; lo = hi; hi = t; }
+  uint64_t lo =
+      is_dollar(pat->index) ? 0 : EvalExpr(pat->index, ctx, arena).ToUint64();
+  uint64_t hi =
+      is_dollar(pat->index_end)
+          ? ((sel.width >= 64) ? ~uint64_t{0} : (uint64_t{1} << sel.width) - 1)
+          : EvalExpr(pat->index_end, ctx, arena).ToUint64();
+  if (lo > hi) {
+    uint64_t t = lo;
+    lo = hi;
+    hi = t;
+  }
   return sv >= lo && sv <= hi;
 }
 
@@ -781,7 +791,6 @@ static bool CaseMatchesMatch(const Logic4Vec& sel, const Logic4Vec& pat,
 static bool CaseMatchesPatternMatch(const Logic4Vec& sel, const Expr* pat_expr,
                                     SimContext& ctx, Arena& arena,
                                     TokenKind case_kind) {
-
   if (pat_expr->kind == ExprKind::kBinary &&
       pat_expr->op == TokenKind::kAmpAmpAmp) {
     auto pat_val = EvalExpr(pat_expr->lhs, ctx, arena);
@@ -923,8 +932,7 @@ static ExecTask ExecFor(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   bool scoped = HasTypedForInit(stmt);
   if (scoped) ctx.PushScope();
   CreateForInitVars(stmt, ctx);
-  for (auto* init : stmt->for_inits)
-    co_await ExecStmt(init, ctx, arena);
+  for (auto* init : stmt->for_inits) co_await ExecStmt(init, ctx, arena);
   while (!ctx.StopRequested()) {
     if (stmt->for_cond) {
       auto cond = EvalExpr(stmt->for_cond, ctx, arena);
@@ -937,8 +945,7 @@ static ExecTask ExecFor(const Stmt* stmt, SimContext& ctx, Arena& arena) {
       if (labeled) ctx.PopStaticScope(stmt->label);
       co_return result;
     }
-    for (auto* step : stmt->for_steps)
-      co_await ExecStmt(step, ctx, arena);
+    for (auto* step : stmt->for_steps) co_await ExecStmt(step, ctx, arena);
   }
   if (scoped) ctx.PopScope();
   if (labeled) ctx.PopStaticScope(stmt->label);
@@ -1058,8 +1065,8 @@ static ExecTask ExecForeach(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     auto* aa = ctx.FindAssocArray(arr_name);
     if (aa && aa->is_wildcard) {
       ctx.GetDiag().Error(
-          {}, "foreach not allowed on wildcard associative array '" +
-                  arr_name + "'");
+          {}, "foreach not allowed on wildcard associative array '" + arr_name +
+                  "'");
       if (labeled) ctx.PopStaticScope(stmt->label);
       co_return StmtResult::kDone;
     }
@@ -1079,7 +1086,8 @@ static ExecTask ExecForeach(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   // not a fixed zero base. A descending dimension counts down from its high
   // index. Variables, packed vectors, and strings carry no array-info entry
   // and keep the natural zero-based ordering.
-  const ArrayInfo* info = arr_name.empty() ? nullptr : ctx.FindArrayInfo(arr_name);
+  const ArrayInfo* info =
+      arr_name.empty() ? nullptr : ctx.FindArrayInfo(arr_name);
 
   ctx.PushScope();
   Variable* iter_var = nullptr;
@@ -1091,7 +1099,8 @@ static ExecTask ExecForeach(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     if (iter_var) {
       uint32_t index = i;
       if (info) {
-        index = info->is_descending ? (info->lo + size - 1 - i) : (info->lo + i);
+        index =
+            info->is_descending ? (info->lo + size - 1 - i) : (info->lo + i);
       }
       iter_var->value = MakeLogic4VecVal(arena, 32, index);
     }
@@ -1227,7 +1236,8 @@ static void ScheduleNbEventTrigger(Variable* var, std::string_view event_name,
       s.ScheduleEvent(ctx.CurrentTime(), wake_region, ev);
     }
   };
-  sched.ScheduleEvent(time, reactive ? Region::kReNBA : Region::kNBA, nba_event);
+  sched.ScheduleEvent(time, reactive ? Region::kReNBA : Region::kNBA,
+                      nba_event);
 }
 
 // The event-control form of ->> reuses the same detached-process machinery that
@@ -1398,8 +1408,8 @@ static ExecTask ExecWaitOrder(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     // §15.5.4: when no else (fail) clause is supplied, a failed sequence
     // raises a default run-time error by calling $error (see §20.10), which
     // records ERROR severity and lets the run continue.
-    EmitSeverityHeader(ctx, "ERROR",
-                       "wait_order events triggered out of order", std::cerr);
+    EmitSeverityHeader(ctx, "ERROR", "wait_order events triggered out of order",
+                       std::cerr);
     co_return StmtResult::kDone;
   }
 
@@ -1500,9 +1510,8 @@ static ExecTask ExecFork(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     // unique seed determined solely by the parent, and the per-child seed
     // material is settled in fork order rather than execution order.
     p->rng_seed = ctx.DrawSeedForChild();
-    p->coro =
-        ForkChildCoroutine(s, ctx, arena, state, parent_wfs, parent_proc)
-            .Release();
+    p->coro = ForkChildCoroutine(s, ctx, arena, state, parent_wfs, parent_proc)
+                  .Release();
 
     if (s->kind == StmtKind::kExprStmt && s->expr) {
       std::string_view task_name;
@@ -1516,12 +1525,10 @@ static ExecTask ExecFork(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     if (s->kind == StmtKind::kBlock && !s->label.empty())
       ctx.RegisterNamedScope(s->label, p);
 
-    for (auto scope : ctx.ActiveNamedScopes())
-      ctx.RegisterNamedScope(scope, p);
+    for (auto scope : ctx.ActiveNamedScopes()) ctx.RegisterNamedScope(scope, p);
     auto* event = ctx.GetScheduler().GetEventPool().Acquire();
     event->callback = [p, &ctx, state, parent_wfs, parent_proc]() {
       if (!p->active) {
-
         state->remaining--;
         bool should_resume =
             state->join_any ? !state->resumed : (state->remaining == 0);
@@ -1538,9 +1545,9 @@ static ExecTask ExecFork(const Stmt* stmt, SimContext& ctx, Arena& arena) {
       ctx.SetCurrentProcess(p);
       p->Resume();
     };
-    auto fork_region =
-        (spawning_proc && spawning_proc->is_reactive) ? Region::kReactive
-                                                      : Region::kActive;
+    auto fork_region = (spawning_proc && spawning_proc->is_reactive)
+                           ? Region::kReactive
+                           : Region::kActive;
     ctx.GetScheduler().ScheduleEvent(ctx.CurrentTime(), fork_region, event);
   }
 
@@ -1592,8 +1599,7 @@ static void SnapshotDeferredCallArgs(const Stmt* action, SimContext& ctx,
   }
 }
 
-static void ClearDeferredCallArgSnapshots(const Stmt* action,
-                                          SimContext& ctx) {
+static void ClearDeferredCallArgSnapshots(const Stmt* action, SimContext& ctx) {
   if (!action || action->kind != StmtKind::kExprStmt || !action->expr) return;
   if (action->expr->kind != ExprKind::kCall &&
       action->expr->kind != ExprKind::kSystemCall) {
@@ -1610,8 +1616,7 @@ static void ScheduleDeferredAction(const Stmt* action, bool is_final_deferred,
   if (!action) return;
 
   SnapshotDeferredCallArgs(action, ctx, arena);
-  Region region =
-      is_final_deferred ? Region::kPostponed : Region::kReactive;
+  Region region = is_final_deferred ? Region::kPostponed : Region::kReactive;
   auto* ev = ctx.GetScheduler().GetEventPool().Acquire();
   ev->callback = [action, &ctx, &arena]() {
     RunDeferredActionSync(action, ctx, arena);
@@ -1634,10 +1639,9 @@ static ExecTask ExecImmediateAssert(const Stmt* stmt, SimContext& ctx,
       ctx.IncrementCoverSuccessCount();
     }
     if (stmt->assert_pass_stmt) {
-
       if (stmt->is_deferred) {
-        ScheduleDeferredAction(stmt->assert_pass_stmt,
-                               stmt->is_final_deferred, ctx, arena);
+        ScheduleDeferredAction(stmt->assert_pass_stmt, stmt->is_final_deferred,
+                               ctx, arena);
         co_return StmtResult::kDone;
       }
       co_return co_await ExecStmt(stmt->assert_pass_stmt, ctx, arena);
@@ -1645,13 +1649,12 @@ static ExecTask ExecImmediateAssert(const Stmt* stmt, SimContext& ctx,
   } else {
     if (stmt->assert_fail_stmt) {
       if (stmt->is_deferred) {
-        ScheduleDeferredAction(stmt->assert_fail_stmt,
-                               stmt->is_final_deferred, ctx, arena);
+        ScheduleDeferredAction(stmt->assert_fail_stmt, stmt->is_final_deferred,
+                               ctx, arena);
         co_return StmtResult::kDone;
       }
       co_return co_await ExecStmt(stmt->assert_fail_stmt, ctx, arena);
     } else if (stmt->kind != StmtKind::kCoverImmediate) {
-
       ctx.IncrementAssertionFailCount();
       EmitSeverityHeader(ctx, "ERROR", "Assertion failed.", std::cerr);
     }
@@ -1670,18 +1673,17 @@ static ExecTask ExecProcessAwait(const Expr* expr, SimContext& ctx,
       auto proc_handle = var->value.ToUint64();
       auto* proc = ctx.FindProcessByHandle(proc_handle);
       if (proc) {
-
         if (proc->kind == ProcessKind::kFinal ||
             proc->kind == ProcessKind::kContAssign) {
           ctx.GetDiag().Error(
-              {}, "await() shall only target a process created by an initial "
-                  "procedure, always procedure, or fork block");
+              {},
+              "await() shall only target a process created by an initial "
+              "procedure, always procedure, or fork block");
           co_return StmtResult::kDone;
         }
 
         if (proc == ctx.CurrentProcess()) {
-          ctx.GetDiag().Error(
-              {}, "process cannot await its own termination");
+          ctx.GetDiag().Error({}, "process cannot await its own termination");
           co_return StmtResult::kDone;
         }
         co_await ProcessAwaitAwaiter{proc};
@@ -1786,8 +1788,8 @@ static uint64_t EvalRepeatCount(const Expr* count_expr, SimContext& ctx,
   return count;
 }
 
-static ExecTask ExecBlockingAssignRepeatEvent(const Stmt* stmt,
-                                              SimContext& ctx, Arena& arena) {
+static ExecTask ExecBlockingAssignRepeatEvent(const Stmt* stmt, SimContext& ctx,
+                                              Arena& arena) {
   auto rhs_val = EvalExpr(stmt->rhs, ctx, arena);
   uint64_t count = EvalRepeatCount(stmt->repeat_event_count, ctx, arena);
   if (count > 0) {
@@ -1803,9 +1805,9 @@ static SimCoroutine NbaEventCoroutine(const Stmt* stmt, Logic4Vec rhs_val,
   ScheduleNonblockingAssign(stmt, rhs_val, 0, ctx, arena);
 }
 
-static SimCoroutine NbaRepeatEventCoroutine(const Stmt* stmt,
-                                            Logic4Vec rhs_val, uint64_t count,
-                                            SimContext& ctx, Arena& arena) {
+static SimCoroutine NbaRepeatEventCoroutine(const Stmt* stmt, Logic4Vec rhs_val,
+                                            uint64_t count, SimContext& ctx,
+                                            Arena& arena) {
   co_await RepeatEventAwaiter{ctx, stmt->events, arena, count};
   ScheduleNonblockingAssign(stmt, rhs_val, 0, ctx, arena);
 }
@@ -1849,12 +1851,9 @@ static StmtResult ExecNbaWithEvent(const Stmt* stmt, SimContext& ctx,
 // Detached waiter for the event-control form of ->>: blocks (off the issuing
 // process) until the event control has occurred the required number of times,
 // then creates the nonblocking-region update event that fires the named event.
-static SimCoroutine NbEventTriggerEventCoroutine(const Stmt* stmt,
-                                                 Variable* var,
-                                                 std::string_view event_name,
-                                                 uint64_t count, bool reactive,
-                                                 SimContext& ctx,
-                                                 Arena& arena) {
+static SimCoroutine NbEventTriggerEventCoroutine(
+    const Stmt* stmt, Variable* var, std::string_view event_name,
+    uint64_t count, bool reactive, SimContext& ctx, Arena& arena) {
   for (uint64_t i = 0; i < count; ++i) {
     co_await EventAwaiter{ctx, stmt->events, arena};
   }
@@ -2009,4 +2008,4 @@ bool IsTimeControlStatement(StmtKind kind) {
   return kind == StmtKind::kDelay || kind == StmtKind::kEventControl;
 }
 
-}
+}  // namespace delta

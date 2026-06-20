@@ -60,4 +60,4 @@ TEST(CompilerDirectiveParsing, NestedIfdef) {
                               "`endif\n"));
 }
 
-}
+}  // namespace

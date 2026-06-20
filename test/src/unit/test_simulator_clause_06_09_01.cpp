@@ -78,4 +78,4 @@ TEST(VectorSpecification, MaxValueFitsInVector) {
   EXPECT_EQ(var->value.ToUint64() & 0xFF, 255u);
 }
 
-}
+}  // namespace

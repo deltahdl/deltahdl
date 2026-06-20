@@ -44,8 +44,8 @@ TEST(OptionalLogSim, LogReenablesOutput) {
   EXPECT_TRUE(f.ctx.LoggingEnabled());
 }
 
-// Annex D.7: a filename argument to $log closes the current log file and creates
-// a new one, so the named file becomes the active log file.
+// Annex D.7: a filename argument to $log closes the current log file and
+// creates a new one, so the named file becomes the active log file.
 TEST(OptionalLogSim, LogFilenameOpensNewFile) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -75,8 +75,8 @@ TEST(OptionalLogSim, LogFilenameReenablesOutput) {
   EXPECT_EQ(f.ctx.LogFile(), "run.log");
 }
 
-// Annex D.7: each $log filename argument opens a fresh log file, so when several
-// are issued the file named most recently is the active one.
+// Annex D.7: each $log filename argument opens a fresh log file, so when
+// several are issued the file named most recently is the active one.
 TEST(OptionalLogSim, MostRecentLogFileWins) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -109,9 +109,9 @@ TEST(OptionalLogSim, NologPreservesLogFile) {
   EXPECT_EQ(f.ctx.LogFile(), "run.log");
 }
 
-// Annex D.7: only the filename form of $log opens a new file. A bare $log merely
-// reenables output, so after a file has been named it keeps directing output to
-// that same file rather than replacing it.
+// Annex D.7: only the filename form of $log opens a new file. A bare $log
+// merely reenables output, so after a file has been named it keeps directing
+// output to that same file rather than replacing it.
 TEST(OptionalLogSim, BareLogPreservesLogFile) {
   SimFixture f;
   auto* design = ElaborateSrc(

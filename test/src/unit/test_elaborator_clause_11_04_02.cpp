@@ -76,4 +76,4 @@ TEST(ExpressionElaboration, IncDecAsSubexpressionElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

@@ -75,8 +75,7 @@ TEST(BlockingTasksCycleEventMode,
   EXPECT_EQ(b->value.ToUint64(), 42u);
 }
 
-TEST(BlockingTasksCycleEventMode,
-     ModuleFunctionCalledFromProgramReturnsValue) {
+TEST(BlockingTasksCycleEventMode, ModuleFunctionCalledFromProgramReturnsValue) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module top;\n"
@@ -96,4 +95,4 @@ TEST(BlockingTasksCycleEventMode,
   EXPECT_EQ(r->value.ToUint64(), 42u);
 }
 
-}
+}  // namespace

@@ -71,8 +71,8 @@ inline bool CoverageControlFromInt(int value, CoverageControl *out) {
   }
 }
 
-// Tracks the coverage-collection state of the named hierarchy scopes and applies
-// the §40.3.2.1 control rules to them.
+// Tracks the coverage-collection state of the named hierarchy scopes and
+// applies the §40.3.2.1 control rules to them.
 class CoverageControlState {
  public:
   // Registers (or updates) the coverage a named scope offers, mirroring what a
@@ -111,11 +111,11 @@ class CoverageControlState {
   // of the collection state, so it stays constant for the whole simulation;
   // starting, stopping, or resetting coverage never changes it.
   //
-  // The integer result follows §40.3.2.2: a scope the design does not contain is
-  // a bad argument (`SV_COV_ERROR); a scope with no coverable items of the type
-  // offers no coverage (`SV_COV_NOCOV, 0); a count too large to represent as an
-  // integer overflows (`SV_COV_OVERFLOW); otherwise the positive sum is the
-  // maximum coverage number.
+  // The integer result follows §40.3.2.2: a scope the design does not contain
+  // is a bad argument (`SV_COV_ERROR); a scope with no coverable items of the
+  // type offers no coverage (`SV_COV_NOCOV, 0); a count too large to represent
+  // as an integer overflows (`SV_COV_OVERFLOW); otherwise the positive sum is
+  // the maximum coverage number.
   int CoverageMax(const std::string &scope, int coverage_type) const {
     auto it = scopes_.find(scope);
     if (it == scopes_.end()) {
@@ -138,12 +138,12 @@ class CoverageControlState {
   // pattern as §40.3.2.2, but the positive value is the current coverage level
   // rather than the maximum, so it can grow as collection proceeds.
   //
-  // The integer result follows §40.3.2.3: a scope the design does not contain is
-  // a bad argument (`SV_COV_ERROR); a count too large to represent as an integer
-  // overflows (`SV_COV_OVERFLOW); a coverage type with nothing covered (no
-  // entry, or none of its items covered yet) reports no coverage (`SV_COV_NOCOV,
-  // 0, since a positive value is strictly greater than zero); otherwise the
-  // positive count is the current coverage number.
+  // The integer result follows §40.3.2.3: a scope the design does not contain
+  // is a bad argument (`SV_COV_ERROR); a count too large to represent as an
+  // integer overflows (`SV_COV_OVERFLOW); a coverage type with nothing covered
+  // (no entry, or none of its items covered yet) reports no coverage
+  // (`SV_COV_NOCOV, 0, since a positive value is strictly greater than zero);
+  // otherwise the positive count is the current coverage number.
   int CoverageGet(const std::string &scope, int coverage_type) const {
     auto it = scopes_.find(scope);
     if (it == scopes_.end()) {
@@ -175,20 +175,22 @@ class CoverageControlState {
   }
 
   // §40.3.2.4 ($coverage_merge): loads and merges coverage data of
-  // `coverage_type` from the database located by `name` into the simulation, and
-  // returns the resulting §40.3.1 status.
+  // `coverage_type` from the database located by `name` into the simulation,
+  // and returns the resulting §40.3.1 status.
   //
   //   `SV_COV_OK    — the database was found, belongs to this design, and holds
   //                   the requested coverage type, so its data are merged.
   //   `SV_COV_NOCOV — the database was found but does not contain the requested
   //                   coverage type, so there is nothing of that type to merge.
-  //   `SV_COV_ERROR — the database was not found, or does not correspond to this
+  //   `SV_COV_ERROR — the database was not found, or does not correspond to
+  //   this
   //                   design, or another error occurred. §40.3.2.4 requires an
   //                   error when `name` does not exist or is from a different
   //                   design.
   CoverageStatus CoverageMerge(int coverage_type, const std::string &name) {
     auto it = databases_.find(name);
-    // The name does not exist: no database to load. §40.3.2.4 requires an error.
+    // The name does not exist: no database to load. §40.3.2.4 requires an
+    // error.
     if (it == databases_.end()) {
       return CoverageStatus::Error;
     }
@@ -207,18 +209,18 @@ class CoverageControlState {
     return CoverageStatus::Ok;
   }
 
-  // Number of successful merges performed against a named database. A merge only
-  // happens on the `SV_COV_OK path, so this makes the "merged" effect of
+  // Number of successful merges performed against a named database. A merge
+  // only happens on the `SV_COV_OK path, so this makes the "merged" effect of
   // $coverage_merge observable rather than just the returned status.
   std::uint64_t MergeCount(const std::string &name) const {
     auto it = databases_.find(name);
     return it == databases_.end() ? 0 : it->second.merges;
   }
 
-  // §40.3.2.5: records which §40.3.1 coverage types are currently available to be
-  // saved from this design, mirroring what a real coverage engine has collected.
-  // $coverage_save reports `SV_COV_NOCOV (and saves nothing) for a type that is
-  // not available here.
+  // §40.3.2.5: records which §40.3.1 coverage types are currently available to
+  // be saved from this design, mirroring what a real coverage engine has
+  // collected. $coverage_save reports `SV_COV_NOCOV (and saves nothing) for a
+  // type that is not available here.
   void SetCoverageAvailableForSave(int coverage_type, bool available) {
     if (available) {
       savable_coverage_types_.insert(coverage_type);
@@ -230,7 +232,9 @@ class CoverageControlState {
   // §40.3.2.5: forces the next save to report an error, mirroring a tool-side
   // failure while writing the coverage database. This exercises the error path,
   // including the required removal of the entry being written.
-  void SetCoverageSaveShouldFail(bool fail) { coverage_save_should_fail_ = fail; }
+  void SetCoverageSaveShouldFail(bool fail) {
+    coverage_save_should_fail_ = fail;
+  }
 
   // Number of successful saves recorded under a named database. A save only
   // records data on the `SV_COV_OK path, so this makes the "saved" effect of
@@ -240,20 +244,21 @@ class CoverageControlState {
     return it == databases_.end() ? 0 : it->second.saves;
   }
 
-  // §40.3.2.5 ($coverage_save): saves the current coverage of `coverage_type` to
-  // the tool's coverage database under `name` and returns the resulting §40.3.1
-  // status. Saving never touches the simulation's coverage-collection state, so
-  // this method only writes the database side.
+  // §40.3.2.5 ($coverage_save): saves the current coverage of `coverage_type`
+  // to the tool's coverage database under `name` and returns the resulting
+  // §40.3.1 status. Saving never touches the simulation's coverage-collection
+  // state, so this method only writes the database side.
   //
   //   `SV_COV_OK    — the coverage data are saved. The entry records that it
-  //                   belongs to this design and holds the saved type, so a later
-  //                   $coverage_merge() with the same name can load it
+  //                   belongs to this design and holds the saved type, so a
+  //                   later $coverage_merge() with the same name can load it
   //                   (§40.3.2.4). Overwriting an entry left by a previous save
   //                   is not an error.
   //   `SV_COV_NOCOV — no coverage of the requested type is available in this
   //                   design, so there is nothing to save and no entry is
   //                   written.
-  //   `SV_COV_ERROR — an error occurred during the save. The entry for `name` is
+  //   `SV_COV_ERROR — an error occurred during the save. The entry for `name`
+  //   is
   //                   removed so a partial write cannot corrupt the database.
   CoverageStatus CoverageSave(int coverage_type, const std::string &name) {
     // An error during the save: remove the entry being written for `name` to
@@ -269,8 +274,8 @@ class CoverageControlState {
         savable_coverage_types_.end()) {
       return CoverageStatus::NoCoverage;
     }
-    // Write (or overwrite) the entry to reflect the current state: it belongs to
-    // this design and holds the saved coverage type.
+    // Write (or overwrite) the entry to reflect the current state: it belongs
+    // to this design and holds the saved coverage type.
     CoverageDatabase &db = databases_[name];
     db.from_this_design = true;
     db.coverage_types = {coverage_type};
@@ -295,8 +300,8 @@ class CoverageControlState {
     return Field(scope, &ScopeState::resets);
   }
 
-  // Performs the §40.3.2.1 action selected by `control` over `scope` and returns
-  // the resulting §40.3.1 status.
+  // Performs the §40.3.2.1 action selected by `control` over `scope` and
+  // returns the resulting §40.3.1 status.
   CoverageStatus Control(CoverageControl control, const std::string &scope) {
     auto it = scopes_.find(scope);
     // A scope the design does not contain is a bad argument: §40.3.2.1 reports
@@ -322,8 +327,8 @@ class CoverageControlState {
         }
         return CoverageStatus::Error;  // unreachable
       case CoverageControl::Stop:
-        // `SV_COV_STOP stops collection; stopping a scope that is not collecting
-        // has no effect. The operation reports success regardless.
+        // `SV_COV_STOP stops collection; stopping a scope that is not
+        // collecting has no effect. The operation reports success regardless.
         if (s.collecting) {
           s.collecting = false;
           ++s.stopped;
@@ -383,8 +388,9 @@ class CoverageControlState {
     std::uint64_t saves = 0;
   };
 
-  // Begins collection on a scope that is not already collecting. A scope already
-  // collecting is left untouched so that a repeated start has no effect.
+  // Begins collection on a scope that is not already collecting. A scope
+  // already collecting is left untouched so that a repeated start has no
+  // effect.
   static void StartCollecting(ScopeState &s) {
     if (!s.collecting) {
       s.collecting = true;

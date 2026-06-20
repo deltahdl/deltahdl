@@ -123,8 +123,10 @@ TEST(IoMultiDimReadmemTest, AddressEntryAddressesHighestDimension) {
 
   EXPECT_EQ(MCell(f, "mem", {1, 0})->value.ToUint64(), 0xAAu);
   EXPECT_EQ(MCell(f, "mem", {1, 1})->value.ToUint64(), 0xBBu);
-  EXPECT_EQ(MCell(f, "mem", {0, 0})->value.ToUint64(), 0x00u);  // word 0 untouched
-  EXPECT_EQ(MCell(f, "mem", {2, 0})->value.ToUint64(), 0x00u);  // word 2 untouched
+  EXPECT_EQ(MCell(f, "mem", {0, 0})->value.ToUint64(),
+            0x00u);  // word 0 untouched
+  EXPECT_EQ(MCell(f, "mem", {2, 0})->value.ToUint64(),
+            0x00u);  // word 2 untouched
   std::remove(path.c_str());
 }
 
@@ -134,12 +136,14 @@ TEST(IoMultiDimReadmemTest, AddressEntryAddressesHighestDimension) {
 TEST(IoMultiDimReadmemTest, InsufficientWordsForAddressedWordLeaveSubwords) {
   SimFixture f;
   SetupMultiMem(f, "mem", {{0, 3}, {0, 2}}, 8);
-  std::string path = WriteTmp("addr_partial", "@2\nAA\n");  // only 1 of 2 subwords
+  std::string path =
+      WriteTmp("addr_partial", "@2\nAA\n");  // only 1 of 2 subwords
 
   Readmem(f, "$readmemh", path, "mem");
 
   EXPECT_EQ(MCell(f, "mem", {2, 0})->value.ToUint64(), 0xAAu);
-  EXPECT_EQ(MCell(f, "mem", {2, 1})->value.ToUint64(), 0x00u);  // subword untouched
+  EXPECT_EQ(MCell(f, "mem", {2, 1})->value.ToUint64(),
+            0x00u);  // subword untouched
   std::remove(path.c_str());
 }
 
@@ -232,7 +236,8 @@ TEST(IoMultiDimReadmemTest, AddressBeyondHighestDimensionIsError) {
   Readmem(f, "$readmemh", path, "mem");
 
   EXPECT_TRUE(f.diag.HasErrors());
-  EXPECT_EQ(MCell(f, "mem", {0, 0})->value.ToUint64(), 0x00u);  // nothing loaded
+  EXPECT_EQ(MCell(f, "mem", {0, 0})->value.ToUint64(),
+            0x00u);  // nothing loaded
   EXPECT_EQ(MCell(f, "mem", {1, 1})->value.ToUint64(), 0x00u);
   std::remove(path.c_str());
 }

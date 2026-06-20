@@ -152,4 +152,4 @@ TEST(IpcSync, SemaphoreLimitsConcurrentHoldersToKeyCount) {
   EXPECT_EQ(sem.Get(1), SemGetStatus::kBlock);
 }
 
-}
+}  // namespace

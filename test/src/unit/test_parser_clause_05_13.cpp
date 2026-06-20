@@ -170,4 +170,4 @@ TEST(BuiltinMethodParsing, StringLenNoParens) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

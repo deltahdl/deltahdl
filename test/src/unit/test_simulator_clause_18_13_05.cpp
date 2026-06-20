@@ -128,11 +128,11 @@ TEST(SetRandstate, AppliesToUntouchedProcessStream) {
   EXPECT_EQ(proc->rng(), source());
 }
 
-// §18.13.5 edge case (object analog of the untouched-process case): installing a
-// state into an object whose stream has never been materialized -- no prior
-// draw, no get_randstate(), no srandom() -- must still take effect. SetRandState
-// lazily seeds the allocation-default stream and then overwrites it, so that
-// lazy seed must not linger and clobber the installed value.
+// §18.13.5 edge case (object analog of the untouched-process case): installing
+// a state into an object whose stream has never been materialized -- no prior
+// draw, no get_randstate(), no srandom() -- must still take effect.
+// SetRandState lazily seeds the allocation-default stream and then overwrites
+// it, so that lazy seed must not linger and clobber the installed value.
 TEST(SetRandstate, AppliesToUntouchedObjectStream) {
   SourceManager mgr;
   Arena arena;

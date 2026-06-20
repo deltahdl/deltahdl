@@ -657,8 +657,7 @@ TEST(Preprocessor, RedefineWithDifferentArgCount) {
 TEST(Preprocessor, DirectivesInMacroTextIgnoredUntilUsed) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
-  auto fid = f.mgr.AddFile("<test>",
-      "`define SET_NET `default_nettype none\n");
+  auto fid = f.mgr.AddFile("<test>", "`define SET_NET `default_nettype none\n");
   pp.Preprocess(fid);
   EXPECT_EQ(pp.DefaultNetType(), NetType::kWire);
 }
@@ -774,4 +773,3 @@ TEST(Preprocessor, TripleQuotedActualArgumentProtectsComma) {
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_NE(result.find("\"\"\"a,b\"\"\""), std::string::npos);
 }
-

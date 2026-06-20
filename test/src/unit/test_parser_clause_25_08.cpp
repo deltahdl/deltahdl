@@ -36,4 +36,4 @@ TEST(ParameterizedInterface, InterfaceInstWithNamedParams) {
   EXPECT_EQ(item->inst_params[0].first, "W");
 }
 
-}
+}  // namespace

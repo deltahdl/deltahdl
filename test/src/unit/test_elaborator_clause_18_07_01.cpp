@@ -53,13 +53,13 @@ TEST(InlineConstraintScopeResolution, SuperBindsToObjectClassScope) {
             InlineConstraintBinding::kObjectClassScope);
 }
 
-// §18.7.1 (C4 / C6 / C5): local:: bypasses the object's class scope and resolves
-// the name in the local scope — even when the object's class also declares the
-// name — so local::a denotes the same declaration as the unqualified a in the
-// local scope. Resolution depends only on the qualifier and the local-scope
-// declaration, never on what the name denotes, so this same call also stands for
-// C5: a local:: name resolves identically whether it is a variable, a type, or a
-// class scope.
+// §18.7.1 (C4 / C6 / C5): local:: bypasses the object's class scope and
+// resolves the name in the local scope — even when the object's class also
+// declares the name — so local::a denotes the same declaration as the
+// unqualified a in the local scope. Resolution depends only on the qualifier
+// and the local-scope declaration, never on what the name denotes, so this same
+// call also stands for C5: a local:: name resolves identically whether it is a
+// variable, a type, or a class scope.
 TEST(InlineConstraintScopeResolution, LocalQualifierBindsToLocalScope) {
   EXPECT_EQ(ResolveInlineConstraintName(InlineConstraintQualifier::kLocal,
                                         /*declared_in_object_class=*/true,
@@ -69,9 +69,10 @@ TEST(InlineConstraintScopeResolution, LocalQualifierBindsToLocalScope) {
 
 // §18.7.1 (C4 / C7): the special name local::this names the local scope's own
 // this, so it resolves to the local scope. A caller treats this/super as always
-// present in a scope, here passing declared_in_local_scope = true. The same call
-// also models C7: for an obj.randomize() with call the object handle obj is
-// itself a local-scope name, so local::obj likewise resolves in the local scope.
+// present in a scope, here passing declared_in_local_scope = true. The same
+// call also models C7: for an obj.randomize() with call the object handle obj
+// is itself a local-scope name, so local::obj likewise resolves in the local
+// scope.
 TEST(InlineConstraintScopeResolution, LocalThisBindsToLocalScope) {
   EXPECT_EQ(ResolveInlineConstraintName(InlineConstraintQualifier::kLocal,
                                         /*declared_in_object_class=*/false,
@@ -92,7 +93,8 @@ TEST(InlineConstraintScopeResolution, LocalQualifierIgnoresObjectClassScope) {
 // §18.7.1 (C1): when only the object's class declares an unqualified name, it
 // binds there — the object-class scope is searched first, so its match settles
 // the name without the local scope needing to declare it.
-TEST(InlineConstraintScopeResolution, UnqualifiedBindsObjectClassWhenLocalAbsent) {
+TEST(InlineConstraintScopeResolution,
+     UnqualifiedBindsObjectClassWhenLocalAbsent) {
   EXPECT_EQ(ResolveInlineConstraintName(InlineConstraintQualifier::kNone,
                                         /*declared_in_object_class=*/true,
                                         /*declared_in_local_scope=*/false),
@@ -102,7 +104,8 @@ TEST(InlineConstraintScopeResolution, UnqualifiedBindsObjectClassWhenLocalAbsent
 // §18.7.1 (C2 / C4): local:: searches only the local scope, so a local:: name
 // declared in neither scope is unresolved — the object-class scope is never
 // consulted to rescue it.
-TEST(InlineConstraintScopeResolution, LocalQualifierUnresolvedWhenAbsentEverywhere) {
+TEST(InlineConstraintScopeResolution,
+     LocalQualifierUnresolvedWhenAbsentEverywhere) {
   EXPECT_EQ(ResolveInlineConstraintName(InlineConstraintQualifier::kLocal,
                                         /*declared_in_object_class=*/false,
                                         /*declared_in_local_scope=*/false),
@@ -124,7 +127,8 @@ TEST(InlineConstraintScopeResolution, QualifierTokenMapping) {
 
 // A token that is not a qualifier keyword leaves the name unqualified; the
 // mapping reports no qualifier.
-TEST(InlineConstraintScopeResolution, QualifierTokenMappingRejectsNonQualifier) {
+TEST(InlineConstraintScopeResolution,
+     QualifierTokenMappingRejectsNonQualifier) {
   InlineConstraintQualifier q = InlineConstraintQualifier::kLocal;
   EXPECT_FALSE(InlineConstraintQualifierFromToken(TokenKind::kPlus, &q));
   EXPECT_FALSE(InlineConstraintQualifierFromToken(TokenKind::kIdentifier, &q));

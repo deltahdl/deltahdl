@@ -131,4 +131,4 @@ TEST(DynamicArraySizeSimulation, EquivalentToDollarSizeWhenUncreated) {
   EXPECT_EQ(v, 1u);
 }
 
-}
+}  // namespace

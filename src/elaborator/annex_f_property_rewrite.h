@@ -21,26 +21,26 @@ namespace delta {
 // nexttime and until rules emit the clock c in property position.
 struct ClockedProperty {
   enum class Kind {
-    kBoolean,        // b, a Boolean used as a property (e.g. the emitted !c)
-    kStrong,         // strong ( R )
-    kWeak,           // weak ( R )
-    kClock,          // @( b ) P
-    kDisableIff,     // disable iff ( b ) P
-    kAcceptOn,       // accept_on ( b ) P
-    kSyncAcceptOn,   // sync_accept_on ( b ) P
-    kNot,            // not P
-    kImplication,    // ( R |-> P )
-    kOr,             // ( P1 or P2 )
-    kAnd,            // ( P1 and P2 )
-    kNexttime,       // ( nexttime P )
-    kUntil,          // ( P1 until P2 )
+    kBoolean,       // b, a Boolean used as a property (e.g. the emitted !c)
+    kStrong,        // strong ( R )
+    kWeak,          // weak ( R )
+    kClock,         // @( b ) P
+    kDisableIff,    // disable iff ( b ) P
+    kAcceptOn,      // accept_on ( b ) P
+    kSyncAcceptOn,  // sync_accept_on ( b ) P
+    kNot,           // not P
+    kImplication,   // ( R |-> P )
+    kOr,            // ( P1 or P2 )
+    kAnd,           // ( P1 and P2 )
+    kNexttime,      // ( nexttime P )
+    kUntil,         // ( P1 until P2 )
   };
 
   Kind kind = Kind::kBoolean;
-  std::shared_ptr<const BooleanExpr> boolean;     // b for Boolean/clock/abort
-  std::shared_ptr<const SequenceExpr> sequence;   // R for strong/weak/impl
-  std::shared_ptr<const ClockedProperty> lhs;     // sub-property / consequent
-  std::shared_ptr<const ClockedProperty> rhs;     // second operand
+  std::shared_ptr<const BooleanExpr> boolean;    // b for Boolean/clock/abort
+  std::shared_ptr<const SequenceExpr> sequence;  // R for strong/weak/impl
+  std::shared_ptr<const ClockedProperty> lhs;    // sub-property / consequent
+  std::shared_ptr<const ClockedProperty> rhs;    // second operand
 };
 
 // Factories for each form. Named with a Clk prefix to stay distinct from the

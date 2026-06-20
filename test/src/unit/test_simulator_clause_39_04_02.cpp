@@ -69,13 +69,13 @@ TEST(AssertionCallback, ApiSurfaceMatchesPrototype) {
   EXPECT_EQ(h, nullptr);
 }
 
-// §39.4.2: a successful placement returns a non-null handle; that handle removes
-// the callback (modeling vpi_remove_cb). An empty (invalid) handle errors.
+// §39.4.2: a successful placement returns a non-null handle; that handle
+// removes the callback (modeling vpi_remove_cb). An empty (invalid) handle
+// errors.
 TEST(AssertionCallback, PlaceReturnsHandleAndRemovesByHandle) {
   AssertionApi api;
-  AssertionCallbackHandle h =
-      api.PlaceAssertionCallback(cbAssertionStart, kA, vpiAssert, NoopCb,
-                                 nullptr);
+  AssertionCallbackHandle h = api.PlaceAssertionCallback(
+      cbAssertionStart, kA, vpiAssert, NoopCb, nullptr);
   EXPECT_NE(h, 0u);
   EXPECT_EQ(api.PlacedCallbackCount(), 1u);
 
@@ -90,11 +90,12 @@ TEST(AssertionCallback, PlaceReturnsHandleAndRemovesByHandle) {
             0u);
 }
 
-// §39.4.2: an unrecognized reason cannot be placed; the NULL handle is returned.
+// §39.4.2: an unrecognized reason cannot be placed; the NULL handle is
+// returned.
 TEST(AssertionCallback, UnknownReasonErrorsWithNullHandle) {
   AssertionApi api;
-  EXPECT_EQ(api.PlaceAssertionCallback(vpiAssertionSysOff, kA, vpiAssert, NoopCb,
-                                       nullptr),
+  EXPECT_EQ(api.PlaceAssertionCallback(vpiAssertionSysOff, kA, vpiAssert,
+                                       NoopCb, nullptr),
             0u);
   EXPECT_EQ(api.PlacedCallbackCount(), 0u);
 }
@@ -116,8 +117,8 @@ TEST(AssertionCallback, HandleTypeValidity) {
 
   // Reasons other than start/success/failure are not valid on a sequence or
   // property instance.
-  EXPECT_FALSE(
-      AssertionApi::IsReasonValidForHandle(cbAssertionDisable, vpiSequenceDecl));
+  EXPECT_FALSE(AssertionApi::IsReasonValidForHandle(cbAssertionDisable,
+                                                    vpiSequenceDecl));
   EXPECT_FALSE(AssertionApi::IsReasonValidForHandle(cbAssertionStepSuccess,
                                                     vpiProperty));
   // A non-assertion handle accepts no assertion callbacks.
@@ -125,22 +126,22 @@ TEST(AssertionCallback, HandleTypeValidity) {
       AssertionApi::IsReasonValidForHandle(cbAssertionStart, vpiModule));
 }
 
-// §39.4.2: placing a reason that is invalid for the handle type is rejected with
-// the NULL handle.
+// §39.4.2: placing a reason that is invalid for the handle type is rejected
+// with the NULL handle.
 TEST(AssertionCallback, PlaceRejectsReasonInvalidForHandle) {
   AssertionApi api;
   EXPECT_EQ(api.PlaceAssertionCallback(cbAssertionDisable, kA, vpiSequenceDecl,
                                        NoopCb, nullptr),
             0u);
   // The same reason is accepted on a concurrent assertion statement.
-  EXPECT_NE(api.PlaceAssertionCallback(cbAssertionDisable, kA, vpiAssert, NoopCb,
-                                       nullptr),
+  EXPECT_NE(api.PlaceAssertionCallback(cbAssertionDisable, kA, vpiAssert,
+                                       NoopCb, nullptr),
             0u);
 }
 
-// §39.4.2: the callback is specific to the assertion it was placed on (events on
-// a different assertion do not trigger it), and it continues to be called each
-// time the event occurs until it is removed.
+// §39.4.2: the callback is specific to the assertion it was placed on (events
+// on a different assertion do not trigger it), and it continues to be called
+// each time the event occurs until it is removed.
 TEST(AssertionCallback, FiresPerAssertionUntilRemoved) {
   AssertionApi api;
   int count = 0;
@@ -166,9 +167,9 @@ TEST(AssertionCallback, FiresPerAssertionUntilRemoved) {
   EXPECT_EQ(count, 2);
 }
 
-// §39.4.2: the callback is supplied the reason, the callback time, the assertion
-// handle, the attempt-info pointer, and the registered user data. attemptStart-
-// Time is the start time of the actual attempt.
+// §39.4.2: the callback is supplied the reason, the callback time, the
+// assertion handle, the attempt-info pointer, and the registered user data.
+// attemptStart- Time is the start time of the actual attempt.
 TEST(AssertionCallback, SuppliesFiveArguments) {
   AssertionApi api;
   int reason = 0;
@@ -220,9 +221,12 @@ TEST(AssertionCallback, ReasonCarriesAttemptInfoClassification) {
     EXPECT_FALSE(AssertionApi::ReasonCarriesAttemptInfo(r));
   }
 
-  int has_info[] = {cbAssertionStart,         cbAssertionSuccess,
-                    cbAssertionFailure,       cbAssertionStepSuccess,
-                    cbAssertionStepFailure,   cbAssertionVacuousSuccess,
+  int has_info[] = {cbAssertionStart,
+                    cbAssertionSuccess,
+                    cbAssertionFailure,
+                    cbAssertionStepSuccess,
+                    cbAssertionStepFailure,
+                    cbAssertionVacuousSuccess,
                     cbAssertionDisabledEvaluation};
   for (int r : has_info) {
     EXPECT_TRUE(AssertionApi::ReasonCarriesAttemptInfo(r));
@@ -272,9 +276,9 @@ TEST(AssertionCallback, FailureDeliversFailExpr) {
   EXPECT_EQ(attempt_start, 5u);
 }
 
-// §39.4.2: a placed step callback is invoked for both success and failure steps,
-// and the step exposes the source/destination states and matched expressions.
-// An empty expression set models an unconditional transition.
+// §39.4.2: a placed step callback is invoked for both success and failure
+// steps, and the step exposes the source/destination states and matched
+// expressions. An empty expression set models an unconditional transition.
 TEST(AssertionCallback, StepCallbackFiresForSuccessAndFailure) {
   AssertionApi api;
   int count = 0;
@@ -337,7 +341,8 @@ TEST(AssertionCallback, FailingStepRequiresAtLeastOneExpression) {
 
   AssertionAttemptInfo good;
   good.step.matched_exprs = {"e"};
-  EXPECT_EQ(api.DeliverAssertionEvent(kA, cbAssertionStepFailure, 10, good), 1u);
+  EXPECT_EQ(api.DeliverAssertionEvent(kA, cbAssertionStepFailure, 10, good),
+            1u);
   EXPECT_EQ(count, 1);
 }
 
@@ -368,8 +373,8 @@ TEST(AssertionCallback, SuccessDeliversAttemptStartTime) {
 }
 
 // §39.4.2: attemptStartTime is the start time of the actual attempt and serves
-// as a unique identifier distinguishing the attempts of a given assertion — each
-// delivery carries its own attempt's start time.
+// as a unique identifier distinguishing the attempts of a given assertion —
+// each delivery carries its own attempt's start time.
 TEST(AssertionCallback, AttemptStartTimeDistinguishesAttempts) {
   AssertionApi api;
   uint64_t first_seen = 0;

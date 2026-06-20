@@ -20,7 +20,8 @@ std::shared_ptr<const LvProperty> LvStrong(
   return p;
 }
 
-std::shared_ptr<const LvProperty> LvWeak(std::shared_ptr<const SequenceExpr> r) {
+std::shared_ptr<const LvProperty> LvWeak(
+    std::shared_ptr<const SequenceExpr> r) {
   auto p = std::make_shared<LvProperty>();
   p->kind = LvProperty::Kind::kWeak;
   p->sequence = std::move(r);
@@ -99,7 +100,8 @@ std::shared_ptr<const LvProperty> LvAcceptOn(
 }
 
 std::shared_ptr<const LvProperty> LvLocalVarDecl(
-    std::string type, std::string name, std::shared_ptr<const LvProperty> body) {
+    std::string type, std::string name,
+    std::shared_ptr<const LvProperty> body) {
   auto p = std::make_shared<LvProperty>();
   p->kind = LvProperty::Kind::kLocalVarDecl;
   p->local_var_type = std::move(type);
@@ -321,7 +323,8 @@ bool Satisfies(const Word& word, const LvProperty& property,
              !Satisfies(ComplementWord(word), *property.lhs, context);
     case LvProperty::Kind::kStrong:
       // §F.5.6.1: strong(R) over the four-way tight-satisfaction relation.
-      return property.sequence && StrongHolds(word, *property.sequence, context);
+      return property.sequence &&
+             StrongHolds(word, *property.sequence, context);
     case LvProperty::Kind::kWeak:
       // §F.5.6.1: weak(R) over the four-way tight-satisfaction relation.
       return property.sequence && WeakHolds(word, *property.sequence, context);
@@ -459,8 +462,7 @@ bool NeutrallySatisfiesTopLevelWithLocals(const Word& word,
   return false;
 }
 
-bool DisablesTopLevelWithLocals(const Word& word,
-                                const LvTopLevelProperty& top,
+bool DisablesTopLevelWithLocals(const Word& word, const LvTopLevelProperty& top,
                                 const LocalContext& context) {
   switch (top.kind) {
     case LvTopLevelProperty::Kind::kProperty:
@@ -487,8 +489,7 @@ bool DisablesTopLevelWithLocals(const Word& word,
     }
     case LvTopLevelProperty::Kind::kParen:
       // §F.5.6.1: w, L_0 |=^d ( T ) iff w, L_0 |=^d T.
-      return top.inner &&
-             DisablesTopLevelWithLocals(word, *top.inner, context);
+      return top.inner && DisablesTopLevelWithLocals(word, *top.inner, context);
     case LvTopLevelProperty::Kind::kLocalVarDecl:
       // §F.5.6.1: w, L_0 |=^d ( t v ; T ) iff w, L_0\v |=^d T.
       return top.inner &&

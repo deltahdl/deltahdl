@@ -95,4 +95,4 @@ TEST(UdpEdgeSeq, ParenthesizedEdgeTransitions) {
   EXPECT_EQ(state.GetOutput(), 'x');
 }
 
-}
+}  // namespace

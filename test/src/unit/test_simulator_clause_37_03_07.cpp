@@ -50,10 +50,12 @@ TEST(ObjectLifetimes, DynamicObjectReportsDynamicScheme) {
   EXPECT_EQ(vpi_get(vpiAllocScheme, &obj), vpiDynamicScheme);
 }
 
-// L11 (exactly three schemes) + L12/L13/L14: the classification helper maps each
-// allocation category to its scheme, with Other as the fallthrough default.
+// L11 (exactly three schemes) + L12/L13/L14: the classification helper maps
+// each allocation category to its scheme, with Other as the fallthrough
+// default.
 TEST(ObjectLifetimes, AllocSchemeForCoversAllThreeKinds) {
-  EXPECT_EQ(VpiAllocSchemeFor(VpiAllocKind::kFrameOrThread), vpiAutomaticScheme);
+  EXPECT_EQ(VpiAllocSchemeFor(VpiAllocKind::kFrameOrThread),
+            vpiAutomaticScheme);
   EXPECT_EQ(VpiAllocSchemeFor(VpiAllocKind::kDynamic), vpiDynamicScheme);
   EXPECT_EQ(VpiAllocSchemeFor(VpiAllocKind::kOther), vpiOtherScheme);
 }
@@ -73,7 +75,8 @@ TEST(ObjectLifetimes, AutomaticIsAlsoAContainerAndClassProperty) {
     VpiObject automatic_container;
     automatic_container.type = kind;
     automatic_container.automatic = true;
-    EXPECT_EQ(vpi_get(vpiAutomatic, &automatic_container), 1) << "kind=" << kind;
+    EXPECT_EQ(vpi_get(vpiAutomatic, &automatic_container), 1)
+        << "kind=" << kind;
 
     VpiObject static_container;
     static_container.type = kind;

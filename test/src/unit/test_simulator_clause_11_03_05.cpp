@@ -75,10 +75,10 @@ TEST(ShortCircuit, LogicalAndFalseLhsSkipsRhsSideEffect) {
   SimFixture f;
   MakeVar(f, "a", 8, 0);
   MakeVar(f, "se", 8, 99);
-  auto result = EvalExpr(
-      MakeBinary(f.arena, TokenKind::kAmpAmp, MakeId(f.arena, "a"),
-                 MakeAssignExpr(f.arena, "se", 42)),
-      f.ctx, f.arena);
+  auto result =
+      EvalExpr(MakeBinary(f.arena, TokenKind::kAmpAmp, MakeId(f.arena, "a"),
+                          MakeAssignExpr(f.arena, "se", 42)),
+               f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 0u);
   EXPECT_EQ(f.ctx.FindVariable("se")->value.ToUint64(), 99u);
 }
@@ -97,10 +97,10 @@ TEST(ShortCircuit, LogicalOrTrueLhsSkipsRhsSideEffect) {
   SimFixture f;
   MakeVar(f, "a", 8, 1);
   MakeVar(f, "se", 8, 99);
-  auto result = EvalExpr(
-      MakeBinary(f.arena, TokenKind::kPipePipe, MakeId(f.arena, "a"),
-                 MakeAssignExpr(f.arena, "se", 42)),
-      f.ctx, f.arena);
+  auto result =
+      EvalExpr(MakeBinary(f.arena, TokenKind::kPipePipe, MakeId(f.arena, "a"),
+                          MakeAssignExpr(f.arena, "se", 42)),
+               f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 1u);
   EXPECT_EQ(f.ctx.FindVariable("se")->value.ToUint64(), 99u);
 }
@@ -119,10 +119,10 @@ TEST(ShortCircuit, ImplicationFalseLhsSkipsRhsSideEffect) {
   SimFixture f;
   MakeVar(f, "a", 8, 0);
   MakeVar(f, "se", 8, 99);
-  auto result = EvalExpr(
-      MakeBinary(f.arena, TokenKind::kArrow, MakeId(f.arena, "a"),
-                 MakeAssignExpr(f.arena, "se", 42)),
-      f.ctx, f.arena);
+  auto result =
+      EvalExpr(MakeBinary(f.arena, TokenKind::kArrow, MakeId(f.arena, "a"),
+                          MakeAssignExpr(f.arena, "se", 42)),
+               f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 1u);
   EXPECT_EQ(f.ctx.FindVariable("se")->value.ToUint64(), 99u);
 }
@@ -189,4 +189,4 @@ TEST(ShortCircuit, EquivalenceAlwaysExecutesRhsSideEffect) {
   EXPECT_EQ(f.ctx.FindVariable("se")->value.ToUint64(), 42u);
 }
 
-}
+}  // namespace

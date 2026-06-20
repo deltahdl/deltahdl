@@ -166,4 +166,4 @@ TEST(AutoBinCreation, WideCoverpointCountCappedByAutoBinMax) {
   EXPECT_EQ(CoverageDB::AutoBinCount(63, 100), 100u);
 }
 
-}
+}  // namespace

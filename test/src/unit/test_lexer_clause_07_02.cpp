@@ -30,4 +30,4 @@ TEST(StructUnionKeywords, VoidTokenizesAsKeyword) {
   EXPECT_EQ(r.token.kind, TokenKind::kKwVoid);
 }
 
-}
+}  // namespace

@@ -62,4 +62,4 @@ TEST(Preprocessor, Pragma_Resetall_SurroundingCodePreserved) {
   EXPECT_NE(out.find("wire b;"), std::string::npos);
 }
 
-}
+}  // namespace

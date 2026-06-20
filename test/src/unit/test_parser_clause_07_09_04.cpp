@@ -45,4 +45,4 @@ TEST(AggregateTypeParsing, AssocArrayFirstInIfCondition) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

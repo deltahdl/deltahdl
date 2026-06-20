@@ -29,4 +29,4 @@ TEST(AggregateTypeParsing, AssocArrayWildcard) {
   EXPECT_FALSE(item->unpacked_dims.empty());
 }
 
-}
+}  // namespace

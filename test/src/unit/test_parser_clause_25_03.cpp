@@ -523,4 +523,4 @@ TEST(InterfaceItemsParsing, ModuleDeclInsideInterface) {
                             ModuleItemKind::kNestedModuleDecl));
 }
 
-}
+}  // namespace

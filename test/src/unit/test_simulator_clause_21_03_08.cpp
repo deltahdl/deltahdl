@@ -75,4 +75,4 @@ TEST(SysTask, FeofZeroAtEndBeforeFailedRead) {
   std::remove(tmp.c_str());
 }
 
-}
+}  // namespace

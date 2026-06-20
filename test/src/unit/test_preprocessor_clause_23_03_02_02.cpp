@@ -35,4 +35,4 @@ TEST(ModuleInstantiation, NamedPortConnections) {
       CountItemsByKind(r.cu->modules[1]->items, ModuleItemKind::kGateInst), 4);
 }
 
-}
+}  // namespace

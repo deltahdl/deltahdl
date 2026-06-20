@@ -31,8 +31,8 @@ ClockScope ClockEnteringParentheses(const ClockScope& incoming) {
 
 ClockScope ClockAfterParentheses(const ClockScope& incoming,
                                  const ClockScope& /*interior_terminal*/) {
-  // A clocking event introduced inside the parentheses does not flow out, so the
-  // surrounding scope is unaffected by whatever clock the interior ends on.
+  // A clocking event introduced inside the parentheses does not flow out, so
+  // the surrounding scope is unaffected by whatever clock the interior ends on.
   return incoming;
 }
 

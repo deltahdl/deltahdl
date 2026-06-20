@@ -83,4 +83,4 @@ TEST(FullAndParallelConnectionElaboration, ErrorParallelScalarToVector) {
   EXPECT_TRUE(f.has_errors);
 }
 
-}
+}  // namespace

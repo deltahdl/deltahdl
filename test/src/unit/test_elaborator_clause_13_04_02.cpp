@@ -98,4 +98,4 @@ TEST(FunctionLifetimeElaboration, AutoFunctionItemHierRefInInitialError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-}
+}  // namespace

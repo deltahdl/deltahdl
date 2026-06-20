@@ -80,4 +80,4 @@ TEST(ClockingHierExprSim, InoutHierSignalBidirectional) {
   EXPECT_EQ(bidir->value.ToUint64(), 0x11u);
 }
 
-}
+}  // namespace

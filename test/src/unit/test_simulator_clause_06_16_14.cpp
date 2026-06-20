@@ -43,4 +43,4 @@ TEST(StringMethods, BintoaIsInverseOfAtobin) {
   EXPECT_EQ(result.ToUint64(), 13u);
 }
 
-}
+}  // namespace

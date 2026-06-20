@@ -27,4 +27,4 @@ TEST(StringIndexAssocArrayParsing, AssocArrayStringIndex_DimExpr) {
   EXPECT_EQ(item->unpacked_dims[0]->text, "string");
 }
 
-}
+}  // namespace

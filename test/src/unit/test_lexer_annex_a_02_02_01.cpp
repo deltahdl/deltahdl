@@ -283,4 +283,4 @@ TEST(NetAndVariableTypeLexing, SizedLiteralStillLexesAsOneToken) {
   EXPECT_EQ(tokens[0].text, "4'd5");
 }
 
-}
+}  // namespace

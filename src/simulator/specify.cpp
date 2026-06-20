@@ -12,16 +12,13 @@ uint64_t ClampPathDelay(int64_t signed_value) {
 }
 
 void ExpandTransitionDelays(PathDelay& pd) {
-
   switch (pd.delay_count) {
     case 1: {
-
       const uint64_t t = pd.delays[0];
       for (int i = 1; i < 6; ++i) pd.delays[i] = t;
       break;
     }
     case 2: {
-
       const uint64_t trise = pd.delays[0];
       const uint64_t tfall = pd.delays[1];
       pd.delays[2] = trise;
@@ -31,7 +28,6 @@ void ExpandTransitionDelays(PathDelay& pd) {
       break;
     }
     case 3: {
-
       const uint64_t trise = pd.delays[0];
       const uint64_t tfall = pd.delays[1];
       const uint64_t tz = pd.delays[2];
@@ -46,10 +42,10 @@ void ExpandTransitionDelays(PathDelay& pd) {
   }
 
   if (pd.delay_count == 12) return;
-  pd.delays[6]  = std::min(pd.delays[2], pd.delays[0]);
-  pd.delays[7]  = std::max(pd.delays[3], pd.delays[0]);
-  pd.delays[8]  = std::min(pd.delays[4], pd.delays[1]);
-  pd.delays[9]  = std::max(pd.delays[5], pd.delays[1]);
+  pd.delays[6] = std::min(pd.delays[2], pd.delays[0]);
+  pd.delays[7] = std::max(pd.delays[3], pd.delays[0]);
+  pd.delays[8] = std::min(pd.delays[4], pd.delays[1]);
+  pd.delays[9] = std::max(pd.delays[5], pd.delays[1]);
   pd.delays[10] = std::max(pd.delays[4], pd.delays[2]);
   pd.delays[11] = std::min(pd.delays[3], pd.delays[5]);
 }
@@ -106,7 +102,6 @@ void InitDefaultPulseLimits(PathDelay& pd) {
 
 void ApplyPulseControlOverride(PathDelay& pd, uint64_t reject, bool has_error,
                                uint64_t error) {
-
   const uint64_t effective_error = has_error ? error : reject;
   for (int i = 0; i < 12; ++i) {
     pd.reject_limit[i] = reject;
@@ -116,7 +111,6 @@ void ApplyPulseControlOverride(PathDelay& pd, uint64_t reject, bool has_error,
 
 void ApplyGlobalPulseLimits(PathDelay& pd, uint8_t reject_pct,
                             uint8_t error_pct) {
-
   if (error_pct < reject_pct) error_pct = reject_pct;
   for (int i = 0; i < 12; ++i) {
     pd.reject_limit[i] = pd.delays[i] * reject_pct / 100;
@@ -126,7 +120,6 @@ void ApplyGlobalPulseLimits(PathDelay& pd, uint8_t reject_pct,
 
 void ApplySdfPulseLimits(PathDelay& pd, uint64_t reject, bool has_error,
                          uint64_t error) {
-
   const uint64_t effective_error = has_error ? error : reject;
   for (int i = 0; i < 12; ++i) {
     pd.reject_limit[i] = reject;
@@ -135,7 +128,6 @@ void ApplySdfPulseLimits(PathDelay& pd, uint64_t reject, bool has_error,
 }
 
 void SpecifyManager::AddPathDelay(PathDelay delay, bool preserve_pulse_limits) {
-
   const bool sdf_is_nonconditional =
       delay.condition.empty() && !delay.is_ifnone;
   if (sdf_is_nonconditional) {
@@ -143,7 +135,6 @@ void SpecifyManager::AddPathDelay(PathDelay delay, bool preserve_pulse_limits) {
     for (auto& existing : path_delays_) {
       if (existing.src_port == delay.src_port &&
           existing.dst_port == delay.dst_port) {
-
         std::string saved_cond = existing.condition;
         bool saved_ifnone = existing.is_ifnone;
         uint64_t saved_reject[12];
@@ -196,7 +187,6 @@ void SpecifyManager::AddPathDelay(PathDelay delay, bool preserve_pulse_limits) {
 }
 
 void SpecifyManager::IncrementPathDelay(const PathDelay& delta) {
-
   const bool sdf_is_nonconditional =
       delta.condition.empty() && !delta.is_ifnone;
   bool matched = false;
@@ -223,8 +213,8 @@ void SpecifyManager::IncrementPathDelay(const PathDelay& delta) {
   if (!matched) path_delays_.push_back(delta);
 }
 
-void SpecifyManager::IncrementInterconnectDelay(const InterconnectDelay& delta) {
-
+void SpecifyManager::IncrementInterconnectDelay(
+    const InterconnectDelay& delta) {
   for (auto& existing : interconnect_delays_) {
     if (existing.src_port == delta.src_port &&
         existing.dst_port == delta.dst_port) {
@@ -240,7 +230,6 @@ void SpecifyManager::IncrementInterconnectDelay(const InterconnectDelay& delta) 
 }
 
 void SpecifyManager::AddTimingCheck(TimingCheckEntry check) {
-
   for (auto& existing : timing_checks_) {
     if (existing.kind == check.kind &&
         existing.ref_signal == check.ref_signal &&
@@ -256,16 +245,15 @@ void SpecifyManager::AddTimingCheck(TimingCheckEntry check) {
 }
 
 void SpecifyManager::AnnotateSdfTimingCheck(const SdfTcAnnotation& a) {
-
   bool matched = false;
   for (auto& existing : timing_checks_) {
     if (existing.kind != a.kind) continue;
     if (existing.ref_signal != a.ref_signal) continue;
     if (existing.data_signal != a.data_signal) continue;
-    if (a.ref_edge != SpecifyEdge::kNone &&
-        existing.ref_edge != a.ref_edge) continue;
-    if (a.data_edge != SpecifyEdge::kNone &&
-        existing.data_edge != a.data_edge) continue;
+    if (a.ref_edge != SpecifyEdge::kNone && existing.ref_edge != a.ref_edge)
+      continue;
+    if (a.data_edge != SpecifyEdge::kNone && existing.data_edge != a.data_edge)
+      continue;
     if (!a.condition.empty() && existing.condition != a.condition) continue;
 
     if (a.set_limit) existing.limit = a.limit;
@@ -296,7 +284,6 @@ void SpecifyManager::AnnotateSdf(SdfAnnotation annotation) {
 }
 
 void SpecifyManager::SetSpecparamValue(SpecparamValue spec) {
-
   std::string name = spec.name;
   uint64_t value = spec.value;
   auto it = specparam_index_.find(spec.name);
@@ -313,7 +300,6 @@ void SpecifyManager::SetSpecparamValue(SpecparamValue spec) {
 }
 
 void SpecifyManager::IncrementSpecparamValue(SpecparamValue delta) {
-
   std::string name = delta.name;
   uint64_t added = delta.value;
   uint64_t new_value = added;
@@ -335,19 +321,16 @@ void SpecifyManager::IncrementSpecparamValue(SpecparamValue delta) {
 
 void SpecifyManager::RegisterSpecparamReevaluation(
     std::string name, std::function<void(uint64_t)> reevaluate) {
-
   specparam_reevaluators_.emplace_back(std::move(name), std::move(reevaluate));
 }
 
 void SpecifyManager::AddSdfPulseLimit(std::string_view src,
-                                       std::string_view dst, uint64_t reject,
-                                       bool has_error, uint64_t error,
-                                       bool is_percent) {
-
+                                      std::string_view dst, uint64_t reject,
+                                      bool has_error, uint64_t error,
+                                      bool is_percent) {
   for (auto& pd : path_delays_) {
     if (pd.src_port != src || pd.dst_port != dst) continue;
     if (is_percent) {
-
       uint64_t reject_pct = reject;
       uint64_t error_pct = has_error ? error : reject;
       if (error_pct < reject_pct) error_pct = reject_pct;
@@ -371,7 +354,6 @@ void SpecifyManager::IncrementSdfPulseLimit(std::string_view src,
                                             int64_t reject_delta,
                                             bool has_error,
                                             int64_t error_delta) {
-
   const int64_t effective_error_delta = has_error ? error_delta : reject_delta;
   for (auto& pd : path_delays_) {
     if (pd.src_port != src || pd.dst_port != dst) continue;
@@ -382,25 +364,21 @@ void SpecifyManager::IncrementSdfPulseLimit(std::string_view src,
           static_cast<int64_t>(pd.error_limit[i]) + effective_error_delta;
       pd.reject_limit[i] =
           new_reject < 0 ? 0u : static_cast<uint64_t>(new_reject);
-      pd.error_limit[i] =
-          new_error < 0 ? 0u : static_cast<uint64_t>(new_error);
+      pd.error_limit[i] = new_error < 0 ? 0u : static_cast<uint64_t>(new_error);
     }
   }
 }
 
 void SpecifyManager::SetGlobalPulseLimitPercents(uint8_t reject_pct,
                                                  uint8_t error_pct) {
-
   reject_pulse_pct_ = reject_pct;
   error_pulse_pct_ = error_pct;
 }
 
 void SpecifyManager::AddInterconnectDelay(InterconnectDelay delay) {
-
   if (delay.src_port.empty()) {
     interconnect_delays_.erase(
-        std::remove_if(interconnect_delays_.begin(),
-                       interconnect_delays_.end(),
+        std::remove_if(interconnect_delays_.begin(), interconnect_delays_.end(),
                        [&](const InterconnectDelay& existing) {
                          return existing.dst_port == delay.dst_port;
                        }),
@@ -421,7 +399,6 @@ void SpecifyManager::AddInterconnectDelay(InterconnectDelay delay) {
 
 uint64_t SpecifyManager::GetPathDelay(std::string_view src,
                                       std::string_view dst) const {
-
   for (const auto& pd : path_delays_) {
     if (pd.src_port == src && pd.dst_port == dst) {
       return pd.delays[0];
@@ -504,7 +481,6 @@ bool SpecifyManager::CheckRecremViolation(std::string_view ref,
     if (check.ref_signal != ref) continue;
     if (check.data_signal != data) continue;
     if (check.negative_timing_check_enabled) {
-
       const int64_t ref_t = static_cast<int64_t>(ref_time);
       const int64_t data_t = static_cast<int64_t>(data_time);
       const int64_t lower = ref_t - check.signed_limit;
@@ -515,10 +491,8 @@ bool SpecifyManager::CheckRecremViolation(std::string_view ref,
 
     if (check.limit == 0 && check.limit2 == 0) continue;
     if (data_time <= ref_time) {
-
       if (ref_time - data_time < check.limit2) return true;
     } else {
-
       if (data_time - ref_time < check.limit) return true;
     }
   }
@@ -595,10 +569,10 @@ bool SpecifyManager::CheckNochangeViolation(std::string_view ref,
     if (check.ref_signal != ref) continue;
     if (check.data_signal != data) continue;
 
-    int64_t begin = static_cast<int64_t>(leading_ref_time) -
-                    check.start_edge_offset;
-    int64_t end = static_cast<int64_t>(trailing_ref_time) +
-                  check.end_edge_offset;
+    int64_t begin =
+        static_cast<int64_t>(leading_ref_time) - check.start_edge_offset;
+    int64_t end =
+        static_cast<int64_t>(trailing_ref_time) + check.end_edge_offset;
     int64_t t = static_cast<int64_t>(data_time);
 
     if (begin < t && t < end) return true;
@@ -620,30 +594,28 @@ bool SpecifyManager::CheckPeriodViolation(std::string_view ref,
   return false;
 }
 
-bool ReportsFullskewViolation(uint64_t timestamp_time,
-                              uint64_t next_event_time,
+bool ReportsFullskewViolation(uint64_t timestamp_time, uint64_t next_event_time,
                               bool next_event_is_timecheck, uint64_t limit,
                               bool event_based_flag) {
-
   if (next_event_time <= timestamp_time) return false;
   uint64_t elapsed = next_event_time - timestamp_time;
   if (event_based_flag) {
-
     return next_event_is_timecheck && elapsed > limit;
   }
 
   return elapsed > limit;
 }
 
-FullskewWindowAction FullskewSecondTimestampAction(bool timestamp_condition_holds,
-                                                   bool remain_active_flag) {
-  // A timestamp whose condition holds (or that carries no condition) always opens a
-  // fresh timing window, superseding any window in progress and re-arming the check
-  // if it was dormant.
+FullskewWindowAction FullskewSecondTimestampAction(
+    bool timestamp_condition_holds, bool remain_active_flag) {
+  // A timestamp whose condition holds (or that carries no condition) always
+  // opens a fresh timing window, superseding any window in progress and
+  // re-arming the check if it was dormant.
   if (timestamp_condition_holds) return FullskewWindowAction::kReplaceWindow;
 
-  // With a false condition the remain_active_flag is decisive: when set, the event is
-  // discarded and the existing window stands; when clear, the check turns dormant.
+  // With a false condition the remain_active_flag is decisive: when set, the
+  // event is discarded and the existing window stands; when clear, the check
+  // turns dormant.
   if (remain_active_flag) return FullskewWindowAction::kIgnore;
   return FullskewWindowAction::kGoDormant;
 }
@@ -651,11 +623,9 @@ FullskewWindowAction FullskewSecondTimestampAction(bool timestamp_condition_hold
 bool ReportsTimeskewViolation(uint64_t ref_time, uint64_t next_event_time,
                               bool next_event_is_data, uint64_t limit,
                               bool event_based_flag) {
-
   if (next_event_time <= ref_time) return false;
   uint64_t elapsed = next_event_time - ref_time;
   if (event_based_flag) {
-
     return next_event_is_data && elapsed > limit;
   }
 
@@ -667,19 +637,15 @@ Logic4Word ToggleNotifierOnViolation(Logic4Word current) {
   const bool pre_b = (current.bval & 1u) != 0u;
   Logic4Word result;
   if (pre_a && pre_b) {
-
     result.aval = 1u;
     result.bval = 1u;
   } else if (pre_b) {
-
     result.aval = 0u;
     result.bval = 0u;
   } else if (pre_a) {
-
     result.aval = 0u;
     result.bval = 0u;
   } else {
-
     result.aval = 1u;
     result.bval = 0u;
   }
@@ -703,7 +669,6 @@ bool IsDeterministicTimingCheckCondition(TimingCheckConditionKind kind) {
 bool TimingCheckConditionEnables(TimingCheckConditionKind kind,
                                  Logic4Word conditioning_lsb,
                                  uint8_t scalar_constant_bit) {
-
   const bool known = (conditioning_lsb.bval & 1u) == 0u;
   if (!known) {
     return !IsDeterministicTimingCheckCondition(kind);
@@ -726,9 +691,7 @@ bool TimingCheckConditionEnables(TimingCheckConditionKind kind,
 }
 
 bool IsSingleSignalTimingCheck(TimingCheckKind kind) {
-
-  return kind == TimingCheckKind::kWidth ||
-         kind == TimingCheckKind::kPeriod;
+  return kind == TimingCheckKind::kWidth || kind == TimingCheckKind::kPeriod;
 }
 
 uint64_t TimingCheckExpandedCount(TimingCheckKind kind, uint32_t ref_width,
@@ -744,7 +707,6 @@ uint64_t TimingCheckExpandedCount(TimingCheckKind kind, uint32_t ref_width,
 
 bool TimingCheckUsesDelayedSignals(TimingCheckKind kind) {
   switch (kind) {
-
     case TimingCheckKind::kSetup:
     case TimingCheckKind::kHold:
     case TimingCheckKind::kSetuphold:
@@ -766,7 +728,6 @@ bool TimingCheckUsesDelayedSignals(TimingCheckKind kind) {
 
 AdjustedNegativeTimingLimit AdjustNegativeTimingCheckLimit(
     int64_t adjusted_limit) {
-
   if (adjusted_limit <= 0) {
     return {0u, true};
   }
@@ -775,7 +736,6 @@ AdjustedNegativeTimingLimit AdjustNegativeTimingCheckLimit(
 
 bool NegativeTimingWindowCanYieldViolation(int64_t lower, int64_t upper,
                                            uint64_t precision_ticks) {
-
   if (upper <= lower) return false;
 
   const int64_t min_width = 2 * static_cast<int64_t>(precision_ticks);
@@ -783,7 +743,6 @@ bool NegativeTimingWindowCanYieldViolation(int64_t lower, int64_t upper,
 }
 
 bool ZeroSmallestNegativeTimingLimit(std::vector<int64_t>& limits) {
-
   size_t best_index = limits.size();
   for (size_t i = 0; i < limits.size(); ++i) {
     if (limits[i] >= 0) continue;
@@ -798,7 +757,6 @@ bool ZeroSmallestNegativeTimingLimit(std::vector<int64_t>& limits) {
 
 NegativeTimingConditionRole TimestampConditionRole(int64_t signed_setup,
                                                    int64_t signed_hold) {
-
   if (signed_setup < 0 && signed_hold < 0) {
     return NegativeTimingConditionRole::kNone;
   }
@@ -812,7 +770,6 @@ NegativeTimingConditionRole TimestampConditionRole(int64_t signed_setup,
 
 NegativeTimingConditionRole TimecheckConditionRole(int64_t signed_setup,
                                                    int64_t signed_hold) {
-
   if (signed_setup < 0 && signed_hold < 0) {
     return NegativeTimingConditionRole::kNone;
   }
@@ -821,23 +778,18 @@ NegativeTimingConditionRole TimecheckConditionRole(int64_t signed_setup,
   return NegativeTimingConditionRole::kBoth;
 }
 
-bool NegativeTimingCheckNotifierShouldToggle(
-    bool delayed_adjusted_violation,
-    bool ) {
-
+bool NegativeTimingCheckNotifierShouldToggle(bool delayed_adjusted_violation,
+                                             bool) {
   return delayed_adjusted_violation;
 }
 
-bool NegativeTimingCheckOptionActive(
-    bool negative_timing_check_option_enabled,
-    bool all_timing_checks_disabled) {
-
+bool NegativeTimingCheckOptionActive(bool negative_timing_check_option_enabled,
+                                     bool all_timing_checks_disabled) {
   return negative_timing_check_option_enabled && !all_timing_checks_disabled;
 }
 
 int64_t EffectiveTimingCheckSignalDelay(int64_t requested_delay,
                                         bool negative_timing_option_active) {
-
   if (!negative_timing_option_active) return 0;
   return requested_delay;
 }
@@ -851,7 +803,6 @@ bool SpecifyManager::CheckSetupholdViolation(std::string_view ref,
     if (check.ref_signal != ref) continue;
     if (check.data_signal != data) continue;
     if (check.negative_timing_check_enabled) {
-
       const int64_t ref_t = static_cast<int64_t>(ref_time);
       const int64_t data_t = static_cast<int64_t>(data_time);
       const int64_t lower = ref_t - check.signed_limit;
@@ -862,14 +813,12 @@ bool SpecifyManager::CheckSetupholdViolation(std::string_view ref,
 
     if (check.limit == 0 && check.limit2 == 0) continue;
     if (data_time <= ref_time) {
-
       if (ref_time - data_time < check.limit) return true;
     } else {
-
       if (data_time - ref_time < check.limit2) return true;
     }
   }
   return false;
 }
 
-}
+}  // namespace delta

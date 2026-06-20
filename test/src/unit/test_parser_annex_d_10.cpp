@@ -41,4 +41,4 @@ TEST(OptionalScaleParser, ScaleAcceptsSimpleName) {
   EXPECT_EQ(call->args[0]->kind, ExprKind::kIdentifier);
 }
 
-}
+}  // namespace

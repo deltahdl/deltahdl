@@ -147,7 +147,10 @@ TEST(ElabSeverityTask, ErrorDoesNotAbortElaboration) {
   ASSERT_FALSE(design->top_modules.empty());
   bool found = false;
   for (const auto& net : design->top_modules[0]->nets) {
-    if (net.name == "after_error") { found = true; break; }
+    if (net.name == "after_error") {
+      found = true;
+      break;
+    }
   }
   EXPECT_TRUE(found);
   EXPECT_TRUE(design->simulation_blocked);
@@ -363,4 +366,4 @@ TEST(ElabSeverityTask, NonConstantArgInFatalRejected) {
   EXPECT_TRUE(ef.has_errors);
 }
 
-}
+}  // namespace

@@ -14,12 +14,10 @@ constexpr const char* kA = "top.a1";
 // §39.5.2: the six per-assertion action-control constants must exist and be
 // distinct from one another.
 TEST(SvVpiUser, AssertionActionControlConstants) {
-  int values[] = {vpiAssertionDisablePassAction,
-                  vpiAssertionEnablePassAction,
-                  vpiAssertionDisableFailAction,
-                  vpiAssertionEnableFailAction,
-                  vpiAssertionDisableVacuousAction,
-                  vpiAssertionEnableNonvacuousAction};
+  int values[] = {
+      vpiAssertionDisablePassAction,    vpiAssertionEnablePassAction,
+      vpiAssertionDisableFailAction,    vpiAssertionEnableFailAction,
+      vpiAssertionDisableVacuousAction, vpiAssertionEnableNonvacuousAction};
   for (size_t i = 0; i < std::size(values); ++i) {
     for (size_t j = i + 1; j < std::size(values); ++j) {
       EXPECT_NE(values[i], values[j]);
@@ -46,8 +44,8 @@ TEST(AssertionControl, EmptyHandleRejected) {
   AssertionApi api;
   EXPECT_FALSE(api.Control(vpiAssertionDisable, {}));
   EXPECT_FALSE(api.ControlAttempt(vpiAssertionKill, {}, 10));
-  EXPECT_FALSE(api.ControlStep(vpiAssertionEnableStep, {}, 10,
-                               vpiAssertionClockSteps));
+  EXPECT_FALSE(
+      api.ControlStep(vpiAssertionEnableStep, {}, 10, vpiAssertionClockSteps));
 }
 
 // §39.5.2 vpiAssertionReset: discards attempts in progress for this assertion
@@ -204,8 +202,9 @@ TEST(AssertionControl, EnableStepEnablesStepping) {
 // control constant; any other value rejects the control.
 TEST(AssertionControl, EnableStepRequiresStepControlConstant) {
   AssertionApi api;
-  EXPECT_FALSE(api.ControlStep(vpiAssertionEnableStep, kA, /*attempt=*/30,
-                               /*not a step control constant=*/vpiAssertionEnable));
+  EXPECT_FALSE(
+      api.ControlStep(vpiAssertionEnableStep, kA, /*attempt=*/30,
+                      /*not a step control constant=*/vpiAssertionEnable));
   EXPECT_FALSE(api.AssertionStepEnabled(kA, 30));
 
   EXPECT_TRUE(api.ControlStep(vpiAssertionEnableStep, kA, /*attempt=*/30,

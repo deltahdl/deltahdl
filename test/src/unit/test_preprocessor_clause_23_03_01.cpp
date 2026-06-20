@@ -16,11 +16,11 @@ TEST(TopLevelModules, MultipleModulesSurvivePreprocessing) {
 }
 
 TEST(TopLevelModules, DollarRootSurvivesPreprocessing) {
-  EXPECT_TRUE(ParseWithPreprocessorOk(
-      "module top;\n"
-      "  logic x;\n"
-      "  assign x = $root.top.x;\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseWithPreprocessorOk("module top;\n"
+                              "  logic x;\n"
+                              "  assign x = $root.top.x;\n"
+                              "endmodule\n"));
 }
 
 TEST(TopLevelModules, ConditionallyCompiledModulesAffectTopCandidates) {
@@ -47,4 +47,4 @@ TEST(TopLevelModules, UndefinedConditionalExcludesModule) {
   EXPECT_EQ(r.cu->modules[0]->name, "a");
 }
 
-}
+}  // namespace

@@ -301,8 +301,8 @@ TEST(TaskBodyElaboration, AutoTaskLocalInMonitorSubexpressionError) {
 }
 
 // §13.3.2: assigning a bit-select of an automatic task variable with a
-// nonblocking assignment writes part of that variable's storage and is therefore
-// also prohibited, not just a whole-variable target.
+// nonblocking assignment writes part of that variable's storage and is
+// therefore also prohibited, not just a whole-variable target.
 TEST(TaskBodyElaboration, AutoTaskLocalBitSelectInNonblockingError) {
   ElabFixture f;
   ElaborateSrc(
@@ -365,4 +365,4 @@ TEST(TaskBodyElaboration, MonitorOfModuleVarOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

@@ -65,7 +65,6 @@ TEST(SvVpiUser, DpiAccessTypeConstants) {
   EXPECT_EQ(vpiDPIImportAcc, 4);
 }
 
-
 TEST(SvVpiUserConstants, VariableAndTypespecTypes) {
   EXPECT_EQ(vpiVarBit, vpiRegBit);
   EXPECT_EQ(vpiLogicVar, vpiReg);
@@ -289,4 +288,4 @@ TEST(SvVpiUserConstants, AliasSpellingsResolveToCanonicalSelectors) {
   EXPECT_EQ(vpiLogicNet, vpiNet);
 }
 
-}
+}  // namespace

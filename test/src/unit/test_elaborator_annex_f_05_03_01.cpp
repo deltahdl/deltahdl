@@ -18,8 +18,8 @@ Letter A(std::set<std::string> atoms) { return LetterAtoms(std::move(atoms)); }
 auto BoolSeq(const std::string& name) { return SeqBoolean(BoolAtom(name)); }
 
 // A clocked property @( clk ) strong( a ): the Boolean a sampled on clk. Under
-// T^p(., 1) it expands to strong(!clk [*0:$] ##1 (clk & a)), so it holds exactly
-// when a is true at the first clk tick.
+// T^p(., 1) it expands to strong(!clk [*0:$] ##1 (clk & a)), so it holds
+// exactly when a is true at the first clk tick.
 auto ClockedStrongA() {
   return ClkClock(BoolAtom("clk"), ClkStrong(SeqBoolean(BoolAtom("a"))));
 }
@@ -101,12 +101,11 @@ TEST(NeutralSatisfaction, NexttimeShiftsPastTheFirstLetter) {
   EXPECT_FALSE(NeutrallySatisfies(Word{A({"a"})}, *p));
 }
 
-// §F.5.3.1: w |= ( P1 until P2 ) iff some suffix satisfies P2 with every earlier
-// suffix satisfying P1, or every suffix satisfies P1.
+// §F.5.3.1: w |= ( P1 until P2 ) iff some suffix satisfies P2 with every
+// earlier suffix satisfying P1, or every suffix satisfies P1.
 TEST(NeutralSatisfaction, UntilHoldsUntilTheReleasingSuffix) {
   auto p = PropUntil(PropStrong(BoolSeq("a")), PropStrong(BoolSeq("b")));
-  EXPECT_TRUE(
-      NeutrallySatisfies(Word{A({"a"}), A({"a"}), A({"b"})}, *p));
+  EXPECT_TRUE(NeutrallySatisfies(Word{A({"a"}), A({"a"}), A({"b"})}, *p));
   // No suffix releases with b and not every suffix satisfies a.
   EXPECT_FALSE(NeutrallySatisfies(Word{A({"a"}), A({"x"})}, *p));
 }
@@ -226,8 +225,9 @@ TEST(NeutralSatisfaction, NotLeavesAtomLettersUnchanged) {
 // Edge of §F.5.3.1: ( R |-> P ) with a two-letter antecedent matches at index
 // 1, and the consequent is then evaluated on the overlap suffix w^{1.}.
 TEST(NeutralSatisfaction, ImplicationEvaluatesConsequentOnTheOverlapSuffix) {
-  auto impl = PropImplication(SeqConcat(BoolSeq("a"), BoolSeq("b")),
-                              PropStrong(SeqConcat(BoolSeq("b"), BoolSeq("c"))));
+  auto impl =
+      PropImplication(SeqConcat(BoolSeq("a"), BoolSeq("b")),
+                      PropStrong(SeqConcat(BoolSeq("b"), BoolSeq("c"))));
   // Antecedent (a ##1 b) matches [a][b]; consequent strong(b ##1 c) holds on
   // the suffix [b][c].
   EXPECT_TRUE(NeutrallySatisfies(Word{A({"a"}), A({"b"}), A({"c"})}, *impl));
@@ -238,9 +238,8 @@ TEST(NeutralSatisfaction, ImplicationEvaluatesConsequentOnTheOverlapSuffix) {
 // Edge of §F.5.3.1: the abort of ( accept_on (b) P ) can fire at a later index,
 // completing a nonempty prefix with T^omega so an unfinished sequence passes.
 TEST(NeutralSatisfaction, AcceptOnCompletesNonemptyPrefixAtLaterAbort) {
-  auto p =
-      PropAcceptOn(BoolAtom("r"), PropStrong(SeqConcat(BoolSeq("a"),
-                                                       BoolSeq("b"))));
+  auto p = PropAcceptOn(BoolAtom("r"),
+                        PropStrong(SeqConcat(BoolSeq("a"), BoolSeq("b"))));
   // strong(a ##1 b) fails on [a][r], but the abort at index 1 completes the
   // prefix [a] with T^omega, which finishes the sequence.
   EXPECT_TRUE(NeutrallySatisfies(Word{A({"a"}), A({"r"})}, *p));
@@ -322,9 +321,8 @@ TEST(ClockedTopLevel, DisableIffIsDisabledWhenCompletionsDiverge) {
   // No letter satisfies d, so the disabling condition never fires.
   EXPECT_FALSE(DisablesTopLevelClocked(Word{A({"clk", "a"})}, *u));
   // A bare clocked property is never disabled.
-  EXPECT_FALSE(
-      DisablesTopLevelClocked(Word{A({"clk", "a"})},
-                              *ClockedTopProperty(ClockedStrongA())));
+  EXPECT_FALSE(DisablesTopLevelClocked(Word{A({"clk", "a"})},
+                                       *ClockedTopProperty(ClockedStrongA())));
 }
 
 // §F.5.3.1: the pass/disabled/fail trichotomy carries over to U.
@@ -350,26 +348,28 @@ auto BodyStrong(const std::string& name) {
 // clock and enabling condition hold, the body passes or is disabled.
 TEST(Assertion, AlwaysClockedAssertChecksEveryClockTick) {
   auto a = AssertionWithClock(AssertionStatement::Activation::kAlways,
-                              AssertionStatement::Role::kAssert, BoolAtom("clk"),
-                              BodyStrong("a"));
+                              AssertionStatement::Role::kAssert,
+                              BoolAtom("clk"), BodyStrong("a"));
   // clk tick with a: the body passes.
-  EXPECT_TRUE(NeutrallySatisfiesAssertion(Word{A({"clk", "a"})}, *BoolTrue(), *a));
+  EXPECT_TRUE(
+      NeutrallySatisfiesAssertion(Word{A({"clk", "a"})}, *BoolTrue(), *a));
   // clk tick without a: the body fails at the activation point.
   EXPECT_FALSE(NeutrallySatisfiesAssertion(Word{A({"clk"})}, *BoolTrue(), *a));
   // No clk tick: no activation, so the assert holds vacuously.
   EXPECT_TRUE(NeutrallySatisfiesAssertion(Word{A({"x"})}, *BoolTrue(), *a));
 }
 
-// §F.5.3.1: w, b |= always @(c) assume property T iff w, b |= always @(c) assert
-// property T -- assume shares the assert definition.
+// §F.5.3.1: w, b |= always @(c) assume property T iff w, b |= always @(c)
+// assert property T -- assume shares the assert definition.
 TEST(Assertion, AssumeSharesTheAssertDefinition) {
-  auto assert_stmt = AssertionWithClock(
-      AssertionStatement::Activation::kAlways,
-      AssertionStatement::Role::kAssert, BoolAtom("clk"), BodyStrong("a"));
-  auto assume_stmt = AssertionWithClock(
-      AssertionStatement::Activation::kAlways,
-      AssertionStatement::Role::kAssume, BoolAtom("clk"), BodyStrong("a"));
-  for (const Word& w : {Word{A({"clk", "a"})}, Word{A({"clk"})}, Word{A({"x"})}}) {
+  auto assert_stmt = AssertionWithClock(AssertionStatement::Activation::kAlways,
+                                        AssertionStatement::Role::kAssert,
+                                        BoolAtom("clk"), BodyStrong("a"));
+  auto assume_stmt = AssertionWithClock(AssertionStatement::Activation::kAlways,
+                                        AssertionStatement::Role::kAssume,
+                                        BoolAtom("clk"), BodyStrong("a"));
+  for (const Word& w :
+       {Word{A({"clk", "a"})}, Word{A({"clk"})}, Word{A({"x"})}}) {
     EXPECT_EQ(NeutrallySatisfiesAssertion(w, *BoolTrue(), *assert_stmt),
               NeutrallySatisfiesAssertion(w, *BoolTrue(), *assume_stmt));
   }
@@ -381,7 +381,8 @@ TEST(Assertion, AlwaysClockedCoverNeedsOnePassingTick) {
   auto a = AssertionWithClock(AssertionStatement::Activation::kAlways,
                               AssertionStatement::Role::kCover, BoolAtom("clk"),
                               BodyStrong("a"));
-  EXPECT_TRUE(NeutrallySatisfiesAssertion(Word{A({"clk", "a"})}, *BoolTrue(), *a));
+  EXPECT_TRUE(
+      NeutrallySatisfiesAssertion(Word{A({"clk", "a"})}, *BoolTrue(), *a));
   // A clk tick without a does not cover.
   EXPECT_FALSE(NeutrallySatisfiesAssertion(Word{A({"clk"})}, *BoolTrue(), *a));
   // No clk tick: nothing covers.
@@ -392,11 +393,11 @@ TEST(Assertion, AlwaysClockedCoverNeedsOnePassingTick) {
 // tick (the prefix tightly satisfies !c [*0:$] ##1 c).
 TEST(Assertion, InitialClockedAssertFiresAtFirstClockTick) {
   auto a = AssertionWithClock(AssertionStatement::Activation::kInitial,
-                              AssertionStatement::Role::kAssert, BoolAtom("clk"),
-                              BodyStrong("a"));
+                              AssertionStatement::Role::kAssert,
+                              BoolAtom("clk"), BodyStrong("a"));
   // First clk tick at index 1 with a present: passes.
-  EXPECT_TRUE(
-      NeutrallySatisfiesAssertion(Word{A({"x"}), A({"clk", "a"})}, *BoolTrue(), *a));
+  EXPECT_TRUE(NeutrallySatisfiesAssertion(Word{A({"x"}), A({"clk", "a"})},
+                                          *BoolTrue(), *a));
   // First clk tick at index 1 without a: fails.
   EXPECT_FALSE(
       NeutrallySatisfiesAssertion(Word{A({"x"}), A({"clk"})}, *BoolTrue(), *a));
@@ -409,11 +410,12 @@ TEST(Assertion, InitialClockedAssertFiresAtFirstClockTick) {
 // activation index, the obligation does not fire.
 TEST(Assertion, EnablingConditionGatesActivation) {
   auto a = AssertionWithClock(AssertionStatement::Activation::kAlways,
-                              AssertionStatement::Role::kAssert, BoolAtom("clk"),
-                              BodyStrong("a"));
+                              AssertionStatement::Role::kAssert,
+                              BoolAtom("clk"), BodyStrong("a"));
   // The body would fail at the clk tick, but b = en is absent, so no
   // activation and the assert holds.
-  EXPECT_TRUE(NeutrallySatisfiesAssertion(Word{A({"clk"})}, *BoolAtom("en"), *a));
+  EXPECT_TRUE(
+      NeutrallySatisfiesAssertion(Word{A({"clk"})}, *BoolAtom("en"), *a));
   // With en present alongside the failing tick, the obligation fires and fails.
   EXPECT_FALSE(
       NeutrallySatisfiesAssertion(Word{A({"clk", "en"})}, *BoolAtom("en"), *a));
@@ -422,13 +424,15 @@ TEST(Assertion, EnablingConditionGatesActivation) {
 // §F.5.3.1: w, b |= always assume property U / cover property U use the
 // intrinsically clocked body U with no explicit leading clock.
 TEST(Assertion, ClockedTopBodyUsesTheIntrinsicClock) {
-  auto cover = AssertionWithClockedTop(
-      AssertionStatement::Activation::kAlways,
-      AssertionStatement::Role::kCover, ClockedTopProperty(ClockedStrongA()));
+  auto cover = AssertionWithClockedTop(AssertionStatement::Activation::kAlways,
+                                       AssertionStatement::Role::kCover,
+                                       ClockedTopProperty(ClockedStrongA()));
   // Some index where the clocked body passes: covered.
-  EXPECT_TRUE(NeutrallySatisfiesAssertion(Word{A({"clk", "a"})}, *BoolTrue(), *cover));
+  EXPECT_TRUE(
+      NeutrallySatisfiesAssertion(Word{A({"clk", "a"})}, *BoolTrue(), *cover));
   // The clocked body never passes here: not covered.
-  EXPECT_FALSE(NeutrallySatisfiesAssertion(Word{A({"x"})}, *BoolTrue(), *cover));
+  EXPECT_FALSE(
+      NeutrallySatisfiesAssertion(Word{A({"x"})}, *BoolTrue(), *cover));
 }
 
 // §F.5.3.1: a word is feasible iff every assumption is satisfied on it; an
@@ -499,7 +503,8 @@ TEST(Assertion, AlwaysAssertUUsesTheIntrinsicClock) {
                                    AssertionStatement::Role::kAssert,
                                    ClockedTopProperty(ClockedStrongA()));
   // The clocked body passes at index 0: the assert holds.
-  EXPECT_TRUE(NeutrallySatisfiesAssertion(Word{A({"clk", "a"})}, *BoolTrue(), *a));
+  EXPECT_TRUE(
+      NeutrallySatisfiesAssertion(Word{A({"clk", "a"})}, *BoolTrue(), *a));
   // A clk tick without a: the body fails at the activation point.
   EXPECT_FALSE(NeutrallySatisfiesAssertion(Word{A({"clk"})}, *BoolTrue(), *a));
 }
@@ -511,8 +516,8 @@ TEST(Assertion, InitialAssertUFiresOnlyAtIndexZero) {
                                    AssertionStatement::Role::kAssert,
                                    ClockedTopProperty(ClockedStrongA()));
   // Index 0 satisfies the body, and the trailing letter is never examined.
-  EXPECT_TRUE(
-      NeutrallySatisfiesAssertion(Word{A({"clk", "a"}), A({"x"})}, *BoolTrue(), *a));
+  EXPECT_TRUE(NeutrallySatisfiesAssertion(Word{A({"clk", "a"}), A({"x"})},
+                                          *BoolTrue(), *a));
   // Index 0 fails the body.
   EXPECT_FALSE(NeutrallySatisfiesAssertion(Word{A({"clk"})}, *BoolTrue(), *a));
 }
@@ -521,11 +526,11 @@ TEST(Assertion, InitialAssertUFiresOnlyAtIndexZero) {
 // U -- assume shares the assert definition for the U body too.
 TEST(Assertion, AlwaysAssumeUSharesAssertU) {
   auto assert_stmt = AssertionWithClockedTop(
-      AssertionStatement::Activation::kAlways, AssertionStatement::Role::kAssert,
-      ClockedTopProperty(ClockedStrongA()));
+      AssertionStatement::Activation::kAlways,
+      AssertionStatement::Role::kAssert, ClockedTopProperty(ClockedStrongA()));
   auto assume_stmt = AssertionWithClockedTop(
-      AssertionStatement::Activation::kAlways, AssertionStatement::Role::kAssume,
-      ClockedTopProperty(ClockedStrongA()));
+      AssertionStatement::Activation::kAlways,
+      AssertionStatement::Role::kAssume, ClockedTopProperty(ClockedStrongA()));
   for (const Word& w :
        {Word{A({"clk", "a"})}, Word{A({"clk"})}, Word{A({"x"})}}) {
     EXPECT_EQ(NeutrallySatisfiesAssertion(w, *BoolTrue(), *assert_stmt),
@@ -571,8 +576,8 @@ TEST(Assertion, InitialClockedCoverFiresAtFirstTick) {
                               AssertionStatement::Role::kCover, BoolAtom("clk"),
                               BodyStrong("a"));
   // First clk tick at index 1 with a present: covered.
-  EXPECT_TRUE(
-      NeutrallySatisfiesAssertion(Word{A({"x"}), A({"clk", "a"})}, *BoolTrue(), *a));
+  EXPECT_TRUE(NeutrallySatisfiesAssertion(Word{A({"x"}), A({"clk", "a"})},
+                                          *BoolTrue(), *a));
   // First clk tick at index 1 without a: not covered.
   EXPECT_FALSE(
       NeutrallySatisfiesAssertion(Word{A({"x"}), A({"clk"})}, *BoolTrue(), *a));
@@ -587,7 +592,8 @@ TEST(Assertion, InitialCoverUFiresAtIndexZero) {
   auto a = AssertionWithClockedTop(AssertionStatement::Activation::kInitial,
                                    AssertionStatement::Role::kCover,
                                    ClockedTopProperty(ClockedStrongA()));
-  EXPECT_TRUE(NeutrallySatisfiesAssertion(Word{A({"clk", "a"})}, *BoolTrue(), *a));
+  EXPECT_TRUE(
+      NeutrallySatisfiesAssertion(Word{A({"clk", "a"})}, *BoolTrue(), *a));
   EXPECT_FALSE(NeutrallySatisfiesAssertion(Word{A({"clk"})}, *BoolTrue(), *a));
   // The enabling condition fails at index 0, so the cover never activates.
   EXPECT_FALSE(
@@ -611,14 +617,14 @@ TEST(ClockedTopLevel, ParenthesizedDisablingPropagates) {
 // is not satisfied.
 TEST(Assertion, AlwaysClockedAssertFailsWhenALaterTickFails) {
   auto a = AssertionWithClock(AssertionStatement::Activation::kAlways,
-                              AssertionStatement::Role::kAssert, BoolAtom("clk"),
-                              BodyStrong("a"));
+                              AssertionStatement::Role::kAssert,
+                              BoolAtom("clk"), BodyStrong("a"));
   // Index 0 passes (a at the tick), index 1 fails (no a at the tick).
-  EXPECT_FALSE(
-      NeutrallySatisfiesAssertion(Word{A({"clk", "a"}), A({"clk"})}, *BoolTrue(), *a));
+  EXPECT_FALSE(NeutrallySatisfiesAssertion(Word{A({"clk", "a"}), A({"clk"})},
+                                           *BoolTrue(), *a));
   // Every tick passes: the assert holds.
-  EXPECT_TRUE(NeutrallySatisfiesAssertion(Word{A({"clk", "a"}), A({"clk", "a"})},
-                                          *BoolTrue(), *a));
+  EXPECT_TRUE(NeutrallySatisfiesAssertion(
+      Word{A({"clk", "a"}), A({"clk", "a"})}, *BoolTrue(), *a));
 }
 
 // §F.5.3.1 edge: w, b |= always @(c) cover property T is existential over
@@ -628,11 +634,11 @@ TEST(Assertion, AlwaysClockedCoverFiresAtALaterTick) {
                               AssertionStatement::Role::kCover, BoolAtom("clk"),
                               BodyStrong("a"));
   // Index 0 (clk, no a) does not cover, but index 1 (clk and a) does.
-  EXPECT_TRUE(
-      NeutrallySatisfiesAssertion(Word{A({"clk"}), A({"clk", "a"})}, *BoolTrue(), *a));
+  EXPECT_TRUE(NeutrallySatisfiesAssertion(Word{A({"clk"}), A({"clk", "a"})},
+                                          *BoolTrue(), *a));
   // No tick carries a, so nothing covers.
-  EXPECT_FALSE(
-      NeutrallySatisfiesAssertion(Word{A({"clk"}), A({"clk"})}, *BoolTrue(), *a));
+  EXPECT_FALSE(NeutrallySatisfiesAssertion(Word{A({"clk"}), A({"clk"})},
+                                           *BoolTrue(), *a));
 }
 
 // §F.5.3.1 edge: for T = disable iff (b) P, the cutoff prefix is fixed by the
@@ -644,12 +650,12 @@ TEST(NeutralSatisfaction, DisableIffUsesLeastSatisfyingIndex) {
                          PropStrong(SeqConcat(BoolSeq("a"), BoolSeq("b"))));
   // d holds at index 1 and index 2. The least index is 1, so the prefix is
   // [a]: under _|_^omega, (a ##1 b) cannot complete, so T is not satisfied.
-  EXPECT_FALSE(NeutrallySatisfiesTopLevel(
-      Word{A({"a"}), A({"b", "d"}), A({"d"})}, *t));
+  EXPECT_FALSE(
+      NeutrallySatisfiesTopLevel(Word{A({"a"}), A({"b", "d"}), A({"d"})}, *t));
   // The same word with d removed from index 1 pushes the least index to 2; the
   // prefix [a][b] now completes (a ##1 b) under either completion, so T holds.
-  EXPECT_TRUE(NeutrallySatisfiesTopLevel(
-      Word{A({"a"}), A({"b"}), A({"d"})}, *t));
+  EXPECT_TRUE(
+      NeutrallySatisfiesTopLevel(Word{A({"a"}), A({"b"}), A({"d"})}, *t));
 }
 
 // §F.5.3.1 edge: w |= ( P1 until P2 ) holds when P2 releases on the very first

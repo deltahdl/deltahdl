@@ -62,4 +62,4 @@ uint64_t BidirSwitchBuiltinControlXZDelay(const BidirSwitchDelaySpec& spec);
 void ResolveBidirSwitchNetwork(std::vector<BidirSwitchInst>& switches,
                                Arena& arena);
 
-}
+}  // namespace delta

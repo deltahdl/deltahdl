@@ -10,8 +10,8 @@
 namespace delta {
 namespace {
 
-// §37.34 Constraint, constraint ordering, distribution: the VPI object model for
-// a constraint, its constraint items (constraint orderings and constraint
+// §37.34 Constraint, constraint ordering, distribution: the VPI object model
+// for a constraint, its constraint items (constraint orderings and constraint
 // expressions), and the distribution / dist-item objects. The diagram's bare
 // relation arrows (vpiParent to the class obj, the constraint-ordering
 // vpiSolveBefore/vpiSolveAfter edges to exprs, the dist-item vpiValueRange/
@@ -33,8 +33,8 @@ namespace {
 // (vpiVirtual, vpiIsConstraintEnabled, vpiDistType); these are field-backed
 // getters observed at the end.
 
-// The fixture installs a context so the public vpi_get/vpi_iterate/vpi_scan entry
-// points run their real dispatch.
+// The fixture installs a context so the public vpi_get/vpi_iterate/vpi_scan
+// entry points run their real dispatch.
 class ConstraintDistribution : public ::testing::Test {
  protected:
   void SetUp() override { SetGlobalVpiContext(&vpi_ctx_); }
@@ -48,9 +48,9 @@ class ConstraintDistribution : public ::testing::Test {
   VpiContext vpi_ctx_;
 };
 
-// D5: a constraint's vpiConstraintItem iteration collects the constraint items it
-// groups - the constraint orderings and constraint expressions - in the order
-// they occur, and nothing else. A child that is neither (here an ordinary
+// D5: a constraint's vpiConstraintItem iteration collects the constraint items
+// it groups - the constraint orderings and constraint expressions - in the
+// order they occur, and nothing else. A child that is neither (here an ordinary
 // operation expression) is excluded, showing the grouping matches the
 // constraint-item kinds rather than every expression.
 TEST_F(ConstraintDistribution, ConstraintItemIterationReturnsItemsInOrder) {
@@ -70,14 +70,14 @@ TEST_F(ConstraintDistribution, ConstraintItemIterationReturnsItemsInOrder) {
   std::vector<vpiHandle> seen;
   while (vpiHandle h = vpi_scan(it)) seen.push_back(h);
 
-  ASSERT_EQ(seen.size(), 2u);    // the non-item child is excluded
-  EXPECT_EQ(seen[0], &ordering); // occurrence order is preserved
+  ASSERT_EQ(seen.size(), 2u);     // the non-item child is excluded
+  EXPECT_EQ(seen[0], &ordering);  // occurrence order is preserved
   EXPECT_EQ(seen[1], &expr);
 }
 
 // D4: the vpiConstraint iteration returns a class's constraints in syntactic
-// declaration order. The constraints are stored as children in that order, and a
-// non-constraint child is filtered out, so the iteration hands them back in
+// declaration order. The constraints are stored as children in that order, and
+// a non-constraint child is filtered out, so the iteration hands them back in
 // order.
 TEST_F(ConstraintDistribution, ConstraintIterationReturnsDeclarationOrder) {
   VpiObject c0;
@@ -106,8 +106,9 @@ TEST_F(ConstraintDistribution, ConstraintIterationReturnsDeclarationOrder) {
 
 // D3: a constraint's vpiAccessType reports vpiExternAcc when it is declared
 // outside its enclosing class declaration and zero otherwise - never a third
-// value. A stored value that is neither collapses to zero. The clamp is specific
-// to constraints, so another object kind reports its stored access type as-is.
+// value. A stored value that is neither collapses to zero. The clamp is
+// specific to constraints, so another object kind reports its stored access
+// type as-is.
 TEST_F(ConstraintDistribution, AccessTypeIsExternAccOrZero) {
   VpiObject extern_constraint;
   extern_constraint.type = vpiConstraint;
@@ -125,7 +126,8 @@ TEST_F(ConstraintDistribution, AccessTypeIsExternAccOrZero) {
   odd_constraint.access_type = 99;  // not vpiExternAcc
   EXPECT_EQ(vpi_get(vpiAccessType, &odd_constraint), 0);
 
-  // The clamp is scoped to constraints: a non-constraint passes its value through.
+  // The clamp is scoped to constraints: a non-constraint passes its value
+  // through.
   VpiObject non_constraint;
   non_constraint.type = vpiReg;
   non_constraint.access_type = 99;

@@ -102,4 +102,4 @@ TEST(ReplicationParsing, ReplicationInParameter) {
   ASSERT_NE(param->init_expr, nullptr);
   EXPECT_EQ(param->init_expr->kind, ExprKind::kReplicate);
 }
-}
+}  // namespace

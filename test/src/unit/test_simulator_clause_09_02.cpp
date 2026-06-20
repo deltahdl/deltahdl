@@ -138,4 +138,4 @@ TEST(StructuredProcedureSimulation, FinalExecutesOnlyOnce) {
   EXPECT_EQ(val, 1u);
 }
 
-}
+}  // namespace

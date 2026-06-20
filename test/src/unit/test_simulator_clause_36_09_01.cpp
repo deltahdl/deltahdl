@@ -89,7 +89,8 @@ TEST_F(UserDefinedSystfRegistration, RegistrationAfterElaborationIsRejected) {
 // (returns a value) or a task. The registration accepts both forms and the
 // stored entry preserves which one was requested, so callers can later treat
 // them as functions or tasks accordingly.
-TEST_F(UserDefinedSystfRegistration, RegistrationDistinguishesFunctionFromTask) {
+TEST_F(UserDefinedSystfRegistration,
+       RegistrationDistinguishesFunctionFromTask) {
   s_vpi_systf_data task = {};
   task.type = vpiSysTask;
   task.tfname = "$as_task";
@@ -128,7 +129,8 @@ void StartupRoutineRegistersFunc() {
 // vlog_startup_routines[] array, and that routine registers user-defined
 // system tasks and functions when invoked. Walking such an array must call
 // every listed routine so that all registrations happen.
-TEST_F(UserDefinedSystfRegistration, VlogStartupRoutinesArrayInvokesEachRoutine) {
+TEST_F(UserDefinedSystfRegistration,
+       VlogStartupRoutinesArrayInvokesEachRoutine) {
   VlogStartupRoutine routines[] = {
       &StartupRoutineRegistersTask,
       &StartupRoutineRegistersFunc,

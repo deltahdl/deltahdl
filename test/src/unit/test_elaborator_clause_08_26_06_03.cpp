@@ -162,4 +162,4 @@ TEST(InterfaceClassDiamond, SameSpecializationIsDiamondMergesOneCopy) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

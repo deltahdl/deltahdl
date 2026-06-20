@@ -1,5 +1,4 @@
 #include <gtest/gtest.h>
-
 #include <unistd.h>
 
 #include <filesystem>
@@ -166,8 +165,8 @@ TEST(KeywordVersionPreprocessing, DoubleNestedBeginKeywords) {
 // §22.14: `resetall does not undo the effect of `begin_keywords. The 1364-2001
 // keyword set is selected and then `resetall appears; afterward `logic` (a word
 // reserved only in later standards) must still lex as an identifier, directly
-// showing the active keyword version survived the reset rather than reverting to
-// the default set.
+// showing the active keyword version survived the reset rather than reverting
+// to the default set.
 TEST(KeywordVersionPreprocessing, ResetallDoesNotAffectKeywordVersion) {
   PreprocFixture f;
   auto out = Preprocess(
@@ -387,11 +386,10 @@ TEST(KeywordVersionPreprocessing, EffectCrossesIncludeBoundary) {
   tmp.Write("inc.svh", "logic\n");
 
   PreprocFixture f;
-  auto fid = f.mgr.AddFile(
-      (tmp.dir / "top.sv").string(),
-      "`begin_keywords \"1364-2001\"\n"
-      "`include \"inc.svh\"\n"
-      "`end_keywords\n");
+  auto fid = f.mgr.AddFile((tmp.dir / "top.sv").string(),
+                           "`begin_keywords \"1364-2001\"\n"
+                           "`include \"inc.svh\"\n"
+                           "`end_keywords\n");
   Preprocessor pp(f.mgr, f.diag, {});
   auto out = pp.Preprocess(fid);
   EXPECT_FALSE(f.diag.HasErrors());
@@ -412,4 +410,4 @@ TEST(KeywordVersionPreprocessing, EffectCrossesIncludeBoundary) {
   EXPECT_TRUE(found_logic);
 }
 
-}
+}  // namespace

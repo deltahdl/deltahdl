@@ -37,7 +37,8 @@ TEST(AssignmentExtensionTruncation, ContAssignInfersLhsWidthWhenWiderThanRhs) {
   EXPECT_EQ(mod->assigns[0].width, 16);
 }
 
-TEST(AssignmentExtensionTruncation, ContAssignInfersLhsWidthWhenNarrowerThanRhs) {
+TEST(AssignmentExtensionTruncation,
+     ContAssignInfersLhsWidthWhenNarrowerThanRhs) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module top;\n"
@@ -52,4 +53,4 @@ TEST(AssignmentExtensionTruncation, ContAssignInfersLhsWidthWhenNarrowerThanRhs)
   EXPECT_EQ(mod->assigns[0].width, 4);
 }
 
-}
+}  // namespace

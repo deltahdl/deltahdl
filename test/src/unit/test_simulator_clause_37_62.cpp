@@ -12,12 +12,13 @@ namespace {
 // event-stmt->named-event edge is the generic one-to-one traversal already
 // provided by the data model (and the named event object is owned by §37.27);
 // the clause's only owned content is the Boolean property. These tests observe
-// the production code apply that property through the public vpi_get(vpiBlocking)
-// dispatch path - both the value it reports for an event statement and the
-// vpiUndefined it returns for an object kind the property is not drawn on.
+// the production code apply that property through the public
+// vpi_get(vpiBlocking) dispatch path - both the value it reports for an event
+// statement and the vpiUndefined it returns for an object kind the property is
+// not drawn on.
 
-// The fixture installs a context so the public vpi_get entry point runs its real
-// dispatch over the test objects.
+// The fixture installs a context so the public vpi_get entry point runs its
+// real dispatch over the test objects.
 class EventStatement : public ::testing::Test {
  protected:
   void SetUp() override { SetGlobalVpiContext(&ctx_); }
@@ -43,9 +44,9 @@ TEST_F(EventStatement, EventStatementReportsBlockingFlagThroughVpiGet) {
 
 // Applied through the public dispatch: vpiBlocking is drawn only on the event
 // statement object, so querying it on any other object kind is not a valid
-// request and the production guard returns vpiUndefined rather than handing back
-// a stored field. This distinguishes the clause's property edge, applied by the
-// guard, from an unconditional field read.
+// request and the production guard returns vpiUndefined rather than handing
+// back a stored field. This distinguishes the clause's property edge, applied
+// by the guard, from an unconditional field read.
 TEST_F(EventStatement, BlockingIsUndefinedForNonEventStatement) {
   VpiObject not_an_event_stmt;
   not_an_event_stmt.type = vpiAssignment;

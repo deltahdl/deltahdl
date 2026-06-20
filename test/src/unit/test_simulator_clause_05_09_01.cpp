@@ -114,4 +114,4 @@ TEST(LexicalConventionSim, DoubleBackslashBeforeNewline) {
   EXPECT_EQ(v, 0x415C42u);
 }
 
-}
+}  // namespace

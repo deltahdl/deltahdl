@@ -125,4 +125,4 @@ TEST(LexicalConventionParsing, EscapedAndSimpleIdentifierShareAstName) {
   EXPECT_EQ(esc_item->name, "cpu3");
 }
 
-}
+}  // namespace

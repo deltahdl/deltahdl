@@ -85,8 +85,8 @@ TEST(MinTypMaxEval, TripletMixedWithPlainOperand) {
   triplet->condition = MakeInt(f.arena, 75);
   triplet->rhs = MakeInt(f.arena, 100);
 
-  auto* sub = MakeBinary(f.arena, TokenKind::kMinus, MakeInt(f.arena, 200),
-                         triplet);
+  auto* sub =
+      MakeBinary(f.arena, TokenKind::kMinus, MakeInt(f.arena, 200), triplet);
 
   f.ctx.SetDelayMode(DelayMode::kMin);
   EXPECT_EQ(EvalExpr(sub, f.ctx, f.arena).ToUint64(), 150u);
@@ -123,4 +123,4 @@ TEST(MinTypMaxEval, AllThreeValuesSame) {
   EXPECT_EQ(EvalExpr(mtm, f.ctx, f.arena).ToUint64(), 7u);
 }
 
-}
+}  // namespace

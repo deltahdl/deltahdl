@@ -28,4 +28,4 @@ TEST(SequenceEventSynthesis, InitialWithSequenceEventSkipped) {
   EXPECT_FALSE(aig->outputs.empty());
 }
 
-}
+}  // namespace

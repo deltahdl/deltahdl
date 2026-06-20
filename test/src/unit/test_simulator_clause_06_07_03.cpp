@@ -111,8 +111,7 @@ TEST(NettypeInitialization, InitialValueSetBeforeResolution) {
   uint8_t value_seen_by_resolution = 0xFF;
   UserNettype nt;
   nt.data_kind = NettypeDataKind::k4StateIntegral;
-  nt.resolution = [&](Arena& a,
-                      const std::vector<Logic4Vec>&) -> Logic4Vec {
+  nt.resolution = [&](Arena& a, const std::vector<Logic4Vec>&) -> Logic4Vec {
     value_seen_by_resolution = ValOf(*var);
     return MakeLogic4Vec(a, 1);
   };
@@ -162,8 +161,7 @@ TEST(NettypeInitialization, ResolutionOverwritesDefault) {
 
   UserNettype nt;
   nt.data_kind = NettypeDataKind::k4StateIntegral;
-  nt.resolution = [](Arena& a,
-                     const std::vector<Logic4Vec>&) -> Logic4Vec {
+  nt.resolution = [](Arena& a, const std::vector<Logic4Vec>&) -> Logic4Vec {
     return MakeLogic4VecVal(a, 1, 1);
   };
 

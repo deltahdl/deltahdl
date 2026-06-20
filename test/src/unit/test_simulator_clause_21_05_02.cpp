@@ -20,14 +20,15 @@ namespace {
 // underlying integer value per 6.19), not its position or name -- which is
 // exactly the form the matching $readmem task reads back.
 
-// Registers an unpacked array of `width`-bit elements, each backed by an element
-// variable named `name[index]` (the simulator's convention). `four_state`
-// selects whether the array element type is 4-state or a 2-state type.
+// Registers an unpacked array of `width`-bit elements, each backed by an
+// element variable named `name[index]` (the simulator's convention).
+// `four_state` selects whether the array element type is 4-state or a 2-state
+// type.
 void SetupMem(SimFixture& f, const char* name, int lo, int size, uint32_t width,
               bool four_state) {
-  f.ctx.RegisterArray(name, {static_cast<uint32_t>(lo),
-                             static_cast<uint32_t>(size), width, false, false,
-                             false, four_state});
+  f.ctx.RegisterArray(
+      name, {static_cast<uint32_t>(lo), static_cast<uint32_t>(size), width,
+             false, false, false, four_state});
   for (int i = 0; i < size; ++i) {
     std::string nm = std::string(name) + "[" + std::to_string(lo + i) + "]";
     auto* s = f.arena.AllocString(nm.c_str(), nm.size());
@@ -54,9 +55,9 @@ std::string ReadFile(const std::string& path) {
                      std::istreambuf_iterator<char>());
 }
 
-// §21.5.2: an unpacked array of a 2-state type (e.g. int) is dumped one word per
-// line. Because a 2-state word has no x or z bits, every element is written as a
-// plain hexadecimal number -- never a four-state digit.
+// §21.5.2: an unpacked array of a 2-state type (e.g. int) is dumped one word
+// per line. Because a 2-state word has no x or z bits, every element is written
+// as a plain hexadecimal number -- never a four-state digit.
 TEST(IoSystemTaskTest, TwoStateIntegerArrayIsWritten) {
   SimFixture f;
   std::string path = "/tmp/deltahdl_test_21_05_02_int.txt";
@@ -95,17 +96,17 @@ void SetupEnumMem(SimFixture& f, const char* name, const char* tname,
 
 // §21.5.2: for an enumerated array, the file holds each element's ordinal value
 // (the member's underlying integer value, see 6.19). The members here have
-// values 2, 5, and 9 -- deliberately not their 0,1,2 declaration positions -- so
-// the dump shows the ordinal values rather than positions or names.
+// values 2, 5, and 9 -- deliberately not their 0,1,2 declaration positions --
+// so the dump shows the ordinal values rather than positions or names.
 TEST(IoSystemTaskTest, EnumeratedArrayWritesOrdinalValues) {
   SimFixture f;
   std::string path = "/tmp/deltahdl_test_21_05_02_enum.txt";
-  SetupEnumMem(f, "states", "state_e",
-               {{"RED", 2}, {"GREEN", 5}, {"BLUE", 9}}, 0, 3, 8);
+  SetupEnumMem(f, "states", "state_e", {{"RED", 2}, {"GREEN", 5}, {"BLUE", 9}},
+               0, 3, 8);
   // Element values are the members' ordinal (underlying) values.
-  Cell(f, "states", 0)->value = MakeLogic4VecVal(f.arena, 8, 2);   // RED
-  Cell(f, "states", 1)->value = MakeLogic4VecVal(f.arena, 8, 5);   // GREEN
-  Cell(f, "states", 2)->value = MakeLogic4VecVal(f.arena, 8, 9);   // BLUE
+  Cell(f, "states", 0)->value = MakeLogic4VecVal(f.arena, 8, 2);  // RED
+  Cell(f, "states", 1)->value = MakeLogic4VecVal(f.arena, 8, 5);  // GREEN
+  Cell(f, "states", 2)->value = MakeLogic4VecVal(f.arena, 8, 9);  // BLUE
 
   Writemem(f, "$writememh", path, "states");
 

@@ -97,4 +97,4 @@ TEST(OperatorPreprocessor, MixedOperatorsPassThrough) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-}
+}  // namespace

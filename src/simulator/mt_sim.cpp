@@ -28,7 +28,7 @@ bool WritesConflictWith(const std::vector<std::string_view>& writes,
   return false;
 }
 
-}
+}  // namespace
 
 void Partitioner::AddDependency(const SignalDep& dep) { deps_.push_back(dep); }
 
@@ -115,7 +115,6 @@ void MtScheduler::RunTimestep(SimContext& ctx,
     threads.emplace_back(
         [&execute_partition, &part]() { execute_partition(part); });
   }
-
 }
 
-}
+}  // namespace delta

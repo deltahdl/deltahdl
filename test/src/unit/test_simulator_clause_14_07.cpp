@@ -18,8 +18,7 @@ TEST(ClockingScopeSim, BlockPersistsAcrossClockEdges) {
 
   ClockingManager cmgr;
   SetupClockingBlock(
-      f, cmgr,
-      {"cb", Edge::kPosedge, {0}, {0}, "data", ClockingDir::kInput});
+      f, cmgr, {"cb", Edge::kPosedge, {0}, {0}, "data", ClockingDir::kInput});
 
   SchedulePosedge(f, clk, 10);
   f.scheduler.Run();
@@ -41,8 +40,7 @@ TEST(ClockingScopeSim, DotAccessRetrievesSampledValue) {
 
   ClockingManager cmgr;
   SetupClockingBlock(
-      f, cmgr,
-      {"dom", Edge::kPosedge, {0}, {0}, "sig", ClockingDir::kInput});
+      f, cmgr, {"dom", Edge::kPosedge, {0}, {0}, "sig", ClockingDir::kInput});
 
   SchedulePosedge(f, clk, 10);
   f.scheduler.Run();
@@ -50,4 +48,4 @@ TEST(ClockingScopeSim, DotAccessRetrievesSampledValue) {
   EXPECT_EQ(cmgr.GetSampledValue("dom", "sig"), 0xBBu);
 }
 
-}
+}  // namespace

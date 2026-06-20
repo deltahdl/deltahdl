@@ -60,4 +60,4 @@ TEST(MultidimensionalArrayValidation, CommaSeparatedSharePackedDims) {
   EXPECT_EQ(mod->variables[0].width, mod->variables[1].width);
 }
 
-}
+}  // namespace

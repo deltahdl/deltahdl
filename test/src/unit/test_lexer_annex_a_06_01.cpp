@@ -92,4 +92,4 @@ TEST(NetAliasLexing, AliasIsFullWordKeyword) {
   EXPECT_EQ(r.token.kind, TokenKind::kIdentifier);
 }
 
-}
+}  // namespace

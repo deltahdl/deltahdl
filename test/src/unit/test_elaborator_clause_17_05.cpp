@@ -7,8 +7,8 @@ using namespace delta;
 namespace {
 
 TEST(CheckerProcedures, OnlyInitialAlwaysAndFinalProceduresAreAllowed) {
-  // §17.5: the procedures allowed inside a checker body are the initial, always,
-  // and final procedures.
+  // §17.5: the procedures allowed inside a checker body are the initial,
+  // always, and final procedures.
   EXPECT_TRUE(ProceduralBlockAllowedInChecker(ProceduralBlockKind::kInitial));
   EXPECT_TRUE(ProceduralBlockAllowedInChecker(ProceduralBlockKind::kFinal));
 }
@@ -16,7 +16,8 @@ TEST(CheckerProcedures, OnlyInitialAlwaysAndFinalProceduresAreAllowed) {
 TEST(CheckerProcedures, OnlyTheThreeSpecializedAlwaysFormsAreAllowed) {
   // §17.5: of the always procedures, only always_comb, always_latch, and
   // always_ff are allowed in a checker; a general-purpose always is not.
-  EXPECT_TRUE(ProceduralBlockAllowedInChecker(ProceduralBlockKind::kAlwaysComb));
+  EXPECT_TRUE(
+      ProceduralBlockAllowedInChecker(ProceduralBlockKind::kAlwaysComb));
   EXPECT_TRUE(
       ProceduralBlockAllowedInChecker(ProceduralBlockKind::kAlwaysLatch));
   EXPECT_TRUE(ProceduralBlockAllowedInChecker(ProceduralBlockKind::kAlwaysFf));
@@ -26,12 +27,12 @@ TEST(CheckerProcedures, OnlyTheThreeSpecializedAlwaysFormsAreAllowed) {
 TEST(CheckerProcedures, InitialProcedureMayContainItsListedConstructs) {
   // §17.5: an initial procedure in a checker may contain let declarations and
   // immediate, deferred, and concurrent assertions.
-  EXPECT_TRUE(CheckerInitialProcedureAllows(
-      CheckerInitialContent::kLetDeclaration));
+  EXPECT_TRUE(
+      CheckerInitialProcedureAllows(CheckerInitialContent::kLetDeclaration));
   EXPECT_TRUE(CheckerInitialProcedureAllows(
       CheckerInitialContent::kImmediateAssertion));
-  EXPECT_TRUE(CheckerInitialProcedureAllows(
-      CheckerInitialContent::kDeferredAssertion));
+  EXPECT_TRUE(
+      CheckerInitialProcedureAllows(CheckerInitialContent::kDeferredAssertion));
   EXPECT_TRUE(CheckerInitialProcedureAllows(
       CheckerInitialContent::kConcurrentAssertion));
 }
@@ -43,35 +44,35 @@ TEST(CheckerProcedures, InitialProcedureTimingControlMustBeEventControl) {
       CheckerInitialContent::kEventTimingControl));
   EXPECT_FALSE(CheckerInitialProcedureAllows(
       CheckerInitialContent::kDelayTimingControl));
-  EXPECT_FALSE(CheckerInitialProcedureAllows(
-      CheckerInitialContent::kWaitTimingControl));
+  EXPECT_FALSE(
+      CheckerInitialProcedureAllows(CheckerInitialContent::kWaitTimingControl));
 }
 
 TEST(CheckerProcedures, BlockingAssignmentLimitedToCombAndLatch) {
   // §17.5: blocking assignments are allowed in always_comb and always_latch
   // procedures only, not in always_ff.
-  EXPECT_TRUE(CheckerAlwaysStatementAllowed(
-      CheckerAlwaysStatement::kBlockingAssignment,
-      CheckerAlwaysForm::kAlwaysComb));
-  EXPECT_TRUE(CheckerAlwaysStatementAllowed(
-      CheckerAlwaysStatement::kBlockingAssignment,
-      CheckerAlwaysForm::kAlwaysLatch));
-  EXPECT_FALSE(CheckerAlwaysStatementAllowed(
-      CheckerAlwaysStatement::kBlockingAssignment,
-      CheckerAlwaysForm::kAlwaysFf));
+  EXPECT_TRUE(
+      CheckerAlwaysStatementAllowed(CheckerAlwaysStatement::kBlockingAssignment,
+                                    CheckerAlwaysForm::kAlwaysComb));
+  EXPECT_TRUE(
+      CheckerAlwaysStatementAllowed(CheckerAlwaysStatement::kBlockingAssignment,
+                                    CheckerAlwaysForm::kAlwaysLatch));
+  EXPECT_FALSE(
+      CheckerAlwaysStatementAllowed(CheckerAlwaysStatement::kBlockingAssignment,
+                                    CheckerAlwaysForm::kAlwaysFf));
 }
 
 TEST(CheckerProcedures, TimingEventControlLimitedToAlwaysFf) {
   // §17.5: timing event control is allowed in always_ff procedures only.
-  EXPECT_TRUE(CheckerAlwaysStatementAllowed(
-      CheckerAlwaysStatement::kTimingEventControl,
-      CheckerAlwaysForm::kAlwaysFf));
-  EXPECT_FALSE(CheckerAlwaysStatementAllowed(
-      CheckerAlwaysStatement::kTimingEventControl,
-      CheckerAlwaysForm::kAlwaysComb));
-  EXPECT_FALSE(CheckerAlwaysStatementAllowed(
-      CheckerAlwaysStatement::kTimingEventControl,
-      CheckerAlwaysForm::kAlwaysLatch));
+  EXPECT_TRUE(
+      CheckerAlwaysStatementAllowed(CheckerAlwaysStatement::kTimingEventControl,
+                                    CheckerAlwaysForm::kAlwaysFf));
+  EXPECT_FALSE(
+      CheckerAlwaysStatementAllowed(CheckerAlwaysStatement::kTimingEventControl,
+                                    CheckerAlwaysForm::kAlwaysComb));
+  EXPECT_FALSE(
+      CheckerAlwaysStatementAllowed(CheckerAlwaysStatement::kTimingEventControl,
+                                    CheckerAlwaysForm::kAlwaysLatch));
 }
 
 TEST(CheckerProcedures, UnconditionalAlwaysStatementsAllowedInEveryForm) {
@@ -115,10 +116,10 @@ TEST(CheckerProcedures, CombAndLatchExpressionsAreNotImplicitlySampled) {
   // implicitly sampled; the assignments use the current values.
   for (auto pos : {CheckerAlwaysExpressionPosition::kBody,
                    CheckerAlwaysExpressionPosition::kEventControl}) {
-    EXPECT_FALSE(CheckerAlwaysExpressionIsSampled(
-        CheckerAlwaysForm::kAlwaysComb, pos));
-    EXPECT_FALSE(CheckerAlwaysExpressionIsSampled(
-        CheckerAlwaysForm::kAlwaysLatch, pos));
+    EXPECT_FALSE(
+        CheckerAlwaysExpressionIsSampled(CheckerAlwaysForm::kAlwaysComb, pos));
+    EXPECT_FALSE(
+        CheckerAlwaysExpressionIsSampled(CheckerAlwaysForm::kAlwaysLatch, pos));
   }
 }
 

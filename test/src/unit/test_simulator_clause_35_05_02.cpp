@@ -41,4 +41,4 @@ TEST(PureDpiImportRegistry, NonPureImportDistinguishable) {
   EXPECT_FALSE(found->is_pure);
 }
 
-}
+}  // namespace

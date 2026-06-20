@@ -28,9 +28,9 @@ class VpiPutValueArraySim : public ::testing::Test {
     elems_.clear();
     name_pool_.reserve(name_pool_.size() + count);
     for (int i = 0; i < count; ++i) {
-      auto* v = sim_ctx_.CreateVariable(name_pool_.emplace_back(
-                                            std::string(name) + std::to_string(i)),
-                                        elem_width);
+      auto* v = sim_ctx_.CreateVariable(
+          name_pool_.emplace_back(std::string(name) + std::to_string(i)),
+          elem_width);
       v->is_4state = four_state;
       elems_.push_back(v);
     }
@@ -80,8 +80,9 @@ TEST_F(VpiPutValueArraySim, RawFourStateValDecodesAvalAndBval) {
   VpiHandle arr = MakeArray("r", {{0, 1}}, 2, 8);  // ngroups = 1
 
   // element 0: aval 0xA5, bval 0x0F; element 1: aval 0x3C, bval 0x00.
-  PLI_BYTE8 raw[4] = {static_cast<PLI_BYTE8>(0xA5), static_cast<PLI_BYTE8>(0x0F),
-                      static_cast<PLI_BYTE8>(0x3C), static_cast<PLI_BYTE8>(0x00)};
+  PLI_BYTE8 raw[4] = {
+      static_cast<PLI_BYTE8>(0xA5), static_cast<PLI_BYTE8>(0x0F),
+      static_cast<PLI_BYTE8>(0x3C), static_cast<PLI_BYTE8>(0x00)};
   s_vpi_arrayvalue av = {};
   av.format = vpiRawFourStateVal;
   av.value.rawvals = raw;
@@ -97,7 +98,8 @@ TEST_F(VpiPutValueArraySim, RawFourStateValDecodesAvalAndBval) {
 // §38.35: if the vpiRawFourStateVal format is set for a 2-state array type, the
 // bvalbits group is ignored - the element keeps a known (bval 0) value.
 TEST_F(VpiPutValueArraySim, RawFourStateValIgnoresBvalForTwoStateArray) {
-  VpiHandle arr = MakeArray("t", {{0}}, 1, 8, vpiStaticArray, /*four_state=*/false);
+  VpiHandle arr =
+      MakeArray("t", {{0}}, 1, 8, vpiStaticArray, /*four_state=*/false);
 
   PLI_BYTE8 raw[2] = {static_cast<PLI_BYTE8>(0xF0),
                       static_cast<PLI_BYTE8>(0xFF)};  // bval group all ones
@@ -226,9 +228,9 @@ TEST_F(VpiPutValueArraySim, RawFourStateValLoadsBytesLeastSignificantFirst) {
   VpiHandle arr = MakeArray("b", {{0}}, 1, 16);  // ngroups = 2
 
   // aval group {0x34, 0x12} -> 0x1234; bval group {0x00, 0x00} -> 0.
-  PLI_BYTE8 raw[4] = {static_cast<PLI_BYTE8>(0x34), static_cast<PLI_BYTE8>(0x12),
-                      static_cast<PLI_BYTE8>(0x00),
-                      static_cast<PLI_BYTE8>(0x00)};
+  PLI_BYTE8 raw[4] = {
+      static_cast<PLI_BYTE8>(0x34), static_cast<PLI_BYTE8>(0x12),
+      static_cast<PLI_BYTE8>(0x00), static_cast<PLI_BYTE8>(0x00)};
   s_vpi_arrayvalue av = {};
   av.format = vpiRawFourStateVal;
   av.value.rawvals = raw;
@@ -360,5 +362,5 @@ TEST_F(VpiPutValueArraySim, VectorValWritesVecvalGroupsToElements) {
   EXPECT_EQ(elems_[0]->value.words[0].bval, 0x00F0u);
 }
 
-}
-}
+}  // namespace
+}  // namespace delta

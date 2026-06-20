@@ -10,11 +10,11 @@ namespace {
 TEST(FineGrainProcessControlSynthesis, RejectProcessDecl) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f,
-      "module m;\n"
-      "  initial begin\n"
-      "    process p = process::self();\n"
-      "  end\n"
-      "endmodule\n");
+                           "module m;\n"
+                           "  initial begin\n"
+                           "    process p = process::self();\n"
+                           "  end\n"
+                           "endmodule\n");
   ASSERT_NE(mod, nullptr);
   SynthLower synth(f.arena, f.diag);
   auto* aig = synth.Lower(mod);
@@ -22,4 +22,4 @@ TEST(FineGrainProcessControlSynthesis, RejectProcessDecl) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-}
+}  // namespace

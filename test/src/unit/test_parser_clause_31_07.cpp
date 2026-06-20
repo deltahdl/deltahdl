@@ -118,4 +118,4 @@ TEST(ConditionedTimingCheckParsing, ConditionBothEvents) {
   EXPECT_NE(tc->data_condition, nullptr);
 }
 
-}
+}  // namespace

@@ -14,12 +14,12 @@
 // Clause 40.5.3 extends vpi_control() so a PLI client can control the
 // collection of coverage. The control constant selects the action:
 // vpiCoverageStart/Stop/Reset/Check carry the semantics of $coverage_control()
-// (§40.3.2.1) and act on the instance or assertion a handle names; vpiCoverageSave
-// carries the semantics of $coverage_save() (§40.3.2.5) and vpiCoverageMerge the
-// semantics of $coverage_merge() (§40.3.2.4), both against a named coverage
-// database. The status the equivalent system function returns is reported back,
-// so each test observes both the status and the collection-state change the
-// production routine applies.
+// (§40.3.2.1) and act on the instance or assertion a handle names;
+// vpiCoverageSave carries the semantics of $coverage_save() (§40.3.2.5) and
+// vpiCoverageMerge the semantics of $coverage_merge() (§40.3.2.4), both against
+// a named coverage database. The status the equivalent system function returns
+// is reported back, so each test observes both the status and the
+// collection-state change the production routine applies.
 
 namespace delta {
 namespace {
@@ -46,8 +46,8 @@ class VpiCoverageControlSim : public ::testing::Test {
 // applied too - a second start still succeeds but does not begin collection
 // afresh.
 TEST_F(VpiCoverageControlSim, StartControlsCoverageOverTheInstanceHandle) {
-  vpi_ctx_.GetCoverageControlState().SetAvailability("top.dut",
-                                                     CoverageAvailability::Full);
+  vpi_ctx_.GetCoverageControlState().SetAvailability(
+      "top.dut", CoverageAvailability::Full);
   VpiHandle dut = vpi_ctx_.CreateModule("dut", "top.dut");
 
   EXPECT_FALSE(vpi_ctx_.GetCoverageControlState().IsCollecting("top.dut"));
@@ -70,10 +70,10 @@ TEST_F(VpiCoverageControlSim, StartControlsCoverageOverTheInstanceHandle) {
 // and FSM coverage are (§40.5.3). The same control rules are applied, just to
 // the scope the assertion handle names.
 TEST_F(VpiCoverageControlSim, ControlAcceptsAnAssertionHandle) {
-  vpi_ctx_.GetCoverageControlState().SetAvailability("top.dut",
-                                                     CoverageAvailability::Full);
-  vpi_ctx_.GetCoverageControlState().SetAvailability("top.dut.a1",
-                                                     CoverageAvailability::Full);
+  vpi_ctx_.GetCoverageControlState().SetAvailability(
+      "top.dut", CoverageAvailability::Full);
+  vpi_ctx_.GetCoverageControlState().SetAvailability(
+      "top.dut.a1", CoverageAvailability::Full);
   VpiHandle assertion = vpi_ctx_.CreateAssertion("top.dut.a1", vpiAssertion);
 
   EXPECT_EQ(VpiControlC(vpiCoverageStart, vpiAssertCoverage, assertion),
@@ -88,8 +88,8 @@ TEST_F(VpiCoverageControlSim, ControlAcceptsAnAssertionHandle) {
 // coverage, both per §40.3.2.1 - the same control rules the $coverage_control()
 // system function applies, reached now through vpi_control().
 TEST_F(VpiCoverageControlSim, StopAndResetApplyTheControlRules) {
-  vpi_ctx_.GetCoverageControlState().SetAvailability("top.dut",
-                                                     CoverageAvailability::Full);
+  vpi_ctx_.GetCoverageControlState().SetAvailability(
+      "top.dut", CoverageAvailability::Full);
   VpiHandle dut = vpi_ctx_.CreateModule("dut", "top.dut");
   ASSERT_EQ(VpiControlC(vpiCoverageStart, vpiAssertCoverage, dut),
             Status(CoverageStatus::Ok));
@@ -104,15 +104,15 @@ TEST_F(VpiCoverageControlSim, StopAndResetApplyTheControlRules) {
   EXPECT_EQ(vpi_ctx_.GetCoverageControlState().ResetCount("top.dut"), 1u);
 }
 
-// C2: vpiCoverageCheck reports whether coverage can be obtained without changing
-// the collection state, per §40.3.2.1. A fully coverable scope reports `SV_COV_OK
-// and a scope offering no coverage of the type reports `SV_COV_NOCOV; neither
-// query starts collection.
+// C2: vpiCoverageCheck reports whether coverage can be obtained without
+// changing the collection state, per §40.3.2.1. A fully coverable scope reports
+// `SV_COV_OK and a scope offering no coverage of the type reports
+// `SV_COV_NOCOV; neither query starts collection.
 TEST_F(VpiCoverageControlSim, CheckReportsAvailabilityWithoutChangingState) {
-  vpi_ctx_.GetCoverageControlState().SetAvailability("top.full",
-                                                     CoverageAvailability::Full);
-  vpi_ctx_.GetCoverageControlState().SetAvailability("top.none",
-                                                     CoverageAvailability::None);
+  vpi_ctx_.GetCoverageControlState().SetAvailability(
+      "top.full", CoverageAvailability::Full);
+  vpi_ctx_.GetCoverageControlState().SetAvailability(
+      "top.none", CoverageAvailability::None);
   VpiHandle full = vpi_ctx_.CreateModule("full", "top.full");
   VpiHandle none = vpi_ctx_.CreateModule("none", "top.none");
 
@@ -142,8 +142,8 @@ TEST_F(VpiCoverageControlSim, ControlOnUnknownScopeIsAnError) {
 // and stopping with a different type over the same instance handle act on one
 // shared instance-level collection state.
 TEST_F(VpiCoverageControlSim, CoverageIsControllableOnlyAtInstanceLevel) {
-  vpi_ctx_.GetCoverageControlState().SetAvailability("top.dut",
-                                                     CoverageAvailability::Full);
+  vpi_ctx_.GetCoverageControlState().SetAvailability(
+      "top.dut", CoverageAvailability::Full);
   VpiHandle dut = vpi_ctx_.CreateModule("dut", "top.dut");
 
   // Start statement coverage on the instance.
@@ -178,10 +178,10 @@ TEST_F(VpiCoverageControlSim, SaveAppliesCoverageSaveRules) {
   EXPECT_EQ(vpi_ctx_.GetCoverageControlState().SaveCount("toggledb"), 0u);
 }
 
-// C5: vpi_control(vpiCoverageMerge, <coverageType>, name) merges coverage of the
-// type from the named database into the simulation, per $coverage_merge()
-// (§40.3.2.4): `SV_COV_OK and a recorded merge when the database belongs to this
-// design and holds the type, `SV_COV_ERROR when the name does not exist.
+// C5: vpi_control(vpiCoverageMerge, <coverageType>, name) merges coverage of
+// the type from the named database into the simulation, per $coverage_merge()
+// (§40.3.2.4): `SV_COV_OK and a recorded merge when the database belongs to
+// this design and holds the type, `SV_COV_ERROR when the name does not exist.
 TEST_F(VpiCoverageControlSim, MergeAppliesCoverageMergeRules) {
   vpi_ctx_.GetCoverageControlState().RegisterCoverageDatabase(
       "covdb", /*from_this_design=*/true, {vpiAssertCoverage});

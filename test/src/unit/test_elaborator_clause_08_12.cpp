@@ -102,4 +102,4 @@ TEST(ClassAssignRenameElaboration, DeepChainedMemberAccessOk) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

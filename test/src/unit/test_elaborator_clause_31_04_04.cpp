@@ -45,4 +45,4 @@ TEST(TimingCheckCommandElaboration, WidthWithSpecparamsElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

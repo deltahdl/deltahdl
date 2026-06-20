@@ -39,10 +39,10 @@ struct TempPrecompDir {
 TEST(SeparateCompilationTool, CompiledFormPersistsOnFilesystem) {
   TempPrecompDir tmp;
   auto path = tmp.dir / "rtlLib.dpl";
-  ASSERT_TRUE(PrecompiledLibrary::Save(
-      "module child;\n"
-      "endmodule\n",
-      "rtlLib", path));
+  ASSERT_TRUE(
+      PrecompiledLibrary::Save("module child;\n"
+                               "endmodule\n",
+                               "rtlLib", path));
   ASSERT_TRUE(fs::exists(path));
   EXPECT_GT(fs::file_size(path), 0u);
 }
@@ -51,8 +51,7 @@ TEST(SeparateCompilationTool, SaveRejectsUnparseableSource) {
   TempPrecompDir tmp;
   auto path = tmp.dir / "rtlLib.dpl";
   EXPECT_FALSE(PrecompiledLibrary::Save(
-      "module broken; this is not legal SystemVerilog\n",
-      "rtlLib", path));
+      "module broken; this is not legal SystemVerilog\n", "rtlLib", path));
 }
 
 // The compiled form has to land somewhere in the filesystem; if the chosen
@@ -62,10 +61,10 @@ TEST(SeparateCompilationTool, SaveRejectsUnparseableSource) {
 TEST(SeparateCompilationTool, SaveFailsWhenLocationUnwritable) {
   TempPrecompDir tmp;
   auto path = tmp.dir / "missing_subdir" / "rtlLib.dpl";
-  EXPECT_FALSE(PrecompiledLibrary::Save(
-      "module child;\n"
-      "endmodule\n",
-      "rtlLib", path));
+  EXPECT_FALSE(
+      PrecompiledLibrary::Save("module child;\n"
+                               "endmodule\n",
+                               "rtlLib", path));
   std::error_code ec;
   EXPECT_FALSE(fs::exists(path, ec));
 }
@@ -73,25 +72,25 @@ TEST(SeparateCompilationTool, SaveFailsWhenLocationUnwritable) {
 TEST(SeparateCompilationTool, AllCellKindsRoundTrip) {
   TempPrecompDir tmp;
   auto path = tmp.dir / "rtlLib.dpl";
-  ASSERT_TRUE(PrecompiledLibrary::Save(
-      "module m;\n"
-      "endmodule\n"
-      "interface i;\n"
-      "endinterface\n"
-      "program p;\n"
-      "endprogram\n"
-      "primitive u(output o, input a);\n"
-      "  table\n"
-      "    0 : 0;\n"
-      "    1 : 1;\n"
-      "  endtable\n"
-      "endprimitive\n"
-      "package pk;\n"
-      "endpackage\n"
-      "config cfg;\n"
-      "  design m;\n"
-      "endconfig\n",
-      "rtlLib", path));
+  ASSERT_TRUE(
+      PrecompiledLibrary::Save("module m;\n"
+                               "endmodule\n"
+                               "interface i;\n"
+                               "endinterface\n"
+                               "program p;\n"
+                               "endprogram\n"
+                               "primitive u(output o, input a);\n"
+                               "  table\n"
+                               "    0 : 0;\n"
+                               "    1 : 1;\n"
+                               "  endtable\n"
+                               "endprimitive\n"
+                               "package pk;\n"
+                               "endpackage\n"
+                               "config cfg;\n"
+                               "  design m;\n"
+                               "endconfig\n",
+                               "rtlLib", path));
 
   SourceManager mgr;
   Arena arena;
@@ -138,14 +137,14 @@ TEST(SeparateCompilationTool, LoadFailsForMissingFile) {
 TEST(SeparateCompilationTool, MultipleLibrariesPreserveTagsIndependently) {
   TempPrecompDir tmp;
   auto path = tmp.dir / "shared.dpl";
-  ASSERT_TRUE(PrecompiledLibrary::Save(
-      "module a;\n"
-      "endmodule\n",
-      "libA", path));
-  ASSERT_TRUE(PrecompiledLibrary::Save(
-      "module b;\n"
-      "endmodule\n",
-      "libB", path));
+  ASSERT_TRUE(
+      PrecompiledLibrary::Save("module a;\n"
+                               "endmodule\n",
+                               "libA", path));
+  ASSERT_TRUE(
+      PrecompiledLibrary::Save("module b;\n"
+                               "endmodule\n",
+                               "libB", path));
 
   SourceManager mgr;
   Arena arena;
@@ -177,4 +176,4 @@ TEST(SeparateCompilationTool, LoadFailsOnTruncatedChunk) {
   EXPECT_FALSE(PrecompiledLibrary::Load(path, target, mgr, arena, diag));
 }
 
-}
+}  // namespace

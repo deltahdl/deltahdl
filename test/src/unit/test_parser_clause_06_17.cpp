@@ -56,4 +56,4 @@ TEST(DataTypeParsing, EventInitFromAnotherEvent) {
   EXPECT_EQ(aliased->init_expr->text, "done");
 }
 
-}
+}  // namespace

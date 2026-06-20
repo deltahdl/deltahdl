@@ -156,4 +156,4 @@ TEST(ObjectPropertyElaboration, ConstantPartSelectWidthOk) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

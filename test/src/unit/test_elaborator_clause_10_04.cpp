@@ -57,4 +57,4 @@ TEST(ProceduralAssignmentElaboration, ConcatenationContainingNetIsError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-}
+}  // namespace

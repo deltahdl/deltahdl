@@ -36,7 +36,8 @@ TEST(InterfaceClassCastingAndRefAssignment, AssignImplHandleToIfaceVarOk) {
              "endmodule\n"));
 }
 
-TEST(InterfaceClassCastingAndRefAssignment, AssignImplHandleToMultipleIfaceVarsOk) {
+TEST(InterfaceClassCastingAndRefAssignment,
+     AssignImplHandleToMultipleIfaceVarsOk) {
   EXPECT_TRUE(
       ElabOk("interface class PutImp;\n"
              "  pure virtual function void put();\n"
@@ -84,4 +85,4 @@ TEST(InterfaceClassCastingAndRefAssignment, InterfaceClassNewError) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

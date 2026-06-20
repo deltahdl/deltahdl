@@ -221,4 +221,4 @@ TEST(BlockingAssignSim, VariableIndexArrayElement) {
   LowerRunAndCheck(f, design, {{"out", 0xFFu}});
 }
 
-}
+}  // namespace

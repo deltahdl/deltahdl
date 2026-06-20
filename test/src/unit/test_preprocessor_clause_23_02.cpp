@@ -21,4 +21,4 @@ TEST(ModuleDefinitions, ModuleDefinitionThroughPreprocessor) {
   EXPECT_EQ(r.cu->modules[0]->name, "m");
 }
 
-}
+}  // namespace

@@ -145,7 +145,7 @@ void MapOutput(const AigGraph& aig, const Liberty& lib, uint32_t out_lit,
   result.instances.push_back(std::move(inst));
 }
 
-}
+}  // namespace
 
 CellMapper::CellMapper(const Liberty& lib) : lib_(lib) {}
 
@@ -157,4 +157,4 @@ CellMapping CellMapper::Map(const AigGraph& aig) const {
   return mapping;
 }
 
-}
+}  // namespace delta

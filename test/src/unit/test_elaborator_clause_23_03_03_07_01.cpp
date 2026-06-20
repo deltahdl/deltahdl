@@ -268,4 +268,4 @@ TEST(InterconnectPortConnectionElaboration,
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

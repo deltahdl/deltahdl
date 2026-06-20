@@ -17,10 +17,18 @@ Logic4Vec MakeVec(Arena& arena, const std::string& bits) {
     uint64_t mask = uint64_t{1} << (idx % 64);
     Logic4Word& w = v.words[idx / 64];
     switch (bits[k]) {
-      case '1': w.aval |= mask; break;
-      case 'x': w.bval |= mask; break;
-      case 'z': w.aval |= mask; w.bval |= mask; break;
-      default: break;  // '0' leaves the bit clear
+      case '1':
+        w.aval |= mask;
+        break;
+      case 'x':
+        w.bval |= mask;
+        break;
+      case 'z':
+        w.aval |= mask;
+        w.bval |= mask;
+        break;
+      default:
+        break;  // '0' leaves the bit clear
     }
   }
   return v;
@@ -40,7 +48,8 @@ TEST(UnknownAndHighImpedance, DecimalAllHighZIsLowercaseZ) {
   EXPECT_EQ(FormatArg(MakeVec(arena, "zzzz"), 'd'), "z");
 }
 
-// §21.2.1.3 (D3): with some but not all bits unknown, decimal shows uppercase X.
+// §21.2.1.3 (D3): with some but not all bits unknown, decimal shows uppercase
+// X.
 TEST(UnknownAndHighImpedance, DecimalSomeUnknownIsUppercaseX) {
   Arena arena;
   EXPECT_EQ(FormatArg(MakeVec(arena, "01x0"), 'd'), "X");

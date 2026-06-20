@@ -34,8 +34,7 @@ struct Net {
   NetStrength resolved_strength;
 
   Strength charge_strength = Strength::kMedium;
-  Strength base_charge_strength =
-      Strength::kMedium;
+  Strength base_charge_strength = Strength::kMedium;
   uint64_t decay_ticks = 0;
   uint64_t decay_generation = 0;
 
@@ -108,8 +107,8 @@ bool ValidateNettypeDataKind(NettypeDataKind kind);
 // the net is an atomic net. Writes the resolved value back into the net.
 bool ResolveUserDefinedNet(Net& net, const UserNettype& nettype, Arena& arena);
 
-// §6.6.7: a nettype declared without a resolution function makes it an error for
-// a net of that nettype to be driven by more than one driver.
+// §6.6.7: a nettype declared without a resolution function makes it an error
+// for a net of that nettype to be driven by more than one driver.
 bool CheckUnresolvedMultipleDrivers(const Net& net, const UserNettype& nt);
 
 // §6.7.3 initialization of nets with user-defined nettypes. The rules below all
@@ -141,4 +140,4 @@ struct StructMemberInit {
 Logic4Vec InitialStructNetValue(Arena& arena, uint32_t total_width,
                                 const std::vector<StructMemberInit>& members);
 
-}
+}  // namespace delta

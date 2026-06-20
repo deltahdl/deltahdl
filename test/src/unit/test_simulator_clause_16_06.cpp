@@ -28,8 +28,8 @@ TEST(AssertionBooleanInterpretation, AnyUnknownBitForcesFalse) {
 
 TEST(AssertionBooleanInterpretation, MaximumKnownValueIsTrue) {
   // Boundary case: every bit known and set — Boolean interpretation is true.
-  EXPECT_TRUE(InterpretAssertionExprAsBoolean(
-      std::numeric_limits<uint64_t>::max(), 0));
+  EXPECT_TRUE(
+      InterpretAssertionExprAsBoolean(std::numeric_limits<uint64_t>::max(), 0));
 }
 
 TEST(AssertionBooleanInterpretation, AllBitsUnknownIsFalse) {
@@ -42,8 +42,7 @@ TEST(AssertionBooleanInterpretation, AllBitsUnknownIsFalse) {
       InterpretAssertionExprAsBoolean(0, std::numeric_limits<uint64_t>::max()));
 }
 
-TEST(AssertionSampledArrayElement,
-     SurvivesArrayMutationDuringEvaluationScope) {
+TEST(AssertionSampledArrayElement, SurvivesArrayMutationDuringEvaluationScope) {
   SampledArrayElement s = SampleArrayElementForAssertion(0xABCD);
   EXPECT_TRUE(SampledArrayElementStillReadable(s));
 
@@ -67,8 +66,7 @@ TEST(AssertionSampledArrayElement,
   }
 }
 
-TEST(AssertionBooleanExprPlace,
-     SequenceOrPropertyExpressionsUseSampledValues) {
+TEST(AssertionBooleanExprPlace, SequenceOrPropertyExpressionsUseSampledValues) {
   EXPECT_TRUE(
       BooleanExprUsesSampledValues(BooleanExprPlace::kSequenceOrPropertyExpr));
 }
@@ -97,4 +95,4 @@ TEST(AssertionDisableCondition, ForbidsLocalVariableReference) {
   EXPECT_FALSE(DisableConditionAllowsLocalVariableReference());
 }
 
-}
+}  // namespace

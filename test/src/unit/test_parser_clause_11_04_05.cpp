@@ -106,4 +106,4 @@ TEST(Precedence, CaseInequalitySamePrecedenceAsLogicalEquality) {
   EXPECT_EQ(rhs->lhs->op, TokenKind::kBangEqEq);
 }
 
-}
+}  // namespace

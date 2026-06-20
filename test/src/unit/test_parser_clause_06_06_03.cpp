@@ -81,4 +81,4 @@ TEST(WiredNetParsing, WorAndTriorIdenticalSyntax) {
   EXPECT_TRUE(ParseOk("module t; trior a = 1'b0; endmodule\n"));
 }
 
-}
+}  // namespace

@@ -86,4 +86,4 @@ TEST(InterconnectPortConnectionSimulation,
   ASSERT_NE(var, nullptr);
 }
 
-}
+}  // namespace

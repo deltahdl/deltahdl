@@ -34,4 +34,4 @@ TEST(SemaphoreNewElaborator, NewWithDefaultKeyCount) {
   EXPECT_NE(mod->variables[0].init_expr, nullptr);
 }
 
-}
+}  // namespace

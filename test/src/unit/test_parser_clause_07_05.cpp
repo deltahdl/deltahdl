@@ -57,4 +57,4 @@ TEST(DynamicArrayParsing, LeftmostDynamicWithInnerFixed) {
   EXPECT_NE(item->unpacked_dims[1], nullptr);
 }
 
-}
+}  // namespace

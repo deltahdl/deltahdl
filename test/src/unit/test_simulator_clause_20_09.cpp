@@ -112,10 +112,10 @@ TEST(UtilitySystemTaskTest, CountbitsControlBitOnlyLsbUsed) {
 TEST(UtilitySystemTaskTest, CountbitsControlBitDeduplicated) {
   SysTaskFixture f;
   auto* once = MkSysCall(f.arena, "$countbits",
-                        {MkInt(f.arena, 0xA5), MkInt(f.arena, 1)});
-  auto* twice = MkSysCall(f.arena, "$countbits",
-                         {MkInt(f.arena, 0xA5), MkInt(f.arena, 1),
-                          MkInt(f.arena, 1)});
+                         {MkInt(f.arena, 0xA5), MkInt(f.arena, 1)});
+  auto* twice =
+      MkSysCall(f.arena, "$countbits",
+                {MkInt(f.arena, 0xA5), MkInt(f.arena, 1), MkInt(f.arena, 1)});
   auto r_once = EvalExpr(once, f.ctx, f.arena);
   auto r_twice = EvalExpr(twice, f.ctx, f.arena);
   EXPECT_EQ(r_once.ToUint64(), r_twice.ToUint64());
@@ -130,7 +130,7 @@ TEST(UtilitySystemTaskTest, CountbitsVariableControlBitAtRuntime) {
   SysTaskFixture f;
   MakeVar(f, "ctrl", 1, 1);
   auto* expr = MakeSysCall(f.arena, "$countbits",
-                          {MakeInt(f.arena, 0xA5), MakeId(f.arena, "ctrl")});
+                           {MakeInt(f.arena, 0xA5), MakeId(f.arena, "ctrl")});
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 4u);
 }
@@ -163,4 +163,4 @@ TEST(UtilitySystemTaskTest, IsunknownTrueZVar) {
   EXPECT_EQ(result.ToUint64(), 1u);
 }
 
-}
+}  // namespace

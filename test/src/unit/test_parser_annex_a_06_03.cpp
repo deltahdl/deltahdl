@@ -1153,4 +1153,4 @@ TEST(BlockStatementSyntaxParsing, ForkWithEndTerminatorErrors) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

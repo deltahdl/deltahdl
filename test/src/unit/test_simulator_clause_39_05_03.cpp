@@ -54,11 +54,11 @@ TEST(DeferredAssertionQueue, ResetFlushOnlyTargetedAssertion) {
 // §39.5.3: non-discard per-assertion controls do not interfere with current
 // attempts, so none of them affect or flush the pending queue.
 TEST(DeferredAssertionQueue, NonDiscardControlsDoNotFlush) {
-  for (int control : {vpiAssertionEnable, vpiAssertionLock, vpiAssertionUnlock,
-                      vpiAssertionDisablePassAction, vpiAssertionEnablePassAction,
-                      vpiAssertionDisableFailAction, vpiAssertionEnableFailAction,
-                      vpiAssertionDisableVacuousAction,
-                      vpiAssertionEnableNonvacuousAction}) {
+  for (int control :
+       {vpiAssertionEnable, vpiAssertionLock, vpiAssertionUnlock,
+        vpiAssertionDisablePassAction, vpiAssertionEnablePassAction,
+        vpiAssertionDisableFailAction, vpiAssertionEnableFailAction,
+        vpiAssertionDisableVacuousAction, vpiAssertionEnableNonvacuousAction}) {
     // A fresh instance per control keeps each case independent of the others.
     AssertionApi api;
     api.QueuePendingAssertionReport(kA);

@@ -194,8 +194,8 @@ TEST(OperatorSim, AllShiftOpsPreserveLhsSignedness) {
   TokenKind ops[] = {TokenKind::kLtLt, TokenKind::kGtGt, TokenKind::kLtLtLt,
                      TokenKind::kGtGtGt};
   for (auto op : ops) {
-    auto* expr = MakeBinary(f.arena, op, MakeId(f.arena, "s"),
-                            MakeId(f.arena, "amt"));
+    auto* expr =
+        MakeBinary(f.arena, op, MakeId(f.arena, "s"), MakeId(f.arena, "amt"));
     auto result = EvalExpr(expr, f.ctx, f.arena);
     EXPECT_TRUE(result.is_signed);
   }
@@ -385,4 +385,4 @@ TEST(BlockingAssignSim, BlockingAssignShiftOps) {
   EXPECT_EQ(shr->value.ToUint64(), 0x03u);
 }
 
-}
+}  // namespace

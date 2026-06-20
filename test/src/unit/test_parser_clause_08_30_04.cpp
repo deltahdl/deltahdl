@@ -52,4 +52,4 @@ TEST(ClassParsing, WeakRefClearThenGetParses) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

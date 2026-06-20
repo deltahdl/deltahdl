@@ -17,7 +17,6 @@ enum class NetlistFormat : uint8_t {
 
 class NetlistWriter {
  public:
-
   static std::string WriteBlif(const AigGraph& aig,
                                std::string_view module_name);
 
@@ -34,4 +33,4 @@ class NetlistWriter {
                            NetlistFormat fmt);
 };
 
-}
+}  // namespace delta

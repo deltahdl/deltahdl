@@ -29,4 +29,4 @@ TEST(DesignBuildingBlockLexing, NumberAloneIsIntLiteralNotTimeLiteral) {
   EXPECT_EQ(LexOne("100").token.kind, TokenKind::kIntLiteral);
 }
 
-}
+}  // namespace

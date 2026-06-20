@@ -237,4 +237,4 @@ TEST(ParameterizedClassElaboration, ExplicitOverrideForNoDefaultClassOk) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

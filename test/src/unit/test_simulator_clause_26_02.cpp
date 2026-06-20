@@ -45,4 +45,4 @@ TEST(PackageDeclarationSim, MultiplePackageVariablesInitBeforeProcedures) {
   EXPECT_EQ(sum->value.ToUint64(), 12u);
 }
 
-}
+}  // namespace

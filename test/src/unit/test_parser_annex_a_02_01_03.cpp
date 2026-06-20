@@ -187,7 +187,6 @@ TEST(TypeDeclParsing, NetDeclWithDelay3) {
 }
 
 TEST(TypeDeclParsing, NetDeclWireWithExplicitDataType) {
-
   auto r = Parse("module m; wire logic [7:0] bus; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -196,7 +195,6 @@ TEST(TypeDeclParsing, NetDeclWireWithExplicitDataType) {
 }
 
 TEST(TypeDeclParsing, NetDeclInterconnectWithDelay) {
-
   auto r = Parse("module m; interconnect #5 x; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -212,13 +210,13 @@ TEST(TypeDeclParsing, NetDeclInterconnectMultipleNetIdentifiers) {
   int net_count = 0;
   for (auto* item : r.cu->modules[0]->items) {
     if (item->kind == ModuleItemKind::kNetDecl &&
-        item->data_type.is_interconnect) ++net_count;
+        item->data_type.is_interconnect)
+      ++net_count;
   }
   EXPECT_GE(net_count, 3);
 }
 
 TEST(TypeDeclParsing, TypedefWithVariableDimension) {
-
   auto r = Parse("module m; typedef int arr_t [10]; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -229,7 +227,6 @@ TEST(TypeDeclParsing, TypedefWithVariableDimension) {
 }
 
 TEST(TypeDeclParsing, NettypeDeclAliasForm) {
-
   auto r = Parse(
       "module m;\n"
       "  nettype real base_nt;\n"
@@ -245,7 +242,6 @@ TEST(TypeDeclParsing, NettypeDeclAliasForm) {
 }
 
 TEST(TypeDeclParsing, DataDeclStaticLifetime) {
-
   auto r = Parse(
       "module m;\n"
       "  function void f();\n"
@@ -563,4 +559,4 @@ TEST(TypeDeclParsing, ForwardTypedefWithoutKeyword) {
   EXPECT_EQ(item->name, "incomplete_t");
 }
 
-}
+}  // namespace

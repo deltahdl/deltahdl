@@ -52,7 +52,6 @@ TEST(CompilerDirectiveSimulation, DirectiveOverriddenBeforeSimulation) {
 }
 
 TEST(CompilerDirectiveSimulation, MacroDoesNotLeakBetweenCus) {
-
   auto first = PreprocessAndGet(
       "`define LEAK 8'd17\n"
       "module t;\n"
@@ -63,12 +62,11 @@ TEST(CompilerDirectiveSimulation, MacroDoesNotLeakBetweenCus) {
   EXPECT_EQ(first, 17u);
 
   SimFixture f2;
-  auto fid = f2.mgr.AddFile(
-      "<test>",
-      "module t;\n"
-      "  logic [7:0] result;\n"
-      "  initial result = `LEAK;\n"
-      "endmodule\n");
+  auto fid = f2.mgr.AddFile("<test>",
+                            "module t;\n"
+                            "  logic [7:0] result;\n"
+                            "  initial result = `LEAK;\n"
+                            "endmodule\n");
   Preprocessor pp2(f2.mgr, f2.diag, {});
   auto preprocessed = pp2.Preprocess(fid);
   auto fid2 = f2.mgr.AddFile("<preprocessed>", preprocessed);

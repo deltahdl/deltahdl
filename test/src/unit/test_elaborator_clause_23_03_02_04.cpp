@@ -180,7 +180,8 @@ TEST(WildcardPortConnectionElaboration, DefaultValueUsedWhenNameNotInScope) {
   EXPECT_EQ(b_binding->connection, b_default);
 }
 
-TEST(WildcardPortConnectionElaboration, WildcardDoesNotReferenceWildcardImport) {
+TEST(WildcardPortConnectionElaboration,
+     WildcardDoesNotReferenceWildcardImport) {
   // §23.3.2.4 exception 2: .* does not create a sufficient reference for a
   // wildcard package import. Even though `sig` is provided by `import pkg::*`,
   // .* does not connect the port to it; the port's default value is used
@@ -230,4 +231,4 @@ TEST(WildcardPortConnectionElaboration, MixedStylesInSameParent) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

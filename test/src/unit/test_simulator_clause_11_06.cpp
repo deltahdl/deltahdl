@@ -120,4 +120,4 @@ TEST(AdditionBitLength, SingleBitOperandsCarryIntoTwoBitLhs) {
   EXPECT_EQ(var->value.ToUint64(), 0x2u);
 }
 
-}
+}  // namespace

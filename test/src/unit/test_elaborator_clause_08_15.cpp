@@ -172,4 +172,4 @@ TEST(SuperElaboration, StaticInitConstantOk) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

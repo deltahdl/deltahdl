@@ -32,4 +32,4 @@ TEST(Arena, Reset) {
   EXPECT_EQ(arena.TotalAllocated(), 0);
 }
 
-}
+}  // namespace

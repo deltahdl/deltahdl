@@ -30,4 +30,4 @@ TEST(AssignmentParsing, NetDeclAssignmentVector) {
   EXPECT_NE(item->init_expr, nullptr);
 }
 
-}
+}  // namespace

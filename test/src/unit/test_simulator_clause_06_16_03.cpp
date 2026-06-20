@@ -86,7 +86,8 @@ TEST(StringMethods, GetcEquivalentToIndexedRead) {
   auto* call = f.MakeMethodCall("s", "getc", {f.MakeIntLiteral(2)});
   auto via_getc = EvalExpr(call, f.ctx, f.arena);
 
-  auto* index = MakeSelectExpr(f.arena, MakeId(f.arena, "s"), MakeInt(f.arena, 2));
+  auto* index =
+      MakeSelectExpr(f.arena, MakeId(f.arena, "s"), MakeInt(f.arena, 2));
   auto via_index = EvalExpr(index, f.ctx, f.arena);
 
   EXPECT_EQ(via_getc.ToUint64(), static_cast<uint64_t>('r'));
@@ -102,11 +103,12 @@ TEST(StringMethods, GetcEquivalentToIndexedReadOutOfBounds) {
   auto* call = f.MakeMethodCall("s", "getc", {f.MakeIntLiteral(5)});
   auto via_getc = EvalExpr(call, f.ctx, f.arena);
 
-  auto* index = MakeSelectExpr(f.arena, MakeId(f.arena, "s"), MakeInt(f.arena, 5));
+  auto* index =
+      MakeSelectExpr(f.arena, MakeId(f.arena, "s"), MakeInt(f.arena, 5));
   auto via_index = EvalExpr(index, f.ctx, f.arena);
 
   EXPECT_EQ(via_getc.ToUint64(), 0u);
   EXPECT_EQ(via_getc.ToUint64(), via_index.ToUint64());
 }
 
-}
+}  // namespace

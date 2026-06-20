@@ -59,4 +59,4 @@ TEST(OperatorAndExpressionParsing, WildcardEqInIfCondition) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}
+}  // namespace

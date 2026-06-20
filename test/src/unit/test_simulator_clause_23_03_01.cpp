@@ -87,4 +87,4 @@ TEST(TopLevelModules, DollarRootDisambiguatesFromLocalScope) {
   EXPECT_EQ(v->value.ToUint64(), 20u);
 }
 
-}
+}  // namespace

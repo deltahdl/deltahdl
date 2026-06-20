@@ -97,10 +97,11 @@ TEST(UdpInstantiation, MultipleInstancesInOneStatement) {
 // once applies to every instance in the declaration. This observes that the
 // pair parsed once is propagated onto both instances of the list.
 TEST(UdpInstantiation, SharedStrengthAndDelayAcrossInstances) {
-  auto r = Parse(std::string(kUdpDef) +
-                 "module top;\n"
-                 "  my_udp (strong0, weak1) #(2, 3) u1 (y, a, b), u2 (y, a, b);\n"
-                 "endmodule\n");
+  auto r =
+      Parse(std::string(kUdpDef) +
+            "module top;\n"
+            "  my_udp (strong0, weak1) #(2, 3) u1 (y, a, b), u2 (y, a, b);\n"
+            "endmodule\n");
   EXPECT_FALSE(r.has_errors);
   auto insts = FindUdpInstances(r);
   ASSERT_EQ(insts.size(), 2u);
@@ -125,4 +126,4 @@ TEST(UdpInstantiation, RejectsThreeDelays) {
   EXPECT_TRUE(r.has_errors);
 }
 
-}
+}  // namespace

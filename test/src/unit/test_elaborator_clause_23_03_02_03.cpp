@@ -8,7 +8,8 @@ using namespace delta;
 
 namespace {
 
-TEST(ImplicitNamedPortConnectionElaboration, ImplicitConnectionHasCorrectDirection) {
+TEST(ImplicitNamedPortConnectionElaboration,
+     ImplicitConnectionHasCorrectDirection) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module child(input logic a, output logic b);\n"
@@ -43,7 +44,8 @@ TEST(ImplicitNamedPortConnectionElaboration, ErrorWhenSignalNotDeclared) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(ImplicitNamedPortConnectionElaboration, ErrorWhenSignalNotDeclaredEvenWithDefault) {
+TEST(ImplicitNamedPortConnectionElaboration,
+     ErrorWhenSignalNotDeclaredEvenWithDefault) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module child(input logic a = 1'b0);\n"
@@ -108,7 +110,8 @@ TEST(ImplicitNamedPortConnectionElaboration, ErrorForNonEquivalentDataTypes) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(ImplicitNamedPortConnectionElaboration, ImplicitConnectionDoesNotUseDefault) {
+TEST(ImplicitNamedPortConnectionElaboration,
+     ImplicitConnectionDoesNotUseDefault) {
   // 23.3.2.3: when an implicit .name connection is used it is assumed the
   // coder intends to connect the like-named signal, so the input port's
   // default value is NOT used even though one is specified. The binding must
@@ -180,7 +183,8 @@ TEST(ImplicitNamedPortConnectionElaboration, ErrorForDissimilarNetTypes) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(ImplicitNamedPortConnectionElaboration, ExplicitDissimilarNetTypesOnlyWarns) {
+TEST(ImplicitNamedPortConnectionElaboration,
+     ExplicitDissimilarNetTypesOnlyWarns) {
   // Contrast with the implicit form above: an explicit .a(a) named connection
   // of the same dissimilar net types is only a warning, not an error. The
   // 23.3.2.3 escalation to an error applies only to the implicit .name form.
@@ -198,7 +202,8 @@ TEST(ImplicitNamedPortConnectionElaboration, ExplicitDissimilarNetTypesOnlyWarns
   EXPECT_GT(f.diag.WarningCount(), 0u);
 }
 
-TEST(ImplicitNamedPortConnectionElaboration, EquivalentNetTypesConnectWithoutError) {
+TEST(ImplicitNamedPortConnectionElaboration,
+     EquivalentNetTypesConnectWithoutError) {
   // 23.3.2.3: the dissimilar-net-type error is limited to genuinely dissimilar
   // nets. wire and tri are equivalent aliases, so an implicit .name connection
   // between a wire port and a tri signal is accepted with no error and the
@@ -221,4 +226,4 @@ TEST(ImplicitNamedPortConnectionElaboration, EquivalentNetTypesConnectWithoutErr
   EXPECT_NE(bindings[0].connection, nullptr);
 }
 
-}
+}  // namespace

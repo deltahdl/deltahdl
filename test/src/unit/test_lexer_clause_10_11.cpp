@@ -47,4 +47,4 @@ TEST(NetAliasingLexing, AliasPartSelectTokenSequence) {
   EXPECT_EQ(tokens[2].kind, TokenKind::kLBracket);
 }
 
-}
+}  // namespace

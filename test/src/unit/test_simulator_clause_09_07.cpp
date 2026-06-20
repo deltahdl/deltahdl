@@ -7,27 +7,27 @@ using namespace delta;
 namespace {
 
 TEST(FineGrainProcessControlSimulation, SelfReturnsHandle) {
-  EXPECT_EQ(RunAndGet(
-      "module t;\n"
-      "  logic [31:0] x;\n"
-      "  initial begin\n"
-      "    process p = process::self();\n"
-      "    x = (p != null) ? 1 : 0;\n"
-      "  end\n"
-      "endmodule\n",
-      "x"), 1u);
+  EXPECT_EQ(RunAndGet("module t;\n"
+                      "  logic [31:0] x;\n"
+                      "  initial begin\n"
+                      "    process p = process::self();\n"
+                      "    x = (p != null) ? 1 : 0;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "x"),
+            1u);
 }
 
 TEST(FineGrainProcessControlSimulation, StatusRunningForCurrentProcess) {
-  EXPECT_EQ(RunAndGet(
-      "module t;\n"
-      "  logic [31:0] x;\n"
-      "  initial begin\n"
-      "    process p = process::self();\n"
-      "    x = (p.status() == process::RUNNING) ? 1 : 0;\n"
-      "  end\n"
-      "endmodule\n",
-      "x"), 1u);
+  EXPECT_EQ(RunAndGet("module t;\n"
+                      "  logic [31:0] x;\n"
+                      "  initial begin\n"
+                      "    process p = process::self();\n"
+                      "    x = (p.status() == process::RUNNING) ? 1 : 0;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "x"),
+            1u);
 }
 
 TEST(FineGrainProcessControlSimulation, KillTerminatesChild) {
@@ -102,41 +102,41 @@ TEST(FineGrainProcessControlSimulation, SuspendAndResume) {
 }
 
 TEST(FineGrainProcessControlSimulation, StatusFinishedAfterTermination) {
-  EXPECT_EQ(RunAndGet(
-      "module t;\n"
-      "  logic [31:0] x;\n"
-      "  initial begin\n"
-      "    process p;\n"
-      "    fork\n"
-      "      begin\n"
-      "        p = process::self();\n"
-      "      end\n"
-      "    join_none\n"
-      "    #1;\n"
-      "    x = (p.status() == process::FINISHED) ? 1 : 0;\n"
-      "  end\n"
-      "endmodule\n",
-      "x"), 1u);
+  EXPECT_EQ(RunAndGet("module t;\n"
+                      "  logic [31:0] x;\n"
+                      "  initial begin\n"
+                      "    process p;\n"
+                      "    fork\n"
+                      "      begin\n"
+                      "        p = process::self();\n"
+                      "      end\n"
+                      "    join_none\n"
+                      "    #1;\n"
+                      "    x = (p.status() == process::FINISHED) ? 1 : 0;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "x"),
+            1u);
 }
 
 TEST(FineGrainProcessControlSimulation, StatusKilledAfterKill) {
-  EXPECT_EQ(RunAndGet(
-      "module t;\n"
-      "  logic [31:0] x;\n"
-      "  initial begin\n"
-      "    process p;\n"
-      "    fork\n"
-      "      begin\n"
-      "        p = process::self();\n"
-      "        #100;\n"
-      "      end\n"
-      "    join_none\n"
-      "    #1;\n"
-      "    p.kill();\n"
-      "    x = (p.status() == process::KILLED) ? 1 : 0;\n"
-      "  end\n"
-      "endmodule\n",
-      "x"), 1u);
+  EXPECT_EQ(RunAndGet("module t;\n"
+                      "  logic [31:0] x;\n"
+                      "  initial begin\n"
+                      "    process p;\n"
+                      "    fork\n"
+                      "      begin\n"
+                      "        p = process::self();\n"
+                      "        #100;\n"
+                      "      end\n"
+                      "    join_none\n"
+                      "    #1;\n"
+                      "    p.kill();\n"
+                      "    x = (p.status() == process::KILLED) ? 1 : 0;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "x"),
+            1u);
 }
 
 TEST(FineGrainProcessControlSimulation, KillTerminatesDescendants) {
@@ -208,22 +208,22 @@ TEST(FineGrainProcessControlSimulation, SrandomMethodOnProcessHandle) {
 }
 
 TEST(FineGrainProcessControlSimulation, SuspendNoEffectOnFinished) {
-  EXPECT_EQ(RunAndGet(
-      "module t;\n"
-      "  logic [31:0] x;\n"
-      "  initial begin\n"
-      "    process p;\n"
-      "    fork\n"
-      "      begin\n"
-      "        p = process::self();\n"
-      "      end\n"
-      "    join_none\n"
-      "    #1;\n"
-      "    p.suspend();\n"
-      "    x = (p.status() == process::FINISHED) ? 1 : 0;\n"
-      "  end\n"
-      "endmodule\n",
-      "x"), 1u);
+  EXPECT_EQ(RunAndGet("module t;\n"
+                      "  logic [31:0] x;\n"
+                      "  initial begin\n"
+                      "    process p;\n"
+                      "    fork\n"
+                      "      begin\n"
+                      "        p = process::self();\n"
+                      "      end\n"
+                      "    join_none\n"
+                      "    #1;\n"
+                      "    p.suspend();\n"
+                      "    x = (p.status() == process::FINISHED) ? 1 : 0;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "x"),
+            1u);
 }
 
 TEST(FineGrainProcessControlSimulation, AwaitOnCurrentProcessIsError) {
@@ -314,45 +314,45 @@ TEST(FineGrainProcessControlSimulation, SuspendDesensitizesWaitingProcess) {
 }
 
 TEST(FineGrainProcessControlSimulation, SuspendNoEffectOnAlreadySuspended) {
-  EXPECT_EQ(RunAndGet(
-      "module t;\n"
-      "  logic [31:0] x;\n"
-      "  initial begin\n"
-      "    process p;\n"
-      "    fork\n"
-      "      begin\n"
-      "        p = process::self();\n"
-      "        #100;\n"
-      "      end\n"
-      "    join_none\n"
-      "    #1;\n"
-      "    p.suspend();\n"
-      "    p.suspend();\n"
-      "    x = (p.status() == process::SUSPENDED) ? 1 : 0;\n"
-      "  end\n"
-      "endmodule\n",
-      "x"), 1u);
+  EXPECT_EQ(RunAndGet("module t;\n"
+                      "  logic [31:0] x;\n"
+                      "  initial begin\n"
+                      "    process p;\n"
+                      "    fork\n"
+                      "      begin\n"
+                      "        p = process::self();\n"
+                      "        #100;\n"
+                      "      end\n"
+                      "    join_none\n"
+                      "    #1;\n"
+                      "    p.suspend();\n"
+                      "    p.suspend();\n"
+                      "    x = (p.status() == process::SUSPENDED) ? 1 : 0;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "x"),
+            1u);
 }
 
 TEST(FineGrainProcessControlSimulation, SuspendNoEffectOnKilled) {
-  EXPECT_EQ(RunAndGet(
-      "module t;\n"
-      "  logic [31:0] x;\n"
-      "  initial begin\n"
-      "    process p;\n"
-      "    fork\n"
-      "      begin\n"
-      "        p = process::self();\n"
-      "        #100;\n"
-      "      end\n"
-      "    join_none\n"
-      "    #1;\n"
-      "    p.kill();\n"
-      "    p.suspend();\n"
-      "    x = (p.status() == process::KILLED) ? 1 : 0;\n"
-      "  end\n"
-      "endmodule\n",
-      "x"), 1u);
+  EXPECT_EQ(RunAndGet("module t;\n"
+                      "  logic [31:0] x;\n"
+                      "  initial begin\n"
+                      "    process p;\n"
+                      "    fork\n"
+                      "      begin\n"
+                      "        p = process::self();\n"
+                      "        #100;\n"
+                      "      end\n"
+                      "    join_none\n"
+                      "    #1;\n"
+                      "    p.kill();\n"
+                      "    p.suspend();\n"
+                      "    x = (p.status() == process::KILLED) ? 1 : 0;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "x"),
+            1u);
 }
 
 TEST(FineGrainProcessControlSimulation, KillOnFinalProcessIsError) {
@@ -412,4 +412,4 @@ TEST(FineGrainProcessControlSimulation, ResumeOnFinalProcessIsError) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-}
+}  // namespace

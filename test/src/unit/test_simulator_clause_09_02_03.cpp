@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-TEST(FinalProcedureSimulation,FinalBlockExecutesAfterRun) {
+TEST(FinalProcedureSimulation, FinalBlockExecutesAfterRun) {
   LowerFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -29,7 +29,7 @@ TEST(FinalProcedureSimulation,FinalBlockExecutesAfterRun) {
   EXPECT_EQ(var->value.ToUint64(), 77u);
 }
 
-TEST(FinalProcedureSimulation,FinalBlockNotScheduledAtTimeZero) {
+TEST(FinalProcedureSimulation, FinalBlockNotScheduledAtTimeZero) {
   LowerFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -49,7 +49,7 @@ TEST(FinalProcedureSimulation,FinalBlockNotScheduledAtTimeZero) {
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
-TEST(FinalProcedureSimulation,FinalBlocksFIFOOrder) {
+TEST(FinalProcedureSimulation, FinalBlocksFIFOOrder) {
   LowerFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -71,7 +71,7 @@ TEST(FinalProcedureSimulation,FinalBlocksFIFOOrder) {
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
 
-TEST(FinalProcedureSimulation,FinalDoesNotAffectNormalSim) {
+TEST(FinalProcedureSimulation, FinalDoesNotAffectNormalSim) {
   LowerFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -94,7 +94,7 @@ TEST(FinalProcedureSimulation,FinalDoesNotAffectNormalSim) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-TEST(FinalProcedureSimulation,FinalBlockMultipleAssignments) {
+TEST(FinalProcedureSimulation, FinalBlockMultipleAssignments) {
   LowerFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -120,7 +120,7 @@ TEST(FinalProcedureSimulation,FinalBlockMultipleAssignments) {
   EXPECT_EQ(b->value.ToUint64(), 22u);
 }
 
-TEST(FinalProcedureSimulation,FinalExecutesOnlyOnce) {
+TEST(FinalProcedureSimulation, FinalExecutesOnlyOnce) {
   LowerFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -233,4 +233,4 @@ TEST(FinalProcedureSimulation, FinishInsideFinalStopsRemainingFinals) {
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
-}
+}  // namespace

@@ -54,4 +54,4 @@ TEST(DriveStrengthParsing, StrengthSpecHighz) {
   EXPECT_EQ(item->drive_strength1, 3);
 }
 
-}
+}  // namespace

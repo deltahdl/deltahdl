@@ -62,4 +62,4 @@ TEST(CompilerDirectiveParsing, TimescaleWithDelays) {
                               "endmodule\n"));
 }
 
-}
+}  // namespace

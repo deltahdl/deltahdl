@@ -164,14 +164,15 @@ TEST(VariableInitSim, BlockLevelVarInit) {
 }
 
 TEST(VariableInitSim, StaticClassMemberInitBeforeInitialBlock) {
-  EXPECT_EQ(RunAndGet(
-      "class C;\n"
-      "  static int val = 55;\n"
-      "endclass\n"
-      "module t;\n"
-      "  int result;\n"
-      "  initial result = C::val;\n"
-      "endmodule\n", "result"), 55u);
+  EXPECT_EQ(RunAndGet("class C;\n"
+                      "  static int val = 55;\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial result = C::val;\n"
+                      "endmodule\n",
+                      "result"),
+            55u);
 }
 
 // The initial value is placed verbatim, so an initializer carrying x/z bits
@@ -250,4 +251,4 @@ TEST(VariableInitSim, VarInitBeforeAlwaysCombBlock) {
   EXPECT_EQ(o->value.ToUint64(), 10u);
 }
 
-}
+}  // namespace

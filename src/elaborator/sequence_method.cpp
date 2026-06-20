@@ -16,9 +16,7 @@ bool IsSequenceMethodOperandLegal(SequenceMethodOperandKind kind) {
   return false;
 }
 
-bool SequenceMethodResultIsSingleBit() {
-  return true;
-}
+bool SequenceMethodResultIsSingleBit() { return true; }
 
 bool SequenceMethodResultDependsOnStartPoint() {
   // §16.13.6: the result reflects only whether the end point has been reached,
@@ -55,9 +53,7 @@ bool IsSequenceMethodContextLegal(SequenceMethod method,
   return false;
 }
 
-bool SequenceMethodStatusSetInObservedRegion() {
-  return true;
-}
+bool SequenceMethodStatusSetInObservedRegion() { return true; }
 
 SequenceMethodPersistence SequenceMethodStatusPersistence(
     SequenceMethod method) {
@@ -70,9 +66,7 @@ SequenceMethodPersistence SequenceMethodStatusPersistence(
   return SequenceMethodPersistence::kThroughTimeStep;
 }
 
-bool SequenceMethodSampledValueIsCurrentValue() {
-  return true;
-}
+bool SequenceMethodSampledValueIsCurrentValue() { return true; }
 
 bool EmptyMatchActivatesSequenceMethod() {
   // §16.13.6 / §16.9.11: empty matches never activate triggered or matched.

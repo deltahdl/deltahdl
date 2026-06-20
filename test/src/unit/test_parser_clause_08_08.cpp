@@ -176,4 +176,4 @@ TEST(TypedConstructorCallParsing, ParameterizedWithMultipleParams) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}
+}  // namespace

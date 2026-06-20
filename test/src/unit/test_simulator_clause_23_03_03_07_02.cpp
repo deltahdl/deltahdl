@@ -89,8 +89,7 @@ TEST(InterconnectPrimitiveTerminalSimulation,
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-TEST(InterconnectPrimitiveTerminalSimulation,
-     InterconnectOnPullupReceivesOne) {
+TEST(InterconnectPrimitiveTerminalSimulation, InterconnectOnPullupReceivesOne) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module top;\n"
@@ -121,4 +120,4 @@ TEST(InterconnectPrimitiveTerminalSimulation,
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
-}
+}  // namespace

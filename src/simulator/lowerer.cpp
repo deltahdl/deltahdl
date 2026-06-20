@@ -24,7 +24,7 @@
 
 namespace delta {
 
-Lowerer::Lowerer(SimContext& ctx, Arena& arena, DiagEngine& )
+Lowerer::Lowerer(SimContext& ctx, Arena& arena, DiagEngine&)
     : ctx_(ctx), arena_(arena) {}
 
 static SimCoroutine MakeInitialCoroutine(const Stmt* body, SimContext& ctx,
@@ -170,7 +170,6 @@ static uint64_t SelectContAssignDelay(const Logic4Vec& old_val,
   }
 
   if (width <= 1) {
-
     bool new_has_x = HasUnknownBits(new_val);
     if (new_has_x) {
       uint64_t m = std::min(d.rise, d.fall);
@@ -234,7 +233,6 @@ static SimCoroutine MakeContAssignCoroutine(ContAssignParams params,
 
       uint64_t ticks = SelectContAssignDelay(old_val, val, d, params.width);
       if (ticks > 0 && !read_vars.empty()) {
-
         SimTime target = ctx.CurrentTime() + SimTime{ticks};
         while (true) {
           uint64_t remaining = (target.ticks > ctx.CurrentTime().ticks)
@@ -266,13 +264,12 @@ static SimCoroutine MakeContAssignCoroutine(ContAssignParams params,
 
     DriverStrength effective_ds = params.ds;
     if ((params.nonresistive_switch || params.resistive_switch) &&
-        params.data_input &&
-        params.data_input->kind == ExprKind::kIdentifier) {
+        params.data_input && params.data_input->kind == ExprKind::kIdentifier) {
       auto* data_net = ctx.FindNet(params.data_input->text);
       if (data_net) {
         const NetStrength& ns = data_net->resolved_strength;
-        auto reduce = params.resistive_switch ? &ReduceResistive
-                                              : &ReduceNonresistive;
+        auto reduce =
+            params.resistive_switch ? &ReduceResistive : &ReduceNonresistive;
         effective_ds.s0 = reduce(ns.s0_hi);
         effective_ds.s1 = reduce(ns.s1_hi);
       }
@@ -292,7 +289,6 @@ static SimCoroutine MakeContAssignCoroutine(ContAssignParams params,
     } else {
       auto* var = ctx.FindVariable(params.lhs->text);
       if (var && !var->is_forced) {
-
         var->value = ResizeToWidth(driven_val, var->value.width, arena);
         var->NotifyWatchers();
       }
@@ -386,26 +382,40 @@ static void InitArrayFromReplicate(const RtlirVariable& var, uint32_t elem_idx,
 static bool IsTypeKeyword(std::string_view key) {
   return key == "int" || key == "integer" || key == "logic" || key == "reg" ||
          key == "byte" || key == "shortint" || key == "longint" ||
-         key == "bit" || key == "real" || key == "shortreal" ||
-         key == "time" || key == "realtime" || key == "string";
+         key == "bit" || key == "real" || key == "shortreal" || key == "time" ||
+         key == "realtime" || key == "string";
 }
 
 static bool TypeKeyMatchesKind(std::string_view key, DataTypeKind kind) {
   switch (kind) {
-    case DataTypeKind::kInt: return key == "int";
-    case DataTypeKind::kInteger: return key == "integer";
-    case DataTypeKind::kLogic: return key == "logic";
-    case DataTypeKind::kReg: return key == "reg";
-    case DataTypeKind::kByte: return key == "byte";
-    case DataTypeKind::kShortint: return key == "shortint";
-    case DataTypeKind::kLongint: return key == "longint";
-    case DataTypeKind::kBit: return key == "bit";
-    case DataTypeKind::kReal: return key == "real";
-    case DataTypeKind::kShortreal: return key == "shortreal";
-    case DataTypeKind::kTime: return key == "time";
-    case DataTypeKind::kRealtime: return key == "realtime";
-    case DataTypeKind::kString: return key == "string";
-    default: return false;
+    case DataTypeKind::kInt:
+      return key == "int";
+    case DataTypeKind::kInteger:
+      return key == "integer";
+    case DataTypeKind::kLogic:
+      return key == "logic";
+    case DataTypeKind::kReg:
+      return key == "reg";
+    case DataTypeKind::kByte:
+      return key == "byte";
+    case DataTypeKind::kShortint:
+      return key == "shortint";
+    case DataTypeKind::kLongint:
+      return key == "longint";
+    case DataTypeKind::kBit:
+      return key == "bit";
+    case DataTypeKind::kReal:
+      return key == "real";
+    case DataTypeKind::kShortreal:
+      return key == "shortreal";
+    case DataTypeKind::kTime:
+      return key == "time";
+    case DataTypeKind::kRealtime:
+      return key == "realtime";
+    case DataTypeKind::kString:
+      return key == "string";
+    default:
+      return false;
   }
 }
 
@@ -427,8 +437,7 @@ static void InitArrayFromNamed(const RtlirVariable& var, uint32_t idx,
   for (size_t i = 0; i < init->pattern_keys.size(); ++i) {
     if (i >= init->elements.size()) break;
     auto& key = init->pattern_keys[i];
-    if (IsTypeKeyword(key) &&
-        TypeKeyMatchesKind(key, var.elem_type_kind)) {
+    if (IsTypeKeyword(key) && TypeKeyMatchesKind(key, var.elem_type_kind)) {
       elem->value = EvalExpr(init->elements[i], ctx, arena);
       return;
     }
@@ -504,7 +513,8 @@ void Lowerer::LowerDynArrayInit(const RtlirVariable& var) {
       if (init_expr && init_expr->kind == ExprKind::kIdentifier) {
         if (auto* src = ctx_.FindQueue(init_expr->text)) {
           size_t copy_len = std::min(q->elements.size(), src->elements.size());
-          for (size_t i = 0; i < copy_len; ++i) q->elements[i] = src->elements[i];
+          for (size_t i = 0; i < copy_len; ++i)
+            q->elements[i] = src->elements[i];
         }
       }
     }
@@ -545,7 +555,6 @@ static void ApplyStructMemberDefaults(const RtlirVariable& var, Variable* v,
   auto* sinfo = ctx.GetVariableStructType(var.name);
   if (!sinfo) return;
   for (const auto& f : sinfo->fields) {
-
     for (const auto& m : var.dtype->struct_members) {
       if (m.name != f.name || !m.init_expr) continue;
       auto val = EvalExpr(m.init_expr, ctx, arena).ToUint64();
@@ -563,7 +572,6 @@ void Lowerer::LowerVarAggregate(const RtlirVariable& var) {
   if (var.is_queue) {
     ctx_.CreateQueue(var.name, var.width, var.queue_max_size, var.is_4state);
   } else if (var.is_dynamic) {
-
     ctx_.CreateQueue(var.name, var.width);
     LowerDynArrayInit(var);
 
@@ -572,10 +580,9 @@ void Lowerer::LowerVarAggregate(const RtlirVariable& var) {
     info.elem_width = var.width;
     ctx_.RegisterArray(var.name, info);
   } else if (var.is_assoc) {
-    auto* aa = ctx_.CreateAssocArray(var.name, var.width, var.is_string_index,
-                                     var.assoc_index_width,
-                                     var.is_wildcard_index,
-                                     var.is_4state, var.is_index_signed);
+    auto* aa = ctx_.CreateAssocArray(
+        var.name, var.width, var.is_string_index, var.assoc_index_width,
+        var.is_wildcard_index, var.is_4state, var.is_index_signed);
     InitAssocDefault(var.init_expr, aa);
   } else {
     CreateArrayElements(var, ctx_, arena_);
@@ -583,7 +590,6 @@ void Lowerer::LowerVarAggregate(const RtlirVariable& var) {
 }
 
 void Lowerer::LowerVar(const RtlirVariable& var) {
-
   uint32_t width = var.class_type_name.empty() ? var.width : 64;
   auto* v = ctx_.CreateVariable(var.name, width);
 
@@ -619,7 +625,6 @@ void Lowerer::LowerVar(const RtlirVariable& var) {
 
 void Lowerer::LowerVarInit(const RtlirVariable& var, Variable* v,
                            uint32_t width) {
-
   if (var.is_event && var.init_expr->kind == ExprKind::kIdentifier &&
       var.init_expr->text == "null") {
     v->is_null_event = true;
@@ -688,7 +693,10 @@ static void BuildVTable(ClassTypeInfo* info, const ClassDecl* cls) {
     for (const auto& entry : iface->vtable) {
       bool found = false;
       for (const auto& existing : info->vtable) {
-        if (existing.method_name == entry.method_name) { found = true; break; }
+        if (existing.method_name == entry.method_name) {
+          found = true;
+          break;
+        }
       }
       if (!found) info->vtable.push_back(entry);
     }
@@ -775,7 +783,8 @@ void Lowerer::LowerClassDecl(const ClassDecl* cls) {
     int64_t next_val = 0;
     for (const auto& em : enum_members) {
       if (em.value) next_val = static_cast<int64_t>(em.value->int_val);
-      info->enum_members[std::string(em.name)] = static_cast<uint64_t>(next_val);
+      info->enum_members[std::string(em.name)] =
+          static_cast<uint64_t>(next_val);
       ++next_val;
     }
   }
@@ -791,25 +800,23 @@ void Lowerer::LowerClassDecl(const ClassDecl* cls) {
           info->enum_members[k] = v;
       }
     };
-    if (info->parent && info->parent->is_interface)
-      inherit_from(info->parent);
-    for (const auto* iface : info->extended_interfaces)
-      inherit_from(iface);
+    if (info->parent && info->parent->is_interface) inherit_from(info->parent);
+    for (const auto* iface : info->extended_interfaces) inherit_from(iface);
   }
   ctx_.RegisterClassType(cls->name, info);
 
   for (const auto* member : cls->members) {
     if (member->kind == ClassMemberKind::kClassDecl && member->nested_class) {
-      auto qualified =
-          std::string(cls->name) + "::" + std::string(member->nested_class->name);
+      auto qualified = std::string(cls->name) +
+                       "::" + std::string(member->nested_class->name);
       auto* nested_info = arena_.Create<ClassTypeInfo>();
-      nested_info->name =
-          *arena_.Create<std::string>(std::move(qualified));
+      nested_info->name = *arena_.Create<std::string>(std::move(qualified));
       nested_info->decl = member->nested_class;
       nested_info->is_abstract = member->nested_class->is_virtual;
       nested_info->is_interface = member->nested_class->is_interface;
       if (!member->nested_class->base_class.empty())
-        nested_info->parent = ctx_.FindClassType(member->nested_class->base_class);
+        nested_info->parent =
+            ctx_.FindClassType(member->nested_class->base_class);
       for (auto* m : member->nested_class->members) {
         if (m->kind == ClassMemberKind::kProperty) {
           uint32_t w = EvalTypeWidth(m->data_type, {});
@@ -869,7 +876,6 @@ void Lowerer::LowerAliases(const RtlirModule* mod) {
 }
 
 void Lowerer::LowerModule(const RtlirModule* mod) {
-
   {
     std::string key = inst_prefix_;
     if (!key.empty() && key.back() == '.') key.pop_back();
@@ -914,7 +920,6 @@ void Lowerer::LowerModule(const RtlirModule* mod) {
 
   LowerImports(mod);
   {
-
     auto* proc_type = arena_.Create<ClassTypeInfo>();
     proc_type->name = "process";
     proc_type->enum_members["FINISHED"] = 0;
@@ -947,8 +952,9 @@ void Lowerer::LowerProcess(const RtlirProcess& proc, bool from_program,
   auto* p = arena_.Create<Process>();
   p->id = next_id_++;
 
-  p->home_region = from_program ? Scheduler::HomeRegionForReactiveBlockingAssign()
-                                : Region::kActive;
+  p->home_region = from_program
+                       ? Scheduler::HomeRegionForReactiveBlockingAssign()
+                       : Region::kActive;
   p->is_reactive = from_program;
   p->inst_prefix = inst_prefix_;
   // §18.14.1: a static process is seeded with the next value from the
@@ -1003,8 +1009,9 @@ void Lowerer::LowerContAssign(const RtlirContAssign& ca, bool from_program) {
   p->kind = ProcessKind::kContAssign;
   p->id = next_id_++;
 
-  p->home_region = from_program ? Scheduler::HomeRegionForReactiveBlockingAssign()
-                                : Region::kActive;
+  p->home_region = from_program
+                       ? Scheduler::HomeRegionForReactiveBlockingAssign()
+                       : Region::kActive;
   p->is_reactive = from_program;
 
   p->inst_prefix = inst_prefix_;
@@ -1047,7 +1054,8 @@ void Lowerer::LowerPackageItem(ModuleItem* item) {
 static bool PackageItemHasName(const ModuleItem* item, std::string_view name) {
   if (item->name == name) return true;
   if (item->kind == ModuleItemKind::kClassDecl && item->class_decl &&
-      item->class_decl->name == name) return true;
+      item->class_decl->name == name)
+    return true;
   return false;
 }
 
@@ -1057,7 +1065,8 @@ void Lowerer::LowerImportedName(
   if (!visited.insert(pkg).second) return;
   for (auto* item : pkg->items) {
     if (item->kind == ModuleItemKind::kImportDecl ||
-        item->kind == ModuleItemKind::kExportDecl) continue;
+        item->kind == ModuleItemKind::kExportDecl)
+      continue;
     if (PackageItemHasName(item, name)) {
       LowerPackageItem(item);
       return;
@@ -1068,7 +1077,6 @@ void Lowerer::LowerImportedName(
     if (item->kind != ModuleItemKind::kExportDecl) continue;
     const auto& ex = item->import_item;
     if (ex.package_name == "*") {
-
       for (auto* imp_item : pkg->items) {
         if (imp_item->kind != ModuleItemKind::kImportDecl) continue;
         auto* src = FindPackage(imp_item->import_item.package_name);
@@ -1095,7 +1103,8 @@ void Lowerer::LowerAllImported(
   if (!visited.insert(pkg).second) return;
   for (auto* item : pkg->items) {
     if (item->kind == ModuleItemKind::kImportDecl ||
-        item->kind == ModuleItemKind::kExportDecl) continue;
+        item->kind == ModuleItemKind::kExportDecl)
+      continue;
     LowerPackageItem(item);
   }
 
@@ -1130,8 +1139,7 @@ void Lowerer::LowerImports(const RtlirModule* mod) {
     bool is_var = item->kind == ModuleItemKind::kVarDecl;
     if (!(is_param || is_var) || !item->init_expr) return;
     if (ctx_.FindVariable(item->name)) return;
-    std::string qname =
-        std::string(pkg->name) + "." + std::string(item->name);
+    std::string qname = std::string(pkg->name) + "." + std::string(item->name);
     ctx_.AliasVariable(item->name, qname);
   };
 
@@ -1154,8 +1162,8 @@ void Lowerer::LowerImports(const RtlirModule* mod) {
   // of the same name. Because alias_data_item lets the first binding of a name
   // win, the explicitly imported names must be bound before any wildcard import
   // is applied, regardless of the order the import declarations appear in the
-  // source. Module-local declarations are materialized before LowerImports runs,
-  // so they already shadow both kinds of import.
+  // source. Module-local declarations are materialized before LowerImports
+  // runs, so they already shadow both kinds of import.
   for (const auto& imp : mod->imports)
     if (!imp.is_wildcard) apply_import(imp);
   for (const auto& imp : mod->imports)
@@ -1180,7 +1188,8 @@ void Lowerer::LowerPortBindings(const RtlirModuleInst& inst,
 
     if (binding.direction == Direction::kInout) {
       if (binding.connection->kind != ExprKind::kIdentifier) continue;
-      std::string local_qualified = inst_prefix_ + std::string(binding.port_name);
+      std::string local_qualified =
+          inst_prefix_ + std::string(binding.port_name);
       ctx_.AliasVariable(local_qualified, binding.connection->text);
       continue;
     }
@@ -1266,7 +1275,8 @@ void Lowerer::Lower(const RtlirDesign* design) {
   if (design->simulation_blocked) return;
   design_ = design;
   // Annex D.11: the interactive scope consulted by the optional $scope system
-  // task starts at the first top-level module. A later $scope call retargets it.
+  // task starts at the first top-level module. A later $scope call retargets
+  // it.
   if (!design->top_modules.empty()) {
     ctx_.SetInteractiveScope(design->top_modules.front()->name);
   }
@@ -1279,8 +1289,8 @@ void Lowerer::Lower(const RtlirDesign* design) {
       bool is_param = item->kind == ModuleItemKind::kParamDecl;
       bool is_var = item->kind == ModuleItemKind::kVarDecl;
       if (!(is_param || is_var) || !item->init_expr) continue;
-      auto* qname = arena_.Create<std::string>(
-          std::string(pkg->name) + "." + std::string(item->name));
+      auto* qname = arena_.Create<std::string>(std::string(pkg->name) + "." +
+                                               std::string(item->name));
       auto* var = ctx_.CreateVariable(*qname, 32);
       var->value = EvalExpr(item->init_expr, ctx_, arena_);
     }
@@ -1313,4 +1323,4 @@ void Lowerer::Lower(const RtlirDesign* design) {
   }
 }
 
-}
+}  // namespace delta

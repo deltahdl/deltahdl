@@ -75,4 +75,4 @@ TEST(UnpackedArrayConcatSim, VectorConcatInByteArrayConcat) {
   EXPECT_EQ(ba1->value.ToUint64(), 15u);
 }
 
-}
+}  // namespace

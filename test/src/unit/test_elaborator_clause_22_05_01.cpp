@@ -111,4 +111,4 @@ TEST(DefineElaboration, MacroWithDefaultArgElaboratesCorrectly) {
   EXPECT_TRUE(found);
 }
 
-}
+}  // namespace

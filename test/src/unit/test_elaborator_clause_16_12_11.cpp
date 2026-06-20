@@ -21,14 +21,16 @@ TEST(AlwaysRange, EqualBoundsAreWellFormed) {
   EXPECT_TRUE(IsAlwaysRangeWellFormed(range, /*strong=*/false));
 }
 
-// §16.12.11: a weak always range may be unbounded, so a `$` maximum is accepted.
+// §16.12.11: a weak always range may be unbounded, so a `$` maximum is
+// accepted.
 TEST(AlwaysRange, WeakAlwaysAllowsUnboundedMaximum) {
   AlwaysRange range{MakeAlwaysBound(1), MakeAlwaysDollar()};
   EXPECT_TRUE(IsAlwaysRangeWellFormed(range, /*strong=*/false));
 }
 
-// §16.12.11: the range for a strong always shall be bounded, so a `$` maximum is
-// rejected for `s_always` even though the same range is legal for a weak always.
+// §16.12.11: the range for a strong always shall be bounded, so a `$` maximum
+// is rejected for `s_always` even though the same range is legal for a weak
+// always.
 TEST(AlwaysRange, StrongAlwaysRejectsUnboundedMaximum) {
   AlwaysRange range{MakeAlwaysBound(1), MakeAlwaysDollar()};
   EXPECT_FALSE(IsAlwaysRangeWellFormed(range, /*strong=*/true));
@@ -40,21 +42,22 @@ TEST(AlwaysRange, StrongAlwaysAcceptsBoundedRange) {
   EXPECT_TRUE(IsAlwaysRangeWellFormed(range, /*strong=*/true));
 }
 
-// §16.12.11: when both bounds are integer constants the minimum shall not exceed
-// the maximum, so an inverted range is rejected.
+// §16.12.11: when both bounds are integer constants the minimum shall not
+// exceed the maximum, so an inverted range is rejected.
 TEST(AlwaysRange, MinimumGreaterThanMaximumIsRejected) {
   AlwaysRange range{MakeAlwaysBound(5), MakeAlwaysBound(2)};
   EXPECT_FALSE(IsAlwaysRangeWellFormed(range, /*strong=*/false));
 }
 
-// §16.12.11: the minimum shall be a non-negative integer constant expression, so
-// a negative minimum is rejected.
+// §16.12.11: the minimum shall be a non-negative integer constant expression,
+// so a negative minimum is rejected.
 TEST(AlwaysRange, NegativeMinimumIsRejected) {
   AlwaysRange range{MakeAlwaysBound(-1), MakeAlwaysBound(3)};
   EXPECT_FALSE(IsAlwaysRangeWellFormed(range, /*strong=*/false));
 }
 
-// §16.12.11: the maximum shall be a non-negative integer constant expression (or
+// §16.12.11: the maximum shall be a non-negative integer constant expression
+// (or
 // `$`), so a negative maximum is rejected.
 TEST(AlwaysRange, NegativeMaximumIsRejected) {
   AlwaysRange range{MakeAlwaysBound(0), MakeAlwaysBound(-2)};
@@ -84,4 +87,4 @@ TEST(AlwaysRange, NonIntegerBoundIsRejected) {
   EXPECT_FALSE(IsAlwaysRangeWellFormed(range, /*strong=*/false));
 }
 
-}
+}  // namespace

@@ -169,4 +169,4 @@ TEST(AssocTraversal, NextStringAssignsSuccessorKey) {
   EXPECT_EQ(ref->value.ToUint64(), expected);
 }
 
-}
+}  // namespace

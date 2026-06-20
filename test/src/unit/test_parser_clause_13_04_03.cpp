@@ -49,4 +49,4 @@ TEST(ConstantFunctionParsing, CallInSubExpression) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}
+}  // namespace

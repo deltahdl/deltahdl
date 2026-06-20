@@ -50,7 +50,8 @@ TEST(SoftConstraintPriority, HigherPrioritySoftConstraintPrevails) {
   ConstraintExpr inner_lo, soft_lo;  // x == 10, lower priority (declared first)
   MakeSoftEq(inner_lo, soft_lo, "x", 10);
   block.constraints.push_back(soft_lo);
-  ConstraintExpr inner_hi, soft_hi;  // x == 20, higher priority (declared later)
+  ConstraintExpr inner_hi,
+      soft_hi;  // x == 20, higher priority (declared later)
   MakeSoftEq(inner_hi, soft_hi, "x", 20);
   block.constraints.push_back(soft_hi);
   solver.AddConstraintBlock(block);
@@ -61,9 +62,9 @@ TEST(SoftConstraintPriority, HigherPrioritySoftConstraintPrevails) {
 
 // 18.5.13.1: priority by declaration order spans the whole enclosing construct,
 // not just one block — a soft constraint in a constraint block declared later
-// in the class outranks one in an earlier block. Two separate blocks each prefer
-// a contradictory value for x; the later block's preference (x == 20) prevails
-// over the earlier block's (x == 10).
+// in the class outranks one in an earlier block. Two separate blocks each
+// prefer a contradictory value for x; the later block's preference (x == 20)
+// prevails over the earlier block's (x == 10).
 TEST(SoftConstraintPriority, LaterConstraintBlockOutranksEarlierBlock) {
   ConstraintSolver solver(64);
   AddRand(solver, "x", 0, 100);
@@ -257,4 +258,4 @@ TEST(SoftConstraintPriority, NonContradictingSoftConstraintsAllHonored) {
   EXPECT_EQ(solver.GetValue("y"), 7);
 }
 
-}
+}  // namespace

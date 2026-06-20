@@ -52,4 +52,4 @@ TEST(InputSamplingElab, MultipleInputSignalsElaborate) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

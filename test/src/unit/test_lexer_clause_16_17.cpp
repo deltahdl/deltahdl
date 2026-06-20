@@ -23,4 +23,4 @@ TEST(ExpectStatementLexing, ExpectKeywordIsNotAPrefixMatch) {
   EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);
 }
 
-}
+}  // namespace

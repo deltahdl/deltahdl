@@ -280,7 +280,8 @@ TEST(ConstraintImplication, AllConsequentConstraintsEnforced) {
 // unsatisfiable, so randomization must report failure rather than hand back a
 // solution that breaks the rule. Here a is pinned to 0 (antecedent true) while
 // b is pinned to 0, so the consequent b == 1 can never hold.
-TEST(ConstraintImplication, SolveFailsWhenForcedAntecedentHasImpossibleConsequent) {
+TEST(ConstraintImplication,
+     SolveFailsWhenForcedAntecedentHasImpossibleConsequent) {
   ConstraintSolver solver(7);
   solver.AddVariable(Pinned("a", 0));
   solver.AddVariable(Pinned("b", 0));
@@ -302,4 +303,4 @@ TEST(ConstraintImplication, SolveFailsWhenForcedAntecedentHasImpossibleConsequen
   EXPECT_FALSE(solver.Solve());
 }
 
-}
+}  // namespace

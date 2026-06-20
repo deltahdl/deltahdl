@@ -171,4 +171,4 @@ TEST(LexicalConventionSim, AttrWithStringValue) {
   EXPECT_EQ(f.ctx.FindVariable("g")->value.ToUint64(), 0x99);
 }
 
-}
+}  // namespace

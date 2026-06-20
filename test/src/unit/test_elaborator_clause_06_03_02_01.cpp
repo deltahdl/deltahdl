@@ -168,4 +168,4 @@ TEST(ChargeStrengthElaboration, TriregSmallSignedVectorPreservesSmall) {
   EXPECT_TRUE(found);
 }
 
-}
+}  // namespace

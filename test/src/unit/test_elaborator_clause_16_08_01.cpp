@@ -12,8 +12,8 @@ TEST(TypedSequenceFormal, AllowedTypeKindsIncludeUntypedSequenceEventIntegral) {
   EXPECT_TRUE(IsSequenceFormalTypeAllowed(SequenceFormalTypeKind::kUntyped));
   EXPECT_TRUE(IsSequenceFormalTypeAllowed(SequenceFormalTypeKind::kSequence));
   EXPECT_TRUE(IsSequenceFormalTypeAllowed(SequenceFormalTypeKind::kEvent));
-  EXPECT_TRUE(IsSequenceFormalTypeAllowed(
-      SequenceFormalTypeKind::kIntegralOrUserType));
+  EXPECT_TRUE(
+      IsSequenceFormalTypeAllowed(SequenceFormalTypeKind::kIntegralOrUserType));
 }
 
 TEST(TypedSequenceFormal, ForbiddenTypeKindRejected) {
@@ -38,7 +38,8 @@ TEST(TypedSequenceFormal, SequenceTypedRefLegalPlaces) {
 TEST(TypedSequenceFormal, EventTypedRefRequiresEventExpressionPosition) {
   // §16.8.1(b): a reference to an `event`-typed formal shall be in a place
   // where an event_expression may be written.
-  EXPECT_TRUE(IsEventTypedFormalRefLegal(/*in_event_expression_position=*/true));
+  EXPECT_TRUE(
+      IsEventTypedFormalRefLegal(/*in_event_expression_position=*/true));
   EXPECT_FALSE(
       IsEventTypedFormalRefLegal(/*in_event_expression_position=*/false));
 }
@@ -66,8 +67,8 @@ TEST(TypedSequenceFormal, DelayAndRepetitionIndexTypeRestricted) {
   // type shortint, int, or longint.
   EXPECT_TRUE(IsDelayOrRepetitionIndexTypeAllowed(
       SequenceFormalIntegralType::kShortint));
-  EXPECT_TRUE(IsDelayOrRepetitionIndexTypeAllowed(
-      SequenceFormalIntegralType::kInt));
+  EXPECT_TRUE(
+      IsDelayOrRepetitionIndexTypeAllowed(SequenceFormalIntegralType::kInt));
   EXPECT_TRUE(IsDelayOrRepetitionIndexTypeAllowed(
       SequenceFormalIntegralType::kLongint));
   EXPECT_FALSE(IsDelayOrRepetitionIndexTypeAllowed(
@@ -112,4 +113,4 @@ TEST(TypedSequenceFormal, EventTypedFormalRejectsEdgeIdentifierActual) {
       /*actual_combined_with_edge_identifier=*/true));
 }
 
-}
+}  // namespace

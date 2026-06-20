@@ -17,4 +17,4 @@ TEST(NamedEventParser, EventInitializedToNull) {
   EXPECT_NE(item->init_expr, nullptr);
 }
 
-}
+}  // namespace

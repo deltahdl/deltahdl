@@ -34,10 +34,9 @@ TEST(AttachSubroutineCall, AutomaticAsConstantInputFromProceduralAllowed) {
   // §16.11: an automatic variable may be passed as a constant input from a
   // subroutine call attached to a sequence inside a procedural assertion
   // (§16.14.6.1).
-  EXPECT_TRUE(
-      IsAutomaticArgUseAllowed(SubroutineArgPassing::kByValueInput,
-                               /*from_procedural_assertion=*/true,
-                               /*is_constant=*/true));
+  EXPECT_TRUE(IsAutomaticArgUseAllowed(SubroutineArgPassing::kByValueInput,
+                                       /*from_procedural_assertion=*/true,
+                                       /*is_constant=*/true));
 }
 
 TEST(AttachSubroutineCall, LocalVarArgumentMustBeByValue) {
@@ -84,8 +83,7 @@ TEST(AttachSubroutineCall, EachArgIsByValueOrByReference) {
   // enumerated trio is the full set of legal passing modes.
   EXPECT_TRUE(
       IsArgPassingAllowedForAttachedCall(SubroutineArgPassing::kByValueInput));
-  EXPECT_TRUE(
-      IsArgPassingAllowedForAttachedCall(SubroutineArgPassing::kByRef));
+  EXPECT_TRUE(IsArgPassingAllowedForAttachedCall(SubroutineArgPassing::kByRef));
   EXPECT_TRUE(
       IsArgPassingAllowedForAttachedCall(SubroutineArgPassing::kByConstRef));
 }
@@ -116,4 +114,4 @@ TEST(AttachSubroutineCall, ByValueInputTypeMustBeAllowedBy16_6) {
       IsByValueInputArgumentTypeAllowed(/*type_allowed_in_16_6=*/false));
 }
 
-}
+}  // namespace

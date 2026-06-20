@@ -144,8 +144,9 @@ TEST(SourceText, DescriptionConfig) {
   EXPECT_EQ(r.cu->configs[0]->name, "cfg");
 }
 
-// description's bind_directive alternative: a bind directive may appear directly
-// as a top-level description, landing in the compilation unit's bind list.
+// description's bind_directive alternative: a bind directive may appear
+// directly as a top-level description, landing in the compilation unit's bind
+// list.
 TEST(SourceText, DescriptionBindDirective) {
   auto r = Parse("bind target_mod chk chk_i(.a(s));\n");
   ASSERT_NE(r.cu, nullptr);
@@ -190,7 +191,8 @@ TEST(SourceText, MacromoduleKeyword) {
   EXPECT_EQ(r.cu->modules[0]->name, "m");
 }
 
-// interface_ansi_header: an interface whose ports carry directions in the header.
+// interface_ansi_header: an interface whose ports carry directions in the
+// header.
 TEST(SourceText, InterfaceAnsiHeader) {
   auto r = Parse("interface ifc(input clk); endinterface\n");
   ASSERT_NE(r.cu, nullptr);
@@ -298,4 +300,4 @@ TEST(SourceText, ErrorMissingEndmodule) {
   EXPECT_TRUE(r.has_errors);
 }
 
-}
+}  // namespace

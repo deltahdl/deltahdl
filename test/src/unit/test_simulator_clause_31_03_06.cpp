@@ -57,8 +57,8 @@ TEST(RecremTimingCheckWindow, DataSecondEndEndpointExcluded) {
   EXPECT_FALSE(mgr.CheckRecremViolation("clk", 100, "rst", 108));
 }
 
-// Each limit independently scales the side of the window it governs: removal_limit
-// the data-first side, recovery_limit the data-second side.
+// Each limit independently scales the side of the window it governs:
+// removal_limit the data-first side, recovery_limit the data-second side.
 TEST(RecremTimingCheckWindow, WindowsScaleWithLimits) {
   SpecifyManager mgr;
   mgr.AddTimingCheck(MakeRecrem(7, 3));
@@ -79,4 +79,4 @@ TEST(RecremTimingCheckWindow, BothLimitsZeroNeverViolates) {
   EXPECT_FALSE(mgr.CheckRecremViolation("clk", 100, "rst", 101));
 }
 
-}
+}  // namespace

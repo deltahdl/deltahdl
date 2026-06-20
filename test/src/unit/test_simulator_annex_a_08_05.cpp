@@ -139,9 +139,8 @@ TEST(LvalueSim, VarLvalueNestedConcatBlocking) {
       "  initial {{a, b}, {c, d}} = 8'b11_01_10_00;\n"
       "endmodule\n",
       f);
-  LowerRunAndCheck(
-      f, design,
-      {{"a", 0x3u}, {"b", 0x1u}, {"c", 0x2u}, {"d", 0x0u}});
+  LowerRunAndCheck(f, design,
+                   {{"a", 0x3u}, {"b", 0x1u}, {"c", 0x2u}, {"d", 0x0u}});
 }
 
 TEST(LvalueSim, VarLvalueNonblockingAssign) {
@@ -155,4 +154,4 @@ TEST(LvalueSim, VarLvalueNonblockingAssign) {
   LowerRunAndCheck(f, design, {{"x", 0xA5u}});
 }
 
-}
+}  // namespace

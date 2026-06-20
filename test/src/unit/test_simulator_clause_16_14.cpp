@@ -83,4 +83,4 @@ TEST(Assertion, AttachDetectsFailure) {
   EXPECT_GE(monitor.FailCount(), 1u);
 }
 
-}
+}  // namespace

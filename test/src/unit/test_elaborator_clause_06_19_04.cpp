@@ -149,4 +149,4 @@ TEST(EnumNumericalExpr, EnumIncrementNoCast_Error) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-}
+}  // namespace

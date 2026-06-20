@@ -61,4 +61,4 @@ TEST(GateKeywordOpensDeclaration, NonKeywordIsNotGateDecl) {
   }
 }
 
-}
+}  // namespace

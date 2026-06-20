@@ -21,4 +21,4 @@ TEST(IoSystemTaskParsing, DumpportsflushCall) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

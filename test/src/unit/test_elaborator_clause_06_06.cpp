@@ -140,4 +140,4 @@ TEST(NetTypes, UserDefinedNettypeIsDistinguishedFromBuiltin) {
   EXPECT_TRUE(user->is_user_nettype);
 }
 
-}
+}  // namespace

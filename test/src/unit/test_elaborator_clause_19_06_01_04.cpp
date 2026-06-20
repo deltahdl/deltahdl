@@ -7,9 +7,9 @@ using namespace delta;
 
 namespace {
 
-// A DataType standing for the cross's CrossQueueType — the automatically defined
-// queue type a cross provides (§19.6.1.3). It is the assignment target a
-// cross_set_expression must evaluate to (§19.6.1.4).
+// A DataType standing for the cross's CrossQueueType — the automatically
+// defined queue type a cross provides (§19.6.1.3). It is the assignment target
+// a cross_set_expression must evaluate to (§19.6.1.4).
 DataType CrossQueueType() {
   DataType t;
   t.kind = DataTypeKind::kNamed;

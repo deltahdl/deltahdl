@@ -16,11 +16,14 @@ namespace {
 // dedicated production code:
 //   - Detail 1: the vpiMethods iteration returns the class's methods (tasks and
 //     functions) but omits implicit built-in methods carrying no declaration.
-//   - Detail 2: vpi_get_value()/vpi_put_value() are not allowed for variable and
+//   - Detail 2: vpi_get_value()/vpi_put_value() are not allowed for variable
+//   and
 //     event handles obtained from a class defn handle.
-//   - Detail 3: the vpiConstraint iteration returns only normal constraints, not
+//   - Detail 3: the vpiConstraint iteration returns only normal constraints,
+//   not
 //     inline constraints.
-//   - Detail 5: the vpiDerivedClasses iteration returns the derived class defns.
+//   - Detail 5: the vpiDerivedClasses iteration returns the derived class
+//   defns.
 //   - Detail 6: the vpiArgument iteration from an extends object returns the
 //     expressions used for constructor chaining.
 
@@ -72,10 +75,10 @@ TEST_F(ClassDefinition, ClassMethodsIterationExcludesImplicitBuiltins) {
   EXPECT_EQ(seen[1], &declared_task);
 }
 
-// D2: vpi_get_value() and vpi_put_value() are not allowed for a variable or event
-// handle obtained from a class defn handle. Both a variable member and a named
-// event member are refused by both routines: an error is recorded and a get
-// leaves the caller's value buffer untouched.
+// D2: vpi_get_value() and vpi_put_value() are not allowed for a variable or
+// event handle obtained from a class defn handle. Both a variable member and a
+// named event member are refused by both routines: an error is recorded and a
+// get leaves the caller's value buffer untouched.
 TEST_F(ClassDefinition, ValueRoutinesDeniedForClassDefnMembers) {
   VpiObject class_defn;
   class_defn.type = vpiClassDefn;
@@ -94,21 +97,23 @@ TEST_F(ClassDefinition, ValueRoutinesDeniedForClassDefnMembers) {
 
     vpi_get_value(member, &value);
     SVpiErrorInfo get_info = {};
-    EXPECT_EQ(VpiChkErrorC(&get_info), vpiError) << "get, type " << member->type;
+    EXPECT_EQ(VpiChkErrorC(&get_info), vpiError)
+        << "get, type " << member->type;
     EXPECT_EQ(value.value.integer, 0x5eed) << "get, type " << member->type;
 
     vpiHandle ret = vpi_put_value(member, &value, nullptr, vpiNoDelay);
     EXPECT_EQ(ret, nullptr) << "put, type " << member->type;
     SVpiErrorInfo put_info = {};
-    EXPECT_EQ(VpiChkErrorC(&put_info), vpiError) << "put, type " << member->type;
+    EXPECT_EQ(VpiChkErrorC(&put_info), vpiError)
+        << "put, type " << member->type;
   }
 }
 
-// D2 scope: the restriction names handles obtained from a class defn handle. The
-// same variable kind reached from a non-class-defn parent (here a module) is an
-// ordinary variable, so neither value routine refuses it on §37.31's account.
-// Both routines carry an independent guard whose parent-type arm must let it
-// pass.
+// D2 scope: the restriction names handles obtained from a class defn handle.
+// The same variable kind reached from a non-class-defn parent (here a module)
+// is an ordinary variable, so neither value routine refuses it on §37.31's
+// account. Both routines carry an independent guard whose parent-type arm must
+// let it pass.
 TEST_F(ClassDefinition, ValueRestrictionScopedToClassDefnParent) {
   VpiObject module;
   module.type = kVpiModule;
@@ -130,10 +135,11 @@ TEST_F(ClassDefinition, ValueRestrictionScopedToClassDefnParent) {
 }
 
 // D2 scope: the restriction names variable and event handles specifically. A
-// non-value member reached from a class defn handle - here a constraint - is not
-// a variable or event, so the guard's type-membership arm must let it through
-// and neither value routine refuses it on §37.31's account. This exercises the
-// arm complementary to the denial test, which the module-parent test does not.
+// non-value member reached from a class defn handle - here a constraint - is
+// not a variable or event, so the guard's type-membership arm must let it
+// through and neither value routine refuses it on §37.31's account. This
+// exercises the arm complementary to the denial test, which the module-parent
+// test does not.
 TEST_F(ClassDefinition, ValueRestrictionAppliesOnlyToVariableAndEventMembers) {
   VpiObject class_defn;
   class_defn.type = vpiClassDefn;
@@ -154,8 +160,9 @@ TEST_F(ClassDefinition, ValueRestrictionAppliesOnlyToVariableAndEventMembers) {
   EXPECT_EQ(VpiChkErrorC(&put_info), 0);
 }
 
-// D3: a class defn's vpiConstraint iteration returns only normal constraints, in
-// declaration order, and leaves out an inline constraint that sits among them.
+// D3: a class defn's vpiConstraint iteration returns only normal constraints,
+// in declaration order, and leaves out an inline constraint that sits among
+// them.
 TEST_F(ClassDefinition, ConstraintIterationExcludesInlineConstraints) {
   VpiObject normal_a;
   normal_a.type = vpiConstraint;
@@ -178,9 +185,9 @@ TEST_F(ClassDefinition, ConstraintIterationExcludesInlineConstraints) {
   EXPECT_EQ(seen[1], &normal_b);
 }
 
-// D5: a class defn's vpiDerivedClasses iteration returns the class defns derived
-// from it. The targets are class-defn objects, so a child of any other kind
-// (here a constraint) is not reported.
+// D5: a class defn's vpiDerivedClasses iteration returns the class defns
+// derived from it. The targets are class-defn objects, so a child of any other
+// kind (here a constraint) is not reported.
 TEST_F(ClassDefinition, DerivedClassesIterationReturnsDerivedClassDefns) {
   VpiObject derived_a;
   derived_a.type = vpiClassDefn;

@@ -29,4 +29,4 @@ TEST(KeywordElaboration, UppercaseKeywordAsIdentifierElaborates) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

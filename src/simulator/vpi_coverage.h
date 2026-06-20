@@ -49,7 +49,8 @@ enum class CoverageProperty {
 // apply because a single attempt can yield many matches.
 struct AssertionCoverageCounters {
   std::uint64_t attempts = 0;
-  std::uint64_t successes = 0;  // nonvacuous successes, or matches for a sequence
+  std::uint64_t successes =
+      0;  // nonvacuous successes, or matches for a sequence
   std::uint64_t vacuous_successes = 0;
   std::uint64_t disabled = 0;
   std::uint64_t killed = 0;
@@ -122,25 +123,25 @@ inline bool assertion_covered(const AssertionCoverageCounters &c) {
 }
 
 // The number of attempts still in progress: attempts that have not yet resolved
-// into any terminal outcome (nonvacuous success, vacuous success, disable, kill,
-// or failure). This identity does not describe a cover sequence, where a single
-// attempt may match many times, so the result is absent for one. Should the
-// recorded outcomes ever exceed the attempts the count is clamped to zero.
+// into any terminal outcome (nonvacuous success, vacuous success, disable,
+// kill, or failure). This identity does not describe a cover sequence, where a
+// single attempt may match many times, so the result is absent for one. Should
+// the recorded outcomes ever exceed the attempts the count is clamped to zero.
 inline std::optional<std::uint64_t> assert_in_progress(
     const AssertionCoverageCounters &c) {
   if (c.is_cover_sequence) {
     return std::nullopt;
   }
-  std::uint64_t resolved = c.successes + c.vacuous_successes + c.disabled +
-                           c.killed + c.failures;
+  std::uint64_t resolved =
+      c.successes + c.vacuous_successes + c.disabled + c.killed + c.failures;
   if (resolved >= c.attempts) {
     return std::uint64_t{0};
   }
   return c.attempts - resolved;
 }
 
-// Dispatches an assertion-status property to the matching tally. Properties that
-// are not per-assertion status counts contribute nothing.
+// Dispatches an assertion-status property to the matching tally. Properties
+// that are not per-assertion status counts contribute nothing.
 inline std::uint64_t assertion_status_query(
     CoverageProperty property, const AssertionCoverageCounters &c) {
   switch (property) {

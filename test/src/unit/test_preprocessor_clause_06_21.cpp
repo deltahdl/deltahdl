@@ -12,4 +12,4 @@ TEST(ScopeAndLifetimeParsing, ProgramLifetimeAutomatic) {
   EXPECT_EQ(r.cu->programs[0]->name, "test_prog");
 }
 
-}
+}  // namespace

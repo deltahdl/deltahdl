@@ -107,4 +107,4 @@ TEST(IfElseIfParsing, IfElseIfWithBlockBodies) {
   EXPECT_EQ(stmt->else_branch->else_branch->kind, StmtKind::kBlock);
 }
 
-}
+}  // namespace

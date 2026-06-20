@@ -91,4 +91,4 @@ TEST(Elaboration, EventAliasInitElaborates) {
   EXPECT_EQ(done_too->init_expr->text, "done");
 }
 
-}
+}  // namespace

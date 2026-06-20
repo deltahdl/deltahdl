@@ -56,4 +56,4 @@ TEST(ConstraintInheritanceParsing, ExtendsFinalCombinationRecorded) {
   EXPECT_TRUE(m->is_constraint_final);
 }
 
-}
+}  // namespace

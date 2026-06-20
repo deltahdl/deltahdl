@@ -191,4 +191,4 @@ TEST(StringMethods, AtobinStopsAtNonBinaryDigit) {
   EXPECT_EQ(result.ToUint64(), 0b10u);
 }
 
-}
+}  // namespace

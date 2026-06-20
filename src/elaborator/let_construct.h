@@ -65,9 +65,9 @@ bool IsLetReferenceLegal(bool is_hierarchical_reference);
 // there. It shall be an error if a clock is required but cannot be inferred in
 // the instantiation context.
 enum class LetSampledValueClockStatus : uint8_t {
-  kExplicit,                  // the sampled value call names its own clock
-  kInferredFromContext,       // no explicit clock, but one is inferable
-  kRequiredButNotInferable,   // a clock is required yet none can be inferred
+  kExplicit,                 // the sampled value call names its own clock
+  kInferredFromContext,      // no explicit clock, but one is inferable
+  kRequiredButNotInferable,  // a clock is required yet none can be inferred
 };
 
 bool IsLetSampledValueClockResolved(LetSampledValueClockStatus status);

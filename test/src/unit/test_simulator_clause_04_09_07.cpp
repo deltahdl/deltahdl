@@ -183,7 +183,8 @@ TEST(SubroutineArgSchedulingSim, CopyOutSupportsBlockingAssignLhsForms) {
 // function-call evaluation path (not the task-call statement path), so the
 // copy-out is exercised here on that separate production path while confirming
 // it does not disturb the returned value.
-TEST(SubroutineArgSchedulingSim, OutputArgAndReturnValueBothDeliveredFromFunction) {
+TEST(SubroutineArgSchedulingSim,
+     OutputArgAndReturnValueBothDeliveredFromFunction) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -210,7 +211,8 @@ TEST(SubroutineArgSchedulingSim, OutputArgAndReturnValueBothDeliveredFromFunctio
 // Because the copy-out is a blocking assignment, it adapts the value to the
 // width of the target the same way a direct blocking assignment would: an
 // output formal wider than the actual it is bound to truncates on return.
-TEST(SubroutineArgSchedulingSim, CopyOutTruncatesToTargetWidthLikeBlockingAssign) {
+TEST(SubroutineArgSchedulingSim,
+     CopyOutTruncatesToTargetWidthLikeBlockingAssign) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

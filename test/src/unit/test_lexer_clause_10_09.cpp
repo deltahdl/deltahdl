@@ -72,4 +72,4 @@ TEST(AssignmentPatternLex, EmptyAssignmentPatternTokens) {
   EXPECT_EQ(tokens[1].kind, TokenKind::kRBrace);
 }
 
-}
+}  // namespace

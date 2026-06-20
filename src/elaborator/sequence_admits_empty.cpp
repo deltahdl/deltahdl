@@ -26,8 +26,7 @@ std::string KappaForLocalVarRewrite(const SemanticLeadingClock& leading_clock) {
   return "@(" + leading_clock.event_expression + ")";
 }
 
-bool AdmitsEmpty(AdmitsEmptyForm form,
-                 bool first_child_admits_empty,
+bool AdmitsEmpty(AdmitsEmptyForm form, bool first_child_admits_empty,
                  bool second_child_admits_empty) {
   switch (form) {
     case AdmitsEmptyForm::kBoolean:
@@ -60,9 +59,7 @@ bool AdmitsEmpty(AdmitsEmptyForm form,
   return false;
 }
 
-PushRouting RoutePush(PushSite site,
-                      bool list_empty,
-                      bool right_admits_empty) {
+PushRouting RoutePush(PushSite site, bool list_empty, bool right_admits_empty) {
   switch (site) {
     case PushSite::kLocalVarDeclThenProp:
       return PushRouting::kPrependLocalVarDecl;

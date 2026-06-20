@@ -57,4 +57,4 @@ TEST(RemovalTimingCheckWindow, ZeroLimitNeverViolates) {
   EXPECT_FALSE(mgr.CheckRemovalViolation("rst", 100, "clk", 101));
 }
 
-}
+}  // namespace

@@ -77,4 +77,4 @@ TEST(ClockingBlockEventParse, OutputNegedgeWithBlockEvent) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

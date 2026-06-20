@@ -37,4 +37,4 @@ TEST(SemaphoreNewParser, DeclarationWithNewZeroKeys) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}
+}  // namespace

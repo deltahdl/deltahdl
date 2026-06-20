@@ -13,4 +13,4 @@ TEST(OptionalDirectiveExtendedParsing, DelayModeUnit) {
   EXPECT_EQ(r.cu->delay_mode_directive, DelayModeDirective::kUnit);
 }
 
-}
+}  // namespace

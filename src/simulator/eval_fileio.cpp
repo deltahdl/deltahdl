@@ -124,8 +124,7 @@ static Logic4Vec EvalFerror(const Expr* expr, SimContext& ctx, Arena& arena) {
   // raised by the most recent file I/O operation. When the most recent
   // operation did not fail, the standard requires the returned code to be zero
   // and the str variable to be cleared rather than left holding a stale value.
-  if (expr->args.size() >= 2 &&
-      expr->args[1]->kind == ExprKind::kIdentifier) {
+  if (expr->args.size() >= 2 && expr->args[1]->kind == ExprKind::kIdentifier) {
     auto* var = ctx.FindVariable(expr->args[1]->text);
     if (var) {
       std::string msg = err != 0 ? std::strerror(errno) : std::string();
@@ -218,8 +217,8 @@ static Logic4Vec EvalUngetc(const Expr* expr, SimContext& ctx, Arena& arena) {
 // so on). Returns the numeric base for an integer code, or 0 for a code this
 // reader does not treat as an integer field.
 static int SpecToBase(char spec) {
-  char c = (spec >= 'A' && spec <= 'Z') ? static_cast<char>(spec - 'A' + 'a')
-                                        : spec;
+  char c =
+      (spec >= 'A' && spec <= 'Z') ? static_cast<char>(spec - 'A' + 'a') : spec;
   if (c == 'd') return 10;
   if (c == 'h' || c == 'x') return 16;
   if (c == 'b') return 2;
@@ -539,8 +538,8 @@ static Logic4Vec EvalFread(const Expr* expr, SimContext& ctx, Arena& arena) {
             PackWordBigEndian(arena, fbuf, fread_n, fbytes, fld.width);
         delete[] fbuf;
 
-        uint64_t fmask = (fld.width >= 64) ? ~uint64_t{0}
-                                           : (uint64_t{1} << fld.width) - 1;
+        uint64_t fmask =
+            (fld.width >= 64) ? ~uint64_t{0} : (uint64_t{1} << fld.width) - 1;
         whole &= ~(fmask << fld.bit_offset);
         whole |= (fv.ToUint64() & fmask) << fld.bit_offset;
         total_bytes += fread_n;
@@ -633,4 +632,4 @@ Logic4Vec EvalFileIOSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
   return MakeLogic4VecVal(arena, 1, 0);
 }
 
-}
+}  // namespace delta

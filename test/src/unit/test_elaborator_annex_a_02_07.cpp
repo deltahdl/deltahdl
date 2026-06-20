@@ -21,30 +21,30 @@ TEST(TaskDeclElaboration, TaskDeclAddedToModule) {
 }
 
 TEST(TaskDeclElaboration, TaskOldStylePortsElaborate) {
-  EXPECT_TRUE(ElabOk(
-      "module m;\n"
-      "  task my_task;\n"
-      "    input int a;\n"
-      "    output int b;\n"
-      "    b = a + 1;\n"
-      "  endtask\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  task my_task;\n"
+             "    input int a;\n"
+             "    output int b;\n"
+             "    b = a + 1;\n"
+             "  endtask\n"
+             "endmodule\n"));
 }
 
 TEST(TaskDeclElaboration, TaskWithEndLabelElaborates) {
-  EXPECT_TRUE(ElabOk(
-      "module m;\n"
-      "  task my_task;\n"
-      "  endtask : my_task\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  task my_task;\n"
+             "  endtask : my_task\n"
+             "endmodule\n"));
 }
 
 TEST(TaskDeclElaboration, TaskEmptyBodyElaborates) {
-  EXPECT_TRUE(ElabOk(
-      "module m;\n"
-      "  task empty_task;\n"
-      "  endtask\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  task empty_task;\n"
+             "  endtask\n"
+             "endmodule\n"));
 }
 
 TEST(TaskDeclElaboration, TaskMultiplePortsElaborate) {
@@ -63,26 +63,26 @@ TEST(TaskDeclElaboration, TaskMultiplePortsElaborate) {
 }
 
 TEST(TaskDeclElaboration, TaskPortDefaultValueElaborates) {
-  EXPECT_TRUE(ElabOk(
-      "module m;\n"
-      "  task my_task(input int x = 5);\n"
-      "  endtask\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  task my_task(input int x = 5);\n"
+             "  endtask\n"
+             "endmodule\n"));
 }
 
 TEST(TaskDeclElaboration, TaskConstRefPortElaborates) {
-  EXPECT_TRUE(ElabOk(
-      "module m;\n"
-      "  task my_task(const ref int x);\n"
-      "  endtask\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  task my_task(const ref int x);\n"
+             "  endtask\n"
+             "endmodule\n"));
 }
 
 TEST(TaskDeclElaboration, TaskPrototypeExternElaborates) {
-  EXPECT_TRUE(ElabOk(
-      "module m;\n"
-      "  extern task my_task(input int x);\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  extern task my_task(input int x);\n"
+             "endmodule\n"));
 }
 
 TEST(TaskDeclElaboration, MultipleTasksElaborate) {
@@ -103,30 +103,30 @@ TEST(TaskDeclElaboration, MultipleTasksElaborate) {
 TEST(TaskDeclElaboration, TaskLifetimeAutomaticElaborates) {
   // task_declaration may carry an explicit `automatic' lifetime; the elaborator
   // must accept the resulting AST.
-  EXPECT_TRUE(ElabOk(
-      "module m;\n"
-      "  task automatic my_task;\n"
-      "  endtask\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  task automatic my_task;\n"
+             "  endtask\n"
+             "endmodule\n"));
 }
 
 TEST(TaskDeclElaboration, TaskAnsiEmptyParensElaborates) {
   // task_body_declaration's ANSI form permits an empty tf_port_list.
-  EXPECT_TRUE(ElabOk(
-      "module m;\n"
-      "  task my_task();\n"
-      "  endtask\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  task my_task();\n"
+             "  endtask\n"
+             "endmodule\n"));
 }
 
 TEST(TaskDeclElaboration, TaskVarPortElaborates) {
   // tf_port_item permits the optional `var' before data_type_or_implicit.
-  EXPECT_TRUE(ElabOk(
-      "module m;\n"
-      "  task my_task(input var int x);\n"
-      "    x = x + 1;\n"
-      "  endtask\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  task my_task(input var int x);\n"
+             "    x = x + 1;\n"
+             "  endtask\n"
+             "endmodule\n"));
 }
 
-}
+}  // namespace

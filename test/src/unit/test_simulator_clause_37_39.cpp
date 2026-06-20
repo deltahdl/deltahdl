@@ -9,9 +9,10 @@ namespace {
 
 // §37.39 "Module path, path term": the only normative requirement the subclause
 // text owns is detail 1 - the vpiModule relation is preserved for a mod path
-// (specify-block path) but shall return NULL when that specify block lives in an
-// interface instead of a module. These tests build a mod path under a module and
-// under an interface and observe the production dispatch applying that rule.
+// (specify-block path) but shall return NULL when that specify block lives in
+// an interface instead of a module. These tests build a mod path under a module
+// and under an interface and observe the production dispatch applying that
+// rule.
 class ModulePathModel : public ::testing::Test {
  protected:
   void SetUp() override {

@@ -230,8 +230,9 @@ DpiArgValue CoerceArgValue(const DpiArgValue& v, DataTypeKind target) {
       // any other source yields the empty string.
       return v.type == DataTypeKind::kString ? v : DpiArgValue::FromString("");
     case DataTypeKind::kChandle:
-      return v.type == DataTypeKind::kChandle ? v
-                                              : DpiArgValue::FromChandle(nullptr);
+      return v.type == DataTypeKind::kChandle
+                 ? v
+                 : DpiArgValue::FromChandle(nullptr);
     default: {  // kInt, kInteger, and any other integral formal
       DpiArgValue r =
           DpiArgValue::FromInt(static_cast<int32_t>(NumericToInt(v)));
@@ -365,8 +366,8 @@ DpiArgValue DpiRuntime::CallImportWithArgs(
     } else {
       // §35.6.1: input and inout formals are passed copy-in through a temporary
       // initialized with the actual coerced to the formal's type. When the
-      // actual already matches the formal type CoerceArgValue is a no-op, so the
-      // §35.5.1.2 same-type behavior is preserved.
+      // actual already matches the formal type CoerceArgValue is a no-op, so
+      // the §35.5.1.2 same-type behavior is preserved.
       callee[i] = CoerceArgValue(callee[i], func->args[i].type);
     }
   }
@@ -1115,13 +1116,15 @@ bool AssertionApi::AssertionLocked(std::string_view assertion) const {
   return s ? s->locked : false;
 }
 
-bool AssertionApi::AssertionPassActionEnabled(std::string_view assertion) const {
+bool AssertionApi::AssertionPassActionEnabled(
+    std::string_view assertion) const {
   const AssertionControlState* s = FindState(assertion);
   if (!s) return true;
   return s->vacuous_action_enabled && s->nonvacuous_action_enabled;
 }
 
-bool AssertionApi::AssertionFailActionEnabled(std::string_view assertion) const {
+bool AssertionApi::AssertionFailActionEnabled(
+    std::string_view assertion) const {
   const AssertionControlState* s = FindState(assertion);
   return s ? s->fail_action_enabled : true;
 }

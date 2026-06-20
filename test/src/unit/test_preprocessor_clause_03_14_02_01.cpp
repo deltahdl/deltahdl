@@ -132,4 +132,4 @@ TEST(DesignBuildingBlockParsing, LrmExampleThreeModules) {
   EXPECT_FALSE(r.cu->modules[2]->has_timeunit);
 }
 
-}
+}  // namespace

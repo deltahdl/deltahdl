@@ -122,4 +122,4 @@ TEST(CovergroupKeywordLexing, TypeOptionIsIdentifier) {
   EXPECT_EQ(tokens[0].text, "type_option");
 }
 
-}
+}  // namespace

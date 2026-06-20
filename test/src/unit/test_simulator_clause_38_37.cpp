@@ -104,5 +104,5 @@ TEST_F(VpiSystfRegistrationSim, RegisterSystfNullptrDoesNotCrash) {
   EXPECT_TRUE(vpi_ctx_.RegisteredSystfs().empty());
 }
 
-}
-}
+}  // namespace
+}  // namespace delta

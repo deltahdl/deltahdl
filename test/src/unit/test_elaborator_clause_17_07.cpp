@@ -39,4 +39,4 @@ TEST(CheckerVariables, RandFreeVariableInCheckerBodyIsLegal) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

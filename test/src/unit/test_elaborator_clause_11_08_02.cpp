@@ -60,4 +60,4 @@ TEST(ConstEvalSteps, UnsignedLiteralZeroExtendsThroughEvaluation) {
   EXPECT_EQ(val.value_or(-1), 15);
 }
 
-}
+}  // namespace

@@ -38,4 +38,4 @@ TEST(ArrayLiteralPreprocessor, MacroExpandsToDefaultValue) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}
+}  // namespace

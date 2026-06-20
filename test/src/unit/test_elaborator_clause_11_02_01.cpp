@@ -23,60 +23,60 @@ TEST(ConstEval, ScopedUnresolved) {
 }
 
 TEST(ConstantExpressionElaboration, BinaryExprInParamElaborates) {
-  EXPECT_TRUE(ElabOk(
-      "module m;\n"
-      "  parameter int P = 3 + 4;\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  parameter int P = 3 + 4;\n"
+             "endmodule\n"));
 }
 
 TEST(ConstantExpressionElaboration, DependentParamsElaborate) {
-  EXPECT_TRUE(ElabOk(
-      "module m;\n"
-      "  parameter int WIDTH = 8;\n"
-      "  parameter int DEPTH = 2 ** WIDTH;\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  parameter int WIDTH = 8;\n"
+             "  parameter int DEPTH = 2 ** WIDTH;\n"
+             "endmodule\n"));
 }
 
 TEST(ConstantExpressionElaboration, ConstantSysFuncInParamElaborates) {
-  EXPECT_TRUE(ElabOk(
-      "module m;\n"
-      "  parameter int P = $clog2(256);\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  parameter int P = $clog2(256);\n"
+             "endmodule\n"));
 }
 
 TEST(ConstantExpressionElaboration, ConcatenationInParamElaborates) {
-  EXPECT_TRUE(ElabOk(
-      "module m;\n"
-      "  parameter logic [7:0] P = {4'd3, 4'd5};\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  parameter logic [7:0] P = {4'd3, 4'd5};\n"
+             "endmodule\n"));
 }
 
 TEST(ConstantExpressionElaboration, ReplicationInParamElaborates) {
-  EXPECT_TRUE(ElabOk(
-      "module m;\n"
-      "  parameter logic [3:0] P = {4{1'b1}};\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  parameter logic [3:0] P = {4{1'b1}};\n"
+             "endmodule\n"));
 }
 
 TEST(ConstantExpressionElaboration, UnaryExprInParamElaborates) {
-  EXPECT_TRUE(ElabOk(
-      "module m;\n"
-      "  parameter int P = -42;\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  parameter int P = -42;\n"
+             "endmodule\n"));
 }
 
 TEST(ConstantExpressionElaboration, StringLiteralInParamElaborates) {
-  EXPECT_TRUE(ElabOk(
-      "module m;\n"
-      "  parameter string S = \"hello\";\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  parameter string S = \"hello\";\n"
+             "endmodule\n"));
 }
 
 TEST(ConstantExpressionElaboration, NestedSysFuncInParamElaborates) {
-  EXPECT_TRUE(ElabOk(
-      "module m;\n"
-      "  parameter int P = $clog2($bits(logic [31:0]));\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  parameter int P = $clog2($bits(logic [31:0]));\n"
+             "endmodule\n"));
 }
 
 TEST(ConstEval, ScopedConcatenationEvaluation) {
@@ -162,19 +162,19 @@ TEST(ConstantSysFuncWhitelist, ImpureFunctionRejected) {
 // elaborator accepts a parameter whose value is computed from a bit-select
 // of another parameter.
 TEST(ConstantExpressionElaboration, ConstantBitSelectOfParameterElaborates) {
-  EXPECT_TRUE(ElabOk(
-      "module m;\n"
-      "  parameter logic [7:0] BASE = 8'b1010_1100;\n"
-      "  parameter logic       BIT  = BASE[5];\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  parameter logic [7:0] BASE = 8'b1010_1100;\n"
+             "  parameter logic       BIT  = BASE[5];\n"
+             "endmodule\n"));
 }
 
 TEST(ConstantExpressionElaboration, ConstantPartSelectOfParameterElaborates) {
-  EXPECT_TRUE(ElabOk(
-      "module m;\n"
-      "  parameter logic [7:0] BASE  = 8'b1010_1100;\n"
-      "  parameter logic [3:0] NIBBLE = BASE[7:4];\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  parameter logic [7:0] BASE  = 8'b1010_1100;\n"
+             "  parameter logic [3:0] NIBBLE = BASE[7:4];\n"
+             "endmodule\n"));
 }
 
 // §11.2.1: a built-in method call is constant when used as the initialiser
@@ -185,4 +185,4 @@ TEST(ConstantExpressionElaboration, ConstantBuiltinMethodTypeQueryElaborates) {
   EXPECT_TRUE(IsConstantExpr(e));
 }
 
-}
+}  // namespace

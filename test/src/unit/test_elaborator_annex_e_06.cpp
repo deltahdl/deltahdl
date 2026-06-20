@@ -44,4 +44,4 @@ TEST(Elaborator, DelayModeUnit_AbsentLeavesModeUnset) {
   EXPECT_EQ(design->top_modules[0]->delay_mode, DelayModeDirective::kNone);
 }
 
-}
+}  // namespace

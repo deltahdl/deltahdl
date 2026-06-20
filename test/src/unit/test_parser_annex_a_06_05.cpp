@@ -125,31 +125,31 @@ TEST(TimingControlSyntaxParsing, WaitOrder) {
 }
 
 TEST(TimingControlSyntaxParsing, DelayControlMissingRParen) {
-  EXPECT_TRUE(Parse(
-      "module m;\n"
-      "  initial #(5 + 3 a = 1;\n"
-      "endmodule\n").has_errors);
+  EXPECT_TRUE(Parse("module m;\n"
+                    "  initial #(5 + 3 a = 1;\n"
+                    "endmodule\n")
+                  .has_errors);
 }
 
 TEST(TimingControlSyntaxParsing, EventControlMissingRParen) {
-  EXPECT_TRUE(Parse(
-      "module m;\n"
-      "  initial @(posedge clk a = 1;\n"
-      "endmodule\n").has_errors);
+  EXPECT_TRUE(Parse("module m;\n"
+                    "  initial @(posedge clk a = 1;\n"
+                    "endmodule\n")
+                  .has_errors);
 }
 
 TEST(TimingControlSyntaxParsing, WaitOrderMissingLParen) {
-  EXPECT_TRUE(Parse(
-      "module m;\n"
-      "  initial wait_order a, b;\n"
-      "endmodule\n").has_errors);
+  EXPECT_TRUE(Parse("module m;\n"
+                    "  initial wait_order a, b;\n"
+                    "endmodule\n")
+                  .has_errors);
 }
 
 TEST(TimingControlSyntaxParsing, WaitOrderMissingRParen) {
-  EXPECT_TRUE(Parse(
-      "module m;\n"
-      "  initial wait_order(a, b ;\n"
-      "endmodule\n").has_errors);
+  EXPECT_TRUE(Parse("module m;\n"
+                    "  initial wait_order(a, b ;\n"
+                    "endmodule\n")
+                  .has_errors);
 }
 
 TEST(TimingControlSyntaxParsing, CycleDelayStmtParen) {
@@ -183,21 +183,21 @@ TEST(TimingControlSyntaxParsing, CycleDelayStmtLiteral) {
 }
 
 TEST(TimingControlSyntaxParsing, CycleDelayMissingSemicolon) {
-  EXPECT_TRUE(Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    ##5\n"
-      "  end\n"
-      "endmodule\n").has_errors);
+  EXPECT_TRUE(Parse("module m;\n"
+                    "  initial begin\n"
+                    "    ##5\n"
+                    "  end\n"
+                    "endmodule\n")
+                  .has_errors);
 }
 
 TEST(TimingControlSyntaxParsing, CycleDelayMissingRParen) {
-  EXPECT_TRUE(Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    ##(5 ;\n"
-      "  end\n"
-      "endmodule\n").has_errors);
+  EXPECT_TRUE(Parse("module m;\n"
+                    "  initial begin\n"
+                    "    ##(5 ;\n"
+                    "  end\n"
+                    "endmodule\n")
+                  .has_errors);
 }
 
 TEST(TimingControlSyntaxParsing, IntraAssignCycleDelayBlocking) {
@@ -409,26 +409,26 @@ TEST(JumpStatementSyntaxParsing, ReturnWithExpressionBnf) {
 }
 
 TEST(JumpStatementSyntaxParsing, ReturnMissingSemicolonBnf) {
-  EXPECT_TRUE(Parse(
-      "module m;\n"
-      "  function int f();\n"
-      "    return 42\n"
-      "  endfunction\n"
-      "endmodule\n").has_errors);
+  EXPECT_TRUE(Parse("module m;\n"
+                    "  function int f();\n"
+                    "    return 42\n"
+                    "  endfunction\n"
+                    "endmodule\n")
+                  .has_errors);
 }
 
 TEST(JumpStatementSyntaxParsing, BreakMissingSemicolonBnf) {
-  EXPECT_TRUE(Parse(
-      "module m;\n"
-      "  initial forever begin break end\n"
-      "endmodule\n").has_errors);
+  EXPECT_TRUE(Parse("module m;\n"
+                    "  initial forever begin break end\n"
+                    "endmodule\n")
+                  .has_errors);
 }
 
 TEST(JumpStatementSyntaxParsing, ContinueMissingSemicolonBnf) {
-  EXPECT_TRUE(Parse(
-      "module m;\n"
-      "  initial forever begin continue end\n"
-      "endmodule\n").has_errors);
+  EXPECT_TRUE(Parse("module m;\n"
+                    "  initial forever begin continue end\n"
+                    "endmodule\n")
+                  .has_errors);
 }
 
 TEST(WaitStatementSyntaxParsing, WaitExpressionStatement) {
@@ -476,21 +476,21 @@ TEST(WaitStatementSyntaxParsing, WaitForkStatement) {
 }
 
 TEST(WaitStatementSyntaxParsing, WaitMissingLParenErrors) {
-  EXPECT_TRUE(Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    wait done) a = 1;\n"
-      "  end\n"
-      "endmodule\n").has_errors);
+  EXPECT_TRUE(Parse("module m;\n"
+                    "  initial begin\n"
+                    "    wait done) a = 1;\n"
+                    "  end\n"
+                    "endmodule\n")
+                  .has_errors);
 }
 
 TEST(WaitStatementSyntaxParsing, WaitForkMissingSemicolonErrors) {
-  EXPECT_TRUE(Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    wait fork\n"
-      "  end\n"
-      "endmodule\n").has_errors);
+  EXPECT_TRUE(Parse("module m;\n"
+                    "  initial begin\n"
+                    "    wait fork\n"
+                    "  end\n"
+                    "endmodule\n")
+                  .has_errors);
 }
 
 TEST(TimingControlSyntaxParsing, ParenthesizedEventExprEdges) {
@@ -526,9 +526,9 @@ TEST(TimingControlSyntaxParsing, ParenthesizedEventExprNested) {
   EXPECT_EQ(stmt->events[0].edge, Edge::kPosedge);
 }
 
-// event_trigger ::= ->> [ delay_or_event_control ] hierarchical_event_identifier ;
-// delay_or_event_control covers delay_control | event_control
-// | repeat ( expression ) event_control.
+// event_trigger ::= ->> [ delay_or_event_control ]
+// hierarchical_event_identifier ; delay_or_event_control covers delay_control |
+// event_control | repeat ( expression ) event_control.
 TEST(EventTriggerSyntaxParsing, NonblockingWithEventControlClockingEvent) {
   auto r = Parse(
       "module m;\n"
@@ -596,10 +596,10 @@ TEST(EventTriggerSyntaxParsing, NonblockingWithRepeatEventControl) {
 }
 
 TEST(EventTriggerSyntaxParsing, NonblockingRepeatEventControlMissingAt) {
-  EXPECT_TRUE(Parse(
-      "module m;\n"
-      "  initial ->> repeat (3) ev;\n"
-      "endmodule\n").has_errors);
+  EXPECT_TRUE(Parse("module m;\n"
+                    "  initial ->> repeat (3) ev;\n"
+                    "endmodule\n")
+                  .has_errors);
 }
 
 // event_trigger ::= -> hierarchical_event_identifier nonrange_select ;
@@ -677,10 +677,10 @@ TEST(DisableStatementSyntaxParsing, DisableHierarchicalBlock) {
 }
 
 TEST(DisableStatementSyntaxParsing, DisableMissingSemicolon) {
-  EXPECT_TRUE(Parse(
-      "module m;\n"
-      "  initial disable foo\n"
-      "endmodule\n").has_errors);
+  EXPECT_TRUE(Parse("module m;\n"
+                    "  initial disable foo\n"
+                    "endmodule\n")
+                  .has_errors);
 }
 
 // event_expression ::= [ edge_identifier ] expression [ iff expression ]
@@ -805,4 +805,4 @@ TEST(TimingControlSyntaxParsing, EventControlHierarchicalIdentifier) {
   EXPECT_NE(stmt->events[0].signal, nullptr);
 }
 
-}
+}  // namespace

@@ -311,4 +311,4 @@ TEST(IfMatchesSim, MatchesNoElse) {
   EXPECT_EQ(var->value.ToUint64(), 77u);
 }
 
-}
+}  // namespace

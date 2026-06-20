@@ -35,7 +35,8 @@ ConstraintExpr Eq(const std::string& name, int64_t value) {
 // per-element constraint is imposed.
 TEST(ForeachIterativeConstraint, AppliesConstraintToEveryElement) {
   ConstraintSolver solver(42);
-  for (int i = 0; i < 3; ++i) solver.AddVariable(MakeVar("e" + std::to_string(i), -10, 10));
+  for (int i = 0; i < 3; ++i)
+    solver.AddVariable(MakeVar("e" + std::to_string(i), -10, 10));
 
   ConstraintBlock block;
   block.name = "fc";
@@ -52,12 +53,13 @@ TEST(ForeachIterativeConstraint, AppliesConstraintToEveryElement) {
   solver.AddConstraintBlock(block);
 
   ASSERT_TRUE(solver.Solve());
-  for (int i = 0; i < 3; ++i) EXPECT_GT(solver.GetValue("e" + std::to_string(i)), 0);
+  for (int i = 0; i < 3; ++i)
+    EXPECT_GT(solver.GetValue("e" + std::to_string(i)), 0);
 }
 
-// 18.5.7.1: an array's size method is a state variable within the foreach block.
-// With the size pinned to 2, the iterative constraint applies only to the two
-// elements that exist (indices 0 and 1); the remaining elements are not
+// 18.5.7.1: an array's size method is a state variable within the foreach
+// block. With the size pinned to 2, the iterative constraint applies only to
+// the two elements that exist (indices 0 and 1); the remaining elements are not
 // iterated, so their conflicting hard constraints can be satisfied. Were the
 // foreach to ignore the size and constrain all four elements, e2 == 0 would
 // clash with the hard e2 == 1 and randomization would fail.
@@ -66,7 +68,8 @@ TEST(ForeachIterativeConstraint, SizeLimitsIteratedElements) {
   RandVariable n = MakeVar("n", 2, 2);
   n.is_array_size = true;
   solver.AddVariable(n);
-  for (int i = 0; i < 4; ++i) solver.AddVariable(MakeVar("e" + std::to_string(i), 0, 1));
+  for (int i = 0; i < 4; ++i)
+    solver.AddVariable(MakeVar("e" + std::to_string(i), 0, 1));
 
   // foreach (arr[i]) arr[i] == 0;  -- over a dynamically sized array 'arr'.
   ConstraintBlock fb;
@@ -74,7 +77,8 @@ TEST(ForeachIterativeConstraint, SizeLimitsIteratedElements) {
   ConstraintExpr fe;
   fe.kind = ConstraintKind::kForeach;
   fe.size_var = "n";
-  for (int i = 0; i < 4; ++i) fe.sub_constraints.push_back(Eq("e" + std::to_string(i), 0));
+  for (int i = 0; i < 4; ++i)
+    fe.sub_constraints.push_back(Eq("e" + std::to_string(i), 0));
   fb.constraints.push_back(fe);
   solver.AddConstraintBlock(fb);
 
@@ -151,7 +155,8 @@ TEST(ForeachIterativeConstraint, SizeEqualToElementCountConstrainsAll) {
   RandVariable n = MakeVar("n", 3, 3);
   n.is_array_size = true;
   solver.AddVariable(n);
-  for (int i = 0; i < 3; ++i) solver.AddVariable(MakeVar("e" + std::to_string(i), -10, 10));
+  for (int i = 0; i < 3; ++i)
+    solver.AddVariable(MakeVar("e" + std::to_string(i), -10, 10));
 
   ConstraintBlock fb;
   fb.name = "fc";
@@ -170,12 +175,13 @@ TEST(ForeachIterativeConstraint, SizeEqualToElementCountConstrainsAll) {
 
   ASSERT_TRUE(solver.Solve());
   EXPECT_EQ(solver.GetValue("n"), 3);
-  for (int i = 0; i < 3; ++i) EXPECT_GT(solver.GetValue("e" + std::to_string(i)), 0);
+  for (int i = 0; i < 3; ++i)
+    EXPECT_GT(solver.GetValue("e" + std::to_string(i)), 0);
 }
 
-// 18.5.7.1: when the size method is zero, the foreach iterates over no elements,
-// so even a per-element constraint that is impossible in isolation imposes
-// nothing and randomization succeeds.
+// 18.5.7.1: when the size method is zero, the foreach iterates over no
+// elements, so even a per-element constraint that is impossible in isolation
+// imposes nothing and randomization succeeds.
 TEST(ForeachIterativeConstraint, ZeroSizeMakesForeachVacuous) {
   ConstraintSolver solver(99);
   RandVariable n = MakeVar("n", 0, 0);

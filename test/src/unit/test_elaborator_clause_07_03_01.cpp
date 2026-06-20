@@ -180,7 +180,8 @@ TEST(PackedUnionValidation, SoftPackedUnion_WidthIsMaxOfMembers) {
   EXPECT_EQ(vars[0].width, 24u);
 }
 
-TEST(PackedUnionValidation, SoftPackedUnion_PredefinedIntegralKinds_WidthIsLongest) {
+TEST(PackedUnionValidation,
+     SoftPackedUnion_PredefinedIntegralKinds_WidthIsLongest) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module top;\n"
@@ -200,7 +201,8 @@ TEST(PackedUnionValidation, NestedSoftPackedUnion_WidthRecursesToOuterMax) {
       "module top;\n"
       "  union soft packed {\n"
       "    bit [3:0] tiny;\n"
-      "    union soft packed { bit [11:0] inner_wide; bit [5:0] inner_narrow; } "
+      "    union soft packed { bit [11:0] inner_wide; bit [5:0] inner_narrow; "
+      "} "
       "nested;\n"
       "  } u;\n"
       "endmodule\n",
@@ -212,4 +214,4 @@ TEST(PackedUnionValidation, NestedSoftPackedUnion_WidthRecursesToOuterMax) {
   EXPECT_EQ(vars[0].width, 12u);
 }
 
-}
+}  // namespace

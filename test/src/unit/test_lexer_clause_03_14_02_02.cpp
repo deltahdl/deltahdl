@@ -45,4 +45,4 @@ TEST(DesignBuildingBlockLexing, TimeprecisionFollowedByTimeLiteral) {
   EXPECT_EQ(tokens[1].kind, TokenKind::kTimeLiteral);
 }
 
-}
+}  // namespace

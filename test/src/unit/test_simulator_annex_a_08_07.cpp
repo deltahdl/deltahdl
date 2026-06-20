@@ -196,4 +196,4 @@ TEST(NumberSim, UnbasedUnsizedZero) {
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
-}
+}  // namespace

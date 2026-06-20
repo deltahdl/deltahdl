@@ -316,4 +316,4 @@ TEST(PassByRefParsing, RefIsNotConstByDefault) {
   EXPECT_FALSE(fn->func_args[2].is_const);
 }
 
-}
+}  // namespace

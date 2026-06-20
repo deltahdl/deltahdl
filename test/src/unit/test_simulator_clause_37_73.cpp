@@ -10,14 +10,14 @@ namespace {
 // statement - a solid edge to the property specification it watches, an
 // unlabeled edge to its pass action statement (vpiStmt), and a vpiElseStmt edge
 // to its else (fail) action statement. The clause carries no numbered Details,
-// no 'shall' sentences, and no properties; the three edges are its only content.
-// None of the three needs dedicated production code. An expect statement is not
-// one of the kinds that override vpiStmt (an event control, a delay control, or
-// a task/func) and it is not the if-else kind that overrides vpiElseStmt, and no
-// special case overrides vpiPropertySpec at all, so each edge is served by the
-// generic, type-directed traversal in VpiHandleC: the relation tag names the
-// kind of the child it returns. These tests observe that production path
-// applying the rule to an expect statement object.
+// no 'shall' sentences, and no properties; the three edges are its only
+// content. None of the three needs dedicated production code. An expect
+// statement is not one of the kinds that override vpiStmt (an event control, a
+// delay control, or a task/func) and it is not the if-else kind that overrides
+// vpiElseStmt, and no special case overrides vpiPropertySpec at all, so each
+// edge is served by the generic, type-directed traversal in VpiHandleC: the
+// relation tag names the kind of the child it returns. These tests observe that
+// production path applying the rule to an expect statement object.
 
 // The fixture installs a context so the public VpiHandleC entry point runs its
 // real dispatch over the test objects.
@@ -52,7 +52,8 @@ TEST_F(Expect, ExpectStatementReachesItsPropertySpecification) {
 // vpiStmt does not return the else child and vpiElseStmt does not return the
 // pass child - which also shows that, unlike an if-else, an expect statement's
 // vpiElseStmt edge is served by the generic traversal.
-TEST_F(Expect, ExpectStatementReachesPassAndElseStatementsThroughDistinctRelations) {
+TEST_F(Expect,
+       ExpectStatementReachesPassAndElseStatementsThroughDistinctRelations) {
   VpiObject pass;
   pass.type = vpiStmt;
 

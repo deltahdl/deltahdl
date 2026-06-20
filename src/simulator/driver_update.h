@@ -32,4 +32,4 @@ class DriverUpdatePool {
   size_t free_count_ = 0;
 };
 
-}
+}  // namespace delta

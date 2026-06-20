@@ -116,4 +116,4 @@ TEST(TristateGateElaboration, Notif0InvertsDataArmAndSwapsArms) {
   EXPECT_EQ(rhs->false_expr->lhs->text, "a");
 }
 
-}
+}  // namespace

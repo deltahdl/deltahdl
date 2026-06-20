@@ -97,9 +97,8 @@ TEST(ExpressionBitLengthProblem, ConditionalContextWidensNarrowBranch) {
   auto* tern = f.arena.Create<Expr>();
   tern->kind = ExprKind::kTernary;
   tern->condition = MakeId(f.arena, "c");
-  tern->true_expr =
-      MakeBinary(f.arena, TokenKind::kAmp, MakeId(f.arena, "a"),
-                 MakeId(f.arena, "b"));
+  tern->true_expr = MakeBinary(f.arena, TokenKind::kAmp, MakeId(f.arena, "a"),
+                               MakeId(f.arena, "b"));
   tern->false_expr = MakeId(f.arena, "d");
 
   auto result = EvalExpr(tern, f.ctx, f.arena);
@@ -108,4 +107,4 @@ TEST(ExpressionBitLengthProblem, ConditionalContextWidensNarrowBranch) {
   EXPECT_EQ(result.ToUint64(), 8u);
 }
 
-}
+}  // namespace

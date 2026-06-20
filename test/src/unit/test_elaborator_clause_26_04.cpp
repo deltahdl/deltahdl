@@ -144,4 +144,4 @@ TEST(PackageImportInHeader, WildcardProgramHeaderImportVisibleInPort) {
              "endprogram\n"));
 }
 
-}
+}  // namespace

@@ -3,8 +3,8 @@
 namespace delta {
 
 bool CheckerAssumeStatementIsCheckedForViolationDuringSimulation() {
-  // §17.7.2: checker assume statements behave like ordinary assume statements in
-  // that they are also checked for violation during simulation.
+  // §17.7.2: checker assume statements behave like ordinary assume statements
+  // in that they are also checked for violation during simulation.
   return true;
 }
 
@@ -56,8 +56,8 @@ bool AssumeRandomizationProvidesActivenessControlFacility() {
 bool AssumeRandomizationElementsAreSeparatelyActive(
     CheckerVariableAggregate agg) {
   // §17.7.2: a packed array or structure is active or inactive monolithically,
-  // whereas the elements of an unpacked array or structure are separately active
-  // or inactive.
+  // whereas the elements of an unpacked array or structure are separately
+  // active or inactive.
   return agg == CheckerVariableAggregate::kUnpackedArrayOrStruct;
 }
 
@@ -104,7 +104,8 @@ bool AssumeStatementOriginContributesToAssumeSet(AssumeStatementOrigin origin) {
 
 bool AssumeStatementIsInAssumeSet(const AssumeStatementMembership& statement) {
   // §17.7.2: a statement referencing a formal whose actual argument contains a
-  // const cast or automatic-value subexpression is excluded from the assume set.
+  // const cast or automatic-value subexpression is excluded from the assume
+  // set.
   if (statement.references_const_cast_or_automatic_actual) {
     return false;
   }
@@ -122,7 +123,8 @@ SolutionAttemptOutcome AssumeSetSolutionAttempt(bool satisfying_values_found) {
 }
 
 bool AssumeRandomizationMustFindSolutionWhenItExists() {
-  // §17.7.2: there is no requirement that a solution be found even if it exists.
+  // §17.7.2: there is no requirement that a solution be found even if it
+  // exists.
   return false;
 }
 
@@ -162,8 +164,8 @@ bool ImplicitlyClockedVariableStaysConstantUntilEndOfTimeStep() {
 }
 
 AssumeSetClocking ActiveVariableAbsentFromNonemptyAssumeSetClocking() {
-  // §17.7.2: an active variable that appears in no property of a nonempty assume
-  // set is still explicitly clocked.
+  // §17.7.2: an active variable that appears in no property of a nonempty
+  // assume set is still explicitly clocked.
   return AssumeSetClocking::kExplicitlyClocked;
 }
 

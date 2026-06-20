@@ -320,7 +320,8 @@ TEST(ModuleParametersAndPorts, ParameterPortDeclDataType) {
   EXPECT_EQ(mod->param_types[0].kind, DataTypeKind::kInt);
 }
 
-// --- list_of_ports / port / port_expression / port_reference (prods 3,6,7,8) ---
+// --- list_of_ports / port / port_expression / port_reference (prods 3,6,7,8)
+// ---
 
 // A non-ANSI list_of_ports is a parenthesized comma list of bare
 // port_reference port identifiers.
@@ -537,4 +538,4 @@ TEST(ModuleParametersAndPorts, AnsiExplicitlyNamedPortMissingParen) {
   EXPECT_TRUE(r.has_errors);
 }
 
-}
+}  // namespace

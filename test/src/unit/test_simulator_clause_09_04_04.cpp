@@ -181,7 +181,8 @@ TEST(LevelSensitiveSequenceSimulation, WaitMultipleTriggeredOr) {
   EXPECT_EQ(var->value.ToUint64(), 55u);
 }
 
-TEST(LevelSensitiveSequenceSimulation, WaitSequenceTriggeredDoesNotFireBeforeMatch) {
+TEST(LevelSensitiveSequenceSimulation,
+     WaitSequenceTriggeredDoesNotFireBeforeMatch) {
   auto val = RunAndGet(
       "module t;\n"
       "  logic clk, a, b;\n"
@@ -202,4 +203,4 @@ TEST(LevelSensitiveSequenceSimulation, WaitSequenceTriggeredDoesNotFireBeforeMat
   EXPECT_EQ(val, 0u);
 }
 
-}
+}  // namespace

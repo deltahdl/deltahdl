@@ -21,8 +21,8 @@ TEST(RealLiteralLexing, LeadingZeroDecimalIsRealLiteral) {
   EXPECT_EQ(r.token.text, "0.1");
 }
 
-// §5.7.2: real numbers may also be written in scientific notation, including the
-// exponent-only form (e.g. 39e8 = 39 x 10^8).
+// §5.7.2: real numbers may also be written in scientific notation, including
+// the exponent-only form (e.g. 39e8 = 39 x 10^8).
 TEST(RealLiteralLexing, ExponentOnlyIsRealLiteral) {
   auto r = LexOne("39e8 ");
   EXPECT_EQ(r.token.kind, TokenKind::kRealLiteral);
@@ -76,4 +76,4 @@ TEST(RealLiteralLexing, NoLeadingDigitWithExponentIsNotRealLiteral) {
   EXPECT_EQ(tokens[0].kind, TokenKind::kDot);
 }
 
-}
+}  // namespace

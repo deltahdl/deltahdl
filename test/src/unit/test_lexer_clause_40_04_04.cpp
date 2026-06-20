@@ -54,9 +54,9 @@ std::vector<FsmPragmaInfo> CollectFsmPragmas(const std::string& src) {
 // C1: the next-state signal is specified by the enumeration pragma placed after
 // the bit range. The current-state signal names the FSM via a `state_vector`
 // pragma; a separate next-state signal carries only `/* tool enum state_e */`,
-// tying it to the same FSM through the shared enumeration name. Both pragmas are
-// recorded, the next-state signal's as a standalone enum-only pragma, and the
-// next-state signal's own name still reaches the token stream.
+// tying it to the same FSM through the shared enumeration name. Both pragmas
+// are recorded, the next-state signal's as a standalone enum-only pragma, and
+// the next-state signal's own name still reaches the token stream.
 TEST(FsmNextStatePragmaLexing, NextStateSignalSpecifiedByEnumPragma) {
   const std::string src =
       "module fsm;\n"
@@ -72,9 +72,9 @@ TEST(FsmNextStatePragmaLexing, NextStateSignalSpecifiedByEnumPragma) {
   EXPECT_EQ(pragmas[0].signal, "cur_state");
   EXPECT_EQ(pragmas[0].enum_name, "state_e");
 
-  // The next-state signal is identified purely by the enum pragma; it shares the
-  // enumeration name with the current-state signal but carries no signal name of
-  // its own in the pragma.
+  // The next-state signal is identified purely by the enum pragma; it shares
+  // the enumeration name with the current-state signal but carries no signal
+  // name of its own in the pragma.
   EXPECT_EQ(pragmas[1].form, "enum_only");
   EXPECT_TRUE(pragmas[1].has_enum);
   EXPECT_EQ(pragmas[1].enum_name, "state_e");

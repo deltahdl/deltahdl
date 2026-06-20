@@ -260,7 +260,8 @@ TEST(NonAnsiStylePortDeclarations, PartialPortDeclAsVariableMatchingRanges) {
 
 // §23.2.2.1: the range of the completing variable declaration must be identical
 // to the port declaration's range.
-TEST(NonAnsiStylePortDeclarations, PartialPortDeclAsVariableMismatchedRangesIsError) {
+TEST(NonAnsiStylePortDeclarations,
+     PartialPortDeclAsVariableMismatchedRangesIsError) {
   ElabFixture f;
   ElaborateSrc(
       "module m(a);\n"
@@ -273,7 +274,8 @@ TEST(NonAnsiStylePortDeclarations, PartialPortDeclAsVariableMismatchedRangesIsEr
 
 // §23.2.2.1: once a port is completely declared (here with a variable data
 // type), redeclaring it again in a data type declaration is an error.
-TEST(NonAnsiStylePortDeclarations, CompletePortDeclRedeclaredAsVariableIsError) {
+TEST(NonAnsiStylePortDeclarations,
+     CompletePortDeclRedeclaredAsVariableIsError) {
   ElabFixture f;
   ElaborateSrc(
       "module m(a);\n"
@@ -296,4 +298,4 @@ TEST(NonAnsiStylePortDeclarations, PortWithNetDeclButNoDirectionIsError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-}
+}  // namespace

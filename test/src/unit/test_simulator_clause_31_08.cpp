@@ -1,8 +1,8 @@
+#include <gtest/gtest.h>
+
 #include "common/types.h"
 #include "parser/ast.h"
 #include "simulator/specify.h"
-
-#include <gtest/gtest.h>
 
 using namespace delta;
 
@@ -28,16 +28,15 @@ TEST(VectorSignalsInTimingChecks, TwoSignalChecksClassifyAsTwoSignal) {
 
 TEST(VectorSignalsInTimingChecks, SingleModeAlwaysYieldsOneCheck) {
   const TimingCheckKind kinds[] = {
-      TimingCheckKind::kSetup,    TimingCheckKind::kHold,
+      TimingCheckKind::kSetup,     TimingCheckKind::kHold,
       TimingCheckKind::kSetuphold, TimingCheckKind::kRecovery,
-      TimingCheckKind::kRemoval,  TimingCheckKind::kRecrem,
-      TimingCheckKind::kSkew,     TimingCheckKind::kTimeskew,
-      TimingCheckKind::kFullskew, TimingCheckKind::kNochange,
-      TimingCheckKind::kWidth,    TimingCheckKind::kPeriod,
+      TimingCheckKind::kRemoval,   TimingCheckKind::kRecrem,
+      TimingCheckKind::kSkew,      TimingCheckKind::kTimeskew,
+      TimingCheckKind::kFullskew,  TimingCheckKind::kNochange,
+      TimingCheckKind::kWidth,     TimingCheckKind::kPeriod,
   };
   for (auto k : kinds) {
-    EXPECT_EQ(TimingCheckExpandedCount(k, 8, 8,
-                                       TimingCheckVectorMode::kSingle),
+    EXPECT_EQ(TimingCheckExpandedCount(k, 8, 8, TimingCheckVectorMode::kSingle),
               1u);
   }
 }
@@ -105,4 +104,4 @@ TEST(VectorSignalsInTimingChecks, ScalarInvocationsYieldOneCheckInBothModes) {
             1u);
 }
 
-}
+}  // namespace

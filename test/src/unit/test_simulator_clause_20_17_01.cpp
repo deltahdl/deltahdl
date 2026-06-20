@@ -17,7 +17,8 @@ namespace {
 // handler (eval_function.cpp) and observe the returned value and the side
 // effect of the executed command.
 
-uint64_t RunAndRead(SimFixture& f, const std::string& src, std::string_view var) {
+uint64_t RunAndRead(SimFixture& f, const std::string& src,
+                    std::string_view var) {
   auto* design = ElaborateSrc(src, f);
   EXPECT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -42,11 +43,11 @@ void Run(SimFixture& f, const std::string& src) {
 TEST(SystemTask, FunctionReportsCommandFailure) {
   SimFixture f;
   uint64_t r = RunAndRead(f,
-      "module t;\n"
-      "  int r;\n"
-      "  initial r = $system(\"exit 1\");\n"
-      "endmodule\n",
-      "r");
+                          "module t;\n"
+                          "  int r;\n"
+                          "  initial r = $system(\"exit 1\");\n"
+                          "endmodule\n",
+                          "r");
   EXPECT_NE(r, 0u);
 }
 
@@ -55,15 +56,18 @@ TEST(SystemTask, FunctionReportsCommandFailure) {
 // observes on disk to confirm the command ran.
 TEST(SystemTask, TaskExecutesCommandFromTerminal) {
   namespace fs = std::filesystem;
-  fs::path marker = fs::temp_directory_path() / "deltahdl_clause_20_17_01.marker";
+  fs::path marker =
+      fs::temp_directory_path() / "deltahdl_clause_20_17_01.marker";
   std::error_code ec;
   fs::remove(marker, ec);
 
   SimFixture f;
   Run(f,
       "module t;\n"
-      "  initial $system(\"touch '" + marker.string() + "'\");\n"
-      "endmodule\n");
+      "  initial $system(\"touch '" +
+          marker.string() +
+          "'\");\n"
+          "endmodule\n");
 
   EXPECT_TRUE(fs::exists(marker));
   fs::remove(marker, ec);
@@ -76,11 +80,11 @@ TEST(SystemTask, TaskExecutesCommandFromTerminal) {
 TEST(SystemTask, NoArgumentInvokesSystemWithNullString) {
   SimFixture f;
   uint64_t r = RunAndRead(f,
-      "module t;\n"
-      "  int r;\n"
-      "  initial r = $system();\n"
-      "endmodule\n",
-      "r");
+                          "module t;\n"
+                          "  int r;\n"
+                          "  initial r = $system();\n"
+                          "endmodule\n",
+                          "r");
   EXPECT_NE(r, 0u);
 }
 

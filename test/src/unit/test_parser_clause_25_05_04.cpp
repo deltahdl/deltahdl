@@ -58,4 +58,4 @@ TEST(ModportExpressionParsing, DotNotationWithoutDirection) {
   EXPECT_EQ(mp->ports[0].direction, Direction::kNone);
 }
 
-}
+}  // namespace

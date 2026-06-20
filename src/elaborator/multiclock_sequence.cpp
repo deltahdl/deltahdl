@@ -54,8 +54,7 @@ std::optional<std::string> CheckMulticlockSequenceLegality(
     // (`##0`) operators may join two subsequences. An identically clocked join
     // stays in a singly clocked context and is left to the singly clocked
     // rules.
-    const bool crosses_clock =
-        subsequence.clock != subsequences[i - 1].clock;
+    const bool crosses_clock = subsequence.clock != subsequences[i - 1].clock;
     if (crosses_clock && subsequence.join == MulticlockJoin::kOther) {
       return "differently clocked sequence operands may be joined only by the "
              "single-delay (##1) or zero-delay (##0) operator";

@@ -323,10 +323,11 @@ void Elaborator::ValidateDpiGlobalNameSpace() {
             if (has_dynamic_dim) {
               diag_.Error(
                   item->loc,
-                  std::format("SystemVerilog function '{}' has a dynamic array "
-                              "formal argument and therefore cannot be exported "
-                              "for DPI (§35.5.6)",
-                              item->name));
+                  std::format(
+                      "SystemVerilog function '{}' has a dynamic array "
+                      "formal argument and therefore cannot be exported "
+                      "for DPI (§35.5.6)",
+                      item->name));
               break;
             }
           }
@@ -395,8 +396,7 @@ void Elaborator::ValidateElabSystemTask(const ModuleItem* item,
     if (first_arg->kind == ExprKind::kIntegerLiteral) {
       auto val = first_arg->int_val;
       if (val < 0 || val > 2) {
-        diag_.Error(first_arg->range.start,
-                    "finish_number must be 0, 1, or 2");
+        diag_.Error(first_arg->range.start, "finish_number must be 0, 1, or 2");
       }
       arg_start = 1;
     }
@@ -429,10 +429,14 @@ void Elaborator::ValidateElabSystemTask(const ModuleItem* item,
   }
 
   std::string severity;
-  if (is_fatal) severity = "FATAL";
-  else if (is_error) severity = "ERROR";
-  else if (is_warning) severity = "WARNING";
-  else severity = "INFO";
+  if (is_fatal)
+    severity = "FATAL";
+  else if (is_error)
+    severity = "ERROR";
+  else if (is_warning)
+    severity = "WARNING";
+  else
+    severity = "INFO";
 
   std::string user_msg;
   if (arg_start < expr->args.size() &&
@@ -445,10 +449,9 @@ void Elaborator::ValidateElabSystemTask(const ModuleItem* item,
   }
 
   std::string message =
-      scope_name.empty()
-          ? std::format("elaboration {}: {}", severity, user_msg)
-          : std::format("elaboration {} in scope '{}': {}", severity,
-                        scope_name, user_msg);
+      scope_name.empty() ? std::format("elaboration {}: {}", severity, user_msg)
+                         : std::format("elaboration {} in scope '{}': {}",
+                                       severity, scope_name, user_msg);
 
   // Per §20.10.1, $fatal and $error block simulation; $warning and $info do
   // not affect the rest of elaboration or simulation. All four shall emit a
@@ -969,9 +972,9 @@ bool Elaborator::MaybeCreateImplicitNet(std::string_view name, SourceLoc loc,
   // on the left side of a continuous assignment gets an implicit scalar net of
   // the default net type. It shares the implicit-net constructor with the
   // port-expression case; here the width is scalar and the net is unsigned.
-  RtlirNet net = MakeImplicitPortNet(ScopedName(name), /*port_width=*/1,
-                                     /*port_is_signed=*/false,
-                                     unit_->default_nettype);
+  RtlirNet net =
+      MakeImplicitPortNet(ScopedName(name), /*port_width=*/1,
+                          /*port_is_signed=*/false, unit_->default_nettype);
   mod->nets.push_back(net);
   declared_names_.insert(name);
   net_names_.insert(name);
@@ -1334,10 +1337,11 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
                                    interconnect_names_.count(term->text) != 0;
             if (is_interconnect) {
               if (w != array_len) {
-                diag_.Error(item->loc,
-                            "interconnect terminal of a gate instance array "
-                            "must have a bit-length equal to the instance-array "
-                            "length");
+                diag_.Error(
+                    item->loc,
+                    "interconnect terminal of a gate instance array "
+                    "must have a bit-length equal to the instance-array "
+                    "length");
                 break;
               }
               continue;
@@ -1748,10 +1752,9 @@ void Elaborator::ElaborateNettypeDecl(ModuleItem* item, RtlirModule*) {
 // (source) nettype each name resolves to: an alias shares its source's
 // canonical name, so it matches; unrelated nettypes have distinct canonical
 // names, so they do not.
-bool NettypesMatch(
-    std::string_view a, std::string_view b,
-    const std::unordered_map<std::string_view, std::string_view>&
-        nettype_canonical) {
+bool NettypesMatch(std::string_view a, std::string_view b,
+                   const std::unordered_map<std::string_view, std::string_view>&
+                       nettype_canonical) {
   if (a == b) return true;
   auto ait = nettype_canonical.find(a);
   auto bit = nettype_canonical.find(b);
@@ -2696,10 +2699,11 @@ void Elaborator::BindPorts(RtlirModuleInst& inst, const ModuleItem* item,
           header_modport != connection_modport) {
         diag_.Error(
             item->loc,
-            std::format("interface port '{}' selects modport '{}' in the module "
-                        "header but '{}' in the instance connection; both shall "
-                        "name the same modport",
-                        binding.port_name, header_modport, connection_modport));
+            std::format(
+                "interface port '{}' selects modport '{}' in the module "
+                "header but '{}' in the instance connection; both shall "
+                "name the same modport",
+                binding.port_name, header_modport, connection_modport));
       }
     }
 

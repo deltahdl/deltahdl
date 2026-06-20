@@ -208,4 +208,4 @@ TEST(DefparamElaboration, DefparamCannotTargetOtherArrayInstance) {
   EXPECT_LE(count_77, 1);
 }
 
-}
+}  // namespace

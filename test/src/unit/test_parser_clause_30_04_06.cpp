@@ -21,4 +21,4 @@ TEST(MultiplePathDeclarationParsing, MultipleSourceDestPorts) {
   VerifyFullPathPorts(si, {"a", "b", "c"}, {"x", "y"});
 }
 
-}
+}  // namespace

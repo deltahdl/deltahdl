@@ -101,4 +101,4 @@ TEST(WiredNetElaboration, WorAndTriorBothAreNets) {
   EXPECT_TRUE(mod->variables.empty());
 }
 
-}
+}  // namespace

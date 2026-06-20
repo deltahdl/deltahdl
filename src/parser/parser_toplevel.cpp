@@ -435,7 +435,6 @@ void Parser::ParseGateInst(std::vector<ModuleItem*>& items) {
     auto tk = CurrentToken().kind;
     has_strength = IsStrength0Token(tk) || IsStrength1Token(tk);
     if (!has_strength) {
-
       ParseInlineGateTerminals(gate_kind, loc, items);
       return;
     }
@@ -452,11 +451,9 @@ void Parser::ParseGateInst(std::vector<ModuleItem*>& items) {
       diag_.Error(loc, "drive strength not allowed on this gate type");
 
     if (gate_kind == GateKind::kPulldown && str0 == 0 && str1 != 0)
-      diag_.Error(loc,
-                  "pulldown single-strength must be a strength0 keyword");
+      diag_.Error(loc, "pulldown single-strength must be a strength0 keyword");
     if (gate_kind == GateKind::kPullup && str1 == 0 && str0 != 0)
-      diag_.Error(loc,
-                  "pullup single-strength must be a strength1 keyword");
+      diag_.Error(loc, "pullup single-strength must be a strength1 keyword");
 
     if (GateAllowsStrength(gate_kind) && gate_kind != GateKind::kPullup &&
         gate_kind != GateKind::kPulldown && (str0 == 0 || str1 == 0))
@@ -602,7 +599,6 @@ void Parser::ParseUdpInstList(const Token& udp_tok,
 }
 
 void Parser::RejectUdpPortDimension() {
-
   if (!Check(TokenKind::kLBracket)) return;
   diag_.Error(CurrentLoc(),
               "UDP port shall be scalar; vector range not permitted");
@@ -617,14 +613,12 @@ void Parser::RejectUdpPortDimension() {
 }
 
 void Parser::RejectUdpInoutPort() {
-
   diag_.Error(CurrentLoc(),
               "UDP ports shall be input or output; inout not permitted");
   Consume();
 }
 
 void Parser::ValidateUdpHeader(UdpDecl* udp) {
-
   if (udp->output_name.empty()) {
     diag_.Error(udp->range.start, "UDP shall have exactly one output port");
   }
@@ -634,7 +628,6 @@ void Parser::ValidateUdpHeader(UdpDecl* udp) {
 }
 
 void Parser::ValidateUdpTable(UdpDecl* udp) {
-
   for (size_t i = 0; i < udp->table.size(); ++i) {
     for (size_t j = i + 1; j < udp->table.size(); ++j) {
       const auto& a = udp->table[i];
@@ -659,7 +652,6 @@ static char UdpCharFromToken(const Token& tok) {
 }
 
 static bool UdpInputIsEdge(char c) {
-
   if (c == 'r' || c == 'R' || c == 'f' || c == 'F') return true;
   if (c == 'p' || c == 'P' || c == 'n' || c == 'N') return true;
   if (c == '*' || c == '\x01') return true;
@@ -669,8 +661,8 @@ static bool UdpInputIsEdge(char c) {
 static bool UdpSymbolIsZ(char c) { return c == 'z' || c == 'Z'; }
 
 static bool UdpIsLevelSymbol(char c) {
-  return c == '0' || c == '1' || c == 'x' || c == 'X' ||
-         c == '?' || c == 'b' || c == 'B';
+  return c == '0' || c == '1' || c == 'x' || c == 'X' || c == '?' || c == 'b' ||
+         c == 'B';
 }
 
 static bool IsValidUdpInitialLiteral(std::string_view text) {
@@ -717,7 +709,6 @@ void Parser::ParseUdpOutputDecl(UdpDecl* udp) {
 }
 
 void Parser::ParseUdpPortDecls(UdpDecl* udp) {
-
   struct PendingReg {
     std::string_view name;
     SourceLoc loc;
@@ -753,8 +744,7 @@ void Parser::ParseUdpPortDecls(UdpDecl* udp) {
 
   for (const auto& reg : reg_decls) {
     if (!udp->output_name.empty() && reg.name != udp->output_name) {
-      diag_.Error(reg.loc,
-                  "UDP reg declaration shall name the output port");
+      diag_.Error(reg.loc, "UDP reg declaration shall name the output port");
     }
   }
 }
@@ -850,8 +840,9 @@ void Parser::ParseUdpTableRow(UdpDecl* udp) {
     bool ok = (out == '0' || out == '1' || out == 'x' || out == 'X');
     if (udp->is_sequential && out == '-') ok = true;
     if (!ok) {
-      diag_.Error(row_loc,
-                  "UDP output field shall be 0, 1, or x (- is sequential only)");
+      diag_.Error(
+          row_loc,
+          "UDP output field shall be 0, 1, or x (- is sequential only)");
     }
   }
 
@@ -890,7 +881,6 @@ UdpDecl* Parser::ParseUdpDecl() {
   } else {
     ParseAttributes();
     if (Check(TokenKind::kKwInout)) {
-
       RejectUdpInoutPort();
     }
     if (Check(TokenKind::kKwOutput)) {
@@ -918,7 +908,6 @@ UdpDecl* Parser::ParseUdpDecl() {
       Expect(TokenKind::kRParen);
       Expect(TokenKind::kSemicolon);
     } else {
-
       auto first_tok = Expect(TokenKind::kIdentifier);
       std::string_view first_name = first_tok.text;
       SourceLoc first_loc = first_tok.loc;
@@ -973,8 +962,8 @@ UdpDecl* Parser::ParseUdpDecl() {
     Expect(TokenKind::kEq);
 
     auto rhs_tok = CurrentToken();
-    udp->initial_value = ParseUdpInitialValue(TokenKind::kSemicolon,
-                                              TokenKind::kSemicolon);
+    udp->initial_value =
+        ParseUdpInitialValue(TokenKind::kSemicolon, TokenKind::kSemicolon);
     if (!IsValidUdpInitialLiteral(rhs_tok.text)) {
       diag_.Error(rhs_tok.loc,
                   "UDP initial statement RHS shall be 0, 1, or a single-bit "
@@ -1004,7 +993,6 @@ UdpDecl* Parser::ParseExternUdpDecl() {
     RejectUdpInoutPort();
   }
   if (Check(TokenKind::kKwOutput)) {
-
     Consume();
     if (Match(TokenKind::kKwReg)) {
       udp->is_sequential = true;
@@ -1022,7 +1010,6 @@ UdpDecl* Parser::ParseExternUdpDecl() {
       udp->input_names.push_back(Expect(TokenKind::kIdentifier).text);
     }
   } else {
-
     udp->output_name = Expect(TokenKind::kIdentifier).text;
     while (Match(TokenKind::kComma)) {
       udp->input_names.push_back(Expect(TokenKind::kIdentifier).text);
@@ -1035,4 +1022,4 @@ UdpDecl* Parser::ParseExternUdpDecl() {
   return udp;
 }
 
-}
+}  // namespace delta

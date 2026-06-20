@@ -158,4 +158,4 @@ TEST(PullSourceElaboration, PulldownIgnoresSuppliedStrength1) {
   EXPECT_EQ(mod->assigns[0].drive_strength1, 0u);
 }
 
-}
+}  // namespace

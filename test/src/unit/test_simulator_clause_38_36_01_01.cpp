@@ -10,13 +10,14 @@
 namespace delta {
 namespace {
 
-// §38.36.1.1 governs cbStmt callbacks placed on individual statements. It states
-// one registration-time prohibition (a cbStmt callback may not be placed on a
-// statement in a protected portion of the code), one repetition rule (multiple
-// identical registrations produce multiple callbacks), and the fixed contents of
-// the s_cb_data structure delivered to the routine (value always NULL, index
-// always 0, and a NULL time pointer when registered with vpiSuppressTime). These
-// tests observe vpi_register_cb()/DispatchCallbacks() applying those rules.
+// §38.36.1.1 governs cbStmt callbacks placed on individual statements. It
+// states one registration-time prohibition (a cbStmt callback may not be placed
+// on a statement in a protected portion of the code), one repetition rule
+// (multiple identical registrations produce multiple callbacks), and the fixed
+// contents of the s_cb_data structure delivered to the routine (value always
+// NULL, index always 0, and a NULL time pointer when registered with
+// vpiSuppressTime). These tests observe vpi_register_cb()/DispatchCallbacks()
+// applying those rules.
 
 // Recorder for the contents of the s_cb_data structure the simulator hands to a
 // cbStmt routine, so a test can observe the dispatch-time field guarantees.
@@ -46,9 +47,9 @@ class VpiStmtCallback : public ::testing::Test {
   }
   void TearDown() override { SetGlobalVpiContext(nullptr); }
 
-  // Build a handle that stands for a statement (here a named-begin block, one of
-  // the cbStmt-eligible objects). `protect` marks it as residing in a protected
-  // portion of the code.
+  // Build a handle that stands for a statement (here a named-begin block, one
+  // of the cbStmt-eligible objects). `protect` marks it as residing in a
+  // protected portion of the code.
   vpiHandle MakeStatementHandle(const char* name, bool protect) {
     sim_ctx_.CreateVariable(name, 1);
     vpi_ctx_.Attach(sim_ctx_);
@@ -99,7 +100,8 @@ TEST_F(VpiStmtCallback, UnprotectedStatementAccepted) {
 
 // §38.36.1.1: the protected-code prohibition is specific to the cbStmt reason.
 // A callback for another reason (here cbValueChange) placed on the same
-// protected handle is outside this rule, so the cbStmt guard does not reject it.
+// protected handle is outside this rule, so the cbStmt guard does not reject
+// it.
 TEST_F(VpiStmtCallback, ProtectedHandleRejectionIsSpecificToStmtReason) {
   vpiHandle stmt = MakeStatementHandle("s", /*protect=*/true);
   ASSERT_NE(stmt, nullptr);
@@ -113,7 +115,8 @@ TEST_F(VpiStmtCallback, ProtectedHandleRejectionIsSpecificToStmtReason) {
 // §38.36.1.1: multiple calls to vpi_register_cb() with the same data shall
 // result in multiple callbacks. Registering the identical cbStmt data twice and
 // dispatching the reason once invokes the routine twice.
-TEST_F(VpiStmtCallback, MultipleIdenticalRegistrationsProduceMultipleCallbacks) {
+TEST_F(VpiStmtCallback,
+       MultipleIdenticalRegistrationsProduceMultipleCallbacks) {
   s_cb_data cb = {};
   cb.reason = cbStmt;
   cb.cb_rtn = &RecordStmtCb;

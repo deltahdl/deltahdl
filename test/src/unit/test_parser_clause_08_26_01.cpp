@@ -174,4 +174,4 @@ TEST(InterfaceClassSyntax, SingleExtendsNoAdditionalBases) {
   EXPECT_TRUE(r.cu->classes[0]->extends_interfaces.empty());
 }
 
-}
+}  // namespace

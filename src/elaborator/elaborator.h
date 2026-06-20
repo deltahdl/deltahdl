@@ -196,8 +196,7 @@ class Elaborator {
   void VerifyEarlyResolvedDefparams();
 
   void CheckEarlyResolutionAmbiguity(
-      RtlirModule* mod,
-      const std::unordered_set<std::string_view>& top_names);
+      RtlirModule* mod, const std::unordered_set<std::string_view>& top_names);
 
   void ProcessPendingGenerate(ModuleItem* item, RtlirModule* mod);
 
@@ -917,13 +916,13 @@ void AddProcess(RtlirProcessKind kind, ModuleItem* item, RtlirModule* mod,
 void ElaborateGateInst(ModuleItem* item, RtlirModule* mod, Arena& arena);
 
 // §6.22.6: a nettype matches itself and the nettype of nets declared using it,
-// and a renaming alias of a user-defined nettype matches the nettype it renames.
-// Two nettype names match when they resolve to the same canonical (source)
-// nettype; `nettype_canonical` maps each nettype name to its canonical name.
-bool NettypesMatch(
-    std::string_view a, std::string_view b,
-    const std::unordered_map<std::string_view, std::string_view>&
-        nettype_canonical);
+// and a renaming alias of a user-defined nettype matches the nettype it
+// renames. Two nettype names match when they resolve to the same canonical
+// (source) nettype; `nettype_canonical` maps each nettype name to its canonical
+// name.
+bool NettypesMatch(std::string_view a, std::string_view b,
+                   const std::unordered_map<std::string_view, std::string_view>&
+                       nettype_canonical);
 
 void ValidateBidirectionalSwitchConnections(
     const ModuleItem* item, const RtlirModule* mod, DiagEngine& diag,
@@ -958,10 +957,10 @@ RtlirNet MakeImplicitPortNet(std::string_view name, uint32_t port_width,
                              bool port_is_signed, NetType default_nettype);
 
 // §6.6.7: the structural constraints a user-defined resolution function for a
-// nettype whose data type is T must satisfy. The function shall return T, take a
-// single input argument that is a dynamic array of T, and be automatic (hold no
-// state). A class method used as a resolution function shall be a static method,
-// since it is called in a context where no class object is involved.
+// nettype whose data type is T must satisfy. The function shall return T, take
+// a single input argument that is a dynamic array of T, and be automatic (hold
+// no state). A class method used as a resolution function shall be a static
+// method, since it is called in a context where no class object is involved.
 struct NettypeResolutionSig {
   bool return_type_matches_nettype = false;
   bool single_input_argument = false;

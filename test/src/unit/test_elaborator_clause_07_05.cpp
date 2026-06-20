@@ -58,4 +58,4 @@ TEST(DynamicArrayValidation, DynamicArrayOfArraysElaborates) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

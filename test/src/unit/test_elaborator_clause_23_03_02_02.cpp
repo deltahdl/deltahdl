@@ -158,7 +158,8 @@ TEST(NamedPortConnectionElaboration, OmittedPortWithDefaultUsesDefault) {
   // §23.3.2.2: a port left out of a named connection list is unconnected only
   // when it has no default value. An omitted input that does carry a default
   // (here rst_n) is bound to that default -- the inverse of the explicit empty
-  // ".rst_n()" form, which leaves the port unconnected and discards the default.
+  // ".rst_n()" form, which leaves the port unconnected and discards the
+  // default.
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module child(input logic [7:0] a,\n"
@@ -229,4 +230,4 @@ TEST(NamedPortConnectionElaboration, ReversedOrderBindsCorrectly) {
   EXPECT_TRUE(found_b);
 }
 
-}
+}  // namespace

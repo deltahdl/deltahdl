@@ -84,4 +84,4 @@ TEST(EventControlSynthesis, NonEdgeEventExpressionIsCombinational) {
   EXPECT_TRUE(aig->latches.empty());
 }
 
-}
+}  // namespace

@@ -32,7 +32,6 @@ TEST(NonblockingAssignSim, BitSelect) {
 }
 
 TEST(NonblockingAssignSim, OrderingPreservedAcrossInitials) {
-
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -54,7 +53,6 @@ TEST(NonblockingAssignSim, OrderingPreservedAcrossInitials) {
 }
 
 TEST(NonblockingAssignSim, BlockingEventsFromNbaProcessedAfter) {
-
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -80,7 +78,6 @@ TEST(NonblockingAssignSim, BlockingEventsFromNbaProcessedAfter) {
 }
 
 TEST(NonblockingAssignSim, ProceduralFlowNotBlockedBySubsequent) {
-
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -102,7 +99,6 @@ TEST(NonblockingAssignSim, ProceduralFlowNotBlockedBySubsequent) {
 }
 
 TEST(NonblockingAssignSim, LhsRequiringEvaluationBindsAtScheduleTime) {
-
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -125,4 +121,4 @@ TEST(NonblockingAssignSim, LhsRequiringEvaluationBindsAtScheduleTime) {
   EXPECT_EQ(f.ctx.FindVariable("arr[1]")->value.ToUint64(), 0u);
 }
 
-}
+}  // namespace

@@ -82,13 +82,13 @@ TEST(BnfClarificationElaboration, FinalOnPureVirtualError) {
 // §A.10 item 4: when the bind target is an interface, the bound instance must
 // be an interface or checker instantiation, not a module instantiation.
 TEST(BnfClarificationElaboration, BindCheckerIntoInterfaceOk) {
-  EXPECT_TRUE(ElabOk(
-      "checker chk; endchecker\n"
-      "interface ifc; endinterface\n"
-      "module top;\n"
-      "  ifc i();\n"
-      "endmodule\n"
-      "bind ifc chk c();\n"));
+  EXPECT_TRUE(
+      ElabOk("checker chk; endchecker\n"
+             "interface ifc; endinterface\n"
+             "module top;\n"
+             "  ifc i();\n"
+             "endmodule\n"
+             "bind ifc chk c();\n"));
 }
 
 TEST(BnfClarificationElaboration, BindModuleIntoInterfaceError) {
@@ -318,4 +318,4 @@ TEST(BnfClarificationElaboration, TypeRefEqualityComparisonOk) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

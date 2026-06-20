@@ -37,4 +37,4 @@ TEST(NetDeclAssignSynth, NetDeclAssignPassthrough) {
   EXPECT_EQ(aig->outputs[0], AigLit(aig->inputs[0], false));
 }
 
-}
+}  // namespace

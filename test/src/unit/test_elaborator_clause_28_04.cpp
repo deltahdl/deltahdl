@@ -190,4 +190,4 @@ TEST(NInputGateElaboration, PropagationDelayIndependentOfInputCount) {
   }
 }
 
-}
+}  // namespace

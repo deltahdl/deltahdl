@@ -41,4 +41,4 @@ struct Variable {
   }
 };
 
-}
+}  // namespace delta

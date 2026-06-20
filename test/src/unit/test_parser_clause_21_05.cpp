@@ -23,4 +23,4 @@ TEST(IoSystemTaskParsing, WritememWithStartAndFinishAddresses) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

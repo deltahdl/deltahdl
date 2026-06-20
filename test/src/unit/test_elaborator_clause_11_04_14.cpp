@@ -88,4 +88,4 @@ TEST(StreamingOperatorElaboration, StreamingAsArithOperandRejected) {
   EXPECT_TRUE(f.has_errors);
 }
 
-}
+}  // namespace

@@ -29,7 +29,8 @@ TEST(StratifiedEventSchedulerSim,
   EXPECT_EQ(sched.GetEventPool().FreeCount(), 5u);
 }
 
-TEST(StratifiedEventSchedulerSim, EventExecutesAtItsOneSimulationExecutionTime) {
+TEST(StratifiedEventSchedulerSim,
+     EventExecutesAtItsOneSimulationExecutionTime) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<uint64_t> fired_at;
@@ -138,12 +139,12 @@ TEST(StratifiedEventSchedulerSim,
   std::vector<Region> fired;
 
   std::vector<Region> all_regions = {
-      Region::kPostponed,    Region::kPrePostponed, Region::kPostReNBA,
-      Region::kReNBA,        Region::kPreReNBA,     Region::kReInactive,
-      Region::kReactive,     Region::kPostObserved, Region::kObserved,
-      Region::kPreObserved,  Region::kPostNBA,      Region::kNBA,
-      Region::kPreNBA,       Region::kInactive,     Region::kActive,
-      Region::kPreActive,    Region::kPreponed};
+      Region::kPostponed,   Region::kPrePostponed, Region::kPostReNBA,
+      Region::kReNBA,       Region::kPreReNBA,     Region::kReInactive,
+      Region::kReactive,    Region::kPostObserved, Region::kObserved,
+      Region::kPreObserved, Region::kPostNBA,      Region::kNBA,
+      Region::kPreNBA,      Region::kInactive,     Region::kActive,
+      Region::kPreActive,   Region::kPreponed};
   for (Region r : all_regions) {
     auto* ev = sched.GetEventPool().Acquire();
     ev->callback = [&fired, r]() { fired.push_back(r); };
@@ -152,11 +153,11 @@ TEST(StratifiedEventSchedulerSim,
 
   sched.Run();
   std::vector<Region> expected = {
-      Region::kPreponed,     Region::kPreActive,    Region::kActive,
-      Region::kInactive,     Region::kPreNBA,       Region::kNBA,
-      Region::kPostNBA,      Region::kPreObserved,  Region::kObserved,
-      Region::kPostObserved, Region::kReactive,     Region::kReInactive,
-      Region::kPreReNBA,     Region::kReNBA,        Region::kPostReNBA,
+      Region::kPreponed,     Region::kPreActive,   Region::kActive,
+      Region::kInactive,     Region::kPreNBA,      Region::kNBA,
+      Region::kPostNBA,      Region::kPreObserved, Region::kObserved,
+      Region::kPostObserved, Region::kReactive,    Region::kReInactive,
+      Region::kPreReNBA,     Region::kReNBA,       Region::kPostReNBA,
       Region::kPrePostponed, Region::kPostponed};
   EXPECT_EQ(fired, expected);
 }

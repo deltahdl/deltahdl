@@ -48,4 +48,4 @@ TEST(ClassParsing, WeakReferenceAsTaskArg) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

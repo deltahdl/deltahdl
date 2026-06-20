@@ -86,4 +86,4 @@ TEST(SysTask, StimeReportsFullUnsigned32BitRange) {
   EXPECT_EQ(StimeAtTick(f, high), 0x80000001u);
 }
 
-}
+}  // namespace

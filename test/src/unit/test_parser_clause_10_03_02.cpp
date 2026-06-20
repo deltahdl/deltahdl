@@ -202,4 +202,4 @@ TEST(ContAssignStatementParsing, PackedStructAssign) {
   ASSERT_NE(item->assign_rhs, nullptr);
 }
 
-}
+}  // namespace

@@ -72,4 +72,4 @@ TEST(IdentifierPreprocessor, IdentifierInMacroExpansion) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-}
+}  // namespace

@@ -41,4 +41,4 @@ TEST(SubroutineCallExprParsing, SystemTfCallBitsDataTypeArg) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}
+}  // namespace

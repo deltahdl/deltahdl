@@ -154,7 +154,8 @@ TEST(FunctionBackgroundProcessElaboration, ContAssignToFuncWithNbaError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(FunctionBackgroundProcessElaboration, ContAssignToFuncWithForkJoinNoneError) {
+TEST(FunctionBackgroundProcessElaboration,
+     ContAssignToFuncWithForkJoinNoneError) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -171,7 +172,8 @@ TEST(FunctionBackgroundProcessElaboration, ContAssignToFuncWithForkJoinNoneError
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(FunctionBackgroundProcessElaboration, ContAssignToFuncWithEventTriggerError) {
+TEST(FunctionBackgroundProcessElaboration,
+     ContAssignToFuncWithEventTriggerError) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -201,7 +203,8 @@ TEST(FunctionBackgroundProcessElaboration, NbEventTriggerOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(FunctionBackgroundProcessElaboration, ContAssignToFuncWithNbEventTriggerError) {
+TEST(FunctionBackgroundProcessElaboration,
+     ContAssignToFuncWithNbEventTriggerError) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -250,4 +253,4 @@ TEST(FunctionBackgroundProcessElaboration, InitialCallToBackgroundFuncOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

@@ -63,4 +63,4 @@ TEST(ModportDeclarationElaboration, CommaModportItemsElaborate) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

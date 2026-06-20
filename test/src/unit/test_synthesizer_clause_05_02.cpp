@@ -61,12 +61,11 @@ TEST(LexicalConventionSynthesis, BlockCommentAsSeparatorSynthesizes) {
 
 TEST(LexicalConventionSynthesis, CommentsDoNotAffectSynthesis) {
   SynthFixture f;
-  auto* mod = ElaborateSrc(
-      f,
-      "module /* block */ m; // line\n"
-      "  logic /* type */ a; // decl\n"
-      "  assign /* cont */ a = /* rhs */ 1'b0;\n"
-      "endmodule /* end */\n");
+  auto* mod = ElaborateSrc(f,
+                           "module /* block */ m; // line\n"
+                           "  logic /* type */ a; // decl\n"
+                           "  assign /* cont */ a = /* rhs */ 1'b0;\n"
+                           "endmodule /* end */\n");
   ASSERT_NE(mod, nullptr);
   SynthLower synth(f.arena, f.diag);
   auto* aig = synth.Lower(mod);
@@ -75,17 +74,16 @@ TEST(LexicalConventionSynthesis, CommentsDoNotAffectSynthesis) {
 
 TEST(LexicalConventionSynthesis, AllSynthesizableTokenCategoriesSynthesize) {
   SynthFixture f;
-  auto* mod = ElaborateSrc(
-      f,
-      "module m; // line comment\n"
-      "  /* block comment */\n"
-      "  logic [7:0] data;\n"
-      "  assign data = 8'hAB + 8'd1;\n"
-      "endmodule\n");
+  auto* mod = ElaborateSrc(f,
+                           "module m; // line comment\n"
+                           "  /* block comment */\n"
+                           "  logic [7:0] data;\n"
+                           "  assign data = 8'hAB + 8'd1;\n"
+                           "endmodule\n");
   ASSERT_NE(mod, nullptr);
   SynthLower synth(f.arena, f.diag);
   auto* aig = synth.Lower(mod);
   ASSERT_NE(aig, nullptr);
 }
 
-}
+}  // namespace

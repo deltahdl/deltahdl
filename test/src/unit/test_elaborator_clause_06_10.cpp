@@ -209,7 +209,8 @@ TEST(ImplicitDeclaration, ExplicitVarNotDuplicatedByImplicit) {
   for (const auto& n : mod->nets) {
     if (n.name == "w") ++net_count;
   }
-  EXPECT_EQ(net_count, 0) << "declared variable 'w' should not create an implicit net";
+  EXPECT_EQ(net_count, 0)
+      << "declared variable 'w' should not create an implicit net";
 }
 
 // §6.10: an identifier used in a port expression declaration takes an implicit
@@ -350,4 +351,4 @@ TEST(ImplicitDeclaration, PrimitiveTerminalForbiddenUnderNone) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-}
+}  // namespace

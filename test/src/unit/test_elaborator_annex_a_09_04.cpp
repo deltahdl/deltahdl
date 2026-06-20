@@ -25,4 +25,4 @@ TEST(WhiteSpaceElaboration, EmptyInputElaboratesNoDesign) {
   EXPECT_EQ(design, nullptr);
 }
 
-}
+}  // namespace

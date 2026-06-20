@@ -165,4 +165,4 @@ TEST(TaskAndFunctionNameResolutionSimulation,
   EXPECT_EQ(v->value.ToUint64(), 16u);
 }
 
-}
+}  // namespace

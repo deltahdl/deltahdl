@@ -53,4 +53,4 @@ TEST(PackageItemsParsing, MacroExpandedPackageItem) {
   EXPECT_FALSE(r.cu->packages[0]->items.empty());
 }
 
-}
+}  // namespace

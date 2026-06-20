@@ -229,7 +229,7 @@ TEST(IpcSync, MailboxFullKeepsExtraSendersSuspendedUntilRoomFrees) {
 
   uint64_t msg = 0;
   ASSERT_EQ(mb.Get(msg), MbxGetStatus::kRetrieved);  // frees one slot
-  EXPECT_EQ(msg, 10u);  // the originally stored message exits
+  EXPECT_EQ(msg, 10u);        // the originally stored message exits
   ASSERT_EQ(ran.size(), 1u);  // exactly one suspended sender admitted
   EXPECT_EQ(mb.put_waiters.size(), 1u);  // other stays suspended (still full)
   EXPECT_EQ(mb.Num(), 1);
@@ -246,4 +246,4 @@ TEST(IpcSync, MailboxFullKeepsExtraSendersSuspendedUntilRoomFrees) {
   p2.h.destroy();
 }
 
-}
+}  // namespace

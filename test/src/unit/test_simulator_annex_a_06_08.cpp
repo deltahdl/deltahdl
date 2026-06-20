@@ -190,4 +190,4 @@ TEST(LoopSyntaxSimulation, ForMultipleInitsAndSteps) {
   EXPECT_EQ(var->value.ToUint64(), 5u);
 }
 
-}
+}  // namespace

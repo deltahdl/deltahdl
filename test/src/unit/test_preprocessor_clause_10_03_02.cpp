@@ -44,4 +44,4 @@ TEST(ContAssignStatementPreprocessor, ContinuousAssignBasic) {
   ASSERT_NE(ca->assign_rhs, nullptr);
 }
 
-}
+}  // namespace

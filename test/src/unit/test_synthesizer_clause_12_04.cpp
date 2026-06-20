@@ -8,7 +8,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ConditionalStatementSynth,AlwaysCombIfElse) {
+TEST(ConditionalStatementSynth, AlwaysCombIfElse) {
   SynthFixture f;
   auto* mod =
       ElaborateSrc(f,
@@ -43,4 +43,4 @@ TEST(ConditionalStatementSynth, IfWithoutElseSynthesizes) {
   EXPECT_EQ(aig->outputs.size(), 8);
 }
 
-}
+}  // namespace

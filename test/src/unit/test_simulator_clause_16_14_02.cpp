@@ -103,9 +103,12 @@ TEST(AssumeStatement, AssumedPropertyHoldsSameWithOrWithoutBiasing) {
 TEST(AssumeStatement, BiasingSelectsFreeVariableByWeight) {
   std::vector<uint32_t> weights = {40, 60};
   EXPECT_EQ(SelectBiasedFreeVariable(weights, 0u), static_cast<std::size_t>(0));
-  EXPECT_EQ(SelectBiasedFreeVariable(weights, 39u), static_cast<std::size_t>(0));
-  EXPECT_EQ(SelectBiasedFreeVariable(weights, 40u), static_cast<std::size_t>(1));
-  EXPECT_EQ(SelectBiasedFreeVariable(weights, 99u), static_cast<std::size_t>(1));
+  EXPECT_EQ(SelectBiasedFreeVariable(weights, 39u),
+            static_cast<std::size_t>(0));
+  EXPECT_EQ(SelectBiasedFreeVariable(weights, 40u),
+            static_cast<std::size_t>(1));
+  EXPECT_EQ(SelectBiasedFreeVariable(weights, 99u),
+            static_cast<std::size_t>(1));
 }
 
 // §16.14.2: a disabled assume evaluation runs neither branch, so the §20.11
@@ -123,8 +126,8 @@ TEST(AssumeStatement, ActionControlDoesNotResurrectDisabledBranch) {
 // regardless of whether biasing weights are present.
 TEST(AssumeStatement, NoLegalValuesRejectsEveryCandidate) {
   std::vector<int64_t> empty_members;
-  EXPECT_FALSE(
-      AssumeValueIsLegalUnderBiasing(0, empty_members, /*weights_present=*/true));
+  EXPECT_FALSE(AssumeValueIsLegalUnderBiasing(0, empty_members,
+                                              /*weights_present=*/true));
   EXPECT_FALSE(AssumeValueIsLegalUnderBiasing(0, empty_members,
                                               /*weights_present=*/false));
 }

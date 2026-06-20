@@ -10,9 +10,10 @@
 // coverage API; the rules here say how a single attempt updates those tallies
 // and how often the optional pass statement runs.
 //
-// The rules are encoded as small pure helpers over plain outcome descriptions so
-// the canonical test can exercise them directly. The simulator's cover-statement
-// evaluation path applies these same helpers to real per-attempt outcomes.
+// The rules are encoded as small pure helpers over plain outcome descriptions
+// so the canonical test can exercise them directly. The simulator's
+// cover-statement evaluation path applies these same helpers to real
+// per-attempt outcomes.
 
 #include <cstdint>
 #include <vector>

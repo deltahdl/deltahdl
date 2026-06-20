@@ -169,7 +169,8 @@ TEST(SignedUnsignedArithmetic, PowerOneBaseNegativeExponentReturnsOne) {
   EXPECT_EQ(result.ToUint64(), 1u);
 }
 
-TEST(SignedUnsignedArithmetic, PowerNegativeOneNegativeOddExponentReturnsNegativeOne) {
+TEST(SignedUnsignedArithmetic,
+     PowerNegativeOneNegativeOddExponentReturnsNegativeOne) {
   SimFixture f;
 
   MakeSignedVarAdv(f, "n1a", 8, 0xFF);
@@ -273,7 +274,8 @@ TEST(SignedUnsignedArithmetic, EndToEndSignedDivision) {
   auto* var = f.ctx.FindVariable("r");
   ASSERT_NE(var, nullptr);
 
-  EXPECT_EQ(var->value.ToUint64(), static_cast<uint64_t>(static_cast<uint32_t>(-4)));
+  EXPECT_EQ(var->value.ToUint64(),
+            static_cast<uint64_t>(static_cast<uint32_t>(-4)));
   EXPECT_TRUE(var->is_signed);
 }
 
@@ -355,14 +357,14 @@ TEST(SignedUnsignedArithmetic,
   MakeVar(f, "uv", 8, 0xF9);
 
   auto* sdiv = MakeBinary(f.arena, TokenKind::kSlash, MakeId(f.arena, "sv"),
-                           MakeId(f.arena, "sv"));
+                          MakeId(f.arena, "sv"));
   auto sresult = EvalExpr(sdiv, f.ctx, f.arena);
 
   EXPECT_EQ(sresult.ToUint64(), 1u);
   EXPECT_TRUE(sresult.is_signed);
 
   auto* udiv = MakeBinary(f.arena, TokenKind::kSlash, MakeId(f.arena, "uv"),
-                           MakeId(f.arena, "uv"));
+                          MakeId(f.arena, "uv"));
   auto uresult = EvalExpr(udiv, f.ctx, f.arena);
 
   EXPECT_EQ(uresult.ToUint64(), 1u);
@@ -431,4 +433,4 @@ TEST(SignedUnsignedArithmetic, EndToEndUnsignedToSignedConversionKeepsBits) {
   EXPECT_TRUE(var->is_signed);
 }
 
-}
+}  // namespace

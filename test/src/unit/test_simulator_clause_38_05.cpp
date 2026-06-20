@@ -85,5 +85,5 @@ TEST_F(VpiFlushSim, BuffersPreservedByFailedFlushAreCommittedOnRetry) {
   EXPECT_EQ(vpi_ctx_.LogFileFlushed(), "log-pending");
 }
 
-}
-}
+}  // namespace
+}  // namespace delta

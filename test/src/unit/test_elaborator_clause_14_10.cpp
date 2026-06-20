@@ -40,4 +40,4 @@ TEST(ClockingBlockEventElab, InitialBlockWaitsOnEventElaborates) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

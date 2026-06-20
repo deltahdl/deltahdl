@@ -51,10 +51,11 @@ struct PropertyExpr {
   };
 
   Kind kind = Kind::kStrong;
-  std::shared_ptr<const SequenceExpr> sequence;  // R for strong/weak/implication
-  std::shared_ptr<const BooleanExpr> boolean;    // b for accept_on
-  std::shared_ptr<const PropertyExpr> lhs;        // sub-property / first operand
-  std::shared_ptr<const PropertyExpr> rhs;        // second operand
+  std::shared_ptr<const SequenceExpr>
+      sequence;                                // R for strong/weak/implication
+  std::shared_ptr<const BooleanExpr> boolean;  // b for accept_on
+  std::shared_ptr<const PropertyExpr> lhs;     // sub-property / first operand
+  std::shared_ptr<const PropertyExpr> rhs;     // second operand
 };
 
 std::shared_ptr<const PropertyExpr> PropStrong(
@@ -96,7 +97,7 @@ struct TopLevelProperty {
   Kind kind = Kind::kProperty;
   std::shared_ptr<const BooleanExpr> disable_condition;  // b for disable iff
   std::shared_ptr<const PropertyExpr> property;          // P
-  std::shared_ptr<const TopLevelProperty> inner;          // T for ( T )
+  std::shared_ptr<const TopLevelProperty> inner;         // T for ( T )
 };
 
 std::shared_ptr<const TopLevelProperty> TopProperty(
@@ -111,8 +112,7 @@ std::shared_ptr<const TopLevelProperty> TopParen(
 bool NeutrallySatisfies(const Word& word, const PropertyExpr& property);
 
 // §F.5.3.1: neutral satisfaction w |= T of an (unclocked) top-level property.
-bool NeutrallySatisfiesTopLevel(const Word& word,
-                                const TopLevelProperty& top);
+bool NeutrallySatisfiesTopLevel(const Word& word, const TopLevelProperty& top);
 
 // §F.5.3.1: the disabling relation w |=^d T for an (unclocked) top-level
 // property. A bare property is never disabled; a disable iff guard is disabled
@@ -129,8 +129,8 @@ bool FailsTopLevel(const Word& word, const TopLevelProperty& top);
 
 // §F.5.3.1: neutral satisfaction of a clocked property Q, defined by the single
 // rule w |= Q iff w |= T^p(Q, 1). Q is the §F.5.1.2 ClockedProperty; the clock
-// is pushed down by that subclause's property rewrite under the constant clock 1
-// and the unclocked result is evaluated as a §F.5.3.1 property.
+// is pushed down by that subclause's property rewrite under the constant clock
+// 1 and the unclocked result is evaluated as a §F.5.3.1 property.
 bool NeutrallySatisfiesClockedProperty(const Word& word,
                                        const ClockedProperty& q);
 
@@ -160,7 +160,8 @@ std::shared_ptr<const ClockedTopLevelProperty> ClockedTopParen(
 
 // §F.5.3.1: neutral satisfaction w |= U and disabling w |=^d U of a clocked
 // top-level property. The U forms mirror the unclocked T forms with Q replacing
-// P, so each reduces to its T counterpart over the unclocked property T^p(Q, 1).
+// P, so each reduces to its T counterpart over the unclocked property T^p(Q,
+// 1).
 bool NeutrallySatisfiesTopLevelClocked(const Word& word,
                                        const ClockedTopLevelProperty& top);
 bool DisablesTopLevelClocked(const Word& word,
@@ -169,7 +170,8 @@ bool DisablesTopLevelClocked(const Word& word,
 // §F.5.3.1: the pass/disabled/fail trichotomy applies to clocked top-level
 // properties as well, since the disabling-of-top-level definitions it follows
 // cover both T and U.
-bool PassesTopLevelClocked(const Word& word, const ClockedTopLevelProperty& top);
+bool PassesTopLevelClocked(const Word& word,
+                           const ClockedTopLevelProperty& top);
 bool IsDisabledTopLevelClocked(const Word& word,
                                const ClockedTopLevelProperty& top);
 bool FailsTopLevelClocked(const Word& word, const ClockedTopLevelProperty& top);
@@ -191,8 +193,8 @@ struct AssertionStatement {
   Activation activation = Activation::kAlways;
   Role role = Role::kAssert;
   Form form = Form::kExplicitClock;
-  std::shared_ptr<const BooleanExpr> clock;        // c, for kExplicitClock
-  std::shared_ptr<const TopLevelProperty> top;     // T, for kExplicitClock
+  std::shared_ptr<const BooleanExpr> clock;     // c, for kExplicitClock
+  std::shared_ptr<const TopLevelProperty> top;  // T, for kExplicitClock
   std::shared_ptr<const ClockedTopLevelProperty> clocked_top;  // U, kClockedTop
 };
 
@@ -204,12 +206,12 @@ std::shared_ptr<const AssertionStatement> AssertionWithClockedTop(
     AssertionStatement::Activation activation, AssertionStatement::Role role,
     std::shared_ptr<const ClockedTopLevelProperty> clocked_top);
 
-// §F.5.3.1: neutral satisfaction w, b |= A of an assertion statement, where b is
-// the Boolean enabling condition (1 for a declarative assertion statement). The
-// always forms quantify over every index; the initial forms over the first
+// §F.5.3.1: neutral satisfaction w, b |= A of an assertion statement, where b
+// is the Boolean enabling condition (1 for a declarative assertion statement).
+// The always forms quantify over every index; the initial forms over the first
 // clocked activation. An assert or assume statement requires that the body pass
-// or be disabled at every enabled activation; a cover statement requires that it
-// pass at some enabled activation.
+// or be disabled at every enabled activation; a cover statement requires that
+// it pass at some enabled activation.
 bool NeutrallySatisfiesAssertion(const Word& word, const BooleanExpr& enabling,
                                  const AssertionStatement& assertion);
 
@@ -228,22 +230,22 @@ bool WordIsFeasible(const Word& word,
 // §F.5.3.1: "An assert property statement is satisfied on a set of words
 // predicated on the set of assumptions if it is satisfied on each feasible
 // word."
-bool AssertSatisfiedOnWordSet(
-    const EnabledAssertion& assertion, const std::vector<Word>& words,
-    const std::vector<EnabledAssertion>& assumptions);
+bool AssertSatisfiedOnWordSet(const EnabledAssertion& assertion,
+                              const std::vector<Word>& words,
+                              const std::vector<EnabledAssertion>& assumptions);
 
 // §F.5.3.1: "A cover property statement is satisfied on a set of words
 // predicated on the set of assumptions if it is satisfied on at least one
 // feasible word."
-bool CoverSatisfiedOnWordSet(
-    const EnabledAssertion& assertion, const std::vector<Word>& words,
-    const std::vector<EnabledAssertion>& assumptions);
+bool CoverSatisfiedOnWordSet(const EnabledAssertion& assertion,
+                             const std::vector<Word>& words,
+                             const std::vector<EnabledAssertion>& assumptions);
 
 // §F.5.3.1: "An assertion statement holds globally on the set of words
 // predicated on the set of assumptions if it is satisfied on every feasible
 // word."
-bool HoldsGloballyOnWordSet(
-    const EnabledAssertion& assertion, const std::vector<Word>& words,
-    const std::vector<EnabledAssertion>& assumptions);
+bool HoldsGloballyOnWordSet(const EnabledAssertion& assertion,
+                            const std::vector<Word>& words,
+                            const std::vector<EnabledAssertion>& assumptions);
 
 }  // namespace delta

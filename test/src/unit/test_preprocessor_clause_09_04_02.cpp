@@ -68,8 +68,7 @@ TEST(EventControlPreprocessor, OrEventExpressionSurvivesPreprocessor) {
       "endmodule\n",
       f);
   EXPECT_FALSE(f.diag.HasErrors());
-  EXPECT_NE(result.find("@(posedge clk_a or negedge rst)"),
-            std::string::npos);
+  EXPECT_NE(result.find("@(posedge clk_a or negedge rst)"), std::string::npos);
 }
 
 TEST(EventControlPreprocessor, MacroExpansionInEdgeIdentifier) {
@@ -99,4 +98,4 @@ TEST(EventControlPreprocessor, MacroExpansionInNamedEventControl) {
   EXPECT_NE(result.find("@(my_event)"), std::string::npos);
 }
 
-}
+}  // namespace

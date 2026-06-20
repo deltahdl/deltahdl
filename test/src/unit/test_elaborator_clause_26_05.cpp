@@ -131,8 +131,8 @@ TEST(PackageImport, ExplicitImportAfterWildcardReferenceIsIllegal) {
 }
 
 // Table 26-1 Row B, column 4 (the "otherwise allowed" facet): two wildcard
-// imports that both supply the same name make only an unqualified *reference* to
-// that name illegal; the import declarations themselves stay legal. Here the
+// imports that both supply the same name make only an unqualified *reference*
+// to that name illegal; the import declarations themselves stay legal. Here the
 // overlapping name is never referenced, while the names unique to each package
 // are referenced and resolve cleanly, so elaboration succeeds.
 TEST(PackageImport, OverlappingWildcardImportsLegalWithoutAmbiguousReference) {
@@ -178,4 +178,4 @@ TEST(PackageImport, ExplicitImportResolvesWildcardAmbiguity) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

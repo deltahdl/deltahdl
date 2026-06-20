@@ -293,4 +293,4 @@ TEST(TimingControlElaboration, EventControlNestedInForeverFuncError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-}
+}  // namespace

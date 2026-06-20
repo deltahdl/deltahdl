@@ -9,10 +9,10 @@ namespace {
 // §37.15 Reference objects: the VPI ref obj object model. A ref obj stands in
 // for a declared object (or a subelement of one) that references an actual
 // instantiated object - for instance the lowConn of an interface port (§37.14
-// detail 5). Details 1, 2 are descriptive of when/what a ref obj is and carry no
-// own decision rule; the rule-bearing details (3-7) are observed below against
-// the production helpers and dispatch cases in vpi.cpp. The connection relations
-// (vpiHighConn/vpiLowConn) are shared with §37.14 and tested there.
+// detail 5). Details 1, 2 are descriptive of when/what a ref obj is and carry
+// no own decision rule; the rule-bearing details (3-7) are observed below
+// against the production helpers and dispatch cases in vpi.cpp. The connection
+// relations (vpiHighConn/vpiLowConn) are shared with §37.14 and tested there.
 
 class RefObjContext : public ::testing::Test {
  protected:
@@ -37,12 +37,12 @@ TEST_F(RefObjContext, ActualReturnsBoundObject) {
   EXPECT_EQ(VpiHandleC(vpiActual, &unbound), nullptr);
 }
 
-// D4: vpiParent traverses from a ref obj that is a subelement of a ref obj up to
-// its containing ref obj. Modelled on the clause's example: r[0] is a ref obj
-// whose parent is the ref obj r; vpiActual of r[0] is the var bit a[0], and
+// D4: vpiParent traverses from a ref obj that is a subelement of a ref obj up
+// to its containing ref obj. Modelled on the clause's example: r[0] is a ref
+// obj whose parent is the ref obj r; vpiActual of r[0] is the var bit a[0], and
 // vpiActual of r is the variable a.
 TEST_F(RefObjContext, ParentTraversesSubelementRefObj) {
-  VpiObject var_a;       // variable a
+  VpiObject var_a;  // variable a
   var_a.type = vpiReg;
   VpiObject var_bit_a0;  // var bit a[0]
   var_bit_a0.type = vpiReg;
@@ -147,8 +147,8 @@ TEST_F(RefObjContext, TypespecGatedOnActualKind) {
   ps_ref.children.push_back(&typespec);
   EXPECT_EQ(VpiHandleC(vpiTypespec, &ps_ref), &typespec);
 
-  // An interface actual is none of net/variable/part select -> NULL, even though
-  // a typespec child is present.
+  // An interface actual is none of net/variable/part select -> NULL, even
+  // though a typespec child is present.
   VpiObject iface;
   iface.type = vpiInterface;
   VpiObject iface_ref;

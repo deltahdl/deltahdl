@@ -44,8 +44,7 @@ struct AssertionLeadingClock {
 // though it had been written as the leading clocking event (rule a). An empty
 // argument denotes the absence of that candidate.
 AssertionLeadingClock ResolveConcurrentAssertionClock(
-    std::string_view explicit_clock,
-    std::string_view inferred_clock,
+    std::string_view explicit_clock, std::string_view inferred_clock,
     std::string_view default_clock);
 
 // §16.16(a): the default clocking event applies to a sequence or property

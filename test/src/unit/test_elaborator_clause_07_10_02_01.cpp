@@ -22,4 +22,4 @@ TEST(QueueSizeElaboration, QueueSizeNoParensOk) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

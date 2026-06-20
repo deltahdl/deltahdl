@@ -196,7 +196,8 @@ TEST(InterfaceClassMethodDefaults, EquivalentConstantExpressionDefaultsOk) {
 
 // Conversely, two constant expressions that evaluate to different values are a
 // mismatch even though both are well-formed constant expressions.
-TEST(InterfaceClassMethodDefaults, ConstantExpressionDefaultValueMismatchError) {
+TEST(InterfaceClassMethodDefaults,
+     ConstantExpressionDefaultValueMismatchError) {
   EXPECT_FALSE(
       ElabOk("interface class IC;\n"
              "  pure virtual function int foo(int a = 5);\n"
@@ -210,4 +211,4 @@ TEST(InterfaceClassMethodDefaults, ConstantExpressionDefaultValueMismatchError) 
              "endmodule\n"));
 }
 
-}
+}  // namespace

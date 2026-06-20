@@ -127,4 +127,4 @@ TEST(StringMethods, CompareLongerIsGreaterThanPrefix) {
   EXPECT_GT(signed_val, 0);
 }
 
-}
+}  // namespace

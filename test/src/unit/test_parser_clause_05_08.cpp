@@ -97,4 +97,4 @@ TEST(TimeLiteralParsing, TimeLiteralTextIncludesUnit) {
   EXPECT_EQ(stmt->delay->text, "40ps");
 }
 
-}
+}  // namespace

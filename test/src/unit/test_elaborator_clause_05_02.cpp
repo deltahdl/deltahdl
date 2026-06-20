@@ -32,8 +32,7 @@ TEST(LexicalConventionElaboration, AllTokenCategoriesElaborate) {
 }
 
 TEST(LexicalConventionElaboration, BlockCommentAsSeparatorElaborates) {
-  EXPECT_TRUE(
-      ElabOk("module/**/t;logic/**/a;assign/**/a=1'b0;endmodule"));
+  EXPECT_TRUE(ElabOk("module/**/t;logic/**/a;assign/**/a=1'b0;endmodule"));
 }
 
 TEST(LexicalConventionElaboration, CommentsDoNotAffectElaborationResult) {
@@ -51,4 +50,4 @@ TEST(LexicalConventionElaboration, CommentsDoNotAffectElaborationResult) {
   EXPECT_FALSE(f2.has_errors);
 }
 
-}
+}  // namespace

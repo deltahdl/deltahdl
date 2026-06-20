@@ -6,8 +6,8 @@ namespace {
 
 // 18.11: naming a property in randomize()'s inline argument list changes that
 // property's random mode. The random mode of a local member may only be changed
-// from a scope that can reach the member, so naming it through an external class
-// handle is illegal.
+// from a scope that can reach the member, so naming it through an external
+// class handle is illegal.
 TEST(InlineRandomControlVisibility, LocalMemberArgRejectedFromOutside) {
   EXPECT_FALSE(
       ElabOk("class C;\n"
@@ -57,4 +57,4 @@ TEST(InlineRandomControlVisibility, PublicMemberArgAcceptedFromOutside) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

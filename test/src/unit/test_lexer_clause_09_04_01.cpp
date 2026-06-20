@@ -46,4 +46,4 @@ TEST(DelayControlLexing, HashNotConfusedWithHashHash) {
   EXPECT_EQ(tokens[0].kind, TokenKind::kHash);
 }
 
-}
+}  // namespace

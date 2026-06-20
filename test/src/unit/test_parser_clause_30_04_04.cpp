@@ -41,10 +41,10 @@ TEST(StateDependentPathSyntax, IfGuardWrapsSimplePath) {
   ASSERT_NE(si, nullptr);
   EXPECT_EQ(si->kind, SpecifyItemKind::kPathDecl);
   // The three structural items of a state-dependent path description:
-  ASSERT_NE(si->path.condition, nullptr);            // conditional expression
-  ASSERT_EQ(si->path.src_ports.size(), 1u);          // module path description
+  ASSERT_NE(si->path.condition, nullptr);    // conditional expression
+  ASSERT_EQ(si->path.src_ports.size(), 1u);  // module path description
   ASSERT_EQ(si->path.dst_ports.size(), 1u);
-  ASSERT_EQ(si->path.delays.size(), 1u);             // delay expression
+  ASSERT_EQ(si->path.delays.size(), 1u);  // delay expression
   // A guarded simple path is neither edge-sensitive nor an ifnone default.
   EXPECT_EQ(si->path.edge, SpecifyEdge::kNone);
   EXPECT_FALSE(si->path.is_ifnone);
@@ -64,10 +64,10 @@ TEST(StateDependentPathSyntax, IfGuardWrapsEdgeSensitivePath) {
   auto* si = GetSolePathItem(r);
   ASSERT_NE(si, nullptr);
   EXPECT_EQ(si->kind, SpecifyItemKind::kPathDecl);
-  ASSERT_NE(si->path.condition, nullptr);            // conditional expression
-  EXPECT_EQ(si->path.edge, SpecifyEdge::kPosedge);   // edge-sensitive path
+  ASSERT_NE(si->path.condition, nullptr);           // conditional expression
+  EXPECT_EQ(si->path.edge, SpecifyEdge::kPosedge);  // edge-sensitive path
   EXPECT_FALSE(si->path.is_ifnone);
-  ASSERT_EQ(si->path.delays.size(), 2u);             // delay expression
+  ASSERT_EQ(si->path.delays.size(), 2u);  // delay expression
 }
 
 // Alternative 3: ifnone simple_path_declaration.
@@ -84,11 +84,11 @@ TEST(StateDependentPathSyntax, IfnoneWrapsSimplePath) {
   auto* si = GetSolePathItem(r);
   ASSERT_NE(si, nullptr);
   EXPECT_EQ(si->kind, SpecifyItemKind::kPathDecl);
-  EXPECT_TRUE(si->path.is_ifnone);                   // ifnone alternative
-  EXPECT_EQ(si->path.condition, nullptr);            // no conditional expression
-  ASSERT_EQ(si->path.src_ports.size(), 1u);          // module path description
+  EXPECT_TRUE(si->path.is_ifnone);           // ifnone alternative
+  EXPECT_EQ(si->path.condition, nullptr);    // no conditional expression
+  ASSERT_EQ(si->path.src_ports.size(), 1u);  // module path description
   ASSERT_EQ(si->path.dst_ports.size(), 1u);
-  ASSERT_EQ(si->path.delays.size(), 1u);             // delay expression
+  ASSERT_EQ(si->path.delays.size(), 1u);  // delay expression
 }
 
 // Error case for alternatives 1 and 2: the module_path_expression must be

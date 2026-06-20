@@ -298,4 +298,4 @@ TEST(LoopStatementSim, ForLabeledLoopRuns) {
   EXPECT_EQ(var->value.ToUint64(), 5u);
 }
 
-}
+}  // namespace

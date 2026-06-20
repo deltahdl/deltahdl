@@ -85,4 +85,4 @@ TEST(PrimaryElaboration, NullPrimaryElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

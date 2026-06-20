@@ -82,7 +82,8 @@ TEST(ConfigPackageBinding, LibraryQualifiedUseClauseToPackageIsRejected) {
 }
 
 // The cell-clause path must not over-fire: selecting an ordinary module (not a
-// package) for reconfiguration is exactly what §33.4 permits, so it is accepted.
+// package) for reconfiguration is exactly what §33.4 permits, so it is
+// accepted.
 TEST(ConfigPackageBinding, CellClauseSelectingModuleIsAccepted) {
   ElabFixture f;
   ElaborateSrc(
@@ -96,4 +97,4 @@ TEST(ConfigPackageBinding, CellClauseSelectingModuleIsAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

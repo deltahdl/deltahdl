@@ -13,8 +13,8 @@ namespace {
 // bare-expression kinds; an operation's vpiOpType is drawn from a fixed set of
 // sequence operators and its operands appear in a defined order; a sequence
 // instance resolves to its declaration and reports its arguments in formal
-// order (filling defaults); and a bare expression exposes its match items. These
-// tests observe the production helpers in vpi.cpp that apply those rules.
+// order (filling defaults); and a bare expression exposes its match items.
+// These tests observe the production helpers in vpi.cpp that apply those rules.
 
 // D1: the sequence-expr class groups the member kinds the diagram draws -
 // operation, sequence instance, distribution, and a bare boolean expression
@@ -34,17 +34,17 @@ TEST(SequenceExprModel, ClassGroupsItsMemberKinds) {
 // Detail 2: within a sequence expression vpiOpType is one of exactly these
 // eleven sequence operators.
 TEST(SequenceExprModel, OpTypeSetCoversTheElevenSequenceOperators) {
-  for (int op : {vpiCompAndOp, vpiIntersectOp, vpiCompOrOp, vpiFirstMatchOp,
-                 vpiThroughoutOp, vpiWithinOp, vpiUnaryCycleDelayOp,
-                 vpiCycleDelayOp, vpiRepeatOp, vpiConsecutiveRepeatOp,
-                 vpiGotoRepeatOp}) {
+  for (int op :
+       {vpiCompAndOp, vpiIntersectOp, vpiCompOrOp, vpiFirstMatchOp,
+        vpiThroughoutOp, vpiWithinOp, vpiUnaryCycleDelayOp, vpiCycleDelayOp,
+        vpiRepeatOp, vpiConsecutiveRepeatOp, vpiGotoRepeatOp}) {
     EXPECT_TRUE(VpiIsSequenceExprOpType(op)) << "op=" << op;
   }
 }
 
 // D2: an operation object reports its operation type as an int property through
-// vpi_get(vpiOpType); for a sequence operation that value is one of the sequence
-// operators.
+// vpi_get(vpiOpType); for a sequence operation that value is one of the
+// sequence operators.
 TEST(SequenceExprModel, OperationReportsItsOpTypeProperty) {
   VpiContext ctx;
   VpiObject op;
@@ -60,8 +60,8 @@ TEST(SequenceExprModel, OperationReportsItsOpTypeProperty) {
   EXPECT_EQ(ctx.Get(vpiOpType, &unset), 0);
 }
 
-// Detail 2 edge: operators outside the sequence set (ordinary expression ops and
-// property-level operators) are rejected.
+// Detail 2 edge: operators outside the sequence set (ordinary expression ops
+// and property-level operators) are rejected.
 TEST(SequenceExprModel, OpTypeSetRejectsNonSequenceOperators) {
   EXPECT_FALSE(VpiIsSequenceExprOpType(vpiAddOp));
   EXPECT_FALSE(VpiIsSequenceExprOpType(vpiLogAndOp));
@@ -183,13 +183,15 @@ TEST(SequenceExprModel, ArgumentsUseSuppliedActualsOverDefaults) {
   EXPECT_EQ(args[1], &a1);  // the supplied actual wins over the default
 }
 
-// Detail 1 edge: a formal that is neither supplied nor defaulted leaves an empty
-// slot, while the result still lines up one-to-one with the declared formals.
+// Detail 1 edge: a formal that is neither supplied nor defaulted leaves an
+// empty slot, while the result still lines up one-to-one with the declared
+// formals.
 TEST(SequenceExprModel, OmittedFormalWithoutDefaultYieldsNoArgument) {
   VpiObject a0;
 
   std::vector<VpiSequenceFormal> formals = {{nullptr}, {nullptr}};
-  std::vector<VpiHandle> provided = {&a0, nullptr};  // formal 1 omitted, no default
+  std::vector<VpiHandle> provided = {&a0,
+                                     nullptr};  // formal 1 omitted, no default
 
   auto args = VpiSequenceInstArguments(formals, provided);
   ASSERT_EQ(args.size(), 2u);
@@ -241,7 +243,8 @@ TEST(SequenceExprModel, SequenceInstResolvesItsDeclaration) {
 }
 
 // D4 edge: the relation matches by the declaration kind, so an instance whose
-// children are all something other than a sequence declaration resolves to none.
+// children are all something other than a sequence declaration resolves to
+// none.
 TEST(SequenceExprModel, SequenceInstWithOnlyOtherChildrenResolvesNone) {
   VpiObject inst;
   inst.type = vpiSequenceInst;

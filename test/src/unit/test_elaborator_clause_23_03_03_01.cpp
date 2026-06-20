@@ -47,8 +47,8 @@ TEST(PortCoercionElaboration, OutputWithExternalDriverWarns) {
   EXPECT_GT(f.diag.WarningCount(), 0u);
 }
 
-// Negative guard: ports used in their declared direction need no coercion, so no
-// warning is emitted.
+// Negative guard: ports used in their declared direction need no coercion, so
+// no warning is emitted.
 TEST(PortCoercionElaboration, CorrectDirectionsNoWarning) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -85,4 +85,4 @@ TEST(PortCoercionElaboration, InoutPortNeedsNoCoercion) {
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
-}
+}  // namespace

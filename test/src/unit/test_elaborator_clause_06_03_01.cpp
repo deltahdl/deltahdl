@@ -110,4 +110,4 @@ TEST(LogicValuesElab, RealTypeIsNotFourState) {
   EXPECT_FALSE(mod->variables[0].is_4state);
 }
 
-}
+}  // namespace

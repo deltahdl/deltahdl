@@ -157,7 +157,8 @@ TEST(ClassScopeResolutionElaboration, TypeParamScopePrefixRestricted) {
 // block (here on the right side of a nonblocking assignment), confirming the
 // restriction is enforced across these contexts rather than only in an initial
 // block with a body-declared type parameter.
-TEST(ClassScopeResolutionElaboration, PortTypeParamScopePrefixInAlwaysBlockIsError) {
+TEST(ClassScopeResolutionElaboration,
+     PortTypeParamScopePrefixInAlwaysBlockIsError) {
   ElabFixture f;
   ElaborateSrc(
       "module m #(parameter type T = int) ();\n"
@@ -184,4 +185,4 @@ TEST(ClassScopeResolutionElaboration, ClassNamePrefixInExpressionOk) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

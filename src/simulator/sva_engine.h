@@ -76,8 +76,8 @@ struct EmptyConcatResult {
   bool matchable = false;
   // The ##(n-1) delay carried onto the surviving operand. Because the empty
   // operand occupies zero ticks, concatenating across it spends one tick fewer
-  // than the written delay — the same reason an empty case (a[*0]) runs one tick
-  // shorter than the corresponding length-1 case (a[*1]).
+  // than the written delay — the same reason an empty case (a[*0]) runs one
+  // tick shorter than the corresponding length-1 case (a[*1]).
   uint32_t effective_delay = 0;
   // "(seq ##n empty)" trails the surviving sequence with `true, extending the
   // match one tick past seq's end; the empty-on-the-left rule does not.
@@ -86,11 +86,11 @@ struct EmptyConcatResult {
 
 EmptyConcatResult ConcatEmptyMatch(EmptyConcatSide side, uint32_t delay);
 
-// §16.9.2.1: a sequence admitting both empty and nonempty matches — a repetition
-// whose count range spans zero, e.g. a[*0:1] — is evaluated by rewriting it as
-// the OR of its empty case (count 0) and its nonempty cases (count >= 1). The
-// composite matches when either disjunct matches; a range that excludes zero has
-// only the nonempty case.
+// §16.9.2.1: a sequence admitting both empty and nonempty matches — a
+// repetition whose count range spans zero, e.g. a[*0:1] — is evaluated by
+// rewriting it as the OR of its empty case (count 0) and its nonempty cases
+// (count >= 1). The composite matches when either disjunct matches; a range
+// that excludes zero has only the nonempty case.
 bool MatchEmptyOrNonempty(uint32_t rep_min, bool empty_case_match,
                           bool nonempty_case_match);
 
@@ -138,7 +138,8 @@ struct FirstMatchMatches {
   bool matched = false;
   std::vector<uint32_t> end_times;
 };
-FirstMatchMatches EvalFirstMatch(const std::vector<uint32_t>& operand_end_times);
+FirstMatchMatches EvalFirstMatch(
+    const std::vector<uint32_t>& operand_end_times);
 
 bool EvalSequenceIntersect(bool a_match, bool b_match, uint32_t a_len,
                            uint32_t b_len);
@@ -150,23 +151,24 @@ bool EvalThroughout(const std::function<bool(uint64_t)>& check,
 // finite interval of consecutive clock ticks when seq2 matches along the whole
 // interval and seq1 matches along some subinterval of it. Both operands shall
 // therefore match, and the match of seq1 shall be contained in the match of
-// seq2: seq1 shall start no earlier than seq2 starts and shall complete no later
-// than seq2 completes. The intersection forces the composite to span seq2's
-// interval, so the containment completes at seq2's match point. This carries the
-// composite end-time alongside the match decision.
+// seq2: seq1 shall start no earlier than seq2 starts and shall complete no
+// later than seq2 completes. The intersection forces the composite to span
+// seq2's interval, so the containment completes at seq2's match point. This
+// carries the composite end-time alongside the match decision.
 struct SequenceWithinMatch {
   bool matched = false;
   uint32_t end_time = 0;
 };
 SequenceWithinMatch EvalSequenceWithin(bool inner_match, uint32_t inner_start,
                                        uint32_t inner_end, bool outer_match,
-                                       uint32_t outer_start, uint32_t outer_end);
+                                       uint32_t outer_start,
+                                       uint32_t outer_end);
 
 // §16.12.7: an implication `sequence_expr |-> property_expr` (overlapped) or
-// `sequence_expr |=> property_expr` (nonoverlapped) preconditions the consequent
-// property_expr on a match of the antecedent sequence_expr. When the antecedent
-// has no match the implication holds vacuously. The overlapped form evaluates
-// the consequent at the end point of the match, so the result is the
+// `sequence_expr |=> property_expr` (nonoverlapped) preconditions the
+// consequent property_expr on a match of the antecedent sequence_expr. When the
+// antecedent has no match the implication holds vacuously. The overlapped form
+// evaluates the consequent at the end point of the match, so the result is the
 // consequent's verdict; the nonoverlapped form starts the consequent one clock
 // tick later, so its verdict is deferred (kPending) and settled by
 // ResolveNonOverlapping — capturing `seq |=> p` ≡ `seq ##1 `true |-> p`.
@@ -188,8 +190,9 @@ PropertyResult EvalPropertyOr(PropertyResult a, PropertyResult b);
 
 // §16.12.6: an if-else property is governed by the guard expression. When the
 // guard holds, the overall result is that of the then-branch. The single-branch
-// form (no else) holds vacuously when the guard is false, since there is nothing
-// to check; the two-branch form routes a false guard to the else-branch instead.
+// form (no else) holds vacuously when the guard is false, since there is
+// nothing to check; the two-branch form routes a false guard to the else-branch
+// instead.
 PropertyResult EvalPropertyIfElse(bool cond, PropertyResult then_result,
                                   bool has_else, PropertyResult else_result);
 PropertyResult EvalWithDisableIff(bool disable_cond, PropertyResult inner);
@@ -208,9 +211,9 @@ struct PropertyCaseBranch {
 // in source order; the first one whose expression matches the case expression
 // is the single property_expr that contributes the verdict, and the search
 // stops there, so later items are never reached. The default item is held apart
-// from the scan and consulted only when no ordinary item matches: when a default
-// is present its property_expr supplies the verdict, and when none is present
-// the case property succeeds vacuously (a true verdict).
+// from the scan and consulted only when no ordinary item matches: when a
+// default is present its property_expr supplies the verdict, and when none is
+// present the case property succeeds vacuously (a true verdict).
 PropertyResult EvalPropertyCase(const std::vector<PropertyCaseBranch>& branches,
                                 bool has_default,
                                 PropertyResult default_result);
@@ -220,18 +223,18 @@ PropertyResult EvalPropertyCase(const std::vector<PropertyCaseBranch>& branches,
 // evaluated.
 PropertyResult ResolveNonOverlapping(bool consequent_matched);
 
-// §16.12.8: a property `property_expr1 implies property_expr2` evaluates to true
-// if, and only if, the antecedent fails to hold or the consequent holds — the
-// ordinary logical implication over the two operands' verdicts. Unlike the
+// §16.12.8: a property `property_expr1 implies property_expr2` evaluates to
+// true if, and only if, the antecedent fails to hold or the consequent holds —
+// the ordinary logical implication over the two operands' verdicts. Unlike the
 // sequence implication operators of §16.12.7 there is no antecedent match point
 // to defer to, so the result settles from the operand verdicts directly. A
 // vacuous pass counts as the operand holding, mirroring EvalPropertyOr.
 PropertyResult EvalPropertyImplies(PropertyResult antecedent,
                                    PropertyResult consequent);
 
-// §16.12.8: a property `property_expr1 iff property_expr2` evaluates to true if,
-// and only if, both operands hold or both operands fail to hold — the operands'
-// verdicts must agree. A vacuous pass counts as the operand holding.
+// §16.12.8: a property `property_expr1 iff property_expr2` evaluates to true
+// if, and only if, both operands hold or both operands fail to hold — the
+// operands' verdicts must agree. A vacuous pass counts as the operand holding.
 PropertyResult EvalPropertyIff(PropertyResult a, PropertyResult b);
 
 // §16.12.9: a followed-by `sequence_expr #-# property_expr` (overlapped) or
@@ -252,8 +255,8 @@ PropertyResult EvalPropertyIff(PropertyResult a, PropertyResult b);
 PropertyResult EvalFollowedBy(bool antecedent, bool consequent,
                               bool non_overlapping);
 
-// §16.12.9: settles a deferred nonoverlapped followed-by (#=#) at the tick after
-// the antecedent match, where the consequent property_expr is finally
+// §16.12.9: settles a deferred nonoverlapped followed-by (#=#) at the tick
+// after the antecedent match, where the consequent property_expr is finally
 // evaluated. By the duality with |=>, the dual implication settles on the
 // negated consequent and that verdict is negated, so a holding consequent makes
 // the followed-by pass.
@@ -267,9 +270,9 @@ PropertyResult ResolveFollowedByNonOverlapping(bool consequent_matched);
 // `s_nexttime[n]` target the n-th future tick instead of the immediately next
 // one. The only difference between the weak and strong readings is how an
 // unreachable target tick is judged: weakly it passes (the clock ran out before
-// the obligation could be disproven), strongly it fails (the required tick never
-// arrived). When the target tick is reachable the nexttime verdict is exactly
-// the property_expr's verdict at that tick.
+// the obligation could be disproven), strongly it fails (the required tick
+// never arrived). When the target tick is reachable the nexttime verdict is
+// exactly the property_expr's verdict at that tick.
 PropertyResult EvalNexttime(bool strong, bool target_tick_reachable,
                             PropertyResult inner_at_target);
 
@@ -285,12 +288,12 @@ bool NexttimeTargetReachable(uint64_t index, uint64_t future_clock_ticks);
 // range may be unbounded; the strong form's range is always bounded.
 inline constexpr int kAlwaysUnboundedMax = -1;
 
-// §16.12.11: outcome of an `always`/`s_always` property over its window of clock
-// ticks. `strong` selects `s_always` (strong) versus `always` (weak).
-// `all_covered_ticks_present` says whether every clock tick the range demands is
-// actually present; only the strong form requires the covered ticks to exist,
-// since for a weak always it is not required that all clock ticks within the
-// range exist. `inner_holds_at_present_ticks` says whether the inner
+// §16.12.11: outcome of an `always`/`s_always` property over its window of
+// clock ticks. `strong` selects `s_always` (strong) versus `always` (weak).
+// `all_covered_ticks_present` says whether every clock tick the range demands
+// is actually present; only the strong form requires the covered ticks to
+// exist, since for a weak always it is not required that all clock ticks within
+// the range exist. `inner_holds_at_present_ticks` says whether the inner
 // property_expr held at every covered tick that is present.
 //
 // The weak form holds when the inner property_expr held at every present tick,
@@ -307,9 +310,10 @@ PropertyResult EvalAlways(bool strong, bool all_covered_ticks_present,
 // maximum, which covers every tick from `range_min` onward.
 bool AlwaysRangeCovers(int index, int range_min, int range_max);
 
-// §16.12.11: for a strong always, every clock tick the range covers shall exist.
-// Counting starts at the current time step, so the covered ticks all exist when
-// at least `range_max` further ticks are available after the current step.
+// §16.12.11: for a strong always, every clock tick the range covers shall
+// exist. Counting starts at the current time step, so the covered ticks all
+// exist when at least `range_max` further ticks are available after the current
+// step.
 bool AlwaysStrongTicksAllPresent(int range_max, int future_clock_ticks);
 
 // §16.12.12: sentinel for the offset of the first tick at which the right
@@ -318,8 +322,8 @@ bool AlwaysStrongTicksAllPresent(int range_max, int future_clock_ticks);
 inline constexpr int kUntilRhsNever = -1;
 
 // §16.12.12: whether the left operand holds at every clock tick it is required
-// to for an until property. `lhs_run_length` is the number of consecutive ticks,
-// starting at the evaluation attempt, at which the left operand holds.
+// to for an until property. `lhs_run_length` is the number of consecutive
+// ticks, starting at the evaluation attempt, at which the left operand holds.
 // `first_rhs_index` is the offset of the first tick at which the right operand
 // holds (kUntilRhsNever when it never holds). For the non-overlapping forms
 // (until / s_until) the left operand is required only on the ticks before the
@@ -342,18 +346,19 @@ PropertyResult EvalUntil(bool strong, bool rhs_holds_eventually,
 // without a range) is the strong form and the ranged `eventually` is the weak
 // form; the non-ranged strong form covers every current or future clock tick.
 // `inner_holds_within_range` is whether the inner property_expr holds at some
-// present clock tick within the range. `all_range_ticks_present` is whether every
-// clock tick the range covers exists. The strong form requires such a witness and
-// fails when none is found; the weak form also holds when the range's ticks do
-// not all exist, since it does not require those later ticks to be present.
+// present clock tick within the range. `all_range_ticks_present` is whether
+// every clock tick the range covers exists. The strong form requires such a
+// witness and fails when none is found; the weak form also holds when the
+// range's ticks do not all exist, since it does not require those later ticks
+// to be present.
 PropertyResult EvalEventually(bool strong, bool inner_holds_within_range,
                               bool all_range_ticks_present);
 
-// §16.12.14: an accept abort property (accept_on / sync_accept_on) evaluates the
-// underlying property_expr, but if the abort condition becomes true during that
-// evaluation the overall result is forced to true; otherwise the result is the
-// underlying verdict. The abort condition takes precedence, so a true condition
-// wins even over an underlying verdict that has already settled.
+// §16.12.14: an accept abort property (accept_on / sync_accept_on) evaluates
+// the underlying property_expr, but if the abort condition becomes true during
+// that evaluation the overall result is forced to true; otherwise the result is
+// the underlying verdict. The abort condition takes precedence, so a true
+// condition wins even over an underlying verdict that has already settled.
 PropertyResult EvalAbortAccept(bool abort_condition, PropertyResult inner);
 
 // §16.12.14: a reject abort property (reject_on / sync_reject_on) forces the
@@ -384,35 +389,36 @@ bool AbortConditionEvaluatedAtClockingEventOnly(bool synchronous_abort);
 
 // §16.13.2: a multiclocked sequence is itself a multiclocked property. When a
 // multiclocked sequence is evaluated as a property beginning at some point, the
-// evaluation is true if, and only if, there is a match of the sequence beginning
-// at that point. Like a singly clocked property the result is always a definite
-// true or false, never pending.
+// evaluation is true if, and only if, there is a match of the sequence
+// beginning at that point. Like a singly clocked property the result is always
+// a definite true or false, never pending.
 PropertyResult EvalMulticlockedSequenceAsProperty(bool sequence_has_match);
 
 // §16.13.2: a Boolean `and` whose two operands are clocked by different clocks
-// forms a multiclocked property — but not a multiclocked sequence. Both operands
-// begin at the same evaluation point, each on its own clock; the conjunction is
-// true if, and only if, both operands have a match beginning at that point.
+// forms a multiclocked property — but not a multiclocked sequence. Both
+// operands begin at the same evaluation point, each on its own clock; the
+// conjunction is true if, and only if, both operands have a match beginning at
+// that point.
 PropertyResult EvalMulticlockedAnd(bool left_operand_has_match,
                                    bool right_operand_has_match);
 
-// §16.13.2: sentinel returned when no tick of the relevant clock is available to
-// locate the evaluation point of a multiclocked operand.
+// §16.13.2: sentinel returned when no tick of the relevant clock is available
+// to locate the evaluation point of a multiclocked operand.
 inline constexpr uint64_t kNoMulticlockTick = ~static_cast<uint64_t>(0);
 
-// §16.13.2: the nearest tick of `clock_ticks` at which a multiclocked operand is
-// evaluated relative to time `from`. When `inclusive` is true a tick coincident
-// with `from` qualifies (the "possibly overlapping" / "non-strictly subsequent"
-// reading); when false only strictly future ticks qualify. `clock_ticks` shall
-// be in increasing time order. Returns kNoMulticlockTick when no qualifying tick
-// exists.
+// §16.13.2: the nearest tick of `clock_ticks` at which a multiclocked operand
+// is evaluated relative to time `from`. When `inclusive` is true a tick
+// coincident with `from` qualifies (the "possibly overlapping" / "non-strictly
+// subsequent" reading); when false only strictly future ticks qualify.
+// `clock_ticks` shall be in increasing time order. Returns kNoMulticlockTick
+// when no qualifying tick exists.
 uint64_t NearestClockTickAtOrAfter(uint64_t from,
                                    const std::vector<uint64_t>& clock_ticks,
                                    bool inclusive);
 
 // §16.13.2: the tick at which the consequent of a multiclocked implication is
-// evaluated. Both forms synchronize from the antecedent match end time to a tick
-// of the consequent's clock. The nonoverlapping form (|=>) advances to the
+// evaluated. Both forms synchronize from the antecedent match end time to a
+// tick of the consequent's clock. The nonoverlapping form (|=>) advances to the
 // nearest strictly future consequent-clock tick. The overlapping form (|->)
 // awaits the nearest consequent-clock tick: when the consequent clock ticks at
 // the antecedent end the consequent is checked there immediately, otherwise it
@@ -423,20 +429,21 @@ uint64_t MulticlockedConsequentEvalTick(
     const std::vector<uint64_t>& consequent_clock_ticks, bool overlapping);
 
 // §16.13.2: whether a multiclocked overlapping implication (|->) checks its
-// consequent immediately, i.e. the consequent clock ticks at the antecedent match
-// end. The nonoverlapping form (|=>) never checks immediately because it advances
-// to a strictly future tick.
+// consequent immediately, i.e. the consequent clock ticks at the antecedent
+// match end. The nonoverlapping form (|=>) never checks immediately because it
+// advances to a strictly future tick.
 bool MulticlockedImplicationChecksImmediately(
     uint64_t antecedent_end_time,
     const std::vector<uint64_t>& consequent_clock_ticks, bool overlapping);
 
-// §16.13.2: the tick at which a branch of a multiclocked if / if-else property is
-// evaluated. The condition is checked at the property clock (`condition_time`);
-// the then-branch is then evaluated at the nearest, possibly overlapping tick of
-// its clock and the else-branch at the nearest non-strictly subsequent tick of
-// its clock. Both readings admit a tick coincident with the condition check, so
-// the branch tick is the nearest tick at or after `condition_time`. Returns
-// kNoMulticlockTick when the branch clock has no qualifying tick.
+// §16.13.2: the tick at which a branch of a multiclocked if / if-else property
+// is evaluated. The condition is checked at the property clock
+// (`condition_time`); the then-branch is then evaluated at the nearest,
+// possibly overlapping tick of its clock and the else-branch at the nearest
+// non-strictly subsequent tick of its clock. Both readings admit a tick
+// coincident with the condition check, so the branch tick is the nearest tick
+// at or after `condition_time`. Returns kNoMulticlockTick when the branch clock
+// has no qualifying tick.
 uint64_t MulticlockedIfBranchEvalTick(
     uint64_t condition_time, const std::vector<uint64_t>& branch_clock_ticks);
 
@@ -454,9 +461,9 @@ struct LocalVarInitCopy {
 };
 
 // §16.13.7: for a singly clocked sequence or property, the local variable
-// initialization assignment of an evaluation attempt is performed when the attempt
-// begins, and such an attempt always begins at a tick of the single governing
-// clock. The init thus happens at the attempt-begin time itself.
+// initialization assignment of an evaluation attempt is performed when the
+// attempt begins, and such an attempt always begins at a tick of the single
+// governing clock. The init thus happens at the attempt-begin time itself.
 uint64_t SinglyClockedLocalInitTick(uint64_t attempt_begin);
 
 // §16.13.7: for a multiclock instance with a single semantic leading clock (see
@@ -467,18 +474,18 @@ uint64_t SinglyClockedLocalInitTick(uint64_t attempt_begin);
 uint64_t MulticlockedLocalInitTick(
     uint64_t attempt_begin, const std::vector<uint64_t>& leading_clock_ticks);
 
-// §16.13.7: the number of copies of a local variable an evaluation attempt holds.
-// A separate copy shall be created for each distinct semantic leading clock of the
-// named property instance, so two or more distinct leading clocks yield two or more
-// independent copies.
+// §16.13.7: the number of copies of a local variable an evaluation attempt
+// holds. A separate copy shall be created for each distinct semantic leading
+// clock of the named property instance, so two or more distinct leading clocks
+// yield two or more independent copies.
 size_t LocalVarCopyCount(size_t distinct_semantic_leading_clocks);
 
-// §16.13.7: the per-copy initialization schedule for a multiclock named property
-// instance. One copy is created for each distinct semantic leading clock (passed as
-// its own tick list, in increasing time order). For each copy the init assignment
-// shall be performed at the earliest tick of its leading clock at or after the
-// attempt begin, and that copy shall be used in evaluating the subproperty governed
-// by the same leading clock.
+// §16.13.7: the per-copy initialization schedule for a multiclock named
+// property instance. One copy is created for each distinct semantic leading
+// clock (passed as its own tick list, in increasing time order). For each copy
+// the init assignment shall be performed at the earliest tick of its leading
+// clock at or after the attempt begin, and that copy shall be used in
+// evaluating the subproperty governed by the same leading clock.
 std::vector<LocalVarInitCopy> MulticlockedLocalInitCopies(
     uint64_t attempt_begin,
     const std::vector<std::vector<uint64_t>>& per_leading_clock_ticks);
@@ -552,8 +559,8 @@ bool NonvacuousEventually(bool inner_nonvacuous_at_some_covered_event,
 // when, at some clock event, a witnessing subproperty attempt is nonvacuous,
 // the right operand does not hold at any earlier clock event, and the left
 // operand holds at every earlier clock event. For the non-overlapping forms
-// (until, s_until) the witness is either operand's attempt being nonvacuous; for
-// the overlapping forms (until_with, s_until_with) only the left operand's
+// (until, s_until) the witness is either operand's attempt being nonvacuous;
+// for the overlapping forms (until_with, s_until_with) only the left operand's
 // attempt witnesses. Nonvacuity does not distinguish the weak from the strong
 // reading.
 bool NonvacuousUntil(bool overlapping, bool left_nonvacuous_at_witness,
@@ -576,7 +583,7 @@ bool NonvacuousImplies(bool antecedent_true, bool antecedent_nonvacuous,
 // abort forms evaluate it only at clock events — but in every case nonvacuity
 // requires the condition never to hold across the evaluated steps.
 bool NonvacuousAbortOrDisable(bool inner_nonvacuous,
-                             bool condition_holds_at_any_evaluated_step);
+                              bool condition_holds_at_any_evaluated_step);
 
 // §16.14.8(af): the attempt of a `case` property is nonvacuous when one case
 // item is selected — a matching expression_or_dist, or the default when no item
@@ -659,8 +666,8 @@ SampledValue SampleConstCastExpression(uint64_t argument_current_value);
 
 SampledValue SampleProceduralAssertionArgument(uint64_t current_value);
 
-SampledValue ProceduralArgumentValueAfterMature(SampledValue captured,
-                                                 uint64_t later_underlying_value);
+SampledValue ProceduralArgumentValueAfterMature(
+    SampledValue captured, uint64_t later_underlying_value);
 
 enum class ProceduralExecutionEffect : uint8_t {
   kActivation = 0,
@@ -668,21 +675,22 @@ enum class ProceduralExecutionEffect : uint8_t {
 };
 
 bool ProceduralExecutionAffects(ProceduralExecutionEffect effect,
-                                 bool already_matured);
+                                bool already_matured);
 
-SampledValue SampleProceduralAssertionActionBlockArgument(uint64_t current_value);
+SampledValue SampleProceduralAssertionActionBlockArgument(
+    uint64_t current_value);
 
 bool ActionBlockMayModifyArgument();
 
 uint64_t ReadProceduralConditionalGuard(uint64_t current_value,
-                                         uint64_t sampled_value);
+                                        uint64_t sampled_value);
 
 SampledValue SampledValueOfTriggered(bool current_returned);
 SampledValue SampledValueOfMatched(bool current_returned);
 
-SampledValue SampleRecursiveExpression(
-    SampledValue a, SampledValue b,
-    uint64_t (*combinator)(uint64_t, uint64_t));
+SampledValue SampleRecursiveExpression(SampledValue a, SampledValue b,
+                                       uint64_t (*combinator)(uint64_t,
+                                                              uint64_t));
 
 SampledValue DefaultSampledValueOfVariableOrNet(uint64_t type_default);
 
@@ -892,12 +900,11 @@ struct InferredClock {
 };
 
 InferredClock InferClockForProceduralConcurrentAssertion(
-    std::string_view proc_context_clock,
-    std::string_view default_clock);
+    std::string_view proc_context_clock, std::string_view default_clock);
 
 bool SatisfiesClockInferenceRequirements(bool no_blocking_timing_control,
-                                          bool exactly_one_event_control,
-                                          bool unique_qualifying_event_expr);
+                                         bool exactly_one_event_control,
+                                         bool unique_qualifying_event_expr);
 
 class MaturedAssertionQueue {
  public:
@@ -959,7 +966,8 @@ Region ConcurrentAssertActionRegion();
 // branch follows the property outcome exactly as an assert statement's does: a
 // true evaluation runs the pass statements, a false evaluation runs the fail
 // statements, and a disabled evaluation runs neither. Delegating to the
-// §16.14.1 selector keeps the assume and assert action-block behavior identical.
+// §16.14.1 selector keeps the assume and assert action-block behavior
+// identical.
 inline AssertActionBlockChoice SelectAssumeActionBlock(bool property_passed,
                                                        bool property_disabled) {
   return SelectAssertActionBlock(property_passed, property_disabled);
@@ -1006,14 +1014,15 @@ inline bool BiasingWeightsIgnored(BiasedAssertionDirective directive) {
 
 // §16.14.2: within an assert or cover statement a biased dist behaves as the
 // inside operator — plain set membership with the weights dropped. In an assume
-// statement the weights are honored, so the dist is not reduced to inside there.
+// statement the weights are honored, so the dist is not reduced to inside
+// there.
 inline bool BiasedDistActsAsInside(BiasedAssertionDirective directive) {
   return BiasingWeightsIgnored(directive);
 }
 
 // §16.14.2: a property that is assumed shall hold in the same way with or
-// without biasing. The set of free-variable values that satisfy an assumption is
-// the membership set of the distribution and does not depend on the weights;
+// without biasing. The set of free-variable values that satisfy an assumption
+// is the membership set of the distribution and does not depend on the weights;
 // biasing only chooses among those legal values when there is a choice at a
 // given time. Whether `value` is a legal selection is therefore independent of
 // whether biasing weights are present.
@@ -1028,9 +1037,9 @@ inline bool AssumeValueIsLegalUnderBiasing(int64_t value,
 
 // §16.14.2: for an assume statement the biasing weights select among the legal
 // free-variable values according to their cumulative distribution. Given the
-// per-candidate weights and a random draw in [0, sum(weights)), return the index
-// of the chosen candidate. (In an assert or cover statement the weights are
-// ignored, so this weighted selection does not apply there.)
+// per-candidate weights and a random draw in [0, sum(weights)), return the
+// index of the chosen candidate. (In an assert or cover statement the weights
+// are ignored, so this weighted selection does not apply there.)
 inline std::size_t SelectBiasedFreeVariable(
     const std::vector<uint32_t>& weights, uint64_t draw) {
   uint64_t cumulative = 0;
@@ -1049,8 +1058,8 @@ inline std::size_t SelectBiasedFreeVariable(
 // behave identically.
 bool RestrictSharesAssumeConstraintSemantics();
 
-// §16.14.4: in contrast to assume property, a restrict property statement is not
-// verified in simulation. No pass/fail evaluation runs for it, so it never
+// §16.14.4: in contrast to assume property, a restrict property statement is
+// not verified in simulation. No pass/fail evaluation runs for it, so it never
 // yields a run-time pass or fail result the way an assumed or asserted property
 // does.
 bool RestrictIsVerifiedInSimulation();
@@ -1060,7 +1069,8 @@ bool RestrictIsVerifiedInSimulation();
 // flagged — violating the restriction during simulation is not an error.
 bool RestrictViolationIsSimulationError();
 
-// === §16.14.5 Using concurrent assertion statements outside procedural code ===
+// === §16.14.5 Using concurrent assertion statements outside procedural code
+// ===
 
 // §16.14.5: a concurrent assertion statement used outside procedural code (a
 // static concurrent assertion) follows `always` semantics — a new evaluation
@@ -1074,8 +1084,9 @@ int StaticConcurrentAssertionAttemptsStarted(int leading_clock_ticks);
 // code is equivalent to `always assert property (ps) action_block;`.
 bool StaticAssertEquivalentToAlwaysAssert();
 
-// §16.14.5: a `cover property (ps) statement_or_null` written outside procedural
-// code is equivalent to `always cover property (ps) statement_or_null`.
+// §16.14.5: a `cover property (ps) statement_or_null` written outside
+// procedural code is equivalent to `always cover property (ps)
+// statement_or_null`.
 bool StaticCoverEquivalentToAlwaysCover();
 
 // §16.9.4: the global clocking past value-change functions compare the sampled
@@ -1310,8 +1321,7 @@ class SvaEngine {
   ProceduralAssertionQueue& GetProceduralQueue(std::string_view process_id);
 
   void QueuePendingReport(std::string_view process_id,
-                          const DeferredAssertion& da,
-                          DeferralKind kind);
+                          const DeferredAssertion& da, DeferralKind kind);
 
   void MatureObservedReports(std::string_view process_id);
   void MatureFinalReports(std::string_view process_id);
@@ -1360,4 +1370,4 @@ class SvaEngine {
   std::unordered_map<std::string, DeferredReportQueue> per_process_reports_;
 };
 
-}
+}  // namespace delta

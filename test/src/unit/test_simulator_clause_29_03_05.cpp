@@ -84,4 +84,4 @@ TEST(UdpInputZAsX, SetInputsCoercesZ) {
   EXPECT_EQ(state.Evaluate({'z', 'z'}), '1');
 }
 
-}
+}  // namespace

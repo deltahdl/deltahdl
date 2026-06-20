@@ -142,4 +142,4 @@ TEST(DriveStrengthParsing, NetDeclStrengthBeforeDelay) {
   EXPECT_NE(item->net_delay, nullptr);
 }
 
-}
+}  // namespace

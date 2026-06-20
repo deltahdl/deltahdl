@@ -341,8 +341,8 @@ TEST(ProgramItemsParsing, AssumePropertyInProgram) {
       "endprogram\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(HasItemOfKind(r.cu->programs[0]->items,
-                            ModuleItemKind::kAssumeProperty));
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->programs[0]->items, ModuleItemKind::kAssumeProperty));
 }
 
 TEST(ProgramItemsParsing, CoverPropertyInProgram) {
@@ -352,8 +352,8 @@ TEST(ProgramItemsParsing, CoverPropertyInProgram) {
       "endprogram\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(HasItemOfKind(r.cu->programs[0]->items,
-                            ModuleItemKind::kCoverProperty));
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->programs[0]->items, ModuleItemKind::kCoverProperty));
 }
 
 TEST(ProgramItemsParsing, GenerateCaseInProgram) {
@@ -367,8 +367,8 @@ TEST(ProgramItemsParsing, GenerateCaseInProgram) {
       "endprogram\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(HasItemOfKind(r.cu->programs[0]->items,
-                            ModuleItemKind::kGenerateCase));
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->programs[0]->items, ModuleItemKind::kGenerateCase));
 }
 
 TEST(ProgramItemsParsing, TypedefInProgram) {
@@ -756,4 +756,4 @@ TEST(ProgramDeclaration, AnonymousProgramAllowsInterfaceClassDecl) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}
+}  // namespace

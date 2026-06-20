@@ -85,4 +85,4 @@ TEST(BindDirective, TargetInstanceCarriesConstantBitSelect) {
   EXPECT_NE(r.cu->bind_directives[0]->target_instance_bit_selects[0], nullptr);
 }
 
-}
+}  // namespace

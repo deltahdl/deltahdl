@@ -52,7 +52,8 @@ TEST(LibraryBindingDisplay, FormatSpecifierLDoesNotConsumeArg) {
   fx.ctx.RegisterInstanceBinding("", "rtlLib", "adder");
   std::vector<Logic4Vec> vals{MakeLogic4VecVal(fx.arena, 8, 42)};
   auto out = FormatDisplay("%l %d", vals, {}, nullptr, {}, &fx.ctx);
-  // %l takes no argument (like %m), so the following %d still renders the value.
+  // %l takes no argument (like %m), so the following %d still renders the
+  // value.
   EXPECT_NE(out.find("rtlLib.adder"), std::string::npos);
   EXPECT_NE(out.find("42"), std::string::npos);
 }
@@ -160,5 +161,5 @@ TEST(LibraryBindingDisplay, VpiGetStrCApiReadsBindingProperties) {
   SetGlobalVpiContext(nullptr);
 }
 
-}
-}
+}  // namespace
+}  // namespace delta

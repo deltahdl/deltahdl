@@ -62,7 +62,8 @@ TEST_F(ProtectRuntimeLicenseSyntaxTest,
 // The two optional subkeywords are independent in the grammar
 // (`[ , exit ] [ , match ]`): a form that omits `exit` but supplies `match` is
 // a valid keyword expression and is consumed in full.
-TEST_F(ProtectRuntimeLicenseSyntaxTest, RuntimeLicenseMatchWithoutExitConsumed) {
+TEST_F(ProtectRuntimeLicenseSyntaxTest,
+       RuntimeLicenseMatchWithoutExitConsumed) {
   auto result = Preprocess(
       "`pragma protect runtime_license = ( library = \"liblic.so\" , entry = "
       "\"check\" , feature = \"core\" , match = 0 )\n");
@@ -75,7 +76,8 @@ TEST_F(ProtectRuntimeLicenseSyntaxTest, RuntimeLicenseMatchWithoutExitConsumed) 
 // that supplies `exit` but omits `match` is also a valid keyword expression and
 // is consumed in full. Together with the both/required-only/match-only forms
 // this exhausts the four combinations of the two optional subkeywords.
-TEST_F(ProtectRuntimeLicenseSyntaxTest, RuntimeLicenseExitWithoutMatchConsumed) {
+TEST_F(ProtectRuntimeLicenseSyntaxTest,
+       RuntimeLicenseExitWithoutMatchConsumed) {
   auto result = Preprocess(
       "`pragma protect runtime_license = ( library = \"liblic.so\" , entry = "
       "\"check\" , feature = \"core\" , exit = \"release\" )\n");

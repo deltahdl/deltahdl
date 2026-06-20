@@ -191,9 +191,9 @@ TEST(ExprType, RealDivRealIsReal) {
 TEST(ExprType, UnaryMinusOnRealIsReal) {
   SimFixture f;
   MakeRealVar(f, "a", 3.5);
-  auto result = EvalExpr(MakeUnary(f.arena, TokenKind::kMinus,
-                                   MakeId(f.arena, "a")),
-                         f.ctx, f.arena);
+  auto result =
+      EvalExpr(MakeUnary(f.arena, TokenKind::kMinus, MakeId(f.arena, "a")),
+               f.ctx, f.arena);
   EXPECT_TRUE(result.is_real);
   EXPECT_DOUBLE_EQ(ToDouble(result), -3.5);
 }
@@ -201,9 +201,9 @@ TEST(ExprType, UnaryMinusOnRealIsReal) {
 TEST(ExprType, UnaryPlusOnRealIsReal) {
   SimFixture f;
   MakeRealVar(f, "a", 3.5);
-  auto result = EvalExpr(MakeUnary(f.arena, TokenKind::kPlus,
-                                   MakeId(f.arena, "a")),
-                         f.ctx, f.arena);
+  auto result =
+      EvalExpr(MakeUnary(f.arena, TokenKind::kPlus, MakeId(f.arena, "a")),
+               f.ctx, f.arena);
   EXPECT_TRUE(result.is_real);
   EXPECT_DOUBLE_EQ(ToDouble(result), 3.5);
 }
@@ -372,10 +372,10 @@ TEST(ExprType, TypeNotDeterminedByLhsSignedTarget) {
   MakeSignedVarAdv(f, "target", 16, 0);
   MakeVar(f, "u1", 8, 200);
   MakeVar(f, "u2", 8, 100);
-  auto result = EvalExpr(MakeBinary(f.arena, TokenKind::kPlus,
-                                    MakeId(f.arena, "u1"),
-                                    MakeId(f.arena, "u2")),
-                         f.ctx, f.arena);
+  auto result =
+      EvalExpr(MakeBinary(f.arena, TokenKind::kPlus, MakeId(f.arena, "u1"),
+                          MakeId(f.arena, "u2")),
+               f.ctx, f.arena);
   EXPECT_FALSE(result.is_signed);
 }
 
@@ -488,10 +488,10 @@ TEST(ExprType, ShiftPreservesLeftOperandSignedness) {
   SimFixture f;
   MakeSignedVarAdv(f, "s", 8, 0x80);
   MakeVar(f, "amt", 8, 1);
-  auto result = EvalExpr(MakeBinary(f.arena, TokenKind::kLtLt,
-                                    MakeId(f.arena, "s"),
-                                    MakeId(f.arena, "amt")),
-                         f.ctx, f.arena);
+  auto result =
+      EvalExpr(MakeBinary(f.arena, TokenKind::kLtLt, MakeId(f.arena, "s"),
+                          MakeId(f.arena, "amt")),
+               f.ctx, f.arena);
   EXPECT_TRUE(result.is_signed);
 }
 
@@ -499,10 +499,10 @@ TEST(ExprType, ShiftUnsignedLeftStaysUnsigned) {
   SimFixture f;
   MakeVar(f, "u", 8, 0x80);
   MakeSignedVarAdv(f, "amt", 8, 1);
-  auto result = EvalExpr(MakeBinary(f.arena, TokenKind::kLtLt,
-                                    MakeId(f.arena, "u"),
-                                    MakeId(f.arena, "amt")),
-                         f.ctx, f.arena);
+  auto result =
+      EvalExpr(MakeBinary(f.arena, TokenKind::kLtLt, MakeId(f.arena, "u"),
+                          MakeId(f.arena, "amt")),
+               f.ctx, f.arena);
   EXPECT_FALSE(result.is_signed);
 }
 
@@ -532,4 +532,4 @@ TEST(ExprType, PartSelectAssignedToWiderVarIsZeroExtended) {
   EXPECT_EQ(val, 0x00FFu);
 }
 
-}
+}  // namespace

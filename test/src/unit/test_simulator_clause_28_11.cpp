@@ -82,4 +82,4 @@ TEST(StrengthClassification, HighzIsNeitherDrivingNorChargeStorage) {
   EXPECT_FALSE(IsChargeStorageStrength(Strength::kHighz));
 }
 
-}
+}  // namespace

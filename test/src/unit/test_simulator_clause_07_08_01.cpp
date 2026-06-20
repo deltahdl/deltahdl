@@ -263,4 +263,4 @@ TEST(WildcardAssocArraySimulation, UnsignedKeyOrdering) {
   EXPECT_EQ(it->first, 4294967295);
 }
 
-}
+}  // namespace

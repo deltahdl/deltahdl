@@ -61,7 +61,8 @@ TEST_F(VpiObjectTypeProperty, GetStrTypeReturnsTheTypeConstantName) {
 // for any property it cannot supply.
 TEST_F(VpiObjectTypeProperty, GetStrTypeYieldsNoNameForUnmodelledType) {
   VpiObject mem;
-  mem.type = vpiMemory;  // a valid object type, but one with no modelled spelling
+  mem.type =
+      vpiMemory;  // a valid object type, but one with no modelled spelling
 
   // The integer type is still reported faithfully...
   EXPECT_EQ(vpi_get(vpiType, &mem), vpiMemory);
@@ -70,9 +71,10 @@ TEST_F(VpiObjectTypeProperty, GetStrTypeYieldsNoNameForUnmodelledType) {
 }
 
 // Claim: some objects expose additional type properties shown in the data model
-// diagrams (vpiOpType among those the clause lists), and vpi_get(<type_property>,
-// handle) likewise returns an integer constant representing that extra type. An
-// operation reports its operator kind through vpiOpType.
+// diagrams (vpiOpType among those the clause lists), and
+// vpi_get(<type_property>, handle) likewise returns an integer constant
+// representing that extra type. An operation reports its operator kind through
+// vpiOpType.
 TEST_F(VpiObjectTypeProperty, GetReturnsAnAdditionalTypePropertyConstant) {
   VpiObject op;
   op.type = vpiOperation;

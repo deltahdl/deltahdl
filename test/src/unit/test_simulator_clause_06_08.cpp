@@ -248,4 +248,4 @@ TEST(VariableDeclaration, VariableStoresValueBetweenAssignmentAndRead) {
   EXPECT_EQ(val, 99u);
 }
 
-}
+}  // namespace

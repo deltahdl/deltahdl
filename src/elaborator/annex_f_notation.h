@@ -39,8 +39,7 @@ enum class NotationCategory {
 // unclocked sequence) from lowercase r (a sequence of either flavor), and
 // t (a type) from T (an unclocked top-level property). A symbol that
 // §F.3.3 gives no convention yields no category.
-std::optional<NotationCategory> ClassifyAnnexFNotation(
-    std::string_view symbol);
+std::optional<NotationCategory> ClassifyAnnexFNotation(std::string_view symbol);
 
 // True when the category names some flavor of sequence (unclocked,
 // clocked, or the either-flavor lowercase form).

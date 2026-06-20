@@ -27,9 +27,9 @@ TEST(SynthLower, MultiBitAndGate) {
 TEST(BitwiseOperators, AndGate) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f,
-      "module m(input a, input b, output y);\n"
-      "  assign y = a & b;\n"
-      "endmodule");
+                           "module m(input a, input b, output y);\n"
+                           "  assign y = a & b;\n"
+                           "endmodule");
   ASSERT_NE(mod, nullptr);
   SynthLower synth(f.arena, f.diag);
   auto* aig = synth.Lower(mod);
@@ -41,9 +41,9 @@ TEST(BitwiseOperators, AndGate) {
 TEST(BitwiseOperators, OrGate) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f,
-      "module m(input a, input b, output y);\n"
-      "  assign y = a | b;\n"
-      "endmodule");
+                           "module m(input a, input b, output y);\n"
+                           "  assign y = a | b;\n"
+                           "endmodule");
   ASSERT_NE(mod, nullptr);
   SynthLower synth(f.arena, f.diag);
   auto* aig = synth.Lower(mod);
@@ -55,9 +55,9 @@ TEST(BitwiseOperators, OrGate) {
 TEST(BitwiseOperators, XorGate) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f,
-      "module m(input a, input b, output y);\n"
-      "  assign y = a ^ b;\n"
-      "endmodule");
+                           "module m(input a, input b, output y);\n"
+                           "  assign y = a ^ b;\n"
+                           "endmodule");
   ASSERT_NE(mod, nullptr);
   SynthLower synth(f.arena, f.diag);
   auto* aig = synth.Lower(mod);
@@ -69,9 +69,9 @@ TEST(BitwiseOperators, XorGate) {
 TEST(BitwiseOperators, XnorGate) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f,
-      "module m(input a, input b, output y);\n"
-      "  assign y = a ^~ b;\n"
-      "endmodule");
+                           "module m(input a, input b, output y);\n"
+                           "  assign y = a ^~ b;\n"
+                           "endmodule");
   ASSERT_NE(mod, nullptr);
   SynthLower synth(f.arena, f.diag);
   auto* aig = synth.Lower(mod);
@@ -83,9 +83,9 @@ TEST(BitwiseOperators, XnorGate) {
 TEST(BitwiseOperators, NotGate) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f,
-      "module m(input a, output y);\n"
-      "  assign y = ~a;\n"
-      "endmodule");
+                           "module m(input a, output y);\n"
+                           "  assign y = ~a;\n"
+                           "endmodule");
   ASSERT_NE(mod, nullptr);
   SynthLower synth(f.arena, f.diag);
   auto* aig = synth.Lower(mod);
@@ -94,4 +94,4 @@ TEST(BitwiseOperators, NotGate) {
   EXPECT_EQ(aig->outputs.size(), 1);
 }
 
-}
+}  // namespace

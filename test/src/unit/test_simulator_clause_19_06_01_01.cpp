@@ -100,7 +100,8 @@ TEST(Coverage, IntersectMatchesLastValueOfEachTransitionSequence) {
   EXPECT_EQ(hit_second, (std::vector<size_t>{0}));
 
   // The last value of the first sequence (3) selects it as well.
-  auto hit_first = CoverageDB::SelectBinsByIntersect(bins, {3}, /*negate=*/false);
+  auto hit_first =
+      CoverageDB::SelectBinsByIntersect(bins, {3}, /*negate=*/false);
   EXPECT_EQ(hit_first, (std::vector<size_t>{0}));
 
   // The starting value (7) and an intermediate value (8) of a sequence are not
@@ -108,7 +109,8 @@ TEST(Coverage, IntersectMatchesLastValueOfEachTransitionSequence) {
   auto miss_start =
       CoverageDB::SelectBinsByIntersect(bins, {7}, /*negate=*/false);
   EXPECT_TRUE(miss_start.empty());
-  auto miss_mid = CoverageDB::SelectBinsByIntersect(bins, {8}, /*negate=*/false);
+  auto miss_mid =
+      CoverageDB::SelectBinsByIntersect(bins, {8}, /*negate=*/false);
   EXPECT_TRUE(miss_mid.empty());
 }
 
@@ -136,4 +138,4 @@ TEST(Coverage, MixedEmptyAndNonEmptyTransitionSequences) {
   EXPECT_EQ(hit, (std::vector<size_t>{0}));
 }
 
-}
+}  // namespace

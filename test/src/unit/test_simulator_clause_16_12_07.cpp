@@ -77,4 +77,4 @@ TEST(SvaEngine, NoAntecedentMatchHoldsVacuouslyRegardlessOfConsequent) {
   EXPECT_EQ(EvalImplication(false, true, true), PropertyResult::kVacuousPass);
 }
 
-}
+}  // namespace

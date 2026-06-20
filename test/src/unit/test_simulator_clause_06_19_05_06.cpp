@@ -107,4 +107,4 @@ TEST(EnumMethods, NameEndToEnd) {
   EXPECT_NE(var->value.ToUint64(), 0u);
 }
 
-}
+}  // namespace

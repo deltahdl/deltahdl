@@ -185,4 +185,4 @@ TEST(StateOps, BitwiseOrWithXzLiteralCoercedToInt) {
   EXPECT_EQ(result, 12u);
 }
 
-}
+}  // namespace

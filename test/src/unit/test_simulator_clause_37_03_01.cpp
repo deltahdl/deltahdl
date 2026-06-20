@@ -78,9 +78,9 @@ TEST_F(VpiObjectAccess, GetStrAccessesStringPropertiesAsPliByte8) {
   EXPECT_EQ(std::string(full_name), "top.m1");
 }
 
-// Claim: one-to-one relationships are traversed with vpi_handle(), which returns
-// a handle to the related object - the example walks from a net to the module
-// that contains it. The result is itself a vpiHandle.
+// Claim: one-to-one relationships are traversed with vpi_handle(), which
+// returns a handle to the related object - the example walks from a net to the
+// module that contains it. The result is itself a vpiHandle.
 TEST_F(VpiObjectAccess, HandleTraversesOneToOneRelationship) {
   static_assert(std::is_same_v<decltype(VpiHandleC(0, nullptr)), vpiHandle>,
                 "vpi_handle returns a vpiHandle");
@@ -125,11 +125,11 @@ TEST_F(VpiObjectAccess, IterateAndScanTraverseOneToManyRelationship) {
   EXPECT_EQ(vpi_scan(iter), nullptr);
 }
 
-// Edge of the Boolean-property rule: the 1/0 representation is general, not tied
-// to one property. It holds for a property derived by computation (vpiExpanded,
-// reported as the negation of the vectored flag) and for one read straight from
-// a stored flag (vpiExplicitScalared) - in every case vpi_get() yields only 1 or
-// 0.
+// Edge of the Boolean-property rule: the 1/0 representation is general, not
+// tied to one property. It holds for a property derived by computation
+// (vpiExpanded, reported as the negation of the vectored flag) and for one read
+// straight from a stored flag (vpiExplicitScalared) - in every case vpi_get()
+// yields only 1 or 0.
 TEST_F(VpiObjectAccess, GetEncodesEveryBooleanPropertyAsOneOrZero) {
   VpiObject vectored_net;
   vectored_net.type = vpiNet;
@@ -151,9 +151,9 @@ TEST_F(VpiObjectAccess, GetEncodesEveryBooleanPropertyAsOneOrZero) {
 }
 
 // Edge of the string-property rule: vpi_get_str() accesses string properties
-// other than the full name (here the simple name), and when an object carries no
-// distinct full hierarchical name the full-name query falls back to that simple
-// name. Both still hand back a PLI_BYTE8 * string.
+// other than the full name (here the simple name), and when an object carries
+// no distinct full hierarchical name the full-name query falls back to that
+// simple name. Both still hand back a PLI_BYTE8 * string.
 TEST_F(VpiObjectAccess, GetStrAccessesNamePropertyAndFullNameFallback) {
   VpiObject net;
   net.type = vpiNet;
@@ -169,8 +169,8 @@ TEST_F(VpiObjectAccess, GetStrAccessesNamePropertyAndFullNameFallback) {
 }
 
 // Edge of the one-to-one traversal rule: when the reference object has no such
-// relationship, vpi_handle() produces no handle. A net with no containing module
-// and no children yields a null handle for the vpiModule relation.
+// relationship, vpi_handle() produces no handle. A net with no containing
+// module and no children yields a null handle for the vpiModule relation.
 TEST_F(VpiObjectAccess, HandleReturnsNoHandleForAbsentRelationship) {
   VpiObject net;
   net.type = vpiNet;

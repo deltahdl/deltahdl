@@ -17,4 +17,4 @@ TEST(AggregateTypeParsing, QueuePushFront) {
   EXPECT_EQ(stmt->kind, StmtKind::kExprStmt);
 }
 
-}
+}  // namespace

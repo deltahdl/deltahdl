@@ -58,7 +58,6 @@ std::vector<std::string_view> Normalize(std::vector<std::string_view> segs) {
 }
 
 bool GlobOne(std::string_view pat, std::string_view name) {
-
   size_t pi = 0, ni = 0;
   size_t star_p = std::string_view::npos;
   size_t star_n = 0;
@@ -106,13 +105,11 @@ std::string CellKey(std::string_view library, std::string_view name) {
   return key;
 }
 
-bool GlobMatchSegments(const std::vector<std::string_view>& pat_segs,
-                       size_t pi,
+bool GlobMatchSegments(const std::vector<std::string_view>& pat_segs, size_t pi,
                        const std::vector<std::string_view>& path_segs,
                        size_t si) {
   if (pi == pat_segs.size()) return si == path_segs.size();
   if (pat_segs[pi] == "...") {
-
     for (size_t k = si; k <= path_segs.size(); ++k) {
       if (GlobMatchSegments(pat_segs, pi + 1, path_segs, k)) return true;
     }
@@ -123,7 +120,7 @@ bool GlobMatchSegments(const std::vector<std::string_view>& pat_segs,
   return GlobMatchSegments(pat_segs, pi + 1, path_segs, si + 1);
 }
 
-}
+}  // namespace
 
 std::string LibraryMap::ResolveSpec(std::string_view spec,
                                     std::string_view base_dir) {
@@ -160,13 +157,12 @@ bool LibraryMap::PathMatches(std::string_view spec, std::string_view base_dir,
 void LibraryMap::AddDeclaration(const LibraryDecl& decl,
                                 std::string_view base_dir) {
   for (auto path : decl.file_paths) {
-    entries_.push_back({std::string(decl.name), std::string(base_dir),
-                        std::string(path)});
+    entries_.push_back(
+        {std::string(decl.name), std::string(base_dir), std::string(path)});
   }
 }
 
 std::string_view LibraryMap::LibraryForFile(std::string_view path) const {
-
   bool found_any = false;
   SpecKind best = SpecKind::kDirectory;
   std::string_view chosen;
@@ -236,7 +232,6 @@ std::vector<std::string_view> LibraryMap::LibraryDeclarationOrder() const {
 
 std::vector<std::string> LibraryMap::ResolveSearchOrder(
     const std::vector<std::string>& cli_override) const {
-
   if (!cli_override.empty()) return cli_override;
   std::vector<std::string> order;
   for (auto name : LibraryDeclarationOrder()) order.emplace_back(name);
@@ -327,4 +322,4 @@ bool LibraryMap::LoadMapFileImpl(const std::filesystem::path& map_file,
   return ok;
 }
 
-}
+}  // namespace delta

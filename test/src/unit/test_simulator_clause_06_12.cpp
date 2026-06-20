@@ -21,4 +21,4 @@ TEST(RealDataType, IsRealVariable) {
   EXPECT_FALSE(f.ctx.IsRealVariable("i"));
 }
 
-}
+}  // namespace

@@ -95,4 +95,4 @@ TEST(BufNotParsing, TwoValueDelayAccepted) {
   EXPECT_EQ(g->gate_delay_decay, nullptr);
 }
 
-}
+}  // namespace

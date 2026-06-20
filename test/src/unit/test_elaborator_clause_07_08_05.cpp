@@ -80,7 +80,8 @@ TEST(UserDefinedTypeAssocArrayElaboration, EnumTypedefIndexAllowed) {
 // dynamically sized types it may contain, so such a type is a legal index.
 // This mirrors the clause's own example of a struct holding an unsized
 // dynamic-array member used as the index type.
-TEST(UserDefinedTypeAssocArrayElaboration, StructIndexWithDynamicMemberAllowed) {
+TEST(UserDefinedTypeAssocArrayElaboration,
+     StructIndexWithDynamicMemberAllowed) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module top;\n"
@@ -118,7 +119,8 @@ TEST(UserDefinedTypeAssocArrayElaboration, StructIndexContainingRealRejected) {
 // §7.8.5: the illegality of a real index type follows the type through a
 // typedef chain, so an index named via a typedef that resolves to real is
 // rejected just as a bare real would be.
-TEST(UserDefinedTypeAssocArrayElaboration, TypedefResolvingToRealIndexRejected) {
+TEST(UserDefinedTypeAssocArrayElaboration,
+     TypedefResolvingToRealIndexRejected) {
   ElabFixture f;
   ElaborateSrc(
       "module top;\n"
@@ -145,4 +147,4 @@ TEST(UserDefinedTypeAssocArrayElaboration,
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-}
+}  // namespace

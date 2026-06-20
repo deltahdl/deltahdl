@@ -60,4 +60,4 @@ TEST(UdpLevelSeq, UnmatchedInputsYieldX) {
   EXPECT_EQ(state.GetOutput(), 'x');
 }
 
-}
+}  // namespace

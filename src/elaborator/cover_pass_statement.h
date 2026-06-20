@@ -14,8 +14,8 @@ enum class CoverPassStatementForm : uint8_t {
   kOther,
 };
 
-// §16.14.3: a cover statement may have an optional pass statement, and that pass
-// statement shall not include any concurrent assert, assume, or cover
+// §16.14.3: a cover statement may have an optional pass statement, and that
+// pass statement shall not include any concurrent assert, assume, or cover
 // statement. Returns whether a statement of the given form is permitted as the
 // pass statement.
 bool CoverPassStatementAllows(CoverPassStatementForm form);

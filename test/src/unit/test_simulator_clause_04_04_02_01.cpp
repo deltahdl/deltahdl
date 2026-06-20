@@ -157,4 +157,3 @@ TEST(PreponedRegionSim, PreponedNotReExecutedByReactiveToActiveRestart) {
 TEST(PreponedRegionSim, PreponedIsOrdinalZero) {
   EXPECT_EQ(static_cast<int>(Region::kPreponed), 0);
 }
-

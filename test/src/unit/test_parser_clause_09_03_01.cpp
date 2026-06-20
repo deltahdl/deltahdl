@@ -308,4 +308,4 @@ TEST(BlockItemDeclParsing, AttributeInstanceBeforeBlockItem) {
   EXPECT_EQ(body->stmts[0]->attrs[0].name, "foo");
 }
 
-}
+}  // namespace

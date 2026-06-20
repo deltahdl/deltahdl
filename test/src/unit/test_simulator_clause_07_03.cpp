@@ -64,4 +64,4 @@ TEST(UnionSimulation, UnpackedUnionOverwrite) {
   EXPECT_EQ(v, 20u);
 }
 
-}
+}  // namespace

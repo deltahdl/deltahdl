@@ -68,4 +68,4 @@ TEST(SignalMultiBlockElab, SameOutputSignalInTwoBlocksElaborates) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

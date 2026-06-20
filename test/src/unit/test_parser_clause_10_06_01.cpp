@@ -568,5 +568,4 @@ TEST(ProceduralAssignDeassignParsing, AssignToVector) {
   EXPECT_EQ(stmt->lhs->text, "vec");
   ASSERT_NE(stmt->rhs, nullptr);
 }
-
 }

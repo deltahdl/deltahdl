@@ -62,4 +62,4 @@ TEST(ProgramControlTasksElab, ExitInsideForkInProgramElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

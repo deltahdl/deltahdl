@@ -110,4 +110,4 @@ TEST(QueueMethods, InsertWithNegativeIndexIsNoop) {
   EXPECT_EQ(q->elements[1].ToUint64(), 20u);
 }
 
-}
+}  // namespace

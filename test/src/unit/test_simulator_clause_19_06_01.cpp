@@ -56,7 +56,8 @@ TEST(Coverage, IntersectSelectsBinsByValueOverlap) {
   CoverPoint i = MakeTwoBinPoint("i");
   auto bins = CoverageDB::BinsofYield(&i);
 
-  auto included = CoverageDB::SelectBinsByIntersect(bins, {0}, /*negate=*/false);
+  auto included =
+      CoverageDB::SelectBinsByIntersect(bins, {0}, /*negate=*/false);
   EXPECT_EQ(included, (std::vector<size_t>{0}));
 
   auto excluded = CoverageDB::SelectBinsByIntersect(bins, {0}, /*negate=*/true);
@@ -77,8 +78,9 @@ TEST(Coverage, UserCrossBinAndRetainedAutoBins) {
 
   EXPECT_EQ(user, (std::vector<std::vector<size_t>>{{0, 0}, {0, 1}}));
 
-  auto retained = CoverageDB::RetainedAutoCrossProducts(counts, user,
-                                                        /*retain_auto_bins=*/true);
+  auto retained =
+      CoverageDB::RetainedAutoCrossProducts(counts, user,
+                                            /*retain_auto_bins=*/true);
   EXPECT_EQ(retained, (std::vector<std::vector<size_t>>{{1, 0}, {1, 1}}));
 
   // With cross_retain_auto_bins false, no automatic bins survive.
@@ -99,8 +101,7 @@ TEST(Coverage, SelectionsCombineWithAndOr) {
   EXPECT_EQ(both, (std::vector<std::vector<size_t>>{{0, 1}}));
 
   auto either = CoverageDB::OrCrossSelections(sel_i0, sel_j1);
-  EXPECT_EQ(either,
-            (std::vector<std::vector<size_t>>{{0, 0}, {0, 1}, {1, 1}}));
+  EXPECT_EQ(either, (std::vector<std::vector<size_t>>{{0, 0}, {0, 1}, {1, 1}}));
 }
 
 // A cross coverage bin associates a count with a set of cross products; the
@@ -131,13 +132,14 @@ TEST(Coverage, CrossBinCountsAnyMatchingProduct) {
   EXPECT_EQ(bin->hit_count, 2u);
 }
 
-// binsof on an absent coverpoint, a bin index past the end, or a coverpoint with
-// no bins yields nothing (LRM 19.6.1).
+// binsof on an absent coverpoint, a bin index past the end, or a coverpoint
+// with no bins yields nothing (LRM 19.6.1).
 TEST(Coverage, BinsofYieldHandlesEmptyAndOutOfRange) {
   EXPECT_TRUE(CoverageDB::BinsofYield(nullptr).empty());
 
   CoverPoint i = MakeTwoBinPoint("i");
-  EXPECT_TRUE(CoverageDB::BinsofYield(&i, 2).empty());  // only bins 0 and 1 exist
+  EXPECT_TRUE(
+      CoverageDB::BinsofYield(&i, 2).empty());  // only bins 0 and 1 exist
 
   CoverPoint empty;
   empty.name = "empty";
@@ -151,10 +153,12 @@ TEST(Coverage, IntersectMatchesOnAnyValueOverlap) {
   std::vector<std::vector<int64_t>> bins = {{2, 3, 4}, {6, 7}};
 
   // Bin 0 shares the value 4 with {4,5}; bin 1 shares nothing.
-  auto included = CoverageDB::SelectBinsByIntersect(bins, {4, 5}, /*negate=*/false);
+  auto included =
+      CoverageDB::SelectBinsByIntersect(bins, {4, 5}, /*negate=*/false);
   EXPECT_EQ(included, (std::vector<size_t>{0}));
 
-  auto excluded = CoverageDB::SelectBinsByIntersect(bins, {4, 5}, /*negate=*/true);
+  auto excluded =
+      CoverageDB::SelectBinsByIntersect(bins, {4, 5}, /*negate=*/true);
   EXPECT_EQ(excluded, (std::vector<size_t>{1}));
 
   EXPECT_TRUE(
@@ -176,8 +180,10 @@ TEST(Coverage, EmptyAndDisjointSelectionsDenoteNoProducts) {
 
   EXPECT_TRUE(CoverageDB::SelectProductsByPointBins(counts, 0, {}).empty());
 
-  auto i0 = CoverageDB::SelectProductsByPointBins(counts, 0, {0});  // {0,0},{0,1}
-  auto i1 = CoverageDB::SelectProductsByPointBins(counts, 0, {1});  // {1,0},{1,1}
+  auto i0 =
+      CoverageDB::SelectProductsByPointBins(counts, 0, {0});  // {0,0},{0,1}
+  auto i1 =
+      CoverageDB::SelectProductsByPointBins(counts, 0, {1});  // {1,0},{1,1}
   EXPECT_TRUE(CoverageDB::AndCrossSelections(i0, i1).empty());
 }
 
@@ -189,9 +195,10 @@ TEST(Coverage, NoAutoBinsRetainedWhenUserBinsCoverAll) {
   auto all = CoverageDB::EnumerateCrossProducts(counts);
   ASSERT_EQ(all.size(), 4u);
 
-  auto retained = CoverageDB::RetainedAutoCrossProducts(counts, all,
-                                                        /*retain_auto_bins=*/true);
+  auto retained =
+      CoverageDB::RetainedAutoCrossProducts(counts, all,
+                                            /*retain_auto_bins=*/true);
   EXPECT_TRUE(retained.empty());
 }
 
-}
+}  // namespace

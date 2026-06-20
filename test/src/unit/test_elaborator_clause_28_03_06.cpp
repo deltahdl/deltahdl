@@ -70,4 +70,4 @@ TEST(GateArrayConnection, InterconnectWidthEqualToArrayLengthElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

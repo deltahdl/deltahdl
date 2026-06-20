@@ -64,4 +64,4 @@ TEST(AssertionSemanticsParsing, FirstMatchWithMultipleSequenceMatchItems) {
   EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kAssertProperty));
 }
 
-}
+}  // namespace

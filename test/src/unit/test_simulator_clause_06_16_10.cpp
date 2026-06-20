@@ -98,4 +98,4 @@ TEST(StringMethods, AtorealNegativeValue) {
   EXPECT_NEAR(d, -3.5, 0.001);
 }
 
-}
+}  // namespace

@@ -45,4 +45,4 @@ TEST(AggregateTypeParsing, QueuePushBackItemArgument) {
   ASSERT_EQ(expr->args.size(), 1u);
 }
 
-}
+}  // namespace

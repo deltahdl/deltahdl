@@ -127,4 +127,4 @@ TEST(FineGrainProcessControlElaboration, AllStateEnumMembersElaborate) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

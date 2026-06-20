@@ -99,4 +99,4 @@ TEST(MatchingTypesElaboration, SimpleTypedefMatchesUnderlyingBuiltin) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-}
+}  // namespace

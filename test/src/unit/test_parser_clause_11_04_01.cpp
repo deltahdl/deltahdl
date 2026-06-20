@@ -146,4 +146,4 @@ TEST(LvalueParsing, VarLvalueCompoundAdd) {
   EXPECT_EQ(stmt->lhs->kind, ExprKind::kIdentifier);
 }
 
-}
+}  // namespace

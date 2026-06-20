@@ -116,4 +116,4 @@ TEST(ConstraintProperties, OverConstrainedProblemFails) {
   EXPECT_FALSE(solver.Solve());
 }
 
-}
+}  // namespace

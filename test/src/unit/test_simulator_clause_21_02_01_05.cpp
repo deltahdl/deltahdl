@@ -12,9 +12,9 @@ using namespace delta;
 // and expands to the hierarchical name of the design element, subroutine, named
 // block, or labeled statement that invokes the system task carrying it. These
 // tests drive the full simulator ($display passes the run-time context into the
-// formatter in eval_format.cpp, which builds the name from the running process's
-// instance path and the active subroutine / named-block scopes) and capture the
-// displayed text end to end.
+// formatter in eval_format.cpp, which builds the name from the running
+// process's instance path and the active subroutine / named-block scopes) and
+// capture the displayed text end to end.
 
 namespace {
 
@@ -34,9 +34,9 @@ TEST(HierarchicalNameFormat, TopLevelModuleName) {
 }
 
 // §21.2.1.5 (C1): %m accepts no argument. With a following %0d specifier and a
-// single expression supplied, %m expands to the scope name without consuming the
-// expression, leaving it for %0d. If %m had drawn an argument, the decimal field
-// would have nothing to print.
+// single expression supplied, %m expands to the scope name without consuming
+// the expression, leaving it for %0d. If %m had drawn an argument, the decimal
+// field would have nothing to print.
 TEST(HierarchicalNameFormat, PercentMConsumesNoArgument) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -75,8 +75,8 @@ TEST(HierarchicalNameFormat, NestedNamedBlocks) {
 }
 
 // §21.2.1.5 (C2): a subroutine is a hierarchy level too. When the task that
-// calls $display is itself invoked from the module, %m names the task within the
-// module.
+// calls $display is itself invoked from the module, %m names the task within
+// the module.
 TEST(HierarchicalNameFormat, SubroutineScopeInHierarchy) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -93,9 +93,9 @@ TEST(HierarchicalNameFormat, SubroutineScopeInHierarchy) {
   EXPECT_EQ(testing::internal::GetCapturedStdout(), "chip.show\n");
 }
 
-// §21.2.1.5 (C2): for a system task running inside an instantiated submodule, %m
-// reports the full instance path -- the top module name followed by the instance
-// name, not the submodule's type name. This is the case the subclause
+// §21.2.1.5 (C2): for a system task running inside an instantiated submodule,
+// %m reports the full instance path -- the top module name followed by the
+// instance name, not the submodule's type name. This is the case the subclause
 // highlights: distinguishing among many instances of the same module.
 TEST(HierarchicalNameFormat, ChildInstancePathReported) {
   SimFixture f;
@@ -115,10 +115,10 @@ TEST(HierarchicalNameFormat, ChildInstancePathReported) {
 
 // §21.2.1.5 (C2) edge: the instance path and an inner subroutine scope compose
 // into one name. A task that runs $display inside an instantiated submodule
-// contributes both the instance level and the subroutine level, joined in order:
-// top module, instance, task. This is the only case that exercises a non-empty
-// instance prefix and an active scope together, observing the separator between
-// the two contributions.
+// contributes both the instance level and the subroutine level, joined in
+// order: top module, instance, task. This is the only case that exercises a
+// non-empty instance prefix and an active scope together, observing the
+// separator between the two contributions.
 TEST(HierarchicalNameFormat, SubroutineWithinInstanceComposesPath) {
   SimFixture f;
   auto* design = ElaborateSrc(

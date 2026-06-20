@@ -130,7 +130,8 @@ TEST(SignedUnsignedArithmetic, ExplicitSignedOnUnsignedTypeElaboratesAsSigned) {
   EXPECT_TRUE(mod->variables[0].is_signed);
 }
 
-TEST(SignedUnsignedArithmetic, ExplicitUnsignedOnSignedTypeElaboratesAsUnsigned) {
+TEST(SignedUnsignedArithmetic,
+     ExplicitUnsignedOnSignedTypeElaboratesAsUnsigned) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -191,4 +192,4 @@ TEST(SignedUnsignedArithmetic, BitVectorVariableElaboratesAsUnsigned) {
   EXPECT_FALSE(mod->variables[0].is_signed);
 }
 
-}
+}  // namespace

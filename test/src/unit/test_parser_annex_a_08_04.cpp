@@ -422,4 +422,4 @@ TEST(PrimaryParsing, PrimaryLetExpression) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

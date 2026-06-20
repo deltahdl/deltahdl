@@ -41,4 +41,4 @@ TEST(FunctionDeclParsing, DpiExportTaskWithCIdentifier) {
   EXPECT_EQ(item->dpi_c_name, "c_task");
 }
 
-}
+}  // namespace

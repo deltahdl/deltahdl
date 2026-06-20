@@ -35,15 +35,16 @@ auto Trig(const std::string& name) {
 
 // --- §F.5.6.3 C1: the §F.5.3.3 rules realized over the local-variable model,
 // threading an input context. With local-variable-free properties and the empty
-// context the four-way relation collapses to tight satisfaction, so the verdicts
-// match §F.5.3.3 exactly. ---
+// context the four-way relation collapses to tight satisfaction, so the
+// verdicts match §F.5.3.3 exactly. ---
 
 // §F.5.3.3 base: w, L_0 |=^non strong(R) and weak(R) hold for every w; the
 // context plays no role.
 TEST(NonVacuityLocals, StrongAndWeakAreAlwaysNonvacuous) {
+  EXPECT_TRUE(NonVacuouslyEvaluatesWithLocals(Word{L({"a"})}, *Strong("a"),
+                                              LocalContext{}));
   EXPECT_TRUE(
-      NonVacuouslyEvaluatesWithLocals(Word{L({"a"})}, *Strong("a"), LocalContext{}));
-  EXPECT_TRUE(NonVacuouslyEvaluatesWithLocals(Word{}, *Strong("a"), LocalContext{}));
+      NonVacuouslyEvaluatesWithLocals(Word{}, *Strong("a"), LocalContext{}));
   EXPECT_TRUE(NonVacuouslyEvaluatesWithLocals(Word{L({"a"})}, *LvWeak(Bs("a")),
                                               LocalContext{}));
   // An unrelated incoming binding does not change the verdict.
@@ -54,20 +55,20 @@ TEST(NonVacuityLocals, StrongAndWeakAreAlwaysNonvacuous) {
 // §F.5.3.3: w, L_0 |=^non ( P ) iff w, L_0 |=^non P -- a parenthesis is
 // transparent.
 TEST(NonVacuityLocals, ParenthesisIsTransparent) {
-  EXPECT_TRUE(NonVacuouslyEvaluatesWithLocals(Word{L({"a"})}, *LvParen(Trig("a")),
-                                              LocalContext{}));
-  EXPECT_FALSE(NonVacuouslyEvaluatesWithLocals(Word{L({"x"})}, *LvParen(Trig("a")),
-                                               LocalContext{}));
+  EXPECT_TRUE(NonVacuouslyEvaluatesWithLocals(
+      Word{L({"a"})}, *LvParen(Trig("a")), LocalContext{}));
+  EXPECT_FALSE(NonVacuouslyEvaluatesWithLocals(
+      Word{L({"x"})}, *LvParen(Trig("a")), LocalContext{}));
 }
 
 // §F.5.3.3: w, L_0 |=^non R |-> P iff some prefix w^{0,i} tightly satisfies the
 // trigger R -- on w itself -- and the matching suffix is nonvacuous for P. A
 // trigger that never matches leaves the implication vacuous.
 TEST(NonVacuityLocals, ImplicationNeedsTheTriggerToMatch) {
-  EXPECT_TRUE(
-      NonVacuouslyEvaluatesWithLocals(Word{L({"a"})}, *Trig("a"), LocalContext{}));
-  EXPECT_FALSE(
-      NonVacuouslyEvaluatesWithLocals(Word{L({"x"})}, *Trig("a"), LocalContext{}));
+  EXPECT_TRUE(NonVacuouslyEvaluatesWithLocals(Word{L({"a"})}, *Trig("a"),
+                                              LocalContext{}));
+  EXPECT_FALSE(NonVacuouslyEvaluatesWithLocals(Word{L({"x"})}, *Trig("a"),
+                                               LocalContext{}));
 }
 
 // §F.5.6.3: the implication threads each output context the antecedent yields
@@ -79,15 +80,13 @@ TEST(NonVacuityLocals, ImplicationThreadsAntecedentOutputContexts) {
   EXPECT_TRUE(NonVacuouslyEvaluatesWithLocals(Word{L({"a"}), L({"b"})}, *prop,
                                               LocalContext{}));
   // The empty word has no prefix for the antecedent to match, so it is vacuous.
-  EXPECT_FALSE(
-      NonVacuouslyEvaluatesWithLocals(Word{}, *prop, LocalContext{}));
+  EXPECT_FALSE(NonVacuouslyEvaluatesWithLocals(Word{}, *prop, LocalContext{}));
 }
 
 // §F.5.3.3: w, L_0 |=^non ( P1 or P2 ) iff either side is nonvacuous.
 TEST(NonVacuityLocals, DisjunctionIsNonvacuousWhenEitherSideIs) {
-  EXPECT_FALSE(NonVacuouslyEvaluatesWithLocals(Word{L({"x"})},
-                                               *LvOr(Trig("a"), Trig("a")),
-                                               LocalContext{}));
+  EXPECT_FALSE(NonVacuouslyEvaluatesWithLocals(
+      Word{L({"x"})}, *LvOr(Trig("a"), Trig("a")), LocalContext{}));
   EXPECT_TRUE(NonVacuouslyEvaluatesWithLocals(
       Word{L({"x"})}, *LvOr(Trig("a"), Strong("s")), LocalContext{}));
 }
@@ -106,15 +105,14 @@ TEST(NonVacuityLocals, ConjunctionIsNonvacuousWhenEitherSideIs) {
 TEST(NonVacuityLocals, NegationEvaluatesOnTheComplement) {
   EXPECT_FALSE(NonVacuouslyEvaluatesWithLocals(Word{LetterBottom()}, *Trig("a"),
                                                LocalContext{}));
-  EXPECT_TRUE(NonVacuouslyEvaluatesWithLocals(Word{LetterBottom()},
-                                              *LvNot(Trig("a")), LocalContext{}));
+  EXPECT_TRUE(NonVacuouslyEvaluatesWithLocals(
+      Word{LetterBottom()}, *LvNot(Trig("a")), LocalContext{}));
 }
 
 // §F.5.3.3: w, L_0 |=^non nexttime P iff |w| > 0 and w^{1.}, L_0 |=^non P.
 TEST(NonVacuityLocals, NexttimeRequiresANonemptyWord) {
-  EXPECT_TRUE(NonVacuouslyEvaluatesWithLocals(Word{L({"a"})},
-                                              *LvNexttime(Strong("b")),
-                                              LocalContext{}));
+  EXPECT_TRUE(NonVacuouslyEvaluatesWithLocals(
+      Word{L({"a"})}, *LvNexttime(Strong("b")), LocalContext{}));
   EXPECT_FALSE(NonVacuouslyEvaluatesWithLocals(Word{}, *LvNexttime(Strong("b")),
                                                LocalContext{}));
 }
@@ -134,8 +132,9 @@ TEST(NonVacuityLocals, UntilNeedsAnOperandToBecomeNonvacuous) {
 
 // §F.5.3.3: w, L_0 |=^non accept_on (b) P requires the operand to be nonvacuous
 // together with the abort condition. When no letter satisfies b the no-abort
-// alternative holds; with the only letter satisfying b non-vacuity can come only
-// through the prefix alternative; and a vacuous operand makes the whole vacuous.
+// alternative holds; with the only letter satisfying b non-vacuity can come
+// only through the prefix alternative; and a vacuous operand makes the whole
+// vacuous.
 TEST(NonVacuityLocals, AcceptOnFollowsTheAbortShape) {
   auto good = LvAcceptOn(BoolAtom("b"), Strong("s"));
   EXPECT_TRUE(
@@ -143,8 +142,8 @@ TEST(NonVacuityLocals, AcceptOnFollowsTheAbortShape) {
   EXPECT_TRUE(NonVacuouslyEvaluatesWithLocals(Word{L({"b", "s"})}, *good,
                                               LocalContext{}));
   auto vacuous = LvAcceptOn(BoolAtom("b"), Trig("a"));
-  EXPECT_FALSE(
-      NonVacuouslyEvaluatesWithLocals(Word{L({"x"})}, *vacuous, LocalContext{}));
+  EXPECT_FALSE(NonVacuouslyEvaluatesWithLocals(Word{L({"x"})}, *vacuous,
+                                               LocalContext{}));
 }
 
 // §F.5.3.3 at the top level: a bare property defers to the property rule; the
@@ -164,13 +163,14 @@ TEST(NonVacuityLocals, TopLevelDisableIffUsesTheAbortShape) {
 }
 
 // §F.5.6.3 inherits §F.5.3.3's "w satisfies P nonvacuously iff w |= P and
-// w |=^non P," realized with locals. A genuine match satisfies both relations; a
-// vacuous pass (a trigger that never fires) is neutrally satisfied yet rejected.
+// w |=^non P," realized with locals. A genuine match satisfies both relations;
+// a vacuous pass (a trigger that never fires) is neutrally satisfied yet
+// rejected.
 TEST(NonVacuityLocals, NonvacuousSatisfactionCombinesBothRelations) {
   EXPECT_TRUE(SatisfiesNonVacuouslyWithLocals(Word{L({"s"})}, *Strong("s"),
                                               LocalContext{}));
-  EXPECT_TRUE(NeutrallySatisfiesWithLocals(Word{L({"x"})}, *Trig("a"),
-                                           LocalContext{}));
+  EXPECT_TRUE(
+      NeutrallySatisfiesWithLocals(Word{L({"x"})}, *Trig("a"), LocalContext{}));
   EXPECT_FALSE(SatisfiesNonVacuouslyWithLocals(Word{L({"x"})}, *Trig("a"),
                                                LocalContext{}));
   EXPECT_TRUE(SatisfiesTopLevelNonVacuouslyWithLocals(
@@ -183,18 +183,18 @@ TEST(NonVacuityLocals, NonvacuousSatisfactionCombinesBothRelations) {
 // local variables and agrees with passing {} explicitly.
 TEST(NonVacuityLocals, EmptyContextEntryPoint) {
   EXPECT_TRUE(NonVacuouslyEvaluatesWithLocals(Word{L({"a"})}, *Strong("a")));
-  EXPECT_EQ(
-      NonVacuouslyEvaluatesWithLocals(Word{L({"a"})}, *Trig("a")),
-      NonVacuouslyEvaluatesWithLocals(Word{L({"a"})}, *Trig("a"), LocalContext{}));
+  EXPECT_EQ(NonVacuouslyEvaluatesWithLocals(Word{L({"a"})}, *Trig("a")),
+            NonVacuouslyEvaluatesWithLocals(Word{L({"a"})}, *Trig("a"),
+                                            LocalContext{}));
 }
 
 // --- §F.5.6.3 C2: the local-variable declaration rule, the one rule this
 // subclause states explicitly. ---
 
 // §F.5.6.3: w, L_0 |=^non ( t v ; P ) iff w, L_0\v |=^non P. The declaration's
-// verdict equals the body's verdict under the context with v removed, the body's
-// verdict passes through (both true and false), an incoming binding for v is
-// hidden, and declarations nest.
+// verdict equals the body's verdict under the context with v removed, the
+// body's verdict passes through (both true and false), an incoming binding for
+// v is hidden, and declarations nest.
 TEST(NonVacuityLocals, PropertyDeclarationStripsTheNameFromTheContext) {
   auto body = Trig("a");
   auto decl = LvLocalVarDecl("int", "v", body);
@@ -219,7 +219,8 @@ TEST(NonVacuityLocals, PropertyDeclarationStripsTheNameFromTheContext) {
       NonVacuouslyEvaluatesWithLocals(Word{L({"a"})}, *decl, LocalContext{}));
 
   // Declarations nest, each stripping its own name.
-  auto nested = LvLocalVarDecl("int", "v", LvLocalVarDecl("int", "w", Trig("a")));
+  auto nested =
+      LvLocalVarDecl("int", "v", LvLocalVarDecl("int", "w", Trig("a")));
   EXPECT_TRUE(
       NonVacuouslyEvaluatesWithLocals(Word{L({"a"})}, *nested, LocalContext{}));
   EXPECT_FALSE(
@@ -246,9 +247,9 @@ TEST(NonVacuityLocals, TopLevelDeclarationStripsTheNameFromTheContext) {
 // --- §F.5.6.3 C1: error conditions and edge cases of the §F.5.3.3 rules,
 // realized over the local-variable model. ---
 
-// §F.5.3.3 edge case: ( P1 until P2 ) needs an index 0 <= i < |w| witnessing one
-// operand's non-vacuity, so over the empty word there is no such index and the
-// until is vacuous.
+// §F.5.3.3 edge case: ( P1 until P2 ) needs an index 0 <= i < |w| witnessing
+// one operand's non-vacuity, so over the empty word there is no such index and
+// the until is vacuous.
 TEST(NonVacuityLocals, UntilIsVacuousOverTheEmptyWord) {
   EXPECT_FALSE(NonVacuouslyEvaluatesWithLocals(
       Word{}, *LvUntil(Trig("a"), Trig("a")), LocalContext{}));
@@ -256,18 +257,17 @@ TEST(NonVacuityLocals, UntilIsVacuousOverTheEmptyWord) {
 
 // §F.5.3.3 edge case: nexttime is not merely a length gate -- past the |w| > 0
 // check it defers to non-vacuity of the suffix. On a one-letter word the suffix
-// is empty after the shift, leaving the trigger property vacuous, so nexttime is
-// vacuous even though the word is nonempty.
+// is empty after the shift, leaving the trigger property vacuous, so nexttime
+// is vacuous even though the word is nonempty.
 TEST(NonVacuityLocals, NexttimeDefersToTheSuffixNonVacuity) {
-  EXPECT_FALSE(NonVacuouslyEvaluatesWithLocals(Word{L({"a"})},
-                                               *LvNexttime(Trig("a")),
-                                               LocalContext{}));
+  EXPECT_FALSE(NonVacuouslyEvaluatesWithLocals(
+      Word{L({"a"})}, *LvNexttime(Trig("a")), LocalContext{}));
 }
 
 // §F.5.3.3 edge case: over the empty word no letter can satisfy the abort
 // condition b, so accept_on's no-abort alternative holds and the result reduces
-// to the operand's non-vacuity -- nonvacuous for strong(s), vacuous for a trigger
-// that cannot match.
+// to the operand's non-vacuity -- nonvacuous for strong(s), vacuous for a
+// trigger that cannot match.
 TEST(NonVacuityLocals, AcceptOnOnTheEmptyWordFollowsTheOperand) {
   EXPECT_TRUE(NonVacuouslyEvaluatesWithLocals(
       Word{}, *LvAcceptOn(BoolAtom("b"), Strong("s")), LocalContext{}));

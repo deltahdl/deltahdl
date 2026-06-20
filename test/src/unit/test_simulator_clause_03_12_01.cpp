@@ -29,4 +29,4 @@ TEST(CompilationUnitSim, MultipleCuScopeFunctionsResolvedAtRuntime) {
   EXPECT_EQ(val, 8u);
 }
 
-}
+}  // namespace

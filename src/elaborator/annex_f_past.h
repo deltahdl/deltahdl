@@ -23,12 +23,12 @@ namespace delta {
 // subword w^{i,j} tightly satisfies the gating sequence
 //   (c && e2) ##1 (c && e2)[=n-1] ##1 1
 // from the empty contexts. The active condition is c && e2 (the destination
-// clock c and the gating expression e2 both holding); the sequence pins i to the
-// start of a window holding exactly n active ticks, so i is the n-th active tick
-// counted back from j. $past(e1, n, e2, c)[w^j] reports e1[w^i] for such an i.
-// The result is empty when no index qualifies; §F.6.2 then evaluates e1 at its
-// initial values instead. n shall be at least 1; the result is empty when it is
-// not, or when j lies outside 0 <= j < |w|.
+// clock c and the gating expression e2 both holding); the sequence pins i to
+// the start of a window holding exactly n active ticks, so i is the n-th active
+// tick counted back from j. $past(e1, n, e2, c)[w^j] reports e1[w^i] for such
+// an i. The result is empty when no index qualifies; §F.6.2 then evaluates e1
+// at its initial values instead. n shall be at least 1; the result is empty
+// when it is not, or when j lies outside 0 <= j < |w|.
 std::vector<std::size_t> PastSourceIndices(
     const Word& word, std::size_t j, unsigned int n,
     const std::shared_ptr<const BooleanExpr>& gate,
@@ -43,8 +43,8 @@ bool PastSamplesInitialValue(const Word& word, std::size_t j, unsigned int n,
 
 // §F.6.2 ($past_gclk): the source letter index of $past_gclk(e)[w^j]. The value
 // is e[w^{j-1}] when j > 0, so the source is the immediately preceding letter
-// j-1; std::nullopt at w^0 (and for an out-of-range j), where §F.6.2 evaluates e
-// at its initial values.
+// j-1; std::nullopt at w^0 (and for an out-of-range j), where §F.6.2 evaluates
+// e at its initial values.
 std::optional<std::size_t> PastGclkSourceIndex(const Word& word, std::size_t j);
 
 }  // namespace delta

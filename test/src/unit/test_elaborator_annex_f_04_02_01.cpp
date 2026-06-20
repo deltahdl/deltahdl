@@ -10,8 +10,7 @@ namespace {
 // (checker instances). It therefore has exactly one stage, whose successor is
 // itself — unlike §F.4.1.1's properties→sequences progression.
 TEST(CheckerRewriteAlgorithm, MainLoopHasSingleStage) {
-  EXPECT_EQ(FirstCheckerRewriteStage(),
-            CheckerRewriteStage::kCheckerInstances);
+  EXPECT_EQ(FirstCheckerRewriteStage(), CheckerRewriteStage::kCheckerInstances);
   EXPECT_EQ(NextCheckerRewriteStage(CheckerRewriteStage::kCheckerInstances),
             CheckerRewriteStage::kCheckerInstances);
 }
@@ -38,9 +37,9 @@ TEST(CheckerRewriteAlgorithm, UntypedFormalSubstitution) {
   EXPECT_EQ(ReplaceCheckerFormalReference(FormalKind::kUntyped,
                                           ActualNature::kDollarOrLvalue),
             ReferenceReplacement::kActualDirect);
-  EXPECT_EQ(ReplaceCheckerFormalReference(FormalKind::kUntyped,
-                                          ActualNature::kOther),
-            ReferenceReplacement::kItemCastInferredType);
+  EXPECT_EQ(
+      ReplaceCheckerFormalReference(FormalKind::kUntyped, ActualNature::kOther),
+      ReferenceReplacement::kItemCastInferredType);
 }
 
 // §F.4.2.1 step 4: a typed non-matching formal casts to the formal type t
@@ -68,8 +67,10 @@ TEST(CheckerRewriteAlgorithm, TypedMatchingFormalSubstitution) {
 // §F.4.2.1 step 4 shall: a reference replaced by a cast in step 4 shall not be
 // a variable_lvalue anywhere in the checker. The replacement (a cast) can never
 // be an lvalue, and the prohibition spans the whole checker — a wider scope
-// than §F.4.1.1's, which is confined to a sequence_match_item assignment target.
-TEST(CheckerRewriteAlgorithm, Step4ReplacementForbidsVariableLvalueWholeChecker) {
+// than §F.4.1.1's, which is confined to a sequence_match_item assignment
+// target.
+TEST(CheckerRewriteAlgorithm,
+     Step4ReplacementForbidsVariableLvalueWholeChecker) {
   Step4LvalueRule rule = CheckerStep4LvalueRule();
   EXPECT_FALSE(rule.replacement_may_be_lvalue);
   EXPECT_EQ(rule.scope, LvalueProhibitionScope::kWholeChecker);

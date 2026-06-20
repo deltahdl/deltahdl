@@ -108,4 +108,4 @@ void Refactor(AigGraph& g) {
 
 void RemoveRedundancy(AigGraph& g) { ConstProp(g); }
 
-}
+}  // namespace delta

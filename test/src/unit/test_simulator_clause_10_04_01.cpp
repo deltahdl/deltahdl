@@ -127,4 +127,4 @@ TEST(BlockingAssignSim, IntraAssignmentDelayEvaluatesLvalueAfterDelay) {
   EXPECT_EQ(arr->unpacked_array[3].ToUint64(), 99u);
 }
 
-}
+}  // namespace

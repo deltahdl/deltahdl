@@ -30,4 +30,4 @@ TEST(LogicValuesLexer, KeywordMatchIsCaseSensitive) {
   EXPECT_EQ(tokens[0].text, "Logic");
 }
 
-}
+}  // namespace

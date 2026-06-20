@@ -86,4 +86,4 @@ TEST(ModuleHeaderDefinition, TimeunitsInModuleThroughPreprocessor) {
   EXPECT_TRUE(r.cu->modules[0]->has_timeprecision);
 }
 
-}
+}  // namespace

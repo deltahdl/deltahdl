@@ -23,10 +23,10 @@ enum class InterfaceHierRefStep {
 // §25.3: when the actual of an interface port connection is a hierarchical
 // reference to an interface, or to a modport of a hierarchically referenced
 // interface, the reference must terminate at an interface instance and must not
-// pass through an arrayed instance or a generate block along the way. A trailing
-// modport name does not change the requirement: the path of instance steps must
-// still resolve to an interface instance. An empty path names nothing and is
-// therefore not a legal interface-port actual.
+// pass through an arrayed instance or a generate block along the way. A
+// trailing modport name does not change the requirement: the path of instance
+// steps must still resolve to an interface instance. An empty path names
+// nothing and is therefore not a legal interface-port actual.
 bool InterfacePortHierRefIsLegal(const std::vector<InterfaceHierRefStep>& path);
 
 // §25.3: where the parameter targeted by a defparam sits relative to the

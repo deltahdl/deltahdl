@@ -113,8 +113,8 @@ TEST_F(Callback, CallbackOnTimeQueueIsReachedFromTimeQueue) {
 // The object-scoped iteration is limited to its reference object: a callback
 // placed on one object is not reached from a different object, and a callback
 // not related to any object (its obj field is null - detail 2) is not reached
-// from an object reference either. The reference objects are statements, so this
-// also observes the diagram's stmt -> callback edge on its positive path.
+// from an object reference either. The reference objects are statements, so
+// this also observes the diagram's stmt -> callback edge on its positive path.
 TEST_F(Callback, CallbackIterationFromObjectIsScopedToThatObject) {
   VpiObject target;
   target.type = vpiAssignStmt;
@@ -148,10 +148,11 @@ TEST_F(Callback, CallbackIterationFromObjectIsScopedToThatObject) {
 }
 
 // Edge case of the object -> callback edges: iterating vpiCallback from an
-// object that carries no callback yields no iterator at all, even when callbacks
-// are registered on other objects. The walk matches by the object a callback was
-// placed on, so an object none name produces an empty result, which the iterate
-// dispatch reports as a null handle rather than an empty iterator.
+// object that carries no callback yields no iterator at all, even when
+// callbacks are registered on other objects. The walk matches by the object a
+// callback was placed on, so an object none name produces an empty result,
+// which the iterate dispatch reports as a null handle rather than an empty
+// iterator.
 TEST_F(Callback, IterationFromObjectWithoutCallbackYieldsNoIterator) {
   VpiObject with_callback;
   with_callback.type = vpiAssignStmt;

@@ -1,8 +1,7 @@
-#include "simulator/specify.h"
-
 #include <gtest/gtest.h>
 
 #include "common/types.h"
+#include "simulator/specify.h"
 
 using namespace delta;
 

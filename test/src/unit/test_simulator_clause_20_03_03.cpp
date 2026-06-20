@@ -79,4 +79,4 @@ TEST(SysTask, RealtimeScalesAcrossMultipleDecades) {
   EXPECT_DOUBLE_EQ(RealtimeAtTick(f, 250), 2.5);
 }
 
-}
+}  // namespace

@@ -92,4 +92,4 @@ TEST(LoopSyntaxParsing, RepeatAsStatement) {
   EXPECT_EQ(stmt->kind, StmtKind::kRepeat);
 }
 
-}
+}  // namespace

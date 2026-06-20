@@ -76,4 +76,4 @@ TEST(FunctionSim, FunctionMultipleStatements) {
   EXPECT_EQ(val, 6u);
 }
 
-}
+}  // namespace

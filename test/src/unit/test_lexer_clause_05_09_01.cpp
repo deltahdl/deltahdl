@@ -122,7 +122,8 @@ TEST(LexicalConventionLexing, LineContinuationRequiresThirdBackslash) {
 TEST(LexicalConventionLexing, TripleQuotedEscapeSequencesSupported) {
   auto r = LexOne(R"("""a\nb\"c""")");
   ASSERT_EQ(r.token.kind, TokenKind::kStringLiteral);
-  std::string body = std::string(r.token.text).substr(3, r.token.text.size() - 6);
+  std::string body =
+      std::string(r.token.text).substr(3, r.token.text.size() - 6);
   EXPECT_EQ(InterpretStringEscapes(body), "a\nb\"c");
 }
 
@@ -154,4 +155,4 @@ TEST(LexicalConventionLexing, OctalConsumesAtMostThreeDigits) {
   EXPECT_EQ(InterpretStringEscapes(R"(\1011)"), "A1");
 }
 
-}
+}  // namespace

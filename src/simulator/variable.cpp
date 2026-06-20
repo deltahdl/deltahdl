@@ -1,5 +1,3 @@
 #include "simulator/variable.h"
 
-namespace delta {
-
-}
+namespace delta {}

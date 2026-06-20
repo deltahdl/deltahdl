@@ -20,8 +20,8 @@ TEST(EventuallyRange, WeakEventuallyRejectsUnboundedMaximum) {
 }
 
 // §16.12.13: the range for a strong eventually may be unbounded, so a `$` upper
-// bound is accepted for `s_eventually` even though the same bound is illegal for
-// the weak form.
+// bound is accepted for `s_eventually` even though the same bound is illegal
+// for the weak form.
 TEST(EventuallyRange, StrongEventuallyAllowsUnboundedMaximum) {
   EXPECT_TRUE(
       IsEventuallyRangeWellFormed(MakeEventuallyDollar(), /*strong=*/true));

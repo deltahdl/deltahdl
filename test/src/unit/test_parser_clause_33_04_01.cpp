@@ -12,11 +12,12 @@ namespace {
 //   { local_parameter_declaration ; } design_statement
 //   { config_rule_statement } endconfig [ : config_identifier ]
 TEST(ConfigDeclarationParsing, FullShapeWithLocalparamAndEndLabel) {
-  auto r = Parse("config cfg;\n"
-                 "  localparam W = 8;\n"
-                 "  design work.top;\n"
-                 "  default liblist work;\n"
-                 "endconfig : cfg\n");
+  auto r = Parse(
+      "config cfg;\n"
+      "  localparam W = 8;\n"
+      "  design work.top;\n"
+      "  default liblist work;\n"
+      "endconfig : cfg\n");
   ASSERT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->configs.size(), 1u);
   auto* cfg = r.cu->configs[0];
@@ -27,9 +28,10 @@ TEST(ConfigDeclarationParsing, FullShapeWithLocalparamAndEndLabel) {
 }
 
 TEST(ConfigDeclarationParsing, MinimalConfigParses) {
-  auto r = Parse("config c;\n"
-                 "  design top;\n"
-                 "endconfig\n");
+  auto r = Parse(
+      "config c;\n"
+      "  design top;\n"
+      "endconfig\n");
   ASSERT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->configs.size(), 1u);
   EXPECT_TRUE(r.cu->configs[0]->local_params.empty());
@@ -37,11 +39,12 @@ TEST(ConfigDeclarationParsing, MinimalConfigParses) {
 
 // The { local_parameter_declaration ; } repetition admits more than one entry.
 TEST(ConfigDeclarationParsing, MultipleLocalParamsCollected) {
-  auto r = Parse("config c;\n"
-                 "  localparam A = 1;\n"
-                 "  localparam B = 2;\n"
-                 "  design top;\n"
-                 "endconfig\n");
+  auto r = Parse(
+      "config c;\n"
+      "  localparam A = 1;\n"
+      "  localparam B = 2;\n"
+      "  design top;\n"
+      "endconfig\n");
   ASSERT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->configs.size(), 1u);
   auto& params = r.cu->configs[0]->local_params;
@@ -52,24 +55,27 @@ TEST(ConfigDeclarationParsing, MultipleLocalParamsCollected) {
 
 // config_declaration requires a ';' after the config identifier.
 TEST(ConfigDeclarationParsing, MissingSemicolonAfterNameReported) {
-  auto r = Parse("config c\n"
-                 "  design top;\n"
-                 "endconfig\n");
+  auto r = Parse(
+      "config c\n"
+      "  design top;\n"
+      "endconfig\n");
   EXPECT_TRUE(r.has_errors);
 }
 
 // config_declaration requires the closing 'endconfig' keyword.
 TEST(ConfigDeclarationParsing, MissingEndconfigReported) {
-  auto r = Parse("config c;\n"
-                 "  design top;\n");
+  auto r = Parse(
+      "config c;\n"
+      "  design top;\n");
   EXPECT_TRUE(r.has_errors);
 }
 
 // design_statement ::= design { [ library_identifier . ] cell_identifier } ;
 TEST(ConfigDesignStatementParsing, CollectsQualifiedAndBareCells) {
-  auto r = Parse("config c;\n"
-                 "  design work.top other;\n"
-                 "endconfig\n");
+  auto r = Parse(
+      "config c;\n"
+      "  design work.top other;\n"
+      "endconfig\n");
   ASSERT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->configs.size(), 1u);
   auto& cells = r.cu->configs[0]->design_cells;
@@ -83,9 +89,10 @@ TEST(ConfigDesignStatementParsing, CollectsQualifiedAndBareCells) {
 // design_statement's cell list is a { } repetition, so an empty list still
 // forms a well-formed statement at the grammar level.
 TEST(ConfigDesignStatementParsing, EmptyCellListParses) {
-  auto r = Parse("config c;\n"
-                 "  design ;\n"
-                 "endconfig\n");
+  auto r = Parse(
+      "config c;\n"
+      "  design ;\n"
+      "endconfig\n");
   ASSERT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->configs.size(), 1u);
   EXPECT_TRUE(r.cu->configs[0]->design_cells.empty());
@@ -95,14 +102,15 @@ TEST(ConfigDesignStatementParsing, EmptyCellListParses) {
 //   | inst_clause liblist_clause ; | inst_clause use_clause ;
 //   | cell_clause liblist_clause ; | cell_clause use_clause ;
 TEST(ConfigRuleStatementParsing, AllFiveAlternativesParse) {
-  auto r = Parse("config c;\n"
-                 "  design top;\n"
-                 "  default liblist work;\n"
-                 "  instance top.a liblist work;\n"
-                 "  instance top.b use work.alt;\n"
-                 "  cell rtlLib.adder liblist gateLib;\n"
-                 "  cell adder use gateLib.alt;\n"
-                 "endconfig\n");
+  auto r = Parse(
+      "config c;\n"
+      "  design top;\n"
+      "  default liblist work;\n"
+      "  instance top.a liblist work;\n"
+      "  instance top.b use work.alt;\n"
+      "  cell rtlLib.adder liblist gateLib;\n"
+      "  cell adder use gateLib.alt;\n"
+      "endconfig\n");
   ASSERT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->configs.size(), 1u);
   EXPECT_EQ(r.cu->configs[0]->rules.size(), 5u);
@@ -110,10 +118,11 @@ TEST(ConfigRuleStatementParsing, AllFiveAlternativesParse) {
 
 // default_clause ::= default
 TEST(ConfigDefaultClauseParsing, ProducesDefaultRule) {
-  auto r = Parse("config c;\n"
-                 "  design top;\n"
-                 "  default liblist work;\n"
-                 "endconfig\n");
+  auto r = Parse(
+      "config c;\n"
+      "  design top;\n"
+      "  default liblist work;\n"
+      "endconfig\n");
   ASSERT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->configs[0]->rules.size(), 1u);
   EXPECT_EQ(r.cu->configs[0]->rules[0]->kind, ConfigRuleKind::kDefault);
@@ -122,10 +131,11 @@ TEST(ConfigDefaultClauseParsing, ProducesDefaultRule) {
 // inst_clause ::= instance inst_name
 // inst_name ::= topmodule_identifier { . instance_identifier }
 TEST(ConfigInstanceClauseParsing, CapturesDottedInstancePath) {
-  auto r = Parse("config c;\n"
-                 "  design top;\n"
-                 "  instance top.a1.b liblist work;\n"
-                 "endconfig\n");
+  auto r = Parse(
+      "config c;\n"
+      "  design top;\n"
+      "  instance top.a1.b liblist work;\n"
+      "endconfig\n");
   ASSERT_FALSE(r.has_errors);
   auto* rule = r.cu->configs[0]->rules[0];
   EXPECT_EQ(rule->kind, ConfigRuleKind::kInstance);
@@ -133,21 +143,23 @@ TEST(ConfigInstanceClauseParsing, CapturesDottedInstancePath) {
 }
 
 TEST(ConfigInstanceClauseParsing, TopModuleOnlyPath) {
-  auto r = Parse("config c;\n"
-                 "  design top;\n"
-                 "  instance top liblist work;\n"
-                 "endconfig\n");
+  auto r = Parse(
+      "config c;\n"
+      "  design top;\n"
+      "  instance top liblist work;\n"
+      "endconfig\n");
   ASSERT_FALSE(r.has_errors);
   EXPECT_EQ(r.cu->configs[0]->rules[0]->inst_path, "top");
 }
 
 // cell_clause ::= cell [ library_identifier . ] cell_identifier
 TEST(ConfigCellClauseParsing, QualifiedAndBareForms) {
-  auto r = Parse("config c;\n"
-                 "  design top;\n"
-                 "  cell rtlLib.adder liblist gateLib;\n"
-                 "  cell adder liblist gateLib;\n"
-                 "endconfig\n");
+  auto r = Parse(
+      "config c;\n"
+      "  design top;\n"
+      "  cell rtlLib.adder liblist gateLib;\n"
+      "  cell adder liblist gateLib;\n"
+      "endconfig\n");
   ASSERT_FALSE(r.has_errors);
   auto& rules = r.cu->configs[0]->rules;
   ASSERT_EQ(rules.size(), 2u);
@@ -160,10 +172,11 @@ TEST(ConfigCellClauseParsing, QualifiedAndBareForms) {
 
 // liblist_clause ::= liblist { library_identifier }
 TEST(ConfigLiblistClauseParsing, CollectsMultipleLibraries) {
-  auto r = Parse("config c;\n"
-                 "  design top;\n"
-                 "  default liblist rtlLib gateLib spareLib;\n"
-                 "endconfig\n");
+  auto r = Parse(
+      "config c;\n"
+      "  design top;\n"
+      "  default liblist rtlLib gateLib spareLib;\n"
+      "endconfig\n");
   ASSERT_FALSE(r.has_errors);
   auto* rule = r.cu->configs[0]->rules[0];
   ASSERT_EQ(rule->liblist.size(), 3u);
@@ -173,20 +186,22 @@ TEST(ConfigLiblistClauseParsing, CollectsMultipleLibraries) {
 }
 
 TEST(ConfigLiblistClauseParsing, EmptyLibraryListParses) {
-  auto r = Parse("config c;\n"
-                 "  design top;\n"
-                 "  default liblist;\n"
-                 "endconfig\n");
+  auto r = Parse(
+      "config c;\n"
+      "  design top;\n"
+      "  default liblist;\n"
+      "endconfig\n");
   ASSERT_FALSE(r.has_errors);
   EXPECT_TRUE(r.cu->configs[0]->rules[0]->liblist.empty());
 }
 
 // use_clause ::= use [ library_identifier . ] cell_identifier [ : config ]
 TEST(ConfigUseClauseParsing, CellWithLibraryAndConfigSuffix) {
-  auto r = Parse("config c;\n"
-                 "  design top;\n"
-                 "  instance top.a use gateLib.adder : config;\n"
-                 "endconfig\n");
+  auto r = Parse(
+      "config c;\n"
+      "  design top;\n"
+      "  instance top.a use gateLib.adder : config;\n"
+      "endconfig\n");
   ASSERT_FALSE(r.has_errors);
   auto* rule = r.cu->configs[0]->rules[0];
   EXPECT_EQ(rule->use_lib, "gateLib");
@@ -197,10 +212,11 @@ TEST(ConfigUseClauseParsing, CellWithLibraryAndConfigSuffix) {
 // use_clause ::= use named_parameter_assignment
 //   { , named_parameter_assignment } [ : config ]
 TEST(ConfigUseClauseParsing, BareNamedParameterAssignmentList) {
-  auto r = Parse("config c;\n"
-                 "  design top;\n"
-                 "  instance top.a use .W(8), .D(16);\n"
-                 "endconfig\n");
+  auto r = Parse(
+      "config c;\n"
+      "  design top;\n"
+      "  instance top.a use .W(8), .D(16);\n"
+      "endconfig\n");
   ASSERT_FALSE(r.has_errors);
   auto* rule = r.cu->configs[0]->rules[0];
   EXPECT_EQ(rule->use_cell, "");
@@ -212,10 +228,11 @@ TEST(ConfigUseClauseParsing, BareNamedParameterAssignmentList) {
 // use_clause ::= use [ library_identifier . ] cell_identifier
 //   { , named_parameter_assignment } [ : config ]
 TEST(ConfigUseClauseParsing, CellFollowedByNamedParameterAssignments) {
-  auto r = Parse("config c;\n"
-                 "  design top;\n"
-                 "  instance top.a use gateLib.adder, .W(8) : config;\n"
-                 "endconfig\n");
+  auto r = Parse(
+      "config c;\n"
+      "  design top;\n"
+      "  instance top.a use gateLib.adder, .W(8) : config;\n"
+      "endconfig\n");
   ASSERT_FALSE(r.has_errors);
   auto* rule = r.cu->configs[0]->rules[0];
   EXPECT_EQ(rule->use_lib, "gateLib");
@@ -227,10 +244,11 @@ TEST(ConfigUseClauseParsing, CellFollowedByNamedParameterAssignments) {
 
 // The bare named_parameter_assignment form also accepts the ': config' suffix.
 TEST(ConfigUseClauseParsing, BareNamedParametersWithConfigSuffix) {
-  auto r = Parse("config c;\n"
-                 "  design top;\n"
-                 "  instance top.a use .W(8) : config;\n"
-                 "endconfig\n");
+  auto r = Parse(
+      "config c;\n"
+      "  design top;\n"
+      "  instance top.a use .W(8) : config;\n"
+      "endconfig\n");
   ASSERT_FALSE(r.has_errors);
   auto* rule = r.cu->configs[0]->rules[0];
   EXPECT_EQ(rule->use_cell, "");
@@ -240,10 +258,11 @@ TEST(ConfigUseClauseParsing, BareNamedParametersWithConfigSuffix) {
 }
 
 TEST(ConfigUseClauseParsing, EmptyParameterExpressionAccepted) {
-  auto r = Parse("config c;\n"
-                 "  design top;\n"
-                 "  instance top.a use .W();\n"
-                 "endconfig\n");
+  auto r = Parse(
+      "config c;\n"
+      "  design top;\n"
+      "  instance top.a use .W();\n"
+      "endconfig\n");
   ASSERT_FALSE(r.has_errors);
   auto* rule = r.cu->configs[0]->rules[0];
   ASSERT_EQ(rule->use_params.size(), 1u);

@@ -19,9 +19,9 @@ namespace {
 // simulator uses), so $writememb / $writememh have a memory to dump.
 void SetupMem(SimFixture& f, const char* name, int lo, int size,
               uint32_t width) {
-  f.ctx.RegisterArray(name, {static_cast<uint32_t>(lo),
-                             static_cast<uint32_t>(size), width, false, false,
-                             false});
+  f.ctx.RegisterArray(
+      name, {static_cast<uint32_t>(lo), static_cast<uint32_t>(size), width,
+             false, false, false});
   for (int i = 0; i < size; ++i) {
     std::string nm = std::string(name) + "[" + std::to_string(lo + i) + "]";
     auto* s = f.arena.AllocString(nm.c_str(), nm.size());
@@ -96,8 +96,8 @@ TEST(IoSystemTaskTest, WritemembBasic) {
   std::remove(tmp_path.c_str());
 }
 
-// §21.5: the file $writememh produces is readable by $readmemh. Dumping a memory
-// array and reading it back into a fresh array reproduces every word.
+// §21.5: the file $writememh produces is readable by $readmemh. Dumping a
+// memory array and reading it back into a fresh array reproduces every word.
 TEST(IoSystemTaskTest, WritememhArrayRoundTripsThroughReadmemh) {
   SimFixture f;
   std::string path = "/tmp/deltahdl_test_21_05_rt_h.txt";

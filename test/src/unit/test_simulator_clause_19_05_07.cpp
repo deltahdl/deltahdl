@@ -79,14 +79,13 @@ TEST(ValueResolution, UnknownBitsWarnExceptForWildcardBins) {
 // LRM 19.5.7, first warning bullet: a singleton value that warns does not
 // participate in the bin.
 TEST(ValueResolution, WarnedSingletonDoesNotParticipate) {
-  EXPECT_TRUE(
-      CoverageDB::SingletonValueParticipates(BinValueResolution::kOk));
+  EXPECT_TRUE(CoverageDB::SingletonValueParticipates(BinValueResolution::kOk));
   EXPECT_FALSE(CoverageDB::SingletonValueParticipates(
       BinValueResolution::kUnsignedNegative));
   EXPECT_FALSE(CoverageDB::SingletonValueParticipates(
       BinValueResolution::kValueChanged));
-  EXPECT_FALSE(CoverageDB::SingletonValueParticipates(
-      BinValueResolution::kUnknownBits));
+  EXPECT_FALSE(
+      CoverageDB::SingletonValueParticipates(BinValueResolution::kUnknownBits));
 }
 
 // LRM 19.5.7, second range bullet: a range whose endpoint carries x/z bits, or
@@ -98,9 +97,8 @@ TEST(ValueResolution, RangeDropsWhenEndpointUnknownOrAllValuesWarn) {
                                           /*is_wildcard=*/false, Unsigned(3))
                   .empty());
   // [6:10] under signed bit[2:0] (domain -4..3) has no expressible value.
-  EXPECT_TRUE(
-      CoverageDB::ResolveBinRange(6, 10, false, false, false, Signed(3))
-          .empty());
+  EXPECT_TRUE(CoverageDB::ResolveBinRange(6, 10, false, false, false, Signed(3))
+                  .empty());
 }
 
 // LRM 19.5.7, third range bullet: a range with at least one non-warning value

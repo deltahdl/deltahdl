@@ -135,4 +135,4 @@ TEST(RealDataType, DivByZeroReturnsNullopt) {
   EXPECT_FALSE(val.has_value());
 }
 
-}
+}  // namespace

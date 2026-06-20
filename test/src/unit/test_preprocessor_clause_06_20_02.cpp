@@ -17,4 +17,4 @@ TEST(DataTypeParsing, ParameterWithExplicitType) {
   ASSERT_NE(item->init_expr, nullptr);
 }
 
-}
+}  // namespace

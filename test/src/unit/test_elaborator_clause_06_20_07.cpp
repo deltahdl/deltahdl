@@ -207,4 +207,4 @@ TEST(DollarConstantElaboration, DollarParameterNotResolved) {
   }
 }
 
-}
+}  // namespace

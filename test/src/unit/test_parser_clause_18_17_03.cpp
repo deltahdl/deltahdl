@@ -75,4 +75,4 @@ TEST(CaseProductionParsing, CommaSharedExpressionsNoDefault) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}
+}  // namespace

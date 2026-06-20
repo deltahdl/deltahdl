@@ -54,8 +54,7 @@ TEST_F(ProtectDataKeynameSyntaxTest,
 // portion of the quoted value leaking into the output.
 TEST_F(ProtectDataKeynameSyntaxTest,
        DataKeynameStringArgumentWithSpacesConsumed) {
-  auto result =
-      Preprocess("`pragma protect data_keyname = \"my key name\"\n");
+  auto result = Preprocess("`pragma protect data_keyname = \"my key name\"\n");
   EXPECT_FALSE(diag_.HasErrors());
   EXPECT_EQ(result.find("pragma"), std::string::npos);
   EXPECT_EQ(result.find("my key name"), std::string::npos);

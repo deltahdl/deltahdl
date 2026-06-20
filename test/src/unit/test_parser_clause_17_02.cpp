@@ -144,4 +144,4 @@ TEST(CheckerDeclaration, WithMixedContents) {
               "endchecker\n"));
 }
 
-}
+}  // namespace

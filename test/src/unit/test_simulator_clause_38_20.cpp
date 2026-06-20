@@ -29,9 +29,9 @@ class VpiHandleByMultiIndexSim : public ::testing::Test {
 // supplied indices to apply.
 TEST_F(VpiHandleByMultiIndexSim, ResolvesNestedSubobjectFromIndexList) {
   auto* mod = vpi_ctx_.CreateModule("top", "top");
-  vpi_ctx_.CreatePort("a", kVpiInput, mod);          // index 0
+  vpi_ctx_.CreatePort("a", kVpiInput, mod);                  // index 0
   auto* port_b = vpi_ctx_.CreatePort("b", kVpiOutput, mod);  // index 1
-  vpi_ctx_.CreatePort("b0", kVpiOutput, port_b);     // index 0 within b
+  vpi_ctx_.CreatePort("b0", kVpiOutput, port_b);             // index 0 within b
   auto* bit_b1 = vpi_ctx_.CreatePort("b1", kVpiOutput, port_b);  // index 1
 
   int indices[] = {1, 1};
@@ -41,14 +41,15 @@ TEST_F(VpiHandleByMultiIndexSim, ResolvesNestedSubobjectFromIndexList) {
 }
 
 // §38.20: the indices follow the array dimension declaration from leftmost to
-// rightmost, so applying them in the opposite order names a different subobject.
+// rightmost, so applying them in the opposite order names a different
+// subobject.
 TEST_F(VpiHandleByMultiIndexSim, IndicesAreAppliedLeftmostFirst) {
   auto* mod = vpi_ctx_.CreateModule("top", "top");
   auto* port_a = vpi_ctx_.CreatePort("a", kVpiInput, mod);   // index 0
   auto* port_b = vpi_ctx_.CreatePort("b", kVpiOutput, mod);  // index 1
-  vpi_ctx_.CreatePort("a0", kVpiInput, port_a);             // a[0]
-  auto* a1 = vpi_ctx_.CreatePort("a1", kVpiInput, port_a);  // a[1]
-  auto* b0 = vpi_ctx_.CreatePort("b0", kVpiOutput, port_b); // b[0]
+  vpi_ctx_.CreatePort("a0", kVpiInput, port_a);              // a[0]
+  auto* a1 = vpi_ctx_.CreatePort("a1", kVpiInput, port_a);   // a[1]
+  auto* b0 = vpi_ctx_.CreatePort("b0", kVpiOutput, port_b);  // b[0]
 
   int forward[] = {0, 1};  // a then a[1]
   EXPECT_EQ(VpiHandleByMultiIndexC(mod, 2, forward), a1);
@@ -62,9 +63,9 @@ TEST_F(VpiHandleByMultiIndexSim, IndicesAreAppliedLeftmostFirst) {
 // intermediate subobject without descending further.
 TEST_F(VpiHandleByMultiIndexSim, NumIndexGovernsHowManyIndicesApply) {
   auto* mod = vpi_ctx_.CreateModule("top", "top");
-  vpi_ctx_.CreatePort("a", kVpiInput, mod);                 // index 0
-  auto* port_b = vpi_ctx_.CreatePort("b", kVpiOutput, mod); // index 1
-  vpi_ctx_.CreatePort("b0", kVpiOutput, port_b);            // index 0 within b
+  vpi_ctx_.CreatePort("a", kVpiInput, mod);                  // index 0
+  auto* port_b = vpi_ctx_.CreatePort("b", kVpiOutput, mod);  // index 1
+  vpi_ctx_.CreatePort("b0", kVpiOutput, port_b);             // index 0 within b
 
   int indices[] = {1};
   EXPECT_EQ(VpiHandleByMultiIndexC(mod, 1, indices), port_b);
@@ -123,5 +124,5 @@ TEST_F(VpiHandleByMultiIndexSim, ReferenceWithoutAccessByIndexReturnsNullptr) {
   EXPECT_EQ(VpiHandleByMultiIndexC(param, 1, indices), nullptr);
 }
 
-}
-}
+}  // namespace
+}  // namespace delta

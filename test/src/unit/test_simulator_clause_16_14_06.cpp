@@ -20,7 +20,8 @@ TEST(ProceduralConcurrentAssertion, EnqueuePendingInstanceCapturesCurrentArgs) {
   EXPECT_EQ(q.Size(), 1u);
   EXPECT_EQ(q.MaturedCount(), 0u);
   EXPECT_EQ(q.Entries().front().sampled_args.front().value, 7u);
-  EXPECT_EQ(q.Entries().front().sampled_args.front().mode, SampleMode::kCurrent);
+  EXPECT_EQ(q.Entries().front().sampled_args.front().mode,
+            SampleMode::kCurrent);
 }
 
 TEST(ProceduralConcurrentAssertion, MatureAllConfirmsEveryPendingInstance) {
@@ -76,12 +77,14 @@ TEST(ProceduralConcurrentAssertion, EngineProvidesQueuePerProcess) {
   EXPECT_EQ(q2.Size(), 0u);
 }
 
-TEST(ProceduralConcurrentAssertion, StaticConcurrentAssertionIsTheNonProceduralCase) {
-  EXPECT_TRUE(IsStaticConcurrentAssertion( false));
-  EXPECT_FALSE(IsStaticConcurrentAssertion( true));
+TEST(ProceduralConcurrentAssertion,
+     StaticConcurrentAssertionIsTheNonProceduralCase) {
+  EXPECT_TRUE(IsStaticConcurrentAssertion(false));
+  EXPECT_FALSE(IsStaticConcurrentAssertion(true));
 }
 
-TEST(ProceduralConcurrentAssertion, MaturedQueueHoldsInstanceUntilNextClockTick) {
+TEST(ProceduralConcurrentAssertion,
+     MaturedQueueHoldsInstanceUntilNextClockTick) {
   MaturedAssertionQueue mq;
   EXPECT_EQ(mq.Size(), 0u);
 
@@ -98,35 +101,31 @@ TEST(ProceduralConcurrentAssertion, MaturedQueueHoldsInstanceUntilNextClockTick)
 }
 
 TEST(ProceduralConcurrentAssertion, AutomaticVariableForbiddenInClockingEvent) {
-  EXPECT_TRUE(IsAutomaticAllowedInClockingEvent( false));
-  EXPECT_FALSE(IsAutomaticAllowedInClockingEvent( true));
+  EXPECT_TRUE(IsAutomaticAllowedInClockingEvent(false));
+  EXPECT_FALSE(IsAutomaticAllowedInClockingEvent(true));
 }
 
 TEST(ProceduralConcurrentAssertion, ClockInferredFromProceduralContextFirst) {
-  InferredClock c = InferClockForProceduralConcurrentAssertion(
-      "clk_proc",
-      "clk_default");
+  InferredClock c =
+      InferClockForProceduralConcurrentAssertion("clk_proc", "clk_default");
   EXPECT_EQ(c.kind, InferredClockKind::kFromProceduralContext);
   EXPECT_EQ(c.signal_name, "clk_proc");
 }
 
 TEST(ProceduralConcurrentAssertion, ClockInferredFromDefaultClockingFallback) {
-  InferredClock c = InferClockForProceduralConcurrentAssertion(
-      "",
-      "clk_default");
+  InferredClock c =
+      InferClockForProceduralConcurrentAssertion("", "clk_default");
   EXPECT_EQ(c.kind, InferredClockKind::kFromDefaultClocking);
   EXPECT_EQ(c.signal_name, "clk_default");
 }
 
 TEST(ProceduralConcurrentAssertion, ClockInferenceFailsWhenNoContextAvailable) {
-  InferredClock c = InferClockForProceduralConcurrentAssertion(
-      "", "");
+  InferredClock c = InferClockForProceduralConcurrentAssertion("", "");
   EXPECT_EQ(c.kind, InferredClockKind::kNotInferrable);
   EXPECT_EQ(c.signal_name, "");
 }
 
 TEST(ProceduralConcurrentAssertion, ClockInferenceRequiresAllThreeConditions) {
-
   EXPECT_TRUE(SatisfiesClockInferenceRequirements(true, true, true));
 
   EXPECT_FALSE(SatisfiesClockInferenceRequirements(false, true, true));
@@ -136,4 +135,4 @@ TEST(ProceduralConcurrentAssertion, ClockInferenceRequiresAllThreeConditions) {
   EXPECT_FALSE(SatisfiesClockInferenceRequirements(false, false, false));
 }
 
-}
+}  // namespace

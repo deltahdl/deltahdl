@@ -222,4 +222,4 @@ TEST(AggregateTypeParsing, ReductionWithCustomIterator) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}
+}  // namespace

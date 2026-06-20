@@ -49,7 +49,7 @@ TEST(CrossWithCovergroup, BareCrossIdentifierSelectsAllBinTuples) {
 TEST(CrossWithCovergroup, WithClauseDefaultsToAtLeastOne) {
   // candidate 0: <{0},{0}> sum 0; candidate 1: <{5},{5}> sum 10.
   std::vector<std::vector<std::vector<int64_t>>> candidates = {{{0}, {0}},
-                                                              {{5}, {5}}};
+                                                               {{5}, {5}}};
   std::function<bool(const std::vector<int64_t>&)> pred =
       [](const std::vector<int64_t>& t) { return t[0] + t[1] < 1; };
   CrossWithMatchPolicy policy;  // default: require_all false, min_count 1
@@ -64,7 +64,7 @@ TEST(CrossWithCovergroup, MatchesIntegerRequiresMinimumCount) {
   // candidate 0: <{0,1},{0}>     -> tuples <0,0>,<1,0>, 2 satisfy a+b<2.
   // candidate 1: <{0,5},{0}>     -> tuples <0,0>,<5,0>, 1 satisfies a+b<2.
   std::vector<std::vector<std::vector<int64_t>>> candidates = {{{0, 1}, {0}},
-                                                              {{0, 5}, {0}}};
+                                                               {{0, 5}, {0}}};
   std::function<bool(const std::vector<int64_t>&)> pred =
       [](const std::vector<int64_t>& t) { return t[0] + t[1] < 2; };
 
@@ -84,7 +84,7 @@ TEST(CrossWithCovergroup, MatchesDollarRequiresAllValueTuples) {
   // candidate 0: <{0,1},{0}> -> all of <0,0>,<1,0> satisfy a+b<2.
   // candidate 1: <{0,5},{0}> -> <5,0> fails a+b<2, so not all satisfy.
   std::vector<std::vector<std::vector<int64_t>>> candidates = {{{0, 1}, {0}},
-                                                              {{0, 5}, {0}}};
+                                                               {{0, 5}, {0}}};
   std::function<bool(const std::vector<int64_t>&)> pred =
       [](const std::vector<int64_t>& t) { return t[0] + t[1] < 2; };
 
@@ -129,8 +129,8 @@ TEST(CrossWithCovergroup, MatchesCountAboveTupleCountSelectsNothing) {
 }
 
 // The $ form selects a candidate only when it has value tuples and all satisfy:
-// a candidate with an empty value set has no value tuples, so it is not selected
-// (LRM 19.6.1.2).
+// a candidate with an empty value set has no value tuples, so it is not
+// selected (LRM 19.6.1.2).
 TEST(CrossWithCovergroup, MatchesDollarRejectsCandidateWithNoValueTuples) {
   std::vector<std::vector<std::vector<int64_t>>> candidates = {{{1, 2}, {}}};
   std::function<bool(const std::vector<int64_t>&)> pred =

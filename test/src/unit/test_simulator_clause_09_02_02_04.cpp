@@ -94,4 +94,4 @@ TEST(AlwaysFFSimulation, NonblockingAssignSemantics) {
   EXPECT_EQ(b->value.ToUint64(), 0x11u);
 }
 
-}
+}  // namespace

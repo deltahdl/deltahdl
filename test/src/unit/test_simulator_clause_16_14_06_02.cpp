@@ -31,8 +31,8 @@ TEST(ProceduralAssertionFlushPoints, WaitResumeIsFlushPoint) {
 // §16.14.6.2: an always_comb re-running on a dependent-signal transition is a
 // flush point.
 TEST(ProceduralAssertionFlushPoints, AlwaysCombSignalDeltaIsFlushPoint) {
-  EXPECT_TRUE(
-      IsProceduralAssertionFlushPoint(FlushPointReason::kAlwaysCombSignalDelta));
+  EXPECT_TRUE(IsProceduralAssertionFlushPoint(
+      FlushPointReason::kAlwaysCombSignalDelta));
 }
 
 // §16.14.6.2: an always_latch re-running on a dependent-signal transition is a
@@ -147,4 +147,4 @@ TEST(ProceduralAssertionFlushPoints, AllMaturedQueueIsUntouchedByFlush) {
   EXPECT_EQ(q.MaturedCount(), 2u);
 }
 
-}
+}  // namespace

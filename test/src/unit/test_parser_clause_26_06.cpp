@@ -75,4 +75,4 @@ TEST(PackageExportParsing, PackageContainingOnlyExports) {
   EXPECT_EQ(r.cu->packages[0]->items.size(), 2u);
 }
 
-}
+}  // namespace

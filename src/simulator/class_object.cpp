@@ -91,8 +91,7 @@ void ClassObject::SetPropertyForType(std::string_view name,
     if (it != properties.end()) {
       it->second = val;
 
-      if (declared_type == type)
-        properties[std::string(name)] = val;
+      if (declared_type == type) properties[std::string(name)] = val;
       return;
     }
   }
@@ -169,8 +168,8 @@ std::string_view VpiClassTypespecParamRhs(const ClassTypespecParamAssign& pa) {
   return pa.has_explicit_arg ? pa.explicit_rhs : pa.default_rhs;
 }
 
-// §37.32: reading a value through the typespec is allowed unless the member is a
-// non-static member reached only via the typespec.
+// §37.32: reading a value through the typespec is allowed unless the member is
+// a non-static member reached only via the typespec.
 bool VpiClassTypespecValueAccessAllowed(bool obtained_from_class_typespec,
                                         bool is_static) {
   return !(obtained_from_class_typespec && !is_static);
@@ -184,18 +183,18 @@ std::vector<ClassTypespecConstraint> VpiClassTypespecConstraints(
   for (const ClassTypespecConstraint& c : ts.constraints) {
     if (!c.is_inline) result.push_back(c);
   }
-  std::stable_sort(result.begin(), result.end(),
-                   [](const ClassTypespecConstraint& a,
-                      const ClassTypespecConstraint& b) {
-                     int ea = a.is_extern ? a.prototype_order : a.decl_order;
-                     int eb = b.is_extern ? b.prototype_order : b.decl_order;
-                     return ea < eb;
-                   });
+  std::stable_sort(
+      result.begin(), result.end(),
+      [](const ClassTypespecConstraint& a, const ClassTypespecConstraint& b) {
+        int ea = a.is_extern ? a.prototype_order : a.decl_order;
+        int eb = b.is_extern ? b.prototype_order : b.decl_order;
+        return ea < eb;
+      });
   return result;
 }
 
-// §37.32: expanding arrays counts each element of a virtual interface array as a
-// separate variable; scalars count once.
+// §37.32: expanding arrays counts each element of a virtual interface array as
+// a separate variable; scalars count once.
 int VpiClassTypespecVirtualInterfaceVarCount(const ClassTypespecInfo& ts) {
   int total = 0;
   for (const ClassTypespecVifVar& v : ts.vif_vars) {
@@ -216,4 +215,4 @@ std::vector<const ClassTypespecInfo*> VpiClassDefnSpecializations(
   return cls.direct_specializations;
 }
 
-}
+}  // namespace delta

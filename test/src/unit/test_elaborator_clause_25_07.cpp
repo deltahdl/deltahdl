@@ -151,7 +151,8 @@ TEST(InterfaceSubroutines, HierarchicalBodyKindMismatchIsError) {
 
 // §25.7: when a modport exports a subroutine via a full prototype, a connected
 // module that supplies a matching definition elaborates without error.
-TEST(ModportDeclarationElaboration, ExportPrototypeMatchingDefinitionElaborates) {
+TEST(ModportDeclarationElaboration,
+     ExportPrototypeMatchingDefinitionElaborates) {
   EXPECT_TRUE(
       ElabOk("interface simple_bus(input logic clk);\n"
              "  modport target(input clk,\n"
@@ -171,7 +172,8 @@ TEST(ModportDeclarationElaboration, ExportPrototypeMatchingDefinitionElaborates)
 // §25.7: a module's definition of an exported subroutine must match the
 // modport's exported prototype exactly; here the argument width differs, which
 // is an elaboration error.
-TEST(ModportDeclarationElaboration, ExportPrototypeMismatchedDefinitionIsError) {
+TEST(ModportDeclarationElaboration,
+     ExportPrototypeMismatchedDefinitionIsError) {
   EXPECT_FALSE(
       ElabOk("interface simple_bus(input logic clk);\n"
              "  modport target(input clk,\n"
@@ -190,7 +192,8 @@ TEST(ModportDeclarationElaboration, ExportPrototypeMismatchedDefinitionIsError) 
 
 // §25.7: matching includes the return value for an exported function prototype;
 // a definition whose return type agrees elaborates cleanly.
-TEST(ModportDeclarationElaboration, ExportFunctionPrototypeMatchingReturnElaborates) {
+TEST(ModportDeclarationElaboration,
+     ExportFunctionPrototypeMatchingReturnElaborates) {
   EXPECT_TRUE(
       ElabOk("interface simple_bus(input logic clk);\n"
              "  modport target(input clk,\n"
@@ -208,9 +211,10 @@ TEST(ModportDeclarationElaboration, ExportFunctionPrototypeMatchingReturnElabora
              "endmodule\n"));
 }
 
-// §25.7: an exported function whose definition returns a different type than the
-// modport prototype does not match, which is an elaboration error.
-TEST(ModportDeclarationElaboration, ExportFunctionPrototypeReturnMismatchIsError) {
+// §25.7: an exported function whose definition returns a different type than
+// the modport prototype does not match, which is an elaboration error.
+TEST(ModportDeclarationElaboration,
+     ExportFunctionPrototypeReturnMismatchIsError) {
   EXPECT_FALSE(
       ElabOk("interface simple_bus(input logic clk);\n"
              "  modport target(input clk,\n"
@@ -228,4 +232,4 @@ TEST(ModportDeclarationElaboration, ExportFunctionPrototypeReturnMismatchIsError
              "endmodule\n"));
 }
 
-}
+}  // namespace

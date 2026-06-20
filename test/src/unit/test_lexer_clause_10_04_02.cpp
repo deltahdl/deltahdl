@@ -33,4 +33,4 @@ TEST(NonblockingAssignLexing, WithIntraDelayTokenSequence) {
   EXPECT_EQ(tokens[5].kind, TokenKind::kSemicolon);
 }
 
-}
+}  // namespace

@@ -82,8 +82,7 @@ TEST(QueueDelete, IndexEqualToSizeIsNoop) {
 TEST(QueueDelete, IndexGreaterThanSizeIsNoop) {
   SimFixture f;
   auto* q = MakeQueue(f, "q", {10, 20});
-  auto* call =
-      MakeMethodCall(f.arena, "q", "delete", {MakeInt(f.arena, 100)});
+  auto* call = MakeMethodCall(f.arena, "q", "delete", {MakeInt(f.arena, 100)});
   TryExecQueueMethodStmt(call, f.ctx, f.arena);
   EXPECT_EQ(q->elements.size(), 2u);
   EXPECT_EQ(q->elements[0].ToUint64(), 10u);
@@ -97,8 +96,7 @@ TEST(QueueDelete, XzIndexIsNoop) {
   idx_var->value = MakeLogic4Vec(f.arena, 32);
   idx_var->value.words[0].aval = 0;
   idx_var->value.words[0].bval = 1;
-  auto* call =
-      MakeMethodCall(f.arena, "q", "delete", {MakeId(f.arena, "idx")});
+  auto* call = MakeMethodCall(f.arena, "q", "delete", {MakeId(f.arena, "idx")});
   TryExecQueueMethodStmt(call, f.ctx, f.arena);
   EXPECT_EQ(q->elements.size(), 2u);
   EXPECT_EQ(q->elements[0].ToUint64(), 10u);
@@ -113,8 +111,7 @@ TEST(QueueDelete, NegativeIndexIsNoop) {
   idx_var->value.words[0].aval = static_cast<uint64_t>(-1);
   idx_var->value.words[0].bval = 0;
   idx_var->value.is_signed = true;
-  auto* call =
-      MakeMethodCall(f.arena, "q", "delete", {MakeId(f.arena, "idx")});
+  auto* call = MakeMethodCall(f.arena, "q", "delete", {MakeId(f.arena, "idx")});
   TryExecQueueMethodStmt(call, f.ctx, f.arena);
   EXPECT_EQ(q->elements.size(), 2u);
   EXPECT_EQ(q->elements[0].ToUint64(), 10u);
@@ -129,4 +126,4 @@ TEST(QueueDelete, DeleteOnEmptyQueueWithIndexIsNoop) {
   EXPECT_EQ(q->elements.size(), 0u);
 }
 
-}
+}  // namespace

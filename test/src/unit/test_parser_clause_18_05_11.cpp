@@ -49,10 +49,10 @@ TEST(FunctionsInConstraintsParsing, NoCallRecordsNothing) {
   EXPECT_TRUE(m->constraint_function_call_refs.empty());
 }
 
-// 18.5.11: a member-qualified call (obj.f(...)) is not an unqualified call on the
-// enclosing class, so its leaf name is not recorded as a constraint function
-// call — only the receiver-free form is the function-in-constraint the clause
-// governs.
+// 18.5.11: a member-qualified call (obj.f(...)) is not an unqualified call on
+// the enclosing class, so its leaf name is not recorded as a constraint
+// function call — only the receiver-free form is the function-in-constraint the
+// clause governs.
 TEST(FunctionsInConstraintsParsing, MemberQualifiedCallNotRecorded) {
   auto r = Parse(
       "class C;\n"
@@ -97,9 +97,9 @@ TEST(FunctionsInConstraintsParsing, RecordsMultipleCalls) {
   EXPECT_TRUE(RefersTo(m, "g"));
 }
 
-// 18.5.11: a call nested as the argument of another call is itself an unqualified
-// call and is recorded too, so the restrictions can later be applied to both the
-// outer and the inner function.
+// 18.5.11: a call nested as the argument of another call is itself an
+// unqualified call and is recorded too, so the restrictions can later be
+// applied to both the outer and the inner function.
 TEST(FunctionsInConstraintsParsing, RecordsNestedCall) {
   auto r = Parse(
       "class C;\n"

@@ -32,4 +32,4 @@ TEST(QueuePopFrontParsing, StatementForm) {
   EXPECT_EQ(expr->kind, ExprKind::kCall);
 }
 
-}
+}  // namespace

@@ -132,4 +132,4 @@ TEST(ExtendsVsImplementsParsing, InterfaceClassNoExtends) {
   EXPECT_TRUE(cls->implements_types.empty());
 }
 
-}
+}  // namespace

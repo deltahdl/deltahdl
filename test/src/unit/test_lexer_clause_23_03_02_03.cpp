@@ -14,4 +14,4 @@ TEST(ImplicitNamedPortConnectionLexing, NoParenthesesAfterImplicitPortName) {
   EXPECT_EQ(tokens[8].kind, TokenKind::kLParen);
 }
 
-}
+}  // namespace

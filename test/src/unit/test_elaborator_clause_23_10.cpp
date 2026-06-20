@@ -125,4 +125,4 @@ TEST(ParameterOverride, SignedRangedKeepsDeclarationRangeAndSignedness) {
   EXPECT_EQ(u0->params[0].resolved_value, 1);
 }
 
-}
+}  // namespace

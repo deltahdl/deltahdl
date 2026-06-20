@@ -95,8 +95,8 @@ typedef struct svOpenArrayDimRange {
 // elem_size is the byte stride of one array element within the actual
 // representation that data points at. Annex H.12.4's element-address functions
 // use it to step between consecutive elements. A value of 0 marks an element
-// representation that differs from that of an individual value of the same type,
-// for which H.12.4 requires those functions to return a null pointer.
+// representation that differs from that of an individual value of the same
+// type, for which H.12.4 requires those functions to return a null pointer.
 typedef struct svOpenArrayDesc {
   void* data;
   int n_dims;

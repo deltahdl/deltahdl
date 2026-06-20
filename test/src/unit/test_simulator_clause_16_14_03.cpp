@@ -22,7 +22,8 @@ namespace {
 // §16.14.3: the two cover categories are distinct — property coverage and
 // sequence coverage are not the same thing.
 TEST(CoverStatement, PropertyAndSequenceAreDistinctCategories) {
-  EXPECT_NE(CoverStatementCategory::kProperty, CoverStatementCategory::kSequence);
+  EXPECT_NE(CoverStatementCategory::kProperty,
+            CoverStatementCategory::kSequence);
 }
 
 // §16.14.3: for a cover property the attempt counter includes the attempts that
@@ -122,8 +123,8 @@ TEST(CoverStatement, SequenceCountsEveryMatchWithMultiplicity) {
   EXPECT_EQ(CoverSequenceMatchDelta({false, false, false, false}), 4U);
 }
 
-// §16.14.3: the pass statement of a cover sequence runs, with multiplicity, once
-// for each match counted toward the attempt total.
+// §16.14.3: the pass statement of a cover sequence runs, with multiplicity,
+// once for each match counted toward the attempt total.
 TEST(CoverStatement, SequencePassStatementRunsPerCountedMatch) {
   std::vector<bool> matches = {false, true, false};
   EXPECT_EQ(CoverSequencePassExecutions(matches), 2U);
@@ -140,8 +141,9 @@ TEST(CoverStatement, SequenceExcludesAllMatchesUnderDisableIff) {
   EXPECT_EQ(CoverSequencePassExecutions(all_under_disable_iff), 0U);
 }
 
-// §16.14.3: the pass statement of either cover category executes in the Reactive
-// region of the time step in which the attempt succeeds or the match completes.
+// §16.14.3: the pass statement of either cover category executes in the
+// Reactive region of the time step in which the attempt succeeds or the match
+// completes.
 TEST(CoverStatement, PassStatementExecutesInReactiveRegion) {
   EXPECT_EQ(CoverPassStatementRegion(), Region::kReactive);
 }

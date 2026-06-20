@@ -16,18 +16,18 @@
 #include "simulator/sv_vpi_user.h"
 
 // Deliberately include the provided header a second time. A normative include
-// file must be safe to pull in more than once; the production multiple-inclusion
-// guard in sv_vpi_user.h is what makes this translation unit compile despite the
-// repeat. Compilation succeeding is itself the observation for the edge case
-// below.
+// file must be safe to pull in more than once; the production
+// multiple-inclusion guard in sv_vpi_user.h is what makes this translation unit
+// compile despite the repeat. Compilation succeeding is itself the observation
+// for the edge case below.
 #include "simulator/sv_vpi_user.h"
 
 namespace {
 
 // Compile-time provision lock: the supplied header must declare the
 // SystemVerilog VPI extension routine with its canonical PLI-typed signature.
-// vpi_register_assertion_cb is declared in sv_vpi_user.h itself (not in the base
-// vpi_user.h), so it is the symbol that distinguishes provision of the SV
+// vpi_register_assertion_cb is declared in sv_vpi_user.h itself (not in the
+// base vpi_user.h), so it is the symbol that distinguishes provision of the SV
 // extensions from provision of the base interface. Naming the function type via
 // decltype neither calls nor odr-uses it, so this checks declaration provision
 // purely at compile time.
@@ -61,10 +61,10 @@ TEST(SvVpiUserHeaderProvided, ProvidesSystemVerilogExtensionConstants) {
 }
 
 TEST(SvVpiUserHeaderProvided, ProvidesExtensionStructures) {
-  // The extension structures the header introduces for the assertion VPI must be
-  // usable types once the header is included. Instantiating them and touching a
-  // member confirms the simulator genuinely supplies the layouts the include
-  // file advertises.
+  // The extension structures the header introduces for the assertion VPI must
+  // be usable types once the header is included. Instantiating them and
+  // touching a member confirms the simulator genuinely supplies the layouts the
+  // include file advertises.
   s_vpi_assertion_step_info step = {};
   s_vpi_attempt_info attempt = {};
   EXPECT_EQ(step.matched_expression_count, 0);

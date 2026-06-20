@@ -123,4 +123,4 @@ TEST(WireTriElaboration, TriMultipleDeclarators) {
   EXPECT_EQ(mod->nets[2].net_type, NetType::kTri);
 }
 
-}
+}  // namespace

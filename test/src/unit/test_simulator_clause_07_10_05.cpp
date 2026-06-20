@@ -111,9 +111,8 @@ TEST(BoundedQueue, InsertOnFullDiscardsLastElement) {
   q->elements.push_back(MakeLogic4VecVal(f.arena, 32, 30));
   q->AssignFreshIds();
 
-  auto* call =
-      MakeMethodCall(f.arena, "q", "insert",
-                     {MakeInt(f.arena, 1), MakeInt(f.arena, 15)});
+  auto* call = MakeMethodCall(f.arena, "q", "insert",
+                              {MakeInt(f.arena, 1), MakeInt(f.arena, 15)});
   TryExecQueueMethodStmt(call, f.ctx, f.arena);
   ASSERT_EQ(q->elements.size(), 3u);
   EXPECT_EQ(q->elements[0].ToUint64(), 10u);
@@ -129,9 +128,8 @@ TEST(BoundedQueue, InsertWarnsOnDiscard) {
   q->AssignFreshIds();
 
   auto before = f.diag.WarningCount();
-  auto* call =
-      MakeMethodCall(f.arena, "q", "insert",
-                     {MakeInt(f.arena, 1), MakeInt(f.arena, 15)});
+  auto* call = MakeMethodCall(f.arena, "q", "insert",
+                              {MakeInt(f.arena, 1), MakeInt(f.arena, 15)});
   TryExecQueueMethodStmt(call, f.ctx, f.arena);
   EXPECT_GT(f.diag.WarningCount(), before);
 }
@@ -180,9 +178,8 @@ TEST(BoundedQueue, ConcatAssignTruncates) {
                  MakeLogic4VecVal(f.arena, 32, 20)};
   q->AssignFreshIds();
 
-  auto* rhs = MakeConcat(
-      f.arena, {MakeId(f.arena, "q"), MakeInt(f.arena, 30),
-                MakeInt(f.arena, 40), MakeInt(f.arena, 50)});
+  auto* rhs = MakeConcat(f.arena, {MakeId(f.arena, "q"), MakeInt(f.arena, 30),
+                                   MakeInt(f.arena, 40), MakeInt(f.arena, 50)});
   auto* stmt = MakeAssign(f.arena, "q", rhs);
   TryQueueBlockingAssign(stmt, f.ctx, f.arena);
 
@@ -199,8 +196,7 @@ TEST(BoundedQueue, ConcatAssignWarnsOnTruncate) {
   q->AssignFreshIds();
 
   auto before = f.diag.WarningCount();
-  auto* rhs = MakeConcat(f.arena, {MakeId(f.arena, "q"),
-                                   MakeInt(f.arena, 20),
+  auto* rhs = MakeConcat(f.arena, {MakeId(f.arena, "q"), MakeInt(f.arena, 20),
                                    MakeInt(f.arena, 30)});
   auto* stmt = MakeAssign(f.arena, "q", rhs);
   TryQueueBlockingAssign(stmt, f.ctx, f.arena);
@@ -260,8 +256,8 @@ TEST(BoundedQueue, AssignWithinBoundNoWarning) {
   q->AssignFreshIds();
   auto before = f.diag.WarningCount();
 
-  auto* rhs = MakeConcat(f.arena, {MakeInt(f.arena, 1), MakeInt(f.arena, 2),
-                                   MakeInt(f.arena, 3)});
+  auto* rhs = MakeConcat(
+      f.arena, {MakeInt(f.arena, 1), MakeInt(f.arena, 2), MakeInt(f.arena, 3)});
   auto* stmt = MakeAssign(f.arena, "q", rhs);
   TryQueueBlockingAssign(stmt, f.ctx, f.arena);
   ASSERT_EQ(q->elements.size(), 3u);
@@ -282,4 +278,4 @@ TEST(BoundedQueue, PushBackBelowBoundNoWarning) {
   EXPECT_EQ(f.diag.WarningCount(), before);
 }
 
-}
+}  // namespace

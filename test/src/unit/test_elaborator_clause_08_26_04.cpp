@@ -39,7 +39,8 @@ TEST(InterfaceClassTypeUsageRestrictions, ClassImplementsTypeParamError) {
              "endmodule\n"));
 }
 
-TEST(InterfaceClassTypeUsageRestrictions, VirtualClassImplementsTypeParamError) {
+TEST(InterfaceClassTypeUsageRestrictions,
+     VirtualClassImplementsTypeParamError) {
   EXPECT_FALSE(
       ElabOk("interface class PutImp;\n"
              "  pure virtual function void put();\n"
@@ -98,8 +99,7 @@ TEST(InterfaceClassTypeUsageRestrictions,
              "endmodule\n"));
 }
 
-TEST(InterfaceClassTypeUsageRestrictions,
-     ClassImplementsForwardTypedefError) {
+TEST(InterfaceClassTypeUsageRestrictions, ClassImplementsForwardTypedefError) {
   EXPECT_FALSE(
       ElabOk("typedef interface class IC;\n"
              "class C implements IC;\n"
@@ -127,8 +127,7 @@ TEST(InterfaceClassTypeUsageRestrictions,
              "endmodule\n"));
 }
 
-TEST(InterfaceClassTypeUsageRestrictions,
-     InterfaceExtendsForwardTypedefError) {
+TEST(InterfaceClassTypeUsageRestrictions, InterfaceExtendsForwardTypedefError) {
   EXPECT_FALSE(
       ElabOk("typedef interface class IC;\n"
              "interface class IC2 extends IC;\n"
@@ -210,8 +209,7 @@ TEST(InterfaceClassTypeUsageRestrictions,
              "endmodule\n"));
 }
 
-TEST(InterfaceClassTypeUsageRestrictions,
-     ForwardTypedefThenDeclThenExtendsOk) {
+TEST(InterfaceClassTypeUsageRestrictions, ForwardTypedefThenDeclThenExtendsOk) {
   EXPECT_TRUE(
       ElabOk("typedef interface class IC;\n"
              "interface class IC;\n"
@@ -224,4 +222,4 @@ TEST(InterfaceClassTypeUsageRestrictions,
              "endmodule\n"));
 }
 
-}
+}  // namespace

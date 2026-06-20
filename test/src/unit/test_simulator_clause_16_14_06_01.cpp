@@ -10,7 +10,6 @@ using namespace delta;
 namespace {
 
 TEST(ProceduralAssertionArgs, ConstAndAutomaticArgsAreSnapshotAtQueueTime) {
-
   SampledValue from_const = SampleProceduralAssertionArgument(7);
   EXPECT_EQ(from_const.value, 7u);
   EXPECT_EQ(from_const.mode, SampleMode::kCurrent);
@@ -21,27 +20,27 @@ TEST(ProceduralAssertionArgs, ConstAndAutomaticArgsAreSnapshotAtQueueTime) {
 }
 
 TEST(ProceduralAssertionArgs, StaticVariableInExpressionUsesPreponed) {
-
   SampledValue s = SampleStaticVariable(10, SimTime{1}, 0);
   EXPECT_EQ(s.value, 10u);
   EXPECT_EQ(s.mode, SampleMode::kPreponed);
 }
 
-TEST(ProceduralAssertionArgs, ProceduralExecutionAffectsActivationNotCompletion) {
+TEST(ProceduralAssertionArgs,
+     ProceduralExecutionAffectsActivationNotCompletion) {
+  EXPECT_TRUE(
+      ProceduralExecutionAffects(ProceduralExecutionEffect::kActivation, true));
 
-  EXPECT_TRUE(ProceduralExecutionAffects(
-      ProceduralExecutionEffect::kActivation, true));
+  EXPECT_FALSE(
+      ProceduralExecutionAffects(ProceduralExecutionEffect::kCompletion, true));
 
-  EXPECT_FALSE(ProceduralExecutionAffects(
-      ProceduralExecutionEffect::kCompletion, true));
-
-  EXPECT_TRUE(ProceduralExecutionAffects(
-      ProceduralExecutionEffect::kActivation, false));
-  EXPECT_TRUE(ProceduralExecutionAffects(
-      ProceduralExecutionEffect::kCompletion, false));
+  EXPECT_TRUE(ProceduralExecutionAffects(ProceduralExecutionEffect::kActivation,
+                                         false));
+  EXPECT_TRUE(ProceduralExecutionAffects(ProceduralExecutionEffect::kCompletion,
+                                         false));
 }
 
-TEST(ProceduralAssertionArgs, ActionBlockArgumentSamplingMatchesAssertionArgument) {
+TEST(ProceduralAssertionArgs,
+     ActionBlockArgumentSamplingMatchesAssertionArgument) {
   SampledValue arg = SampleProceduralAssertionArgument(5);
   SampledValue ab = SampleProceduralAssertionActionBlockArgument(5);
 
@@ -50,12 +49,10 @@ TEST(ProceduralAssertionArgs, ActionBlockArgumentSamplingMatchesAssertionArgumen
 }
 
 TEST(ProceduralAssertionArgs, ActionBlockCannotModifyCapturedArgument) {
-
   EXPECT_FALSE(ActionBlockMayModifyArgument());
 }
 
 TEST(ProceduralAssertionArgs, EnclosingConditionalUsesCurrentValueNotSampled) {
-
   uint64_t guard = ReadProceduralConditionalGuard(1, 0);
   EXPECT_EQ(guard, 1u);
 
@@ -64,12 +61,11 @@ TEST(ProceduralAssertionArgs, EnclosingConditionalUsesCurrentValueNotSampled) {
 }
 
 TEST(ProceduralAssertionArgs, AssertionExpressionStillUsesSampledValues) {
-
   EXPECT_TRUE(ConcurrentTimingUsesSampledValues(AssertionTiming::kConcurrent));
 }
 
-TEST(ProceduralAssertionArgs, EnqueuedSnapshotIsWhatEvaluationReadsAfterMature) {
-
+TEST(ProceduralAssertionArgs,
+     EnqueuedSnapshotIsWhatEvaluationReadsAfterMature) {
   PendingProceduralAssertion p;
   p.instance_name = "a_args";
   p.kind = AssertionKind::kAssert;
@@ -90,19 +86,16 @@ TEST(ProceduralAssertionArgs, EnqueuedSnapshotIsWhatEvaluationReadsAfterMature) 
 }
 
 TEST(ProceduralAssertionArgs, StaticVariableAtTimeZeroFallsBackToTypeDefault) {
-
   SampledValue s = SampleStaticVariable(42, SimTime{0}, 0);
   EXPECT_EQ(s.value, 0u);
   EXPECT_EQ(s.mode, SampleMode::kDefault);
 }
 
 TEST(ProceduralAssertionArgs, ImmediateTimingDoesNotUseSampledValues) {
-
   EXPECT_FALSE(ConcurrentTimingUsesSampledValues(AssertionTiming::kImmediate));
 }
 
 TEST(ProceduralAssertionArgs, MultipleQueuedInstancesEachHoldTheirOwnSnapshot) {
-
   ProceduralAssertionQueue q;
   for (uint64_t i = 0; i < 10; ++i) {
     PendingProceduralAssertion p;
@@ -114,7 +107,8 @@ TEST(ProceduralAssertionArgs, MultipleQueuedInstancesEachHoldTheirOwnSnapshot) {
 
   ASSERT_EQ(q.Entries().size(), 10u);
   for (uint64_t i = 0; i < 10; ++i) {
-    const auto& stored = q.Entries()[static_cast<size_t>(i)].sampled_args.front();
+    const auto& stored =
+        q.Entries()[static_cast<size_t>(i)].sampled_args.front();
     EXPECT_EQ(stored.value, i);
     EXPECT_EQ(stored.mode, SampleMode::kCurrent);
 
@@ -124,7 +118,6 @@ TEST(ProceduralAssertionArgs, MultipleQueuedInstancesEachHoldTheirOwnSnapshot) {
 }
 
 TEST(ProceduralAssertionArgs, ActionBlockArgumentRemainsConstantAfterMature) {
-
   SampledValue captured = SampleProceduralAssertionActionBlockArgument(11);
 
   SampledValue post = ProceduralArgumentValueAfterMature(captured, 0);
@@ -133,7 +126,6 @@ TEST(ProceduralAssertionArgs, ActionBlockArgumentRemainsConstantAfterMature) {
 }
 
 TEST(ProceduralAssertionArgs, SnapshotCapturesBoundaryValuesExactly) {
-
   SampledValue lo = SampleProceduralAssertionArgument(0);
   EXPECT_EQ(lo.value, 0u);
   EXPECT_EQ(lo.mode, SampleMode::kCurrent);
@@ -145,10 +137,9 @@ TEST(ProceduralAssertionArgs, SnapshotCapturesBoundaryValuesExactly) {
 }
 
 TEST(ProceduralAssertionArgs, GuardIgnoresSampledWhenCurrentDiffers) {
-
   uint64_t big_sampled = std::numeric_limits<uint64_t>::max();
   EXPECT_EQ(ReadProceduralConditionalGuard(0, big_sampled), 0u);
   EXPECT_EQ(ReadProceduralConditionalGuard(7, big_sampled), 7u);
 }
 
-}
+}  // namespace

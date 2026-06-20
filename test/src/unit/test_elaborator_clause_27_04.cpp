@@ -270,4 +270,4 @@ TEST(GenerateElaboration, GenerateForSingleItemBodyWithoutBeginEnd) {
   EXPECT_EQ(mod->variables.size(), 3u);
 }
 
-}
+}  // namespace

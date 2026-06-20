@@ -23,4 +23,4 @@ TEST(SynthLower, MultiBitPortMapping) {
   EXPECT_EQ(aig->outputs.size(), 4);
 }
 
-}
+}  // namespace

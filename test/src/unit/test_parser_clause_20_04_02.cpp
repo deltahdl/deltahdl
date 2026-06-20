@@ -35,4 +35,4 @@ TEST(PrinttimescaleSysTask, HierarchicalArgumentParses) {
   ASSERT_EQ(stmt->expr->args.size(), 1u);
 }
 
-}
+}  // namespace

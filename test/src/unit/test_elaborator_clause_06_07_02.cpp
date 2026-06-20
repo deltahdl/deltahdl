@@ -51,7 +51,8 @@ TEST(NettypeElaboration, NettypeNotInVariables) {
   for (const auto& v : mod->variables) {
     if (v.name == "x") found_var = true;
   }
-  EXPECT_FALSE(found_var) << "nettype-declared net must not appear in variables";
+  EXPECT_FALSE(found_var)
+      << "nettype-declared net must not appear in variables";
 }
 
 TEST(NettypeElaboration, NettypeWithStructCreatesNet) {
@@ -211,4 +212,4 @@ TEST(NettypeElaboration, MultipleNettypeNetsElaborate) {
   EXPECT_EQ(count, 3);
 }
 
-}
+}  // namespace

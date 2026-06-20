@@ -50,4 +50,4 @@ TEST(LevelSensitiveSequenceSynthesis, RejectWaitTriggeredInAlways) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-}
+}  // namespace

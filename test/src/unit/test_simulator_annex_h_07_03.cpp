@@ -14,7 +14,8 @@
 //   1) SystemVerilog types that are neither packed nor contain packed elements
 //      have a C-compatible representation. (own)
 //   2) Basic integer and real types are represented as defined in H.7.4. (a
-//      delegation to the satisfied dependency H.7.4 / Table H.1; not re-proven.)
+//      delegation to the satisfied dependency H.7.4 / Table H.1; not
+//      re-proven.)
 //   3) Packed types (time, integer, user-defined) use the canonical format of
 //      H.7.7. (a delegation to the satisfied dependency H.7.7; not re-proven.)
 //   4) Enumeration types are represented by the C representation of their
@@ -23,32 +24,37 @@
 //      small-value classification (35.5.5) and the set of supported base types
 //      (6.19, A.2.2.1) are delegated dependencies; the base-type representation
 //      and the absence of names are H.7.3's own claims.)
-//   5) An unpacked array embedded in a structure, and a stand-alone array passed
+//   5) An unpacked array embedded in a structure, and a stand-alone array
+//   passed
 //      to a sized formal, both have a C-compatible representation. (own)
 //   6) For a stand-alone array passed to an open array formal: a 2-/4-state
-//      scalar or packed element type is represented in canonical form; any other
-//      element type is C compatible, in which case (shall) an element has the
-//      same representation as an individual value of the same type, reachable by
-//      normal C array indexing. (own)
+//      scalar or packed element type is represented in canonical form; any
+//      other element type is C compatible, in which case (shall) an element has
+//      the same representation as an individual value of the same type,
+//      reachable by normal C array indexing. (own)
 //   7) (shall) The natural order of elements is used for each dimension of an
-//      unpacked array - lower indices first. For a SystemVerilog range [L:R] the
-//      element with index min(L,R) has C index 0 and the element with index
+//      unpacked array - lower indices first. For a SystemVerilog range [L:R]
+//      the element with index min(L,R) has C index 0 and the element with index
 //      max(L,R) has C index abs(L-R). (own)
 //
 // These rules are realized entirely by existing production code, so the pass is
 // test-only:
 //   - C-compatible representation (claims 1, 5, 6-other) is carried by the
-//     elem_size stride of svOpenArrayDesc: an element sits at data + i*elem_size,
-//     i.e. exactly where an individual value of that type would sit in a plain C
-//     array, and svGetArrElemPtr* expose that address.
-//   - Canonical form for packed/scalar open-array elements (claim 6-canonical) is
+//     elem_size stride of svOpenArrayDesc: an element sits at data +
+//     i*elem_size, i.e. exactly where an individual value of that type would
+//     sit in a plain C array, and svGetArrElemPtr* expose that address.
+//   - Canonical form for packed/scalar open-array elements (claim 6-canonical)
+//   is
 //     carried by the canonical word storage: elem_size is 0 (the element
-//     representation differs from an individual C value, so svGetArrElemPtr* and
-//     svGetArrayPtr return null) while svPutBitArrElem1VecVal / svGetBitArrElem1VecVal
-//     move the value through its canonical words.
-//   - The 4-state canonical representation of an integer-base enum value (claim 4)
-//     is carried by the canonical logic accessors svPutBitselLogic / svGetBitselLogic.
-//   - The natural element order (claim 7) is carried by svLow / svHigh / svSize,
+//     representation differs from an individual C value, so svGetArrElemPtr*
+//     and svGetArrayPtr return null) while svPutBitArrElem1VecVal /
+//     svGetBitArrElem1VecVal move the value through its canonical words.
+//   - The 4-state canonical representation of an integer-base enum value (claim
+//   4)
+//     is carried by the canonical logic accessors svPutBitselLogic /
+//     svGetBitselLogic.
+//   - The natural element order (claim 7) is carried by svLow / svHigh /
+//   svSize,
 //     which report min(L,R) / max(L,R) / abs(L-R)+1 over a dimension's declared
 //     bounds, so an element's C index is its SystemVerilog index minus svLow.
 //
@@ -79,14 +85,16 @@ svOpenArrayHandle MakeHandle(void* data, const svOpenArrayDimRange* ranges,
 // the individual-value representation.
 TEST(DataRepresentation, NonPackedTypeIsCCompatible) {
   int data[4] = {10, 20, 30, 40};
-  const svOpenArrayDimRange ranges[] = {{31, 0}, {0, 3}};  // int element, [0:3].
+  const svOpenArrayDimRange ranges[] = {{31, 0},
+                                        {0, 3}};  // int element, [0:3].
   svOpenArrayDesc desc;
   svOpenArrayHandle h = MakeHandle(data, ranges, 2, sizeof(int), &desc);
 
   for (int i = 0; i < 4; ++i) {
     void* p = svGetArrElemPtr1(h, i);
     EXPECT_EQ(p, static_cast<void*>(&data[i]));
-    EXPECT_EQ(*static_cast<int*>(p), data[i]);  // element repr == individual int.
+    EXPECT_EQ(*static_cast<int*>(p),
+              data[i]);  // element repr == individual int.
   }
 }
 
@@ -94,11 +102,12 @@ TEST(DataRepresentation, NonPackedTypeIsCCompatible) {
 // unpacked array embedded in a structure) has a C-compatible representation
 // regardless of element type. Exercised with a non-packed double element: the
 // elements occupy a contiguous C layout with the type's natural stride and the
-// value at each slot is an ordinary double, so the representation matches a plain
-// C double array element for element.
+// value at each slot is an ordinary double, so the representation matches a
+// plain C double array element for element.
 TEST(DataRepresentation, SizedFormalAndStructEmbeddedAreCCompatible) {
   double data[3] = {1.5, -2.25, 100.0};
-  const svOpenArrayDimRange ranges[] = {{63, 0}, {0, 2}};  // double element, [0:2].
+  const svOpenArrayDimRange ranges[] = {{63, 0},
+                                        {0, 2}};  // double element, [0:2].
   svOpenArrayDesc desc;
   svOpenArrayHandle h = MakeHandle(data, ranges, 2, sizeof(double), &desc);
 
@@ -109,13 +118,13 @@ TEST(DataRepresentation, SizedFormalAndStructEmbeddedAreCCompatible) {
   }
 }
 
-// Claim 6 (C-compatible branch, shall): when an open array's element type is not
-// a 2-/4-state scalar or packed type, an element shall have the same
+// Claim 6 (C-compatible branch, shall): when an open array's element type is
+// not a 2-/4-state scalar or packed type, an element shall have the same
 // representation as an individual value of the same type, and the elements are
 // reachable by normal C array indexing. With a C-compatible element the stride
-// equals sizeof(element), so consecutive elements are one element apart - exactly
-// normal C pointer arithmetic - and reading a slot yields the individual value
-// stored there.
+// equals sizeof(element), so consecutive elements are one element apart -
+// exactly normal C pointer arithmetic - and reading a slot yields the
+// individual value stored there.
 TEST(DataRepresentation, OpenArrayCCompatibleElementMatchesIndividualValue) {
   int data[5] = {0, 11, 22, 33, 44};
   const svOpenArrayDimRange ranges[] = {{31, 0}, {0, 4}};
@@ -138,11 +147,11 @@ TEST(DataRepresentation, OpenArrayCCompatibleElementMatchesIndividualValue) {
 
 // Claim 6 (canonical branch): a packed (or 2-/4-state scalar) element type is
 // represented in canonical form rather than as an individual C value. The
-// descriptor marks this by recording elem_size 0, which signals that the element
-// representation differs from an individual value of the same type. Production
-// then refuses the C-pointer views - svGetArrElemPtr* and svGetArrayPtr return
-// null - while the canonical element accessors move the value through its
-// canonical words.
+// descriptor marks this by recording elem_size 0, which signals that the
+// element representation differs from an individual value of the same type.
+// Production then refuses the C-pointer views - svGetArrElemPtr* and
+// svGetArrayPtr return null - while the canonical element accessors move the
+// value through its canonical words.
 TEST(DataRepresentation, OpenArrayPackedElementUsesCanonicalForm) {
   // Element is logic [7:0] -> one canonical word; four such elements, [0:3].
   svBitVecVal data[4] = {0u, 0u, 0u, 0u};
@@ -172,7 +181,8 @@ TEST(DataRepresentation, OpenArrayPackedElementUsesCanonicalForm) {
 // round-trip, confirming the representation is the 4-state canonical one.
 TEST(DataRepresentation, OpenArrayScalarElementUsesCanonicalForm) {
   svLogicVecVal data[4] = {{0u, 0u}, {0u, 0u}, {0u, 0u}, {0u, 0u}};
-  const svOpenArrayDimRange ranges[] = {{0, 0}, {0, 3}};  // logic scalar, [0:3].
+  const svOpenArrayDimRange ranges[] = {{0, 0},
+                                        {0, 3}};  // logic scalar, [0:3].
   svOpenArrayDesc desc;
   svOpenArrayHandle h = MakeHandle(data, ranges, 2, /*elem_size=*/0, &desc);
 
@@ -188,20 +198,22 @@ TEST(DataRepresentation, OpenArrayScalarElementUsesCanonicalForm) {
 }
 
 // Claim 6 (canonical branch, multi-word edge): a packed element wider than one
-// canonical 32-bit word is still represented in canonical form, spanning as many
-// canonical words as the element width requires. A logic [39:0] element occupies
-// two canonical words; the value round-trips across both words while the
-// individual-value C address remains unavailable (elem_size 0).
+// canonical 32-bit word is still represented in canonical form, spanning as
+// many canonical words as the element width requires. A logic [39:0] element
+// occupies two canonical words; the value round-trips across both words while
+// the individual-value C address remains unavailable (elem_size 0).
 TEST(DataRepresentation, OpenArrayWidePackedElementUsesCanonicalForm) {
   // Two elements of a 40-bit packed type: two canonical words each.
   svBitVecVal data[4] = {0u, 0u, 0u, 0u};
-  const svOpenArrayDimRange ranges[] = {{39, 0}, {0, 1}};  // [39:0] element, [0:1].
+  const svOpenArrayDimRange ranges[] = {{39, 0},
+                                        {0, 1}};  // [39:0] element, [0:1].
   svOpenArrayDesc desc;
   svOpenArrayHandle h = MakeHandle(data, ranges, 2, /*elem_size=*/0, &desc);
 
   EXPECT_EQ(svGetArrElemPtr1(h, 0), nullptr);
 
-  const svBitVecVal in[2] = {0x12345678u, 0x9Au};  // 40-bit value over two words.
+  const svBitVecVal in[2] = {0x12345678u,
+                             0x9Au};  // 40-bit value over two words.
   svPutBitArrElem1VecVal(h, in, 1);
   EXPECT_EQ(data[2], 0x12345678u);  // element [1] low canonical word.
   EXPECT_EQ(data[3], 0x9Au);        // element [1] high canonical word.
@@ -214,11 +226,11 @@ TEST(DataRepresentation, OpenArrayWidePackedElementUsesCanonicalForm) {
 
 // Claim 4: an enumeration is represented by the C representation of its
 // SystemVerilog base type, and an integer base type is represented as a 4-state
-// packed array. An integer-base enum value is therefore carried as the canonical
-// 4-state packed value of the underlying integer, identical to representing that
-// plain integer - the canonical logic accessors place the value's bits, and no
-// enumerator name accompanies it. The named constant exists only in
-// SystemVerilog; the C side sees the numeric base value alone.
+// packed array. An integer-base enum value is therefore carried as the
+// canonical 4-state packed value of the underlying integer, identical to
+// representing that plain integer - the canonical logic accessors place the
+// value's bits, and no enumerator name accompanies it. The named constant
+// exists only in SystemVerilog; the C side sees the numeric base value alone.
 TEST(DataRepresentation, EnumRepresentedByBaseTypeWithoutNames) {
   // An enum value whose SystemVerilog enumerator label is irrelevant to C: only
   // its integer base value (here 0x2C) crosses, as a 4-state packed value.
@@ -239,14 +251,15 @@ TEST(DataRepresentation, EnumRepresentedByBaseTypeWithoutNames) {
   EXPECT_EQ(as_enum.aval, base_value);
   EXPECT_EQ(as_enum.bval, 0u);  // a defined integer base value: no x/z bits.
   for (int bit = 0; bit < 32; ++bit) {
-    EXPECT_EQ(svGetBitselLogic(&as_enum, bit), svGetBitselLogic(&as_integer, bit));
+    EXPECT_EQ(svGetBitselLogic(&as_enum, bit),
+              svGetBitselLogic(&as_integer, bit));
   }
 }
 
 // Claim 4 (time base edge): a time base type is represented as a 4-state packed
-// array too, and time is 64 bits wide, so its canonical representation spans two
-// canonical words. A time-base enum value is therefore carried bit-for-bit as
-// the canonical 4-state representation of the underlying 64-bit base value,
+// array too, and time is 64 bits wide, so its canonical representation spans
+// two canonical words. A time-base enum value is therefore carried bit-for-bit
+// as the canonical 4-state representation of the underlying 64-bit base value,
 // across both words, with no enumerator name attached.
 TEST(DataRepresentation, EnumTimeBaseRepresentedAsWide4State) {
   const uint64_t base_value = (static_cast<uint64_t>(0x100u) << 32) | 0x2Cu;
@@ -273,8 +286,8 @@ TEST(DataRepresentation, EnumTimeBaseRepresentedAsWide4State) {
 }
 
 // Claim 7 (shall): the natural element order is used per unpacked dimension,
-// lower indices first, so for a SystemVerilog range [L:R] the element with index
-// min(L,R) has C index 0 and the element with index max(L,R) has C index
+// lower indices first, so for a SystemVerilog range [L:R] the element with
+// index min(L,R) has C index 0 and the element with index max(L,R) has C index
 // abs(L-R). svLow / svHigh / svSize report min / max / count over the declared
 // bounds, and an element's C index is its SystemVerilog index minus svLow.
 // Exercised for an ascending, a descending, and a negative range.
@@ -285,7 +298,8 @@ TEST(DataRepresentation, UnpackedNaturalOrderMinToZeroMaxToAbs) {
   };
   const Case cases[] = {{0, 7}, {7, 0}, {-1, -8}};
   for (const Case& c : cases) {
-    const svOpenArrayDimRange ranges[] = {{0, 0}, {c.l, c.r}};  // dim 1 under test.
+    const svOpenArrayDimRange ranges[] = {{0, 0},
+                                          {c.l, c.r}};  // dim 1 under test.
     svOpenArrayDesc desc;
     svOpenArrayHandle h = MakeHandle(nullptr, ranges, 2, 0, &desc);
 
@@ -297,8 +311,8 @@ TEST(DataRepresentation, UnpackedNaturalOrderMinToZeroMaxToAbs) {
     EXPECT_EQ(hi, std::max(c.l, c.r));      // svHigh == max(L,R).
     EXPECT_EQ(svSize(h, 1), abs_span + 1);  // count == abs(L-R)+1.
 
-    EXPECT_EQ(lo - lo, 0);          // element at min(L,R) -> C index 0.
-    EXPECT_EQ(hi - lo, abs_span);   // element at max(L,R) -> C index abs(L-R).
+    EXPECT_EQ(lo - lo, 0);         // element at min(L,R) -> C index 0.
+    EXPECT_EQ(hi - lo, abs_span);  // element at max(L,R) -> C index abs(L-R).
   }
 }
 
@@ -334,7 +348,8 @@ TEST(DataRepresentation, UnpackedLowerIndicesGoFirst) {
 
   int expected_c = 0;
   for (int sv = lo; sv < lo + size; ++sv) {
-    EXPECT_EQ(sv - lo, expected_c);  // ascending SV index -> 0,1,2,... C indices.
+    EXPECT_EQ(sv - lo,
+              expected_c);  // ascending SV index -> 0,1,2,... C indices.
     ++expected_c;
   }
   EXPECT_EQ(expected_c, size);

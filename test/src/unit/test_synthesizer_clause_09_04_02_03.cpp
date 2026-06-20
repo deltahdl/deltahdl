@@ -55,4 +55,4 @@ TEST(ConditionalEventIffSynthesis, IffPrecedenceOverOrSynthesizes) {
   EXPECT_FALSE(aig->outputs.empty());
 }
 
-}
+}  // namespace

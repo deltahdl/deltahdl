@@ -8,25 +8,29 @@
 namespace delta {
 namespace {
 
-// §37.18 Packed array variables: the VPI object model for a vpiPackedArrayVar, a
-// packed array of packed struct var, union var, or enum var objects. The
+// §37.18 Packed array variables: the VPI object model for a vpiPackedArrayVar,
+// a packed array of packed struct var, union var, or enum var objects. The
 // clause's own normative details are exercised here:
 //   detail 1 - vpiVector is always TRUE for a packed array var (carried by the
-//              §37.17 variable helpers; observed here from §37.18's standpoint);
-//   detail 2 - vpiSize is the number of bits in the packed array, not the number
+//              §37.17 variable helpers; observed here from §37.18's
+//              standpoint);
+//   detail 2 - vpiSize is the number of bits in the packed array, not the
+//   number
 //              of element objects (also a §37.17 size rule, observed here);
-//   detail 3 - vpiElement reaches the subelements one dimension level at a time,
+//   detail 3 - vpiElement reaches the subelements one dimension level at a
+//   time,
 //              and they are themselves packed array vars for a multidimensioned
 //              array;
 //   detail 4 - vpiPackedArrayMember is TRUE for an element whose vpiParent is a
 //              packed array var;
-//   detail 5 - vpiStructUnionMember is TRUE only for a packed array var that is a
+//   detail 5 - vpiStructUnionMember is TRUE only for a packed array var that is
+//   a
 //              direct member of a struct/union var, FALSE for its subelements
 //              (carried by the §37.17 helper, observed here);
 //   detail 6 - vpi_iterate(vpiIndex, ...) reaches a subelement's index
 //              expressions, beginning with its own index and working outward.
-// The vpiPacked/vpiConstantSelect properties and the vpiParent edge are owned by
-// the generic machinery and §37.17/§37.26, the cited dependencies.
+// The vpiPacked/vpiConstantSelect properties and the vpiParent edge are owned
+// by the generic machinery and §37.17/§37.26, the cited dependencies.
 
 // Walk an iterator to completion, collecting every object it yields in order.
 std::vector<VpiHandle> Collect(VpiContext& ctx, VpiHandle iterator) {
@@ -36,9 +40,9 @@ std::vector<VpiHandle> Collect(VpiContext& ctx, VpiHandle iterator) {
   return objects;
 }
 
-// Detail 3: vpiElement on a packed array variable returns its subelements - here
-// the leaf-level struct vars - skipping a child that is not an element kind, and
-// preserving their declaration order.
+// Detail 3: vpiElement on a packed array variable returns its subelements -
+// here the leaf-level struct vars - skipping a child that is not an element
+// kind, and preserving their declaration order.
 TEST(PackedArrayVarModel, ElementIterationReachesSubelementsOneLevel) {
   VpiContext ctx;
 
@@ -60,8 +64,8 @@ TEST(PackedArrayVarModel, ElementIterationReachesSubelementsOneLevel) {
 }
 
 // Detail 3: for a multidimensioned packed array, vpiElement retrieves elements
-// that are themselves packed array vars (the leftmost packed range removed), one
-// dimension level at a time.
+// that are themselves packed array vars (the leftmost packed range removed),
+// one dimension level at a time.
 TEST(PackedArrayVarModel, ElementIterationReachesPackedArrayVarsForMultiDim) {
   VpiContext ctx;
 
@@ -162,8 +166,7 @@ TEST(PackedArrayVarModel, PackedArrayMemberTrueWhenParentIsPackedArrayVar) {
   VpiObject pavar;
   pavar.type = vpiPackedArrayVar;
 
-  for (int kind :
-       {vpiStructVar, vpiUnionVar, vpiEnumVar, vpiPackedArrayVar}) {
+  for (int kind : {vpiStructVar, vpiUnionVar, vpiEnumVar, vpiPackedArrayVar}) {
     VpiObject element;
     element.type = kind;
     element.parent = &pavar;
@@ -178,7 +181,8 @@ TEST(PackedArrayVarModel, PackedArrayMemberTrueWhenParentIsPackedArrayVar) {
   member.parent = &struct_parent;
   EXPECT_FALSE(VpiVariableIsPackedArrayMember(&member));
 
-  // A packed-array parent with an element kind outside the four is not a member.
+  // A packed-array parent with an element kind outside the four is not a
+  // member.
   VpiObject scalar;
   scalar.type = vpiBitVar;
   scalar.parent = &pavar;
@@ -193,10 +197,11 @@ TEST(PackedArrayVarModel, PackedArrayMemberTrueWhenParentIsPackedArrayVar) {
   EXPECT_FALSE(VpiVariableIsPackedArrayMember(nullptr));
 }
 
-// Detail 5: vpiStructUnionMember is TRUE for a packed array var that is a direct
-// member of a struct or union var, and FALSE for a subelement reached by the
-// vpiElement iterator (whose parent is a packed array var). The distinction is
-// carried by the §37.17 helper and observed here for the packed-array-var case.
+// Detail 5: vpiStructUnionMember is TRUE for a packed array var that is a
+// direct member of a struct or union var, and FALSE for a subelement reached by
+// the vpiElement iterator (whose parent is a packed array var). The distinction
+// is carried by the §37.17 helper and observed here for the packed-array-var
+// case.
 TEST(PackedArrayVarModel, StructUnionMemberDistinguishesDirectMembersFromSubs) {
   VpiObject struct_var;
   struct_var.type = vpiStructVar;
@@ -219,7 +224,7 @@ TEST(PackedArrayVarModel, StructUnionMemberDistinguishesDirectMembersFromSubs) {
 TEST(PackedArrayVarModel, SizeIsBitsNotElementCount) {
   VpiVariableSizeQuery q;
   q.var_type = vpiPackedArrayVar;
-  q.bit_width = 24;          // e.g. three 8-bit elements
+  q.bit_width = 24;           // e.g. three 8-bit elements
   q.array_element_count = 3;  // the element count must not be reported
   EXPECT_EQ(VpiVariableSize(q), 24);
 }

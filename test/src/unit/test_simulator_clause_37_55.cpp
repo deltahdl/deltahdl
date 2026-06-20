@@ -14,10 +14,10 @@ namespace {
 // assume, and immediate cover directives. Each reaches its asserted expression
 // through vpiExpr and its pass action statement through vpiStmt, and reports
 // whether it is a deferred assertion (vpiIsDeferred) and whether it is a final
-// assertion (vpiIsFinal). An immediate assert and an immediate assume also carry
-// an else (fail) statement reached through vpiElseStmt; an immediate cover does
-// not. These tests observe the production helpers in vpi.cpp and the VpiContext
-// methods that apply those rules.
+// assertion (vpiIsFinal). An immediate assert and an immediate assume also
+// carry an else (fail) statement reached through vpiElseStmt; an immediate
+// cover does not. These tests observe the production helpers in vpi.cpp and the
+// VpiContext methods that apply those rules.
 
 // The three immediate directive kinds are immediate assertions; the concurrent
 // kinds (the broader §37.49 class) and unrelated kinds are not.
@@ -61,10 +61,10 @@ TEST(ImmediateAssertionModel, AssumeAndCoverReportIsDeferredAndIsFinal) {
   EXPECT_EQ(ctx.Get(vpiIsDeferred, &assume), 1);
   EXPECT_EQ(ctx.Get(vpiIsFinal, &assume), 1);
 
-  // A cover carries the same properties: here the stored deferred flag is set and
-  // the final flag is not, so each reports its own stored value (1 and 0) rather
-  // than a shared one. This shows a true value flows through a cover, not only the
-  // default.
+  // A cover carries the same properties: here the stored deferred flag is set
+  // and the final flag is not, so each reports its own stored value (1 and 0)
+  // rather than a shared one. This shows a true value flows through a cover,
+  // not only the default.
   VpiObject cover;
   cover.type = vpiImmediateCover;
   cover.is_deferred = true;
@@ -72,8 +72,8 @@ TEST(ImmediateAssertionModel, AssumeAndCoverReportIsDeferredAndIsFinal) {
   EXPECT_EQ(ctx.Get(vpiIsFinal, &cover), 0);
 }
 
-// The deferred/final properties are drawn only on the immediate-assertion kinds,
-// so querying them on any other object kind is not valid and yields
+// The deferred/final properties are drawn only on the immediate-assertion
+// kinds, so querying them on any other object kind is not valid and yields
 // vpiUndefined.
 TEST(ImmediateAssertionModel, IsDeferredAndIsFinalAreUndefinedElsewhere) {
   VpiContext ctx;
@@ -91,10 +91,10 @@ TEST(ImmediateAssertionModel, IsDeferredAndIsFinalAreUndefinedElsewhere) {
   EXPECT_EQ(ctx.Get(vpiIsFinal, &concurrent), vpiUndefined);
 }
 
-// Every immediate-assertion kind reaches its asserted expression through vpiExpr,
-// modeled as its first expression child, and its pass action statement through
-// vpiStmt. The diagram draws both edges from each of the assert, assume, and
-// cover boxes, so the traversals are observed on all three kinds.
+// Every immediate-assertion kind reaches its asserted expression through
+// vpiExpr, modeled as its first expression child, and its pass action statement
+// through vpiStmt. The diagram draws both edges from each of the assert,
+// assume, and cover boxes, so the traversals are observed on all three kinds.
 TEST(ImmediateAssertionModel, EachKindReachesExpressionAndPassStatement) {
   for (int kind : {vpiImmediateAssert, vpiImmediateAssume, vpiImmediateCover}) {
     VpiObject assertion;

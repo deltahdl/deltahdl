@@ -2,8 +2,7 @@
 
 namespace {
 
-TEST(ConfigHierarchicalRules,
-     InstancePathInsideDelegatedHierarchyIsRejected) {
+TEST(ConfigHierarchicalRules, InstancePathInsideDelegatedHierarchyIsRejected) {
   ElabFixture f;
   ElaborateSrc(
       "module top; endmodule\n"
@@ -86,4 +85,4 @@ TEST(ConfigHierarchicalRules, DeeplyNestedInstancePathIsRejected) {
   EXPECT_TRUE(f.has_errors);
 }
 
-}
+}  // namespace

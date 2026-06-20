@@ -43,4 +43,4 @@ TEST(WaitForkParsing, ForkJoinNoneThenWaitFork) {
   EXPECT_EQ(body->stmts[1]->kind, StmtKind::kWaitFork);
 }
 
-}
+}  // namespace

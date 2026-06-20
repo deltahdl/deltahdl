@@ -65,4 +65,4 @@ class AssertionMonitor {
   uint32_t pass_count_ = 0;
 };
 
-}
+}  // namespace delta

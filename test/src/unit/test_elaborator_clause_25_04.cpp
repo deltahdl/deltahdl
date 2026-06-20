@@ -71,4 +71,4 @@ TEST(InterfacePorts, TwoInstancesShareExternalWire) {
   EXPECT_NE(top->children[1].resolved, nullptr);
 }
 
-}
+}  // namespace

@@ -1,5 +1,5 @@
-#include "fixture_elaborator.h"
 #include "elaborator/let_construct.h"
+#include "fixture_elaborator.h"
 
 using namespace delta;
 
@@ -301,4 +301,4 @@ TEST(LetDeclElaboration, LetFormalWithAllowedTypeElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

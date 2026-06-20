@@ -215,8 +215,8 @@ TEST(SvaEngine, ApplyControlOffOnByControlType) {
   EXPECT_TRUE(ctrl.IsEnabled("inst1"));
 }
 
-// §20.11: VacuousOff (11) stops the pass action on vacuous success while leaving
-// nonvacuous success enabled; PassOn (6) re-enables both.
+// §20.11: VacuousOff (11) stops the pass action on vacuous success while
+// leaving nonvacuous success enabled; PassOn (6) re-enables both.
 TEST(SvaEngine, VacuousOffDisablesOnlyVacuousPass) {
   AssertionControl ctrl;
   ctrl.SetVacuousOff("inst1");
@@ -240,8 +240,8 @@ TEST(SvaEngine, NonvacuousOnReenablesNonvacuousPassOnly) {
 // §20.11: the action controls (control_type 6 through 11) do not affect the
 // statistics counters, while the status controls (1 through 5) do.
 TEST(SvaEngine, OnlyStatusControlsAffectStatistics) {
-  EXPECT_TRUE(ControlTypeAffectsStatistics(
-      static_cast<int>(AssertControlType::kKill)));
+  EXPECT_TRUE(
+      ControlTypeAffectsStatistics(static_cast<int>(AssertControlType::kKill)));
   EXPECT_FALSE(ControlTypeAffectsStatistics(
       static_cast<int>(AssertControlType::kPassOn)));
   EXPECT_FALSE(ControlTypeAffectsStatistics(
@@ -252,8 +252,7 @@ TEST(SvaEngine, OnlyStatusControlsAffectStatistics) {
 TEST(SvaEngine, AssertOffEquivalentToControl) {
   AssertControlInvocation inv;
   ASSERT_TRUE(EquivalentAssertControlForTask("$assertoff", inv));
-  EXPECT_EQ(inv.control_type,
-            static_cast<uint32_t>(AssertControlType::kOff));
+  EXPECT_EQ(inv.control_type, static_cast<uint32_t>(AssertControlType::kOff));
   EXPECT_EQ(inv.assertion_type, 15u);
   EXPECT_EQ(inv.directive_type, 7u);
 }
@@ -309,7 +308,8 @@ TEST(SvaEngine, ApplyControlVacuousOffNonvacuousOnByControlType) {
   EXPECT_FALSE(ctrl.IsVacuousPassEnabled("inst1"));
   EXPECT_TRUE(ctrl.IsNonvacuousPassEnabled("inst1"));
   ctrl.ApplyControl(static_cast<int>(AssertControlType::kPassOff), "inst1");
-  ctrl.ApplyControl(static_cast<int>(AssertControlType::kNonvacuousOn), "inst1");
+  ctrl.ApplyControl(static_cast<int>(AssertControlType::kNonvacuousOn),
+                    "inst1");
   EXPECT_TRUE(ctrl.IsNonvacuousPassEnabled("inst1"));
 }
 
@@ -340,13 +340,15 @@ TEST(SvaEngine, StatusTaskEquivalents) {
 TEST(SvaEngine, ActionTaskEquivalents) {
   AssertControlInvocation inv;
   ASSERT_TRUE(EquivalentAssertControlForTask("$assertpasson", inv));
-  EXPECT_EQ(inv.control_type, static_cast<uint32_t>(AssertControlType::kPassOn));
+  EXPECT_EQ(inv.control_type,
+            static_cast<uint32_t>(AssertControlType::kPassOn));
   EXPECT_EQ(inv.assertion_type, 31u);
   ASSERT_TRUE(EquivalentAssertControlForTask("$assertpassoff", inv));
   EXPECT_EQ(inv.control_type,
             static_cast<uint32_t>(AssertControlType::kPassOff));
   ASSERT_TRUE(EquivalentAssertControlForTask("$assertfailon", inv));
-  EXPECT_EQ(inv.control_type, static_cast<uint32_t>(AssertControlType::kFailOn));
+  EXPECT_EQ(inv.control_type,
+            static_cast<uint32_t>(AssertControlType::kFailOn));
   ASSERT_TRUE(EquivalentAssertControlForTask("$assertnonvacuouson", inv));
   EXPECT_EQ(inv.control_type,
             static_cast<uint32_t>(AssertControlType::kNonvacuousOn));
@@ -372,8 +374,8 @@ TEST(SvaEngine, LockAlsoBlocksActionControls) {
 // §20.11: the status controls (1 through 5) affect statistics counters; the
 // boundary is at control_type 5/6. Lock (1) and On (3) affect them.
 TEST(SvaEngine, StatusControlsBelowSixAffectStatistics) {
-  EXPECT_TRUE(ControlTypeAffectsStatistics(
-      static_cast<int>(AssertControlType::kLock)));
+  EXPECT_TRUE(
+      ControlTypeAffectsStatistics(static_cast<int>(AssertControlType::kLock)));
   EXPECT_TRUE(
       ControlTypeAffectsStatistics(static_cast<int>(AssertControlType::kOn)));
   EXPECT_FALSE(ControlTypeAffectsStatistics(
@@ -423,4 +425,4 @@ TEST(SvaEngine, DefaultDirectiveTypeAffectsAllDirectives) {
                                           DirectiveTypeBit::kAssume));
 }
 
-}
+}  // namespace

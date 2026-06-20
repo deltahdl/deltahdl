@@ -31,4 +31,4 @@ TEST(DynamicArrayDeleteParsing, DynamicArrayDeleteMethod) {
   EXPECT_EQ(expr->kind, ExprKind::kCall);
 }
 
-}
+}  // namespace

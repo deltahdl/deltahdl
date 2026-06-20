@@ -69,4 +69,4 @@ TEST(SequenceLexing, NonconsecutiveRepetitionUsesEquals) {
   EXPECT_EQ(tokens[3].kind, TokenKind::kRBracket);
 }
 
-}
+}  // namespace

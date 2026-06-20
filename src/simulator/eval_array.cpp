@@ -141,8 +141,7 @@ static Logic4Vec ReduceWithExpr(std::string_view var_name,
     auto* item_var = ctx.CreateLocalVariable(iter_name, elems[i].width);
     item_var->value = elems[i];
     auto* idx_var = ctx.CreateLocalVariable(idx_var_name, 32);
-    idx_var->value =
-        MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(i));
+    idx_var->value = MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(i));
     Logic4Vec ev = EvalExpr(expr->with_expr, ctx, arena);
     ctx.PopScope();
     vals.push_back(ev.ToUint64());
@@ -299,8 +298,8 @@ static uint64_t EvalSortKey(const Expr* with_expr, std::string_view iter_name,
 }
 
 static void ArraySortWithExpr(std::string_view var_name, const ArrayInfo& info,
-                              const Expr* expr, bool ascending,
-                              SimContext& ctx, Arena& arena) {
+                              const Expr* expr, bool ascending, SimContext& ctx,
+                              Arena& arena) {
   auto vals = CollectVecElements(var_name, info, ctx, arena);
   std::string_view iter_name = "item";
   std::string_view index_name = "index";
@@ -402,9 +401,8 @@ bool TryExecArrayMethodStmt(const Expr* expr, SimContext& ctx, Arena& arena) {
 
   if ((parts.method_name == "reverse" || parts.method_name == "shuffle") &&
       expr->with_expr) {
-    ctx.GetDiag().Error(
-        {}, "'" + std::string(parts.method_name) +
-                "' does not accept a 'with' clause");
+    ctx.GetDiag().Error({}, "'" + std::string(parts.method_name) +
+                                "' does not accept a 'with' clause");
     return true;
   }
   if (parts.method_name == "sort") {
@@ -582,8 +580,8 @@ static bool DispatchQueueDelete(std::string_view method, QueueObject* q,
 
 static bool IsQueueMutator(std::string_view method) {
   return method == "push_back" || method == "push_front" ||
-         method == "pop_back" || method == "pop_front" ||
-         method == "insert" || method == "delete";
+         method == "pop_back" || method == "pop_front" || method == "insert" ||
+         method == "delete";
 }
 
 static void NotifyOwningVar(SimContext& ctx, std::string_view var_name) {
@@ -597,8 +595,7 @@ bool TryEvalQueueMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
   auto* q = ctx.FindQueue(parts.var_name);
   if (!q) return false;
   if (DispatchQueueEval(parts.method_name, q, arena, out)) {
-    if (IsQueueMutator(parts.method_name))
-      NotifyOwningVar(ctx, parts.var_name);
+    if (IsQueueMutator(parts.method_name)) NotifyOwningVar(ctx, parts.var_name);
     return true;
   }
 
@@ -671,7 +668,7 @@ static void ShuffleQueueWithIds(QueueObject* q, SimContext& ctx) {
 }
 
 bool TryExecQueuePropertyStmt(std::string_view var_name, std::string_view prop,
-                              SimContext& ctx, Arena& ) {
+                              SimContext& ctx, Arena&) {
   auto* q = ctx.FindQueue(var_name);
   if (!q) return false;
   if (prop == "delete") {
@@ -940,7 +937,7 @@ bool TryEvalAssocProperty(std::string_view var_name, std::string_view prop,
 }
 
 bool TryExecAssocPropertyStmt(std::string_view var_name, std::string_view prop,
-                              SimContext& ctx, Arena& ) {
+                              SimContext& ctx, Arena&) {
   auto* aa = ctx.FindAssocArray(var_name);
   if (!aa) return false;
   if (prop == "delete") {
@@ -976,8 +973,8 @@ struct LocatorCtx {
 };
 
 static LocatorCtx MakeLocatorCtx(const std::vector<Logic4Vec>& elems,
-                                 bool is_str, const Expr* expr,
-                                 SimContext& ctx, Arena& arena) {
+                                 bool is_str, const Expr* expr, SimContext& ctx,
+                                 Arena& arena) {
   std::string_view iter_name = "item";
   std::string_view index_name = "index";
   if (!expr->args.empty() && expr->args[0] &&
@@ -989,9 +986,8 @@ static LocatorCtx MakeLocatorCtx(const std::vector<Logic4Vec>& elems,
     index_name = expr->args[1]->text;
   }
   std::string idx_var = std::string(iter_name) + "." + std::string(index_name);
-  return LocatorCtx{elems,    is_str,       expr->with_expr,
-                    ctx,      arena,        iter_name,
-                    std::move(idx_var)};
+  return LocatorCtx{elems, is_str,    expr->with_expr,   ctx,
+                    arena, iter_name, std::move(idx_var)};
 }
 
 static bool EvalLocatorPredicate(const LocatorCtx& lc,
@@ -1066,7 +1062,8 @@ static void LocatorFindIndex(std::string_view method, const LocatorCtx& lc,
 static void LocatorMap(const LocatorCtx& lc, std::vector<Logic4Vec>& out) {
   for (size_t i = 0; i < lc.elems.size(); ++i) {
     lc.ctx.PushScope();
-    auto* item_var = lc.ctx.CreateLocalVariable(lc.iter_name, lc.elems[i].width);
+    auto* item_var =
+        lc.ctx.CreateLocalVariable(lc.iter_name, lc.elems[i].width);
     item_var->value = lc.elems[i];
     if (lc.is_string) lc.ctx.RegisterStringVariable(lc.iter_name);
     auto* idx_var = lc.ctx.CreateLocalVariable(lc.idx_var_name, 32);
@@ -1076,7 +1073,7 @@ static void LocatorMap(const LocatorCtx& lc, std::vector<Logic4Vec>& out) {
   }
 }
 
-static void LocatorUnique(const std::vector<Logic4Vec>& elems, Arena& ,
+static void LocatorUnique(const std::vector<Logic4Vec>& elems, Arena&,
                           std::vector<Logic4Vec>& out) {
   std::vector<uint64_t> seen;
   for (const auto& e : elems) {
@@ -1167,14 +1164,12 @@ static void LocatorUniqueIndexWith(const LocatorCtx& lc,
     }
     if (!dup) {
       seen.push_back(v);
-      out.push_back(
-          MakeLogic4VecVal(lc.arena, 32, static_cast<uint64_t>(i)));
+      out.push_back(MakeLogic4VecVal(lc.arena, 32, static_cast<uint64_t>(i)));
     }
   }
 }
 
 static bool ExtractLocatorParts(const Expr* expr, MethodCallParts& out) {
-
   if (expr->kind == ExprKind::kMemberAccess) {
     if (!expr->lhs || expr->lhs->kind != ExprKind::kIdentifier) return false;
     if (!expr->rhs || expr->rhs->kind != ExprKind::kIdentifier) return false;
@@ -1202,10 +1197,10 @@ static bool TryCollectAssocLocatorResult(const Expr* expr,
   std::string_view method = parts.method_name;
   if (method == "map") return false;  // not a 7.12.1 locator method
 
-  const bool needs_with =
-      method == "find" || method == "find_index" || method == "find_first" ||
-      method == "find_first_index" || method == "find_last" ||
-      method == "find_last_index";
+  const bool needs_with = method == "find" || method == "find_index" ||
+                          method == "find_first" ||
+                          method == "find_first_index" ||
+                          method == "find_last" || method == "find_last_index";
   if (!expr->with_expr && needs_with) {
     ctx.GetDiag().Error({}, "array locator method '" + std::string(method) +
                                 "' requires a 'with' clause");
@@ -1356,8 +1351,7 @@ bool TryCollectLocatorResult(const Expr* expr, SimContext& ctx, Arena& arena,
   // and that clause is required: there is nothing to evaluate without it, so a
   // bare map() is illegal rather than a silent no-op.
   if (parts.method_name == "map" && !expr->with_expr) {
-    ctx.GetDiag().Error({},
-                        "array method 'map' requires a 'with' clause");
+    ctx.GetDiag().Error({}, "array method 'map' requires a 'with' clause");
     return false;
   }
 
@@ -1443,4 +1437,4 @@ bool TryCollectAssocMapResult(const Expr* expr, SimContext& ctx, Arena& arena,
   return true;
 }
 
-}
+}  // namespace delta

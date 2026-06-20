@@ -46,8 +46,8 @@ TEST(AssertStatement, ActionControlSuppressesSelectedBranch) {
 // unless $assertcontrol (a FailOff) has suppressed the fail action.
 TEST(AssertStatement, DefaultErrorOnFailureUnlessSuppressed) {
   DeferredAssertion da;
-  da.condition_val = 0;       // the property failed
-  da.has_else_clause = false; // no explicit else action
+  da.condition_val = 0;        // the property failed
+  da.has_else_clause = false;  // no explicit else action
   EXPECT_TRUE(CallsDefaultErrorOnFailure(da, /*fail_enabled=*/true));
   EXPECT_FALSE(CallsDefaultErrorOnFailure(da, /*fail_enabled=*/false));
 }

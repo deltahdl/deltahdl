@@ -32,4 +32,4 @@ TEST_F(AnnexHParseTest, UrandomRangeTwoArgumentForm) {
   EXPECT_FALSE(diag_.HasErrors());
 }
 
-}
+}  // namespace

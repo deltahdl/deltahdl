@@ -120,7 +120,9 @@ TEST(ThreadStability, HierarchicalSeedingFromParent) {
         "  int unsigned b;\n"
         "  initial begin\n"
         "    process p = process::self();\n"
-        "    p.srandom(" + std::to_string(parent_seed) + ");\n"
+        "    p.srandom(" +
+        std::to_string(parent_seed) +
+        ");\n"
         "    fork\n"
         "      a = $urandom;\n"
         "      b = $urandom;\n"
@@ -260,4 +262,4 @@ TEST(ThreadStability, ChildDrawDoesNotAdvanceParentRng) {
   EXPECT_EQ(with, without);
 }
 
-}
+}  // namespace

@@ -51,4 +51,4 @@ TEST(CycleDelayConcat, NamedSequenceWithConcatRegisters) {
   EXPECT_TRUE(ep->is_event);
 }
 
-}
+}  // namespace

@@ -125,5 +125,5 @@ TEST_F(VpiGetCbInfoSim, SystfCallbackHandleLeavesDestinationUntouched) {
   EXPECT_EQ(out.reason, 5151);
 }
 
-}
-}
+}  // namespace
+}  // namespace delta

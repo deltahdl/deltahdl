@@ -153,4 +153,4 @@ TEST(AssocTraversalArgs, LongintIndexTruncatesTo32Bit) {
   EXPECT_EQ(ref->value.ToUint64(), 100000u);
 }
 
-}
+}  // namespace

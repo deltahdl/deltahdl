@@ -151,4 +151,4 @@ TEST(OperatorAndExpressionParsing, InsideExpressionWithLhsAndElements) {
   EXPECT_EQ(cond->elements.size(), 3u);
 }
 
-}
+}  // namespace

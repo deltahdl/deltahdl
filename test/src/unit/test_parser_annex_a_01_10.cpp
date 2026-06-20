@@ -697,8 +697,7 @@ TEST(ConstraintItemsParsing, ErrorConstraintPrototypeMissingSemicolon) {
 }
 
 TEST(ConstraintItemsParsing, ErrorExternConstraintMissingScope) {
-  auto r = Parse(
-      "constraint c { x > 0; }\n");
+  auto r = Parse("constraint c { x > 0; }\n");
   EXPECT_TRUE(r.has_errors);
 }
 
@@ -829,4 +828,4 @@ TEST(ConstraintItemsParsing, ConstraintPrimaryWithParens) {
   EXPECT_EQ(r.cu->classes[0]->members[1]->name, "c");
 }
 
-}
+}  // namespace

@@ -87,4 +87,4 @@ TEST(AlwaysCombSensitivityParsing, TaskCallInAlwaysCombBlockParses) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

@@ -5,9 +5,9 @@ using namespace delta;
 
 namespace {
 
-// §6.7.1 net-declaration rules enforced by the elaborator. These tests drive the
-// real Elaborator (via ElaborateSrc) so they observe the production code applying
-// the rule, rather than a standalone model.
+// §6.7.1 net-declaration rules enforced by the elaborator. These tests drive
+// the real Elaborator (via ElaborateSrc) so they observe the production code
+// applying the rule, rather than a standalone model.
 
 const RtlirNet* FindNet(const RtlirDesign* design, std::string_view name) {
   for (const auto& net : design->top_modules[0]->nets) {
@@ -88,8 +88,7 @@ TEST(NetDataType, ImplicitNetIsSingleBit) {
 
 TEST(NetDataType, ImplicitNetWithRangeMatchesExplicitLogic) {
   ElabFixture f;
-  auto* design =
-      ElaborateSrc("module m; wire [15:0] ww; endmodule\n", f);
+  auto* design = ElaborateSrc("module m; wire [15:0] ww; endmodule\n", f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
   auto* net = FindNet(design, "ww");
@@ -112,4 +111,4 @@ TEST(InterconnectNet, PlainInterconnectIsAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

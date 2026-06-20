@@ -41,8 +41,7 @@ RepetitionCount NormalizePlusShortcut();
 // §16.9.2: goto and nonconsecutive repetition can be applied only to Boolean
 // expressions. In particular, neither may be applied to a Boolean expression
 // to which a sequence_match_item (see §16.10, §16.11) has been attached.
-bool IsRepetitionAllowedOn(RepetitionKind kind,
-                           bool operand_is_boolean_expr,
+bool IsRepetitionAllowedOn(RepetitionKind kind, bool operand_is_boolean_expr,
                            bool boolean_has_attached_match_item);
 
 // §16.9.2.1 (descendant; here only as the reading anchor): a zero repetition

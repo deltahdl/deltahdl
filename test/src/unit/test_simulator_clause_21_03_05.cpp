@@ -91,9 +91,10 @@ TEST(SysTask, FseekFromCurrentPosition) {
   EvalExpr(MkSysCall(f.arena, "$fgetc", {MkInt(f.arena, fd)}), f.ctx, f.arena);
 
   // From the current position (2), advance by one more to land on 'd'.
-  EvalExpr(MkSysCall(f.arena, "$fseek",
-                     {MkInt(f.arena, fd), MkInt(f.arena, 1), MkInt(f.arena, 1)}),
-           f.ctx, f.arena);
+  EvalExpr(
+      MkSysCall(f.arena, "$fseek",
+                {MkInt(f.arena, fd), MkInt(f.arena, 1), MkInt(f.arena, 1)}),
+      f.ctx, f.arena);
   auto ch = EvalExpr(MkSysCall(f.arena, "$fgetc", {MkInt(f.arena, fd)}), f.ctx,
                      f.arena);
   EXPECT_EQ(ch.ToUint64(), static_cast<uint64_t>('d'));
@@ -139,8 +140,9 @@ TEST(SysTask, FtellReturnsEofOnError) {
 // §21.3.5: $rewind reports -1 when the reposition fails (invalid descriptor).
 TEST(SysTask, RewindReturnsEofOnError) {
   SysTaskFixture f;
-  auto code = EvalExpr(
-      MkSysCall(f.arena, "$rewind", {MkInt(f.arena, 0x12345u)}), f.ctx, f.arena);
+  auto code =
+      EvalExpr(MkSysCall(f.arena, "$rewind", {MkInt(f.arena, 0x12345u)}), f.ctx,
+               f.arena);
   EXPECT_EQ(code.ToUint64(), static_cast<uint64_t>(-1));
 }
 
@@ -163,17 +165,18 @@ TEST(SysTask, FseekReturnsCode) {
   EXPECT_EQ(ok.ToUint64(), 0u);
 
   // An invalid descriptor cannot be repositioned, so the error code is used.
-  auto bad = EvalExpr(
-      MkSysCall(f.arena, "$fseek",
-                {MkInt(f.arena, 0x12345u), MkInt(f.arena, 0), MkInt(f.arena, 0)}),
-      f.ctx, f.arena);
+  auto bad = EvalExpr(MkSysCall(f.arena, "$fseek",
+                                {MkInt(f.arena, 0x12345u), MkInt(f.arena, 0),
+                                 MkInt(f.arena, 0)}),
+                      f.ctx, f.arena);
   EXPECT_EQ(bad.ToUint64(), static_cast<uint64_t>(-1));
 
   EvalExpr(MkSysCall(f.arena, "$fclose", {MkInt(f.arena, fd)}), f.ctx, f.arena);
   std::remove(tmp.c_str());
 }
 
-// §21.3.5: repositioning with $fseek shall cancel any pending $ungetc push-back.
+// §21.3.5: repositioning with $fseek shall cancel any pending $ungetc
+// push-back.
 TEST(SysTask, FseekCancelsUngetc) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_test_fseek_ungetc.txt";
@@ -192,9 +195,10 @@ TEST(SysTask, FseekCancelsUngetc) {
                       MkInt(f.arena, fd)}),
            f.ctx, f.arena);
   // The reposition discards the push-back, so reading resumes from the file.
-  EvalExpr(MkSysCall(f.arena, "$fseek",
-                     {MkInt(f.arena, fd), MkInt(f.arena, 0), MkInt(f.arena, 0)}),
-           f.ctx, f.arena);
+  EvalExpr(
+      MkSysCall(f.arena, "$fseek",
+                {MkInt(f.arena, fd), MkInt(f.arena, 0), MkInt(f.arena, 0)}),
+      f.ctx, f.arena);
   auto ch = EvalExpr(MkSysCall(f.arena, "$fgetc", {MkInt(f.arena, fd)}), f.ctx,
                      f.arena);
   EXPECT_EQ(ch.ToUint64(), static_cast<uint64_t>('a'));
@@ -258,4 +262,4 @@ TEST(SysTask, FseekBeyondEndOfFile) {
   std::remove(tmp.c_str());
 }
 
-}
+}  // namespace

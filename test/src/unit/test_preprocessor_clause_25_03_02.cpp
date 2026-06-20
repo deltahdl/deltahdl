@@ -23,4 +23,4 @@ TEST(InterfaceParsing, SimpleBusWithMultipleVariableDecls) {
   EXPECT_GE(r.cu->interfaces[0]->items.size(), 5u);
 }
 
-}
+}  // namespace

@@ -57,4 +57,4 @@ TEST(ParameterizedInterface, NamedOverrideAppliedToInterfaceInstance) {
   EXPECT_EQ(u0->params[0].resolved_value, 32);
 }
 
-}
+}  // namespace

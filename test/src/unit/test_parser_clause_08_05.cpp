@@ -84,4 +84,4 @@ TEST(ObjectPropertyParsing, PropertyReadAndWrite) {
       "endmodule\n");
 }
 
-}
+}  // namespace

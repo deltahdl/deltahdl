@@ -98,4 +98,4 @@ TEST(ContinuousAssignSim, AssignmentReevaluatesOnRhsChange) {
   EXPECT_EQ(y->value.ToUint64(), 42u);
 }
 
-}
+}  // namespace

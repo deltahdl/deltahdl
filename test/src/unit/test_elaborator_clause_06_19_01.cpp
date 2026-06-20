@@ -57,4 +57,4 @@ TEST(Elaboration, TypedefEnumVarHasCorrectWidth) {
   }
 }
 
-}
+}  // namespace

@@ -72,4 +72,4 @@ TEST(TimescaleElaboration, LaterTimescaleOverrideElaboratesCorrectly) {
   EXPECT_TRUE(found);
 }
 
-}
+}  // namespace

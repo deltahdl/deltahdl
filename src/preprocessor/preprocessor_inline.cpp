@@ -457,7 +457,6 @@ void Preprocessor::TrackDesignElement(std::string_view trimmed) {
       trimmed.starts_with("interface ") || trimmed.starts_with("checker ") ||
       trimmed.starts_with("package ") || trimmed.starts_with("primitive ") ||
       trimmed.starts_with("config ") || trimmed.starts_with("macromodule ")) {
-
     if (in_celldefine_) {
       if (trimmed.starts_with("module ")) {
         auto name = ExtractModuleName(trimmed, "module ");
@@ -593,7 +592,7 @@ void Preprocessor::HandleDefine(std::string_view rest, SourceLoc loc) {
   macros_.Define(std::move(def));
 }
 
-void Preprocessor::HandleUndef(std::string_view rest, SourceLoc ) {
+void Preprocessor::HandleUndef(std::string_view rest, SourceLoc) {
   if (!IsActive()) return;
   auto name = Trim(rest);
   macros_.Undefine(name);
@@ -697,9 +696,9 @@ void Preprocessor::HandleInclude(std::string_view filename_raw, SourceLoc loc,
   }
 
   if (fn.front() != '"' && fn.front() != '<') {
-    diag_.Error(
-        loc,
-        "`include filename must be enclosed in double quotes or angle brackets");
+    diag_.Error(loc,
+                "`include filename must be enclosed in double quotes or angle "
+                "brackets");
     return;
   }
 
@@ -720,4 +719,4 @@ void Preprocessor::HandleInclude(std::string_view filename_raw, SourceLoc loc,
   ResolveAndReadInclude(fn, loc, depth, output, angle_bracket);
 }
 
-}
+}  // namespace delta

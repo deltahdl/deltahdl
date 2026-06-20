@@ -89,4 +89,4 @@ TEST(ObjectMethodElaboration, MultipleMethodCallsElaborate) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

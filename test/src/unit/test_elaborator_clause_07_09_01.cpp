@@ -22,4 +22,4 @@ TEST(BuiltinMethodElaboration, AssocArraySizeOk) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

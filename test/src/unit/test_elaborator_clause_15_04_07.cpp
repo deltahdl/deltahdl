@@ -19,4 +19,4 @@ TEST(MailboxPeekElaborator, PeekCallElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

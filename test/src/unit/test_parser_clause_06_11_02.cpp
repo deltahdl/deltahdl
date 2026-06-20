@@ -267,4 +267,4 @@ TEST(TwoStateAndFourState, RegWithPackedDims) {
   EXPECT_EQ(item->name, "wide_reg");
 }
 
-}
+}  // namespace

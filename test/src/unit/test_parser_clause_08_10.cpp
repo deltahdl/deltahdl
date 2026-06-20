@@ -107,4 +107,4 @@ TEST(StaticMethodParsing, StaticMethodWithArgs) {
   EXPECT_EQ(m->method->func_args.size(), 2u);
 }
 
-}
+}  // namespace

@@ -60,12 +60,12 @@ TEST(UdpDeclGrammar, NonAnsiWithPortDecls) {
 }
 
 TEST(UdpDeclGrammar, MissingEndprimitiveIsError) {
-  EXPECT_FALSE(ParseOk(
-      "primitive inv(output y, input a);\n"
-      "  table\n"
-      "    0 : 1;\n"
-      "    1 : 0;\n"
-      "  endtable\n"));
+  EXPECT_FALSE(
+      ParseOk("primitive inv(output y, input a);\n"
+              "  table\n"
+              "    0 : 1;\n"
+              "    1 : 0;\n"
+              "  endtable\n"));
 }
 
 TEST(UdpDeclGrammar, UdpWithNoOutputPortRejected) {
@@ -177,4 +177,4 @@ TEST(UdpDeclGrammar, UdpHeaderWithoutStateTableRejected) {
   EXPECT_TRUE(r.has_errors);
 }
 
-}
+}  // namespace

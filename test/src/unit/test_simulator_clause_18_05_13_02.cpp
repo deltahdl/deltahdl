@@ -59,7 +59,8 @@ TEST(DisableSoftConstraint, DiscardsLowerPrioritySoftReferencingVariable) {
   cb.constraints.push_back(cs);
   control.AddConstraintBlock(cb);
   ASSERT_TRUE(control.Solve());
-  EXPECT_EQ(control.GetValue("x"), 5);  // soft preference honored without disable
+  EXPECT_EQ(control.GetValue("x"),
+            5);  // soft preference honored without disable
 
   ConstraintSolver reference(42);
   AddRand(reference, "x", 0, 100);  // no constraints: x is unconstrained
@@ -71,7 +72,7 @@ TEST(DisableSoftConstraint, DiscardsLowerPrioritySoftReferencingVariable) {
   b.name = "c";
   ConstraintExpr inner, soft;
   MakeSoftEq(inner, soft, "x", 5);
-  b.constraints.push_back(soft);          // lower priority: declared first
+  b.constraints.push_back(soft);  // lower priority: declared first
   b.constraints.push_back(MakeDisableSoft("x"));  // discards the soft above
   solver.AddConstraintBlock(b);
 
@@ -121,7 +122,8 @@ TEST(DisableSoftConstraint, DiscardsNonContradictingSoft) {
   cb.constraints.push_back(cys);
   control.AddConstraintBlock(cb);
   ASSERT_TRUE(control.Solve());
-  EXPECT_EQ(control.GetValue("x"), 5);  // both soft preferences honored, no disable
+  EXPECT_EQ(control.GetValue("x"),
+            5);  // both soft preferences honored, no disable
   EXPECT_EQ(control.GetValue("y"), 7);
 
   ConstraintSolver reference(7);
@@ -170,7 +172,8 @@ TEST(DisableSoftConstraint, SkipsSoftWhereVariableNotDirect) {
   ConstraintExpr inner, soft;
   MakeSoftEq(inner, soft, "q", 7);  // directly references q only, not p
   b.constraints.push_back(soft);
-  b.constraints.push_back(MakeDisableSoft("p"));  // p is not directly in the soft
+  b.constraints.push_back(
+      MakeDisableSoft("p"));  // p is not directly in the soft
   solver.AddConstraintBlock(b);
 
   ASSERT_TRUE(solver.Solve());
@@ -219,8 +222,9 @@ TEST(DisableSoftConstraint, DiscardsSoftWithDirectMultiVarReference) {
 
 // 18.5.13.2: the directive applies to an array's size variable too — the clause
 // names array.size explicitly. A soft constraint preferring the size be 4 is
-// discarded by 'disable soft' on that same size variable, so the size returns to
-// its unconstrained value; the control without the directive honors size == 4.
+// discarded by 'disable soft' on that same size variable, so the size returns
+// to its unconstrained value; the control without the directive honors size
+// == 4.
 TEST(DisableSoftConstraint, AppliesToArraySizeVariable) {
   ConstraintSolver control(99);
   RandVariable cv;
@@ -288,7 +292,8 @@ TEST(DisableSoftConstraint, DiscardsSoftInEarlierConstraintBlock) {
   solver.AddConstraintBlock(first);
   ConstraintBlock second;
   second.name = "c_second";
-  second.constraints.push_back(MakeDisableSoft("x"));  // later block: discards it
+  second.constraints.push_back(
+      MakeDisableSoft("x"));  // later block: discards it
   solver.AddConstraintBlock(second);
 
   ASSERT_TRUE(solver.Solve());
@@ -354,4 +359,4 @@ TEST(DisableSoftConstraint, InlineDisableSoftDiscardsClassSoft) {
   EXPECT_EQ(solver.GetValue("x"), reference.GetValue("x"));
 }
 
-}
+}  // namespace

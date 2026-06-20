@@ -121,4 +121,4 @@ TEST(ChandleDataType, ChandleChandleEquality) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

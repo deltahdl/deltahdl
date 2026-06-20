@@ -65,4 +65,4 @@ TEST(Tri0Tri1Elaboration, Tri1IsNetNotVariable) {
   EXPECT_TRUE(mod->variables.empty());
 }
 
-}
+}  // namespace

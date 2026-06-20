@@ -225,9 +225,9 @@ TEST(FsmSameDeclarationPragmaLexing, MultipleTrailingSignalsAreAllIgnored) {
     }
   }
   ASSERT_EQ(decl_order.size(), 4u);
-  EXPECT_EQ(decl_order[0], "cs");    // current state
-  EXPECT_EQ(decl_order[1], "ns");    // next state
-  EXPECT_EQ(decl_order[2], "idle");  // ignored
+  EXPECT_EQ(decl_order[0], "cs");     // current state
+  EXPECT_EQ(decl_order[1], "ns");     // next state
+  EXPECT_EQ(decl_order[2], "idle");   // ignored
   EXPECT_EQ(decl_order[3], "extra");  // ignored
 }
 

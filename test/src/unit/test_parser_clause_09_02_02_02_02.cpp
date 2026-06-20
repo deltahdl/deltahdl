@@ -117,4 +117,4 @@ TEST(ProcessParsing, SideBySideBodiesExist) {
   EXPECT_EQ(second->body->kind, StmtKind::kBlockingAssign);
 }
 
-}
+}  // namespace

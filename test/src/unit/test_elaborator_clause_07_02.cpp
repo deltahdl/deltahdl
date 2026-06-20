@@ -114,4 +114,4 @@ TEST(StructDeclarationValidation, BareStructWithRealMemberClassifiedUnpacked) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-}
+}  // namespace

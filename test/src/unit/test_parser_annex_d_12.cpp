@@ -24,4 +24,4 @@ TEST(OptionalSystemTaskParserParsing, ShowScopesIntegerArgument) {
   ASSERT_NE(r.cu, nullptr);
 }
 
-}
+}  // namespace

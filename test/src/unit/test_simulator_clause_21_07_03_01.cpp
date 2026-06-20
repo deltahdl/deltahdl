@@ -54,7 +54,7 @@ TEST_F(DumpportsSysTask, IncludesRegisteredPortsWhenScopeOmitted) {
       f.ctx, f.arena);
 
   auto content = ReadVcd();
-  EXPECT_NE(content.find("1!"), std::string::npos);  // a dumped
+  EXPECT_NE(content.find("1!"), std::string::npos);   // a dumped
   EXPECT_NE(content.find("0\""), std::string::npos);  // b dumped
 }
 
@@ -108,8 +108,9 @@ TEST_F(DumpportsSysTask, ResolvesHierarchicalScopeName) {
   EXPECT_EQ(content.find("0\""), std::string::npos);  // other not dumped
 }
 
-// §21.7.3.1: when arguments are present but none is a trailing filename literal,
-// the filename still defaults to dumpports.vcd while the scope is dumped.
+// §21.7.3.1: when arguments are present but none is a trailing filename
+// literal, the filename still defaults to dumpports.vcd while the scope is
+// dumped.
 TEST_F(DumpportsSysTask, ScopeWithoutFilenameDefaultsName) {
   SimFixture f;
   auto* sig = MakeVar(f, "sig", 1, 1);

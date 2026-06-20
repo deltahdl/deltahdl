@@ -54,9 +54,9 @@ ConstraintSolver MakeSdSolver(uint32_t seed) {
 // 18.5.9: with no ordering constraint the solver gives a uniform distribution
 // over the legal value combinations — every legal (s, d) pair is equally
 // probable. For the 's -> d == 0' example there are five legal combinations and
-// s is 1 in only one of them, so without ordering s comes out 1 with probability
-// near 1/5. The far-from-half observed frequency is what the ordering example
-// then sets out to change.
+// s is 1 in only one of them, so without ordering s comes out 1 with
+// probability near 1/5. The far-from-half observed frequency is what the
+// ordering example then sets out to change.
 TEST(VariableOrdering, UniformOverLegalCombinationsWithoutOrdering) {
   ConstraintSolver solver = MakeSdSolver(12345);
   int s_one = 0;
@@ -131,8 +131,8 @@ TEST(VariableOrdering, OrderingNeverCausesFailure) {
 // the solution space is still honored. Here a hard constraint pins the ordered
 // variable s to 0; even though 'solve s before d' would otherwise let s be 0 or
 // 1 with equal probability, committing s=1 admits no completion, so the solver
-// keeps redrawing s until it lands on the only feasible value. s therefore comes
-// out 0 every time and the solve always succeeds.
+// keeps redrawing s until it lands on the only feasible value. s therefore
+// comes out 0 every time and the solve always succeeds.
 TEST(VariableOrdering, OrderingRespectsHardConstraintOnOrderedVariable) {
   ConstraintSolver solver(99);
   solver.AddVariable(MakeVar("s", 0, 1, 1));
@@ -158,10 +158,11 @@ TEST(VariableOrdering, OrderingRespectsHardConstraintOnOrderedVariable) {
 // of ordered variables — that is, after the ordered head — so its value is
 // conditioned on the earlier choice rather than chosen freely. With 'solve a
 // before d', the head a is drawn first and so keeps a uniform 1/2 marginal,
-// while the unordered u (constrained by 'u -> a == 0') is solved afterward: when
-// a came out 1 the constraint forces u to 0, so u is 1 only when a is 0, giving a
-// skewed ~1/4 marginal. The two marginals together show u is solved last (after
-// a) rather than first; were u solved first it too would be uniform at ~1/2.
+// while the unordered u (constrained by 'u -> a == 0') is solved afterward:
+// when a came out 1 the constraint forces u to 0, so u is 1 only when a is 0,
+// giving a skewed ~1/4 marginal. The two marginals together show u is solved
+// last (after a) rather than first; were u solved first it too would be uniform
+// at ~1/2.
 TEST(VariableOrdering, UnorderedVariableSolvedAfterOrderedHead) {
   ConstraintSolver solver(31);
   solver.AddVariable(MakeVar("a", 0, 1, 1));
@@ -199,13 +200,13 @@ TEST(VariableOrdering, UnorderedVariableSolvedAfterOrderedHead) {
   EXPECT_LE(u_one, 270);
 }
 
-// 18.5.9: variables that are partially ordered are solved with the latest set of
-// ordered variables so that all ordering constraints are met. Here a and b are
-// each ordered before c but unordered relative to each other, so they belong to
-// the first solved set (each keeps a uniform 1/2 marginal) while c is solved in
-// the final set. Because c is solved after both, the constraint 'c == a & b' is
-// always met by the value chosen for c, so the solve never fails and c equals the
-// committed a & b on every randomization.
+// 18.5.9: variables that are partially ordered are solved with the latest set
+// of ordered variables so that all ordering constraints are met. Here a and b
+// are each ordered before c but unordered relative to each other, so they
+// belong to the first solved set (each keeps a uniform 1/2 marginal) while c is
+// solved in the final set. Because c is solved after both, the constraint 'c ==
+// a & b' is always met by the value chosen for c, so the solve never fails and
+// c equals the committed a & b on every randomization.
 TEST(VariableOrdering, PartiallyOrderedVariablesSolvedInFirstSet) {
   ConstraintSolver solver(17);
   solver.AddVariable(MakeVar("a", 0, 1, 1));
@@ -215,14 +216,13 @@ TEST(VariableOrdering, PartiallyOrderedVariablesSolvedInFirstSet) {
   blk.name = "c";
   ConstraintExpr c_eq_a_and_b;
   c_eq_a_and_b.kind = ConstraintKind::kCustom;
-  c_eq_a_and_b.eval_fn =
-      [](const std::unordered_map<std::string, int64_t>& v) {
-        auto a = v.find("a");
-        auto b = v.find("b");
-        auto c = v.find("c");
-        if (a == v.end() || b == v.end() || c == v.end()) return true;
-        return c->second == (a->second & b->second);
-      };
+  c_eq_a_and_b.eval_fn = [](const std::unordered_map<std::string, int64_t>& v) {
+    auto a = v.find("a");
+    auto b = v.find("b");
+    auto c = v.find("c");
+    if (a == v.end() || b == v.end() || c == v.end()) return true;
+    return c->second == (a->second & b->second);
+  };
   blk.constraints.push_back(c_eq_a_and_b);
   solver.AddConstraintBlock(blk);
   solver.AddSolveBefore({"a"}, {"c"});
@@ -232,7 +232,8 @@ TEST(VariableOrdering, PartiallyOrderedVariablesSolvedInFirstSet) {
   int b_one = 0;
   const int kTrials = 800;
   for (int i = 0; i < kTrials; ++i) {
-    ASSERT_TRUE(solver.Solve());  // never fails: c is solved last to match a & b
+    ASSERT_TRUE(
+        solver.Solve());  // never fails: c is solved last to match a & b
     int64_t a = solver.GetValue("a");
     int64_t b = solver.GetValue("b");
     EXPECT_EQ(solver.GetValue("c"), a & b);  // c solved in the latest set
@@ -246,13 +247,14 @@ TEST(VariableOrdering, PartiallyOrderedVariablesSolvedInFirstSet) {
   EXPECT_LE(b_one, 470);
 }
 
-// 18.5.9: each side of a 'solve ... before ...' ordering is a list of variables.
-// 'solve a, b before c, d' orders every variable on the left ahead of every
-// variable on the right, so a and b form the first solved set and c and d the
-// last. With c constrained to equal a and d to equal b — relations the solver can
-// always meet because c and d are chosen after a and b — the solve never fails,
-// a and b keep their uniform marginals, and the dependent pair takes the matching
-// committed values. This exercises the multi-variable list on both sides.
+// 18.5.9: each side of a 'solve ... before ...' ordering is a list of
+// variables. 'solve a, b before c, d' orders every variable on the left ahead
+// of every variable on the right, so a and b form the first solved set and c
+// and d the last. With c constrained to equal a and d to equal b — relations
+// the solver can always meet because c and d are chosen after a and b — the
+// solve never fails, a and b keep their uniform marginals, and the dependent
+// pair takes the matching committed values. This exercises the multi-variable
+// list on both sides.
 TEST(VariableOrdering, MultiVariableListsOrderedAcrossGroups) {
   ConstraintSolver solver(23);
   solver.AddVariable(MakeVar("a", 0, 1, 1));
@@ -268,7 +270,8 @@ TEST(VariableOrdering, MultiVariableListsOrderedAcrossGroups) {
     auto b = v.find("b");
     auto c = v.find("c");
     auto d = v.find("d");
-    if (a == v.end() || b == v.end() || c == v.end() || d == v.end()) return true;
+    if (a == v.end() || b == v.end() || c == v.end() || d == v.end())
+      return true;
     return c->second == a->second && d->second == b->second;
   };
   blk.constraints.push_back(deps);

@@ -186,4 +186,4 @@ TEST(StructLiteralSim, NestedBracesArrayOfStructs) {
   EXPECT_EQ(vr1->value.ToUint64(), 0x3344u);
 }
 
-}
+}  // namespace

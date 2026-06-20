@@ -8,10 +8,8 @@ namespace {
 
 // §F.3.3: b and c denote Boolean expressions.
 TEST(NotationConventions, BooleanExpressionLetters) {
-  EXPECT_EQ(ClassifyAnnexFNotation("b"),
-            NotationCategory::kBooleanExpression);
-  EXPECT_EQ(ClassifyAnnexFNotation("c"),
-            NotationCategory::kBooleanExpression);
+  EXPECT_EQ(ClassifyAnnexFNotation("b"), NotationCategory::kBooleanExpression);
+  EXPECT_EQ(ClassifyAnnexFNotation("c"), NotationCategory::kBooleanExpression);
 }
 
 // §F.3.3: t denotes a type; v a local variable name; u a free checker
@@ -19,8 +17,7 @@ TEST(NotationConventions, BooleanExpressionLetters) {
 // not the uppercase top-level-property letter T.
 TEST(NotationConventions, TerminalLetters) {
   EXPECT_EQ(ClassifyAnnexFNotation("t"), NotationCategory::kType);
-  EXPECT_EQ(ClassifyAnnexFNotation("v"),
-            NotationCategory::kLocalVariableName);
+  EXPECT_EQ(ClassifyAnnexFNotation("v"), NotationCategory::kLocalVariableName);
   EXPECT_EQ(ClassifyAnnexFNotation("u"),
             NotationCategory::kFreeCheckerVariableName);
   EXPECT_EQ(ClassifyAnnexFNotation("e"), NotationCategory::kExpression);
@@ -30,14 +27,10 @@ TEST(NotationConventions, TerminalLetters) {
 // sequence, clocked sequence, unclocked property, clocked property,
 // unclocked top-level property, and clocked top-level property.
 TEST(NotationConventions, UppercaseAbstractSyntaxLetters) {
-  EXPECT_EQ(ClassifyAnnexFNotation("R"),
-            NotationCategory::kUnclockedSequence);
-  EXPECT_EQ(ClassifyAnnexFNotation("S"),
-            NotationCategory::kClockedSequence);
-  EXPECT_EQ(ClassifyAnnexFNotation("P"),
-            NotationCategory::kUnclockedProperty);
-  EXPECT_EQ(ClassifyAnnexFNotation("Q"),
-            NotationCategory::kClockedProperty);
+  EXPECT_EQ(ClassifyAnnexFNotation("R"), NotationCategory::kUnclockedSequence);
+  EXPECT_EQ(ClassifyAnnexFNotation("S"), NotationCategory::kClockedSequence);
+  EXPECT_EQ(ClassifyAnnexFNotation("P"), NotationCategory::kUnclockedProperty);
+  EXPECT_EQ(ClassifyAnnexFNotation("Q"), NotationCategory::kClockedProperty);
   EXPECT_EQ(ClassifyAnnexFNotation("T"),
             NotationCategory::kUnclockedTopLevelProperty);
   EXPECT_EQ(ClassifyAnnexFNotation("U"),
@@ -90,11 +83,9 @@ TEST(NotationConventions, CaseIsSignificant) {
 // §F.3.3: the conventions cover subscripted versions of each notation, so
 // a subscripted symbol resolves to the same category as its base letter.
 TEST(NotationConventions, SubscriptedFormsShareBaseCategory) {
-  EXPECT_EQ(ClassifyAnnexFNotation("b1"),
-            NotationCategory::kBooleanExpression);
+  EXPECT_EQ(ClassifyAnnexFNotation("b1"), NotationCategory::kBooleanExpression);
   EXPECT_EQ(ClassifyAnnexFNotation("e_1"), NotationCategory::kExpression);
-  EXPECT_EQ(ClassifyAnnexFNotation("R2"),
-            NotationCategory::kUnclockedSequence);
+  EXPECT_EQ(ClassifyAnnexFNotation("R2"), NotationCategory::kUnclockedSequence);
   EXPECT_EQ(ClassifyAnnexFNotation("R_2"),
             NotationCategory::kUnclockedSequence);
   EXPECT_EQ(ClassifyAnnexFNotation("n10"),
@@ -132,8 +123,7 @@ TEST(NotationConventions, SequenceLettersAreSequences) {
 TEST(NotationConventions, PropertyLettersAreProperties) {
   EXPECT_TRUE(DenotesProperty(NotationCategory::kUnclockedProperty));
   EXPECT_TRUE(DenotesProperty(NotationCategory::kClockedProperty));
-  EXPECT_TRUE(
-      DenotesProperty(NotationCategory::kUnclockedTopLevelProperty));
+  EXPECT_TRUE(DenotesProperty(NotationCategory::kUnclockedTopLevelProperty));
   EXPECT_TRUE(DenotesProperty(NotationCategory::kClockedTopLevelProperty));
   EXPECT_TRUE(DenotesProperty(NotationCategory::kProperty));
   for (const char* sym : {"P", "Q", "T", "U", "p", "q"}) {
@@ -151,8 +141,7 @@ TEST(NotationConventions, SequenceAndPropertyFamiliesAreDisjoint) {
   EXPECT_FALSE(DenotesProperty(NotationCategory::kSequence));
   EXPECT_FALSE(DenotesSequence(NotationCategory::kUnclockedProperty));
   EXPECT_FALSE(DenotesSequence(NotationCategory::kClockedProperty));
-  EXPECT_FALSE(
-      DenotesSequence(NotationCategory::kUnclockedTopLevelProperty));
+  EXPECT_FALSE(DenotesSequence(NotationCategory::kUnclockedTopLevelProperty));
   EXPECT_FALSE(DenotesSequence(NotationCategory::kClockedTopLevelProperty));
   EXPECT_FALSE(DenotesSequence(NotationCategory::kProperty));
 }
@@ -180,8 +169,7 @@ TEST(NotationConventions, TerminalCategoriesAreNeitherSequenceNorProperty) {
 // that is only digits, or a trailing underscore with no digits, is not a
 // subscripted notation and carries no convention.
 TEST(NotationConventions, SubscriptEdgeCases) {
-  EXPECT_EQ(ClassifyAnnexFNotation("R0"),
-            NotationCategory::kUnclockedSequence);
+  EXPECT_EQ(ClassifyAnnexFNotation("R0"), NotationCategory::kUnclockedSequence);
   EXPECT_EQ(ClassifyAnnexFNotation("p_2"), NotationCategory::kProperty);
   EXPECT_FALSE(ClassifyAnnexFNotation("1").has_value());
   EXPECT_FALSE(ClassifyAnnexFNotation("123").has_value());

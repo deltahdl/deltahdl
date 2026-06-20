@@ -15,16 +15,16 @@ namespace delta {
 // §19.6.1.2 helpers in coverage.h).
 
 // §19.6.1.2: when a cross_identifier is used as a select_expression, only the
-// cross_identifier of the enclosing cross may be used; any other cross_identifier
-// shall be disallowed. Returns true when the referenced cross_identifier is the
-// enclosing cross and is therefore legal.
+// cross_identifier of the enclosing cross may be used; any other
+// cross_identifier shall be disallowed. Returns true when the referenced
+// cross_identifier is the enclosing cross and is therefore legal.
 bool CrossIdentifierSelectIsLegal(std::string_view referenced_cross,
                                   std::string_view enclosing_cross);
 
 // §19.6.1.2: the integer_covergroup_expression of a matches clause shall
 // evaluate to a positive integer (or be the $ token, which is always legal and
-// handled separately). A value that is zero or negative is illegal. Returns true
-// when the evaluated integer is a positive count.
+// handled separately). A value that is zero or negative is illegal. Returns
+// true when the evaluated integer is a positive count.
 bool CrossMatchesCountIsLegal(int64_t evaluated_count);
 
 }  // namespace delta

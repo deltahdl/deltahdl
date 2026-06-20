@@ -81,4 +81,4 @@ TEST(InterfaceItemsParsing, MacroExpandsToInterfaceItem) {
   ASSERT_EQ(r.cu->interfaces.size(), 1u);
 }
 
-}
+}  // namespace

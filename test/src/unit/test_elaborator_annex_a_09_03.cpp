@@ -235,4 +235,4 @@ TEST(IdentifierElaboration, PsIdentifierUnknownPackageIsError) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-}
+}  // namespace

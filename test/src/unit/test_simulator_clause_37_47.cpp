@@ -22,8 +22,8 @@ namespace {
 // properties §37.47's own text defines, through the production dispatch in
 // vpi.cpp.
 
-// The fixture installs a context so the public vpi_get entry point runs its real
-// dispatch and so callbacks register through the same context.
+// The fixture installs a context so the public vpi_get entry point runs its
+// real dispatch and so callbacks register through the same context.
 class ContinuousAssignment : public ::testing::Test {
  protected:
   void SetUp() override { SetGlobalVpiContext(&ctx_); }
@@ -47,8 +47,8 @@ TEST_F(ContinuousAssignment, ContAssignBitSizeIsAlwaysScalar) {
   EXPECT_EQ(vpi_get(vpiSize, &assign), 4);
 }
 
-// Detail 3: vpiOffset shall return zero for the LSB. The offset is measured from
-// the least significant bit, so the LSB bit reports zero and a bit three
+// Detail 3: vpiOffset shall return zero for the LSB. The offset is measured
+// from the least significant bit, so the LSB bit reports zero and a bit three
 // positions above it reports three.
 TEST_F(ContinuousAssignment, LsbContAssignBitReportsZeroOffset) {
   VpiObject lsb;

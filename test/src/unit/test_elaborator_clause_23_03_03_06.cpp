@@ -72,8 +72,7 @@ TEST(SingleSourceNetsElaboration,
   EXPECT_GT(f.diag.WarningCount(), 0u);
 }
 
-TEST(SingleSourceNetsElaboration,
-     UwireInputPortConnectedToExpressionWarns) {
+TEST(SingleSourceNetsElaboration, UwireInputPortConnectedToExpressionWarns) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module child(input uwire [7:0] a);\n"
@@ -88,8 +87,7 @@ TEST(SingleSourceNetsElaboration,
   EXPECT_GT(f.diag.WarningCount(), 0u);
 }
 
-TEST(SingleSourceNetsElaboration,
-     UwireInputPortConnectedToLiteralWarns) {
+TEST(SingleSourceNetsElaboration, UwireInputPortConnectedToLiteralWarns) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module child(input uwire [7:0] a);\n"
@@ -184,8 +182,7 @@ TEST(SingleSourceNetsElaboration,
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
-TEST(SingleSourceNetsElaboration,
-     UwirePortLeftUnconnectedNoWarning) {
+TEST(SingleSourceNetsElaboration, UwirePortLeftUnconnectedNoWarning) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module child(input uwire a, input wire b);\n"
@@ -200,8 +197,7 @@ TEST(SingleSourceNetsElaboration,
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
-TEST(SingleSourceNetsElaboration,
-     UwireInoutPortConnectedToWireNoWarning) {
+TEST(SingleSourceNetsElaboration, UwireInoutPortConnectedToWireNoWarning) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module child(inout uwire a);\n"
@@ -216,8 +212,7 @@ TEST(SingleSourceNetsElaboration,
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
-TEST(SingleSourceNetsElaboration,
-     UwirePortConnectedToTriNetNoWarning) {
+TEST(SingleSourceNetsElaboration, UwirePortConnectedToTriNetNoWarning) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module child(input uwire a);\n"
@@ -248,4 +243,4 @@ TEST(SingleSourceNetsElaboration,
   EXPECT_GT(f.diag.WarningCount(), 0u);
 }
 
-}
+}  // namespace

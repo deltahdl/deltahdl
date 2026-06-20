@@ -116,4 +116,4 @@ TEST(ConditionalGenerateParsing, IfBodyWithoutBeginEnd) {
   EXPECT_EQ(cg->gen_else, nullptr);
 }
 
-}
+}  // namespace

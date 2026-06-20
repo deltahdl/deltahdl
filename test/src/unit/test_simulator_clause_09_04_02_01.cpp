@@ -105,4 +105,4 @@ TEST(EventOrOperatorSimulation, OrAndCommaProduceIdenticalBehavior) {
   EXPECT_EQ(run("a or b"), run("a, b"));
 }
 
-}
+}  // namespace

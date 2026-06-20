@@ -29,16 +29,15 @@ TEST(GenerateRegion, RegionNestedInGenerateIfBodyRejected) {
 }
 
 TEST(GenerateRegion, GenerateRegionAtModuleScopeAllowedOncePerSibling) {
-
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  generate\n"
-      "    wire a;\n"
-      "  endgenerate\n"
-      "  generate\n"
-      "    wire b;\n"
-      "  endgenerate\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  generate\n"
+              "    wire a;\n"
+              "  endgenerate\n"
+              "  generate\n"
+              "    wire b;\n"
+              "  endgenerate\n"
+              "endmodule\n"));
 }
 
 TEST(GenerateRegion, MissingEndgenerateRejected) {
@@ -51,7 +50,6 @@ TEST(GenerateRegion, MissingEndgenerateRejected) {
 }
 
 TEST(GenerateRegion, OptionalRegionKeywordsProduceSameItems) {
-
   auto with_region = Parse(
       "module m;\n"
       "  generate\n"
@@ -168,4 +166,4 @@ TEST(GenerateLoopConstruct, ForWithInlineGenvarParsesAllClauses) {
   EXPECT_NE(loop->gen_step, nullptr);
 }
 
-}
+}  // namespace

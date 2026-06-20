@@ -49,8 +49,8 @@ TEST(ClassTypespec, SpecializationNameMustBeNonEmpty) {
   EXPECT_FALSE(VpiClassTypespecNameValid(unnamed));
 }
 
-// C1 + C4 edge: the valid-name requirement applies only to specializations, so a
-// purely lexical typespec with no name is still well formed.
+// C1 + C4 edge: the valid-name requirement applies only to specializations, so
+// a purely lexical typespec with no name is still well formed.
 TEST(ClassTypespec, LexicalTypespecNeedsNoName) {
   ClassTypespecInfo lexical;
   lexical.kind = ClassTypespecKind::kLexical;
@@ -64,9 +64,12 @@ TEST(ClassTypespec, LexicalTypespecNeedsNoName) {
 TEST(ClassTypespec, MethodsExcludeUndeclaredBuiltins) {
   ClassTypespecInfo spec;
   spec.kind = ClassTypespecKind::kSpecialization;
-  spec.methods.push_back({"push", /*is_static=*/false, /*has_explicit_decl=*/true});
-  spec.methods.push_back({"create", /*is_static=*/true, /*has_explicit_decl=*/true});
-  spec.methods.push_back({"randomize", /*is_static=*/false, /*has_explicit_decl=*/false});
+  spec.methods.push_back(
+      {"push", /*is_static=*/false, /*has_explicit_decl=*/true});
+  spec.methods.push_back(
+      {"create", /*is_static=*/true, /*has_explicit_decl=*/true});
+  spec.methods.push_back(
+      {"randomize", /*is_static=*/false, /*has_explicit_decl=*/false});
 
   std::vector<ClassTypespecMethod> visible = VpiClassTypespecMethods(spec);
   ASSERT_EQ(visible.size(), 2u);
@@ -80,7 +83,8 @@ TEST(ClassTypespec, MethodsExcludeUndeclaredBuiltins) {
 TEST(ClassTypespec, LexicalTypespecYieldsNoMethods) {
   ClassTypespecInfo lexical;
   lexical.kind = ClassTypespecKind::kLexical;
-  lexical.methods.push_back({"push", /*is_static=*/false, /*has_explicit_decl=*/true});
+  lexical.methods.push_back(
+      {"push", /*is_static=*/false, /*has_explicit_decl=*/true});
 
   EXPECT_TRUE(VpiClassTypespecMethods(lexical).empty());
 }
@@ -198,18 +202,18 @@ TEST(ClassTypespec, ValueAccessDisallowedForNonStaticTypespecMember) {
 TEST(ClassTypespec, ConstraintsExcludeInlineAndKeepDeclarationOrder) {
   ClassTypespecInfo spec;
   spec.kind = ClassTypespecKind::kSpecialization;
-  spec.constraints.push_back(
-      {"c_first", /*is_inline=*/false, /*is_extern=*/false, /*decl_order=*/0,
-       /*prototype_order=*/0});
-  spec.constraints.push_back(
-      {"c_inline", /*is_inline=*/true, /*is_extern=*/false, /*decl_order=*/1,
-       /*prototype_order=*/0});
-  spec.constraints.push_back(
-      {"c_extern", /*is_inline=*/false, /*is_extern=*/true, /*decl_order=*/3,
-       /*prototype_order=*/1});
-  spec.constraints.push_back(
-      {"c_last", /*is_inline=*/false, /*is_extern=*/false, /*decl_order=*/2,
-       /*prototype_order=*/0});
+  spec.constraints.push_back({"c_first", /*is_inline=*/false,
+                              /*is_extern=*/false, /*decl_order=*/0,
+                              /*prototype_order=*/0});
+  spec.constraints.push_back({"c_inline", /*is_inline=*/true,
+                              /*is_extern=*/false, /*decl_order=*/1,
+                              /*prototype_order=*/0});
+  spec.constraints.push_back({"c_extern", /*is_inline=*/false,
+                              /*is_extern=*/true, /*decl_order=*/3,
+                              /*prototype_order=*/1});
+  spec.constraints.push_back({"c_last", /*is_inline=*/false,
+                              /*is_extern=*/false, /*decl_order=*/2,
+                              /*prototype_order=*/0});
 
   std::vector<ClassTypespecConstraint> visible =
       VpiClassTypespecConstraints(spec);

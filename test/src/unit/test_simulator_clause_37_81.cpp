@@ -31,11 +31,11 @@ class TimeQueue : public ::testing::Test {
 
 // Detail 1: the iteration hands back the time queue objects in increasing order
 // of simulation time, regardless of the order the slots were recorded in. Three
-// future slots are seeded out of order; scanning the iterator yields them sorted
-// by their recorded simulation time.
+// future slots are seeded out of order; scanning the iterator yields them
+// sorted by their recorded simulation time.
 TEST_F(TimeQueue, ObjectsAreReturnedInIncreasingTimeOrder) {
-  ctx_.SetTimeQueueSlots({{30, false, false}, {10, false, false},
-                          {20, false, false}});
+  ctx_.SetTimeQueueSlots(
+      {{30, false, false}, {10, false, false}, {20, false, false}});
 
   vpiHandle it = vpi_iterate(vpiTimeQueue, nullptr);
   ASSERT_NE(it, nullptr);
@@ -65,9 +65,9 @@ TEST_F(TimeQueue, EmptyQueueIteratesToNull) {
 }
 
 // Detail 3: the current-time slot takes part only when events remain before its
-// read-only synch region. Here events do remain, so the slot yields a time queue
-// object carrying its time; the exclusion case (events absent) is observed by
-// FutureSlotContributesWhileCurrentSlotIsFiltered below.
+// read-only synch region. Here events do remain, so the slot yields a time
+// queue object carrying its time; the exclusion case (events absent) is
+// observed by FutureSlotContributesWhileCurrentSlotIsFiltered below.
 TEST_F(TimeQueue, CurrentSlotIsIncludedWithEventsBeforeReadOnlySync) {
   ctx_.SetTimeQueueSlots({{5, true, true}});
 
@@ -81,9 +81,9 @@ TEST_F(TimeQueue, CurrentSlotIsIncludedWithEventsBeforeReadOnlySync) {
   EXPECT_EQ(vpi_scan(it), nullptr);
 }
 
-// Detail 3 boundary: the read-only-sync condition gates only the current slot. A
-// future slot always contributes even though its read-only flag is clear, so a
-// future slot recorded alongside an excluded current slot still appears - and
+// Detail 3 boundary: the read-only-sync condition gates only the current slot.
+// A future slot always contributes even though its read-only flag is clear, so
+// a future slot recorded alongside an excluded current slot still appears - and
 // the surviving objects keep increasing-time order (detail 1). The current slot
 // at time 5 is dropped; the future slot at time 8 remains.
 TEST_F(TimeQueue, FutureSlotContributesWhileCurrentSlotIsFiltered) {

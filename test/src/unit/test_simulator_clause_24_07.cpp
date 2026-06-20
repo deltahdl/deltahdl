@@ -200,10 +200,10 @@ TEST(ProgramControlTasksSim, ExitFromForkedDescendantInModuleIsIgnored) {
   EXPECT_EQ(v->value.ToUint64(), 44u);
 }
 
-// $exit reaching production through a task call chain (rather than a fork) still
-// counts as originating in the program's initial procedure: the task call runs
-// in the same thread, so the program is terminated and the post-call assignment
-// is skipped.
+// $exit reaching production through a task call chain (rather than a fork)
+// still counts as originating in the program's initial procedure: the task call
+// runs in the same thread, so the program is terminated and the post-call
+// assignment is skipped.
 TEST(ProgramControlTasksSim, ExitFromTaskCalledInProgramInitialTerminates) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -229,4 +229,4 @@ TEST(ProgramControlTasksSim, ExitFromTaskCalledInProgramInitialTerminates) {
   EXPECT_EQ(v->value.ToUint64(), 0u);
 }
 
-}
+}  // namespace

@@ -24,7 +24,7 @@ TEST(ConditionalSyntaxParsing, DanglingElseBindsToInnerIf) {
   EXPECT_NE(stmt->then_branch->else_branch, nullptr);
 }
 
-TEST(ConditionalSyntaxParsing,IfWithBlockBody) {
+TEST(ConditionalSyntaxParsing, IfWithBlockBody) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"
@@ -81,7 +81,7 @@ TEST(ConditionalSyntaxParsing, IfWithBlockNoElse) {
   EXPECT_EQ(stmt->then_branch->kind, StmtKind::kBlock);
 }
 
-TEST(ConditionalSyntaxParsing,PlainIfHasNoQualifier) {
+TEST(ConditionalSyntaxParsing, PlainIfHasNoQualifier) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"
@@ -96,7 +96,7 @@ TEST(ConditionalSyntaxParsing,PlainIfHasNoQualifier) {
   EXPECT_EQ(stmt->qualifier, CaseQualifier::kNone);
 }
 
-TEST(ConditionalSyntaxParsing,NestedIfElseWithExpressions) {
+TEST(ConditionalSyntaxParsing, NestedIfElseWithExpressions) {
   auto r = Parse(
       "module m;\n"
       "  reg [7:0] out, a, b;\n"
@@ -495,4 +495,4 @@ TEST(ConditionalSyntaxParsing, ElseIfChainProducesNestedIf) {
   EXPECT_EQ(stmt->else_branch->else_branch->kind, StmtKind::kBlockingAssign);
 }
 
-}
+}  // namespace

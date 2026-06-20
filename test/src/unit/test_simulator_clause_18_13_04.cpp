@@ -71,7 +71,8 @@ TEST(GetRandstate, StateCapturesFullStreamPosition) {
 
   for (int i = 0; i < 3; ++i) ctx.ObjectRng(a)();
   ctx.ObjectRng(b)();
-  // Different number of draws -> different stream positions -> different states.
+  // Different number of draws -> different stream positions -> different
+  // states.
   EXPECT_NE(ctx.GetRandState(a), ctx.GetRandState(b));
 
   for (int i = 0; i < 2; ++i) ctx.ObjectRng(b)();

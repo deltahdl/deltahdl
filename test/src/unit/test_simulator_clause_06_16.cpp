@@ -76,8 +76,8 @@ TEST(StringDataType, StringInequalityOp) {
   SimFixture f;
   MakeStringVar(f, "a", "abc");
   MakeStringVar(f, "b", "xyz");
-  auto* ne = MakeBinary(f.arena, TokenKind::kBangEq,
-                         MakeId(f.arena, "a"), MakeId(f.arena, "b"));
+  auto* ne = MakeBinary(f.arena, TokenKind::kBangEq, MakeId(f.arena, "a"),
+                        MakeId(f.arena, "b"));
   auto result = EvalExpr(ne, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 1u);
 }
@@ -86,8 +86,8 @@ TEST(StringDataType, StringEqualityOpSameValue) {
   SimFixture f;
   MakeStringVar(f, "a", "hello");
   MakeStringVar(f, "b", "hello");
-  auto* eq = MakeBinary(f.arena, TokenKind::kEqEq,
-                         MakeId(f.arena, "a"), MakeId(f.arena, "b"));
+  auto* eq = MakeBinary(f.arena, TokenKind::kEqEq, MakeId(f.arena, "a"),
+                        MakeId(f.arena, "b"));
   auto result = EvalExpr(eq, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 1u);
 }
@@ -96,8 +96,8 @@ TEST(StringDataType, StringRelationalLessThan) {
   SimFixture f;
   MakeStringVar(f, "a", "abc");
   MakeStringVar(f, "b", "def");
-  auto* lt = MakeBinary(f.arena, TokenKind::kLt,
-                         MakeId(f.arena, "a"), MakeId(f.arena, "b"));
+  auto* lt = MakeBinary(f.arena, TokenKind::kLt, MakeId(f.arena, "a"),
+                        MakeId(f.arena, "b"));
   auto result = EvalExpr(lt, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 1u);
 }
@@ -106,8 +106,8 @@ TEST(StringDataType, StringRelationalGreaterThan) {
   SimFixture f;
   MakeStringVar(f, "a", "xyz");
   MakeStringVar(f, "b", "abc");
-  auto* gt = MakeBinary(f.arena, TokenKind::kGt,
-                         MakeId(f.arena, "a"), MakeId(f.arena, "b"));
+  auto* gt = MakeBinary(f.arena, TokenKind::kGt, MakeId(f.arena, "a"),
+                        MakeId(f.arena, "b"));
   auto result = EvalExpr(gt, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 1u);
 }
@@ -116,8 +116,8 @@ TEST(StringDataType, StringRelationalLessEqual) {
   SimFixture f;
   MakeStringVar(f, "a", "abc");
   MakeStringVar(f, "b", "abc");
-  auto* le = MakeBinary(f.arena, TokenKind::kLtEq,
-                         MakeId(f.arena, "a"), MakeId(f.arena, "b"));
+  auto* le = MakeBinary(f.arena, TokenKind::kLtEq, MakeId(f.arena, "a"),
+                        MakeId(f.arena, "b"));
   auto result = EvalExpr(le, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 1u);
 }
@@ -126,8 +126,8 @@ TEST(StringDataType, StringRelationalGreaterEqual) {
   SimFixture f;
   MakeStringVar(f, "a", "def");
   MakeStringVar(f, "b", "abc");
-  auto* ge = MakeBinary(f.arena, TokenKind::kGtEq,
-                         MakeId(f.arena, "a"), MakeId(f.arena, "b"));
+  auto* ge = MakeBinary(f.arena, TokenKind::kGtEq, MakeId(f.arena, "a"),
+                        MakeId(f.arena, "b"));
   auto result = EvalExpr(ge, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 1u);
 }
@@ -135,7 +135,8 @@ TEST(StringDataType, StringRelationalGreaterEqual) {
 TEST(StringDataType, StringIndexReturnsAscii) {
   SimFixture f;
   MakeStringVar(f, "s", "hello");
-  auto* sel = MakeSelectExpr(f.arena, MakeId(f.arena, "s"), MakeInt(f.arena, 0));
+  auto* sel =
+      MakeSelectExpr(f.arena, MakeId(f.arena, "s"), MakeInt(f.arena, 0));
   auto result = EvalExpr(sel, f.ctx, f.arena);
 
   EXPECT_EQ(result.ToUint64(), 0x68u);
@@ -237,7 +238,8 @@ TEST(StringDataType, AssignZeroToStringCharIgnored) {
 TEST(StringDataType, IndexOutOfRangeReturnsZero) {
   SimFixture f;
   MakeStringVar(f, "s", "abc");
-  auto* sel = MakeSelectExpr(f.arena, MakeId(f.arena, "s"), MakeInt(f.arena, 10));
+  auto* sel =
+      MakeSelectExpr(f.arena, MakeId(f.arena, "s"), MakeInt(f.arena, 10));
   auto result = EvalExpr(sel, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 0u);
 }
@@ -245,7 +247,8 @@ TEST(StringDataType, IndexOutOfRangeReturnsZero) {
 TEST(StringDataType, IndexEmptyStringIsOutOfBounds) {
   SimFixture f;
   MakeStringVar(f, "s", "");
-  auto* sel = MakeSelectExpr(f.arena, MakeId(f.arena, "s"), MakeInt(f.arena, 0));
+  auto* sel =
+      MakeSelectExpr(f.arena, MakeId(f.arena, "s"), MakeInt(f.arena, 0));
   auto result = EvalExpr(sel, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 0u);
 }
@@ -424,4 +427,4 @@ TEST(StringDataType, StringLiteralToNarrowerIntegralTruncatesLeft) {
   EXPECT_EQ(VecToStr(h->value), "ello");
 }
 
-}
+}  // namespace

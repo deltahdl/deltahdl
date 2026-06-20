@@ -100,4 +100,4 @@ TEST(StringMethods, IcompareReturnsIntWidth) {
   EXPECT_EQ(result.width, 32u);
 }
 
-}
+}  // namespace

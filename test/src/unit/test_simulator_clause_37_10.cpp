@@ -37,10 +37,12 @@ TEST(InstanceModel, NetTypedefIterationReturnsDeclaredUserNettypes) {
   std::vector<VpiTypeDeclEntry> entries = {
       {"wire", /*user_defined=*/false, /*declared_in_instance=*/true},
       {"my_net_t", /*user_defined=*/true, /*declared_in_instance=*/true},
-      {"elsewhere_net_t", /*user_defined=*/true, /*declared_in_instance=*/false},
+      {"elsewhere_net_t", /*user_defined=*/true,
+       /*declared_in_instance=*/false},
   };
 
-  std::vector<const VpiTypeDeclEntry*> visible = VpiInstanceNetTypedefs(entries);
+  std::vector<const VpiTypeDeclEntry*> visible =
+      VpiInstanceNetTypedefs(entries);
   ASSERT_EQ(visible.size(), 1u);
   EXPECT_EQ(visible[0]->name, "my_net_t");
 }

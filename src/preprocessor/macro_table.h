@@ -31,4 +31,4 @@ class MacroTable {
   std::unordered_map<std::string, MacroDef> macros_;
 };
 
-}
+}  // namespace delta

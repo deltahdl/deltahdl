@@ -11,9 +11,7 @@ bool IsSequenceCompositionMethodValid(SequenceCompositionMethod method) {
   return false;
 }
 
-bool NamedSequenceReferenceMatchesFromReferenceTick() {
-  return true;
-}
+bool NamedSequenceReferenceMatchesFromReferenceTick() { return true; }
 
 bool TriggeredEndPointOperandLegal(SequenceMethodOperandKind kind) {
   // §16.9.11 admits exactly the operand kinds defined for the sequence methods

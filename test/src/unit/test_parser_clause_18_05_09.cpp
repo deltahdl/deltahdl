@@ -56,8 +56,8 @@ TEST(SolveBeforeOrdering, ImplicitClassHandleQualifierAccepted) {
 }
 
 // 18.5.9: a constraint block may contain both regular value constraints and
-// ordering constraints. A block mixing an inside constraint, an implication, and
-// a solve...before ordering parses as a whole.
+// ordering constraints. A block mixing an inside constraint, an implication,
+// and a solve...before ordering parses as a whole.
 TEST(SolveBeforeOrdering, MixedValueAndOrderingConstraintsAccepted) {
   auto r = Parse(
       "class C;\n"

@@ -39,4 +39,4 @@ TEST(HierarchicalNameLexing, InstanceSelectInPathTokens) {
   EXPECT_EQ(tokens[5].text, "b");
 }
 
-}
+}  // namespace

@@ -39,4 +39,4 @@ TEST(QueueOpsElaboration, EmptyConcatClearOk) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

@@ -146,4 +146,4 @@ TEST(SequentialBlockSimulation, ControlPassesOutAfterDelayedStatements) {
   EXPECT_EQ(after->value.ToUint64(), 99u);
 }
 
-}
+}  // namespace

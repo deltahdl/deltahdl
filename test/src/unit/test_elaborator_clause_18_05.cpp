@@ -40,4 +40,4 @@ TEST(ConstraintBlockNames, SameNameDifferentClassesAccepted) {
              "module m; endmodule\n"));
 }
 
-}
+}  // namespace

@@ -47,8 +47,7 @@ TEST(Coverage, IllegalBinsExcludesSelectedCrossProducts) {
   EXPECT_EQ(illegal.size(), 2u);
 
   auto kept = CoverageDB::ExcludeIllegalCrossProducts(all, illegal);
-  std::vector<std::vector<size_t>> expected = {
-      {0, 0}, {0, 2}, {1, 0}, {1, 2}};
+  std::vector<std::vector<size_t>> expected = {{0, 0}, {0, 2}, {1, 0}, {1, 2}};
   EXPECT_EQ(kept, expected);
 }
 
@@ -80,7 +79,8 @@ TEST(Coverage, IllegalTakesPrecedenceOverIgnore) {
 }
 
 // LRM 19.6.3: illegal cross products take precedence over inclusion in another
-// cross coverage bin of the enclosing cross. The run-time error is still raised.
+// cross coverage bin of the enclosing cross. The run-time error is still
+// raised.
 TEST(Coverage, IllegalTakesPrecedenceOverOtherCrossBin) {
   std::vector<std::vector<size_t>> illegal = {{0, 1}};
   std::vector<std::vector<size_t>> ignored = {};
@@ -138,4 +138,4 @@ TEST(Coverage, IllegalPrecedenceHoldsWhenAlsoIgnoredAndInOtherCrossBin) {
             CrossSampleOutcome::kIllegalError);
 }
 
-}
+}  // namespace

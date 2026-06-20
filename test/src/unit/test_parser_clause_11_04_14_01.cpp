@@ -84,4 +84,4 @@ TEST(StreamExpressionConcatParsing, MixedExpressionTypes) {
   EXPECT_EQ(rhs->elements[2]->kind, ExprKind::kBinary);
 }
 
-}
+}  // namespace

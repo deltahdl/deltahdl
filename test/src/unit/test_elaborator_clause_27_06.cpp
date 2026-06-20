@@ -144,4 +144,4 @@ TEST(GenerateBlockNaming, RepeatedCollisionAddsMoreLeadingZeros) {
   EXPECT_EQ(second->name, "genblk002");
 }
 
-}
+}  // namespace

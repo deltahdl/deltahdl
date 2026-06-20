@@ -51,4 +51,3 @@ TEST(KeywordIdentifierSim, KeywordLowercaseOnly) {
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
-

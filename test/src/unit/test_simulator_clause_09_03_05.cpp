@@ -168,4 +168,4 @@ TEST(StatementLabelSimulation, LabeledForkJoinExecutes) {
   EXPECT_EQ(val, 55u);
 }
 
-}
+}  // namespace

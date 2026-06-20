@@ -57,7 +57,7 @@ AssertionResult AssertionMonitor::Evaluate(std::string_view prop_name,
   return AssertionResult::kVacuousPass;
 }
 
-void AssertionMonitor::Tick(SimContext& ) {
+void AssertionMonitor::Tick(SimContext&) {
   for (auto& entry : entries_) {
     ++entry.cycle_count;
   }
@@ -110,4 +110,4 @@ AssertionResult AssertionMonitor::EvaluateEntry(AssertionEntry& entry,
   return result;
 }
 
-}
+}  // namespace delta

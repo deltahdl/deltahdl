@@ -92,8 +92,8 @@ TEST(EventTriggerSimulator, NonblockingTriggerWithDelay) {
 
 // The ->> operator defers the trigger to the nonblocking assignment region of
 // the current time step. A process that registers its wait in the active region
-// *after* the ->> statement (same time step) is therefore still unblocked, since
-// the deferred trigger fires only once the active region has drained. An
+// *after* the ->> statement (same time step) is therefore still unblocked,
+// since the deferred trigger fires only once the active region has drained. An
 // active-region (immediate) trigger would be lost here, leaving result == 0.
 TEST(EventTriggerSimulator, NonblockingTriggerDefersToNbaRegion) {
   LowerFixture f;
@@ -263,4 +263,4 @@ TEST(EventTriggerSimulator, NonblockingTriggerRepeatEventControl) {
   EXPECT_EQ(result->value.ToUint64(), 55u);
 }
 
-}
+}  // namespace

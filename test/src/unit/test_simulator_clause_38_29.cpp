@@ -18,8 +18,7 @@ namespace {
 PLI_INT32 CallWithStartedVarargs(PLI_UINT32 mcd, const char* format, ...) {
   va_list ap;
   va_start(ap, format);
-  PLI_INT32 written =
-      vpi_mcd_vprintf(mcd, const_cast<PLI_BYTE8*>(format), ap);
+  PLI_INT32 written = vpi_mcd_vprintf(mcd, const_cast<PLI_BYTE8*>(format), ap);
   va_end(ap);
   return written;
 }
@@ -42,7 +41,8 @@ class VpiMcdVprintfSim : public ::testing::Test {
 // fprintf()-style format against the caller's arguments, writes the result to
 // the channel named by the descriptor, and returns the number of characters
 // written.
-TEST_F(VpiMcdVprintfSim, ConsumesAnAlreadyStartedVarargsListAndWritesFormattedText) {
+TEST_F(VpiMcdVprintfSim,
+       ConsumesAnAlreadyStartedVarargsListAndWritesFormattedText) {
   char name[] = "v.log";
   PLI_UINT32 mcd = vpi_mcd_open(name);
   ASSERT_NE(mcd, 0u);

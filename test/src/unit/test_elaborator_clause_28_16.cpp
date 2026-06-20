@@ -138,4 +138,4 @@ TEST(GateDelayElaboration, CmosSwitchDelayForwardsToContAssign) {
   EXPECT_EQ(mod->assigns[0].delay_decay->int_val, 9u);
 }
 
-}
+}  // namespace

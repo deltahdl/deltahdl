@@ -71,4 +71,4 @@ TEST(GeneralPurposeAlwaysSimulation, SensitivityListTriggersOnEdge) {
   EXPECT_EQ(q->value.ToUint64(), 1u);
 }
 
-}
+}  // namespace

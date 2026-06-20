@@ -415,8 +415,8 @@ TEST(StreamExpressionConcat, UntaggedUnionStreamsFirstMemberOnly) {
 }
 
 // §11.4.14.1: a null class handle is skipped (not streamed). The handle here is
-// null and contributes nothing, so the generic stream contains only the trailing
-// scalar's 8 bits.
+// null and contributes nothing, so the generic stream contains only the
+// trailing scalar's 8 bits.
 TEST(StreamExpressionConcat, NullClassHandleSkipped) {
   SimFixture f;
 
@@ -515,4 +515,4 @@ TEST(StreamExpressionConcat, NonNullClassHandleStreamsBaseFirstInDeclOrder) {
   EXPECT_EQ(result.ToUint64(), 0x112233u);
 }
 
-}
+}  // namespace

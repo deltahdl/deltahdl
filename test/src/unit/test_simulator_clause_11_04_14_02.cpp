@@ -198,4 +198,4 @@ TEST(StreamReordering, NestedStreamingReordering) {
   EXPECT_EQ(var->value.ToUint64(), 0b1110u);
 }
 
-}
+}  // namespace

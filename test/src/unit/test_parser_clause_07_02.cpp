@@ -261,4 +261,4 @@ TEST(StructDeclarationParsing, UnionSoftAloneOk) {
   EXPECT_FALSE(item->data_type.is_tagged);
 }
 
-}
+}  // namespace

@@ -122,4 +122,4 @@ TEST(ThisParsing, ThisMultipleMemberAccesses) {
               "endclass\n"));
 }
 
-}
+}  // namespace

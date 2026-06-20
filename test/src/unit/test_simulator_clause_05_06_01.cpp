@@ -101,4 +101,3 @@ TEST(EscapedIdentifierSim, EscapedDeclSimpleRefResolves) {
       "cpu3");
   EXPECT_EQ(result, 77u);
 }
-

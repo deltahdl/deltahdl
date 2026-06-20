@@ -14,9 +14,10 @@
 namespace delta {
 namespace {
 
-// §38.36.3: the simulator executes a callback by invoking its cb_rtn and passing
-// a pointer to the s_cb_data structure, whose reason field holds the reason for
-// the callback. This recorder lets a test observe that contract being applied.
+// §38.36.3: the simulator executes a callback by invoking its cb_rtn and
+// passing a pointer to the s_cb_data structure, whose reason field holds the
+// reason for the callback. This recorder lets a test observe that contract
+// being applied.
 int g_invocations = 0;
 int g_seen_reason = 0;
 void* g_seen_user_data = nullptr;
@@ -42,8 +43,8 @@ const int kActionReasons[] = {
 
 // §38.36.3 feature callbacks: optional, tool-specific reasons.
 const int kFeatureReasons[] = {
-    cbStartOfSave,    cbEndOfSave,         cbStartOfRestart,
-    cbEndOfRestart,   cbStartOfReset,      cbEndOfReset,
+    cbStartOfSave,      cbEndOfSave,       cbStartOfRestart,
+    cbEndOfRestart,     cbStartOfReset,    cbEndOfReset,
     cbEnterInteractive, cbExitInteractive, cbInteractiveScopeChange,
     cbUnresolvedSystf,
 };
@@ -186,8 +187,8 @@ TEST_F(VpiActionFeatureCallbacks, TchkViolationDeliversTimingCheckHandle) {
   EXPECT_EQ(g_seen_obj, &timing_check);
 }
 
-// §38.36.3: for a cbInteractiveScopeChange callback the obj field is a handle to
-// the new interactive scope.
+// §38.36.3: for a cbInteractiveScopeChange callback the obj field is a handle
+// to the new interactive scope.
 TEST_F(VpiActionFeatureCallbacks, InteractiveScopeChangeDeliversScopeHandle) {
   VpiObject scope;
   Register(cbInteractiveScopeChange);
@@ -198,8 +199,8 @@ TEST_F(VpiActionFeatureCallbacks, InteractiveScopeChangeDeliversScopeHandle) {
   EXPECT_EQ(g_seen_obj, &scope);
 }
 
-// §38.36.3: for a cbUnresolvedSystf callback user_data points to the name of the
-// unresolved task or system function.
+// §38.36.3: for a cbUnresolvedSystf callback user_data points to the name of
+// the unresolved task or system function.
 TEST_F(VpiActionFeatureCallbacks, UnresolvedSystfDeliversName) {
   const char* name = "$unknown_systf";
   Register(cbUnresolvedSystf);
@@ -230,7 +231,8 @@ TEST_F(VpiActionFeatureCallbacks, ResetDeliversStartThenEnd) {
 // only callbacks that exist across the restart are those two. This observes
 // both halves of the rule: several varied non-restart callbacks are all purged,
 // while the restart pair both survives and is delivered.
-TEST_F(VpiActionFeatureCallbacks, RestartPurgesOthersAndDeliversRestartCallbacks) {
+TEST_F(VpiActionFeatureCallbacks,
+       RestartPurgesOthersAndDeliversRestartCallbacks) {
   Register(cbValueChange);
   Register(cbStmt);
   Register(cbStartOfSave);
@@ -273,8 +275,8 @@ TEST_F(VpiActionFeatureCallbacks, ResetViaVpiControlDeliversCallbacks) {
   EXPECT_EQ(g_sequence[1], cbEndOfReset);
 }
 
-// §38.36.3 (edge case): dispatching a reason with no registered callback invokes
-// no application routine and reports zero deliveries.
+// §38.36.3 (edge case): dispatching a reason with no registered callback
+// invokes no application routine and reports zero deliveries.
 TEST_F(VpiActionFeatureCallbacks, DispatchWithNoMatchingCallbackFiresNothing) {
   Register(cbStartOfSimulation);
 

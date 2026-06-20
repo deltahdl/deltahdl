@@ -54,10 +54,10 @@ bool IsMacroName(std::string_view n) {
 // type, function, or macro) so the test only compiles if svdpi.h truly
 // introduces it under that spelling.
 TEST(SvdpiNamingConventions, EveryInterfaceNameHasSvPrefix) {
-  EXPECT_EQ(sv_x, 3);                       // symbolic constant
-  svLogicVecVal vec_value{};                // type
+  EXPECT_EQ(sv_x, 3);         // symbolic constant
+  svLogicVecVal vec_value{};  // type
   (void)vec_value;
-  EXPECT_GT(sizeof(&svGetScope), 0u);        // function (declaration referenced)
+  EXPECT_GT(sizeof(&svGetScope), 0u);  // function (declaration referenced)
   EXPECT_EQ(SV_GET_UNSIGNED_BITS(0xFFFFFFFFu, 4), 0xFu);  // macro
 
   EXPECT_TRUE(HasInterfacePrefix(SPELL(sv_x)));

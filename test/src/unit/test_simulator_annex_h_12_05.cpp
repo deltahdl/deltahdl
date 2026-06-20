@@ -14,13 +14,13 @@
 //   C1 - the functions copy a whole packed element, in the canonical
 //        representation of H.10.1.2, in the direction implied by Put vs Get;
 //   C2 - the actual argument's original SystemVerilog ranges index the open
-//        array (so a descending or offset unpacked range indexes by its declared
-//        coordinates, not by a zero-based position);
+//        array (so a descending or offset unpacked range indexes by its
+//        declared coordinates, not by a zero-based position);
 //   C3 - the copy spans the element's full width, including multi-word packed
 //        elements, and multiple unpacked indices select the element row-major.
 //
-// These tests build an svOpenArrayHandle backed by a real svOpenArrayDesc buffer
-// and observe the svdpi.cpp copy functions applying those rules.
+// These tests build an svOpenArrayHandle backed by a real svOpenArrayDesc
+// buffer and observe the svdpi.cpp copy functions applying those rules.
 
 namespace {
 
@@ -37,8 +37,8 @@ bool LogicEq(const svLogicVecVal& a, const svLogicVecVal& b) {
 }
 
 // C1: a Put then a Get round-trips a single-word bit element through simulator
-// storage, and the value lands at the storage slot the index selects. The handle
-// models: bit [7:0] arr [0:3].
+// storage, and the value lands at the storage slot the index selects. The
+// handle models: bit [7:0] arr [0:3].
 TEST(ElementCanonicalAccess, BitPutGetRoundTrip) {
   const svOpenArrayDimRange ranges[] = {{7, 0}, {0, 3}};
   svBitVecVal data[4] = {0, 0, 0, 0};
@@ -106,8 +106,8 @@ TEST(ElementCanonicalAccess, BitDescendingOriginalRangeIndexing) {
 }
 
 // C1/C3: a logic element wider than 32 bits spans two canonical words; the copy
-// moves both words in full, including their bval (x/z) lanes. The handle models:
-// logic [39:0] arr [0:1].
+// moves both words in full, including their bval (x/z) lanes. The handle
+// models: logic [39:0] arr [0:1].
 TEST(ElementCanonicalAccess, LogicMultiWordPutGetRoundTrip) {
   const svOpenArrayDimRange ranges[] = {{39, 0}, {0, 1}};
   svLogicVecVal data[4] = {{0, 0}, {0, 0}, {0, 0}, {0, 0}};
@@ -243,8 +243,8 @@ TEST(ElementCanonicalAccess, LogicTwoDimensionRowMajor) {
 
 // C2 edge: an ascending unpacked range that does not start at zero. The element
 // at the left bound (index 2) occupies storage position 0 and positions advance
-// toward the right bound, so the declared coordinates - not a zero-based count -
-// select the slot. The handle models: bit [7:0] arr [2:5].
+// toward the right bound, so the declared coordinates - not a zero-based count
+// - select the slot. The handle models: bit [7:0] arr [2:5].
 TEST(ElementCanonicalAccess, AscendingOffsetRangeIndexing) {
   const svOpenArrayDimRange ranges[] = {{7, 0}, {2, 5}};
   svBitVecVal data[4] = {0, 0, 0, 0};
@@ -268,10 +268,10 @@ TEST(ElementCanonicalAccess, AscendingOffsetRangeIndexing) {
   EXPECT_EQ(out, 0x33u);
 }
 
-// C2 edge: a descending unpacked range with negative bounds. Indexing still uses
-// the actual argument's original coordinates - the left bound (index -1) is
-// position 0 and the right bound (index -4) is position 3. The handle models:
-// logic [7:0] arr [-1:-4].
+// C2 edge: a descending unpacked range with negative bounds. Indexing still
+// uses the actual argument's original coordinates - the left bound (index -1)
+// is position 0 and the right bound (index -4) is position 3. The handle
+// models: logic [7:0] arr [-1:-4].
 TEST(ElementCanonicalAccess, NegativeBoundRangeIndexing) {
   const svOpenArrayDimRange ranges[] = {{7, 0}, {-1, -4}};
   svLogicVecVal data[4];
@@ -315,9 +315,9 @@ TEST(ElementCanonicalAccess, PartialOutOfRangeIndexInMultiDimIsNoOp) {
 }
 
 // C1/C3 edge: a packed element exactly one canonical word wide (32 bits)
-// round-trips through a single full word - exercising the per-element word-count
-// boundary where the width is an exact multiple of 32. The handle models:
-// bit [31:0] arr [0:1].
+// round-trips through a single full word - exercising the per-element
+// word-count boundary where the width is an exact multiple of 32. The handle
+// models: bit [31:0] arr [0:1].
 TEST(ElementCanonicalAccess, ExactWordWidthElementRoundTrip) {
   const svOpenArrayDimRange ranges[] = {{31, 0}, {0, 1}};
   svBitVecVal data[2] = {0, 0};

@@ -23,7 +23,6 @@ class SynthLower {
   bool CheckExprSynthesizable(const Expr* expr);
 
  private:
-
   bool CheckSynthesizable(const RtlirModule* mod);
   bool CheckBlockStmts(const Stmt* stmt);
   bool CheckIfSynth(const Stmt* stmt);
@@ -70,4 +69,4 @@ class SynthLower {
   std::vector<std::pair<std::string_view, uint32_t>> output_ports_;
 };
 
-}
+}  // namespace delta

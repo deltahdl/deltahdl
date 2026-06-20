@@ -33,7 +33,8 @@ TEST(ChainedConstructorSimulation, SuperNewWithArgs) {
   ctor->kind = ModuleItemKind::kFunctionDecl;
   ctor->name = "new";
   ctor->return_type.kind = DataTypeKind::kVoid;
-  ctor->func_args = {{Direction::kInput, false, false, false, {}, "s", nullptr, {}}};
+  ctor->func_args = {
+      {Direction::kInput, false, false, false, {}, "s", nullptr, {}}};
   ctor->func_body_stmts.push_back(
       MakeAssign(f.arena, "speed", MkId(f.arena, "s")));
   base->methods["new"] = ctor;
@@ -84,121 +85,127 @@ TEST(ChainedConstructorSimulation, BaseConstructorResolvable) {
 }
 
 TEST(ChainedConstructorSimulation, SuperNewWithArgsInitializesBase) {
-  EXPECT_EQ(RunAndGet(
-      "class Base;\n"
-      "  int x;\n"
-      "  function new(int v); x = v; endfunction\n"
-      "endclass\n"
-      "class Derived extends Base;\n"
-      "  function new(int v); super.new(v); endfunction\n"
-      "endclass\n"
-      "module t;\n"
-      "  int result;\n"
-      "  initial begin\n"
-      "    Derived d = new(42);\n"
-      "    result = d.x;\n"
-      "  end\n"
-      "endmodule\n", "result"), 42u);
+  EXPECT_EQ(RunAndGet("class Base;\n"
+                      "  int x;\n"
+                      "  function new(int v); x = v; endfunction\n"
+                      "endclass\n"
+                      "class Derived extends Base;\n"
+                      "  function new(int v); super.new(v); endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    Derived d = new(42);\n"
+                      "    result = d.x;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            42u);
 }
 
 TEST(ChainedConstructorSimulation, ImplicitSuperNewInitializesBase) {
-  EXPECT_EQ(RunAndGet(
-      "class Base;\n"
-      "  int x;\n"
-      "  function new(); x = 7; endfunction\n"
-      "endclass\n"
-      "class Derived extends Base;\n"
-      "endclass\n"
-      "module t;\n"
-      "  int result;\n"
-      "  initial begin\n"
-      "    Derived d = new;\n"
-      "    result = d.x;\n"
-      "  end\n"
-      "endmodule\n", "result"), 7u);
+  EXPECT_EQ(RunAndGet("class Base;\n"
+                      "  int x;\n"
+                      "  function new(); x = 7; endfunction\n"
+                      "endclass\n"
+                      "class Derived extends Base;\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    Derived d = new;\n"
+                      "    result = d.x;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            7u);
 }
 
 TEST(ChainedConstructorSimulation, ThreeLevelChainingEndToEnd) {
-  EXPECT_EQ(RunAndGet(
-      "class A;\n"
-      "  int a_val;\n"
-      "  function new(); a_val = 1; endfunction\n"
-      "endclass\n"
-      "class B extends A;\n"
-      "  int b_val;\n"
-      "  function new(); super.new(); b_val = 2; endfunction\n"
-      "endclass\n"
-      "class C extends B;\n"
-      "  int c_val;\n"
-      "  function new(); super.new(); c_val = 3; endfunction\n"
-      "endclass\n"
-      "module t;\n"
-      "  int result;\n"
-      "  initial begin\n"
-      "    C c = new;\n"
-      "    result = c.a_val + c.b_val * 10 + c.c_val * 100;\n"
-      "  end\n"
-      "endmodule\n", "result"), 321u);
+  EXPECT_EQ(RunAndGet("class A;\n"
+                      "  int a_val;\n"
+                      "  function new(); a_val = 1; endfunction\n"
+                      "endclass\n"
+                      "class B extends A;\n"
+                      "  int b_val;\n"
+                      "  function new(); super.new(); b_val = 2; endfunction\n"
+                      "endclass\n"
+                      "class C extends B;\n"
+                      "  int c_val;\n"
+                      "  function new(); super.new(); c_val = 3; endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    C c = new;\n"
+                      "    result = c.a_val + c.b_val * 10 + c.c_val * 100;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            321u);
 }
 
 TEST(ChainedConstructorSimulation, BaseConstructorRunsBeforeDerived) {
-  EXPECT_EQ(RunAndGet(
-      "class Base;\n"
-      "  int x;\n"
-      "  function new(); x = 10; endfunction\n"
-      "endclass\n"
-      "class Derived extends Base;\n"
-      "  int y;\n"
-      "  function new();\n"
-      "    super.new();\n"
-      "    y = x + 5;\n"
-      "  endfunction\n"
-      "endclass\n"
-      "module t;\n"
-      "  int result;\n"
-      "  initial begin\n"
-      "    Derived d = new;\n"
-      "    result = d.y;\n"
-      "  end\n"
-      "endmodule\n", "result"), 15u);
+  EXPECT_EQ(RunAndGet("class Base;\n"
+                      "  int x;\n"
+                      "  function new(); x = 10; endfunction\n"
+                      "endclass\n"
+                      "class Derived extends Base;\n"
+                      "  int y;\n"
+                      "  function new();\n"
+                      "    super.new();\n"
+                      "    y = x + 5;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    Derived d = new;\n"
+                      "    result = d.y;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            15u);
 }
 
 TEST(ChainedConstructorSimulation, ImplicitSuperNewWithDerivedConstructor) {
-  EXPECT_EQ(RunAndGet(
-      "class Base;\n"
-      "  int x;\n"
-      "  function new(); x = 100; endfunction\n"
-      "endclass\n"
-      "class Derived extends Base;\n"
-      "  int y;\n"
-      "  function new(); y = 200; endfunction\n"
-      "endclass\n"
-      "module t;\n"
-      "  int result;\n"
-      "  initial begin\n"
-      "    Derived d = new;\n"
-      "    result = d.x + d.y;\n"
-      "  end\n"
-      "endmodule\n", "result"), 300u);
+  EXPECT_EQ(RunAndGet("class Base;\n"
+                      "  int x;\n"
+                      "  function new(); x = 100; endfunction\n"
+                      "endclass\n"
+                      "class Derived extends Base;\n"
+                      "  int y;\n"
+                      "  function new(); y = 200; endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    Derived d = new;\n"
+                      "    result = d.x + d.y;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            300u);
 }
 
 TEST(ChainedConstructorSimulation, PropertyDefaultsInitializedDuringChaining) {
-  EXPECT_EQ(RunAndGet(
-      "class Base;\n"
-      "  int x = 50;\n"
-      "  function new(); endfunction\n"
-      "endclass\n"
-      "class Derived extends Base;\n"
-      "  int y = 25;\n"
-      "  function new(); super.new(); endfunction\n"
-      "endclass\n"
-      "module t;\n"
-      "  int result;\n"
-      "  initial begin\n"
-      "    Derived d = new;\n"
-      "    result = d.x + d.y;\n"
-      "  end\n"
-      "endmodule\n", "result"), 75u);
+  EXPECT_EQ(RunAndGet("class Base;\n"
+                      "  int x = 50;\n"
+                      "  function new(); endfunction\n"
+                      "endclass\n"
+                      "class Derived extends Base;\n"
+                      "  int y = 25;\n"
+                      "  function new(); super.new(); endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    Derived d = new;\n"
+                      "    result = d.x + d.y;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            75u);
 }
 
-}
+}  // namespace

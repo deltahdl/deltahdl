@@ -276,4 +276,4 @@ TEST(SignedXZ, ZInLowBitStillYieldsAllX) {
   EXPECT_EQ(result.words[0].bval & mask, mask);
 }
 
-}
+}  // namespace

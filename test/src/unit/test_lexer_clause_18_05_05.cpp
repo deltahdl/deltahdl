@@ -12,4 +12,4 @@ TEST(ConstraintImplicationLexing, ArrowOperatorRecognised) {
   EXPECT_EQ(r.token.kind, TokenKind::kArrow);
 }
 
-}
+}  // namespace

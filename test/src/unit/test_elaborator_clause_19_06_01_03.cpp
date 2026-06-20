@@ -6,9 +6,9 @@ using namespace delta;
 
 namespace {
 
-// §19.6.1.3: CrossValType is a SystemVerilog struct consisting of one member for
-// each coverpoint in the cross; the name and type of each field are the name and
-// type of the corresponding coverpoint, in order.
+// §19.6.1.3: CrossValType is a SystemVerilog struct consisting of one member
+// for each coverpoint in the cross; the name and type of each field are the
+// name and type of the corresponding coverpoint, in order.
 TEST(CrossAutomaticTypes, CrossValTypeHasOneMemberPerCoverpoint) {
   std::vector<CrossValMember> coverpoints = {
       {"xy", "logic [11:0]"},

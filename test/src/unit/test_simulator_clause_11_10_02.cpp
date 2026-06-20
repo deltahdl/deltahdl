@@ -98,8 +98,8 @@ TEST(StringLiteralPaddingSim, PaddingIndistinguishableFromNul) {
 
 TEST(StringLiteralPaddingSim, LeadingNulStringCharsMatchPadding) {
   // A string literal whose high-order characters are explicit NUL escapes packs
-  // the same bits as a shorter literal that the assignment left-pads with zeros.
-  // Equality must not tell the two sources of zero bytes apart.
+  // the same bits as a shorter literal that the assignment left-pads with
+  // zeros. Equality must not tell the two sources of zero bytes apart.
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -206,4 +206,4 @@ TEST(StringLiteralPaddingSim, PaddedStringSelfCompare) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-}
+}  // namespace

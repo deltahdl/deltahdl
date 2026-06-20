@@ -202,4 +202,4 @@ TEST(NetStrengthDisjunction, NetStrengthMutationTogglesIsAmbiguous) {
   EXPECT_FALSE(ns.IsAmbiguous());
 }
 
-}
+}  // namespace

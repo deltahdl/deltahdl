@@ -39,4 +39,4 @@ TEST(GateDelaySimulator, ProductionUndecoratedGateLeavesSchedulerAtInputTime) {
   EXPECT_EQ(f.scheduler.CurrentTime().ticks, 4u);
 }
 
-}
+}  // namespace

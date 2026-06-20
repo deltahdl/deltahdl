@@ -572,4 +572,4 @@ TEST(WiredLogicAmbig, EmptyInputProducesEmptyRange) {
   EXPECT_EQ(r.s1_hi, Strength::kHighz);
 }
 
-}
+}  // namespace

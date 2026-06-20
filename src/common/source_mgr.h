@@ -30,4 +30,4 @@ class SourceManager {
   std::vector<FileEntry> files_;
 };
 
-}
+}  // namespace delta

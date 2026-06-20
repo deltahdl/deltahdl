@@ -50,4 +50,4 @@ TEST(ExternModuleSimulation, WildcardPortsFromExternSimulate) {
   EXPECT_EQ(var->value.ToUint64(), 0xCDu);
 }
 
-}
+}  // namespace

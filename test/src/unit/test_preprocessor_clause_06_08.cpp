@@ -40,4 +40,4 @@ TEST(DataTypeParsing, MultipleVarDeclsSameStmt) {
   EXPECT_EQ(r.cu->modules[0]->items[1]->name, "s2");
 }
 
-}
+}  // namespace

@@ -7,8 +7,8 @@ using namespace delta;
 namespace {
 
 // When a cross_identifier is used as a select_expression, only the
-// cross_identifier of the enclosing cross may be used; any other cross_identifier
-// shall be disallowed (LRM 19.6.1.2).
+// cross_identifier of the enclosing cross may be used; any other
+// cross_identifier shall be disallowed (LRM 19.6.1.2).
 TEST(CrossBinWithCovergroup, OnlyEnclosingCrossIdentifierIsLegal) {
   EXPECT_TRUE(CrossIdentifierSelectIsLegal("X", "X"));
   EXPECT_FALSE(CrossIdentifierSelectIsLegal("Y", "X"));

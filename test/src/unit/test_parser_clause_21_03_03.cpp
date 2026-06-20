@@ -69,4 +69,4 @@ TEST(IoSystemTaskParsing, SformatfFormatOnly) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

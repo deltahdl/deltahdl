@@ -35,9 +35,8 @@ TEST(SysTask, FflushFileDescriptor) {
   EvalExpr(MkSysCall(f.arena, "$fwrite",
                      {MkInt(f.arena, fd), MkStr(f.arena, "hello")}),
            f.ctx, f.arena);
-  auto result =
-      EvalExpr(MkSysCall(f.arena, "$fflush", {MkInt(f.arena, fd)}), f.ctx,
-               f.arena);
+  auto result = EvalExpr(MkSysCall(f.arena, "$fflush", {MkInt(f.arena, fd)}),
+                         f.ctx, f.arena);
   EXPECT_EQ(result.width, 1u);
 
   EXPECT_EQ(ReadWholeFile(tmp), "hello");
@@ -55,16 +54,15 @@ TEST(SysTask, FflushMultiChannelDescriptor) {
   std::string tmp = "/tmp/deltahdl_test_fflush_mcd.txt";
   std::remove(tmp.c_str());
 
-  auto mcd_val = EvalExpr(
-      MkSysCall(f.arena, "$fopen", {MkStr(f.arena, tmp)}), f.ctx, f.arena);
+  auto mcd_val = EvalExpr(MkSysCall(f.arena, "$fopen", {MkStr(f.arena, tmp)}),
+                          f.ctx, f.arena);
   uint64_t mcd = mcd_val.ToUint64();
 
   EvalExpr(MkSysCall(f.arena, "$fwrite",
                      {MkInt(f.arena, mcd), MkStr(f.arena, "world")}),
            f.ctx, f.arena);
-  auto result =
-      EvalExpr(MkSysCall(f.arena, "$fflush", {MkInt(f.arena, mcd)}), f.ctx,
-               f.arena);
+  auto result = EvalExpr(MkSysCall(f.arena, "$fflush", {MkInt(f.arena, mcd)}),
+                         f.ctx, f.arena);
   EXPECT_EQ(result.width, 1u);
 
   EXPECT_EQ(ReadWholeFile(tmp), "world");
@@ -81,9 +79,9 @@ TEST(SysTask, FflushUnopenedFileDescriptor) {
   SysTaskFixture f;
   // High bit set marks this as a file descriptor; channel 5 was never opened.
   uint64_t stale_fd = 0x80000005ull;
-  auto result = EvalExpr(
-      MkSysCall(f.arena, "$fflush", {MkInt(f.arena, stale_fd)}), f.ctx,
-      f.arena);
+  auto result =
+      EvalExpr(MkSysCall(f.arena, "$fflush", {MkInt(f.arena, stale_fd)}), f.ctx,
+               f.arena);
   EXPECT_EQ(result.width, 1u);
 }
 
@@ -93,9 +91,8 @@ TEST(SysTask, FflushUnopenedFileDescriptor) {
 TEST(SysTask, FflushMcdWithNoChannelsSelected) {
   SysTaskFixture f;
   // No high bit and no channel bits set: an mcd that names no open channel.
-  auto result =
-      EvalExpr(MkSysCall(f.arena, "$fflush", {MkInt(f.arena, 0)}), f.ctx,
-               f.arena);
+  auto result = EvalExpr(MkSysCall(f.arena, "$fflush", {MkInt(f.arena, 0)}),
+                         f.ctx, f.arena);
   EXPECT_EQ(result.width, 1u);
 }
 

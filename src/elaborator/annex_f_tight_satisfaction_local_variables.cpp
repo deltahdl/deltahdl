@@ -140,8 +140,8 @@ std::vector<LocalContext> OutputsForSlice(const Word& word, std::size_t lo,
       const std::string& v = seq.local_var_name;
       const LocalContext outer_v = RestrictToName(input, v);
       const LocalContext body_input = RemoveName(input, v);
-      for (LocalContext inner : OutputsForSlice(word, lo, hi, *seq.lhs,
-                                                body_input)) {
+      for (LocalContext inner :
+           OutputsForSlice(word, lo, hi, *seq.lhs, body_input)) {
         LocalContext out = RemoveName(inner, v);
         for (const auto& entry : outer_v) {
           out.insert(entry);
@@ -255,14 +255,14 @@ std::vector<LocalContext> OutputsForSlice(const Word& word, std::size_t lo,
       // contexts chain L_0 = L_(0), ..., L_(j) = L_1 with each wi, L_(i-1),
       // L_(i) |== R. One piece covering the whole slice is the j = 1 case;
       // longer chains peel off a nonempty first piece and recurse.
-      for (LocalContext out :
-           OutputsForSlice(word, lo, hi, *seq.lhs, input)) {
+      for (LocalContext out : OutputsForSlice(word, lo, hi, *seq.lhs, input)) {
         AddUnique(result, std::move(out));
       }
       for (std::size_t mid = lo + 1; mid < hi; ++mid) {
         for (const LocalContext& mid_ctx :
              OutputsForSlice(word, lo, mid, *seq.lhs, input)) {
-          for (LocalContext out : OutputsForSlice(word, mid, hi, seq, mid_ctx)) {
+          for (LocalContext out :
+               OutputsForSlice(word, mid, hi, seq, mid_ctx)) {
             AddUnique(result, std::move(out));
           }
         }
@@ -276,14 +276,14 @@ std::vector<LocalContext> OutputsForSlice(const Word& word, std::size_t lo,
         result.push_back(input);
         return result;
       }
-      for (LocalContext out :
-           OutputsForSlice(word, lo, hi, *seq.lhs, input)) {
+      for (LocalContext out : OutputsForSlice(word, lo, hi, *seq.lhs, input)) {
         AddUnique(result, std::move(out));
       }
       for (std::size_t mid = lo + 1; mid < hi; ++mid) {
         for (const LocalContext& mid_ctx :
              OutputsForSlice(word, lo, mid, *seq.lhs, input)) {
-          for (LocalContext out : OutputsForSlice(word, mid, hi, seq, mid_ctx)) {
+          for (LocalContext out :
+               OutputsForSlice(word, mid, hi, seq, mid_ctx)) {
             AddUnique(result, std::move(out));
           }
         }

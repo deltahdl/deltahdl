@@ -8,9 +8,10 @@ namespace {
 
 // §37.26 Structures and unions: the VPI object model for a structure or union
 // declared as a variable (struct/union var) or as a net (struct/union net). The
-// figure's structural relations (vpiParent to the enclosing object, vpiMember to
-// the member variables/nets) are served by the generic object-model machinery,
-// so the tests below observe the two rules this clause's own text defines:
+// figure's structural relations (vpiParent to the enclosing object, vpiMember
+// to the member variables/nets) are served by the generic object-model
+// machinery, so the tests below observe the two rules this clause's own text
+// defines:
 //   - The figure's Boolean properties vpiPacked, vpiTagged, and vpiSoft, read
 //     through the vpi_get dispatch.
 //   - Detail 1: vpi_get_value()/vpi_put_value() cannot access the value of an
@@ -33,8 +34,8 @@ constexpr int kStructUnionKinds[] = {vpiStructVar, vpiUnionVar, vpiStructNet,
                                      vpiUnionNet};
 
 // Figure: a struct/union object reports whether it is packed through the
-// vpiPacked Boolean property. A packed aggregate reports TRUE; one left unpacked
-// reports FALSE.
+// vpiPacked Boolean property. A packed aggregate reports TRUE; one left
+// unpacked reports FALSE.
 TEST_F(StructuresAndUnions, PackedPropertyReportsDeclaredFlag) {
   VpiObject packed_struct;
   packed_struct.type = vpiStructVar;
@@ -114,8 +115,8 @@ TEST_F(StructuresAndUnions, PutValueRejectsEntireUnpackedStructOrUnion) {
   }
 }
 
-// D1: the restriction is on the *unpacked* aggregate only. A packed structure or
-// union has a single vector value, so neither value routine refuses it - the
+// D1: the restriction is on the *unpacked* aggregate only. A packed structure
+// or union has a single vector value, so neither value routine refuses it - the
 // §37.26 guard each carries is bypassed and no error is recorded. Both routines
 // carry an independent guard, so both are checked.
 TEST_F(StructuresAndUnions, PackedStructOrUnionValueIsNotRefused) {

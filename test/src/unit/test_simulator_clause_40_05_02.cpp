@@ -93,7 +93,8 @@ TEST(CoverageInformationQueries, StatusQueryDispatchesByProperty) {
 
 // C3: vpiCovered on an assertion is true only when the assertion has been
 // attempted, has succeeded nonvacuously, and has never failed.
-TEST(CoverageInformationQueries, AssertionCoveredRequiresAttemptSuccessNoFailure) {
+TEST(CoverageInformationQueries,
+     AssertionCoveredRequiresAttemptSuccessNoFailure) {
   AssertionCoverageCounters covered;
   covered.attempts = 3;
   covered.successes = 3;
@@ -159,7 +160,8 @@ TEST(CoverageInformationQueries, WorkedExampleAssertionCoverageResults) {
 }
 
 // C10: in-progress attempts derive from attempts minus all concluded outcomes.
-TEST(CoverageInformationQueries, InProgressDerivesFromAttemptsMinusConclusions) {
+TEST(CoverageInformationQueries,
+     InProgressDerivesFromAttemptsMinusConclusions) {
   AssertionCoverageCounters c;
   c.attempts = 10;
   c.successes = 3;
@@ -229,12 +231,14 @@ TEST(CoverageInformationQueries, InstanceCoverageSelectsByCoverageType) {
   inst.statements.covered = 3;
   inst.toggles.covered = 4;
 
-  EXPECT_EQ(instance_coverage_count(CoverageProperty::AssertCoverage, inst), 1U);
+  EXPECT_EQ(instance_coverage_count(CoverageProperty::AssertCoverage, inst),
+            1U);
   EXPECT_EQ(instance_coverage_count(CoverageProperty::FsmStateCoverage, inst),
             2U);
   EXPECT_EQ(instance_coverage_count(CoverageProperty::StatementCoverage, inst),
             3U);
-  EXPECT_EQ(instance_coverage_count(CoverageProperty::ToggleCoverage, inst), 4U);
+  EXPECT_EQ(instance_coverage_count(CoverageProperty::ToggleCoverage, inst),
+            4U);
   // A property that is not a coverage type selects nothing.
   EXPECT_EQ(instance_coverage_count(CoverageProperty::Covered, inst), 0U);
 }

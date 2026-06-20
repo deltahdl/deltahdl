@@ -18,4 +18,4 @@ TEST(IoSystemTaskParsing, FeofFerror) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

@@ -202,4 +202,4 @@ TEST(ProgramConstruct, AnonymousProgramHierRefToProgramIsError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-}
+}  // namespace

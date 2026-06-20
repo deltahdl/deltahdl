@@ -86,8 +86,7 @@ TEST(DpiGlobalNameElab,
 // signatures are permitted. Two tasks with matching argument shapes meet
 // the equivalence rule and the elaborator accepts the pair. Tasks also
 // exercise the function-vs-task half of the signature equivalence check.
-TEST(DpiGlobalNameElab,
-     ExportsSharingLinkageWithMatchingTaskSignaturesIsOk) {
+TEST(DpiGlobalNameElab, ExportsSharingLinkageWithMatchingTaskSignaturesIsOk) {
   ElabFixture f;
   Elaborate(R"(
     module m;

@@ -6,48 +6,39 @@ using namespace delta;
 namespace {
 
 TEST(SeveritySystemTaskParsing, FatalNoArgsParses) {
-  EXPECT_TRUE(
-      ParseOk("module m; initial $fatal; endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m; initial $fatal; endmodule\n"));
 }
 
 TEST(SeveritySystemTaskParsing, FatalFinishNumber0Parses) {
-  EXPECT_TRUE(
-      ParseOk("module m; initial $fatal(0); endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m; initial $fatal(0); endmodule\n"));
 }
 
 TEST(SeveritySystemTaskParsing, FatalFinishNumber1Parses) {
-  EXPECT_TRUE(
-      ParseOk("module m; initial $fatal(1); endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m; initial $fatal(1); endmodule\n"));
 }
 
 TEST(SeveritySystemTaskParsing, FatalFinishNumber2Parses) {
-  EXPECT_TRUE(
-      ParseOk("module m; initial $fatal(2); endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m; initial $fatal(2); endmodule\n"));
 }
 
 TEST(SeveritySystemTaskParsing, FatalWithFinishAndMessage) {
-  EXPECT_TRUE(
-      ParseOk("module m; initial $fatal(1, \"boom\"); endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m; initial $fatal(1, \"boom\"); endmodule\n"));
 }
 
 TEST(SeveritySystemTaskParsing, ErrorNoArgsParses) {
-  EXPECT_TRUE(
-      ParseOk("module m; initial $error; endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m; initial $error; endmodule\n"));
 }
 
 TEST(SeveritySystemTaskParsing, ErrorWithMessageParses) {
-  EXPECT_TRUE(
-      ParseOk("module m; initial $error(\"oops\"); endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m; initial $error(\"oops\"); endmodule\n"));
 }
 
 TEST(SeveritySystemTaskParsing, WarningWithMessageParses) {
-  EXPECT_TRUE(
-      ParseOk("module m; initial $warning(\"careful\"); endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m; initial $warning(\"careful\"); endmodule\n"));
 }
 
 TEST(SeveritySystemTaskParsing, InfoWithMessageParses) {
-  EXPECT_TRUE(
-      ParseOk("module m; initial $info(\"fyi\"); endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m; initial $info(\"fyi\"); endmodule\n"));
 }
 
 TEST(SeveritySystemTaskParsing, ErrorWithFormatArgsParses) {
@@ -72,4 +63,4 @@ TEST(SeveritySystemTaskParsing, SeverityTaskInsideCoverPassAction) {
   EXPECT_NE(stmt->assert_pass_stmt, nullptr);
 }
 
-}
+}  // namespace

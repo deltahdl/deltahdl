@@ -22,9 +22,9 @@ class VpiCompareObjectsSim : public ::testing::Test {
   VpiContext vpi_ctx_;
 };
 
-// §38.3: vpi_compare_objects() returns TRUE when both handles reference the same
-// underlying simulation object. The simplest case: one object, one handle to it
-// on both sides.
+// §38.3: vpi_compare_objects() returns TRUE when both handles reference the
+// same underlying simulation object. The simplest case: one object, one handle
+// to it on both sides.
 TEST_F(VpiCompareObjectsSim, SameHandleComparesEqual) {
   auto* mod = vpi_ctx_.CreateModule("top", "top");
 
@@ -43,9 +43,10 @@ TEST_F(VpiCompareObjectsSim, DifferentObjectsCompareUnequal) {
 // Example 1 - ps[0] is another way of referring to bit 7 of ps.b, so a handle
 // to ps[0] and a handle to ps.b[7] are two different handles that denote the
 // same bit. They compare equal even though their pointers differ.
-TEST_F(VpiCompareObjectsSim, AliasingHandlesCompareEqualDespiteDistinctPointers) {
+TEST_F(VpiCompareObjectsSim,
+       AliasingHandlesCompareEqualDespiteDistinctPointers) {
   auto* bit = vpi_ctx_.CreateParameter("ps_bit", 0);
-  auto* ps_index = vpi_ctx_.CreateParameter("ps_0", 0);    // ps[0]
+  auto* ps_index = vpi_ctx_.CreateParameter("ps_0", 0);      // ps[0]
   auto* member_bit = vpi_ctx_.CreateParameter("ps_b_7", 0);  // ps.b[7]
   ps_index->same_object_as = bit;
   member_bit->same_object_as = bit;
@@ -54,9 +55,10 @@ TEST_F(VpiCompareObjectsSim, AliasingHandlesCompareEqualDespiteDistinctPointers)
   EXPECT_EQ(VpiCompareObjectsC(ps_index, member_bit), 1);
 }
 
-// §38.3, Example 2: obj1 is a handle to the expression i[j] and obj2 is a handle
-// to i[0]. The result tracks what i[j] resolves to at the time of the call - TRUE
-// when j has the value 0 (i[j] is i[0]) and FALSE when j has the value 1.
+// §38.3, Example 2: obj1 is a handle to the expression i[j] and obj2 is a
+// handle to i[0]. The result tracks what i[j] resolves to at the time of the
+// call - TRUE when j has the value 0 (i[j] is i[0]) and FALSE when j has the
+// value 1.
 TEST_F(VpiCompareObjectsSim, ExpressionHandleTracksResolvedElement) {
   auto* i0 = vpi_ctx_.CreateParameter("i_0", 0);
   auto* i1 = vpi_ctx_.CreateParameter("i_1", 0);
@@ -73,9 +75,9 @@ TEST_F(VpiCompareObjectsSim, ExpressionHandleTracksResolvedElement) {
   EXPECT_EQ(VpiCompareObjectsC(obj1, obj2), 0);
 }
 
-// §38.3, Example 3: obj1 represents c.a and obj2 represents d.a. While both c and
-// d are null neither object exists, so the comparison is FALSE - the result holds
-// only "provided that the simulation object exists".
+// §38.3, Example 3: obj1 represents c.a and obj2 represents d.a. While both c
+// and d are null neither object exists, so the comparison is FALSE - the result
+// holds only "provided that the simulation object exists".
 TEST_F(VpiCompareObjectsSim, AbsentObjectsCompareUnequal) {
   auto* c_a = vpi_ctx_.CreateParameter("c_a", 0);
   auto* d_a = vpi_ctx_.CreateParameter("d_a", 0);
@@ -131,8 +133,8 @@ TEST_F(VpiCompareObjectsSim, AliasToAbsentObjectComparesUnequal) {
   EXPECT_EQ(VpiCompareObjectsC(alias_a, alias_b), 0);
 }
 
-// §38.3: the routine takes two handles to objects; a null handle names no object
-// and therefore never compares equal.
+// §38.3: the routine takes two handles to objects; a null handle names no
+// object and therefore never compares equal.
 TEST_F(VpiCompareObjectsSim, NullHandleNeverCompareEqual) {
   auto* mod = vpi_ctx_.CreateModule("top", "top");
 

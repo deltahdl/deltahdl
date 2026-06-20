@@ -30,4 +30,4 @@ TEST(KeywordVersionElaboration, OldVersionIdentifierElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

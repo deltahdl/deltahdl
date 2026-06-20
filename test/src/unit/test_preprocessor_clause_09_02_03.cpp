@@ -62,4 +62,4 @@ TEST(FinalProcedurePreprocessing, ConditionalCompilationOmitsFinal) {
   }
 }
 
-}
+}  // namespace

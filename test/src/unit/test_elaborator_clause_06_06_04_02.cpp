@@ -48,4 +48,4 @@ TEST(ChargeDecayElaboration, PlainTriregHasNoDecay) {
   EXPECT_TRUE(found);
 }
 
-}
+}  // namespace

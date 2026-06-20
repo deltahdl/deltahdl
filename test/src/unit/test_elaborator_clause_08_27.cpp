@@ -70,4 +70,4 @@ TEST(ClassObjectElaboration, BareForwardTypedefWithoutClassKeywordOk) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

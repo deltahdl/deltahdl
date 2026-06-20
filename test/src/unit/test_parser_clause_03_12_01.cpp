@@ -551,4 +551,4 @@ TEST(CompilationUnitParsing, DesignElementsInterleaveWithNonDesignElements) {
   EXPECT_EQ(r.cu->packages.size(), 1u);
 }
 
-}
+}  // namespace

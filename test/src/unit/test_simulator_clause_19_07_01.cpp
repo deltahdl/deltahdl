@@ -86,7 +86,8 @@ TEST(CoverageTypeOptions, TypeCoverageMergedUnion) {
       CoverageDB::ComputeTypeCoverage(insts, /*merge_instances=*/true), 100.0);
 }
 
-// LRM 19.7.1, Table 19-4: syntactic levels at which each type option is allowed.
+// LRM 19.7.1, Table 19-4: syntactic levels at which each type option is
+// allowed.
 TEST(CoverageTypeOptions, AllowedSyntacticLevels) {
   using K = TypeOptionKind;
   using L = CoverSyntacticLevel;
@@ -106,8 +107,10 @@ TEST(CoverageTypeOptions, AllowedSyntacticLevels) {
   }
 
   // real_interval: covergroup and coverpoint, not cross.
-  EXPECT_TRUE(CoverageDB::TypeOptionAllowedAt(K::kRealInterval, L::kCovergroup));
-  EXPECT_TRUE(CoverageDB::TypeOptionAllowedAt(K::kRealInterval, L::kCoverpoint));
+  EXPECT_TRUE(
+      CoverageDB::TypeOptionAllowedAt(K::kRealInterval, L::kCovergroup));
+  EXPECT_TRUE(
+      CoverageDB::TypeOptionAllowedAt(K::kRealInterval, L::kCoverpoint));
   EXPECT_FALSE(CoverageDB::TypeOptionAllowedAt(K::kRealInterval, L::kCross));
 }
 
@@ -162,4 +165,4 @@ TEST(CoverageTypeOptions, TypeCoverageZeroWeight) {
       CoverageDB::ComputeTypeCoverage(insts, /*merge_instances=*/false), 0.0);
 }
 
-}
+}  // namespace

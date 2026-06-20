@@ -33,4 +33,4 @@ TEST(SystemNameParserParsing, SystemTask_ExitEmptyParens) {
   EXPECT_TRUE(ParseOk("module m; initial $exit(); endmodule"));
 }
 
-}
+}  // namespace

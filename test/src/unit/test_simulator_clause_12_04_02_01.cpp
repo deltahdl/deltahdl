@@ -557,4 +557,4 @@ TEST(UniqueIfViolationSim, MaturedViolationSurvivesLaterEventControlResume) {
   EXPECT_EQ(f.diag.WarningCount(), 1u);
 }
 
-}
+}  // namespace

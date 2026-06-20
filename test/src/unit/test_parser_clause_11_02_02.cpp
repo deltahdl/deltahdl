@@ -72,4 +72,4 @@ TEST(AggregateTypeParsing, ArrayComparison) {
   EXPECT_EQ(stmt->rhs->op, TokenKind::kEqEq);
 }
 
-}
+}  // namespace

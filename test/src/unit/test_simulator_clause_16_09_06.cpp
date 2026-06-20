@@ -54,4 +54,4 @@ TEST(SvaEngine, IntersectRequiresEqualMatchLengths) {
   EXPECT_TRUE(EvalSequenceIntersect(true, true, 1, 1));
 }
 
-}
+}  // namespace

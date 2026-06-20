@@ -47,8 +47,7 @@ TEST(CmosSwitches, CmosIsNotBidirectional) {
 }
 
 TEST(CmosSwitches, CmosBlocksHighZData) {
-  EXPECT_EQ(EvalMosSwitch(SwitchType::kCmos, Val4::kZ, Val4::kV1),
-            Val4Ext::kZ);
+  EXPECT_EQ(EvalMosSwitch(SwitchType::kCmos, Val4::kZ, Val4::kV1), Val4Ext::kZ);
   EXPECT_EQ(EvalMosSwitch(SwitchType::kRcmos, Val4::kZ, Val4::kV1),
             Val4Ext::kZ);
 }
@@ -226,4 +225,4 @@ TEST(CmosSwitches, CmosPassesHighZDataAsHighZ) {
   EXPECT_TRUE(SettledToHighZ(f, "y"));
 }
 
-}
+}  // namespace

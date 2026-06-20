@@ -18,4 +18,4 @@ TEST(DataTypeParsing, RealInExpression) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

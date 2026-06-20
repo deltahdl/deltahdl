@@ -120,23 +120,24 @@ TEST(AbstractClassSimulation, LoweredPureVirtualNullInVtable) {
 }
 
 TEST(AbstractClassSimulation, ConcreteSubclassOfAbstractBaseConstructed) {
-  EXPECT_EQ(RunAndGet(
-      "virtual class Base;\n"
-      "  pure virtual function int compute();\n"
-      "endclass\n"
-      "class Derived extends Base;\n"
-      "  virtual function int compute();\n"
-      "    compute = 42;\n"
-      "  endfunction\n"
-      "endclass\n"
-      "module t;\n"
-      "  int result;\n"
-      "  initial begin\n"
-      "    Derived d;\n"
-      "    d = new;\n"
-      "    result = d.compute();\n"
-      "  end\n"
-      "endmodule\n", "result"), 42u);
+  EXPECT_EQ(RunAndGet("virtual class Base;\n"
+                      "  pure virtual function int compute();\n"
+                      "endclass\n"
+                      "class Derived extends Base;\n"
+                      "  virtual function int compute();\n"
+                      "    compute = 42;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    Derived d;\n"
+                      "    d = new;\n"
+                      "    result = d.compute();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            42u);
 }
 
 // 8.21: an object of an abstract class shall not be constructed directly.
@@ -162,20 +163,21 @@ TEST(AbstractClassSimulation, ConstructAbstractClassDirectlyError) {
 }
 
 TEST(AbstractClassSimulation, EmptyBodyVirtualMethodIsCallable) {
-  EXPECT_EQ(RunAndGet(
-      "class Base;\n"
-      "  virtual function int send(bit[31:0] data);\n"
-      "  endfunction\n"
-      "endclass\n"
-      "module t;\n"
-      "  int result;\n"
-      "  initial begin\n"
-      "    Base b;\n"
-      "    b = new;\n"
-      "    b.send(0);\n"
-      "    result = 1;\n"
-      "  end\n"
-      "endmodule\n", "result"), 1u);
+  EXPECT_EQ(RunAndGet("class Base;\n"
+                      "  virtual function int send(bit[31:0] data);\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    Base b;\n"
+                      "    b = new;\n"
+                      "    b.send(0);\n"
+                      "    result = 1;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            1u);
 }
 
-}
+}  // namespace

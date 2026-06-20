@@ -110,4 +110,4 @@ TEST(CommentPreprocessor, CommentAfterMacroDefinition) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-}
+}  // namespace

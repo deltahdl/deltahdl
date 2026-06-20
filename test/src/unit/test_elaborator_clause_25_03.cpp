@@ -171,17 +171,17 @@ TEST(InterfaceDefinitions, NestedInterfaceNotImplicitlyInstantiated) {
 // §25.3: an interface-port-connection actual that is a hierarchical reference
 // to an interface instance, taking only plain instance steps, is legal.
 TEST(InterfacePortHierRef, PlainInterfacePathIsLegal) {
-  EXPECT_TRUE(InterfacePortHierRefIsLegal(
-      {InterfaceHierRefStep::kInterfaceInstance,
-       InterfaceHierRefStep::kInterfaceInstance}));
+  EXPECT_TRUE(
+      InterfacePortHierRefIsLegal({InterfaceHierRefStep::kInterfaceInstance,
+                                   InterfaceHierRefStep::kInterfaceInstance}));
 }
 
 // §25.3: the reference must terminate at an interface instance; a path ending
 // at something other than an interface instance is rejected.
 TEST(InterfacePortHierRef, NonInterfaceTargetIsIllegal) {
-  EXPECT_FALSE(InterfacePortHierRefIsLegal(
-      {InterfaceHierRefStep::kInterfaceInstance,
-       InterfaceHierRefStep::kNonInterface}));
+  EXPECT_FALSE(
+      InterfacePortHierRefIsLegal({InterfaceHierRefStep::kInterfaceInstance,
+                                   InterfaceHierRefStep::kNonInterface}));
 }
 
 // §25.3: the reference shall not resolve through an arrayed instance.
@@ -193,9 +193,9 @@ TEST(InterfacePortHierRef, PathThroughArrayedInstanceIsIllegal) {
 
 // §25.3: the reference shall not resolve through a generate block.
 TEST(InterfacePortHierRef, PathThroughGenerateBlockIsIllegal) {
-  EXPECT_FALSE(InterfacePortHierRefIsLegal(
-      {InterfaceHierRefStep::kGenerateBlock,
-       InterfaceHierRefStep::kInterfaceInstance}));
+  EXPECT_FALSE(
+      InterfacePortHierRefIsLegal({InterfaceHierRefStep::kGenerateBlock,
+                                   InterfaceHierRefStep::kInterfaceInstance}));
 }
 
 // §25.3: an empty reference designates no interface instance and is illegal.
@@ -227,4 +227,4 @@ TEST(ArrayedInterfaceDefparam, NonArrayedInstanceIsUnconstrained) {
       DefparamReach::kOutsideInstance));
 }
 
-}
+}  // namespace

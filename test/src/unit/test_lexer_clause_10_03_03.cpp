@@ -63,4 +63,4 @@ TEST(ContAssignDelayLexing, NetDeclDelayWithInitTokenStream) {
   EXPECT_EQ(tokens[4].kind, TokenKind::kEq);
 }
 
-}
+}  // namespace

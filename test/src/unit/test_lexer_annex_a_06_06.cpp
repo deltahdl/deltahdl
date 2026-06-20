@@ -48,4 +48,4 @@ TEST(ConditionalStmtOperatorLexing, TripleAmp) {
   EXPECT_EQ(r.token.kind, TokenKind::kAmpAmpAmp);
 }
 
-}
+}  // namespace

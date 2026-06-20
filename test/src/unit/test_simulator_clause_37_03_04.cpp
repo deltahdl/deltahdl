@@ -44,7 +44,8 @@ TEST(SourceDelayModel, DelayCarryingTypeClassification) {
 TEST(SourceDelayModel, SingleDelayReachesConstantExpression) {
   VpiObject net;
   net.type = vpiNet;
-  VpiObject delay;  // one delay specified -> an expression evaluating to a const
+  VpiObject
+      delay;  // one delay specified -> an expression evaluating to a const
   delay.type = vpiConstant;
   net.delay_expr = &delay;
 
@@ -138,9 +139,9 @@ TEST(SourceDelayPublic, HandleDelayReturnsListOperationForMultipleDelays) {
   SetGlobalVpiContext(nullptr);
 }
 
-// D2 (public path edge): vpiDelay is diverted only for the delay-carrying object
-// kinds; an object that does not carry a source delay is not diverted, so the
-// public path reaches nothing.
+// D2 (public path edge): vpiDelay is diverted only for the delay-carrying
+// object kinds; an object that does not carry a source delay is not diverted,
+// so the public path reaches nothing.
 TEST(SourceDelayPublic, HandleDelayNotDivertedForNonDelayObject) {
   VpiContext ctx;
   SetGlobalVpiContext(&ctx);

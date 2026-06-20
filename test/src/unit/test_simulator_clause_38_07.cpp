@@ -27,7 +27,8 @@ TEST_F(VpiGet64Sim, ReturnsSixtyFourBitPropertyAtFullWidth) {
   class_obj.type = vpiClassObj;
   class_obj.obj_id = static_cast<int64_t>(0x1'0000'0002);  // > INT32_MAX
 
-  EXPECT_EQ(vpi_get64(vpiObjId, &class_obj), static_cast<PLI_INT64>(0x1'0000'0002));
+  EXPECT_EQ(vpi_get64(vpiObjId, &class_obj),
+            static_cast<PLI_INT64>(0x1'0000'0002));
   // The 32-bit reader cannot carry the full value, so the 64-bit path is what
   // preserves it.
   EXPECT_NE(static_cast<PLI_INT64>(vpi_get(vpiObjId, &class_obj)),

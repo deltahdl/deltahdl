@@ -66,8 +66,8 @@ TEST(NettypeElaboration, NetCarriesResolutionFunction) {
   EXPECT_EQ(net->resolve_func, "my_resolve");
 }
 
-// §6.6.7: the second declaration form names another nettype for an existing one;
-// a net of the alias resolves to the source nettype's resolution function.
+// §6.6.7: the second declaration form names another nettype for an existing
+// one; a net of the alias resolves to the source nettype's resolution function.
 TEST(NettypeElaboration, AliasNetInheritsResolutionFunction) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -144,4 +144,4 @@ TEST(NettypeElaboration, ResolutionFunctionStaticClassMethodAccepted) {
   EXPECT_TRUE(ValidateNettypeResolutionFunction(sig));
 }
 
-}
+}  // namespace

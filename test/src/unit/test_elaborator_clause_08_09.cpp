@@ -72,4 +72,4 @@ TEST(StaticClassPropertyElaboration, MultipleStaticDeclaratorsOk) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

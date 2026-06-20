@@ -28,7 +28,8 @@ TEST(ContAssignStatementElaboration, VarWithInitializerAndContAssignErrors) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(ContAssignStatementElaboration, VarWithoutInitializerAndContAssignSucceeds) {
+TEST(ContAssignStatementElaboration,
+     VarWithoutInitializerAndContAssignSucceeds) {
   ElabFixture f;
   auto* design = Elaborate(
       "module t;\n"
@@ -240,4 +241,4 @@ TEST(ContAssignStatementElaboration, VarOutputPortWithProceduralAssignErrors) {
   EXPECT_TRUE(f.has_errors);
 }
 
-}
+}  // namespace

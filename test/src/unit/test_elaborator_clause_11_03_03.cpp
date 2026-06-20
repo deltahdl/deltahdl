@@ -82,4 +82,4 @@ TEST(IntegerLiteralElaboration, NegatedSizedSignedBasedDivThreeEqualsOne) {
   EXPECT_EQ(val.value_or(0), 1);
 }
 
-}
+}  // namespace

@@ -37,4 +37,4 @@ TEST(ChargeDecayParsing, ThreeDelaysSlotIntoRiseFallDecay) {
   EXPECT_EQ(item->net_delay_decay->int_val, 9u);
 }
 
-}
+}  // namespace

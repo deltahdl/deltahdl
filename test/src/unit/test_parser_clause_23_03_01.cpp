@@ -25,31 +25,31 @@ TEST(TopLevelModules, SingleModuleParsesAsTopCandidate) {
 }
 
 TEST(TopLevelModules, DollarRootHierPathInAssignParses) {
-  EXPECT_TRUE(ParseOk(
-      "module top;\n"
-      "  logic x;\n"
-      "  assign x = $root.top.x;\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module top;\n"
+              "  logic x;\n"
+              "  assign x = $root.top.x;\n"
+              "endmodule\n"));
 }
 
 TEST(TopLevelModules, DollarRootHierPathInInitialBlockParses) {
-  EXPECT_TRUE(ParseOk(
-      "module top;\n"
-      "  logic [7:0] val;\n"
-      "  initial val = $root.top.val;\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module top;\n"
+              "  logic [7:0] val;\n"
+              "  initial val = $root.top.val;\n"
+              "endmodule\n"));
 }
 
 TEST(TopLevelModules, DollarRootMultiLevelHierPathParses) {
-  EXPECT_TRUE(ParseOk(
-      "module child;\n"
-      "  logic sig;\n"
-      "endmodule\n"
-      "module top;\n"
-      "  child c1();\n"
-      "  logic x;\n"
-      "  assign x = $root.top.c1.sig;\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module child;\n"
+              "  logic sig;\n"
+              "endmodule\n"
+              "module top;\n"
+              "  child c1();\n"
+              "  logic x;\n"
+              "  assign x = $root.top.c1.sig;\n"
+              "endmodule\n"));
 }
 
-}
+}  // namespace

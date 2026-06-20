@@ -217,4 +217,4 @@ TEST(LoopSyntaxParsing, ErrorForeachMissingCloseBracket) {
   EXPECT_TRUE(r.has_errors);
 }
 
-}
+}  // namespace

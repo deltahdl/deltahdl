@@ -110,7 +110,8 @@ TEST(UpwardNameReferenceSimulation, UpwardReferenceAcrossTwoLevels) {
   EXPECT_EQ(v->value.ToUint64(), 55u);
 }
 
-TEST(UpwardNameReferenceSimulation, InstanceScopeNameResolvesDownwardFromParent) {
+TEST(UpwardNameReferenceSimulation,
+     InstanceScopeNameResolvesDownwardFromParent) {
   // A scope_name.item_name reference whose leading scope_name is a sibling
   // instance resolves by first stepping up to the reference's enclosing
   // scope, locating the named instance there, and then resolving the item
@@ -181,4 +182,4 @@ TEST(UpwardNameReferenceSimulation, UpwardSearchUsesEnclosingModuleNotSibling) {
   EXPECT_EQ(r->value.ToUint64(), 88u);
 }
 
-}
+}  // namespace

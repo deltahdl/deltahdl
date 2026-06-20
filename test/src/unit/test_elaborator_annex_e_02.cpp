@@ -176,4 +176,4 @@ TEST(Elaborator, DefaultDecayTime_AppliesToAllTriregNets) {
   EXPECT_EQ(count, 2);
 }
 
-}
+}  // namespace

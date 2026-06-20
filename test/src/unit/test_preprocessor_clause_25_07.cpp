@@ -19,4 +19,4 @@ TEST(SourceText, ExternFunctionPrototypeInModule) {
   EXPECT_TRUE(mod->items[0]->func_body_stmts.empty());
 }
 
-}
+}  // namespace

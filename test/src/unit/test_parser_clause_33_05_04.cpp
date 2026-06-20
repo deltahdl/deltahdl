@@ -23,8 +23,8 @@ struct TempPrecompDir {
     static std::atomic<uint64_t> counter{0};
     auto seq = counter.fetch_add(1);
     dir = fs::temp_directory_path() /
-          ("delta_clause_33_05_04_parser_" + std::to_string(::getpid()) +
-           "_" + std::to_string(seq));
+          ("delta_clause_33_05_04_parser_" + std::to_string(::getpid()) + "_" +
+           std::to_string(seq));
     fs::create_directories(dir);
   }
   ~TempPrecompDir() {
@@ -40,17 +40,17 @@ struct TempPrecompDir {
 TEST(ConfigCommandLine, ConfigDesignCellsAndRulesRoundTrip) {
   TempPrecompDir tmp;
   auto path = tmp.dir / "lib.dpl";
-  ASSERT_TRUE(PrecompiledLibrary::Save(
-      "module a;\n"
-      "endmodule\n"
-      "module b;\n"
-      "endmodule\n"
-      "config cfg;\n"
-      "  design a b;\n"
-      "  default liblist work;\n"
-      "  cell a liblist work;\n"
-      "endconfig\n",
-      "myLib", path));
+  ASSERT_TRUE(
+      PrecompiledLibrary::Save("module a;\n"
+                               "endmodule\n"
+                               "module b;\n"
+                               "endmodule\n"
+                               "config cfg;\n"
+                               "  design a b;\n"
+                               "  default liblist work;\n"
+                               "  cell a liblist work;\n"
+                               "endconfig\n",
+                               "myLib", path));
 
   SourceManager mgr;
   Arena arena;
@@ -72,4 +72,4 @@ TEST(ConfigCommandLine, ConfigDesignCellsAndRulesRoundTrip) {
   EXPECT_EQ(cfg->rules[1]->cell_name, "a");
 }
 
-}
+}  // namespace

@@ -66,4 +66,4 @@ TEST(NamedEventWaitSynthesis, RejectEventTriggerInAlways) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-}
+}  // namespace

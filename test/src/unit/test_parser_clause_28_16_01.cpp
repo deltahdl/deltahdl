@@ -192,4 +192,4 @@ TEST(MinTypMaxDelayParsing, UdpInstanceDelayTriples) {
   EXPECT_EQ(inst->gate_delay_fall->kind, ExprKind::kMinTypMax);
 }
 
-}
+}  // namespace

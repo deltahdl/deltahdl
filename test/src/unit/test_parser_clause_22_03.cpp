@@ -56,4 +56,4 @@ TEST(CompilerDirectiveParsing, ResetallResetsTimescaleForParsing) {
   EXPECT_TRUE(r.cu->default_decay_time_infinite);
 }
 
-}
+}  // namespace

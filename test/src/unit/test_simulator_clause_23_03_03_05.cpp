@@ -77,4 +77,4 @@ TEST(UnpackedArrayPortsAndArraysOfInstancesSimulation,
   EXPECT_EQ(var->value.ToUint64(), 0xCAFEu);
 }
 
-}
+}  // namespace

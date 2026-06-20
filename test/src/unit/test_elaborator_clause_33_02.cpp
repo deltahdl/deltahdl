@@ -113,9 +113,7 @@ TEST(ConfigInstanceSourceMapping, EveryInstanceMappedToSourceDescription) {
 // instance cannot be mapped and elaboration reports the failure.
 TEST(ConfigInstanceSourceMapping, UnlocatableSubinstanceIsError) {
   ElabFixture f;
-  ElaborateSrc(
-      "module top; missing u_missing(); endmodule\n",
-      f, "top");
+  ElaborateSrc("module top; missing u_missing(); endmodule\n", f, "top");
   EXPECT_TRUE(f.has_errors);
 }
 
@@ -131,4 +129,4 @@ TEST(ConfigInstanceSourceMapping, UnlocatableNestedSubinstanceIsError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-}
+}  // namespace

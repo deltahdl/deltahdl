@@ -38,4 +38,4 @@ TEST(DefparamLexer, MultipleAssignmentsCommaToken) {
   EXPECT_TRUE(saw_comma);
 }
 
-}
+}  // namespace

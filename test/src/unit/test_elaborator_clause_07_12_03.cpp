@@ -67,4 +67,4 @@ TEST(BuiltinMethodElaboration, ArraySumWithClauseOk) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

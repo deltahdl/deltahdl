@@ -372,4 +372,4 @@ TEST(ValueParameters, IntegerParameterFromNegativeRealRoundsAwayFromZero) {
   EXPECT_EQ(p.resolved_value, -3);
 }
 
-}
+}  // namespace

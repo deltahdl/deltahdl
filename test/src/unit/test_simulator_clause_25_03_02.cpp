@@ -49,4 +49,4 @@ TEST(InterfaceNamedBundleSim, NetDrivenThroughPortReachesSharedNet) {
   LowerRunAndCheck(f, design, {{"top.sb_intf.data", 0xA5u}});
 }
 
-}
+}  // namespace

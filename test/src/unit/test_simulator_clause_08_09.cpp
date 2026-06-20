@@ -116,4 +116,4 @@ TEST(ClassSim, LowererInitializesStaticPropertiesToZero) {
   EXPECT_EQ(info->static_properties.count("inst"), 0u);
 }
 
-}
+}  // namespace

@@ -42,7 +42,8 @@ void RunRefOpThenWrite(SimFixture& f, std::vector<Stmt*> op_stmts,
   EvalExpr(call, f.ctx, f.arena);
 }
 
-// --- Rule A: methods outdate only the elements they remove --------------------
+// --- Rule A: methods outdate only the elements they remove
+// --------------------
 
 // delete(idx) removes the indexed element, so a reference held to it is
 // outdated and the later write through that reference is dropped.
@@ -52,8 +53,8 @@ TEST(QueueRefPersistence, DeleteOutdatesRemovedElementRef) {
 
   RunRefOpThenWrite(
       f,
-      {MakeExprStmt(f.arena,
-                    MakeMethodCall(f.arena, "q", "delete", {MakeInt(f.arena, 1)}))},
+      {MakeExprStmt(f.arena, MakeMethodCall(f.arena, "q", "delete",
+                                            {MakeInt(f.arena, 1)}))},
       MakeSelect(f.arena, "q", 1));
 
   ASSERT_EQ(q->elements.size(), 2u);
@@ -69,8 +70,8 @@ TEST(QueueRefPersistence, DeleteLeavesOtherElementRefValid) {
 
   RunRefOpThenWrite(
       f,
-      {MakeExprStmt(f.arena,
-                    MakeMethodCall(f.arena, "q", "delete", {MakeInt(f.arena, 1)}))},
+      {MakeExprStmt(f.arena, MakeMethodCall(f.arena, "q", "delete",
+                                            {MakeInt(f.arena, 1)}))},
       MakeSelect(f.arena, "q", 0));
 
   ASSERT_EQ(q->elements.size(), 2u);
@@ -89,7 +90,8 @@ TEST(QueueRefPersistence, DeleteAllOutdatesAllRefs) {
       f, {MakeExprStmt(f.arena, MakeMethodCall(f.arena, "q", "delete", {}))},
       MakeSelect(f.arena, "q", 1));
 
-  EXPECT_EQ(q->elements.size(), 0u);  // all removed: ref outdated, write dropped
+  EXPECT_EQ(q->elements.size(),
+            0u);  // all removed: ref outdated, write dropped
 }
 
 // pop_front removes the first element, outdating a reference to it.
@@ -157,9 +159,9 @@ TEST(QueueRefPersistence, InsertNeverOutdatesExistingRef) {
 
   RunRefOpThenWrite(
       f,
-      {MakeExprStmt(f.arena, MakeMethodCall(f.arena, "q", "insert",
-                                            {MakeInt(f.arena, 0),
-                                             MakeInt(f.arena, 5)}))},
+      {MakeExprStmt(
+          f.arena, MakeMethodCall(f.arena, "q", "insert",
+                                  {MakeInt(f.arena, 0), MakeInt(f.arena, 5)}))},
       MakeSelect(f.arena, "q", 1));
 
   ASSERT_EQ(q->elements.size(), 4u);
@@ -202,8 +204,8 @@ TEST(QueueRefPersistence, PushFrontNeverOutdatesExistingRef) {
   EXPECT_EQ(q->elements[3].ToUint64(), 30u);
 }
 
-// Consequence noted in §7.10.3: insert/push_front on a *bounded* queue whose new
-// size would exceed the bound deletes the highest-numbered element, so a
+// Consequence noted in §7.10.3: insert/push_front on a *bounded* queue whose
+// new size would exceed the bound deletes the highest-numbered element, so a
 // reference held to that dropped tail element becomes outdated.
 TEST(QueueRefPersistence, BoundedInsertOutdatesDroppedTailRef) {
   SimFixture f;
@@ -214,9 +216,9 @@ TEST(QueueRefPersistence, BoundedInsertOutdatesDroppedTailRef) {
 
   RunRefOpThenWrite(
       f,
-      {MakeExprStmt(f.arena, MakeMethodCall(f.arena, "q", "insert",
-                                            {MakeInt(f.arena, 0),
-                                             MakeInt(f.arena, 5)}))},
+      {MakeExprStmt(
+          f.arena, MakeMethodCall(f.arena, "q", "insert",
+                                  {MakeInt(f.arena, 0), MakeInt(f.arena, 5)}))},
       MakeSelect(f.arena, "q", 2));
 
   ASSERT_EQ(q->elements.size(), 3u);
@@ -271,7 +273,8 @@ TEST(QueueRefPersistence, BoundedPushBackNeverOutdatesExistingRef) {
   EXPECT_EQ(q->elements[2].ToUint64(), 99u);  // element 30's ref survived
 }
 
-// --- Rule B: assigning the entire queue outdates every element reference ------
+// --- Rule B: assigning the entire queue outdates every element reference
+// ------
 
 // Updating a queue with an unpacked array concatenation that names the queue
 // itself (the §7.10.4 idiom) is an assignment whose target is the whole queue,

@@ -78,4 +78,4 @@ TEST(IpcSync, MailboxParameterizedTransferNeverTypeErrors) {
   EXPECT_EQ(msg, 0xABu);
 }
 
-}
+}  // namespace

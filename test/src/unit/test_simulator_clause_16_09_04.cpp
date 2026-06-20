@@ -51,8 +51,8 @@ TEST(SvaEngine, GotoRepetitionEndsAtMatch) {
   EXPECT_FALSE(MatchGotoRepetition(seq, {0, 1, 0}));
 }
 
-// §16.9.4: $rose_gclk/$fell_gclk report the LSB changing to 1 / to 0 between the
-// preceding and current global clock ticks.
+// §16.9.4: $rose_gclk/$fell_gclk report the LSB changing to 1 / to 0 between
+// the preceding and current global clock ticks.
 TEST(GlobalClockingSampledValue, PastEdgeFunctions) {
   EXPECT_TRUE(RoseGclk(/*prev_lsb=*/0, /*cur_lsb=*/1));
   EXPECT_FALSE(RoseGclk(/*prev_lsb=*/1, /*cur_lsb=*/1));
@@ -60,8 +60,8 @@ TEST(GlobalClockingSampledValue, PastEdgeFunctions) {
   EXPECT_FALSE(FellGclk(/*prev_lsb=*/0, /*cur_lsb=*/0));
 }
 
-// §16.9.4: $stable_gclk reports the whole expression unchanged and $changed_gclk
-// reports it changed across global clock ticks.
+// §16.9.4: $stable_gclk reports the whole expression unchanged and
+// $changed_gclk reports it changed across global clock ticks.
 TEST(GlobalClockingSampledValue, PastStableAndChanged) {
   EXPECT_TRUE(StableGclk(/*prev=*/5, /*cur=*/5));
   EXPECT_FALSE(StableGclk(/*prev=*/5, /*cur=*/6));
@@ -146,4 +146,4 @@ TEST(GlobalClockingSampledValue, EvalWithMissingArgumentIsDefined) {
   EXPECT_EQ(EvalExpr(past, f.ctx, f.arena).ToUint64(), 0u);
 }
 
-}
+}  // namespace

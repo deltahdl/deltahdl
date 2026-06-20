@@ -7,14 +7,15 @@ namespace delta {
 namespace {
 
 // §37.5 Module: the VPI object model for a module instance. Most of the diagram
-// is structural and is walked by the generic object-model machinery, carrying no
-// rule of its own here: the default/global clocking blocks (vpiDefaultClocking,
-// vpiGlobalClocking), the default disable-iff expr/distribution
-// (vpiDefaultDisableIff), the instance array and module array the module belongs
-// to, and the one-to-many vpiInternalScope edges to the module's scopes, ports,
-// interfaces, processes, cont assigns, nested modules, primitives, mod paths,
-// timing checks, def params, io decls, alias statements, and clocking blocks are
-// all reached through vpi_handle / vpi_iterate without a clause-specific rule.
+// is structural and is walked by the generic object-model machinery, carrying
+// no rule of its own here: the default/global clocking blocks
+// (vpiDefaultClocking, vpiGlobalClocking), the default disable-iff
+// expr/distribution (vpiDefaultDisableIff), the instance array and module array
+// the module belongs to, and the one-to-many vpiInternalScope edges to the
+// module's scopes, ports, interfaces, processes, cont assigns, nested modules,
+// primitives, mod paths, timing checks, def params, io decls, alias statements,
+// and clocking blocks are all reached through vpi_handle / vpi_iterate without
+// a clause-specific rule.
 //
 // This clause carries its own normative content in two numbered Details and two
 // module-specific diagram properties, each observed below through the public
@@ -22,7 +23,8 @@ namespace {
 //   D1 - top-level modules are reached by iterating vpiModule with a NULL
 //        reference object; a module nested in another scope is excluded.
 //   D2 - vpiIndex from a module reaches the index expression that locates it
-//        within a module array, or NULL when the module is not an array element.
+//        within a module array, or NULL when the module is not an array
+//        element.
 //   vpiTopModule  - a module reports whether it is a top-level module.
 //   vpiDefDecayTime - a module reports its default net decay time.
 

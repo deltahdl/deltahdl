@@ -42,7 +42,6 @@ TEST(DesignElementLexing, ConfigKeywordRecognised) {
 }
 
 TEST(DesignElementLexing, AllSevenKeywordsAreDistinctTokenKinds) {
-
   auto m = LexOne("module").token.kind;
   auto p = LexOne("program").token.kind;
   auto i = LexOne("interface").token.kind;
@@ -59,4 +58,4 @@ TEST(DesignElementLexing, AllSevenKeywordsAreDistinctTokenKinds) {
   }
 }
 
-}
+}  // namespace

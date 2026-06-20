@@ -288,4 +288,4 @@ TEST(Elaboration, EnumRelationalCompareWithInt_Ok) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-}
+}  // namespace

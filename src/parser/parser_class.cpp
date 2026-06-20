@@ -45,9 +45,7 @@ ModportPort Parser::ParseModportTfPort(bool is_import) {
     item->loc = CurrentLoc();
     Consume();
     item->name = Expect(TokenKind::kIdentifier).text;
-    if (Check(TokenKind::kLParen))
-
-      item->func_args = ParseFunctionArgs( false);
+    if (Check(TokenKind::kLParen)) item->func_args = ParseFunctionArgs(false);
     port.prototype = item;
     port.name = item->name;
   } else if (Check(TokenKind::kKwFunction)) {
@@ -57,9 +55,7 @@ ModportPort Parser::ParseModportTfPort(bool is_import) {
     Consume();
     item->data_type = ParseFunctionReturnType();
     item->name = Expect(TokenKind::kIdentifier).text;
-    if (Check(TokenKind::kLParen))
-
-      item->func_args = ParseFunctionArgs( false);
+    if (Check(TokenKind::kLParen)) item->func_args = ParseFunctionArgs(false);
     port.prototype = item;
     port.name = item->name;
   } else {
@@ -186,7 +182,6 @@ void Parser::ParseExtendsArgList(ClassDecl* decl) {
 }
 
 void Parser::ParseClassExtendsClause(ClassDecl* decl, bool is_implements) {
-
   do {
     auto name = Expect(TokenKind::kIdentifier).text;
     while (Match(TokenKind::kColonColon)) {
@@ -280,7 +275,6 @@ bool Parser::TryConsumeClassQualifier(ClassMember* m, TokenKind kw,
 }
 
 bool Parser::TryConsumeAccessQualifier(ClassMember* m) {
-
   if (Check(TokenKind::kKwLocal)) {
     if (m->is_protected)
       diag_.Error(CurrentLoc(),
@@ -304,7 +298,6 @@ bool Parser::TryConsumeAccessQualifier(ClassMember* m) {
 }
 
 bool Parser::TryConsumeRandQualifier(ClassMember* m) {
-
   if (Check(TokenKind::kKwRand)) {
     if (m->is_randc)
       diag_.Error(CurrentLoc(), "cannot combine 'rand' and 'randc' qualifiers");
@@ -342,8 +335,7 @@ bool Parser::ParseClassQualifiers(ClassMember* m) {
       continue;
     }
     if (TryConsumeRandQualifier(m)) continue;
-    if (TryConsumeClassQualifier(m, TokenKind::kKwConst,
-                                 &ClassMember::is_const,
+    if (TryConsumeClassQualifier(m, TokenKind::kKwConst, &ClassMember::is_const,
                                  "duplicate 'const' qualifier"))
       continue;
     if (Match(TokenKind::kKwExtern)) {
@@ -359,7 +351,6 @@ bool Parser::ParseClassQualifiers(ClassMember* m) {
 }
 
 void Parser::ValidateClassMethod(ClassMember* member) {
-
   if (member->method->is_static) {
     diag_.Error(member->method->loc,
                 "class method shall not have static lifetime");
@@ -456,7 +447,6 @@ bool Parser::TryParseKeywordClassMember(std::vector<ClassMember*>& members,
 }
 
 void Parser::ParseClassMembers(std::vector<ClassMember*>& members) {
-
   ParseAttributes();
 
   if (Check(TokenKind::kKwImport)) {
@@ -562,14 +552,16 @@ ClassMember* Parser::ParseConstraintStub(ClassMember* member) {
       // 18.5.9: 'solve solve_before_list before solve_before_list ;' defines a
       // partial ordering on the evaluation of random variables. Record the two
       // lists on the member so the elaborator can enforce the ordering
-      // restrictions and reject circular dependencies; the statement is consumed
-      // through its terminating ';' before the surrounding scan resumes.
+      // restrictions and reject circular dependencies; the statement is
+      // consumed through its terminating ';' before the surrounding scan
+      // resumes.
       CheckSolveBeforeConstraint(member);
       prev_was_qualifier = false;
     } else if (Check(TokenKind::kKwSoft)) {
-      // 18.5.13.1: 'soft' introduces a soft constraint ('soft expression_or_dist
-      // ;'). Begin collecting the bare local variables its expression names; the
-      // collection ends at the constraint_expression's terminating ';'.
+      // 18.5.13.1: 'soft' introduces a soft constraint ('soft
+      // expression_or_dist
+      // ;'). Begin collecting the bare local variables its expression names;
+      // the collection ends at the constraint_expression's terminating ';'.
       Consume();
       in_soft = true;
       prev_was_qualifier = false;
@@ -742,7 +734,8 @@ void Parser::CheckForeachConstraintHeader(ClassMember* member) {
 // array built-in such as size()) is not a simple local variable; the elaborator
 // uses that flag to confine the rand/integral restrictions to ordinary
 // variables. The list ends at 'before', ';', or the constraint block's '}'.
-void Parser::ParseSolveBeforeList(std::vector<ConstraintSolveBeforeEntry>& out) {
+void Parser::ParseSolveBeforeList(
+    std::vector<ConstraintSolveBeforeEntry>& out) {
   while (!AtEnd()) {
     ConstraintSolveBeforeEntry entry;
     bool qualified = false;  // a '.' or '::' qualifier was seen
@@ -797,8 +790,7 @@ void Parser::CheckConstraintExprToken(const Token& tok) {
     case TokenKind::kUnbasedUnsizedLiteral:
       // 18.3: 4-state values (x or z) are illegal in a constraint.
       if (LiteralHasFourStateDigit(tok.text)) {
-        diag_.Error(tok.loc,
-                    "4-state value is not allowed in a constraint");
+        diag_.Error(tok.loc, "4-state value is not allowed in a constraint");
       }
       break;
     default:
@@ -806,4 +798,4 @@ void Parser::CheckConstraintExprToken(const Token& tok) {
   }
 }
 
-}
+}  // namespace delta

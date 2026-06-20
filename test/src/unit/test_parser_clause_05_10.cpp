@@ -80,4 +80,4 @@ TEST(StructLiteralParsing, StructureLiteralWithDefaultParses) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

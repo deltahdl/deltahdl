@@ -167,4 +167,4 @@ TEST(Tri0Tri1NetStrengths, Tri1WideUndrivenAllBitsOne) {
   EXPECT_EQ(net.resolved_strength.s1_hi, Strength::kPull);
 }
 
-}
+}  // namespace

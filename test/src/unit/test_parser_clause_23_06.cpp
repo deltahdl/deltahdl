@@ -101,4 +101,4 @@ TEST(HierarchicalNameParsing, HierarchicalReferenceWithInstanceSelect) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

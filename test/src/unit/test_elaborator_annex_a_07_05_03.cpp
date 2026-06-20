@@ -56,4 +56,4 @@ TEST(TimingCheckEventDefElaboration, TerminalBitSelectElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

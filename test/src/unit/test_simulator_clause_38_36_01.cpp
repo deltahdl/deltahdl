@@ -14,7 +14,8 @@ namespace {
 // vpi_register_cb(). The single registration-time rule this subclause's text
 // states - distinct from the firing semantics of the individual reasons - is
 // that a cbForce, cbRelease, or cbDisable callback may not be placed on a
-// variable bit-select. These tests observe vpi_register_cb() applying that rule.
+// variable bit-select. These tests observe vpi_register_cb() applying that
+// rule.
 class VpiSimEventCb : public ::testing::Test {
  protected:
   void SetUp() override { SetGlobalVpiContext(&vpi_ctx_); }

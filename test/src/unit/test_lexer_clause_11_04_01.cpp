@@ -99,4 +99,4 @@ TEST(AssignmentOperatorLexing, CompoundOpsDistinctFromBinaryCounterparts) {
   EXPECT_EQ(tokens[5].kind, TokenKind::kLtLtLtEq);
 }
 
-}
+}  // namespace

@@ -108,4 +108,4 @@ TEST(PrinttimescaleSysTask, TaskDisplaysReportLineToStdout) {
   EXPECT_EQ(out, "Time scale of (a_dat) is 1ms / 1us\n");
 }
 
-}
+}  // namespace

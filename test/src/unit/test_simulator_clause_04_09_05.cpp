@@ -61,16 +61,14 @@ TEST(BidirectionalSwitchNetwork,
 }
 
 TEST(BidirectionalSwitchNetwork, AllSixSourceElementsAreBidirectional) {
-  for (auto kind :
-       {BidirSwitchKind::kTran, BidirSwitchKind::kRtran,
-        BidirSwitchKind::kTranif0, BidirSwitchKind::kTranif1,
-        BidirSwitchKind::kRtranif0, BidirSwitchKind::kRtranif1}) {
+  for (auto kind : {BidirSwitchKind::kTran, BidirSwitchKind::kRtran,
+                    BidirSwitchKind::kTranif0, BidirSwitchKind::kTranif1,
+                    BidirSwitchKind::kRtranif0, BidirSwitchKind::kRtranif1}) {
     auto np = MakeNetPair(1);
-    Logic4Word ctrl =
-        (kind == BidirSwitchKind::kTranif0 ||
-         kind == BidirSwitchKind::kRtranif0)
-            ? Logic4Word{0, 0}
-            : Logic4Word{1, 0};
+    Logic4Word ctrl = (kind == BidirSwitchKind::kTranif0 ||
+                       kind == BidirSwitchKind::kRtranif0)
+                          ? Logic4Word{0, 0}
+                          : Logic4Word{1, 0};
     std::vector<BidirSwitchInst> sw;
     sw.push_back({&np.a, &np.b, kind, ctrl, false});
     ResolveBidirSwitchNetwork(sw, np.arena);
@@ -147,8 +145,7 @@ TEST(BidirectionalSwitchNetwork, UserDefinedNetZControlIsOff) {
   EXPECT_EQ(ValOf(*np.vb), kValZ);
 }
 
-TEST(BidirectionalSwitchNetwork,
-     ConductsAlwaysForTranAndRtranIgnoringControl) {
+TEST(BidirectionalSwitchNetwork, ConductsAlwaysForTranAndRtranIgnoringControl) {
   EXPECT_TRUE(BidirSwitchConducts(BidirSwitchKind::kTran, {0, 0}));
   EXPECT_TRUE(BidirSwitchConducts(BidirSwitchKind::kTran, {1, 0}));
   EXPECT_TRUE(BidirSwitchConducts(BidirSwitchKind::kTran, {0, 1}));
@@ -169,4 +166,4 @@ TEST(BidirectionalSwitchNetwork,
   EXPECT_TRUE(BidirSwitchControlIsUnknown(BidirSwitchKind::kRtranif1, {1, 1}));
 }
 
-}
+}  // namespace

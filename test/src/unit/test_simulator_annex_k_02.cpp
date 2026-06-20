@@ -84,7 +84,6 @@ TEST(VpiConstantAndStructSim, VpiTimeDefaultInit) {
   EXPECT_DOUBLE_EQ(time.real, 0.0);
 }
 
-
 TEST(VpiUserHeader, Constants01) {
   EXPECT_EQ(vpiAlways, 1);
   EXPECT_EQ(vpiAssignStmt, 2);
@@ -641,7 +640,8 @@ TEST(VpiUserHeader, EdgeBitsComposeIntoPosNegAnyEdge) {
   EXPECT_EQ(vpiPosedge, vpiEdgex1 | vpiEdge01 | vpiEdge0x);
   EXPECT_EQ(vpiNegedge, vpiEdgex0 | vpiEdge10 | vpiEdge1x);
   EXPECT_EQ(vpiAnyEdge, vpiPosedge | vpiNegedge);
-  int all = vpiEdge01 | vpiEdge10 | vpiEdge0x | vpiEdgex1 | vpiEdge1x | vpiEdgex0;
+  int all =
+      vpiEdge01 | vpiEdge10 | vpiEdge0x | vpiEdgex1 | vpiEdge1x | vpiEdgex0;
   EXPECT_EQ(all, 0x3F);
 }
 
@@ -666,4 +666,4 @@ TEST(VpiUserHeader, StrengthMasksOccupyDistinctBits) {
   EXPECT_EQ(vpiSupplyDrive & vpiStrongDrive, 0);
 }
 
-}
+}  // namespace

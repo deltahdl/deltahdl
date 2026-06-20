@@ -219,4 +219,4 @@ TEST(GateInstStrengthParsing, MissingCommaBetweenStrengthsRejected) {
   EXPECT_TRUE(r.has_errors);
 }
 
-}
+}  // namespace

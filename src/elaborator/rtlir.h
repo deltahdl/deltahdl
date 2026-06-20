@@ -249,4 +249,4 @@ struct RtlirDesign {
   SourceLoc last_elab_severity_loc;
 };
 
-}
+}  // namespace delta

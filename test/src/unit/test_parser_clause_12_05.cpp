@@ -480,4 +480,4 @@ TEST(CaseSyntaxParsing, SingleDefaultItemAccepted) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}
+}  // namespace

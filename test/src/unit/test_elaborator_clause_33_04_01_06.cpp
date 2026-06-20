@@ -126,4 +126,4 @@ TEST(ConfigUseClause, UseToMissingTargetLeavesInstanceUnbound) {
   EXPECT_EQ(top->children[0].resolved, nullptr);
 }
 
-}
+}  // namespace

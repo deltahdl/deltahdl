@@ -16,4 +16,4 @@ TEST(DefaultPortValueParsing, AnsiPortWithDefault) {
   EXPECT_NE(r.cu->modules[0]->ports[0].default_value, nullptr);
 }
 
-}
+}  // namespace

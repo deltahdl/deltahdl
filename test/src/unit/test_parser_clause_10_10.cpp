@@ -66,4 +66,4 @@ TEST(UnpackedArrayConcatParsing, MixedScalarAndArrayItems) {
   EXPECT_EQ(stmt->rhs->elements[3]->text, "A3");
 }
 
-}
+}  // namespace

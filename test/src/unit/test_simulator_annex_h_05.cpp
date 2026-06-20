@@ -91,8 +91,8 @@ TEST(SvdpiIncludeFile, DefinesReferenceTypesForDataObjects) {
 // the file would not compile this translation unit otherwise. A representative
 // header is taken from each functional group of the interface.
 TEST(SvdpiIncludeFile, ProvidesInterfaceFunctionHeaders) {
-  // Version, scope access, bit-select access, and array querying each contribute
-  // at least one declared header.
+  // Version, scope access, bit-select access, and array querying each
+  // contribute at least one declared header.
   const char* (*version)(void) = &svDpiVersion;
   svScope (*get_scope)(void) = &svGetScope;
   svBit (*get_bitsel)(const svBitVecVal*, int) = &svGetBitselBit;
@@ -128,17 +128,18 @@ TEST(SvdpiIncludeFile, DefinesHelperMacrosAndConstants) {
 #endif
 }
 
-// §H.5: the content of svdpi.h does not depend on any particular implementation,
-// so all simulators shall use the same file. This is observable in three ways:
-// the file is a single guarded unit (re-inclusion is idempotent, so there is one
-// canonical file); its canonical content is available with no implementation- or
-// vendor-selection macro defined by the consumer; and the canonical
-// representation types resolve to fixed-width standard integer types, giving
-// every consumer the same representation regardless of which simulator built
-// against the header.
+// §H.5: the content of svdpi.h does not depend on any particular
+// implementation, so all simulators shall use the same file. This is observable
+// in three ways: the file is a single guarded unit (re-inclusion is idempotent,
+// so there is one canonical file); its canonical content is available with no
+// implementation- or vendor-selection macro defined by the consumer; and the
+// canonical representation types resolve to fixed-width standard integer types,
+// giving every consumer the same representation regardless of which simulator
+// built against the header.
 TEST(SvdpiIncludeFile, ContentIsImplementationIndependent) {
   // One canonical, guarded file: the include guard is set after inclusion, and
-  // re-including is a no-op (the guard prevents a second, divergent definition).
+  // re-including is a no-op (the guard prevents a second, divergent
+  // definition).
 #ifdef INCLUDED_SVDPI
   SUCCEED();
 #else

@@ -126,18 +126,17 @@ TEST(LoopStatementSim, DoWhileXConditionOneIteration) {
 TEST(LoopStatementSim, DoWhileInFunctionRunsBodyBeforeTest) {
   // count_up(0): the body increments once before the while test reads the
   // updated value (1 < 0 is false), so the function returns 1, not 0.
-  EXPECT_EQ(RunAndGet(
-                "module t;\n"
-                "  logic [31:0] result;\n"
-                "  function automatic int count_up(input int n);\n"
-                "    count_up = 0;\n"
-                "    do count_up = count_up + 1; while (count_up < n);\n"
-                "  endfunction\n"
-                "  initial begin\n"
-                "    result = count_up(0);\n"
-                "  end\n"
-                "endmodule\n",
-                "result"),
+  EXPECT_EQ(RunAndGet("module t;\n"
+                      "  logic [31:0] result;\n"
+                      "  function automatic int count_up(input int n);\n"
+                      "    count_up = 0;\n"
+                      "    do count_up = count_up + 1; while (count_up < n);\n"
+                      "  endfunction\n"
+                      "  initial begin\n"
+                      "    result = count_up(0);\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
             1u);
 }
 
@@ -198,4 +197,4 @@ TEST(LoopStatementSim, DoWhileMultiBitConditionIsTruthy) {
   EXPECT_EQ(iters->value.ToUint64(), 5u);
 }
 
-}
+}  // namespace

@@ -46,4 +46,4 @@ TEST(AssertionStatementKinds, ConcurrentTimingImpliesSampledValueSemantics) {
   EXPECT_FALSE(ConcurrentTimingUsesSampledValues(AssertionTiming::kImmediate));
 }
 
-}
+}  // namespace

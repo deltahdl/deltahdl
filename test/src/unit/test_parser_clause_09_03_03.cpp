@@ -196,4 +196,4 @@ TEST(BlockStartFinishParsing, EmptyNestedBlocks) {
   EXPECT_EQ(body->stmts[1]->stmts.size(), 0u);
 }
 
-}
+}  // namespace

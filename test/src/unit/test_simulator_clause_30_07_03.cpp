@@ -73,4 +73,4 @@ TEST(SdfPulseLimitAnnotation, SdfWinsOverGlobalAndPathpulseCombined) {
   }
 }
 
-}
+}  // namespace

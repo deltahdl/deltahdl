@@ -243,4 +243,4 @@ std::vector<EventExpr> InferSensitivity(const Stmt* body, Arena& arena,
   return events;
 }
 
-}
+}  // namespace delta

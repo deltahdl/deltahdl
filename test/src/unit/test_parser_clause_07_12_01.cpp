@@ -215,4 +215,4 @@ TEST(AggregateTypeParsing, ArrayLocatorUniqueIndexWithClause) {
   EXPECT_NE(stmt->rhs->with_expr, nullptr);
 }
 
-}
+}  // namespace

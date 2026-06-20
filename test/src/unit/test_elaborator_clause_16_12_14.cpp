@@ -63,7 +63,8 @@ TEST(AbortProperty, AbortConditionForbidsLocalVariablesTriggeredAndMatched) {
                                             /*matched=*/false));
   EXPECT_FALSE(AbortConditionContentIsLegal(/*local=*/false, /*triggered=*/true,
                                             /*matched=*/false));
-  EXPECT_FALSE(AbortConditionContentIsLegal(/*local=*/false, /*triggered=*/false,
+  EXPECT_FALSE(AbortConditionContentIsLegal(/*local=*/false,
+                                            /*triggered=*/false,
                                             /*matched=*/true));
 }
 
@@ -71,12 +72,12 @@ TEST(AbortProperty, NonSampledSampledValueFunctionsRequireExplicitClock) {
   // §16.12.14: the abort condition may contain sampled value functions (see
   // §16.9.3); when a function other than $sampled is used the clock argument
   // shall be explicitly specified.
-  EXPECT_FALSE(
-      AbortConditionSampledValueRequiresExplicitClock(SampledValueFunction::kSampled));
-  EXPECT_TRUE(
-      AbortConditionSampledValueRequiresExplicitClock(SampledValueFunction::kRose));
-  EXPECT_TRUE(
-      AbortConditionSampledValueRequiresExplicitClock(SampledValueFunction::kPast));
+  EXPECT_FALSE(AbortConditionSampledValueRequiresExplicitClock(
+      SampledValueFunction::kSampled));
+  EXPECT_TRUE(AbortConditionSampledValueRequiresExplicitClock(
+      SampledValueFunction::kRose));
+  EXPECT_TRUE(AbortConditionSampledValueRequiresExplicitClock(
+      SampledValueFunction::kPast));
 
   // $sampled is well formed with or without an explicit clock argument.
   EXPECT_TRUE(AbortConditionSampledValueClockIsWellFormed(
@@ -92,15 +93,17 @@ TEST(AbortProperty, NonSampledSampledValueFunctionsRequireExplicitClock) {
 
 TEST(AbortProperty, SampledValueFunctionsArePermittedInAbortConditions) {
   // §16.12.14: the abort condition may contain sampled value functions (see
-  // §16.9.3). None of them is categorically forbidden — each is well formed once
-  // its clock-argument requirement is satisfied (only $sampled may omit it).
+  // §16.9.3). None of them is categorically forbidden — each is well formed
+  // once its clock-argument requirement is satisfied (only $sampled may omit
+  // it).
   for (SampledValueFunction fn :
        {SampledValueFunction::kSampled, SampledValueFunction::kRose,
         SampledValueFunction::kFell, SampledValueFunction::kStable,
         SampledValueFunction::kChanged, SampledValueFunction::kPast}) {
     const bool clock_explicit =
         AbortConditionSampledValueRequiresExplicitClock(fn);
-    EXPECT_TRUE(AbortConditionSampledValueClockIsWellFormed(fn, clock_explicit));
+    EXPECT_TRUE(
+        AbortConditionSampledValueClockIsWellFormed(fn, clock_explicit));
   }
 }
 

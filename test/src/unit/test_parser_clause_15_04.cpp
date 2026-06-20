@@ -60,4 +60,4 @@ TEST(MailboxParser, MethodCallsInInitialBlock) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}
+}  // namespace

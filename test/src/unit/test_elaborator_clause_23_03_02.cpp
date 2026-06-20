@@ -150,8 +150,7 @@ TEST(ModuleInstantiationElaboration, PortConnectionsToPortlessModuleWarns) {
   EXPECT_GT(f.diag.WarningCount(), 0u);
 }
 
-TEST(ModuleInstantiationElaboration,
-     EmptyParensOnPortlessModuleElaborates) {
+TEST(ModuleInstantiationElaboration, EmptyParensOnPortlessModuleElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module child; endmodule\n"
@@ -165,4 +164,4 @@ TEST(ModuleInstantiationElaboration,
   EXPECT_NE(design->top_modules[0]->children[0].resolved, nullptr);
 }
 
-}
+}  // namespace

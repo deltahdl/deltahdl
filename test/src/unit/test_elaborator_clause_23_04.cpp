@@ -278,4 +278,4 @@ TEST(NestedModuleElaboration, ImplicitInstanceElaboratesNestedBody) {
   EXPECT_TRUE(has_inner_net);
 }
 
-}
+}  // namespace

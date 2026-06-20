@@ -236,4 +236,4 @@ TEST(LexicalConventionLexing, BlockCommentSpanningMultipleLinesAsSeparator) {
   EXPECT_EQ(tokens[2].kind, TokenKind::kEof);
 }
 
-}
+}  // namespace

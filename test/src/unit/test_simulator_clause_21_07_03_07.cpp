@@ -66,7 +66,8 @@ TEST_F(ExtendedVcdControlRules, AppliesControlTaskNamingOpenedFile) {
              f.ctx, f.arena);
     EXPECT_FALSE(vcd.IsEnabled());  // matched name: suspend applied
   }
-  EXPECT_NE(ReadVcd().find("$dumpoff"), std::string::npos);  // checkpoint written
+  EXPECT_NE(ReadVcd().find("$dumpoff"),
+            std::string::npos);  // checkpoint written
 }
 
 // §21.7.3.7: for the tasks that have only optional arguments, issuing the task
@@ -94,7 +95,8 @@ TEST_F(ExtendedVcdControlRules, NoArgumentFormRunsDefaultAction) {
 // name to mismatch, so a control task naming a file is not ignored but acts on
 // the lone dump. Here the writer is attached without any $dumpports call, so a
 // $dumpportsoff naming an otherwise-unknown file still suspends it.
-TEST_F(ExtendedVcdControlRules, NamedTaskAppliesWhenNoDumpportsFilenameSpecified) {
+TEST_F(ExtendedVcdControlRules,
+       NamedTaskAppliesWhenNoDumpportsFilenameSpecified) {
   SimFixture f;
   auto* clk = MakeVar(f, "clk", 1, 1);
   {
@@ -127,8 +129,8 @@ TEST_F(ExtendedVcdControlRules, LimitTaskAppliesWithoutFilename) {
     vcd.EndDefinitions();
     OpenPortsDump(f, vcd);  // registers the explicit file name "ports.vcd"
 
-    EvalExpr(MkSysCall(f.arena, "$dumpportslimit", {MkInt(f.arena, 200)}), f.ctx,
-             f.arena);
+    EvalExpr(MkSysCall(f.arena, "$dumpportslimit", {MkInt(f.arena, 200)}),
+             f.ctx, f.arena);
     data->prev_value = MakeLogic4VecVal(f.arena, 8, 0x00);
     for (uint64_t t = 1; t <= 40; ++t) {
       data->value = MakeLogic4VecVal(f.arena, 8, t & 0xFF);
@@ -143,9 +145,9 @@ TEST_F(ExtendedVcdControlRules, LimitTaskAppliesWithoutFilename) {
 }
 
 // §21.7.3.7: the ignore rule reaches $dumpportslimit too, and the filename it
-// matches is the trailing argument that follows the filesize. Naming an unopened
-// file there leaves the limit unset, so dumping continues unbounded: no limit
-// comment appears and the late value changes are retained.
+// matches is the trailing argument that follows the filesize. Naming an
+// unopened file there leaves the limit unset, so dumping continues unbounded:
+// no limit comment appears and the late value changes are retained.
 TEST_F(ExtendedVcdControlRules, LimitTaskIgnoredWhenTrailingFilenameUnmatched) {
   SimFixture f;
   auto* data = MakeVar(f, "data", 8, 0x00);
@@ -169,7 +171,7 @@ TEST_F(ExtendedVcdControlRules, LimitTaskIgnoredWhenTrailingFilenameUnmatched) {
   }
   auto content = ReadVcd();
   EXPECT_EQ(content.find("$comment"), std::string::npos);  // limit never set
-  EXPECT_NE(content.find("#400\n"), std::string::npos);    // late dumps retained
+  EXPECT_NE(content.find("#400\n"), std::string::npos);  // late dumps retained
 }
 
 }  // namespace

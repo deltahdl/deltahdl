@@ -12,8 +12,8 @@ namespace {
 // §19.4.1: when a derived covergroup defines a coverpoint whose name matches a
 // base coverpoint, that base coverpoint no longer contributes to the coverage
 // computation. Here the base covergroup has an uncovered coverpoint "a" and a
-// covered coverpoint "b" (50% before). Overriding "a" drops it from the average,
-// leaving only "b" — coverage becomes 100%.
+// covered coverpoint "b" (50% before). Overriding "a" drops it from the
+// average, leaving only "b" — coverage becomes 100%.
 TEST(Coverage, DerivedOverridesBaseCoverpoint) {
   CoverageDB db;
   CoverGroup* base = db.CreateGroup("base_cg");
@@ -100,4 +100,4 @@ TEST(Coverage, DerivedAndBaseAreSeparateTypesForGetCoverage) {
   EXPECT_TRUE(CoverageDB::CovergroupTypesAggregate("base_cg", "base_cg"));
 }
 
-}
+}  // namespace

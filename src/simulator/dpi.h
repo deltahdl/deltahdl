@@ -73,9 +73,9 @@ class DpiContext {
 //
 // Report the current simulation time for the design as a whole (the time a NULL
 // svScope selects). When want_scaled_real is true the time scaled to the
-// simulation time unit is written to *real; otherwise the 64-bit simulation-time
-// count is split into *high/*low. Equivalent to vpi_get_time() with a null
-// object.
+// simulation time unit is written to *real; otherwise the 64-bit
+// simulation-time count is split into *high/*low. Equivalent to vpi_get_time()
+// with a null object.
 void DpiGetSimTime(bool want_scaled_real, uint32_t* high, uint32_t* low,
                    double* real);
 // The design-wide simulation time unit and precision, equivalent to the values
@@ -83,4 +83,4 @@ void DpiGetSimTime(bool want_scaled_real, uint32_t* high, uint32_t* low,
 int32_t DpiGetSimTimeUnit();
 int32_t DpiGetSimTimePrecision();
 
-}
+}  // namespace delta

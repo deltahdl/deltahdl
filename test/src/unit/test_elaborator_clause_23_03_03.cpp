@@ -107,4 +107,4 @@ TEST(PortConnectionRulesElaboration, InputPortConnectionIsSourceToSink) {
   ASSERT_EQ(design->top_modules[0]->children.size(), 1u);
 }
 
-}
+}  // namespace

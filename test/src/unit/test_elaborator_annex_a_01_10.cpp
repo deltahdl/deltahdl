@@ -104,4 +104,4 @@ TEST(ConstraintElaboration, ConstraintWithComplexBlock) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

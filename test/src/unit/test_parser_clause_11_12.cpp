@@ -799,4 +799,4 @@ TEST(LetDeclParsing, LetArgsMixedPositionalAndNamed) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

@@ -194,4 +194,4 @@ TEST(Coverage, IllegalTransitionOccurrenceIssuesRuntimeError) {
   EXPECT_EQ(cp->bins[0].hit_count, 0u);
 }
 
-}
+}  // namespace

@@ -36,14 +36,14 @@ TEST(IfElseIfElaboration, AlwaysCombPriorityEncoder) {
 }
 
 TEST(IfElseIfElaboration, IfElseIfNoFinalElseElaborates) {
-  EXPECT_TRUE(ElabOk(
-      "module m;\n"
-      "  logic a, b, x;\n"
-      "  initial begin\n"
-      "    if (a) x = 1;\n"
-      "    else if (b) x = 0;\n"
-      "  end\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  logic a, b, x;\n"
+             "  initial begin\n"
+             "    if (a) x = 1;\n"
+             "    else if (b) x = 0;\n"
+             "  end\n"
+             "endmodule\n"));
 }
 
 TEST(IfElseIfElaboration, IfElseIfInInitialElaborates) {
@@ -62,4 +62,4 @@ TEST(IfElseIfElaboration, IfElseIfInInitialElaborates) {
   ASSERT_NE(design, nullptr);
 }
 
-}
+}  // namespace

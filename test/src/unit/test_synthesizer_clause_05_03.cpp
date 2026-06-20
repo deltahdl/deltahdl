@@ -41,16 +41,15 @@ TEST(WhiteSpaceSynthesis, ExcessiveWhitespaceSynthesizes) {
 
 TEST(WhiteSpaceSynthesis, CrlfDelimiterSynthesizes) {
   SynthFixture f;
-  auto* mod = ElaborateSrc(
-      f,
-      "module m;\r\n"
-      "  logic a;\r\n"
-      "  assign a = 1'b0;\r\n"
-      "endmodule\r\n");
+  auto* mod = ElaborateSrc(f,
+                           "module m;\r\n"
+                           "  logic a;\r\n"
+                           "  assign a = 1'b0;\r\n"
+                           "endmodule\r\n");
   ASSERT_NE(mod, nullptr);
   SynthLower synth(f.arena, f.diag);
   auto* aig = synth.Lower(mod);
   ASSERT_NE(aig, nullptr);
 }
 
-}
+}  // namespace

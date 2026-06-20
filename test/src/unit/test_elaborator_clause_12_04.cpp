@@ -32,7 +32,7 @@ TEST(ConditionalElaboration, BasicIfElseElaborates) {
   EXPECT_EQ(y->value.ToUint64(), 1u);
 }
 
-TEST(ConditionalElaboration,MatchesInIfElaborates) {
+TEST(ConditionalElaboration, MatchesInIfElaborates) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -48,70 +48,70 @@ TEST(ConditionalElaboration,MatchesInIfElaborates) {
 }
 
 TEST(ConditionalElaboration, IfElseInAlwaysComb) {
-  EXPECT_TRUE(ElabOk(
-      "module m;\n"
-      "  logic a, x;\n"
-      "  always_comb begin\n"
-      "    if (a) x = 1;\n"
-      "    else x = 0;\n"
-      "  end\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  logic a, x;\n"
+             "  always_comb begin\n"
+             "    if (a) x = 1;\n"
+             "    else x = 0;\n"
+             "  end\n"
+             "endmodule\n"));
 }
 
 TEST(ConditionalElaboration, IfWithTripleAndElaborates) {
-  EXPECT_TRUE(ElabOk(
-      "module m;\n"
-      "  logic a, b, x;\n"
-      "  initial begin\n"
-      "    if (a &&& b) x = 1;\n"
-      "  end\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  logic a, b, x;\n"
+             "  initial begin\n"
+             "    if (a &&& b) x = 1;\n"
+             "  end\n"
+             "endmodule\n"));
 }
 
 TEST(ConditionalElaboration, NestedIfInFunction) {
-  EXPECT_TRUE(ElabOk(
-      "module m;\n"
-      "  function int pick(input int a, input int b, input int sel);\n"
-      "    if (sel) return a;\n"
-      "    else return b;\n"
-      "  endfunction\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  function int pick(input int a, input int b, input int sel);\n"
+             "    if (sel) return a;\n"
+             "    else return b;\n"
+             "  endfunction\n"
+             "endmodule\n"));
 }
 
 TEST(ConditionalElaboration, IfWithoutElseElaborates) {
-  EXPECT_TRUE(ElabOk(
-      "module m;\n"
-      "  logic a, x;\n"
-      "  initial begin\n"
-      "    if (a) x = 1;\n"
-      "  end\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  logic a, x;\n"
+             "  initial begin\n"
+             "    if (a) x = 1;\n"
+             "  end\n"
+             "endmodule\n"));
 }
 
 TEST(ConditionalElaboration, BothBranchesNullElaborates) {
-  EXPECT_TRUE(ElabOk(
-      "module m;\n"
-      "  logic a;\n"
-      "  initial begin\n"
-      "    if (a) ;\n"
-      "    else ;\n"
-      "  end\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  logic a;\n"
+             "  initial begin\n"
+             "    if (a) ;\n"
+             "    else ;\n"
+             "  end\n"
+             "endmodule\n"));
 }
 
 TEST(ConditionalElaboration, NestedIfElseInInitial) {
-  EXPECT_TRUE(ElabOk(
-      "module m;\n"
-      "  logic a, b, x;\n"
-      "  initial begin\n"
-      "    if (a) begin\n"
-      "      if (b) x = 1;\n"
-      "      else x = 0;\n"
-      "    end else begin\n"
-      "      x = 0;\n"
-      "    end\n"
-      "  end\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  logic a, b, x;\n"
+             "  initial begin\n"
+             "    if (a) begin\n"
+             "      if (b) x = 1;\n"
+             "      else x = 0;\n"
+             "    end else begin\n"
+             "      x = 0;\n"
+             "    end\n"
+             "  end\n"
+             "endmodule\n"));
 }
 
-}
+}  // namespace

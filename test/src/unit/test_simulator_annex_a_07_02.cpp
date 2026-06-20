@@ -29,4 +29,4 @@ TEST_F(SpecifyTest, RuntimeMultiplePathDelays) {
   EXPECT_EQ(mgr.GetPathDelay("in2", "out2"), 8u);
 }
 
-}
+}  // namespace

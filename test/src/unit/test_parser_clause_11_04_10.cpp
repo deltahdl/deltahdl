@@ -44,4 +44,4 @@ TEST(OperatorParsing, BinaryArithShiftLeft) {
   EXPECT_EQ(rhs->op, TokenKind::kLtLtLt);
 }
 
-}
+}  // namespace

@@ -32,4 +32,4 @@ struct Liberty {
 
 Liberty ParseLiberty(std::string_view source);
 
-}
+}  // namespace delta

@@ -58,4 +58,4 @@ TEST(TypedefEnumSimulation, NamedEnumTypeReusedForMultipleVars) {
   EXPECT_EQ(rb->value.ToUint64(), 1u);
 }
 
-}
+}  // namespace

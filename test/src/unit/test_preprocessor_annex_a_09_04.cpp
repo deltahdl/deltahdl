@@ -36,4 +36,4 @@ TEST(WhiteSpacePreprocessor, EmptyInputPreprocessesCleanly) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-}
+}  // namespace

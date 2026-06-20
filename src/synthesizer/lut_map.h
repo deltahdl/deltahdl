@@ -32,4 +32,4 @@ class LutMapper {
   uint32_t lut_size_;
 };
 
-}
+}  // namespace delta

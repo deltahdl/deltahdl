@@ -9,4 +9,4 @@ TEST(InterfaceModport, ModportKeyword) {
   EXPECT_EQ(r.token.kind, TokenKind::kKwModport);
 }
 
-}
+}  // namespace

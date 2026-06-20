@@ -233,4 +233,4 @@ TEST(ParallelBlockElaboration, NestedForkInsideAlwaysCombErrors) {
   EXPECT_TRUE(f.has_errors);
 }
 
-}
+}  // namespace

@@ -13,8 +13,8 @@ TEST(RestrictStatement, SharesAssumeConstraintSemantics) {
   EXPECT_TRUE(RestrictSharesAssumeConstraintSemantics());
 }
 
-// §16.14.4: in contrast to assume property, a restrict property statement is not
-// verified in simulation, so no pass/fail evaluation runs for it.
+// §16.14.4: in contrast to assume property, a restrict property statement is
+// not verified in simulation, so no pass/fail evaluation runs for it.
 TEST(RestrictStatement, NotVerifiedInSimulation) {
   EXPECT_FALSE(RestrictIsVerifiedInSimulation());
 }

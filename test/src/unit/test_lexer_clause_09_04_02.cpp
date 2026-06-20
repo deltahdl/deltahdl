@@ -42,4 +42,4 @@ TEST(EventControlLexing, AtFollowedByParenPosedge) {
   EXPECT_EQ(tokens[3].kind, TokenKind::kIdentifier);
 }
 
-}
+}  // namespace

@@ -141,4 +141,4 @@ class ClockingManager {
   std::unordered_map<std::string, SimTime> last_event_time_;
 };
 
-}
+}  // namespace delta

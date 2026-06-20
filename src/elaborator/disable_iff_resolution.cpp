@@ -66,7 +66,8 @@ bool AssertionGovernedBySameScopeDefault(DeclarationPosition position) {
 }
 
 DisableConditionSource ResolveDisableConditionSource(
-    bool assertion_has_explicit_disable_iff, bool within_default_disable_scope) {
+    bool assertion_has_explicit_disable_iff,
+    bool within_default_disable_scope) {
   // §16.15 rule a): an explicit disable iff clause wins and any default disable
   // iff is ignored for this assertion.
   if (assertion_has_explicit_disable_iff)

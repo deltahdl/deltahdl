@@ -122,8 +122,8 @@ std::shared_ptr<const SequenceExpr> RewriteSequenceUnderClock(
     case SequenceExpr::Kind::kLocalVarSampling: {
       // §F.5.1.1: T^s((1, v = e), c) = (T^s(1, c) ##0 (1, v = e)). The
       // assignment is fused onto the clocked tick that 1 rewrites to.
-      auto clocked_one = RewriteSequenceUnderClock(*SeqBoolean(BoolTrue()),
-                                                   clock);
+      auto clocked_one =
+          RewriteSequenceUnderClock(*SeqBoolean(BoolTrue()), clock);
       return SeqFusion(clocked_one,
                        SeqLocalVarSampling(sequence.local_var_name));
     }
@@ -158,9 +158,8 @@ std::shared_ptr<const SequenceExpr> RewriteSequenceUnderClock(
       // sequence unchanged.
       return SeqParen(RewriteSequenceUnderClock(*sequence.lhs, clock));
     case SequenceExpr::Kind::kLocalVarDecl:
-      return SeqLocalVarDecl(
-          sequence.local_var_type, sequence.local_var_name,
-          RewriteSequenceUnderClock(*sequence.lhs, clock));
+      return SeqLocalVarDecl(sequence.local_var_type, sequence.local_var_name,
+                             RewriteSequenceUnderClock(*sequence.lhs, clock));
   }
   return std::make_shared<SequenceExpr>(sequence);
 }

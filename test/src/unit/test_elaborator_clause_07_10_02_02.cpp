@@ -24,4 +24,4 @@ TEST(QueueInsertElaboration, InsertWithVariableIndex) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

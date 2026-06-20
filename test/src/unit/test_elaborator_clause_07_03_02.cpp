@@ -13,7 +13,7 @@ DataType MakePackedTaggedUnion(size_t count) {
   dt.is_tagged = true;
   dt.is_packed = true;
   static const char* const kNames[] = {"M0", "M1", "M2", "M3", "M4",
-                                        "M5", "M6", "M7", "M8"};
+                                       "M5", "M6", "M7", "M8"};
   for (size_t i = 0; i < count; ++i) {
     StructMember m;
     m.type_kind = DataTypeKind::kInt;
@@ -161,8 +161,12 @@ TEST(TaggedUnionPackedRepr, VoidOnlyTaggedUnionHasOnlyTagBits) {
   dt.kind = DataTypeKind::kUnion;
   dt.is_tagged = true;
   dt.is_packed = true;
-  StructMember a; a.type_kind = DataTypeKind::kVoid; a.name = "A";
-  StructMember b; b.type_kind = DataTypeKind::kVoid; b.name = "B";
+  StructMember a;
+  a.type_kind = DataTypeKind::kVoid;
+  a.name = "A";
+  StructMember b;
+  b.type_kind = DataTypeKind::kVoid;
+  b.name = "B";
   dt.struct_members = {a, b};
   EXPECT_EQ(EvalTypeWidth(dt), 1u);
 }
@@ -174,8 +178,12 @@ TEST(TaggedUnionPackedRepr, VoidMemberContributesZeroBits) {
   dt.kind = DataTypeKind::kUnion;
   dt.is_tagged = true;
   dt.is_packed = true;
-  StructMember v; v.type_kind = DataTypeKind::kVoid; v.name = "Invalid";
-  StructMember i; i.type_kind = DataTypeKind::kInt; i.name = "Valid";
+  StructMember v;
+  v.type_kind = DataTypeKind::kVoid;
+  v.name = "Invalid";
+  StructMember i;
+  i.type_kind = DataTypeKind::kInt;
+  i.name = "Valid";
   dt.struct_members = {v, i};
   EXPECT_EQ(EvalTypeWidth(dt), 33u);
 }
@@ -254,8 +262,12 @@ TEST(TaggedUnionPackedRepr, RecursiveRepresentationForNestedTaggedUnion) {
   inner.kind = DataTypeKind::kUnion;
   inner.is_tagged = true;
   inner.is_packed = true;
-  StructMember ix; ix.type_kind = DataTypeKind::kInt; ix.name = "X";
-  StructMember iy; iy.type_kind = DataTypeKind::kInt; iy.name = "Y";
+  StructMember ix;
+  ix.type_kind = DataTypeKind::kInt;
+  ix.name = "X";
+  StructMember iy;
+  iy.type_kind = DataTypeKind::kInt;
+  iy.name = "Y";
   inner.struct_members = {ix, iy};
 
   TypedefMap typedefs;
@@ -278,4 +290,4 @@ TEST(TaggedUnionPackedRepr, RecursiveRepresentationForNestedTaggedUnion) {
   EXPECT_EQ(EvalTypeWidth(outer, typedefs), 34u);
 }
 
-}
+}  // namespace

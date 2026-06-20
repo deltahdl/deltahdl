@@ -146,4 +146,4 @@ TEST(Constraint, RandModeDisableHoldsRandcVariableAsStateConstant) {
   EXPECT_EQ(solver.GetValue("c"), 2);
 }
 
-}
+}  // namespace

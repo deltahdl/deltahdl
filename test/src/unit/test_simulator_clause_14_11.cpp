@@ -127,4 +127,4 @@ TEST(CycleDelaySim, ZeroDelayEventTimeRecordedFromClockWatcher) {
   EXPECT_FALSE(cmgr.ZeroCycleDelayProceeds("cb", SimTime{5}));
 }
 
-}
+}  // namespace

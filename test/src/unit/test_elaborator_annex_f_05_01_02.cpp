@@ -141,8 +141,8 @@ TEST(PropertyRewrite, UntilGatesBothOperandsOnTheClock) {
                         ClkWeak(SeqBoolean(BoolAtom("b"))));
   auto result = RewritePropertyUnderClock(*input, BoolAtom("clk"));
 
-  auto left = ClkStrong(ClockedBoolean("clk", "a"));   // T^p(p1, c)
-  auto right = ClkWeak(ClockedBoolean("clk", "b"));     // T^p(p2, c)
+  auto left = ClkStrong(ClockedBoolean("clk", "a"));  // T^p(p1, c)
+  auto right = ClkWeak(ClockedBoolean("clk", "b"));   // T^p(p2, c)
   auto on_clock = ClkBoolean(BoolAtom("clk"));
   auto guard = ClkNot(ClkAnd(on_clock, ClkNot(left)));
   auto release = ClkAnd(on_clock, right);
@@ -160,13 +160,13 @@ TEST(PropertyRewrite, BooleanPropertyIsUnchanged) {
 }
 
 // Edge case for §F.5.1.2: T^p((@(c2) p), c1) = T^p(p, c2). When two clock forms
-// nest, the rule fires at each level, so the innermost clock wins and both outer
-// clocks are discarded. This exercises the recursion the single-level test does
-// not reach.
+// nest, the rule fires at each level, so the innermost clock wins and both
+// outer clocks are discarded. This exercises the recursion the single-level
+// test does not reach.
 TEST(PropertyRewrite, NestedClocksSupersedeRecursively) {
-  auto input = ClkClock(
-      BoolAtom("c2"),
-      ClkClock(BoolAtom("c3"), ClkStrong(SeqBoolean(BoolAtom("a")))));
+  auto input =
+      ClkClock(BoolAtom("c2"),
+               ClkClock(BoolAtom("c3"), ClkStrong(SeqBoolean(BoolAtom("a")))));
   auto result = RewritePropertyUnderClock(*input, BoolAtom("c1"));
   auto expected = ClkStrong(ClockedBoolean("c3", "a"));
   EXPECT_TRUE(ClockedPropertyEqual(*result, *expected));
@@ -176,7 +176,8 @@ TEST(PropertyRewrite, NestedClocksSupersedeRecursively) {
 // operand carries its own clock and the other does not, the incoming clock must
 // recurse into the bare operand while the nested clock overrides locally. This
 // confirms T^p descends through an operator before any inner clock takes over.
-TEST(PropertyRewrite, IncomingClockReachesBareOperandWhileNestedClockOverrides) {
+TEST(PropertyRewrite,
+     IncomingClockReachesBareOperandWhileNestedClockOverrides) {
   auto clocked_left =
       ClkClock(BoolAtom("c2"), ClkStrong(SeqBoolean(BoolAtom("a"))));
   auto bare_right = ClkWeak(SeqBoolean(BoolAtom("b")));

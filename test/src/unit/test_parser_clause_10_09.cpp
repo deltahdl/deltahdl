@@ -286,4 +286,4 @@ TEST(AssignmentPatternParsing, ConstantAssignmentPatternExpressionInParameter) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

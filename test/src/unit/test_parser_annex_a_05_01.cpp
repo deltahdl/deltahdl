@@ -289,13 +289,13 @@ TEST(UdpDeclGrammar, EndLabelSequential) {
 }
 
 TEST(UdpDeclGrammar, EndLabelMismatchIsError) {
-  EXPECT_FALSE(ParseOk(
-      "primitive inv(output y, input a);\n"
-      "  table\n"
-      "    0 : 1;\n"
-      "    1 : 0;\n"
-      "  endtable\n"
-      "endprimitive : wrong_name\n"));
+  EXPECT_FALSE(
+      ParseOk("primitive inv(output y, input a);\n"
+              "  table\n"
+              "    0 : 1;\n"
+              "    1 : 0;\n"
+              "  endtable\n"
+              "endprimitive : wrong_name\n"));
 }
 
 TEST(UdpDeclGrammar, AttributeOnAnsiUdp) {
@@ -361,24 +361,24 @@ TEST(UdpDeclGrammar, AttributeOnExternUdp) {
 // semicolon after the closing parenthesis of its port list. Dropping it must
 // be diagnosed by the declaration parser.
 TEST(UdpDeclGrammar, MissingSemicolonAfterPortListIsError) {
-  EXPECT_FALSE(ParseOk(
-      "primitive inv(output out, input in)\n"
-      "  table\n"
-      "    0 : 1;\n"
-      "    1 : 0;\n"
-      "  endtable\n"
-      "endprimitive\n"));
+  EXPECT_FALSE(
+      ParseOk("primitive inv(output out, input in)\n"
+              "  table\n"
+              "    0 : 1;\n"
+              "    1 : 0;\n"
+              "  endtable\n"
+              "endprimitive\n"));
 }
 
 // A udp_declaration must be terminated by the endprimitive keyword; a body that
 // reaches end-of-input without it must be diagnosed.
 TEST(UdpDeclGrammar, MissingEndprimitiveIsError) {
-  EXPECT_FALSE(ParseOk(
-      "primitive inv(output out, input in);\n"
-      "  table\n"
-      "    0 : 1;\n"
-      "    1 : 0;\n"
-      "  endtable\n"));
+  EXPECT_FALSE(
+      ParseOk("primitive inv(output out, input in);\n"
+              "  table\n"
+              "    0 : 1;\n"
+              "    1 : 0;\n"
+              "  endtable\n"));
 }
 
-}
+}  // namespace

@@ -45,12 +45,12 @@ TEST(AdditionBitLength, KeepsWidestOperandWhenLhsNarrower) {
 }
 
 TEST(AdditionBitLength, AssignmentToWiderLhsIsAcceptedByElaborator) {
-  EXPECT_TRUE(ElabOk(
-      "module m;\n"
-      "  logic [15:0] a, b;\n"
-      "  logic [16:0] sumB;\n"
-      "  initial sumB = a + b;\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  logic [15:0] a, b;\n"
+             "  logic [16:0] sumB;\n"
+             "  initial sumB = a + b;\n"
+             "endmodule\n"));
 }
 
-}
+}  // namespace

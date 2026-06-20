@@ -101,4 +101,4 @@ TEST(ContAssignStatementSim, ContAssignOnVectorVariable) {
   EXPECT_EQ(var->value.ToUint64(), 0xCAFEu);
 }
 
-}
+}  // namespace

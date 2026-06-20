@@ -306,8 +306,7 @@ std::vector<GrammarForm> ProductionForms(GrammarProduction production) {
   return {};
 }
 
-bool SequenceOperandSatisfiesNondegeneracyRequirement(
-    const SequenceExpr& seq) {
+bool SequenceOperandSatisfiesNondegeneracyRequirement(const SequenceExpr& seq) {
   // §F.3.2 imposes two conditions on the sequence operand of a strong/weak
   // sequence property: it shall be nondegenerate, and it shall not be tightly
   // satisfied by the empty word. Both definitions live in §F.5.2.

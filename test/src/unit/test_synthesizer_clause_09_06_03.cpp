@@ -41,4 +41,4 @@ TEST(DisableForkSynthesis, RejectDisableForkInAlwaysFF) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-}
+}  // namespace

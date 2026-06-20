@@ -60,4 +60,4 @@ TEST(StreamReorderingParsing, RightShiftOperator) {
   EXPECT_EQ(rhs->op, TokenKind::kGtGt);
 }
 
-}
+}  // namespace

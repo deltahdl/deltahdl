@@ -41,4 +41,4 @@ TEST(DataTypeParsing, EnumRangeDecrementing) {
   EXPECT_NE(member.range_end, nullptr);
 }
 
-}
+}  // namespace

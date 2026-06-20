@@ -386,4 +386,4 @@ TEST(ArrayLiteralSim, TypeKeyMismatchFallsToDefault) {
   EXPECT_EQ(e2->value.ToUint64(), 0xFFu);
 }
 
-}
+}  // namespace

@@ -83,8 +83,8 @@ TEST(OptionalListSim, ArgumentOverridesCurrentScope) {
   EXPECT_EQ(f.ctx.LastListedScope(), "t");
 }
 
-// Annex D.6: each $list produces a fresh listing, so when several are issued the
-// scope most recently listed is the one observed.
+// Annex D.6: each $list produces a fresh listing, so when several are issued
+// the scope most recently listed is the one observed.
 TEST(OptionalListSim, MostRecentListingWins) {
   SimFixture f;
   auto* design = ElaborateSrc(

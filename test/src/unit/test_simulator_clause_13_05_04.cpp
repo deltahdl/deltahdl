@@ -27,7 +27,14 @@ TEST(NamedArgBindingSimulation, NamedArgsWithDefaults) {
   func->name = "weighted";
   func->func_args = {
       {Direction::kInput, false, false, false, {}, "a", nullptr, {}},
-      {Direction::kInput, false, false, false, {}, "w", MakeInt(f.arena, 2), {}},
+      {Direction::kInput,
+       false,
+       false,
+       false,
+       {},
+       "w",
+       MakeInt(f.arena, 2),
+       {}},
   };
   auto* body_expr = MakeBinary(f.arena, TokenKind::kStar, MakeId(f.arena, "a"),
                                MakeId(f.arena, "w"));
@@ -188,4 +195,4 @@ TEST(SubroutineCallSim, EmptyNamedBindingUsesDefault) {
   EXPECT_EQ(var->value.ToUint64(), 15u);
 }
 
-}
+}  // namespace

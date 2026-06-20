@@ -123,4 +123,4 @@ TEST(AssocMethods, ExistsAfterDeleteReturnsFalse) {
   EXPECT_EQ(out2.ToUint64(), 0u);
 }
 
-}
+}  // namespace

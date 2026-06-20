@@ -131,8 +131,9 @@ TEST(UdpPortGrammar, AttributesOnAnsiPortDeclarations) {
 }
 
 // udp_port_declaration: each of udp_output_declaration, udp_reg_declaration and
-// udp_input_declaration carries an optional { attribute_instance } prefix in the
-// non-ANSI body. The prefixes must be consumed without disturbing the port set.
+// udp_input_declaration carries an optional { attribute_instance } prefix in
+// the non-ANSI body. The prefixes must be consumed without disturbing the port
+// set.
 TEST(UdpPortGrammar, AttributesOnNonAnsiPortDeclarations) {
   auto r = Parse(
       "primitive dff(q, d, clk);\n"
@@ -155,7 +156,8 @@ TEST(UdpPortGrammar, AttributesOnNonAnsiPortDeclarations) {
   EXPECT_TRUE(udp->is_sequential);
 }
 
-// udp_declaration_port_list with the first alternative of udp_output_declaration
+// udp_declaration_port_list with the first alternative of
+// udp_output_declaration
 // ({ attribute_instance } output port_identifier) — a combinational UDP whose
 // ANSI output port carries no reg keyword, so the primitive is not sequential.
 TEST(UdpPortGrammar, CombinationalOutputDeclAnsi) {
@@ -179,8 +181,9 @@ TEST(UdpPortGrammar, CombinationalOutputDeclAnsi) {
   EXPECT_FALSE(udp->has_initial);
 }
 
-// udp_output_declaration second alternative with the optional [ = constant_expression ]
-// omitted: a sequential reg output that declares no port-level initial value.
+// udp_output_declaration second alternative with the optional [ =
+// constant_expression ] omitted: a sequential reg output that declares no
+// port-level initial value.
 TEST(UdpPortGrammar, OutputRegDeclWithoutInitializer) {
   auto r = Parse(
       "primitive dff(output reg q, input d, input clk);\n"
@@ -197,8 +200,8 @@ TEST(UdpPortGrammar, OutputRegDeclWithoutInitializer) {
   EXPECT_FALSE(udp->has_initial);
 }
 
-// udp_port_declaration requires each declaration to be terminated by a semicolon;
-// dropping it on a non-ANSI body declaration is rejected.
+// udp_port_declaration requires each declaration to be terminated by a
+// semicolon; dropping it on a non-ANSI body declaration is rejected.
 TEST(UdpPortGrammar, NonAnsiPortDeclarationMissingSemicolon) {
   auto r = Parse(
       "primitive dff(q, d, clk);\n"
@@ -241,4 +244,4 @@ TEST(UdpPortGrammar, SimStandaloneRegSequential) {
   EXPECT_EQ(state.GetOutput(), '1');
 }
 
-}
+}  // namespace

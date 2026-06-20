@@ -40,4 +40,4 @@ TEST(DataTypeParsing, StringDeclWithInit) {
   ASSERT_NE(item->init_expr, nullptr);
 }
 
-}
+}  // namespace

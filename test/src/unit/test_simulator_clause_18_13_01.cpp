@@ -65,14 +65,12 @@ TEST(SysTask, UrandomAdvancesEachCall) {
 TEST(SysTask, UrandomDeterministicAcrossContexts) {
   SysTaskFixture f1;
   SysTaskFixture f2;
-  uint32_t a =
-      static_cast<uint32_t>(
-          EvalExpr(MkSysCall(f1.arena, "$urandom", {}), f1.ctx, f1.arena)
-              .ToUint64());
-  uint32_t b =
-      static_cast<uint32_t>(
-          EvalExpr(MkSysCall(f2.arena, "$urandom", {}), f2.ctx, f2.arena)
-              .ToUint64());
+  uint32_t a = static_cast<uint32_t>(
+      EvalExpr(MkSysCall(f1.arena, "$urandom", {}), f1.ctx, f1.arena)
+          .ToUint64());
+  uint32_t b = static_cast<uint32_t>(
+      EvalExpr(MkSysCall(f2.arena, "$urandom", {}), f2.ctx, f2.arena)
+          .ToUint64());
   EXPECT_EQ(a, b);
 }
 
@@ -103,4 +101,4 @@ TEST(SysTask, UrandomWideSeedAcceptedAndReplays) {
   EXPECT_EQ(first, again);
 }
 
-}
+}  // namespace

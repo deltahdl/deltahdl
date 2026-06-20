@@ -53,4 +53,4 @@ TEST(GlobalClockingSim, GlobalAndDefaultCoexist) {
   EXPECT_NE(cmgr.Find("dclk"), nullptr);
 }
 
-}
+}  // namespace

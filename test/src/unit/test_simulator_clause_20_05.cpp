@@ -164,7 +164,8 @@ TEST(SysTask, CastFunctionsPreserveValueWithHighBitSet) {
   SysTaskFixture f;
   auto in = EvalExpr(MkInt(f.arena, 0xFFFFFFFFu), f.ctx, f.arena);
 
-  auto* signed_expr = MkSysCall(f.arena, "$signed", {MkInt(f.arena, 0xFFFFFFFFu)});
+  auto* signed_expr =
+      MkSysCall(f.arena, "$signed", {MkInt(f.arena, 0xFFFFFFFFu)});
   auto signed_res = EvalExpr(signed_expr, f.ctx, f.arena);
   EXPECT_TRUE(signed_res.is_signed);
   EXPECT_EQ(signed_res.width, in.width);
@@ -178,4 +179,4 @@ TEST(SysTask, CastFunctionsPreserveValueWithHighBitSet) {
   EXPECT_EQ(unsigned_res.ToUint64(), in.ToUint64());
 }
 
-}
+}  // namespace

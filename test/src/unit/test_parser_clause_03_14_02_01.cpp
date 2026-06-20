@@ -65,4 +65,4 @@ TEST(DesignBuildingBlockParsing, TimeScaleTwoComponents) {
   EXPECT_NE(static_cast<int8_t>(ts.unit), static_cast<int8_t>(ts.precision));
 }
 
-}
+}  // namespace

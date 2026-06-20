@@ -300,7 +300,8 @@ TEST(PliPreObservedSim, VpiPutValueFromPostNbaIsNotFlaggedAgainstPreObserved) {
 // Preponed region, there is no exemption for scheduling back into the same
 // region. An event scheduled into Pre-Observed itself at the current time is
 // still a violation (the re-entrant event itself is harmless and runs).
-TEST(PliPreObservedSim, ScheduleIntoSamePreObservedRegionAtCurrentTimeIsFlagged) {
+TEST(PliPreObservedSim,
+     ScheduleIntoSamePreObservedRegionAtCurrentTimeIsFlagged) {
   Arena arena;
   Scheduler sched(arena);
   bool inner_ran = false;

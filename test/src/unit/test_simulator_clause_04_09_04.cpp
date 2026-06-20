@@ -113,4 +113,3 @@ TEST(NonblockingAssignSchedulingSim, LhsTargetUsesValuesAtScheduleTime) {
   EXPECT_EQ(f.ctx.FindVariable("mem[0]")->value.ToUint64(), 0xCCu);
   EXPECT_EQ(f.ctx.FindVariable("mem[1]")->value.ToUint64(), 0u);
 }
-

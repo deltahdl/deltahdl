@@ -61,17 +61,17 @@ TEST(RandseqValuePassingSim, ArgumentAvailableThroughoutProduction) {
 TEST(RandseqValuePassingSim, DefaultArgumentUsedWhenOmitted) {
   SimFixture f;
   uint64_t got = RunModule(f,
-      "module t;\n"
-      "  int got;\n"
-      "  initial begin\n"
-      "    got = 0;\n"
-      "    randsequence(main)\n"
-      "      main : compute ;\n"
-      "      compute( int v = 9 ) : { got = v; } ;\n"
-      "    endsequence\n"
-      "  end\n"
-      "endmodule\n",
-      "got");
+                           "module t;\n"
+                           "  int got;\n"
+                           "  initial begin\n"
+                           "    got = 0;\n"
+                           "    randsequence(main)\n"
+                           "      main : compute ;\n"
+                           "      compute( int v = 9 ) : { got = v; } ;\n"
+                           "    endsequence\n"
+                           "  end\n"
+                           "endmodule\n",
+                           "got");
   EXPECT_EQ(got, 9u);
 }
 
@@ -80,25 +80,25 @@ TEST(RandseqValuePassingSim, DefaultArgumentUsedWhenOmitted) {
 TEST(RandseqValuePassingSim, ReturnValueReadByTriggeringProduction) {
   SimFixture f;
   uint64_t r = RunModule(f,
-      "module t;\n"
-      "  int r;\n"
-      "  initial begin\n"
-      "    r = 0;\n"
-      "    randsequence(main)\n"
-      "      void main : a { r = a; } ;\n"
-      "      int a : { return 7; } ;\n"
-      "    endsequence\n"
-      "  end\n"
-      "endmodule\n",
-      "r");
+                         "module t;\n"
+                         "  int r;\n"
+                         "  initial begin\n"
+                         "    r = 0;\n"
+                         "    randsequence(main)\n"
+                         "      void main : a { r = a; } ;\n"
+                         "      int a : { return 7; } ;\n"
+                         "    endsequence\n"
+                         "  end\n"
+                         "endmodule\n",
+                         "r");
   EXPECT_EQ(r, 7u);
 }
 
 // §18.17.7: a production appearing more than once in a rule yields an implicit
 // array indexed from 1 to the number of appearances, with element i holding the
 // value returned by the i-th appearance in syntactic order. Here 'a' increments
-// a counter and returns it, so a[1] precedes a[2], proving both the indexing and
-// the left-to-right order in which return values become available.
+// a counter and returns it, so a[1] precedes a[2], proving both the indexing
+// and the left-to-right order in which return values become available.
 TEST(RandseqValuePassingSim, MultipleAppearancesIndexedInSyntacticOrder) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -130,25 +130,25 @@ TEST(RandseqValuePassingSim, MultipleAppearancesIndexedInSyntacticOrder) {
 // §18.17.7: a production that does not specify a return type assumes a void
 // return type and so contributes no implicit return-value variable. Here the
 // production named 'x' is void; inside main's code block the name 'x' therefore
-// still resolves to the outer module variable (88) rather than to a return-value
-// variable. Had 'x' been value-returning, an implicit local would have shadowed
-// the outer 'x'.
+// still resolves to the outer module variable (88) rather than to a
+// return-value variable. Had 'x' been value-returning, an implicit local would
+// have shadowed the outer 'x'.
 TEST(RandseqValuePassingSim, NoReturnTypeProductionYieldsNoValue) {
   SimFixture f;
   uint64_t captured = RunModule(f,
-      "module t;\n"
-      "  int x;\n"
-      "  int captured;\n"
-      "  initial begin\n"
-      "    x = 88;\n"
-      "    captured = 0;\n"
-      "    randsequence(main)\n"
-      "      void main : x { captured = x; } ;\n"
-      "      x : { } ;\n"
-      "    endsequence\n"
-      "  end\n"
-      "endmodule\n",
-      "captured");
+                                "module t;\n"
+                                "  int x;\n"
+                                "  int captured;\n"
+                                "  initial begin\n"
+                                "    x = 88;\n"
+                                "    captured = 0;\n"
+                                "    randsequence(main)\n"
+                                "      void main : x { captured = x; } ;\n"
+                                "      x : { } ;\n"
+                                "    endsequence\n"
+                                "  end\n"
+                                "endmodule\n",
+                                "captured");
   EXPECT_EQ(captured, 88u);
 }
 
@@ -158,28 +158,28 @@ TEST(RandseqValuePassingSim, NoReturnTypeProductionYieldsNoValue) {
 TEST(RandseqValuePassingSim, ArgumentInThenValueOut) {
   SimFixture f;
   uint64_t r = RunModule(f,
-      "module t;\n"
-      "  int r;\n"
-      "  initial begin\n"
-      "    r = 0;\n"
-      "    randsequence(main)\n"
-      "      void main : mk(10) { r = mk; } ;\n"
-      "      int mk( int base ) : { return base + 5; } ;\n"
-      "    endsequence\n"
-      "  end\n"
-      "endmodule\n",
-      "r");
+                         "module t;\n"
+                         "  int r;\n"
+                         "  initial begin\n"
+                         "    r = 0;\n"
+                         "    randsequence(main)\n"
+                         "      void main : mk(10) { r = mk; } ;\n"
+                         "      int mk( int base ) : { return base + 5; } ;\n"
+                         "    endsequence\n"
+                         "  end\n"
+                         "endmodule\n",
+                         "r");
   EXPECT_EQ(r, 15u);
 }
 
 // §18.17.7: only the return values of productions already generated — those to
 // the left of a code block — can be retrieved; a value not yet generated is not
-// available. Here the production named 'a' is generated between two code blocks.
-// The first code block runs before 'a' is generated, so no implicit return-value
-// variable exists yet and the name 'a' still resolves to the outer module
-// variable (99). The second code block runs after 'a' is generated, so 'a' there
-// resolves to its return value (7). The contrast pins down the left-to-right
-// availability rule deterministically.
+// available. Here the production named 'a' is generated between two code
+// blocks. The first code block runs before 'a' is generated, so no implicit
+// return-value variable exists yet and the name 'a' still resolves to the outer
+// module variable (99). The second code block runs after 'a' is generated, so
+// 'a' there resolves to its return value (7). The contrast pins down the
+// left-to-right availability rule deterministically.
 TEST(RandseqValuePassingSim, OnlyAlreadyGeneratedValuesAreAvailable) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -204,51 +204,53 @@ TEST(RandseqValuePassingSim, OnlyAlreadyGeneratedValuesAreAvailable) {
   auto* va = f.ctx.FindVariable("after");
   ASSERT_NE(vb, nullptr);
   ASSERT_NE(va, nullptr);
-  // 'a' not yet generated -> outer variable; 'a' already generated -> its value.
+  // 'a' not yet generated -> outer variable; 'a' already generated -> its
+  // value.
   EXPECT_EQ(vb->value.ToUint64(), 99u);
   EXPECT_EQ(va->value.ToUint64(), 7u);
 }
 
-// §18.17.7: more than one actual argument may be passed; the actuals bind to the
-// formals by position, as in a task call.
+// §18.17.7: more than one actual argument may be passed; the actuals bind to
+// the formals by position, as in a task call.
 TEST(RandseqValuePassingSim, MultipleArgumentsBoundByPosition) {
   SimFixture f;
-  uint64_t got = RunModule(f,
-      "module t;\n"
-      "  int got;\n"
-      "  initial begin\n"
-      "    got = 0;\n"
-      "    randsequence(main)\n"
-      "      main : combine(3, 4) ;\n"
-      "      combine( int a, int b ) : { got = a * 10 + b; } ;\n"
-      "    endsequence\n"
-      "  end\n"
-      "endmodule\n",
-      "got");
+  uint64_t got =
+      RunModule(f,
+                "module t;\n"
+                "  int got;\n"
+                "  initial begin\n"
+                "    got = 0;\n"
+                "    randsequence(main)\n"
+                "      main : combine(3, 4) ;\n"
+                "      combine( int a, int b ) : { got = a * 10 + b; } ;\n"
+                "    endsequence\n"
+                "  end\n"
+                "endmodule\n",
+                "got");
   EXPECT_EQ(got, 34u);
 }
 
-// §18.17.7: data is passed down to a production about to be generated regardless
-// of how that production is reached. Here the production is selected by an
-// rs_if production item, and its argument is still bound — exercising argument
-// passing through the conditional-generation path.
+// §18.17.7: data is passed down to a production about to be generated
+// regardless of how that production is reached. Here the production is selected
+// by an rs_if production item, and its argument is still bound — exercising
+// argument passing through the conditional-generation path.
 TEST(RandseqValuePassingSim, ArgumentPassedThroughConditionalProduction) {
   SimFixture f;
   uint64_t got = RunModule(f,
-      "module t;\n"
-      "  int got;\n"
-      "  int sel;\n"
-      "  initial begin\n"
-      "    got = 0; sel = 1;\n"
-      "    randsequence(main)\n"
-      "      void main : pick ;\n"
-      "      pick : if (sel) hi(7) else lo(9) ;\n"
-      "      hi( int v ) : { got = v; } ;\n"
-      "      lo( int v ) : { got = v; } ;\n"
-      "    endsequence\n"
-      "  end\n"
-      "endmodule\n",
-      "got");
+                           "module t;\n"
+                           "  int got;\n"
+                           "  int sel;\n"
+                           "  initial begin\n"
+                           "    got = 0; sel = 1;\n"
+                           "    randsequence(main)\n"
+                           "      void main : pick ;\n"
+                           "      pick : if (sel) hi(7) else lo(9) ;\n"
+                           "      hi( int v ) : { got = v; } ;\n"
+                           "      lo( int v ) : { got = v; } ;\n"
+                           "    endsequence\n"
+                           "  end\n"
+                           "endmodule\n",
+                           "got");
   EXPECT_EQ(got, 7u);
 }
 
@@ -259,38 +261,39 @@ TEST(RandseqValuePassingSim, ArgumentPassedThroughConditionalProduction) {
 TEST(RandseqValuePassingSim, SeparateCallsBindOwnArguments) {
   SimFixture f;
   uint64_t sum = RunModule(f,
-      "module t;\n"
-      "  int sum;\n"
-      "  initial begin\n"
-      "    sum = 0;\n"
-      "    randsequence(main)\n"
-      "      void main : add(3) add(5) ;\n"
-      "      add( int v ) : { sum = sum + v; } ;\n"
-      "    endsequence\n"
-      "  end\n"
-      "endmodule\n",
-      "sum");
+                           "module t;\n"
+                           "  int sum;\n"
+                           "  initial begin\n"
+                           "    sum = 0;\n"
+                           "    randsequence(main)\n"
+                           "      void main : add(3) add(5) ;\n"
+                           "      add( int v ) : { sum = sum + v; } ;\n"
+                           "    endsequence\n"
+                           "  end\n"
+                           "endmodule\n",
+                           "sum");
   EXPECT_EQ(sum, 8u);
 }
 
 // §18.17.7: actuals bind by position as in a task call, and a formal left
 // unsupplied falls back to its declared default. Here only the first of two
-// formals is supplied, so the second takes its default — exercising the boundary
-// between positionally bound actuals and default-filled formals.
+// formals is supplied, so the second takes its default — exercising the
+// boundary between positionally bound actuals and default-filled formals.
 TEST(RandseqValuePassingSim, OmittedTrailingArgumentUsesDefault) {
   SimFixture f;
-  uint64_t got = RunModule(f,
-      "module t;\n"
-      "  int got;\n"
-      "  initial begin\n"
-      "    got = 0;\n"
-      "    randsequence(main)\n"
-      "      main : combine(3) ;\n"
-      "      combine( int a, int b = 5 ) : { got = a * 10 + b; } ;\n"
-      "    endsequence\n"
-      "  end\n"
-      "endmodule\n",
-      "got");
+  uint64_t got =
+      RunModule(f,
+                "module t;\n"
+                "  int got;\n"
+                "  initial begin\n"
+                "    got = 0;\n"
+                "    randsequence(main)\n"
+                "      main : combine(3) ;\n"
+                "      combine( int a, int b = 5 ) : { got = a * 10 + b; } ;\n"
+                "    endsequence\n"
+                "  end\n"
+                "endmodule\n",
+                "got");
   EXPECT_EQ(got, 35u);
 }
 
@@ -302,18 +305,18 @@ TEST(RandseqValuePassingSim, OmittedTrailingArgumentUsesDefault) {
 TEST(RandseqValuePassingSim, NestedProductionReturnValues) {
   SimFixture f;
   uint64_t r = RunModule(f,
-      "module t;\n"
-      "  int r;\n"
-      "  initial begin\n"
-      "    r = 0;\n"
-      "    randsequence(main)\n"
-      "      void main : outer { r = outer; } ;\n"
-      "      int outer : inner { return inner; } ;\n"
-      "      int inner : { return 3; } ;\n"
-      "    endsequence\n"
-      "  end\n"
-      "endmodule\n",
-      "r");
+                         "module t;\n"
+                         "  int r;\n"
+                         "  initial begin\n"
+                         "    r = 0;\n"
+                         "    randsequence(main)\n"
+                         "      void main : outer { r = outer; } ;\n"
+                         "      int outer : inner { return inner; } ;\n"
+                         "      int inner : { return 3; } ;\n"
+                         "    endsequence\n"
+                         "  end\n"
+                         "endmodule\n",
+                         "r");
   EXPECT_EQ(r, 3u);
 }
 

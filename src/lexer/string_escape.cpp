@@ -87,7 +87,7 @@ size_t ProcessEscape(std::string_view raw, size_t i, std::string& out) {
   return 0;
 }
 
-}
+}  // namespace
 
 std::string InterpretStringEscapes(std::string_view raw) {
   std::string result;
@@ -104,4 +104,4 @@ std::string InterpretStringEscapes(std::string_view raw) {
   return result;
 }
 
-}
+}  // namespace delta

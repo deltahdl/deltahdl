@@ -83,4 +83,4 @@ TEST(SuperParsing, SuperPropertyAssignment) {
               "endclass\n"));
 }
 
-}
+}  // namespace

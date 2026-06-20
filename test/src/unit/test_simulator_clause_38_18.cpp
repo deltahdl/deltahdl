@@ -72,5 +72,5 @@ TEST_F(VpiHandleSim, HandleProtectedObjectIsAnError) {
   EXPECT_EQ(info.level, vpiError);
 }
 
-}
-}
+}  // namespace
+}  // namespace delta

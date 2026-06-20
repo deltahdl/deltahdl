@@ -38,8 +38,8 @@ TEST(NetDefaultValue, UndrivenWireDefaultsToZ) {
 // §6.7.1: nets with drivers shall assume the output value of their drivers.
 TEST(NetDefaultValue, DrivenNetAssumesDriverValue) {
   LowerFixture f;
-  auto* design = ElaborateSrc(
-      "module t; wire w; assign w = 1'b1; endmodule\n", f);
+  auto* design =
+      ElaborateSrc("module t; wire w; assign w = 1'b1; endmodule\n", f);
   ASSERT_NE(design, nullptr);
   LowerAndRun(design, f);
   auto* var = f.ctx.FindVariable("w");
@@ -84,4 +84,4 @@ TEST(NetDefaultValue, UndrivenVectorTriregAllBitsX) {
   EXPECT_EQ(var->value.words[0].bval & 0xF, 0xFu);
 }
 
-}
+}  // namespace

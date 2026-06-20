@@ -54,7 +54,8 @@ TEST_F(ProtectKeyKeynameSyntaxTest,
 // line, exercising the <string> portion of `key_keyname = <string>`.
 TEST_F(ProtectKeyKeynameSyntaxTest,
        KeyKeynameStringArgumentWithSpacesConsumed) {
-  auto result = Preprocess("`pragma protect key_keyname = \"acme rsa key 1\"\n");
+  auto result =
+      Preprocess("`pragma protect key_keyname = \"acme rsa key 1\"\n");
   EXPECT_FALSE(diag_.HasErrors());
   EXPECT_EQ(result.find("pragma"), std::string::npos);
   EXPECT_EQ(result.find("acme rsa key 1"), std::string::npos);

@@ -166,4 +166,4 @@ TEST(DriveStrengthElaboration, MultipleAssignsPreserveIndependentStrengths) {
   EXPECT_EQ(mod->assigns[1].drive_strength1, 2u);
 }
 
-}
+}  // namespace

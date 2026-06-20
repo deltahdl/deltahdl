@@ -64,7 +64,8 @@ TEST(SysTask, TimeRoundsScaledValueDown) {
 
 // §20.3.1 (rounding tie edge case): a scaled value landing exactly halfway
 // between two integers exercises the nearest-integer tie-break. 15 ns over a
-// 10 ns unit is 1.5, which the round-to-nearest conversion resolves upward to 2.
+// 10 ns unit is 1.5, which the round-to-nearest conversion resolves upward
+// to 2.
 TEST(SysTask, TimeRoundsHalfwayValueUp) {
   SysTaskFixture f;
   f.ctx.SetGlobalPrecision(TimeUnit::kNs);
@@ -105,4 +106,4 @@ TEST(SysTask, TimeScaledAcrossMultipleDecades) {
   EXPECT_EQ(TimeAtTick(f, 3600), 4u);
 }
 
-}
+}  // namespace

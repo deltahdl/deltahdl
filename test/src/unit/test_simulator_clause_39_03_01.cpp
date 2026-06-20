@@ -13,7 +13,8 @@ namespace {
 // the handle for a named assertion through direct access. It carries no BNF and
 // no "shall" sentences; its normative content is the navigation recipe and two
 // closing details:
-//   - the VPI navigation/instance-iterator model reaches assertions, properties,
+//   - the VPI navigation/instance-iterator model reaches assertions,
+//   properties,
 //     and sequences (intro);
 //   - (a) a null reference to vpi_iterate(vpiAssertion, ...) walks every
 //     assertion in the design;
@@ -31,7 +32,8 @@ namespace {
 
 // Intro: the assertion-class walk reaches not only assertion directives but the
 // property and sequence instances the navigation model encompasses.
-TEST(ObtainAssertionHandles, NavigationEncompassesAssertionsPropertiesSequences) {
+TEST(ObtainAssertionHandles,
+     NavigationEncompassesAssertionsPropertiesSequences) {
   VpiContext ctx;
   VpiHandle assertion = ctx.CreateAssertion("a_req", vpiAssert);
   VpiHandle property = ctx.CreateAssertion("p_inst", vpiPropertyInst);
@@ -48,8 +50,8 @@ TEST(ObtainAssertionHandles, NavigationEncompassesAssertionsPropertiesSequences)
   EXPECT_NE(std::find(seen.begin(), seen.end(), sequence), seen.end());
 }
 
-// Step a: a null reference handle to vpi_iterate(vpiAssertion, ...) returns every
-// assertion in the design and skips non-assertion objects.
+// Step a: a null reference handle to vpi_iterate(vpiAssertion, ...) returns
+// every assertion in the design and skips non-assertion objects.
 TEST(ObtainAssertionHandles, NullReferenceWalksEveryAssertionInDesign) {
   VpiContext ctx;
   VpiHandle a = ctx.CreateAssertion("a_req", vpiAssert);

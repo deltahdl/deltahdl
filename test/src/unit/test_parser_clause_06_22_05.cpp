@@ -77,4 +77,4 @@ TEST(TypeIncompatibleParsing, EventToEventIsCompatible) {
   EXPECT_TRUE(IsCastCompatible(a, b));
 }
 
-}
+}  // namespace

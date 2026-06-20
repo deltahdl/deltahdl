@@ -189,10 +189,8 @@ struct ResolvedSdfAnnotateArgs {
 };
 
 ResolvedSdfAnnotateArgs ResolveSdfAnnotateArgs(
-    std::string_view explicit_mtm_spec,
-    std::string_view explicit_scale_factors,
-    std::string_view explicit_scale_type,
-    const SdfAnnotateConfig& config);
+    std::string_view explicit_mtm_spec, std::string_view explicit_scale_factors,
+    std::string_view explicit_scale_type, const SdfAnnotateConfig& config);
 
 bool ParseSdf(std::string_view input, SdfFile& out);
 
@@ -210,4 +208,4 @@ SdfAnnotationResult AnnotateSdfToManager(const SdfFile& file,
                                          SpecifyManager& mgr, SdfMtm mtm,
                                          std::string_view scope = {});
 
-}
+}  // namespace delta

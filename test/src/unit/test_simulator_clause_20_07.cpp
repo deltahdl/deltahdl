@@ -108,7 +108,8 @@ TEST(SysTask, QueueIncrementReturnsMinusOne) {
   auto* q = f.ctx.CreateQueue("q", 16, -1);
   q->elements.push_back(MakeLogic4VecVal(f.arena, 16, 1));
   auto* expr = MkSysCall(f.arena, "$increment", {MkId(f.arena, "q")});
-  EXPECT_EQ(static_cast<int32_t>(EvalExpr(expr, f.ctx, f.arena).ToUint64()), -1);
+  EXPECT_EQ(static_cast<int32_t>(EvalExpr(expr, f.ctx, f.arena).ToUint64()),
+            -1);
 }
 
 TEST(SysTask, QueueSizeReturnsElementCount) {
@@ -126,7 +127,8 @@ TEST(SysTask, EmptyQueueRightReturnsMinusOne) {
   SysTaskFixture f;
   f.ctx.CreateQueue("q", 16, -1);
   auto* expr = MkSysCall(f.arena, "$right", {MkId(f.arena, "q")});
-  EXPECT_EQ(static_cast<int32_t>(EvalExpr(expr, f.ctx, f.arena).ToUint64()), -1);
+  EXPECT_EQ(static_cast<int32_t>(EvalExpr(expr, f.ctx, f.arena).ToUint64()),
+            -1);
 }
 
 // §20.7: on an integral-indexed associative array dimension $left is 0,
@@ -146,7 +148,8 @@ TEST(SysTask, AssocIncrementReturnsMinusOne) {
                                    /*index_width=*/8);
   a->int_data[3] = MakeLogic4VecVal(f.arena, 32, 30);
   auto* expr = MkSysCall(f.arena, "$increment", {MkId(f.arena, "a")});
-  EXPECT_EQ(static_cast<int32_t>(EvalExpr(expr, f.ctx, f.arena).ToUint64()), -1);
+  EXPECT_EQ(static_cast<int32_t>(EvalExpr(expr, f.ctx, f.arena).ToUint64()),
+            -1);
 }
 
 TEST(SysTask, AssocSizeReturnsAllocatedCount) {
@@ -398,4 +401,4 @@ TEST(SysTask, DynamicArrayDimension) {
             -1);
 }
 
-}
+}  // namespace

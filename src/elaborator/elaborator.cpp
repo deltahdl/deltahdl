@@ -96,7 +96,6 @@ Elaborator::Elaborator(Arena& arena, DiagEngine& diag, CompilationUnit* unit)
     : arena_(arena), diag_(diag), unit_(unit) {}
 
 void Elaborator::ValidateNameSpaces() {
-
   std::map<std::pair<std::string_view, std::string_view>, SourceRange>
       def_names;
   auto check_def = [&](std::string_view library, std::string_view name,
@@ -112,7 +111,8 @@ void Elaborator::ValidateNameSpaces() {
   for (auto* i : unit_->interfaces) check_def(i->library, i->name, i->range);
   for (auto* u : unit_->udps) check_def(u->library, u->name, u->range);
 
-  for (auto* cfg : unit_->configs) check_def(cfg->library, cfg->name, cfg->range);
+  for (auto* cfg : unit_->configs)
+    check_def(cfg->library, cfg->name, cfg->range);
 
   std::unordered_set<std::string_view> pkg_names;
   for (auto* pkg : unit_->packages) {
@@ -139,9 +139,9 @@ void Elaborator::ValidateNameSpaces() {
     }
   };
   for (auto* item : unit_->cu_items) {
-
     if (item->kind == ModuleItemKind::kImportDecl ||
-        item->kind == ModuleItemKind::kExportDecl) continue;
+        item->kind == ModuleItemKind::kExportDecl)
+      continue;
     if (item->from_anonymous_program) continue;
     check_cu(item->name, item->loc);
   }
@@ -165,7 +165,6 @@ void Elaborator::ValidateConfigDesignStatements() {
 
   for (auto* cfg : unit_->configs) {
     for (auto& [lib, cell] : cfg->design_cells) {
-
       if (config_names.contains(cell) && !cell_names.contains(cell)) {
         diag_.Error(
             cfg->range.start,
@@ -275,7 +274,6 @@ void Elaborator::ValidateConfigPackageBinding() {
 
 void Elaborator::ValidateConfigHierarchicalRules() {
   for (auto* cfg : unit_->configs) {
-
     std::vector<std::string_view> delegated;
     for (auto* rule : cfg->rules) {
       if (rule->kind == ConfigRuleKind::kInstance && rule->use_config) {
@@ -341,18 +339,17 @@ bool WalkExprAny(const Expr* expr, Visitor&& v) {
   return false;
 }
 
-}
+}  // namespace
 
 void Elaborator::ValidateConfigLocalparams() {
   for (auto* cfg : unit_->configs) {
     for (const auto& [name, expr] : cfg->local_params) {
       if (!expr) continue;
       if (!IsLiteralKind(expr->kind)) {
-        diag_.Error(
-            cfg->range.start,
-            std::format("config '{}' localparam '{}' is not assigned a "
-                        "literal value",
-                        cfg->name, name));
+        diag_.Error(cfg->range.start,
+                    std::format("config '{}' localparam '{}' is not assigned a "
+                                "literal value",
+                                cfg->name, name));
       }
     }
   }
@@ -360,7 +357,6 @@ void Elaborator::ValidateConfigLocalparams() {
 
 void Elaborator::ValidateConfigParamOverrides() {
   for (auto* cfg : unit_->configs) {
-
     std::unordered_set<std::string_view> lp_names;
     for (const auto& [name, _] : cfg->local_params) lp_names.insert(name);
 
@@ -434,9 +430,8 @@ void Elaborator::ValidateConfigParamOverrides() {
           return false;
         });
 
-        bool has_user_call = WalkExprAny(expr, [](const Expr* e) {
-          return e->kind == ExprKind::kCall;
-        });
+        bool has_user_call = WalkExprAny(
+            expr, [](const Expr* e) { return e->kind == ExprKind::kCall; });
         if (has_user_call) {
           diag_.Error(
               cfg->range.start,
@@ -461,8 +456,7 @@ void Elaborator::ValidateAnonymousProgramNameSharing() {
       }
       auto [it, inserted] = seen.try_emplace(item->name, item);
       if (inserted) continue;
-      if (item->from_anonymous_program ||
-          it->second->from_anonymous_program) {
+      if (item->from_anonymous_program || it->second->from_anonymous_program) {
         diag_.Error(
             item->loc,
             std::format(
@@ -505,7 +499,6 @@ void Elaborator::ValidatePackageItems() {
 }
 
 void Elaborator::ValidatePackageReferences() {
-
   std::unordered_set<std::string_view> known_package_names;
   for (const auto* pkg : unit_->packages) known_package_names.insert(pkg->name);
 
@@ -555,15 +548,13 @@ void Elaborator::ValidatePackageReferences() {
     walk = [&](const Expr* e) {
       if (!e) return;
       if (e->kind == ExprKind::kIdentifier) {
-
         if (!e->scope_prefix.empty()) {
           diag_.Error(
               e->range.start,
               std::format("package item uses scope prefix '{}', which targets "
                           "a scope outside the package",
                           e->scope_prefix));
-        } else if (cu_top_names.count(e->text) &&
-                   !pkg_names.count(e->text) &&
+        } else if (cu_top_names.count(e->text) && !pkg_names.count(e->text) &&
                    !imported_names.count(e->text) &&
                    !is_provided_by_wildcard(e->text)) {
           diag_.Error(
@@ -615,29 +606,30 @@ void Elaborator::ValidatePackageReferences() {
 }
 
 void Elaborator::ValidatePackageExports() {
-
   std::unordered_map<std::string_view, const PackageDecl*> pkg_by_name;
   for (const auto* pkg : unit_->packages) {
     pkg_by_name[pkg->name] = pkg;
   }
 
   std::function<bool(const PackageDecl*, std::string_view,
-                     std::unordered_set<const PackageDecl*>&)> provides;
+                     std::unordered_set<const PackageDecl*>&)>
+      provides;
   provides = [&](const PackageDecl* src_pkg, std::string_view name,
                  std::unordered_set<const PackageDecl*>& visited) -> bool {
     if (!visited.insert(src_pkg).second) return false;
     for (const auto* it : src_pkg->items) {
       if (it->kind == ModuleItemKind::kImportDecl ||
-          it->kind == ModuleItemKind::kExportDecl) continue;
+          it->kind == ModuleItemKind::kExportDecl)
+        continue;
       if (it->kind == ModuleItemKind::kClassDecl && it->class_decl &&
-          it->class_decl->name == name) return true;
+          it->class_decl->name == name)
+        return true;
       if (!it->name.empty() && it->name == name) return true;
     }
     for (const auto* it : src_pkg->items) {
       if (it->kind != ModuleItemKind::kExportDecl) continue;
       const auto& ex = it->import_item;
       if (ex.package_name == "*") {
-
         for (const auto* imp : src_pkg->items) {
           if (imp->kind != ModuleItemKind::kImportDecl) continue;
           auto sit = pkg_by_name.find(imp->import_item.package_name);
@@ -658,7 +650,6 @@ void Elaborator::ValidatePackageExports() {
   };
 
   for (const auto* pkg : unit_->packages) {
-
     std::unordered_set<std::string> direct_imports;
     std::unordered_set<std::string_view> wildcard_sources;
     for (const auto* item : pkg->items) {
@@ -680,9 +671,8 @@ void Elaborator::ValidatePackageExports() {
 
       auto src_it = pkg_by_name.find(ex.package_name);
       if (src_it == pkg_by_name.end()) {
-        diag_.Error(item->loc,
-                    std::format("export from unknown package '{}'",
-                                ex.package_name));
+        diag_.Error(item->loc, std::format("export from unknown package '{}'",
+                                           ex.package_name));
         continue;
       }
       std::unordered_set<const PackageDecl*> visited;
@@ -693,15 +683,16 @@ void Elaborator::ValidatePackageExports() {
                         ex.item_name, ex.package_name));
         continue;
       }
-      auto key = std::string(ex.package_name) + "::" + std::string(ex.item_name);
+      auto key =
+          std::string(ex.package_name) + "::" + std::string(ex.item_name);
 
       if (direct_imports.count(key) == 0 &&
           wildcard_sources.count(ex.package_name) == 0) {
         diag_.Error(
             item->loc,
-            std::format(
-                "export '{}::{}': '{}' is not imported in package '{}'",
-                ex.package_name, ex.item_name, ex.item_name, pkg->name));
+            std::format("export '{}::{}': '{}' is not imported in package '{}'",
+                        ex.package_name, ex.item_name, ex.item_name,
+                        pkg->name));
       }
     }
   }
@@ -732,8 +723,7 @@ void Elaborator::ValidateModports() {
       if (!port.name.empty()) declared_names.insert(port.name);
     }
     for (const auto* item : iface->items) {
-      if (item->kind == ModuleItemKind::kClockingBlock &&
-          !item->name.empty()) {
+      if (item->kind == ModuleItemKind::kClockingBlock && !item->name.empty()) {
         clocking_names.insert(item->name);
       }
       if (!item->name.empty()) declared_names.insert(item->name);
@@ -806,25 +796,23 @@ void Elaborator::ValidateSpecifyBlocks() {
         if (it != port_map.end()) {
           const PortDecl* p = it->second;
           if (p->direction == Direction::kRef) {
-            diag_.Error(loc,
-                        std::format("ref port '{}' cannot be used as a "
-                                    "terminal in a specify block",
-                                    t.name));
+            diag_.Error(loc, std::format("ref port '{}' cannot be used as a "
+                                         "terminal in a specify block",
+                                         t.name));
             return;
           }
           if (p->direction != Direction::kInput &&
               p->direction != Direction::kInout) {
-            diag_.Error(loc,
-                        std::format("module path source '{}' must be "
-                                    "connected to an input or inout port",
-                                    t.name));
+            diag_.Error(loc, std::format("module path source '{}' must be "
+                                         "connected to an input or inout port",
+                                         t.name));
             return;
           }
           bool is_var = !p->data_type.is_net && !p->data_type.is_interconnect;
           if (is_var) {
-            diag_.Error(loc,
-                        std::format("module path source '{}' must be a net",
-                                    t.name));
+            diag_.Error(
+                loc,
+                std::format("module path source '{}' must be a net", t.name));
           }
           return;
         }
@@ -842,26 +830,23 @@ void Elaborator::ValidateSpecifyBlocks() {
         if (it != port_map.end()) {
           const PortDecl* p = it->second;
           if (p->direction == Direction::kRef) {
-            diag_.Error(loc,
-                        std::format("ref port '{}' cannot be used as a "
-                                    "terminal in a specify block",
-                                    t.name));
+            diag_.Error(loc, std::format("ref port '{}' cannot be used as a "
+                                         "terminal in a specify block",
+                                         t.name));
             return;
           }
           if (p->direction != Direction::kOutput &&
               p->direction != Direction::kInout) {
-            diag_.Error(loc,
-                        std::format("module path destination '{}' must be "
-                                    "connected to an output or inout port",
-                                    t.name));
+            diag_.Error(loc, std::format("module path destination '{}' must be "
+                                         "connected to an output or inout port",
+                                         t.name));
           }
           return;
         }
         if (local_signals.contains(t.name)) {
-          diag_.Error(loc,
-                      std::format("module path destination '{}' is not "
-                                  "connected to an output or inout port",
-                                  t.name));
+          diag_.Error(loc, std::format("module path destination '{}' is not "
+                                       "connected to an output or inout port",
+                                       t.name));
         }
       };
 
@@ -870,10 +855,9 @@ void Elaborator::ValidateSpecifyBlocks() {
         if (!t.interface_name.empty()) return;
         auto it = port_map.find(t.name);
         if (it != port_map.end() && it->second->direction == Direction::kRef) {
-          diag_.Error(loc,
-                      std::format("ref port '{}' cannot be used as a "
-                                  "terminal in a specify block",
-                                  t.name));
+          diag_.Error(loc, std::format("ref port '{}' cannot be used as a "
+                                       "terminal in a specify block",
+                                       t.name));
         }
       };
 
@@ -892,7 +876,7 @@ void Elaborator::ValidateSpecifyBlocks() {
       }
 
       auto same_endpoints = [](const SpecifyPathDecl& a,
-                                const SpecifyPathDecl& b) {
+                               const SpecifyPathDecl& b) {
         if (a.src_ports.size() != b.src_ports.size()) return false;
         if (a.dst_ports.size() != b.dst_ports.size()) return false;
         for (size_t i = 0; i < a.src_ports.size(); ++i) {
@@ -963,7 +947,7 @@ void Elaborator::ValidateSpecifyBlocks() {
         }
       };
       auto consistent_refs = [&](const SpecifyPathDecl& a,
-                                  const SpecifyPathDecl& b) {
+                                 const SpecifyPathDecl& b) {
         for (size_t i = 0; i < a.src_ports.size(); ++i) {
           if (ref_category(a.src_ports[i]) != ref_category(b.src_ports[i]))
             return false;
@@ -1019,11 +1003,14 @@ void Elaborator::ValidateSpecifyBlocks() {
         return EvalTypeWidth(it->second->data_type);
       };
       auto sum_widths = [&](const std::vector<SpecifyTerminal>& ts,
-                             bool& known) {
+                            bool& known) {
         uint32_t total = 0;
         for (const auto& t : ts) {
           uint32_t w = terminal_width(t);
-          if (w == 0) { known = false; return uint32_t{0}; }
+          if (w == 0) {
+            known = false;
+            return uint32_t{0};
+          }
           total += w;
         }
         return total;
@@ -1093,51 +1080,51 @@ void Elaborator::ValidateSpecifyBlocks() {
         }
         std::function<void(const Expr*, SourceLoc)> check_delay_expr =
             [&](const Expr* e, SourceLoc loc) {
-          if (!e) return;
-          switch (e->kind) {
-            case ExprKind::kIdentifier:
-              if (!specparams.contains(e->text)) {
-                diag_.Error(loc,
-                            std::format("module path delay operand '{}' is "
-                                        "not a specparam",
-                                        e->text));
+              if (!e) return;
+              switch (e->kind) {
+                case ExprKind::kIdentifier:
+                  if (!specparams.contains(e->text)) {
+                    diag_.Error(loc,
+                                std::format("module path delay operand '{}' is "
+                                            "not a specparam",
+                                            e->text));
+                  }
+                  return;
+                case ExprKind::kUnary:
+                case ExprKind::kPostfixUnary:
+                  check_delay_expr(e->lhs, loc);
+                  return;
+                case ExprKind::kBinary:
+                  check_delay_expr(e->lhs, loc);
+                  check_delay_expr(e->rhs, loc);
+                  return;
+                case ExprKind::kTernary:
+                  check_delay_expr(e->condition, loc);
+                  check_delay_expr(e->true_expr, loc);
+                  check_delay_expr(e->false_expr, loc);
+                  return;
+                case ExprKind::kMinTypMax:
+                  check_delay_expr(e->lhs, loc);
+                  check_delay_expr(e->condition, loc);
+                  check_delay_expr(e->rhs, loc);
+                  return;
+                case ExprKind::kSelect:
+                  check_delay_expr(e->base, loc);
+                  check_delay_expr(e->index, loc);
+                  check_delay_expr(e->index_end, loc);
+                  return;
+                case ExprKind::kConcatenation:
+                case ExprKind::kAssignmentPattern:
+                  for (auto* el : e->elements) check_delay_expr(el, loc);
+                  return;
+                case ExprKind::kReplicate:
+                  check_delay_expr(e->repeat_count, loc);
+                  for (auto* el : e->elements) check_delay_expr(el, loc);
+                  return;
+                default:
+                  return;
               }
-              return;
-            case ExprKind::kUnary:
-            case ExprKind::kPostfixUnary:
-              check_delay_expr(e->lhs, loc);
-              return;
-            case ExprKind::kBinary:
-              check_delay_expr(e->lhs, loc);
-              check_delay_expr(e->rhs, loc);
-              return;
-            case ExprKind::kTernary:
-              check_delay_expr(e->condition, loc);
-              check_delay_expr(e->true_expr, loc);
-              check_delay_expr(e->false_expr, loc);
-              return;
-            case ExprKind::kMinTypMax:
-              check_delay_expr(e->lhs, loc);
-              check_delay_expr(e->condition, loc);
-              check_delay_expr(e->rhs, loc);
-              return;
-            case ExprKind::kSelect:
-              check_delay_expr(e->base, loc);
-              check_delay_expr(e->index, loc);
-              check_delay_expr(e->index_end, loc);
-              return;
-            case ExprKind::kConcatenation:
-            case ExprKind::kAssignmentPattern:
-              for (auto* el : e->elements) check_delay_expr(el, loc);
-              return;
-            case ExprKind::kReplicate:
-              check_delay_expr(e->repeat_count, loc);
-              for (auto* el : e->elements) check_delay_expr(el, loc);
-              return;
-            default:
-              return;
-          }
-        };
+            };
         for (auto* si : item->specify_items) {
           if (si->kind != SpecifyItemKind::kPathDecl) continue;
           for (auto* d : si->path.delays) check_delay_expr(d, si->loc);
@@ -1162,7 +1149,6 @@ static void CollectAllModules(
 }
 
 void Elaborator::RunPreElaborationValidations() {
-
   ValidateNameSpaces();
 
   ValidateConfigDesignStatements();
@@ -1257,7 +1243,6 @@ RtlirDesign* Elaborator::ElaborateTops(
   early_defparam_resolutions_.clear();
 
   for (auto* mod_decl : top_decls) {
-
     std::string saved_path = std::move(current_inst_path_);
     current_inst_path_.assign(mod_decl->name.data(), mod_decl->name.size());
     auto* top = ElaborateModule(mod_decl, empty_params);
@@ -1476,7 +1461,6 @@ RtlirDesign* Elaborator::Elaborate(const ConfigDecl* cfg) {
 }
 
 void Elaborator::RegisterCuScopeItems() {
-
   class_names_.insert("semaphore");
 
   class_names_.insert("mailbox");
@@ -1560,11 +1544,11 @@ void Elaborator::ResolveExternModules() {
     }
 
     if (extern_decl->ports.size() != mod->ports.size()) {
-      diag_.Error(mod->range.start,
-                  std::format("module '{}' port count ({}) does not match "
-                              "extern declaration ({})",
-                              mod->name, mod->ports.size(),
-                              extern_decl->ports.size()));
+      diag_.Error(
+          mod->range.start,
+          std::format("module '{}' port count ({}) does not match "
+                      "extern declaration ({})",
+                      mod->name, mod->ports.size(), extern_decl->ports.size()));
       continue;
     }
     for (size_t i = 0; i < mod->ports.size(); ++i) {
@@ -1582,12 +1566,13 @@ void Elaborator::ResolveExternModules() {
       // only compared when the extern header states them: a non-ANSI extern
       // port list supplies names and positions alone and leaves the type to the
       // actual definition, so an unspecified side is treated as a match.
-      if (ep.direction != Direction::kNone && mp.direction != Direction::kNone &&
-          ep.direction != mp.direction) {
-        diag_.Error(mp.loc,
-                    std::format("module '{}' port '{}' direction does not match "
-                                "extern declaration",
-                                mod->name, mp.name));
+      if (ep.direction != Direction::kNone &&
+          mp.direction != Direction::kNone && ep.direction != mp.direction) {
+        diag_.Error(
+            mp.loc,
+            std::format("module '{}' port '{}' direction does not match "
+                        "extern declaration",
+                        mod->name, mp.name));
         break;
       }
       if (ep.data_type.kind != DataTypeKind::kImplicit &&
@@ -1601,12 +1586,11 @@ void Elaborator::ResolveExternModules() {
       }
     }
     if (extern_decl->params.size() != mod->params.size()) {
-      diag_.Error(
-          mod->range.start,
-          std::format("module '{}' parameter count ({}) does not match "
-                      "extern declaration ({})",
-                      mod->name, mod->params.size(),
-                      extern_decl->params.size()));
+      diag_.Error(mod->range.start,
+                  std::format("module '{}' parameter count ({}) does not match "
+                              "extern declaration ({})",
+                              mod->name, mod->params.size(),
+                              extern_decl->params.size()));
     } else {
       // The parameter lists must also correspond by name and position.
       for (size_t i = 0; i < mod->params.size(); ++i) {
@@ -1672,7 +1656,6 @@ std::optional<ModuleDecl*> Elaborator::ResolveCellUseOverride(
 }
 
 ModuleDecl* Elaborator::FindModule(std::string_view name) const {
-
   if (!current_inst_path_.empty()) {
     for (const auto& [path, ulib, ucell] : instance_use_overrides_) {
       if (path != current_inst_path_) continue;
@@ -1708,8 +1691,8 @@ ModuleDecl* Elaborator::FindModule(std::string_view name) const {
       if (current_inst_path_ == rule_path) {
         matches = true;
       } else if (current_inst_path_.size() > rule_path.size() &&
-                 current_inst_path_.compare(0, rule_path.size(), rule_path)
-                     == 0 &&
+                 current_inst_path_.compare(0, rule_path.size(), rule_path) ==
+                     0 &&
                  current_inst_path_[rule_path.size()] == '.') {
         matches = true;
       }
@@ -1760,7 +1743,6 @@ ModuleDecl* Elaborator::FindModule(std::string_view name) const {
       return best;
     }
   } else {
-
     // An empty selected library list selects no libraries to filter against;
     // it is treated below as no list being selected (§33.4.1.5).
     if (library_order_strict_ && !library_order_.empty() &&
@@ -1861,8 +1843,7 @@ void PopulateParamTypeInfo(RtlirParamDecl& pd, const DataType& dtype) {
 }
 
 void PopulateParamTypeInfo(RtlirParamDecl& pd, const DataType& dtype,
-                           const TypedefMap& typedefs,
-                           const ScopeMap& scope) {
+                           const TypedefMap& typedefs, const ScopeMap& scope) {
   pd.has_decl_range = dtype.packed_dim_left != nullptr;
   pd.has_decl_type = dtype.kind != DataTypeKind::kImplicit || dtype.is_signed;
   pd.decl_is_signed = dtype.is_signed;
@@ -1917,7 +1898,10 @@ void Elaborator::ApplyHeaderImports(const ModuleDecl* decl) {
     auto pkg_name = item->import_item.package_name;
     const ModuleDecl* pkg = nullptr;
     for (const auto* p : unit_->packages) {
-      if (p->name == pkg_name) { pkg = p; break; }
+      if (p->name == pkg_name) {
+        pkg = p;
+        break;
+      }
     }
     if (!pkg) continue;
     if (item->import_item.is_wildcard) {
@@ -1940,7 +1924,8 @@ void Elaborator::ApplyHeaderImports(const ModuleDecl* decl) {
 // data type of its connection expression. Resolve the expression's width
 // against the module's already-elaborated variables and nets. Returns 0 when
 // the width cannot be determined here, leaving the port's default untouched.
-static uint32_t ExplicitPortExprWidth(const Expr* expr, const RtlirModule* mod) {
+static uint32_t ExplicitPortExprWidth(const Expr* expr,
+                                      const RtlirModule* mod) {
   if (!expr) return 0;
   switch (expr->kind) {
     case ExprKind::kIdentifier:
@@ -2122,14 +2107,12 @@ void Elaborator::ElaboratePorts(const ModuleDecl* decl, RtlirModule* mod) {
   }
 
   for (const auto& port : decl->ports) {
-
     if (port.data_type.kind == DataTypeKind::kChandle) {
       diag_.Error(port.loc, "chandle cannot be used as a port type");
       continue;
     }
     if (port.data_type.kind == DataTypeKind::kVirtualInterface) {
-      diag_.Error(port.loc,
-                  "virtual interface cannot be used as a port type");
+      diag_.Error(port.loc, "virtual interface cannot be used as a port type");
       continue;
     }
 
@@ -2150,8 +2133,7 @@ void Elaborator::ElaboratePorts(const ModuleDecl* decl, RtlirModule* mod) {
             EvalTypeWidth(port.data_type, typedefs_, param_scope);
         // §23.2.2.1: remember a `signed` port direction declaration so the
         // matching net/variable declaration can be considered signed too.
-        if (port.data_type.is_signed)
-          non_ansi_signed_ports_.insert(port.name);
+        if (port.data_type.is_signed) non_ansi_signed_ports_.insert(port.name);
       }
     }
 
@@ -2162,7 +2144,7 @@ void Elaborator::ElaboratePorts(const ModuleDecl* decl, RtlirModule* mod) {
                                 "only allowed on input ports",
                                 port.direction == Direction::kOutput  ? "output"
                                 : port.direction == Direction::kInout ? "inout"
-                                                                     : "ref",
+                                                                      : "ref",
                                 port.name));
       }
       if (decl->is_non_ansi_ports) {
@@ -2173,14 +2155,14 @@ void Elaborator::ElaboratePorts(const ModuleDecl* decl, RtlirModule* mod) {
                                 port.name));
       }
       if (port.data_type.is_interconnect) {
-        diag_.Error(port.loc,
-                    std::format("default value on interconnect port '{}'",
-                                port.name));
+        diag_.Error(
+            port.loc,
+            std::format("default value on interconnect port '{}'", port.name));
       }
       if (!port.unpacked_dims.empty() || !IsSingularType(port.data_type)) {
-        diag_.Error(port.loc,
-                    std::format("default value on non-singular port '{}'",
-                                port.name));
+        diag_.Error(
+            port.loc,
+            std::format("default value on non-singular port '{}'", port.name));
       }
     }
 
@@ -2229,8 +2211,7 @@ void Elaborator::ElaboratePorts(const ModuleDecl* decl, RtlirModule* mod) {
           rp.unpacked_dim_sizes.push_back(static_cast<uint32_t>(*sv));
       }
     }
-    rp.num_unpacked_dims =
-        static_cast<uint32_t>(rp.unpacked_dim_sizes.size());
+    rp.num_unpacked_dims = static_cast<uint32_t>(rp.unpacked_dim_sizes.size());
 
     if (port.is_interface_port) {
       rp.is_interface_port = true;
@@ -2452,8 +2433,7 @@ void AddProcess(
   }
   if (kind == RtlirProcessKind::kAlways && item->is_star_sensitivity &&
       proc.sensitivity.empty()) {
-    proc.sensitivity =
-        InferSensitivity(proc.body, arena, nullptr, false);
+    proc.sensitivity = InferSensitivity(proc.body, arena, nullptr, false);
   }
 
   if (kind == RtlirProcessKind::kAlways && item->sensitivity.empty() &&
@@ -2495,8 +2475,8 @@ static void CollectStmtLhsPrefixes(const Stmt* stmt,
   for (const auto* s : stmt->fork_stmts) CollectStmtLhsPrefixes(s, out);
 }
 
-static void CollectCallNamesExpr(
-    const Expr* expr, std::unordered_set<std::string_view>& out) {
+static void CollectCallNamesExpr(const Expr* expr,
+                                 std::unordered_set<std::string_view>& out) {
   if (!expr) return;
   if (expr->kind == ExprKind::kCall && !expr->callee.empty())
     out.insert(expr->callee);
@@ -2511,8 +2491,8 @@ static void CollectCallNamesExpr(
   for (auto* elem : expr->elements) CollectCallNamesExpr(elem, out);
 }
 
-static void CollectCallNamesStmt(
-    const Stmt* stmt, std::unordered_set<std::string_view>& out) {
+static void CollectCallNamesStmt(const Stmt* stmt,
+                                 std::unordered_set<std::string_view>& out) {
   if (!stmt) return;
   CollectCallNamesExpr(stmt->expr, out);
   CollectCallNamesExpr(stmt->rhs, out);
@@ -2529,9 +2509,8 @@ static void CollectCallNamesStmt(
   for (const auto* s : stmt->fork_stmts) CollectCallNamesStmt(s, out);
 }
 
-static void CollectFuncLhsPrefixes(
-    const Stmt* body, const FuncMap& funcs,
-    std::unordered_set<std::string>& out) {
+static void CollectFuncLhsPrefixes(const Stmt* body, const FuncMap& funcs,
+                                   std::unordered_set<std::string>& out) {
   std::unordered_set<std::string_view> pending;
   CollectCallNamesStmt(body, pending);
   std::unordered_set<std::string_view> visited;
@@ -2581,8 +2560,7 @@ static const char* ProcessKindLabel(ModuleItemKind k) {
 
 static void CollectProcessLhsInfo(
     const ModuleDecl* decl, std::vector<ProcInfo>& procs,
-    std::unordered_set<std::string>& cont_assign_lhs,
-    const FuncMap* func_map) {
+    std::unordered_set<std::string>& cont_assign_lhs, const FuncMap* func_map) {
   for (const auto* item : decl->items) {
     if (item->kind == ModuleItemKind::kAlwaysCombBlock ||
         item->kind == ModuleItemKind::kAlwaysLatchBlock ||
@@ -2639,7 +2617,7 @@ static void CheckDriverConflicts(
 }
 
 void Elaborator::CheckAlwaysCombMultiDriver(const ModuleDecl* decl,
-                                            RtlirModule* ) {
+                                            RtlirModule*) {
   std::vector<ProcInfo> procs;
   std::unordered_set<std::string> cont_assign_lhs;
   CollectProcessLhsInfo(decl, procs, cont_assign_lhs, &func_decls_);
@@ -2720,8 +2698,8 @@ static bool IsUserDefinedType(
 static void ComputeUnpackedDims(
     const std::vector<Expr*>& dims, RtlirVariable& var,
     const TypedefMap& typedefs,
-    const std::unordered_set<std::string_view>& class_names,
-    DiagEngine& diag, SourceLoc loc) {
+    const std::unordered_set<std::string_view>& class_names, DiagEngine& diag,
+    SourceLoc loc) {
   if (dims.empty() || !dims[0]) return;
   auto* dim = dims[0];
   if (TryParseQueueDim(dim, var, diag, loc)) return;
@@ -2736,7 +2714,6 @@ static void ComputeUnpackedDims(
       var.assoc_index_class_name = dim->text;
       var.assoc_index_width = 64;
     } else {
-
       auto it = typedefs.find(dim->text);
       if (it != typedefs.end()) {
         var.assoc_index_width = EvalTypeWidth(it->second, typedefs);
@@ -2753,8 +2730,7 @@ static void ComputeUnpackedDims(
   auto size_val = ConstEvalInt(dim);
   if (size_val) {
     if (*size_val <= 0) {
-      diag.Error(loc,
-                 "unpacked dimension size shall be a positive integer");
+      diag.Error(loc, "unpacked dimension size shall be a positive integer");
     } else {
       var.unpacked_size = static_cast<uint32_t>(*size_val);
     }
@@ -2831,16 +2807,15 @@ void Elaborator::ElaborateNetDecl(ModuleItem* item, RtlirModule* mod) {
     DataTypeKind k = item->data_type.kind;
     if (k != DataTypeKind::kStruct && k != DataTypeKind::kUnion &&
         k != DataTypeKind::kEnum && k != DataTypeKind::kNamed &&
-        DataTypeToNetType(k) == NetType::kWire &&
-        k != DataTypeKind::kWire && !Is4stateType(k)) {
+        DataTypeToNetType(k) == NetType::kWire && k != DataTypeKind::kWire &&
+        !Is4stateType(k)) {
       diag_.Error(item->loc, "net data type must be 4-state");
     }
   }
 
   if (item->data_type.charge_strength != 0 &&
       net.net_type != NetType::kTrireg) {
-    diag_.Error(item->loc,
-                "charge strength can only be used with trireg nets");
+    diag_.Error(item->loc, "charge strength can only be used with trireg nets");
   }
   net.is_vectored = item->data_type.is_vectored;
   net.is_scalared = item->data_type.is_scalared;
@@ -2866,7 +2841,6 @@ void Elaborator::ElaborateNetDecl(ModuleItem* item, RtlirModule* mod) {
         static_cast<uint64_t>(ConstEvalInt(item->net_delay_decay).value_or(0));
   } else if (net.net_type == NetType::kTrireg &&
              !unit_->default_decay_time_infinite) {
-
     net.decay_ticks = unit_->default_decay_time;
   }
 
@@ -2941,7 +2915,6 @@ void Elaborator::SetStructTypeInfo(const ModuleItem* item, RtlirVariable& var) {
 }
 
 void Elaborator::ValidateVarDeclTypes(ModuleItem* item) {
-
   if (item->data_type.kind == DataTypeKind::kNamed &&
       class_names_.count(item->data_type.type_name)) {
     class_var_names_.insert(item->name);
@@ -2966,7 +2939,8 @@ void Elaborator::ValidateVarDeclTypes(ModuleItem* item) {
     if (item->data_type.type_name == "weak_reference" &&
         !item->data_type.type_params.empty()) {
       const auto& tp = item->data_type.type_params[0];
-      if (tp.kind != DataTypeKind::kNamed || !class_names_.count(tp.type_name)) {
+      if (tp.kind != DataTypeKind::kNamed ||
+          !class_names_.count(tp.type_name)) {
         diag_.Error(item->loc,
                     "weak_reference type parameter shall be a class type");
       }
@@ -3022,8 +2996,7 @@ void Elaborator::TrackVarArrayInfo(const ModuleItem* item,
       }
     } else {
       auto sv = ConstEvalInt(dim);
-      if (sv && *sv > 0)
-        info.dim_sizes.push_back(static_cast<uint32_t>(*sv));
+      if (sv && *sv > 0) info.dim_sizes.push_back(static_cast<uint32_t>(*sv));
     }
   }
   var_array_info_[item->name] = info;
@@ -3204,8 +3177,7 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
       }
     }
     auto* iface_decl = FindModule(iface_name);
-    if (!iface_decl ||
-        iface_decl->decl_kind != ModuleDeclKind::kInterface) {
+    if (!iface_decl || iface_decl->decl_kind != ModuleDeclKind::kInterface) {
       diag_.Error(item->loc,
                   std::format("unknown interface '{}' in virtual interface "
                               "declaration",
@@ -3227,8 +3199,7 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
     // §25.9: an interface containing hierarchical references to objects
     // outside its body (or ports that reference other interfaces) shall not
     // be used as the type of a virtual interface.
-    if (iface_decl &&
-        iface_decl->decl_kind == ModuleDeclKind::kInterface &&
+    if (iface_decl && iface_decl->decl_kind == ModuleDeclKind::kInterface &&
         InterfaceContainsExternalReference(iface_decl)) {
       diag_.Error(item->loc,
                   std::format("interface '{}' contains references to objects "
@@ -3269,8 +3240,8 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
 
   SetEnumTypeInfo(item, var, typedefs_, arena_);
 
-  ComputeUnpackedDims(item->unpacked_dims, var, typedefs_, class_names_,
-                      diag_, item->loc);
+  ComputeUnpackedDims(item->unpacked_dims, var, typedefs_, class_names_, diag_,
+                      item->loc);
   ValidateUnpackedDimRange(item->unpacked_dims, item->loc);
   InferDynArraySize(item->unpacked_dims, item->init_expr, var);
 
@@ -3324,8 +3295,7 @@ void Elaborator::ApplyBindDirectives(RtlirModule* top) {
   if (binds.empty()) return;
   std::unordered_set<RtlirModule*> visited;
   std::unordered_set<BindDirective*> applied;
-  WalkForBind(top, std::string(top->name), binds, false,
-              visited, applied);
+  WalkForBind(top, std::string(top->name), binds, false, visited, applied);
 
   // §23.11: the bind_target_scope shall be a module or an interface, and a
   // bind_target_instance shall be an instance of a module or an interface. A
@@ -3355,10 +3325,8 @@ void Elaborator::WalkForBind(RtlirModule* mod, const std::string& hier_path,
     bool has_instances = !bd->target_instances.empty();
     bool is_scope = IsBindTargetScope(bd->target, unit_);
     if (is_scope && !has_instances) {
-
       if (mod->name == bd->target) applies = true;
     } else if (is_scope && has_instances) {
-
       if (mod->name == bd->target) {
         for (auto inst_path : bd->target_instances) {
           if (hier_path == inst_path) {
@@ -3368,7 +3336,6 @@ void Elaborator::WalkForBind(RtlirModule* mod, const std::string& hier_path,
         }
       }
     } else {
-
       if (hier_path == bd->target) applies = true;
     }
     if (!applies) continue;
@@ -3423,9 +3390,8 @@ void Elaborator::ApplyBindInstance(BindDirective* bd, RtlirModule* target) {
 
   auto* child_decl = FindModule(item->inst_module);
   if (!child_decl) {
-    diag_.Error(bd->loc,
-                std::format("bind refers to unknown module '{}'",
-                            item->inst_module));
+    diag_.Error(bd->loc, std::format("bind refers to unknown module '{}'",
+                                     item->inst_module));
     return;
   }
 
@@ -3434,16 +3400,25 @@ void Elaborator::ApplyBindInstance(BindDirective* bd, RtlirModule* target) {
     auto name = conn_expr->text;
     bool found = false;
     for (const auto& v : target->variables) {
-      if (v.name == name) { found = true; break; }
+      if (v.name == name) {
+        found = true;
+        break;
+      }
     }
     if (!found) {
       for (const auto& n : target->nets) {
-        if (n.name == name) { found = true; break; }
+        if (n.name == name) {
+          found = true;
+          break;
+        }
       }
     }
     if (!found) {
       for (const auto& p : target->ports) {
-        if (p.name == name) { found = true; break; }
+        if (p.name == name) {
+          found = true;
+          break;
+        }
       }
     }
     if (!found) {
@@ -3577,7 +3552,7 @@ bool ExportPrototypeMatchesBody(const ModuleItem* proto,
   return true;
 }
 
-}
+}  // namespace
 
 void Elaborator::ValidateModportExportConflicts(RtlirModule* top) {
   if (!top) return;
@@ -3590,8 +3565,7 @@ void Elaborator::WalkForExportConflicts(
   if (!mod) return;
   if (!visited.insert(mod).second) return;
 
-  std::unordered_map<std::string_view, std::string_view>
-      iface_inst_to_type;
+  std::unordered_map<std::string_view, std::string_view> iface_inst_to_type;
   for (const auto& c : mod->children) {
     if (auto* cd = FindModule(c.module_name);
         cd && cd->decl_kind == ModuleDeclKind::kInterface) {
@@ -3630,34 +3604,32 @@ void Elaborator::WalkForExportConflicts(
       auto* iface_decl = FindModule(it->second);
       if (!iface_decl) continue;
 
-      auto collect_exports =
-          [&](const std::vector<ModportPort>& mp_ports) {
-            for (const auto& pp : mp_ports) {
-              if (!pp.is_export) continue;
-              if (pp.name.empty()) continue;
-              const auto* body = FindOutOfBlockBodyInChild(
-                  child_decl, binding.port_name, pp.name);
-              if (!body) continue;
-              // §25.7: an export written as a full prototype pins the signature
-              // the defining module must provide; a definition that does not
-              // match it exactly is an elaboration error.
-              if (pp.prototype &&
-                  !ExportPrototypeMatchesBody(pp.prototype, body)) {
-                diag_.Error(
-                    body->loc,
-                    std::format(
-                        "definition of exported subroutine '{}' in module '{}' "
-                        "does not match the prototype declared in the modport",
-                        pp.name, child.module_name));
-              }
-              ExportKey key{iface_inst_name, modport_name, pp.name};
-              ExportSite site;
-              site.child_inst = child.inst_name;
-              site.is_task = body->kind == ModuleItemKind::kTaskDecl;
-              site.loc = body->loc;
-              buckets[key].push_back(site);
-            }
-          };
+      auto collect_exports = [&](const std::vector<ModportPort>& mp_ports) {
+        for (const auto& pp : mp_ports) {
+          if (!pp.is_export) continue;
+          if (pp.name.empty()) continue;
+          const auto* body =
+              FindOutOfBlockBodyInChild(child_decl, binding.port_name, pp.name);
+          if (!body) continue;
+          // §25.7: an export written as a full prototype pins the signature
+          // the defining module must provide; a definition that does not
+          // match it exactly is an elaboration error.
+          if (pp.prototype && !ExportPrototypeMatchesBody(pp.prototype, body)) {
+            diag_.Error(
+                body->loc,
+                std::format(
+                    "definition of exported subroutine '{}' in module '{}' "
+                    "does not match the prototype declared in the modport",
+                    pp.name, child.module_name));
+          }
+          ExportKey key{iface_inst_name, modport_name, pp.name};
+          ExportSite site;
+          site.child_inst = child.inst_name;
+          site.is_task = body->kind == ModuleItemKind::kTaskDecl;
+          site.loc = body->loc;
+          buckets[key].push_back(site);
+        }
+      };
 
       if (!modport_name.empty()) {
         const auto* mp = FindModportInInterface(iface_decl, modport_name);
@@ -3689,12 +3661,11 @@ void Elaborator::WalkForExportConflicts(
     if (is_task_export && is_forkjoin_task) continue;
 
     if (!is_task_export) {
-      diag_.Error(
-          sites[0].loc,
-          std::format("function '{}' exported by more than one module "
-                      "connected to interface instance '{}' (§25.7.4: "
-                      "multiple export of functions is not allowed)",
-                      key.name, key.iface_inst));
+      diag_.Error(sites[0].loc,
+                  std::format("function '{}' exported by more than one module "
+                              "connected to interface instance '{}' (§25.7.4: "
+                              "multiple export of functions is not allowed)",
+                              key.name, key.iface_inst));
     } else {
       diag_.Error(
           sites[0].loc,
@@ -3712,4 +3683,4 @@ void Elaborator::WalkForExportConflicts(
   }
 }
 
-}
+}  // namespace delta

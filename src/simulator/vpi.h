@@ -118,12 +118,13 @@ constexpr int kVpiAutomatic = 50;
 // other property/object/callback constant in this module.
 constexpr int kVpiAllocScheme = 731;
 
-// §37.3.7: the three (and only three) allocation schemes vpi_get(vpiAllocScheme)
-// may return. These live in the property-RETURN-value namespace, distinct from
-// the selector numbers above, so small contiguous ints are unambiguous.
+// §37.3.7: the three (and only three) allocation schemes
+// vpi_get(vpiAllocScheme) may return. These live in the property-RETURN-value
+// namespace, distinct from the selector numbers above, so small contiguous ints
+// are unambiguous.
 //   kVpiAutomaticScheme -> object lives with a frame or thread
-//   kVpiDynamicScheme   -> object was allocated in dynamic memory (e.g. a class)
-//   kVpiOtherScheme     -> the mandated default for every other object
+//   kVpiDynamicScheme   -> object was allocated in dynamic memory (e.g. a
+//   class) kVpiOtherScheme     -> the mandated default for every other object
 constexpr int kVpiAutomaticScheme = 1;
 constexpr int kVpiDynamicScheme = 2;
 constexpr int kVpiOtherScheme = 3;
@@ -212,10 +213,11 @@ struct VpiObject {
   int size = 0;
   int index = 0;
 
-  // §37.36 detail 2: the primitive type a UDP reports through vpi_get(vpiPrimType)
+  // §37.36 detail 2: the primitive type a UDP reports through
+  // vpi_get(vpiPrimType)
   // - vpiSeqPrim for a sequential UDP, vpiCombPrim for a combinational one. The
-  // same property labels a primitive in §37.35; both read it from here. Zero when
-  // the object reports no primitive type.
+  // same property labels a primitive in §37.35; both read it from here. Zero
+  // when the object reports no primitive type.
   int prim_type = 0;
 
   // §6.9.2: the advisory accessibility keyword a vector net was declared with.
@@ -303,13 +305,13 @@ struct VpiObject {
   std::string def_name;
 
   // §37.54 (D2): the operation type an operation object reports through
-  // vpi_get(vpiOpType). For a sequence expression's operation this is one of the
-  // sequence operators (see VpiIsSequenceExprOpType); zero when unset.
+  // vpi_get(vpiOpType). For a sequence expression's operation this is one of
+  // the sequence operators (see VpiIsSequenceExprOpType); zero when unset.
   int op_type = 0;
 
   // §37.59: the constant type a constant object reports through
-  // vpi_get(vpiConstType). vpiUnboundedConst names the $ value used in assertion
-  // ranges (detail 4). Zero when unset.
+  // vpi_get(vpiConstType). vpiUnboundedConst names the $ value used in
+  // assertion ranges (detail 4). Zero when unset.
   int const_type = 0;
 
   // §37.59: the index-part-select type an indexed part-select reports through
@@ -319,7 +321,8 @@ struct VpiObject {
 
   // §37.52 detail 3: whether an operation reports the strong version of its
   // operator through vpi_get(vpiOpStrong). Meaningful only for the operators
-  // VpiIsOpStrongValidOp accepts (and for sequence expressions); false otherwise.
+  // VpiIsOpStrongValidOp accepts (and for sequence expressions); false
+  // otherwise.
   bool op_strong = false;
 
   // §37.50: whether a cover covers a sequence rather than a property, reported
@@ -348,8 +351,9 @@ struct VpiObject {
   bool active = false;
 
   // §37.49: the source span an assertion object occupies. start/column/end are
-  // reported through vpi_get(vpiStartLine/vpiColumn/vpiEndLine/vpiEndColumn) and
-  // the file through vpi_get_str(vpiFile); the assertion name reuses `name`.
+  // reported through vpi_get(vpiStartLine/vpiColumn/vpiEndLine/vpiEndColumn)
+  // and the file through vpi_get_str(vpiFile); the assertion name reuses
+  // `name`.
   std::string file;
   int start_line = 0;
   int column = 0;
@@ -364,12 +368,13 @@ struct VpiObject {
   int line_no = 0;
 
   // §37.83: the scalar properties the Attribute data model diagram draws on an
-  // attribute object (vpiAttribute). vpiDefAttribute reports whether the attribute
-  // was specified on a definition (such as a UDP or module definition) rather than
-  // on an instance; vpiDefFile and vpiDefLineNo give the source file and line of
-  // that definition. The attribute's vpiName reuses `name`, its value is reached
-  // through vpi_get_value() (§38.34), and its owning object is reached through
-  // vpiParent (reusing `parent`). All default to the "unset" state.
+  // attribute object (vpiAttribute). vpiDefAttribute reports whether the
+  // attribute was specified on a definition (such as a UDP or module
+  // definition) rather than on an instance; vpiDefFile and vpiDefLineNo give
+  // the source file and line of that definition. The attribute's vpiName reuses
+  // `name`, its value is reached through vpi_get_value() (§38.34), and its
+  // owning object is reached through vpiParent (reusing `parent`). All default
+  // to the "unset" state.
   bool def_attribute = false;
   std::string def_file;
   int def_line_no = 0;
@@ -382,12 +387,13 @@ struct VpiObject {
 
   // §37.3.4: the source-specified delay expression this object exposes through
   // the vpiDelay relation. A net, primitive, module path, timing check, or
-  // continuous assignment can carry a delay written in the SystemVerilog source;
-  // vpiDelay reaches the expression standing for it - a single constant-valued
-  // expression when one delay is written, or a vpiListOp operation listing them
-  // when more than one is written. NULL when the object carries no source delay.
-  // Distinct from `delays` above, which holds the actual delay values the tool
-  // uses (reported by vpi_get_delays(), §38.10), not the source expression.
+  // continuous assignment can carry a delay written in the SystemVerilog
+  // source; vpiDelay reaches the expression standing for it - a single
+  // constant-valued expression when one delay is written, or a vpiListOp
+  // operation listing them when more than one is written. NULL when the object
+  // carries no source delay. Distinct from `delays` above, which holds the
+  // actual delay values the tool uses (reported by vpi_get_delays(), §38.10),
+  // not the source expression.
   VpiObject* delay_expr = nullptr;
 
   // §37.14 / §37.15: a port (or a ref obj) carries two designated connections.
@@ -410,19 +416,20 @@ struct VpiObject {
   // tf call's prefix is modeled separately by §37.42.
   VpiObject* prefix = nullptr;
 
-  // §37.61 detail 3: how this object's correspondence to an actual is fixed (one
-  // of the kVpiActual* provenances). The default, kVpiActualBySimTime, leaves
-  // vpiHasActual driven by whether `actual` is bound at the current simulation
-  // time; the other values pin the answer per the object's provenance.
+  // §37.61 detail 3: how this object's correspondence to an actual is fixed
+  // (one of the kVpiActual* provenances). The default, kVpiActualBySimTime,
+  // leaves vpiHasActual driven by whether `actual` is bound at the current
+  // simulation time; the other values pin the answer per the object's
+  // provenance.
   int actual_origin = kVpiActualBySimTime;
 
   // §37.14 detail 1: a port's type, one of vpiPort, vpiInterfacePort, or
-  // vpiModportPort, reported through vpi_get(vpiPortType). It is derived from the
-  // formal, not the actual. Zero when unset.
+  // vpiModportPort, reported through vpi_get(vpiPortType). It is derived from
+  // the formal, not the actual. Zero when unset.
   int port_type = 0;
 
-  // §37.14 detail 8: whether a port was given an explicit name in the port list,
-  // reported through vpi_get(vpiExplicitName).
+  // §37.14 detail 8: whether a port was given an explicit name in the port
+  // list, reported through vpi_get(vpiExplicitName).
   bool explicit_name = false;
 
   // §37.14 detail 10/11: whether a port is a null port (e.g. "module M();").
@@ -487,13 +494,15 @@ struct VpiObject {
   // array. It gates the vpiIndex transition for both an array-member primitive
   // and a program that is an element of an instance array: such an object
   // reaches the index expression that selects it within the array through that
-  // transition, while an object that is not an array element returns NULL there.
+  // transition, while an object that is not an array element returns NULL
+  // there.
   bool array_member = false;
 
   // §37.35 detail 4 / §37.9 detail 1: for an array-member object, the index
-  // expression the vpiIndex transition reaches - the expr that locates it within
-  // its array. The target's own type is an expr kind (not vpiIndex), so it is
-  // held as a designated pointer rather than found by the generic child walk.
+  // expression the vpiIndex transition reaches - the expr that locates it
+  // within its array. The target's own type is an expr kind (not vpiIndex), so
+  // it is held as a designated pointer rather than found by the generic child
+  // walk.
   VpiObject* index_expr = nullptr;
 
   // §37.17 detail 21 / §38.35: the array kind this object reports through
@@ -532,11 +541,11 @@ struct VpiObject {
   VpiObject* tf_prefix = nullptr;
 
   // §37.42 detail 1: the with-clause a method call carries (an expression, or a
-  // constraint for randomize), reached through vpiWith. The relation is available
-  // only for the methods that accept a with clause - the randomize methods (18.7)
-  // and the array locator methods (7.12.1); `tf_with_method` records whether this
-  // call is one of those. vpiWith reports `tf_with` only when it is, NULL
-  // otherwise.
+  // constraint for randomize), reached through vpiWith. The relation is
+  // available only for the methods that accept a with clause - the randomize
+  // methods (18.7) and the array locator methods (7.12.1); `tf_with_method`
+  // records whether this call is one of those. vpiWith reports `tf_with` only
+  // when it is, NULL otherwise.
   VpiObject* tf_with = nullptr;
   bool tf_with_method = false;
 
@@ -552,9 +561,9 @@ struct VpiObject {
   // offset n. Zero by default, which is the value the LSB must report.
   int offset = 0;
 
-  // §37.47: whether a continuous assignment is a net declaration assignment (the
-  // assignment written as part of a net declaration, as in "wire w = a & b;")
-  // rather than a standalone assign statement. Reported through the
+  // §37.47: whether a continuous assignment is a net declaration assignment
+  // (the assignment written as part of a net declaration, as in "wire w = a &
+  // b;") rather than a standalone assign statement. Reported through the
   // vpiNetDeclAssign Boolean property; false by default.
   bool net_decl_assign = false;
 
@@ -564,17 +573,18 @@ struct VpiObject {
   int strength0 = 0;
   int strength1 = 0;
 
-  // §37.34: a constraint's access type, reported through vpi_get(vpiAccessType).
-  // For a constraint the only values are vpiExternAcc - when the constraint is
-  // declared outside its enclosing class declaration (detail 3) - and zero.
+  // §37.34: a constraint's access type, reported through
+  // vpi_get(vpiAccessType). For a constraint the only values are vpiExternAcc -
+  // when the constraint is declared outside its enclosing class declaration
+  // (detail 3) - and zero.
   int access_type = 0;
 
   // §37.34: whether a constraint is virtual, reported through the vpiVirtual
   // Boolean property; false by default.
   bool is_virtual = false;
 
-  // §37.34: whether a constraint is currently enabled (constraint_mode), reported
-  // through the vpiIsConstraintEnabled Boolean property.
+  // §37.34: whether a constraint is currently enabled (constraint_mode),
+  // reported through the vpiIsConstraintEnabled Boolean property.
   bool constraint_enabled = false;
 
   // §37.34: the distribution kind a dist item carries (e.g. vpiEqualDist or
@@ -597,13 +607,13 @@ struct VpiObject {
   // localparam). `conn_by_name` backs a param assign's vpiConnByName Boolean
   // (whether the override connects by name). `param_default` is the vpiExpr
   // target - a value parameter's default value expression or a type parameter's
-  // default typespec (detail 3). `param_typespec` is a type parameter's vpiTypespec
-  // target - the typespec it resolved to at the end of elaboration, kept without
-  // typedef-alias resolution (detail 2). `explicit_param_range` records whether a
-  // value parameter was declared with an explicit range; when false, vpiLeftRange
-  // and vpiRightRange both report a null handle (detail 5). `param_left_range` and
-  // `param_right_range` hold the range-bound expressions for a parameter that does
-  // have an explicit range.
+  // default typespec (detail 3). `param_typespec` is a type parameter's
+  // vpiTypespec target - the typespec it resolved to at the end of elaboration,
+  // kept without typedef-alias resolution (detail 2). `explicit_param_range`
+  // records whether a value parameter was declared with an explicit range; when
+  // false, vpiLeftRange and vpiRightRange both report a null handle (detail 5).
+  // `param_left_range` and `param_right_range` hold the range-bound expressions
+  // for a parameter that does have an explicit range.
   bool local_param = false;
   bool conn_by_name = false;
   VpiObject* param_default = nullptr;
@@ -612,32 +622,33 @@ struct VpiObject {
   VpiObject* param_left_range = nullptr;
   VpiObject* param_right_range = nullptr;
 
-  // §37.31 detail 1: whether a class method is an implicit built-in method - one
-  // SystemVerilog provides for which the class carries no explicit declaration.
-  // The vpiMethods iteration of a class defn omits such methods (it returns only
-  // explicitly declared static and automatic methods); false by default, so an
-  // ordinary declared method is always reported.
+  // §37.31 detail 1: whether a class method is an implicit built-in method -
+  // one SystemVerilog provides for which the class carries no explicit
+  // declaration. The vpiMethods iteration of a class defn omits such methods
+  // (it returns only explicitly declared static and automatic methods); false
+  // by default, so an ordinary declared method is always reported.
   bool implicit_builtin_method = false;
 
-  // §37.31 detail 3: whether a constraint is an inline constraint (one written at
-  // a randomize()-with call site, 18.7) rather than a normal constraint declared
-  // as a class item. A class defn's vpiConstraint iteration returns only normal
-  // constraints, so an inline constraint is skipped; false by default.
+  // §37.31 detail 3: whether a constraint is an inline constraint (one written
+  // at a randomize()-with call site, 18.7) rather than a normal constraint
+  // declared as a class item. A class defn's vpiConstraint iteration returns
+  // only normal constraints, so an inline constraint is skipped; false by
+  // default.
   bool inline_constraint = false;
 
   // §37.33 detail 1: a class object's identifier, reported through
   // vpi_get(vpiObjId). It is a 64-bit value guaranteed unique among all live
   // dynamic objects that carry this property for as long as the object lives;
   // once the object is reclaimed its value may be reused. §37.33 detail 2: a
-  // class variable does not store its own identifier - it reports the identifier
-  // of the object it currently references (see referenced_object), or 0 when it
-  // references none. Zero by default.
+  // class variable does not store its own identifier - it reports the
+  // identifier of the object it currently references (see referenced_object),
+  // or 0 when it references none. Zero by default.
   int64_t obj_id = 0;
 
   // §37.33 detail 2/5: the class object a class variable currently references.
   // A class variable holding the value null references no object, in which case
-  // this is null: its vpiObjId is then 0 (detail 2) and the vpiClassObj relation
-  // applied to it reaches a null handle (detail 5). Null by default.
+  // this is null: its vpiObjId is then 0 (detail 2) and the vpiClassObj
+  // relation applied to it reaches a null handle (detail 5). Null by default.
   VpiObject* referenced_object = nullptr;
 
   // §37.40 detail 1: the event terms a timing check reaches through its
@@ -650,9 +661,9 @@ struct VpiObject {
   VpiObject* tchk_ref_term = nullptr;
   VpiObject* tchk_data_term = nullptr;
 
-  // §37.45: the two delay terminals a delay device reaches. vpiInTerm denotes the
-  // input delay term and vpiOutTerm the output delay term. Each is a delay term
-  // object, whose own type (vpiDelayTerm) differs from the relation enum
+  // §37.45: the two delay terminals a delay device reaches. vpiInTerm denotes
+  // the input delay term and vpiOutTerm the output delay term. Each is a delay
+  // term object, whose own type (vpiDelayTerm) differs from the relation enum
   // (vpiInTerm / vpiOutTerm), so - as with the timing-check terms above - they
   // are held as designated pointers rather than found by a type match. Null by
   // default.
@@ -662,26 +673,26 @@ struct VpiObject {
   // §37.79: the left- and right-hand side expressions of a procedural
   // continuous assignment family object - an assign statement, a force, a
   // deassign, or a release. The diagram draws vpiLhs from all four and vpiRhs
-  // only from the assign statement and force (deassign and release name a target
-  // but supply no value). Each side is an expression, whose own type is an
-  // expression kind rather than the vpiLhs / vpiRhs relation enum, so - as with
-  // the other designated targets above - they are held as designated pointers
-  // rather than found by a type match. Null by default.
+  // only from the assign statement and force (deassign and release name a
+  // target but supply no value). Each side is an expression, whose own type is
+  // an expression kind rather than the vpiLhs / vpiRhs relation enum, so - as
+  // with the other designated targets above - they are held as designated
+  // pointers rather than found by a type match. Null by default.
   VpiObject* lhs = nullptr;
   VpiObject* rhs = nullptr;
 
-  // §37.45: the vpiDelayType integer property carried by a delay device and by a
-  // delay term. It names the kind of delay (for example a module-path or timing
-  // delay). Zero by default, which is what every object that is not a delay
-  // device or delay term reports.
+  // §37.45: the vpiDelayType integer property carried by a delay device and by
+  // a delay term. It names the kind of delay (for example a module-path or
+  // timing delay). Zero by default, which is what every object that is not a
+  // delay device or delay term reports.
   int delay_type = 0;
 
   // §37.38 detail 1 / §37.75 detail 1: the variable a foreach constraint or
   // foreach statement indexes. The foreach reaches it through the vpiVariables
-  // relation, where it represents the array (or string) being iterated over. Its
-  // own type is a variable kind, not the relation enum, so it is held as a
-  // designated pointer rather than found by a type match. Null by default - only
-  // a foreach constraint or foreach statement carries one.
+  // relation, where it represents the array (or string) being iterated over.
+  // Its own type is a variable kind, not the relation enum, so it is held as a
+  // designated pointer rather than found by a type match. Null by default -
+  // only a foreach constraint or foreach statement carries one.
   VpiObject* foreach_array = nullptr;
 
   // §37.38 detail 2 / §37.75 detail 2: the index variables of a foreach
@@ -703,24 +714,25 @@ struct VpiObject {
   // §37.41 details 1-3: the variable that captures a function's return value,
   // reached through the vpiReturn relation. Detail 1 makes a function contain a
   // return-capture object sharing the function's name, size, and type; detail 2
-  // makes vpi_handle(vpiReturn, function) hand back that variable so a caller can
-  // inspect a user-defined return type through it; detail 3 makes the relation
-  // always reach a var object, even for a simple scalar return. Its own type is a
-  // variable kind, not the relation enum, so it is held as a designated pointer
-  // rather than found by the generic child walk. Null for a task (which returns
-  // nothing) and for any object that is not a function.
+  // makes vpi_handle(vpiReturn, function) hand back that variable so a caller
+  // can inspect a user-defined return type through it; detail 3 makes the
+  // relation always reach a var object, even for a simple scalar return. Its
+  // own type is a variable kind, not the relation enum, so it is held as a
+  // designated pointer rather than found by the generic child walk. Null for a
+  // task (which returns nothing) and for any object that is not a function.
   VpiObject* return_var = nullptr;
 
-  // §37.41 details 6-10: the DPI properties a DPI import/export task or function
-  // reports. `is_dpi` marks the tf as a DPI import or export, and `dpi_export`
-  // distinguishes an export (true) from an import (false); vpiAccessType reports
-  // vpiDPIExportAcc or vpiDPIImportAcc from the pair (detail 6). `dpi_pure` backs
-  // vpiDPIPure - true only for a pure DPI import function (detail 7). `dpi_context`
-  // backs vpiDPIContext - true for a context import (detail 8). `is_dpi_c` selects
-  // the flavor vpiDPICStr reports: vpiDPIC for a "DPI-C" tf, vpiDPI for a "DPI" tf
-  // (detail 9). `dpi_c_identifier` is the C linkage name vpiDPICIdentifier reports
-  // (detail 10). All default to the not-a-DPI-tf values, so a plain task or
-  // function reports none of them.
+  // §37.41 details 6-10: the DPI properties a DPI import/export task or
+  // function reports. `is_dpi` marks the tf as a DPI import or export, and
+  // `dpi_export` distinguishes an export (true) from an import (false);
+  // vpiAccessType reports vpiDPIExportAcc or vpiDPIImportAcc from the pair
+  // (detail 6). `dpi_pure` backs vpiDPIPure - true only for a pure DPI import
+  // function (detail 7). `dpi_context` backs vpiDPIContext - true for a context
+  // import (detail 8). `is_dpi_c` selects the flavor vpiDPICStr reports:
+  // vpiDPIC for a "DPI-C" tf, vpiDPI for a "DPI" tf (detail 9).
+  // `dpi_c_identifier` is the C linkage name vpiDPICIdentifier reports (detail
+  // 10). All default to the not-a-DPI-tf values, so a plain task or function
+  // reports none of them.
   bool is_dpi = false;
   bool dpi_export = false;
   bool dpi_pure = false;
@@ -732,14 +744,16 @@ struct VpiObject {
   size_t scan_index = 0;
 
   // §38.23: for an iterator object (type vpiIterator), the reference object the
-  // iteration was created over. It is reported back through the vpiUse relation,
-  // so vpi_handle(vpiUse, iterator) recovers the object the iterator walks.
+  // iteration was created over. It is reported back through the vpiUse
+  // relation, so vpi_handle(vpiUse, iterator) recovers the object the iterator
+  // walks.
   VpiObject* iter_ref = nullptr;
 
   // §37.84: for an iterator object (type vpiIterator), the kind of object the
   // iteration walks - the type code handed to vpi_iterate when the iterator was
-  // created. It is reported back through the iterator's vpiIteratorType property,
-  // so vpi_get(vpiIteratorType, iterator) recovers what the iterator traverses.
+  // created. It is reported back through the iterator's vpiIteratorType
+  // property, so vpi_get(vpiIteratorType, iterator) recovers what the iterator
+  // traverses.
   int iter_type = 0;
 
   // §38.3: the underlying simulation object this handle denotes, when that is
@@ -770,30 +784,30 @@ struct VpiObject {
   // subclause classifies such expressions as ones built from assignment
   // operators, increment or decrement operators, function or system-function
   // calls (including built-in methods) that change simulation state by some
-  // means other than their return value, or any expression that contains such an
-  // expression as an operand, argument, or index. This flag marks an
+  // means other than their return value, or any expression that contains such
+  // an expression as an operand, argument, or index. This flag marks an
   // already-classified expression; the VPI value, property, and relation
   // routines consult it. False by default.
   bool has_side_effects = false;
 
   // §37.3.5: a running count of how many times this expression has been
   // evaluated through VPI. Applying vpi_get_value() to an expression with side
-  // effects shall fully evaluate it together with its side effects, so that read
-  // bumps this counter - the observable stand-in for the state change the
+  // effects shall fully evaluate it together with its side effects, so that
+  // read bumps this counter - the observable stand-in for the state change the
   // evaluation performs (for instance an embedded i++). Zero until the first
   // such evaluation.
   int side_effect_count = 0;
 
   // §37.3.5: whether a VPI query for a property or relation of this expression
   // cannot be answered without also evaluating an expression that has side
-  // effects. When set, vpi_get() and vpi_handle() refuse the query and record an
-  // error rather than silently triggering the side effect - for example asking
-  // the vpiSize of a function call whose size cannot be known without calling
-  // it. False by default; most queries are answerable structurally.
+  // effects. When set, vpi_get() and vpi_handle() refuse the query and record
+  // an error rather than silently triggering the side effect - for example
+  // asking the vpiSize of a function call whose size cannot be known without
+  // calling it. False by default; most queries are answerable structurally.
   bool property_needs_side_effect_eval = false;
 
-  // §37.3.5: the index expressions that select into this object, in order. It is
-  // an error to apply vpi_put_value() to an object when any of these index
+  // §37.3.5: the index expressions that select into this object, in order. It
+  // is an error to apply vpi_put_value() to an object when any of these index
   // expressions has side effects (for instance my_array[i++]); vpi_put_value()
   // consults this list and refuses the write in that case. Empty for an object
   // that is not an indexed select.
@@ -892,9 +906,10 @@ bool VpiHandleByNameAccessible(const VpiObject& obj);
 // With no modules there is nothing to report, so the result is zero.
 int VpiSmallestTimePrecision(const std::vector<int>& precisions);
 
-// §37.49: the assertion class groups the concurrent assert/assume/cover/restrict
-// kinds, the immediate assert/assume/cover kinds, and sequence and property
-// instances. An object is an assertion exactly when its type is one of these.
+// §37.49: the assertion class groups the concurrent
+// assert/assume/cover/restrict kinds, the immediate assert/assume/cover kinds,
+// and sequence and property instances. An object is an assertion exactly when
+// its type is one of these.
 bool VpiIsAssertionType(int type);
 
 // §37.34 detail 5: a constraint item is the abstract grouping of the kinds the
@@ -904,18 +919,19 @@ bool VpiIsAssertionType(int type);
 bool VpiIsConstraintItemType(int type);
 
 // §37.38 detail 3: a constraint-expression container is the kind of constraint
-// expression whose vpiConstraintExpr iteration reaches the nested expressions it
-// holds - an implication, a constraint if, a constraint if-else, or a foreach
-// constraint. An object qualifies exactly when its type is one of these.
+// expression whose vpiConstraintExpr iteration reaches the nested expressions
+// it holds - an implication, a constraint if, a constraint if-else, or a
+// foreach constraint. An object qualifies exactly when its type is one of
+// these.
 bool VpiIsConstraintExprContainerType(int type);
 
-// §37.31 detail 1: a class method is the kind of object the vpiMethods iteration
-// of a class defn reaches - a task or a function declared as a class item. An
-// object qualifies as a method exactly when its type is one of these.
+// §37.31 detail 1: a class method is the kind of object the vpiMethods
+// iteration of a class defn reaches - a task or a function declared as a class
+// item. An object qualifies as a method exactly when its type is one of these.
 bool VpiIsClassMethodType(int type);
 
-// §37.31 detail 2: the variable/event grouping for which a value obtained from a
-// class defn handle is not accessible - the variables node, the concrete
+// §37.31 detail 2: the variable/event grouping for which a value obtained from
+// a class defn handle is not accessible - the variables node, the concrete
 // variable kinds, a class variable, and the named event / named event array.
 bool VpiIsClassMemberValueType(int type);
 
@@ -936,9 +952,9 @@ bool VpiIsConcurrentAssertionType(int type);
 // concurrent assertion's property.
 bool VpiIsConcurrentAssertionPropertyType(int type);
 
-// §37.50: the property a concurrent assertion traverses to through vpiProperty -
-// its first property-instance/specification child; null for a null handle or an
-// assertion with no property attached.
+// §37.50: the property a concurrent assertion traverses to through vpiProperty
+// - its first property-instance/specification child; null for a null handle or
+// an assertion with no property attached.
 VpiHandle VpiConcurrentAssertionProperty(VpiHandle assertion);
 
 // §37.50 (detail 1): the clocking event a concurrent assertion is evaluated on,
@@ -959,8 +975,8 @@ bool VpiConcurrentAssertionHasPassStmt(int type);
 bool VpiConcurrentAssertionHasElseStmt(int type);
 
 // §37.50: the pass action statement a concurrent assertion traverses to through
-// vpiStmt - its first statement child; null when none is attached (for example a
-// restrict, which has no pass action statement).
+// vpiStmt - its first statement child; null when none is attached (for example
+// a restrict, which has no pass action statement).
 VpiHandle VpiConcurrentAssertionStmt(VpiHandle assertion);
 
 // §37.50: the else (fail) action statement a concurrent assertion traverses to
@@ -996,8 +1012,8 @@ VpiHandle VpiImmediateAssertionExpr(VpiHandle assertion);
 VpiHandle VpiImmediateAssertionStmt(VpiHandle assertion);
 
 // §37.55 (vpiElseStmt): the else (fail) action statement an immediate assert or
-// assume traverses to through vpiElseStmt - its first else-statement child; null
-// when none is attached (an immediate cover never has one).
+// assume traverses to through vpiElseStmt - its first else-statement child;
+// null when none is attached (an immediate cover never has one).
 VpiHandle VpiImmediateAssertionElseStmt(VpiHandle assertion);
 
 // §37.54 (D1): the sequence-expr class groups the kinds the diagram draws under
@@ -1037,9 +1053,9 @@ std::vector<VpiHandle> VpiRepeatOperands(VpiHandle sequence,
                                          VpiHandle left_bound,
                                          VpiHandle right_bound);
 
-// §37.54 detail 1: a sequence formal as seen by the argument iteration. A formal
-// may carry a default value (null when it has none) that is used as the argument
-// when an instantiation does not provide one.
+// §37.54 detail 1: a sequence formal as seen by the argument iteration. A
+// formal may carry a default value (null when it has none) that is used as the
+// argument when an instantiation does not provide one.
 struct VpiSequenceFormal {
   VpiHandle default_value = nullptr;
 };
@@ -1073,21 +1089,22 @@ bool VpiIsMatchItemType(int type);
 std::vector<VpiHandle> VpiExprMatchItems(VpiHandle expr);
 
 // §37.52: the property-expr class groups the kinds the diagram draws under it -
-// an operation, a multiclock sequence expression, a property instance, a clocked
-// property, and a case property. (A sequence expression is also a property
-// expression; classifying the sequence-expr kinds is the sequence-expr class's
-// concern.) The class selector itself is not one of these member kinds.
+// an operation, a multiclock sequence expression, a property instance, a
+// clocked property, and a case property. (A sequence expression is also a
+// property expression; classifying the sequence-expr kinds is the sequence-expr
+// class's concern.) The class selector itself is not one of these member kinds.
 bool VpiIsPropertyExprType(int type);
 
-// §37.52 detail 2: the property operators a property expr's operation may report
-// through vpi_get(vpiOpType). Every other operator value is not a property
-// operator.
+// §37.52 detail 2: the property operators a property expr's operation may
+// report through vpi_get(vpiOpType). Every other operator value is not a
+// property operator.
 bool VpiIsPropertyExprOpType(int op);
 
 // §37.52 detail 2 (vpiNexttimeOp exception): the operands of a nexttime
 // operation in the order vpiOperand presents them - the property, then the
 // constant. The constant is reported only when it differs from 1.
-std::vector<VpiHandle> VpiNexttimeOperands(VpiHandle property, VpiHandle constant,
+std::vector<VpiHandle> VpiNexttimeOperands(VpiHandle property,
+                                           VpiHandle constant,
                                            bool constant_differs_from_one);
 
 // §37.52 detail 2 (vpiAlwaysOp/vpiEventuallyOp exception): the operands of an
@@ -1108,10 +1125,10 @@ bool VpiIsOpStrongValidOp(int op);
 bool VpiIsPropertyVariableValueAccessible();
 
 // §37.52 detail 4: the case conditions a case property item groups - its
-// condition members, each of which branches to the item's property statement, in
-// order. A case property item's property statement (the diagram's case property
-// item -> property expr edge) is excluded. The default case item has no
-// condition expression, so it groups none (detail 5).
+// condition members, each of which branches to the item's property statement,
+// in order. A case property item's property statement (the diagram's case
+// property item -> property expr edge) is excluded. The default case item has
+// no condition expression, so it groups none (detail 5).
 std::vector<VpiHandle> VpiCaseItemConditions(VpiHandle case_item);
 
 // §37.72: the object kinds a case item's match expressions may reach. The
@@ -1133,9 +1150,10 @@ std::vector<VpiHandle> VpiCaseItemMatchExprs(VpiHandle case_item);
 bool VpiIsDisableConditionType(int type);
 
 // §37.52: the clocking event a property spec or clocked property traverses to
-// through vpiClockingEvent (the diagram's -> expr edge), modeled as the object's
-// event-control child; null when none is present. §37.56's clocked seq shares
-// this relation (its own vpiClockingEvent -> expr edge has the same shape).
+// through vpiClockingEvent (the diagram's -> expr edge), modeled as the
+// object's event-control child; null when none is present. §37.56's clocked seq
+// shares this relation (its own vpiClockingEvent -> expr edge has the same
+// shape).
 VpiHandle VpiClockingEvent(VpiHandle obj);
 
 // §37.52: the property expression reached through a "-> property expr" edge (a
@@ -1149,11 +1167,12 @@ VpiHandle VpiPropertyExprChild(VpiHandle obj);
 std::vector<VpiHandle> VpiPropFormals(VpiHandle property_decl);
 
 // §37.51 detail 5: a property formal's vpiDirection. A formal that is a local
-// variable argument reports vpiInput; every other formal reports vpiNoDirection.
+// variable argument reports vpiInput; every other formal reports
+// vpiNoDirection.
 int VpiPropFormalDirection(bool is_local_variable_argument);
 
-// §37.51 detail 3: the typespec of a property formal (its vpiTypespec child), or
-// null when the formal is untyped.
+// §37.51 detail 3: the typespec of a property formal (its vpiTypespec child),
+// or null when the formal is untyped.
 VpiHandle VpiPropFormalTypespec(VpiHandle formal);
 
 // §37.51 detail 4: the initialization expression of a property formal, reached
@@ -1162,15 +1181,15 @@ VpiHandle VpiPropFormalTypespec(VpiHandle formal);
 VpiHandle VpiPropFormalInitExpr(VpiHandle formal);
 
 // §37.51 detail 2: a property formal as seen by the property-instance argument
-// iteration. A formal may carry a default value (null when none) that is used as
-// the argument when an instantiation does not provide one.
+// iteration. A formal may carry a default value (null when none) that is used
+// as the argument when an instantiation does not provide one.
 struct VpiPropertyFormal {
   VpiHandle default_value = nullptr;
 };
 
-// §37.51 detail 2: the arguments the vpiArgument iteration returns for a property
-// instance, in formal-declaration order so each argument corresponds to its
-// formal. `provided` is parallel to `formals`; a null entry means the
+// §37.51 detail 2: the arguments the vpiArgument iteration returns for a
+// property instance, in formal-declaration order so each argument corresponds
+// to its formal. `provided` is parallel to `formals`; a null entry means the
 // instantiation omitted that argument, so the formal's default value is used in
 // its place, preserving the order so each argument lines up with its formal.
 std::vector<VpiHandle> VpiPropertyInstArguments(
@@ -1189,15 +1208,16 @@ VpiHandle VpiPropertyInstDecl(VpiHandle property_inst);
 
 // §37.56: the clocked-seq members of a multiclock sequence expression. The
 // diagram's double (one-to-many) tagless arrow is the vpiClockedSeq iteration,
-// so this returns the multiclock sequence expression's vpiClockedSeq children in
-// order, dropping anything else. A null handle yields none.
-std::vector<VpiHandle> VpiMulticlockSequenceClockedSeqs(VpiHandle multiclock_seq);
+// so this returns the multiclock sequence expression's vpiClockedSeq children
+// in order, dropping anything else. A null handle yields none.
+std::vector<VpiHandle> VpiMulticlockSequenceClockedSeqs(
+    VpiHandle multiclock_seq);
 
 // §37.56: the sequence expression a clocked seq clocks (the diagram's single
 // tagless arrow, vpi_handle(vpiSequenceExpr, ...)). A clocked seq pairs one
 // clocking event with one sequence expression, so this is the clocked seq's
-// first sequence-expr-kind child (classified by VpiIsSequenceExprType); null for
-// a null handle or a clocked seq with no sequence expression attached. The
+// first sequence-expr-kind child (classified by VpiIsSequenceExprType); null
+// for a null handle or a clocked seq with no sequence expression attached. The
 // clocking-event half of the pair is reached through VpiClockingEvent.
 VpiHandle VpiClockedSeqSequenceExpr(VpiHandle clocked_seq);
 
@@ -1212,15 +1232,15 @@ std::vector<VpiHandle> VpiSeqFormals(VpiHandle sequence_decl);
 // first such child, or null when none is present.
 VpiHandle VpiSeqDeclBodyExpr(VpiHandle sequence_decl);
 
-// §37.53 detail 4: a seq formal decl's vpiDirection. A formal that is not a local
-// variable argument has no direction (vpiNoDirection); a local variable argument
-// reports its declared direction, one of vpiInput, vpiOutput, or vpiInout. (This
-// is the sequence analog of §37.51's property formal, which only ever reports
-// vpiInput.)
+// §37.53 detail 4: a seq formal decl's vpiDirection. A formal that is not a
+// local variable argument has no direction (vpiNoDirection); a local variable
+// argument reports its declared direction, one of vpiInput, vpiOutput, or
+// vpiInout. (This is the sequence analog of §37.51's property formal, which
+// only ever reports vpiInput.)
 int VpiSeqFormalDirection(bool is_local_variable_argument, int local_direction);
 
-// §37.53 detail 2: the typespec of a seq formal decl (its vpiTypespec child), or
-// null when the formal is untyped.
+// §37.53 detail 2: the typespec of a seq formal decl (its vpiTypespec child),
+// or null when the formal is untyped.
 VpiHandle VpiSeqFormalTypespec(VpiHandle formal);
 
 // §37.53 detail 3: the initialization expression of a seq formal decl, reached
@@ -1247,10 +1267,10 @@ std::vector<VpiHandle> VpiLetExprArguments(
 // ===========================================================================
 // §37.42 Task and function call. The VPI object model for a tf call - the task
 // call, function call, method task/func call, and system task/func call the
-// diagram groups under "tf call". A call iterates its arguments (vpiArgument); a
-// method call additionally reaches the object it is applied to (vpiPrefix) and,
-// for the methods that take one, a with clause (vpiWith). The helpers and the
-// dispatch wiring below carry the subclause's numbered Details.
+// diagram groups under "tf call". A call iterates its arguments (vpiArgument);
+// a method call additionally reaches the object it is applied to (vpiPrefix)
+// and, for the methods that take one, a with clause (vpiWith). The helpers and
+// the dispatch wiring below carry the subclause's numbered Details.
 // ===========================================================================
 
 // §37.42: the call kinds the tf call class groups - a task call, a function
@@ -1263,20 +1283,20 @@ bool VpiIsTfCallType(int type);
 bool VpiIsMethodCallType(int type);
 
 // §37.42: the object kinds the vpiArgument relation reaches from a tf call - an
-// expression, an interface expression, a scope, a primitive, a named event, or a
-// named event array. Used to collect a call's arguments when iterating
+// expression, an interface expression, a scope, a primitive, a named event, or
+// a named event array. Used to collect a call's arguments when iterating
 // vpiArgument: an argument is found by being one of these kinds, not by being a
 // child whose own type happens to be vpiArgument.
 bool VpiIsTfCallArgumentType(int type);
 
 // §37.42 detail 8: how an omitted (empty) call argument is represented - as an
-// expression object of type vpiOperation whose vpiOpType is vpiNullOp. Sets those
-// two fields on `arg` so vpi_get reports them.
+// expression object of type vpiOperation whose vpiOpType is vpiNullOp. Sets
+// those two fields on `arg` so vpi_get reports them.
 void VpiMakeEmptyArgument(VpiHandle arg);
 
 // §37.42 detail 8: how a call argument written as the special value `null` is
-// represented - as an expression object of type vpiConstant whose vpiConstType is
-// vpiNullConst. Sets those two fields on `arg` so vpi_get reports them.
+// represented - as an expression object of type vpiConstant whose vpiConstType
+// is vpiNullConst. Sets those two fields on `arg` so vpi_get reports them.
 void VpiMakeNullArgument(VpiHandle arg);
 
 // ===========================================================================
@@ -1305,7 +1325,8 @@ bool VpiSimpleExprBitSelectUseAccessesUse(
 
 // §37.58 detail 3: vpiConstantSelect of a bit-select. TRUE only when every
 // associated index expression is an elaboration-time constant and
-// vpiConstantSelect is itself TRUE for the bit-select's parent; otherwise FALSE.
+// vpiConstantSelect is itself TRUE for the bit-select's parent; otherwise
+// FALSE.
 bool VpiSimpleExprBitSelectConstantSelect(bool all_indices_constant,
                                           bool parent_constant_select);
 
@@ -1320,8 +1341,8 @@ bool VpiSimpleExprBitSelectConstantSelect(bool all_indices_constant,
 // ===========================================================================
 
 // §37.61 detail 1: the object kinds that can carry a dynamic prefix and report
-// it through vpiPrefix - the concrete simple-expression kinds (a reference and a
-// bit-select), a part-select and an indexed part-select, a named event, and a
+// it through vpiPrefix - the concrete simple-expression kinds (a reference and
+// a bit-select), a part-select and an indexed part-select, a named event, and a
 // named event array. A tf call is excluded: a method call's prefix is supplied
 // by §37.42, so a tf call is not classified here. Scopes the vpiPrefix
 // traversal so the relation is served only for the source kinds the diagram
@@ -1345,15 +1366,17 @@ bool VpiObjectHasActual(int actual_origin, bool has_current_actual);
 // function/method-function/system-function calls and let expressions, and a
 // simple expression (a reference). Every expression carries the vpiDecompile,
 // vpiSize and value properties; an operation carries vpiOpType, a constant
-// vpiConstType, and an indexed part-select vpiIndexedPartSelectType (all applied
-// by VpiContext::Get). The helpers below carry the subclause's normative details.
+// vpiConstType, and an indexed part-select vpiIndexedPartSelectType (all
+// applied by VpiContext::Get). The helpers below carry the subclause's
+// normative details.
 // ===========================================================================
 
 // §37.59: the kinds the expr class groups in the data model diagram - an
-// operation, a constant, a part-select or indexed part-select, a func/method-func/
-// sys-func call, a let expression, and a reference (the concrete simple
-// expression). Used to scope detail 8's protected-object carve-out (vpiSize stays
-// accessible on a protected expression) and to classify diagram members.
+// operation, a constant, a part-select or indexed part-select, a
+// func/method-func/ sys-func call, a let expression, and a reference (the
+// concrete simple expression). Used to scope detail 8's protected-object
+// carve-out (vpiSize stays accessible on a protected expression) and to
+// classify diagram members.
 bool VpiIsExprType(int type);
 
 // §37.3.5: whether an expression has side effects when evaluated - true exactly
@@ -1391,22 +1414,23 @@ bool VpiSourceDelayExprIsListOp(VpiHandle expr);
 // statement a single label edge: vpiName reports its label, or NULL when none.
 bool VpiIsAtomicStmtType(int type);
 
-// §37.64 Assignment detail 1: the vpiOpType an assignment object reports. A normal
-// assignment - blocking "=" or nonblocking "<=" - reports vpiAssignmentOp. An
-// assignment written with an assignment operator instead reports the operator
-// combined with the assignment, following 11.4.1: "+=" reports vpiAddOp, "-="
-// vpiSubOp, "<<<=" vpiArithLShiftOp, and so on. `assign_operator` is the source
-// spelling of the operator ("=", "<=", "+=", ...). Any spelling that is not one of
-// the assignment operators is treated as a normal assignment (vpiAssignmentOp).
+// §37.64 Assignment detail 1: the vpiOpType an assignment object reports. A
+// normal assignment - blocking "=" or nonblocking "<=" - reports
+// vpiAssignmentOp. An assignment written with an assignment operator instead
+// reports the operator combined with the assignment, following 11.4.1: "+="
+// reports vpiAddOp, "-=" vpiSubOp, "<<<=" vpiArithLShiftOp, and so on.
+// `assign_operator` is the source spelling of the operator ("=", "<=", "+=",
+// ...). Any spelling that is not one of the assignment operators is treated as
+// a normal assignment (vpiAssignmentOp).
 int VpiAssignmentOpType(std::string_view assign_operator);
 
 // §37.63 Process detail 1: whether `always_type` is a legal value of the
 // vpiAlwaysType property. The property distinguishes the flavors of always
 // procedure and is restricted to exactly four constants - vpiAlways,
-// vpiAlwaysComb, vpiAlwaysFF, and vpiAlwaysLatch. Any other value (including the
-// unset default carried by an initial or final process) is not an always type.
-// Scopes vpi_get(vpiAlwaysType), which reports the value only when it is one of
-// the four and vpiUndefined otherwise.
+// vpiAlwaysComb, vpiAlwaysFF, and vpiAlwaysLatch. Any other value (including
+// the unset default carried by an initial or final process) is not an always
+// type. Scopes vpi_get(vpiAlwaysType), which reports the value only when it is
+// one of the four and vpiUndefined otherwise.
 bool VpiIsAlwaysType(int always_type);
 
 // §37.65 Event control detail 1: the statement an event control "@" reaches
@@ -1414,8 +1438,8 @@ bool VpiIsAlwaysType(int always_type);
 // control drawn on an assignment object (§37.64), recognized here by its parent
 // being a vpiAssignment - always reports a null statement, because the
 // assignment itself is the action and guards no separate statement. Any other
-// event control reports its first statement child, or null when none is attached.
-// Backs the public vpi_handle(vpiStmt, event_control) dispatch.
+// event control reports its first statement child, or null when none is
+// attached. Backs the public vpi_handle(vpiStmt, event_control) dispatch.
 VpiHandle VpiEventControlStmt(VpiHandle event_control);
 
 // §37.68 Delay control detail 1: the statement a delay control "#" reaches
@@ -1423,8 +1447,8 @@ VpiHandle VpiEventControlStmt(VpiHandle event_control);
 // control drawn on an assignment object (§37.64), recognized here by its parent
 // being a vpiAssignment - always reports a null statement, because the
 // assignment itself is the action and guards no separate statement. Any other
-// delay control reports its first statement child, or null when none is attached.
-// Backs the public vpi_handle(vpiStmt, delay_control) dispatch.
+// delay control reports its first statement child, or null when none is
+// attached. Backs the public vpi_handle(vpiStmt, delay_control) dispatch.
 VpiHandle VpiDelayControlStmt(VpiHandle delay_control);
 
 // §37.66 While, repeat: whether an object kind is one of the two looping
@@ -1440,47 +1464,48 @@ bool VpiIsWhileOrRepeatType(int type);
 // public vpi_handle(vpiCondition, while/repeat) dispatch.
 VpiHandle VpiLoopConditionExpr(VpiHandle loop);
 
-// §37.67 Waits: whether an object kind is one of the wait statements the diagram
-// groups under "waits" - a wait, an ordered wait, or a wait fork. The grouping
-// shares a body statement (vpiStmt) and, for the wait and ordered wait, a
-// controlling condition (vpiCondition).
+// §37.67 Waits: whether an object kind is one of the wait statements the
+// diagram groups under "waits" - a wait, an ordered wait, or a wait fork. The
+// grouping shares a body statement (vpiStmt) and, for the wait and ordered
+// wait, a controlling condition (vpiCondition).
 bool VpiIsWaitType(int type);
 
-// §37.67 Waits: the controlling condition a wait or ordered wait statement reaches
-// through vpiCondition. The condition may be either an expression or a sequence
-// instance; either way its own type is an expression/sequence kind rather than the
-// vpiCondition relation tag, so it is found as the wait's first such child. Null
-// when none is attached (as for a wait fork, which draws no condition edge). This
-// is a dedicated helper rather than a vpi_handle dispatch case: the public
-// vpiCondition dispatch is scoped to the loop statements of §37.66, which leaves a
-// wait's condition to this helper.
+// §37.67 Waits: the controlling condition a wait or ordered wait statement
+// reaches through vpiCondition. The condition may be either an expression or a
+// sequence instance; either way its own type is an expression/sequence kind
+// rather than the vpiCondition relation tag, so it is found as the wait's first
+// such child. Null when none is attached (as for a wait fork, which draws no
+// condition edge). This is a dedicated helper rather than a vpi_handle dispatch
+// case: the public vpiCondition dispatch is scoped to the loop statements of
+// §37.66, which leaves a wait's condition to this helper.
 VpiHandle VpiWaitConditionExpr(VpiHandle wait);
 
 // §37.69 Repeat control: the count expression a repeat control reaches through
 // its unlabeled edge to an expr (the vpiExpr relation) - the number of triggers
-// of the intra-assignment repeat event control "repeat (n) @(event)". The count's
-// own type is an expression kind (an operation, a constant, a reference, ...)
-// rather than the vpiExpr relation tag, so it is found as the repeat control's
-// first expression child; null when none is attached. The diagram's other
-// unlabeled edge, to the event control, reaches an object whose own type is
-// vpiEventControl and so is served by the generic traversal, needing no helper.
-// Backs the public vpi_handle(vpiExpr, repeat_control) dispatch.
+// of the intra-assignment repeat event control "repeat (n) @(event)". The
+// count's own type is an expression kind (an operation, a constant, a
+// reference, ...) rather than the vpiExpr relation tag, so it is found as the
+// repeat control's first expression child; null when none is attached. The
+// diagram's other unlabeled edge, to the event control, reaches an object whose
+// own type is vpiEventControl and so is served by the generic traversal,
+// needing no helper. Backs the public vpi_handle(vpiExpr, repeat_control)
+// dispatch.
 VpiHandle VpiRepeatControlExpr(VpiHandle repeat_control);
 
 // §37.77 Disables: whether an object kind is one of the named scopes a disable
-// statement may target - the four kinds the diagram groups at the far end of the
-// disable's vpiExpr edge: a task, a function, a named begin block, or a named
-// fork block.
+// statement may target - the four kinds the diagram groups at the far end of
+// the disable's vpiExpr edge: a task, a function, a named begin block, or a
+// named fork block.
 bool VpiIsDisableTargetType(int type);
 
-// §37.77 Disables: the named scope a disable statement reaches through vpiExpr -
-// the task, function, named begin, or named fork it disables. The scope's own
-// type is one of those kinds rather than the vpiExpr relation tag, so it is found
-// as the disable's first disable-target child; null when none is attached. A
-// disable fork (vpiDisableFork) draws no such edge - it disables the active
-// process's children with no named operand - so this relation is scoped to the
-// plain disable statement and a disable fork reports null. Backs the public
-// vpi_handle(vpiExpr, disable) dispatch.
+// §37.77 Disables: the named scope a disable statement reaches through vpiExpr
+// - the task, function, named begin, or named fork it disables. The scope's own
+// type is one of those kinds rather than the vpiExpr relation tag, so it is
+// found as the disable's first disable-target child; null when none is
+// attached. A disable fork (vpiDisableFork) draws no such edge - it disables
+// the active process's children with no named operand - so this relation is
+// scoped to the plain disable statement and a disable fork reports null. Backs
+// the public vpi_handle(vpiExpr, disable) dispatch.
 VpiHandle VpiDisableExpr(VpiHandle disable);
 
 // §37.71 If, if-else: whether an object kind is one of the two conditional
@@ -1498,20 +1523,20 @@ bool VpiIsIfOrIfElseType(int type);
 VpiHandle VpiIfConditionExpr(VpiHandle if_stmt);
 
 // §37.71 If, if-else: the else-branch body an if-else statement reaches through
-// vpiElseStmt. The then-branch and the else-branch are both body statements; the
-// then-branch is served by the generic vpiStmt traversal (the first body child)
-// and the else-branch is the second body child, found here. Its own type is a
-// statement kind rather than the vpiElseStmt relation tag, so the generic walk
-// cannot serve it; null when the statement has no else branch. Backs the public
-// vpi_handle(vpiElseStmt, if-else) dispatch.
+// vpiElseStmt. The then-branch and the else-branch are both body statements;
+// the then-branch is served by the generic vpiStmt traversal (the first body
+// child) and the else-branch is the second body child, found here. Its own type
+// is a statement kind rather than the vpiElseStmt relation tag, so the generic
+// walk cannot serve it; null when the statement has no else branch. Backs the
+// public vpi_handle(vpiElseStmt, if-else) dispatch.
 VpiHandle VpiIfElseStmt(VpiHandle if_stmt);
 
 // §37.74 For: the controlling condition expression a for statement reaches
 // through vpiCondition. The condition's own type is an expression kind rather
 // than the vpiCondition relation tag, so it is found as the for statement's
-// first expression child; the initialization, increment, and body statements are
-// statement-edge children and are skipped. Null when none is attached. Backs the
-// public vpi_handle(vpiCondition, for) dispatch.
+// first expression child; the initialization, increment, and body statements
+// are statement-edge children and are skipped. Null when none is attached.
+// Backs the public vpi_handle(vpiCondition, for) dispatch.
 VpiHandle VpiForConditionExpr(VpiHandle for_stmt);
 
 // §37.12 detail 1: whether an object kind is a block item declaration - a
@@ -1557,49 +1582,52 @@ VpiHandle VpiTaskFuncStmt(VpiHandle task_func);
 std::vector<VpiHandle> VpiMultiConcatOperands(
     VpiHandle multiplier, const std::vector<VpiHandle>& concat_exprs);
 
-// §37.59 detail 7: the operand order of a vpiMultiAssignmentPatternOp operation.
-// As with multiconcat, the first operand is the multiplier expression and the
-// remaining operands are the expressions within the assignment pattern.
+// §37.59 detail 7: the operand order of a vpiMultiAssignmentPatternOp
+// operation. As with multiconcat, the first operand is the multiplier
+// expression and the remaining operands are the expressions within the
+// assignment pattern.
 std::vector<VpiHandle> VpiMultiAssignmentPatternOperands(
     VpiHandle multiplier, const std::vector<VpiHandle>& pattern_exprs);
 
 // §37.59 detail 3: a cast operation (vpiOpType == vpiCastOp) is modeled as a
-// unary operation whose sole operand is the expression being cast; the type cast
-// to is reached through the one-to-one typespec relation (detail 5). The operand
-// list is therefore exactly that single argument.
+// unary operation whose sole operand is the expression being cast; the type
+// cast to is reached through the one-to-one typespec relation (detail 5). The
+// operand list is therefore exactly that single argument.
 std::vector<VpiHandle> VpiCastOpOperands(VpiHandle cast_expr);
 
 // §37.59 detail 6: an assignment pattern (vpiAssignmentPatternOp) resolves its
 // keyed entries (member, type, index, or default keys) to positional notation
-// before vpiOperand iterates it. One entry assigns a value to a target position.
+// before vpiOperand iterates it. One entry assigns a value to a target
+// position.
 struct VpiAssignmentPatternEntry {
-  int position = 0;          // 0-based target position this entry fills
+  int position = 0;  // 0-based target position this entry fills
   VpiHandle value = nullptr;
 };
 
 // §37.59 detail 6: build the positional operand list of an assignment pattern.
 // `slots` is the number of target positions (struct members or array elements);
-// each positioned entry fills its position, and any position left unassigned takes
-// `default_value`. The result is the value of position 0..slots-1 in order. Values
-// stay opaque handles, so a nested assignment-pattern operand is preserved as a
-// single handle - nesting is not flattened.
+// each positioned entry fills its position, and any position left unassigned
+// takes `default_value`. The result is the value of position 0..slots-1 in
+// order. Values stay opaque handles, so a nested assignment-pattern operand is
+// preserved as a single handle - nesting is not flattened.
 std::vector<VpiHandle> VpiAssignmentPatternPositionalOperands(
     int slots, const std::vector<VpiAssignmentPatternEntry>& positioned,
     VpiHandle default_value);
 
 // §37.59 detail 5: the one-to-one typespec relation of an expression is always
-// available for a cast operation, for a simple expression, and for an assignment-
-// pattern operation (vpiAssignmentPatternOp/vpiMultiAssignmentPatternOp) whose
-// curly braces are prefixed by a data type name. For every other expression it is
-// implementation dependent, so the guarantee does not hold. Returns whether a
-// typespec is guaranteed to be available.
+// available for a cast operation, for a simple expression, and for an
+// assignment- pattern operation
+// (vpiAssignmentPatternOp/vpiMultiAssignmentPatternOp) whose curly braces are
+// prefixed by a data type name. For every other expression it is implementation
+// dependent, so the guarantee does not hold. Returns whether a typespec is
+// guaranteed to be available.
 bool VpiTypespecAlwaysAvailable(int op_type, bool is_simple_expr,
                                 bool assignment_pattern_has_type_prefix);
 
-// §37.59 detail 9: vpiConstantSelect of a part-select or indexed part-select. It
-// is TRUE only when vpiConstantSelect is TRUE for the parent, the parent is a
-// packed or unpacked array with static bounds, and every range expression of the
-// (indexed) part-select is an elaboration-time constant; otherwise FALSE.
+// §37.59 detail 9: vpiConstantSelect of a part-select or indexed part-select.
+// It is TRUE only when vpiConstantSelect is TRUE for the parent, the parent is
+// a packed or unpacked array with static bounds, and every range expression of
+// the (indexed) part-select is an elaboration-time constant; otherwise FALSE.
 struct VpiPartSelectConstantSelectQuery {
   bool parent_constant_select = false;
   bool parent_array_has_static_bounds = false;
@@ -1607,20 +1635,21 @@ struct VpiPartSelectConstantSelectQuery {
 };
 bool VpiPartSelectConstantSelect(const VpiPartSelectConstantSelectQuery& query);
 
-// §37.59 detail 10: the vpiParent of a part-select or indexed part-select is the
-// expression formed by removing the part-select range - the expression with its
-// trailing bracketed selection dropped (Table 37-1). Given the decompiled select
-// expression, returns the parent's decompiled form.
+// §37.59 detail 10: the vpiParent of a part-select or indexed part-select is
+// the expression formed by removing the part-select range - the expression with
+// its trailing bracketed selection dropped (Table 37-1). Given the decompiled
+// select expression, returns the parent's decompiled form.
 std::string VpiPartSelectParentExpr(std::string_view select_expr);
 
-// §37.59 detail 2: vpiDecompile renders an expression as a functionally equivalent
-// string with each operand and operator separated by a single space. Joins the
-// pieces with exactly one space, skipping empty pieces so no double space appears.
+// §37.59 detail 2: vpiDecompile renders an expression as a functionally
+// equivalent string with each operand and operator separated by a single space.
+// Joins the pieces with exactly one space, skipping empty pieces so no double
+// space appears.
 std::string VpiDecompileJoin(const std::vector<std::string>& pieces);
 
 // §37.59 detail 2: parentheses are added to a decompiled subexpression only to
-// preserve precedence and introduce no white space - none inside the parentheses
-// and none around them. Wraps `inner` accordingly.
+// preserve precedence and introduce no white space - none inside the
+// parentheses and none around them. Wraps `inner` accordingly.
 std::string VpiDecompileParenthesize(std::string_view inner);
 
 // ===========================================================================
@@ -1644,8 +1673,9 @@ std::string VpiDecompileParenthesize(std::string_view inner);
 bool VpiIsFrameOriginType(int type);
 
 // §37.43 (vpiParent -> frame / detail 5): the frame from which this child frame
-// was activated, reached up the parent chain when that parent is itself a frame.
-// Null for a null handle, a root frame with no parent, or a non-frame parent.
+// was activated, reached up the parent chain when that parent is itself a
+// frame. Null for a null handle, a root frame with no parent, or a non-frame
+// parent.
 VpiHandle VpiFrameParent(VpiHandle frame);
 
 // §37.43 (vpiOrigin / detail 6): the elaboration-hierarchy point a frame was
@@ -1679,27 +1709,27 @@ std::vector<VpiHandle> VpiFrameAutomatics(VpiHandle frame);
 // specific callbacks are §38.36.1's (detail 2).
 // ===========================================================================
 
-// §37.44 (vpiParent -> thread): the thread that spawned this one, reached up the
-// parent chain. Returns the thread's parent when that parent is itself a thread;
-// null for a null handle, a root thread with no parent, or a parent that is not
-// a thread.
+// §37.44 (vpiParent -> thread): the thread that spawned this one, reached up
+// the parent chain. Returns the thread's parent when that parent is itself a
+// thread; null for a null handle, a root thread with no parent, or a parent
+// that is not a thread.
 VpiHandle VpiThreadParent(VpiHandle thread);
 
-// §37.44 (vpiOrigin -> stmt): the statement a thread originated from, modeled as
-// the thread's first statement child. Null for a null handle or a thread with no
-// origin statement attached.
+// §37.44 (vpiOrigin -> stmt): the statement a thread originated from, modeled
+// as the thread's first statement child. Null for a null handle or a thread
+// with no origin statement attached.
 VpiHandle VpiThreadOrigin(VpiHandle thread);
 
-// §37.44 (frame -- thread / detail 1): the active frame of a thread. As a thread
-// descends a call chain of tasks and functions a new frame is activated for each
-// one entered, and at most one is active at a time (§37.43); this returns that
-// frame, modeled as the thread's first frame child. Null for a null handle or a
-// thread with no frame attached.
+// §37.44 (frame -- thread / detail 1): the active frame of a thread. As a
+// thread descends a call chain of tasks and functions a new frame is activated
+// for each one entered, and at most one is active at a time (§37.43); this
+// returns that frame, modeled as the thread's first frame child. Null for a
+// null handle or a thread with no frame attached.
 VpiHandle VpiThreadFrame(VpiHandle thread);
 
-// §37.44 (thread one-to-many thread): the threads spawned by this thread, as the
-// iteration over its thread children yields them, in order. A null handle yields
-// none.
+// §37.44 (thread one-to-many thread): the threads spawned by this thread, as
+// the iteration over its thread children yields them, in order. A null handle
+// yields none.
 std::vector<VpiHandle> VpiThreadThreads(VpiHandle thread);
 
 // ===========================================================================
@@ -1709,11 +1739,11 @@ std::vector<VpiHandle> VpiThreadThreads(VpiHandle thread);
 // the other.
 // ===========================================================================
 
-// §37.22 detail 1: a range object's contents. An empty range has no elements; it
-// stands in for an associative-array dimension, an empty dynamic array or queue,
-// and any range obtained from a typespec for a dynamic-array, queue, or
-// associative dimension. A non-empty range carries the bound expressions reached
-// through vpiLeftRange/vpiRightRange and an element count.
+// §37.22 detail 1: a range object's contents. An empty range has no elements;
+// it stands in for an associative-array dimension, an empty dynamic array or
+// queue, and any range obtained from a typespec for a dynamic-array, queue, or
+// associative dimension. A non-empty range carries the bound expressions
+// reached through vpiLeftRange/vpiRightRange and an element count.
 struct VpiRangeDesc {
   bool empty = false;
   VpiHandle left_expr = nullptr;
@@ -1773,16 +1803,16 @@ bool VpiVariableIsArrayMember(VpiHandle var);
 bool VpiVariableIsStructUnionMember(VpiHandle var);
 
 // §37.17 detail 8: a variable's initialization expression, reached through
-// vpiExpr (modeled as the variable's first child). Null when the variable has no
-// initialization expression.
+// vpiExpr (modeled as the variable's first child). Null when the variable has
+// no initialization expression.
 VpiHandle VpiVariableInitExpr(VpiHandle var);
 
 // §37.17 detail 14: whether the cbSizeChange callback is applicable to a
 // variable. It applies only to dynamic arrays, associative arrays, queues, and
 // string variables; array_type is the variable's vpiArrayType (0 when not an
 // array). The detail's firing-order and new-size-value semantics need a
-// size-change callback engine the simulator does not have, so only applicability
-// is realized here.
+// size-change callback engine the simulator does not have, so only
+// applicability is realized here.
 bool VpiSizeChangeCallbackApplies(int array_type, bool is_string_var);
 
 // §37.17 detail 4: one dimension of a variable as the vpiRange iteration sees
@@ -1812,7 +1842,8 @@ std::vector<VpiRangeDesc> VpiArrayVarRanges(
 VpiHandle VpiVariableLeftRange(const std::vector<VpiArrayDimension>& dims,
                                bool has_members);
 
-// §37.17 detail 6: vpiRightRange of a variable, the mirror of VpiVariableLeftRange.
+// §37.17 detail 6: vpiRightRange of a variable, the mirror of
+// VpiVariableLeftRange.
 VpiHandle VpiVariableRightRange(const std::vector<VpiArrayDimension>& dims,
                                 bool has_members);
 
@@ -1828,11 +1859,12 @@ VpiHandle VpiSelectSingleIndex(
 std::vector<VpiHandle> VpiSelectIndicesOutward(
     const std::vector<VpiHandle>& indices_inner_to_outer);
 
-// §37.17 details 9 and 10: the inputs vpiSize reads for a variable or var select.
+// §37.17 details 9 and 10: the inputs vpiSize reads for a variable or var
+// select.
 struct VpiVariableSizeQuery {
   int var_type = 0;
-  bool packed = false;          // struct/union var: packed vs unpacked
-  int bit_width = 0;            // integer-typed/packed/enum var, packed var select
+  bool packed = false;  // struct/union var: packed vs unpacked
+  int bit_width = 0;    // integer-typed/packed/enum var, packed var select
   int array_element_count = 0;  // variable array: number of element variables
   int string_length = 0;        // string var: current character count
   int field_count = 0;          // unpacked struct/union var: number of fields
@@ -1846,11 +1878,12 @@ struct VpiVariableSizeQuery {
 // and reported as 0.
 int VpiVariableSize(const VpiVariableSizeQuery& query);
 
-// §37.41 detail 12: vpiSize of a function. When the function's vpiReturn variable
-// has a defined size that can be determined without evaluating the function,
-// vpiSize for the function is the same as vpiSize for that variable. A void
-// function reports 0. For every other case the behavior is undefined; this helper
-// reports 0 there, the same not-defined sentinel VpiVariableSize uses.
+// §37.41 detail 12: vpiSize of a function. When the function's vpiReturn
+// variable has a defined size that can be determined without evaluating the
+// function, vpiSize for the function is the same as vpiSize for that variable.
+// A void function reports 0. For every other case the behavior is undefined;
+// this helper reports 0 there, the same not-defined sentinel VpiVariableSize
+// uses.
 int VpiFunctionSize(bool is_void_function, bool return_size_defined,
                     int return_var_size);
 
@@ -1863,7 +1896,8 @@ bool VpiVariableHasValueProperty(int var_type, bool vpi_vector);
 // struct, packed union, and packed array variables.
 bool VpiBitIteratorApplies(int var_type, bool packed);
 
-// §37.17 details 15 and 22: vpiRandType is one of vpiRand, vpiRandC, vpiNotRand.
+// §37.17 details 15 and 22: vpiRandType is one of vpiRand, vpiRandC,
+// vpiNotRand.
 bool VpiIsRandTypeValue(int value);
 
 // §37.17 detail 16: vpiIsRandomized reports whether a random variable is
@@ -1886,8 +1920,9 @@ struct VpiScalarVectorQuery {
 };
 
 // §37.17 detail 20: vpiScalar for a variable. A scalar bit/logic var (no packed
-// dimension) and a var bit are scalars; an enum var defers to its base typespec;
-// an array var defers to an element; every other variable is not a scalar.
+// dimension) and a var bit are scalars; an enum var defers to its base
+// typespec; an array var defers to an element; every other variable is not a
+// scalar.
 bool VpiVariableScalar(const VpiScalarVectorQuery& query);
 
 // §37.17 detail 20: vpiVector for a variable. A packed bit/logic var, a packed
@@ -1902,23 +1937,25 @@ bool VpiVariableVector(const VpiScalarVectorQuery& query);
 // reports vpiPublicVis.
 int VpiVariableVisibility(bool is_class_member, int declared_visibility);
 
-// §37.41 detail 4: vpiVisibility of a task or function. A class member (a method)
-// reports its declared visibility (vpiLocalVis, vpiProtectedVis, or vpiPublicVis);
-// a member that is neither local nor protected - and any task or function that is
-// not a class member - reports vpiPublicVis.
+// §37.41 detail 4: vpiVisibility of a task or function. A class member (a
+// method) reports its declared visibility (vpiLocalVis, vpiProtectedVis, or
+// vpiPublicVis); a member that is neither local nor protected - and any task or
+// function that is not a class member - reports vpiPublicVis.
 int VpiTaskFuncVisibility(bool is_class_member, int declared_visibility);
 
-// §37.17 detail 25: vpiFullName for a class data member. A non-static member has
-// none (the empty string marks its absence); a static member's full name is the
-// hierarchical path written through its "class defn", e.g. "top.Packet::Id".
+// §37.17 detail 25: vpiFullName for a class data member. A non-static member
+// has none (the empty string marks its absence); a static member's full name is
+// the hierarchical path written through its "class defn", e.g.
+// "top.Packet::Id".
 std::string VpiClassMemberFullName(bool is_static, std::string_view scope_path,
                                    std::string_view class_defn,
                                    std::string_view member);
 
 // §37.17 detail 26: a candidate vpiParent prefix object, in prefix order
-// (rightmost/innermost first). A prefix qualifies when it is a struct/union/class
-// variable, a struct/union member or class data member, or the largest
-// containing packed or unpacked array object; otherwise its handle is null.
+// (rightmost/innermost first). A prefix qualifies when it is a
+// struct/union/class variable, a struct/union member or class data member, or
+// the largest containing packed or unpacked array object; otherwise its handle
+// is null.
 struct VpiParentPrefix {
   bool qualifies = false;
   VpiHandle handle = nullptr;
@@ -1938,22 +1975,23 @@ VpiHandle VpiLargestContainingArray(
 // variable.
 struct VpiConstantSelectQuery {
   bool has_static_lifetime = false;
-  bool has_parent = false;                    // vpiParent != NULL
-  bool all_indices_constant = false;          // every index is elaboration-constant
-  bool all_elements_static_members = false;   // struct/union members or packed/
-                                              // unpacked array elements with
-                                              // static bounds
+  bool has_parent = false;            // vpiParent != NULL
+  bool all_indices_constant = false;  // every index is elaboration-constant
+  bool all_elements_static_members = false;  // struct/union members or packed/
+                                             // unpacked array elements with
+                                             // static bounds
 };
 
-// §37.17 detail 27: vpiConstantSelect. TRUE when the variable has static lifetime
-// and no parent, or when every index expression is an elaboration-time constant
-// and every selected element is a struct/union member or a packed/unpacked array
-// element with static bounds; FALSE otherwise.
+// §37.17 detail 27: vpiConstantSelect. TRUE when the variable has static
+// lifetime and no parent, or when every index expression is an elaboration-time
+// constant and every selected element is a struct/union member or a
+// packed/unpacked array element with static bounds; FALSE otherwise.
 bool VpiConstantSelect(const VpiConstantSelectQuery& query);
 
-// §37.17 detail 28: the components of a member variable's name. The struct/union/
-// class-var prefixes run outermost first; the object's own index/slice (if any)
-// is carried separately so it can be appended to all three name forms.
+// §37.17 detail 28: the components of a member variable's name. The
+// struct/union/ class-var prefixes run outermost first; the object's own
+// index/slice (if any) is carried separately so it can be appended to all three
+// name forms.
 struct VpiVariableNameParts {
   std::string top_scope;
   std::vector<std::string> member_prefixes;
@@ -1966,8 +2004,8 @@ struct VpiVariableNameParts {
 std::string VpiVariableName(const VpiVariableNameParts& parts);
 
 // §37.17 detail 28: vpiDecompile - the prefixes joined to the member (and its
-// index/slice) without the top-level scope, so it resolves for any non-top-level
-// scope context.
+// index/slice) without the top-level scope, so it resolves for any
+// non-top-level scope context.
 std::string VpiVariableDecompile(const VpiVariableNameParts& parts);
 
 // §37.17 detail 28: vpiFullName - the top-level scope prefixed to the decompile
@@ -2005,19 +2043,19 @@ bool VpiVariableIsPackedArrayMember(VpiHandle var);
 
 // §37.19 detail 1: the inputs vpiConstantSelect reads for a var select.
 struct VpiVarSelectConstantSelectQuery {
-  bool all_indices_constant = false;          // every index expression of the
-                                              // select is an elaboration-time
-                                              // constant expression
-  bool parent_is_unpacked_static_array =      // the select's parent is an
-      false;                                  // unpacked array with static bounds
-  bool parent_constant_select = false;        // vpiConstantSelect is TRUE for
-                                              // the select's parent
+  bool all_indices_constant = false;      // every index expression of the
+                                          // select is an elaboration-time
+                                          // constant expression
+  bool parent_is_unpacked_static_array =  // the select's parent is an
+      false;                              // unpacked array with static bounds
+  bool parent_constant_select = false;    // vpiConstantSelect is TRUE for
+                                          // the select's parent
 };
 
-// §37.19 detail 1: vpiConstantSelect of a var select. TRUE only when every index
-// expression of the select is an elaboration-time constant, the parent is an
-// unpacked array with static bounds, and vpiConstantSelect is itself TRUE for
-// that parent; otherwise FALSE.
+// §37.19 detail 1: vpiConstantSelect of a var select. TRUE only when every
+// index expression of the select is an elaboration-time constant, the parent is
+// an unpacked array with static bounds, and vpiConstantSelect is itself TRUE
+// for that parent; otherwise FALSE.
 bool VpiVarSelectConstantSelect(const VpiVarSelectConstantSelectQuery& query);
 
 // ===========================================================================
@@ -2025,31 +2063,32 @@ bool VpiVarSelectConstantSelect(const VpiVarSelectConstantSelectQuery& query);
 // applies one of the clause's numbered "Details"; the figure's range relations
 // route through §37.22 and a member's expr role reuses §37.59's expr class. The
 // figure attributes that carry no numbered Detail (vpiTagged/vpiSoft/vpiPacked/
-// vpiVector/vpiArrayType/vpiRandType) are defined by §37.26 and §37.17, not here.
+// vpiVector/vpiArrayType/vpiRandType) are defined by §37.26 and §37.17, not
+// here.
 // ===========================================================================
 
-// §37.25: the object-type codes the data model groups under the typespec class -
-// every "... typespec" node of Figure 37.25, plus an unresolved type parameter,
-// which acts as a typespec (detail 11). Used to tell a member's typespec child
-// from its default-value expr child.
+// §37.25: the object-type codes the data model groups under the typespec class
+// - every "... typespec" node of Figure 37.25, plus an unresolved type
+// parameter, which acts as a typespec (detail 11). Used to tell a member's
+// typespec child from its default-value expr child.
 bool VpiIsTypespecType(int type);
 
-// §37.25 detail 1: vpiName of a typespec. A typespec that denotes a user-defined
-// typedef reports that typedef's name (which may be the empty string for a field
-// defined inline, detail 5); a class typespec always reports the class name;
-// every SystemVerilog built-in type reports NULL.
+// §37.25 detail 1: vpiName of a typespec. A typespec that denotes a
+// user-defined typedef reports that typedef's name (which may be the empty
+// string for a field defined inline, detail 5); a class typespec always reports
+// the class name; every SystemVerilog built-in type reports NULL.
 const char* VpiTypespecName(int ts_type, bool denotes_user_typedef,
                             const char* typedef_name, const char* class_name);
 
 // §37.25 detail 1: vpiTypedefAlias of a typespec. A typespec whose typedef
-// creates an alias of another typedef hands back a handle to the aliased typedef;
-// a typespec that is not such an alias reports NULL.
+// creates an alias of another typedef hands back a handle to the aliased
+// typedef; a typespec that is not such an alias reports NULL.
 VpiHandle VpiTypespecTypedefAlias(bool is_alias, VpiHandle aliased_typedef);
 
-// §37.25 detail 2: vpiIndexTypespec of a typespec. The relation exists only on an
-// associative-array typespec, where it yields the type used as the array key; a
-// wildcard index type (see 7.8.1) yields NULL, and so does any typespec that is
-// not an associative array.
+// §37.25 detail 2: vpiIndexTypespec of a typespec. The relation exists only on
+// an associative-array typespec, where it yields the type used as the array
+// key; a wildcard index type (see 7.8.1) yields NULL, and so does any typespec
+// that is not an associative array.
 VpiHandle VpiTypespecIndexTypespec(bool is_assoc_array_typespec,
                                    bool wildcard_index, VpiHandle key_typespec);
 
@@ -2063,36 +2102,37 @@ std::vector<VpiHandle> VpiTypespecMembers(
 // member's type - the member's typespec child.
 VpiHandle VpiTypespecMemberTypespec(VpiHandle member);
 
-// §37.25 detail 4: vpiName of a typespec member is the member's own name, not the
-// name of the member's typespec.
+// §37.25 detail 4: vpiName of a typespec member is the member's own name, not
+// the name of the member's typespec.
 const char* VpiTypespecMemberName(VpiHandle member);
 
-// §37.25 detail 7: the expr of a typespec member is the explicit default value of
-// the corresponding member of an unpacked structure (see 7.2), reached as the
-// member's expr child; a member with no default reports NULL.
+// §37.25 detail 7: the expr of a typespec member is the explicit default value
+// of the corresponding member of an unpacked structure (see 7.2), reached as
+// the member's expr child; a member with no default reports NULL.
 VpiHandle VpiTypespecMemberDefaultExpr(VpiHandle member);
 
 // §37.25 detail 8: vpi_handle(vpiElemTypespec, typespec) unwinds one array
 // dimension at a time. A typespec that still has at least one range hands back
-// the element typespec with its leftmost range removed; a typespec with no ranges
-// present yields NULL.
+// the element typespec with its leftmost range removed; a typespec with no
+// ranges present yields NULL.
 VpiHandle VpiTypespecElemTypespec(bool has_ranges, VpiHandle element_typespec);
 
 // §37.25 detail 10 (woven with §37.22): the ranges vpi_iterate(vpiRange,
 // typespec) returns, one per dimension from leftmost to rightmost. For an array
 // typespec these are the unpacked ranges; for a bit or logic typespec they are
-// the packed ranges. A dynamic-array, queue, or associative dimension contributes
-// an empty range.
+// the packed ranges. A dynamic-array, queue, or associative dimension
+// contributes an empty range.
 std::vector<VpiRangeDesc> VpiTypespecRanges(
     const std::vector<VpiArrayDimension>& dims);
 
 // §37.25 detail 9: vpiLeftRange of a typespec - the left bound of its leftmost
-// dimension (the leftmost packed dimension of a logic/bit/packed-array typespec,
-// the leftmost unpacked dimension of an array typespec). NULL when there is no
-// dimension or that leftmost range is empty (§37.22).
+// dimension (the leftmost packed dimension of a logic/bit/packed-array
+// typespec, the leftmost unpacked dimension of an array typespec). NULL when
+// there is no dimension or that leftmost range is empty (§37.22).
 VpiHandle VpiTypespecLeftRange(const std::vector<VpiArrayDimension>& dims);
 
-// §37.25 detail 9: vpiRightRange of a typespec, the mirror of VpiTypespecLeftRange.
+// §37.25 detail 9: vpiRightRange of a typespec, the mirror of
+// VpiTypespecLeftRange.
 VpiHandle VpiTypespecRightRange(const std::vector<VpiArrayDimension>& dims);
 
 // §37.25 detail 11: in a context where a type parameter has not been resolved,
@@ -2151,12 +2191,13 @@ bool VpiIsNetDriverType(int type);
 // complex-expression rule of detail 1, so it is not part of this set.
 bool VpiIsNetLoadType(int type);
 
-// §37.46 detail 1: whether an input port carries a complex expression that loads
-// the nets it reads, making the port itself a load. The connection on the port
-// (its vpiHighConn) must be a complex expression - an operation rather than a
-// simple reference - and must not be a concatenation, whose operands connect
-// their nets individually. Only an input port loads this way; the complex
-// expression itself is reached through vpi_handle(vpiHighConn, port) (§37.14).
+// §37.46 detail 1: whether an input port carries a complex expression that
+// loads the nets it reads, making the port itself a load. The connection on the
+// port (its vpiHighConn) must be a complex expression - an operation rather
+// than a simple reference - and must not be a concatenation, whose operands
+// connect their nets individually. Only an input port loads this way; the
+// complex expression itself is reached through vpi_handle(vpiHighConn, port)
+// (§37.14).
 bool VpiPortIsComplexExpressionLoad(VpiHandle port);
 
 // §37.26 (figure): the four object kinds the Structures-and-unions figure
@@ -2164,11 +2205,11 @@ bool VpiPortIsComplexExpressionLoad(VpiHandle port);
 // union declared as a net. Used to recognise an entire structure/union object.
 bool VpiIsStructOrUnionType(int type);
 
-// §37.26 detail 1: whether an object is an entire unpacked structure or unpacked
-// union - one whose value vpi_get_value()/vpi_put_value() cannot access. A
-// packed struct/union (vpiPacked true) has a single vector value and stays
-// accessible; only the unpacked aggregate is off-limits, so the rule is the
-// struct/union object kinds restricted to the unpacked case.
+// §37.26 detail 1: whether an object is an entire unpacked structure or
+// unpacked union - one whose value vpi_get_value()/vpi_put_value() cannot
+// access. A packed struct/union (vpiPacked true) has a single vector value and
+// stays accessible; only the unpacked aggregate is off-limits, so the rule is
+// the struct/union object kinds restricted to the unpacked case.
 bool VpiIsEntireUnpackedStructOrUnion(int type, bool packed);
 
 // ===========================================================================
@@ -2182,9 +2223,9 @@ bool VpiIsEntireUnpackedStructOrUnion(int type, bool packed);
 // and drive the public vpi_handle dispatch.
 // ===========================================================================
 
-// §37.28 detail 2: vpiTypespec of a type parameter - the typespec it resolved to
-// at the end of elaboration, handed back without following any typedef alias to
-// its underlying type (deliberately not applying §37.25/§37.30's alias
+// §37.28 detail 2: vpiTypespec of a type parameter - the typespec it resolved
+// to at the end of elaboration, handed back without following any typedef alias
+// to its underlying type (deliberately not applying §37.25/§37.30's alias
 // resolution). NULL when the type parameter carries no such typespec.
 VpiHandle VpiTypeParameterTypespec(VpiHandle type_parameter);
 
@@ -2223,10 +2264,10 @@ VpiHandle VpiParameterRightRange(VpiHandle parameter);
 bool VpiIsInterfaceExprType(int type);
 
 // §37.29 detail 2: whether an object of an interface-expr kind is a legal
-// interface expr. A ref obj qualifies only when its vpiActual is an interface or
-// a modport (a local declaration passed through a port); a constant only when
-// its vpiConstType is vpiNullConst; an interface, modport, or virtual interface
-// var always qualifies.
+// interface expr. A ref obj qualifies only when its vpiActual is an interface
+// or a modport (a local declaration passed through a port); a constant only
+// when its vpiConstType is vpiNullConst; an interface, modport, or virtual
+// interface var always qualifies.
 bool VpiInterfaceExprIsValid(VpiHandle expr);
 
 // §37.29 detail 1: vpiExpr of a virtual interface var - the interface instance
@@ -2260,27 +2301,27 @@ VpiHandle VpiInterfaceTypespecParent(VpiHandle interface_typespec);
 // ===========================================================================
 // §37.48 Clocking block. The VPI object model for a clocking block
 // (vpiClockingBlock) and the clocking io decls (vpiClockingIODecl) it contains.
-// Most of the figure - the input/output skew delay controls, the clocking event,
-// the contained io/property/sequence decls, and the vpiName/vpiFullName and
-// vpiInputEdge/vpiOutputEdge properties - is served by the generic Get/GetStr/
-// Iterate/Handle machinery once the objects' fields and children are populated;
-// detail 1 only records that those skew/edge relations target the default
-// constructs on a clocking block and the io decl itself on an io decl. The three
-// numbered Details that refine traversal - vpiPrefix (detail 2), vpiActual
-// (detail 3), and vpiExpr of an io decl (detail 4) - are carried by the helpers
-// below, which also drive the public vpi_handle dispatch.
+// Most of the figure - the input/output skew delay controls, the clocking
+// event, the contained io/property/sequence decls, and the vpiName/vpiFullName
+// and vpiInputEdge/vpiOutputEdge properties - is served by the generic
+// Get/GetStr/ Iterate/Handle machinery once the objects' fields and children
+// are populated; detail 1 only records that those skew/edge relations target
+// the default constructs on a clocking block and the io decl itself on an io
+// decl. The three numbered Details that refine traversal - vpiPrefix (detail
+// 2), vpiActual (detail 3), and vpiExpr of an io decl (detail 4) - are carried
+// by the helpers below, which also drive the public vpi_handle dispatch.
 // ===========================================================================
 
-// §37.48 detail 2: vpiPrefix of a clocking block - the virtual interface var the
-// clocking block expression is immediately prefixed by (e.g., "vif.cb"). It is
-// modeled as a virtual interface var child; a clocking block that is not so
+// §37.48 detail 2: vpiPrefix of a clocking block - the virtual interface var
+// the clocking block expression is immediately prefixed by (e.g., "vif.cb"). It
+// is modeled as a virtual interface var child; a clocking block that is not so
 // prefixed has none and reports NULL.
 VpiHandle VpiClockingBlockPrefix(VpiHandle block);
 
 // §37.48 detail 3: vpiActual of a clocking block - the concrete clocking block
 // selected through its virtual interface prefix. When the prefix is a virtual
-// interface that holds no value at the current simulation time (its own vpiActual
-// is NULL), the clocking block's vpiActual is NULL as well.
+// interface that holds no value at the current simulation time (its own
+// vpiActual is NULL), the clocking block's vpiActual is NULL as well.
 VpiHandle VpiClockingBlockActual(VpiHandle block);
 
 // §37.48 (figure, clocking io decl -> nets / variables / ref obj): the object
@@ -2288,9 +2329,10 @@ VpiHandle VpiClockingBlockActual(VpiHandle block);
 // ref obj the io decl names.
 bool VpiIsClockingIODeclExprType(int type);
 
-// §37.48 detail 4: vpiExpr of a clocking io decl - the expression or ref obj the
-// io decl names. For "enable = top.mem1.enable" the io decl "enable" reaches a
-// handle to the ref obj "top.mem1.enable"; NULL when the io decl names nothing.
+// §37.48 detail 4: vpiExpr of a clocking io decl - the expression or ref obj
+// the io decl names. For "enable = top.mem1.enable" the io decl "enable"
+// reaches a handle to the ref obj "top.mem1.enable"; NULL when the io decl
+// names nothing.
 VpiHandle VpiClockingIODeclExpr(VpiHandle io_decl);
 
 // ===========================================================================
@@ -2334,9 +2376,9 @@ int VpiIoDeclDirection(int declared_direction, bool passed_by_reference,
 // null, is not an io decl, or carries no expr-target child.
 VpiHandle VpiIoDeclExpr(VpiHandle io_decl);
 
-// §37.13 detail 4 (woven with §37.25): the ranges vpi_iterate(vpiRange, io_decl)
-// returns are the same as for the io decl's corresponding typespec, so this
-// defers to §37.25's typespec range helper.
+// §37.13 detail 4 (woven with §37.25): the ranges vpi_iterate(vpiRange,
+// io_decl) returns are the same as for the io decl's corresponding typespec, so
+// this defers to §37.25's typespec range helper.
 std::vector<VpiRangeDesc> VpiIoDeclRanges(
     const std::vector<VpiArrayDimension>& dims);
 
@@ -2350,21 +2392,23 @@ VpiHandle VpiIoDeclRightRange(const std::vector<VpiArrayDimension>& dims);
 
 // ===========================================================================
 // §37.14 Ports and §37.15 Reference objects. The two clauses share a model: a
-// port's vpiHighConn/vpiLowConn connections are reached the same way a ref obj's
-// are, and the lowConn of an interface port is itself a ref obj (§37.14 detail
-// 5), so the connection helpers below serve both. The numbered "Details" that
-// carry decision rules are realized as helpers; the diagram's structural
+// port's vpiHighConn/vpiLowConn connections are reached the same way a ref
+// obj's are, and the lowConn of an interface port is itself a ref obj (§37.14
+// detail 5), so the connection helpers below serve both. The numbered "Details"
+// that carry decision rules are realized as helpers; the diagram's structural
 // relations are served by the generic Handle/Get machinery once the designated
 // connection pointers are populated.
 // ===========================================================================
 
 // §37.14 detail 1: the three port types a port may report through
-// vpi_get(vpiPortType). The value is determined by the formal, never the actual.
+// vpi_get(vpiPortType). The value is determined by the formal, never the
+// actual.
 bool VpiIsValidPortType(int port_type);
 
 // §37.14 detail 1: the port type derived from what the formal denotes - an
-// interface formal yields vpiInterfacePort, a modport formal vpiModportPort, and
-// any ordinary formal vpiPort. The actual a port connects to never changes this.
+// interface formal yields vpiInterfacePort, a modport formal vpiModportPort,
+// and any ordinary formal vpiPort. The actual a port connects to never changes
+// this.
 int VpiPortTypeFromFormal(bool formal_is_interface, bool formal_is_modport);
 
 // §37.14 detail 2: vpi_get_delays() and vpi_put_delays() are not applicable to
@@ -2382,8 +2426,9 @@ VpiHandle VpiHighConn(VpiHandle obj);
 VpiHandle VpiLowConn(VpiHandle obj);
 
 // §37.14 detail 5: the lowConn of a vpiInterfacePort shall always be a ref obj.
-// TRUE when the port is not an interface port, or it is and its lowConn is a ref
-// obj; FALSE when an interface port's lowConn is missing or some other kind.
+// TRUE when the port is not an interface port, or it is and its lowConn is a
+// ref obj; FALSE when an interface port's lowConn is missing or some other
+// kind.
 bool VpiPortLowConnSatisfiesInterfaceRule(VpiHandle port);
 
 // §37.14 detail 6: vpiScalar is TRUE when the port is exactly one bit wide. The
@@ -2413,14 +2458,14 @@ int VpiPortSize(bool is_null_port, int port_width);
 // vpiUndefined for every other kind of ref obj.
 int VpiRefObjGeneric(bool refers_to_interface, bool is_generic_interface);
 
-// §37.15 detail 6: vpiDefName for a ref obj whose vpiActual is an interface or a
-// modport returns that interface's definition name or the modport name. NULL for
-// a ref obj whose actual is neither (or which is unbound).
+// §37.15 detail 6: vpiDefName for a ref obj whose vpiActual is an interface or
+// a modport returns that interface's definition name or the modport name. NULL
+// for a ref obj whose actual is neither (or which is unbound).
 const char* VpiRefObjDefName(VpiHandle ref_obj);
 
 // §37.15 detail 7: the vpiTypespec relation returns NULL for a ref obj whose
-// vpiActual is not a net, variable, or part select; otherwise it returns the ref
-// obj's typespec child.
+// vpiActual is not a net, variable, or part select; otherwise it returns the
+// ref obj's typespec child.
 VpiHandle VpiRefObjTypespec(VpiHandle ref_obj);
 
 // ===========================================================================
@@ -2443,9 +2488,9 @@ bool VpiIsArrayNet(int unpacked_range_count);
 // ranges written on the declaration, never the implicit element ranges.
 bool VpiIsPackedArrayNet(int net_type, int explicit_packed_range_count);
 
-// §37.16 detail 2: vpiArrayMember is TRUE exactly when a net is an element of an
-// array net, read from the net's vpiParent prefix. (The older vpiArray property
-// is deprecated for the same role.)
+// §37.16 detail 2: vpiArrayMember is TRUE exactly when a net is an element of
+// an array net, read from the net's vpiParent prefix. (The older vpiArray
+// property is deprecated for the same role.)
 bool VpiNetIsArrayMember(VpiHandle net);
 
 // §37.16 detail 2: vpiPackedArrayMember is TRUE for a packed struct net, packed
@@ -2458,8 +2503,9 @@ bool VpiNetIsPackedArrayMember(VpiHandle net);
 // logic net or a bit net.
 bool VpiNetBitIteratorApplies(int net_type);
 
-// §37.16 detail 5: continuous assignments and primitive terminals (vpiContAssign
-// and vpiPrimTerm) shall only be accessed from a scalar net or a bit-select.
+// §37.16 detail 5: continuous assignments and primitive terminals
+// (vpiContAssign and vpiPrimTerm) shall only be accessed from a scalar net or a
+// bit-select.
 bool VpiNetTerminalAccessAllowed(bool is_scalar_net_or_bit_select);
 
 // §37.16 details 6 and 7: the granularity a vpiPorts or vpiPortInst iteration
@@ -2501,8 +2547,8 @@ int VpiNetLineNo(bool implicit, int declared_line);
 // scopes).
 bool VpiHasLocationProperties(int type);
 
-// §37.16 detail 10: vpi_handle(vpiIndex, net_bit) returns the bit index of a net
-// bit - its single innermost index.
+// §37.16 detail 10: vpi_handle(vpiIndex, net_bit) returns the bit index of a
+// net bit - its single innermost index.
 VpiHandle VpiNetBitIndex(const std::vector<VpiHandle>& indices_inner_to_outer);
 
 // §37.16 detail 10: vpi_iterate(vpiIndex, net_bit) over a multidimensional net
@@ -2516,8 +2562,8 @@ std::vector<VpiHandle> VpiNetBitIndicesOutward(
 // with a nettype reports vpiNettypeNetSelect.
 int VpiNetNettypeValue(bool is_part_of_nettype_net);
 
-// §37.16 detail 11: vpiDriver and vpiLocalDriver iterations are not supported for
-// a net whose vpiNetType is vpiNettypeNetSelect.
+// §37.16 detail 11: vpiDriver and vpiLocalDriver iterations are not supported
+// for a net whose vpiNetType is vpiNettypeNetSelect.
 bool VpiNetDriverIterationSupported(int nettype_value);
 
 // §37.16 detail 12: vpiNetType for an interconnect net or interconnect net
@@ -2536,11 +2582,11 @@ VpiHandle VpiNetTypespec(VpiHandle net);
 // property for the bit's parent net.
 bool VpiNetBitExpanded(VpiHandle net_bit);
 
-// §37.16 detail 23: vpiConstantSelect for a net or net bit. TRUE when the object
-// has no parent (vpiParent returns NULL), or when every index expression in the
-// select is an elaboration-time constant and every selected element denotes a
-// struct/union net member or a packed/unpacked array element with static bounds
-// (see A.8.4); FALSE otherwise.
+// §37.16 detail 23: vpiConstantSelect for a net or net bit. TRUE when the
+// object has no parent (vpiParent returns NULL), or when every index expression
+// in the select is an elaboration-time constant and every selected element
+// denotes a struct/union net member or a packed/unpacked array element with
+// static bounds (see A.8.4); FALSE otherwise.
 bool VpiNetConstantSelect(bool has_parent, bool all_indices_constant,
                           bool all_elements_static_members);
 
@@ -2580,8 +2626,8 @@ std::vector<VpiRangeDesc> VpiNetRanges(
     const std::vector<VpiArrayDimension>& dims);
 
 // §37.16 detail 26: vpiLeftRange of a bit, logic, or packed array net - the
-// bound of the leftmost packed dimension. NULL when the net has no dimensions or
-// that leftmost range is empty.
+// bound of the leftmost packed dimension. NULL when the net has no dimensions
+// or that leftmost range is empty.
 VpiHandle VpiNetLeftRange(const std::vector<VpiArrayDimension>& dims);
 
 // §37.16 detail 26: vpiRightRange of a net, the mirror of VpiNetLeftRange.
@@ -2610,28 +2656,29 @@ bool VpiNetScalar(const VpiNetScalarVectorQuery& query);
 // net object is not a vector.
 bool VpiNetVector(const VpiNetScalarVectorQuery& query);
 
-// §37.16 detail 30: whether a net kind has a value property. Array nets, unpacked
-// struct nets, unpacked union nets, and interconnect arrays do not; every other
-// net does.
+// §37.16 detail 30: whether a net kind has a value property. Array nets,
+// unpacked struct nets, unpacked union nets, and interconnect arrays do not;
+// every other net does.
 bool VpiNetHasValueProperty(int net_type, bool packed_struct_union);
 
-// §37.16 detail 31: vpiParent of a net. Scanning the prefix objects rightmost to
-// leftmost (the order given), the first qualifying prefix is returned - a
+// §37.16 detail 31: vpiParent of a net. Scanning the prefix objects rightmost
+// to leftmost (the order given), the first qualifying prefix is returned - a
 // struct/union net, a struct/union member net, or the largest containing packed
 // or unpacked array net; NULL when none qualifies. Reuses §37.17's prefix
 // descriptor, whose shape is shared between the two object models.
 VpiHandle VpiNetParent(const std::vector<VpiParentPrefix>& prefixes);
 
 // §37.16 detail 32: vpiElement iterates the subelements of a packed array net,
-// one dimension at a time. True for a packed array net, false for any other net.
+// one dimension at a time. True for a packed array net, false for any other
+// net.
 bool VpiNetElementIteratorApplies(int net_type);
 
 // §37.16 detail 32: the subelements a vpiElement iteration over a packed array
 // net returns - its element children, in declaration order.
 std::vector<VpiHandle> VpiPackedArrayNetElements(VpiHandle packed_array_net);
 
-// §37.16 detail 33: vpiStructUnionMember is TRUE for a net or array net that is a
-// direct member of a struct net or union net (its vpiParent is a struct/union
+// §37.16 detail 33: vpiStructUnionMember is TRUE for a net or array net that is
+// a direct member of a struct net or union net (its vpiParent is a struct/union
 // net), FALSE for any other net, and is not defined for a net bit (reported
 // FALSE).
 bool VpiNetStructUnionMember(VpiHandle net);
@@ -2640,8 +2687,8 @@ bool VpiNetStructUnionMember(VpiHandle net);
 // but none of its struct/union-net prefixes. Reuses §37.17's name-parts shape.
 std::string VpiNetName(const VpiVariableNameParts& parts);
 
-// §37.16 detail 34: vpiDecompile of a net - the struct/union-net prefixes joined
-// to the member (and its index/slice) without the top-level scope, so it
+// §37.16 detail 34: vpiDecompile of a net - the struct/union-net prefixes
+// joined to the member (and its index/slice) without the top-level scope, so it
 // resolves for any non-top-level scope context.
 std::string VpiNetDecompile(const VpiVariableNameParts& parts);
 
@@ -2697,21 +2744,22 @@ VpiHandle VpiInstanceArrayConnections(VpiHandle instance_array);
 // expression object of type vpiOperation whose vpiOpType is vpiListOp.
 bool VpiInstanceArrayConnectionsIsListOp(VpiHandle expr);
 
-// §37.11 detail 2: the ranges vpi_iterate(vpiRange, instance_array) returns, one
-// per declared dimension, beginning with the leftmost range of the declaration
-// and running through the rightmost. Each dimension routes through §37.22's
-// empty-range rule.
+// §37.11 detail 2: the ranges vpi_iterate(vpiRange, instance_array) returns,
+// one per declared dimension, beginning with the leftmost range of the
+// declaration and running through the rightmost. Each dimension routes through
+// §37.22's empty-range rule.
 std::vector<VpiRangeDesc> VpiInstanceArrayRanges(
     const std::vector<VpiArrayDimension>& dims);
 
 // §37.11 detail 2: vpiLeftRange of an instance array - the left bound of the
-// leftmost dimension of a (possibly multidimensional) array. NULL when the array
-// has no dimensions or that leftmost range is empty (§37.22).
+// leftmost dimension of a (possibly multidimensional) array. NULL when the
+// array has no dimensions or that leftmost range is empty (§37.22).
 VpiHandle VpiInstanceArrayLeftRange(const std::vector<VpiArrayDimension>& dims);
 
 // §37.11 detail 2: vpiRightRange of an instance array, the mirror of
 // VpiInstanceArrayLeftRange.
-VpiHandle VpiInstanceArrayRightRange(const std::vector<VpiArrayDimension>& dims);
+VpiHandle VpiInstanceArrayRightRange(
+    const std::vector<VpiArrayDimension>& dims);
 
 struct VpiVectorVal {
   uint32_t aval;
@@ -2786,8 +2834,9 @@ struct VpiDelay {
 
 struct VpiCbData {
   int reason = 0;
-  // §38.36 (Figure 38-17): the application routine the simulator invokes when it
-  // executes the callback; it is passed a pointer to this s_cb_data structure.
+  // §38.36 (Figure 38-17): the application routine the simulator invokes when
+  // it executes the callback; it is passed a pointer to this s_cb_data
+  // structure.
   int (*cb_rtn)(VpiCbData*) = nullptr;
   VpiHandle obj = nullptr;
   VpiTime* time = nullptr;
@@ -2845,9 +2894,10 @@ enum class VpiSystfCallback { kCompiletf, kSizetf, kCalltf };
 
 // §38.37.1 (tfname rule): whether a candidate system task/function name is a
 // well-formed name as it would be written in SystemVerilog source - it begins
-// with a dollar sign and is followed by one or more characters that are legal in
-// a SystemVerilog simple identifier (A-Z, a-z, 0-9, underscore, dollar sign). A
-// bare "$", an empty string, or any other character makes the name ill-formed.
+// with a dollar sign and is followed by one or more characters that are legal
+// in a SystemVerilog simple identifier (A-Z, a-z, 0-9, underscore, dollar
+// sign). A bare "$", an empty string, or any other character makes the name
+// ill-formed.
 bool VpiSystfNameIsValid(const char* tfname);
 
 // §38.37.1 (sysfunctype rule): the value kind a registration declares for a
@@ -2856,9 +2906,10 @@ bool VpiSystfNameIsValid(const char* tfname);
 // reports 0 (no return-value kind) regardless of the stored field.
 int VpiSystfReturnType(const VpiSystfData& data);
 
-// §38.37.1: whether a given callback application fires while the simulation data
-// structure is being compiled or built (true for compiletf and sizetf) rather
-// than on every invocation during simulation execution (false for calltf).
+// §38.37.1: whether a given callback application fires while the simulation
+// data structure is being compiled or built (true for compiletf and sizetf)
+// rather than on every invocation during simulation execution (false for
+// calltf).
 bool VpiSystfCallbackFiresAtBuild(VpiSystfCallback callback);
 
 // §38.37.1: invoke one of the systf callback applications. Every callback
@@ -2869,8 +2920,8 @@ int VpiSystfInvoke(int (*routine)(const char*), void* user_data);
 
 // §38.37.1 (sizetf rule): whether the sizetf application is to be called for a
 // registration. It is called only for a system function (vpiSysFunc) whose
-// sysfunctype is vpiSizedFunc or vpiSizedSignedFunc; for anything else sizetf is
-// never invoked.
+// sysfunctype is vpiSizedFunc or vpiSizedSignedFunc; for anything else sizetf
+// is never invoked.
 bool VpiSystfSizetfIsCalled(const VpiSystfData& data);
 
 // §38.37.1: the bit width a sized system function reports. When sizetf is to be
@@ -2889,9 +2940,9 @@ int VpiSystfResultSizeBits(const VpiSystfData& data);
 enum class VpiToolPhase { kStartup, kSizetf, kFull };
 
 // §36.10.2: whether a phase restricts VPI functionality. The startup phase and
-// the sizetf phase that follows it both restrict it (the sizetf phase permits no
-// access beyond the startup phase); only the full phase makes all functionality
-// available.
+// the sizetf phase that follows it both restrict it (the sizetf phase permits
+// no access beyond the startup phase); only the full phase makes all
+// functionality available.
 bool VpiPhaseRestrictsFunctionality(VpiToolPhase phase);
 
 // §36.10.2: the VPI routines whose availability the startup-phase restriction
@@ -2941,8 +2992,8 @@ int VpiGenScopeArraySize(VpiHandle gen_scope_array);
 // §37.81: one entry of the simulation time queue - a simulation time, expressed
 // in ticks of the simulation time unit, at which events are still scheduled.
 // `is_current` marks the entry at the current simulation time; detail 3 admits
-// that entry to the vpi_iterate(vpiTimeQueue, NULL) walk only when events remain
-// scheduled before its read-only synch region, recorded by
+// that entry to the vpi_iterate(vpiTimeQueue, NULL) walk only when events
+// remain scheduled before its read-only synch region, recorded by
 // `has_events_before_read_only_synch`. A future entry (is_current false) always
 // takes part in the iteration.
 struct VpiTimeQueueSlot {
@@ -2962,13 +3013,14 @@ class VpiContext {
 
   VpiHandle RegisterSystf(VpiSystfData* data);
 
-  // §36.3.2: resolve the effective registration for a system task/function name,
-  // honouring the override rule. A user-provided PLI application associated with
-  // the same name as a built-in overrides that built-in, replacing its
-  // functionality, so the registry is consulted first: a matching registration
-  // is the override to invoke, and only when none is present (a null result)
-  // does the built-in stand. When several registrations share the name the most
-  // recent one wins, so a later user application overrides an earlier one.
+  // §36.3.2: resolve the effective registration for a system task/function
+  // name, honouring the override rule. A user-provided PLI application
+  // associated with the same name as a built-in overrides that built-in,
+  // replacing its functionality, so the registry is consulted first: a matching
+  // registration is the override to invoke, and only when none is present (a
+  // null result) does the built-in stand. When several registrations share the
+  // name the most recent one wins, so a later user application overrides an
+  // earlier one.
   const VpiSystfData* ResolveSystf(const char* name) const;
 
   // §38.12: report the registration of the system task or system function
@@ -2979,13 +3031,13 @@ class VpiContext {
   // task/function callback leaves the destination untouched.
   void GetSystfInfo(VpiHandle obj, VpiSystfData* systf_data_p);
 
-  // §38.8: report the registration of the simulation-related callback denoted by
-  // `obj` into the application-allocated structure `cb_data_p`. The structure's
-  // memory belongs to the caller; this routine only writes the stored s_cb_data
-  // fields into it - it never allocates that storage. A null destination, a null
-  // handle, or a handle that does not name a registered simulation callback
-  // leaves the destination untouched. (Use GetSystfInfo for a system
-  // task/function callback instead.)
+  // §38.8: report the registration of the simulation-related callback denoted
+  // by `obj` into the application-allocated structure `cb_data_p`. The
+  // structure's memory belongs to the caller; this routine only writes the
+  // stored s_cb_data fields into it - it never allocates that storage. A null
+  // destination, a null handle, or a handle that does not name a registered
+  // simulation callback leaves the destination untouched. (Use GetSystfInfo for
+  // a system task/function callback instead.)
   void GetCbInfo(VpiHandle obj, VpiCbData* cb_data_p);
 
   // §38.13: write the relevant simulation time into the application-allocated
@@ -3035,8 +3087,8 @@ class VpiContext {
 
   // §38.9 / §38.32: populate the save/restart store for `id` with `len` bytes
   // from `data`, appending to whatever is already stored for that id. The
-  // production writer is vpi_put_data() (§38.32); this entry point stands in for
-  // it so the data vpi_get_data() reads back can be established.
+  // production writer is vpi_put_data() (§38.32); this entry point stands in
+  // for it so the data vpi_get_data() reads back can be established.
   void SeedSaveData(int id, const char* data, int len);
 
   // §38.31: append `num_of_bytes` bytes from `data_loc` to the save/restart
@@ -3071,21 +3123,21 @@ class VpiContext {
   void ClearUserDataForRestartOrReset();
 
   // §38.13: set the simulation time unit, as a base-ten exponent of one second
-  // (the unit the scheduler counts ticks in). vpi_get_time() uses it both as the
-  // scaling reference for a scaled-real result and as the unit reported for a
-  // null obj or a time queue object.
+  // (the unit the scheduler counts ticks in). vpi_get_time() uses it both as
+  // the scaling reference for a scaled-real result and as the unit reported for
+  // a null obj or a time queue object.
   void SetSimTimeUnit(int exponent) { sim_time_unit_ = exponent; }
 
   // §38.13: create a time queue object so vpi_get_time() can report the
   // scheduled time of the next future event.
   VpiHandle CreateTimeQueue();
 
-  // §37.81: record the simulation time queue the vpi_iterate(vpiTimeQueue, NULL)
-  // walk reports. The scheduler keeps this in step with the pending-event
+  // §37.81: record the simulation time queue the vpi_iterate(vpiTimeQueue,
+  // NULL) walk reports. The scheduler keeps this in step with the pending-event
   // calendar; each slot names a simulation time that still holds events. The
-  // iteration sorts them into increasing time order, drops the current-time slot
-  // unless events remain before its read-only synch region, and yields a time
-  // queue object for each surviving slot (an empty result returns NULL).
+  // iteration sorts them into increasing time order, drops the current-time
+  // slot unless events remain before its read-only synch region, and yields a
+  // time queue object for each surviving slot (an empty result returns NULL).
   void SetTimeQueueSlots(std::vector<VpiTimeQueueSlot> slots) {
     time_queue_slots_ = std::move(slots);
   }
@@ -3100,11 +3152,12 @@ class VpiContext {
 
   // §38.20: return a handle to the index-selected subobject of `parent` named
   // by the `num_index` indices in `index_array`. Like vpi_handle_by_index(),
-  // the reference object must carry the access-by-index property and must not be
-  // protected, or the call is an error. The indices are applied leftmost first,
-  // following the array dimension declaration from the leftmost to the rightmost
-  // range, optionally ending in a bit-select index. When the indices do not form
-  // a legal SystemVerilog index select expression the result is a null handle.
+  // the reference object must carry the access-by-index property and must not
+  // be protected, or the call is an error. The indices are applied leftmost
+  // first, following the array dimension declaration from the leftmost to the
+  // rightmost range, optionally ending in a bit-select index. When the indices
+  // do not form a legal SystemVerilog index select expression the result is a
+  // null handle.
   VpiHandle HandleByMultiIndex(int num_index, const int* index_array,
                                VpiHandle parent);
   VpiHandle Handle(int type, VpiHandle ref);
@@ -3119,30 +3172,31 @@ class VpiContext {
 
   // §38.36.3: deliver every active callback registered for the given action or
   // feature reason. Each routine receives a copy of its s_cb_data whose reason
-  // field holds the reason for the callback; when a non-null obj or user_data is
-  // supplied the simulator fills that field before the routine runs (for
+  // field holds the reason for the callback; when a non-null obj or user_data
+  // is supplied the simulator fills that field before the routine runs (for
   // example, the timing-check handle for cbTchkViolation, the new scope handle
-  // for cbInteractiveScopeChange, or the unresolved name for cbUnresolvedSystf).
-  // Returns how many callbacks were delivered.
+  // for cbInteractiveScopeChange, or the unresolved name for
+  // cbUnresolvedSystf). Returns how many callbacks were delivered.
   int DispatchCallbacks(int reason, VpiHandle obj = nullptr,
                         void* user_data = nullptr);
 
   // §38.36.3: a reset delivers cbStartOfReset at the start of the operation and
-  // cbEndOfReset once it has completed. This is the single path used whether the
-  // reset was requested directly or through vpi_control(vpiReset, ...).
+  // cbEndOfReset once it has completed. This is the single path used whether
+  // the reset was requested directly or through vpi_control(vpiReset, ...).
   int DispatchReset();
 
   // §38.36.3: a restart first removes every registered callback except the
-  // restart callbacks, then delivers cbStartOfRestart followed by cbEndOfRestart,
-  // so the only callbacks that exist across a restart are those two.
+  // restart callbacks, then delivers cbStartOfRestart followed by
+  // cbEndOfRestart, so the only callbacks that exist across a restart are those
+  // two.
   int DispatchRestart();
 
   int Get(int property, VpiHandle obj);
 
   // §38.7: read a 64-bit integer object property (one whose type is PLI_INT64),
-  // returning the value at full width instead of the PLI_INT32 vpi_get() yields.
-  // Querying a protected object is an error, and on any error the value returned
-  // is vpiUndefined.
+  // returning the value at full width instead of the PLI_INT32 vpi_get()
+  // yields. Querying a protected object is an error, and on any error the value
+  // returned is vpiUndefined.
   PLI_INT64 Get64(int property, VpiHandle obj);
 
   // §37.10 detail 7: the smallest time precision over every module object the
@@ -3247,8 +3301,8 @@ class VpiContext {
   // every set bit that names an open channel is freed and the file it named is
   // dropped from the shared namespace (the same namespace $fopen uses, so an fd
   // opened there can be closed here too). Descriptor 1 (the LSB) is predefined
-  // for the tool's own output channel and log file and cannot be closed; any bit
-  // that names no closeable channel is left untouched. Returns 0 when every
+  // for the tool's own output channel and log file and cannot be closed; any
+  // bit that names no closeable channel is left untouched. Returns 0 when every
   // requested channel was closed, otherwise the mcd of the channels left open.
   PLI_UINT32 McdClose(PLI_UINT32 mcd);
 
@@ -3273,8 +3327,8 @@ class VpiContext {
   // descriptor. Because the channels are discrete bits of the integer mcd, one
   // call names several files; the buffered output of every named channel is
   // committed into its committed stream and the buffer emptied. Returns 0 on
-  // success and nonzero on failure, in which case the buffers are left untouched
-  // so nothing pending is lost.
+  // success and nonzero on failure, in which case the buffers are left
+  // untouched so nothing pending is lost.
   PLI_INT32 McdFlush(PLI_UINT32 mcd);
 
   // §38.26: return the name of the file a single-channel descriptor names. The
@@ -3296,15 +3350,15 @@ class VpiContext {
 
   // §38.30: write already-formatted text to both the output channel of the tool
   // that invoked the PLI application and the current tool log file. Unlike
-  // McdPrintf() there is no descriptor: the destination is always the tool's own
-  // output channel and log file (the §38.5 buffers), so the same text is appended
-  // to each. Returns the number of characters written.
+  // McdPrintf() there is no descriptor: the destination is always the tool's
+  // own output channel and log file (the §38.5 buffers), so the same text is
+  // appended to each. Returns the number of characters written.
   PLI_INT32 Printf(std::string_view text);
 
-  // Support hooks for the mcd-flush model. The writer feeds buffered text onto a
-  // single channel (the one set bit naming the file); the accessors report what
-  // is still pending on a channel and what a flush has committed; the failure
-  // hook forces the next flush down its nonzero return.
+  // Support hooks for the mcd-flush model. The writer feeds buffered text onto
+  // a single channel (the one set bit naming the file); the accessors report
+  // what is still pending on a channel and what a flush has committed; the
+  // failure hook forces the next flush down its nonzero return.
   void WriteMcdChannel(PLI_UINT32 channel, std::string_view text) {
     mcd_channel_buffers_[channel].append(text);
   }
@@ -3348,13 +3402,13 @@ class VpiContext {
 
   // §38.38: the public vpi_release_handle() routine. It frees the memory a VPI
   // routine allocated for a handle and reports whether it did so - 1 on success
-  // and 0 on failure. The routine shall not be called on an invalid handle, so a
-  // null, already-released, or otherwise invalid handle has no live memory to
+  // and 0 on failure. The routine shall not be called on an invalid handle, so
+  // a null, already-released, or otherwise invalid handle has no live memory to
   // free and the call fails with 0. An iterator object (from vpi_iterate(),
   // §38.21) owns storage that vpi_scan() reclaims only once a traversal runs to
-  // its end; releasing one before then frees that storage directly, which is how
-  // a program that breaks out of an iteration loop early reclaims it. For any
-  // other handle, freeing it is the §37.2.2 release operation above.
+  // its end; releasing one before then frees that storage directly, which is
+  // how a program that breaks out of an iteration loop early reclaims it. For
+  // any other handle, freeing it is the §37.2.2 release operation above.
   PLI_INT32 ReleaseHandleStatus(VpiHandle handle);
 
   // §37.2.2: observe whether a handle has been released. False for a null
@@ -3377,12 +3431,13 @@ class VpiContext {
   bool HandleSurvivesRestart(VpiHandle handle) const;
 
   // §37.2.2 (restart): release every handle a simulation restart releases - all
-  // of them except the two restart-callback handles (see HandleSurvivesRestart).
-  // DispatchRestart() invokes this so a restart applies the rule.
+  // of them except the two restart-callback handles (see
+  // HandleSurvivesRestart). DispatchRestart() invokes this so a restart applies
+  // the rule.
   void ReleaseHandlesForRestart();
 
-  // §37.2.2 (frame/thread free): when the simulator frees objects belonging to a
-  // frame or thread, it releases all handles to those objects and to any
+  // §37.2.2 (frame/thread free): when the simulator frees objects belonging to
+  // a frame or thread, it releases all handles to those objects and to any
   // subelement of them; handles to callbacks placed on any of these objects are
   // released as well. `root` is the freed object; its subelements are its
   // children, walked recursively.
@@ -3416,9 +3471,9 @@ class VpiContext {
   int DefaultCompatibilityMode() const { return default_compat_mode_; }
 
   // §36.12.2.2: the compatibility mode that actually governs a particular VPI
-  // application. An application bound to a mode through Mechanism 1 carries that
-  // mode in its recompiled entry points, so the run-wide default does not apply
-  // to it - when `uses_mechanism1` is true the application's own
+  // application. An application bound to a mode through Mechanism 1 carries
+  // that mode in its recompiled entry points, so the run-wide default does not
+  // apply to it - when `uses_mechanism1` is true the application's own
   // `mechanism1_mode` governs. Every application not using the compile-based
   // scheme is governed by the run-wide default instead. This is how an
   // application needing a mode different from the default obtains one: by using
@@ -3451,8 +3506,8 @@ class VpiContext {
 
   // §38.35: write values into contiguous elements of a static unpacked array.
   // arrayvalue_p selects the element encoding and flags; index_p gives the
-  // starting element's coordinate (one entry per unpacked dimension); num is how
-  // many consecutive elements to set. Applies vpiNoDelay semantics only.
+  // starting element's coordinate (one entry per unpacked dimension); num is
+  // how many consecutive elements to set. Applies vpiNoDelay semantics only.
   void PutValueArray(VpiHandle obj, VpiArrayValue* arrayvalue_p, int* index_p,
                      unsigned int num);
 
@@ -3517,13 +3572,13 @@ class VpiContext {
   int ResetResetValue() const { return reset_reset_value_; }
   int ResetDiagValue() const { return reset_diag_value_; }
 
-  // §38.4: the scope vpi_control(vpiSetInteractiveScope, ...) most recently made
-  // the tool's interactive scope.
+  // §38.4: the scope vpi_control(vpiSetInteractiveScope, ...) most recently
+  // made the tool's interactive scope.
   VpiHandle InteractiveScope() const { return interactive_scope_; }
 
-  // §37.43 detail 4: record which frame is the one currently active. There is at
-  // most one active frame at a time in a given thread, and an application reaches
-  // it through vpi_handle(vpiFrame, NULL) (see Handle).
+  // §37.43 detail 4: record which frame is the one currently active. There is
+  // at most one active frame at a time in a given thread, and an application
+  // reaches it through vpi_handle(vpiFrame, NULL) (see Handle).
   void SetActiveFrame(VpiHandle frame) { active_frame_ = frame; }
   VpiHandle ActiveFrame() const { return active_frame_; }
 
@@ -3534,8 +3589,8 @@ class VpiContext {
   void SetCurrentSystfCall(VpiHandle call) { current_systf_call_ = call; }
   VpiHandle CurrentSystfCall() const { return current_systf_call_; }
 
-  // §37.82: record the system task call that established the active time format,
-  // i.e. the $timeformat() call. An application reaches it through
+  // §37.82: record the system task call that established the active time
+  // format, i.e. the $timeformat() call. An application reaches it through
   // vpi_handle(vpiActiveTimeFormat, NULL) (see Handle). It stays null until
   // $timeformat() runs, which is what makes that traversal return NULL when no
   // time format has been set (detail 1).
@@ -3555,8 +3610,8 @@ class VpiContext {
  private:
   VpiHandle AllocObject();
 
-  // §37.2.2: release one handle plus the handles to every callback placed on the
-  // object it names. Building block for the simulation-event release rules.
+  // §37.2.2: release one handle plus the handles to every callback placed on
+  // the object it names. Building block for the simulation-event release rules.
   void ReleaseHandleWithCallbacks(VpiObject* object);
 
   // §37.2.2: release a handle, all subelement handles reachable through its
@@ -3632,9 +3687,10 @@ class VpiContext {
   bool mcd_open_should_fail_ = false;
 
   // §38.25: each open mcd channel holds the text written to its file in an
-  // in-memory buffer until vpi_mcd_flush() commits it. A flush appends each named
-  // channel's buffer to its committed stream and clears the buffer. Keyed by the
-  // single channel bit so one descriptor's several channels are flushed together.
+  // in-memory buffer until vpi_mcd_flush() commits it. A flush appends each
+  // named channel's buffer to its committed stream and clears the buffer. Keyed
+  // by the single channel bit so one descriptor's several channels are flushed
+  // together.
   std::unordered_map<PLI_UINT32, std::string> mcd_channel_buffers_;
   std::unordered_map<PLI_UINT32, std::string> mcd_channel_flushed_;
   // Test hook that drives vpi_mcd_flush() down its failure return.
@@ -3643,8 +3699,8 @@ class VpiContext {
   // text, so they can hand back a reference without inserting an entry.
   const std::string empty_mcd_buffer_;
 
-  // §38.26: the single buffer vpi_mcd_name() reuses for its result, so each call
-  // overwrites the previous returned value. Separate from get_str_buffer_.
+  // §38.26: the single buffer vpi_mcd_name() reuses for its result, so each
+  // call overwrites the previous returned value. Separate from get_str_buffer_.
   std::string mcd_name_buffer_;
 
   VpiErrorInfo last_error_ = {};
@@ -3729,7 +3785,7 @@ using VlogStartupRoutine = void (*)();
 // the first null sentinel.
 void InvokeVlogStartupRoutines(VlogStartupRoutine* routines);
 
-}
+}  // namespace delta
 
 using vpiHandle = delta::VpiHandle;
 using s_vpi_value = delta::VpiValue;
@@ -3771,7 +3827,8 @@ using SVpiVlogInfo = delta::VpiVlogInfo;
 #define cbNBASynch 9
 #define cbAtEndOfSimTime 10
 
-// §38.36.3 simulator action/feature callback reasons (mirror of the kCb* values).
+// §38.36.3 simulator action/feature callback reasons (mirror of the kCb*
+// values).
 #define cbEndOfCompile 11
 #define cbStartOfSimulation 12
 #define cbError 13
@@ -4239,13 +4296,14 @@ using PLI_UBYTE8 = unsigned char;
 #define cbDisable 27
 
 // §37.17 Variables / §37.22 Object range: the variable object kinds (vpiBitVar,
-// vpiStructVar, ...), the backward-compatibility aliases of detail 19 (vpiVarBit,
-// vpiLogicVar, vpiArrayVar), and the related properties (vpiArrayType,
-// vpiRandType, vpiVisibility, vpiArrayMember, vpiStructUnionMember, ...) are all
-// defined by the Annex M source listing in sv_vpi_user.h. The range relations
-// (vpiSize, vpiLeftRange, vpiRightRange, vpiRange, vpiBit, vpiIndex, vpiParent,
-// vpiScalar, vpiVector, vpiConstantSelect, vpiDecompile) are defined above. The
-// helpers declared below apply the clause rules on top of those constants.
+// vpiStructVar, ...), the backward-compatibility aliases of detail 19
+// (vpiVarBit, vpiLogicVar, vpiArrayVar), and the related properties
+// (vpiArrayType, vpiRandType, vpiVisibility, vpiArrayMember,
+// vpiStructUnionMember, ...) are all defined by the Annex M source listing in
+// sv_vpi_user.h. The range relations (vpiSize, vpiLeftRange, vpiRightRange,
+// vpiRange, vpiBit, vpiIndex, vpiParent, vpiScalar, vpiVector,
+// vpiConstantSelect, vpiDecompile) are defined above. The helpers declared
+// below apply the clause rules on top of those constants.
 
 // §K.2: delay structure exchanged with the delay-processing routines. The
 // definition lives inside the delta namespace (VpiDelay) so the simulator's
@@ -4269,7 +4327,6 @@ typedef struct t_vpi_strengthval {
 // PLI spellings.
 using s_vpi_arrayvalue = delta::VpiArrayValue;
 using p_vpi_arrayvalue = delta::VpiArrayValue*;
-
 
 vpiHandle vpi_register_systf(s_vpi_systf_data* data);
 void vpi_get_systf_info(vpiHandle obj, s_vpi_systf_data* systf_data_p);

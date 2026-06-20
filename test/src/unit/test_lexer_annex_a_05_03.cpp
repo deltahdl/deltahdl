@@ -118,4 +118,4 @@ TEST(UdpBodyLexing, EdgeSymbolTokenKinds) {
   EXPECT_EQ(ts.token.kind, TokenKind::kStar);
 }
 
-}
+}  // namespace

@@ -90,4 +90,4 @@ TEST(InitialProcedureElaboration, BeginEndBodyPreserved) {
   EXPECT_EQ(procs[0].body->kind, StmtKind::kBlock);
 }
 
-}
+}  // namespace

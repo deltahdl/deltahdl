@@ -27,7 +27,8 @@ TEST(PrimitiveInstantiationParsing, GateInst_SharedStrengthAcrossInstances) {
 TEST(PrimitiveInstantiationParsing, GateInst_SharedStrengthAndDelayAcrossList) {
   auto r = Parse(
       "module m;\n"
-      "  nand (strong0, weak1) #(2, 3) g1(o1, a, b), g2(o2, c, d), g3(o3, e, f);\n"
+      "  nand (strong0, weak1) #(2, 3) g1(o1, a, b), g2(o2, c, d), g3(o3, e, "
+      "f);\n"
       "endmodule\n");
   EXPECT_FALSE(r.has_errors);
   auto gates = FindAllGates(r.cu->modules[0]->items);
@@ -60,14 +61,14 @@ TEST(PrimitiveInstantiationParsing, GateInst_AllDeclarationComponents) {
   auto gates = FindAllGates(r.cu->modules[0]->items);
   ASSERT_EQ(gates.size(), 1u);
   auto* g = gates[0];
-  EXPECT_EQ(g->gate_kind, GateKind::kAnd);          // keyword
-  EXPECT_EQ(g->drive_strength0, 4u);                // drive strength
+  EXPECT_EQ(g->gate_kind, GateKind::kAnd);  // keyword
+  EXPECT_EQ(g->drive_strength0, 4u);        // drive strength
   EXPECT_EQ(g->drive_strength1, 4u);
-  EXPECT_NE(g->gate_delay, nullptr);                // propagation delay
-  EXPECT_EQ(g->gate_inst_name, "g");                // instance identifier
-  EXPECT_NE(g->inst_range_left, nullptr);           // range for array
+  EXPECT_NE(g->gate_delay, nullptr);       // propagation delay
+  EXPECT_EQ(g->gate_inst_name, "g");       // instance identifier
+  EXPECT_NE(g->inst_range_left, nullptr);  // range for array
   EXPECT_NE(g->inst_range_right, nullptr);
-  EXPECT_EQ(g->gate_terminals.size(), 3u);          // terminal connection list
+  EXPECT_EQ(g->gate_terminals.size(), 3u);  // terminal connection list
 }
 
 TEST(GateDelayParsing, MultipleInstancesWithRiseFallDelay) {
@@ -91,4 +92,4 @@ TEST(GateDelayParsing, MultipleInstancesWithRiseFallDelay) {
   EXPECT_EQ(g2->gate_delay_fall->int_val, 6u);
 }
 
-}
+}  // namespace

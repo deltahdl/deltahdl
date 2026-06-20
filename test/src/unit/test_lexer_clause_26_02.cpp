@@ -49,4 +49,4 @@ TEST(PackageDeclarationLexing, AnonymousProgramKeywordsTokenized) {
   EXPECT_EQ(tokens[2].kind, TokenKind::kKwEndprogram);
 }
 
-}
+}  // namespace

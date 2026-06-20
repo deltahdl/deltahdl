@@ -43,4 +43,4 @@ TEST(StringMethods, OcttoaIsInverseOfAtooct) {
   EXPECT_EQ(result.ToUint64(), 511u);
 }
 
-}
+}  // namespace

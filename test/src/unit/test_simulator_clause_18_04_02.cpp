@@ -30,13 +30,13 @@ RandVariable MakeRandc(const char* name, int64_t lo, int64_t hi) {
   return v;
 }
 
-// 18.4.2 (claim A/B): an unconstrained randc cycles through a permutation of its
-// whole declared range. The first iteration — a run of as many randomize() calls
-// as there are values in the range — returns each value exactly once with no
-// repeat (claim A); once an iteration finishes a new one starts automatically
-// (claim B). Over two full iterations of a 4-value range every value occurs
-// exactly twice, and each 4-call block is itself a complete permutation with no
-// repeats.
+// 18.4.2 (claim A/B): an unconstrained randc cycles through a permutation of
+// its whole declared range. The first iteration — a run of as many randomize()
+// calls as there are values in the range — returns each value exactly once with
+// no repeat (claim A); once an iteration finishes a new one starts
+// automatically (claim B). Over two full iterations of a 4-value range every
+// value occurs exactly twice, and each 4-call block is itself a complete
+// permutation with no repeats.
 TEST(RandcModifierCyclic, NewIterationStartsAfterExhaustion) {
   ConstraintSolver solver(5);
   solver.AddVariable(MakeRandc("x", 0, 3));
@@ -75,8 +75,8 @@ TEST(RandcModifierCyclic, PermutationContainsOnlyTwoStateValues) {
 }
 
 // 18.4.2 (claim E): an implementation may cap a randc variable's size but the
-// cap shall be no smaller than 8 bits. An 8-bit randc is therefore supported and
-// its first iteration is a full 256-value permutation with no repeats.
+// cap shall be no smaller than 8 bits. An 8-bit randc is therefore supported
+// and its first iteration is a full 256-value permutation with no repeats.
 TEST(RandcModifierCyclic, EightBitRandcCoversEntireRangeInOneIteration) {
   ConstraintSolver solver(3);
   solver.AddVariable(MakeRandc("x", 0, 255));  // 8-bit range
@@ -126,11 +126,11 @@ TEST(RandcModifierCyclic, ConstrainedRandcYieldsOnlySatisfyingValues) {
 // 18.4.2 (claim C, "constraints change" trigger): the permutation sequence is
 // recomputed not only when no remaining value can satisfy the constraints but
 // also whenever the constraints on the variable change. Draw an unconstrained
-// randc over 0..3 for a few calls, then add a constraint that excludes the lower
-// half of the range. Every value produced after the change respects the new
-// constraint — the solver re-derives the admissible permutation from the changed
-// constraint set rather than continuing to emit values from the stale, fuller
-// permutation it was cycling through before.
+// randc over 0..3 for a few calls, then add a constraint that excludes the
+// lower half of the range. Every value produced after the change respects the
+// new constraint — the solver re-derives the admissible permutation from the
+// changed constraint set rather than continuing to emit values from the stale,
+// fuller permutation it was cycling through before.
 TEST(RandcModifierCyclic, PermutationRecomputedWhenConstraintsChange) {
   ConstraintSolver solver(41);
   solver.AddVariable(MakeRandc("x", 0, 3));
@@ -207,9 +207,9 @@ TEST(RandcModifierCyclic, DegenerateSingleValueRangeAlwaysYieldsThatValue) {
 }
 
 // 18.4.2 (claim A edge case): the permutation spans the variable's declared
-// range, which need not start at zero. A randc declared over 5..8 cycles through
-// exactly {5,6,7,8} — its first iteration is a permutation of those four values
-// with no repeats and no out-of-range value.
+// range, which need not start at zero. A randc declared over 5..8 cycles
+// through exactly {5,6,7,8} — its first iteration is a permutation of those
+// four values with no repeats and no out-of-range value.
 TEST(RandcModifierCyclic, PermutationCoversNonZeroBasedRange) {
   ConstraintSolver solver(17);
   solver.AddVariable(MakeRandc("x", 5, 8));
@@ -275,9 +275,9 @@ TEST(RandcModifierCyclic, StaticRandcSharesOneCycleAcrossInstances) {
   inst_a.AddVariable(make_static("x"));
   inst_b.AddVariable(make_static("x"));
 
-  // Four randomize() calls, alternating between the two instances, span one full
-  // iteration of the 4-value range with no value repeated — proof of a single
-  // shared cyclic sequence.
+  // Four randomize() calls, alternating between the two instances, span one
+  // full iteration of the 4-value range with no value repeated — proof of a
+  // single shared cyclic sequence.
   std::unordered_set<int64_t> seen;
   ConstraintSolver* order[] = {&inst_a, &inst_b, &inst_a, &inst_b};
   for (ConstraintSolver* s : order) {

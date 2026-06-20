@@ -159,4 +159,4 @@ TEST(ParallelBlockParsing, ForkEventControlsInThreads) {
   EXPECT_EQ(stmt->fork_stmts[1]->kind, StmtKind::kEventControl);
 }
 
-}
+}  // namespace

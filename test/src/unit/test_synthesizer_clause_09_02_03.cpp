@@ -20,10 +20,10 @@ TEST(FinalProcedureSynthesis, RejectFinalBlock) {
 TEST(FinalProcedureSynthesis, RejectFinalWithAssignment) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f,
-      "module m;\n"
-      "  logic x;\n"
-      "  final x = 1;\n"
-      "endmodule\n");
+                           "module m;\n"
+                           "  logic x;\n"
+                           "  final x = 1;\n"
+                           "endmodule\n");
   ASSERT_NE(mod, nullptr);
   SynthLower synth(f.arena, f.diag);
   auto* aig = synth.Lower(mod);
@@ -34,9 +34,9 @@ TEST(FinalProcedureSynthesis, RejectFinalWithAssignment) {
 TEST(FinalProcedureSynthesis, RejectFinalWithDisplay) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f,
-      "module m;\n"
-      "  final $display(\"done\");\n"
-      "endmodule\n");
+                           "module m;\n"
+                           "  final $display(\"done\");\n"
+                           "endmodule\n");
   ASSERT_NE(mod, nullptr);
   SynthLower synth(f.arena, f.diag);
   auto* aig = synth.Lower(mod);
@@ -44,4 +44,4 @@ TEST(FinalProcedureSynthesis, RejectFinalWithDisplay) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-}
+}  // namespace

@@ -13,9 +13,9 @@ std::optional<std::size_t> FutureGclkSourceIndex(const Word& word,
     return std::nullopt;  // §F.6.3 requires a nonempty word.
   }
   if (j >= word.size() - 1) {
-    // §F.6.3 constrains the point to 0 <= j < |w| - 1. At j == |w| - 1 the value
-    // is undefined for a finite word, and a larger j lies past the end; neither
-    // has a following letter to sample.
+    // §F.6.3 constrains the point to 0 <= j < |w| - 1. At j == |w| - 1 the
+    // value is undefined for a finite word, and a larger j lies past the end;
+    // neither has a following letter to sample.
     return std::nullopt;
   }
   return j + 1;  // §F.6.3: $future_gclk(e)[w^j] = e[w^{j+1}].

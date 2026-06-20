@@ -84,4 +84,4 @@ TEST(SvaEngine, SequenceOrHasNoMatchWhenNeitherOperandMatches) {
   EXPECT_TRUE(u.end_times.empty());
 }
 
-}
+}  // namespace

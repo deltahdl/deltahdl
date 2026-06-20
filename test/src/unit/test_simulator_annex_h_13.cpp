@@ -55,8 +55,8 @@ class SvGetTimeSim : public ::testing::Test {
 };
 
 // §H.13: svGetTime retrieves the current simulation time. With a null scope the
-// time is read in the simulation time unit; a sim-time request delivers the full
-// 64-bit count split across the high and low halves. Reaching the current
+// time is read in the simulation time unit; a sim-time request delivers the
+// full 64-bit count split across the high and low halves. Reaching the current
 // scheduler time through svGetTime is the rule being applied.
 TEST_F(SvGetTimeSim, NullScopeRetrievesCurrentSimulationTime) {
   const uint64_t ticks = (static_cast<uint64_t>(3) << 32) | 5u;
@@ -103,8 +103,9 @@ TEST_F(SvGetTimeSim, NullScopeScalesToSimulationTimeUnit) {
   EXPECT_DOUBLE_EQ(t.real, 1000.0);
 }
 
-// §H.13: svGetTimeUnit with a null scope retrieves the simulation time unit, and
-// the value it returns is equivalent to vpi_get(vpiTimeUnit) for the design.
+// §H.13: svGetTimeUnit with a null scope retrieves the simulation time unit,
+// and the value it returns is equivalent to vpi_get(vpiTimeUnit) for the
+// design.
 TEST_F(SvGetTimeSim, TimeUnitMatchesVpiGetForNullScope) {
   vpiHandle top = vpi_ctx_.CreateModule("top", "top");
   ASSERT_NE(top, nullptr);
@@ -129,15 +130,17 @@ TEST_F(SvGetTimeSim, TimePrecisionMatchesVpiGetForNullScope) {
 
 // §H.13: svGetTime is defined to scale to the time unit of the instance scope
 // associated with the supplied svScope; the null-scope case is the special form
-// that uses the simulation time unit. This simulator binds no per-scope timescale
-// to an svScope, so a non-null scope resolves to the same design-wide simulation
-// time. Driving the non-null-scope path confirms production accepts the scope
-// argument and routes it to the shared time source rather than rejecting it.
+// that uses the simulation time unit. This simulator binds no per-scope
+// timescale to an svScope, so a non-null scope resolves to the same design-wide
+// simulation time. Driving the non-null-scope path confirms production accepts
+// the scope argument and routes it to the shared time source rather than
+// rejecting it.
 TEST_F(SvGetTimeSim, NonNullScopeRetrievesCurrentSimulationTime) {
   AdvanceTo(42);
 
   int marker = 0;
-  const void* scope = &marker;  // non-null svScope; no per-scope timescale bound
+  const void* scope =
+      &marker;  // non-null svScope; no per-scope timescale bound
 
   VpiTime with_scope = {};
   with_scope.type = kSvSimTime;

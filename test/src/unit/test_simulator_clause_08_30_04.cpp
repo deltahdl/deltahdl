@@ -88,4 +88,4 @@ TEST(ClassSim, WeakRefClearDoesNotAffectOtherWeakRefs) {
   EXPECT_EQ(wr2->Get(), handle);
 }
 
-}
+}  // namespace

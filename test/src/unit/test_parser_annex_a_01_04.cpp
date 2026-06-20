@@ -306,8 +306,8 @@ TEST(ModuleOrGenerateItemDecl, DefaultDisableIff) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item =
-      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kDefaultDisableIff);
+  auto* item = FindItemByKind(r.cu->modules[0]->items,
+                              ModuleItemKind::kDefaultDisableIff);
   ASSERT_NE(item, nullptr);
   EXPECT_NE(item->init_expr, nullptr);
 }
@@ -321,7 +321,8 @@ TEST(ModuleOrGenerateItem, ParameterOverrideDefparam) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kDefparam));
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kDefparam));
 }
 
 TEST(ModuleOrGenerateItem, GateInstantiation) {
@@ -331,7 +332,8 @@ TEST(ModuleOrGenerateItem, GateInstantiation) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kGateInst));
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kGateInst));
 }
 
 // --- non_port_module_item ---
@@ -343,7 +345,8 @@ TEST(NonPortModuleItem, SpecparamDeclaration) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kSpecparam));
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kSpecparam));
 }
 
 TEST(NonPortModuleItem, NestedModuleDeclaration) {
@@ -391,8 +394,8 @@ TEST(ModuleOrGenerateItem, InstantiationItem) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(HasItemOfKind(r.cu->modules[0]->items,
-                            ModuleItemKind::kModuleInst));
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kModuleInst));
 }
 
 // --- module_or_generate_item_declaration: remaining named alternatives ---
@@ -419,7 +422,8 @@ TEST(ModuleOrGenerateItemDecl, PackageOrGenerateItemDeclaration) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kParamDecl));
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kParamDecl));
 }
 
 // --- non_port_module_item: remaining named alternatives ---
@@ -433,8 +437,8 @@ TEST(NonPortModuleItem, GenerateRegion) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(HasItemOfKind(r.cu->modules[0]->items,
-                            ModuleItemKind::kGenerateIf));
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kGenerateIf));
 }
 
 TEST(NonPortModuleItem, SpecifyBlock) {
@@ -445,8 +449,8 @@ TEST(NonPortModuleItem, SpecifyBlock) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(HasItemOfKind(r.cu->modules[0]->items,
-                            ModuleItemKind::kSpecifyBlock));
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kSpecifyBlock));
 }
 
 TEST(NonPortModuleItem, TimeunitsDeclaration) {
@@ -504,8 +508,8 @@ TEST(ModuleOrGenerateItem, ParameterOverrideMissingSemicolonRejected) {
   EXPECT_TRUE(r.has_errors);
 }
 
-// module_or_generate_item_declaration's `default disable iff expression_or_dist`
-// form requires the `iff` keyword after `default disable`.
+// module_or_generate_item_declaration's `default disable iff
+// expression_or_dist` form requires the `iff` keyword after `default disable`.
 TEST(ModuleOrGenerateItemDecl, DefaultDisableMissingIffRejected) {
   auto r = Parse(
       "module m;\n"
@@ -514,4 +518,4 @@ TEST(ModuleOrGenerateItemDecl, DefaultDisableMissingIffRejected) {
   EXPECT_TRUE(r.has_errors);
 }
 
-}
+}  // namespace

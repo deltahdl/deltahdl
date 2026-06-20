@@ -59,4 +59,4 @@ TEST(PrimitiveTerminals, TerminalsWithoutSeparatingCommaRejected) {
   EXPECT_TRUE(r.has_errors);
 }
 
-}
+}  // namespace

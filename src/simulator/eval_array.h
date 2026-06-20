@@ -44,4 +44,4 @@ bool TryCollectLocatorResult(const Expr* expr, SimContext& ctx, Arena& arena,
 bool TryCollectAssocMapResult(const Expr* expr, SimContext& ctx, Arena& arena,
                               AssocArrayObject& out);
 
-}
+}  // namespace delta

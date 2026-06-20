@@ -2,10 +2,9 @@
 
 namespace delta {
 
-bool IsMulticlockedProperty(
-    std::string_view property_clock,
-    const std::vector<std::string>& subproperty_clocks,
-    bool any_subproperty_is_multiclocked_sequence) {
+bool IsMulticlockedProperty(std::string_view property_clock,
+                            const std::vector<std::string>& subproperty_clocks,
+                            bool any_subproperty_is_multiclocked_sequence) {
   // §16.13.2: a multiclocked sequence subproperty makes the enclosing property
   // multiclocked regardless of the explicit clocks present.
   if (any_subproperty_is_multiclocked_sequence) return true;

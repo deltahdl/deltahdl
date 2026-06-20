@@ -57,4 +57,4 @@ TEST(OptionalSystemTaskParserParsing, ShowVarsIndexedPartSelect) {
   ASSERT_NE(r.cu, nullptr);
 }
 
-}
+}  // namespace

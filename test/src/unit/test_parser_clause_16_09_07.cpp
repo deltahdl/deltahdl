@@ -38,4 +38,4 @@ TEST(AssertionSemanticsParsing, OrOfBooleanExpressions) {
   EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kAssertProperty));
 }
 
-}
+}  // namespace

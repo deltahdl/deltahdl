@@ -232,4 +232,4 @@ TEST(BlockStartFinishSimulation, EmptySeqBlockFinishesImmediately) {
   LowerRunAndCheck(f, design, {{"done", 7u}});
 }
 
-}
+}  // namespace

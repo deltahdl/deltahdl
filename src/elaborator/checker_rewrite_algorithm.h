@@ -40,12 +40,12 @@ CheckerRewriteStage FirstCheckerRewriteStage();
 // structure observable and distinguishes it from §F.4.1.1's two-stage loop.
 CheckerRewriteStage NextCheckerRewriteStage(CheckerRewriteStage stage);
 
-// §F.4.2.1 step 2 / step 6: the algorithm rewrites references for formal *input*
-// arguments, each classified as untyped, typed-non-matching, or typed-matching.
-// A checker formal input argument is never a local variable, so — unlike
-// §F.4.1.1 — there is no kLocalVariable case and no step that prepends local
-// variable declarations; step 6 only returns the body. Returns true iff `kind`
-// is a formal kind that the checker algorithm rewrites in place.
+// §F.4.2.1 step 2 / step 6: the algorithm rewrites references for formal
+// *input* arguments, each classified as untyped, typed-non-matching, or
+// typed-matching. A checker formal input argument is never a local variable, so
+// — unlike §F.4.1.1 — there is no kLocalVariable case and no step that prepends
+// local variable declarations; step 6 only returns the body. Returns true iff
+// `kind` is a formal kind that the checker algorithm rewrites in place.
 bool CheckerAlgorithmHandlesFormal(FormalKind kind);
 
 // §F.4.2.1 steps 3–5: for a reference to a formal input argument, the checker
@@ -63,11 +63,11 @@ enum class LvalueProhibitionScope {
   kWholeChecker,
 };
 
-// §F.4.2.1 step 4 shall: after step 4 replaces a typed non-matching formal input
-// reference by a cast (item(t'(a_f)) or item(type(t)'(a_f))), that replaced
-// reference shall not be a variable_lvalue anywhere in the checker. A cast
-// expression is never an lvalue, so the rule forbids using such a formal as a
-// variable_lvalue.
+// §F.4.2.1 step 4 shall: after step 4 replaces a typed non-matching formal
+// input reference by a cast (item(t'(a_f)) or item(type(t)'(a_f))), that
+// replaced reference shall not be a variable_lvalue anywhere in the checker. A
+// cast expression is never an lvalue, so the rule forbids using such a formal
+// as a variable_lvalue.
 struct Step4LvalueRule {
   // Whether a step-4 replaced reference is permitted to be a variable_lvalue.
   // Always false: the cast it is replaced by cannot be an lvalue.

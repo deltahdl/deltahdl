@@ -32,19 +32,19 @@ uint64_t RunModule(SimFixture& f, const char* src, std::string_view var) {
 TEST(PlaArrayType, OutputsUpdatedWithoutDelay) {
   SimFixture f;
   uint64_t cap = RunModule(f,
-      "module t;\n"
-      "  logic [1:2] in;\n"
-      "  logic [1:2] mem [1:1];\n"
-      "  logic [1:1] out;\n"
-      "  logic [1:1] cap;\n"
-      "  initial begin\n"
-      "    mem[1] = 2'b11;\n"
-      "    in = 2'b11;\n"
-      "    $sync$and$array(mem, in, out);\n"
-      "    cap = out;\n"
-      "  end\n"
-      "endmodule\n",
-      "cap");
+                           "module t;\n"
+                           "  logic [1:2] in;\n"
+                           "  logic [1:2] mem [1:1];\n"
+                           "  logic [1:1] out;\n"
+                           "  logic [1:1] cap;\n"
+                           "  initial begin\n"
+                           "    mem[1] = 2'b11;\n"
+                           "    in = 2'b11;\n"
+                           "    $sync$and$array(mem, in, out);\n"
+                           "    cap = out;\n"
+                           "  end\n"
+                           "endmodule\n",
+                           "cap");
   EXPECT_EQ(cap, 1u);
 }
 
@@ -55,18 +55,18 @@ TEST(PlaArrayType, OutputsUpdatedWithoutDelay) {
 TEST(PlaArrayType, AsyncReevaluatesOnInputChange) {
   SimFixture f;
   uint64_t out = RunModule(f,
-      "module t;\n"
-      "  logic [1:2] in;\n"
-      "  logic [1:2] mem [1:1];\n"
-      "  logic [1:1] out;\n"
-      "  initial begin\n"
-      "    mem[1] = 2'b11;\n"
-      "    in = 2'b11;\n"
-      "    $async$and$array(mem, in, out);\n"
-      "    #1 in = 2'b10;\n"
-      "  end\n"
-      "endmodule\n",
-      "out");
+                           "module t;\n"
+                           "  logic [1:2] in;\n"
+                           "  logic [1:2] mem [1:1];\n"
+                           "  logic [1:1] out;\n"
+                           "  initial begin\n"
+                           "    mem[1] = 2'b11;\n"
+                           "    in = 2'b11;\n"
+                           "    $async$and$array(mem, in, out);\n"
+                           "    #1 in = 2'b10;\n"
+                           "  end\n"
+                           "endmodule\n",
+                           "out");
   EXPECT_EQ(out, 0u);
 }
 
@@ -77,18 +77,18 @@ TEST(PlaArrayType, AsyncReevaluatesOnInputChange) {
 TEST(PlaArrayType, SyncDoesNotReevaluateOnInputChange) {
   SimFixture f;
   uint64_t out = RunModule(f,
-      "module t;\n"
-      "  logic [1:2] in;\n"
-      "  logic [1:2] mem [1:1];\n"
-      "  logic [1:1] out;\n"
-      "  initial begin\n"
-      "    mem[1] = 2'b11;\n"
-      "    in = 2'b11;\n"
-      "    $sync$and$array(mem, in, out);\n"
-      "    #1 in = 2'b10;\n"
-      "  end\n"
-      "endmodule\n",
-      "out");
+                           "module t;\n"
+                           "  logic [1:2] in;\n"
+                           "  logic [1:2] mem [1:1];\n"
+                           "  logic [1:1] out;\n"
+                           "  initial begin\n"
+                           "    mem[1] = 2'b11;\n"
+                           "    in = 2'b11;\n"
+                           "    $sync$and$array(mem, in, out);\n"
+                           "    #1 in = 2'b10;\n"
+                           "  end\n"
+                           "endmodule\n",
+                           "out");
   EXPECT_EQ(out, 1u);
 }
 
@@ -97,19 +97,19 @@ TEST(PlaArrayType, SyncDoesNotReevaluateOnInputChange) {
 TEST(PlaArrayType, SyncReevaluatesWhenCalledAgain) {
   SimFixture f;
   uint64_t out = RunModule(f,
-      "module t;\n"
-      "  logic [1:2] in;\n"
-      "  logic [1:2] mem [1:1];\n"
-      "  logic [1:1] out;\n"
-      "  initial begin\n"
-      "    mem[1] = 2'b11;\n"
-      "    in = 2'b11;\n"
-      "    $sync$and$array(mem, in, out);\n"
-      "    #1 in = 2'b10;\n"
-      "    $sync$and$array(mem, in, out);\n"
-      "  end\n"
-      "endmodule\n",
-      "out");
+                           "module t;\n"
+                           "  logic [1:2] in;\n"
+                           "  logic [1:2] mem [1:1];\n"
+                           "  logic [1:1] out;\n"
+                           "  initial begin\n"
+                           "    mem[1] = 2'b11;\n"
+                           "    in = 2'b11;\n"
+                           "    $sync$and$array(mem, in, out);\n"
+                           "    #1 in = 2'b10;\n"
+                           "    $sync$and$array(mem, in, out);\n"
+                           "  end\n"
+                           "endmodule\n",
+                           "out");
   EXPECT_EQ(out, 0u);
 }
 
@@ -120,18 +120,18 @@ TEST(PlaArrayType, SyncReevaluatesWhenCalledAgain) {
 TEST(PlaArrayType, AsyncReevaluatesOnMemoryChange) {
   SimFixture f;
   uint64_t out = RunModule(f,
-      "module t;\n"
-      "  logic [1:2] in;\n"
-      "  logic [1:2] mem [1:1];\n"
-      "  logic [1:1] out;\n"
-      "  initial begin\n"
-      "    in = 2'b10;\n"
-      "    mem[1] = 2'b11;\n"
-      "    $async$and$array(mem, in, out);\n"
-      "    #1 mem[1] = 2'b10;\n"
-      "  end\n"
-      "endmodule\n",
-      "out");
+                           "module t;\n"
+                           "  logic [1:2] in;\n"
+                           "  logic [1:2] mem [1:1];\n"
+                           "  logic [1:1] out;\n"
+                           "  initial begin\n"
+                           "    in = 2'b10;\n"
+                           "    mem[1] = 2'b11;\n"
+                           "    $async$and$array(mem, in, out);\n"
+                           "    #1 mem[1] = 2'b10;\n"
+                           "  end\n"
+                           "endmodule\n",
+                           "out");
   EXPECT_EQ(out, 1u);
 }
 
@@ -143,20 +143,20 @@ TEST(PlaArrayType, AsyncReevaluatesOnMemoryChange) {
 TEST(PlaArrayType, AsyncOutputUpdatedWithoutDelay) {
   SimFixture f;
   uint64_t cap = RunModule(f,
-      "module t;\n"
-      "  logic [1:2] in;\n"
-      "  logic [1:2] mem [1:1];\n"
-      "  logic [1:1] out;\n"
-      "  logic [1:1] cap;\n"
-      "  initial begin\n"
-      "    mem[1] = 2'b11;\n"
-      "    in = 2'b11;\n"
-      "    $async$and$array(mem, in, out);\n"
-      "    in = 2'b10;\n"
-      "    cap = out;\n"
-      "  end\n"
-      "endmodule\n",
-      "cap");
+                           "module t;\n"
+                           "  logic [1:2] in;\n"
+                           "  logic [1:2] mem [1:1];\n"
+                           "  logic [1:1] out;\n"
+                           "  logic [1:1] cap;\n"
+                           "  initial begin\n"
+                           "    mem[1] = 2'b11;\n"
+                           "    in = 2'b11;\n"
+                           "    $async$and$array(mem, in, out);\n"
+                           "    in = 2'b10;\n"
+                           "    cap = out;\n"
+                           "  end\n"
+                           "endmodule\n",
+                           "cap");
   EXPECT_EQ(cap, 0u);
 }
 
@@ -164,7 +164,8 @@ TEST(PlaArrayType, AsyncOutputUpdatedWithoutDelay) {
 // concatenations of scalars rather than as packed vectors. The asynchronous
 // engine must collect each concatenated input signal as a trigger and unpack
 // the result across the concatenated output terms. With a personality that maps
-// each output to one input, lowering one input recomputes only that output term.
+// each output to one input, lowering one input recomputes only that output
+// term.
 TEST(PlaArrayType, AsyncDrivesConcatenatedTermsOnInputChange) {
   SimFixture f;
   auto* design = ElaborateSrc(

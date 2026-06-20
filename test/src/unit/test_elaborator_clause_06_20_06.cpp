@@ -228,4 +228,4 @@ TEST(ConstConstantElaboration, ConstObjectMemberWriteSucceeds) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-}
+}  // namespace

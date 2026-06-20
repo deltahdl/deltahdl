@@ -53,4 +53,4 @@ TEST(StringMethods, ItoaIsInverseOfAtoi) {
   EXPECT_EQ(result.ToUint64(), 2024u);
 }
 
-}
+}  // namespace

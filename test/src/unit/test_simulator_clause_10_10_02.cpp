@@ -101,4 +101,4 @@ TEST(ConcatDisambiguationSim, ScalarPacksWhileArrayExtendsPerElement) {
   EXPECT_EQ(ba1->value.ToUint64(), 0x0fu);
 }
 
-}
+}  // namespace

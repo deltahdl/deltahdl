@@ -20,8 +20,10 @@ Letter A(std::set<std::string> atoms) { return LetterAtoms(std::move(atoms)); }
 // following letter.
 TEST(FutureGclk, SamplesTheFollowingLetter) {
   const Word word{A({}), A({}), A({})};
-  EXPECT_EQ(FutureGclkSourceIndex(word, /*j=*/0), std::optional<std::size_t>{1});
-  EXPECT_EQ(FutureGclkSourceIndex(word, /*j=*/1), std::optional<std::size_t>{2});
+  EXPECT_EQ(FutureGclkSourceIndex(word, /*j=*/0),
+            std::optional<std::size_t>{1});
+  EXPECT_EQ(FutureGclkSourceIndex(word, /*j=*/1),
+            std::optional<std::size_t>{2});
 }
 
 // §F.6.3: for a finite word the value at the last letter, j == |w| - 1, is

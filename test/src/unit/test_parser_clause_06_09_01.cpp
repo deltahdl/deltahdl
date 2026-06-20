@@ -180,4 +180,4 @@ TEST(VectorSpecification, MixedScalarAndVectorDeclarations) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}
+}  // namespace

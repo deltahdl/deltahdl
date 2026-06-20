@@ -35,4 +35,4 @@ TEST(SynthLower, RejectDelayInInitial) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-}
+}  // namespace

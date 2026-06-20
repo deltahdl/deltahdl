@@ -41,4 +41,4 @@ TEST(SystemNameLexing, ExceedsMaxLength) {
   EXPECT_TRUE(errors);
 }
 
-}
+}  // namespace

@@ -75,8 +75,8 @@ TEST(FsmStatePragmaLexing, RequiresStateVectorKeyword) {
 // enumeration without the keyword is not a valid binding and is not recognized;
 // with the keyword the binding is captured.
 TEST(FsmStatePragmaLexing, EnumKeywordRequiredToBindName) {
-  EXPECT_TRUE(CollectFsmPragmas("/* tool state_vector cur_state state_e */")
-                  .empty());
+  EXPECT_TRUE(
+      CollectFsmPragmas("/* tool state_vector cur_state state_e */").empty());
   auto bound =
       CollectFsmPragmas("/* tool state_vector cur_state enum state_e */");
   ASSERT_EQ(bound.size(), 1u);

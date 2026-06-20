@@ -190,4 +190,4 @@ TEST(RandsequenceSim, CaseProductionNoMatchNoDefaultGeneratesNothing) {
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
-}
+}  // namespace

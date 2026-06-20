@@ -14,8 +14,8 @@ constexpr const char* kA = "top.a1";
 
 // §39.4.2.1 (Claim A, rule): the deferred delivery tick is the nearest global
 // clock tick strictly following the event. A tick that coincides with the event
-// does not qualify, the smallest greater tick wins regardless of schedule order,
-// and a schedule with no later tick yields the no-tick sentinel.
+// does not qualify, the smallest greater tick wins regardless of schedule
+// order, and a schedule with no later tick yields the no-tick sentinel.
 TEST(GlobalClockingFutureCallback, NearestTickIsStrictlyAfterTheEvent) {
   std::vector<uint64_t> ticks = {12, 10, 11};  // unsorted on purpose
 
@@ -31,10 +31,10 @@ TEST(GlobalClockingFutureCallback, NearestTickIsStrictlyAfterTheEvent) {
 // §39.4.2.1 (Claims A and B together — the LRM example): an assertion referring
 // to a global clocking future sampled value function has its callback event at
 // time 11 but its callback executes at the nearest later global clock tick, 12.
-// At the event nothing fires; at the coinciding tick 11 still nothing fires; the
-// callback runs only when the clock reaches 12 (Claim A). The cb_time delivered
-// is 11 — the time of the event — not 12, while attemptStartTime stays 10
-// (Claim B).
+// At the event nothing fires; at the coinciding tick 11 still nothing fires;
+// the callback runs only when the clock reaches 12 (Claim A). The cb_time
+// delivered is 11 — the time of the event — not 12, while attemptStartTime
+// stays 10 (Claim B).
 TEST(GlobalClockingFutureCallback, DefersToNextTickButReportsEventTime) {
   AssertionApi api;
   api.SetGlobalClockTicks({10, 11, 12, 13});
@@ -56,9 +56,9 @@ TEST(GlobalClockingFutureCallback, DefersToNextTickButReportsEventTime) {
   info.attempt_start_time = 10;
 
   // The event happens at time 11. The callback is deferred, not delivered.
-  EXPECT_EQ(api.DeliverAssertionEventAtGlobalClock(kA, cbAssertionStart, 11,
-                                                   info),
-            0u);
+  EXPECT_EQ(
+      api.DeliverAssertionEventAtGlobalClock(kA, cbAssertionStart, 11, info),
+      0u);
   EXPECT_EQ(fired, 0);
   EXPECT_EQ(api.PendingGlobalClockingCallbackCount(), 1u);
 
@@ -79,9 +79,9 @@ TEST(GlobalClockingFutureCallback, DefersToNextTickButReportsEventTime) {
   EXPECT_EQ(seen_attempt_start, 10u);
 }
 
-// §39.4.2.1 (scope guard): the deferral is specific to assertions referring to a
-// global clocking future sampled value function. An assertion not so marked is
-// delivered immediately at the event time through the same entry point, with
+// §39.4.2.1 (scope guard): the deferral is specific to assertions referring to
+// a global clocking future sampled value function. An assertion not so marked
+// is delivered immediately at the event time through the same entry point, with
 // cb_time equal to the event time and nothing left queued.
 TEST(GlobalClockingFutureCallback, OrdinaryAssertionDeliversImmediately) {
   AssertionApi api;
@@ -99,9 +99,9 @@ TEST(GlobalClockingFutureCallback, OrdinaryAssertionDeliversImmediately) {
 
   AssertionAttemptInfo info;
   info.attempt_start_time = 11;
-  EXPECT_EQ(api.DeliverAssertionEventAtGlobalClock(kA, cbAssertionStart, 11,
-                                                   info),
-            1u);
+  EXPECT_EQ(
+      api.DeliverAssertionEventAtGlobalClock(kA, cbAssertionStart, 11, info),
+      1u);
   EXPECT_EQ(fired, 1);
   EXPECT_EQ(seen_cb_time, 11u);
   EXPECT_EQ(api.PendingGlobalClockingCallbackCount(), 0u);
@@ -125,22 +125,23 @@ TEST(GlobalClockingFutureCallback, EachDeferredEventKeepsItsOwnTickAndTime) {
       cbAssertionStart, kA, vpiAssert,
       [&](const AssertionCallbackArgs& a) {
         cb_times.push_back(a.cb_time);
-        if (a.info != nullptr) attempt_starts.push_back(a.info->attempt_start_time);
+        if (a.info != nullptr)
+          attempt_starts.push_back(a.info->attempt_start_time);
       },
       nullptr);
 
   // First event at 11 (attempt started at 10) defers to tick 12.
   AssertionAttemptInfo first;
   first.attempt_start_time = 10;
-  EXPECT_EQ(api.DeliverAssertionEventAtGlobalClock(kA, cbAssertionStart, 11,
-                                                   first),
-            0u);
+  EXPECT_EQ(
+      api.DeliverAssertionEventAtGlobalClock(kA, cbAssertionStart, 11, first),
+      0u);
   // Second event at 13 (attempt started at 12) defers to tick 14.
   AssertionAttemptInfo second;
   second.attempt_start_time = 12;
-  EXPECT_EQ(api.DeliverAssertionEventAtGlobalClock(kA, cbAssertionStart, 13,
-                                                   second),
-            0u);
+  EXPECT_EQ(
+      api.DeliverAssertionEventAtGlobalClock(kA, cbAssertionStart, 13, second),
+      0u);
   EXPECT_EQ(api.PendingGlobalClockingCallbackCount(), 2u);
 
   // Reaching tick 12 matures only the first event; the second is not yet due.
@@ -178,10 +179,11 @@ TEST(GlobalClockingFutureCallback, NoTickAfterEventNeverFires) {
   AssertionAttemptInfo info;
   info.attempt_start_time = 12;
 
-  // The event coincides with the last tick (12); nothing strictly follows it, so
-  // the callback is deferred (returns 0) rather than delivered now.
+  // The event coincides with the last tick (12); nothing strictly follows it,
+  // so the callback is deferred (returns 0) rather than delivered now.
   EXPECT_EQ(
-      api.DeliverAssertionEventAtGlobalClock(kA, cbAssertionStart, 12, info), 0u);
+      api.DeliverAssertionEventAtGlobalClock(kA, cbAssertionStart, 12, info),
+      0u);
   EXPECT_EQ(fired, 0);
   EXPECT_EQ(api.PendingGlobalClockingCallbackCount(), 1u);
 

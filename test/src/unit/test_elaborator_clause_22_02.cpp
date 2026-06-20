@@ -95,4 +95,4 @@ TEST(CompilerDirectiveElaboration, DirectiveInCommentDoesNotAffectElaboration) {
   EXPECT_TRUE(found);
 }
 
-}
+}  // namespace

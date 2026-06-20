@@ -38,7 +38,8 @@ TEST(ProceduralContinuousAssignmentParsing, ForceWithFuncCallExpressionRhs) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kBinary);
 }
 
-TEST(ProceduralContinuousAssignmentParsing, AssignWithoutEqualsExpressionIsError) {
+TEST(ProceduralContinuousAssignmentParsing,
+     AssignWithoutEqualsExpressionIsError) {
   auto r = Parse(
       "module m;\n"
       "  initial begin assign q; end\n"
@@ -46,4 +47,4 @@ TEST(ProceduralContinuousAssignmentParsing, AssignWithoutEqualsExpressionIsError
   EXPECT_TRUE(r.has_errors);
 }
 
-}
+}  // namespace

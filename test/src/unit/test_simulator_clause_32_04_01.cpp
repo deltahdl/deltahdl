@@ -103,7 +103,6 @@ TEST(SdfDelayMapping, ConditionalIopathAnnotatesOnlyMatchingConditionPath) {
       EXPECT_EQ(pd.delays[0], 13u);
       EXPECT_EQ(pd.delays[1], 17u);
     } else if (pd.condition == "!mode") {
-
       EXPECT_EQ(pd.delays[0], 2u);
     } else {
       ADD_FAILURE() << "unexpected condition: " << pd.condition;
@@ -111,7 +110,8 @@ TEST(SdfDelayMapping, ConditionalIopathAnnotatesOnlyMatchingConditionPath) {
   }
 }
 
-TEST(SdfDelayMapping, ConditionalIopathSkipsSameConditionPathsWithDifferentPorts) {
+TEST(SdfDelayMapping,
+     ConditionalIopathSkipsSameConditionPathsWithDifferentPorts) {
   // §32.4.1: a conditional IOPATH annotates only specify paths between *those
   // same two ports* with the same condition. Sharing the condition is not
   // enough: paths with a different source or destination must be left alone,
@@ -603,4 +603,4 @@ TEST(SdfDelayMapping, ConditionalIopathDoesNotAnnotateIfnoneSibling) {
   EXPECT_TRUE(saw_new_conditional);
 }
 
-}
+}  // namespace

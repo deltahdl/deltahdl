@@ -70,4 +70,4 @@ TEST(BuiltinMethodLexing, DollarPrefixIsSystemIdentifier) {
   EXPECT_EQ(tokens[2].text, "$size");
 }
 
-}
+}  // namespace

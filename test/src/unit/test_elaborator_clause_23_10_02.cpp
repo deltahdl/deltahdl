@@ -6,11 +6,11 @@ namespace {
 
 // §23.10.2: module instance parameter value assignment supplies values to the
 // parameters specified in a module's definition. A parameter declared inside a
-// named block, task, or function is not part of that overridable surface; such a
-// parameter can only be redefined directly with a defparam statement, never by an
-// ordered or named instance parameter value assignment. The tests below confirm
-// that the elaborator's override surface is the module's own parameters and
-// excludes parameters nested inside a function, task, or named block.
+// named block, task, or function is not part of that overridable surface; such
+// a parameter can only be redefined directly with a defparam statement, never
+// by an ordered or named instance parameter value assignment. The tests below
+// confirm that the elaborator's override surface is the module's own parameters
+// and excludes parameters nested inside a function, task, or named block.
 
 TEST(ModuleInstanceParameterValueAssignment,
      FunctionLocalParameterIsNotOverridableByInstanceAssignment) {
@@ -127,4 +127,4 @@ TEST(ModuleInstanceParameterValueAssignment,
   EXPECT_EQ(u0->params[1].resolved_value, 50);
 }
 
-}
+}  // namespace

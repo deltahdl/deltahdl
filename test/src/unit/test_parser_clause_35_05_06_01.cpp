@@ -5,8 +5,8 @@ using namespace delta;
 
 namespace {
 
-// §35.5.6.1: a formal argument of an imported function is an *open array* when a
-// range of one or more of its dimensions is left unspecified, denoted with
+// §35.5.6.1: a formal argument of an imported function is an *open array* when
+// a range of one or more of its dimensions is left unspecified, denoted with
 // empty square brackets "[]". Imported functions are explicitly permitted to
 // take such formals, so this LRM example import parses without error and the
 // open dimension is recorded as a dimension with no bounds.
@@ -27,8 +27,8 @@ TEST_F(DpiParseTest, DpiImportOpenArrayFormalAccepted) {
   EXPECT_FALSE(diag_.HasErrors());
 }
 
-// §35.5.6.1: "The number of unpacked dimensions is not restricted." A formal can
-// be an open array in several unpacked dimensions at once -- each unsized
+// §35.5.6.1: "The number of unpacked dimensions is not restricted." A formal
+// can be an open array in several unpacked dimensions at once -- each unsized
 // dimension is a separate unbounded entry -- and the import still parses
 // cleanly, matching the LRM's two-dimensional open-array example shape.
 TEST_F(DpiParseTest, DpiImportMultiDimensionOpenArrayFormalAccepted) {

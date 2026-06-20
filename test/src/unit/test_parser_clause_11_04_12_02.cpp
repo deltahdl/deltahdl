@@ -28,4 +28,4 @@ TEST(OperatorAndExpressionParsing, StringReplication) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

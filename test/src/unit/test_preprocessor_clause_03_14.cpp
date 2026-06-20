@@ -15,7 +15,8 @@ TEST(DesignBuildingBlockPreprocessing, TimescaleAcceptsAllSixUnits) {
   EXPECT_FALSE(PreprocessTimescale("`timescale 1fs / 1fs\n").has_errors);
 }
 
-TEST(DesignBuildingBlockPreprocessing, TimescaleAcceptsMagnitudesOneTenHundred) {
+TEST(DesignBuildingBlockPreprocessing,
+     TimescaleAcceptsMagnitudesOneTenHundred) {
   EXPECT_FALSE(PreprocessTimescale("`timescale 1ns / 1ps\n").has_errors);
   EXPECT_FALSE(PreprocessTimescale("`timescale 10ns / 10ps\n").has_errors);
   EXPECT_FALSE(PreprocessTimescale("`timescale 100ns / 100ps\n").has_errors);
@@ -32,7 +33,8 @@ TEST(DesignBuildingBlockPreprocessing, TimescaleRejectsUnknownSuffix) {
   EXPECT_TRUE(PreprocessTimescale("`timescale 1ns / 1xs\n").has_errors);
 }
 
-TEST(DesignBuildingBlockPreprocessing, TimescaleRangeSpansSecondsToFemtoseconds) {
+TEST(DesignBuildingBlockPreprocessing,
+     TimescaleRangeSpansSecondsToFemtoseconds) {
   auto r_max = PreprocessTimescale("`timescale 100s / 100s\n");
   EXPECT_FALSE(r_max.has_errors);
   EXPECT_EQ(r_max.timescale.unit, TimeUnit::kS);
@@ -72,9 +74,10 @@ TEST(DesignBuildingBlockPreprocessing, TimescaleMapsEachSuffixToCorrectUnit) {
             TimeUnit::kFs);
 }
 
-TEST(DesignBuildingBlockPreprocessing, TimescalePrecisionLongerByMagnitudeRejected) {
+TEST(DesignBuildingBlockPreprocessing,
+     TimescalePrecisionLongerByMagnitudeRejected) {
   EXPECT_TRUE(PreprocessTimescale("`timescale 1ns / 10ns\n").has_errors);
   EXPECT_TRUE(PreprocessTimescale("`timescale 10ps / 100ps\n").has_errors);
 }
 
-}
+}  // namespace

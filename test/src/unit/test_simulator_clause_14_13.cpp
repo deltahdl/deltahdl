@@ -203,8 +203,7 @@ TEST(InputSamplingSim, InoutSignalSampledAsInput) {
 
   ClockingManager cmgr;
   SetupClockingBlock(
-      f, cmgr,
-      {"cb", Edge::kPosedge, {0}, {0}, "data", ClockingDir::kInout});
+      f, cmgr, {"cb", Edge::kPosedge, {0}, {0}, "data", ClockingDir::kInout});
 
   SchedulePosedge(f, clk, 10);
   f.scheduler.Run();
@@ -221,13 +220,11 @@ TEST(InputSamplingSim, SampledBeforeBlockEventFires) {
 
   ClockingManager cmgr;
   SetupClockingBlock(
-      f, cmgr,
-      {"cb", Edge::kPosedge, {0}, {0}, "data", ClockingDir::kInput});
+      f, cmgr, {"cb", Edge::kPosedge, {0}, {0}, "data", ClockingDir::kInput});
 
   uint64_t value_seen_in_callback = 0;
   cmgr.RegisterEdgeCallback(
-      "cb", f.ctx, f.scheduler,
-      [&cmgr, &value_seen_in_callback]() {
+      "cb", f.ctx, f.scheduler, [&cmgr, &value_seen_in_callback]() {
         value_seen_in_callback = cmgr.GetSampledValue("cb", "data");
       });
 
@@ -244,8 +241,7 @@ TEST(InputSamplingSim, ClockvarMemberAccessResolvesToSampledValue) {
 
   ClockingManager cmgr;
   SetupClockingBlock(
-      f, cmgr,
-      {"cb", Edge::kPosedge, {0}, {0}, "data", ClockingDir::kInput});
+      f, cmgr, {"cb", Edge::kPosedge, {0}, {0}, "data", ClockingDir::kInput});
   f.ctx.SetClockingManager(&cmgr);
 
   auto* clk = f.ctx.CreateVariable("clk", 1);
@@ -266,4 +262,4 @@ TEST(InputSamplingSim, ClockvarMemberAccessResolvesToSampledValue) {
   EXPECT_EQ(result.ToUint64(), 0xA5u);
 }
 
-}
+}  // namespace

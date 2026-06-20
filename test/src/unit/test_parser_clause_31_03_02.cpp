@@ -6,7 +6,8 @@ using namespace delta;
 namespace {
 
 // §31.3.2 owns Syntax 31-4, the $hold_timing_check production:
-//   $hold ( reference_event , data_event , timing_check_limit [ , [ notifier ] ] ) ;
+//   $hold ( reference_event , data_event , timing_check_limit [ , [ notifier ]
+//   ] ) ;
 // The shared timing-check parser (ParseTimingCheck / ParseTimingCheckKind /
 // ParseTimingCheckTrailingArgs) carries it. The terminals are recorded
 // positionally, so for $hold the first argument (the reference_event) lands in
@@ -90,4 +91,4 @@ TEST(TimingCheckCommandParsing, HoldLimitIsExpression) {
   ASSERT_EQ(tc->limits.size(), 1u);
 }
 
-}
+}  // namespace

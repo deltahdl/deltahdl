@@ -10,7 +10,8 @@
 // programmer sees across the DPI. Its own distinctive rules are:
 //
 //   b) A packed array of range [L:R] is normalized to [abs(L-R):0]: its LSB has
-//      the normalized C index 0 and its MSB has the normalized C index abs(L-R).
+//      the normalized C index 0 and its MSB has the normalized C index
+//      abs(L-R).
 //   c) (shall) The natural order of unpacked elements is used - lower indices
 //      first. For a SystemVerilog range [L:R], the element with SystemVerilog
 //      index min(L,R) has C index 0 and the element with index max(L,R) has C
@@ -25,9 +26,9 @@
 // canonical bit-select accessors in svdpi.cpp (normalized index 0 is the
 // least-significant bit, word = i/32, bit = i%32), and rule c by svLow / svHigh
 // / svSize, which return min / max / element-count over a dimension's declared
-// bounds so that a C index is sv_index - svLow. These tests play the role of the
-// user C code that derives the normalized indices and observe production placing
-// each element exactly where H.7.6 says it must land.
+// bounds so that a C index is sv_index - svLow. These tests play the role of
+// the user C code that derives the normalized indices and observe production
+// placing each element exactly where H.7.6 says it must land.
 
 namespace {
 
@@ -70,14 +71,15 @@ TEST(MappingSvRangesToCRanges, PackedRangeNormalizedLsbZeroMsbAbsLminusR) {
     // exactly indices 0 .. abs(L-R) and no more.
     for (int i = 0; i < width; ++i) {
       const svBit expected = (i == 0 || i == msb) ? 1u : 0u;
-      EXPECT_EQ(svGetBitselBit(vec, i), expected) << "L=" << c.l << " R=" << c.r;
+      EXPECT_EQ(svGetBitselBit(vec, i), expected)
+          << "L=" << c.l << " R=" << c.r;
     }
   }
 }
 
 // Rule b at element granularity: a single-element packed range [k:k] has
-// abs(L-R) == 0, so it normalizes to [0:0] - the MSB and LSB coincide at C index
-// 0. This is the degenerate endpoint of the normalization formula.
+// abs(L-R) == 0, so it normalizes to [0:0] - the MSB and LSB coincide at C
+// index 0. This is the degenerate endpoint of the normalization formula.
 TEST(MappingSvRangesToCRanges, SingleElementPackedRangeNormalizesToZeroZero) {
   const int l = 5, r = 5;
   EXPECT_EQ(std::abs(l - r), 0);
@@ -89,10 +91,10 @@ TEST(MappingSvRangesToCRanges, SingleElementPackedRangeNormalizesToZeroZero) {
 }
 
 // Rule c (shall): for an unpacked dimension of SystemVerilog range [L:R] the
-// element with index min(L,R) gets C index 0 and the element with index max(L,R)
-// gets C index abs(L-R). svLow / svHigh / svSize supply min / max / count, and a
-// C index is the user computation sv_index - svLow. Exercised for an ascending,
-// a descending, and a negative range.
+// element with index min(L,R) gets C index 0 and the element with index
+// max(L,R) gets C index abs(L-R). svLow / svHigh / svSize supply min / max /
+// count, and a C index is the user computation sv_index - svLow. Exercised for
+// an ascending, a descending, and a negative range.
 TEST(MappingSvRangesToCRanges, UnpackedNaturalOrderMinToZeroMaxToAbs) {
   struct Case {
     int l;
@@ -114,22 +116,22 @@ TEST(MappingSvRangesToCRanges, UnpackedNaturalOrderMinToZeroMaxToAbs) {
     EXPECT_EQ(svSize(h, 1), abs_span + 1);
 
     // The C index of an element is its SystemVerilog index minus the low bound.
-    EXPECT_EQ(lo - lo, 0);              // min(L,R) -> C index 0.
-    EXPECT_EQ(hi - lo, abs_span);       // max(L,R) -> C index abs(L-R).
+    EXPECT_EQ(lo - lo, 0);         // min(L,R) -> C index 0.
+    EXPECT_EQ(hi - lo, abs_span);  // max(L,R) -> C index abs(L-R).
   }
 }
 
 // Rule c "natural order ... lower indices go first": walking the SystemVerilog
 // indices from low to high yields C indices 0, 1, 2, ... contiguously, so the C
-// layout preserves the ascending element order independent of the declared range
-// orientation. Verified against a descending declaration [3:-2].
+// layout preserves the ascending element order independent of the declared
+// range orientation. Verified against a descending declaration [3:-2].
 TEST(MappingSvRangesToCRanges, UnpackedLowerIndicesGoFirst) {
   const svOpenArrayDimRange ranges[] = {{0, 0}, {3, -2}};  // unpacked [3:-2].
   svOpenArrayDesc desc;
   svOpenArrayHandle h = MakeHandle(ranges, 2, &desc);
 
-  const int lo = svLow(h, 1);          // -2
-  const int size = svSize(h, 1);       // 6
+  const int lo = svLow(h, 1);     // -2
+  const int size = svSize(h, 1);  // 6
   EXPECT_EQ(lo, -2);
   EXPECT_EQ(size, 6);
 
@@ -181,15 +183,15 @@ TEST(MappingSvRangesToCRanges, WorkedExampleNormalizedForm) {
 }
 
 // "The above range mapping ... applies to calls made in both directions." The
-// same normalized index addresses the same bit whether C reads a value handed in
-// by SystemVerilog (the get path of an SV->C call) or writes a value that
-// SystemVerilog will read back (the put path of a C->SV call / copy-out). Writing
-// through the normalized indices of a packed [L:R] and reading them back yields
-// the identical mapping in both directions.
+// same normalized index addresses the same bit whether C reads a value handed
+// in by SystemVerilog (the get path of an SV->C call) or writes a value that
+// SystemVerilog will read back (the put path of a C->SV call / copy-out).
+// Writing through the normalized indices of a packed [L:R] and reading them
+// back yields the identical mapping in both directions.
 TEST(MappingSvRangesToCRanges, MappingAppliesInBothCallDirections) {
-  const int l = 11, r = 4;             // packed [11:4].
-  const int msb = std::abs(l - r);     // 7
-  const int width = msb + 1;           // 8
+  const int l = 11, r = 4;          // packed [11:4].
+  const int msb = std::abs(l - r);  // 7
+  const int width = msb + 1;        // 8
   svBitVecVal vec = 0u;
 
   // C->SV direction: C writes the value SystemVerilog will observe.
@@ -199,10 +201,11 @@ TEST(MappingSvRangesToCRanges, MappingAppliesInBothCallDirections) {
 
   // SV->C direction: C reads the value back at the same normalized indices.
   for (int i = 0; i < width; ++i) {
-    EXPECT_EQ(svGetBitselBit(&vec, i), static_cast<svBit>(i % 2 == 0 ? 1u : 0u));
+    EXPECT_EQ(svGetBitselBit(&vec, i),
+              static_cast<svBit>(i % 2 == 0 ? 1u : 0u));
   }
-  EXPECT_EQ(svGetBitselBit(&vec, 0), 1u);     // LSB normalized index 0.
-  EXPECT_EQ(svGetBitselBit(&vec, msb), 0u);   // MSB normalized index abs(L-R)=7.
+  EXPECT_EQ(svGetBitselBit(&vec, 0), 1u);    // LSB normalized index 0.
+  EXPECT_EQ(svGetBitselBit(&vec, msb), 0u);  // MSB normalized index abs(L-R)=7.
 }
 
 // Rule b edge: the normalization holds when the packed range is wider than one

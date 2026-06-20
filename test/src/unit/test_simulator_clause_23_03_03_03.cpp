@@ -70,8 +70,7 @@ TEST(PortConnectionRulesForNetsSimulation,
   EXPECT_EQ(var->value.ToUint64(), 0x42u);
 }
 
-TEST(PortConnectionRulesForNetsSimulation,
-     OutputNetPortDrivesParentVariable) {
+TEST(PortConnectionRulesForNetsSimulation, OutputNetPortDrivesParentVariable) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module child(output wire [7:0] y);\n"
@@ -89,8 +88,7 @@ TEST(PortConnectionRulesForNetsSimulation,
   EXPECT_EQ(var->value.ToUint64(), 0x55u);
 }
 
-TEST(PortConnectionRulesForNetsSimulation,
-     OutputNetPortDrivesParentNet) {
+TEST(PortConnectionRulesForNetsSimulation, OutputNetPortDrivesParentNet) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module child(output wire [7:0] y);\n"
@@ -127,4 +125,4 @@ TEST(PortConnectionRulesForNetsSimulation,
   EXPECT_EQ(var->value.ToUint64(), 0xCDu);
 }
 
-}
+}  // namespace

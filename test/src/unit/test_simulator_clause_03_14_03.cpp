@@ -32,4 +32,4 @@ TEST(DesignBuildingBlockSimulation, StepTimeUnitTracksLatestGlobalPrecision) {
   EXPECT_EQ(f.ctx.StepTimeUnit(), TimeUnit::kFs);
 }
 
-}
+}  // namespace

@@ -131,7 +131,7 @@ bool TryEvalEnumMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
 }
 
 bool TryEvalEnumProperty(std::string_view var_name, std::string_view method,
-                          SimContext& ctx, Arena& arena, Logic4Vec& out) {
+                         SimContext& ctx, Arena& arena, Logic4Vec& out) {
   const auto* info = ctx.GetVariableEnumType(var_name);
   if (!info) return false;
 
@@ -161,4 +161,4 @@ bool TryEvalEnumProperty(std::string_view var_name, std::string_view method,
   return false;
 }
 
-}
+}  // namespace delta

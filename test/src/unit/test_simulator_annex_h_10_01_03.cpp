@@ -6,8 +6,8 @@ namespace {
 
 // H.10.1.3 declares svScope (a scope instance) and svOpenArrayHandle (a generic
 // object) as opaque handles. Beyond holding null, each must be able to carry an
-// arbitrary object address and yield it back unchanged, since callers round-trip
-// real pointers through these handle types.
+// arbitrary object address and yield it back unchanged, since callers
+// round-trip real pointers through these handle types.
 TEST(SvDpi, HandleTypesCarryOpaquePointers) {
   int scope_object = 0;
   int array_object = 0;
@@ -27,4 +27,4 @@ TEST(SvDpi, DpiVersionReportsVpiCanonicalRepresentation) {
   EXPECT_STREQ(ver, "1800-2005");
 }
 
-}
+}  // namespace

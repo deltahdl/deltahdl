@@ -8,7 +8,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ConditionalStatementSim,ExecuteIfElse) {
+TEST(ConditionalStatementSim, ExecuteIfElse) {
   CompiledSimFixture f;
   auto* sel = f.ctx.CreateVariable("sel", 1);
   sel->value = MakeLogic4VecVal(f.arena, 1, 1);
@@ -543,4 +543,4 @@ TEST(ConditionalStatementSim, CompiledIfZRunsElseBranch) {
   EXPECT_EQ(out->value.ToUint64(), 11u);
 }
 
-}
+}  // namespace

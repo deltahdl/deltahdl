@@ -59,19 +59,20 @@ TEST(ClassSim, CastDeepHierarchySucceeds) {
 }
 
 TEST(ClassSim, E2eCastFunctionReturnsOneOnSuccess) {
-  EXPECT_EQ(RunAndGet(
-      "class Base; int x; endclass\n"
-      "class Derived extends Base; int y; endclass\n"
-      "module t;\n"
-      "  int result;\n"
-      "  initial begin\n"
-      "    Base b;\n"
-      "    Derived d;\n"
-      "    d = new;\n"
-      "    b = d;\n"
-      "    result = $cast(d, b);\n"
-      "  end\n"
-      "endmodule\n", "result"), 1u);
+  EXPECT_EQ(RunAndGet("class Base; int x; endclass\n"
+                      "class Derived extends Base; int y; endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    Base b;\n"
+                      "    Derived d;\n"
+                      "    d = new;\n"
+                      "    b = d;\n"
+                      "    result = $cast(d, b);\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            1u);
 }
 
 TEST(ClassSim, E2eCastAssignmentCompatibleDirectionSucceeds) {
@@ -79,33 +80,35 @@ TEST(ClassSim, E2eCastAssignmentCompatibleDirectionSucceeds) {
   // the destination type is the same as or a superclass of the source
   // expression's type. Casting a derived handle into a base-typed destination
   // is that direction, so the cast succeeds and returns 1.
-  EXPECT_EQ(RunAndGet(
-      "class Base; int x; endclass\n"
-      "class Derived extends Base; int y; endclass\n"
-      "module t;\n"
-      "  int result;\n"
-      "  initial begin\n"
-      "    Base b;\n"
-      "    Derived d;\n"
-      "    d = new;\n"
-      "    result = $cast(b, d);\n"
-      "  end\n"
-      "endmodule\n", "result"), 1u);
+  EXPECT_EQ(RunAndGet("class Base; int x; endclass\n"
+                      "class Derived extends Base; int y; endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    Base b;\n"
+                      "    Derived d;\n"
+                      "    d = new;\n"
+                      "    result = $cast(b, d);\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            1u);
 }
 
 TEST(ClassSim, E2eCastFunctionReturnsZeroOnFailure) {
-  EXPECT_EQ(RunAndGet(
-      "class Base; endclass\n"
-      "class Derived extends Base; endclass\n"
-      "module t;\n"
-      "  int result;\n"
-      "  initial begin\n"
-      "    Base b;\n"
-      "    Derived d;\n"
-      "    b = new;\n"
-      "    result = $cast(d, b);\n"
-      "  end\n"
-      "endmodule\n", "result"), 0u);
+  EXPECT_EQ(RunAndGet("class Base; endclass\n"
+                      "class Derived extends Base; endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    Base b;\n"
+                      "    Derived d;\n"
+                      "    b = new;\n"
+                      "    result = $cast(d, b);\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            0u);
 }
 
 TEST(ClassSim, E2eCastTaskFormFailsWithError) {
@@ -129,31 +132,33 @@ TEST(ClassSim, E2eCastTaskFormFailsWithError) {
 }
 
 TEST(ClassSim, E2eCastNullSucceeds) {
-  EXPECT_EQ(RunAndGet(
-      "class Base; endclass\n"
-      "class Derived extends Base; endclass\n"
-      "module t;\n"
-      "  int result;\n"
-      "  initial begin\n"
-      "    Derived d;\n"
-      "    result = $cast(d, null);\n"
-      "  end\n"
-      "endmodule\n", "result"), 1u);
+  EXPECT_EQ(RunAndGet("class Base; endclass\n"
+                      "class Derived extends Base; endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    Derived d;\n"
+                      "    result = $cast(d, null);\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            1u);
 }
 
 TEST(ClassSim, E2eCastNullAssignsNull) {
-  EXPECT_EQ(RunAndGet(
-      "class Base; endclass\n"
-      "class Derived extends Base; endclass\n"
-      "module t;\n"
-      "  int result;\n"
-      "  initial begin\n"
-      "    Derived d;\n"
-      "    d = new;\n"
-      "    $cast(d, null);\n"
-      "    result = (d == null);\n"
-      "  end\n"
-      "endmodule\n", "result"), 1u);
+  EXPECT_EQ(RunAndGet("class Base; endclass\n"
+                      "class Derived extends Base; endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    Derived d;\n"
+                      "    d = new;\n"
+                      "    $cast(d, null);\n"
+                      "    result = (d == null);\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            1u);
 }
 
 TEST(ClassSim, E2eSuccessfulCastWritesDestinationHandle) {
@@ -162,21 +167,22 @@ TEST(ClassSim, E2eSuccessfulCastWritesDestinationHandle) {
   // object the source pointed at. Here the base handle b points at a Derived
   // object, the downcast into d2 succeeds, and d2 then refers to the same
   // object as the original derived handle d.
-  EXPECT_EQ(RunAndGet(
-      "class Base; int x; endclass\n"
-      "class Derived extends Base; int y; endclass\n"
-      "module t;\n"
-      "  int result;\n"
-      "  initial begin\n"
-      "    Base b;\n"
-      "    Derived d;\n"
-      "    Derived d2;\n"
-      "    d = new;\n"
-      "    b = d;\n"
-      "    $cast(d2, b);\n"
-      "    result = (d2 == d);\n"
-      "  end\n"
-      "endmodule\n", "result"), 1u);
+  EXPECT_EQ(RunAndGet("class Base; int x; endclass\n"
+                      "class Derived extends Base; int y; endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    Base b;\n"
+                      "    Derived d;\n"
+                      "    Derived d2;\n"
+                      "    d = new;\n"
+                      "    b = d;\n"
+                      "    $cast(d2, b);\n"
+                      "    result = (d2 == d);\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            1u);
 }
 
 TEST(ClassSim, E2eUpcastAssignment) {
@@ -219,33 +225,35 @@ TEST(ClassSim, E2eCastDeepHierarchyDowncast) {
 }
 
 TEST(ClassSim, E2eCastDeepHierarchyDowncastFails) {
-  EXPECT_EQ(RunAndGet(
-      "class Grand; endclass\n"
-      "class Mid extends Grand; endclass\n"
-      "class Leaf extends Mid; endclass\n"
-      "module t;\n"
-      "  int result;\n"
-      "  initial begin\n"
-      "    Grand g;\n"
-      "    Leaf l;\n"
-      "    g = new;\n"
-      "    result = $cast(l, g);\n"
-      "  end\n"
-      "endmodule\n", "result"), 0u);
+  EXPECT_EQ(RunAndGet("class Grand; endclass\n"
+                      "class Mid extends Grand; endclass\n"
+                      "class Leaf extends Mid; endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    Grand g;\n"
+                      "    Leaf l;\n"
+                      "    g = new;\n"
+                      "    result = $cast(l, g);\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            0u);
 }
 
 TEST(ClassSim, E2eCastFailsIncompatibleTypesEvenIfNull) {
-  EXPECT_EQ(RunAndGet(
-      "class A; endclass\n"
-      "class B; endclass\n"
-      "module t;\n"
-      "  int result;\n"
-      "  initial begin\n"
-      "    A a;\n"
-      "    B b;\n"
-      "    result = $cast(a, b);\n"
-      "  end\n"
-      "endmodule\n", "result"), 0u);
+  EXPECT_EQ(RunAndGet("class A; endclass\n"
+                      "class B; endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    A a;\n"
+                      "    B b;\n"
+                      "    result = $cast(a, b);\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            0u);
 }
 
-}
+}  // namespace

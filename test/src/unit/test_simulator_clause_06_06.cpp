@@ -156,4 +156,4 @@ TEST(NetTypesIntro, TriregFollowsRemainingDriverWhenOneOfTwoGoesToZ) {
   EXPECT_EQ(var->value.ToUint64() & 0xFFu, 0x55u);
 }
 
-}
+}  // namespace

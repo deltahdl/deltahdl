@@ -28,4 +28,4 @@ TEST_F(AnnexHParseTest, DpiImportRecordsInputOutputInoutDirections) {
   EXPECT_EQ(items[0]->func_args[2].name, "status");
 }
 
-}
+}  // namespace

@@ -268,4 +268,3 @@ TEST(IdentifierLexing, EscapedIdentifierExceedsMaxLength) {
   auto [tokens, errors] = LexWithDiag(src);
   EXPECT_TRUE(errors);
 }
-

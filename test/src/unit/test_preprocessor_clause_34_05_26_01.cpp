@@ -55,8 +55,7 @@ TEST_F(ProtectKeyPublicKeySyntaxTest,
 // value belongs to the Description, not the Syntax, of this keyword.)
 TEST_F(ProtectKeyPublicKeySyntaxTest,
        KeyPublicKeyConsumesOnlyDirectiveLineFollowingLineKept) {
-  auto result =
-      Preprocess("`pragma protect key_public_key\nDEADBEEFKEYDATA\n");
+  auto result = Preprocess("`pragma protect key_public_key\nDEADBEEFKEYDATA\n");
   EXPECT_FALSE(diag_.HasErrors());
   EXPECT_EQ(result.find("pragma"), std::string::npos);
   EXPECT_NE(result.find("DEADBEEFKEYDATA"), std::string::npos);

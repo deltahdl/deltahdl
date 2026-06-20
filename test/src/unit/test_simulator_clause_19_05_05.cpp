@@ -91,8 +91,7 @@ TEST(Coverage, IgnoreTransitionMustBeBounded) {
 // the bin is left with no values at all. This is the precondition for the
 // empty-bin exclusion handled by §19.11.
 TEST(Coverage, IgnoringEveryValueEmptiesStateBin) {
-  EXPECT_TRUE(
-      CoverageDB::RemoveIgnoredValues({1, 2, 3}, {3, 1, 2}).empty());
+  EXPECT_TRUE(CoverageDB::RemoveIgnoredValues({1, 2, 3}, {3, 1, 2}).empty());
   // An empty bin stays empty regardless of what is ignored.
   EXPECT_TRUE(CoverageDB::RemoveIgnoredValues({}, {5}).empty());
 }
@@ -123,4 +122,4 @@ TEST(Coverage, IgnoredSequenceMatchedAtTransitionBoundaries) {
   EXPECT_TRUE(CoverageDB::CoveredTransitionIsIgnored({1, 2, 3}, {2, 3}));
 }
 
-}
+}  // namespace

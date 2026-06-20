@@ -17,7 +17,8 @@ namespace {
 //   - Detail 1: a class object reports its own unique identifier (vpiObjId).
 //   - Detail 2: a class variable reports the identifier of the object it
 //     references, or 0 when it references none.
-//   - Detail 3: vpiWaitingProcesses on a class object (mailbox/semaphore) reaches
+//   - Detail 3: vpiWaitingProcesses on a class object (mailbox/semaphore)
+//   reaches
 //     the threads of the processes waiting on it.
 //   - Detail 4: vpiMessages on a class object (mailbox) reaches its messages.
 //   - Detail 5: vpiClassObj of a class variable reaches the referenced object
@@ -26,10 +27,12 @@ namespace {
 //   - Detail 6: vpiMethods from a class object returns the explicitly declared
 //     methods of both lifetimes and omits implicit built-ins.
 //   - Detail 7: vpiVirtualInterfaceVar expands a declared array of virtual
-//     interfaces into its elements, while vpiVariables reports that array whole.
+//     interfaces into its elements, while vpiVariables reports that array
+//     whole.
 //   - Detail 8: vpiParameter returns both parameter-port-list and body
 //     parameters; vpiLocalParam is TRUE for the body ones (§37.28).
-//   - Detail 9: vpi_handle_by_name() reaches a non-static data member through the
+//   - Detail 9: vpi_handle_by_name() reaches a non-static data member through
+//   the
 //     class variable that holds the object.
 
 // The fixture installs a context so the public vpi_get/vpi_iterate/vpi_scan/
@@ -79,7 +82,8 @@ TEST_F(ClassVariablesAndObjects, ClassVariableReportsReferencedObjectId) {
 // D3: a class object's vpiWaitingProcesses iteration reaches the thread objects
 // of the processes waiting on it (a mailbox or semaphore resource). The targets
 // are threads, so a non-thread child is never reported.
-TEST_F(ClassVariablesAndObjects, WaitingProcessesIterationReturnsWaitingThreads) {
+TEST_F(ClassVariablesAndObjects,
+       WaitingProcessesIterationReturnsWaitingThreads) {
   VpiObject waiter_a;
   waiter_a.type = vpiThread;
   VpiObject not_a_thread;
@@ -141,10 +145,11 @@ TEST_F(ClassVariablesAndObjects, ClassObjRelationReachesReferencedObject) {
   EXPECT_EQ(VpiHandleC(vpiClassObj, &null_var), nullptr);
 }
 
-// D5: vpiClassTypespec of a class variable is the type the variable was declared
-// with, while vpiClassTypespec of the class object is the type the object was
-// created with. When a base-class variable references a derived-class object the
-// two differ (the LRM's Packet variable vs. its LinkedPacket object).
+// D5: vpiClassTypespec of a class variable is the type the variable was
+// declared with, while vpiClassTypespec of the class object is the type the
+// object was created with. When a base-class variable references a
+// derived-class object the two differ (the LRM's Packet variable vs. its
+// LinkedPacket object).
 TEST_F(ClassVariablesAndObjects, ClassTypespecDiffersBetweenVariableAndObject) {
   VpiObject declared_typespec;  // "Packet"
   declared_typespec.type = vpiClassTypespec;
@@ -203,10 +208,12 @@ TEST_F(ClassVariablesAndObjects,
 }
 
 // D6: a class object's vpiVariables iteration returns the class's data members
-// of both lifetimes - a static one and an automatic one - since the iteration is
-// not filtered by declared lifetime. (The companion rule that an array of
-// virtual interfaces is reported as a single array var is exercised separately.)
-TEST_F(ClassVariablesAndObjects, VariablesIterationFromObjectReturnsBothLifetimes) {
+// of both lifetimes - a static one and an automatic one - since the iteration
+// is not filtered by declared lifetime. (The companion rule that an array of
+// virtual interfaces is reported as a single array var is exercised
+// separately.)
+TEST_F(ClassVariablesAndObjects,
+       VariablesIterationFromObjectReturnsBothLifetimes) {
   VpiObject static_var;
   static_var.type = vpiVariables;
   static_var.automatic = false;  // static property
@@ -231,7 +238,8 @@ TEST_F(ClassVariablesAndObjects, VariablesIterationFromObjectReturnsBothLifetime
 // one and an automatic one - and vpiNamedEventArray returns its named event
 // arrays. Each relation reaches only objects of its own kind, so a child of the
 // other kind is not reported.
-TEST_F(ClassVariablesAndObjects, NamedEventIterationsFromObjectReturnBothLifetimes) {
+TEST_F(ClassVariablesAndObjects,
+       NamedEventIterationsFromObjectReturnBothLifetimes) {
   VpiObject static_event;
   static_event.type = vpiNamedEvent;
   static_event.automatic = false;  // static property
@@ -298,7 +306,8 @@ TEST_F(ClassVariablesAndObjects,
 // the parameter port list and those declared within the body as class items.
 // vpiLocalParam (§37.28) is TRUE for a body parameter and FALSE for a port-list
 // one, which is how the two origins are told apart.
-TEST_F(ClassVariablesAndObjects, ParameterIterationReturnsPortAndBodyParameters) {
+TEST_F(ClassVariablesAndObjects,
+       ParameterIterationReturnsPortAndBodyParameters) {
   VpiObject port_param;
   port_param.type = vpiParameter;
   port_param.local_param = false;  // parameter port list
@@ -321,10 +330,11 @@ TEST_F(ClassVariablesAndObjects, ParameterIterationReturnsPortAndBodyParameters)
   EXPECT_EQ(vpi_get(vpiLocalParam, &port_param), 0);
 }
 
-// D9: vpi_handle_by_name() accepts a full name down to a non-static data member.
-// The member lives on the class object the variable references, so resolution
-// descends through the class variable into that object's members; the member is
-// reachable even though it is non-static and therefore carries no full name.
+// D9: vpi_handle_by_name() accepts a full name down to a non-static data
+// member. The member lives on the class object the variable references, so
+// resolution descends through the class variable into that object's members;
+// the member is reachable even though it is non-static and therefore carries no
+// full name.
 TEST_F(ClassVariablesAndObjects, HandleByNameReachesNonStaticDataMember) {
   VpiObject data_member;  // the "Id" member of class Packet
   data_member.type = vpiIntegerVar;

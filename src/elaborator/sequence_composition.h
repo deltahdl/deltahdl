@@ -27,9 +27,9 @@ bool IsSequenceCompositionMethodValid(SequenceCompositionMethod method);
 
 // §16.9.11: instantiating a named sequence by referencing its name requires the
 // referenced sequence to match starting from the clock tick at which the
-// reference is reached during evaluation of the enclosing sequence. Returns true
-// to assert that the match start is anchored at the reference tick (not at the
-// enclosing sequence's start).
+// reference is reached during evaluation of the enclosing sequence. Returns
+// true to assert that the match start is anchored at the reference tick (not at
+// the enclosing sequence's start).
 bool NamedSequenceReferenceMatchesFromReferenceTick();
 
 // §16.9.11: detecting the reaching of a sequence's end point is done with the

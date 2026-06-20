@@ -49,4 +49,4 @@ TEST(TimescaleSystemFunctions, TimeprecisionParsesRootArgument) {
   ASSERT_EQ(call->args.size(), 1u);
 }
 
-}
+}  // namespace

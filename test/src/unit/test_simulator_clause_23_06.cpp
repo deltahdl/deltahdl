@@ -132,4 +132,4 @@ TEST(HierarchicalNameSimulation, HierarchicalNameInEventExpression) {
   EXPECT_EQ(v->value.ToUint64(), 1u);
 }
 
-}
+}  // namespace

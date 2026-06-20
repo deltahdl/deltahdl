@@ -131,4 +131,4 @@ TEST(ElaborationOrder, DesignWithoutGeneratesTerminatesInSinglePass) {
   EXPECT_EQ(leaf->params[0].resolved_value, 7);
 }
 
-}
+}  // namespace

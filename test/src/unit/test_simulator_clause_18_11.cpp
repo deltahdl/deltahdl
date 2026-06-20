@@ -197,4 +197,4 @@ TEST(InlineRandomControl, NamedNonRandIsNotPromotedToCyclical) {
   EXPECT_TRUE(consecutive_repeat);
 }
 
-}
+}  // namespace

@@ -31,41 +31,41 @@ bool RunReportsError(const std::string& src) {
 // Reading the deprecated ended method off a named sequence names a method that
 // no longer exists; evaluating it is rejected.
 TEST(EndedSequenceMethodDeprecated, EndedMethodOnSequenceIsRejected) {
-  EXPECT_TRUE(RunReportsError(
-      "module t;\n"
-      "  logic clk, a;\n"
-      "  logic r;\n"
-      "  sequence s;\n"
-      "    @(posedge clk) a;\n"
-      "  endsequence\n"
-      "  initial r = s.ended;\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      RunReportsError("module t;\n"
+                      "  logic clk, a;\n"
+                      "  logic r;\n"
+                      "  sequence s;\n"
+                      "    @(posedge clk) a;\n"
+                      "  endsequence\n"
+                      "  initial r = s.ended;\n"
+                      "endmodule\n"));
 }
 
 // triggered replaces ended and remains a defined sequence method, so reading it
 // off the same named sequence evaluates cleanly.
 TEST(EndedSequenceMethodDeprecated, TriggeredMethodOnSequenceStillEvaluates) {
-  EXPECT_FALSE(RunReportsError(
-      "module t;\n"
-      "  logic clk, a;\n"
-      "  logic r;\n"
-      "  sequence s;\n"
-      "    @(posedge clk) a;\n"
-      "  endsequence\n"
-      "  initial r = s.triggered;\n"
-      "endmodule\n"));
+  EXPECT_FALSE(
+      RunReportsError("module t;\n"
+                      "  logic clk, a;\n"
+                      "  logic r;\n"
+                      "  sequence s;\n"
+                      "    @(posedge clk) a;\n"
+                      "  endsequence\n"
+                      "  initial r = s.triggered;\n"
+                      "endmodule\n"));
 }
 
 // The removal targets the sequence method specifically. A member named ended
 // whose base is an ordinary variable rather than a named sequence is not the
 // deprecated construct and is left alone by this rule.
 TEST(EndedSequenceMethodDeprecated, EndedOnNonSequenceIsNotRejectedByThisRule) {
-  EXPECT_FALSE(RunReportsError(
-      "module t;\n"
-      "  logic [7:0] s;\n"
-      "  logic r;\n"
-      "  initial r = s.ended;\n"
-      "endmodule\n"));
+  EXPECT_FALSE(
+      RunReportsError("module t;\n"
+                      "  logic [7:0] s;\n"
+                      "  logic r;\n"
+                      "  initial r = s.ended;\n"
+                      "endmodule\n"));
 }
 
 }  // namespace

@@ -21,4 +21,4 @@ TimeUnit ComputeGlobalTimePrecision(const CompilationUnit* cu,
                                     bool has_preproc_timescale,
                                     TimeUnit preproc_global_precision);
 
-}
+}  // namespace delta

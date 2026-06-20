@@ -24,4 +24,4 @@ TEST(AssertionSemanticsParsing, AssertActionBlocks) {
   EXPECT_TRUE(found);
 }
 
-}
+}  // namespace

@@ -72,104 +72,112 @@ TEST(ObjectPropertySim, PropertyOverwrite) {
 }
 
 TEST(ObjectPropertySim, PropertyReadViaInstance) {
-  EXPECT_EQ(RunAndGet(
-      "class Packet;\n"
-      "  int command;\n"
-      "  int address;\n"
-      "endclass\n"
-      "module t;\n"
-      "  int result;\n"
-      "  initial begin\n"
-      "    Packet p;\n"
-      "    p = new;\n"
-      "    p.command = 42;\n"
-      "    result = p.command;\n"
-      "  end\n"
-      "endmodule\n", "result"), 42u);
+  EXPECT_EQ(RunAndGet("class Packet;\n"
+                      "  int command;\n"
+                      "  int address;\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    Packet p;\n"
+                      "    p = new;\n"
+                      "    p.command = 42;\n"
+                      "    result = p.command;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            42u);
 }
 
 TEST(ObjectPropertySim, MultiplePropertyReadWrite) {
-  EXPECT_EQ(RunAndGet(
-      "class Packet;\n"
-      "  int header;\n"
-      "  int payload;\n"
-      "endclass\n"
-      "module t;\n"
-      "  int result;\n"
-      "  initial begin\n"
-      "    Packet p;\n"
-      "    p = new;\n"
-      "    p.header = 10;\n"
-      "    p.payload = 20;\n"
-      "    result = p.header + p.payload;\n"
-      "  end\n"
-      "endmodule\n", "result"), 30u);
+  EXPECT_EQ(RunAndGet("class Packet;\n"
+                      "  int header;\n"
+                      "  int payload;\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    Packet p;\n"
+                      "    p = new;\n"
+                      "    p.header = 10;\n"
+                      "    p.payload = 20;\n"
+                      "    result = p.header + p.payload;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            30u);
 }
 
 TEST(ObjectPropertySim, EnumAccessViaInstance) {
-  EXPECT_EQ(RunAndGet(
-      "class Packet;\n"
-      "  typedef enum integer {ERR_OVERFLOW = 10, ERR_UNDERFLOW = 1123} "
-      "PCKT_TYPE;\n"
-      "endclass\n"
-      "module t;\n"
-      "  int result;\n"
-      "  initial begin\n"
-      "    Packet p;\n"
-      "    p = new;\n"
-      "    result = p.ERR_OVERFLOW;\n"
-      "  end\n"
-      "endmodule\n", "result"), 10u);
+  EXPECT_EQ(
+      RunAndGet(
+          "class Packet;\n"
+          "  typedef enum integer {ERR_OVERFLOW = 10, ERR_UNDERFLOW = 1123} "
+          "PCKT_TYPE;\n"
+          "endclass\n"
+          "module t;\n"
+          "  int result;\n"
+          "  initial begin\n"
+          "    Packet p;\n"
+          "    p = new;\n"
+          "    result = p.ERR_OVERFLOW;\n"
+          "  end\n"
+          "endmodule\n",
+          "result"),
+      10u);
 }
 
 TEST(ObjectPropertySim, ParameterValueAccessViaInstance) {
-  EXPECT_EQ(RunAndGet(
-      "class vector #(parameter width = 7);\n"
-      "  bit [width:0] data;\n"
-      "endclass\n"
-      "module t;\n"
-      "  int result;\n"
-      "  initial begin\n"
-      "    vector #(3) v;\n"
-      "    v = new;\n"
-      "    result = v.width;\n"
-      "  end\n"
-      "endmodule\n", "result"), 3u);
+  EXPECT_EQ(RunAndGet("class vector #(parameter width = 7);\n"
+                      "  bit [width:0] data;\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    vector #(3) v;\n"
+                      "    v = new;\n"
+                      "    result = v.width;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            3u);
 }
 
 TEST(ObjectPropertySim, ParameterDefaultValueAccessViaInstance) {
-  EXPECT_EQ(RunAndGet(
-      "class vector #(parameter width = 7);\n"
-      "  bit [width:0] data;\n"
-      "endclass\n"
-      "module t;\n"
-      "  int result;\n"
-      "  initial begin\n"
-      "    vector v;\n"
-      "    v = new;\n"
-      "    result = v.width;\n"
-      "  end\n"
-      "endmodule\n", "result"), 7u);
+  EXPECT_EQ(RunAndGet("class vector #(parameter width = 7);\n"
+                      "  bit [width:0] data;\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    vector v;\n"
+                      "    v = new;\n"
+                      "    result = v.width;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            7u);
 }
 
 TEST(ObjectPropertySim, NoRestrictionOnPropertyDataType) {
-  EXPECT_EQ(RunAndGet(
-      "class C;\n"
-      "  bit [7:0] b;\n"
-      "  logic [15:0] l;\n"
-      "  integer ig;\n"
-      "endclass\n"
-      "module t;\n"
-      "  int result;\n"
-      "  initial begin\n"
-      "    C c;\n"
-      "    c = new;\n"
-      "    c.b = 8'hAB;\n"
-      "    c.l = 16'hCDEF;\n"
-      "    c.ig = 5;\n"
-      "    result = c.ig;\n"
-      "  end\n"
-      "endmodule\n", "result"), 5u);
+  EXPECT_EQ(RunAndGet("class C;\n"
+                      "  bit [7:0] b;\n"
+                      "  logic [15:0] l;\n"
+                      "  integer ig;\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    C c;\n"
+                      "    c = new;\n"
+                      "    c.b = 8'hAB;\n"
+                      "    c.l = 16'hCDEF;\n"
+                      "    c.ig = 5;\n"
+                      "    result = c.ig;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            5u);
 }
 
-}
+}  // namespace

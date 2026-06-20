@@ -1,6 +1,7 @@
 
 
 #include <gtest/gtest.h>
+
 #include "fixture_lexer.h"
 
 using namespace delta;
@@ -47,4 +48,4 @@ TEST(GateKeywordLexing, MultipleNInputKeywordsInSequence) {
   EXPECT_EQ(tokens[5].kind, TokenKind::kKwXnor);
 }
 
-}
+}  // namespace

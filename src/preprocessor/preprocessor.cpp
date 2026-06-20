@@ -407,7 +407,8 @@ static size_t FindMidLineDirective(std::string_view s) {
   bool in_string = false;
   for (size_t i = 0; i < s.size(); ++i) {
     char c = s[i];
-    if (c == '"' && (i == 0 || s[i - 1] != '\\') && (i == 0 || s[i - 1] != '`')) {
+    if (c == '"' && (i == 0 || s[i - 1] != '\\') &&
+        (i == 0 || s[i - 1] != '`')) {
       in_string = !in_string;
       continue;
     }
@@ -506,7 +507,6 @@ std::string Preprocessor::ProcessSource(std::string_view src, uint32_t file_id,
 
     bool handled = ProcessDirective(line, file_id, line_num, depth, output);
     if (!handled && IsActive()) {
-
       auto stripped = StripComments(std::string(line), in_block_comment_);
       size_t dir_pos = FindDirectiveInStripped(stripped);
       if (dir_pos != std::string_view::npos) {
@@ -514,8 +514,7 @@ std::string Preprocessor::ProcessSource(std::string_view src, uint32_t file_id,
         auto dir_text = std::string_view(stripped).substr(dir_pos);
         if (!ProcessDirective(dir_text, file_id, line_num, depth, output)) {
           auto conditioned = ExpandInlineConditionals(std::string(dir_text));
-          auto expanded =
-              ExpandInlineMacros(conditioned, file_id, line_num);
+          auto expanded = ExpandInlineMacros(conditioned, file_id, line_num);
           TrackDesignElement(Trim(expanded));
           output.append(expanded);
         }
@@ -850,4 +849,4 @@ bool Preprocessor::ProcessConditionalDirective(std::string_view line,
   return false;
 }
 
-}
+}  // namespace delta

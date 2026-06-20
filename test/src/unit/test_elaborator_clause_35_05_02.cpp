@@ -98,4 +98,4 @@ TEST(PureDpiImportRestrictions, NonPureFunctionUnrestrictedShapeAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

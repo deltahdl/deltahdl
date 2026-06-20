@@ -132,4 +132,4 @@ TEST(DataTypeParsing, DefaultNettypeNone) {
   EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
 }
 
-}
+}  // namespace

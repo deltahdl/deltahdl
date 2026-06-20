@@ -44,55 +44,57 @@ TEST(AssignmentLikeContextSim, NBAAssignLikeContext) {
 }
 
 TEST(AssignmentLikeContextSim, ContAssignExtendsInAssignLikeContext) {
-  EXPECT_EQ(RunAndGet(
-      "module t;\n"
-      "  logic [15:0] result;\n"
-      "  logic [3:0] narrow = 4'hA;\n"
-      "  assign result = narrow;\n"
-      "endmodule\n",
-      "result"), 0x000Au);
+  EXPECT_EQ(RunAndGet("module t;\n"
+                      "  logic [15:0] result;\n"
+                      "  logic [3:0] narrow = 4'hA;\n"
+                      "  assign result = narrow;\n"
+                      "endmodule\n",
+                      "result"),
+            0x000Au);
 }
 
 TEST(AssignmentLikeContextSim, ContAssignTruncatesInAssignLikeContext) {
-  EXPECT_EQ(RunAndGet(
-      "module t;\n"
-      "  logic [3:0] result;\n"
-      "  logic [15:0] wide = 16'hCAFE;\n"
-      "  assign result = wide;\n"
-      "endmodule\n",
-      "result"), 0xEu);
+  EXPECT_EQ(RunAndGet("module t;\n"
+                      "  logic [3:0] result;\n"
+                      "  logic [15:0] wide = 16'hCAFE;\n"
+                      "  assign result = wide;\n"
+                      "endmodule\n",
+                      "result"),
+            0xEu);
 }
 
 TEST(AssignmentLikeContextSim, ParameterExplicitTypeTruncatesValue) {
-  EXPECT_EQ(RunAndGet(
-      "module t;\n"
-      "  parameter logic [7:0] P = 16'hCAFE;\n"
-      "  logic [7:0] result;\n"
-      "  initial result = P;\n"
-      "endmodule\n",
-      "result"), 0xFEu);
+  EXPECT_EQ(RunAndGet("module t;\n"
+                      "  parameter logic [7:0] P = 16'hCAFE;\n"
+                      "  logic [7:0] result;\n"
+                      "  initial result = P;\n"
+                      "endmodule\n",
+                      "result"),
+            0xFEu);
 }
 
 TEST(AssignmentLikeContextSim, ParameterExplicitTypeExtendsValue) {
-  EXPECT_EQ(RunAndGet(
-      "module t;\n"
-      "  parameter logic [15:0] P = 4'hA;\n"
-      "  logic [15:0] result;\n"
-      "  initial result = P;\n"
-      "endmodule\n",
-      "result"), 0x000Au);
+  EXPECT_EQ(RunAndGet("module t;\n"
+                      "  parameter logic [15:0] P = 4'hA;\n"
+                      "  logic [15:0] result;\n"
+                      "  initial result = P;\n"
+                      "endmodule\n",
+                      "result"),
+            0x000Au);
 }
 
 TEST(AssignmentLikeContextSim, ParameterOverrideInInstanceTruncates) {
-  EXPECT_EQ(RunAndGet(
-      "module inner #(parameter logic [7:0] P = 0)(output logic [7:0] o);\n"
-      "  assign o = P;\n"
-      "endmodule\n"
-      "module t;\n"
-      "  logic [7:0] result;\n"
-      "  inner #(.P(16'hCAFE)) u(.o(result));\n"
-      "endmodule\n",
-      "result"), 0xFEu);
+  EXPECT_EQ(
+      RunAndGet(
+          "module inner #(parameter logic [7:0] P = 0)(output logic [7:0] o);\n"
+          "  assign o = P;\n"
+          "endmodule\n"
+          "module t;\n"
+          "  logic [7:0] result;\n"
+          "  inner #(.P(16'hCAFE)) u(.o(result));\n"
+          "endmodule\n",
+          "result"),
+      0xFEu);
 }
 
 TEST(AssignmentLikeContextSim, OutputPortAssignLikeContext) {
@@ -118,16 +120,17 @@ TEST(AssignmentLikeContextSim, OutputPortAssignLikeContext) {
 }
 
 TEST(AssignmentLikeContextSim, InputPortConnectionTruncates) {
-  EXPECT_EQ(RunAndGet(
-      "module inner(input logic [3:0] i, output logic [3:0] o);\n"
-      "  assign o = i;\n"
-      "endmodule\n"
-      "module t;\n"
-      "  logic [7:0] wide = 8'hAB;\n"
-      "  logic [3:0] result;\n"
-      "  inner u(.i(wide), .o(result));\n"
-      "endmodule\n",
-      "result"), 0xBu);
+  EXPECT_EQ(
+      RunAndGet("module inner(input logic [3:0] i, output logic [3:0] o);\n"
+                "  assign o = i;\n"
+                "endmodule\n"
+                "module t;\n"
+                "  logic [7:0] wide = 8'hAB;\n"
+                "  logic [3:0] result;\n"
+                "  inner u(.i(wide), .o(result));\n"
+                "endmodule\n",
+                "result"),
+      0xBu);
 }
 
 TEST(AssignmentLikeContextSim, SubroutineArgAssignLikeContext) {
@@ -152,30 +155,30 @@ TEST(AssignmentLikeContextSim, SubroutineArgAssignLikeContext) {
 }
 
 TEST(AssignmentLikeContextSim, OutputArgTruncatesInAssignLikeContext) {
-  EXPECT_EQ(RunAndGet(
-      "module t;\n"
-      "  task set_val(output logic [7:0] o);\n"
-      "    o = 16'hCAFE;\n"
-      "  endtask\n"
-      "  logic [7:0] result;\n"
-      "  initial set_val(result);\n"
-      "endmodule\n",
-      "result"), 0xFEu);
+  EXPECT_EQ(RunAndGet("module t;\n"
+                      "  task set_val(output logic [7:0] o);\n"
+                      "    o = 16'hCAFE;\n"
+                      "  endtask\n"
+                      "  logic [7:0] result;\n"
+                      "  initial set_val(result);\n"
+                      "endmodule\n",
+                      "result"),
+            0xFEu);
 }
 
 TEST(AssignmentLikeContextSim, InoutArgTruncatesInAssignLikeContext) {
-  EXPECT_EQ(RunAndGet(
-      "module t;\n"
-      "  task modify(inout logic [7:0] x);\n"
-      "    x = 16'hCAFE;\n"
-      "  endtask\n"
-      "  logic [7:0] result;\n"
-      "  initial begin\n"
-      "    result = 0;\n"
-      "    modify(result);\n"
-      "  end\n"
-      "endmodule\n",
-      "result"), 0xFEu);
+  EXPECT_EQ(RunAndGet("module t;\n"
+                      "  task modify(inout logic [7:0] x);\n"
+                      "    x = 16'hCAFE;\n"
+                      "  endtask\n"
+                      "  logic [7:0] result;\n"
+                      "  initial begin\n"
+                      "    result = 0;\n"
+                      "    modify(result);\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            0xFEu);
 }
 
 TEST(AssignmentLikeContextSim, ReturnStatementAssignLikeContext) {
@@ -199,17 +202,19 @@ TEST(AssignmentLikeContextSim, ReturnStatementAssignLikeContext) {
 }
 
 TEST(AssignmentLikeContextSim, TaggedUnionExprTruncatesInAssignLikeContext) {
-  EXPECT_EQ(RunAndGet(
-      "module t;\n"
-      "  typedef union tagged { logic [7:0] Small; logic [15:0] Big; } U;\n"
-      "  U u;\n"
-      "  int result;\n"
-      "  initial begin\n"
-      "    u = tagged Small (16'hCAFE);\n"
-      "    result = u.Small;\n"
-      "  end\n"
-      "endmodule\n",
-      "result"), 0xFEu);
+  EXPECT_EQ(
+      RunAndGet(
+          "module t;\n"
+          "  typedef union tagged { logic [7:0] Small; logic [15:0] Big; } U;\n"
+          "  U u;\n"
+          "  int result;\n"
+          "  initial begin\n"
+          "    u = tagged Small (16'hCAFE);\n"
+          "    result = u.Small;\n"
+          "  end\n"
+          "endmodule\n",
+          "result"),
+      0xFEu);
 }
 
 TEST(AssignmentLikeContextSim, ParenExprInAssignLikeContext) {
@@ -249,54 +254,56 @@ TEST(AssignmentLikeContextSim, ConditionalExprInAssignLikeContext) {
 }
 
 TEST(AssignmentLikeContextSim, MintypMaxTruncatesInAssignLikeContext) {
-  EXPECT_EQ(RunAndGet(
-      "module t;\n"
-      "  logic [7:0] result;\n"
-      "  initial result = (16'hDEAD : 16'hBEEF : 16'hCAFE);\n"
-      "endmodule\n",
-      "result"), 0xEFu);
+  EXPECT_EQ(RunAndGet("module t;\n"
+                      "  logic [7:0] result;\n"
+                      "  initial result = (16'hDEAD : 16'hBEEF : 16'hCAFE);\n"
+                      "endmodule\n",
+                      "result"),
+            0xEFu);
 }
 
 TEST(AssignmentLikeContextSim, NestedParenInConditionalPropagatesContext) {
-  EXPECT_EQ(RunAndGet(
-      "module t;\n"
-      "  logic [7:0] result;\n"
-      "  logic sel = 1;\n"
-      "  initial result = sel ? (16'hCAFE) : (16'hBEEF);\n"
-      "endmodule\n",
-      "result"), 0xFEu);
+  EXPECT_EQ(RunAndGet("module t;\n"
+                      "  logic [7:0] result;\n"
+                      "  logic sel = 1;\n"
+                      "  initial result = sel ? (16'hCAFE) : (16'hBEEF);\n"
+                      "endmodule\n",
+                      "result"),
+            0xFEu);
 }
 
 TEST(AssignmentLikeContextSim, NondefaultCorrespondenceTruncatesToFieldWidth) {
-  EXPECT_EQ(RunAndGet(
-      "module t;\n"
-      "  typedef struct packed { logic [7:0] a; logic [7:0] b; } ab_t;\n"
-      "  ab_t s;\n"
-      "  logic [7:0] result;\n"
-      "  initial begin\n"
-      "    s = '{a: 16'hCAFE, b: 8'h22};\n"
-      "    result = s.a;\n"
-      "  end\n"
-      "endmodule\n",
-      "result"), 0xFEu);
+  EXPECT_EQ(
+      RunAndGet(
+          "module t;\n"
+          "  typedef struct packed { logic [7:0] a; logic [7:0] b; } ab_t;\n"
+          "  ab_t s;\n"
+          "  logic [7:0] result;\n"
+          "  initial begin\n"
+          "    s = '{a: 16'hCAFE, b: 8'h22};\n"
+          "    result = s.a;\n"
+          "  end\n"
+          "endmodule\n",
+          "result"),
+      0xFEu);
 }
 
 TEST(AssignmentLikeContextSim, StaticCastTruncatesInAssignLikeContext) {
-  EXPECT_EQ(RunAndGet(
-      "module t;\n"
-      "  logic [7:0] result;\n"
-      "  initial result = 8'(16'hCAFE);\n"
-      "endmodule\n",
-      "result"), 0xFEu);
+  EXPECT_EQ(RunAndGet("module t;\n"
+                      "  logic [7:0] result;\n"
+                      "  initial result = 8'(16'hCAFE);\n"
+                      "endmodule\n",
+                      "result"),
+            0xFEu);
 }
 
 TEST(AssignmentLikeContextSim, StaticCastExtendsInAssignLikeContext) {
-  EXPECT_EQ(RunAndGet(
-      "module t;\n"
-      "  logic [15:0] result;\n"
-      "  initial result = 16'(4'hA);\n"
-      "endmodule\n",
-      "result"), 0x000Au);
+  EXPECT_EQ(RunAndGet("module t;\n"
+                      "  logic [15:0] result;\n"
+                      "  initial result = 16'(4'hA);\n"
+                      "endmodule\n",
+                      "result"),
+            0x000Au);
 }
 
-}
+}  // namespace

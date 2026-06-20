@@ -25,7 +25,8 @@ std::string WriteTmp(const char* tag, const std::string& data) {
 // any extra (start/finish) address arguments appended.
 void Readmem(SimFixture& f, const char* task, const std::string& path,
              const char* mem, std::vector<Expr*> extra = {}) {
-  std::vector<Expr*> args = {MkStr(f.arena, path.c_str()), MakeId(f.arena, mem)};
+  std::vector<Expr*> args = {MkStr(f.arena, path.c_str()),
+                             MakeId(f.arena, mem)};
   for (auto* e : extra) args.push_back(e);
   EvalExpr(MakeSysCall(f.arena, task, args), f.ctx, f.arena);
 }
@@ -34,9 +35,9 @@ void Readmem(SimFixture& f, const char* task, const std::string& path,
 // packed elements, each backed by a zero-initialized element variable.
 void SetupMem(SimFixture& f, const char* name, int lo, int size,
               uint32_t width) {
-  f.ctx.RegisterArray(name, {static_cast<uint32_t>(lo),
-                             static_cast<uint32_t>(size), width, false, false,
-                             false});
+  f.ctx.RegisterArray(
+      name, {static_cast<uint32_t>(lo), static_cast<uint32_t>(size), width,
+             false, false, false});
   for (int i = 0; i < size; ++i) {
     std::string nm = std::string(name) + "[" + std::to_string(lo + i) + "]";
     auto* s = f.arena.AllocString(nm.c_str(), nm.size());
@@ -156,8 +157,9 @@ TEST(ReadmemPackedDataTest, AssocLoadUpdatesExistingElementInPlace) {
 
   Readmem(f, "$readmemh", path, "am");
 
-  ASSERT_EQ(aa->int_data.size(), 2u);               // only index 8 is created
-  EXPECT_EQ(aa->int_data.at(7).ToUint64(), 0x22u);  // existing index overwritten
+  ASSERT_EQ(aa->int_data.size(), 2u);  // only index 8 is created
+  EXPECT_EQ(aa->int_data.at(7).ToUint64(),
+            0x22u);  // existing index overwritten
   EXPECT_EQ(aa->int_data.at(8).ToUint64(), 0x33u);  // absent index created
   std::remove(path.c_str());
 }

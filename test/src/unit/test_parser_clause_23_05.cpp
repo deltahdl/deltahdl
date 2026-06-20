@@ -151,4 +151,4 @@ TEST(ExternModuleParsing, ErrorMissingModuleName) {
   EXPECT_FALSE(ParseOk("extern module ;\n"));
 }
 
-}
+}  // namespace

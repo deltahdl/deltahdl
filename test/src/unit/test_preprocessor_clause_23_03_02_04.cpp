@@ -22,4 +22,4 @@ TEST(WildcardPortConnectionPreprocessing, WildcardSurvivesPreprocessing) {
   EXPECT_TRUE(inst->inst_ports.empty());
 }
 
-}
+}  // namespace

@@ -68,4 +68,4 @@ TEST(TimeLiteralSimulation, ScaledToExplicitTimeunitUs) {
   EXPECT_DOUBLE_EQ(v, 0.5);
 }
 
-}
+}  // namespace

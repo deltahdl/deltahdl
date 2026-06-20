@@ -5,21 +5,21 @@ using namespace delta;
 namespace {
 
 TEST(EmbeddedConcurrentAssertion, AssertPropertyEmbeddedInAlways) {
-  EXPECT_TRUE(ParseOk(
-      "module m(input logic clk, input logic a);\n"
-      "  always @(posedge clk) begin\n"
-      "    assert property (a |-> a);\n"
-      "  end\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m(input logic clk, input logic a);\n"
+              "  always @(posedge clk) begin\n"
+              "    assert property (a |-> a);\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
 TEST(EmbeddedConcurrentAssertion, CoverPropertyEmbeddedInAlways) {
-  EXPECT_TRUE(ParseOk(
-      "module m(input logic clk, input logic a);\n"
-      "  always @(posedge clk) begin\n"
-      "    cover property (a);\n"
-      "  end\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m(input logic clk, input logic a);\n"
+              "  always @(posedge clk) begin\n"
+              "    cover property (a);\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
 TEST(EmbeddedConcurrentAssertion, AstFlagsProceduralConcurrentAssertion) {
@@ -52,4 +52,4 @@ TEST(EmbeddedConcurrentAssertion, AstFlagsProceduralConcurrentAssertion) {
   EXPECT_FALSE(found->is_deferred);
 }
 
-}
+}  // namespace

@@ -134,4 +134,4 @@ TEST(ScopeAndLifetimeSimulation, DefaultLifetimeInAutoModuleIsAutomatic) {
   EXPECT_EQ(val, 1u);
 }
 
-}
+}  // namespace

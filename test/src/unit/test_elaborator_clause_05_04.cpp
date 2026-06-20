@@ -94,4 +94,4 @@ TEST(LexicalConventionElaboration, CommentsAroundContinuousAssignElaborate) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

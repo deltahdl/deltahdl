@@ -42,10 +42,10 @@ CoverGroup GroupWithPoint(std::vector<CoverBin> bins, uint32_t weight = 1) {
 // instance B is 100% covered with weight 3, so the type coverage is
 // (50*1 + 100*3) / 4 = 87.5.
 TEST(TypeCoverage, WeightedAverageOfInstancesByOptionWeight) {
-  CoverGroup a = GroupWithPoint(
-      {ValueBin("lo", 0, 1), ValueBin("hi", 1, 0)}, /*weight=*/1);
-  CoverGroup b = GroupWithPoint(
-      {ValueBin("lo", 0, 1), ValueBin("hi", 1, 1)}, /*weight=*/3);
+  CoverGroup a = GroupWithPoint({ValueBin("lo", 0, 1), ValueBin("hi", 1, 0)},
+                                /*weight=*/1);
+  CoverGroup b = GroupWithPoint({ValueBin("lo", 0, 1), ValueBin("hi", 1, 1)},
+                                /*weight=*/3);
   std::vector<const CoverGroup*> insts = {&a, &b};
   EXPECT_DOUBLE_EQ(
       CoverageDB::ComputeTypeCoverage(insts, /*merge_instances=*/false), 87.5);
@@ -63,14 +63,12 @@ TEST(TypeCoverage, WeightedAverageZeroWeightIsZero) {
 
 // LRM 19.11.3: with merge_instances true, the bins of every instance are
 // unioned. Bins that share a name overlap, so a bin covered in any instance is
-// covered in the union. Here each instance covers a different bin yet shares the
-// bin names, so the union covers both bins (100%) while neither instance alone
-// reaches it (50%).
+// covered in the union. Here each instance covers a different bin yet shares
+// the bin names, so the union covers both bins (100%) while neither instance
+// alone reaches it (50%).
 TEST(TypeCoverage, MergeUnionsBinsBySharedName) {
-  CoverGroup a =
-      GroupWithPoint({ValueBin("lo", 0, 1), ValueBin("hi", 1, 0)});
-  CoverGroup b =
-      GroupWithPoint({ValueBin("lo", 0, 0), ValueBin("hi", 1, 1)});
+  CoverGroup a = GroupWithPoint({ValueBin("lo", 0, 1), ValueBin("hi", 1, 0)});
+  CoverGroup b = GroupWithPoint({ValueBin("lo", 0, 0), ValueBin("hi", 1, 1)});
   std::vector<const CoverGroup*> insts = {&a, &b};
   EXPECT_DOUBLE_EQ(
       CoverageDB::ComputeTypeCoverage(insts, /*merge_instances=*/false), 50.0);
@@ -95,9 +93,9 @@ TEST(TypeCoverage, MergeSumsCountsOfOverlappingBins) {
 }
 
 // LRM 19.11.3: when same-named bins overlap across instances, a bin covered in
-// any instance is covered in the union, while the union denominator still counts
-// each distinct bin name once. This mirrors the standard's "gt" example: two
-// instances share the bins b0, b1, b2; one instance covers b0 and the other
+// any instance is covered in the union, while the union denominator still
+// counts each distinct bin name once. This mirrors the standard's "gt" example:
+// two instances share the bins b0, b1, b2; one instance covers b0 and the other
 // covers b1, leaving b2 uncovered everywhere. The merged coverage is therefore
 // 2/3, strictly more than either instance alone (each covers only 1/3).
 TEST(TypeCoverage, MergeUnionExceedsIndividualInstancesFractionally) {
@@ -219,14 +217,15 @@ TEST(TypeCoverage, CrossTypeCoverageWeightedByScopeWeight) {
       87.5);
 }
 
-// LRM 19.11.3: with merge, automatically created cross bins are unioned by their
-// cross-product bin name; instances sharing the same cross product bin name
-// overlap. Each instance covers a different cross bin, so the union covers both.
+// LRM 19.11.3: with merge, automatically created cross bins are unioned by
+// their cross-product bin name; instances sharing the same cross product bin
+// name overlap. Each instance covers a different cross bin, so the union covers
+// both.
 TEST(TypeCoverage, CrossTypeCoverageMergeUnionsByProductName) {
-  CrossCover a = CrossWithBins(
-      {CrossBinNamed("<a1,b1>", 1), CrossBinNamed("<a2,b2>", 0)});
-  CrossCover b = CrossWithBins(
-      {CrossBinNamed("<a1,b1>", 0), CrossBinNamed("<a2,b2>", 1)});
+  CrossCover a =
+      CrossWithBins({CrossBinNamed("<a1,b1>", 1), CrossBinNamed("<a2,b2>", 0)});
+  CrossCover b =
+      CrossWithBins({CrossBinNamed("<a1,b1>", 0), CrossBinNamed("<a2,b2>", 1)});
   std::vector<const CrossCover*> insts = {&a, &b};
   EXPECT_DOUBLE_EQ(
       CoverageDB::ComputeCrossTypeCoverage(insts, /*merge_instances=*/true),
@@ -257,11 +256,9 @@ TEST(TypeCoverage, NoInstancesIsZero) {
   EXPECT_DOUBLE_EQ(
       CoverageDB::ComputeTypeCoverage(none, /*merge_instances=*/true), 0.0);
   std::vector<const CoverPoint*> no_points;
-  EXPECT_DOUBLE_EQ(
-      CoverageDB::ComputePointTypeCoverage(no_points, false), 0.0);
+  EXPECT_DOUBLE_EQ(CoverageDB::ComputePointTypeCoverage(no_points, false), 0.0);
   std::vector<const CrossCover*> no_crosses;
-  EXPECT_DOUBLE_EQ(
-      CoverageDB::ComputeCrossTypeCoverage(no_crosses, true), 0.0);
+  EXPECT_DOUBLE_EQ(CoverageDB::ComputeCrossTypeCoverage(no_crosses, true), 0.0);
 }
 
 }  // namespace

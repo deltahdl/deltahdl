@@ -89,4 +89,4 @@ TEST(PortConnectionRulesForVariablesSimulation, RefPortWriteReflectsInParent) {
   EXPECT_EQ(var->value.ToUint64(), 0xABu);
 }
 
-}
+}  // namespace

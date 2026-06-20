@@ -62,7 +62,6 @@ TEST(CompilerDirectivePreprocessor, DefineInOneFileVisibleInAnother) {
 }
 
 TEST(CompilerDirectivePreprocessor, MacroDefinedInOneCuInvisibleInOther) {
-
   {
     PreprocFixture f;
     Preprocessor cu1(f.mgr, f.diag, {});
@@ -73,8 +72,8 @@ TEST(CompilerDirectivePreprocessor, MacroDefinedInOneCuInvisibleInOther) {
   PreprocFixture f2;
   Preprocessor cu2(f2.mgr, f2.diag, {});
   auto result = PreprocessFile(
-      "cu2.sv",
-      "`ifdef ONLY_IN_CU1\nleaked\n`else\nisolated\n`endif\n", f2, cu2);
+      "cu2.sv", "`ifdef ONLY_IN_CU1\nleaked\n`else\nisolated\n`endif\n", f2,
+      cu2);
   EXPECT_FALSE(f2.diag.HasErrors());
   EXPECT_EQ(result.find("leaked"), std::string::npos);
   EXPECT_NE(result.find("isolated"), std::string::npos);
@@ -82,11 +81,10 @@ TEST(CompilerDirectivePreprocessor, MacroDefinedInOneCuInvisibleInOther) {
 
 TEST(CompilerDirectivePreprocessor, DefineAffectsOnlySubsequentReads) {
   PreprocFixture f;
-  std::string src =
-      std::string("\x60") + "ifdef X\nEARLY_BRANCH\n" + "\x60" +
-      "else\nEARLY_ELSE\n" + "\x60" + "endif\n" + "\x60" + "define X 1\n" +
-      "\x60" + "ifdef X\nLATE_BRANCH\n" + "\x60" + "else\nLATE_ELSE\n" +
-      "\x60" + "endif\n";
+  std::string src = std::string("\x60") + "ifdef X\nEARLY_BRANCH\n" + "\x60" +
+                    "else\nEARLY_ELSE\n" + "\x60" + "endif\n" + "\x60" +
+                    "define X 1\n" + "\x60" + "ifdef X\nLATE_BRANCH\n" +
+                    "\x60" + "else\nLATE_ELSE\n" + "\x60" + "endif\n";
   auto result = Preprocess(src, f);
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_EQ(result.find("EARLY_BRANCH"), std::string::npos);
@@ -105,4 +103,4 @@ TEST(CompilerDirectivePreprocessor, ConcurrentCusIndependent) {
   EXPECT_EQ(cu2.DefaultNetType(), NetType::kTri);
 }
 
-}
+}  // namespace

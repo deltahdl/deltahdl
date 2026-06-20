@@ -156,4 +156,4 @@ TEST(SignedAndUnsigned, ArraysOfUnsignedTypesDefaultUnsigned) {
   EXPECT_FALSE(mod->variables[3].is_signed) << "time stamps[4]";
 }
 
-}
+}  // namespace

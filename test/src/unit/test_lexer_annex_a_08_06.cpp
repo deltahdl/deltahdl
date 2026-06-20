@@ -220,4 +220,4 @@ TEST(OperatorLexing, WhitespaceBreaksGtEq) {
   EXPECT_NE(tokens[2].kind, TokenKind::kGtEq);
 }
 
-}
+}  // namespace

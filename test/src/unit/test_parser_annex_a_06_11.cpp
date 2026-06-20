@@ -1674,4 +1674,4 @@ TEST(GlobalClockingParse, RejectsClockingItems) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

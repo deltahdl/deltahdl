@@ -36,10 +36,11 @@ struct ClockFlowOperand {
 };
 
 // §16.13.3: resolve the clocking event governing each operand of an operator of
-// the given kind, given the scope `incoming` at the operator and the operands in
-// source order. The flowing scope is replaced by a clocking event written at an
-// operand; for a linear operator the replacement persists to the operands that
-// follow, while for a branching operator each operand starts from `incoming`.
+// the given kind, given the scope `incoming` at the operator and the operands
+// in source order. The flowing scope is replaced by a clocking event written at
+// an operand; for a linear operator the replacement persists to the operands
+// that follow, while for a branching operator each operand starts from
+// `incoming`.
 std::vector<ClockScope> ResolveOperandClocks(
     ClockFlowOperator kind, const ClockScope& incoming,
     const std::vector<ClockFlowOperand>& operands);
@@ -49,16 +50,16 @@ std::vector<ClockScope> ResolveOperandClocks(
 // left to right unless replaced there).
 ClockScope ClockEnteringParentheses(const ClockScope& incoming);
 
-// §16.13.3: the scope in effect immediately after a parenthesized subexpression.
-// A clocking event introduced inside (here `interior_terminal`) does not flow
-// out of the enclosing parentheses, so the surrounding scope is unchanged from
-// `incoming`.
+// §16.13.3: the scope in effect immediately after a parenthesized
+// subexpression. A clocking event introduced inside (here `interior_terminal`)
+// does not flow out of the enclosing parentheses, so the surrounding scope is
+// unchanged from `incoming`.
 ClockScope ClockAfterParentheses(const ClockScope& incoming,
                                  const ClockScope& interior_terminal);
 
-// §16.13.3: a method applied to an instance of a named property or sequence. The
-// clocking-event scope flows into the instance regardless of which (if any) of
-// these is applied.
+// §16.13.3: a method applied to an instance of a named property or sequence.
+// The clocking-event scope flows into the instance regardless of which (if any)
+// of these is applied.
 enum class InstanceMethod {
   kNone,
   kTriggered,

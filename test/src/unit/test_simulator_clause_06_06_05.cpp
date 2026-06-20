@@ -349,4 +349,4 @@ TEST(Tri0Tri1Resolution, Tri1PullsOnlyResidualZBitsHighAcrossVector) {
   EXPECT_EQ(var->value.words[0].bval & 0xFF, 0x00u);
 }
 
-}
+}  // namespace

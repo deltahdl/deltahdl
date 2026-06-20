@@ -342,4 +342,4 @@ TEST(AlwaysLatchParsing, CaseWithBeginEndItems) {
   }
 }
 
-}
+}  // namespace

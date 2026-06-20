@@ -22,4 +22,4 @@ TEST(CompilerDirectiveParsing,
                               "`end_keywords\n"));
 }
 
-}
+}  // namespace

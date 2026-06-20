@@ -120,4 +120,4 @@ TEST(LexicalConventionParsing, StringWithLineContinuation) {
               "endmodule"));
 }
 
-}
+}  // namespace

@@ -303,7 +303,8 @@ TEST(CompilationUnitPreprocessing, IncludeDirectiveContentBecomesPartOfCu) {
   fs::remove_all(dir);
 }
 
-TEST(CompilationUnitPreprocessing, MacroDefinitionDoesNotCrossCompilationUnits) {
+TEST(CompilationUnitPreprocessing,
+     MacroDefinitionDoesNotCrossCompilationUnits) {
   SourceManager mgr_a;
   DiagEngine diag_a(mgr_a);
   auto fid_a =
@@ -313,15 +314,14 @@ TEST(CompilationUnitPreprocessing, MacroDefinitionDoesNotCrossCompilationUnits) 
 
   SourceManager mgr_b;
   DiagEngine diag_b(mgr_b);
-  auto fid_b =
-      mgr_b.AddFile("<unit_b>",
-                    "module b;\n"
-                    "  localparam int W = `WIDTH;\n"
-                    "endmodule\n");
+  auto fid_b = mgr_b.AddFile("<unit_b>",
+                             "module b;\n"
+                             "  localparam int W = `WIDTH;\n"
+                             "endmodule\n");
   Preprocessor preproc_b(mgr_b, diag_b, {});
   auto pp_b = preproc_b.Preprocess(fid_b);
   EXPECT_TRUE(diag_b.HasErrors());
   EXPECT_EQ(pp_b.find("8"), std::string::npos);
 }
 
-}
+}  // namespace

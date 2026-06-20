@@ -131,8 +131,8 @@ TEST(SysTask, FscanfReadsFormatted) {
 // and returns the fd for the given type string.
 static uint64_t OpenWith(SysTaskFixture& f, const std::string& tmp,
                          const char* type) {
-  auto* open_expr = MkSysCall(f.arena, "$fopen",
-                              {MkStr(f.arena, tmp), MkStr(f.arena, type)});
+  auto* open_expr =
+      MkSysCall(f.arena, "$fopen", {MkStr(f.arena, tmp), MkStr(f.arena, type)});
   return EvalExpr(open_expr, f.ctx, f.arena).ToUint64();
 }
 
@@ -189,9 +189,9 @@ TEST(SysTask, FscanfOnWriteOnlyFdReturnsZero) {
 
   auto* var = f.ctx.CreateVariable("wv", 32);
   var->value = MakeLogic4VecVal(f.arena, 32, 0);
-  auto* expr = MkSysCall(f.arena, "$fscanf",
-                         {MkInt(f.arena, fd), MkStr(f.arena, "%d"),
-                          MkId(f.arena, "wv")});
+  auto* expr = MkSysCall(
+      f.arena, "$fscanf",
+      {MkInt(f.arena, fd), MkStr(f.arena, "%d"), MkId(f.arena, "wv")});
   EXPECT_EQ(EvalExpr(expr, f.ctx, f.arena).ToUint64(), 0u);
 
   EvalExpr(MkSysCall(f.arena, "$fclose", {MkInt(f.arena, fd)}), f.ctx, f.arena);
@@ -206,8 +206,8 @@ TEST(SysTask, FreadOnWriteOnlyFdReturnsZero) {
 
   auto* var = f.ctx.CreateVariable("wr", 32);
   var->value = MakeLogic4VecVal(f.arena, 32, 0);
-  auto* expr = MkSysCall(f.arena, "$fread",
-                         {MkId(f.arena, "wr"), MkInt(f.arena, fd)});
+  auto* expr =
+      MkSysCall(f.arena, "$fread", {MkId(f.arena, "wr"), MkInt(f.arena, fd)});
   EXPECT_EQ(EvalExpr(expr, f.ctx, f.arena).ToUint64(), 0u);
 
   EvalExpr(MkSysCall(f.arena, "$fclose", {MkInt(f.arena, fd)}), f.ctx, f.arena);
@@ -254,8 +254,8 @@ TEST(SysTask, ReadRejectedOnStandardOutputDescriptor) {
   // STDOUT is pre-opened for append, not reading; a read on its reserved
   // descriptor must report end-of-file rather than touch the stream.
   SysTaskFixture f;
-  auto* expr = MkSysCall(f.arena, "$fgetc",
-                         {MkInt(f.arena, SimContext::kStdoutFd)});
+  auto* expr =
+      MkSysCall(f.arena, "$fgetc", {MkInt(f.arena, SimContext::kStdoutFd)});
   EXPECT_EQ(EvalExpr(expr, f.ctx, f.arena).ToUint64(), 0xFFFFFFFFu);
 }
 
@@ -286,4 +286,4 @@ TEST(SysTask, FreadReadsBinary) {
   std::remove(tmp.c_str());
 }
 
-}
+}  // namespace

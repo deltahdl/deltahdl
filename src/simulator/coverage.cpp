@@ -343,7 +343,8 @@ double CoverageDB::GetCrossCoverage(const CrossCover* cross) {
 }
 
 double CoverageDB::GetCrossCoverage(const CrossCover* cross,
-                                    int32_t& covered_bins, int32_t& total_bins) {
+                                    int32_t& covered_bins,
+                                    int32_t& total_bins) {
   covered_bins = 0;
   total_bins = 0;
   // When the cross coverage denominator is zero, both reported counts are zero
@@ -472,9 +473,9 @@ double CoverageDB::GetPointCoverage(const CoverPoint* cp, int32_t& covered_bins,
 
 uint32_t CoverageDB::CumulativeAtLeast(
     const std::vector<uint32_t>& at_least_values) {
-  // For cumulative coverage a bin is not considered covered unless its hit count
-  // reaches the maximum of the at_least values of all instances; the maximum is
-  // the more conservative choice (LRM 19.11.1).
+  // For cumulative coverage a bin is not considered covered unless its hit
+  // count reaches the maximum of the at_least values of all instances; the
+  // maximum is the more conservative choice (LRM 19.11.1).
   uint32_t result = 1;
   for (uint32_t v : at_least_values) {
     result = std::max(result, v);
@@ -494,8 +495,8 @@ uint64_t CoverageDB::CrossAutoBinCount(
   for (uint64_t b_j : per_point_bin_counts) {
     total_products *= b_j;
   }
-  // B_b is the subset of cross products comprised by user-defined cross bins, so
-  // it never exceeds the total; guard against an ill-formed argument anyway.
+  // B_b is the subset of cross products comprised by user-defined cross bins,
+  // so it never exceeds the total; guard against an ill-formed argument anyway.
   if (user_defined_cross_products > total_products) return 0;
   return total_products - user_defined_cross_products;
 }
@@ -562,8 +563,8 @@ static void MergeLoadedCoverPoint(CoverPoint* live, const CoverPoint& loaded) {
   }
 }
 
-// Accumulates one loaded cross onto a live cross of the same name, mirroring the
-// per-bin accumulation used for coverpoints (LRM 19.9).
+// Accumulates one loaded cross onto a live cross of the same name, mirroring
+// the per-bin accumulation used for coverpoints (LRM 19.9).
 static void MergeLoadedCross(CrossCover* live, const CrossCover& loaded) {
   for (const auto& lb : loaded.bins) {
     CrossBin* match = nullptr;
@@ -632,8 +633,8 @@ void CoverageDB::MergeCumulativeCoverage(
 
 // --- LRM 19.6: cross coverage -----------------------------------------------
 
-void CoverageDB::EnsureCrossCoverPoints(
-    CoverGroup* group, const std::vector<std::string>& names) {
+void CoverageDB::EnsureCrossCoverPoints(CoverGroup* group,
+                                        const std::vector<std::string>& names) {
   for (const auto& name : names) {
     bool found = false;
     for (const auto& cp : group->coverpoints) {
@@ -745,7 +746,8 @@ std::vector<std::vector<int64_t>> CoverageDB::BinsofYield(const CoverPoint* cp,
   if (bin_index >= 0) {
     // binsof(cp.bin) yields the single named coverpoint bin.
     if (static_cast<size_t>(bin_index) < cp->bins.size()) {
-      yielded.push_back(BinsofBinValues(cp->bins[static_cast<size_t>(bin_index)]));
+      yielded.push_back(
+          BinsofBinValues(cp->bins[static_cast<size_t>(bin_index)]));
     }
     return yielded;
   }
@@ -838,8 +840,7 @@ std::vector<std::vector<size_t>> CoverageDB::RetainedAutoCrossProducts(
   std::vector<std::vector<size_t>> retained;
   if (!retain_auto_bins) return retained;
   for (const auto& product : EnumerateCrossProducts(per_point_bin_counts)) {
-    if (std::find(user_selected_products.begin(),
-                  user_selected_products.end(),
+    if (std::find(user_selected_products.begin(), user_selected_products.end(),
                   product) == user_selected_products.end()) {
       retained.push_back(product);
     }
@@ -1006,7 +1007,8 @@ static std::string FormatReal(double value) {
   return text;
 }
 
-std::vector<RealInterval> CoverageDB::RealRangeIntervals(double low, double high,
+std::vector<RealInterval> CoverageDB::RealRangeIntervals(double low,
+                                                         double high,
                                                          double interval,
                                                          bool uses_dollar) {
   std::vector<RealInterval> result;
@@ -1802,9 +1804,10 @@ void CoverageDB::ApplyDerivedCoverpointOverrides(
 
 void CoverageDB::ApplyDerivedCrossOverrides(
     CoverGroup* base, const std::vector<std::string>& derived_cross_names) {
-  // LRM 19.4.1: a base cross stops contributing only when the derived covergroup
-  // defines a cross with the same name. A base cross whose coverpoint was
-  // overridden still contributes as long as no derived cross shares its name.
+  // LRM 19.4.1: a base cross stops contributing only when the derived
+  // covergroup defines a cross with the same name. A base cross whose
+  // coverpoint was overridden still contributes as long as no derived cross
+  // shares its name.
   for (CrossCover& cross : base->crosses) {
     if (std::find(derived_cross_names.begin(), derived_cross_names.end(),
                   cross.name) != derived_cross_names.end()) {
@@ -1821,4 +1824,4 @@ bool CoverageDB::CovergroupTypesAggregate(std::string_view type_a,
   return type_a == type_b;
 }
 
-}
+}  // namespace delta

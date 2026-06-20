@@ -302,4 +302,4 @@ TEST(DataHidingParsing, PureVirtualLocalMethodPrototype) {
   EXPECT_TRUE(m->is_local);
 }
 
-}
+}  // namespace

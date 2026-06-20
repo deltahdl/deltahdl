@@ -39,25 +39,25 @@ TEST(DeclarationAssignmentElaboration, ParamAssignmentResolvesConstant) {
 }
 
 TEST(DeclarationAssignmentElaboration, ParamAssignmentNoDefaultInPort) {
-  EXPECT_TRUE(ElabOk(
-      "module child #(parameter int P = 1)(); endmodule\n"
-      "module m; child #(.P(10)) c(); endmodule\n"));
+  EXPECT_TRUE(
+      ElabOk("module child #(parameter int P = 1)(); endmodule\n"
+             "module m; child #(.P(10)) c(); endmodule\n"));
 }
 
 TEST(DeclarationAssignmentElaboration, TypeAssignmentRegistersType) {
-  EXPECT_TRUE(ElabOk(
-      "module m;\n"
-      "  parameter type T = int;\n"
-      "  T x = 5;\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  parameter type T = int;\n"
+             "  T x = 5;\n"
+             "endmodule\n"));
 }
 
 TEST(DeclarationAssignmentElaboration, TypeAssignmentNoDefaultInPort) {
-  EXPECT_TRUE(ElabOk(
-      "module child #(parameter type T = int)();\n"
-      "  T x = 0;\n"
-      "endmodule\n"
-      "module m; child c(); endmodule\n"));
+  EXPECT_TRUE(
+      ElabOk("module child #(parameter type T = int)();\n"
+             "  T x = 0;\n"
+             "endmodule\n"
+             "module m; child c(); endmodule\n"));
 }
 
 TEST(DeclarationAssignmentElaboration, VarDeclAssignmentPreservesInit) {
@@ -101,19 +101,19 @@ TEST(DeclarationAssignmentElaboration, VarDeclAssignmentWithUnpackedDims) {
 }
 
 TEST(DeclarationAssignmentElaboration, VarDeclAssignmentDynamicArray) {
-  EXPECT_TRUE(ElabOk(
-      "module m;\n"
-      "  int d[];\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  int d[];\n"
+             "endmodule\n"));
 }
 
 TEST(DeclarationAssignmentElaboration, VarDeclAssignmentClassVariable) {
-  EXPECT_TRUE(ElabOk(
-      "class C;\n"
-      "endclass\n"
-      "module m;\n"
-      "  C c;\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ElabOk("class C;\n"
+             "endclass\n"
+             "module m;\n"
+             "  C c;\n"
+             "endmodule\n"));
 }
 
 TEST(DeclarationAssignmentElaboration, DefparamAssignmentOverridesChildParam) {
@@ -180,4 +180,4 @@ TEST(DeclarationAssignmentElaboration, DefparamAssignmentDeepHierarchy) {
   EXPECT_TRUE(found);
 }
 
-}
+}  // namespace

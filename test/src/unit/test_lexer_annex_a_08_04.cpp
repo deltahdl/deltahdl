@@ -54,4 +54,4 @@ TEST(PrimaryLexing, TimeUnitFemtoseconds) {
   EXPECT_EQ(tokens[0].kind, TokenKind::kTimeLiteral);
 }
 
-}
+}  // namespace

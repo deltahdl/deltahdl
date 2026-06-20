@@ -95,4 +95,4 @@ TEST(TimingCheckArgumentElaboration, DelayedRefDataSimpleElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

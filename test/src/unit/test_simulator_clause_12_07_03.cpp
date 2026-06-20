@@ -467,4 +467,4 @@ TEST(LoopStatementSim, ForeachOverStringIteratesPerCharacter) {
   EXPECT_EQ(var->value.ToUint64(), 3u);
 }
 
-}
+}  // namespace

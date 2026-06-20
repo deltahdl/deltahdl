@@ -30,4 +30,4 @@ TEST(ParallelBlockLexing, JoinNoneKeyword) {
   EXPECT_EQ(r.token.text, "join_none");
 }
 
-}
+}  // namespace

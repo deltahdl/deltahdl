@@ -30,8 +30,8 @@ TEST(Elaborator, DelayModePath_OverridesDistributed) {
 }
 
 // Claim A edge case ("all modules that follow"): a single directive selects the
-// path delay mode for every module that comes after it, not just the first. Both
-// modules elaborated below should carry the path mode.
+// path delay mode for every module that comes after it, not just the first.
+// Both modules elaborated below should carry the path mode.
 TEST(Elaborator, DelayModePath_AppliesToAllFollowingModules) {
   ElabFixture f;
   auto* design = ElaborateWithPreprocessor(
@@ -48,4 +48,4 @@ TEST(Elaborator, DelayModePath_AppliesToAllFollowingModules) {
   EXPECT_EQ(design->top_modules[1]->delay_mode, DelayModeDirective::kPath);
 }
 
-}
+}  // namespace

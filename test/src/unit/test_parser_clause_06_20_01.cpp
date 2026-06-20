@@ -23,7 +23,7 @@ const ModuleItem* FindParamInGenerate(const ModuleItem* item) {
   return nullptr;
 }
 
-TEST(ParameterPortListParsing,ParamPortDataTypeForm) {
+TEST(ParameterPortListParsing, ParamPortDataTypeForm) {
   auto r = Parse("module m #(int WIDTH = 8); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -31,7 +31,7 @@ TEST(ParameterPortListParsing,ParamPortDataTypeForm) {
   EXPECT_EQ(r.cu->modules[0]->params[0].first, "WIDTH");
 }
 
-TEST(ParameterPortListParsing,ParamPortMixedForms) {
+TEST(ParameterPortListParsing, ParamPortMixedForms) {
   auto r = Parse(
       "module m #(parameter int A = 1, localparam int B = 2,\n"
       "           type T = logic, int C = 3);\n"
@@ -87,7 +87,7 @@ TEST(DeclarationAssignmentParsing, TypeAssignmentWithDefault) {
   EXPECT_EQ(item->name, "T");
 }
 
-TEST(ParameterPortListParsing,ParamPortLocalparam) {
+TEST(ParameterPortListParsing, ParamPortLocalparam) {
   auto r = Parse("module m #(localparam int X = 5); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -368,7 +368,8 @@ TEST(DeclarationListParsing, ListOfTypeAssignmentsMultiple) {
 // param_assignment ::= parameter_identifier { variable_dimension }
 //                      [ = constant_param_expression ]
 TEST(DeclarationAssignmentParsing, ParamAssignmentWithVariableDimension) {
-  auto r = Parse("module m; localparam int arr [0:2] = '{1, 2, 3}; endmodule\n");
+  auto r =
+      Parse("module m; localparam int arr [0:2] = '{1, 2, 3}; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto* item = r.cu->modules[0]->items[0];
@@ -379,8 +380,9 @@ TEST(DeclarationAssignmentParsing, ParamAssignmentWithVariableDimension) {
 
 // specparam_declaration ::= specparam [ packed_dimension ]
 //                           list_of_specparam_assignments ;
-// list_of_specparam_assignments ::= specparam_assignment { , specparam_assignment }
-// specparam_assignment ::= specparam_identifier = constant_mintypmax_expression
+// list_of_specparam_assignments ::= specparam_assignment { ,
+// specparam_assignment } specparam_assignment ::= specparam_identifier =
+// constant_mintypmax_expression
 TEST(DeclarationListParsing, SpecparamDeclarationWithPackedDimAndList) {
   auto r = Parse("module m; specparam [3:0] d1 = 5, d2 = 10; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -433,4 +435,4 @@ TEST(ParameterPortListParsing, LocalparamTypePortWithDefaultParses) {
   EXPECT_EQ(mod->localparam_port_names.count("T"), 1u);
 }
 
-}
+}  // namespace

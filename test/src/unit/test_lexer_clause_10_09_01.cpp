@@ -88,4 +88,4 @@ TEST(ArrayLiteralLexing, TypeKeyInArrayPatternTokens) {
   EXPECT_EQ(tokens[8].kind, TokenKind::kRBrace);
 }
 
-}
+}  // namespace

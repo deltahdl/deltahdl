@@ -80,4 +80,4 @@ TEST(ConditionalEventIffPreprocessor, IffWithOrSurvives) {
   EXPECT_NE(result.find("or"), std::string::npos);
 }
 
-}
+}  // namespace

@@ -26,7 +26,7 @@ uint32_t TaggedUnionTagBitOffset(const DataType& dtype);
 uint32_t EvalTypeWidth(const DataType& dtype, const TypedefMap& typedefs);
 
 uint32_t EvalTypeWidth(const DataType& dtype, const TypedefMap& typedefs,
-                        const ScopeMap& scope);
+                       const ScopeMap& scope);
 
 bool Is4stateType(DataTypeKind kind);
 
@@ -71,4 +71,4 @@ uint32_t InferExprWidth(const Expr* expr, const TypedefMap& typedefs);
 uint32_t ContextWidth(const Expr* expr, uint32_t ctx_width,
                       const TypedefMap& typedefs);
 
-}
+}  // namespace delta

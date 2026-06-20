@@ -34,9 +34,7 @@ TEST(ModuleParametersAndPorts, CorrectPortCount) {
 
 TEST(ModuleParametersAndPorts, EmptyPortListElaborates) {
   ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m(); endmodule\n",
-      f, "m");
+  auto* design = ElaborateSrc("module m(); endmodule\n", f, "m");
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
   EXPECT_TRUE(design->top_modules[0]->ports.empty());
@@ -94,12 +92,10 @@ TEST(ModuleHeaderDefinition, NonAnsiPortDeclarationsAreLocalToModule) {
 
 TEST(ModuleHeaderDefinition, ModuleWithAttributesElaborates) {
   ElabFixture f;
-  auto* design = ElaborateSrc(
-      "(* synthesis *) module m; endmodule\n",
-      f, "m");
+  auto* design = ElaborateSrc("(* synthesis *) module m; endmodule\n", f, "m");
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
   EXPECT_FALSE(design->top_modules[0]->attrs.empty());
 }
 
-}
+}  // namespace

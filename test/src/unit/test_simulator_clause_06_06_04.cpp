@@ -294,4 +294,4 @@ TEST(TriregResolution, DrivenStrengthFollowsSupplyDriver) {
   EXPECT_EQ(net.resolved_strength.s1_lo, Strength::kSupply);
 }
 
-}
+}  // namespace

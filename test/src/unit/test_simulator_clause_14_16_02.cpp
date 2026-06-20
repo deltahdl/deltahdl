@@ -35,7 +35,8 @@ TEST(SyncDriveSignals, LastDriveInSameReNBAWinsAtClockingEvent) {
 
   ClockingManager cmgr;
   SetupClockingBlock(
-      f, cmgr, {"pe", Edge::kPosedge, {0}, {0}, "nibble", ClockingDir::kOutput});
+      f, cmgr,
+      {"pe", Edge::kPosedge, {0}, {0}, "nibble", ClockingDir::kOutput});
 
   cmgr.RegisterEdgeCallback("pe", f.ctx, f.scheduler, [&]() {
     cmgr.ScheduleOutputDrive("pe", "nibble", 0x5, f.ctx, f.scheduler);
@@ -60,7 +61,8 @@ TEST(SyncDriveSignals, LastDriveInSameReNBAWinsBetweenClockingEvents) {
 
   ClockingManager cmgr;
   SetupClockingBlock(
-      f, cmgr, {"pe", Edge::kPosedge, {0}, {0}, "nibble", ClockingDir::kOutput});
+      f, cmgr,
+      {"pe", Edge::kPosedge, {0}, {0}, "nibble", ClockingDir::kOutput});
 
   auto* ev = f.scheduler.GetEventPool().Acquire();
   ev->callback = [&]() {
@@ -194,9 +196,7 @@ TEST(SyncDriveSignals, ProceduralValueHeldUntilSynchronousDrive) {
 
   // Procedural assignment to the underlying variable at time 5.
   auto* proc = f.scheduler.GetEventPool().Acquire();
-  proc->callback = [&]() {
-    v->value = MakeLogic4VecVal(f.arena, 8, 0x33);
-  };
+  proc->callback = [&]() { v->value = MakeLogic4VecVal(f.arena, 8, 0x33); };
   f.scheduler.ScheduleEvent(SimTime{5}, Region::kActive, proc);
 
   uint64_t held = 0;
@@ -230,8 +230,10 @@ TEST(SyncDriveSignals, MultipleClockingOutputsOnNetResolveByNetType) {
   // Two drivers stand for two clocking outputs; both carry the (strong1,
   // strong0) strength §14.16 assigns to a clockvar net driver. The third
   // driver represents "any other drivers on the net."
-  net.drivers.push_back(MakeLogic4VecVal(f.arena, 4, 0b0001));  // clocking out A
-  net.drivers.push_back(MakeLogic4VecVal(f.arena, 4, 0b0001));  // clocking out B
+  net.drivers.push_back(
+      MakeLogic4VecVal(f.arena, 4, 0b0001));  // clocking out A
+  net.drivers.push_back(
+      MakeLogic4VecVal(f.arena, 4, 0b0001));  // clocking out B
   net.drivers.push_back(MakeLogic4VecVal(f.arena, 4, 0b0000));  // other driver
   net.driver_strengths.push_back(ClockvarNetDriverStrength());
   net.driver_strengths.push_back(ClockvarNetDriverStrength());

@@ -178,4 +178,4 @@ TEST(LexicalConventionLexing, EndOfFileTerminatesEachTokenCategory) {
   EXPECT_EQ(str[1].kind, TokenKind::kEof);
 }
 
-}
+}  // namespace

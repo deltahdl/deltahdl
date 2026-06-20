@@ -183,4 +183,4 @@ TEST(Precedence, UnaryBindsTighterThanBinary) {
   EXPECT_EQ(rhs->lhs->op, TokenKind::kTilde);
 }
 
-}
+}  // namespace

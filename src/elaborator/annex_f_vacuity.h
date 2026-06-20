@@ -7,13 +7,13 @@ namespace delta {
 
 // §F.5.3.3 defines non-vacuity, the relation w |=^non P, between a word w over
 // Sigma and a property P. An evaluation of P on w is nonvacuous exactly when
-// w |=^non P holds. The relation is given inductively over the property forms of
-// the §F.3.2 grammar (assuming, as in §F.5.3, that no local variables are
+// w |=^non P holds. The relation is given inductively over the property forms
+// of the §F.3.2 grammar (assuming, as in §F.5.3, that no local variables are
 // involved). It is layered on §F.5.3.1's neutral satisfaction w |= P (a
 // satisfied dependency) -- used for the sequence trigger of an implication, the
-// "P1 and not P2" guard of an until, and the abort/disable completions -- and on
-// the §F.5 word operations (suffix w^{i.}, letterwise complement w-bar, finite
-// prefixes, and the T^omega / _|_^omega tails).
+// "P1 and not P2" guard of an until, and the abort/disable completions -- and
+// on the §F.5 word operations (suffix w^{i.}, letterwise complement w-bar,
+// finite prefixes, and the T^omega / _|_^omega tails).
 //
 // §F.5.3.3 also lists |=^non rules for the derived property operators (iff,
 // implies, s_until, always, always[m:n], s_always[m:n], s_eventually,
@@ -25,8 +25,8 @@ namespace delta {
 // which is precisely the set §F.5.3.3 gives an explicit |=^non rule for among
 // them: the two base cases strong(R)/weak(R) and the inductive cases for ( P ),
 // R |-> P, and/or, not, nexttime, until, and accept_on. The top-level disable
-// iff (b) P rule is provided over §F.5.3.1's TopLevelProperty, where disable iff
-// is modeled.
+// iff (b) P rule is provided over §F.5.3.1's TopLevelProperty, where disable
+// iff is modeled.
 
 // §F.5.3.3: non-vacuity w |=^non P of a property P by a word w. strong(R) and
 // weak(R) are nonvacuous on every word; the remaining forms recurse per the

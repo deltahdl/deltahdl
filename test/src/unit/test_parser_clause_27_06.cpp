@@ -49,4 +49,4 @@ TEST(GenerateBlockNaming, UnnamedBlockHasNoParserLabel) {
   EXPECT_TRUE(mod->items[0]->name.empty());
 }
 
-}
+}  // namespace

@@ -51,4 +51,4 @@ TEST(EscapedIdentifierElaboration, EscapedDeclResolvesSimpleRef) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

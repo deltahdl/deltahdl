@@ -56,4 +56,4 @@ TEST(StructLiteralLexing, TypePrefixedTokens) {
   EXPECT_EQ(tokens[2].kind, TokenKind::kKwInt);
 }
 
-}
+}  // namespace

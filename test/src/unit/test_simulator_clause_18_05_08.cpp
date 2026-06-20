@@ -107,7 +107,8 @@ TEST(GlobalConstraint, InactiveMemberIsStateConstantInGlobalConstraint) {
 // variable to it can become unsatisfiable. Here v is held at 0 while left_v can
 // only take values in [5, 10], so left_v <= v has no solution and randomization
 // fails — confirming the held value is a binding constant, not an ignored term.
-TEST(GlobalConstraint, InactiveStateConstantCanMakeGlobalConstraintUnsatisfiable) {
+TEST(GlobalConstraint,
+     InactiveStateConstantCanMakeGlobalConstraintUnsatisfiable) {
   ConstraintSolver solver(42);
 
   RandVariable v;
@@ -141,4 +142,4 @@ TEST(GlobalConstraint, InactiveStateConstantCanMakeGlobalConstraintUnsatisfiable
   EXPECT_FALSE(solver.Solve());
 }
 
-}
+}  // namespace

@@ -15,4 +15,4 @@ TEST(ModuleDefinitions, MacromoduleElaborates) {
   EXPECT_TRUE(ElabOk("macromodule m; endmodule\n"));
 }
 
-}
+}  // namespace

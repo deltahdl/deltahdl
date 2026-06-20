@@ -22,7 +22,8 @@ bool ConcurrentAssertionSubexprTypeIsExempt();
 
 // §16.6: a procedural concurrent assertion may reference automatic variables
 // (per §16.14.6.1); any non-procedural concurrent assertion may not.
-bool AutomaticVariableReferenceAllowed(bool inside_procedural_concurrent_assertion);
+bool AutomaticVariableReferenceAllowed(
+    bool inside_procedural_concurrent_assertion);
 
 // §16.6: expressions shall not reference non-static class properties or
 // methods.
@@ -53,8 +54,7 @@ bool FunctionArgKindAllowedInAssertionExpr(FunctionArgKind kind);
 // §16.6: a function used in a concurrent-assertion expression must be
 // automatic (or stateless: "preserve no state information") and have no side
 // effects.
-bool FunctionEligibleInAssertionExpr(bool is_automatic,
-                                     bool preserves_no_state,
+bool FunctionEligibleInAssertionExpr(bool is_automatic, bool preserves_no_state,
                                      bool has_no_side_effects);
 
 // §16.6: a disable-condition expression may reference the sequence method

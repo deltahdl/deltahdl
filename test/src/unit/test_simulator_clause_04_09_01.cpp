@@ -97,8 +97,7 @@ TEST(ContinuousAssignSchedulingSim, EvaluatedAtTimeZeroForConstantPropagation) {
   EXPECT_EQ(f.scheduler.CurrentTime().ticks, 0u);
 }
 
-TEST(ContinuousAssignSchedulingSim,
-     ConstantExpressionEvaluatedAtTimeZero) {
+TEST(ContinuousAssignSchedulingSim, ConstantExpressionEvaluatedAtTimeZero) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

@@ -25,12 +25,11 @@ TEST(ConfigDesignStatement, DesignCellSharingNameWithConfigIsAccepted) {
   delta::SourceManager mgr;
   delta::Arena arena;
   delta::DiagEngine diag(mgr);
-  auto fid = mgr.AddFile(
-      "<test>",
-      "module shared; endmodule\n"
-      "config shared;\n"
-      "  design shared;\n"
-      "endconfig\n");
+  auto fid = mgr.AddFile("<test>",
+                         "module shared; endmodule\n"
+                         "config shared;\n"
+                         "  design shared;\n"
+                         "endconfig\n");
   delta::Lexer lexer(mgr.FileContent(fid), fid, diag);
   delta::Parser parser(lexer, arena, diag);
   auto* cu = parser.Parse();
@@ -49,12 +48,11 @@ TEST(ConfigDesignStatement, OmittedLibraryDefaultsToConfigLibrary) {
   delta::SourceManager mgr;
   delta::Arena arena;
   delta::DiagEngine diag(mgr);
-  auto fid = mgr.AddFile(
-      "<test>",
-      "module top; endmodule\n"
-      "config c;\n"
-      "  design top;\n"
-      "endconfig\n");
+  auto fid = mgr.AddFile("<test>",
+                         "module top; endmodule\n"
+                         "config c;\n"
+                         "  design top;\n"
+                         "endconfig\n");
   delta::Lexer lexer(mgr.FileContent(fid), fid, diag);
   delta::Parser parser(lexer, arena, diag);
   auto* cu = parser.Parse();
@@ -80,12 +78,11 @@ TEST(ConfigDesignStatement, ExplicitLibraryIsNotOverridden) {
   delta::SourceManager mgr;
   delta::Arena arena;
   delta::DiagEngine diag(mgr);
-  auto fid = mgr.AddFile(
-      "<test>",
-      "module top; endmodule\n"
-      "config c;\n"
-      "  design work.top;\n"
-      "endconfig\n");
+  auto fid = mgr.AddFile("<test>",
+                         "module top; endmodule\n"
+                         "config c;\n"
+                         "  design work.top;\n"
+                         "endconfig\n");
   delta::Lexer lexer(mgr.FileContent(fid), fid, diag);
   delta::Parser parser(lexer, arena, diag);
   auto* cu = parser.Parse();
@@ -104,4 +101,4 @@ TEST(ConfigDesignStatement, ExplicitLibraryIsNotOverridden) {
   EXPECT_EQ(cu->configs[0]->design_cells[0].second, "top");
 }
 
-}
+}  // namespace

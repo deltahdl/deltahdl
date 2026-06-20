@@ -116,4 +116,4 @@ TEST(LibraryMapCellTagging, IndependentTaggingPerCompilationUnit) {
   EXPECT_EQ(mod_gates.library, "gates");
 }
 
-}
+}  // namespace

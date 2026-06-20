@@ -27,4 +27,4 @@ TEST(UserDefinedTypeAssocArrayParsing, TypedefIndexParsed) {
   EXPECT_EQ(var_item->unpacked_dims[0]->text, "nibble_t");
 }
 
-}
+}  // namespace

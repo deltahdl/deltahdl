@@ -277,4 +277,4 @@ TEST(AssertionStatementSim, ObservedDeferredAssumeActionDeferred) {
   EXPECT_EQ(var->value.ToUint64(), 88u);
 }
 
-}
+}  // namespace

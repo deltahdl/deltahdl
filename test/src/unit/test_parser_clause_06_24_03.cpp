@@ -79,14 +79,14 @@ TEST(BitStreamCastParsing, BitstreamCastStringType) {
 }
 
 TEST(BitStreamCastParsing, UnpackedArrayToIntCast) {
-  EXPECT_TRUE(ParseOk(
-      "module t;\n"
-      "  byte arr [4];\n"
-      "  int result;\n"
-      "  initial begin\n"
-      "    result = int'(arr);\n"
-      "  end\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  byte arr [4];\n"
+              "  int result;\n"
+              "  initial begin\n"
+              "    result = int'(arr);\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
-}
+}  // namespace

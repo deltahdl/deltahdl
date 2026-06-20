@@ -62,4 +62,4 @@ TEST(AssocArrayElaboration, WholeAssocEqualityComparisonAccepted) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

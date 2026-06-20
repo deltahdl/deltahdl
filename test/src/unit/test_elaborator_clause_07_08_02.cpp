@@ -26,8 +26,7 @@ TEST(StringIndexAssocArrayElaboration, NotWildcardIndex) {
 
 TEST(StringIndexAssocArrayElaboration, VectorElementType) {
   ElabFixture f;
-  auto* design =
-      Elaborate("module m; bit [7:0] aa [string]; endmodule\n", f);
+  auto* design = Elaborate("module m; bit [7:0] aa [string]; endmodule\n", f);
   ASSERT_NE(design, nullptr);
   auto& v = design->top_modules[0]->variables[0];
   EXPECT_TRUE(v.is_assoc);
@@ -99,4 +98,4 @@ TEST(StringIndexAssocArrayElaboration, EmptyStringLiteralIndexNoError) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-}
+}  // namespace

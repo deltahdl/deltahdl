@@ -45,4 +45,4 @@ TEST(HierarchicalNamePreprocessing, RootPrefixSurvivesPreprocessing) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-}
+}  // namespace

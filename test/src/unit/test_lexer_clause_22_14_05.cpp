@@ -42,4 +42,4 @@ TEST(Lexer, KeywordVersion_1364_2005_Includes1364_1995Keywords) {
   EXPECT_TRUE(LookupKeyword("reg", KeywordVersion::kVer13642005).has_value());
 }
 
-}
+}  // namespace

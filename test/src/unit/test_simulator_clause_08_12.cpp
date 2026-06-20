@@ -175,20 +175,21 @@ TEST(ClassAssignRenameSim, E2eHandleAssignmentAliasesObject) {
 }
 
 TEST(ClassAssignRenameSim, E2eShallowCopyCopiesProperties) {
-  EXPECT_EQ(RunAndGet(
-      "class C;\n"
-      "  int x;\n"
-      "endclass\n"
-      "module t;\n"
-      "  int result;\n"
-      "  initial begin\n"
-      "    C p1, p2;\n"
-      "    p1 = new;\n"
-      "    p1.x = 42;\n"
-      "    p2 = new p1;\n"
-      "    result = p2.x;\n"
-      "  end\n"
-      "endmodule\n", "result"), 42u);
+  EXPECT_EQ(RunAndGet("class C;\n"
+                      "  int x;\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    C p1, p2;\n"
+                      "    p1 = new;\n"
+                      "    p1.x = 42;\n"
+                      "    p2 = new p1;\n"
+                      "    result = p2.x;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            42u);
 }
 
 TEST(ClassAssignRenameSim, E2eShallowCopyCreatesIndependentObject) {
@@ -343,4 +344,4 @@ TEST(ClassAssignRenameSim, E2eShallowCopyMultipleProperties) {
   LowerRunAndCheck(f, design, {{"ra", 1u}, {"rb", 2u}, {"rc", 3u}});
 }
 
-}
+}  // namespace

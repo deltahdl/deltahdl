@@ -64,4 +64,4 @@ TEST(ChargeDecaySpecElaboration, TwoDelaysDoNotPopulateDecayTicks) {
   EXPECT_TRUE(found);
 }
 
-}
+}  // namespace

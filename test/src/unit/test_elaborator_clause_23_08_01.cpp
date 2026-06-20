@@ -184,4 +184,4 @@ TEST(TaskAndFunctionNameResolutionElaboration,
   EXPECT_TRUE(CuListHas(design, "f"));
 }
 
-}
+}  // namespace

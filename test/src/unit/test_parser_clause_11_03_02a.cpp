@@ -306,4 +306,4 @@ TEST(Precedence, AllPrecedenceLevelsInOneExpression) {
   EXPECT_EQ(rhs->op, TokenKind::kPipePipe);
 }
 
-}
+}  // namespace

@@ -50,7 +50,8 @@ TEST(DefparamEarlyNameResolution, RenamedGenerateBlockRemovesAmbiguity) {
 // merely matches the leading path component, with no like-named outer scope, is
 // an ordinary unresolved target -- not an early/late divergence -- so it must
 // not raise the §23.10.4.2 error.
-TEST(DefparamEarlyNameResolution, BlockNameWithoutMatchingTopScopeIsNotAmbiguous) {
+TEST(DefparamEarlyNameResolution,
+     BlockNameWithoutMatchingTopScopeIsNotAmbiguous) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module top;\n"
@@ -71,4 +72,4 @@ TEST(DefparamEarlyNameResolution, BlockNameWithoutMatchingTopScopeIsNotAmbiguous
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

@@ -10,8 +10,9 @@ using namespace delta;
 
 namespace {
 
-// §16.13.6: the operand of a sequence method shall be a named sequence instance,
-// an untyped formal argument, or a formal argument of type `sequence`.
+// §16.13.6: the operand of a sequence method shall be a named sequence
+// instance, an untyped formal argument, or a formal argument of type
+// `sequence`.
 TEST(SequenceMethods, OperandMustBeNamedInstanceOrSequenceFormal) {
   EXPECT_TRUE(IsSequenceMethodOperandLegal(
       SequenceMethodOperandKind::kNamedSequenceInstance));
@@ -19,8 +20,7 @@ TEST(SequenceMethods, OperandMustBeNamedInstanceOrSequenceFormal) {
       SequenceMethodOperandKind::kUntypedFormalArgument));
   EXPECT_TRUE(IsSequenceMethodOperandLegal(
       SequenceMethodOperandKind::kSequenceTypedFormalArgument));
-  EXPECT_FALSE(
-      IsSequenceMethodOperandLegal(SequenceMethodOperandKind::kOther));
+  EXPECT_FALSE(IsSequenceMethodOperandLegal(SequenceMethodOperandKind::kOther));
 }
 
 // §16.13.6: the result of a sequence method is a single-bit true/false value
@@ -122,8 +122,8 @@ TEST(SequenceMethods, EmptyMatchDoesNotActivateMethods) {
   EXPECT_FALSE(EmptyMatchActivatesSequenceMethod());
 }
 
-// §16.13.6: there shall be no circular dependencies between sequences induced by
-// the use of triggered.
+// §16.13.6: there shall be no circular dependencies between sequences induced
+// by the use of triggered.
 TEST(SequenceMethods, TriggeredDependenciesMustBeAcyclic) {
   // a -> b -> c is a legal chain.
   const std::vector<std::pair<int, int>> chain = {{0, 1}, {1, 2}};
@@ -138,7 +138,8 @@ TEST(SequenceMethods, TriggeredDependenciesMustBeAcyclic) {
 
 // §16.13.6 (edge cases): the circularity check follows dependency chains of any
 // length, and a sequence reachable through more than one path is not a cycle.
-TEST(SequenceMethods, TriggeredDependencyCycleDetectionHandlesChainsAndDiamonds) {
+TEST(SequenceMethods,
+     TriggeredDependencyCycleDetectionHandlesChainsAndDiamonds) {
   // A longer cycle a -> b -> c -> a is still illegal.
   const std::vector<std::pair<int, int>> long_cycle = {{0, 1}, {1, 2}, {2, 0}};
   EXPECT_FALSE(TriggeredSequenceDependenciesAreAcyclic(3, long_cycle));

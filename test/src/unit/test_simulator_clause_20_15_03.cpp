@@ -29,17 +29,17 @@ uint64_t RunQueueCall(SimFixture& f, std::string_view name,
 uint64_t Initialize(SimFixture& f, uint64_t q_id, int64_t q_type,
                     int64_t max_length) {
   MakeVar(f, "st", 32, 0xDEAD);
-  return RunQueueCall(f, "$q_initialize",
-                      {MkInt(f.arena, q_id),
-                       MkInt(f.arena, static_cast<uint64_t>(q_type)),
-                       MkInt(f.arena, static_cast<uint64_t>(max_length)),
-                       MkId(f.arena, "st")},
-                      "st");
+  return RunQueueCall(
+      f, "$q_initialize",
+      {MkInt(f.arena, q_id), MkInt(f.arena, static_cast<uint64_t>(q_type)),
+       MkInt(f.arena, static_cast<uint64_t>(max_length)), MkId(f.arena, "st")},
+      "st");
 }
 
 // $q_add(q_id, job_id, inform_id, status): place an entry carrying the given
 // identifiers onto queue q_id, returning the reported status.
-uint64_t Add(SimFixture& f, uint64_t q_id, uint64_t job_id, uint64_t inform_id) {
+uint64_t Add(SimFixture& f, uint64_t q_id, uint64_t job_id,
+             uint64_t inform_id) {
   MakeVar(f, "st", 32, 0xDEAD);
   return RunQueueCall(f, "$q_add",
                       {MkInt(f.arena, q_id), MkInt(f.arena, job_id),
@@ -137,8 +137,8 @@ TEST(QRemove, RemoveFromUndefinedQueueReportsError) {
   EXPECT_NE(Remove(f, 99, "job", "inf"), 0u);
 }
 
-// §20.15.3: a successful $q_remove actually takes the entry off the queue. After
-// the single stored entry is removed, the queue is empty, so an immediate
+// §20.15.3: a successful $q_remove actually takes the entry off the queue.
+// After the single stored entry is removed, the queue is empty, so an immediate
 // second remove can no longer return an entry and reports an error — confirming
 // the first remove consumed the entry rather than leaving it behind.
 TEST(QRemove, SuccessfulRemoveConsumesTheEntry) {

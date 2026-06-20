@@ -34,4 +34,4 @@ TEST(ClockingModportParsing, AttrOnClockingPort) {
               "endinterface\n"));
 }
 
-}
+}  // namespace

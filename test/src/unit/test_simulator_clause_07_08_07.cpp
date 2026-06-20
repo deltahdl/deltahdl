@@ -292,4 +292,4 @@ TEST(AssocArrayAllocation, RefArgToNonexistentStringKeyAllocates) {
   EXPECT_EQ(v, 8u);
 }
 
-}
+}  // namespace

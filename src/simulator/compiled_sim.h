@@ -29,7 +29,6 @@ class CompiledProcess {
 
 class ProcessCompiler {
  public:
-
   static bool IsCompilable(const Stmt* body);
 
   static CompiledProcess Compile(uint32_t id, const Stmt* body);
@@ -39,4 +38,4 @@ class ProcessCompiler {
   static bool HasTimingControlInBlock(const std::vector<Stmt*>& stmts);
 };
 
-}
+}  // namespace delta

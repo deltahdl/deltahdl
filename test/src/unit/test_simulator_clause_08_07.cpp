@@ -42,7 +42,8 @@ TEST(ClassConstructorSim, ConstructorBodyExecutesStatements) {
   ctor->kind = ModuleItemKind::kFunctionDecl;
   ctor->name = "new";
   ctor->return_type.kind = DataTypeKind::kVoid;
-  ctor->func_args = {{Direction::kInput, false, false, false, {}, "v", nullptr, {}}};
+  ctor->func_args = {
+      {Direction::kInput, false, false, false, {}, "v", nullptr, {}}};
   ctor->func_body_stmts.push_back(
       MakeAssign(f.arena, "val", MkId(f.arena, "v")));
   type->methods["new"] = ctor;
@@ -67,133 +68,140 @@ TEST(ClassConstructorSim, ConstructorBodyExecutesStatements) {
 }
 
 TEST(ClassConstructorSim, ConstructorAssignsProperty) {
-  EXPECT_EQ(RunAndGet(
-      "class Packet;\n"
-      "  integer command;\n"
-      "  function new();\n"
-      "    command = 42;\n"
-      "  endfunction\n"
-      "endclass\n"
-      "module t;\n"
-      "  int result;\n"
-      "  initial begin\n"
-      "    Packet p;\n"
-      "    p = new;\n"
-      "    result = p.command;\n"
-      "  end\n"
-      "endmodule\n", "result"), 42u);
+  EXPECT_EQ(RunAndGet("class Packet;\n"
+                      "  integer command;\n"
+                      "  function new();\n"
+                      "    command = 42;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    Packet p;\n"
+                      "    p = new;\n"
+                      "    result = p.command;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            42u);
 }
 
 TEST(ClassConstructorSim, ConstructorWithArguments) {
-  EXPECT_EQ(RunAndGet(
-      "class Packet;\n"
-      "  int command;\n"
-      "  int address;\n"
-      "  function new(int cmd, int addr);\n"
-      "    command = cmd;\n"
-      "    address = addr;\n"
-      "  endfunction\n"
-      "endclass\n"
-      "module t;\n"
-      "  int result;\n"
-      "  initial begin\n"
-      "    Packet p;\n"
-      "    p = new(10, 20);\n"
-      "    result = p.command + p.address;\n"
-      "  end\n"
-      "endmodule\n", "result"), 30u);
+  EXPECT_EQ(RunAndGet("class Packet;\n"
+                      "  int command;\n"
+                      "  int address;\n"
+                      "  function new(int cmd, int addr);\n"
+                      "    command = cmd;\n"
+                      "    address = addr;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    Packet p;\n"
+                      "    p = new(10, 20);\n"
+                      "    result = p.command + p.address;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            30u);
 }
 
 TEST(ClassConstructorSim, ConstructorWithDefaultArgValues) {
-  EXPECT_EQ(RunAndGet(
-      "class Packet;\n"
-      "  int command;\n"
-      "  int address;\n"
-      "  function new(int cmd = 5, int addr = 15);\n"
-      "    command = cmd;\n"
-      "    address = addr;\n"
-      "  endfunction\n"
-      "endclass\n"
-      "module t;\n"
-      "  int result;\n"
-      "  initial begin\n"
-      "    Packet p;\n"
-      "    p = new;\n"
-      "    result = p.command + p.address;\n"
-      "  end\n"
-      "endmodule\n", "result"), 20u);
+  EXPECT_EQ(RunAndGet("class Packet;\n"
+                      "  int command;\n"
+                      "  int address;\n"
+                      "  function new(int cmd = 5, int addr = 15);\n"
+                      "    command = cmd;\n"
+                      "    address = addr;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    Packet p;\n"
+                      "    p = new;\n"
+                      "    result = p.command + p.address;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            20u);
 }
 
 TEST(ClassConstructorSim, ImplicitConstructorCreatesObject) {
-  EXPECT_EQ(RunAndGet(
-      "class C;\n"
-      "  int x;\n"
-      "endclass\n"
-      "module t;\n"
-      "  int result;\n"
-      "  initial begin\n"
-      "    C c;\n"
-      "    c = new;\n"
-      "    c.x = 99;\n"
-      "    result = c.x;\n"
-      "  end\n"
-      "endmodule\n", "result"), 99u);
+  EXPECT_EQ(RunAndGet("class C;\n"
+                      "  int x;\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    C c;\n"
+                      "    c = new;\n"
+                      "    c.x = 99;\n"
+                      "    result = c.x;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            99u);
 }
 
 TEST(ClassConstructorSim, PropertyExplicitDefaultInitialized) {
-  EXPECT_EQ(RunAndGet(
-      "class C;\n"
-      "  int x = 7;\n"
-      "  function new();\n"
-      "  endfunction\n"
-      "endclass\n"
-      "module t;\n"
-      "  int result;\n"
-      "  initial begin\n"
-      "    C c;\n"
-      "    c = new;\n"
-      "    result = c.x;\n"
-      "  end\n"
-      "endmodule\n", "result"), 7u);
+  EXPECT_EQ(RunAndGet("class C;\n"
+                      "  int x = 7;\n"
+                      "  function new();\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    C c;\n"
+                      "    c = new;\n"
+                      "    result = c.x;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            7u);
 }
 
 TEST(ClassConstructorSim, PropertyDefaultOverriddenByConstructorBody) {
-  EXPECT_EQ(RunAndGet(
-      "class C;\n"
-      "  int c1 = 1;\n"
-      "  int c2 = 1;\n"
-      "  function new();\n"
-      "    c2 = 2;\n"
-      "  endfunction\n"
-      "endclass\n"
-      "module t;\n"
-      "  int r1, r2;\n"
-      "  initial begin\n"
-      "    C c;\n"
-      "    c = new;\n"
-      "    r1 = c.c1;\n"
-      "    r2 = c.c2;\n"
-      "  end\n"
-      "endmodule\n", "r1"), 1u);
+  EXPECT_EQ(RunAndGet("class C;\n"
+                      "  int c1 = 1;\n"
+                      "  int c2 = 1;\n"
+                      "  function new();\n"
+                      "    c2 = 2;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int r1, r2;\n"
+                      "  initial begin\n"
+                      "    C c;\n"
+                      "    c = new;\n"
+                      "    r1 = c.c1;\n"
+                      "    r2 = c.c2;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "r1"),
+            1u);
 }
 
 TEST(ClassConstructorSim, ConstructorBodyOverridesDefault) {
-  EXPECT_EQ(RunAndGet(
-      "class C;\n"
-      "  int c1 = 1;\n"
-      "  int c2 = 1;\n"
-      "  function new();\n"
-      "    c2 = 2;\n"
-      "  endfunction\n"
-      "endclass\n"
-      "module t;\n"
-      "  int result;\n"
-      "  initial begin\n"
-      "    C c;\n"
-      "    c = new;\n"
-      "    result = c.c2;\n"
-      "  end\n"
-      "endmodule\n", "result"), 2u);
+  EXPECT_EQ(RunAndGet("class C;\n"
+                      "  int c1 = 1;\n"
+                      "  int c2 = 1;\n"
+                      "  function new();\n"
+                      "    c2 = 2;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    C c;\n"
+                      "    c = new;\n"
+                      "    result = c.c2;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            2u);
 }
 
 TEST(ClassConstructorSim, MultiplePropertiesWithDefaults) {
@@ -221,24 +229,25 @@ TEST(ClassConstructorSim, MultiplePropertiesWithDefaults) {
 }
 
 TEST(ClassConstructorSim, ConstructorArgPassedToProperty) {
-  EXPECT_EQ(RunAndGet(
-      "class C;\n"
-      "  int c1 = 1;\n"
-      "  int c2 = 1;\n"
-      "  int c3 = 1;\n"
-      "  function new(int a);\n"
-      "    c2 = 2;\n"
-      "    c3 = a;\n"
-      "  endfunction\n"
-      "endclass\n"
-      "module t;\n"
-      "  int result;\n"
-      "  initial begin\n"
-      "    C c;\n"
-      "    c = new(99);\n"
-      "    result = c.c3;\n"
-      "  end\n"
-      "endmodule\n", "result"), 99u);
+  EXPECT_EQ(RunAndGet("class C;\n"
+                      "  int c1 = 1;\n"
+                      "  int c2 = 1;\n"
+                      "  int c3 = 1;\n"
+                      "  function new(int a);\n"
+                      "    c2 = 2;\n"
+                      "    c3 = a;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    C c;\n"
+                      "    c = new(99);\n"
+                      "    result = c.c3;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            99u);
 }
 
 TEST(ClassConstructorSim, ImplicitConstructorNoExplicitNew) {
@@ -286,4 +295,4 @@ TEST(ClassConstructorSim, TwoObjectsIndependentConstruction) {
   LowerRunAndCheck(f, design, {{"r1", 11u}, {"r2", 22u}});
 }
 
-}
+}  // namespace

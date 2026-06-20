@@ -123,8 +123,9 @@ SequenceOrMatches EvalSequenceOrMatches(
     const std::vector<uint32_t>& b_end_times) {
   SequenceOrMatches result;
   // The match set is the union of the two operands' matches: each operand match
-  // carries through unchanged, keeping its own end time. Matches are not merged,
-  // so both operands matching on the same tick yields two separate entries.
+  // carries through unchanged, keeping its own end time. Matches are not
+  // merged, so both operands matching on the same tick yields two separate
+  // entries.
   result.end_times = a_end_times;
   result.end_times.insert(result.end_times.end(), b_end_times.begin(),
                           b_end_times.end());
@@ -139,8 +140,8 @@ FirstMatchMatches EvalFirstMatch(
   if (operand_end_times.empty()) return result;
   // The earliest ending clock tick among the operand's matches selects the
   // first match; every match ending later is discarded.
-  uint32_t earliest = *std::min_element(operand_end_times.begin(),
-                                        operand_end_times.end());
+  uint32_t earliest =
+      *std::min_element(operand_end_times.begin(), operand_end_times.end());
   // Ties at the earliest ending tick are all retained: when several operand
   // matches end on that tick, each one is a match of first_match.
   for (uint32_t end_time : operand_end_times) {
@@ -307,19 +308,19 @@ PropertyResult EvalNexttime(bool strong, bool target_tick_reachable,
 }
 
 bool NexttimeTargetReachable(uint64_t index, uint64_t future_clock_ticks) {
-  // §16.12.10: counting starts at the current time step, so the index-`n` target
-  // is the tick reached after `n` further ticks. Index 0 targets the current
-  // step and is always reachable — the alignment-operator behavior — while the
-  // non-indexed next-tick case is index 1.
+  // §16.12.10: counting starts at the current time step, so the index-`n`
+  // target is the tick reached after `n` further ticks. Index 0 targets the
+  // current step and is always reachable — the alignment-operator behavior —
+  // while the non-indexed next-tick case is index 1.
   return future_clock_ticks >= index;
 }
 
 // §16.12.11: weak `always` and strong `s_always` differ only in how they treat
-// covered clock ticks that are missing. The weak form does not require the ticks
-// within its range to exist, so it depends solely on the inner property_expr
-// holding at every present tick. The strong form additionally requires every
-// covered tick to exist, failing when any is absent even if the inner verdict at
-// the present ticks was true.
+// covered clock ticks that are missing. The weak form does not require the
+// ticks within its range to exist, so it depends solely on the inner
+// property_expr holding at every present tick. The strong form additionally
+// requires every covered tick to exist, failing when any is absent even if the
+// inner verdict at the present ticks was true.
 PropertyResult EvalAlways(bool strong, bool all_covered_ticks_present,
                           bool inner_holds_at_present_ticks) {
   if (strong && !all_covered_ticks_present) {
@@ -329,9 +330,9 @@ PropertyResult EvalAlways(bool strong, bool all_covered_ticks_present,
                                       : PropertyResult::kFail;
 }
 
-// §16.12.11: a tick is covered when its index is at least the minimum bound and,
-// unless the maximum is unbounded, at most the maximum bound. Counting starts at
-// the current time step.
+// §16.12.11: a tick is covered when its index is at least the minimum bound
+// and, unless the maximum is unbounded, at most the maximum bound. Counting
+// starts at the current time step.
 bool AlwaysRangeCovers(int index, int range_min, int range_max) {
   if (index < range_min) {
     return false;
@@ -342,8 +343,8 @@ bool AlwaysRangeCovers(int index, int range_min, int range_max) {
   return index <= range_max;
 }
 
-// §16.12.11: with counting starting at the current time step, every covered tick
-// up to `range_max` exists when that many further ticks are available.
+// §16.12.11: with counting starting at the current time step, every covered
+// tick up to `range_max` exists when that many further ticks are available.
 bool AlwaysStrongTicksAllPresent(int range_max, int future_clock_ticks) {
   return range_max <= future_clock_ticks;
 }
@@ -380,10 +381,11 @@ PropertyResult EvalUntil(bool strong, bool rhs_holds_eventually,
   return lhs_holds_required ? PropertyResult::kPass : PropertyResult::kFail;
 }
 
-// §16.12.13: a strong eventually holds exactly when the inner property_expr holds
-// at some current or future clock tick within the range; with no such witness it
-// fails. A weak eventually also holds when the range's ticks do not all exist,
-// because the weak form does not require those later ticks to be present.
+// §16.12.13: a strong eventually holds exactly when the inner property_expr
+// holds at some current or future clock tick within the range; with no such
+// witness it fails. A weak eventually also holds when the range's ticks do not
+// all exist, because the weak form does not require those later ticks to be
+// present.
 PropertyResult EvalEventually(bool strong, bool inner_holds_within_range,
                               bool all_range_ticks_present) {
   if (inner_holds_within_range) {
@@ -392,7 +394,8 @@ PropertyResult EvalEventually(bool strong, bool inner_holds_within_range,
   if (strong) {
     return PropertyResult::kFail;
   }
-  return all_range_ticks_present ? PropertyResult::kFail : PropertyResult::kPass;
+  return all_range_ticks_present ? PropertyResult::kFail
+                                 : PropertyResult::kPass;
 }
 
 PropertyResult EvalAbortAccept(bool abort_condition, PropertyResult inner) {
@@ -403,11 +406,11 @@ PropertyResult EvalAbortAccept(bool abort_condition, PropertyResult inner) {
 }
 
 PropertyResult EvalAbortReject(bool abort_condition, PropertyResult inner) {
-  // §16.12.14: a true abort condition forces the reject forms to false and takes
-  // precedence over the underlying verdict. This is the dual of EvalAbortAccept:
-  // reject_on(c) p is not(accept_on(c) not p), so a true condition that accepts
-  // not(p) negates back to a fail, and a false condition leaves the underlying
-  // verdict unchanged.
+  // §16.12.14: a true abort condition forces the reject forms to false and
+  // takes precedence over the underlying verdict. This is the dual of
+  // EvalAbortAccept: reject_on(c) p is not(accept_on(c) not p), so a true
+  // condition that accepts not(p) negates back to a fail, and a false condition
+  // leaves the underlying verdict unchanged.
   if (abort_condition) return PropertyResult::kFail;
   return inner;
 }
@@ -415,10 +418,11 @@ PropertyResult EvalAbortReject(bool abort_condition, PropertyResult inner) {
 PropertyResult EvalNestedAbort(bool outer_forces_true, bool outer_condition,
                                bool inner_forces_true, bool inner_condition,
                                PropertyResult inner_property) {
-  // §16.12.14: apply the inner abort operator first, then the outer one. Because
-  // the outer operator forces its own outcome whenever its condition is true, it
-  // overrides whatever the inner operator decided — so when both conditions
-  // become true in the same time step the outermost operator takes precedence.
+  // §16.12.14: apply the inner abort operator first, then the outer one.
+  // Because the outer operator forces its own outcome whenever its condition is
+  // true, it overrides whatever the inner operator decided — so when both
+  // conditions become true in the same time step the outermost operator takes
+  // precedence.
   PropertyResult after_inner =
       inner_forces_true ? EvalAbortAccept(inner_condition, inner_property)
                         : EvalAbortReject(inner_condition, inner_property);
@@ -433,9 +437,10 @@ bool AbortConditionEvaluatedAtClockingEventOnly(bool synchronous_abort) {
 }
 
 PropertyResult EvalMulticlockedSequenceAsProperty(bool sequence_has_match) {
-  // §16.13.2: evaluated as a property at a point, a multiclocked sequence is true
-  // exactly when a match of the sequence begins at that point. The verdict is
-  // definite — there is no pending reading at the multiclocked-property level.
+  // §16.13.2: evaluated as a property at a point, a multiclocked sequence is
+  // true exactly when a match of the sequence begins at that point. The verdict
+  // is definite — there is no pending reading at the multiclocked-property
+  // level.
   return sequence_has_match ? PropertyResult::kPass : PropertyResult::kFail;
 }
 
@@ -452,8 +457,8 @@ PropertyResult EvalMulticlockedAnd(bool left_operand_has_match,
 uint64_t NearestClockTickAtOrAfter(uint64_t from,
                                    const std::vector<uint64_t>& clock_ticks,
                                    bool inclusive) {
-  // §16.13.2: ticks are in increasing time order; the first that qualifies is the
-  // nearest. The inclusive reading admits a tick coincident with `from`.
+  // §16.13.2: ticks are in increasing time order; the first that qualifies is
+  // the nearest. The inclusive reading admits a tick coincident with `from`.
   for (uint64_t tick : clock_ticks) {
     if (tick > from || (inclusive && tick == from)) return tick;
   }
@@ -477,8 +482,8 @@ bool MulticlockedImplicationChecksImmediately(
   // consequent clock actually ticks at the antecedent match end.
   if (!overlapping) return false;
   return MulticlockedConsequentEvalTick(antecedent_end_time,
-                                        consequent_clock_ticks, overlapping) ==
-         antecedent_end_time;
+                                        consequent_clock_ticks,
+                                        overlapping) == antecedent_end_time;
 }
 
 uint64_t MulticlockedIfBranchEvalTick(
@@ -491,17 +496,19 @@ uint64_t MulticlockedIfBranchEvalTick(
 }
 
 uint64_t SinglyClockedLocalInitTick(uint64_t attempt_begin) {
-  // §16.13.7: the evaluation attempt of a singly clocked instance always begins at
-  // a tick of the single governing clock, and the initialization assignment is
-  // performed at that beginning — so the init time is the attempt-begin time.
+  // §16.13.7: the evaluation attempt of a singly clocked instance always begins
+  // at a tick of the single governing clock, and the initialization assignment
+  // is performed at that beginning — so the init time is the attempt-begin
+  // time.
   return attempt_begin;
 }
 
 uint64_t MulticlockedLocalInitTick(
     uint64_t attempt_begin, const std::vector<uint64_t>& leading_clock_ticks) {
-  // §16.13.7: schedule the init assignment at the earliest semantic-leading-clock
-  // tick at or after the attempt begin. A tick coincident with the begin qualifies,
-  // reusing the §16.13.2 at-or-after (inclusive) reading.
+  // §16.13.7: schedule the init assignment at the earliest
+  // semantic-leading-clock tick at or after the attempt begin. A tick
+  // coincident with the begin qualifies, reusing the §16.13.2 at-or-after
+  // (inclusive) reading.
   return NearestClockTickAtOrAfter(attempt_begin, leading_clock_ticks,
                                    /*inclusive=*/true);
 }
@@ -516,14 +523,14 @@ std::vector<LocalVarInitCopy> MulticlockedLocalInitCopies(
     uint64_t attempt_begin,
     const std::vector<std::vector<uint64_t>>& per_leading_clock_ticks) {
   // §16.13.7: build one copy per semantic leading clock. Each copy's init
-  // assignment is scheduled independently at the earliest tick of its own leading
-  // clock at or after the attempt begin; that copy then governs the subproperty
-  // associated with the same leading clock.
+  // assignment is scheduled independently at the earliest tick of its own
+  // leading clock at or after the attempt begin; that copy then governs the
+  // subproperty associated with the same leading clock.
   std::vector<LocalVarInitCopy> copies;
   copies.reserve(per_leading_clock_ticks.size());
   for (size_t i = 0; i < per_leading_clock_ticks.size(); ++i) {
-    copies.push_back(
-        {i, MulticlockedLocalInitTick(attempt_begin, per_leading_clock_ticks[i])});
+    copies.push_back({i, MulticlockedLocalInitTick(
+                             attempt_begin, per_leading_clock_ticks[i])});
   }
   return copies;
 }
@@ -592,10 +599,11 @@ bool NonvacuousUntil(bool overlapping, bool left_nonvacuous_at_witness,
   // alone; the non-overlapping forms witness on either operand. In both cases
   // the right operand must not have held earlier and the left operand must have
   // held at every earlier clock event.
-  bool witness = overlapping
-                     ? left_nonvacuous_at_witness
-                     : (left_nonvacuous_at_witness || right_nonvacuous_at_witness);
-  return witness && !right_holds_at_prior_event && left_holds_at_all_prior_events;
+  bool witness =
+      overlapping ? left_nonvacuous_at_witness
+                  : (left_nonvacuous_at_witness || right_nonvacuous_at_witness);
+  return witness && !right_holds_at_prior_event &&
+         left_holds_at_all_prior_events;
 }
 
 bool NonvacuousImplies(bool antecedent_true, bool antecedent_nonvacuous,
@@ -606,7 +614,7 @@ bool NonvacuousImplies(bool antecedent_true, bool antecedent_nonvacuous,
 }
 
 bool NonvacuousAbortOrDisable(bool inner_nonvacuous,
-                             bool condition_holds_at_any_evaluated_step) {
+                              bool condition_holds_at_any_evaluated_step) {
   // §16.14.8(ab)(ac)(ad)(ae)(ag): a nonvacuous underlying attempt whose
   // abort/disable condition never held across the steps it was evaluated at.
   return inner_nonvacuous && !condition_holds_at_any_evaluated_step;
@@ -638,14 +646,16 @@ PropertyResult EvalStrongSequenceProperty(bool has_nonempty_match) {
   return has_nonempty_match ? PropertyResult::kPass : PropertyResult::kFail;
 }
 
-PropertyResult EvalWeakSequenceProperty(bool finite_prefix_witnesses_inability) {
+PropertyResult EvalWeakSequenceProperty(
+    bool finite_prefix_witnesses_inability) {
   // §16.12.2: the weak reading holds unless some finite prefix has already
   // ruled out any match.
   return finite_prefix_witnesses_inability ? PropertyResult::kFail
                                            : PropertyResult::kPass;
 }
 
-SequencePropertyStrength NegatePropertyStrength(SequencePropertyStrength inner) {
+SequencePropertyStrength NegatePropertyStrength(
+    SequencePropertyStrength inner) {
   // §16.12.3: negation flips the strength — a weak underlying property becomes
   // strong under `not`, and a strong one becomes weak.
   return inner == SequencePropertyStrength::kWeak
@@ -654,18 +664,15 @@ SequencePropertyStrength NegatePropertyStrength(SequencePropertyStrength inner) 
 }
 
 bool IsImmediateAssertionKindAllowed(AssertionKind kind) {
-
   return kind != AssertionKind::kRestrict;
 }
 
 bool ConcurrentTimingUsesSampledValues(AssertionTiming timing) {
-
   return timing == AssertionTiming::kConcurrent;
 }
 
 SampledValue SampleStaticVariable(uint64_t preponed_value, SimTime t,
                                   uint64_t type_default) {
-
   if (t.ticks == 0) {
     return SampledValue{type_default, SampleMode::kDefault};
   }
@@ -673,27 +680,22 @@ SampledValue SampleStaticVariable(uint64_t preponed_value, SimTime t,
 }
 
 SampledValue SampleAutomaticVariable(uint64_t current_value) {
-
   return SampledValue{current_value, SampleMode::kCurrent};
 }
 
 SampledValue DefaultSampledValueOfTriggered() {
-
   return SampledValue{0, SampleMode::kDefault};
 }
 
 SampledValue DefaultSampledValueOfMatched() {
-
   return SampledValue{0, SampleMode::kDefault};
 }
 
 SampledValue SampleSingleVariableExpression(SampledValue var_sample) {
-
   return var_sample;
 }
 
 SampledValue SampleConstCastExpression(uint64_t argument_current_value) {
-
   return SampledValue{argument_current_value, SampleMode::kCurrent};
 }
 
@@ -707,38 +709,34 @@ SampledValue ProceduralArgumentValueAfterMature(
 }
 
 bool ProceduralExecutionAffects(ProceduralExecutionEffect effect,
-                                 bool already_matured) {
+                                bool already_matured) {
   if (!already_matured) return true;
   return effect == ProceduralExecutionEffect::kActivation;
 }
 
-SampledValue SampleProceduralAssertionActionBlockArgument(uint64_t current_value) {
+SampledValue SampleProceduralAssertionActionBlockArgument(
+    uint64_t current_value) {
   return SampleProceduralAssertionArgument(current_value);
 }
 
-bool ActionBlockMayModifyArgument() {
-  return false;
-}
+bool ActionBlockMayModifyArgument() { return false; }
 
 uint64_t ReadProceduralConditionalGuard(uint64_t current_value,
-                                         uint64_t /*sampled_value*/) {
+                                        uint64_t /*sampled_value*/) {
   return current_value;
 }
 
 SampledValue SampledValueOfTriggered(bool current_returned) {
-
   return SampledValue{current_returned ? 1u : 0u, SampleMode::kCurrent};
 }
 
 SampledValue SampledValueOfMatched(bool current_returned) {
-
   return SampledValue{current_returned ? 1u : 0u, SampleMode::kCurrent};
 }
 
-SampledValue SampleRecursiveExpression(
-    SampledValue a, SampledValue b,
-    uint64_t (*combinator)(uint64_t, uint64_t)) {
-
+SampledValue SampleRecursiveExpression(SampledValue a, SampledValue b,
+                                       uint64_t (*combinator)(uint64_t,
+                                                              uint64_t)) {
   SampleMode mode =
       (a.mode == SampleMode::kCurrent || b.mode == SampleMode::kCurrent)
           ? SampleMode::kCurrent
@@ -747,12 +745,10 @@ SampledValue SampleRecursiveExpression(
 }
 
 SampledValue DefaultSampledValueOfVariableOrNet(uint64_t type_default) {
-
   return SampledValue{type_default, SampleMode::kDefault};
 }
 
 bool IsClockingBlockInputSamplingValid(ClockingInputSkew skew) {
-
   return skew == ClockingInputSkew::kStep1;
 }
 
@@ -804,42 +800,28 @@ bool BooleanExprUsesSampledValues(BooleanExprPlace place) {
   return false;
 }
 
-bool DisableConditionUsesCurrentValues() {
-  return true;
-}
+bool DisableConditionUsesCurrentValues() { return true; }
 
-bool DisableConditionAllowsTriggeredMethod() {
-  return true;
-}
+bool DisableConditionAllowsTriggeredMethod() { return true; }
 
-bool DisableConditionAllowsMatchedMethod() {
-  return false;
-}
+bool DisableConditionAllowsMatchedMethod() { return false; }
 
-bool DisableConditionAllowsLocalVariableReference() {
-  return false;
-}
+bool DisableConditionAllowsLocalVariableReference() { return false; }
 
 void ProceduralAssertionQueue::Enqueue(PendingProceduralAssertion pending) {
-
   pending.matured = false;
   queue_.push_back(std::move(pending));
 }
 
 void ProceduralAssertionQueue::MatureAll() {
-
   for (auto& p : queue_) p.matured = true;
 }
 
-void ProceduralAssertionQueue::Flush() {
-
-  queue_.clear();
-}
+void ProceduralAssertionQueue::Flush() { queue_.clear(); }
 
 void ProceduralAssertionQueue::FlushPending() {
-  std::erase_if(queue_, [](const PendingProceduralAssertion& p) {
-    return !p.matured;
-  });
+  std::erase_if(queue_,
+                [](const PendingProceduralAssertion& p) { return !p.matured; });
 }
 
 void ProceduralAssertionQueue::FlushPendingForInstance(
@@ -900,19 +882,15 @@ bool DisableFlushesDeferredAssertions(DisableTarget target) {
 }
 
 bool IsStaticConcurrentAssertion(bool appears_in_procedural_code) {
-
   return !appears_in_procedural_code;
 }
 
 bool IsAutomaticAllowedInClockingEvent(bool variable_is_automatic) {
-
   return !variable_is_automatic;
 }
 
 InferredClock InferClockForProceduralConcurrentAssertion(
-    std::string_view proc_context_clock,
-    std::string_view default_clock) {
-
+    std::string_view proc_context_clock, std::string_view default_clock) {
   if (!proc_context_clock.empty()) {
     return InferredClock{InferredClockKind::kFromProceduralContext,
                          proc_context_clock};
@@ -925,15 +903,13 @@ InferredClock InferClockForProceduralConcurrentAssertion(
 }
 
 bool SatisfiesClockInferenceRequirements(bool no_blocking_timing_control,
-                                          bool exactly_one_event_control,
-                                          bool unique_qualifying_event_expr) {
-
+                                         bool exactly_one_event_control,
+                                         bool unique_qualifying_event_expr) {
   return no_blocking_timing_control && exactly_one_event_control &&
          unique_qualifying_event_expr;
 }
 
 void MaturedAssertionQueue::Place(PendingProceduralAssertion matured) {
-
   matured.matured = true;
   queue_.push_back(std::move(matured));
 }
@@ -1401,7 +1377,6 @@ uint32_t SvaEngine::DeferredQueueSize() const {
 
 ProceduralAssertionQueue& SvaEngine::GetProceduralQueue(
     std::string_view process_id) {
-
   return procedural_queues_[std::string(process_id)];
 }
 
@@ -1448,8 +1423,9 @@ uint32_t SvaEngine::ExecuteMaturedObservedInReactive(
   return static_cast<uint32_t>(matured.size());
 }
 
-uint32_t SvaEngine::ExecuteMaturedFinalInPostponed(
-    std::string_view process_id, Scheduler& sched, SimTime time) {
+uint32_t SvaEngine::ExecuteMaturedFinalInPostponed(std::string_view process_id,
+                                                   Scheduler& sched,
+                                                   SimTime time) {
   auto matured = GetDeferredReportQueue(process_id).TakeMaturedFinal();
   for (auto& report : matured) {
     auto* event = sched.GetEventPool().Acquire();
@@ -1489,8 +1465,8 @@ void SvaEngine::ApplyDisableToDeferredAssertions(
     std::string_view assertion_instance) {
   if (!DisableFlushesDeferredAssertions(target)) return;
   if (target == DisableTarget::kSpecificAssertion) {
-    GetDeferredReportQueue(process_id).FlushNonMaturedForInstance(
-        assertion_instance);
+    GetDeferredReportQueue(process_id)
+        .FlushNonMaturedForInstance(assertion_instance);
   } else {
     GetDeferredReportQueue(process_id).FlushNonMatured();
   }
@@ -1525,4 +1501,4 @@ bool ExpectClockingEventBeginsEvaluation(uint64_t activation_tick,
   return clocking_event_tick > activation_tick;
 }
 
-}
+}  // namespace delta

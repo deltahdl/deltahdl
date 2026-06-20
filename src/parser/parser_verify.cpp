@@ -321,7 +321,6 @@ Stmt* Parser::ParseRandsequenceStmt() {
 }
 
 static void SkipCoverpointBody(Lexer& lexer) {
-
   while (!lexer.Peek().Is(TokenKind::kSemicolon) &&
          !lexer.Peek().Is(TokenKind::kLBrace) &&
          !lexer.Peek().Is(TokenKind::kEof)) {
@@ -335,7 +334,6 @@ static void SkipCoverpointBody(Lexer& lexer) {
 }
 
 void Parser::ParseBlockEventExpression() {
-
   do {
     if (!Check(TokenKind::kKwBegin) && !Check(TokenKind::kKwEnd)) {
       diag_.Error(CurrentLoc(), "expected 'begin' or 'end' in block event");
@@ -486,9 +484,8 @@ void Parser::ParseCovergroupDecl(std::vector<ModuleItem*>& items) {
     Expect(TokenKind::kKwFunction);
     auto sample_id = ExpectIdentifier();
     if (sample_id.text != "sample") {
-      diag_.Error(sample_id.loc,
-                  "expected 'sample', got '" +
-                      std::string(sample_id.text) + "'");
+      diag_.Error(sample_id.loc, "expected 'sample', got '" +
+                                     std::string(sample_id.text) + "'");
     }
     Expect(TokenKind::kLParen);
     ParseSampleFormalList(covergroup_formals);
@@ -520,7 +517,6 @@ static void SkipToSemiOrEnd(Lexer& lexer, TokenKind end_kw) {
 }
 
 void Parser::SkipCovergroupItem() {
-
   if (Check(TokenKind::kIdentifier) && IsOptionKeyword(CurrentToken().text)) {
     SkipToSemiOrEnd(lexer_, TokenKind::kKwEndgroup);
     return;
@@ -544,4 +540,4 @@ void Parser::SkipCovergroupItem() {
   SkipToSemiOrEnd(lexer_, TokenKind::kKwEndgroup);
 }
 
-}
+}  // namespace delta

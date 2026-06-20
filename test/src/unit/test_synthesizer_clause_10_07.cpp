@@ -40,4 +40,4 @@ TEST(AssignmentExtensionTruncationSynth, ExtensionIncreasesOutputWidth) {
   }
 }
 
-}
+}  // namespace

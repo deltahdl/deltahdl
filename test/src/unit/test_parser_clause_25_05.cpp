@@ -116,4 +116,4 @@ TEST(InterfaceModport, NamedInterfacePortWithModport) {
   EXPECT_EQ(port.name, "s");
 }
 
-}
+}  // namespace

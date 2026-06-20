@@ -296,12 +296,12 @@ TEST(ConstEval, NestedTernaryConstEval) {
 TEST(ConstEval, ChainedTernaryConstEval) {
   EvalFixture f;
   ScopeMap scope = {{"SEL", 2}};
-  EXPECT_EQ(ConstEvalInt(
-                ParseExprFrom("SEL == 0 ? 10 : SEL == 1 ? 20 : 30", f), scope),
+  EXPECT_EQ(ConstEvalInt(ParseExprFrom("SEL == 0 ? 10 : SEL == 1 ? 20 : 30", f),
+                         scope),
             30);
   scope["SEL"] = 1;
-  EXPECT_EQ(ConstEvalInt(
-                ParseExprFrom("SEL == 0 ? 10 : SEL == 1 ? 20 : 30", f), scope),
+  EXPECT_EQ(ConstEvalInt(ParseExprFrom("SEL == 0 ? 10 : SEL == 1 ? 20 : 30", f),
+                         scope),
             20);
 }
 
@@ -333,4 +333,4 @@ TEST(ConditionalElaboration, TernaryWithOneNullBranchElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

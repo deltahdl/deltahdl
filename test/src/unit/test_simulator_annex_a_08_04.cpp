@@ -183,4 +183,4 @@ TEST(PrimarySim, ConcatenationWithRangeSimulates) {
   EXPECT_EQ(var->value.ToUint64(), 0x5u);
 }
 
-}
+}  // namespace

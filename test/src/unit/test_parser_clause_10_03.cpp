@@ -239,4 +239,4 @@ TEST(ContinuousAssignSyntax, ListOfVariableAssignments) {
   EXPECT_EQ(CountKind(r, ModuleItemKind::kContAssign), 3);
 }
 
-}
+}  // namespace

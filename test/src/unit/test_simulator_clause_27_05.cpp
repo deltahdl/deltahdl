@@ -207,4 +207,4 @@ TEST(GenerateSimulation, GenerateCaseMultiplePatternsPerItem) {
   EXPECT_EQ(var->value.ToUint64(), 11u);
 }
 
-}
+}  // namespace

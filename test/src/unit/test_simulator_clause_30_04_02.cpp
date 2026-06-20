@@ -29,4 +29,4 @@ TEST(SpecifyPathSim, SimpleParallelPathSimulates) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-}
+}  // namespace

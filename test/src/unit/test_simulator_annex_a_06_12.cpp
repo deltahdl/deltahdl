@@ -130,4 +130,4 @@ TEST(RandsequenceSim, NestedRandsequenceExecutes) {
   EXPECT_EQ(var->value.ToUint64(), 33u);
 }
 
-}
+}  // namespace

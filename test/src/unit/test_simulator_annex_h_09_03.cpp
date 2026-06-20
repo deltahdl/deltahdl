@@ -158,9 +158,9 @@ TEST(SvDpi, GetNameFromUnrecognizedScopeIsEmpty) {
   EXPECT_STREQ(svGetNameFromScope(nullptr), "");
 }
 
-// §H.9.3: whether caller file/line is available is implementation-specific. When
-// it is unavailable this simulator returns FALSE (0) and leaves the caller's
-// fileName and lineNumber untouched.
+// §H.9.3: whether caller file/line is available is implementation-specific.
+// When it is unavailable this simulator returns FALSE (0) and leaves the
+// caller's fileName and lineNumber untouched.
 TEST(SvDpi, GetCallerInfoUnavailableReturnsFalseAndLeavesArgsUnmodified) {
   const char* file = reinterpret_cast<const char*>(0xDEADBEEF);
   int line = 12345;
@@ -172,4 +172,4 @@ TEST(SvDpi, GetCallerInfoUnavailableReturnsFalseAndLeavesArgsUnmodified) {
   EXPECT_EQ(line, 12345);
 }
 
-}
+}  // namespace

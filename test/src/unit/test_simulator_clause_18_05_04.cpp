@@ -31,9 +31,10 @@ ConstraintBlock UniqueBlock(const std::vector<std::string>& members) {
   return block;
 }
 
-// 18.5.4: a unique constraint requires that no two members of the group hold the
-// same value after randomization. With three members confined to a domain that
-// barely fits three distinct values, every solve yields three different values.
+// 18.5.4: a unique constraint requires that no two members of the group hold
+// the same value after randomization. With three members confined to a domain
+// that barely fits three distinct values, every solve yields three different
+// values.
 TEST(ConstraintUnique, MembersGetDistinctValues) {
   ConstraintSolver solver(7);
   solver.AddVariable(MakeVar("a", 0, 2));
@@ -93,8 +94,8 @@ TEST(ConstraintUnique, EmptyGroupCausesNoContradiction) {
   EXPECT_EQ(solver.GetValue("a"), 4);
 }
 
-// 18.5.4: no randc variable shall appear in the group. A unique group that names
-// a randc member is illegal and makes randomization fail.
+// 18.5.4: no randc variable shall appear in the group. A unique group that
+// names a randc member is illegal and makes randomization fail.
 TEST(ConstraintUnique, RandcMemberFails) {
   ConstraintSolver solver(7);
   solver.AddVariable(MakeVar("a", 0, 7));
@@ -137,8 +138,8 @@ TEST(ConstraintUnique, MixedRealAndIntegralMembersFail) {
 }
 
 // 18.5.4: a group whose members agree on real-ness and width is of equivalent
-// type and solves normally, confirming the equivalent-type check does not reject
-// a well-formed group.
+// type and solves normally, confirming the equivalent-type check does not
+// reject a well-formed group.
 TEST(ConstraintUnique, EquivalentTypeMembersSolve) {
   ConstraintSolver solver(7);
   solver.AddVariable(MakeVar("a", 0, 7, /*width=*/8));
@@ -149,4 +150,4 @@ TEST(ConstraintUnique, EquivalentTypeMembersSolve) {
   EXPECT_NE(solver.GetValue("a"), solver.GetValue("b"));
 }
 
-}
+}  // namespace

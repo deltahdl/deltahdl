@@ -106,7 +106,8 @@ TEST(ParameterizedScopeResolutionParsing, ExplicitSpecAccessesClassParam) {
               "endmodule\n"));
 }
 
-TEST(ParameterizedScopeResolutionParsing, OutOfBlockMethodForParameterizedClass) {
+TEST(ParameterizedScopeResolutionParsing,
+     OutOfBlockMethodForParameterizedClass) {
   EXPECT_TRUE(
       ParseOk("class C #(int p = 1);\n"
               "  extern static function int f();\n"
@@ -132,4 +133,4 @@ TEST(ParameterizedScopeResolutionParsing, EmptyParamListWithMemberAccess) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

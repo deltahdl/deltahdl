@@ -131,9 +131,8 @@ TEST(UnpackedArrayConcatSim, FixedSizeMismatchEmitsError) {
   f.ctx.RegisterArray("A", info);
   for (uint32_t i = 0; i < 3; ++i)
     f.ctx.CreateVariable("A[" + std::to_string(i) + "]", 32);
-  auto* rhs = MakeConcat(
-      f.arena, {MakeInt(f.arena, 1), MakeInt(f.arena, 2),
-                MakeInt(f.arena, 3), MakeInt(f.arena, 4)});
+  auto* rhs = MakeConcat(f.arena, {MakeInt(f.arena, 1), MakeInt(f.arena, 2),
+                                   MakeInt(f.arena, 3), MakeInt(f.arena, 4)});
   auto* stmt = MakeAssign(f.arena, "A", rhs);
   TryArrayBlockingAssign(stmt, f.ctx, f.arena);
   EXPECT_TRUE(f.diag.HasErrors());
@@ -158,9 +157,8 @@ TEST(UnpackedArrayConcatSim, EmptyConcatToFixedSizeError) {
 TEST(UnpackedArrayConcatSim, BoundedQueueOverflowTruncates) {
   SimFixture f;
   auto* q = f.ctx.CreateQueue("q", 32, 3);
-  auto* rhs = MakeConcat(
-      f.arena, {MakeInt(f.arena, 10), MakeInt(f.arena, 20),
-                MakeInt(f.arena, 30), MakeInt(f.arena, 40)});
+  auto* rhs = MakeConcat(f.arena, {MakeInt(f.arena, 10), MakeInt(f.arena, 20),
+                                   MakeInt(f.arena, 30), MakeInt(f.arena, 40)});
   auto* stmt = MakeAssign(f.arena, "q", rhs);
   TryQueueBlockingAssign(stmt, f.ctx, f.arena);
   ASSERT_EQ(q->elements.size(), 3u);
@@ -173,12 +171,11 @@ TEST(UnpackedArrayConcatSim, BoundedQueueOverflowWarns) {
   SimFixture f;
   f.ctx.CreateQueue("q", 32, 2);
   auto before = f.diag.WarningCount();
-  auto* rhs = MakeConcat(
-      f.arena, {MakeInt(f.arena, 10), MakeInt(f.arena, 20),
-                MakeInt(f.arena, 30)});
+  auto* rhs = MakeConcat(f.arena, {MakeInt(f.arena, 10), MakeInt(f.arena, 20),
+                                   MakeInt(f.arena, 30)});
   auto* stmt = MakeAssign(f.arena, "q", rhs);
   TryQueueBlockingAssign(stmt, f.ctx, f.arena);
   EXPECT_GT(f.diag.WarningCount(), before);
 }
 
-}
+}  // namespace

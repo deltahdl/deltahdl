@@ -11,11 +11,12 @@ namespace {
 // condition expression and an unlabeled edge from each to a body statement (the
 // vpiStmt relation). The clause carries no numbered Details and no 'shall'
 // sentences. These tests observe the production code that serves the diagram's
-// relations: the vpiCondition edge through the dedicated helper VpiLoopConditionExpr
-// (wired into VpiHandleC), and the body edge through the generic vpiStmt traversal.
+// relations: the vpiCondition edge through the dedicated helper
+// VpiLoopConditionExpr (wired into VpiHandleC), and the body edge through the
+// generic vpiStmt traversal.
 
-// The fixture installs a context so the public VpiHandleC entry point runs its real
-// dispatch over the test objects.
+// The fixture installs a context so the public VpiHandleC entry point runs its
+// real dispatch over the test objects.
 class WhileRepeat : public ::testing::Test {
  protected:
   void SetUp() override { SetGlobalVpiContext(&ctx_); }
@@ -39,8 +40,8 @@ TEST_F(WhileRepeat, WhileStatementReachesConditionThroughVpiCondition) {
   EXPECT_EQ(VpiHandleC(vpiCondition, &while_stmt), &condition);
 }
 
-// vpiCondition edge: a repeat statement reaches its condition expression the same
-// way - the grouping serves both looping kinds.
+// vpiCondition edge: a repeat statement reaches its condition expression the
+// same way - the grouping serves both looping kinds.
 TEST_F(WhileRepeat, RepeatStatementReachesConditionThroughVpiCondition) {
   VpiObject condition;
   condition.type = vpiRefObj;  // another expression kind
@@ -52,9 +53,9 @@ TEST_F(WhileRepeat, RepeatStatementReachesConditionThroughVpiCondition) {
   EXPECT_EQ(VpiHandleC(vpiCondition, &repeat_stmt), &condition);
 }
 
-// vpiCondition edge: the condition is found even when a non-expression child (the
-// loop body statement) precedes it in the child list. The scan skips the body and
-// returns the first expression child.
+// vpiCondition edge: the condition is found even when a non-expression child
+// (the loop body statement) precedes it in the child list. The scan skips the
+// body and returns the first expression child.
 TEST_F(WhileRepeat, ConditionFoundWhenItFollowsTheBodyChild) {
   VpiObject body;
   body.type = vpiStmt;  // a non-expression child, listed first
@@ -69,8 +70,8 @@ TEST_F(WhileRepeat, ConditionFoundWhenItFollowsTheBodyChild) {
   EXPECT_EQ(VpiHandleC(vpiCondition, &while_stmt), &condition);
 }
 
-// vpiCondition edge: a null handle and a loop with no expression child both report
-// no condition.
+// vpiCondition edge: a null handle and a loop with no expression child both
+// report no condition.
 TEST_F(WhileRepeat, ConditionIsNullWhenAbsentOrHandleNull) {
   EXPECT_EQ(VpiLoopConditionExpr(nullptr), nullptr);
 
@@ -83,10 +84,10 @@ TEST_F(WhileRepeat, ConditionIsNullWhenAbsentOrHandleNull) {
   EXPECT_EQ(VpiLoopConditionExpr(&bare_loop), nullptr);
 }
 
-// vpiCondition edge is scoped to the loop statements: asking a non-loop statement
-// for vpiCondition does not pick up an expression child through this path. Here an
-// ordinary wait (§37.67 draws its own vpiCondition) with an expression child yields
-// no condition from the while/repeat dispatch.
+// vpiCondition edge is scoped to the loop statements: asking a non-loop
+// statement for vpiCondition does not pick up an expression child through this
+// path. Here an ordinary wait (§37.67 draws its own vpiCondition) with an
+// expression child yields no condition from the while/repeat dispatch.
 TEST_F(WhileRepeat, VpiConditionIsScopedToLoopStatements) {
   VpiObject condition;
   condition.type = vpiOperation;

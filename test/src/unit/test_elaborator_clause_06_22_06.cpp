@@ -11,7 +11,8 @@ namespace {
 // predicate. `nettype_canonical` maps each nettype name to the canonical
 // (source) nettype it resolves to, which is how an alias is tied to the nettype
 // it renames.
-std::unordered_map<std::string_view, std::string_view> SampleNettypeCanonical() {
+std::unordered_map<std::string_view, std::string_view>
+SampleNettypeCanonical() {
   std::unordered_map<std::string_view, std::string_view> canon;
   canon["base_t"] = "base_t";    // a user-defined nettype is its own canonical
   canon["alias_t"] = "base_t";   // alias of base_t resolves to base_t

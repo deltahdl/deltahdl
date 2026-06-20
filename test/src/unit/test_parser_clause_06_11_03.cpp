@@ -453,4 +453,4 @@ TEST(SignedAndUnsigned, BitMultiDimPackedDefaultUnsigned) {
   EXPECT_FALSE(item->data_type.extra_packed_dims.empty());
 }
 
-}
+}  // namespace

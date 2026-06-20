@@ -104,4 +104,4 @@ TEST(VarDeclAssignmentElaboration, NetVsVariableDeclAssignmentDistinction) {
   EXPECT_FALSE(assign_targets_var);
 }
 
-}
+}  // namespace

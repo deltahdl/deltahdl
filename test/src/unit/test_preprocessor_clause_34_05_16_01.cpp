@@ -42,7 +42,8 @@ TEST_F(ProtectDigestKeyownerSyntaxTest, PragmaProtectDigestKeyownerConsumed) {
 TEST_F(ProtectDigestKeyownerSyntaxTest,
        DigestKeyownerDirectiveStrippedSurroundingTextKept) {
   auto result = Preprocess(
-      "module m;\n`pragma protect digest_keyowner = \"Acme Corp\"\nendmodule\n");
+      "module m;\n`pragma protect digest_keyowner = \"Acme "
+      "Corp\"\nendmodule\n");
   EXPECT_FALSE(diag_.HasErrors());
   EXPECT_EQ(result.find("pragma"), std::string::npos);
   EXPECT_NE(result.find("module m;"), std::string::npos);

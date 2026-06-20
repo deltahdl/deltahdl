@@ -7,8 +7,8 @@ using namespace delta;
 // §E.2 `default_decay_time. The directive specifies the charge decay time for
 // trireg nets that do not declare one of their own. Its argument shall be an
 // integer constant, a real constant, or the keyword `infinite`, and an argument
-// shall always be present. The rule is carried by the preprocessor, which parses
-// the directive and records the decay-time state queried below.
+// shall always be present. The rule is carried by the preprocessor, which
+// parses the directive and records the decay-time state queried below.
 
 namespace {
 
@@ -47,8 +47,8 @@ TEST(Preprocessor, DefaultDecayTime_InfiniteKeyword) {
   EXPECT_TRUE(pp.DefaultDecayTimeInfinite());
 }
 
-// E2-C2 (shall): an argument shall be used with the directive; omitting it is an
-// error.
+// E2-C2 (shall): an argument shall be used with the directive; omitting it is
+// an error.
 TEST(Preprocessor, DefaultDecayTime_MissingArgumentIsError) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
@@ -67,8 +67,8 @@ TEST(Preprocessor, DefaultDecayTime_InvalidArgumentIsError) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-// E2-C4 (baseline): with no directive present, no charge decay applies, i.e. the
-// default state is infinite.
+// E2-C4 (baseline): with no directive present, no charge decay applies, i.e.
+// the default state is infinite.
 TEST(Preprocessor, DefaultDecayTime_DefaultStateIsInfinite) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
@@ -83,8 +83,8 @@ TEST(Preprocessor, DefaultDecayTime_DefaultStateIsInfinite) {
 TEST(Preprocessor, DefaultDecayTime_LaterDirectiveReplacesEarlier) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
-  auto fid = f.mgr.AddFile(
-      "<test>", "`default_decay_time 10\n`default_decay_time 200\n");
+  auto fid = f.mgr.AddFile("<test>",
+                           "`default_decay_time 10\n`default_decay_time 200\n");
   pp.Preprocess(fid);
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_EQ(pp.DefaultDecayTime(), 200u);

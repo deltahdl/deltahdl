@@ -86,4 +86,4 @@ TEST(LoopSyntaxParsing, ErrorDoWhileMissingCloseParen) {
   EXPECT_TRUE(r.has_errors);
 }
 
-}
+}  // namespace

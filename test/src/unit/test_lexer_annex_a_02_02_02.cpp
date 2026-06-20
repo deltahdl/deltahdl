@@ -96,4 +96,4 @@ TEST(StrengthKeywordLexing, LargeKeyword) {
   EXPECT_EQ(tokens[0].kind, TokenKind::kKwLarge);
 }
 
-}
+}  // namespace

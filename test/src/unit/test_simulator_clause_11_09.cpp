@@ -266,4 +266,4 @@ TEST(TaggedUnionEval, VoidMemberThenValueMember) {
   EXPECT_EQ(v, 77u);
 }
 
-}
+}  // namespace

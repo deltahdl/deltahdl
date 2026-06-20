@@ -45,9 +45,10 @@ std::shared_ptr<const SequenceExpr> GotoOnce(
 
 }  // namespace
 
-std::vector<LocalContext> TriggeredOutputs(
-    const Word& word, std::size_t j, const SequenceExpr& sequence,
-    const std::set<std::string>& actuals, const LocalContext& input) {
+std::vector<LocalContext> TriggeredOutputs(const Word& word, std::size_t j,
+                                           const SequenceExpr& sequence,
+                                           const std::set<std::string>& actuals,
+                                           const LocalContext& input) {
   std::vector<LocalContext> result;
   if (j >= word.size()) {
     return result;  // §F.6.1 requires 0 <= j < |w|.
@@ -101,7 +102,8 @@ bool TriggeredSatisfies(const Word& word, std::size_t j,
 std::vector<LocalContext> MatchedOutputs(
     const Word& word, std::size_t j, const SequenceExpr& sequence,
     const std::set<std::string>& actuals,
-    const std::shared_ptr<const BooleanExpr>& clock, const LocalContext& input) {
+    const std::shared_ptr<const BooleanExpr>& clock,
+    const LocalContext& input) {
   std::vector<LocalContext> result;
   if (j >= word.size()) {
     return result;  // §F.6.1 requires 0 <= j < |w|.

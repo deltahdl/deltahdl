@@ -24,8 +24,8 @@ TEST(TimeformatSysTask, BareInvocationParsesAsArglessSystemCall) {
 // Syntax 20-5: when the parens block is present it carries the four arguments
 // units_number, precision_number, suffix_string, and minimum_field_width.
 TEST(TimeformatSysTask, FullInvocationParsesFourArguments) {
-  auto r = Parse(
-      "module m; initial $timeformat(-9, 5, \" ns\", 10); endmodule");
+  auto r =
+      Parse("module m; initial $timeformat(-9, 5, \" ns\", 10); endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto* stmt = FirstInitialStmt(r);
@@ -37,4 +37,4 @@ TEST(TimeformatSysTask, FullInvocationParsesFourArguments) {
   EXPECT_EQ(stmt->expr->args[2]->kind, ExprKind::kStringLiteral);
 }
 
-}
+}  // namespace

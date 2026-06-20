@@ -32,7 +32,6 @@ static bool IsCastTypeToken(TokenKind kind) {
 }
 
 static uint64_t ParseIntText(std::string_view text) {
-
   std::string buf;
   buf.reserve(text.size());
   for (char c : text) {
@@ -183,7 +182,6 @@ Expr* Parser::ParseExprBp(int min_bp) {
 }
 
 Expr* Parser::TryParseSpecialInfix(Expr*& lhs, const Token& tok, int min_bp) {
-
   if (tok.kind == TokenKind::kQuestion && min_bp <= 1) {
     Consume();
     ParseAttributes();
@@ -288,7 +286,6 @@ Expr* Parser::MakeLiteral(ExprKind kind, const Token& tok) {
     lit->int_val = ParseIntText(tok.text);
     WarnSizedOverflow(tok);
   } else if (kind == ExprKind::kUnbasedUnsizedLiteral) {
-
     if (tok.text.size() >= 2 && tok.text[1] == '1') {
       lit->int_val = ~uint64_t{0};
     }
@@ -303,10 +300,9 @@ Expr* Parser::MakeLiteral(ExprKind kind, const Token& tok) {
           ParseTimeUnitStr(t.substr(t.size() - 1), literal_unit);
         }
       }
-      TimeUnit current_unit = current_module_ ? current_module_->time_unit
-                                              : TimeUnit::kNs;
-      int exp =
-          static_cast<int>(literal_unit) - static_cast<int>(current_unit);
+      TimeUnit current_unit =
+          current_module_ ? current_module_->time_unit : TimeUnit::kNs;
+      int exp = static_cast<int>(literal_unit) - static_cast<int>(current_unit);
       if (exp != 0) {
         lit->real_val *= std::pow(10.0, exp);
       }
@@ -318,7 +314,6 @@ Expr* Parser::MakeLiteral(ExprKind kind, const Token& tok) {
 void Parser::WarnSizedOverflow(const Token& tok) {
   uint32_t size = ExtractLiteralSize(tok.text);
   if (size == 0) {
-
     auto tick = tok.text.find('\'');
     if (tick != std::string_view::npos && tick > 0) {
       diag_.Error(tok.loc, "size of integer literal shall be nonzero");
@@ -339,7 +334,6 @@ Expr* Parser::ParseNewExpr() {
   expr->text = "new";
   expr->range.start = Consume().loc;
   if (Check(TokenKind::kLBracket)) {
-
     Consume();
     expr->args.push_back(ParseExpr());
     Expect(TokenKind::kRBracket);
@@ -368,7 +362,6 @@ Expr* Parser::ParseTaggedExpr() {
   } else if (Check(TokenKind::kApostropheLBrace)) {
     expr->lhs = ParseAssignmentPattern();
   } else if (Check(TokenKind::kDot)) {
-
     expr->lhs = ParsePrimaryExpr();
   } else if (!Check(TokenKind::kSemicolon) && !Check(TokenKind::kComma) &&
              !Check(TokenKind::kRParen) && !Check(TokenKind::kRBrace) &&
@@ -701,7 +694,6 @@ void Parser::ParseTrailingNamedArgs(Expr* call) {
 }
 
 void Parser::ParseCallArgs(Expr* call) {
-
   if (Check(TokenKind::kKwDefault)) {
     auto tok = Consume();
     auto* expr = arena_.Create<Expr>();
@@ -890,7 +882,6 @@ Expr* Parser::ParseSystemCall() {
   call->range.start = tok.loc;
   if (!Match(TokenKind::kLParen)) return call;
   if (!Check(TokenKind::kRParen)) {
-
     if (Check(TokenKind::kComma)) {
       call->args.push_back(nullptr);
     } else {
@@ -1029,7 +1020,6 @@ Expr* Parser::ParsePatternReplication(Expr* count, SourceLoc loc) {
 }
 
 bool Parser::ParseFirstPatternElement(Expr* pat, bool& named) {
-
   if (Check(TokenKind::kDot)) {
     auto loc = CurrentLoc();
     Consume();
@@ -1115,4 +1105,4 @@ Expr* Parser::ParseAssignmentPattern() {
   return pat;
 }
 
-}
+}  // namespace delta

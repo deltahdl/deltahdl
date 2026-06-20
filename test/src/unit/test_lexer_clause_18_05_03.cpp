@@ -21,4 +21,4 @@ TEST(ConstraintDistLexing, DefaultKeywordRecognised) {
   EXPECT_EQ(r.token.kind, TokenKind::kKwDefault);
 }
 
-}
+}  // namespace

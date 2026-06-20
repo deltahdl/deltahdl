@@ -196,4 +196,4 @@ TEST(StaticMethodElaboration, StaticMethodThisInCallArgError) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

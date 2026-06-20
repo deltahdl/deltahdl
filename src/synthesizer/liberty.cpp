@@ -311,11 +311,11 @@ class LibertyParser {
   Token cur_;
 };
 
-}
+}  // namespace
 
 Liberty ParseLiberty(std::string_view source) {
   LibertyParser parser(source);
   return parser.Parse();
 }
 
-}
+}  // namespace delta

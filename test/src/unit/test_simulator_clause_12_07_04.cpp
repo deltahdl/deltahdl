@@ -200,4 +200,4 @@ TEST(LoopStatementSim, WhileVectorConditionIteratesUntilZero) {
   EXPECT_EQ(tempreg->value.ToUint64(), 0u);  // ran until the register hit zero
 }
 
-}
+}  // namespace

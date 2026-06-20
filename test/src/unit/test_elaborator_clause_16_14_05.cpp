@@ -73,7 +73,8 @@ TEST(AssertionStatementElaboration, AssumePropertyElaboratesOutsideProcedure) {
 // §16.14.5: a restrict statement is the remaining concurrent assertion
 // statement kind that may appear outside procedural code, so it too elaborates
 // as a module item.
-TEST(AssertionStatementElaboration, RestrictPropertyElaboratesOutsideProcedure) {
+TEST(AssertionStatementElaboration,
+     RestrictPropertyElaboratesOutsideProcedure) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -84,10 +85,12 @@ TEST(AssertionStatementElaboration, RestrictPropertyElaboratesOutsideProcedure) 
   EXPECT_FALSE(f.has_errors);
 }
 
-// §16.14.5: the bare `assert property (ps) action_block` outside procedural code
-// is equivalent to the explicit `always assert property (ps) action_block;`
-// form, so the explicit form elaborates just as the bare one does.
-TEST(AssertionStatementElaboration, AlwaysAssertPropertyEquivalentFormElaborates) {
+// §16.14.5: the bare `assert property (ps) action_block` outside procedural
+// code is equivalent to the explicit `always assert property (ps)
+// action_block;` form, so the explicit form elaborates just as the bare one
+// does.
+TEST(AssertionStatementElaboration,
+     AlwaysAssertPropertyEquivalentFormElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -102,7 +105,8 @@ TEST(AssertionStatementElaboration, AlwaysAssertPropertyEquivalentFormElaborates
 // §16.14.5: likewise the bare `cover property (ps) statement_or_null` is
 // equivalent to the explicit `always cover property (ps) statement_or_null`
 // form, which therefore elaborates as well.
-TEST(AssertionStatementElaboration, AlwaysCoverPropertyEquivalentFormElaborates) {
+TEST(AssertionStatementElaboration,
+     AlwaysCoverPropertyEquivalentFormElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -114,4 +118,4 @@ TEST(AssertionStatementElaboration, AlwaysCoverPropertyEquivalentFormElaborates)
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

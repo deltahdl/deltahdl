@@ -114,4 +114,4 @@ TEST(NamedPortSimulation, OmittedInputUsesDefaultValueAtRuntime) {
   EXPECT_EQ(var->value.ToUint64(), 15u);
 }
 
-}
+}  // namespace

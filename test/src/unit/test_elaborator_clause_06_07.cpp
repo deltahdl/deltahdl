@@ -54,8 +54,8 @@ TEST(NetDecl, TriregChargeLargeProducesLargeStrength) {
 
 TEST(NetDecl, VectoredWithPackedDimOk) {
   ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m; wire vectored [3:0] w; endmodule\n", f);
+  auto* design =
+      ElaborateSrc("module m; wire vectored [3:0] w; endmodule\n", f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
   auto* net = FindNet(design, "w");
@@ -65,8 +65,8 @@ TEST(NetDecl, VectoredWithPackedDimOk) {
 
 TEST(NetDecl, ScalaredWithPackedDimOk) {
   ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m; wire scalared [3:0] w; endmodule\n", f);
+  auto* design =
+      ElaborateSrc("module m; wire scalared [3:0] w; endmodule\n", f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
   auto* net = FindNet(design, "w");
@@ -86,4 +86,4 @@ TEST(NetDecl, ScalaredWithoutPackedDimEmitsError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-}
+}  // namespace

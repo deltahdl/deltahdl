@@ -34,10 +34,11 @@ bool Contains(const std::vector<VpiHandle>& objects, VpiHandle wanted) {
 }
 
 // Figure (net drivers): vpiDriver on a net reaches every net-driver kind - a
-// port, a force, a delay terminal, a continuous assignment, a single bit of one,
-// and a primitive terminal - while skipping children that are not drivers. The
-// net case differs from a variable (§37.21): an assignment statement loads a net
-// but does not drive it, so it is excluded from the driver iteration here.
+// port, a force, a delay terminal, a continuous assignment, a single bit of
+// one, and a primitive terminal - while skipping children that are not drivers.
+// The net case differs from a variable (§37.21): an assignment statement loads
+// a net but does not drive it, so it is excluded from the driver iteration
+// here.
 TEST(NetDriversAndLoads, DriverIterationReachesEveryNetDriverKind) {
   VpiContext ctx;
 
@@ -63,8 +64,9 @@ TEST(NetDriversAndLoads, DriverIterationReachesEveryNetDriverKind) {
 
   VpiObject net;
   net.type = vpiNet;
-  net.children = {&port,       &force,           &delay_term, &cont_assign,
-                  &cont_assign_bit, &prim_term,  &assign_stmt, &unrelated};
+  net.children = {&port,        &force,           &delay_term,
+                  &cont_assign, &cont_assign_bit, &prim_term,
+                  &assign_stmt, &unrelated};
 
   std::vector<VpiHandle> drivers = Collect(ctx, ctx.Iterate(vpiDriver, &net));
   ASSERT_EQ(drivers.size(), 6u);
@@ -106,7 +108,7 @@ TEST(NetDriversAndLoads, LoadIterationReachesNetLoadKindsExcludingPlainPort) {
 
   VpiObject net;
   net.type = vpiNet;
-  net.children = {&delay_term,      &assign_stmt, &force,       &cont_assign,
+  net.children = {&delay_term,      &assign_stmt, &force,      &cont_assign,
                   &cont_assign_bit, &prim_term,   &driver_port};
 
   std::vector<VpiHandle> loads = Collect(ctx, ctx.Iterate(vpiLoad, &net));
@@ -120,13 +122,14 @@ TEST(NetDriversAndLoads, LoadIterationReachesNetLoadKindsExcludingPlainPort) {
   EXPECT_FALSE(Contains(loads, &driver_port));
 }
 
-// Detail 1 (both shalls): a complex expression that is not a concatenation on an
-// input port shall be considered a load for each net it reads, and that complex
-// expression shall be reachable through vpi_handle(vpiHighConn, port). Modeled
-// on the clause's example - trinet feeding ram's fourth port through !trinet -
-// the input port appears when iterating the net's loads, and its vpiHighConn
-// reaches the operation.
-TEST(NetDriversAndLoads, ComplexExpressionInputPortIsLoadAndHighConnReachesExpr) {
+// Detail 1 (both shalls): a complex expression that is not a concatenation on
+// an input port shall be considered a load for each net it reads, and that
+// complex expression shall be reachable through vpi_handle(vpiHighConn, port).
+// Modeled on the clause's example - trinet feeding ram's fourth port through
+// !trinet - the input port appears when iterating the net's loads, and its
+// vpiHighConn reaches the operation.
+TEST(NetDriversAndLoads,
+     ComplexExpressionInputPortIsLoadAndHighConnReachesExpr) {
   VpiContext ctx;
 
   // The complex connection on the port: an operation (here a logical negation),
@@ -175,11 +178,12 @@ TEST(NetDriversAndLoads, ConcatenationOnInputPortIsNotLoad) {
   EXPECT_FALSE(Contains(loads, &port));
 }
 
-// Detail 1 (concatenation carve-out, replication form): a multiple concatenation
-// (replication, {n{...}}) is also a concatenation, so its grouped operand
-// connections drive/load their nets individually. A replication on an input port
-// therefore does not make the whole port a complex-expression load, and the port
-// is excluded from the net's load iteration just as a plain concatenation is.
+// Detail 1 (concatenation carve-out, replication form): a multiple
+// concatenation (replication, {n{...}}) is also a concatenation, so its grouped
+// operand connections drive/load their nets individually. A replication on an
+// input port therefore does not make the whole port a complex-expression load,
+// and the port is excluded from the net's load iteration just as a plain
+// concatenation is.
 TEST(NetDriversAndLoads, MultipleConcatenationOnInputPortIsNotLoad) {
   VpiContext ctx;
 

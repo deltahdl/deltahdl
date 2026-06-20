@@ -56,4 +56,4 @@ TEST(StringMethods, ToupperOriginalUnchanged) {
   EXPECT_EQ(ch.ToUint64(), static_cast<uint64_t>('h'));
 }
 
-}
+}  // namespace

@@ -114,4 +114,4 @@ TEST(NestedModuleSimulation, OuterScopeVariableReadFromNestedModule) {
   EXPECT_EQ(v->value.ToUint64(), 5u);
 }
 
-}
+}  // namespace

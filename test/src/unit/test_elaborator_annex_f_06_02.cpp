@@ -30,16 +30,20 @@ using Indices = std::vector<std::size_t>;
 // w^j is the immediately preceding letter w^{j-1}.
 TEST(Past, DefaultFormSamplesThePrecedingLetter) {
   const Word word{A({}), A({}), A({})};
-  EXPECT_EQ(PastSourceIndices(word, /*j=*/2, /*n=*/1, One(), One()), Indices{1});
-  EXPECT_EQ(PastSourceIndices(word, /*j=*/1, /*n=*/1, One(), One()), Indices{0});
+  EXPECT_EQ(PastSourceIndices(word, /*j=*/2, /*n=*/1, One(), One()),
+            Indices{1});
+  EXPECT_EQ(PastSourceIndices(word, /*j=*/1, /*n=*/1, One(), One()),
+            Indices{0});
 }
 
 // §F.6.2 ($past): with all ticks active, $past(e, n) reaches back exactly n
 // ticks, so the source of w^j is w^{j-n}.
 TEST(Past, NTicksBackWithEveryTickActive) {
   const Word word{A({}), A({}), A({}), A({})};
-  EXPECT_EQ(PastSourceIndices(word, /*j=*/3, /*n=*/2, One(), One()), Indices{1});
-  EXPECT_EQ(PastSourceIndices(word, /*j=*/3, /*n=*/3, One(), One()), Indices{0});
+  EXPECT_EQ(PastSourceIndices(word, /*j=*/3, /*n=*/2, One(), One()),
+            Indices{1});
+  EXPECT_EQ(PastSourceIndices(word, /*j=*/3, /*n=*/3, One(), One()),
+            Indices{0});
 }
 
 // §F.6.2 ($past): the gating expression e2 selects which letters count as
@@ -56,7 +60,8 @@ TEST(Past, GatingExpressionCountsOnlyActiveTicks) {
 }
 
 // §F.6.2 ($past): the destination clock c gates ticks just as e2 does -- the
-// active condition is c && e2. A letter where the clock is absent is not a tick.
+// active condition is c && e2. A letter where the clock is absent is not a
+// tick.
 TEST(Past, ClockGatesTicks) {
   auto clk = BoolAtom("clk");
   // clk ticks at 1 and 3; letters 0 and 2 carry no clock edge.
@@ -133,8 +138,8 @@ TEST(PastGclk, TakesInitialValueAtTheFirstLetter) {
   EXPECT_EQ(PastGclkSourceIndex(word, /*j=*/0), std::nullopt);
 }
 
-// §F.6.2 ($past_gclk) boundary: a point at or past the end of the word is out of
-// range and yields no source index.
+// §F.6.2 ($past_gclk) boundary: a point at or past the end of the word is out
+// of range and yields no source index.
 TEST(PastGclk, RejectsOutOfRangePoint) {
   const Word word{A({}), A({})};
   EXPECT_EQ(PastGclkSourceIndex(word, /*j=*/2), std::nullopt);

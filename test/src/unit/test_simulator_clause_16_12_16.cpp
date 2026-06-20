@@ -18,9 +18,9 @@ TEST(PropertyCase, FirstMatchingItemSelectedAndSearchTerminates) {
       {/*selected=*/true, PropertyResult::kPass},
       {/*selected=*/true, PropertyResult::kFail},
   };
-  EXPECT_EQ(EvalPropertyCase(branches, /*has_default=*/false,
-                             PropertyResult::kFail),
-            PropertyResult::kPass);
+  EXPECT_EQ(
+      EvalPropertyCase(branches, /*has_default=*/false, PropertyResult::kFail),
+      PropertyResult::kPass);
 }
 
 // §16.12.16: the verdict the case property returns is exactly that of the
@@ -30,25 +30,25 @@ TEST(PropertyCase, SelectedItemVerdictPropagates) {
       {/*selected=*/false, PropertyResult::kPass},
       {/*selected=*/true, PropertyResult::kFail},
   };
-  EXPECT_EQ(EvalPropertyCase(branches, /*has_default=*/false,
-                             PropertyResult::kPass),
-            PropertyResult::kFail);
+  EXPECT_EQ(
+      EvalPropertyCase(branches, /*has_default=*/false, PropertyResult::kPass),
+      PropertyResult::kFail);
 
   std::vector<PropertyCaseBranch> vacuous = {
       {/*selected=*/true, PropertyResult::kVacuousPass},
   };
-  EXPECT_EQ(EvalPropertyCase(vacuous, /*has_default=*/false,
-                             PropertyResult::kFail),
-            PropertyResult::kVacuousPass);
+  EXPECT_EQ(
+      EvalPropertyCase(vacuous, /*has_default=*/false, PropertyResult::kFail),
+      PropertyResult::kVacuousPass);
 
   // An as-yet unresolved verdict from the selected item is carried through
   // unchanged rather than normalized — the case result tracks the chosen item.
   std::vector<PropertyCaseBranch> pending = {
       {/*selected=*/true, PropertyResult::kPending},
   };
-  EXPECT_EQ(EvalPropertyCase(pending, /*has_default=*/false,
-                             PropertyResult::kPass),
-            PropertyResult::kPending);
+  EXPECT_EQ(
+      EvalPropertyCase(pending, /*has_default=*/false, PropertyResult::kPass),
+      PropertyResult::kPending);
 }
 
 // §16.12.16: if there is a default item it is ignored during the linear search.
@@ -87,9 +87,9 @@ TEST(PropertyCase, NoDefaultAllComparisonsFailSucceedsVacuously) {
       {/*selected=*/false, PropertyResult::kFail},
       {/*selected=*/false, PropertyResult::kFail},
   };
-  EXPECT_EQ(EvalPropertyCase(branches, /*has_default=*/false,
-                             PropertyResult::kFail),
-            PropertyResult::kVacuousPass);
+  EXPECT_EQ(
+      EvalPropertyCase(branches, /*has_default=*/false, PropertyResult::kFail),
+      PropertyResult::kVacuousPass);
 }
 
 // §16.12.16: the empty-ordinary-item boundary — a case property whose only item
@@ -109,9 +109,9 @@ TEST(PropertyCase, EmptyItemListWithDefaultExecutesDefault) {
 // nothing to evaluate, so the case property holds vacuously.
 TEST(PropertyCase, EmptyItemListWithoutDefaultSucceedsVacuously) {
   std::vector<PropertyCaseBranch> branches;
-  EXPECT_EQ(EvalPropertyCase(branches, /*has_default=*/false,
-                             PropertyResult::kFail),
-            PropertyResult::kVacuousPass);
+  EXPECT_EQ(
+      EvalPropertyCase(branches, /*has_default=*/false, PropertyResult::kFail),
+      PropertyResult::kVacuousPass);
 }
 
 }  // namespace

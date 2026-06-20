@@ -67,7 +67,6 @@ TEST(SdfMtmKeyword, ToolControlReturnsCallerSuppliedDefaultMtm) {
 }
 
 TEST(SdfMtmKeyword, NamedKeywordOverridesCallerSuppliedDefault) {
-
   EXPECT_EQ(ResolveSdfMtm(SdfMtmKeyword::kMaximum, SdfMtm::kMinimum),
             SdfMtm::kMaximum);
   EXPECT_EQ(ResolveSdfMtm(SdfMtmKeyword::kMinimum, SdfMtm::kMaximum),
@@ -169,7 +168,6 @@ TEST(SdfScaling, FromMaximumDerivesEverySlotFromTheMaximumValue) {
 }
 
 TEST(SdfScaling, FromMinimumDerivesEverySlotFromTheMinimumValue) {
-
   SdfDelayValue v;
   v.min_val = 10;
   v.typ_val = 20;
@@ -185,7 +183,6 @@ TEST(SdfScaling, FromMinimumDerivesEverySlotFromTheMinimumValue) {
 }
 
 TEST(SdfScaling, FromTypicalDerivesEverySlotFromTheTypicalValue) {
-
   SdfDelayValue v;
   v.min_val = 10;
   v.typ_val = 20;
@@ -217,7 +214,8 @@ TEST(SdfAnnotateScaling,
         (CELLTYPE "buf")
         (INSTANCE u1)
         (DELAY (ABSOLUTE (IOPATH A Z (10) (20))))))
-  )", file));
+  )",
+                       file));
 
   SdfScaleFactors factors;
   factors.min_factor = 1.6;
@@ -284,7 +282,8 @@ TEST(SdfAnnotationLog, OneEntryWrittenPerIndividualAnnotation) {
           (IOPATH A Z (10) (20))
           (IOPATH B Z (5)  (8))
           (IOPATH C Z (1)  (2))))))
-  )", file));
+  )",
+                       file));
 
   std::string log_path = "/tmp/sdf_annotate_log_test.log";
   std::remove(log_path.c_str());
@@ -314,7 +313,8 @@ TEST(SdfAnnotationLog, EveryBackannotationCategoryContributesAnEntry) {
           (PATHPULSE A Z (3))))
         (TIMINGCHECK (SETUP D (posedge CLK) (4)))
         (LABEL (ABSOLUTE (tHold 11)))))
-  )", file));
+  )",
+                       file));
 
   std::string log_path = "/tmp/sdf_annotate_log_test_categories.log";
   std::remove(log_path.c_str());
@@ -342,7 +342,8 @@ TEST(SdfAnnotationLog, EmptyPathIsANoOpAndReportsSuccess) {
         (CELLTYPE "buf")
         (INSTANCE u1)
         (DELAY (ABSOLUTE (IOPATH A Z (10))))))
-  )", file));
+  )",
+                       file));
   EXPECT_TRUE(WriteSdfAnnotationLog(file, ""));
 }
 
@@ -354,7 +355,8 @@ TEST(SdfAnnotationLog, UnwritablePathReportsFailureToCaller) {
         (CELLTYPE "buf")
         (INSTANCE u1)
         (DELAY (ABSOLUTE (IOPATH A Z (10))))))
-  )", file));
+  )",
+                       file));
 
   EXPECT_FALSE(WriteSdfAnnotationLog(
       file, "/tmp/nonexistent_dir_for_sdf_log_test/x.log"));
@@ -418,16 +420,14 @@ TEST(SdfAnnotateRequest, EmptyScopePreservesSdfFileForCallerDefaulting) {
   EXPECT_TRUE(mgr.GetSdfAnnotations()[0].scope.empty());
 }
 
-TEST(SdfAnnotateArgResolver,
-     ExplicitMtmSpecOverridesConfigFileKeyword) {
+TEST(SdfAnnotateArgResolver, ExplicitMtmSpecOverridesConfigFileKeyword) {
   SdfAnnotateConfig config;
   config.mtm_spec = "MAXIMUM";
   auto out = ResolveSdfAnnotateArgs("MINIMUM", "", "", config);
   EXPECT_EQ(out.mtm, SdfMtmKeyword::kMinimum);
 }
 
-TEST(SdfAnnotateArgResolver,
-     EmptyExplicitMtmSpecFallsThroughToConfigKeyword) {
+TEST(SdfAnnotateArgResolver, EmptyExplicitMtmSpecFallsThroughToConfigKeyword) {
   SdfAnnotateConfig config;
   config.mtm_spec = "MAXIMUM";
   auto out = ResolveSdfAnnotateArgs("", "", "", config);
@@ -441,8 +441,7 @@ TEST(SdfAnnotateArgResolver,
   EXPECT_EQ(out.mtm, SdfMtmKeyword::kToolControl);
 }
 
-TEST(SdfAnnotateArgResolver,
-     ExplicitScaleFactorsOverrideConfigFileKeyword) {
+TEST(SdfAnnotateArgResolver, ExplicitScaleFactorsOverrideConfigFileKeyword) {
   SdfAnnotateConfig config;
   config.scale_factors = "2.0:3.0:4.0";
   auto out = ResolveSdfAnnotateArgs("", "1.6:1.4:1.2", "", config);
@@ -461,8 +460,7 @@ TEST(SdfAnnotateArgResolver,
   EXPECT_DOUBLE_EQ(out.factors.max_factor, 4.0);
 }
 
-TEST(SdfAnnotateArgResolver,
-     ExplicitScaleTypeOverridesConfigFileKeyword) {
+TEST(SdfAnnotateArgResolver, ExplicitScaleTypeOverridesConfigFileKeyword) {
   SdfAnnotateConfig config;
   config.scale_type = "FROM_MAXIMUM";
   auto out = ResolveSdfAnnotateArgs("", "", "FROM_MINIMUM", config);
@@ -477,8 +475,7 @@ TEST(SdfAnnotateArgResolver,
   EXPECT_EQ(out.scale_type, SdfScaleType::kFromMaximum);
 }
 
-TEST(SdfAnnotateArgResolver,
-     EmptyExplicitAndEmptyConfigYieldsFromMtmDefault) {
+TEST(SdfAnnotateArgResolver, EmptyExplicitAndEmptyConfigYieldsFromMtmDefault) {
   SdfAnnotateConfig config;
   auto out = ResolveSdfAnnotateArgs("", "", "", config);
   EXPECT_EQ(out.scale_type, SdfScaleType::kFromMtm);
@@ -539,7 +536,8 @@ TEST(SdfAnnotateScope, RestrictsAnnotationToInstancesWithinSpecifiedScope) {
         (DELAY (ABSOLUTE (IOPATH A Z (10)))))
       (CELL (CELLTYPE "buf") (INSTANCE top/other/leaf)
         (DELAY (ABSOLUTE (IOPATH B Y (20))))))
-  )", file));
+  )",
+                       file));
 
   AnnotateSdfToManager(file, mgr, SdfMtm::kTypical, "top/sub");
 
@@ -570,7 +568,8 @@ TEST(SdfAnnotateScope, ScopeMatchRequiresHierarchySeparatorNotMerePrefix) {
     (DELAYFILE
       (CELL (CELLTYPE "buf") (INSTANCE top/u1x)
         (DELAY (ABSOLUTE (IOPATH A Z (10))))))
-  )", file));
+  )",
+                       file));
 
   AnnotateSdfToManager(file, mgr, SdfMtm::kTypical, "top/u1");
 
@@ -578,4 +577,4 @@ TEST(SdfAnnotateScope, ScopeMatchRequiresHierarchySeparatorNotMerePrefix) {
   EXPECT_EQ(mgr.GetPathDelays()[0].delays[0], 0u);
 }
 
-}
+}  // namespace

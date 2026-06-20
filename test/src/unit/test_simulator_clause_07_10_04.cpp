@@ -87,7 +87,8 @@ TEST(QueueAssign, SliceFromOneEquivPopFront) {
   SimFixture f;
   MakeQueue(f, "q", {10, 20, 30});
 
-  auto* slice = MakeSlice(f.arena, "q", MakeInt(f.arena, 1), MakeDollar(f.arena));
+  auto* slice =
+      MakeSlice(f.arena, "q", MakeInt(f.arena, 1), MakeDollar(f.arena));
   auto* rhs = MakeConcat(f.arena, {slice});
   auto* stmt = MakeAssign(f.arena, "q", rhs);
   TryQueueBlockingAssign(stmt, f.ctx, f.arena);
@@ -118,8 +119,10 @@ TEST(QueueAssign, ConcatInsertAtPosEquivInsert) {
   SimFixture f;
   MakeQueue(f, "q", {10, 20, 30, 40});
 
-  auto* left = MakeSlice(f.arena, "q", MakeInt(f.arena, 0), MakeInt(f.arena, 1));
-  auto* right = MakeSlice(f.arena, "q", MakeInt(f.arena, 2), MakeDollar(f.arena));
+  auto* left =
+      MakeSlice(f.arena, "q", MakeInt(f.arena, 0), MakeInt(f.arena, 1));
+  auto* right =
+      MakeSlice(f.arena, "q", MakeInt(f.arena, 2), MakeDollar(f.arena));
   auto* rhs = MakeConcat(f.arena, {left, MakeInt(f.arena, 99), right});
   auto* stmt = MakeAssign(f.arena, "q", rhs);
   TryQueueBlockingAssign(stmt, f.ctx, f.arena);
@@ -148,7 +151,8 @@ TEST(QueueAssign, SliceDropFirstTwo) {
   SimFixture f;
   MakeQueue(f, "q", {10, 20, 30, 40, 50});
 
-  auto* slice = MakeSlice(f.arena, "q", MakeInt(f.arena, 2), MakeDollar(f.arena));
+  auto* slice =
+      MakeSlice(f.arena, "q", MakeInt(f.arena, 2), MakeDollar(f.arena));
   auto* rhs = MakeConcat(f.arena, {slice});
   auto* stmt = MakeAssign(f.arena, "q", rhs);
   TryQueueBlockingAssign(stmt, f.ctx, f.arena);
@@ -198,7 +202,8 @@ TEST(QueueAssign, SliceAssignOutdatesAllRefs) {
   auto* q = MakeQueue(f, "q", {10, 20, 30});
   auto old_gen = q->generation;
 
-  auto* slice = MakeSlice(f.arena, "q", MakeInt(f.arena, 1), MakeDollar(f.arena));
+  auto* slice =
+      MakeSlice(f.arena, "q", MakeInt(f.arena, 1), MakeDollar(f.arena));
   auto* rhs = MakeConcat(f.arena, {slice});
   auto* stmt = MakeAssign(f.arena, "q", rhs);
   TryQueueBlockingAssign(stmt, f.ctx, f.arena);
@@ -236,7 +241,8 @@ TEST(QueueAssign, SlicePopFrontOnSingleElement) {
   SimFixture f;
   MakeQueue(f, "q", {42});
 
-  auto* slice = MakeSlice(f.arena, "q", MakeInt(f.arena, 1), MakeDollar(f.arena));
+  auto* slice =
+      MakeSlice(f.arena, "q", MakeInt(f.arena, 1), MakeDollar(f.arena));
   auto* rhs = MakeConcat(f.arena, {slice});
   auto* stmt = MakeAssign(f.arena, "q", rhs);
   TryQueueBlockingAssign(stmt, f.ctx, f.arena);
@@ -347,15 +353,17 @@ TEST(QueueAssign, BareSliceDropFirstAndLast) {
   EXPECT_EQ(q->elements[2].ToUint64(), 40u);
 }
 
-// Second insert example: q = {q[0:pos], e, q[pos+1:$]} mirrors insert(pos+1, e).
-// With pos = 2 the new element lands after index 2, distinct from the
+// Second insert example: q = {q[0:pos], e, q[pos+1:$]} mirrors insert(pos+1,
+// e). With pos = 2 the new element lands after index 2, distinct from the
 // q[0:pos-1]/q[pos:$] form above.
 TEST(QueueAssign, ConcatInsertAfterPosEquivInsertPlus1) {
   SimFixture f;
   MakeQueue(f, "q", {10, 20, 30, 40});
 
-  auto* left = MakeSlice(f.arena, "q", MakeInt(f.arena, 0), MakeInt(f.arena, 2));
-  auto* right = MakeSlice(f.arena, "q", MakeInt(f.arena, 3), MakeDollar(f.arena));
+  auto* left =
+      MakeSlice(f.arena, "q", MakeInt(f.arena, 0), MakeInt(f.arena, 2));
+  auto* right =
+      MakeSlice(f.arena, "q", MakeInt(f.arena, 3), MakeDollar(f.arena));
   auto* rhs = MakeConcat(f.arena, {left, MakeInt(f.arena, 99), right});
   auto* stmt = MakeAssign(f.arena, "q", rhs);
   TryQueueBlockingAssign(stmt, f.ctx, f.arena);
@@ -369,4 +377,4 @@ TEST(QueueAssign, ConcatInsertAfterPosEquivInsertPlus1) {
   EXPECT_EQ(q->elements[4].ToUint64(), 40u);
 }
 
-}
+}  // namespace

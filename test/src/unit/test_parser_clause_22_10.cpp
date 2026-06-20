@@ -17,4 +17,4 @@ TEST(CompilerDirectiveParsing, CelldefineEndcelldefine) {
                               "`endcelldefine\n"));
 }
 
-}
+}  // namespace

@@ -130,4 +130,4 @@ TEST(SpecifyTerminalElaboration, InterfacePortFormElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

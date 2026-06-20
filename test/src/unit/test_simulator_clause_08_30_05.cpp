@@ -97,4 +97,4 @@ TEST(ClassSim, WeakRefGetIdStaticCallSameAcrossSpecializations) {
   EXPECT_EQ(id_base->value.ToUint64(), id_derived->value.ToUint64());
 }
 
-}
+}  // namespace

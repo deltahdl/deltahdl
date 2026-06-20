@@ -32,7 +32,7 @@ uint32_t ComputeMaxDepth(const LutMapping& mapping) {
   return static_cast<uint32_t>(mapping.cells.size());
 }
 
-}
+}  // namespace
 
 uint32_t RetimeForward(AigGraph& g) {
   uint32_t moved = 0;
@@ -71,14 +71,12 @@ uint32_t RetimeForward(AigGraph& g) {
 }
 
 uint32_t RetimeBackward(AigGraph& g) {
-
   uint32_t moved = 0;
   ConstProp(g);
   return moved;
 }
 
 LutMapping MapForDelay(const AigGraph& g, uint32_t lut_size) {
-
   LutMapper mapper(lut_size);
   LutMapping mapping = mapper.Map(g);
 
@@ -96,7 +94,6 @@ static LutMapping MapForArea(const AigGraph& g, uint32_t lut_size) {
 
 LutMapping IterativeAreaDelay(const AigGraph& g, uint32_t lut_size,
                               uint32_t iterations) {
-
   LutMapping best = MapForDelay(g, lut_size);
   auto best_area = static_cast<uint32_t>(best.cells.size());
   uint32_t best_depth = ComputeMaxDepth(best);
@@ -131,4 +128,4 @@ LutMapping IterativeAreaDelay(const AigGraph& g, uint32_t lut_size,
   return best;
 }
 
-}
+}  // namespace delta

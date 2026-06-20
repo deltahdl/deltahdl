@@ -78,75 +78,80 @@ TEST(ClassScopeResolutionSim, ScopeResolutionBaseClassStatic) {
 }
 
 TEST(ClassScopeResolutionSim, ScopeResolutionCallReturnsValue) {
-  EXPECT_EQ(RunAndGet(
-      "class Util;\n"
-      "  static function int answer();\n"
-      "    return 42;\n"
-      "  endfunction\n"
-      "endclass\n"
-      "module t;\n"
-      "  int result;\n"
-      "  initial begin\n"
-      "    result = Util::answer();\n"
-      "  end\n"
-      "endmodule\n", "result"), 42u);
+  EXPECT_EQ(RunAndGet("class Util;\n"
+                      "  static function int answer();\n"
+                      "    return 42;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    result = Util::answer();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            42u);
 }
 
 TEST(ClassScopeResolutionSim, StaticPropertyReadViaScope) {
-  EXPECT_EQ(RunAndGet(
-      "class C;\n"
-      "  static int count;\n"
-      "endclass\n"
-      "module t;\n"
-      "  int result;\n"
-      "  initial begin\n"
-      "    result = C::count;\n"
-      "  end\n"
-      "endmodule\n", "result"), 0u);
+  EXPECT_EQ(RunAndGet("class C;\n"
+                      "  static int count;\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    result = C::count;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            0u);
 }
 
 TEST(ClassScopeResolutionSim, StaticPropertyReadWithInit) {
-  EXPECT_EQ(RunAndGet(
-      "class C;\n"
-      "  static int val = 99;\n"
-      "endclass\n"
-      "module t;\n"
-      "  int result;\n"
-      "  initial result = C::val;\n"
-      "endmodule\n", "result"), 99u);
+  EXPECT_EQ(RunAndGet("class C;\n"
+                      "  static int val = 99;\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial result = C::val;\n"
+                      "endmodule\n",
+                      "result"),
+            99u);
 }
 
 TEST(ClassScopeResolutionSim, StaticMethodWithArgs) {
-  EXPECT_EQ(RunAndGet(
-      "class Math;\n"
-      "  static function int add(int a, int b);\n"
-      "    return a + b;\n"
-      "  endfunction\n"
-      "endclass\n"
-      "module t;\n"
-      "  int result;\n"
-      "  initial result = Math::add(10, 25);\n"
-      "endmodule\n", "result"), 35u);
+  EXPECT_EQ(RunAndGet("class Math;\n"
+                      "  static function int add(int a, int b);\n"
+                      "    return a + b;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial result = Math::add(10, 25);\n"
+                      "endmodule\n",
+                      "result"),
+            35u);
 }
 
 TEST(ClassScopeResolutionSim, StaticVoidMethodCall) {
-  EXPECT_EQ(RunAndGet(
-      "class C;\n"
-      "  static int x;\n"
-      "  static function void set_x(int v);\n"
-      "    x = v;\n"
-      "  endfunction\n"
-      "  static function int get_x();\n"
-      "    return x;\n"
-      "  endfunction\n"
-      "endclass\n"
-      "module t;\n"
-      "  int result;\n"
-      "  initial begin\n"
-      "    C::set_x(77);\n"
-      "    result = C::get_x();\n"
-      "  end\n"
-      "endmodule\n", "result"), 77u);
+  EXPECT_EQ(RunAndGet("class C;\n"
+                      "  static int x;\n"
+                      "  static function void set_x(int v);\n"
+                      "    x = v;\n"
+                      "  endfunction\n"
+                      "  static function int get_x();\n"
+                      "    return x;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    C::set_x(77);\n"
+                      "    result = C::get_x();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            77u);
 }
 
 TEST(ClassScopeResolutionSim, EnumMemberReadViaScope) {
@@ -162,15 +167,16 @@ TEST(ClassScopeResolutionSim, EnumMemberReadViaScope) {
 }
 
 TEST(ClassScopeResolutionSim, DisambiguatesClassScopeFromLocal) {
-  EXPECT_EQ(RunAndGet(
-      "class Base;\n"
-      "  static int val = 42;\n"
-      "endclass\n"
-      "module t;\n"
-      "  int val = 100;\n"
-      "  int result;\n"
-      "  initial result = Base::val;\n"
-      "endmodule\n", "result"), 42u);
+  EXPECT_EQ(RunAndGet("class Base;\n"
+                      "  static int val = 42;\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int val = 100;\n"
+                      "  int result;\n"
+                      "  initial result = Base::val;\n"
+                      "endmodule\n",
+                      "result"),
+            42u);
 }
 
 TEST(ClassScopeResolutionSim, UnknownClassTypeReturnsDefault) {
@@ -212,24 +218,26 @@ TEST(ClassScopeResolutionSim, StaticPropertyLoweredFromDecl) {
       "    r1 = Config::WIDTH;\n"
       "    r2 = Config::DEPTH;\n"
       "  end\n"
-      "endmodule\n", f);
+      "endmodule\n",
+      f);
   LowerRunAndCheck(f, design, {{"r1", 8u}, {"r2", 16u}});
 }
 
 TEST(ClassScopeResolutionSim, SuperclassStaticAccessFromDerived) {
-  EXPECT_EQ(RunAndGet(
-      "class Base;\n"
-      "  static int shared = 55;\n"
-      "endclass\n"
-      "class Derived extends Base;\n"
-      "  static function int get_shared();\n"
-      "    return Base::shared;\n"
-      "  endfunction\n"
-      "endclass\n"
-      "module t;\n"
-      "  int result;\n"
-      "  initial result = Derived::get_shared();\n"
-      "endmodule\n", "result"), 55u);
+  EXPECT_EQ(RunAndGet("class Base;\n"
+                      "  static int shared = 55;\n"
+                      "endclass\n"
+                      "class Derived extends Base;\n"
+                      "  static function int get_shared();\n"
+                      "    return Base::shared;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial result = Derived::get_shared();\n"
+                      "endmodule\n",
+                      "result"),
+            55u);
 }
 
-}
+}  // namespace

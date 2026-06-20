@@ -25,7 +25,8 @@ std::string WriteTmp(const char* tag, const std::string& data) {
 // Invokes $readmemb / $readmemh on a memory named by a bare identifier.
 void Readmem(SimFixture& f, const char* task, const std::string& path,
              const char* mem) {
-  std::vector<Expr*> args = {MkStr(f.arena, path.c_str()), MakeId(f.arena, mem)};
+  std::vector<Expr*> args = {MkStr(f.arena, path.c_str()),
+                             MakeId(f.arena, mem)};
   EvalExpr(MakeSysCall(f.arena, task, args), f.ctx, f.arena);
 }
 
@@ -126,7 +127,8 @@ TEST(Readmem2StateTest, EnumeratedValueOutOfRangeErrorsAndStopsReading) {
 
   EXPECT_TRUE(f.diag.HasErrors());
   EXPECT_EQ(Cell(f, "mem", 0)->value.ToUint64(), 1u);  // word before the error
-  EXPECT_EQ(Cell(f, "mem", 1)->value.ToUint64(), 0u);  // out-of-range word dropped
+  EXPECT_EQ(Cell(f, "mem", 1)->value.ToUint64(),
+            0u);  // out-of-range word dropped
   EXPECT_EQ(Cell(f, "mem", 2)->value.ToUint64(), 0u);  // later word never read
   std::remove(path.c_str());
 }

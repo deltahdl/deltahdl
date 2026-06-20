@@ -43,4 +43,4 @@ TEST(StringMethods, HextoaIsInverseOfAtohex) {
   EXPECT_EQ(result.ToUint64(), 0xABCu);
 }
 
-}
+}  // namespace

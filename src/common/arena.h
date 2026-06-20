@@ -129,4 +129,4 @@ class Arena {
   std::vector<DtorEntry> dtors_;
 };
 
-}
+}  // namespace delta

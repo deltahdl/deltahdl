@@ -174,4 +174,4 @@ TEST(ModuleAndHierarchyParsing, ErrorNestedModuleMissingEndmodule) {
   EXPECT_TRUE(r.has_errors);
 }
 
-}
+}  // namespace

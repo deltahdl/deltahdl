@@ -21,4 +21,4 @@ TEST(PackageDeclarationPreprocessing, PackageDeclarationsAndEndLabel) {
       HasItemOfKind(r.cu->packages[0]->items, ModuleItemKind::kFunctionDecl));
 }
 
-}
+}  // namespace

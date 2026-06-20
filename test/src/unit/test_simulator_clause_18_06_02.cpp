@@ -25,8 +25,7 @@ TEST(PrePostRandomize, PreBeforeComputePostAfterCompute) {
 
   size_t values_at_pre = 999;
   size_t values_at_post = 999;
-  solver.SetPreRandomize(
-      [&]() { values_at_pre = solver.GetValues().size(); });
+  solver.SetPreRandomize([&]() { values_at_pre = solver.GetValues().size(); });
   solver.SetPostRandomize(
       [&]() { values_at_post = solver.GetValues().size(); });
 
@@ -87,4 +86,4 @@ TEST(PrePostRandomize, PreThenPostInvokedExactlyOnceInOrder) {
   EXPECT_EQ(events, expected);
 }
 
-}
+}  // namespace

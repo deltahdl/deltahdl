@@ -104,7 +104,8 @@ TEST(PackageImport, ExplicitImportCollidesWithExistingLocalDeclaration) {
              "endmodule\n"));
 }
 
-TEST(PackageImport, ExplicitImportCollidesWithExplicitImportFromAnotherPackage) {
+TEST(PackageImport,
+     ExplicitImportCollidesWithExplicitImportFromAnotherPackage) {
   EXPECT_FALSE(
       ElabOk("package p1;\n"
              "  parameter int X = 1;\n"
@@ -227,4 +228,4 @@ TEST(PackageImport, UnresolvedReferenceIsError) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

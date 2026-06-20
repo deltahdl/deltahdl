@@ -139,4 +139,4 @@ TEST(DesignBuildingBlockParsing, EffectiveOrderOrdersMagnitudeAndUnit) {
             EffectiveTimeOrder(TimeUnit::kNs, 1));
 }
 
-}
+}  // namespace

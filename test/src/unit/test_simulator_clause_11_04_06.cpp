@@ -279,4 +279,4 @@ TEST(OperatorSim, WildcardNeqWithXLiteral) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-}
+}  // namespace

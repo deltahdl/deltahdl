@@ -177,10 +177,11 @@ TEST(BehaviorOfRandomizationMethods, ObjectRandomStabilityIsSeedDetermined) {
 // 18.6.3 (edge of B1 + B2): the shared cell of a static random variable is only
 // updated by a successful randomize(). When one instance commits a value and a
 // later randomize() on another instance fails, the failing call leaves the
-// shared value at the one the successful call published — it does not change the
-// static variable in any instance, since the variables retain their previous
-// values on failure.
-TEST(BehaviorOfRandomizationMethods, FailedRandomizeLeavesSharedStaticUnchanged) {
+// shared value at the one the successful call published — it does not change
+// the static variable in any instance, since the variables retain their
+// previous values on failure.
+TEST(BehaviorOfRandomizationMethods,
+     FailedRandomizeLeavesSharedStaticUnchanged) {
   auto shared = std::make_shared<int64_t>(0);
 
   auto make_static = [&]() {

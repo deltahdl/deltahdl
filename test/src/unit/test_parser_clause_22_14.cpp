@@ -41,4 +41,4 @@ TEST(KeywordVersionParsing, OldVersionIdentifierInExpression) {
                               "`end_keywords\n"));
 }
 
-}
+}  // namespace

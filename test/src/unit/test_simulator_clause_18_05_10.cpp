@@ -33,8 +33,9 @@ ConstraintExpr XGreaterThanFive() {
 }
 
 // Build a solver holding x in [0, 3] and one constraint block 'c' carrying the
-// unsatisfiable 'x > 5'. When 'shared' is non-null the block is static and binds
-// its on/off state to that shared cell, modelling one instance of the class.
+// unsatisfiable 'x > 5'. When 'shared' is non-null the block is static and
+// binds its on/off state to that shared cell, modelling one instance of the
+// class.
 ConstraintSolver MakeInstance(uint32_t seed, std::shared_ptr<bool> shared) {
   ConstraintSolver solver(seed);
   solver.AddVariable(MakeVar("x", 0, 3));
@@ -50,11 +51,11 @@ ConstraintSolver MakeInstance(uint32_t seed, std::shared_ptr<bool> shared) {
   return solver;
 }
 
-// 18.5.10: a constraint_mode() call on a static constraint affects all instances
-// of the class. Model two instances whose static block 'c' shares one on/off
-// cell: turning the constraint off through one instance is observed by the other
-// — its enabled state, reported by constraint_mode() with no argument, reads as
-// off without any call of its own.
+// 18.5.10: a constraint_mode() call on a static constraint affects all
+// instances of the class. Model two instances whose static block 'c' shares one
+// on/off cell: turning the constraint off through one instance is observed by
+// the other — its enabled state, reported by constraint_mode() with no
+// argument, reads as off without any call of its own.
 TEST(StaticConstraintMode, StaticConstraintModeIsSharedAcrossInstances) {
   auto shared = std::make_shared<bool>(true);
   ConstraintSolver inst_a = MakeInstance(11, shared);
@@ -115,8 +116,8 @@ TEST(StaticConstraintMode, DisablingStaticConstraintAffectsOtherInstanceCheck) {
   inst_b.SetValue("x", 0);
   EXPECT_FALSE(inst_b.Check());
 
-  // Turning the static constraint off through the first instance removes it from
-  // the second instance's evaluation, so the same values now check clean.
+  // Turning the static constraint off through the first instance removes it
+  // from the second instance's evaluation, so the same values now check clean.
   inst_a.SetConstraintMode("c", false);
   EXPECT_TRUE(inst_b.Check());
 }

@@ -15,8 +15,8 @@ namespace {
 // working from that context up to the top-level process. Its content is
 // implementation dependent; this build reports the names of the active
 // subroutine frames, innermost first. These tests drive the simulator's
-// $stacktrace handling (eval_function.cpp for the function form that returns the
-// string, stmt_exec.cpp for the task form that displays it).
+// $stacktrace handling (eval_function.cpp for the function form that returns
+// the string, stmt_exec.cpp for the task form that displays it).
 
 // Decode a string-valued Logic4Vec back into the characters it packs, so the
 // text returned by the function form of $stacktrace can be inspected.
@@ -60,9 +60,9 @@ TEST(Stacktrace, FunctionFormReportsLoneFrameWithoutSeparator) {
 
 // §20.17.2: the function form follows the call stack only up to the top-level
 // process. Evaluated directly from a top-level process, with no enclosing
-// subroutine frame, the function returns an empty call-stack string. This drives
-// the function dispatch (eval_function.cpp) on an empty stack, the edge its
-// frame-bearing counterparts above do not reach.
+// subroutine frame, the function returns an empty call-stack string. This
+// drives the function dispatch (eval_function.cpp) on an empty stack, the edge
+// its frame-bearing counterparts above do not reach.
 TEST(Stacktrace, FunctionFormAtTopLevelReturnsEmptyString) {
   SimFixture f;
   auto* call = MkSysCall(f.arena, "$stacktrace", {});

@@ -84,4 +84,4 @@ TEST(DataTypeParsing, TypedefChainPreprocessor) {
   EXPECT_EQ(var->data_type.type_name, "addr_t");
 }
 
-}
+}  // namespace

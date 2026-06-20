@@ -16,4 +16,4 @@ TEST(InterfaceDeclParsing, EmptyModport) {
   EXPECT_EQ(mp->name, "empty");
 }
 
-}
+}  // namespace

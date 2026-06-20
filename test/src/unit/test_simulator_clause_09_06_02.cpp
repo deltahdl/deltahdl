@@ -342,4 +342,4 @@ TEST(DisableStatementExecution, DisableTaskWithProceduralAssignDoesNotCrash) {
   LowerAndRun(design, f);
 }
 
-}
+}  // namespace

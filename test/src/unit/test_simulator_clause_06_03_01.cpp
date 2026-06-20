@@ -131,4 +131,4 @@ TEST(LogicValuesSim, FourStateVectorBitsAreIndependentlySettable) {
   EXPECT_EQ(vec.ToString(), "zx10");
 }
 
-}
+}  // namespace

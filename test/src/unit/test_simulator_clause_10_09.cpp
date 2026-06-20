@@ -270,4 +270,4 @@ TEST(AssignmentPatternSimulation, PatternInForLoop) {
   EXPECT_EQ(var->value.ToUint64(), 1800u);
 }
 
-}
+}  // namespace

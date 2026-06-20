@@ -9,31 +9,40 @@ namespace {
 
 TEST(Lexer, KeywordVersion_1364_2001_AllAdditionalKeywordsRecognized) {
   const char* kTable22_2[] = {
-      "automatic",           "cell",
-      "config",              "design",
-      "endconfig",           "endgenerate",
-      "generate",            "genvar",
-      "incdir",              "include",
-      "instance",            "liblist",
-      "library",             "localparam",
-      "noshowcancelled",     "pulsestyle_ondetect",
-      "pulsestyle_onevent",  "showcancelled",
-      "signed",              "unsigned",
+      "automatic",
+      "cell",
+      "config",
+      "design",
+      "endconfig",
+      "endgenerate",
+      "generate",
+      "genvar",
+      "incdir",
+      "include",
+      "instance",
+      "liblist",
+      "library",
+      "localparam",
+      "noshowcancelled",
+      "pulsestyle_ondetect",
+      "pulsestyle_onevent",
+      "showcancelled",
+      "signed",
+      "unsigned",
       "use",
   };
   for (const char* kw : kTable22_2) {
     auto result = LookupKeyword(kw, KeywordVersion::kVer13642001);
-    EXPECT_TRUE(result.has_value()) << kw << " should be a keyword in 1364-2001";
+    EXPECT_TRUE(result.has_value())
+        << kw << " should be a keyword in 1364-2001";
   }
 }
 
 TEST(Lexer, KeywordVersion_1364_2001_Includes1364_1995Keywords) {
   EXPECT_TRUE(
       LookupKeyword("module", KeywordVersion::kVer13642001).has_value());
-  EXPECT_TRUE(
-      LookupKeyword("wire", KeywordVersion::kVer13642001).has_value());
-  EXPECT_TRUE(
-      LookupKeyword("reg", KeywordVersion::kVer13642001).has_value());
+  EXPECT_TRUE(LookupKeyword("wire", KeywordVersion::kVer13642001).has_value());
+  EXPECT_TRUE(LookupKeyword("reg", KeywordVersion::kVer13642001).has_value());
   EXPECT_TRUE(
       LookupKeyword("always", KeywordVersion::kVer13642001).has_value());
   EXPECT_TRUE(
@@ -41,14 +50,12 @@ TEST(Lexer, KeywordVersion_1364_2001_Includes1364_1995Keywords) {
 }
 
 TEST(Lexer, KeywordVersion_1364_2001_LaterKeywordsNotRecognized) {
-
   EXPECT_FALSE(
       LookupKeyword("uwire", KeywordVersion::kVer13642001).has_value());
 
   EXPECT_FALSE(
       LookupKeyword("logic", KeywordVersion::kVer13642001).has_value());
-  EXPECT_FALSE(
-      LookupKeyword("bit", KeywordVersion::kVer13642001).has_value());
+  EXPECT_FALSE(LookupKeyword("bit", KeywordVersion::kVer13642001).has_value());
   EXPECT_FALSE(
       LookupKeyword("interface", KeywordVersion::kVer13642001).has_value());
   EXPECT_FALSE(
@@ -63,4 +70,4 @@ TEST(Lexer, KeywordVersion_1364_2001_NonKeywordIdentifier) {
   EXPECT_FALSE(kw.has_value());
 }
 
-}
+}  // namespace

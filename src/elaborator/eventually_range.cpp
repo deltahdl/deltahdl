@@ -3,9 +3,10 @@
 namespace delta {
 
 // §16.12.13: only an unbounded (`$`) upper bound is constrained by this
-// subclause. A weak `eventually` range shall be bounded, so an unbounded maximum
-// is rejected for it; a strong `s_eventually` range may be unbounded, so the same
-// maximum is accepted there. Any finite upper bound is permitted for both forms.
+// subclause. A weak `eventually` range shall be bounded, so an unbounded
+// maximum is rejected for it; a strong `s_eventually` range may be unbounded,
+// so the same maximum is accepted there. Any finite upper bound is permitted
+// for both forms.
 bool IsEventuallyRangeWellFormed(EventuallyRangeBound upper, bool strong) {
   if (upper.is_dollar) {
     return strong;
@@ -25,4 +26,4 @@ EventuallyRangeBound MakeEventuallyDollar() {
   return bound;
 }
 
-}
+}  // namespace delta

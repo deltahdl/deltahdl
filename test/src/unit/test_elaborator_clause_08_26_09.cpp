@@ -78,7 +78,8 @@ TEST(InterfaceClassRandomize, RandomizeOnInterfaceHandleOk) {
              "endmodule\n"));
 }
 
-TEST(InterfaceClassRandomize, RandomizeWithInlineConstraintOnInterfaceHandleOk) {
+TEST(InterfaceClassRandomize,
+     RandomizeWithInlineConstraintOnInterfaceHandleOk) {
   EXPECT_TRUE(
       ElabOk("interface class IC;\n"
              "  pure virtual function void foo();\n"
@@ -170,7 +171,8 @@ TEST(InterfaceClassPrePostRandomize, OverridePostRandomizeInImplementor) {
              "endmodule\n"));
 }
 
-TEST(InterfaceClassPrePostRandomize, BuiltinRandomizeMethodsAcrossInterfacesNoConflict) {
+TEST(InterfaceClassPrePostRandomize,
+     BuiltinRandomizeMethodsAcrossInterfacesNoConflict) {
   // §8.26.9 special case: even when more than one implemented interface class
   // carries pre_randomize/post_randomize, those names shall not be treated as
   // an interface method name conflict. Declaring both in two distinct
@@ -198,7 +200,8 @@ TEST(InterfaceClassPrePostRandomize, BuiltinRandomizeMethodsAcrossInterfacesNoCo
              "endmodule\n"));
 }
 
-TEST(InterfaceClassPrePostRandomize, PrePostRandomizeNoConflictMultipleInterfaces) {
+TEST(InterfaceClassPrePostRandomize,
+     PrePostRandomizeNoConflictMultipleInterfaces) {
   EXPECT_TRUE(
       ElabOk("interface class A;\n"
              "  pure virtual function void fa();\n"
@@ -220,4 +223,4 @@ TEST(InterfaceClassPrePostRandomize, PrePostRandomizeNoConflictMultipleInterface
              "endmodule\n"));
 }
 
-}
+}  // namespace

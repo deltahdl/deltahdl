@@ -45,4 +45,4 @@ TEST(ConstraintFourState, TwoStateConstraintAccepted) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}
+}  // namespace

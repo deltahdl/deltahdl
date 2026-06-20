@@ -17,4 +17,4 @@ TEST(AggregateTypeParsing, ArrayMapMethod) {
   ASSERT_NE(stmt->rhs, nullptr);
 }
 
-}
+}  // namespace

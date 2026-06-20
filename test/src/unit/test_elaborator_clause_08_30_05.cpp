@@ -47,4 +47,4 @@ TEST(ClassConstraintElaboration, WeakRefGetIdInExpressionOk) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

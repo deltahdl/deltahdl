@@ -4,13 +4,13 @@ namespace delta {
 
 namespace {
 
-// §16.12.11: a bound is a usable non-negative integer constant when it folded to
-// a constant, is integer-valued, and is not negative.
+// §16.12.11: a bound is a usable non-negative integer constant when it folded
+// to a constant, is integer-valued, and is not negative.
 bool IsNonNegativeIntegerConstant(const AlwaysRangeBound& bound) {
   return bound.is_constant && bound.is_integer && bound.value >= 0;
 }
 
-}
+}  // namespace
 
 // §16.12.11: enforce the range restrictions. The minimum is always a
 // non-negative integer constant expression. The maximum is either `$` or a
@@ -43,4 +43,4 @@ AlwaysRangeBound MakeAlwaysDollar() {
   return bound;
 }
 
-}
+}  // namespace delta

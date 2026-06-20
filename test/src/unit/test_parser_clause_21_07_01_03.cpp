@@ -15,4 +15,4 @@ TEST(IoSystemTaskParsing, DumpOffOnSequence) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

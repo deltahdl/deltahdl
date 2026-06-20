@@ -118,7 +118,6 @@ Direction Parser::ParseClockingDirection(Edge& in_edge, Expr*& in_delay,
 }
 
 void Parser::ParseClockingItem(ModuleItem* item) {
-
   if (Check(TokenKind::kKwDefault)) {
     Consume();
     if (Match(TokenKind::kKwInput)) {
@@ -217,4 +216,4 @@ Stmt* Parser::ParseWaitOrderStmt() {
   return stmt;
 }
 
-}
+}  // namespace delta

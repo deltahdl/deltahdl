@@ -63,7 +63,6 @@ TEST(SignedAndUnsigned, PackedArraysOfUnsignedTypesAreUnsigned) {
 }
 
 TEST(SignedAndUnsigned, ExplicitSignedOverrideObservedAtRuntime) {
-
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -87,7 +86,6 @@ TEST(SignedAndUnsigned, ExplicitSignedOverrideObservedAtRuntime) {
 }
 
 TEST(SignedAndUnsigned, ExplicitUnsignedOverrideObservedAtRuntime) {
-
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -110,4 +108,4 @@ TEST(SignedAndUnsigned, ExplicitUnsignedOverrideObservedAtRuntime) {
   EXPECT_EQ(dst->value.ToUint64(), 0x00000000FFFFFFFFull);
 }
 
-}
+}  // namespace

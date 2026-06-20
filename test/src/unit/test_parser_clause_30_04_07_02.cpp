@@ -51,4 +51,4 @@ TEST(PositivePolarityParsing, ParallelPathPlusAdjacentToEqGt) {
   EXPECT_EQ(si->path.polarity, SpecifyPolarity::kPositive);
 }
 
-}
+}  // namespace

@@ -515,4 +515,4 @@ TEST(ImmediateAssertSim, MultipleSeverityTasksInActionBlockBothRun) {
   EXPECT_EQ(f.ctx.LastSeverityMsg(), "second");
 }
 
-}
+}  // namespace

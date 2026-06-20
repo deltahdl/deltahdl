@@ -76,4 +76,4 @@ TEST(ImplicitSensitivity, EmptyRefsProduceEmptyList) {
   EXPECT_EQ(result.size(), 0u);
 }
 
-}
+}  // namespace

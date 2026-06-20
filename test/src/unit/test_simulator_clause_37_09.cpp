@@ -7,12 +7,13 @@ namespace delta {
 namespace {
 
 // §37.9 Program: the VPI object model for a program block. The diagram's
-// property and structural edges - the default clocking block (vpiDefaultClocking),
-// the default disable iff expr/distribution (vpiDefaultDisableIff), the instance
-// array the program belongs to, and the one-to-many vpiInstance edges to the
-// program's cont assigns, clocking blocks, interfaces, interface arrays, and
-// processes - are walked by the generic object-model machinery (vpi_handle /
-// vpi_iterate) and carry no rule of their own here.
+// property and structural edges - the default clocking block
+// (vpiDefaultClocking), the default disable iff expr/distribution
+// (vpiDefaultDisableIff), the instance array the program belongs to, and the
+// one-to-many vpiInstance edges to the program's cont assigns, clocking blocks,
+// interfaces, interface arrays, and processes - are walked by the generic
+// object-model machinery (vpi_handle / vpi_iterate) and carry no rule of their
+// own here.
 //
 // The single numbered Detail carries this clause's own normative rule, observed
 // below through the public vpi_handle dispatch:

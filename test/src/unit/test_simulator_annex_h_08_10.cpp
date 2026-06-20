@@ -108,12 +108,13 @@ TEST(DpiStringArguments, ImportOutputStringWrittenBackToActual) {
   EXPECT_EQ(actuals[0].AsString(), "produced");
 }
 
-// §H.8.10 (item 4, imported output, edge case): an output mode string carries no
-// meaningful value on arrival, so the caller's actual is not handed in. When the
-// foreign code writes nothing, the actual is left holding the undetermined
-// (empty) seed rather than its prior value — the original contents are discarded
-// regardless of any foreign write.
-TEST(DpiStringArguments, ImportOutputStringDiscardsActualWhenForeignWritesNothing) {
+// §H.8.10 (item 4, imported output, edge case): an output mode string carries
+// no meaningful value on arrival, so the caller's actual is not handed in. When
+// the foreign code writes nothing, the actual is left holding the undetermined
+// (empty) seed rather than its prior value — the original contents are
+// discarded regardless of any foreign write.
+TEST(DpiStringArguments,
+     ImportOutputStringDiscardsActualWhenForeignWritesNothing) {
   DpiRuntime rt;
   DpiRtFunction func;
   func.c_name = "c_noop_out";
@@ -161,7 +162,8 @@ TEST(DpiStringArguments, ImportInoutStringContentsCopiedBack) {
 // also handed to C in the SystemVerilog-to-C direction, so it arrives as a
 // null-terminated C string. When the foreign code reads it but supplies no new
 // value, the copy-back leaves the actual carrying its original contents intact.
-TEST(DpiStringArguments, ImportInoutStringRoundTripsUnchangedWhenForeignLeavesItAlone) {
+TEST(DpiStringArguments,
+     ImportInoutStringRoundTripsUnchangedWhenForeignLeavesItAlone) {
   DpiRuntime rt;
   DpiRtFunction func;
   func.c_name = "c_peek_inout";
@@ -185,4 +187,4 @@ TEST(DpiStringArguments, ImportInoutStringRoundTripsUnchangedWhenForeignLeavesIt
   EXPECT_EQ(actuals[0].AsString(), "keep-me");
 }
 
-}
+}  // namespace

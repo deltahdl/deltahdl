@@ -15,4 +15,4 @@ LutMapping MapForDelay(const AigGraph& g, uint32_t lut_size);
 LutMapping IterativeAreaDelay(const AigGraph& g, uint32_t lut_size,
                               uint32_t iterations);
 
-}
+}  // namespace delta

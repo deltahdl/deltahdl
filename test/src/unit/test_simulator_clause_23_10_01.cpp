@@ -49,4 +49,4 @@ TEST(DefparamSimulation, LastDefparamVisibleAtRuntime) {
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
 
-}
+}  // namespace

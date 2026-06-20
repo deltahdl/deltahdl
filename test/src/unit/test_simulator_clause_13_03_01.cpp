@@ -145,4 +145,4 @@ TEST(TaskDeclSim, SetupReturnsTaskItem) {
   TeardownTaskCall(result, call, f.ctx);
 }
 
-}
+}  // namespace

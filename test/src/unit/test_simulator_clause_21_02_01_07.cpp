@@ -95,4 +95,4 @@ TEST(SysTask, MissingArgumentLeavesSpecifierEmpty) {
   EXPECT_TRUE(out.empty());
 }
 
-}
+}  // namespace

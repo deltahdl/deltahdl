@@ -40,9 +40,9 @@ std::vector<PartSelectPragmaInfo> CollectPartSelectPragmas(
 // FSM. The pragma names the base signal, its part-select range, an FSM name,
 // and the bound enumeration name.
 TEST(FsmPartSelectPragmaLexing, RecognizesPartSelectPragma) {
-  auto pragmas =
-      CollectPartSelectPragmas("/* tool state_vector cur_state[3:0] my_fsm "
-                               "enum state_e */");
+  auto pragmas = CollectPartSelectPragmas(
+      "/* tool state_vector cur_state[3:0] my_fsm "
+      "enum state_e */");
   ASSERT_EQ(pragmas.size(), 1u);
   EXPECT_EQ(pragmas[0].signal, "cur_state");
   EXPECT_EQ(pragmas[0].msb, 3);
@@ -124,7 +124,8 @@ TEST(FsmPartSelectPragmaLexing, RecognizedWithinModuleBody) {
 TEST(FsmPartSelectPragmaLexing, PartSelectIsSeparateFromSimpleSignalPragma) {
   SourceManager mgr;
   DiagEngine diag(mgr);
-  const std::string src = "/* tool state_vector cur_state[3:0] my_fsm enum e */";
+  const std::string src =
+      "/* tool state_vector cur_state[3:0] my_fsm enum e */";
   auto fid = mgr.AddFile("<test>", src);
   Lexer lexer(mgr.FileContent(fid), fid, diag);
   lexer.LexAll();

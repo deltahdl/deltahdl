@@ -1,6 +1,6 @@
-#include "simulator/specify.h"
-
 #include <gtest/gtest.h>
+
+#include "simulator/specify.h"
 
 using namespace delta;
 
@@ -78,4 +78,4 @@ TEST(SpecifyXTransitionSim, TwelveDelaysPreserveExplicitXSlots) {
   }
 }
 
-}
+}  // namespace

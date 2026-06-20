@@ -34,7 +34,8 @@ struct DeferredDisableFixture {
 // procedure with an active deferred report queue, clears pending reports;
 // disabling a task or a non-outermost scope does not.
 TEST(DeferredDisableClassification, SpecificAssertionFlushes) {
-  EXPECT_TRUE(DisableFlushesDeferredAssertions(DisableTarget::kSpecificAssertion));
+  EXPECT_TRUE(
+      DisableFlushesDeferredAssertions(DisableTarget::kSpecificAssertion));
 }
 
 TEST(DeferredDisableClassification, OutermostScopeFlushes) {
@@ -58,13 +59,13 @@ TEST(DeferredDisableSpecific, CancelsOnlyNamedAssertionPendingReports) {
   f.QueueObserved("p0", "a2");
   ASSERT_EQ(f.engine.GetDeferredReportQueue("p0").Size(), 2u);
 
-  f.engine.ApplyDisableToDeferredAssertions("p0",
-                                            DisableTarget::kSpecificAssertion,
-                                            "a1");
+  f.engine.ApplyDisableToDeferredAssertions(
+      "p0", DisableTarget::kSpecificAssertion, "a1");
 
   EXPECT_EQ(f.engine.GetDeferredReportQueue("p0").Size(), 1u);
-  EXPECT_EQ(f.engine.GetDeferredReportQueue("p0").Entries().front().da.instance_name,
-            "a2");
+  EXPECT_EQ(
+      f.engine.GetDeferredReportQueue("p0").Entries().front().da.instance_name,
+      "a2");
 }
 
 // §16.4.4 Claim A: a report that already matured is no longer pending, so
@@ -75,9 +76,8 @@ TEST(DeferredDisableSpecific, LeavesMaturedReportOfNamedAssertion) {
   f.engine.MatureObservedReports("p0");
   ASSERT_EQ(f.engine.GetDeferredReportQueue("p0").MaturedCount(), 1u);
 
-  f.engine.ApplyDisableToDeferredAssertions("p0",
-                                            DisableTarget::kSpecificAssertion,
-                                            "a1");
+  f.engine.ApplyDisableToDeferredAssertions(
+      "p0", DisableTarget::kSpecificAssertion, "a1");
 
   EXPECT_EQ(f.engine.GetDeferredReportQueue("p0").Size(), 1u);
 }
@@ -186,8 +186,8 @@ TEST(DeferredDisableSpecific, DoesNotAffectOtherProcessQueue) {
 TEST(DeferredDisableOutermost, EmptyQueueIsSafeNoOp) {
   DeferredDisableFixture f;
 
-  f.engine.ApplyDisableToDeferredAssertions(
-      "p0", DisableTarget::kOutermostScope, "");
+  f.engine.ApplyDisableToDeferredAssertions("p0",
+                                            DisableTarget::kOutermostScope, "");
 
   EXPECT_EQ(f.engine.GetDeferredReportQueue("p0").Size(), 0u);
 }
@@ -201,8 +201,8 @@ TEST(DeferredDisableOutermost, AllMaturedQueueSurvives) {
   f.engine.MatureObservedReports("p0");
   ASSERT_EQ(f.engine.GetDeferredReportQueue("p0").MaturedCount(), 2u);
 
-  f.engine.ApplyDisableToDeferredAssertions(
-      "p0", DisableTarget::kOutermostScope, "");
+  f.engine.ApplyDisableToDeferredAssertions("p0",
+                                            DisableTarget::kOutermostScope, "");
 
   EXPECT_EQ(f.engine.GetDeferredReportQueue("p0").Size(), 2u);
 }
@@ -214,11 +214,11 @@ TEST(DeferredDisableOutermost, DoesNotAffectOtherProcessQueue) {
   f.QueueObserved("p0", "a1");
   f.QueueObserved("p1", "a1");
 
-  f.engine.ApplyDisableToDeferredAssertions(
-      "p0", DisableTarget::kOutermostScope, "");
+  f.engine.ApplyDisableToDeferredAssertions("p0",
+                                            DisableTarget::kOutermostScope, "");
 
   EXPECT_EQ(f.engine.GetDeferredReportQueue("p0").Size(), 0u);
   EXPECT_EQ(f.engine.GetDeferredReportQueue("p1").Size(), 1u);
 }
 
-}
+}  // namespace

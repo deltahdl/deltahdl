@@ -43,4 +43,4 @@ TEST(Coverage, UninstantiatedCoverGroupNotCreated) {
   EXPECT_EQ(with.db.GroupCount(), 1u);
 }
 
-}
+}  // namespace

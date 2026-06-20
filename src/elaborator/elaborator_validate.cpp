@@ -19,8 +19,8 @@ void ValidateConstRefWriteProtection(const ModuleItem* func, DiagEngine& diag);
 static bool IsTypeKeyword(std::string_view key) {
   return key == "int" || key == "integer" || key == "logic" || key == "reg" ||
          key == "byte" || key == "shortint" || key == "longint" ||
-         key == "bit" || key == "real" || key == "shortreal" ||
-         key == "time" || key == "realtime" || key == "string";
+         key == "bit" || key == "real" || key == "shortreal" || key == "time" ||
+         key == "realtime" || key == "string";
 }
 
 static bool IsArrayPatternSpecial(const Expr* init) {
@@ -164,18 +164,17 @@ void Elaborator::ValidateStructInitPattern(const ModuleItem* item) {
   if (!members) return;
 
   if (item->init_expr->pattern_keys.empty()) {
-
     bool is_replication =
         item->init_expr->repeat_count ||
         (item->init_expr->elements.size() == 1 &&
          item->init_expr->elements[0]->kind == ExprKind::kReplicate);
     if (is_replication) return;
     if (item->init_expr->elements.size() != members->size()) {
-      diag_.Error(item->loc,
-                  std::format("positional struct pattern has {} elements, "
-                              "but struct has {} members",
-                              item->init_expr->elements.size(),
-                              members->size()));
+      diag_.Error(
+          item->loc,
+          std::format("positional struct pattern has {} elements, "
+                      "but struct has {} members",
+                      item->init_expr->elements.size(), members->size()));
     }
     return;
   }
@@ -202,8 +201,7 @@ static std::string_view LhsBaseName(const Expr* e) {
 }
 
 static void CheckNbaDynamicArrayTarget(
-    const Stmt* s,
-    const std::unordered_set<std::string_view>& dyn_names,
+    const Stmt* s, const std::unordered_set<std::string_view>& dyn_names,
     DiagEngine& diag) {
   if (!s) return;
   if (s->lhs && s->lhs->kind == ExprKind::kSelect) {
@@ -212,8 +210,7 @@ static void CheckNbaDynamicArrayTarget(
       if (s->kind == StmtKind::kNonblockingAssign) {
         diag.Error(s->range.start,
                    "nonblocking assignment to element of dynamic array");
-      } else if (s->kind == StmtKind::kForce ||
-                 s->kind == StmtKind::kAssign) {
+      } else if (s->kind == StmtKind::kForce || s->kind == StmtKind::kAssign) {
         diag.Error(s->range.start,
                    "procedural continuous assignment to element of "
                    "dynamic array");
@@ -299,8 +296,7 @@ static void CheckProceduralAssignLhs(const Stmt* s, DiagEngine& diag) {
 }
 
 static void CheckForceLhsOperand(
-    const Expr* e,
-    const std::unordered_set<std::string_view>& net_names,
+    const Expr* e, const std::unordered_set<std::string_view>& net_names,
     const std::unordered_set<std::string_view>& nettype_net_names,
     SourceLoc loc, DiagEngine& diag) {
   if (!e) return;
@@ -317,21 +313,21 @@ static void CheckForceLhsOperand(
                  "bit-select or part-select of a net with a user-defined "
                  "nettype is not a legal force LHS");
     } else if (net_names.count(base_name) == 0) {
-      diag.Error(loc, "bit-select or part-select of a variable is not a "
-                      "legal force LHS");
+      diag.Error(loc,
+                 "bit-select or part-select of a variable is not a "
+                 "legal force LHS");
     }
   }
 }
 
 static void CheckForceLhs(
-    const Stmt* s,
-    const std::unordered_set<std::string_view>& net_names,
+    const Stmt* s, const std::unordered_set<std::string_view>& net_names,
     const std::unordered_set<std::string_view>& nettype_net_names,
     DiagEngine& diag) {
   if (!s) return;
   if (s->kind == StmtKind::kForce && s->lhs) {
-    CheckForceLhsOperand(s->lhs, net_names, nettype_net_names,
-                         s->range.start, diag);
+    CheckForceLhsOperand(s->lhs, net_names, nettype_net_names, s->range.start,
+                         diag);
   }
   for (auto* sub : s->stmts)
     CheckForceLhs(sub, net_names, nettype_net_names, diag);
@@ -346,8 +342,7 @@ static void CheckForceLhs(
 }
 
 static bool ExprUsesInterconnect(
-    const Expr* e,
-    const std::unordered_set<std::string_view>& names) {
+    const Expr* e, const std::unordered_set<std::string_view>& names) {
   if (!e) return false;
   if (e->kind == ExprKind::kIdentifier) return names.count(e->text) > 0;
   if (ExprUsesInterconnect(e->lhs, names)) return true;
@@ -406,11 +401,12 @@ static void CheckScalarSelectNode(const Expr* e, const NameSet& scalars,
   auto name = ExprIdent(e->base);
   if (name.empty()) return;
   if (scalars.count(name) != 0)
-    diag.Error(e->range.start, "bit-select or part-select of a scalar is illegal");
+    diag.Error(e->range.start,
+               "bit-select or part-select of a scalar is illegal");
 }
 
 static void CheckScalarSelect(const Expr* e, const NameSet& scalars,
-                               DiagEngine& diag) {
+                              DiagEngine& diag) {
   if (!e) return;
   if (e->kind == ExprKind::kSelect && e->base)
     CheckScalarSelectNode(e, scalars, diag);
@@ -539,7 +535,7 @@ static bool IsAllowedChandleBinaryOp(TokenKind op) {
 }
 
 static void CheckChandleExpr(const Expr* e, const TypeMap& types,
-                              DiagEngine& diag) {
+                             DiagEngine& diag) {
   if (!e) return;
   if (e->kind == ExprKind::kBinary) {
     bool lhs_ch = e->lhs && IsChandleVar(e->lhs, types);
@@ -554,8 +550,7 @@ static void CheckChandleExpr(const Expr* e, const TypeMap& types,
   if (e->kind == ExprKind::kPostfixUnary && IsChandleVar(e->lhs, types)) {
     diag.Error(e->range.start, "operator is not allowed on chandle");
   }
-  if (e->kind == ExprKind::kSelect && e->base &&
-      IsChandleVar(e->base, types)) {
+  if (e->kind == ExprKind::kSelect && e->base && IsChandleVar(e->base, types)) {
     diag.Error(e->range.start, "bit-select on chandle is illegal");
   }
   CheckChandleExpr(e->lhs, types, diag);
@@ -694,13 +689,11 @@ static void CheckVirtualInterfaceExpr(const Expr* e, const TypeMap& types,
     }
   }
   if (e->kind == ExprKind::kUnary && IsVirtualInterfaceVar(e->lhs, types)) {
-    diag.Error(e->range.start,
-               "operator is not allowed on virtual interface");
+    diag.Error(e->range.start, "operator is not allowed on virtual interface");
   }
   if (e->kind == ExprKind::kPostfixUnary &&
       IsVirtualInterfaceVar(e->lhs, types)) {
-    diag.Error(e->range.start,
-               "operator is not allowed on virtual interface");
+    diag.Error(e->range.start, "operator is not allowed on virtual interface");
   }
   if (e->kind == ExprKind::kSelect && e->base &&
       IsVirtualInterfaceVar(e->base, types)) {
@@ -745,17 +738,14 @@ void Elaborator::WalkStmtsForVirtualInterfaceOps(const Stmt* s) {
       }
       auto lmp = vi_var_modports_.find(lhs_name);
       auto rmp = vi_var_modports_.find(rhs_name);
-      bool lhs_has_mp =
-          lmp != vi_var_modports_.end() && !lmp->second.empty();
-      bool rhs_has_mp =
-          rmp != vi_var_modports_.end() && !rmp->second.empty();
+      bool lhs_has_mp = lmp != vi_var_modports_.end() && !lmp->second.empty();
+      bool rhs_has_mp = rmp != vi_var_modports_.end() && !rmp->second.empty();
       if (!lhs_has_mp && rhs_has_mp) {
         diag_.Error(s->range.start,
                     "virtual interface with modport cannot be assigned to "
                     "virtual interface without modport");
       } else if (lhs_has_mp && rhs_has_mp && lmp->second != rmp->second) {
-        diag_.Error(s->range.start,
-                    "virtual interface modports do not match");
+        diag_.Error(s->range.start, "virtual interface modports do not match");
       }
       // §25.9: the actual parameter values shall match for two virtual
       // interfaces to be of the same type and assignment compatible.
@@ -965,8 +955,7 @@ const ModuleDecl* FindInterfaceDeclByName(const CompilationUnit* unit,
     if (i && i->name == name) return i;
   }
   for (const auto* m : unit->modules) {
-    if (m && m->name == name &&
-        m->decl_kind == ModuleDeclKind::kInterface) {
+    if (m && m->name == name && m->decl_kind == ModuleDeclKind::kInterface) {
       return m;
     }
   }
@@ -1058,11 +1047,11 @@ void CheckVifClockingExpr(const Expr* e, const VifTypeMap& vifs,
             }
           }
           if (!signal_found) {
-            diag.Error(e->range.start,
-                       std::format(
-                           "'{}' is not a signal of clocking block '{}' in "
-                           "interface '{}'",
-                           sig_name, block_name, vif_it->second));
+            diag.Error(
+                e->range.start,
+                std::format("'{}' is not a signal of clocking block '{}' in "
+                            "interface '{}'",
+                            sig_name, block_name, vif_it->second));
           }
         }
       }
@@ -1103,7 +1092,7 @@ void WalkStmtsForVifClocking(const Stmt* s, const VifTypeMap& vifs,
   }
 }
 
-}
+}  // namespace
 
 void Elaborator::ValidateArrayOfVifInitStmt(const Stmt* s) {
   if (!s || s->kind != StmtKind::kVarDecl) return;
@@ -1115,8 +1104,8 @@ void Elaborator::ValidateArrayOfVifInitStmt(const Stmt* s) {
   if (s->var_unpacked_dims.empty()) return;
 
   auto size_opt = ComputeDimSize(s->var_unpacked_dims.front());
-  if (size_opt && static_cast<int64_t>(s->var_init->elements.size()) !=
-                      *size_opt) {
+  if (size_opt &&
+      static_cast<int64_t>(s->var_init->elements.size()) != *size_opt) {
     diag_.Error(
         s->var_init->range.start,
         std::format(
@@ -1145,10 +1134,9 @@ void Elaborator::ValidateArrayOfVifInitStmt(const Stmt* s) {
       if (vif_it->second != iface_type) {
         diag_.Error(
             elem->range.start,
-            std::format(
-                "virtual interface '{}' of type '{}' is not compatible "
-                "with element type '{}'",
-                elem->text, vif_it->second, iface_type));
+            std::format("virtual interface '{}' of type '{}' is not compatible "
+                        "with element type '{}'",
+                        elem->text, vif_it->second, iface_type));
       }
     }
   }
@@ -1206,8 +1194,7 @@ void Elaborator::ValidateVirtualInterfaceClocking(const ModuleDecl* decl) {
 
 namespace {
 
-using IfacePortTypeMap =
-    std::unordered_map<std::string_view, std::string_view>;
+using IfacePortTypeMap = std::unordered_map<std::string_view, std::string_view>;
 using IfacePortModportMap =
     std::unordered_map<std::string_view, std::string_view>;
 
@@ -1218,8 +1205,7 @@ const ModuleDecl* LookupInterfaceDecl(const CompilationUnit* unit,
     if (i && i->name == name) return i;
   }
   for (const auto* m : unit->modules) {
-    if (m && m->name == name &&
-        m->decl_kind == ModuleDeclKind::kInterface) {
+    if (m && m->name == name && m->decl_kind == ModuleDeclKind::kInterface) {
       return m;
     }
   }
@@ -1377,7 +1363,7 @@ void WalkStmtsForInterfaceObjectAccess(const Stmt* s,
   }
 }
 
-}
+}  // namespace
 
 void Elaborator::ValidateInterfaceObjectAccess(const ModuleDecl* decl) {
   if (!decl) return;
@@ -1444,18 +1430,15 @@ void Elaborator::ValidateInterconnectContAssign(const ModuleItem* item) {
   }
 
   if (ExprUsesInterconnect(item->assign_rhs, interconnect_names_)) {
-    diag_.Error(item->loc,
-                "interconnect net cannot be used in expression");
+    diag_.Error(item->loc, "interconnect net cannot be used in expression");
   }
 }
 
 static void CheckLhsPatternNamedKeys(const Expr* lhs, DiagEngine& diag) {
   if (!lhs) return;
   const Expr* pat = lhs;
-  if (pat->kind == ExprKind::kCast && pat->lhs)
-    pat = pat->lhs;
-  if (pat->kind == ExprKind::kAssignmentPattern &&
-      !pat->pattern_keys.empty()) {
+  if (pat->kind == ExprKind::kCast && pat->lhs) pat = pat->lhs;
+  if (pat->kind == ExprKind::kAssignmentPattern && !pat->pattern_keys.empty()) {
     diag.Error(lhs->range.start,
                "LHS assignment pattern shall use positional notation only");
   }
@@ -1505,8 +1488,7 @@ static void CheckLhsPatternWidthSum(const Expr* lhs, const Expr* rhs,
                          sum, rhs_w));
 }
 
-static void WalkStmtsForLhsPatternWidths(const Stmt* s,
-                                         const RtlirModule* mod,
+static void WalkStmtsForLhsPatternWidths(const Stmt* s, const RtlirModule* mod,
                                          const TypedefMap& typedefs,
                                          DiagEngine& diag) {
   if (!s) return;
@@ -1654,8 +1636,7 @@ static void WalkStmtForMatchesPattern(const Stmt* s, DiagEngine& diag) {
   WalkStmtForMatchesPattern(s->body, diag);
   WalkStmtForMatchesPattern(s->for_body, diag);
   for (auto& ci : s->case_items) WalkStmtForMatchesPattern(ci.body, diag);
-  for (auto& ri : s->randcase_items)
-    WalkStmtForMatchesPattern(ri.second, diag);
+  for (auto& ri : s->randcase_items) WalkStmtForMatchesPattern(ri.second, diag);
 }
 
 void Elaborator::ValidateMatchesPatternIntegral(const ModuleDecl* decl) {
@@ -1670,8 +1651,7 @@ void Elaborator::ValidateMatchesPatternIntegral(const ModuleDecl* decl) {
     }
     if (item->kind == ModuleItemKind::kTaskDecl ||
         item->kind == ModuleItemKind::kFunctionDecl) {
-      for (auto* s : item->func_body_stmts)
-        WalkStmtForMatchesPattern(s, diag_);
+      for (auto* s : item->func_body_stmts) WalkStmtForMatchesPattern(s, diag_);
     }
   }
 }
@@ -1679,9 +1659,9 @@ void Elaborator::ValidateMatchesPatternIntegral(const ModuleDecl* decl) {
 // §12.6.1: a pattern-matching case statement compares its tested expression
 // against the patterns of each item, so the tested expression and the patterns
 // must share a known type. A real-valued selector cannot have the same type as
-// an integral constant pattern, so the pairing is a static type error. Identifier
-// and wildcard patterns (§12.6) match any value and impose no integral type, so
-// they are left alone here.
+// an integral constant pattern, so the pairing is a static type error.
+// Identifier and wildcard patterns (§12.6) match any value and impose no
+// integral type, so they are left alone here.
 static bool IsIntegralLiteralPattern(const Expr* pat) {
   if (!pat) return false;
   const Expr* p = pat;
@@ -1712,7 +1692,8 @@ static void CheckMatchesCaseSelectorType(const Stmt* s, const TypeMap& types,
     }
   }
   for (auto* sub : s->stmts) CheckMatchesCaseSelectorType(sub, types, diag);
-  for (auto* sub : s->fork_stmts) CheckMatchesCaseSelectorType(sub, types, diag);
+  for (auto* sub : s->fork_stmts)
+    CheckMatchesCaseSelectorType(sub, types, diag);
   CheckMatchesCaseSelectorType(s->then_branch, types, diag);
   CheckMatchesCaseSelectorType(s->else_branch, types, diag);
   CheckMatchesCaseSelectorType(s->body, types, diag);
@@ -1729,7 +1710,8 @@ void Elaborator::ValidateMatchesCaseSelectorType(const ModuleDecl* decl) {
         item->kind == ModuleItemKind::kAlwaysCombBlock ||
         item->kind == ModuleItemKind::kAlwaysFFBlock ||
         item->kind == ModuleItemKind::kAlwaysLatchBlock) {
-      if (item->body) CheckMatchesCaseSelectorType(item->body, var_types_, diag_);
+      if (item->body)
+        CheckMatchesCaseSelectorType(item->body, var_types_, diag_);
     }
     if (item->kind == ModuleItemKind::kTaskDecl ||
         item->kind == ModuleItemKind::kFunctionDecl) {
@@ -1788,7 +1770,8 @@ void Elaborator::ValidateMatchesIfPredicateType(const ModuleDecl* decl) {
         item->kind == ModuleItemKind::kAlwaysCombBlock ||
         item->kind == ModuleItemKind::kAlwaysFFBlock ||
         item->kind == ModuleItemKind::kAlwaysLatchBlock) {
-      if (item->body) CheckMatchesIfPredicateStmt(item->body, var_types_, diag_);
+      if (item->body)
+        CheckMatchesIfPredicateStmt(item->body, var_types_, diag_);
     }
     if (item->kind == ModuleItemKind::kTaskDecl ||
         item->kind == ModuleItemKind::kFunctionDecl) {
@@ -1814,16 +1797,14 @@ void Elaborator::ValidateMixedAssignments() {
                               name));
     }
     if (var_init_names_.count(name) != 0) {
-      diag_.Error(loc,
-                  std::format("variable '{}' driven by output port has an "
-                              "initializer",
-                              name));
+      diag_.Error(loc, std::format("variable '{}' driven by output port has an "
+                                   "initializer",
+                                   name));
     }
     if (proc_assign_targets_.find(name) != proc_assign_targets_.end()) {
-      diag_.Error(loc,
-                  std::format("variable '{}' driven by output port has "
-                              "procedural assignments",
-                              name));
+      diag_.Error(loc, std::format("variable '{}' driven by output port has "
+                                   "procedural assignments",
+                                   name));
     }
   }
 }
@@ -1873,8 +1854,7 @@ static void CheckDisableTargets(
   CheckDisableTargets(s->else_branch, func_decls, diag);
   CheckDisableTargets(s->body, func_decls, diag);
   CheckDisableTargets(s->for_body, func_decls, diag);
-  for (auto& ci : s->case_items)
-    CheckDisableTargets(ci.body, func_decls, diag);
+  for (auto& ci : s->case_items) CheckDisableTargets(ci.body, func_decls, diag);
   for (auto& ri : s->randcase_items)
     CheckDisableTargets(ri.second, func_decls, diag);
 }
@@ -1887,8 +1867,7 @@ void Elaborator::ValidateDisableTargets(const ModuleDecl* decl) {
         item->kind == ModuleItemKind::kAlwaysCombBlock ||
         item->kind == ModuleItemKind::kAlwaysFFBlock ||
         item->kind == ModuleItemKind::kAlwaysLatchBlock) {
-      if (item->body)
-        CheckDisableTargets(item->body, func_decls_, diag_);
+      if (item->body) CheckDisableTargets(item->body, func_decls_, diag_);
     }
     if (item->kind == ModuleItemKind::kTaskDecl ||
         item->kind == ModuleItemKind::kFunctionDecl) {
@@ -1915,8 +1894,7 @@ void Elaborator::ValidateDynamicArrayNba(const ModuleDecl* decl) {
   }
   if (dyn_names.empty()) return;
   for (const auto* item : decl->items) {
-    if (item->body)
-      CheckNbaDynamicArrayTarget(item->body, dyn_names, diag_);
+    if (item->body) CheckNbaDynamicArrayTarget(item->body, dyn_names, diag_);
     for (auto* s : item->func_body_stmts)
       CheckNbaDynamicArrayTarget(s, dyn_names, diag_);
   }
@@ -2030,7 +2008,8 @@ bool IsNonIntegralSeedKind(DataTypeKind k) {
   return IsRealType(k) || k == DataTypeKind::kString;
 }
 
-void CheckRandomSeedExpr(const Expr* e, const TypeMap& types, DiagEngine& diag) {
+void CheckRandomSeedExpr(const Expr* e, const TypeMap& types,
+                         DiagEngine& diag) {
   if (!e) return;
   if (e->kind == ExprKind::kSystemCall && e->callee == "$random" &&
       !e->args.empty() && e->args[0]) {
@@ -2057,7 +2036,8 @@ void CheckRandomSeedExpr(const Expr* e, const TypeMap& types, DiagEngine& diag) 
   for (auto* el : e->elements) CheckRandomSeedExpr(el, types, diag);
 }
 
-void CheckRandomSeedStmt(const Stmt* s, const TypeMap& types, DiagEngine& diag) {
+void CheckRandomSeedStmt(const Stmt* s, const TypeMap& types,
+                         DiagEngine& diag) {
   if (!s) return;
   CheckRandomSeedExpr(s->condition, types, diag);
   CheckRandomSeedExpr(s->lhs, types, diag);
@@ -2110,8 +2090,8 @@ bool IsPlaSystemTask(std::string_view callee) {
   std::string_view format = take();
   if (!rest.empty()) return false;  // more than three components
   bool ok_type = array_type == "sync" || array_type == "async";
-  bool ok_logic = logic == "and" || logic == "or" || logic == "nand" ||
-                  logic == "nor";
+  bool ok_logic =
+      logic == "and" || logic == "or" || logic == "nand" || logic == "nor";
   bool ok_format = format == "array" || format == "plane";
   return ok_type && ok_logic && ok_format;
 }
@@ -2170,9 +2150,10 @@ void CheckPlaOutputTermsStmt(
   CheckPlaOutputTermsStmt(s->else_branch, net_names, diag);
   CheckPlaOutputTermsStmt(s->body, net_names, diag);
   CheckPlaOutputTermsStmt(s->for_body, net_names, diag);
-  for (auto* init : s->for_inits) CheckPlaOutputTermsStmt(init, net_names, diag);
-  for (auto& ci : s->case_items) CheckPlaOutputTermsStmt(ci.body, net_names,
-                                                         diag);
+  for (auto* init : s->for_inits)
+    CheckPlaOutputTermsStmt(init, net_names, diag);
+  for (auto& ci : s->case_items)
+    CheckPlaOutputTermsStmt(ci.body, net_names, diag);
 }
 
 }  // namespace
@@ -2191,8 +2172,8 @@ void Elaborator::ValidatePlaOutputTerms(const ModuleDecl* decl) {
 
 namespace {
 
-// §20.16.3: the constant-folded declaration ranges of a signal that may be named
-// as a PLA memory or term, used to test the ascending-order requirement.
+// §20.16.3: the constant-folded declaration ranges of a signal that may be
+// named as a PLA memory or term, used to test the ascending-order requirement.
 struct PlaDeclRanges {
   std::optional<int64_t> packed_left;
   std::optional<int64_t> packed_right;
@@ -2204,9 +2185,9 @@ using PlaRangeMap = std::unordered_map<std::string_view, PlaDeclRanges>;
 
 // §20.16.3: "PLA input terms, output terms, and memory shall be specified in
 // ascending order." A declared range is ascending when its left index is no
-// greater than its right index; flag a memory or term whose declaration runs the
-// other way. The check uses only the base identifier's declaration, so a term
-// given as a concatenation of scalars or a range that does not fold to a
+// greater than its right index; flag a memory or term whose declaration runs
+// the other way. The check uses only the base identifier's declaration, so a
+// term given as a concatenation of scalars or a range that does not fold to a
 // constant is simply left unchecked.
 void CheckPlaArgAscending(const Expr* arg, const PlaRangeMap& ranges,
                           bool check_unpacked, const char* message,
@@ -2231,9 +2212,9 @@ void CheckPlaArgAscending(const Expr* arg, const PlaRangeMap& ranges,
   }
 }
 
-// §20.16.3: at every PLA system task call, check the memory (first argument) for
-// ascending packed and unpacked ranges and the input/output term arguments for
-// ascending packed ranges.
+// §20.16.3: at every PLA system task call, check the memory (first argument)
+// for ascending packed and unpacked ranges and the input/output term arguments
+// for ascending packed ranges.
 void CheckPlaAscendingExpr(const Expr* e, const PlaRangeMap& ranges,
                            DiagEngine& diag) {
   if (!e) return;
@@ -2251,11 +2232,11 @@ void CheckPlaAscendingExpr(const Expr* e, const PlaRangeMap& ranges,
           "ascending order",
           diag);
     if (e->args.size() >= 3)
-      CheckPlaArgAscending(
-          e->args[2], ranges, /*check_unpacked=*/false,
-          "the output terms of a PLA modeling system task shall be specified in "
-          "ascending order",
-          diag);
+      CheckPlaArgAscending(e->args[2], ranges, /*check_unpacked=*/false,
+                           "the output terms of a PLA modeling system task "
+                           "shall be specified in "
+                           "ascending order",
+                           diag);
   }
   CheckPlaAscendingExpr(e->lhs, ranges, diag);
   CheckPlaAscendingExpr(e->rhs, ranges, diag);
@@ -2424,10 +2405,11 @@ bool IsBitsCall(const Expr* e) {
 // §20.6.2: a single argument that is a bare identifier names either the
 // dynamically sized typedef itself (NC12) or an interface-class object (NC13);
 // in either case there is no defined bit-stream size.
-void CheckBitsCallExpr(
-    const Expr* e, const std::unordered_set<std::string_view>& dyn_types,
-    const std::unordered_set<std::string_view>& dyn_funcs,
-    const std::unordered_set<std::string_view>& iface_vars, DiagEngine& diag) {
+void CheckBitsCallExpr(const Expr* e,
+                       const std::unordered_set<std::string_view>& dyn_types,
+                       const std::unordered_set<std::string_view>& dyn_funcs,
+                       const std::unordered_set<std::string_view>& iface_vars,
+                       DiagEngine& diag) {
   if (!e) return;
   if (IsBitsCall(e)) {
     const Expr* a = e->args[0];
@@ -2472,10 +2454,11 @@ void CheckBitsCallExpr(
     CheckBitsCallExpr(el, dyn_types, dyn_funcs, iface_vars, diag);
 }
 
-void CheckBitsCallStmt(
-    const Stmt* s, const std::unordered_set<std::string_view>& dyn_types,
-    const std::unordered_set<std::string_view>& dyn_funcs,
-    const std::unordered_set<std::string_view>& iface_vars, DiagEngine& diag) {
+void CheckBitsCallStmt(const Stmt* s,
+                       const std::unordered_set<std::string_view>& dyn_types,
+                       const std::unordered_set<std::string_view>& dyn_funcs,
+                       const std::unordered_set<std::string_view>& iface_vars,
+                       DiagEngine& diag) {
   if (!s) return;
   CheckBitsCallExpr(s->condition, dyn_types, dyn_funcs, iface_vars, diag);
   CheckBitsCallExpr(s->lhs, dyn_types, dyn_funcs, iface_vars, diag);
@@ -2531,8 +2514,7 @@ void Elaborator::ValidateBitsCallRestrictions(const ModuleDecl* decl) {
       CheckBitsCallStmt(item->body, dyn_types, dyn_funcs, iface_vars, diag_);
     for (auto* s : item->func_body_stmts)
       CheckBitsCallStmt(s, dyn_types, dyn_funcs, iface_vars, diag_);
-    CheckBitsCallExpr(item->init_expr, dyn_types, dyn_funcs, iface_vars,
-                      diag_);
+    CheckBitsCallExpr(item->init_expr, dyn_types, dyn_funcs, iface_vars, diag_);
   }
 }
 
@@ -2665,8 +2647,7 @@ void CheckPartSelectBoundsStmt(const Stmt* s, const PartSelectBoundsCtx& ctx) {
   CheckPartSelectBoundsStmt(s->for_body, ctx);
   for (const auto* fs : s->for_steps) CheckPartSelectBoundsStmt(fs, ctx);
   CheckPartSelectBoundsExpr(s->for_cond, ctx);
-  for (const auto& ci : s->case_items)
-    CheckPartSelectBoundsStmt(ci.body, ctx);
+  for (const auto& ci : s->case_items) CheckPartSelectBoundsStmt(ci.body, ctx);
   for (const auto* fs : s->fork_stmts) CheckPartSelectBoundsStmt(fs, ctx);
 }
 
@@ -2727,10 +2708,9 @@ void Elaborator::ValidateSpecparamInDeclRange(const ModuleDecl* decl) {
     if (!range) return;
     for (const auto& sp : specparam_names_) {
       if (ExprContainsIdent(range, sp)) {
-        diag_.Error(loc,
-                    std::format("specparam '{}' may not appear in a "
-                                "declaration range specification",
-                                sp));
+        diag_.Error(loc, std::format("specparam '{}' may not appear in a "
+                                     "declaration range specification",
+                                     sp));
         break;
       }
     }
@@ -2771,7 +2751,6 @@ static bool ExprContainsHierRef(const Expr* e) {
 
 void Elaborator::ValidateValueParams(const ModuleDecl* decl,
                                      const RtlirModule* mod) {
-
   for (const auto* item : decl->items) {
     if (item->kind != ModuleItemKind::kParamDecl) continue;
 
@@ -2779,9 +2758,9 @@ void Elaborator::ValidateValueParams(const ModuleDecl* decl,
         item->typedef_type.kind != DataTypeKind::kImplicit)
       continue;
     if (!item->init_expr) {
-      diag_.Error(item->loc,
-                  std::format("value parameter '{}' has no default value",
-                              item->name));
+      diag_.Error(
+          item->loc,
+          std::format("value parameter '{}' has no default value", item->name));
       continue;
     }
 
@@ -2826,17 +2805,14 @@ static void CheckNoReturnInFork(const Stmt* s, DiagEngine& diag) {
   CheckNoReturnInFork(s->else_branch, diag);
   CheckNoReturnInFork(s->body, diag);
   CheckNoReturnInFork(s->for_body, diag);
-  for (auto& ci : s->case_items)
-    CheckNoReturnInFork(ci.body, diag);
-  for (auto& ri : s->randcase_items)
-    CheckNoReturnInFork(ri.second, diag);
+  for (auto& ci : s->case_items) CheckNoReturnInFork(ci.body, diag);
+  for (auto& ri : s->randcase_items) CheckNoReturnInFork(ri.second, diag);
   CheckNoReturnInFork(s->assert_pass_stmt, diag);
   CheckNoReturnInFork(s->assert_fail_stmt, diag);
 }
 
 static void CheckExprForRefArgs(
-    const Expr* e,
-    const std::unordered_set<std::string_view>& ref_names,
+    const Expr* e, const std::unordered_set<std::string_view>& ref_names,
     DiagEngine& diag) {
   if (!e) return;
   if (e->kind == ExprKind::kIdentifier && ref_names.count(e->text)) {
@@ -2861,8 +2837,7 @@ static void CheckExprForRefArgs(
 }
 
 static void CheckStmtForRefArgs(
-    const Stmt* s,
-    const std::unordered_set<std::string_view>& ref_names,
+    const Stmt* s, const std::unordered_set<std::string_view>& ref_names,
     bool is_fork_block_item, DiagEngine& diag) {
   if (!s) return;
   if (!(is_fork_block_item && s->kind == StmtKind::kVarDecl))
@@ -2888,8 +2863,7 @@ static void CheckStmtForRefArgs(
     CheckExprForRefArgs(ri.first, ref_names, diag);
   for (auto* we : s->wait_order_events)
     CheckExprForRefArgs(we, ref_names, diag);
-  for (auto* sub : s->stmts)
-    CheckStmtForRefArgs(sub, ref_names, false, diag);
+  for (auto* sub : s->stmts) CheckStmtForRefArgs(sub, ref_names, false, diag);
   for (auto* sub : s->fork_stmts)
     CheckStmtForRefArgs(sub, ref_names, false, diag);
   CheckStmtForRefArgs(s->then_branch, ref_names, false, diag);
@@ -2909,20 +2883,17 @@ static void CheckStmtForRefArgs(
 }
 
 static void CheckRefArgsInForkBlocks(
-    const Stmt* s,
-    const std::unordered_set<std::string_view>& ref_names,
+    const Stmt* s, const std::unordered_set<std::string_view>& ref_names,
     DiagEngine& diag) {
   if (!s) return;
-  if (s->kind == StmtKind::kFork &&
-      (s->join_kind == TokenKind::kKwJoinAny ||
-       s->join_kind == TokenKind::kKwJoinNone)) {
+  if (s->kind == StmtKind::kFork && (s->join_kind == TokenKind::kKwJoinAny ||
+                                     s->join_kind == TokenKind::kKwJoinNone)) {
     for (auto* fs : s->fork_stmts) {
       bool is_block_item = (fs->kind == StmtKind::kVarDecl);
       CheckStmtForRefArgs(fs, ref_names, is_block_item, diag);
     }
   }
-  for (auto* sub : s->stmts)
-    CheckRefArgsInForkBlocks(sub, ref_names, diag);
+  for (auto* sub : s->stmts) CheckRefArgsInForkBlocks(sub, ref_names, diag);
   for (auto* sub : s->fork_stmts)
     CheckRefArgsInForkBlocks(sub, ref_names, diag);
   CheckRefArgsInForkBlocks(s->then_branch, ref_names, diag);
@@ -3042,8 +3013,8 @@ static std::string_view NbaAutoTargetRoot(const Expr* e) {
 }
 
 static void CheckTaskBodyStmt(
-    const Stmt* s,
-    const std::unordered_set<std::string_view>& auto_vars, DiagEngine& diag) {
+    const Stmt* s, const std::unordered_set<std::string_view>& auto_vars,
+    DiagEngine& diag) {
   if (!s) return;
   if (s->kind == StmtKind::kReturn && s->expr) {
     diag.Error(s->range.start, "task returns a value");
@@ -3112,15 +3083,13 @@ static void CheckTaskBodyStmt(
   CheckTaskBodyStmt(s->else_branch, auto_vars, diag);
   CheckTaskBodyStmt(s->body, auto_vars, diag);
   CheckTaskBodyStmt(s->for_body, auto_vars, diag);
-  for (auto& ci : s->case_items)
-    CheckTaskBodyStmt(ci.body, auto_vars, diag);
+  for (auto& ci : s->case_items) CheckTaskBodyStmt(ci.body, auto_vars, diag);
 }
 
 static void CollectAutoVarNames(const Stmt* s, bool task_is_auto,
                                 std::unordered_set<std::string_view>& out) {
   if (!s) return;
   if (s->kind == StmtKind::kVarDecl && !s->var_name.empty()) {
-
     if (task_is_auto && !s->var_is_static) {
       out.insert(s->var_name);
     } else if (!task_is_auto && s->var_is_automatic) {
@@ -3137,7 +3106,6 @@ static void CollectAutoVarNames(const Stmt* s, bool task_is_auto,
 }
 
 void Elaborator::ValidateFunctionBody(const ModuleItem* item) {
-
   ValidateRefLifetime(item, diag_);
 
   ValidateConstRefWriteProtection(item, diag_);
@@ -3147,7 +3115,8 @@ void Elaborator::ValidateFunctionBody(const ModuleItem* item) {
         arg.data_type.type_name == "weak_reference" &&
         !arg.data_type.type_params.empty()) {
       const auto& tp = arg.data_type.type_params[0];
-      if (tp.kind != DataTypeKind::kNamed || !class_names_.count(tp.type_name)) {
+      if (tp.kind != DataTypeKind::kNamed ||
+          !class_names_.count(tp.type_name)) {
         diag_.Error(item->loc,
                     "weak_reference type parameter shall be a class type");
       }
@@ -3231,7 +3200,7 @@ void CollectIdentLeaves(const Expr* e, std::vector<const Expr*>& out) {
   for (auto* el : e->elements) CollectIdentLeaves(el, out);
 }
 
-}
+}  // namespace
 
 void Elaborator::ValidateFunctionArgDefaultsScope(const ModuleItem* item) {
   if (!item) return;
@@ -3277,8 +3246,7 @@ static void CheckAutoVarWritesInProc(
   if (s->kind == StmtKind::kNonblockingAssign && s->lhs &&
       s->lhs->kind == ExprKind::kIdentifier &&
       auto_vars.count(s->lhs->text) != 0) {
-    diag.Error(s->range.start,
-               "automatic variable in nonblocking assignment");
+    diag.Error(s->range.start, "automatic variable in nonblocking assignment");
   }
   if (s->kind == StmtKind::kForce || s->kind == StmtKind::kAssign) {
     auto name = ExprIdent(s->lhs);
@@ -3343,8 +3311,7 @@ void CheckJumpRules(const Stmt* s, int loop_depth, int fork_depth,
                      "continue inside fork-join cannot affect a loop outside "
                      "the fork-join block");
         } else {
-          diag.Error(s->range.start,
-                     "continue statement is not inside a loop");
+          diag.Error(s->range.start, "continue statement is not inside a loop");
         }
       }
       return;
@@ -3534,8 +3501,7 @@ static void CheckForeachVarsReadOnly(
   for (auto* sub : s->for_inits) CheckForeachVarsReadOnly(sub, vars, diag);
   for (auto* sub : s->for_steps) CheckForeachVarsReadOnly(sub, vars, diag);
   for (auto* sub : s->fork_stmts) CheckForeachVarsReadOnly(sub, vars, diag);
-  for (auto& ci : s->case_items)
-    CheckForeachVarsReadOnly(ci.body, vars, diag);
+  for (auto& ci : s->case_items) CheckForeachVarsReadOnly(ci.body, vars, diag);
 }
 
 static bool IsIntegralVectorKind(DataTypeKind k) {
@@ -3758,8 +3724,7 @@ static const Expr* LeftmostIdentifier(const Expr* e) {
 }
 
 static bool IsBuiltinMethodOnLocal(
-    const Expr* call,
-    const std::unordered_set<std::string_view>& local_names) {
+    const Expr* call, const std::unordered_set<std::string_view>& local_names) {
   if (!call || call->kind != ExprKind::kCall) return false;
   if (!call->lhs || call->lhs->kind != ExprKind::kMemberAccess) return false;
   const Expr* root = LeftmostIdentifier(call->lhs);
@@ -3788,8 +3753,7 @@ static bool ValidateConstantFunction(
 
 static void WalkConstFuncExpr(const Expr* e, ConstFuncBodyCheck& chk);
 
-static void WalkConstFuncExprChildren(const Expr* e,
-                                      ConstFuncBodyCheck& chk) {
+static void WalkConstFuncExprChildren(const Expr* e, ConstFuncBodyCheck& chk) {
   WalkConstFuncExpr(e->lhs, chk);
   WalkConstFuncExpr(e->rhs, chk);
   WalkConstFuncExpr(e->condition, chk);
@@ -3830,10 +3794,9 @@ static void WalkConstFuncExpr(const Expr* e, ConstFuncBodyCheck& chk) {
           !chk.param_names.count(root->text)) {
         chk.diag.Error(
             chk.loc,
-            std::format(
-                "constant function '{}' shall not contain hierarchical "
-                "references",
-                chk.func_name));
+            std::format("constant function '{}' shall not contain hierarchical "
+                        "references",
+                        chk.func_name));
         chk.failed = true;
         return;
       }
@@ -3882,8 +3845,7 @@ static void WalkConstFuncExpr(const Expr* e, ConstFuncBodyCheck& chk) {
       // constant-function constraints. Recurse into its body, guarding
       // against direct or mutual recursion by tracking visited names.
       if (!e->callee.empty() && chk.func_decls && chk.visited &&
-          e->callee != chk.func_name &&
-          !chk.visited->count(e->callee)) {
+          e->callee != chk.func_name && !chk.visited->count(e->callee)) {
         auto it = chk.func_decls->find(e->callee);
         if (it != chk.func_decls->end()) {
           if (!ValidateConstantFunction(it->second, chk.loc, chk.param_names,
@@ -3979,20 +3941,17 @@ static bool ValidateConstantFunction(
       return false;
     }
     if (BodyContainsNonblocking(s)) {
-      diag.Error(
-          loc,
-          std::format(
-              "constant function '{}' shall not contain nonblocking assignments",
-              func->name));
+      diag.Error(loc, std::format("constant function '{}' shall not contain "
+                                  "nonblocking assignments",
+                                  func->name));
       return false;
     }
     if (BodyContainsEventScheduling(s)) {
-      diag.Error(
-          loc,
-          std::format(
-              "constant function '{}' shall not contain statements that "
-              "schedule events to execute after it returns",
-              func->name));
+      diag.Error(loc,
+                 std::format(
+                     "constant function '{}' shall not contain statements that "
+                     "schedule events to execute after it returns",
+                     func->name));
       return false;
     }
   }
@@ -4003,9 +3962,9 @@ static bool ValidateConstantFunction(
   if (!func->name.empty()) local_names.insert(func->name);
   for (auto* s : func->func_body_stmts) CollectLocalDeclNames(s, local_names);
 
-  ConstFuncBodyCheck chk{func->name,    param_names, function_names,
-                         local_names,   func_decls,  visited,
-                         diag,          loc,         /*failed=*/false};
+  ConstFuncBodyCheck chk{func->name,  param_names, function_names,
+                         local_names, func_decls,  visited,
+                         diag,        loc,         /*failed=*/false};
   for (auto* s : func->func_body_stmts) WalkConstFuncStmt(s, chk);
   return !chk.failed;
 }
@@ -4026,10 +3985,9 @@ static void ValidateConstantFuncCallsInExpr(const Expr* expr, SourceLoc loc,
     // attempt to invoke one in a constant context is rejected here.
     if (ctx.dpi_import_names.count(expr->callee)) {
       ctx.diag.Error(
-          loc,
-          std::format(
-              "DPI import '{}' shall not be used as a constant function",
-              expr->callee));
+          loc, std::format(
+                   "DPI import '{}' shall not be used as a constant function",
+                   expr->callee));
     } else {
       auto it = ctx.func_decls.find(expr->callee);
       if (it != ctx.func_decls.end()) {
@@ -4066,8 +4024,8 @@ static void ValidateConstantFuncCallsInExpr(const Expr* expr, SourceLoc loc,
     ValidateConstantFuncCallsInExpr(elem, loc, ctx);
 }
 
-static void ValidateConstFuncCallsInItems(
-    const std::vector<ModuleItem*>& items, const ConstFuncCallCtx& ctx) {
+static void ValidateConstFuncCallsInItems(const std::vector<ModuleItem*>& items,
+                                          const ConstFuncCallCtx& ctx) {
   for (const auto* item : items) {
     if (item->kind == ModuleItemKind::kParamDecl && item->init_expr) {
       ValidateConstantFuncCallsInExpr(item->init_expr, item->loc, ctx);
@@ -4107,8 +4065,8 @@ void Elaborator::ValidateConstantFunctionCalls(const ModuleDecl* decl) {
       dpi_import_names.insert(item->name);
   }
 
-  ConstFuncCallCtx ctx{func_decls_,       param_names, function_names,
-                       dpi_import_names,  diag_};
+  ConstFuncCallCtx ctx{func_decls_, param_names, function_names,
+                       dpi_import_names, diag_};
 
   for (const auto& [name, default_expr] : decl->params) {
     if (default_expr) {
@@ -4201,8 +4159,7 @@ static bool StmtSpawnsBackgroundProcess(const Stmt* s) {
   if (s->kind == StmtKind::kNonblockingAssign) return true;
   if (s->kind == StmtKind::kEventTrigger) return true;
   if (s->kind == StmtKind::kNbEventTrigger) return true;
-  if (s->kind == StmtKind::kFork &&
-      s->join_kind == TokenKind::kKwJoinNone) {
+  if (s->kind == StmtKind::kFork && s->join_kind == TokenKind::kKwJoinNone) {
     return true;
   }
   for (auto* sub : s->stmts)
@@ -4240,12 +4197,11 @@ static void CheckBackgroundFuncCallInExpr(
   if (expr->kind == ExprKind::kCall && !expr->callee.empty()) {
     auto it = func_decls.find(expr->callee);
     if (it != func_decls.end() && FuncSpawnsBackgroundProcess(it->second)) {
-      diag.Error(
-          expr->range.start,
-          std::format(
-              "function '{}' schedules a background event and cannot be "
-              "called from a continuous assignment",
-              expr->callee));
+      diag.Error(expr->range.start,
+                 std::format(
+                     "function '{}' schedules a background event and cannot be "
+                     "called from a continuous assignment",
+                     expr->callee));
     }
   }
   CheckBackgroundFuncCallInExpr(expr->lhs, func_decls, diag);
@@ -4429,8 +4385,7 @@ static void CheckVoidCallInExpr(
 static std::string_view ForbiddenFuncArgInNonProc(
     const Expr* expr,
     const std::unordered_map<std::string_view, const ModuleItem*>& func_decls) {
-  if (!expr || expr->kind != ExprKind::kCall || expr->callee.empty())
-    return {};
+  if (!expr || expr->kind != ExprKind::kCall || expr->callee.empty()) return {};
   auto it = func_decls.find(expr->callee);
   if (it == func_decls.end()) return {};
   const auto* func = it->second;
@@ -4451,8 +4406,7 @@ static void CheckNoTaskCallInExpr(
   if (!expr) return;
   if (expr->kind == ExprKind::kCall && !expr->callee.empty()) {
     auto it = decls.find(expr->callee);
-    if (it != decls.end() &&
-        it->second->kind == ModuleItemKind::kTaskDecl) {
+    if (it != decls.end() && it->second->kind == ModuleItemKind::kTaskDecl) {
       diag.Error(expr->range.start,
                  std::format("task '{}' cannot be called in an event "
                              "expression",
@@ -4499,10 +4453,10 @@ static void CheckEventExprSingular(
                          diag);
   CheckEventExprSingular(expr->rhs, non_singular_vars, non_singular_funcs,
                          diag);
-  CheckEventExprSingular(expr->condition, non_singular_vars,
-                         non_singular_funcs, diag);
-  CheckEventExprSingular(expr->true_expr, non_singular_vars,
-                         non_singular_funcs, diag);
+  CheckEventExprSingular(expr->condition, non_singular_vars, non_singular_funcs,
+                         diag);
+  CheckEventExprSingular(expr->true_expr, non_singular_vars, non_singular_funcs,
+                         diag);
   CheckEventExprSingular(expr->false_expr, non_singular_vars,
                          non_singular_funcs, diag);
   for (auto* a : expr->args)
@@ -4581,7 +4535,8 @@ static void WalkExprForCallArgs(
   WalkExprForCallArgs(expr->condition, func_decls, net_names, diag);
   WalkExprForCallArgs(expr->true_expr, func_decls, net_names, diag);
   WalkExprForCallArgs(expr->false_expr, func_decls, net_names, diag);
-  for (auto* a : expr->args) WalkExprForCallArgs(a, func_decls, net_names, diag);
+  for (auto* a : expr->args)
+    WalkExprForCallArgs(a, func_decls, net_names, diag);
   for (auto* e : expr->elements)
     WalkExprForCallArgs(e, func_decls, net_names, diag);
 }
@@ -4715,8 +4670,7 @@ static bool IsScopeRandomizeCall(const Expr* expr) {
 // parenthesized-form check uses the `with_has_parens` AST flag set by the
 // parser regardless of whether the parenthesized list happened to be empty
 // or non-empty.
-static void CheckScopeRandomizeRulesInExpr(const Expr* expr,
-                                           DiagEngine& diag) {
+static void CheckScopeRandomizeRulesInExpr(const Expr* expr, DiagEngine& diag) {
   if (!expr) return;
   if (IsScopeRandomizeCall(expr)) {
     for (const auto* arg : expr->args) {
@@ -4740,8 +4694,7 @@ static void CheckScopeRandomizeRulesInExpr(const Expr* expr,
   CheckScopeRandomizeRulesInExpr(expr->index, diag);
   CheckScopeRandomizeRulesInExpr(expr->index_end, diag);
   for (const auto* a : expr->args) CheckScopeRandomizeRulesInExpr(a, diag);
-  for (const auto* e : expr->elements)
-    CheckScopeRandomizeRulesInExpr(e, diag);
+  for (const auto* e : expr->elements) CheckScopeRandomizeRulesInExpr(e, diag);
 }
 
 static void WalkStmtForScopeRandomize(const Stmt* s, DiagEngine& diag) {
@@ -4758,12 +4711,10 @@ static void WalkStmtForScopeRandomize(const Stmt* s, DiagEngine& diag) {
   for (const auto* fi : s->for_inits) WalkStmtForScopeRandomize(fi, diag);
   WalkStmtForScopeRandomize(s->for_body, diag);
   for (const auto* fs : s->for_steps) WalkStmtForScopeRandomize(fs, diag);
-  for (const auto& ci : s->case_items)
-    WalkStmtForScopeRandomize(ci.body, diag);
+  for (const auto& ci : s->case_items) WalkStmtForScopeRandomize(ci.body, diag);
 }
 
 void Elaborator::ValidateSubroutineCallArgs(const ModuleDecl* decl) {
-
   std::unordered_map<std::string_view, const ModuleItem*> all_decls =
       func_decls_;
   for (const auto* item : decl->items) {
@@ -4788,10 +4739,9 @@ void Elaborator::ValidateSubroutineCallArgs(const ModuleDecl* decl) {
   for (const auto* item : decl->items) {
     if (item->kind != ModuleItemKind::kVarDecl) continue;
     bool unpacked_array = !item->unpacked_dims.empty();
-    bool unpacked_aggregate =
-        (item->data_type.kind == DataTypeKind::kStruct ||
-         item->data_type.kind == DataTypeKind::kUnion) &&
-        !item->data_type.is_packed;
+    bool unpacked_aggregate = (item->data_type.kind == DataTypeKind::kStruct ||
+                               item->data_type.kind == DataTypeKind::kUnion) &&
+                              !item->data_type.is_packed;
     if (unpacked_array || unpacked_aggregate)
       non_singular_vars.insert(item->name);
   }
@@ -4801,8 +4751,7 @@ void Elaborator::ValidateSubroutineCallArgs(const ModuleDecl* decl) {
     if (item->kind != ModuleItemKind::kFunctionDecl) return;
     const auto& rt = item->return_type;
     bool unpacked_aggregate =
-        (rt.kind == DataTypeKind::kStruct ||
-         rt.kind == DataTypeKind::kUnion) &&
+        (rt.kind == DataTypeKind::kStruct || rt.kind == DataTypeKind::kUnion) &&
         !rt.is_packed;
     if (unpacked_aggregate) non_singular_funcs.insert(item->name);
   };
@@ -4830,8 +4779,8 @@ void Elaborator::ValidateSubroutineCallArgs(const ModuleDecl* decl) {
         CheckNoTaskCallInExpr(ev.signal, all_decls, diag_);
         CheckNoTaskCallInExpr(ev.iff_condition, all_decls, diag_);
 
-        CheckEventExprSingular(ev.signal, non_singular_vars,
-                               non_singular_funcs, diag_);
+        CheckEventExprSingular(ev.signal, non_singular_vars, non_singular_funcs,
+                               diag_);
         CheckEventExprSingular(ev.iff_condition, non_singular_vars,
                                non_singular_funcs, diag_);
       }
@@ -4846,9 +4795,8 @@ void Elaborator::ValidateSubroutineCallArgs(const ModuleDecl* decl) {
     if (item->kind == ModuleItemKind::kContAssign) {
       CheckVoidCallInExpr(item->assign_rhs, all_decls, diag_);
 
-      CheckCallNoOutInoutRefInExpr(
-          item->assign_rhs, all_decls, diag_,
-          "a continuous assignment");
+      CheckCallNoOutInoutRefInExpr(item->assign_rhs, all_decls, diag_,
+                                   "a continuous assignment");
     }
   }
 }
@@ -4882,7 +4830,6 @@ static bool IsLegalClockingOutputExpr(const Expr* e) {
 
 void Elaborator::ValidateClockingBlock(ModuleItem* item,
                                        const RtlirModule* mod) {
-
   if (item->name.empty() && !item->is_default_clocking) {
     diag_.Error(item->loc, "non-default clocking block must have a name");
   }
@@ -4932,14 +4879,14 @@ void Elaborator::ValidateClockingBlock(ModuleItem* item,
 
 void Elaborator::ValidateNoFormalShadowedByBodyLocal(ModuleItem* item) {
   // §16.10: a formal-argument identifier cannot be redeclared in the body of
-  // the same sequence/property declaration as an assertion_variable_declaration.
-  // The two name lists are harvested by the parser; the elaborator only has
-  // to flag any overlap.
+  // the same sequence/property declaration as an
+  // assertion_variable_declaration. The two name lists are harvested by the
+  // parser; the elaborator only has to flag any overlap.
   if (item->prop_formals.empty() || item->prop_seq_assert_vars.empty()) {
     return;
   }
-  std::unordered_set<std::string_view> formal_set(
-      item->prop_formals.begin(), item->prop_formals.end());
+  std::unordered_set<std::string_view> formal_set(item->prop_formals.begin(),
+                                                  item->prop_formals.end());
   for (auto body_var : item->prop_seq_assert_vars) {
     if (formal_set.count(body_var) != 0) {
       diag_.Error(item->loc,
@@ -5001,7 +4948,7 @@ void Elaborator::ValidateRecursivePropertyArguments(const ModuleItem* item) {
 
   // Formal arguments of the enclosing property p.
   std::unordered_set<std::string_view> p_formals(item->prop_formals.begin(),
-                                                  item->prop_formals.end());
+                                                 item->prop_formals.end());
 
   for (const auto& inst : item->prop_instance_args) {
     const ModuleItem* q = property_registry_.Find(inst.callee);
@@ -5037,7 +4984,8 @@ void Elaborator::ValidateRecursivePropertyArguments(const ModuleItem* item) {
       diag_.Error(item->loc,
                   "recursive instance of \"" + std::string(inst.callee) +
                       "\" passes an actual argument that contains a formal of "
-                      "\"" + std::string(item->name) +
+                      "\"" +
+                      std::string(item->name) +
                       "\" yet is neither a formal itself nor bound to a local "
                       "variable formal (§16.12.17 Restriction 4)");
     }
@@ -5050,7 +4998,6 @@ void Elaborator::CheckClockvarAccessExpr(const Expr* e, bool is_lvalue) {
       e->lhs->kind == ExprKind::kIdentifier) {
     auto block_it = clocking_signals_.find(e->lhs->text);
     if (block_it != clocking_signals_.end()) {
-
       std::string_view member;
       if (e->rhs && e->rhs->kind == ExprKind::kIdentifier) {
         member = e->rhs->text;
@@ -5239,9 +5186,8 @@ void Elaborator::ValidateDefaultClockingReference(const ModuleDecl* decl) {
       }
     }
     if (!names_block) {
-      diag_.Error(item->loc,
-                  "default clocking \"" + std::string(item->name) +
-                      "\" does not name a clocking block");
+      diag_.Error(item->loc, "default clocking \"" + std::string(item->name) +
+                                 "\" does not name a clocking block");
     }
   }
 }
@@ -5311,7 +5257,7 @@ const Expr* FindGlobalClockRefInStmt(const Stmt* s) {
   return nullptr;
 }
 
-}
+}  // namespace
 
 void Elaborator::ValidateGlobalClockReference(const ModuleDecl* decl) {
   bool has_global = false;
@@ -5362,7 +5308,8 @@ void Elaborator::ValidateContAssignToClockvar(const ModuleDecl* decl) {
     // variable would be. This mirrors the root resolution the primitive and
     // procedural-continuous checks already perform for the same prohibition.
     const Expr* root = item->assign_lhs;
-    while (root != nullptr && root->kind == ExprKind::kSelect) root = root->base;
+    while (root != nullptr && root->kind == ExprKind::kSelect)
+      root = root->base;
     if (root == nullptr || root->kind != ExprKind::kIdentifier) continue;
     if (IsOutputClockvarSignal(root->text)) {
       diag_.Error(item->loc,
@@ -5379,9 +5326,8 @@ bool Elaborator::IsOutputClockvarSignal(std::string_view name) const {
   // output/inout clockvar members collected across every clocking block.
   for (const auto& [block_name, sigs] : clocking_signals_) {
     auto it = sigs.find(name);
-    if (it != sigs.end() &&
-        (it->second.direction == Direction::kOutput ||
-         it->second.direction == Direction::kInout)) {
+    if (it != sigs.end() && (it->second.direction == Direction::kOutput ||
+                             it->second.direction == Direction::kInout)) {
       return true;
     }
   }
@@ -5570,8 +5516,8 @@ void Elaborator::ValidateSequenceEventArgs(const ModuleDecl* decl) {
     }
 
     if (item->kind == ModuleItemKind::kTaskDecl && item->body) {
-      WalkStmtsForSequenceEvents(const_cast<Stmt*>(item->body),
-                                 sequence_names_, item->is_automatic, diag_);
+      WalkStmtsForSequenceEvents(const_cast<Stmt*>(item->body), sequence_names_,
+                                 item->is_automatic, diag_);
     }
   }
 }
@@ -5638,12 +5584,12 @@ static void CheckFinalDeferredCallee(const Stmt* action,
   auto it = subs.find(action->expr->callee);
   if (it == subs.end()) return;
   if (CalleeBodyHasPostponedIllegal(it->second)) {
-    diag.Warning(action->range.start,
-                 std::format(
-                     "§16.4: final deferred assertion calls '{}', whose body "
-                     "contains statements not legally callable in the "
-                     "Postponed region (§4.4.2.9)",
-                     action->expr->callee));
+    diag.Warning(
+        action->range.start,
+        std::format("§16.4: final deferred assertion calls '{}', whose body "
+                    "contains statements not legally callable in the "
+                    "Postponed region (§4.4.2.9)",
+                    action->expr->callee));
   }
 }
 
@@ -5663,12 +5609,11 @@ static void CheckDeferredCallRefArgs(const Stmt* action,
     const Expr* a = actuals[i];
     if (!a) continue;
     if (a->kind == ExprKind::kMemberAccess) {
-      diag.Error(a->range.start,
-                 std::format(
-                     "§16.4: cannot pass dynamic variable as actual for "
-                     "ref{} formal '{}' in deferred-assertion call",
-                     formals[i].is_const ? " const" : "",
-                     formals[i].name));
+      diag.Error(
+          a->range.start,
+          std::format("§16.4: cannot pass dynamic variable as actual for "
+                      "ref{} formal '{}' in deferred-assertion call",
+                      formals[i].is_const ? " const" : "", formals[i].name));
     }
   }
 }
@@ -5716,7 +5661,6 @@ void Elaborator::WalkStmtsForDeferredActions(const Stmt* s) {
 }
 
 void Elaborator::ValidateDeferredAssertionActions(const ModuleDecl* decl) {
-
   deferred_subroutine_map_.clear();
   for (const auto* item : decl->items) {
     if (item->kind == ModuleItemKind::kTaskDecl ||
@@ -5725,7 +5669,6 @@ void Elaborator::ValidateDeferredAssertionActions(const ModuleDecl* decl) {
     }
   }
   for (const auto* item : decl->items) {
-
     if (item->body) {
       WalkStmtsForDeferredActions(item->body);
     }
@@ -5746,4 +5689,4 @@ bool ValidateNettypeResolutionFunction(const NettypeResolutionSig& sig) {
   return true;
 }
 
-}
+}  // namespace delta

@@ -165,7 +165,8 @@ struct ClassTypespecVifVar {
 
 // §37.32: lightweight description of a class typespec sufficient to answer the
 // VPI queries this clause defines. It reuses ClassTypeInfo for the class
-// definition (which already carries the base-class chain and the built-in flag).
+// definition (which already carries the base-class chain and the built-in
+// flag).
 struct ClassTypespecInfo {
   std::string_view name;
   ClassTypespecKind kind = ClassTypespecKind::kLexical;
@@ -189,7 +190,8 @@ struct ClassTypespecInfo {
 
 // §37.32: a lexical-only typespec does not support the member-collection
 // relations (vpiVariables, vpiMethods, vpiConstraint, vpiNamedEvent,
-// vpiNamedEventArray, vpiTypedef, vpiInternalScope). Only a specialization does.
+// vpiNamedEventArray, vpiTypedef, vpiInternalScope). Only a specialization
+// does.
 bool VpiClassTypespecSupportsMembers(const ClassTypespecInfo& ts);
 
 // §37.32: a specialization must carry a valid, non-empty (though tool-chosen)
@@ -215,8 +217,8 @@ bool VpiClassTypespecBaseIsSpecialization(const ClassTypespecInfo& ts);
 std::vector<ClassTypespecMethod> VpiClassTypespecMethods(
     const ClassTypespecInfo& ts);
 
-// §37.32: vpi_get(vpiLocalParam) for a class-typespec parameter -- true when the
-// parameter was declared in the class body.
+// §37.32: vpi_get(vpiLocalParam) for a class-typespec parameter -- true when
+// the parameter was declared in the class body.
 bool VpiClassTypespecParamIsLocal(const ClassTypespecParam& param);
 
 // §37.32: the vpiRhs of a parameter assignment -- the explicit argument when
@@ -262,4 +264,4 @@ struct WeakReference {
   }
 };
 
-}
+}  // namespace delta

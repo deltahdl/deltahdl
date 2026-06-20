@@ -81,4 +81,4 @@ TEST(StringMethods, SubstrEmptyString) {
   EXPECT_EQ(VecToString(result), "");
 }
 
-}
+}  // namespace

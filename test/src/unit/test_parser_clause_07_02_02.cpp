@@ -153,4 +153,4 @@ TEST(StructAssignmentParsing, StructMemberExpressionDefault) {
   EXPECT_EQ(item->typedef_type.struct_members[1].init_expr, nullptr);
 }
 
-}
+}  // namespace

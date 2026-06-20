@@ -45,4 +45,4 @@ TEST(DesignBuildingBlockParsing, ZeroDelayResolvesToZeroTicks) {
   EXPECT_EQ(RealDelayToTicks(0.0, ts, TimeUnit::kPs), 0u);
 }
 
-}
+}  // namespace

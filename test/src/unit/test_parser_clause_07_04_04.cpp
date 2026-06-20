@@ -82,4 +82,4 @@ TEST(MultidimensionalArrayParsing, ThreeDimUnpackedArray) {
   ASSERT_EQ(item->unpacked_dims.size(), 3u);
 }
 
-}
+}  // namespace

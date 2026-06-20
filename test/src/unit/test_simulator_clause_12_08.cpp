@@ -474,4 +474,4 @@ TEST(LoopStatementSim, NestedLoopInnerContinue) {
   EXPECT_EQ(var->value.ToUint64(), 9u);
 }
 
-}
+}  // namespace

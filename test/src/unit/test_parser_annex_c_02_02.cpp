@@ -53,7 +53,8 @@ TEST(SampledClockingEventArgDeprecated, ClockingEventArgStillAllowedForRose) {
 // argument supplied to a non-$sampled sampled value function such as $fell
 // must still parse, confirming the gate does not fire on the event syntax
 // itself.
-TEST(SampledClockingEventArgDeprecated, BareClockingEventArgStillAllowedForFell) {
+TEST(SampledClockingEventArgDeprecated,
+     BareClockingEventArgStillAllowedForFell) {
   auto r = Parse(
       "module m; logic a, b, clk; "
       "assign b = $fell(a, @clk); endmodule\n");

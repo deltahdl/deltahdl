@@ -259,4 +259,4 @@ TEST(LibraryMapFileReading, MalformedMapFileReportsFailure) {
   EXPECT_FALSE(errors.empty());
 }
 
-}
+}  // namespace

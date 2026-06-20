@@ -138,4 +138,4 @@ TEST(WildcardIndexType, IntegralIndexIsAllowed) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

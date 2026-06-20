@@ -2,9 +2,10 @@
 
 namespace delta {
 
-CrossValTypeDef BuildCrossValType(const std::vector<CrossValMember>& coverpoints) {
-  // §19.6.1.3: one struct member for each coverpoint in the cross, carrying that
-  // coverpoint's name and type, in order.
+CrossValTypeDef BuildCrossValType(
+    const std::vector<CrossValMember>& coverpoints) {
+  // §19.6.1.3: one struct member for each coverpoint in the cross, carrying
+  // that coverpoint's name and type, in order.
   CrossValTypeDef def;
   def.members = coverpoints;
   return def;
@@ -17,7 +18,8 @@ CrossQueueTypeDef BuildCrossQueueType() {
 
 std::string CrossValMemberDefaultBoundType(int64_t expr_bit_width) {
   // §19.6.1.3: bounds default to [$bits(coverpoint_expression)-1:0] when not
-  // otherwise evident. A coverpoint expression always occupies at least one bit.
+  // otherwise evident. A coverpoint expression always occupies at least one
+  // bit.
   int64_t high = expr_bit_width >= 1 ? expr_bit_width - 1 : 0;
   return "logic [" + std::to_string(high) + ":0]";
 }

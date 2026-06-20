@@ -119,7 +119,8 @@ TEST(TimingCheckEventDefParsing, EdgeControlSpecifierZeroOneDescriptors) {
   EXPECT_EQ(tc->data_edge_descriptors[1], std::make_pair('1', '0'));
 }
 
-// edge_descriptor ::= z_or_x zero_or_one ; z_or_x ::= x|X|z|Z, zero_or_one ::= 0|1.
+// edge_descriptor ::= z_or_x zero_or_one ; z_or_x ::= x|X|z|Z, zero_or_one ::=
+// 0|1.
 TEST(TimingCheckEventDefParsing, EdgeDescriptorZorXThenZeroOrOne) {
   auto r = Parse(
       "module m;\n"
@@ -173,7 +174,8 @@ TEST(TimingCheckEventDefParsing, TimingCheckConditionBareExpression) {
   ASSERT_NE(tc->ref_condition, nullptr);
 }
 
-// timing_check_condition ::= ( scalar_timing_check_condition ) -- parenthesized.
+// timing_check_condition ::= ( scalar_timing_check_condition ) --
+// parenthesized.
 TEST(TimingCheckEventDefParsing, TimingCheckConditionParenthesized) {
   auto r = Parse(
       "module m;\n"
@@ -297,4 +299,4 @@ TEST(TimingCheckEventDefParsing, EdgeControlSpecifierEmptyListRejected) {
   EXPECT_TRUE(r.has_errors);
 }
 
-}
+}  // namespace

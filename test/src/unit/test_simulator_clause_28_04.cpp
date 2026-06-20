@@ -281,4 +281,4 @@ TEST(NInputGateDelay, ProductionTwoDelayAndGateSchedulerEndsAtInputPlusRise) {
   EXPECT_EQ(f.scheduler.CurrentTime().ticks, 7u);
 }
 
-}
+}  // namespace

@@ -155,20 +155,20 @@ struct ConstraintExpr {
 
   std::vector<std::string> unique_vars;
 
-  // 18.5.7.2: an array reduction iterative constraint. In a constraint, an array
-  // reduction method is treated as an expression iterated over each element of
-  // the array, joined by the operand for that method (reduce_op). reduce_vars
-  // names the array's element variables in index order; reduce_with, when set,
-  // is the with-clause expression applied to each element value (the with-clause
-  // 'item') before it is folded, defaulting to the element value itself. The
-  // folded result — a single value — is compared against 'lo' under the relation
-  // reduce_cmp. reduce_width is the bit width of that result's type: the array
-  // element type by default, or the type of the with-clause expression when one
-  // is given, so the fold is truncated to that width exactly as the result type
-  // demands. As with a foreach iterative constraint, when the array is
-  // dynamically sized size_var names its size method; the size constraints are
-  // solved first, so only the elements whose index is below the committed size
-  // take part in the reduction.
+  // 18.5.7.2: an array reduction iterative constraint. In a constraint, an
+  // array reduction method is treated as an expression iterated over each
+  // element of the array, joined by the operand for that method (reduce_op).
+  // reduce_vars names the array's element variables in index order;
+  // reduce_with, when set, is the with-clause expression applied to each
+  // element value (the with-clause 'item') before it is folded, defaulting to
+  // the element value itself. The folded result — a single value — is compared
+  // against 'lo' under the relation reduce_cmp. reduce_width is the bit width
+  // of that result's type: the array element type by default, or the type of
+  // the with-clause expression when one is given, so the fold is truncated to
+  // that width exactly as the result type demands. As with a foreach iterative
+  // constraint, when the array is dynamically sized size_var names its size
+  // method; the size constraints are solved first, so only the elements whose
+  // index is below the committed size take part in the reduction.
   ArrayReductionOp reduce_op = ArrayReductionOp::kSum;
   std::vector<std::string> reduce_vars;
   std::function<int64_t(int64_t)> reduce_with;
@@ -185,9 +185,9 @@ struct ConstraintExpr {
   // variables first and treats them as state variables; it may then enforce a
   // constraint only once every variable the constraint references has been
   // committed. ref_vars names those variables so the solver can defer the
-  // constraint until they are all drawn. Left empty when the priority feature is
-  // not in use, in which case the constraint is checked in the final pass like
-  // any other.
+  // constraint until they are all drawn. Left empty when the priority feature
+  // is not in use, in which case the constraint is checked in the final pass
+  // like any other.
   std::vector<std::string> ref_vars;
 
   // 18.5.12: an optional constraint guard. When has_guard is set, the guard is
@@ -298,25 +298,25 @@ class ConstraintSolver {
   void AddConstraintBlock(const ConstraintBlock& block);
 
   // 18.5.9: record a 'solve before_list before after_list' ordering constraint.
-  // Every variable in 'before' is to be solved before every variable in 'after',
-  // which alters the probability distribution over legal value combinations
-  // without changing the set of legal combinations. The ordering is partial:
-  // calling this more than once accumulates the constraints. A solve...before
-  // ordering never removes a solution, so it cannot by itself cause a solve to
-  // fail.
+  // Every variable in 'before' is to be solved before every variable in
+  // 'after', which alters the probability distribution over legal value
+  // combinations without changing the set of legal combinations. The ordering
+  // is partial: calling this more than once accumulates the constraints. A
+  // solve...before ordering never removes a solution, so it cannot by itself
+  // cause a solve to fail.
   void AddSolveBefore(const std::vector<std::string>& before,
                       const std::vector<std::string>& after);
 
-  // 18.5.11: record that using a random variable as a function argument gives it
-  // a higher priority than the variables of the constraint it appears in. Each
-  // 'higher' variable is solved before each 'lower' variable, and the
+  // 18.5.11: record that using a random variable as a function argument gives
+  // it a higher priority than the variables of the constraint it appears in.
+  // Each 'higher' variable is solved before each 'lower' variable, and the
   // higher-priority variables — solved as part of a higher-priority set of
   // constraints — become state variables to the lower-priority set. Unlike
   // solve...before (18.5.9), this ordering subdivides the solution space: the
   // higher-priority constraints are solved without regard to the lower-priority
   // ones, so the subdivision can make an otherwise solvable set fail. The
-  // ordering is partial and accumulates across calls; a cycle among the implicit
-  // priorities is an error that fails randomize().
+  // ordering is partial and accumulates across calls; a cycle among the
+  // implicit priorities is an error that fails randomize().
   void AddFunctionArgPriority(const std::vector<std::string>& higher,
                               const std::vector<std::string>& lower);
 
@@ -332,9 +332,9 @@ class ConstraintSolver {
   // as soon as one expression is false and true (1) only when all of them hold.
   bool Check(const std::vector<ConstraintExpr>& constraints = {});
 
-  // 18.11.1: the inline constraint checker. Passing the special argument null to
-  // randomize() designates an empty set of random variables for the duration of
-  // the call, so every class member — including any declared rand or randc —
+  // 18.11.1: the inline constraint checker. Passing the special argument null
+  // to randomize() designates an empty set of random variables for the duration
+  // of the call, so every class member — including any declared rand or randc —
   // behaves as a state variable and the solver assigns no new value to any of
   // them. With no active random variable left, randomize() acts as a checker
   // rather than a generator: it evaluates every constraint (the enabled blocks
@@ -342,7 +342,8 @@ class ConstraintSolver {
   // current values and returns true (1) only when all of them hold, false (0)
   // as soon as one does not. A class that declares no random variables at all
   // reduces to this same checker behavior even without the null argument.
-  bool InlineConstraintCheck(const std::vector<ConstraintExpr>& constraints = {});
+  bool InlineConstraintCheck(
+      const std::vector<ConstraintExpr>& constraints = {});
 
   int64_t GetValue(std::string_view name) const;
 
@@ -382,7 +383,6 @@ class ConstraintSolver {
   const std::unordered_map<std::string, int64_t>& GetValues() const;
 
  private:
-
   int64_t GenerateRandValue(RandVariable& var);
 
   // 18.4.1: draw a uniformly distributed real value over [real_min, real_max).
@@ -449,12 +449,12 @@ class ConstraintSolver {
   // 18.5.13.2: resolve the 'disable soft' directives for the current solve.
   // Walking every enabled block and then the inline (with) constraints in
   // declaration order — the same order that fixes soft-constraint priority in
-  // 18.5.13.1 — each directive discards the soft constraints already seen (those
-  // of lower priority) that directly reference the directive's variable. A
-  // discarded soft constraint is recorded in disabled_soft_ and treated as true
-  // for the rest of the solve, unconditionally: it is removed whether or not it
-  // contradicts anything, and ahead of the priority resolution among the soft
-  // constraints that remain. Recomputed per call into a cleared set.
+  // 18.5.13.1 — each directive discards the soft constraints already seen
+  // (those of lower priority) that directly reference the directive's variable.
+  // A discarded soft constraint is recorded in disabled_soft_ and treated as
+  // true for the rest of the solve, unconditionally: it is removed whether or
+  // not it contradicts anything, and ahead of the priority resolution among the
+  // soft constraints that remain. Recomputed per call into a cleared set.
   void ComputeDisabledSoft(const std::vector<ConstraintExpr>& extra);
 
   bool EvalConstraint(const ConstraintExpr& expr) const;
@@ -465,8 +465,8 @@ class ConstraintSolver {
 
   bool EvalForeach(const ConstraintExpr& expr) const;
 
-  // 18.5.7.2: evaluate an array reduction iterative constraint. Fold the array's
-  // existing elements (those below the committed size when the array is
+  // 18.5.7.2: evaluate an array reduction iterative constraint. Fold the
+  // array's existing elements (those below the committed size when the array is
   // dynamically sized) with the method's operand, applying the with-clause
   // expression to each element first, then truncate to the result type's width
   // and test the configured relation against the target value.
@@ -475,8 +475,8 @@ class ConstraintSolver {
   bool EvalUnique(const ConstraintExpr& expr) const;
 
   // 18.5.10: refresh each static block's per-instance 'enabled' flag from its
-  // shared state, so a constraint_mode() call routed through another instance of
-  // the class is observed here before the constraints are evaluated.
+  // shared state, so a constraint_mode() call routed through another instance
+  // of the class is observed here before the constraints are evaluated.
   void RefreshStaticBlockState();
 
   void ApplyDistConstraints();
@@ -488,27 +488,27 @@ class ConstraintSolver {
                       bool include_soft);
 
   // 18.6.3: publish the values of the static random variables into their shared
-  // cells after a successful solve, so that the value this instance just drew is
-  // the one every other instance of the class now observes. Called only when the
-  // solve succeeds; a failed randomize() leaves the shared cells untouched, in
-  // keeping with the rule that the variables retain their previous values.
+  // cells after a successful solve, so that the value this instance just drew
+  // is the one every other instance of the class now observes. Called only when
+  // the solve succeeds; a failed randomize() leaves the shared cells untouched,
+  // in keeping with the rule that the variables retain their previous values.
   void CommitStaticSharedValues();
 
   // 18.5.9: partition the given active rand variables into ordered solve groups
   // honoring the recorded solve...before constraints. Each group is solved in
   // turn, earliest first; a variable is placed as late as the ordering allows
   // (its distance to the end of the longest chain that depends on it), so that
-  // variables with nothing ordered after them — including every variable that is
-  // not explicitly ordered — fall into the final group and are solved last. The
-  // groups are returned earliest-first; empty groups are omitted.
+  // variables with nothing ordered after them — including every variable that
+  // is not explicitly ordered — fall into the final group and are solved last.
+  // The groups are returned earliest-first; empty groups are omitted.
   std::vector<std::vector<std::string>> ComputeSolveGroups(
       const std::vector<std::string>& vars) const;
 
   // 18.5.9: solve the ordered groups by staged generate-and-test. Variables in
   // an earlier group are drawn and committed before the later groups are solved
   // against them, so an earlier variable's value is held fixed while the later
-  // variables are completed. An earlier value is kept whenever some completion of
-  // the remaining groups satisfies every constraint; only when no completion
+  // variables are completed. An earlier value is kept whenever some completion
+  // of the remaining groups satisfies every constraint; only when no completion
   // exists is it redrawn. This reproduces the solve...before distribution (an
   // ordered variable is chosen over its own legal values, then the dependent
   // variables subject to it) while preserving the full solution space.
@@ -517,8 +517,9 @@ class ConstraintSolver {
                           bool include_soft);
 
   // 18.5.11: true when the recorded function-argument priority edges contain a
-  // cycle, i.e. a set of random variables whose implicit priorities are mutually
-  // contradictory. Such a circular dependency is an error and fails randomize().
+  // cycle, i.e. a set of random variables whose implicit priorities are
+  // mutually contradictory. Such a circular dependency is an error and fails
+  // randomize().
   bool HasFunctionArgPriorityCycle() const;
 
   // 18.5.11: partition the given active variables into priority layers honoring
@@ -529,9 +530,9 @@ class ConstraintSolver {
   std::vector<std::vector<std::string>> ComputePriorityLayers(
       const std::vector<std::string>& vars) const;
 
-  // 18.5.11: solve the priority layers in order, committing each layer before the
-  // next and never redrawing an earlier layer. Within a layer the variables are
-  // drawn until every constraint all of whose referenced variables are now
+  // 18.5.11: solve the priority layers in order, committing each layer before
+  // the next and never redrawing an earlier layer. Within a layer the variables
+  // are drawn until every constraint all of whose referenced variables are now
   // committed holds; if no draw satisfies them the solve fails, because the
   // higher-priority commitment is not reconsidered. This realizes the
   // solution-space subdivision the clause describes — and its ability to fail —
@@ -540,15 +541,14 @@ class ConstraintSolver {
                            const std::vector<ConstraintExpr>& extra,
                            bool include_soft);
 
-  // 18.5.11: check the subset of constraints (enabled blocks plus 'extra') whose
-  // referenced variables are all present in 'committed'. A constraint that names
-  // a not-yet-committed variable, or that declares no referenced variables, is
-  // skipped so the priority solve does not evaluate it before its operands
-  // exist; the final full check still enforces every constraint.
-  bool CheckCommittedConstraints(const std::vector<ConstraintExpr>& extra,
-                                 bool include_soft,
-                                 const std::unordered_set<std::string>& committed)
-      const;
+  // 18.5.11: check the subset of constraints (enabled blocks plus 'extra')
+  // whose referenced variables are all present in 'committed'. A constraint
+  // that names a not-yet-committed variable, or that declares no referenced
+  // variables, is skipped so the priority solve does not evaluate it before its
+  // operands exist; the final full check still enforces every constraint.
+  bool CheckCommittedConstraints(
+      const std::vector<ConstraintExpr>& extra, bool include_soft,
+      const std::unordered_set<std::string>& committed) const;
 
   std::mt19937 rng_;
   std::unordered_map<std::string, RandVariable> variables_;
@@ -567,10 +567,10 @@ class ConstraintSolver {
   // combination with uniform probability.
   std::vector<std::pair<std::string, std::string>> solve_before_edges_;
 
-  // 18.5.11: the implicit priority edges induced by using a random variable as a
-  // function argument. Each pair (higher, lower) requires 'higher' to be solved
-  // ahead of 'lower' and, unlike solve_before_edges_, makes 'higher' a state
-  // variable to the constraints on 'lower' — a strict subdivision of the
+  // 18.5.11: the implicit priority edges induced by using a random variable as
+  // a function argument. Each pair (higher, lower) requires 'higher' to be
+  // solved ahead of 'lower' and, unlike solve_before_edges_, makes 'higher' a
+  // state variable to the constraints on 'lower' — a strict subdivision of the
   // solution space rather than a redistribution within it. Empty when no
   // function-argument ordering applies.
   std::vector<std::pair<std::string, std::string>> function_arg_priority_edges_;
@@ -597,4 +597,4 @@ class ConstraintSolver {
   std::unordered_set<const ConstraintExpr*> disabled_soft_;
 };
 
-}
+}  // namespace delta

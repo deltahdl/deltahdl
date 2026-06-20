@@ -10,9 +10,10 @@ namespace {
 // a variable that holds an interface instance. These tests observe the
 // production code that applies the clause's two numbered "Details" - what
 // vpiExpr reports for the declaration-time assignment (detail 1) and which
-// objects may serve as an interface expr (detail 2) - together with the figure's
-// vpiActual relation (refined by Example 2: NULL while uninitialized) and the
-// vpiName/vpiFullName/vpiIsModPort properties served by the generic machinery.
+// objects may serve as an interface expr (detail 2) - together with the
+// figure's vpiActual relation (refined by Example 2: NULL while uninitialized)
+// and the vpiName/vpiFullName/vpiIsModPort properties served by the generic
+// machinery.
 
 // The fixture installs a context so the public vpi_get/vpi_get_str/VpiHandleC
 // entry points run their real dispatch over the test objects.
@@ -35,8 +36,8 @@ TEST_F(VirtualInterface, InterfaceExprGroupMembership) {
   EXPECT_FALSE(VpiIsInterfaceExprType(vpiModule));
 }
 
-// D1: vpiExpr of a virtual interface var reaches the interface instance assigned
-// in its declaration. Observed through the helper and the public
+// D1: vpiExpr of a virtual interface var reaches the interface instance
+// assigned in its declaration. Observed through the helper and the public
 // VpiHandleC(vpiExpr, ...) dispatch path.
 TEST_F(VirtualInterface, ExprReachesAssignedInterfaceInstance) {
   VpiObject iface;  // the interface instance assigned at declaration
@@ -71,7 +72,8 @@ TEST_F(VirtualInterface, ExprHelperOnlyForVirtualInterfaceVar) {
 
 // D2: a ref obj is a legal interface expr only when its vpiActual is an
 // interface or a modport (a local declaration passed through a port).
-TEST_F(VirtualInterface, RefObjIsInterfaceExprOnlyWhenActualIsInterfaceOrModport) {
+TEST_F(VirtualInterface,
+       RefObjIsInterfaceExprOnlyWhenActualIsInterfaceOrModport) {
   VpiObject iface;
   iface.type = vpiInterface;
   VpiObject modport;
@@ -112,9 +114,9 @@ TEST_F(VirtualInterface, ConstantIsInterfaceExprOnlyWhenNullConst) {
 }
 
 // D2: an interface, a modport, and a (nested) virtual interface var are always
-// legal interface exprs; a null handle and any unrelated kind are not. Covers the
-// always-valid arms of the validity predicate together with its null guard and
-// its default-false branch.
+// legal interface exprs; a null handle and any unrelated kind are not. Covers
+// the always-valid arms of the validity predicate together with its null guard
+// and its default-false branch.
 TEST_F(VirtualInterface, InterfaceModportAndVifAreAlwaysValidInterfaceExprs) {
   VpiObject iface;
   iface.type = vpiInterface;
@@ -133,7 +135,8 @@ TEST_F(VirtualInterface, InterfaceModportAndVifAreAlwaysValidInterfaceExprs) {
 }
 
 // D1 + D2 together through the public path: a ref-obj assignment that fails the
-// detail-2 constraint is not an interface expr, so vpiExpr does not hand it back.
+// detail-2 constraint is not an interface expr, so vpiExpr does not hand it
+// back.
 TEST_F(VirtualInterface, ExprSkipsRefObjThatFailsDetail2) {
   VpiObject net;
   net.type = kVpiNet;
@@ -149,8 +152,9 @@ TEST_F(VirtualInterface, ExprSkipsRefObjThatFailsDetail2) {
   EXPECT_EQ(VpiHandleC(vpiExpr, &vif), nullptr);
 }
 
-// Example 2: vpiActual of a virtual interface var reaches the interface instance
-// it currently holds - the actual passed to the new call that bound it.
+// Example 2: vpiActual of a virtual interface var reaches the interface
+// instance it currently holds - the actual passed to the new call that bound
+// it.
 TEST_F(VirtualInterface, ActualReachesHeldInterfaceInstance) {
   VpiObject iface;
   iface.type = vpiInterface;
@@ -171,9 +175,9 @@ TEST_F(VirtualInterface, ActualIsNullWhileUninitialized) {
   EXPECT_EQ(VpiHandleC(vpiActual, &vif), nullptr);
 }
 
-// Figure properties: the virtual interface var carries vpiName/vpiFullName and a
-// vpiIsModPort Boolean, reported by the generic Get/GetStr dispatch. Example 2's
-// virtual interface var is named "bus".
+// Figure properties: the virtual interface var carries vpiName/vpiFullName and
+// a vpiIsModPort Boolean, reported by the generic Get/GetStr dispatch. Example
+// 2's virtual interface var is named "bus".
 TEST_F(VirtualInterface, NameAndIsModPortProperties) {
   VpiObject vif;
   vif.type = vpiVirtualInterfaceVar;

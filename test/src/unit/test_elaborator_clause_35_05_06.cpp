@@ -66,7 +66,8 @@ TEST(DpiExportFormalType, ExportedFunctionWithScalarArgIsOk) {
 // §35.5.6: the prohibition applies to every formal argument, so a dynamic array
 // is rejected even when it is not the first argument and is preceded by
 // permitted ones.
-TEST(DpiExportFormalType, ExportedFunctionWithDynamicArrayArgAmongOthersIsError) {
+TEST(DpiExportFormalType,
+     ExportedFunctionWithDynamicArrayArgAmongOthersIsError) {
   ElabFixture f;
   Elaborate(R"(
     module m;

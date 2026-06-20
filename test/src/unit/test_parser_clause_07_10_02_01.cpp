@@ -31,4 +31,4 @@ TEST(QueueSizeParsing, QueueMethodSize) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kMemberAccess);
 }
 
-}
+}  // namespace

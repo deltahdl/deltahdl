@@ -81,8 +81,8 @@ TEST(DeferredAssertionReporting, MaturedObservedSchedulesInReactiveAndClears) {
   f.engine.QueuePendingReport("p0", da, DeferralKind::kObserved);
 
   f.engine.MatureObservedReports("p0");
-  uint32_t scheduled = f.engine.ExecuteMaturedObservedInReactive(
-      "p0", f.scheduler, SimTime{0});
+  uint32_t scheduled =
+      f.engine.ExecuteMaturedObservedInReactive("p0", f.scheduler, SimTime{0});
   EXPECT_EQ(scheduled, 1u);
   EXPECT_EQ(f.engine.GetDeferredReportQueue("p0").Size(), 0u);
 
@@ -111,7 +111,8 @@ TEST(DeferredAssertionReporting, FinalReportMaturesInPostponed) {
   EXPECT_EQ(f.engine.GetDeferredReportQueue("p0").MaturedCount(), 1u);
 }
 
-TEST(DeferredAssertionReporting, FinalActionScheduledInPostponedRegionAndClears) {
+TEST(DeferredAssertionReporting,
+     FinalActionScheduledInPostponedRegionAndClears) {
   DeferredFixture f;
   int fail_calls = 0;
 
@@ -121,8 +122,8 @@ TEST(DeferredAssertionReporting, FinalActionScheduledInPostponedRegionAndClears)
   f.engine.QueuePendingReport("p0", da, DeferralKind::kFinal);
 
   f.engine.MatureFinalReports("p0");
-  uint32_t scheduled = f.engine.ExecuteMaturedFinalInPostponed(
-      "p0", f.scheduler, SimTime{0});
+  uint32_t scheduled =
+      f.engine.ExecuteMaturedFinalInPostponed("p0", f.scheduler, SimTime{0});
   EXPECT_EQ(scheduled, 1u);
   EXPECT_EQ(f.engine.GetDeferredReportQueue("p0").Size(), 0u);
 
@@ -210,8 +211,8 @@ TEST(DeferredAssertionReporting, FlushedPendingReportIsClearedAndNotExecuted) {
   EXPECT_EQ(f.engine.GetDeferredReportQueue("p0").Size(), 0u);
 
   f.engine.MatureObservedReports("p0");
-  uint32_t scheduled = f.engine.ExecuteMaturedObservedInReactive(
-      "p0", f.scheduler, SimTime{0});
+  uint32_t scheduled =
+      f.engine.ExecuteMaturedObservedInReactive("p0", f.scheduler, SimTime{0});
   f.scheduler.Run();
   EXPECT_EQ(scheduled, 0u);
   EXPECT_EQ(pass_calls, 0);
@@ -226,8 +227,8 @@ TEST(DeferredAssertionReporting, UnmaturedObservedDoesNotScheduleInReactive) {
   da.pass_action = [&pass_calls]() { ++pass_calls; };
   f.engine.QueuePendingReport("p0", da, DeferralKind::kObserved);
 
-  uint32_t scheduled = f.engine.ExecuteMaturedObservedInReactive(
-      "p0", f.scheduler, SimTime{0});
+  uint32_t scheduled =
+      f.engine.ExecuteMaturedObservedInReactive("p0", f.scheduler, SimTime{0});
   f.scheduler.Run();
   EXPECT_EQ(scheduled, 0u);
   EXPECT_EQ(pass_calls, 0);
@@ -243,8 +244,8 @@ TEST(DeferredAssertionReporting, UnmaturedFinalDoesNotScheduleInPostponed) {
   da.fail_action = [&fail_calls]() { ++fail_calls; };
   f.engine.QueuePendingReport("p0", da, DeferralKind::kFinal);
 
-  uint32_t scheduled = f.engine.ExecuteMaturedFinalInPostponed(
-      "p0", f.scheduler, SimTime{0});
+  uint32_t scheduled =
+      f.engine.ExecuteMaturedFinalInPostponed("p0", f.scheduler, SimTime{0});
   f.scheduler.Run();
   EXPECT_EQ(scheduled, 0u);
   EXPECT_EQ(fail_calls, 0);
@@ -265,11 +266,11 @@ TEST(DeferredAssertionReporting, FinalPendingReportIsClearedByFlushPoint) {
   EXPECT_EQ(f.engine.GetDeferredReportQueue("p0").Size(), 0u);
 
   f.engine.MatureFinalReports("p0");
-  uint32_t scheduled = f.engine.ExecuteMaturedFinalInPostponed(
-      "p0", f.scheduler, SimTime{0});
+  uint32_t scheduled =
+      f.engine.ExecuteMaturedFinalInPostponed("p0", f.scheduler, SimTime{0});
   f.scheduler.Run();
   EXPECT_EQ(scheduled, 0u);
   EXPECT_EQ(fail_calls, 0);
 }
 
-}
+}  // namespace

@@ -252,4 +252,4 @@ TEST(EventControlParsing, MemberAccessInEventExpression) {
   EXPECT_EQ(stmt->events[0].signal->kind, ExprKind::kMemberAccess);
 }
 
-}
+}  // namespace

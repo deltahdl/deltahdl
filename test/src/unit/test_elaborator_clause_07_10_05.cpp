@@ -38,4 +38,4 @@ TEST(BoundedQueueElaboration, NegativeBoundIsError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-}
+}  // namespace

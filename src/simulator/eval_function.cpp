@@ -27,8 +27,8 @@ static Logic4Vec EvalPrngCall(const Expr* expr, SimContext& ctx, Arena& arena,
     // different sequences and a given seed replays identically. Reseed the
     // active generator from the argument before drawing, mirroring $urandom.
     if (!expr->args.empty()) {
-      ctx.SeedUrandom(
-          static_cast<uint32_t>(EvalExpr(expr->args[0], ctx, arena).ToUint64()));
+      ctx.SeedUrandom(static_cast<uint32_t>(
+          EvalExpr(expr->args[0], ctx, arena).ToUint64()));
     }
     // The returned 32-bit number is a signed integer (it may be negative).
     return MakeLogic4VecVal(arena, 32, ctx.Random32());
@@ -37,8 +37,8 @@ static Logic4Vec EvalPrngCall(const Expr* expr, SimContext& ctx, Arena& arena,
     // An optional seed (any integral expression) selects the sequence; the
     // same seed must replay identically.
     if (!expr->args.empty()) {
-      ctx.SeedUrandom(
-          static_cast<uint32_t>(EvalExpr(expr->args[0], ctx, arena).ToUint64()));
+      ctx.SeedUrandom(static_cast<uint32_t>(
+          EvalExpr(expr->args[0], ctx, arena).ToUint64()));
     }
     return MakeLogic4VecVal(arena, 32, ctx.Urandom32());
   }
@@ -87,9 +87,9 @@ static std::string FormatSingularForP(const Logic4Vec& val, DataTypeKind kind) {
   return FormatArg(v, 'd');
 }
 
-// §21.2.1.6: copy the [offset, offset+width) bit field out of a packed aggregate
-// into its own vector, preserving unknown/high-impedance bits so a member that
-// holds x or z renders as such.
+// §21.2.1.6: copy the [offset, offset+width) bit field out of a packed
+// aggregate into its own vector, preserving unknown/high-impedance bits so a
+// member that holds x or z renders as such.
 static Logic4Vec SliceField(const Logic4Vec& val, uint32_t offset,
                             uint32_t width, DataTypeKind kind, Arena& arena) {
   Logic4Vec out = MakeLogic4Vec(arena, width == 0 ? 1 : width);
@@ -170,8 +170,8 @@ static std::string BuildFormatP(const Expr* arg, const Logic4Vec& val,
         std::string elem_name =
             std::string(name) + "[" + std::to_string(idx) + "]";
         Variable* elem = ctx.FindVariable(elem_name);
-        Logic4Vec ev = elem ? elem->value
-                            : MakeLogic4VecVal(arena, ai->elem_width, 0);
+        Logic4Vec ev =
+            elem ? elem->value : MakeLogic4VecVal(arena, ai->elem_width, 0);
         out += FormatSingularForP(ev, ai->elem_type_kind);
       }
       out += "}";
@@ -200,8 +200,8 @@ static std::string BuildFormatP(const Expr* arg, const Logic4Vec& val,
     }
   }
 
-  // §21.2.1.6 (C10): %p on a singular expression formats it as one element of an
-  // aggregate would be formatted.
+  // §21.2.1.6 (C10): %p on a singular expression formats it as one element of
+  // an aggregate would be formatted.
   return FormatSingularForP(val, DataTypeKind::kImplicit);
 }
 
@@ -276,8 +276,8 @@ static void ExecDisplayWrite(const Expr* expr, SimContext& ctx, Arena& arena) {
     // carrying string-typed data is always rendered as its character
     // sequence regardless of the task name.
     auto val = EvalExpr(arg, ctx, arena);
-    char spec = val.is_string ? 's'
-                              : DefaultRadixForDisplayWriteTask(expr->callee);
+    char spec =
+        val.is_string ? 's' : DefaultRadixForDisplayWriteTask(expr->callee);
     output += FormatArg(val, spec);
   }
   std::cout << output;
@@ -497,7 +497,8 @@ static std::string ResolveDumpportsFileName(const Expr* expr) {
 }
 
 // §21.7.3.7: the extended VCD control tasks each act on a $dumpports dump and
-// share the general rules for filename matching and no-argument default actions.
+// share the general rules for filename matching and no-argument default
+// actions.
 static bool IsDumpportsControlTask(std::string_view name) {
   return name == "$dumpportsoff" || name == "$dumpportson" ||
          name == "$dumpportsall" || name == "$dumpportslimit" ||
@@ -603,8 +604,9 @@ static Logic4Vec EvalVcdSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
         // scope name.
         if (expr->args[i]->kind == ExprKind::kStringLiteral) {
           ctx.GetDiag().Error(
-              {}, "$dumpports scope_list entry must be a module, not a string "
-                  "literal");
+              {},
+              "$dumpports scope_list entry must be a module, not a string "
+              "literal");
           continue;
         }
         auto scope = DumpvarsScopeName(expr->args[i]);
@@ -612,8 +614,8 @@ static Logic4Vec EvalVcdSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
         // §21.7.3.1: each scope named in a $dumpports scope_list shall be
         // unique; a repeated scope is reported rather than dumped twice.
         if (std::find(scopes.begin(), scopes.end(), scope) != scopes.end()) {
-          ctx.GetDiag().Error(
-              {}, "$dumpports scope_list entries must be unique");
+          ctx.GetDiag().Error({},
+                              "$dumpports scope_list entries must be unique");
           continue;
         }
         // §21.7.3.1: scope names must also be unique across separate $dumpports
@@ -634,40 +636,40 @@ static Logic4Vec EvalVcdSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
   } else if (name == "$dumpportsoff") {
     // §21.7.3.2: suspend the extended VCD port dump. A checkpoint marking every
     // selected port as x is written and recording stops from this simulation
-    // time forward. The optional filename argument denotes the $dumpports output
-    // file; with this single-file writer it selects that one dump, and with no
-    // argument every $dumpports file is suspended. The suspend checkpoint reuses
-    // the 4-state machinery the extended VCD file inherits (§21.7.1.3). If port
-    // dumping is already suspended for the file the task is ignored, so no
-    // second checkpoint is written.
+    // time forward. The optional filename argument denotes the $dumpports
+    // output file; with this single-file writer it selects that one dump, and
+    // with no argument every $dumpports file is suspended. The suspend
+    // checkpoint reuses the 4-state machinery the extended VCD file inherits
+    // (§21.7.1.3). If port dumping is already suspended for the file the task
+    // is ignored, so no second checkpoint is written.
     if (vcd && vcd->IsEnabled()) vcd->DumpOff();
   } else if (name == "$dumpportson") {
     // §21.7.3.2: resume the extended VCD port dump, emitting a checkpoint of
     // every selected port's current value. The optional filename argument names
     // the $dumpports file to resume; with no argument every stopped $dumpports
-    // file resumes. The resume checkpoint reuses the inherited 4-state machinery
-    // (§21.7.1.3). If the ports are already being dumped the task is ignored, so
-    // no checkpoint is written.
+    // file resumes. The resume checkpoint reuses the inherited 4-state
+    // machinery (§21.7.1.3). If the ports are already being dumped the task is
+    // ignored, so no checkpoint is written.
     if (vcd && !vcd->IsEnabled()) vcd->DumpOn();
   } else if (name == "$dumpportsall") {
-    // §21.7.3.3: write an extended-VCD checkpoint recording the current value of
-    // every selected port at this simulation time, regardless of whether the
+    // §21.7.3.3: write an extended-VCD checkpoint recording the current value
+    // of every selected port at this simulation time, regardless of whether the
     // values changed since the previous time step. The optional filename names
     // the $dumpports output to checkpoint; with this single-file writer it
     // selects that one dump, and with no filename the checkpoint covers every
-    // file opened by $dumpports. The checkpoint reuses the 4-state machinery the
-    // extended VCD file inherits (§21.7.1.4).
+    // file opened by $dumpports. The checkpoint reuses the 4-state machinery
+    // the extended VCD file inherits (§21.7.1.4).
     if (vcd) vcd->DumpAll();
   } else if (name == "$dumpportslimit") {
-    // §21.7.3.4: bound the extended VCD file size. The required leading filesize
-    // argument gives the maximum number of bytes; once the dump reaches it,
-    // recording stops and a comment noting the limit is inserted. A trailing
-    // filename argument may denote which $dumpports output the limit applies to;
-    // with no filename the limit covers every file opened by $dumpports. With
-    // this single-file writer both cases bound the one dump, so the optional
-    // filename is parsed but does not change which dump is limited. The byte
-    // budget reuses the 4-state size-limit machinery the extended VCD file
-    // inherits (§21.7.1.5).
+    // §21.7.3.4: bound the extended VCD file size. The required leading
+    // filesize argument gives the maximum number of bytes; once the dump
+    // reaches it, recording stops and a comment noting the limit is inserted. A
+    // trailing filename argument may denote which $dumpports output the limit
+    // applies to; with no filename the limit covers every file opened by
+    // $dumpports. With this single-file writer both cases bound the one dump,
+    // so the optional filename is parsed but does not change which dump is
+    // limited. The byte budget reuses the 4-state size-limit machinery the
+    // extended VCD file inherits (§21.7.1.5).
     if (vcd && !expr->args.empty()) {
       uint64_t limit = EvalExpr(expr->args[0], ctx, arena).ToUint64();
       vcd->SetSizeLimit(limit);
@@ -681,8 +683,8 @@ static Logic4Vec EvalVcdSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
     // every file opened by $dumpports are flushed. Either way the one writer is
     // flushed, so the filename is parsed but does not change which dump is
     // emptied. The flush reuses the buffer-flushing machinery the extended VCD
-    // file inherits (§21.7.1.6): no VCD command is written and the dump state is
-    // left untouched so dumping continues exactly as before.
+    // file inherits (§21.7.1.6): no VCD command is written and the dump state
+    // is left untouched so dumping continues exactly as before.
     if (vcd) vcd->Flush();
   }
   return MakeLogic4VecVal(arena, 1, 0);
@@ -875,9 +877,8 @@ static bool IsVerifSysCall(std::string_view n) {
 }
 
 static bool IsIOSysCall(std::string_view n) {
-  if (n == "$fopen" || n == "$fclose" || n == "$readmemh" ||
-      n == "$readmemb" || n == "$writememh" || n == "$writememb" ||
-      n == "$sscanf") {
+  if (n == "$fopen" || n == "$fclose" || n == "$readmemh" || n == "$readmemb" ||
+      n == "$writememh" || n == "$writememb" || n == "$sscanf") {
     return true;
   }
   // §D.14: $sreadmemh / $sreadmemb load a memory from string arguments.
@@ -912,12 +913,24 @@ static std::string TimeOrderToUnitString(int order) {
   const char* mantissa = diff == 2 ? "100" : (diff == 1 ? "10" : "1");
   const char* unit;
   switch (base) {
-    case 0: unit = "s"; break;
-    case -3: unit = "ms"; break;
-    case -6: unit = "us"; break;
-    case -9: unit = "ns"; break;
-    case -12: unit = "ps"; break;
-    default: unit = "fs"; break;  // -15
+    case 0:
+      unit = "s";
+      break;
+    case -3:
+      unit = "ms";
+      break;
+    case -6:
+      unit = "us";
+      break;
+    case -9:
+      unit = "ns";
+      break;
+    case -12:
+      unit = "ps";
+      break;
+    default:
+      unit = "fs";
+      break;  // -15
   }
   return std::string(mantissa) + unit;
 }
@@ -944,7 +957,8 @@ std::string BuildPrinttimescaleReport(const Expr* expr, SimContext& ctx) {
       name = "$unit";
     } else {
       name = std::string(target);
-      if (const TimeScale* found = ctx.FindScopeTimeScale(target)) scale = found;
+      if (const TimeScale* found = ctx.FindScopeTimeScale(target))
+        scale = found;
     }
   } else {
     name = ctx.CurrentScopeName();
@@ -960,8 +974,9 @@ std::string BuildPrinttimescaleReport(const Expr* expr, SimContext& ctx) {
     unit_order = EffectiveTimeOrder(scale->unit, scale->magnitude);
     prec_order = EffectiveTimeOrder(scale->precision, scale->prec_magnitude);
   }
-  return "Time scale of (" + name + ") is " + TimeOrderToUnitString(unit_order) +
-         " / " + TimeOrderToUnitString(prec_order);
+  return "Time scale of (" + name + ") is " +
+         TimeOrderToUnitString(unit_order) + " / " +
+         TimeOrderToUnitString(prec_order);
 }
 
 static Logic4Vec EvalPrinttimescaleTask(const Expr* expr, SimContext& ctx,
@@ -991,21 +1006,21 @@ static Logic4Vec EvalTimeformatTask(const Expr* expr, SimContext& ctx,
 
   TimeFormatSpec spec = ctx.GetTimeFormat();
   if (expr->args.size() >= 1 && expr->args[0]) {
-    auto v = static_cast<int64_t>(
-        EvalExpr(expr->args[0], ctx, arena).ToUint64());
+    auto v =
+        static_cast<int64_t>(EvalExpr(expr->args[0], ctx, arena).ToUint64());
     // The value arrives as an unsigned 64-bit word, so widen the negative
     // 32-bit pattern back into a signed integer for the range check.
     int32_t units = static_cast<int32_t>(v);
     if (!TimeformatRangeOk(units)) {
-      ctx.GetDiag().Error(
-          {}, "$timeformat units_number out of range [2 .. -15]");
+      ctx.GetDiag().Error({},
+                          "$timeformat units_number out of range [2 .. -15]");
       return MakeLogic4VecVal(arena, 1, 0);
     }
     spec.units_number = units;
   }
   if (expr->args.size() >= 2 && expr->args[1]) {
-    auto v = static_cast<int64_t>(
-        EvalExpr(expr->args[1], ctx, arena).ToUint64());
+    auto v =
+        static_cast<int64_t>(EvalExpr(expr->args[1], ctx, arena).ToUint64());
     int32_t prec = static_cast<int32_t>(v);
     if (!TimeformatRangeOk(prec)) {
       ctx.GetDiag().Error(
@@ -1023,8 +1038,8 @@ static Logic4Vec EvalTimeformatTask(const Expr* expr, SimContext& ctx,
     }
   }
   if (expr->args.size() >= 4 && expr->args[3]) {
-    auto v = static_cast<int64_t>(
-        EvalExpr(expr->args[3], ctx, arena).ToUint64());
+    auto v =
+        static_cast<int64_t>(EvalExpr(expr->args[3], ctx, arena).ToUint64());
     spec.minimum_field_width = static_cast<int>(v);
   }
   ctx.SetTimeFormat(spec);
@@ -1183,8 +1198,8 @@ static void EmitSimControlDiagnostic(const Expr* expr, SimContext& ctx,
 // Optional $countdrivers system function (Annex D.2). It counts the drivers on
 // a net so that bus contention can be identified. The net argument shall be a
 // scalar net or a bit-select of a vector net; the selected bit is the one whose
-// drivers are tallied. The function returns 0 when at most one driver drives the
-// net and 1 otherwise (contention). When the optional output arguments are
+// drivers are tallied. The function returns 0 when at most one driver drives
+// the net and 1 otherwise (contention). When the optional output arguments are
 // present they receive, in declared order, the per-state tallies of Table D.1:
 // net_is_forced, number_of_01x_drivers, number_of_0_drivers,
 // number_of_1_drivers, number_of_x_drivers.
@@ -1235,8 +1250,8 @@ static Logic4Vec EvalCountDrivers(const Expr* expr, SimContext& ctx,
   const uint64_t outs[5] = {forced ? 1u : 0u, n01x, n0, n1, nx};
   for (size_t i = 1; i < expr->args.size() && i <= 5u; ++i) {
     if (expr->args[i] != nullptr) {
-      PerformBlockingAssign(expr->args[i], MakeLogic4VecVal(arena, 32, outs[i - 1]),
-                            ctx, arena);
+      PerformBlockingAssign(
+          expr->args[i], MakeLogic4VecVal(arena, 32, outs[i - 1]), ctx, arena);
     }
   }
 
@@ -1287,12 +1302,11 @@ Logic4Vec EvalSystemCall(const Expr* expr, SimContext& ctx, Arena& arena) {
   }
   // $reset_value returns the reset_value argument supplied to the last $reset.
   if (name == "$reset_value") {
-    return MakeLogic4VecVal(arena, 32,
-                            static_cast<uint64_t>(ctx.ResetValue()));
+    return MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(ctx.ResetValue()));
   }
-  // Optional $scope system task (Annex D.11). It selects a level of hierarchy as
-  // the interactive scope used to identify objects. Its single argument is the
-  // complete hierarchical name of a module, task, function, or named block;
+  // Optional $scope system task (Annex D.11). It selects a level of hierarchy
+  // as the interactive scope used to identify objects. Its single argument is
+  // the complete hierarchical name of a module, task, function, or named block;
   // record that name as the new interactive scope.
   if (name == "$scope") {
     if (!expr->args.empty() && expr->args[0]) {
@@ -1302,8 +1316,8 @@ Logic4Vec EvalSystemCall(const Expr* expr, SimContext& ctx, Arena& arena) {
   }
   // Optional $list system task (Annex D.6). It produces a listing of a module,
   // task, function, or named block. With no argument the object listed is the
-  // current scope setting (the interactive scope established by $scope); with an
-  // argument, the argument is the complete hierarchical name of the specific
+  // current scope setting (the interactive scope established by $scope); with
+  // an argument, the argument is the complete hierarchical name of the specific
   // scope to list. Resolve which scope is selected and record it.
   if (name == "$list") {
     std::string target = (!expr->args.empty() && expr->args[0])
@@ -1315,10 +1329,10 @@ Logic4Vec EvalSystemCall(const Expr* expr, SimContext& ctx, Arena& arena) {
   // Optional $showscopes system task (Annex D.12). It produces a complete list
   // of the modules, tasks, functions, and named blocks defined at the current
   // scope level (the interactive scope established by $scope). An optional
-  // integer argument widens the listing: a nonzero value lists every such object
-  // in or below the current hierarchical scope, while no argument or a zero
-  // value lists only the objects at the current scope level itself. Evaluate the
-  // optional argument to decide the depth and record the request.
+  // integer argument widens the listing: a nonzero value lists every such
+  // object in or below the current hierarchical scope, while no argument or a
+  // zero value lists only the objects at the current scope level itself.
+  // Evaluate the optional argument to decide the depth and record the request.
   if (name == "$showscopes") {
     bool recursive = false;
     if (!expr->args.empty() && expr->args[0]) {
@@ -1329,12 +1343,12 @@ Logic4Vec EvalSystemCall(const Expr* expr, SimContext& ctx, Arena& arena) {
   }
   // Optional $showvars system task (Annex D.13). It produces status information
   // for the reg and net variables, scalar and vector, in the current scope (the
-  // interactive scope established by $scope). With no argument every variable in
-  // that scope is reported; with a list of variables only the named ones are. A
-  // bit-select or part-select of a vector reports the status of all bits of that
-  // vector, so such a selection is reduced to the name of its underlying vector.
-  // Collect the requested variable names and record the request against the
-  // current scope.
+  // interactive scope established by $scope). With no argument every variable
+  // in that scope is reported; with a list of variables only the named ones
+  // are. A bit-select or part-select of a vector reports the status of all bits
+  // of that vector, so such a selection is reduced to the name of its
+  // underlying vector. Collect the requested variable names and record the
+  // request against the current scope.
   if (name == "$showvars") {
     std::vector<std::string> vars;
     for (const Expr* arg : expr->args) {
@@ -1366,7 +1380,6 @@ Logic4Vec EvalSystemCall(const Expr* expr, SimContext& ctx, Arena& arena) {
     return EvalScale(expr, ctx, arena);
   }
   if (name == "$exit") {
-
     auto* cur = ctx.CurrentProcess();
     if (cur && cur->program_block_id != 0) {
       ctx.ExitProgramBlock(cur->program_block_id);
@@ -1470,7 +1483,8 @@ static bool TryBindAssocElementRef(const Expr* expr, int arg_index,
   binding.is_string_key = aa->is_string_key;
   binding.local_var = var;
   if (aa->is_string_key) {
-    binding.str_key = FormatValueAsString(EvalExpr(call_arg->index, ctx, arena));
+    binding.str_key =
+        FormatValueAsString(EvalExpr(call_arg->index, ctx, arena));
     auto it = aa->str_data.find(binding.str_key);
     if (it == aa->str_data.end()) {
       aa->str_data[binding.str_key] = MakeLogic4Vec(arena, aa->elem_width);
@@ -1544,10 +1558,10 @@ static bool TryBindArrayArg(const Expr* call_arg, const FunctionArg& formal,
       auto formal_size =
           EvalExpr(formal.unpacked_dims[0], ctx, arena).ToUint64();
       if (src_q->elements.size() != formal_size) {
-        ctx.GetDiag().Error(
-            {}, "array size mismatch: formal expects " +
-                    std::to_string(formal_size) + " elements, actual has " +
-                    std::to_string(src_q->elements.size()));
+        ctx.GetDiag().Error({}, "array size mismatch: formal expects " +
+                                    std::to_string(formal_size) +
+                                    " elements, actual has " +
+                                    std::to_string(src_q->elements.size()));
         return true;
       }
       ArrayInfo finfo;
@@ -1557,9 +1571,9 @@ static bool TryBindArrayArg(const Expr* call_arg, const FunctionArg& formal,
       ctx.RegisterArray(formal.name, finfo);
       for (uint32_t j = 0; j < finfo.size; ++j) {
         auto dst = std::string(formal.name) + "[" + std::to_string(j) + "]";
-        auto* dst_var = ctx.CreateLocalVariable(
-            *arena.Create<std::string>(std::move(dst)),
-            src_q->elements[j].width);
+        auto* dst_var =
+            ctx.CreateLocalVariable(*arena.Create<std::string>(std::move(dst)),
+                                    src_q->elements[j].width);
         dst_var->value = src_q->elements[j];
       }
       return true;
@@ -1712,11 +1726,12 @@ static const Stmt* FuncFindFinalElse(const Stmt* stmt) {
   return cur->else_branch;
 }
 
-// A unique/unique0/priority if encountered while running a function or task body
-// performs the same violation checks as one in a process body (§12.4.2). Because
-// the report queue is keyed on the calling process (§12.4.2.2), routing the
-// report through AddPendingViolation attributes it to whichever process invoked
-// the subroutine; separate callers therefore accumulate and flush independently.
+// A unique/unique0/priority if encountered while running a function or task
+// body performs the same violation checks as one in a process body (§12.4.2).
+// Because the report queue is keyed on the calling process (§12.4.2.2), routing
+// the report through AddPendingViolation attributes it to whichever process
+// invoked the subroutine; separate callers therefore accumulate and flush
+// independently.
 static bool ExecFuncUniqueIf(const Stmt* stmt, CaseQualifier qual,
                              Variable* ret_var, std::string_view func_name,
                              SimContext& ctx, Arena& arena) {
@@ -1822,7 +1837,10 @@ static bool ExecFuncFor(const Stmt* stmt, Variable* ret_var,
   if (labeled) ctx.PushStaticScope(stmt->label);
   bool scoped = false;
   for (const auto& t : stmt->for_init_types) {
-    if (t.kind != DataTypeKind::kImplicit) { scoped = true; break; }
+    if (t.kind != DataTypeKind::kImplicit) {
+      scoped = true;
+      break;
+    }
   }
   if (scoped) ctx.PushScope();
   for (size_t i = 0; i < stmt->for_inits.size(); ++i) {
@@ -1838,8 +1856,7 @@ static bool ExecFuncFor(const Stmt* stmt, Variable* ret_var,
       ExecFuncStmt(init, ret_var, func_name, ctx, arena);
     }
   }
-  while (stmt->for_cond &&
-         EvalExpr(stmt->for_cond, ctx, arena).IsTruthy()) {
+  while (stmt->for_cond && EvalExpr(stmt->for_cond, ctx, arena).IsTruthy()) {
     if (stmt->for_body &&
         ExecFuncStmt(stmt->for_body, ret_var, func_name, ctx, arena)) {
       if (scoped) ctx.PopScope();
@@ -1913,8 +1930,7 @@ static bool ExecFuncWhile(const Stmt* stmt, Variable* ret_var,
                           Arena& arena) {
   bool labeled = !stmt->label.empty();
   if (labeled) ctx.PushStaticScope(stmt->label);
-  while (stmt->condition &&
-         EvalExpr(stmt->condition, ctx, arena).IsTruthy()) {
+  while (stmt->condition && EvalExpr(stmt->condition, ctx, arena).IsTruthy()) {
     if (stmt->body &&
         ExecFuncStmt(stmt->body, ret_var, func_name, ctx, arena)) {
       if (labeled) ctx.PopStaticScope(stmt->label);
@@ -1936,8 +1952,7 @@ static bool ExecFuncDoWhile(const Stmt* stmt, Variable* ret_var,
       if (labeled) ctx.PopStaticScope(stmt->label);
       return true;
     }
-  } while (stmt->condition &&
-           EvalExpr(stmt->condition, ctx, arena).IsTruthy());
+  } while (stmt->condition && EvalExpr(stmt->condition, ctx, arena).IsTruthy());
   if (labeled) ctx.PopStaticScope(stmt->label);
   return false;
 }
@@ -2016,8 +2031,7 @@ static bool ExecFuncStmt(const Stmt* stmt, Variable* ret_var,
   switch (stmt->kind) {
     case StmtKind::kReturn:
       if (stmt->expr)
-        ret_var->value =
-            EvalExpr(stmt->expr, ctx, arena, ret_var->value.width);
+        ret_var->value = EvalExpr(stmt->expr, ctx, arena, ret_var->value.width);
       return true;
     case StmtKind::kBlockingAssign:
       ExecFuncBlockingAssign(stmt, ctx, arena);
@@ -2059,9 +2073,10 @@ static void InitClassPropertyDefaults(const ClassTypeInfo* info,
                                       Arena& arena) {
   for (const auto& prop : info->properties) {
     Logic4Vec val = prop.init_expr ? EvalExpr(prop.init_expr, ctx, arena)
-                                  : MakeLogic4VecVal(arena, prop.width, 0);
+                                   : MakeLogic4VecVal(arena, prop.width, 0);
     obj->properties[std::string(prop.name)] = val;
-    std::string scoped = std::string(info->name) + "::" + std::string(prop.name);
+    std::string scoped =
+        std::string(info->name) + "::" + std::string(prop.name);
     obj->properties[scoped] = val;
   }
 
@@ -2070,7 +2085,8 @@ static void InitClassPropertyDefaults(const ClassTypeInfo* info,
       if (pexpr) {
         auto val = EvalExpr(pexpr, ctx, arena);
         obj->properties[std::string(pname)] = val;
-        std::string scoped = std::string(info->name) + "::" + std::string(pname);
+        std::string scoped =
+            std::string(info->name) + "::" + std::string(pname);
         obj->properties[scoped] = val;
       }
     }
@@ -2094,15 +2110,13 @@ Logic4Vec EvalClassNew(std::string_view class_type, const Expr* new_expr,
   auto* info = ctx.FindClassType(class_type);
   if (!info) return MakeLogic4VecVal(arena, 64, kNullClassHandle);
   if (info->is_abstract) {
-    ctx.GetDiag().Error(
-        {}, "cannot construct object of abstract class '" +
-                std::string(class_type) + "'");
+    ctx.GetDiag().Error({}, "cannot construct object of abstract class '" +
+                                std::string(class_type) + "'");
     return MakeLogic4VecVal(arena, 64, kNullClassHandle);
   }
   if (info->is_interface) {
-    ctx.GetDiag().Error(
-        {}, "cannot construct object of interface class '" +
-                std::string(class_type) + "'");
+    ctx.GetDiag().Error({}, "cannot construct object of interface class '" +
+                                std::string(class_type) + "'");
     return MakeLogic4VecVal(arena, 64, kNullClassHandle);
   }
   auto* obj = arena.Create<ClassObject>();
@@ -2127,7 +2141,6 @@ Logic4Vec EvalClassNew(std::string_view class_type, const Expr* new_expr,
         synth->args = child_decl->extends_args;
         args = synth;
       } else if (child_decl->extends_has_default && new_expr) {
-
         size_t default_pos = 0;
         for (const auto* m : child_decl->members) {
           if (m->kind == ClassMemberKind::kMethod && m->method &&
@@ -2149,9 +2162,8 @@ Logic4Vec EvalClassNew(std::string_view class_type, const Expr* new_expr,
         }
         auto* synth = arena.Create<Expr>();
         synth->kind = ExprKind::kCall;
-        for (size_t j = 0; j < base_argc &&
-                           default_pos + j < new_expr->args.size();
-             ++j) {
+        for (size_t j = 0;
+             j < base_argc && default_pos + j < new_expr->args.size(); ++j) {
           synth->args.push_back(new_expr->args[default_pos + j]);
         }
         args = synth;
@@ -2209,8 +2221,8 @@ static Logic4Vec EvalDpiCall(const Expr* expr, SimContext& ctx, Arena& arena) {
         }
       }
       if (ai >= 0 && expr->args[static_cast<size_t>(ai)] != nullptr) {
-        args.push_back(
-            EvalExpr(expr->args[static_cast<size_t>(ai)], ctx, arena).ToUint64());
+        args.push_back(EvalExpr(expr->args[static_cast<size_t>(ai)], ctx, arena)
+                           .ToUint64());
       } else if (import->args[i].default_value) {
         args.push_back(
             EvalExpr(import->args[i].default_value, ctx, arena).ToUint64());
@@ -2248,7 +2260,6 @@ static bool ResolveInstanceMethod(const MethodCallParts& parts, SimContext& ctx,
   if (!info.obj) return false;
   info.method = info.obj->ResolveVirtualMethod(parts.method_name);
   if (!info.method) {
-
     auto* declared_type = ctx.FindClassType(class_type);
     if (declared_type) {
       info.method =
@@ -2393,7 +2404,8 @@ static bool TryEvalWeakRefMethodCall(const Expr* expr, SimContext& ctx,
                                      Arena& arena, Logic4Vec& out) {
   MethodCallParts parts;
   if (!ExtractMethodCallParts(expr, parts)) return false;
-  if (ctx.GetVariableClassType(parts.var_name) != "weak_reference") return false;
+  if (ctx.GetVariableClassType(parts.var_name) != "weak_reference")
+    return false;
   auto* var = ctx.FindVariable(parts.var_name);
   if (!var) return false;
   auto wr_handle = var->value.ToUint64();
@@ -2470,8 +2482,9 @@ static bool TryEvalProcessMethodCall(const Expr* expr, SimContext& ctx,
   if (parts.method_name == "kill") {
     if (IsRestrictedTarget(proc)) {
       ctx.GetDiag().Error(
-          {}, "kill() shall only target a process created by an initial "
-              "procedure, always procedure, or fork block");
+          {},
+          "kill() shall only target a process created by an initial "
+          "procedure, always procedure, or fork block");
       out = MakeLogic4VecVal(arena, 1, 0);
       return true;
     }
@@ -2503,15 +2516,15 @@ static bool TryEvalProcessMethodCall(const Expr* expr, SimContext& ctx,
   if (parts.method_name == "suspend") {
     if (IsRestrictedTarget(proc)) {
       ctx.GetDiag().Error(
-          {}, "suspend() shall only target a process created by an initial "
-              "procedure, always procedure, or fork block");
+          {},
+          "suspend() shall only target a process created by an initial "
+          "procedure, always procedure, or fork block");
       out = MakeLogic4VecVal(arena, 1, 0);
       return true;
     }
 
     if (proc && proc == ctx.CurrentProcess() && ctx.InFunction()) {
-      ctx.GetDiag().Error(
-          {}, "function cannot suspend its own execution");
+      ctx.GetDiag().Error({}, "function cannot suspend its own execution");
       out = MakeLogic4VecVal(arena, 1, 0);
       return true;
     }
@@ -2524,7 +2537,6 @@ static bool TryEvalProcessMethodCall(const Expr* expr, SimContext& ctx,
     return true;
   }
   if (parts.method_name == "srandom") {
-
     if (proc && !expr->args.empty()) {
       auto seed_val = EvalExpr(expr->args[0], ctx, arena);
       auto seed = static_cast<uint32_t>(seed_val.ToUint64());
@@ -2540,8 +2552,9 @@ static bool TryEvalProcessMethodCall(const Expr* expr, SimContext& ctx,
   if (parts.method_name == "resume") {
     if (IsRestrictedTarget(proc)) {
       ctx.GetDiag().Error(
-          {}, "resume() shall only target a process created by an initial "
-              "procedure, always procedure, or fork block");
+          {},
+          "resume() shall only target a process created by an initial "
+          "procedure, always procedure, or fork block");
       out = MakeLogic4VecVal(arena, 1, 0);
       return true;
     }
@@ -2632,7 +2645,6 @@ static void BindLetArgs(ModuleItem* decl, const std::vector<Logic4Vec>& vals,
 
 static Logic4Vec EvalLetExpansion(ModuleItem* decl, const Expr* call,
                                   SimContext& ctx, Arena& arena) {
-
   if (expanding_lets.count(decl->name)) return MakeAllX(arena, 32);
   expanding_lets.insert(decl->name);
 
@@ -2691,7 +2703,8 @@ Logic4Vec EvalFunctionCall(const Expr* expr, SimContext& ctx, Arena& arena) {
     auto* existing = is_static ? ctx.FindLocalVariable(func->name) : nullptr;
     uint32_t ret_width = EvalTypeWidth(func->return_type);
     if (ret_width == 0) ret_width = 32;
-    ret_var = existing ? existing : ctx.CreateLocalVariable(func->name, ret_width);
+    ret_var =
+        existing ? existing : ctx.CreateLocalVariable(func->name, ret_width);
   }
 
   ctx.EnterFunction();
@@ -2752,8 +2765,8 @@ const ModuleItem* SetupTaskCall(const Expr* expr, SimContext& ctx,
   return func;
 }
 
-void TeardownTaskCall(const ModuleItem* func, const Expr* expr,
-                      SimContext& ctx, Arena& arena) {
+void TeardownTaskCall(const ModuleItem* func, const Expr* expr, SimContext& ctx,
+                      Arena& arena) {
   WritebackOutputArgs(func, expr, ctx, arena);
   WritebackQueueRefs(ctx);
   WritebackAssocRefs(ctx);
@@ -2812,7 +2825,8 @@ static void CheckConstRefWrites(
     default:
       break;
   }
-  for (auto* s : stmt->stmts) CheckConstRefWrites(s, const_ref_names, func, diag);
+  for (auto* s : stmt->stmts)
+    CheckConstRefWrites(s, const_ref_names, func, diag);
   CheckConstRefWrites(stmt->then_branch, const_ref_names, func, diag);
   CheckConstRefWrites(stmt->else_branch, const_ref_names, func, diag);
   CheckConstRefWrites(stmt->body, const_ref_names, func, diag);
@@ -2831,8 +2845,7 @@ static void CheckConstRefWrites(
     CheckConstRefWrites(ri.second, const_ref_names, func, diag);
 }
 
-void ValidateConstRefWriteProtection(const ModuleItem* func,
-                                     DiagEngine& diag) {
+void ValidateConstRefWriteProtection(const ModuleItem* func, DiagEngine& diag) {
   if (!func) return;
   std::unordered_set<std::string_view> const_ref_names;
   for (const auto& arg : func->func_args) {
@@ -2846,4 +2859,4 @@ void ValidateConstRefWriteProtection(const ModuleItem* func,
   }
 }
 
-}
+}  // namespace delta

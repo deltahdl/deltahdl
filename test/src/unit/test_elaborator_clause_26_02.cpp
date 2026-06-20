@@ -2,7 +2,8 @@
 
 namespace {
 
-TEST(PackageDeclarationElaboration, NetWithImplicitContinuousAssignmentRejected) {
+TEST(PackageDeclarationElaboration,
+     NetWithImplicitContinuousAssignmentRejected) {
   EXPECT_FALSE(
       ElabOk("package pkg;\n"
              "  wire w = 1'b0;\n"
@@ -121,4 +122,4 @@ TEST(PackageDeclarationElaboration, TimeprecisionMismatchRejected) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

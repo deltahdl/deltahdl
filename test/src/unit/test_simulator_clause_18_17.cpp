@@ -252,4 +252,4 @@ TEST(RandsequenceSim, CodeBlockLocalsAreAutomaticPerInvocation) {
   EXPECT_EQ(var->value.ToUint64(), 2u);
 }
 
-}
+}  // namespace

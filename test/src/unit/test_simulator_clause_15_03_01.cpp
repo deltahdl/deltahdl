@@ -62,4 +62,4 @@ TEST(IpcSync, SemaphoreNewReturnsHandle) {
   EXPECT_EQ(sem->key_count, 4);
 }
 
-}
+}  // namespace

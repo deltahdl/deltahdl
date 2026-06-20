@@ -38,4 +38,4 @@ TEST(SpecifyPathSim, EdgeSensitivePathSimulates) {
   EXPECT_EQ(var->value.ToUint64(), 33u);
 }
 
-}
+}  // namespace

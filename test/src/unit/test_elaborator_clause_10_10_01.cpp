@@ -105,4 +105,4 @@ TEST(UnpackedArrayConcatDescending, UnpackedArrayConcatDescending) {
   RunAndExpectArray(f, design, "arr", {{2, 10}, {1, 20}, {0, 30}});
 }
 
-}
+}  // namespace

@@ -129,4 +129,4 @@ TEST(ClockingHierExprElab, OutputRejectsConcatWithNonLvalueElement) {
   EXPECT_TRUE(f.has_errors);
 }
 
-}
+}  // namespace

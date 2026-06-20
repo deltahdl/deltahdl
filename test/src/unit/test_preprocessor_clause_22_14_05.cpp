@@ -73,4 +73,4 @@ TEST(KeywordVersionPreprocessing, BeginKeywords1364_2005_LogicIsIdentifier) {
   EXPECT_TRUE(found);
 }
 
-}
+}  // namespace

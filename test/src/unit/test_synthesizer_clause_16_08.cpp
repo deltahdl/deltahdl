@@ -25,4 +25,4 @@ TEST(NamedSequenceSynthesis, ModuleWithSequenceDeclSynthesizes) {
   EXPECT_FALSE(aig->outputs.empty());
 }
 
-}
+}  // namespace

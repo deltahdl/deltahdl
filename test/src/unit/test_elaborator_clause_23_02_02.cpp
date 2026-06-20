@@ -121,8 +121,7 @@ TEST(PortDeclaration, UnpackedArrayOfStructPortElaborates) {
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
   ASSERT_EQ(design->top_modules[0]->ports.size(), 1u);
-  EXPECT_EQ(design->top_modules[0]->ports[0].type_kind,
-            DataTypeKind::kStruct);
+  EXPECT_EQ(design->top_modules[0]->ports[0].type_kind, DataTypeKind::kStruct);
 }
 
-}
+}  // namespace

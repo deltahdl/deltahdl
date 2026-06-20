@@ -54,4 +54,4 @@ TEST(LocalVariableElaboration, FreshBodyLocalAlongsideFormalElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

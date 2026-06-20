@@ -12,15 +12,15 @@ namespace {
 // (the generic vpiStmt relation); the if-else additionally draws a vpiElseStmt
 // edge to an else-branch body statement. Both kinds carry an int vpiQualifier
 // property (the unique/priority qualifier flags). The clause has no numbered
-// Details and no 'shall' sentences. These tests observe the production code that
-// serves the diagram's relations and property: the vpiCondition edge through the
-// dedicated helper VpiIfConditionExpr (wired into VpiHandleC), the then-branch
-// through the generic vpiStmt traversal, the vpiElseStmt edge through
-// VpiIfElseStmt (also wired into VpiHandleC), and the vpiQualifier property
-// through the public vpi_get dispatch.
+// Details and no 'shall' sentences. These tests observe the production code
+// that serves the diagram's relations and property: the vpiCondition edge
+// through the dedicated helper VpiIfConditionExpr (wired into VpiHandleC), the
+// then-branch through the generic vpiStmt traversal, the vpiElseStmt edge
+// through VpiIfElseStmt (also wired into VpiHandleC), and the vpiQualifier
+// property through the public vpi_get dispatch.
 
-// The fixture installs a context so the public VpiHandleC / vpi_get entry points
-// run their real dispatch over the test objects.
+// The fixture installs a context so the public VpiHandleC / vpi_get entry
+// points run their real dispatch over the test objects.
 class IfIfElse : public ::testing::Test {
  protected:
   void SetUp() override { SetGlobalVpiContext(&ctx_); }

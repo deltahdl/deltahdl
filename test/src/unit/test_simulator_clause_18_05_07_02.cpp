@@ -47,10 +47,10 @@ ConstraintExpr Reduction(ArrayReductionOp op,
   return c;
 }
 
-// 18.5.7.2: in a constraint, a sum() reduction is treated as the elements joined
-// by addition. This is the LRM example: A.sum() with (int'(item)) < 1000 is
-// interpreted as int'(A[0])+...+int'(A[4]) < 1000. With the five elements pinned
-// to values whose sum is below 1000, the reduction holds and randomize()
+// 18.5.7.2: in a constraint, a sum() reduction is treated as the elements
+// joined by addition. This is the LRM example: A.sum() with (int'(item)) < 1000
+// is interpreted as int'(A[0])+...+int'(A[4]) < 1000. With the five elements
+// pinned to values whose sum is below 1000, the reduction holds and randomize()
 // succeeds; the solver folds exactly those element values.
 TEST(ArrayReductionConstraint, SumReductionJoinsElementsByAddition) {
   ConstraintSolver solver(42);
@@ -64,13 +64,13 @@ TEST(ArrayReductionConstraint, SumReductionJoinsElementsByAddition) {
     pins.constraints.push_back(Pin(elems[i], vals[i]));
   solver.AddConstraintBlock(pins);
 
-  // c2: A.sum() with (int'(item)) < 1000. int' of an in-range 8-bit value is the
-  // value itself, so the with mapping is value-preserving; the 32-bit result
-  // type leaves the sum un-truncated.
+  // c2: A.sum() with (int'(item)) < 1000. int' of an in-range 8-bit value is
+  // the value itself, so the with mapping is value-preserving; the 32-bit
+  // result type leaves the sum un-truncated.
   ConstraintBlock rc;
   rc.name = "reduce";
-  rc.constraints.push_back(
-      Reduction(ArrayReductionOp::kSum, elems, ConstraintKind::kLessThan, 1000));
+  rc.constraints.push_back(Reduction(ArrayReductionOp::kSum, elems,
+                                     ConstraintKind::kLessThan, 1000));
   solver.AddConstraintBlock(rc);
 
   ASSERT_TRUE(solver.Solve());
@@ -98,8 +98,8 @@ TEST(ArrayReductionConstraint, ReductionViolationFailsRandomize) {
 
   ConstraintBlock rc;
   rc.name = "reduce";
-  rc.constraints.push_back(
-      Reduction(ArrayReductionOp::kSum, elems, ConstraintKind::kLessThan, 1000));
+  rc.constraints.push_back(Reduction(ArrayReductionOp::kSum, elems,
+                                     ConstraintKind::kLessThan, 1000));
   solver.AddConstraintBlock(rc);
 
   EXPECT_FALSE(solver.Solve());
@@ -121,8 +121,8 @@ TEST(ArrayReductionConstraint, WithClauseExpressionTransformsEachElement) {
   pins.constraints.push_back(Pin("e2", 3));
   solver.AddConstraintBlock(pins);
 
-  ConstraintExpr r = Reduction(ArrayReductionOp::kSum, elems,
-                               ConstraintKind::kEqual, 14);
+  ConstraintExpr r =
+      Reduction(ArrayReductionOp::kSum, elems, ConstraintKind::kEqual, 14);
   r.reduce_with = [](int64_t item) { return item * item; };
   ConstraintBlock rc;
   rc.name = "reduce";
@@ -147,9 +147,9 @@ TEST(ArrayReductionConstraint, WithClauseExpressionTransformsEachElement) {
 
 // 18.5.7.2: the result is of the array element type, or the with-clause
 // expression type when specified. With an 8-bit element-type result, a sum that
-// overflows 8 bits wraps (200+100 == 300 -> 44 mod 256); promoting the result to
-// a 32-bit with-clause type (int'(item)) preserves the full sum (300). The two
-// solves observe the result type governing the folded value.
+// overflows 8 bits wraps (200+100 == 300 -> 44 mod 256); promoting the result
+// to a 32-bit with-clause type (int'(item)) preserves the full sum (300). The
+// two solves observe the result type governing the folded value.
 TEST(ArrayReductionConstraint, ResultTypeGovernsTruncation) {
   const std::vector<std::string> elems = {"e0", "e1"};
 
@@ -194,8 +194,8 @@ TEST(ArrayReductionConstraint, ResultTypeGovernsTruncation) {
   EXPECT_TRUE(wide.Solve());  // full sum survives in the wider with-clause type
 }
 
-// 18.5.7.2: "the relevant operand for each method" — a product() reduction joins
-// the elements by multiplication. {2,3,4} folds to 24.
+// 18.5.7.2: "the relevant operand for each method" — a product() reduction
+// joins the elements by multiplication. {2,3,4} folds to 24.
 TEST(ArrayReductionConstraint, ProductReductionJoinsByMultiplication) {
   ConstraintSolver solver(13);
   const std::vector<std::string> elems = {"e0", "e1", "e2"};
@@ -210,8 +210,8 @@ TEST(ArrayReductionConstraint, ProductReductionJoinsByMultiplication) {
 
   ConstraintBlock rc;
   rc.name = "reduce";
-  rc.constraints.push_back(Reduction(ArrayReductionOp::kProduct, elems,
-                                     ConstraintKind::kEqual, 24));
+  rc.constraints.push_back(
+      Reduction(ArrayReductionOp::kProduct, elems, ConstraintKind::kEqual, 24));
   solver.AddConstraintBlock(rc);
 
   EXPECT_TRUE(solver.Solve());
@@ -235,8 +235,8 @@ TEST(ArrayReductionConstraint, AndReductionJoinsByBitwiseAnd) {
 
   ConstraintBlock rc;
   rc.name = "reduce";
-  rc.constraints.push_back(Reduction(ArrayReductionOp::kAnd, elems,
-                                     ConstraintKind::kEqual, 0x0C));
+  rc.constraints.push_back(
+      Reduction(ArrayReductionOp::kAnd, elems, ConstraintKind::kEqual, 0x0C));
   solver.AddConstraintBlock(rc);
 
   EXPECT_TRUE(solver.Solve());
@@ -247,14 +247,14 @@ TEST(ArrayReductionConstraint, AndReductionJoinsByBitwiseAnd) {
   solver2.AddConstraintBlock(pins);
   ConstraintBlock rc2;
   rc2.name = "reduce";
-  rc2.constraints.push_back(Reduction(ArrayReductionOp::kAnd, elems,
-                                      ConstraintKind::kEqual, 0x0F));
+  rc2.constraints.push_back(
+      Reduction(ArrayReductionOp::kAnd, elems, ConstraintKind::kEqual, 0x0F));
   solver2.AddConstraintBlock(rc2);
   EXPECT_FALSE(solver2.Solve());
 }
 
-// 18.5.7.2: "the relevant operand for each method" — an or() reduction joins the
-// elements by bitwise OR. {0x01, 0x02, 0x04} folds to 0x07.
+// 18.5.7.2: "the relevant operand for each method" — an or() reduction joins
+// the elements by bitwise OR. {0x01, 0x02, 0x04} folds to 0x07.
 TEST(ArrayReductionConstraint, OrReductionJoinsByBitwiseOr) {
   ConstraintSolver solver(22);
   const std::vector<std::string> elems = {"e0", "e1", "e2"};
@@ -269,15 +269,15 @@ TEST(ArrayReductionConstraint, OrReductionJoinsByBitwiseOr) {
 
   ConstraintBlock rc;
   rc.name = "reduce";
-  rc.constraints.push_back(Reduction(ArrayReductionOp::kOr, elems,
-                                     ConstraintKind::kEqual, 0x07));
+  rc.constraints.push_back(
+      Reduction(ArrayReductionOp::kOr, elems, ConstraintKind::kEqual, 0x07));
   solver.AddConstraintBlock(rc);
 
   EXPECT_TRUE(solver.Solve());
 }
 
-// 18.5.7.2: "the relevant operand for each method" — an xor() reduction joins the
-// elements by bitwise XOR. {0x0F, 0x03, 0x01} folds to 0x0D, and the zero
+// 18.5.7.2: "the relevant operand for each method" — an xor() reduction joins
+// the elements by bitwise XOR. {0x0F, 0x03, 0x01} folds to 0x0D, and the zero
 // identity makes an even pairing of a bit cancel out.
 TEST(ArrayReductionConstraint, XorReductionJoinsByBitwiseXor) {
   ConstraintSolver solver(23);
@@ -293,19 +293,19 @@ TEST(ArrayReductionConstraint, XorReductionJoinsByBitwiseXor) {
 
   ConstraintBlock rc;
   rc.name = "reduce";
-  rc.constraints.push_back(Reduction(ArrayReductionOp::kXor, elems,
-                                     ConstraintKind::kEqual, 0x0D));
+  rc.constraints.push_back(
+      Reduction(ArrayReductionOp::kXor, elems, ConstraintKind::kEqual, 0x0D));
   solver.AddConstraintBlock(rc);
 
   EXPECT_TRUE(solver.Solve());
 }
 
 // 18.5.7.2: as with foreach iterative constraints, when an array has both size
-// constraints and array-reduction iterative constraints the size is solved first
-// and the reduction next, so only the elements that exist take part. The size is
-// pinned to 2, so the reduction folds only e0 and e1 (sum 30 < 100) even though
-// the trailing elements carry large values; folding all four would give 540 and
-// the < 100 relation would fail.
+// constraints and array-reduction iterative constraints the size is solved
+// first and the reduction next, so only the elements that exist take part. The
+// size is pinned to 2, so the reduction folds only e0 and e1 (sum 30 < 100)
+// even though the trailing elements carry large values; folding all four would
+// give 540 and the < 100 relation would fail.
 TEST(ArrayReductionConstraint, SizeConstraintBoundsReduction) {
   ConstraintSolver solver(99);
   RandVariable n = MakeVar("n", 2, 2, 32);
@@ -322,8 +322,8 @@ TEST(ArrayReductionConstraint, SizeConstraintBoundsReduction) {
   pins.constraints.push_back(Pin("e3", 255));  // beyond size 2
   solver.AddConstraintBlock(pins);
 
-  ConstraintExpr r = Reduction(ArrayReductionOp::kSum, elems,
-                               ConstraintKind::kLessThan, 100);
+  ConstraintExpr r =
+      Reduction(ArrayReductionOp::kSum, elems, ConstraintKind::kLessThan, 100);
   r.size_var = "n";  // dynamically sized: size committed before the reduction
   ConstraintBlock rc;
   rc.name = "reduce";

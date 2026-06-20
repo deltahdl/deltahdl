@@ -399,4 +399,4 @@ TEST(ModuleHeaderDefinition, ErrorMissingSemicolonAfterPortList) {
   EXPECT_FALSE(ParseOk("module m(input logic a) endmodule\n"));
 }
 
-}
+}  // namespace

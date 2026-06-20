@@ -31,8 +31,8 @@ int64_t SignExtend(uint64_t val, uint32_t width);
 // values of differing widths collapse to one entry. A typed integral index is
 // cast to its index width: sign-extended when the index type is signed and
 // zero-extended when it is unsigned, which fixes the key ordering.
-int64_t AssocIntKey(const Logic4Vec& val, bool is_wildcard, uint32_t index_width,
-                    bool is_signed = true);
+int64_t AssocIntKey(const Logic4Vec& val, bool is_wildcard,
+                    uint32_t index_width, bool is_signed = true);
 
 Logic4Vec EvalSelect(const Expr* expr, SimContext& ctx, Arena& arena);
 
@@ -66,7 +66,7 @@ bool TryEvalStringMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
 bool TryEvalEnumMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
                            Logic4Vec& out);
 bool TryEvalEnumProperty(std::string_view var_name, std::string_view method,
-                          SimContext& ctx, Arena& arena, Logic4Vec& out);
+                         SimContext& ctx, Arena& arena, Logic4Vec& out);
 
 bool TryEvalArrayMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
                             Logic4Vec& out);
@@ -112,8 +112,8 @@ void EmitSeverityHeader(SimContext& ctx, std::string_view prefix,
 
 const ModuleItem* SetupTaskCall(const Expr* expr, SimContext& ctx,
                                 Arena& arena);
-void TeardownTaskCall(const ModuleItem* func, const Expr* expr,
-                      SimContext& ctx, Arena& arena);
+void TeardownTaskCall(const ModuleItem* func, const Expr* expr, SimContext& ctx,
+                      Arena& arena);
 
 Logic4Vec EvalClassNew(std::string_view class_type, const Expr* new_expr,
                        SimContext& ctx, Arena& arena);
@@ -156,4 +156,4 @@ Logic4Vec EvalUnbasedUnsized(const Expr* expr, Arena& arena);
 Logic4Vec EvalIntLiteral(const Expr* expr, Arena& arena);
 Logic4Vec EvalStringLiteral(const Expr* expr, Arena& arena);
 
-}
+}  // namespace delta

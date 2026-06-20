@@ -33,19 +33,19 @@ TEST(PortDeclaration, EventAsPortType) {
 }
 
 TEST(PortDeclaration, TypedefStructWithUnionAsPortType) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  typedef struct {\n"
-      "    bit isfloat;\n"
-      "    union { int i; shortreal f; } n;\n"
-      "  } tagged_st;\n"
-      "endmodule\n"
-      "module mh1(\n"
-      "  input var int in1,\n"
-      "  input var shortreal in2,\n"
-      "  output tagged_st out\n"
-      ");\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  typedef struct {\n"
+              "    bit isfloat;\n"
+              "    union { int i; shortreal f; } n;\n"
+              "  } tagged_st;\n"
+              "endmodule\n"
+              "module mh1(\n"
+              "  input var int in1,\n"
+              "  input var shortreal in2,\n"
+              "  output tagged_st out\n"
+              ");\n"
+              "endmodule\n"));
 }
 
 TEST(PortDeclaration, InterfaceAsPortType) {
@@ -95,8 +95,7 @@ TEST(PortDeclaration, ModuleWithAtLeast256Ports) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->modules.size(), 1u);
-  EXPECT_EQ(r.cu->modules[0]->ports.size(),
-            static_cast<size_t>(port_count));
+  EXPECT_EQ(r.cu->modules[0]->ports.size(), static_cast<size_t>(port_count));
 }
 
 TEST(PortDeclaration, ModuleWithExactly256Ports) {
@@ -112,8 +111,7 @@ TEST(PortDeclaration, ModuleWithExactly256Ports) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->modules.size(), 1u);
-  EXPECT_EQ(r.cu->modules[0]->ports.size(),
-            static_cast<size_t>(port_count));
+  EXPECT_EQ(r.cu->modules[0]->ports.size(), static_cast<size_t>(port_count));
 }
 
 TEST(PortDeclaration, UnpackedArrayOfStructAsPortType) {
@@ -132,4 +130,4 @@ TEST(PortDeclaration, UnpackedArrayOfStructAsPortType) {
   EXPECT_FALSE(mod->ports[0].unpacked_dims.empty());
 }
 
-}
+}  // namespace

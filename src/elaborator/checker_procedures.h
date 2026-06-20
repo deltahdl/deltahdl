@@ -20,7 +20,7 @@ namespace delta {
 enum class ProceduralBlockKind : uint8_t {
   kInitial,
   kFinal,
-  kAlways,       // a general-purpose always procedure
+  kAlways,  // a general-purpose always procedure
   kAlwaysComb,
   kAlwaysLatch,
   kAlwaysFf,

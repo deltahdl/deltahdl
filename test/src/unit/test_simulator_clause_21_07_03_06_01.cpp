@@ -5,8 +5,8 @@
 namespace delta {
 namespace {
 
-// Exercises the $vcdclose keyword command (§21.7.3.6.1) as the production VcdWriter
-// emits it when an extended VCD file is closed.
+// Exercises the $vcdclose keyword command (§21.7.3.6.1) as the production
+// VcdWriter emits it when an extended VCD file is closed.
 class VcdcloseKeyword : public VcdTestBase {};
 
 // §21.7.3.6.1 / Syntax 21-26: an extended VCD file is closed with
@@ -31,7 +31,8 @@ TEST_F(VcdcloseKeyword, ExtendedVcdRecordsFinalSimulationTime) {
 
   auto content = ReadVcd();
   EXPECT_NE(content.find("$vcdclose #13000 $end"), std::string::npos);
-  // The close time is the final simulation time, not the last value-change time.
+  // The close time is the final simulation time, not the last value-change
+  // time.
   EXPECT_EQ(content.find("$vcdclose #500"), std::string::npos);
 }
 
@@ -66,5 +67,5 @@ TEST_F(VcdcloseKeyword, WithoutOpenFileIsHarmless) {
   EXPECT_FALSE(vcd.IsOpen());
 }
 
-}
-}
+}  // namespace
+}  // namespace delta

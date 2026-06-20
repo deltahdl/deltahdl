@@ -59,8 +59,8 @@ bool IsSequenceMethodContextLegal(SequenceMethod method,
                                   SequenceMethodContext context,
                                   bool sequence_treats_formal_as_local_var);
 
-// §16.13.6: the triggered/matched status of a sequence is established during the
-// Observed region of the time step.
+// §16.13.6: the triggered/matched status of a sequence is established during
+// the Observed region of the time step.
 bool SequenceMethodStatusSetInObservedRegion();
 
 // §16.13.6: how long the status of a sequence method persists once established.
@@ -73,7 +73,8 @@ enum class SequenceMethodPersistence : uint8_t {
   // synchronization between the two clocks.
   kUntilFirstDestinationClockTick,
 };
-SequenceMethodPersistence SequenceMethodStatusPersistence(SequenceMethod method);
+SequenceMethodPersistence SequenceMethodStatusPersistence(
+    SequenceMethod method);
 
 // §16.13.6: the sampled value of a sequence method is defined as its current
 // value (see §16.5.1).
@@ -84,29 +85,31 @@ bool SequenceMethodSampledValueIsCurrentValue();
 // fire only on a nonempty match.
 bool EmptyMatchActivatesSequenceMethod();
 
-// §16.13.6: there shall be no circular dependencies between sequences induced by
-// the use of `triggered`. A dependency edge {a, b} records that the body of
-// sequence `a` applies `triggered` to sequence `b`. Returns true when the set of
-// such edges over `sequence_count` sequences contains no cycle (and is thus
+// §16.13.6: there shall be no circular dependencies between sequences induced
+// by the use of `triggered`. A dependency edge {a, b} records that the body of
+// sequence `a` applies `triggered` to sequence `b`. Returns true when the set
+// of such edges over `sequence_count` sequences contains no cycle (and is thus
 // legal).
 bool TriggeredSequenceDependenciesAreAcyclic(
     int sequence_count,
     const std::vector<std::pair<int, int>>& triggered_edges);
 
 // §16.13.6: a sequence on which a method is applied shall either be clocked or
-// infer its clocking event from the context where it is used, following the same
-// inference rules as §16.9.3 for sampled value functions. This enumerates the
-// place that supplies the clocking event.
+// infer its clocking event from the context where it is used, following the
+// same inference rules as §16.9.3 for sampled value functions. This enumerates
+// the place that supplies the clocking event.
 enum class SequenceMethodClockContext : uint8_t {
   // The sequence carries its own (explicit) clocking event.
   kExplicitlyClocked,
   // Substituted into a checker instantiation: clocked as if instantiated inside
   // the checker.
   kCheckerInstantiation,
-  // Connected to a port of a module instantiation: clocked as if instantiated at
+  // Connected to a port of a module instantiation: clocked as if instantiated
+  // at
   // the place of module instantiation.
   kModulePortConnection,
-  // Connected to a port of an interface or program instantiation: same rule as a
+  // Connected to a port of an interface or program instantiation: same rule as
+  // a
   // module port connection.
   kInterfaceOrProgramPortConnection,
   // Passed as an actual argument to a function or task call: same rule as a
@@ -123,10 +126,10 @@ enum class SequenceMethodClockContext : uint8_t {
 // context inference rather than being carried explicitly on the sequence.
 bool SequenceMethodClockIsInferredFromContext(SequenceMethodClockContext ctx);
 
-// §16.13.6: if `$inferred_clock` is the default value for a formal argument of a
-// sequence (see §16.14.7) and an actual argument is not provided to the instance
-// to which a method is applied, the §16.9.3 inference rules are used to
-// determine the clocking event bound to that formal. Returns true when those
+// §16.13.6: if `$inferred_clock` is the default value for a formal argument of
+// a sequence (see §16.14.7) and an actual argument is not provided to the
+// instance to which a method is applied, the §16.9.3 inference rules are used
+// to determine the clocking event bound to that formal. Returns true when those
 // inference rules apply (i.e., no actual argument was supplied).
 bool InferredClockDefaultUsesSampledValueRules(bool actual_argument_provided);
 

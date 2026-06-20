@@ -607,4 +607,4 @@ TEST(IntegerLiteralElaboration, OctalXZCaseInsensitive) {
   LowerRunAndCompareBitPatterns(f, design, 0x3F);
 }
 
-}
+}  // namespace

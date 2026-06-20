@@ -52,4 +52,3 @@ TEST(ResetAllSimulation, InsideExcludedBranchDoesNotAffectSimulation) {
       "result");
   EXPECT_EQ(result, 50u);
 }
-

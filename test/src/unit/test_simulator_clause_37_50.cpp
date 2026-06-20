@@ -10,19 +10,20 @@ namespace delta {
 namespace {
 
 // §37.50 concurrent assertion: the VPI object model for a concurrent assertion.
-// The concurrent-assertion class is realized by the assert/assume/cover/restrict
-// directives; a concurrent assertion traverses to its clocking event (always the
-// actual event, explicit or inferred), to its property (a property instance or
-// specification), and - except for restrict - to its pass action statement;
-// assert and assume additionally carry an else (fail) statement. A cover reports
-// whether it covers a sequence, every assertion reports whether its clock was
-// inferred, and a restrict is not simulated and so has no pass/fail statement and
-// generates no run-time information. These tests observe the production helpers
-// in vpi.cpp and the VpiContext methods that apply those rules.
+// The concurrent-assertion class is realized by the
+// assert/assume/cover/restrict directives; a concurrent assertion traverses to
+// its clocking event (always the actual event, explicit or inferred), to its
+// property (a property instance or specification), and - except for restrict -
+// to its pass action statement; assert and assume additionally carry an else
+// (fail) statement. A cover reports whether it covers a sequence, every
+// assertion reports whether its clock was inferred, and a restrict is not
+// simulated and so has no pass/fail statement and generates no run-time
+// information. These tests observe the production helpers in vpi.cpp and the
+// VpiContext methods that apply those rules.
 
-// Claim 1: the four directive kinds the diagram draws are concurrent assertions;
-// the immediate kinds and sequence/property instances (the broader §37.49 class)
-// and unrelated kinds are not.
+// Claim 1: the four directive kinds the diagram draws are concurrent
+// assertions; the immediate kinds and sequence/property instances (the broader
+// §37.49 class) and unrelated kinds are not.
 TEST(ConcurrentAssertionModel, ConcurrentAssertionTypeCoversTheFourDirectives) {
   EXPECT_TRUE(VpiIsConcurrentAssertionType(vpiAssert));
   EXPECT_TRUE(VpiIsConcurrentAssertionType(vpiAssume));
@@ -68,9 +69,9 @@ TEST(ConcurrentAssertionModel, AssertionReachesItsProperty) {
   EXPECT_EQ(VpiConcurrentAssertionProperty(nullptr), nullptr);
 }
 
-// Claim 2 + Detail 1: the same clocking event is reported whether it was written
-// explicitly or inferred; the vpiIsClockInferred Boolean is what distinguishes
-// the two, not the clocking-event traversal.
+// Claim 2 + Detail 1: the same clocking event is reported whether it was
+// written explicitly or inferred; the vpiIsClockInferred Boolean is what
+// distinguishes the two, not the clocking-event traversal.
 TEST(ConcurrentAssertionModel, ClockingEventIsTheActualEventForBothForms) {
   VpiContext ctx;
 
@@ -197,8 +198,8 @@ TEST(ConcurrentAssertionModel, PropertyTraversalSkipsNonPropertyChildren) {
   EXPECT_EQ(VpiConcurrentAssertionProperty(&assertion), nullptr);
 }
 
-// Claim 2 edge: the clocking-event traversal matches the event-control child, so
-// an assertion carrying only unrelated children reports no clocking event.
+// Claim 2 edge: the clocking-event traversal matches the event-control child,
+// so an assertion carrying only unrelated children reports no clocking event.
 TEST(ConcurrentAssertionModel, ClockingEventTraversalSkipsNonEventChildren) {
   VpiObject assertion;
   assertion.type = vpiAssume;

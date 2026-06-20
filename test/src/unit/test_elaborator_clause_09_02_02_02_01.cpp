@@ -255,7 +255,8 @@ TEST(AlwaysCombSensitivityInference, AssertExprInSensitivity) {
   EXPECT_TRUE(found_c);
 }
 
-TEST(AlwaysCombSensitivityInference, MultipleAlwaysCombProcessesIndependentSensitivity) {
+TEST(AlwaysCombSensitivityInference,
+     MultipleAlwaysCombProcessesIndependentSensitivity) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -377,7 +378,8 @@ TEST(AlwaysCombSensitivityCollection, AssertExprCollectedButActionBlocksNot) {
 
 TEST(AlwaysCombSensitivityCollection, CallArgsCollectedButCalleeNameNot) {
   Arena arena;
-  auto* call = MakeCall(arena, "my_func", {SensId(arena, "x"), SensId(arena, "y")});
+  auto* call =
+      MakeCall(arena, "my_func", {SensId(arena, "x"), SensId(arena, "y")});
   std::unordered_set<std::string> reads;
   CollectExprReads(call, reads);
   EXPECT_TRUE(reads.count("x"));
@@ -398,8 +400,7 @@ TEST(AlwaysCombSensitivityInference, FunctionBodyReadsContributeToSensitivity) {
       f);
   ASSERT_NE(design, nullptr);
   ASSERT_FALSE(design->top_modules.empty());
-  ExpectSensitivityContains(design->top_modules[0]->processes[0],
-                            {"a", "ext"});
+  ExpectSensitivityContains(design->top_modules[0]->processes[0], {"a", "ext"});
 }
 
 // Functions are analyzed as normal functions, so a read reached through a chain
@@ -445,7 +446,8 @@ TEST(AlwaysCombSensitivityInference, FunctionLocalVarsExcludedFromSensitivity) {
 
 // A variable that is written within a called function is excluded from the
 // sensitivity list even though it is also read within that function.
-TEST(AlwaysCombSensitivityInference, FunctionWrittenVarExcludedFromSensitivity) {
+TEST(AlwaysCombSensitivityInference,
+     FunctionWrittenVarExcludedFromSensitivity) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -590,4 +592,4 @@ TEST(AlwaysCombSensitivityCollection, MethodCallObjectReferenceExcluded) {
   EXPECT_FALSE(reads.count("method"));
 }
 
-}
+}  // namespace

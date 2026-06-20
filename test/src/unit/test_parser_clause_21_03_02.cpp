@@ -77,4 +77,4 @@ TEST(IoSystemTaskParsing, FileOutputTaskNoExtraArguments) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

@@ -166,4 +166,4 @@ TEST(CastOperatorSim, IntCastFromRealRoundsHalfUp) {
   EXPECT_EQ(var->value.ToUint64(), 3u);
 }
 
-}
+}  // namespace

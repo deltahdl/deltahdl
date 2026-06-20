@@ -48,4 +48,4 @@ TEST(SemaphoreGetElaborator, MultipleGetCalls) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

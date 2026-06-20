@@ -105,4 +105,4 @@ TEST(ConstraintModeNamedBlock, UnnamedFormNotTreatedAsMissingBlock) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

@@ -42,4 +42,4 @@ TEST(MailboxPutParser, PutOnParameterizedMailbox) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}
+}  // namespace

@@ -65,7 +65,6 @@ TEST(DesignElementParsing, PrimitiveKeywordIntroducesPrimitiveDesignElement) {
 }
 
 TEST(DesignElementParsing, ConfigKeywordIntroducesConfigurationDesignElement) {
-
   auto r = Parse(
       "module m; endmodule\n"
       "config cfg;\n"
@@ -99,4 +98,4 @@ TEST(DesignElementParsing, AllSevenDesignElementsCoexistInOneCompilationUnit) {
   EXPECT_EQ(r.cu->configs.size(), 1u);
 }
 
-}
+}  // namespace

@@ -15,11 +15,14 @@ namespace {
 std::string ExpandMacro(const std::string& name) {
   PreprocFixture f;
   auto out = Preprocess("`" + name + "\n", f);
-  EXPECT_FALSE(f.diag.HasErrors()) << "unexpected diagnostics expanding " << name;
+  EXPECT_FALSE(f.diag.HasErrors())
+      << "unexpected diagnostics expanding " << name;
   size_t begin = 0;
   size_t end = out.size();
-  while (begin < end && std::isspace(static_cast<unsigned char>(out[begin]))) ++begin;
-  while (end > begin && std::isspace(static_cast<unsigned char>(out[end - 1]))) --end;
+  while (begin < end && std::isspace(static_cast<unsigned char>(out[begin])))
+    ++begin;
+  while (end > begin && std::isspace(static_cast<unsigned char>(out[end - 1])))
+    --end;
   return out.substr(begin, end - begin);
 }
 
@@ -68,8 +71,9 @@ TEST(CoverageConstantsPreprocessor, UsableWithoutUserDefine) {
 }
 
 // Being predefined `define macros, the constants must be visible to conditional
-// compilation directives — proving they are real macro-table entries, not ad hoc
-// textual substitutions. This exercises the `ifdef path rather than expansion.
+// compilation directives — proving they are real macro-table entries, not ad
+// hoc textual substitutions. This exercises the `ifdef path rather than
+// expansion.
 TEST(CoverageConstantsPreprocessor, DefinedForConditionalCompilation) {
   PreprocFixture f;
   auto out = Preprocess(

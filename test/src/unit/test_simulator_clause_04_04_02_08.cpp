@@ -118,7 +118,8 @@ TEST(ReNbaRegionSim, NonblockingAssignFromReactiveSetSchedulesReNBA) {
   EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 3u);
 }
 
-TEST(ReNbaRegionSim, NonblockingAssignFromReactiveSetWithDelaySchedulesReNBALater) {
+TEST(ReNbaRegionSim,
+     NonblockingAssignFromReactiveSetWithDelaySchedulesReNBALater) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module top;\n"

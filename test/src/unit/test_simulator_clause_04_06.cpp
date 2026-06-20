@@ -153,4 +153,3 @@ TEST(DeterminismSim, SourceOrderPreservedAcrossSuspension) {
       "x");
   EXPECT_EQ(result, 0x123u);
 }
-

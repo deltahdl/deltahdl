@@ -310,4 +310,4 @@ TEST(AnsiStylePortDeclarations, ExplicitlyNamedAnsiPortAssignmentPattern) {
   EXPECT_EQ(port.port_expr->kind, ExprKind::kAssignmentPattern);
 }
 
-}
+}  // namespace

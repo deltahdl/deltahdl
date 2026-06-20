@@ -65,8 +65,7 @@ class Parser {
       std::vector<std::pair<std::string_view, Expr*>>& params,
       std::unordered_set<std::string_view>& type_param_names,
       std::unordered_set<std::string_view>& localparam_port_names,
-      bool& is_localparam_group,
-      std::vector<DataType>* param_types = nullptr);
+      bool& is_localparam_group, std::vector<DataType>* param_types = nullptr);
   void ParseParamsPortsAndSemicolon(ModuleDecl& decl);
 
   void ParseGenerateRegion(std::vector<ModuleItem*>& items);
@@ -416,4 +415,4 @@ inline void SkipBraceBlock(Lexer& lexer) {
   if (lexer.Peek().Is(TokenKind::kRBrace)) lexer.Next();
 }
 
-}
+}  // namespace delta

@@ -19,7 +19,8 @@ std::string RunCapture(const std::string& src, SimFixture& f) {
   return captured.str();
 }
 
-size_t CountOccurrences(const std::string& haystack, const std::string& needle) {
+size_t CountOccurrences(const std::string& haystack,
+                        const std::string& needle) {
   size_t count = 0;
   for (size_t pos = haystack.find(needle); pos != std::string::npos;
        pos = haystack.find(needle, pos + needle.size())) {

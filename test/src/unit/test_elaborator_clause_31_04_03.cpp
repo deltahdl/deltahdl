@@ -71,4 +71,4 @@ TEST(SystemTimingCheckElaboration, FullskewZeroLimitsElaborate) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

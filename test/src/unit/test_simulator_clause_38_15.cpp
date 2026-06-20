@@ -420,5 +420,5 @@ TEST_F(VpiGetValueSim, GetValueObjTypeRealObject) {
   EXPECT_DOUBLE_EQ(val.value.real, 42.0);
 }
 
-}
-}
+}  // namespace
+}  // namespace delta

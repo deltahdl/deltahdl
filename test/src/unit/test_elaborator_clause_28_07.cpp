@@ -112,4 +112,4 @@ TEST(MosSwitchElaboration, RpmosConductsOnZeroWithoutInverting) {
   EXPECT_EQ(rhs->false_expr->text, "a");
 }
 
-}
+}  // namespace

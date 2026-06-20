@@ -61,4 +61,4 @@ TEST(CompilerDirectiveParsing, TokenPasteProducesValidIdentifier) {
                               "endmodule\n"));
 }
 
-}
+}  // namespace

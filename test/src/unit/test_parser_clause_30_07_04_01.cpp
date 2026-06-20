@@ -72,4 +72,4 @@ TEST(SpecifyBlockDeclParsing, ErrorPulsestyleMissingSemicolon) {
   EXPECT_TRUE(r.has_errors);
 }
 
-}
+}  // namespace

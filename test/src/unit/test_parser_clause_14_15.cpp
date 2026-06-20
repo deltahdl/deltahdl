@@ -88,4 +88,4 @@ TEST(SyncEventParse, WaitForClockingBlockEvent) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

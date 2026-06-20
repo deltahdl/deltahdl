@@ -65,10 +65,8 @@ static bool TrySelectBlockingAssign(const Expr* lhs, Logic4Vec& rhs_val,
     if (!base_name.empty() && ctx.IsStringVariable(base_name)) {
       auto idx_val = EvalExpr(lhs->index, ctx, arena);
       if (!HasUnknownBits(idx_val)) {
-        StringWriteByte(var,
-                        static_cast<uint32_t>(idx_val.ToUint64()),
-                        static_cast<uint8_t>(rhs_val.ToUint64() & 0xFF),
-                        arena);
+        StringWriteByte(var, static_cast<uint32_t>(idx_val.ToUint64()),
+                        static_cast<uint8_t>(rhs_val.ToUint64() & 0xFF), arena);
         var->NotifyWatchers();
       }
       return true;
@@ -177,8 +175,7 @@ static bool TryTypedClassNewAssign(const Stmt* stmt, SimContext& ctx,
     return false;
   if (stmt->rhs->rhs->text != "new") return false;
   if (!ctx.FindClassType(stmt->rhs->lhs->text)) return false;
-  auto handle =
-      EvalClassNew(stmt->rhs->lhs->text, nullptr, ctx, arena);
+  auto handle = EvalClassNew(stmt->rhs->lhs->text, nullptr, ctx, arena);
   auto* var = ctx.FindVariable(stmt->lhs->text);
   if (var) var->value = handle;
   return true;
@@ -199,7 +196,6 @@ static uint32_t LhsContextWidth(const Expr* lhs, SimContext& ctx) {
 
 static Logic4Vec EvalRhsWithStructContext(const Stmt* stmt, SimContext& ctx,
                                           Arena& arena) {
-
   uint32_t ctx_width = LhsContextWidth(stmt->lhs, ctx);
   if (!stmt->rhs || stmt->lhs->kind != ExprKind::kIdentifier) {
     return EvalExpr(stmt->rhs, ctx, arena, ctx_width);
@@ -353,7 +349,8 @@ static uint32_t StreamSliceSizeForUnpack(const Expr* size_expr, SimContext& ctx,
   auto val = EvalExpr(size_expr, ctx, arena).ToUint64();
   auto sval = static_cast<int64_t>(val);
   if (val == 0 || sval < 0) {
-    ctx.GetDiag().Error({}, "slice_size for streaming operator must be positive");
+    ctx.GetDiag().Error({},
+                        "slice_size for streaming operator must be positive");
     return 1;
   }
   return static_cast<uint32_t>(val);
@@ -387,8 +384,8 @@ static bool ResolveWithRangeForUnpack(const Expr* with_expr, SimContext& ctx,
     out_count = 1;
     return true;
   }
-  int64_t idx2 =
-      static_cast<int64_t>(EvalExpr(with_expr->index_end, ctx, arena).ToUint64());
+  int64_t idx2 = static_cast<int64_t>(
+      EvalExpr(with_expr->index_end, ctx, arena).ToUint64());
   if (with_expr->is_part_select_plus) {
     int64_t rel = idx - static_cast<int64_t>(array_lo);
     out_start = (rel < 0) ? 0 : static_cast<uint32_t>(rel);
@@ -413,7 +410,6 @@ static uint32_t CollectStreamElements(const Expr* lhs, SimContext& ctx,
                                       Arena& arena,
                                       std::vector<StreamElemInfo>& elems,
                                       uint32_t rhs_width) {
-
   bool has_dynamic = false;
   for (auto* elem : lhs->elements) {
     if (elem->with_expr) continue;
@@ -429,8 +425,8 @@ static uint32_t CollectStreamElements(const Expr* lhs, SimContext& ctx,
       if (elem->with_expr && elem->kind == ExprKind::kIdentifier) {
         if (auto* ainfo = ctx.FindArrayInfo(elem->text)) {
           uint32_t start = 0, count = 0;
-          ResolveWithRangeForUnpack(elem->with_expr, ctx, arena,
-                                    ainfo->size, ainfo->lo, start, count);
+          ResolveWithRangeForUnpack(elem->with_expr, ctx, arena, ainfo->size,
+                                    ainfo->lo, start, count);
           if (start + count > ainfo->size)
             count = (start < ainfo->size) ? ainfo->size - start : 0;
           fixed_sum += count * ainfo->elem_width;
@@ -453,7 +449,6 @@ static uint32_t CollectStreamElements(const Expr* lhs, SimContext& ctx,
   uint32_t total_width = 0;
   bool first_dynamic_consumed = false;
   for (auto* elem : lhs->elements) {
-
     if (elem->with_expr && elem->kind == ExprKind::kIdentifier) {
       if (auto* ainfo = ctx.FindArrayInfo(elem->text)) {
         uint32_t start = 0, count = 0;
@@ -476,17 +471,16 @@ static uint32_t CollectStreamElements(const Expr* lhs, SimContext& ctx,
       }
       if (auto* queue = ctx.FindQueue(elem->text)) {
         uint32_t start = 0, count = 0;
-        ResolveWithRangeForUnpack(
-            elem->with_expr, ctx, arena,
-            static_cast<uint32_t>(queue->elements.size()), 0, start, count);
+        ResolveWithRangeForUnpack(elem->with_expr, ctx, arena,
+                                  static_cast<uint32_t>(queue->elements.size()),
+                                  0, start, count);
         uint32_t needed = start + count;
         while (queue->elements.size() < needed) {
-          queue->elements.push_back(
-              MakeLogic4Vec(arena, queue->elem_width));
+          queue->elements.push_back(MakeLogic4Vec(arena, queue->elem_width));
         }
         for (uint32_t i = 0; i < count; ++i) {
-          std::string name = std::string(elem->text) + "__q__" +
-                             std::to_string(start + i);
+          std::string name =
+              std::string(elem->text) + "__q__" + std::to_string(start + i);
           elems.push_back({elem, queue->elem_width, std::move(name)});
           total_width += queue->elem_width;
         }
@@ -506,17 +500,15 @@ static uint32_t CollectStreamElements(const Expr* lhs, SimContext& ctx,
               queue->elem_width > 0 ? remaining / queue->elem_width : 0;
           queue->elements.clear();
           for (uint32_t i = 0; i < count; ++i) {
-            queue->elements.push_back(
-                MakeLogic4Vec(arena, queue->elem_width));
+            queue->elements.push_back(MakeLogic4Vec(arena, queue->elem_width));
           }
           for (uint32_t i = 0; i < count; ++i) {
-            std::string name = std::string(elem->text) + "__q__" +
-                               std::to_string(i);
+            std::string name =
+                std::string(elem->text) + "__q__" + std::to_string(i);
             elems.push_back({elem, queue->elem_width, std::move(name)});
             total_width += queue->elem_width;
           }
         } else {
-
           queue->elements.clear();
         }
         continue;
@@ -559,9 +551,9 @@ static Logic4Vec ReverseStreamSlices(const Logic4Vec& stream,
   return reordered;
 }
 
-static Logic4Vec ExtractStreamBits(const Logic4Vec& stream,
-                                   uint32_t bit_offset, uint32_t width,
-                                   uint32_t total_width, Arena& arena) {
+static Logic4Vec ExtractStreamBits(const Logic4Vec& stream, uint32_t bit_offset,
+                                   uint32_t width, uint32_t total_width,
+                                   Arena& arena) {
   auto result = MakeLogic4Vec(arena, width);
   for (uint32_t b = 0; b < width; ++b) {
     uint32_t sbit = bit_offset + b;
@@ -644,9 +636,8 @@ static void UnpackStreamingConcatLhsForward(const Expr* lhs,
     if (elem->with_expr && elem->kind == ExprKind::kIdentifier) {
       if (auto* ainfo = ctx.FindArrayInfo(elem->text)) {
         uint32_t start = 0, count = 0;
-        bool in_range = ResolveWithRangeForUnpack(elem->with_expr, ctx, arena,
-                                                  ainfo->size, ainfo->lo, start,
-                                                  count);
+        bool in_range = ResolveWithRangeForUnpack(
+            elem->with_expr, ctx, arena, ainfo->size, ainfo->lo, start, count);
         if (!in_range || start + count > ainfo->size) {
           ctx.GetDiag().Error(
               {}, "streaming unpack with-range exceeds fixed array bounds");
@@ -668,15 +659,16 @@ static void UnpackStreamingConcatLhsForward(const Expr* lhs,
       }
       if (auto* queue = ctx.FindQueue(elem->text)) {
         uint32_t start = 0, count = 0;
-        ResolveWithRangeForUnpack(
-            elem->with_expr, ctx, arena,
-            static_cast<uint32_t>(queue->elements.size()), 0, start, count);
+        ResolveWithRangeForUnpack(elem->with_expr, ctx, arena,
+                                  static_cast<uint32_t>(queue->elements.size()),
+                                  0, start, count);
         uint32_t needed = start + count;
         while (queue->elements.size() < needed)
           queue->elements.push_back(MakeLogic4Vec(arena, queue->elem_width));
         for (uint32_t i = 0; i < count; ++i) {
           Logic4Vec v = take(queue->elem_width);
-          if (start + i < queue->elements.size()) queue->elements[start + i] = v;
+          if (start + i < queue->elements.size())
+            queue->elements[start + i] = v;
           cursor += queue->elem_width;
         }
         continue;
@@ -701,8 +693,8 @@ static void UnpackStreamingConcatLhs(const Expr* lhs, const Logic4Vec& rhs_val,
     return;
   }
   std::vector<StreamElemInfo> elems;
-  uint32_t total_width = CollectStreamElements(lhs, ctx, arena, elems,
-                                                 rhs_val.width);
+  uint32_t total_width =
+      CollectStreamElements(lhs, ctx, arena, elems, rhs_val.width);
   if (total_width == 0 || elems.empty()) return;
 
   if (rhs_val.width < total_width) {
@@ -738,7 +730,6 @@ static void UnpackStreamingConcatLhs(const Expr* lhs, const Logic4Vec& rhs_val,
   for (auto& ei : elems) {
     bit_offset -= ei.width;
     if (!ei.target_name.empty()) {
-
       auto qpos = ei.target_name.find("__q__");
       if (qpos != std::string::npos) {
         auto qname = std::string_view(ei.target_name).substr(0, qpos);
@@ -746,14 +737,14 @@ static void UnpackStreamingConcatLhs(const Expr* lhs, const Logic4Vec& rhs_val,
         uint32_t idx = static_cast<uint32_t>(std::stoul(idx_str));
         auto* queue = ctx.FindQueue(qname);
         if (queue && idx < queue->elements.size()) {
-          queue->elements[idx] =
-              ExtractStreamBits(stream, bit_offset, ei.width, total_width, arena);
+          queue->elements[idx] = ExtractStreamBits(stream, bit_offset, ei.width,
+                                                   total_width, arena);
         }
       } else {
         auto* var = ctx.FindVariable(ei.target_name);
         if (!var) {
-          var = ctx.CreateVariable(
-              *arena.Create<std::string>(ei.target_name), ei.width);
+          var = ctx.CreateVariable(*arena.Create<std::string>(ei.target_name),
+                                   ei.width);
         }
         var->value =
             ExtractStreamBits(stream, bit_offset, ei.width, total_width, arena);
@@ -792,17 +783,15 @@ static Logic4Vec ConvertRealOnAssign(Logic4Vec rhs_val, const Expr* lhs,
   bool lhs_is_real = ctx.IsRealVariable(name);
   if (rhs_val.is_real && !lhs_is_real) {
     double d = RealVecToDouble(rhs_val);
-    auto ival = static_cast<uint64_t>(
-        static_cast<int64_t>(std::llround(d)));
+    auto ival = static_cast<uint64_t>(static_cast<int64_t>(std::llround(d)));
     auto result = MakeLogic4VecVal(arena, target_width, ival);
     result.is_signed = true;
     return result;
   }
   if (!rhs_val.is_real && lhs_is_real) {
-    uint64_t raw =
-        rhs_val.nwords > 0
-            ? (rhs_val.words[0].aval & ~rhs_val.words[0].bval)
-            : 0;
+    uint64_t raw = rhs_val.nwords > 0
+                       ? (rhs_val.words[0].aval & ~rhs_val.words[0].bval)
+                       : 0;
     auto d = static_cast<double>(raw);
     if (target_width == 32) {
       auto f = static_cast<float>(d);
@@ -841,7 +830,6 @@ static void AssignToScalarLhs(const Stmt* stmt, Logic4Vec rhs_val,
                               SimContext& ctx, Arena& arena) {
   auto* var = ResolveLhsVariable(stmt->lhs, ctx);
   if (var) {
-
     if (var->is_forced) return;
 
     auto lhs_name = LhsIdentName(stmt->lhs);
@@ -850,8 +838,8 @@ static void AssignToScalarLhs(const Stmt* stmt, Logic4Vec rhs_val,
       var->NotifyWatchers();
       return;
     }
-    rhs_val = ConvertRealOnAssign(rhs_val, stmt->lhs, var->value.width, ctx,
-                                  arena);
+    rhs_val =
+        ConvertRealOnAssign(rhs_val, stmt->lhs, var->value.width, ctx, arena);
     var->value = rhs_val;
     if (!var->is_4state) CoerceTo2State(var->value);
     var->NotifyWatchers();
@@ -953,8 +941,7 @@ static Logic4Vec ApplyStreamPackToTargetWidening(const Stmt* stmt,
   if (!stmt->lhs || stmt->lhs->kind != ExprKind::kIdentifier) {
     return rhs_val;
   }
-  if (ctx.FindArrayInfo(stmt->lhs->text) ||
-      ctx.FindQueue(stmt->lhs->text) ||
+  if (ctx.FindArrayInfo(stmt->lhs->text) || ctx.FindQueue(stmt->lhs->text) ||
       ctx.FindAssocArray(stmt->lhs->text)) {
     return rhs_val;
   }
@@ -1031,9 +1018,8 @@ StmtResult ExecBlockingAssignImpl(const Stmt* stmt, SimContext& ctx,
     return StmtResult::kDone;
   if (TryQueueBlockingAssign(stmt, ctx, arena)) return StmtResult::kDone;
 
-  if (stmt->lhs->kind == ExprKind::kIdentifier &&
-      stmt->rhs && stmt->rhs->kind == ExprKind::kIdentifier &&
-      stmt->rhs->text == "null") {
+  if (stmt->lhs->kind == ExprKind::kIdentifier && stmt->rhs &&
+      stmt->rhs->kind == ExprKind::kIdentifier && stmt->rhs->text == "null") {
     auto* lhs_var = ctx.FindVariable(stmt->lhs->text);
     if (lhs_var && lhs_var->is_event) {
       ctx.NullifyEventVariable(stmt->lhs->text);
@@ -1041,8 +1027,8 @@ StmtResult ExecBlockingAssignImpl(const Stmt* stmt, SimContext& ctx,
     }
   }
 
-  if (stmt->lhs->kind == ExprKind::kIdentifier &&
-      stmt->rhs && stmt->rhs->kind == ExprKind::kIdentifier) {
+  if (stmt->lhs->kind == ExprKind::kIdentifier && stmt->rhs &&
+      stmt->rhs->kind == ExprKind::kIdentifier) {
     auto* lhs_var = ctx.FindVariable(stmt->lhs->text);
     auto* rhs_var = ctx.FindVariable(stmt->rhs->text);
     if (lhs_var && lhs_var->is_event && rhs_var && rhs_var->is_event) {
@@ -1129,8 +1115,7 @@ static bool TryArrayConcatNba(const Stmt* stmt, SimContext& ctx, Arena& arena) {
           uint32_t idx = src_arr->is_descending
                              ? (src_arr->lo + src_arr->size - 1 - i)
                              : (src_arr->lo + i);
-          auto name =
-              std::string(item->text) + "[" + std::to_string(idx) + "]";
+          auto name = std::string(item->text) + "[" + std::to_string(idx) + "]";
           auto* v = ctx.FindVariable(name);
           if (v) elems.push_back(v->value);
         }
@@ -1160,9 +1145,8 @@ static bool TryArrayConcatNba(const Stmt* stmt, SimContext& ctx, Arena& arena) {
       return true;
     }
     for (uint32_t i = 0; i < ainfo->size; ++i) {
-      uint32_t idx = ainfo->is_descending
-                         ? (ainfo->lo + ainfo->size - 1 - i)
-                         : (ainfo->lo + i);
+      uint32_t idx = ainfo->is_descending ? (ainfo->lo + ainfo->size - 1 - i)
+                                          : (ainfo->lo + i);
       auto name =
           std::string(stmt->lhs->text) + "[" + std::to_string(idx) + "]";
       auto* var = ctx.FindVariable(name);
@@ -1173,7 +1157,6 @@ static bool TryArrayConcatNba(const Stmt* stmt, SimContext& ctx, Arena& arena) {
       ctx.GetScheduler().ScheduleEvent(schedule_time, nba_region, event);
     }
   } else {
-
     auto* event = ctx.GetScheduler().GetEventPool().Acquire();
 
     event->kind = EventKind::kUpdate;
@@ -1189,7 +1172,6 @@ static bool TryArrayConcatNba(const Stmt* stmt, SimContext& ctx, Arena& arena) {
 
 StmtResult ExecNonblockingAssignImpl(const Stmt* stmt, SimContext& ctx,
                                      Arena& arena) {
-
   if (TryArrayConcatNba(stmt, ctx, arena)) return StmtResult::kDone;
 
   auto rhs_val = EvalRhsWithStructContext(stmt, ctx, arena);
@@ -1221,10 +1203,9 @@ void PerformBlockingAssign(const Expr* lhs, const Logic4Vec& rhs_val,
   }
   auto* var = ResolveLhsVariable(lhs, ctx);
   if (var) {
-
     if (var->is_forced) return;
-    auto converted = ConvertRealOnAssign(rhs_val, lhs, var->value.width, ctx,
-                                         arena);
+    auto converted =
+        ConvertRealOnAssign(rhs_val, lhs, var->value.width, ctx, arena);
     var->value = converted;
     if (!var->is_4state) CoerceTo2State(var->value);
     var->NotifyWatchers();
@@ -1235,7 +1216,6 @@ void PerformBlockingAssign(const Expr* lhs, const Logic4Vec& rhs_val,
 
 static void SetupWholeVarNbaCallback(Event* event, Variable* var,
                                      const Logic4Vec& rhs_val) {
-
   event->kind = EventKind::kUpdate;
   var->pending_nba = rhs_val;
   var->has_pending_nba = true;
@@ -1267,7 +1247,8 @@ void ScheduleNonblockingAssign(const Stmt* stmt, const Logic4Vec& rhs_val,
     stream_event->callback = [lhs, rhs_val, &ctx, &arena]() {
       UnpackStreamingConcatLhs(lhs, rhs_val, ctx, arena);
     };
-    auto stream_region = ctx.IsReactiveContext() ? Region::kReNBA : Region::kNBA;
+    auto stream_region =
+        ctx.IsReactiveContext() ? Region::kReNBA : Region::kNBA;
     auto stream_time = ctx.CurrentTime() + SimTime{delay_ticks};
     ctx.GetScheduler().ScheduleEvent(stream_time, stream_region, stream_event);
     return;
@@ -1282,14 +1263,12 @@ void ScheduleNonblockingAssign(const Stmt* stmt, const Logic4Vec& rhs_val,
 
   event->kind = EventKind::kUpdate;
   if (is_select && !elem) {
-
     const Expr* lhs = stmt->lhs;
     auto idx_val = EvalExpr(lhs->index, ctx, arena);
     if (HasUnknownBits(idx_val)) return;
     uint32_t idx = static_cast<uint32_t>(idx_val.ToUint64());
 
     if (!lhs->index_end) {
-
       event->callback = [var, idx, rhs_val, &arena]() {
         if (idx >= var->value.width) return;
         uint64_t old_val = var->value.ToUint64();
@@ -1300,13 +1279,11 @@ void ScheduleNonblockingAssign(const Stmt* stmt, const Logic4Vec& rhs_val,
         var->NotifyWatchers();
       };
     } else {
-
       uint32_t end_val = static_cast<uint32_t>(
           EvalExpr(lhs->index_end, ctx, arena).ToUint64());
       uint32_t lo = idx;
       uint32_t w = end_val;
       if (lhs->is_part_select_plus) {
-
       } else if (lhs->is_part_select_minus) {
         lo = (idx >= w - 1) ? idx - w + 1 : 0;
       } else {
@@ -1326,8 +1303,8 @@ void ScheduleNonblockingAssign(const Stmt* stmt, const Logic4Vec& rhs_val,
       };
     }
   } else {
-    auto converted = ConvertRealOnAssign(rhs_val, stmt->lhs, var->value.width,
-                                         ctx, arena);
+    auto converted =
+        ConvertRealOnAssign(rhs_val, stmt->lhs, var->value.width, ctx, arena);
     SetupWholeVarNbaCallback(event, var, converted);
   }
   auto nba_region = ctx.IsReactiveContext() ? Region::kReNBA : Region::kNBA;
@@ -1466,7 +1443,6 @@ StmtResult ExecVarDeclImpl(const Stmt* stmt, SimContext& ctx, Arena& arena) {
       return StmtResult::kDone;
     }
   } else if (!stmt->var_is_automatic) {
-
     if (ctx.HasLocalScope() && ctx.FindLocalVariable(stmt->var_name)) {
       return StmtResult::kDone;
     }
@@ -1527,8 +1503,7 @@ StmtResult ExecForceOrAssignImpl(const Stmt* stmt, SimContext& ctx,
   var->value = rhs_val;
   if (!var->is_4state) CoerceTo2State(var->value);
   var->proc_cont_rhs = stmt->rhs;
-  if (stmt->kind == StmtKind::kAssign)
-    var->assign_cont_rhs = stmt->rhs;
+  if (stmt->kind == StmtKind::kAssign) var->assign_cont_rhs = stmt->rhs;
   var->NotifyWatchers();
 
   std::vector<Variable*> rhs_vars;
@@ -1569,14 +1544,12 @@ StmtResult ExecReleaseOrDeassignImpl(const Stmt* stmt, SimContext& ctx,
   if (stmt->kind == StmtKind::kDeassign) {
     var->assign_cont_rhs = nullptr;
   } else if (stmt->lhs->kind == ExprKind::kIdentifier) {
-
     if (auto* net = ctx.FindNet(stmt->lhs->text)) {
       net->Resolve(arena);
     }
   }
 
   if (var->assign_cont_rhs && stmt->kind != StmtKind::kDeassign) {
-
     auto rhs_val = EvalExpr(var->assign_cont_rhs, ctx, arena);
     var->is_forced = true;
     var->forced_value = rhs_val;
@@ -1611,4 +1584,4 @@ StmtResult ExecReleaseOrDeassignImpl(const Stmt* stmt, SimContext& ctx,
   return StmtResult::kDone;
 }
 
-}
+}  // namespace delta

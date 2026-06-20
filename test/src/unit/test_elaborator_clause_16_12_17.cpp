@@ -112,7 +112,8 @@ TEST(RecursivePropertyRestrictions, NotAppliedToSelfInstanceRejected) {
 // s_eventually, s_always, s_until, s_until_with) likewise cannot be applied to
 // a property expression that instantiates a recursive property. Here
 // s_eventually is applied to the recursive rec.
-TEST(RecursivePropertyRestrictions, StrongOperatorAppliedToRecursivePropertyRejected) {
+TEST(RecursivePropertyRestrictions,
+     StrongOperatorAppliedToRecursivePropertyRejected) {
   ElabFixture f;
   Elaborate(
       "module m;\n"
@@ -237,7 +238,8 @@ TEST(RecursivePropertyRestrictions, RecursiveArgsBoundToLocalFormalsAllowed) {
       "module m;\n"
       "  property fibonacci1 (local input int a, b, n, int fib_sig);\n"
       "    (n > 0) |->\n"
-      "    ((fib_sig == a) and (1'b1 |=> fibonacci1(b, a + b, n - 1, fib_sig)));\n"
+      "    ((fib_sig == a) and (1'b1 |=> fibonacci1(b, a + b, n - 1, "
+      "fib_sig)));\n"
       "  endproperty\n"
       "endmodule\n",
       f);
@@ -247,13 +249,15 @@ TEST(RecursivePropertyRestrictions, RecursiveArgsBoundToLocalFormalsAllowed) {
 
 // §16.12.17 Restriction 4: fibonacci2 passes a+b and n-1 — expressions that
 // mention formals of fibonacci2 — to non-local formals, so it is illegal.
-TEST(RecursivePropertyRestrictions, RecursiveArgsNotBoundToLocalFormalsRejected) {
+TEST(RecursivePropertyRestrictions,
+     RecursiveArgsNotBoundToLocalFormalsRejected) {
   ElabFixture f;
   Elaborate(
       "module m;\n"
       "  property fibonacci2 (int a, b, n, fib_sig);\n"
       "    (n > 0) |->\n"
-      "    ((fib_sig == a) and (1'b1 |=> fibonacci2(b, a + b, n - 1, fib_sig)));\n"
+      "    ((fib_sig == a) and (1'b1 |=> fibonacci2(b, a + b, n - 1, "
+      "fib_sig)));\n"
       "  endproperty\n"
       "endmodule\n",
       f);

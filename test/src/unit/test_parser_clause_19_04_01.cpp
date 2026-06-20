@@ -6,9 +6,9 @@ namespace {
 
 // §19.4.1: a derived embedded covergroup is written with the inheritance form
 // `covergroup extends base ;`. There is no fresh name between `covergroup` and
-// `extends`; the derived covergroup adopts the base covergroup_identifier as its
-// own name. The form must parse, and the member must record both that name and
-// the base it extends.
+// `extends`; the derived covergroup adopts the base covergroup_identifier as
+// its own name. The form must parse, and the member must record both that name
+// and the base it extends.
 TEST(EmbeddedCovergroupInheritance, ExtendsFormParses) {
   auto r = Parse(
       "class base;\n"
@@ -81,19 +81,19 @@ TEST(EmbeddedCovergroupInheritance, PlainCovergroupHasNoExtendsBase) {
 // covergroup_identifier. Omitting that identifier (`covergroup extends ;`) is a
 // syntax error reported by the parser.
 TEST(EmbeddedCovergroupInheritance, ExtendsFormRequiresBaseIdentifier) {
-  EXPECT_FALSE(ParseOk(
-      "class base;\n"
-      "  bit a;\n"
-      "  covergroup g1;\n"
-      "    coverpoint a;\n"
-      "  endgroup\n"
-      "endclass\n"
-      "class derived extends base;\n"
-      "  bit d;\n"
-      "  covergroup extends ;\n"
-      "    coverpoint d;\n"
-      "  endgroup\n"
-      "endclass\n"));
+  EXPECT_FALSE(
+      ParseOk("class base;\n"
+              "  bit a;\n"
+              "  covergroup g1;\n"
+              "    coverpoint a;\n"
+              "  endgroup\n"
+              "endclass\n"
+              "class derived extends base;\n"
+              "  bit d;\n"
+              "  covergroup extends ;\n"
+              "    coverpoint d;\n"
+              "  endgroup\n"
+              "endclass\n"));
 }
 
-}
+}  // namespace

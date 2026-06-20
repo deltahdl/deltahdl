@@ -357,7 +357,8 @@ TEST(ConcurrentAssertionSim, AssertionControlAssertonReenablesAssertion) {
   EXPECT_TRUE(executed);
 }
 
-TEST(ConcurrentAssertionSim, AssertionControlAssertkillRemovesPendingAssertions) {
+TEST(ConcurrentAssertionSim,
+     AssertionControlAssertkillRemovesPendingAssertions) {
   SimCh16Fixture f;
   int count = 0;
 

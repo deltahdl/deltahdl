@@ -122,8 +122,8 @@ TEST(MosSwitchParsing, AllFourKindsParseToDistinctGateKind) {
   ASSERT_NE(r.cu, nullptr);
   auto* mod = r.cu->modules[0];
   ASSERT_EQ(mod->items.size(), 4);
-  GateKind expected[] = {GateKind::kNmos, GateKind::kPmos,
-                         GateKind::kRnmos, GateKind::kRpmos};
+  GateKind expected[] = {GateKind::kNmos, GateKind::kPmos, GateKind::kRnmos,
+                         GateKind::kRpmos};
   for (size_t i = 0; i < std::size(expected); ++i) {
     EXPECT_EQ(mod->items[i]->gate_kind, expected[i]);
   }
@@ -145,4 +145,4 @@ TEST(MosSwitchParsing, TerminalOrderOutputDataControl) {
   EXPECT_EQ(g->gate_terminals[2]->text, "en");
 }
 
-}
+}  // namespace

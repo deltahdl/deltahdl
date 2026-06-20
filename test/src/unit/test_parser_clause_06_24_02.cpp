@@ -63,14 +63,14 @@ TEST(DynamicCastParsing, DynamicCastInCondition) {
 }
 
 TEST(DynamicCastParsing, DynamicCastWithExpression) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  typedef enum {RED, GREEN, BLUE, YELLOW, WHITE, BLACK} Colors;\n"
-              "  Colors col;\n"
-              "  initial begin\n"
-              "    $cast(col, 2 + 3);\n"
-              "  end\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk(
+      "module t;\n"
+      "  typedef enum {RED, GREEN, BLUE, YELLOW, WHITE, BLACK} Colors;\n"
+      "  Colors col;\n"
+      "  initial begin\n"
+      "    $cast(col, 2 + 3);\n"
+      "  end\n"
+      "endmodule\n"));
 }
 
-}
+}  // namespace

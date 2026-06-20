@@ -67,4 +67,4 @@ TEST(BlockNameSimulation, NamedBlockVarsAreStatic) {
   EXPECT_EQ(val, 3u);
 }
 
-}
+}  // namespace

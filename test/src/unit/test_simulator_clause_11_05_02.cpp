@@ -150,8 +150,9 @@ TEST(ArrayAddressing, PartSelectAfterArrayElement) {
   EXPECT_EQ(v, 0x5u);
 }
 
-// §11.5.2 — once every array dimension has been addressed, the selected word may
-// be bit-selected with a run-time (variable) index, as in twod_array[1][3][sel].
+// §11.5.2 — once every array dimension has been addressed, the selected word
+// may be bit-selected with a run-time (variable) index, as in
+// twod_array[1][3][sel].
 TEST(ArrayAddressing, VariableBitSelectAfterArrayElement) {
   auto v = RunAndGet(
       "module t;\n"
@@ -168,4 +169,4 @@ TEST(ArrayAddressing, VariableBitSelectAfterArrayElement) {
   EXPECT_EQ(v, 1u);
 }
 
-}
+}  // namespace

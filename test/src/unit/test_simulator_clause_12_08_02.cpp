@@ -32,4 +32,4 @@ TEST(LoopStatementSim, WhileContinue) {
   EXPECT_EQ(count->value.ToUint64(), 5u);
 }
 
-}
+}  // namespace

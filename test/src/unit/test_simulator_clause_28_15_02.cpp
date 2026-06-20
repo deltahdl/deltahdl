@@ -70,4 +70,4 @@ TEST(TriregChargeStrength, UnknownHeldValueDrivesBothSidesAtChargeStrength) {
   EXPECT_EQ(net.resolved_strength.s1_lo, Strength::kLarge);
 }
 
-}
+}  // namespace

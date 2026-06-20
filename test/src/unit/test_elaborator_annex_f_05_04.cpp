@@ -119,8 +119,7 @@ TEST(LocalVariableFlow, BlockOfOrUnionsOperandBlocks) {
 // block(R1) U block(R2) U (sample(R1) ∩ sample(R2)). Names sampled in both
 // operands are blocked even when neither operand blocks them alone.
 TEST(LocalVariableFlow, BlockOfIntersectAddsCommonlySampledNames) {
-  EXPECT_EQ(BlockLocals(*SeqIntersect(Samp("v"), Samp("v"))),
-            (NameSet{"v"}));
+  EXPECT_EQ(BlockLocals(*SeqIntersect(Samp("v"), Samp("v"))), (NameSet{"v"}));
   EXPECT_EQ(BlockLocals(*SeqIntersect(Samp("v"), Samp("w"))), NameSet{});
 }
 

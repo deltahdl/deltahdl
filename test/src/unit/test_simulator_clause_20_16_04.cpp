@@ -30,7 +30,8 @@ uint64_t RunModule(SimFixture& f, const char* src, std::string_view var) {
 // low value there cannot pull the AND result down.
 TEST(PlaPersonalityFormat, ArrayFormatOneTakesInputZeroExcludesIt) {
   SimFixture f;
-  uint64_t out = RunModule(f,
+  uint64_t out = RunModule(
+      f,
       "module t;\n"
       "  logic [1:2] in;\n"
       "  logic [1:2] mem [1:1];\n"
@@ -48,9 +49,10 @@ TEST(PlaPersonalityFormat, ArrayFormatOneTakesInputZeroExcludesIt) {
 // §20.16.4: the two personality formats are differentiated by whether the array
 // or the plane system call is used, and they interpret the very same memory bit
 // differently. Driving identical personality memory and inputs through an
-// AND-array and an AND-plane, a 0 bit means "do not take the input" in the array
-// format (leaving the AND identity 1) but "take the complemented input" in the
-// plane format (~1 = 0). The two calls therefore disagree on the same memory.
+// AND-array and an AND-plane, a 0 bit means "do not take the input" in the
+// array format (leaving the AND identity 1) but "take the complemented input"
+// in the plane format (~1 = 0). The two calls therefore disagree on the same
+// memory.
 TEST(PlaPersonalityFormat, ArrayAndPlaneFormatsDifferOnSameMemory) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -84,17 +86,17 @@ TEST(PlaPersonalityFormat, ArrayAndPlaneFormatsDifferOnSameMemory) {
 TEST(PlaPersonalityFormat, PlaneFormatZeroTakesComplementedInput) {
   SimFixture f;
   uint64_t out = RunModule(f,
-      "module t;\n"
-      "  logic [1:1] in;\n"
-      "  logic [1:1] mem [1:1];\n"
-      "  logic [1:1] out;\n"
-      "  initial begin\n"
-      "    mem[1] = 1'b0;\n"
-      "    in = 1'b1;\n"
-      "    $sync$and$plane(mem, in, out);\n"
-      "  end\n"
-      "endmodule\n",
-      "out");
+                           "module t;\n"
+                           "  logic [1:1] in;\n"
+                           "  logic [1:1] mem [1:1];\n"
+                           "  logic [1:1] out;\n"
+                           "  initial begin\n"
+                           "    mem[1] = 1'b0;\n"
+                           "    in = 1'b1;\n"
+                           "    $sync$and$plane(mem, in, out);\n"
+                           "  end\n"
+                           "endmodule\n",
+                           "out");
   EXPECT_EQ(out, 0u);
 }
 

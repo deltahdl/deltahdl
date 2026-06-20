@@ -10,8 +10,7 @@ RepetitionCount MakeExactCount(unsigned long long n) {
   return c;
 }
 
-RepetitionCount MakeFiniteRange(unsigned long long lo,
-                                unsigned long long hi) {
+RepetitionCount MakeFiniteRange(unsigned long long lo, unsigned long long hi) {
   RepetitionCount c;
   c.min = lo;
   c.max = hi;
@@ -43,8 +42,7 @@ RepetitionCount NormalizePlusShortcut() {
   return MakeDollarRange(1);
 }
 
-bool IsRepetitionAllowedOn(RepetitionKind kind,
-                           bool operand_is_boolean_expr,
+bool IsRepetitionAllowedOn(RepetitionKind kind, bool operand_is_boolean_expr,
                            bool boolean_has_attached_match_item) {
   switch (kind) {
     case RepetitionKind::kConsecutive:

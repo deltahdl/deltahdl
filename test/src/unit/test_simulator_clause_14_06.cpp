@@ -244,4 +244,4 @@ TEST(SignalMultiBlockSim, SameClockSignalOppositeEdgesNotShared) {
   EXPECT_EQ(cmgr.GetSampledValue("cb_neg", "sig_n"), 0u);
 }
 
-}
+}  // namespace

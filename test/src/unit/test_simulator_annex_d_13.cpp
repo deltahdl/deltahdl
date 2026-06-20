@@ -163,4 +163,4 @@ TEST(OptionalShowVarsSim, IndexedPartSelectReportsWholeVector) {
   EXPECT_EQ(f.ctx.ShowVarsVariables()[0], "v");
 }
 
-}
+}  // namespace

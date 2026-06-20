@@ -14,4 +14,4 @@ TEST(CompilerDirectiveParsing, BeginKeywords1800_2005_LogicIsKeyword) {
                               "`end_keywords\n"));
 }
 
-}
+}  // namespace

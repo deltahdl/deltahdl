@@ -222,4 +222,4 @@ TEST(ConcatenationParsing, ModulePathMultipleConcatenation) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

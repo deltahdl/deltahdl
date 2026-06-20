@@ -298,4 +298,4 @@ TEST(DesignBuildingBlockParsing, NestedOverridesInheritance) {
   EXPECT_EQ(inner_resolved.precision, TimeUnit::kFs);
 }
 
-}
+}  // namespace

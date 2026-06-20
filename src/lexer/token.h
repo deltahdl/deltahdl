@@ -373,4 +373,4 @@ struct Token {
 
 std::string_view TokenKindName(TokenKind kind);
 
-}
+}  // namespace delta

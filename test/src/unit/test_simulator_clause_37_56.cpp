@@ -16,9 +16,9 @@ namespace {
 // edge). These tests observe the production helpers in vpi.cpp that apply those
 // relations.
 
-// Diagram (multiclock sequence expr ==> clocked seq): the one-to-many vpiClockedSeq
-// iteration returns the multiclock sequence expression's clocked-seq members, in
-// order, and reports none for a null handle.
+// Diagram (multiclock sequence expr ==> clocked seq): the one-to-many
+// vpiClockedSeq iteration returns the multiclock sequence expression's
+// clocked-seq members, in order, and reports none for a null handle.
 TEST(MulticlockSequenceExprModel, ClockedSeqsCollectClockedSeqMembersInOrder) {
   VpiObject multiclock;
   multiclock.type = vpiMulticlockSequenceExpr;
@@ -36,9 +36,9 @@ TEST(MulticlockSequenceExprModel, ClockedSeqsCollectClockedSeqMembersInOrder) {
   EXPECT_TRUE(VpiMulticlockSequenceClockedSeqs(nullptr).empty());
 }
 
-// Diagram (multiclock sequence expr ==> clocked seq): the relation matches by the
-// clocked-seq kind, so children that are not clocked sequences are skipped while
-// the clocked-seq members keep their relative order.
+// Diagram (multiclock sequence expr ==> clocked seq): the relation matches by
+// the clocked-seq kind, so children that are not clocked sequences are skipped
+// while the clocked-seq members keep their relative order.
 TEST(MulticlockSequenceExprModel, ClockedSeqsSkipNonClockedSeqChildren) {
   VpiObject multiclock;
   multiclock.type = vpiMulticlockSequenceExpr;
@@ -55,10 +55,10 @@ TEST(MulticlockSequenceExprModel, ClockedSeqsSkipNonClockedSeqChildren) {
   EXPECT_EQ(seqs[0], &seq);
 }
 
-// Diagram (clocked seq -- vpiClockingEvent --> expr): a clocked seq traverses to
-// its clocking event through the same one-to-one relation a property spec and a
-// clocked property use, modeled as its event-control child; none when no clocking
-// event is attached.
+// Diagram (clocked seq -- vpiClockingEvent --> expr): a clocked seq traverses
+// to its clocking event through the same one-to-one relation a property spec
+// and a clocked property use, modeled as its event-control child; none when no
+// clocking event is attached.
 TEST(MulticlockSequenceExprModel, ClockedSeqReachesItsClockingEvent) {
   VpiObject clocked;
   clocked.type = vpiClockedSeq;
@@ -101,11 +101,13 @@ TEST(MulticlockSequenceExprModel, ClockedSeqReachesItsSequenceExpr) {
   EXPECT_EQ(VpiClockedSeqSequenceExpr(&paired), &primary);
 }
 
-// Diagram (clocked seq's two edges are distinct): when a clocked seq carries both
-// a clocking event and a sequence expression, the vpiClockingEvent edge and the
-// sequence-expr edge resolve to the two different objects - the event-control
-// child is not mistaken for the sequence expression, nor the reverse.
-TEST(MulticlockSequenceExprModel, ClockingEventAndSequenceExprAreDistinctEdges) {
+// Diagram (clocked seq's two edges are distinct): when a clocked seq carries
+// both a clocking event and a sequence expression, the vpiClockingEvent edge
+// and the sequence-expr edge resolve to the two different objects - the
+// event-control child is not mistaken for the sequence expression, nor the
+// reverse.
+TEST(MulticlockSequenceExprModel,
+     ClockingEventAndSequenceExprAreDistinctEdges) {
   VpiObject clocked;
   clocked.type = vpiClockedSeq;
   VpiObject ev;
@@ -118,11 +120,11 @@ TEST(MulticlockSequenceExprModel, ClockingEventAndSequenceExprAreDistinctEdges) 
   EXPECT_EQ(VpiClockedSeqSequenceExpr(&clocked), &seq_expr);
 }
 
-// Diagram (multiclock sequence expr ==> clocked seq) through the public VPI path:
-// vpi_iterate(vpiClockedSeq, multiclockHandle) walks the multiclock sequence
-// expression's clocked-seq members. The dispatch collects exactly the clocked-seq
-// children, in order, skipping unrelated children, then drains and frees the
-// iterator.
+// Diagram (multiclock sequence expr ==> clocked seq) through the public VPI
+// path: vpi_iterate(vpiClockedSeq, multiclockHandle) walks the multiclock
+// sequence expression's clocked-seq members. The dispatch collects exactly the
+// clocked-seq children, in order, skipping unrelated children, then drains and
+// frees the iterator.
 TEST(MulticlockSequenceExprModel, IterateClockedSeqsThroughVpiDispatch) {
   VpiContext ctx;
   VpiObject multiclock;

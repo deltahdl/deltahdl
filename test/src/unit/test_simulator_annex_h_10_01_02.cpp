@@ -71,4 +71,4 @@ TEST(SvDpi, PackedArrayTypeSizes) {
   EXPECT_EQ(sizeof(svLogicVecVal), 8u);
 }
 
-}
+}  // namespace

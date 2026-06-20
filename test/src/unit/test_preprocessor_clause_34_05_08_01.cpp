@@ -29,7 +29,8 @@ namespace {
 
 // The `encrypt_agent_info = <string>` keyword expression is accepted and the
 // directive line is stripped, including its string value.
-TEST_F(ProtectEncryptAgentInfoSyntaxTest, PragmaProtectEncryptAgentInfoConsumed) {
+TEST_F(ProtectEncryptAgentInfoSyntaxTest,
+       PragmaProtectEncryptAgentInfoConsumed) {
   auto result =
       Preprocess("`pragma protect encrypt_agent_info = \"AcmeCrypt 3.1\"\n");
   EXPECT_FALSE(diag_.HasErrors());
@@ -37,9 +38,9 @@ TEST_F(ProtectEncryptAgentInfoSyntaxTest, PragmaProtectEncryptAgentInfoConsumed)
   EXPECT_EQ(result.find("AcmeCrypt"), std::string::npos);
 }
 
-// Only the encrypt_agent_info directive line is removed; neighboring source text
-// survives, confirming it is the encrypt_agent_info keyword expression line that
-// the pragma path consumes.
+// Only the encrypt_agent_info directive line is removed; neighboring source
+// text survives, confirming it is the encrypt_agent_info keyword expression
+// line that the pragma path consumes.
 TEST_F(ProtectEncryptAgentInfoSyntaxTest,
        EncryptAgentInfoDirectiveStrippedSurroundingTextKept) {
   auto result = Preprocess(

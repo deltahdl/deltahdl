@@ -361,18 +361,19 @@ TEST(ClassSim, E2eMultipleObjectsIndependent) {
 }
 
 TEST(ClassSim, E2eNewObjectDefaultsToNonNull) {
-  EXPECT_EQ(RunAndGet(
-      "class C;\n"
-      "  int x;\n"
-      "endclass\n"
-      "module t;\n"
-      "  int result;\n"
-      "  initial begin\n"
-      "    C p;\n"
-      "    p = new;\n"
-      "    result = (p != null);\n"
-      "  end\n"
-      "endmodule\n", "result"), 1u);
+  EXPECT_EQ(RunAndGet("class C;\n"
+                      "  int x;\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    C p;\n"
+                      "    p = new;\n"
+                      "    result = (p != null);\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            1u);
 }
 
 TEST(ClassSim, E2eReassignToNewObjectOldHandleLost) {
@@ -395,4 +396,4 @@ TEST(ClassSim, E2eReassignToNewObjectOldHandleLost) {
   LowerRunAndCheck(f, design, {{"result", 0u}});
 }
 
-}
+}  // namespace

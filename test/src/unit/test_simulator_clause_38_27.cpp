@@ -14,8 +14,8 @@ class VpiMcdOpenSim : public ::testing::Test {
   void SetUp() override { SetGlobalVpiContext(&vpi_ctx_); }
   void TearDown() override { SetGlobalVpiContext(nullptr); }
 
-  // Counts the set bits of an mcd; a freshly opened descriptor names exactly one
-  // channel.
+  // Counts the set bits of an mcd; a freshly opened descriptor names exactly
+  // one channel.
   static int ChannelCount(PLI_UINT32 mcd) {
     int n = 0;
     for (PLI_UINT32 m = mcd; m != 0; m &= m - 1) ++n;
@@ -64,9 +64,9 @@ TEST_F(VpiMcdOpenSim, FreshDescriptorsAvoidReservedLsbAndMsbChannels) {
   EXPECT_NE(mcd_a, mcd_b);
 }
 
-// §38.27: vpi_mcd_open() shall return 0 on error. An open that cannot be carried
-// out and a missing file name both take the error return, and nothing is
-// recorded.
+// §38.27: vpi_mcd_open() shall return 0 on error. An open that cannot be
+// carried out and a missing file name both take the error return, and nothing
+// is recorded.
 TEST_F(VpiMcdOpenSim, ReturnsZeroOnError) {
   vpi_ctx_.SetMcdOpenShouldFail(true);
   char name[] = "denied.log";
@@ -86,7 +86,8 @@ TEST_F(VpiMcdOpenSim, ReopeningSameFileReturnsExistingDescriptor) {
   PLI_UINT32 second = vpi_mcd_open(name);
   EXPECT_EQ(second, first);
 
-  // A third, different file gets a new channel - re-opening did not consume one.
+  // A third, different file gets a new channel - re-opening did not consume
+  // one.
   char other[] = "other.log";
   PLI_UINT32 third = vpi_mcd_open(other);
   EXPECT_NE(third, first);
@@ -109,8 +110,8 @@ TEST_F(VpiMcdOpenSim, FileOpenedByFopenSharesDescriptorNamespace) {
   EXPECT_EQ(mcd & fopen_mcd, 0u);
 }
 
-// §38.27: only channels 2..31 are available (channels 1 and 32 are reserved), so
-// once all are in use a further open has no free channel and returns 0.
+// §38.27: only channels 2..31 are available (channels 1 and 32 are reserved),
+// so once all are in use a further open has no free channel and returns 0.
 TEST_F(VpiMcdOpenSim, ExhaustedChannelsReturnZero) {
   PLI_UINT32 used = 0;
   for (int i = 0; i < 30; ++i) {

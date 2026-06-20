@@ -272,4 +272,4 @@ TEST(AlwaysCombSensitivitySim, TaskCallInAlwaysCombExecutes) {
   EXPECT_EQ(var->value.ToUint64(), 6u);
 }
 
-}
+}  // namespace

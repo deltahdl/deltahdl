@@ -32,4 +32,4 @@ TEST(StringMethods, LenReturnsIntWidth) {
   EXPECT_EQ(result.width, 32u);
 }
 
-}
+}  // namespace

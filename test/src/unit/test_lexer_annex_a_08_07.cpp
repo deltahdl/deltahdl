@@ -515,4 +515,4 @@ TEST(NumberTokenLexing, OctalValueOnlyXDigit) {
   EXPECT_EQ(r.token.text, "4'ox");
 }
 
-}
+}  // namespace

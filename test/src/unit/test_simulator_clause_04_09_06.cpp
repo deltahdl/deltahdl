@@ -194,4 +194,4 @@ TEST(PortConnectionSchedulingSim,
   EXPECT_EQ(f.ctx.FindVariable("out_sig")->value.ToUint64() & 1u, 1u);
 }
 
-}
+}  // namespace

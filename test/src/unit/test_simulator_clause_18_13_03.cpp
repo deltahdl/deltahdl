@@ -118,4 +118,4 @@ TEST(SrandomSimulation, RecordsMostRecentSeed) {
   EXPECT_EQ(proc->rng_seed, 3u);
 }
 
-}
+}  // namespace

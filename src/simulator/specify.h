@@ -58,8 +58,7 @@ enum class PulseClassification : uint8_t {
   kReject,
 };
 
-PulseClassification ClassifyPulse(uint64_t pulse_width,
-                                  uint64_t reject_limit,
+PulseClassification ClassifyPulse(uint64_t pulse_width, uint64_t reject_limit,
                                   uint64_t error_limit);
 
 void InitDefaultPulseLimits(PathDelay& pd);
@@ -99,21 +98,23 @@ bool ReportsTimeskewViolation(uint64_t ref_time, uint64_t next_event_time,
                               bool next_event_is_data, uint64_t limit,
                               bool event_based_flag);
 
-bool ReportsFullskewViolation(uint64_t timestamp_time,
-                              uint64_t next_event_time,
+bool ReportsFullskewViolation(uint64_t timestamp_time, uint64_t next_event_time,
                               bool next_event_is_timecheck, uint64_t limit,
                               bool event_based_flag);
 
 // Effect of a fresh timestamp event on a $fullskew check (§31.4.3
-// remain_active_flag semantics; identical in timer-based and event-based modes).
+// remain_active_flag semantics; identical in timer-based and event-based
+// modes).
 enum class FullskewWindowAction : uint8_t {
-  kReplaceWindow,  // condition holds: a new window supersedes the open one / re-arms
-  kIgnore,         // condition false but remain_active_flag set: event has no effect
-  kGoDormant,      // condition false and remain_active_flag clear: check goes dormant
+  kReplaceWindow,  // condition holds: a new window supersedes the open one /
+                   // re-arms
+  kIgnore,  // condition false but remain_active_flag set: event has no effect
+  kGoDormant,  // condition false and remain_active_flag clear: check goes
+               // dormant
 };
 
-FullskewWindowAction FullskewSecondTimestampAction(bool timestamp_condition_holds,
-                                                   bool remain_active_flag);
+FullskewWindowAction FullskewSecondTimestampAction(
+    bool timestamp_condition_holds, bool remain_active_flag);
 
 Logic4Word ToggleNotifierOnViolation(Logic4Word current);
 
@@ -171,13 +172,11 @@ NegativeTimingConditionRole TimestampConditionRole(int64_t signed_setup,
 NegativeTimingConditionRole TimecheckConditionRole(int64_t signed_setup,
                                                    int64_t signed_hold);
 
-bool NegativeTimingCheckNotifierShouldToggle(
-    bool delayed_adjusted_violation,
-    bool undelayed_original_violation);
+bool NegativeTimingCheckNotifierShouldToggle(bool delayed_adjusted_violation,
+                                             bool undelayed_original_violation);
 
-bool NegativeTimingCheckOptionActive(
-    bool negative_timing_check_option_enabled,
-    bool all_timing_checks_disabled);
+bool NegativeTimingCheckOptionActive(bool negative_timing_check_option_enabled,
+                                     bool all_timing_checks_disabled);
 
 int64_t EffectiveTimingCheckSignalDelay(int64_t requested_delay,
                                         bool negative_timing_option_active);
@@ -221,7 +220,6 @@ struct SdfTcAnnotation {
 
 class SpecifyManager {
  public:
-
   void AddPathDelay(PathDelay delay, bool preserve_pulse_limits = false);
 
   void IncrementPathDelay(const PathDelay& delta);
@@ -293,12 +291,10 @@ class SpecifyManager {
                           std::string_view data, uint64_t data_time) const;
 
   bool CheckTimeskewViolation(std::string_view ref, uint64_t ref_time,
-                              std::string_view data,
-                              uint64_t data_time) const;
+                              std::string_view data, uint64_t data_time) const;
 
   bool CheckFullskewViolation(std::string_view ref, uint64_t ref_time,
-                              std::string_view data,
-                              uint64_t data_time) const;
+                              std::string_view data, uint64_t data_time) const;
 
   bool CheckWidthViolation(std::string_view ref, uint64_t ref_time,
                            uint64_t data_time) const;
@@ -307,8 +303,8 @@ class SpecifyManager {
                             uint64_t data_time) const;
 
   bool CheckNochangeViolation(std::string_view ref, uint64_t leading_ref_time,
-                              uint64_t trailing_ref_time,
-                              std::string_view data, uint64_t data_time) const;
+                              uint64_t trailing_ref_time, std::string_view data,
+                              uint64_t data_time) const;
 
   uint32_t PathDelayCount() const {
     return static_cast<uint32_t>(path_delays_.size());
@@ -318,7 +314,6 @@ class SpecifyManager {
   }
 
  private:
-
   std::vector<PathDelay> path_delays_;
   std::vector<TimingCheckEntry> timing_checks_;
   std::vector<SdfAnnotation> sdf_annotations_;
@@ -334,4 +329,4 @@ class SpecifyManager {
   uint8_t error_pulse_pct_ = 100;
 };
 
-}
+}  // namespace delta

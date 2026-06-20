@@ -332,4 +332,4 @@ TEST(Simulator, NullifyOnAliasOnlyBreaksAssignedVariable) {
   EXPECT_TRUE(after_b->is_null_event);
 }
 
-}
+}  // namespace

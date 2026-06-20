@@ -122,4 +122,4 @@ TEST(FineGrainProcessControlParsing, ProcessArrayDecl) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

@@ -32,4 +32,4 @@ TEST(AggregateTypeParsing, AssocArraySizeMethod) {
   EXPECT_EQ(rhs->kind, ExprKind::kCall);
 }
 
-}
+}  // namespace

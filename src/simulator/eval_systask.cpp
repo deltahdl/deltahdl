@@ -26,7 +26,6 @@ namespace delta {
 static uint32_t CountOnesInVec(const Logic4Vec& val) {
   uint32_t count = 0;
   for (uint32_t i = 0; i < val.nwords; ++i) {
-
     uint64_t known_ones = val.words[i].aval & ~val.words[i].bval;
     count += static_cast<uint32_t>(std::popcount(known_ones));
   }
@@ -160,12 +159,21 @@ static bool ParsePlusargInteger(const std::string& s, char conv, uint64_t& out,
   negative = false;
   int base = 0;
   switch (conv) {
-    case 'd': base = 10; break;
-    case 'o': base = 8; break;
+    case 'd':
+      base = 10;
+      break;
+    case 'o':
+      base = 8;
+      break;
     case 'h':
-    case 'x': base = 16; break;
-    case 'b': base = 2; break;
-    default: return false;
+    case 'x':
+      base = 16;
+      break;
+    case 'b':
+      base = 2;
+      break;
+    default:
+      return false;
   }
   size_t i = 0;
   if (base == 10 && i < s.size() && (s[i] == '+' || s[i] == '-')) {
@@ -176,10 +184,14 @@ static bool ParsePlusargInteger(const std::string& s, char conv, uint64_t& out,
   for (; i < s.size(); ++i) {
     char c = s[i];
     int digit;
-    if (c >= '0' && c <= '9') digit = c - '0';
-    else if (c >= 'a' && c <= 'f') digit = c - 'a' + 10;
-    else if (c >= 'A' && c <= 'F') digit = c - 'A' + 10;
-    else return false;
+    if (c >= '0' && c <= '9')
+      digit = c - '0';
+    else if (c >= 'a' && c <= 'f')
+      digit = c - 'a' + 10;
+    else if (c >= 'A' && c <= 'F')
+      digit = c - 'A' + 10;
+    else
+      return false;
     if (digit >= base) return false;
     out = out * static_cast<uint64_t>(base) + static_cast<uint64_t>(digit);
   }
@@ -205,8 +217,8 @@ static Logic4Vec PackStringIntoWidth(Arena& arena, const std::string& s,
   return vec;
 }
 
-// §21.6: convert the remainder of a matching plusarg into `var` according to the
-// format string's conversion code. The stored value is automatically zero-
+// §21.6: convert the remainder of a matching plusarg into `var` according to
+// the format string's conversion code. The stored value is automatically zero-
 // padded or truncated to the variable width by MakeLogic4VecVal.
 static void StorePlusargValue(Variable* var, const std::string& name, char conv,
                               const std::string& remainder, SimContext& ctx,
@@ -348,8 +360,8 @@ static void WarnIfArgCountMismatch(SimContext& ctx, std::string_view task_name,
                                    const std::string& fmt, size_t supplied) {
   size_t required = CountConsumingSpecifiers(fmt);
   if (supplied == required) return;
-  std::string msg = std::string(task_name) +
-                    ": format-specifier count (" + std::to_string(required) +
+  std::string msg = std::string(task_name) + ": format-specifier count (" +
+                    std::to_string(required) +
                     ") does not match supplied argument count (" +
                     std::to_string(supplied) + ")";
   ctx.GetDiag().Warning({}, std::move(msg));
@@ -422,8 +434,7 @@ static Logic4Vec EvalSwriteFamily(const Expr* expr, SimContext& ctx,
   }
 
   std::vector<Expr*> rest(expr->args.begin() + 1, expr->args.end());
-  std::string output =
-      BuildStringTaskOutput(rest, default_radix, ctx, arena);
+  std::string output = BuildStringTaskOutput(rest, default_radix, ctx, arena);
   if (dst) {
     // §5.9 / §21.3.3 N7: writing via StringToLogic4Vec packs the leftmost
     // character at the high byte position, giving left-bound to right-bound
@@ -560,8 +571,8 @@ Logic4Vec EvalArrayQuerySysCall(const Expr* expr, SimContext& ctx, Arena& arena,
     queue = ctx.FindQueue(arg0->text);
     arr = ctx.FindArrayInfo(arg0->text);
   }
-  bool dynamic_outer =
-      queue != nullptr || (arr != nullptr && (arr->is_dynamic || arr->is_queue));
+  bool dynamic_outer = queue != nullptr ||
+                       (arr != nullptr && (arr->is_dynamic || arr->is_queue));
   bool has_unpacked = assoc != nullptr || queue != nullptr || arr != nullptr;
 
   // Width of the packed element dimension (the [n-1:0] of an integer type).
@@ -592,8 +603,7 @@ Logic4Vec EvalArrayQuerySysCall(const Expr* expr, SimContext& ctx, Arena& arena,
   uint32_t unpacked_dims = has_unpacked ? 1 : 0;
   uint32_t total_dims = packed_dims + unpacked_dims;
 
-  if (name == "$dimensions")
-    return MakeLogic4VecVal(arena, 32, total_dims);
+  if (name == "$dimensions") return MakeLogic4VecVal(arena, 32, total_dims);
   if (name == "$unpacked_dimensions")
     return MakeLogic4VecVal(arena, 32, unpacked_dims);
 
@@ -627,9 +637,8 @@ Logic4Vec EvalArrayQuerySysCall(const Expr* expr, SimContext& ctx, Arena& arena,
     }
   } else if (query_unpacked && dynamic_outer) {
     // Queue or dynamic array dimension: indices run 0 .. size-1, descending.
-    int64_t count =
-        queue ? static_cast<int64_t>(queue->elements.size())
-              : static_cast<int64_t>(arr ? arr->size : 0);
+    int64_t count = queue ? static_cast<int64_t>(queue->elements.size())
+                          : static_cast<int64_t>(arr ? arr->size : 0);
     q.left = 0;
     q.right = count - 1;  // -1 when the dimension is currently empty
     q.low = 0;
@@ -832,11 +841,11 @@ static Logic4Vec EvalStochasticQueue(const Expr* expr, SimContext& ctx,
     auto it = queues.find(q_id);
     WriteQueueStatus(args[1], it == queues.end() ? kQUndefinedId : kQOk, ctx,
                      arena);
-    uint64_t full = (it != queues.end() &&
-                     static_cast<int64_t>(it->second.count) >=
-                         it->second.max_length)
-                        ? 1u
-                        : 0u;
+    uint64_t full =
+        (it != queues.end() &&
+         static_cast<int64_t>(it->second.count) >= it->second.max_length)
+            ? 1u
+            : 0u;
     return MakeLogic4VecVal(arena, 32, full);
   }
 
@@ -862,10 +871,9 @@ static Logic4Vec EvalStochasticQueue(const Expr* expr, SimContext& ctx,
         break;
       case 2:  // Mean interarrival time: total span between the first and last
                // arrival divided by the number of gaps between arrivals.
-        value = q.arrivals > 1
-                    ? (q.last_arrival_tick - q.first_arrival_tick) /
-                          (q.arrivals - 1)
-                    : 0;
+        value = q.arrivals > 1 ? (q.last_arrival_tick - q.first_arrival_tick) /
+                                     (q.arrivals - 1)
+                               : 0;
         break;
       case 3:  // Maximum queue length ever reached.
         value = q.max_count;
@@ -873,13 +881,12 @@ static Logic4Vec EvalStochasticQueue(const Expr* expr, SimContext& ctx,
       case 4:  // Shortest wait time ever, across removed entries.
         value = q.departures ? q.shortest_wait : 0;
         break;
-      case 5:  // Longest wait among entries still queued: the oldest entry is at
-               // the front, as $q_add appends in arrival order.
-        value = q.entries.empty()
-                    ? 0
-                    : (now >= q.entries.front().arrival_tick
-                           ? now - q.entries.front().arrival_tick
-                           : 0);
+      case 5:  // Longest wait among entries still queued: the oldest entry is
+               // at the front, as $q_add appends in arrival order.
+        value = q.entries.empty() ? 0
+                                  : (now >= q.entries.front().arrival_tick
+                                         ? now - q.entries.front().arrival_tick
+                                         : 0);
         break;
       case 6:  // Average wait time over removed entries.
         value = q.departures ? q.total_wait / q.departures : 0;
@@ -915,8 +922,8 @@ static Logic4Vec EvalCoverageControl(const Expr* expr, SimContext& ctx,
   if (!CoverageControlFromInt(control_value, &control)) {
     return status_vec(CoverageStatus::Error);
   }
-  // The fourth argument names the module definition or instance. When given as a
-  // string literal it is used directly; otherwise the scope is left empty.
+  // The fourth argument names the module definition or instance. When given as
+  // a string literal it is used directly; otherwise the scope is left empty.
   std::string scope;
   if (expr->args.size() > 3 &&
       expr->args[3]->kind == ExprKind::kStringLiteral) {
@@ -952,7 +959,8 @@ static Logic4Vec EvalCoverageGetMax(const Expr* expr, SimContext& ctx,
       expr->args[2]->kind == ExprKind::kStringLiteral) {
     scope = ExtractStrArg(expr->args[2]);
   }
-  return int_vec(ctx.GetCoverageControlState().CoverageMax(scope, coverage_type));
+  return int_vec(
+      ctx.GetCoverageControlState().CoverageMax(scope, coverage_type));
 }
 
 // §40.3.2.3: $coverage_get(coverage_type, scope_def, modules_or_instance)
@@ -984,17 +992,18 @@ static Logic4Vec EvalCoverageGet(const Expr* expr, SimContext& ctx,
       expr->args[2]->kind == ExprKind::kStringLiteral) {
     scope = ExtractStrArg(expr->args[2]);
   }
-  return int_vec(ctx.GetCoverageControlState().CoverageGet(scope, coverage_type));
+  return int_vec(
+      ctx.GetCoverageControlState().CoverageGet(scope, coverage_type));
 }
 
 // §40.3.2.4: $coverage_merge(coverage_type, "name") loads and merges coverage
 // data of the given coverage type from the named coverage database into the
 // simulation. `name` is an arbitrary, implementation-specific locator for the
 // database. The integer result is one of the §40.3.1 status values:
-// `SV_COV_OK when the data are found (for this design) and merged, `SV_COV_NOCOV
-// when the data are found but do not contain the requested coverage type, and
-// `SV_COV_ERROR when the name does not exist, the data are from a different
-// design, or another error occurs.
+// `SV_COV_OK when the data are found (for this design) and merged,
+// `SV_COV_NOCOV when the data are found but do not contain the requested
+// coverage type, and `SV_COV_ERROR when the name does not exist, the data are
+// from a different design, or another error occurs.
 static Logic4Vec EvalCoverageMerge(const Expr* expr, SimContext& ctx,
                                    Arena& arena) {
   auto int_vec = [&](int value) {
@@ -1018,12 +1027,12 @@ static Logic4Vec EvalCoverageMerge(const Expr* expr, SimContext& ctx,
       ctx.GetCoverageControlState().CoverageMerge(coverage_type, name)));
 }
 
-// §40.3.2.5: $coverage_save(coverage_type, "name") saves the current coverage of
-// the given type to the tool's coverage database under `name`, so a later
+// §40.3.2.5: $coverage_save(coverage_type, "name") saves the current coverage
+// of the given type to the tool's coverage database under `name`, so a later
 // $coverage_merge() (§40.3.2.4) with the same name can load it. Saving never
-// affects the coverage state of this simulation. The integer result is one of the
-// §40.3.1 status values: `SV_COV_OK when the data are saved, `SV_COV_NOCOV when
-// no such coverage is available in this design (nothing is saved), and
+// affects the coverage state of this simulation. The integer result is one of
+// the §40.3.1 status values: `SV_COV_OK when the data are saved, `SV_COV_NOCOV
+// when no such coverage is available in this design (nothing is saved), and
 // `SV_COV_ERROR when an error occurs during the save — in which case the entry
 // for `name` is removed to preserve coverage-database integrity.
 static Logic4Vec EvalCoverageSave(const Expr* expr, SimContext& ctx,
@@ -1051,7 +1060,6 @@ static Logic4Vec EvalCoverageSave(const Expr* expr, SimContext& ctx,
 
 Logic4Vec EvalVerifSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
                            std::string_view name) {
-
   if (name == "$sampled") {
     if (expr->args.empty()) return MakeLogic4VecVal(arena, 1, 0);
     return EvalExpr(expr->args[0], ctx, arena);
@@ -1317,9 +1325,9 @@ static Logic4Vec EvalFdisplayWrite(const Expr* expr, SimContext& ctx,
   if (targets.empty()) return MakeLogic4VecVal(arena, 1, 0);
 
   char suffix = FileOutputSuffix(name);
-  bool is_display_family =
-      name.rfind("$fdisplay", 0) == 0 || name.rfind("$fstrobe", 0) == 0 ||
-      name.rfind("$fmonitor", 0) == 0;
+  bool is_display_family = name.rfind("$fdisplay", 0) == 0 ||
+                           name.rfind("$fstrobe", 0) == 0 ||
+                           name.rfind("$fmonitor", 0) == 0;
 
   std::string fmt;
   std::vector<Logic4Vec> arg_vals;
@@ -1516,9 +1524,9 @@ static void EvalReadmemIndexed(SimContext& ctx, Arena& arena, bool is_hex,
   if (is_slice && has_start &&
       (start_addr < low_addr || start_addr > high_addr ||
        (has_finish && (finish_addr < low_addr || finish_addr > high_addr)))) {
-    ctx.GetDiag().Error(
-        {}, "$readmem" + std::string(is_hex ? "h" : "b") +
-                ": start/finish address outside the slice bounds");
+    ctx.GetDiag().Error({},
+                        "$readmem" + std::string(is_hex ? "h" : "b") +
+                            ": start/finish address outside the slice bounds");
     return;
   }
 
@@ -1644,8 +1652,8 @@ static void EvalReadmemAssoc(SimContext& ctx, Arena& arena, bool is_hex,
 // or subwords not yet reached are left unchanged.
 static void EvalReadmemMultiDim(SimContext& ctx, Arena& arena, bool is_hex,
                                 const std::string& content,
-                                const std::string& mem_name, const ArrayInfo* ai,
-                                bool two_state,
+                                const std::string& mem_name,
+                                const ArrayInfo* ai, bool two_state,
                                 const EnumTypeInfo* enum_info) {
   const std::vector<uint32_t>& los = ai->dim_los;
   const std::vector<uint32_t>& sizes = ai->dim_sizes;
@@ -1661,19 +1669,20 @@ static void EvalReadmemMultiDim(SimContext& ctx, Arena& arena, bool is_hex,
   const int64_t top_hi = top_lo + static_cast<int64_t>(sizes[0]) - 1;
 
   // §21.4.3: a global position numbers every element of the array in row-major
-  // order, so a sequential file fills element 0, 1, 2, ... regardless of how the
-  // dimensions nest. The element name carries one bracketed subscript per
+  // order, so a sequential file fills element 0, 1, 2, ... regardless of how
+  // the dimensions nest. The element name carries one bracketed subscript per
   // dimension (mem[i0][i1]...), each running from its dimension's low address.
   auto element_at = [&](uint64_t global) -> std::string {
     uint64_t top = global / inner;
     uint64_t flat = global % inner;
-    std::string nm = mem_name + "[" + std::to_string(top_lo + static_cast<int64_t>(top)) + "]";
+    std::string nm = mem_name + "[" +
+                     std::to_string(top_lo + static_cast<int64_t>(top)) + "]";
     // Decompose the within-word position into per-dimension subscripts,
     // innermost first (it varies fastest), then emit them outer-to-inner.
     std::vector<int64_t> subs(ndim - 1);
     for (size_t d = ndim - 1; d >= 1; --d) {
-      subs[d - 1] = static_cast<int64_t>(los[d]) +
-                    static_cast<int64_t>(flat % sizes[d]);
+      subs[d - 1] =
+          static_cast<int64_t>(los[d]) + static_cast<int64_t>(flat % sizes[d]);
       flat /= sizes[d];
     }
     for (size_t d = 1; d < ndim; ++d) {
@@ -1740,7 +1749,8 @@ static void DoMemLoad(SimContext& ctx, Arena& arena, bool is_hex,
              mn->base != nullptr && mn->base->kind == ExprKind::kIdentifier) {
     base_id = mn->base;
     is_slice = true;
-    int64_t a = static_cast<int64_t>(EvalExpr(mn->index, ctx, arena).ToUint64());
+    int64_t a =
+        static_cast<int64_t>(EvalExpr(mn->index, ctx, arena).ToUint64());
     int64_t b =
         static_cast<int64_t>(EvalExpr(mn->index_end, ctx, arena).ToUint64());
     slice_lo = std::min(a, b);
@@ -1787,8 +1797,8 @@ static void DoMemLoad(SimContext& ctx, Arena& arena, bool is_hex,
 
   // §21.4.3: a memory with more than one unpacked dimension is filled in
   // row-major order, with @-addresses naming highest-dimension words. (A slice
-  // memory_name resolves to a single lower dimension, see §7.4.5, and is handled
-  // by the single-dimension path below.)
+  // memory_name resolves to a single lower dimension, see §7.4.5, and is
+  // handled by the single-dimension path below.)
   if (!is_slice && ai->dim_sizes.size() >= 2) {
     EvalReadmemMultiDim(ctx, arena, is_hex, content, mem_name, ai,
                         !ai->is_4state, enum_info);
@@ -1801,14 +1811,13 @@ static void DoMemLoad(SimContext& ctx, Arena& arena, bool is_hex,
   int64_t low_addr = is_slice ? std::max(slice_lo, arr_lo) : arr_lo;
   int64_t high_addr = is_slice ? std::min(slice_hi, arr_hi) : arr_hi;
 
-  EvalReadmemIndexed(ctx, arena, is_hex, content, low_addr, high_addr, is_slice,
-                     ai->elem_width, !ai->is_4state, enum_info, has_start,
-                     has_finish, start_arg, finish_arg,
-                     [&](int64_t addr, const Logic4Vec& v) {
-                       std::string elem =
-                           mem_name + "[" + std::to_string(addr) + "]";
-                       if (auto* var = ctx.FindVariable(elem)) var->value = v;
-                     });
+  EvalReadmemIndexed(
+      ctx, arena, is_hex, content, low_addr, high_addr, is_slice,
+      ai->elem_width, !ai->is_4state, enum_info, has_start, has_finish,
+      start_arg, finish_arg, [&](int64_t addr, const Logic4Vec& v) {
+        std::string elem = mem_name + "[" + std::to_string(addr) + "]";
+        if (auto* var = ctx.FindVariable(elem)) var->value = v;
+      });
 }
 
 // §21.4: $readmemb / $readmemh read a text file of white space, comments, and
@@ -1824,9 +1833,8 @@ static Logic4Vec EvalReadmem(const Expr* expr, SimContext& ctx, Arena& arena,
 
   std::ifstream ifs(filename);
   if (!ifs.is_open()) {
-    ctx.GetDiag().Warning(
-        {}, "$readmem" + std::string(is_hex ? "h" : "b") +
-                ": cannot open file: " + filename);
+    ctx.GetDiag().Warning({}, "$readmem" + std::string(is_hex ? "h" : "b") +
+                                  ": cannot open file: " + filename);
     return MakeLogic4VecVal(arena, 1, 0);
   }
   std::string content((std::istreambuf_iterator<char>(ifs)),
@@ -1935,13 +1943,13 @@ static Logic4Vec EvalWritemem(const Expr* expr, SimContext& ctx, Arena& arena,
     bool has_start = expr->args.size() >= 3;
     bool has_finish = expr->args.size() >= 4;
     int64_t start_addr =
-        has_start
-            ? static_cast<int64_t>(EvalExpr(expr->args[2], ctx, arena).ToUint64())
-            : arr_lo;
+        has_start ? static_cast<int64_t>(
+                        EvalExpr(expr->args[2], ctx, arena).ToUint64())
+                  : arr_lo;
     int64_t finish_addr =
-        has_finish
-            ? static_cast<int64_t>(EvalExpr(expr->args[3], ctx, arena).ToUint64())
-            : arr_hi;
+        has_finish ? static_cast<int64_t>(
+                         EvalExpr(expr->args[3], ctx, arena).ToUint64())
+                   : arr_hi;
     if (arr_hi < arr_lo) return MakeLogic4VecVal(arena, 1, 0);
     int64_t step = (start_addr <= finish_addr) ? 1 : -1;
     for (int64_t addr = start_addr;; addr += step) {
@@ -1961,13 +1969,13 @@ static Logic4Vec EvalWritemem(const Expr* expr, SimContext& ctx, Arena& arena,
     bool has_start = expr->args.size() >= 3;
     bool has_finish = expr->args.size() >= 4;
     int64_t start_addr =
-        has_start
-            ? static_cast<int64_t>(EvalExpr(expr->args[2], ctx, arena).ToUint64())
-            : arr_lo;
+        has_start ? static_cast<int64_t>(
+                        EvalExpr(expr->args[2], ctx, arena).ToUint64())
+                  : arr_lo;
     int64_t finish_addr =
-        has_finish
-            ? static_cast<int64_t>(EvalExpr(expr->args[3], ctx, arena).ToUint64())
-            : arr_hi;
+        has_finish ? static_cast<int64_t>(
+                         EvalExpr(expr->args[3], ctx, arena).ToUint64())
+                   : arr_hi;
     int64_t step = (start_addr <= finish_addr) ? 1 : -1;
     for (int64_t addr = start_addr;; addr += step) {
       if (addr >= arr_lo && addr <= arr_hi) {
@@ -1987,8 +1995,8 @@ static Logic4Vec EvalWritemem(const Expr* expr, SimContext& ctx, Arena& arena,
 // §21.3.4.3: integer conversion codes are case-insensitive (%d or %D, etc.).
 // Returns the numeric base, or 0 for a code not treated as an integer field.
 static int SpecToBase(char spec) {
-  char c = (spec >= 'A' && spec <= 'Z') ? static_cast<char>(spec - 'A' + 'a')
-                                        : spec;
+  char c =
+      (spec >= 'A' && spec <= 'Z') ? static_cast<char>(spec - 'A' + 'a') : spec;
   if (c == 'd') return 10;
   if (c == 'h' || c == 'x') return 16;
   if (c == 'b') return 2;
@@ -2053,8 +2061,8 @@ static Logic4Vec ScanStringToVec(Arena& arena, const std::string& str,
     uint32_t word = (byte_idx * 8) / 64;
     uint32_t bit = (byte_idx * 8) % 64;
     if (word < vec.nwords) {
-      vec.words[word].aval |= static_cast<uint64_t>(static_cast<uint8_t>(str[i]))
-                              << bit;
+      vec.words[word].aval |=
+          static_cast<uint64_t>(static_cast<uint8_t>(str[i])) << bit;
     }
   }
   return vec;
@@ -2271,8 +2279,8 @@ static Logic4Vec EvalSscanf(const Expr* expr, SimContext& ctx, Arena& arena) {
 
 namespace {
 
-// §20.16, Table 20-12: a PLA task is named $<array_type>$<logic>$<format>. These
-// are the decoded components that drive evaluation.
+// §20.16, Table 20-12: a PLA task is named $<array_type>$<logic>$<format>.
+// These are the decoded components that drive evaluation.
 struct PlaTaskKind {
   bool valid = false;
   bool is_async = false;  // §20.16.1: asynchronous vs synchronous array
@@ -2373,7 +2381,8 @@ Logic4Word PlaReduceWord(const PlaTaskKind& k, const Logic4Vec& mem_word,
         // x: take the worst case of the input value - contribute an unknown.
         term = Logic4Word{0, 1};
       } else {
-        // z (and the equivalent ?): do-not-care, the input does not participate.
+        // z (and the equivalent ?): do-not-care, the input does not
+        // participate.
         participates = false;
       }
     } else {
@@ -2422,8 +2431,7 @@ void EvaluatePla(const Expr* call, const PlaTaskKind& k, SimContext& ctx,
 
 // Gathers the simple signal names referenced anywhere in the input-terms
 // argument, so the asynchronous forms can watch each one for changes.
-void CollectPlaInputSignals(const Expr* e,
-                            std::vector<std::string_view>& out) {
+void CollectPlaInputSignals(const Expr* e, std::vector<std::string_view>& out) {
   if (!e) return;
   if (e->kind == ExprKind::kIdentifier) {
     out.push_back(e->text);
@@ -2502,4 +2510,4 @@ Logic4Vec EvalIOSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
   return MakeLogic4VecVal(arena, 1, 0);
 }
 
-}
+}  // namespace delta

@@ -100,4 +100,4 @@ TEST(TimescaleSystemFunctions, ReturnValueWithinTableRange) {
   EXPECT_GE(prec, -15);
 }
 
-}
+}  // namespace

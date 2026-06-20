@@ -103,4 +103,4 @@ TEST(CaseMatchesItemParsing, CaseMatchesCommaSeparatedPatterns) {
   EXPECT_EQ(stmt->case_items[0].patterns.size(), 3u);
 }
 
-}
+}  // namespace

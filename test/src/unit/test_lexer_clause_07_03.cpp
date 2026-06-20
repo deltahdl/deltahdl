@@ -48,4 +48,4 @@ TEST(UnionKeywords, TaggedUnionTokenSequence) {
   EXPECT_EQ(tokens[3].kind, TokenKind::kKwVoid);
 }
 
-}
+}  // namespace

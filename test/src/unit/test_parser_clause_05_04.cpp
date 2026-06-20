@@ -126,4 +126,4 @@ TEST(LexicalConventionParsing, CommentsInPackageDeclaration) {
               "endpackage /* end */\n"));
 }
 
-}
+}  // namespace

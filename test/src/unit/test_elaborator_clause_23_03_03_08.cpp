@@ -32,8 +32,7 @@ TEST(SignedValuesViaPortsElaboration,
              "endmodule\n"));
 }
 
-TEST(SignedValuesViaPortsElaboration,
-     BothSidesSignedElaborates) {
+TEST(SignedValuesViaPortsElaboration, BothSidesSignedElaborates) {
   EXPECT_TRUE(
       ElabOk("module child(input logic signed [7:0] a,\n"
              "             output logic signed [7:0] b);\n"
@@ -46,8 +45,7 @@ TEST(SignedValuesViaPortsElaboration,
              "endmodule\n"));
 }
 
-TEST(SignedValuesViaPortsElaboration,
-     PortSignednessReflectsOwnDeclaration) {
+TEST(SignedValuesViaPortsElaboration, PortSignednessReflectsOwnDeclaration) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module child(input logic signed [7:0] a, output logic [7:0] b);\n"
@@ -82,8 +80,7 @@ TEST(SignedValuesViaPortsElaboration,
              "endmodule\n"));
 }
 
-TEST(SignedValuesViaPortsElaboration,
-     ExpressionOnPortConnectionElaborates) {
+TEST(SignedValuesViaPortsElaboration, ExpressionOnPortConnectionElaborates) {
   EXPECT_TRUE(
       ElabOk("module child(input logic [7:0] a, output logic [7:0] b);\n"
              "  assign b = a;\n"
@@ -96,4 +93,4 @@ TEST(SignedValuesViaPortsElaboration,
              "endmodule\n"));
 }
 
-}
+}  // namespace

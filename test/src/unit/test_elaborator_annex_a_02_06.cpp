@@ -20,48 +20,48 @@ TEST(FunctionDeclElaboration, FunctionDeclAddedToModule) {
 }
 
 TEST(FunctionDeclElaboration, FunctionDeclVoidReturn) {
-  EXPECT_TRUE(ElabOk(
-      "module m;\n"
-      "  function void f(); endfunction\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  function void f(); endfunction\n"
+             "endmodule\n"));
 }
 
 TEST(FunctionDeclElaboration, FunctionImplicitReturnType) {
-  EXPECT_TRUE(ElabOk(
-      "module m;\n"
-      "  function [7:0] f(); return 8'hFF; endfunction\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  function [7:0] f(); return 8'hFF; endfunction\n"
+             "endmodule\n"));
 }
 
 TEST(FunctionDeclElaboration, FunctionOldStylePorts) {
-  EXPECT_TRUE(ElabOk(
-      "module m;\n"
-      "  function int f;\n"
-      "    input int a;\n"
-      "    f = a + 1;\n"
-      "  endfunction\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  function int f;\n"
+             "    input int a;\n"
+             "    f = a + 1;\n"
+             "  endfunction\n"
+             "endmodule\n"));
 }
 
 TEST(FunctionDeclElaboration, DpiImportPureElaborates) {
-  EXPECT_TRUE(ElabOk(
-      "module m;\n"
-      "  import \"DPI-C\" pure function int pure_func(int x);\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  import \"DPI-C\" pure function int pure_func(int x);\n"
+             "endmodule\n"));
 }
 
 TEST(FunctionDeclElaboration, DpiImportContextElaborates) {
-  EXPECT_TRUE(ElabOk(
-      "module m;\n"
-      "  import \"DPI-C\" context function void ctx_func();\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  import \"DPI-C\" context function void ctx_func();\n"
+             "endmodule\n"));
 }
 
 TEST(FunctionDeclElaboration, DpiImportTaskContextElaborates) {
-  EXPECT_TRUE(ElabOk(
-      "module m;\n"
-      "  import \"DPI-C\" context task ctx_task();\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  import \"DPI-C\" context task ctx_task();\n"
+             "endmodule\n"));
 }
 
 TEST(FunctionDeclElaboration, MultipleFunctionsElaborate) {
@@ -78,4 +78,4 @@ TEST(FunctionDeclElaboration, MultipleFunctionsElaborate) {
   EXPECT_GE(mod->function_decls.size(), 2u);
 }
 
-}
+}  // namespace

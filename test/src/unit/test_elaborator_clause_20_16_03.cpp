@@ -96,8 +96,8 @@ TEST(PlaAscendingOrder, EqualBoundRangeIsAccepted) {
 }
 
 // §20.16.3: terms given as a concatenation of scalars carry no declared range,
-// so the structural check leaves them alone — the ascending-order requirement on
-// the listing order is the modeler's responsibility, not a range violation.
+// so the structural check leaves them alone — the ascending-order requirement
+// on the listing order is the modeler's responsibility, not a range violation.
 TEST(PlaAscendingOrder, ConcatenatedScalarTermsAreNotRangeChecked) {
   ElabFixture f;
   Elaborate(
@@ -111,9 +111,9 @@ TEST(PlaAscendingOrder, ConcatenatedScalarTermsAreNotRangeChecked) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §20.16.3, scoped against §20.16's task table: the ascending-order rule applies
-// only to recognized PLA tasks. A descending memory passed to a name that is not
-// one of the enumerated tasks raises no ascending-order error.
+// §20.16.3, scoped against §20.16's task table: the ascending-order rule
+// applies only to recognized PLA tasks. A descending memory passed to a name
+// that is not one of the enumerated tasks raises no ascending-order error.
 TEST(PlaAscendingOrder, NonPlaTaskNameIsNotRangeChecked) {
   ElabFixture f;
   Elaborate(

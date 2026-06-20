@@ -35,4 +35,4 @@ TEST(DeclarationAssignmentParsing, NetDeclAssignmentDimsAndInit) {
   EXPECT_GE(item->unpacked_dims.size(), 1u);
 }
 
-}
+}  // namespace

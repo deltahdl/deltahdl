@@ -89,4 +89,4 @@ TEST(SystemNamePreprocessor, SystemIdNotConfusedWithDirective) {
   EXPECT_NE(result.find("$display"), std::string::npos);
 }
 
-}
+}  // namespace

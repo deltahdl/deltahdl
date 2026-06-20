@@ -82,4 +82,4 @@ TEST(TaggedUnionExprParsing, TaggedWithAssignmentPatternPrimary) {
   EXPECT_EQ(rhs->lhs->kind, ExprKind::kAssignmentPattern);
 }
 
-}
+}  // namespace

@@ -156,7 +156,8 @@ TEST(Coverage, InstanceOptionSyntacticLevels) {
        {InstanceOptionKind::kAutoBinMax, InstanceOptionKind::kDetectOverlap}) {
     EXPECT_TRUE(
         CoverageDB::OptionAllowedAt(kind, CoverSyntacticLevel::kCoverpoint));
-    EXPECT_FALSE(CoverageDB::OptionAllowedAt(kind, CoverSyntacticLevel::kCross));
+    EXPECT_FALSE(
+        CoverageDB::OptionAllowedAt(kind, CoverSyntacticLevel::kCross));
   }
 
   // cross_num_print_missing and cross_retain_auto_bins: cross yes, coverpoint
@@ -174,7 +175,8 @@ TEST(Coverage, InstanceOptionSyntacticLevels) {
         InstanceOptionKind::kGetInstCoverage}) {
     EXPECT_FALSE(
         CoverageDB::OptionAllowedAt(kind, CoverSyntacticLevel::kCoverpoint));
-    EXPECT_FALSE(CoverageDB::OptionAllowedAt(kind, CoverSyntacticLevel::kCross));
+    EXPECT_FALSE(
+        CoverageDB::OptionAllowedAt(kind, CoverSyntacticLevel::kCross));
   }
 }
 
@@ -219,4 +221,4 @@ TEST(Coverage, InstanceOptionProceduralSettability) {
   }
 }
 
-}
+}  // namespace

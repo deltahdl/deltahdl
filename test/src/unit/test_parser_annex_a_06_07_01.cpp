@@ -398,4 +398,4 @@ TEST(AssignmentPatternLvalueParsing, VariableLvalueInProceduralAssign) {
   EXPECT_EQ(stmt->lhs->kind, ExprKind::kAssignmentPattern);
 }
 
-}
+}  // namespace

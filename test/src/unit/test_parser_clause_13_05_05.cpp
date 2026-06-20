@@ -86,4 +86,4 @@ TEST(SubroutineCallSyntaxParsing, ClassMethodAllDefaultsWithoutParens) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

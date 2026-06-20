@@ -31,17 +31,17 @@ uint64_t RunModule(SimFixture& f, const char* src, std::string_view var) {
 TEST(RandsequenceSim, RepeatProduction) {
   SimFixture f;
   uint64_t x = RunModule(f,
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial begin\n"
-      "    x = 8'd0;\n"
-      "    randsequence(main)\n"
-      "      main : repeat(3) inc;\n"
-      "      inc : { x = x + 8'd1; };\n"
-      "    endsequence\n"
-      "  end\n"
-      "endmodule\n",
-      "x");
+                         "module t;\n"
+                         "  logic [7:0] x;\n"
+                         "  initial begin\n"
+                         "    x = 8'd0;\n"
+                         "    randsequence(main)\n"
+                         "      main : repeat(3) inc;\n"
+                         "      inc : { x = x + 8'd1; };\n"
+                         "    endsequence\n"
+                         "  end\n"
+                         "endmodule\n",
+                         "x");
   EXPECT_EQ(x, 3u);
 }
 
@@ -50,20 +50,20 @@ TEST(RandsequenceSim, RepeatProduction) {
 TEST(RandsequenceSim, RepeatZeroCountGeneratesNothing) {
   SimFixture f;
   uint64_t x = RunModule(f,
-      "module t;\n"
-      "  int x;\n"
-      "  initial begin\n"
-      "    x = 0;\n"
-      "    randsequence(main)\n"
-      "      main : pre repeated post;\n"
-      "      pre      : { x = 1; };\n"
-      "      repeated : repeat(0) bump;\n"
-      "      bump     : { x = x + 100; };\n"
-      "      post     : { x = x + 10; };\n"
-      "    endsequence\n"
-      "  end\n"
-      "endmodule\n",
-      "x");
+                         "module t;\n"
+                         "  int x;\n"
+                         "  initial begin\n"
+                         "    x = 0;\n"
+                         "    randsequence(main)\n"
+                         "      main : pre repeated post;\n"
+                         "      pre      : { x = 1; };\n"
+                         "      repeated : repeat(0) bump;\n"
+                         "      bump     : { x = x + 100; };\n"
+                         "      post     : { x = x + 10; };\n"
+                         "    endsequence\n"
+                         "  end\n"
+                         "endmodule\n",
+                         "x");
   // pre sets 1, the repeated production runs bump zero times, post adds 10.
   EXPECT_EQ(x, 11u);
 }
@@ -73,19 +73,19 @@ TEST(RandsequenceSim, RepeatZeroCountGeneratesNothing) {
 TEST(RandsequenceSim, RepeatCountFromExpression) {
   SimFixture f;
   uint64_t x = RunModule(f,
-      "module t;\n"
-      "  int x;\n"
-      "  int n;\n"
-      "  initial begin\n"
-      "    x = 0;\n"
-      "    n = 4;\n"
-      "    randsequence(main)\n"
-      "      main : repeat(n + 1) inc;\n"
-      "      inc  : { x = x + 1; };\n"
-      "    endsequence\n"
-      "  end\n"
-      "endmodule\n",
-      "x");
+                         "module t;\n"
+                         "  int x;\n"
+                         "  int n;\n"
+                         "  initial begin\n"
+                         "    x = 0;\n"
+                         "    n = 4;\n"
+                         "    randsequence(main)\n"
+                         "      main : repeat(n + 1) inc;\n"
+                         "      inc  : { x = x + 1; };\n"
+                         "    endsequence\n"
+                         "  end\n"
+                         "endmodule\n",
+                         "x");
   // n + 1 == 5 generations of inc.
   EXPECT_EQ(x, 5u);
 }
@@ -126,4 +126,4 @@ TEST(RandsequenceSim, RepeatBreakTerminatesEntireRandsequence) {
   EXPECT_EQ(vy->value.ToUint64(), 0u);
 }
 
-}
+}  // namespace

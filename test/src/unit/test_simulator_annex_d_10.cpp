@@ -130,4 +130,4 @@ TEST(OptionalScaleSim, MissingArgumentYieldsZero) {
   EXPECT_EQ(EvalExpr(call, f.ctx, f.arena).ToUint64(), 0u);
 }
 
-}
+}  // namespace

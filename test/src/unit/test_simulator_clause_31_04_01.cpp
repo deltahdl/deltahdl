@@ -86,4 +86,4 @@ TEST(SkewTimingCheckWindow, OtherKindsAreIgnored) {
   EXPECT_FALSE(mgr.CheckSkewViolation("clk1", 100, "clk2", 200));
 }
 
-}
+}  // namespace

@@ -193,4 +193,4 @@ TEST(SvDpi, PartSelectWidthOutOfRangeIsNoOp) {
   EXPECT_EQ(putdst, 0x12345678u);
 }
 
-}
+}  // namespace

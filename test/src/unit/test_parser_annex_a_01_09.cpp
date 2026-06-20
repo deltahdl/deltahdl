@@ -115,7 +115,8 @@ TEST(ClassItems, ClassItemWithAttributeInstance) {
 
 // --- class_property ----------------------------------------------------------
 // class_property's second alternative:
-//   const {class_item_qualifier} data_type const_identifier [= constant_expression] ;
+//   const {class_item_qualifier} data_type const_identifier [=
+//   constant_expression] ;
 TEST(ClassItems, ClassPropertyConstForm) {
   auto r = Parse(
       "class C;\n"
@@ -273,7 +274,8 @@ TEST(ClassItems, ClassMethodPureVirtualPrototype) {
 }
 
 // class_method's 'extern {method_qualifier} method_prototype ;' alternative —
-// covers both method_prototype branches (function_prototype and task_prototype).
+// covers both method_prototype branches (function_prototype and
+// task_prototype).
 TEST(ClassItems, ClassMethodExternPrototypes) {
   auto r = Parse(
       "class C;\n"
@@ -293,8 +295,8 @@ TEST(ClassItems, ClassMethodExternPrototypes) {
 }
 
 // --- class_constructor_declaration -------------------------------------------
-// class_constructor_declaration: 'function new (...) ; ... [super.new(...);] ...
-// endfunction'. The constructor's name is recognized as "new".
+// class_constructor_declaration: 'function new (...) ; ... [super.new(...);]
+// ... endfunction'. The constructor's name is recognized as "new".
 TEST(ClassItems, ClassConstructorDeclaration) {
   auto r = Parse(
       "class C;\n"
@@ -369,7 +371,8 @@ TEST(ClassItems, ClassConstructorClassScope) {
 
 // --- class_constructor_prototype ---------------------------------------------
 // class_method's 'extern {method_qualifier} class_constructor_prototype' form:
-//   class_constructor_prototype ::= function new [( [class_constructor_arg_list] )] ;
+//   class_constructor_prototype ::= function new [(
+//   [class_constructor_arg_list] )] ;
 TEST(ClassItems, ClassConstructorPrototype) {
   auto r = Parse(
       "class C;\n"
@@ -385,10 +388,10 @@ TEST(ClassItems, ClassConstructorPrototype) {
 }
 
 // --- class_constructor_arg_list / class_constructor_arg ----------------------
-// class_constructor_arg_list ::= class_constructor_arg { , class_constructor_arg }
-// class_constructor_arg ::= tf_port_item | default
-// The constructor argument list accepts several ordinary port items together
-// with the 'default' keyword argument.
+// class_constructor_arg_list ::= class_constructor_arg { ,
+// class_constructor_arg } class_constructor_arg ::= tf_port_item | default The
+// constructor argument list accepts several ordinary port items together with
+// the 'default' keyword argument.
 TEST(ClassItems, ConstructorArgListWithDefaultArg) {
   auto r = Parse(
       "class C;\n"

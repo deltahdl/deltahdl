@@ -236,7 +236,7 @@ void AppendJsonNetnames(std::string& out, const AigGraph& aig,
   }
 }
 
-}
+}  // namespace
 
 std::string NetlistWriter::WriteBlif(const AigGraph& aig,
                                      std::string_view module_name) {
@@ -413,4 +413,4 @@ std::string NetlistWriter::Write(const AigGraph& aig,
   return "";
 }
 
-}
+}  // namespace delta

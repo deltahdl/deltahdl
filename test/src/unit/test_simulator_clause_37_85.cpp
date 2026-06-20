@@ -12,7 +12,8 @@ namespace {
 // claims this pass carries through production code and observes here are:
 //   * the gen scope array's -> size property (vpiSize), governed by detail 1:
 //     the size is the number of elements (gen scopes) in the array;
-//   * the gen scope array's -> access by index, drawn with vpi_handle_by_index()
+//   * the gen scope array's -> access by index, drawn with
+//   vpi_handle_by_index()
 //     / vpi_handle_by_multi_index(): a gen scope array is a valid index-select
 //     reference object whose indices select its gen scope elements;
 //   * the gen scope's vpiIndex -> expr edge: an array-member gen scope reaches
@@ -20,18 +21,20 @@ namespace {
 //   * the gen scope's -> is implicitly declared property (vpiImplicitDecl),
 //     governed by detail 2: the implicit scope created for an unnamed generate
 //     reports TRUE.
-// Every other relation in the diagram (vpiInstance, vpiInternalScope, vpiMemory,
-// vpiParameter, vpiTypedef, vpiNetTypedef, the names, and the deprecated
-// vpiArray/vpiArrayMember/vpiProtected booleans) is served by generic scope,
-// instance, typedef, and property machinery owned by §37.10, §37.12, §37.23, and
-// §37.25, so it is not re-tested here. Details 3 and 4 (gen var references and
-// parameters within a gen scope are treated as local parameters) describe
-// elaboration semantics with no §37.85-specific VPI query, and details 5 and 6
-// (the vpiTypedef/vpiNetTypedef iterations) restate the instance rule already
-// implemented for §37.10, so neither adds production for this clause.
+// Every other relation in the diagram (vpiInstance, vpiInternalScope,
+// vpiMemory, vpiParameter, vpiTypedef, vpiNetTypedef, the names, and the
+// deprecated vpiArray/vpiArrayMember/vpiProtected booleans) is served by
+// generic scope, instance, typedef, and property machinery owned by §37.10,
+// §37.12, §37.23, and §37.25, so it is not re-tested here. Details 3 and 4 (gen
+// var references and parameters within a gen scope are treated as local
+// parameters) describe elaboration semantics with no §37.85-specific VPI query,
+// and details 5 and 6 (the vpiTypedef/vpiNetTypedef iterations) restate the
+// instance rule already implemented for §37.10, so neither adds production for
+// this clause.
 //
 // The fixture installs a context so the public vpi_get, vpi_handle, and
-// vpi_handle_by_index entry points run their real dispatch over the test objects.
+// vpi_handle_by_index entry points run their real dispatch over the test
+// objects.
 class Generates : public ::testing::Test {
  protected:
   void SetUp() override { SetGlobalVpiContext(&ctx_); }
@@ -71,9 +74,9 @@ TEST_F(Generates, SizeIsZeroForEmptyGenScopeArray) {
   EXPECT_EQ(vpi_get(vpiSize, &array), 0);
 }
 
-// Edge (-> access by index, vpi_handle_by_index()): a gen scope array is a valid
-// index-select reference object, and its indices select its gen scope elements.
-// An index that names no element yields a null handle.
+// Edge (-> access by index, vpi_handle_by_index()): a gen scope array is a
+// valid index-select reference object, and its indices select its gen scope
+// elements. An index that names no element yields a null handle.
 TEST_F(Generates, ElementsAccessedByIndex) {
   VpiObject elem0;
   elem0.type = vpiGenScope;
@@ -141,9 +144,9 @@ TEST_F(Generates, IndexIsNullWhenGenScopeIsNotAnArrayMember) {
 }
 
 // Property (-> is implicitly declared, bool: vpiImplicitDecl), detail 2: the
-// implicit scope created for an unnamed generate reports TRUE, while a gen scope
-// that was explicitly named reports FALSE - so the property reflects the scope's
-// own flag rather than a fixed value.
+// implicit scope created for an unnamed generate reports TRUE, while a gen
+// scope that was explicitly named reports FALSE - so the property reflects the
+// scope's own flag rather than a fixed value.
 TEST_F(Generates, ImplicitlyDeclaredScopeReportsTrue) {
   VpiObject implicit_scope;
   implicit_scope.type = vpiGenScope;

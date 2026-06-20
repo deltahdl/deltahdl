@@ -579,4 +579,4 @@ TEST(PackedStructParsing, UnpackedUnsignedStruct_Rejected) {
   EXPECT_TRUE(r.has_errors);
 }
 
-}
+}  // namespace

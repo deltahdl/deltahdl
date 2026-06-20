@@ -8,22 +8,22 @@
 namespace delta {
 namespace {
 
-// §21.7.5 ("VCD SystemVerilog type mappings") states that SystemVerilog does not
-// extend the IEEE Std 1364-2005 VCD format: a SystemVerilog data type is dumped
-// by masquerading as a 1364-2005 type. Table 21-11 gives the mapping used to
-// pick the var_type keyword and size written in each $var declaration. These
-// tests drive the VcdWriter that emits the file (the output stage) and observe
-// the declaration line produced for each data type.
+// §21.7.5 ("VCD SystemVerilog type mappings") states that SystemVerilog does
+// not extend the IEEE Std 1364-2005 VCD format: a SystemVerilog data type is
+// dumped by masquerading as a 1364-2005 type. Table 21-11 gives the mapping
+// used to pick the var_type keyword and size written in each $var declaration.
+// These tests drive the VcdWriter that emits the file (the output stage) and
+// observe the declaration line produced for each data type.
 //
 // Two requirements of §21.7.5 are not exercised here because the simulator's
 // runtime carries no information for the output stage to act on:
 //   - A typed enum is dumped as its specified base type rather than the default
 //     integer/32. Resolving an enum to its base type is an elaboration-time
-//     decision; the writer faithfully dumps whichever resolved type it is given,
-//     so the only enum-specific behavior at the output stage is the default
-//     (kEnum -> integer/32), covered below. A typed enum is dumped exactly like
-//     a plain variable of its base type, with no writer code distinct from that
-//     base type's mapping.
+//     decision; the writer faithfully dumps whichever resolved type it is
+//     given, so the only enum-specific behavior at the output stage is the
+//     default (kEnum -> integer/32), covered below. A typed enum is dumped
+//     exactly like a plain variable of its base type, with no writer code
+//     distinct from that base type's mapping.
 //   - Unpacked arrays and automatic variables are not dumped. The writer is
 //     handed one resolved object per $var with no tag marking it as an unpacked
 //     array element or an automatic variable, so this omission rule cannot be
@@ -60,22 +60,22 @@ TEST_F(VcdTypeMappingSim, BitAndLogicDumpAsReg) {
   EXPECT_EQ(content.find("$var wire"), std::string::npos);
 }
 
-// Table 21-11: the fixed-width integer types and the default enum each carry the
-// keyword and size fixed by the table, independent of the object's stored width.
-// int -> integer/32, shortint -> reg/16, longint -> reg/64, byte -> reg/8, and
-// an untyped enum -> integer/32. Every object here is registered with a stored
-// width that differs from its table size, so the size written in the declaration
-// can only have come from the table lookup (VcdDataTypeSize) and not from
-// echoing the registered width: if the writer echoed the width, none of these
-// expectations would hold.
+// Table 21-11: the fixed-width integer types and the default enum each carry
+// the keyword and size fixed by the table, independent of the object's stored
+// width. int -> integer/32, shortint -> reg/16, longint -> reg/64, byte ->
+// reg/8, and an untyped enum -> integer/32. Every object here is registered
+// with a stored width that differs from its table size, so the size written in
+// the declaration can only have come from the table lookup (VcdDataTypeSize)
+// and not from echoing the registered width: if the writer echoed the width,
+// none of these expectations would hold.
 TEST_F(VcdTypeMappingSim, FixedWidthIntegerTypesUseTableSizes) {
   {
     VcdWriter vcd(tmp_path_);
     vcd.WriteHeader("1ns");
     vcd.RegisterSignal("myint", 8, MakeVar(arena_, 8), NetType::kWire, -1, -1,
                        VcdDataType::kInt);
-    vcd.RegisterSignal("myshort", 8, MakeVar(arena_, 8), NetType::kWire, -1,
-                       -1, VcdDataType::kShortint);
+    vcd.RegisterSignal("myshort", 8, MakeVar(arena_, 8), NetType::kWire, -1, -1,
+                       VcdDataType::kShortint);
     vcd.RegisterSignal("mylong", 8, MakeVar(arena_, 8), NetType::kWire, -1, -1,
                        VcdDataType::kLongint);
     vcd.RegisterSignal("mybyte", 4, MakeVar(arena_, 4), NetType::kWire, -1, -1,

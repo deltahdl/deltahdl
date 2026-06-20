@@ -16,8 +16,7 @@ TEST(PortConnectionRulesForNetsElaboration,
              "endmodule\n"));
 }
 
-TEST(PortConnectionRulesForNetsElaboration,
-     InputNetPortConnectsToNet) {
+TEST(PortConnectionRulesForNetsElaboration, InputNetPortConnectsToNet) {
   EXPECT_TRUE(
       ElabOk("module child(input wire [7:0] a);\n"
              "endmodule\n"
@@ -27,8 +26,7 @@ TEST(PortConnectionRulesForNetsElaboration,
              "endmodule\n"));
 }
 
-TEST(PortConnectionRulesForNetsElaboration,
-     InputNetPortConnectsToVariable) {
+TEST(PortConnectionRulesForNetsElaboration, InputNetPortConnectsToVariable) {
   EXPECT_TRUE(
       ElabOk("module child(input wire [7:0] a);\n"
              "endmodule\n"
@@ -38,8 +36,7 @@ TEST(PortConnectionRulesForNetsElaboration,
              "endmodule\n"));
 }
 
-TEST(PortConnectionRulesForNetsElaboration,
-     InputNetPortConnectsToLiteral) {
+TEST(PortConnectionRulesForNetsElaboration, InputNetPortConnectsToLiteral) {
   EXPECT_TRUE(
       ElabOk("module child(input wire [7:0] a);\n"
              "endmodule\n"
@@ -48,8 +45,7 @@ TEST(PortConnectionRulesForNetsElaboration,
              "endmodule\n"));
 }
 
-TEST(PortConnectionRulesForNetsElaboration,
-     InputTriPortConnectsToExpression) {
+TEST(PortConnectionRulesForNetsElaboration, InputTriPortConnectsToExpression) {
   EXPECT_TRUE(
       ElabOk("module child(input tri [7:0] a);\n"
              "endmodule\n"
@@ -59,8 +55,7 @@ TEST(PortConnectionRulesForNetsElaboration,
              "endmodule\n"));
 }
 
-TEST(PortConnectionRulesForNetsElaboration,
-     UnconnectedInputNetPortNoError) {
+TEST(PortConnectionRulesForNetsElaboration, UnconnectedInputNetPortNoError) {
   EXPECT_TRUE(
       ElabOk("module child(input wire [7:0] a);\n"
              "endmodule\n"
@@ -80,8 +75,7 @@ TEST(PortConnectionRulesForNetsElaboration,
              "endmodule\n"));
 }
 
-TEST(PortConnectionRulesForNetsElaboration,
-     OutputNetPortConnectsToNet) {
+TEST(PortConnectionRulesForNetsElaboration, OutputNetPortConnectsToNet) {
   EXPECT_TRUE(
       ElabOk("module child(output wire [7:0] y);\n"
              "  assign y = 8'hAB;\n"
@@ -92,8 +86,7 @@ TEST(PortConnectionRulesForNetsElaboration,
              "endmodule\n"));
 }
 
-TEST(PortConnectionRulesForNetsElaboration,
-     OutputNetPortConnectsToVariable) {
+TEST(PortConnectionRulesForNetsElaboration, OutputNetPortConnectsToVariable) {
   EXPECT_TRUE(
       ElabOk("module child(output wire [7:0] y);\n"
              "  assign y = 8'hAB;\n"
@@ -116,8 +109,7 @@ TEST(PortConnectionRulesForNetsElaboration,
              "endmodule\n"));
 }
 
-TEST(PortConnectionRulesForNetsElaboration,
-     OutputTriPortConnectsToNet) {
+TEST(PortConnectionRulesForNetsElaboration, OutputTriPortConnectsToNet) {
   EXPECT_TRUE(
       ElabOk("module child(output tri y);\n"
              "  assign y = 1'b1;\n"
@@ -128,8 +120,7 @@ TEST(PortConnectionRulesForNetsElaboration,
              "endmodule\n"));
 }
 
-TEST(PortConnectionRulesForNetsElaboration,
-     InoutNetPortConnectsToNet) {
+TEST(PortConnectionRulesForNetsElaboration, InoutNetPortConnectsToNet) {
   EXPECT_TRUE(
       ElabOk("module child(inout wire [7:0] a);\n"
              "endmodule\n"
@@ -150,8 +141,7 @@ TEST(PortConnectionRulesForNetsElaboration,
              "endmodule\n"));
 }
 
-TEST(PortConnectionRulesForNetsElaboration,
-     InoutTriPortConnectsToNet) {
+TEST(PortConnectionRulesForNetsElaboration, InoutTriPortConnectsToNet) {
   EXPECT_TRUE(
       ElabOk("module child(inout tri data);\n"
              "endmodule\n"
@@ -171,8 +161,7 @@ TEST(PortConnectionRulesForNetsElaboration,
              "endmodule\n"));
 }
 
-TEST(PortConnectionRulesForNetsElaboration,
-     InoutNetPortOmittedByNameNoError) {
+TEST(PortConnectionRulesForNetsElaboration, InoutNetPortOmittedByNameNoError) {
   EXPECT_TRUE(
       ElabOk("module child(inout wire [7:0] a, input wire b);\n"
              "endmodule\n"
@@ -224,4 +213,4 @@ TEST(PortConnectionRulesForNetsElaboration,
   EXPECT_TRUE(f.has_errors);
 }
 
-}
+}  // namespace

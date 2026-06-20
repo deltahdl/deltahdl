@@ -86,25 +86,24 @@ TEST(LoopStatementSim, ForeverImmediateBreak) {
 // interpreted by ExecFuncForever. accumulate(5) runs the body once per pass,
 // summing 1+2+3+4+5 across five iterations before the return ends the loop.
 TEST(LoopStatementSim, ForeverInFunctionRunsBodyRepeatedly) {
-  EXPECT_EQ(RunAndGet(
-                "module t;\n"
-                "  logic [31:0] result;\n"
-                "  function automatic int accumulate(input int n);\n"
-                "    int i;\n"
-                "    int acc;\n"
-                "    i = 0;\n"
-                "    acc = 0;\n"
-                "    forever begin\n"
-                "      if (i == n) return acc;\n"
-                "      i = i + 1;\n"
-                "      acc = acc + i;\n"
-                "    end\n"
-                "  endfunction\n"
-                "  initial begin\n"
-                "    result = accumulate(5);\n"
-                "  end\n"
-                "endmodule\n",
-                "result"),
+  EXPECT_EQ(RunAndGet("module t;\n"
+                      "  logic [31:0] result;\n"
+                      "  function automatic int accumulate(input int n);\n"
+                      "    int i;\n"
+                      "    int acc;\n"
+                      "    i = 0;\n"
+                      "    acc = 0;\n"
+                      "    forever begin\n"
+                      "      if (i == n) return acc;\n"
+                      "      i = i + 1;\n"
+                      "      acc = acc + i;\n"
+                      "    end\n"
+                      "  endfunction\n"
+                      "  initial begin\n"
+                      "    result = accumulate(5);\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
             15u);
 }
 
@@ -136,4 +135,4 @@ TEST(LoopStatementSim, ForeverWithDelayIteratesAcrossSimTime) {
   EXPECT_EQ(var->value.ToUint64(), 4u);
 }
 
-}
+}  // namespace

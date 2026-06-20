@@ -26,7 +26,8 @@ TEST(SdfPulseLimitAnnotation,
         (CELLTYPE "buf")
         (INSTANCE u1)
         (DELAY (ABSOLUTE (IOPATH A Z (5))))))
-  )", file));
+  )",
+                       file));
   AnnotateSdfToManager(file, mgr, SdfMtm::kTypical);
 
   ASSERT_EQ(mgr.GetPathDelays().size(), 1u);
@@ -39,7 +40,7 @@ TEST(SdfPulseLimitAnnotation,
 TEST(SdfPulseLimitAnnotation,
      CustomPercentagesScaleIopathDelayIntoRejectAndErrorLimits) {
   SpecifyManager mgr;
-  mgr.SetGlobalPulseLimitPercents( 40, 80);
+  mgr.SetGlobalPulseLimitPercents(40, 80);
   PathDelay pre;
   pre.src_port = "A";
   pre.dst_port = "Z";
@@ -54,7 +55,8 @@ TEST(SdfPulseLimitAnnotation,
         (CELLTYPE "buf")
         (INSTANCE u1)
         (DELAY (ABSOLUTE (IOPATH A Z (5))))))
-  )", file));
+  )",
+                       file));
   AnnotateSdfToManager(file, mgr, SdfMtm::kTypical);
 
   ASSERT_EQ(mgr.GetPathDelays().size(), 1u);
@@ -83,7 +85,8 @@ TEST(SdfPulseLimitAnnotation,
         (CELLTYPE "buf")
         (INSTANCE u1)
         (DELAY (ABSOLUTE (IOPATH A Z ((5) () ()))))))
-  )", file));
+  )",
+                       file));
   AnnotateSdfToManager(file, mgr, SdfMtm::kTypical);
 
   ASSERT_EQ(mgr.GetPathDelays().size(), 1u);
@@ -111,7 +114,8 @@ TEST(SdfPulseLimitAnnotation, PathpulseClampsLimitsExceedingDelay) {
         (CELLTYPE "buf")
         (INSTANCE u1)
         (DELAY (ABSOLUTE (PATHPULSE A Z (50) (90))))))
-  )", file));
+  )",
+                       file));
   AnnotateSdfToManager(file, mgr, SdfMtm::kTypical);
 
   ASSERT_EQ(mgr.GetPathDelays().size(), 1u);
@@ -139,7 +143,8 @@ TEST(SdfPulseLimitAnnotation, PathpulseClampsOnlyTheLimitsThatExceedDelay) {
         (CELLTYPE "buf")
         (INSTANCE u1)
         (DELAY (ABSOLUTE (PATHPULSE A Z (20) (90))))))
-  )", file));
+  )",
+                       file));
   AnnotateSdfToManager(file, mgr, SdfMtm::kTypical);
 
   ASSERT_EQ(mgr.GetPathDelays().size(), 1u);
@@ -164,7 +169,8 @@ TEST(SdfPulseLimitAnnotation, PathpulseLeavesPropagationDelaysUntouched) {
         (CELLTYPE "buf")
         (INSTANCE u1)
         (DELAY (ABSOLUTE (PATHPULSE A Z (10) (20))))))
-  )", file));
+  )",
+                       file));
   AnnotateSdfToManager(file, mgr, SdfMtm::kTypical);
 
   ASSERT_EQ(mgr.GetPathDelays().size(), 1u);
@@ -188,15 +194,15 @@ TEST(SdfPulseLimitAnnotation,
         (CELLTYPE "buf")
         (INSTANCE u1)
         (DELAY (ABSOLUTE (PATHPULSEPERCENT A Z (25) (75))))))
-  )", file));
+  )",
+                       file));
   AnnotateSdfToManager(file, mgr, SdfMtm::kTypical);
 
   ASSERT_EQ(mgr.GetPathDelays().size(), 1u);
   EXPECT_EQ(mgr.GetPathDelays()[0].delays[0], 50u);
 }
 
-TEST(SdfPulseLimitAnnotation,
-     IncrementPulseLimitClampsNegativeResultToZero) {
+TEST(SdfPulseLimitAnnotation, IncrementPulseLimitClampsNegativeResultToZero) {
   SpecifyManager mgr;
   PathDelay pre;
   pre.src_port = "A";
@@ -209,8 +215,7 @@ TEST(SdfPulseLimitAnnotation,
   }
   mgr.AddPathDelay(pre);
 
-  mgr.IncrementSdfPulseLimit("A", "Z", -4,
-                             true, -5);
+  mgr.IncrementSdfPulseLimit("A", "Z", -4, true, -5);
 
   ASSERT_EQ(mgr.GetPathDelays().size(), 1u);
   const auto& pd = mgr.GetPathDelays()[0];
@@ -234,8 +239,7 @@ TEST(SdfPulseLimitAnnotation,
   }
   mgr.AddPathDelay(pre);
 
-  mgr.IncrementSdfPulseLimit("A", "Z", -3,
-                             false, 0);
+  mgr.IncrementSdfPulseLimit("A", "Z", -3, false, 0);
 
   ASSERT_EQ(mgr.GetPathDelays().size(), 1u);
   const auto& pd = mgr.GetPathDelays()[0];
@@ -264,7 +268,8 @@ TEST(SdfPulseLimitAnnotation, PathpulseClampsPerSlotAgainstEachSlotsDelay) {
         (CELLTYPE "buf")
         (INSTANCE u1)
         (DELAY (ABSOLUTE (PATHPULSE A Z (50) (60))))))
-  )", file));
+  )",
+                       file));
   AnnotateSdfToManager(file, mgr, SdfMtm::kTypical);
 
   ASSERT_EQ(mgr.GetPathDelays().size(), 1u);
@@ -289,8 +294,7 @@ TEST(SdfPulseLimitAnnotation,
   }
   mgr.AddPathDelay(pre);
 
-  mgr.IncrementSdfPulseLimit("A", "Z", -5,
-                             true, 2);
+  mgr.IncrementSdfPulseLimit("A", "Z", -5, true, 2);
 
   ASSERT_EQ(mgr.GetPathDelays().size(), 1u);
   const auto& pd = mgr.GetPathDelays()[0];
@@ -298,4 +302,4 @@ TEST(SdfPulseLimitAnnotation,
   EXPECT_EQ(pd.error_limit[0], 5u);
 }
 
-}
+}  // namespace

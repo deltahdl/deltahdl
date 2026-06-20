@@ -29,8 +29,8 @@ class VpiReleaseHandleSim : public ::testing::Test {
 
 // Shall (free memory) + returns: releasing a valid handle frees it - it stops
 // being a live handle to its object - and the routine reports success with 1.
-// The release is observable through HandleReleased, which now reports the handle
-// as released where it did not before the call.
+// The release is observable through HandleReleased, which now reports the
+// handle as released where it did not before the call.
 TEST_F(VpiReleaseHandleSim, ReleasesAValidHandleAndReportsSuccess) {
   VpiObject obj;
   obj.type = vpiModule;
@@ -40,9 +40,9 @@ TEST_F(VpiReleaseHandleSim, ReleasesAValidHandleAndReportsSuccess) {
   EXPECT_TRUE(vpi_ctx_.HandleReleased(&obj));
 }
 
-// Shall (not called on an invalid handle): once a handle has been released it is
-// invalid, so a second vpi_release_handle() on it has no live memory to free and
-// fails with 0. The first call succeeds; the repeat reports the failure.
+// Shall (not called on an invalid handle): once a handle has been released it
+// is invalid, so a second vpi_release_handle() on it has no live memory to free
+// and fails with 0. The first call succeeds; the repeat reports the failure.
 TEST_F(VpiReleaseHandleSim, FailsWhenTheHandleIsAlreadyInvalid) {
   VpiObject obj;
   obj.type = vpiModule;
@@ -59,9 +59,10 @@ TEST_F(VpiReleaseHandleSim, FailsOnANullHandle) {
   EXPECT_EQ(vpi_release_handle(nullptr), 0);
 }
 
-// Shall (not called on an invalid handle), destroyed-object edge: a handle whose
-// underlying object has ceased to exist is invalid even though the handle was
-// never released. The routine has no live object to act on, so it fails with 0.
+// Shall (not called on an invalid handle), destroyed-object edge: a handle
+// whose underlying object has ceased to exist is invalid even though the handle
+// was never released. The routine has no live object to act on, so it fails
+// with 0.
 TEST_F(VpiReleaseHandleSim, FailsWhenTheObjectNoLongerExists) {
   VpiObject obj;
   obj.type = vpiModule;
@@ -72,10 +73,10 @@ TEST_F(VpiReleaseHandleSim, FailsWhenTheObjectNoLongerExists) {
 }
 
 // Iterator paragraph: vpi_release_handle() may free the memory of an iterator
-// object. vpi_scan() reclaims an iterator only once a traversal runs to its end;
-// a program that breaks out early - here after a single vpi_scan() - releases
-// the iterator instead, and the routine frees that storage and returns 1. The
-// iterator is produced by the real vpi_iterate path.
+// object. vpi_scan() reclaims an iterator only once a traversal runs to its
+// end; a program that breaks out early - here after a single vpi_scan() -
+// releases the iterator instead, and the routine frees that storage and
+// returns 1. The iterator is produced by the real vpi_iterate path.
 TEST_F(VpiReleaseHandleSim, FreesAnIteratorReleasedBeforeExhaustion) {
   VpiObject first_child;
   first_child.type = vpiModule;

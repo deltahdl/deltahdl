@@ -55,4 +55,4 @@ TEST(AssertionSemanticsParsing, PropertyIfElseIfChain) {
   EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kPropertyDecl));
 }
 
-}
+}  // namespace

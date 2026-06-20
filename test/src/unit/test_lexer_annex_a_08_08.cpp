@@ -149,4 +149,4 @@ TEST(StringLiteralLexing, QuotedStringCarriageReturnTerminatesError) {
   EXPECT_TRUE(LexHasErrors("\"before\rafter\""));
 }
 
-}
+}  // namespace

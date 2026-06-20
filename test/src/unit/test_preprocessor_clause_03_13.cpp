@@ -140,4 +140,4 @@ TEST(NameSpacePreprocessing, TextMacroLaterDefinitionOverridesEarlier) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-}
+}  // namespace

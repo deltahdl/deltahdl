@@ -55,8 +55,8 @@ TEST(TightSatisfactionLocals, ContextDomainAndRestrictions) {
   EXPECT_EQ(ContextDomain(ctx), (NameSet{"v", "w"}));
   EXPECT_TRUE(LocalContextEqual(RestrictContext(ctx, {"v"}),
                                 LocalContext{{"v", A({"x"})}}));
-  EXPECT_TRUE(LocalContextEqual(RemoveName(ctx, "v"),
-                                LocalContext{{"w", A({"y"})}}));
+  EXPECT_TRUE(
+      LocalContextEqual(RemoveName(ctx, "v"), LocalContext{{"w", A({"y"})}}));
   EXPECT_TRUE(LocalContextEqual(RestrictToName(ctx, "w"),
                                 LocalContext{{"w", A({"y"})}}));
   EXPECT_TRUE(LocalContextEqual(RestrictToName(ctx, "absent"), LocalContext{}));
@@ -93,14 +93,14 @@ TEST(TightSatisfactionLocals, SamplingBindsObservedValue) {
   EXPECT_TRUE(SameContexts(
       TightSatisfactionOutputs(Word{A({"x"})}, *Samp("v"), LocalContext{}),
       {LocalContext{{"v", A({"x"})}}}));
-  EXPECT_TRUE(SameContexts(
-      TightSatisfactionOutputs(Word{A({"x"})}, *Samp("v"),
-                               LocalContext{{"w", A({"y"})}}),
-      {LocalContext{{"w", A({"y"})}, {"v", A({"x"})}}}));
-  EXPECT_TRUE(SameContexts(
-      TightSatisfactionOutputs(Word{A({"x"})}, *Samp("v"),
-                               LocalContext{{"v", A({"old"})}}),
-      {LocalContext{{"v", A({"x"})}}}));
+  EXPECT_TRUE(
+      SameContexts(TightSatisfactionOutputs(Word{A({"x"})}, *Samp("v"),
+                                            LocalContext{{"w", A({"y"})}}),
+                   {LocalContext{{"w", A({"y"})}, {"v", A({"x"})}}}));
+  EXPECT_TRUE(
+      SameContexts(TightSatisfactionOutputs(Word{A({"x"})}, *Samp("v"),
+                                            LocalContext{{"v", A({"old"})}}),
+                   {LocalContext{{"v", A({"x"})}}}));
   EXPECT_TRUE(
       TightSatisfactionOutputs(Word{}, *Samp("v"), LocalContext{}).empty());
 }
@@ -114,23 +114,23 @@ TEST(TightSatisfactionLocals, LocalDeclScopesTheDeclaredName) {
       TightSatisfactionOutputs(Word{A({"x"})}, *decl, LocalContext{}),
       {LocalContext{}}));
   // An outer v is restored to its incoming value.
-  EXPECT_TRUE(SameContexts(
-      TightSatisfactionOutputs(Word{A({"x"})}, *decl,
-                               LocalContext{{"v", A({"old"})}}),
-      {LocalContext{{"v", A({"old"})}}}));
+  EXPECT_TRUE(
+      SameContexts(TightSatisfactionOutputs(Word{A({"x"})}, *decl,
+                                            LocalContext{{"v", A({"old"})}}),
+                   {LocalContext{{"v", A({"old"})}}}));
   // A different incoming name survives the declaration unchanged.
-  EXPECT_TRUE(SameContexts(
-      TightSatisfactionOutputs(Word{A({"x"})}, *decl,
-                               LocalContext{{"w", A({"y"})}}),
-      {LocalContext{{"w", A({"y"})}}}));
+  EXPECT_TRUE(
+      SameContexts(TightSatisfactionOutputs(Word{A({"x"})}, *decl,
+                                            LocalContext{{"w", A({"y"})}}),
+                   {LocalContext{{"w", A({"y"})}}}));
 }
 
 // §F.5.5 (R4): w, L_0, L_1 |== (R) iff w, L_0, L_1 |== R.
 TEST(TightSatisfactionLocals, ParenthesisIsTransparent) {
-  EXPECT_TRUE(SameContexts(
-      TightSatisfactionOutputs(Word{A({"x"})}, *SeqParen(Samp("v")),
-                               LocalContext{}),
-      {LocalContext{{"v", A({"x"})}}}));
+  EXPECT_TRUE(
+      SameContexts(TightSatisfactionOutputs(
+                       Word{A({"x"})}, *SeqParen(Samp("v")), LocalContext{}),
+                   {LocalContext{{"v", A({"x"})}}}));
 }
 
 // §F.5.5 (R5): w, L_0, L_1 |== (R1 ##1 R2) threads the context from R1 into R2
@@ -237,8 +237,8 @@ TEST(TightSatisfactionLocals, FourWayPredicateAcceptsOnlyYieldedContexts) {
   EXPECT_FALSE(TightlySatisfiesWithLocals(Word{A({"x"})}, *Samp("v"),
                                           LocalContext{},
                                           LocalContext{{"v", A({"y"})}}));
-  EXPECT_FALSE(TightlySatisfiesWithLocals(
-      Word{A({"x"})}, *Samp("v"), LocalContext{}, LocalContext{}));
+  EXPECT_FALSE(TightlySatisfiesWithLocals(Word{A({"x"})}, *Samp("v"),
+                                          LocalContext{}, LocalContext{}));
 }
 
 // §F.5.5 (C3): every yielded output context has domain flow(dom(L_0), R). Each
@@ -246,19 +246,18 @@ TEST(TightSatisfactionLocals, FourWayPredicateAcceptsOnlyYieldedContexts) {
 TEST(TightSatisfactionLocals, OutputDomainEqualsFlowOfInputDomain) {
   const Letter x = A({"x"});
   const Letter y = A({"y"});
-  const std::vector<std::pair<std::shared_ptr<const SequenceExpr>, Word>>
-      cases{
-          {Samp("v"), Word{x}},
-          {SeqConcat(Samp("v"), Samp("w")), Word{x, y}},
-          {SeqOr(Samp("v"), Samp("w")), Word{x}},
-          {SeqIntersect(Samp("v"), Samp("w")), Word{x}},
-          {SeqLocalVarDecl("int", "v", Samp("v")), Word{x}},
-      };
+  const std::vector<std::pair<std::shared_ptr<const SequenceExpr>, Word>> cases{
+      {Samp("v"), Word{x}},
+      {SeqConcat(Samp("v"), Samp("w")), Word{x, y}},
+      {SeqOr(Samp("v"), Samp("w")), Word{x}},
+      {SeqIntersect(Samp("v"), Samp("w")), Word{x}},
+      {SeqLocalVarDecl("int", "v", Samp("v")), Word{x}},
+  };
   const LocalContext input{{"u", A({"z"})}};
   for (const auto& item : cases) {
     const NameSet expected = FlowLocals(ContextDomain(input), *item.first);
-    const auto outputs = TightSatisfactionOutputs(item.second, *item.first,
-                                                  input);
+    const auto outputs =
+        TightSatisfactionOutputs(item.second, *item.first, input);
     EXPECT_FALSE(outputs.empty());
     for (const LocalContext& out : outputs) {
       EXPECT_EQ(ContextDomain(out), expected);
@@ -299,10 +298,9 @@ TEST(TightSatisfactionLocals, ClockedSequenceMatchesItsUnclockedRewrite) {
 TEST(TightSatisfactionLocals, NondegeneracyReflectsNonemptyMatch) {
   EXPECT_TRUE(IsNondegenerateSequenceWithLocals(*Samp("v")));
   EXPECT_TRUE(IsNondegenerateSequenceWithLocals(*Bool("a")));
-  EXPECT_TRUE(IsNondegenerateSequenceWithLocals(
-      *SeqClock(BoolAtom("clk"), Samp("v"))));
-  auto incompatible =
-      SeqIntersect(Bool("a"), SeqConcat(Bool("a"), Bool("a")));
+  EXPECT_TRUE(
+      IsNondegenerateSequenceWithLocals(*SeqClock(BoolAtom("clk"), Samp("v"))));
+  auto incompatible = SeqIntersect(Bool("a"), SeqConcat(Bool("a"), Bool("a")));
   EXPECT_FALSE(IsNondegenerateSequenceWithLocals(*incompatible));
   EXPECT_FALSE(IsNondegenerateSequenceWithLocals(*SeqNullRepeat(Bool("a"))));
 }
@@ -316,10 +314,9 @@ TEST(TightSatisfactionLocals, SamplingOverUnknownLetterStillBinds) {
   EXPECT_TRUE(SameContexts(
       TightSatisfactionOutputs(Word{LetterTop()}, *Samp("v"), LocalContext{}),
       {LocalContext{{"v", LetterTop()}}}));
-  EXPECT_TRUE(SameContexts(
-      TightSatisfactionOutputs(Word{LetterBottom()}, *Samp("v"),
-                               LocalContext{}),
-      {LocalContext{{"v", LetterBottom()}}}));
+  EXPECT_TRUE(SameContexts(TightSatisfactionOutputs(Word{LetterBottom()},
+                                                    *Samp("v"), LocalContext{}),
+                           {LocalContext{{"v", LetterBottom()}}}));
 }
 
 // §F.5.5 (R3) edge with §F.5 letter semantics: the top letter T satisfies every
@@ -329,9 +326,8 @@ TEST(TightSatisfactionLocals, BooleanMatchesTopRejectsBottom) {
   const LocalContext input{{"w", A({"y"})}};
   EXPECT_TRUE(SameContexts(
       TightSatisfactionOutputs(Word{LetterTop()}, *Bool("a"), input), {input}));
-  EXPECT_TRUE(
-      TightSatisfactionOutputs(Word{LetterBottom()}, *Bool("a"), input)
-          .empty());
+  EXPECT_TRUE(TightSatisfactionOutputs(Word{LetterBottom()}, *Bool("a"), input)
+                  .empty());
 }
 
 // §F.5.5 (R5) boundary: the existential split of (R1 ##1 R2) admits an empty
@@ -347,8 +343,7 @@ TEST(TightSatisfactionLocals, ConcatAdmitsEmptyLeftOperand) {
 // word can never satisfy a fusion.
 TEST(TightSatisfactionLocals, FusionRejectsEmptyWord) {
   auto seq = SeqFusion(Bool("a"), Bool("b"));
-  EXPECT_TRUE(
-      TightSatisfactionOutputs(Word{}, *seq, LocalContext{}).empty());
+  EXPECT_TRUE(TightSatisfactionOutputs(Word{}, *seq, LocalContext{}).empty());
 }
 
 // §F.5.5 (R7) error condition: when neither alternative of (R1 or R2) is
@@ -365,9 +360,9 @@ TEST(TightSatisfactionLocals, IntersectYieldsNothingForIncompatibleLengths) {
   auto seq = SeqIntersect(Bool("a"), SeqConcat(Bool("a"), Bool("a")));
   EXPECT_TRUE(
       TightSatisfactionOutputs(Word{A({"a"})}, *seq, LocalContext{}).empty());
-  EXPECT_TRUE(TightSatisfactionOutputs(Word{A({"a"}), A({"a"})}, *seq,
-                                       LocalContext{})
-                  .empty());
+  EXPECT_TRUE(
+      TightSatisfactionOutputs(Word{A({"a"}), A({"a"})}, *seq, LocalContext{})
+          .empty());
 }
 
 // §F.5.5 (R11) edge: R[*1:$] requires at least one piece (j >= 1), so the empty
@@ -375,8 +370,7 @@ TEST(TightSatisfactionLocals, IntersectYieldsNothingForIncompatibleLengths) {
 // satisfies.
 TEST(TightSatisfactionLocals, UnboundedRepeatRejectsEmptyWord) {
   auto seq = SeqUnboundedRepeat(Bool("a"));
-  EXPECT_TRUE(
-      TightSatisfactionOutputs(Word{}, *seq, LocalContext{}).empty());
+  EXPECT_TRUE(TightSatisfactionOutputs(Word{}, *seq, LocalContext{}).empty());
 }
 
 }  // namespace

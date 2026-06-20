@@ -18,8 +18,8 @@ namespace {
 // (vpiName) is the generic string relation, and the underlying typespec edge is
 // owned by the typespec subclauses (§37.25), so neither is re-tested here.
 
-// Detail 1: a nettype declared without an associated resolution function reports
-// NULL for vpiWith.
+// Detail 1: a nettype declared without an associated resolution function
+// reports NULL for vpiWith.
 TEST(NettypeDeclarationModel, WithIsNullWithoutResolutionFunction) {
   VpiContext ctx;
 

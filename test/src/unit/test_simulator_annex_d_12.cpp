@@ -81,4 +81,4 @@ TEST(OptionalShowScopesSim, FollowsInteractiveScope) {
   EXPECT_EQ(f.ctx.LastShownScope(), "t.blk");
 }
 
-}
+}  // namespace

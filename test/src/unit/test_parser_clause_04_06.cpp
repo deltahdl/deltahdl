@@ -27,4 +27,4 @@ TEST(DeterminismParsing, BlockingAssignOrdering) {
   EXPECT_EQ(body->stmts[2]->kind, StmtKind::kBlockingAssign);
 }
 
-}
+}  // namespace

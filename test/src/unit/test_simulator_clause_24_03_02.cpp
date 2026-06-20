@@ -65,7 +65,8 @@ TEST(ProgramPortConnectionSim, ProgramContinuousAssignDrivesDesignNet) {
 // updated across the region boundary are woken in the active region set. A
 // design always block sensitive to a variable written by a program must wake
 // and observe the program's reactive-region update.
-TEST(ProgramPortConnectionSim, DesignAlwaysSensitiveToProgramWriteObservesUpdate) {
+TEST(ProgramPortConnectionSim,
+     DesignAlwaysSensitiveToProgramWriteObservesUpdate) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module top;\n"
@@ -87,8 +88,8 @@ TEST(ProgramPortConnectionSim, DesignAlwaysSensitiveToProgramWriteObservesUpdate
 
 // §24.3.2: driving and resolution of a net happen right after an event changes
 // a driver on a program net. A design process that samples the resolved net at
-// a later time step must see the value produced by the program's reactive-region
-// drive.
+// a later time step must see the value produced by the program's
+// reactive-region drive.
 TEST(ProgramPortConnectionSim, NetResolutionImmediateOnProgramDriverChange) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -151,7 +152,8 @@ TEST(ProgramPortConnectionSim, MultiIterationLoopProgramAssignDesignAlways) {
 // program-driven value. This exercises the port-binding path (input/output
 // bindings lowered as reactive continuous assigns), not a nested hierarchical
 // reference.
-TEST(ProgramPortConnectionSim, ProgramOutputPortDrivesDesignNetAndWakesDesignAlways) {
+TEST(ProgramPortConnectionSim,
+     ProgramOutputPortDrivesDesignNetAndWakesDesignAlways) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "program p(input din, output dout);\n"
@@ -182,7 +184,8 @@ TEST(ProgramPortConnectionSim, ProgramOutputPortDrivesDesignNetAndWakesDesignAlw
 // The program reads a design value through its input port and drives a design
 // variable through its output port; the final variable value reflects the
 // reactive-region update carried across the port connection.
-TEST(ProgramPortConnectionSim, ProgramOutputPortUpdatesDesignVariableInReactive) {
+TEST(ProgramPortConnectionSim,
+     ProgramOutputPortUpdatesDesignVariableInReactive) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "program p(input [7:0] din, output logic [7:0] dout);\n"

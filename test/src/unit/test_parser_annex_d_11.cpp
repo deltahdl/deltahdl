@@ -25,4 +25,4 @@ TEST(OptionalSystemTaskParserParsing, ScopeHierarchicalArgument) {
   ASSERT_NE(r.cu, nullptr);
 }
 
-}
+}  // namespace

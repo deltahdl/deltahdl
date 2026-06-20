@@ -114,47 +114,49 @@ TEST(OverriddenMemberSimulation, E2eSubclassHandleAssignedToBaseVariable) {
 }
 
 TEST(OverriddenMemberSimulation, E2eBasePropertyAccessThroughBaseHandle) {
-  EXPECT_EQ(RunAndGet(
-      "class Packet;\n"
-      "  integer i = 1;\n"
-      "endclass\n"
-      "class LinkedPacket extends Packet;\n"
-      "  integer i = 2;\n"
-      "endclass\n"
-      "module t;\n"
-      "  int result;\n"
-      "  initial begin\n"
-      "    LinkedPacket lp;\n"
-      "    Packet p;\n"
-      "    lp = new;\n"
-      "    p = lp;\n"
-      "    result = p.i;\n"
-      "  end\n"
-      "endmodule\n", "result"), 1u);
+  EXPECT_EQ(RunAndGet("class Packet;\n"
+                      "  integer i = 1;\n"
+                      "endclass\n"
+                      "class LinkedPacket extends Packet;\n"
+                      "  integer i = 2;\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    LinkedPacket lp;\n"
+                      "    Packet p;\n"
+                      "    lp = new;\n"
+                      "    p = lp;\n"
+                      "    result = p.i;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            1u);
 }
 
 TEST(OverriddenMemberSimulation, E2eBaseMethodAccessThroughBaseHandle) {
-  EXPECT_EQ(RunAndGet(
-      "class Packet;\n"
-      "  function integer get();\n"
-      "    get = 10;\n"
-      "  endfunction\n"
-      "endclass\n"
-      "class LinkedPacket extends Packet;\n"
-      "  function integer get();\n"
-      "    get = 20;\n"
-      "  endfunction\n"
-      "endclass\n"
-      "module t;\n"
-      "  int result;\n"
-      "  initial begin\n"
-      "    LinkedPacket lp;\n"
-      "    Packet p;\n"
-      "    lp = new;\n"
-      "    p = lp;\n"
-      "    result = p.get();\n"
-      "  end\n"
-      "endmodule\n", "result"), 10u);
+  EXPECT_EQ(RunAndGet("class Packet;\n"
+                      "  function integer get();\n"
+                      "    get = 10;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "class LinkedPacket extends Packet;\n"
+                      "  function integer get();\n"
+                      "    get = 20;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    LinkedPacket lp;\n"
+                      "    Packet p;\n"
+                      "    lp = new;\n"
+                      "    p = lp;\n"
+                      "    result = p.get();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            10u);
 }
 
 TEST(OverriddenMemberSimulation, E2eDerivedAccessSeesOverriddenMembers) {
@@ -210,22 +212,23 @@ TEST(OverriddenMemberSimulation, E2eBaseAndDerivedAccessContrast) {
 }
 
 TEST(OverriddenMemberSimulation, E2eNonOverriddenMemberAccessibleThroughBase) {
-  EXPECT_EQ(RunAndGet(
-      "class Packet;\n"
-      "  integer x = 5;\n"
-      "endclass\n"
-      "class LinkedPacket extends Packet;\n"
-      "endclass\n"
-      "module t;\n"
-      "  int result;\n"
-      "  initial begin\n"
-      "    LinkedPacket lp;\n"
-      "    Packet p;\n"
-      "    lp = new;\n"
-      "    p = lp;\n"
-      "    result = p.x;\n"
-      "  end\n"
-      "endmodule\n", "result"), 5u);
+  EXPECT_EQ(RunAndGet("class Packet;\n"
+                      "  integer x = 5;\n"
+                      "endclass\n"
+                      "class LinkedPacket extends Packet;\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    LinkedPacket lp;\n"
+                      "    Packet p;\n"
+                      "    lp = new;\n"
+                      "    p = lp;\n"
+                      "    result = p.x;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            5u);
 }
 
 // §8.14: a non-virtual method reference is bound by the handle's declared type.
@@ -317,4 +320,4 @@ TEST(OverriddenMemberSimulation, E2eIntermediateHandleSeesIntermediateMember) {
   LowerRunAndCheck(f, design, {{"result", 2u}});
 }
 
-}
+}  // namespace

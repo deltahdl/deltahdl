@@ -23,4 +23,4 @@ TEST(WildcardPortConnectionLexing, WildcardMixedWithNamed) {
   EXPECT_EQ(tokens[9].kind, TokenKind::kRParen);
 }
 
-}
+}  // namespace

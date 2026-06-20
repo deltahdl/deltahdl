@@ -151,4 +151,4 @@ TEST(UtilitySystemTaskParsing, ArraySizeOfDataTypeWithDimArg) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}
+}  // namespace

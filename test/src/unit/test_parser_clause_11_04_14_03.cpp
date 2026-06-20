@@ -60,4 +60,4 @@ TEST(StreamingUnpackParsing, LeftShiftWithTypeSliceAsTarget) {
   EXPECT_EQ(stmt->lhs->op, TokenKind::kLtLt);
 }
 
-}
+}  // namespace

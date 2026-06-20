@@ -107,15 +107,15 @@ using PLI_BYTE8 = char;
 #define vpiNetTypedef 736
 
 /* §37.49 assertion model. The diagram introduces the clocking-block relation an
- * assertion traverses, two instance object kinds the assertion class groups that
- * had no constant yet, and the source-span location properties an assertion
- * exposes. 737-743 are the free selector numbers between vpiNetTypedef (736) and
- * vpiAssertion (744).
- *   vpiClockingBlock - the clocking block governing a concurrent assertion
- *   vpiSequenceInst  - a sequence instance grouped under the assertion class
- *   vpiPropertyInst  - a property instance grouped under the assertion class
- *   vpiStartLine/vpiColumn/vpiEndLine/vpiEndColumn - the source span an assertion
- *                      occupies (its file component is read through vpiFile) */
+ * assertion traverses, two instance object kinds the assertion class groups
+ * that had no constant yet, and the source-span location properties an
+ * assertion exposes. 737-743 are the free selector numbers between
+ * vpiNetTypedef (736) and vpiAssertion (744). vpiClockingBlock - the clocking
+ * block governing a concurrent assertion vpiSequenceInst  - a sequence instance
+ * grouped under the assertion class vpiPropertyInst  - a property instance
+ * grouped under the assertion class
+ *   vpiStartLine/vpiColumn/vpiEndLine/vpiEndColumn - the source span an
+ * assertion occupies (its file component is read through vpiFile) */
 #define vpiClockingBlock 737
 #define vpiSequenceInst 738
 #define vpiPropertyInst 739
@@ -138,25 +138,23 @@ using PLI_BYTE8 = char;
 #define vpiMatchItem 746
 
 /* §37.51 property declaration. The diagram introduces the property-formal
- * declaration object kind and the disable-condition relation a property instance
- * traverses. 778 and 779 are free selector numbers above vpiMatchItem (746) and
- * below the coverage block (vpiCoverageStart 750).
- *   vpiPropFormalDecl   - a formal of a property declaration; the kind the
- *                         vpiPropFormalDecl iteration yields in declaration order
- *   vpiDisableCondition - the disable-condition relation, shared with §37.52's
- *                         property specification */
+ * declaration object kind and the disable-condition relation a property
+ * instance traverses. 778 and 779 are free selector numbers above vpiMatchItem
+ * (746) and below the coverage block (vpiCoverageStart 750). vpiPropFormalDecl
+ * - a formal of a property declaration; the kind the vpiPropFormalDecl
+ * iteration yields in declaration order vpiDisableCondition - the
+ * disable-condition relation, shared with §37.52's property specification */
 #define vpiPropFormalDecl 778
 #define vpiDisableCondition 779
 
 /* §37.52 property specification. The diagram introduces the property-spec and
  * property-expr kinds, the clocked/case property member kinds and the case
- * property item kind, plus the clocking-event and property-expr relations and the
- * operator-strength property. 780-789 are free selector numbers in this module.
- *   vpiPropertySpec           - a property specification
- *   vpiPropertyExpr           - the property-expr class selector / relation
- *   vpiMulticlockSequenceExpr - a multiclock sequence expression member
- *   vpiClockedProperty        - a clocked property member
- *   vpiCaseProperty           - a case property member
+ * property item kind, plus the clocking-event and property-expr relations and
+ * the operator-strength property. 780-789 are free selector numbers in this
+ * module. vpiPropertySpec           - a property specification vpiPropertyExpr
+ * - the property-expr class selector / relation vpiMulticlockSequenceExpr - a
+ * multiclock sequence expression member vpiClockedProperty        - a clocked
+ * property member vpiCaseProperty           - a case property member
  *   vpiCasePropertyItem       - a case property item
  *   vpiClockingEvent          - the clocking-event relation
  *   vpiOpStrong               - the Boolean operator-strength property */
@@ -181,19 +179,19 @@ using PLI_BYTE8 = char;
 
 /* §37.56 multiclock sequence expression. The diagram introduces the clocked-seq
  * object kind a multiclock sequence expression is built from. The arrow into it
- * carries no tag, so the access type is the enclosure name with "vpi" prepended.
- * 790 is the first free selector number above the §37.50/§37.52 block (780-789).
- *   vpiClockedSeq - a single-clock sequence (a sequence expression paired with a
- *                   clocking event) grouped under a multiclock sequence
+ * carries no tag, so the access type is the enclosure name with "vpi"
+ * prepended. 790 is the first free selector number above the §37.50/§37.52
+ * block (780-789). vpiClockedSeq - a single-clock sequence (a sequence
+ * expression paired with a clocking event) grouped under a multiclock sequence
  *                   expression */
 #define vpiClockedSeq 790
 
-/* §37.53 sequence declaration. The diagram introduces the seq-formal-declaration
- * object kind a sequence declaration is built from - the sequence analog of
- * §37.51's property formal. 791 is the first free selector number above
- * vpiClockedSeq (790).
- *   vpiSeqFormalDecl - a formal of a sequence declaration; the kind the
- *                      vpiSeqFormalDecl iteration yields in declaration order */
+/* §37.53 sequence declaration. The diagram introduces the
+ * seq-formal-declaration object kind a sequence declaration is built from - the
+ * sequence analog of §37.51's property formal. 791 is the first free selector
+ * number above vpiClockedSeq (790). vpiSeqFormalDecl - a formal of a sequence
+ * declaration; the kind the vpiSeqFormalDecl iteration yields in declaration
+ * order */
 #define vpiSeqFormalDecl 791
 
 #define vpiTop 600
@@ -275,13 +273,14 @@ using PLI_BYTE8 = char;
 #define vpiUntilOp 92
 #define vpiUntilWithOp 93
 
-/* §37.52 detail 2: the property operators a property expr's operation may report
- * through vpi_get(vpiOpType) that had no constant yet. These live in the vpiOpType
- * return-value namespace; 73-84 are free values there (between vpiStreamRLOp(72),
- * vpiTypeOp(81)/vpiAssignmentOp(82) and vpiInsideOp(95)). The remaining listed
- * property operators already have constants: vpiAlwaysOp(90), vpiEventuallyOp(91),
- * vpiNexttimeOp(89), vpiUntilOp(92), vpiUntilWithOp(93), vpiCompAndOp(66),
- * vpiCompOrOp(67), vpiNotOp(3), vpiNonOverlapImplyOp(51), vpiOverlapImplyOp(52). */
+/* §37.52 detail 2: the property operators a property expr's operation may
+ * report through vpi_get(vpiOpType) that had no constant yet. These live in the
+ * vpiOpType return-value namespace; 73-84 are free values there (between
+ * vpiStreamRLOp(72), vpiTypeOp(81)/vpiAssignmentOp(82) and vpiInsideOp(95)).
+ * The remaining listed property operators already have constants:
+ * vpiAlwaysOp(90), vpiEventuallyOp(91), vpiNexttimeOp(89), vpiUntilOp(92),
+ * vpiUntilWithOp(93), vpiCompAndOp(66), vpiCompOrOp(67), vpiNotOp(3),
+ * vpiNonOverlapImplyOp(51), vpiOverlapImplyOp(52). */
 #define vpiAcceptOnOp 73
 #define vpiRejectOnOp 74
 #define vpiSyncAcceptOnOp 75
@@ -407,11 +406,11 @@ using PLI_BYTE8 = char;
 #define vpiAssertionSysEnableNonvacuousAction 658
 
 /* Annex M source-listing completion. The constants below are entries of the
- * sv_vpi_user.h listing that no other VPI subclause had yet introduced into this
- * header. Annex M is the defining home of these numeric values, so they are
- * provided here with the values the listing assigns. Symbols already supplied by
- * another subclause (possibly with that subclause's own value) are left to their
- * owner and are not repeated. */
+ * sv_vpi_user.h listing that no other VPI subclause had yet introduced into
+ * this header. Annex M is the defining home of these numeric values, so they
+ * are provided here with the values the listing assigns. Symbols already
+ * supplied by another subclause (possibly with that subclause's own value) are
+ * left to their owner and are not repeated. */
 
 /* Variable object types aliased onto their IEEE 1364 register counterparts. */
 #define vpiVarBit vpiRegBit
@@ -584,8 +583,8 @@ using PLI_BYTE8 = char;
 #define vpiOtherFunc 6
 #define vpiValidUnknown 2
 
-/* Coverage status property; vpiCoveredMax is the spelling retained alongside the
- * backward-compatible vpiCoverMax. */
+/* Coverage status property; vpiCoveredMax is the spelling retained alongside
+ * the backward-compatible vpiCoverMax. */
 #define vpiCoveredMax 766
 
 typedef struct t_vpi_assertion_step_info {

@@ -218,4 +218,4 @@ TEST(ScalarAndVectorDeclaration, MultipleVectorsHaveSpecifiedWidth) {
   EXPECT_EQ(mod->variables[2].width, 4u);
 }
 
-}
+}  // namespace

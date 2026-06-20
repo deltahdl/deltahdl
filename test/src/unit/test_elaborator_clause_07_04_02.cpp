@@ -119,8 +119,7 @@ TEST(UnpackedArrayValidation, NegativeSizeFormRejected) {
 
 TEST(UnpackedArrayValidation, LargeArraySupportsAtLeastTwoPowTwentyFour) {
   ElabFixture f;
-  auto* design =
-      Elaborate("module m; logic x [16777216]; endmodule\n", f);
+  auto* design = Elaborate("module m; logic x [16777216]; endmodule\n", f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.diag.HasErrors());
   auto* mod = design->top_modules[0];
@@ -138,4 +137,4 @@ TEST(UnpackedArrayValidation, TwoDimUnpackedElaborates) {
   EXPECT_GT(mod->variables[0].unpacked_size, 0u);
 }
 
-}
+}  // namespace

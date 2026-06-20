@@ -127,7 +127,8 @@ TEST(ExternalConstraintBlocks, SameNamePrototypeInDistinctClassesAccepted) {
 
 // 18.5.1: a class may carry several prototypes, each completed by its own
 // external constraint block.
-TEST(ExternalConstraintBlocks, MultipleDistinctPrototypesEachCompletedAccepted) {
+TEST(ExternalConstraintBlocks,
+     MultipleDistinctPrototypesEachCompletedAccepted) {
   EXPECT_TRUE(
       ElabOk("class C;\n"
              "  rand int x, y;\n"
@@ -160,4 +161,4 @@ TEST(ExternalConstraintBlocks, ExplicitPrototypeNotSatisfiedByOtherClassBlock) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

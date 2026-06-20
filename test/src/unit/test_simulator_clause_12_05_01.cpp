@@ -569,4 +569,4 @@ TEST(CasezStatementSim, CasezFirstMatchWins) {
   EXPECT_EQ(result_var->value.ToUint64(), 10u);
 }
 
-}
+}  // namespace

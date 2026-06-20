@@ -26,4 +26,4 @@ TEST(SeveritySystemTaskElab, FatalFinishNumberOutOfRangeRejected) {
   EXPECT_TRUE(ef.has_errors);
 }
 
-}
+}  // namespace

@@ -66,4 +66,4 @@ TEST(VpiCompatibilityHeader, EntryPointsRetargetedToResolvedVersion) {
   EXPECT_STREQ(ANNEX_L_XSTR(vpi_scan), "vpi_scan_1800v2012");
 }
 
-}
+}  // namespace

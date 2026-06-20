@@ -44,12 +44,9 @@ TEST(SvaEngine, WithinContainedSubintervalMatches) {
 // §16.9.10: both operands shall match. A non-matching operand defeats the
 // containment even when the time bounds would otherwise be satisfied.
 TEST(SvaEngine, WithinRequiresBothOperandsToMatch) {
-  EXPECT_FALSE(
-      EvalSequenceWithin(false, 4, 10, true, 3, 11).matched);
-  EXPECT_FALSE(
-      EvalSequenceWithin(true, 4, 10, false, 3, 11).matched);
-  EXPECT_FALSE(
-      EvalSequenceWithin(false, 4, 10, false, 3, 11).matched);
+  EXPECT_FALSE(EvalSequenceWithin(false, 4, 10, true, 3, 11).matched);
+  EXPECT_FALSE(EvalSequenceWithin(true, 4, 10, false, 3, 11).matched);
+  EXPECT_FALSE(EvalSequenceWithin(false, 4, 10, false, 3, 11).matched);
 }
 
 // §16.9.10 first bullet: the start point of seq1 shall be no earlier than the
@@ -86,4 +83,4 @@ TEST(SvaEngine, WithinSeq1SpanningEntireOuterIntervalMatches) {
   EXPECT_EQ(m.end_time, 11u);
 }
 
-}
+}  // namespace

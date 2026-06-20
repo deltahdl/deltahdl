@@ -99,4 +99,4 @@ TEST(ContinuousAssignDeclElaboration, InterconnectNetDeclAssignIsError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-}
+}  // namespace

@@ -341,4 +341,4 @@ TEST(StructPatternSimulation, ReplicationInStructContext) {
   EXPECT_EQ(var->value.ToUint64(), 0xABABu);
 }
 
-}
+}  // namespace

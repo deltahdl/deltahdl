@@ -165,4 +165,4 @@ TEST(RandsequenceSim, ConditionFromExpressionSelectsBranch) {
   EXPECT_EQ(var->value.ToUint64(), 2u);
 }
 
-}
+}  // namespace

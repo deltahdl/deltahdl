@@ -57,4 +57,4 @@ TEST(ClassSyntaxElaboration, DynamicOverrideInNonInterfaceClassOk) {
              "module m; endmodule\n"));
 }
 
-}
+}  // namespace

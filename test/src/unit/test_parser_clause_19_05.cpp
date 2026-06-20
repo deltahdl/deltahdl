@@ -86,4 +86,4 @@ TEST(CoverPointParsing, LabeledCoverpoint) {
   )"));
 }
 
-}
+}  // namespace

@@ -126,4 +126,4 @@ TEST(TimingCheckArgumentSim, TimingCheckLimitSimulates) {
   EXPECT_EQ(var->value.ToUint64(), 22u);
 }
 
-}
+}  // namespace

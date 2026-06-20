@@ -287,4 +287,4 @@ TEST(Coverage, LoadCumulativeCoverageHandlesMultipleTypes) {
   EXPECT_EQ(db.FindGroup("cg_b")->sample_count, 22u);
 }
 
-}
+}  // namespace

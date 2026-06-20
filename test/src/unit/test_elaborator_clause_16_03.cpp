@@ -80,4 +80,4 @@ TEST(ImmediateAssertionElaboration, DeferredImmediateAssertionElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

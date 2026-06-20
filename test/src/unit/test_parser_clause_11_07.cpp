@@ -75,4 +75,4 @@ TEST(OperatorAndExpressionParsing, SignedWithLiteral) {
   EXPECT_EQ(rhs->args.size(), 1u);
 }
 
-}
+}  // namespace

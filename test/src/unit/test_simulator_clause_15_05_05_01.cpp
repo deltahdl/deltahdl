@@ -175,4 +175,4 @@ TEST(IpcSync, MergedEventTriggeredStateShared) {
   EXPECT_EQ(var->value.ToUint64(), 55u);
 }
 
-}
+}  // namespace

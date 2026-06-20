@@ -7,13 +7,13 @@ namespace delta {
 namespace {
 
 // §37.30 Interface typespec: an interface typespec (vpiInterfaceTypespec) is a
-// typespec object that denotes a virtual interface or one of its modports. These
-// tests observe the production code that applies the clause's two numbered
-// "Details" - what vpiDefName reports for a modport versus an interface typespec
-// (detail 1) and where vpiParent leads for each (detail 2) - together with the
-// figure's vpiIsModPort/vpiName properties and the vpiParamAssign relation, which
-// the generic Get/GetStr/Handle/Iterate machinery serves once the typespec's
-// fields and children are populated.
+// typespec object that denotes a virtual interface or one of its modports.
+// These tests observe the production code that applies the clause's two
+// numbered "Details" - what vpiDefName reports for a modport versus an
+// interface typespec (detail 1) and where vpiParent leads for each (detail 2) -
+// together with the figure's vpiIsModPort/vpiName properties and the
+// vpiParamAssign relation, which the generic Get/GetStr/Handle/Iterate
+// machinery serves once the typespec's fields and children are populated.
 
 // The fixture installs a context so the public vpi_get/vpi_get_str/VpiHandleC/
 // vpi_iterate entry points run their real dispatch over the test objects.
@@ -43,15 +43,15 @@ TEST_F(InterfaceTypespec, DefNameOfModportIsModportIdentifier) {
   EXPECT_STREQ(vpi_get_str(vpiDefName, &modport_ts), "phy");
 }
 
-// D1: the vpiDefName of an interface typespec that represents an interface is the
-// identifier of the interface declaration - SBus in the figure's example, where
-// the typespec's own vpiName is the typedef name SB16.
+// D1: the vpiDefName of an interface typespec that represents an interface is
+// the identifier of the interface declaration - SBus in the figure's example,
+// where the typespec's own vpiName is the typedef name SB16.
 TEST_F(InterfaceTypespec, DefNameOfInterfaceIsInterfaceDeclarationIdentifier) {
   VpiObject iface_ts;
   iface_ts.type = vpiInterfaceTypespec;
   iface_ts.is_modport = false;
-  iface_ts.name = "SB16";       // the typedef name -> vpiName
-  iface_ts.def_name = "SBus";   // the interface declaration's identifier
+  iface_ts.name = "SB16";      // the typedef name -> vpiName
+  iface_ts.def_name = "SBus";  // the interface declaration's identifier
 
   EXPECT_STREQ(VpiInterfaceTypespecDefName(&iface_ts), "SBus");
   EXPECT_STREQ(vpi_get_str(vpiDefName, &iface_ts), "SBus");
@@ -82,9 +82,9 @@ TEST_F(InterfaceTypespec, DefNameOfInterfaceTypespecWithoutRecordedNameIsNull) {
   EXPECT_EQ(vpi_get_str(vpiDefName, &iface_ts), nullptr);
 }
 
-// D2: for an interface typespec that represents a modport, vpiParent returns the
-// interface typespec of the corresponding interface. Observed through the helper
-// and the public VpiHandleC(vpiParent, ...) dispatch path.
+// D2: for an interface typespec that represents a modport, vpiParent returns
+// the interface typespec of the corresponding interface. Observed through the
+// helper and the public VpiHandleC(vpiParent, ...) dispatch path.
 TEST_F(InterfaceTypespec, ParentOfModportIsItsInterfaceTypespec) {
   VpiObject iface_ts;
   iface_ts.type = vpiInterfaceTypespec;
@@ -108,7 +108,8 @@ TEST_F(InterfaceTypespec, ParentOfInterfaceIsNull) {
   VpiObject iface_ts;
   iface_ts.type = vpiInterfaceTypespec;
   iface_ts.is_modport = false;
-  iface_ts.parent = &enclosing;  // an interface typespec still reports no parent
+  iface_ts.parent =
+      &enclosing;  // an interface typespec still reports no parent
 
   EXPECT_EQ(VpiInterfaceTypespecParent(&iface_ts), nullptr);
   EXPECT_EQ(VpiHandleC(vpiParent, &iface_ts), nullptr);
@@ -139,8 +140,9 @@ TEST_F(InterfaceTypespec, IsModPortProperty) {
 }
 
 // Figure relation: an interface typespec reaches its param assigns through the
-// vpiParamAssign relation - the typedef SB16's assigned parameter value of 16 in
-// the figure's example is one such param assign, walked by vpi_iterate/vpi_scan.
+// vpiParamAssign relation - the typedef SB16's assigned parameter value of 16
+// in the figure's example is one such param assign, walked by
+// vpi_iterate/vpi_scan.
 TEST_F(InterfaceTypespec, ParamAssignIterationWalksParamAssigns) {
   VpiObject iface_ts;
   iface_ts.type = vpiInterfaceTypespec;

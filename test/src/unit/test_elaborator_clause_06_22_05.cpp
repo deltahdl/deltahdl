@@ -115,4 +115,4 @@ TEST(TypeIncompatibleElaboration, ClassHandleIncompatibleWithOtherTypes) {
   EXPECT_FALSE(IsTypeIncompatible(handle, same));
 }
 
-}
+}  // namespace

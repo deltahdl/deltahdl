@@ -48,4 +48,4 @@ TEST(IpcSync, MailboxNumUnchangedByFailedGet) {
   EXPECT_EQ(mb.Num(), 0);
 }
 
-}
+}  // namespace

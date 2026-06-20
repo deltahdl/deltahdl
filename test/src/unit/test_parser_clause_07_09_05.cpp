@@ -45,4 +45,4 @@ TEST(AssocArrayLastParsing, AssocArrayLastInIfCondition) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

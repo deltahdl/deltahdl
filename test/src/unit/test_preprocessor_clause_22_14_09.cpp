@@ -37,4 +37,4 @@ TEST(KeywordVersionPreprocessing, BeginKeywords1800_2023_EmitsCorrectMarker) {
             KeywordVersion::kVer18002023);
 }
 
-}
+}  // namespace

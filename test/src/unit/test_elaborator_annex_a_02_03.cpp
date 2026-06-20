@@ -51,8 +51,8 @@ TEST(DeclarationListElaboration, MultiplePortsElaborate) {
 }
 
 TEST(DeclarationListElaboration, TypeParamsElaborate) {
-  EXPECT_TRUE(ElabOk(
-      "module m; parameter type T1 = int, T2 = real; endmodule"));
+  EXPECT_TRUE(
+      ElabOk("module m; parameter type T1 = int, T2 = real; endmodule"));
 }
 
-}
+}  // namespace

@@ -39,4 +39,4 @@ TEST(StructDeclarationSynthesis, NestedPackedStructLowers) {
   ASSERT_NE(aig, nullptr);
 }
 
-}
+}  // namespace

@@ -13,8 +13,8 @@ TEST(StructuredProcedureLexing, FinalKeyword) {
 }
 
 TEST(StructuredProcedureLexing, KeywordsAreNotIdentifiers) {
-  const char* keywords[] = {"initial",     "always",    "always_comb",
-                             "always_latch", "always_ff", "final"};
+  const char* keywords[] = {"initial",      "always",    "always_comb",
+                            "always_latch", "always_ff", "final"};
   for (const auto* kw : keywords) {
     std::string src = std::string(kw) + " ";
     auto r = LexOne(src);
@@ -22,4 +22,4 @@ TEST(StructuredProcedureLexing, KeywordsAreNotIdentifiers) {
   }
 }
 
-}
+}  // namespace

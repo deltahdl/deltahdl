@@ -399,4 +399,4 @@ TEST(StreamingDynamicDataSim, UnpackQueuePartialRangeKeepsRemainder) {
   EXPECT_EQ(q->elements[3].ToUint64(), 0x44u);
 }
 
-}
+}  // namespace

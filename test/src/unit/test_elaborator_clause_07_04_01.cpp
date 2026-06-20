@@ -307,4 +307,4 @@ TEST(PackedArrayValidation, PackedDimOnPackedStruct_Allowed) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-}
+}  // namespace

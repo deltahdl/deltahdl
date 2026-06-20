@@ -72,4 +72,4 @@ TEST(DefaultPortValueSimulation, DefaultEvaluatedInDefiningModuleScope) {
   EXPECT_EQ(var->value.ToUint64(), 0xFFu);
 }
 
-}
+}  // namespace

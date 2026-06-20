@@ -8,34 +8,34 @@ namespace {
 // operators are the only comparison operators permitted on event variables,
 // and an event may be used as a Boolean test. These uses elaborate cleanly.
 TEST(EventComparisonElaborator, AllowedComparisonOperatorsAccepted) {
-  EXPECT_TRUE(ElabOk(
-      "module m;\n"
-      "  event a, b;\n"
-      "  logic w, x, y, z, t;\n"
-      "  initial begin\n"
-      "    w = (a == b);\n"
-      "    x = (a != b);\n"
-      "    y = (a === b);\n"
-      "    z = (a !== b);\n"
-      "    if (a) t = 1;\n"
-      "  end\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  event a, b;\n"
+             "  logic w, x, y, z, t;\n"
+             "  initial begin\n"
+             "    w = (a == b);\n"
+             "    x = (a != b);\n"
+             "    y = (a === b);\n"
+             "    z = (a !== b);\n"
+             "    if (a) t = 1;\n"
+             "  end\n"
+             "endmodule\n"));
 }
 
 // §15.5.5.3: an event may be compared against the special value null with any
 // of the permitted equality operators, including the case-equality forms.
 TEST(EventComparisonElaborator, ComparisonAgainstNullAccepted) {
-  EXPECT_TRUE(ElabOk(
-      "module m;\n"
-      "  event a;\n"
-      "  logic w, x, y, z;\n"
-      "  initial begin\n"
-      "    w = (a == null);\n"
-      "    x = (a != null);\n"
-      "    y = (a === null);\n"
-      "    z = (a !== null);\n"
-      "  end\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  event a;\n"
+             "  logic w, x, y, z;\n"
+             "  initial begin\n"
+             "    w = (a == null);\n"
+             "    x = (a != null);\n"
+             "    y = (a === null);\n"
+             "    z = (a !== null);\n"
+             "  end\n"
+             "endmodule\n"));
 }
 
 // §15.5.5.3: a relational operator is not among the permitted operators for an

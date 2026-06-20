@@ -107,4 +107,4 @@ TEST(CoverageOrganization, MembersReachableThroughCoverGroup) {
   EXPECT_TRUE(g->type_option.merge_instances);
 }
 
-}
+}  // namespace

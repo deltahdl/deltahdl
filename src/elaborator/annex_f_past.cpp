@@ -23,20 +23,20 @@ Word Subword(const Word& word, std::size_t lo, std::size_t hi) {
 // The §F.6.2 gating sequence (c && e2) ##1 (c && e2)[=n-1] ##1 1, expressed in
 // the §F.3.2 primitives the tight-satisfaction engine understands. With `g` the
 // active condition c && e2, a run of inactive letters is (!g)[*0:$], and the
-// nonconsecutive repetition g[=m] expands per §F.3.4.2.3 to g[->m] ##1 (!g)[*0:$]
-// with g[->m] the m-fold concatenation of ((!g)[*0:$] ##1 g). Because the engine
-// reads ##1 as plain adjacency, the whole sequence lays out as a leading active
-// letter, then m more active letters each preceded by an inactive run, a final
-// trailing inactive run, and one wildcard letter at j -- exactly n active ticks
-// before j.
+// nonconsecutive repetition g[=m] expands per §F.3.4.2.3 to g[->m] ##1
+// (!g)[*0:$] with g[->m] the m-fold concatenation of ((!g)[*0:$] ##1 g).
+// Because the engine reads ##1 as plain adjacency, the whole sequence lays out
+// as a leading active letter, then m more active letters each preceded by an
+// inactive run, a final trailing inactive run, and one wildcard letter at j --
+// exactly n active ticks before j.
 std::shared_ptr<const SequenceExpr> GatingSequence(
     const std::shared_ptr<const BooleanExpr>& g, unsigned int n) {
   const std::shared_ptr<const SequenceExpr> active = SeqBoolean(g);
   const std::shared_ptr<const SequenceExpr> inactive_run =
       SeqZeroOrMoreRepeat(SeqBoolean(BoolNot(g)));
 
-  // g[=n-1]. For n == 1 there is no g[->m] part: g[=0] is just a run of inactive
-  // letters.
+  // g[=n-1]. For n == 1 there is no g[->m] part: g[=0] is just a run of
+  // inactive letters.
   std::shared_ptr<const SequenceExpr> nonconsecutive = inactive_run;
   const unsigned int repeats = n - 1;
   if (repeats > 0) {
@@ -52,8 +52,7 @@ std::shared_ptr<const SequenceExpr> GatingSequence(
   }
 
   // (c && e2) ##1 g[=n-1] ##1 1.
-  return SeqConcat(active,
-                   SeqConcat(nonconsecutive, SeqBoolean(BoolTrue())));
+  return SeqConcat(active, SeqConcat(nonconsecutive, SeqBoolean(BoolTrue())));
 }
 
 }  // namespace

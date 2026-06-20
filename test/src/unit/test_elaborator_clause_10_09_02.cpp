@@ -258,4 +258,4 @@ TEST(StructPatternSimulation, StructTypeKeyedPattern) {
   EXPECT_EQ(var->value.ToUint64(), uint64_t{99} << 8);
 }
 
-}
+}  // namespace

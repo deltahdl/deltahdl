@@ -108,4 +108,4 @@ TEST(PropertyLocalLvarArgumentParsing, MultipleInputLocalsParse) {
   EXPECT_EQ(item->prop_formals[1], "b");
 }
 
-}
+}  // namespace

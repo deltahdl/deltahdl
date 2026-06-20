@@ -160,4 +160,4 @@ TEST(VirtualInterfaceSim, ReboundInstanceReflectsNewTarget) {
   EXPECT_EQ(y->value.ToUint64(), 0x22u);
 }
 
-}
+}  // namespace

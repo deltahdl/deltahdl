@@ -16,9 +16,10 @@ Letter L(std::set<std::string> atoms) { return LetterAtoms(std::move(atoms)); }
 
 auto BoolSeq(const std::string& name) { return SeqBoolean(BoolAtom(name)); }
 
-// initial @( 1 ) strong( a ##1 b ): a single activation at index 0 whose body is
-// the strong sequence a then b. Under T^p(., 1) the constant clock collapses, so
-// the body holds exactly when a ##1 b is tightly matched within the word.
+// initial @( 1 ) strong( a ##1 b ): a single activation at index 0 whose body
+// is the strong sequence a then b. Under T^p(., 1) the constant clock
+// collapses, so the body holds exactly when a ##1 b is tightly matched within
+// the word.
 auto InitialStrongAThenB() {
   return AssertionWithClock(
       AssertionStatement::Activation::kInitial,
@@ -41,23 +42,20 @@ auto InitialWeakAThenB() {
 // sequence is rejected however the tail is chosen.
 TEST(FiniteWordSatisfaction, WeakCompletesWithTheTopTail) {
   auto a = InitialStrongAThenB();
+  EXPECT_TRUE(WeaklySatisfiesByFiniteWord(Word{L({"a"})}, *BoolTrue(), *a));
   EXPECT_TRUE(
-      WeaklySatisfiesByFiniteWord(Word{L({"a"})}, *BoolTrue(), *a));
-  EXPECT_TRUE(WeaklySatisfiesByFiniteWord(Word{L({"a"}), L({"b"})},
-                                          *BoolTrue(), *a));
-  EXPECT_FALSE(
-      WeaklySatisfiesByFiniteWord(Word{L({"x"})}, *BoolTrue(), *a));
+      WeaklySatisfiesByFiniteWord(Word{L({"a"}), L({"b"})}, *BoolTrue(), *a));
+  EXPECT_FALSE(WeaklySatisfiesByFiniteWord(Word{L({"x"})}, *BoolTrue(), *a));
 }
 
-// §F.5.3.2: w |=^+ A completes w with the bottom tail _|_^omega, which can never
-// finish an open obligation. The completed [a][b] still matches, but a lone [a]
-// is left unfinished and so does not satisfy strongly.
+// §F.5.3.2: w |=^+ A completes w with the bottom tail _|_^omega, which can
+// never finish an open obligation. The completed [a][b] still matches, but a
+// lone [a] is left unfinished and so does not satisfy strongly.
 TEST(FiniteWordSatisfaction, StrongCompletesWithTheBottomTail) {
   auto a = InitialStrongAThenB();
-  EXPECT_TRUE(StronglySatisfiesByFiniteWord(Word{L({"a"}), L({"b"})},
-                                            *BoolTrue(), *a));
-  EXPECT_FALSE(
-      StronglySatisfiesByFiniteWord(Word{L({"a"})}, *BoolTrue(), *a));
+  EXPECT_TRUE(
+      StronglySatisfiesByFiniteWord(Word{L({"a"}), L({"b"})}, *BoolTrue(), *a));
+  EXPECT_FALSE(StronglySatisfiesByFiniteWord(Word{L({"a"})}, *BoolTrue(), *a));
 }
 
 // §F.5.3.2: a finite word that meets a strong obligation completely returns
@@ -77,14 +75,12 @@ TEST(FiniteWordSatisfaction, FailsWhenNotEvenWeaklySatisfied) {
 }
 
 // §F.5.3.2: "Pending" when the top-tail completion satisfies the assertion but
-// the word itself does not yet -- w |=^- A and not w |= A. A lone [a] leaves the
-// strong obligation a ##1 b open: weak holds, neutral does not.
+// the word itself does not yet -- w |=^- A and not w |= A. A lone [a] leaves
+// the strong obligation a ##1 b open: weak holds, neutral does not.
 TEST(FiniteWordSatisfaction, PendingWhenWeakHoldsButNeutralDoesNot) {
   auto a = InitialStrongAThenB();
-  EXPECT_TRUE(
-      WeaklySatisfiesByFiniteWord(Word{L({"a"})}, *BoolTrue(), *a));
-  EXPECT_FALSE(
-      NeutrallySatisfiesAssertion(Word{L({"a"})}, *BoolTrue(), *a));
+  EXPECT_TRUE(WeaklySatisfiesByFiniteWord(Word{L({"a"})}, *BoolTrue(), *a));
+  EXPECT_FALSE(NeutrallySatisfiesAssertion(Word{L({"a"})}, *BoolTrue(), *a));
   EXPECT_EQ(CheckFiniteWord(Word{L({"a"})}, *BoolTrue(), *a),
             FiniteWordVerdict::kPending);
 }
@@ -97,8 +93,7 @@ TEST(FiniteWordSatisfaction, PendingWhenWeakHoldsButNeutralDoesNot) {
 TEST(FiniteWordSatisfaction, HoldsWithoutStrengthWhenNeutralButNotStrong) {
   auto a = InitialWeakAThenB();
   EXPECT_TRUE(NeutrallySatisfiesAssertion(Word{L({"a"})}, *BoolTrue(), *a));
-  EXPECT_FALSE(
-      StronglySatisfiesByFiniteWord(Word{L({"a"})}, *BoolTrue(), *a));
+  EXPECT_FALSE(StronglySatisfiesByFiniteWord(Word{L({"a"})}, *BoolTrue(), *a));
   EXPECT_EQ(CheckFiniteWord(Word{L({"a"})}, *BoolTrue(), *a),
             FiniteWordVerdict::kHolds);
 }

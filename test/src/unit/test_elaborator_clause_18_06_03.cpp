@@ -17,9 +17,9 @@ TEST(BehaviorOfRandomizationMethods, RandomizeOverrideIsError) {
              "endmodule\n"));
 }
 
-// 18.6.3: the prohibition is on declaring randomize itself; a class with no such
-// declaration uses the built-in method and elaborates without complaint, even
-// when it declares random variables and constraints.
+// 18.6.3: the prohibition is on declaring randomize itself; a class with no
+// such declaration uses the built-in method and elaborates without complaint,
+// even when it declares random variables and constraints.
 TEST(BehaviorOfRandomizationMethods, NoRandomizeOverrideOk) {
   EXPECT_TRUE(
       ElabOk("class C;\n"

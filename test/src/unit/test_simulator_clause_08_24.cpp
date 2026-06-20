@@ -127,4 +127,4 @@ TEST(ClassSim, UnresolvedMethodReturnsNull) {
   EXPECT_EQ(obj->ResolveMethod("nonexistent"), nullptr);
 }
 
-}
+}  // namespace

@@ -289,4 +289,4 @@ TEST(ProgramSchedulingSim, ConcurrentAssertionInProgramStillEvaluatesAndFails) {
   EXPECT_EQ(f.ctx.AssertionFailCount(), 1);
 }
 
-}
+}  // namespace

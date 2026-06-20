@@ -325,4 +325,4 @@ TEST(SubroutineCallArgWriteback, TaskInoutArgRoundTrip) {
   LowerRunAndCheck(f, design, {{"x", 42u}});
 }
 
-}
+}  // namespace

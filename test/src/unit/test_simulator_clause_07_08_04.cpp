@@ -224,4 +224,4 @@ TEST(IntegralIndexAssocArraySimulation, XZIndexInvalidOnRead) {
   EXPECT_GE(f.diag.WarningCount(), 1u);
 }
 
-}
+}  // namespace

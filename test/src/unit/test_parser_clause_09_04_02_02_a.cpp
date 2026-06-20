@@ -342,4 +342,4 @@ TEST(ImplicitEventParsing, AtStarWithLhsIndexSelect) {
   EXPECT_EQ(assign->lhs->kind, ExprKind::kSelect);
 }
 
-}
+}  // namespace

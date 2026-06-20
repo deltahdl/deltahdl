@@ -41,10 +41,11 @@ TEST_F(ProtectViewportSyntaxTest, PragmaProtectViewportConsumed) {
   EXPECT_EQ(result.find("top.dut"), std::string::npos);
 }
 
-// Only the viewport directive line is removed; neighboring source text survives,
-// confirming it is the viewport keyword expression line that the pragma path
-// consumes.
-TEST_F(ProtectViewportSyntaxTest, ViewportDirectiveStrippedSurroundingTextKept) {
+// Only the viewport directive line is removed; neighboring source text
+// survives, confirming it is the viewport keyword expression line that the
+// pragma path consumes.
+TEST_F(ProtectViewportSyntaxTest,
+       ViewportDirectiveStrippedSurroundingTextKept) {
   auto result = Preprocess(
       "module m;\n"
       "`pragma protect viewport = ( object = \"top.dut\" , access = \"rw\" )\n"

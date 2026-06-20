@@ -47,10 +47,9 @@ constexpr std::string_view kName = "run.cov";
 // Evaluates $coverage_merge(coverage_type, "name") through the production
 // evaluator and returns the reported value as a signed integer.
 int RunMerge(SimFixture& f, int coverage_type, std::string_view name) {
-  auto* call = MkSysCall(
-      f.arena, "$coverage_merge",
-      {MkInt(f.arena, static_cast<uint64_t>(coverage_type)),
-       MkStr(f.arena, name)});
+  auto* call = MkSysCall(f.arena, "$coverage_merge",
+                         {MkInt(f.arena, static_cast<uint64_t>(coverage_type)),
+                          MkStr(f.arena, name)});
   return static_cast<int32_t>(EvalExpr(call, f.ctx, f.arena).ToUint64());
 }
 
@@ -90,8 +89,8 @@ TEST(CoverageMerge, UnknownNameReportsError) {
   EXPECT_EQ(RunMerge(f, kToggle, "nonesuch.cov"), kError);
 }
 
-// `SV_COV_ERROR: §40.3.2.4 requires an error when the database is found but does
-// not correspond to the design being simulated.
+// `SV_COV_ERROR: §40.3.2.4 requires an error when the database is found but
+// does not correspond to the design being simulated.
 TEST(CoverageMerge, DatabaseFromAnotherDesignReportsError) {
   SimFixture f;
   Cov(f).RegisterCoverageDatabase(std::string(kName),

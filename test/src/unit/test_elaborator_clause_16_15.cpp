@@ -90,10 +90,10 @@ TEST(DisableIffResolution, EffectIndependentOfDeclarationPosition) {
   // §16.15: a default disable iff governs assertions sharing its scope
   // regardless of whether the declaration appears before or after the
   // assertion, so both orderings are governed.
-  EXPECT_TRUE(
-      AssertionGovernedBySameScopeDefault(DeclarationPosition::kBeforeAssertion));
-  EXPECT_TRUE(
-      AssertionGovernedBySameScopeDefault(DeclarationPosition::kAfterAssertion));
+  EXPECT_TRUE(AssertionGovernedBySameScopeDefault(
+      DeclarationPosition::kBeforeAssertion));
+  EXPECT_TRUE(AssertionGovernedBySameScopeDefault(
+      DeclarationPosition::kAfterAssertion));
 }
 
 }  // namespace

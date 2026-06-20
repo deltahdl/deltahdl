@@ -127,4 +127,4 @@ TEST(ModuleInstantiationGrammar, TrailingBlankOrderedPort) {
   EXPECT_EQ(item->inst_ports[2].second, nullptr);
 }
 
-}
+}  // namespace

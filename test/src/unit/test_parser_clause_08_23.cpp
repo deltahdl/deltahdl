@@ -79,24 +79,24 @@ TEST(ClassScopeResolutionParsing, SuperclassScopeAccess) {
 }
 
 TEST(ClassScopeResolutionParsing, StaticPropertyRead) {
-  EXPECT_TRUE(ParseOk(
-      "class C;\n"
-      "  static int count;\n"
-      "endclass\n"
-      "module m;\n"
-      "  int x;\n"
-      "  initial x = C::count;\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("class C;\n"
+              "  static int count;\n"
+              "endclass\n"
+              "module m;\n"
+              "  int x;\n"
+              "  initial x = C::count;\n"
+              "endmodule\n"));
 }
 
 TEST(ClassScopeResolutionParsing, StaticPropertyWrite) {
-  EXPECT_TRUE(ParseOk(
-      "class C;\n"
-      "  static int count;\n"
-      "endclass\n"
-      "module m;\n"
-      "  initial C::count = 5;\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("class C;\n"
+              "  static int count;\n"
+              "endclass\n"
+              "module m;\n"
+              "  initial C::count = 5;\n"
+              "endmodule\n"));
 }
 
 TEST(ClassScopeResolutionParsing, ScopeAsTypePrefix) {
@@ -120,37 +120,37 @@ TEST(ClassScopeResolutionParsing, ScopeAsTypePrefix) {
 }
 
 TEST(ClassScopeResolutionParsing, StaticTaskCall) {
-  EXPECT_TRUE(ParseOk(
-      "class Logger;\n"
-      "  static task log(string msg);\n"
-      "  endtask\n"
-      "endclass\n"
-      "module m;\n"
-      "  initial Logger::log(\"hello\");\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("class Logger;\n"
+              "  static task log(string msg);\n"
+              "  endtask\n"
+              "endclass\n"
+              "module m;\n"
+              "  initial Logger::log(\"hello\");\n"
+              "endmodule\n"));
 }
 
 TEST(ClassScopeResolutionParsing, DisambiguatesLocalFromClassMember) {
-  EXPECT_TRUE(ParseOk(
-      "class Base;\n"
-      "  typedef enum {bin, oct, dec, hex} radix;\n"
-      "  static task print(radix r, integer n);\n"
-      "  endtask\n"
-      "endclass\n"
-      "module m;\n"
-      "  int bin = 123;\n"
-      "  initial Base::print(Base::bin, bin);\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("class Base;\n"
+              "  typedef enum {bin, oct, dec, hex} radix;\n"
+              "  static task print(radix r, integer n);\n"
+              "  endtask\n"
+              "endclass\n"
+              "module m;\n"
+              "  int bin = 123;\n"
+              "  initial Base::print(Base::bin, bin);\n"
+              "endmodule\n"));
 }
 
 TEST(ClassScopeResolutionParsing, LocalparamAccess) {
-  EXPECT_TRUE(ParseOk(
-      "class C;\n"
-      "  localparam int SIZE = 16;\n"
-      "endclass\n"
-      "module m;\n"
-      "  logic [C::SIZE-1:0] data;\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("class C;\n"
+              "  localparam int SIZE = 16;\n"
+              "endclass\n"
+              "module m;\n"
+              "  logic [C::SIZE-1:0] data;\n"
+              "endmodule\n"));
 }
 
 TEST(ClassScopeResolutionParsing, NestedClassDeclaration) {
@@ -168,4 +168,4 @@ TEST(ClassScopeResolutionParsing, NestedClassDeclaration) {
   EXPECT_EQ(r.cu->classes[0]->members[0]->nested_class->name, "Inner");
 }
 
-}
+}  // namespace

@@ -307,4 +307,4 @@ TEST(Process, NestedForkSpawnsThreadPerStatement) {
   LowerRunAndCheck(f, design, {{"a", 1u}, {"b", 2u}, {"c", 3u}});
 }
 
-}
+}  // namespace

@@ -93,4 +93,4 @@ TEST(ConfigInstanceClause, InstancePathRootedAtLibraryNameRejected) {
   EXPECT_TRUE(f.has_errors);
 }
 
-}
+}  // namespace

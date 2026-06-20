@@ -43,4 +43,4 @@ TEST(AggregateTypeParsing, QueueDeletePropertyStyle) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}
+}  // namespace

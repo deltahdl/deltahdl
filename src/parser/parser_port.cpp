@@ -171,7 +171,6 @@ void Parser::ParseExportDecl(std::vector<ModuleItem*>& items) {
   item->kind = ModuleItemKind::kExportDecl;
   item->loc = loc;
   if (Match(TokenKind::kStar)) {
-
     item->import_item.package_name = "*";
     Expect(TokenKind::kColonColon);
     Expect(TokenKind::kStar);
@@ -275,7 +274,7 @@ ModuleItem* Parser::ParseDpiImport() {
   item->name = Expect(TokenKind::kIdentifier).text;
 
   if (Check(TokenKind::kLParen)) {
-    item->func_args = ParseFunctionArgs( false);
+    item->func_args = ParseFunctionArgs(false);
   }
   // §35.5.4: ref qualifier is forbidden in import declarations.
   for (const auto& arg : item->func_args) {
@@ -355,8 +354,7 @@ void Parser::ParseParamPortDecl(
     std::vector<std::pair<std::string_view, Expr*>>& params,
     std::unordered_set<std::string_view>& type_param_names,
     std::unordered_set<std::string_view>& localparam_port_names,
-    bool& is_localparam_group,
-    std::vector<DataType>* param_types) {
+    bool& is_localparam_group, std::vector<DataType>* param_types) {
   if (Match(TokenKind::kKwLocalparam)) {
     is_localparam_group = true;
   } else if (Match(TokenKind::kKwParameter)) {
@@ -416,7 +414,6 @@ void Parser::ParseParamPortDecl(
 }
 
 void Parser::ParseParamsPortsAndSemicolon(ModuleDecl& decl) {
-
   SourceLoc import_loc;
   bool has_header_import = false;
   while (Check(TokenKind::kKwImport)) {
@@ -474,9 +471,9 @@ static void ResolvePortDefaults(PortDecl& port, const PortDecl* prev,
   // of the previous formal is inferred; the first formal defaults to input.
   // Module-style ports instead default to inout when no prior direction exists.
   if (port.direction == Direction::kNone)
-    port.direction =
-        prev ? prev->direction
-             : (is_checker ? Direction::kInput : Direction::kInout);
+    port.direction = prev
+                         ? prev->direction
+                         : (is_checker ? Direction::kInput : Direction::kInout);
 
   if (!port.has_explicit_var && !port.data_type.is_net) {
     switch (port.direction) {
@@ -518,14 +515,12 @@ void Parser::ParsePortList(ModuleDecl& mod) {
 
   if (CheckIdentifier()) {
     if (known_types_.count(CurrentToken().text) != 0) {
-
     } else {
-
       auto saved = lexer_.SavePos();
       Consume();
       bool is_non_ansi = Check(TokenKind::kRParen) ||
-                          Check(TokenKind::kComma) ||
-                          Check(TokenKind::kLBracket);
+                         Check(TokenKind::kComma) ||
+                         Check(TokenKind::kLBracket);
       lexer_.RestorePos(saved);
       if (is_non_ansi) {
         ParseNonAnsiPortList(mod);
@@ -555,7 +550,6 @@ void Parser::ParsePortList(ModuleDecl& mod) {
           port.direction = prev.direction;
           port.data_type = prev.data_type;
         } else {
-
           ResolvePortDefaults(port, &prev, is_checker);
         }
         mod.ports.push_back(port);
@@ -572,7 +566,6 @@ void Parser::ParseNonAnsiPortList(ModuleDecl& mod) {
   mod.is_non_ansi_ports = true;
 
   do {
-
     if (Check(TokenKind::kComma) || Check(TokenKind::kRParen)) {
       PortDecl port;
       port.loc = CurrentLoc();
@@ -582,7 +575,6 @@ void Parser::ParseNonAnsiPortList(ModuleDecl& mod) {
     PortDecl port;
     port.loc = CurrentLoc();
     if (Match(TokenKind::kDot)) {
-
       port.is_explicit_named = true;
       port.name = ExpectIdentifier().text;
       Expect(TokenKind::kLParen);
@@ -591,10 +583,8 @@ void Parser::ParseNonAnsiPortList(ModuleDecl& mod) {
       }
       Expect(TokenKind::kRParen);
     } else if (Check(TokenKind::kLBrace)) {
-
       port.port_expr = ParseExpr();
     } else {
-
       port.name = ExpectIdentifier().text;
       if (Check(TokenKind::kLBracket)) {
         auto* ref = arena_.Create<Expr>();
@@ -695,7 +685,6 @@ PortDecl Parser::ParsePortDecl() {
     port.data_type = ParseStructOrUnionType();
     ParsePackedDims(port.data_type);
   } else if (Match(TokenKind::kKwInterconnect)) {
-
     port.data_type.kind = DataTypeKind::kWire;
     port.data_type.is_net = true;
     port.data_type.is_interconnect = true;
@@ -840,4 +829,4 @@ void Parser::ParseNonAnsiPortDecls(ModuleDecl& mod) {
   Expect(TokenKind::kSemicolon);
 }
 
-}
+}  // namespace delta

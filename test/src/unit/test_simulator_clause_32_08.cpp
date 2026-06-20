@@ -95,9 +95,9 @@ TEST(SdfExpand, TwelveValuesCopyDirectly) {
   for (int i = 0; i < 12; ++i) EXPECT_EQ(out[i], (uint64_t)((i + 1) * 7));
 }
 
-// Claim R + Claim X (final paragraph): more than three SDF delays are reduced to
-// three by ignoring the extras (the trailing 99s never appear), and the x-state
-// delay is the minimum of the three retained values.
+// Claim R + Claim X (final paragraph): more than three SDF delays are reduced
+// to three by ignoring the extras (the trailing 99s never appear), and the
+// x-state delay is the minimum of the three retained values.
 TEST(SdfReduceToThree, MoreThanThreeDropsExtrasAndDerivesXFromMin) {
   std::vector<SdfDelayValue> vals(6);
   vals[0].typ_val = 30;

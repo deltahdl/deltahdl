@@ -98,4 +98,4 @@ TEST(SysTask, UrandomRangeIsThreadStable) {
   EXPECT_EQ(b1, b2);
 }
 
-}
+}  // namespace

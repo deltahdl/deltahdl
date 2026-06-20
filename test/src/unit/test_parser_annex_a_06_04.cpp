@@ -491,4 +491,4 @@ TEST(FunctionStatementOrNullSyntaxParsing, MultipleAttrInstancesOnNullInFunc) {
   EXPECT_EQ(null_stmt->attrs[1].name, "b");
 }
 
-}
+}  // namespace

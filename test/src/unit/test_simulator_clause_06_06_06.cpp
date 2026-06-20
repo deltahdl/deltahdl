@@ -135,7 +135,8 @@ TEST(SupplyNetResolution, Supply0StrengthOverridesWeakerDriver) {
   net.resolved = var;
 
   net.drivers.push_back(MakeLogic4VecVal(arena, 8, 0xFF));
-  net.driver_strengths.push_back(DriverStrength{Strength::kWeak, Strength::kWeak});
+  net.driver_strengths.push_back(
+      DriverStrength{Strength::kWeak, Strength::kWeak});
   net.Resolve(arena);
   EXPECT_EQ(var->value.ToUint64(), 0u);
   EXPECT_EQ(net.resolved_strength.s0_hi, Strength::kSupply);
@@ -153,11 +154,12 @@ TEST(SupplyNetResolution, Supply1StrengthOverridesWeakerDriver) {
   net.resolved = var;
 
   net.drivers.push_back(MakeLogic4VecVal(arena, 8, 0));
-  net.driver_strengths.push_back(DriverStrength{Strength::kPull, Strength::kPull});
+  net.driver_strengths.push_back(
+      DriverStrength{Strength::kPull, Strength::kPull});
   net.Resolve(arena);
   EXPECT_EQ(var->value.ToUint64() & 0xFF, 0xFFu);
   EXPECT_EQ(net.resolved_strength.s1_hi, Strength::kSupply);
   EXPECT_EQ(net.resolved_strength.s1_lo, Strength::kSupply);
 }
 
-}
+}  // namespace

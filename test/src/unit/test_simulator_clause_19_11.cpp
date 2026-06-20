@@ -237,4 +237,4 @@ TEST(Coverage, OverallCoverageAllZeroWeightIs100) {
   EXPECT_DOUBLE_EQ(CoverageDB::ComputeOverallCoverage({g}), 100.0);
 }
 
-}
+}  // namespace

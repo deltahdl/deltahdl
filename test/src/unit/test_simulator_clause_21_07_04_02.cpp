@@ -101,8 +101,8 @@ TEST_F(ExtendedVcdNodeInfoSim, BusIndexRangePreservesDeclaredMsbLsbOrder) {
   EXPECT_EQ(content.find("[0:7]"), std::string::npos);
 }
 
-// §21.7.4.2: the var_type of a node-information entry is the keyword port and no
-// other keyword is allowed. The acid test is a real-valued port: a 4-state
+// §21.7.4.2: the var_type of a node-information entry is the keyword port and
+// no other keyword is allowed. The acid test is a real-valued port: a 4-state
 // writer declares a real object with the real keyword, but in the extended
 // node information the entry is still a port. This confirms the keyword is
 // fixed at port rather than derived from the dumped object's type.

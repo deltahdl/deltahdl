@@ -65,7 +65,8 @@ TEST(CaseMatchesItemElaboration, RealSelectorWithIntegralPatternRejected) {
 
 // §12.6.1: the type check looks through a `&&&` filter to the pattern itself,
 // so a real selector paired with a guarded integral pattern is still rejected.
-TEST(CaseMatchesItemElaboration, RealSelectorWithGuardedIntegralPatternRejected) {
+TEST(CaseMatchesItemElaboration,
+     RealSelectorWithGuardedIntegralPatternRejected) {
   SimFixture f;
   ElaborateSrc(
       "module t;\n"
@@ -85,4 +86,4 @@ TEST(CaseMatchesItemElaboration, RealSelectorWithGuardedIntegralPatternRejected)
   EXPECT_TRUE(f.has_errors);
 }
 
-}
+}  // namespace

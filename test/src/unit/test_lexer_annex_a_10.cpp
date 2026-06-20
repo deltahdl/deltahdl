@@ -99,4 +99,4 @@ TEST(BnfClarificationLexing, SpaceBreaksTimeLiteral) {
   EXPECT_EQ(tokens[1].text, "ns");
 }
 
-}
+}  // namespace

@@ -258,4 +258,4 @@ TEST(AlwaysCombVsAlwaysStar, AlwaysCombRejectsNestedDelay) {
   EXPECT_TRUE(f.has_errors);
 }
 
-}
+}  // namespace

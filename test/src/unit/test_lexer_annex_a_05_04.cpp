@@ -73,4 +73,4 @@ TEST(UdpInstantiationLexing, MultipleInstancesTokenSequence) {
   EXPECT_EQ(semicolons, 1u);
 }
 
-}
+}  // namespace

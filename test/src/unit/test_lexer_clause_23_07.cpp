@@ -27,7 +27,8 @@ TEST(DottedNameLexing, ThreeComponentDottedName) {
   EXPECT_EQ(tokens[4].text, "c");
 }
 
-TEST(DottedNameLexing, DottedNameTokensIdenticalForMemberSelectAndHierarchical) {
+TEST(DottedNameLexing,
+     DottedNameTokensIdenticalForMemberSelectAndHierarchical) {
   auto member_tokens = Lex("s.x");
   auto hier_tokens = Lex("inst.sig");
   ASSERT_GE(member_tokens.size(), 4u);
@@ -37,4 +38,4 @@ TEST(DottedNameLexing, DottedNameTokensIdenticalForMemberSelectAndHierarchical) 
   EXPECT_EQ(member_tokens[2].kind, hier_tokens[2].kind);
 }
 
-}
+}  // namespace

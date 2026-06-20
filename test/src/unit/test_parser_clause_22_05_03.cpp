@@ -13,4 +13,4 @@ TEST(CompilerDirectiveParsing, UndefineallDirective) {
                               "endmodule\n"));
 }
 
-}
+}  // namespace

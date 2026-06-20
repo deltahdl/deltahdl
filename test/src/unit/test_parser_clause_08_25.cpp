@@ -336,4 +336,4 @@ TEST(ParameterizedClassParsing, StaticMemberInParameterizedClass) {
   ASSERT_GE(r.cu->classes[0]->members.size(), 2u);
 }
 
-}
+}  // namespace

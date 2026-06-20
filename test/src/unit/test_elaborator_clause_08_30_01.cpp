@@ -91,4 +91,4 @@ TEST(ClassConstraintElaboration, WeakReferenceNonClassTaskArgError) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

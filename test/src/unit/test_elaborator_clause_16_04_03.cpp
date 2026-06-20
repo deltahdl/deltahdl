@@ -138,7 +138,8 @@ TEST(StaticDeferredAssertion, ModuleLevelDeferredAssumeBecomesAlwaysComb) {
 
 // Several static deferred assertions in one module each get their own implicit
 // always_comb process, just as several separate always_comb procedures would.
-TEST(StaticDeferredAssertion, MultipleStaticDeferredAssertionsEachBecomeAlwaysComb) {
+TEST(StaticDeferredAssertion,
+     MultipleStaticDeferredAssertionsEachBecomeAlwaysComb) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m (input logic a, b, c);\n"

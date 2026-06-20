@@ -114,14 +114,14 @@ TEST(SyncDriveSim, NonCoincidentDriveDefersToNextClockingEvent) {
   SimTime now{10};
   SimTime next_event{20};
   SimTime skew{2};
-  EXPECT_EQ(SynchronousDriveEffectiveTime(now, /*event_now=*/true, next_event,
-                                          skew)
-                .ticks,
-            uint64_t{12});
-  EXPECT_EQ(SynchronousDriveEffectiveTime(now, /*event_now=*/false, next_event,
-                                          skew)
-                .ticks,
-            uint64_t{22});
+  EXPECT_EQ(
+      SynchronousDriveEffectiveTime(now, /*event_now=*/true, next_event, skew)
+          .ticks,
+      uint64_t{12});
+  EXPECT_EQ(
+      SynchronousDriveEffectiveTime(now, /*event_now=*/false, next_event, skew)
+          .ticks,
+      uint64_t{22});
 }
 
 // §14.16: the implicit driver created on a net target has (strong1, strong0)
@@ -143,4 +143,4 @@ TEST(SyncDriveSim, ClockvarNetDriverInitIsHighZ) {
   EXPECT_EQ(v.words[0].bval, 0xFFu);
 }
 
-}
+}  // namespace

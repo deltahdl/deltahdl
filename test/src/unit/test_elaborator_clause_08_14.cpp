@@ -107,4 +107,4 @@ TEST(OverriddenMemberElaboration, NonOverriddenMemberThroughBaseOk) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

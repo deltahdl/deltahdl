@@ -54,7 +54,7 @@ TEST(OperatorElaboration, BinaryCaseNeqElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(EqualityOperatorElaboration,AlwaysCombEqualityCheck) {
+TEST(EqualityOperatorElaboration, AlwaysCombEqualityCheck) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -80,7 +80,7 @@ TEST(EqualityOperatorElaboration,AlwaysCombEqualityCheck) {
   EXPECT_EQ(y->value.ToUint64(), 1u);
 }
 
-TEST(EqualityOperatorElaboration,BlockingAssignComparisonOps) {
+TEST(EqualityOperatorElaboration, BlockingAssignComparisonOps) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -150,4 +150,4 @@ TEST(OperatorElaboration, ChandleInequalityWithNullElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

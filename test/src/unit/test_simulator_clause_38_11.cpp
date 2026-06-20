@@ -122,5 +122,5 @@ TEST_F(VpiGetStringSim, ProtectedObjectIsAnError) {
   EXPECT_NE(info.level, 0);
 }
 
-}
-}
+}  // namespace
+}  // namespace delta

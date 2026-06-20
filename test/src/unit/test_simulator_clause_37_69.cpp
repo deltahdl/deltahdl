@@ -6,16 +6,17 @@
 namespace delta {
 namespace {
 
-// §37.69 Repeat control: the object model diagram draws a repeat control with two
-// unlabeled edges - one to a count expression (the vpiExpr relation) and one to an
-// event control (the vpiEventControl relation). It carries no numbered Details and
-// no 'shall' sentences. These tests observe the production code that serves the
-// diagram's relations: the count edge through the dedicated helper
-// VpiRepeatControlExpr (wired into VpiHandleC), and the event-control edge through
-// the generic traversal, since an event control's own type is vpiEventControl.
+// §37.69 Repeat control: the object model diagram draws a repeat control with
+// two unlabeled edges - one to a count expression (the vpiExpr relation) and
+// one to an event control (the vpiEventControl relation). It carries no
+// numbered Details and no 'shall' sentences. These tests observe the production
+// code that serves the diagram's relations: the count edge through the
+// dedicated helper VpiRepeatControlExpr (wired into VpiHandleC), and the
+// event-control edge through the generic traversal, since an event control's
+// own type is vpiEventControl.
 
-// The fixture installs a context so the public VpiHandleC entry point runs its real
-// dispatch over the test objects.
+// The fixture installs a context so the public VpiHandleC entry point runs its
+// real dispatch over the test objects.
 class RepeatControl : public ::testing::Test {
  protected:
   void SetUp() override { SetGlobalVpiContext(&ctx_); }
@@ -39,9 +40,9 @@ TEST_F(RepeatControl, RepeatControlReachesCountThroughVpiExpr) {
   EXPECT_EQ(VpiHandleC(vpiExpr, &repeat_control), &count);
 }
 
-// Count edge: the count is found even when the event control child precedes it in
-// the child list. The scan skips the non-expression event control and returns the
-// first expression child.
+// Count edge: the count is found even when the event control child precedes it
+// in the child list. The scan skips the non-expression event control and
+// returns the first expression child.
 TEST_F(RepeatControl, CountFoundWhenItFollowsTheEventControlChild) {
   VpiObject event_control;
   event_control.type = vpiEventControl;  // a non-expression child, listed first
@@ -70,10 +71,10 @@ TEST_F(RepeatControl, CountIsNullWhenAbsentOrHandleNull) {
   EXPECT_EQ(VpiRepeatControlExpr(&bare_repeat), nullptr);
 }
 
-// Count edge is scoped to the repeat control: asking another object that owns an
-// expression child for vpiExpr through this path does not pick up that child. A
-// while statement reaches an expression only through vpiCondition (§37.66), so it
-// reports nothing through the vpiExpr count edge owned here.
+// Count edge is scoped to the repeat control: asking another object that owns
+// an expression child for vpiExpr through this path does not pick up that
+// child. A while statement reaches an expression only through vpiCondition
+// (§37.66), so it reports nothing through the vpiExpr count edge owned here.
 TEST_F(RepeatControl, VpiExprCountIsScopedToRepeatControl) {
   VpiObject expr_child;
   expr_child.type = vpiOperation;
@@ -86,8 +87,8 @@ TEST_F(RepeatControl, VpiExprCountIsScopedToRepeatControl) {
 }
 
 // Event-control edge (the diagram's other unlabeled arrow): a repeat control
-// reaches its event control through the generic vpiEventControl traversal, since an
-// event control's own type is vpiEventControl.
+// reaches its event control through the generic vpiEventControl traversal,
+// since an event control's own type is vpiEventControl.
 TEST_F(RepeatControl, EventControlReachedThroughGenericTraversal) {
   VpiObject count;
   count.type = vpiOperation;

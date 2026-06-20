@@ -324,4 +324,4 @@ TEST(ArrayArgPassing, DynamicArrayCallerUnchanged) {
   EXPECT_EQ(v, 42u);
 }
 
-}
+}  // namespace

@@ -66,4 +66,4 @@ TEST(NamedEventWaitPreprocessor, TriggerOperatorSurvivesPreprocessor) {
   EXPECT_NE(result.find("-> ev"), std::string::npos);
 }
 
-}
+}  // namespace

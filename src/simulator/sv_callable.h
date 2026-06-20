@@ -56,4 +56,4 @@ class SvCallableContext {
   std::vector<CallFrame> stack_;
 };
 
-}
+}  // namespace delta

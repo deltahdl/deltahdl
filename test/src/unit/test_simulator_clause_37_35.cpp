@@ -14,12 +14,14 @@ namespace {
 // switch, or UDP) and the prim-term objects that carry its terminals. The
 // diagram's property labels (vpiDefName, vpiName/vpiFullName, vpiPrimType,
 // vpiStrength0/1, the array-member booleans) and structural edges (to module,
-// primitive array, udp defn, the delay expr, and the prim term's value/direction)
-// are read by the generic object-model machinery and the value/delay routines
-// owned by other subclauses. The four numbered Details carry this clause's own
-// rules, and the tests below observe the production code that applies them:
-//   D1 - vpiSize returns a primitive's number of inputs (the kVpiSize dispatch).
-//   D2 - vpi_put_value() is allowed only on a sequential UDP primitive
+// primitive array, udp defn, the delay expr, and the prim term's
+// value/direction) are read by the generic object-model machinery and the
+// value/delay routines owned by other subclauses. The four numbered Details
+// carry this clause's own rules, and the tests below observe the production
+// code that applies them:
+//   D1 - vpiSize returns a primitive's number of inputs (the kVpiSize
+//   dispatch). D2 - vpi_put_value() is allowed only on a sequential UDP
+//   primitive
 //        (the guard at the head of PutValue).
 //   D3 - vpiTermIndex reports a prim term's terminal order, first index zero
 //        (the vpiTermIndex dispatch).

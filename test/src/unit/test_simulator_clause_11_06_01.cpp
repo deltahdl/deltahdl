@@ -113,9 +113,8 @@ TEST(ExpressionBitLength, ShiftWidthIsLhsWidth) {
   MakeVar(f, "sv", 8, 0xFF);
   MakeVar(f, "sh", 16, 2);
 
-  for (TokenKind op :
-       {TokenKind::kLtLt, TokenKind::kGtGt, TokenKind::kLtLtLt,
-        TokenKind::kGtGtGt}) {
+  for (TokenKind op : {TokenKind::kLtLt, TokenKind::kGtGt, TokenKind::kLtLtLt,
+                       TokenKind::kGtGtGt}) {
     auto* expr =
         MakeBinary(f.arena, op, MakeId(f.arena, "sv"), MakeId(f.arena, "sh"));
     auto result = EvalExpr(expr, f.ctx, f.arena);
@@ -138,10 +137,9 @@ TEST(ExpressionBitLength, ReductionOpsProduceOneBit) {
   SimFixture f;
   MakeVar(f, "rv", 8, 0xFF);
 
-  for (TokenKind op :
-       {TokenKind::kAmp, TokenKind::kTildeAmp, TokenKind::kPipe,
-        TokenKind::kTildePipe, TokenKind::kCaret, TokenKind::kTildeCaret,
-        TokenKind::kCaretTilde}) {
+  for (TokenKind op : {TokenKind::kAmp, TokenKind::kTildeAmp, TokenKind::kPipe,
+                       TokenKind::kTildePipe, TokenKind::kCaret,
+                       TokenKind::kTildeCaret, TokenKind::kCaretTilde}) {
     auto* expr = MakeUnary(f.arena, op, MakeId(f.arena, "rv"));
     auto result = EvalExpr(expr, f.ctx, f.arena);
     EXPECT_EQ(result.width, 1u);
@@ -179,13 +177,13 @@ TEST(ExpressionBitLength, ImplicationAndEquivalenceProduceOneBit) {
   MakeVar(f, "ib", 8, 0);
 
   auto* impl = MakeBinary(f.arena, TokenKind::kArrow, MakeId(f.arena, "ia"),
-                           MakeId(f.arena, "ib"));
+                          MakeId(f.arena, "ib"));
   auto r1 = EvalExpr(impl, f.ctx, f.arena);
   EXPECT_EQ(r1.width, 1u);
   EXPECT_EQ(r1.ToUint64(), 0u);
 
-  auto* equiv = MakeBinary(f.arena, TokenKind::kLtDashGt,
-                           MakeId(f.arena, "ia"), MakeId(f.arena, "ib"));
+  auto* equiv = MakeBinary(f.arena, TokenKind::kLtDashGt, MakeId(f.arena, "ia"),
+                           MakeId(f.arena, "ib"));
   auto r2 = EvalExpr(equiv, f.ctx, f.arena);
   EXPECT_EQ(r2.width, 1u);
   EXPECT_EQ(r2.ToUint64(), 0u);
@@ -196,12 +194,11 @@ TEST(ExpressionBitLength, ComparisonOpsProduceOneBit) {
   MakeVar(f, "ca", 16, 5);
   MakeVar(f, "cb", 8, 5);
 
-  for (TokenKind op :
-       {TokenKind::kEqEq, TokenKind::kBangEq, TokenKind::kEqEqEq,
-        TokenKind::kBangEqEq, TokenKind::kLt, TokenKind::kGt,
-        TokenKind::kLtEq, TokenKind::kGtEq}) {
-    auto* expr = MakeBinary(f.arena, op, MakeId(f.arena, "ca"),
-                            MakeId(f.arena, "cb"));
+  for (TokenKind op : {TokenKind::kEqEq, TokenKind::kBangEq, TokenKind::kEqEqEq,
+                       TokenKind::kBangEqEq, TokenKind::kLt, TokenKind::kGt,
+                       TokenKind::kLtEq, TokenKind::kGtEq}) {
+    auto* expr =
+        MakeBinary(f.arena, op, MakeId(f.arena, "ca"), MakeId(f.arena, "cb"));
     auto result = EvalExpr(expr, f.ctx, f.arena);
     EXPECT_EQ(result.width, 1u);
   }
@@ -265,11 +262,10 @@ TEST(ExpressionBitLength, ArithmeticResultUsesMaxOperandWidth) {
   SimFixture f;
   MakeVar(f, "aw8", 8, 0xFF);
   MakeVar(f, "bw16", 16, 0x0001);
-  for (TokenKind op :
-       {TokenKind::kPlus, TokenKind::kMinus, TokenKind::kStar,
-        TokenKind::kSlash, TokenKind::kPercent, TokenKind::kAmp,
-        TokenKind::kPipe, TokenKind::kCaret, TokenKind::kCaretTilde,
-        TokenKind::kTildeCaret}) {
+  for (TokenKind op : {TokenKind::kPlus, TokenKind::kMinus, TokenKind::kStar,
+                       TokenKind::kSlash, TokenKind::kPercent, TokenKind::kAmp,
+                       TokenKind::kPipe, TokenKind::kCaret,
+                       TokenKind::kCaretTilde, TokenKind::kTildeCaret}) {
     auto* expr = MakeBinary(f.arena, op, MakeId(f.arena, "aw8"),
                             MakeId(f.arena, "bw16"));
     auto result = EvalExpr(expr, f.ctx, f.arena);
@@ -357,4 +353,4 @@ TEST(ExpressionBitLength, ReplicationElementIsSelfDetermined) {
   EXPECT_EQ(result.ToUint64(), 0u);
 }
 
-}
+}  // namespace

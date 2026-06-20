@@ -158,4 +158,4 @@ TEST(TaskLifetimeParsing, AutoTaskWithVariousTypes) {
   EXPECT_EQ(t->func_body_stmts[2]->var_decl_type.kind, DataTypeKind::kReal);
 }
 
-}
+}  // namespace

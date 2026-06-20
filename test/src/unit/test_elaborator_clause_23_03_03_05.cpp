@@ -214,4 +214,4 @@ TEST(UnpackedArrayPortsAndArraysOfInstancesElaboration,
              "endmodule\n"));
 }
 
-}
+}  // namespace

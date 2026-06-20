@@ -15,8 +15,9 @@ struct Variable;
 // §21.7.5 (Table 21-11): SystemVerilog does not extend the IEEE Std 1364-2005
 // VCD format, so a SystemVerilog data type is dumped by masquerading as a
 // 1364-2005 type. This selects which type the dumped object maps to. kNet keeps
-// the net mapping of §21.7.2.3 (wire) and is the default so nets and the 4-state
-// objects of the earlier subclauses keep their existing declaration form.
+// the net mapping of §21.7.2.3 (wire) and is the default so nets and the
+// 4-state objects of the earlier subclauses keep their existing declaration
+// form.
 enum class VcdDataType : uint8_t {
   kNet,       // a net: var_type wire (§21.7.2.3)
   kBit,       // -> reg, size = total packed dimension
@@ -102,8 +103,8 @@ class VcdWriter {
   bool IsEnabled() const { return enabled_; }
 
   // Read the dump file during simulation (§21.7.1.6): push any buffered output
-  // out to the file so an application reading the file mid-simulation sees every
-  // value change recorded so far. The dump state is untouched, so dumping
+  // out to the file so an application reading the file mid-simulation sees
+  // every value change recorded so far. The dump state is untouched, so dumping
   // continues afterward exactly as before and no value changes are lost.
   void Flush();
 
@@ -137,10 +138,10 @@ class VcdWriter {
   // Emit a real value change (§21.7.2.1): real variables are dumped as real
   // numbers using a %.16g format so all 53 mantissa bits are preserved.
   void WriteRealChange(const VcdSignal& sig);
-  // Emit a port value change in the extended VCD form (§21.7.4.3, Syntax 21-29):
-  // the key character p, the port_value state character(s), the strength0 and
-  // strength1 strength components, then the port's identifier code (< followed by
-  // its integer code as written in the $var declaration).
+  // Emit a port value change in the extended VCD form (§21.7.4.3, Syntax
+  // 21-29): the key character p, the port_value state character(s), the
+  // strength0 and strength1 strength components, then the port's identifier
+  // code (< followed by its integer code as written in the $var declaration).
   void WritePortValueChange(const VcdSignal& sig);
   void WriteSignalChange(const VcdSignal& sig);
   void WriteSignalAllX(const VcdSignal& sig);
@@ -161,4 +162,4 @@ class VcdWriter {
   uint32_t next_port_id_ = 0;
 };
 
-}
+}  // namespace delta

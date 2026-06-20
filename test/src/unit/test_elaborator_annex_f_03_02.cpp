@@ -20,12 +20,12 @@ std::vector<std::string> Labels(GrammarProduction production) {
 // §F.3.2: the unclocked sequence production R lists eleven alternatives, from
 // the bare Boolean through the two repetition forms.
 TEST(AbstractGrammar, UnclockedSequenceProductionForms) {
-  EXPECT_EQ(Labels(GrammarProduction::kUnclockedSequence),
-            (std::vector<std::string>{
-                "boolean", "local variable declaration",
-                "local variable sampling", "parenthesis", "concatenation",
-                "fusion", "or", "intersect", "first match", "null repetition",
-                "unbounded repetition"}));
+  EXPECT_EQ(
+      Labels(GrammarProduction::kUnclockedSequence),
+      (std::vector<std::string>{
+          "boolean", "local variable declaration", "local variable sampling",
+          "parenthesis", "concatenation", "fusion", "or", "intersect",
+          "first match", "null repetition", "unbounded repetition"}));
 }
 
 // §F.3.2: the clocked sequence production S adds the clock form and keeps only
@@ -81,19 +81,19 @@ TEST(AbstractGrammar, ClockedPropertyProductionForms) {
 // §F.3.2: the unclocked top-level property T is a plain property, a
 // disable-iff guarded property, a declaration, or a parenthesized form.
 TEST(AbstractGrammar, UnclockedTopLevelPropertyProductionForms) {
-  EXPECT_EQ(Labels(GrammarProduction::kUnclockedTopLevelProperty),
-            (std::vector<std::string>{"plain", "disable",
-                                      "local variable declaration",
-                                      "parenthesis"}));
+  EXPECT_EQ(
+      Labels(GrammarProduction::kUnclockedTopLevelProperty),
+      (std::vector<std::string>{"plain", "disable",
+                                "local variable declaration", "parenthesis"}));
 }
 
 // §F.3.2: the clocked top-level property U has the same four shapes as T but
 // over the clocked property Q.
 TEST(AbstractGrammar, ClockedTopLevelPropertyProductionForms) {
-  EXPECT_EQ(Labels(GrammarProduction::kClockedTopLevelProperty),
-            (std::vector<std::string>{"plain", "disable",
-                                      "local variable declaration",
-                                      "parenthesis"}));
+  EXPECT_EQ(
+      Labels(GrammarProduction::kClockedTopLevelProperty),
+      (std::vector<std::string>{"plain", "disable",
+                                "local variable declaration", "parenthesis"}));
 }
 
 // §F.3.2: an assertion A is an always/initial assertion, either with an
@@ -147,8 +147,8 @@ TEST(AbstractGrammar, SequenceModelRepresentsUnclockedForms) {
 // §F.3.2: S is exactly R with a clock form. A sequence is clocked precisely
 // when the @( b ) form occurs within it.
 TEST(AbstractGrammar, ClockFormDistinguishesClockedSequences) {
-  auto unclocked = SeqConcat(SeqBoolean(BoolAtom("a")),
-                             SeqBoolean(BoolAtom("b")));
+  auto unclocked =
+      SeqConcat(SeqBoolean(BoolAtom("a")), SeqBoolean(BoolAtom("b")));
   EXPECT_FALSE(ContainsClock(*unclocked));
 
   auto clocked = SeqClock(BoolAtom("clk"), SeqBoolean(BoolAtom("a")));

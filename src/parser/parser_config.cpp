@@ -1,6 +1,6 @@
-#include "parser/parser.h"
-
 #include <format>
+
+#include "parser/parser.h"
 
 namespace delta {
 
@@ -164,8 +164,8 @@ ConfigDecl* Parser::ParseConfigDecl() {
                               decl->name));
 
       Consume();
-      while (!Check(TokenKind::kSemicolon) && !Check(TokenKind::kKwEndconfig)
-             && !AtEnd()) {
+      while (!Check(TokenKind::kSemicolon) && !Check(TokenKind::kKwEndconfig) &&
+             !AtEnd()) {
         Consume();
       }
       if (Check(TokenKind::kSemicolon)) Consume();
@@ -175,9 +175,9 @@ ConfigDecl* Parser::ParseConfigDecl() {
   }
 
   if (!has_design) {
-    diag_.Error(decl->range.start,
-                std::format("config '{}' is missing a 'design' statement",
-                            decl->name));
+    diag_.Error(
+        decl->range.start,
+        std::format("config '{}' is missing a 'design' statement", decl->name));
   }
 
   Expect(TokenKind::kKwEndconfig);
@@ -186,4 +186,4 @@ ConfigDecl* Parser::ParseConfigDecl() {
   return decl;
 }
 
-}
+}  // namespace delta

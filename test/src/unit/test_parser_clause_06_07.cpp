@@ -102,11 +102,13 @@ TEST(NetDeclarationSyntax, InterconnectMultipleIdentifiers) {
 }
 
 TEST(DriveStrengthSyntax, Strength0ThenStrength1) {
-  EXPECT_TRUE(ParseOk("module m; wire (strong0, strong1) w = 1'b1; endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m; wire (strong0, strong1) w = 1'b1; endmodule\n"));
 }
 
 TEST(DriveStrengthSyntax, Strength1ThenStrength0) {
-  EXPECT_TRUE(ParseOk("module m; wire (strong1, strong0) w = 1'b1; endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m; wire (strong1, strong0) w = 1'b1; endmodule\n"));
 }
 
 TEST(DriveStrengthSyntax, Strength0ThenHighz1) {
@@ -118,25 +120,35 @@ TEST(DriveStrengthSyntax, Strength1ThenHighz0) {
 }
 
 TEST(DriveStrengthSyntax, Highz0ThenStrength1) {
-  EXPECT_TRUE(ParseOk("module m; wire (highz0, supply1) w = 1'b1; endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m; wire (highz0, supply1) w = 1'b1; endmodule\n"));
 }
 
 TEST(DriveStrengthSyntax, Highz1ThenStrength0) {
-  EXPECT_TRUE(ParseOk("module m; wire (highz1, supply0) w = 1'b1; endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m; wire (highz1, supply0) w = 1'b1; endmodule\n"));
 }
 
 TEST(Strength0Keywords, EachKeyword) {
-  EXPECT_TRUE(ParseOk("module m; wire (supply0, strong1) w = 1'b1; endmodule\n"));
-  EXPECT_TRUE(ParseOk("module m; wire (strong0, strong1) w = 1'b1; endmodule\n"));
-  EXPECT_TRUE(ParseOk("module m; wire (pull0,   strong1) w = 1'b1; endmodule\n"));
-  EXPECT_TRUE(ParseOk("module m; wire (weak0,   strong1) w = 1'b1; endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m; wire (supply0, strong1) w = 1'b1; endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m; wire (strong0, strong1) w = 1'b1; endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m; wire (pull0,   strong1) w = 1'b1; endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m; wire (weak0,   strong1) w = 1'b1; endmodule\n"));
 }
 
 TEST(Strength1Keywords, EachKeyword) {
-  EXPECT_TRUE(ParseOk("module m; wire (strong0, supply1) w = 1'b1; endmodule\n"));
-  EXPECT_TRUE(ParseOk("module m; wire (strong0, strong1) w = 1'b1; endmodule\n"));
-  EXPECT_TRUE(ParseOk("module m; wire (strong0, pull1)   w = 1'b1; endmodule\n"));
-  EXPECT_TRUE(ParseOk("module m; wire (strong0, weak1)   w = 1'b1; endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m; wire (strong0, supply1) w = 1'b1; endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m; wire (strong0, strong1) w = 1'b1; endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m; wire (strong0, pull1)   w = 1'b1; endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m; wire (strong0, weak1)   w = 1'b1; endmodule\n"));
 }
 
 TEST(ChargeStrengthSyntax, NonTriregKeywordRejectsChargeStrength) {
@@ -261,4 +273,4 @@ TEST(NetDeclAssignmentForm, IdentifierWithInitExpression) {
   EXPECT_NE(items[0]->init_expr, nullptr);
 }
 
-}
+}  // namespace

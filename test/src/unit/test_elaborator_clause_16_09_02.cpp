@@ -54,19 +54,19 @@ TEST(RepetitionContext, GotoAndNonconsecutiveRequireBareBoolean) {
   // §16.9.2: goto and nonconsecutive repetition operate only on Boolean
   // expressions, and not on a Boolean to which a sequence_match_item (see
   // §16.10/§16.11) has been attached.
-  EXPECT_FALSE(IsRepetitionAllowedOn(RepetitionKind::kGoto,
-                                     /*operand_is_boolean_expr=*/false,
-                                     /*boolean_has_attached_match_item=*/false));
+  EXPECT_FALSE(
+      IsRepetitionAllowedOn(RepetitionKind::kGoto,
+                            /*operand_is_boolean_expr=*/false,
+                            /*boolean_has_attached_match_item=*/false));
   EXPECT_TRUE(IsRepetitionAllowedOn(RepetitionKind::kGoto,
                                     /*operand_is_boolean_expr=*/true,
                                     /*boolean_has_attached_match_item=*/false));
   EXPECT_FALSE(IsRepetitionAllowedOn(RepetitionKind::kGoto,
                                      /*operand_is_boolean_expr=*/true,
                                      /*boolean_has_attached_match_item=*/true));
-  EXPECT_FALSE(IsRepetitionAllowedOn(
-      RepetitionKind::kNonconsecutive,
-      /*operand_is_boolean_expr=*/true,
-      /*boolean_has_attached_match_item=*/true));
+  EXPECT_FALSE(IsRepetitionAllowedOn(RepetitionKind::kNonconsecutive,
+                                     /*operand_is_boolean_expr=*/true,
+                                     /*boolean_has_attached_match_item=*/true));
 }
 
 TEST(RepetitionZero, OnlyConsecutivePermitsZeroIterations) {
@@ -79,4 +79,4 @@ TEST(RepetitionZero, OnlyConsecutivePermitsZeroIterations) {
   EXPECT_FALSE(IsZeroRepetitionPermitted(RepetitionKind::kNonconsecutive));
 }
 
-}
+}  // namespace

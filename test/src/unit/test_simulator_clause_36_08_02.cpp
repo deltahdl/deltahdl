@@ -5,8 +5,8 @@
 namespace delta {
 namespace {
 
-// §36.8.2: a compiletf application is typically used to check the correctness of
-// the arguments a user-defined system task or function is given. These stubs
+// §36.8.2: a compiletf application is typically used to check the correctness
+// of the arguments a user-defined system task or function is given. These stubs
 // record that they ran and what single argument they received, so a test can
 // observe the routine actually being invoked.
 const char* g_compiletf_arg = nullptr;
@@ -36,27 +36,29 @@ class CompiletfApplicationRoutine : public ::testing::Test {
 
 // -----------------------------------------------------------------------------
 // §36.8.2: "A compiletf VPI application routine shall be called when the
-// user-defined system task or system function name is encountered during parsing
-// or compiling the SystemVerilog source code." and "shall be called one time for
-// each instance ... in the source description." The when of that call is
-// delegated to §36.10.2 and §38.37.1; what §36.8.2 itself fixes is that compiletf
-// runs while the design is being compiled/built - in contrast to calltf, which
-// runs on every invocation during simulation. That compile-time-per-instance
-// classification is what distinguishes compiletf from the execution-time routine.
+// user-defined system task or system function name is encountered during
+// parsing or compiling the SystemVerilog source code." and "shall be called one
+// time for each instance ... in the source description." The when of that call
+// is delegated to §36.10.2 and §38.37.1; what §36.8.2 itself fixes is that
+// compiletf runs while the design is being compiled/built - in contrast to
+// calltf, which runs on every invocation during simulation. That
+// compile-time-per-instance classification is what distinguishes compiletf from
+// the execution-time routine.
 // -----------------------------------------------------------------------------
 
 TEST_F(CompiletfApplicationRoutine, IsACompileTimeRoutineUnlikeCalltf) {
   // compiletf fires while the simulation data structure is compiled/built...
   EXPECT_TRUE(VpiSystfCallbackFiresAtBuild(VpiSystfCallback::kCompiletf));
-  // ...whereas calltf fires per execution during simulation, not at compile time.
+  // ...whereas calltf fires per execution during simulation, not at compile
+  // time.
   EXPECT_FALSE(VpiSystfCallbackFiresAtBuild(VpiSystfCallback::kCalltf));
 }
 
 // -----------------------------------------------------------------------------
 // §36.8.2: the routine is called when "the user-defined system task or system
 // function name is encountered". Unlike sizetf (functions only, §36.8.1),
-// compiletf applies to both kinds, so the same compiletf application runs whether
-// the registration is a system task or a system function.
+// compiletf applies to both kinds, so the same compiletf application runs
+// whether the registration is a system task or a system function.
 // -----------------------------------------------------------------------------
 
 TEST_F(CompiletfApplicationRoutine, RunsForBothSystemTaskAndSystemFunction) {
@@ -75,7 +77,8 @@ TEST_F(CompiletfApplicationRoutine, RunsForBothSystemTaskAndSystemFunction) {
   ResetCompiletfProbe();
   VpiSystfInvoke(task.compiletf, task.user_data);
   EXPECT_EQ(g_compiletf_calls, 1);
-  // The single argument passed is the registration's user_data, typed as char *.
+  // The single argument passed is the registration's user_data, typed as char
+  // *.
   EXPECT_EQ(g_compiletf_arg, reinterpret_cast<const char*>(&payload));
 
   ResetCompiletfProbe();
@@ -86,8 +89,9 @@ TEST_F(CompiletfApplicationRoutine, RunsForBothSystemTaskAndSystemFunction) {
 
 // -----------------------------------------------------------------------------
 // §36.8.2: "Providing a compiletf routine is optional." A registration that
-// supplies no compiletf application is accepted and reads back with no compiletf,
-// and asking the runtime to run the absent routine is a harmless no-op.
+// supplies no compiletf application is accepted and reads back with no
+// compiletf, and asking the runtime to run the absent routine is a harmless
+// no-op.
 // -----------------------------------------------------------------------------
 
 TEST_F(CompiletfApplicationRoutine, IsOptional) {
@@ -115,7 +119,8 @@ TEST_F(CompiletfApplicationRoutine, IsOptional) {
 // when invoked, receives the registration's user_data as its lone argument.
 // -----------------------------------------------------------------------------
 
-TEST_F(CompiletfApplicationRoutine, SuppliedRoutineRoundTripsAndReceivesUserData) {
+TEST_F(CompiletfApplicationRoutine,
+       SuppliedRoutineRoundTripsAndReceivesUserData) {
   int payload = 0;
 
   VpiSystfData with_compiletf = {};

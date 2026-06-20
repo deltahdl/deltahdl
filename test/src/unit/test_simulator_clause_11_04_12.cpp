@@ -97,4 +97,4 @@ TEST(EvalOp, ConcatBitSelectUsesPackedRangeNMinus1Down0) {
   EXPECT_EQ(mid.ToUint64(), 0u);
 }
 
-}
+}  // namespace

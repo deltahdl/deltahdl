@@ -76,4 +76,4 @@ TEST(SvaEngine, ImpliesIffTreatVacuousPassAsHolding) {
       PropertyResult::kFail);
 }
 
-}
+}  // namespace

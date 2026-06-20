@@ -569,4 +569,4 @@ TEST(TaskAndFunctionParsing, FunctionFormalArgDataTypeInherited) {
   EXPECT_EQ(item->func_args[1].data_type.packed_dim_left->int_val, 3u);
 }
 
-}
+}  // namespace

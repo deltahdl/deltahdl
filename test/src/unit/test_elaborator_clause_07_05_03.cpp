@@ -20,4 +20,4 @@ TEST(DynamicArrayDeleteValidation, DeleteOnUninitializedElaborates) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

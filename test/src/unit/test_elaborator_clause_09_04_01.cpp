@@ -123,4 +123,4 @@ TEST(DelayControlElaboration, NullStatementDelayElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

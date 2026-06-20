@@ -12,7 +12,8 @@
 // and through a variadic form that accepts one index per unpacked dimension.
 // Its declarative requirements are:
 //
-//   C1 - a Get reads, and a Put writes, exactly the scalar value of the selected
+//   C1 - a Get reads, and a Put writes, exactly the scalar value of the
+//   selected
 //        element (bit 0 of that element's canonical word); a logic scalar
 //        carries the full four-state value 0/1/z/x;
 //   C2 - the actual argument's original SystemVerilog ranges index the open
@@ -21,9 +22,9 @@
 //   C3 - multiple unpacked indices select the element row-major, and the
 //        variadic form resolves the same element as the matching numbered form.
 //
-// These tests build an svOpenArrayHandle backed by a real svOpenArrayDesc buffer
-// whose packed dimension is one bit wide (a scalar element) and observe the
-// svdpi.cpp scalar access functions applying those rules.
+// These tests build an svOpenArrayHandle backed by a real svOpenArrayDesc
+// buffer whose packed dimension is one bit wide (a scalar element) and observe
+// the svdpi.cpp scalar access functions applying those rules.
 
 namespace {
 
@@ -88,9 +89,9 @@ TEST(ScalarElementAccess, LogicPutUsesCanonicalEncoding) {
   EXPECT_EQ(data[1].bval & 1u, 1u);
 }
 
-// C1: a Get reads only bit 0 of the element's canonical word; higher bits of the
-// storage word are not part of the scalar value. The handle models: bit arr[0:1]
-// pre-seeded directly so the read cannot be echoing a prior Put.
+// C1: a Get reads only bit 0 of the element's canonical word; higher bits of
+// the storage word are not part of the scalar value. The handle models: bit
+// arr[0:1] pre-seeded directly so the read cannot be echoing a prior Put.
 TEST(ScalarElementAccess, BitGetReadsOnlyBitZero) {
   const svOpenArrayDimRange ranges[] = {{0, 0}, {0, 1}};
   svBitVecVal data[2] = {0xFFFFFFFEu, 0x00000001u};
@@ -119,8 +120,9 @@ TEST(ScalarElementAccess, BitPutTouchesOnlyBitZero) {
 
 // C1: a logic Get decodes only bit 0 of the element's canonical aval/bval pair;
 // the higher bits of the storage word are not part of the scalar. Storage is
-// pre-seeded directly so the read cannot be echoing a prior Put, with garbage in
-// the upper bits to prove they are ignored. The handle models: logic arr [0:3].
+// pre-seeded directly so the read cannot be echoing a prior Put, with garbage
+// in the upper bits to prove they are ignored. The handle models: logic arr
+// [0:3].
 TEST(ScalarElementAccess, LogicGetReadsOnlyBitZero) {
   const svOpenArrayDimRange ranges[] = {{0, 0}, {0, 3}};
   svLogicVecVal data[4] = {{0xFFFFFFFEu, 0xFFFFFFFEu},   // bit0: a=0 b=0 -> 0
@@ -142,7 +144,8 @@ TEST(ScalarElementAccess, LogicGetReadsOnlyBitZero) {
 // logic arr [0:1].
 TEST(ScalarElementAccess, LogicPutTouchesOnlyBitZero) {
   const svOpenArrayDimRange ranges[] = {{0, 0}, {0, 1}};
-  svLogicVecVal data[2] = {{0xAAAAAAAAu, 0x55555555u}, {0xFFFFFFFFu, 0x00000000u}};
+  svLogicVecVal data[2] = {{0xAAAAAAAAu, 0x55555555u},
+                           {0xFFFFFFFFu, 0x00000000u}};
   svOpenArrayDesc desc;
   svOpenArrayHandle h = MakeHandle(data, ranges, 2, &desc);
 
@@ -212,9 +215,9 @@ TEST(ScalarElementAccess, BitTwoDimensionRowMajor) {
   EXPECT_EQ(svGetBitArrElem2(h, 0, 0), 0);
 }
 
-// C3: three unpacked indices select the element row-major over all three unpacked
-// dimensions. The handle models: logic arr [0:1][0:1][0:1], so index (i,j,k)
-// maps to ((i*2 + j)*2 + k).
+// C3: three unpacked indices select the element row-major over all three
+// unpacked dimensions. The handle models: logic arr [0:1][0:1][0:1], so index
+// (i,j,k) maps to ((i*2 + j)*2 + k).
 TEST(ScalarElementAccess, LogicThreeDimensionRowMajor) {
   const svOpenArrayDimRange ranges[] = {{0, 0}, {0, 1}, {0, 1}, {0, 1}};
   svLogicVecVal data[8];
@@ -229,9 +232,9 @@ TEST(ScalarElementAccess, LogicThreeDimensionRowMajor) {
 }
 
 // C3: the bit three-index entry points select the element row-major over three
-// unpacked dimensions, exercising the distinct svPutBitArrElem3/svGetBitArrElem3
-// functions. The handle models: bit arr [0:1][0:1][0:1], so index (i,j,k) maps
-// to ((i*2 + j)*2 + k).
+// unpacked dimensions, exercising the distinct
+// svPutBitArrElem3/svGetBitArrElem3 functions. The handle models: bit arr
+// [0:1][0:1][0:1], so index (i,j,k) maps to ((i*2 + j)*2 + k).
 TEST(ScalarElementAccess, BitThreeDimensionRowMajor) {
   const svOpenArrayDimRange ranges[] = {{0, 0}, {0, 1}, {0, 1}, {0, 1}};
   svBitVecVal data[8] = {0, 0, 0, 0, 0, 0, 0, 0};
@@ -262,8 +265,8 @@ TEST(ScalarElementAccess, LogicTwoDimensionRowMajor) {
   EXPECT_EQ(svGetLogicArrElem2(h, 0, 0), sv_0);
 }
 
-// C3: the variadic forms resolve the same element as the matching numbered form.
-// The handle models: bit arr [0:1][0:2] (two unpacked dimensions).
+// C3: the variadic forms resolve the same element as the matching numbered
+// form. The handle models: bit arr [0:1][0:2] (two unpacked dimensions).
 TEST(ScalarElementAccess, BitVariadicMatchesNumbered) {
   const svOpenArrayDimRange ranges[] = {{0, 0}, {0, 1}, {0, 2}};
   svBitVecVal data[6] = {0, 0, 0, 0, 0, 0};
@@ -292,8 +295,8 @@ TEST(ScalarElementAccess, LogicVariadicMatchesNumbered) {
 }
 
 // C3 edge: the variadic forms supply one index per unpacked dimension. A handle
-// with no unpacked dimensions (only the packed dimension) leaves them nothing to
-// resolve, so a variadic Get returns the zero scalar and a variadic Put is a
+// with no unpacked dimensions (only the packed dimension) leaves them nothing
+// to resolve, so a variadic Get returns the zero scalar and a variadic Put is a
 // no-op. The handle models a degenerate single-packed-dimension descriptor.
 TEST(ScalarElementAccess, VariadicNoUnpackedDimensionsIsNoOp) {
   const svOpenArrayDimRange ranges[] = {{0, 0}};

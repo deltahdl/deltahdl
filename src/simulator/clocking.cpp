@@ -115,15 +115,13 @@ static void RegisterClockWatcher(ClockingManager* mgr, Variable* clk_var,
           return true;
         }
 
-        SampleBlockInputs(mgr, block_name, signals, ctx,
-                          false);
+        SampleBlockInputs(mgr, block_name, signals, ctx, false);
 
         auto* ev = sched.GetEventPool().Acquire();
         auto bn_copy = block_name;
         auto sigs_copy = signals;
         ev->callback = [mgr, bn_copy, sigs_copy, &ctx, &sched]() {
-          SampleBlockInputs(mgr, bn_copy, sigs_copy, ctx,
-                            true);
+          SampleBlockInputs(mgr, bn_copy, sigs_copy, ctx, true);
           mgr->MarkBlockEventTime(bn_copy, sched.CurrentTime());
           mgr->NotifyBlockEvent(bn_copy);
           mgr->InvokeEdgeCallbacks(bn_copy);
@@ -197,12 +195,10 @@ void ClockingManager::NotifyBlockEvent(std::string_view block_name) {
 }
 
 void ClockingManager::RegisterEdgeCallback(std::string_view block_name,
-                                           SimContext& ,
-                                           Scheduler& ,
+                                           SimContext&, Scheduler&,
                                            std::function<void()> cb) {
   auto bn = std::string(block_name);
   edge_callbacks_[bn].push_back(std::move(cb));
-
 }
 
 void ClockingManager::MarkBlockEventTime(std::string_view block_name,
@@ -238,9 +234,9 @@ const ClockingSignal* ClockingManager::FindSignal(
   return nullptr;
 }
 
-Variable* ClockingManager::ResolveClockingMember(
-    std::string_view block_name, std::string_view signal_name,
-    SimContext& ctx) const {
+Variable* ClockingManager::ResolveClockingMember(std::string_view block_name,
+                                                 std::string_view signal_name,
+                                                 SimContext& ctx) const {
   const auto* block = Find(block_name);
   if (!block) return nullptr;
   const auto* sig = FindSignal(*block, signal_name);
@@ -248,4 +244,4 @@ Variable* ClockingManager::ResolveClockingMember(
   return ctx.FindVariable(sig->signal_name);
 }
 
-}
+}  // namespace delta

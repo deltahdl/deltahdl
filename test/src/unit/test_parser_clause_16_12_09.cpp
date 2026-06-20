@@ -11,8 +11,8 @@ bool HasItemKind(ParseResult& r, ModuleItemKind kind) {
   return false;
 }
 
-// §16.12.9: the overlapped followed-by form `sequence_expr #-# property_expr` is
-// accepted at the property level of a concurrent assertion.
+// §16.12.9: the overlapped followed-by form `sequence_expr #-# property_expr`
+// is accepted at the property level of a concurrent assertion.
 TEST(FollowedByPropertyParsing, OverlappedFollowedBy) {
   auto r = Parse(
       "module m;\n"
@@ -24,8 +24,9 @@ TEST(FollowedByPropertyParsing, OverlappedFollowedBy) {
   EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kAssertProperty));
 }
 
-// §16.12.9: the nonoverlapped followed-by form `sequence_expr #=# property_expr`
-// is likewise accepted at the property level of a concurrent assertion.
+// §16.12.9: the nonoverlapped followed-by form `sequence_expr #=#
+// property_expr` is likewise accepted at the property level of a concurrent
+// assertion.
 TEST(FollowedByPropertyParsing, NonoverlappedFollowedBy) {
   auto r = Parse(
       "module m;\n"
@@ -64,4 +65,4 @@ TEST(FollowedByPropertyParsing, FollowedByWithRangedAntecedent) {
   EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kAssertProperty));
 }
 
-}
+}  // namespace

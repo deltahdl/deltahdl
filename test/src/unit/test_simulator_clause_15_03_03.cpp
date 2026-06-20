@@ -166,4 +166,4 @@ TEST(IpcSync, SemaphoreGetFifoPreservesArrivalOrderUnderHeadOfLine) {
   later.h.destroy();
 }
 
-}
+}  // namespace

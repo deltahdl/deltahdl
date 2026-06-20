@@ -76,4 +76,4 @@ TEST(UndefElaboration, UndefDoesNotAffectOtherMacroElaboration) {
   EXPECT_TRUE(found);
 }
 
-}
+}  // namespace

@@ -34,4 +34,4 @@ TEST(TaskDeclPreprocessing, TaskAllDirectionsAndBlocking) {
   EXPECT_GE(task->func_body_stmts.size(), 1u);
 }
 
-}
+}  // namespace

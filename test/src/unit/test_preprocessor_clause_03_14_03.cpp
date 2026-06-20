@@ -74,4 +74,4 @@ TEST(Preprocessor, Timescale_StepRejectedAsPrecision) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-}
+}  // namespace

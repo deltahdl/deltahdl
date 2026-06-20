@@ -187,4 +187,4 @@ TEST(RealConversion, ImplicitNegativeNonTieRoundsToNearest) {
             static_cast<uint32_t>(-2));
 }
 
-}
+}  // namespace

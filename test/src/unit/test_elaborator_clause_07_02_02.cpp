@@ -24,7 +24,8 @@ TEST(StructAssignmentValidation, UnpackedStructMemberDefault_Allowed) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-TEST(StructAssignmentValidation, UnpackedStructWithUnionMemberDefault_Rejected) {
+TEST(StructAssignmentValidation,
+     UnpackedStructWithUnionMemberDefault_Rejected) {
   ElabFixture f;
   ElaborateSrc(
       "module top;\n"
@@ -130,4 +131,4 @@ TEST(StructAssignmentValidation,
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-}
+}  // namespace

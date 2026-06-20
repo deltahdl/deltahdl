@@ -5,7 +5,6 @@ using namespace delta;
 namespace {
 
 TEST(SpecifyBlockDeclElaboration, PulsestyleOnModulePathOutputIsError) {
-
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m(input a, output o);\n"
@@ -40,7 +39,8 @@ TEST(SpecifyBlockDeclElaboration, PulsestyleBeforeModulePathIsLegal) {
 // declaration, not just the first one listed. Here the conflicting output (o,
 // already a module path destination) appears second in the list, so the per
 // output scan must still flag it.
-TEST(SpecifyBlockDeclElaboration, ConflictAmongMultiplePulsestyleOutputsIsError) {
+TEST(SpecifyBlockDeclElaboration,
+     ConflictAmongMultiplePulsestyleOutputsIsError) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m(input a, output o, output p);\n"
@@ -54,4 +54,4 @@ TEST(SpecifyBlockDeclElaboration, ConflictAmongMultiplePulsestyleOutputsIsError)
   EXPECT_TRUE(f.has_errors);
 }
 
-}
+}  // namespace

@@ -144,4 +144,4 @@ TEST(InheritanceSimulation, MethodNotFoundReturnsNull) {
   EXPECT_EQ(obj->ResolveMethod("nonexistent"), nullptr);
 }
 
-}
+}  // namespace

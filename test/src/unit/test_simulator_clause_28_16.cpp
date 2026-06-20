@@ -169,8 +169,8 @@ TEST(GateNetDelays, StrengthDoesNotAffectPropagationDelay) {
                 "ComputeGateDelay must take only delay slots and endpoints");
 
   static constexpr StrengthLevel kAllStrengths[] = {
-      StrengthLevel::kSmall, StrengthLevel::kMedium, StrengthLevel::kWeak,
-      StrengthLevel::kLarge, StrengthLevel::kPull,   StrengthLevel::kStrong,
+      StrengthLevel::kSmall,  StrengthLevel::kMedium, StrengthLevel::kWeak,
+      StrengthLevel::kLarge,  StrengthLevel::kPull,   StrengthLevel::kStrong,
       StrengthLevel::kSupply,
   };
   static constexpr Val4 kVals[] = {Val4::kV0, Val4::kV1, Val4::kX, Val4::kZ};
@@ -299,4 +299,4 @@ TEST(GateNetDelays, ProductionTransitionFromXToOneUsesRiseSlot) {
   EXPECT_EQ(f.scheduler.CurrentTime().ticks, 107u);
 }
 
-}
+}  // namespace

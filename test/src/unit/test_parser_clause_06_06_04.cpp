@@ -46,4 +46,4 @@ TEST(TriregParsing, TriregVector) {
   EXPECT_EQ(item->name, "bus");
 }
 
-}
+}  // namespace

@@ -43,8 +43,8 @@ TEST(StrengthCombine, LikeValueThreeSignalsKeepMaxStrength) {
                           StrengthLevel::kPull};
   StrengthSignal strong_one{Val4::kV1, StrengthLevel::kHighz,
                             StrengthLevel::kStrong};
-  auto result = CombineUnambiguous(CombineUnambiguous(weak_one, pull_one),
-                                   strong_one);
+  auto result =
+      CombineUnambiguous(CombineUnambiguous(weak_one, pull_one), strong_one);
   EXPECT_EQ(result.value, Val4::kV1);
   EXPECT_EQ(result.strength1_hi, StrengthLevel::kStrong);
 }
@@ -206,4 +206,4 @@ TEST(StrengthResolution, AllHighzProducesZ) {
   EXPECT_EQ(var->value.words[0].bval & 1u, 1u);
 }
 
-}
+}  // namespace

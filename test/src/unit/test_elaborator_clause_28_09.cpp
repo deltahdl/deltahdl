@@ -75,8 +75,7 @@ TEST(CmosSwitchElaboration, CmosLowersToNestedTernary) {
   ASSERT_NE(rhs->false_expr->condition, nullptr);
   EXPECT_EQ(rhs->false_expr->condition->text, "pctrl");
   ASSERT_NE(rhs->false_expr->true_expr, nullptr);
-  EXPECT_EQ(rhs->false_expr->true_expr->kind,
-            ExprKind::kUnbasedUnsizedLiteral);
+  EXPECT_EQ(rhs->false_expr->true_expr->kind, ExprKind::kUnbasedUnsizedLiteral);
   ASSERT_NE(rhs->false_expr->false_expr, nullptr);
   EXPECT_EQ(rhs->false_expr->false_expr->kind, ExprKind::kIdentifier);
   EXPECT_EQ(rhs->false_expr->false_expr->text, "data");
@@ -123,4 +122,4 @@ TEST(CmosSwitchElaboration, RcmosOutputIsFirstTerminal) {
   EXPECT_EQ(mod->assigns[0].lhs->text, "out");
 }
 
-}
+}  // namespace

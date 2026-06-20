@@ -171,4 +171,4 @@ TEST(LibraryMapCellWrite, ModuleAndNonModuleOfSameNameDoNotWarn) {
   EXPECT_EQ(diag.WarningCount(), 0u);
 }
 
-}
+}  // namespace

@@ -9,10 +9,10 @@
 
 #include "common/types.h"
 #include "parser/ast.h"
-#include "simulator/process.h"
-#include "simulator/evaluation.h"
-#include "simulator/scheduler.h"
 #include "simulator/clocking.h"
+#include "simulator/evaluation.h"
+#include "simulator/process.h"
+#include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
 #include "simulator/statement_assign.h"
 #include "simulator/sync_objects.h"
@@ -66,9 +66,7 @@ struct EventAwaiter {
       if (ev.signal->kind == ExprKind::kIdentifier) {
         var = ctx.FindVariable(ev.signal->text);
       } else if (ev.signal->kind == ExprKind::kMemberAccess) {
-
-        if (ev.signal->lhs &&
-            ev.signal->lhs->kind == ExprKind::kIdentifier) {
+        if (ev.signal->lhs && ev.signal->lhs->kind == ExprKind::kIdentifier) {
           auto* mgr = ctx.GetClockingManager();
           std::string_view member;
           if (ev.signal->rhs && ev.signal->rhs->kind == ExprKind::kIdentifier)
@@ -85,7 +83,6 @@ struct EventAwaiter {
           var = ctx.FindVariable(hier_name);
         }
       } else {
-
         AttachCompoundWatchers(ev, h, proc);
         continue;
       }
@@ -150,8 +147,8 @@ struct EventAwaiter {
   }
 
   static bool HandleEdgeEvent(std::coroutine_handle<>& h, Variable* var,
-                              Edge edge, const Expr* iff_cond,
-                              SimContext& ctx, Process* proc) {
+                              Edge edge, const Expr* iff_cond, SimContext& ctx,
+                              Process* proc) {
     if (!CheckEdge(var, edge)) {
       var->prev_value = var->value;
       return false;
@@ -224,8 +221,8 @@ struct EventAwaiter {
     std::vector<std::string_view> names;
     CollectExprIdentifiers(ev.signal, names);
     if (names.empty()) return;
-    auto prev = std::make_shared<Logic4Vec>(
-        EvalExpr(ev.signal, ctx, ctx.GetArena()));
+    auto prev =
+        std::make_shared<Logic4Vec>(EvalExpr(ev.signal, ctx, ctx.GetArena()));
     auto consumed = std::make_shared<bool>(false);
     auto* ctx_ptr = &ctx;
     const Expr* signal = ev.signal;
@@ -240,11 +237,9 @@ struct EventAwaiter {
             if (proc && !proc->active) return true;
             auto cur = EvalExpr(signal, *ctx_ptr, ctx_ptr->GetArena());
             if (Logic4VecBitsEqual(cur, *prev)) {
-
               return false;
             }
-            if (edge != Edge::kNone &&
-                !CheckEdgeOnValues(*prev, cur, edge)) {
+            if (edge != Edge::kNone && !CheckEdgeOnValues(*prev, cur, edge)) {
               *prev = cur;
               return false;
             }
@@ -316,8 +311,7 @@ struct RepeatEventAwaiter {
       if (ev.signal->kind == ExprKind::kIdentifier) {
         var = ctx.FindVariable(ev.signal->text);
       } else if (ev.signal->kind == ExprKind::kMemberAccess) {
-        if (ev.signal->lhs &&
-            ev.signal->lhs->kind == ExprKind::kIdentifier) {
+        if (ev.signal->lhs && ev.signal->lhs->kind == ExprKind::kIdentifier) {
           auto* mgr = ctx.GetClockingManager();
           std::string_view member;
           if (ev.signal->rhs && ev.signal->rhs->kind == ExprKind::kIdentifier)
@@ -361,24 +355,25 @@ struct RepeatEventAwaiter {
       var->prev_value = var->value;
       Edge edge = ev.edge;
       const Expr* iff_cond = ev.iff_condition;
-      var->AddWatcher([var, edge, iff_cond, ctx_ptr, proc, done, tally]() mutable {
-        if (*done) return true;
-        if (proc && !proc->active) return true;
-        if (proc && proc->is_suspended) return false;
-        if (!EventAwaiter::CheckEdge(var, edge)) {
-          var->prev_value = var->value;
-          return false;
-        }
-        if (iff_cond) {
-          auto val = EvalExpr(iff_cond, *ctx_ptr, ctx_ptr->GetArena());
-          if (val.ToUint64() == 0) {
+      var->AddWatcher(
+          [var, edge, iff_cond, ctx_ptr, proc, done, tally]() mutable {
+            if (*done) return true;
+            if (proc && !proc->active) return true;
+            if (proc && proc->is_suspended) return false;
+            if (!EventAwaiter::CheckEdge(var, edge)) {
+              var->prev_value = var->value;
+              return false;
+            }
+            if (iff_cond) {
+              auto val = EvalExpr(iff_cond, *ctx_ptr, ctx_ptr->GetArena());
+              if (val.ToUint64() == 0) {
+                var->prev_value = var->value;
+                return false;
+              }
+            }
             var->prev_value = var->value;
-            return false;
-          }
-        }
-        var->prev_value = var->value;
-        return tally();
-      });
+            return tally();
+          });
     }
   }
 
@@ -581,15 +576,14 @@ struct CycleDelayAwaiter {
       return;
     }
     auto* counter = new uint32_t(cycles);
-    mgr->RegisterEdgeCallback(
-        block_name, ctx, ctx.GetScheduler(),
-        [h, counter]() mutable {
-          if (*counter > 0) --(*counter);
-          if (*counter == 0) {
-            delete counter;
-            h.resume();
-          }
-        });
+    mgr->RegisterEdgeCallback(block_name, ctx, ctx.GetScheduler(),
+                              [h, counter]() mutable {
+                                if (*counter > 0) --(*counter);
+                                if (*counter == 0) {
+                                  delete counter;
+                                  h.resume();
+                                }
+                              });
   }
 
   void await_resume() const noexcept {}
@@ -655,4 +649,4 @@ struct MailboxPutAwaiter {
   }
 };
 
-}
+}  // namespace delta

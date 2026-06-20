@@ -37,7 +37,8 @@ TEST(UnionParsing, UnionMemberTypeKinds) {
   EXPECT_EQ(item->typedef_type.struct_members[0].type_kind, DataTypeKind::kInt);
   EXPECT_EQ(item->typedef_type.struct_members[1].type_kind,
             DataTypeKind::kLogic);
-  EXPECT_EQ(item->typedef_type.struct_members[2].type_kind, DataTypeKind::kByte);
+  EXPECT_EQ(item->typedef_type.struct_members[2].type_kind,
+            DataTypeKind::kByte);
 }
 
 TEST(UnionParsing, AnonymousUnionInStruct) {
@@ -190,4 +191,4 @@ TEST(UnionParsing, AttributeInstanceOnMember) {
   EXPECT_FALSE(item->typedef_type.struct_members[0].attrs.empty());
 }
 
-}
+}  // namespace

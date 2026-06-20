@@ -67,9 +67,9 @@ TEST_F(VpiErrorCheckSim, SeverityConstantsAreOrderedLowestToHighest) {
   EXPECT_LT(vpiSystem, vpiInternal);
 }
 
-// §38.2 (R1, F1): after a VPI routine fails, vpi_chk_error() returns the error's
-// severity-level constant (not a plain boolean) and fills in the s_vpi_error_info
-// structure describing the error.
+// §38.2 (R1, F1): after a VPI routine fails, vpi_chk_error() returns the
+// error's severity-level constant (not a plain boolean) and fills in the
+// s_vpi_error_info structure describing the error.
 TEST_F(VpiErrorCheckSim, ChkErrorReturnsSeverityLevelAfterError) {
   RaiseError();
 
@@ -95,8 +95,8 @@ TEST_F(VpiErrorCheckSim, OtherRoutineCallResetsErrorStatus) {
   EXPECT_EQ(VpiChkErrorC(nullptr), 0);
 }
 
-// §38.2 (E1, edge): the reset is performed on entry to any VPI routine, not just
-// one. A successful call to the very routine that previously failed - here
+// §38.2 (E1, edge): the reset is performed on entry to any VPI routine, not
+// just one. A successful call to the very routine that previously failed - here
 // vpi_register_systf() with a well-formed name - still clears the prior error,
 // confirming the reset is a general per-routine behavior.
 TEST_F(VpiErrorCheckSim, SuccessfulRoutineCallClearsPriorError) {
@@ -122,5 +122,5 @@ TEST_F(VpiErrorCheckSim, ChkErrorDoesNotResetErrorStatus) {
   EXPECT_EQ(info.level, vpiError);
 }
 
-}
-}
+}  // namespace
+}  // namespace delta

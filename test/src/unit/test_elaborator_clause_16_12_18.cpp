@@ -19,7 +19,8 @@ TEST(TypedPropertyFormal, SequenceRulesCarryOverExceptOverriddenAspects) {
       PropertyFormalRuleAspect::kTypedReferencePlacement));
 }
 
-TEST(TypedPropertyFormal, AllowedTypeKindsIncludePropertySequenceEventOrDataType) {
+TEST(TypedPropertyFormal,
+     AllowedTypeKindsIncludePropertySequenceEventOrDataType) {
   // §16.12.18: a typed formal of a named property shall be `property`,
   // `sequence`, `event`, or one of the types allowed in §16.6. The addition
   // of `property` is what distinguishes this list from the §16.8.1 one.

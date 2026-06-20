@@ -2,7 +2,8 @@
 
 namespace {
 
-// Syntax 23-5 "more" case: a module with many different module items elaborates.
+// Syntax 23-5 "more" case: a module with many different module items
+// elaborates.
 TEST(ModuleContents, MixedItemsElaborate) {
   EXPECT_TRUE(
       ElabOk("module m (input logic clk, output logic [7:0] q);\n"
@@ -225,4 +226,4 @@ TEST(ModuleItemsElaboration, ElabSystemTaskElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

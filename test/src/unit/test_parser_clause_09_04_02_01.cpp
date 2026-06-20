@@ -183,8 +183,8 @@ TEST(EventOrOperatorParsing, CommaListSynonymousWithOrList) {
   ASSERT_EQ(comma_stmt->events.size(), or_stmt->events.size());
   ASSERT_EQ(comma_stmt->events.size(), 3u);
   for (size_t i = 0; i < comma_stmt->events.size(); ++i) {
-    EXPECT_EQ(comma_stmt->events[i].edge, or_stmt->events[i].edge) << "event "
-                                                                   << i;
+    EXPECT_EQ(comma_stmt->events[i].edge, or_stmt->events[i].edge)
+        << "event " << i;
     EXPECT_EQ(comma_stmt->events[i].signal != nullptr,
               or_stmt->events[i].signal != nullptr)
         << "event " << i;
@@ -206,4 +206,4 @@ TEST(EventOrOperatorParsing, InterleavedOrGroupsWithComma) {
   ASSERT_EQ(item->sensitivity.size(), 5u);
 }
 
-}
+}  // namespace

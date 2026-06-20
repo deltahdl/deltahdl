@@ -116,8 +116,8 @@ TEST(TimingCheckCommandParsing, RecremConditionsArePresent) {
 }
 
 // Syntax 31-8 productions delayed_reference and delayed_data each admit the
-// terminal_identifier [ constant_mintypmax_expression ] alternative; the bracket
-// select is captured alongside the terminal name.
+// terminal_identifier [ constant_mintypmax_expression ] alternative; the
+// bracket select is captured alongside the terminal name.
 TEST(TimingCheckCommandParsing, RecremDelayedSignalsAcceptConstantSelect) {
   auto r = Parse(
       "module m;\n"
@@ -135,9 +135,10 @@ TEST(TimingCheckCommandParsing, RecremDelayedSignalsAcceptConstantSelect) {
 }
 
 // The optional trailing arguments of Syntax 31-8 nest independently: a
-// timestamp_condition may be supplied while the following timecheck_condition is
-// omitted, so the argument list closes right after the timestamp slot.
-TEST(TimingCheckCommandParsing, RecremTimestampConditionWithoutTimecheckCondition) {
+// timestamp_condition may be supplied while the following timecheck_condition
+// is omitted, so the argument list closes right after the timestamp slot.
+TEST(TimingCheckCommandParsing,
+     RecremTimestampConditionWithoutTimecheckCondition) {
   auto r = Parse(
       "module m;\n"
       "specify\n"
@@ -171,4 +172,4 @@ TEST(TimingCheckCommandParsing, RecremDelayedReferenceWithoutDelayedData) {
   EXPECT_TRUE(tc->delayed_data.empty());
 }
 
-}
+}  // namespace

@@ -104,13 +104,13 @@ TEST(ConfigCommandLine, MultipleDesignCellsAllBecomeTopModules) {
 TEST(ConfigCommandLine, PrecompiledConfigDrivesBinding) {
   TempPrecompDir tmp;
   auto path = tmp.dir / "lib.dpl";
-  ASSERT_TRUE(PrecompiledLibrary::Save(
-      "module top;\n"
-      "endmodule\n"
-      "config cfg;\n"
-      "  design top;\n"
-      "endconfig\n",
-      "rtlLib", path));
+  ASSERT_TRUE(
+      PrecompiledLibrary::Save("module top;\n"
+                               "endmodule\n"
+                               "config cfg;\n"
+                               "  design top;\n"
+                               "endconfig\n",
+                               "rtlLib", path));
 
   SourceManager mgr;
   Arena arena;
@@ -129,4 +129,4 @@ TEST(ConfigCommandLine, PrecompiledConfigDrivesBinding) {
   EXPECT_EQ(design->top_modules[0]->name, "top");
 }
 
-}
+}  // namespace

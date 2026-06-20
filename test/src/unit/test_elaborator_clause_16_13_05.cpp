@@ -37,12 +37,11 @@ TEST(MulticlockEndPoint, MatchedOperandMustBeNamedInstanceOrSequenceFormal) {
       SequenceMethodOperandKind::kUntypedFormalArgument));
   EXPECT_TRUE(IsSequenceMethodOperandLegal(
       SequenceMethodOperandKind::kSequenceTypedFormalArgument));
-  EXPECT_FALSE(
-      IsSequenceMethodOperandLegal(SequenceMethodOperandKind::kOther));
+  EXPECT_FALSE(IsSequenceMethodOperandLegal(SequenceMethodOperandKind::kOther));
 }
 
-// §16.13.5: the result of matched is a single-bit true/false value that does not
-// depend on where the source sequence match began.
+// §16.13.5: the result of matched is a single-bit true/false value that does
+// not depend on where the source sequence match began.
 TEST(MulticlockEndPoint, MatchedResultIsSingleBitAndStartPointIndependent) {
   EXPECT_TRUE(SequenceMethodResultIsSingleBit());
   EXPECT_FALSE(SequenceMethodResultDependsOnStartPoint());

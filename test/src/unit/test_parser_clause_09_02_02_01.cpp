@@ -82,4 +82,4 @@ TEST(GeneralPurposeAlwaysParsing, NegedgeSensitivity) {
   EXPECT_EQ(item->sensitivity[0].edge, Edge::kNegedge);
 }
 
-}
+}  // namespace

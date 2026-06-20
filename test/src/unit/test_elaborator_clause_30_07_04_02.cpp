@@ -39,7 +39,8 @@ TEST(SpecifyBlockDeclElaboration, ShowcancelledAfterModulePathIsError) {
 // The error applies to any output named in the declaration, not just the
 // first: here the conflicting output is the second entry in the list, so a
 // check that only inspected the head of the list would miss it.
-TEST(SpecifyBlockDeclElaboration, ConflictAmongMultipleShowcancelledOutputsIsError) {
+TEST(SpecifyBlockDeclElaboration,
+     ConflictAmongMultipleShowcancelledOutputsIsError) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m(input a, output o, output p);\n"
@@ -53,4 +54,4 @@ TEST(SpecifyBlockDeclElaboration, ConflictAmongMultipleShowcancelledOutputsIsErr
   EXPECT_TRUE(f.has_errors);
 }
 
-}
+}  // namespace

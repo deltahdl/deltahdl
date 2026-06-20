@@ -72,4 +72,4 @@ TEST(BidirectionalSwitchLexing, Tranif1InstantiationTokenSequence) {
   EXPECT_EQ(tokens[9].kind, TokenKind::kSemicolon);
 }
 
-}
+}  // namespace

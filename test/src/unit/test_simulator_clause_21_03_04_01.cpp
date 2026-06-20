@@ -42,8 +42,8 @@ TEST(IoSystemTaskTest, Ungetc) {
 
 // §21.3.4.1: $fgetc reads a single byte and returns its value; once the data is
 // exhausted the read fails and yields EOF, represented as -1 (0xFFFFFFFF in the
-// 32-bit result). The successful read of 'Z' covers the byte-read behavior, so a
-// separate byte-only test would be redundant.
+// 32-bit result). The successful read of 'Z' covers the byte-read behavior, so
+// a separate byte-only test would be redundant.
 TEST(IoSystemTaskTest, FgetcReturnsEofAtEndOfFile) {
   SimFixture f;
   std::string tmp_path = "/tmp/deltahdl_test_fgetc_eof.txt";
@@ -94,8 +94,8 @@ TEST(IoSystemTaskTest, UngetcReturnsZeroOnSuccess) {
 }
 
 // §21.3.4.1: when the push back cannot be performed, $ungetc sets its result to
-// EOF rather than zero. Pushing EOF itself is rejected by the host stream, which
-// drives the failure branch deterministically.
+// EOF rather than zero. Pushing EOF itself is rejected by the host stream,
+// which drives the failure branch deterministically.
 TEST(IoSystemTaskTest, UngetcReturnsEofOnError) {
   SimFixture f;
   std::string tmp_path = "/tmp/deltahdl_test_ungetc_err.txt";
@@ -110,9 +110,8 @@ TEST(IoSystemTaskTest, UngetcReturnsEofOnError) {
   ASSERT_NE(fd, 0u);
 
   // 0xFFFFFFFF narrows to -1, i.e. EOF, which the stream refuses to push back.
-  auto* ug = MakeSysCall(
-      f.arena, "$ungetc",
-      {MakeInt(f.arena, 0xFFFFFFFFu), MakeInt(f.arena, fd)});
+  auto* ug = MakeSysCall(f.arena, "$ungetc",
+                         {MakeInt(f.arena, 0xFFFFFFFFu), MakeInt(f.arena, fd)});
   EXPECT_EQ(EvalExpr(ug, f.ctx, f.arena).ToUint64(), 0xFFFFFFFFu);
 
   EvalExpr(MakeSysCall(f.arena, "$fclose", {MakeInt(f.arena, fd)}), f.ctx,
@@ -146,4 +145,4 @@ TEST(IoSystemTaskTest, FgetcDistinguishesHighByteFromEof) {
   std::remove(tmp_path.c_str());
 }
 
-}
+}  // namespace

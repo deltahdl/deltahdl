@@ -73,4 +73,4 @@ TEST(KeywordVersionPreprocessing, BeginKeywords1364_2001_GenerateIsKeyword) {
   EXPECT_TRUE(found);
 }
 
-}
+}  // namespace

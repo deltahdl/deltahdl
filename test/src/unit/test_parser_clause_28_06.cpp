@@ -126,4 +126,4 @@ TEST(TristateGateParsing, Bufif0ThreeValueDelay) {
   EXPECT_EQ(item->gate_delay_decay->int_val, 15u);
 }
 
-}
+}  // namespace

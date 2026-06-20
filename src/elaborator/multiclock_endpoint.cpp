@@ -15,17 +15,11 @@ bool MatchedDetectsCrossClockEndPoint(std::string_view source_clock,
   return source_clock != destination_clock;
 }
 
-bool MatchedAllowedOnSequenceWithFormalArguments() {
-  return true;
-}
+bool MatchedAllowedOnSequenceWithFormalArguments() { return true; }
 
-bool MatchedLocalVariableRulesSameAsTriggered() {
-  return true;
-}
+bool MatchedLocalVariableRulesSameAsTriggered() { return true; }
 
-bool MatchedMultipleMatchesTreatedAsOrDisjuncts() {
-  return true;
-}
+bool MatchedMultipleMatchesTreatedAsOrDisjuncts() { return true; }
 
 bool MatchedSynchronizesAcrossClocks() {
   return SequenceMethodStatusPersistence(SequenceMethod::kMatched) ==

@@ -145,4 +145,4 @@ TEST(ModuleItemsParsing, SpecifyBlockThroughPreprocessor) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}
+}  // namespace

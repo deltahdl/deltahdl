@@ -251,4 +251,4 @@ TEST(ChargeDecayProcess, ReBeginsAfterDriverCyclesOffAgain) {
   EXPECT_TRUE(AllBitsX(var->value));
 }
 
-}
+}  // namespace

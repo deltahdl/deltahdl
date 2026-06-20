@@ -91,7 +91,8 @@ TEST(StreamExpressionConcatElaboration, ClassHandleWithLocalMemberRejected) {
 
 // §11.4.14.1: a protected member is likewise inaccessible at the streaming
 // operator, so the handle is illegal as a streaming concatenation operand.
-TEST(StreamExpressionConcatElaboration, ClassHandleWithProtectedMemberRejected) {
+TEST(StreamExpressionConcatElaboration,
+     ClassHandleWithProtectedMemberRejected) {
   ElabFixture f;
   ElaborateSrc(
       "class Hidden;\n"
@@ -154,4 +155,4 @@ TEST(StreamExpressionConcatElaboration, ClassHandleWithPublicMembersAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

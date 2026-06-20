@@ -245,4 +245,4 @@ TEST(AlwaysLatchElaboration, BlockWrappingIncompleteIfNoWarning) {
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
-}
+}  // namespace

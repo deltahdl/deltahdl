@@ -64,4 +64,4 @@ TEST(OperatorParsing, UnaryBitwiseNot) {
   EXPECT_EQ(rhs->op, TokenKind::kTilde);
 }
 
-}
+}  // namespace

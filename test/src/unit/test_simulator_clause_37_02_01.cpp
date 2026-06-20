@@ -28,8 +28,8 @@ class VpiHandleCreationSim : public ::testing::Test {
   VpiContext vpi_ctx_;
 };
 
-// §37.2.1: a tool may answer a request for a handle to an existing object with a
-// new, distinct handle - a different pointer than the original - and two such
+// §37.2.1: a tool may answer a request for a handle to an existing object with
+// a new, distinct handle - a different pointer than the original - and two such
 // distinct handles that refer to the same object are equivalent, so
 // vpi_compare_objects() reports them equal even though their pointers differ.
 TEST_F(VpiHandleCreationSim, DistinctHandlesToSameObjectAreEquivalent) {

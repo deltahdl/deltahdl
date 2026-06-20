@@ -4,7 +4,8 @@ using namespace delta;
 
 namespace {
 
-TEST(ModuleInstanceParameterAssignment, OverrideSuppliesValueToInstanceParameter) {
+TEST(ModuleInstanceParameterAssignment,
+     OverrideSuppliesValueToInstanceParameter) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module child #(parameter int W = 4)();\n"
@@ -35,7 +36,8 @@ TEST(ModuleInstanceParameterAssignment, UnknownParameterNameProducesError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(ModuleInstanceParameterAssignment, PartialOverrideLeavesUnspecifiedAtDefault) {
+TEST(ModuleInstanceParameterAssignment,
+     PartialOverrideLeavesUnspecifiedAtDefault) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module child #(parameter int A = 1,\n"
@@ -77,7 +79,8 @@ TEST(ModuleInstanceParameterAssignment, EmptyExpressionRetainsDefault) {
   EXPECT_EQ(u0->params[0].resolved_value, 7);
 }
 
-TEST(ModuleInstanceParameterAssignment, DifferentInstancesMayUseDifferentMethods) {
+TEST(ModuleInstanceParameterAssignment,
+     DifferentInstancesMayUseDifferentMethods) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module child #(parameter int W = 1)();\n"
@@ -101,4 +104,4 @@ TEST(ModuleInstanceParameterAssignment, DifferentInstancesMayUseDifferentMethods
   EXPECT_EQ(u_named->params[0].resolved_value, 8);
 }
 
-}
+}  // namespace

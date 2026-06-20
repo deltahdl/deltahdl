@@ -116,7 +116,8 @@ TEST(PackedUnionSimulation, SoftPackedUnionNarrowMemberLandsAtLSB) {
   EXPECT_EQ(v, 0x00C3u);
 }
 
-TEST(PackedUnionSimulation, NestedSoftPackedUnion_InnerNarrowWriteLeavesOuterUntouched) {
+TEST(PackedUnionSimulation,
+     NestedSoftPackedUnion_InnerNarrowWriteLeavesOuterUntouched) {
   auto v = RunAndGet(
       "module t;\n"
       "  typedef union soft packed {\n"
@@ -167,4 +168,4 @@ TEST(PackedUnionSimulation, PackedUnionSignedQualifier_SignExtendsOnAssign) {
   EXPECT_EQ(v, 0xFFFFFFFFu);
 }
 
-}
+}  // namespace

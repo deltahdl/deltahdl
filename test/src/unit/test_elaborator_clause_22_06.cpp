@@ -104,4 +104,4 @@ TEST(IfdefElaboration, IfndefElaboratesWhenUndefined) {
   EXPECT_TRUE(found);
 }
 
-}
+}  // namespace

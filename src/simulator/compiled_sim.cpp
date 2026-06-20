@@ -128,4 +128,4 @@ bool ProcessCompiler::HasTimingControlInBlock(const std::vector<Stmt*>& stmts) {
   return false;
 }
 
-}
+}  // namespace delta

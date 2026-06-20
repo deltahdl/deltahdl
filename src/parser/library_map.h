@@ -81,4 +81,4 @@ class LibraryMap {
                        std::vector<std::string>* errors);
 };
 
-}
+}  // namespace delta

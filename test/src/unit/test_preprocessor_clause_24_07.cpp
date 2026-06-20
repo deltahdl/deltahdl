@@ -30,4 +30,4 @@ TEST(ProgramControlTasksPreprocessing, ExitInsideMacroExpansion) {
       HasItemOfKind(r.cu->programs[0]->items, ModuleItemKind::kInitialBlock));
 }
 
-}
+}  // namespace

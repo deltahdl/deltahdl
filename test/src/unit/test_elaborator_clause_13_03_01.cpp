@@ -52,4 +52,4 @@ TEST(StaticAutomaticTask, AutoTaskItemHierRefInInitialError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-}
+}  // namespace

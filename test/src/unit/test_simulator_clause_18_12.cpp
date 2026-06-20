@@ -146,7 +146,8 @@ TEST(ScopeRandomize, NoArgCheckerFailsWhenConstraintFalse) {
 
 // 18.12: "if one or more of those expressions evaluates to false" — a single
 // false expression among several true ones is enough to make the checker
-// return 0, confirming all expressions are evaluated rather than only the first.
+// return 0, confirming all expressions are evaluated rather than only the
+// first.
 TEST(ScopeRandomize, NoArgCheckerFailsIfAnyExpressionFalse) {
   ConstraintSolver solver(1);
   RandVariable a;
@@ -190,4 +191,4 @@ TEST(ScopeRandomize, NoArgCheckerReturnsTrueWithNoConstraints) {
   EXPECT_EQ(solver.GetValue("a"), 17);  // unchanged by the check
 }
 
-}
+}  // namespace

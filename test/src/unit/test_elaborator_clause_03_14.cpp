@@ -66,4 +66,4 @@ TEST(DesignBuildingBlockElaboration, PrecisionFinerByMagnitudeAccepted) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

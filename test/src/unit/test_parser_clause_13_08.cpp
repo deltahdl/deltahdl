@@ -171,4 +171,4 @@ TEST(ParameterizedSubroutineParsing, TaskCallInInitialBlock) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

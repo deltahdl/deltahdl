@@ -44,7 +44,7 @@ TEST(LeadingClockSet, StrongOfSeqGivesSequenceUniqueClock) {
   // semantic leading clock.
   auto seq = ExplicitLeadingClock("posedge clk");
   auto s = LeadingClockSetOf(PropertyLeadingClockForm::kStrongOfMulticlockedSeq,
-                              {}, {}, "", seq);
+                             {}, {}, "", seq);
   EXPECT_TRUE(HasUniqueSemanticLeadingClock(s));
   EXPECT_EQ(*s.begin(), "posedge clk");
 }
@@ -55,7 +55,7 @@ TEST(LeadingClockSet, AndUnionsChildren) {
   LeadingClockSet a{std::string{"posedge clk1"}};
   LeadingClockSet b{std::string{"posedge clk2"}};
   auto s = LeadingClockSetOf(PropertyLeadingClockForm::kAnd, a, b, "",
-                              InheritedLeadingClock());
+                             InheritedLeadingClock());
   EXPECT_EQ(s.size(), 2u);
 }
 
@@ -63,9 +63,8 @@ TEST(LeadingClockSet, ImplicationUsesAntecedentSet) {
   // §16.16.1: m |-> p and m |=> p inherit m's set, not p's.
   LeadingClockSet ante{std::string{"posedge clkA"}};
   LeadingClockSet cons{std::string{"posedge clkC"}};
-  auto s = LeadingClockSetOf(
-      PropertyLeadingClockForm::kOverlappingImplication, ante, cons, "",
-      InheritedLeadingClock());
+  auto s = LeadingClockSetOf(PropertyLeadingClockForm::kOverlappingImplication,
+                             ante, cons, "", InheritedLeadingClock());
   EXPECT_EQ(s.size(), 1u);
   EXPECT_EQ(*s.begin(), "posedge clkA");
 }
@@ -73,9 +72,8 @@ TEST(LeadingClockSet, ImplicationUsesAntecedentSet) {
 TEST(LeadingClockSet, AtCReplacesInheritedInOperandSet) {
   // §16.16.1: @(c) q is obtained from q's set by replacing inherited with c.
   LeadingClockSet a{std::string{InheritedSentinel()}};
-  auto s = LeadingClockSetOf(
-      PropertyLeadingClockForm::kClockedAtProperty, a, {}, "posedge clk",
-      InheritedLeadingClock());
+  auto s = LeadingClockSetOf(PropertyLeadingClockForm::kClockedAtProperty, a,
+                             {}, "posedge clk", InheritedLeadingClock());
   EXPECT_TRUE(HasUniqueSemanticLeadingClock(s));
   EXPECT_EQ(*s.begin(), "posedge clk");
 }
@@ -93,7 +91,7 @@ TEST(LeadingClockSet, WeakOfSeqGivesSequenceUniqueClock) {
   // leading clock — same shape as strong(m).
   auto seq = ExplicitLeadingClock("posedge clk");
   auto s = LeadingClockSetOf(PropertyLeadingClockForm::kWeakOfMulticlockedSeq,
-                              {}, {}, "", seq);
+                             {}, {}, "", seq);
   EXPECT_TRUE(HasUniqueSemanticLeadingClock(s));
   EXPECT_EQ(*s.begin(), "posedge clk");
 }
@@ -102,7 +100,7 @@ TEST(LeadingClockSet, BarePropertyHasInheritedSingleton) {
   // §16.16.1: a property p (with no enclosing clock) has the inherited
   // singleton set.
   auto s = LeadingClockSetOf(PropertyLeadingClockForm::kBareProperty, {}, {},
-                              "", InheritedLeadingClock());
+                             "", InheritedLeadingClock());
   ASSERT_EQ(s.size(), 1u);
   EXPECT_TRUE(IsInheritedSentinel(*s.begin()));
 }
@@ -111,7 +109,7 @@ TEST(LeadingClockSet, ParenthesizedKeepsInnerSet) {
   // §16.16.1: (q) has the leading clock set of q.
   LeadingClockSet inner{std::string{"posedge clkP"}};
   auto s = LeadingClockSetOf(PropertyLeadingClockForm::kParenthesized, inner,
-                              {}, "", InheritedLeadingClock());
+                             {}, "", InheritedLeadingClock());
   EXPECT_EQ(s, inner);
 }
 
@@ -119,7 +117,7 @@ TEST(LeadingClockSet, NotKeepsInnerSet) {
   // §16.16.1: not q has the leading clock set of q.
   LeadingClockSet inner{std::string{"posedge clkN"}};
   auto s = LeadingClockSetOf(PropertyLeadingClockForm::kNot, inner, {}, "",
-                              InheritedLeadingClock());
+                             InheritedLeadingClock());
   EXPECT_EQ(s, inner);
 }
 
@@ -128,7 +126,7 @@ TEST(LeadingClockSet, OrUnionsChildren) {
   LeadingClockSet a{std::string{"posedge clk1"}};
   LeadingClockSet b{std::string{"posedge clk2"}};
   auto s = LeadingClockSetOf(PropertyLeadingClockForm::kOr, a, b, "",
-                              InheritedLeadingClock());
+                             InheritedLeadingClock());
   EXPECT_EQ(s.size(), 2u);
 }
 
@@ -136,9 +134,9 @@ TEST(LeadingClockSet, NonoverlappingImplicationUsesAntecedentSet) {
   // §16.16.1: m |=> p uses m's leading clock set, not p's.
   LeadingClockSet ante{std::string{"posedge clkAnte"}};
   LeadingClockSet cons{std::string{"posedge clkCons"}};
-  auto s = LeadingClockSetOf(
-      PropertyLeadingClockForm::kNonoverlappingImplication, ante, cons, "",
-      InheritedLeadingClock());
+  auto s =
+      LeadingClockSetOf(PropertyLeadingClockForm::kNonoverlappingImplication,
+                        ante, cons, "", InheritedLeadingClock());
   ASSERT_EQ(s.size(), 1u);
   EXPECT_EQ(*s.begin(), "posedge clkAnte");
 }
@@ -147,10 +145,10 @@ TEST(LeadingClockSet, IfThenAndIfElseHaveInheritedSet) {
   // §16.16.1: if (b) q and if (b) q1 else q2 both have the inherited
   // singleton set, regardless of the children's clocks.
   LeadingClockSet inner{std::string{"posedge clkIn"}};
-  auto if_then = LeadingClockSetOf(PropertyLeadingClockForm::kIfThen, inner,
-                                    {}, "", InheritedLeadingClock());
+  auto if_then = LeadingClockSetOf(PropertyLeadingClockForm::kIfThen, inner, {},
+                                   "", InheritedLeadingClock());
   auto if_else = LeadingClockSetOf(PropertyLeadingClockForm::kIfElse, inner,
-                                    inner, "", InheritedLeadingClock());
+                                   inner, "", InheritedLeadingClock());
   ASSERT_EQ(if_then.size(), 1u);
   EXPECT_TRUE(IsInheritedSentinel(*if_then.begin()));
   ASSERT_EQ(if_else.size(), 1u);
@@ -161,7 +159,7 @@ TEST(LeadingClockSet, CaseHasInheritedSet) {
   // §16.16.1: case ... endcase has the inherited singleton set.
   LeadingClockSet branch{std::string{"posedge clkB"}};
   auto s = LeadingClockSetOf(PropertyLeadingClockForm::kCase, branch, {}, "",
-                              InheritedLeadingClock());
+                             InheritedLeadingClock());
   ASSERT_EQ(s.size(), 1u);
   EXPECT_TRUE(IsInheritedSentinel(*s.begin()));
 }
@@ -170,13 +168,12 @@ TEST(LeadingClockSet, TemporalOperatorsHaveInheritedSet) {
   // §16.16.1: nexttime, always, s_eventually, until, and until_with all
   // have the inherited singleton set.
   LeadingClockSet inner{std::string{"posedge clk"}};
-  for (auto form : {PropertyLeadingClockForm::kNexttime,
-                    PropertyLeadingClockForm::kAlways,
-                    PropertyLeadingClockForm::kSEventually,
-                    PropertyLeadingClockForm::kUntil,
-                    PropertyLeadingClockForm::kUntilWith}) {
-    auto s = LeadingClockSetOf(form, inner, inner, "",
-                                InheritedLeadingClock());
+  for (auto form :
+       {PropertyLeadingClockForm::kNexttime, PropertyLeadingClockForm::kAlways,
+        PropertyLeadingClockForm::kSEventually,
+        PropertyLeadingClockForm::kUntil,
+        PropertyLeadingClockForm::kUntilWith}) {
+    auto s = LeadingClockSetOf(form, inner, inner, "", InheritedLeadingClock());
     ASSERT_EQ(s.size(), 1u) << "form index " << static_cast<int>(form);
     EXPECT_TRUE(IsInheritedSentinel(*s.begin()))
         << "form index " << static_cast<int>(form);
@@ -188,9 +185,9 @@ TEST(LeadingClockSet, AcceptOnAndRejectOnKeepOperandSet) {
   // set unchanged.
   LeadingClockSet inner{std::string{"posedge clkX"}};
   auto accept = LeadingClockSetOf(PropertyLeadingClockForm::kAcceptOn, inner,
-                                   {}, "", InheritedLeadingClock());
+                                  {}, "", InheritedLeadingClock());
   auto reject = LeadingClockSetOf(PropertyLeadingClockForm::kRejectOn, inner,
-                                   {}, "", InheritedLeadingClock());
+                                  {}, "", InheritedLeadingClock());
   EXPECT_EQ(accept, inner);
   EXPECT_EQ(reject, inner);
 }
@@ -200,9 +197,9 @@ TEST(LeadingClockSet, SyncAcceptOnAndSyncRejectOnHaveInheritedSet) {
   // inherited singleton set.
   LeadingClockSet inner{std::string{"posedge clkY"}};
   auto sa = LeadingClockSetOf(PropertyLeadingClockForm::kSyncAcceptOn, inner,
-                               {}, "", InheritedLeadingClock());
+                              {}, "", InheritedLeadingClock());
   auto sr = LeadingClockSetOf(PropertyLeadingClockForm::kSyncRejectOn, inner,
-                               {}, "", InheritedLeadingClock());
+                              {}, "", InheritedLeadingClock());
   ASSERT_EQ(sa.size(), 1u);
   EXPECT_TRUE(IsInheritedSentinel(*sa.begin()));
   ASSERT_EQ(sr.size(), 1u);
@@ -217,4 +214,4 @@ TEST(LeadingClockSet, PropertyInstanceMirrorsFlattenedBody) {
   EXPECT_EQ(s, body);
 }
 
-}
+}  // namespace

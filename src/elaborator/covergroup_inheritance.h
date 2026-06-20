@@ -21,8 +21,8 @@ namespace delta {
 
 // §19.4.1: a derived covergroup in one class may itself act as the base
 // covergroup for covergroup inheritance in another class, so the inheritance
-// chain has no fixed depth. A derived covergroup is therefore always eligible to
-// be extended again.
+// chain has no fixed depth. A derived covergroup is therefore always eligible
+// to be extended again.
 bool DerivedCovergroupCanBeExtended();
 
 // §19.4.1: the side of an inheritance relationship from which a covergroup name
@@ -45,15 +45,17 @@ bool CovergroupReferenceResolvesToDerived(bool derived_exists,
                                           CovergroupReferenceSite site);
 
 // §19.4.1: unless the derived covergroup overrides a base component (as
-// described for coverpoints, crosses, and options), every component belonging to
-// the base covergroup is considered to also belong to the derived covergroup.
-// Returns true when the base component is inherited by the derived covergroup.
+// described for coverpoints, crosses, and options), every component belonging
+// to the base covergroup is considered to also belong to the derived
+// covergroup. Returns true when the base component is inherited by the derived
+// covergroup.
 bool BaseComponentBelongsToDerived(bool overridden_in_derived);
 
 // §19.4.1: the role a coverpoint declared in the derived covergroup plays
 // relative to the base covergroup.
 enum class DerivedCoverpointRole : uint8_t {
-  // The name does not occur in the base covergroup, so the derived coverpoint is
+  // The name does not occur in the base covergroup, so the derived coverpoint
+  // is
   // an additional coverage point that is sampled alongside the inherited ones.
   kAdditional,
   // The name matches a base coverpoint, so the derived coverpoint replaces
@@ -101,8 +103,9 @@ struct InheritedCoverageOption {
 bool DerivedOptionOverridesBase(const InheritedCoverageOption& option);
 
 // §19.4.1: the effective value of a coverage option for a derived covergroup. A
-// value specified in the derived covergroup overrides the base; a base value the
-// derived covergroup does not specify still applies to the derived covergroup.
+// value specified in the derived covergroup overrides the base; a base value
+// the derived covergroup does not specify still applies to the derived
+// covergroup.
 int32_t EffectiveDerivedOption(const InheritedCoverageOption& option);
 
 }  // namespace delta

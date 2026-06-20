@@ -35,4 +35,4 @@ TEST(AggregateTypeParsing, AssocArrayLiteralDefaultOnly) {
   EXPECT_EQ(item->init_expr->pattern_keys[0], "default");
 }
 
-}
+}  // namespace

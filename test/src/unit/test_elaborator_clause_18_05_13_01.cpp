@@ -40,9 +40,9 @@ TEST(SoftConstraintVariable, SoftOnRandcInSetMembershipRejected) {
 }
 
 // 18.5.13.1: the restriction applies only to soft constraints. A randc variable
-// is free to appear in an ordinary (hard) constraint, so a class whose only soft
-// constraint is on a rand variable elaborates even though it references a randc
-// member in a hard constraint.
+// is free to appear in an ordinary (hard) constraint, so a class whose only
+// soft constraint is on a rand variable elaborates even though it references a
+// randc member in a hard constraint.
 TEST(SoftConstraintVariable, RandcInHardConstraintNotFlagged) {
   EXPECT_TRUE(
       ElabOk("class C;\n"
@@ -54,8 +54,8 @@ TEST(SoftConstraintVariable, RandcInHardConstraintNotFlagged) {
 }
 
 // 18.5.13.1: the restriction is confined to the soft constraint's own
-// expression. A hard constraint that follows a soft constraint in the same block
-// may freely reference a randc variable; the soft scan ends at the soft
+// expression. A hard constraint that follows a soft constraint in the same
+// block may freely reference a randc variable; the soft scan ends at the soft
 // expression's ';', so the randc named only in the later hard constraint is not
 // flagged and the class elaborates.
 TEST(SoftConstraintVariable, RandcInHardConstraintAfterSoftNotFlagged) {
@@ -82,9 +82,9 @@ TEST(SoftConstraintVariable, RandcInLaterSoftConstraintRejected) {
              "module m; endmodule\n"));
 }
 
-// 18.5.13.1: the soft variable is resolved against the class and its base chain,
-// so a soft constraint on a randc variable inherited from a superclass is
-// likewise rejected.
+// 18.5.13.1: the soft variable is resolved against the class and its base
+// chain, so a soft constraint on a randc variable inherited from a superclass
+// is likewise rejected.
 TEST(SoftConstraintVariable, SoftOnInheritedRandcRejected) {
   EXPECT_FALSE(
       ElabOk("class B;\n"
@@ -97,4 +97,4 @@ TEST(SoftConstraintVariable, SoftOnInheritedRandcRejected) {
              "module m; endmodule\n"));
 }
 
-}
+}  // namespace

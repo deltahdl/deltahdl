@@ -275,4 +275,4 @@ TEST(BlockNameParsing, NamedEmptyForkBlock) {
   EXPECT_EQ(stmt->fork_stmts.size(), 0u);
 }
 
-}
+}  // namespace

@@ -12,8 +12,8 @@ namespace {
 //   vpiUse ->   (instance array, scope, ports, nets, variables, processes,
 //                statements, ... - the long catalog of objects an iterator may
 //                have been created over)
-// There is no BNF and no syntax in this clause; it owns the runtime behaviour of
-// an iterator handle. Two normative pieces belong to it:
+// There is no BNF and no syntax in this clause; it owns the runtime behaviour
+// of an iterator handle. Two normative pieces belong to it:
 //   * the vpiIteratorType property - an iterator reports the kind of object it
 //     walks (the type code handed to vpi_iterate); and
 //   * the vpiUse relation, governed by details 1 and 2: vpi_handle(vpiUse, itr)
@@ -73,9 +73,9 @@ TEST_F(Iterator, UseRecoversTheReferenceHandle) {
 }
 
 // Edge (vpiUse), detail 2: an iterator may have been created over a NULL
-// reference handle, in which case vpi_handle(vpiUse, iterator) returns NULL. The
-// iterator object exists but carries no reference, and the traversal reports the
-// absence as a null result rather than fabricating a handle.
+// reference handle, in which case vpi_handle(vpiUse, iterator) returns NULL.
+// The iterator object exists but carries no reference, and the traversal
+// reports the absence as a null result rather than fabricating a handle.
 TEST_F(Iterator, UseReturnsNullForANullReference) {
   VpiObject iter;
   iter.type = vpiIterator;

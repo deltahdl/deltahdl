@@ -60,9 +60,9 @@ TEST(SvaEngine, EmptyConcatRightCollapsesDelayWithTrue) {
   EXPECT_TRUE(r.append_true);
 }
 
-// §16.9.2.1: matching the 0-tick empty case a[*0] runs one tick shorter than the
-// 1-tick case a[*1]; concatenating across a[*0] ##1 b collapses to ##0 b, one
-// fewer tick than a[*1] ##1 b would spend.
+// §16.9.2.1: matching the 0-tick empty case a[*0] runs one tick shorter than
+// the 1-tick case a[*1]; concatenating across a[*0] ##1 b collapses to ##0 b,
+// one fewer tick than a[*1] ##1 b would spend.
 TEST(SvaEngine, EmptyCaseExecutionOneTickShorter) {
   EmptyConcatResult empty = ConcatEmptyMatch(EmptyConcatSide::kEmptyLeft, 1);
   EXPECT_TRUE(empty.matchable);
@@ -83,8 +83,8 @@ TEST(SvaEngine, EmptyAtZeroDelayNeverMatchesButFusionDoes) {
   EXPECT_FALSE(MatchDelaySequence(b, {0}));
 }
 
-// §16.9.2.1: a repetition admitting both empty and nonempty matches (a[*0:1]) is
-// evaluated as the OR of its empty and nonempty cases; a range that excludes
+// §16.9.2.1: a repetition admitting both empty and nonempty matches (a[*0:1])
+// is evaluated as the OR of its empty and nonempty cases; a range that excludes
 // zero (a[*1:2]) keeps only the nonempty case.
 TEST(SvaEngine, RangeAdmittingEmptyIsOrOfCases) {
   EXPECT_TRUE(MatchEmptyOrNonempty(0, /*empty=*/true, /*nonempty=*/false));
@@ -112,4 +112,4 @@ TEST(SvaEngine, RangeAdmittingEmptyBothCasesMatch) {
   EXPECT_TRUE(MatchEmptyOrNonempty(0, /*empty=*/true, /*nonempty=*/true));
 }
 
-}
+}  // namespace

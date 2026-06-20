@@ -118,8 +118,8 @@ TEST(ConstEval, LongestStaticPrefixHierarchicalRefConstIdx) {
   Arena arena;
   // A constant index applied to a hierarchical reference stays inside the
   // static prefix.
-  auto* mem = MakeMember(arena, MakeMember(arena, MakeId(arena, "top"), "sub"),
-                         "mem");
+  auto* mem =
+      MakeMember(arena, MakeMember(arena, MakeId(arena, "top"), "sub"), "mem");
   auto* sel = MakeSelectExpr(arena, mem, MakeInt(arena, 2));
   EXPECT_EQ(LongestStaticPrefix(sel), "top.sub.mem[2]");
 }
@@ -127,8 +127,8 @@ TEST(ConstEval, LongestStaticPrefixHierarchicalRefConstIdx) {
 TEST(ConstEval, LongestStaticPrefixHierarchicalRefVarIdx) {
   Arena arena;
   // A variable index breaks the static prefix back to the hierarchical name.
-  auto* mem = MakeMember(arena, MakeMember(arena, MakeId(arena, "top"), "sub"),
-                         "mem");
+  auto* mem =
+      MakeMember(arena, MakeMember(arena, MakeId(arena, "top"), "sub"), "mem");
   auto* sel = MakeSelectExpr(arena, mem, MakeId(arena, "i"));
   EXPECT_EQ(LongestStaticPrefix(sel), "top.sub.mem");
 }
@@ -155,8 +155,8 @@ TEST(ConstEval, LongestStaticPrefixVarThenConstIdx) {
 TEST(ConstEval, LongestStaticPrefixConstExprIdx) {
   Arena arena;
   // The select expression may be any constant expression, not just a literal.
-  auto* idx = MakeBinary(arena, TokenKind::kPlus, MakeInt(arena, 1),
-                         MakeInt(arena, 1));
+  auto* idx =
+      MakeBinary(arena, TokenKind::kPlus, MakeInt(arena, 1), MakeInt(arena, 1));
   auto* sel = MakeSelectExpr(arena, MakeId(arena, "m"), idx);
   EXPECT_EQ(LongestStaticPrefix(sel), "m[2]");
 }
@@ -186,4 +186,4 @@ TEST(ConstEval, LongestStaticPrefixPackageRefConstIdx) {
   EXPECT_EQ(LongestStaticPrefix(sel), "pkg::arr[3]");
 }
 
-}
+}  // namespace

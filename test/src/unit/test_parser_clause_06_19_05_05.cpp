@@ -35,4 +35,4 @@ TEST(EnumMethods, NumCallInConditionalParses) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

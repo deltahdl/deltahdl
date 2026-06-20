@@ -40,4 +40,4 @@ TEST(ImplicitEventLexing, AtParenStarParenFollowedByIdentifier) {
   EXPECT_EQ(tokens[4].kind, TokenKind::kIdentifier);
 }
 
-}
+}  // namespace

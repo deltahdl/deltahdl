@@ -27,7 +27,6 @@ static uint32_t LiteralWidth(std::string_view text, uint64_t val) {
   return (val > UINT32_MAX) ? 64 : 32;
 }
 Logic4Vec EvalUnbasedUnsized(const Expr* expr, Arena& arena) {
-
   auto text = expr->text;
   if (text.size() >= 2 && text[0] == '\'') {
     char c = text[1];
@@ -118,7 +117,6 @@ static Logic4Vec ParseBasedXZLiteral(std::string_view text, uint32_t width,
   size_t i = ParseLiteralBase(text, buf, bpd);
   if (i == 0) return vec;
   if (bpd == 0) {
-
     ++i;
     char first = (i < buf.size()) ? buf[i] : '\0';
     if (IsXChar(first) || IsZChar(first)) FillXZ(vec, 0, width, IsXChar(first));
@@ -269,4 +267,4 @@ Logic4Vec EvalStringLiteral(const Expr* expr, Arena& arena) {
   return vec;
 }
 
-}
+}  // namespace delta

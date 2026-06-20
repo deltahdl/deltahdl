@@ -93,4 +93,4 @@ TEST(InheritanceElaboration, FinalDerivedClassOk) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

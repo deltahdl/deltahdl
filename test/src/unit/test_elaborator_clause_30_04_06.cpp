@@ -56,4 +56,4 @@ TEST(MultiplePathDeclarationElaboration, EverySourceInListIsAnEndpoint) {
   EXPECT_TRUE(f.has_errors);
 }
 
-}
+}  // namespace

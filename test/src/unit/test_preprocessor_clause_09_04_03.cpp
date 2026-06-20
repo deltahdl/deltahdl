@@ -39,4 +39,4 @@ TEST(LevelSensitiveEventPreprocessor, WaitKeywordSurvivesPreprocessor) {
   EXPECT_NE(result.find("wait"), std::string::npos);
 }
 
-}
+}  // namespace

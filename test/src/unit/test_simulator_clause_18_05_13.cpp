@@ -242,4 +242,4 @@ TEST(Constraint, DiscardedSoftConstraintDoesNotBiasDistribution) {
   EXPECT_EQ(seen.size(), 2u);
 }
 
-}
+}  // namespace

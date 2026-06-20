@@ -12,8 +12,9 @@
 // (src/simulator/vpi.cpp) applying the mechanism: the simulation provider makes
 // a means available to set a single run-wide default compatibility mode, that
 // default governs every application not using the compile-based scheme of
-// Mechanism 1, only one default is selectable for a given simulation run, and an
-// application needing a different mode obtains it through Mechanism 1 instead.
+// Mechanism 1, only one default is selectable for a given simulation run, and
+// an application needing a different mode obtains it through Mechanism 1
+// instead.
 
 namespace delta {
 namespace {
@@ -80,7 +81,8 @@ TEST_F(VpiDefaultCompatibilityMode, SelectingNativeModeStillLocksTheRun) {
 // §36.12.2.2: the default shall determine the compatibility-mode behavior for
 // all applications not using the compile-based scheme (Mechanism 1). Such an
 // application is governed by the run-wide default.
-TEST_F(VpiDefaultCompatibilityMode, DefaultGovernsApplicationsNotUsingMechanism1) {
+TEST_F(VpiDefaultCompatibilityMode,
+       DefaultGovernsApplicationsNotUsingMechanism1) {
   ASSERT_TRUE(vpi_ctx_.SetDefaultCompatibilityMode(vpiMode1364v2005));
 
   EXPECT_EQ(vpi_ctx_.EffectiveCompatibilityMode(/*uses_mechanism1=*/false,
@@ -88,15 +90,17 @@ TEST_F(VpiDefaultCompatibilityMode, DefaultGovernsApplicationsNotUsingMechanism1
             vpiMode1364v2005);
 }
 
-// §36.12.2.2: an application requiring a different mode in the same run uses the
-// compile-based mechanism to do so. Such an application carries its own mode in
-// its recompiled entry points, so the run-wide default does not apply to it.
+// §36.12.2.2: an application requiring a different mode in the same run uses
+// the compile-based mechanism to do so. Such an application carries its own
+// mode in its recompiled entry points, so the run-wide default does not apply
+// to it.
 TEST_F(VpiDefaultCompatibilityMode, Mechanism1ApplicationKeepsItsOwnMode) {
   ASSERT_TRUE(vpi_ctx_.SetDefaultCompatibilityMode(vpiMode1364v2005));
 
-  EXPECT_EQ(vpi_ctx_.EffectiveCompatibilityMode(/*uses_mechanism1=*/true,
-                                                /*mechanism1_mode=*/vpiMode1800v2009),
-            vpiMode1800v2009);
+  EXPECT_EQ(
+      vpi_ctx_.EffectiveCompatibilityMode(/*uses_mechanism1=*/true,
+                                          /*mechanism1_mode=*/vpiMode1800v2009),
+      vpiMode1800v2009);
 }
 
 }  // namespace

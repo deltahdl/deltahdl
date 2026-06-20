@@ -109,4 +109,4 @@ TEST(CheckerInstantiationGrammar, ElaborationUnresolvedChecker) {
   EXPECT_EQ(top->children[0].resolved, nullptr);
 }
 
-}
+}  // namespace

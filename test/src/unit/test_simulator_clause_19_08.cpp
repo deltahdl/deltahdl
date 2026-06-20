@@ -244,7 +244,8 @@ TEST(Coverage, DefaultGroupCollectsWithoutStart) {
   EXPECT_DOUBLE_EQ(CoverageDB::GetCoverage(g), 100.0);
 }
 
-// LRM 19.8 edge case: a later set_inst_name() replaces an earlier instance name.
+// LRM 19.8 edge case: a later set_inst_name() replaces an earlier instance
+// name.
 TEST(Coverage, SetInstNameOverwrites) {
   CoverageDB db;
   auto* g = db.CreateGroup("cg");
@@ -253,4 +254,4 @@ TEST(Coverage, SetInstNameOverwrites) {
   EXPECT_EQ(g->options.name, "second");
 }
 
-}
+}  // namespace

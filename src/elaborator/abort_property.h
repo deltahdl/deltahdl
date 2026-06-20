@@ -58,10 +58,10 @@ bool AbortConditionContentIsLegal(bool references_local_variable,
 // reports when the explicit clock argument is required.
 bool AbortConditionSampledValueRequiresExplicitClock(SampledValueFunction fn);
 
-// §16.12.14: legality of a sampled value function used inside an abort condition
-// given whether its clock argument was explicitly specified. Only $sampled may
-// omit the explicit clock argument.
-bool AbortConditionSampledValueClockIsWellFormed(SampledValueFunction fn,
-                                                 bool clock_explicitly_specified);
+// §16.12.14: legality of a sampled value function used inside an abort
+// condition given whether its clock argument was explicitly specified. Only
+// $sampled may omit the explicit clock argument.
+bool AbortConditionSampledValueClockIsWellFormed(
+    SampledValueFunction fn, bool clock_explicitly_specified);
 
 }  // namespace delta

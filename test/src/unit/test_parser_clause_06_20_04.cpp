@@ -179,4 +179,4 @@ TEST(LocalparamParsing, PortListLocalparamGroupingIsSticky) {
   EXPECT_EQ(mod->localparam_port_names.count("D"), 0u);
 }
 
-}
+}  // namespace

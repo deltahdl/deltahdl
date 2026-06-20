@@ -70,4 +70,4 @@ TEST(ClassSim, WeakReferenceInstanceIsGcEligible) {
   EXPECT_NE(f.ctx.GetClassObject(handle), nullptr);
 }
 
-}
+}  // namespace

@@ -91,4 +91,4 @@ TEST(ProceduralAssignSim, NonblockingFlowSwapsInSameBlock) {
   EXPECT_EQ(b, 1u);
 }
 
-}
+}  // namespace

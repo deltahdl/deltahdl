@@ -143,4 +143,4 @@ TEST(ForceReleaseElaboration, ForceConcatWithBitSelectVariableIsError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-}
+}  // namespace

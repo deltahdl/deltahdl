@@ -56,12 +56,13 @@ struct LvProperty {
   };
 
   Kind kind = Kind::kStrong;
-  std::shared_ptr<const SequenceExpr> sequence;  // R for strong/weak/implication
-  std::shared_ptr<const BooleanExpr> boolean;    // b for accept_on
-  std::shared_ptr<const LvProperty> lhs;         // sub-property / first operand
-  std::shared_ptr<const LvProperty> rhs;         // second operand
-  std::string local_var_type;                    // t, for the declaration form
-  std::string local_var_name;                    // v, for the declaration form
+  std::shared_ptr<const SequenceExpr>
+      sequence;                                // R for strong/weak/implication
+  std::shared_ptr<const BooleanExpr> boolean;  // b for accept_on
+  std::shared_ptr<const LvProperty> lhs;       // sub-property / first operand
+  std::shared_ptr<const LvProperty> rhs;       // second operand
+  std::string local_var_type;                  // t, for the declaration form
+  std::string local_var_name;                  // v, for the declaration form
 };
 
 std::shared_ptr<const LvProperty> LvStrong(
@@ -69,7 +70,8 @@ std::shared_ptr<const LvProperty> LvStrong(
 std::shared_ptr<const LvProperty> LvWeak(std::shared_ptr<const SequenceExpr> r);
 std::shared_ptr<const LvProperty> LvParen(
     std::shared_ptr<const LvProperty> inner);
-std::shared_ptr<const LvProperty> LvNot(std::shared_ptr<const LvProperty> inner);
+std::shared_ptr<const LvProperty> LvNot(
+    std::shared_ptr<const LvProperty> inner);
 std::shared_ptr<const LvProperty> LvImplication(
     std::shared_ptr<const SequenceExpr> antecedent,
     std::shared_ptr<const LvProperty> consequent);
@@ -101,9 +103,9 @@ struct LvTopLevelProperty {
   Kind kind = Kind::kProperty;
   std::shared_ptr<const BooleanExpr> disable_condition;  // b for disable iff
   std::shared_ptr<const LvProperty> property;            // P
-  std::shared_ptr<const LvTopLevelProperty> inner;       // T for ( T )/decl body
-  std::string local_var_type;                            // t, for declaration
-  std::string local_var_name;                            // v, for declaration
+  std::shared_ptr<const LvTopLevelProperty> inner;  // T for ( T )/decl body
+  std::string local_var_type;                       // t, for declaration
+  std::string local_var_name;                       // v, for declaration
 };
 
 std::shared_ptr<const LvTopLevelProperty> LvTopProperty(
@@ -136,8 +138,7 @@ bool NeutrallySatisfiesTopLevelWithLocals(const Word& word,
 // word for which the guarded property holds under a T^omega completion but not
 // under a _|_^omega one; a declaration strips its name and a parenthesis is
 // transparent.
-bool DisablesTopLevelWithLocals(const Word& word,
-                                const LvTopLevelProperty& top,
+bool DisablesTopLevelWithLocals(const Word& word, const LvTopLevelProperty& top,
                                 const LocalContext& context);
 
 // §F.5.6.1: "T is said to pass on w, L_0 if w, L_0 |= T", "T is said to be

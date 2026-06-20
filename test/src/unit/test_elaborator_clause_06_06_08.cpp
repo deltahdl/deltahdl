@@ -245,4 +245,4 @@ TEST(InterconnectElaboration, ResolvesToDissimilarNetTypesNamedShorthand) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-}
+}  // namespace

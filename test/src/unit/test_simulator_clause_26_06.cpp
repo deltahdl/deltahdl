@@ -74,7 +74,6 @@ TEST(PackageExportSim, FunctionVisibleThroughStarStarExport) {
 }
 
 TEST(PackageExportSim, FunctionVisibleThroughReExportChain) {
-
   SimFixture f;
   auto* design = ElaborateSrc(
       "package p1;\n"
@@ -102,7 +101,6 @@ TEST(PackageExportSim, FunctionVisibleThroughReExportChain) {
 }
 
 TEST(PackageExportSim, MultipleFunctionsExportedViaStarStarResolve) {
-
   SimFixture f;
   auto* design = ElaborateSrc(
       "package p1;\n"
@@ -184,4 +182,4 @@ TEST(PackageExportSim, SpecificExportConsumedByWildcardImport) {
   EXPECT_EQ(f.ctx.FindVariable("r")->value.ToUint64(), 66u);
 }
 
-}
+}  // namespace

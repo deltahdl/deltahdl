@@ -41,7 +41,6 @@ bool Lexer::AtEnd() const { return pos_ >= source_.size(); }
 SourceLoc Lexer::MakeLoc() const { return {file_id_, line_, column_}; }
 
 uint32_t Lexer::SkipLineComment() {
-
   while (!AtEnd() && Current() != '\n') {
     Advance();
   }
@@ -49,7 +48,6 @@ uint32_t Lexer::SkipLineComment() {
 }
 
 uint32_t Lexer::SkipBlockComment(SourceLoc start_loc) {
-
   while (!AtEnd()) {
     if (Current() == '*' && PeekChar() == '/') {
       uint32_t body_end = pos_;
@@ -327,7 +325,6 @@ void Lexer::TryRecognizeFsmConcatPragma(
 
 void Lexer::SkipWhitespaceAndComments() {
   while (!AtEnd()) {
-
     if (std::isspace(static_cast<unsigned char>(Current()))) {
       Advance();
       continue;
@@ -401,7 +398,6 @@ Token Lexer::Next() {
   }
   char c = Current();
   if (c == '$') {
-
     char next = PeekChar();
     if (std::isalnum(static_cast<unsigned char>(next)) || next == '_' ||
         next == '$') {
@@ -596,8 +592,7 @@ void Lexer::LexExponentPart() {
   if (Current() != 'e' && Current() != 'E') return;
 
   uint32_t look = pos_ + 1;
-  if (look < source_.size() &&
-      (source_[look] == '+' || source_[look] == '-')) {
+  if (look < source_.size() && (source_[look] == '+' || source_[look] == '-')) {
     ++look;
   }
   if (look >= source_.size() ||
@@ -731,7 +726,6 @@ Token Lexer::LexStringLiteral() {
 bool Lexer::LexQuotedBody() {
   while (!AtEnd() && Current() != '"') {
     if (Current() == '\n' || Current() == '\r') {
-
       return false;
     }
     if (Current() == '\\') {
@@ -839,7 +833,6 @@ Token Lexer::LexApostrophe() {
     return LexBasedNumber(MakeLoc(), pos_);
   }
   if (next == 's' || next == 'S') {
-
     if (pos_ + 2 < source_.size() && IsBaseSpecifier(source_[pos_ + 2])) {
       return LexBasedNumber(MakeLoc(), pos_);
     }
@@ -1245,4 +1238,4 @@ void Lexer::RestorePos(const SavedPos& saved) {
   keyword_version_ = saved.keyword_version;
 }
 
-}
+}  // namespace delta

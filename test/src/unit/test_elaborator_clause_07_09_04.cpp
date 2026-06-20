@@ -34,4 +34,4 @@ TEST(BuiltinMethodElaboration, FirstOnStringKeyAssocArrayOk) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

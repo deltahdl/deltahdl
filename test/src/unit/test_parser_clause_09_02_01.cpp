@@ -143,4 +143,4 @@ TEST(InitialProcedureParsing, InitialWithNestedBeginEnd) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

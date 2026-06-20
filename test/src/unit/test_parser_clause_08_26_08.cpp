@@ -61,4 +61,4 @@ TEST(ClassSyntaxParsing, InterfaceMethodNoDefaultArgs) {
   EXPECT_EQ(method->func_args[0].default_value, nullptr);
 }
 
-}
+}  // namespace

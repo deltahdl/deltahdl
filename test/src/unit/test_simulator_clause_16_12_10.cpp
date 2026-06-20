@@ -26,9 +26,9 @@ struct SvaFixture {
 
 namespace {
 
-// §16.12.10: weak `nexttime property_expr` holds when property_expr holds at the
-// next clock tick. With the target tick reachable, the nexttime verdict is the
-// inner property_expr's verdict at that tick.
+// §16.12.10: weak `nexttime property_expr` holds when property_expr holds at
+// the next clock tick. With the target tick reachable, the nexttime verdict is
+// the inner property_expr's verdict at that tick.
 TEST(SvaEngine, WeakNexttimeTakesInnerVerdictAtNextTick) {
   EXPECT_EQ(EvalNexttime(/*strong=*/false, /*target_tick_reachable=*/true,
                          PropertyResult::kPass),
@@ -67,8 +67,8 @@ TEST(SvaEngine, StrongNexttimeFailsWhenNoFurtherTick) {
 }
 
 // §16.12.10: the index counts clock ticks with counting starting at the current
-// time step, so the target for index n is reachable exactly when n further ticks
-// exist after the current step.
+// time step, so the target for index n is reachable exactly when n further
+// ticks exist after the current step.
 TEST(SvaEngine, NexttimeIndexCountsFromCurrentStep) {
   EXPECT_TRUE(NexttimeTargetReachable(/*index=*/2, /*future_clock_ticks=*/2));
   EXPECT_TRUE(NexttimeTargetReachable(/*index=*/2, /*future_clock_ticks=*/3));
@@ -84,8 +84,9 @@ TEST(SvaEngine, NexttimeZeroIndexIsAlignmentOperator) {
 
 // §16.12.10: the non-indexed nexttime/s_nexttime forms target the next clock
 // tick, i.e. index 1. At that boundary the index-1 target is reachable exactly
-// when one further tick exists, so a missing further tick leaves it out of reach
-// — the reachability input behind the weak-pass / strong-fail next-tick cases.
+// when one further tick exists, so a missing further tick leaves it out of
+// reach — the reachability input behind the weak-pass / strong-fail next-tick
+// cases.
 TEST(SvaEngine, NexttimeIndexOneMatchesNextTick) {
   EXPECT_TRUE(NexttimeTargetReachable(/*index=*/1, /*future_clock_ticks=*/1));
   EXPECT_TRUE(NexttimeTargetReachable(/*index=*/1, /*future_clock_ticks=*/4));
@@ -114,4 +115,4 @@ TEST(SvaEngine, IndexedNexttimeComposesReachabilityWithStrength) {
             PropertyResult::kFail);
 }
 
-}
+}  // namespace

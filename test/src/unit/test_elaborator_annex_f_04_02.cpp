@@ -1,6 +1,6 @@
-#include "elaborator/checker_rewrite.h"
-
 #include <gtest/gtest.h>
+
+#include "elaborator/checker_rewrite.h"
 
 using namespace delta;
 

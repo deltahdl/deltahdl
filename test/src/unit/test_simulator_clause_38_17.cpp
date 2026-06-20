@@ -77,5 +77,5 @@ TEST_F(VpiVlogInfoSim, GetVlogInfoReportsToolNameWhenNoOptions) {
   EXPECT_STREQ(info.argv[0], "delta-sim");
 }
 
-}
-}
+}  // namespace
+}  // namespace delta

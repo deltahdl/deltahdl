@@ -10,12 +10,12 @@ namespace delta {
 namespace {
 
 // §37.17 Variables: the VPI variable object model. These tests observe the
-// production helpers in vpi.cpp that apply the numbered "Details" of the clause.
-// The range relations (details 4 and 6) are woven onto §37.22's range helpers,
-// so an empty dimension behaves the same here as it does there. Lifetime and
-// memory-allocation properties (detail 23) belong to §37.3.7, and struct/union
-// member access (detail 3) to §37.26, so those are exercised by their own
-// subclauses.
+// production helpers in vpi.cpp that apply the numbered "Details" of the
+// clause. The range relations (details 4 and 6) are woven onto §37.22's range
+// helpers, so an empty dimension behaves the same here as it does there.
+// Lifetime and memory-allocation properties (detail 23) belong to §37.3.7, and
+// struct/union member access (detail 3) to §37.26, so those are exercised by
+// their own subclauses.
 
 // D19: the backward-compatibility object-kind equivalences. A var bit is the
 // same kind as a reg bit; a logic var is equivalent to a reg, and an array var
@@ -85,9 +85,10 @@ TEST(VariableModel, StructUnionMemberReadsStructOrUnionParent) {
   EXPECT_FALSE(VpiVariableIsStructUnionMember(nullptr));
 }
 
-// D4 (woven with §37.22): the vpiRange iteration returns one range per dimension
-// from leftmost to rightmost. A fixed dimension keeps its bounds; a dynamic,
-// queue, or associative dimension becomes an empty range with null bounds.
+// D4 (woven with §37.22): the vpiRange iteration returns one range per
+// dimension from leftmost to rightmost. A fixed dimension keeps its bounds; a
+// dynamic, queue, or associative dimension becomes an empty range with null
+// bounds.
 TEST(VariableModel, RangeIterationYieldsBoundsOrEmptyPerDimension) {
   VpiObject l0;
   VpiObject r0;
@@ -144,14 +145,15 @@ TEST(VariableModel, LeftRightRangeReportLeftmostDimensionBounds) {
   dims[0].kind = VpiDimensionKind::kPacked;
   dims[0].left_expr = &l;
   dims[0].right_expr = &r;
-  dims[1].kind = VpiDimensionKind::kPacked;  // a later dimension is ignored here
+  dims[1].kind =
+      VpiDimensionKind::kPacked;  // a later dimension is ignored here
 
   EXPECT_EQ(VpiVariableLeftRange(dims, /*has_members=*/true), &l);
   EXPECT_EQ(VpiVariableRightRange(dims, /*has_members=*/true), &r);
 }
 
-// D6: vpiLeftRange/vpiRightRange return NULL when the variable has no members or
-// when the leftmost range is empty.
+// D6: vpiLeftRange/vpiRightRange return NULL when the variable has no members
+// or when the leftmost range is empty.
 TEST(VariableModel, LeftRightRangeNullForNoMembersOrEmptyRange) {
   VpiObject l;
   VpiObject r;
@@ -210,10 +212,10 @@ TEST(VariableModel, IndexIterationRunsInnermostOutward) {
   EXPECT_EQ(out[2], &outer);
 }
 
-// D9: vpiSize for the kinds whose size is defined - a variable array reports its
-// element count; integer-typed, packed, and enum vars report bit width; a string
-// var reports its character count; an unpacked struct/union reports field count;
-// a var bit reports 1.
+// D9: vpiSize for the kinds whose size is defined - a variable array reports
+// its element count; integer-typed, packed, and enum vars report bit width; a
+// string var reports its character count; an unpacked struct/union reports
+// field count; a var bit reports 1.
 TEST(VariableModel, SizeFollowsTheVariableKind) {
   VpiVariableSizeQuery q;
 
@@ -299,13 +301,12 @@ TEST(VariableModel, SizeIsZeroWhenUndefined) {
   EXPECT_EQ(VpiVariableSize(q), 0);
 }
 
-// D11: array, class, and virtual-interface variables have no value property, and
-// neither does an unpacked struct/union; every other kind does.
+// D11: array, class, and virtual-interface variables have no value property,
+// and neither does an unpacked struct/union; every other kind does.
 TEST(VariableModel, ValuePropertyAvailability) {
   EXPECT_FALSE(VpiVariableHasValueProperty(vpiArrayVar, /*vpi_vector=*/false));
   EXPECT_FALSE(VpiVariableHasValueProperty(vpiClassVar, false));
-  EXPECT_FALSE(
-      VpiVariableHasValueProperty(vpiVirtualInterfaceVar, false));
+  EXPECT_FALSE(VpiVariableHasValueProperty(vpiVirtualInterfaceVar, false));
   // Unpacked struct/union (vpiVector FALSE) has none; packed (TRUE) has one.
   EXPECT_FALSE(VpiVariableHasValueProperty(vpiStructVar, /*vpi_vector=*/false));
   EXPECT_TRUE(VpiVariableHasValueProperty(vpiStructVar, /*vpi_vector=*/true));
@@ -347,10 +348,12 @@ TEST(VariableModel, IsRandomizedReflectsActiveness) {
 // D14: cbSizeChange applies only to dynamic arrays, associative arrays, queues,
 // and string variables - not to static arrays or any other variable.
 TEST(VariableModel, SizeChangeCallbackApplicability) {
-  EXPECT_TRUE(VpiSizeChangeCallbackApplies(vpiDynamicArray, /*is_string=*/false));
+  EXPECT_TRUE(
+      VpiSizeChangeCallbackApplies(vpiDynamicArray, /*is_string=*/false));
   EXPECT_TRUE(VpiSizeChangeCallbackApplies(vpiAssocArray, false));
   EXPECT_TRUE(VpiSizeChangeCallbackApplies(vpiQueueArray, false));
-  EXPECT_TRUE(VpiSizeChangeCallbackApplies(/*array_type=*/0, /*is_string=*/true));
+  EXPECT_TRUE(
+      VpiSizeChangeCallbackApplies(/*array_type=*/0, /*is_string=*/true));
   EXPECT_FALSE(VpiSizeChangeCallbackApplies(vpiStaticArray, false));
   EXPECT_FALSE(VpiSizeChangeCallbackApplies(/*array_type=*/0, false));
 }
@@ -449,8 +452,8 @@ TEST(VariableModel, ScalarVectorDeferForEnumAndArray) {
   EXPECT_TRUE(VpiVariableVector(array_q));
 }
 
-// D24: a non-class-member variable, and a class member that is neither local nor
-// protected, report vpiPublicVis; local/protected members report their own
+// D24: a non-class-member variable, and a class member that is neither local
+// nor protected, report vpiPublicVis; local/protected members report their own
 // visibility.
 TEST(VariableModel, VisibilityRules) {
   EXPECT_EQ(VpiVariableVisibility(/*is_class_member=*/false, vpiLocalVis),
@@ -463,8 +466,8 @@ TEST(VariableModel, VisibilityRules) {
             vpiProtectedVis);
 }
 
-// D25: a non-static class data member has no vpiFullName; a static member's full
-// name routes through its class defn with "::".
+// D25: a non-static class data member has no vpiFullName; a static member's
+// full name routes through its class defn with "::".
 TEST(VariableModel, ClassMemberFullName) {
   EXPECT_EQ(VpiClassMemberFullName(/*is_static=*/false, "top", "Packet", "Id"),
             "");

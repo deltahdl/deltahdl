@@ -56,8 +56,7 @@ TEST(ClockingBlockEventSim, EdgeCallbackInvokedOnPosedge) {
   cmgr.Register(block);
 
   uint32_t count = 0;
-  cmgr.RegisterEdgeCallback("cb", f.ctx, f.scheduler,
-                            [&count]() { count++; });
+  cmgr.RegisterEdgeCallback("cb", f.ctx, f.scheduler, [&count]() { count++; });
   cmgr.Attach(f.ctx, f.scheduler);
 
   SchedulePosedge(f, clk, 10);
@@ -340,4 +339,4 @@ TEST(ClockingBlockEventSim, SharedClockBothBlocksFireEvents) {
   EXPECT_TRUE(ev2_fired);
 }
 
-}
+}  // namespace

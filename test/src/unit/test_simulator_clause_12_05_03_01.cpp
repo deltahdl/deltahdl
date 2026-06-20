@@ -195,12 +195,13 @@ TEST(CaseViolationDeferralSim, DeferredUniqueCasezOverlapReported) {
 TEST(CaseViolationDeferralSim, AlwaysCombRetriggerFlushesCaseViolation) {
   // §12.5.3.1: a unique-case violation check is immune to false reports caused
   // by zero-delay glitches in the active region set, using the same mechanics
-  // as the unique-if construct (§12.4.2.1). Here the always_comb first evaluates
-  // with a==1 and b==1, so both case items match 1'b1 and an overlap violation
-  // is queued. The nonblocking update of b re-triggers the procedure within the
-  // same time step; on resume the procedure reaches a flush point that discards
-  // the pending violation before the Observed region can mature it. The settled
-  // state (a==1, b==0) has a single match, so nothing is reported.
+  // as the unique-if construct (§12.4.2.1). Here the always_comb first
+  // evaluates with a==1 and b==1, so both case items match 1'b1 and an overlap
+  // violation is queued. The nonblocking update of b re-triggers the procedure
+  // within the same time step; on resume the procedure reaches a flush point
+  // that discards the pending violation before the Observed region can mature
+  // it. The settled state (a==1, b==0) has a single match, so nothing is
+  // reported.
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -254,9 +255,9 @@ TEST(CaseViolationDeferralSim, EventControlFlushesCaseViolation) {
   // as the unique-if construct (§12.4.2.1), so a pending case violation is also
   // a flush point candidate when the procedure suspends mid-body. Here a unique
   // case queues an overlap violation, then the procedure suspends on an event
-  // control and is resumed in the same time step by the other process; on resume
-  // the pending violation is flushed before the Observed region matures it, so
-  // nothing is reported.
+  // control and is resumed in the same time step by the other process; on
+  // resume the pending violation is flushed before the Observed region matures
+  // it, so nothing is reported.
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -286,10 +287,10 @@ TEST(CaseViolationDeferralSim, EventControlFlushesCaseViolation) {
 }
 
 TEST(CaseViolationDeferralSim, WaitStatementFlushesCaseViolation) {
-  // §12.5.3.1: resuming after suspending on a wait statement is likewise a flush
-  // point for a pending case violation, matching the §12.4.2.1 mechanics. The
-  // queued overlap violation is dropped when the procedure resumes once the wait
-  // condition becomes true within the same time step.
+  // §12.5.3.1: resuming after suspending on a wait statement is likewise a
+  // flush point for a pending case violation, matching the §12.4.2.1 mechanics.
+  // The queued overlap violation is dropped when the procedure resumes once the
+  // wait condition becomes true within the same time step.
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -321,9 +322,9 @@ TEST(CaseViolationDeferralSim, WaitStatementFlushesCaseViolation) {
 
 TEST(CaseViolationDeferralSim, MaturedCaseViolationSurvivesLaterResume) {
   // §12.5.3.1 / §12.4.2.1 edge case: once a deferred case violation matures in
-  // the Observed region it can no longer be flushed. The overlap is detected and
-  // matured at time 0; the procedure only resumes from the event control at a
-  // later time step, so the flush on resume finds an empty queue and the
+  // the Observed region it can no longer be flushed. The overlap is detected
+  // and matured at time 0; the procedure only resumes from the event control at
+  // a later time step, so the flush on resume finds an empty queue and the
   // already-reported violation stands.
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -353,4 +354,4 @@ TEST(CaseViolationDeferralSim, MaturedCaseViolationSurvivesLaterResume) {
   EXPECT_EQ(f.diag.WarningCount(), 1u);
 }
 
-}
+}  // namespace

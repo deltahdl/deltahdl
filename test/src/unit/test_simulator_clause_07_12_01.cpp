@@ -468,4 +468,4 @@ TEST(ArrayLocator, AssocFindFirstAndLastByKeyOrder) {
   EXPECT_EQ(lo[0].ToUint64(), 25u);
 }
 
-}
+}  // namespace

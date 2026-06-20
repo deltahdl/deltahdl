@@ -153,7 +153,6 @@ TEST(AttributeSyntaxParsing, AttrValueStringLiteral) {
 }
 
 TEST(AttributeSyntaxParsing, AttrNameEscapedIdentifier) {
-
   auto r = Parse(
       "(* \\full-case *)\n"
       "module m; endmodule\n");
@@ -172,17 +171,14 @@ TEST(AttributeSyntaxParsing, ErrorEmptyAttribute) {
 }
 
 TEST(AttributeSyntaxParsing, ErrorTrailingComma) {
-
   EXPECT_FALSE(ParseOk("(* full_case, *) module m; endmodule\n"));
 }
 
 TEST(AttributeSyntaxParsing, ErrorMissingCommaBetweenSpecs) {
-
   EXPECT_FALSE(ParseOk("(* full_case parallel_case *) module m; endmodule\n"));
 }
 
 TEST(AttributeSyntaxParsing, ErrorMissingValueAfterEquals) {
-
   EXPECT_FALSE(ParseOk("(* depth = *) module m; endmodule\n"));
 }
 
@@ -220,4 +216,4 @@ TEST(AttributeSyntaxParsing, AttrInstanceCanBeRepeatedAcrossDeclarations) {
   EXPECT_EQ(items[1]->attrs[0].name, "keep");
 }
 
-}
+}  // namespace

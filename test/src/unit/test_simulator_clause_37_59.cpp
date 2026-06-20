@@ -15,18 +15,19 @@ namespace {
 // reference). Operations report vpiOpType, constants vpiConstType, and indexed
 // part-selects vpiIndexedPartSelectType; every expression exposes vpiDecompile,
 // vpiSize and a value. The subclause's details fix operand orders for the
-// multiplier-style and assignment-pattern operators, the cast representation, the
-// typespec-availability guarantee, the vpiDecompile spacing rules, the
+// multiplier-style and assignment-pattern operators, the cast representation,
+// the typespec-availability guarantee, the vpiDecompile spacing rules, the
 // part-select vpiConstantSelect rule, the part-select vpiParent, and the
-// guarantee that a protected expression still exposes vpiSize. These tests observe
-// the production helpers and Get cases in vpi.cpp that apply those rules.
+// guarantee that a protected expression still exposes vpiSize. These tests
+// observe the production helpers and Get cases in vpi.cpp that apply those
+// rules.
 
-// Diagram: the expr class groups exactly the drawn member kinds; variables, nets
-// and other objects are not expressions.
+// Diagram: the expr class groups exactly the drawn member kinds; variables,
+// nets and other objects are not expressions.
 TEST(ExpressionModel, ExprClassGroupsItsMemberKinds) {
-  for (int type : {vpiOperation, vpiConstant, vpiPartSelect, vpiIndexedPartSelect,
-                   vpiFuncCall, vpiMethodFuncCall, vpiSysFuncCall, vpiLetExpr,
-                   vpiRefObj}) {
+  for (int type : {vpiOperation, vpiConstant, vpiPartSelect,
+                   vpiIndexedPartSelect, vpiFuncCall, vpiMethodFuncCall,
+                   vpiSysFuncCall, vpiLetExpr, vpiRefObj}) {
     EXPECT_TRUE(VpiIsExprType(type)) << "type=" << type;
   }
 
@@ -48,14 +49,15 @@ TEST(ExpressionModel, MultiConcatOperandOrder) {
   EXPECT_EQ(operands[1], &a);
   EXPECT_EQ(operands[2], &b);
 
-  // The multiplier alone is still the first operand when nothing is concatenated.
+  // The multiplier alone is still the first operand when nothing is
+  // concatenated.
   auto just_mult = VpiMultiConcatOperands(&mult, {});
   ASSERT_EQ(just_mult.size(), 1u);
   EXPECT_EQ(just_mult[0], &mult);
 }
 
-// Detail 7: a vpiMultiAssignmentPatternOp operation reports the multiplier first,
-// then the expressions within the assignment pattern - the same shape as
+// Detail 7: a vpiMultiAssignmentPatternOp operation reports the multiplier
+// first, then the expressions within the assignment pattern - the same shape as
 // multiconcat but for a distinct operator.
 TEST(ExpressionModel, MultiAssignmentPatternOperandOrder) {
   VpiObject mult;
@@ -68,8 +70,8 @@ TEST(ExpressionModel, MultiAssignmentPatternOperandOrder) {
   EXPECT_EQ(operands[1], &y);
 }
 
-// Detail 7 (edge): with no pattern expressions the multiplier is still the one and
-// only first operand, mirroring the multiconcat empty case for the distinct
+// Detail 7 (edge): with no pattern expressions the multiplier is still the one
+// and only first operand, mirroring the multiconcat empty case for the distinct
 // operator.
 TEST(ExpressionModel, MultiAssignmentPatternMultiplierAloneWhenPatternEmpty) {
   VpiObject mult;
@@ -89,9 +91,9 @@ TEST(ExpressionModel, CastOpIsUnary) {
   EXPECT_EQ(operands[0], &cast_arg);
 }
 
-// Detail 6: an assignment pattern's keyed entries resolve to positional notation;
-// positions not given a value take the default key's value, and the result lists
-// the positions in order.
+// Detail 6: an assignment pattern's keyed entries resolve to positional
+// notation; positions not given a value take the default key's value, and the
+// result lists the positions in order.
 TEST(ExpressionModel, AssignmentPatternResolvesToPositional) {
   VpiObject member0;
   VpiObject member1;
@@ -101,8 +103,7 @@ TEST(ExpressionModel, AssignmentPatternResolvesToPositional) {
   // member0, def, member1, def.
   std::vector<VpiAssignmentPatternEntry> positioned = {{0, &member0},
                                                        {2, &member1}};
-  auto operands =
-      VpiAssignmentPatternPositionalOperands(4, positioned, &def);
+  auto operands = VpiAssignmentPatternPositionalOperands(4, positioned, &def);
   ASSERT_EQ(operands.size(), 4u);
   EXPECT_EQ(operands[0], &member0);
   EXPECT_EQ(operands[1], &def);
@@ -111,7 +112,8 @@ TEST(ExpressionModel, AssignmentPatternResolvesToPositional) {
 }
 
 // Detail 6 (nesting): a value that is itself an assignment-pattern operation is
-// kept as a single nested handle, so nesting is preserved rather than flattened.
+// kept as a single nested handle, so nesting is preserved rather than
+// flattened.
 TEST(ExpressionModel, AssignmentPatternPreservesNesting) {
   VpiObject nested;
   nested.type = vpiOperation;
@@ -126,18 +128,18 @@ TEST(ExpressionModel, AssignmentPatternPreservesNesting) {
   EXPECT_EQ(operands[1], &def);
 }
 
-// Detail 6 (edge/error): an entry whose target position lies outside the pattern's
-// position range (too large, or negative) is ignored rather than overrunning the
-// operand list, and a pattern with no positions at all is empty. The remaining
-// positions still take the default value.
+// Detail 6 (edge/error): an entry whose target position lies outside the
+// pattern's position range (too large, or negative) is ignored rather than
+// overrunning the operand list, and a pattern with no positions at all is
+// empty. The remaining positions still take the default value.
 TEST(ExpressionModel, AssignmentPatternIgnoresOutOfRangePositions) {
   VpiObject good;
   VpiObject stray_high;
   VpiObject stray_neg;
   VpiObject def;
 
-  // Position 0 is in range; positions 5 and -1 are out of range for two slots and
-  // must be dropped, leaving slot 1 at the default.
+  // Position 0 is in range; positions 5 and -1 are out of range for two slots
+  // and must be dropped, leaving slot 1 at the default.
   std::vector<VpiAssignmentPatternEntry> entries = {
       {0, &good}, {5, &stray_high}, {-1, &stray_neg}};
   auto operands = VpiAssignmentPatternPositionalOperands(2, entries, &def);
@@ -160,7 +162,8 @@ TEST(ExpressionModel, TypespecAvailabilityGuarantee) {
   // Cast operation: always available.
   EXPECT_TRUE(VpiTypespecAlwaysAvailable(vpiCastOp, false, false));
 
-  // Assignment-pattern operations: only when the braces carry a data type prefix.
+  // Assignment-pattern operations: only when the braces carry a data type
+  // prefix.
   EXPECT_TRUE(VpiTypespecAlwaysAvailable(vpiAssignmentPatternOp, false,
                                          /*has_type_prefix=*/true));
   EXPECT_TRUE(VpiTypespecAlwaysAvailable(vpiMultiAssignmentPatternOp, false,
@@ -214,8 +217,8 @@ TEST(ExpressionModel, PartSelectParentEdgeCases) {
   EXPECT_EQ(VpiPartSelectParentExpr("r[0:2]  "), "r");
 }
 
-// Detail 2: vpiDecompile separates each operand and operator with a single space,
-// and adds no double or boundary spaces for empty pieces.
+// Detail 2: vpiDecompile separates each operand and operator with a single
+// space, and adds no double or boundary spaces for empty pieces.
 TEST(ExpressionModel, DecompileJoinUsesSingleSpaces) {
   EXPECT_EQ(VpiDecompileJoin({"a", "+", "b"}), "a + b");
 
@@ -229,14 +232,16 @@ TEST(ExpressionModel, DecompileJoinUsesSingleSpaces) {
 TEST(ExpressionModel, DecompileParenthesizeAddsNoWhitespace) {
   EXPECT_EQ(VpiDecompileParenthesize("a + b"), "(a + b)");
 
-  // Composed with the join, a parenthesized operand still has single spacing and
-  // no padding next to the parentheses.
-  std::string inner = VpiDecompileParenthesize(VpiDecompileJoin({"a", "+", "b"}));
+  // Composed with the join, a parenthesized operand still has single spacing
+  // and no padding next to the parentheses.
+  std::string inner =
+      VpiDecompileParenthesize(VpiDecompileJoin({"a", "+", "b"}));
   EXPECT_EQ(VpiDecompileJoin({inner, "*", "c"}), "(a + b) * c");
 }
 
 // Detail 4 / diagram: a constant reports its constant type through
-// vpi_get(vpiConstType); vpiUnboundedConst names the $ used in assertion ranges.
+// vpi_get(vpiConstType); vpiUnboundedConst names the $ used in assertion
+// ranges.
 TEST(ExpressionModel, ConstantReportsConstType) {
   VpiContext ctx;
   VpiObject c;
@@ -261,8 +266,8 @@ TEST(ExpressionModel, IndexedPartSelectReportsItsType) {
 }
 
 // Diagram (edge): the descending +/- direction round-trips through the same Get
-// case, and an indexed part-select with no recorded direction reports zero rather
-// than garbage.
+// case, and an indexed part-select with no recorded direction reports zero
+// rather than garbage.
 TEST(ExpressionModel, IndexedPartSelectReportsNegativeAndUnsetType) {
   VpiContext ctx;
 
@@ -276,8 +281,8 @@ TEST(ExpressionModel, IndexedPartSelectReportsNegativeAndUnsetType) {
   EXPECT_EQ(ctx.Get(vpiIndexedPartSelectType, &unset), 0);
 }
 
-// Detail 8: a protected expression still permits access to vpiSize - the property
-// passes through the protected-object guard and records no error.
+// Detail 8: a protected expression still permits access to vpiSize - the
+// property passes through the protected-object guard and records no error.
 TEST(ExpressionModel, ProtectedExpressionPermitsVpiSize) {
   VpiContext ctx;
   VpiObject op;
@@ -290,8 +295,8 @@ TEST(ExpressionModel, ProtectedExpressionPermitsVpiSize) {
 }
 
 // Detail 8 (scope): the carve-out is for expressions and the vpiSize property
-// only. A protected expression queried for some other property is still an error,
-// confirming the carve-out does not reopen the whole object.
+// only. A protected expression queried for some other property is still an
+// error, confirming the carve-out does not reopen the whole object.
 TEST(ExpressionModel, ProtectedExpressionStillGuardsOtherProperties) {
   VpiContext ctx;
   VpiObject op;
@@ -304,8 +309,8 @@ TEST(ExpressionModel, ProtectedExpressionStillGuardsOtherProperties) {
 }
 
 // Detail 8 (scope): the carve-out is keyed on the object being an expression. A
-// protected non-expression (a variable) still has vpiSize guarded, so the carve-
-// out does not leak to other object kinds.
+// protected non-expression (a variable) still has vpiSize guarded, so the
+// carve- out does not leak to other object kinds.
 TEST(ExpressionModel, ProtectedNonExpressionStillGuardsVpiSize) {
   VpiContext ctx;
   VpiObject reg;

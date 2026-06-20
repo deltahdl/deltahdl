@@ -125,9 +125,9 @@ std::size_t PropertyReach(const PropertyExpr& property) {
 }
 
 // A finite materialization of a prefix followed by a constant tail (T^omega or
-// _|_^omega), padded `reach` letters past the prefix plus a margin -- enough for
-// the verdict to have stabilized for the finite properties this model handles,
-// matching §F.5.3.1's PrefixWithTail.
+// _|_^omega), padded `reach` letters past the prefix plus a margin -- enough
+// for the verdict to have stabilized for the finite properties this model
+// handles, matching §F.5.3.1's PrefixWithTail.
 Word PrefixWithTail(const Word& prefix, const Letter& tail, std::size_t reach) {
   Word out = prefix;
   const std::size_t pad = reach + 2;
@@ -153,8 +153,8 @@ bool NonVacuousAbortShape(const Word& word, const BooleanExpr& boolean,
   if (first_b == word.size()) {
     return true;
   }
-  // (2) Some b-free prefix x leaves P unmet under one of the constant tails. The
-  // prefixes with no b-letter are exactly those of length 0..first_b.
+  // (2) Some b-free prefix x leaves P unmet under one of the constant tails.
+  // The prefixes with no b-letter are exactly those of length 0..first_b.
   const std::size_t reach = PropertyReach(operand);
   for (std::size_t len = 0; len <= first_b; ++len) {
     const Word prefix = FirstLetters(word, len);
@@ -172,7 +172,8 @@ bool NonVacuous(const Word& word, const PropertyExpr& property) {
   switch (property.kind) {
     case PropertyExpr::Kind::kStrong:
     case PropertyExpr::Kind::kWeak:
-      // §F.5.3.3 base: w |=^non strong(R) and w |=^non weak(R) hold for every w.
+      // §F.5.3.3 base: w |=^non strong(R) and w |=^non weak(R) hold for every
+      // w.
       return true;
     case PropertyExpr::Kind::kParen:
       // §F.5.3.3: w |=^non ( P ) iff w |=^non P.

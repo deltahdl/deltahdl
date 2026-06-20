@@ -48,10 +48,9 @@ TEST(ReadFormattedTest, SscanfIgnoresExcessArguments) {
   auto* b = f.ctx.CreateVariable("b", 32);
   b->value = MakeLogic4VecVal(f.arena, 32, 7);  // sentinel; must stay
 
-  auto* expr =
-      MkSysCall(f.arena, "$sscanf",
-                {MkStr(f.arena, "3"), MkStr(f.arena, "%d"), MkId(f.arena, "a"),
-                 MkId(f.arena, "b")});
+  auto* expr = MkSysCall(f.arena, "$sscanf",
+                         {MkStr(f.arena, "3"), MkStr(f.arena, "%d"),
+                          MkId(f.arena, "a"), MkId(f.arena, "b")});
   EXPECT_EQ(EvalExpr(expr, f.ctx, f.arena).ToUint64(), 1u);
   EXPECT_EQ(a->value.ToUint64(), 3u);
   EXPECT_EQ(b->value.ToUint64(), 7u);  // excess argument untouched
@@ -76,10 +75,9 @@ TEST(ReadFormattedTest, FscanfReadsFormattedFromDescriptor) {
   auto* h = f.ctx.CreateVariable("h", 32);
   h->value = MakeLogic4VecVal(f.arena, 32, 0);
 
-  auto* expr = MkSysCall(
-      f.arena, "$fscanf",
-      {MkInt(f.arena, fd), MkStr(f.arena, "%d %h"), MkId(f.arena, "d"),
-       MkId(f.arena, "h")});
+  auto* expr = MkSysCall(f.arena, "$fscanf",
+                         {MkInt(f.arena, fd), MkStr(f.arena, "%d %h"),
+                          MkId(f.arena, "d"), MkId(f.arena, "h")});
   EXPECT_EQ(EvalExpr(expr, f.ctx, f.arena).ToUint64(), 2u);
   EXPECT_EQ(d->value.ToUint64(), 42u);
   EXPECT_EQ(h->value.ToUint64(), 0xFFu);
@@ -129,9 +127,9 @@ TEST(ReadFormattedTest, SscanfReturnsEofWhenInputExhausted) {
   auto* dest = f.ctx.CreateVariable("d", 32);
   dest->value = MakeLogic4VecVal(f.arena, 32, 0);
 
-  auto* expr = MkSysCall(
-      f.arena, "$sscanf",
-      {MkStr(f.arena, ""), MkStr(f.arena, "%d"), MkId(f.arena, "d")});
+  auto* expr =
+      MkSysCall(f.arena, "$sscanf",
+                {MkStr(f.arena, ""), MkStr(f.arena, "%d"), MkId(f.arena, "d")});
   EXPECT_EQ(EvalExpr(expr, f.ctx, f.arena).ToUint64(), 0xFFFFFFFFu);
 }
 
@@ -167,9 +165,9 @@ TEST(ReadFormattedTest, FscanfReturnsEofForUnknownBitsInFormat) {
   auto* dest = f.ctx.CreateVariable("d", 32);
   dest->value = MakeLogic4VecVal(f.arena, 32, 0);
 
-  auto* expr = MkSysCall(
-      f.arena, "$fscanf",
-      {MkInt(f.arena, fd), MkId(f.arena, "fmt"), MkId(f.arena, "d")});
+  auto* expr =
+      MkSysCall(f.arena, "$fscanf",
+                {MkInt(f.arena, fd), MkId(f.arena, "fmt"), MkId(f.arena, "d")});
   EXPECT_EQ(EvalExpr(expr, f.ctx, f.arena).ToUint64(), 0xFFFFFFFFu);
 
   EvalExpr(MkSysCall(f.arena, "$fclose", {MkInt(f.arena, fd)}), f.ctx, f.arena);
@@ -181,7 +179,9 @@ TEST(ReadFormattedTest, FscanfReturnsEofForUnknownBitsInFormat) {
 TEST(ReadFormattedTest, FscanfReturnsEofAtEndOfFile) {
   SimFixture f;
   std::string tmp = "/tmp/deltahdl_test_fscanf_empty.txt";
-  { std::ofstream ofs(tmp); }  // empty file
+  {
+    std::ofstream ofs(tmp);
+  }  // empty file
   auto fd = EvalExpr(MkSysCall(f.arena, "$fopen",
                                {MkStr(f.arena, tmp), MkStr(f.arena, "r")}),
                      f.ctx, f.arena)
@@ -190,9 +190,9 @@ TEST(ReadFormattedTest, FscanfReturnsEofAtEndOfFile) {
   auto* dest = f.ctx.CreateVariable("d", 32);
   dest->value = MakeLogic4VecVal(f.arena, 32, 0);
 
-  auto* expr = MkSysCall(
-      f.arena, "$fscanf",
-      {MkInt(f.arena, fd), MkStr(f.arena, "%d"), MkId(f.arena, "d")});
+  auto* expr =
+      MkSysCall(f.arena, "$fscanf",
+                {MkInt(f.arena, fd), MkStr(f.arena, "%d"), MkId(f.arena, "d")});
   EXPECT_EQ(EvalExpr(expr, f.ctx, f.arena).ToUint64(), 0xFFFFFFFFu);
 
   EvalExpr(MkSysCall(f.arena, "$fclose", {MkInt(f.arena, fd)}), f.ctx, f.arena);
@@ -276,10 +276,9 @@ TEST(ReadFormattedTest, SscanfMatchesMultipleFields) {
   auto* b = f.ctx.CreateVariable("m2", 32);
   b->value = MakeLogic4VecVal(f.arena, 32, 0);
 
-  auto* expr =
-      MkSysCall(f.arena, "$sscanf",
-                {MkStr(f.arena, "12 34"), MkStr(f.arena, "%d %d"),
-                 MkId(f.arena, "m1"), MkId(f.arena, "m2")});
+  auto* expr = MkSysCall(f.arena, "$sscanf",
+                         {MkStr(f.arena, "12 34"), MkStr(f.arena, "%d %d"),
+                          MkId(f.arena, "m1"), MkId(f.arena, "m2")});
   EXPECT_EQ(EvalExpr(expr, f.ctx, f.arena).ToUint64(), 2u);
   EXPECT_EQ(a->value.ToUint64(), 12u);
   EXPECT_EQ(b->value.ToUint64(), 34u);
@@ -335,11 +334,11 @@ TEST(ReadFormattedTest, SscanfSuppressesAssignment) {
   auto* dest = f.ctx.CreateVariable("kept", 32);
   dest->value = MakeLogic4VecVal(f.arena, 32, 0);
 
-  auto* expr =
-      MkSysCall(f.arena, "$sscanf",
-                {MkStr(f.arena, "3 4"), MkStr(f.arena, "%*d %d"),
-                 MkId(f.arena, "kept")});
-  EXPECT_EQ(EvalExpr(expr, f.ctx, f.arena).ToUint64(), 1u);  // only one assigned
+  auto* expr = MkSysCall(
+      f.arena, "$sscanf",
+      {MkStr(f.arena, "3 4"), MkStr(f.arena, "%*d %d"), MkId(f.arena, "kept")});
+  EXPECT_EQ(EvalExpr(expr, f.ctx, f.arena).ToUint64(),
+            1u);                          // only one assigned
   EXPECT_EQ(dest->value.ToUint64(), 4u);  // the second field, not the first
 }
 
@@ -482,17 +481,16 @@ TEST(ReadFormattedTest, SscanfNumericFieldStopsAtNonNumericCharacter) {
   auto* rest = f.ctx.CreateVariable("rest", 16);
   rest->value = MakeLogic4VecVal(f.arena, 16, 0);
 
-  auto* expr =
-      MkSysCall(f.arena, "$sscanf",
-                {MkStr(f.arena, "12ab"), MkStr(f.arena, "%d%s"),
-                 MkId(f.arena, "num"), MkId(f.arena, "rest")});
+  auto* expr = MkSysCall(f.arena, "$sscanf",
+                         {MkStr(f.arena, "12ab"), MkStr(f.arena, "%d%s"),
+                          MkId(f.arena, "num"), MkId(f.arena, "rest")});
   EXPECT_EQ(EvalExpr(expr, f.ctx, f.arena).ToUint64(), 2u);
-  EXPECT_EQ(num->value.ToUint64(), 12u);          // digits only
-  EXPECT_EQ(rest->value.ToUint64(), 0x6162u);     // "ab" follows
+  EXPECT_EQ(num->value.ToUint64(), 12u);       // digits only
+  EXPECT_EQ(rest->value.ToUint64(), 0x6162u);  // "ab" follows
 }
 
-// §21.3.4.3: a %s field is a run of nonwhite-space characters, so it ends at the
-// first space; the next %s resumes after that space.
+// §21.3.4.3: a %s field is a run of nonwhite-space characters, so it ends at
+// the first space; the next %s resumes after that space.
 TEST(ReadFormattedTest, SscanfStringFieldStopsAtWhitespace) {
   SimFixture f;
   auto* w1 = f.ctx.CreateVariable("w1", 16);
@@ -500,10 +498,9 @@ TEST(ReadFormattedTest, SscanfStringFieldStopsAtWhitespace) {
   auto* w2 = f.ctx.CreateVariable("w2", 16);
   w2->value = MakeLogic4VecVal(f.arena, 16, 0);
 
-  auto* expr =
-      MkSysCall(f.arena, "$sscanf",
-                {MkStr(f.arena, "ab cd"), MkStr(f.arena, "%s %s"),
-                 MkId(f.arena, "w1"), MkId(f.arena, "w2")});
+  auto* expr = MkSysCall(f.arena, "$sscanf",
+                         {MkStr(f.arena, "ab cd"), MkStr(f.arena, "%s %s"),
+                          MkId(f.arena, "w1"), MkId(f.arena, "w2")});
   EXPECT_EQ(EvalExpr(expr, f.ctx, f.arena).ToUint64(), 2u);
   EXPECT_EQ(w1->value.ToUint64(), 0x6162u);  // "ab"
   EXPECT_EQ(w2->value.ToUint64(), 0x6364u);  // "cd"
@@ -527,9 +524,9 @@ TEST(ReadFormattedTest, FscanfLeavesConflictingCharacterUnread) {
   auto* d = f.ctx.CreateVariable("d", 32);
   d->value = MakeLogic4VecVal(f.arena, 32, 0);
 
-  auto* scan = MkSysCall(
-      f.arena, "$fscanf",
-      {MkInt(f.arena, fd), MkStr(f.arena, "%d"), MkId(f.arena, "d")});
+  auto* scan =
+      MkSysCall(f.arena, "$fscanf",
+                {MkInt(f.arena, fd), MkStr(f.arena, "%d"), MkId(f.arena, "d")});
   EXPECT_EQ(EvalExpr(scan, f.ctx, f.arena).ToUint64(), 1u);
   EXPECT_EQ(d->value.ToUint64(), 12u);
 

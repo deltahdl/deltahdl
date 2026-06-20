@@ -117,68 +117,40 @@ TEST(FullskewTimingCheckWindow, OtherKindsAreIgnored) {
 }
 
 TEST(FullskewModeOracle, TimerModeTimecheckAtLimitDoesNotViolate) {
-  EXPECT_FALSE(ReportsFullskewViolation(100, 105,
-                                        true,
-                                        5,
-                                        false));
+  EXPECT_FALSE(ReportsFullskewViolation(100, 105, true, 5, false));
 }
 
 TEST(FullskewModeOracle, TimerModeTimecheckBeyondLimitViolates) {
-  EXPECT_TRUE(ReportsFullskewViolation(100, 106,
-                                       true,
-                                       5,
-                                       false));
+  EXPECT_TRUE(ReportsFullskewViolation(100, 106, true, 5, false));
 }
 
 TEST(FullskewModeOracle, TimerModeNewTimestampBeyondLimitViolates) {
-  EXPECT_TRUE(ReportsFullskewViolation(100, 106,
-                                       false,
-                                       5,
-                                       false));
+  EXPECT_TRUE(ReportsFullskewViolation(100, 106, false, 5, false));
 }
 
 TEST(FullskewModeOracle, TimerModeNewTimestampAtLimitDoesNotViolate) {
-  EXPECT_FALSE(ReportsFullskewViolation(100, 105,
-                                        false,
-                                        5,
-                                        false));
+  EXPECT_FALSE(ReportsFullskewViolation(100, 105, false, 5, false));
 }
 
 TEST(FullskewModeOracle, TimerModeSimultaneousDoesNotViolate) {
-  EXPECT_FALSE(ReportsFullskewViolation(100, 100,
-                                        true,
-                                        0,
-                                        false));
+  EXPECT_FALSE(ReportsFullskewViolation(100, 100, true, 0, false));
 }
 
 TEST(FullskewModeOracle, EventModeTimecheckBeyondLimitViolates) {
-  EXPECT_TRUE(ReportsFullskewViolation(100, 106,
-                                       true,
-                                       5,
-                                       true));
+  EXPECT_TRUE(ReportsFullskewViolation(100, 106, true, 5, true));
 }
 
 TEST(FullskewModeOracle, EventModeTimecheckAtLimitDoesNotViolate) {
-  EXPECT_FALSE(ReportsFullskewViolation(100, 105,
-                                        true,
-                                        5,
-                                        true));
+  EXPECT_FALSE(ReportsFullskewViolation(100, 105, true, 5, true));
 }
 
 TEST(FullskewModeOracle, EventModeNewTimestampBeyondLimitDoesNotViolate) {
-  EXPECT_FALSE(ReportsFullskewViolation(100, 200,
-                                        false,
-                                        5,
-                                        true));
+  EXPECT_FALSE(ReportsFullskewViolation(100, 200, false, 5, true));
 }
 
 TEST(FullskewModeOracle, OutOfOrderEventDoesNotViolate) {
-  EXPECT_FALSE(ReportsFullskewViolation(100, 90, true,
-                                        5,
-                                        false));
-  EXPECT_FALSE(ReportsFullskewViolation(100, 90, true,
-                                        5,
-                                        true));
+  EXPECT_FALSE(ReportsFullskewViolation(100, 90, true, 5, false));
+  EXPECT_FALSE(ReportsFullskewViolation(100, 90, true, 5, true));
 }
 
 // A timestamp whose condition holds opens a fresh window, regardless of the
@@ -190,17 +162,18 @@ TEST(FullskewRemainActiveFlag, HoldingConditionReplacesWindow) {
             FullskewWindowAction::kReplaceWindow);
 }
 
-// A false-condition timestamp with remain_active_flag set leaves the open window
-// in place and is otherwise discarded.
+// A false-condition timestamp with remain_active_flag set leaves the open
+// window in place and is otherwise discarded.
 TEST(FullskewRemainActiveFlag, FalseConditionWithFlagIgnoresEvent) {
   EXPECT_EQ(FullskewSecondTimestampAction(false, true),
             FullskewWindowAction::kIgnore);
 }
 
-// A false-condition timestamp without remain_active_flag turns the check dormant.
+// A false-condition timestamp without remain_active_flag turns the check
+// dormant.
 TEST(FullskewRemainActiveFlag, FalseConditionWithoutFlagGoesDormant) {
   EXPECT_EQ(FullskewSecondTimestampAction(false, false),
             FullskewWindowAction::kGoDormant);
 }
 
-}
+}  // namespace

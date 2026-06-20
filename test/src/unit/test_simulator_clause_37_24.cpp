@@ -9,12 +9,13 @@ namespace delta {
 namespace {
 
 // §37.24 Generic interconnect: the VPI object model for a vpiInterconnectArray
-// and the vpiInterconnectNet objects it ultimately resolves to. The clause's own
-// normative details are exercised here:
+// and the vpiInterconnectNet objects it ultimately resolves to. The clause's
+// own normative details are exercised here:
 //   detail 1 - the typespec an interconnect net connects to decides which
-//              subobject iteration it supports: a packed/unpacked array typespec
-//              supports vpiElement (the net's array elements); a packed/unpacked
-//              struct typespec supports vpiMember (the net's struct members);
+//              subobject iteration it supports: a packed/unpacked array
+//              typespec supports vpiElement (the net's array elements); a
+//              packed/unpacked struct typespec supports vpiMember (the net's
+//              struct members);
 //   detail 2 - vpiElement on an interconnect array reaches its subelements one
 //              dimension level at a time, each itself an interconnect array (a
 //              further dimension) or a leaf interconnect net.
@@ -159,8 +160,8 @@ TEST(GenericInterconnectModel, NetMemberIterationEmptyWhenTypespecIsArray) {
 }
 
 // Detail 2 (scope guard): the special interconnect vpiElement handling is keyed
-// on an interconnect parent. A vpiElement iteration over an ordinary object that
-// merely has interconnect-typed children falls through to the generic
+// on an interconnect parent. A vpiElement iteration over an ordinary object
+// that merely has interconnect-typed children falls through to the generic
 // same-type match and so reaches nothing.
 TEST(GenericInterconnectModel, ElementIterationDoesNotApplyToNonInterconnect) {
   VpiContext ctx;
@@ -177,8 +178,8 @@ TEST(GenericInterconnectModel, ElementIterationDoesNotApplyToNonInterconnect) {
 
 // Detail 1 (edge): whether an interconnect net supports vpiElement or vpiMember
 // is decided by the data type of the typespec it connects to. An interconnect
-// net that carries no typespec at all therefore supports neither iteration, even
-// when it holds interconnect subobjects - both relations reach nothing.
+// net that carries no typespec at all therefore supports neither iteration,
+// even when it holds interconnect subobjects - both relations reach nothing.
 TEST(GenericInterconnectModel, NetSubobjectIterationEmptyWhenNoTypespec) {
   VpiContext ctx;
 

@@ -55,4 +55,4 @@ TEST(NetDeclAssignSim, NetDeclAssignReEvaluatesOnChange) {
   EXPECT_EQ(f.ctx.FindVariable("dst")->value.ToUint64(), 42u);
 }
 
-}
+}  // namespace

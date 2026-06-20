@@ -176,8 +176,7 @@ TEST(ReInactiveRegionSim, ReInactiveRegionHoldsMultipleEvents) {
 TEST(ReInactiveRegionSim, ReInactiveIsReactiveSetDualOfInactive) {
   EXPECT_EQ(Scheduler::ReactiveSetDualOf(Region::kInactive),
             Region::kReInactive);
-  EXPECT_EQ(Scheduler::ReactiveSetDualOf(Region::kReInactive),
-            Region::kCOUNT);
+  EXPECT_EQ(Scheduler::ReactiveSetDualOf(Region::kReInactive), Region::kCOUNT);
 
   EXPECT_TRUE(IsActiveRegionSet(Region::kInactive));
   EXPECT_TRUE(IsReactiveRegionSet(Region::kReInactive));
@@ -209,4 +208,3 @@ TEST(ReInactiveRegionSim,
   EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 9u);
   EXPECT_EQ(f.scheduler.CurrentTime().ticks, 0u);
 }
-

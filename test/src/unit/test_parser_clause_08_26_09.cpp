@@ -18,47 +18,47 @@ TEST(InterfaceClassRandomizeParsing, ConstraintBlockInInterfaceClassParses) {
 TEST(InterfaceClassRandomizeParsing, CovergroupInInterfaceClassParses) {
   EXPECT_TRUE(
       ParseOk("interface class IC;\n"
-               "  pure virtual function void foo();\n"
-               "  covergroup cg; endgroup\n"
-               "endclass\n"));
+              "  pure virtual function void foo();\n"
+              "  covergroup cg; endgroup\n"
+              "endclass\n"));
 }
 
 TEST(InterfaceClassRandomizeParsing, RandomizeCallOnInterfaceHandle) {
   EXPECT_TRUE(
       ParseOk("interface class IC;\n"
-               "  pure virtual function void foo();\n"
-               "endclass\n"
-               "class C implements IC;\n"
-               "  rand int x;\n"
-               "  virtual function void foo();\n"
-               "  endfunction\n"
-               "endclass\n"
-               "module m;\n"
-               "  initial begin\n"
-               "    C obj = new;\n"
-               "    IC iref = obj;\n"
-               "    void'(iref.randomize());\n"
-               "  end\n"
-               "endmodule\n"));
+              "  pure virtual function void foo();\n"
+              "endclass\n"
+              "class C implements IC;\n"
+              "  rand int x;\n"
+              "  virtual function void foo();\n"
+              "  endfunction\n"
+              "endclass\n"
+              "module m;\n"
+              "  initial begin\n"
+              "    C obj = new;\n"
+              "    IC iref = obj;\n"
+              "    void'(iref.randomize());\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
 TEST(InterfaceClassRandomizeParsing, RandomizeWithInlineConstraintOnHandle) {
   EXPECT_TRUE(
       ParseOk("interface class IC;\n"
-               "  pure virtual function void foo();\n"
-               "endclass\n"
-               "class C implements IC;\n"
-               "  rand int x;\n"
-               "  virtual function void foo();\n"
-               "  endfunction\n"
-               "endclass\n"
-               "module m;\n"
-               "  initial begin\n"
-               "    C obj = new;\n"
-               "    IC iref = obj;\n"
-               "    void'(iref.randomize() with { });\n"
-               "  end\n"
-               "endmodule\n"));
+              "  pure virtual function void foo();\n"
+              "endclass\n"
+              "class C implements IC;\n"
+              "  rand int x;\n"
+              "  virtual function void foo();\n"
+              "  endfunction\n"
+              "endclass\n"
+              "module m;\n"
+              "  initial begin\n"
+              "    C obj = new;\n"
+              "    IC iref = obj;\n"
+              "    void'(iref.randomize() with { });\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
 TEST(InterfaceClassRandomizeParsing, PreRandomizeInImplementingClass) {
@@ -78,4 +78,4 @@ TEST(InterfaceClassRandomizeParsing, PreRandomizeInImplementingClass) {
   ASSERT_GE(cls->members.size(), 2u);
 }
 
-}
+}  // namespace

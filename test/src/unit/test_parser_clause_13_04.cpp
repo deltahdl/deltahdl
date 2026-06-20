@@ -462,4 +462,4 @@ TEST(FunctionDeclParsing, FuncArgDataTypeInheritedFromPrevious) {
   EXPECT_EQ(item->func_args[1].data_type.kind, DataTypeKind::kInt);
 }
 
-}
+}  // namespace

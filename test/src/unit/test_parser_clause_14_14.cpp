@@ -44,37 +44,37 @@ TEST(GlobalClockingParse, GlobalClockingInGenerateBlockIsError) {
 }
 
 TEST(GlobalClockingParse, RegularClockingInGenerateBlockIsAllowed) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  logic clk;\n"
-      "  if (1) begin : g\n"
-      "    clocking cb @(posedge clk); endclocking\n"
-      "  end\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  logic clk;\n"
+              "  if (1) begin : g\n"
+              "    clocking cb @(posedge clk); endclocking\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
 TEST(GlobalClockingParse, GlobalClockingInInterfaceParses) {
-  EXPECT_TRUE(ParseOk(
-      "interface ifc;\n"
-      "  logic clk;\n"
-      "  global clocking gclk @(posedge clk); endclocking\n"
-      "endinterface\n"));
+  EXPECT_TRUE(
+      ParseOk("interface ifc;\n"
+              "  logic clk;\n"
+              "  global clocking gclk @(posedge clk); endclocking\n"
+              "endinterface\n"));
 }
 
 TEST(GlobalClockingParse, GlobalClockingInProgramParses) {
-  EXPECT_TRUE(ParseOk(
-      "program p;\n"
-      "  logic clk;\n"
-      "  global clocking gclk @(posedge clk); endclocking\n"
-      "endprogram\n"));
+  EXPECT_TRUE(
+      ParseOk("program p;\n"
+              "  logic clk;\n"
+              "  global clocking gclk @(posedge clk); endclocking\n"
+              "endprogram\n"));
 }
 
 TEST(GlobalClockingParse, GlobalClockingInCheckerParses) {
-  EXPECT_TRUE(ParseOk(
-      "checker chk;\n"
-      "  logic clk;\n"
-      "  global clocking gclk @(posedge clk); endclocking\n"
-      "endchecker\n"));
+  EXPECT_TRUE(
+      ParseOk("checker chk;\n"
+              "  logic clk;\n"
+              "  global clocking gclk @(posedge clk); endclocking\n"
+              "endchecker\n"));
 }
 
 TEST(GlobalClockingParse, MatchingEndLabelAccepted) {
@@ -101,4 +101,4 @@ TEST(GlobalClockingParse, GlobalClockingInGenerateForIsError) {
   EXPECT_TRUE(r.has_errors);
 }
 
-}
+}  // namespace

@@ -121,7 +121,8 @@ TEST(CommandLineLibrarySearchOrder, CliOverrideReplacesLibMapDeclarationOrder) {
   EXPECT_EQ(a->library, "gateLib");
 }
 
-TEST(CommandLineLibrarySearchOrder, OverrideNamesOnlyDefinitionsComeFromLibMap) {
+TEST(CommandLineLibrarySearchOrder,
+     OverrideNamesOnlyDefinitionsComeFromLibMap) {
   LibraryMap libmap;
   libmap.AddDeclaration(MakeDecl("aLib", {"a.v"}), "/proj");
   libmap.AddDeclaration(MakeDecl("gateLib", {"g.v"}), "/proj");
@@ -149,4 +150,4 @@ TEST(CommandLineLibrarySearchOrder, OverrideNamesOnlyDefinitionsComeFromLibMap) 
   EXPECT_EQ(a->library, "aLib");
 }
 
-}
+}  // namespace

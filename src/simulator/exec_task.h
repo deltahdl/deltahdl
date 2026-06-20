@@ -93,4 +93,4 @@ struct ExecTask {
   bool is_immediate_ = false;
 };
 
-}
+}  // namespace delta

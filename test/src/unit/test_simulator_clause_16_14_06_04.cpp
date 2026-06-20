@@ -106,7 +106,8 @@ TEST(DisablingProceduralAssertions, OutermostScopeFlushesWholeQueue) {
 }
 
 // §16.14.6.4: once an evaluation attempt has matured it is not impacted by a
-// disable of its specific assertion; only the still-pending instance is cleared.
+// disable of its specific assertion; only the still-pending instance is
+// cleared.
 TEST(DisablingProceduralAssertions, MaturedSurvivesSpecificAssertionDisable) {
   ProceduralAssertionQueue q;
   q.Enqueue(MakePending("a1"));
@@ -167,7 +168,8 @@ TEST(DisablingProceduralAssertions, NonOutermostScopeDisableLeavesQueueIntact) {
 // §16.14.6.4 (bullet 1), edge case: disabling an assertion that has no pending
 // instances in the queue clears nothing; every other assertion's pending
 // instances are left in place.
-TEST(DisablingProceduralAssertions, SpecificAssertionDisableForAbsentNameKeepsQueue) {
+TEST(DisablingProceduralAssertions,
+     SpecificAssertionDisableForAbsentNameKeepsQueue) {
   SvaEngine engine;
   auto& q = engine.GetProceduralQueue("b1");
   q.Enqueue(MakePending("other"));
@@ -182,19 +184,20 @@ TEST(DisablingProceduralAssertions, SpecificAssertionDisableForAbsentNameKeepsQu
 
 // §16.14.6.4 (bullet 1), edge case: a specific-assertion disable on a process
 // with no queued instances is a safe no-op.
-TEST(DisablingProceduralAssertions, SpecificAssertionDisableOnEmptyQueueIsNoOp) {
+TEST(DisablingProceduralAssertions,
+     SpecificAssertionDisableOnEmptyQueueIsNoOp) {
   SvaEngine engine;
   engine.ApplyDisableToProceduralAssertions(
       "never_queued", DisableTarget::kSpecificAssertion, "a1");
   EXPECT_EQ(engine.GetProceduralQueue("never_queued").Size(), 0u);
 }
 
-// §16.14.6.4 (bullet 2), edge case: an outermost-scope disable on a process with
-// no queued instances is a safe no-op.
+// §16.14.6.4 (bullet 2), edge case: an outermost-scope disable on a process
+// with no queued instances is a safe no-op.
 TEST(DisablingProceduralAssertions, OutermostScopeDisableOnEmptyQueueIsNoOp) {
   SvaEngine engine;
-  engine.ApplyDisableToProceduralAssertions(
-      "never_queued", DisableTarget::kOutermostScope, {});
+  engine.ApplyDisableToProceduralAssertions("never_queued",
+                                            DisableTarget::kOutermostScope, {});
   EXPECT_EQ(engine.GetProceduralQueue("never_queued").Size(), 0u);
 }
 
@@ -214,4 +217,4 @@ TEST(DisablingProceduralAssertions, AllMaturedSurviveSpecificAssertionDisable) {
   EXPECT_EQ(q.MaturedCount(), 2u);
 }
 
-}
+}  // namespace

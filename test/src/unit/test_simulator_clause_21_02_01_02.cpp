@@ -160,4 +160,4 @@ TEST(SizeOfDisplayedData, ZeroValueBinaryUsesMinimumWidth) {
   EXPECT_EQ(FormatDisplay("%0b", vals), "0");
 }
 
-}
+}  // namespace

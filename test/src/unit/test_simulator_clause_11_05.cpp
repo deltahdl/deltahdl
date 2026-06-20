@@ -145,4 +145,4 @@ TEST(Eval, NetReferenceUsesAllBits) {
   EXPECT_EQ(v, 0xDEADBEEFu);
 }
 
-}
+}  // namespace

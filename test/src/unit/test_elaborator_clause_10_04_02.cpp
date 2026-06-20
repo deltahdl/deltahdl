@@ -651,4 +651,4 @@ TEST(NonblockingAssignSim, DynamicArrayElementNbaIsError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-}
+}  // namespace

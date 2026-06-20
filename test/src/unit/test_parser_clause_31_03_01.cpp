@@ -6,7 +6,8 @@ using namespace delta;
 namespace {
 
 // §31.3.1 owns Syntax 31-3, the $setup_timing_check production:
-//   $setup ( data_event , reference_event , timing_check_limit [ , [ notifier ] ] ) ;
+//   $setup ( data_event , reference_event , timing_check_limit [ , [ notifier ]
+//   ] ) ;
 // The shared timing-check parser (ParseTimingCheck / ParseTimingCheckKind /
 // ParseTimingCheckTrailingArgs) carries it. The terminals are recorded
 // positionally, so for $setup the first argument (the data_event) lands in
@@ -90,4 +91,4 @@ TEST(TimingCheckCommandParsing, SetupLimitIsExpression) {
   ASSERT_EQ(tc->limits.size(), 1u);
 }
 
-}
+}  // namespace

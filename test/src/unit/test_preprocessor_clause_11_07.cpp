@@ -34,4 +34,4 @@ TEST(SignedExprPreprocessor, UnsignedThroughPreprocessor) {
   EXPECT_EQ(rhs->callee, "$unsigned");
 }
 
-}
+}  // namespace

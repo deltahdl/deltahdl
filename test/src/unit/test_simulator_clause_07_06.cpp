@@ -259,4 +259,4 @@ TEST(ArrayAssignmentSimulation, DynamicToFixedSizeMismatchRuntimeError) {
   EXPECT_EQ(d1->value.ToUint64(), 99u);
 }
 
-}
+}  // namespace

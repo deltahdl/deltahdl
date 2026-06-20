@@ -110,13 +110,13 @@ TEST(DeclarationAssignmentParsing, DefparamAssignmentMultiplePaths) {
 }
 
 TEST(DeclarationAssignmentParsing, DefparamAssignmentDeepHierarchy) {
-  EXPECT_TRUE(ParseOk(
-      "module leaf; parameter P = 1; endmodule\n"
-      "module mid; leaf l(); endmodule\n"
-      "module m;\n"
-      "  mid mi();\n"
-      "  defparam mi.l.P = 9;\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module leaf; parameter P = 1; endmodule\n"
+              "module mid; leaf l(); endmodule\n"
+              "module m;\n"
+              "  mid mi();\n"
+              "  defparam mi.l.P = 9;\n"
+              "endmodule\n"));
 }
 
 TEST(DeclarationAssignmentParsing, TypeAssignmentWithDefault) {
@@ -167,38 +167,38 @@ TEST(DeclarationAssignmentParsing, VarDeclAssignmentWithDims) {
 }
 
 TEST(DeclarationAssignmentParsing, VarDeclAssignmentDynamicArray) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  int d[];\n"
-      "  initial d = new[10];\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  int d[];\n"
+              "  initial d = new[10];\n"
+              "endmodule\n"));
 }
 
 TEST(DeclarationAssignmentParsing, VarDeclAssignmentDynamicArrayWithInit) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  int src[], d[];\n"
-      "  initial d = new[10](src);\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  int src[], d[];\n"
+              "  initial d = new[10](src);\n"
+              "endmodule\n"));
 }
 
 TEST(DeclarationAssignmentParsing, VarDeclAssignmentClassNew) {
-  EXPECT_TRUE(ParseOk(
-      "class C;\n"
-      "endclass\n"
-      "module m;\n"
-      "  C c = new;\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("class C;\n"
+              "endclass\n"
+              "module m;\n"
+              "  C c = new;\n"
+              "endmodule\n"));
 }
 
 TEST(DeclarationAssignmentParsing, VarDeclAssignmentClassNewWithArgs) {
-  EXPECT_TRUE(ParseOk(
-      "class C;\n"
-      "  function new(int a, int b); endfunction\n"
-      "endclass\n"
-      "module m;\n"
-      "  C c = new(1, 2);\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("class C;\n"
+              "  function new(int a, int b); endfunction\n"
+              "endclass\n"
+              "module m;\n"
+              "  C c = new(1, 2);\n"
+              "endmodule\n"));
 }
 
 TEST(DeclarationAssignmentParsing, SpecparamAssignmentSimple) {
@@ -215,17 +215,17 @@ TEST(DeclarationAssignmentParsing, SpecparamAssignmentSimple) {
 }
 
 TEST(DeclarationAssignmentParsing, SpecparamAssignmentMintypmax) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  specparam delay = 1:2:3;\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  specparam delay = 1:2:3;\n"
+              "endmodule\n"));
 }
 
 TEST(DeclarationAssignmentParsing, SpecparamAssignmentMultiple) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  specparam tr = 10, tf = 20;\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  specparam tr = 10, tf = 20;\n"
+              "endmodule\n"));
 }
 
 TEST(DeclarationAssignmentParsing, PulseControlSpecparamBareReject) {
@@ -284,12 +284,12 @@ TEST(DeclarationAssignmentParsing, PulseControlSpecparamWithTerminals) {
 }
 
 TEST(DeclarationAssignmentParsing, PulseControlSpecparamMintypmaxLimits) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  specify\n"
-      "    specparam PATHPULSE$ = (1:2:3, 4:5:6);\n"
-      "  endspecify\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  specify\n"
+              "    specparam PATHPULSE$ = (1:2:3, 4:5:6);\n"
+              "  endspecify\n"
+              "endmodule\n"));
 }
 
 TEST(DeclarationAssignmentParsing, ClassNewCopyConstruct) {
@@ -305,23 +305,23 @@ TEST(DeclarationAssignmentParsing, ClassNewCopyConstruct) {
 }
 
 TEST(DeclarationAssignmentParsing, ClassNewScopedConstructor) {
-  EXPECT_TRUE(ParseOk(
-      "class C;\n"
-      "  function new(int x); endfunction\n"
-      "endclass\n"
-      "module m;\n"
-      "  C c = C::new(7);\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("class C;\n"
+              "  function new(int x); endfunction\n"
+              "endclass\n"
+              "module m;\n"
+              "  C c = C::new(7);\n"
+              "endmodule\n"));
 }
 
 TEST(DeclarationAssignmentParsing, ClassNewEmptyParens) {
-  EXPECT_TRUE(ParseOk(
-      "class C;\n"
-      "  function new(); endfunction\n"
-      "endclass\n"
-      "module m;\n"
-      "  C c = new();\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("class C;\n"
+              "  function new(); endfunction\n"
+              "endclass\n"
+              "module m;\n"
+              "  C c = new();\n"
+              "endmodule\n"));
 }
 
 TEST(DeclarationAssignmentParsing, SpecparamMissingEqualsIsError) {
@@ -349,4 +349,4 @@ TEST(DeclarationAssignmentParsing, PulseControlSpecparamMissingParensIsError) {
   EXPECT_TRUE(r.has_errors);
 }
 
-}
+}  // namespace

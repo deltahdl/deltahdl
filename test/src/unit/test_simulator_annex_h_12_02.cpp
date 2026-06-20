@@ -119,11 +119,12 @@ TEST(ArrayQueryingFunctions, DegenerateSingleElementRange) {
   EXPECT_EQ(svIncrement(h, 0), 1);  // left >= right -> +1
 }
 
-// Q2/Q3 error path: only the dimension indices in the valid span are addressable
-// (0 for the packed part, 1 .. svDimensions-1 for the unpacked parts). A query
-// against an index outside that span - or against a null handle - resolves no
-// range, so the functions fall back to safe defaults rather than reading past
-// the descriptor. This exercises the handle/dimension guard in production.
+// Q2/Q3 error path: only the dimension indices in the valid span are
+// addressable (0 for the packed part, 1 .. svDimensions-1 for the unpacked
+// parts). A query against an index outside that span - or against a null handle
+// - resolves no range, so the functions fall back to safe defaults rather than
+// reading past the descriptor. This exercises the handle/dimension guard in
+// production.
 TEST(ArrayQueryingFunctions, OutOfRangeDimensionAndNullHandle) {
   const svOpenArrayDimRange ranges[] = {{15, 0}, {0, 7}};
   svOpenArrayDesc desc;

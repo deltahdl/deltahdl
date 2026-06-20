@@ -146,4 +146,4 @@ TEST(NetAliasingSimulation, AliasAmongOtherModuleItems) {
   EXPECT_EQ(vy->value.ToUint64(), 1u);
 }
 
-}
+}  // namespace

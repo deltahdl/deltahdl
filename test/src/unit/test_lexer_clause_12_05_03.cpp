@@ -48,4 +48,4 @@ TEST(CaseQualifierLexing, Unique0BeforeCasexTokenStream) {
   EXPECT_EQ(tokens[1].kind, TokenKind::kKwCasex);
 }
 
-}
+}  // namespace

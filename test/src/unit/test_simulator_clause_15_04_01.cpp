@@ -65,9 +65,9 @@ TEST(IpcSync, MailboxNewContextUnbounded) {
 }
 
 // §15.4.1: new() returns the mailbox handle, and a nonzero bound is the size of
-// the queue. Exercise the context creation path (the production site driven by a
-// language-level new(N)) with a positive bound and confirm the returned handle
-// carries that bound and fills exactly at it.
+// the queue. Exercise the context creation path (the production site driven by
+// a language-level new(N)) with a positive bound and confirm the returned
+// handle carries that bound and fills exactly at it.
 TEST(IpcSync, MailboxNewContextBounded) {
   SyncFixture f;
   auto* mb = f.ctx.CreateMailbox("mb_b", 2);
@@ -81,8 +81,9 @@ TEST(IpcSync, MailboxNewContextBounded) {
 }
 
 // §15.4.1: a negative bound is illegal; this implementation resolves the
-// indeterminate case by treating it as unbounded. Drive that through the context
-// creation path to confirm the clamp applies to the handle new() hands back.
+// indeterminate case by treating it as unbounded. Drive that through the
+// context creation path to confirm the clamp applies to the handle new() hands
+// back.
 TEST(IpcSync, MailboxNewContextNegativeBoundClampsToZero) {
   SyncFixture f;
   auto* mb = f.ctx.CreateMailbox("mb_neg", -4);
@@ -103,4 +104,4 @@ TEST(IpcSync, MailboxNewUnboundedPutNeverBlocks) {
   EXPECT_EQ(mb.Num(), 1000);
 }
 
-}
+}  // namespace

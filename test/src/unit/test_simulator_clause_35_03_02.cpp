@@ -146,7 +146,8 @@ TEST(DpiForeignLayer, SameSvCodeUsableWithDifferentForeignDataAccessMethods) {
       rt_argpass_layer.CallImportWithArgs("sv_triple", actuals).AsInt();
 
   EXPECT_EQ(via_input, 42);
-  // Same SystemVerilog code, different foreign data access methods, same result.
+  // Same SystemVerilog code, different foreign data access methods, same
+  // result.
   EXPECT_EQ(via_input, via_argpass);
 }
 
@@ -218,8 +219,8 @@ TEST(DpiForeignLayer, MixedDirectionCallExercisesFullArgPassingMechanism) {
   // Record what the foreign side was handed for the output formal so we can
   // confirm the mechanism did not leak the caller's actual into it.
   auto seen_output_seed = std::make_shared<int32_t>(-1);
-  func.arg_impl = [seen_output_seed](
-                      std::vector<DpiArgValue>& args) -> DpiArgValue {
+  func.arg_impl =
+      [seen_output_seed](std::vector<DpiArgValue>& args) -> DpiArgValue {
     const int32_t in = args[0].AsInt();
     const int32_t inout_initial = args[2].AsInt();
     *seen_output_seed = args[1].AsInt();

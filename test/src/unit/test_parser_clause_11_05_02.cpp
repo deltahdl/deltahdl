@@ -112,4 +112,4 @@ TEST(ArrayAddressingParsing, ComputedIndexExpression) {
   EXPECT_EQ(rhs->index->kind, ExprKind::kBinary);
 }
 
-}
+}  // namespace

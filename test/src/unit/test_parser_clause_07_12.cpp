@@ -111,4 +111,4 @@ TEST(ArrayMethodCallParsing, PropertyAccessWithoutWithClause) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}
+}  // namespace

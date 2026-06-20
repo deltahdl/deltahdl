@@ -163,4 +163,4 @@ TEST(ExpressionLexing, MintypMaxColonSeparatorTokens) {
   EXPECT_EQ(tokens[4].kind, TokenKind::kIntLiteral);
 }
 
-}
+}  // namespace

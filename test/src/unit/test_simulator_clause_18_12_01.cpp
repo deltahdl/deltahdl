@@ -16,9 +16,8 @@ namespace {
 // Build a custom relation over two named integral variables, supplied to a
 // std::randomize() with block as one inline constraint. The relation is only
 // enforced once both operands are present in the solved-value map.
-ConstraintExpr Relation(
-    std::function<bool(int64_t, int64_t)> rel, std::string lhs,
-    std::string rhs) {
+ConstraintExpr Relation(std::function<bool(int64_t, int64_t)> rel,
+                        std::string lhs, std::string rhs) {
   ConstraintExpr c;
   c.kind = ConstraintKind::kCustom;
   c.eval_fn = [rel = std::move(rel), lhs = std::move(lhs),
@@ -171,7 +170,8 @@ TEST(ScopeRandomizeWith, NamedArgumentWithoutConstraintIsStillRandomized) {
 // constant, its current value can leave the with constraint over the random
 // arguments with no solution, in which case the scope randomize fails. Here the
 // state variable length holds a value larger than any achievable difference of
-// the named a and b, so b - a > length cannot be met and the call returns false.
+// the named a and b, so b - a > length cannot be met and the call returns
+// false.
 TEST(ScopeRandomizeWith, UnsatisfiableAgainstStateValueFails) {
   ConstraintSolver solver(55);
   for (const char* name : {"a", "b", "length"}) {
@@ -219,8 +219,8 @@ TEST(ScopeRandomizeWith, LaterCallRedesignatesRandomAndStateVariables) {
 
   // First call: both a and b are random.
   solver.ApplyInlineRandomList({"a", "b"});
-  ASSERT_TRUE(solver.SolveWith({
-      Relation([](int64_t a, int64_t b) { return a < b; }, "a", "b")}));
+  ASSERT_TRUE(solver.SolveWith(
+      {Relation([](int64_t a, int64_t b) { return a < b; }, "a", "b")}));
   const int64_t b_after_first = solver.GetValue("b");
 
   // Carry b's drawn value forward as its current value, then re-designate: now
@@ -235,4 +235,4 @@ TEST(ScopeRandomizeWith, LaterCallRedesignatesRandomAndStateVariables) {
   EXPECT_EQ(solver.GetValue("b"), b_after_first);  // held as a state variable
 }
 
-}
+}  // namespace

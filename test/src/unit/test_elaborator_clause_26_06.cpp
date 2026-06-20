@@ -31,7 +31,6 @@ TEST(PackageExport, SpecificExportMatchingExplicitImport) {
 }
 
 TEST(PackageExport, SpecificExportMatchingWildcardImport) {
-
   EXPECT_TRUE(
       ElabOk("package p1;\n"
              "  typedef int x;\n"
@@ -143,7 +142,6 @@ TEST(PackageExport, ExportRequiresImportFromTheNamedPackage) {
 }
 
 TEST(PackageExport, ReExportChainAcrossThreePackages) {
-
   EXPECT_TRUE(
       ElabOk("package p1;\n"
              "  typedef int t;\n"
@@ -161,4 +159,4 @@ TEST(PackageExport, ReExportChainAcrossThreePackages) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

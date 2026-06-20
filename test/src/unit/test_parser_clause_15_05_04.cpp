@@ -85,4 +85,4 @@ TEST(WaitOrderParser, WaitOrderElseOnly) {
   EXPECT_NE(stmt->else_branch, nullptr);
 }
 
-}
+}  // namespace

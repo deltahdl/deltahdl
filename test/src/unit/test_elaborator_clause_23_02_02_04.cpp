@@ -4,28 +4,25 @@
 namespace {
 
 TEST(DefaultPortValueElaboration, InputPortWithDefaultElaborates) {
-  EXPECT_TRUE(ElabOk(
-      "module m(input logic a = 1'b0); endmodule"));
+  EXPECT_TRUE(ElabOk("module m(input logic a = 1'b0); endmodule"));
 }
 
 TEST(DefaultPortValueElaboration, OutputPortWithDefaultIsError) {
   ElabFixture f;
-  ElaborateSrc(
-      "module m(output logic q = 1'b0); endmodule", f, "m");
+  ElaborateSrc("module m(output logic q = 1'b0); endmodule", f, "m");
   EXPECT_TRUE(f.has_errors);
 }
 
 TEST(DefaultPortValueElaboration, InterconnectPortWithDefaultIsError) {
   ElabFixture f;
-  ElaborateSrc(
-      "module m(input interconnect x = 1'b0); endmodule", f, "m");
+  ElaborateSrc("module m(input interconnect x = 1'b0); endmodule", f, "m");
   EXPECT_TRUE(f.has_errors);
 }
 
 TEST(DefaultPortValueElaboration, NonSingularPortWithDefaultIsError) {
   ElabFixture f;
-  ElaborateSrc(
-      "module m(input logic x [3:0] = '{0, 0, 0, 0}); endmodule", f, "m");
+  ElaborateSrc("module m(input logic x [3:0] = '{0, 0, 0, 0}); endmodule", f,
+               "m");
   EXPECT_TRUE(f.has_errors);
 }
 
@@ -44,4 +41,4 @@ TEST(DefaultPortValueElaboration, OmittedInputUsesDefaultNamedConn) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

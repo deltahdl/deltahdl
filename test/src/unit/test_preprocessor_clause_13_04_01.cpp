@@ -18,4 +18,4 @@ TEST(DataTypeParsing, AutomaticFunctionReturnType) {
   EXPECT_EQ(item->return_type.kind, DataTypeKind::kInt);
 }
 
-}
+}  // namespace

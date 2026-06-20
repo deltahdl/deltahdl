@@ -171,8 +171,8 @@ TEST(AssertionControlGrammar, ClassifiesAssertControlAndRejectsOthers) {
   EXPECT_FALSE(IsAssertionControlTaskName("$display"));
 }
 
-// §20.11 (Syntax 20-12): list_of_scopes_or_assertions is a comma-separated list,
-// so an assert_task may name several scopes after the levels argument.
+// §20.11 (Syntax 20-12): list_of_scopes_or_assertions is a comma-separated
+// list, so an assert_task may name several scopes after the levels argument.
 TEST(AssertionApiParsing, AssertTaskWithScopeList) {
   EXPECT_TRUE(ParseOk(R"(
     module m;
@@ -192,4 +192,4 @@ TEST(AssertionApiParsing, AssertControlWithHierarchicalScope) {
   )"));
 }
 
-}
+}  // namespace

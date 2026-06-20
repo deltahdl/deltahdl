@@ -121,8 +121,7 @@ TEST(UpwardNameReferenceElaboration,
              "endmodule\n"));
 }
 
-TEST(UpwardNameReferenceElaboration,
-     ScopeNameFoundInInstantiationParentScope) {
+TEST(UpwardNameReferenceElaboration, ScopeNameFoundInInstantiationParentScope) {
   EXPECT_TRUE(
       ElabOk("module leaf;\n"
              "  integer r;\n"
@@ -135,4 +134,4 @@ TEST(UpwardNameReferenceElaboration,
              "endmodule\n"));
 }
 
-}
+}  // namespace

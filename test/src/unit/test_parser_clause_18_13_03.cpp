@@ -31,4 +31,4 @@ TEST(SrandomParsing, SrandomInInitialBlock) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
-}
+}  // namespace

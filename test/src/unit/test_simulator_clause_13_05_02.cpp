@@ -19,7 +19,8 @@ TEST(PassByRef, WriteThroughRefModifiesCaller) {
   func->kind = ModuleItemKind::kFunctionDecl;
   func->name = "add_ten";
   func->return_type.kind = DataTypeKind::kVoid;
-  func->func_args = {{Direction::kRef, false, false, false, {}, "r", nullptr, {}}};
+  func->func_args = {
+      {Direction::kRef, false, false, false, {}, "r", nullptr, {}}};
   auto* rhs = MakeBinary(f.arena, TokenKind::kPlus, MakeId(f.arena, "r"),
                          MakeInt(f.arena, 10));
   func->func_body_stmts.push_back(MakeAssign(f.arena, "r", rhs));
@@ -40,7 +41,8 @@ TEST(PassByRef, PassByRefReadsCaller) {
   auto* func = f.arena.Create<ModuleItem>();
   func->kind = ModuleItemKind::kFunctionDecl;
   func->name = "read_ref";
-  func->func_args = {{Direction::kRef, false, false, false, {}, "r", nullptr, {}}};
+  func->func_args = {
+      {Direction::kRef, false, false, false, {}, "r", nullptr, {}}};
   auto* body_expr = MakeBinary(f.arena, TokenKind::kStar, MakeId(f.arena, "r"),
                                MakeInt(f.arena, 3));
   func->func_body_stmts.push_back(MakeReturn(f.arena, body_expr));
@@ -58,7 +60,8 @@ TEST(QueueRef, RefReadsCurrentValue) {
   func->kind = ModuleItemKind::kFunctionDecl;
   func->name = "read_ref";
   func->is_automatic = true;
-  func->func_args = {{Direction::kRef, false, false, false, {}, "v", nullptr, {}}};
+  func->func_args = {
+      {Direction::kRef, false, false, false, {}, "v", nullptr, {}}};
   func->func_body_stmts = {MakeReturn(f.arena, MakeId(f.arena, "v"))};
   f.ctx.RegisterFunction("read_ref", func);
 
@@ -75,7 +78,8 @@ TEST(PassByRef, RefImmediateVisibility) {
   auto* func = f.arena.Create<ModuleItem>();
   func->kind = ModuleItemKind::kFunctionDecl;
   func->name = "write_and_read";
-  func->func_args = {{Direction::kRef, false, false, false, {}, "r", nullptr, {}}};
+  func->func_args = {
+      {Direction::kRef, false, false, false, {}, "r", nullptr, {}}};
 
   func->func_body_stmts.push_back(
       MakeAssign(f.arena, "r", MakeInt(f.arena, 42)));
@@ -149,7 +153,8 @@ TEST(QueueRef, OutdatedByPopFront) {
   auto* q = MakeQueue(f, "q", {10, 20, 30});
 
   RegAutoFunc(
-      f, "test_fn", {{Direction::kRef, false, false, false, {}, "v", nullptr, {}}},
+      f, "test_fn",
+      {{Direction::kRef, false, false, false, {}, "v", nullptr, {}}},
       {MakeExprStmt(f.arena, MakeMethodCall(f.arena, "q", "pop_front", {})),
        MakeAssign(f.arena, "v", MakeInt(f.arena, 99))});
 
@@ -166,7 +171,8 @@ TEST(QueueRef, OutdatedByPopBack) {
   auto* q = MakeQueue(f, "q", {10, 20, 30});
 
   RegAutoFunc(
-      f, "test_fn", {{Direction::kRef, false, false, false, {}, "v", nullptr, {}}},
+      f, "test_fn",
+      {{Direction::kRef, false, false, false, {}, "v", nullptr, {}}},
       {MakeExprStmt(f.arena, MakeMethodCall(f.arena, "q", "pop_back", {})),
        MakeAssign(f.arena, "v", MakeInt(f.arena, 99))});
 
@@ -241,7 +247,8 @@ TEST(QueueRef, OutdatedByWholeAssign) {
   auto* q = MakeQueue(f, "q", {10, 20, 30});
 
   RegAutoFunc(
-      f, "test_fn", {{Direction::kRef, false, false, false, {}, "v", nullptr, {}}},
+      f, "test_fn",
+      {{Direction::kRef, false, false, false, {}, "v", nullptr, {}}},
       {MakeExprStmt(f.arena, MakeMethodCall(f.arena, "q", "delete", {})),
        MakeExprStmt(f.arena, MakeMethodCall(f.arena, "q", "push_back",
                                             {MakeInt(f.arena, 100)})),
@@ -303,7 +310,8 @@ TEST(QueueRef, PopFrontPreservesOtherRef) {
   auto* q = MakeQueue(f, "q", {10, 20, 30});
 
   RegAutoFunc(
-      f, "test_fn", {{Direction::kRef, false, false, false, {}, "v", nullptr, {}}},
+      f, "test_fn",
+      {{Direction::kRef, false, false, false, {}, "v", nullptr, {}}},
       {MakeExprStmt(f.arena, MakeMethodCall(f.arena, "q", "pop_front", {})),
        MakeAssign(f.arena, "v", MakeInt(f.arena, 99))});
 
@@ -320,7 +328,8 @@ TEST(QueueRef, PopBackPreservesOtherRef) {
   auto* q = MakeQueue(f, "q", {10, 20, 30});
 
   RegAutoFunc(
-      f, "test_fn", {{Direction::kRef, false, false, false, {}, "v", nullptr, {}}},
+      f, "test_fn",
+      {{Direction::kRef, false, false, false, {}, "v", nullptr, {}}},
       {MakeExprStmt(f.arena, MakeMethodCall(f.arena, "q", "pop_back", {})),
        MakeAssign(f.arena, "v", MakeInt(f.arena, 99))});
 
@@ -418,7 +427,8 @@ TEST(PassByRef, NonIdentifierArgFallsBackToValueCopy) {
   func->kind = ModuleItemKind::kFunctionDecl;
   func->name = "add_ten";
   func->return_type.kind = DataTypeKind::kVoid;
-  func->func_args = {{Direction::kRef, false, false, false, {}, "r", nullptr, {}}};
+  func->func_args = {
+      {Direction::kRef, false, false, false, {}, "r", nullptr, {}}};
   auto* rhs = MakeBinary(f.arena, TokenKind::kPlus, MakeId(f.arena, "r"),
                          MakeInt(f.arena, 10));
   func->func_body_stmts.push_back(MakeAssign(f.arena, "r", rhs));
@@ -496,7 +506,8 @@ TEST(PassByRef, CallSyntaxTransparentForRef) {
   auto* by_ref = f.arena.Create<ModuleItem>();
   by_ref->kind = ModuleItemKind::kFunctionDecl;
   by_ref->name = "triple_ref";
-  by_ref->func_args = {{Direction::kRef, false, false, false, {}, "v", nullptr, {}}};
+  by_ref->func_args = {
+      {Direction::kRef, false, false, false, {}, "v", nullptr, {}}};
   by_ref->func_body_stmts = {MakeReturn(
       f.arena, MakeBinary(f.arena, TokenKind::kStar, MakeId(f.arena, "v"),
                           MakeInt(f.arena, 3)))};
@@ -512,10 +523,8 @@ TEST(PassByRef, CallSyntaxTransparentForRef) {
                           MakeInt(f.arena, 3)))};
   f.ctx.RegisterFunction("triple_val", by_val);
 
-  auto* call_ref =
-      MakeCall(f.arena, "triple_ref", {MakeId(f.arena, "x")});
-  auto* call_val =
-      MakeCall(f.arena, "triple_val", {MakeId(f.arena, "x")});
+  auto* call_ref = MakeCall(f.arena, "triple_ref", {MakeId(f.arena, "x")});
+  auto* call_val = MakeCall(f.arena, "triple_val", {MakeId(f.arena, "x")});
 
   EXPECT_EQ(EvalExpr(call_ref, f.ctx, f.arena).ToUint64(), 21u);
   EXPECT_EQ(EvalExpr(call_val, f.ctx, f.arena).ToUint64(), 21u);
@@ -538,4 +547,4 @@ TEST(QueueRef, QueueRefOutOfBoundsFallsBackToValue) {
   EXPECT_EQ(q->elements[2].ToUint64(), 30u);
 }
 
-}
+}  // namespace

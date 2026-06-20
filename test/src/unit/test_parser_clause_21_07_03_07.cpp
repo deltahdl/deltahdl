@@ -24,4 +24,4 @@ TEST(IoSystemTaskParsing, ExtendedVcdControlTaskEmptyArgumentList) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

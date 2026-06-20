@@ -13,9 +13,9 @@ namespace {
 class DumpflushSysTask : public VcdTestBase {};
 
 // $dumpflush empties the dump file buffer so that all data written so far is
-// stored in the file and is observable to a reader while the simulation is still
-// running. Before the flush the records sit in the stream buffer and are not yet
-// in the file; after the production $dumpflush path runs they are.
+// stored in the file and is observable to a reader while the simulation is
+// still running. Before the flush the records sit in the stream buffer and are
+// not yet in the file; after the production $dumpflush path runs they are.
 TEST_F(DumpflushSysTask, PushesBufferedOutputToFile) {
   SimFixture f;
   auto* clk = MakeVar(f, "clk", 1, 1);
@@ -38,9 +38,9 @@ TEST_F(DumpflushSysTask, PushesBufferedOutputToFile) {
   EXPECT_NE(ReadVcd().find("b10100101 \""), std::string::npos);
 }
 
-// After $dumpflush, dumping resumes exactly as before: the dump remains enabled,
-// no value changes are lost, and the flush itself emits no VCD command (it is
-// not a declaration or simulation command in the dump file).
+// After $dumpflush, dumping resumes exactly as before: the dump remains
+// enabled, no value changes are lost, and the flush itself emits no VCD command
+// (it is not a declaration or simulation command in the dump file).
 TEST_F(DumpflushSysTask, ResumesDumpingWithoutLoss) {
   SimFixture f;
   auto* data = MakeVar(f, "data", 8, 0x3C);
@@ -62,13 +62,14 @@ TEST_F(DumpflushSysTask, ResumesDumpingWithoutLoss) {
   }
   auto content = ReadVcd();
   EXPECT_NE(content.find("b00111100 !"), std::string::npos);  // change recorded
-  EXPECT_EQ(content.find("$dumpflush"), std::string::npos);   // no command emitted
+  EXPECT_EQ(content.find("$dumpflush"),
+            std::string::npos);  // no command emitted
 }
 
-// "Resumed as before" holds symmetrically: when dumping is suspended at the time
-// of the flush, $dumpflush still empties the buffer into the file (the flush is
-// not gated by the enabled state) yet leaves the dump suspended so it continues
-// exactly as it was.
+// "Resumed as before" holds symmetrically: when dumping is suspended at the
+// time of the flush, $dumpflush still empties the buffer into the file (the
+// flush is not gated by the enabled state) yet leaves the dump suspended so it
+// continues exactly as it was.
 TEST_F(DumpflushSysTask, FlushWhileSuspendedLeavesDumpSuspended) {
   SimFixture f;
   auto* data = MakeVar(f, "data", 8, 0xA5);
@@ -97,5 +98,5 @@ TEST_F(DumpflushSysTask, WithoutDumpFileIsHarmless) {
   EXPECT_EQ(f.ctx.GetVcdWriter(), nullptr);
 }
 
-}
-}
+}  // namespace
+}  // namespace delta

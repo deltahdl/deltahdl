@@ -73,4 +73,4 @@ TEST(KeywordVersionPreprocessing, BeginKeywords1800_2005_CheckerIsIdentifier) {
   EXPECT_TRUE(found);
 }
 
-}
+}  // namespace

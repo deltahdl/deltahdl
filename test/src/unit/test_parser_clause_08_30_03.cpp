@@ -35,4 +35,4 @@ TEST(ClassParsing, WeakRefGetInWaitParses) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

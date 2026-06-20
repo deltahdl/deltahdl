@@ -17,13 +17,9 @@ bool AutomaticVariableReferenceAllowed(
   return inside_procedural_concurrent_assertion;
 }
 
-bool NonStaticClassMemberReferenceAllowed() {
-  return false;
-}
+bool NonStaticClassMemberReferenceAllowed() { return false; }
 
-bool ChandleVariableReferenceAllowed() {
-  return false;
-}
+bool ChandleVariableReferenceAllowed() { return false; }
 
 bool SideEffectAllowed(bool inside_sequence_match_item,
                        bool variable_lvalue_is_local) {
@@ -43,8 +39,7 @@ bool FunctionArgKindAllowedInAssertionExpr(FunctionArgKind kind) {
   return false;
 }
 
-bool FunctionEligibleInAssertionExpr(bool is_automatic,
-                                     bool preserves_no_state,
+bool FunctionEligibleInAssertionExpr(bool is_automatic, bool preserves_no_state,
                                      bool has_no_side_effects) {
   // §16.6 phrases the lifetime constraint as automatic OR stateless: a static
   // function with no preserved state is acceptable in lieu of an automatic

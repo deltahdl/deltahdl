@@ -90,4 +90,4 @@ TEST(UnpackedArrayPortsAndArraysOfInstancesParser,
   EXPECT_EQ(item->inst_range_right, nullptr);
 }
 
-}
+}  // namespace

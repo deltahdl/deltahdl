@@ -8,8 +8,8 @@ namespace delta {
 
 // §18.7.1: the qualifier that may precede a name referenced inside an inline
 // `randomize() with` constraint block, which selects how that name is resolved.
-// An unqualified name (kNone) is searched for in two scopes in order; `this` and
-// `super` anchor the search at the randomized object's class; the local::
+// An unqualified name (kNone) is searched for in two scopes in order; `this`
+// and `super` anchor the search at the randomized object's class; the local::
 // operator redirects the search to the scope that contains the randomize()
 // method call. The local form also covers the special names local::this and
 // local::super, which name that local scope's own this/super.
@@ -20,10 +20,10 @@ enum class InlineConstraintQualifier : uint8_t {
   kLocal,  // local::<name>, including local::this and local::super
 };
 
-// §18.7.1: the scope a referenced name binds to once resolved. kObjectClassScope
-// is the class of the object handle on which randomize() with was called;
-// kLocalScope is the scope containing that method call. kUnresolved reports a
-// name that is found in neither of the searched scopes.
+// §18.7.1: the scope a referenced name binds to once resolved.
+// kObjectClassScope is the class of the object handle on which randomize() with
+// was called; kLocalScope is the scope containing that method call. kUnresolved
+// reports a name that is found in neither of the searched scopes.
 enum class InlineConstraintBinding : uint8_t {
   kObjectClassScope,
   kLocalScope,
@@ -45,8 +45,8 @@ enum class InlineConstraintBinding : uint8_t {
 //     there to the handle that designates the randomized object.
 //
 // `declared_in_object_class` and `declared_in_local_scope` report whether each
-// scope declares the bare name. The special names this and super always exist in
-// a scope, so a caller resolving local::this or local::super passes
+// scope declares the bare name. The special names this and super always exist
+// in a scope, so a caller resolving local::this or local::super passes
 // declared_in_local_scope = true.
 InlineConstraintBinding ResolveInlineConstraintName(
     InlineConstraintQualifier qualifier, bool declared_in_object_class,

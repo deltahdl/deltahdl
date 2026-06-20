@@ -48,8 +48,7 @@ std::set<std::string> SampleLocals(const SequenceExpr& sequence) {
     case SequenceExpr::Kind::kLocalVarDecl:
       // §F.5.4: sample((t v; R)) = sample(R) - {v}. The local declaration hides
       // v, so it is excluded from the names sampled by the inner sequence.
-      return Difference(SampleLocals(*sequence.lhs),
-                        {sequence.local_var_name});
+      return Difference(SampleLocals(*sequence.lhs), {sequence.local_var_name});
     case SequenceExpr::Kind::kLocalVarSampling:
       // §F.5.4: sample((1, v = e)) = {v}.
       return {sequence.local_var_name};
@@ -100,9 +99,9 @@ std::set<std::string> BlockLocals(const SequenceExpr& sequence) {
       // §F.5.4: block((R1 ##1 R2)) and block((R1 ##0 R2)) are both
       // (block(R1) - flow({}, R2)) U block(R2). A name blocked by R1 stops
       // being blocked if it flows out of R2 on its own.
-      return Union(Difference(BlockLocals(*sequence.lhs),
-                              FlowLocals({}, *sequence.rhs)),
-                   BlockLocals(*sequence.rhs));
+      return Union(
+          Difference(BlockLocals(*sequence.lhs), FlowLocals({}, *sequence.rhs)),
+          BlockLocals(*sequence.rhs));
     case SequenceExpr::Kind::kOr:
       // §F.5.4: block((R1 or R2)) = block(R1) U block(R2).
       return Union(BlockLocals(*sequence.lhs), BlockLocals(*sequence.rhs));
@@ -110,10 +109,9 @@ std::set<std::string> BlockLocals(const SequenceExpr& sequence) {
       // §F.5.4: block((R1 intersect R2)) =
       // block(R1) U block(R2) U (sample(R1) ∩ sample(R2)). Names sampled in
       // both operands are blocked because the two threads would disagree.
-      return Union(Union(BlockLocals(*sequence.lhs),
-                         BlockLocals(*sequence.rhs)),
-                   Intersect(SampleLocals(*sequence.lhs),
-                             SampleLocals(*sequence.rhs)));
+      return Union(
+          Union(BlockLocals(*sequence.lhs), BlockLocals(*sequence.rhs)),
+          Intersect(SampleLocals(*sequence.lhs), SampleLocals(*sequence.rhs)));
     case SequenceExpr::Kind::kFirstMatch:
       // §F.5.4: block(first_match(R)) = block(R).
       return BlockLocals(*sequence.lhs);
@@ -144,9 +142,8 @@ std::set<std::string> FlowLocals(const std::set<std::string>& incoming,
       // fresh v flow, and even that is stripped at the declaration boundary.
       const std::set<std::string> hidden{sequence.local_var_name};
       std::set<std::string> kept = Intersect(incoming, hidden);
-      std::set<std::string> inner =
-          Difference(FlowLocals(Difference(incoming, hidden), *sequence.lhs),
-                     hidden);
+      std::set<std::string> inner = Difference(
+          FlowLocals(Difference(incoming, hidden), *sequence.lhs), hidden);
       return Union(kept, inner);
     }
     case SequenceExpr::Kind::kLocalVarSampling:

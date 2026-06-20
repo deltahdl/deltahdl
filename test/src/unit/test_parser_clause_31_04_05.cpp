@@ -74,4 +74,4 @@ TEST(TimingCheckCommandParsing, PeriodEmptyNotifierSlot) {
   EXPECT_TRUE(tc->notifier.empty());
 }
 
-}
+}  // namespace

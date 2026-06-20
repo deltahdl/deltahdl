@@ -18,7 +18,6 @@ TEST(NonblockingAssignParsing, ParenthesizedIntraDelay) {
 }
 
 TEST(NonblockingAssignParsing, IntraAssignEventControl) {
-
   auto r = Parse(
       "module m;\n"
       "  reg q, d, clk;\n"
@@ -487,4 +486,4 @@ TEST(NonblockingAssignParsing, DisambiguationBothInSameBlock) {
   EXPECT_EQ(s1->rhs->op, TokenKind::kLtEq);
 }
 
-}
+}  // namespace

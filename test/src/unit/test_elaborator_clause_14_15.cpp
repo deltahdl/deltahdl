@@ -44,4 +44,4 @@ TEST(SyncEventElab, InoutSyncEventElaborates) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

@@ -398,4 +398,4 @@ TEST(TimingCheckEventDefParsing, TerminalBitSelectOnDataSignal) {
   EXPECT_EQ(tc->data_terminal.range_kind, SpecifyRangeKind::kBitSelect);
 }
 
-}
+}  // namespace

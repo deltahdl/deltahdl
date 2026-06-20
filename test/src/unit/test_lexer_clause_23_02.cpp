@@ -32,4 +32,4 @@ TEST(ModuleDefinitions, IdentifierAfterModuleKeyword) {
   EXPECT_EQ(tokens[1].text, "my_design");
 }
 
-}
+}  // namespace

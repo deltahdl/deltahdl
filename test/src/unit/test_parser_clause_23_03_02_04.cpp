@@ -134,4 +134,4 @@ TEST(WildcardPortConnectionParsing, MixedStylesInSameParent) {
   EXPECT_TRUE(items[3]->inst_wildcard);
 }
 
-}
+}  // namespace

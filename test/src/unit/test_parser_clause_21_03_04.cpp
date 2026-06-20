@@ -116,4 +116,4 @@ TEST(FileReadFunctions, FreadMemoryFormWithCountButNoStart) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

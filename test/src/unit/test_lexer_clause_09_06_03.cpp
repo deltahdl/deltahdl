@@ -14,4 +14,4 @@ TEST(DisableForkLexing, DisableForkTokenSequence) {
   EXPECT_EQ(tokens[2].kind, TokenKind::kSemicolon);
 }
 
-}
+}  // namespace

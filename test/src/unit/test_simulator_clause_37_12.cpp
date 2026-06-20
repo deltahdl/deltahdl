@@ -43,8 +43,9 @@ TEST(ScopeModel, BlockItemDeclTypeClassification) {
   EXPECT_TRUE(VpiIsBlockItemDeclType(vpiLogicVar));  // a variable declaration
   EXPECT_TRUE(VpiIsBlockItemDeclType(vpiIntVar));
   EXPECT_TRUE(VpiIsBlockItemDeclType(vpiStructVar));
-  EXPECT_TRUE(VpiIsBlockItemDeclType(vpiTypedef));    // a type declaration
-  EXPECT_TRUE(VpiIsBlockItemDeclType(vpiParameter));  // a localparam declaration
+  EXPECT_TRUE(VpiIsBlockItemDeclType(vpiTypedef));  // a type declaration
+  EXPECT_TRUE(
+      VpiIsBlockItemDeclType(vpiParameter));  // a localparam declaration
 
   EXPECT_FALSE(VpiIsBlockItemDeclType(vpiAssignment));  // a statement
   EXPECT_FALSE(VpiIsBlockItemDeclType(vpiNamedBegin));  // a nested block
@@ -219,8 +220,7 @@ TEST(ScopePublic, ImportIterationReturnsOnlyReferencedImports) {
   scope.children.push_back(&imported_b);
   scope.children.push_back(&visible_unreferenced);
 
-  std::vector<VpiHandle> imports =
-      Collect(ctx, ctx.Iterate(vpiImport, &scope));
+  std::vector<VpiHandle> imports = Collect(ctx, ctx.Iterate(vpiImport, &scope));
   ASSERT_EQ(imports.size(), 2u);
   EXPECT_EQ(imports[0], &imported_a);
   EXPECT_EQ(imports[1], &imported_b);
@@ -421,8 +421,8 @@ TEST(ScopePublic, VirtualInterfaceIterationExpandsArrayElements) {
   EXPECT_EQ(vifs[1], &elem0);  // array expanded to its elements
   EXPECT_EQ(vifs[2], &elem1);
 
-  // D7: vpiVariables reports the array of virtual interfaces as the single array
-  // var that declares it, not its individual elements.
+  // D7: vpiVariables reports the array of virtual interfaces as the single
+  // array var that declares it, not its individual elements.
   std::vector<VpiHandle> vars = Collect(ctx, ctx.Iterate(vpiVariables, &scope));
   ASSERT_EQ(vars.size(), 1u);
   EXPECT_EQ(vars[0], &vif_array);

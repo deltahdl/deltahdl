@@ -49,4 +49,4 @@ TEST(BlockingAssignLexing, EqualsDistinctFromLtEq) {
   EXPECT_EQ(tokens[1].kind, TokenKind::kLtEq);
 }
 
-}
+}  // namespace

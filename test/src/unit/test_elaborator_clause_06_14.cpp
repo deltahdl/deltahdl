@@ -264,4 +264,4 @@ TEST(ChandleDataType, ChandleCaseInequalityOk) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-}
+}  // namespace

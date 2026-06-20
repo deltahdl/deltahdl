@@ -293,4 +293,4 @@ TEST(DelayParsing, Delay3OverArityRejected) {
   EXPECT_TRUE(r.has_errors);
 }
 
-}
+}  // namespace

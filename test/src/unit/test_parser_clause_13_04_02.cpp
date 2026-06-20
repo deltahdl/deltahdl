@@ -242,4 +242,4 @@ TEST(FunctionLifetimeParsing, FunctionInInterface) {
   EXPECT_EQ(item->name, "get_data");
 }
 
-}
+}  // namespace

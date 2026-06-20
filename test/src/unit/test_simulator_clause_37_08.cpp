@@ -14,8 +14,8 @@ namespace {
 // task or function imported from several module instances) carries no rule of
 // its own beyond what generic iteration already allows.
 //
-// The clause's own normative rule is Detail 2, observed below through the public
-// vpi_get dispatch:
+// The clause's own normative rule is Detail 2, observed below through the
+// public vpi_get dispatch:
 //   D2 - the access type reported for an interface tf decl is only ever
 //        vpiForkJoinAcc or vpiExternAcc; no third value escapes the property.
 

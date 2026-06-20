@@ -289,8 +289,7 @@ std::size_t PropertyReach(const PropertyExpr& property) {
 // _|_^omega). The tail is padded to `reach` letters past the prefix, plus a
 // margin; for the finite properties this model evaluates that is enough for the
 // verdict to have stabilized, mirroring §F.5.2's bounded witness search.
-Word PrefixWithTail(const Word& prefix, const Letter& tail,
-                    std::size_t reach) {
+Word PrefixWithTail(const Word& prefix, const Letter& tail, std::size_t reach) {
   Word out = prefix;
   const std::size_t pad = reach + 2;
   for (std::size_t i = 0; i < pad; ++i) {
@@ -362,8 +361,8 @@ bool Satisfies(const Word& word, const PropertyExpr& property) {
              (property.rhs && Satisfies(word, *property.rhs));
     case PropertyExpr::Kind::kAnd:
       // §F.5.3.1: w |= ( P1 and P2 ) iff w |= P1 and w |= P2.
-      return property.lhs && property.rhs &&
-             Satisfies(word, *property.lhs) && Satisfies(word, *property.rhs);
+      return property.lhs && property.rhs && Satisfies(word, *property.lhs) &&
+             Satisfies(word, *property.rhs);
     case PropertyExpr::Kind::kNexttime:
       // §F.5.3.1: w |= ( nexttime P ) iff |w| = 0 or w^{1.} |= P.
       return word.empty() ||
@@ -451,7 +450,8 @@ std::shared_ptr<const PropertyExpr> BridgeClockedProperty(
     case ClockedProperty::Kind::kImplication:
       return PropImplication(q.sequence, BridgeClockedProperty(*q.lhs));
     case ClockedProperty::Kind::kOr:
-      return PropOr(BridgeClockedProperty(*q.lhs), BridgeClockedProperty(*q.rhs));
+      return PropOr(BridgeClockedProperty(*q.lhs),
+                    BridgeClockedProperty(*q.rhs));
     case ClockedProperty::Kind::kAnd:
       return PropAnd(BridgeClockedProperty(*q.lhs),
                      BridgeClockedProperty(*q.rhs));
@@ -529,12 +529,12 @@ std::shared_ptr<const TopLevelProperty> UnclockTopLevel(
 // clock c is pushed onto the guarded property via T^p(., c); the disable iff
 // guard and parentheses carry through unchanged.
 std::shared_ptr<const TopLevelProperty> UnclockTopLevelUnderClock(
-    const TopLevelProperty& t, const std::shared_ptr<const BooleanExpr>& clock) {
+    const TopLevelProperty& t,
+    const std::shared_ptr<const BooleanExpr>& clock) {
   switch (t.kind) {
     case TopLevelProperty::Kind::kProperty:
-      return TopProperty(
-          BridgeClockedProperty(*RewritePropertyUnderClock(
-              *LiftProperty(*t.property), clock)));
+      return TopProperty(BridgeClockedProperty(
+          *RewritePropertyUnderClock(*LiftProperty(*t.property), clock)));
     case TopLevelProperty::Kind::kDisableIff:
       return TopDisableIff(t.disable_condition,
                            BridgeClockedProperty(*RewritePropertyUnderClock(
@@ -569,8 +569,7 @@ bool NeutrallySatisfies(const Word& word, const PropertyExpr& property) {
   return Satisfies(word, property);
 }
 
-bool NeutrallySatisfiesTopLevel(const Word& word,
-                                const TopLevelProperty& top) {
+bool NeutrallySatisfiesTopLevel(const Word& word, const TopLevelProperty& top) {
   switch (top.kind) {
     case TopLevelProperty::Kind::kProperty:
       // §F.5.3.1: for T = P, w |= T iff w |= P.
@@ -761,9 +760,9 @@ bool AssertSatisfiedOnWordSet(
   return true;
 }
 
-bool CoverSatisfiedOnWordSet(
-    const EnabledAssertion& assertion, const std::vector<Word>& words,
-    const std::vector<EnabledAssertion>& assumptions) {
+bool CoverSatisfiedOnWordSet(const EnabledAssertion& assertion,
+                             const std::vector<Word>& words,
+                             const std::vector<EnabledAssertion>& assumptions) {
   // §F.5.3.1: a cover statement is satisfied on the set iff it is satisfied on
   // at least one feasible word.
   for (const Word& word : words) {
@@ -776,9 +775,9 @@ bool CoverSatisfiedOnWordSet(
   return false;
 }
 
-bool HoldsGloballyOnWordSet(
-    const EnabledAssertion& assertion, const std::vector<Word>& words,
-    const std::vector<EnabledAssertion>& assumptions) {
+bool HoldsGloballyOnWordSet(const EnabledAssertion& assertion,
+                            const std::vector<Word>& words,
+                            const std::vector<EnabledAssertion>& assumptions) {
   // §F.5.3.1: an assertion statement holds globally on the set iff it is
   // satisfied on every feasible word.
   for (const Word& word : words) {

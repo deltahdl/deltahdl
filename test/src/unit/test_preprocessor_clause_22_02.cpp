@@ -597,7 +597,8 @@ TEST(Preprocessor, LanguageElementBeforeDirectiveOnSameLine) {
   auto fid = f.mgr.AddFile("<test>", "bit b; `default_nettype none\n");
   auto result = pp.Preprocess(fid);
   EXPECT_FALSE(f.diag.HasErrors());
-  // The directive still takes effect even though a language element precedes it.
+  // The directive still takes effect even though a language element precedes
+  // it.
   EXPECT_EQ(pp.DefaultNetType(), NetType::kNone);
   // And the preceding language element is preserved in the output.
   EXPECT_NE(result.find("bit b;"), std::string::npos);

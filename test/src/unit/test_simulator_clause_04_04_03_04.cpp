@@ -153,11 +153,11 @@ TEST(PliPostNbaSim, PostNBAReadWriteInActiveRegionSetContext) {
   EXPECT_EQ(observed_sample, 55);
 }
 
-// Edge case: an event created from within a Post-NBA callback that lands back in
-// the Post-NBA region of the same time slot must still be evaluated, and still
-// only after the NBA region has run. Exercises the scheduler draining the region
-// to empty so the "create events after NBA" guarantee holds for re-entrant
-// scheduling.
+// Edge case: an event created from within a Post-NBA callback that lands back
+// in the Post-NBA region of the same time slot must still be evaluated, and
+// still only after the NBA region has run. Exercises the scheduler draining the
+// region to empty so the "create events after NBA" guarantee holds for
+// re-entrant scheduling.
 TEST(PliPostNbaSim, PostNBAReentrantEventStillRunsAfterNBA) {
   Arena arena;
   Scheduler sched(arena);

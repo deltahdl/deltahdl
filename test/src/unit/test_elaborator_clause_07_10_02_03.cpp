@@ -28,4 +28,4 @@ TEST(QueueDeleteElaboration, DeletePropertyStyleElaborates) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

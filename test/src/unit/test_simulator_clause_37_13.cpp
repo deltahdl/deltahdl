@@ -51,9 +51,9 @@ TEST(IoDeclModel, ExprTargetKindFollowsPassingMode) {
             vpiRefObj);
   // A virtual interface io decl -> virtual interface var; this wins over the
   // by-reference/interface routing.
-  EXPECT_EQ(VpiIoDeclExprType(true, true, /*is_virtual_interface=*/true,
-                              kVpiNet),
-            vpiVirtualInterfaceVar);
+  EXPECT_EQ(
+      VpiIoDeclExprType(true, true, /*is_virtual_interface=*/true, kVpiNet),
+      vpiVirtualInterfaceVar);
   // An ordinary input port keeps its connected kind (here a net).
   EXPECT_EQ(VpiIoDeclExprType(false, false, false, /*default=*/kVpiNet),
             kVpiNet);
@@ -93,11 +93,12 @@ TEST(IoDeclPublic, HandleExprReturnsConnectionChild) {
 // D1: a port or argument passed by reference reports vpiRef as its direction;
 // any other passing mode keeps its declared direction.
 TEST(IoDeclModel, ByReferenceReportsVpiRefDirection) {
-  EXPECT_EQ(VpiIoDeclDirection(/*declared_direction=*/vpiInput,
-                               /*passed_by_reference=*/true,
-                               /*expr_is_ref_obj_to_interface_or_modport=*/false,
-                               /*expr_is_virtual_interface_var=*/false),
-            vpiRef);
+  EXPECT_EQ(
+      VpiIoDeclDirection(/*declared_direction=*/vpiInput,
+                         /*passed_by_reference=*/true,
+                         /*expr_is_ref_obj_to_interface_or_modport=*/false,
+                         /*expr_is_virtual_interface_var=*/false),
+      vpiRef);
   // A plain input keeps its declared direction.
   EXPECT_EQ(VpiIoDeclDirection(vpiInput, false, false, false), vpiInput);
   EXPECT_EQ(VpiIoDeclDirection(vpiOutput, false, false, false), vpiOutput);
@@ -112,10 +113,11 @@ TEST(IoDeclModel, InterfaceModportAndVirtualInterfaceHaveNoDirection) {
                                /*expr_is_ref_obj_to_interface_or_modport=*/true,
                                /*expr_is_virtual_interface_var=*/false),
             vpiNoDirection);
-  EXPECT_EQ(VpiIoDeclDirection(vpiInput, /*passed_by_reference=*/false,
-                               /*expr_is_ref_obj_to_interface_or_modport=*/false,
-                               /*expr_is_virtual_interface_var=*/true),
-            vpiNoDirection);
+  EXPECT_EQ(
+      VpiIoDeclDirection(vpiInput, /*passed_by_reference=*/false,
+                         /*expr_is_ref_obj_to_interface_or_modport=*/false,
+                         /*expr_is_virtual_interface_var=*/true),
+      vpiNoDirection);
 }
 
 // D4: the io decl's range relations are the same as for its corresponding
@@ -175,8 +177,8 @@ TEST(IoDeclModel, LeftRightRangeMatchTypespec) {
 TEST(IoDeclModel, ExprTraversalAppliesOnlyToIoDecl) {
   EXPECT_EQ(VpiIoDeclExpr(nullptr), nullptr);
 
-  // A non-io-decl object that happens to carry a ref obj child is not subject to
-  // the io decl rule, so its vpiExpr target is not taken.
+  // A non-io-decl object that happens to carry a ref obj child is not subject
+  // to the io decl rule, so its vpiExpr target is not taken.
   VpiObject not_io_decl;
   not_io_decl.type = vpiModule;
   VpiObject ref_obj;

@@ -31,4 +31,4 @@ TEST(DynamicArraySizeValidation, SizeInExpressionElaborates) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

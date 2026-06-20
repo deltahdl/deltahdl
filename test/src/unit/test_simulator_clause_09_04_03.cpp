@@ -188,4 +188,4 @@ TEST(LevelSensitiveEventSimulation, WaitVectorNonzeroConditionUnblocks) {
   EXPECT_EQ(val, 123u);
 }
 
-}
+}  // namespace

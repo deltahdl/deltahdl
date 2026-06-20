@@ -328,4 +328,4 @@ TEST(OutOfBlockDeclElaboration, OutOfBlockBeforeClassError) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

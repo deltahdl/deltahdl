@@ -29,4 +29,4 @@ TEST(DefaultClockingSim, SetAndGetDefaultClocking) {
   EXPECT_EQ(found->default_output_skew.ticks, 2u);
 }
 
-}
+}  // namespace

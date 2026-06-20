@@ -83,4 +83,4 @@ TEST(SubroutineCallExprElaboration, TypenameAcceptsScalarBitSelect) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

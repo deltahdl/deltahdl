@@ -60,4 +60,4 @@ TEST(CompilerDirectiveParsing, DirectiveDoesNotAffectOtherCU) {
   EXPECT_TRUE(r2.has_errors);
 }
 
-}
+}  // namespace

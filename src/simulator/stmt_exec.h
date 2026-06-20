@@ -16,4 +16,4 @@ ExecTask ExecStmt(const Stmt* stmt, SimContext& ctx, Arena& arena);
 
 bool IsTimeControlStatement(StmtKind kind);
 
-}
+}  // namespace delta

@@ -146,4 +146,4 @@ TEST(EventOrOperatorElaboration, CommaAndOrYieldIdenticalSensitivity) {
   }
 }
 
-}
+}  // namespace

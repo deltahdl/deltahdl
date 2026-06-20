@@ -14,8 +14,7 @@ TEST(WhiteSpacePreprocessor, VerticalTabDelimiterPreserved) {
 
 TEST(WhiteSpacePreprocessor, CrlfDelimiterPreserved) {
   PreprocFixture f;
-  auto result =
-      Preprocess("module t;\r\nlogic a;\r\nendmodule\r\n", f);
+  auto result = Preprocess("module t;\r\nlogic a;\r\nendmodule\r\n", f);
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
@@ -56,4 +55,4 @@ TEST(WhiteSpacePreprocessor, TabsInStringPreserved) {
   EXPECT_NE(result.find("\thello\tworld\t"), std::string::npos);
 }
 
-}
+}  // namespace

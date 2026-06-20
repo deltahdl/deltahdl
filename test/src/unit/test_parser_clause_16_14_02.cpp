@@ -21,4 +21,4 @@ TEST(AssertionSemanticsParsing, AssumeProperty) {
   EXPECT_TRUE(found);
 }
 
-}
+}  // namespace

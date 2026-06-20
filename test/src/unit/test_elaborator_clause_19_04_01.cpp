@@ -197,4 +197,4 @@ TEST(EmbeddedCovergroupInheritance, EffectiveOptionValue) {
   EXPECT_EQ(EffectiveDerivedOption(inherited), 10);
 }
 
-}
+}  // namespace

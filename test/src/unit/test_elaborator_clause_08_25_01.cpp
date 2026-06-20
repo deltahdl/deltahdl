@@ -13,7 +13,8 @@ TEST(ParameterizedScopeResolutionElaboration, ValueParamScopeOk) {
              "endmodule\n"));
 }
 
-TEST(ParameterizedScopeResolutionElaboration, ExplicitDefaultAccessesLocalParamOk) {
+TEST(ParameterizedScopeResolutionElaboration,
+     ExplicitDefaultAccessesLocalParamOk) {
   EXPECT_TRUE(
       ElabOk("class C #(int p = 1);\n"
              "  parameter int q = 5;\n"
@@ -24,7 +25,8 @@ TEST(ParameterizedScopeResolutionElaboration, ExplicitDefaultAccessesLocalParamO
              "endmodule\n"));
 }
 
-TEST(ParameterizedScopeResolutionElaboration, ExplicitDefaultAccessesClassParamOk) {
+TEST(ParameterizedScopeResolutionElaboration,
+     ExplicitDefaultAccessesClassParamOk) {
   EXPECT_TRUE(
       ElabOk("class C #(int p = 1);\n"
              "  parameter int q = 5;\n"
@@ -35,7 +37,8 @@ TEST(ParameterizedScopeResolutionElaboration, ExplicitDefaultAccessesClassParamO
              "endmodule\n"));
 }
 
-TEST(ParameterizedScopeResolutionElaboration, SpecificSpecializationAccessesParamOk) {
+TEST(ParameterizedScopeResolutionElaboration,
+     SpecificSpecializationAccessesParamOk) {
   EXPECT_TRUE(
       ElabOk("class C #(int p = 1);\n"
              "  parameter int q = 5;\n"
@@ -46,7 +49,8 @@ TEST(ParameterizedScopeResolutionElaboration, SpecificSpecializationAccessesPara
              "endmodule\n"));
 }
 
-TEST(ParameterizedScopeResolutionElaboration, SpecificSpecializationAccessesTypeParamOk) {
+TEST(ParameterizedScopeResolutionElaboration,
+     SpecificSpecializationAccessesTypeParamOk) {
   // The scope resolution operator reaches a type parameter of the class, not
   // only its value parameters. The explicit specialization supplies the actual
   // type that the parameter name resolves to, here giving the variable the
@@ -59,7 +63,8 @@ TEST(ParameterizedScopeResolutionElaboration, SpecificSpecializationAccessesType
              "endmodule\n"));
 }
 
-TEST(ParameterizedScopeResolutionElaboration, BothClassAndLocalParamsAccessibleOk) {
+TEST(ParameterizedScopeResolutionElaboration,
+     BothClassAndLocalParamsAccessibleOk) {
   EXPECT_TRUE(
       ElabOk("class C #(int p = 1);\n"
              "  parameter int q = 5;\n"
@@ -73,7 +78,8 @@ TEST(ParameterizedScopeResolutionElaboration, BothClassAndLocalParamsAccessibleO
              "endmodule\n"));
 }
 
-TEST(ParameterizedScopeResolutionElaboration, OutOfBlockMethodForParameterizedClassOk) {
+TEST(ParameterizedScopeResolutionElaboration,
+     OutOfBlockMethodForParameterizedClassOk) {
   EXPECT_TRUE(
       ElabOk("class C #(int p = 1);\n"
              "  extern static function int f();\n"
@@ -110,7 +116,8 @@ TEST(ParameterizedScopeResolutionElaboration, UnadornedScopeOutsideIsError) {
              "endmodule\n"));
 }
 
-TEST(ParameterizedScopeResolutionElaboration, UnadornedScopeInContAssignIsError) {
+TEST(ParameterizedScopeResolutionElaboration,
+     UnadornedScopeInContAssignIsError) {
   EXPECT_FALSE(
       ElabOk("class C #(int p = 1);\n"
              "  parameter int q = 5;\n"
@@ -121,10 +128,12 @@ TEST(ParameterizedScopeResolutionElaboration, UnadornedScopeInContAssignIsError)
              "endmodule\n"));
 }
 
-TEST(ParameterizedScopeResolutionElaboration, UnadornedScopeInNestedExprIsError) {
+TEST(ParameterizedScopeResolutionElaboration,
+     UnadornedScopeInNestedExprIsError) {
   // The prohibition on the bare parameterized-class name as a scope resolution
-  // prefix outside the class applies wherever the prefix appears, including as a
-  // subexpression of a larger expression, not only as the whole right-hand side.
+  // prefix outside the class applies wherever the prefix appears, including as
+  // a subexpression of a larger expression, not only as the whole right-hand
+  // side.
   EXPECT_FALSE(
       ElabOk("class C #(int p = 1);\n"
              "  parameter int q = 5;\n"
@@ -135,7 +144,8 @@ TEST(ParameterizedScopeResolutionElaboration, UnadornedScopeInNestedExprIsError)
              "endmodule\n"));
 }
 
-TEST(ParameterizedScopeResolutionElaboration, UnadornedScopeInAlwaysCombIsError) {
+TEST(ParameterizedScopeResolutionElaboration,
+     UnadornedScopeInAlwaysCombIsError) {
   // The same prohibition holds across procedural contexts; an always_comb block
   // outside the class is still outside the class, so the unadorned prefix is
   // illegal there too.
@@ -153,7 +163,8 @@ TEST(ParameterizedScopeResolutionElaboration, UnadornedScopeInsideClassOk) {
   // Within the parameterized class's own scope the unadorned name may prefix
   // the scope resolution operator to name a member; the restriction that makes
   // the bare name illegal applies only outside the class and its out-of-block
-  // declarations. Here it names a member rather than the default specialization.
+  // declarations. Here it names a member rather than the default
+  // specialization.
   EXPECT_TRUE(
       ElabOk("class C #(int p = 1);\n"
              "  parameter int q = 5;\n"
@@ -165,4 +176,4 @@ TEST(ParameterizedScopeResolutionElaboration, UnadornedScopeInsideClassOk) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

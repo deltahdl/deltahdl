@@ -7,7 +7,8 @@
 
 using namespace delta;
 
-TEST(ProceduralContinuousSchedulingSim, AssignCorrespondsToProcessSensitiveToSource) {
+TEST(ProceduralContinuousSchedulingSim,
+     AssignCorrespondsToProcessSensitiveToSource) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -29,7 +30,8 @@ TEST(ProceduralContinuousSchedulingSim, AssignCorrespondsToProcessSensitiveToSou
   EXPECT_TRUE(q->is_forced);
 }
 
-TEST(ProceduralContinuousSchedulingSim, ForceCorrespondsToProcessSensitiveToSource) {
+TEST(ProceduralContinuousSchedulingSim,
+     ForceCorrespondsToProcessSensitiveToSource) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -52,7 +54,8 @@ TEST(ProceduralContinuousSchedulingSim, ForceCorrespondsToProcessSensitiveToSour
   EXPECT_TRUE(q->is_forced);
 }
 
-TEST(ProceduralContinuousSchedulingSim, ExpressionChangeUsesCurrentValuesForTarget) {
+TEST(ProceduralContinuousSchedulingSim,
+     ExpressionChangeUsesCurrentValuesForTarget) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -97,7 +100,8 @@ TEST(ProceduralContinuousSchedulingSim, DeassignDeactivatesAssign) {
   EXPECT_EQ(q->value.ToUint64(), 5u);
 }
 
-TEST(ProceduralContinuousSchedulingSim, AssignTracksCurrentValuesAcrossMultipleSources) {
+TEST(ProceduralContinuousSchedulingSim,
+     AssignTracksCurrentValuesAcrossMultipleSources) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -122,7 +126,8 @@ TEST(ProceduralContinuousSchedulingSim, AssignTracksCurrentValuesAcrossMultipleS
 
 // Claim 1 edge case: the process stays sensitive to the source, so the target
 // tracks every subsequent source change, not just the first one.
-TEST(ProceduralContinuousSchedulingSim, AssignStaysSensitiveAcrossRepeatedChanges) {
+TEST(ProceduralContinuousSchedulingSim,
+     AssignStaysSensitiveAcrossRepeatedChanges) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -195,4 +200,3 @@ TEST(ProceduralContinuousSchedulingSim, ReleaseDeactivatesForce) {
   EXPECT_FALSE(q->is_forced);
   EXPECT_EQ(q->value.ToUint64(), 5u);
 }
-

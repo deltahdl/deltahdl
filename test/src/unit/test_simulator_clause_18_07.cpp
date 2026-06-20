@@ -109,4 +109,4 @@ TEST(Constraint, InlineConstraintConflictingWithBlockFails) {
   EXPECT_FALSE(solver.SolveWith({inline_c}));
 }
 
-}
+}  // namespace

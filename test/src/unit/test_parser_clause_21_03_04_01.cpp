@@ -26,4 +26,4 @@ TEST(IoSystemTaskParsing, UngetcCall) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

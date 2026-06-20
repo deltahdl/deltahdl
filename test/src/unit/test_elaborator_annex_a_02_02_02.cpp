@@ -370,4 +370,4 @@ TEST(ChargeStrengthElaboration, LargeEncodesAsLarge) {
   EXPECT_TRUE(found);
 }
 
-}
+}  // namespace

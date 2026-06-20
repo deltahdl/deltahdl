@@ -57,7 +57,9 @@ TEST(UdpTopLevelParsing, AtLeast256UdpsAccepted) {
   for (int i = 0; i < 300; ++i) {
     src += "primitive p";
     src += std::to_string(i);
-    src += "(output out, input in);\n  table 0 : 1; 1 : 0; endtable\nendprimitive\n";
+    src +=
+        "(output out, input in);\n  table 0 : 1; 1 : 0; "
+        "endtable\nendprimitive\n";
   }
   auto r = Parse(src);
   ASSERT_NE(r.cu, nullptr);
@@ -65,4 +67,4 @@ TEST(UdpTopLevelParsing, AtLeast256UdpsAccepted) {
   EXPECT_EQ(r.cu->udps.size(), 300u);
 }
 
-}
+}  // namespace

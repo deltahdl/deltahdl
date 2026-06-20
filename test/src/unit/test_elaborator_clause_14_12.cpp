@@ -101,4 +101,4 @@ TEST(DefaultClockingElab, DuplicateDefaultClockingViaAssignmentErrors) {
   EXPECT_TRUE(f.has_errors);
 }
 
-}
+}  // namespace

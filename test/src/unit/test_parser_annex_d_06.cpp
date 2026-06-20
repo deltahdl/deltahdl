@@ -29,19 +29,19 @@ TEST(OptionalListParserParsing, HierarchicalArgument) {
 // dotted name reaching a block nested inside another named block parses with no
 // diagnostics.
 TEST(OptionalListParserParsing, MultiLevelHierarchicalArgument) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  initial $list(m.outer.inner);\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  initial $list(m.outer.inner);\n"
+              "endmodule\n"));
 }
 
 // Annex D.6: both forms (bare and parenthesized) are accepted by the parser
 // without producing diagnostics.
 TEST(OptionalListParserParsing, BareFormParsesWithoutError) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  initial $list;\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  initial $list;\n"
+              "endmodule\n"));
 }
 
 }  // namespace

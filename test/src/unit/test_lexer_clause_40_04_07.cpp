@@ -63,7 +63,8 @@ struct FsmPartSelectInfo {
   std::string enum_name;
 };
 
-std::vector<FsmPartSelectInfo> CollectPartSelectPragmas(const std::string& src) {
+std::vector<FsmPartSelectInfo> CollectPartSelectPragmas(
+    const std::string& src) {
   SourceManager mgr;
   DiagEngine diag(mgr);
   auto fid = mgr.AddFile("<test>", src);

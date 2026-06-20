@@ -723,4 +723,4 @@ TEST(AssertionParsing, ExpectStatement) {
   EXPECT_EQ(r.cu->modules.size(), 1u);
 }
 
-}
+}  // namespace

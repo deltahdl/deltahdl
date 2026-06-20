@@ -19,7 +19,8 @@ using namespace delta;
 //     parameter /* tool enum enumeration_name */
 //     S0 = 0, s1 = 1, s2 = 2, s3 = 3;
 //
-// and, when a bit width is used for the parameters, immediately after the width:
+// and, when a bit width is used for the parameters, immediately after the
+// width:
 //
 //     parameter [1:0] /* tool enum enumeration_name */
 //     S0 = 0, s1 = 1, s2 = 2, s3 = 3;
@@ -30,8 +31,9 @@ using namespace delta;
 // width. The interpretation that these parameters are the FSM's possible states
 // is a semantic FSM-extraction layer on top of the tokens — the same kind of
 // semantic decision §40.4.4/§40.4.5 noted the lexer does not make. These tests
-// observe that the existing recognition surfaces the enum pragma in both §40.4.6
-// placements, and that every state-naming parameter reaches the token stream.
+// observe that the existing recognition surfaces the enum pragma in both
+// §40.4.6 placements, and that every state-naming parameter reaches the token
+// stream.
 
 namespace {
 
@@ -113,7 +115,8 @@ TEST(FsmPossibleStatesPragmaLexing, RecognizesEnumPragmaAfterParameterKeyword) {
 // immediately after the bit width instead. Recognition is unchanged: the same
 // enum pragma is surfaced, and the bit-range tokens between `parameter` and the
 // pragma do not disturb it. The state-naming parameters still reach the stream.
-TEST(FsmPossibleStatesPragmaLexing, RecognizesEnumPragmaAfterParameterBitWidth) {
+TEST(FsmPossibleStatesPragmaLexing,
+     RecognizesEnumPragmaAfterParameterBitWidth) {
   const std::string src =
       "module fsm;\n"
       "  parameter [1:0] /* tool enum myFSM */\n"

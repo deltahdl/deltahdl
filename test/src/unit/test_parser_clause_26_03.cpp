@@ -283,4 +283,4 @@ TEST(PackageImport, PackagePrecedesImport) {
       HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kImportDecl));
 }
 
-}
+}  // namespace

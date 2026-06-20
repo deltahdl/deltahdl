@@ -7,8 +7,8 @@
 
 namespace delta {
 
-// §F.6.3 fixes the meaning of the "future" extended expression $future_gclk at a
-// point w^j of a word over Sigma. Like the "past" expression $past_gclk of
+// §F.6.3 fixes the meaning of the "future" extended expression $future_gclk at
+// a point w^j of a word over Sigma. Like the "past" expression $past_gclk of
 // §F.6.2 it reaches to an adjacent letter, but in the opposite direction: the
 // value at j is the value the expression e takes at the immediately following
 // letter w^{j+1}. The abstract word semantics determines which letter supplies

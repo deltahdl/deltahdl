@@ -277,4 +277,4 @@ TEST(BuiltinMethodSim, MethodResultInConditional) {
   EXPECT_EQ(f.ctx.FindVariable("r")->value.ToUint64(), 1u);
 }
 
-}
+}  // namespace

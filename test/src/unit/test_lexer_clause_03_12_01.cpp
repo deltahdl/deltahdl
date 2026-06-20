@@ -69,4 +69,4 @@ TEST(CompilationUnitLexing, DollarUnitFollowedByDot) {
   EXPECT_EQ(t2.kind, TokenKind::kDot);
 }
 
-}
+}  // namespace

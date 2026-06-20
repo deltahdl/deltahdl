@@ -33,4 +33,4 @@ TEST(Tri0Tri1Parsing, Tri1Decl) {
   EXPECT_TRUE(item->data_type.is_net);
 }
 
-}
+}  // namespace

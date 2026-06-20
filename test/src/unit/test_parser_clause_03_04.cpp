@@ -20,7 +20,6 @@ TEST(ProgramBlockParsing, ProgramEndprogramEnclosureProducesProgramDecl) {
 }
 
 TEST(ProgramBlockParsing, ProgramBodyTerminatesOnlyAtEndprogram) {
-
   auto r = Parse("program p; initial begin end\n");
   EXPECT_TRUE(r.has_errors);
 }
@@ -202,4 +201,4 @@ TEST(ProgramBlockParsing, ProgramRejectsOtherProgramInstance) {
   EXPECT_TRUE(r.has_errors);
 }
 
-}
+}  // namespace

@@ -335,4 +335,4 @@ TEST(ConstraintSolving, MultipleExpressionsInOneBlock) {
   EXPECT_LT(solver.GetValue("y"), 30);
 }
 
-}
+}  // namespace

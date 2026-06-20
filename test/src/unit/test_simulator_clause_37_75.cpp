@@ -16,16 +16,16 @@ namespace {
 // relation tag, so it needs dedicated production code; the body is a
 // statement-edge child served by the generic traversal.
 //
-// The foreach diagram draws the indexed variable (vpiVariables), the loop's index
-// variables (vpiLoopVars), and an unlabeled edge to a body statement. Its two
-// Details are this clause's own rules:
+// The foreach diagram draws the indexed variable (vpiVariables), the loop's
+// index variables (vpiLoopVars), and an unlabeled edge to a body statement. Its
+// two Details are this clause's own rules:
 //   D1 - the variable reached from a foreach statement via vpiVariables
 //        represents the packed array, unpacked array, or string var being
 //        indexed (the designated-pointer Handle case).
 //   D2 - the vpiLoopVars iteration returns the foreach statement's index
-//        variables in left-to-right order, with a skipped position reported as a
-//        vpiOperation whose vpiOpType is vpiNullOp (the dedicated loop-var walk
-//        of Iterate, shared with the foreach constraint of §37.38).
+//        variables in left-to-right order, with a skipped position reported as
+//        a vpiOperation whose vpiOpType is vpiNullOp (the dedicated loop-var
+//        walk of Iterate, shared with the foreach constraint of §37.38).
 //
 // The tests below observe the production code applying each rule through the
 // public vpi_handle/vpi_iterate/vpi_scan/vpi_get entry points.
@@ -71,10 +71,10 @@ TEST_F(DoWhileForeach, DoWhileWithoutConditionReportsNoCondition) {
 }
 
 // Do-while condition gating: the do-while condition relation is scoped to the
-// do-while kind, so it does not disturb the vpiCondition edge other objects draw.
-// A non-do-while object carrying an expression child is left to the generic
-// traversal, which matches by exact relation tag and so does not surface that
-// expression.
+// do-while kind, so it does not disturb the vpiCondition edge other objects
+// draw. A non-do-while object carrying an expression child is left to the
+// generic traversal, which matches by exact relation tag and so does not
+// surface that expression.
 TEST_F(DoWhileForeach, DoWhileConditionRelationIsScopedToDoWhile) {
   VpiObject expr;
   expr.type = vpiOperation;
@@ -112,26 +112,29 @@ TEST_F(DoWhileForeach, ForeachStatementVariablesReachesIndexedArray) {
   array.type = vpiPackedArrayVar;  // the packed array the foreach iterates over
 
   VpiObject foreach;
-  foreach.type = vpiForeachStmt;
-  foreach.foreach_array = &array;
+  foreach
+    .type = vpiForeachStmt;
+  foreach
+    .foreach_array = &array;
 
   EXPECT_EQ(vpi_handle(vpiVariables, &foreach), &array);
 }
 
-// D1: the relation reports NULL when no indexed variable is attached. The scoped
-// Handle case still fires for the foreach statement kind, but the designated
-// pointer is null, so the relation yields nothing.
+// D1: the relation reports NULL when no indexed variable is attached. The
+// scoped Handle case still fires for the foreach statement kind, but the
+// designated pointer is null, so the relation yields nothing.
 TEST_F(DoWhileForeach, ForeachStatementVariablesReportsNoVariableWhenAbsent) {
   VpiObject foreach;
-  foreach.type = vpiForeachStmt;  // no indexed variable attached
+  foreach
+    .type = vpiForeachStmt;  // no indexed variable attached
 
   EXPECT_EQ(vpi_handle(vpiVariables, &foreach), nullptr);
 }
 
-// D1: the foreach-statement vpiVariables case is specific to a foreach statement.
-// A different object kind is left to the generic traversal: its designated
-// foreach_array pointer is ignored and a child whose own type is literally
-// vpiVariables is returned instead.
+// D1: the foreach-statement vpiVariables case is specific to a foreach
+// statement. A different object kind is left to the generic traversal: its
+// designated foreach_array pointer is ignored and a child whose own type is
+// literally vpiVariables is returned instead.
 TEST_F(DoWhileForeach, ForeachStatementVariablesIsScopedToForeachStatements) {
   VpiObject distractor_array;
   distractor_array.type = vpiPackedArrayVar;
@@ -139,7 +142,7 @@ TEST_F(DoWhileForeach, ForeachStatementVariablesIsScopedToForeachStatements) {
   vars_child.type = vpiVariables;
 
   VpiObject not_a_foreach;
-  not_a_foreach.type = vpiBegin;  // not a foreach statement
+  not_a_foreach.type = vpiBegin;                    // not a foreach statement
   not_a_foreach.foreach_array = &distractor_array;  // must be ignored here
   not_a_foreach.children = {&vars_child};
 
@@ -160,8 +163,10 @@ TEST_F(DoWhileForeach, ForeachStatementSkippedIndexIsNullOpPlaceholder) {
   var_k.type = vpiIntegerVar;
 
   VpiObject foreach;
-  foreach.type = vpiForeachStmt;
-  foreach.loop_vars = {&var_i, nullptr, &var_k};  // middle index skipped
+  foreach
+    .type = vpiForeachStmt;
+  foreach
+    .loop_vars = {&var_i, nullptr, &var_k};  // middle index skipped
 
   vpiHandle it = vpi_iterate(vpiLoopVars, &foreach);
   ASSERT_NE(it, nullptr);
@@ -176,19 +181,22 @@ TEST_F(DoWhileForeach, ForeachStatementSkippedIndexIsNullOpPlaceholder) {
   EXPECT_EQ(vpi_scan(it), nullptr);
 }
 
-// D2 edge case: when several index positions are skipped - here the first and the
-// last, surrounding a single named index - each skip is reported as its own
+// D2 edge case: when several index positions are skipped - here the first and
+// the last, surrounding a single named index - each skip is reported as its own
 // freshly built null-op placeholder. The two placeholders are distinct objects
 // (one per slot), and the named index keeps its middle position, confirming the
 // left-to-right walk handles boundary skips and back-to-back placeholder
 // construction.
-TEST_F(DoWhileForeach, ForeachStatementBoundarySkipsEachGetDistinctNullOpPlaceholder) {
+TEST_F(DoWhileForeach,
+       ForeachStatementBoundarySkipsEachGetDistinctNullOpPlaceholder) {
   VpiObject var_j;
   var_j.type = vpiIntegerVar;
 
   VpiObject foreach;
-  foreach.type = vpiForeachStmt;
-  foreach.loop_vars = {nullptr, &var_j, nullptr};  // leading and trailing skip
+  foreach
+    .type = vpiForeachStmt;
+  foreach
+    .loop_vars = {nullptr, &var_j, nullptr};  // leading and trailing skip
 
   vpiHandle it = vpi_iterate(vpiLoopVars, &foreach);
   ASSERT_NE(it, nullptr);
@@ -219,26 +227,31 @@ TEST_F(DoWhileForeach, ForeachStatementReachesBodyThroughVpiStmt) {
   VpiObject array;
   array.type = vpiPackedArrayVar;  // the indexed variable (its own relation)
   VpiObject body;
-  body.type = vpiStmt;             // the body (the diagram's unlabeled edge)
+  body.type = vpiStmt;  // the body (the diagram's unlabeled edge)
 
   VpiObject foreach;
-  foreach.type = vpiForeachStmt;
-  foreach.foreach_array = &array;
-  foreach.children = {&body};
+  foreach
+    .type = vpiForeachStmt;
+  foreach
+    .foreach_array = &array;
+  foreach
+    .children = {&body};
 
   EXPECT_EQ(vpi_handle(vpiStmt, &foreach), &body);
 }
 
-// D2: the loop-var iteration is scoped to the foreach statement kind. A different
-// object kind carrying a loop-var list does not have it walked: the iteration
-// falls to the generic handling, which matches children whose own type is
-// literally vpiLoopVars - of which there are none - and so reports nothing.
-TEST_F(DoWhileForeach, ForeachStatementLoopVarsIterationIsScopedToForeachStatements) {
+// D2: the loop-var iteration is scoped to the foreach statement kind. A
+// different object kind carrying a loop-var list does not have it walked: the
+// iteration falls to the generic handling, which matches children whose own
+// type is literally vpiLoopVars - of which there are none - and so reports
+// nothing.
+TEST_F(DoWhileForeach,
+       ForeachStatementLoopVarsIterationIsScopedToForeachStatements) {
   VpiObject var_i;
   var_i.type = vpiIntegerVar;
 
   VpiObject not_a_foreach;
-  not_a_foreach.type = vpiBegin;  // not a foreach statement
+  not_a_foreach.type = vpiBegin;       // not a foreach statement
   not_a_foreach.loop_vars = {&var_i};  // must not be walked here
 
   EXPECT_EQ(vpi_iterate(vpiLoopVars, &not_a_foreach), nullptr);

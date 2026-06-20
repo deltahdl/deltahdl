@@ -94,4 +94,4 @@ TEST(BitsCallRestrictions, BitsOnInterfaceClassObjectIsError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-}
+}  // namespace

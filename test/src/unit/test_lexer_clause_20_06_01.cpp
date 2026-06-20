@@ -10,4 +10,4 @@ TEST(SystemTfCallLexing, TypenameTokenizesAsSystemIdentifier) {
   EXPECT_EQ(r.token.text, "$typename");
 }
 
-}
+}  // namespace

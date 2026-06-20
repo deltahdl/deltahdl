@@ -6,7 +6,8 @@ using namespace delta;
 
 namespace {
 
-TEST(EscapedIdentifierPreprocessor, EscapedIdentifierPreservedThroughPreprocessing) {
+TEST(EscapedIdentifierPreprocessor,
+     EscapedIdentifierPreservedThroughPreprocessing) {
   PreprocFixture f;
   auto result = Preprocess(
       "module t;\n"
@@ -17,7 +18,8 @@ TEST(EscapedIdentifierPreprocessor, EscapedIdentifierPreservedThroughPreprocessi
   EXPECT_NE(result.find("\\my+sig"), std::string::npos);
 }
 
-TEST(EscapedIdentifierPreprocessor, EscapedKeywordPreservedThroughPreprocessing) {
+TEST(EscapedIdentifierPreprocessor,
+     EscapedKeywordPreservedThroughPreprocessing) {
   PreprocFixture f;
   auto result = Preprocess(
       "module t;\n"
@@ -51,4 +53,4 @@ TEST(EscapedIdentifierPreprocessor, EscapedIdentifierInMacroContext) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-}
+}  // namespace

@@ -24,4 +24,4 @@ TEST(AlwaysFFSynthesis, AlwaysFFRegistersLatch) {
   EXPECT_FALSE(aig->latches.empty());
 }
 
-}
+}  // namespace

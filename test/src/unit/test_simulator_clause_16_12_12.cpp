@@ -22,11 +22,13 @@ namespace {
 // hold at that tick itself.
 TEST(SvaEngineUntil, NonOverlappingExcludesRhsTick) {
   // Right operand first holds at offset 2; left operand held at ticks 0 and 1.
-  EXPECT_TRUE(UntilLeftHoldsRequired(/*overlapping=*/false, /*lhs_run_length=*/2,
-                                     /*first_rhs_index=*/2, /*trace_length=*/5));
+  EXPECT_TRUE(
+      UntilLeftHoldsRequired(/*overlapping=*/false, /*lhs_run_length=*/2,
+                             /*first_rhs_index=*/2, /*trace_length=*/5));
   // Left operand stopped holding before the required window was covered.
-  EXPECT_FALSE(UntilLeftHoldsRequired(/*overlapping=*/false, /*lhs_run_length=*/1,
-                                      /*first_rhs_index=*/2, /*trace_length=*/5));
+  EXPECT_FALSE(
+      UntilLeftHoldsRequired(/*overlapping=*/false, /*lhs_run_length=*/1,
+                             /*first_rhs_index=*/2, /*trace_length=*/5));
 }
 
 // §16.12.12: for the overlapping forms the left operand is also required at the
@@ -34,41 +36,48 @@ TEST(SvaEngineUntil, NonOverlappingExcludesRhsTick) {
 TEST(SvaEngineUntil, OverlappingIncludesRhsTick) {
   // The same trace that satisfies the non-overlapping form fails here because
   // the left operand must also hold at the right operand's tick (offset 2).
-  EXPECT_FALSE(UntilLeftHoldsRequired(/*overlapping=*/true, /*lhs_run_length=*/2,
-                                      /*first_rhs_index=*/2, /*trace_length=*/5));
+  EXPECT_FALSE(
+      UntilLeftHoldsRequired(/*overlapping=*/true, /*lhs_run_length=*/2,
+                             /*first_rhs_index=*/2, /*trace_length=*/5));
   EXPECT_TRUE(UntilLeftHoldsRequired(/*overlapping=*/true, /*lhs_run_length=*/3,
-                                     /*first_rhs_index=*/2, /*trace_length=*/5));
+                                     /*first_rhs_index=*/2,
+                                     /*trace_length=*/5));
 }
 
 // §16.12.12: when the right operand holds at the starting tick, the
 // non-overlapping form does not require the left operand to hold there at all.
 TEST(SvaEngineUntil, NonOverlappingRhsAtStartRequiresNothing) {
-  EXPECT_TRUE(UntilLeftHoldsRequired(/*overlapping=*/false, /*lhs_run_length=*/0,
-                                     /*first_rhs_index=*/0, /*trace_length=*/4));
+  EXPECT_TRUE(
+      UntilLeftHoldsRequired(/*overlapping=*/false, /*lhs_run_length=*/0,
+                             /*first_rhs_index=*/0, /*trace_length=*/4));
 }
 
 // §16.12.12: when the right operand holds at the starting tick, the overlapping
 // form still requires the left operand to hold at that one (overlapping) tick.
 TEST(SvaEngineUntil, OverlappingRhsAtStartRequiresLhsThere) {
-  EXPECT_FALSE(UntilLeftHoldsRequired(/*overlapping=*/true, /*lhs_run_length=*/0,
-                                      /*first_rhs_index=*/0, /*trace_length=*/4));
+  EXPECT_FALSE(
+      UntilLeftHoldsRequired(/*overlapping=*/true, /*lhs_run_length=*/0,
+                             /*first_rhs_index=*/0, /*trace_length=*/4));
   EXPECT_TRUE(UntilLeftHoldsRequired(/*overlapping=*/true, /*lhs_run_length=*/1,
-                                     /*first_rhs_index=*/0, /*trace_length=*/4));
+                                     /*first_rhs_index=*/0,
+                                     /*trace_length=*/4));
 }
 
-// §16.12.12: when the right operand never holds, the left operand is required at
-// every tick of the trace for both windowings.
+// §16.12.12: when the right operand never holds, the left operand is required
+// at every tick of the trace for both windowings.
 TEST(SvaEngineUntil, RhsNeverRequiresLhsEverywhere) {
-  EXPECT_TRUE(UntilLeftHoldsRequired(/*overlapping=*/false, /*lhs_run_length=*/3,
-                                     kUntilRhsNever, /*trace_length=*/3));
+  EXPECT_TRUE(UntilLeftHoldsRequired(/*overlapping=*/false,
+                                     /*lhs_run_length=*/3, kUntilRhsNever,
+                                     /*trace_length=*/3));
   EXPECT_TRUE(UntilLeftHoldsRequired(/*overlapping=*/true, /*lhs_run_length=*/3,
                                      kUntilRhsNever, /*trace_length=*/3));
-  EXPECT_FALSE(UntilLeftHoldsRequired(/*overlapping=*/false, /*lhs_run_length=*/2,
-                                      kUntilRhsNever, /*trace_length=*/3));
+  EXPECT_FALSE(UntilLeftHoldsRequired(/*overlapping=*/false,
+                                      /*lhs_run_length=*/2, kUntilRhsNever,
+                                      /*trace_length=*/3));
 }
 
-// §16.12.12: a weak until holds whenever the left operand held over its required
-// window, regardless of whether the right operand ever holds.
+// §16.12.12: a weak until holds whenever the left operand held over its
+// required window, regardless of whether the right operand ever holds.
 TEST(SvaEngineUntil, WeakHoldsRegardlessOfRhsPresence) {
   EXPECT_EQ(EvalUntil(/*strong=*/false, /*rhs_holds_eventually=*/false,
                       /*lhs_holds_required=*/true),
@@ -89,9 +98,9 @@ TEST(SvaEngineUntil, FailsWhenLeftOperandDidNotHold) {
             PropertyResult::kFail);
 }
 
-// §16.12.12: a strong until requires a current or future tick at which the right
-// operand holds; if none exists the property fails even though the same trace
-// satisfies the corresponding weak form.
+// §16.12.12: a strong until requires a current or future tick at which the
+// right operand holds; if none exists the property fails even though the same
+// trace satisfies the corresponding weak form.
 TEST(SvaEngineUntil, StrongRequiresRhsToHold) {
   EXPECT_EQ(EvalUntil(/*strong=*/true, /*rhs_holds_eventually=*/false,
                       /*lhs_holds_required=*/true),
@@ -120,8 +129,8 @@ TEST(SvaEngineUntil, ComposesStrongNonOverlappingFailsWithoutRhs) {
             PropertyResult::kFail);
 }
 
-// §16.12.12: composing the helpers reproduces `a s_until_with b` (p4) — the left
-// operand holds through and including the right-operand tick and the right
+// §16.12.12: composing the helpers reproduces `a s_until_with b` (p4) — the
+// left operand holds through and including the right-operand tick and the right
 // operand holds, so the strong overlapping form passes.
 TEST(SvaEngineUntil, ComposesStrongOverlapping) {
   bool lhs = UntilLeftHoldsRequired(/*overlapping=*/true, /*lhs_run_length=*/3,
@@ -132,9 +141,9 @@ TEST(SvaEngineUntil, ComposesStrongOverlapping) {
 
 // §16.12.12: composing the helpers reproduces `a until_with b` (p3) — the weak
 // overlapping form requires the left operand through and including the
-// right-operand tick but, being weak, does not require the right operand to hold
-// at all. Here the left operand holds at every tick while the right operand
-// never holds, so the property still passes.
+// right-operand tick but, being weak, does not require the right operand to
+// hold at all. Here the left operand holds at every tick while the right
+// operand never holds, so the property still passes.
 TEST(SvaEngineUntil, ComposesWeakOverlapping) {
   bool lhs = UntilLeftHoldsRequired(/*overlapping=*/true, /*lhs_run_length=*/3,
                                     kUntilRhsNever, /*trace_length=*/3);

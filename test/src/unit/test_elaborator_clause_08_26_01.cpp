@@ -70,4 +70,4 @@ TEST(InterfaceClassImplElaboration, ExtendsMultipleInterfacesOk) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

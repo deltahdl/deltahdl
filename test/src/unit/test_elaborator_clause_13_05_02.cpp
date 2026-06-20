@@ -16,7 +16,8 @@ TEST(PassByRefValidation, RejectRefInStaticFunc) {
   func->name = "bad_func";
   func->is_static = true;
   func->is_automatic = false;
-  func->func_args = {{Direction::kRef, false, false, false, {}, "v", nullptr, {}}};
+  func->func_args = {
+      {Direction::kRef, false, false, false, {}, "v", nullptr, {}}};
 
   ValidateRefLifetime(func, f.diag);
   EXPECT_TRUE(f.diag.HasErrors());
@@ -29,7 +30,8 @@ TEST(PassByRefValidation, AcceptRefInAutoFunc) {
   func->kind = ModuleItemKind::kFunctionDecl;
   func->name = "good_func";
   func->is_automatic = true;
-  func->func_args = {{Direction::kRef, false, false, false, {}, "v", nullptr, {}}};
+  func->func_args = {
+      {Direction::kRef, false, false, false, {}, "v", nullptr, {}}};
 
   ValidateRefLifetime(func, f.diag);
   EXPECT_FALSE(f.diag.HasErrors());
@@ -42,7 +44,8 @@ TEST(PassByRefValidation, ConstRefArgAccepted) {
   func->kind = ModuleItemKind::kFunctionDecl;
   func->name = "read_only";
   func->is_automatic = true;
-  func->func_args = {{Direction::kRef, true, false, false, {}, "data", nullptr, {}}};
+  func->func_args = {
+      {Direction::kRef, true, false, false, {}, "data", nullptr, {}}};
 
   ValidateRefLifetime(func, f.diag);
   EXPECT_FALSE(f.diag.HasErrors());
@@ -56,7 +59,8 @@ TEST(PassByRefValidation, RejectRefInStaticTask) {
   task->name = "bad_task";
   task->is_static = true;
   task->is_automatic = false;
-  task->func_args = {{Direction::kRef, false, false, false, {}, "v", nullptr, {}}};
+  task->func_args = {
+      {Direction::kRef, false, false, false, {}, "v", nullptr, {}}};
 
   ValidateRefLifetime(task, f.diag);
   EXPECT_TRUE(f.diag.HasErrors());
@@ -70,7 +74,8 @@ TEST(PassByRefValidation, ConstRefInStaticSubroutineRejected) {
   func->name = "bad_func";
   func->is_static = true;
   func->is_automatic = false;
-  func->func_args = {{Direction::kRef, true, false, false, {}, "data", nullptr, {}}};
+  func->func_args = {
+      {Direction::kRef, true, false, false, {}, "data", nullptr, {}}};
 
   ValidateRefLifetime(func, f.diag);
   EXPECT_TRUE(f.diag.HasErrors());
@@ -183,8 +188,7 @@ TEST(PassByRefValidation, ConstRefBlockingWriteRejected) {
   func->is_automatic = true;
   func->func_args = {
       {Direction::kRef, true, false, false, {}, "data", nullptr, {}}};
-  func->func_body_stmts = {
-      MakeAssign(f.arena, "data", MakeInt(f.arena, 7))};
+  func->func_body_stmts = {MakeAssign(f.arena, "data", MakeInt(f.arena, 7))};
 
   ValidateConstRefWriteProtection(func, f.diag);
   EXPECT_TRUE(f.diag.HasErrors());
@@ -233,8 +237,7 @@ TEST(PassByRefValidation, PlainRefWriteAccepted) {
   func->is_automatic = true;
   func->func_args = {
       {Direction::kRef, false, false, false, {}, "data", nullptr, {}}};
-  func->func_body_stmts = {
-      MakeAssign(f.arena, "data", MakeInt(f.arena, 7))};
+  func->func_body_stmts = {MakeAssign(f.arena, "data", MakeInt(f.arena, 7))};
 
   ValidateConstRefWriteProtection(func, f.diag);
   EXPECT_FALSE(f.diag.HasErrors());
@@ -319,4 +322,4 @@ TEST(PassByRefValidation, NonRefArgsInStaticFuncAccepted) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-}
+}  // namespace

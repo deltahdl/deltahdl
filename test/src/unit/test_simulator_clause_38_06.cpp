@@ -107,5 +107,5 @@ TEST_F(VpiGetPropertySim, ProtectedObjectQueryReturnsVpiUndefined) {
   EXPECT_NE(info.level, 0);
 }
 
-}
-}
+}  // namespace
+}  // namespace delta

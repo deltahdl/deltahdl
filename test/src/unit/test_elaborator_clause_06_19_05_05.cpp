@@ -24,4 +24,4 @@ TEST(EnumMethods, NumSingleMemberElaboratesOk) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

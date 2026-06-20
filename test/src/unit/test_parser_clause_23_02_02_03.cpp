@@ -294,4 +294,4 @@ TEST(PortDeclParsing, SubsequentPortInheritsInterconnect) {
   EXPECT_EQ(ports[1].name, "y");
 }
 
-}
+}  // namespace

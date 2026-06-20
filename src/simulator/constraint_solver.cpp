@@ -24,8 +24,8 @@ void ConstraintSolver::AddConstraintBlock(const ConstraintBlock& block) {
 void ConstraintSolver::AddSolveBefore(const std::vector<std::string>& before,
                                       const std::vector<std::string>& after) {
   // 18.5.9: 'solve before_list before after_list' constrains every variable of
-  // the first list to be solved ahead of every variable of the second, so record
-  // the cross product of ordering edges.
+  // the first list to be solved ahead of every variable of the second, so
+  // record the cross product of ordering edges.
   for (const auto& b : before) {
     for (const auto& a : after) {
       solve_before_edges_.emplace_back(b, a);
@@ -140,7 +140,8 @@ int64_t ConstraintSolver::GenerateRandValue(RandVariable& var) {
         history.clear();
       }
       for (int attempt = 0; attempt < 1000; ++attempt) {
-        std::uniform_int_distribution<size_t> pick(0, var.enum_values.size() - 1);
+        std::uniform_int_distribution<size_t> pick(0,
+                                                   var.enum_values.size() - 1);
         int64_t val = var.enum_values[pick(rng_)];
         if (history.find(val) == history.end()) {
           history.insert(val);
@@ -347,8 +348,8 @@ bool ConstraintSolver::HasRandcInUnique() const {
 // 18.5.4: all members of a uniqueness constraint group shall be of equivalent
 // type. Compare the known members of each enabled unique constraint against the
 // first known member: a difference in real-ness or bit width means the group
-// mixes inequivalent types. Members the solver does not know are left out of the
-// comparison, mirroring the lenient treatment elsewhere in the solver.
+// mixes inequivalent types. Members the solver does not know are left out of
+// the comparison, mirroring the lenient treatment elsewhere in the solver.
 bool ConstraintSolver::UniqueMembersNotEquivalentType() const {
   for (const auto& block : blocks_) {
     if (!block.enabled) continue;
@@ -600,8 +601,8 @@ bool ConstraintSolver::CheckAllConstraints(
     // with include_soft clear.
     for (const auto* c : soft) {
       // 18.5.13.1 / 18.5.13.2: a soft constraint discarded by the priority
-      // resolution, or by a 'disable soft' directive, is treated as true, so its
-      // inner relation imposes nothing.
+      // resolution, or by a 'disable soft' directive, is treated as true, so
+      // its inner relation imposes nothing.
       if (dropped_soft_.count(c) || disabled_soft_.count(c)) continue;
       const ConstraintExpr* inner = c->inner ? c->inner : nullptr;
       if (inner && !EvalConstraint(*inner)) return false;
@@ -684,8 +685,8 @@ bool ConstraintSolver::EvalForeach(const ConstraintExpr& expr) const {
 bool ConstraintSolver::EvalArrayReduction(const ConstraintExpr& expr) const {
   // 18.5.7.2: an array reduction method in a constraint is treated as an
   // expression iterated over each element of the array, joined by the relevant
-  // operand for the method. Begin from the operand's identity so a fold over any
-  // number of elements is well defined, then combine each element in turn.
+  // operand for the method. Begin from the operand's identity so a fold over
+  // any number of elements is well defined, then combine each element in turn.
   int64_t acc = 0;
   switch (expr.reduce_op) {
     case ArrayReductionOp::kSum:
@@ -740,10 +741,11 @@ bool ConstraintSolver::EvalArrayReduction(const ConstraintExpr& expr) const {
     }
   }
 
-  // 18.5.7.2: the reduction returns a single value of the array element type, or
-  // the type of the with-clause expression when one is specified. Truncate the
-  // fold to that result type's width so a sum that would overflow the element
-  // type wraps, while a wider with-clause type (e.g. int'(item)) preserves it.
+  // 18.5.7.2: the reduction returns a single value of the array element type,
+  // or the type of the with-clause expression when one is specified. Truncate
+  // the fold to that result type's width so a sum that would overflow the
+  // element type wraps, while a wider with-clause type (e.g. int'(item))
+  // preserves it.
   if (expr.reduce_width > 0 && expr.reduce_width < 64) {
     uint64_t mask = (static_cast<uint64_t>(1) << expr.reduce_width) - 1;
     acc = static_cast<int64_t>(static_cast<uint64_t>(acc) & mask);
@@ -858,9 +860,10 @@ bool ConstraintSolver::SolveWith(
   if (pre_randomize_) pre_randomize_();
 
   // 18.6.3: if randomize() fails, the random variables retain their previous
-  // values. The iterative solver overwrites the solved-value maps in place as it
-  // searches, so capture them here and restore them should the solve fail, so a
-  // failed randomize() leaves the variables exactly as the caller last saw them.
+  // values. The iterative solver overwrites the solved-value maps in place as
+  // it searches, so capture them here and restore them should the solve fail,
+  // so a failed randomize() leaves the variables exactly as the caller last saw
+  // them.
   const std::unordered_map<std::string, int64_t> prev_values = values_;
   const std::unordered_map<std::string, double> prev_real_values = real_values_;
 
@@ -1057,7 +1060,8 @@ std::vector<std::vector<std::string>> ConstraintSolver::ComputeSolveGroups(
     max_depth = std::max(max_depth, dfs(v, on_stack));
   }
   // Bucket by depth, highest depth (solved first) into the earliest group; the
-  // unordered variables sit at depth 0 and so form the final, last-solved group.
+  // unordered variables sit at depth 0 and so form the final, last-solved
+  // group.
   std::vector<std::vector<std::string>> buckets(max_depth + 1);
   for (const auto& v : vars) buckets[max_depth - depth[v]].push_back(v);
   std::vector<std::vector<std::string>> groups;
@@ -1089,8 +1093,8 @@ bool ConstraintSolver::SolveOrderedGroups(
 }
 
 bool ConstraintSolver::HasFunctionArgPriorityCycle() const {
-  // Build the priority digraph (higher -> lower) and look for a back edge with a
-  // depth-first walk. A gray (on-stack) successor closes a cycle, e.g. one
+  // Build the priority digraph (higher -> lower) and look for a back edge with
+  // a depth-first walk. A gray (on-stack) successor closes a cycle, e.g. one
   // variable used as a function argument in a constraint on a second while the
   // second is used as a function argument in a constraint on the first.
   std::unordered_map<std::string, std::vector<std::string>> succ;
@@ -1131,7 +1135,8 @@ bool ConstraintSolver::HasFunctionArgPriorityCycle() const {
 std::vector<std::vector<std::string>> ConstraintSolver::ComputePriorityLayers(
     const std::vector<std::string>& vars) const {
   std::unordered_set<std::string> var_set(vars.begin(), vars.end());
-  // pred -> {successors}, i.e. higher -> lower, restricted to vars in this pass.
+  // pred -> {successors}, i.e. higher -> lower, restricted to vars in this
+  // pass.
   std::unordered_map<std::string, std::vector<std::string>> succ;
   for (const auto& [h, l] : function_arg_priority_edges_) {
     if (var_set.count(h) && var_set.count(l)) succ[h].push_back(l);
@@ -1141,12 +1146,13 @@ std::vector<std::vector<std::string>> ConstraintSolver::ComputePriorityLayers(
   // before it has rank 0 and is solved in the first (highest-priority) layer;
   // each successor sits at least one rank past every predecessor. Solving in
   // ascending rank therefore honors every priority edge and gathers the
-  // unordered variables into layer 0. The rank is computed by relaxing along the
-  // edges from the sources.
+  // unordered variables into layer 0. The rank is computed by relaxing along
+  // the edges from the sources.
   std::unordered_map<std::string, int> prank;
   for (const auto& v : vars) prank[v] = 0;
-  // Iteratively relax: a successor's rank is at least one past its predecessor's.
-  // The graph is acyclic here, so |vars| passes suffice to reach the fixpoint.
+  // Iteratively relax: a successor's rank is at least one past its
+  // predecessor's. The graph is acyclic here, so |vars| passes suffice to reach
+  // the fixpoint.
   for (size_t pass = 0; pass < vars.size(); ++pass) {
     bool changed = false;
     for (const auto& [h, ls] : succ) {
@@ -1201,8 +1207,8 @@ bool ConstraintSolver::SolvePriorityLayers(
     const std::vector<std::vector<std::string>>& layers,
     const std::vector<ConstraintExpr>& extra, bool include_soft) {
   static constexpr int kLayerAttempts = 200;
-  // committed starts from every variable already fixed before the general pass —
-  // the inactive (state) variables, the randc draws, the array sizes, and the
+  // committed starts from every variable already fixed before the general pass
+  // — the inactive (state) variables, the randc draws, the array sizes, and the
   // real variables — all of which are present in values_/real_values_ by now.
   std::unordered_set<std::string> committed;
   for (const auto& kv : values_) committed.insert(kv.first);
@@ -1233,8 +1239,8 @@ bool ConstraintSolver::SolvePriorityLayers(
   return CheckAllConstraints(extra, include_soft);
 }
 
-bool ConstraintSolver::SolveIterative(
-    const std::vector<ConstraintExpr>& extra, bool include_soft) {
+bool ConstraintSolver::SolveIterative(const std::vector<ConstraintExpr>& extra,
+                                      bool include_soft) {
   static constexpr int kMaxAttempts = 500;
   guard_error_ = false;
   for (int attempt = 0; attempt < kMaxAttempts; ++attempt) {
@@ -1284,15 +1290,15 @@ bool ConstraintSolver::SolveIterative(
     // 18.5.9: when a solve...before ordering applies, solve the active integral
     // rand variables in ordered groups rather than in one flat pass. An earlier
     // group is committed before the later groups are solved against it, which
-    // shifts the probability distribution to match the ordering while leaving the
-    // set of legal solutions unchanged. With no ordering the default single pass
-    // below is used unchanged, and it already draws each legal value combination
-    // with uniform probability.
-    // 18.5.11: when random variables are used as function arguments, the implied
-    // priority is solved in layers — the higher-priority variables first, each
-    // layer committed as state variables to the next without backtracking. This
-    // subdivides the solution space (and can fail), distinct from the
-    // solution-space-preserving solve...before ordering handled below.
+    // shifts the probability distribution to match the ordering while leaving
+    // the set of legal solutions unchanged. With no ordering the default single
+    // pass below is used unchanged, and it already draws each legal value
+    // combination with uniform probability. 18.5.11: when random variables are
+    // used as function arguments, the implied priority is solved in layers —
+    // the higher-priority variables first, each layer committed as state
+    // variables to the next without backtracking. This subdivides the solution
+    // space (and can fail), distinct from the solution-space-preserving
+    // solve...before ordering handled below.
     if (!function_arg_priority_edges_.empty()) {
       for (auto& [name, var] : variables_) {
         if (var.enabled && var.is_real) {
@@ -1313,8 +1319,8 @@ bool ConstraintSolver::SolveIterative(
       continue;
     }
     if (!solve_before_edges_.empty()) {
-      // Real variables are committed first (as in the flat pass), so any ordered
-      // integral group is completed against them.
+      // Real variables are committed first (as in the flat pass), so any
+      // ordered integral group is completed against them.
       for (auto& [name, var] : variables_) {
         if (var.enabled && var.is_real) {
           real_values_[name] = GenerateRandRealValue(var);
@@ -1351,10 +1357,10 @@ bool ConstraintSolver::SolveIterative(
 }
 
 int64_t ConstraintSolver::GetValue(std::string_view name) const {
-  // 18.6.3: a static random variable is shared by all instances of its class, so
-  // its committed value lives in the shared cell. Read it there when one is
-  // attached, so this instance observes the value another instance most recently
-  // drew rather than only the value this instance itself last solved.
+  // 18.6.3: a static random variable is shared by all instances of its class,
+  // so its committed value lives in the shared cell. Read it there when one is
+  // attached, so this instance observes the value another instance most
+  // recently drew rather than only the value this instance itself last solved.
   auto vit = variables_.find(std::string(name));
   if (vit != variables_.end() && vit->second.is_static &&
       vit->second.shared_value) {
@@ -1369,4 +1375,4 @@ double ConstraintSolver::GetRealValue(std::string_view name) const {
   return (it != real_values_.end()) ? it->second : 0.0;
 }
 
-}
+}  // namespace delta

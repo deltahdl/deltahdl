@@ -31,4 +31,4 @@ TEST(AttachedSubroutineScheduling, ByValueArgumentMatchesSequenceEvaluation) {
   EXPECT_TRUE(ByValueArgumentValueIsConsistentWithSequenceMatch());
 }
 
-}
+}  // namespace

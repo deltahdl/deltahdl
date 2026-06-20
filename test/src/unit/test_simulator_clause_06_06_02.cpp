@@ -37,4 +37,4 @@ TEST(UwireResolution, UndrivenResolvesToZ) {
   EXPECT_EQ(var->value.words[0].bval & 1u, 1u);
 }
 
-}
+}  // namespace

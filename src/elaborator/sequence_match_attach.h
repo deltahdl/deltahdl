@@ -48,8 +48,7 @@ bool IsArgPassingAllowedForAttachedCall(SubroutineArgPassing kind);
 // subroutine call in an assertion in procedural code (§16.14.6.1). It shall
 // not be passed by reference, nor as a non-constant input, in any case.
 bool IsAutomaticArgUseAllowed(SubroutineArgPassing kind,
-                              bool from_procedural_assertion,
-                              bool is_constant);
+                              bool from_procedural_assertion, bool is_constant);
 
 // §16.11: a local variable may be passed into an attached call. If a local
 // variable appears in an actual argument expression, that argument shall be

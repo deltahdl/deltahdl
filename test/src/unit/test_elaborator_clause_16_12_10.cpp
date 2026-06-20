@@ -43,4 +43,4 @@ TEST(NexttimeIndex, NonIntegerConstantIsRejected) {
   EXPECT_FALSE(IsNexttimeIndexWellFormed(index));
 }
 
-}
+}  // namespace

@@ -89,4 +89,4 @@ TEST(ParameterDeclElaboration, LocalparamResolvesAsLocal) {
   EXPECT_TRUE(found);
 }
 
-}
+}  // namespace

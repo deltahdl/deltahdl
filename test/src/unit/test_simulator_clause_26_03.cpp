@@ -49,4 +49,4 @@ TEST(PackageImportSim, ExplicitImportParameter) {
   EXPECT_EQ(val, 77u);
 }
 
-}
+}  // namespace

@@ -12,4 +12,4 @@ TEST(AlwaysFFLexing, AlwaysFFKeyword) {
   EXPECT_EQ(r.token.text, "always_ff");
 }
 
-}
+}  // namespace

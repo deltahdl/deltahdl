@@ -45,7 +45,6 @@ void Elaborator::CheckArrayAssignExprs(const Expr* lhs, const Expr* rhs,
   auto lhs_it = var_array_info_.find(lhs->text);
   auto rhs_it = var_array_info_.find(rhs->text);
   if (lhs_it == var_array_info_.end() || rhs_it == var_array_info_.end()) {
-
     if (lhs_it != var_array_info_.end() &&
         packed_array_vars_.count(rhs->text)) {
       diag_.Error(loc,
@@ -64,8 +63,7 @@ void Elaborator::CheckArrayAssignExprs(const Expr* lhs, const Expr* rhs,
                 "non-associative array");
     return;
   }
-  if (l.is_assoc && r.is_assoc &&
-      l.assoc_index_type != r.assoc_index_type) {
+  if (l.is_assoc && r.is_assoc && l.assoc_index_type != r.assoc_index_type) {
     diag_.Error(loc, "associative array index type mismatch in assignment");
     return;
   }
@@ -74,27 +72,26 @@ void Elaborator::CheckArrayAssignExprs(const Expr* lhs, const Expr* rhs,
     diag_.Error(loc,
                 std::format("array assignment requires the same number of "
                             "unpacked dimensions ('{}' has {}, '{}' has {})",
-                            lhs->text, l.num_unpacked_dims,
-                            rhs->text, r.num_unpacked_dims));
+                            lhs->text, l.num_unpacked_dims, rhs->text,
+                            r.num_unpacked_dims));
     return;
   }
 
   if (!ElementTypesEquivalent(l.elem_type, l.elem_width, l.elem_is_signed,
                               l.elem_is_4state, r.elem_type, r.elem_width,
                               r.elem_is_signed, r.elem_is_4state)) {
-    diag_.Error(loc,
-                std::format("array element type mismatch in assignment "
-                            "('{}' vs '{}')",
-                            lhs->text, rhs->text));
+    diag_.Error(loc, std::format("array element type mismatch in assignment "
+                                 "('{}' vs '{}')",
+                                 lhs->text, rhs->text));
     return;
   }
   if (l.unpacked_size > 0 && !l.is_dynamic && r.unpacked_size > 0 &&
       !r.is_dynamic && l.unpacked_size != r.unpacked_size) {
-    diag_.Error(loc,
-                std::format("array size mismatch: '{}' has {} elements but "
-                            "'{}' has {}",
-                            lhs->text, l.unpacked_size,
-                            rhs->text, r.unpacked_size));
+    diag_.Error(
+        loc,
+        std::format("array size mismatch: '{}' has {} elements but "
+                    "'{}' has {}",
+                    lhs->text, l.unpacked_size, rhs->text, r.unpacked_size));
     return;
   }
 
@@ -301,13 +298,13 @@ static void WalkStmtForArrayArgTypes(
   for (auto* fi : s->for_inits)
     WalkStmtForArrayArgTypes(fi, func_decls, var_array_info, class_names,
                              typedefs, diag);
-  WalkStmtForArrayArgTypes(s->for_body, func_decls, var_array_info,
-                           class_names, typedefs, diag);
+  WalkStmtForArrayArgTypes(s->for_body, func_decls, var_array_info, class_names,
+                           typedefs, diag);
   for (auto* fs : s->for_steps)
     WalkStmtForArrayArgTypes(fs, func_decls, var_array_info, class_names,
                              typedefs, diag);
-  WalkExprForArrayArgTypes(s->for_cond, func_decls, var_array_info,
-                           class_names, typedefs, diag);
+  WalkExprForArrayArgTypes(s->for_cond, func_decls, var_array_info, class_names,
+                           typedefs, diag);
   for (auto& ci : s->case_items)
     WalkStmtForArrayArgTypes(ci.body, func_decls, var_array_info, class_names,
                              typedefs, diag);
@@ -342,12 +339,10 @@ static bool IsSliceSelect(const Expr* e) {
 }
 
 static void CheckAssocSliceExpr(
-    const Expr* e,
-    const std::unordered_set<std::string_view>& assoc_names,
+    const Expr* e, const std::unordered_set<std::string_view>& assoc_names,
     DiagEngine& diag) {
   if (!e) return;
-  if (IsSliceSelect(e) && e->base &&
-      e->base->kind == ExprKind::kIdentifier) {
+  if (IsSliceSelect(e) && e->base && e->base->kind == ExprKind::kIdentifier) {
     if (assoc_names.count(e->base->text)) {
       diag.Error(e->range.start,
                  "slice is not allowed on an associative array");
@@ -367,8 +362,7 @@ static void CheckAssocSliceExpr(
 }
 
 static void WalkStmtsForAssocSlice(
-    const Stmt* s,
-    const std::unordered_set<std::string_view>& assoc_names,
+    const Stmt* s, const std::unordered_set<std::string_view>& assoc_names,
     DiagEngine& diag) {
   if (!s) return;
   CheckAssocSliceExpr(s->lhs, assoc_names, diag);
@@ -380,7 +374,8 @@ static void WalkStmtsForAssocSlice(
   WalkStmtsForAssocSlice(s->else_branch, assoc_names, diag);
   WalkStmtsForAssocSlice(s->body, assoc_names, diag);
   WalkStmtsForAssocSlice(s->for_body, assoc_names, diag);
-  for (auto& ci : s->case_items) WalkStmtsForAssocSlice(ci.body, assoc_names, diag);
+  for (auto& ci : s->case_items)
+    WalkStmtsForAssocSlice(ci.body, assoc_names, diag);
 }
 
 void Elaborator::ValidateAssocArraySlices(const ModuleDecl* decl) {
@@ -429,13 +424,12 @@ static bool IsNonintegralIndex(const Expr* idx, const TypeMap& var_types) {
 }
 
 static void CheckWildcardTraversalExpr(
-    const Expr* e,
-    const std::unordered_set<std::string_view>& wildcard_names,
+    const Expr* e, const std::unordered_set<std::string_view>& wildcard_names,
     const TypeMap& var_types, DiagEngine& diag) {
   if (!e) return;
   if (e->kind == ExprKind::kCall && e->base &&
-      e->base->kind == ExprKind::kIdentifier &&
-      IsTraversalMethod(e->callee) && wildcard_names.count(e->base->text)) {
+      e->base->kind == ExprKind::kIdentifier && IsTraversalMethod(e->callee) &&
+      wildcard_names.count(e->base->text)) {
     diag.Error(e->range.start,
                std::format("'{}' is not allowed on wildcard associative "
                            "array '{}'",
@@ -478,8 +472,7 @@ static void CheckWildcardTraversalExpr(
 }
 
 static void WalkStmtsForWildcardTraversal(
-    const Stmt* s,
-    const std::unordered_set<std::string_view>& wildcard_names,
+    const Stmt* s, const std::unordered_set<std::string_view>& wildcard_names,
     const TypeMap& var_types, DiagEngine& diag) {
   if (!s) return;
   // §7.8.1 — a wildcard-indexed associative array may not drive a foreach loop.
@@ -498,8 +491,10 @@ static void WalkStmtsForWildcardTraversal(
   CheckWildcardTraversalExpr(s->condition, wildcard_names, var_types, diag);
   for (auto* sub : s->stmts)
     WalkStmtsForWildcardTraversal(sub, wildcard_names, var_types, diag);
-  WalkStmtsForWildcardTraversal(s->then_branch, wildcard_names, var_types, diag);
-  WalkStmtsForWildcardTraversal(s->else_branch, wildcard_names, var_types, diag);
+  WalkStmtsForWildcardTraversal(s->then_branch, wildcard_names, var_types,
+                                diag);
+  WalkStmtsForWildcardTraversal(s->else_branch, wildcard_names, var_types,
+                                diag);
   WalkStmtsForWildcardTraversal(s->body, wildcard_names, var_types, diag);
   WalkStmtsForWildcardTraversal(s->for_body, wildcard_names, var_types, diag);
   for (auto& ci : s->case_items)
@@ -576,11 +571,10 @@ static void CheckTraversalArgTypeExpr(
     auto it = assoc_keys.find(e->base->text);
     if (it != assoc_keys.end()) {
       const Expr* arg = e->args[0];
-      bool wrong =
-          (it->second == AssocKeyCategory::kStringKey &&
-           TraversalArgIsIntegral(arg, var_types)) ||
-          (it->second == AssocKeyCategory::kIntegralKey &&
-           TraversalArgIsString(arg, var_types));
+      bool wrong = (it->second == AssocKeyCategory::kStringKey &&
+                    TraversalArgIsIntegral(arg, var_types)) ||
+                   (it->second == AssocKeyCategory::kIntegralKey &&
+                    TraversalArgIsString(arg, var_types));
       if (wrong) {
         diag.Error(arg ? arg->range.start : e->range.start,
                    std::format("traversal method '{}' argument is not "
@@ -633,8 +627,10 @@ void Elaborator::ValidateAssocTraversalArgType(const ModuleDecl* decl) {
   if (assoc_keys.empty()) return;
   for (const auto* item : decl->items) {
     if (item->kind == ModuleItemKind::kContAssign) {
-      CheckTraversalArgTypeExpr(item->assign_lhs, assoc_keys, var_types_, diag_);
-      CheckTraversalArgTypeExpr(item->assign_rhs, assoc_keys, var_types_, diag_);
+      CheckTraversalArgTypeExpr(item->assign_lhs, assoc_keys, var_types_,
+                                diag_);
+      CheckTraversalArgTypeExpr(item->assign_rhs, assoc_keys, var_types_,
+                                diag_);
     }
     bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
                    item->kind == ModuleItemKind::kInitialBlock;
@@ -766,9 +762,8 @@ static bool IsClassDerivedFrom(std::string_view a, std::string_view b,
                                const CompilationUnit* unit);
 
 static bool IsLiteralExpr(ExprKind kind) {
-  return kind == ExprKind::kIntegerLiteral ||
-         kind == ExprKind::kRealLiteral || kind == ExprKind::kTimeLiteral ||
-         kind == ExprKind::kStringLiteral ||
+  return kind == ExprKind::kIntegerLiteral || kind == ExprKind::kRealLiteral ||
+         kind == ExprKind::kTimeLiteral || kind == ExprKind::kStringLiteral ||
          kind == ExprKind::kUnbasedUnsizedLiteral;
 }
 
@@ -791,8 +786,7 @@ static void CheckClassIndexSelectExpr(
         class_names.count(it->second.assoc_index_type) > 0) {
       const Expr* idx = e->index;
       auto index_class = it->second.assoc_index_type;
-      bool is_null =
-          idx->kind == ExprKind::kIdentifier && idx->text == "null";
+      bool is_null = idx->kind == ExprKind::kIdentifier && idx->text == "null";
       bool illegal = false;
       if (!is_null) {
         if (IsLiteralExpr(idx->kind)) {
@@ -926,11 +920,10 @@ static void CheckStringIndexSelectExpr(
         }
       }
       if (illegal) {
-        diag.Error(
-            e->range.start,
-            std::format("string-indexed associative array '{}' shall be "
-                        "indexed by a string or string literal",
-                        e->base->text));
+        diag.Error(e->range.start,
+                   std::format("string-indexed associative array '{}' shall be "
+                               "indexed by a string or string literal",
+                               e->base->text));
       }
     }
   }
@@ -958,8 +951,10 @@ static void WalkStmtsForStringIndexSelect(
   CheckStringIndexSelectExpr(s->condition, var_array_info, var_types, diag);
   for (auto* sub : s->stmts)
     WalkStmtsForStringIndexSelect(sub, var_array_info, var_types, diag);
-  WalkStmtsForStringIndexSelect(s->then_branch, var_array_info, var_types, diag);
-  WalkStmtsForStringIndexSelect(s->else_branch, var_array_info, var_types, diag);
+  WalkStmtsForStringIndexSelect(s->then_branch, var_array_info, var_types,
+                                diag);
+  WalkStmtsForStringIndexSelect(s->else_branch, var_array_info, var_types,
+                                diag);
   WalkStmtsForStringIndexSelect(s->body, var_array_info, var_types, diag);
   WalkStmtsForStringIndexSelect(s->for_body, var_array_info, var_types, diag);
   for (auto& ci : s->case_items)
@@ -997,8 +992,7 @@ void Elaborator::ValidateStringIndexSelect(const ModuleDecl* decl) {
 // expression is illegal. Flag any element select on such an array whose index
 // is a nonintegral (real) expression.
 static void CheckIntegralIndexSelectExpr(
-    const Expr* e,
-    const std::unordered_set<std::string_view>& integral_names,
+    const Expr* e, const std::unordered_set<std::string_view>& integral_names,
     const TypeMap& var_types, DiagEngine& diag) {
   if (!e) return;
   if (e->kind == ExprKind::kSelect && e->base && e->index &&
@@ -1023,8 +1017,7 @@ static void CheckIntegralIndexSelectExpr(
 }
 
 static void WalkStmtsForIntegralIndexSelect(
-    const Stmt* s,
-    const std::unordered_set<std::string_view>& integral_names,
+    const Stmt* s, const std::unordered_set<std::string_view>& integral_names,
     const TypeMap& var_types, DiagEngine& diag) {
   if (!s) return;
   CheckIntegralIndexSelectExpr(s->lhs, integral_names, var_types, diag);
@@ -1092,7 +1085,8 @@ static bool ContainsRealType(const DataType& dtype, const TypedefMap& tds,
     if (IsRealType(m.type_kind)) return true;
     // A member written through a typedef only reveals a real after the alias is
     // resolved, so follow a named member type into the typedef table and check
-    // whatever it ultimately denotes (including a nested struct that holds one).
+    // whatever it ultimately denotes (including a nested struct that holds
+    // one).
     if (m.type_kind == DataTypeKind::kNamed) {
       auto it = tds.find(m.type_name);
       if (it != tds.end() && ContainsRealType(it->second, tds, depth + 1))
@@ -1152,9 +1146,9 @@ static bool IsClassDerivedFrom(std::string_view a, std::string_view b,
   return false;
 }
 
-static bool AreClassTypesComparable(
-    std::string_view type_a, std::string_view type_b,
-    const CompilationUnit* unit) {
+static bool AreClassTypesComparable(std::string_view type_a,
+                                    std::string_view type_b,
+                                    const CompilationUnit* unit) {
   return IsClassDerivedFrom(type_a, type_b, unit) ||
          IsClassDerivedFrom(type_b, type_a, unit);
 }
@@ -1235,8 +1229,7 @@ static void CheckClassHandleExpr(
       FindClassDecl(e->text, unit) != nullptr && e->lhs &&
       !IsClassVar(e->lhs, class_vars) &&
       !(e->lhs->kind == ExprKind::kIdentifier && e->lhs->text == "null")) {
-    diag.Error(e->range.start,
-               "cannot cast non-class value to a class type");
+    diag.Error(e->range.start, "cannot cast non-class value to a class type");
   }
 
   CheckClassHandleExpr(e->lhs, class_vars, class_var_types, unit, diag);
@@ -1330,9 +1323,9 @@ static void CheckNamedConstraintModeExists(
   if (!cls || cls->is_interface) return;
 
   // Walk the class and its base classes for a constraint block of that name.
-  for (const auto* c = cls; c;
-       c = c->base_class.empty() ? nullptr
-                                 : FindClassDecl(c->base_class, unit)) {
+  for (const auto* c = cls; c; c = c->base_class.empty()
+                                       ? nullptr
+                                       : FindClassDecl(c->base_class, unit)) {
     for (const auto* m : c->members) {
       if (m->kind == ClassMemberKind::kConstraint &&
           m->name == constraint_name) {
@@ -1376,10 +1369,11 @@ void Elaborator::WalkStmtsForClassHandleOps(const Stmt* s) {
         } else {
           const auto* cls = FindClassDecl(lt->second, unit_);
           if (cls && cls->is_interface) {
-            diag_.Error(s->range.start,
-                        std::format("cannot construct object of interface class "
-                                    "'{}'",
-                                    cls->name));
+            diag_.Error(
+                s->range.start,
+                std::format("cannot construct object of interface class "
+                            "'{}'",
+                            cls->name));
           }
         }
       }
@@ -1423,8 +1417,8 @@ void Elaborator::WalkStmtsForClassHandleOps(const Stmt* s) {
   if ((s->kind == StmtKind::kBlockingAssign ||
        s->kind == StmtKind::kNonblockingAssign) &&
       s->lhs && s->lhs->kind == ExprKind::kIdentifier &&
-      !IsClassVar(s->lhs, class_var_names_) &&
-      s->rhs && IsClassVar(s->rhs, class_var_names_)) {
+      !IsClassVar(s->lhs, class_var_names_) && s->rhs &&
+      IsClassVar(s->rhs, class_var_names_)) {
     diag_.Error(s->range.start,
                 "cannot assign class object handle to a non-class variable");
   }
@@ -1541,12 +1535,11 @@ static void CollectLocalNames(const Stmt* s,
 }
 
 static bool ExprRefsNonStaticMember(
-    const Expr* e,
-    const std::unordered_set<std::string_view>& non_static,
+    const Expr* e, const std::unordered_set<std::string_view>& non_static,
     const std::unordered_set<std::string_view>& locals) {
   if (!e) return false;
-  if (e->kind == ExprKind::kIdentifier &&
-      non_static.count(e->text) && !locals.count(e->text))
+  if (e->kind == ExprKind::kIdentifier && non_static.count(e->text) &&
+      !locals.count(e->text))
     return true;
   if (e->kind == ExprKind::kCall && !e->callee.empty() &&
       non_static.count(e->callee) && !locals.count(e->callee))
@@ -1569,8 +1562,7 @@ static bool ExprRefsNonStaticMember(
 }
 
 static bool StmtRefsNonStaticMember(
-    const Stmt* s,
-    const std::unordered_set<std::string_view>& non_static,
+    const Stmt* s, const std::unordered_set<std::string_view>& non_static,
     const std::unordered_set<std::string_view>& locals) {
   if (!s) return false;
   if (ExprRefsNonStaticMember(s->lhs, non_static, locals)) return true;
@@ -1591,7 +1583,6 @@ static bool StmtRefsNonStaticMember(
 }
 
 void Elaborator::ValidateOneClassStaticMethods(const ClassDecl* cls) {
-
   for (const auto* m : cls->members) {
     if (m->kind != ClassMemberKind::kMethod || !m->is_static) continue;
     if (!m->method) continue;
@@ -1698,8 +1689,8 @@ void Elaborator::ValidateFinalClassExtension() {
   }
 }
 
-// §8.30.1: a weak_reference incorporated into another object as a class property
-// carries the same parameter restriction as a standalone variable or a
+// §8.30.1: a weak_reference incorporated into another object as a class
+// property carries the same parameter restriction as a standalone variable or a
 // subroutine argument — its type argument shall name a class type. Any other
 // type argument is a compile error, mirroring the variable-declaration and
 // subroutine-argument checks elsewhere in the elaborator.
@@ -1711,7 +1702,8 @@ void Elaborator::ValidateWeakReferenceMembers() {
       if (m->data_type.type_name != "weak_reference") continue;
       if (m->data_type.type_params.empty()) continue;
       const auto& tp = m->data_type.type_params[0];
-      if (tp.kind != DataTypeKind::kNamed || !class_names_.count(tp.type_name)) {
+      if (tp.kind != DataTypeKind::kNamed ||
+          !class_names_.count(tp.type_name)) {
         diag_.Error(m->loc,
                     "weak_reference type parameter shall be a class type");
       }
@@ -1756,7 +1748,8 @@ void Elaborator::ValidateOneClassChainingCtor(const ClassDecl* cls) {
     }
     break;
   }
-  if (has_super_new && (!cls->extends_args.empty() || cls->extends_has_default)) {
+  if (has_super_new &&
+      (!cls->extends_args.empty() || cls->extends_has_default)) {
     diag_.Error(ctor->method->loc,
                 "constructor shall not contain super.new() when extends "
                 "specifier has arguments");
@@ -1825,8 +1818,8 @@ void Elaborator::ValidateEmbeddedCovergroupAssign() {
 static bool BaseClassDefinesCovergroup(const ClassDecl* cls,
                                        std::string_view cg_name,
                                        const CompilationUnit* unit) {
-  for (const ClassDecl* base =
-           cls->base_class.empty() ? nullptr
+  for (const ClassDecl* base = cls->base_class.empty()
+                                   ? nullptr
                                    : FindClassDecl(cls->base_class, unit);
        base; base = base->base_class.empty()
                         ? nullptr
@@ -2089,7 +2082,7 @@ void Elaborator::ValidateChainingConstructors() {
 static const ClassMember* FindMemberInClass(const ClassDecl* cls,
                                             std::string_view name,
                                             const CompilationUnit* unit) {
-  for (const auto* c = cls; c; ) {
+  for (const auto* c = cls; c;) {
     for (const auto* m : c->members) {
       if (m->name == name) return m;
     }
@@ -2215,8 +2208,7 @@ void Elaborator::ValidateLocalProtectedAccess(const ModuleDecl* decl) {
 }
 
 static void WalkStmtsForConstClassProp(
-    const Stmt* s,
-    const std::unordered_set<std::string_view>& global_consts,
+    const Stmt* s, const std::unordered_set<std::string_view>& global_consts,
     const std::unordered_set<std::string_view>& instance_consts,
     bool in_constructor, DiagEngine& diag) {
   if (!s) return;
@@ -2224,9 +2216,9 @@ static void WalkStmtsForConstClassProp(
       s->kind == StmtKind::kNonblockingAssign) {
     if (s->lhs && s->lhs->kind == ExprKind::kIdentifier) {
       if (global_consts.count(s->lhs->text)) {
-        diag.Error(s->range.start,
-                   std::format("assignment to global constant '{}'",
-                               s->lhs->text));
+        diag.Error(
+            s->range.start,
+            std::format("assignment to global constant '{}'", s->lhs->text));
       } else if (instance_consts.count(s->lhs->text) && !in_constructor) {
         diag.Error(
             s->range.start,
@@ -2444,9 +2436,8 @@ void Elaborator::ValidateAbstractClassRules() {
         }
       } else if (m->kind == ClassMemberKind::kConstraint) {
         if (m->is_pure_virtual && m->is_constraint_final) {
-          diag_.Error(
-              m->loc,
-              "':final' shall not be specified on a pure constraint");
+          diag_.Error(m->loc,
+                      "':final' shall not be specified on a pure constraint");
         }
       }
     }
@@ -2455,7 +2446,7 @@ void Elaborator::ValidateAbstractClassRules() {
 }
 
 static const ModuleItem* FindExternPrototype(const ClassDecl* cls,
-                                              std::string_view name) {
+                                             std::string_view name) {
   for (const auto* m : cls->members) {
     if (m->kind == ClassMemberKind::kMethod && m->method &&
         m->method->name == name && m->method->is_extern) {
@@ -2498,16 +2489,15 @@ static void ValidateOutOfBlockSignature(const ModuleItem* proto,
                                         std::string_view class_name,
                                         DiagEngine& diag) {
   if (proto->kind != impl->kind) {
-    diag.Error(impl->loc,
-               std::format("out-of-block declaration for '{}::{}' is a {} but "
-                           "the prototype is a {}",
-                           class_name, impl->name,
-                           impl->kind == ModuleItemKind::kFunctionDecl
-                               ? "function"
-                               : "task",
-                           proto->kind == ModuleItemKind::kFunctionDecl
-                               ? "function"
-                               : "task"));
+    diag.Error(
+        impl->loc,
+        std::format(
+            "out-of-block declaration for '{}::{}' is a {} but "
+            "the prototype is a {}",
+            class_name, impl->name,
+            impl->kind == ModuleItemKind::kFunctionDecl ? "function" : "task",
+            proto->kind == ModuleItemKind::kFunctionDecl ? "function"
+                                                         : "task"));
     return;
   }
   const auto& proto_args = proto->func_args;
@@ -2613,10 +2603,9 @@ void Elaborator::ValidateOutOfBlockDeclarations() {
         auto key =
             std::string(item->method_class) + "." + std::string(item->name);
         if (linked.count(key)) {
-          diag_.Error(
-              item->loc,
-              std::format("duplicate hierarchical body for '{}.{}'",
-                          item->method_class, item->name));
+          diag_.Error(item->loc,
+                      std::format("duplicate hierarchical body for '{}.{}'",
+                                  item->method_class, item->name));
           continue;
         }
         linked.insert(key);
@@ -2727,8 +2716,7 @@ static bool IsForwardTypedefOnly(std::string_view name,
   return true;
 }
 
-static bool IsDeclaredBefore(std::string_view name,
-                             const ClassDecl* before_cls,
+static bool IsDeclaredBefore(std::string_view name, const ClassDecl* before_cls,
                              const CompilationUnit* unit) {
   for (const auto* c : unit->classes) {
     if (c == before_cls) return false;
@@ -2752,14 +2740,12 @@ void Elaborator::ValidateInterfaceClassInheritance(const ClassDecl* cls) {
                             "parameter '{}'",
                             cls->name, cls->base_class));
   } else if (IsForwardTypedefOnly(cls->base_class, cls, unit_)) {
-
     diag_.Error(cls->range.start,
                 std::format("interface class '{}' shall not extend forward "
                             "typedef '{}'; the interface class must be "
                             "declared before it is extended",
                             cls->name, cls->base_class));
   } else if (!IsDeclaredBefore(cls->base_class, cls, unit_)) {
-
     const auto* base = FindClassDecl(cls->base_class, unit_);
     if (base && base->is_interface) {
       diag_.Error(cls->range.start,
@@ -2897,8 +2883,7 @@ static std::string MakeSpecKey(std::string_view name,
 
 using IfaceMethodMap =
     std::unordered_map<std::string_view,
-                       std::vector<std::pair<std::string,
-                                             const ModuleItem*>>>;
+                       std::vector<std::pair<std::string, const ModuleItem*>>>;
 
 static void CollectInterfacePureVirtualMethods(
     const ClassDecl* iface, const std::string& spec_key,
@@ -2913,8 +2898,8 @@ static void CollectInterfacePureVirtualMethods(
   if (!iface->base_class.empty()) {
     const auto* base = FindClassDecl(iface->base_class, unit);
     if (base && base->is_interface) {
-      auto base_key = MakeSpecKey(iface->base_class,
-                                  iface->base_class_type_params);
+      auto base_key =
+          MakeSpecKey(iface->base_class, iface->base_class_type_params);
       CollectInterfacePureVirtualMethods(base, base_key, unit, out, visited);
     }
   }
@@ -2927,9 +2912,9 @@ static void CollectInterfacePureVirtualMethods(
   }
 }
 
-static void CollectImplementedInterfaces(
-    const ClassDecl* cls, const CompilationUnit* unit,
-    std::vector<InterfaceRef>& out) {
+static void CollectImplementedInterfaces(const ClassDecl* cls,
+                                         const CompilationUnit* unit,
+                                         std::vector<InterfaceRef>& out) {
   for (const auto& iface : cls->implements_types) {
     out.push_back(iface);
   }
@@ -2941,20 +2926,20 @@ static void CollectImplementedInterfaces(
   }
 }
 
-static void ValidateMethodNameConflicts(
-    const ClassDecl* cls, const CompilationUnit* unit, DiagEngine& diag) {
+static void ValidateMethodNameConflicts(const ClassDecl* cls,
+                                        const CompilationUnit* unit,
+                                        DiagEngine& diag) {
   IfaceMethodMap iface_methods;
   std::unordered_set<std::string> visited;
 
   if (cls->is_interface) {
-
     if (!cls->base_class.empty()) {
       const auto* base = FindClassDecl(cls->base_class, unit);
       if (base && base->is_interface) {
-        auto base_key = MakeSpecKey(cls->base_class,
-                                    cls->base_class_type_params);
-        CollectInterfacePureVirtualMethods(base, base_key, unit,
-                                           iface_methods, visited);
+        auto base_key =
+            MakeSpecKey(cls->base_class, cls->base_class_type_params);
+        CollectInterfacePureVirtualMethods(base, base_key, unit, iface_methods,
+                                           visited);
       }
     }
     for (const auto& ref : cls->extends_interfaces) {
@@ -2966,7 +2951,6 @@ static void ValidateMethodNameConflicts(
       }
     }
   } else {
-
     std::vector<InterfaceRef> all_ifaces;
     CollectImplementedInterfaces(cls, unit, all_ifaces);
     std::unordered_set<std::string> seen_iface;
@@ -2975,8 +2959,8 @@ static void ValidateMethodNameConflicts(
       if (!seen_iface.insert(iface_key).second) continue;
       const auto* iface = FindClassDecl(iref.name, unit);
       if (!iface || !iface->is_interface) continue;
-      CollectInterfacePureVirtualMethods(iface, iface_key, unit,
-                                         iface_methods, visited);
+      CollectInterfacePureVirtualMethods(iface, iface_key, unit, iface_methods,
+                                         visited);
     }
   }
 
@@ -3000,7 +2984,6 @@ static void ValidateMethodNameConflicts(
 
   if (!cls->is_interface) {
     for (const auto& [method_name, entries] : iface_methods) {
-
       const ModuleItem* impl = nullptr;
       for (const auto* cm : cls->members) {
         if (cm->kind == ClassMemberKind::kMethod && cm->method &&
@@ -3030,11 +3013,10 @@ static void ValidateMethodNameConflicts(
       if (!impl) continue;
       for (const auto& [iface_name, iface_method] : entries) {
         if (!MethodSignaturesCompatible(impl, iface_method)) {
-          diag.Error(
-              impl->loc,
-              std::format("method '{}' does not match signature of pure "
-                          "virtual method '{}' in interface '{}'",
-                          method_name, method_name, iface_name));
+          diag.Error(impl->loc,
+                     std::format("method '{}' does not match signature of pure "
+                                 "virtual method '{}' in interface '{}'",
+                                 method_name, method_name, iface_name));
           break;
         }
       }
@@ -3076,9 +3058,8 @@ static const ModuleItem* FindConcreteMethodInHierarchy(
       return cm->method;
     }
   }
-  const auto* walk = cls->base_class.empty()
-                         ? nullptr
-                         : FindClassDecl(cls->base_class, unit);
+  const auto* walk =
+      cls->base_class.empty() ? nullptr : FindClassDecl(cls->base_class, unit);
   while (walk) {
     for (const auto* bm : walk->members) {
       if (bm->kind == ClassMemberKind::kMethod && bm->method &&
@@ -3100,8 +3081,8 @@ static void CheckInterfaceMethods(const ClassDecl* cls, const ClassDecl* iface,
   for (const auto* im : iface->members) {
     if (im->kind != ClassMemberKind::kMethod || !im->is_pure_virtual) continue;
     if (!im->method) continue;
-    const auto* impl = FindConcreteMethodInHierarchy(cls, im->method->name,
-                                                     unit);
+    const auto* impl =
+        FindConcreteMethodInHierarchy(cls, im->method->name, unit);
     if (!impl) {
       diag.Error(cls->range.start,
                  std::format("class '{}' does not implement pure virtual "
@@ -3158,14 +3139,11 @@ void Elaborator::ValidateImplementsInterfaceMethods(const ClassDecl* cls) {
 }
 
 using NameOriginMap =
-    std::unordered_map<std::string_view,
-                       std::unordered_set<std::string>>;
+    std::unordered_map<std::string_view, std::unordered_set<std::string>>;
 
 static void CollectOwnParamTypeNames(
-    const ClassDecl* iface,
-    std::unordered_set<std::string_view>& own_names) {
-  for (const auto& [pname, _] : iface->params)
-    own_names.insert(pname);
+    const ClassDecl* iface, std::unordered_set<std::string_view>& own_names) {
+  for (const auto& [pname, _] : iface->params) own_names.insert(pname);
   for (const auto* m : iface->members) {
     if (m->kind == ClassMemberKind::kTypedef)
       own_names.insert(m->name);
@@ -3174,13 +3152,13 @@ static void CollectOwnParamTypeNames(
   }
 }
 
-static void CollectEffectiveParamTypeNames(
-    const ClassDecl* iface, const std::string& spec_key,
-    const CompilationUnit* unit, NameOriginMap& out) {
+static void CollectEffectiveParamTypeNames(const ClassDecl* iface,
+                                           const std::string& spec_key,
+                                           const CompilationUnit* unit,
+                                           NameOriginMap& out) {
   std::unordered_set<std::string_view> own_names;
   CollectOwnParamTypeNames(iface, own_names);
-  for (auto n : own_names)
-    out[n].insert(spec_key);
+  for (auto n : own_names) out[n].insert(spec_key);
   auto inherit = [&](const ClassDecl* parent, const std::string& parent_key) {
     NameOriginMap parent_map;
     CollectEffectiveParamTypeNames(parent, parent_key, unit, parent_map);
@@ -3192,8 +3170,8 @@ static void CollectEffectiveParamTypeNames(
   if (!iface->base_class.empty()) {
     const auto* base = FindClassDecl(iface->base_class, unit);
     if (base && base->is_interface) {
-      auto base_key = MakeSpecKey(iface->base_class,
-                                  iface->base_class_type_params);
+      auto base_key =
+          MakeSpecKey(iface->base_class, iface->base_class_type_params);
       inherit(base, base_key);
     }
   }
@@ -3206,8 +3184,9 @@ static void CollectEffectiveParamTypeNames(
   }
 }
 
-static void ValidateParamTypeConflicts(
-    const ClassDecl* cls, const CompilationUnit* unit, DiagEngine& diag) {
+static void ValidateParamTypeConflicts(const ClassDecl* cls,
+                                       const CompilationUnit* unit,
+                                       DiagEngine& diag) {
   if (!cls->is_interface) return;
   std::unordered_set<std::string_view> own_names;
   CollectOwnParamTypeNames(cls, own_names);
@@ -3223,8 +3202,7 @@ static void ValidateParamTypeConflicts(
   if (!cls->base_class.empty()) {
     const auto* base = FindClassDecl(cls->base_class, unit);
     if (base && base->is_interface) {
-      auto base_key = MakeSpecKey(cls->base_class,
-                                  cls->base_class_type_params);
+      auto base_key = MakeSpecKey(cls->base_class, cls->base_class_type_params);
       process(base, base_key);
     }
   }
@@ -3264,13 +3242,11 @@ void Elaborator::ValidateInterfaceClassRules() {
 }
 
 static void CheckParamScopeExpr(
-    const Expr* e,
-    const std::unordered_set<std::string_view>& param_classes,
+    const Expr* e, const std::unordered_set<std::string_view>& param_classes,
     DiagEngine& diag) {
   if (!e) return;
   if (e->kind == ExprKind::kMemberAccess && e->lhs && e->rhs &&
-      e->lhs->kind == ExprKind::kIdentifier &&
-      !e->lhs->has_param_spec &&
+      e->lhs->kind == ExprKind::kIdentifier && !e->lhs->has_param_spec &&
       param_classes.count(e->lhs->text)) {
     diag.Error(e->lhs->range.start,
                std::format("unadorned name '{}' used as scope resolution "
@@ -3285,13 +3261,11 @@ static void CheckParamScopeExpr(
   CheckParamScopeExpr(e->condition, param_classes, diag);
   CheckParamScopeExpr(e->true_expr, param_classes, diag);
   CheckParamScopeExpr(e->false_expr, param_classes, diag);
-  for (const auto* arg : e->args)
-    CheckParamScopeExpr(arg, param_classes, diag);
+  for (const auto* arg : e->args) CheckParamScopeExpr(arg, param_classes, diag);
 }
 
 static void WalkStmtsForParamScope(
-    const Stmt* s,
-    const std::unordered_set<std::string_view>& param_classes,
+    const Stmt* s, const std::unordered_set<std::string_view>& param_classes,
     DiagEngine& diag) {
   if (!s) return;
   CheckParamScopeExpr(s->lhs, param_classes, diag);
@@ -3334,8 +3308,7 @@ void Elaborator::ValidateParameterizedScopeResolution(const ModuleDecl* decl) {
 // outside the permitted set. Both subclauses agree on this rule; enforcing it
 // from one place keeps them consistent.
 static void CheckTypeParamScopeExpr(
-    const Expr* e,
-    const std::unordered_set<std::string_view>& type_params,
+    const Expr* e, const std::unordered_set<std::string_view>& type_params,
     DiagEngine& diag) {
   if (!e) return;
   if (e->kind == ExprKind::kMemberAccess && e->lhs && e->rhs &&
@@ -3360,8 +3333,7 @@ static void CheckTypeParamScopeExpr(
 }
 
 static void WalkStmtsForTypeParamScope(
-    const Stmt* s,
-    const std::unordered_set<std::string_view>& type_params,
+    const Stmt* s, const std::unordered_set<std::string_view>& type_params,
     DiagEngine& diag) {
   if (!s) return;
   CheckTypeParamScopeExpr(s->lhs, type_params, diag);
@@ -3656,14 +3628,15 @@ bool Elaborator::IsSolveOrderableType(const DataType& dt) const {
 
 // 18.5.9: the restrictions that apply to solve...before variable ordering:
 //   - only random variables are allowed (they shall be rand);
-//   - randc variables are not allowed (they are always solved before any other);
+//   - randc variables are not allowed (they are always solved before any
+//   other);
 //   - the variables shall be integral or real;
 //   - there shall be no circular dependency in the ordering.
 // As with the foreach dimension check, resolve each named variable against the
-// class and its base chain (a derived declaration shadows a base one), and apply
-// the rand/integral restrictions only to simple local identifiers that resolve
-// to a property — a hierarchical reference or an array.size() method (expressly
-// allowed as an ordering variable) is left alone.
+// class and its base chain (a derived declaration shadows a base one), and
+// apply the rand/integral restrictions only to simple local identifiers that
+// resolve to a property — a hierarchical reference or an array.size() method
+// (expressly allowed as an ordering variable) is left alone.
 void Elaborator::ValidateOneClassSolveBeforeConstraints(const ClassDecl* cls) {
   std::unordered_map<std::string_view, const ClassMember*> properties;
   for (const ClassDecl* c = cls; c;
@@ -3808,18 +3781,18 @@ void Elaborator::ValidateSoftConstraintVariables() {
     ValidateOneClassSoftConstraintVariables(cls);
 }
 
-// 18.5.11: locate a function method of the given name visible in 'cls' or any of
-// its base classes, returning its ModuleItem (the function declaration) or
+// 18.5.11: locate a function method of the given name visible in 'cls' or any
+// of its base classes, returning its ModuleItem (the function declaration) or
 // nullptr. The nearest declaration wins, matching ordinary method lookup.
 static const ModuleItem* FindClassFunction(const ClassDecl* cls,
                                            std::string_view name,
                                            const CompilationUnit* unit) {
-  for (const auto* c = cls; c;
-       c = c->base_class.empty() ? nullptr
-                                 : FindClassDecl(c->base_class, unit)) {
+  for (const auto* c = cls; c; c = c->base_class.empty()
+                                       ? nullptr
+                                       : FindClassDecl(c->base_class, unit)) {
     for (const auto* m : c->members) {
-      if (m->kind == ClassMemberKind::kMethod && m->name == name &&
-          m->method && m->method->kind == ModuleItemKind::kFunctionDecl) {
+      if (m->kind == ClassMemberKind::kMethod && m->name == name && m->method &&
+          m->method->kind == ModuleItemKind::kFunctionDecl) {
         return m->method;
       }
     }
@@ -3925,9 +3898,10 @@ void Elaborator::ValidateOneClassConstraintFunctionArgs(const ClassDecl* cls) {
         if (StmtCallsModeMethod(s)) {
           diag_.Error(
               ref.loc,
-              std::format("function '{}' used in a constraint cannot modify the "
-                          "constraints by calling rand_mode or constraint_mode",
-                          ref.callee));
+              std::format(
+                  "function '{}' used in a constraint cannot modify the "
+                  "constraints by calling rand_mode or constraint_mode",
+                  ref.callee));
           break;
         }
       }
@@ -4103,9 +4077,8 @@ void Elaborator::ValidateOneConstraintOverride(const ClassDecl* cls,
 
   // 18.5.10: it is illegal to use the dynamic override specifiers ':initial',
   // ':extends', or ':final' on a constraint that is qualified 'static'.
-  if (m->is_static &&
-      (m->is_constraint_initial || m->is_constraint_extends ||
-       m->is_constraint_final)) {
+  if (m->is_static && (m->is_constraint_initial || m->is_constraint_extends ||
+                       m->is_constraint_final)) {
     diag_.Error(m->loc,
                 std::format("static constraint '{}' shall not carry a dynamic "
                             "override specifier",
@@ -4119,10 +4092,11 @@ void Elaborator::ValidateOneConstraintOverride(const ClassDecl* cls,
   // is static, non-static if it is not.
   if (base != nullptr && base->is_pure_virtual && !m->is_pure_virtual &&
       m->is_static != base->is_static) {
-    diag_.Error(m->loc,
-                std::format("constraint '{}' overriding a pure constraint shall "
-                            "match its 'static' qualification",
-                            m->name));
+    diag_.Error(
+        m->loc,
+        std::format("constraint '{}' overriding a pure constraint shall "
+                    "match its 'static' qualification",
+                    m->name));
   }
 
   if (m->is_constraint_initial && base) {
@@ -4286,13 +4260,13 @@ void Elaborator::ValidateExternalConstraints() {
     }
     if (target == nullptr) continue;
     if (!LocStrictlyBefore(target->range.end, ext.loc)) {
-      diag_.Error(ext.loc,
-                  std::format("external constraint block '{}::{}' shall appear "
-                              "after the declaration of class '{}'",
-                              ext.class_name, ext.constraint_name,
-                              ext.class_name));
+      diag_.Error(
+          ext.loc,
+          std::format("external constraint block '{}::{}' shall appear "
+                      "after the declaration of class '{}'",
+                      ext.class_name, ext.constraint_name, ext.class_name));
     }
   }
 }
 
-}
+}  // namespace delta

@@ -32,4 +32,4 @@ TEST(GenerateSimulation, GenerateForAssignValues) {
   EXPECT_EQ(var->value.ToUint64(), 7u);
 }
 
-}
+}  // namespace

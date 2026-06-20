@@ -145,8 +145,7 @@ TEST(InterconnectPrimitiveTerminalElaboration,
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(InterconnectPrimitiveTerminalElaboration,
-     InterconnectOnPullupNoError) {
+TEST(InterconnectPrimitiveTerminalElaboration, InterconnectOnPullupNoError) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module top;\n"
@@ -158,8 +157,7 @@ TEST(InterconnectPrimitiveTerminalElaboration,
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(InterconnectPrimitiveTerminalElaboration,
-     InterconnectOnPulldownNoError) {
+TEST(InterconnectPrimitiveTerminalElaboration, InterconnectOnPulldownNoError) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module top;\n"
@@ -212,8 +210,7 @@ TEST(InterconnectPrimitiveTerminalElaboration,
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(InterconnectPrimitiveTerminalElaboration,
-     InterconnectOnUdpInputNoError) {
+TEST(InterconnectPrimitiveTerminalElaboration, InterconnectOnUdpInputNoError) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "primitive my_udp(output y, input a, input b);\n"
@@ -234,8 +231,7 @@ TEST(InterconnectPrimitiveTerminalElaboration,
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(InterconnectPrimitiveTerminalElaboration,
-     InterconnectOnUdpOutputNoError) {
+TEST(InterconnectPrimitiveTerminalElaboration, InterconnectOnUdpOutputNoError) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "primitive my_udp(output y, input a, input b);\n"
@@ -277,4 +273,4 @@ TEST(InterconnectPrimitiveTerminalElaboration,
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

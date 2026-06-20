@@ -53,4 +53,4 @@ TEST(UndefineAllElaboration, UndefineAllExcludesConditionalFromElaboration) {
   EXPECT_TRUE(found);
 }
 
-}
+}  // namespace

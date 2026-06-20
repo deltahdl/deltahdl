@@ -21,7 +21,8 @@ TEST(PropertyDeclarationElaboration, ExplicitDisableIffNestingRejected) {
 // §16.12 forbids disable iff nesting that arises through property
 // instantiation: one disable iff in the outer body plus one inside an
 // instantiated callee makes two in the flattened form.
-TEST(PropertyDeclarationElaboration, DisableIffNestingViaInstantiationRejected) {
+TEST(PropertyDeclarationElaboration,
+     DisableIffNestingViaInstantiationRejected) {
   ElabFixture f;
   Elaborate(
       "module m;\n"

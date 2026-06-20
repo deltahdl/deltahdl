@@ -120,8 +120,7 @@ TEST(ArrayIteratorIndex, IndexEqualToItemValue) {
 
   MakeDynArray(f, "arr", {2, 1, 2, 3});
 
-  auto* pred = MakeBinary(f.arena, TokenKind::kEqEq,
-                          MakeId(f.arena, "item"),
+  auto* pred = MakeBinary(f.arena, TokenKind::kEqEq, MakeId(f.arena, "item"),
                           MakeId(f.arena, "item.index"));
   auto* call = MakeMethodCall(f.arena, "arr", "find", {});
   call->with_expr = pred;
@@ -140,8 +139,8 @@ TEST(ArrayIteratorIndex, RenamedIndexArgument) {
   auto* iter_arg = MakeId(f.arena, "elem");
   auto* idx_arg = MakeId(f.arena, "pos");
 
-  auto* pred = MakeBinary(f.arena, TokenKind::kLt,
-                          MakeId(f.arena, "elem.pos"), MakeInt(f.arena, 2));
+  auto* pred = MakeBinary(f.arena, TokenKind::kLt, MakeId(f.arena, "elem.pos"),
+                          MakeInt(f.arena, 2));
   auto* call = MakeMethodCall(f.arena, "arr", "find", {iter_arg, idx_arg});
   call->with_expr = pred;
   std::vector<Logic4Vec> out;
@@ -159,9 +158,10 @@ TEST(ArrayIteratorIndex, RenamedIndexInFindIndex) {
   auto* iter_arg = MakeId(f.arena, "x");
   auto* idx_arg = MakeId(f.arena, "i");
 
-  auto* pred = MakeBinary(f.arena, TokenKind::kGt,
-                          MakeId(f.arena, "x.i"), MakeInt(f.arena, 0));
-  auto* call = MakeMethodCall(f.arena, "arr", "find_index", {iter_arg, idx_arg});
+  auto* pred = MakeBinary(f.arena, TokenKind::kGt, MakeId(f.arena, "x.i"),
+                          MakeInt(f.arena, 0));
+  auto* call =
+      MakeMethodCall(f.arena, "arr", "find_index", {iter_arg, idx_arg});
   call->with_expr = pred;
   std::vector<Logic4Vec> out;
   bool ok = TryCollectLocatorResult(call, f.ctx, f.arena, out);
@@ -178,8 +178,7 @@ TEST(ArrayIteratorIndex, RenamedIndexInMap) {
   auto* iter_arg = MakeId(f.arena, "a");
   auto* idx_arg = MakeId(f.arena, "idx");
 
-  auto* with_expr = MakeBinary(f.arena, TokenKind::kPlus,
-                               MakeId(f.arena, "a"),
+  auto* with_expr = MakeBinary(f.arena, TokenKind::kPlus, MakeId(f.arena, "a"),
                                MakeId(f.arena, "a.idx"));
   auto* call = MakeMethodCall(f.arena, "arr", "map", {iter_arg, idx_arg});
   call->with_expr = with_expr;
@@ -251,4 +250,4 @@ TEST(ArrayIteratorIndex, IndexMatchesNoElements) {
   EXPECT_EQ(out.size(), 0u);
 }
 
-}
+}  // namespace

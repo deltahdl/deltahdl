@@ -93,4 +93,4 @@ TEST(ClockingSkewConstExpr, VariableDefaultSkewRejected) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

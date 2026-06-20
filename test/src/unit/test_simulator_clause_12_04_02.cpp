@@ -357,4 +357,4 @@ TEST(QualifiedIfSimulation, QualifiedIfFallsToElse) {
   EXPECT_EQ(var->value.ToUint64(), 30u);
 }
 
-}
+}  // namespace

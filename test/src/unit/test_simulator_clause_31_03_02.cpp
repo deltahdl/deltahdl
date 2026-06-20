@@ -63,4 +63,4 @@ TEST(HoldTimingCheckWindow, ZeroLimitNeverViolates) {
   EXPECT_FALSE(mgr.CheckHoldViolation("clk", 100, "data", 101));
 }
 
-}
+}  // namespace

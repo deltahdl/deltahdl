@@ -7,16 +7,17 @@ namespace delta {
 namespace {
 
 // §37.42 Task and function call: the object model diagram for a tf call - the
-// task call, function call, method task/func call, and system task/func call the
-// diagram groups under "tf call". A call iterates its arguments (vpiArgument); a
-// method call additionally reaches the object it is applied to (vpiPrefix) and a
-// with clause (vpiWith) when the method accepts one. The diagram carries eleven
-// numbered Details; these tests observe the production code that applies the ones
-// this subclause owns: the vpiPrefix relation (detail 2), the vpiWith
-// availability rule (detail 1), the invoking-systf handle (detail 3), the
-// vpiUserSystf iteration (detail 6), the empty/null argument representations
-// (detail 8), the protected-call argument-iteration carve-out (detail 10), and
-// the built-in-method NULL rule for vpiFunction/vpiTask (detail 11).
+// task call, function call, method task/func call, and system task/func call
+// the diagram groups under "tf call". A call iterates its arguments
+// (vpiArgument); a method call additionally reaches the object it is applied to
+// (vpiPrefix) and a with clause (vpiWith) when the method accepts one. The
+// diagram carries eleven numbered Details; these tests observe the production
+// code that applies the ones this subclause owns: the vpiPrefix relation
+// (detail 2), the vpiWith availability rule (detail 1), the invoking-systf
+// handle (detail 3), the vpiUserSystf iteration (detail 6), the empty/null
+// argument representations (detail 8), the protected-call argument-iteration
+// carve-out (detail 10), and the built-in-method NULL rule for
+// vpiFunction/vpiTask (detail 11).
 
 // The fixture installs a context so the public vpi_get/vpi_iterate/vpi_handle
 // entry points run their real dispatch over the test objects.
@@ -42,13 +43,13 @@ TEST_F(TaskFuncCall, CallKindsAreClassified) {
 
   EXPECT_TRUE(VpiIsMethodCallType(vpiMethodFuncCall));
   EXPECT_TRUE(VpiIsMethodCallType(vpiMethodTaskCall));
-  EXPECT_FALSE(VpiIsMethodCallType(vpiFuncCall));   // a plain func call
+  EXPECT_FALSE(VpiIsMethodCallType(vpiFuncCall));  // a plain func call
   EXPECT_FALSE(VpiIsMethodCallType(vpiSysFuncCall));
 }
 
 // Detail 2: vpiPrefix of a method call reaches the object the method is applied
-// to (the class var "packet" in "packet.send()"). A tf call that is not a method
-// call carries no prefix, so vpiPrefix on it reports NULL.
+// to (the class var "packet" in "packet.send()"). A tf call that is not a
+// method call carries no prefix, so vpiPrefix on it reports NULL.
 TEST_F(TaskFuncCall, MethodPrefixReachesAppliedObject) {
   VpiObject packet;  // the class variable the method is applied to
   packet.type = vpiRefObj;
@@ -67,8 +68,8 @@ TEST_F(TaskFuncCall, MethodPrefixReachesAppliedObject) {
   EXPECT_EQ(VpiHandleC(vpiPrefix, &func), nullptr);
 }
 
-// Detail 1: the vpiWith relation is available only for the methods that accept a
-// with clause - the randomize methods and the array locator methods. A method
+// Detail 1: the vpiWith relation is available only for the methods that accept
+// a with clause - the randomize methods and the array locator methods. A method
 // call flagged as one of those reaches its with clause; any other method call
 // reports NULL through vpiWith even when a with object is attached.
 TEST_F(TaskFuncCall, WithRelationAvailableOnlyForWithMethods) {
@@ -143,11 +144,11 @@ TEST_F(TaskFuncCall, UserSystfIterationIsNullWhenNoneRegistered) {
 }
 
 // Detail 8: an omitted (empty) argument and a `null`-valued argument have
-// distinct representations - an empty argument is a vpiOperation whose vpiOpType
-// is vpiNullOp, while a null argument is a vpiConstant whose vpiConstType is
-// vpiNullConst. The representations are observed through the public vpi_get
-// dispatch. The argument-kind classifier additionally pins which object kinds
-// the vpiArgument relation reaches.
+// distinct representations - an empty argument is a vpiOperation whose
+// vpiOpType is vpiNullOp, while a null argument is a vpiConstant whose
+// vpiConstType is vpiNullConst. The representations are observed through the
+// public vpi_get dispatch. The argument-kind classifier additionally pins which
+// object kinds the vpiArgument relation reaches.
 TEST_F(TaskFuncCall, EmptyAndNullArgumentsHaveDistinctRepresentations) {
   VpiObject empty;
   VpiMakeEmptyArgument(&empty);
@@ -167,15 +168,15 @@ TEST_F(TaskFuncCall, EmptyAndNullArgumentsHaveDistinctRepresentations) {
   EXPECT_TRUE(VpiIsTfCallArgumentType(vpiGate));  // a primitive
   EXPECT_TRUE(VpiIsTfCallArgumentType(vpiNamedEvent));
   EXPECT_TRUE(VpiIsTfCallArgumentType(vpiNamedEventArray));
-  EXPECT_FALSE(VpiIsTfCallArgumentType(vpiIf));      // a statement
+  EXPECT_FALSE(VpiIsTfCallArgumentType(vpiIf));  // a statement
   EXPECT_FALSE(VpiIsTfCallArgumentType(vpiModule));
 }
 
 // Detail 10: iterating a protected object's relationships is normally an error,
 // but a protected system task or function call still allows iteration over its
-// vpiArgument relation. The argument iteration collects only the call's argument
-// objects (excluding a non-argument child), while any other relation on the same
-// protected call is still refused.
+// vpiArgument relation. The argument iteration collects only the call's
+// argument objects (excluding a non-argument child), while any other relation
+// on the same protected call is still refused.
 TEST_F(TaskFuncCall, ProtectedCallStillIteratesArguments) {
   VpiObject arg0;
   arg0.type = vpiOperation;  // an argument expression
@@ -209,8 +210,9 @@ TEST_F(TaskFuncCall, ProtectedCallStillIteratesArguments) {
 }
 
 // Detail 11: a built-in method func call has no user function object, so
-// vpiFunction reports NULL; a built-in method task call likewise reports NULL for
-// vpiTask. A user-defined (non-built-in) method call reaches its function/task.
+// vpiFunction reports NULL; a built-in method task call likewise reports NULL
+// for vpiTask. A user-defined (non-built-in) method call reaches its
+// function/task.
 TEST_F(TaskFuncCall, BuiltinMethodHasNoFunctionOrTask) {
   VpiObject builtin_fn;
   builtin_fn.type = vpiMethodFuncCall;

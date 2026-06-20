@@ -1,31 +1,27 @@
-#include "simulator/specify.h"
-
 #include <gtest/gtest.h>
 
 #include <cstdint>
+
+#include "simulator/specify.h"
 
 using namespace delta;
 
 namespace {
 
 TEST(PulseFiltering, PulseAtErrorLimitPropagates) {
-  EXPECT_EQ(ClassifyPulse( 7, 3, 7),
-            PulseClassification::kPropagate);
+  EXPECT_EQ(ClassifyPulse(7, 3, 7), PulseClassification::kPropagate);
 }
 
 TEST(PulseFiltering, PulseAtRejectLimitForcesXWhenErrorHigher) {
-  EXPECT_EQ(ClassifyPulse( 3, 3, 7),
-            PulseClassification::kForceX);
+  EXPECT_EQ(ClassifyPulse(3, 3, 7), PulseClassification::kForceX);
 }
 
 TEST(PulseFiltering, PulseJustBelowErrorLimitForcesX) {
-  EXPECT_EQ(ClassifyPulse( 6, 3, 7),
-            PulseClassification::kForceX);
+  EXPECT_EQ(ClassifyPulse(6, 3, 7), PulseClassification::kForceX);
 }
 
 TEST(PulseFiltering, PulseBelowRejectLimitIsRejected) {
-  EXPECT_EQ(ClassifyPulse( 2, 3, 7),
-            PulseClassification::kReject);
+  EXPECT_EQ(ClassifyPulse(2, 3, 7), PulseClassification::kReject);
 }
 
 TEST(PulseFiltering, DefaultPulseLimitsMatchEveryTransitionDelay) {
@@ -34,7 +30,8 @@ TEST(PulseFiltering, DefaultPulseLimitsMatchEveryTransitionDelay) {
   for (int i = 0; i < 12; ++i) pd.delays[i] = static_cast<uint64_t>(10 + i);
   InitDefaultPulseLimits(pd);
   for (int i = 0; i < 12; ++i) {
-    EXPECT_EQ(pd.reject_limit[i], static_cast<uint64_t>(10 + i)) << "slot " << i;
+    EXPECT_EQ(pd.reject_limit[i], static_cast<uint64_t>(10 + i))
+        << "slot " << i;
     EXPECT_EQ(pd.error_limit[i], static_cast<uint64_t>(10 + i)) << "slot " << i;
   }
 }
@@ -44,7 +41,7 @@ TEST(PulseFiltering, DefaultsRejectPulseNarrowerThanPathDelay) {
   pd.delay_count = 1;
   pd.delays[0] = 10;
   InitDefaultPulseLimits(pd);
-  EXPECT_EQ(ClassifyPulse( 5, pd.reject_limit[0], pd.error_limit[0]),
+  EXPECT_EQ(ClassifyPulse(5, pd.reject_limit[0], pd.error_limit[0]),
             PulseClassification::kReject);
 }
 
@@ -53,7 +50,7 @@ TEST(PulseFiltering, DefaultsPropagatePulseAtPathDelayWidth) {
   pd.delay_count = 1;
   pd.delays[0] = 10;
   InitDefaultPulseLimits(pd);
-  EXPECT_EQ(ClassifyPulse( 10, pd.reject_limit[0], pd.error_limit[0]),
+  EXPECT_EQ(ClassifyPulse(10, pd.reject_limit[0], pd.error_limit[0]),
             PulseClassification::kPropagate);
 }
 
@@ -80,4 +77,4 @@ TEST(PulseFiltering, ClassifierProducesOneOfThreeCategories) {
   EXPECT_EQ(c, PulseClassification::kPropagate);
 }
 
-}
+}  // namespace

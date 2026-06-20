@@ -79,4 +79,4 @@ TEST(BufNotElaboration, MultiOutputNotEmitsInvertedAssignsPerOutput) {
   }
 }
 
-}
+}  // namespace

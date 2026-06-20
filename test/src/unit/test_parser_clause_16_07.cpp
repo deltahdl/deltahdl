@@ -228,4 +228,4 @@ TEST(SequenceExpressionParsing, ExpressionOrDistInsideSequenceParses) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}
+}  // namespace

@@ -48,4 +48,4 @@ TEST(IoSystemTaskParsing, StrobeNoArgumentListOptional) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

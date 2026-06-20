@@ -77,8 +77,7 @@ TEST(InterfacePortConnectionRulesElaboration,
 }
 
 // §23.3.3.4: an interface port cannot be left unconnected.
-TEST(InterfacePortConnectionRulesElaboration,
-     UnconnectedInterfacePortErrors) {
+TEST(InterfacePortConnectionRulesElaboration, UnconnectedInterfacePortErrors) {
   ElabFixture f;
   ElaborateSrc(
       "interface bus_if;\n"
@@ -131,4 +130,4 @@ TEST(InterfacePortConnectionRulesElaboration,
   EXPECT_TRUE(f.has_errors);
 }
 
-}
+}  // namespace

@@ -178,5 +178,5 @@ TEST_F(VcdFileSyntaxSim, SimulationTimesAreAbsolute) {
   EXPECT_EQ(content.find("#150"), std::string::npos);
 }
 
-}
-}
+}  // namespace
+}  // namespace delta

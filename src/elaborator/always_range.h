@@ -25,8 +25,8 @@ struct AlwaysRange {
 // non-negative integer constant expression; the maximum shall be a non-negative
 // integer constant expression or `$`; when both bounds are integer constant
 // expressions the minimum shall not exceed the maximum. The range for a strong
-// always (`s_always`) shall be bounded, so a `$` maximum is rejected there while
-// it is allowed for a weak always.
+// always (`s_always`) shall be bounded, so a `$` maximum is rejected there
+// while it is allowed for a weak always.
 bool IsAlwaysRangeWellFormed(const AlwaysRange& range, bool strong);
 
 // §16.12.11: build a folded constant-integer bound from a raw value (the common
@@ -36,4 +36,4 @@ AlwaysRangeBound MakeAlwaysBound(std::int64_t value);
 // §16.12.11: build the `$` maximum bound — a finite but unbounded maximum.
 AlwaysRangeBound MakeAlwaysDollar();
 
-}
+}  // namespace delta

@@ -14,4 +14,4 @@ void Refactor(AigGraph& g);
 
 void RemoveRedundancy(AigGraph& g);
 
-}
+}  // namespace delta

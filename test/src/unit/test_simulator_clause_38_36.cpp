@@ -76,8 +76,8 @@ TEST_F(VpiCallbackSim, RemoveCbNullReturnsZero) {
   EXPECT_EQ(VpiRemoveCbC(nullptr), 0);
 }
 
-// §38.36: cb_data_p shall point to an s_cb_data structure. A null pointer is not
-// a valid structure, so registration cannot produce a callback handle.
+// §38.36: cb_data_p shall point to an s_cb_data structure. A null pointer is
+// not a valid structure, so registration cannot produce a callback handle.
 TEST_F(VpiCallbackSim, RegisterCbNullDataReturnsNull) {
   EXPECT_EQ(vpi_register_cb(nullptr), nullptr);
 }
@@ -158,8 +158,8 @@ TEST_F(VpiCallbackSim, ExecuteCallbackNullHandleReturnsZero) {
   EXPECT_EQ(vpi_ctx_.ExecuteCallback(nullptr), 0);
 }
 
-// §38.36: vpi_register_cb returns a handle to a callback object; a handle to any
-// other kind of object does not name a callback to execute.
+// §38.36: vpi_register_cb returns a handle to a callback object; a handle to
+// any other kind of object does not name a callback to execute.
 TEST_F(VpiCallbackSim, ExecuteCallbackNonCallbackHandleReturnsZero) {
   sim_ctx_.CreateVariable("sig", 1);
   vpi_ctx_.Attach(sim_ctx_);
@@ -189,5 +189,5 @@ TEST_F(VpiCallbackSim, CbValueChangeWithWatcherFires) {
   EXPECT_TRUE(fired);
 }
 
-}
-}
+}  // namespace
+}  // namespace delta

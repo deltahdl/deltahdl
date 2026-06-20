@@ -84,4 +84,4 @@ TEST(AnsiStylePortDeclarations, AnsiPortBodyDeclDifferentNameIsOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

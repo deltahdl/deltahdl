@@ -54,4 +54,4 @@ TEST(MultidimensionalArraySimulation, PackedElementParticipatesInArithmetic) {
   EXPECT_EQ(v, 16u);
 }
 
-}
+}  // namespace

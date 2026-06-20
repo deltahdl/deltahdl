@@ -51,4 +51,4 @@ TEST(NegativePolarityParsing, ParallelPathMinusAdjacentToEqGt) {
   EXPECT_EQ(si->path.polarity, SpecifyPolarity::kNegative);
 }
 
-}
+}  // namespace

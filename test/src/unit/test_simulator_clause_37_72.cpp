@@ -10,14 +10,14 @@ namespace {
 // statement. The case object carries the vpiCaseType and vpiQualifier int
 // properties; it reaches its condition expression (vpiCondition) and iterates
 // its case items. A case item reaches its match expressions through the vpiExpr
-// edge (drawn to both the pattern grouping and a plain expr) and branches to one
-// statement. Two numbered Details govern the case item: it groups all the
+// edge (drawn to both the pattern grouping and a plain expr) and branches to
+// one statement. Two numbered Details govern the case item: it groups all the
 // conditions that branch to one statement (detail 1), and the default case item
-// - which has no condition expression - iterates to NULL (detail 2). These tests
-// observe the production code that applies those rules: the vpiCaseType and
-// vpiQualifier property dispatch (vpi_get), the match-expression grouping
-// (VpiCaseItemMatchExprs), and the vpiExpr iteration over a case item (Iterate),
-// including the default-item NULL rule.
+// - which has no condition expression - iterates to NULL (detail 2). These
+// tests observe the production code that applies those rules: the vpiCaseType
+// and vpiQualifier property dispatch (vpi_get), the match-expression grouping
+// (VpiCaseItemMatchExprs), and the vpiExpr iteration over a case item
+// (Iterate), including the default-item NULL rule.
 
 // The fixture installs a context so the public vpi_get/vpi_iterate entry points
 // run their real dispatch over the test objects.
@@ -48,9 +48,9 @@ TEST_F(CasePattern, CaseStatementReportsCaseTypeAndQualifier) {
 }
 
 // Diagram (case item -> vpiExpr -> pattern|expr): the classifier recognizes the
-// kinds a case item's match expressions may reach - the pattern grouping members
-// and ordinary expressions - while statements and unrelated objects are not
-// conditions. This pins the grouping to the right children so the item's
+// kinds a case item's match expressions may reach - the pattern grouping
+// members and ordinary expressions - while statements and unrelated objects are
+// not conditions. This pins the grouping to the right children so the item's
 // statement branch is never mistaken for a condition.
 TEST_F(CasePattern, CaseItemConditionTypesAreClassified) {
   EXPECT_TRUE(VpiIsCaseItemConditionType(vpiAnyPattern));
@@ -60,16 +60,16 @@ TEST_F(CasePattern, CaseItemConditionTypesAreClassified) {
   EXPECT_TRUE(VpiIsCaseItemConditionType(vpiExpr));
   EXPECT_TRUE(VpiIsCaseItemConditionType(vpiOperation));  // an expr-class kind
 
-  EXPECT_FALSE(VpiIsCaseItemConditionType(vpiIf));    // a statement, not a cond
+  EXPECT_FALSE(VpiIsCaseItemConditionType(vpiIf));  // a statement, not a cond
   EXPECT_FALSE(VpiIsCaseItemConditionType(vpiBegin));  // a statement container
   EXPECT_FALSE(VpiIsCaseItemConditionType(vpiModule));
 }
 
 // Detail 1: a case item groups every case condition that branches to the same
 // statement. The grouping helper returns the item's match-expression members -
-// including a pattern - in order, and excludes the statement reached through the
-// item's -> stmt edge; the shared statement itself is still reachable as the
-// item's stmt.
+// including a pattern - in order, and excludes the statement reached through
+// the item's -> stmt edge; the shared statement itself is still reachable as
+// the item's stmt.
 TEST_F(CasePattern, CaseItemGroupsConditionsBranchingToOneStatement) {
   VpiObject item;
   item.type = vpiCaseItem;
@@ -110,14 +110,15 @@ TEST_F(CasePattern, CaseItemMatchExprIterationReachesPatternsAndExprs) {
   ASSERT_NE(it, nullptr);
   EXPECT_EQ(ctx_.Scan(it), &pattern);
   EXPECT_EQ(ctx_.Scan(it), &expr);
-  EXPECT_EQ(ctx_.Scan(it), nullptr);  // drains; the statement is not a condition
+  EXPECT_EQ(ctx_.Scan(it),
+            nullptr);  // drains; the statement is not a condition
 }
 
 // Detail 2: vpi_iterate() returns NULL for the default case item, because there
 // is no expression with the default case. The grouping helper likewise yields
-// none. The flag enforces this even if the object carries stray children, so the
-// default item is distinguished from a non-default item; a non-default item with
-// conditions iterates to them.
+// none. The flag enforces this even if the object carries stray children, so
+// the default item is distinguished from a non-default item; a non-default item
+// with conditions iterates to them.
 TEST_F(CasePattern, DefaultCaseItemIteratesToNullAndGroupsNothing) {
   VpiObject default_item;
   default_item.type = vpiCaseItem;
@@ -141,12 +142,12 @@ TEST_F(CasePattern, DefaultCaseItemIteratesToNullAndGroupsNothing) {
   EXPECT_EQ(ctx_.Scan(it), nullptr);  // drains and frees the iterator
 }
 
-// Detail 2 (scope edge case): the default case item has no condition expression,
-// but it still branches to a statement - the diagram's case item -> stmt edge
-// applies to every item, default included. The NULL-iteration rule is therefore
-// scoped to the vpiExpr edge: vpi_iterate(vpiExpr, default) is NULL while the
-// item's statement stays reachable through vpiStmt. Without that scoping the
-// guard would wrongly sever the default item from its statement.
+// Detail 2 (scope edge case): the default case item has no condition
+// expression, but it still branches to a statement - the diagram's case item ->
+// stmt edge applies to every item, default included. The NULL-iteration rule is
+// therefore scoped to the vpiExpr edge: vpi_iterate(vpiExpr, default) is NULL
+// while the item's statement stays reachable through vpiStmt. Without that
+// scoping the guard would wrongly sever the default item from its statement.
 TEST_F(CasePattern, DefaultCaseItemStillReachesItsStatement) {
   VpiObject default_item;
   default_item.type = vpiCaseItem;
@@ -156,21 +157,22 @@ TEST_F(CasePattern, DefaultCaseItemStillReachesItsStatement) {
   default_item.children = {&stmt};
 
   EXPECT_EQ(ctx_.Iterate(vpiExpr, &default_item), nullptr);  // no conditions
-  EXPECT_EQ(VpiHandleC(vpiStmt, &default_item), &stmt);       // stmt still there
+  EXPECT_EQ(VpiHandleC(vpiStmt, &default_item), &stmt);      // stmt still there
 }
 
 // Diagram scope (edge case): the vpiExpr edge that reaches patterns is the case
-// item's edge, not the case statement's. Iterating vpiExpr over a case statement
-// does not surface a pattern child (the generic type match a pattern does not
-// satisfy), whereas the same pattern reached through a case item's vpiExpr edge
-// is returned. This pins the case-item gating of the match-expression iteration,
-// keeping the pattern-reaching behavior from leaking to other object kinds.
+// item's edge, not the case statement's. Iterating vpiExpr over a case
+// statement does not surface a pattern child (the generic type match a pattern
+// does not satisfy), whereas the same pattern reached through a case item's
+// vpiExpr edge is returned. This pins the case-item gating of the
+// match-expression iteration, keeping the pattern-reaching behavior from
+// leaking to other object kinds.
 TEST_F(CasePattern, PatternReachIsSpecificToCaseItems) {
   VpiObject pattern;
   pattern.type = vpiTaggedPattern;
 
-  // A case statement is not a case item: its vpiExpr iteration falls back to the
-  // generic type match, which a pattern child does not satisfy.
+  // A case statement is not a case item: its vpiExpr iteration falls back to
+  // the generic type match, which a pattern child does not satisfy.
   VpiObject case_stmt;
   case_stmt.type = vpiCase;
   case_stmt.children = {&pattern};

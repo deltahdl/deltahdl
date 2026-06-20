@@ -52,4 +52,4 @@ void DiagEngine::Emit(DiagSeverity sev, SourceLoc loc, std::string msg) {
   diags_.push_back({sev, loc, std::move(msg)});
 }
 
-}
+}  // namespace delta

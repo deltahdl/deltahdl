@@ -47,8 +47,7 @@ TEST(TimingCheckCommandSim, WidthElapsedBetweenThresholdAndLimitViolates) {
   tc.threshold = 1;
   mgr.AddTimingCheck(tc);
 
-  EXPECT_TRUE(mgr.CheckWidthViolation("clk", 100,
-                                      110));
+  EXPECT_TRUE(mgr.CheckWidthViolation("clk", 100, 110));
 }
 
 TEST(TimingCheckCommandSim, WidthElapsedAtLimitNoViolation) {
@@ -59,8 +58,7 @@ TEST(TimingCheckCommandSim, WidthElapsedAtLimitNoViolation) {
   tc.ref_edge = SpecifyEdge::kPosedge;
   tc.limit = 20;
   mgr.AddTimingCheck(tc);
-  EXPECT_FALSE(mgr.CheckWidthViolation("clk", 100,
-                                       120));
+  EXPECT_FALSE(mgr.CheckWidthViolation("clk", 100, 120));
 }
 
 TEST(TimingCheckCommandSim, WidthElapsedAtThresholdNoViolation) {
@@ -72,8 +70,7 @@ TEST(TimingCheckCommandSim, WidthElapsedAtThresholdNoViolation) {
   tc.limit = 20;
   tc.threshold = 5;
   mgr.AddTimingCheck(tc);
-  EXPECT_FALSE(mgr.CheckWidthViolation("clk", 100,
-                                       105));
+  EXPECT_FALSE(mgr.CheckWidthViolation("clk", 100, 105));
 }
 
 TEST(TimingCheckCommandSim, WidthSimultaneousNoViolation) {
@@ -84,8 +81,7 @@ TEST(TimingCheckCommandSim, WidthSimultaneousNoViolation) {
   tc.ref_edge = SpecifyEdge::kPosedge;
   tc.limit = 20;
   mgr.AddTimingCheck(tc);
-  EXPECT_FALSE(mgr.CheckWidthViolation("clk", 100,
-                                       100));
+  EXPECT_FALSE(mgr.CheckWidthViolation("clk", 100, 100));
 }
 
 TEST(TimingCheckCommandSim, WidthMismatchedSignalIgnored) {
@@ -96,8 +92,7 @@ TEST(TimingCheckCommandSim, WidthMismatchedSignalIgnored) {
   tc.ref_edge = SpecifyEdge::kPosedge;
   tc.limit = 20;
   mgr.AddTimingCheck(tc);
-  EXPECT_FALSE(mgr.CheckWidthViolation("other", 100,
-                                       110));
+  EXPECT_FALSE(mgr.CheckWidthViolation("other", 100, 110));
 }
 
 TEST(TimingCheckCommandSim, WidthOtherKindsIgnored) {
@@ -108,8 +103,7 @@ TEST(TimingCheckCommandSim, WidthOtherKindsIgnored) {
   setup.data_signal = "data";
   setup.limit = 20;
   mgr.AddTimingCheck(setup);
-  EXPECT_FALSE(mgr.CheckWidthViolation("clk", 100,
-                                       110));
+  EXPECT_FALSE(mgr.CheckWidthViolation("clk", 100, 110));
 }
 
 TEST(TimingCheckCommandSim, WidthSimulates) {
@@ -132,4 +126,4 @@ TEST(TimingCheckCommandSim, WidthSimulates) {
   EXPECT_EQ(var->value.ToUint64(), 55u);
 }
 
-}
+}  // namespace

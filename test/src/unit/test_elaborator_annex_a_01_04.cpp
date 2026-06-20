@@ -56,4 +56,4 @@ TEST(ElaborationSeverityTaskElab, FatalNoArgsIsValid) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

@@ -163,4 +163,4 @@ TEST(DataHidingElaboration, SameClassInstanceLocalAccessOk) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

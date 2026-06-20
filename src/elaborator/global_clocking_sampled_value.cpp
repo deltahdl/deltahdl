@@ -2,8 +2,8 @@
 
 namespace delta {
 
-bool ClassifyGlobalClockingSampledFunction(
-    std::string_view name, GlobalClockingSampledFunction& out) {
+bool ClassifyGlobalClockingSampledFunction(std::string_view name,
+                                           GlobalClockingSampledFunction& out) {
   if (name == "$past_gclk") {
     out = GlobalClockingSampledFunction::kPastGclk;
     return true;

@@ -17,9 +17,10 @@ namespace {
 // validity and the dynamic data of the SystemVerilog object model, and in doing
 // so it was renamed vpi_release_handle(). IEEE 1800-2023 therefore deprecates
 // vpi_free_object(): the old name no longer denotes a supported operation. The
-// simulator carries this deprecation - a call to the deprecated routine performs
-// no release, reports failure, and records a deprecation diagnostic that names
-// the replacement - while the renamed routine keeps the live functionality.
+// simulator carries this deprecation - a call to the deprecated routine
+// performs no release, reports failure, and records a deprecation diagnostic
+// that names the replacement - while the renamed routine keeps the live
+// functionality.
 class VpiFreeObjectDeprecated : public ::testing::Test {
  protected:
   void SetUp() override { SetGlobalVpiContext(&vpi_ctx_); }
@@ -51,8 +52,9 @@ TEST_F(VpiFreeObjectDeprecated, RecordsADeprecationDiagnostic) {
 }
 
 // The rename carries the functionality the deprecated name lost. Where
-// vpi_free_object() refused to act, vpi_release_handle() releases the same valid
-// handle and reports success - demonstrating which routine is now the live one.
+// vpi_free_object() refused to act, vpi_release_handle() releases the same
+// valid handle and reports success - demonstrating which routine is now the
+// live one.
 TEST_F(VpiFreeObjectDeprecated, ReplacementRoutineCarriesTheLiveRelease) {
   VpiObject obj;
   obj.type = vpiModule;
@@ -64,11 +66,11 @@ TEST_F(VpiFreeObjectDeprecated, ReplacementRoutineCarriesTheLiveRelease) {
   EXPECT_TRUE(vpi_ctx_.HandleReleased(&obj));
 }
 
-// Edge case: the deprecation is unconditional. The deprecated routine carries no
-// working path for any handle, so even a null handle - one a live routine would
-// dismiss as naming nothing - still draws the deprecation diagnostic and the
-// failure return. There is no argument for which vpi_free_object() does real
-// work; it only ever reports that it is gone.
+// Edge case: the deprecation is unconditional. The deprecated routine carries
+// no working path for any handle, so even a null handle - one a live routine
+// would dismiss as naming nothing - still draws the deprecation diagnostic and
+// the failure return. There is no argument for which vpi_free_object() does
+// real work; it only ever reports that it is gone.
 TEST_F(VpiFreeObjectDeprecated, DeprecationAppliesEvenToANullHandle) {
   EXPECT_EQ(vpi_free_object(nullptr), 0);
 

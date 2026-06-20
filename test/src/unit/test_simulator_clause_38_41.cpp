@@ -43,7 +43,8 @@ class VpiVprintfSim : public ::testing::Test {
 // printf()-style format against the caller's arguments, writes the result to
 // both the tool's output channel and the current tool log file, and returns the
 // number of characters written. One call exercises that conjunction together.
-TEST_F(VpiVprintfSim, ConsumesAnAlreadyStartedVarargsListWritingBothDestinations) {
+TEST_F(VpiVprintfSim,
+       ConsumesAnAlreadyStartedVarargsListWritingBothDestinations) {
   PLI_INT32 written = CallWithStartedVarargs("value=%d name=%s", 42, "ok");
 
   const std::string expected = "value=42 name=ok";

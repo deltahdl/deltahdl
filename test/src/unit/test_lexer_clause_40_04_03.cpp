@@ -45,17 +45,16 @@ TEST(FsmConcatPragmaLexing, ComposedOfAllSignalsWithIrregularSpacing) {
   auto pragmas =
       CollectConcatPragmas("/* tool state_vector { a , b,c } my_fsm enum e */");
   ASSERT_EQ(pragmas.size(), 1u);
-  EXPECT_EQ(pragmas[0].signals,
-            (std::vector<std::string>{"a", "b", "c"}));
+  EXPECT_EQ(pragmas[0].signals, (std::vector<std::string>{"a", "b", "c"}));
 }
 
 // §40.4.3: the concatenation is composed of all the signals specified — the
 // minimal case being a single whole signal between the braces, written as one
 // contiguous word. That single member is recorded.
 TEST(FsmConcatPragmaLexing, SingleSignalConcatenationRecordsThatSignal) {
-  auto pragmas =
-      CollectConcatPragmas("/* tool state_vector {only} my_fsm enum state_e "
-                           "*/");
+  auto pragmas = CollectConcatPragmas(
+      "/* tool state_vector {only} my_fsm enum state_e "
+      "*/");
   ASSERT_EQ(pragmas.size(), 1u);
   EXPECT_EQ(pragmas[0].signals, (std::vector<std::string>{"only"}));
   EXPECT_EQ(pragmas[0].fsm_name, "my_fsm");

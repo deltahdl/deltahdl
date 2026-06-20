@@ -25,4 +25,4 @@ TEST(ClassTypeElaboration, MultipleClassTypesOk) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

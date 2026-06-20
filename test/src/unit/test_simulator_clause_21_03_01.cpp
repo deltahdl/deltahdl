@@ -48,8 +48,7 @@ TEST(IoSystemTaskTest, FopenFdHasMsbSet) {
   SimFixture f;
   std::string path = "/tmp/deltahdl_test_fopen_msb.txt";
   auto* open_expr = MakeSysCall(
-      f.arena, "$fopen",
-      {MkStr(f.arena, path.c_str()), MkStr(f.arena, "w")});
+      f.arena, "$fopen", {MkStr(f.arena, path.c_str()), MkStr(f.arena, "w")});
   auto fd_val = EvalExpr(open_expr, f.ctx, f.arena);
   auto fd = static_cast<uint32_t>(fd_val.ToUint64());
   EXPECT_NE(fd & 0x80000000u, 0u);
@@ -84,18 +83,16 @@ TEST(IoSystemTaskTest, FopenReusesClosedChannel) {
   SimFixture f;
   std::string path = "/tmp/deltahdl_test_fopen_reuse.txt";
 
-  auto* first =
-      MakeSysCall(f.arena, "$fopen",
-                  {MkStr(f.arena, path.c_str()), MkStr(f.arena, "w")});
+  auto* first = MakeSysCall(
+      f.arena, "$fopen", {MkStr(f.arena, path.c_str()), MkStr(f.arena, "w")});
   auto first_fd = EvalExpr(first, f.ctx, f.arena).ToUint64();
 
   auto* close_first =
       MakeSysCall(f.arena, "$fclose", {MakeInt(f.arena, first_fd)});
   EvalExpr(close_first, f.ctx, f.arena);
 
-  auto* second =
-      MakeSysCall(f.arena, "$fopen",
-                  {MkStr(f.arena, path.c_str()), MkStr(f.arena, "w")});
+  auto* second = MakeSysCall(
+      f.arena, "$fopen", {MkStr(f.arena, path.c_str()), MkStr(f.arena, "w")});
   auto second_fd = EvalExpr(second, f.ctx, f.arena).ToUint64();
 
   EXPECT_EQ(first_fd, second_fd);
@@ -142,18 +139,20 @@ TEST(IoSystemTaskTest, FopenAcceptsBinaryModeSuffix) {
   std::string path = "/tmp/deltahdl_test_fopen_binary.bin";
 
   auto write_fd =
-      EvalExpr(MakeSysCall(f.arena, "$fopen",
-                           {MkStr(f.arena, path.c_str()), MkStr(f.arena, "wb")}),
-               f.ctx, f.arena)
+      EvalExpr(
+          MakeSysCall(f.arena, "$fopen",
+                      {MkStr(f.arena, path.c_str()), MkStr(f.arena, "wb")}),
+          f.ctx, f.arena)
           .ToUint64();
   EXPECT_NE(write_fd, 0u);
   EvalExpr(MakeSysCall(f.arena, "$fclose", {MakeInt(f.arena, write_fd)}), f.ctx,
            f.arena);
 
   auto read_fd =
-      EvalExpr(MakeSysCall(f.arena, "$fopen",
-                           {MkStr(f.arena, path.c_str()), MkStr(f.arena, "rb")}),
-               f.ctx, f.arena)
+      EvalExpr(
+          MakeSysCall(f.arena, "$fopen",
+                      {MkStr(f.arena, path.c_str()), MkStr(f.arena, "rb")}),
+          f.ctx, f.arena)
           .ToUint64();
   EXPECT_NE(read_fd, 0u);
   EvalExpr(MakeSysCall(f.arena, "$fclose", {MakeInt(f.arena, read_fd)}), f.ctx,
@@ -201,13 +200,13 @@ TEST(IoSystemTaskTest, FopenAcceptsEveryTable21_6Mode) {
     std::ofstream seed(path);
     seed << "seed\n";
   }
-  for (const char* mode :
-       {"r", "rb", "w", "wb", "a", "ab", "r+", "r+b", "rb+", "w+", "w+b", "wb+",
-        "a+", "a+b", "ab+"}) {
+  for (const char* mode : {"r", "rb", "w", "wb", "a", "ab", "r+", "r+b", "rb+",
+                           "w+", "w+b", "wb+", "a+", "a+b", "ab+"}) {
     auto fd =
-        EvalExpr(MakeSysCall(f.arena, "$fopen",
-                             {MkStr(f.arena, path.c_str()), MkStr(f.arena, mode)}),
-                 f.ctx, f.arena)
+        EvalExpr(
+            MakeSysCall(f.arena, "$fopen",
+                        {MkStr(f.arena, path.c_str()), MkStr(f.arena, mode)}),
+            f.ctx, f.arena)
             .ToUint64();
     EXPECT_NE(fd, 0u) << "mode=" << mode;
     EXPECT_NE(fd & 0x80000000u, 0u) << "mode=" << mode;
@@ -229,15 +228,17 @@ TEST(IoSystemTaskTest, FopenReturnValueIsThirtyTwoBits) {
                            {MkStr(f.arena, path.c_str()), MkStr(f.arena, "w")}),
                f.ctx, f.arena);
   EXPECT_EQ(vec_fd.width, 32u);
-  EvalExpr(MakeSysCall(f.arena, "$fclose", {MakeInt(f.arena, vec_fd.ToUint64())}),
-           f.ctx, f.arena);
+  EvalExpr(
+      MakeSysCall(f.arena, "$fclose", {MakeInt(f.arena, vec_fd.ToUint64())}),
+      f.ctx, f.arena);
 
   auto vec_mcd =
       EvalExpr(MakeSysCall(f.arena, "$fopen", {MkStr(f.arena, path.c_str())}),
                f.ctx, f.arena);
   EXPECT_EQ(vec_mcd.width, 32u);
-  EvalExpr(MakeSysCall(f.arena, "$fclose", {MakeInt(f.arena, vec_mcd.ToUint64())}),
-           f.ctx, f.arena);
+  EvalExpr(
+      MakeSysCall(f.arena, "$fclose", {MakeInt(f.arena, vec_mcd.ToUint64())}),
+      f.ctx, f.arena);
   std::remove(path.c_str());
 }
 
@@ -250,9 +251,9 @@ TEST(IoSystemTaskTest, StdoutFdIsWritable) {
   EXPECT_NE(f.ctx.GetFileHandle(SimContext::kStdoutFd), nullptr);
   EXPECT_NE(f.ctx.GetFileHandle(SimContext::kStderrFd), nullptr);
   // $fdisplay to STDOUT must not crash and must not allocate a new fd slot.
-  EvalExpr(MakeSysCall(f.arena, "$fdisplay",
-                       {MakeInt(f.arena, SimContext::kStdoutFd),
-                        MkStr(f.arena, "")}),
+  EvalExpr(MakeSysCall(
+               f.arena, "$fdisplay",
+               {MakeInt(f.arena, SimContext::kStdoutFd), MkStr(f.arena, "")}),
            f.ctx, f.arena);
   // Reopening STDOUT-adjacent slots after writing must still succeed: the
   // reserved descriptors do not consume the user-allocatable channel range.
@@ -282,9 +283,9 @@ TEST(IoSystemTaskTest, FcloseDoesNotInvalidateReservedStdio) {
   EvalExpr(MakeSysCall(f.arena, "$fclose",
                        {MakeInt(f.arena, SimContext::kStderrFd)}),
            f.ctx, f.arena);
-  EvalExpr(MakeSysCall(f.arena, "$fclose",
-                       {MakeInt(f.arena, SimContext::kStdinFd)}),
-           f.ctx, f.arena);
+  EvalExpr(
+      MakeSysCall(f.arena, "$fclose", {MakeInt(f.arena, SimContext::kStdinFd)}),
+      f.ctx, f.arena);
   EXPECT_NE(f.ctx.GetFileHandle(SimContext::kStdoutFd), nullptr);
   EXPECT_NE(f.ctx.GetFileHandle(SimContext::kStderrFd), nullptr);
   EXPECT_NE(f.ctx.GetFileHandle(SimContext::kStdinFd), nullptr);
@@ -297,7 +298,10 @@ TEST(IoSystemTaskTest, FcloseDoesNotInvalidateReservedStdio) {
 TEST(IoSystemTaskTest, FopenAcceptsIntegralCharacterStringForFilename) {
   SimFixture f;
   const std::string path = "/tmp/x";
-  { std::ofstream seed(path); seed << "ok\n"; }
+  {
+    std::ofstream seed(path);
+    seed << "ok\n";
+  }
 
   auto* fname_var = f.ctx.CreateVariable("fname", 48);
   uint64_t packed = 0;
@@ -309,8 +313,7 @@ TEST(IoSystemTaskTest, FopenAcceptsIntegralCharacterStringForFilename) {
   fname_var->value = MakeLogic4VecVal(f.arena, 48, packed);
 
   auto* mode_var = f.ctx.CreateVariable("mode", 8);
-  mode_var->value =
-      MakeLogic4VecVal(f.arena, 8, static_cast<uint64_t>('r'));
+  mode_var->value = MakeLogic4VecVal(f.arena, 8, static_cast<uint64_t>('r'));
 
   auto* open_expr = MakeSysCall(
       f.arena, "$fopen", {MakeId(f.arena, "fname"), MakeId(f.arena, "mode")});
@@ -374,4 +377,4 @@ TEST(IoSystemTaskTest, FmonitorAndFstrobeCancelledOnClose) {
   std::remove(path.c_str());
 }
 
-}
+}  // namespace

@@ -78,23 +78,23 @@ TEST(BindDirective, FormTwoBindsOnlyToSpecifiedInstance) {
 }
 
 TEST(BindDirective, InterfaceTargetWithInterfaceInstantiationAllowed) {
-  EXPECT_TRUE(ElabOk(
-      "interface sub; endinterface\n"
-      "interface ifc; endinterface\n"
-      "module top;\n"
-      "  ifc i();\n"
-      "endmodule\n"
-      "bind ifc sub s();\n"));
+  EXPECT_TRUE(
+      ElabOk("interface sub; endinterface\n"
+             "interface ifc; endinterface\n"
+             "module top;\n"
+             "  ifc i();\n"
+             "endmodule\n"
+             "bind ifc sub s();\n"));
 }
 
 TEST(BindDirective, InterfaceTargetWithCheckerInstantiationAllowed) {
-  EXPECT_TRUE(ElabOk(
-      "checker chk; endchecker\n"
-      "interface ifc; endinterface\n"
-      "module top;\n"
-      "  ifc i();\n"
-      "endmodule\n"
-      "bind ifc chk c();\n"));
+  EXPECT_TRUE(
+      ElabOk("checker chk; endchecker\n"
+             "interface ifc; endinterface\n"
+             "module top;\n"
+             "  ifc i();\n"
+             "endmodule\n"
+             "bind ifc chk c();\n"));
 }
 
 TEST(BindDirective, InterfaceTargetWithModuleInstantiationIsError) {
@@ -232,15 +232,15 @@ TEST(BindDirective, UnitScopeDeclarationsNotVisibleInBindStatement) {
 }
 
 TEST(BindDirective, MultipleBindsIntoSameTargetScopeAllowed) {
-  EXPECT_TRUE(ElabOk(
-      "module probe_a; endmodule\n"
-      "module probe_b; endmodule\n"
-      "module cpu; endmodule\n"
-      "module top;\n"
-      "  cpu c();\n"
-      "endmodule\n"
-      "bind cpu probe_a pa();\n"
-      "bind cpu probe_b pb();\n"));
+  EXPECT_TRUE(
+      ElabOk("module probe_a; endmodule\n"
+             "module probe_b; endmodule\n"
+             "module cpu; endmodule\n"
+             "module top;\n"
+             "  cpu c();\n"
+             "endmodule\n"
+             "bind cpu probe_a pa();\n"
+             "bind cpu probe_b pb();\n"));
 }
 
 TEST(BindDirective, ElaborationOrderOfMultipleBindsIsInsignificant) {
@@ -337,4 +337,4 @@ TEST(BindDirective, SecondFormUnknownInstancePathIsError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-}
+}  // namespace

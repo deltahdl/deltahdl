@@ -59,4 +59,4 @@ TEST(ApplyPulseControlOverride, PathSpecificOverrideTakesPrecedence) {
   }
 }
 
-}
+}  // namespace

@@ -100,9 +100,7 @@ class Scheduler {
     return illegal_postponed_write_count_;
   }
 
-  size_t IllegalObservedPliCount() const {
-    return illegal_observed_pli_count_;
-  }
+  size_t IllegalObservedPliCount() const { return illegal_observed_pli_count_; }
 
   // §4.4.3.5: the Pre-Observed region is read-only - it is illegal to schedule
   // an event into the current time slot or to write a net or variable from
@@ -189,4 +187,4 @@ class Scheduler {
   bool stop_requested_ = false;
 };
 
-}
+}  // namespace delta

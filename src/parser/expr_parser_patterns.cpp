@@ -56,7 +56,6 @@ void Parser::ParseInsideRangeList(std::vector<Expr*>& out) {
 }
 
 Expr* Parser::ParseInsideValueRange() {
-
   if (!Check(TokenKind::kLBracket)) return ParseExpr();
   Consume();
   auto* lo = ParseExpr();
@@ -79,4 +78,4 @@ Expr* Parser::ParseInsideValueRange() {
   return range;
 }
 
-}
+}  // namespace delta

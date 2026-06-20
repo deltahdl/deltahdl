@@ -30,10 +30,10 @@ class Attribute : public ::testing::Test {
   VpiContext ctx_;
 };
 
-// Diagram edge (vpiParent): an attribute reaches the design object it is attached
-// to. The owning object is one of the many kinds the figure lists; here a net
-// carries the attribute, and VpiHandleC(vpiParent, ...) reaches that net rather
-// than some other null result.
+// Diagram edge (vpiParent): an attribute reaches the design object it is
+// attached to. The owning object is one of the many kinds the figure lists;
+// here a net carries the attribute, and VpiHandleC(vpiParent, ...) reaches that
+// net rather than some other null result.
 TEST_F(Attribute, ParentReachesTheOwningObject) {
   VpiObject owning_net;
   owning_net.type = vpiNet;
@@ -57,8 +57,8 @@ TEST_F(Attribute, NameReportsTheAttributeName) {
 
 // Figure property (-> On definition): an attribute reports through
 // vpi_get(vpiDefAttribute) whether it was specified on a definition rather than
-// on an instance, as 1 when on a definition and 0 otherwise. Driving both states
-// exercises the production code reading the stored Boolean.
+// on an instance, as 1 when on a definition and 0 otherwise. Driving both
+// states exercises the production code reading the stored Boolean.
 TEST_F(Attribute, OnDefinitionFlagReportedThroughVpiGet) {
   VpiObject on_definition;
   on_definition.type = vpiAttribute;
@@ -73,17 +73,18 @@ TEST_F(Attribute, OnDefinitionFlagReportedThroughVpiGet) {
 
 // Figure property guard: vpiDefAttribute is drawn only on the attribute object,
 // so querying it on any other object kind is not a valid request and the
-// production guard returns vpiUndefined rather than handing back a stored field.
+// production guard returns vpiUndefined rather than handing back a stored
+// field.
 TEST_F(Attribute, OnDefinitionFlagIsUndefinedForNonAttribute) {
   VpiObject not_an_attribute;
   not_an_attribute.type = vpiNet;
   EXPECT_EQ(vpi_get(vpiDefAttribute, &not_an_attribute), vpiUndefined);
 }
 
-// Figure property (-> definition location, file): an attribute reports the source
-// file of its definition through vpi_get_str(vpiDefFile). An attribute with no
-// recorded definition file yields null rather than an empty string - the
-// empty-name branch distinct from the wrong-kind guard.
+// Figure property (-> definition location, file): an attribute reports the
+// source file of its definition through vpi_get_str(vpiDefFile). An attribute
+// with no recorded definition file yields null rather than an empty string -
+// the empty-name branch distinct from the wrong-kind guard.
 TEST_F(Attribute, DefinitionFileReportedThroughVpiGetStr) {
   VpiObject attr;
   attr.type = vpiAttribute;
@@ -95,8 +96,8 @@ TEST_F(Attribute, DefinitionFileReportedThroughVpiGetStr) {
   EXPECT_EQ(vpi_get_str(vpiDefFile, &no_file), nullptr);
 }
 
-// Figure property (-> definition location, line): an attribute reports the source
-// line of its definition through vpi_get(vpiDefLineNo).
+// Figure property (-> definition location, line): an attribute reports the
+// source line of its definition through vpi_get(vpiDefLineNo).
 TEST_F(Attribute, DefinitionLineReportedThroughVpiGet) {
   VpiObject attr;
   attr.type = vpiAttribute;
@@ -104,10 +105,10 @@ TEST_F(Attribute, DefinitionLineReportedThroughVpiGet) {
   EXPECT_EQ(vpi_get(vpiDefLineNo, &attr), 42);
 }
 
-// Figure property guard: the definition-location properties are drawn only on the
-// attribute object, so querying them on any other object kind is not a valid
-// request - vpiDefFile yields null and vpiDefLineNo yields vpiUndefined through
-// the production guards rather than handing back stored fields.
+// Figure property guard: the definition-location properties are drawn only on
+// the attribute object, so querying them on any other object kind is not a
+// valid request - vpiDefFile yields null and vpiDefLineNo yields vpiUndefined
+// through the production guards rather than handing back stored fields.
 TEST_F(Attribute, DefinitionLocationPropertiesGuardedToAttribute) {
   VpiObject not_an_attribute;
   not_an_attribute.type = vpiModule;

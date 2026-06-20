@@ -136,4 +136,4 @@ TEST(StringLiteralExpressionsSim, WideVectorPaddingSpansMultipleWords) {
   EXPECT_EQ(var->value.words[1].aval, 0ULL);
 }
 
-}
+}  // namespace

@@ -346,4 +346,4 @@ TEST(FormatArg, UnknownSpecifierSurfacesAsLiteralPercent) {
   EXPECT_NE(out.find('%'), std::string::npos);
 }
 
-}
+}  // namespace

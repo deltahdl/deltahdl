@@ -149,4 +149,4 @@ TEST(ConditionalStatementSim, IfElseIfNoMatchNoElseRetainsValue) {
   EXPECT_EQ(var->value.ToUint64(), 77u);
 }
 
-}
+}  // namespace

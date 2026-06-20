@@ -162,8 +162,7 @@ TEST(ModuleItemsParsing, UdpInstantiation) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(
-      HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kUdpInst));
+  EXPECT_TRUE(HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kUdpInst));
 }
 
 // module_or_generate_item alternative: module_instantiation.
@@ -242,8 +241,7 @@ TEST(ModuleItemsParsing, NetAlias) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(
-      HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kAlias));
+  EXPECT_TRUE(HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kAlias));
 }
 
 // module_or_generate_item_declaration alternative:
@@ -356,8 +354,8 @@ TEST(ModuleItemsParsing, NestedModuleDeclaration) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item =
-      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kNestedModuleDecl);
+  auto* item = FindItemByKind(r.cu->modules[0]->items,
+                              ModuleItemKind::kNestedModuleDecl);
   ASSERT_NE(item, nullptr);
   ASSERT_NE(item->nested_module_decl, nullptr);
   EXPECT_EQ(item->nested_module_decl->decl_kind, ModuleDeclKind::kModule);
@@ -373,8 +371,8 @@ TEST(ModuleItemsParsing, NestedInterfaceDeclaration) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item =
-      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kNestedModuleDecl);
+  auto* item = FindItemByKind(r.cu->modules[0]->items,
+                              ModuleItemKind::kNestedModuleDecl);
   ASSERT_NE(item, nullptr);
   ASSERT_NE(item->nested_module_decl, nullptr);
   EXPECT_EQ(item->nested_module_decl->decl_kind, ModuleDeclKind::kInterface);
@@ -389,8 +387,8 @@ TEST(ModuleItemsParsing, NestedProgramDeclaration) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item =
-      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kNestedModuleDecl);
+  auto* item = FindItemByKind(r.cu->modules[0]->items,
+                              ModuleItemKind::kNestedModuleDecl);
   ASSERT_NE(item, nullptr);
   ASSERT_NE(item->nested_module_decl, nullptr);
   EXPECT_EQ(item->nested_module_decl->decl_kind, ModuleDeclKind::kProgram);
@@ -516,4 +514,4 @@ TEST(ModuleItemsParsing, ErrorTimeunitMissingSemicolon) {
   EXPECT_TRUE(r.has_errors);
 }
 
-}
+}  // namespace

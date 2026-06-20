@@ -49,8 +49,9 @@ TEST(SvDpi, ScalarCodesAreDistinct) {
   }
 }
 
-// Edge case: every canonical code survives a round trip through svScalar with no
-// truncation, since the carrier is the type used to pass scalars across the DPI.
+// Edge case: every canonical code survives a round trip through svScalar with
+// no truncation, since the carrier is the type used to pass scalars across the
+// DPI.
 TEST(SvDpi, AllScalarCodesRoundTripThroughCarrier) {
   const int codes[] = {sv_0, sv_1, sv_z, sv_x};
   for (int code : codes) {
@@ -59,4 +60,4 @@ TEST(SvDpi, AllScalarCodesRoundTripThroughCarrier) {
   }
 }
 
-}
+}  // namespace

@@ -9,7 +9,8 @@ namespace {
 // is available as a specify terminal. The parser splits the qualified terminal
 // into interface name and signal name. The same terminal parse serves source,
 // destination, and timing-check positions, so one observer covers the rule.
-TEST(SpecifyInterfaceTerminalParsing, InterfaceSignalSplitsIntoInterfaceAndName) {
+TEST(SpecifyInterfaceTerminalParsing,
+     InterfaceSignalSplitsIntoInterfaceAndName) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -25,4 +26,4 @@ TEST(SpecifyInterfaceTerminalParsing, InterfaceSignalSplitsIntoInterfaceAndName)
   EXPECT_EQ(si->path.src_ports[0].name, "sig");
 }
 
-}
+}  // namespace

@@ -79,4 +79,4 @@ TEST(ConstraintDistParsing, MultipleDefaultsRejected) {
   EXPECT_TRUE(r.has_errors);
 }
 
-}
+}  // namespace

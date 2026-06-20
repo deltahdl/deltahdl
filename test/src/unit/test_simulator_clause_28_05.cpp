@@ -71,10 +71,12 @@ static ResolvedBit ReadResolvedBit(SimFixture& f, std::string_view name) {
 }
 
 static RtlirDesign* ElaborateBufNot(SimFixture& f, const std::string& body) {
-  return ElaborateSrc("module m;\n"
-                      "  reg a;\n"
-                      "  wire y;\n" +
-                      body + "endmodule\n", f);
+  return ElaborateSrc(
+      "module m;\n"
+      "  reg a;\n"
+      "  wire y;\n" +
+          body + "endmodule\n",
+      f);
 }
 
 TEST(BufNotSimulation, ProductionBufPassesZeroToOutput) {
@@ -155,7 +157,8 @@ TEST(BufNotSimulation, ProductionNotDrivesUnknownForHighImpedanceInput) {
 TEST(BufNotSimulation, ProductionBufRisingOutputUsesFirstDelaySlot) {
   SimFixture f;
   auto* design = ElaborateBufNot(
-      f, "  buf #(4, 9) g(y, a);\n  initial begin a = 1'b0; #3 a = 1'b1; end\n");
+      f,
+      "  buf #(4, 9) g(y, a);\n  initial begin a = 1'b0; #3 a = 1'b1; end\n");
   ASSERT_NE(design, nullptr);
   LowerAndRun(design, f);
   EXPECT_EQ(f.scheduler.CurrentTime().ticks, 7u);
@@ -167,7 +170,8 @@ TEST(BufNotSimulation, ProductionBufRisingOutputUsesFirstDelaySlot) {
 TEST(BufNotSimulation, ProductionNotFallingOutputUsesSecondDelaySlot) {
   SimFixture f;
   auto* design = ElaborateBufNot(
-      f, "  not #(4, 9) g(y, a);\n  initial begin a = 1'b0; #3 a = 1'b1; end\n");
+      f,
+      "  not #(4, 9) g(y, a);\n  initial begin a = 1'b0; #3 a = 1'b1; end\n");
   ASSERT_NE(design, nullptr);
   LowerAndRun(design, f);
   EXPECT_EQ(f.scheduler.CurrentTime().ticks, 12u);
@@ -200,4 +204,4 @@ TEST(BufNotSimulation, ProductionNoDelaySpecHasZeroPropagationDelay) {
   EXPECT_EQ(b.bval, 0u);
 }
 
-}
+}  // namespace

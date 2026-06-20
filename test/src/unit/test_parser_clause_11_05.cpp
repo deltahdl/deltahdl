@@ -274,7 +274,8 @@ TEST(OperatorAndExpressionParsing, ParenthesizedPrimaryIsNotSimpleOperand) {
   EXPECT_FALSE(IsSimpleOperand(rhs));
 }
 
-TEST(OperatorAndExpressionParsing, LrmExampleSubExpressionsAreNotSimpleOperands) {
+TEST(OperatorAndExpressionParsing,
+     LrmExampleSubExpressionsAreNotSimpleOperands) {
   auto r = Parse(
       "module t;\n"
       "  initial x = 1'b1 - 2'b00 + (1'b1 + 1'b1);\n"
@@ -359,4 +360,4 @@ TEST(OperatorAndExpressionParsing, SimpleOperandSystemFunctionCallPrimary) {
   EXPECT_TRUE(IsSimpleOperand(rhs));
 }
 
-}
+}  // namespace

@@ -19,4 +19,4 @@ struct SourceRange {
   SourceLoc end;
 };
 
-}
+}  // namespace delta

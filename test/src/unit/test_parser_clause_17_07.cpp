@@ -39,10 +39,10 @@ TEST(CheckerVariables, PlainCheckerVariableIsNotRand) {
 // §17.7: a free variable declaration may additionally carry a const qualifier,
 // producing a constant free variable.
 TEST(CheckerVariables, ConstFreeVariableParses) {
-  EXPECT_TRUE(ParseOk(
-      "checker chk;\n"
-      "  rand const bit [5:0] idx;\n"
-      "endchecker\n"));
+  EXPECT_TRUE(
+      ParseOk("checker chk;\n"
+              "  rand const bit [5:0] idx;\n"
+              "endchecker\n"));
 }
 
-}
+}  // namespace

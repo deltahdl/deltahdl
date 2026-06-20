@@ -13,18 +13,18 @@
 namespace delta {
 namespace {
 
-// §38.36.1.3 ("Registering callbacks on module-wide basis") states three things.
-// (1) Passing a handle to a module instance in the obj field of the s_cb_data
-// structure places a cbStmt callback on every statement in the module that can
-// have one. (2) The call returns a single callback object that can be passed to
-// vpi_remove_cb() to remove the callback on every statement in the module
-// instance at once. (3) Statements that reside in protected portions of the code
-// shall not have callbacks placed on them. These tests build a module instance,
-// register a cbStmt callback against it, and observe vpi_register_cb()/
-// DispatchCallbacks()/RemoveCb() applying those rules.
+// §38.36.1.3 ("Registering callbacks on module-wide basis") states three
+// things. (1) Passing a handle to a module instance in the obj field of the
+// s_cb_data structure places a cbStmt callback on every statement in the module
+// that can have one. (2) The call returns a single callback object that can be
+// passed to vpi_remove_cb() to remove the callback on every statement in the
+// module instance at once. (3) Statements that reside in protected portions of
+// the code shall not have callbacks placed on them. These tests build a module
+// instance, register a cbStmt callback against it, and observe
+// vpi_register_cb()/ DispatchCallbacks()/RemoveCb() applying those rules.
 
-// Records the obj field of each s_cb_data the simulator hands to the routine, so
-// a test can confirm which statements the module-wide callback fired on.
+// Records the obj field of each s_cb_data the simulator hands to the routine,
+// so a test can confirm which statements the module-wide callback fired on.
 int g_calls = 0;
 std::vector<vpiHandle> g_objs;
 
@@ -48,8 +48,8 @@ class VpiModuleWideCallback : public ::testing::Test {
   void TearDown() override { SetGlobalVpiContext(nullptr); }
 
   // Build a statement object of the given VPI type, parented under `module` as
-  // one of its children. `protect` marks the statement as residing in a protected
-  // portion of the code.
+  // one of its children. `protect` marks the statement as residing in a
+  // protected portion of the code.
   vpiHandle AddStmt(vpiHandle module, const char* name, int type,
                     bool protect = false) {
     vpiHandle h = vpi_ctx_.CreateModule(name, name);
@@ -77,9 +77,9 @@ class VpiModuleWideCallback : public ::testing::Test {
 };
 
 // §38.36.1.3: a handle to a module instance in obj places a callback on every
-// statement in the module that can have one. Registering once against the module
-// and dispatching cbStmt fires the routine on each statement - including one
-// nested inside a block - and never on the module itself.
+// statement in the module that can have one. Registering once against the
+// module and dispatching cbStmt fires the routine on each statement - including
+// one nested inside a block - and never on the module itself.
 TEST_F(VpiModuleWideCallback, PlacesCallbackOnEveryStatementIncludingNested) {
   vpiHandle module = vpi_ctx_.CreateModule("m", "m");
   vpiHandle flat = AddStmt(module, "m.a", vpiAssignment);
@@ -112,9 +112,9 @@ TEST_F(VpiModuleWideCallback, NonStatementChildrenGetNoCallback) {
   EXPECT_FALSE(Fired(net));
 }
 
-// §38.36.1.3: statements that reside in protected portions of the code shall not
-// have callbacks placed on them. A protected statement in the module is skipped,
-// while an unprotected sibling still fires.
+// §38.36.1.3: statements that reside in protected portions of the code shall
+// not have callbacks placed on them. A protected statement in the module is
+// skipped, while an unprotected sibling still fires.
 TEST_F(VpiModuleWideCallback, ProtectedStatementsGetNoCallback) {
   vpiHandle module = vpi_ctx_.CreateModule("m", "m");
   vpiHandle open = AddStmt(module, "m.open", vpiAssignment, /*protect=*/false);
@@ -129,8 +129,8 @@ TEST_F(VpiModuleWideCallback, ProtectedStatementsGetNoCallback) {
 }
 
 // §38.36.1.3: module-wide registration applies to the module instance. The walk
-// does not cross into a nested module instance, which owns its own statements; a
-// statement inside the sub-instance does not fire.
+// does not cross into a nested module instance, which owns its own statements;
+// a statement inside the sub-instance does not fire.
 TEST_F(VpiModuleWideCallback, NestedModuleInstanceIsNotReached) {
   vpiHandle module = vpi_ctx_.CreateModule("m", "m");
   vpiHandle own = AddStmt(module, "m.s", vpiAssignment);
@@ -146,11 +146,11 @@ TEST_F(VpiModuleWideCallback, NestedModuleInstanceIsNotReached) {
   EXPECT_FALSE(Fired(subStmt));
 }
 
-// §38.36.1.3: "every statement that can have a callback" is the empty set when a
-// module instance holds no eligible statements. Registration still yields a
-// single callback object, but dispatching cbStmt fires nothing - the module-wide
-// record is consumed by the fan-out and never delivers a callback on the module
-// itself.
+// §38.36.1.3: "every statement that can have a callback" is the empty set when
+// a module instance holds no eligible statements. Registration still yields a
+// single callback object, but dispatching cbStmt fires nothing - the
+// module-wide record is consumed by the fan-out and never delivers a callback
+// on the module itself.
 TEST_F(VpiModuleWideCallback, ModuleWithNoStatementsFiresNothing) {
   vpiHandle module = vpi_ctx_.CreateModule("m", "m");
 

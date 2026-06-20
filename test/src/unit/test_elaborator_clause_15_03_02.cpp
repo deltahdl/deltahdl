@@ -48,4 +48,4 @@ TEST(SemaphorePutElaborator, MultiplePutCalls) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

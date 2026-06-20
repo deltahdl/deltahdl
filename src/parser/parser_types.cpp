@@ -251,7 +251,6 @@ static void ApplyNetInfo(DataType& inner, const DataType& net) {
 }
 
 bool Parser::TryParseNetDataType(DataType& dtype, bool has_intervening) {
-
   if (!has_intervening && CurrentToken().kind == TokenKind::kKwReg) {
     diag_.Error(CurrentLoc(),
                 "net type keyword shall not be followed directly by 'reg'");
@@ -371,7 +370,6 @@ void Parser::ParseUnpackedDims(std::vector<Expr*>& dims) {
       continue;
     }
     if (Match(TokenKind::kDollar)) {
-
       auto* dim = arena_.Create<Expr>();
       dim->kind = ExprKind::kIdentifier;
       dim->text = "$";
@@ -383,7 +381,6 @@ void Parser::ParseUnpackedDims(std::vector<Expr*>& dims) {
       continue;
     }
     if (Match(TokenKind::kStar)) {
-
       auto* dim = arena_.Create<Expr>();
       dim->kind = ExprKind::kIdentifier;
       dim->text = "*";
@@ -444,9 +441,8 @@ void Parser::ParseVarDeclList(std::vector<ModuleItem*>& items,
   Expect(TokenKind::kSemicolon);
 }
 
-void Parser::ParseTypeParamDecl(std::vector<ModuleItem*>& items,
-                                SourceLoc loc, bool localparam) {
-
+void Parser::ParseTypeParamDecl(std::vector<ModuleItem*>& items, SourceLoc loc,
+                                bool localparam) {
   DataTypeKind fwd = DataTypeKind::kImplicit;
   if (Check(TokenKind::kKwEnum) || Check(TokenKind::kKwStruct) ||
       Check(TokenKind::kKwUnion) || Check(TokenKind::kKwClass) ||
@@ -455,10 +451,14 @@ void Parser::ParseTypeParamDecl(std::vector<ModuleItem*>& items,
       Expect(TokenKind::kKwClass);
       fwd = DataTypeKind::kVoid;
     } else {
-      if (Check(TokenKind::kKwEnum)) fwd = DataTypeKind::kEnum;
-      else if (Check(TokenKind::kKwStruct)) fwd = DataTypeKind::kStruct;
-      else if (Check(TokenKind::kKwUnion)) fwd = DataTypeKind::kUnion;
-      else if (Check(TokenKind::kKwClass)) fwd = DataTypeKind::kNamed;
+      if (Check(TokenKind::kKwEnum))
+        fwd = DataTypeKind::kEnum;
+      else if (Check(TokenKind::kKwStruct))
+        fwd = DataTypeKind::kStruct;
+      else if (Check(TokenKind::kKwUnion))
+        fwd = DataTypeKind::kUnion;
+      else if (Check(TokenKind::kKwClass))
+        fwd = DataTypeKind::kNamed;
       Consume();
     }
   }
@@ -550,4 +550,4 @@ bool Parser::TryParseTypeRef(std::vector<ModuleItem*>& items) {
   return true;
 }
 
-}
+}  // namespace delta

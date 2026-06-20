@@ -26,4 +26,4 @@ class UdpEvalState {
   std::vector<char> prev_inputs_;
 };
 
-}
+}  // namespace delta

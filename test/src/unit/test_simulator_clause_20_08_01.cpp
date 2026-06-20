@@ -156,4 +156,4 @@ TEST(UtilitySystemTaskTest, Clog2WideVectorArgument) {
   EXPECT_EQ(var->value.ToUint64(), 34u);
 }
 
-}
+}  // namespace

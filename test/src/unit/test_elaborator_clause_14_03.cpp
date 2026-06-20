@@ -115,4 +115,4 @@ TEST(ClockingBlockElab, ClockingBlockNegedgeEventElaborates) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

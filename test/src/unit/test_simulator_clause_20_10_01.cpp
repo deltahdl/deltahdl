@@ -48,4 +48,4 @@ TEST(ElabSeverityTaskSim, WarningDoesNotBlockLowering) {
   EXPECT_EQ(var->value.ToUint64(), 9u);
 }
 
-}
+}  // namespace

@@ -170,4 +170,4 @@ TEST(InterfaceClassPartialImplementation, VirtualClassAllMethodsImplOk) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

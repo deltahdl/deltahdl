@@ -82,4 +82,4 @@ TEST(ScopeRulesElaboration, InstanceNamePrecedenceOverModuleTypeName) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

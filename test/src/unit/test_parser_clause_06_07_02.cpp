@@ -81,4 +81,4 @@ TEST(DataTypeParsing, NettypeNetWithUnpackedDims) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}
+}  // namespace

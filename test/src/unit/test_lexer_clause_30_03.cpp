@@ -35,4 +35,4 @@ TEST(SpecifyBlockDeclLexing, EndspecifyPrefixIsIdentifier) {
   EXPECT_NE(tokens[0].kind, TokenKind::kKwEndspecify);
 }
 
-}
+}  // namespace

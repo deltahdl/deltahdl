@@ -41,4 +41,4 @@ TEST(VoidDataType, VoidFunctionWithArgs) {
   ASSERT_EQ(item->func_args.size(), 1u);
 }
 
-}
+}  // namespace

@@ -157,4 +157,4 @@ TEST(ConstExprElab, NoDefaultParamBlocksTopElaboration) {
   EXPECT_TRUE(f.has_errors);
 }
 
-}
+}  // namespace

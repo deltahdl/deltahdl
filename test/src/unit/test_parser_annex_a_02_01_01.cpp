@@ -193,8 +193,8 @@ TEST(ParameterDeclParsing, TypeParamForwardClass) {
 }
 
 TEST(ParameterDeclParsing, TypeParamForwardInterfaceClass) {
-  auto r = Parse(
-      "module m; parameter type interface class T = my_ic_t; endmodule");
+  auto r =
+      Parse("module m; parameter type interface class T = my_ic_t; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto* item = r.cu->modules[0]->items[0];
@@ -203,7 +203,6 @@ TEST(ParameterDeclParsing, TypeParamForwardInterfaceClass) {
 }
 
 TEST(ParameterDeclParsing, ErrorTypeParamWithoutDefault) {
-
   auto r = Parse("module m; parameter type T; endmodule");
   EXPECT_TRUE(r.has_errors);
 }
@@ -219,8 +218,7 @@ TEST(ParameterDeclParsing, ErrorSpecparamMissingSemicolon) {
 }
 
 TEST(ParameterDeclParsing, TypeParamCommaSeparatedList) {
-  auto r =
-      Parse("module m; parameter type T1 = int, T2 = real; endmodule");
+  auto r = Parse("module m; parameter type T1 = int, T2 = real; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   size_t param_count = 0;

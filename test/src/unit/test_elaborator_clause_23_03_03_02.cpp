@@ -16,8 +16,7 @@ TEST(PortConnectionRulesForVariablesElaboration,
              "endmodule\n"));
 }
 
-TEST(PortConnectionRulesForVariablesElaboration,
-     UnconnectedInputPortNoError) {
+TEST(PortConnectionRulesForVariablesElaboration, UnconnectedInputPortNoError) {
   EXPECT_TRUE(
       ElabOk("module child(input logic [7:0] a);\n"
              "endmodule\n"
@@ -48,8 +47,7 @@ TEST(PortConnectionRulesForVariablesElaboration,
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(PortConnectionRulesForVariablesElaboration,
-     OutputPortConnectsToVariable) {
+TEST(PortConnectionRulesForVariablesElaboration, OutputPortConnectsToVariable) {
   EXPECT_TRUE(
       ElabOk("module child(output logic [7:0] y);\n"
              "  assign y = 8'hAB;\n"
@@ -148,7 +146,8 @@ TEST(PortConnectionRulesForVariablesElaboration,
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(PortConnectionRulesForVariablesElaboration, RefPortBindingHasRefDirection) {
+TEST(PortConnectionRulesForVariablesElaboration,
+     RefPortBindingHasRefDirection) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module child(ref logic [7:0] v);\n"
@@ -166,8 +165,7 @@ TEST(PortConnectionRulesForVariablesElaboration, RefPortBindingHasRefDirection) 
   EXPECT_EQ(bindings[0].direction, Direction::kRef);
 }
 
-TEST(PortConnectionRulesForVariablesElaboration,
-     RefPortConnectedToNetErrors) {
+TEST(PortConnectionRulesForVariablesElaboration, RefPortConnectedToNetErrors) {
   ElabFixture f;
   ElaborateSrc(
       "module child(ref logic [7:0] v);\n"
@@ -180,8 +178,7 @@ TEST(PortConnectionRulesForVariablesElaboration,
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(PortConnectionRulesForVariablesElaboration,
-     RefPortLeftUnconnectedErrors) {
+TEST(PortConnectionRulesForVariablesElaboration, RefPortLeftUnconnectedErrors) {
   ElabFixture f;
   ElaborateSrc(
       "module child(ref logic [7:0] v);\n"
@@ -225,4 +222,4 @@ TEST(PortConnectionRulesForVariablesElaboration,
   EXPECT_TRUE(f.has_errors);
 }
 
-}
+}  // namespace

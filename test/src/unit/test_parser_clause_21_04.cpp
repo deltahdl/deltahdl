@@ -48,4 +48,4 @@ TEST(IoSystemTaskParsing, ReadmemhWithStartAddrOnly) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

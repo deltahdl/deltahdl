@@ -96,4 +96,4 @@ TEST(LexicalConventionLexing, MultipleStrings) {
   EXPECT_EQ(tokens[1].text, "\"def\"");
 }
 
-}
+}  // namespace

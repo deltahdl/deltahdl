@@ -43,4 +43,4 @@ TEST(BitwiseOperatorLexing, UnaryNot) {
   EXPECT_EQ(tokens[1].kind, TokenKind::kIdentifier);
 }
 
-}
+}  // namespace

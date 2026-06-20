@@ -30,7 +30,8 @@ TEST(ModportExpressionElaboration, DuplicatePortIdInSameModportErrors) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(ModportExpressionElaboration, ConstantPortExpressionWithOutputDirectionErrors) {
+TEST(ModportExpressionElaboration,
+     ConstantPortExpressionWithOutputDirectionErrors) {
   ElabFixture f;
   ElaborateSrc(
       "interface I;\n"
@@ -43,7 +44,8 @@ TEST(ModportExpressionElaboration, ConstantPortExpressionWithOutputDirectionErro
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(ModportExpressionElaboration, ConstantPortExpressionWithInputDirectionAccepted) {
+TEST(ModportExpressionElaboration,
+     ConstantPortExpressionWithInputDirectionAccepted) {
   EXPECT_TRUE(
       ElabOk("interface I;\n"
              "  modport mp(input .P(2));\n"
@@ -53,7 +55,8 @@ TEST(ModportExpressionElaboration, ConstantPortExpressionWithInputDirectionAccep
              "endmodule\n"));
 }
 
-TEST(ModportExpressionElaboration, HierarchicalAccessThroughModportSelectsBoundExpression) {
+TEST(ModportExpressionElaboration,
+     HierarchicalAccessThroughModportSelectsBoundExpression) {
   EXPECT_TRUE(
       ElabOk("interface I;\n"
              "  logic [7:0] r;\n"
@@ -67,4 +70,4 @@ TEST(ModportExpressionElaboration, HierarchicalAccessThroughModportSelectsBoundE
              "endmodule\n"));
 }
 
-}
+}  // namespace

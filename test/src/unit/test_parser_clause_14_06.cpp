@@ -98,4 +98,4 @@ TEST(SignalMultiBlockParse, SameOutputSignalInTwoBlocks) {
   EXPECT_EQ(clocking_count, 2);
 }
 
-}
+}  // namespace

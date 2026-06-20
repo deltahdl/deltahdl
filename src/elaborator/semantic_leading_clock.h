@@ -25,11 +25,9 @@ using LeadingClockSet = std::set<std::string>;
 // clock); ##1 and ##0 keep the left operand's clock.
 SemanticLeadingClock SequenceLeadingClockOfBareSequence();
 SemanticLeadingClock SequenceLeadingClockAfterAtC(
-    std::string_view c,
-    const SemanticLeadingClock& inner);
+    std::string_view c, const SemanticLeadingClock& inner);
 SemanticLeadingClock SequenceLeadingClockOfDelay(
-    const SemanticLeadingClock& left,
-    const SemanticLeadingClock& /*right*/);
+    const SemanticLeadingClock& left, const SemanticLeadingClock& /*right*/);
 
 // §16.16.1 enumerates the property forms whose set of semantic leading
 // clocks is given by a piecewise rule. Each entry below names one form; the

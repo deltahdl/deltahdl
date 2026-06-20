@@ -82,4 +82,4 @@ TEST(PrePostRandomizePrototype, PostRandomizeTaskFormError) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

@@ -86,4 +86,4 @@ TEST(DelayElaboration, DelayValueOneStepElaborates) {
   EXPECT_EQ(mod->assigns[0].delay->text, "1step");
 }
 
-}
+}  // namespace

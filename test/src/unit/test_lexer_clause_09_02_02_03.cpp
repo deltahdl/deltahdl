@@ -12,4 +12,4 @@ TEST(AlwaysLatchLexing, AlwaysLatchKeyword) {
   EXPECT_EQ(r.token.text, "always_latch");
 }
 
-}
+}  // namespace

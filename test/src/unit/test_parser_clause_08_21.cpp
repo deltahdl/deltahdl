@@ -138,4 +138,4 @@ TEST(AbstractClassParsing, MultiplePureVirtualMethods) {
   EXPECT_TRUE(r.cu->classes[0]->members[1]->is_pure_virtual);
 }
 
-}
+}  // namespace

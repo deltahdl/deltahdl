@@ -185,4 +185,4 @@ TEST(StringLiteralSim, EscapeSeqUnknownDropsBackslash) {
   EXPECT_EQ(v, 0x62u);
 }
 
-}
+}  // namespace

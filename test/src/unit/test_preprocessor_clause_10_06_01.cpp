@@ -131,19 +131,18 @@ TEST(ProceduralAssignDeassignParsing, ProceduralAssignExpressionRhs) {
 }
 
 TEST(ProceduralAssignDeassignParsing, DFlipFlopClearPresetPattern) {
-  EXPECT_TRUE(
-      ParseWithPreprocessorOk(
-          "module dff(output reg q, input d, clear, preset, clock);\n"
-          "  always @(clear or preset)\n"
-          "    if (!clear)\n"
-          "      assign q = 0;\n"
-          "    else if (!preset)\n"
-          "      assign q = 1;\n"
-          "    else\n"
-          "      deassign q;\n"
-          "  always @(posedge clock)\n"
-          "    q <= d;\n"
-          "endmodule\n"));
+  EXPECT_TRUE(ParseWithPreprocessorOk(
+      "module dff(output reg q, input d, clear, preset, clock);\n"
+      "  always @(clear or preset)\n"
+      "    if (!clear)\n"
+      "      assign q = 0;\n"
+      "    else if (!preset)\n"
+      "      assign q = 1;\n"
+      "    else\n"
+      "      deassign q;\n"
+      "  always @(posedge clock)\n"
+      "    q <= d;\n"
+      "endmodule\n"));
 }
 
-}
+}  // namespace

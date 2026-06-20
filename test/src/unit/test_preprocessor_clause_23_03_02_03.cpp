@@ -5,7 +5,8 @@ using namespace delta;
 
 namespace {
 
-TEST(ImplicitNamedPortConnectionPreprocessing, ImplicitConnectionSurvivesPreprocessing) {
+TEST(ImplicitNamedPortConnectionPreprocessing,
+     ImplicitConnectionSurvivesPreprocessing) {
   auto r = ParseWithPreprocessor(
       "module child(input logic a, output logic b);\n"
       "  assign b = a;\n"
@@ -23,4 +24,4 @@ TEST(ImplicitNamedPortConnectionPreprocessing, ImplicitConnectionSurvivesPreproc
   EXPECT_EQ(inst->inst_ports[1].first, "b");
 }
 
-}
+}  // namespace

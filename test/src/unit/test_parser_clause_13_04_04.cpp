@@ -45,4 +45,4 @@ TEST(FunctionBackgroundProcessParsing, ForkJoinInFunction) {
   EXPECT_EQ(fork->join_kind, TokenKind::kKwJoin);
 }
 
-}
+}  // namespace

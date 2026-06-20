@@ -23,12 +23,11 @@ uint64_t RunQueueCall(SimFixture& f, std::string_view name,
 uint64_t Initialize(SimFixture& f, uint64_t q_id, int64_t q_type,
                     int64_t max_length) {
   MakeVar(f, "st", 32, 0xDEAD);
-  return RunQueueCall(f, "$q_initialize",
-                      {MkInt(f.arena, q_id),
-                       MkInt(f.arena, static_cast<uint64_t>(q_type)),
-                       MkInt(f.arena, static_cast<uint64_t>(max_length)),
-                       MkId(f.arena, "st")},
-                      "st");
+  return RunQueueCall(
+      f, "$q_initialize",
+      {MkInt(f.arena, q_id), MkInt(f.arena, static_cast<uint64_t>(q_type)),
+       MkInt(f.arena, static_cast<uint64_t>(max_length)), MkId(f.arena, "st")},
+      "st");
 }
 
 uint64_t Add(SimFixture& f, uint64_t q_id) {
@@ -123,13 +122,13 @@ TEST(StochasticQueueStatus, RemoveFromUndefinedQueue) {
 TEST(StochasticQueueStatus, FullReportsStatus) {
   SimFixture f;
   MakeVar(f, "st", 32, 0xDEAD);
-  EXPECT_EQ(RunQueueCall(f, "$q_full",
-                         {MkInt(f.arena, 3), MkId(f.arena, "st")}, "st"),
+  EXPECT_EQ(RunQueueCall(f, "$q_full", {MkInt(f.arena, 3), MkId(f.arena, "st")},
+                         "st"),
             2u);
   EXPECT_EQ(Initialize(f, 3, 1, 4), 0u);
   MakeVar(f, "st", 32, 0xDEAD);
-  EXPECT_EQ(RunQueueCall(f, "$q_full",
-                         {MkInt(f.arena, 3), MkId(f.arena, "st")}, "st"),
+  EXPECT_EQ(RunQueueCall(f, "$q_full", {MkInt(f.arena, 3), MkId(f.arena, "st")},
+                         "st"),
             0u);
 }
 

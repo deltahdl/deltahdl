@@ -278,4 +278,4 @@ TEST(ClockingSkewSim, DefaultSkewValues) {
   EXPECT_EQ(cmgr.GetOutputSkew("cb", "data").ticks, 0u);
 }
 
-}
+}  // namespace

@@ -78,7 +78,8 @@ TEST(AlwaysProcedureInCheckers, GeneralAlwaysOutsideCheckerIsStillAllowed) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(AlwaysProcedureInCheckers, GeneralAlwaysRejectedAlongsideAcceptedSpecializedForms) {
+TEST(AlwaysProcedureInCheckers,
+     GeneralAlwaysRejectedAlongsideAcceptedSpecializedForms) {
   // Integration: a checker mixing an accepted always_comb with a forbidden
   // general always is still rejected. The presence of valid specialized forms
   // does not suppress the general-always diagnostic.
@@ -93,4 +94,4 @@ TEST(AlwaysProcedureInCheckers, GeneralAlwaysRejectedAlongsideAcceptedSpecialize
   EXPECT_TRUE(f.has_errors);
 }
 
-}
+}  // namespace

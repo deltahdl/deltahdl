@@ -19,4 +19,4 @@ TEST(AggregateTypeParsing, QueueInsertMethod) {
   EXPECT_EQ(expr->kind, ExprKind::kCall);
 }
 
-}
+}  // namespace

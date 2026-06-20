@@ -5,42 +5,41 @@ using namespace delta;
 
 namespace {
 
-// Annex D.2: $countdrivers returns 1 to flag bus contention when a net is driven
-// by more than one driver. Two continuous assignments place two drivers on w.
+// Annex D.2: $countdrivers returns 1 to flag bus contention when a net is
+// driven by more than one driver. Two continuous assignments place two drivers
+// on w.
 TEST(OptionalCountDriversSim, MultipleDriversReportContention) {
-  EXPECT_EQ(RunAndGet(
-                "module t;\n"
-                "  wire w;\n"
-                "  logic a, b;\n"
-                "  integer n;\n"
-                "  assign w = a;\n"
-                "  assign w = b;\n"
-                "  initial begin\n"
-                "    a = 1; b = 0;\n"
-                "    #1;\n"
-                "    n = $countdrivers(w);\n"
-                "  end\n"
-                "endmodule\n",
-                "n"),
+  EXPECT_EQ(RunAndGet("module t;\n"
+                      "  wire w;\n"
+                      "  logic a, b;\n"
+                      "  integer n;\n"
+                      "  assign w = a;\n"
+                      "  assign w = b;\n"
+                      "  initial begin\n"
+                      "    a = 1; b = 0;\n"
+                      "    #1;\n"
+                      "    n = $countdrivers(w);\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "n"),
             1u);
 }
 
 // Annex D.2: $countdrivers returns 0 when the net has no more than one driver,
 // so a single continuous assignment is not contention.
 TEST(OptionalCountDriversSim, SingleDriverIsNotContention) {
-  EXPECT_EQ(RunAndGet(
-                "module t;\n"
-                "  wire w;\n"
-                "  logic a;\n"
-                "  integer n;\n"
-                "  assign w = a;\n"
-                "  initial begin\n"
-                "    a = 1;\n"
-                "    #1;\n"
-                "    n = $countdrivers(w);\n"
-                "  end\n"
-                "endmodule\n",
-                "n"),
+  EXPECT_EQ(RunAndGet("module t;\n"
+                      "  wire w;\n"
+                      "  logic a;\n"
+                      "  integer n;\n"
+                      "  assign w = a;\n"
+                      "  initial begin\n"
+                      "    a = 1;\n"
+                      "    #1;\n"
+                      "    n = $countdrivers(w);\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "n"),
             0u);
 }
 
@@ -63,8 +62,9 @@ TEST(OptionalCountDriversSim, OptionalArgsCarryTableD1Tallies) {
       "  end\n"
       "endmodule\n",
       f);
-  LowerRunAndCheck(f, design,
-                   {{"fc", 0u}, {"c01x", 2u}, {"c0", 1u}, {"c1", 1u}, {"cx", 0u}});
+  LowerRunAndCheck(
+      f, design,
+      {{"fc", 0u}, {"c01x", 2u}, {"c0", 1u}, {"c1", 1u}, {"cx", 0u}});
 }
 
 // Annex D.2 / Table D.1: a driver in the high-impedance (z) state is not
@@ -90,8 +90,8 @@ TEST(OptionalCountDriversSim, HighImpedanceExcludedAndXCounted) {
 
 // Annex D.2: the specified net may be a bit-select of a vector net, and the
 // count is taken on that selected bit. Two whole-vector drivers drive bit 0 the
-// same (contention) but only one of them actively drives bit 1 (the other is z),
-// so the same pair of drivers yields a different verdict per selected bit.
+// same (contention) but only one of them actively drives bit 1 (the other is
+// z), so the same pair of drivers yields a different verdict per selected bit.
 TEST(OptionalCountDriversSim, BitSelectOfVectorNetCountsSelectedBit) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -154,32 +154,27 @@ TEST(OptionalCountDriversSim, DriversInSameStateBothTallied) {
       "  end\n"
       "endmodule\n",
       f);
-  LowerRunAndCheck(f, design,
-                   {{"n", 1u},
-                    {"c01x", 2u},
-                    {"c0", 2u},
-                    {"c1", 0u},
-                    {"cx", 0u}});
+  LowerRunAndCheck(
+      f, design, {{"n", 1u}, {"c01x", 2u}, {"c0", 2u}, {"c1", 0u}, {"cx", 0u}});
 }
 
 // Annex D.2 / Table D.1: the net_is_forced output argument reports 1 once the
 // net has been forced.
 TEST(OptionalCountDriversSim, NetIsForcedReportedAfterForce) {
-  EXPECT_EQ(RunAndGet(
-                "module t;\n"
-                "  wire w;\n"
-                "  logic a;\n"
-                "  integer fc;\n"
-                "  assign w = a;\n"
-                "  initial begin\n"
-                "    a = 1;\n"
-                "    force w = 0;\n"
-                "    #1;\n"
-                "    $countdrivers(w, fc);\n"
-                "  end\n"
-                "endmodule\n",
-                "fc"),
+  EXPECT_EQ(RunAndGet("module t;\n"
+                      "  wire w;\n"
+                      "  logic a;\n"
+                      "  integer fc;\n"
+                      "  assign w = a;\n"
+                      "  initial begin\n"
+                      "    a = 1;\n"
+                      "    force w = 0;\n"
+                      "    #1;\n"
+                      "    $countdrivers(w, fc);\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "fc"),
             1u);
 }
 
-}
+}  // namespace

@@ -132,4 +132,4 @@ TEST(PackedArraySimulation, ByteCanBeSelectedAsPackedArray) {
   EXPECT_EQ(v, 0xAu);
 }
 
-}
+}  // namespace

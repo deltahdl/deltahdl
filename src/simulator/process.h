@@ -146,4 +146,4 @@ struct Process {
   }
 };
 
-}
+}  // namespace delta

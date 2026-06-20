@@ -30,4 +30,4 @@ TEST(ConstraintUniqueParsing, ArraySliceMemberAccepted) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}
+}  // namespace

@@ -59,4 +59,4 @@ TEST(SemaphoreParser, NoClassDeclarationRequired) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}
+}  // namespace

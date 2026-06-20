@@ -191,4 +191,4 @@ TEST(TernaryMatchesSim, FailedClauseSkipsLaterClauseEvaluation) {
   EXPECT_EQ(y->value.ToUint64(), 2u);
 }
 
-}
+}  // namespace

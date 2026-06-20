@@ -19,4 +19,4 @@ TEST(LevelSensitiveEventLexing, WaitFollowedByLParen) {
   EXPECT_EQ(tokens[1].kind, TokenKind::kLParen);
 }
 
-}
+}  // namespace

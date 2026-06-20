@@ -19,4 +19,4 @@ TEST(ScopeResolutionPrefixPreprocessing, ExpressionPrefixSurvives) {
   EXPECT_EQ(rhs->kind, ExprKind::kMemberAccess);
 }
 
-}
+}  // namespace

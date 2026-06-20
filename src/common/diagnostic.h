@@ -45,4 +45,4 @@ class DiagEngine {
   bool warnings_as_errors_ = false;
 };
 
-}
+}  // namespace delta

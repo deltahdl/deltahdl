@@ -6,8 +6,8 @@ namespace {
 
 // §23.10.2: a module instance parameter value assignment uses one of two forms,
 // assignment by ordered list or assignment by name. The two forms shall not be
-// mixed; the assignments for a particular instance shall be entirely by order or
-// entirely by name. The parser enforces this while reading the #(...) list.
+// mixed; the assignments for a particular instance shall be entirely by order
+// or entirely by name. The parser enforces this while reading the #(...) list.
 
 TEST(ModuleInstanceParameterValueAssignment, OrderedFollowedByNamedIsRejected) {
   auto r = Parse("module top; child #(8, .B(4)) u0(); endmodule\n");
@@ -37,4 +37,4 @@ TEST(ModuleInstanceParameterValueAssignment, EntirelyByNameIsAccepted) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}
+}  // namespace

@@ -101,4 +101,4 @@ TEST(CoverageWith, DistributeIntoZeroBins) {
   EXPECT_TRUE(bins.empty());
 }
 
-}
+}  // namespace

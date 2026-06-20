@@ -6,19 +6,20 @@
 namespace delta {
 namespace {
 
-// §37.6 Interface: the VPI object model for an interface. The diagram's property
-// and structural edges - the global and default clocking blocks
+// §37.6 Interface: the VPI object model for an interface. The diagram's
+// property and structural edges - the global and default clocking blocks
 // (vpiGlobalClocking, vpiDefaultClocking), the default disable iff
 // expr/distribution (vpiDefaultDisableIff), the instance array the interface
-// belongs to, and the one-to-many vpiInstance edges to the interface's interface
-// tf decls, modports, mod paths, cont assigns, clocking blocks, nested
-// interfaces, interface arrays, and processes - are walked by the generic
-// object-model machinery (vpi_handle / vpi_iterate) and carry no rule of their
-// own here.
+// belongs to, and the one-to-many vpiInstance edges to the interface's
+// interface tf decls, modports, mod paths, cont assigns, clocking blocks,
+// nested interfaces, interface arrays, and processes - are walked by the
+// generic object-model machinery (vpi_handle / vpi_iterate) and carry no rule
+// of their own here.
 //
 // The single numbered Detail carries this clause's own normative rule, observed
 // below through the public vpi_handle dispatch:
-//   D1 - vpiIndex from an interface reaches the index expression that locates it
+//   D1 - vpiIndex from an interface reaches the index expression that locates
+//   it
 //        within an instance array, or NULL when the interface is not an element
 //        of an instance array.
 
@@ -32,8 +33,8 @@ class Interface : public ::testing::Test {
   VpiContext vpi_ctx_;
 };
 
-// D1: vpiIndex from an interface that is an element of an instance array reaches
-// the index expression that locates it within the array.
+// D1: vpiIndex from an interface that is an element of an instance array
+// reaches the index expression that locates it within the array.
 TEST_F(Interface, IndexTransitionReachesArrayIndex) {
   VpiObject index_expr;
   index_expr.type = vpiConstant;
@@ -73,7 +74,7 @@ TEST_F(Interface, IndexTransitionIsNullForArrayElementWithoutIndexExpr) {
   VpiObject member;
   member.type = vpiInterface;
   member.array_member = true;
-  member.index_expr = nullptr;          // array element, but no index recorded
+  member.index_expr = nullptr;  // array element, but no index recorded
   member.children.push_back(&child_expr);  // must not be reported via vpiIndex
 
   EXPECT_EQ(VpiHandleC(vpiIndex, &member), nullptr);

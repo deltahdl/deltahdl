@@ -12,12 +12,12 @@ namespace {
 // event array, or a tf call - to the class var, virtual interface var, or
 // clocking block that prefixes it, and gives those source objects one property
 // edge, "-> has actual" (bool: vpiHasActual). The clause has three numbered
-// Details. Detail 1 fixes when vpiPrefix is non-NULL; detail 2 ties the object's
-// memory allocation scheme to a class-var/virtual-interface-var prefix; detail 3
-// fixes what vpiHasActual reports. A tf call's prefix is owned by §37.42, so
-// these tests cover only the source kinds and rules §37.61 defines, observing the
-// production code through the same-pipeline public dispatch (VpiHandleC and
-// vpi_get) and the clause's helpers.
+// Details. Detail 1 fixes when vpiPrefix is non-NULL; detail 2 ties the
+// object's memory allocation scheme to a class-var/virtual-interface-var
+// prefix; detail 3 fixes what vpiHasActual reports. A tf call's prefix is owned
+// by §37.42, so these tests cover only the source kinds and rules §37.61
+// defines, observing the production code through the same-pipeline public
+// dispatch (VpiHandleC and vpi_get) and the clause's helpers.
 
 // The fixture installs a context so the public dispatch entry points run their
 // real dispatch over the test objects.
@@ -30,10 +30,10 @@ class DynamicPrefixing : public ::testing::Test {
 
 // D1: the source classifier admits exactly the dynamic-prefix source kinds the
 // diagram draws vpiPrefix from - a reference and bit-select (the simple
-// expression), a part-select and indexed part-select, a named event, and a named
-// event array. It rejects a tf call (a method call's prefix is §37.42's) and an
-// unrelated kind, so the vpiPrefix traversal is served only where the diagram
-// draws it.
+// expression), a part-select and indexed part-select, a named event, and a
+// named event array. It rejects a tf call (a method call's prefix is §37.42's)
+// and an unrelated kind, so the vpiPrefix traversal is served only where the
+// diagram draws it.
 TEST_F(DynamicPrefixing, PrefixSourceClassifier) {
   EXPECT_TRUE(VpiIsDynamicPrefixSourceType(vpiRefObj));
   EXPECT_TRUE(VpiIsDynamicPrefixSourceType(vpiBitSelect));
@@ -49,8 +49,8 @@ TEST_F(DynamicPrefixing, PrefixSourceClassifier) {
 // D1: vpiPrefix of a dynamically prefixed object reaches the object that
 // prefixes it. The non-NULL condition spans all three prefix targets the
 // diagram draws - a virtual interface var or clocking block prefixing an
-// expression, and a class var prefixing a non-static class property - so each is
-// exercised through the public VpiHandleC(vpiPrefix, ...) dispatch.
+// expression, and a class var prefixing a non-static class property - so each
+// is exercised through the public VpiHandleC(vpiPrefix, ...) dispatch.
 TEST_F(DynamicPrefixing, PrefixReachesEachPrefixTargetKind) {
   for (int prefix_kind :
        {vpiClassVar, vpiVirtualInterfaceVar, vpiClockingBlock}) {
@@ -81,8 +81,9 @@ TEST_F(DynamicPrefixing, PrefixIsNullWhenObjectIsNotPrefixed) {
 }
 
 // D2: an object reached through a class var or virtual interface var prefix
-// reports that prefix's memory allocation scheme through vpi_get(vpiAllocScheme),
-// not its own. An object without such a prefix reports its own scheme.
+// reports that prefix's memory allocation scheme through
+// vpi_get(vpiAllocScheme), not its own. An object without such a prefix reports
+// its own scheme.
 TEST_F(DynamicPrefixing, AllocSchemeFollowsClassVarAndVifPrefix) {
   for (int prefix_kind : {vpiClassVar, vpiVirtualInterfaceVar}) {
     VpiObject prefix;
@@ -132,7 +133,8 @@ TEST_F(DynamicPrefixing, HasActualThroughVpiGet) {
   actual.type = vpiNamedEvent;
 
   // Sim-time provenance (the default): the answer tracks the live binding -
-  // TRUE when an actual is bound at the current simulation time, FALSE when not.
+  // TRUE when an actual is bound at the current simulation time, FALSE when
+  // not.
   VpiObject sim_bound;
   sim_bound.type = vpiNamedEvent;
   sim_bound.actual = &actual;
@@ -156,8 +158,8 @@ TEST_F(DynamicPrefixing, HasActualThroughVpiGet) {
   // bound: an object obtained from a class defn lexical context (§37.31), one
   // referenced relative to its class typespec (§37.32), and an automatic
   // variable obtained from a task or function declaration (§37.41).
-  for (int origin :
-       {kVpiActualLexicalDefn, kVpiActualClassTypespec, kVpiActualTaskFuncVar}) {
+  for (int origin : {kVpiActualLexicalDefn, kVpiActualClassTypespec,
+                     kVpiActualTaskFuncVar}) {
     VpiObject obj;
     obj.type = vpiRefObj;
     obj.actual = &actual;  // bound, yet the provenance pins FALSE
@@ -167,8 +169,8 @@ TEST_F(DynamicPrefixing, HasActualThroughVpiGet) {
 }
 
 // D3: vpiHasActual is drawn only on the dynamic-prefix source kinds, so asking
-// any other object kind is not a valid query and yields vpiUndefined rather than
-// a Boolean answer.
+// any other object kind is not a valid query and yields vpiUndefined rather
+// than a Boolean answer.
 TEST_F(DynamicPrefixing, HasActualIsUndefinedForNonSourceKind) {
   VpiObject module;
   module.type = vpiModule;

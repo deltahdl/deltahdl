@@ -107,4 +107,4 @@ TEST(AssocArrayAssignment, AllEntriesCopied) {
   EXPECT_EQ(v, 60u);
 }
 
-}
+}  // namespace

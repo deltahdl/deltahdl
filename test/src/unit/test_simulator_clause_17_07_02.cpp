@@ -13,11 +13,11 @@ TEST(CheckerVariableRandomization, CheckerAssumeIsCheckedForViolation) {
   EXPECT_TRUE(CheckerAssumeStatementIsCheckedForViolationDuringSimulation());
 }
 
-// §17.7.2: solving is triggered by an assume set clock event, not by an explicit
-// procedural call such as randomize().
+// §17.7.2: solving is triggered by an assume set clock event, not by an
+// explicit procedural call such as randomize().
 TEST(CheckerVariableRandomization, SolveTriggeredByAssumeSetClockEvent) {
-  EXPECT_TRUE(
-      AssumeRandomizationIsTriggeredBy(RandomizationTrigger::kAssumeSetClockEvent));
+  EXPECT_TRUE(AssumeRandomizationIsTriggeredBy(
+      RandomizationTrigger::kAssumeSetClockEvent));
   EXPECT_FALSE(AssumeRandomizationIsTriggeredBy(
       RandomizationTrigger::kExplicitProceduralCall));
 }
@@ -37,8 +37,8 @@ TEST(CheckerVariableRandomization, HoldEndsAtWhicheverComesFirst) {
 }
 
 // §17.7.2: a non-const free checker variable is active unless it appears on the
-// left-hand side of a checker variable assignment, in which case it is inactive;
-// non-free checker variables and checker formals are always inactive.
+// left-hand side of a checker variable assignment, in which case it is
+// inactive; non-free checker variables and checker formals are always inactive.
 TEST(CheckerVariableRandomization, ActiveClassification) {
   EXPECT_TRUE(IsActiveForAssumeRandomization(
       AssumeRandomizationVariable::kFreeNonConstUnassigned));
@@ -81,8 +81,8 @@ TEST(CheckerVariableRandomization, OneAssumeSetPerInstanceMaybeEmpty) {
   EXPECT_TRUE(AssumeSetMayBeEmpty());
 }
 
-// §17.7.2: checker assume sets exist at every time step regardless of whether the
-// checker instance is static or procedural.
+// §17.7.2: checker assume sets exist at every time step regardless of whether
+// the checker instance is static or procedural.
 TEST(CheckerVariableRandomization, AssumeSetExistsForStaticAndProcedural) {
   EXPECT_TRUE(AssumeSetExistsAtEveryTimeStep(CheckerInstanceKind::kStatic));
   EXPECT_TRUE(AssumeSetExistsAtEveryTimeStep(CheckerInstanceKind::kProcedural));
@@ -99,9 +99,9 @@ TEST(CheckerVariableRandomization, AssumeSetOriginContribution) {
       AssumeStatementOrigin::kUnrelated));
 }
 
-// §17.7.2: a candidate statement that references a const-cast or automatic-value
-// actual is excluded; of the rest, only those referencing an active free
-// variable are included.
+// §17.7.2: a candidate statement that references a const-cast or
+// automatic-value actual is excluded; of the rest, only those referencing an
+// active free variable are included.
 TEST(CheckerVariableRandomization, AssumeSetMembership) {
   // Excluded because of the const-cast / automatic actual, even though it would
   // otherwise reference an active free variable.
@@ -124,8 +124,8 @@ TEST(CheckerVariableRandomization, SolutionAttemptOutcome) {
             SolutionAttemptOutcome::kUnsuccessful);
 }
 
-// §17.7.2: there is no requirement that a solution be found when one exists, nor
-// that dead-end states be avoided.
+// §17.7.2: there is no requirement that a solution be found when one exists,
+// nor that dead-end states be avoided.
 TEST(CheckerVariableRandomization, NoSolutionGuarantees) {
   EXPECT_FALSE(AssumeRandomizationMustFindSolutionWhenItExists());
   EXPECT_FALSE(AssumeRandomizationMustAvoidDeadEndStates());
@@ -141,8 +141,8 @@ TEST(CheckerVariableRandomization, EmptyAssumeSetImplicitClock) {
             static_cast<int>(Region::kObserved));
 }
 
-// §17.7.2: active variables of a checker with an empty assume set are implicitly
-// clocked; with a nonempty assume set they are explicitly clocked.
+// §17.7.2: active variables of a checker with an empty assume set are
+// implicitly clocked; with a nonempty assume set they are explicitly clocked.
 TEST(CheckerVariableRandomization, ActiveVariableClocking) {
   EXPECT_EQ(ActiveVariableClocking(/*assume_set_is_empty=*/true),
             AssumeSetClocking::kImplicitlyClocked);
@@ -159,23 +159,24 @@ TEST(CheckerVariableRandomization, ImplicitlyClockedUpdateAndHold) {
 
 // §17.7.2: an active variable that appears in no property of a nonempty assume
 // set is unconstrained but still explicitly clocked.
-TEST(CheckerVariableRandomization, AbsentActiveVariableUnconstrainedButClocked) {
+TEST(CheckerVariableRandomization,
+     AbsentActiveVariableUnconstrainedButClocked) {
   EXPECT_EQ(ActiveVariableAbsentFromNonemptyAssumeSetClocking(),
             AssumeSetClocking::kExplicitlyClocked);
   EXPECT_FALSE(ActiveVariableAbsentFromNonemptyAssumeSetIsConstrained());
 }
 
-// §17.7.2: the active free checker variables are solved for as the implementation
-// is about to begin the Observed region, using sampled values that, for an active
-// checker variable, are its current value.
+// §17.7.2: the active free checker variables are solved for as the
+// implementation is about to begin the Observed region, using sampled values
+// that, for an active checker variable, are its current value.
 TEST(CheckerVariableRandomization, SolveAtObservedWithCurrentValues) {
   EXPECT_EQ(AssumeRandomizationSolvePrecedesRegion(), Region::kObserved);
   EXPECT_TRUE(SampledValueOfActiveCheckerVariableIsCurrentValue());
 }
 
-// §17.7.2: after an unsuccessful solution attempt, an assumption failure does not
-// occur until the unsatisfied property is clocked and checked in the Observed
-// region.
+// §17.7.2: after an unsuccessful solution attempt, an assumption failure does
+// not occur until the unsatisfied property is clocked and checked in the
+// Observed region.
 TEST(CheckerVariableRandomization, UnsuccessfulFailureSurfacesInObserved) {
   EXPECT_EQ(AssumptionFailureRegionAfterUnsuccessfulSolve(), Region::kObserved);
 }

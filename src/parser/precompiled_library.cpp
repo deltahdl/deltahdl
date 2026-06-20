@@ -33,8 +33,7 @@ void WriteU32(std::ofstream& os, uint32_t v) {
 bool ReadU32(std::ifstream& is, uint32_t& v) {
   unsigned char buf[4];
   if (!is.read(reinterpret_cast<char*>(buf), 4)) return false;
-  v = static_cast<uint32_t>(buf[0]) |
-      (static_cast<uint32_t>(buf[1]) << 8) |
+  v = static_cast<uint32_t>(buf[0]) | (static_cast<uint32_t>(buf[1]) << 8) |
       (static_cast<uint32_t>(buf[2]) << 16) |
       (static_cast<uint32_t>(buf[3]) << 24);
   return true;
@@ -83,10 +82,9 @@ void AppendCells(CompilationUnit& target, const CompilationUnit& src) {
                         src.configs.end());
 }
 
-}
+}  // namespace
 
-bool PrecompiledLibrary::Save(std::string_view source,
-                              std::string_view library,
+bool PrecompiledLibrary::Save(std::string_view source, std::string_view library,
                               const std::filesystem::path& path) {
   if (!ParsesCleanly(source)) return false;
 
@@ -143,4 +141,4 @@ bool PrecompiledLibrary::Load(const std::filesystem::path& path,
   return true;
 }
 
-}
+}  // namespace delta

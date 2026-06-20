@@ -7,8 +7,8 @@
 
 using namespace delta;
 
-// Exercises the syntax of the `encoding` protect pragma keyword (§34.5.9.1). The
-// syntax block defines the keyword expression as a parenthesized subkeyword
+// Exercises the syntax of the `encoding` protect pragma keyword (§34.5.9.1).
+// The syntax block defines the keyword expression as a parenthesized subkeyword
 // list: `encoding = ( enctype = <string> [ , line_length = <number> ]
 // [ , bytes = <number> ] )`. Protect pragmas are processed at the preprocessor
 // stage, where the generic `pragma` handler recognizes the keyword expression
@@ -41,10 +41,11 @@ TEST_F(ProtectEncodingSyntaxTest, PragmaProtectEncodingConsumed) {
   EXPECT_EQ(result.find("base64"), std::string::npos);
 }
 
-// Only the encoding directive line is removed; neighboring source text survives,
-// confirming it is the encoding keyword expression line that the pragma path
-// consumes.
-TEST_F(ProtectEncodingSyntaxTest, EncodingDirectiveStrippedSurroundingTextKept) {
+// Only the encoding directive line is removed; neighboring source text
+// survives, confirming it is the encoding keyword expression line that the
+// pragma path consumes.
+TEST_F(ProtectEncodingSyntaxTest,
+       EncodingDirectiveStrippedSurroundingTextKept) {
   auto result = Preprocess(
       "module m;\n"
       "`pragma protect encoding = ( enctype = \"uuencode\" )\n"
@@ -56,11 +57,12 @@ TEST_F(ProtectEncodingSyntaxTest, EncodingDirectiveStrippedSurroundingTextKept) 
   EXPECT_NE(result.find("endmodule"), std::string::npos);
 }
 
-// The optional `line_length` and `bytes` subkeywords may be omitted: the minimal
-// form carrying only the required `enctype` subkeyword is still recognized and
-// the directive line is stripped in full.
+// The optional `line_length` and `bytes` subkeywords may be omitted: the
+// minimal form carrying only the required `enctype` subkeyword is still
+// recognized and the directive line is stripped in full.
 TEST_F(ProtectEncodingSyntaxTest, EncodingMinimalEnctypeOnlyFormConsumed) {
-  auto result = Preprocess("`pragma protect encoding = ( enctype = \"raw\" )\n");
+  auto result =
+      Preprocess("`pragma protect encoding = ( enctype = \"raw\" )\n");
   EXPECT_FALSE(diag_.HasErrors());
   EXPECT_EQ(result.find("pragma"), std::string::npos);
   EXPECT_EQ(result.find("enctype"), std::string::npos);
@@ -71,9 +73,9 @@ TEST_F(ProtectEncodingSyntaxTest, EncodingMinimalEnctypeOnlyFormConsumed) {
 // supplies `bytes` is a valid keyword expression and is consumed in full, just
 // like the forms that include both or neither optional.
 TEST_F(ProtectEncodingSyntaxTest, EncodingBytesWithoutLineLengthConsumed) {
-  auto result =
-      Preprocess("`pragma protect encoding = ( enctype = \"base64\" , bytes = "
-                 "256 )\n");
+  auto result = Preprocess(
+      "`pragma protect encoding = ( enctype = \"base64\" , bytes = "
+      "256 )\n");
   EXPECT_FALSE(diag_.HasErrors());
   EXPECT_EQ(result.find("pragma"), std::string::npos);
   EXPECT_EQ(result.find("bytes"), std::string::npos);
@@ -84,9 +86,9 @@ TEST_F(ProtectEncodingSyntaxTest, EncodingBytesWithoutLineLengthConsumed) {
 // expression and is consumed in full. Together with the both/neither/bytes-only
 // forms this exhausts the four combinations of the two optional subkeywords.
 TEST_F(ProtectEncodingSyntaxTest, EncodingLineLengthWithoutBytesConsumed) {
-  auto result =
-      Preprocess("`pragma protect encoding = ( enctype = \"base64\" , "
-                 "line_length = 72 )\n");
+  auto result = Preprocess(
+      "`pragma protect encoding = ( enctype = \"base64\" , "
+      "line_length = 72 )\n");
   EXPECT_FALSE(diag_.HasErrors());
   EXPECT_EQ(result.find("pragma"), std::string::npos);
   EXPECT_EQ(result.find("line_length"), std::string::npos);

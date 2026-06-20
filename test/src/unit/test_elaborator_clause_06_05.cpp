@@ -251,4 +251,4 @@ TEST(NetsAndVariables, VariableDistinctBitsContinuousAndProceduralOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

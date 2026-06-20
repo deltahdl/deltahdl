@@ -21,7 +21,8 @@ TEST(RestrictStatementParsing, FormWithoutActionBlock) {
     if (item->kind == ModuleItemKind::kRestrictProperty) {
       found = true;
       EXPECT_NE(item->assert_expr, nullptr);
-      // §16.14.4: there is no action block — neither a pass nor a fail statement.
+      // §16.14.4: there is no action block — neither a pass nor a fail
+      // statement.
       EXPECT_EQ(item->assert_pass_stmt, nullptr);
       EXPECT_EQ(item->assert_fail_stmt, nullptr);
     }

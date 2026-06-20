@@ -55,4 +55,4 @@ TEST(WhiteSpaceSynthesis, EndOfFileTerminatesSynthesis) {
   ASSERT_NE(aig, nullptr);
 }
 
-}
+}  // namespace

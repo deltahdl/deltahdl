@@ -167,4 +167,3 @@ TEST(CompilationUnitElaboration, ForwardReferenceToCuScopeTaskAccepted) {
              "endmodule\n"
              "task later_task; endtask\n"));
 }
-

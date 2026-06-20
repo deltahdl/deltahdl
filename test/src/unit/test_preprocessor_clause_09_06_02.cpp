@@ -64,4 +64,4 @@ TEST(DisableStatementPreprocessor, ConditionalCompilationExcludesDisable) {
   EXPECT_EQ(result.find("disable"), std::string::npos);
 }
 
-}
+}  // namespace

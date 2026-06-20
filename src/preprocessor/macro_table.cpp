@@ -25,4 +25,4 @@ bool MacroTable::IsDefined(std::string_view name) const {
   return macros_.contains(std::string(name));
 }
 
-}
+}  // namespace delta

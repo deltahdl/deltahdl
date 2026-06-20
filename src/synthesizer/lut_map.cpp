@@ -169,7 +169,7 @@ void BuildCovering(const AigGraph& aig,
   }
 }
 
-}
+}  // namespace
 
 LutMapper::LutMapper(uint32_t lut_size) : lut_size_(lut_size) {}
 
@@ -184,4 +184,4 @@ LutMapping LutMapper::Map(const AigGraph& aig) {
   return mapping;
 }
 
-}
+}  // namespace delta

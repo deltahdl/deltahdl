@@ -337,7 +337,8 @@ TEST(ConstraintInheritance, DerivedPlainOverrideAccepted) {
 // 18.5.2: an abstract intermediate class may override an inherited pure
 // constraint, and that override is non-pure for every class derived from it,
 // so a non-abstract grandchild need not re-implement the constraint.
-TEST(ConstraintInheritance, AbstractIntermediateOverridesInheritedPureAccepted) {
+TEST(ConstraintInheritance,
+     AbstractIntermediateOverridesInheritedPureAccepted) {
   EXPECT_TRUE(
       ElabOk("virtual class B;\n"
              "  rand int x;\n"
@@ -415,4 +416,4 @@ TEST(ConstraintInheritance, PrototypeExtendsMatchAccepted) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

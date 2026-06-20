@@ -74,7 +74,8 @@ TEST(ArrayIndexingAndSlicing, TwoStateInvalidIndexReadsZero) {
   // for a 4-state element type.
   SimFixture f;
 
-  f.ctx.RegisterArray("barr", {0, 4, 8, false, false, false, /*is_4state=*/false});
+  f.ctx.RegisterArray("barr",
+                      {0, 4, 8, false, false, false, /*is_4state=*/false});
   for (uint32_t i = 0; i < 4; ++i) {
     auto tmp = "barr[" + std::to_string(i) + "]";
     auto* s = f.arena.AllocString(tmp.c_str(), tmp.size());
@@ -96,8 +97,8 @@ TEST(ArrayIndexingAndSlicing, UnknownIndexBitMakesIndexInvalid) {
   auto* idx = f.ctx.CreateVariable("idx", 8);
   idx->value = MakeAllX(f.arena, 8);
 
-  auto* sel = MakeSelectExpr(f.arena, MakeId(f.arena, "arr"),
-                             MakeId(f.arena, "idx"));
+  auto* sel =
+      MakeSelectExpr(f.arena, MakeId(f.arena, "arr"), MakeId(f.arena, "idx"));
   auto result = EvalExpr(sel, f.ctx, f.arena);
   EXPECT_FALSE(result.IsKnown());
 }
@@ -113,8 +114,8 @@ TEST(ArrayIndexingAndSlicing, IndexedPartSelectSizeIsConstantPositionVaries) {
   auto* pos = f.ctx.CreateVariable("pos", 32);
   pos->value = MakeLogic4VecVal(f.arena, 32, 8);
 
-  auto result = EvalExpr(MkPlusPartSelect(f.arena, "vec", "pos", 8), f.ctx,
-                         f.arena);
+  auto result =
+      EvalExpr(MkPlusPartSelect(f.arena, "vec", "pos", 8), f.ctx, f.arena);
   EXPECT_EQ(result.width, 8u);
   EXPECT_TRUE(result.IsKnown());
   EXPECT_EQ(result.ToUint64(), 0xCCu);
@@ -122,8 +123,8 @@ TEST(ArrayIndexingAndSlicing, IndexedPartSelectSizeIsConstantPositionVaries) {
   // A different runtime position selects different bits but the width — the
   // constant size of the part-select — is unchanged.
   pos->value = MakeLogic4VecVal(f.arena, 32, 16);
-  auto moved = EvalExpr(MkPlusPartSelect(f.arena, "vec", "pos", 8), f.ctx,
-                        f.arena);
+  auto moved =
+      EvalExpr(MkPlusPartSelect(f.arena, "vec", "pos", 8), f.ctx, f.arena);
   EXPECT_EQ(moved.width, 8u);
   EXPECT_EQ(moved.ToUint64(), 0xBBu);
 }
@@ -256,4 +257,4 @@ TEST(ArrayIndexingAndSlicing, IndexedPartSelectMinus) {
   EXPECT_EQ(v, 0xCCu);
 }
 
-}
+}  // namespace

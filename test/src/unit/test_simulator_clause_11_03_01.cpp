@@ -122,9 +122,9 @@ TEST(RealOperandResult, LogicalOrOnRealIsSingleBit) {
 TEST(RealOperandResult, LogicalNotOnRealIsSingleBit) {
   SimFixture f;
   MakeRealVar(f, "a", 0.0);
-  auto result = EvalExpr(MakeUnary(f.arena, TokenKind::kBang,
-                                   MakeId(f.arena, "a")),
-                         f.ctx, f.arena);
+  auto result =
+      EvalExpr(MakeUnary(f.arena, TokenKind::kBang, MakeId(f.arena, "a")),
+               f.ctx, f.arena);
   EXPECT_EQ(result.width, 1u);
   EXPECT_EQ(result.ToUint64(), 1u);
 }
@@ -132,9 +132,9 @@ TEST(RealOperandResult, LogicalNotOnRealIsSingleBit) {
 TEST(RealOperandResult, LogicalNotOnNonzeroRealIsFalse) {
   SimFixture f;
   MakeRealVar(f, "a", 3.14);
-  auto result = EvalExpr(MakeUnary(f.arena, TokenKind::kBang,
-                                   MakeId(f.arena, "a")),
-                         f.ctx, f.arena);
+  auto result =
+      EvalExpr(MakeUnary(f.arena, TokenKind::kBang, MakeId(f.arena, "a")),
+               f.ctx, f.arena);
   EXPECT_EQ(result.width, 1u);
   EXPECT_EQ(result.ToUint64(), 0u);
 }
@@ -285,10 +285,10 @@ TEST(RealOperandResult, ConditionalWithRealBranchResultIsReal) {
   SimFixture f;
   MakeRealVar(f, "a", 1.5);
   MakeRealVar(f, "b", 2.5);
-  auto result = EvalExpr(
-      MakeTernary(f.arena, MakeInt(f.arena, 1), MakeId(f.arena, "a"),
-                  MakeId(f.arena, "b")),
-      f.ctx, f.arena);
+  auto result =
+      EvalExpr(MakeTernary(f.arena, MakeInt(f.arena, 1), MakeId(f.arena, "a"),
+                           MakeId(f.arena, "b")),
+               f.ctx, f.arena);
   EXPECT_TRUE(result.is_real);
 }
 
@@ -299,11 +299,11 @@ TEST(RealOperandResult, ConditionalConditionRealDoesNotForceRealResult) {
   MakeRealVar(f, "rc", 1.5);
   MakeVar(f, "x", 32, 7);
   MakeVar(f, "y", 32, 9);
-  auto result = EvalExpr(
-      MakeTernary(f.arena, MakeId(f.arena, "rc"), MakeId(f.arena, "x"),
-                  MakeId(f.arena, "y")),
-      f.ctx, f.arena);
+  auto result =
+      EvalExpr(MakeTernary(f.arena, MakeId(f.arena, "rc"), MakeId(f.arena, "x"),
+                           MakeId(f.arena, "y")),
+               f.ctx, f.arena);
   EXPECT_FALSE(result.is_real);
 }
 
-}
+}  // namespace

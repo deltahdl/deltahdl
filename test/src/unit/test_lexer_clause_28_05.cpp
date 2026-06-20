@@ -1,6 +1,7 @@
 
 
 #include <gtest/gtest.h>
+
 #include "fixture_lexer.h"
 
 using namespace delta;
@@ -32,4 +33,4 @@ TEST(BufNotLexing, NamedBufGateTokenSequence) {
   EXPECT_EQ(tokens[7].kind, TokenKind::kSemicolon);
 }
 
-}
+}  // namespace

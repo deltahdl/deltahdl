@@ -249,11 +249,11 @@ TEST(TaskDeclParsing, TfPortDirectionConstRef) {
 }
 
 TEST(TaskDeclParsing, TfPortDirectionRefStatic) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  task my_task(ref static int a);\n"
-      "  endtask\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  task my_task(ref static int a);\n"
+              "  endtask\n"
+              "endmodule\n"));
 }
 
 TEST(TaskDeclParsing, TfPortDeclOldStyleVar) {
@@ -620,4 +620,4 @@ TEST(TaskDeclParsing, TaskPrototypeMultiplePorts) {
   EXPECT_EQ(item->func_args[1].direction, Direction::kOutput);
 }
 
-}
+}  // namespace

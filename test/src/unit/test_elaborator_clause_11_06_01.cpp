@@ -142,7 +142,8 @@ TEST(Elaboration, UnaryPlusMinusTildeWidthEqualsOperand) {
   operand.kind = ExprKind::kIntegerLiteral;
   operand.text = "8'h0";
 
-  for (TokenKind op : {TokenKind::kPlus, TokenKind::kMinus, TokenKind::kTilde}) {
+  for (TokenKind op :
+       {TokenKind::kPlus, TokenKind::kMinus, TokenKind::kTilde}) {
     Expr unary;
     unary.kind = ExprKind::kUnary;
     unary.op = op;
@@ -200,11 +201,10 @@ TEST(Elaboration, AllComparisonOpsWidthIsOneBit) {
   rhs.kind = ExprKind::kIntegerLiteral;
   rhs.text = "16'h0";
 
-  for (TokenKind op :
-       {TokenKind::kEqEq, TokenKind::kBangEq, TokenKind::kEqEqEq,
-        TokenKind::kBangEqEq, TokenKind::kLt, TokenKind::kGt,
-        TokenKind::kLtEq, TokenKind::kGtEq, TokenKind::kEqEqQuestion,
-        TokenKind::kBangEqQuestion}) {
+  for (TokenKind op : {TokenKind::kEqEq, TokenKind::kBangEq, TokenKind::kEqEqEq,
+                       TokenKind::kBangEqEq, TokenKind::kLt, TokenKind::kGt,
+                       TokenKind::kLtEq, TokenKind::kGtEq,
+                       TokenKind::kEqEqQuestion, TokenKind::kBangEqQuestion}) {
     Expr cmp;
     cmp.kind = ExprKind::kBinary;
     cmp.op = op;
@@ -223,9 +223,8 @@ TEST(Elaboration, LogicalOpsWidthIsOneBit) {
   rhs.kind = ExprKind::kIntegerLiteral;
   rhs.text = "16'h0";
 
-  for (TokenKind op :
-       {TokenKind::kAmpAmp, TokenKind::kPipePipe, TokenKind::kArrow,
-        TokenKind::kLtDashGt}) {
+  for (TokenKind op : {TokenKind::kAmpAmp, TokenKind::kPipePipe,
+                       TokenKind::kArrow, TokenKind::kLtDashGt}) {
     Expr binop;
     binop.kind = ExprKind::kBinary;
     binop.op = op;
@@ -244,9 +243,8 @@ TEST(Elaboration, ShiftWidthIsLhsWidth) {
   rhs.kind = ExprKind::kIntegerLiteral;
   rhs.text = "16'h0";
 
-  for (TokenKind op :
-       {TokenKind::kLtLt, TokenKind::kGtGt, TokenKind::kLtLtLt,
-        TokenKind::kGtGtGt}) {
+  for (TokenKind op : {TokenKind::kLtLt, TokenKind::kGtGt, TokenKind::kLtLtLt,
+                       TokenKind::kGtGtGt}) {
     Expr binop;
     binop.kind = ExprKind::kBinary;
     binop.op = op;
@@ -303,4 +301,4 @@ TEST(Elaboration, ContextWidthZeroReturnsSelfDetermined) {
   EXPECT_EQ(ContextWidth(&lit, 0, typedefs), 32u);
 }
 
-}
+}  // namespace

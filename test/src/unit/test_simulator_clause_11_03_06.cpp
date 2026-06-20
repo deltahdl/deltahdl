@@ -63,8 +63,8 @@ TEST(AssignmentWithinExpression, ChainedAssignUpdatesAllVariables) {
 
   auto* inner = MakeBinary(f.arena, TokenKind::kEq, MakeId(f.arena, "b"),
                            MakeInt(f.arena, 5));
-  auto* outer = MakeBinary(f.arena, TokenKind::kEq, MakeId(f.arena, "a"),
-                           inner);
+  auto* outer =
+      MakeBinary(f.arena, TokenKind::kEq, MakeId(f.arena, "a"), inner);
   auto result = EvalExpr(outer, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 5u);
   EXPECT_EQ(f.ctx.FindVariable("a")->value.ToUint64(), 5u);
@@ -88,8 +88,8 @@ TEST(AssignmentWithinExpression, AssignInExprReturnUsedByOuterExpr) {
 
   auto* assign = MakeBinary(f.arena, TokenKind::kEq, MakeId(f.arena, "a"),
                             MakeInt(f.arena, 10));
-  auto* add = MakeBinary(f.arena, TokenKind::kPlus, assign,
-                         MakeInt(f.arena, 20));
+  auto* add =
+      MakeBinary(f.arena, TokenKind::kPlus, assign, MakeInt(f.arena, 20));
   auto result = EvalExpr(add, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 30u);
   EXPECT_EQ(f.ctx.FindVariable("a")->value.ToUint64(), 10u);
@@ -109,8 +109,8 @@ TEST(AssignmentWithinExpression, ConcatLhsReturnsUnsignedSumOfOperandWidths) {
   concat->elements.push_back(MakeId(f.arena, "lo"));
 
   // A wider right-hand side is cast to the 16-bit concatenation target.
-  auto* assign = MakeBinary(f.arena, TokenKind::kEq, concat,
-                            MakeInt(f.arena, 0x1ABCD));
+  auto* assign =
+      MakeBinary(f.arena, TokenKind::kEq, concat, MakeInt(f.arena, 0x1ABCD));
   auto result = EvalExpr(assign, f.ctx, f.arena);
 
   EXPECT_EQ(result.width, 16u);
@@ -134,8 +134,8 @@ TEST(AssignmentWithinExpression, ConcatLhsResultIsUnsignedForSignedRhs) {
   concat->elements.push_back(MakeId(f.arena, "hi"));
   concat->elements.push_back(MakeId(f.arena, "lo"));
 
-  auto* assign = MakeBinary(f.arena, TokenKind::kEq, concat,
-                            MakeId(f.arena, "src"));
+  auto* assign =
+      MakeBinary(f.arena, TokenKind::kEq, concat, MakeId(f.arena, "src"));
   auto result = EvalExpr(assign, f.ctx, f.arena);
 
   EXPECT_EQ(result.width, 16u);
@@ -143,4 +143,4 @@ TEST(AssignmentWithinExpression, ConcatLhsResultIsUnsignedForSignedRhs) {
   EXPECT_EQ(result.ToUint64(), 0xABCDu);
 }
 
-}
+}  // namespace

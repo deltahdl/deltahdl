@@ -296,7 +296,7 @@ static bool IsSignedLiteral(std::string_view text) {
 static int64_t TruncateToWidth(int64_t val, uint32_t width) {
   if (width == 0 || width >= 64) return val;
   return static_cast<int64_t>(static_cast<uint64_t>(val) &
-                               ((uint64_t{1} << width) - 1));
+                              ((uint64_t{1} << width) - 1));
 }
 
 static int64_t SignExtendFromWidth(int64_t val, uint32_t width) {
@@ -352,8 +352,8 @@ static std::optional<ConstVal> ConstEvalFull(const Expr* expr,
         lv = TruncateToWidth(lhs->value, lhs->width);
         rv = TruncateToWidth(rhs->value, rhs->width);
       }
-      if (!s && (expr->op == TokenKind::kSlash ||
-                 expr->op == TokenKind::kSlashEq)) {
+      if (!s &&
+          (expr->op == TokenKind::kSlash || expr->op == TokenKind::kSlashEq)) {
         auto ul = static_cast<uint64_t>(lv);
         auto ur = static_cast<uint64_t>(rv);
         if (ur == 0) return std::nullopt;
@@ -415,9 +415,7 @@ static std::optional<ConstVal> ConstEvalFull(const Expr* expr,
       return ConstVal{*val, 32, true};
     }
     case ExprKind::kMemberAccess: {
-
-      if (expr->lhs && expr->rhs &&
-          expr->lhs->kind == ExprKind::kIdentifier &&
+      if (expr->lhs && expr->rhs && expr->lhs->kind == ExprKind::kIdentifier &&
           expr->rhs->kind == ExprKind::kIdentifier) {
         std::string compound =
             std::string(expr->lhs->text) + "." + std::string(expr->rhs->text);
@@ -581,9 +579,8 @@ static bool AllElementsConstant(const std::vector<Expr*>& elems,
 
 static bool IsConstEvenWithNonConstArgs(std::string_view name) {
   static const std::unordered_set<std::string_view> kFuncs = {
-      "$bits",   "$dimensions", "$unpacked_dimensions", "$left",
-      "$right",  "$low",        "$high",                "$increment",
-      "$size",
+      "$bits", "$dimensions", "$unpacked_dimensions", "$left", "$right",
+      "$low",  "$high",       "$increment",           "$size",
   };
   return kFuncs.count(name) > 0;
 }
@@ -596,9 +593,8 @@ static bool IsConstantSysCallExpr(const Expr* expr, const ScopeMap& scope) {
 
 static bool IsTypeOnlyBuiltinMethod(std::string_view method) {
   static const std::unordered_set<std::string_view> kMethods = {
-      "size",  "num",   "bits",      "dimensions",
-      "unpacked_dimensions", "left",  "right",     "low",
-      "high",  "increment",
+      "size", "num",   "bits", "dimensions", "unpacked_dimensions",
+      "left", "right", "low",  "high",       "increment",
   };
   return kMethods.count(method) > 0;
 }
@@ -671,16 +667,13 @@ bool IsConstantExpr(const Expr* expr, const ScopeMap& scope) {
     case ExprKind::kAssignmentPattern:
       return AllElementsConstant(expr->elements, scope);
     case ExprKind::kCall: {
-
       if (IsConstantBuiltinMethodCall(expr, scope)) return true;
 
       return AllElementsConstant(expr->args, scope);
     }
     case ExprKind::kMemberAccess: {
-
       if (IsConstantBuiltinMethodCall(expr, scope)) return true;
-      if (expr->lhs && expr->rhs &&
-          expr->lhs->kind == ExprKind::kIdentifier &&
+      if (expr->lhs && expr->rhs && expr->lhs->kind == ExprKind::kIdentifier &&
           expr->rhs->kind == ExprKind::kIdentifier) {
         std::string compound =
             std::string(expr->lhs->text) + "." + std::string(expr->rhs->text);
@@ -733,4 +726,4 @@ std::string LongestStaticPrefix(const Expr* expr, const ScopeMap& scope) {
   return BuildStaticPrefix(expr, scope).text;
 }
 
-}
+}  // namespace delta

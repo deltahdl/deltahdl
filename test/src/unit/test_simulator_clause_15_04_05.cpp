@@ -11,16 +11,18 @@ using namespace delta;
 namespace {
 
 // Minimal getter coroutine used to observe the get-side wakeup. It starts
-// suspended; the first resume runs it to the co_await, where — while the mailbox
-// is empty — the awaiter parks the handle on the mailbox's get-waiter queue. A
-// later put() that places a message resumes it through production
+// suspended; the first resume runs it to the co_await, where — while the
+// mailbox is empty — the awaiter parks the handle on the mailbox's get-waiter
+// queue. A later put() that places a message resumes it through production
 // WakeGetWaiters(), at which point it retrieves the message and records that it
 // ran. Parking on get_waiters is exactly what a get awaiter's suspend does; the
 // rule under observation here is the resume performed by WakeGetWaiters().
 struct GetWaiter {
   MailboxObject& mbx;
   bool await_ready() { return !mbx.messages.empty(); }
-  void await_suspend(std::coroutine_handle<> h) { mbx.get_waiters.push_back(h); }
+  void await_suspend(std::coroutine_handle<> h) {
+    mbx.get_waiters.push_back(h);
+  }
   void await_resume() const noexcept {}
 };
 
@@ -166,4 +168,4 @@ TEST(IpcSync, MailboxGetTypeErrorLeavesMessageForMatchingGet) {
   EXPECT_EQ(msg, 0xABu);
 }
 
-}
+}  // namespace

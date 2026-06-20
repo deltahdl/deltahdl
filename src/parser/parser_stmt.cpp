@@ -479,7 +479,6 @@ CaseItem Parser::ParseCaseItem(bool inside) {
     item.is_default = true;
     Match(TokenKind::kColon);
   } else {
-
     item.patterns.push_back(inside ? ParseInsideValueRange() : ParseExpr());
     while (Match(TokenKind::kComma)) {
       item.patterns.push_back(inside ? ParseInsideValueRange() : ParseExpr());
@@ -498,11 +497,9 @@ Stmt* Parser::ParseForStmt() {
   Expect(TokenKind::kLParen);
 
   if (Check(TokenKind::kSemicolon)) {
-
     Consume();
   } else if (Check(TokenKind::kKwVar) ||
              IsDataTypeKeyword(CurrentToken().kind)) {
-
     do {
       Match(TokenKind::kKwVar);
       stmt->for_init_types.push_back(ParseDataType());
@@ -510,7 +507,6 @@ Stmt* Parser::ParseForStmt() {
     } while (Match(TokenKind::kComma));
     Expect(TokenKind::kSemicolon);
   } else {
-
     do {
       if (Check(TokenKind::kKwVar) || IsDataTypeKeyword(CurrentToken().kind)) {
         // The first control variable was a plain assignment, so a later item
@@ -589,7 +585,6 @@ Stmt* Parser::ParseForkStmt(std::string_view prefix_label) {
   }
   while (!Check(TokenKind::kKwJoin) && !Check(TokenKind::kKwJoinAny) &&
          !Check(TokenKind::kKwJoinNone) && !AtEnd()) {
-
     if (IsBlockVarDeclStart()) {
       ParseBlockVarDecls(stmt->fork_stmts);
     } else {
@@ -673,7 +668,6 @@ Stmt* Parser::ParseForeachStmt() {
 }
 
 void Parser::ParseForeachVars(std::vector<std::string_view>& vars) {
-
   if (CheckIdentifier()) {
     vars.push_back(Consume().text);
   } else {
@@ -760,7 +754,6 @@ static bool IsCompoundAssignOp(TokenKind kind) {
 
 void Parser::ParseIntraAssignTiming(Stmt* stmt) {
   if (Check(TokenKind::kHashHash)) {
-
     Consume();
     if (Check(TokenKind::kLParen)) {
       Consume();
@@ -770,7 +763,6 @@ void Parser::ParseIntraAssignTiming(Stmt* stmt) {
       stmt->cycle_delay = ParsePrimaryExpr();
     }
   } else if (Check(TokenKind::kHash)) {
-
     Consume();
     if (Check(TokenKind::kLParen)) {
       Consume();
@@ -780,13 +772,11 @@ void Parser::ParseIntraAssignTiming(Stmt* stmt) {
       stmt->delay = ParsePrimaryExpr();
     }
   } else if (Check(TokenKind::kAt)) {
-
     Consume();
     Expect(TokenKind::kLParen);
     stmt->events = ParseEventList();
     Expect(TokenKind::kRParen);
   } else if (Check(TokenKind::kKwRepeat)) {
-
     Consume();
     Expect(TokenKind::kLParen);
     stmt->repeat_event_count = ParseExpr();
@@ -814,7 +804,6 @@ Stmt* Parser::ParseAssignmentOrExprNoSemi() {
     stmt->lhs = lhs_expr;
     ParseIntraAssignTiming(stmt);
   } else if (IsCompoundAssignOp(CurrentToken().kind)) {
-
     stmt->kind = StmtKind::kBlockingAssign;
     stmt->lhs = lhs_expr;
     auto op_tok = Consume();
@@ -829,7 +818,6 @@ Stmt* Parser::ParseAssignmentOrExprNoSemi() {
     bin->range.start = lhs_expr->range.start;
     stmt->rhs = bin;
   } else {
-
     stmt->kind = StmtKind::kExprStmt;
     stmt->expr = ParseInfixBp(lhs_expr, 0);
   }
@@ -881,19 +869,16 @@ Stmt* Parser::ParseEventControlStmt() {
   stmt->range.start = CurrentLoc();
   Expect(TokenKind::kAt);
   if (Match(TokenKind::kStar)) {
-
     stmt->is_star_event = true;
   } else if (Check(TokenKind::kLParen)) {
     Consume();
     if (Match(TokenKind::kStar)) {
-
       stmt->is_star_event = true;
     } else {
       stmt->events = ParseEventList();
     }
     Expect(TokenKind::kRParen);
   } else {
-
     EventExpr ev;
     ev.signal = ParseExpr();
     stmt->events.push_back(ev);
@@ -946,4 +931,4 @@ Stmt* Parser::ParseReleaseStmt() {
   return stmt;
 }
 
-}
+}  // namespace delta

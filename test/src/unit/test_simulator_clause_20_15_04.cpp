@@ -28,17 +28,17 @@ uint64_t RunQueueCall(SimFixture& f, std::string_view name,
 uint64_t Initialize(SimFixture& f, uint64_t q_id, int64_t q_type,
                     int64_t max_length) {
   MakeVar(f, "st", 32, 0xDEAD);
-  return RunQueueCall(f, "$q_initialize",
-                      {MkInt(f.arena, q_id),
-                       MkInt(f.arena, static_cast<uint64_t>(q_type)),
-                       MkInt(f.arena, static_cast<uint64_t>(max_length)),
-                       MkId(f.arena, "st")},
-                      "st");
+  return RunQueueCall(
+      f, "$q_initialize",
+      {MkInt(f.arena, q_id), MkInt(f.arena, static_cast<uint64_t>(q_type)),
+       MkInt(f.arena, static_cast<uint64_t>(max_length)), MkId(f.arena, "st")},
+      "st");
 }
 
 // $q_add(q_id, job_id, inform_id, status): place an entry onto queue q_id,
 // returning the reported status.
-uint64_t Add(SimFixture& f, uint64_t q_id, uint64_t job_id, uint64_t inform_id) {
+uint64_t Add(SimFixture& f, uint64_t q_id, uint64_t job_id,
+             uint64_t inform_id) {
   MakeVar(f, "st", 32, 0xDEAD);
   return RunQueueCall(f, "$q_add",
                       {MkInt(f.arena, q_id), MkInt(f.arena, job_id),

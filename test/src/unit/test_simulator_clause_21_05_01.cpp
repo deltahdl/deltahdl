@@ -14,21 +14,22 @@ using namespace delta;
 namespace {
 
 // §21.5.1 says $writememb / $writememh treat packed data exactly as $readmemb /
-// $readmemh do (see 21.4.1): each element of an unpacked array is the equivalent
-// vector word, written as a single number whose width is the element's full
-// packed width. For fully known words this is observed as a round-trip -- a
-// memory dumped by $writemem and reloaded by the matching $readmem reproduces
-// every packed word. Four-state words are observed at the file the write task
-// produces, since that text is precisely the form the matching read task accepts.
+// $readmemh do (see 21.4.1): each element of an unpacked array is the
+// equivalent vector word, written as a single number whose width is the
+// element's full packed width. For fully known words this is observed as a
+// round-trip -- a memory dumped by $writemem and reloaded by the matching
+// $readmem reproduces every packed word. Four-state words are observed at the
+// file the write task produces, since that text is precisely the form the
+// matching read task accepts.
 
 // Registers an unpacked array whose elements are `width`-bit packed vectors,
 // each backed by an element variable named `name[index]` (the simulator's
 // convention), so the write/read tasks have a memory to operate on.
 void SetupMem(SimFixture& f, const char* name, int lo, int size,
               uint32_t width) {
-  f.ctx.RegisterArray(name, {static_cast<uint32_t>(lo),
-                             static_cast<uint32_t>(size), width, false, false,
-                             false});
+  f.ctx.RegisterArray(
+      name, {static_cast<uint32_t>(lo), static_cast<uint32_t>(size), width,
+             false, false, false});
   for (int i = 0; i < size; ++i) {
     std::string nm = std::string(name) + "[" + std::to_string(lo + i) + "]";
     auto* s = f.arena.AllocString(nm.c_str(), nm.size());
@@ -84,17 +85,19 @@ TEST(IoSystemTaskTest, WidePackedWordRoundTripsThroughReadmemh) {
   std::remove(path.c_str());
 }
 
-// §21.5.1: packed data is four-state, so a word's unknown (x) and high-impedance
-// (z) bits are written out -- and distinguished from each other -- in the same
-// textual form $readmemb accepts. $writememb emits one four-state digit per bit,
-// preserving the whole packed value rather than collapsing it to a known number.
+// §21.5.1: packed data is four-state, so a word's unknown (x) and
+// high-impedance (z) bits are written out -- and distinguished from each other
+// -- in the same textual form $readmemb accepts. $writememb emits one
+// four-state digit per bit, preserving the whole packed value rather than
+// collapsing it to a known number.
 TEST(IoSystemTaskTest, PackedFourStateBitsWrittenInReadmemForm) {
   SimFixture f;
   std::string path = "/tmp/deltahdl_test_21_05_01_xz.txt";
   SetupMem(f, "src", 0, 1, 8);
-  // Build the 8-bit word 1 0 x z 1 0 0 1. In the four-state encoding a known bit
-  // has bval clear, an x bit is bval set with aval clear, and a z bit is bval
-  // set with aval set; bits 5 (x) and 4 (z) carry the unknown/high-Z values.
+  // Build the 8-bit word 1 0 x z 1 0 0 1. In the four-state encoding a known
+  // bit has bval clear, an x bit is bval set with aval clear, and a z bit is
+  // bval set with aval set; bits 5 (x) and 4 (z) carry the unknown/high-Z
+  // values.
   Logic4Vec v = MakeLogic4VecVal(f.arena, 8, 0);
   v.words[0].aval = 0b10011001u;  // the 1 bits, plus the z bit's set aval
   v.words[0].bval = 0b00110000u;  // bits 5 and 4 are the x and z positions

@@ -126,8 +126,9 @@ TEST(ConstraintDist, ProbabilityProportionalToWeight) {
   EXPECT_LT(Count(vals, 20), 20);
 }
 
-// 18.5.3: a distribution is a relational test for set membership, so only values
-// named by the dist set are ever produced; the rest of the domain is excluded.
+// 18.5.3: a distribution is a relational test for set membership, so only
+// values named by the dist set are ever produced; the rest of the domain is
+// excluded.
 TEST(ConstraintDist, OnlyListedValuesProduced) {
   auto vals =
       SampleDist(0, 100, {Single(10, 1), Single(20, 1), Single(30, 1)}, 200);
@@ -147,9 +148,9 @@ TEST(ConstraintDist, AssignWeightOnRangeIsPerElement) {
   EXPECT_GT(in_range, at_ten * 2);
 }
 
-// 18.5.3: when :/ is applied to a range the weight is assigned to the range as a
-// whole, so the same four-element range with weight 1 is only as likely overall
-// as a single value with weight 1.
+// 18.5.3: when :/ is applied to a range the weight is assigned to the range as
+// a whole, so the same four-element range with weight 1 is only as likely
+// overall as a single value with weight 1.
 TEST(ConstraintDist, DivideWeightOnRangeIsWholeRange) {
   auto vals = SampleDist(0, 100, {Range(0, 3, 1, false), Single(10, 1)}, 400);
   ASSERT_EQ(vals.size(), 400u);
@@ -284,4 +285,4 @@ TEST(ConstraintDist, ZeroTotalWeightValueExcluded) {
   for (int64_t v : vals) EXPECT_EQ(v, 200);
 }
 
-}
+}  // namespace

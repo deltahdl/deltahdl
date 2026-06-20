@@ -205,4 +205,4 @@ TEST(Coverage, DefaultBinExcludedFromCoverage) {
   EXPECT_DOUBLE_EQ(CoverageDB::GetPointCoverage(&g->coverpoints[0]), 100.0);
 }
 
-}
+}  // namespace

@@ -54,4 +54,4 @@ TEST(SupplyNetParsing, Supply1Decl) {
   EXPECT_EQ(item->name, "vdd");
 }
 
-}
+}  // namespace

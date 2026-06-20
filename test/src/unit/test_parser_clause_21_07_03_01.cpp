@@ -41,4 +41,4 @@ TEST(IoSystemTaskParsing, DumpportsMultipleScopes) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

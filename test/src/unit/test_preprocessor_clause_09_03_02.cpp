@@ -35,4 +35,4 @@ TEST(ParallelBlockPreprocessor, MacroExpandsToForkJoinContent) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-}
+}  // namespace

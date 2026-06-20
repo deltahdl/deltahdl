@@ -14,8 +14,8 @@ namespace {
 // vpiParent reaches the spawning thread, vpiOrigin reaches the originating
 // statement, the tagless frame line reaches the thread's active frame, and the
 // one-to-many thread relation iterates the threads this thread spawned. These
-// tests observe the production helpers in vpi.cpp and VpiContext::Get that apply
-// those rules. Thread specific callbacks are §38.36.1's (detail 2).
+// tests observe the production helpers in vpi.cpp and VpiContext::Get that
+// apply those rules. Thread specific callbacks are §38.36.1's (detail 2).
 
 // vpiActive property: a thread reports whether it is the active one through
 // vpi_get(vpiActive).

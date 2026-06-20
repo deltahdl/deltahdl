@@ -291,4 +291,4 @@ TEST(IpcSync, EventControlOperatorDispatchesEdgeAndNamedEvent) {
   EXPECT_EQ(vb->value.ToUint64(), 22u);
 }
 
-}
+}  // namespace

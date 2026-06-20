@@ -51,4 +51,4 @@ TEST(SemaphorePutParser, MultiplePutCalls) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}
+}  // namespace

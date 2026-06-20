@@ -64,4 +64,4 @@ TEST(Elaboration, StringLiteralRelationalElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

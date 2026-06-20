@@ -127,4 +127,4 @@ TEST(ArraySubroutineArgValidation, DpiOpenArrayOutputAcceptsFixedArray) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

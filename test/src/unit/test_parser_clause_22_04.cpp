@@ -31,8 +31,7 @@ static ParseResult ParseWithIncludes(IncludeTestDir& tmp,
   ParseResult result;
   DiagEngine diag(result.mgr);
   tmp.WriteFile("main.sv", main_src);
-  auto fid =
-      result.mgr.AddFile((tmp.dir / "main.sv").string(), main_src);
+  auto fid = result.mgr.AddFile((tmp.dir / "main.sv").string(), main_src);
   Preprocessor preproc(result.mgr, diag, {});
   auto pp = preproc.Preprocess(fid);
   auto pp_fid = result.mgr.AddFile("<preprocessed>", pp);
@@ -123,4 +122,4 @@ TEST(IncludeFileParsing, IncludedMacroAffectsParseResult) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
-}
+}  // namespace

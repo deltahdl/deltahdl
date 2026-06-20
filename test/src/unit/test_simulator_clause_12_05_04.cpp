@@ -486,8 +486,8 @@ TEST(CaseInsideStatementSim, CaseInsideTolerancePlusPercentMinusOutOfRange) {
 
 // §12.5.4: the set-membership comparison is evaluated in the order specified by
 // a priority-case statement. A priority-qualified case-inside acts on the first
-// matching item even when later items also match (mirrors the LRM example, which
-// qualifies a case-inside with priority).
+// matching item even when later items also match (mirrors the LRM example,
+// which qualifies a case-inside with priority).
 TEST(CaseInsideStatementSim, CaseInsidePriorityFirstMatch) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -562,4 +562,4 @@ TEST(CaseInsideStatementSim, CaseInsideEmptyNoItems) {
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
-}
+}  // namespace

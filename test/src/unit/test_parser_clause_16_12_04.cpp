@@ -22,4 +22,4 @@ TEST(AssertionSemanticsParsing, PropertyOr) {
   EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kAssertProperty));
 }
 
-}
+}  // namespace

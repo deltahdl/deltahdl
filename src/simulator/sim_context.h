@@ -240,9 +240,9 @@ class SimContext {
   // the current scope level (the interactive scope above). Its optional integer
   // argument widens the listing: a nonzero value lists every such object in or
   // below the current hierarchical scope, while no argument or a zero value
-  // lists only the objects at the current scope level itself. Remember the scope
-  // whose contents were shown and whether the listing recursed so the selection
-  // can be observed.
+  // lists only the objects at the current scope level itself. Remember the
+  // scope whose contents were shown and whether the listing recursed so the
+  // selection can be observed.
   void RecordShowScopes(std::string_view scope, bool recursive) {
     last_shown_scope_ = std::string(scope);
     show_scopes_recursive_ = recursive;
@@ -251,14 +251,14 @@ class SimContext {
   bool ShowScopesRecursive() const { return show_scopes_recursive_; }
 
   // Optional $showvars system task (Annex D.13). $showvars produces status
-  // information for the reg and net variables, scalar and vector, in the current
-  // scope (the interactive scope above). With no argument it reports every
-  // variable in that scope; with a list of variables it reports only the named
-  // ones. A bit-select or part-select of a vector reports the status of every
-  // bit of that vector, so such a selection is recorded by the name of its
-  // underlying vector. Remember the scope the request applied to and the list of
-  // variables named (empty when none were given) so the selection can be
-  // observed.
+  // information for the reg and net variables, scalar and vector, in the
+  // current scope (the interactive scope above). With no argument it reports
+  // every variable in that scope; with a list of variables it reports only the
+  // named ones. A bit-select or part-select of a vector reports the status of
+  // every bit of that vector, so such a selection is recorded by the name of
+  // its underlying vector. Remember the scope the request applied to and the
+  // list of variables named (empty when none were given) so the selection can
+  // be observed.
   void RecordShowVars(std::string_view scope, std::vector<std::string> vars) {
     last_showvars_scope_ = std::string(scope);
     showvars_variables_ = std::move(vars);
@@ -398,7 +398,9 @@ class SimContext {
   }
 
   void EnterFunction() { ++function_depth_; }
-  void ExitFunction() { if (function_depth_ > 0) --function_depth_; }
+  void ExitFunction() {
+    if (function_depth_ > 0) --function_depth_;
+  }
   bool InFunction() const { return function_depth_ > 0; }
 
   void PushQueueRefFrame();
@@ -786,7 +788,8 @@ class SimContext {
 
   uint32_t pending_program_initials_ = 0;
 
-  std::unordered_map<uint32_t, std::vector<Process*>> program_initials_by_block_;
+  std::unordered_map<uint32_t, std::vector<Process*>>
+      program_initials_by_block_;
   DelayMode delay_mode_ = DelayMode::kTyp;
   TimeUnit global_precision_ = TimeUnit::kNs;
   TimeFormatSpec time_format_;
@@ -888,4 +891,4 @@ class SimContext {
   std::vector<std::string_view> active_scope_stack_;
 };
 
-}
+}  // namespace delta

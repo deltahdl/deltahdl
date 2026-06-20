@@ -105,4 +105,4 @@ TEST(PackageItemsElaboration, MultiplePackagesWithImportsElaborate) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

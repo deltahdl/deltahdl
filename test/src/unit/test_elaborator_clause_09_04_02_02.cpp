@@ -547,8 +547,7 @@ TEST(AlwaysStarElab, SubroutineArgInSensitivity) {
     if (ev.signal && ev.signal->kind == ExprKind::kIdentifier)
       names.insert(std::string(ev.signal->text));
   }
-  EXPECT_TRUE(names.count("a"))
-      << "a (subroutine arg) must be in sensitivity";
+  EXPECT_TRUE(names.count("a")) << "a (subroutine arg) must be in sensitivity";
   EXPECT_FALSE(names.count("y")) << "y (pure LHS) must not be in sensitivity";
 }
 
@@ -772,4 +771,4 @@ TEST(AlwaysStarElab, ConstantRhsProducesEmptySensitivity) {
       << "a constant RHS reads no signals, so the implicit list is empty";
 }
 
-}
+}  // namespace

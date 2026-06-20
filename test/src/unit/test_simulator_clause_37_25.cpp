@@ -8,14 +8,15 @@
 namespace delta {
 namespace {
 
-// §37.25 Typespec: a typespec object describes a type specification. These tests
-// observe the production helpers in vpi.cpp that apply the clause's numbered
-// "Details" - what vpiName/vpiTypedefAlias report (detail 1), which typespecs
-// carry an index typespec (detail 2) and members (detail 3/4), what a member's
-// type and default value are (detail 3/7), how vpiElemTypespec unwinds an array
-// (detail 8), and how the figure's range relations route through §37.22 (details
-// 9 and 10). The figure attributes with no numbered Detail (vpiTagged/vpiSoft/
-// vpiPacked/vpiVector/vpiArrayType/vpiRandType) belong to §37.26 and §37.17.
+// §37.25 Typespec: a typespec object describes a type specification. These
+// tests observe the production helpers in vpi.cpp that apply the clause's
+// numbered "Details" - what vpiName/vpiTypedefAlias report (detail 1), which
+// typespecs carry an index typespec (detail 2) and members (detail 3/4), what a
+// member's type and default value are (detail 3/7), how vpiElemTypespec unwinds
+// an array (detail 8), and how the figure's range relations route through
+// §37.22 (details 9 and 10). The figure attributes with no numbered Detail
+// (vpiTagged/vpiSoft/ vpiPacked/vpiVector/vpiArrayType/vpiRandType) belong to
+// §37.26 and §37.17.
 
 // §37.25: the typespec class groups every "... typespec" node of the figure; a
 // plain expression or variable object is not a typespec.
@@ -61,9 +62,9 @@ TEST(Typespec, NameOfInlineFieldMayBeEmpty) {
   EXPECT_STREQ(name, "");
 }
 
-// D1: a typespec whose typedef aliases another typedef hands back a handle to the
-// aliased typedef; the aliased typedef, not itself an alias, reports NULL. This
-// mirrors the colors -> primary_colors example.
+// D1: a typespec whose typedef aliases another typedef hands back a handle to
+// the aliased typedef; the aliased typedef, not itself an alias, reports NULL.
+// This mirrors the colors -> primary_colors example.
 TEST(Typespec, TypedefAliasChain) {
   VpiObject primary_colors;
   EXPECT_EQ(VpiTypespecTypedefAlias(/*is_alias=*/true, &primary_colors),
@@ -72,16 +73,16 @@ TEST(Typespec, TypedefAliasChain) {
 }
 
 // D6: a type defined as an alias of another type inherits the other type's
-// vpiType, so both the alias and the aliased typespec report the same type code,
-// observed through the existing vpi_get(vpiType). The alias of a time typedef
-// reports vpiTimeTypespec, not a distinct alias type.
+// vpiType, so both the alias and the aliased typespec report the same type
+// code, observed through the existing vpi_get(vpiType). The alias of a time
+// typedef reports vpiTimeTypespec, not a distinct alias type.
 TEST(Typespec, AliasInheritsUnderlyingType) {
   VpiContext ctx;
   SetGlobalVpiContext(&ctx);
 
   VpiObject aliased;  // the predefined "time" typespec
   aliased.type = vpiTimeTypespec;
-  VpiObject my_time;  // typedef time my_time;
+  VpiObject my_time;               // typedef time my_time;
   my_time.type = vpiTimeTypespec;  // inherits the underlying type
 
   EXPECT_EQ(vpi_get(vpiType, &my_time), vpiTimeTypespec);
@@ -90,8 +91,8 @@ TEST(Typespec, AliasInheritsUnderlyingType) {
   SetGlobalVpiContext(nullptr);
 }
 
-// D2: vpiIndexTypespec exists only on an associative-array typespec and gives the
-// key type.
+// D2: vpiIndexTypespec exists only on an associative-array typespec and gives
+// the key type.
 TEST(Typespec, IndexTypespecOnAssociativeArray) {
   VpiObject key;
   EXPECT_EQ(VpiTypespecIndexTypespec(/*is_assoc_array_typespec=*/true,
@@ -145,8 +146,8 @@ TEST(Typespec, MemberTypespecIsTheTypespecChild) {
   EXPECT_EQ(VpiTypespecMemberTypespec(&member), &member_type);
 }
 
-// D4: vpiName of a typespec member is the member's own name, not the name of the
-// member's type.
+// D4: vpiName of a typespec member is the member's own name, not the name of
+// the member's type.
 TEST(Typespec, MemberNameIsTheMembersOwnName) {
   VpiObject member;
   member.name = "a";
@@ -200,8 +201,8 @@ TEST(Typespec, MemberRelationsNullHandleSafe) {
 // once no ranges remain it yields NULL. This walks the figure's arr example:
 // a 4x3 unpacked array typespec -> ... -> base struct typespec.
 TEST(Typespec, ElemTypespecUnwindsUntilNoRangesRemain) {
-  VpiObject after_first_unwind;   // 3-element unpacked array typespec
-  VpiObject base_struct;          // the non-array element, no ranges left
+  VpiObject after_first_unwind;  // 3-element unpacked array typespec
+  VpiObject base_struct;         // the non-array element, no ranges left
 
   // The outer typespec still has unpacked ranges, so unwinding yields the next
   // level.
@@ -212,9 +213,9 @@ TEST(Typespec, ElemTypespecUnwindsUntilNoRangesRemain) {
             nullptr);
 }
 
-// D8 edge: a multidimensional array typespec unwinds one level per call, walking
-// the chain until the base element (no ranges) is reached and the next call
-// yields NULL - the stepwise behavior of the figure's arr example.
+// D8 edge: a multidimensional array typespec unwinds one level per call,
+// walking the chain until the base element (no ranges) is reached and the next
+// call yields NULL - the stepwise behavior of the figure's arr example.
 TEST(Typespec, ElemTypespecUnwindsMultipleDimensionsStepwise) {
   VpiObject inner;  // the outer array with its leftmost range removed
   VpiObject base;   // the base element typespec, no ranges remaining
@@ -247,8 +248,8 @@ TEST(Typespec, RangeIterationYieldsOneRangePerDimension) {
   EXPECT_EQ(VpiRangeRightRange(ranges[1]), &r1);
 }
 
-// D10: a dynamic, associative, or queue dimension of the typespec contributes an
-// empty range (§37.22).
+// D10: a dynamic, associative, or queue dimension of the typespec contributes
+// an empty range (§37.22).
 TEST(Typespec, RangeIterationGivesEmptyRangeForUnboundedDimension) {
   VpiObject l, r;
   std::vector<VpiArrayDimension> dims(1);
@@ -263,9 +264,9 @@ TEST(Typespec, RangeIterationGivesEmptyRangeForUnboundedDimension) {
   EXPECT_EQ(VpiRangeLeftRange(ranges[0]), nullptr);
 }
 
-// D9: vpiLeftRange/vpiRightRange of a typespec report the bounds of the leftmost
-// declared dimension (leftmost packed for a logic/bit/packed-array typespec,
-// leftmost unpacked for an array typespec).
+// D9: vpiLeftRange/vpiRightRange of a typespec report the bounds of the
+// leftmost declared dimension (leftmost packed for a logic/bit/packed-array
+// typespec, leftmost unpacked for an array typespec).
 TEST(Typespec, LeftAndRightRangeUseLeftmostDimension) {
   VpiObject l0, r0, l1, r1;
   std::vector<VpiArrayDimension> dims(2);
@@ -291,7 +292,8 @@ TEST(Typespec, LeftAndRightRangeNullForEmptyLeftmostDimension) {
   EXPECT_EQ(VpiTypespecRightRange(dims), nullptr);
 }
 
-// D9: a typespec with no declared dimension has neither a left nor a right range.
+// D9: a typespec with no declared dimension has neither a left nor a right
+// range.
 TEST(Typespec, LeftAndRightRangeNullWhenNoDimensions) {
   std::vector<VpiArrayDimension> dims;
   EXPECT_EQ(VpiTypespecLeftRange(dims), nullptr);

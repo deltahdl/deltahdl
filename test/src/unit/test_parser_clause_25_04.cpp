@@ -76,4 +76,4 @@ TEST(InterfaceDeclaration, WithNonAnsiPortDeclaration) {
   EXPECT_EQ(r.cu->interfaces[0]->ports[1].direction, Direction::kInput);
 }
 
-}
+}  // namespace

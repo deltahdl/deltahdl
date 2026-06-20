@@ -61,4 +61,4 @@ TEST(OptionalSystemTaskExtendedParsing, ResetWithStopAndResetValue) {
   ASSERT_EQ(stmt->expr->args.size(), 2u);
 }
 
-}
+}  // namespace

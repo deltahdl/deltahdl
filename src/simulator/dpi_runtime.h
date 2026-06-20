@@ -254,7 +254,8 @@ class DpiRuntime {
   // a function frame may never call an exported task.
   void EnterContextImportCall(std::string_view sv_name, DpiScope decl_scope,
                               bool is_task = false);
-  void EnterNoncontextImportCall(std::string_view sv_name, bool is_task = false);
+  void EnterNoncontextImportCall(std::string_view sv_name,
+                                 bool is_task = false);
   void LeaveImportCall();
   uint32_t ImportCallDepth() const;
   bool ChainRootIsContext() const;
@@ -358,13 +359,13 @@ struct AssertionCbData {
 
 using AssertionCbFunc = std::function<void(const AssertionCbData&)>;
 
-// §39.4.2 step detail. Describes the set of expressions matched while satisfying
-// one step along the flattened assertion (modeled here by their source text)
-// plus the source and destination state ids identifying the path taken through
-// the assertion. State ids are integers: 0 is the origin state, 1 an accepting
-// state, any other value an intermediate point. An empty expression set models
-// an unconditional transition. On a failing step the last expression is the one
-// where the transition failed.
+// §39.4.2 step detail. Describes the set of expressions matched while
+// satisfying one step along the flattened assertion (modeled here by their
+// source text) plus the source and destination state ids identifying the path
+// taken through the assertion. State ids are integers: 0 is the origin state, 1
+// an accepting state, any other value an intermediate point. An empty
+// expression set models an unconditional transition. On a failing step the last
+// expression is the one where the transition failed.
 struct AssertionStepDetail {
   std::vector<std::string> matched_exprs;
   int state_from = 0;
@@ -383,9 +384,9 @@ struct AssertionAttemptInfo {
 };
 
 // §39.4.2 the five arguments supplied to a placed assertion callback: the
-// reason, the callback time, the assertion (the handle, modeled here by name), a
-// pointer to the attempt information (null for the reasons that carry none), and
-// the user data registered when the callback was placed.
+// reason, the callback time, the assertion (the handle, modeled here by name),
+// a pointer to the attempt information (null for the reasons that carry none),
+// and the user data registered when the callback was placed.
 struct AssertionCallbackArgs {
   int reason = 0;
   uint64_t cb_time = 0;
@@ -453,8 +454,8 @@ class AssertionApi {
                                                  AssertionPlacedCallback cb,
                                                  void* user_data);
 
-  // §39.4.2: remove a previously placed callback via the handle returned when it
-  // was placed (modeling vpi_remove_cb()). Returns true when a callback was
+  // §39.4.2: remove a previously placed callback via the handle returned when
+  // it was placed (modeling vpi_remove_cb()). Returns true when a callback was
   // removed, false when the handle matches no placed callback.
   bool RemoveAssertionCallback(AssertionCallbackHandle handle);
 
@@ -465,20 +466,21 @@ class AssertionApi {
   // reason matches the event is supplied the five §39.4.2 arguments; the
   // attempt-info pointer is null for the reasons that carry none. A placed step
   // callback fires for both step success and step failure. A malformed failing
-  // step (no expression in the array) is rejected and fires nothing. Returns the
-  // number of callbacks invoked.
+  // step (no expression in the array) is rejected and fires nothing. Returns
+  // the number of callbacks invoked.
   uint32_t DeliverAssertionEvent(std::string_view assertion, int reason,
                                  uint64_t cb_time,
                                  const AssertionAttemptInfo& info);
 
-  // §39.4.2.1: callbacks placed on an assertion that refers to a global clocking
-  // future sampled value function (see §16.9.4) are delivered with two
+  // §39.4.2.1: callbacks placed on an assertion that refers to a global
+  // clocking future sampled value function (see §16.9.4) are delivered with two
   // peculiarities. The callback is not executed when its event occurs; delivery
   // is deferred to the nearest tick of the global clock strictly following the
   // event. The cb_time reported to the callback is, however, the time of the
   // event itself — not the later tick at which the callback executes.
 
-  // The schedule of global clock ticks against which deferred deliveries mature.
+  // The schedule of global clock ticks against which deferred deliveries
+  // mature.
   void SetGlobalClockTicks(std::vector<uint64_t> ticks);
 
   // Records that the named assertion refers to a global clocking future sampled
@@ -490,25 +492,27 @@ class AssertionApi {
   static constexpr uint64_t kNoGlobalClockTick = UINT64_MAX;
 
   // The nearest global clock tick strictly following `event_time`: the smallest
-  // tick greater than it. A tick that coincides with the event does not qualify.
-  // Returns kNoGlobalClockTick when no later tick exists in the schedule.
+  // tick greater than it. A tick that coincides with the event does not
+  // qualify. Returns kNoGlobalClockTick when no later tick exists in the
+  // schedule.
   static uint64_t NearestGlobalClockTickAfter(
       const std::vector<uint64_t>& ticks, uint64_t event_time);
 
   // Deliver, or for a global-clocking-future assertion schedule, an event for
-  // `reason` occurring on `assertion` at `event_time`. When the assertion refers
-  // to a global clocking future sampled value function the callback is not fired
-  // now: it is queued for the nearest global clock tick strictly following the
-  // event, so this call invokes nothing and returns 0. For any other assertion
-  // delivery is immediate, exactly as DeliverAssertionEvent at the event time.
+  // `reason` occurring on `assertion` at `event_time`. When the assertion
+  // refers to a global clocking future sampled value function the callback is
+  // not fired now: it is queued for the nearest global clock tick strictly
+  // following the event, so this call invokes nothing and returns 0. For any
+  // other assertion delivery is immediate, exactly as DeliverAssertionEvent at
+  // the event time.
   uint32_t DeliverAssertionEventAtGlobalClock(std::string_view assertion,
                                               int reason, uint64_t event_time,
                                               const AssertionAttemptInfo& info);
 
   // Advances the global clock to `tick_time`, firing every queued global-
-  // clocking-future callback whose deferred delivery tick has been reached. Each
-  // is invoked with cb_time equal to the time of its original event — not this
-  // delivery tick. Returns the number of callbacks invoked.
+  // clocking-future callback whose deferred delivery tick has been reached.
+  // Each is invoked with cb_time equal to the time of its original event — not
+  // this delivery tick. Returns the number of callbacks invoked.
   uint32_t AdvanceGlobalClockTick(uint64_t tick_time);
 
   // The number of global-clocking-future callbacks still awaiting their tick.
@@ -520,11 +524,12 @@ class AssertionApi {
   void SetAction(std::string_view name, AssertionAction action);
   AssertionAction GetAction(std::string_view name) const;
 
-  // §39.5.1 assertion system control via vpi_control(). The constant selects the
-  // system-wide operation; an empty scope models a null scope handle, meaning
-  // the control applies to all assertions regardless of scope. Returns true when
-  // the control is applied, false when it is rejected (the system is locked, or
-  // has ended and permits no further actions) or the constant is unrecognized.
+  // §39.5.1 assertion system control via vpi_control(). The constant selects
+  // the system-wide operation; an empty scope models a null scope handle,
+  // meaning the control applies to all assertions regardless of scope. Returns
+  // true when the control is applied, false when it is rejected (the system is
+  // locked, or has ended and permits no further actions) or the constant is
+  // unrecognized.
   bool SysControl(int control, std::string_view scope = {});
 
   // §39.5.2 per-assertion control via vpi_control(). These controls target a
@@ -540,8 +545,8 @@ class AssertionApi {
   // unlock), or an unrecognized control.
   bool Control(int control, std::string_view assertion);
 
-  // Controls whose arguments are the assertion handle and an attempt start time:
-  // kill (discards the given attempt) and disable step.
+  // Controls whose arguments are the assertion handle and an attempt start
+  // time: kill (discards the given attempt) and disable step.
   bool ControlAttempt(int control, std::string_view assertion,
                       uint64_t attempt_start_time);
 
@@ -590,10 +595,11 @@ class AssertionApi {
   // concurrent assertion (see §16.14.6) may have an instance waiting in a
   // procedural assertion queue to mature. These model that pending, not-yet-
   // matured state per assertion: an instance is enqueued for an assertion and
-  // counted. A control that discards the assertion's current evaluation attempts
-  // in progress also flushes its pending instances (e.g. vpiAssertionReset); a
-  // control that does not interfere with current attempts leaves them queued so
-  // they may still mature and be reported (e.g. vpiAssertionDisable).
+  // counted. A control that discards the assertion's current evaluation
+  // attempts in progress also flushes its pending instances (e.g.
+  // vpiAssertionReset); a control that does not interfere with current attempts
+  // leaves them queued so they may still mature and be reported (e.g.
+  // vpiAssertionDisable).
 
   // Enqueue a pending, not-yet-matured instance for the named assertion.
   void QueuePendingAssertionReport(std::string_view assertion);
@@ -625,8 +631,8 @@ class AssertionApi {
 
   // §39.4.2.1 deferred delivery for assertions referring to global clocking
   // future sampled value functions. Such an assertion's callbacks fire at the
-  // nearest global clock tick strictly following the event; until that tick they
-  // wait here, each remembering the event time that becomes its cb_time.
+  // nearest global clock tick strictly following the event; until that tick
+  // they wait here, each remembering the event time that becomes its cb_time.
   struct PendingGlobalClockingCb {
     std::string assertion;
     int reason = 0;
@@ -653,10 +659,10 @@ class AssertionApi {
   bool last_control_global_ = false;
 
   // §39.5.2 per-assertion control state. Defaults reflect each assertion's
-  // initial state: enabled, unlocked, all actions enabled. Attempts are keyed by
-  // their start time; stepping is disabled by default per attempt. An entry may
-  // exist before its attempt has started (stepping configured ahead of time);
-  // once started, its stepping mode is frozen.
+  // initial state: enabled, unlocked, all actions enabled. Attempts are keyed
+  // by their start time; stepping is disabled by default per attempt. An entry
+  // may exist before its attempt has started (stepping configured ahead of
+  // time); once started, its stepping mode is frozen.
   struct AttemptControlState {
     bool started = false;
     bool step_enabled = false;

@@ -8,7 +8,6 @@
 namespace delta {
 
 Logic4Word Logic4And(Logic4Word a, Logic4Word b) {
-
   uint64_t a_known_0 = ~a.aval & ~a.bval;
   uint64_t b_known_0 = ~b.aval & ~b.bval;
   uint64_t result_aval = a.aval & b.aval;
@@ -18,7 +17,6 @@ Logic4Word Logic4And(Logic4Word a, Logic4Word b) {
 }
 
 Logic4Word Logic4Or(Logic4Word a, Logic4Word b) {
-
   uint64_t a_known_1 = a.aval & ~a.bval;
   uint64_t b_known_1 = b.aval & ~b.bval;
   uint64_t result_aval = a.aval | b.aval;
@@ -91,7 +89,6 @@ Logic4Vec MakeLogic4Vec(Arena& arena, uint32_t width) {
 Logic4Vec MakeLogic4VecVal(Arena& arena, uint32_t width, uint64_t val) {
   auto vec = MakeLogic4Vec(arena, width);
   if (vec.nwords > 0) {
-
     if (width < 64) val &= (uint64_t{1} << width) - 1;
     vec.words[0].aval = val;
   }
@@ -110,7 +107,6 @@ Strength ReduceNonresistive(Strength input) {
 }
 
 Strength ReduceResistive(Strength input) {
-
   switch (input) {
     case Strength::kSupply:
     case Strength::kStrong:
@@ -237,8 +233,10 @@ bool IsPliRegion(Region r) {
 
 int EffectiveTimeOrder(TimeUnit unit, int magnitude) {
   int order = static_cast<int>(unit);
-  if (magnitude == 10) order += 1;
-  else if (magnitude == 100) order += 2;
+  if (magnitude == 10)
+    order += 1;
+  else if (magnitude == 100)
+    order += 2;
   return order;
 }
 
@@ -269,7 +267,6 @@ static uint64_t PowerOf10(int exp) {
 
 uint64_t DelayToTicks(uint64_t delay, const TimeScale& scale,
                       TimeUnit global_precision) {
-
   int exp_diff =
       static_cast<int>(scale.unit) - static_cast<int>(global_precision);
   uint64_t ticks = delay * scale.magnitude;
@@ -283,7 +280,6 @@ uint64_t DelayToTicks(uint64_t delay, const TimeScale& scale,
 
 uint64_t RealDelayToTicks(double delay, const TimeScale& scale,
                           TimeUnit global_precision) {
-
   int exp_diff =
       static_cast<int>(scale.unit) - static_cast<int>(global_precision);
   double raw_ticks = delay * scale.magnitude;
@@ -304,4 +300,4 @@ uint64_t RealDelayToTicks(double delay, const TimeScale& scale,
   return static_cast<uint64_t>(rounded);
 }
 
-}
+}  // namespace delta

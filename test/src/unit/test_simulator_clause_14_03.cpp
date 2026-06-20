@@ -89,7 +89,7 @@ TEST(ClockingBlockSim, MultipleBlocks) {
   EXPECT_NE(cmgr.Find("cb_slow"), nullptr);
 }
 
-TEST(ClockingBlockSim,DeclareWithClockEvent) {
+TEST(ClockingBlockSim, DeclareWithClockEvent) {
   ClockingSimFixture f;
   ClockingManager cmgr;
 
@@ -107,13 +107,13 @@ TEST(ClockingBlockSim,DeclareWithClockEvent) {
   EXPECT_EQ(found->clock_edge, Edge::kPosedge);
 }
 
-TEST(ClockingBlockSim,NegedgeClockEvent) {
+TEST(ClockingBlockSim, NegedgeClockEvent) {
   ClockingSimFixture f;
   ClockingManager cmgr;
   TestNegedgeSampling(f, cmgr);
 }
 
-TEST(ClockingBlockSim,SimContextClockingManagerAccess) {
+TEST(ClockingBlockSim, SimContextClockingManagerAccess) {
   ClockingSimFixture f;
   ClockingManager cmgr;
 
@@ -129,7 +129,7 @@ TEST(ClockingBlockSim,SimContextClockingManagerAccess) {
   EXPECT_EQ(f.ctx.GetClockingManager(), &cmgr);
 }
 
-TEST(ClockingBlockSim,RegisterAndFind) {
+TEST(ClockingBlockSim, RegisterAndFind) {
   ClockingManager mgr;
   ClockingBlock block;
   block.name = "cb_main";
@@ -146,12 +146,12 @@ TEST(ClockingBlockSim,RegisterAndFind) {
   EXPECT_EQ(found->default_input_skew.ticks, 2u);
 }
 
-TEST(ClockingBlockSim,FindNonexistent) {
+TEST(ClockingBlockSim, FindNonexistent) {
   ClockingManager mgr;
   EXPECT_EQ(mgr.Find("nonexistent"), nullptr);
 }
 
-TEST(ClockingBlockSim,DefaultSkewAppliedToAllSignals) {
+TEST(ClockingBlockSim, DefaultSkewAppliedToAllSignals) {
   ClockingManager cmgr;
   ClockingBlock block;
   block.name = "cb";
@@ -176,7 +176,7 @@ TEST(ClockingBlockSim,DefaultSkewAppliedToAllSignals) {
   EXPECT_EQ(cmgr.GetOutputSkew("cb", "b").ticks, 7u);
 }
 
-TEST(ClockingBlockSim,DefaultInputSkew) {
+TEST(ClockingBlockSim, DefaultInputSkew) {
   ClockingManager mgr;
   ClockingBlock block;
   block.name = "cb";
@@ -189,7 +189,7 @@ TEST(ClockingBlockSim,DefaultInputSkew) {
   EXPECT_EQ(skew.ticks, 5u);
 }
 
-TEST(ClockingBlockSim,OutputSkew) {
+TEST(ClockingBlockSim, OutputSkew) {
   ClockingManager mgr;
   ClockingBlock block;
   block.name = "cb";
@@ -236,4 +236,4 @@ TEST(ClockingBlockSim, EdgeClockEdgeRegistered) {
   EXPECT_EQ(found->clock_edge, Edge::kEdge);
 }
 
-}
+}  // namespace
