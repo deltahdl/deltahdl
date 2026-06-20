@@ -26,13 +26,13 @@ using NameSet = std::unordered_set<std::string_view>;
 std::optional<int64_t> ComputeDimSize(const Expr* dim);
 std::string_view LhsBaseName(const Expr* e);
 bool ExprContainsIdent(const Expr* e, std::string_view name);
-bool ExprUsesInterconnect(
-    const Expr* e, const std::unordered_set<std::string_view>& names);
+bool ExprUsesInterconnect(const Expr* e,
+                          const std::unordered_set<std::string_view>& names);
 void CheckNbaDynamicArrayTarget(
     const Stmt* s, const std::unordered_set<std::string_view>& dyn_names,
     DiagEngine& diag);
-void CollectProcTargets(
-    const Stmt* s, std::unordered_map<std::string_view, SourceLoc>& out);
+void CollectProcTargets(const Stmt* s,
+                        std::unordered_map<std::string_view, SourceLoc>& out);
 void CheckInterconnectProcContAssign(
     const Stmt* s,
     const std::unordered_set<std::string_view>& interconnect_names,

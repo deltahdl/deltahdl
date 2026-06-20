@@ -6,8 +6,8 @@
 #include "common/diagnostic.h"
 #include "parser/ast.h"
 #include "simulator/coverage_control.h"
-#include "simulator/evaluation.h"
 #include "simulator/eval_systask_internal.h"
+#include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
 #include "simulator/variable.h"
 

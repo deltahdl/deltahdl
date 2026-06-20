@@ -238,8 +238,8 @@ static void CollectLhsBaseNames(
   if (!name.empty()) out.emplace(name, loc);
 }
 
-void CollectProcTargets(
-    const Stmt* s, std::unordered_map<std::string_view, SourceLoc>& out) {
+void CollectProcTargets(const Stmt* s,
+                        std::unordered_map<std::string_view, SourceLoc>& out) {
   if (!s) return;
   if (s->kind == StmtKind::kBlockingAssign ||
       s->kind == StmtKind::kNonblockingAssign) {
@@ -339,8 +339,8 @@ void CheckForceLhs(
     CheckForceLhs(ci.body, net_names, nettype_net_names, diag);
 }
 
-bool ExprUsesInterconnect(
-    const Expr* e, const std::unordered_set<std::string_view>& names) {
+bool ExprUsesInterconnect(const Expr* e,
+                          const std::unordered_set<std::string_view>& names) {
   if (!e) return false;
   if (e->kind == ExprKind::kIdentifier) return names.count(e->text) > 0;
   if (ExprUsesInterconnect(e->lhs, names)) return true;
@@ -380,8 +380,7 @@ static void CheckRealSelectNode(const Expr* e, const TypeMap& types,
   }
 }
 
-void CheckRealSelect(const Expr* e, const TypeMap& types,
-                     DiagEngine& diag) {
+void CheckRealSelect(const Expr* e, const TypeMap& types, DiagEngine& diag) {
   if (!e) return;
   if (e->kind == ExprKind::kSelect && e->base) {
     CheckRealSelectNode(e, types, diag);

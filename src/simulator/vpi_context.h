@@ -796,5 +796,4 @@ using VlogStartupRoutine = void (*)();
 // the first null sentinel.
 void InvokeVlogStartupRoutines(VlogStartupRoutine* routines);
 
-
 }  // namespace delta

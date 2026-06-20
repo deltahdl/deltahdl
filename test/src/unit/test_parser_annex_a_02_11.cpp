@@ -886,5 +886,4 @@ TEST(CovergroupDeclParsing, SelectExpression_Or) {
               "endmodule\n"));
 }
 
-
 }  // namespace

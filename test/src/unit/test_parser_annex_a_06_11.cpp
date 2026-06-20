@@ -892,5 +892,4 @@ TEST(ClockingSkewParse, DefaultOutputSkew) {
   EXPECT_EQ(item->clocking_signals[0].name, "ack");
 }
 
-
 }  // namespace

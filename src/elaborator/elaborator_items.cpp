@@ -48,7 +48,6 @@ bool IsNameDeclared(std::string_view name, const RtlirModule* mod) {
   return false;
 }
 
-
 bool Elaborator::MaybeCreateImplicitNet(std::string_view name, SourceLoc loc,
                                         RtlirModule* mod) {
   if (IsNameDeclared(name, mod)) return true;
@@ -812,6 +811,5 @@ std::string_view Elaborator::ScopedName(std::string_view base) {
   std::string full = gen_prefix_ + std::string(base);
   return {arena_.AllocString(full.c_str(), full.size()), full.size()};
 }
-
 
 }  // namespace delta

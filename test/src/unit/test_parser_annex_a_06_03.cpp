@@ -886,5 +886,4 @@ TEST(BlockStatementSyntaxParsing, ForkNamed) {
   EXPECT_EQ(stmt->label, "my_fork");
 }
 
-
 }  // namespace

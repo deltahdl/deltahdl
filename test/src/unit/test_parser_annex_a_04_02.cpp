@@ -894,5 +894,4 @@ TEST(GenerateInstantiationGrammar, GenerateForBlockScope) {
   EXPECT_TRUE(found_gen);
 }
 
-
 }  // namespace

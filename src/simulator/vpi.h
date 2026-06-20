@@ -10,10 +10,10 @@
 // declarations, matching the original single-file ordering.
 
 #include "simulator/vpi_constants.h"
-#include "simulator/vpi_object.h"
+#include "simulator/vpi_context.h"
+#include "simulator/vpi_data_structs.h"
 #include "simulator/vpi_model_helpers1.h"
 #include "simulator/vpi_model_helpers2.h"
 #include "simulator/vpi_model_helpers3.h"
-#include "simulator/vpi_data_structs.h"
-#include "simulator/vpi_context.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user_macros.h"

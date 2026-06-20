@@ -9,7 +9,6 @@
 
 namespace delta {
 
-
 // §16.12.7: an implication `sequence_expr |-> property_expr` (overlapped) or
 // `sequence_expr |=> property_expr` (nonoverlapped) preconditions the
 // consequent property_expr on a match of the antecedent sequence_expr. When the

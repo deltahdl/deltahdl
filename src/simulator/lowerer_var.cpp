@@ -1,5 +1,3 @@
-#include "simulator/lowerer.h"
-
 #include <algorithm>
 #include <string>
 #include <string_view>
@@ -13,6 +11,7 @@
 #include "simulator/class_object.h"
 #include "simulator/eval_string.h"
 #include "simulator/evaluation.h"
+#include "simulator/lowerer.h"
 #include "simulator/sim_context.h"
 
 namespace delta {

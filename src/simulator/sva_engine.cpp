@@ -703,5 +703,4 @@ bool ExpectClockingEventBeginsEvaluation(uint64_t activation_tick,
   return clocking_event_tick > activation_tick;
 }
 
-
 }  // namespace delta

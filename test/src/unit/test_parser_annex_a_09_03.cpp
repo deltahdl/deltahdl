@@ -896,5 +896,4 @@ TEST(IdentifierSyntaxParsing, InterfacePortIdentifierAsModulePort) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-
 }  // namespace
