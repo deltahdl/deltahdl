@@ -349,6 +349,35 @@ void Parser::ParseBlockEventExpression() {
   } while (Match(TokenKind::kKwOr));
 }
 
+// Classify the current token and update the tf_port-style formal-list scan
+// state for one step. Shared by ParseCovergroupFormalList and
+// ParseSampleFormalList; the per-list behaviors (what to do when a formal name
+// is flushed, and which directions to reject) are supplied as callbacks.
+// pending_loc is always recorded on the identifier branch; callers that do not
+// need it simply ignore the field.
+void Parser::StepTfPortFormalScan(
+    TfPortFormalScan& st, const std::function<void()>& flush,
+    const std::function<bool()>& reject_direction) {
+  if (Check(TokenKind::kLParen)) {
+    ++st.depth;
+  } else if (Check(TokenKind::kRParen)) {
+    --st.depth;
+    if (st.depth == 0) flush();
+  } else if (reject_direction()) {
+    // diagnostic emitted; nothing else to record for this token.
+  } else if (st.depth == 1 && Check(TokenKind::kComma)) {
+    flush();
+  } else if (st.depth == 1 && Check(TokenKind::kEq)) {
+    // Everything up to the next comma is a default-value expression whose
+    // identifiers are not formal-argument names.
+    st.in_default = true;
+  } else if (!st.in_default && Check(TokenKind::kIdentifier)) {
+    st.pending = CurrentToken().text;
+    st.pending_loc = CurrentLoc();
+    st.have_pending = true;
+  }
+}
+
 void Parser::ParseCovergroupFormalList(std::vector<std::string>& names) {
   // Scan across the covergroup's optional formal-argument list, which follows
   // the same balanced-parenthesis shape as a tf_port_list. While scanning,
@@ -356,14 +385,11 @@ void Parser::ParseCovergroupFormalList(std::vector<std::string>& names) {
   // permitted for a covergroup formal (LRM 19.3), and collect each formal's
   // name. In a tf_port the declared name is the last identifier that appears
   // before a comma, a default-value '=', or the closing parenthesis.
-  int depth = 1;
-  std::string_view pending;
-  bool have_pending = false;
-  bool in_default = false;
+  TfPortFormalScan st;
   auto flush = [&]() {
-    if (have_pending) names.emplace_back(pending);
-    have_pending = false;
-    in_default = false;
+    if (st.have_pending) names.emplace_back(st.pending);
+    st.have_pending = false;
+    st.in_default = false;
   };
   auto reject_output_inout = [&]() {
     if (!Check(TokenKind::kKwOutput) && !Check(TokenKind::kKwInout))
@@ -373,29 +399,9 @@ void Parser::ParseCovergroupFormalList(std::vector<std::string>& names) {
                 "or 'inout'");
     return true;
   };
-  // Classify the current token and update the scan state for one step.
-  auto step = [&]() {
-    if (Check(TokenKind::kLParen)) {
-      ++depth;
-    } else if (Check(TokenKind::kRParen)) {
-      --depth;
-      if (depth == 0) flush();
-    } else if (reject_output_inout()) {
-      // diagnostic emitted; nothing else to record for this token.
-    } else if (depth == 1 && Check(TokenKind::kComma)) {
-      flush();
-    } else if (depth == 1 && Check(TokenKind::kEq)) {
-      // Everything up to the next comma is a default-value expression whose
-      // identifiers are not formal-argument names.
-      in_default = true;
-    } else if (!in_default && Check(TokenKind::kIdentifier)) {
-      pending = CurrentToken().text;
-      have_pending = true;
-    }
-  };
-  while (depth > 0 && !AtEnd()) {
-    step();
-    if (depth > 0) Consume();
+  while (st.depth > 0 && !AtEnd()) {
+    StepTfPortFormalScan(st, flush, reject_output_inout);
+    if (st.depth > 0) Consume();
   }
   if (Check(TokenKind::kRParen)) Consume();
 }
@@ -408,26 +414,22 @@ void Parser::ParseSampleFormalList(
   // an output direction, and because the sample formals share the covergroup's
   // argument scope (the formals consumed by the covergroup new operator), a
   // name shall not be specified in both the covergroup and sample lists.
-  int depth = 1;
-  std::string_view pending;
-  SourceLoc pending_loc{};
-  bool have_pending = false;
-  bool in_default = false;
+  TfPortFormalScan st;
   auto reuses_covergroup_formal = [&]() {
     for (const auto& formal : covergroup_formals) {
-      if (formal == pending) return true;
+      if (formal == st.pending) return true;
     }
     return false;
   };
   auto flush = [&]() {
-    if (have_pending && reuses_covergroup_formal()) {
-      diag_.Error(pending_loc,
-                  "sample method formal argument '" + std::string(pending) +
+    if (st.have_pending && reuses_covergroup_formal()) {
+      diag_.Error(st.pending_loc,
+                  "sample method formal argument '" + std::string(st.pending) +
                       "' shares the covergroup argument scope and cannot "
                       "reuse a covergroup formal-argument name");
     }
-    have_pending = false;
-    in_default = false;
+    st.have_pending = false;
+    st.in_default = false;
   };
   auto reject_output_inout = [&]() {
     if (!Check(TokenKind::kKwOutput) && !Check(TokenKind::kKwInout))
@@ -437,28 +439,9 @@ void Parser::ParseSampleFormalList(
                 "direction");
     return true;
   };
-  // Classify the current token and update the scan state for one step.
-  auto step = [&]() {
-    if (Check(TokenKind::kLParen)) {
-      ++depth;
-    } else if (Check(TokenKind::kRParen)) {
-      --depth;
-      if (depth == 0) flush();
-    } else if (reject_output_inout()) {
-      // diagnostic emitted; nothing else to record for this token.
-    } else if (depth == 1 && Check(TokenKind::kComma)) {
-      flush();
-    } else if (depth == 1 && Check(TokenKind::kEq)) {
-      in_default = true;
-    } else if (!in_default && Check(TokenKind::kIdentifier)) {
-      pending = CurrentToken().text;
-      pending_loc = CurrentLoc();
-      have_pending = true;
-    }
-  };
-  while (depth > 0 && !AtEnd()) {
-    step();
-    if (depth > 0) Consume();
+  while (st.depth > 0 && !AtEnd()) {
+    StepTfPortFormalScan(st, flush, reject_output_inout);
+    if (st.depth > 0) Consume();
   }
   if (Check(TokenKind::kRParen)) Consume();
 }

@@ -1,6 +1,8 @@
 #pragma once
 
+#include <functional>
 #include <string>
+#include <string_view>
 #include <unordered_set>
 #include <vector>
 
@@ -157,6 +159,19 @@ class Parser {
   RsProductionItem ParseRsProductionItem();
   RsCaseItem ParseRsCaseItem();
   void ParseCovergroupDecl(std::vector<ModuleItem*>& items);
+  // Scan state shared by the tf_port-style formal-list scanners
+  // (ParseCovergroupFormalList / ParseSampleFormalList). A single
+  // classification step is performed by StepTfPortFormalScan.
+  struct TfPortFormalScan {
+    int depth = 1;
+    std::string_view pending;
+    SourceLoc pending_loc;
+    bool have_pending = false;
+    bool in_default = false;
+  };
+  void StepTfPortFormalScan(TfPortFormalScan& st,
+                            const std::function<void()>& flush,
+                            const std::function<bool()>& reject_direction);
   void ParseCovergroupFormalList(std::vector<std::string>& names);
   void ParseSampleFormalList(
       const std::vector<std::string>& covergroup_formals);
