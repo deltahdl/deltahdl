@@ -72,8 +72,9 @@ CoverageControl CoverageControlForOperation(int operation) {
       return CoverageControl::kReset;
     case vpiCoverageCheck:
       return CoverageControl::kCheck;
+    default:
+      return CoverageControl::kStart;
   }
-  return CoverageControl::kStart;
 }
 
 // The handle names the controlled scope. A handle's hierarchical name

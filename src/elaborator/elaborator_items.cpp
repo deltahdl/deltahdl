@@ -200,14 +200,12 @@ void Elaborator::ElaborateParamDecl(ModuleItem* item, RtlirModule* mod) {
     PopulateValueParamInfo(pd, item, scalar_var_names_);
   }
 
+  // §6.20.7: a parameter is unbounded if it is assigned a literal '$', or if it
+  // is assigned another (unbounded) parameter; the assigned-to parameter is
+  // itself unbounded in that case.
   if (item->init_expr && item->init_expr->kind == ExprKind::kIdentifier &&
-      item->init_expr->text == "$") {
-    pd.is_unbounded = true;
-  } else if (item->init_expr &&
-             item->init_expr->kind == ExprKind::kIdentifier &&
-             RefersToUnboundedParam(mod, item->init_expr->text)) {
-    // §6.20.7: it is legal to assign a $ (unbounded) parameter to another
-    // parameter; the assigned-to parameter is itself unbounded.
+      (item->init_expr->text == "$" ||
+       RefersToUnboundedParam(mod, item->init_expr->text))) {
     pd.is_unbounded = true;
   } else if (item->init_expr) {
     if (ContainsDollarSubexpr(item->init_expr)) {

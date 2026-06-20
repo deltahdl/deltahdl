@@ -745,10 +745,7 @@ Logic4Word ToggleNotifierOnViolation(Logic4Word current) {
   if (kPreA && kPreB) {
     result.aval = 1u;
     result.bval = 1u;
-  } else if (kPreB) {
-    result.aval = 0u;
-    result.bval = 0u;
-  } else if (kPreA) {
+  } else if (kPreB || kPreA) {
     result.aval = 0u;
     result.bval = 0u;
   } else {

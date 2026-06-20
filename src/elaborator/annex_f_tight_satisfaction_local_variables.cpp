@@ -160,7 +160,7 @@ std::vector<LocalContext> OutputsForLocalVarDecl(const Word& word,
   const std::string& v = seq.local_var_name;
   const LocalContext kOuterV = RestrictToName(input, v);
   const LocalContext kBodyInput = RemoveName(input, v);
-  for (LocalContext inner :
+  for (const LocalContext& inner :
        OutputsForSlice(word, lo, hi, *seq.lhs, kBodyInput)) {
     LocalContext out = RemoveName(inner, v);
     for (const auto& entry : kOuterV) {

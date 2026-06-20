@@ -189,7 +189,6 @@ static bool ValidGateTerminalCount(GateKind kind, size_t count) {
     case GateKind::kNor:
     case GateKind::kXor:
     case GateKind::kXnor:
-      return count >= 2;
     case GateKind::kBuf:
     case GateKind::kNot:
       return count >= 2;

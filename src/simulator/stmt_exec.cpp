@@ -148,7 +148,7 @@ static void SubstituteSequenceEndpoints(std::unordered_set<std::string>& reads,
     }
   }
   for (const auto& r : seq_removes) reads.erase(r);
-  for (auto& a : seq_adds) reads.insert(std::move(a));
+  for (auto& a : seq_adds) reads.insert(a);
 }
 
 static ExecTask ExecWait(const Stmt* stmt, SimContext& ctx, Arena& arena) {

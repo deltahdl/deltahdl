@@ -135,7 +135,7 @@ static void ExpandArrayElementsSliced(std::string_view name, SimContext& ctx,
 
 static void ExpandQueueElements(QueueObject* queue,
                                 std::vector<Logic4Vec>& parts,
-                                uint32_t& total_width, Arena& arena) {
+                                uint32_t& total_width, Arena&) {
   for (const auto& elem : queue->elements) {
     parts.push_back(elem);
     total_width += elem.width;

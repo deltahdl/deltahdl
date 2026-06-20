@@ -43,7 +43,7 @@ static void InitClassPropertyDefaults(const ClassTypeInfo* info,
   }
 }
 
-static void RunConstructorForLevel(const ClassTypeInfo* info, ClassObject* obj,
+static void RunConstructorForLevel(const ClassTypeInfo* info, ClassObject*,
                                    const Expr* args_expr, SimContext& ctx,
                                    Arena& arena) {
   auto it = info->methods.find("new");

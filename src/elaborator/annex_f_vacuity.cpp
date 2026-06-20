@@ -235,12 +235,11 @@ bool NonVacuous(const Word& word, const PropertyExpr& property) {
     case PropertyExpr::Kind::kImplication:
       return NonVacuousImplication(word, property);
     case PropertyExpr::Kind::kOr:
-      // §F.5.3.3: w |=^non ( P1 or P2 ) iff w |=^non P1 or w |=^non P2.
-      return (property.lhs && NonVacuous(word, *property.lhs)) ||
-             (property.rhs && NonVacuous(word, *property.rhs));
     case PropertyExpr::Kind::kAnd:
-      // §F.5.3.3: w |=^non ( P1 and P2 ) iff w |=^non P1 or w |=^non P2. A
-      // conjunction is nonvacuous when either conjunct is, not both.
+      // §F.5.3.3: w |=^non ( P1 or P2 ) iff w |=^non P1 or w |=^non P2; and
+      // w |=^non ( P1 and P2 ) iff w |=^non P1 or w |=^non P2. A conjunction is
+      // nonvacuous when either conjunct is, not both, so both kinds share the
+      // same disjunctive shape.
       return (property.lhs && NonVacuous(word, *property.lhs)) ||
              (property.rhs && NonVacuous(word, *property.rhs));
     case PropertyExpr::Kind::kNexttime:

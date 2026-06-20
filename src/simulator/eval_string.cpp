@@ -175,8 +175,7 @@ static Logic4Vec StringSubstr(const std::string& str, const Expr* call_expr,
 }
 
 static int DigitValueForBase(char c, int base) {
-  if (base == 10 && c >= '0' && c <= '9') return c - '0';
-  if (base == 16 && c >= '0' && c <= '9') return c - '0';
+  if ((base == 10 || base == 16) && c >= '0' && c <= '9') return c - '0';
   if (base == 16 && c >= 'a' && c <= 'f') return c - 'a' + 10;
   if (base == 16 && c >= 'A' && c <= 'F') return c - 'A' + 10;
   if (base == 8 && c >= '0' && c <= '7') return c - '0';

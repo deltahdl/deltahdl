@@ -44,6 +44,7 @@ static std::unordered_set<std::string_view> CollectDeclaredNames(
 static std::vector<BindDirective*> CollectBindDirectives(
     const CompilationUnit* unit) {
   std::vector<BindDirective*> binds;
+  binds.reserve(unit->bind_directives.size());
   for (auto* bd : unit->bind_directives) binds.push_back(bd);
   for (auto* m : unit->modules)
     for (auto* bd : m->bind_directives) binds.push_back(bd);

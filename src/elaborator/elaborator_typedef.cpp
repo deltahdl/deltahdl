@@ -72,13 +72,10 @@ bool IsAssocFirstDimTypedef(
     return false;
   }
   auto t = item->unpacked_dims[0]->text;
-  bool is_assoc = false;
-  if (t == "string" || t == "int" || t == "integer" || t == "byte" ||
-      t == "shortint" || t == "longint" || t == "*") {
-    is_assoc = true;
-  } else if (typedefs.count(t) > 0 || class_names.count(t) > 0) {
-    is_assoc = true;
-  }
+  bool is_assoc =
+      (t == "string" || t == "int" || t == "integer" || t == "byte" ||
+       t == "shortint" || t == "longint" || t == "*") ||
+      (typedefs.count(t) > 0 || class_names.count(t) > 0);
   if (is_assoc) {
     assoc_typedef_names.insert(item->name);
   }

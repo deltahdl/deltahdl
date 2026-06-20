@@ -108,13 +108,10 @@ bool NonVacuous(const Word& word, const LvProperty& property,
     case LvProperty::Kind::kImplication:
       return NonVacuousImplication(word, property, context);
     case LvProperty::Kind::kOr:
-      // §F.5.3.3: w, L_0 |=^non ( P1 or P2 ) iff w, L_0 |=^non P1 or
-      // w, L_0 |=^non P2.
-      return (property.lhs && NonVacuous(word, *property.lhs, context)) ||
-             (property.rhs && NonVacuous(word, *property.rhs, context));
     case LvProperty::Kind::kAnd:
-      // §F.5.3.3: w, L_0 |=^non ( P1 and P2 ) iff w, L_0 |=^non P1 or
-      // w, L_0 |=^non P2. A conjunction is nonvacuous when either conjunct is.
+      // §F.5.3.3: w, L_0 |=^non ( P1 or P2 ) iff w, L_0 |=^non P1 or
+      // w, L_0 |=^non P2; and w, L_0 |=^non ( P1 and P2 ) holds when either
+      // conjunct is nonvacuous. Both reduce to the same disjunctive test.
       return (property.lhs && NonVacuous(word, *property.lhs, context)) ||
              (property.rhs && NonVacuous(word, *property.rhs, context));
     case LvProperty::Kind::kNexttime:

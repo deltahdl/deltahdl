@@ -58,6 +58,7 @@ static bool TryExecWeakRefVarDecl(const Stmt* stmt, SimContext& ctx,
   const auto& type_params = stmt->var_decl_type.type_params;
   if (!type_params.empty()) {
     std::vector<Expr*> exprs;
+    exprs.reserve(type_params.size());
     for (const auto& tp : type_params) {
       exprs.push_back(tp.type_ref_expr);
     }
@@ -84,6 +85,7 @@ static void SetClassParamExprs(std::string_view var_name,
                                SimContext& ctx) {
   if (type_params.empty()) return;
   std::vector<Expr*> exprs;
+  exprs.reserve(type_params.size());
   for (const auto& tp : type_params) {
     exprs.push_back(tp.type_ref_expr);
   }

@@ -41,7 +41,8 @@ std::string Join(const std::vector<std::string_view>& segs, bool absolute) {
   return out;
 }
 
-std::vector<std::string_view> Normalize(std::vector<std::string_view> segs) {
+std::vector<std::string_view> Normalize(
+    const std::vector<std::string_view>& segs) {
   std::vector<std::string_view> out;
   for (auto seg : segs) {
     if (seg == ".") continue;

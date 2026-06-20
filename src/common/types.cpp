@@ -117,7 +117,6 @@ Strength ReduceResistive(Strength input) {
     case Strength::kWeak:
       return Strength::kMedium;
     case Strength::kMedium:
-      return Strength::kSmall;
     case Strength::kSmall:
       return Strength::kSmall;
     case Strength::kHighz:

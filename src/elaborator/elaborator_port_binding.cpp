@@ -791,7 +791,7 @@ void Elaborator::CheckUwirePortMerge(const RtlirModuleInst& inst,
 
 void Elaborator::CheckInterconnectPortMerge(const RtlirModuleInst& inst,
                                             const ModuleItem* item,
-                                            RtlirModule* parent_mod) {
+                                            RtlirModule*) {
   if (!inst.resolved) return;
   const auto& child_ports = inst.resolved->ports;
 
@@ -888,7 +888,7 @@ static void CheckUnpackedArrayPortBinding(
 
 void Elaborator::ValidateUnpackedArrayPorts(const RtlirModuleInst& inst,
                                             const ModuleItem* item,
-                                            RtlirModule* parent_mod) {
+                                            RtlirModule*) {
   if (!inst.resolved) return;
   const auto& child_ports = inst.resolved->ports;
 

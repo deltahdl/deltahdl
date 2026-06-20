@@ -58,7 +58,8 @@ static uint64_t VpiReadRawGroup(const char* base, int ngroups) {
 // supply are left zero.
 static void VpiWriteRawGroup(char* base, int ngroups, uint64_t v) {
   for (int b = 0; b < ngroups; ++b) {
-    base[b] = (b < 8) ? static_cast<char>((v >> (8 * b)) & 0xFF) : 0;
+    base[b] = (b < 8) ? static_cast<char>((v >> (8 * b)) & 0xFF)
+                      : static_cast<char>(0);
   }
 }
 

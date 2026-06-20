@@ -269,9 +269,9 @@ static double RefErlangian(int32_t* seed, int32_t k, int32_t mean) {
 // §N.2: every rtl_dist_* wrapper except uniform rounds its real draw to the
 // nearest integer, preserving the sign by rounding the magnitude.
 static int32_t RoundDistResult(double r) {
-  if (r >= 0) return static_cast<int32_t>(r + 0.5);
+  if (r >= 0) return static_cast<int32_t>(std::lround(r));
   r = -r;
-  return -static_cast<int32_t>(r + 0.5);
+  return -static_cast<int32_t>(std::lround(r));
 }
 
 // §N.2 rtl_dist_uniform() common rounding: the reference floors a non-negative

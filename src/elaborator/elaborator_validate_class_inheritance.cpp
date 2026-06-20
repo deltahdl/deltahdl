@@ -893,9 +893,8 @@ static void CollectOwnParamTypeNames(
     const ClassDecl* iface, std::unordered_set<std::string_view>& own_names) {
   for (const auto& [pname, _] : iface->params) own_names.insert(pname);
   for (const auto* m : iface->members) {
-    if (m->kind == ClassMemberKind::kTypedef)
-      own_names.insert(m->name);
-    else if (m->kind == ClassMemberKind::kProperty)
+    if (m->kind == ClassMemberKind::kTypedef ||
+        m->kind == ClassMemberKind::kProperty)
       own_names.insert(m->name);
   }
 }

@@ -246,7 +246,7 @@ using SVpiVlogInfo = delta::VpiVlogInfo;
 #define vpiBaseExpr 131
 #define vpiWidthExpr 132
 #define vpiAutomatics 136
-#define vpiUndefined -1
+#define vpiUndefined (-1)
 #define vpiFile 5
 #define vpiLineNo 6
 #define vpiTopModule 7

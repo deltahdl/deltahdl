@@ -123,7 +123,7 @@ void Elaborator::AssignGenerateBlockNames(const ModuleDecl* decl) {
     std::string digits = std::to_string(n);
     std::string candidate = "genblk" + digits;
     while (used.count(candidate)) {
-      digits = "0" + digits;
+      digits.insert(digits.begin(), '0');
       candidate = "genblk" + digits;
     }
     auto* buf = arena_.AllocString(candidate.c_str(), candidate.size());

@@ -600,6 +600,8 @@ void Lexer::ValidateBaseDigits(SourceLoc loc, char base_letter,
       case 'H':
         valid = std::isxdigit(static_cast<unsigned char>(c));
         break;
+      default:
+        break;
     }
     if (!valid) {
       diag_.Error(loc, "illegal digit for specified base");

@@ -118,8 +118,8 @@ static void RegisterClockWatcher(ClockingManager* mgr, Variable* clk_var,
         SampleBlockInputs(mgr, block_name, signals, ctx, false);
 
         auto* ev = sched.GetEventPool().Acquire();
-        auto bn_copy = block_name;
-        auto sigs_copy = signals;
+        const auto& bn_copy = block_name;
+        const auto& sigs_copy = signals;
         ev->callback = [mgr, bn_copy, sigs_copy, &ctx, &sched]() {
           SampleBlockInputs(mgr, bn_copy, sigs_copy, ctx, true);
           mgr->MarkBlockEventTime(bn_copy, sched.CurrentTime());
