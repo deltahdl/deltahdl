@@ -69,7 +69,7 @@ TEST_F(Iterator, UseRecoversTheReferenceHandle) {
 
   vpiHandle iter = vpi_iterate(vpiModule, &scope);
   ASSERT_NE(iter, nullptr);
-  EXPECT_EQ(VpiHandleC(vpiUse, iter), &scope);
+  EXPECT_EQ(vpi_handle(vpiUse, iter), &scope);
 }
 
 // Edge (vpiUse), detail 2: an iterator may have been created over a NULL
@@ -81,7 +81,7 @@ TEST_F(Iterator, UseReturnsNullForANullReference) {
   iter.type = vpiIterator;
   iter.iter_ref = nullptr;
 
-  EXPECT_EQ(VpiHandleC(vpiUse, &iter), nullptr);
+  EXPECT_EQ(vpi_handle(vpiUse, &iter), nullptr);
 }
 
 }  // namespace

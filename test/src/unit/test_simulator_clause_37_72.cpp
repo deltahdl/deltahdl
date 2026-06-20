@@ -87,7 +87,7 @@ TEST_F(CasePattern, CaseItemGroupsConditionsBranchingToOneStatement) {
   EXPECT_EQ(conditions[1], &c1);
 
   // The statement is reached as the item's stmt, not as one of the conditions.
-  EXPECT_EQ(VpiHandleC(vpiStmt, &item), &stmt);
+  EXPECT_EQ(vpi_handle(vpiStmt, &item), &stmt);
 }
 
 // Detail 1 (via the public iteration): iterating the vpiExpr edge over a case
@@ -157,7 +157,7 @@ TEST_F(CasePattern, DefaultCaseItemStillReachesItsStatement) {
   default_item.children = {&stmt};
 
   EXPECT_EQ(ctx_.Iterate(vpiExpr, &default_item), nullptr);  // no conditions
-  EXPECT_EQ(VpiHandleC(vpiStmt, &default_item), &stmt);      // stmt still there
+  EXPECT_EQ(vpi_handle(vpiStmt, &default_item), &stmt);      // stmt still there
 }
 
 // Diagram scope (edge case): the vpiExpr edge that reaches patterns is the case

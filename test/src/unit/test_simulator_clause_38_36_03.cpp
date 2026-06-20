@@ -267,7 +267,7 @@ TEST_F(VpiActionFeatureCallbacks, ResetViaVpiControlDeliversCallbacks) {
   Register(cbStartOfReset);
   Register(cbEndOfReset);
 
-  int handled = VpiControlC(vpiReset, 0);
+  int handled = vpi_control(vpiReset, 0);
 
   EXPECT_EQ(handled, 1);
   ASSERT_EQ(g_sequence.size(), 2u);
@@ -292,7 +292,7 @@ TEST_F(VpiActionFeatureCallbacks, RemovedCallbackIsNotDispatched) {
   vpiHandle removed = Register(cbStartOfSimulation);
   Register(cbStartOfSimulation);
   ASSERT_NE(removed, nullptr);
-  ASSERT_EQ(VpiRemoveCbC(removed), 1);
+  ASSERT_EQ(vpi_remove_cb(removed), 1);
 
   int fired = vpi_ctx_.DispatchCallbacks(cbStartOfSimulation);
 

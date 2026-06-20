@@ -66,14 +66,14 @@ TEST_F(VpiCallbackSim, RemoveCbMarksRemoved) {
   vpiHandle h = vpi_register_cb(&cb);
   ASSERT_NE(h, nullptr);
 
-  int result = VpiRemoveCbC(h);
+  int result = vpi_remove_cb(h);
   EXPECT_EQ(result, 1);
 
   EXPECT_EQ(vpi_ctx_.RegisteredCallbacks()[0].reason, -1);
 }
 
 TEST_F(VpiCallbackSim, RemoveCbNullReturnsZero) {
-  EXPECT_EQ(VpiRemoveCbC(nullptr), 0);
+  EXPECT_EQ(vpi_remove_cb(nullptr), 0);
 }
 
 // §38.36: cb_data_p shall point to an s_cb_data structure. A null pointer is

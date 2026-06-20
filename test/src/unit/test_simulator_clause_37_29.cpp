@@ -15,7 +15,7 @@ namespace {
 // and the vpiName/vpiFullName/vpiIsModPort properties served by the generic
 // machinery.
 
-// The fixture installs a context so the public vpi_get/vpi_get_str/VpiHandleC
+// The fixture installs a context so the public vpi_get/vpi_get_str/vpi_handle
 // entry points run their real dispatch over the test objects.
 class VirtualInterface : public ::testing::Test {
  protected:
@@ -38,7 +38,7 @@ TEST_F(VirtualInterface, InterfaceExprGroupMembership) {
 
 // D1: vpiExpr of a virtual interface var reaches the interface instance
 // assigned in its declaration. Observed through the helper and the public
-// VpiHandleC(vpiExpr, ...) dispatch path.
+// vpi_handle(vpiExpr, ...) dispatch path.
 TEST_F(VirtualInterface, ExprReachesAssignedInterfaceInstance) {
   VpiObject iface;  // the interface instance assigned at declaration
   iface.type = vpiInterface;
@@ -48,7 +48,7 @@ TEST_F(VirtualInterface, ExprReachesAssignedInterfaceInstance) {
   vif.children = {&iface};
 
   EXPECT_EQ(VpiVirtualInterfaceExpr(&vif), &iface);
-  EXPECT_EQ(VpiHandleC(vpiExpr, &vif), &iface);
+  EXPECT_EQ(vpi_handle(vpiExpr, &vif), &iface);
 }
 
 // D1: a virtual interface var whose declaration assigned no interface reports
@@ -58,7 +58,7 @@ TEST_F(VirtualInterface, ExprIsNullWhenNoInterfaceAssigned) {
   vif.type = vpiVirtualInterfaceVar;  // no children -> no assignment
 
   EXPECT_EQ(VpiVirtualInterfaceExpr(&vif), nullptr);
-  EXPECT_EQ(VpiHandleC(vpiExpr, &vif), nullptr);
+  EXPECT_EQ(vpi_handle(vpiExpr, &vif), nullptr);
 }
 
 // D1 edge: the helper only speaks for a virtual interface var; any other handle
@@ -149,7 +149,7 @@ TEST_F(VirtualInterface, ExprSkipsRefObjThatFailsDetail2) {
   vif.children = {&ref_to_net};
 
   EXPECT_EQ(VpiVirtualInterfaceExpr(&vif), nullptr);
-  EXPECT_EQ(VpiHandleC(vpiExpr, &vif), nullptr);
+  EXPECT_EQ(vpi_handle(vpiExpr, &vif), nullptr);
 }
 
 // Example 2: vpiActual of a virtual interface var reaches the interface
@@ -163,7 +163,7 @@ TEST_F(VirtualInterface, ActualReachesHeldInterfaceInstance) {
   vif.type = vpiVirtualInterfaceVar;
   vif.actual = &iface;
 
-  EXPECT_EQ(VpiHandleC(vpiActual, &vif), &iface);
+  EXPECT_EQ(vpi_handle(vpiActual, &vif), &iface);
 }
 
 // Example 2: vpiActual returns NULL while the virtual interface is
@@ -172,7 +172,7 @@ TEST_F(VirtualInterface, ActualIsNullWhileUninitialized) {
   VpiObject vif;
   vif.type = vpiVirtualInterfaceVar;  // no actual bound yet
 
-  EXPECT_EQ(VpiHandleC(vpiActual, &vif), nullptr);
+  EXPECT_EQ(vpi_handle(vpiActual, &vif), nullptr);
 }
 
 // Figure properties: the virtual interface var carries vpiName/vpiFullName and

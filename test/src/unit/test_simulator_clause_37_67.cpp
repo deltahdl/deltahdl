@@ -17,7 +17,7 @@ namespace {
 // helper VpiWaitConditionExpr, and the body and else edges through the generic
 // traversal.
 
-// The fixture installs a context so the public VpiHandleC entry point runs its
+// The fixture installs a context so the public vpi_handle entry point runs its
 // real dispatch over the test objects.
 class Waits : public ::testing::Test {
  protected:
@@ -43,7 +43,7 @@ TEST_F(Waits, WaitReachesExpressionCondition) {
   wait_stmt.children = {&condition, &body};
 
   EXPECT_EQ(VpiWaitConditionExpr(&wait_stmt), &condition);
-  EXPECT_EQ(VpiHandleC(vpiCondition, &wait_stmt), &condition);
+  EXPECT_EQ(vpi_handle(vpiCondition, &wait_stmt), &condition);
 }
 
 // vpiCondition edge: an ordered wait reaches a sequence-instance condition.
@@ -58,7 +58,7 @@ TEST_F(Waits, OrderedWaitReachesSequenceInstanceCondition) {
   ordered_wait.children = {&condition};
 
   EXPECT_EQ(VpiWaitConditionExpr(&ordered_wait), &condition);
-  EXPECT_EQ(VpiHandleC(vpiCondition, &ordered_wait), &condition);
+  EXPECT_EQ(vpi_handle(vpiCondition, &ordered_wait), &condition);
 }
 
 // vpiCondition edge: the condition is found even when a non-condition child
@@ -94,7 +94,7 @@ TEST_F(Waits, ConditionNullWhenAbsentOrHandleNull) {
   EXPECT_EQ(VpiWaitConditionExpr(&wait_fork), nullptr);
   // The wait-statement gate admits a wait fork, but it draws no condition edge,
   // so the public dispatch reports null rather than mistaking the body for one.
-  EXPECT_EQ(VpiHandleC(vpiCondition, &wait_fork), nullptr);
+  EXPECT_EQ(vpi_handle(vpiCondition, &wait_fork), nullptr);
 }
 
 // The "waits" grouping: the predicate admits the three wait kinds the diagram
@@ -120,7 +120,7 @@ TEST_F(Waits, BodyStatementReachedThroughGenericVpiStmt) {
   wait_stmt.type = vpiWait;
   wait_stmt.children = {&condition, &body};
 
-  EXPECT_EQ(VpiHandleC(vpiStmt, &wait_stmt), &body);
+  EXPECT_EQ(vpi_handle(vpiStmt, &wait_stmt), &body);
 }
 
 // Else edge (the diagram's vpiElseStmt arrow to a statement): a wait fork
@@ -134,7 +134,7 @@ TEST_F(Waits, ElseStatementReachedThroughGenericVpiElseStmt) {
   wait_fork.type = vpiWaitFork;
   wait_fork.children = {&else_stmt};
 
-  EXPECT_EQ(VpiHandleC(vpiElseStmt, &wait_fork), &else_stmt);
+  EXPECT_EQ(vpi_handle(vpiElseStmt, &wait_fork), &else_stmt);
 }
 
 }  // namespace

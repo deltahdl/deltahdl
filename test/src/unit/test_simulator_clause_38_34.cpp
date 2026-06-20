@@ -193,7 +193,7 @@ TEST_F(VpiPutValueSim, CancelAlreadyOccurredIsNotError) {
   vpi_put_value(ev, nullptr, nullptr, vpiCancelEvent);
   SVpiErrorInfo info = {};
   vpi_put_value(ev, nullptr, nullptr, vpiCancelEvent);
-  EXPECT_EQ(VpiChkErrorC(&info), 0);
+  EXPECT_EQ(vpi_chk_error(&info), 0);
   EXPECT_EQ(vpi_get(vpiScheduled, ev), 0);
 }
 
@@ -270,7 +270,7 @@ TEST_F(VpiPutValueSim, StringFormatToRealIsIllegal) {
   vpi_put_value(h, &val, nullptr, vpiNoDelay);
 
   SVpiErrorInfo info = {};
-  EXPECT_EQ(VpiChkErrorC(&info), vpiError);
+  EXPECT_EQ(vpi_chk_error(&info), vpiError);
 }
 
 // §38.34: it is illegal to put a value in vpiStrengthVal format to a vector
@@ -286,7 +286,7 @@ TEST_F(VpiPutValueSim, StrengthFormatToVectorIsIllegal) {
   vpi_put_value(h, &val, nullptr, vpiNoDelay);
 
   SVpiErrorInfo info = {};
-  EXPECT_EQ(VpiChkErrorC(&info), vpiError);
+  EXPECT_EQ(vpi_chk_error(&info), vpiError);
 }
 
 // §38.34 (edge): the vpiStrengthVal restriction is scoped to vector objects, so
@@ -302,7 +302,7 @@ TEST_F(VpiPutValueSim, StrengthFormatToScalarIsNotIllegal) {
   vpi_put_value(h, &val, nullptr, vpiNoDelay);
 
   SVpiErrorInfo info = {};
-  EXPECT_EQ(VpiChkErrorC(&info), 0);
+  EXPECT_EQ(vpi_chk_error(&info), 0);
 }
 
 // §38.34 (edge): the vpiStringVal restriction is scoped to real objects, so
@@ -319,7 +319,7 @@ TEST_F(VpiPutValueSim, StringFormatToNonRealIsNotIllegal) {
   vpi_put_value(h, &val, nullptr, vpiNoDelay);
 
   SVpiErrorInfo info = {};
-  EXPECT_EQ(VpiChkErrorC(&info), 0);
+  EXPECT_EQ(vpi_chk_error(&info), 0);
 }
 
 // §38.34 (edge): vpiCancelEvent acts only on a vpiSchedEvent handle. Asking to
@@ -336,7 +336,7 @@ TEST_F(VpiPutValueSim, CancelOnNonSchedEventHandleIsNoError) {
   EXPECT_EQ(ret, nullptr);
 
   SVpiErrorInfo info = {};
-  EXPECT_EQ(VpiChkErrorC(&info), 0);
+  EXPECT_EQ(vpi_chk_error(&info), 0);
   EXPECT_EQ(var->value.ToUint64(), 7u);
 }
 
@@ -360,7 +360,7 @@ TEST_F(VpiPutValueSim, SequentialUdpRejectsDelayMode) {
   vpi_put_value(h, &val, &time, vpiTransportDelay);
 
   SVpiErrorInfo info = {};
-  EXPECT_EQ(VpiChkErrorC(&info), vpiError);
+  EXPECT_EQ(vpi_chk_error(&info), vpiError);
   // The rejected put left the object unchanged.
   EXPECT_EQ(var->value.words[0].aval & 1, 0u);
 }
@@ -382,7 +382,7 @@ TEST_F(VpiPutValueSim, SequentialUdpAcceptsNoDelay) {
   vpi_put_value(h, &val, nullptr, vpiNoDelay);
 
   SVpiErrorInfo info = {};
-  EXPECT_EQ(VpiChkErrorC(&info), 0);
+  EXPECT_EQ(vpi_chk_error(&info), 0);
   EXPECT_EQ(var->value.words[0].aval & 1, 1u);
 }
 

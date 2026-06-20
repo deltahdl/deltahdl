@@ -118,7 +118,7 @@ TEST_F(VpiGetStringSim, ProtectedObjectIsAnError) {
   EXPECT_EQ(vpi_get_str(vpiName, &mod), nullptr);
 
   SVpiErrorInfo info = {};
-  EXPECT_NE(VpiChkErrorC(&info), 0);
+  EXPECT_NE(vpi_chk_error(&info), 0);
   EXPECT_NE(info.level, 0);
 }
 

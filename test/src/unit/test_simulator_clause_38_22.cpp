@@ -30,13 +30,13 @@ TEST_F(VpiHandleMultiSim, HandleMultiCombinesChildren) {
   auto* mod2 = vpi_ctx_.CreateModule("m2", "m2");
   vpi_ctx_.CreatePort("p2", kVpiOutput, mod2);
 
-  vpiHandle h = VpiHandleMultiC(vpiPort, mod1, mod2);
+  vpiHandle h = vpi_handle_multi(vpiPort, mod1, mod2);
   ASSERT_NE(h, nullptr);
   EXPECT_EQ(static_cast<int>(h->children.size()), 2);
 }
 
 TEST_F(VpiHandleMultiSim, HandleMultiBothNullReturnsNull) {
-  vpiHandle h = VpiHandleMultiC(vpiPort, nullptr, nullptr);
+  vpiHandle h = vpi_handle_multi(vpiPort, nullptr, nullptr);
   EXPECT_EQ(h, nullptr);
 }
 
@@ -51,7 +51,7 @@ TEST_F(VpiHandleMultiSim, InterModPathRejectsDifferentlySizedPorts) {
   out_port->size = 8;
   in_port->size = 4;
 
-  vpiHandle h = VpiHandleMultiC(vpiInterModPath, out_port, in_port);
+  vpiHandle h = vpi_handle_multi(vpiInterModPath, out_port, in_port);
   EXPECT_EQ(h, nullptr);
   EXPECT_EQ(vpi_ctx_.LastError().level, kVpiError);
 }
@@ -68,7 +68,7 @@ TEST_F(VpiHandleMultiSim, SizeMismatchIgnoredForNonInterModPathType) {
   vpi_ctx_.CreatePort("b", kVpiOutput, mod2);
   mod2->size = 4;
 
-  vpiHandle h = VpiHandleMultiC(vpiPort, mod1, mod2);
+  vpiHandle h = vpi_handle_multi(vpiPort, mod1, mod2);
   ASSERT_NE(h, nullptr);
   EXPECT_EQ(static_cast<int>(h->children.size()), 2);
   EXPECT_EQ(vpi_ctx_.LastError().level, 0);
@@ -90,7 +90,7 @@ TEST_F(VpiHandleMultiSim, InterModPathAcceptsSameSizedPortsAcrossHierarchy) {
   out_port->children.push_back(path);
   in_port->children.push_back(path);
 
-  vpiHandle h = VpiHandleMultiC(vpiInterModPath, out_port, in_port);
+  vpiHandle h = vpi_handle_multi(vpiInterModPath, out_port, in_port);
   ASSERT_NE(h, nullptr);
   EXPECT_EQ(vpi_ctx_.LastError().level, 0);
   ASSERT_FALSE(h->children.empty());

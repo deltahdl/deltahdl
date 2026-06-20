@@ -40,14 +40,14 @@ class VpiErrorCheckSim : public ::testing::Test {
 // leaves the supplied structure's severity level at zero.
 TEST_F(VpiErrorCheckSim, ChkErrorNoErrorReturnsZero) {
   SVpiErrorInfo info = {};
-  int result = VpiChkErrorC(&info);
+  int result = vpi_chk_error(&info);
   EXPECT_EQ(result, 0);
   EXPECT_EQ(info.level, 0);
 }
 
 // §38.2: a null error_info_p is accepted - the detail is simply not copied out.
 TEST_F(VpiErrorCheckSim, ChkErrorNullDoesNotCrash) {
-  int result = VpiChkErrorC(nullptr);
+  int result = vpi_chk_error(nullptr);
 
   EXPECT_EQ(result, 0);
 }
@@ -74,7 +74,7 @@ TEST_F(VpiErrorCheckSim, ChkErrorReturnsSeverityLevelAfterError) {
   RaiseError();
 
   SVpiErrorInfo info = {};
-  int result = VpiChkErrorC(&info);
+  int result = vpi_chk_error(&info);
 
   EXPECT_EQ(result, vpiError);
   EXPECT_EQ(info.level, vpiError);
@@ -86,13 +86,13 @@ TEST_F(VpiErrorCheckSim, ChkErrorReturnsSeverityLevelAfterError) {
 // subsequent vpi_chk_error() reports 0.
 TEST_F(VpiErrorCheckSim, OtherRoutineCallResetsErrorStatus) {
   RaiseError();
-  ASSERT_EQ(VpiChkErrorC(nullptr), vpiError);
+  ASSERT_EQ(vpi_chk_error(nullptr), vpiError);
 
   // A different, successful VPI routine call resets the pending error status.
   SVpiVlogInfo vlog = {};
   vpi_get_vlog_info(&vlog);
 
-  EXPECT_EQ(VpiChkErrorC(nullptr), 0);
+  EXPECT_EQ(vpi_chk_error(nullptr), 0);
 }
 
 // §38.2 (E1, edge): the reset is performed on entry to any VPI routine, not
@@ -101,14 +101,14 @@ TEST_F(VpiErrorCheckSim, OtherRoutineCallResetsErrorStatus) {
 // confirming the reset is a general per-routine behavior.
 TEST_F(VpiErrorCheckSim, SuccessfulRoutineCallClearsPriorError) {
   RaiseError();
-  ASSERT_EQ(VpiChkErrorC(nullptr), vpiError);
+  ASSERT_EQ(vpi_chk_error(nullptr), vpiError);
 
   s_vpi_systf_data data = {};
   data.type = vpiSysTask;
   data.tfname = "$ok";  // valid name: registration succeeds, records no error
   vpi_register_systf(&data);
 
-  EXPECT_EQ(VpiChkErrorC(nullptr), 0);
+  EXPECT_EQ(vpi_chk_error(nullptr), 0);
 }
 
 // §38.2 (E2): calling vpi_chk_error() has no effect on the error status, so two
@@ -116,9 +116,9 @@ TEST_F(VpiErrorCheckSim, SuccessfulRoutineCallClearsPriorError) {
 TEST_F(VpiErrorCheckSim, ChkErrorDoesNotResetErrorStatus) {
   RaiseError();
 
-  EXPECT_EQ(VpiChkErrorC(nullptr), vpiError);
+  EXPECT_EQ(vpi_chk_error(nullptr), vpiError);
   SVpiErrorInfo info = {};
-  EXPECT_EQ(VpiChkErrorC(&info), vpiError);
+  EXPECT_EQ(vpi_chk_error(&info), vpiError);
   EXPECT_EQ(info.level, vpiError);
 }
 

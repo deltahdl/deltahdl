@@ -23,7 +23,7 @@ namespace {
 //        within an instance array, or NULL when the interface is not an element
 //        of an instance array.
 
-// The fixture installs a context so the public VpiHandleC entry point runs its
+// The fixture installs a context so the public vpi_handle entry point runs its
 // real Handle dispatch.
 class Interface : public ::testing::Test {
  protected:
@@ -44,7 +44,7 @@ TEST_F(Interface, IndexTransitionReachesArrayIndex) {
   member.array_member = true;
   member.index_expr = &index_expr;
 
-  EXPECT_EQ(VpiHandleC(vpiIndex, &member), &index_expr);
+  EXPECT_EQ(vpi_handle(vpiIndex, &member), &index_expr);
 }
 
 // D1: for an interface that is not part of an instance array, the vpiIndex
@@ -60,7 +60,7 @@ TEST_F(Interface, IndexTransitionIsNullWhenNotAnArrayElement) {
   standalone.index_expr = &stray_expr;  // present but must not be reported
   standalone.children.push_back(&stray_expr);
 
-  EXPECT_EQ(VpiHandleC(vpiIndex, &standalone), nullptr);
+  EXPECT_EQ(vpi_handle(vpiIndex, &standalone), nullptr);
 }
 
 // D1 edge: an interface marked as an array element but carrying no recorded
@@ -77,7 +77,7 @@ TEST_F(Interface, IndexTransitionIsNullForArrayElementWithoutIndexExpr) {
   member.index_expr = nullptr;  // array element, but no index recorded
   member.children.push_back(&child_expr);  // must not be reported via vpiIndex
 
-  EXPECT_EQ(VpiHandleC(vpiIndex, &member), nullptr);
+  EXPECT_EQ(vpi_handle(vpiIndex, &member), nullptr);
 }
 
 }  // namespace

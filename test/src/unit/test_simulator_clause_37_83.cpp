@@ -32,7 +32,7 @@ class Attribute : public ::testing::Test {
 
 // Diagram edge (vpiParent): an attribute reaches the design object it is
 // attached to. The owning object is one of the many kinds the figure lists;
-// here a net carries the attribute, and VpiHandleC(vpiParent, ...) reaches that
+// here a net carries the attribute, and vpi_handle(vpiParent, ...) reaches that
 // net rather than some other null result.
 TEST_F(Attribute, ParentReachesTheOwningObject) {
   VpiObject owning_net;
@@ -42,7 +42,7 @@ TEST_F(Attribute, ParentReachesTheOwningObject) {
   attr.type = vpiAttribute;
   attr.parent = &owning_net;
 
-  EXPECT_EQ(VpiHandleC(vpiParent, &attr), &owning_net);
+  EXPECT_EQ(vpi_handle(vpiParent, &attr), &owning_net);
 }
 
 // Figure property (-> name): an attribute reports its name through the generic

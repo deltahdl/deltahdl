@@ -11,11 +11,11 @@ namespace {
 // one to an event control (the vpiEventControl relation). It carries no
 // numbered Details and no 'shall' sentences. These tests observe the production
 // code that serves the diagram's relations: the count edge through the
-// dedicated helper VpiRepeatControlExpr (wired into VpiHandleC), and the
+// dedicated helper VpiRepeatControlExpr (wired into vpi_handle), and the
 // event-control edge through the generic traversal, since an event control's
 // own type is vpiEventControl.
 
-// The fixture installs a context so the public VpiHandleC entry point runs its
+// The fixture installs a context so the public vpi_handle entry point runs its
 // real dispatch over the test objects.
 class RepeatControl : public ::testing::Test {
  protected:
@@ -37,7 +37,7 @@ TEST_F(RepeatControl, RepeatControlReachesCountThroughVpiExpr) {
   repeat_control.type = vpiRepeatControl;
   repeat_control.children = {&count, &event_control};
 
-  EXPECT_EQ(VpiHandleC(vpiExpr, &repeat_control), &count);
+  EXPECT_EQ(vpi_handle(vpiExpr, &repeat_control), &count);
 }
 
 // Count edge: the count is found even when the event control child precedes it
@@ -54,7 +54,7 @@ TEST_F(RepeatControl, CountFoundWhenItFollowsTheEventControlChild) {
   repeat_control.type = vpiRepeatControl;
   repeat_control.children = {&event_control, &count};
 
-  EXPECT_EQ(VpiHandleC(vpiExpr, &repeat_control), &count);
+  EXPECT_EQ(vpi_handle(vpiExpr, &repeat_control), &count);
 }
 
 // Count edge: a null handle and a repeat control with no expression child both
@@ -83,7 +83,7 @@ TEST_F(RepeatControl, VpiExprCountIsScopedToRepeatControl) {
   loop.type = vpiWhile;  // not a repeat control; draws its own relations
   loop.children = {&expr_child};
 
-  EXPECT_EQ(VpiHandleC(vpiExpr, &loop), nullptr);
+  EXPECT_EQ(vpi_handle(vpiExpr, &loop), nullptr);
 }
 
 // Event-control edge (the diagram's other unlabeled arrow): a repeat control
@@ -100,7 +100,7 @@ TEST_F(RepeatControl, EventControlReachedThroughGenericTraversal) {
   repeat_control.type = vpiRepeatControl;
   repeat_control.children = {&count, &event_control};
 
-  EXPECT_EQ(VpiHandleC(vpiEventControl, &repeat_control), &event_control);
+  EXPECT_EQ(vpi_handle(vpiEventControl, &repeat_control), &event_control);
 }
 
 }  // namespace

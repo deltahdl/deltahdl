@@ -35,7 +35,7 @@ TEST_F(VpiHandleByMultiIndexSim, ResolvesNestedSubobjectFromIndexList) {
   auto* bit_b1 = vpi_ctx_.CreatePort("b1", kVpiOutput, port_b);  // index 1
 
   int indices[] = {1, 1};
-  vpiHandle result = VpiHandleByMultiIndexC(mod, 2, indices);
+  vpiHandle result = vpi_handle_by_multi_index(mod, 2, indices);
   ASSERT_NE(result, nullptr);
   EXPECT_EQ(result, bit_b1);
 }
@@ -52,10 +52,10 @@ TEST_F(VpiHandleByMultiIndexSim, IndicesAreAppliedLeftmostFirst) {
   auto* b0 = vpi_ctx_.CreatePort("b0", kVpiOutput, port_b);  // b[0]
 
   int forward[] = {0, 1};  // a then a[1]
-  EXPECT_EQ(VpiHandleByMultiIndexC(mod, 2, forward), a1);
+  EXPECT_EQ(vpi_handle_by_multi_index(mod, 2, forward), a1);
 
   int reversed[] = {1, 0};  // b then b[0]
-  EXPECT_EQ(VpiHandleByMultiIndexC(mod, 2, reversed), b0);
+  EXPECT_EQ(vpi_handle_by_multi_index(mod, 2, reversed), b0);
 }
 
 // §38.20: the trailing bit-select index is optional - num_index governs how
@@ -68,12 +68,12 @@ TEST_F(VpiHandleByMultiIndexSim, NumIndexGovernsHowManyIndicesApply) {
   vpi_ctx_.CreatePort("b0", kVpiOutput, port_b);             // index 0 within b
 
   int indices[] = {1};
-  EXPECT_EQ(VpiHandleByMultiIndexC(mod, 1, indices), port_b);
+  EXPECT_EQ(vpi_handle_by_multi_index(mod, 1, indices), port_b);
 }
 
 TEST_F(VpiHandleByMultiIndexSim, NullParentReturnsNullptr) {
   int indices[] = {0};
-  EXPECT_EQ(VpiHandleByMultiIndexC(nullptr, 1, indices), nullptr);
+  EXPECT_EQ(vpi_handle_by_multi_index(nullptr, 1, indices), nullptr);
 }
 
 // §38.20: when an index names no subobject the index list does not form a legal
@@ -84,7 +84,7 @@ TEST_F(VpiHandleByMultiIndexSim, IndexNamingNoSubobjectReturnsNullptr) {
   vpi_ctx_.CreatePort("b0", kVpiOutput, port_b);             // index 0 within b
 
   int indices[] = {0, 99};  // b exists, b[99] does not
-  EXPECT_EQ(VpiHandleByMultiIndexC(mod, 2, indices), nullptr);
+  EXPECT_EQ(vpi_handle_by_multi_index(mod, 2, indices), nullptr);
 }
 
 // §38.20: with no indices there is no index select expression to construct, so
@@ -94,7 +94,7 @@ TEST_F(VpiHandleByMultiIndexSim, EmptyIndexListReturnsNullptr) {
   vpi_ctx_.CreatePort("a", kVpiInput, mod);
 
   int indices[] = {0};
-  EXPECT_EQ(VpiHandleByMultiIndexC(mod, 0, indices), nullptr);
+  EXPECT_EQ(vpi_handle_by_multi_index(mod, 0, indices), nullptr);
 }
 
 // §38.20: unless otherwise specified, calling vpi_handle_by_multi_index() for a
@@ -106,10 +106,10 @@ TEST_F(VpiHandleByMultiIndexSim, ProtectedReferenceObjectIsAnError) {
   mod->is_protected = true;
 
   int indices[] = {0};
-  EXPECT_EQ(VpiHandleByMultiIndexC(mod, 1, indices), nullptr);
+  EXPECT_EQ(vpi_handle_by_multi_index(mod, 1, indices), nullptr);
 
   SVpiErrorInfo info = {};
-  EXPECT_EQ(VpiChkErrorC(&info), vpiError);
+  EXPECT_EQ(vpi_chk_error(&info), vpiError);
   EXPECT_EQ(info.level, vpiError);
 }
 
@@ -121,7 +121,7 @@ TEST_F(VpiHandleByMultiIndexSim, ReferenceWithoutAccessByIndexReturnsNullptr) {
   vpi_ctx_.CreatePort("a", kVpiInput, param);  // gives param a child at index 0
 
   int indices[] = {0};
-  EXPECT_EQ(VpiHandleByMultiIndexC(param, 1, indices), nullptr);
+  EXPECT_EQ(vpi_handle_by_multi_index(param, 1, indices), nullptr);
 }
 
 }  // namespace

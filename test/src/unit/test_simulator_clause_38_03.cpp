@@ -28,7 +28,7 @@ class VpiCompareObjectsSim : public ::testing::Test {
 TEST_F(VpiCompareObjectsSim, SameHandleComparesEqual) {
   auto* mod = vpi_ctx_.CreateModule("top", "top");
 
-  EXPECT_EQ(VpiCompareObjectsC(mod, mod), 1);
+  EXPECT_EQ(vpi_compare_objects(mod, mod), 1);
 }
 
 // §38.3: distinct objects are not the same object, so the comparison is FALSE.
@@ -36,7 +36,7 @@ TEST_F(VpiCompareObjectsSim, DifferentObjectsCompareUnequal) {
   auto* a = vpi_ctx_.CreateModule("a", "a");
   auto* b = vpi_ctx_.CreateModule("b", "b");
 
-  EXPECT_EQ(VpiCompareObjectsC(a, b), 0);
+  EXPECT_EQ(vpi_compare_objects(a, b), 0);
 }
 
 // §38.3: object equivalence cannot be determined with a C "==" comparison.
@@ -52,7 +52,7 @@ TEST_F(VpiCompareObjectsSim,
   member_bit->same_object_as = bit;
 
   ASSERT_NE(ps_index, member_bit);  // genuinely different handles
-  EXPECT_EQ(VpiCompareObjectsC(ps_index, member_bit), 1);
+  EXPECT_EQ(vpi_compare_objects(ps_index, member_bit), 1);
 }
 
 // §38.3, Example 2: obj1 is a handle to the expression i[j] and obj2 is a
@@ -68,11 +68,11 @@ TEST_F(VpiCompareObjectsSim, ExpressionHandleTracksResolvedElement) {
   // j == 0: i[j] resolves to i[0].
   auto* obj1 = vpi_ctx_.CreateParameter("i_j", 0);
   obj1->same_object_as = i0;
-  EXPECT_EQ(VpiCompareObjectsC(obj1, obj2), 1);
+  EXPECT_EQ(vpi_compare_objects(obj1, obj2), 1);
 
   // j == 1: i[j] now resolves to i[1].
   obj1->same_object_as = i1;
-  EXPECT_EQ(VpiCompareObjectsC(obj1, obj2), 0);
+  EXPECT_EQ(vpi_compare_objects(obj1, obj2), 0);
 }
 
 // §38.3, Example 3: obj1 represents c.a and obj2 represents d.a. While both c
@@ -84,7 +84,7 @@ TEST_F(VpiCompareObjectsSim, AbsentObjectsCompareUnequal) {
   c_a->object_exists = false;
   d_a->object_exists = false;
 
-  EXPECT_EQ(VpiCompareObjectsC(c_a, d_a), 0);
+  EXPECT_EQ(vpi_compare_objects(c_a, d_a), 0);
 }
 
 // §38.3, Example 3 (continued): after c gets a new object, c.a exists but d.a
@@ -96,7 +96,7 @@ TEST_F(VpiCompareObjectsSim, OneExistentOneAbsentCompareUnequal) {
   c_a->object_exists = true;
   d_a->object_exists = false;
 
-  EXPECT_EQ(VpiCompareObjectsC(c_a, d_a), 0);
+  EXPECT_EQ(vpi_compare_objects(c_a, d_a), 0);
 }
 
 // §38.3: a handle may reach the underlying object through more than one
@@ -114,7 +114,7 @@ TEST_F(VpiCompareObjectsSim, TransitiveAliasResolvesToSameObject) {
   first->same_object_as = mid;
   second->same_object_as = underlying;
 
-  EXPECT_EQ(VpiCompareObjectsC(first, second), 1);
+  EXPECT_EQ(vpi_compare_objects(first, second), 1);
 }
 
 // §38.3: existence is a property of the underlying object the handle denotes,
@@ -130,7 +130,7 @@ TEST_F(VpiCompareObjectsSim, AliasToAbsentObjectComparesUnequal) {
   alias_a->same_object_as = underlying;
   alias_b->same_object_as = underlying;
 
-  EXPECT_EQ(VpiCompareObjectsC(alias_a, alias_b), 0);
+  EXPECT_EQ(vpi_compare_objects(alias_a, alias_b), 0);
 }
 
 // §38.3: the routine takes two handles to objects; a null handle names no
@@ -138,9 +138,9 @@ TEST_F(VpiCompareObjectsSim, AliasToAbsentObjectComparesUnequal) {
 TEST_F(VpiCompareObjectsSim, NullHandleNeverCompareEqual) {
   auto* mod = vpi_ctx_.CreateModule("top", "top");
 
-  EXPECT_EQ(VpiCompareObjectsC(nullptr, mod), 0);
-  EXPECT_EQ(VpiCompareObjectsC(mod, nullptr), 0);
-  EXPECT_EQ(VpiCompareObjectsC(nullptr, nullptr), 0);
+  EXPECT_EQ(vpi_compare_objects(nullptr, mod), 0);
+  EXPECT_EQ(vpi_compare_objects(mod, nullptr), 0);
+  EXPECT_EQ(vpi_compare_objects(nullptr, nullptr), 0);
 }
 
 }  // namespace

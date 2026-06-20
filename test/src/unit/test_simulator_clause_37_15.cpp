@@ -30,11 +30,11 @@ TEST_F(RefObjContext, ActualReturnsBoundObject) {
   VpiObject ref_obj;
   ref_obj.type = vpiRefObj;
   ref_obj.actual = &variable;
-  EXPECT_EQ(VpiHandleC(vpiActual, &ref_obj), &variable);
+  EXPECT_EQ(vpi_handle(vpiActual, &ref_obj), &variable);
 
   VpiObject unbound;
   unbound.type = vpiRefObj;
-  EXPECT_EQ(VpiHandleC(vpiActual, &unbound), nullptr);
+  EXPECT_EQ(vpi_handle(vpiActual, &unbound), nullptr);
 }
 
 // D4: vpiParent traverses from a ref obj that is a subelement of a ref obj up
@@ -55,9 +55,9 @@ TEST_F(RefObjContext, ParentTraversesSubelementRefObj) {
   r0.parent = &r;
   r0.actual = &var_bit_a0;
 
-  EXPECT_EQ(VpiHandleC(vpiParent, &r0), &r);
-  EXPECT_EQ(VpiHandleC(vpiActual, &r0), &var_bit_a0);
-  EXPECT_EQ(VpiHandleC(vpiActual, &r), &var_a);
+  EXPECT_EQ(vpi_handle(vpiParent, &r0), &r);
+  EXPECT_EQ(vpi_handle(vpiActual, &r0), &var_bit_a0);
+  EXPECT_EQ(vpi_handle(vpiActual, &r), &var_a);
 }
 
 // D5: vpiGeneric is TRUE for a reference to a generic interface, FALSE for a
@@ -136,7 +136,7 @@ TEST_F(RefObjContext, TypespecGatedOnActualKind) {
   net_ref.actual = &net;
   net_ref.children.push_back(&typespec);
   EXPECT_EQ(VpiRefObjTypespec(&net_ref), &typespec);
-  EXPECT_EQ(VpiHandleC(vpiTypespec, &net_ref), &typespec);
+  EXPECT_EQ(vpi_handle(vpiTypespec, &net_ref), &typespec);
 
   // A part-select actual also exposes the typespec.
   VpiObject part_select;
@@ -145,7 +145,7 @@ TEST_F(RefObjContext, TypespecGatedOnActualKind) {
   ps_ref.type = vpiRefObj;
   ps_ref.actual = &part_select;
   ps_ref.children.push_back(&typespec);
-  EXPECT_EQ(VpiHandleC(vpiTypespec, &ps_ref), &typespec);
+  EXPECT_EQ(vpi_handle(vpiTypespec, &ps_ref), &typespec);
 
   // An interface actual is none of net/variable/part select -> NULL, even
   // though a typespec child is present.
@@ -156,7 +156,7 @@ TEST_F(RefObjContext, TypespecGatedOnActualKind) {
   iface_ref.actual = &iface;
   iface_ref.children.push_back(&typespec);
   EXPECT_EQ(VpiRefObjTypespec(&iface_ref), nullptr);
-  EXPECT_EQ(VpiHandleC(vpiTypespec, &iface_ref), nullptr);
+  EXPECT_EQ(vpi_handle(vpiTypespec, &iface_ref), nullptr);
 }
 
 // D7 (the variable arm, through the vpi_handle dispatch path): a ref obj whose
@@ -172,7 +172,7 @@ TEST_F(RefObjContext, TypespecExposedForVariableActual) {
   var_ref.type = vpiRefObj;
   var_ref.actual = &variable;
   var_ref.children.push_back(&typespec);
-  EXPECT_EQ(VpiHandleC(vpiTypespec, &var_ref), &typespec);
+  EXPECT_EQ(vpi_handle(vpiTypespec, &var_ref), &typespec);
 }
 
 }  // namespace

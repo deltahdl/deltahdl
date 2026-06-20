@@ -551,13 +551,13 @@ PLI_INT32 vpi_get_data(PLI_INT32 id, PLI_BYTE8* dataLoc, PLI_INT32 numOfBytes);
 PLI_INT32 vpi_put_data(PLI_INT32 id, PLI_BYTE8* dataLoc, PLI_INT32 numOfBytes);
 PLI_INT32 vpi_put_userdata(vpiHandle obj, void* userdata);
 void* vpi_get_userdata(vpiHandle obj);
-vpiHandle VpiHandleC(int type, vpiHandle ref);
+vpiHandle vpi_handle(int type, vpiHandle ref);
 vpiHandle vpi_handle_by_name(const char* name, vpiHandle scope);
-vpiHandle VpiHandleByIndexC(vpiHandle parent, int index);
-vpiHandle VpiHandleByMultiIndexC(vpiHandle parent, int num_index,
-                                 int* index_array);
-vpiHandle VpiHandleMultiC(int type, vpiHandle ref1, vpiHandle ref2);
-int VpiCompareObjectsC(vpiHandle obj1, vpiHandle obj2);
+vpiHandle vpi_handle_by_index(vpiHandle parent, int index);
+vpiHandle vpi_handle_by_multi_index(vpiHandle parent, int num_index,
+                                    int* index_array);
+vpiHandle vpi_handle_multi(int type, vpiHandle ref1, vpiHandle ref2);
+int vpi_compare_objects(vpiHandle obj1, vpiHandle obj2);
 vpiHandle vpi_iterate(int type, vpiHandle ref);
 vpiHandle vpi_scan(vpiHandle iterator);
 void vpi_get_value(vpiHandle obj, s_vpi_value* value);
@@ -568,14 +568,14 @@ void vpi_put_value_array(vpiHandle obj, p_vpi_arrayvalue arrayvalue_p,
 void vpi_get_value_array(vpiHandle obj, p_vpi_arrayvalue arrayvalue_p,
                          PLI_INT32* index_p, PLI_UINT32 num);
 vpiHandle vpi_register_cb(s_cb_data* data);
-int VpiRemoveCbC(vpiHandle cb_handle);
+int vpi_remove_cb(vpiHandle cb_handle);
 int vpi_get(int property, vpiHandle obj);
 PLI_INT64 vpi_get64(int property, vpiHandle obj);
 const char* vpi_get_str(int property, vpiHandle obj);
 int vpi_free_object(vpiHandle obj);
 PLI_INT32 vpi_release_handle(vpiHandle obj);
-int VpiControlC(int operation, ...);
-int VpiChkErrorC(SVpiErrorInfo* info);
+int vpi_control(int operation, ...);
+int vpi_chk_error(SVpiErrorInfo* info);
 PLI_INT32 vpi_get_vlog_info(SVpiVlogInfo* info);
 PLI_INT32 vpi_flush();
 PLI_UINT32 vpi_mcd_open(PLI_BYTE8* file);

@@ -21,7 +21,7 @@ namespace {
 //        within an instance array, or NULL when the program is not an element
 //        of an instance array.
 
-// The fixture installs a context so the public VpiHandleC entry point runs its
+// The fixture installs a context so the public vpi_handle entry point runs its
 // real Handle dispatch.
 class Program : public ::testing::Test {
  protected:
@@ -42,7 +42,7 @@ TEST_F(Program, IndexTransitionReachesArrayIndex) {
   member.array_member = true;
   member.index_expr = &index_expr;
 
-  EXPECT_EQ(VpiHandleC(vpiIndex, &member), &index_expr);
+  EXPECT_EQ(vpi_handle(vpiIndex, &member), &index_expr);
 }
 
 // D1: for a program that is not part of an instance array, the vpiIndex
@@ -58,7 +58,7 @@ TEST_F(Program, IndexTransitionIsNullWhenNotAnArrayElement) {
   standalone.index_expr = &stray_expr;  // present but must not be reported
   standalone.children.push_back(&stray_expr);
 
-  EXPECT_EQ(VpiHandleC(vpiIndex, &standalone), nullptr);
+  EXPECT_EQ(vpi_handle(vpiIndex, &standalone), nullptr);
 }
 
 }  // namespace

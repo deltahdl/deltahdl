@@ -143,7 +143,7 @@ TEST(NetDriversAndLoads,
   EXPECT_TRUE(VpiIterationContains(loads, &port));
 
   // Shall #2: the complex expression is reached through the port's vpiHighConn.
-  EXPECT_EQ(VpiHandleC(vpiHighConn, &port), &complex_expr);
+  EXPECT_EQ(vpi_handle(vpiHighConn, &port), &complex_expr);
 }
 
 // Detail 1 (concatenation carve-out): a concatenation on an input port does not

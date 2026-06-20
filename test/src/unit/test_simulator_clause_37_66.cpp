@@ -12,10 +12,10 @@ namespace {
 // vpiStmt relation). The clause carries no numbered Details and no 'shall'
 // sentences. These tests observe the production code that serves the diagram's
 // relations: the vpiCondition edge through the dedicated helper
-// VpiLoopConditionExpr (wired into VpiHandleC), and the body edge through the
+// VpiLoopConditionExpr (wired into vpi_handle), and the body edge through the
 // generic vpiStmt traversal.
 
-// The fixture installs a context so the public VpiHandleC entry point runs its
+// The fixture installs a context so the public vpi_handle entry point runs its
 // real dispatch over the test objects.
 class WhileRepeat : public ::testing::Test {
  protected:
@@ -37,7 +37,7 @@ TEST_F(WhileRepeat, WhileStatementReachesConditionThroughVpiCondition) {
   while_stmt.type = vpiWhile;
   while_stmt.children = {&condition, &body};
 
-  EXPECT_EQ(VpiHandleC(vpiCondition, &while_stmt), &condition);
+  EXPECT_EQ(vpi_handle(vpiCondition, &while_stmt), &condition);
 }
 
 // vpiCondition edge: a repeat statement reaches its condition expression the
@@ -50,7 +50,7 @@ TEST_F(WhileRepeat, RepeatStatementReachesConditionThroughVpiCondition) {
   repeat_stmt.type = vpiRepeat;
   repeat_stmt.children = {&condition};
 
-  EXPECT_EQ(VpiHandleC(vpiCondition, &repeat_stmt), &condition);
+  EXPECT_EQ(vpi_handle(vpiCondition, &repeat_stmt), &condition);
 }
 
 // vpiCondition edge: the condition is found even when a non-expression child
@@ -67,7 +67,7 @@ TEST_F(WhileRepeat, ConditionFoundWhenItFollowsTheBodyChild) {
   while_stmt.type = vpiWhile;
   while_stmt.children = {&body, &condition};
 
-  EXPECT_EQ(VpiHandleC(vpiCondition, &while_stmt), &condition);
+  EXPECT_EQ(vpi_handle(vpiCondition, &while_stmt), &condition);
 }
 
 // vpiCondition edge: a null handle and a loop with no expression child both
@@ -96,7 +96,7 @@ TEST_F(WhileRepeat, VpiConditionIsScopedToLoopStatements) {
   wait_stmt.type = vpiWait;
   wait_stmt.children = {&condition};
 
-  EXPECT_EQ(VpiHandleC(vpiCondition, &wait_stmt), nullptr);
+  EXPECT_EQ(vpi_handle(vpiCondition, &wait_stmt), nullptr);
 }
 
 // Body edge (the diagram's unlabeled arrow to a statement): a while statement
@@ -112,7 +112,7 @@ TEST_F(WhileRepeat, LoopBodyReachedThroughGenericVpiStmt) {
   while_stmt.type = vpiWhile;
   while_stmt.children = {&condition, &body};
 
-  EXPECT_EQ(VpiHandleC(vpiStmt, &while_stmt), &body);
+  EXPECT_EQ(vpi_handle(vpiStmt, &while_stmt), &body);
 }
 
 }  // namespace

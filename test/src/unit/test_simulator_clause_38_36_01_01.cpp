@@ -82,7 +82,7 @@ TEST_F(VpiStmtCallback, ProtectedStatementRejected) {
   EXPECT_EQ(vpi_register_cb(&cb), nullptr);
 
   SVpiErrorInfo info = {};
-  EXPECT_EQ(VpiChkErrorC(&info), vpiError);
+  EXPECT_EQ(vpi_chk_error(&info), vpiError);
 }
 
 // §38.36.1.1: the prohibition is specific to protected code. A cbStmt callback

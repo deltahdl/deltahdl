@@ -28,13 +28,13 @@ TEST_F(VpiHandleByIndexSim, HandleByIndexReturnCorrectChild) {
   vpi_ctx_.CreatePort("a", kVpiInput, mod);
   auto* port_b = vpi_ctx_.CreatePort("b", kVpiOutput, mod);
 
-  vpiHandle result = VpiHandleByIndexC(mod, 1);
+  vpiHandle result = vpi_handle_by_index(mod, 1);
   ASSERT_NE(result, nullptr);
   EXPECT_EQ(result, port_b);
 }
 
 TEST_F(VpiHandleByIndexSim, HandleByIndexNullParentReturnsNullptr) {
-  vpiHandle result = VpiHandleByIndexC(nullptr, 0);
+  vpiHandle result = vpi_handle_by_index(nullptr, 0);
   EXPECT_EQ(result, nullptr);
 }
 
@@ -42,7 +42,7 @@ TEST_F(VpiHandleByIndexSim, HandleByIndexNullParentReturnsNullptr) {
 // select expression, so the routine returns a null handle.
 TEST_F(VpiHandleByIndexSim, HandleByIndexOutOfRangeReturnsNullptr) {
   auto* mod = vpi_ctx_.CreateModule("top", "top");
-  vpiHandle result = VpiHandleByIndexC(mod, 99);
+  vpiHandle result = vpi_handle_by_index(mod, 99);
   EXPECT_EQ(result, nullptr);
 }
 
@@ -54,11 +54,11 @@ TEST_F(VpiHandleByIndexSim, HandleByIndexProtectedObjectIsAnError) {
   vpi_ctx_.CreatePort("a", kVpiInput, mod);
   mod->is_protected = true;
 
-  vpiHandle result = VpiHandleByIndexC(mod, 0);
+  vpiHandle result = vpi_handle_by_index(mod, 0);
   EXPECT_EQ(result, nullptr);
 
   SVpiErrorInfo info = {};
-  EXPECT_EQ(VpiChkErrorC(&info), vpiError);
+  EXPECT_EQ(vpi_chk_error(&info), vpiError);
   EXPECT_EQ(info.level, vpiError);
 }
 
@@ -70,7 +70,7 @@ TEST_F(VpiHandleByIndexSim,
   auto* param = vpi_ctx_.CreateParameter("p", 0);
   vpi_ctx_.CreatePort("a", kVpiInput, param);  // gives param a child at index 0
 
-  vpiHandle result = VpiHandleByIndexC(param, 0);
+  vpiHandle result = vpi_handle_by_index(param, 0);
   EXPECT_EQ(result, nullptr);
 }
 

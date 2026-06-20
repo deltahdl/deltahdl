@@ -90,7 +90,7 @@ TEST_F(PrimitivePrimTerm, IndexTransitionReachesArrayIndex) {
   member.array_member = true;
   member.index_expr = &index_expr;
 
-  EXPECT_EQ(VpiHandleC(vpiIndex, &member), &index_expr);
+  EXPECT_EQ(vpi_handle(vpiIndex, &member), &index_expr);
 }
 
 // D4: for a primitive that is not part of a primitive array, the vpiIndex
@@ -106,7 +106,7 @@ TEST_F(PrimitivePrimTerm, IndexTransitionIsNullWhenNotAnArrayElement) {
   standalone.index_expr = &stray_expr;  // present but must not be reported
   standalone.children.push_back(&stray_expr);
 
-  EXPECT_EQ(VpiHandleC(vpiIndex, &standalone), nullptr);
+  EXPECT_EQ(vpi_handle(vpiIndex, &standalone), nullptr);
 }
 
 // D2: vpi_put_value() applied to a primitive that is not a sequential UDP - a
@@ -125,7 +125,7 @@ TEST_F(PrimitivePrimTerm, PutValueRejectedOnNonSequentialPrimitive) {
     EXPECT_EQ(ret, nullptr) << "kind " << kind;
 
     SVpiErrorInfo info = {};
-    EXPECT_EQ(VpiChkErrorC(&info), vpiError) << "kind " << kind;
+    EXPECT_EQ(vpi_chk_error(&info), vpiError) << "kind " << kind;
   }
 }
 
@@ -147,7 +147,7 @@ TEST_F(PrimitivePrimTerm, PutValueAcceptedOnSequentialUdp) {
   vpi_put_value(h, &val, nullptr, vpiNoDelay);
 
   SVpiErrorInfo info = {};
-  EXPECT_EQ(VpiChkErrorC(&info), 0);
+  EXPECT_EQ(vpi_chk_error(&info), 0);
   EXPECT_EQ(var->value.words[0].aval & 1, 1u);
 }
 

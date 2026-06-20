@@ -17,7 +17,7 @@ namespace {
 // prefix; detail 3 fixes what vpiHasActual reports. A tf call's prefix is owned
 // by §37.42, so these tests cover only the source kinds and rules §37.61
 // defines, observing the production code through the same-pipeline public
-// dispatch (VpiHandleC and vpi_get) and the clause's helpers.
+// dispatch (vpi_handle and vpi_get) and the clause's helpers.
 
 // The fixture installs a context so the public dispatch entry points run their
 // real dispatch over the test objects.
@@ -50,7 +50,7 @@ TEST_F(DynamicPrefixing, PrefixSourceClassifier) {
 // prefixes it. The non-NULL condition spans all three prefix targets the
 // diagram draws - a virtual interface var or clocking block prefixing an
 // expression, and a class var prefixing a non-static class property - so each
-// is exercised through the public VpiHandleC(vpiPrefix, ...) dispatch.
+// is exercised through the public vpi_handle(vpiPrefix, ...) dispatch.
 TEST_F(DynamicPrefixing, PrefixReachesEachPrefixTargetKind) {
   for (int prefix_kind :
        {vpiClassVar, vpiVirtualInterfaceVar, vpiClockingBlock}) {
@@ -61,7 +61,7 @@ TEST_F(DynamicPrefixing, PrefixReachesEachPrefixTargetKind) {
     part_select.type = vpiPartSelect;
     part_select.prefix = &prefix;
 
-    EXPECT_EQ(VpiHandleC(vpiPrefix, &part_select), &prefix)
+    EXPECT_EQ(vpi_handle(vpiPrefix, &part_select), &prefix)
         << "prefix kind " << prefix_kind;
   }
 }
@@ -77,7 +77,7 @@ TEST_F(DynamicPrefixing, PrefixIsNullWhenObjectIsNotPrefixed) {
   simple_expr.type = vpiRefObj;  // a simple expression, not prefixed
   simple_expr.children = {&child};
 
-  EXPECT_EQ(VpiHandleC(vpiPrefix, &simple_expr), nullptr);
+  EXPECT_EQ(vpi_handle(vpiPrefix, &simple_expr), nullptr);
 }
 
 // D2: an object reached through a class var or virtual interface var prefix

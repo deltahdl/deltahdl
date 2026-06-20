@@ -15,11 +15,11 @@ namespace {
 // statement is not one of the kinds that override vpiStmt (an event control, a
 // delay control, or a task/func) and it is not the if-else kind that overrides
 // vpiElseStmt, and no special case overrides vpiPropertySpec at all, so each
-// edge is served by the generic, type-directed traversal in VpiHandleC: the
+// edge is served by the generic, type-directed traversal in vpi_handle: the
 // relation tag names the kind of the child it returns. These tests observe that
 // production path applying the rule to an expect statement object.
 
-// The fixture installs a context so the public VpiHandleC entry point runs its
+// The fixture installs a context so the public vpi_handle entry point runs its
 // real dispatch over the test objects.
 class Expect : public ::testing::Test {
  protected:
@@ -43,7 +43,7 @@ TEST_F(Expect, ExpectStatementReachesItsPropertySpecification) {
   expect_stmt.type = vpiExpectStmt;
   expect_stmt.children = {&incidental, &spec};
 
-  EXPECT_EQ(VpiHandleC(vpiPropertySpec, &expect_stmt), &spec);
+  EXPECT_EQ(vpi_handle(vpiPropertySpec, &expect_stmt), &spec);
 }
 
 // Pass- and else-statement edges (the two dashed arrows): an expect statement
@@ -64,8 +64,8 @@ TEST_F(Expect,
   expect_stmt.type = vpiExpectStmt;
   expect_stmt.children = {&pass, &els};
 
-  EXPECT_EQ(VpiHandleC(vpiStmt, &expect_stmt), &pass);
-  EXPECT_EQ(VpiHandleC(vpiElseStmt, &expect_stmt), &els);
+  EXPECT_EQ(vpi_handle(vpiStmt, &expect_stmt), &pass);
+  EXPECT_EQ(vpi_handle(vpiElseStmt, &expect_stmt), &els);
 }
 
 // Edge: each of the three relations reports no handle when the expect statement
@@ -74,9 +74,9 @@ TEST_F(Expect, ExpectStatementWithoutBodyReportsNullThroughEachRelation) {
   VpiObject expect_stmt;
   expect_stmt.type = vpiExpectStmt;
 
-  EXPECT_EQ(VpiHandleC(vpiPropertySpec, &expect_stmt), nullptr);
-  EXPECT_EQ(VpiHandleC(vpiStmt, &expect_stmt), nullptr);
-  EXPECT_EQ(VpiHandleC(vpiElseStmt, &expect_stmt), nullptr);
+  EXPECT_EQ(vpi_handle(vpiPropertySpec, &expect_stmt), nullptr);
+  EXPECT_EQ(vpi_handle(vpiStmt, &expect_stmt), nullptr);
+  EXPECT_EQ(vpi_handle(vpiElseStmt, &expect_stmt), nullptr);
 }
 
 }  // namespace

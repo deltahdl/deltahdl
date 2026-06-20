@@ -15,7 +15,7 @@ namespace {
 // vpiParamAssign relation, which the generic Get/GetStr/Handle/Iterate
 // machinery serves once the typespec's fields and children are populated.
 
-// The fixture installs a context so the public vpi_get/vpi_get_str/VpiHandleC/
+// The fixture installs a context so the public vpi_get/vpi_get_str/vpi_handle/
 // vpi_iterate entry points run their real dispatch over the test objects.
 class InterfaceTypespec : public ::testing::Test {
  protected:
@@ -84,7 +84,7 @@ TEST_F(InterfaceTypespec, DefNameOfInterfaceTypespecWithoutRecordedNameIsNull) {
 
 // D2: for an interface typespec that represents a modport, vpiParent returns
 // the interface typespec of the corresponding interface. Observed through the
-// helper and the public VpiHandleC(vpiParent, ...) dispatch path.
+// helper and the public vpi_handle(vpiParent, ...) dispatch path.
 TEST_F(InterfaceTypespec, ParentOfModportIsItsInterfaceTypespec) {
   VpiObject iface_ts;
   iface_ts.type = vpiInterfaceTypespec;
@@ -96,7 +96,7 @@ TEST_F(InterfaceTypespec, ParentOfModportIsItsInterfaceTypespec) {
   modport_ts.parent = &iface_ts;
 
   EXPECT_EQ(VpiInterfaceTypespecParent(&modport_ts), &iface_ts);
-  EXPECT_EQ(VpiHandleC(vpiParent, &modport_ts), &iface_ts);
+  EXPECT_EQ(vpi_handle(vpiParent, &modport_ts), &iface_ts);
 }
 
 // D2: for an interface typespec that represents an interface, vpiParent returns
@@ -112,7 +112,7 @@ TEST_F(InterfaceTypespec, ParentOfInterfaceIsNull) {
       &enclosing;  // an interface typespec still reports no parent
 
   EXPECT_EQ(VpiInterfaceTypespecParent(&iface_ts), nullptr);
-  EXPECT_EQ(VpiHandleC(vpiParent, &iface_ts), nullptr);
+  EXPECT_EQ(vpi_handle(vpiParent, &iface_ts), nullptr);
 }
 
 // D2 edge: the parent helper only speaks for an interface typespec; any other

@@ -27,7 +27,7 @@ TEST_F(VpiGetValueArraySim, NonStaticArrayIsError) {
   vpi_get_value_array(arr, &av, index, 2);
 
   SVpiErrorInfo info = {};
-  EXPECT_EQ(VpiChkErrorC(&info), vpiError);
+  EXPECT_EQ(vpi_chk_error(&info), vpiError);
   EXPECT_EQ(av.value.integers, nullptr);  // value arm overwritten to NULL
 }
 
@@ -148,7 +148,7 @@ TEST_F(VpiGetValueArraySim, UnsupportedFormatIsErrorAndNullsValuePointer) {
   vpi_get_value_array(arr, &av, index, 2);
 
   SVpiErrorInfo info = {};
-  EXPECT_EQ(VpiChkErrorC(&info), vpiError);
+  EXPECT_EQ(vpi_chk_error(&info), vpiError);
   EXPECT_EQ(av.value.rawvals, nullptr);  // value pointer overwritten to NULL
 }
 
@@ -271,7 +271,7 @@ TEST_F(VpiGetValueArraySim, MissingStartingIndexIsError) {
   vpi_get_value_array(arr, &av, /*index_p=*/nullptr, 2);
 
   SVpiErrorInfo info = {};
-  EXPECT_EQ(VpiChkErrorC(&info), vpiError);
+  EXPECT_EQ(vpi_chk_error(&info), vpiError);
   EXPECT_EQ(av.value.integers, nullptr);  // value arm overwritten to NULL
 }
 
@@ -291,7 +291,7 @@ TEST_F(VpiGetValueArraySim, OutOfRangeStartingIndexIsError) {
   vpi_get_value_array(arr, &av, index, 2);
 
   SVpiErrorInfo info = {};
-  EXPECT_EQ(VpiChkErrorC(&info), vpiError);
+  EXPECT_EQ(vpi_chk_error(&info), vpiError);
   EXPECT_EQ(av.value.integers, nullptr);  // value arm overwritten to NULL
 }
 

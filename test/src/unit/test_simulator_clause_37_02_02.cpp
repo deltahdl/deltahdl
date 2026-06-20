@@ -54,7 +54,7 @@ TEST_F(VpiHandleReleaseSim, ReleasingOneHandleLeavesDistinctHandleUsable) {
   EXPECT_TRUE(vpi_ctx_.HandleReleased(mod));
   EXPECT_FALSE(vpi_ctx_.HandleReleased(other));
   // The distinct handle still refers to the same object.
-  EXPECT_EQ(VpiCompareObjectsC(other, mod), 1);
+  EXPECT_EQ(vpi_compare_objects(other, mod), 1);
 }
 
 // §37.2.2: a null handle names nothing to release, and releasing a handle more

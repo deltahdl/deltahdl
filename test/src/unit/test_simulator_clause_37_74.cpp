@@ -52,7 +52,7 @@ TEST_F(For, ForStatementReachesConditionAmongInitIncrementAndBody) {
   for_stmt.type = vpiFor;
   for_stmt.children = {&init, &condition, &increment, &body};
 
-  EXPECT_EQ(VpiHandleC(vpiCondition, &for_stmt), &condition);
+  EXPECT_EQ(vpi_handle(vpiCondition, &for_stmt), &condition);
 }
 
 // Condition edge reports no expression when the for statement has no condition
@@ -70,7 +70,7 @@ TEST_F(For, ForWithoutConditionReportsNoCondition) {
   for_stmt.type = vpiFor;
   for_stmt.children = {&init, &increment, &body};
 
-  EXPECT_EQ(VpiHandleC(vpiCondition, &for_stmt), nullptr);
+  EXPECT_EQ(vpi_handle(vpiCondition, &for_stmt), nullptr);
 }
 
 // Condition gating: the for-condition relation is scoped to the for statement
@@ -85,7 +85,7 @@ TEST_F(For, ForConditionRelationIsScopedToForStatements) {
   not_a_for.type = vpiBegin;  // not a for statement
   not_a_for.children = {&expr};
 
-  EXPECT_EQ(VpiHandleC(vpiCondition, &not_a_for), nullptr);
+  EXPECT_EQ(vpi_handle(vpiCondition, &not_a_for), nullptr);
 }
 
 // Initialization edge (vpiForInitStmt iteration): a for statement may carry
@@ -160,7 +160,7 @@ TEST_F(For, ForStatementReachesBodyThroughVpiStmt) {
   for_stmt.type = vpiFor;
   for_stmt.children = {&init, &condition, &increment, &body};
 
-  EXPECT_EQ(VpiHandleC(vpiStmt, &for_stmt), &body);
+  EXPECT_EQ(vpi_handle(vpiStmt, &for_stmt), &body);
 }
 
 // Body edge edge case (no body): a for statement carrying initialization,
@@ -180,7 +180,7 @@ TEST_F(For, ForWithoutBodyReportsNoStatement) {
   for_stmt.type = vpiFor;
   for_stmt.children = {&init, &condition, &increment};
 
-  EXPECT_EQ(VpiHandleC(vpiStmt, &for_stmt), nullptr);
+  EXPECT_EQ(vpi_handle(vpiStmt, &for_stmt), nullptr);
 }
 
 // Initialization edge edge case (no init statements): a for statement written

@@ -50,7 +50,7 @@ TEST_F(VpiSimEventCb, ForceCallbackOnBitSelectRejected) {
   EXPECT_EQ(vpi_register_cb(&cb), nullptr);
 
   SVpiErrorInfo info = {};
-  EXPECT_EQ(VpiChkErrorC(&info), vpiError);
+  EXPECT_EQ(vpi_chk_error(&info), vpiError);
 }
 
 // §38.36.1: the same prohibition holds for a cbRelease callback.
@@ -64,7 +64,7 @@ TEST_F(VpiSimEventCb, ReleaseCallbackOnBitSelectRejected) {
   EXPECT_EQ(vpi_register_cb(&cb), nullptr);
 
   SVpiErrorInfo info = {};
-  EXPECT_EQ(VpiChkErrorC(&info), vpiError);
+  EXPECT_EQ(vpi_chk_error(&info), vpiError);
 }
 
 // §38.36.1: and for a cbDisable callback.
@@ -78,7 +78,7 @@ TEST_F(VpiSimEventCb, DisableCallbackOnBitSelectRejected) {
   EXPECT_EQ(vpi_register_cb(&cb), nullptr);
 
   SVpiErrorInfo info = {};
-  EXPECT_EQ(VpiChkErrorC(&info), vpiError);
+  EXPECT_EQ(vpi_chk_error(&info), vpiError);
 }
 
 // §38.36.1: the prohibition is specific to a bit-select target. A cbForce

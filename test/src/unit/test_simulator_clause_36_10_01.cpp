@@ -49,7 +49,7 @@ class VpiErrorHandling : public ::testing::Test {
 TEST_F(VpiErrorHandling, ChkErrorReturnsZeroWhenNoErrorOccurred) {
   CallVpiRoutineThatSucceeds();
 
-  EXPECT_EQ(VpiChkErrorC(nullptr), 0);
+  EXPECT_EQ(vpi_chk_error(nullptr), 0);
 }
 
 // §36.10.1 (C2, edge): the determination is scoped to the previously called
@@ -58,11 +58,11 @@ TEST_F(VpiErrorHandling, ChkErrorReturnsZeroWhenNoErrorOccurred) {
 // reports no error - the pending status does not persist across a good call.
 TEST_F(VpiErrorHandling, ChkErrorTracksMostRecentRoutineNotAnyPriorError) {
   CallVpiRoutineThatErrors();
-  ASSERT_NE(VpiChkErrorC(nullptr), 0);
+  ASSERT_NE(vpi_chk_error(nullptr), 0);
 
   CallVpiRoutineThatSucceeds();
 
-  EXPECT_EQ(VpiChkErrorC(nullptr), 0);
+  EXPECT_EQ(vpi_chk_error(nullptr), 0);
 }
 
 // §36.10.1 (C4): the vpi_chk_error() routine can provide detailed information
@@ -71,7 +71,7 @@ TEST_F(VpiErrorHandling, ChkErrorProvidesDetailedInformation) {
   CallVpiRoutineThatErrors();
 
   SVpiErrorInfo info = {};
-  int result = VpiChkErrorC(&info);
+  int result = vpi_chk_error(&info);
 
   EXPECT_NE(result, 0);
   EXPECT_NE(info.level, 0);

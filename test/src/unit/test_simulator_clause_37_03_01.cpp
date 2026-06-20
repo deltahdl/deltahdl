@@ -82,7 +82,7 @@ TEST_F(VpiObjectAccess, GetStrAccessesStringPropertiesAsPliByte8) {
 // returns a handle to the related object - the example walks from a net to the
 // module that contains it. The result is itself a vpiHandle.
 TEST_F(VpiObjectAccess, HandleTraversesOneToOneRelationship) {
-  static_assert(std::is_same_v<decltype(VpiHandleC(0, nullptr)), vpiHandle>,
+  static_assert(std::is_same_v<decltype(vpi_handle(0, nullptr)), vpiHandle>,
                 "vpi_handle returns a vpiHandle");
 
   VpiObject mod;
@@ -93,7 +93,7 @@ TEST_F(VpiObjectAccess, HandleTraversesOneToOneRelationship) {
   net.type = vpiNet;
   net.parent = &mod;
 
-  EXPECT_EQ(VpiHandleC(vpiModule, &net), &mod);
+  EXPECT_EQ(vpi_handle(vpiModule, &net), &mod);
 }
 
 // Claim: one-to-many relationships are traversed with an iteration mechanism -
@@ -175,7 +175,7 @@ TEST_F(VpiObjectAccess, HandleReturnsNoHandleForAbsentRelationship) {
   VpiObject net;
   net.type = vpiNet;
 
-  EXPECT_EQ(VpiHandleC(vpiModule, &net), nullptr);
+  EXPECT_EQ(vpi_handle(vpiModule, &net), nullptr);
 }
 
 }  // namespace

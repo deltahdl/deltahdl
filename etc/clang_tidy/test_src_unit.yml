@@ -32,7 +32,7 @@ CheckOptions:
   readability-identifier-naming.FunctionCase: CamelCase
   # C++ standard: main, coroutine promise/awaitable methods
   # IEEE 1800-2023 VPI (§36) + DPI (Annex I) C-API functions
-  readability-identifier-naming.FunctionIgnoredRegexp: 'main|get_return_object|initial_suspend|final_suspend|return_void|return_value|unhandled_exception|await_ready|await_suspend|await_resume|vpi_register_systf|vpi_handle_by_name|vpi_iterate|vpi_scan|vpi_get_value|vpi_put_value|vpi_register_cb|vpi_get|vpi_get_str|vpi_free_object|vpi_get_vlog_info|vpi_register_assertion_cb|vpi_put_delays|vpi_put_data|vpi_put_userdata|vpi_release_handle|vpi_flush|vpi_mcd_open|vpi_mcd_close|vpi_mcd_flush|vpi_mcd_name|vpi_mcd_printf|vpi_mcd_vprintf|vpi_printf|vpi_vprintf|sv[A-Z].*'
+  readability-identifier-naming.FunctionIgnoredRegexp: 'main|get_return_object|initial_suspend|final_suspend|return_void|return_value|unhandled_exception|await_ready|await_suspend|await_resume|vpi_register_systf|vpi_handle_by_name|vpi_iterate|vpi_scan|vpi_get_value|vpi_put_value|vpi_register_cb|vpi_get|vpi_get_str|vpi_free_object|vpi_get_vlog_info|vpi_register_assertion_cb|vpi_put_delays|vpi_put_data|vpi_put_userdata|vpi_release_handle|vpi_flush|vpi_mcd_open|vpi_mcd_close|vpi_mcd_flush|vpi_mcd_name|vpi_mcd_printf|vpi_mcd_vprintf|vpi_printf|vpi_vprintf|vpi_handle|vpi_control|vpi_compare_objects|vpi_remove_cb|vpi_chk_error|sv[A-Z].*'
   readability-identifier-naming.GlobalConstantCase: CamelCase
   readability-identifier-naming.GlobalConstantPrefix: k
   readability-identifier-naming.LocalConstantCase: CamelCase

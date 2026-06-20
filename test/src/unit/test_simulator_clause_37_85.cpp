@@ -89,9 +89,9 @@ TEST_F(Generates, ElementsAccessedByIndex) {
   array.type = vpiGenScopeArray;
   array.children = {&elem0, &elem1};
 
-  EXPECT_EQ(VpiHandleByIndexC(&array, 0), &elem0);
-  EXPECT_EQ(VpiHandleByIndexC(&array, 1), &elem1);
-  EXPECT_EQ(VpiHandleByIndexC(&array, 2), nullptr);
+  EXPECT_EQ(vpi_handle_by_index(&array, 0), &elem0);
+  EXPECT_EQ(vpi_handle_by_index(&array, 1), &elem1);
+  EXPECT_EQ(vpi_handle_by_index(&array, 2), nullptr);
 }
 
 // Edge (-> access by index, vpi_handle_by_multi_index()): the diagram draws the
@@ -111,7 +111,7 @@ TEST_F(Generates, ElementSelectedByMultiIndex) {
   array.children = {&elem0, &elem1};
 
   int indices[] = {1};
-  EXPECT_EQ(VpiHandleByMultiIndexC(&array, 1, indices), &elem1);
+  EXPECT_EQ(vpi_handle_by_multi_index(&array, 1, indices), &elem1);
 }
 
 // Edge (vpiIndex -> expr): an array-member gen scope reaches the index
@@ -125,7 +125,7 @@ TEST_F(Generates, IndexReachesArrayMemberIndexExpression) {
   gen_scope.array_member = true;
   gen_scope.index_expr = &index_expr;
 
-  EXPECT_EQ(VpiHandleC(vpiIndex, &gen_scope), &index_expr);
+  EXPECT_EQ(vpi_handle(vpiIndex, &gen_scope), &index_expr);
 }
 
 // Edge (vpiIndex -> expr), gate: a gen scope that is not an element of a gen
@@ -140,7 +140,7 @@ TEST_F(Generates, IndexIsNullWhenGenScopeIsNotAnArrayMember) {
   gen_scope.array_member = false;
   gen_scope.index_expr = &stray_expr;  // present but not a locating index
 
-  EXPECT_EQ(VpiHandleC(vpiIndex, &gen_scope), nullptr);
+  EXPECT_EQ(vpi_handle(vpiIndex, &gen_scope), nullptr);
 }
 
 // Property (-> is implicitly declared, bool: vpiImplicitDecl), detail 2: the

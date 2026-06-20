@@ -40,8 +40,8 @@ TEST_F(TimingCheck, RefAndDataTermsAreReached) {
   tchk.tchk_ref_term = &ref_term;
   tchk.tchk_data_term = &data_term;
 
-  VpiHandle reached_ref = VpiHandleC(vpiTchkRefTerm, &tchk);
-  VpiHandle reached_data = VpiHandleC(vpiTchkDataTerm, &tchk);
+  VpiHandle reached_ref = vpi_handle(vpiTchkRefTerm, &tchk);
+  VpiHandle reached_data = vpi_handle(vpiTchkDataTerm, &tchk);
   EXPECT_EQ(reached_ref, &ref_term);
   EXPECT_EQ(reached_data, &data_term);
 
@@ -61,8 +61,8 @@ TEST_F(TimingCheck, DataTermIsNullWhenCheckHasNoDataEvent) {
   tchk.tchk_ref_term = &ref_term;
   // tchk_data_term left null: this check has no data event.
 
-  EXPECT_EQ(VpiHandleC(vpiTchkRefTerm, &tchk), &ref_term);
-  EXPECT_EQ(VpiHandleC(vpiTchkDataTerm, &tchk), nullptr);
+  EXPECT_EQ(vpi_handle(vpiTchkRefTerm, &tchk), &ref_term);
+  EXPECT_EQ(vpi_handle(vpiTchkDataTerm, &tchk), nullptr);
 }
 
 // Detail 1 (scope): the vpiTchkRefTerm/vpiTchkDataTerm relations are specific
@@ -77,8 +77,8 @@ TEST_F(TimingCheck, TermRelationsApplyOnlyToTimingChecks) {
   not_a_tchk.type = vpiModule;
   not_a_tchk.children = {&stray_term};
 
-  EXPECT_EQ(VpiHandleC(vpiTchkRefTerm, &not_a_tchk), nullptr);
-  EXPECT_EQ(VpiHandleC(vpiTchkDataTerm, &not_a_tchk), nullptr);
+  EXPECT_EQ(vpi_handle(vpiTchkRefTerm, &not_a_tchk), nullptr);
+  EXPECT_EQ(vpi_handle(vpiTchkDataTerm, &not_a_tchk), nullptr);
 }
 
 // Detail 2: iterating vpiExpr over a timing check returns its arguments - the

@@ -13,9 +13,9 @@ namespace {
 // associated with an assignment, the statement shall always be NULL. These
 // tests observe the production code that applies that rule
 // (VpiEventControlStmt) both directly and through the public
-// VpiHandleC(vpiStmt, ...) dispatch path.
+// vpi_handle(vpiStmt, ...) dispatch path.
 
-// The fixture installs a context so the public VpiHandleC entry point runs its
+// The fixture installs a context so the public vpi_handle entry point runs its
 // real dispatch over the test objects.
 class EventControl : public ::testing::Test {
  protected:
@@ -55,7 +55,7 @@ TEST_F(EventControl, NullAndEmptyEventControlsReportNoStatement) {
   EXPECT_EQ(VpiEventControlStmt(&bare), nullptr);
 }
 
-// D1 end to end: the rule is applied by the public VpiHandleC(vpiStmt, ...)
+// D1 end to end: the rule is applied by the public vpi_handle(vpiStmt, ...)
 // dispatch. The assignment-associated event control yields a null statement,
 // while a standalone event control yields its statement child through the same
 // entry point.
@@ -70,12 +70,12 @@ TEST_F(EventControl, RuleAppliesThroughPublicVpiHandleDispatch) {
   on_assignment.type = vpiEventControl;
   on_assignment.parent = &assignment;
   on_assignment.children = {&guarded};
-  EXPECT_EQ(VpiHandleC(vpiStmt, &on_assignment), nullptr);
+  EXPECT_EQ(vpi_handle(vpiStmt, &on_assignment), nullptr);
 
   VpiObject standalone;
   standalone.type = vpiEventControl;
   standalone.children = {&guarded};
-  EXPECT_EQ(VpiHandleC(vpiStmt, &standalone), &guarded);
+  EXPECT_EQ(vpi_handle(vpiStmt, &standalone), &guarded);
 }
 
 }  // namespace

@@ -168,7 +168,7 @@ TEST_F(UdpModel, TableEntryValueAllowsStringFormat) {
   vpi_get_value(row, &v);
 
   SVpiErrorInfo info = {};
-  EXPECT_EQ(VpiChkErrorC(&info), 0);
+  EXPECT_EQ(vpi_chk_error(&info), 0);
   EXPECT_STREQ(v.value.str, "AB");
 }
 
@@ -185,7 +185,7 @@ TEST_F(UdpModel, TableEntryValueAllowsVectorFormat) {
   vpi_get_value(row, &v);
 
   SVpiErrorInfo info = {};
-  EXPECT_EQ(VpiChkErrorC(&info), 0);
+  EXPECT_EQ(vpi_chk_error(&info), 0);
   ASSERT_NE(v.value.vector, nullptr);
   EXPECT_EQ(v.value.vector[0].aval, 0x4142u);
 }
@@ -205,7 +205,7 @@ TEST_F(UdpModel, TableEntryValueRejectsOtherFormats) {
   vpi_get_value(row, &v);
 
   SVpiErrorInfo info = {};
-  EXPECT_EQ(VpiChkErrorC(&info), vpiError);
+  EXPECT_EQ(vpi_chk_error(&info), vpiError);
   EXPECT_EQ(v.value.integer, 0x7777);
 }
 
@@ -229,7 +229,7 @@ TEST_F(UdpModel, TableEntryValueRejectsStringLikeAndNumericFormats) {
     vpi_get_value(row, &v);
 
     SVpiErrorInfo info = {};
-    EXPECT_EQ(VpiChkErrorC(&info), vpiError) << "format " << format;
+    EXPECT_EQ(vpi_chk_error(&info), vpiError) << "format " << format;
   }
 }
 

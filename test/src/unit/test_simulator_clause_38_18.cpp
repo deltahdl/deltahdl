@@ -27,7 +27,7 @@ TEST_F(VpiHandleSim, HandleReturnsParentModule) {
   auto* mod = vpi_ctx_.CreateModule("top", "top");
   auto* port = vpi_ctx_.CreatePort("clk", kVpiInput, mod);
 
-  vpiHandle result = VpiHandleC(vpiModule, port);
+  vpiHandle result = vpi_handle(vpiModule, port);
   ASSERT_NE(result, nullptr);
   EXPECT_EQ(result, mod);
 }
@@ -39,20 +39,20 @@ TEST_F(VpiHandleSim, HandleReturnsChildPort) {
   auto* mod = vpi_ctx_.CreateModule("top", "top");
   auto* port = vpi_ctx_.CreatePort("clk", kVpiInput, mod);
 
-  vpiHandle result = VpiHandleC(vpiPort, mod);
+  vpiHandle result = vpi_handle(vpiPort, mod);
   ASSERT_NE(result, nullptr);
   EXPECT_EQ(result, port);
 }
 
 TEST_F(VpiHandleSim, HandleReturnsNullptrForNullRef) {
-  vpiHandle result = VpiHandleC(vpiModule, nullptr);
+  vpiHandle result = vpi_handle(vpiModule, nullptr);
   EXPECT_EQ(result, nullptr);
 }
 
 TEST_F(VpiHandleSim, HandleReturnsNullptrForNoMatch) {
   auto* mod = vpi_ctx_.CreateModule("top", "top");
 
-  vpiHandle result = VpiHandleC(vpiNet, mod);
+  vpiHandle result = vpi_handle(vpiNet, mod);
   EXPECT_EQ(result, nullptr);
 }
 
@@ -64,11 +64,11 @@ TEST_F(VpiHandleSim, HandleProtectedObjectIsAnError) {
   vpi_ctx_.CreatePort("clk", kVpiInput, mod);
   mod->is_protected = true;
 
-  vpiHandle result = VpiHandleC(vpiPort, mod);
+  vpiHandle result = vpi_handle(vpiPort, mod);
   EXPECT_EQ(result, nullptr);
 
   SVpiErrorInfo info = {};
-  EXPECT_EQ(VpiChkErrorC(&info), vpiError);
+  EXPECT_EQ(vpi_chk_error(&info), vpiError);
   EXPECT_EQ(info.level, vpiError);
 }
 

@@ -51,14 +51,14 @@ TEST_F(VpiCoverageControlSim, StartControlsCoverageOverTheInstanceHandle) {
   VpiHandle dut = vpi_ctx_.CreateModule("dut", "top.dut");
 
   EXPECT_FALSE(vpi_ctx_.GetCoverageControlState().IsCollecting("top.dut"));
-  int result = VpiControlC(vpiCoverageStart, vpiAssertCoverage, dut);
+  int result = vpi_control(vpiCoverageStart, vpiAssertCoverage, dut);
   EXPECT_EQ(result, Status(CoverageStatus::Ok));
   EXPECT_TRUE(vpi_ctx_.GetCoverageControlState().IsCollecting("top.dut"));
   EXPECT_EQ(vpi_ctx_.GetCoverageControlState().StartCount("top.dut"), 1u);
 
   // A redundant start has no effect: it still succeeds, but collection does not
   // start a second time.
-  EXPECT_EQ(VpiControlC(vpiCoverageStart, vpiAssertCoverage, dut),
+  EXPECT_EQ(vpi_control(vpiCoverageStart, vpiAssertCoverage, dut),
             Status(CoverageStatus::Ok));
   EXPECT_EQ(vpi_ctx_.GetCoverageControlState().StartCount("top.dut"), 1u);
 }
@@ -76,7 +76,7 @@ TEST_F(VpiCoverageControlSim, ControlAcceptsAnAssertionHandle) {
       "top.dut.a1", CoverageAvailability::Full);
   VpiHandle assertion = vpi_ctx_.CreateAssertion("top.dut.a1", vpiAssertion);
 
-  EXPECT_EQ(VpiControlC(vpiCoverageStart, vpiAssertCoverage, assertion),
+  EXPECT_EQ(vpi_control(vpiCoverageStart, vpiAssertCoverage, assertion),
             Status(CoverageStatus::Ok));
   EXPECT_TRUE(vpi_ctx_.GetCoverageControlState().IsCollecting("top.dut.a1"));
   // Controlling the assertion did not implicitly start its enclosing instance;
@@ -91,15 +91,15 @@ TEST_F(VpiCoverageControlSim, StopAndResetApplyTheControlRules) {
   vpi_ctx_.GetCoverageControlState().SetAvailability(
       "top.dut", CoverageAvailability::Full);
   VpiHandle dut = vpi_ctx_.CreateModule("dut", "top.dut");
-  ASSERT_EQ(VpiControlC(vpiCoverageStart, vpiAssertCoverage, dut),
+  ASSERT_EQ(vpi_control(vpiCoverageStart, vpiAssertCoverage, dut),
             Status(CoverageStatus::Ok));
 
-  EXPECT_EQ(VpiControlC(vpiCoverageStop, vpiAssertCoverage, dut),
+  EXPECT_EQ(vpi_control(vpiCoverageStop, vpiAssertCoverage, dut),
             Status(CoverageStatus::Ok));
   EXPECT_FALSE(vpi_ctx_.GetCoverageControlState().IsCollecting("top.dut"));
   EXPECT_EQ(vpi_ctx_.GetCoverageControlState().StopCount("top.dut"), 1u);
 
-  EXPECT_EQ(VpiControlC(vpiCoverageReset, vpiAssertCoverage, dut),
+  EXPECT_EQ(vpi_control(vpiCoverageReset, vpiAssertCoverage, dut),
             Status(CoverageStatus::Ok));
   EXPECT_EQ(vpi_ctx_.GetCoverageControlState().ResetCount("top.dut"), 1u);
 }
@@ -116,9 +116,9 @@ TEST_F(VpiCoverageControlSim, CheckReportsAvailabilityWithoutChangingState) {
   VpiHandle full = vpi_ctx_.CreateModule("full", "top.full");
   VpiHandle none = vpi_ctx_.CreateModule("none", "top.none");
 
-  EXPECT_EQ(VpiControlC(vpiCoverageCheck, vpiStatementCoverage, full),
+  EXPECT_EQ(vpi_control(vpiCoverageCheck, vpiStatementCoverage, full),
             Status(CoverageStatus::Ok));
-  EXPECT_EQ(VpiControlC(vpiCoverageCheck, vpiStatementCoverage, none),
+  EXPECT_EQ(vpi_control(vpiCoverageCheck, vpiStatementCoverage, none),
             Status(CoverageStatus::NoCoverage));
   // Checking is a pure query: it does not begin collection.
   EXPECT_FALSE(vpi_ctx_.GetCoverageControlState().IsCollecting("top.full"));
@@ -129,10 +129,10 @@ TEST_F(VpiCoverageControlSim, CheckReportsAvailabilityWithoutChangingState) {
 // handle likewise names no scope and is an error.
 TEST_F(VpiCoverageControlSim, ControlOnUnknownScopeIsAnError) {
   VpiHandle ghost = vpi_ctx_.CreateModule("ghost", "top.ghost");
-  EXPECT_EQ(VpiControlC(vpiCoverageStart, vpiAssertCoverage, ghost),
+  EXPECT_EQ(vpi_control(vpiCoverageStart, vpiAssertCoverage, ghost),
             Status(CoverageStatus::Error));
   EXPECT_EQ(
-      VpiControlC(vpiCoverageStart, vpiAssertCoverage, VpiHandle{nullptr}),
+      vpi_control(vpiCoverageStart, vpiAssertCoverage, VpiHandle{nullptr}),
       Status(CoverageStatus::Error));
 }
 
@@ -147,14 +147,14 @@ TEST_F(VpiCoverageControlSim, CoverageIsControllableOnlyAtInstanceLevel) {
   VpiHandle dut = vpi_ctx_.CreateModule("dut", "top.dut");
 
   // Start statement coverage on the instance.
-  ASSERT_EQ(VpiControlC(vpiCoverageStart, vpiStatementCoverage, dut),
+  ASSERT_EQ(vpi_control(vpiCoverageStart, vpiStatementCoverage, dut),
             Status(CoverageStatus::Ok));
   EXPECT_TRUE(vpi_ctx_.GetCoverageControlState().IsCollecting("top.dut"));
 
   // Stopping toggle coverage over the same instance handle stops the very same
   // instance-level collection - the control is not bound to an individual
   // statement, signal, or FSM.
-  EXPECT_EQ(VpiControlC(vpiCoverageStop, vpiToggleCoverage, dut),
+  EXPECT_EQ(vpi_control(vpiCoverageStop, vpiToggleCoverage, dut),
             Status(CoverageStatus::Ok));
   EXPECT_FALSE(vpi_ctx_.GetCoverageControlState().IsCollecting("top.dut"));
   EXPECT_EQ(vpi_ctx_.GetCoverageControlState().StopCount("top.dut"), 1u);
@@ -168,12 +168,12 @@ TEST_F(VpiCoverageControlSim, SaveAppliesCoverageSaveRules) {
   vpi_ctx_.GetCoverageControlState().SetCoverageAvailableForSave(
       vpiAssertCoverage, true);
 
-  EXPECT_EQ(VpiControlC(vpiCoverageSave, vpiAssertCoverage, "covdb"),
+  EXPECT_EQ(vpi_control(vpiCoverageSave, vpiAssertCoverage, "covdb"),
             Status(CoverageStatus::Ok));
   EXPECT_EQ(vpi_ctx_.GetCoverageControlState().SaveCount("covdb"), 1u);
 
   // A type with no coverage available to save records nothing.
-  EXPECT_EQ(VpiControlC(vpiCoverageSave, vpiToggleCoverage, "toggledb"),
+  EXPECT_EQ(vpi_control(vpiCoverageSave, vpiToggleCoverage, "toggledb"),
             Status(CoverageStatus::NoCoverage));
   EXPECT_EQ(vpi_ctx_.GetCoverageControlState().SaveCount("toggledb"), 0u);
 }
@@ -186,13 +186,13 @@ TEST_F(VpiCoverageControlSim, MergeAppliesCoverageMergeRules) {
   vpi_ctx_.GetCoverageControlState().RegisterCoverageDatabase(
       "covdb", /*from_this_design=*/true, {vpiAssertCoverage});
 
-  EXPECT_EQ(VpiControlC(vpiCoverageMerge, vpiAssertCoverage, "covdb"),
+  EXPECT_EQ(vpi_control(vpiCoverageMerge, vpiAssertCoverage, "covdb"),
             Status(CoverageStatus::Ok));
   EXPECT_EQ(vpi_ctx_.GetCoverageControlState().MergeCount("covdb"), 1u);
 
   // A name no database is recorded under cannot be loaded: an error, with no
   // merge performed.
-  EXPECT_EQ(VpiControlC(vpiCoverageMerge, vpiAssertCoverage, "missing"),
+  EXPECT_EQ(vpi_control(vpiCoverageMerge, vpiAssertCoverage, "missing"),
             Status(CoverageStatus::Error));
   EXPECT_EQ(vpi_ctx_.GetCoverageControlState().MergeCount("missing"), 0u);
 }

@@ -30,7 +30,7 @@ class ActiveTimeFormat : public ::testing::Test {
 // - vpi_handle(vpiActiveTimeFormat, NULL) returns NULL rather than reaching any
 // object.
 TEST_F(ActiveTimeFormat, ReturnsNullWhenTimeformatNotCalled) {
-  EXPECT_EQ(VpiHandleC(vpiActiveTimeFormat, nullptr), nullptr);
+  EXPECT_EQ(vpi_handle(vpiActiveTimeFormat, nullptr), nullptr);
 }
 
 // Diagram edge: once a $timeformat() call has set the active time format,
@@ -41,7 +41,7 @@ TEST_F(ActiveTimeFormat, ReachesTheTimeformatCallThatSetTheFormat) {
   timeformat_call.type = vpiSysTaskCall;
   ctx_.SetActiveTimeFormatCall(&timeformat_call);
 
-  EXPECT_EQ(VpiHandleC(vpiActiveTimeFormat, nullptr), &timeformat_call);
+  EXPECT_EQ(vpi_handle(vpiActiveTimeFormat, nullptr), &timeformat_call);
 }
 
 // Diagram edge / detail 1 both spell the traversal with a NULL second argument:
@@ -57,7 +57,7 @@ TEST_F(ActiveTimeFormat, DoesNotReachTheTimeformatCallFromANonNullReference) {
   VpiObject some_object;
   some_object.type = vpiSysTaskCall;
 
-  EXPECT_NE(VpiHandleC(vpiActiveTimeFormat, &some_object), &timeformat_call);
+  EXPECT_NE(vpi_handle(vpiActiveTimeFormat, &some_object), &timeformat_call);
 }
 
 }  // namespace

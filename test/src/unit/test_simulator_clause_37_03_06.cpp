@@ -45,7 +45,7 @@ TEST_F(VpiObjectProtection, GetTypeIsPermittedOnProtectedObject) {
   EXPECT_EQ(vpi_get(vpiType, &mod), vpiModule);
 
   SVpiErrorInfo info = {};
-  EXPECT_EQ(VpiChkErrorC(&info), 0);
+  EXPECT_EQ(vpi_chk_error(&info), 0);
 }
 
 // Claim: access to the vpiIsProtected property of a protected object is
@@ -59,7 +59,7 @@ TEST_F(VpiObjectProtection, GetIsProtectedIsPermittedOnProtectedObject) {
   EXPECT_EQ(vpi_get(vpiIsProtected, &mod), 1);
 
   SVpiErrorInfo info = {};
-  EXPECT_EQ(VpiChkErrorC(&info), 0);
+  EXPECT_EQ(vpi_chk_error(&info), 0);
 }
 
 // Claim: unless otherwise specified, access to a property of a protected object
@@ -74,7 +74,7 @@ TEST_F(VpiObjectProtection, GetOtherPropertyOnProtectedObjectIsAnError) {
   EXPECT_EQ(vpi_get(vpiSize, &reg), vpiUndefined);
 
   SVpiErrorInfo info = {};
-  EXPECT_NE(VpiChkErrorC(&info), 0);
+  EXPECT_NE(vpi_chk_error(&info), 0);
   EXPECT_NE(info.level, 0);
 }
 
@@ -91,7 +91,7 @@ TEST_F(VpiObjectProtection, GetStrTypeIsPermittedOnProtectedObject) {
   EXPECT_EQ(std::string(type_name), "vpiModule");
 
   SVpiErrorInfo info = {};
-  EXPECT_EQ(VpiChkErrorC(&info), 0);
+  EXPECT_EQ(vpi_chk_error(&info), 0);
 }
 
 // Claim (string form of the general rule): a string query for any other
@@ -106,7 +106,7 @@ TEST_F(VpiObjectProtection, GetStrOtherPropertyOnProtectedObjectIsAnError) {
   EXPECT_EQ(vpi_get_str(vpiName, &mod), nullptr);
 
   SVpiErrorInfo info = {};
-  EXPECT_NE(VpiChkErrorC(&info), 0);
+  EXPECT_NE(vpi_chk_error(&info), 0);
   EXPECT_NE(info.level, 0);
 }
 
@@ -124,7 +124,7 @@ TEST_F(VpiObjectProtection, GetStrIsProtectedIsPermittedOnProtectedObject) {
   EXPECT_EQ(vpi_get_str(vpiIsProtected, &mod), nullptr);
 
   SVpiErrorInfo info = {};
-  EXPECT_EQ(VpiChkErrorC(&info), 0);
+  EXPECT_EQ(vpi_chk_error(&info), 0);
 }
 
 // Edge (boundary of the protected-object rule): the access error applies only
@@ -140,7 +140,7 @@ TEST_F(VpiObjectProtection, GetNonExceptionPropertyOnOrdinaryObjectSucceeds) {
   EXPECT_EQ(vpi_get(vpiSize, &reg), 16);
 
   SVpiErrorInfo info = {};
-  EXPECT_EQ(VpiChkErrorC(&info), 0);
+  EXPECT_EQ(vpi_chk_error(&info), 0);
 }
 
 }  // namespace

@@ -14,12 +14,12 @@ namespace {
 // property (the unique/priority qualifier flags). The clause has no numbered
 // Details and no 'shall' sentences. These tests observe the production code
 // that serves the diagram's relations and property: the vpiCondition edge
-// through the dedicated helper VpiIfConditionExpr (wired into VpiHandleC), the
+// through the dedicated helper VpiIfConditionExpr (wired into vpi_handle), the
 // then-branch through the generic vpiStmt traversal, the vpiElseStmt edge
-// through VpiIfElseStmt (also wired into VpiHandleC), and the vpiQualifier
+// through VpiIfElseStmt (also wired into vpi_handle), and the vpiQualifier
 // property through the public vpi_get dispatch.
 
-// The fixture installs a context so the public VpiHandleC / vpi_get entry
+// The fixture installs a context so the public vpi_handle / vpi_get entry
 // points run their real dispatch over the test objects.
 class IfIfElse : public ::testing::Test {
  protected:
@@ -41,7 +41,7 @@ TEST_F(IfIfElse, IfStatementReachesConditionThroughVpiCondition) {
   if_stmt.type = vpiIf;
   if_stmt.children = {&condition, &then_body};
 
-  EXPECT_EQ(VpiHandleC(vpiCondition, &if_stmt), &condition);
+  EXPECT_EQ(vpi_handle(vpiCondition, &if_stmt), &condition);
 }
 
 // vpiCondition edge: an if-else statement reaches its condition the same way -
@@ -60,7 +60,7 @@ TEST_F(IfIfElse, IfElseStatementReachesConditionThroughVpiCondition) {
   if_else.type = vpiIfElse;
   if_else.children = {&condition, &then_body, &else_body};
 
-  EXPECT_EQ(VpiHandleC(vpiCondition, &if_else), &condition);
+  EXPECT_EQ(vpi_handle(vpiCondition, &if_else), &condition);
 }
 
 // vpiCondition edge: the condition is found even when a non-expression child (a
@@ -77,7 +77,7 @@ TEST_F(IfIfElse, ConditionFoundWhenItFollowsABodyChild) {
   if_stmt.type = vpiIf;
   if_stmt.children = {&then_body, &condition};
 
-  EXPECT_EQ(VpiHandleC(vpiCondition, &if_stmt), &condition);
+  EXPECT_EQ(vpi_handle(vpiCondition, &if_stmt), &condition);
 }
 
 // vpiCondition edge is scoped to the conditional statements: asking some other
@@ -92,7 +92,7 @@ TEST_F(IfIfElse, VpiConditionIsScopedToConditionalStatements) {
   other.type = vpiRepeatControl;
   other.children = {&expr};
 
-  EXPECT_EQ(VpiHandleC(vpiCondition, &other), nullptr);
+  EXPECT_EQ(vpi_handle(vpiCondition, &other), nullptr);
 }
 
 // vpiCondition edge, no-condition edge case: a conditional statement that
@@ -108,7 +108,7 @@ TEST_F(IfIfElse, ConditionIsNullWhenNoExpressionChild) {
   if_stmt.type = vpiIf;
   if_stmt.children = {&then_body};
 
-  EXPECT_EQ(VpiHandleC(vpiCondition, &if_stmt), nullptr);
+  EXPECT_EQ(vpi_handle(vpiCondition, &if_stmt), nullptr);
 }
 
 // Then-branch edge (the diagram's unlabeled arrow to a statement): an if
@@ -128,7 +128,7 @@ TEST_F(IfIfElse, ThenBodyReachedThroughGenericVpiStmt) {
   if_else.type = vpiIfElse;
   if_else.children = {&condition, &then_body, &else_body};
 
-  EXPECT_EQ(VpiHandleC(vpiStmt, &if_else), &then_body);
+  EXPECT_EQ(vpi_handle(vpiStmt, &if_else), &then_body);
 }
 
 // vpiElseStmt edge: an if-else statement reaches its else-branch body - the
@@ -148,7 +148,7 @@ TEST_F(IfIfElse, IfElseStatementReachesElseBranchThroughVpiElseStmt) {
   if_else.type = vpiIfElse;
   if_else.children = {&condition, &then_body, &else_body};
 
-  EXPECT_EQ(VpiHandleC(vpiElseStmt, &if_else), &else_body);
+  EXPECT_EQ(vpi_handle(vpiElseStmt, &if_else), &else_body);
 }
 
 // vpiElseStmt is drawn only from the if-else grouping: a plain if statement
@@ -168,7 +168,7 @@ TEST_F(IfIfElse, PlainIfReportsNoElseStatement) {
   if_stmt.type = vpiIf;
   if_stmt.children = {&condition, &then_body, &second_body};
 
-  EXPECT_EQ(VpiHandleC(vpiElseStmt, &if_stmt), nullptr);
+  EXPECT_EQ(vpi_handle(vpiElseStmt, &if_stmt), nullptr);
 }
 
 // vpiElseStmt edge: an if-else statement with only a then branch (a single body
@@ -184,7 +184,7 @@ TEST_F(IfIfElse, ElseStatementIsNullWhenNoElseBranch) {
   if_else.type = vpiIfElse;
   if_else.children = {&condition, &then_body};
 
-  EXPECT_EQ(VpiHandleC(vpiElseStmt, &if_else), nullptr);
+  EXPECT_EQ(vpi_handle(vpiElseStmt, &if_else), nullptr);
 }
 
 // Property (-> qualifier int: vpiQualifier): an if or if-else statement reports

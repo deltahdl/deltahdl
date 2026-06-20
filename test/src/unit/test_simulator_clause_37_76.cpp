@@ -17,13 +17,13 @@ namespace {
 //
 // Each labelled edge needs dedicated production code because both sides are
 // expression kinds (a reference, an operation, a concatenation, ...), not the
-// vpiLhs / vpiRhs relation tags, so the generic child walk in VpiHandleC -
+// vpiLhs / vpiRhs relation tags, so the generic child walk in vpi_handle -
 // which matches by exact relation tag - cannot find them; they are held as the
 // designated lhs / rhs pointers shared with the §37.79 assignment family. These
 // tests observe the production path applying the rule through the public
 // vpi_handle dispatch.
 
-// The fixture installs a context so the public VpiHandleC entry point runs its
+// The fixture installs a context so the public vpi_handle entry point runs its
 // real dispatch over the test objects.
 class AliasStatement : public ::testing::Test {
  protected:
@@ -47,8 +47,8 @@ TEST_F(AliasStatement, LhsAndRhsAreDistinctEdges) {
   alias_stmt.lhs = &lhs;
   alias_stmt.rhs = &rhs;
 
-  EXPECT_EQ(VpiHandleC(vpiLhs, &alias_stmt), &lhs);
-  EXPECT_EQ(VpiHandleC(vpiRhs, &alias_stmt), &rhs);
+  EXPECT_EQ(vpi_handle(vpiLhs, &alias_stmt), &lhs);
+  EXPECT_EQ(vpi_handle(vpiRhs, &alias_stmt), &rhs);
 }
 
 // Gating: the alias statement's vpiLhs / vpiRhs branches are scoped to the
@@ -67,8 +67,8 @@ TEST_F(AliasStatement, EdgesAreScopedToTheAliasStatement) {
   not_alias.lhs = &lhs;
   not_alias.rhs = &rhs;
 
-  EXPECT_EQ(VpiHandleC(vpiLhs, &not_alias), nullptr);
-  EXPECT_EQ(VpiHandleC(vpiRhs, &not_alias), nullptr);
+  EXPECT_EQ(vpi_handle(vpiLhs, &not_alias), nullptr);
+  EXPECT_EQ(vpi_handle(vpiRhs, &not_alias), nullptr);
 }
 
 }  // namespace

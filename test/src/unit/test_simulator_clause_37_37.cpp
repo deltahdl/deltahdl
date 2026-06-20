@@ -50,7 +50,7 @@ TEST_F(IntermodulePathModel, ReachedByHandleMultiFromTwoPorts) {
   port1->children.push_back(path);
   port2->children.push_back(path);
 
-  vpiHandle reached = VpiHandleMultiC(vpiInterModPath, port1, port2);
+  vpiHandle reached = vpi_handle_multi(vpiInterModPath, port1, port2);
   ASSERT_NE(reached, nullptr);
   ASSERT_FALSE(reached->children.empty());
   EXPECT_EQ(reached->children[0]->type, vpiInterModPath);
@@ -63,7 +63,7 @@ TEST_F(IntermodulePathModel, NoPathBetweenUnconnectedPorts) {
   auto* port1 = vpi_ctx_.CreatePort("q1", kVpiInput, mod);
   auto* port2 = vpi_ctx_.CreatePort("q2", kVpiOutput, mod);
 
-  EXPECT_EQ(VpiHandleMultiC(vpiInterModPath, port1, port2), nullptr);
+  EXPECT_EQ(vpi_handle_multi(vpiInterModPath, port1, port2), nullptr);
 }
 
 // §37.37 (delay property): the inter mod path object carries delays that the

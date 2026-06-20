@@ -42,7 +42,7 @@ TEST_F(ModulePathModel, ModuleReachedFromPathInModule) {
   path->parent = mod;
   mod->children.push_back(path);
 
-  VpiHandle reached = VpiHandleC(kVpiModule, path);
+  VpiHandle reached = vpi_handle(kVpiModule, path);
   EXPECT_EQ(reached, mod);
 }
 
@@ -61,7 +61,7 @@ TEST_F(ModulePathModel, ModuleIsNullForInterfaceNestedInModule) {
   path->parent = iface;
   iface->children.push_back(path);
 
-  EXPECT_EQ(VpiHandleC(kVpiModule, path), nullptr);
+  EXPECT_EQ(vpi_handle(kVpiModule, path), nullptr);
 }
 
 // §37.39 detail 1 (scope guard): the NULL carve-out is specific to mod paths.
@@ -73,7 +73,7 @@ TEST_F(ModulePathModel, CarveOutAppliesOnlyToModPath) {
   other->parent = mod;
   mod->children.push_back(other);
 
-  EXPECT_EQ(VpiHandleC(kVpiModule, other), mod);
+  EXPECT_EQ(vpi_handle(kVpiModule, other), mod);
 }
 
 // §37.39 detail 1 (edge): vpiModule walks the full ancestry of a mod path, not
@@ -86,7 +86,7 @@ TEST_F(ModulePathModel, ModuleIsNullWhenNoInstanceEncloses) {
   path->parent = scope;
   scope->children.push_back(path);
 
-  EXPECT_EQ(VpiHandleC(kVpiModule, path), nullptr);
+  EXPECT_EQ(vpi_handle(kVpiModule, path), nullptr);
 }
 
 }  // namespace

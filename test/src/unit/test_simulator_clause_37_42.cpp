@@ -58,14 +58,14 @@ TEST_F(TaskFuncCall, MethodPrefixReachesAppliedObject) {
   send.type = vpiMethodFuncCall;
   send.tf_prefix = &packet;
 
-  EXPECT_EQ(VpiHandleC(vpiPrefix, &send), &packet);
+  EXPECT_EQ(vpi_handle(vpiPrefix, &send), &packet);
 
   // A plain function call is not a method call: vpiPrefix does not apply, even
   // when a prefix object happens to be set, so the gating reports NULL.
   VpiObject func;
   func.type = vpiFuncCall;
   func.tf_prefix = &packet;
-  EXPECT_EQ(VpiHandleC(vpiPrefix, &func), nullptr);
+  EXPECT_EQ(vpi_handle(vpiPrefix, &func), nullptr);
 }
 
 // Detail 1: the vpiWith relation is available only for the methods that accept
@@ -80,7 +80,7 @@ TEST_F(TaskFuncCall, WithRelationAvailableOnlyForWithMethods) {
   randomize.type = vpiMethodFuncCall;
   randomize.tf_with = &with_expr;
   randomize.tf_with_method = true;  // a randomize/array-locator method
-  EXPECT_EQ(VpiHandleC(vpiWith, &randomize), &with_expr);
+  EXPECT_EQ(vpi_handle(vpiWith, &randomize), &with_expr);
 
   // An ordinary method call does not accept a with clause: the relation is
   // unavailable, so vpiWith reports NULL despite the attached object.
@@ -88,7 +88,7 @@ TEST_F(TaskFuncCall, WithRelationAvailableOnlyForWithMethods) {
   ordinary.type = vpiMethodFuncCall;
   ordinary.tf_with = &with_expr;
   ordinary.tf_with_method = false;
-  EXPECT_EQ(VpiHandleC(vpiWith, &ordinary), nullptr);
+  EXPECT_EQ(vpi_handle(vpiWith, &ordinary), nullptr);
 }
 
 // Detail 3: the system task or function that invoked the application is reached
@@ -98,11 +98,11 @@ TEST_F(TaskFuncCall, InvokingSystemTfCallReachedWithNullRef) {
   call.type = vpiSysTaskCall;
   ctx_.SetCurrentSystfCall(&call);
 
-  EXPECT_EQ(VpiHandleC(vpiSysTfCall, nullptr), &call);
+  EXPECT_EQ(vpi_handle(vpiSysTfCall, nullptr), &call);
 
   // With no system tf call active the relation reports NULL.
   ctx_.SetCurrentSystfCall(nullptr);
-  EXPECT_EQ(VpiHandleC(vpiSysTfCall, nullptr), nullptr);
+  EXPECT_EQ(vpi_handle(vpiSysTfCall, nullptr), nullptr);
 }
 
 // Detail 6: every user-defined system task or function is retrieved with
@@ -220,7 +220,7 @@ TEST_F(TaskFuncCall, BuiltinMethodHasNoFunctionOrTask) {
   VpiObject fn_obj;  // would be the function were this user-defined
   fn_obj.type = vpiFunction;
   builtin_fn.children = {&fn_obj};
-  EXPECT_EQ(VpiHandleC(vpiFunction, &builtin_fn), nullptr);
+  EXPECT_EQ(vpi_handle(vpiFunction, &builtin_fn), nullptr);
 
   // A user-defined method func call reaches its function object.
   VpiObject user_fn;
@@ -229,7 +229,7 @@ TEST_F(TaskFuncCall, BuiltinMethodHasNoFunctionOrTask) {
   VpiObject user_fn_obj;
   user_fn_obj.type = vpiFunction;
   user_fn.children = {&user_fn_obj};
-  EXPECT_EQ(VpiHandleC(vpiFunction, &user_fn), &user_fn_obj);
+  EXPECT_EQ(vpi_handle(vpiFunction, &user_fn), &user_fn_obj);
 
   // The same rule governs a built-in method task call through vpiTask.
   VpiObject builtin_task;
@@ -238,7 +238,7 @@ TEST_F(TaskFuncCall, BuiltinMethodHasNoFunctionOrTask) {
   VpiObject task_obj;
   task_obj.type = vpiTask;
   builtin_task.children = {&task_obj};
-  EXPECT_EQ(VpiHandleC(vpiTask, &builtin_task), nullptr);
+  EXPECT_EQ(vpi_handle(vpiTask, &builtin_task), nullptr);
 }
 
 }  // namespace

@@ -20,8 +20,8 @@ namespace {
 //   - Claim C: it shall be an error to apply vpi_put_value() to an object when
 //     any of its index expressions has side effects (Example 2: my_array[i++]).
 // The fixture installs a private context as the global one so the public
-// vpi_get/vpi_get_value/vpi_put_value/VpiHandleC entry points run their real
-// dispatch and so VpiChkErrorC() observes the recorded error, exactly as a PLI
+// vpi_get/vpi_get_value/vpi_put_value/vpi_handle entry points run their real
+// dispatch and so vpi_chk_error() observes the recorded error, exactly as a PLI
 // program would.
 class ExpressionsWithSideEffects : public ::testing::Test {
  protected:
@@ -78,7 +78,7 @@ TEST_F(ExpressionsWithSideEffects, GetPropertyNeedingSideEffectEvalIsAnError) {
   EXPECT_EQ(vpi_get(vpiSize, &call), vpiUndefined);
 
   SVpiErrorInfo info = {};
-  EXPECT_EQ(VpiChkErrorC(&info), vpiError);
+  EXPECT_EQ(vpi_chk_error(&info), vpiError);
   // The side effect was not triggered: the query was refused, not evaluated.
   EXPECT_EQ(call.side_effect_count, 0);
 }
@@ -94,7 +94,7 @@ TEST_F(ExpressionsWithSideEffects, GetTypeIsAllowedOnSuchAnExpression) {
   EXPECT_EQ(vpi_get(vpiType, &call), vpiFuncCall);
 
   SVpiErrorInfo info = {};
-  EXPECT_EQ(VpiChkErrorC(&info), 0);
+  EXPECT_EQ(vpi_chk_error(&info), 0);
 }
 
 // Claim B (relation): the rule covers handles as well as values. Traversing a
@@ -107,10 +107,10 @@ TEST_F(ExpressionsWithSideEffects,
   call.type = vpiFuncCall;
   call.property_needs_side_effect_eval = true;
 
-  EXPECT_EQ(VpiHandleC(vpiExpr, &call), nullptr);
+  EXPECT_EQ(vpi_handle(vpiExpr, &call), nullptr);
 
   SVpiErrorInfo info = {};
-  EXPECT_EQ(VpiChkErrorC(&info), vpiError);
+  EXPECT_EQ(vpi_chk_error(&info), vpiError);
 }
 
 // Claim C (Example 2): applying vpi_put_value() to an object one of whose index
@@ -132,7 +132,7 @@ TEST_F(ExpressionsWithSideEffects, PutValueWithSideEffectingIndexIsAnError) {
   EXPECT_EQ(vpi_put_value(&select, &value, nullptr, vpiNoDelay), nullptr);
 
   SVpiErrorInfo info = {};
-  EXPECT_EQ(VpiChkErrorC(&info), vpiError);
+  EXPECT_EQ(vpi_chk_error(&info), vpiError);
   // The refused write never evaluated the side-effecting index expression.
   EXPECT_EQ(post_inc.side_effect_count, 0);
 }
@@ -163,7 +163,7 @@ TEST_F(ExpressionsWithSideEffects,
   EXPECT_EQ(vpi_put_value(&select, &value, nullptr, vpiNoDelay), nullptr);
 
   SVpiErrorInfo info = {};
-  EXPECT_EQ(VpiChkErrorC(&info), vpiError);
+  EXPECT_EQ(vpi_chk_error(&info), vpiError);
   EXPECT_EQ(pre_dec.side_effect_count, 0);
 }
 
@@ -186,7 +186,7 @@ TEST_F(ExpressionsWithSideEffects, PutValueWithPlainIndexIsNotRefused) {
   vpi_put_value(&select, &value, nullptr, vpiNoDelay);
 
   SVpiErrorInfo info = {};
-  EXPECT_EQ(VpiChkErrorC(&info), 0);
+  EXPECT_EQ(vpi_chk_error(&info), 0);
 }
 
 }  // namespace

@@ -90,7 +90,7 @@ TEST_F(StructuresAndUnions, GetValueRejectsEntireUnpackedStructOrUnion) {
     vpi_get_value(&aggregate, &value);
 
     SVpiErrorInfo info = {};
-    EXPECT_EQ(VpiChkErrorC(&info), vpiError) << "kind " << kind;
+    EXPECT_EQ(vpi_chk_error(&info), vpiError) << "kind " << kind;
     EXPECT_EQ(value.value.integer, 0x5eed) << "kind " << kind;
   }
 }
@@ -111,7 +111,7 @@ TEST_F(StructuresAndUnions, PutValueRejectsEntireUnpackedStructOrUnion) {
     EXPECT_EQ(ret, nullptr) << "kind " << kind;
 
     SVpiErrorInfo info = {};
-    EXPECT_EQ(VpiChkErrorC(&info), vpiError) << "kind " << kind;
+    EXPECT_EQ(vpi_chk_error(&info), vpiError) << "kind " << kind;
   }
 }
 
@@ -131,11 +131,11 @@ TEST_F(StructuresAndUnions, PackedStructOrUnionValueIsNotRefused) {
 
     vpi_get_value(&aggregate, &value);
     SVpiErrorInfo get_info = {};
-    EXPECT_EQ(VpiChkErrorC(&get_info), 0) << "get, kind " << kind;
+    EXPECT_EQ(vpi_chk_error(&get_info), 0) << "get, kind " << kind;
 
     vpi_put_value(&aggregate, &value, nullptr, vpiNoDelay);
     SVpiErrorInfo put_info = {};
-    EXPECT_EQ(VpiChkErrorC(&put_info), 0) << "put, kind " << kind;
+    EXPECT_EQ(vpi_chk_error(&put_info), 0) << "put, kind " << kind;
   }
 }
 
@@ -153,11 +153,11 @@ TEST_F(StructuresAndUnions, RestrictionDoesNotApplyToOrdinaryObjects) {
 
     vpi_get_value(&obj, &value);
     SVpiErrorInfo get_info = {};
-    EXPECT_EQ(VpiChkErrorC(&get_info), 0) << "get, kind " << kind;
+    EXPECT_EQ(vpi_chk_error(&get_info), 0) << "get, kind " << kind;
 
     vpi_put_value(&obj, &value, nullptr, vpiNoDelay);
     SVpiErrorInfo put_info = {};
-    EXPECT_EQ(VpiChkErrorC(&put_info), 0) << "put, kind " << kind;
+    EXPECT_EQ(vpi_chk_error(&put_info), 0) << "put, kind " << kind;
   }
 }
 

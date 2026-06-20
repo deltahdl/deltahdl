@@ -14,10 +14,10 @@ namespace {
 // vpiCondition edge. The body edge needs no dedicated production code: a
 // forever statement is not one of the kinds that override vpiStmt (an event
 // control, a delay control, or a task/func), so it is served by the generic
-// vpiStmt traversal in VpiHandleC. These tests observe that production path
+// vpiStmt traversal in vpi_handle. These tests observe that production path
 // applying the rule to a forever object.
 
-// The fixture installs a context so the public VpiHandleC entry point runs its
+// The fixture installs a context so the public vpi_handle entry point runs its
 // real dispatch over the test objects.
 class Forever : public ::testing::Test {
  protected:
@@ -37,7 +37,7 @@ TEST_F(Forever, ForeverStatementReachesBodyThroughVpiStmt) {
   forever_stmt.type = vpiForever;
   forever_stmt.children = {&body};
 
-  EXPECT_EQ(VpiHandleC(vpiStmt, &forever_stmt), &body);
+  EXPECT_EQ(vpi_handle(vpiStmt, &forever_stmt), &body);
 }
 
 // Body edge is type-directed: when the forever object also carries an
@@ -54,7 +54,7 @@ TEST_F(Forever, ForeverBodyFoundAmongOtherChildren) {
   forever_stmt.type = vpiForever;
   forever_stmt.children = {&other, &body};
 
-  EXPECT_EQ(VpiHandleC(vpiStmt, &forever_stmt), &body);
+  EXPECT_EQ(vpi_handle(vpiStmt, &forever_stmt), &body);
 }
 
 // Body edge reports no statement when the forever object has no statement
@@ -63,7 +63,7 @@ TEST_F(Forever, ForeverWithoutBodyReportsNoStatement) {
   VpiObject forever_stmt;
   forever_stmt.type = vpiForever;
 
-  EXPECT_EQ(VpiHandleC(vpiStmt, &forever_stmt), nullptr);
+  EXPECT_EQ(vpi_handle(vpiStmt, &forever_stmt), nullptr);
 }
 
 }  // namespace

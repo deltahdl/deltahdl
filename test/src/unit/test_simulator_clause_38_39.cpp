@@ -59,7 +59,7 @@ TEST_F(VpiRemoveCbSim, RemovesRegisteredCallbackAndReturnsOne) {
   ASSERT_EQ(vpi_ctx_.DispatchCallbacks(cbValueChange), 1);
   ASSERT_EQ(g_38_39_fired, 1);
 
-  EXPECT_EQ(VpiRemoveCbC(h), 1);
+  EXPECT_EQ(vpi_remove_cb(h), 1);
 
   // After removal the same reason no longer delivers it.
   EXPECT_EQ(vpi_ctx_.DispatchCallbacks(cbValueChange), 0);
@@ -82,7 +82,7 @@ TEST_F(VpiRemoveCbSim, RemovesOnlyTheTargetedCallback) {
   vpiHandle hb = vpi_register_cb(&cb_b);
   ASSERT_NE(hb, nullptr);
 
-  EXPECT_EQ(VpiRemoveCbC(ha), 1);
+  EXPECT_EQ(vpi_remove_cb(ha), 1);
 
   // Only the survivor (b) is delivered when the reason next occurs.
   EXPECT_EQ(vpi_ctx_.DispatchCallbacks(cbValueChange), 1);
@@ -100,13 +100,13 @@ TEST_F(VpiRemoveCbSim, NonCallbackHandleReturnsZero) {
   vpiHandle net = vpi_handle_by_name("n", nullptr);
   ASSERT_NE(net, nullptr);
 
-  EXPECT_EQ(VpiRemoveCbC(net), 0);
+  EXPECT_EQ(vpi_remove_cb(net), 0);
 }
 
 // §38.39: the routine shall return 0 (false) on failure; a null argument is not
 // a handle to a callback object.
 TEST_F(VpiRemoveCbSim, NullHandleReturnsZero) {
-  EXPECT_EQ(VpiRemoveCbC(nullptr), 0);
+  EXPECT_EQ(vpi_remove_cb(nullptr), 0);
 }
 
 // §38.39: after vpi_remove_cb() is called with a handle to the callback, the
@@ -118,8 +118,8 @@ TEST_F(VpiRemoveCbSim, HandleIsNoLongerValidAfterRemoval) {
   vpiHandle h = vpi_register_cb(&cb);
   ASSERT_NE(h, nullptr);
 
-  EXPECT_EQ(VpiRemoveCbC(h), 1);
-  EXPECT_EQ(VpiRemoveCbC(h), 0);
+  EXPECT_EQ(vpi_remove_cb(h), 1);
+  EXPECT_EQ(vpi_remove_cb(h), 0);
 }
 
 }  // namespace

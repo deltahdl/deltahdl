@@ -76,7 +76,7 @@ TEST_F(VpiIterateSim, HandleVpiUseReturnsReferenceObject) {
 
   vpiHandle iter = vpi_iterate(vpiPort, mod);
   ASSERT_NE(iter, nullptr);
-  EXPECT_EQ(VpiHandleC(vpiUse, iter), mod);
+  EXPECT_EQ(vpi_handle(vpiUse, iter), mod);
 }
 
 // §38.23: unless otherwise specified, iterating a protected object is an error,

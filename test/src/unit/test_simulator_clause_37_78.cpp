@@ -14,14 +14,14 @@ namespace {
 //
 // The edge needs dedicated production code because the value's own type is an
 // expression kind (an operation, a reference, a constant, ...), not the
-// vpiCondition relation tag, so the generic child walk in VpiHandleC - which
+// vpiCondition relation tag, so the generic child walk in vpi_handle - which
 // matches by exact relation tag - cannot find it. This is the same situation as
 // the controlling conditions of the while/repeat (§37.66), if/if-else (§37.71),
 // for (§37.74), and do-while (§37.75) statements. A return that yields no value
 // (a void function or task return) draws no such edge. These tests observe the
 // production path applying the rule through the public vpi_handle dispatch.
 
-// The fixture installs a context so the public VpiHandleC entry point runs its
+// The fixture installs a context so the public vpi_handle entry point runs its
 // real dispatch over the test objects.
 class ReturnStatement : public ::testing::Test {
  protected:
@@ -45,7 +45,7 @@ TEST_F(ReturnStatement, ReturnReachesReturnedValueAmongOtherChildren) {
   return_stmt.type = vpiReturnStmt;
   return_stmt.children = {&other, &value};
 
-  EXPECT_EQ(VpiHandleC(vpiCondition, &return_stmt), &value);
+  EXPECT_EQ(vpi_handle(vpiCondition, &return_stmt), &value);
 }
 
 // Condition edge reports no expression when the return statement yields no
@@ -55,7 +55,7 @@ TEST_F(ReturnStatement, VoidReturnReportsNoValue) {
   VpiObject return_stmt;
   return_stmt.type = vpiReturnStmt;
 
-  EXPECT_EQ(VpiHandleC(vpiCondition, &return_stmt), nullptr);
+  EXPECT_EQ(vpi_handle(vpiCondition, &return_stmt), nullptr);
 }
 
 // Condition gating: the return-value relation is scoped to the return statement
@@ -71,7 +71,7 @@ TEST_F(ReturnStatement, ReturnConditionRelationIsScopedToReturnStatements) {
   not_a_return.type = vpiBegin;  // not a return statement
   not_a_return.children = {&expr};
 
-  EXPECT_EQ(VpiHandleC(vpiCondition, &not_a_return), nullptr);
+  EXPECT_EQ(vpi_handle(vpiCondition, &not_a_return), nullptr);
 }
 
 }  // namespace

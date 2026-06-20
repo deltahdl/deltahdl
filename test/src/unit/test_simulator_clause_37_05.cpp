@@ -50,7 +50,7 @@ TEST_F(Module, IndexTransitionReachesArrayIndex) {
   member.array_member = true;
   member.index_expr = &index_expr;
 
-  EXPECT_EQ(VpiHandleC(vpiIndex, &member), &index_expr);
+  EXPECT_EQ(vpi_handle(vpiIndex, &member), &index_expr);
 }
 
 // D2: for a module that is not part of a module array, the vpiIndex transition
@@ -66,7 +66,7 @@ TEST_F(Module, IndexTransitionIsNullWhenNotAnArrayElement) {
   standalone.index_expr = &stray_expr;  // present but must not be reported
   standalone.children.push_back(&stray_expr);
 
-  EXPECT_EQ(VpiHandleC(vpiIndex, &standalone), nullptr);
+  EXPECT_EQ(vpi_handle(vpiIndex, &standalone), nullptr);
 }
 
 // D1: iterating vpiModule with a NULL reference object reaches the top-level

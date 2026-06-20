@@ -25,7 +25,7 @@ namespace {
 // existing machinery applying each diagram element to a modport.
 
 // The fixture installs a context so the public
-// vpi_get_str/vpi_iterate/vpi_scan/ VpiHandleC entry points run their real
+// vpi_get_str/vpi_iterate/vpi_scan/ vpi_handle entry points run their real
 // dispatch over the test objects.
 class Modport : public ::testing::Test {
  protected:
@@ -48,7 +48,7 @@ TEST_F(Modport, ReportsItsNameViaVpiName) {
 // Edge interface <-> modport, both directions. Forward: the enclosing interface
 // iterates to its modport children via vpi_iterate(vpiModport, interface).
 // Reverse: the modport reaches its enclosing interface via
-// VpiHandleC(vpiInterface, modport).
+// vpi_handle(vpiInterface, modport).
 TEST_F(Modport, InterfaceAndModportTraverseBothWays) {
   VpiObject iface;
   iface.type = vpiInterface;
@@ -66,12 +66,12 @@ TEST_F(Modport, InterfaceAndModportTraverseBothWays) {
   EXPECT_EQ(vpi_scan(iter), nullptr);
 
   // Reverse: the modport reaches its enclosing interface.
-  EXPECT_EQ(VpiHandleC(vpiInterface, &modport), &iface);
+  EXPECT_EQ(vpi_handle(vpiInterface, &modport), &iface);
 }
 
 // Edge modport <-> io decl, both directions. Forward: the modport iterates to
 // the io declarations it groups via vpi_iterate(vpiIODecl, modport). Reverse:
-// an io decl reaches its enclosing modport via VpiHandleC(vpiModport, iodecl).
+// an io decl reaches its enclosing modport via vpi_handle(vpiModport, iodecl).
 TEST_F(Modport, ModportAndIoDeclTraverseBothWays) {
   VpiObject modport;
   modport.type = vpiModport;
@@ -92,7 +92,7 @@ TEST_F(Modport, ModportAndIoDeclTraverseBothWays) {
   EXPECT_EQ(count, 2);
 
   // Reverse: an io decl reaches its enclosing modport.
-  EXPECT_EQ(VpiHandleC(vpiModport, &in_decl), &modport);
+  EXPECT_EQ(vpi_handle(vpiModport, &in_decl), &modport);
 }
 
 // Edge for C3 forward: a modport that groups no io declarations yields no
@@ -107,14 +107,14 @@ TEST_F(Modport, ModportWithNoIoDeclsIteratesToNone) {
 }
 
 // Edge for C2 reverse: a modport with no enclosing interface reaches none
-// through VpiHandleC(vpiInterface, modport) - the reverse parent lookup reports
+// through vpi_handle(vpiInterface, modport) - the reverse parent lookup reports
 // NULL when no interface parent is recorded, distinct from the matching-parent
 // path above.
 TEST_F(Modport, ModportWithoutEnclosingInterfaceReachesNone) {
   VpiObject modport;
   modport.type = vpiModport;
 
-  EXPECT_EQ(VpiHandleC(vpiInterface, &modport), nullptr);
+  EXPECT_EQ(vpi_handle(vpiInterface, &modport), nullptr);
 }
 
 }  // namespace

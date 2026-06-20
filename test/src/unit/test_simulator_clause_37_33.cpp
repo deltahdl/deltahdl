@@ -36,7 +36,7 @@ namespace {
 //     class variable that holds the object.
 
 // The fixture installs a context so the public vpi_get/vpi_iterate/vpi_scan/
-// VpiHandleC/vpi_handle_by_name entry points run their real dispatch.
+// vpi_handle/vpi_handle_by_name entry points run their real dispatch.
 class ClassVariablesAndObjects : public ::testing::Test {
  protected:
   void SetUp() override { SetGlobalVpiContext(&vpi_ctx_); }
@@ -138,11 +138,11 @@ TEST_F(ClassVariablesAndObjects, ClassObjRelationReachesReferencedObject) {
   VpiObject referencing_var;
   referencing_var.type = vpiClassVar;
   referencing_var.referenced_object = &class_obj;
-  EXPECT_EQ(VpiHandleC(vpiClassObj, &referencing_var), &class_obj);
+  EXPECT_EQ(vpi_handle(vpiClassObj, &referencing_var), &class_obj);
 
   VpiObject null_var;
   null_var.type = vpiClassVar;  // references nothing
-  EXPECT_EQ(VpiHandleC(vpiClassObj, &null_var), nullptr);
+  EXPECT_EQ(vpi_handle(vpiClassObj, &null_var), nullptr);
 }
 
 // D5: vpiClassTypespec of a class variable is the type the variable was
@@ -168,8 +168,8 @@ TEST_F(ClassVariablesAndObjects, ClassTypespecDiffersBetweenVariableAndObject) {
   class_var.children = {&declared_typespec};
   class_var.referenced_object = &class_obj;
 
-  vpiHandle from_var = VpiHandleC(vpiClassTypespec, &class_var);
-  vpiHandle from_obj = VpiHandleC(vpiClassTypespec, &class_obj);
+  vpiHandle from_var = vpi_handle(vpiClassTypespec, &class_var);
+  vpiHandle from_obj = vpi_handle(vpiClassTypespec, &class_obj);
   ASSERT_EQ(from_var, &declared_typespec);
   ASSERT_EQ(from_obj, &created_typespec);
   EXPECT_NE(from_var, from_obj);

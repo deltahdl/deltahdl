@@ -55,7 +55,7 @@ TEST_F(TaskFuncDeclaration, FunctionReturnReachesReturnCaptureVariable) {
   fn.size = 32;       // detail 1: same size as the function
   fn.return_var = &ret;
 
-  vpiHandle reached = VpiHandleC(vpiReturn, &fn);
+  vpiHandle reached = vpi_handle(vpiReturn, &fn);
   ASSERT_EQ(reached, &ret);
   // Detail 3: the reached object is a variable; detail 2: its type is readable
   // off the handle, which is how a user-defined return type is inspected.
@@ -76,7 +76,7 @@ TEST_F(TaskFuncDeclaration, ReturnRelationIsGatedToFunctions) {
   VpiObject task;
   task.type = vpiTask;
   task.return_var = &ret;
-  EXPECT_EQ(VpiHandleC(vpiReturn, &task), nullptr);
+  EXPECT_EQ(vpi_handle(vpiReturn, &task), nullptr);
 }
 
 // Detail 4: a task or function that is not a class member reports vpiPublicVis;

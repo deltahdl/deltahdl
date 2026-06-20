@@ -82,21 +82,21 @@ TEST_F(PortContext, HighConnAndLowConnReachDesignatedConnections) {
   port.type = vpiPort;
   port.high_conn = &high;
   port.low_conn = &low;
-  EXPECT_EQ(VpiHandleC(vpiHighConn, &port), &high);
-  EXPECT_EQ(VpiHandleC(vpiLowConn, &port), &low);
+  EXPECT_EQ(vpi_handle(vpiHighConn, &port), &high);
+  EXPECT_EQ(vpi_handle(vpiLowConn, &port), &low);
 
   // D10: an instance with no connection to the port -> NULL highConn.
   VpiObject unconnected;
   unconnected.type = vpiPort;
   unconnected.low_conn = &low;
-  EXPECT_EQ(VpiHandleC(vpiHighConn, &unconnected), nullptr);
+  EXPECT_EQ(vpi_handle(vpiHighConn, &unconnected), nullptr);
 
   // D10: a null port -> NULL lowConn, even if a stored pointer were present.
   VpiObject null_port;
   null_port.type = vpiPort;
   null_port.null_port = true;
   null_port.low_conn = &low;
-  EXPECT_EQ(VpiHandleC(vpiLowConn, &null_port), nullptr);
+  EXPECT_EQ(vpi_handle(vpiLowConn, &null_port), nullptr);
   EXPECT_EQ(VpiLowConn(&null_port), nullptr);
 }
 

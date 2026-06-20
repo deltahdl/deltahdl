@@ -11,12 +11,12 @@ namespace {
 // (vpiClockingIODecl) it contains. These tests observe the production code that
 // applies the clause's three numbered "Details" that refine traversal -
 // vpiPrefix (detail 2), vpiActual (detail 3), and an io decl's vpiExpr (detail
-// 4) - through the same-pipeline public VpiHandleC dispatch. Detail 1 only
+// 4) - through the same-pipeline public vpi_handle dispatch. Detail 1 only
 // records which construct the skew/edge relations target, and the figure's
 // other relations and properties are served by the generic machinery; neither
 // refines behavior here.
 
-// The fixture installs a context so the public VpiHandleC entry point runs its
+// The fixture installs a context so the public vpi_handle entry point runs its
 // real dispatch over the test objects.
 class ClockingBlock : public ::testing::Test {
  protected:
@@ -27,7 +27,7 @@ class ClockingBlock : public ::testing::Test {
 
 // D2: vpiPrefix of a clocking block reaches the virtual interface var the
 // clocking block expression is immediately prefixed by. Observed through the
-// helper and the public VpiHandleC(vpiPrefix, ...) dispatch. The relation is
+// helper and the public vpi_handle(vpiPrefix, ...) dispatch. The relation is
 // non-NULL exactly because the clocking block carries that prefix.
 TEST_F(ClockingBlock, PrefixReachesVirtualInterfacePrefix) {
   VpiObject vif;  // the virtual interface that prefixes the clocking block
@@ -38,7 +38,7 @@ TEST_F(ClockingBlock, PrefixReachesVirtualInterfacePrefix) {
   block.children = {&vif};
 
   EXPECT_EQ(VpiClockingBlockPrefix(&block), &vif);
-  EXPECT_EQ(VpiHandleC(vpiPrefix, &block), &vif);
+  EXPECT_EQ(vpi_handle(vpiPrefix, &block), &vif);
 }
 
 // D2: a clocking block that is not a virtual-interface-prefixed expression has
@@ -53,7 +53,7 @@ TEST_F(ClockingBlock, PrefixIsNullWhenNotVirtualInterfacePrefixed) {
   block.children = {&event_ctrl};
 
   EXPECT_EQ(VpiClockingBlockPrefix(&block), nullptr);
-  EXPECT_EQ(VpiHandleC(vpiPrefix, &block), nullptr);
+  EXPECT_EQ(vpi_handle(vpiPrefix, &block), nullptr);
 }
 
 // D3: vpiActual of a clocking block reaches the concrete clocking block
@@ -77,7 +77,7 @@ TEST_F(ClockingBlock, ActualReachesResolvedClockingBlockWhenPrefixHasValue) {
   block.actual = &resolved;
 
   EXPECT_EQ(VpiClockingBlockActual(&block), &resolved);
-  EXPECT_EQ(VpiHandleC(vpiActual, &block), &resolved);
+  EXPECT_EQ(vpi_handle(vpiActual, &block), &resolved);
 }
 
 // D3: when the prefix is a virtual interface that has no value at the current
@@ -97,7 +97,7 @@ TEST_F(ClockingBlock, ActualIsNullWhenVirtualInterfacePrefixHasNoValue) {
   block.actual = &resolved;  // present, but suppressed by the empty prefix
 
   EXPECT_EQ(VpiClockingBlockActual(&block), nullptr);
-  EXPECT_EQ(VpiHandleC(vpiActual, &block), nullptr);
+  EXPECT_EQ(vpi_handle(vpiActual, &block), nullptr);
 }
 
 // D3 edge: the no-value suppression is gated on a virtual interface prefix. A
@@ -112,7 +112,7 @@ TEST_F(ClockingBlock, ActualReachesActualWhenNotVirtualInterfacePrefixed) {
   block.actual = &resolved;
 
   EXPECT_EQ(VpiClockingBlockActual(&block), &resolved);
-  EXPECT_EQ(VpiHandleC(vpiActual, &block), &resolved);
+  EXPECT_EQ(vpi_handle(vpiActual, &block), &resolved);
 }
 
 // Figure (clocking io decl -> nets / variables / ref obj): the io-decl expr
@@ -128,7 +128,7 @@ TEST_F(ClockingBlock, IODeclExprGroupMembership) {
 
 // D4: vpiExpr of a clocking io decl reaches the ref obj the io decl names. This
 // is the clause's own example - the io decl "enable" reaches "top.mem1.enable".
-// Observed through the helper and the public VpiHandleC(vpiExpr, ...) dispatch.
+// Observed through the helper and the public vpi_handle(vpiExpr, ...) dispatch.
 TEST_F(ClockingBlock, IODeclExprReachesNamedRefObj) {
   VpiObject ref;  // the ref obj "top.mem1.enable" the io decl names
   ref.type = vpiRefObj;
@@ -138,7 +138,7 @@ TEST_F(ClockingBlock, IODeclExprReachesNamedRefObj) {
   io_decl.children = {&ref};
 
   EXPECT_EQ(VpiClockingIODeclExpr(&io_decl), &ref);
-  EXPECT_EQ(VpiHandleC(vpiExpr, &io_decl), &ref);
+  EXPECT_EQ(vpi_handle(vpiExpr, &io_decl), &ref);
 }
 
 // D4: a clocking io decl whose only children are its skews names no expression,
@@ -152,7 +152,7 @@ TEST_F(ClockingBlock, IODeclExprIsNullWhenNothingNamed) {
   io_decl.children = {&skew};
 
   EXPECT_EQ(VpiClockingIODeclExpr(&io_decl), nullptr);
-  EXPECT_EQ(VpiHandleC(vpiExpr, &io_decl), nullptr);
+  EXPECT_EQ(vpi_handle(vpiExpr, &io_decl), nullptr);
 }
 
 // Edge: each clocking-block helper speaks only for its own object kind, so an

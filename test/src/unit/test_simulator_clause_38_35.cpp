@@ -129,7 +129,7 @@ TEST_F(VpiPutValueArraySim, PropagateOffFlagIsAccepted) {
   vpi_put_value_array(arr, &av, index, 2);
 
   SVpiErrorInfo info = {};
-  EXPECT_EQ(VpiChkErrorC(&info), 0);
+  EXPECT_EQ(vpi_chk_error(&info), 0);
   EXPECT_EQ(elems_[0]->value.words[0].aval, 5u);
   EXPECT_EQ(elems_[1]->value.words[0].aval, 6u);
 }
@@ -145,7 +145,7 @@ TEST_F(VpiPutValueArraySim, UnsupportedFormatIsError) {
   vpi_put_value_array(arr, &av, index, 2);
 
   SVpiErrorInfo info = {};
-  EXPECT_EQ(VpiChkErrorC(&info), vpiError);
+  EXPECT_EQ(vpi_chk_error(&info), vpiError);
   EXPECT_EQ(elems_[0]->value.words[0].bval, ~uint64_t{0});  // unchanged
 }
 
@@ -163,7 +163,7 @@ TEST_F(VpiPutValueArraySim, IllegalFlagIsError) {
   vpi_put_value_array(arr, &av, index, 2);
 
   SVpiErrorInfo info = {};
-  EXPECT_EQ(VpiChkErrorC(&info), vpiError);
+  EXPECT_EQ(vpi_chk_error(&info), vpiError);
   EXPECT_EQ(elems_[0]->value.words[0].bval, ~uint64_t{0});  // unchanged
 }
 
@@ -180,7 +180,7 @@ TEST_F(VpiPutValueArraySim, NonStaticArrayIsError) {
   vpi_put_value_array(arr, &av, index, 2);
 
   SVpiErrorInfo info = {};
-  EXPECT_EQ(VpiChkErrorC(&info), vpiError);
+  EXPECT_EQ(vpi_chk_error(&info), vpiError);
   EXPECT_EQ(elems_[0]->value.words[0].bval, ~uint64_t{0});  // unchanged
 }
 
@@ -222,7 +222,7 @@ TEST_F(VpiPutValueArraySim, NetArrayTargetOverridesElementValues) {
   vpi_put_value_array(arr, &av, index, 2);
 
   SVpiErrorInfo info = {};
-  EXPECT_EQ(VpiChkErrorC(&info), 0);
+  EXPECT_EQ(vpi_chk_error(&info), 0);
   EXPECT_EQ(elems_[1]->value.words[0].aval, 44u);
   EXPECT_EQ(elems_[2]->value.words[0].aval, 55u);
   EXPECT_EQ(elems_[0]->value.words[0].bval, ~uint64_t{0});  // outside section

@@ -16,12 +16,12 @@ namespace {
 //
 // Each edge needs dedicated production code because both sides are expression
 // kinds (an operation, a reference, a constant, ...), not the vpiLhs / vpiRhs
-// relation tags, so the generic child walk in VpiHandleC - which matches by
+// relation tags, so the generic child walk in vpi_handle - which matches by
 // exact relation tag - cannot find them; they are held as designated pointers.
 // These tests observe the production path applying the rule through the public
 // vpi_handle dispatch.
 
-// The fixture installs a context so the public VpiHandleC entry point runs its
+// The fixture installs a context so the public vpi_handle entry point runs its
 // real dispatch over the test objects.
 class AssignDeassignForceRelease : public ::testing::Test {
  protected:
@@ -40,7 +40,7 @@ TEST_F(AssignDeassignForceRelease, AssignStatementReachesLhsTarget) {
   assign_stmt.type = vpiAssignStmt;
   assign_stmt.lhs = &target;
 
-  EXPECT_EQ(VpiHandleC(vpiLhs, &assign_stmt), &target);
+  EXPECT_EQ(vpi_handle(vpiLhs, &assign_stmt), &target);
 }
 
 // Rhs edge of an assign statement (vpiRhs -> expr): the value driven onto the
@@ -53,7 +53,7 @@ TEST_F(AssignDeassignForceRelease, AssignStatementReachesRhsValue) {
   assign_stmt.type = vpiAssignStmt;
   assign_stmt.rhs = &value;
 
-  EXPECT_EQ(VpiHandleC(vpiRhs, &assign_stmt), &value);
+  EXPECT_EQ(vpi_handle(vpiRhs, &assign_stmt), &value);
 }
 
 // Lhs and rhs edges of a force (vpiLhs/vpiRhs -> expr): the target the force
@@ -72,8 +72,8 @@ TEST_F(AssignDeassignForceRelease, ForceReachesRhsValueDistinctFromLhs) {
   force.lhs = &target;
   force.rhs = &value;
 
-  EXPECT_EQ(VpiHandleC(vpiRhs, &force), &value);
-  EXPECT_EQ(VpiHandleC(vpiLhs, &force), &target);
+  EXPECT_EQ(vpi_handle(vpiRhs, &force), &value);
+  EXPECT_EQ(vpi_handle(vpiLhs, &force), &target);
 }
 
 // Lhs edge of a deassign (vpiLhs -> expr): the target whose procedural
@@ -86,7 +86,7 @@ TEST_F(AssignDeassignForceRelease, DeassignReachesLhsTarget) {
   deassign.type = vpiDeassign;
   deassign.lhs = &target;
 
-  EXPECT_EQ(VpiHandleC(vpiLhs, &deassign), &target);
+  EXPECT_EQ(vpi_handle(vpiLhs, &deassign), &target);
 }
 
 // Lhs edge of a release (vpiLhs -> expr): the target whose force is removed.
@@ -98,7 +98,7 @@ TEST_F(AssignDeassignForceRelease, ReleaseReachesLhsTarget) {
   release.type = vpiRelease;
   release.lhs = &target;
 
-  EXPECT_EQ(VpiHandleC(vpiLhs, &release), &target);
+  EXPECT_EQ(vpi_handle(vpiLhs, &release), &target);
 }
 
 // The diagram draws no vpiRhs edge from a deassign or a release: they name a
@@ -118,8 +118,8 @@ TEST_F(AssignDeassignForceRelease, DeassignAndReleaseDrawNoRhsEdge) {
   release.type = vpiRelease;
   release.rhs = &value;
 
-  EXPECT_EQ(VpiHandleC(vpiRhs, &deassign), nullptr);
-  EXPECT_EQ(VpiHandleC(vpiRhs, &release), nullptr);
+  EXPECT_EQ(vpi_handle(vpiRhs, &deassign), nullptr);
+  EXPECT_EQ(vpi_handle(vpiRhs, &release), nullptr);
 }
 
 // Lhs gating: the lhs relation is scoped to the four procedural continuous
@@ -134,7 +134,7 @@ TEST_F(AssignDeassignForceRelease, LhsRelationIsScopedToTheAssignmentFamily) {
   not_in_family.type = vpiBegin;  // not an assign/force/deassign/release
   not_in_family.lhs = &target;
 
-  EXPECT_EQ(VpiHandleC(vpiLhs, &not_in_family), nullptr);
+  EXPECT_EQ(vpi_handle(vpiLhs, &not_in_family), nullptr);
 }
 
 }  // namespace

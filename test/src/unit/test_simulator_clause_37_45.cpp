@@ -43,8 +43,8 @@ TEST_F(DelayTerminals, InAndOutTermsAreReached) {
   device.in_term = &in_term;
   device.out_term = &out_term;
 
-  VpiHandle reached_in = VpiHandleC(vpiInTerm, &device);
-  VpiHandle reached_out = VpiHandleC(vpiOutTerm, &device);
+  VpiHandle reached_in = vpi_handle(vpiInTerm, &device);
+  VpiHandle reached_out = vpi_handle(vpiOutTerm, &device);
   EXPECT_EQ(reached_in, &in_term);
   EXPECT_EQ(reached_out, &out_term);
 
@@ -60,8 +60,8 @@ TEST_F(DelayTerminals, TermRelationsAreNullWhenAbsent) {
   device.type = vpiDelayDevice;
   // in_term and out_term left null.
 
-  EXPECT_EQ(VpiHandleC(vpiInTerm, &device), nullptr);
-  EXPECT_EQ(VpiHandleC(vpiOutTerm, &device), nullptr);
+  EXPECT_EQ(vpi_handle(vpiInTerm, &device), nullptr);
+  EXPECT_EQ(vpi_handle(vpiOutTerm, &device), nullptr);
 }
 
 // vpiInTerm / vpiOutTerm (scope): the terminal relations are specific to a
@@ -77,8 +77,8 @@ TEST_F(DelayTerminals, TermRelationsApplyOnlyToDelayDevices) {
   not_a_device.in_term = &stray_term;   // ignored: object is not a delay device
   not_a_device.out_term = &stray_term;  // ignored: object is not a delay device
 
-  EXPECT_EQ(VpiHandleC(vpiInTerm, &not_a_device), nullptr);
-  EXPECT_EQ(VpiHandleC(vpiOutTerm, &not_a_device), nullptr);
+  EXPECT_EQ(vpi_handle(vpiInTerm, &not_a_device), nullptr);
+  EXPECT_EQ(vpi_handle(vpiOutTerm, &not_a_device), nullptr);
 }
 
 // vpiDelayType: a delay device and a delay term both report their delay-type
@@ -109,11 +109,11 @@ TEST_F(DelayTerminals, ModuleRelationReachesEnclosingModule) {
   VpiObject device;
   device.type = vpiDelayDevice;
   device.parent = &module_scope;
-  EXPECT_EQ(VpiHandleC(vpiModule, &device), &module_scope);
+  EXPECT_EQ(vpi_handle(vpiModule, &device), &module_scope);
 
   VpiObject orphan;
   orphan.type = vpiDelayDevice;
-  EXPECT_EQ(VpiHandleC(vpiModule, &orphan), nullptr);
+  EXPECT_EQ(vpi_handle(vpiModule, &orphan), nullptr);
 }
 
 }  // namespace

@@ -14,12 +14,12 @@ namespace {
 // 'shall' sentences; that vpiExpr edge and its four target kinds are its entire
 // content. The edge needs dedicated production code because the scope at its
 // far end is not an expression - its own type is a scope kind, not the vpiExpr
-// relation tag - so the generic vpiExpr traversal in VpiHandleC cannot find it.
+// relation tag - so the generic vpiExpr traversal in vpi_handle cannot find it.
 // The disable fork statement names no scope and so draws no such edge. These
 // tests observe that production path applying the rule through the public
 // vpi_handle dispatch.
 
-// The fixture installs a context so the public VpiHandleC entry point runs its
+// The fixture installs a context so the public vpi_handle entry point runs its
 // real dispatch over the test objects.
 class Disables : public ::testing::Test {
  protected:
@@ -38,7 +38,7 @@ TEST_F(Disables, DisableReachesTaskTargetThroughVpiExpr) {
   disable.type = vpiDisable;
   disable.children = {&task};
 
-  EXPECT_EQ(VpiHandleC(vpiExpr, &disable), &task);
+  EXPECT_EQ(vpi_handle(vpiExpr, &disable), &task);
 }
 
 // vpiExpr edge, function target: the same edge reaches a disabled function.
@@ -50,7 +50,7 @@ TEST_F(Disables, DisableReachesFunctionTargetThroughVpiExpr) {
   disable.type = vpiDisable;
   disable.children = {&function};
 
-  EXPECT_EQ(VpiHandleC(vpiExpr, &disable), &function);
+  EXPECT_EQ(vpi_handle(vpiExpr, &disable), &function);
 }
 
 // vpiExpr edge, named begin target: the edge reaches a disabled named begin
@@ -64,7 +64,7 @@ TEST_F(Disables, DisableReachesNamedBeginTargetThroughVpiExpr) {
   disable.type = vpiDisable;
   disable.children = {&named_begin};
 
-  EXPECT_EQ(VpiHandleC(vpiExpr, &disable), &named_begin);
+  EXPECT_EQ(vpi_handle(vpiExpr, &disable), &named_begin);
 }
 
 // vpiExpr edge, named fork target: the edge reaches a disabled named fork
@@ -77,7 +77,7 @@ TEST_F(Disables, DisableReachesNamedForkTargetThroughVpiExpr) {
   disable.type = vpiDisable;
   disable.children = {&named_fork};
 
-  EXPECT_EQ(VpiHandleC(vpiExpr, &disable), &named_fork);
+  EXPECT_EQ(vpi_handle(vpiExpr, &disable), &named_fork);
 }
 
 // The edge is target-kind-directed: when the disable object also carries an
@@ -94,7 +94,7 @@ TEST_F(Disables, DisableTargetFoundAmongOtherChildren) {
   disable.type = vpiDisable;
   disable.children = {&other, &named_begin};
 
-  EXPECT_EQ(VpiHandleC(vpiExpr, &disable), &named_begin);
+  EXPECT_EQ(vpi_handle(vpiExpr, &disable), &named_begin);
 }
 
 // The edge reports no scope when the disable object has no disable-target
@@ -103,7 +103,7 @@ TEST_F(Disables, DisableWithoutTargetReportsNull) {
   VpiObject disable;
   disable.type = vpiDisable;
 
-  EXPECT_EQ(VpiHandleC(vpiExpr, &disable), nullptr);
+  EXPECT_EQ(vpi_handle(vpiExpr, &disable), nullptr);
 }
 
 // The vpiExpr relation belongs to the plain disable statement only. A disable
@@ -118,7 +118,7 @@ TEST_F(Disables, DisableForkHasNoVpiExprTarget) {
   disable_fork.type = vpiDisableFork;
   disable_fork.children = {&named_fork};
 
-  EXPECT_EQ(VpiHandleC(vpiExpr, &disable_fork), nullptr);
+  EXPECT_EQ(vpi_handle(vpiExpr, &disable_fork), nullptr);
 }
 
 }  // namespace

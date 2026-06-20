@@ -38,8 +38,8 @@ TEST_F(VpiHandleCreationSim, DistinctHandlesToSameObjectAreEquivalent) {
   auto* dup = vpi_ctx_.CreateHandleFor(mod);
 
   ASSERT_NE(dup, mod);
-  EXPECT_EQ(VpiCompareObjectsC(mod, dup), 1);
-  EXPECT_EQ(VpiCompareObjectsC(dup, mod), 1);
+  EXPECT_EQ(vpi_compare_objects(mod, dup), 1);
+  EXPECT_EQ(vpi_compare_objects(dup, mod), 1);
 }
 
 // §37.2.1: equivalence is a property of the underlying object, not of any one
@@ -53,8 +53,8 @@ TEST_F(VpiHandleCreationSim, IndependentlyCreatedHandlesAreMutuallyEquivalent) {
   auto* dup2 = vpi_ctx_.CreateHandleFor(dup1);  // created from a derived handle
 
   ASSERT_NE(dup1, dup2);
-  EXPECT_EQ(VpiCompareObjectsC(dup1, dup2), 1);
-  EXPECT_EQ(VpiCompareObjectsC(dup2, mod), 1);
+  EXPECT_EQ(vpi_compare_objects(dup1, dup2), 1);
+  EXPECT_EQ(vpi_compare_objects(dup2, mod), 1);
 }
 
 // §37.2.1: distinct handles are equivalent only when they refer to the *same*
@@ -66,7 +66,7 @@ TEST_F(VpiHandleCreationSim, HandlesForDifferentObjectsAreNotEquivalent) {
   auto* dup_a = vpi_ctx_.CreateHandleFor(a);
   auto* dup_b = vpi_ctx_.CreateHandleFor(b);
 
-  EXPECT_EQ(VpiCompareObjectsC(dup_a, dup_b), 0);
+  EXPECT_EQ(vpi_compare_objects(dup_a, dup_b), 0);
 }
 
 // §37.2.1: a null object denotes nothing, so there is no handle to create.

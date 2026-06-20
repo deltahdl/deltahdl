@@ -47,7 +47,7 @@ TEST_F(VpiGet64Sim, ProtectedObjectQueryReturnsVpiUndefined) {
 
   // The refused query is recorded as an error.
   SVpiErrorInfo info = {};
-  EXPECT_NE(VpiChkErrorC(&info), 0);
+  EXPECT_NE(vpi_chk_error(&info), 0);
   EXPECT_NE(info.level, 0);
 }
 

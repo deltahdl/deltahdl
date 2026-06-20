@@ -97,14 +97,14 @@ TEST_F(ClassDefinition, ValueRoutinesDeniedForClassDefnMembers) {
 
     vpi_get_value(member, &value);
     SVpiErrorInfo get_info = {};
-    EXPECT_EQ(VpiChkErrorC(&get_info), vpiError)
+    EXPECT_EQ(vpi_chk_error(&get_info), vpiError)
         << "get, type " << member->type;
     EXPECT_EQ(value.value.integer, 0x5eed) << "get, type " << member->type;
 
     vpiHandle ret = vpi_put_value(member, &value, nullptr, vpiNoDelay);
     EXPECT_EQ(ret, nullptr) << "put, type " << member->type;
     SVpiErrorInfo put_info = {};
-    EXPECT_EQ(VpiChkErrorC(&put_info), vpiError)
+    EXPECT_EQ(vpi_chk_error(&put_info), vpiError)
         << "put, type " << member->type;
   }
 }
@@ -127,11 +127,11 @@ TEST_F(ClassDefinition, ValueRestrictionScopedToClassDefnParent) {
 
   vpi_get_value(&free_var, &value);
   SVpiErrorInfo get_info = {};
-  EXPECT_EQ(VpiChkErrorC(&get_info), 0);
+  EXPECT_EQ(vpi_chk_error(&get_info), 0);
 
   vpi_put_value(&free_var, &value, nullptr, vpiNoDelay);
   SVpiErrorInfo put_info = {};
-  EXPECT_EQ(VpiChkErrorC(&put_info), 0);
+  EXPECT_EQ(vpi_chk_error(&put_info), 0);
 }
 
 // D2 scope: the restriction names variable and event handles specifically. A
@@ -153,11 +153,11 @@ TEST_F(ClassDefinition, ValueRestrictionAppliesOnlyToVariableAndEventMembers) {
 
   vpi_get_value(&member_constraint, &value);
   SVpiErrorInfo get_info = {};
-  EXPECT_EQ(VpiChkErrorC(&get_info), 0);
+  EXPECT_EQ(vpi_chk_error(&get_info), 0);
 
   vpi_put_value(&member_constraint, &value, nullptr, vpiNoDelay);
   SVpiErrorInfo put_info = {};
-  EXPECT_EQ(VpiChkErrorC(&put_info), 0);
+  EXPECT_EQ(vpi_chk_error(&put_info), 0);
 }
 
 // D3: a class defn's vpiConstraint iteration returns only normal constraints,
