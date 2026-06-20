@@ -199,14 +199,14 @@ void Elaborator::ApplyBindInstance(BindDirective* bd, RtlirModule* target) {
 
   if (resolved) {
     const auto& child_ports = resolved->ports;
-    const bool is_ordered =
+    const bool kIsOrdered =
         !item->inst_ports.empty() && item->inst_ports[0].first.empty();
     for (size_t i = 0; i < item->inst_ports.size(); ++i) {
       auto& [port_name, conn_expr] = item->inst_ports[i];
       RtlirPortBinding binding;
       binding.connection = conn_expr;
       auto it = child_ports.end();
-      if (is_ordered) {
+      if (kIsOrdered) {
         if (i < child_ports.size()) {
           it = child_ports.begin() + static_cast<ptrdiff_t>(i);
           binding.port_name = it->name;

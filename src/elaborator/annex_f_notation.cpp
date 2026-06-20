@@ -28,11 +28,11 @@ std::string_view StripSubscript(std::string_view symbol) {
 
 std::optional<NotationCategory> ClassifyAnnexFNotation(
     std::string_view symbol) {
-  const std::string_view base = StripSubscript(symbol);
-  if (base.size() != 1) {
+  const std::string_view kBase = StripSubscript(symbol);
+  if (kBase.size() != 1) {
     return std::nullopt;
   }
-  switch (base[0]) {
+  switch (kBase[0]) {
     case 'b':
     case 'c':
       return NotationCategory::kBooleanExpression;

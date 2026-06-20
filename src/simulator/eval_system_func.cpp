@@ -556,35 +556,35 @@ static Logic4Vec EvalCountDrivers(const Expr* expr, SimContext& ctx,
   uint64_t n0 = 0, n1 = 0, nx = 0;
   Net* net = net_name.empty() ? nullptr : ctx.FindNet(net_name);
   if (net != nullptr) {
-    const uint32_t word = bit / 64;
-    const uint64_t mask = uint64_t{1} << (bit % 64);
+    const uint32_t kWord = bit / 64;
+    const uint64_t kMask = uint64_t{1} << (bit % 64);
     for (const auto& drv : net->drivers) {
-      if (word >= drv.nwords) continue;
-      const bool a = (drv.words[word].aval & mask) != 0;
-      const bool b = (drv.words[word].bval & mask) != 0;
-      if (!b && !a)
+      if (kWord >= drv.nwords) continue;
+      const bool kA = (drv.words[kWord].aval & kMask) != 0;
+      const bool kB = (drv.words[kWord].bval & kMask) != 0;
+      if (!kB && !kA)
         ++n0;
-      else if (!b && a)
+      else if (!kB && kA)
         ++n1;
-      else if (b && a)
+      else if (kB && kA)
         ++nx;
     }
   }
-  const uint64_t n01x = n0 + n1 + nx;
+  const uint64_t kN01x = n0 + n1 + nx;
 
   // Write back any supplied output arguments per Table D.1, in declared order.
-  const bool forced =
+  const bool kForced =
       net != nullptr && net->resolved != nullptr && net->resolved->is_forced;
-  const uint64_t outs[5] = {forced ? 1u : 0u, n01x, n0, n1, nx};
+  const uint64_t kOuts[5] = {kForced ? 1u : 0u, kN01x, n0, n1, nx};
   for (size_t i = 1; i < expr->args.size() && i <= 5u; ++i) {
     if (expr->args[i] != nullptr) {
       PerformBlockingAssign(
-          expr->args[i], MakeLogic4VecVal(arena, 32, outs[i - 1]), ctx, arena);
+          expr->args[i], MakeLogic4VecVal(arena, 32, kOuts[i - 1]), ctx, arena);
     }
   }
 
   // Returns 0 with no more than one driver, 1 otherwise to flag contention.
-  return MakeLogic4VecVal(arena, 1, n01x > 1 ? 1 : 0);
+  return MakeLogic4VecVal(arena, 1, kN01x > 1 ? 1 : 0);
 }
 
 Logic4Vec EvalSystemCall(const Expr* expr, SimContext& ctx, Arena& arena) {

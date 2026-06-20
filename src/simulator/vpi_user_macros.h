@@ -547,8 +547,10 @@ void vpi_get_cb_info(vpiHandle obj, s_cb_data* cb_data_p);
 void vpi_get_time(vpiHandle obj, s_vpi_time* time_p);
 void vpi_get_delays(vpiHandle obj, p_vpi_delay delay_p);
 void vpi_put_delays(vpiHandle obj, p_vpi_delay delay_p);
-PLI_INT32 vpi_get_data(PLI_INT32 id, PLI_BYTE8* dataLoc, PLI_INT32 numOfBytes);
-PLI_INT32 vpi_put_data(PLI_INT32 id, PLI_BYTE8* dataLoc, PLI_INT32 numOfBytes);
+PLI_INT32 vpi_get_data(PLI_INT32 id, PLI_BYTE8* data_loc,
+                       PLI_INT32 num_of_bytes);
+PLI_INT32 vpi_put_data(PLI_INT32 id, PLI_BYTE8* data_loc,
+                       PLI_INT32 num_of_bytes);
 PLI_INT32 vpi_put_userdata(vpiHandle obj, void* userdata);
 void* vpi_get_userdata(vpiHandle obj);
 vpiHandle vpi_handle(int type, vpiHandle ref);

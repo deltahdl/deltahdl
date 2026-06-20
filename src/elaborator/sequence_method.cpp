@@ -81,11 +81,11 @@ bool HasCycleFrom(size_t node, const std::vector<std::vector<int>>& adjacency,
   // state: 0 = unvisited, 1 = on the current path, 2 = fully explored.
   state[node] = 1;
   for (int next : adjacency[node]) {
-    const auto next_index = static_cast<size_t>(next);
-    if (state[next_index] == 1) {
+    const auto kNextIndex = static_cast<size_t>(next);
+    if (state[kNextIndex] == 1) {
       return true;
     }
-    if (state[next_index] == 0 && HasCycleFrom(next_index, adjacency, state)) {
+    if (state[kNextIndex] == 0 && HasCycleFrom(kNextIndex, adjacency, state)) {
       return true;
     }
   }

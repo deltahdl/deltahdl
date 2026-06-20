@@ -340,10 +340,10 @@ static SdfTimingCheck ParseOneTc(std::string_view& s, SdfCheckType type) {
   SdfTimingCheck tc;
   tc.check_type = type;
 
-  const bool single_signal =
+  const bool kSingleSignal =
       (type == SdfCheckType::kWidth || type == SdfCheckType::kPeriod);
   auto first = ParseSdfSignal(s);
-  if (single_signal) {
+  if (kSingleSignal) {
     tc.ref_port = first.port;
     tc.ref_edge = first.edge;
 
@@ -359,10 +359,10 @@ static SdfTimingCheck ParseOneTc(std::string_view& s, SdfCheckType type) {
   }
   tc.limit = ParseDelayVal(s);
 
-  const bool two_value =
+  const bool kTwoValue =
       (type == SdfCheckType::kSetuphold || type == SdfCheckType::kRecrem ||
        type == SdfCheckType::kBidirectskew || type == SdfCheckType::kNochange);
-  if (two_value) {
+  if (kTwoValue) {
     SkipWhitespace(s);
     if (!s.empty() && s[0] == '(') {
       tc.limit2 = ParseDelayVal(s);
@@ -562,7 +562,7 @@ static void ParseLabelSection(std::string_view& s, SdfCell& cell,
     if (!s.empty() && s[0] == ')') Expect(s, SdfTokKind::kRParen);
     return;
   }
-  const bool increment = (mode.text == "INCREMENT");
+  const bool kIncrement = (mode.text == "INCREMENT");
   while (true) {
     SkipWhitespace(s);
     if (s.empty() || s[0] == ')') break;
@@ -571,7 +571,7 @@ static void ParseLabelSection(std::string_view& s, SdfCell& cell,
     SdfSpecparam sp;
     sp.name = std::string(name_tok.text);
     sp.value = ParseLabelValue(s);
-    sp.is_increment = increment;
+    sp.is_increment = kIncrement;
     Expect(s, SdfTokKind::kRParen);
 
     cell.specparams.push_back(std::move(sp));

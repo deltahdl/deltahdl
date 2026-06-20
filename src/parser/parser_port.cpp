@@ -517,9 +517,9 @@ void Parser::ParsePortList(ModuleDecl& mod) {
       }
     }
   }
-  const bool is_checker = mod.decl_kind == ModuleDeclKind::kChecker;
+  const bool kIsChecker = mod.decl_kind == ModuleDeclKind::kChecker;
   mod.ports.push_back(ParsePortDecl());
-  ResolvePortDefaults(mod.ports.back(), nullptr, is_checker);
+  ResolvePortDefaults(mod.ports.back(), nullptr, kIsChecker);
   while (Match(TokenKind::kComma)) {
     PortDecl prev = mod.ports.back();
 
@@ -539,14 +539,14 @@ void Parser::ParsePortList(ModuleDecl& mod) {
           port.direction = prev.direction;
           port.data_type = prev.data_type;
         } else {
-          ResolvePortDefaults(port, &prev, is_checker);
+          ResolvePortDefaults(port, &prev, kIsChecker);
         }
         mod.ports.push_back(port);
         continue;
       }
     }
     mod.ports.push_back(ParsePortDecl());
-    ResolvePortDefaults(mod.ports.back(), &prev, is_checker);
+    ResolvePortDefaults(mod.ports.back(), &prev, kIsChecker);
   }
   Expect(TokenKind::kRParen);
 }

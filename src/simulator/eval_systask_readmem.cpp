@@ -320,16 +320,16 @@ static void EvalReadmemMultiDim(SimContext& ctx, Arena& arena, bool is_hex,
                                 const EnumTypeInfo* enum_info) {
   const std::vector<uint32_t>& los = ai->dim_los;
   const std::vector<uint32_t>& sizes = ai->dim_sizes;
-  const size_t ndim = sizes.size();
+  const size_t kNdim = sizes.size();
 
   // §21.4.3: the number of subwords enclosed by a single highest-dimension word
   // is the product of every lower dimension's extent.
   uint64_t inner = 1;
-  for (size_t d = 1; d < ndim; ++d) inner *= sizes[d];
+  for (size_t d = 1; d < kNdim; ++d) inner *= sizes[d];
   if (inner == 0) return;
 
-  const auto top_lo = static_cast<int64_t>(los[0]);
-  const int64_t top_hi = top_lo + static_cast<int64_t>(sizes[0]) - 1;
+  const auto kTopLo = static_cast<int64_t>(los[0]);
+  const int64_t kTopHi = kTopLo + static_cast<int64_t>(sizes[0]) - 1;
 
   // §21.4.3: a global position numbers every element of the array in row-major
   // order, so a sequential file fills element 0, 1, 2, ... regardless of how
@@ -339,22 +339,22 @@ static void EvalReadmemMultiDim(SimContext& ctx, Arena& arena, bool is_hex,
     uint64_t top = global / inner;
     uint64_t flat = global % inner;
     std::string nm = mem_name + "[" +
-                     std::to_string(top_lo + static_cast<int64_t>(top)) + "]";
+                     std::to_string(kTopLo + static_cast<int64_t>(top)) + "]";
     // Decompose the within-word position into per-dimension subscripts,
     // innermost first (it varies fastest), then emit them outer-to-inner.
-    std::vector<int64_t> subs(ndim - 1);
-    for (size_t d = ndim - 1; d >= 1; --d) {
+    std::vector<int64_t> subs(kNdim - 1);
+    for (size_t d = kNdim - 1; d >= 1; --d) {
       subs[d - 1] =
           static_cast<int64_t>(los[d]) + static_cast<int64_t>(flat % sizes[d]);
       flat /= sizes[d];
     }
-    for (size_t d = 1; d < ndim; ++d) {
+    for (size_t d = 1; d < kNdim; ++d) {
       nm += "[" + std::to_string(subs[d - 1]) + "]";
     }
     return nm;
   };
 
-  const uint64_t total = static_cast<uint64_t>(sizes[0]) * inner;
+  const uint64_t kTotal = static_cast<uint64_t>(sizes[0]) * inner;
   uint64_t cursor = 0;
 
   ScanMemFile(
@@ -362,17 +362,17 @@ static void EvalReadmemMultiDim(SimContext& ctx, Arena& arena, bool is_hex,
       [&](int64_t addr) -> bool {
         // §21.4.3: an address entry names a highest-dimension word. Loading
         // resumes at the first subword enclosed by that word.
-        if (addr < top_lo || addr > top_hi) {
+        if (addr < kTopLo || addr > kTopHi) {
           ctx.GetDiag().Error(
               {}, "$readmem" + std::string(is_hex ? "h" : "b") +
                       ": file address outside the highest dimension's range");
           return false;
         }
-        cursor = static_cast<uint64_t>(addr - top_lo) * inner;
+        cursor = static_cast<uint64_t>(addr - kTopLo) * inner;
         return true;
       },
       [&](const std::string& tok) -> bool {
-        if (cursor >= total) return false;  // array full; nothing more to fill
+        if (cursor >= kTotal) return false;  // array full; nothing more to fill
         Logic4Vec word = ParseMemNumber(arena, tok, is_hex, ai->elem_width);
         if (two_state) CoerceToTwoState(word);
         if (enum_info && !EnumValueInRange(enum_info, word)) {

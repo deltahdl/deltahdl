@@ -19,21 +19,21 @@ void ExpandTransitionDelays(PathDelay& pd) {
       break;
     }
     case 2: {
-      const uint64_t trise = pd.delays[0];
-      const uint64_t tfall = pd.delays[1];
-      pd.delays[2] = trise;
-      pd.delays[3] = trise;
-      pd.delays[4] = tfall;
-      pd.delays[5] = tfall;
+      const uint64_t kTrise = pd.delays[0];
+      const uint64_t kTfall = pd.delays[1];
+      pd.delays[2] = kTrise;
+      pd.delays[3] = kTrise;
+      pd.delays[4] = kTfall;
+      pd.delays[5] = kTfall;
       break;
     }
     case 3: {
-      const uint64_t trise = pd.delays[0];
-      const uint64_t tfall = pd.delays[1];
-      const uint64_t tz = pd.delays[2];
-      pd.delays[3] = trise;
-      pd.delays[4] = tz;
-      pd.delays[5] = tfall;
+      const uint64_t kTrise = pd.delays[0];
+      const uint64_t kTfall = pd.delays[1];
+      const uint64_t kTz = pd.delays[2];
+      pd.delays[3] = kTrise;
+      pd.delays[4] = kTz;
+      pd.delays[5] = kTfall;
       break;
     }
     default:
@@ -76,8 +76,8 @@ uint64_t SelectPathDelay(const std::vector<PathCandidate>& candidates,
 bool StateDependentPathConditionEnables(Logic4Word condition_lsb) {
   // An unknown (x or z) condition counts as true; otherwise the path is active
   // only when the least-significant bit of the result is 1.
-  const bool unknown = (condition_lsb.bval & 1u) != 0u;
-  if (unknown) return true;
+  const bool kUnknown = (condition_lsb.bval & 1u) != 0u;
+  if (kUnknown) return true;
   return (condition_lsb.aval & 1u) != 0u;
 }
 
@@ -102,10 +102,10 @@ void InitDefaultPulseLimits(PathDelay& pd) {
 
 void ApplyPulseControlOverride(PathDelay& pd, uint64_t reject, bool has_error,
                                uint64_t error) {
-  const uint64_t effective_error = has_error ? error : reject;
+  const uint64_t kEffectiveError = has_error ? error : reject;
   for (int i = 0; i < 12; ++i) {
     pd.reject_limit[i] = reject;
-    pd.error_limit[i] = effective_error;
+    pd.error_limit[i] = kEffectiveError;
   }
 }
 
@@ -120,17 +120,16 @@ void ApplyGlobalPulseLimits(PathDelay& pd, uint8_t reject_pct,
 
 void ApplySdfPulseLimits(PathDelay& pd, uint64_t reject, bool has_error,
                          uint64_t error) {
-  const uint64_t effective_error = has_error ? error : reject;
+  const uint64_t kEffectiveError = has_error ? error : reject;
   for (int i = 0; i < 12; ++i) {
     pd.reject_limit[i] = reject;
-    pd.error_limit[i] = effective_error;
+    pd.error_limit[i] = kEffectiveError;
   }
 }
 
 void SpecifyManager::AddPathDelay(PathDelay delay, bool preserve_pulse_limits) {
-  const bool sdf_is_nonconditional =
-      delay.condition.empty() && !delay.is_ifnone;
-  if (sdf_is_nonconditional) {
+  const bool kSdfIsNonconditional = delay.condition.empty() && !delay.is_ifnone;
+  if (kSdfIsNonconditional) {
     bool matched = false;
     for (auto& existing : path_delays_) {
       if (existing.src_port == delay.src_port &&
@@ -187,10 +186,9 @@ void SpecifyManager::AddPathDelay(PathDelay delay, bool preserve_pulse_limits) {
 }
 
 void SpecifyManager::IncrementPathDelay(const PathDelay& delta) {
-  const bool sdf_is_nonconditional =
-      delta.condition.empty() && !delta.is_ifnone;
+  const bool kSdfIsNonconditional = delta.condition.empty() && !delta.is_ifnone;
   bool matched = false;
-  if (sdf_is_nonconditional) {
+  if (kSdfIsNonconditional) {
     for (auto& existing : path_delays_) {
       if (existing.src_port == delta.src_port &&
           existing.dst_port == delta.dst_port) {
@@ -354,17 +352,17 @@ void SpecifyManager::IncrementSdfPulseLimit(std::string_view src,
                                             int64_t reject_delta,
                                             bool has_error,
                                             int64_t error_delta) {
-  const int64_t effective_error_delta = has_error ? error_delta : reject_delta;
+  const int64_t kEffectiveErrorDelta = has_error ? error_delta : reject_delta;
   for (auto& pd : path_delays_) {
     if (pd.src_port != src || pd.dst_port != dst) continue;
     for (int i = 0; i < 12; ++i) {
-      const int64_t new_reject =
+      const int64_t kNewReject =
           static_cast<int64_t>(pd.reject_limit[i]) + reject_delta;
-      const int64_t new_error =
-          static_cast<int64_t>(pd.error_limit[i]) + effective_error_delta;
+      const int64_t kNewError =
+          static_cast<int64_t>(pd.error_limit[i]) + kEffectiveErrorDelta;
       pd.reject_limit[i] =
-          new_reject < 0 ? 0u : static_cast<uint64_t>(new_reject);
-      pd.error_limit[i] = new_error < 0 ? 0u : static_cast<uint64_t>(new_error);
+          kNewReject < 0 ? 0u : static_cast<uint64_t>(kNewReject);
+      pd.error_limit[i] = kNewError < 0 ? 0u : static_cast<uint64_t>(kNewError);
     }
   }
 }
@@ -490,11 +488,11 @@ static bool CheckTimingViolation(
     if (check.ref_signal != ref) continue;
     if (check.data_signal != data) continue;
     if (check.negative_timing_check_enabled) {
-      const auto ref_t = static_cast<int64_t>(ref_time);
-      const auto data_t = static_cast<int64_t>(data_time);
-      const int64_t lower = ref_t - check.signed_limit;
-      const int64_t upper = ref_t + check.signed_limit2;
-      if (data_t > lower && data_t < upper) return true;
+      const auto kRefT = static_cast<int64_t>(ref_time);
+      const auto kDataT = static_cast<int64_t>(data_time);
+      const int64_t kLower = kRefT - check.signed_limit;
+      const int64_t kUpper = kRefT + check.signed_limit2;
+      if (kDataT > kLower && kDataT < kUpper) return true;
       continue;
     }
 
@@ -651,16 +649,16 @@ bool ReportsTimeskewViolation(uint64_t ref_time, uint64_t next_event_time,
 }
 
 Logic4Word ToggleNotifierOnViolation(Logic4Word current) {
-  const bool pre_a = (current.aval & 1u) != 0u;
-  const bool pre_b = (current.bval & 1u) != 0u;
+  const bool kPreA = (current.aval & 1u) != 0u;
+  const bool kPreB = (current.bval & 1u) != 0u;
   Logic4Word result;
-  if (pre_a && pre_b) {
+  if (kPreA && kPreB) {
     result.aval = 1u;
     result.bval = 1u;
-  } else if (pre_b) {
+  } else if (kPreB) {
     result.aval = 0u;
     result.bval = 0u;
-  } else if (pre_a) {
+  } else if (kPreA) {
     result.aval = 0u;
     result.bval = 0u;
   } else {
@@ -687,23 +685,23 @@ bool IsDeterministicTimingCheckCondition(TimingCheckConditionKind kind) {
 bool TimingCheckConditionEnables(TimingCheckConditionKind kind,
                                  Logic4Word conditioning_lsb,
                                  uint8_t scalar_constant_bit) {
-  const bool known = (conditioning_lsb.bval & 1u) == 0u;
-  if (!known) {
+  const bool kNown = (conditioning_lsb.bval & 1u) == 0u;
+  if (!kNown) {
     return !IsDeterministicTimingCheckCondition(kind);
   }
-  const auto bit = static_cast<uint8_t>(conditioning_lsb.aval & 1u);
-  const auto rhs = static_cast<uint8_t>(scalar_constant_bit & 1u);
+  const auto kBit = static_cast<uint8_t>(conditioning_lsb.aval & 1u);
+  const auto kRhs = static_cast<uint8_t>(scalar_constant_bit & 1u);
   switch (kind) {
     case TimingCheckConditionKind::kPlain:
-      return bit == 1u;
+      return kBit == 1u;
     case TimingCheckConditionKind::kNegate:
-      return bit == 0u;
+      return kBit == 0u;
     case TimingCheckConditionKind::kEq:
     case TimingCheckConditionKind::kCaseEq:
-      return bit == rhs;
+      return kBit == kRhs;
     case TimingCheckConditionKind::kNeq:
     case TimingCheckConditionKind::kCaseNeq:
-      return bit != rhs;
+      return kBit != kRhs;
   }
   return false;
 }
@@ -756,8 +754,8 @@ bool NegativeTimingWindowCanYieldViolation(int64_t lower, int64_t upper,
                                            uint64_t precision_ticks) {
   if (upper <= lower) return false;
 
-  const int64_t min_width = 2 * static_cast<int64_t>(precision_ticks);
-  return (upper - lower) >= min_width;
+  const int64_t kMinWidth = 2 * static_cast<int64_t>(precision_ticks);
+  return (upper - lower) >= kMinWidth;
 }
 
 bool ZeroSmallestNegativeTimingLimit(std::vector<int64_t>& limits) {

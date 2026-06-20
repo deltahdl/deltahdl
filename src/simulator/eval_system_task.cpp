@@ -245,8 +245,8 @@ void ExecDisplayWrite(const Expr* expr, SimContext& ctx, Arena& arena) {
   // trailing, or doubled comma in the call -- carries no expression and is
   // rendered as a single space.
   std::string output;
-  const size_t n = expr->args.size();
-  for (size_t i = 0; i < n; ++i) {
+  const size_t kN = expr->args.size();
+  for (size_t i = 0; i < kN; ++i) {
     const Expr* arg = expr->args[i];
     if (arg == nullptr) {
       output += ' ';
@@ -257,7 +257,7 @@ void ExecDisplayWrite(const Expr* expr, SimContext& ctx, Arena& arena) {
       std::vector<Logic4Vec> arg_vals;
       std::vector<std::string> p_fmts;
       std::vector<std::string> v_fmts;
-      while (i + 1 < n && expr->args[i + 1] != nullptr &&
+      while (i + 1 < kN && expr->args[i + 1] != nullptr &&
              expr->args[i + 1]->kind != ExprKind::kStringLiteral) {
         const Expr* val_arg = expr->args[++i];
         auto v = EvalExpr(val_arg, ctx, arena);

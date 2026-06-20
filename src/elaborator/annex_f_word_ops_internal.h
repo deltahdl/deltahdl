@@ -110,17 +110,17 @@ template <typename SlicePredicate>
 bool SomeWordOfLengthSatisfies(const std::vector<Letter>& alphabet,
                                std::size_t length, const SequenceExpr& seq,
                                SlicePredicate satisfies) {
-  const std::size_t base = alphabet.size();
+  const std::size_t kBase = alphabet.size();
   std::size_t total = 1;
   for (std::size_t i = 0; i < length; ++i) {
-    total *= base;
+    total *= kBase;
   }
   for (std::size_t code = 0; code < total; ++code) {
     Word word(length);
     std::size_t rest = code;
     for (std::size_t pos = 0; pos < length; ++pos) {
-      word[pos] = alphabet[rest % base];
-      rest /= base;
+      word[pos] = alphabet[rest % kBase];
+      rest /= kBase;
     }
     if (satisfies(word, length, seq)) {
       return true;
@@ -147,10 +147,10 @@ bool IsNondegenerateSequenceImpl(const SequenceExpr& sequence,
   std::size_t leaf_count = 0;
   CollectSequenceAtoms(*target, atoms, leaf_count);
 
-  const std::vector<Letter> alphabet = CandidateAlphabet(atoms);
-  const std::size_t max_length = leaf_count + 2;
-  for (std::size_t length = 1; length <= max_length; ++length) {
-    if (SomeWordOfLengthSatisfies(alphabet, length, *target, slice)) {
+  const std::vector<Letter> kAlphabet = CandidateAlphabet(atoms);
+  const std::size_t kMaxLength = leaf_count + 2;
+  for (std::size_t length = 1; length <= kMaxLength; ++length) {
+    if (SomeWordOfLengthSatisfies(kAlphabet, length, *target, slice)) {
       return true;
     }
   }
@@ -168,16 +168,16 @@ bool DisableIffShape(const Word& word, const TopProperty& top,
   if (!top.disable_condition || !top.property) {
     return false;
   }
-  const std::size_t i = FirstSatisfyingIndex(word, *top.disable_condition);
-  if (i == word.size()) {
+  const std::size_t kI = FirstSatisfyingIndex(word, *top.disable_condition);
+  if (kI == word.size()) {
     return false;
   }
-  const std::size_t reach = PropertyReach(*top.property);
-  const Word prefix = FirstLetters(word, i);
-  const Word top_completed = PrefixWithTail(prefix, LetterTop(), reach);
-  const Word bottom_completed = PrefixWithTail(prefix, LetterBottom(), reach);
-  return satisfies(top_completed, *top.property) &&
-         !satisfies(bottom_completed, *top.property);
+  const std::size_t kReach = PropertyReach(*top.property);
+  const Word kPrefix = FirstLetters(word, kI);
+  const Word kTopCompleted = PrefixWithTail(kPrefix, LetterTop(), kReach);
+  const Word kBottomCompleted = PrefixWithTail(kPrefix, LetterBottom(), kReach);
+  return satisfies(kTopCompleted, *top.property) &&
+         !satisfies(kBottomCompleted, *top.property);
 }
 
 // §F.5.3.3 (and §F.5.6.3): the abort/disable family shares one shape. The
@@ -194,20 +194,20 @@ bool NonVacuousAbortShape(const Word& word, const BooleanExpr& boolean,
   if (!non_vacuous(word, operand)) {
     return false;
   }
-  const std::size_t first_b = FirstSatisfyingIndex(word, boolean);
+  const std::size_t kFirstB = FirstSatisfyingIndex(word, boolean);
   // (1) No letter of w satisfies b.
-  if (first_b == word.size()) {
+  if (kFirstB == word.size()) {
     return true;
   }
   // (2) Some b-free prefix x leaves P unmet under one of the constant tails.
-  // The prefixes with no b-letter are exactly those of length 0..first_b.
-  const std::size_t reach = PropertyReach(operand);
-  for (std::size_t len = 0; len <= first_b; ++len) {
-    const Word prefix = FirstLetters(word, len);
-    const Word bottom = PrefixWithTail(prefix, LetterBottom(), reach);
-    const Word top = PrefixWithTail(prefix, LetterTop(), reach);
-    if (!neutrally_satisfies(bottom, operand) ||
-        !neutrally_satisfies(top, operand)) {
+  // The prefixes with no b-letter are exactly those of length 0..kFirstB.
+  const std::size_t kReach = PropertyReach(operand);
+  for (std::size_t len = 0; len <= kFirstB; ++len) {
+    const Word kPrefix = FirstLetters(word, len);
+    const Word kBottom = PrefixWithTail(kPrefix, LetterBottom(), kReach);
+    const Word kTop = PrefixWithTail(kPrefix, LetterTop(), kReach);
+    if (!neutrally_satisfies(kBottom, operand) ||
+        !neutrally_satisfies(kTop, operand)) {
       return true;
     }
   }

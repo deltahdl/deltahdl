@@ -41,10 +41,10 @@ bool InferredFunctionPlacementIsLegal(FormalArgumentOwner owner,
                                       DefaultValuePosition position) {
   // §16.14.7: legal only as the entire default value of a formal argument that
   // belongs to a property, sequence, or checker declaration.
-  const bool owner_allows = owner == FormalArgumentOwner::kProperty ||
+  const bool kOwnerAllows = owner == FormalArgumentOwner::kProperty ||
                             owner == FormalArgumentOwner::kSequence ||
                             owner == FormalArgumentOwner::kChecker;
-  return owner_allows && position == DefaultValuePosition::kEntireDefaultValue;
+  return kOwnerAllows && position == DefaultValuePosition::kEntireDefaultValue;
 }
 
 bool InferredClockFormalArgumentTypeIsLegal(FormalArgumentType type) {

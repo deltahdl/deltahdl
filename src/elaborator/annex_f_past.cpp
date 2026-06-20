@@ -31,28 +31,28 @@ Word Subword(const Word& word, std::size_t lo, std::size_t hi) {
 // exactly n active ticks before j.
 std::shared_ptr<const SequenceExpr> GatingSequence(
     const std::shared_ptr<const BooleanExpr>& g, unsigned int n) {
-  const std::shared_ptr<const SequenceExpr> active = SeqBoolean(g);
-  const std::shared_ptr<const SequenceExpr> inactive_run =
+  const std::shared_ptr<const SequenceExpr> kActive = SeqBoolean(g);
+  const std::shared_ptr<const SequenceExpr> kInactiveRun =
       SeqZeroOrMoreRepeat(SeqBoolean(BoolNot(g)));
 
   // g[=n-1]. For n == 1 there is no g[->m] part: g[=0] is just a run of
   // inactive letters.
-  std::shared_ptr<const SequenceExpr> nonconsecutive = inactive_run;
-  const unsigned int repeats = n - 1;
-  if (repeats > 0) {
+  std::shared_ptr<const SequenceExpr> nonconsecutive = kInactiveRun;
+  const unsigned int kRepeats = n - 1;
+  if (kRepeats > 0) {
     // g[->repeats]: repeats copies of ((!g)[*0:$] ##1 g) laid end to end.
-    const std::shared_ptr<const SequenceExpr> goto_unit =
-        SeqConcat(inactive_run, active);
-    std::shared_ptr<const SequenceExpr> goto_m = goto_unit;
-    for (unsigned int k = 1; k < repeats; ++k) {
-      goto_m = SeqConcat(goto_m, goto_unit);
+    const std::shared_ptr<const SequenceExpr> kGotoUnit =
+        SeqConcat(kInactiveRun, kActive);
+    std::shared_ptr<const SequenceExpr> goto_m = kGotoUnit;
+    for (unsigned int k = 1; k < kRepeats; ++k) {
+      goto_m = SeqConcat(goto_m, kGotoUnit);
     }
     // g[=repeats] = g[->repeats] ##1 (!g)[*0:$].
-    nonconsecutive = SeqConcat(goto_m, inactive_run);
+    nonconsecutive = SeqConcat(goto_m, kInactiveRun);
   }
 
   // (c && e2) ##1 g[=n-1] ##1 1.
-  return SeqConcat(active, SeqConcat(nonconsecutive, SeqBoolean(BoolTrue())));
+  return SeqConcat(kActive, SeqConcat(nonconsecutive, SeqBoolean(BoolTrue())));
 }
 
 }  // namespace
@@ -70,13 +70,14 @@ std::vector<std::size_t> PastSourceIndices(
   }
   // The active condition c && e2, both the destination clock and the gating
   // expression holding.
-  const std::shared_ptr<const BooleanExpr> active = BoolAnd(clock, gate);
-  const std::shared_ptr<const SequenceExpr> gating = GatingSequence(active, n);
+  const std::shared_ptr<const BooleanExpr> kActive = BoolAnd(clock, gate);
+  const std::shared_ptr<const SequenceExpr> kGating =
+      GatingSequence(kActive, n);
   // §F.6.2: try every start point 0 <= i < j; the subword w^{i,j} must tightly
   // satisfy the gating sequence.
   for (std::size_t i = 0; i < j; ++i) {
-    const Word slice = Subword(word, i, j + 1);
-    if (TightlySatisfies(slice, *gating)) {
+    const Word kSlice = Subword(word, i, j + 1);
+    if (TightlySatisfies(kSlice, *kGating)) {
       result.push_back(i);
     }
   }

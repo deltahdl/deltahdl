@@ -284,9 +284,9 @@ std::string FormatArg(const Logic4Vec& val, char spec) {
 // Table 21-4 maps each strength level (0..7, the numeric value of the
 // Strength enum) to its two-letter mnemonic.
 static const char* StrengthMnemonic(uint8_t level) {
-  static const char* kMnemonics[8] = {"Hi", "Sm", "Me", "We",
-                                      "La", "Pu", "St", "Su"};
-  return kMnemonics[level & 0x7];
+  static const char* k_mnemonics[8] = {"Hi", "Sm", "Me", "We",
+                                       "La", "Pu", "St", "Su"};
+  return k_mnemonics[level & 0x7];
 }
 
 // Renders the three-character strength format of a scalar net. The first two

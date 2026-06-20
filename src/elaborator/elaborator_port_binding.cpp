@@ -157,9 +157,9 @@ void Elaborator::BindPorts(RtlirModuleInst& inst, const ModuleItem* item,
                            RtlirModule* parent_mod) {
   if (!inst.resolved) return;
   const auto& child_ports = inst.resolved->ports;
-  const bool has_pull = unit_->unconnected_drive != NetType::kWire;
+  const bool kHasPull = unit_->unconnected_drive != NetType::kWire;
 
-  const bool is_ordered =
+  const bool kIsOrdered =
       !item->inst_ports.empty() && item->inst_ports[0].first.empty();
 
   // §23.3.3.2: connecting a child's port variable to an interconnect signal of
@@ -175,11 +175,11 @@ void Elaborator::BindPorts(RtlirModuleInst& inst, const ModuleItem* item,
 
   for (size_t i = 0; i < item->inst_ports.size(); ++i) {
     auto& [port_name, conn_expr] = item->inst_ports[i];
-    const bool is_implicit =
+    const bool kIsImplicit =
         i < item->inst_ports_implicit.size() && item->inst_ports_implicit[i];
 
     if (conn_expr && conn_expr->kind == ExprKind::kIdentifier) {
-      if (is_implicit) {
+      if (kIsImplicit) {
         if (!IsNameDeclared(conn_expr->text, parent_mod)) {
           diag_.Error(
               item->loc,
@@ -196,7 +196,7 @@ void Elaborator::BindPorts(RtlirModuleInst& inst, const ModuleItem* item,
     binding.connection = conn_expr;
 
     auto it = child_ports.end();
-    if (is_ordered) {
+    if (kIsOrdered) {
       if (i < child_ports.size()) {
         it = child_ports.begin() + static_cast<ptrdiff_t>(i);
         binding.port_name = it->name;
@@ -225,7 +225,7 @@ void Elaborator::BindPorts(RtlirModuleInst& inst, const ModuleItem* item,
       binding.direction = it->direction;
       binding.width = it->width;
 
-      if (is_implicit && conn_expr &&
+      if (kIsImplicit && conn_expr &&
           IsNameDeclared(conn_expr->text, parent_mod)) {
         uint32_t sig_width = FindSignalWidth(conn_expr->text, parent_mod);
         if (sig_width != 0 && sig_width != it->width) {
@@ -257,7 +257,7 @@ void Elaborator::BindPorts(RtlirModuleInst& inst, const ModuleItem* item,
         }
       }
 
-      if (!is_implicit && conn_expr &&
+      if (!kIsImplicit && conn_expr &&
           conn_expr->kind == ExprKind::kIdentifier) {
         NetType pnet = PortNetType(it->type_kind);
         if (pnet != NetType::kNone) {
@@ -373,13 +373,13 @@ void Elaborator::BindPorts(RtlirModuleInst& inst, const ModuleItem* item,
       }
     }
 
-    if (is_ordered && !binding.connection &&
+    if (kIsOrdered && !binding.connection &&
         binding.direction == Direction::kInput && it != child_ports.end() &&
         it->default_value) {
       binding.connection = it->default_value;
     }
 
-    if (has_pull && !binding.connection &&
+    if (kHasPull && !binding.connection &&
         binding.direction == Direction::kInput) {
       binding.connection = MakePullExpr(unit_->unconnected_drive);
     }
@@ -522,7 +522,7 @@ void Elaborator::BindPorts(RtlirModuleInst& inst, const ModuleItem* item,
         }
       } else if (port.default_value) {
         binding.connection = port.default_value;
-      } else if (has_pull && port.direction == Direction::kInput) {
+      } else if (kHasPull && port.direction == Direction::kInput) {
         binding.connection = MakePullExpr(unit_->unconnected_drive);
       } else if (port.direction == Direction::kInput && !port.is_var &&
                  PortNetType(port.type_kind) != NetType::kNone) {
@@ -534,12 +534,12 @@ void Elaborator::BindPorts(RtlirModuleInst& inst, const ModuleItem* item,
       }
     }
   } else {
-    size_t first_unconnected = is_ordered ? item->inst_ports.size() : 0;
+    size_t first_unconnected = kIsOrdered ? item->inst_ports.size() : 0;
     for (size_t i = first_unconnected; i < child_ports.size(); ++i) {
       const auto& port = child_ports[i];
       if (port.direction != Direction::kInput) continue;
 
-      if (!is_ordered) {
+      if (!kIsOrdered) {
         bool connected = false;
         for (const auto& [pname, _] : item->inst_ports) {
           if (pname == port.name) {
@@ -557,7 +557,7 @@ void Elaborator::BindPorts(RtlirModuleInst& inst, const ModuleItem* item,
 
       if (port.default_value) {
         binding.connection = port.default_value;
-      } else if (has_pull) {
+      } else if (kHasPull) {
         binding.connection = MakePullExpr(unit_->unconnected_drive);
       } else if (!port.is_var &&
                  PortNetType(port.type_kind) != NetType::kNone) {

@@ -270,43 +270,43 @@ void VpiContext::GetDelays(VpiHandle obj, VpiDelay* delay_p) {
 
   if (delay_p->da == nullptr) return;
 
-  const bool mtm = delay_p->mtm_flag != 0;
-  const bool pulsere = delay_p->pulsere_flag != 0;
-  const int tt = delay_p->time_type;
+  const bool kMtm = delay_p->mtm_flag != 0;
+  const bool kPulsere = delay_p->pulsere_flag != 0;
+  const int kTt = delay_p->time_type;
 
   // §38.10 (Table 38-2): each delay occupies a run of da entries selected by
   // mtm_flag and pulsere_flag, and the delays appear in source order. Walk the
   // delays in order, emitting each delay's run before moving to the next.
   int k = 0;
   for (int i = 0; i < delay_p->no_of_delays; ++i) {
-    const VpiDelayInfo d = (static_cast<size_t>(i) < obj->delays.size())
-                               ? obj->delays[i]
-                               : VpiDelayInfo{};
-    if (!mtm && !pulsere) {
+    const VpiDelayInfo kD = (static_cast<size_t>(i) < obj->delays.size())
+                                ? obj->delays[i]
+                                : VpiDelayInfo{};
+    if (!kMtm && !kPulsere) {
       // Neither flag set: one entry, the plain delay.
-      VpiWriteDelayValue(&delay_p->da[k++], tt, d.delay);
-    } else if (mtm && !pulsere) {
+      VpiWriteDelayValue(&delay_p->da[k++], kTt, kD.delay);
+    } else if (kMtm && !kPulsere) {
       // min:typ:max only: three entries, min then typ then max delay.
-      VpiWriteDelayValue(&delay_p->da[k++], tt, d.min_delay);
-      VpiWriteDelayValue(&delay_p->da[k++], tt, d.typ_delay);
-      VpiWriteDelayValue(&delay_p->da[k++], tt, d.max_delay);
-    } else if (!mtm && pulsere) {
+      VpiWriteDelayValue(&delay_p->da[k++], kTt, kD.min_delay);
+      VpiWriteDelayValue(&delay_p->da[k++], kTt, kD.typ_delay);
+      VpiWriteDelayValue(&delay_p->da[k++], kTt, kD.max_delay);
+    } else if (!kMtm && kPulsere) {
       // Pulse limits only: delay, reject limit, error limit.
-      VpiWriteDelayValue(&delay_p->da[k++], tt, d.delay);
-      VpiWriteDelayValue(&delay_p->da[k++], tt, d.reject);
-      VpiWriteDelayValue(&delay_p->da[k++], tt, d.error);
+      VpiWriteDelayValue(&delay_p->da[k++], kTt, kD.delay);
+      VpiWriteDelayValue(&delay_p->da[k++], kTt, kD.reject);
+      VpiWriteDelayValue(&delay_p->da[k++], kTt, kD.error);
     } else {
       // Both flags: nine entries - min:typ:max of delay, then reject, then
       // error.
-      VpiWriteDelayValue(&delay_p->da[k++], tt, d.min_delay);
-      VpiWriteDelayValue(&delay_p->da[k++], tt, d.typ_delay);
-      VpiWriteDelayValue(&delay_p->da[k++], tt, d.max_delay);
-      VpiWriteDelayValue(&delay_p->da[k++], tt, d.min_reject);
-      VpiWriteDelayValue(&delay_p->da[k++], tt, d.typ_reject);
-      VpiWriteDelayValue(&delay_p->da[k++], tt, d.max_reject);
-      VpiWriteDelayValue(&delay_p->da[k++], tt, d.min_error);
-      VpiWriteDelayValue(&delay_p->da[k++], tt, d.typ_error);
-      VpiWriteDelayValue(&delay_p->da[k++], tt, d.max_error);
+      VpiWriteDelayValue(&delay_p->da[k++], kTt, kD.min_delay);
+      VpiWriteDelayValue(&delay_p->da[k++], kTt, kD.typ_delay);
+      VpiWriteDelayValue(&delay_p->da[k++], kTt, kD.max_delay);
+      VpiWriteDelayValue(&delay_p->da[k++], kTt, kD.min_reject);
+      VpiWriteDelayValue(&delay_p->da[k++], kTt, kD.typ_reject);
+      VpiWriteDelayValue(&delay_p->da[k++], kTt, kD.max_reject);
+      VpiWriteDelayValue(&delay_p->da[k++], kTt, kD.min_error);
+      VpiWriteDelayValue(&delay_p->da[k++], kTt, kD.typ_error);
+      VpiWriteDelayValue(&delay_p->da[k++], kTt, kD.max_error);
     }
   }
 }
@@ -342,9 +342,9 @@ void VpiContext::PutDelays(VpiHandle obj, VpiDelay* delay_p) {
 
   if (delay_p->da == nullptr) return;
 
-  const bool mtm = delay_p->mtm_flag != 0;
-  const bool pulsere = delay_p->pulsere_flag != 0;
-  const int tt = delay_p->time_type;
+  const bool kMtm = delay_p->mtm_flag != 0;
+  const bool kPulsere = delay_p->pulsere_flag != 0;
+  const int kTt = delay_p->time_type;
 
   // Ensure there is a stored slot for every delay being set, preserving any
   // values already present so the pulse limits survive a delay-only write
@@ -361,31 +361,31 @@ void VpiContext::PutDelays(VpiHandle obj, VpiDelay* delay_p) {
   int k = 0;
   for (int i = 0; i < delay_p->no_of_delays; ++i) {
     VpiDelayInfo& d = obj->delays[i];
-    if (!mtm && !pulsere) {
+    if (!kMtm && !kPulsere) {
       // Neither flag set: one entry, the plain delay.
-      d.delay = VpiReadDelayValue(delay_p->da[k++], tt);
-    } else if (mtm && !pulsere) {
+      d.delay = VpiReadDelayValue(delay_p->da[k++], kTt);
+    } else if (kMtm && !kPulsere) {
       // min:typ:max only: three entries, min then typ then max delay.
-      d.min_delay = VpiReadDelayValue(delay_p->da[k++], tt);
-      d.typ_delay = VpiReadDelayValue(delay_p->da[k++], tt);
-      d.max_delay = VpiReadDelayValue(delay_p->da[k++], tt);
-    } else if (!mtm && pulsere) {
+      d.min_delay = VpiReadDelayValue(delay_p->da[k++], kTt);
+      d.typ_delay = VpiReadDelayValue(delay_p->da[k++], kTt);
+      d.max_delay = VpiReadDelayValue(delay_p->da[k++], kTt);
+    } else if (!kMtm && kPulsere) {
       // Pulse limits only: delay, reject limit, error limit.
-      d.delay = VpiReadDelayValue(delay_p->da[k++], tt);
-      d.reject = VpiReadDelayValue(delay_p->da[k++], tt);
-      d.error = VpiReadDelayValue(delay_p->da[k++], tt);
+      d.delay = VpiReadDelayValue(delay_p->da[k++], kTt);
+      d.reject = VpiReadDelayValue(delay_p->da[k++], kTt);
+      d.error = VpiReadDelayValue(delay_p->da[k++], kTt);
     } else {
       // Both flags: nine entries - min:typ:max of delay, then reject, then
       // error.
-      d.min_delay = VpiReadDelayValue(delay_p->da[k++], tt);
-      d.typ_delay = VpiReadDelayValue(delay_p->da[k++], tt);
-      d.max_delay = VpiReadDelayValue(delay_p->da[k++], tt);
-      d.min_reject = VpiReadDelayValue(delay_p->da[k++], tt);
-      d.typ_reject = VpiReadDelayValue(delay_p->da[k++], tt);
-      d.max_reject = VpiReadDelayValue(delay_p->da[k++], tt);
-      d.min_error = VpiReadDelayValue(delay_p->da[k++], tt);
-      d.typ_error = VpiReadDelayValue(delay_p->da[k++], tt);
-      d.max_error = VpiReadDelayValue(delay_p->da[k++], tt);
+      d.min_delay = VpiReadDelayValue(delay_p->da[k++], kTt);
+      d.typ_delay = VpiReadDelayValue(delay_p->da[k++], kTt);
+      d.max_delay = VpiReadDelayValue(delay_p->da[k++], kTt);
+      d.min_reject = VpiReadDelayValue(delay_p->da[k++], kTt);
+      d.typ_reject = VpiReadDelayValue(delay_p->da[k++], kTt);
+      d.max_reject = VpiReadDelayValue(delay_p->da[k++], kTt);
+      d.min_error = VpiReadDelayValue(delay_p->da[k++], kTt);
+      d.typ_error = VpiReadDelayValue(delay_p->da[k++], kTt);
+      d.max_error = VpiReadDelayValue(delay_p->da[k++], kTt);
     }
   }
 }
@@ -425,22 +425,22 @@ int VpiContext::GetData(int id, char* data_loc, int num_of_bytes) {
 
   const std::vector<char>& bytes = it->second;
   std::size_t& cursor = save_data_cursor_[id];
-  const std::size_t available =
+  const std::size_t kAvailable =
       (cursor < bytes.size()) ? bytes.size() - cursor : 0;
 
-  if (static_cast<std::size_t>(num_of_bytes) > available) {
+  if (static_cast<std::size_t>(num_of_bytes) > kAvailable) {
     // §38.9: asking for more than remains is a warning. Hand back the bytes
     // that are left, zero-fill the rest of the buffer, advance the cursor past
     // what was delivered, and return the count actually retrieved.
-    const int retrieved = static_cast<int>(available);
-    for (int i = 0; i < retrieved; ++i) data_loc[i] = bytes[cursor + i];
-    for (int i = retrieved; i < num_of_bytes; ++i) data_loc[i] = '\0';
-    cursor += available;
+    const int kRetrieved = static_cast<int>(kAvailable);
+    for (int i = 0; i < kRetrieved; ++i) data_loc[i] = bytes[cursor + i];
+    for (int i = kRetrieved; i < num_of_bytes; ++i) data_loc[i] = '\0';
+    cursor += kAvailable;
     last_error_.state = kVpiWarning;
     last_error_.level = kVpiWarning;
     last_error_.message =
         "vpi_get_data() requested more data than were saved for this id";
-    return retrieved;
+    return kRetrieved;
   }
 
   // §38.9: the normal case (and the explicitly-acceptable case of asking for

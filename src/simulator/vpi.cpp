@@ -51,14 +51,16 @@ void vpi_put_delays(vpiHandle obj, p_vpi_delay delay_p) {
   delta::GetGlobalVpiContext().PutDelays(obj, delay_p);
 }
 
-PLI_INT32 vpi_get_data(PLI_INT32 id, PLI_BYTE8* dataLoc, PLI_INT32 numOfBytes) {
+PLI_INT32 vpi_get_data(PLI_INT32 id, PLI_BYTE8* data_loc,
+                       PLI_INT32 num_of_bytes) {
   delta::GetGlobalVpiContext().ResetErrorStatus();  // §38.2: clear prior error
-  return delta::GetGlobalVpiContext().GetData(id, dataLoc, numOfBytes);
+  return delta::GetGlobalVpiContext().GetData(id, data_loc, num_of_bytes);
 }
 
-PLI_INT32 vpi_put_data(PLI_INT32 id, PLI_BYTE8* dataLoc, PLI_INT32 numOfBytes) {
+PLI_INT32 vpi_put_data(PLI_INT32 id, PLI_BYTE8* data_loc,
+                       PLI_INT32 num_of_bytes) {
   delta::GetGlobalVpiContext().ResetErrorStatus();  // §38.2: clear prior error
-  return delta::GetGlobalVpiContext().PutData(id, dataLoc, numOfBytes);
+  return delta::GetGlobalVpiContext().PutData(id, data_loc, num_of_bytes);
 }
 
 PLI_INT32 vpi_put_userdata(vpiHandle obj, void* userdata) {

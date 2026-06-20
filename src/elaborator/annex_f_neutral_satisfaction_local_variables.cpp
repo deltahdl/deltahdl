@@ -170,11 +170,11 @@ bool StrongHolds(const Word& word, const SequenceExpr& seq,
 // prefix w^{0,j} T^omega, L_0 |= strong(R).
 bool WeakHolds(const Word& word, const SequenceExpr& seq,
                const LocalContext& context) {
-  const std::size_t reach = SequenceReach(seq);
+  const std::size_t kReach = SequenceReach(seq);
   for (std::size_t j = 0; j < word.size(); ++j) {
-    const Word completed =
-        PrefixWithTail(PrefixInclusive(word, j), LetterTop(), reach);
-    if (!StrongHolds(completed, seq, context)) {
+    const Word kCompleted =
+        PrefixWithTail(PrefixInclusive(word, j), LetterTop(), kReach);
+    if (!StrongHolds(kCompleted, seq, context)) {
       return false;
     }
   }
@@ -211,10 +211,11 @@ bool Satisfies(const Word& word, const LvProperty& property,
       if (!property.sequence || !property.lhs) {
         return false;
       }
-      const Word complement = ComplementWord(word);
+      const Word kComplement = ComplementWord(word);
       for (std::size_t j = 0; j < word.size(); ++j) {
-        for (const LocalContext& out : TightSatisfactionOutputs(
-                 PrefixInclusive(complement, j), *property.sequence, context)) {
+        for (const LocalContext& out :
+             TightSatisfactionOutputs(PrefixInclusive(kComplement, j),
+                                      *property.sequence, context)) {
           if (!Satisfies(Suffix(word, j), *property.lhs, out)) {
             return false;
           }
@@ -273,12 +274,12 @@ bool Satisfies(const Word& word, const LvProperty& property,
       if (Satisfies(word, *property.lhs, context)) {
         return true;
       }
-      const std::size_t reach = PropertyReach(*property.lhs);
+      const std::size_t kReach = PropertyReach(*property.lhs);
       for (std::size_t i = 0; i < word.size(); ++i) {
         if (LetterSatisfiesBoolean(word[i], *property.boolean)) {
-          const Word completed =
-              PrefixWithTail(FirstLetters(word, i), LetterTop(), reach);
-          if (Satisfies(completed, *property.lhs, context)) {
+          const Word kCompleted =
+              PrefixWithTail(FirstLetters(word, i), LetterTop(), kReach);
+          if (Satisfies(kCompleted, *property.lhs, context)) {
             return true;
           }
         }
@@ -316,14 +317,14 @@ bool NeutrallySatisfiesTopLevelWithLocals(const Word& word,
       if (!top.disable_condition || !top.property) {
         return false;
       }
-      const std::size_t i = FirstSatisfyingIndex(word, *top.disable_condition);
-      if (i == word.size()) {
+      const std::size_t kI = FirstSatisfyingIndex(word, *top.disable_condition);
+      if (kI == word.size()) {
         return Satisfies(word, *top.property, context);
       }
-      const std::size_t reach = PropertyReach(*top.property);
-      const Word completed =
-          PrefixWithTail(FirstLetters(word, i), LetterBottom(), reach);
-      return Satisfies(completed, *top.property, context);
+      const std::size_t kReach = PropertyReach(*top.property);
+      const Word kCompleted =
+          PrefixWithTail(FirstLetters(word, kI), LetterBottom(), kReach);
+      return Satisfies(kCompleted, *top.property, context);
     }
     case LvTopLevelProperty::Kind::kParen:
       // §F.5.6.1: w, L_0 |= ( T ) iff w, L_0 |= T.

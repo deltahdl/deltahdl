@@ -140,10 +140,10 @@ std::set<std::string> FlowLocals(const std::set<std::string>& incoming,
       // §F.5.4: flow(X, (t v; R)) = (X ∩ {v}) U (flow(X - {v}, R) - {v}). The
       // declaration shadows any incoming v; only the inner sequence may let a
       // fresh v flow, and even that is stripped at the declaration boundary.
-      const std::set<std::string> hidden{sequence.local_var_name};
-      std::set<std::string> kept = Intersect(incoming, hidden);
+      const std::set<std::string> kHidden{sequence.local_var_name};
+      std::set<std::string> kept = Intersect(incoming, kHidden);
       std::set<std::string> inner = Difference(
-          FlowLocals(Difference(incoming, hidden), *sequence.lhs), hidden);
+          FlowLocals(Difference(incoming, kHidden), *sequence.lhs), kHidden);
       return Union(kept, inner);
     }
     case SequenceExpr::Kind::kLocalVarSampling:

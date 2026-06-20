@@ -29,69 +29,69 @@ std::vector<uint64_t> ExpandSdfDelays(const std::vector<SdfDelayValue>& vals,
   std::vector<uint64_t> out(12, 0);
   if (vals.empty()) return out;
 
-  const std::size_t n = vals.size();
-  const uint64_t v1 = SelectMtm(vals[0], mtm);
+  const std::size_t kN = vals.size();
+  const uint64_t kV1 = SelectMtm(vals[0], mtm);
 
-  if (n != 1 && n != 2 && n != 3 && n != 6 && n != 12) {
-    std::fill(out.begin(), out.end(), v1);
+  if (kN != 1 && kN != 2 && kN != 3 && kN != 6 && kN != 12) {
+    std::fill(out.begin(), out.end(), kV1);
     return out;
   }
 
-  if (n == 1) {
-    std::fill(out.begin(), out.end(), v1);
+  if (kN == 1) {
+    std::fill(out.begin(), out.end(), kV1);
     return out;
   }
 
-  const uint64_t v2 = SelectMtm(vals[1], mtm);
-  if (n == 2) {
-    out[0] = v1;
-    out[1] = v2;
-    out[2] = v1;
-    out[3] = v1;
-    out[4] = v2;
-    out[5] = v2;
-    out[6] = v1;
-    out[7] = v1;
-    out[8] = v2;
-    out[9] = v2;
-    out[10] = std::max(v1, v2);
-    out[11] = std::min(v1, v2);
+  const uint64_t kV2 = SelectMtm(vals[1], mtm);
+  if (kN == 2) {
+    out[0] = kV1;
+    out[1] = kV2;
+    out[2] = kV1;
+    out[3] = kV1;
+    out[4] = kV2;
+    out[5] = kV2;
+    out[6] = kV1;
+    out[7] = kV1;
+    out[8] = kV2;
+    out[9] = kV2;
+    out[10] = std::max(kV1, kV2);
+    out[11] = std::min(kV1, kV2);
     return out;
   }
 
-  const uint64_t v3 = SelectMtm(vals[2], mtm);
-  if (n == 3) {
-    out[0] = v1;
-    out[1] = v2;
-    out[2] = v3;
-    out[3] = v1;
-    out[4] = v3;
-    out[5] = v2;
-    out[6] = std::min(v1, v3);
-    out[7] = std::max(v1, v3);
-    out[8] = std::min(v2, v3);
-    out[9] = v2;
-    out[10] = v3;
-    out[11] = std::min(v1, v2);
+  const uint64_t kV3 = SelectMtm(vals[2], mtm);
+  if (kN == 3) {
+    out[0] = kV1;
+    out[1] = kV2;
+    out[2] = kV3;
+    out[3] = kV1;
+    out[4] = kV3;
+    out[5] = kV2;
+    out[6] = std::min(kV1, kV3);
+    out[7] = std::max(kV1, kV3);
+    out[8] = std::min(kV2, kV3);
+    out[9] = kV2;
+    out[10] = kV3;
+    out[11] = std::min(kV1, kV2);
     return out;
   }
 
-  const uint64_t v4 = SelectMtm(vals[3], mtm);
-  const uint64_t v5 = SelectMtm(vals[4], mtm);
-  const uint64_t v6 = SelectMtm(vals[5], mtm);
-  if (n == 6) {
-    out[0] = v1;
-    out[1] = v2;
-    out[2] = v3;
-    out[3] = v4;
-    out[4] = v5;
-    out[5] = v6;
-    out[6] = std::min(v1, v3);
-    out[7] = std::max(v1, v4);
-    out[8] = std::min(v2, v5);
-    out[9] = std::max(v2, v6);
-    out[10] = std::max(v3, v5);
-    out[11] = std::min(v4, v6);
+  const uint64_t kV4 = SelectMtm(vals[3], mtm);
+  const uint64_t kV5 = SelectMtm(vals[4], mtm);
+  const uint64_t kV6 = SelectMtm(vals[5], mtm);
+  if (kN == 6) {
+    out[0] = kV1;
+    out[1] = kV2;
+    out[2] = kV3;
+    out[3] = kV4;
+    out[4] = kV5;
+    out[5] = kV6;
+    out[6] = std::min(kV1, kV3);
+    out[7] = std::max(kV1, kV4);
+    out[8] = std::min(kV2, kV5);
+    out[9] = std::max(kV2, kV6);
+    out[10] = std::max(kV3, kV5);
+    out[11] = std::min(kV4, kV6);
     return out;
   }
 
@@ -116,8 +116,8 @@ std::array<uint64_t, 4> ReduceSdfDelaysToThree(
 
 static std::vector<SdfTcAnnotation> ExpandSdfTimingCheckTargets(
     const SdfTimingCheck& tc, SdfMtm mtm) {
-  const uint64_t v1 = SelectMtm(tc.limit, mtm);
-  const uint64_t v2 = SelectMtm(tc.limit2, mtm);
+  const uint64_t kV1 = SelectMtm(tc.limit, mtm);
+  const uint64_t kV2 = SelectMtm(tc.limit2, mtm);
   std::vector<SdfTcAnnotation> targets;
   auto push = [&](TimingCheckKind kind) -> SdfTcAnnotation& {
     SdfTcAnnotation a;
@@ -134,102 +134,102 @@ static std::vector<SdfTcAnnotation> ExpandSdfTimingCheckTargets(
     case SdfCheckType::kSetup: {
       auto& s = push(TimingCheckKind::kSetup);
       s.set_limit = true;
-      s.limit = v1;
+      s.limit = kV1;
       auto& sh = push(TimingCheckKind::kSetuphold);
       sh.set_limit = true;
-      sh.limit = v1;
+      sh.limit = kV1;
       break;
     }
     case SdfCheckType::kHold: {
       auto& h = push(TimingCheckKind::kHold);
       h.set_limit = true;
-      h.limit = v1;
+      h.limit = kV1;
       auto& sh = push(TimingCheckKind::kSetuphold);
       sh.set_limit2 = true;
-      sh.limit2 = v1;
+      sh.limit2 = kV1;
       break;
     }
     case SdfCheckType::kSetuphold: {
       auto& s = push(TimingCheckKind::kSetup);
       s.set_limit = true;
-      s.limit = v1;
+      s.limit = kV1;
       auto& h = push(TimingCheckKind::kHold);
       h.set_limit = true;
-      h.limit = v2;
+      h.limit = kV2;
       auto& sh = push(TimingCheckKind::kSetuphold);
       sh.set_limit = true;
-      sh.limit = v1;
+      sh.limit = kV1;
       sh.set_limit2 = true;
-      sh.limit2 = v2;
+      sh.limit2 = kV2;
       break;
     }
     case SdfCheckType::kRecovery: {
       auto& r = push(TimingCheckKind::kRecovery);
       r.set_limit = true;
-      r.limit = v1;
+      r.limit = kV1;
       auto& rr = push(TimingCheckKind::kRecrem);
       rr.set_limit = true;
-      rr.limit = v1;
+      rr.limit = kV1;
       break;
     }
     case SdfCheckType::kRemoval: {
       auto& r = push(TimingCheckKind::kRemoval);
       r.set_limit = true;
-      r.limit = v1;
+      r.limit = kV1;
       auto& rr = push(TimingCheckKind::kRecrem);
       rr.set_limit2 = true;
-      rr.limit2 = v1;
+      rr.limit2 = kV1;
       break;
     }
     case SdfCheckType::kRecrem: {
       auto& r = push(TimingCheckKind::kRecovery);
       r.set_limit = true;
-      r.limit = v1;
+      r.limit = kV1;
       auto& rm = push(TimingCheckKind::kRemoval);
       rm.set_limit = true;
-      rm.limit = v2;
+      rm.limit = kV2;
       auto& rr = push(TimingCheckKind::kRecrem);
       rr.set_limit = true;
-      rr.limit = v1;
+      rr.limit = kV1;
       rr.set_limit2 = true;
-      rr.limit2 = v2;
+      rr.limit2 = kV2;
       break;
     }
     case SdfCheckType::kSkew: {
       auto& s = push(TimingCheckKind::kSkew);
       s.set_limit = true;
-      s.limit = v1;
+      s.limit = kV1;
       auto& ts = push(TimingCheckKind::kTimeskew);
       ts.set_limit = true;
-      ts.limit = v1;
+      ts.limit = kV1;
       break;
     }
     case SdfCheckType::kBidirectskew: {
       auto& fs = push(TimingCheckKind::kFullskew);
       fs.set_limit = true;
-      fs.limit = v1;
+      fs.limit = kV1;
       fs.set_limit2 = true;
-      fs.limit2 = v2;
+      fs.limit2 = kV2;
       break;
     }
     case SdfCheckType::kWidth: {
       auto& w = push(TimingCheckKind::kWidth);
       w.set_limit = true;
-      w.limit = v1;
+      w.limit = kV1;
       break;
     }
     case SdfCheckType::kPeriod: {
       auto& p = push(TimingCheckKind::kPeriod);
       p.set_limit = true;
-      p.limit = v1;
+      p.limit = kV1;
       break;
     }
     case SdfCheckType::kNochange: {
       auto& nc = push(TimingCheckKind::kNochange);
       nc.set_start_edge_offset = true;
-      nc.start_edge_offset = static_cast<int64_t>(v1);
+      nc.start_edge_offset = static_cast<int64_t>(kV1);
       nc.set_end_edge_offset = true;
-      nc.end_edge_offset = static_cast<int64_t>(v2);
+      nc.end_edge_offset = static_cast<int64_t>(kV2);
       break;
     }
   }
@@ -241,8 +241,8 @@ static bool CellInScope(std::string_view instance, std::string_view scope) {
   if (instance.size() < scope.size()) return false;
   if (instance.compare(0, scope.size(), scope) != 0) return false;
   if (instance.size() == scope.size()) return true;
-  const char sep = instance[scope.size()];
-  return sep == '/' || sep == '.';
+  const char kSep = instance[scope.size()];
+  return kSep == '/' || kSep == '.';
 }
 
 SdfAnnotationResult AnnotateSdfToManager(const SdfFile& file,
@@ -287,10 +287,10 @@ SdfAnnotationResult AnnotateSdfToManager(const SdfFile& file,
           pd.is_ifnone = io.is_ifnone;
 
           {
-            const auto expanded =
+            const auto kExpanded =
                 ExpandSdfDelays({io.rise, io.fall, io.turnoff}, mtm);
             pd.delay_count = 12;
-            for (int i = 0; i < 12; ++i) pd.delays[i] = expanded[i];
+            for (int i = 0; i < 12; ++i) pd.delays[i] = kExpanded[i];
           }
           if (!io.extended_form) {
             if (io.is_increment) {
@@ -304,10 +304,10 @@ SdfAnnotationResult AnnotateSdfToManager(const SdfFile& file,
             break;
           }
 
-          const bool any_pulse_supplied =
+          const bool kAnyPulseSupplied =
               io.rise_reject_present || io.rise_error_present ||
               io.fall_reject_present || io.fall_error_present;
-          if (!any_pulse_supplied) {
+          if (!kAnyPulseSupplied) {
             mgr.AddPathDelay(pd, true);
             break;
           }
@@ -317,14 +317,14 @@ SdfAnnotationResult AnnotateSdfToManager(const SdfFile& file,
           if (io.rise_reject_present || io.fall_reject_present) {
             const SdfDelayValue& src_dv =
                 io.rise_reject_present ? io.rise_reject : io.fall_reject;
-            const uint64_t reject = SelectMtm(src_dv, mtm);
-            for (int i = 0; i < 12; ++i) pd.reject_limit[i] = reject;
+            const uint64_t kReject = SelectMtm(src_dv, mtm);
+            for (int i = 0; i < 12; ++i) pd.reject_limit[i] = kReject;
           }
           if (io.rise_error_present || io.fall_error_present) {
             const SdfDelayValue& src_dv =
                 io.rise_error_present ? io.rise_error : io.fall_error;
-            const uint64_t err = SelectMtm(src_dv, mtm);
-            for (int i = 0; i < 12; ++i) pd.error_limit[i] = err;
+            const uint64_t kErr = SelectMtm(src_dv, mtm);
+            for (int i = 0; i < 12; ++i) pd.error_limit[i] = kErr;
           }
           mgr.AddPathDelay(pd);
           break;
@@ -345,18 +345,18 @@ SdfAnnotationResult AnnotateSdfToManager(const SdfFile& file,
           delay.rise = SelectMtm(ic.rise, mtm);
           delay.fall = SelectMtm(ic.fall, mtm);
 
-          const bool fall_supplied = ic.fall.min_val != 0 ||
+          const bool kFallSupplied = ic.fall.min_val != 0 ||
                                      ic.fall.typ_val != 0 ||
                                      ic.fall.max_val != 0;
           std::vector<SdfDelayValue> ic_vals;
           ic_vals.push_back(ic.rise);
-          if (fall_supplied) ic_vals.push_back(ic.fall);
-          const auto expanded = ExpandSdfDelays(ic_vals, mtm);
+          if (kFallSupplied) ic_vals.push_back(ic.fall);
+          const auto kExpanded = ExpandSdfDelays(ic_vals, mtm);
           for (int i = 0; i < 12; ++i) {
-            delay.delays[i] = expanded[i];
+            delay.delays[i] = kExpanded[i];
 
-            delay.reject_limit[i] = expanded[i];
-            delay.error_limit[i] = expanded[i];
+            delay.reject_limit[i] = kExpanded[i];
+            delay.error_limit[i] = kExpanded[i];
           }
 
           if (ic.is_increment) {
@@ -568,26 +568,26 @@ bool WriteSdfAnnotationLog(const SdfFile& file, std::string_view log_path) {
   if (!out.is_open()) return false;
 
   for (const auto& cell : file.cells) {
-    const std::string prefix = cell.cell_type + "/" + cell.instance + ": ";
+    const std::string kPrefix = cell.cell_type + "/" + cell.instance + ": ";
     for (const auto& io : cell.iopaths) {
-      out << prefix << "IOPATH " << io.src_port << " -> " << io.dst_port
+      out << kPrefix << "IOPATH " << io.src_port << " -> " << io.dst_port
           << " rise=" << io.rise.typ_val << " fall=" << io.fall.typ_val << '\n';
     }
     for (const auto& ic : cell.interconnects) {
-      out << prefix << "INTERCONNECT " << ic.src_port << " -> " << ic.dst_port
+      out << kPrefix << "INTERCONNECT " << ic.src_port << " -> " << ic.dst_port
           << " rise=" << ic.rise.typ_val << " fall=" << ic.fall.typ_val << '\n';
     }
     for (const auto& pl : cell.pulse_limits) {
-      out << prefix << "PATHPULSE " << pl.src_port << " -> " << pl.dst_port
+      out << kPrefix << "PATHPULSE " << pl.src_port << " -> " << pl.dst_port
           << " reject=" << pl.reject.typ_val << " error=" << pl.error.typ_val
           << '\n';
     }
     for (const auto& tc : cell.timing_checks) {
-      out << prefix << "TIMINGCHECK " << tc.data_port << " ref=" << tc.ref_port
+      out << kPrefix << "TIMINGCHECK " << tc.data_port << " ref=" << tc.ref_port
           << " limit=" << tc.limit.typ_val << '\n';
     }
     for (const auto& sp : cell.specparams) {
-      out << prefix << "SPECPARAM " << sp.name << " value=" << sp.value.typ_val
+      out << kPrefix << "SPECPARAM " << sp.name << " value=" << sp.value.typ_val
           << '\n';
     }
   }

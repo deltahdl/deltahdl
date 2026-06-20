@@ -95,17 +95,18 @@ bool NonVacuous(const Word& word, const LvProperty& property,
       if (!property.lhs || !property.rhs) {
         return false;
       }
-      const std::shared_ptr<const LvProperty> guard =
+      const std::shared_ptr<const LvProperty> kGuard =
           LvAnd(property.lhs, LvNot(property.rhs));
       for (std::size_t i = 0; i < word.size(); ++i) {
-        const Word suffix_i = Suffix(word, i);
-        if (!NonVacuous(suffix_i, *property.lhs, context) &&
-            !NonVacuous(suffix_i, *property.rhs, context)) {
+        const Word kSuffixI = Suffix(word, i);
+        if (!NonVacuous(kSuffixI, *property.lhs, context) &&
+            !NonVacuous(kSuffixI, *property.rhs, context)) {
           continue;
         }
         bool prefix_holds = true;
         for (std::size_t j = 0; j < i; ++j) {
-          if (!NeutrallySatisfiesWithLocals(Suffix(word, j), *guard, context)) {
+          if (!NeutrallySatisfiesWithLocals(Suffix(word, j), *kGuard,
+                                            context)) {
             prefix_holds = false;
             break;
           }

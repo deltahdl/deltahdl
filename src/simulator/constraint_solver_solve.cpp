@@ -112,8 +112,8 @@ bool ConstraintSolver::SolveWith(
   // it searches, so capture them here and restore them should the solve fail,
   // so a failed randomize() leaves the variables exactly as the caller last saw
   // them.
-  const std::unordered_map<std::string, int64_t> prev_values = values_;
-  const std::unordered_map<std::string, double> prev_real_values = real_values_;
+  const std::unordered_map<std::string, int64_t> kPrevValues = values_;
+  const std::unordered_map<std::string, double> kPrevRealValues = real_values_;
 
   // 18.5.13.2: resolve the 'disable soft' directives before solving. Each
   // discards the lower-priority soft constraints that directly reference its
@@ -151,8 +151,8 @@ bool ConstraintSolver::SolveWith(
   } else {
     // 18.6.3: the solve failed, so restore the values the variables held before
     // this call rather than leaving the solver's partial search state behind.
-    values_ = prev_values;
-    real_values_ = prev_real_values;
+    values_ = kPrevValues;
+    real_values_ = kPrevRealValues;
   }
 
   // 18.6.3: post_randomize() is not called when randomize() fails.

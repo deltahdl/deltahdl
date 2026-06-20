@@ -13,12 +13,12 @@ std::vector<ClockScope> ResolveOperandClocks(
   ClockScope flowing = incoming;
   for (const ClockFlowOperand& operand : operands) {
     // A clocking event written at the operand replaces the flowing scope.
-    const ClockScope governing =
+    const ClockScope kGoverning =
         operand.explicit_clock.empty() ? flowing : operand.explicit_clock;
-    resolved.push_back(governing);
+    resolved.push_back(kGoverning);
     if (kind == ClockFlowOperator::kLinear) {
       // The replacement persists to the operands that follow.
-      flowing = governing;
+      flowing = kGoverning;
     }
   }
   return resolved;

@@ -45,11 +45,11 @@ bool AtomSetSatisfies(const std::set<std::string>& atoms,
 // representation lets the recursive cases split a word without copying.
 bool TightSlice(const Word& word, std::size_t lo, std::size_t hi,
                 const SequenceExpr& seq) {
-  const std::size_t length = hi - lo;
+  const std::size_t kLength = hi - lo;
   switch (seq.kind) {
     case SequenceExpr::Kind::kBoolean:
       // §F.5.2: w |== b iff |w| = 1 and w^0 |= b.
-      return length == 1 && LetterSatisfiesBoolean(word[lo], *seq.boolean);
+      return kLength == 1 && LetterSatisfiesBoolean(word[lo], *seq.boolean);
     case SequenceExpr::Kind::kParen:
       // §F.5.2: w |== (R) iff w |== R.
       return TightSlice(word, lo, hi, *seq.lhs);
@@ -95,7 +95,7 @@ bool TightSlice(const Word& word, std::size_t lo, std::size_t hi,
     }
     case SequenceExpr::Kind::kNullRepeat:
       // §F.5.2: w |== R[*0] iff |w| = 0.
-      return length == 0;
+      return kLength == 0;
     case SequenceExpr::Kind::kUnboundedRepeat: {
       // §F.5.2: w |== R[*1:$] iff w = w1 w2 ... wj (j >= 1) with each wi |== R.
       if (TightSlice(word, lo, hi, *seq.lhs)) {
@@ -112,7 +112,7 @@ bool TightSlice(const Word& word, std::size_t lo, std::size_t hi,
     case SequenceExpr::Kind::kZeroOrMoreRepeat: {
       // [*0:$], produced by the §F.5.1.1 rewrite: zero pieces match the empty
       // word, otherwise it behaves like [*1:$].
-      if (length == 0) {
+      if (kLength == 0) {
         return true;
       }
       if (TightSlice(word, lo, hi, *seq.lhs)) {

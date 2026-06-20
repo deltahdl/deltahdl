@@ -48,13 +48,13 @@ Word Suffix(const Word& word, std::size_t i) {
 }
 
 Word PrefixInclusive(const Word& word, std::size_t k) {
-  const std::size_t count = std::min(k + 1, word.size());
-  return Word(word.begin(), word.begin() + static_cast<std::ptrdiff_t>(count));
+  const std::size_t kCount = std::min(k + 1, word.size());
+  return Word(word.begin(), word.begin() + static_cast<std::ptrdiff_t>(kCount));
 }
 
 Word FirstLetters(const Word& word, std::size_t i) {
-  const std::size_t count = std::min(i, word.size());
-  return Word(word.begin(), word.begin() + static_cast<std::ptrdiff_t>(count));
+  const std::size_t kCount = std::min(i, word.size());
+  return Word(word.begin(), word.begin() + static_cast<std::ptrdiff_t>(kCount));
 }
 
 std::size_t FirstSatisfyingIndex(const Word& word, const BooleanExpr& b) {
@@ -94,8 +94,8 @@ std::size_t SequenceReach(const SequenceExpr& seq) {
 
 Word PrefixWithTail(const Word& prefix, const Letter& tail, std::size_t reach) {
   Word out = prefix;
-  const std::size_t pad = reach + 2;
-  for (std::size_t i = 0; i < pad; ++i) {
+  const std::size_t kPad = reach + 2;
+  for (std::size_t i = 0; i < kPad; ++i) {
     out.push_back(tail);
   }
   return out;
@@ -144,8 +144,8 @@ std::vector<Letter> CandidateAlphabet(const std::set<std::string>& atoms) {
   if (names.size() > 6) {
     return letters;
   }
-  const std::size_t subset_count = std::size_t{1} << names.size();
-  for (std::size_t mask = 0; mask < subset_count; ++mask) {
+  const std::size_t kSubsetCount = std::size_t{1} << names.size();
+  for (std::size_t mask = 0; mask < kSubsetCount; ++mask) {
     std::set<std::string> subset;
     for (std::size_t i = 0; i < names.size(); ++i) {
       if ((mask & (std::size_t{1} << i)) != 0) {
@@ -222,17 +222,17 @@ bool NonVacuous(const Word& word, const PropertyExpr& property) {
       if (!property.lhs || !property.rhs) {
         return false;
       }
-      const std::shared_ptr<const PropertyExpr> guard =
+      const std::shared_ptr<const PropertyExpr> kGuard =
           PropAnd(property.lhs, PropNot(property.rhs));
       for (std::size_t i = 0; i < word.size(); ++i) {
-        const Word suffix_i = Suffix(word, i);
-        if (!NonVacuous(suffix_i, *property.lhs) &&
-            !NonVacuous(suffix_i, *property.rhs)) {
+        const Word kSuffixI = Suffix(word, i);
+        if (!NonVacuous(kSuffixI, *property.lhs) &&
+            !NonVacuous(kSuffixI, *property.rhs)) {
           continue;
         }
         bool prefix_holds = true;
         for (std::size_t j = 0; j < i; ++j) {
-          if (!NeutrallySatisfies(Suffix(word, j), *guard)) {
+          if (!NeutrallySatisfies(Suffix(word, j), *kGuard)) {
             prefix_holds = false;
             break;
           }

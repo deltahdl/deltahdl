@@ -196,11 +196,11 @@ bool Satisfies(const Word& word, const PropertyExpr& property);
 // §F.5.3.1: w |= weak(R) iff for every 0 <= j < |w|, w^{0,j} T^omega |=
 // strong(R).
 bool WeakHolds(const Word& word, const SequenceExpr& seq) {
-  const std::size_t reach = SequenceReach(seq);
+  const std::size_t kReach = SequenceReach(seq);
   for (std::size_t j = 0; j < word.size(); ++j) {
-    const Word completed =
-        PrefixWithTail(PrefixInclusive(word, j), LetterTop(), reach);
-    if (!StrongHolds(completed, seq)) {
+    const Word kCompleted =
+        PrefixWithTail(PrefixInclusive(word, j), LetterTop(), kReach);
+    if (!StrongHolds(kCompleted, seq)) {
       return false;
     }
   }
@@ -228,9 +228,9 @@ bool Satisfies(const Word& word, const PropertyExpr& property) {
       if (!property.sequence || !property.lhs) {
         return false;
       }
-      const Word complement = ComplementWord(word);
+      const Word kComplement = ComplementWord(word);
       for (std::size_t j = 0; j < word.size(); ++j) {
-        if (TightlySatisfies(PrefixInclusive(complement, j),
+        if (TightlySatisfies(PrefixInclusive(kComplement, j),
                              *property.sequence) &&
             !Satisfies(Suffix(word, j), *property.lhs)) {
           return false;
@@ -286,12 +286,12 @@ bool Satisfies(const Word& word, const PropertyExpr& property) {
       if (Satisfies(word, *property.lhs)) {
         return true;
       }
-      const std::size_t reach = PropertyReach(*property.lhs);
+      const std::size_t kReach = PropertyReach(*property.lhs);
       for (std::size_t i = 0; i < word.size(); ++i) {
         if (LetterSatisfiesBoolean(word[i], *property.boolean)) {
-          const Word completed =
-              PrefixWithTail(FirstLetters(word, i), LetterTop(), reach);
-          if (Satisfies(completed, *property.lhs)) {
+          const Word kCompleted =
+              PrefixWithTail(FirstLetters(word, i), LetterTop(), kReach);
+          if (Satisfies(kCompleted, *property.lhs)) {
             return true;
           }
         }
@@ -453,14 +453,14 @@ bool NeutrallySatisfiesTopLevel(const Word& word, const TopLevelProperty& top) {
       if (!top.disable_condition || !top.property) {
         return false;
       }
-      const std::size_t i = FirstSatisfyingIndex(word, *top.disable_condition);
-      if (i == word.size()) {
+      const std::size_t kI = FirstSatisfyingIndex(word, *top.disable_condition);
+      if (kI == word.size()) {
         return Satisfies(word, *top.property);
       }
-      const std::size_t reach = PropertyReach(*top.property);
-      const Word completed =
-          PrefixWithTail(FirstLetters(word, i), LetterBottom(), reach);
-      return Satisfies(completed, *top.property);
+      const std::size_t kReach = PropertyReach(*top.property);
+      const Word kCompleted =
+          PrefixWithTail(FirstLetters(word, kI), LetterBottom(), kReach);
+      return Satisfies(kCompleted, *top.property);
     }
     case TopLevelProperty::Kind::kParen:
       // §F.5.3.1: w |= ( T ) iff w |= T.
@@ -545,26 +545,27 @@ bool FailsTopLevelClocked(const Word& word,
 
 bool NeutrallySatisfiesAssertion(const Word& word, const BooleanExpr& enabling,
                                  const AssertionStatement& assertion) {
-  const std::shared_ptr<const TopLevelProperty> body = AssertionBody(assertion);
-  const Word complement = ComplementWord(word);
-  const bool cover = assertion.role == AssertionStatement::Role::kCover;
+  const std::shared_ptr<const TopLevelProperty> kBody =
+      AssertionBody(assertion);
+  const Word kComplement = ComplementWord(word);
+  const bool kCover = assertion.role == AssertionStatement::Role::kCover;
 
   // §F.5.3.1: every rule guards an activation point i by the enabling condition
   // (w-bar^i |= b) and, depending on activation and form, by the clock. The
   // always forms scan every index; the initial forms fire only at the first
   // clock tick (clocked) or at index 0 (the U column).
   auto activated = [&](std::size_t i) -> bool {
-    if (!LetterSatisfiesBoolean(complement[i], enabling)) {
+    if (!LetterSatisfiesBoolean(kComplement[i], enabling)) {
       return false;
     }
     if (assertion.activation == AssertionStatement::Activation::kAlways) {
       if (assertion.form == AssertionStatement::Form::kExplicitClock) {
-        return LetterSatisfiesBoolean(complement[i], *assertion.clock);
+        return LetterSatisfiesBoolean(kComplement[i], *assertion.clock);
       }
       return true;
     }
     if (assertion.form == AssertionStatement::Form::kExplicitClock) {
-      return TightlySatisfies(PrefixInclusive(complement, i),
+      return TightlySatisfies(PrefixInclusive(kComplement, i),
                               *FirstClockTickSequence(assertion.clock));
     }
     return i == 0;
@@ -574,14 +575,14 @@ bool NeutrallySatisfiesAssertion(const Word& word, const BooleanExpr& enabling,
     if (!activated(i)) {
       continue;
     }
-    const Word suffix = Suffix(word, i);
-    if (cover) {
+    const Word kSuffix = Suffix(word, i);
+    if (kCover) {
       // §F.5.3.1: a cover statement holds when the body passes at some enabled
       // activation point.
-      if (NeutrallySatisfiesTopLevel(suffix, *body)) {
+      if (NeutrallySatisfiesTopLevel(kSuffix, *kBody)) {
         return true;
       }
-    } else if (FailsTopLevel(suffix, *body)) {
+    } else if (FailsTopLevel(kSuffix, *kBody)) {
       // §F.5.3.1: an assert or assume statement requires that the body pass or
       // be disabled (i.e. not fail) at every enabled activation point. assume
       // statements share the assert definition.
@@ -590,7 +591,7 @@ bool NeutrallySatisfiesAssertion(const Word& word, const BooleanExpr& enabling,
   }
   // No enabled activation falsified an assert/assume statement, so it holds; a
   // cover statement with no satisfying activation does not.
-  return !cover;
+  return !kCover;
 }
 
 bool WordIsFeasible(const Word& word,

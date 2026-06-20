@@ -124,7 +124,7 @@ void Elaborator::ElaborateParamDecl(ModuleItem* item, RtlirModule* mod) {
     }
     if (resolved->kind != DataTypeKind::kNamed &&
         resolved->kind != item->forward_type_kind) {
-      static const auto basic_name = [](DataTypeKind k) -> std::string_view {
+      static const auto kBasicName = [](DataTypeKind k) -> std::string_view {
         switch (k) {
           case DataTypeKind::kEnum:
             return "enum";
@@ -140,7 +140,7 @@ void Elaborator::ElaborateParamDecl(ModuleItem* item, RtlirModule* mod) {
           item->loc,
           std::format("type parameter '{}' is assigned a type that does "
                       "not conform to the required {} kind",
-                      item->name, basic_name(item->forward_type_kind)));
+                      item->name, kBasicName(item->forward_type_kind)));
     }
   }
 
@@ -548,11 +548,11 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
                   "virtual interface cannot be declared inside an interface");
     }
   }
-  const bool parent_is_program = decl->decl_kind == ModuleDeclKind::kProgram;
-  const bool parent_is_checker = decl->decl_kind == ModuleDeclKind::kChecker;
-  const std::string_view parent_kind_word = parent_is_program
-                                                ? std::string_view{"program"}
-                                                : std::string_view{"checker"};
+  const bool kParentIsProgram = decl->decl_kind == ModuleDeclKind::kProgram;
+  const bool kParentIsChecker = decl->decl_kind == ModuleDeclKind::kChecker;
+  const std::string_view kParentKindWord = kParentIsProgram
+                                               ? std::string_view{"program"}
+                                               : std::string_view{"checker"};
 
   for (const auto* item : decl->items) {
     if (item->kind == ModuleItemKind::kModuleInst) {
@@ -596,26 +596,26 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
                                 "interface '{}'",
                                 item->inst_module, decl->name));
       }
-      if ((parent_is_program || parent_is_checker) && child &&
+      if ((kParentIsProgram || kParentIsChecker) && child &&
           child->decl_kind != ModuleDeclKind::kChecker) {
         diag_.Error(item->loc,
                     std::format("only checkers can be instantiated inside "
                                 "{} '{}'",
-                                parent_kind_word, decl->name));
+                                kParentKindWord, decl->name));
       }
     }
-    if ((parent_is_program || parent_is_checker) &&
+    if ((kParentIsProgram || kParentIsChecker) &&
         item->kind == ModuleItemKind::kUdpInst) {
       diag_.Error(item->loc,
                   std::format("primitive cannot be instantiated inside "
                               "{} '{}'",
-                              parent_kind_word, decl->name));
+                              kParentKindWord, decl->name));
     }
 
     // §17.7: a checker body may define variables (the checker variables of
     // §17.2's checker_or_generate_item_declaration), but defining nets in the
     // checker body is illegal.
-    if (parent_is_checker && item->kind == ModuleItemKind::kNetDecl) {
+    if (kParentIsChecker && item->kind == ModuleItemKind::kNetDecl) {
       diag_.Error(item->loc,
                   std::format("a net cannot be declared inside checker '{}'; "
                               "only variables may be defined in a checker body",
@@ -627,7 +627,7 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
     // always_comb, always_latch, and always_ff procedures have been added for
     // checkers and cover every case a general always could express, so a plain
     // always inside a checker body is rejected.
-    if (parent_is_checker && item->kind == ModuleItemKind::kAlwaysBlock) {
+    if (kParentIsChecker && item->kind == ModuleItemKind::kAlwaysBlock) {
       diag_.Error(item->loc,
                   std::format("a general 'always' procedure cannot be used "
                               "inside checker '{}'; use always_comb, "
@@ -637,7 +637,7 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
 
     // §17.2: modules, interfaces, and programs shall not be declared inside a
     // checker. Only further checker declarations are permitted here.
-    if (parent_is_checker && item->kind == ModuleItemKind::kNestedModuleDecl &&
+    if (kParentIsChecker && item->kind == ModuleItemKind::kNestedModuleDecl &&
         item->nested_module_decl &&
         item->nested_module_decl->decl_kind != ModuleDeclKind::kChecker) {
       diag_.Error(item->loc,

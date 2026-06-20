@@ -257,11 +257,11 @@ static bool TryCollectAssocLocatorResult(const Expr* expr,
   std::string_view method = parts.method_name;
   if (method == "map") return false;  // not a 7.12.1 locator method
 
-  const bool needs_with = method == "find" || method == "find_index" ||
+  const bool kNeedsWith = method == "find" || method == "find_index" ||
                           method == "find_first" ||
                           method == "find_first_index" ||
                           method == "find_last" || method == "find_last_index";
-  if (!expr->with_expr && needs_with) {
+  if (!expr->with_expr && kNeedsWith) {
     ctx.GetDiag().Error({}, "array locator method '" + std::string(method) +
                                 "' requires a 'with' clause");
     return false;
@@ -276,9 +276,9 @@ static bool TryCollectAssocLocatorResult(const Expr* expr,
   }
 
   LocatorCtx lc = MakeLocatorCtx(vals, /*is_str=*/false, expr, ctx, arena);
-  const uint32_t iw = aa.index_width;
+  const uint32_t kIw = aa.index_width;
   auto key_vec = [&](size_t i) {
-    return MakeLogic4VecVal(arena, iw, static_cast<uint64_t>(keys[i]));
+    return MakeLogic4VecVal(arena, kIw, static_cast<uint64_t>(keys[i]));
   };
   // Evaluates the with expression for entry i, binding the element iterator to
   // the value and the index iterator to the key.
@@ -286,7 +286,7 @@ static bool TryCollectAssocLocatorResult(const Expr* expr,
     ctx.PushScope();
     auto* item_var = ctx.CreateLocalVariable(lc.iter_name, vals[i].width);
     item_var->value = vals[i];
-    auto* idx_var = ctx.CreateLocalVariable(lc.idx_var_name, iw);
+    auto* idx_var = ctx.CreateLocalVariable(lc.idx_var_name, kIw);
     idx_var->value = key_vec(i);
     Logic4Vec r = EvalExpr(lc.with_expr, ctx, arena);
     ctx.PopScope();
@@ -481,14 +481,14 @@ bool TryCollectAssocMapResult(const Expr* expr, SimContext& ctx, Arena& arena,
     vals.push_back(v);
   }
   LocatorCtx lc = MakeLocatorCtx(vals, /*is_str=*/false, expr, ctx, arena);
-  const uint32_t iw = aa->index_width;
+  const uint32_t kIw = aa->index_width;
   for (size_t i = 0; i < vals.size(); ++i) {
     ctx.PushScope();
     auto* item_var = ctx.CreateLocalVariable(lc.iter_name, vals[i].width);
     item_var->value = vals[i];
-    auto* idx_var = ctx.CreateLocalVariable(lc.idx_var_name, iw);
+    auto* idx_var = ctx.CreateLocalVariable(lc.idx_var_name, kIw);
     idx_var->value =
-        MakeLogic4VecVal(arena, iw, static_cast<uint64_t>(keys[i]));
+        MakeLogic4VecVal(arena, kIw, static_cast<uint64_t>(keys[i]));
     Logic4Vec mapped = EvalExpr(lc.with_expr, ctx, arena);
     ctx.PopScope();
     out.int_data[keys[i]] = mapped;

@@ -177,7 +177,7 @@ static Logic4Vec EvalAtanh(const Expr* expr, SimContext& ctx, Arena& arena) {
 // (this relies on the IEEE 754 binary32 layout, as the reference notes), and
 // rescales it onto [start, end).
 static double RefUniform(int32_t* seed, int32_t start, int32_t end) {
-  const double d = 0.00000011920928955078125;  // 2^-23
+  const double kD = 0.00000011920928955078125;  // 2^-23
   double a = 0.0, b = 0.0;
   if (*seed == 0) *seed = 259341593;
   if (start >= end) {
@@ -194,7 +194,7 @@ static double RefUniform(int32_t* seed, int32_t start, int32_t end) {
   float fs = 0.0F;
   std::memcpy(&fs, &bits, sizeof(fs));
   auto c = static_cast<double>(fs);
-  c = c + (c * d);
+  c = c + (c * kD);
   c = ((b - a) * (c - 1.0)) + a;
   return c;
 }

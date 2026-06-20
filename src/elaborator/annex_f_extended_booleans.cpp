@@ -53,23 +53,23 @@ std::vector<LocalContext> TriggeredOutputs(const Word& word, std::size_t j,
   if (j >= word.size()) {
     return result;  // §F.6.1 requires 0 <= j < |w|.
   }
-  const std::set<std::string> in_domain = ContextDomain(input);
+  const std::set<std::string> kInDomain = ContextDomain(input);
   // §F.6.1: try every start point 0 <= i <= j; the subword w^{i,j} must tightly
   // satisfy T from the empty context.
   for (std::size_t i = 0; i <= j; ++i) {
-    const Word slice = Subword(word, i, j + 1);
+    const Word kSlice = Subword(word, i, j + 1);
     for (const LocalContext& inner :
-         TightSatisfactionOutputs(slice, sequence, LocalContext{})) {
+         TightSatisfactionOutputs(kSlice, sequence, LocalContext{})) {
       // D = dom(L_0) - (dom(L) & V): the incoming names the call leaves intact.
-      const std::set<std::string> inner_domain = ContextDomain(inner);
+      const std::set<std::string> kInnerDomain = ContextDomain(inner);
       std::set<std::string> overwritten;  // dom(L) & V
-      for (const std::string& name : inner_domain) {
+      for (const std::string& name : kInnerDomain) {
         if (actuals.count(name) != 0) {
           overwritten.insert(name);
         }
       }
       std::set<std::string> d;
-      for (const std::string& name : in_domain) {
+      for (const std::string& name : kInDomain) {
         if (overwritten.count(name) == 0) {
           d.insert(name);
         }
@@ -108,13 +108,13 @@ std::vector<LocalContext> MatchedOutputs(
   if (j >= word.size()) {
     return result;  // §F.6.1 requires 0 <= j < |w|.
   }
-  const std::shared_ptr<const SequenceExpr> goto_once = GotoOnce(clock);
+  const std::shared_ptr<const SequenceExpr> kGotoOnce = GotoOnce(clock);
   // §F.6.1: try every earlier trigger point 0 <= i < j. The clock c must tick
   // exactly once over the gap w^{i+1,j}; that gap is independent of the output
   // context, so it is checked once per i.
   for (std::size_t i = 0; i < j; ++i) {
-    const Word gap = Subword(word, i + 1, j + 1);
-    if (!TightlySatisfiesWithLocals(gap, *goto_once, LocalContext{},
+    const Word kGap = Subword(word, i + 1, j + 1);
+    if (!TightlySatisfiesWithLocals(kGap, *kGotoOnce, LocalContext{},
                                     LocalContext{})) {
       continue;
     }

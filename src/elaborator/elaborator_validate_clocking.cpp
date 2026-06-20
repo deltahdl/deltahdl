@@ -110,13 +110,13 @@ void Elaborator::ValidateNoFormalShadowedByBodyLocal(ModuleItem* item) {
 void Elaborator::ValidateRecursiveProperty(const ModuleItem* item) {
   if (item == nullptr || item->kind != ModuleItemKind::kPropertyDecl) return;
 
-  const bool recursive = property_registry_.IsRecursiveProperty(item);
+  const bool kRecursive = property_registry_.IsRecursiveProperty(item);
 
   // §16.12.17 Restriction 2 / §F.7 RESTRICTION 2: disable iff cannot be used in
   // the declaration of a recursive property. (This mirrors the rule that
   // disable iff cannot be nested.) The accept_on/reject_on family is *not*
   // affected: those operators may appear inside a recursive property.
-  if (recursive && item->prop_disable_iff_count > 0) {
+  if (kRecursive && item->prop_disable_iff_count > 0) {
     diag_.Error(item->loc,
                 "recursive property \"" + std::string(item->name) +
                     "\" may not use disable iff (§16.12.17 Restriction 2)");
@@ -171,10 +171,10 @@ void Elaborator::ValidateRecursivePropertyArguments(const ModuleItem* item) {
       const auto& idents = inst.arg_idents[i];
 
       // (a) the actual argument expression e is itself a formal of p.
-      const bool is_single_formal =
+      const bool kIsSingleFormal =
           i < inst.arg_is_single_ident.size() && inst.arg_is_single_ident[i] &&
           idents.size() == 1 && p_formals.count(idents[0]) != 0;
-      if (is_single_formal) continue;
+      if (kIsSingleFormal) continue;
 
       // (b) no formal argument of p appears in e.
       bool any_p_formal = false;
@@ -187,9 +187,9 @@ void Elaborator::ValidateRecursivePropertyArguments(const ModuleItem* item) {
       if (!any_p_formal) continue;
 
       // (c) e is bound to a local variable formal argument of q (positional).
-      const bool bound_to_local_formal =
+      const bool kBoundToLocalFormal =
           i < q->prop_formal_is_local.size() && q->prop_formal_is_local[i];
-      if (bound_to_local_formal) continue;
+      if (kBoundToLocalFormal) continue;
 
       diag_.Error(item->loc,
                   "recursive instance of \"" + std::string(inst.callee) +

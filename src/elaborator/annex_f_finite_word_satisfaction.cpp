@@ -31,19 +31,19 @@ Word CompleteWord(const Word& word, const Letter& tail, std::size_t count) {
 bool NeutralOnCompletion(const Word& word, const Letter& tail,
                          const BooleanExpr& enabling,
                          const AssertionStatement& assertion) {
-  const std::size_t cap = word.size() * 4 + 64;
-  const std::size_t window = 3;
+  const std::size_t kCap = word.size() * 4 + 64;
+  const std::size_t kWindow = 3;
   bool steady_value = false;
   std::size_t steady_run = 0;
-  for (std::size_t count = 1; count <= cap; ++count) {
-    const bool value = NeutrallySatisfiesAssertion(
+  for (std::size_t count = 1; count <= kCap; ++count) {
+    const bool kValue = NeutrallySatisfiesAssertion(
         CompleteWord(word, tail, count), enabling, assertion);
-    if (count > 1 && value == steady_value) {
-      if (++steady_run >= window) {
+    if (count > 1 && kValue == steady_value) {
+      if (++steady_run >= kWindow) {
         return steady_value;
       }
     } else {
-      steady_value = value;
+      steady_value = kValue;
       steady_run = 1;
     }
   }

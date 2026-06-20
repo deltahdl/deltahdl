@@ -17,7 +17,7 @@
 namespace delta {
 
 void Elaborator::ElaborateTypedef(ModuleItem* item, RtlirModule* mod) {
-  static const auto kind_name = [](DataTypeKind k) -> std::string_view {
+  static const auto kIndName = [](DataTypeKind k) -> std::string_view {
     switch (k) {
       case DataTypeKind::kEnum:
         return "enum";
@@ -36,11 +36,10 @@ void Elaborator::ElaborateTypedef(ModuleItem* item, RtlirModule* mod) {
       if (td_it != typedefs_.end() &&
           td_it->second.kind != DataTypeKind::kImplicit &&
           td_it->second.kind != item->forward_type_kind) {
-        diag_.Error(
-            item->loc,
-            std::format("forward typedef '{}' as {} does not conform "
-                        "to its existing definition",
-                        item->name, kind_name(item->forward_type_kind)));
+        diag_.Error(item->loc,
+                    std::format("forward typedef '{}' as {} does not conform "
+                                "to its existing definition",
+                                item->name, kIndName(item->forward_type_kind)));
       }
       forward_typedef_kinds_[item->name] = item->forward_type_kind;
     }
@@ -54,7 +53,7 @@ void Elaborator::ElaborateTypedef(ModuleItem* item, RtlirModule* mod) {
     diag_.Error(item->loc,
                 std::format("typedef '{}' does not conform to its forward "
                             "declaration as {}",
-                            item->name, kind_name(it->second)));
+                            item->name, kIndName(it->second)));
   }
   typedefs_[item->name] = item->typedef_type;
   // §6.24.3: track typedefs whose first unpacked dimension is an associative
