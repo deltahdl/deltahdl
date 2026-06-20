@@ -171,6 +171,7 @@ add_library(deltahdl_lib STATIC
     elaborator/elaborator_module_inst.cpp
     elaborator/elaborator_module.cpp
     elaborator/elaborator_port_binding.cpp
+    elaborator/elaborator_port_binding_checks.cpp
     elaborator/elaborator_process.cpp
     elaborator/elaborator_resolve.cpp
     elaborator/elaborator_scope_rules.cpp

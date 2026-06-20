@@ -154,6 +154,55 @@ class Elaborator {
   void BindPorts(RtlirModuleInst& inst, const ModuleItem* item,
                  RtlirModule* parent_mod);
 
+  // §23.3.3 per-instance binding scope shared by the BindPorts helpers.
+  struct PortBindScope {
+    RtlirModuleInst& inst;
+    const ModuleItem* item;
+    RtlirModule* parent_mod;
+    bool has_pull;
+    bool is_ordered;
+  };
+  // Mutable per-connection state threaded through the BindExplicitPort helpers.
+  struct ExplicitPortBind {
+    RtlirPortBinding& binding;
+    const Expr* conn_expr;
+    std::string_view port_name;
+    const RtlirPort* child_port;  // nullptr when no port matches
+    bool is_implicit;
+  };
+  // Binds the explicit port connection at `index`; returns false to stop the
+  // loop (too many ordered connections for the instantiated module).
+  bool BindExplicitPort(const PortBindScope& scope, size_t index);
+  // Declares an implicit net (named form) or diagnoses an undeclared signal.
+  void PrepareExplicitConnNet(const PortBindScope& scope,
+                              const ExplicitPortBind& bind);
+  // Resolves the targeted child port, fills the binding direction/width, and
+  // runs named-connection net-type checks. Returns false to stop the loop.
+  bool ResolveExplicitTarget(const PortBindScope& scope, size_t index,
+                             ExplicitPortBind& bind);
+  // Connection-legality checks: assignment compatibility, replication,
+  // assignment-pattern, and multiple-driver rules.
+  void CheckExplicitConnLegality(const PortBindScope& scope,
+                                 const ExplicitPortBind& bind);
+  // Synthesizes a connection for an unconnected input port
+  // (default/pull/highZ).
+  void SynthesizeExplicitDefault(const PortBindScope& scope,
+                                 ExplicitPortBind& bind);
+  // §25.5 header-vs-connection modport consistency for an interface port.
+  void CheckPortModportConsistency(const PortBindScope& scope,
+                                   const RtlirPortBinding& binding,
+                                   const Expr* conn_expr,
+                                   const RtlirPort* child_port);
+  // §23.3.2.2 wildcard `.*` completion: binds each not-yet-connected port.
+  void BindWildcardPorts(const PortBindScope& scope);
+  void BindOneWildcardPort(const PortBindScope& scope, const RtlirPort& port);
+  // Wildcard completion when a same-named signal is declared in the scope.
+  void BindWildcardDeclaredPort(const PortBindScope& scope,
+                                const RtlirPort& port,
+                                RtlirPortBinding& binding);
+  // Trailing unconnected-input completion when no wildcard appears.
+  void BindTrailingInputPorts(const PortBindScope& scope);
+
   void CheckPortCoercion(const RtlirModuleInst& inst, SourceLoc loc);
 
   void CheckUwirePortMerge(const RtlirModuleInst& inst, const ModuleItem* item,
