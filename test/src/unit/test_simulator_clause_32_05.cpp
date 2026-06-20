@@ -23,27 +23,39 @@ SpecifyManager SeedManagerWithPathDelay(unsigned delay0) {
   return mgr;
 }
 
+// Wraps a DELAY body in a single-CELL DELAYFILE, parses it, applies the typical
+// SDF annotation onto |mgr|, asserts exactly one resulting PathDelay survives,
+// and returns it so the caller can make its distinct delay/pulse assertions.
+// Shared by the §32.5 PATHPULSE+IOPATH ordered-process tests whose
+// parse/annotate tail is otherwise identical.
+const PathDelay& AnnotateBufDelayBody(const std::string& delay_body,
+                                      SpecifyManager& mgr) {
+  SdfFile file;
+  std::string sdf =
+      R"(
+    (DELAYFILE
+      (CELL
+        (CELLTYPE "buf")
+        (INSTANCE u1)
+        )" +
+      delay_body + "))\n";
+  EXPECT_TRUE(ParseSdf(sdf, file));
+  AnnotateSdfToManager(file, mgr, SdfMtm::kTypical);
+  EXPECT_EQ(mgr.GetPathDelays().size(), 1u);
+  return mgr.GetPathDelays()[0];
+}
+
 // §32.5 C1 (ordered process): a later construct overwrites an earlier one even
 // when the two are different constructs. PATHPULSE seeds pulse limits, then a
 // plain IOPATH resets them to the delay-derived defaults.
 TEST(SdfMultipleAnnotations, IopathAfterPathpulseOverwritesPulseLimits) {
   SpecifyManager mgr = SeedManagerWithPathDelay(1);
 
-  SdfFile file;
-  std::string sdf = R"(
-    (DELAYFILE
-      (CELL
-        (CELLTYPE "buf")
-        (INSTANCE u1)
-        (DELAY (ABSOLUTE
+  const PathDelay& pd = AnnotateBufDelayBody(R"((DELAY (ABSOLUTE
           (PATHPULSE A Z (10) (20))
-          (IOPATH A Z (35) (61))))))
-  )";
-  ASSERT_TRUE(ParseSdf(sdf, file));
-  AnnotateSdfToManager(file, mgr, SdfMtm::kTypical);
+          (IOPATH A Z (35) (61)))))",
+                                             mgr);
 
-  ASSERT_EQ(mgr.GetPathDelays().size(), 1u);
-  const auto& pd = mgr.GetPathDelays()[0];
   EXPECT_EQ(pd.delays[0], 35u);
   EXPECT_EQ(pd.delays[1], 61u);
 
@@ -205,21 +217,11 @@ TEST(SdfMultipleAnnotations,
      ExtendedIopathWithEmptyPulseSlotsPreservesPriorPathpulse) {
   SpecifyManager mgr = SeedManagerWithPathDelay(20);
 
-  SdfFile file;
-  std::string sdf = R"(
-    (DELAYFILE
-      (CELL
-        (CELLTYPE "buf")
-        (INSTANCE u1)
-        (DELAY (ABSOLUTE
+  const PathDelay& pd = AnnotateBufDelayBody(R"((DELAY (ABSOLUTE
           (PATHPULSE A Z (10) (20))
-          (IOPATH A Z ((35) () ()) ((61) () ()))))))
-  )";
-  ASSERT_TRUE(ParseSdf(sdf, file));
-  AnnotateSdfToManager(file, mgr, SdfMtm::kTypical);
+          (IOPATH A Z ((35) () ()) ((61) () ())))))",
+                                             mgr);
 
-  ASSERT_EQ(mgr.GetPathDelays().size(), 1u);
-  const auto& pd = mgr.GetPathDelays()[0];
   EXPECT_EQ(pd.delays[0], 35u);
   EXPECT_EQ(pd.delays[1], 61u);
 

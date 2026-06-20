@@ -2,6 +2,7 @@
 #include <cstring>
 
 #include "fixture_vcd.h"
+#include "helpers_vcd_four_state_scalars.h"
 #include "helpers_vcd_logic4vec.h"
 #include "simulator/variable.h"
 #include "simulator/vcd_writer.h"
@@ -118,18 +119,7 @@ TEST_F(ExtendedVcdSyntaxSim, ExtendedScalarPortValuesUseBinaryCharacters) {
     VcdWriter vcd(tmp_path_);
     vcd.SetExtended();
     vcd.WriteHeader("1ns");
-    auto* zero = arena_.Create<Variable>();
-    zero->value = MakeScalar(arena_, 0, 0);
-    vcd.RegisterSignal("z0", 1, zero);  // ident '!'
-    auto* one = arena_.Create<Variable>();
-    one->value = MakeScalar(arena_, 1, 0);
-    vcd.RegisterSignal("o1", 1, one);  // ident '"'
-    auto* unknown = arena_.Create<Variable>();
-    unknown->value = MakeScalar(arena_, 0, 1);
-    vcd.RegisterSignal("ux", 1, unknown);  // ident '#'
-    auto* highz = arena_.Create<Variable>();
-    highz->value = MakeScalar(arena_, 1, 1);
-    vcd.RegisterSignal("hz", 1, highz);  // ident '$'
+    RegisterFourStateScalars(vcd, arena_);
     vcd.EndDefinitions();
     vcd.WriteTimestamp(0);
     vcd.DumpAllValues();

@@ -151,21 +151,7 @@ TEST(SdfAnnotation, IopathExpansionPopulatesAllTwelveTransitionSlots) {
 // (interconnect delays): a two-value INTERCONNECT is expanded to 12 slots.
 TEST(SdfAnnotation, InterconnectTwoValuesPopulateXStateSlotsThroughAnnotator) {
   SpecifyManager mgr;
-  AnnotateSingleInterconnect(mgr, "a", "b", 7, 11);
-  ASSERT_EQ(mgr.GetInterconnectDelays().size(), 1u);
-  const auto& got = mgr.GetInterconnectDelays()[0];
-  EXPECT_EQ(got.delays[0], 7u);
-  EXPECT_EQ(got.delays[1], 11u);
-  EXPECT_EQ(got.delays[2], 7u);
-  EXPECT_EQ(got.delays[3], 7u);
-  EXPECT_EQ(got.delays[4], 11u);
-  EXPECT_EQ(got.delays[5], 11u);
-  EXPECT_EQ(got.delays[6], 7u);
-  EXPECT_EQ(got.delays[7], 7u);
-  EXPECT_EQ(got.delays[8], 11u);
-  EXPECT_EQ(got.delays[9], 11u);
-  EXPECT_EQ(got.delays[10], 11u);
-  EXPECT_EQ(got.delays[11], 7u);
+  ExpectTwoValueInterconnectExpansion(mgr, "a", "b", 7, 11);
 }
 
 }  // namespace

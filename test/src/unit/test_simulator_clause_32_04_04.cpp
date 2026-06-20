@@ -149,16 +149,7 @@ TEST(SdfInterconnectAnnotation,
 
 TEST(SdfInterconnectAnnotation, InterconnectDelayHas12TransitionSlots) {
   SpecifyManager mgr;
-  AnnotateSingleInterconnect(mgr, "a", "b", 7, 11);
-  ASSERT_EQ(mgr.GetInterconnectDelays().size(), 1u);
-  const auto& got = mgr.GetInterconnectDelays()[0];
-
-  EXPECT_EQ(got.delays[0], 7u);
-  EXPECT_EQ(got.delays[1], 11u);
-  EXPECT_EQ(got.delays[2], 7u);
-  EXPECT_EQ(got.delays[3], 7u);
-  EXPECT_EQ(got.delays[4], 11u);
-  EXPECT_EQ(got.delays[5], 11u);
+  ExpectTwoValueInterconnectExpansion(mgr, "a", "b", 7, 11);
 }
 
 TEST(SdfInterconnectAnnotation, InterconnectPulseLimitsInitFromDelays) {

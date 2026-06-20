@@ -1,4 +1,5 @@
 #include "fixture_simulator.h"
+#include "helpers_fork_urandom_programs.h"
 #include "helpers_seeded_run.h"
 #include "simulator/process.h"
 
@@ -63,22 +64,7 @@ TEST(ThreadStability, ForkedSiblingsHaveDistinctStreams) {
 // fork that produces many children must give each of them its own stream so
 // that no two collide.
 TEST(ThreadStability, ManyForkedSiblingsHaveDistinctStreams) {
-  auto vals = RunSeededAndRead(
-      "module t;\n"
-      "  int unsigned a;\n"
-      "  int unsigned b;\n"
-      "  int unsigned c;\n"
-      "  int unsigned d;\n"
-      "  initial begin\n"
-      "    fork\n"
-      "      a = $urandom;\n"
-      "      b = $urandom;\n"
-      "      c = $urandom;\n"
-      "      d = $urandom;\n"
-      "    join\n"
-      "  end\n"
-      "endmodule\n",
-      {"a", "b", "c", "d"});
+  auto vals = RunFourForkedSiblingUrandom();
   auto a = vals[0];
   auto b = vals[1];
   auto c = vals[2];
@@ -96,31 +82,10 @@ TEST(ThreadStability, ManyForkedSiblingsHaveDistinctStreams) {
 // parent before the fork changes the seed material the children inherit, so
 // the children's draws shift accordingly.
 TEST(ThreadStability, HierarchicalSeedingFromParent) {
-  auto run = [](uint32_t parent_seed, uint64_t& a, uint64_t& b) {
-    std::string src =
-        "module t;\n"
-        "  int unsigned a;\n"
-        "  int unsigned b;\n"
-        "  initial begin\n"
-        "    process p = process::self();\n"
-        "    p.srandom(" +
-        std::to_string(parent_seed) +
-        ");\n"
-        "    fork\n"
-        "      a = $urandom;\n"
-        "      b = $urandom;\n"
-        "    join\n"
-        "  end\n"
-        "endmodule\n";
-    auto vals = RunSeededAndRead(src, {"a", "b"});
-    a = vals[0];
-    b = vals[1];
-  };
-  uint64_t a1 = 0, b1 = 0, a2 = 0, b2 = 0;
-  run(/*parent_seed=*/1, a1, b1);
-  run(/*parent_seed=*/2, a2, b2);
-  EXPECT_NE(a1, a2);
-  EXPECT_NE(b1, b2);
+  auto vals1 = RunParentSeededTwoForkUrandom(/*parent_seed=*/1);
+  auto vals2 = RunParentSeededTwoForkUrandom(/*parent_seed=*/2);
+  EXPECT_NE(vals1[0], vals2[0]);
+  EXPECT_NE(vals1[1], vals2[1]);
 }
 
 // Edge case: independence must hold across multiple fork levels. A draw made

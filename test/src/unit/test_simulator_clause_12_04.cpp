@@ -30,16 +30,14 @@ Stmt* MakeAssignStmt(Arena& arena, const char* lhs_name, uint64_t rhs_value) {
   return stmt;
 }
 
-TEST(ConditionalStatementSim, ExecuteIfElse) {
-  CompiledSimFixture f;
-  auto* sel = f.ctx.CreateVariable("sel", 1);
-  sel->value = MakeLogic4VecVal(f.arena, 1, 1);
-  auto* out = f.ctx.CreateVariable("out", 32);
-  out->value = MakeLogic4VecVal(f.arena, 32, 0);
-
+// Compiles and runs `if (cond) out = then_val; else out = else_val;` wrapped in
+// a block against `f.ctx`. The condition is an identifier reference to `sel`.
+// Returns the compiled process so callers can re-run it after mutating inputs.
+CompiledProcess CompileIfElseAssignOut(CompiledSimFixture& f, uint64_t then_val,
+                                       uint64_t else_val) {
   auto* cond = MakeIdentExpr(f.arena, "sel");
-  auto* then_stmt = MakeAssignStmt(f.arena, "out", 1);
-  auto* else_stmt = MakeAssignStmt(f.arena, "out", 0);
+  auto* then_stmt = MakeAssignStmt(f.arena, "out", then_val);
+  auto* else_stmt = MakeAssignStmt(f.arena, "out", else_val);
 
   auto* if_stmt = f.arena.Create<Stmt>();
   if_stmt->kind = StmtKind::kIf;
@@ -53,6 +51,17 @@ TEST(ConditionalStatementSim, ExecuteIfElse) {
 
   auto compiled = ProcessCompiler::Compile(1, block);
   compiled.Execute(f.ctx);
+  return compiled;
+}
+
+TEST(ConditionalStatementSim, ExecuteIfElse) {
+  CompiledSimFixture f;
+  auto* sel = f.ctx.CreateVariable("sel", 1);
+  sel->value = MakeLogic4VecVal(f.arena, 1, 1);
+  auto* out = f.ctx.CreateVariable("out", 32);
+  out->value = MakeLogic4VecVal(f.arena, 32, 0);
+
+  auto compiled = CompileIfElseAssignOut(f, 1, 0);
   EXPECT_EQ(out->value.ToUint64(), 1u);
 
   sel->value = MakeLogic4VecVal(f.arena, 1, 0);
@@ -490,22 +499,7 @@ TEST(ConditionalStatementSim, CompiledIfZRunsElseBranch) {
   auto* out = f.ctx.CreateVariable("out", 32);
   out->value = MakeLogic4VecVal(f.arena, 32, 7);
 
-  auto* cond = MakeIdentExpr(f.arena, "sel");
-  auto* then_stmt = MakeAssignStmt(f.arena, "out", 42);
-  auto* else_stmt = MakeAssignStmt(f.arena, "out", 11);
-
-  auto* if_stmt = f.arena.Create<Stmt>();
-  if_stmt->kind = StmtKind::kIf;
-  if_stmt->condition = cond;
-  if_stmt->then_branch = then_stmt;
-  if_stmt->else_branch = else_stmt;
-
-  auto* block = f.arena.Create<Stmt>();
-  block->kind = StmtKind::kBlock;
-  block->stmts.push_back(if_stmt);
-
-  auto compiled = ProcessCompiler::Compile(1, block);
-  compiled.Execute(f.ctx);
+  CompileIfElseAssignOut(f, 42, 11);
   EXPECT_EQ(out->value.ToUint64(), 11u);
 }
 

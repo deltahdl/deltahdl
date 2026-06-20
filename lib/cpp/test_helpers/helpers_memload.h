@@ -5,6 +5,7 @@
 #include <iterator>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "builders_ast.h"
@@ -41,9 +42,10 @@ inline Variable* Cell(SimFixture& f, const char* name, int addr) {
   return f.ctx.FindVariable(nm);
 }
 
-// Invokes a $readmem* task on a memory named by a bare identifier, with any
-// extra (start/finish) address arguments appended after the memory operand.
-inline void Readmem(SimFixture& f, const char* task, const std::string& path,
+// Invokes a memory-load/store system task (`$readmem*` / `$writemem*`) on a
+// memory named by a bare identifier, with any extra (start/finish) address
+// arguments appended after the memory operand.
+inline void MemTask(SimFixture& f, const char* task, const std::string& path,
                     const char* mem, std::vector<Expr*> extra = {}) {
   std::vector<Expr*> args = {MkStr(f.arena, path.c_str()),
                              MakeId(f.arena, mem)};
@@ -51,14 +53,18 @@ inline void Readmem(SimFixture& f, const char* task, const std::string& path,
   EvalExpr(MakeSysCall(f.arena, task, args), f.ctx, f.arena);
 }
 
+// Invokes a $readmem* task on a memory named by a bare identifier, with any
+// extra (start/finish) address arguments appended after the memory operand.
+inline void Readmem(SimFixture& f, const char* task, const std::string& path,
+                    const char* mem, std::vector<Expr*> extra = {}) {
+  MemTask(f, task, path, mem, std::move(extra));
+}
+
 // Invokes a $writemem* task on a memory named by a bare identifier, with any
 // extra (start/finish) address arguments appended after the memory operand.
 inline void Writemem(SimFixture& f, const char* task, const std::string& path,
                      const char* mem, std::vector<Expr*> extra = {}) {
-  std::vector<Expr*> args = {MkStr(f.arena, path.c_str()),
-                             MakeId(f.arena, mem)};
-  for (auto* e : extra) args.push_back(e);
-  EvalExpr(MakeSysCall(f.arena, task, args), f.ctx, f.arena);
+  MemTask(f, task, path, mem, std::move(extra));
 }
 
 // Writes `data` to a scratch file `<prefix><tag>.txt` and returns its path.
