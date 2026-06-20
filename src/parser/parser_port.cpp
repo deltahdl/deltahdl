@@ -31,6 +31,17 @@ static std::string_view StripStringLiteralQuotes(std::string_view text) {
 static void ResolvePortDefaults(PortDecl& port, const PortDecl* prev,
                                 bool is_checker);
 
+// §23.10 / Syntax A.1.3 parameter_port_list: the collections being built up as
+// each parameter_declaration / type_parameter_declaration in the list is
+// parsed. These four references are the one accumulator object for the whole
+// parameter port list, so the value- and type-parameter parsers share it.
+struct ParamPortList {
+  std::vector<std::pair<std::string_view, Expr*>>& params;
+  std::unordered_set<std::string_view>& type_param_names;
+  std::unordered_set<std::string_view>& localparam_port_names;
+  std::vector<DataType>* param_types;
+};
+
 // CPD-dedup: the dpi_spec_string parse/validation and the optional
 // "= c_identifier" tail are identical between DPI import and export.
 struct ParserPortHelpers {
@@ -269,11 +280,8 @@ struct ParserPortHelpers {
 
   // A type_parameter_declaration in a parameter_port_list. The `type` keyword
   // has already been consumed by the caller.
-  static void ParseTypeParamPortDecl(
-      Parser& p, std::vector<std::pair<std::string_view, Expr*>>& params,
-      std::unordered_set<std::string_view>& type_param_names,
-      std::unordered_set<std::string_view>& localparam_port_names,
-      bool is_localparam_group, std::vector<DataType>* param_types) {
+  static void ParseTypeParamPortDecl(Parser& p, ParamPortList& out,
+                                     bool is_localparam_group) {
     // A type_parameter_declaration may carry an optional forward_type keyword
     // (enum, struct, union, class, or interface class) before the identifier
     // to restrict the kinds of type the parameter accepts.
@@ -300,18 +308,16 @@ struct ParserPortHelpers {
                                 "must have a default type",
                                 name.text));
     }
-    params.push_back({name.text, nullptr});
-    if (param_types) param_types->push_back(DataType{});
-    type_param_names.insert(name.text);
-    if (is_localparam_group) localparam_port_names.insert(name.text);
+    out.params.push_back({name.text, nullptr});
+    if (out.param_types) out.param_types->push_back(DataType{});
+    out.type_param_names.insert(name.text);
+    if (is_localparam_group) out.localparam_port_names.insert(name.text);
     p.known_types_.insert(name.text);
   }
 
   // A value parameter declaration in a parameter_port_list.
-  static void ParseValueParamPortDecl(
-      Parser& p, std::vector<std::pair<std::string_view, Expr*>>& params,
-      std::unordered_set<std::string_view>& localparam_port_names,
-      bool is_localparam_group, std::vector<DataType>* param_types) {
+  static void ParseValueParamPortDecl(Parser& p, ParamPortList& out,
+                                      bool is_localparam_group) {
     DataType dtype = p.ParseDataType();
     auto name = p.Expect(TokenKind::kIdentifier);
     Expr* default_val = nullptr;
@@ -325,9 +331,9 @@ struct ParserPortHelpers {
                                 "have a default value",
                                 name.text));
     }
-    params.push_back({name.text, default_val});
-    if (param_types) param_types->push_back(dtype);
-    if (is_localparam_group) localparam_port_names.insert(name.text);
+    out.params.push_back({name.text, default_val});
+    if (out.param_types) out.param_types->push_back(dtype);
+    if (is_localparam_group) out.localparam_port_names.insert(name.text);
   }
 
   // Parse a leading timeunit/timeprecision declaration and, if the first one
@@ -661,14 +667,13 @@ void Parser::ParseParamPortDecl(
     is_localparam_group = false;
   }
 
+  ParamPortList out{params, type_param_names, localparam_port_names,
+                    param_types};
   if (Match(TokenKind::kKwType)) {
-    ParserPortHelpers::ParseTypeParamPortDecl(*this, params, type_param_names,
-                                              localparam_port_names,
-                                              is_localparam_group, param_types);
+    ParserPortHelpers::ParseTypeParamPortDecl(*this, out, is_localparam_group);
     return;
   }
-  ParserPortHelpers::ParseValueParamPortDecl(
-      *this, params, localparam_port_names, is_localparam_group, param_types);
+  ParserPortHelpers::ParseValueParamPortDecl(*this, out, is_localparam_group);
 }
 
 void Parser::ParseParamsPortsAndSemicolon(ModuleDecl& decl) {

@@ -381,19 +381,31 @@ static void ReconcileUdpNonAnsiPortList(
   }
 }
 
+namespace {
+// The illegal syntactic forms scanned at the head of a UDP initial statement
+// (IEEE 1800 §29.6): a leading begin keyword and a leading # delay control,
+// each with the source position captured at the matching point in the token
+// stream so a diagnostic can be emitted later.
+struct UdpInitialHeaderScan {
+  bool saw_begin = false;
+  SourceLoc begin_loc;
+  bool saw_hash = false;
+  SourceLoc hash_loc;
+};
+}  // namespace
+
 // Emits the diagnostics for a UDP initial statement header (the begin/delay
 // form errors and the output-target mismatch) given the positions captured at
 // the matching points in the token stream. Pure-diagnostic; no parsing.
 static void ValidateUdpInitialHeader(DiagEngine& diag, const UdpDecl* udp,
-                                     bool saw_begin, SourceLoc begin_loc,
-                                     bool saw_hash, SourceLoc hash_loc,
+                                     const UdpInitialHeaderScan& scan,
                                      const Token& id_tok) {
-  if (saw_begin) {
-    diag.Error(begin_loc,
+  if (scan.saw_begin) {
+    diag.Error(scan.begin_loc,
                "UDP initial statement shall be a single procedural assignment");
   }
-  if (saw_hash) {
-    diag.Error(hash_loc,
+  if (scan.saw_hash) {
+    diag.Error(scan.hash_loc,
                "UDP initial statement shall not contain delay control");
   }
   if (!udp->output_name.empty() && id_tok.text != udp->output_name) {
@@ -462,13 +474,13 @@ UdpDecl* Parser::ParseUdpDecl() {
   if (Match(TokenKind::kKwInitial)) {
     udp->has_initial = true;
 
-    bool saw_begin = Check(TokenKind::kKwBegin);
-    SourceLoc begin_loc = CurrentLoc();
-    bool saw_hash = Check(TokenKind::kHash);
-    SourceLoc hash_loc = CurrentLoc();
+    UdpInitialHeaderScan scan;
+    scan.saw_begin = Check(TokenKind::kKwBegin);
+    scan.begin_loc = CurrentLoc();
+    scan.saw_hash = Check(TokenKind::kHash);
+    scan.hash_loc = CurrentLoc();
     auto id_tok = Expect(TokenKind::kIdentifier);
-    ValidateUdpInitialHeader(diag_, udp, saw_begin, begin_loc, saw_hash,
-                             hash_loc, id_tok);
+    ValidateUdpInitialHeader(diag_, udp, scan, id_tok);
     Expect(TokenKind::kEq);
 
     auto rhs_tok = CurrentToken();

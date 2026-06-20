@@ -363,31 +363,48 @@ static uint64_t FreadMaxWords(const Expr* expr, bool& has_count,
   return EvalExpr(expr->args[3], ctx, arena).ToUint64();
 }
 
+// §21.3.4.4: the destination memory is an unpacked array; these fields describe
+// it once for the load loop -- its element name prefix, its address bounds, and
+// the per-word byte count derived from the element width.
+struct FreadMemory {
+  std::string mem_name;
+  int64_t low_addr;
+  int64_t high_addr;
+  uint32_t bytes_per_word;
+};
+
+// §21.3.4.4: the optional start/count operands bound the load. start_addr is
+// the address of the first element loaded; has_count/max_words cap how many
+// locations are filled (max_words is meaningful only when has_count is true).
+struct FreadWindow {
+  int64_t start_addr;
+  bool has_count;
+  uint64_t max_words;
+};
+
 // §21.3.4.4: load consecutive words toward the highest address (increasing
 // index), regardless of the array's declared direction, until the memory is
 // full, the count is reached, or the file is exhausted. Returns the total
 // number of bytes read.
-static uint64_t FreadLoadWords(const std::string& mem_name, int64_t start_addr,
-                               int64_t low_addr, int64_t high_addr,
-                               uint32_t bytes_per_word, bool has_count,
-                               uint64_t max_words, FILE* fp, SimContext& ctx,
-                               Arena& arena) {
+static uint64_t FreadLoadWords(const FreadMemory& mem, const FreadWindow& win,
+                               FILE* fp, SimContext& ctx, Arena& arena) {
   uint64_t total_bytes = 0;
   uint64_t words_done = 0;
-  auto* buf = new uint8_t[bytes_per_word];
-  for (int64_t addr = start_addr;
-       addr <= high_addr && (!has_count || words_done < max_words); ++addr) {
-    if (addr < low_addr) continue;
-    size_t nread = std::fread(buf, 1, bytes_per_word, fp);
+  auto* buf = new uint8_t[mem.bytes_per_word];
+  for (int64_t addr = win.start_addr;
+       addr <= mem.high_addr && (!win.has_count || words_done < win.max_words);
+       ++addr) {
+    if (addr < mem.low_addr) continue;
+    size_t nread = std::fread(buf, 1, mem.bytes_per_word, fp);
     if (nread == 0) break;
-    std::string elem = mem_name + "[" + std::to_string(addr) + "]";
+    std::string elem = mem.mem_name + "[" + std::to_string(addr) + "]";
     if (auto* v = ctx.FindVariable(elem)) {
-      v->value =
-          PackWordBigEndian(arena, buf, nread, bytes_per_word, v->value.width);
+      v->value = PackWordBigEndian(arena, buf, nread, mem.bytes_per_word,
+                                   v->value.width);
     }
     total_bytes += nread;
     ++words_done;
-    if (nread < bytes_per_word) break;  // file ran out mid-word
+    if (nread < mem.bytes_per_word) break;  // file ran out mid-word
   }
   delete[] buf;
   return total_bytes;
@@ -412,9 +429,9 @@ static Logic4Vec FreadMemoryArray(const Expr* expr, const ArrayInfo* ai,
   bool has_count = false;
   uint64_t max_words = FreadMaxWords(expr, has_count, ctx, arena);
 
-  uint64_t total_bytes =
-      FreadLoadWords(mem_name, start_addr, low_addr, high_addr, bytes_per_word,
-                     has_count, max_words, fp, ctx, arena);
+  FreadMemory mem{mem_name, low_addr, high_addr, bytes_per_word};
+  FreadWindow win{start_addr, has_count, max_words};
+  uint64_t total_bytes = FreadLoadWords(mem, win, fp, ctx, arena);
   return MakeLogic4VecVal(arena, 32, total_bytes);
 }
 

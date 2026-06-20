@@ -518,27 +518,31 @@ static bool IsDeclaredBefore(std::string_view name, const ClassDecl* before_cls,
 
 namespace {
 
+// §8.26: how one interface-inheritance relationship is phrased in diagnostics
+// (verb/noun = extend/extended or implement/implemented; self_label names the
+// owning class). The three move together as one relationship.
+struct InheritanceWording {
+  std::string_view verb, noun, self_label;
+};
 // Shared per-name validation for a base/extended/implemented interface name.
-// `verb` is "extend"/"implement", `noun` is "extended"/"implemented", and
-// `self_label` is "interface class"/"class" for the owning class in messages.
 // Returns true when a diagnostic was emitted that should stop further checks on
 // this name (mirrors the original `continue`/early-out control flow).
 bool ValidateInheritedInterfaceName(const ClassDecl* cls, std::string_view name,
                                     const CompilationUnit* unit,
-                                    DiagEngine& diag, std::string_view verb,
-                                    std::string_view noun,
-                                    std::string_view self_label) {
+                                    DiagEngine& diag,
+                                    const InheritanceWording& wording) {
   if (cls->type_param_names.count(name) > 0) {
     diag.Error(cls->range.start,
                std::format("{} '{}' shall not {} type parameter '{}'",
-                           self_label, cls->name, verb, name));
+                           wording.self_label, cls->name, wording.verb, name));
     return true;
   }
   if (IsForwardTypedefOnly(name, cls, unit)) {
     diag.Error(cls->range.start,
                std::format("{} '{}' shall not {} forward typedef '{}'; the "
                            "interface class must be declared before it is {}",
-                           self_label, cls->name, verb, name, noun));
+                           wording.self_label, cls->name, wording.verb, name,
+                           wording.noun));
     return true;
   }
   if (!IsDeclaredBefore(name, cls, unit)) {
@@ -547,7 +551,7 @@ bool ValidateInheritedInterfaceName(const ClassDecl* cls, std::string_view name,
       diag.Error(cls->range.start,
                  std::format("interface class '{}' must be declared before it "
                              "is {} by '{}'",
-                             name, noun, cls->name));
+                             name, wording.noun, cls->name));
       return true;
     }
   }
@@ -565,9 +569,8 @@ void Elaborator::ValidateInterfaceClassInheritance(const ClassDecl* cls) {
   }
   if (cls->base_class.empty()) return;
 
-  ValidateInheritedInterfaceName(cls, cls->base_class, unit_, diag_, "extend",
-                                 "extended", "interface class");
-
+  ValidateInheritedInterfaceName(cls, cls->base_class, unit_, diag_,
+                                 {"extend", "extended", "interface class"});
   const auto* base = FindClassDecl(cls->base_class, unit_);
   if (base && !base->is_interface) {
     diag_.Error(cls->range.start,
@@ -577,8 +580,9 @@ void Elaborator::ValidateInterfaceClassInheritance(const ClassDecl* cls) {
   }
   for (const auto& ref : cls->extends_interfaces) {
     auto iface_name = ref.name;
-    if (ValidateInheritedInterfaceName(cls, iface_name, unit_, diag_, "extend",
-                                       "extended", "interface class")) {
+    if (ValidateInheritedInterfaceName(
+            cls, iface_name, unit_, diag_,
+            {"extend", "extended", "interface class"})) {
       continue;
     }
     const auto* ibase = FindClassDecl(iface_name, unit_);
@@ -604,7 +608,7 @@ void Elaborator::ValidateRegularClassInheritance(const ClassDecl* cls) {
   for (const auto& ref : cls->implements_types) {
     auto impl_name = ref.name;
     if (ValidateInheritedInterfaceName(cls, impl_name, unit_, diag_,
-                                       "implement", "implemented", "class")) {
+                                       {"implement", "implemented", "class"})) {
       continue;
     }
     const auto* impl = FindClassDecl(impl_name, unit_);

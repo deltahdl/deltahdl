@@ -25,6 +25,24 @@
 
 namespace delta {
 
+namespace {
+// §9.6/§18.14.2: per-fork rendezvous shared by every child of one fork (join
+// tally, spawning process's wait-fork tally, spawning process to restore).
+struct ForkRendezvous {
+  ForkJoinState* state;
+  WaitForkState* parent_wfs;
+  Process* parent_proc;
+};
+// §15.5.3: named-event trigger of the event-control form of ->> (target event
+// variable, its name, required occurrence count, reactive-region flag).
+struct NbEventTrigger {
+  Variable* var;
+  std::string_view event_name;
+  uint64_t count;
+  bool reactive;
+};
+}  // namespace
+
 static StmtResult ExecEventTriggerImpl(const Stmt* stmt, SimContext& ctx) {
   if (!stmt->expr || stmt->expr->kind != ExprKind::kIdentifier) {
     return StmtResult::kDone;
@@ -80,9 +98,7 @@ static uint64_t EvalRepeatCount(const Expr* count_expr, SimContext& ctx,
 static void SpawnNbaEventProcess(SimCoroutine coro, SimContext& ctx,
                                  Arena& arena);
 static SimCoroutine NbEventTriggerEventCoroutine(const Stmt* stmt,
-                                                 Variable* var,
-                                                 std::string_view event_name,
-                                                 uint64_t count, bool reactive,
+                                                 const NbEventTrigger& trigger,
                                                  SimContext& ctx, Arena& arena);
 
 static StmtResult ExecNbEventTriggerImpl(const Stmt* stmt, SimContext& ctx,
@@ -113,7 +129,7 @@ static StmtResult ExecNbEventTriggerImpl(const Stmt* stmt, SimContext& ctx,
       }
     }
     SpawnNbaEventProcess(
-        NbEventTriggerEventCoroutine(stmt, var, event_name, count, reactive,
+        NbEventTriggerEventCoroutine(stmt, {var, event_name, count, reactive},
                                      ctx, arena),
         ctx, arena);
     return StmtResult::kDone;
@@ -281,36 +297,38 @@ static void FinalizeForkChildProcess(SimContext& ctx) {
   }
 }
 
-// Decrements the join/wait-fork tallies for one finished child and resumes the
-// join site and/or the wait-fork waiter when their conditions are met.
-static void NotifyForkChildDone(SimContext& ctx, ForkJoinState* state,
-                                WaitForkState* parent_wfs,
-                                Process* parent_proc) {
+// Decrements the join/wait-fork tallies for one finished (or, when
+// restore_parent is false, cancelled) child and resumes the join site and/or
+// the wait-fork waiter when their conditions are met. §18.14.2: a normally
+// completing child restores the spawning thread as current before the join site
+// resumes so its subsequent draws come from its own RNG, not from whichever
+// child ran last; a cancelled child never ran user code, so it does not.
+static void DrainForkChild(SimContext& ctx, const ForkRendezvous& rdv,
+                           bool restore_parent) {
+  auto* state = rdv.state;
   state->remaining--;
   bool should_resume =
       state->join_any ? !state->resumed : (state->remaining == 0);
   if (should_resume && state->parent) {
     state->resumed = true;
-    // §18.14.2: restore the spawning thread as current before the join site
-    // resumes so its subsequent draws come from its own RNG, not from
-    // whichever child happened to run last.
-    if (state->parent_proc) ctx.SetCurrentProcess(state->parent_proc);
+    if (restore_parent && state->parent_proc)
+      ctx.SetCurrentProcess(state->parent_proc);
     state->parent.resume();
   }
-  if (parent_wfs && --parent_wfs->remaining == 0 && parent_wfs->waiter) {
-    ctx.SetCurrentProcess(parent_proc);
-    parent_wfs->waiter.resume();
+  if (rdv.parent_wfs && --rdv.parent_wfs->remaining == 0 &&
+      rdv.parent_wfs->waiter) {
+    ctx.SetCurrentProcess(rdv.parent_proc);
+    rdv.parent_wfs->waiter.resume();
   }
 }
 
 static SimCoroutine ForkChildCoroutine(const Stmt* body, SimContext& ctx,
-                                       Arena& arena, ForkJoinState* state,
-                                       WaitForkState* parent_wfs,
-                                       Process* parent_proc) {
+                                       Arena& arena,
+                                       const ForkRendezvous& rdv) {
   co_await ExecStmt(body, ctx, arena);
 
   FinalizeForkChildProcess(ctx);
-  NotifyForkChildDone(ctx, state, parent_wfs, parent_proc);
+  DrainForkChild(ctx, rdv, /*restore_parent=*/true);
 }
 
 static bool IsForkBlockItemDecl(const Stmt* s) {
@@ -358,34 +376,14 @@ static Process* CreateForkChildProcess(SimContext& ctx, Arena& arena,
   return p;
 }
 
-// Handles a fork child whose scheduled start event fired after the child was
-// already cancelled (e.g. by disable fork): drains its join/wait-fork tallies
-// and resumes the join site and/or wait-fork waiter when their conditions are
-// met, exactly as a normally completing child would.
-static void RetireCancelledForkChild(SimContext& ctx, ForkJoinState* state,
-                                     WaitForkState* parent_wfs,
-                                     Process* parent_proc) {
-  state->remaining--;
-  bool should_resume =
-      state->join_any ? !state->resumed : (state->remaining == 0);
-  if (should_resume && state->parent) {
-    state->resumed = true;
-    state->parent.resume();
-  }
-  if (parent_wfs && --parent_wfs->remaining == 0 && parent_wfs->waiter) {
-    ctx.SetCurrentProcess(parent_proc);
-    parent_wfs->waiter.resume();
-  }
-}
-
-// Builds the scheduler callback that starts (or retires, if cancelled) one fork
-// child process when its start event fires.
+// Builds the scheduler callback that starts (or, if cancelled e.g. by disable
+// fork, drains the tallies for) one fork child process when its start event
+// fires.
 static std::function<void()> MakeForkChildStartCallback(
-    Process* p, SimContext& ctx, ForkJoinState* state,
-    WaitForkState* parent_wfs, Process* parent_proc) {
-  return [p, &ctx, state, parent_wfs, parent_proc]() {
+    Process* p, SimContext& ctx, const ForkRendezvous& rdv) {
+  return [p, &ctx, rdv]() {
     if (!p->active) {
-      RetireCancelledForkChild(ctx, state, parent_wfs, parent_proc);
+      DrainForkChild(ctx, rdv, /*restore_parent=*/false);
       return;
     }
     ctx.SetCurrentProcess(p);
@@ -396,17 +394,14 @@ static std::function<void()> MakeForkChildStartCallback(
 // Creates and schedules one fork child process for the statement s, wiring it
 // into the shared join state and the spawning process's wait-fork tally.
 static void SpawnForkChild(const Stmt* s, SimContext& ctx, Arena& arena,
-                           ForkJoinState* state, Process* spawning_proc,
-                           WaitForkState* parent_wfs, Process* parent_proc) {
-  if (parent_wfs) parent_wfs->remaining++;
+                           Process* spawning_proc, const ForkRendezvous& rdv) {
+  if (rdv.parent_wfs) rdv.parent_wfs->remaining++;
   auto* p = CreateForkChildProcess(ctx, arena, spawning_proc);
-  p->coro = ForkChildCoroutine(s, ctx, arena, state, parent_wfs, parent_proc)
-                .Release();
+  p->coro = ForkChildCoroutine(s, ctx, arena, rdv).Release();
 
   RegisterForkChildScopes(s, p, ctx);
   auto* event = ctx.GetScheduler().GetEventPool().Acquire();
-  event->callback =
-      MakeForkChildStartCallback(p, ctx, state, parent_wfs, parent_proc);
+  event->callback = MakeForkChildStartCallback(p, ctx, rdv);
   auto fork_region = (spawning_proc && spawning_proc->is_reactive)
                          ? Region::kReactive
                          : Region::kActive;
@@ -416,12 +411,11 @@ static void SpawnForkChild(const Stmt* s, SimContext& ctx, Arena& arena,
 // Spawns one fork child per non-declaration statement in the fork block, each
 // wired into the shared join state and the spawning process's wait-fork tally.
 static void SpawnForkChildren(const Stmt* stmt, SimContext& ctx, Arena& arena,
-                              ForkJoinState* state, Process* spawning_proc,
-                              WaitForkState* parent_wfs, Process* parent_proc) {
+                              Process* spawning_proc,
+                              const ForkRendezvous& rdv) {
   for (auto* s : stmt->fork_stmts) {
     if (IsForkBlockItemDecl(s)) continue;
-    SpawnForkChild(s, ctx, arena, state, spawning_proc, parent_wfs,
-                   parent_proc);
+    SpawnForkChild(s, ctx, arena, spawning_proc, rdv);
   }
 }
 
@@ -465,8 +459,8 @@ static ExecTask ExecFork(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   WaitForkState* parent_wfs =
       parent_proc ? &parent_proc->wait_fork_state : nullptr;
 
-  SpawnForkChildren(stmt, ctx, arena, state, spawning_proc, parent_wfs,
-                    parent_proc);
+  SpawnForkChildren(stmt, ctx, arena, spawning_proc,
+                    {state, parent_wfs, parent_proc});
 
   if (stmt->join_kind != TokenKind::kKwJoinNone) {
     co_await ForkJoinAwaiter{state};
@@ -828,13 +822,15 @@ static StmtResult ExecNbaWithEvent(const Stmt* stmt, SimContext& ctx,
 // Detached waiter for the event-control form of ->>: blocks (off the issuing
 // process) until the event control has occurred the required number of times,
 // then creates the nonblocking-region update event that fires the named event.
-static SimCoroutine NbEventTriggerEventCoroutine(
-    const Stmt* stmt, Variable* var, std::string_view event_name,
-    uint64_t count, bool reactive, SimContext& ctx, Arena& arena) {
-  for (uint64_t i = 0; i < count; ++i) {
+static SimCoroutine NbEventTriggerEventCoroutine(const Stmt* stmt,
+                                                 const NbEventTrigger& trigger,
+                                                 SimContext& ctx,
+                                                 Arena& arena) {
+  for (uint64_t i = 0; i < trigger.count; ++i) {
     co_await EventAwaiter{ctx, stmt->events, arena};
   }
-  ScheduleNbEventTrigger(var, event_name, ctx.CurrentTime(), reactive, ctx);
+  ScheduleNbEventTrigger(trigger.var, trigger.event_name, ctx.CurrentTime(),
+                         trigger.reactive, ctx);
 }
 
 static StmtResult ExecDisableImpl(const Stmt* stmt, SimContext& ctx) {

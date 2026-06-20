@@ -20,6 +20,38 @@
 
 namespace delta {
 
+// Parameter-bundle entities for the event-control awaiters below (§9.4.2
+// event control, §9.4.5 intra-assignment repeat event control). These mirror
+// the real domain objects the watcher helpers operate on, so the helper
+// signatures carry one struct per entity instead of a long flat parameter
+// list. They are used only by the inline awaiter helpers in this header.
+
+// The edge qualifier and optional iff condition of a single event-control
+// operand (§9.4.2). Both come from one EventExpr (ev.edge, ev.iff_condition)
+// and always travel together through the edge-gate helpers.
+struct EdgeSpec {
+  Edge edge;
+  const Expr* iff_cond;
+};
+
+// The suspended process and its simulation context, i.e. the target to resume
+// once a watcher's gates pass. ctx and proc are obtained together from the
+// awaiting coroutine and are forwarded as a pair to every resume decision.
+struct ResumeTarget {
+  SimContext& ctx;
+  Process* proc;
+};
+
+// The shared per-operand watch state for a compound (non-identifier) event
+// expression operand: the previous evaluated value, the once-only consumed
+// guard shared across sibling operand watchers, and the signal expression to
+// re-evaluate. One object describes a single compound operand being watched.
+struct CompoundOperand {
+  const std::shared_ptr<Logic4Vec>& prev;
+  const std::shared_ptr<bool>& consumed;
+  const Expr* signal;
+};
+
 // Resolves a member-access event-control signal down to a Variable*. Tries a
 // clocking-block member first, then falls back to a flattened hierarchical
 // name lookup. Returns nullptr when neither resolves.
@@ -122,7 +154,8 @@ struct EventAwaiter {
       if (proc && !proc->active) return true;
 
       if (proc && proc->is_suspended) return false;
-      return HandleEdgeEvent(h, var, edge, iff_cond, *ctx_ptr, proc);
+      return HandleEdgeEvent(h, var, EdgeSpec{edge, iff_cond},
+                             ResumeTarget{*ctx_ptr, proc});
     });
   }
 
@@ -185,11 +218,10 @@ struct EventAwaiter {
   }
 
   static bool HandleEdgeEvent(std::coroutine_handle<>& h, Variable* var,
-                              Edge edge, const Expr* iff_cond, SimContext& ctx,
-                              Process* proc) {
-    if (!EdgeGatePasses(var, edge)) return false;
-    if (!IffGatePasses(var, iff_cond, ctx)) return false;
-    ResumeMaybeReactive(h, proc, ctx);
+                              const EdgeSpec& spec, ResumeTarget target) {
+    if (!EdgeGatePasses(var, spec.edge)) return false;
+    if (!IffGatePasses(var, spec.iff_cond, target.ctx)) return false;
+    ResumeMaybeReactive(h, target.proc, target.ctx);
     return true;
   }
 
@@ -262,37 +294,33 @@ struct EventAwaiter {
   // watcher against the shared previous value, updating *prev in place. The
   // shared `consumed` guard ensures the resume happens at most once across all
   // sibling watchers. Does not perform the resume itself.
-  static CompoundTrigger EvalCompoundTrigger(
-      const std::shared_ptr<Logic4Vec>& prev,
-      const std::shared_ptr<bool>& consumed, const Expr* signal, Edge edge,
-      const Expr* iff_cond, SimContext& ctx, Process* proc) {
-    if (*consumed) return {true, false};
-    if (proc && !proc->active) return {true, false};
-    auto cur = EvalExpr(signal, ctx, ctx.GetArena());
-    if (Logic4VecBitsEqual(cur, *prev)) return {false, false};
-    if (edge != Edge::kNone && !CheckEdgeOnValues(*prev, cur, edge)) {
-      *prev = cur;
+  static CompoundTrigger EvalCompoundTrigger(const CompoundOperand& op,
+                                             const EdgeSpec& spec,
+                                             ResumeTarget target) {
+    if (*op.consumed) return {true, false};
+    if (target.proc && !target.proc->active) return {true, false};
+    auto cur = EvalExpr(op.signal, target.ctx, target.ctx.GetArena());
+    if (Logic4VecBitsEqual(cur, *op.prev)) return {false, false};
+    if (spec.edge != Edge::kNone &&
+        !CheckEdgeOnValues(*op.prev, cur, spec.edge)) {
+      *op.prev = cur;
       return {false, false};
     }
-    *prev = cur;
-    if (iff_cond) {
-      auto val = EvalExpr(iff_cond, ctx, ctx.GetArena());
+    *op.prev = cur;
+    if (spec.iff_cond) {
+      auto val = EvalExpr(spec.iff_cond, target.ctx, target.ctx.GetArena());
       if (val.ToUint64() == 0) return {false, false};
     }
-    *consumed = true;
+    *op.consumed = true;
     return {true, true};
   }
 
   static bool EvalCompoundWatcher(std::coroutine_handle<> h,
-                                  const std::shared_ptr<Logic4Vec>& prev,
-                                  const std::shared_ptr<bool>& consumed,
-                                  const Expr* signal, Edge edge,
-                                  const Expr* iff_cond, SimContext& ctx,
-                                  Process* proc) {
-    auto trigger =
-        EvalCompoundTrigger(prev, consumed, signal, edge, iff_cond, ctx, proc);
+                                  const CompoundOperand& op,
+                                  const EdgeSpec& spec, ResumeTarget target) {
+    auto trigger = EvalCompoundTrigger(op, spec, target);
     if (!trigger.resume) return trigger.removed;
-    ResumeMaybeReactive(h, proc, ctx);
+    ResumeMaybeReactive(h, target.proc, target.ctx);
     return true;
   }
 
@@ -311,11 +339,12 @@ struct EventAwaiter {
     for (auto name : names) {
       Variable* op_var = ctx.FindVariable(name);
       if (!op_var) continue;
-      op_var->AddWatcher(
-          [h, prev, consumed, signal, edge, iff_cond, ctx_ptr, proc]() mutable {
-            return EvalCompoundWatcher(h, prev, consumed, signal, edge,
-                                       iff_cond, *ctx_ptr, proc);
-          });
+      op_var->AddWatcher([h, prev, consumed, signal, edge, iff_cond, ctx_ptr,
+                          proc]() mutable {
+        return EvalCompoundWatcher(h, CompoundOperand{prev, consumed, signal},
+                                   EdgeSpec{edge, iff_cond},
+                                   ResumeTarget{*ctx_ptr, proc});
+      });
     }
   }
 
@@ -391,19 +420,19 @@ struct RepeatEventAwaiter {
   // watcher, resyncing var->prev_value on each non-tally exit. Returns whether
   // the occurrence should be tallied along with the watcher return value to use
   // when it should not.
-  static EdgeOperandGate EvalEdgeOperandGate(Variable* var, Edge edge,
-                                             const Expr* iff_cond,
+  static EdgeOperandGate EvalEdgeOperandGate(Variable* var,
+                                             const EdgeSpec& spec,
                                              const std::shared_ptr<bool>& done,
-                                             SimContext& ctx, Process* proc) {
+                                             ResumeTarget target) {
     if (*done) return {false, true};
-    if (proc && !proc->active) return {false, true};
-    if (proc && proc->is_suspended) return {false, false};
-    if (!EventAwaiter::CheckEdge(var, edge)) {
+    if (target.proc && !target.proc->active) return {false, true};
+    if (target.proc && target.proc->is_suspended) return {false, false};
+    if (!EventAwaiter::CheckEdge(var, spec.edge)) {
       var->prev_value = var->value;
       return {false, false};
     }
-    if (iff_cond) {
-      auto val = EvalExpr(iff_cond, ctx, ctx.GetArena());
+    if (spec.iff_cond) {
+      auto val = EvalExpr(spec.iff_cond, target.ctx, target.ctx.GetArena());
       if (val.ToUint64() == 0) {
         var->prev_value = var->value;
         return {false, false};
@@ -415,16 +444,17 @@ struct RepeatEventAwaiter {
 
   template <typename TallyFn>
   static void ArmEdgeOperand(Variable* var, const EventExpr& ev,
-                             std::shared_ptr<bool> done, SimContext& ctx,
-                             Process* proc, TallyFn tally) {
+                             std::shared_ptr<bool> done, ResumeTarget target,
+                             TallyFn tally) {
     var->prev_value = var->value;
     Edge edge = ev.edge;
     const Expr* iff_cond = ev.iff_condition;
-    auto* ctx_ptr = &ctx;
+    auto* ctx_ptr = &target.ctx;
+    auto* proc = target.proc;
     var->AddWatcher(
         [var, edge, iff_cond, ctx_ptr, proc, done, tally]() mutable {
-          auto gate =
-              EvalEdgeOperandGate(var, edge, iff_cond, done, *ctx_ptr, proc);
+          auto gate = EvalEdgeOperandGate(var, EdgeSpec{edge, iff_cond}, done,
+                                          ResumeTarget{*ctx_ptr, proc});
           if (!gate.passed) return gate.keep_armed_return;
           return tally();
         });
@@ -457,7 +487,7 @@ struct RepeatEventAwaiter {
         ArmEventOperand(var, done, proc, tally);
         continue;
       }
-      ArmEdgeOperand(var, ev, done, ctx, proc, tally);
+      ArmEdgeOperand(var, ev, done, ResumeTarget{ctx, proc}, tally);
     }
   }
 

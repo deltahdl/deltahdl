@@ -92,6 +92,18 @@ static bool ComputeStartOrdinal(const std::vector<std::vector<int>>& dims,
 
 namespace {
 
+// §38.16/§38.35: one array element's decoded value - the aval/bval word pair
+// plus whether the element keeps unknown bits (is_4state). The put path
+// (§38.35) treats is_4state as an input set by the caller and fills aval/bval;
+// the get path (§38.16) supplies aval/bval/is_4state for the encoder to lay
+// out. Bundling these mirrors the single element value the standard moves into
+// or out of one source/destination position.
+struct ElementValue {
+  uint64_t aval = 0;
+  uint64_t bval = 0;
+  bool is_4state = false;
+};
+
 // §38.2: record a VPI error into err and return false, so a validation step can
 // report a rejected precondition in a single statement.
 bool RecordArrayError(VpiErrorInfo* err, const char* msg) {
@@ -195,11 +207,10 @@ uint64_t DecodePutTimeAval(const VpiArrayValue* arrayvalue_p,
 // §38.35: decode one supplied source value from the vpiVectorVal arm into the
 // element's aval/bval words. A 2-state element ignores the supplied bval bits.
 void DecodePutVectorValue(const VpiArrayValue* arrayvalue_p, unsigned int src,
-                          bool elem_4state, uint64_t* out_aval,
-                          uint64_t* out_bval) {
+                          ElementValue* out) {
   const VpiVectorVal& vv = arrayvalue_p->value.vectors[src];
-  *out_aval = vv.aval;
-  *out_bval = elem_4state ? vv.bval : 0;
+  out->aval = vv.aval;
+  out->bval = out->is_4state ? vv.bval : 0;
 }
 
 // §38.35: decode one supplied source value from the vpiRawFourStateVal arm into
@@ -208,13 +219,12 @@ void DecodePutVectorValue(const VpiArrayValue* arrayvalue_p, unsigned int src,
 // this 4-state format is used for a 2-state array, the bvalbits group is
 // ignored.
 void DecodePutRawFourState(const VpiArrayValue* arrayvalue_p, unsigned int src,
-                           uint32_t width, bool elem_4state, uint64_t* out_aval,
-                           uint64_t* out_bval) {
+                           uint32_t width, ElementValue* out) {
   int ngroups = (static_cast<int>(width) + 7) / 8;
   const char* abase =
       arrayvalue_p->value.rawvals + static_cast<size_t>(src) * ngroups * 2;
-  *out_aval = VpiReadRawGroup(abase, ngroups);
-  *out_bval = elem_4state ? VpiReadRawGroup(abase + ngroups, ngroups) : 0;
+  out->aval = VpiReadRawGroup(abase, ngroups);
+  out->bval = out->is_4state ? VpiReadRawGroup(abase + ngroups, ngroups) : 0;
 }
 
 // §38.35: decode one supplied source value from the vpiRawTwoStateVal arm into
@@ -235,37 +245,31 @@ uint64_t DecodePutRawTwoState(const VpiArrayValue* arrayvalue_p,
 // keeps unknown bits. The byte/word group layouts follow the standard's
 // per-format descriptions.
 void DecodePutSourceValue(const VpiArrayValue* arrayvalue_p, unsigned int src,
-                          uint32_t width, bool elem_4state, uint64_t* out_aval,
-                          uint64_t* out_bval) {
-  uint64_t aval = 0;
-  uint64_t bval = 0;
+                          uint32_t width, ElementValue* out) {
   int fmt = static_cast<int>(arrayvalue_p->format);
   switch (fmt) {
     case kVpiTimeVal:
-      aval = DecodePutTimeAval(arrayvalue_p, src);
+      out->aval = DecodePutTimeAval(arrayvalue_p, src);
       break;
     case kVpiVectorVal:
-      DecodePutVectorValue(arrayvalue_p, src, elem_4state, &aval, &bval);
+      DecodePutVectorValue(arrayvalue_p, src, out);
       break;
     case kVpiRawFourStateVal:
-      DecodePutRawFourState(arrayvalue_p, src, width, elem_4state, &aval,
-                            &bval);
+      DecodePutRawFourState(arrayvalue_p, src, width, out);
       break;
     case kVpiRawTwoStateVal:
-      aval = DecodePutRawTwoState(arrayvalue_p, src, width);
+      out->aval = DecodePutRawTwoState(arrayvalue_p, src, width);
       break;
     case kVpiIntVal:
     case kVpiShortIntVal:
     case kVpiLongIntVal:
     case kVpiRealVal:
     case kVpiShortRealVal:
-      aval = DecodePutScalarAval(arrayvalue_p, src, fmt);
+      out->aval = DecodePutScalarAval(arrayvalue_p, src, fmt);
       break;
     default:
       break;
   }
-  *out_aval = aval;
-  *out_bval = bval;
 }
 
 // §38.35: find the element child of obj whose flat ordinal equals the target,
@@ -292,14 +296,13 @@ void PutValueArrayElement(VpiHandle obj, const VpiArrayValue* arrayvalue_p,
   Logic4Vec& ev = element->var->value;
   uint32_t width = ev.width;
   uint64_t mask = (width >= 64) ? ~uint64_t{0} : ((uint64_t{1} << width) - 1);
-  bool elem_4state = element->var->is_4state;
-  uint64_t aval = 0;
-  uint64_t bval = 0;
-  DecodePutSourceValue(arrayvalue_p, src, width, elem_4state, &aval, &bval);
+  ElementValue value;
+  value.is_4state = element->var->is_4state;
+  DecodePutSourceValue(arrayvalue_p, src, width, &value);
 
   if (ev.nwords > 0) {
-    ev.words[0].aval = aval & mask;
-    ev.words[0].bval = bval & mask;
+    ev.words[0].aval = value.aval & mask;
+    ev.words[0].bval = value.bval & mask;
   }
 }
 
@@ -409,18 +412,17 @@ size_t ComputeGetValueArrayBytes(int fmt, int ngroups, int words_per_elem,
 // whether it keeps unknown bits. A missing element, one without a backing
 // variable, or one with no value words leaves the outputs at their zero
 // defaults.
-void ReadGetElementValue(VpiObject* element, uint64_t* out_aval,
-                         uint64_t* out_bval, bool* out_4state) {
-  *out_aval = 0;
-  *out_bval = 0;
-  *out_4state = false;
+void ReadGetElementValue(VpiObject* element, ElementValue* out) {
+  out->aval = 0;
+  out->bval = 0;
+  out->is_4state = false;
   if (element && element->var) {
     const Logic4Vec& ev = element->var->value;
     if (ev.nwords > 0) {
-      *out_aval = ev.words[0].aval;
-      *out_bval = ev.words[0].bval;
+      out->aval = ev.words[0].aval;
+      out->bval = ev.words[0].bval;
     }
-    *out_4state = element->var->is_4state;
+    out->is_4state = element->var->is_4state;
   }
 }
 
@@ -461,22 +463,21 @@ void EncodeGetTimeValue(VpiArrayValue* arrayvalue_p, unsigned int k,
 // bvalbits carry the unknown/high-impedance state for a 4-state element; a
 // 2-state element reports a known (bval 0) value.
 void EncodeGetVectorValue(VpiArrayValue* arrayvalue_p, unsigned int k,
-                          uint64_t aval, uint64_t bval, bool elem_4state) {
-  arrayvalue_p->value.vectors[k].aval = static_cast<uint32_t>(aval);
+                          const ElementValue& value) {
+  arrayvalue_p->value.vectors[k].aval = static_cast<uint32_t>(value.aval);
   arrayvalue_p->value.vectors[k].bval =
-      elem_4state ? static_cast<uint32_t>(bval) : 0;
+      value.is_4state ? static_cast<uint32_t>(value.bval) : 0;
 }
 
 // §38.16: encode one element's value into position k of the vpiRawFourStateVal
 // arm. Each element occupies ngroups*2 bytes - an aval group followed by a bval
 // group - loaded least-significant byte first.
 void EncodeGetRawFourState(VpiArrayValue* arrayvalue_p, unsigned int k,
-                           int ngroups, uint64_t aval, uint64_t bval,
-                           bool elem_4state) {
+                           int ngroups, const ElementValue& value) {
   char* abase =
       arrayvalue_p->value.rawvals + static_cast<size_t>(k) * ngroups * 2;
-  VpiWriteRawGroup(abase, ngroups, aval);
-  VpiWriteRawGroup(abase + ngroups, ngroups, elem_4state ? bval : 0);
+  VpiWriteRawGroup(abase, ngroups, value.aval);
+  VpiWriteRawGroup(abase + ngroups, ngroups, value.is_4state ? value.bval : 0);
 }
 
 // §38.16: encode one element's value into position k of the vpiRawTwoStateVal
@@ -493,27 +494,26 @@ void EncodeGetRawTwoState(VpiArrayValue* arrayvalue_p, unsigned int k,
 // the element bits out per their byte/word group descriptions; the scalar arms
 // widen the element value into one C scalar.
 void EncodeGetElementValue(VpiArrayValue* arrayvalue_p, unsigned int k, int fmt,
-                           int ngroups, uint64_t aval, uint64_t bval,
-                           bool elem_4state) {
+                           int ngroups, const ElementValue& value) {
   switch (fmt) {
     case kVpiTimeVal:
-      EncodeGetTimeValue(arrayvalue_p, k, aval);
+      EncodeGetTimeValue(arrayvalue_p, k, value.aval);
       break;
     case kVpiVectorVal:
-      EncodeGetVectorValue(arrayvalue_p, k, aval, bval, elem_4state);
+      EncodeGetVectorValue(arrayvalue_p, k, value);
       break;
     case kVpiRawFourStateVal:
-      EncodeGetRawFourState(arrayvalue_p, k, ngroups, aval, bval, elem_4state);
+      EncodeGetRawFourState(arrayvalue_p, k, ngroups, value);
       break;
     case kVpiRawTwoStateVal:
-      EncodeGetRawTwoState(arrayvalue_p, k, ngroups, aval);
+      EncodeGetRawTwoState(arrayvalue_p, k, ngroups, value.aval);
       break;
     case kVpiIntVal:
     case kVpiShortIntVal:
     case kVpiLongIntVal:
     case kVpiRealVal:
     case kVpiShortRealVal:
-      EncodeGetScalarValue(arrayvalue_p, k, fmt, aval);
+      EncodeGetScalarValue(arrayvalue_p, k, fmt, value.aval);
       break;
     default:
       break;
@@ -611,12 +611,9 @@ void VpiContext::GetValueArray(VpiHandle obj, VpiArrayValue* arrayvalue_p,
   // raw and vector formats lay the element bits out per their byte/word group
   // descriptions; the scalar arms widen the element value into one C scalar.
   for (unsigned int k = 0; k < num; ++k) {
-    uint64_t aval = 0;
-    uint64_t bval = 0;
-    bool elem_4state = false;
-    ReadGetElementValue(section[k], &aval, &bval, &elem_4state);
-    EncodeGetElementValue(arrayvalue_p, k, fmt, ngroups, aval, bval,
-                          elem_4state);
+    ElementValue value;
+    ReadGetElementValue(section[k], &value);
+    EncodeGetElementValue(arrayvalue_p, k, fmt, ngroups, value);
   }
 }
 

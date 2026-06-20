@@ -270,21 +270,32 @@ void CheckExportDuplicateSvFunc(
   }
 }
 
+// §35.4/§35.7: the per-scope context against which one export declaration is
+// validated. Each module declaration is one scope (§35.4/§35.7), and it carries
+// the SystemVerilog function/task callables indexed by name plus the two
+// per-scope dedup sets the "forbidden in one scope" rules consult: the set of
+// export linkage names already seen and the set of SystemVerilog functions
+// already exported.
+struct ExportScopeContext {
+  const std::unordered_map<std::string_view, const ModuleItem*>& sv_callables;
+  std::unordered_set<std::string_view>& export_link_in_scope;
+  std::unordered_set<std::string_view>& exported_sv_func_in_scope;
+};
+
 // §35.4/§35.7: run the full battery of export-declaration checks for one export
-// item, given the SystemVerilog callables indexed for its enclosing scope and
-// the per-scope / cross-scope bookkeeping sets.
+// item, given the enclosing scope's context (indexed callables and per-scope
+// bookkeeping sets) and the cross-scope signature table.
 void ValidateExportDeclaration(
     const ModuleItem* item, std::string_view link_name,
-    const std::unordered_map<std::string_view, const ModuleItem*>& sv_callables,
-    std::unordered_set<std::string_view>& export_link_in_scope,
-    std::unordered_set<std::string_view>& exported_sv_func_in_scope,
+    ExportScopeContext& scope,
     std::unordered_map<std::string_view, DpiExportSignature>& export_signatures,
     DiagEngine& diag) {
-  CheckExportDuplicateLinkName(item, link_name, export_link_in_scope, diag);
-  CheckExportDuplicateSvFunc(item, exported_sv_func_in_scope, diag);
+  CheckExportDuplicateLinkName(item, link_name, scope.export_link_in_scope,
+                               diag);
+  CheckExportDuplicateSvFunc(item, scope.exported_sv_func_in_scope, diag);
 
-  auto callable_it = sv_callables.find(item->name);
-  if (callable_it == sv_callables.end()) {
+  auto callable_it = scope.sv_callables.find(item->name);
+  if (callable_it == scope.sv_callables.end()) {
     // §35.7: an export declaration is allowed only in the scope where the
     // function being exported is defined. If the scope contains no
     // SystemVerilog function or task with the named identifier, the export
@@ -441,9 +452,10 @@ void Elaborator::ValidateDpiGlobalNameSpace() {
       auto link_name = DpiLinkageName(item);
 
       if (item->kind == ModuleItemKind::kDpiExport) {
-        ValidateExportDeclaration(
-            item, link_name, sv_callables, export_link_in_scope,
-            exported_sv_func_in_scope, export_signatures, diag_);
+        ExportScopeContext scope{sv_callables, export_link_in_scope,
+                                 exported_sv_func_in_scope};
+        ValidateExportDeclaration(item, link_name, scope, export_signatures,
+                                  diag_);
       }
 
       CheckDpiVersionStringAgreement(item, link_name, link_version, diag_);

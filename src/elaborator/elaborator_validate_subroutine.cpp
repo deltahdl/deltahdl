@@ -801,44 +801,50 @@ static std::unordered_set<std::string_view> CollectNonSingularFuncs(
   return non_singular_funcs;
 }
 
+// The set of per-module lookup tables consulted while validating subroutine
+// calls and event expressions (§9.4.2, §13.4.x, §13.5.5). These travel together
+// as one validation context: the map of callable subroutines, the net names
+// (for ref-arg legality), and the sets of non-singular variables/functions
+// (for event-expression singular-value checks), plus the diagnostic sink.
+struct SubroutineCallContext {
+  const std::unordered_map<std::string_view, const ModuleItem*>& all_decls;
+  const std::unordered_set<std::string_view>& net_names;
+  const std::unordered_set<std::string_view>& non_singular_vars;
+  const std::unordered_set<std::string_view>& non_singular_funcs;
+  DiagEngine& diag;
+};
+
 // Validates one sensitivity-list event expression (the `signal` and
 // `iff_condition` of a single entry): call legality, no task calls, and
 // singular-value requirements.
-static void ValidateSensitivityEntry(
-    const Expr* signal, const Expr* iff_condition,
-    const std::unordered_map<std::string_view, const ModuleItem*>& all_decls,
-    const std::unordered_set<std::string_view>& non_singular_vars,
-    const std::unordered_set<std::string_view>& non_singular_funcs,
-    DiagEngine& diag) {
-  CheckCallNoOutInoutRefInExpr(signal, all_decls, diag, "an event expression");
-  CheckCallNoOutInoutRefInExpr(iff_condition, all_decls, diag,
+static void ValidateSensitivityEntry(const Expr* signal,
+                                     const Expr* iff_condition,
+                                     const SubroutineCallContext& ctx) {
+  CheckCallNoOutInoutRefInExpr(signal, ctx.all_decls, ctx.diag,
+                               "an event expression");
+  CheckCallNoOutInoutRefInExpr(iff_condition, ctx.all_decls, ctx.diag,
                                "an event expression");
 
-  CheckNoTaskCallInExpr(signal, all_decls, diag);
-  CheckNoTaskCallInExpr(iff_condition, all_decls, diag);
+  CheckNoTaskCallInExpr(signal, ctx.all_decls, ctx.diag);
+  CheckNoTaskCallInExpr(iff_condition, ctx.all_decls, ctx.diag);
 
-  CheckEventExprSingular(signal, non_singular_vars, non_singular_funcs, diag);
-  CheckEventExprSingular(iff_condition, non_singular_vars, non_singular_funcs,
-                         diag);
+  CheckEventExprSingular(signal, ctx.non_singular_vars, ctx.non_singular_funcs,
+                         ctx.diag);
+  CheckEventExprSingular(iff_condition, ctx.non_singular_vars,
+                         ctx.non_singular_funcs, ctx.diag);
 }
 
 // Validates the event expressions in a procedural block's body and sensitivity
 // list: call legality, no task calls, and singular-value requirements.
-static void ValidateProcBlockEvents(
-    const ModuleItem* item,
-    const std::unordered_map<std::string_view, const ModuleItem*>& all_decls,
-    const std::unordered_set<std::string_view>& net_names,
-    const std::unordered_set<std::string_view>& non_singular_vars,
-    const std::unordered_set<std::string_view>& non_singular_funcs,
-    DiagEngine& diag) {
-  WalkStmtForCallArgs(item->body, all_decls, net_names, diag);
+static void ValidateProcBlockEvents(const ModuleItem* item,
+                                    const SubroutineCallContext& ctx) {
+  WalkStmtForCallArgs(item->body, ctx.all_decls, ctx.net_names, ctx.diag);
 
-  WalkStmtForEventSingular(item->body, non_singular_vars, non_singular_funcs,
-                           diag);
+  WalkStmtForEventSingular(item->body, ctx.non_singular_vars,
+                           ctx.non_singular_funcs, ctx.diag);
 
   for (const auto& ev : item->sensitivity) {
-    ValidateSensitivityEntry(ev.signal, ev.iff_condition, all_decls,
-                             non_singular_vars, non_singular_funcs, diag);
+    ValidateSensitivityEntry(ev.signal, ev.iff_condition, ctx);
   }
 }
 
@@ -864,24 +870,19 @@ static void ValidateContAssignCallArgs(
 }
 
 // Validates the subroutine-call rules in one top-level item.
-static void ValidateCallArgsInItem(
-    const ModuleItem* item,
-    const std::unordered_map<std::string_view, const ModuleItem*>& all_decls,
-    const std::unordered_set<std::string_view>& net_names,
-    const std::unordered_set<std::string_view>& non_singular_vars,
-    const std::unordered_set<std::string_view>& non_singular_funcs,
-    DiagEngine& diag) {
+static void ValidateCallArgsInItem(const ModuleItem* item,
+                                   const SubroutineCallContext& ctx) {
   if (IsProceduralBlock(item)) {
-    ValidateProcBlockEvents(item, all_decls, net_names, non_singular_vars,
-                            non_singular_funcs, diag);
+    ValidateProcBlockEvents(item, ctx);
   }
 
   if (item->kind == ModuleItemKind::kFunctionDecl ||
       item->kind == ModuleItemKind::kTaskDecl) {
-    ValidateSubroutineBodyCallArgs(item, all_decls, net_names, diag);
+    ValidateSubroutineBodyCallArgs(item, ctx.all_decls, ctx.net_names,
+                                   ctx.diag);
   }
   if (item->kind == ModuleItemKind::kContAssign) {
-    ValidateContAssignCallArgs(item, all_decls, diag);
+    ValidateContAssignCallArgs(item, ctx.all_decls, ctx.diag);
   }
 }
 
@@ -896,9 +897,10 @@ void Elaborator::ValidateSubroutineCallArgs(const ModuleDecl* decl) {
   std::unordered_set<std::string_view> non_singular_funcs =
       CollectNonSingularFuncs(decl, func_decls_);
 
+  SubroutineCallContext ctx{all_decls, net_names_, non_singular_vars,
+                            non_singular_funcs, diag_};
   for (const auto* item : decl->items) {
-    ValidateCallArgsInItem(item, all_decls, net_names_, non_singular_vars,
-                           non_singular_funcs, diag_);
+    ValidateCallArgsInItem(item, ctx);
   }
 }
 

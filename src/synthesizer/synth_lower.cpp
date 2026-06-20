@@ -362,30 +362,45 @@ static PatternBits ParsePatternLiteral(std::string_view text,
   return result;
 }
 
-static uint32_t PatternBitLit(const Expr* pat, AigGraph& aig, SynthLower& synth,
-                              const PatternBits& pbits, bool has_dc,
+// The lowering engine objects (§12.5 case lowering) threaded through the
+// pattern-match family: the AIG being built and the SynthLower bit lowerer.
+struct LowerCtx {
+  AigGraph& aig;
+  SynthLower& synth;
+};
+
+// One case-item pattern (§12.5.1 casez/casez wildcards) after decoding: the
+// source literal expression plus its decoded aval/dc_mask and whether wildcard
+// decoding applies at all.
+struct DecodedPattern {
+  const Expr* pat;
+  PatternBits bits;
+  bool has_dc;
+};
+
+static uint32_t PatternBitLit(const LowerCtx& ctx, const DecodedPattern& pat,
                               uint32_t b) {
-  if (has_dc) {
-    return ((pbits.aval >> b) & 1u) ? AigGraph::kConstTrue
-                                    : AigGraph::kConstFalse;
+  if (pat.has_dc) {
+    return ((pat.bits.aval >> b) & 1u) ? AigGraph::kConstTrue
+                                       : AigGraph::kConstFalse;
   }
-  return synth.LowerExprBit(pat, aig, b);
+  return ctx.synth.LowerExprBit(pat.pat, ctx.aig, b);
 }
 
 static uint32_t BuildPatternMatch(const Expr* sel_expr, const Expr* pat,
-                                  AigGraph& aig, SynthLower& synth,
-                                  uint32_t sel_width, TokenKind case_kind) {
-  bool has_dc = (case_kind != TokenKind::kKwCase) &&
-                (pat->kind == ExprKind::kIntegerLiteral);
-  PatternBits pbits{};
-  if (has_dc) pbits = ParsePatternLiteral(pat->text, case_kind);
+                                  const LowerCtx& ctx, uint32_t sel_width,
+                                  TokenKind case_kind) {
+  DecodedPattern dp{pat, PatternBits{},
+                    (case_kind != TokenKind::kKwCase) &&
+                        (pat->kind == ExprKind::kIntegerLiteral)};
+  if (dp.has_dc) dp.bits = ParsePatternLiteral(pat->text, case_kind);
 
   uint32_t eq = AigGraph::kConstTrue;
   for (uint32_t b = 0; b < sel_width; ++b) {
-    if (has_dc && ((pbits.dc_mask >> b) & 1u)) continue;
-    uint32_t sb = synth.LowerExprBit(sel_expr, aig, b);
-    uint32_t pb = PatternBitLit(pat, aig, synth, pbits, has_dc, b);
-    eq = aig.AddAnd(eq, aig.AddNot(aig.AddXor(sb, pb)));
+    if (dp.has_dc && ((dp.bits.dc_mask >> b) & 1u)) continue;
+    uint32_t sb = ctx.synth.LowerExprBit(sel_expr, ctx.aig, b);
+    uint32_t pb = PatternBitLit(ctx, dp, b);
+    eq = ctx.aig.AddAnd(eq, ctx.aig.AddNot(ctx.aig.AddXor(sb, pb)));
   }
   return eq;
 }
@@ -413,10 +428,10 @@ void SynthLower::LowerCaseStmt(const Stmt* stmt, AigGraph& aig) {
     auto case_bits = signal_bits_;
 
     uint32_t match = AigGraph::kConstFalse;
+    LowerCtx ctx{aig, *this};
     for (const auto* pat : ci.patterns) {
-      match =
-          aig.AddOr(match, BuildPatternMatch(stmt->condition, pat, aig, *this,
-                                             sel_width, stmt->case_kind));
+      match = aig.AddOr(match, BuildPatternMatch(stmt->condition, pat, ctx,
+                                                 sel_width, stmt->case_kind));
     }
     MuxCaseBits(result_bits, case_bits, match, aig);
   }

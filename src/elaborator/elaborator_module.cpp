@@ -258,22 +258,37 @@ static void FoldParamConstantValue(RtlirParamDecl& pd, const Expr* pval,
   }
 }
 
-static void ResolveUnresolvedParamValue(
-    RtlirParamDecl& pd, const Expr* pval, std::string_view pname,
-    const ScopeMap& scope, bool refers_to_unbounded, bool contains_dollar,
-    bool has_param_type, const DataType* param_type, DiagEngine& diag) {
-  if (TryResolveUnboundedParamValue(pd, pval, refers_to_unbounded)) {
+// §6.20: a parameter's default value expression together with the
+// classification of that expression and the parameter's declared type. These
+// fields describe a single domain object - the value being assigned to the
+// parameter - so they are bundled and passed together when resolving the
+// parameter's concrete value.
+struct ParamValueExpr {
+  const Expr* pval;          // the default value expression
+  std::string_view pname;    // name of the parameter receiving the value
+  bool refers_to_unbounded;  // §6.20.7: expr is an unbounded ($) parameter ref
+  bool contains_dollar;      // §6.20.7: expr contains a $ subexpression
+  bool has_param_type;       // parameter has an explicit declared data type
+  const DataType* param_type;  // §6.20.2: that declared type (null if none)
+};
+
+static void ResolveUnresolvedParamValue(RtlirParamDecl& pd,
+                                        const ParamValueExpr& val,
+                                        const ScopeMap& scope,
+                                        DiagEngine& diag) {
+  if (TryResolveUnboundedParamValue(pd, val.pval, val.refers_to_unbounded)) {
     return;
   }
-  if (contains_dollar) {
+  if (val.contains_dollar) {
     // §6.20.7: $ must be the entire, self-contained parameter value; it
     // may not be combined with operators or selects in this context.
-    diag.Error(pval->range.start,
+    diag.Error(val.pval->range.start,
                std::format("'$' may only be assigned to parameter '{}' "
                            "as a complete, self-contained expression",
-                           pname));
+                           val.pname));
   }
-  FoldParamConstantValue(pd, pval, scope, has_param_type, param_type);
+  FoldParamConstantValue(pd, val.pval, scope, val.has_param_type,
+                         val.param_type);
 }
 
 // §6.20: report every value parameter that ends up with neither a default
@@ -370,9 +385,10 @@ RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
       bool refers_to_unbounded = pval->kind == ExprKind::kIdentifier &&
                                  RefersToUnboundedParam(mod, pval->text);
       bool contains_dollar = ContainsDollarSubexpr(pval);
-      ResolveUnresolvedParamValue(pd, pval, pname, scope, refers_to_unbounded,
-                                  contains_dollar, has_param_type, param_type,
-                                  diag_);
+      ParamValueExpr val{
+          pval,           pname,     refers_to_unbounded, contains_dollar,
+          has_param_type, param_type};
+      ResolveUnresolvedParamValue(pd, val, scope, diag_);
     }
     mod->params.push_back(pd);
   }
@@ -532,26 +548,37 @@ static void DiagnosePortTypeConstraints(const PortDecl& port, bool port_is_var,
   }
 }
 
+// State threaded into ElaborateOnePort that would otherwise be Elaborator
+// members; grouped so the helper can stay a free function (no header change).
+// The non-ANSI port-tracking sets and the type-lookup context together form the
+// elaboration state for one module's port list, so they travel as one object.
+struct PortElabContext {
+  const TypedefMap& typedefs;
+  const ScopeMap& param_scope;
+  std::unordered_set<std::string_view>& complete_ports;
+  std::unordered_map<std::string_view, uint32_t>& partial_ports;
+  std::unordered_set<std::string_view>& signed_ports;
+  DiagEngine& diag;
+};
+
 // Record the type information of a directioned non-ANSI port so the matching
-// body net/variable declaration can be reconciled later (§23.2.2.1).
-static void TrackNonAnsiPortType(
-    const ModuleDecl* decl, const PortDecl& port, const TypedefMap& typedefs,
-    const ScopeMap& param_scope,
-    std::unordered_set<std::string_view>& complete_ports,
-    std::unordered_map<std::string_view, uint32_t>& partial_ports,
-    std::unordered_set<std::string_view>& signed_ports) {
+// body net/variable declaration can be reconciled later (§23.2.2.1). The
+// tracking sets are reference members of the context, so a const reference
+// still allows recording into them.
+static void TrackNonAnsiPortType(const ModuleDecl* decl, const PortDecl& port,
+                                 const PortElabContext& ctx) {
   if (!decl->is_non_ansi_ports || port.name.empty() ||
       port.direction == Direction::kNone) {
     return;
   }
   if (port.data_type.kind != DataTypeKind::kImplicit) {
-    complete_ports.insert(port.name);
+    ctx.complete_ports.insert(port.name);
   } else {
-    partial_ports[port.name] =
-        EvalTypeWidth(port.data_type, typedefs, param_scope);
+    ctx.partial_ports[port.name] =
+        EvalTypeWidth(port.data_type, ctx.typedefs, ctx.param_scope);
     // §23.2.2.1: remember a `signed` port direction declaration so the
     // matching net/variable declaration can be considered signed too.
-    if (port.data_type.is_signed) signed_ports.insert(port.name);
+    if (port.data_type.is_signed) ctx.signed_ports.insert(port.name);
   }
 }
 
@@ -572,25 +599,13 @@ static RtlirPort BuildRtlirPortBase(const PortDecl& port, bool port_is_var,
   return rp;
 }
 
-// State threaded into ElaborateOnePort that would otherwise be Elaborator
-// members; grouped so the helper can stay a free function (no header change).
-struct PortElabContext {
-  const TypedefMap& typedefs;
-  const ScopeMap& param_scope;
-  std::unordered_set<std::string_view>& complete_ports;
-  std::unordered_map<std::string_view, uint32_t>& partial_ports;
-  std::unordered_set<std::string_view>& signed_ports;
-  DiagEngine& diag;
-};
-
 // Elaborate one port declaration into its RtlirPort: run the per-port
 // diagnostics, track non-ANSI type info, and build the base fields. The
 // interface-port flag is resolved by the caller because it needs FindModule.
 static RtlirPort ElaborateOnePort(const ModuleDecl* decl, const PortDecl& port,
                                   PortElabContext& ctx) {
   DiagnoseMissingNonAnsiPortDirection(port, decl->is_non_ansi_ports, ctx.diag);
-  TrackNonAnsiPortType(decl, port, ctx.typedefs, ctx.param_scope,
-                       ctx.complete_ports, ctx.partial_ports, ctx.signed_ports);
+  TrackNonAnsiPortType(decl, port, ctx);
 
   if (port.default_value) {
     ValidatePortDefaultValue(port, decl->is_non_ansi_ports, ctx.diag);

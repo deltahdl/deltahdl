@@ -167,25 +167,34 @@ void RegisterBuiltinClassNames(
   class_names.insert("process");
 }
 
+// The compilation-unit scope (§26.3, §6.14): the set of elaborator name spaces
+// that compilation-unit items populate -- visible names, typedefs, the
+// class/parameterized-class name sets, and the constant parameter scope. These
+// containers are members of the Elaborator that are filled together while
+// classifying each compilation-unit item, so they travel as one entity.
+struct CuScope {
+  std::unordered_set<std::string_view>& names;
+  TypedefMap& typedefs;
+  std::unordered_set<std::string_view>& class_names;
+  std::unordered_set<std::string_view>& parameterized_classes;
+  ScopeMap& param_scope;
+};
+
 // Classifies one compilation-unit item, recording it in the appropriate
 // elaborator scope structures (names, typedefs, class/parameterized-class sets,
 // or the constant parameter scope).
-void ClassifyCuScopeItem(
-    ModuleItem* item, std::unordered_set<std::string_view>& cu_scope_names,
-    TypedefMap& typedefs, std::unordered_set<std::string_view>& class_names,
-    std::unordered_set<std::string_view>& parameterized_classes,
-    ScopeMap& cu_param_scope) {
-  if (!item->name.empty()) cu_scope_names.insert(item->name);
+void ClassifyCuScopeItem(ModuleItem* item, CuScope& scope) {
+  if (!item->name.empty()) scope.names.insert(item->name);
   if (item->kind == ModuleItemKind::kTypedef) {
-    typedefs[item->name] = item->typedef_type;
+    scope.typedefs[item->name] = item->typedef_type;
   } else if (item->kind == ModuleItemKind::kClassDecl && item->class_decl) {
-    class_names.insert(item->class_decl->name);
+    scope.class_names.insert(item->class_decl->name);
     if (!item->class_decl->params.empty())
-      parameterized_classes.insert(item->class_decl->name);
+      scope.parameterized_classes.insert(item->class_decl->name);
   } else if (item->kind == ModuleItemKind::kParamDecl && item->init_expr) {
-    auto val = ConstEvalInt(item->init_expr, cu_param_scope);
+    auto val = ConstEvalInt(item->init_expr, scope.param_scope);
     if (val) {
-      cu_param_scope[item->name] = *val;
+      scope.param_scope[item->name] = *val;
     }
   }
 }
@@ -207,9 +216,10 @@ void RegisterCuClasses(
 
 void Elaborator::RegisterCuScopeItems() {
   RegisterBuiltinClassNames(class_names_);
+  CuScope cu_scope{cu_scope_names_, typedefs_, class_names_,
+                   parameterized_class_names_, cu_param_scope_};
   for (auto* item : unit_->cu_items) {
-    ClassifyCuScopeItem(item, cu_scope_names_, typedefs_, class_names_,
-                        parameterized_class_names_, cu_param_scope_);
+    ClassifyCuScopeItem(item, cu_scope);
   }
   RegisterCuClasses(unit_, class_names_, cu_scope_names_,
                     parameterized_class_names_);

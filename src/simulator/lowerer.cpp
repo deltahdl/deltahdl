@@ -155,6 +155,26 @@ struct ContAssignParams {
   const Expr* data_input = nullptr;
 };
 
+// Identifies the driver slot that a continuous assignment writes to. Per IEEE
+// 1800 §10.3, a continuous assignment drives a single net (or variable) through
+// one driver; `net` is the resolved net (null when the target is a variable),
+// `driver_idx` is that driver's slot within the net, and `first` is true on the
+// initial commit, when the driver slot must be appended rather than
+// overwritten.
+struct ContAssignDriver {
+  Net* net = nullptr;
+  size_t driver_idx = 0;
+  bool first = true;
+};
+
+// The value a continuous-assignment driver contributes to net resolution: the
+// driven logic value paired with the driver strength selected for it (IEEE 1800
+// §10.3, §28.x driver strengths).
+struct ContAssignDrivenValue {
+  const Logic4Vec& value;
+  DriverStrength strength;
+};
+
 static uint64_t SelectScalarContAssignDelay(const Logic4Vec& old_val,
                                             const Logic4Vec& new_val,
                                             const ContAssignDelays& d) {
@@ -229,17 +249,17 @@ static DriverStrength ComputeEffectiveDriverStrength(
   return effective_ds;
 }
 
-static void ApplyContAssignToNet(Net* net, size_t driver_idx, bool first,
-                                 const Logic4Vec& driven_val,
-                                 DriverStrength effective_ds, Arena& arena) {
-  if (first) {
-    net->drivers.push_back(driven_val);
-    net->driver_strengths.push_back(effective_ds);
+static void ApplyContAssignToNet(const ContAssignDriver& drv,
+                                 const ContAssignDrivenValue& driven,
+                                 Arena& arena) {
+  if (drv.first) {
+    drv.net->drivers.push_back(driven.value);
+    drv.net->driver_strengths.push_back(driven.strength);
   } else {
-    net->drivers[driver_idx] = driven_val;
-    net->driver_strengths[driver_idx] = effective_ds;
+    drv.net->drivers[drv.driver_idx] = driven.value;
+    drv.net->driver_strengths[drv.driver_idx] = driven.strength;
   }
-  net->Resolve(arena);
+  drv.net->Resolve(arena);
 }
 
 static void ApplyContAssignToVariable(const ContAssignParams& params,
@@ -252,16 +272,14 @@ static void ApplyContAssignToVariable(const ContAssignParams& params,
   }
 }
 
-static void ApplyContAssignResult(const ContAssignParams& params, Net* net,
-                                  size_t driver_idx, bool first,
-                                  const Logic4Vec& driven_val,
-                                  DriverStrength effective_ds, SimContext& ctx,
-                                  Arena& arena) {
-  if (net) {
-    ApplyContAssignToNet(net, driver_idx, first, driven_val, effective_ds,
-                         arena);
+static void ApplyContAssignResult(const ContAssignParams& params,
+                                  const ContAssignDriver& drv,
+                                  const ContAssignDrivenValue& driven,
+                                  SimContext& ctx, Arena& arena) {
+  if (drv.net) {
+    ApplyContAssignToNet(drv, driven, arena);
   } else {
-    ApplyContAssignToVariable(params, driven_val, ctx, arena);
+    ApplyContAssignToVariable(params, driven.value, ctx, arena);
   }
 }
 
@@ -296,38 +314,46 @@ struct InertialReeval {
   SimTime target;
 };
 
-static InertialReeval ReevalInertialContAssign(const ContAssignParams& params,
-                                               const ContAssignDelays& d,
-                                               const Logic4Vec& old_val,
-                                               Logic4Vec& val, SimContext& ctx,
-                                               Arena& arena) {
+// The endpoints of a pending inertial continuous-assignment transition (IEEE
+// 1800 §28 inertial delays): `old_val` is the value already present on the
+// left-hand side and `val` is the pending new value being scheduled. `val` is a
+// reference because re-evaluating the right-hand side may replace it in place.
+struct PendingContAssignTransition {
+  const Logic4Vec& old_val;
+  Logic4Vec& val;
+};
+
+static InertialReeval ReevalInertialContAssign(
+    const ContAssignParams& params, const ContAssignDelays& d,
+    const PendingContAssignTransition& xition, SimContext& ctx, Arena& arena) {
   InertialReeval result;
   auto new_val = EvalExpr(params.rhs, ctx, arena, params.width);
-  if (Logic4VecEqual(new_val, val)) return result;
+  if (Logic4VecEqual(new_val, xition.val)) return result;
   // The operand changed again before the pending value could propagate, so the
   // previously scheduled event is dropped.
-  val = new_val;
-  if (Logic4VecEqual(new_val, old_val)) {
+  xition.val = new_val;
+  if (Logic4VecEqual(new_val, xition.old_val)) {
     // The re-evaluated right-hand side now matches the value already present on
     // the left-hand side, so no replacement event is scheduled and the pending
     // transition collapses immediately.
     result.collapsed = true;
     return result;
   }
-  uint64_t ticks = SelectContAssignDelay(old_val, val, d, params.width);
+  uint64_t ticks =
+      SelectContAssignDelay(xition.old_val, xition.val, d, params.width);
   result.rescheduled = true;
   result.target = ctx.CurrentTime() + SimTime{ticks};
   return result;
 }
 
-static void CommitContAssignValue(const ContAssignParams& params, Net* net,
-                                  size_t driver_idx, bool first,
+static void CommitContAssignValue(const ContAssignParams& params,
+                                  const ContAssignDriver& drv,
                                   const Logic4Vec& val, SimContext& ctx,
                                   Arena& arena) {
   DriverStrength effective_ds = ComputeEffectiveDriverStrength(params, ctx);
   auto driven_val = ApplyHighzStrengthsToValue(val, effective_ds, arena);
-  ApplyContAssignResult(params, net, driver_idx, first, driven_val,
-                        effective_ds, ctx, arena);
+  ApplyContAssignResult(
+      params, drv, ContAssignDrivenValue{driven_val, effective_ds}, ctx, arena);
 }
 
 static SimCoroutine MakeContAssignCoroutine(ContAssignParams params,
@@ -338,8 +364,10 @@ static SimCoroutine MakeContAssignCoroutine(ContAssignParams params,
       CollectContAssignReadVars(params.rhs);
 
   auto* net = ctx.FindNet(params.lhs->text);
-  size_t driver_idx = net ? net->drivers.size() : 0;
-  bool first = true;
+  ContAssignDriver drv;
+  drv.net = net;
+  drv.driver_idx = net ? net->drivers.size() : 0;
+  drv.first = true;
 
   while (!ctx.StopRequested()) {
     auto val = EvalExpr(params.rhs, ctx, arena, params.width);
@@ -359,8 +387,8 @@ static SimCoroutine MakeContAssignCoroutine(ContAssignParams params,
           bool expired =
               co_await InertialDelayAwaiter{ctx, remaining, read_vars};
           if (expired) break;
-          InertialReeval re =
-              ReevalInertialContAssign(params, d, old_val, val, ctx, arena);
+          InertialReeval re = ReevalInertialContAssign(
+              params, d, PendingContAssignTransition{old_val, val}, ctx, arena);
           if (re.collapsed) break;
           if (re.rescheduled) target = re.target;
         }
@@ -369,8 +397,8 @@ static SimCoroutine MakeContAssignCoroutine(ContAssignParams params,
       }
     }
 
-    CommitContAssignValue(params, net, driver_idx, first, val, ctx, arena);
-    first = false;
+    CommitContAssignValue(params, drv, val, ctx, arena);
+    drv.first = false;
 
     if (read_vars.empty()) break;
     co_await AnyChangeAwaiter{ctx, read_vars};

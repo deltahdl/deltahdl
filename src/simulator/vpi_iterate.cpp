@@ -231,6 +231,21 @@ struct VpiIterateModes {
   bool callback_object = false;
 };
 
+// The context-owned object and registry stores an iteration is resolved
+// against. §37.42 detail 6 / §37.81 reach the simulator's full object list and
+// surviving time-queue slots (both grown as placeholder/time-queue objects are
+// allocated, so held by non-const reference like VpiContext::AllocObject's
+// bookkeeping); §37.80 (figure) reaches the read-only callback registry. These
+// four collections always travel together from VpiContext::Iterate through the
+// dispatch helpers, so they are bundled as one entity rather than threaded
+// through each signature individually.
+struct VpiIterateStores {
+  std::vector<VpiObject*>& all_objects;
+  const std::vector<VpiTimeQueueSlot>& time_queue_slots;
+  const std::vector<VpiHandle>& cb_handles;
+  const std::vector<VpiCbData>& callbacks;
+};
+
 // §37.42 / §37.27: classify the tf-call argument and named-event special
 // modes. A tf call's arguments are reached through vpiArgument (argument-kind
 // children, not vpiArgument-typed children); a named event's
@@ -657,10 +672,7 @@ bool DispatchRegistryMode(int type, VpiHandle ref,
 // objects. Returns true if one of these modes applied.
 bool DispatchRefSpecialMode(int type, VpiHandle ref,
                             const VpiIterateModes& modes,
-                            std::vector<VpiObject*>& all_objects,
-                            const std::vector<VpiHandle>& cb_handles,
-                            const std::vector<VpiCbData>& callbacks,
-                            VpiObject* iter) {
+                            VpiIterateStores& stores, VpiObject* iter) {
   (void)type;
   if (modes.net_driver || modes.net_load) {
     CollectNetDriversOrLoads(ref, modes.net_driver, iter);
@@ -672,7 +684,7 @@ bool DispatchRefSpecialMode(int type, VpiHandle ref,
     return true;
   }
   if (modes.constr_foreach_loopvars || modes.foreach_stmt_loopvars) {
-    CollectForeachLoopVars(ref, all_objects, iter);
+    CollectForeachLoopVars(ref, stores.all_objects, iter);
     return true;
   }
   if (modes.constraint_expr) {
@@ -680,30 +692,26 @@ bool DispatchRefSpecialMode(int type, VpiHandle ref,
     return true;
   }
   if (modes.callback_object) {
-    CollectCallbackObjects(ref, cb_handles, callbacks, iter);
+    CollectCallbackObjects(ref, stores.cb_handles, stores.callbacks, iter);
     return true;
   }
   return false;
 }
 
 void DispatchVpiIterate(int type, VpiHandle ref, const VpiIterateModes& modes,
-                        std::vector<VpiObject*>& all_objects,
-                        const std::vector<VpiTimeQueueSlot>& time_queue_slots,
-                        const std::vector<VpiHandle>& cb_handles,
-                        const std::vector<VpiCbData>& callbacks,
-                        VpiObject* iter) {
+                        VpiIterateStores& stores, VpiObject* iter) {
   if (DispatchScopeMode(type, ref, modes, iter)) return;
-  if (DispatchRegistryMode(type, ref, all_objects, time_queue_slots, iter)) {
+  if (DispatchRegistryMode(type, ref, stores.all_objects,
+                           stores.time_queue_slots, iter)) {
     return;
   }
-  if (DispatchRefSpecialMode(type, ref, modes, all_objects, cb_handles,
-                             callbacks, iter)) {
+  if (DispatchRefSpecialMode(type, ref, modes, stores, iter)) {
     return;
   }
   if (ref) {
     CollectMatchingChildren(type, ref, modes, iter);
   } else {
-    CollectMatchingObjects(type, ref, modes, all_objects, iter);
+    CollectMatchingObjects(type, ref, modes, stores.all_objects, iter);
   }
 }
 
@@ -746,8 +754,9 @@ VpiHandle VpiContext::Iterate(int type, VpiHandle ref) {
   // special mode (or the generic walks). Detail 2 of §37.81 - an empty time
   // queue yields NULL rather than an empty iterator - is left to the shared
   // empty-children check below.
-  DispatchVpiIterate(type, ref, modes, all_objects_, time_queue_slots_,
-                     cb_handles_, callbacks_, iter);
+  VpiIterateStores stores{all_objects_, time_queue_slots_, cb_handles_,
+                          callbacks_};
+  DispatchVpiIterate(type, ref, modes, stores, iter);
 
   if (iter->children.empty()) {
     delete iter;

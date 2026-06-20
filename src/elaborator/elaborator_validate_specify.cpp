@@ -19,26 +19,52 @@ namespace {
 using PortMap = std::unordered_map<std::string_view, const PortDecl*>;
 using SignalSet = std::unordered_set<std::string_view>;
 
+// The role a terminal plays in a module path (§30.4.4): a source must be
+// connected to an input/inout port (and be a net), a destination to an
+// output/inout port. Groups the direction rule with the diagnostic wording so
+// the whole expectation travels as one entity.
+struct TerminalRole {
+  Direction allowed_dir;        // kInput for sources, kOutput for destinations
+  std::string_view role;        // diagnostic word ("source"/"destination")
+  std::string_view dir_phrase;  // diagnostic phrase for the allowed direction
+  bool require_net;             // sources must be nets, destinations need not
+};
+
+// Builds the source/destination terminal-role expectations.
+TerminalRole SourceRole() {
+  return {Direction::kInput, "source", "input or inout", /*require_net=*/true};
+}
+TerminalRole DestRole() {
+  return {Direction::kOutput, "destination", "output or inout",
+          /*require_net=*/false};
+}
+
+// The signal scope of one module: its declared ports plus the net/var
+// declarations that are local signals (not ports).
+struct SignalScope {
+  const PortMap& port_map;
+  const SignalSet& local_signals;
+};
+
 // Validates a path terminal that resolves to a declared port `p`: checks the
 // ref-port prohibition, direction compatibility, and (for sources) the net
 // requirement. Emits at most one diagnostic.
 void CheckPathTerminalPort(const PortDecl* p, const SpecifyTerminal& t,
-                           SourceLoc loc, Direction allowed_dir,
-                           std::string_view role, std::string_view dir_phrase,
-                           bool require_net, DiagEngine& diag) {
+                           SourceLoc loc, const TerminalRole& tr,
+                           DiagEngine& diag) {
   if (p->direction == Direction::kRef) {
     diag.Error(loc, std::format("ref port '{}' cannot be used as a "
                                 "terminal in a specify block",
                                 t.name));
     return;
   }
-  if (p->direction != allowed_dir && p->direction != Direction::kInout) {
+  if (p->direction != tr.allowed_dir && p->direction != Direction::kInout) {
     diag.Error(loc, std::format("module path {} '{}' must be "
                                 "connected to an {} port",
-                                role, t.name, dir_phrase));
+                                tr.role, t.name, tr.dir_phrase));
     return;
   }
-  if (require_net) {
+  if (tr.require_net) {
     bool is_var = !p->data_type.is_net && !p->data_type.is_interconnect;
     if (is_var) {
       diag.Error(loc,
@@ -50,25 +76,20 @@ void CheckPathTerminalPort(const PortDecl* p, const SpecifyTerminal& t,
 // Validates one terminal of a module path: it must name a port whose direction
 // permits the given role (kInput for path sources, kOutput for destinations;
 // inout is always allowed), it may not be a ref port, and a source must be a
-// net. `role` is the word used in diagnostics ("source"/"destination").
+// net. `tr.role` is the word used in diagnostics ("source"/"destination").
 void CheckSpecifyPathTerminal(const SpecifyTerminal& t, SourceLoc loc,
-                              const PortMap& port_map,
-                              const SignalSet& local_signals,
-                              Direction allowed_dir, std::string_view role,
-                              bool require_net, DiagEngine& diag) {
-  std::string_view dir_phrase =
-      allowed_dir == Direction::kInput ? "input or inout" : "output or inout";
+                              const SignalScope& scope, const TerminalRole& tr,
+                              DiagEngine& diag) {
   if (!t.interface_name.empty()) return;
-  auto it = port_map.find(t.name);
-  if (it != port_map.end()) {
-    CheckPathTerminalPort(it->second, t, loc, allowed_dir, role, dir_phrase,
-                          require_net, diag);
+  auto it = scope.port_map.find(t.name);
+  if (it != scope.port_map.end()) {
+    CheckPathTerminalPort(it->second, t, loc, tr, diag);
     return;
   }
-  if (local_signals.contains(t.name)) {
+  if (scope.local_signals.contains(t.name)) {
     diag.Error(loc, std::format("module path {} '{}' is not connected "
                                 "to an {} port",
-                                role, t.name, dir_phrase));
+                                tr.role, t.name, tr.dir_phrase));
   }
 }
 
@@ -109,15 +130,12 @@ void CheckTimingTerminal(const SpecifyTerminal& t, SourceLoc loc,
 // Validates all source and destination terminals of one path declaration.
 void CheckPathDeclTerminals(const SpecifyItem* si, const PortMap& port_map,
                             const SignalSet& local_signals, DiagEngine& diag) {
+  SignalScope scope{port_map, local_signals};
   for (const auto& t : si->path.src_ports) {
-    CheckSpecifyPathTerminal(t, si->loc, port_map, local_signals,
-                             Direction::kInput, "source",
-                             /*require_net=*/true, diag);
+    CheckSpecifyPathTerminal(t, si->loc, scope, SourceRole(), diag);
   }
   for (const auto& t : si->path.dst_ports) {
-    CheckSpecifyPathTerminal(t, si->loc, port_map, local_signals,
-                             Direction::kOutput, "destination",
-                             /*require_net=*/false, diag);
+    CheckSpecifyPathTerminal(t, si->loc, scope, DestRole(), diag);
   }
 }
 

@@ -492,6 +492,21 @@ static bool IsBuiltinMethodOnLocal(
   return local_names.count(root->text) > 0;
 }
 
+// §13.4.3 — the recursion-invariant scope a constant function is validated
+// against: the names visible to its body (module parameters and the set of
+// callable function names), the function-declaration map used to recurse into
+// nested constant-function calls, the visited-name guard against (mutual)
+// recursion, and the diagnostic sink. One scope object threads through the
+// whole constant-function check; only `func`, its source location, and the
+// per-function set of body-local names vary between calls.
+struct ConstFuncScope {
+  const std::unordered_set<std::string_view>& param_names;
+  const std::unordered_set<std::string_view>& function_names;
+  const std::unordered_map<std::string_view, const ModuleItem*>* func_decls;
+  std::unordered_set<std::string_view>* visited;
+  DiagEngine& diag;
+};
+
 struct ConstFuncBodyCheck {
   std::string_view func_name;
   const std::unordered_set<std::string_view>& param_names;
@@ -504,12 +519,8 @@ struct ConstFuncBodyCheck {
   bool failed = false;
 };
 
-static bool ValidateConstantFunction(
-    const ModuleItem* func, SourceLoc loc,
-    const std::unordered_set<std::string_view>& param_names,
-    const std::unordered_set<std::string_view>& function_names,
-    const std::unordered_map<std::string_view, const ModuleItem*>* func_decls,
-    std::unordered_set<std::string_view>* visited, DiagEngine& diag);
+static bool ValidateConstantFunction(const ModuleItem* func, SourceLoc loc,
+                                     const ConstFuncScope& scope);
 
 static void WalkConstFuncExpr(const Expr* e, ConstFuncBodyCheck& chk);
 
@@ -604,9 +615,9 @@ static void CheckConstFuncCall(const Expr* e, ConstFuncBodyCheck& chk) {
       e->callee != chk.func_name && !chk.visited->count(e->callee)) {
     auto it = chk.func_decls->find(e->callee);
     if (it != chk.func_decls->end()) {
-      if (!ValidateConstantFunction(it->second, chk.loc, chk.param_names,
-                                    chk.function_names, chk.func_decls,
-                                    chk.visited, chk.diag)) {
+      ConstFuncScope scope{chk.param_names, chk.function_names, chk.func_decls,
+                           chk.visited, chk.diag};
+      if (!ValidateConstantFunction(it->second, chk.loc, scope)) {
         chk.failed = true;
         return;
       }
@@ -750,35 +761,27 @@ static std::unordered_set<std::string_view> CollectConstFuncLocalNames(
 // identifier-scope, hierarchical-reference, system-call, and nested-call rules.
 // Returns false (the body failed) once any §13.4.3 violation is reported.
 static bool CheckConstFuncBody(
-    const ModuleItem* func, SourceLoc loc,
-    const std::unordered_set<std::string_view>& param_names,
-    const std::unordered_set<std::string_view>& function_names,
-    const std::unordered_set<std::string_view>& local_names,
-    const std::unordered_map<std::string_view, const ModuleItem*>* func_decls,
-    std::unordered_set<std::string_view>* visited, DiagEngine& diag) {
-  ConstFuncBodyCheck chk{func->name,  param_names, function_names,
-                         local_names, func_decls,  visited,
-                         diag,        loc,         /*failed=*/false};
+    const ModuleItem* func, SourceLoc loc, const ConstFuncScope& scope,
+    const std::unordered_set<std::string_view>& local_names) {
+  ConstFuncBodyCheck chk{
+      func->name,       scope.param_names, scope.function_names, local_names,
+      scope.func_decls, scope.visited,     scope.diag,           loc,
+      /*failed=*/false};
   for (auto* s : func->func_body_stmts) WalkConstFuncStmt(s, chk);
   return !chk.failed;
 }
 
-static bool ValidateConstantFunction(
-    const ModuleItem* func, SourceLoc loc,
-    const std::unordered_set<std::string_view>& param_names,
-    const std::unordered_set<std::string_view>& function_names,
-    const std::unordered_map<std::string_view, const ModuleItem*>* func_decls,
-    std::unordered_set<std::string_view>* visited, DiagEngine& diag) {
-  if (visited && !func->name.empty()) {
-    if (!visited->insert(func->name).second) return true;
+static bool ValidateConstantFunction(const ModuleItem* func, SourceLoc loc,
+                                     const ConstFuncScope& scope) {
+  if (scope.visited && !func->name.empty()) {
+    if (!scope.visited->insert(func->name).second) return true;
   }
-  if (!ValidateConstFuncArgs(func, loc, diag)) return false;
-  if (!ValidateConstFuncBodyContent(func, loc, diag)) return false;
+  if (!ValidateConstFuncArgs(func, loc, scope.diag)) return false;
+  if (!ValidateConstFuncBodyContent(func, loc, scope.diag)) return false;
 
   std::unordered_set<std::string_view> local_names =
       CollectConstFuncLocalNames(func);
-  return CheckConstFuncBody(func, loc, param_names, function_names, local_names,
-                            func_decls, visited, diag);
+  return CheckConstFuncBody(func, loc, scope, local_names);
 }
 
 struct ConstFuncCallCtx {
@@ -823,8 +826,9 @@ static void ValidateConstFuncCallNode(const Expr* expr, SourceLoc loc,
   auto it = ctx.func_decls.find(expr->callee);
   if (it == ctx.func_decls.end()) return;
   std::unordered_set<std::string_view> visited;
-  ValidateConstantFunction(it->second, loc, ctx.param_names, ctx.function_names,
-                           &ctx.func_decls, &visited, ctx.diag);
+  ConstFuncScope scope{ctx.param_names, ctx.function_names, &ctx.func_decls,
+                       &visited, ctx.diag};
+  ValidateConstantFunction(it->second, loc, scope);
   CheckConstFuncCallArgs(expr, loc, ctx);
 }
 

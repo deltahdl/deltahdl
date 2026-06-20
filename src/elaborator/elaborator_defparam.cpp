@@ -148,27 +148,44 @@ static bool DefparamOverrideAllowed(DiagEngine& diag,
   return true;
 }
 
+// One defparam override as an LRM entity (§23.10.4): the resolved target
+// parameter, the right-hand side value expression, the scope its value is
+// evaluated in, and the source location of the defparam statement.
+struct DefparamOverride {
+  const RtlirParamDecl* param;
+  const Expr* val_expr;
+  const ScopeMap& scope;
+  SourceLoc loc;
+};
+
+// The bookkeeping for which defparam assignments have been handled: the
+// applied-set keyed by (module, item, assignment index) plus the key naming
+// this particular assignment.
+using DefparamAppliedKey = std::tuple<RtlirModule*, const ModuleItem*, size_t>;
+struct DefparamAppliedRecord {
+  std::set<DefparamAppliedKey>& applied;
+  const DefparamAppliedKey& key;
+};
+
 // Validates one already-resolved defparam target and, if the override may
 // proceed, evaluates its right-hand side. On any rejection (illegal override or
-// non-constant value) the assignment `key` is recorded in `applied` and an
+// non-constant value) the assignment key is recorded in the applied set and an
 // empty optional is returned; the caller then skips it. On success the
 // converted override value is returned.
 static std::optional<int64_t> EvalDefparamOverride(
-    DiagEngine& diag, const RtlirParamDecl* param, const Expr* val_expr,
-    const ScopeMap& scope, SourceLoc loc,
-    std::set<std::tuple<RtlirModule*, const ModuleItem*, size_t>>& applied,
-    const std::tuple<RtlirModule*, const ModuleItem*, size_t>& key) {
-  if (!DefparamOverrideAllowed(diag, param, val_expr, loc)) {
-    applied.insert(key);
+    DiagEngine& diag, const DefparamOverride& ovr,
+    const DefparamAppliedRecord& rec) {
+  if (!DefparamOverrideAllowed(diag, ovr.param, ovr.val_expr, ovr.loc)) {
+    rec.applied.insert(rec.key);
     return std::nullopt;
   }
-  auto val = ConstEvalInt(val_expr, scope);
+  auto val = ConstEvalInt(ovr.val_expr, ovr.scope);
   if (!val) {
-    diag.Warning(loc, "defparam value is not constant");
-    applied.insert(key);
+    diag.Warning(ovr.loc, "defparam value is not constant");
+    rec.applied.insert(rec.key);
     return std::nullopt;
   }
-  return ConvertOverrideValue(*val, *param);
+  return ConvertOverrideValue(*val, *ovr.param);
 }
 
 void Elaborator::ApplyDefparams(RtlirModule* mod, const ModuleDecl* decl) {
@@ -182,8 +199,9 @@ void Elaborator::ApplyDefparams(RtlirModule* mod, const ModuleDecl* decl) {
       RtlirModule* target_mod = nullptr;
       auto* param = ResolveDefparamPath(mod, path_expr, &target_mod);
       if (!param) continue;
-      auto value = EvalDefparamOverride(diag_, param, val_expr, scope,
-                                        item->loc, applied_defparams_, key);
+      DefparamOverride ovr{param, val_expr, scope, item->loc};
+      DefparamAppliedRecord rec{applied_defparams_, key};
+      auto value = EvalDefparamOverride(diag_, ovr, rec);
       if (!value) continue;
 
       param->resolved_value = *value;

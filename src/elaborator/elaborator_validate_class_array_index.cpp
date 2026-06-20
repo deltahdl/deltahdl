@@ -42,29 +42,37 @@ static bool IsIllegalClassIndex(
   return false;
 }
 
+// §7.8.3: resolving a class-indexed select requires the elaboration context
+// that describes the visible class-indexed associative arrays and class types
+// of the enclosing scope. These five values always travel together as one
+// unit, so they are bundled into a single context object passed through the
+// recursive walk.
+struct ClassIndexCtx {
+  const std::unordered_map<std::string_view, Elaborator::VarArrayInfo>&
+      var_array_info;
+  const std::unordered_map<std::string_view, std::string_view>& class_var_types;
+  const std::unordered_set<std::string_view>& class_names;
+  const CompilationUnit* unit;
+  DiagEngine& diag;
+};
+
 // Validates a single select node against the class-index rule, emitting a
 // diagnostic when its index expression is illegal. Non-select nodes are
 // ignored.
-static void CheckClassIndexSelectNode(
-    const Expr* e,
-    const std::unordered_map<std::string_view, Elaborator::VarArrayInfo>&
-        var_array_info,
-    const std::unordered_map<std::string_view, std::string_view>&
-        class_var_types,
-    const std::unordered_set<std::string_view>& class_names,
-    const CompilationUnit* unit, DiagEngine& diag) {
+static void CheckClassIndexSelectNode(const Expr* e, const ClassIndexCtx& ctx) {
   if (!(e->kind == ExprKind::kSelect && e->base && e->index &&
         e->base->kind == ExprKind::kIdentifier)) {
     return;
   }
-  auto it = var_array_info.find(e->base->text);
-  if (it == var_array_info.end() || !it->second.is_assoc ||
-      class_names.count(it->second.assoc_index_type) == 0) {
+  auto it = ctx.var_array_info.find(e->base->text);
+  if (it == ctx.var_array_info.end() || !it->second.is_assoc ||
+      ctx.class_names.count(it->second.assoc_index_type) == 0) {
     return;
   }
   auto index_class = it->second.assoc_index_type;
-  if (IsIllegalClassIndex(e->index, index_class, class_var_types, unit)) {
-    diag.Error(
+  if (IsIllegalClassIndex(e->index, index_class, ctx.class_var_types,
+                          ctx.unit)) {
+    ctx.diag.Error(
         e->range.start,
         std::format("class-indexed associative array '{}' shall be "
                     "indexed by an object of class '{}' or a derived class",
@@ -72,82 +80,41 @@ static void CheckClassIndexSelectNode(
   }
 }
 
-static void CheckClassIndexSelectExpr(
-    const Expr* e,
-    const std::unordered_map<std::string_view, Elaborator::VarArrayInfo>&
-        var_array_info,
-    const std::unordered_map<std::string_view, std::string_view>&
-        class_var_types,
-    const std::unordered_set<std::string_view>& class_names,
-    const CompilationUnit* unit, DiagEngine& diag) {
+static void CheckClassIndexSelectExpr(const Expr* e, const ClassIndexCtx& ctx) {
   if (!e) return;
-  CheckClassIndexSelectNode(e, var_array_info, class_var_types, class_names,
-                            unit, diag);
-  CheckClassIndexSelectExpr(e->lhs, var_array_info, class_var_types,
-                            class_names, unit, diag);
-  CheckClassIndexSelectExpr(e->rhs, var_array_info, class_var_types,
-                            class_names, unit, diag);
-  CheckClassIndexSelectExpr(e->base, var_array_info, class_var_types,
-                            class_names, unit, diag);
-  CheckClassIndexSelectExpr(e->index, var_array_info, class_var_types,
-                            class_names, unit, diag);
-  CheckClassIndexSelectExpr(e->condition, var_array_info, class_var_types,
-                            class_names, unit, diag);
-  CheckClassIndexSelectExpr(e->true_expr, var_array_info, class_var_types,
-                            class_names, unit, diag);
-  CheckClassIndexSelectExpr(e->false_expr, var_array_info, class_var_types,
-                            class_names, unit, diag);
+  CheckClassIndexSelectNode(e, ctx);
+  CheckClassIndexSelectExpr(e->lhs, ctx);
+  CheckClassIndexSelectExpr(e->rhs, ctx);
+  CheckClassIndexSelectExpr(e->base, ctx);
+  CheckClassIndexSelectExpr(e->index, ctx);
+  CheckClassIndexSelectExpr(e->condition, ctx);
+  CheckClassIndexSelectExpr(e->true_expr, ctx);
+  CheckClassIndexSelectExpr(e->false_expr, ctx);
   for (const auto* elem : e->elements) {
-    CheckClassIndexSelectExpr(elem, var_array_info, class_var_types,
-                              class_names, unit, diag);
+    CheckClassIndexSelectExpr(elem, ctx);
   }
 }
 
 // Checks every expression directly attached to a statement node against the
 // class-index rule (excluding nested sub-statements).
-static void CheckStmtExprsForClassIndexSelect(
-    const Stmt* s,
-    const std::unordered_map<std::string_view, Elaborator::VarArrayInfo>&
-        var_array_info,
-    const std::unordered_map<std::string_view, std::string_view>&
-        class_var_types,
-    const std::unordered_set<std::string_view>& class_names,
-    const CompilationUnit* unit, DiagEngine& diag) {
-  CheckClassIndexSelectExpr(s->lhs, var_array_info, class_var_types,
-                            class_names, unit, diag);
-  CheckClassIndexSelectExpr(s->rhs, var_array_info, class_var_types,
-                            class_names, unit, diag);
-  CheckClassIndexSelectExpr(s->expr, var_array_info, class_var_types,
-                            class_names, unit, diag);
-  CheckClassIndexSelectExpr(s->condition, var_array_info, class_var_types,
-                            class_names, unit, diag);
+static void CheckStmtExprsForClassIndexSelect(const Stmt* s,
+                                              const ClassIndexCtx& ctx) {
+  CheckClassIndexSelectExpr(s->lhs, ctx);
+  CheckClassIndexSelectExpr(s->rhs, ctx);
+  CheckClassIndexSelectExpr(s->expr, ctx);
+  CheckClassIndexSelectExpr(s->condition, ctx);
 }
 
-static void WalkStmtsForClassIndexSelect(
-    const Stmt* s,
-    const std::unordered_map<std::string_view, Elaborator::VarArrayInfo>&
-        var_array_info,
-    const std::unordered_map<std::string_view, std::string_view>&
-        class_var_types,
-    const std::unordered_set<std::string_view>& class_names,
-    const CompilationUnit* unit, DiagEngine& diag) {
+static void WalkStmtsForClassIndexSelect(const Stmt* s,
+                                         const ClassIndexCtx& ctx) {
   if (!s) return;
-  CheckStmtExprsForClassIndexSelect(s, var_array_info, class_var_types,
-                                    class_names, unit, diag);
-  for (auto* sub : s->stmts)
-    WalkStmtsForClassIndexSelect(sub, var_array_info, class_var_types,
-                                 class_names, unit, diag);
-  WalkStmtsForClassIndexSelect(s->then_branch, var_array_info, class_var_types,
-                               class_names, unit, diag);
-  WalkStmtsForClassIndexSelect(s->else_branch, var_array_info, class_var_types,
-                               class_names, unit, diag);
-  WalkStmtsForClassIndexSelect(s->body, var_array_info, class_var_types,
-                               class_names, unit, diag);
-  WalkStmtsForClassIndexSelect(s->for_body, var_array_info, class_var_types,
-                               class_names, unit, diag);
-  for (auto& ci : s->case_items)
-    WalkStmtsForClassIndexSelect(ci.body, var_array_info, class_var_types,
-                                 class_names, unit, diag);
+  CheckStmtExprsForClassIndexSelect(s, ctx);
+  for (auto* sub : s->stmts) WalkStmtsForClassIndexSelect(sub, ctx);
+  WalkStmtsForClassIndexSelect(s->then_branch, ctx);
+  WalkStmtsForClassIndexSelect(s->else_branch, ctx);
+  WalkStmtsForClassIndexSelect(s->body, ctx);
+  WalkStmtsForClassIndexSelect(s->for_body, ctx);
+  for (auto& ci : s->case_items) WalkStmtsForClassIndexSelect(ci.body, ctx);
 }
 
 void Elaborator::ValidateClassIndexSelect(const ModuleDecl* decl) {
@@ -160,19 +127,17 @@ void Elaborator::ValidateClassIndexSelect(const ModuleDecl* decl) {
     }
   }
   if (!has_class_index) return;
+  ClassIndexCtx ctx{var_array_info_, class_var_types_, class_names_, unit_,
+                    diag_};
   for (const auto* item : decl->items) {
     if (item->kind == ModuleItemKind::kContAssign) {
-      CheckClassIndexSelectExpr(item->assign_lhs, var_array_info_,
-                                class_var_types_, class_names_, unit_, diag_);
-      CheckClassIndexSelectExpr(item->assign_rhs, var_array_info_,
-                                class_var_types_, class_names_, unit_, diag_);
+      CheckClassIndexSelectExpr(item->assign_lhs, ctx);
+      CheckClassIndexSelectExpr(item->assign_rhs, ctx);
     }
     bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
                    item->kind == ModuleItemKind::kInitialBlock;
     if (is_proc && item->body) {
-      WalkStmtsForClassIndexSelect(item->body, var_array_info_,
-                                   class_var_types_, class_names_, unit_,
-                                   diag_);
+      WalkStmtsForClassIndexSelect(item->body, ctx);
     }
   }
 }

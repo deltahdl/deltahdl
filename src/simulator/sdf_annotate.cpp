@@ -56,33 +56,47 @@ static void ExpandSdfDelaysThree(std::vector<uint64_t>& out, uint64_t v1,
   out[11] = std::min(v1, v2);
 }
 
-static void ExpandSdfDelaysSixDirect(std::vector<uint64_t>& out, uint64_t v1,
-                                     uint64_t v2, uint64_t v3, uint64_t v4,
-                                     uint64_t v5, uint64_t v6) {
-  out[0] = v1;
-  out[1] = v2;
-  out[2] = v3;
-  out[3] = v4;
-  out[4] = v5;
-  out[5] = v6;
+namespace {
+
+// The six explicit SDF delay-transition values supplied for the 6-tuple delay
+// form (IEEE 1800 SDF annotation): 0->1, 1->0, 0->Z, Z->1, 1->Z, Z->0. They
+// together describe one domain object - a single delay specification - so they
+// travel as one struct rather than six loose scalars.
+struct SdfSixDelays {
+  uint64_t v1;
+  uint64_t v2;
+  uint64_t v3;
+  uint64_t v4;
+  uint64_t v5;
+  uint64_t v6;
+};
+
+}  // namespace
+
+static void ExpandSdfDelaysSixDirect(std::vector<uint64_t>& out,
+                                     const SdfSixDelays& d) {
+  out[0] = d.v1;
+  out[1] = d.v2;
+  out[2] = d.v3;
+  out[3] = d.v4;
+  out[4] = d.v5;
+  out[5] = d.v6;
 }
 
-static void ExpandSdfDelaysSixDerived(std::vector<uint64_t>& out, uint64_t v1,
-                                      uint64_t v2, uint64_t v3, uint64_t v4,
-                                      uint64_t v5, uint64_t v6) {
-  out[6] = std::min(v1, v3);
-  out[7] = std::max(v1, v4);
-  out[8] = std::min(v2, v5);
-  out[9] = std::max(v2, v6);
-  out[10] = std::max(v3, v5);
-  out[11] = std::min(v4, v6);
+static void ExpandSdfDelaysSixDerived(std::vector<uint64_t>& out,
+                                      const SdfSixDelays& d) {
+  out[6] = std::min(d.v1, d.v3);
+  out[7] = std::max(d.v1, d.v4);
+  out[8] = std::min(d.v2, d.v5);
+  out[9] = std::max(d.v2, d.v6);
+  out[10] = std::max(d.v3, d.v5);
+  out[11] = std::min(d.v4, d.v6);
 }
 
-static void ExpandSdfDelaysSix(std::vector<uint64_t>& out, uint64_t v1,
-                               uint64_t v2, uint64_t v3, uint64_t v4,
-                               uint64_t v5, uint64_t v6) {
-  ExpandSdfDelaysSixDirect(out, v1, v2, v3, v4, v5, v6);
-  ExpandSdfDelaysSixDerived(out, v1, v2, v3, v4, v5, v6);
+static void ExpandSdfDelaysSix(std::vector<uint64_t>& out,
+                               const SdfSixDelays& d) {
+  ExpandSdfDelaysSixDirect(out, d);
+  ExpandSdfDelaysSixDerived(out, d);
 }
 
 std::vector<uint64_t> ExpandSdfDelays(const std::vector<SdfDelayValue>& vals,
@@ -119,7 +133,7 @@ std::vector<uint64_t> ExpandSdfDelays(const std::vector<SdfDelayValue>& vals,
   const uint64_t kV5 = SelectMtm(vals[4], mtm);
   const uint64_t kV6 = SelectMtm(vals[5], mtm);
   if (kN == 6) {
-    ExpandSdfDelaysSix(out, kV1, kV2, kV3, kV4, kV5, kV6);
+    ExpandSdfDelaysSix(out, SdfSixDelays{kV1, kV2, kV3, kV4, kV5, kV6});
     return out;
   }
 

@@ -158,6 +158,18 @@ void ApplyClassParamOverrides(std::string_view var_name, uint64_t handle,
   }
 }
 
+// §35.6 / §11.13: binding context for resolving the actual arguments of a
+// subroutine/let call. It bundles the call-site expression with the boundary
+// between positional and named actuals (positional_count) and the evaluation
+// environment, mirroring the single "call actuals" entity shared by DPI import
+// and let-construct argument binding.
+struct ActualBindingCtx {
+  const Expr* call;
+  size_t positional_count;
+  SimContext& ctx;
+  Arena& arena;
+};
+
 static int ResolveDpiActualIndex(const DpiFunction* import, const Expr* expr,
                                  size_t i, size_t positional_count) {
   if (i < positional_count) {
@@ -171,16 +183,15 @@ static int ResolveDpiActualIndex(const DpiFunction* import, const Expr* expr,
   return -1;
 }
 
-static uint64_t EvalDpiActualForFormal(const DpiFunction* import,
-                                       const Expr* expr, size_t i,
-                                       size_t positional_count, SimContext& ctx,
-                                       Arena& arena) {
-  int ai = ResolveDpiActualIndex(import, expr, i, positional_count);
-  if (ai >= 0 && expr->args[static_cast<size_t>(ai)] != nullptr) {
-    return EvalExpr(expr->args[static_cast<size_t>(ai)], ctx, arena).ToUint64();
+static uint64_t EvalDpiActualForFormal(const DpiFunction* import, size_t i,
+                                       const ActualBindingCtx& b) {
+  int ai = ResolveDpiActualIndex(import, b.call, i, b.positional_count);
+  if (ai >= 0 && b.call->args[static_cast<size_t>(ai)] != nullptr) {
+    return EvalExpr(b.call->args[static_cast<size_t>(ai)], b.ctx, b.arena)
+        .ToUint64();
   }
   if (import->args[i].default_value) {
-    return EvalExpr(import->args[i].default_value, ctx, arena).ToUint64();
+    return EvalExpr(import->args[i].default_value, b.ctx, b.arena).ToUint64();
   }
   return 0;
 }
@@ -190,11 +201,11 @@ static std::vector<uint64_t> BindDpiActualsFromImport(const DpiFunction* import,
                                                       SimContext& ctx,
                                                       Arena& arena) {
   size_t positional_count = expr->args.size() - expr->arg_names.size();
+  ActualBindingCtx binding{expr, positional_count, ctx, arena};
   std::vector<uint64_t> args;
   args.reserve(import->args.size());
   for (size_t i = 0; i < import->args.size(); ++i) {
-    args.push_back(
-        EvalDpiActualForFormal(import, expr, i, positional_count, ctx, arena));
+    args.push_back(EvalDpiActualForFormal(import, i, binding));
   }
   return args;
 }
@@ -622,21 +633,19 @@ static int FindLetNamedActualIndex(const FunctionArg& formal, const Expr* call,
   return -1;
 }
 
-static Logic4Vec EvalLetActualForFormal(const FunctionArg& formal,
-                                        const Expr* call, size_t i,
-                                        size_t positional_count,
-                                        SimContext& ctx, Arena& arena) {
-  if (i < positional_count) {
-    return EvalExpr(call->args[i], ctx, arena);
+static Logic4Vec EvalLetActualForFormal(const FunctionArg& formal, size_t i,
+                                        const ActualBindingCtx& b) {
+  if (i < b.positional_count) {
+    return EvalExpr(b.call->args[i], b.ctx, b.arena);
   }
-  int found = FindLetNamedActualIndex(formal, call, positional_count);
-  if (found >= 0 && call->args[static_cast<size_t>(found)]) {
-    return EvalExpr(call->args[static_cast<size_t>(found)], ctx, arena);
+  int found = FindLetNamedActualIndex(formal, b.call, b.positional_count);
+  if (found >= 0 && b.call->args[static_cast<size_t>(found)]) {
+    return EvalExpr(b.call->args[static_cast<size_t>(found)], b.ctx, b.arena);
   }
   if (formal.default_value) {
-    return EvalExpr(formal.default_value, ctx, arena);
+    return EvalExpr(formal.default_value, b.ctx, b.arena);
   }
-  return MakeLogic4Vec(arena, 32);
+  return MakeLogic4Vec(b.arena, 32);
 }
 
 static Logic4Vec ResizeLetActualToFormal(Logic4Vec val,
@@ -657,11 +666,11 @@ static std::vector<Logic4Vec> EvalLetActuals(ModuleItem* decl, const Expr* call,
                                              SimContext& ctx, Arena& arena) {
   auto& formals = decl->func_args;
   size_t positional_count = call->args.size() - call->arg_names.size();
+  ActualBindingCtx binding{call, positional_count, ctx, arena};
   std::vector<Logic4Vec> vals;
   vals.reserve(formals.size());
   for (size_t i = 0; i < formals.size(); ++i) {
-    Logic4Vec val = EvalLetActualForFormal(formals[i], call, i,
-                                           positional_count, ctx, arena);
+    Logic4Vec val = EvalLetActualForFormal(formals[i], i, binding);
     val = ResizeLetActualToFormal(val, formals[i], arena);
     vals.push_back(val);
   }

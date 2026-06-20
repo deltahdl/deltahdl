@@ -394,20 +394,32 @@ static void CheckNonClassLiteralAssign(const Stmt* s, DiagEngine& diag) {
   }
 }
 
+// The elaborated class environment a statement is validated against: the set of
+// declared class type names, the set of class-handle variable names in scope,
+// the map from each such variable to its declared class type, and the
+// compilation unit used to resolve class declarations. These read-only lookup
+// structures together describe one entity — the class-handle elaboration
+// context referenced throughout §8.8/§18.9 handle and constructor checks.
+namespace {
+struct ClassHandleContext {
+  const std::unordered_set<std::string_view>& class_names;
+  const std::unordered_set<std::string_view>& class_var_names;
+  const std::unordered_map<std::string_view, std::string_view>& class_var_types;
+  const CompilationUnit* unit;
+};
+}  // namespace
+
 // Runs every assignment-target check that applies when a blocking/nonblocking
 // assignment writes a class-handle variable.
-static void CheckClassHandleAssignTarget(
-    const Stmt* s, const std::unordered_set<std::string_view>& class_names,
-    const std::unordered_set<std::string_view>& class_var_names,
-    const std::unordered_map<std::string_view, std::string_view>&
-        class_var_types,
-    const CompilationUnit* unit, DiagEngine& diag) {
+static void CheckClassHandleAssignTarget(const Stmt* s,
+                                         const ClassHandleContext& ctx,
+                                         DiagEngine& diag) {
   CheckCompoundAssignOnClassHandle(s, diag);
-  CheckNewOnUnconstructibleHandle(s, class_var_types, unit, diag);
-  CheckTypedConstructorCompatibility(s, class_names, class_var_types, unit,
-                                     diag);
-  CheckClassHandleAssignCompatibility(s, class_var_names, class_var_types, unit,
-                                      diag);
+  CheckNewOnUnconstructibleHandle(s, ctx.class_var_types, ctx.unit, diag);
+  CheckTypedConstructorCompatibility(s, ctx.class_names, ctx.class_var_types,
+                                     ctx.unit, diag);
+  CheckClassHandleAssignCompatibility(s, ctx.class_var_names,
+                                      ctx.class_var_types, ctx.unit, diag);
   CheckNonClassLiteralAssign(s, diag);
 }
 
@@ -424,8 +436,9 @@ void Elaborator::WalkStmtsForClassHandleOps(const Stmt* s) {
   if ((s->kind == StmtKind::kBlockingAssign ||
        s->kind == StmtKind::kNonblockingAssign) &&
       s->lhs && IsClassVar(s->lhs, class_var_names_)) {
-    CheckClassHandleAssignTarget(s, class_names_, class_var_names_,
-                                 class_var_types_, unit_, diag_);
+    ClassHandleContext ctx{class_names_, class_var_names_, class_var_types_,
+                           unit_};
+    CheckClassHandleAssignTarget(s, ctx, diag_);
   }
 
   if ((s->kind == StmtKind::kBlockingAssign ||

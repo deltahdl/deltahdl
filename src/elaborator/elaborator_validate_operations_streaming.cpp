@@ -269,27 +269,46 @@ static uint32_t CastTargetSimpleWidth(std::string_view t) {
 
 namespace {
 
+// §6.24.3: the bit-stream cast under validation, named for the two domain
+// facts that identify it -- the cast operand expression and the destination
+// type the operand is being cast to.
+struct BitStreamCast {
+  const Expr* expr;
+  std::string_view target;
+};
+
+// §6.24.3: the elaboration context the bit-stream-cast checks consult to
+// resolve the types named in a cast: the diagnostic sink plus the type maps
+// (class names, class-handle variable types, unpacked-array variable info,
+// typedefs) and the enclosing compilation unit.
+struct BitStreamCastCtx {
+  DiagEngine& diag;
+  const std::unordered_set<std::string_view>& class_names;
+  const std::unordered_map<std::string_view, std::string_view>& class_var_types;
+  const std::unordered_map<std::string_view, Elaborator::VarArrayInfo>&
+      var_array_info;
+  const TypedefMap& typedefs;
+  CompilationUnit* unit;
+};
+
 // §6.24.3: a class handle whose class exposes local or protected members is an
 // illegal bit-stream-cast source, except for the current instance `this` and
 // when the destination is itself a class type. Returns true if the operand was
 // flagged (the caller must then stop checking this cast).
-bool CheckBitStreamCastClassSource(
-    const Expr* expr, std::string_view target, DiagEngine& diag,
-    const std::unordered_set<std::string_view>& class_names,
-    const std::unordered_map<std::string_view, std::string_view>&
-        class_var_types,
-    CompilationUnit* unit) {
+bool CheckBitStreamCastClassSource(const BitStreamCast& cast,
+                                   const BitStreamCastCtx& ctx) {
+  const Expr* expr = cast.expr;
   if (expr->lhs && expr->lhs->kind == ExprKind::kIdentifier &&
-      expr->lhs->text != "this" && class_names.count(target) == 0) {
-    auto it = class_var_types.find(expr->lhs->text);
-    if (it != class_var_types.end()) {
-      const auto* cls = FindClassDecl(it->second, unit);
+      expr->lhs->text != "this" && ctx.class_names.count(cast.target) == 0) {
+    auto it = ctx.class_var_types.find(expr->lhs->text);
+    if (it != ctx.class_var_types.end()) {
+      const auto* cls = FindClassDecl(it->second, ctx.unit);
       if (ClassHasHiddenMember(cls)) {
-        diag.Error(expr->range.start,
-                   std::format("class handle '{}' is illegal as a bit-stream "
-                               "cast source: its class has local or "
-                               "protected members",
-                               expr->lhs->text));
+        ctx.diag.Error(expr->range.start,
+                       std::format("class handle '{}' is illegal as a "
+                                   "bit-stream cast source: its class has "
+                                   "local or protected members",
+                                   expr->lhs->text));
         return true;
       }
     }
@@ -300,32 +319,31 @@ bool CheckBitStreamCastClassSource(
 // §6.24.3: when both source and destination are fixed-size types of different
 // sizes and either is unpacked, the cast generates a compile-time error. This
 // handles the case where the operand is a fixed-size unpacked-array variable.
-void CheckBitStreamCastUnpackedOperand(
-    const Expr* expr, std::string_view target, DiagEngine& diag,
-    const std::unordered_map<std::string_view, Elaborator::VarArrayInfo>&
-        var_array_info,
-    const TypedefMap& typedefs) {
+void CheckBitStreamCastUnpackedOperand(const BitStreamCast& cast,
+                                       const BitStreamCastCtx& ctx) {
+  const Expr* expr = cast.expr;
   if (expr->lhs->kind != ExprKind::kIdentifier) return;
   auto src_name = expr->lhs->text;
-  auto var_it = var_array_info.find(src_name);
-  if (var_it == var_array_info.end()) return;
+  auto var_it = ctx.var_array_info.find(src_name);
+  if (var_it == ctx.var_array_info.end()) return;
   const auto& info = var_it->second;
   if (info.is_dynamic || info.is_assoc) return;
   if (info.unpacked_size == 0 || info.elem_width == 0) return;
   uint32_t src_width = info.unpacked_size * info.elem_width;
 
-  uint32_t dst_width = CastTargetSimpleWidth(target);
+  uint32_t dst_width = CastTargetSimpleWidth(cast.target);
   if (dst_width == 0) {
-    auto td = typedefs.find(target);
-    if (td != typedefs.end()) dst_width = EvalTypeWidth(td->second, typedefs);
+    auto td = ctx.typedefs.find(cast.target);
+    if (td != ctx.typedefs.end())
+      dst_width = EvalTypeWidth(td->second, ctx.typedefs);
   }
   if (dst_width == 0) return;
   if (src_width == dst_width) return;
-  diag.Error(expr->range.start,
-             std::format("bit-stream cast between fixed-size types of "
-                         "different sizes ({} bits to {} bits) with an "
-                         "unpacked operand is illegal",
-                         src_width, dst_width));
+  ctx.diag.Error(expr->range.start,
+                 std::format("bit-stream cast between fixed-size types of "
+                             "different sizes ({} bits to {} bits) with an "
+                             "unpacked operand is illegal",
+                             src_width, dst_width));
 }
 
 }  // namespace
@@ -345,12 +363,15 @@ void Elaborator::CheckBitStreamCastExpr(const Expr* expr) {
     return;
   }
 
+  BitStreamCast cast{expr, target};
+  BitStreamCastCtx ctx{diag_,           class_names_, class_var_types_,
+                       var_array_info_, typedefs_,    unit_};
+
   // §6.24.3: a class handle whose class exposes local or protected members
   // shall be illegal as a source type, except when the handle is the current
   // instance `this`. The rule applies to a bit-stream cast, i.e., when the
   // destination is not itself a class type.
-  if (CheckBitStreamCastClassSource(expr, target, diag_, class_names_,
-                                    class_var_types_, unit_)) {
+  if (CheckBitStreamCastClassSource(cast, ctx)) {
     return;
   }
 
@@ -374,8 +395,7 @@ void Elaborator::CheckBitStreamCastExpr(const Expr* expr) {
     }
   }
 
-  CheckBitStreamCastUnpackedOperand(expr, target, diag_, var_array_info_,
-                                    typedefs_);
+  CheckBitStreamCastUnpackedOperand(cast, ctx);
 }
 
 void Elaborator::WalkExprForBitStreamCast(const Expr* expr) {

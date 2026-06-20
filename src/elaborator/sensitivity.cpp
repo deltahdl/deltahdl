@@ -216,20 +216,30 @@ static void MergeOneCalledFunctionWritten(
   }
 }
 
-static void MergeCalledFunctionSignals(
-    const Stmt* body, const FuncMap& funcs, bool exclude_written,
-    std::unordered_set<std::string>& reads,
-    std::unordered_set<std::string>& locals,
-    std::unordered_set<std::string>& written) {
+// The three signal-name accumulators collected while inferring an implicit
+// sensitivity list (IEEE 1800 §9.2.2.2.1, @* / @(*)): identifiers read by the
+// process (reads), identifiers that are block-local declarations or formal
+// arguments and therefore excluded (locals), and identifiers written by the
+// process when self-trigger suppression is requested (written). They describe
+// one domain object -- the signal classification of a process body -- so they
+// travel together.
+struct SignalSets {
+  std::unordered_set<std::string> reads;
+  std::unordered_set<std::string> locals;
+  std::unordered_set<std::string> written;
+};
+
+static void MergeCalledFunctionSignals(const Stmt* body, const FuncMap& funcs,
+                                       bool exclude_written, SignalSets& sigs) {
   auto called = ResolveCalledFunctions(body, funcs);
   for (auto& fname : called) {
     auto it = funcs.find(fname);
     if (it == funcs.end()) continue;
     const auto* func = it->second;
-    MergeOneCalledFunctionReads(func, reads);
-    MergeOneCalledFunctionLocals(func, locals);
+    MergeOneCalledFunctionReads(func, sigs.reads);
+    MergeOneCalledFunctionLocals(func, sigs.locals);
     if (exclude_written) {
-      MergeOneCalledFunctionWritten(func, written);
+      MergeOneCalledFunctionWritten(func, sigs.written);
     }
   }
 }
@@ -256,23 +266,19 @@ static std::vector<EventExpr> BuildSensitivityEvents(
 std::vector<EventExpr> InferSensitivity(const Stmt* body, Arena& arena,
                                         const FuncMap* funcs,
                                         bool exclude_written) {
-  std::unordered_set<std::string> reads;
-  CollectStmtReads(body, reads);
-
-  std::unordered_set<std::string> locals;
-  CollectBlockLocalNames(body, locals);
-
-  std::unordered_set<std::string> written;
+  SignalSets sigs;
+  CollectStmtReads(body, sigs.reads);
+  CollectBlockLocalNames(body, sigs.locals);
   if (exclude_written) {
-    CollectWrittenNames(body, written);
+    CollectWrittenNames(body, sigs.written);
   }
 
   if (funcs && !funcs->empty()) {
-    MergeCalledFunctionSignals(body, *funcs, exclude_written, reads, locals,
-                               written);
+    MergeCalledFunctionSignals(body, *funcs, exclude_written, sigs);
   }
 
-  return BuildSensitivityEvents(reads, locals, written, exclude_written, arena);
+  return BuildSensitivityEvents(sigs.reads, sigs.locals, sigs.written,
+                                exclude_written, arena);
 }
 
 }  // namespace delta

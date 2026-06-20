@@ -538,6 +538,24 @@ bool SpecifyManager::CheckRecoveryViolation(std::string_view ref,
 // `upper_side_limit` when data_time > ref_time.
 namespace {
 
+// A single observed reference/data transition pair to test against the timing
+// checks (IEEE 1800 §31): the reference event (signal + time) and the data
+// event (signal + time) that together describe one timing-check observation.
+struct TimingCheckEvent {
+  std::string_view ref;
+  uint64_t ref_time;
+  std::string_view data;
+  uint64_t data_time;
+};
+
+// Selects which TimingCheckEntry limit applies on each side of the reference
+// time for two-sided checks (recrem / setuphold): `lower` is compared when the
+// data event is on/before the reference, `upper` when it is after.
+struct TwoSidedLimitSelector {
+  uint64_t TimingCheckEntry::* lower;
+  uint64_t TimingCheckEntry::* upper;
+};
+
 // True when `data_time` falls inside the negative-timing-check window centered
 // on `ref_time` and spanning [-signed_limit, +signed_limit2].
 bool NegativeTimingWindowViolated(const TimingCheckEntry& check,
@@ -566,19 +584,18 @@ bool TwoSidedLimitViolated(const TimingCheckEntry& check, uint64_t ref_time,
 
 static bool CheckTimingViolation(
     const std::vector<TimingCheckEntry>& timing_checks, TimingCheckKind kind,
-    std::string_view ref, uint64_t ref_time, std::string_view data,
-    uint64_t data_time, uint64_t TimingCheckEntry::* lower_side_limit,
-    uint64_t TimingCheckEntry::* upper_side_limit) {
+    const TimingCheckEvent& event, const TwoSidedLimitSelector& selector) {
   for (const auto& check : timing_checks) {
     if (check.kind != kind) continue;
-    if (check.ref_signal != ref) continue;
-    if (check.data_signal != data) continue;
+    if (check.ref_signal != event.ref) continue;
+    if (check.data_signal != event.data) continue;
     if (check.negative_timing_check_enabled) {
-      if (NegativeTimingWindowViolated(check, ref_time, data_time)) return true;
+      if (NegativeTimingWindowViolated(check, event.ref_time, event.data_time))
+        return true;
       continue;
     }
-    if (TwoSidedLimitViolated(check, ref_time, data_time, lower_side_limit,
-                              upper_side_limit)) {
+    if (TwoSidedLimitViolated(check, event.ref_time, event.data_time,
+                              selector.lower, selector.upper)) {
       return true;
     }
   }
@@ -590,8 +607,9 @@ bool SpecifyManager::CheckRecremViolation(std::string_view ref,
                                           std::string_view data,
                                           uint64_t data_time) const {
   return CheckTimingViolation(
-      timing_checks_, TimingCheckKind::kRecrem, ref, ref_time, data, data_time,
-      &TimingCheckEntry::limit2, &TimingCheckEntry::limit);
+      timing_checks_, TimingCheckKind::kRecrem,
+      {ref, ref_time, data, data_time},
+      {&TimingCheckEntry::limit2, &TimingCheckEntry::limit});
 }
 
 bool SpecifyManager::CheckSkewViolation(std::string_view ref, uint64_t ref_time,
@@ -902,8 +920,9 @@ bool SpecifyManager::CheckSetupholdViolation(std::string_view ref,
                                              std::string_view data,
                                              uint64_t data_time) const {
   return CheckTimingViolation(
-      timing_checks_, TimingCheckKind::kSetuphold, ref, ref_time, data,
-      data_time, &TimingCheckEntry::limit, &TimingCheckEntry::limit2);
+      timing_checks_, TimingCheckKind::kSetuphold,
+      {ref, ref_time, data, data_time},
+      {&TimingCheckEntry::limit, &TimingCheckEntry::limit2});
 }
 
 }  // namespace delta

@@ -217,37 +217,45 @@ static void ExpandClassProperties(ClassObject* obj,
   }
 }
 
+// Streaming-concatenation expansion sink (IEEE 1800 §11.4.14): the evaluation
+// environment (ctx + arena) together with the growing concatenation result
+// (the element parts and their accumulated bit width) that each aggregate
+// expansion appends to.
+struct StreamExpandSink {
+  SimContext& ctx;
+  Arena& arena;
+  std::vector<Logic4Vec>& parts;
+  uint32_t& total_width;
+};
+
 // Expands an unpacked-array identifier into its constituent element parts,
 // honoring an optional `with` slice range.
 static void ExpandArrayAggregate(const Expr* elem, const ArrayInfo* ainfo,
-                                 SimContext& ctx, Arena& arena,
-                                 std::vector<Logic4Vec>& parts,
-                                 uint32_t& total_width) {
+                                 StreamExpandSink& sink) {
   if (elem->with_expr) {
     uint32_t start = 0, count = 0;
-    ResolveWithRange(elem->with_expr, ctx, arena, ainfo->size, ainfo->lo, start,
-                     count);
-    ExpandArrayElementsSliced(elem->text, ctx, parts, total_width,
-                              {start, count});
+    ResolveWithRange(elem->with_expr, sink.ctx, sink.arena, ainfo->size,
+                     ainfo->lo, start, count);
+    ExpandArrayElementsSliced(elem->text, sink.ctx, sink.parts,
+                              sink.total_width, {start, count});
   } else {
-    ExpandArrayElements(elem->text, ctx, parts, total_width);
+    ExpandArrayElements(elem->text, sink.ctx, sink.parts, sink.total_width);
   }
 }
 
 // Expands a queue identifier into its constituent element parts, honoring an
 // optional `with` slice range.
 static void ExpandQueueAggregate(const Expr* elem, QueueObject* queue,
-                                 SimContext& ctx, Arena& arena,
-                                 std::vector<Logic4Vec>& parts,
-                                 uint32_t& total_width) {
+                                 StreamExpandSink& sink) {
   if (elem->with_expr) {
     uint32_t start = 0, count = 0;
-    ResolveWithRange(elem->with_expr, ctx, arena,
+    ResolveWithRange(elem->with_expr, sink.ctx, sink.arena,
                      static_cast<uint32_t>(queue->elements.size()), 0, start,
                      count);
-    ExpandQueueElementsSliced(queue, parts, total_width, arena, {start, count});
+    ExpandQueueElementsSliced(queue, sink.parts, sink.total_width, sink.arena,
+                              {start, count});
   } else {
-    ExpandQueueElements(queue, parts, total_width, arena);
+    ExpandQueueElements(queue, sink.parts, sink.total_width, sink.arena);
   }
 }
 
@@ -255,15 +263,14 @@ static void ExpandQueueAggregate(const Expr* elem, QueueObject* queue,
 // Returns true if the named struct variable existed and was expanded.
 static bool TryExpandStructAggregate(const Expr* elem,
                                      const StructTypeInfo* sinfo,
-                                     SimContext& ctx, Arena& arena,
-                                     std::vector<Logic4Vec>& parts,
-                                     uint32_t& total_width) {
-  auto* var = ctx.FindVariable(elem->text);
+                                     StreamExpandSink& sink) {
+  auto* var = sink.ctx.FindVariable(elem->text);
   if (!var) return false;
   if (sinfo->is_union) {
-    ExpandUnionFirstMember(var, sinfo, parts, total_width, arena);
+    ExpandUnionFirstMember(var, sinfo, sink.parts, sink.total_width,
+                           sink.arena);
   } else {
-    ExpandStructFields(var, sinfo, parts, total_width, arena);
+    ExpandStructFields(var, sinfo, sink.parts, sink.total_width, sink.arena);
   }
   return true;
 }
@@ -296,13 +303,14 @@ static bool TryExpandAggregateElement(const Expr* elem, SimContext& ctx,
                                       Arena& arena,
                                       std::vector<Logic4Vec>& parts,
                                       uint32_t& total_width) {
+  StreamExpandSink sink{ctx, arena, parts, total_width};
   if (auto* ainfo = ctx.FindArrayInfo(elem->text)) {
-    ExpandArrayAggregate(elem, ainfo, ctx, arena, parts, total_width);
+    ExpandArrayAggregate(elem, ainfo, sink);
     return true;
   }
 
   if (auto* queue = ctx.FindQueue(elem->text)) {
-    ExpandQueueAggregate(elem, queue, ctx, arena, parts, total_width);
+    ExpandQueueAggregate(elem, queue, sink);
     return true;
   }
 
@@ -312,7 +320,7 @@ static bool TryExpandAggregateElement(const Expr* elem, SimContext& ctx,
   }
 
   if (auto* sinfo = ctx.GetVariableStructType(elem->text)) {
-    if (TryExpandStructAggregate(elem, sinfo, ctx, arena, parts, total_width)) {
+    if (TryExpandStructAggregate(elem, sinfo, sink)) {
       return true;
     }
   }

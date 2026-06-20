@@ -527,26 +527,38 @@ void Parser::ParseExtraPropertyDecls(std::vector<ClassMember*>& members,
 
 namespace {
 
+// 18.5.11/18.5.13.1: the lexical context surrounding the leaf token just
+// consumed in a constraint block body. prev_was_qualifier records whether the
+// preceding token was a '.'/'::' (so a member/scope-qualified name is not taken
+// for an unqualified call); next_is_lparen/next_is_dot/next_is_coloncolon are
+// the one-token lookahead that distinguishes a call ('identifier (') from a
+// continued qualified reference. All four are computed by the caller so the
+// recording stays a pure operation on the member.
+struct ConstraintTokenContext {
+  bool prev_was_qualifier;
+  bool next_is_lparen;
+  bool next_is_dot;
+  bool next_is_coloncolon;
+};
+
 // 18.5.11/18.5.13.1: from the leaf identifier token just consumed inside a
 // constraint block body, record an unqualified function call (the 'identifier (
 // ' form) and, while scanning a soft constraint, a bare local variable
-// reference. The lookahead results (whether the next token opens a call or
-// continues a qualified reference) are computed by the caller and passed in so
-// this stays a pure operation on the recorded member. in_soft is cleared when
-// the soft constraint's expression terminates at its ';'.
+// reference. in_soft is cleared when the soft constraint's expression
+// terminates at its ';'.
 void RecordConstraintTokenRefs(ClassMember* member, const Token& tok,
-                               bool prev_was_qualifier, bool& in_soft,
-                               bool next_is_lparen, bool next_is_dot,
-                               bool next_is_coloncolon) {
-  if (tok.kind == TokenKind::kIdentifier && !prev_was_qualifier &&
-      next_is_lparen) {
+                               const ConstraintTokenContext& ctx,
+                               bool& in_soft) {
+  if (tok.kind == TokenKind::kIdentifier && !ctx.prev_was_qualifier &&
+      ctx.next_is_lparen) {
     ConstraintFunctionCallRef ref;
     ref.callee = tok.text;
     ref.loc = tok.loc;
     if (member) member->constraint_function_call_refs.push_back(ref);
   }
-  if (in_soft && tok.kind == TokenKind::kIdentifier && !prev_was_qualifier &&
-      !next_is_lparen && !next_is_dot && !next_is_coloncolon) {
+  if (in_soft && tok.kind == TokenKind::kIdentifier &&
+      !ctx.prev_was_qualifier && !ctx.next_is_lparen && !ctx.next_is_dot &&
+      !ctx.next_is_coloncolon) {
     if (member) {
       ConstraintSoftVarRef sref;
       sref.name = tok.text;
@@ -650,9 +662,10 @@ ClassMember* Parser::ParseConstraintStub(ClassMember* member) {
     // 18.5.11/18.5.13.1: with the leaf token consumed, look at the next token
     // to recognize an unqualified call ('identifier (') and a bare local
     // variable named in a soft constraint, then record them on the member.
-    RecordConstraintTokenRefs(member, t, prev_was_qualifier, in_soft,
-                              Check(TokenKind::kLParen), Check(TokenKind::kDot),
-                              Check(TokenKind::kColonColon));
+    ConstraintTokenContext ctx{prev_was_qualifier, Check(TokenKind::kLParen),
+                               Check(TokenKind::kDot),
+                               Check(TokenKind::kColonColon)};
+    RecordConstraintTokenRefs(member, t, ctx, in_soft);
     prev_was_qualifier =
         t.kind == TokenKind::kDot || t.kind == TokenKind::kColonColon;
   }
@@ -720,6 +733,16 @@ static bool LiteralHasFourStateDigit(std::string_view text) {
 // left to the surrounding scan.
 namespace {
 
+// 18.5.7.1: the running state of a scan over a foreach header's bracketed
+// loop_variables list. bracket_depth is the current '['/']' nesting; slot is
+// the 1-based index of the loop-variable slot in view; loop_var_count is the
+// index of the last slot that names a variable.
+struct ForeachBracketScan {
+  int bracket_depth;
+  int slot;
+  int loop_var_count;
+};
+
 // 18.5.7.1: handle one token of a foreach header's bracketed loop_variables
 // list, the token having just been consumed by the caller. '[' and ']' adjust
 // the bracket nesting depth; at the top level a ',' opens the next
@@ -728,22 +751,22 @@ namespace {
 // deeper bracket depth (such as a select expression's contents) only need to be
 // skipped, which the caller's consume already accomplished.
 void HandleForeachBracketToken(DiagEngine& diag, const Token& t,
-                               std::string_view array_name, int& bracket_depth,
-                               int& slot, int& loop_var_count) {
+                               std::string_view array_name,
+                               ForeachBracketScan& scan) {
   if (t.kind == TokenKind::kLBracket) {
-    ++bracket_depth;
+    ++scan.bracket_depth;
     return;
   }
   if (t.kind == TokenKind::kRBracket) {
-    --bracket_depth;
+    --scan.bracket_depth;
     return;
   }
-  if (bracket_depth == 1 && t.kind == TokenKind::kComma) {
-    ++slot;
+  if (scan.bracket_depth == 1 && t.kind == TokenKind::kComma) {
+    ++scan.slot;
     return;
   }
-  if (bracket_depth == 1 && t.kind == TokenKind::kIdentifier) {
-    loop_var_count = slot;
+  if (scan.bracket_depth == 1 && t.kind == TokenKind::kIdentifier) {
+    scan.loop_var_count = scan.slot;
     if (!array_name.empty() && t.text == array_name) {
       diag.Error(t.loc, std::string("foreach loop variable '") +
                             std::string(t.text) +
@@ -780,21 +803,22 @@ void Parser::CheckForeachConstraintHeader(ClassMember* member) {
     Token t = Consume();
     if (t.kind == TokenKind::kIdentifier) array_name = t.text;
   }
-  int slot = 0;            // 1-based index of the loop-variable slot in view
-  int loop_var_count = 0;  // index of the last slot that names a variable
+  // bracket_depth: '['/']' nesting; slot: 1-based slot in view; loop_var_count:
+  // index of the last slot that names a variable.
+  ForeachBracketScan scan{0, 0, 0};
   if (Match(TokenKind::kLBracket)) {
-    slot = 1;
-    int bracket_depth = 1;
+    scan.slot = 1;
+    scan.bracket_depth = 1;
     // Every token of the list is consumed exactly once; the per-token bracket
     // depth, slot, and loop-variable bookkeeping is delegated.
-    while (bracket_depth > 0 && !AtEnd()) {
+    while (scan.bracket_depth > 0 && !AtEnd()) {
       Token t = Consume();
-      HandleForeachBracketToken(diag_, t, array_name, bracket_depth, slot,
-                                loop_var_count);
+      HandleForeachBracketToken(diag_, t, array_name, scan);
     }
   }
   Match(TokenKind::kRParen);
-  RecordForeachConstraintRef(member, array_name, loop_var_count, foreach_loc);
+  RecordForeachConstraintRef(member, array_name, scan.loop_var_count,
+                             foreach_loc);
 }
 
 // 18.5.9: scan one solve_before_list,

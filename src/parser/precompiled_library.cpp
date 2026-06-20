@@ -95,19 +95,28 @@ bool ReadRecord(std::ifstream& is, std::string& library, std::string& source) {
   return true;
 }
 
+// Bundles the destination compilation unit together with the shared parsing
+// infrastructure (source manager, arena, diagnostics) that a load pass writes
+// into. These travel together through PrecompiledLibrary::Load and LoadRecord.
+struct LoadContext {
+  CompilationUnit& target;
+  SourceManager& mgr;
+  Arena& arena;
+  DiagEngine& diag;
+};
+
 // Parses one record's source into the target compilation unit, tagging cells
 // with the record's library name. Returns false on parse failure.
 bool LoadRecord(const std::filesystem::path& path, std::string library,
-                std::string source, CompilationUnit& target, SourceManager& mgr,
-                Arena& arena, DiagEngine& diag) {
-  uint32_t fid = mgr.AddFile(path.string(), std::move(source));
-  Lexer lex(mgr.FileContent(fid), fid, diag);
-  Parser parser(lex, arena, diag);
+                std::string source, LoadContext& ctx) {
+  uint32_t fid = ctx.mgr.AddFile(path.string(), std::move(source));
+  Lexer lex(ctx.mgr.FileContent(fid), fid, ctx.diag);
+  Parser parser(lex, ctx.arena, ctx.diag);
   auto* cu = parser.Parse();
-  if (cu == nullptr || diag.HasErrors()) return false;
+  if (cu == nullptr || ctx.diag.HasErrors()) return false;
 
-  TagCells(*cu, library, arena);
-  AppendCells(target, *cu);
+  TagCells(*cu, library, ctx.arena);
+  AppendCells(ctx.target, *cu);
   return true;
 }
 
@@ -146,13 +155,13 @@ bool PrecompiledLibrary::Load(const std::filesystem::path& path,
   if (!is.read(magic, kMagicLen)) return false;
   if (std::memcmp(magic, kMagic, kMagicLen) != 0) return false;
 
+  LoadContext ctx{target, mgr, arena, diag};
   while (true) {
     if (is.peek() == EOF) break;
     std::string library;
     std::string source;
     if (!ReadRecord(is, library, source)) return false;
-    if (!LoadRecord(path, std::move(library), std::move(source), target, mgr,
-                    arena, diag)) {
+    if (!LoadRecord(path, std::move(library), std::move(source), ctx)) {
       return false;
     }
   }

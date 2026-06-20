@@ -468,16 +468,26 @@ static void ParsePropertyPortList(Lexer& lexer, DiagEngine& diag,
   }
 }
 
+// §16.12 named-property body scan state carried across loop iterations. Groups
+// the §16.12.16 case-default stack and the §16.12.17 negation/time-advance
+// trackers as a single entity so cross-iteration state is preserved exactly as
+// in the original inline loop.
+struct PropertyBodyScanState {
+  // §16.12.16: per open case statement, the count of default items seen.
+  std::vector<int> case_default_counts;
+  // §16.12.17 Restriction 1: the next instance reached is a negation operand.
+  bool expect_negated_operand = false;
+  // §16.12.17 Restriction 3: a time-advancing operator has been seen.
+  bool saw_time_advance = false;
+};
+
 // Processes one token of the named-property body scan that is not an assertion
 // variable declaration (those are harvested by the caller, which owns the
-// member helper). Carries the case-default stack and the negation/time-advance
-// trackers by reference so cross-iteration state is preserved exactly as in the
-// original inline loop.
+// member helper). Carries the §16.12 scan state by reference so cross-iteration
+// state is preserved exactly as in the original inline loop.
 static void ScanPropertyBodyToken(Lexer& lexer, DiagEngine& diag,
                                   ModuleItem* item,
-                                  std::vector<int>& case_default_counts,
-                                  bool& expect_negated_operand,
-                                  bool& saw_time_advance) {
+                                  PropertyBodyScanState& state) {
   if (LexerCheck(lexer, TokenKind::kKwDisable)) {
     lexer.Next();
     if (LexerCheck(lexer, TokenKind::kKwIff)) {
@@ -487,21 +497,22 @@ static void ScanPropertyBodyToken(Lexer& lexer, DiagEngine& diag,
     return;
   }
   if (LexerCheck(lexer, TokenKind::kKwCase)) {
-    case_default_counts.push_back(0);
+    state.case_default_counts.push_back(0);
     lexer.Next();
     return;
   }
   if (LexerCheck(lexer, TokenKind::kKwEndcase)) {
-    if (!case_default_counts.empty()) case_default_counts.pop_back();
+    if (!state.case_default_counts.empty())
+      state.case_default_counts.pop_back();
     lexer.Next();
     return;
   }
   if (LexerCheck(lexer, TokenKind::kKwDefault) &&
-      !case_default_counts.empty()) {
+      !state.case_default_counts.empty()) {
     // §16.12.16: the default statement is optional, but using more than one
     // default in a single property case statement shall be illegal.
     auto default_loc = lexer.Peek().loc;
-    if (++case_default_counts.back() == 2) {
+    if (++state.case_default_counts.back() == 2) {
       diag.Error(default_loc,
                  "property case statement shall have at most one 'default' "
                  "item");
@@ -520,8 +531,9 @@ static void ScanPropertyBodyToken(Lexer& lexer, DiagEngine& diag,
       LexerCheck(lexer, TokenKind::kKwSAlways) ||
       LexerCheck(lexer, TokenKind::kKwSUntil) ||
       LexerCheck(lexer, TokenKind::kKwSUntilWith)) {
-    if (LexerCheck(lexer, TokenKind::kKwSNexttime)) saw_time_advance = true;
-    expect_negated_operand = true;
+    if (LexerCheck(lexer, TokenKind::kKwSNexttime))
+      state.saw_time_advance = true;
+    state.expect_negated_operand = true;
     lexer.Next();
     return;
   }
@@ -530,7 +542,7 @@ static void ScanPropertyBodyToken(Lexer& lexer, DiagEngine& diag,
   if (LexerCheck(lexer, TokenKind::kHashHash) ||
       LexerCheck(lexer, TokenKind::kPipeEqGt) ||
       LexerCheck(lexer, TokenKind::kKwNexttime)) {
-    saw_time_advance = true;
+    state.saw_time_advance = true;
     lexer.Next();
     return;
   }
@@ -538,24 +550,25 @@ static void ScanPropertyBodyToken(Lexer& lexer, DiagEngine& diag,
     auto tok = lexer.Next();
     if (LexerCheck(lexer, TokenKind::kLParen)) {
       item->prop_instance_refs.push_back(tok.text);
-      if (expect_negated_operand) {
+      if (state.expect_negated_operand) {
         item->prop_negated_instance_refs.push_back(tok.text);
       }
-      if (tok.text == item->name && !saw_time_advance) {
+      if (tok.text == item->name && !state.saw_time_advance) {
         item->prop_has_untimed_self_recursion = true;
       }
-      expect_negated_operand = false;
+      state.expect_negated_operand = false;
       CaptureInstanceArgs(lexer, item, tok.text);
     } else {
       // A bare identifier is not a property instance; if it stood as the
       // operand of a pending negation, that operand is a simple expression.
-      expect_negated_operand = false;
+      state.expect_negated_operand = false;
     }
     return;
   }
   // Opening parentheses are skipped so a negation can still reach an instance
   // wrapped in parentheses; any other token ends a pending negation operand.
-  if (!LexerCheck(lexer, TokenKind::kLParen)) expect_negated_operand = false;
+  if (!LexerCheck(lexer, TokenKind::kLParen))
+    state.expect_negated_operand = false;
   lexer.Next();
 }
 
@@ -578,20 +591,12 @@ ModuleItem* Parser::ParsePropertyDecl() {
   // property body, just as in a sequence body. Harvest them before the
   // body skip loop falls through to its existing instance-reference scan.
   bool in_decl_prefix = true;
-  // §16.12.16: track open case property statements so the optional default item
-  // can be policed. Each entry counts the default items seen in the
-  // corresponding `case`..`endcase`; nested case statements stack, so an inner
-  // default is never charged against an outer case.
-  std::vector<int> case_default_counts;
-  // §16.12.17 Restriction 1: when a prefix property-negation/strong operator is
-  // seen, the next property instance reached (possibly through opening parens)
-  // is its operand and is recorded so the elaborator can forbid negating a
-  // recursive property.
-  bool expect_negated_operand = false;
-  // §16.12.17 Restriction 3: a recursive instance must occur after a positive
-  // advance in time. Track whether any time-advancing operator has been seen
-  // before a self-name instantiation.
-  bool saw_time_advance = false;
+  // §16.12.16/§16.12.17: the case-default stack and the negation/time-advance
+  // trackers are the body scan's cross-iteration state. case_default_counts
+  // stacks nested `case`..`endcase` default counts; expect_negated_operand
+  // marks a pending prefix-negation operand; saw_time_advance records a
+  // time-advancing operator before a self-name instantiation.
+  PropertyBodyScanState scan_state;
 
   while (!Check(TokenKind::kKwEndproperty) && !AtEnd()) {
     if (in_decl_prefix && IsBuiltinTypeKwForLocalVar(CurrentToken().kind)) {
@@ -599,8 +604,7 @@ ModuleItem* Parser::ParsePropertyDecl() {
       continue;
     }
     in_decl_prefix = false;
-    ScanPropertyBodyToken(lexer_, diag_, item, case_default_counts,
-                          expect_negated_operand, saw_time_advance);
+    ScanPropertyBodyToken(lexer_, diag_, item, scan_state);
   }
   Expect(TokenKind::kKwEndproperty);
   MatchEndLabel(item->name);

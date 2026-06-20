@@ -34,24 +34,38 @@ void SetVpiHandleError(VpiErrorInfo& err, const char* message) {
   err.message = message;
 }
 
+// §38.21: one position in a hierarchical-name walk. A hierarchical name is
+// resolved one path component at a time, so each step is described by the
+// already-resolved enclosing scope (current, null before the first component),
+// the caller-supplied search scope (scope, used to root the outermost
+// component), the component name being resolved (part), and whether it is the
+// rightmost/terminal component (is_last, which governs the protected-scope
+// rule). These travel together as one entity through the resolution routines.
+struct NamePathStep {
+  VpiHandle current;
+  VpiHandle scope;
+  std::string_view part;
+  bool is_last;
+};
+
 // §38.21: resolve a single path component of a hierarchical name to its handle.
 // With no enclosing scope yet, the outermost component is searched from the top
 // level of the design hierarchy (the object map); otherwise the search is
 // confined to the immediate contents of the current/supplied scope. Returns the
 // resolved handle, or null when the component names nothing.
 VpiHandle ResolveNamePathComponent(
-    VpiHandle current, VpiHandle scope, std::string_view part,
+    const NamePathStep& step,
     const std::unordered_map<std::string_view, VpiObject*>& object_map) {
-  if (current == nullptr && scope == nullptr) {
+  if (step.current == nullptr && step.scope == nullptr) {
     // §38.21: with no scope the outermost component is searched for from the
     // top level of the design hierarchy.
-    auto it = object_map.find(part);
+    auto it = object_map.find(step.part);
     return (it == object_map.end()) ? nullptr : it->second;
   }
   // §38.21: within a scope - the supplied scope for the first component, or
   // the previously resolved scope for a deeper one - the search is confined
   // to that scope's immediate contents and nothing outside it.
-  VpiHandle within = (current == nullptr) ? scope : current;
+  VpiHandle within = (step.current == nullptr) ? step.scope : step.current;
   // §37.33 detail 9: vpi_handle_by_name() accepts a full name down to a
   // non-static data member even though such a member has no vpiFullName
   // property. The member lives on the class object the class variable
@@ -62,7 +76,7 @@ VpiHandle ResolveNamePathComponent(
     search = within->referenced_object;
   }
   for (auto* child : search->children) {
-    if (child->name == part) {
+    if (child->name == step.part) {
       return child;
     }
   }
@@ -76,16 +90,16 @@ VpiHandle ResolveNamePathComponent(
 // error via the supplied error slot). The handle is null on every failure path,
 // so the caller stops the walk whenever this returns null.
 VpiHandle ResolveNamePathStep(
-    VpiHandle current, VpiHandle scope, std::string_view part, bool is_last,
+    const NamePathStep& step,
     const std::unordered_map<std::string_view, VpiObject*>& object_map,
     VpiErrorInfo& err) {
-  VpiHandle next = ResolveNamePathComponent(current, scope, part, object_map);
+  VpiHandle next = ResolveNamePathComponent(step, object_map);
   if (next == nullptr) return nullptr;
 
   // §38.21: a hierarchical name that passes through a protected scope is an
   // error - an intermediate component naming a protected object cannot be
   // descended into to reach a deeper object.
-  if (!is_last && next->is_protected) {
+  if (!step.is_last && next->is_protected) {
     SetVpiHandleError(err,
                       "vpi_handle_by_name() through a protected scope is an "
                       "error");
@@ -115,8 +129,8 @@ VpiHandle VpiContext::HandleByName(const char* name, VpiHandle scope) {
   VpiHandle current = nullptr;
   for (size_t i = 0; i < parts.size(); ++i) {
     bool is_last = (i + 1 == parts.size());
-    VpiHandle next = ResolveNamePathStep(current, scope, parts[i], is_last,
-                                         object_map_, last_error_);
+    NamePathStep step{current, scope, parts[i], is_last};
+    VpiHandle next = ResolveNamePathStep(step, object_map_, last_error_);
     if (next == nullptr) return nullptr;
     current = next;
   }

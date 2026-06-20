@@ -99,20 +99,38 @@ static uint32_t VcdDataTypeSize(VcdDataType type, uint32_t width) {
   return width;
 }
 
+namespace {
+
+// The descriptive identity of one dumped object, gathered from the
+// RegisterSignal arguments (§21.7.5, Table 21-11; §21.7.2.3; §21.7.4.2): its
+// name and width, the backing Variable, the net type and SystemVerilog data
+// type that pick the $var var_type keyword, and the declared index range
+// (msb/lsb negative when no vector_index applies). This is everything that
+// describes the signal itself, distinct from the writer's per-registration
+// counter state (the identifier and port-id sequences).
+struct VcdSignalSpec {
+  std::string_view name;
+  uint32_t width = 1;
+  Variable* var = nullptr;
+  NetType net_type = NetType::kWire;
+  int32_t msb = -1;
+  int32_t lsb = -1;
+  VcdDataType data_type = VcdDataType::kNet;
+};
+
+}  // namespace
+
 // Copy the descriptive registration arguments (everything except the counter
 // state) into a fresh VcdSignal. No writer state is consulted or mutated.
-static VcdSignal MakeVcdSignalFields(std::string_view name, uint32_t width,
-                                     Variable* var, NetType net_type,
-                                     int32_t msb, int32_t lsb,
-                                     VcdDataType data_type) {
+static VcdSignal MakeVcdSignalFields(const VcdSignalSpec& spec) {
   VcdSignal sig;
-  sig.name = name;
-  sig.width = width;
-  sig.var = var;
-  sig.net_type = net_type;
-  sig.data_type = data_type;
-  sig.msb = msb;
-  sig.lsb = lsb;
+  sig.name = spec.name;
+  sig.width = spec.width;
+  sig.var = spec.var;
+  sig.net_type = spec.net_type;
+  sig.data_type = spec.data_type;
+  sig.msb = spec.msb;
+  sig.lsb = spec.lsb;
   return sig;
 }
 
@@ -133,12 +151,9 @@ static void AssignVcdSignalCodes(VcdSignal& sig, char& next_ident,
 // Populate a VcdSignal from the registration arguments, advancing the writer's
 // identifier and port counters as §21.7.4.2 requires (the port identifier code
 // ascends one unit per registration, in module-declaration order).
-static VcdSignal MakeVcdSignal(std::string_view name, uint32_t width,
-                               Variable* var, NetType net_type, int32_t msb,
-                               int32_t lsb, VcdDataType data_type,
-                               char& next_ident, uint32_t& next_port_id) {
-  VcdSignal sig =
-      MakeVcdSignalFields(name, width, var, net_type, msb, lsb, data_type);
+static VcdSignal MakeVcdSignal(const VcdSignalSpec& spec, char& next_ident,
+                               uint32_t& next_port_id) {
+  VcdSignal sig = MakeVcdSignalFields(spec);
   AssignVcdSignalCodes(sig, next_ident, next_port_id);
   return sig;
 }
@@ -187,8 +202,8 @@ static void WriteSignalVarDecl(std::ofstream& ofs, const VcdSignal& sig,
 void VcdWriter::RegisterSignal(std::string_view name, uint32_t width,
                                Variable* var, NetType net_type, int32_t msb,
                                int32_t lsb, VcdDataType data_type) {
-  VcdSignal sig = MakeVcdSignal(name, width, var, net_type, msb, lsb, data_type,
-                                next_ident_, next_port_id_);
+  VcdSignalSpec spec{name, width, var, net_type, msb, lsb, data_type};
+  VcdSignal sig = MakeVcdSignal(spec, next_ident_, next_port_id_);
   signals_.push_back(sig);
   if (!ofs_.is_open()) return;
   WriteSignalVarDecl(ofs_, sig, name, width, port_nodes_);

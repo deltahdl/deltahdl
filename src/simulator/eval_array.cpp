@@ -19,6 +19,25 @@ static void WriteVecElements(std::string_view var_name, const ArrayInfo& info,
                              const std::vector<Logic4Vec>& vals,
                              SimContext& ctx);
 
+// The 'with'-clause iteration binding for array reduction/ordering methods
+// (§7.12). Each element is evaluated with the iterator variable (named by
+// iter_name) and its index variable (idx_var_name) bound in a fresh scope.
+// ctx/arena are the evaluation environment those bindings live in.
+struct WithIterEnv {
+  std::string_view iter_name;
+  const std::string& idx_var_name;
+  SimContext& ctx;
+  Arena& arena;
+};
+
+// The index-type spec of an associative array (§7.8): how an index expression
+// is reduced to a stored key. Mirrors the AssocArrayObject index fields.
+struct AssocKeySpec {
+  uint32_t index_width = 64;
+  bool is_wildcard = false;
+  bool is_signed = true;
+};
+
 static std::vector<uint64_t> CollectElements(std::string_view var_name,
                                              const ArrayInfo& info,
                                              SimContext& ctx) {
@@ -137,30 +156,27 @@ IterNames ExtractIterNames(const Expr* expr) {
 }
 
 static Logic4Vec EvalWithExprForElement(const Expr* with_expr,
-                                        std::string_view iter_name,
-                                        const std::string& idx_var_name,
-                                        const Logic4Vec& elem, size_t index,
-                                        SimContext& ctx, Arena& arena) {
-  ctx.PushScope();
-  auto* item_var = ctx.CreateLocalVariable(iter_name, elem.width);
+                                        const WithIterEnv& env,
+                                        const Logic4Vec& elem, size_t index) {
+  env.ctx.PushScope();
+  auto* item_var = env.ctx.CreateLocalVariable(env.iter_name, elem.width);
   item_var->value = elem;
-  auto* idx_var = ctx.CreateLocalVariable(idx_var_name, 32);
-  idx_var->value = MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(index));
-  Logic4Vec ev = EvalExpr(with_expr, ctx, arena);
-  ctx.PopScope();
+  auto* idx_var = env.ctx.CreateLocalVariable(env.idx_var_name, 32);
+  idx_var->value =
+      MakeLogic4VecVal(env.arena, 32, static_cast<uint64_t>(index));
+  Logic4Vec ev = EvalExpr(with_expr, env.ctx, env.arena);
+  env.ctx.PopScope();
   return ev;
 }
 
 static std::vector<uint64_t> EvalReduceWithValues(
     const std::vector<Logic4Vec>& elems, const Expr* expr,
-    std::string_view iter_name, const std::string& idx_var_name,
-    SimContext& ctx, Arena& arena, uint32_t& result_width) {
+    const WithIterEnv& env, uint32_t& result_width) {
   std::vector<uint64_t> vals;
   vals.reserve(elems.size());
   result_width = 0;
   for (size_t i = 0; i < elems.size(); ++i) {
-    Logic4Vec ev = EvalWithExprForElement(
-        expr->with_expr, iter_name, idx_var_name, elems[i], i, ctx, arena);
+    Logic4Vec ev = EvalWithExprForElement(expr->with_expr, env, elems[i], i);
     vals.push_back(ev.ToUint64());
     if (i == 0) result_width = ev.width;
   }
@@ -212,12 +228,10 @@ static Logic4Vec ReduceWithExpr(std::string_view var_name,
                                 SimContext& ctx, Arena& arena) {
   auto elems = CollectVecElements(var_name, info, ctx, arena);
   auto names = ExtractIterNames(expr);
-  std::string_view iter_name = names.iter_name;
-  const std::string& idx_var_name = names.idx_var_name;
+  WithIterEnv env{names.iter_name, names.idx_var_name, ctx, arena};
 
   uint32_t result_width = 0;
-  auto vals = EvalReduceWithValues(elems, expr, iter_name, idx_var_name, ctx,
-                                   arena, result_width);
+  auto vals = EvalReduceWithValues(elems, expr, env, result_width);
   if (result_width == 0) result_width = info.elem_width;
 
   std::string_view method = expr->lhs->rhs->text;
@@ -340,24 +354,17 @@ bool TryEvalArrayMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
   return false;
 }
 
-static uint64_t EvalSortKey(const Expr* with_expr, std::string_view iter_name,
-                            const std::string& idx_var_name,
-                            const Logic4Vec& elem, size_t index,
-                            SimContext& ctx, Arena& arena) {
-  return EvalWithExprForElement(with_expr, iter_name, idx_var_name, elem, index,
-                                ctx, arena)
-      .ToUint64();
+static uint64_t EvalSortKey(const Expr* with_expr, const WithIterEnv& env,
+                            const Logic4Vec& elem, size_t index) {
+  return EvalWithExprForElement(with_expr, env, elem, index).ToUint64();
 }
 
 static std::vector<std::pair<uint64_t, size_t>> BuildSortKeys(
     const std::vector<Logic4Vec>& vals, const Expr* expr,
-    std::string_view iter_name, const std::string& idx_var_name,
-    SimContext& ctx, Arena& arena) {
+    const WithIterEnv& env) {
   std::vector<std::pair<uint64_t, size_t>> keys(vals.size());
   for (size_t i = 0; i < vals.size(); ++i) {
-    keys[i] = {EvalSortKey(expr->with_expr, iter_name, idx_var_name, vals[i], i,
-                           ctx, arena),
-               i};
+    keys[i] = {EvalSortKey(expr->with_expr, env, vals[i], i), i};
   }
   return keys;
 }
@@ -380,16 +387,15 @@ static std::vector<Logic4Vec> ReorderByKeys(
   return sorted;
 }
 
-static void ArraySortWithExpr(std::string_view var_name, const ArrayInfo& info,
-                              const Expr* expr, bool ascending, SimContext& ctx,
-                              Arena& arena) {
-  auto vals = CollectVecElements(var_name, info, ctx, arena);
+static void ArraySortWithExpr(const ArrayCtx& ac, const Expr* expr,
+                              bool ascending) {
+  auto vals = CollectVecElements(ac.var_name, ac.info, ac.ctx, ac.arena);
   auto names = ExtractIterNames(expr);
-  auto keys = BuildSortKeys(vals, expr, names.iter_name, names.idx_var_name,
-                            ctx, arena);
+  WithIterEnv env{names.iter_name, names.idx_var_name, ac.ctx, ac.arena};
+  auto keys = BuildSortKeys(vals, expr, env);
   SortKeysByValue(keys, ascending);
   std::vector<Logic4Vec> sorted = ReorderByKeys(vals, keys);
-  WriteVecElements(var_name, info, sorted, ctx);
+  WriteVecElements(ac.var_name, ac.info, sorted, ac.ctx);
 }
 
 static void ArraySort(std::string_view var_name, const ArrayInfo& info,
@@ -476,16 +482,17 @@ static bool CheckOrderingWithClause(const MethodCallParts& parts,
 static void ExecOrderingMethod(const MethodCallParts& parts,
                                const ArrayInfo& info, const Expr* expr,
                                SimContext& ctx, Arena& arena) {
+  ArrayCtx ac{parts.var_name, info, ctx, arena};
   if (parts.method_name == "sort") {
     if (expr->with_expr)
-      ArraySortWithExpr(parts.var_name, info, expr, true, ctx, arena);
+      ArraySortWithExpr(ac, expr, true);
     else
       ArraySort(parts.var_name, info, ctx, arena);
     return;
   }
   if (parts.method_name == "rsort") {
     if (expr->with_expr)
-      ArraySortWithExpr(parts.var_name, info, expr, false, ctx, arena);
+      ArraySortWithExpr(ac, expr, false);
     else
       ArrayRsort(parts.var_name, info, ctx, arena);
     return;
@@ -578,13 +585,12 @@ static std::string EvalStrKey(const Expr* expr, SimContext& ctx, Arena& arena) {
 }
 
 static int64_t EvalIntKey(const Expr* expr, SimContext& ctx, Arena& arena,
-                          uint32_t index_width = 64, bool is_wildcard = false,
-                          bool is_signed = true) {
+                          const AssocKeySpec& spec = {}) {
   auto val = EvalExpr(expr, ctx, arena);
   if (HasUnknownBits(val)) {
     ctx.GetDiag().Warning({}, "associative array index contains x/z");
   }
-  return AssocIntKey(val, is_wildcard, index_width, is_signed);
+  return AssocIntKey(val, spec.is_wildcard, spec.index_width, spec.is_signed);
 }
 
 static bool AssocExists(AssocArrayObject* aa, const Expr* expr, SimContext& ctx,
@@ -594,9 +600,9 @@ static bool AssocExists(AssocArrayObject* aa, const Expr* expr, SimContext& ctx,
   if (aa->is_string_key) {
     found = aa->str_data.count(EvalStrKey(expr->args[0], ctx, arena)) ? 1 : 0;
   } else {
-    found = aa->int_data.count(EvalIntKey(expr->args[0], ctx, arena,
-                                          aa->index_width, aa->is_wildcard,
-                                          aa->is_index_signed))
+    found = aa->int_data.count(EvalIntKey(
+                expr->args[0], ctx, arena,
+                {aa->index_width, aa->is_wildcard, aa->is_index_signed}))
                 ? 1
                 : 0;
   }
@@ -757,8 +763,9 @@ static bool ExecAssocDelete(AssocArrayObject* aa, const Expr* expr,
   if (aa->is_string_key) {
     aa->str_data.erase(EvalStrKey(expr->args[0], ctx, arena));
   } else {
-    aa->int_data.erase(EvalIntKey(expr->args[0], ctx, arena, aa->index_width,
-                                  aa->is_wildcard, aa->is_index_signed));
+    aa->int_data.erase(
+        EvalIntKey(expr->args[0], ctx, arena,
+                   {aa->index_width, aa->is_wildcard, aa->is_index_signed}));
   }
   return true;
 }

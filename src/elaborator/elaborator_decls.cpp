@@ -163,16 +163,24 @@ static bool TryParseUserDefinedAssocDim(
   return true;
 }
 
-static void ComputeUnpackedDims(
-    const std::vector<Expr*>& dims, RtlirVariable& var,
-    const TypedefMap& typedefs,
-    const std::unordered_set<std::string_view>& class_names, DiagEngine& diag,
-    SourceLoc loc) {
+// §7.8: the set of user-defined type names an unpacked dimension may name as a
+// user-defined associative index — the typedef table and the set of class
+// names that together form the type-name resolution context.
+struct TypeNameContext {
+  const TypedefMap& typedefs;
+  const std::unordered_set<std::string_view>& class_names;
+};
+
+static void ComputeUnpackedDims(const std::vector<Expr*>& dims,
+                                RtlirVariable& var,
+                                const TypeNameContext& types, DiagEngine& diag,
+                                SourceLoc loc) {
   if (dims.empty() || !dims[0]) return;
   auto* dim = dims[0];
   if (TryParseQueueDim(dim, var, diag, loc)) return;
   if (TryParseAssocDim(dim, var)) return;
-  if (TryParseUserDefinedAssocDim(dim, var, typedefs, class_names)) return;
+  if (TryParseUserDefinedAssocDim(dim, var, types.typedefs, types.class_names))
+    return;
   if (TryParseRangeDim(dim, var)) return;
 
   ApplyConstSizedUnpackedDim(dim, var, diag, loc);
@@ -221,17 +229,27 @@ static void CheckPortNameRedeclaration(const ModuleItem* item,
   }
 }
 
+// §23.2.2.1: the declared type whose vector width is reconciled against an
+// earlier partial port declaration — the data type paired with the typedef
+// table needed to evaluate its width.
+struct DeclTypeRef {
+  const DataType& dtype;
+  const TypedefMap& typedefs;
+};
+
 // §23.2.2.1: reconcile a declaration against an earlier partial
 // (direction-only) port declaration — width mismatch is an error — or, when
 // there is no partial port, record the name and diagnose any plain
 // redeclaration. `kind_word` selects "net" or "variable" in the vector-range
 // message.
-static void CheckPartialPortOrNameRedeclaration(
-    const ModuleItem* item, const DataType& dtype, const TypedefMap& typedefs,
-    DeclNameTables tables, std::string_view kind_word, DiagEngine& diag) {
+static void CheckPartialPortOrNameRedeclaration(const ModuleItem* item,
+                                                const DeclTypeRef& decl_type,
+                                                DeclNameTables tables,
+                                                std::string_view kind_word,
+                                                DiagEngine& diag) {
   auto it = tables.non_ansi_partial_ports.find(item->name);
   if (it != tables.non_ansi_partial_ports.end()) {
-    uint32_t decl_width = EvalTypeWidth(dtype, typedefs);
+    uint32_t decl_width = EvalTypeWidth(decl_type.dtype, decl_type.typedefs);
     if (decl_width != it->second) {
       diag.Error(item->loc,
                  std::format("vector range of {} '{}' does not match its port "
@@ -246,12 +264,13 @@ static void CheckPartialPortOrNameRedeclaration(
 // §23.2.2.1: diagnose redeclaration of a declared name and width mismatches
 // against an earlier partial (direction-only) port declaration. `kind_word`
 // selects "net" or "variable" in the vector-range message.
-static void CheckDeclRedeclaration(
-    const ModuleItem* item, const DataType& dtype, const TypedefMap& typedefs,
-    DeclNameTables tables, std::string_view kind_word, DiagEngine& diag) {
+static void CheckDeclRedeclaration(const ModuleItem* item,
+                                   const DeclTypeRef& decl_type,
+                                   DeclNameTables tables,
+                                   std::string_view kind_word,
+                                   DiagEngine& diag) {
   CheckPortNameRedeclaration(item, tables, diag);
-  CheckPartialPortOrNameRedeclaration(item, dtype, typedefs, tables, kind_word,
-                                      diag);
+  CheckPartialPortOrNameRedeclaration(item, decl_type, tables, kind_word, diag);
 }
 
 // §6.7.1 / §23.2.2.1: a net declared with a vector type that cannot carry a
@@ -314,20 +333,27 @@ static RtlirContAssign BuildNetDeclContAssign(const ModuleItem* item,
   return ca;
 }
 
+// §6.10: where a lowered net declaration assignment is emitted — the module
+// receiving the continuous assignment, the arena that allocates its LHS, and
+// the table recording continuous-assignment driver targets.
+struct NetDeclLowerSink {
+  RtlirModule* mod;
+  Arena& arena;
+  std::unordered_map<std::string_view, SourceLoc>& cont_assign_targets;
+};
+
 // §6.10: a net declaration assignment lowers to a continuous assignment of the
 // initializer to the net (illegal on interconnect nets).
-static void LowerNetDeclAssignment(
-    const ModuleItem* item, const RtlirNet& net, RtlirModule* mod, Arena& arena,
-    std::unordered_map<std::string_view, SourceLoc>& cont_assign_targets,
-    DiagEngine& diag) {
+static void LowerNetDeclAssignment(const ModuleItem* item, const RtlirNet& net,
+                                   NetDeclLowerSink sink, DiagEngine& diag) {
   if (!item->init_expr) return;
   if (item->data_type.is_interconnect) {
     diag.Error(item->loc,
                "interconnect net shall not have a net declaration assignment");
     return;
   }
-  cont_assign_targets.emplace(item->name, item->loc);
-  mod->assigns.push_back(BuildNetDeclContAssign(item, net, arena));
+  sink.cont_assign_targets.emplace(item->name, item->loc);
+  sink.mod->assigns.push_back(BuildNetDeclContAssign(item, net, sink.arena));
 }
 
 // §6.10 / §28.16: apply the compilation unit's default trireg charge strength
@@ -349,7 +375,7 @@ static void ApplyTriregNetDefaults(const ModuleItem* item, RtlirNet& net,
 }
 
 void Elaborator::ElaborateNetDecl(ModuleItem* item, RtlirModule* mod) {
-  CheckDeclRedeclaration(item, item->data_type, typedefs_,
+  CheckDeclRedeclaration(item, {item->data_type, typedefs_},
                          {ansi_port_names_, non_ansi_complete_ports_,
                           non_ansi_partial_ports_, declared_names_},
                          "net", diag_);
@@ -399,7 +425,7 @@ void Elaborator::ElaborateNetDecl(ModuleItem* item, RtlirModule* mod) {
 
   ValidateNetDriveStrength(item->data_type, net, diag_, item->loc);
 
-  LowerNetDeclAssignment(item, net, mod, arena_, cont_assign_targets_, diag_);
+  LowerNetDeclAssignment(item, net, {mod, arena_, cont_assign_targets_}, diag_);
 }
 
 static void SetEnumTypeInfo(const ModuleItem* item, RtlirVariable& var,
@@ -823,7 +849,7 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
     diag_.Error(item->loc,
                 "automatic lifetime is not allowed on module-level variables");
   }
-  CheckDeclRedeclaration(item, item->data_type, typedefs_,
+  CheckDeclRedeclaration(item, {item->data_type, typedefs_},
                          {ansi_port_names_, non_ansi_complete_ports_,
                           non_ansi_partial_ports_, declared_names_},
                          "variable", diag_);
@@ -866,8 +892,8 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
 
   SetEnumTypeInfo(item, var, typedefs_, arena_);
 
-  ComputeUnpackedDims(item->unpacked_dims, var, typedefs_, class_names_, diag_,
-                      item->loc);
+  ComputeUnpackedDims(item->unpacked_dims, var, {typedefs_, class_names_},
+                      diag_, item->loc);
   ValidateUnpackedDimRange(item->unpacked_dims, item->loc);
   InferDynArraySize(item->unpacked_dims, item->init_expr, var);
 

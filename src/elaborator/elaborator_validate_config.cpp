@@ -668,6 +668,16 @@ namespace {
 
 using PkgByName = std::unordered_map<std::string_view, const PackageDecl*>;
 
+// §26.5/§26.6: the set of names a package brings in by import. An explicit
+// `import pkg::name` contributes a "pkg::name" key to direct_imports; a
+// wildcard `import pkg::*` contributes the source package name to
+// wildcard_sources. Both export-validation steps consult this same set, so it
+// is one entity passed together rather than two loose parameters.
+struct PackageImportSet {
+  std::unordered_set<std::string> direct_imports;
+  std::unordered_set<std::string_view> wildcard_sources;
+};
+
 bool PackageDeclaresName(const PackageDecl* src_pkg, std::string_view name) {
   for (const auto* it : src_pkg->items) {
     if (it->kind == ModuleItemKind::kImportDecl ||
@@ -731,17 +741,15 @@ bool PackageProvidesName(const PackageDecl* src_pkg, std::string_view name,
   return false;
 }
 
-void CollectPackageImports(
-    const PackageDecl* pkg, std::unordered_set<std::string>& direct_imports,
-    std::unordered_set<std::string_view>& wildcard_sources) {
+void CollectPackageImports(const PackageDecl* pkg, PackageImportSet& imports) {
   for (const auto* item : pkg->items) {
     if (item->kind != ModuleItemKind::kImportDecl) continue;
     const auto& imp = item->import_item;
     if (imp.is_wildcard) {
-      wildcard_sources.insert(imp.package_name);
+      imports.wildcard_sources.insert(imp.package_name);
     } else {
-      direct_imports.insert(std::string(imp.package_name) +
-                            "::" + std::string(imp.item_name));
+      imports.direct_imports.insert(std::string(imp.package_name) +
+                                    "::" + std::string(imp.item_name));
     }
   }
 }
@@ -773,14 +781,12 @@ const PackageDecl* ResolveExportSource(const ModuleItem* item,
 
 // §26.6: an exported name must first be imported by the exporting package,
 // either explicitly or through a wildcard import of the source package.
-void CheckExportIsImported(
-    const PackageDecl* pkg, const ModuleItem* item, const ImportItem& ex,
-    const std::unordered_set<std::string>& direct_imports,
-    const std::unordered_set<std::string_view>& wildcard_sources,
-    DiagEngine& diag) {
+void CheckExportIsImported(const PackageDecl* pkg, const ModuleItem* item,
+                           const ImportItem& ex,
+                           const PackageImportSet& imports, DiagEngine& diag) {
   auto key = std::string(ex.package_name) + "::" + std::string(ex.item_name);
-  if (direct_imports.count(key) == 0 &&
-      wildcard_sources.count(ex.package_name) == 0) {
+  if (imports.direct_imports.count(key) == 0 &&
+      imports.wildcard_sources.count(ex.package_name) == 0) {
     diag.Error(
         item->loc,
         std::format("export '{}::{}': '{}' is not imported in package '{}'",
@@ -788,19 +794,18 @@ void CheckExportIsImported(
   }
 }
 
-void ValidateOnePackageExportItem(
-    const PackageDecl* pkg, const ModuleItem* item,
-    const PkgByName& pkg_by_name,
-    const std::unordered_set<std::string>& direct_imports,
-    const std::unordered_set<std::string_view>& wildcard_sources,
-    DiagEngine& diag) {
+void ValidateOnePackageExportItem(const PackageDecl* pkg,
+                                  const ModuleItem* item,
+                                  const PkgByName& pkg_by_name,
+                                  const PackageImportSet& imports,
+                                  DiagEngine& diag) {
   const auto& ex = item->import_item;
 
   if (ex.package_name == "*" || ex.is_wildcard) return;
 
   if (ResolveExportSource(item, ex, pkg_by_name, diag) == nullptr) return;
 
-  CheckExportIsImported(pkg, item, ex, direct_imports, wildcard_sources, diag);
+  CheckExportIsImported(pkg, item, ex, imports, diag);
 }
 
 }  // namespace
@@ -812,14 +817,12 @@ void Elaborator::ValidatePackageExports() {
   }
 
   for (const auto* pkg : unit_->packages) {
-    std::unordered_set<std::string> direct_imports;
-    std::unordered_set<std::string_view> wildcard_sources;
-    CollectPackageImports(pkg, direct_imports, wildcard_sources);
+    PackageImportSet imports;
+    CollectPackageImports(pkg, imports);
 
     for (const auto* item : pkg->items) {
       if (item->kind != ModuleItemKind::kExportDecl) continue;
-      ValidateOnePackageExportItem(pkg, item, pkg_by_name, direct_imports,
-                                   wildcard_sources, diag_);
+      ValidateOnePackageExportItem(pkg, item, pkg_by_name, imports, diag_);
     }
   }
 }
@@ -840,22 +843,29 @@ bool IsModportLiteralExpr(const Expr* e) {
   }
 }
 
+// §25.5: the set of names an interface declares, against which its modport
+// items are checked. declared_names holds the interface's own ports plus every
+// item declared in its body; clocking_names holds just the clocking blocks.
+// A modport item naming anything outside this scope is rejected.
+struct ModportNameScope {
+  std::unordered_set<std::string_view> declared_names;
+  std::unordered_set<std::string_view> clocking_names;
+};
+
 // §25.5: a modport may only reference names that this interface itself
 // declares. Collect every such name — the interface's own ports plus the
 // signals, subprograms, and other items declared in its body — so a modport
 // item naming anything outside this set can be rejected below.
-void CollectModportDeclaredNames(
-    const ModuleDecl* iface,
-    std::unordered_set<std::string_view>& declared_names,
-    std::unordered_set<std::string_view>& clocking_names) {
+void CollectModportDeclaredNames(const ModuleDecl* iface,
+                                 ModportNameScope& scope) {
   for (const auto& port : iface->ports) {
-    if (!port.name.empty()) declared_names.insert(port.name);
+    if (!port.name.empty()) scope.declared_names.insert(port.name);
   }
   for (const auto* item : iface->items) {
     if (item->kind == ModuleItemKind::kClockingBlock && !item->name.empty()) {
-      clocking_names.insert(item->name);
+      scope.clocking_names.insert(item->name);
     }
-    if (!item->name.empty()) declared_names.insert(item->name);
+    if (!item->name.empty()) scope.declared_names.insert(item->name);
   }
 }
 
@@ -903,21 +913,16 @@ void CheckModportClockingDeclared(
   }
 }
 
-void ValidateOneModportPort(
-    const ModuleDecl* iface, const ModportDecl* mp, const ModportPort& port,
-    const std::unordered_set<std::string_view>& declared_names,
-    const std::unordered_set<std::string_view>& clocking_names,
-    DiagEngine& diag) {
-  CheckSimpleModportItemDeclared(iface, mp, port, declared_names, diag);
+void ValidateOneModportPort(const ModuleDecl* iface, const ModportDecl* mp,
+                            const ModportPort& port,
+                            const ModportNameScope& scope, DiagEngine& diag) {
+  CheckSimpleModportItemDeclared(iface, mp, port, scope.declared_names, diag);
   CheckModportConstExprDirection(mp, port, diag);
-  CheckModportClockingDeclared(iface, mp, port, clocking_names, diag);
+  CheckModportClockingDeclared(iface, mp, port, scope.clocking_names, diag);
 }
 
-void ValidateOneModport(
-    const ModuleDecl* iface, const ModportDecl* mp,
-    const std::unordered_set<std::string_view>& declared_names,
-    const std::unordered_set<std::string_view>& clocking_names,
-    DiagEngine& diag) {
+void ValidateOneModport(const ModuleDecl* iface, const ModportDecl* mp,
+                        const ModportNameScope& scope, DiagEngine& diag) {
   std::unordered_set<std::string_view> port_names;
   for (const auto& port : mp->ports) {
     if (port.name.empty()) continue;
@@ -925,8 +930,7 @@ void ValidateOneModport(
       diag.Error(mp->loc, std::format("duplicate port-id '{}' in modport '{}'",
                                       port.name, mp->name));
     }
-    ValidateOneModportPort(iface, mp, port, declared_names, clocking_names,
-                           diag);
+    ValidateOneModportPort(iface, mp, port, scope, diag);
   }
 }
 
@@ -934,11 +938,10 @@ void ValidateOneModport(
 
 void Elaborator::ValidateModports() {
   for (auto* iface : unit_->interfaces) {
-    std::unordered_set<std::string_view> clocking_names;
-    std::unordered_set<std::string_view> declared_names;
-    CollectModportDeclaredNames(iface, declared_names, clocking_names);
+    ModportNameScope scope;
+    CollectModportDeclaredNames(iface, scope);
     for (auto* mp : iface->modports) {
-      ValidateOneModport(iface, mp, declared_names, clocking_names, diag_);
+      ValidateOneModport(iface, mp, scope, diag_);
     }
   }
 }

@@ -725,19 +725,28 @@ static std::vector<std::string> CollectStagedGeneralVariables(
   return general;
 }
 
+// The solver's mutable random-variable value store, the one domain object a
+// staged pass works over: the rand variables (18.4) plus the two value maps
+// that hold their solved values — the integral values and, separately for real
+// (18.4.1) variables, the real values. Bundled so a staged pass takes the store
+// as one entity rather than its three constituent maps spread apart.
+struct StagedSolveState {
+  std::unordered_map<std::string, RandVariable>& variables;
+  std::unordered_map<std::string, double>& real_values;
+  const std::unordered_map<std::string, int64_t>& values;
+};
+
 static bool RunStagedSolve(
-    std::unordered_map<std::string, RandVariable>& variables,
-    std::unordered_map<std::string, double>& real_values,
-    const std::unordered_map<std::string, int64_t>& values, bool use_priority,
+    StagedSolveState state, bool use_priority,
     const std::function<double(RandVariable&)>& gen_real,
     const std::function<std::vector<std::vector<std::string>>(
         const std::vector<std::string>&)>& partition,
     const std::function<bool(const std::vector<std::vector<std::string>>&)>&
         solve) {
   (void)use_priority;
-  CommitStagedRealVariables(variables, real_values, gen_real);
+  CommitStagedRealVariables(state.variables, state.real_values, gen_real);
   std::vector<std::string> general =
-      CollectStagedGeneralVariables(variables, values);
+      CollectStagedGeneralVariables(state.variables, state.values);
   return solve(partition(general));
 }
 
@@ -761,19 +770,27 @@ AttemptOutcome ResolveAttempt(const std::function<bool()>& pass,
   return AttemptOutcome::kRetry;
 }
 
+// The three mutually-exclusive solve strategies one attempt may run, the entity
+// SolveIterative chooses among: the priority-layer staged pass (18.5.11), the
+// solve...before ordered staged pass (18.5.9), and the default flat pass.
+// Exactly one is invoked per attempt, selected by which ordering edges exist.
+struct AttemptPasses {
+  const std::function<bool()>& priority;
+  const std::function<bool()>& ordered;
+  const std::function<bool()>& flat;
+};
+
 // Select and run the one pass that applies for this attempt — the
 // priority-layer staged pass (18.5.11), the solve...before ordered staged pass
 // (18.5.9), or the default flat pass — and resolve its outcome. Exactly one of
-// 'priority_pass', 'ordered_pass', 'flat_pass' runs, chosen by which ordering
-// edges exist, just as the original inline branch chain did.
+// the passes runs, chosen by which ordering edges exist, just as the original
+// inline branch chain did.
 AttemptOutcome RunAttemptPass(bool has_priority_edges, bool has_before_edges,
-                              const std::function<bool()>& priority_pass,
-                              const std::function<bool()>& ordered_pass,
-                              const std::function<bool()>& flat_pass,
+                              const AttemptPasses& passes,
                               const bool& guard_error) {
-  if (has_priority_edges) return ResolveAttempt(priority_pass, guard_error);
-  if (has_before_edges) return ResolveAttempt(ordered_pass, guard_error);
-  return ResolveAttempt(flat_pass, guard_error);
+  if (has_priority_edges) return ResolveAttempt(passes.priority, guard_error);
+  if (has_before_edges) return ResolveAttempt(passes.ordered, guard_error);
+  return ResolveAttempt(passes.flat, guard_error);
 }
 
 }  // namespace
@@ -791,9 +808,10 @@ bool ConstraintSolver::SolveIterative(const std::vector<ConstraintExpr>& extra,
   // layer committed as state variables to the next without backtracking. This
   // subdivides the solution space (and can fail), distinct from the
   // solution-space-preserving solve...before ordering.
+  StagedSolveState state{variables_, real_values_, values_};
   auto priority_pass = [&] {
     return RunStagedSolve(
-        variables_, real_values_, values_, /*use_priority=*/true, gen_real,
+        state, /*use_priority=*/true, gen_real,
         [this](const std::vector<std::string>& general) {
           return ComputePriorityLayers(general);
         },
@@ -807,7 +825,7 @@ bool ConstraintSolver::SolveIterative(const std::vector<ConstraintExpr>& extra,
   // ordering while leaving the set of legal solutions unchanged.
   auto ordered_pass = [&] {
     return RunStagedSolve(
-        variables_, real_values_, values_, /*use_priority=*/false, gen_real,
+        state, /*use_priority=*/false, gen_real,
         [this](const std::vector<std::string>& general) {
           return ComputeSolveGroups(general);
         },
@@ -829,9 +847,10 @@ bool ConstraintSolver::SolveIterative(const std::vector<ConstraintExpr>& extra,
     ApplyDirectConstraints(extra, include_soft);
     DrawRandcVariables(variables_, values_, gen);
     DrawArraySizeVariables(variables_, values_, gen);
-    AttemptOutcome outcome = RunAttemptPass(
-        !function_arg_priority_edges_.empty(), !solve_before_edges_.empty(),
-        priority_pass, ordered_pass, flat_pass, guard_error_);
+    AttemptPasses passes{priority_pass, ordered_pass, flat_pass};
+    AttemptOutcome outcome =
+        RunAttemptPass(!function_arg_priority_edges_.empty(),
+                       !solve_before_edges_.empty(), passes, guard_error_);
     if (outcome == AttemptOutcome::kSolved) return true;
     // 18.5.12: an ERROR guard fails randomize() outright; do not retry it.
     if (outcome == AttemptOutcome::kAbort) return false;

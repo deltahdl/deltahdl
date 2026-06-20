@@ -374,12 +374,21 @@ static void ExecFuncBlockingAssign(const Stmt* stmt, SimContext& ctx,
   }
 }
 
-static bool ExecFuncStmt(const Stmt* stmt, Variable* ret_var,
-                         std::string_view func_name, SimContext& ctx,
-                         Arena& arena);
-static bool ExecFuncBlock(const Stmt* stmt, Variable* ret_var,
-                          std::string_view func_name, SimContext& ctx,
-                          Arena& arena);
+// The environment in which a subroutine body executes (§13.4): the return
+// variable that a `return` writes, the subroutine name used to key static
+// function-local variables (§13.4.2), and the simulation/evaluation context.
+// This quartet travels together through the entire recursive statement
+// executor, so it is bundled into one entity rather than passed field by
+// field.
+struct FuncExecCtx {
+  Variable* ret_var;
+  std::string_view func_name;
+  SimContext& ctx;
+  Arena& arena;
+};
+
+static bool ExecFuncStmt(const Stmt* stmt, const FuncExecCtx& exec);
+static bool ExecFuncBlock(const Stmt* stmt, const FuncExecCtx& exec);
 
 // Returns the trailing unconditional else of an if/else-if chain, or null when
 // the chain has no final else.
@@ -421,19 +430,16 @@ static UniqueIfScan ScanUniqueIfChain(const Stmt* stmt, SimContext& ctx,
 // the trailing unconditional else, reporting a no-match violation for a plain
 // `unique` chain that has no final else.
 static bool ExecFuncUniqueIfBranch(const Stmt* stmt, const UniqueIfScan& scan,
-                                   CaseQualifier qual, Variable* ret_var,
-                                   std::string_view func_name, SimContext& ctx,
-                                   Arena& arena) {
+                                   CaseQualifier qual,
+                                   const FuncExecCtx& exec) {
   if (scan.first_match) {
-    return ExecFuncStmt(scan.first_match->then_branch, ret_var, func_name, ctx,
-                        arena);
+    return ExecFuncStmt(scan.first_match->then_branch, exec);
   }
   if (scan.has_final_else) {
     const Stmt* final_else = FuncFindFinalElse(stmt);
-    if (final_else)
-      return ExecFuncStmt(final_else, ret_var, func_name, ctx, arena);
+    if (final_else) return ExecFuncStmt(final_else, exec);
   } else if (qual == CaseQualifier::kUnique) {
-    ctx.AddPendingViolation("unique if: no condition matched");
+    exec.ctx.AddPendingViolation("unique if: no condition matched");
   }
   return false;
 }
@@ -445,24 +451,20 @@ static bool ExecFuncUniqueIfBranch(const Stmt* stmt, const UniqueIfScan& scan,
 // invoked the subroutine; separate callers therefore accumulate and flush
 // independently.
 static bool ExecFuncUniqueIf(const Stmt* stmt, CaseQualifier qual,
-                             Variable* ret_var, std::string_view func_name,
-                             SimContext& ctx, Arena& arena) {
-  UniqueIfScan scan = ScanUniqueIfChain(stmt, ctx, arena);
+                             const FuncExecCtx& exec) {
+  UniqueIfScan scan = ScanUniqueIfChain(stmt, exec.ctx, exec.arena);
   if (scan.match_count > 1) {
-    ctx.AddPendingViolation("unique if: multiple conditions matched");
+    exec.ctx.AddPendingViolation("unique if: multiple conditions matched");
   }
-  return ExecFuncUniqueIfBranch(stmt, scan, qual, ret_var, func_name, ctx,
-                                arena);
+  return ExecFuncUniqueIfBranch(stmt, scan, qual, exec);
 }
 
-static bool ExecFuncPriorityIf(const Stmt* stmt, Variable* ret_var,
-                               std::string_view func_name, SimContext& ctx,
-                               Arena& arena) {
+static bool ExecFuncPriorityIf(const Stmt* stmt, const FuncExecCtx& exec) {
   bool has_final_else = false;
   for (const Stmt* cur = stmt; cur && cur->kind == StmtKind::kIf;
        cur = cur->else_branch) {
-    if (EvalExpr(cur->condition, ctx, arena).IsTruthy()) {
-      return ExecFuncStmt(cur->then_branch, ret_var, func_name, ctx, arena);
+    if (EvalExpr(cur->condition, exec.ctx, exec.arena).IsTruthy()) {
+      return ExecFuncStmt(cur->then_branch, exec);
     }
     if (cur->else_branch && cur->else_branch->kind != StmtKind::kIf) {
       has_final_else = true;
@@ -470,53 +472,48 @@ static bool ExecFuncPriorityIf(const Stmt* stmt, Variable* ret_var,
   }
   if (has_final_else) {
     const Stmt* final_else = FuncFindFinalElse(stmt);
-    if (final_else)
-      return ExecFuncStmt(final_else, ret_var, func_name, ctx, arena);
+    if (final_else) return ExecFuncStmt(final_else, exec);
   } else {
-    ctx.AddPendingViolation("priority if: no condition matched");
+    exec.ctx.AddPendingViolation("priority if: no condition matched");
   }
   return false;
 }
 
-static bool ExecFuncIf(const Stmt* stmt, Variable* ret_var,
-                       std::string_view func_name, SimContext& ctx,
-                       Arena& arena) {
+static bool ExecFuncIf(const Stmt* stmt, const FuncExecCtx& exec) {
   bool labeled = !stmt->label.empty();
-  if (labeled) ctx.PushStaticScope(stmt->label);
+  if (labeled) exec.ctx.PushStaticScope(stmt->label);
 
   auto qual = stmt->qualifier;
   bool r = false;
   if (qual == CaseQualifier::kUnique || qual == CaseQualifier::kUnique0) {
-    r = ExecFuncUniqueIf(stmt, qual, ret_var, func_name, ctx, arena);
+    r = ExecFuncUniqueIf(stmt, qual, exec);
   } else if (qual == CaseQualifier::kPriority) {
-    r = ExecFuncPriorityIf(stmt, ret_var, func_name, ctx, arena);
+    r = ExecFuncPriorityIf(stmt, exec);
   } else {
-    auto cond = EvalExpr(stmt->condition, ctx, arena);
+    auto cond = EvalExpr(stmt->condition, exec.ctx, exec.arena);
     if (cond.ToUint64() != 0) {
-      r = ExecFuncStmt(stmt->then_branch, ret_var, func_name, ctx, arena);
+      r = ExecFuncStmt(stmt->then_branch, exec);
     } else if (stmt->else_branch) {
-      r = ExecFuncStmt(stmt->else_branch, ret_var, func_name, ctx, arena);
+      r = ExecFuncStmt(stmt->else_branch, exec);
     } else {
       r = false;
     }
   }
 
-  if (labeled) ctx.PopStaticScope(stmt->label);
+  if (labeled) exec.ctx.PopStaticScope(stmt->label);
   return r;
 }
 
-static bool ExecFuncBlock(const Stmt* stmt, Variable* ret_var,
-                          std::string_view func_name, SimContext& ctx,
-                          Arena& arena) {
+static bool ExecFuncBlock(const Stmt* stmt, const FuncExecCtx& exec) {
   bool named = !stmt->label.empty();
-  if (named) ctx.PushStaticScope(stmt->label);
+  if (named) exec.ctx.PushStaticScope(stmt->label);
   for (auto* c : stmt->stmts) {
-    if (ExecFuncStmt(c, ret_var, func_name, ctx, arena)) {
-      if (named) ctx.PopStaticScope(stmt->label);
+    if (ExecFuncStmt(c, exec)) {
+      if (named) exec.ctx.PopStaticScope(stmt->label);
       return true;
     }
   }
-  if (named) ctx.PopStaticScope(stmt->label);
+  if (named) exec.ctx.PopStaticScope(stmt->label);
   return false;
 }
 
@@ -531,9 +528,7 @@ static bool ForInitNeedsScope(const Stmt* stmt) {
 
 // Runs the for-loop initializers: typed inits create loop-local variables,
 // while untyped inits execute as ordinary statements.
-static void ExecFuncForInits(const Stmt* stmt, Variable* ret_var,
-                             std::string_view func_name, SimContext& ctx,
-                             Arena& arena) {
+static void ExecFuncForInits(const Stmt* stmt, const FuncExecCtx& exec) {
   for (size_t i = 0; i < stmt->for_inits.size(); ++i) {
     auto* init = stmt->for_inits[i];
     if (i < stmt->for_init_types.size() &&
@@ -541,41 +536,36 @@ static void ExecFuncForInits(const Stmt* stmt, Variable* ret_var,
         init->lhs && init->lhs->kind == ExprKind::kIdentifier) {
       uint32_t w = EvalTypeWidth(stmt->for_init_types[i]);
       if (w == 0) w = 32;
-      auto* v = ctx.CreateLocalVariable(init->lhs->text, w);
-      if (init->rhs) v->value = EvalExpr(init->rhs, ctx, arena);
+      auto* v = exec.ctx.CreateLocalVariable(init->lhs->text, w);
+      if (init->rhs) v->value = EvalExpr(init->rhs, exec.ctx, exec.arena);
     } else if (init) {
-      ExecFuncStmt(init, ret_var, func_name, ctx, arena);
+      ExecFuncStmt(init, exec);
     }
   }
 }
 
 // Runs the condition/body/step iterations of a for-loop. Returns true when the
 // body executed a return (so the caller should propagate it).
-static bool ExecFuncForLoop(const Stmt* stmt, Variable* ret_var,
-                            std::string_view func_name, SimContext& ctx,
-                            Arena& arena) {
-  while (stmt->for_cond && EvalExpr(stmt->for_cond, ctx, arena).IsTruthy()) {
-    if (stmt->for_body &&
-        ExecFuncStmt(stmt->for_body, ret_var, func_name, ctx, arena)) {
+static bool ExecFuncForLoop(const Stmt* stmt, const FuncExecCtx& exec) {
+  while (stmt->for_cond &&
+         EvalExpr(stmt->for_cond, exec.ctx, exec.arena).IsTruthy()) {
+    if (stmt->for_body && ExecFuncStmt(stmt->for_body, exec)) {
       return true;
     }
-    for (auto* step : stmt->for_steps)
-      ExecFuncStmt(step, ret_var, func_name, ctx, arena);
+    for (auto* step : stmt->for_steps) ExecFuncStmt(step, exec);
   }
   return false;
 }
 
-static bool ExecFuncFor(const Stmt* stmt, Variable* ret_var,
-                        std::string_view func_name, SimContext& ctx,
-                        Arena& arena) {
+static bool ExecFuncFor(const Stmt* stmt, const FuncExecCtx& exec) {
   bool labeled = !stmt->label.empty();
-  if (labeled) ctx.PushStaticScope(stmt->label);
+  if (labeled) exec.ctx.PushStaticScope(stmt->label);
   bool scoped = ForInitNeedsScope(stmt);
-  if (scoped) ctx.PushScope();
-  ExecFuncForInits(stmt, ret_var, func_name, ctx, arena);
-  bool returned = ExecFuncForLoop(stmt, ret_var, func_name, ctx, arena);
-  if (scoped) ctx.PopScope();
-  if (labeled) ctx.PopStaticScope(stmt->label);
+  if (scoped) exec.ctx.PushScope();
+  ExecFuncForInits(stmt, exec);
+  bool returned = ExecFuncForLoop(stmt, exec);
+  if (scoped) exec.ctx.PopScope();
+  if (labeled) exec.ctx.PopStaticScope(stmt->label);
   return returned;
 }
 
@@ -589,37 +579,35 @@ static Variable* CreateFuncLocalVar(std::string_view name, const DataType& type,
   return v;
 }
 
-static void ExecFuncVarDeclAutomatic(const Stmt* stmt, SimContext& ctx,
-                                     Arena& arena) {
-  CreateFuncLocalVar(stmt->var_name, stmt->var_decl_type, stmt->var_init, ctx,
-                     arena);
+static void ExecFuncVarDeclAutomatic(const Stmt* stmt,
+                                     const FuncExecCtx& exec) {
+  CreateFuncLocalVar(stmt->var_name, stmt->var_decl_type, stmt->var_init,
+                     exec.ctx, exec.arena);
 }
 
-static void ExecFuncVarDeclStatic(const Stmt* stmt, std::string_view func_name,
-                                  SimContext& ctx, Arena& arena) {
-  auto* existing = ctx.FindStaticFuncVar(func_name, stmt->var_name);
+static void ExecFuncVarDeclStatic(const Stmt* stmt, const FuncExecCtx& exec) {
+  auto* existing = exec.ctx.FindStaticFuncVar(exec.func_name, stmt->var_name);
   if (existing) {
-    ctx.AliasLocalVariable(stmt->var_name, existing);
+    exec.ctx.AliasLocalVariable(stmt->var_name, existing);
     return;
   }
   auto* v = CreateFuncLocalVar(stmt->var_name, stmt->var_decl_type,
-                               stmt->var_init, ctx, arena);
-  ctx.SaveStaticFuncVar(func_name, stmt->var_name, v);
+                               stmt->var_init, exec.ctx, exec.arena);
+  exec.ctx.SaveStaticFuncVar(exec.func_name, stmt->var_name, v);
 }
 
-static void ExecFuncVarDecl(const Stmt* stmt, std::string_view func_name,
-                            SimContext& ctx, Arena& arena) {
+static void ExecFuncVarDecl(const Stmt* stmt, const FuncExecCtx& exec) {
   if (stmt->var_is_automatic) {
-    ExecFuncVarDeclAutomatic(stmt, ctx, arena);
+    ExecFuncVarDeclAutomatic(stmt, exec);
     return;
   }
   if (stmt->var_is_static) {
-    ExecFuncVarDeclStatic(stmt, func_name, ctx, arena);
+    ExecFuncVarDeclStatic(stmt, exec);
     return;
   }
-  if (ctx.FindLocalVariable(stmt->var_name)) return;
-  CreateFuncLocalVar(stmt->var_name, stmt->var_decl_type, stmt->var_init, ctx,
-                     arena);
+  if (exec.ctx.FindLocalVariable(stmt->var_name)) return;
+  CreateFuncLocalVar(stmt->var_name, stmt->var_decl_type, stmt->var_init,
+                     exec.ctx, exec.arena);
 }
 
 static std::string GetForeachArrayName(const Expr* expr) {
@@ -633,51 +621,44 @@ static std::string GetForeachArrayName(const Expr* expr) {
   return {};
 }
 
-static bool ExecFuncWhile(const Stmt* stmt, Variable* ret_var,
-                          std::string_view func_name, SimContext& ctx,
-                          Arena& arena) {
+static bool ExecFuncWhile(const Stmt* stmt, const FuncExecCtx& exec) {
   bool labeled = !stmt->label.empty();
-  if (labeled) ctx.PushStaticScope(stmt->label);
-  while (stmt->condition && EvalExpr(stmt->condition, ctx, arena).IsTruthy()) {
-    if (stmt->body &&
-        ExecFuncStmt(stmt->body, ret_var, func_name, ctx, arena)) {
-      if (labeled) ctx.PopStaticScope(stmt->label);
+  if (labeled) exec.ctx.PushStaticScope(stmt->label);
+  while (stmt->condition &&
+         EvalExpr(stmt->condition, exec.ctx, exec.arena).IsTruthy()) {
+    if (stmt->body && ExecFuncStmt(stmt->body, exec)) {
+      if (labeled) exec.ctx.PopStaticScope(stmt->label);
       return true;
     }
   }
-  if (labeled) ctx.PopStaticScope(stmt->label);
+  if (labeled) exec.ctx.PopStaticScope(stmt->label);
   return false;
 }
 
-static bool ExecFuncDoWhile(const Stmt* stmt, Variable* ret_var,
-                            std::string_view func_name, SimContext& ctx,
-                            Arena& arena) {
+static bool ExecFuncDoWhile(const Stmt* stmt, const FuncExecCtx& exec) {
   bool labeled = !stmt->label.empty();
-  if (labeled) ctx.PushStaticScope(stmt->label);
+  if (labeled) exec.ctx.PushStaticScope(stmt->label);
   do {
-    if (stmt->body &&
-        ExecFuncStmt(stmt->body, ret_var, func_name, ctx, arena)) {
-      if (labeled) ctx.PopStaticScope(stmt->label);
+    if (stmt->body && ExecFuncStmt(stmt->body, exec)) {
+      if (labeled) exec.ctx.PopStaticScope(stmt->label);
       return true;
     }
-  } while (stmt->condition && EvalExpr(stmt->condition, ctx, arena).IsTruthy());
-  if (labeled) ctx.PopStaticScope(stmt->label);
+  } while (stmt->condition &&
+           EvalExpr(stmt->condition, exec.ctx, exec.arena).IsTruthy());
+  if (labeled) exec.ctx.PopStaticScope(stmt->label);
   return false;
 }
 
-static bool ExecFuncForever(const Stmt* stmt, Variable* ret_var,
-                            std::string_view func_name, SimContext& ctx,
-                            Arena& arena) {
+static bool ExecFuncForever(const Stmt* stmt, const FuncExecCtx& exec) {
   bool labeled = !stmt->label.empty();
-  if (labeled) ctx.PushStaticScope(stmt->label);
+  if (labeled) exec.ctx.PushStaticScope(stmt->label);
   for (;;) {
-    if (stmt->body &&
-        ExecFuncStmt(stmt->body, ret_var, func_name, ctx, arena)) {
-      if (labeled) ctx.PopStaticScope(stmt->label);
+    if (stmt->body && ExecFuncStmt(stmt->body, exec)) {
+      if (labeled) exec.ctx.PopStaticScope(stmt->label);
       return true;
     }
   }
-  if (labeled) ctx.PopStaticScope(stmt->label);
+  if (labeled) exec.ctx.PopStaticScope(stmt->label);
   return false;
 }
 
@@ -694,81 +675,76 @@ static uint32_t ResolveForeachSize(std::string_view name, SimContext& ctx) {
 // pushing a scope that holds the (optional) loop index variable. Returns true
 // when the body executed a return.
 static bool ExecFuncForeachLoop(const Stmt* stmt, uint32_t size,
-                                Variable* ret_var, std::string_view func_name,
-                                SimContext& ctx, Arena& arena) {
+                                const FuncExecCtx& exec) {
   std::string_view iter_name;
   if (!stmt->foreach_vars.empty() && !stmt->foreach_vars[0].empty()) {
     iter_name = stmt->foreach_vars[0];
   }
 
-  ctx.PushScope();
+  exec.ctx.PushScope();
   Variable* iter_var = nullptr;
   if (!iter_name.empty()) {
-    iter_var = ctx.CreateLocalVariable(iter_name, 32);
+    iter_var = exec.ctx.CreateLocalVariable(iter_name, 32);
   }
 
   for (uint32_t i = 0; i < size; ++i) {
     if (iter_var) {
-      iter_var->value = MakeLogic4VecVal(arena, 32, i);
+      iter_var->value = MakeLogic4VecVal(exec.arena, 32, i);
     }
-    if (stmt->body &&
-        ExecFuncStmt(stmt->body, ret_var, func_name, ctx, arena)) {
-      ctx.PopScope();
+    if (stmt->body && ExecFuncStmt(stmt->body, exec)) {
+      exec.ctx.PopScope();
       return true;
     }
   }
 
-  ctx.PopScope();
+  exec.ctx.PopScope();
   return false;
 }
 
-static bool ExecFuncForeach(const Stmt* stmt, Variable* ret_var,
-                            std::string_view func_name, SimContext& ctx,
-                            Arena& arena) {
+static bool ExecFuncForeach(const Stmt* stmt, const FuncExecCtx& exec) {
   bool labeled = !stmt->label.empty();
-  if (labeled) ctx.PushStaticScope(stmt->label);
+  if (labeled) exec.ctx.PushStaticScope(stmt->label);
   std::string name = GetForeachArrayName(stmt->expr);
-  uint32_t size = name.empty() ? 0 : ResolveForeachSize(name, ctx);
+  uint32_t size = name.empty() ? 0 : ResolveForeachSize(name, exec.ctx);
   bool returned = false;
   if (size != 0) {
-    returned = ExecFuncForeachLoop(stmt, size, ret_var, func_name, ctx, arena);
+    returned = ExecFuncForeachLoop(stmt, size, exec);
   }
-  if (labeled) ctx.PopStaticScope(stmt->label);
+  if (labeled) exec.ctx.PopStaticScope(stmt->label);
   return returned;
 }
 
-static bool ExecFuncStmt(const Stmt* stmt, Variable* ret_var,
-                         std::string_view func_name, SimContext& ctx,
-                         Arena& arena) {
+static bool ExecFuncStmt(const Stmt* stmt, const FuncExecCtx& exec) {
   if (!stmt) return false;
   switch (stmt->kind) {
     case StmtKind::kReturn:
       if (stmt->expr)
-        ret_var->value = EvalExpr(stmt->expr, ctx, arena, ret_var->value.width);
+        exec.ret_var->value = EvalExpr(stmt->expr, exec.ctx, exec.arena,
+                                       exec.ret_var->value.width);
       return true;
     case StmtKind::kBlockingAssign:
-      ExecFuncBlockingAssign(stmt, ctx, arena);
+      ExecFuncBlockingAssign(stmt, exec.ctx, exec.arena);
       return false;
     case StmtKind::kExprStmt:
-      EvalExpr(stmt->expr, ctx, arena);
+      EvalExpr(stmt->expr, exec.ctx, exec.arena);
       return false;
     case StmtKind::kVarDecl:
-      ExecFuncVarDecl(stmt, func_name, ctx, arena);
+      ExecFuncVarDecl(stmt, exec);
       return false;
     case StmtKind::kIf:
-      return ExecFuncIf(stmt, ret_var, func_name, ctx, arena);
+      return ExecFuncIf(stmt, exec);
     case StmtKind::kBlock:
-      return ExecFuncBlock(stmt, ret_var, func_name, ctx, arena);
+      return ExecFuncBlock(stmt, exec);
     case StmtKind::kFor:
-      return ExecFuncFor(stmt, ret_var, func_name, ctx, arena);
+      return ExecFuncFor(stmt, exec);
     case StmtKind::kForeach:
-      return ExecFuncForeach(stmt, ret_var, func_name, ctx, arena);
+      return ExecFuncForeach(stmt, exec);
     case StmtKind::kWhile:
-      return ExecFuncWhile(stmt, ret_var, func_name, ctx, arena);
+      return ExecFuncWhile(stmt, exec);
     case StmtKind::kDoWhile:
-      return ExecFuncDoWhile(stmt, ret_var, func_name, ctx, arena);
+      return ExecFuncDoWhile(stmt, exec);
     case StmtKind::kForever:
-      return ExecFuncForever(stmt, ret_var, func_name, ctx, arena);
+      return ExecFuncForever(stmt, exec);
     default:
       return false;
   }
@@ -776,8 +752,9 @@ static bool ExecFuncStmt(const Stmt* stmt, Variable* ret_var,
 
 void ExecFunctionBody(const ModuleItem* func, Variable* ret_var,
                       SimContext& ctx, Arena& arena) {
+  FuncExecCtx exec{ret_var, func->name, ctx, arena};
   for (auto* s : func->func_body_stmts) {
-    if (ExecFuncStmt(s, ret_var, func->name, ctx, arena)) return;
+    if (ExecFuncStmt(s, exec)) return;
   }
 }
 

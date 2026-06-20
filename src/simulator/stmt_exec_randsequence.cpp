@@ -325,19 +325,33 @@ static ExecTask BuildOneRandJoinSeq(const Stmt* stmt,
   co_return StmtResult::kDone;
 }
 
+namespace {
+// 18.17: the randsequence execution environment threaded through the generation
+// helpers: the randsequence statement that owns the production declarations,
+// the simulator context the productions run in, and the arena their run-time
+// values and names are allocated from. Bundles the {stmt, ctx, arena} trio that
+// recurs throughout this file into the single entity it describes.
+struct RandseqEngine {
+  const Stmt* stmt;
+  SimContext& ctx;
+  Arena& arena;
+};
+}  // namespace
+
 // 18.17.5: expand each rand join operand one level into the production items of
 // its selected rule, running that rule's weight code in declaration order
 // first. A rule whose weight code breaks aborts the whole interleaving; one
 // that returns contributes no steps. Returns false (with abort set) when a
 // break must propagate out of the caller.
-static ExecTask BuildRandJoinSeqs(const Stmt* stmt, const RsRule& selected,
-                                  SimContext& ctx, Arena& arena,
+static ExecTask BuildRandJoinSeqs(const RandseqEngine& eng,
+                                  const RsRule& selected,
                                   std::vector<RandJoinSeq>& seqs,
                                   bool& aborted) {
   seqs.reserve(selected.rand_join_items.size());
   for (const auto& item : selected.rand_join_items) {
     RandJoinSeq seq;
-    auto r = co_await BuildOneRandJoinSeq(stmt, item, ctx, arena, seq);
+    auto r =
+        co_await BuildOneRandJoinSeq(eng.stmt, item, eng.ctx, eng.arena, seq);
     if (r == StmtResult::kBreak) {
       aborted = true;
       co_return StmtResult::kBreak;
@@ -357,8 +371,8 @@ static ExecTask ExecRandJoinItems(const Stmt* stmt, const RsRule& selected,
 
   std::vector<RandJoinSeq> seqs;
   bool aborted = false;
-  auto build =
-      co_await BuildRandJoinSeqs(stmt, selected, ctx, arena, seqs, aborted);
+  RandseqEngine eng{stmt, ctx, arena};
+  auto build = co_await BuildRandJoinSeqs(eng, selected, seqs, aborted);
   if (aborted) co_return build;
 
   double exponent = 4.0 * bias - 1.0;
@@ -407,6 +421,22 @@ static std::unordered_map<std::string_view, int> RegisterRuleProductionArrays(
   return total_count;
 }
 
+namespace {
+// §18.17.7: one appearance of a value-returning production within a rule, for
+// which an implicit variable is declared. prod is the generated production
+// item, child its resolved declaration (it carries the return type), idx the
+// 1-based ordinal of this appearance in syntactic order, and total_count how
+// many times the production appears in the rule: a count above one means the
+// implicit variable is the idx-th element of a 1..N array, a count of one means
+// the scalar named after the production.
+struct RuleProductionSlot {
+  const RsProd& prod;
+  const RsProduction* child;
+  int idx;
+  int total_count;
+};
+}  // namespace
+
 // §18.17.7: store one generated production's return value into its implicit
 // variable, immediately so later code blocks observe it. A multiply appearing
 // production stores into its 1..N indexed element for this (idx-th) appearance;
@@ -416,26 +446,24 @@ static std::unordered_map<std::string_view, int> RegisterRuleProductionArrays(
 // element for this (idx-th) appearance, whose name is built at run time and so
 // must be interned in the arena (the scope map keys on a stable string_view); a
 // singly appearing one uses the scalar named after the production.
-static Variable* CreateRuleProductionVariable(const RsProd& prod, int idx,
-                                              int total_count, uint32_t width,
-                                              SimContext& ctx, Arena& arena) {
-  if (total_count > 1) {
-    auto name = std::string(prod.item.name) + "[" + std::to_string(idx) + "]";
+static Variable* CreateRuleProductionVariable(const RuleProductionSlot& slot,
+                                              uint32_t width, SimContext& ctx,
+                                              Arena& arena) {
+  if (slot.total_count > 1) {
+    auto name =
+        std::string(slot.prod.item.name) + "[" + std::to_string(slot.idx) + "]";
     return ctx.CreateLocalVariable(*arena.Create<std::string>(std::move(name)),
                                    width);
   }
-  return ctx.CreateLocalVariable(prod.item.name, width);
+  return ctx.CreateLocalVariable(slot.prod.item.name, width);
 }
 
-static void StoreRuleProductionValue(const RsProd& prod,
-                                     const RsProduction* child,
-                                     const Logic4Vec& ret_value, int idx,
-                                     int total_count, SimContext& ctx,
-                                     Arena& arena) {
-  uint32_t w = EvalTypeWidth(child->return_type);
+static void StoreRuleProductionValue(const RuleProductionSlot& slot,
+                                     const Logic4Vec& ret_value,
+                                     SimContext& ctx, Arena& arena) {
+  uint32_t w = EvalTypeWidth(slot.child->return_type);
   if (w == 0) w = ret_value.width ? ret_value.width : 32;
-  Variable* var =
-      CreateRuleProductionVariable(prod, idx, total_count, w, ctx, arena);
+  Variable* var = CreateRuleProductionVariable(slot, w, ctx, arena);
   var->value = ret_value;
 }
 
@@ -462,8 +490,9 @@ static ExecTask ExecRuleProds(const Stmt* stmt, const RsRule& selected,
 
     if (slot != nullptr) {
       int idx = ++seen_count[prod.item.name];
-      StoreRuleProductionValue(prod, child, ret_value, idx,
-                               total_count[prod.item.name], ctx, arena);
+      RuleProductionSlot prod_slot{prod, child, idx,
+                                   total_count[prod.item.name]};
+      StoreRuleProductionValue(prod_slot, ret_value, ctx, arena);
     }
 
     if (result == StmtResult::kBreak) co_return StmtResult::kBreak;

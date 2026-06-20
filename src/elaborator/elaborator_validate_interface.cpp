@@ -343,6 +343,29 @@ using IfacePortTypeMap = std::unordered_map<std::string_view, std::string_view>;
 using IfacePortModportMap =
     std::unordered_map<std::string_view, std::string_view>;
 
+// Resolution environment for diagnosing interface-object/modport member access
+// (IEEE 1800 Clause 25 interfaces/modports and virtual interfaces). Bundles the
+// two name->type/modport scopes (interface ports and virtual interfaces) with
+// the compilation unit used for interface-declaration lookup and the diagnostic
+// sink. `vifs`/`vif_mps` are held by reference so a scoped copy can be
+// substituted for task/function bodies (see WithVifScopes).
+struct IfaceAccessContext {
+  const IfacePortTypeMap& iface_ports;
+  const IfacePortModportMap& port_mps;
+  const VifTypeMap& vifs;
+  const VifModportMap& vif_mps;
+  const CompilationUnit* unit;
+  DiagEngine& diag;
+
+  // Returns a copy of this context with the virtual-interface scopes replaced,
+  // used when walking a subroutine body with formal-argument-scoped maps.
+  IfaceAccessContext WithVifScopes(const VifTypeMap& new_vifs,
+                                   const VifModportMap& new_vif_mps) const {
+    return IfaceAccessContext{iface_ports, port_mps, new_vifs,
+                              new_vif_mps, unit,     diag};
+  }
+};
+
 const ModuleDecl* LookupInterfaceDecl(const CompilationUnit* unit,
                                       std::string_view name) {
   if (!unit) return nullptr;
@@ -401,12 +424,7 @@ const ModportDecl* FindModport(const ModuleDecl* iface,
 // interface and `member` is a modport-listable item not exposed by that
 // modport, reports the inaccessibility error.
 void CheckInterfaceObjectMemberAccess(const Expr* e,
-                                      const IfacePortTypeMap& iface_ports,
-                                      const IfacePortModportMap& port_mps,
-                                      const VifTypeMap& vifs,
-                                      const VifModportMap& vif_mps,
-                                      const CompilationUnit* unit,
-                                      DiagEngine& diag) {
+                                      const IfaceAccessContext& ctx) {
   auto base_name = e->lhs->text;
   auto member_name = e->rhs->text;
 
@@ -414,31 +432,31 @@ void CheckInterfaceObjectMemberAccess(const Expr* e,
   std::string_view modport_name;
   bool bound = false;
 
-  auto pit = iface_ports.find(base_name);
-  if (pit != iface_ports.end()) {
+  auto pit = ctx.iface_ports.find(base_name);
+  if (pit != ctx.iface_ports.end()) {
     iface_type = pit->second;
-    auto mp_it = port_mps.find(base_name);
-    if (mp_it != port_mps.end()) modport_name = mp_it->second;
+    auto mp_it = ctx.port_mps.find(base_name);
+    if (mp_it != ctx.port_mps.end()) modport_name = mp_it->second;
     bound = true;
   } else {
-    auto vit = vifs.find(base_name);
-    if (vit != vifs.end()) {
+    auto vit = ctx.vifs.find(base_name);
+    if (vit != ctx.vifs.end()) {
       iface_type = vit->second;
-      auto mp_it = vif_mps.find(base_name);
-      if (mp_it != vif_mps.end()) modport_name = mp_it->second;
+      auto mp_it = ctx.vif_mps.find(base_name);
+      if (mp_it != ctx.vif_mps.end()) modport_name = mp_it->second;
       bound = true;
     }
   }
 
   if (!bound || modport_name.empty() || member_name.empty()) return;
-  const auto* iface = LookupInterfaceDecl(unit, iface_type);
+  const auto* iface = LookupInterfaceDecl(ctx.unit, iface_type);
   const auto* mp = FindModport(iface, modport_name);
   if (!iface || !mp) return;
   const auto* member = FindInterfaceItemByName(iface, member_name);
   if (member && IsListableInModport(member->kind) &&
       member->kind != ModuleItemKind::kClockingBlock &&
       !ModportListsMember(mp, member_name)) {
-    diag.Error(
+    ctx.diag.Error(
         e->range.start,
         std::format(
             "'{}' is not accessible through modport '{}' of interface '{}'",
@@ -447,110 +465,62 @@ void CheckInterfaceObjectMemberAccess(const Expr* e,
 }
 
 void CheckInterfaceObjectAccessExpr(const Expr* e,
-                                    const IfacePortTypeMap& iface_ports,
-                                    const IfacePortModportMap& port_mps,
-                                    const VifTypeMap& vifs,
-                                    const VifModportMap& vif_mps,
-                                    const CompilationUnit* unit,
-                                    DiagEngine& diag) {
+                                    const IfaceAccessContext& ctx) {
   if (!e) return;
   if (e->kind == ExprKind::kMemberAccess && e->lhs &&
       e->lhs->kind == ExprKind::kIdentifier && e->rhs &&
       e->rhs->kind == ExprKind::kIdentifier) {
-    CheckInterfaceObjectMemberAccess(e, iface_ports, port_mps, vifs, vif_mps,
-                                     unit, diag);
+    CheckInterfaceObjectMemberAccess(e, ctx);
   }
-  CheckInterfaceObjectAccessExpr(e->lhs, iface_ports, port_mps, vifs, vif_mps,
-                                 unit, diag);
-  CheckInterfaceObjectAccessExpr(e->rhs, iface_ports, port_mps, vifs, vif_mps,
-                                 unit, diag);
-  CheckInterfaceObjectAccessExpr(e->base, iface_ports, port_mps, vifs, vif_mps,
-                                 unit, diag);
-  CheckInterfaceObjectAccessExpr(e->index, iface_ports, port_mps, vifs, vif_mps,
-                                 unit, diag);
-  CheckInterfaceObjectAccessExpr(e->condition, iface_ports, port_mps, vifs,
-                                 vif_mps, unit, diag);
-  CheckInterfaceObjectAccessExpr(e->true_expr, iface_ports, port_mps, vifs,
-                                 vif_mps, unit, diag);
-  CheckInterfaceObjectAccessExpr(e->false_expr, iface_ports, port_mps, vifs,
-                                 vif_mps, unit, diag);
+  CheckInterfaceObjectAccessExpr(e->lhs, ctx);
+  CheckInterfaceObjectAccessExpr(e->rhs, ctx);
+  CheckInterfaceObjectAccessExpr(e->base, ctx);
+  CheckInterfaceObjectAccessExpr(e->index, ctx);
+  CheckInterfaceObjectAccessExpr(e->condition, ctx);
+  CheckInterfaceObjectAccessExpr(e->true_expr, ctx);
+  CheckInterfaceObjectAccessExpr(e->false_expr, ctx);
   for (const auto* elem : e->elements) {
-    CheckInterfaceObjectAccessExpr(elem, iface_ports, port_mps, vifs, vif_mps,
-                                   unit, diag);
+    CheckInterfaceObjectAccessExpr(elem, ctx);
   }
   for (const auto* arg : e->args) {
-    CheckInterfaceObjectAccessExpr(arg, iface_ports, port_mps, vifs, vif_mps,
-                                   unit, diag);
+    CheckInterfaceObjectAccessExpr(arg, ctx);
   }
 }
 
 void WalkStmtsForInterfaceObjectAccess(const Stmt* s,
-                                       const IfacePortTypeMap& iface_ports,
-                                       const IfacePortModportMap& port_mps,
-                                       const VifTypeMap& vifs,
-                                       const VifModportMap& vif_mps,
-                                       const CompilationUnit* unit,
-                                       DiagEngine& diag);
+                                       const IfaceAccessContext& ctx);
 
 // Runs the interface-object-access check on every expression field carried
 // directly by statement `s`.
 void CheckInterfaceObjectAccessStmtExprs(const Stmt* s,
-                                         const IfacePortTypeMap& iface_ports,
-                                         const IfacePortModportMap& port_mps,
-                                         const VifTypeMap& vifs,
-                                         const VifModportMap& vif_mps,
-                                         const CompilationUnit* unit,
-                                         DiagEngine& diag) {
-  CheckInterfaceObjectAccessExpr(s->lhs, iface_ports, port_mps, vifs, vif_mps,
-                                 unit, diag);
-  CheckInterfaceObjectAccessExpr(s->rhs, iface_ports, port_mps, vifs, vif_mps,
-                                 unit, diag);
-  CheckInterfaceObjectAccessExpr(s->expr, iface_ports, port_mps, vifs, vif_mps,
-                                 unit, diag);
-  CheckInterfaceObjectAccessExpr(s->condition, iface_ports, port_mps, vifs,
-                                 vif_mps, unit, diag);
-  CheckInterfaceObjectAccessExpr(s->var_init, iface_ports, port_mps, vifs,
-                                 vif_mps, unit, diag);
+                                         const IfaceAccessContext& ctx) {
+  CheckInterfaceObjectAccessExpr(s->lhs, ctx);
+  CheckInterfaceObjectAccessExpr(s->rhs, ctx);
+  CheckInterfaceObjectAccessExpr(s->expr, ctx);
+  CheckInterfaceObjectAccessExpr(s->condition, ctx);
+  CheckInterfaceObjectAccessExpr(s->var_init, ctx);
 }
 
 // Recurses the interface-object-access walk into every child statement of `s`.
 void WalkInterfaceObjectAccessChildStmts(const Stmt* s,
-                                         const IfacePortTypeMap& iface_ports,
-                                         const IfacePortModportMap& port_mps,
-                                         const VifTypeMap& vifs,
-                                         const VifModportMap& vif_mps,
-                                         const CompilationUnit* unit,
-                                         DiagEngine& diag) {
+                                         const IfaceAccessContext& ctx) {
   for (const auto* sub : s->stmts) {
-    WalkStmtsForInterfaceObjectAccess(sub, iface_ports, port_mps, vifs, vif_mps,
-                                      unit, diag);
+    WalkStmtsForInterfaceObjectAccess(sub, ctx);
   }
-  WalkStmtsForInterfaceObjectAccess(s->then_branch, iface_ports, port_mps, vifs,
-                                    vif_mps, unit, diag);
-  WalkStmtsForInterfaceObjectAccess(s->else_branch, iface_ports, port_mps, vifs,
-                                    vif_mps, unit, diag);
-  WalkStmtsForInterfaceObjectAccess(s->body, iface_ports, port_mps, vifs,
-                                    vif_mps, unit, diag);
-  WalkStmtsForInterfaceObjectAccess(s->for_body, iface_ports, port_mps, vifs,
-                                    vif_mps, unit, diag);
+  WalkStmtsForInterfaceObjectAccess(s->then_branch, ctx);
+  WalkStmtsForInterfaceObjectAccess(s->else_branch, ctx);
+  WalkStmtsForInterfaceObjectAccess(s->body, ctx);
+  WalkStmtsForInterfaceObjectAccess(s->for_body, ctx);
   for (auto& ci : s->case_items) {
-    WalkStmtsForInterfaceObjectAccess(ci.body, iface_ports, port_mps, vifs,
-                                      vif_mps, unit, diag);
+    WalkStmtsForInterfaceObjectAccess(ci.body, ctx);
   }
 }
 
 void WalkStmtsForInterfaceObjectAccess(const Stmt* s,
-                                       const IfacePortTypeMap& iface_ports,
-                                       const IfacePortModportMap& port_mps,
-                                       const VifTypeMap& vifs,
-                                       const VifModportMap& vif_mps,
-                                       const CompilationUnit* unit,
-                                       DiagEngine& diag) {
+                                       const IfaceAccessContext& ctx) {
   if (!s) return;
-  CheckInterfaceObjectAccessStmtExprs(s, iface_ports, port_mps, vifs, vif_mps,
-                                      unit, diag);
-  WalkInterfaceObjectAccessChildStmts(s, iface_ports, port_mps, vifs, vif_mps,
-                                      unit, diag);
+  CheckInterfaceObjectAccessStmtExprs(s, ctx);
+  WalkInterfaceObjectAccessChildStmts(s, ctx);
 }
 
 bool IsProceduralBlockItem(ModuleItemKind kind) {
@@ -566,27 +536,22 @@ bool IsProceduralBlockItem(ModuleItemKind kind) {
 // module-level interface-port and virtual-interface maps. Task/function bodies
 // are walked with their formal-argument-scoped maps, continuous assignments are
 // checked directly, and procedural blocks are walked with the module maps.
-void CheckInterfaceObjectAccessItem(
-    const ModuleItem* item, const IfacePortTypeMap& iface_ports,
-    const IfacePortModportMap& port_mps, const VifTypeMap& module_vifs,
-    const VifModportMap& module_mps, const TypedefMap& typedefs,
-    const CompilationUnit* unit, DiagEngine& diag) {
+void CheckInterfaceObjectAccessItem(const ModuleItem* item,
+                                    const IfaceAccessContext& module_ctx,
+                                    const TypedefMap& typedefs) {
   if (item->kind == ModuleItemKind::kTaskDecl ||
       item->kind == ModuleItemKind::kFunctionDecl) {
     auto [scoped, scoped_mps] =
-        BuildScopedVifMaps(item, module_vifs, module_mps, typedefs);
+        BuildScopedVifMaps(item, module_ctx.vifs, module_ctx.vif_mps, typedefs);
     if (item->body) {
-      WalkStmtsForInterfaceObjectAccess(item->body, iface_ports, port_mps,
-                                        scoped, scoped_mps, unit, diag);
+      WalkStmtsForInterfaceObjectAccess(
+          item->body, module_ctx.WithVifScopes(scoped, scoped_mps));
     }
   } else if (item->kind == ModuleItemKind::kContAssign) {
-    CheckInterfaceObjectAccessExpr(item->assign_lhs, iface_ports, port_mps,
-                                   module_vifs, module_mps, unit, diag);
-    CheckInterfaceObjectAccessExpr(item->assign_rhs, iface_ports, port_mps,
-                                   module_vifs, module_mps, unit, diag);
+    CheckInterfaceObjectAccessExpr(item->assign_lhs, module_ctx);
+    CheckInterfaceObjectAccessExpr(item->assign_rhs, module_ctx);
   } else if (IsProceduralBlockItem(item->kind) && item->body) {
-    WalkStmtsForInterfaceObjectAccess(item->body, iface_ports, port_mps,
-                                      module_vifs, module_mps, unit, diag);
+    WalkStmtsForInterfaceObjectAccess(item->body, module_ctx);
   }
 }
 
@@ -610,9 +575,10 @@ void Elaborator::ValidateInterfaceObjectAccess(const ModuleDecl* decl) {
 
   VifTypeMap module_vifs = vi_var_interface_types_;
   VifModportMap module_mps = vi_var_modports_;
+  IfaceAccessContext module_ctx{iface_ports, port_mps, module_vifs,
+                                module_mps,  unit_,    diag_};
   for (const auto* item : decl->items) {
-    CheckInterfaceObjectAccessItem(item, iface_ports, port_mps, module_vifs,
-                                   module_mps, typedefs_, unit_, diag_);
+    CheckInterfaceObjectAccessItem(item, module_ctx, typedefs_);
   }
 }
 

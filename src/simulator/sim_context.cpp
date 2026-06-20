@@ -15,6 +15,23 @@ SimContext::SimContext(Scheduler& sched, Arena& arena, DiagEngine& diag,
 
 namespace {
 
+// The two symbol tables consulted during a hierarchical name lookup: the map
+// from instance path to its module type, and the flat variable table.
+struct SymbolTables {
+  const std::unordered_map<std::string, std::string>& instance_types;
+  const std::unordered_map<std::string_view, Variable*>& variables;
+};
+
+// A hierarchical name being resolved: the full dotted `name`, plus its split
+// into the leading instance segment (`head`) and the remainder (`rest`), and
+// the `prefix` of the current scope from which the upward walk begins.
+struct NameLookup {
+  std::string_view name;
+  std::string_view head;
+  std::string_view rest;
+  const std::string& prefix;
+};
+
 // Shrinks `p` to the next-shorter dotted instance prefix (dropping the final
 // path segment, keeping the trailing dot), clearing it when no segment remains.
 void ShrinkInstancePrefix(std::string& p) {
@@ -29,38 +46,35 @@ void ShrinkInstancePrefix(std::string& p) {
 
 // When the instance at `p` has type `head`, looks up `rest` under that prefix.
 // Returns the matching variable or nullptr.
-Variable* LookupRestUnderMatchingInstance(
-    const std::string& p, std::string_view head, std::string_view rest,
-    const std::unordered_map<std::string, std::string>& instance_types,
-    const std::unordered_map<std::string_view, Variable*>& variables) {
+Variable* LookupRestUnderMatchingInstance(const std::string& p,
+                                          std::string_view head,
+                                          std::string_view rest,
+                                          const SymbolTables& tables) {
   std::string prefix_no_dot = p;
   if (!prefix_no_dot.empty() && prefix_no_dot.back() == '.')
     prefix_no_dot.pop_back();
-  auto type_it = instance_types.find(prefix_no_dot);
-  if (type_it == instance_types.end() || type_it->second != head)
+  auto type_it = tables.instance_types.find(prefix_no_dot);
+  if (type_it == tables.instance_types.end() || type_it->second != head)
     return nullptr;
   std::string cand = p + std::string(rest);
-  auto cit = variables.find(cand);
-  return (cit != variables.end()) ? cit->second : nullptr;
+  auto cit = tables.variables.find(cand);
+  return (cit != tables.variables.end()) ? cit->second : nullptr;
 }
 
 // Walks progressively shorter instance prefixes searching for `name` (or its
 // rest under a matching instance head) in the variable table. Extracted from
 // FindVariable so the lookup body stays a single cohesive step.
-Variable* FindVariableByPrefixWalk(
-    std::string_view name, std::string_view head, std::string_view rest,
-    const std::string& prefix,
-    const std::unordered_map<std::string, std::string>& instance_types,
-    const std::unordered_map<std::string_view, Variable*>& variables) {
-  std::string p = prefix;
+Variable* FindVariableByPrefixWalk(const NameLookup& lookup,
+                                   const SymbolTables& tables) {
+  std::string p = lookup.prefix;
   while (!p.empty()) {
     ShrinkInstancePrefix(p);
-    Variable* under_inst = LookupRestUnderMatchingInstance(
-        p, head, rest, instance_types, variables);
+    Variable* under_inst =
+        LookupRestUnderMatchingInstance(p, lookup.head, lookup.rest, tables);
     if (under_inst) return under_inst;
-    std::string cand = p + std::string(name);
-    auto cit = variables.find(cand);
-    if (cit != variables.end()) return cit->second;
+    std::string cand = p + std::string(lookup.name);
+    auto cit = tables.variables.find(cand);
+    if (cit != tables.variables.end()) return cit->second;
   }
   return nullptr;
 }
@@ -85,8 +99,9 @@ Variable* SimContext::FindVariable(std::string_view name) {
   if (dot == std::string_view::npos) return nullptr;
   std::string_view head = name.substr(0, dot);
   std::string_view rest = name.substr(dot + 1);
-  return FindVariableByPrefixWalk(name, head, rest, prefix, instance_types_,
-                                  variables_);
+  NameLookup lookup{name, head, rest, prefix};
+  SymbolTables tables{instance_types_, variables_};
+  return FindVariableByPrefixWalk(lookup, tables);
 }
 
 Variable* SimContext::CreateVariable(std::string_view name, uint32_t width) {
@@ -141,17 +156,25 @@ void InitNetDefaultValue(Variable* var, NetType type, bool is_user_nettype) {
   }
 }
 
+// §6.7.1: the defining attributes of a net — its nettype, charge strength and
+// decay (for trireg), user-nettype flag and resolution function name.
+struct NetAttrs {
+  NetType type;
+  Strength charge_strength;
+  uint64_t decay_ticks;
+  bool is_user_nettype;
+  std::string_view resolve_func;
+};
+
 // Populates a freshly created Net's fields from the CreateNet arguments.
-void PopulateNetFields(Net* net, Variable* var, NetType type,
-                       Strength charge_strength, uint64_t decay_ticks,
-                       bool is_user_nettype, std::string_view resolve_func) {
-  net->type = type;
+void PopulateNetFields(Net* net, Variable* var, const NetAttrs& attrs) {
+  net->type = attrs.type;
   net->resolved = var;
-  net->charge_strength = charge_strength;
-  net->base_charge_strength = charge_strength;
-  net->decay_ticks = decay_ticks;
-  net->is_user_nettype = is_user_nettype;
-  net->resolve_func = resolve_func;
+  net->charge_strength = attrs.charge_strength;
+  net->base_charge_strength = attrs.charge_strength;
+  net->decay_ticks = attrs.decay_ticks;
+  net->is_user_nettype = attrs.is_user_nettype;
+  net->resolve_func = attrs.resolve_func;
 }
 
 }  // namespace
@@ -164,8 +187,9 @@ Net* SimContext::CreateNet(std::string_view name, NetType type, uint32_t width,
   if (is_signed) var->is_signed = true;
   InitNetDefaultValue(var, type, is_user_nettype);
   auto* net = arena_.Create<Net>();
-  PopulateNetFields(net, var, type, charge_strength, decay_ticks,
-                    is_user_nettype, resolve_func);
+  NetAttrs attrs{type, charge_strength, decay_ticks, is_user_nettype,
+                 resolve_func};
+  PopulateNetFields(net, var, attrs);
   nets_[name] = net;
   return net;
 }
@@ -710,18 +734,27 @@ uint32_t AssocArrayObject::Size() const {
 
 namespace {
 
+// §7.8: the defining shape of an associative array — element width/4-state-ness
+// and the index type (string vs integral, width, wildcard, signedness).
+struct AssocArrayAttrs {
+  uint32_t elem_width;
+  bool is_string_key;
+  uint32_t index_width;
+  bool is_wildcard;
+  bool is_4state;
+  bool is_index_signed;
+};
+
 // Populates a freshly created AssocArrayObject's fields from the
 // CreateAssocArray arguments.
-void PopulateAssocArrayFields(AssocArrayObject* aa, uint32_t elem_width,
-                              bool is_string_key, uint32_t index_width,
-                              bool is_wildcard, bool is_4state,
-                              bool is_index_signed) {
-  aa->elem_width = elem_width;
-  aa->is_string_key = is_string_key;
-  aa->is_wildcard = is_wildcard;
-  aa->index_width = index_width;
-  aa->is_4state = is_4state;
-  aa->is_index_signed = is_index_signed;
+void PopulateAssocArrayFields(AssocArrayObject* aa,
+                              const AssocArrayAttrs& attrs) {
+  aa->elem_width = attrs.elem_width;
+  aa->is_string_key = attrs.is_string_key;
+  aa->is_wildcard = attrs.is_wildcard;
+  aa->index_width = attrs.index_width;
+  aa->is_4state = attrs.is_4state;
+  aa->is_index_signed = attrs.is_index_signed;
 }
 
 }  // namespace
@@ -733,8 +766,9 @@ AssocArrayObject* SimContext::CreateAssocArray(std::string_view name,
                                                bool is_wildcard, bool is_4state,
                                                bool is_index_signed) {
   auto* aa = arena_.Create<AssocArrayObject>();
-  PopulateAssocArrayFields(aa, elem_width, is_string_key, index_width,
-                           is_wildcard, is_4state, is_index_signed);
+  AssocArrayAttrs attrs{elem_width,  is_string_key, index_width,
+                        is_wildcard, is_4state,     is_index_signed};
+  PopulateAssocArrayFields(aa, attrs);
   assoc_arrays_[name] = aa;
   return aa;
 }

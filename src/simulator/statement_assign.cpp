@@ -454,16 +454,28 @@ static size_t FindDefaultKeyedElement(const Expr* rhs) {
   return rhs->elements.size();
 }
 
-static Logic4Vec FindArrayKeyedValue(const Expr* rhs, uint32_t idx,
-                                     uint32_t width, DataTypeKind elem_type,
+// One element slot of the unpacked-array target of an assignment pattern
+// (IEEE 1800 §7.6 / §10.9.2). `idx` is the array index being filled; `width`
+// and `elem_type_kind` mirror the element-type fields of the target's
+// ArrayInfo and select default/type-keyed pattern members.
+namespace {
+struct PatternArrayElem {
+  uint32_t idx;
+  uint32_t width;
+  DataTypeKind elem_type_kind;
+};
+}  // namespace
+
+static Logic4Vec FindArrayKeyedValue(const Expr* rhs,
+                                     const PatternArrayElem& slot,
                                      SimContext& ctx, Arena& arena) {
-  size_t match = FindIndexKeyedElement(rhs, idx);
+  size_t match = FindIndexKeyedElement(rhs, slot.idx);
   if (match >= rhs->elements.size())
-    match = FindTypeKeyedElement(rhs, elem_type);
+    match = FindTypeKeyedElement(rhs, slot.elem_type_kind);
   if (match >= rhs->elements.size()) match = FindDefaultKeyedElement(rhs);
   if (match < rhs->elements.size())
     return EvalExpr(rhs->elements[match], ctx, arena);
-  return MakeLogic4VecVal(arena, width, 0);
+  return MakeLogic4VecVal(arena, slot.width, 0);
 }
 
 static void DistributePatternToArray(std::string_view arr_name,
@@ -481,10 +493,9 @@ static void DistributePatternToArray(std::string_view arr_name,
     auto* elem = ctx.FindVariable(name);
     if (!elem) continue;
     if (named) {
-      elem->value =
-          ResizeToWidth(FindArrayKeyedValue(rhs, idx, info.elem_width,
-                                            info.elem_type_kind, ctx, arena),
-                        info.elem_width, arena);
+      PatternArrayElem slot{idx, info.elem_width, info.elem_type_kind};
+      elem->value = ResizeToWidth(FindArrayKeyedValue(rhs, slot, ctx, arena),
+                                  info.elem_width, arena);
     } else if (replicate && inner_count > 0) {
       auto val =
           EvalExpr(rhs->elements[0]->elements[i % inner_count], ctx, arena);

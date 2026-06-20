@@ -576,28 +576,42 @@ std::optional<std::vector<int64_t>> TryConstEvalInstParams(
   return values;
 }
 
+// §17.2/§17.7/§25.9: the kind of the enclosing scope that governs which nested
+// items and instances are legal. `kind_word` is the diagnostic noun ("program"
+// or "checker") used when either flag is set.
+struct ParentScopeKind {
+  bool is_program;
+  bool is_checker;
+  std::string_view kind_word;
+};
+
+// §25.9: the per-module lookup tables that record each instance's resolved kind
+// (interface/checker/program) so later passes can validate references against
+// the instantiated kind. Holds references to the elaborator member tables.
+struct InstClassTables {
+  std::unordered_map<std::string_view, std::string_view>& interface_inst_types;
+  std::unordered_map<std::string_view, std::vector<int64_t>>&
+      interface_inst_param_values;
+  std::unordered_set<std::string_view>& checker_inst_names;
+  std::unordered_set<std::string_view>& program_inst_names;
+};
+
 // §25.9: records a module-instance whose resolved child is an interface,
 // checker, or program into the corresponding lookup table so later passes can
 // validate references against the instantiated kind.
-void ClassifyInstantiatedChild(
-    const ModuleItem* item, const ModuleDecl* child,
-    std::unordered_map<std::string_view, std::string_view>&
-        interface_inst_types,
-    std::unordered_map<std::string_view, std::vector<int64_t>>&
-        interface_inst_param_values,
-    std::unordered_set<std::string_view>& checker_inst_names,
-    std::unordered_set<std::string_view>& program_inst_names) {
+void ClassifyInstantiatedChild(const ModuleItem* item, const ModuleDecl* child,
+                               InstClassTables& tables) {
   if (child->decl_kind == ModuleDeclKind::kInterface) {
-    interface_inst_types[item->inst_name] = item->inst_module;
+    tables.interface_inst_types[item->inst_name] = item->inst_module;
     if (auto values = TryConstEvalInstParams(item)) {
-      interface_inst_param_values[item->inst_name] = std::move(*values);
+      tables.interface_inst_param_values[item->inst_name] = std::move(*values);
     }
   }
   if (child->decl_kind == ModuleDeclKind::kChecker) {
-    checker_inst_names.insert(item->inst_name);
+    tables.checker_inst_names.insert(item->inst_name);
   }
   if (child->decl_kind == ModuleDeclKind::kProgram) {
-    program_inst_names.insert(item->inst_name);
+    tables.program_inst_names.insert(item->inst_name);
   }
 }
 
@@ -605,9 +619,8 @@ void ClassifyInstantiatedChild(
 // resolved child is `child`: an interface may not instantiate a module, and a
 // program or checker may only instantiate checkers.
 void CheckModuleInstParentRules(const ModuleItem* item, const ModuleDecl* decl,
-                                const ModuleDecl* child, bool parent_is_program,
-                                bool parent_is_checker,
-                                std::string_view parent_kind_word,
+                                const ModuleDecl* child,
+                                const ParentScopeKind& parent,
                                 DiagEngine& diag) {
   if (decl->decl_kind == ModuleDeclKind::kInterface &&
       child->decl_kind == ModuleDeclKind::kModule) {
@@ -616,12 +629,12 @@ void CheckModuleInstParentRules(const ModuleItem* item, const ModuleDecl* decl,
                            "interface '{}'",
                            item->inst_module, decl->name));
   }
-  if ((parent_is_program || parent_is_checker) &&
+  if ((parent.is_program || parent.is_checker) &&
       child->decl_kind != ModuleDeclKind::kChecker) {
     diag.Error(item->loc,
                std::format("only checkers can be instantiated inside "
                            "{} '{}'",
-                           parent_kind_word, decl->name));
+                           parent.kind_word, decl->name));
   }
 }
 
@@ -629,25 +642,25 @@ void CheckModuleInstParentRules(const ModuleItem* item, const ModuleDecl* decl,
 // kind (no instance resolution): forbidden primitives/nets/always/nested decls
 // inside programs/checkers/interfaces, and records port-less nested programs.
 void CheckProgramCheckerItemRules(
-    const ModuleItem* item, const ModuleDecl* decl, bool parent_is_program,
-    bool parent_is_checker, std::string_view parent_kind_word,
+    const ModuleItem* item, const ModuleDecl* decl,
+    const ParentScopeKind& parent,
     std::unordered_set<std::string_view>& program_inst_names,
     DiagEngine& diag) {
-  if ((parent_is_program || parent_is_checker) &&
+  if ((parent.is_program || parent.is_checker) &&
       item->kind == ModuleItemKind::kUdpInst) {
     diag.Error(item->loc, std::format("primitive cannot be instantiated inside "
                                       "{} '{}'",
-                                      parent_kind_word, decl->name));
+                                      parent.kind_word, decl->name));
   }
   // §17.7: a checker body may define variables but not nets.
-  if (parent_is_checker && item->kind == ModuleItemKind::kNetDecl) {
+  if (parent.is_checker && item->kind == ModuleItemKind::kNetDecl) {
     diag.Error(item->loc,
                std::format("a net cannot be declared inside checker '{}'; "
                            "only variables may be defined in a checker body",
                            decl->name));
   }
   // Annex C.2.7: a general 'always' procedure is removed for checkers.
-  if (parent_is_checker && item->kind == ModuleItemKind::kAlwaysBlock) {
+  if (parent.is_checker && item->kind == ModuleItemKind::kAlwaysBlock) {
     diag.Error(item->loc,
                std::format("a general 'always' procedure cannot be used "
                            "inside checker '{}'; use always_comb, "
@@ -655,7 +668,7 @@ void CheckProgramCheckerItemRules(
                            decl->name));
   }
   // §17.2: only further checkers may be declared inside a checker.
-  if (parent_is_checker && item->kind == ModuleItemKind::kNestedModuleDecl &&
+  if (parent.is_checker && item->kind == ModuleItemKind::kNestedModuleDecl &&
       item->nested_module_decl &&
       item->nested_module_decl->decl_kind != ModuleDeclKind::kChecker) {
     diag.Error(item->loc,
@@ -791,23 +804,24 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
   CollectNestedModulesAndCheckVif(decl, nested_module_decls_, diag_);
   const bool kParentIsProgram = decl->decl_kind == ModuleDeclKind::kProgram;
   const bool kParentIsChecker = decl->decl_kind == ModuleDeclKind::kChecker;
-  const std::string_view kParentKindWord = kParentIsProgram
-                                               ? std::string_view{"program"}
-                                               : std::string_view{"checker"};
+  const ParentScopeKind kParentScope{kParentIsProgram, kParentIsChecker,
+                                     kParentIsProgram
+                                         ? std::string_view{"program"}
+                                         : std::string_view{"checker"}};
+  InstClassTables inst_class_tables{interface_inst_types_,
+                                    interface_inst_param_values_,
+                                    checker_inst_names_, program_inst_names_};
 
   for (const auto* item : decl->items) {
     if (item->kind == ModuleItemKind::kModuleInst) {
       auto* child = FindModuleInScope(item->inst_module);
       if (child) {
-        ClassifyInstantiatedChild(item, child, interface_inst_types_,
-                                  interface_inst_param_values_,
-                                  checker_inst_names_, program_inst_names_);
-        CheckModuleInstParentRules(item, decl, child, kParentIsProgram,
-                                   kParentIsChecker, kParentKindWord, diag_);
+        ClassifyInstantiatedChild(item, child, inst_class_tables);
+        CheckModuleInstParentRules(item, decl, child, kParentScope, diag_);
       }
     }
-    CheckProgramCheckerItemRules(item, decl, kParentIsProgram, kParentIsChecker,
-                                 kParentKindWord, program_inst_names_, diag_);
+    CheckProgramCheckerItemRules(item, decl, kParentScope, program_inst_names_,
+                                 diag_);
   }
 
   for (const auto& [pname, pval] : decl->params) {

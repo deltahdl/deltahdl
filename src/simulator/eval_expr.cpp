@@ -212,15 +212,28 @@ static bool TryCollectionAccess(std::string_view base, std::string_view field,
   return false;
 }
 
-static bool TryClassPropertyAccess(Variable* base_var,
-                                   std::string_view field_name,
-                                   std::string_view var_name, SimContext& ctx,
-                                   Arena& arena, Logic4Vec& out) {
+// Bundles the subject of a member access (`base_name.field_name`) together with
+// the resolved base variable (when one exists) and the evaluation context. A
+// single instance is built once in ResolveMemberByType and shared across the
+// per-feature member-access helpers below.
+struct MemberAccess {
+  std::string_view base_name;
+  std::string_view field_name;
+  Variable* base_var;
+  SimContext& ctx;
+  Arena& arena;
+};
+
+static bool TryClassPropertyAccess(const MemberAccess& ma, Logic4Vec& out) {
+  Variable* base_var = ma.base_var;
   if (!base_var) return false;
+  SimContext& ctx = ma.ctx;
+  Arena& arena = ma.arena;
+  std::string_view field_name = ma.field_name;
   auto handle = base_var->value.ToUint64();
   auto* obj = ctx.GetClassObject(handle);
   if (!obj) return false;
-  auto declared = ctx.GetVariableClassType(var_name);
+  auto declared = ctx.GetVariableClassType(ma.base_name);
   if (!declared.empty()) {
     auto* declared_type = ctx.FindClassType(declared);
     if (declared_type) {
@@ -322,32 +335,32 @@ static bool TryThisSuperMember(std::string_view base_name,
 // tag that does not match the (top-level) field being read, reports the
 // runtime error and fills `out` with all-X. Returns true when the mismatch
 // fired and `out` was set.
-static bool TryUnionTagMismatch(std::string_view base_name,
-                                std::string_view field_name,
-                                const StructTypeInfo* sinfo, SimContext& ctx,
-                                Arena& arena, Logic4Vec& out) {
+static bool TryUnionTagMismatch(const MemberAccess& ma,
+                                const StructTypeInfo* sinfo, Logic4Vec& out) {
   if (!sinfo->is_union) return false;
-  auto tag = ctx.GetVariableTag(base_name);
+  auto tag = ma.ctx.GetVariableTag(ma.base_name);
   if (tag.empty()) return false;
-  auto top = field_name;
+  auto top = ma.field_name;
   auto subdot = top.find('.');
   if (subdot != std::string_view::npos) top = top.substr(0, subdot);
   if (tag == top) return false;
-  ctx.GetDiag().Error(
-      {}, "run-time error: accessing member '" + std::string(field_name) +
-              "' of tagged union '" + std::string(base_name) +
+  ma.ctx.GetDiag().Error(
+      {}, "run-time error: accessing member '" + std::string(ma.field_name) +
+              "' of tagged union '" + std::string(ma.base_name) +
               "' which currently has tag '" + std::string(tag) + "'");
-  out = MakeAllX(arena, sinfo->total_width);
+  out = MakeAllX(ma.arena, sinfo->total_width);
   return true;
 }
 
 // Handles the named-event `.triggered` and named-sequence `.triggered`/`.ended`
 // pseudo-methods. Returns true and fills `out` when `field_name` named one of
 // these and the base referred to a matching event/sequence.
-static bool TryEventSequenceMethod(std::string_view base_name,
-                                   std::string_view field_name,
-                                   Variable* base_var, SimContext& ctx,
-                                   Arena& arena, Logic4Vec& out) {
+static bool TryEventSequenceMethod(const MemberAccess& ma, Logic4Vec& out) {
+  Variable* base_var = ma.base_var;
+  SimContext& ctx = ma.ctx;
+  Arena& arena = ma.arena;
+  std::string_view base_name = ma.base_name;
+  std::string_view field_name = ma.field_name;
   if (base_var && base_var->is_event && field_name == "triggered") {
     // §15.5.3: the triggered method of a null named event evaluates to false,
     // independent of any triggered state recorded for the current time step.
@@ -390,20 +403,20 @@ static Logic4Vec ResolveMemberByType(std::string_view base_name,
   auto* base_var = ctx.FindVariable(base_name);
   auto* sinfo = ctx.GetVariableStructType(base_name);
 
+  MemberAccess ma{base_name, field_name, base_var, ctx, arena};
+
   if (base_var && sinfo) {
-    if (TryUnionTagMismatch(base_name, field_name, sinfo, ctx, arena, out)) {
+    if (TryUnionTagMismatch(ma, sinfo, out)) {
       return out;
     }
     return ExtractStructField(base_var, sinfo, field_name, arena);
   }
 
-  if (TryEventSequenceMethod(base_name, field_name, base_var, ctx, arena,
-                             out)) {
+  if (TryEventSequenceMethod(ma, out)) {
     return out;
   }
 
-  if (TryClassPropertyAccess(base_var, field_name, base_name, ctx, arena, out))
-    return out;
+  if (TryClassPropertyAccess(ma, out)) return out;
   if (TryClassEnumAccess(base_var, field_name, ctx, arena, out)) return out;
   if (TryCollectionAccess(base_name, field_name, ctx, arena, out)) return out;
   if (TryEvalEnumProperty(base_name, field_name, ctx, arena, out)) return out;
@@ -469,41 +482,55 @@ static double ExtractDouble(const Logic4Vec& vec) {
 // array) takes the most significant bit positions of the result. The aval
 // and bval (4-state mask) are propagated independently so a source carrying
 // any X or Z bit yields a 4-state packed value.
-// Packs the low word of each queue element into `packed_a`/`packed_b` using the
-// element-major shift expected by PackArrayBitStream (element 0 most
+//
+// BitStreamPack bundles the packing layout for one unpacked array: the source
+// array's name and shape (`info`) plus the element count, total packed width,
+// and the per-element bit mask derived from the element width.
+struct BitStreamPack {
+  std::string_view name;
+  const ArrayInfo& info;
+  uint32_t elem_count;
+  uint32_t total_bits;
+  uint32_t elem_mask;
+};
+
+// Accumulated packed result: the aval/bval mask pair of the packed value.
+struct PackedBits {
+  uint64_t aval = 0;
+  uint64_t bval = 0;
+};
+
+// Packs the low word of each queue element into the accumulated result using
+// the element-major shift expected by PackArrayBitStream (element 0 most
 // significant).
-static void PackQueueElements(std::string_view name, const ArrayInfo& info,
-                              uint32_t elem_count, uint32_t total_bits,
-                              uint32_t elem_mask, SimContext& ctx,
-                              uint64_t& packed_a, uint64_t& packed_b) {
-  auto* q = ctx.FindQueue(name);
+static void PackQueueElements(const BitStreamPack& pack, SimContext& ctx,
+                              PackedBits& out) {
+  auto* q = ctx.FindQueue(pack.name);
   if (!q) return;
-  for (uint32_t i = 0; i < elem_count; ++i) {
+  for (uint32_t i = 0; i < pack.elem_count; ++i) {
     const auto& v = q->elements[i];
     uint64_t aval = v.nwords > 0 ? v.words[0].aval : 0;
     uint64_t bval = v.nwords > 0 ? v.words[0].bval : 0;
-    uint32_t shift = total_bits - (i + 1) * info.elem_width;
-    packed_a |= (aval & elem_mask) << shift;
-    packed_b |= (bval & elem_mask) << shift;
+    uint32_t shift = pack.total_bits - (i + 1) * pack.info.elem_width;
+    out.aval |= (aval & pack.elem_mask) << shift;
+    out.bval |= (bval & pack.elem_mask) << shift;
   }
 }
 
-// Packs the low word of each fixed-unpacked-array element into
-// `packed_a`/`packed_b` using the same element-major shift.
-static void PackFixedArrayElements(std::string_view name, const ArrayInfo& info,
-                                   uint32_t elem_count, uint32_t total_bits,
-                                   uint32_t elem_mask, SimContext& ctx,
-                                   uint64_t& packed_a, uint64_t& packed_b) {
-  for (uint32_t i = 0; i < elem_count; ++i) {
-    uint32_t idx = info.lo + i;
-    auto elem_name = std::string(name) + "[" + std::to_string(idx) + "]";
+// Packs the low word of each fixed-unpacked-array element into `out` using the
+// same element-major shift.
+static void PackFixedArrayElements(const BitStreamPack& pack, SimContext& ctx,
+                                   PackedBits& out) {
+  for (uint32_t i = 0; i < pack.elem_count; ++i) {
+    uint32_t idx = pack.info.lo + i;
+    auto elem_name = std::string(pack.name) + "[" + std::to_string(idx) + "]";
     auto* elem = ctx.FindVariable(elem_name);
     if (!elem) continue;
     uint64_t aval = elem->value.nwords > 0 ? elem->value.words[0].aval : 0;
     uint64_t bval = elem->value.nwords > 0 ? elem->value.words[0].bval : 0;
-    uint32_t shift = total_bits - (i + 1) * info.elem_width;
-    packed_a |= (aval & elem_mask) << shift;
-    packed_b |= (bval & elem_mask) << shift;
+    uint32_t shift = pack.total_bits - (i + 1) * pack.info.elem_width;
+    out.aval |= (aval & pack.elem_mask) << shift;
+    out.bval |= (bval & pack.elem_mask) << shift;
   }
 }
 
@@ -517,24 +544,22 @@ static Logic4Vec PackArrayBitStream(std::string_view name,
     }
   }
   uint32_t total_bits = elem_count * info.elem_width;
-  uint64_t packed_a = 0;
-  uint64_t packed_b = 0;
   uint32_t elem_mask = info.elem_width >= 64
                            ? ~uint32_t{0}
                            : (uint32_t{1} << info.elem_width) - 1;
+  BitStreamPack pack{name, info, elem_count, total_bits, elem_mask};
+  PackedBits packed;
   if (info.is_queue) {
-    PackQueueElements(name, info, elem_count, total_bits, elem_mask, ctx,
-                      packed_a, packed_b);
+    PackQueueElements(pack, ctx, packed);
   } else {
-    PackFixedArrayElements(name, info, elem_count, total_bits, elem_mask, ctx,
-                           packed_a, packed_b);
+    PackFixedArrayElements(pack, ctx, packed);
   }
   auto vec = MakeLogic4Vec(arena, total_bits);
   if (vec.nwords > 0) {
     uint64_t width_mask =
         total_bits >= 64 ? ~uint64_t{0} : (uint64_t{1} << total_bits) - 1;
-    vec.words[0].aval = packed_a & width_mask;
-    vec.words[0].bval = packed_b & width_mask;
+    vec.words[0].aval = packed.aval & width_mask;
+    vec.words[0].bval = packed.bval & width_mask;
   }
   return vec;
 }

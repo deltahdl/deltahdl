@@ -224,28 +224,37 @@ static Logic4Vec PackStringIntoWidth(Arena& arena, const std::string& s,
   return vec;
 }
 
+// §21.6: the destination of a $value$plusargs conversion is the named
+// variable receiving the converted remainder, together with its width. Bundled
+// so the conversion helpers share one entity rather than loose parameters.
+struct PlusargDest {
+  Variable* var;
+  std::string name;
+  uint32_t width;
+};
+
 // §21.6: %e/%f/%g convert the remainder to a real value, stored as its 64-bit
 // IEEE pattern. An empty remainder stores zero; an unparseable remainder is
 // written with 'bx.
-static void StorePlusargReal(Variable* var, const std::string& name,
+static void StorePlusargReal(const PlusargDest& dest,
                              const std::string& remainder, SimContext& ctx,
-                             Arena& arena, uint32_t width) {
+                             Arena& arena) {
   if (remainder.empty()) {
-    var->value = MakeLogic4VecVal(arena, width, 0);
+    dest.var->value = MakeLogic4VecVal(arena, dest.width, 0);
     return;
   }
   const char* begin = remainder.c_str();
   char* end = nullptr;
   double d = std::strtod(begin, &end);
   if (end != begin + remainder.size()) {
-    var->value = MakeAllX(arena, width);
+    dest.var->value = MakeAllX(arena, dest.width);
     return;
   }
   uint64_t bits = 0;
   std::memcpy(&bits, &d, sizeof(double));
-  auto vec = MakeLogic4VecVal(arena, width, bits);
-  if (ctx.IsRealVariable(name)) vec.is_real = true;
-  var->value = vec;
+  auto vec = MakeLogic4VecVal(arena, dest.width, bits);
+  if (ctx.IsRealVariable(dest.name)) vec.is_real = true;
+  dest.var->value = vec;
 }
 
 // §21.6: integer conversions (%d/%o/%h/%x/%b) store the parsed magnitude. An
@@ -273,24 +282,23 @@ static void StorePlusargInteger(Variable* var, char conv,
 // §21.6: convert the remainder of a matching plusarg into `var` according to
 // the format string's conversion code. The stored value is automatically zero-
 // padded or truncated to the variable width by MakeLogic4VecVal.
-static void StorePlusargValue(Variable* var, const std::string& name, char conv,
+static void StorePlusargValue(const PlusargDest& dest, char conv,
                               const std::string& remainder, SimContext& ctx,
                               Arena& arena) {
-  if (!var) return;
-  uint32_t width = var->value.width ? var->value.width : 32;
+  if (!dest.var) return;
 
   // §21.6: %s performs no numeric conversion; the characters are stored as is.
   if (conv == 's') {
-    var->value = PackStringIntoWidth(arena, remainder, width);
+    dest.var->value = PackStringIntoWidth(arena, remainder, dest.width);
     return;
   }
 
   if (conv == 'e' || conv == 'f' || conv == 'g') {
-    StorePlusargReal(var, name, remainder, ctx, arena, width);
+    StorePlusargReal(dest, remainder, ctx, arena);
     return;
   }
 
-  StorePlusargInteger(var, conv, remainder, arena, width);
+  StorePlusargInteger(dest.var, conv, remainder, arena, dest.width);
 }
 
 static Logic4Vec EvalValuePlusargs(const Expr* expr, SimContext& ctx,
@@ -306,13 +314,15 @@ static Logic4Vec EvalValuePlusargs(const Expr* expr, SimContext& ctx,
     var_name = std::string(expr->args[1]->text);
     var = ctx.FindVariable(var_name);
   }
+  uint32_t dest_width = (var && var->value.width) ? var->value.width : 32;
+  PlusargDest dest{var, var_name, dest_width};
 
   // §21.6: the first plusarg (in command-line order) whose prefix matches the
   // plusarg_string supplies the remainder available for conversion.
   for (const auto& arg : ctx.GetPlusArgs()) {
     if (arg.substr(0, prefix.size()) != prefix) continue;
     std::string remainder = arg.substr(prefix.size());
-    StorePlusargValue(var, var_name, conv, remainder, ctx, arena);
+    StorePlusargValue(dest, conv, remainder, ctx, arena);
     return MakeLogic4VecVal(arena, 1, 1);
   }
   // §21.6: with no match the function returns zero, leaves the variable
@@ -595,10 +605,18 @@ static bool SrcClassTypeIncompatible(const Expr* src_expr,
   return src_type && !AreCastCompatible(src_type, dest_type);
 }
 
-static bool TryCastClassHandle(std::string_view dest_name, uint64_t src_val,
-                               const Expr* src_expr, SimContext& ctx,
+// §6.24.1 $cast: one dynamic cast request names a destination variable
+// (dest_name) and the source it is cast from (its run-time handle src_val and
+// the originating expression src_expr used for the static-type screen).
+struct CastRequest {
+  std::string_view dest_name;
+  uint64_t src_val;
+  const Expr* src_expr;
+};
+
+static bool TryCastClassHandle(const CastRequest& req, SimContext& ctx,
                                Arena& arena, Logic4Vec& out) {
-  auto dest_class = ctx.GetVariableClassType(dest_name);
+  auto dest_class = ctx.GetVariableClassType(req.dest_name);
   if (dest_class.empty()) return false;
   auto* dest_type = ctx.FindClassType(dest_class);
   if (!dest_type) {
@@ -606,21 +624,21 @@ static bool TryCastClassHandle(std::string_view dest_name, uint64_t src_val,
     return true;
   }
 
-  if (SrcClassTypeIncompatible(src_expr, dest_type, ctx)) {
+  if (SrcClassTypeIncompatible(req.src_expr, dest_type, ctx)) {
     out = MakeLogic4VecVal(arena, 32, 0);
     return true;
   }
 
-  if (src_val == kNullClassHandle) {
-    out = CastAssignSuccess(dest_name, 0, ctx, arena);
+  if (req.src_val == kNullClassHandle) {
+    out = CastAssignSuccess(req.dest_name, 0, ctx, arena);
     return true;
   }
-  auto* src_obj = ctx.GetClassObject(src_val);
+  auto* src_obj = ctx.GetClassObject(req.src_val);
   if (!src_obj || !src_obj->type || !src_obj->type->IsA(dest_type)) {
     out = MakeLogic4VecVal(arena, 32, 0);
     return true;
   }
-  out = CastAssignSuccess(dest_name, src_val, ctx, arena);
+  out = CastAssignSuccess(req.dest_name, req.src_val, ctx, arena);
   return true;
 }
 
@@ -638,8 +656,8 @@ static Logic4Vec EvalCastSysFunc(const Expr* expr, SimContext& ctx,
   auto dest_name = dest_expr->text;
   Logic4Vec out;
   if (TryCastEnum(dest_name, src_val, ctx, arena, out)) return out;
-  if (TryCastClassHandle(dest_name, src_val, expr->args[1], ctx, arena, out))
-    return out;
+  CastRequest cast_req{dest_name, src_val, expr->args[1]};
+  if (TryCastClassHandle(cast_req, ctx, arena, out)) return out;
   return CastAssignSuccess(dest_name, src_val, ctx, arena);
 }
 

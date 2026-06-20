@@ -427,23 +427,44 @@ static void CollectAssocKeyVals(const AssocArrayObject& aa,
   }
 }
 
-static bool TryCollectAssocLocatorResult(const Expr* expr,
+// §7.12.1 — the evaluation environment shared by every array locator entry
+// point: the method-call expression (which carries the optional with clause),
+// the simulator context the iterators are bound in, and the arena that backs
+// the freshly built result vectors. Bundled so the locator helpers stay at or
+// below the parameter cap while still naming a single domain object.
+struct LocatorEnv {
+  const Expr* expr;
+  SimContext& ctx;
+  Arena& arena;
+};
+
+// §7.12.1 — the indexed-array subject of a locator query: the collapsed element
+// vector and whether those elements are strings, evaluated inside a LocatorEnv.
+// The indexed locator family (unique/unique_index/min/max and find*) all act on
+// exactly this object, so they share one struct.
+struct IndexedLocatorInput {
+  LocatorEnv env;
+  const std::vector<Logic4Vec>& elems;
+  bool is_str;
+};
+
+static bool TryCollectAssocLocatorResult(const LocatorEnv& env,
                                          const MethodCallParts& parts,
-                                         AssocArrayObject& aa, SimContext& ctx,
-                                         Arena& arena,
+                                         AssocArrayObject& aa,
                                          std::vector<Logic4Vec>& out) {
   std::string_view method = parts.method_name;
   if (method == "map") return false;  // not a 7.12.1 locator method
 
-  if (!CheckAssocWithClauseRequired(method, expr, ctx)) return false;
+  if (!CheckAssocWithClauseRequired(method, env.expr, env.ctx)) return false;
   if (aa.is_string_key) return false;  // index type not representable here
 
   std::vector<int64_t> keys;
   std::vector<Logic4Vec> vals;
   CollectAssocKeyVals(aa, keys, vals);
 
-  LocatorCtx lc = MakeLocatorCtx(vals, /*is_str=*/false, expr, ctx, arena);
-  AssocLocatorState st{keys, vals, lc, aa.index_width, ctx, arena};
+  LocatorCtx lc =
+      MakeLocatorCtx(vals, /*is_str=*/false, env.expr, env.ctx, env.arena);
+  AssocLocatorState st{keys, vals, lc, aa.index_width, env.ctx, env.arena};
   return DispatchAssocLocator(method, st, out);
 }
 
@@ -453,54 +474,55 @@ static bool TryCollectAssocLocatorResult(const Expr* expr,
 // is one of these and returns the result the caller should propagate.
 // unique: dedupe by with-value when a with clause is present, otherwise by the
 // element value itself.
-static void RunIndexedUnique(const Expr* expr,
-                             const std::vector<Logic4Vec>& elems, bool is_str,
-                             SimContext& ctx, Arena& arena,
+static void RunIndexedUnique(const IndexedLocatorInput& in,
                              std::vector<Logic4Vec>& out) {
-  if (expr->with_expr) {
-    LocatorCtx lc = MakeLocatorCtx(elems, is_str, expr, ctx, arena);
+  const LocatorEnv& env = in.env;
+  if (env.expr->with_expr) {
+    LocatorCtx lc =
+        MakeLocatorCtx(in.elems, in.is_str, env.expr, env.ctx, env.arena);
     LocatorUniqueWith(lc, out);
   } else {
-    LocatorUnique(elems, arena, out);
+    LocatorUnique(in.elems, env.arena, out);
   }
 }
 
 // unique_index: same dedupe rule as unique, but emits 0-based positions.
-static void RunIndexedUniqueIndex(const Expr* expr,
-                                  const std::vector<Logic4Vec>& elems,
-                                  bool is_str, SimContext& ctx, Arena& arena,
+static void RunIndexedUniqueIndex(const IndexedLocatorInput& in,
                                   std::vector<Logic4Vec>& out) {
-  if (expr->with_expr) {
-    LocatorCtx lc = MakeLocatorCtx(elems, is_str, expr, ctx, arena);
+  const LocatorEnv& env = in.env;
+  if (env.expr->with_expr) {
+    LocatorCtx lc =
+        MakeLocatorCtx(in.elems, in.is_str, env.expr, env.ctx, env.arena);
     LocatorUniqueIndexWith(lc, out);
   } else {
-    LocatorUniqueIndex(elems, arena, out);
+    LocatorUniqueIndex(in.elems, env.arena, out);
   }
 }
 
-static void RunIndexedMinMax(std::string_view method, const Expr* expr,
-                             const std::vector<Logic4Vec>& elems, bool is_str,
-                             SimContext& ctx, Arena& arena,
+static void RunIndexedMinMax(std::string_view method,
+                             const IndexedLocatorInput& in,
                              std::vector<Logic4Vec>& out) {
-  LocatorCtx lc = MakeLocatorCtx(elems, is_str, expr, ctx, arena);
+  const LocatorEnv& env = in.env;
+  LocatorCtx lc =
+      MakeLocatorCtx(in.elems, in.is_str, env.expr, env.ctx, env.arena);
   LocatorMinMax(method, lc, out);
 }
 
-static bool TryIndexedOptionalWithLocator(
-    std::string_view method, const Expr* expr,
-    const std::vector<Logic4Vec>& elems, bool is_str, SimContext& ctx,
-    Arena& arena, std::vector<Logic4Vec>& out, bool& handled) {
+static bool TryIndexedOptionalWithLocator(std::string_view method,
+                                          const IndexedLocatorInput& in,
+                                          std::vector<Logic4Vec>& out,
+                                          bool& handled) {
   handled = true;
   if (method == "unique") {
-    RunIndexedUnique(expr, elems, is_str, ctx, arena, out);
+    RunIndexedUnique(in, out);
     return true;
   }
   if (method == "unique_index") {
-    RunIndexedUniqueIndex(expr, elems, is_str, ctx, arena, out);
+    RunIndexedUniqueIndex(in, out);
     return true;
   }
   if (method == "min" || method == "max") {
-    RunIndexedMinMax(method, expr, elems, is_str, ctx, arena, out);
+    RunIndexedMinMax(method, in, out);
     return true;
   }
   handled = false;
@@ -553,16 +575,18 @@ bool TryCollectLocatorResult(const Expr* expr, SimContext& ctx, Arena& arena,
     // Associative arrays are stored separately and honor index-type returns
     // and key ordering through a dedicated path.
     if (auto* aa = ctx.FindAssocArray(parts.var_name))
-      return TryCollectAssocLocatorResult(expr, parts, *aa, ctx, arena, out);
+      return TryCollectAssocLocatorResult(LocatorEnv{expr, ctx, arena}, parts,
+                                          *aa, out);
     return false;
   }
 
   auto elems = CollectVecElements(parts.var_name, *info, ctx, arena);
   bool is_str = IsStringArray(parts.var_name, *info, ctx);
 
+  IndexedLocatorInput in{LocatorEnv{expr, ctx, arena}, elems, is_str};
   bool handled = false;
-  bool optional_result = TryIndexedOptionalWithLocator(
-      parts.method_name, expr, elems, is_str, ctx, arena, out, handled);
+  bool optional_result =
+      TryIndexedOptionalWithLocator(parts.method_name, in, out, handled);
   if (handled) return optional_result;
 
   if (!CheckIndexedWithClauseRequired(parts.method_name, expr, ctx))

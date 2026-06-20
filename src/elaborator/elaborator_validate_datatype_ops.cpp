@@ -287,32 +287,45 @@ static void CheckViToViParamValues(std::string_view lhs_name,
   }
 }
 
+// Parameter bundle for virtual-interface assignment checking, grouping the
+// elaborator state needed to validate a single assignment statement (§25.9) so
+// it can be threaded through the free helpers without member access. It holds
+// the per-name descriptors of both assignment entities: the virtual-interface
+// variable (vi_var_*) and the interface instance (interface_inst_*).
+struct ViAssignContext {
+  const TypeMap& var_types;
+  const ViStringMap& interface_inst_types;
+  const ViStringMap& vi_var_interface_types;
+  const ViStringMap& vi_var_modports;
+  const ViParamMap& vi_var_param_values;
+  const ViParamMap& interface_inst_param_values;
+  const std::unordered_set<std::string_view>& vi_external_defparam_insts;
+};
+
 // §25.9: two virtual interfaces are of the same type, and hence assignment
 // compatible, only when their interface types, modports, and actual parameter
 // values all match.
 static void CheckViToViAssign(std::string_view lhs_name,
                               std::string_view rhs_name,
-                              const ViStringMap& vi_var_interface_types,
-                              const ViStringMap& vi_var_modports,
-                              const ViParamMap& vi_var_param_values,
-                              SourceLoc loc, DiagEngine& diag) {
-  CheckViToViInterfaceTypes(lhs_name, rhs_name, vi_var_interface_types, loc,
+                              const ViAssignContext& ctx, SourceLoc loc,
+                              DiagEngine& diag) {
+  CheckViToViInterfaceTypes(lhs_name, rhs_name, ctx.vi_var_interface_types, loc,
                             diag);
-  CheckViToViModports(lhs_name, rhs_name, vi_var_modports, loc, diag);
-  CheckViToViParamValues(lhs_name, rhs_name, vi_var_param_values, loc, diag);
+  CheckViToViModports(lhs_name, rhs_name, ctx.vi_var_modports, loc, diag);
+  CheckViToViParamValues(lhs_name, rhs_name, ctx.vi_var_param_values, loc,
+                         diag);
 }
 
 // §25.9: assigning an interface instance to a virtual interface requires a
 // matching interface type.
 static void CheckViFromInstanceTypes(std::string_view lhs_name,
                                      std::string_view rhs_name,
-                                     const ViStringMap& vi_var_interface_types,
-                                     const ViStringMap& interface_inst_types,
-                                     SourceLoc loc, DiagEngine& diag) {
-  auto lit = vi_var_interface_types.find(lhs_name);
-  auto iit = interface_inst_types.find(rhs_name);
-  if (lit != vi_var_interface_types.end() &&
-      iit != interface_inst_types.end() && lit->second != iit->second) {
+                                     const ViAssignContext& ctx, SourceLoc loc,
+                                     DiagEngine& diag) {
+  auto lit = ctx.vi_var_interface_types.find(lhs_name);
+  auto iit = ctx.interface_inst_types.find(rhs_name);
+  if (lit != ctx.vi_var_interface_types.end() &&
+      iit != ctx.interface_inst_types.end() && lit->second != iit->second) {
     diag.Error(loc,
                "virtual interface assignment from interface instance of "
                "incompatible type");
@@ -321,15 +334,15 @@ static void CheckViFromInstanceTypes(std::string_view lhs_name,
 
 // §25.9: the actual parameter values of the interface instance shall match
 // those of the virtual interface.
-static void CheckViFromInstanceParamValues(
-    std::string_view lhs_name, std::string_view rhs_name,
-    const ViParamMap& vi_var_param_values,
-    const ViParamMap& interface_inst_param_values, SourceLoc loc,
-    DiagEngine& diag) {
-  auto lpv = vi_var_param_values.find(lhs_name);
-  auto ipv = interface_inst_param_values.find(rhs_name);
-  if (lpv != vi_var_param_values.end() &&
-      ipv != interface_inst_param_values.end() && lpv->second != ipv->second) {
+static void CheckViFromInstanceParamValues(std::string_view lhs_name,
+                                           std::string_view rhs_name,
+                                           const ViAssignContext& ctx,
+                                           SourceLoc loc, DiagEngine& diag) {
+  auto lpv = ctx.vi_var_param_values.find(lhs_name);
+  auto ipv = ctx.interface_inst_param_values.find(rhs_name);
+  if (lpv != ctx.vi_var_param_values.end() &&
+      ipv != ctx.interface_inst_param_values.end() &&
+      lpv->second != ipv->second) {
     diag.Error(loc,
                "virtual interface parameter values do not match the "
                "interface instance");
@@ -353,33 +366,15 @@ static void CheckViFromInstanceDefparam(
 // §25.9: assigning an interface instance to a virtual interface requires
 // matching interface type and actual parameter values, and is forbidden when a
 // defparam declared outside the interface targets that instance.
-static void CheckViFromInstanceAssign(
-    std::string_view lhs_name, std::string_view rhs_name,
-    const ViStringMap& vi_var_interface_types,
-    const ViStringMap& interface_inst_types,
-    const ViParamMap& vi_var_param_values,
-    const ViParamMap& interface_inst_param_values,
-    const std::unordered_set<std::string_view>& vi_external_defparam_insts,
-    SourceLoc loc, DiagEngine& diag) {
-  CheckViFromInstanceTypes(lhs_name, rhs_name, vi_var_interface_types,
-                           interface_inst_types, loc, diag);
-  CheckViFromInstanceParamValues(lhs_name, rhs_name, vi_var_param_values,
-                                 interface_inst_param_values, loc, diag);
-  CheckViFromInstanceDefparam(rhs_name, vi_external_defparam_insts, loc, diag);
+static void CheckViFromInstanceAssign(std::string_view lhs_name,
+                                      std::string_view rhs_name,
+                                      const ViAssignContext& ctx, SourceLoc loc,
+                                      DiagEngine& diag) {
+  CheckViFromInstanceTypes(lhs_name, rhs_name, ctx, loc, diag);
+  CheckViFromInstanceParamValues(lhs_name, rhs_name, ctx, loc, diag);
+  CheckViFromInstanceDefparam(rhs_name, ctx.vi_external_defparam_insts, loc,
+                              diag);
 }
-
-// Parameter bundle for virtual-interface assignment checking, grouping the
-// elaborator state needed to validate a single assignment statement so it can
-// be threaded through a free helper without member access.
-struct ViAssignContext {
-  const TypeMap& var_types;
-  const ViStringMap& interface_inst_types;
-  const ViStringMap& vi_var_interface_types;
-  const ViStringMap& vi_var_modports;
-  const ViParamMap& vi_var_param_values;
-  const ViParamMap& interface_inst_param_values;
-  const std::unordered_set<std::string_view>& vi_external_defparam_insts;
-};
 
 // §25.9: validate a single blocking/nonblocking assignment whose operands may
 // involve virtual interfaces, interface instances, or null.
@@ -397,16 +392,11 @@ static void CheckVirtualInterfaceAssignStmt(const Stmt* s,
                "virtual interface, an interface instance, or null");
   }
   if (lhs_vi && rhs_vi) {
-    CheckViToViAssign(ExprIdent(s->lhs), rhs_name, ctx.vi_var_interface_types,
-                      ctx.vi_var_modports, ctx.vi_var_param_values,
-                      s->range.start, diag);
+    CheckViToViAssign(ExprIdent(s->lhs), rhs_name, ctx, s->range.start, diag);
   }
   if (lhs_vi && rhs_is_iface_inst) {
-    CheckViFromInstanceAssign(
-        ExprIdent(s->lhs), rhs_name, ctx.vi_var_interface_types,
-        ctx.interface_inst_types, ctx.vi_var_param_values,
-        ctx.interface_inst_param_values, ctx.vi_external_defparam_insts,
-        s->range.start, diag);
+    CheckViFromInstanceAssign(ExprIdent(s->lhs), rhs_name, ctx, s->range.start,
+                              diag);
   }
   if (!lhs_vi && rhs_vi) {
     diag.Error(s->range.start,
