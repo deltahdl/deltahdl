@@ -118,17 +118,9 @@ TEST_F(ExtendedVcdSyntaxSim, ExtendedScalarPortValuesUseBinaryCharacters) {
   {
     VcdWriter vcd(tmp_path_);
     vcd.SetExtended();
-    vcd.WriteHeader("1ns");
-    RegisterFourStateScalars(vcd, arena_);
-    vcd.EndDefinitions();
-    vcd.WriteTimestamp(0);
-    vcd.DumpAllValues();
+    WriteFourStateScalarDump(vcd, arena_);
   }
-  auto content = ReadVcd();
-  EXPECT_NE(content.find("0!"), std::string::npos);
-  EXPECT_NE(content.find("1\""), std::string::npos);
-  EXPECT_NE(content.find("x#"), std::string::npos);
-  EXPECT_NE(content.find("z$"), std::string::npos);
+  ExpectFourStateScalarChars(ReadVcd());
 }
 
 // §21.7.4.1: within a time increment, only the ports whose value changed are

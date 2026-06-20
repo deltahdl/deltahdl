@@ -120,17 +120,9 @@ TEST_F(VcdFileSyntaxSim, RealVariableDeclaredWithRealVarType) {
 TEST_F(VcdFileSyntaxSim, ScalarFourStateValuesUseBinaryCharacters) {
   {
     VcdWriter vcd(tmp_path_);
-    vcd.WriteHeader("1ns");
-    RegisterFourStateScalars(vcd, arena_);
-    vcd.EndDefinitions();
-    vcd.WriteTimestamp(0);
-    vcd.DumpAllValues();
+    WriteFourStateScalarDump(vcd, arena_);
   }
-  auto content = ReadVcd();
-  EXPECT_NE(content.find("0!"), std::string::npos);
-  EXPECT_NE(content.find("1\""), std::string::npos);
-  EXPECT_NE(content.find("x#"), std::string::npos);
-  EXPECT_NE(content.find("z$"), std::string::npos);
+  ExpectFourStateScalarChars(ReadVcd());
 }
 
 // §21.7.2.1: the time recorded by a simulation_time command is the absolute

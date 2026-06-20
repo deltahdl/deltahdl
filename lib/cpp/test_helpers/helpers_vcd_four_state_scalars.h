@@ -1,5 +1,9 @@
 #pragma once
 
+#include <gtest/gtest.h>
+
+#include <string>
+
 #include "common/arena.h"
 #include "helpers_vcd_logic4vec.h"
 #include "simulator/variable.h"
@@ -25,4 +29,25 @@ inline void RegisterFourStateScalars(VcdWriter& vcd, Arena& arena) {
   auto* highz = arena.Create<Variable>();
   highz->value = MakeScalar(arena, 1, 1);
   vcd.RegisterSignal("hz", 1, highz);  // ident '$'
+}
+
+// Writes the header, registers the four-state scalars, ends definitions, and
+// dumps their values at time 0 on the already-constructed `vcd`. The caller
+// owns the writer (and any mode such as SetExtended) and the enclosing scope
+// that flushes it before the file is read back.
+inline void WriteFourStateScalarDump(VcdWriter& vcd, Arena& arena) {
+  vcd.WriteHeader("1ns");
+  RegisterFourStateScalars(vcd, arena);
+  vcd.EndDefinitions();
+  vcd.WriteTimestamp(0);
+  vcd.DumpAllValues();
+}
+
+// Asserts that a dumped VCD `content` maps each of the four logic states to its
+// registration-ordered identifier code: 0->'!', 1->'"', x->'#', z->'$'.
+inline void ExpectFourStateScalarChars(const std::string& content) {
+  EXPECT_NE(content.find("0!"), std::string::npos);
+  EXPECT_NE(content.find("1\""), std::string::npos);
+  EXPECT_NE(content.find("x#"), std::string::npos);
+  EXPECT_NE(content.find("z$"), std::string::npos);
 }
