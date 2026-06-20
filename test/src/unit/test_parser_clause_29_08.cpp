@@ -13,7 +13,7 @@ std::vector<ModuleItem*> FindUdpInstances(ParseResult& r) {
   return out;
 }
 
-const char* kUdpDef =
+const char* udp_def =
     "primitive my_udp(output y, input a, input b);\n"
     "  table\n"
     "    0 0 : 0;\n"
@@ -27,7 +27,7 @@ const char* kUdpDef =
 // checks each lands on the parsed instance: the strength pair, both rise/fall
 // delays (delay2), the instance name, and the output/input terminal list.
 TEST(UdpInstantiation, ParsesAllInstantiationComponents) {
-  auto r = Parse(std::string(kUdpDef) +
+  auto r = Parse(std::string(udp_def) +
                  "module top;\n"
                  "  my_udp (strong0, strong1) #(2, 3) u1 (y, a, b);\n"
                  "endmodule\n");
@@ -50,7 +50,7 @@ TEST(UdpInstantiation, ParsesAllInstantiationComponents) {
 // udp_instance BNF brackets name_of_instance accordingly. This observes the
 // nameless form parsing into an anonymous instance with its terminals intact.
 TEST(UdpInstantiation, OptionalInstanceName) {
-  auto r = Parse(std::string(kUdpDef) +
+  auto r = Parse(std::string(udp_def) +
                  "module top;\n"
                  "  my_udp (y, a, b);\n"
                  "endmodule\n");
@@ -65,7 +65,7 @@ TEST(UdpInstantiation, OptionalInstanceName) {
 // name_of_instance BNF carries an unpacked_dimension for this. This observes
 // the range component being accepted and recorded on the instance.
 TEST(UdpInstantiation, ArrayOfInstances) {
-  auto r = Parse(std::string(kUdpDef) +
+  auto r = Parse(std::string(udp_def) +
                  "module top;\n"
                  "  my_udp u1 [3:0] (y, a, b);\n"
                  "endmodule\n");
@@ -81,7 +81,7 @@ TEST(UdpInstantiation, ArrayOfInstances) {
 // items under one declaration. This observes the list repetition producing
 // multiple instances of the same UDP from a single statement.
 TEST(UdpInstantiation, MultipleInstancesInOneStatement) {
-  auto r = Parse(std::string(kUdpDef) +
+  auto r = Parse(std::string(udp_def) +
                  "module top;\n"
                  "  my_udp u1 (y, a, b), u2 (y, a, b);\n"
                  "endmodule\n");
@@ -98,7 +98,7 @@ TEST(UdpInstantiation, MultipleInstancesInOneStatement) {
 // pair parsed once is propagated onto both instances of the list.
 TEST(UdpInstantiation, SharedStrengthAndDelayAcrossInstances) {
   auto r =
-      Parse(std::string(kUdpDef) +
+      Parse(std::string(udp_def) +
             "module top;\n"
             "  my_udp (strong0, weak1) #(2, 3) u1 (y, a, b), u2 (y, a, b);\n"
             "endmodule\n");
@@ -119,7 +119,7 @@ TEST(UdpInstantiation, SharedStrengthAndDelayAcrossInstances) {
 // delay specification is delay2 rather than the gate-style delay3. A third
 // delay must be rejected.
 TEST(UdpInstantiation, RejectsThreeDelays) {
-  auto r = Parse(std::string(kUdpDef) +
+  auto r = Parse(std::string(udp_def) +
                  "module top;\n"
                  "  my_udp #(1, 2, 3) u1 (y, a, b);\n"
                  "endmodule\n");

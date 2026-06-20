@@ -8,25 +8,25 @@ namespace {
 
 TEST(WhiteSpacePreprocessor, VerticalTabDelimiterPreserved) {
   PreprocFixture f;
-  auto result = Preprocess("module\vt\v;\vlogic\va\v;\vendmodule\n", f);
+  Preprocess("module\vt\v;\vlogic\va\v;\vendmodule\n", f);
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
 TEST(WhiteSpacePreprocessor, CrlfDelimiterPreserved) {
   PreprocFixture f;
-  auto result = Preprocess("module t;\r\nlogic a;\r\nendmodule\r\n", f);
+  Preprocess("module t;\r\nlogic a;\r\nendmodule\r\n", f);
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
 TEST(WhiteSpacePreprocessor, WhitespaceOnlyInput) {
   PreprocFixture f;
-  auto result = Preprocess("   \t\n\f\v\r\n   ", f);
+  Preprocess("   \t\n\f\v\r\n   ", f);
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
 TEST(WhiteSpacePreprocessor, MacroExpansionWithMixedWhitespace) {
   PreprocFixture f;
-  auto result = Preprocess(
+  Preprocess(
       "`define VAL 8'd42\n"
       "module\tt\f;\nlogic\v[7:0]\ta;\nassign\fa\t=\n`VAL\f;\vendmodule\n",
       f);

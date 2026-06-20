@@ -113,8 +113,8 @@ TEST(FsmConcatPragmaLexing, UnclosedBraceIsNotRecognized) {
 TEST(FsmConcatPragmaLexing, ConcatIsSeparateFromOtherFsmPragmas) {
   SourceManager mgr;
   DiagEngine diag(mgr);
-  const std::string src = "/* tool state_vector {hi, lo} my_fsm enum e */";
-  auto fid = mgr.AddFile("<test>", src);
+  const std::string kSrc = "/* tool state_vector {hi, lo} my_fsm enum e */";
+  auto fid = mgr.AddFile("<test>", kSrc);
   Lexer lexer(mgr.FileContent(fid), fid, diag);
   lexer.LexAll();
   EXPECT_EQ(lexer.FsmConcatPragmas().size(), 1u);
@@ -126,13 +126,13 @@ TEST(FsmConcatPragmaLexing, ConcatIsSeparateFromOtherFsmPragmas) {
 // declared, and is recognized there while the surrounding source still lexes
 // into its ordinary token stream.
 TEST(FsmConcatPragmaLexing, RecognizedWithinModuleBody) {
-  const std::string src =
+  const std::string kSrc =
       "module fsm;\n"
       "  logic hi;\n"
       "  logic lo;\n"
       "  /* tool state_vector {hi, lo} my_fsm enum state_e */\n"
       "endmodule\n";
-  auto pragmas = CollectConcatPragmas(src);
+  auto pragmas = CollectConcatPragmas(kSrc);
   ASSERT_EQ(pragmas.size(), 1u);
   EXPECT_EQ(pragmas[0].signals, (std::vector<std::string>{"hi", "lo"}));
   EXPECT_EQ(pragmas[0].fsm_name, "my_fsm");

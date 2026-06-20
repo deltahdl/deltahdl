@@ -12,9 +12,9 @@ namespace {
 // §16.13.2: a property whose subproperties all share the property clock and are
 // not multiclocked sequences is singly clocked, not multiclocked.
 TEST(MulticlockProperty, AllSubpropertiesShareClockIsSinglyClocked) {
-  const std::vector<std::string> subproperty_clocks = {"clk", "clk"};
+  const std::vector<std::string> kSubpropertyClocks = {"clk", "clk"};
   EXPECT_FALSE(IsMulticlockedProperty(
-      /*property_clock=*/"clk", subproperty_clocks,
+      /*property_clock=*/"clk", kSubpropertyClocks,
       /*any_subproperty_is_multiclocked_sequence=*/false));
 }
 
@@ -22,9 +22,9 @@ TEST(MulticlockProperty, AllSubpropertiesShareClockIsSinglyClocked) {
 // clock different from the property clock. Mirrors `(@(posedge clk0) sig0) and
 // (@(posedge clk1) sig1)` viewed from the clk0 property clock.
 TEST(MulticlockProperty, SubpropertyOnDifferentClockIsMulticlocked) {
-  const std::vector<std::string> subproperty_clocks = {"clk0", "clk1"};
+  const std::vector<std::string> kSubpropertyClocks = {"clk0", "clk1"};
   EXPECT_TRUE(IsMulticlockedProperty(
-      /*property_clock=*/"clk0", subproperty_clocks,
+      /*property_clock=*/"clk0", kSubpropertyClocks,
       /*any_subproperty_is_multiclocked_sequence=*/false));
 }
 
@@ -33,9 +33,9 @@ TEST(MulticlockProperty, SubpropertyOnDifferentClockIsMulticlocked) {
 // clock. Mirrors `@(posedge clk0) sig0 ##1 @(posedge clk1) sig1` used as a
 // property.
 TEST(MulticlockProperty, MulticlockedSequenceSubpropertyIsMulticlocked) {
-  const std::vector<std::string> subproperty_clocks = {"clk", "clk"};
+  const std::vector<std::string> kSubpropertyClocks = {"clk", "clk"};
   EXPECT_TRUE(IsMulticlockedProperty(
-      /*property_clock=*/"clk", subproperty_clocks,
+      /*property_clock=*/"clk", kSubpropertyClocks,
       /*any_subproperty_is_multiclocked_sequence=*/true));
 }
 
@@ -50,9 +50,9 @@ TEST(MulticlockProperty, NoSubpropertiesIsSinglyClocked) {
 // §16.13.2: a differing clock anywhere in the subproperty list is enough; the
 // scan does not stop at the first matching clock.
 TEST(MulticlockProperty, DifferingClockAfterMatchingClockIsMulticlocked) {
-  const std::vector<std::string> subproperty_clocks = {"clk0", "clk0", "clk2"};
+  const std::vector<std::string> kSubpropertyClocks = {"clk0", "clk0", "clk2"};
   EXPECT_TRUE(IsMulticlockedProperty(
-      /*property_clock=*/"clk0", subproperty_clocks,
+      /*property_clock=*/"clk0", kSubpropertyClocks,
       /*any_subproperty_is_multiclocked_sequence=*/false));
 }
 

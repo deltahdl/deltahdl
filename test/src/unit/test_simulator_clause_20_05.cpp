@@ -66,7 +66,7 @@ TEST(SysTask, ShortrealtobitsReinterpretsShortrealAs32Bits) {
   auto* expr = MkSysCall(f.arena, "$shortrealtobits", {MkInt(f.arena, dbits)});
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.width, 32u);
-  float fval = static_cast<float>(dval);
+  auto fval = static_cast<float>(dval);
   uint32_t expected_bits = 0;
   std::memcpy(&expected_bits, &fval, sizeof(float));
   EXPECT_EQ(result.ToUint64() & 0xFFFFFFFFu, expected_bits);
@@ -97,7 +97,7 @@ TEST(SysTask, ShortrealtobitsRoundsToNearestRepresentation) {
   std::memcpy(&dbits, &dval, sizeof(double));
   auto* expr = MkSysCall(f.arena, "$shortrealtobits", {MkInt(f.arena, dbits)});
   auto result = EvalExpr(expr, f.ctx, f.arena);
-  float rounded = static_cast<float>(dval);
+  auto rounded = static_cast<float>(dval);
   uint32_t expected_bits = 0;
   std::memcpy(&expected_bits, &rounded, sizeof(float));
   EXPECT_EQ(result.ToUint64() & 0xFFFFFFFFu, expected_bits);

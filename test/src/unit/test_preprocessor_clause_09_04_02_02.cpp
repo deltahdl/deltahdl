@@ -14,8 +14,8 @@ TEST(ImplicitEventPreprocessor, AtStarSurvivesPreprocessor) {
       "endmodule\n",
       f);
   EXPECT_FALSE(f.diag.HasErrors());
-  EXPECT_NE(result.find("@"), std::string::npos);
-  EXPECT_NE(result.find("*"), std::string::npos);
+  EXPECT_NE(result.find('@'), std::string::npos);
+  EXPECT_NE(result.find('*'), std::string::npos);
 }
 
 TEST(ImplicitEventPreprocessor, MacroInAtStarBody) {
@@ -32,7 +32,7 @@ TEST(ImplicitEventPreprocessor, MacroInAtStarBody) {
 
 TEST(ImplicitEventPreprocessor, MacroExpandingToAtStar) {
   PreprocFixture f;
-  auto result = Preprocess(
+  Preprocess(
       "`define SENS @*\n"
       "module m;\n"
       "  always `SENS y = a;\n"

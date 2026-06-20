@@ -15,15 +15,18 @@ TEST(AdmitsEmpty, BooleanNeverAdmitsEmpty) {
 TEST(AdmitsEmpty, LocalVarDeclPassesThroughToRest) {
   // §F.4.3: admits_empty((t v [= e]; r)) = admits_empty(r).
   EXPECT_TRUE(AdmitsEmpty(AdmitsEmptyForm::kLocalVarDeclThenRest,
-                          /*first=*/true, /*second=*/false));
+                          /*first_child_admits_empty=*/true,
+                          /*second_child_admits_empty=*/false));
   EXPECT_FALSE(AdmitsEmpty(AdmitsEmptyForm::kLocalVarDeclThenRest,
-                           /*first=*/false, /*second=*/false));
+                           /*first_child_admits_empty=*/false,
+                           /*second_child_admits_empty=*/false));
 }
 
 TEST(AdmitsEmpty, OneTickWithLocalVarAssignmentDoesNotAdmitEmpty) {
   // §F.4.3: admits_empty((1, v = e)) = 0.
   EXPECT_FALSE(AdmitsEmpty(AdmitsEmptyForm::kOneTickWithLocalVarAssignment,
-                           /*first=*/true, /*second=*/true));
+                           /*first_child_admits_empty=*/true,
+                           /*second_child_admits_empty=*/true));
 }
 
 TEST(AdmitsEmpty, Delay1RequiresBothChildrenAdmitEmpty) {

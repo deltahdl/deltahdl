@@ -34,9 +34,9 @@ svOpenArrayHandle MakeHandle(const SvOpenArrayDimRange* ranges, int n_dims,
 // successive unpacked ranges, never confusing one for another. The handle
 // models: logic [15:0] arr [0:7] [-1:-8].
 TEST(ArrayQueryingFunctions, DimensionZeroIsPackedPart) {
-  const SvOpenArrayDimRange ranges[] = {{15, 0}, {0, 7}, {-1, -8}};
+  const SvOpenArrayDimRange kRanges[] = {{15, 0}, {0, 7}, {-1, -8}};
   SvOpenArrayDesc desc;
-  svOpenArrayHandle h = MakeHandle(ranges, 3, &desc);
+  svOpenArrayHandle h = MakeHandle(kRanges, 3, &desc);
 
   // Dimension 0 is the packed part [15:0].
   EXPECT_EQ(svLeft(h, 0), 15);
@@ -53,9 +53,9 @@ TEST(ArrayQueryingFunctions, DimensionZeroIsPackedPart) {
 // the smaller bound, high the larger, size the element count - for an ascending
 // unpacked range.
 TEST(ArrayQueryingFunctions, LowHighSizeMatchTwentySevenSemanticsAscending) {
-  const SvOpenArrayDimRange ranges[] = {{15, 0}, {0, 7}};
+  const SvOpenArrayDimRange kRanges[] = {{15, 0}, {0, 7}};
   SvOpenArrayDesc desc;
-  svOpenArrayHandle h = MakeHandle(ranges, 2, &desc);
+  svOpenArrayHandle h = MakeHandle(kRanges, 2, &desc);
 
   // Unpacked [0:7]: low=0, high=7, size=8.
   EXPECT_EQ(svLow(h, 1), 0);
@@ -66,9 +66,9 @@ TEST(ArrayQueryingFunctions, LowHighSizeMatchTwentySevenSemanticsAscending) {
 // Q1: the same derivations hold for the descending packed range, and for a
 // range whose bounds are negative - low/high are orientation-independent.
 TEST(ArrayQueryingFunctions, LowHighSizeMatchTwentySevenSemanticsDescending) {
-  const SvOpenArrayDimRange ranges[] = {{15, 0}, {-1, -8}};
+  const SvOpenArrayDimRange kRanges[] = {{15, 0}, {-1, -8}};
   SvOpenArrayDesc desc;
-  svOpenArrayHandle h = MakeHandle(ranges, 2, &desc);
+  svOpenArrayHandle h = MakeHandle(kRanges, 2, &desc);
 
   // Packed [15:0]: low=0, high=15, size=16.
   EXPECT_EQ(svLow(h, 0), 0);
@@ -85,9 +85,9 @@ TEST(ArrayQueryingFunctions, LowHighSizeMatchTwentySevenSemanticsDescending) {
 // greater than or equal to the right bound (a descending range) and -1
 // otherwise (an ascending range).
 TEST(ArrayQueryingFunctions, IncrementMatchesTwentySevenSemantics) {
-  const SvOpenArrayDimRange ranges[] = {{15, 0}, {0, 7}};
+  const SvOpenArrayDimRange kRanges[] = {{15, 0}, {0, 7}};
   SvOpenArrayDesc desc;
-  svOpenArrayHandle h = MakeHandle(ranges, 2, &desc);
+  svOpenArrayHandle h = MakeHandle(kRanges, 2, &desc);
 
   EXPECT_EQ(svIncrement(h, 0), 1);   // [15:0] descending -> +1
   EXPECT_EQ(svIncrement(h, 1), -1);  // [0:7] ascending  -> -1
@@ -97,9 +97,9 @@ TEST(ArrayQueryingFunctions, IncrementMatchesTwentySevenSemantics) {
 // single packed dimension plus every unpacked dimension - so that valid
 // dimension arguments span 0 .. svDimensions-1.
 TEST(ArrayQueryingFunctions, DimensionsCountsPackedPlusUnpacked) {
-  const SvOpenArrayDimRange ranges[] = {{15, 0}, {0, 7}, {-1, -8}};
+  const SvOpenArrayDimRange kRanges[] = {{15, 0}, {0, 7}, {-1, -8}};
   SvOpenArrayDesc desc;
-  svOpenArrayHandle h = MakeHandle(ranges, 3, &desc);
+  svOpenArrayHandle h = MakeHandle(kRanges, 3, &desc);
 
   // One packed part + two unpacked parts.
   EXPECT_EQ(svDimensions(h), 3);
@@ -109,9 +109,9 @@ TEST(ArrayQueryingFunctions, DimensionsCountsPackedPlusUnpacked) {
 // right coincide, so low == high, size is 1, and the bound-equal case of
 // $increment yields +1.
 TEST(ArrayQueryingFunctions, DegenerateSingleElementRange) {
-  const SvOpenArrayDimRange ranges[] = {{0, 0}, {0, 0}};
+  const SvOpenArrayDimRange kRanges[] = {{0, 0}, {0, 0}};
   SvOpenArrayDesc desc;
-  svOpenArrayHandle h = MakeHandle(ranges, 2, &desc);
+  svOpenArrayHandle h = MakeHandle(kRanges, 2, &desc);
 
   EXPECT_EQ(svLow(h, 0), 0);
   EXPECT_EQ(svHigh(h, 0), 0);
@@ -126,9 +126,9 @@ TEST(ArrayQueryingFunctions, DegenerateSingleElementRange) {
 // reading past the descriptor. This exercises the handle/dimension guard in
 // production.
 TEST(ArrayQueryingFunctions, OutOfRangeDimensionAndNullHandle) {
-  const SvOpenArrayDimRange ranges[] = {{15, 0}, {0, 7}};
+  const SvOpenArrayDimRange kRanges[] = {{15, 0}, {0, 7}};
   SvOpenArrayDesc desc;
-  svOpenArrayHandle h = MakeHandle(ranges, 2, &desc);
+  svOpenArrayHandle h = MakeHandle(kRanges, 2, &desc);
 
   // Index at and beyond the dimension count, and a negative index, are invalid.
   EXPECT_EQ(svLeft(h, 2), 0);

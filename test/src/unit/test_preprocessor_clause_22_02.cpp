@@ -631,7 +631,7 @@ TEST(Preprocessor, DirectiveInMacroTextInConditionalBlock) {
   PreprocFixture f;
   PreprocConfig cfg;
   cfg.defines = {{"FEATURE", "1"}};
-  auto result = Preprocess(
+  Preprocess(
       "`define SET_TS `timescale 1ns / 1ps\n"
       "`ifdef FEATURE\n"
       "`SET_TS\n"

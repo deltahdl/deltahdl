@@ -13,7 +13,7 @@ namespace {
 Logic4Vec MakeVec(Arena& arena, const std::string& bits) {
   auto v = MakeLogic4Vec(arena, static_cast<uint32_t>(bits.size()));
   for (size_t k = 0; k < bits.size(); ++k) {
-    uint32_t idx = static_cast<uint32_t>(bits.size() - 1 - k);
+    auto idx = static_cast<uint32_t>(bits.size() - 1 - k);
     uint64_t mask = uint64_t{1} << (idx % 64);
     Logic4Word& w = v.words[idx / 64];
     switch (bits[k]) {

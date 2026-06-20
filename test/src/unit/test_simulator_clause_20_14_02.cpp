@@ -16,6 +16,7 @@ namespace {
 // stream.
 std::vector<int32_t> DistStream(SimFixture& f, Expr* call, int n) {
   std::vector<int32_t> out;
+  out.reserve(n);
   for (int i = 0; i < n; ++i) {
     out.push_back(
         static_cast<int32_t>(EvalExpr(call, f.ctx, f.arena).ToUint64()));

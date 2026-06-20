@@ -321,7 +321,7 @@ TEST(CompilationUnitPreprocessing,
   Preprocessor preproc_b(mgr_b, diag_b, {});
   auto pp_b = preproc_b.Preprocess(fid_b);
   EXPECT_TRUE(diag_b.HasErrors());
-  EXPECT_EQ(pp_b.find("8"), std::string::npos);
+  EXPECT_EQ(pp_b.find('8'), std::string::npos);
 }
 
 }  // namespace

@@ -221,18 +221,18 @@ TEST(ScopeRandomizeWith, LaterCallRedesignatesRandomAndStateVariables) {
   solver.ApplyInlineRandomList({"a", "b"});
   ASSERT_TRUE(solver.SolveWith(
       {Relation([](int64_t a, int64_t b) { return a < b; }, "a", "b")}));
-  const int64_t b_after_first = solver.GetValue("b");
+  const int64_t kBAfterFirst = solver.GetValue("b");
 
   // Carry b's drawn value forward as its current value, then re-designate: now
   // only a is random and b is a state variable.
-  solver.SetValue("b", b_after_first);
+  solver.SetValue("b", kBAfterFirst);
   solver.ApplyInlineRandomList({"a"});
   ASSERT_TRUE(solver.SolveWith({Relation(
-      [b_after_first](int64_t a, int64_t) { return a > b_after_first / 2; },
-      "a", "b")}));
+      [kBAfterFirst](int64_t a, int64_t) { return a > kBAfterFirst / 2; }, "a",
+      "b")}));
 
-  EXPECT_GT(solver.GetValue("a"), b_after_first / 2);
-  EXPECT_EQ(solver.GetValue("b"), b_after_first);  // held as a state variable
+  EXPECT_GT(solver.GetValue("a"), kBAfterFirst / 2);
+  EXPECT_EQ(solver.GetValue("b"), kBAfterFirst);  // held as a state variable
 }
 
 }  // namespace

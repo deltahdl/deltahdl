@@ -27,7 +27,7 @@ TEST(VectorSignalsInTimingChecks, TwoSignalChecksClassifyAsTwoSignal) {
 }
 
 TEST(VectorSignalsInTimingChecks, SingleModeAlwaysYieldsOneCheck) {
-  const TimingCheckKind kinds[] = {
+  const TimingCheckKind kKinds[] = {
       TimingCheckKind::kSetup,     TimingCheckKind::kHold,
       TimingCheckKind::kSetuphold, TimingCheckKind::kRecovery,
       TimingCheckKind::kRemoval,   TimingCheckKind::kRecrem,
@@ -35,7 +35,7 @@ TEST(VectorSignalsInTimingChecks, SingleModeAlwaysYieldsOneCheck) {
       TimingCheckKind::kFullskew,  TimingCheckKind::kNochange,
       TimingCheckKind::kWidth,     TimingCheckKind::kPeriod,
   };
-  for (auto k : kinds) {
+  for (auto k : kKinds) {
     EXPECT_EQ(TimingCheckExpandedCount(k, 8, 8, TimingCheckVectorMode::kSingle),
               1u);
   }

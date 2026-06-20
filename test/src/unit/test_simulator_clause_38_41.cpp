@@ -47,12 +47,12 @@ TEST_F(VpiVprintfSim,
        ConsumesAnAlreadyStartedVarargsListWritingBothDestinations) {
   PLI_INT32 written = CallWithStartedVarargs("value=%d name=%s", 42, "ok");
 
-  const std::string expected = "value=42 name=ok";
+  const std::string kExpected = "value=42 name=ok";
   // The same expanded text reached both the output channel and the log file.
-  EXPECT_EQ(vpi_ctx_.OutputChannelBuffer(), expected);
-  EXPECT_EQ(vpi_ctx_.LogFileBuffer(), expected);
+  EXPECT_EQ(vpi_ctx_.OutputChannelBuffer(), kExpected);
+  EXPECT_EQ(vpi_ctx_.LogFileBuffer(), kExpected);
   // The return value is the number of characters written.
-  EXPECT_EQ(written, static_cast<PLI_INT32>(expected.size()));
+  EXPECT_EQ(written, static_cast<PLI_INT32>(kExpected.size()));
 }
 
 // §38.41: an error returns EOF. With no format string there is nothing to

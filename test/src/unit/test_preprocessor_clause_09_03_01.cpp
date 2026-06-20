@@ -8,7 +8,7 @@ namespace {
 
 TEST(SequentialBlockPreprocessor, MacroExpansionInsideSeqBlock) {
   PreprocFixture f;
-  auto result = Preprocess(
+  Preprocess(
       "`define ASSIGN_A a = 1;\n"
       "module m;\n"
       "  initial begin\n"
@@ -21,7 +21,7 @@ TEST(SequentialBlockPreprocessor, MacroExpansionInsideSeqBlock) {
 
 TEST(SequentialBlockPreprocessor, MacroExpandsToSeqBlockContent) {
   PreprocFixture f;
-  auto result = Preprocess(
+  Preprocess(
       "`define BODY begin a = 1; b = 2; end\n"
       "module m;\n"
       "  initial `BODY\n"

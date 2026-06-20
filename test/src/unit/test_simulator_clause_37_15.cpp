@@ -63,9 +63,14 @@ TEST_F(RefObjContext, ParentTraversesSubelementRefObj) {
 // D5: vpiGeneric is TRUE for a reference to a generic interface, FALSE for a
 // reference to a non-generic interface, and vpiUndefined for any other ref obj.
 TEST_F(RefObjContext, GenericPropertyByReferenceKind) {
-  EXPECT_EQ(VpiRefObjGeneric(/*interface=*/true, /*generic=*/true), 1);
-  EXPECT_EQ(VpiRefObjGeneric(/*interface=*/true, /*generic=*/false), 0);
-  EXPECT_EQ(VpiRefObjGeneric(/*interface=*/false, /*generic=*/false),
+  EXPECT_EQ(VpiRefObjGeneric(/*refers_to_interface=*/true,
+                             /*is_generic_interface=*/true),
+            1);
+  EXPECT_EQ(VpiRefObjGeneric(/*refers_to_interface=*/true,
+                             /*is_generic_interface=*/false),
+            0);
+  EXPECT_EQ(VpiRefObjGeneric(/*refers_to_interface=*/false,
+                             /*is_generic_interface=*/false),
             vpiUndefined);
 
   // A ref obj to a generic interface.

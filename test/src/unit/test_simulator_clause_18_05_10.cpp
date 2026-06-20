@@ -36,7 +36,8 @@ ConstraintExpr XGreaterThanFive() {
 // unsatisfiable 'x > 5'. When 'shared' is non-null the block is static and
 // binds its on/off state to that shared cell, modelling one instance of the
 // class.
-ConstraintSolver MakeInstance(uint32_t seed, std::shared_ptr<bool> shared) {
+ConstraintSolver MakeInstance(uint32_t seed,
+                              const std::shared_ptr<bool>& shared) {
   ConstraintSolver solver(seed);
   solver.AddVariable(MakeVar("x", 0, 3));
   ConstraintBlock blk;

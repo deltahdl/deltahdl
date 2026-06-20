@@ -170,16 +170,16 @@ TEST(CoverageInformationQueries,
   c.killed = 1;
   c.failures = 2;
   // 10 - (3 + 1 + 1 + 1 + 2) = 2 still in progress.
-  const std::optional<std::uint64_t> in_progress = AssertInProgress(c);
-  ASSERT_TRUE(in_progress.has_value());
-  EXPECT_EQ(*in_progress, 2U);
+  const std::optional<std::uint64_t> kInProgress = AssertInProgress(c);
+  ASSERT_TRUE(kInProgress.has_value());
+  EXPECT_EQ(*kInProgress, 2U);
 
   AssertionCoverageCounters all_concluded;
   all_concluded.attempts = 4;
   all_concluded.successes = 4;
-  const std::optional<std::uint64_t> none = AssertInProgress(all_concluded);
-  ASSERT_TRUE(none.has_value());
-  EXPECT_EQ(*none, 0U);
+  const std::optional<std::uint64_t> kNone = AssertInProgress(all_concluded);
+  ASSERT_TRUE(kNone.has_value());
+  EXPECT_EQ(*kNone, 0U);
 }
 
 // C10 (edge): the derivation never reports a negative figure. Should the
@@ -190,9 +190,9 @@ TEST(CoverageInformationQueries, InProgressClampsWhenOutcomesExceedAttempts) {
   c.attempts = 2;
   c.successes = 3;  // more recorded conclusions than counted attempts
   c.failures = 2;
-  const std::optional<std::uint64_t> in_progress = AssertInProgress(c);
-  ASSERT_TRUE(in_progress.has_value());
-  EXPECT_EQ(*in_progress, 0U);
+  const std::optional<std::uint64_t> kInProgress = AssertInProgress(c);
+  ASSERT_TRUE(kInProgress.has_value());
+  EXPECT_EQ(*kInProgress, 0U);
 }
 
 // C11: the in-progress identity does not apply to cover sequences.

@@ -10,7 +10,7 @@ namespace {
 
 TEST(IdentifierPreprocessor, SimpleIdentifierPassesThrough) {
   PreprocFixture f;
-  auto result = Preprocess(
+  Preprocess(
       "module t;\n"
       "  logic [7:0] abc_123;\n"
       "endmodule\n",
@@ -20,7 +20,7 @@ TEST(IdentifierPreprocessor, SimpleIdentifierPassesThrough) {
 
 TEST(IdentifierPreprocessor, IdentifierWithDollarPassesThrough) {
   PreprocFixture f;
-  auto result = Preprocess(
+  Preprocess(
       "module t;\n"
       "  logic [7:0] n$657;\n"
       "endmodule\n",
@@ -30,7 +30,7 @@ TEST(IdentifierPreprocessor, IdentifierWithDollarPassesThrough) {
 
 TEST(IdentifierPreprocessor, IdentifierStartingWithUnderscorePassesThrough) {
   PreprocFixture f;
-  auto result = Preprocess(
+  Preprocess(
       "module t;\n"
       "  logic [7:0] _bus3;\n"
       "endmodule\n",
@@ -40,7 +40,7 @@ TEST(IdentifierPreprocessor, IdentifierStartingWithUnderscorePassesThrough) {
 
 TEST(IdentifierPreprocessor, CaseSensitiveIdentifiersPassThrough) {
   PreprocFixture f;
-  auto result = Preprocess(
+  Preprocess(
       "module t;\n"
       "  logic [7:0] data, Data, DATA;\n"
       "endmodule\n",
@@ -51,7 +51,7 @@ TEST(IdentifierPreprocessor, CaseSensitiveIdentifiersPassThrough) {
 TEST(IdentifierPreprocessor, MaxLengthIdentifierPassesThrough) {
   PreprocFixture f;
   std::string long_id(1024, 'a');
-  auto result = Preprocess(
+  Preprocess(
       "module t;\n"
       "  logic [7:0] " +
           long_id +
@@ -63,7 +63,7 @@ TEST(IdentifierPreprocessor, MaxLengthIdentifierPassesThrough) {
 
 TEST(IdentifierPreprocessor, IdentifierInMacroExpansion) {
   PreprocFixture f;
-  auto result = Preprocess(
+  Preprocess(
       "`define DECL(name) logic [7:0] name\n"
       "module t;\n"
       "  `DECL(my_var_99);\n"

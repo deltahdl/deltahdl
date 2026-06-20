@@ -14,7 +14,7 @@ namespace {
 // Builds and evaluates a $sreadmem* call:
 //   task(mem, start, finish, str0, str1, ...)
 void Sreadmem(SimFixture& f, const char* task, const char* mem, int start,
-              int finish, std::vector<const char*> strings) {
+              int finish, const std::vector<const char*>& strings) {
   std::vector<Expr*> args = {MakeId(f.arena, mem),
                              MakeInt(f.arena, static_cast<uint64_t>(start)),
                              MakeInt(f.arena, static_cast<uint64_t>(finish))};

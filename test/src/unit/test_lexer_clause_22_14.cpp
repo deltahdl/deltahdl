@@ -55,7 +55,7 @@ TEST(KeywordVersionLexing, ParseKeywordVersion_Invalid) {
 TEST(KeywordVersionLexing, LookupKeyword_ReturnsKindForCurrentVersion) {
   auto result = LookupKeyword("logic", KeywordVersion::kVer18002023);
   ASSERT_TRUE(result.has_value());
-  EXPECT_EQ(*result, TokenKind::kKwLogic);
+  EXPECT_EQ(result, std::optional(TokenKind::kKwLogic));
 }
 
 TEST(KeywordVersionLexing, LookupKeyword_ReturnsNulloptForOlderVersion) {

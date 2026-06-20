@@ -124,7 +124,7 @@ TEST(Coverage, DuplicateOptionInDefinitionIsError) {
 // syntactic levels. Every instance option may be set at the covergroup level;
 // the coverpoint and cross levels accept only specific subsets.
 TEST(Coverage, InstanceOptionSyntacticLevels) {
-  const InstanceOptionKind all[] = {
+  const InstanceOptionKind kAll[] = {
       InstanceOptionKind::kName,
       InstanceOptionKind::kWeight,
       InstanceOptionKind::kGoal,
@@ -137,7 +137,7 @@ TEST(Coverage, InstanceOptionSyntacticLevels) {
       InstanceOptionKind::kPerInstance,
       InstanceOptionKind::kGetInstCoverage,
   };
-  for (InstanceOptionKind kind : all) {
+  for (InstanceOptionKind kind : kAll) {
     EXPECT_TRUE(
         CoverageDB::OptionAllowedAt(kind, CoverSyntacticLevel::kCovergroup));
   }

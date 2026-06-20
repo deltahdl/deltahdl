@@ -91,10 +91,10 @@ TEST_F(VpiFunctionAvailability, StartupCallbackReasonSetIsTheSixReasons) {
 // the six early-phase reasons.
 TEST_F(VpiFunctionAvailability, RegisterCbAcceptsEarlyReasonsInStartup) {
   vpi_ctx_.SetToolPhase(VpiToolPhase::kStartup);
-  const int reasons[] = {cbEndOfCompile,    cbStartOfSimulation,
-                         cbEndOfSimulation, cbUnresolvedSystf,
-                         cbError,           cbPLIError};
-  for (int reason : reasons) {
+  const int kReasons[] = {cbEndOfCompile,    cbStartOfSimulation,
+                          cbEndOfSimulation, cbUnresolvedSystf,
+                          cbError,           cbPLIError};
+  for (int reason : kReasons) {
     s_cb_data cb = {};
     cb.reason = reason;
     cb.cb_rtn = NoopCb;

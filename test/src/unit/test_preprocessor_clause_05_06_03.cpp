@@ -31,7 +31,7 @@ TEST(SystemNamePreprocessor, SystemFunctionPassesThroughPreprocessor) {
 
 TEST(SystemNamePreprocessor, SystemTaskInMacroExpansion) {
   PreprocFixture f;
-  auto result = Preprocess(
+  Preprocess(
       "`define LOG(msg) $display(msg)\n"
       "module t;\n"
       "  initial `LOG(\"hello\");\n"

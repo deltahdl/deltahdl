@@ -84,19 +84,19 @@ std::vector<std::string> CollectDeclOrder(
 // state and the second (ns) the next state.
 TEST(FsmSameDeclarationPragmaLexing,
      RecognizesCurrentAndNextStateSignalsInSameDeclaration) {
-  const std::string src =
+  const std::string kSrc =
       "module fsm;\n"
       "  /* tool state_vector cs */\n"
       "  logic [1:0] /* tool enum myFSM */ cs, ns, nonstate;\n"
       "endmodule\n";
 
-  auto pragmas = CollectFsmPragmas(src);
+  auto pragmas = CollectFsmPragmas(kSrc);
   ExpectCsThenMyFsmPragmas(pragmas);
 
   // The pragmas are comments: all three declared signals still lex, and they
   // appear in declaration order. The first following the enum pragma is the
   // current state (cs) and the next is the next state (ns).
-  auto decl_order = CollectDeclOrder(src, {"cs", "ns", "nonstate"});
+  auto decl_order = CollectDeclOrder(kSrc, {"cs", "ns", "nonstate"});
   ASSERT_EQ(decl_order.size(), 3u);
   EXPECT_EQ(decl_order[0], "cs");
   EXPECT_EQ(decl_order[1], "ns");
@@ -109,13 +109,13 @@ TEST(FsmSameDeclarationPragmaLexing,
 // all. The positional/ignored interpretation is left entirely to downstream
 // FSM extraction; the lexer singles out no trailing signal of its own.
 TEST(FsmSameDeclarationPragmaLexing, NothingIsAssumedAboutAdditionalSignals) {
-  const std::string src =
+  const std::string kSrc =
       "module fsm;\n"
       "  /* tool state_vector cs */\n"
       "  logic [1:0] /* tool enum myFSM */ cs, ns, nonstate;\n"
       "endmodule\n";
 
-  auto pragmas = CollectFsmPragmas(src);
+  auto pragmas = CollectFsmPragmas(kSrc);
   for (const auto& p : pragmas) {
     EXPECT_NE(p.signal, "ns");
     EXPECT_NE(p.signal, "nonstate");
@@ -134,16 +134,16 @@ TEST(FsmSameDeclarationPragmaLexing, NothingIsAssumedAboutAdditionalSignals) {
 // signal-bearing pragma (cs) and surfaces both names in declaration order.
 TEST(FsmSameDeclarationPragmaLexing,
      TwoSignalDeclarationAssignsCurrentThenNextState) {
-  const std::string src =
+  const std::string kSrc =
       "module fsm;\n"
       "  /* tool state_vector cs */\n"
       "  logic [1:0] /* tool enum myFSM */ cs, ns;\n"
       "endmodule\n";
 
-  auto pragmas = CollectFsmPragmas(src);
+  auto pragmas = CollectFsmPragmas(kSrc);
   ExpectCsThenMyFsmPragmas(pragmas);
 
-  auto decl_order = CollectDeclOrder(src, {"cs", "ns"});
+  auto decl_order = CollectDeclOrder(kSrc, {"cs", "ns"});
   ASSERT_EQ(decl_order.size(), 2u);
   EXPECT_EQ(decl_order[0], "cs");  // current state
   EXPECT_EQ(decl_order[1], "ns");  // next state
@@ -158,13 +158,13 @@ TEST(FsmSameDeclarationPragmaLexing,
 // single signal-bearing pragma (cs) and surfaces every declared signal in
 // order, leaving all trailing signals for downstream extraction to ignore.
 TEST(FsmSameDeclarationPragmaLexing, MultipleTrailingSignalsAreAllIgnored) {
-  const std::string src =
+  const std::string kSrc =
       "module fsm;\n"
       "  /* tool state_vector cs */\n"
       "  logic [1:0] /* tool enum myFSM */ cs, ns, idle, extra;\n"
       "endmodule\n";
 
-  auto pragmas = CollectFsmPragmas(src);
+  auto pragmas = CollectFsmPragmas(kSrc);
   for (const auto& p : pragmas) {
     EXPECT_NE(p.signal, "ns");
     EXPECT_NE(p.signal, "idle");
@@ -173,7 +173,7 @@ TEST(FsmSameDeclarationPragmaLexing, MultipleTrailingSignalsAreAllIgnored) {
 
   ExpectOnlyCsIsSignalBearing(pragmas);
 
-  auto decl_order = CollectDeclOrder(src, {"cs", "ns", "idle", "extra"});
+  auto decl_order = CollectDeclOrder(kSrc, {"cs", "ns", "idle", "extra"});
   ASSERT_EQ(decl_order.size(), 4u);
   EXPECT_EQ(decl_order[0], "cs");     // current state
   EXPECT_EQ(decl_order[1], "ns");     // next state

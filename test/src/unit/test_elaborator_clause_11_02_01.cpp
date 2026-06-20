@@ -99,21 +99,27 @@ TEST(ConstEvalReal, RealLiteralEvaluation) {
   EvalFixture f;
   auto val = ConstEvalReal(ParseExprFrom("3.14", f));
   ASSERT_TRUE(val.has_value());
-  EXPECT_DOUBLE_EQ(*val, 3.14);
+  if (val.has_value()) {
+    EXPECT_DOUBLE_EQ(*val, 3.14);
+  }
 }
 
 TEST(ConstEvalReal, RealBinaryEvaluation) {
   EvalFixture f;
   auto val = ConstEvalReal(ParseExprFrom("1.5 + 2.5", f));
   ASSERT_TRUE(val.has_value());
-  EXPECT_DOUBLE_EQ(*val, 4.0);
+  if (val.has_value()) {
+    EXPECT_DOUBLE_EQ(*val, 4.0);
+  }
 }
 
 TEST(ConstEvalReal, IntPromotesToReal) {
   EvalFixture f;
   auto val = ConstEvalReal(ParseExprFrom("42", f));
   ASSERT_TRUE(val.has_value());
-  EXPECT_DOUBLE_EQ(*val, 42.0);
+  if (val.has_value()) {
+    EXPECT_DOUBLE_EQ(*val, 42.0);
+  }
 }
 
 TEST(ConstEvalReal, DivisionByZeroReturnsNullopt) {

@@ -62,8 +62,8 @@ TEST(ChargeDecay, IdealStatePreservesUnknownBits) {
   val.words[0].aval = 0b1010;
   val.words[0].bval = 0b1100;
   var->value = val;
-  const uint64_t expected_aval = val.words[0].aval;
-  const uint64_t expected_bval = val.words[0].bval;
+  const uint64_t kExpectedAval = val.words[0].aval;
+  const uint64_t kExpectedBval = val.words[0].bval;
 
   Net net;
   net.type = NetType::kTrireg;
@@ -72,12 +72,12 @@ TEST(ChargeDecay, IdealStatePreservesUnknownBits) {
   net.drivers.push_back(MakeAllZ(arena, 8));
 
   net.Resolve(arena, &sched);
-  EXPECT_EQ(var->value.words[0].aval, expected_aval);
-  EXPECT_EQ(var->value.words[0].bval, expected_bval);
+  EXPECT_EQ(var->value.words[0].aval, kExpectedAval);
+  EXPECT_EQ(var->value.words[0].bval, kExpectedBval);
 
   net.Resolve(arena, &sched);
-  EXPECT_EQ(var->value.words[0].aval, expected_aval);
-  EXPECT_EQ(var->value.words[0].bval, expected_bval);
+  EXPECT_EQ(var->value.words[0].aval, kExpectedAval);
+  EXPECT_EQ(var->value.words[0].bval, kExpectedBval);
 
   EXPECT_FALSE(sched.HasEvents());
 }

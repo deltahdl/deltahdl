@@ -100,18 +100,21 @@ TEST(PropertySpecModel, NexttimeOperandOrderAndConstantOmission) {
   VpiObject prop;
   VpiObject k;
 
-  auto with_constant = VpiNexttimeOperands(&prop, &k, /*differs=*/true);
+  auto with_constant =
+      VpiNexttimeOperands(&prop, &k, /*constant_differs_from_one=*/true);
   ASSERT_EQ(with_constant.size(), 2u);
   EXPECT_EQ(with_constant[0], &prop);
   EXPECT_EQ(with_constant[1], &k);
 
   // A constant equal to 1 is omitted, leaving just the property.
-  auto unit_constant = VpiNexttimeOperands(&prop, &k, /*differs=*/false);
+  auto unit_constant =
+      VpiNexttimeOperands(&prop, &k, /*constant_differs_from_one=*/false);
   ASSERT_EQ(unit_constant.size(), 1u);
   EXPECT_EQ(unit_constant[0], &prop);
 
   // No constant supplied at all -> just the property.
-  auto no_constant = VpiNexttimeOperands(&prop, nullptr, /*differs=*/true);
+  auto no_constant =
+      VpiNexttimeOperands(&prop, nullptr, /*constant_differs_from_one=*/true);
   ASSERT_EQ(no_constant.size(), 1u);
   EXPECT_EQ(no_constant[0], &prop);
 }

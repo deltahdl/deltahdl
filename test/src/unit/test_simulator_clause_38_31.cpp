@@ -67,10 +67,10 @@ using VpiPutDataSim = VpiSaveRestoreSim;
 // shall be the number of bytes written. The bytes are observed by reading them
 // back with vpi_get_data() under a restart reason.
 TEST_F(VpiPutDataSim, WritesDataInsideStartOfSave) {
-  const char payload[] = {'D', 'e', 'l', 't', 'a'};
+  const char kPayload[] = {'D', 'e', 'l', 't', 'a'};
   SingleWrite w;
   w.id = 42;
-  w.data = payload;
+  w.data = kPayload;
   w.len = 5;
   DispatchWith(cbStartOfSave, WriteOnceCb, &w);
 
@@ -83,15 +83,15 @@ TEST_F(VpiPutDataSim, WritesDataInsideStartOfSave) {
   r.request = 5;
   DispatchWith(cbStartOfRestart, ReadOnceCb, &r);
   EXPECT_EQ(r.returned, 5);
-  EXPECT_EQ(0, std::memcmp(r.buf, payload, 5));
+  EXPECT_EQ(0, std::memcmp(r.buf, kPayload, 5));
 }
 
 // §38.31 C6: the routine is equally legal from a cbEndOfSave routine.
 TEST_F(VpiPutDataSim, WritesDataInsideEndOfSave) {
-  const char payload[] = {'X', 'Y', 'Z'};
+  const char kPayload[] = {'X', 'Y', 'Z'};
   SingleWrite w;
   w.id = 7;
-  w.data = payload;
+  w.data = kPayload;
   w.len = 3;
   DispatchWith(cbEndOfSave, WriteOnceCb, &w);
 
@@ -103,8 +103,9 @@ TEST_F(VpiPutDataSim, WritesDataInsideEndOfSave) {
 // routine. Called from any other context it fails (an error is detected) and
 // per C3 a failure returns zero.
 TEST_F(VpiPutDataSim, RejectedOutsideSaveCallback) {
-  const char payload[] = {'a', 'b', 'c', 'd'};
-  int returned = vpi_put_data(1, const_cast<char*>(payload), 4);  // no callback
+  const char kPayload[] = {'a', 'b', 'c', 'd'};
+  int returned =
+      vpi_put_data(1, const_cast<char*>(kPayload), 4);  // no callback
 
   EXPECT_EQ(returned, 0);
   EXPECT_EQ(vpi_ctx_.LastError().level, kVpiError);
@@ -123,10 +124,10 @@ TEST_F(VpiPutDataSim, RejectedOutsideSaveCallback) {
 // reject it, distinguishing "a save callback is running" from merely "some
 // callback is running". Per C3 the rejection returns zero.
 TEST_F(VpiPutDataSim, RejectedInsideNonSaveCallback) {
-  const char payload[] = {'w', 'x', 'y', 'z'};
+  const char kPayload[] = {'w', 'x', 'y', 'z'};
   SingleWrite w;
   w.id = 21;
-  w.data = payload;
+  w.data = kPayload;
   w.len = 4;
   DispatchWith(cbStartOfRestart, WriteOnceCb, &w);
 
@@ -144,10 +145,10 @@ TEST_F(VpiPutDataSim, RejectedInsideNonSaveCallback) {
 // §38.31 C1+C3: numOfBytes shall be greater than zero. A non-positive count is
 // a detected error and returns zero.
 TEST_F(VpiPutDataSim, NonPositiveCountReturnsZero) {
-  const char payload[] = {'q'};
+  const char kPayload[] = {'q'};
   SingleWrite w;
   w.id = 5;
-  w.data = payload;
+  w.data = kPayload;
   w.len = 0;  // not greater than zero
   DispatchWith(cbStartOfSave, WriteOnceCb, &w);
 
@@ -172,17 +173,17 @@ TEST_F(VpiPutDataSim, NullSourceReturnsZero) {
 // to one id are interleaved with a write to another; each succeeds and reports
 // its own byte count.
 TEST_F(VpiPutDataSim, RepeatedAndInterleavedWritesAreUnrestricted) {
-  const char a1[] = {'0', '1'};
-  const char b[] = {'!', '?'};
-  const char a2[] = {'2', '3', '4'};
+  const char kA1[] = {'0', '1'};
+  const char kB[] = {'!', '?'};
+  const char kA2[] = {'2', '3', '4'};
   MultiWrite w;
   w.id_a = 9;
   w.id_b = 10;
-  w.a1 = a1;
+  w.a1 = kA1;
   w.a1_len = 2;
-  w.b = b;
+  w.b = kB;
   w.b_len = 2;
-  w.a2 = a2;
+  w.a2 = kA2;
   w.a2_len = 3;
   DispatchWith(cbStartOfSave, WriteInterleavedCb, &w);
 
@@ -205,16 +206,16 @@ TEST_F(VpiPutDataSim, RepeatedAndInterleavedWritesAreUnrestricted) {
 // writes establish six bytes, retrieved as a 2-byte chunk followed by a 4-byte
 // chunk that crosses the boundary between the two writes.
 TEST_F(VpiPutDataSim, MultipleWritesReadBackInDifferentChunkSizes) {
-  const char first[] = {'A', 'B', 'C'};
-  const char second[] = {'D', 'E', 'F'};
+  const char kFirst[] = {'A', 'B', 'C'};
+  const char kSecond[] = {'D', 'E', 'F'};
   SingleWrite w1;
   w1.id = 3;
-  w1.data = first;
+  w1.data = kFirst;
   w1.len = 3;
   DispatchWith(cbStartOfSave, WriteOnceCb, &w1);
   SingleWrite w2;
   w2.id = 3;
-  w2.data = second;
+  w2.data = kSecond;
   w2.len = 3;
   DispatchWith(cbStartOfSave, WriteOnceCb, &w2);
 

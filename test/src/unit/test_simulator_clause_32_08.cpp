@@ -69,7 +69,8 @@ TEST(SdfExpand, ThreeValuesAddTurnoffAndDirectXSlots) {
 // derived from min/max pairings of the six supplied values.
 TEST(SdfExpand, SixValuesPopulateNonXSlotsAndDeriveXFromMinMax) {
   std::vector<SdfDelayValue> vals(6);
-  for (int i = 0; i < 6; ++i) vals[i].typ_val = (i + 1) * 10;
+  for (int i = 0; i < 6; ++i)
+    vals[i].typ_val = static_cast<uint64_t>(i + 1) * 10;
   auto out = ExpandSdfDelays(vals, SdfMtm::kTypical);
   ASSERT_EQ(out.size(), 12u);
   EXPECT_EQ(out[0], 10u);
@@ -90,7 +91,8 @@ TEST(SdfExpand, SixValuesPopulateNonXSlotsAndDeriveXFromMinMax) {
 // across with no derivation.
 TEST(SdfExpand, TwelveValuesCopyDirectly) {
   std::vector<SdfDelayValue> vals(12);
-  for (int i = 0; i < 12; ++i) vals[i].typ_val = (i + 1) * 7;
+  for (int i = 0; i < 12; ++i)
+    vals[i].typ_val = static_cast<uint64_t>(i + 1) * 7;
   auto out = ExpandSdfDelays(vals, SdfMtm::kTypical);
   ASSERT_EQ(out.size(), 12u);
   for (int i = 0; i < 12; ++i) EXPECT_EQ(out[i], (uint64_t)((i + 1) * 7));

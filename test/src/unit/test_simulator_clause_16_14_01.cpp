@@ -10,18 +10,22 @@ namespace {
 // §16.14.1: a true property runs the pass statements, a false property runs the
 // fail statements, and a disabled property runs no action_block statement.
 TEST(AssertStatement, ActionBlockChoiceFollowsPropertyOutcome) {
-  EXPECT_EQ(SelectAssertActionBlock(/*passed=*/true, /*disabled=*/false),
+  EXPECT_EQ(SelectAssertActionBlock(/*property_passed=*/true,
+                                    /*property_disabled=*/false),
             AssertActionBlockChoice::kPass);
-  EXPECT_EQ(SelectAssertActionBlock(/*passed=*/false, /*disabled=*/false),
+  EXPECT_EQ(SelectAssertActionBlock(/*property_passed=*/false,
+                                    /*property_disabled=*/false),
             AssertActionBlockChoice::kFail);
-  EXPECT_EQ(SelectAssertActionBlock(/*passed=*/false, /*disabled=*/true),
+  EXPECT_EQ(SelectAssertActionBlock(/*property_passed=*/false,
+                                    /*property_disabled=*/true),
             AssertActionBlockChoice::kNone);
 }
 
 // §16.14.1: a disabled evaluation suppresses the action_block even when the
 // property would otherwise be considered to pass.
 TEST(AssertStatement, DisabledTakesPrecedenceOverPass) {
-  EXPECT_EQ(SelectAssertActionBlock(/*passed=*/true, /*disabled=*/true),
+  EXPECT_EQ(SelectAssertActionBlock(/*property_passed=*/true,
+                                    /*property_disabled=*/true),
             AssertActionBlockChoice::kNone);
 }
 
@@ -29,16 +33,16 @@ TEST(AssertStatement, DisabledTakesPrecedenceOverPass) {
 // action control tasks; a disabled pass or fail action drops the branch.
 TEST(AssertStatement, ActionControlSuppressesSelectedBranch) {
   EXPECT_EQ(ResolveAssertActionUnderControl(AssertActionBlockChoice::kPass,
-                                            /*pass_enabled=*/false,
-                                            /*fail_enabled=*/true),
+                                            /*pass_action_enabled=*/false,
+                                            /*fail_action_enabled=*/true),
             AssertActionBlockChoice::kNone);
   EXPECT_EQ(ResolveAssertActionUnderControl(AssertActionBlockChoice::kFail,
-                                            /*pass_enabled=*/true,
-                                            /*fail_enabled=*/false),
+                                            /*pass_action_enabled=*/true,
+                                            /*fail_action_enabled=*/false),
             AssertActionBlockChoice::kNone);
   EXPECT_EQ(ResolveAssertActionUnderControl(AssertActionBlockChoice::kFail,
-                                            /*pass_enabled=*/true,
-                                            /*fail_enabled=*/true),
+                                            /*pass_action_enabled=*/true,
+                                            /*fail_action_enabled=*/true),
             AssertActionBlockChoice::kFail);
 }
 
@@ -48,8 +52,8 @@ TEST(AssertStatement, DefaultErrorOnFailureUnlessSuppressed) {
   DeferredAssertion da;
   da.condition_val = 0;        // the property failed
   da.has_else_clause = false;  // no explicit else action
-  EXPECT_TRUE(CallsDefaultErrorOnFailure(da, /*fail_enabled=*/true));
-  EXPECT_FALSE(CallsDefaultErrorOnFailure(da, /*fail_enabled=*/false));
+  EXPECT_TRUE(CallsDefaultErrorOnFailure(da, /*fail_action_enabled=*/true));
+  EXPECT_FALSE(CallsDefaultErrorOnFailure(da, /*fail_action_enabled=*/false));
 }
 
 // §16.14.1: a present else clause supplies the fail action, so the default
@@ -58,7 +62,7 @@ TEST(AssertStatement, NoDefaultErrorWhenElseClausePresent) {
   DeferredAssertion da;
   da.condition_val = 0;
   da.has_else_clause = true;
-  EXPECT_FALSE(CallsDefaultErrorOnFailure(da, /*fail_enabled=*/true));
+  EXPECT_FALSE(CallsDefaultErrorOnFailure(da, /*fail_action_enabled=*/true));
 }
 
 // §16.14.1: the default severity of a concurrent assertion action block is
@@ -77,8 +81,8 @@ TEST(AssertStatement, ActionExecutesInReactiveRegion) {
 // stays kNone regardless of the pass/fail enables.
 TEST(AssertStatement, ControlDoesNotResurrectDisabledAction) {
   EXPECT_EQ(ResolveAssertActionUnderControl(AssertActionBlockChoice::kNone,
-                                            /*pass_enabled=*/true,
-                                            /*fail_enabled=*/true),
+                                            /*pass_action_enabled=*/true,
+                                            /*fail_action_enabled=*/true),
             AssertActionBlockChoice::kNone);
 }
 
@@ -88,7 +92,7 @@ TEST(AssertStatement, NoDefaultErrorWhenPropertyPasses) {
   DeferredAssertion da;
   da.condition_val = 1;  // the property held
   da.has_else_clause = false;
-  EXPECT_FALSE(CallsDefaultErrorOnFailure(da, /*fail_enabled=*/true));
+  EXPECT_FALSE(CallsDefaultErrorOnFailure(da, /*fail_action_enabled=*/true));
 }
 
 // §16.14.1: a cover statement has no fail action, so the default $error
@@ -98,7 +102,7 @@ TEST(AssertStatement, NoDefaultErrorForCover) {
   da.condition_val = 0;
   da.has_else_clause = false;
   da.kind = AssertionKind::kCover;
-  EXPECT_FALSE(CallsDefaultErrorOnFailure(da, /*fail_enabled=*/true));
+  EXPECT_FALSE(CallsDefaultErrorOnFailure(da, /*fail_action_enabled=*/true));
 }
 
 }  // namespace

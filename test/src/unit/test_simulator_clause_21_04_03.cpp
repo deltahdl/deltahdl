@@ -58,7 +58,7 @@ void SetupMultiMem(SimFixture& f, const char* name, std::vector<Dim> dims,
 }
 
 // Looks up an element by its list of subscripts.
-Variable* MCell(SimFixture& f, const char* name, std::vector<int> idx) {
+Variable* MCell(SimFixture& f, const char* name, const std::vector<int>& idx) {
   std::string nm = name;
   for (int i : idx) nm += "[" + std::to_string(i) + "]";
   return f.ctx.FindVariable(nm);

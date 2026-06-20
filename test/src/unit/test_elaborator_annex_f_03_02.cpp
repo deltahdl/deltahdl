@@ -39,9 +39,9 @@ TEST(AbstractGrammar, ClockedSequenceProductionForms) {
 // §F.3.2: the clock form of S is @( b ) R -- a Boolean guard over an unclocked
 // sequence.
 TEST(AbstractGrammar, ClockedSequenceClockFormOperands) {
-  const auto forms = ProductionForms(GrammarProduction::kClockedSequence);
-  ASSERT_FALSE(forms.empty());
-  EXPECT_EQ(forms.front().operands, (std::vector<std::string>{"b", "R"}));
+  const auto kForms = ProductionForms(GrammarProduction::kClockedSequence);
+  ASSERT_FALSE(kForms.empty());
+  EXPECT_EQ(kForms.front().operands, (std::vector<std::string>{"b", "R"}));
 }
 
 // §F.3.2: the unclocked property production P opens with the strong and weak
@@ -57,9 +57,9 @@ TEST(AbstractGrammar, UnclockedPropertyProductionForms) {
 // §F.3.2: the implication form of P is ( R |-> P ): an unclocked sequence
 // antecedent and an unclocked property consequent.
 TEST(AbstractGrammar, UnclockedPropertyImplicationOperands) {
-  const auto forms = ProductionForms(GrammarProduction::kUnclockedProperty);
+  const auto kForms = ProductionForms(GrammarProduction::kUnclockedProperty);
   bool found = false;
-  for (const auto& form : forms) {
+  for (const auto& form : kForms) {
     if (form.label == "implication") {
       found = true;
       EXPECT_EQ(form.operands, (std::vector<std::string>{"R", "P"}));
@@ -108,20 +108,34 @@ TEST(AbstractGrammar, AssertionProductionForms) {
 // production carries exactly the category §F.3.3 assigns to its letter. This
 // ties the abstract grammar to the notation that describes it.
 TEST(AbstractGrammar, ProductionCategoriesMatchNotation) {
+  const auto r_category = ClassifyAnnexFNotation("R");
+  ASSERT_TRUE(r_category.has_value());
   EXPECT_EQ(CategoryOfProduction(GrammarProduction::kUnclockedSequence),
-            ClassifyAnnexFNotation("R").value());
+            r_category.value());
+  const auto s_category = ClassifyAnnexFNotation("S");
+  ASSERT_TRUE(s_category.has_value());
   EXPECT_EQ(CategoryOfProduction(GrammarProduction::kClockedSequence),
-            ClassifyAnnexFNotation("S").value());
+            s_category.value());
+  const auto p_category = ClassifyAnnexFNotation("P");
+  ASSERT_TRUE(p_category.has_value());
   EXPECT_EQ(CategoryOfProduction(GrammarProduction::kUnclockedProperty),
-            ClassifyAnnexFNotation("P").value());
+            p_category.value());
+  const auto q_category = ClassifyAnnexFNotation("Q");
+  ASSERT_TRUE(q_category.has_value());
   EXPECT_EQ(CategoryOfProduction(GrammarProduction::kClockedProperty),
-            ClassifyAnnexFNotation("Q").value());
+            q_category.value());
+  const auto t_category = ClassifyAnnexFNotation("T");
+  ASSERT_TRUE(t_category.has_value());
   EXPECT_EQ(CategoryOfProduction(GrammarProduction::kUnclockedTopLevelProperty),
-            ClassifyAnnexFNotation("T").value());
+            t_category.value());
+  const auto u_category = ClassifyAnnexFNotation("U");
+  ASSERT_TRUE(u_category.has_value());
   EXPECT_EQ(CategoryOfProduction(GrammarProduction::kClockedTopLevelProperty),
-            ClassifyAnnexFNotation("U").value());
+            u_category.value());
+  const auto a_category = ClassifyAnnexFNotation("A");
+  ASSERT_TRUE(a_category.has_value());
   EXPECT_EQ(CategoryOfProduction(GrammarProduction::kAssertion),
-            ClassifyAnnexFNotation("A").value());
+            a_category.value());
 }
 
 // §F.3.2: each R form is representable in the shared sequence model and keeps

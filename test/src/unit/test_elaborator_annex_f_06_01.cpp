@@ -21,12 +21,12 @@ namespace {
 // ending at j=1 is triggered there, with the empty context flowing through.
 TEST(ExtendedBooleans, TriggeredHoldsWhenASubwordEndingAtJMatches) {
   auto seq = SeqConcat(Bool("a"), Bool("b"));
-  const Word word{A({"a"}), A({"b"})};
+  const Word kWord{A({"a"}), A({"b"})};
   EXPECT_TRUE(SameContexts(
-      TriggeredOutputs(word, /*j=*/1, *seq, NameSet{}, LocalContext{}),
+      TriggeredOutputs(kWord, /*j=*/1, *seq, NameSet{}, LocalContext{}),
       {LocalContext{}}));
-  EXPECT_TRUE(TriggeredSatisfies(word, /*j=*/1, *seq, NameSet{}, LocalContext{},
-                                 LocalContext{}));
+  EXPECT_TRUE(TriggeredSatisfies(kWord, /*j=*/1, *seq, NameSet{},
+                                 LocalContext{}, LocalContext{}));
 }
 
 // §F.6.1 (triggered): the start point i is existential -- triggered looks for
@@ -34,13 +34,13 @@ TEST(ExtendedBooleans, TriggeredHoldsWhenASubwordEndingAtJMatches) {
 // only at the point it holds, not earlier.
 TEST(ExtendedBooleans, TriggeredSearchesEveryStartPoint) {
   auto seq = Bool("a");
-  const Word word{A({}), A({"a"})};
+  const Word kWord{A({}), A({"a"})};
   // Ends at j=1 with the start point i=1; the empty leading letter is skipped.
-  EXPECT_TRUE(TriggeredSatisfies(word, /*j=*/1, *seq, NameSet{}, LocalContext{},
-                                 LocalContext{}));
+  EXPECT_TRUE(TriggeredSatisfies(kWord, /*j=*/1, *seq, NameSet{},
+                                 LocalContext{}, LocalContext{}));
   // No subword ending at j=0 satisfies a, since w^0 does not.
-  EXPECT_TRUE(
-      TriggeredOutputs(word, /*j=*/0, *seq, NameSet{}, LocalContext{}).empty());
+  EXPECT_TRUE(TriggeredOutputs(kWord, /*j=*/0, *seq, NameSet{}, LocalContext{})
+                  .empty());
 }
 
 // §F.6.1 (triggered): L_1 = L_0|_D U L|_V. A name sampled by T that is not
@@ -48,22 +48,22 @@ TEST(ExtendedBooleans, TriggeredSearchesEveryStartPoint) {
 // name in L_0 is preserved.
 TEST(ExtendedBooleans, TriggeredDropsLocalsNotPassedAsActuals) {
   auto seq = Samp("v");
-  const Word word{A({"x"})};
-  const LocalContext input{{"u", A({"z"})}};
+  const Word kWord{A({"x"})};
+  const LocalContext kInput{{"u", A({"z"})}};
   // V = {}: the sampled v is discarded; the incoming u survives.
   EXPECT_TRUE(SameContexts(
-      TriggeredOutputs(word, /*j=*/0, *seq, NameSet{}, input), {input}));
+      TriggeredOutputs(kWord, /*j=*/0, *seq, NameSet{}, kInput), {kInput}));
 }
 
 // §F.6.1 (triggered): a name in the actual arguments V flows back out, carrying
 // the value the body sampled, alongside the preserved incoming names.
 TEST(ExtendedBooleans, TriggeredFlowsActualArgumentsBackOut) {
   auto seq = Samp("v");
-  const Word word{A({"x"})};
-  const LocalContext input{{"u", A({"z"})}};
+  const Word kWord{A({"x"})};
+  const LocalContext kInput{{"u", A({"z"})}};
   // V = {v}: v escapes bound to the observed letter; u is still kept.
   EXPECT_TRUE(
-      SameContexts(TriggeredOutputs(word, /*j=*/0, *seq, NameSet{"v"}, input),
+      SameContexts(TriggeredOutputs(kWord, /*j=*/0, *seq, NameSet{"v"}, kInput),
                    {LocalContext{{"u", A({"z"})}, {"v", A({"x"})}}}));
 }
 
@@ -72,12 +72,12 @@ TEST(ExtendedBooleans, TriggeredFlowsActualArgumentsBackOut) {
 // than colliding with it.
 TEST(ExtendedBooleans, TriggeredOverwritesIncomingNameAlsoSampled) {
   auto seq = Samp("v");
-  const Word word{A({"x"})};
-  const LocalContext input{{"v", A({"old"})}};
+  const Word kWord{A({"x"})};
+  const LocalContext kInput{{"v", A({"old"})}};
   // v is both incoming and sampled, and passed as an actual: D excludes v, so
   // only the new binding remains.
   EXPECT_TRUE(
-      SameContexts(TriggeredOutputs(word, /*j=*/0, *seq, NameSet{"v"}, input),
+      SameContexts(TriggeredOutputs(kWord, /*j=*/0, *seq, NameSet{"v"}, kInput),
                    {LocalContext{{"v", A({"x"})}}}));
 }
 
@@ -86,11 +86,11 @@ TEST(ExtendedBooleans, TriggeredOverwritesIncomingNameAlsoSampled) {
 // in D.
 TEST(ExtendedBooleans, TriggeredKeepsIncomingNameWhenNotAnActual) {
   auto seq = Samp("v");
-  const Word word{A({"x"})};
-  const LocalContext input{{"v", A({"old"})}};
+  const Word kWord{A({"x"})};
+  const LocalContext kInput{{"v", A({"old"})}};
   // V = {}: dom(L) & V is empty, so D keeps v and the incoming value survives.
   EXPECT_TRUE(
-      SameContexts(TriggeredOutputs(word, /*j=*/0, *seq, NameSet{}, input),
+      SameContexts(TriggeredOutputs(kWord, /*j=*/0, *seq, NameSet{}, kInput),
                    {LocalContext{{"v", A({"old"})}}}));
 }
 
@@ -98,9 +98,9 @@ TEST(ExtendedBooleans, TriggeredKeepsIncomingNameWhenNotAnActual) {
 // the end of the word yields no output context.
 TEST(ExtendedBooleans, TriggeredRejectsOutOfRangePoint) {
   auto seq = Bool("a");
-  const Word word{A({"a"})};
-  EXPECT_TRUE(
-      TriggeredOutputs(word, /*j=*/1, *seq, NameSet{}, LocalContext{}).empty());
+  const Word kWord{A({"a"})};
+  EXPECT_TRUE(TriggeredOutputs(kWord, /*j=*/1, *seq, NameSet{}, LocalContext{})
+                  .empty());
 }
 
 // §F.6.1 (matched): @(c)(T(V).matched) holds at j when T is triggered at an
@@ -109,8 +109,8 @@ TEST(ExtendedBooleans, TriggeredRejectsOutOfRangePoint) {
 TEST(ExtendedBooleans, MatchedHoldsWhenClockTicksOnceAfterTrigger) {
   auto seq = Bool("a");
   auto clk = BoolAtom("clk");
-  const Word word{A({"a"}), A({}), A({"clk"})};
-  EXPECT_TRUE(MatchedSatisfies(word, /*j=*/2, *seq, NameSet{}, clk,
+  const Word kWord{A({"a"}), A({}), A({"clk"})};
+  EXPECT_TRUE(MatchedSatisfies(kWord, /*j=*/2, *seq, NameSet{}, clk,
                                LocalContext{}, LocalContext{}));
 }
 
@@ -120,9 +120,9 @@ TEST(ExtendedBooleans, MatchedRejectsClockTickBeforeJ) {
   auto seq = Bool("a");
   auto clk = BoolAtom("clk");
   // a triggers at i=0, but clk ticks at point 1, before j=2.
-  const Word word{A({"a"}), A({"clk"}), A({"clk"})};
+  const Word kWord{A({"a"}), A({"clk"}), A({"clk"})};
   EXPECT_TRUE(
-      MatchedOutputs(word, /*j=*/2, *seq, NameSet{}, clk, LocalContext{})
+      MatchedOutputs(kWord, /*j=*/2, *seq, NameSet{}, clk, LocalContext{})
           .empty());
 }
 
@@ -131,9 +131,9 @@ TEST(ExtendedBooleans, MatchedRejectsClockTickBeforeJ) {
 TEST(ExtendedBooleans, MatchedRequiresAStrictlyEarlierTrigger) {
   auto seq = Bool("a");
   auto clk = BoolAtom("clk");
-  const Word word{A({"a"})};
+  const Word kWord{A({"a"})};
   EXPECT_TRUE(
-      MatchedOutputs(word, /*j=*/0, *seq, NameSet{}, clk, LocalContext{})
+      MatchedOutputs(kWord, /*j=*/0, *seq, NameSet{}, clk, LocalContext{})
           .empty());
 }
 
@@ -143,8 +143,8 @@ TEST(ExtendedBooleans, MatchedAllowsAdjacentTriggerAndTick) {
   auto seq = Bool("a");
   auto clk = BoolAtom("clk");
   // a triggers at i=0; the gap is the single letter w^1, which carries clk.
-  const Word word{A({"a"}), A({"clk"})};
-  EXPECT_TRUE(MatchedSatisfies(word, /*j=*/1, *seq, NameSet{}, clk,
+  const Word kWord{A({"a"}), A({"clk"})};
+  EXPECT_TRUE(MatchedSatisfies(kWord, /*j=*/1, *seq, NameSet{}, clk,
                                LocalContext{}, LocalContext{}));
 }
 
@@ -155,13 +155,13 @@ TEST(ExtendedBooleans, MatchedCarriesTheTriggeredOutputContext) {
   auto seq = Samp("v");
   auto clk = BoolAtom("clk");
   // v is sampled at i=0; clk ticks once at j=1.
-  const Word word{A({"x"}), A({"clk"})};
+  const Word kWord{A({"x"}), A({"clk"})};
   EXPECT_TRUE(SameContexts(
-      MatchedOutputs(word, /*j=*/1, *seq, NameSet{"v"}, clk, LocalContext{}),
+      MatchedOutputs(kWord, /*j=*/1, *seq, NameSet{"v"}, clk, LocalContext{}),
       {LocalContext{{"v", A({"x"})}}}));
   // Without v among the actuals the sampled value does not escape.
   EXPECT_TRUE(SameContexts(
-      MatchedOutputs(word, /*j=*/1, *seq, NameSet{}, clk, LocalContext{}),
+      MatchedOutputs(kWord, /*j=*/1, *seq, NameSet{}, clk, LocalContext{}),
       {LocalContext{}}));
 }
 
@@ -170,14 +170,14 @@ TEST(ExtendedBooleans, MatchedCarriesTheTriggeredOutputContext) {
 // other -- a wrong value bound to v, or a context that drops v entirely.
 TEST(ExtendedBooleans, TriggeredPredicateRejectsWrongOutputContext) {
   auto seq = Samp("v");
-  const Word word{A({"x"})};
-  EXPECT_TRUE(TriggeredSatisfies(word, /*j=*/0, *seq, NameSet{"v"},
+  const Word kWord{A({"x"})};
+  EXPECT_TRUE(TriggeredSatisfies(kWord, /*j=*/0, *seq, NameSet{"v"},
                                  LocalContext{},
                                  LocalContext{{"v", A({"x"})}}));
-  EXPECT_FALSE(TriggeredSatisfies(word, /*j=*/0, *seq, NameSet{"v"},
+  EXPECT_FALSE(TriggeredSatisfies(kWord, /*j=*/0, *seq, NameSet{"v"},
                                   LocalContext{},
                                   LocalContext{{"v", A({"y"})}}));
-  EXPECT_FALSE(TriggeredSatisfies(word, /*j=*/0, *seq, NameSet{"v"},
+  EXPECT_FALSE(TriggeredSatisfies(kWord, /*j=*/0, *seq, NameSet{"v"},
                                   LocalContext{}, LocalContext{}));
 }
 
@@ -186,9 +186,9 @@ TEST(ExtendedBooleans, TriggeredPredicateRejectsWrongOutputContext) {
 TEST(ExtendedBooleans, MatchedRejectsOutOfRangePoint) {
   auto seq = Bool("a");
   auto clk = BoolAtom("clk");
-  const Word word{A({"a"}), A({"clk"})};
+  const Word kWord{A({"a"}), A({"clk"})};
   EXPECT_TRUE(
-      MatchedOutputs(word, /*j=*/2, *seq, NameSet{}, clk, LocalContext{})
+      MatchedOutputs(kWord, /*j=*/2, *seq, NameSet{}, clk, LocalContext{})
           .empty());
 }
 
@@ -199,9 +199,9 @@ TEST(ExtendedBooleans, MatchedRequiresTriggerNotJustClock) {
   auto seq = Bool("a");
   auto clk = BoolAtom("clk");
   // clk ticks once at j=1, but a never triggers at i=0 (w^0 lacks a).
-  const Word word{A({}), A({"clk"})};
+  const Word kWord{A({}), A({"clk"})};
   EXPECT_TRUE(
-      MatchedOutputs(word, /*j=*/1, *seq, NameSet{}, clk, LocalContext{})
+      MatchedOutputs(kWord, /*j=*/1, *seq, NameSet{}, clk, LocalContext{})
           .empty());
 }
 

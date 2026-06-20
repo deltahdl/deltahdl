@@ -91,8 +91,8 @@ TEST(SysTask, TimeIs64BitNotTruncatedTo32) {
   SysTaskFixture f;
   f.ctx.SetGlobalPrecision(TimeUnit::kNs);
   f.ctx.SetCurrentTimeScale(TimeScale{TimeUnit::kNs, 1, TimeUnit::kNs, 1});
-  constexpr uint64_t big = (uint64_t{1} << 32) + 1u;  // 0x1_0000_0001
-  EXPECT_EQ(TimeAtTick(f, big), big);
+  constexpr uint64_t kBig = (uint64_t{1} << 32) + 1u;  // 0x1_0000_0001
+  EXPECT_EQ(TimeAtTick(f, kBig), kBig);
 }
 
 // §20.3.1 (edge case for scaling beyond a single decade): a microsecond unit

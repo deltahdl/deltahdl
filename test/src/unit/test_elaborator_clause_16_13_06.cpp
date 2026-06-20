@@ -126,14 +126,14 @@ TEST(SequenceMethods, EmptyMatchDoesNotActivateMethods) {
 // by the use of triggered.
 TEST(SequenceMethods, TriggeredDependenciesMustBeAcyclic) {
   // a -> b -> c is a legal chain.
-  const std::vector<std::pair<int, int>> chain = {{0, 1}, {1, 2}};
-  EXPECT_TRUE(TriggeredSequenceDependenciesAreAcyclic(3, chain));
+  const std::vector<std::pair<int, int>> kChain = {{0, 1}, {1, 2}};
+  EXPECT_TRUE(TriggeredSequenceDependenciesAreAcyclic(3, kChain));
   // a -> b -> a closes a cycle and is illegal.
-  const std::vector<std::pair<int, int>> cycle = {{0, 1}, {1, 0}};
-  EXPECT_FALSE(TriggeredSequenceDependenciesAreAcyclic(2, cycle));
+  const std::vector<std::pair<int, int>> kCycle = {{0, 1}, {1, 0}};
+  EXPECT_FALSE(TriggeredSequenceDependenciesAreAcyclic(2, kCycle));
   // A self-dependency is also a cycle.
-  const std::vector<std::pair<int, int>> self_loop = {{0, 0}};
-  EXPECT_FALSE(TriggeredSequenceDependenciesAreAcyclic(1, self_loop));
+  const std::vector<std::pair<int, int>> kSelfLoop = {{0, 0}};
+  EXPECT_FALSE(TriggeredSequenceDependenciesAreAcyclic(1, kSelfLoop));
 }
 
 // §16.13.6 (edge cases): the circularity check follows dependency chains of any
@@ -141,13 +141,13 @@ TEST(SequenceMethods, TriggeredDependenciesMustBeAcyclic) {
 TEST(SequenceMethods,
      TriggeredDependencyCycleDetectionHandlesChainsAndDiamonds) {
   // A longer cycle a -> b -> c -> a is still illegal.
-  const std::vector<std::pair<int, int>> long_cycle = {{0, 1}, {1, 2}, {2, 0}};
-  EXPECT_FALSE(TriggeredSequenceDependenciesAreAcyclic(3, long_cycle));
+  const std::vector<std::pair<int, int>> kLongCycle = {{0, 1}, {1, 2}, {2, 0}};
+  EXPECT_FALSE(TriggeredSequenceDependenciesAreAcyclic(3, kLongCycle));
   // A diamond a -> b, a -> c, b -> d, c -> d reaches d by two paths but has no
   // cycle, so it is legal.
-  const std::vector<std::pair<int, int>> diamond = {
+  const std::vector<std::pair<int, int>> kDiamond = {
       {0, 1}, {0, 2}, {1, 3}, {2, 3}};
-  EXPECT_TRUE(TriggeredSequenceDependenciesAreAcyclic(4, diamond));
+  EXPECT_TRUE(TriggeredSequenceDependenciesAreAcyclic(4, kDiamond));
   // No dependencies at all is trivially acyclic.
   EXPECT_TRUE(TriggeredSequenceDependenciesAreAcyclic(3, {}));
 }

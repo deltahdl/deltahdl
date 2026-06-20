@@ -13,7 +13,7 @@ namespace {
 constexpr const char* kA = "top.a1";
 constexpr const char* kB = "top.a2";
 
-auto NoopCb = [](const AssertionCallbackArgs&) {};
+auto noop_cb = [](const AssertionCallbackArgs&) {};
 
 // §39.4.2: the assertion callback reasons are all defined, distinct, and
 // recognized as assertion callback reasons.
@@ -75,7 +75,7 @@ TEST(AssertionCallback, ApiSurfaceMatchesPrototype) {
 TEST(AssertionCallback, PlaceReturnsHandleAndRemovesByHandle) {
   AssertionApi api;
   AssertionCallbackHandle h = api.PlaceAssertionCallback(
-      cbAssertionStart, kA, vpiAssert, NoopCb, nullptr);
+      cbAssertionStart, kA, vpiAssert, noop_cb, nullptr);
   EXPECT_NE(h, 0u);
   EXPECT_EQ(api.PlacedCallbackCount(), 1u);
 
@@ -85,7 +85,7 @@ TEST(AssertionCallback, PlaceReturnsHandleAndRemovesByHandle) {
   EXPECT_FALSE(api.RemoveAssertionCallback(h));
 
   // An empty handle is an error: the NULL handle is returned.
-  EXPECT_EQ(api.PlaceAssertionCallback(cbAssertionStart, "", vpiAssert, NoopCb,
+  EXPECT_EQ(api.PlaceAssertionCallback(cbAssertionStart, "", vpiAssert, noop_cb,
                                        nullptr),
             0u);
 }
@@ -95,7 +95,7 @@ TEST(AssertionCallback, PlaceReturnsHandleAndRemovesByHandle) {
 TEST(AssertionCallback, UnknownReasonErrorsWithNullHandle) {
   AssertionApi api;
   EXPECT_EQ(api.PlaceAssertionCallback(vpiAssertionSysOff, kA, vpiAssert,
-                                       NoopCb, nullptr),
+                                       noop_cb, nullptr),
             0u);
   EXPECT_EQ(api.PlacedCallbackCount(), 0u);
 }
@@ -131,11 +131,11 @@ TEST(AssertionCallback, HandleTypeValidity) {
 TEST(AssertionCallback, PlaceRejectsReasonInvalidForHandle) {
   AssertionApi api;
   EXPECT_EQ(api.PlaceAssertionCallback(cbAssertionDisable, kA, vpiSequenceDecl,
-                                       NoopCb, nullptr),
+                                       noop_cb, nullptr),
             0u);
   // The same reason is accepted on a concurrent assertion statement.
   EXPECT_NE(api.PlaceAssertionCallback(cbAssertionDisable, kA, vpiAssert,
-                                       NoopCb, nullptr),
+                                       noop_cb, nullptr),
             0u);
 }
 
@@ -411,7 +411,7 @@ TEST(AssertionCallback, RemoveNullHandleReportsNoRemoval) {
   AssertionApi api;
   EXPECT_FALSE(api.RemoveAssertionCallback(0));
 
-  api.PlaceAssertionCallback(cbAssertionStart, kA, vpiAssert, NoopCb, nullptr);
+  api.PlaceAssertionCallback(cbAssertionStart, kA, vpiAssert, noop_cb, nullptr);
   EXPECT_FALSE(api.RemoveAssertionCallback(0));
   EXPECT_EQ(api.PlacedCallbackCount(), 1u);
 }

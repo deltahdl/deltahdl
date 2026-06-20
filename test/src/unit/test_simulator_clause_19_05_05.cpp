@@ -49,6 +49,7 @@ TEST(Coverage, IgnoredValuesRemovedAfterDistribution) {
   auto distributed = CoverageDB::DistributeValues(values, 3);
   std::vector<int64_t> ignored = {3, 4};
   std::vector<std::vector<int64_t>> remaining;
+  remaining.reserve(distributed.size());
   for (const auto& bin : distributed) {
     remaining.push_back(CoverageDB::RemoveIgnoredValues(bin, ignored));
   }

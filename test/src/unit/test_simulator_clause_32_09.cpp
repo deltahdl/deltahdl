@@ -485,7 +485,7 @@ TEST(SdfAnnotateArgResolver, EmptyExplicitAndEmptyConfigYieldsFromMtmDefault) {
 // A single IOPATH carrying three distinct values lets the annotated delay
 // reveal exactly which member the requested mtm picked.
 TEST(SdfAnnotateMtmSelection, AnnotatesTheMtmMemberChosenForEachKeyword) {
-  const char* kSdf = R"(
+  const char* sdf = R"(
     (DELAYFILE
       (CELL (CELLTYPE "buf") (INSTANCE u1)
         (DELAY (ABSOLUTE (IOPATH A Z (1:2:3))))))
@@ -501,7 +501,7 @@ TEST(SdfAnnotateMtmSelection, AnnotatesTheMtmMemberChosenForEachKeyword) {
     mgr.AddPathDelay(pre);
 
     SdfFile file;
-    EXPECT_TRUE(ParseSdf(kSdf, file));
+    EXPECT_TRUE(ParseSdf(sdf, file));
     AnnotateSdfToManager(file, mgr, mtm);
     return mgr.GetPathDelays()[0].delays[0];
   };

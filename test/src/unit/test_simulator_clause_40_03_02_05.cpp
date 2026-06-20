@@ -132,21 +132,21 @@ TEST(CoverageSave, OverwritingAnExistingNameIsNotAnError) {
 // transition counts are unchanged, and $coverage_get reports the same level.
 TEST(CoverageSave, SavingDoesNotAffectCollectionState) {
   SimFixture f;
-  const std::string scope = "top";
-  Cov(f).SetAvailability(scope, CoverageAvailability::kFull);
-  Cov(f).Control(CoverageControl::kStart, scope);
-  Cov(f).SetCoveredItems(scope, kToggle, 7);
+  const std::string kScope = "top";
+  Cov(f).SetAvailability(kScope, CoverageAvailability::kFull);
+  Cov(f).Control(CoverageControl::kStart, kScope);
+  Cov(f).SetCoveredItems(kScope, kToggle, 7);
   Cov(f).SetCoverageAvailableForSave(kToggle, true);
 
-  const bool collecting_before = Cov(f).IsCollecting(scope);
-  const auto starts_before = Cov(f).StartCount(scope);
-  const int level_before = Cov(f).CoverageGet(scope, kToggle);
+  const bool kCollectingBefore = Cov(f).IsCollecting(kScope);
+  const auto kStartsBefore = Cov(f).StartCount(kScope);
+  const int kLevelBefore = Cov(f).CoverageGet(kScope, kToggle);
 
   ASSERT_EQ(RunSave(f, kToggle, kName), kOk);
 
-  EXPECT_EQ(Cov(f).IsCollecting(scope), collecting_before);
-  EXPECT_EQ(Cov(f).StartCount(scope), starts_before);
-  EXPECT_EQ(Cov(f).CoverageGet(scope, kToggle), level_before);
+  EXPECT_EQ(Cov(f).IsCollecting(kScope), kCollectingBefore);
+  EXPECT_EQ(Cov(f).StartCount(kScope), kStartsBefore);
+  EXPECT_EQ(Cov(f).CoverageGet(kScope, kToggle), kLevelBefore);
 }
 
 // `SV_COV_ERROR edge: a call with no arguments cannot name a coverage type and

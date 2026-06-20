@@ -105,12 +105,12 @@ TEST(FsmPartSelectPragmaLexing, RequiresToolAndStateVectorKeywords) {
 // declared, and is recognized there while the surrounding source still lexes
 // into its ordinary token stream.
 TEST(FsmPartSelectPragmaLexing, RecognizedWithinModuleBody) {
-  const std::string src =
+  const std::string kSrc =
       "module fsm;\n"
       "  logic [7:0] bus;\n"
       "  /* tool state_vector bus[3:0] my_fsm enum state_e */\n"
       "endmodule\n";
-  auto pragmas = CollectPartSelectPragmas(src);
+  auto pragmas = CollectPartSelectPragmas(kSrc);
   ASSERT_EQ(pragmas.size(), 1u);
   EXPECT_EQ(pragmas[0].signal, "bus");
   EXPECT_EQ(pragmas[0].msb, 3);
@@ -124,9 +124,9 @@ TEST(FsmPartSelectPragmaLexing, RecognizedWithinModuleBody) {
 TEST(FsmPartSelectPragmaLexing, PartSelectIsSeparateFromSimpleSignalPragma) {
   SourceManager mgr;
   DiagEngine diag(mgr);
-  const std::string src =
+  const std::string kSrc =
       "/* tool state_vector cur_state[3:0] my_fsm enum e */";
-  auto fid = mgr.AddFile("<test>", src);
+  auto fid = mgr.AddFile("<test>", kSrc);
   Lexer lexer(mgr.FileContent(fid), fid, diag);
   lexer.LexAll();
   EXPECT_EQ(lexer.FsmPartSelectPragmas().size(), 1u);
@@ -134,8 +134,8 @@ TEST(FsmPartSelectPragmaLexing, PartSelectIsSeparateFromSimpleSignalPragma) {
 
   SourceManager mgr2;
   DiagEngine diag2(mgr2);
-  const std::string simple = "/* tool state_vector cur_state enum e */";
-  auto fid2 = mgr2.AddFile("<test>", simple);
+  const std::string kSimple = "/* tool state_vector cur_state enum e */";
+  auto fid2 = mgr2.AddFile("<test>", kSimple);
   Lexer lexer2(mgr2.FileContent(fid2), fid2, diag2);
   lexer2.LexAll();
   EXPECT_TRUE(lexer2.FsmPartSelectPragmas().empty());

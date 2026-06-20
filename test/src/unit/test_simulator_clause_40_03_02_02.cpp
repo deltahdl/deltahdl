@@ -119,13 +119,13 @@ TEST(CoverageGetMax, MaximumStaysConstantAcrossCollectionChanges) {
   Cov(f).SetCoverableItems(std::string(kScope), kToggle, 48);
   Cov(f).SetAvailability(std::string(kScope), CoverageAvailability::kFull);
 
-  const int before = RunGetMax(f, kToggle, kScope);
+  const int kBefore = RunGetMax(f, kToggle, kScope);
   RunControl(f, kStart, kScope);
   RunControl(f, kReset, kScope);
-  const int after = RunGetMax(f, kToggle, kScope);
+  const int kAfter = RunGetMax(f, kToggle, kScope);
 
-  EXPECT_EQ(before, 48);
-  EXPECT_EQ(after, before);
+  EXPECT_EQ(kBefore, 48);
+  EXPECT_EQ(kAfter, kBefore);
 }
 
 // -1 (`SV_COV_ERROR) edge: a call with no arguments cannot name a coverage type

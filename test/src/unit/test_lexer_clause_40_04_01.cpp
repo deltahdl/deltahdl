@@ -63,12 +63,12 @@ TEST(FsmStatePragmaLexing, EnumKeywordRequiredToBindName) {
 // declared, and is recognized there while the surrounding source still lexes
 // into its ordinary token stream.
 TEST(FsmStatePragmaLexing, PragmaWithinModuleBody) {
-  const std::string src =
+  const std::string kSrc =
       "module fsm;\n"
       "  logic [2:0] cur_state;\n"
       "  /* tool state_vector cur_state enum state_e */\n"
       "endmodule\n";
-  auto pragmas = CollectFsmPragmas(src);
+  auto pragmas = CollectFsmPragmas(kSrc);
   ASSERT_EQ(pragmas.size(), 1u);
   EXPECT_EQ(pragmas[0].signal, "cur_state");
   EXPECT_EQ(pragmas[0].enum_name, "state_e");
@@ -78,11 +78,11 @@ TEST(FsmStatePragmaLexing, PragmaWithinModuleBody) {
 // declaration; being a comment it is invisible to the token stream yet is still
 // recorded as an FSM pragma.
 TEST(FsmStatePragmaLexing, SeparatePragmaInDeclarationIsInvisibleToTokens) {
-  const std::string src = "logic [7:0] /* tool enum state_e */ cur_state;";
+  const std::string kSrc = "logic [7:0] /* tool enum state_e */ cur_state;";
 
   SourceManager mgr;
   DiagEngine diag(mgr);
-  auto fid = mgr.AddFile("<test>", src);
+  auto fid = mgr.AddFile("<test>", kSrc);
   Lexer lexer(mgr.FileContent(fid), fid, diag);
   auto tokens = lexer.LexAll();
 
@@ -105,12 +105,12 @@ TEST(FsmStatePragmaLexing, SeparatePragmaInDeclarationIsInvisibleToTokens) {
 // pragma in the declaration binds the enumeration. Both are recognized and the
 // lexer keeps each as its own FSM pragma.
 TEST(FsmStatePragmaLexing, SeparateEnumPragmaPairsWithStateVectorPragma) {
-  const std::string src =
+  const std::string kSrc =
       "module fsm;\n"
       "  /* tool state_vector cur_state */\n"
       "  logic [2:0] /* tool enum state_e */ cur_state;\n"
       "endmodule\n";
-  auto pragmas = CollectFsmPragmas(src);
+  auto pragmas = CollectFsmPragmas(kSrc);
   ASSERT_EQ(pragmas.size(), 2u);
 
   EXPECT_EQ(pragmas[0].form, "state_vector");

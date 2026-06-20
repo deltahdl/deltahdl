@@ -35,11 +35,14 @@ TEST(PortModel, PortTypeValuesAndFormalDerivation) {
   // The formal decides the type: a modport formal wins over an interface
   // formal, an interface formal yields an interface port, and anything else is
   // ordinary.
-  EXPECT_EQ(VpiPortTypeFromFormal(/*interface=*/false, /*modport=*/false),
+  EXPECT_EQ(VpiPortTypeFromFormal(/*formal_is_interface=*/false,
+                                  /*formal_is_modport=*/false),
             vpiPort);
-  EXPECT_EQ(VpiPortTypeFromFormal(/*interface=*/true, /*modport=*/false),
+  EXPECT_EQ(VpiPortTypeFromFormal(/*formal_is_interface=*/true,
+                                  /*formal_is_modport=*/false),
             vpiInterfacePort);
-  EXPECT_EQ(VpiPortTypeFromFormal(/*interface=*/true, /*modport=*/true),
+  EXPECT_EQ(VpiPortTypeFromFormal(/*formal_is_interface=*/true,
+                                  /*formal_is_modport=*/true),
             vpiModportPort);
 }
 
@@ -166,11 +169,11 @@ TEST_F(PortContext, PortIndexAndNameDoNotApplyToPortBit) {
 // D8: an explicitly named port returns its explicit name; failing that, an
 // inferred name if one exists; otherwise NULL.
 TEST_F(PortContext, ExplicitNameResolution) {
-  EXPECT_STREQ(VpiPortName(/*explicit=*/true, "exp", "inf"), "exp");
-  EXPECT_STREQ(VpiPortName(/*explicit=*/false, "exp", "inf"), "inf");
-  EXPECT_EQ(VpiPortName(/*explicit=*/false, "", ""), nullptr);
+  EXPECT_STREQ(VpiPortName(/*explicitly_named=*/true, "exp", "inf"), "exp");
+  EXPECT_STREQ(VpiPortName(/*explicitly_named=*/false, "exp", "inf"), "inf");
+  EXPECT_EQ(VpiPortName(/*explicitly_named=*/false, "", ""), nullptr);
   // No explicit name written, but an inferred name exists.
-  EXPECT_STREQ(VpiPortName(/*explicit=*/false, "", "inf"), "inf");
+  EXPECT_STREQ(VpiPortName(/*explicitly_named=*/false, "", "inf"), "inf");
 
   VpiObject named_port;
   named_port.type = vpiPort;

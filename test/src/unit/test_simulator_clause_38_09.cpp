@@ -24,8 +24,8 @@ using VpiGetDataSim = VpiSaveRestoreSim;
 // §38.9: from a cbStartOfRestart routine the call shall place numOfBytes of the
 // saved data into the caller's buffer and return the number of bytes retrieved.
 TEST_F(VpiGetDataSim, ReadsSavedDataInsideStartOfRestart) {
-  const char saved[] = {'D', 'e', 'l', 't', 'a'};
-  vpi_ctx_.SeedSaveData(42, saved, 5);
+  const char kSaved[] = {'D', 'e', 'l', 't', 'a'};
+  vpi_ctx_.SeedSaveData(42, kSaved, 5);
 
   SingleRead probe;
   probe.id = 42;
@@ -33,15 +33,15 @@ TEST_F(VpiGetDataSim, ReadsSavedDataInsideStartOfRestart) {
   DispatchWith(cbStartOfRestart, ReadOnceCb, &probe);
 
   EXPECT_EQ(probe.returned, 5);
-  EXPECT_EQ(0, std::memcmp(probe.buf, saved, 5));
+  EXPECT_EQ(0, std::memcmp(probe.buf, kSaved, 5));
   // A clean read records no error (the C entry cleared the prior status).
   EXPECT_EQ(vpi_ctx_.LastError().level, 0);
 }
 
 // §38.9: the routine is equally legal from a cbEndOfRestart routine.
 TEST_F(VpiGetDataSim, ReadsSavedDataInsideEndOfRestart) {
-  const char saved[] = {'X', 'Y', 'Z'};
-  vpi_ctx_.SeedSaveData(7, saved, 3);
+  const char kSaved[] = {'X', 'Y', 'Z'};
+  vpi_ctx_.SeedSaveData(7, kSaved, 3);
 
   SingleRead probe;
   probe.id = 7;
@@ -49,14 +49,14 @@ TEST_F(VpiGetDataSim, ReadsSavedDataInsideEndOfRestart) {
   DispatchWith(cbEndOfRestart, ReadOnceCb, &probe);
 
   EXPECT_EQ(probe.returned, 3);
-  EXPECT_EQ(0, std::memcmp(probe.buf, saved, 3));
+  EXPECT_EQ(0, std::memcmp(probe.buf, kSaved, 3));
 }
 
 // §38.9: the routine may only be called from a cbStartOfRestart/cbEndOfRestart
 // routine. Called from any other context it fails, and a failure returns 0.
 TEST_F(VpiGetDataSim, RejectedOutsideRestartCallback) {
-  const char saved[] = {'a', 'b', 'c', 'd'};
-  vpi_ctx_.SeedSaveData(1, saved, 4);
+  const char kSaved[] = {'a', 'b', 'c', 'd'};
+  vpi_ctx_.SeedSaveData(1, kSaved, 4);
 
   char buf[8] = {};
   int returned = vpi_get_data(1, buf, 4);  // no callback active
@@ -68,8 +68,8 @@ TEST_F(VpiGetDataSim, RejectedOutsideRestartCallback) {
 // §38.9: the first call for an id reads from the start of the saved data, and
 // each subsequent call resumes where the previous call left off.
 TEST_F(VpiGetDataSim, SequentialReadsResumeWhereLeftOff) {
-  const char saved[] = {'0', '1', '2', '3', '4', '5'};
-  vpi_ctx_.SeedSaveData(9, saved, 6);
+  const char kSaved[] = {'0', '1', '2', '3', '4', '5'};
+  vpi_ctx_.SeedSaveData(9, kSaved, 6);
 
   DoubleRead probe;
   probe.id = 9;
@@ -88,8 +88,8 @@ TEST_F(VpiGetDataSim, SequentialReadsResumeWhereLeftOff) {
 // left are delivered, the remainder of the buffer is zero-filled, and the
 // return value is the number of bytes actually retrieved.
 TEST_F(VpiGetDataSim, RetrievingMoreThanStoredWarnsAndZeroFills) {
-  const char saved[] = {'h', 'i'};
-  vpi_ctx_.SeedSaveData(3, saved, 2);
+  const char kSaved[] = {'h', 'i'};
+  vpi_ctx_.SeedSaveData(3, kSaved, 2);
 
   SingleRead probe;
   probe.id = 3;
@@ -109,8 +109,8 @@ TEST_F(VpiGetDataSim, RetrievingMoreThanStoredWarnsAndZeroFills) {
 // §38.9: it shall be acceptable to retrieve fewer bytes than were saved; the
 // short read succeeds and reports no error.
 TEST_F(VpiGetDataSim, RetrievingLessThanStoredIsAcceptable) {
-  const char saved[] = {'p', 'q', 'r', 's'};
-  vpi_ctx_.SeedSaveData(5, saved, 4);
+  const char kSaved[] = {'p', 'q', 'r', 's'};
+  vpi_ctx_.SeedSaveData(5, kSaved, 4);
 
   SingleRead probe;
   probe.id = 5;
@@ -137,8 +137,8 @@ TEST_F(VpiGetDataSim, UnknownIdReturnsZero) {
 // destination has nowhere to place the data, so the call fails and returns 0,
 // distinct from the warning path taken when the buffer is valid but oversized.
 TEST_F(VpiGetDataSim, NullDestinationInsideRestartReturnsZero) {
-  const char saved[] = {'m', 'n', 'o'};
-  vpi_ctx_.SeedSaveData(11, saved, 3);
+  const char kSaved[] = {'m', 'n', 'o'};
+  vpi_ctx_.SeedSaveData(11, kSaved, 3);
 
   SingleRead probe;
   probe.id = 11;
@@ -154,8 +154,8 @@ TEST_F(VpiGetDataSim, NullDestinationInsideRestartReturnsZero) {
 // retrieved, the buffer is entirely zero-filled, the return value is 0, and it
 // is reported as a warning rather than an error.
 TEST_F(VpiGetDataSim, ReadingPastEndOfSavedDataWarnsAndZeroFills) {
-  const char saved[] = {'A', 'B', 'C'};
-  vpi_ctx_.SeedSaveData(13, saved, 3);
+  const char kSaved[] = {'A', 'B', 'C'};
+  vpi_ctx_.SeedSaveData(13, kSaved, 3);
 
   DoubleRead probe;
   probe.id = 13;

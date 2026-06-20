@@ -9,7 +9,7 @@ namespace {
 TEST(AbortProperty, RecognizesEveryAbortOperator) {
   // §16.12.14: a property is an abort property when it has one of the forms
   // accept_on, reject_on, sync_accept_on, or sync_reject_on.
-  AbortOperator op;
+  AbortOperator op{};
   EXPECT_TRUE(ClassifyAbortOperator("accept_on", op));
   EXPECT_EQ(op, AbortOperator::kAcceptOn);
   EXPECT_TRUE(ClassifyAbortOperator("reject_on", op));
@@ -57,15 +57,20 @@ TEST(AbortProperty, AbortConditionForbidsLocalVariablesTriggeredAndMatched) {
   EXPECT_FALSE(AbortConditionAllowsTriggeredMethod());
   EXPECT_FALSE(AbortConditionAllowsMatchedMethod());
 
-  EXPECT_TRUE(AbortConditionContentIsLegal(/*local=*/false, /*triggered=*/false,
-                                           /*matched=*/false));
-  EXPECT_FALSE(AbortConditionContentIsLegal(/*local=*/true, /*triggered=*/false,
-                                            /*matched=*/false));
-  EXPECT_FALSE(AbortConditionContentIsLegal(/*local=*/false, /*triggered=*/true,
-                                            /*matched=*/false));
-  EXPECT_FALSE(AbortConditionContentIsLegal(/*local=*/false,
-                                            /*triggered=*/false,
-                                            /*matched=*/true));
+  EXPECT_TRUE(AbortConditionContentIsLegal(
+      /*references_local_variable=*/false,
+      /*references_triggered_method=*/false,
+      /*references_matched_method=*/false));
+  EXPECT_FALSE(AbortConditionContentIsLegal(
+      /*references_local_variable=*/true, /*references_triggered_method=*/false,
+      /*references_matched_method=*/false));
+  EXPECT_FALSE(AbortConditionContentIsLegal(
+      /*references_local_variable=*/false, /*references_triggered_method=*/true,
+      /*references_matched_method=*/false));
+  EXPECT_FALSE(AbortConditionContentIsLegal(
+      /*references_local_variable=*/false,
+      /*references_triggered_method=*/false,
+      /*references_matched_method=*/true));
 }
 
 TEST(AbortProperty, NonSampledSampledValueFunctionsRequireExplicitClock) {
@@ -81,14 +86,14 @@ TEST(AbortProperty, NonSampledSampledValueFunctionsRequireExplicitClock) {
 
   // $sampled is well formed with or without an explicit clock argument.
   EXPECT_TRUE(AbortConditionSampledValueClockIsWellFormed(
-      SampledValueFunction::kSampled, /*clock_explicit=*/false));
+      SampledValueFunction::kSampled, /*clock_explicitly_specified=*/false));
   EXPECT_TRUE(AbortConditionSampledValueClockIsWellFormed(
-      SampledValueFunction::kSampled, /*clock_explicit=*/true));
+      SampledValueFunction::kSampled, /*clock_explicitly_specified=*/true));
   // Any other sampled value function needs the explicit clock argument.
   EXPECT_FALSE(AbortConditionSampledValueClockIsWellFormed(
-      SampledValueFunction::kChanged, /*clock_explicit=*/false));
+      SampledValueFunction::kChanged, /*clock_explicitly_specified=*/false));
   EXPECT_TRUE(AbortConditionSampledValueClockIsWellFormed(
-      SampledValueFunction::kChanged, /*clock_explicit=*/true));
+      SampledValueFunction::kChanged, /*clock_explicitly_specified=*/true));
 }
 
 TEST(AbortProperty, SampledValueFunctionsArePermittedInAbortConditions) {
@@ -100,17 +105,17 @@ TEST(AbortProperty, SampledValueFunctionsArePermittedInAbortConditions) {
        {SampledValueFunction::kSampled, SampledValueFunction::kRose,
         SampledValueFunction::kFell, SampledValueFunction::kStable,
         SampledValueFunction::kChanged, SampledValueFunction::kPast}) {
-    const bool clock_explicit =
+    const bool kClockExplicit =
         AbortConditionSampledValueRequiresExplicitClock(fn);
     EXPECT_TRUE(
-        AbortConditionSampledValueClockIsWellFormed(fn, clock_explicit));
+        AbortConditionSampledValueClockIsWellFormed(fn, kClockExplicit));
   }
 }
 
 TEST(AbortProperty, ClassificationRejectsCaseVariantsAndEmptyKeyword) {
   // §16.12.14 (error/edge): the abort operators are spelled exactly; an empty
   // string, a case variant, or surrounding whitespace is not an abort operator.
-  AbortOperator op;
+  AbortOperator op{};
   EXPECT_FALSE(ClassifyAbortOperator("", op));
   EXPECT_FALSE(IsAbortOperator("Accept_On"));
   EXPECT_FALSE(IsAbortOperator("SYNC_REJECT_ON"));
@@ -122,8 +127,9 @@ TEST(AbortProperty, AbortConditionRejectsAllForbiddenReferencesAtOnce) {
   // §16.12.14 (error/edge): an abort condition that references a local variable
   // and both the triggered and matched methods together is illegal — any one
   // forbidden reference is enough, so their combination is too.
-  EXPECT_FALSE(AbortConditionContentIsLegal(/*local=*/true, /*triggered=*/true,
-                                            /*matched=*/true));
+  EXPECT_FALSE(AbortConditionContentIsLegal(
+      /*references_local_variable=*/true, /*references_triggered_method=*/true,
+      /*references_matched_method=*/true));
 }
 
 }  // namespace

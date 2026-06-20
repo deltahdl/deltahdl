@@ -294,10 +294,10 @@ TEST(NeutralSatisfactionLocals, AcceptOnFailsWhenAbortPrefixDoesNotSatisfy) {
 TEST(NeutralSatisfactionLocals,
      TopLevelDisableIffFailsWhenNeitherPassNorDisabled) {
   auto top = LvTopDisableIff(BoolAtom("g"), LvStrong(Bool("z")));
-  const Word word{A({"c"}), A({"g"})};
-  EXPECT_FALSE(PassesTopLevelWithLocals(word, *top, LocalContext{}));
-  EXPECT_FALSE(IsDisabledTopLevelWithLocals(word, *top, LocalContext{}));
-  EXPECT_TRUE(FailsTopLevelWithLocals(word, *top, LocalContext{}));
+  const Word kWord{A({"c"}), A({"g"})};
+  EXPECT_FALSE(PassesTopLevelWithLocals(kWord, *top, LocalContext{}));
+  EXPECT_FALSE(IsDisabledTopLevelWithLocals(kWord, *top, LocalContext{}));
+  EXPECT_TRUE(FailsTopLevelWithLocals(kWord, *top, LocalContext{}));
 }
 
 // §F.5.6.1 (implication) boundary: over the empty word the antecedent matches
@@ -339,10 +339,11 @@ TEST(NeutralSatisfactionLocals, OrSatisfiedByRightOperandAlone) {
 TEST(NeutralSatisfactionLocals,
      TopLevelDisableIffFailsWhenUnguardedPropertyFails) {
   auto top = LvTopDisableIff(BoolAtom("g"), LvStrong(Bool("a")));
-  const Word word{A({"c"})};  // no 'g' guard letter, and strong(a) fails on [c]
-  EXPECT_FALSE(PassesTopLevelWithLocals(word, *top, LocalContext{}));
-  EXPECT_FALSE(IsDisabledTopLevelWithLocals(word, *top, LocalContext{}));
-  EXPECT_TRUE(FailsTopLevelWithLocals(word, *top, LocalContext{}));
+  const Word kWord{
+      A({"c"})};  // no 'g' guard letter, and strong(a) fails on [c]
+  EXPECT_FALSE(PassesTopLevelWithLocals(kWord, *top, LocalContext{}));
+  EXPECT_FALSE(IsDisabledTopLevelWithLocals(kWord, *top, LocalContext{}));
+  EXPECT_TRUE(FailsTopLevelWithLocals(kWord, *top, LocalContext{}));
 }
 
 }  // namespace

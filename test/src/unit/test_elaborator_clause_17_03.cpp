@@ -74,14 +74,18 @@ TEST(CheckerInstantiation, DollarFormalReferencePermittedUses) {
 TEST(CheckerInstantiation, DollarActualRequiresUntypedFormalAndPermittedRefs) {
   // §17.3: when `$` is an actual input argument, the corresponding formal shall
   // be untyped and each of its references shall be a permitted use.
-  EXPECT_TRUE(DollarActualArgumentIsLegal(/*formal_is_untyped=*/true,
-                                          /*all_refs_permitted=*/true));
-  EXPECT_FALSE(DollarActualArgumentIsLegal(/*formal_is_untyped=*/false,
-                                           /*all_refs_permitted=*/true));
-  EXPECT_FALSE(DollarActualArgumentIsLegal(/*formal_is_untyped=*/true,
-                                           /*all_refs_permitted=*/false));
-  EXPECT_FALSE(DollarActualArgumentIsLegal(/*formal_is_untyped=*/false,
-                                           /*all_refs_permitted=*/false));
+  EXPECT_TRUE(
+      DollarActualArgumentIsLegal(/*formal_is_untyped=*/true,
+                                  /*all_formal_references_permitted=*/true));
+  EXPECT_FALSE(
+      DollarActualArgumentIsLegal(/*formal_is_untyped=*/false,
+                                  /*all_formal_references_permitted=*/true));
+  EXPECT_FALSE(
+      DollarActualArgumentIsLegal(/*formal_is_untyped=*/true,
+                                  /*all_formal_references_permitted=*/false));
+  EXPECT_FALSE(
+      DollarActualArgumentIsLegal(/*formal_is_untyped=*/false,
+                                  /*all_formal_references_permitted=*/false));
 }
 
 TEST(CheckerInstantiation, ConstCastOrAutomaticActualRestrictsFormalUsage) {
@@ -89,26 +93,26 @@ TEST(CheckerInstantiation, ConstCastOrAutomaticActualRestrictsFormalUsage) {
   // from procedural code forbids using the formal in a continuous assignment or
   // in the checker's procedural code.
   EXPECT_TRUE(ConstCastOrAutomaticActualFormalUsageIsLegal(
-      /*actual_has_const_cast_or_automatic=*/false,
-      /*used_in_continuous_assignment=*/true,
-      /*used_in_procedural_code=*/true));
+      /*actual_has_const_cast_or_automatic_value=*/false,
+      /*formal_used_in_continuous_assignment=*/true,
+      /*formal_used_in_procedural_code=*/true));
   EXPECT_FALSE(ConstCastOrAutomaticActualFormalUsageIsLegal(
-      /*actual_has_const_cast_or_automatic=*/true,
-      /*used_in_continuous_assignment=*/true,
-      /*used_in_procedural_code=*/false));
+      /*actual_has_const_cast_or_automatic_value=*/true,
+      /*formal_used_in_continuous_assignment=*/true,
+      /*formal_used_in_procedural_code=*/false));
   EXPECT_FALSE(ConstCastOrAutomaticActualFormalUsageIsLegal(
-      /*actual_has_const_cast_or_automatic=*/true,
-      /*used_in_continuous_assignment=*/false,
-      /*used_in_procedural_code=*/true));
+      /*actual_has_const_cast_or_automatic_value=*/true,
+      /*formal_used_in_continuous_assignment=*/false,
+      /*formal_used_in_procedural_code=*/true));
   EXPECT_TRUE(ConstCastOrAutomaticActualFormalUsageIsLegal(
-      /*actual_has_const_cast_or_automatic=*/true,
-      /*used_in_continuous_assignment=*/false,
-      /*used_in_procedural_code=*/false));
+      /*actual_has_const_cast_or_automatic_value=*/true,
+      /*formal_used_in_continuous_assignment=*/false,
+      /*formal_used_in_procedural_code=*/false));
   // Edge: both forbidden usages present at once is still rejected.
   EXPECT_FALSE(ConstCastOrAutomaticActualFormalUsageIsLegal(
-      /*actual_has_const_cast_or_automatic=*/true,
-      /*used_in_continuous_assignment=*/true,
-      /*used_in_procedural_code=*/true));
+      /*actual_has_const_cast_or_automatic_value=*/true,
+      /*formal_used_in_continuous_assignment=*/true,
+      /*formal_used_in_procedural_code=*/true));
 }
 
 }  // namespace

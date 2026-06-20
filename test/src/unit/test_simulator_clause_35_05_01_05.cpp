@@ -46,8 +46,8 @@ constexpr uint64_t kResumeDelay = 50;
 // returning — exactly how a delay/event/wait control manifests in this
 // scheduler: the thread's continuation is deferred to a later time slot. The
 // optional `on_resume` runs when that future slot executes.
-DpiRuntime MakeRuntimeWithSuspendingExport(Scheduler& sched, uint64_t delay,
-                                           std::function<void()> on_resume) {
+DpiRuntime MakeRuntimeWithSuspendingExport(
+    Scheduler& sched, uint64_t delay, const std::function<void()>& on_resume) {
   DpiRuntime rt;
   DpiRtExport exp;
   exp.c_name = "c_wait";

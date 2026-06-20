@@ -349,11 +349,11 @@ TEST(VariableModel, IsRandomizedReflectsActiveness) {
 // and string variables - not to static arrays or any other variable.
 TEST(VariableModel, SizeChangeCallbackApplicability) {
   EXPECT_TRUE(
-      VpiSizeChangeCallbackApplies(vpiDynamicArray, /*is_string=*/false));
+      VpiSizeChangeCallbackApplies(vpiDynamicArray, /*is_string_var=*/false));
   EXPECT_TRUE(VpiSizeChangeCallbackApplies(vpiAssocArray, false));
   EXPECT_TRUE(VpiSizeChangeCallbackApplies(vpiQueueArray, false));
   EXPECT_TRUE(
-      VpiSizeChangeCallbackApplies(/*array_type=*/0, /*is_string=*/true));
+      VpiSizeChangeCallbackApplies(/*array_type=*/0, /*is_string_var=*/true));
   EXPECT_FALSE(VpiSizeChangeCallbackApplies(vpiStaticArray, false));
   EXPECT_FALSE(VpiSizeChangeCallbackApplies(/*array_type=*/0, false));
 }

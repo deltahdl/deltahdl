@@ -40,10 +40,10 @@ bool LogicEq(const svLogicVecVal& a, const svLogicVecVal& b) {
 // storage, and the value lands at the storage slot the index selects. The
 // handle models: bit [7:0] arr [0:3].
 TEST(ElementCanonicalAccess, BitPutGetRoundTrip) {
-  const SvOpenArrayDimRange ranges[] = {{7, 0}, {0, 3}};
+  const SvOpenArrayDimRange kRanges[] = {{7, 0}, {0, 3}};
   svBitVecVal data[4] = {0, 0, 0, 0};
   SvOpenArrayDesc desc;
-  svOpenArrayHandle h = MakeHandle(data, ranges, 2, &desc);
+  svOpenArrayHandle h = MakeHandle(data, kRanges, 2, &desc);
 
   svBitVecVal in = 0xA5u;
   svPutBitArrElem1VecVal(h, &in, 2);
@@ -64,11 +64,11 @@ TEST(ElementCanonicalAccess, BitPutGetRoundTrip) {
 // from simulator storage rather than echoing a just-written value. The handle
 // models: logic [7:0] arr [0:3], with distinct values pre-placed per slot.
 TEST(ElementCanonicalAccess, GetReadsPreSeededStorage) {
-  const SvOpenArrayDimRange ranges[] = {{7, 0}, {0, 3}};
+  const SvOpenArrayDimRange kRanges[] = {{7, 0}, {0, 3}};
   svLogicVecVal data[4] = {
       {0x10u, 0x01u}, {0x20u, 0x02u}, {0x30u, 0x03u}, {0x40u, 0x04u}};
   SvOpenArrayDesc desc;
-  svOpenArrayHandle h = MakeHandle(data, ranges, 2, &desc);
+  svOpenArrayHandle h = MakeHandle(data, kRanges, 2, &desc);
 
   // Each index reads back exactly the element pre-seeded at its storage slot,
   // both aval and bval lanes.
@@ -84,10 +84,10 @@ TEST(ElementCanonicalAccess, GetReadsPreSeededStorage) {
 // position 0 and positions advance toward the right bound (index 1 -> position
 // 2), so the declared coordinates - not a zero-based count - select the slot.
 TEST(ElementCanonicalAccess, BitDescendingOriginalRangeIndexing) {
-  const SvOpenArrayDimRange ranges[] = {{7, 0}, {3, 1}};
+  const SvOpenArrayDimRange kRanges[] = {{7, 0}, {3, 1}};
   svBitVecVal data[3] = {0, 0, 0};
   SvOpenArrayDesc desc;
-  svOpenArrayHandle h = MakeHandle(data, ranges, 2, &desc);
+  svOpenArrayHandle h = MakeHandle(data, kRanges, 2, &desc);
 
   svBitVecVal v3 = 0x11u, v2 = 0x22u, v1 = 0x33u;
   svPutBitArrElem1VecVal(h, &v3, 3);
@@ -109,10 +109,10 @@ TEST(ElementCanonicalAccess, BitDescendingOriginalRangeIndexing) {
 // moves both words in full, including their bval (x/z) lanes. The handle
 // models: logic [39:0] arr [0:1].
 TEST(ElementCanonicalAccess, LogicMultiWordPutGetRoundTrip) {
-  const SvOpenArrayDimRange ranges[] = {{39, 0}, {0, 1}};
+  const SvOpenArrayDimRange kRanges[] = {{39, 0}, {0, 1}};
   svLogicVecVal data[4] = {{0, 0}, {0, 0}, {0, 0}, {0, 0}};
   SvOpenArrayDesc desc;
-  svOpenArrayHandle h = MakeHandle(data, ranges, 2, &desc);
+  svOpenArrayHandle h = MakeHandle(data, kRanges, 2, &desc);
 
   // Two-word source: word 1 carries x/z bits in its bval lane.
   svLogicVecVal in[2] = {{0xDEADBEEFu, 0u}, {0x000000FFu, 0x0000000Fu}};
@@ -134,10 +134,10 @@ TEST(ElementCanonicalAccess, LogicMultiWordPutGetRoundTrip) {
 // dimensions. The handle models: bit [3:0] arr [0:1][0:2], so index (i,j) maps
 // to storage position i*3 + j.
 TEST(ElementCanonicalAccess, BitTwoDimensionRowMajor) {
-  const SvOpenArrayDimRange ranges[] = {{3, 0}, {0, 1}, {0, 2}};
+  const SvOpenArrayDimRange kRanges[] = {{3, 0}, {0, 1}, {0, 2}};
   svBitVecVal data[6] = {0, 0, 0, 0, 0, 0};
   SvOpenArrayDesc desc;
-  svOpenArrayHandle h = MakeHandle(data, ranges, 3, &desc);
+  svOpenArrayHandle h = MakeHandle(data, kRanges, 3, &desc);
 
   svBitVecVal a = 0x5u, b = 0xCu;
   svPutBitArrElem2VecVal(h, &a, 0, 1);  // 0*3 + 1 = 1
@@ -155,11 +155,11 @@ TEST(ElementCanonicalAccess, BitTwoDimensionRowMajor) {
 // dimensions. The handle models: logic [3:0] arr [0:1][0:1][0:1], so index
 // (i,j,k) maps to ((i*2 + j)*2 + k).
 TEST(ElementCanonicalAccess, LogicThreeDimensionRowMajor) {
-  const SvOpenArrayDimRange ranges[] = {{3, 0}, {0, 1}, {0, 1}, {0, 1}};
+  const SvOpenArrayDimRange kRanges[] = {{3, 0}, {0, 1}, {0, 1}, {0, 1}};
   svLogicVecVal data[8];
   for (auto& w : data) w = svLogicVecVal{0, 0};
   SvOpenArrayDesc desc;
-  svOpenArrayHandle h = MakeHandle(data, ranges, 4, &desc);
+  svOpenArrayHandle h = MakeHandle(data, kRanges, 4, &desc);
 
   svLogicVecVal in = {0x9u, 0x6u};
   svPutLogicArrElem3VecVal(h, &in, 1, 0, 1);  // ((1*2+0)*2+1) = 5
@@ -176,10 +176,10 @@ TEST(ElementCanonicalAccess, LogicThreeDimensionRowMajor) {
 // no-op in either direction and leaves both operands untouched - matching the
 // handle/index guard the production helpers apply before touching storage.
 TEST(ElementCanonicalAccess, OutOfRangeAndNullHandleAreNoOps) {
-  const SvOpenArrayDimRange ranges[] = {{7, 0}, {0, 3}};
+  const SvOpenArrayDimRange kRanges[] = {{7, 0}, {0, 3}};
   svBitVecVal data[4] = {0, 0, 0, 0};
   SvOpenArrayDesc desc;
-  svOpenArrayHandle h = MakeHandle(data, ranges, 2, &desc);
+  svOpenArrayHandle h = MakeHandle(data, kRanges, 2, &desc);
 
   // Put at an index past the [0:3] range leaves storage untouched.
   svBitVecVal in = 0xFFu;
@@ -203,10 +203,10 @@ TEST(ElementCanonicalAccess, OutOfRangeAndNullHandleAreNoOps) {
 // functions. The handle models: bit [3:0] arr [0:1][0:1][0:1], so index (i,j,k)
 // maps to ((i*2 + j)*2 + k).
 TEST(ElementCanonicalAccess, BitThreeDimensionRowMajor) {
-  const SvOpenArrayDimRange ranges[] = {{3, 0}, {0, 1}, {0, 1}, {0, 1}};
+  const SvOpenArrayDimRange kRanges[] = {{3, 0}, {0, 1}, {0, 1}, {0, 1}};
   svBitVecVal data[8] = {0, 0, 0, 0, 0, 0, 0, 0};
   SvOpenArrayDesc desc;
-  svOpenArrayHandle h = MakeHandle(data, ranges, 4, &desc);
+  svOpenArrayHandle h = MakeHandle(data, kRanges, 4, &desc);
 
   svBitVecVal in = 0xBu;
   svPutBitArrElem3VecVal(h, &in, 1, 1, 0);  // ((1*2+1)*2+0) = 6
@@ -224,11 +224,11 @@ TEST(ElementCanonicalAccess, BitThreeDimensionRowMajor) {
 // unpacked dimensions and carry both aval/bval lanes. The handle models:
 // logic [3:0] arr [0:1][0:2], so index (i,j) maps to i*3 + j.
 TEST(ElementCanonicalAccess, LogicTwoDimensionRowMajor) {
-  const SvOpenArrayDimRange ranges[] = {{3, 0}, {0, 1}, {0, 2}};
+  const SvOpenArrayDimRange kRanges[] = {{3, 0}, {0, 1}, {0, 2}};
   svLogicVecVal data[6];
   for (auto& w : data) w = svLogicVecVal{0, 0};
   SvOpenArrayDesc desc;
-  svOpenArrayHandle h = MakeHandle(data, ranges, 3, &desc);
+  svOpenArrayHandle h = MakeHandle(data, kRanges, 3, &desc);
 
   svLogicVecVal in = {0xAu, 0x5u};
   svPutLogicArrElem2VecVal(h, &in, 1, 2);  // 1*3 + 2 = 5
@@ -246,10 +246,10 @@ TEST(ElementCanonicalAccess, LogicTwoDimensionRowMajor) {
 // toward the right bound, so the declared coordinates - not a zero-based count
 // - select the slot. The handle models: bit [7:0] arr [2:5].
 TEST(ElementCanonicalAccess, AscendingOffsetRangeIndexing) {
-  const SvOpenArrayDimRange ranges[] = {{7, 0}, {2, 5}};
+  const SvOpenArrayDimRange kRanges[] = {{7, 0}, {2, 5}};
   svBitVecVal data[4] = {0, 0, 0, 0};
   SvOpenArrayDesc desc;
-  svOpenArrayHandle h = MakeHandle(data, ranges, 2, &desc);
+  svOpenArrayHandle h = MakeHandle(data, kRanges, 2, &desc);
 
   svBitVecVal v2 = 0x11u, v3 = 0x22u, v4 = 0x33u, v5 = 0x44u;
   svPutBitArrElem1VecVal(h, &v2, 2);
@@ -273,11 +273,11 @@ TEST(ElementCanonicalAccess, AscendingOffsetRangeIndexing) {
 // is position 0 and the right bound (index -4) is position 3. The handle
 // models: logic [7:0] arr [-1:-4].
 TEST(ElementCanonicalAccess, NegativeBoundRangeIndexing) {
-  const SvOpenArrayDimRange ranges[] = {{7, 0}, {-1, -4}};
+  const SvOpenArrayDimRange kRanges[] = {{7, 0}, {-1, -4}};
   svLogicVecVal data[4];
   for (auto& w : data) w = svLogicVecVal{0, 0};
   SvOpenArrayDesc desc;
-  svOpenArrayHandle h = MakeHandle(data, ranges, 2, &desc);
+  svOpenArrayHandle h = MakeHandle(data, kRanges, 2, &desc);
 
   svLogicVecVal at_left = {0x7u, 0x0u};
   svLogicVecVal at_right = {0x1u, 0x8u};
@@ -297,16 +297,16 @@ TEST(ElementCanonicalAccess, NegativeBoundRangeIndexing) {
 // so the copy is a no-op in both directions. The handle models:
 // bit [3:0] arr [0:1][0:2].
 TEST(ElementCanonicalAccess, PartialOutOfRangeIndexInMultiDimIsNoOp) {
-  const SvOpenArrayDimRange ranges[] = {{3, 0}, {0, 1}, {0, 2}};
+  const SvOpenArrayDimRange kRanges[] = {{3, 0}, {0, 1}, {0, 2}};
   svBitVecVal data[6] = {1, 2, 3, 4, 5, 6};
   SvOpenArrayDesc desc;
-  svOpenArrayHandle h = MakeHandle(data, ranges, 3, &desc);
+  svOpenArrayHandle h = MakeHandle(data, kRanges, 3, &desc);
 
   // Second index 3 is past [0:2]; storage is left untouched.
   svBitVecVal in = 0xFu;
   svPutBitArrElem2VecVal(h, &in, 1, 3);
-  const svBitVecVal expected[6] = {1, 2, 3, 4, 5, 6};
-  for (int i = 0; i < 6; ++i) EXPECT_EQ(data[i], expected[i]);
+  const svBitVecVal kExpected[6] = {1, 2, 3, 4, 5, 6};
+  for (int i = 0; i < 6; ++i) EXPECT_EQ(data[i], kExpected[i]);
 
   // First index 2 is past [0:1]; the Get destination is left untouched.
   svBitVecVal out = 0x99u;
@@ -319,10 +319,10 @@ TEST(ElementCanonicalAccess, PartialOutOfRangeIndexInMultiDimIsNoOp) {
 // word-count boundary where the width is an exact multiple of 32. The handle
 // models: bit [31:0] arr [0:1].
 TEST(ElementCanonicalAccess, ExactWordWidthElementRoundTrip) {
-  const SvOpenArrayDimRange ranges[] = {{31, 0}, {0, 1}};
+  const SvOpenArrayDimRange kRanges[] = {{31, 0}, {0, 1}};
   svBitVecVal data[2] = {0, 0};
   SvOpenArrayDesc desc;
-  svOpenArrayHandle h = MakeHandle(data, ranges, 2, &desc);
+  svOpenArrayHandle h = MakeHandle(data, kRanges, 2, &desc);
 
   svBitVecVal in = 0xFFFFFFFFu;
   svPutBitArrElem1VecVal(h, &in, 1);

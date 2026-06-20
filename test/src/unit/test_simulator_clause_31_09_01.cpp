@@ -37,15 +37,15 @@ TEST(NegativeTimingCheckDelayedSignals, EventOrderKindsDoNotUseDelayedSignals) {
 }
 
 TEST(AdjustNegativeTimingCheckLimit, SmallestPositivePassesThrough) {
-  const auto result = AdjustNegativeTimingCheckLimit(1);
-  EXPECT_EQ(result.limit, 1u);
-  EXPECT_FALSE(result.warn);
+  const auto kResult = AdjustNegativeTimingCheckLimit(1);
+  EXPECT_EQ(kResult.limit, 1u);
+  EXPECT_FALSE(kResult.warn);
 }
 
 TEST(AdjustNegativeTimingCheckLimit, ZeroClampsAndWarns) {
-  const auto result = AdjustNegativeTimingCheckLimit(0);
-  EXPECT_EQ(result.limit, 0u);
-  EXPECT_TRUE(result.warn);
+  const auto kResult = AdjustNegativeTimingCheckLimit(0);
+  EXPECT_EQ(kResult.limit, 0u);
+  EXPECT_TRUE(kResult.warn);
 }
 
 TEST(NegativeTimingWindowCanYield, WidthAtLeastTwoYields) {

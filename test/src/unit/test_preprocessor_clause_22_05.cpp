@@ -36,5 +36,5 @@ TEST(Preprocessor, MultipleResetAll_PreservesTextMacros) {
       "logic [`WIDTH-1:0] data;\n",
       f);
   EXPECT_FALSE(f.diag.HasErrors());
-  EXPECT_NE(result.find("8"), std::string::npos);
+  EXPECT_NE(result.find('8'), std::string::npos);
 }

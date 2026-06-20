@@ -312,7 +312,7 @@ TEST(ArrayLiteralSim, WideToNarrowContextEval) {
 
 TEST(ArrayLiteralSim, PositionalMultidimensionalValues) {
   SimFixture f;
-  Variable *e00, *e01, *e10, *e11;
+  Variable *e00 = nullptr, *e01 = nullptr, *e10 = nullptr, *e11 = nullptr;
   RunAndFetch2x2(
       "module m;\n"
       "  int arr [0:1][0:1];\n"
@@ -327,7 +327,7 @@ TEST(ArrayLiteralSim, PositionalMultidimensionalValues) {
 
 TEST(ArrayLiteralSim, DefaultMultidimensionalValues) {
   SimFixture f;
-  Variable *e00, *e01, *e10, *e11;
+  Variable *e00 = nullptr, *e01 = nullptr, *e10 = nullptr, *e11 = nullptr;
   RunAndFetch2x2(
       "module m;\n"
       "  int arr [0:1][0:1];\n"

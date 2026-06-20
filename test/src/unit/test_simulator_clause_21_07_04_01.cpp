@@ -105,7 +105,7 @@ TEST_F(ExtendedVcdSyntaxSim, ExtendedDumpsWholeVectorNotPartialSelection) {
   // significant bit is set, so no bit is dropped by leading-digit shortening.
   EXPECT_NE(content.find("b10100101 !"), std::string::npos);
   // No partial-selection syntax (e.g. a [8:15] sub-range) is ever emitted.
-  EXPECT_EQ(content.find("["), std::string::npos);
+  EXPECT_EQ(content.find('['), std::string::npos);
 }
 
 // §21.7.4.1: port value changes are given in binary form as one of 0, 1, x, or

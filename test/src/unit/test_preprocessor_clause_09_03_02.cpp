@@ -8,7 +8,7 @@ namespace {
 
 TEST(ParallelBlockPreprocessor, MacroExpansionInsideForkJoin) {
   PreprocFixture f;
-  auto result = Preprocess(
+  Preprocess(
       "`define ASSIGN_A a = 1;\n"
       "module m;\n"
       "  initial begin\n"
@@ -24,7 +24,7 @@ TEST(ParallelBlockPreprocessor, MacroExpansionInsideForkJoin) {
 
 TEST(ParallelBlockPreprocessor, MacroExpandsToForkJoinContent) {
   PreprocFixture f;
-  auto result = Preprocess(
+  Preprocess(
       "`define FORK_BODY fork a = 1; b = 2; join\n"
       "module m;\n"
       "  initial begin\n"

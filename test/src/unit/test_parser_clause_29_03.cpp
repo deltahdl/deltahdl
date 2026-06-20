@@ -53,7 +53,7 @@ TEST(UdpTopLevelParsing, PrimitiveDefinedAfterInstantiationSiteParses) {
 
 TEST(UdpTopLevelParsing, AtLeast256UdpsAccepted) {
   std::string src;
-  src.reserve(256 * 96);
+  src.reserve(256UL * 96);
   for (int i = 0; i < 300; ++i) {
     src += "primitive p";
     src += std::to_string(i);

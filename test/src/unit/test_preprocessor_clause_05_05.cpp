@@ -8,7 +8,7 @@ namespace {
 
 TEST(OperatorPreprocessor, SingleCharOperatorPassesThrough) {
   PreprocFixture f;
-  auto result = Preprocess(
+  Preprocess(
       "module t;\n"
       "  logic [7:0] a, b, c;\n"
       "  assign a = b + c;\n"
@@ -19,7 +19,7 @@ TEST(OperatorPreprocessor, SingleCharOperatorPassesThrough) {
 
 TEST(OperatorPreprocessor, DoubleCharOperatorPassesThrough) {
   PreprocFixture f;
-  auto result = Preprocess(
+  Preprocess(
       "module t;\n"
       "  logic [7:0] a, b;\n"
       "  initial a = (b == 8'd0);\n"
@@ -30,7 +30,7 @@ TEST(OperatorPreprocessor, DoubleCharOperatorPassesThrough) {
 
 TEST(OperatorPreprocessor, TripleCharOperatorPassesThrough) {
   PreprocFixture f;
-  auto result = Preprocess(
+  Preprocess(
       "module t;\n"
       "  logic [7:0] a, b;\n"
       "  initial a = (b === 8'd0);\n"
@@ -41,7 +41,7 @@ TEST(OperatorPreprocessor, TripleCharOperatorPassesThrough) {
 
 TEST(OperatorPreprocessor, UnaryOperatorPassesThrough) {
   PreprocFixture f;
-  auto result = Preprocess(
+  Preprocess(
       "module t;\n"
       "  logic [7:0] a, b;\n"
       "  assign a = ~b;\n"
@@ -52,7 +52,7 @@ TEST(OperatorPreprocessor, UnaryOperatorPassesThrough) {
 
 TEST(OperatorPreprocessor, BinaryOperatorPassesThrough) {
   PreprocFixture f;
-  auto result = Preprocess(
+  Preprocess(
       "module t;\n"
       "  logic [7:0] a, b, c;\n"
       "  assign a = b & c;\n"
@@ -63,7 +63,7 @@ TEST(OperatorPreprocessor, BinaryOperatorPassesThrough) {
 
 TEST(OperatorPreprocessor, ConditionalOperatorPassesThrough) {
   PreprocFixture f;
-  auto result = Preprocess(
+  Preprocess(
       "module t;\n"
       "  logic sel;\n"
       "  logic [7:0] a, b, c;\n"
@@ -75,7 +75,7 @@ TEST(OperatorPreprocessor, ConditionalOperatorPassesThrough) {
 
 TEST(OperatorPreprocessor, OperatorsInMacroExpansion) {
   PreprocFixture f;
-  auto result = Preprocess(
+  Preprocess(
       "`define ADD(a, b) ((a) + (b))\n"
       "module t;\n"
       "  logic [7:0] x, y, z;\n"
@@ -87,7 +87,7 @@ TEST(OperatorPreprocessor, OperatorsInMacroExpansion) {
 
 TEST(OperatorPreprocessor, MixedOperatorsPassThrough) {
   PreprocFixture f;
-  auto result = Preprocess(
+  Preprocess(
       "module t;\n"
       "  logic [7:0] a, b, c, d;\n"
       "  assign a = (b + c) & ~d;\n"

@@ -113,8 +113,8 @@ TEST_F(PrimitivePrimTerm, IndexTransitionIsNullWhenNotAnArrayElement) {
 // gate, switch, combinational UDP, or generic primitive - is rejected. The put
 // returns NULL and records a vpi_chk_error() error, leaving nothing written.
 TEST_F(PrimitivePrimTerm, PutValueRejectedOnNonSequentialPrimitive) {
-  const int kinds[] = {vpiGate, vpiSwitch, vpiUdp, vpiCombPrim, vpiPrimitive};
-  for (int kind : kinds) {
+  const int kKinds[] = {vpiGate, vpiSwitch, vpiUdp, vpiCombPrim, vpiPrimitive};
+  for (int kind : kKinds) {
     VpiObject prim;
     prim.type = kind;
 

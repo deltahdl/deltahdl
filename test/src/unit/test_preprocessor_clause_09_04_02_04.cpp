@@ -24,7 +24,7 @@ TEST(SequenceEventPreprocessor, SequenceEventSurvivesPreprocessing) {
 
 TEST(SequenceEventPreprocessor, MacroExpandsToSequenceEvent) {
   PreprocFixture f;
-  auto result = Preprocess(
+  Preprocess(
       "`define WAIT_SEQ @(abc)\n"
       "module m;\n"
       "  sequence abc;\n"

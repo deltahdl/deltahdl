@@ -8,7 +8,7 @@ namespace {
 
 TEST(LevelSensitiveSequencePreprocessor, MacroExpansionInSequenceName) {
   PreprocFixture f;
-  auto result = Preprocess(
+  Preprocess(
       "`define SEQ abc\n"
       "module m;\n"
       "  sequence abc;\n"
@@ -22,7 +22,7 @@ TEST(LevelSensitiveSequencePreprocessor, MacroExpansionInSequenceName) {
 
 TEST(LevelSensitiveSequencePreprocessor, MacroExpansionInWaitBody) {
   PreprocFixture f;
-  auto result = Preprocess(
+  Preprocess(
       "`define DONE_MSG $display(\"done\")\n"
       "module m;\n"
       "  sequence s;\n"

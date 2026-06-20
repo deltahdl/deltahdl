@@ -221,9 +221,9 @@ TEST_F(UdpModel, TableEntryValueRejectsStringLikeAndNumericFormats) {
   VpiHandle row = MakeObject(vpiTableEntry, "row_edge");
   row->var = var;
 
-  const int refused[] = {vpiBinStrVal, vpiOctStrVal, vpiHexStrVal, vpiScalarVal,
-                         vpiRealVal};
-  for (int format : refused) {
+  const int kRefused[] = {vpiBinStrVal, vpiOctStrVal, vpiHexStrVal,
+                          vpiScalarVal, vpiRealVal};
+  for (int format : kRefused) {
     s_vpi_value v = {};
     v.format = format;
     vpi_get_value(row, &v);

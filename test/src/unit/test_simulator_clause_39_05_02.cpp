@@ -144,13 +144,15 @@ TEST(AssertionControl, KillDiscardsGivenAttemptKeepsAssertionEnabled) {
   api.NoteAssertionAttemptStarted(kA, 10);
   api.NoteAssertionAttemptStarted(kA, 20);
 
-  EXPECT_TRUE(api.ControlAttempt(vpiAssertionKill, kA, /*attempt=*/10));
+  EXPECT_TRUE(
+      api.ControlAttempt(vpiAssertionKill, kA, /*attempt_start_time=*/10));
 
   EXPECT_EQ(api.AssertionAttemptsInProgress(kA), 1u);
   EXPECT_TRUE(api.AssertionEnabled(kA));
   // Only the given attempt was discarded; the one started at time 20 remains
   // and can itself be killed, dropping the count to zero.
-  EXPECT_TRUE(api.ControlAttempt(vpiAssertionKill, kA, /*attempt=*/20));
+  EXPECT_TRUE(
+      api.ControlAttempt(vpiAssertionKill, kA, /*attempt_start_time=*/20));
   EXPECT_EQ(api.AssertionAttemptsInProgress(kA), 0u);
 }
 
@@ -161,11 +163,13 @@ TEST(AssertionControl, KillDiscardsGivenAttemptKeepsAssertionEnabled) {
 TEST(AssertionControl, StepModeFrozenAfterAttemptStarts) {
   AssertionApi api;
   api.NoteAssertionAttemptStarted(kA, 40);
-  EXPECT_TRUE(api.ControlStep(vpiAssertionEnableStep, kA, /*attempt=*/40,
+  EXPECT_TRUE(api.ControlStep(vpiAssertionEnableStep, kA,
+                              /*attempt_start_time=*/40,
                               vpiAssertionClockSteps));
   EXPECT_FALSE(api.AssertionStepEnabled(kA, 40));  // no effect after start
 
-  EXPECT_TRUE(api.ControlStep(vpiAssertionEnableStep, kA, /*attempt=*/50,
+  EXPECT_TRUE(api.ControlStep(vpiAssertionEnableStep, kA,
+                              /*attempt_start_time=*/50,
                               vpiAssertionClockSteps));
   EXPECT_TRUE(api.AssertionStepEnabled(kA, 50));  // set before the attempt
   api.NoteAssertionAttemptStarted(kA, 50);
@@ -176,15 +180,17 @@ TEST(AssertionControl, StepModeFrozenAfterAttemptStarts) {
 // stepping is not enabled (idempotent).
 TEST(AssertionControl, DisableStepClearsStepping) {
   AssertionApi api;
-  api.ControlStep(vpiAssertionEnableStep, kA, /*attempt=*/30,
+  api.ControlStep(vpiAssertionEnableStep, kA, /*attempt_start_time=*/30,
                   vpiAssertionClockSteps);
   ASSERT_TRUE(api.AssertionStepEnabled(kA, 30));
 
-  EXPECT_TRUE(api.ControlAttempt(vpiAssertionDisableStep, kA, /*attempt=*/30));
+  EXPECT_TRUE(api.ControlAttempt(vpiAssertionDisableStep, kA,
+                                 /*attempt_start_time=*/30));
   EXPECT_FALSE(api.AssertionStepEnabled(kA, 30));
 
   // Idempotent when already disabled.
-  EXPECT_TRUE(api.ControlAttempt(vpiAssertionDisableStep, kA, /*attempt=*/30));
+  EXPECT_TRUE(api.ControlAttempt(vpiAssertionDisableStep, kA,
+                                 /*attempt_start_time=*/30));
   EXPECT_FALSE(api.AssertionStepEnabled(kA, 30));
 }
 
@@ -193,7 +199,8 @@ TEST(AssertionControl, DisableStepClearsStepping) {
 TEST(AssertionControl, EnableStepEnablesStepping) {
   AssertionApi api;
   EXPECT_FALSE(api.AssertionStepEnabled(kA, 30));  // disabled by default
-  EXPECT_TRUE(api.ControlStep(vpiAssertionEnableStep, kA, /*attempt=*/30,
+  EXPECT_TRUE(api.ControlStep(vpiAssertionEnableStep, kA,
+                              /*attempt_start_time=*/30,
                               vpiAssertionClockSteps));
   EXPECT_TRUE(api.AssertionStepEnabled(kA, 30));
 }
@@ -203,11 +210,12 @@ TEST(AssertionControl, EnableStepEnablesStepping) {
 TEST(AssertionControl, EnableStepRequiresStepControlConstant) {
   AssertionApi api;
   EXPECT_FALSE(
-      api.ControlStep(vpiAssertionEnableStep, kA, /*attempt=*/30,
+      api.ControlStep(vpiAssertionEnableStep, kA, /*attempt_start_time=*/30,
                       /*not a step control constant=*/vpiAssertionEnable));
   EXPECT_FALSE(api.AssertionStepEnabled(kA, 30));
 
-  EXPECT_TRUE(api.ControlStep(vpiAssertionEnableStep, kA, /*attempt=*/30,
+  EXPECT_TRUE(api.ControlStep(vpiAssertionEnableStep, kA,
+                              /*attempt_start_time=*/30,
                               vpiAssertionClockSteps));
   EXPECT_TRUE(api.AssertionStepEnabled(kA, 30));
 }
@@ -256,8 +264,10 @@ TEST(AssertionControl, UnrecognizedControlRejected) {
   // vpiAssertionSysOff belongs to §39.5.1 system control, not per-assertion
   // control, so it is not a valid operator here.
   EXPECT_FALSE(api.Control(vpiAssertionSysOff, kA));
-  EXPECT_FALSE(api.ControlAttempt(vpiAssertionSysOff, kA, /*attempt=*/10));
-  EXPECT_FALSE(api.ControlStep(vpiAssertionSysOff, kA, /*attempt=*/10,
+  EXPECT_FALSE(
+      api.ControlAttempt(vpiAssertionSysOff, kA, /*attempt_start_time=*/10));
+  EXPECT_FALSE(api.ControlStep(vpiAssertionSysOff, kA,
+                               /*attempt_start_time=*/10,
                                vpiAssertionClockSteps));
 }
 
@@ -271,9 +281,12 @@ TEST(AssertionControl, LockBlocksAttemptAndStepControls) {
 
   // Reset, kill, disable-step, and enable-step are all rejected while locked.
   EXPECT_FALSE(api.Control(vpiAssertionReset, kA));
-  EXPECT_FALSE(api.ControlAttempt(vpiAssertionKill, kA, /*attempt=*/10));
-  EXPECT_FALSE(api.ControlAttempt(vpiAssertionDisableStep, kA, /*attempt=*/10));
-  EXPECT_FALSE(api.ControlStep(vpiAssertionEnableStep, kA, /*attempt=*/10,
+  EXPECT_FALSE(
+      api.ControlAttempt(vpiAssertionKill, kA, /*attempt_start_time=*/10));
+  EXPECT_FALSE(api.ControlAttempt(vpiAssertionDisableStep, kA,
+                                  /*attempt_start_time=*/10));
+  EXPECT_FALSE(api.ControlStep(vpiAssertionEnableStep, kA,
+                               /*attempt_start_time=*/10,
                                vpiAssertionClockSteps));
 
   // State is unchanged: the attempt is still in progress and stepping is off.
@@ -287,7 +300,8 @@ TEST(AssertionControl, KillUnknownAttemptIsNoOp) {
   AssertionApi api;
   api.NoteAssertionAttemptStarted(kA, 10);
 
-  EXPECT_TRUE(api.ControlAttempt(vpiAssertionKill, kA, /*attempt=*/99));
+  EXPECT_TRUE(
+      api.ControlAttempt(vpiAssertionKill, kA, /*attempt_start_time=*/99));
   EXPECT_EQ(api.AssertionAttemptsInProgress(kA), 1u);
 }
 
@@ -297,7 +311,8 @@ TEST(AssertionControl, DisableStepNoEffectWhenNotStepping) {
   AssertionApi api;
   api.NoteAssertionAttemptStarted(kA, 10);
 
-  EXPECT_TRUE(api.ControlAttempt(vpiAssertionDisableStep, kA, /*attempt=*/10));
+  EXPECT_TRUE(api.ControlAttempt(vpiAssertionDisableStep, kA,
+                                 /*attempt_start_time=*/10));
   EXPECT_FALSE(api.AssertionStepEnabled(kA, 10));
 }
 
@@ -305,9 +320,11 @@ TEST(AssertionControl, DisableStepNoEffectWhenNotStepping) {
 // the attempt has no effect (idempotent).
 TEST(AssertionControl, EnableStepIsIdempotent) {
   AssertionApi api;
-  EXPECT_TRUE(api.ControlStep(vpiAssertionEnableStep, kA, /*attempt=*/30,
+  EXPECT_TRUE(api.ControlStep(vpiAssertionEnableStep, kA,
+                              /*attempt_start_time=*/30,
                               vpiAssertionClockSteps));
-  EXPECT_TRUE(api.ControlStep(vpiAssertionEnableStep, kA, /*attempt=*/30,
+  EXPECT_TRUE(api.ControlStep(vpiAssertionEnableStep, kA,
+                              /*attempt_start_time=*/30,
                               vpiAssertionClockSteps));
   EXPECT_TRUE(api.AssertionStepEnabled(kA, 30));
 }

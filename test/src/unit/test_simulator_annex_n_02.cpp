@@ -26,8 +26,9 @@ using namespace delta;
 namespace {
 
 double RefUniform(int32_t* seed, int32_t start, int32_t end) {
-  const double d = 0.00000011920928955078125;  // 2^-23
-  double a, b;
+  const double kD = 0.00000011920928955078125;  // 2^-23
+  double a = 0.0;
+  double b = 0.0;
   if (*seed == 0) *seed = 259341593;
   if (start >= end) {
     a = 0.0;
@@ -38,10 +39,10 @@ double RefUniform(int32_t* seed, int32_t start, int32_t end) {
   }
   *seed = static_cast<int32_t>(69069u * static_cast<uint32_t>(*seed) + 1u);
   uint32_t bits = (static_cast<uint32_t>(*seed) >> 9) | 0x3f800000u;
-  float fs;
+  float fs = 0.0F;
   std::memcpy(&fs, &bits, sizeof(fs));
-  double c = static_cast<double>(fs);
-  c = c + (c * d);
+  auto c = static_cast<double>(fs);
+  c = c + (c * kD);
   c = ((b - a) * (c - 1.0)) + a;
   return c;
 }
@@ -76,7 +77,7 @@ int32_t RefPoisson(int32_t* seed, int32_t mean) {
 }
 
 double RefChiSquare(int32_t* seed, int32_t deg_of_free) {
-  double x;
+  double x = 0.0;
   if (deg_of_free % 2) {
     x = RefNormal(seed, 0, 1);
     x = x * x;
@@ -99,8 +100,8 @@ double RefT(int32_t* seed, int32_t deg_of_free) {
 double RefErlangian(int32_t* seed, int32_t k, int32_t mean) {
   double x = 1.0;
   for (int32_t i = 1; i <= k; i++) x = x * RefUniform(seed, 0, 1);
-  double a = static_cast<double>(mean);
-  double b = static_cast<double>(k);
+  auto a = static_cast<double>(mean);
+  auto b = static_cast<double>(k);
   return -a * std::log(x) / b;
 }
 
@@ -112,7 +113,7 @@ int32_t RoundDistResult(double r) {
 
 int32_t RtlDistUniform(int32_t* seed, int32_t start, int32_t end) {
   if (start >= end) return start;
-  int32_t i;
+  int32_t i = 0;
   if (end != INT32_MAX) {
     end++;
     double r = RefUniform(seed, start, end);
@@ -321,7 +322,7 @@ TEST(ProbabilisticDistributionAlgorithm, SeedAdvancesByReferenceLcg) {
 
   int32_t rseed = 1;
   RtlDistUniform(&rseed, 0, 1000);  // advance the golden seed identically
-  uint32_t after =
+  auto after =
       static_cast<uint32_t>(f.ctx.FindVariable("seed")->value.ToUint64());
   EXPECT_EQ(after, static_cast<uint32_t>(rseed));
 }

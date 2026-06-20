@@ -94,24 +94,24 @@ TEST(ClassSim, ParameterizedClassStaticMethod) {
 TEST(ClassSim, SpecializationsHaveIndependentStaticMembers) {
   SimFixture f;
 
-  auto* typeA = f.arena.Create<ClassTypeInfo>();
-  typeA->name = "Vec_8";
-  typeA->properties.push_back({"data", 8, false});
-  typeA->properties.push_back({"count", 32, true});
-  typeA->static_properties["count"] = MakeLogic4VecVal(f.arena, 32, 0);
-  f.ctx.RegisterClassType("Vec_8", typeA);
+  auto* type_a = f.arena.Create<ClassTypeInfo>();
+  type_a->name = "Vec_8";
+  type_a->properties.push_back({"data", 8, false});
+  type_a->properties.push_back({"count", 32, true});
+  type_a->static_properties["count"] = MakeLogic4VecVal(f.arena, 32, 0);
+  f.ctx.RegisterClassType("Vec_8", type_a);
 
-  auto* typeB = f.arena.Create<ClassTypeInfo>();
-  typeB->name = "Vec_16";
-  typeB->properties.push_back({"data", 16, false});
-  typeB->properties.push_back({"count", 32, true});
-  typeB->static_properties["count"] = MakeLogic4VecVal(f.arena, 32, 0);
-  f.ctx.RegisterClassType("Vec_16", typeB);
+  auto* type_b = f.arena.Create<ClassTypeInfo>();
+  type_b->name = "Vec_16";
+  type_b->properties.push_back({"data", 16, false});
+  type_b->properties.push_back({"count", 32, true});
+  type_b->static_properties["count"] = MakeLogic4VecVal(f.arena, 32, 0);
+  f.ctx.RegisterClassType("Vec_16", type_b);
 
-  typeA->static_properties["count"] = MakeLogic4VecVal(f.arena, 32, 42);
+  type_a->static_properties["count"] = MakeLogic4VecVal(f.arena, 32, 42);
 
-  EXPECT_EQ(typeA->static_properties["count"].ToUint64(), 42u);
-  EXPECT_EQ(typeB->static_properties["count"].ToUint64(), 0u);
+  EXPECT_EQ(type_a->static_properties["count"].ToUint64(), 42u);
+  EXPECT_EQ(type_b->static_properties["count"].ToUint64(), 0u);
 }
 
 TEST(ClassSim, MultipleParamsPreserved) {

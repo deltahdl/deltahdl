@@ -9,7 +9,7 @@ namespace {
 TEST(SampledValueFunctions, RecognizesEveryProvidedFunction) {
   // §16.9.3: the provided sampled value functions are $sampled, $rose, $fell,
   // $stable, $changed, and $past.
-  SampledValueFunction fn;
+  SampledValueFunction fn{};
   EXPECT_TRUE(ClassifySampledValueFunction("$sampled", fn));
   EXPECT_EQ(fn, SampledValueFunction::kSampled);
   EXPECT_TRUE(ClassifySampledValueFunction("$rose", fn));
@@ -73,10 +73,18 @@ TEST(SampledValueFunctions, ValueChangeResultsAreBoolean) {
 TEST(SampledValueFunctions, LocalVariableAndMatchedAreRejectedInArguments) {
   // §16.9.3: local variables and the sequence method `matched` are not allowed
   // in the argument expressions passed to these functions.
-  EXPECT_TRUE(SampledValueArgumentIsLegal(/*local=*/false, /*matched=*/false));
-  EXPECT_FALSE(SampledValueArgumentIsLegal(/*local=*/true, /*matched=*/false));
-  EXPECT_FALSE(SampledValueArgumentIsLegal(/*local=*/false, /*matched=*/true));
-  EXPECT_FALSE(SampledValueArgumentIsLegal(/*local=*/true, /*matched=*/true));
+  EXPECT_TRUE(SampledValueArgumentIsLegal(
+      /*argument_uses_local_variable=*/false,
+      /*argument_uses_matched_method=*/false));
+  EXPECT_FALSE(SampledValueArgumentIsLegal(
+      /*argument_uses_local_variable=*/true,
+      /*argument_uses_matched_method=*/false));
+  EXPECT_FALSE(SampledValueArgumentIsLegal(
+      /*argument_uses_local_variable=*/false,
+      /*argument_uses_matched_method=*/true));
+  EXPECT_FALSE(SampledValueArgumentIsLegal(
+      /*argument_uses_local_variable=*/true,
+      /*argument_uses_matched_method=*/true));
 }
 
 TEST(SampledValueFunctions, PastNumberOfTicksMustBeOneOrGreater) {
@@ -90,11 +98,16 @@ TEST(SampledValueFunctions, PastNumberOfTicksMustBeOneOrGreater) {
 TEST(SampledValueFunctions, PastFallsBackToDefaultSampledValue) {
   // §16.9.3: $past returns the default sampled value of expression1 when fewer
   // than number_of_ticks qualifying strictly prior time steps exist.
-  EXPECT_TRUE(PastUsesDefaultSampledValue(/*ticks=*/1, /*available=*/0));
-  EXPECT_TRUE(PastUsesDefaultSampledValue(/*ticks=*/2, /*available=*/0));
-  EXPECT_TRUE(PastUsesDefaultSampledValue(/*ticks=*/2, /*available=*/1));
-  EXPECT_FALSE(PastUsesDefaultSampledValue(/*ticks=*/2, /*available=*/2));
-  EXPECT_FALSE(PastUsesDefaultSampledValue(/*ticks=*/1, /*available=*/5));
+  EXPECT_TRUE(PastUsesDefaultSampledValue(/*number_of_ticks=*/1,
+                                          /*available_prior_ticks=*/0));
+  EXPECT_TRUE(PastUsesDefaultSampledValue(/*number_of_ticks=*/2,
+                                          /*available_prior_ticks=*/0));
+  EXPECT_TRUE(PastUsesDefaultSampledValue(/*number_of_ticks=*/2,
+                                          /*available_prior_ticks=*/1));
+  EXPECT_FALSE(PastUsesDefaultSampledValue(/*number_of_ticks=*/2,
+                                           /*available_prior_ticks=*/2));
+  EXPECT_FALSE(PastUsesDefaultSampledValue(/*number_of_ticks=*/1,
+                                           /*available_prior_ticks=*/5));
 }
 
 TEST(SampledValueFunctions, PastArgumentsHaveStandardDefaults) {

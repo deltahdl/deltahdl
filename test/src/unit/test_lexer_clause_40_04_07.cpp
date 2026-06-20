@@ -87,7 +87,7 @@ std::vector<FsmConcatInfo> CollectConcatPragmas(const std::string& src) {
 // example (after a parameter bit width), and its state-naming parameters still
 // reach the token stream for a downstream extractor to read.
 TEST(FsmOneLineCommentPragmaLexing, RecognizedInBothBlockAndOneLineComments) {
-  const std::string src =
+  const std::string kSrc =
       "module fsm;\n"
       "  parameter [1:0] // tool enum myFSM\n"
       "    S0 = 0, s1 = 1, s2 = 2, s3 = 3;\n"
@@ -95,7 +95,7 @@ TEST(FsmOneLineCommentPragmaLexing, RecognizedInBothBlockAndOneLineComments) {
       "    T0 = 0, t1 = 1, t2 = 2, t3 = 3;\n"
       "endmodule\n";
 
-  auto pragmas = CollectFsmPragmas(src);
+  auto pragmas = CollectFsmPragmas(kSrc);
   ASSERT_EQ(pragmas.size(), 2u);
   for (const auto& p : pragmas) {
     EXPECT_EQ(p.form, "enum_only");
@@ -106,7 +106,7 @@ TEST(FsmOneLineCommentPragmaLexing, RecognizedInBothBlockAndOneLineComments) {
 
   // The one-line comment ends at the newline: the parameters on the following
   // line are ordinary tokens, not swallowed by the comment.
-  auto idents = CollectIdentifiers(src);
+  auto idents = CollectIdentifiers(kSrc);
   std::vector<std::string> states;
   for (const auto& id : idents) {
     if (id == "S0" || id == "s1" || id == "s2" || id == "s3") {
@@ -122,13 +122,13 @@ TEST(FsmOneLineCommentPragmaLexing, RecognizedInBothBlockAndOneLineComments) {
 // is one of "these pragmas," so it too is recognized in a one-line comment.
 TEST(FsmOneLineCommentPragmaLexing,
      RecognizesStateVectorCurrentStatePragmaInOneLineComment) {
-  const std::string src =
+  const std::string kSrc =
       "module fsm;\n"
       "  // tool state_vector cs enum myFSM\n"
       "  logic [1:0] cs;\n"
       "endmodule\n";
 
-  auto pragmas = CollectFsmPragmas(src);
+  auto pragmas = CollectFsmPragmas(kSrc);
   ASSERT_EQ(pragmas.size(), 1u);
   EXPECT_EQ(pragmas[0].form, "state_vector");
   EXPECT_EQ(pragmas[0].signal, "cs");
@@ -141,13 +141,13 @@ TEST(FsmOneLineCommentPragmaLexing,
 // comment path and not just the enum-only form of the LRM example.
 TEST(FsmOneLineCommentPragmaLexing,
      RecognizesPartSelectPragmaInOneLineComment) {
-  const std::string src =
+  const std::string kSrc =
       "module fsm;\n"
       "  // tool state_vector st[1:0] myFSM enum E\n"
       "  logic [3:0] st;\n"
       "endmodule\n";
 
-  auto part_selects = CollectPartSelectPragmas(src);
+  auto part_selects = CollectPartSelectPragmas(kSrc);
   ASSERT_EQ(part_selects.size(), 1u);
   EXPECT_EQ(part_selects[0].signal, "st");
   EXPECT_EQ(part_selects[0].msb, 1);
@@ -162,13 +162,13 @@ TEST(FsmOneLineCommentPragmaLexing,
 // just the enum-only, current-state, and part-select forms above.
 TEST(FsmOneLineCommentPragmaLexing,
      RecognizesConcatenationPragmaInOneLineComment) {
-  const std::string src =
+  const std::string kSrc =
       "module fsm;\n"
       "  // tool state_vector {hi , lo} myFSM enum E\n"
       "  logic hi, lo;\n"
       "endmodule\n";
 
-  auto concats = CollectConcatPragmas(src);
+  auto concats = CollectConcatPragmas(kSrc);
   ASSERT_EQ(concats.size(), 1u);
   ASSERT_EQ(concats[0].signals.size(), 2u);
   EXPECT_EQ(concats[0].signals[0], "hi");
@@ -184,9 +184,9 @@ TEST(FsmOneLineCommentPragmaLexing,
 // end-of-file termination of the line-comment scan rather than the newline one.
 TEST(FsmOneLineCommentPragmaLexing,
      RecognizesOneLineCommentPragmaTerminatedByEndOfFile) {
-  const std::string src = "logic [1:0] cs; // tool enum myFSM";
+  const std::string kSrc = "logic [1:0] cs; // tool enum myFSM";
 
-  auto pragmas = CollectFsmPragmas(src);
+  auto pragmas = CollectFsmPragmas(kSrc);
   ASSERT_EQ(pragmas.size(), 1u);
   EXPECT_EQ(pragmas[0].form, "enum_only");
   EXPECT_TRUE(pragmas[0].has_enum);

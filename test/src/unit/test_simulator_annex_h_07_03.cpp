@@ -86,10 +86,10 @@ svOpenArrayHandle MakeHandle(void* data, const SvOpenArrayDimRange* ranges,
 // the individual-value representation.
 TEST(DataRepresentation, NonPackedTypeIsCCompatible) {
   int data[4] = {10, 20, 30, 40};
-  const SvOpenArrayDimRange ranges[] = {{31, 0},
-                                        {0, 3}};  // int element, [0:3].
+  const SvOpenArrayDimRange kRanges[] = {{31, 0},
+                                         {0, 3}};  // int element, [0:3].
   SvOpenArrayDesc desc;
-  svOpenArrayHandle h = MakeHandle(data, ranges, 2, sizeof(int), &desc);
+  svOpenArrayHandle h = MakeHandle(data, kRanges, 2, sizeof(int), &desc);
 
   for (int i = 0; i < 4; ++i) {
     void* p = svGetArrElemPtr1(h, i);
@@ -107,10 +107,10 @@ TEST(DataRepresentation, NonPackedTypeIsCCompatible) {
 // plain C double array element for element.
 TEST(DataRepresentation, SizedFormalAndStructEmbeddedAreCCompatible) {
   double data[3] = {1.5, -2.25, 100.0};
-  const SvOpenArrayDimRange ranges[] = {{63, 0},
-                                        {0, 2}};  // double element, [0:2].
+  const SvOpenArrayDimRange kRanges[] = {{63, 0},
+                                         {0, 2}};  // double element, [0:2].
   SvOpenArrayDesc desc;
-  svOpenArrayHandle h = MakeHandle(data, ranges, 2, sizeof(double), &desc);
+  svOpenArrayHandle h = MakeHandle(data, kRanges, 2, sizeof(double), &desc);
 
   for (int i = 0; i < 3; ++i) {
     void* p = svGetArrElemPtr1(h, i);
@@ -128,9 +128,9 @@ TEST(DataRepresentation, SizedFormalAndStructEmbeddedAreCCompatible) {
 // individual value stored there.
 TEST(DataRepresentation, OpenArrayCCompatibleElementMatchesIndividualValue) {
   int data[5] = {0, 11, 22, 33, 44};
-  const SvOpenArrayDimRange ranges[] = {{31, 0}, {0, 4}};
+  const SvOpenArrayDimRange kRanges[] = {{31, 0}, {0, 4}};
   SvOpenArrayDesc desc;
-  svOpenArrayHandle h = MakeHandle(data, ranges, 2, sizeof(int), &desc);
+  svOpenArrayHandle h = MakeHandle(data, kRanges, 2, sizeof(int), &desc);
 
   int* base = static_cast<int*>(svGetArrElemPtr1(h, 0));
   ASSERT_EQ(base, &data[0]);
@@ -156,9 +156,9 @@ TEST(DataRepresentation, OpenArrayCCompatibleElementMatchesIndividualValue) {
 TEST(DataRepresentation, OpenArrayPackedElementUsesCanonicalForm) {
   // Element is logic [7:0] -> one canonical word; four such elements, [0:3].
   svBitVecVal data[4] = {0u, 0u, 0u, 0u};
-  const SvOpenArrayDimRange ranges[] = {{7, 0}, {0, 3}};
+  const SvOpenArrayDimRange kRanges[] = {{7, 0}, {0, 3}};
   SvOpenArrayDesc desc;
-  svOpenArrayHandle h = MakeHandle(data, ranges, 2, /*elem_size=*/0, &desc);
+  svOpenArrayHandle h = MakeHandle(data, kRanges, 2, /*elem_size=*/0, &desc);
 
   // Canonical, not C-compatible: no individual-value address and no whole-array
   // C address are available.
@@ -166,8 +166,8 @@ TEST(DataRepresentation, OpenArrayPackedElementUsesCanonicalForm) {
   EXPECT_EQ(svGetArrayPtr(h), nullptr);
 
   // The value still round-trips through its canonical word representation.
-  const svBitVecVal in = 0xA5u;
-  svPutBitArrElem1VecVal(h, &in, 2);
+  const svBitVecVal kIn = 0xA5u;
+  svPutBitArrElem1VecVal(h, &kIn, 2);
   EXPECT_EQ(data[2], 0xA5u);  // canonical word for element [2].
   svBitVecVal out = 0u;
   svGetBitArrElem1VecVal(&out, h, 2);
@@ -182,17 +182,17 @@ TEST(DataRepresentation, OpenArrayPackedElementUsesCanonicalForm) {
 // round-trip, confirming the representation is the 4-state canonical one.
 TEST(DataRepresentation, OpenArrayScalarElementUsesCanonicalForm) {
   svLogicVecVal data[4] = {{0u, 0u}, {0u, 0u}, {0u, 0u}, {0u, 0u}};
-  const SvOpenArrayDimRange ranges[] = {{0, 0},
-                                        {0, 3}};  // logic scalar, [0:3].
+  const SvOpenArrayDimRange kRanges[] = {{0, 0},
+                                         {0, 3}};  // logic scalar, [0:3].
   SvOpenArrayDesc desc;
-  svOpenArrayHandle h = MakeHandle(data, ranges, 2, /*elem_size=*/0, &desc);
+  svOpenArrayHandle h = MakeHandle(data, kRanges, 2, /*elem_size=*/0, &desc);
 
   // Canonical, not C-compatible: no individual-value element address.
   EXPECT_EQ(svGetArrElemPtr1(h, 1), nullptr);
   EXPECT_EQ(svGetArrayPtr(h), nullptr);
 
-  const svLogic states[] = {sv_0, sv_1, sv_z, sv_x};
-  for (svLogic s : states) {
+  const svLogic kStates[] = {sv_0, sv_1, sv_z, sv_x};
+  for (svLogic s : kStates) {
     svPutLogicArrElem1(h, s, 1);
     EXPECT_EQ(svGetLogicArrElem1(h, 1), s);  // 4-state canonical round-trip.
   }
@@ -206,16 +206,16 @@ TEST(DataRepresentation, OpenArrayScalarElementUsesCanonicalForm) {
 TEST(DataRepresentation, OpenArrayWidePackedElementUsesCanonicalForm) {
   // Two elements of a 40-bit packed type: two canonical words each.
   svBitVecVal data[4] = {0u, 0u, 0u, 0u};
-  const SvOpenArrayDimRange ranges[] = {{39, 0},
-                                        {0, 1}};  // [39:0] element, [0:1].
+  const SvOpenArrayDimRange kRanges[] = {{39, 0},
+                                         {0, 1}};  // [39:0] element, [0:1].
   SvOpenArrayDesc desc;
-  svOpenArrayHandle h = MakeHandle(data, ranges, 2, /*elem_size=*/0, &desc);
+  svOpenArrayHandle h = MakeHandle(data, kRanges, 2, /*elem_size=*/0, &desc);
 
   EXPECT_EQ(svGetArrElemPtr1(h, 0), nullptr);
 
-  const svBitVecVal in[2] = {0x12345678u,
-                             0x9Au};  // 40-bit value over two words.
-  svPutBitArrElem1VecVal(h, in, 1);
+  const svBitVecVal kIn[2] = {0x12345678u,
+                              0x9Au};  // 40-bit value over two words.
+  svPutBitArrElem1VecVal(h, kIn, 1);
   EXPECT_EQ(data[2], 0x12345678u);  // element [1] low canonical word.
   EXPECT_EQ(data[3], 0x9Au);        // element [1] high canonical word.
 
@@ -235,12 +235,12 @@ TEST(DataRepresentation, OpenArrayWidePackedElementUsesCanonicalForm) {
 TEST(DataRepresentation, EnumRepresentedByBaseTypeWithoutNames) {
   // An enum value whose SystemVerilog enumerator label is irrelevant to C: only
   // its integer base value (here 0x2C) crosses, as a 4-state packed value.
-  const uint32_t base_value = 0x2Cu;
+  const uint32_t kBaseValue = 0x2Cu;
 
   svLogicVecVal as_enum = {0u, 0u};
   svLogicVecVal as_integer = {0u, 0u};
   for (int bit = 0; bit < 32; ++bit) {
-    svLogic v = ((base_value >> bit) & 1u) ? sv_1 : sv_0;
+    svLogic v = ((kBaseValue >> bit) & 1u) ? sv_1 : sv_0;
     svPutBitselLogic(&as_enum, bit, v);
     svPutBitselLogic(&as_integer, bit, v);
   }
@@ -249,7 +249,7 @@ TEST(DataRepresentation, EnumRepresentedByBaseTypeWithoutNames) {
   // integer base value (4-state packed, all bits 0/1), carrying no name data.
   EXPECT_EQ(as_enum.aval, as_integer.aval);
   EXPECT_EQ(as_enum.bval, as_integer.bval);
-  EXPECT_EQ(as_enum.aval, base_value);
+  EXPECT_EQ(as_enum.aval, kBaseValue);
   EXPECT_EQ(as_enum.bval, 0u);  // a defined integer base value: no x/z bits.
   for (int bit = 0; bit < 32; ++bit) {
     EXPECT_EQ(svGetBitselLogic(&as_enum, bit),
@@ -263,12 +263,12 @@ TEST(DataRepresentation, EnumRepresentedByBaseTypeWithoutNames) {
 // as the canonical 4-state representation of the underlying 64-bit base value,
 // across both words, with no enumerator name attached.
 TEST(DataRepresentation, EnumTimeBaseRepresentedAsWide4State) {
-  const uint64_t base_value = (static_cast<uint64_t>(0x100u) << 32) | 0x2Cu;
+  const uint64_t kBaseValue = (static_cast<uint64_t>(0x100u) << 32) | 0x2Cu;
 
   svLogicVecVal as_enum[2] = {{0u, 0u}, {0u, 0u}};
   svLogicVecVal as_time[2] = {{0u, 0u}, {0u, 0u}};
   for (int bit = 0; bit < 64; ++bit) {
-    svLogic v = ((base_value >> bit) & 1u) ? sv_1 : sv_0;
+    svLogic v = ((kBaseValue >> bit) & 1u) ? sv_1 : sv_0;
     svPutBitselLogic(as_enum, bit, v);  // bit/32 selects the canonical word.
     svPutBitselLogic(as_time, bit, v);
   }
@@ -297,12 +297,12 @@ TEST(DataRepresentation, UnpackedNaturalOrderMinToZeroMaxToAbs) {
     int l;
     int r;
   };
-  const Case cases[] = {{0, 7}, {7, 0}, {-1, -8}};
-  for (const Case& c : cases) {
-    const SvOpenArrayDimRange ranges[] = {{0, 0},
-                                          {c.l, c.r}};  // dim 1 under test.
+  const Case kCases[] = {{0, 7}, {7, 0}, {-1, -8}};
+  for (const Case& c : kCases) {
+    const SvOpenArrayDimRange kRanges[] = {{0, 0},
+                                           {c.l, c.r}};  // dim 1 under test.
     SvOpenArrayDesc desc;
-    svOpenArrayHandle h = MakeHandle(nullptr, ranges, 2, 0, &desc);
+    svOpenArrayHandle h = MakeHandle(nullptr, kRanges, 2, 0, &desc);
 
     ExpectUnpackedNaturalOrderMinToZeroMaxToAbs(h, 1, c.l, c.r);
   }
@@ -314,9 +314,10 @@ TEST(DataRepresentation, UnpackedNaturalOrderMinToZeroMaxToAbs) {
 // index, where svLow / svHigh report the coincident bound and svSize reports a
 // unit count.
 TEST(DataRepresentation, UnpackedSingleElementDimensionMapsToZero) {
-  const SvOpenArrayDimRange ranges[] = {{0, 0}, {-4, -4}};  // unpacked [-4:-4].
+  const SvOpenArrayDimRange kRanges[] = {{0, 0},
+                                         {-4, -4}};  // unpacked [-4:-4].
   SvOpenArrayDesc desc;
-  svOpenArrayHandle h = MakeHandle(nullptr, ranges, 2, 0, &desc);
+  svOpenArrayHandle h = MakeHandle(nullptr, kRanges, 2, 0, &desc);
 
   EXPECT_EQ(svLow(h, 1), -4);
   EXPECT_EQ(svHigh(h, 1), -4);
@@ -329,22 +330,22 @@ TEST(DataRepresentation, UnpackedSingleElementDimensionMapsToZero) {
 // independent of the declared orientation. Verified against a descending,
 // negative-spanning declaration [3:-2].
 TEST(DataRepresentation, UnpackedLowerIndicesGoFirst) {
-  const SvOpenArrayDimRange ranges[] = {{0, 0}, {3, -2}};  // unpacked [3:-2].
+  const SvOpenArrayDimRange kRanges[] = {{0, 0}, {3, -2}};  // unpacked [3:-2].
   SvOpenArrayDesc desc;
-  svOpenArrayHandle h = MakeHandle(nullptr, ranges, 2, 0, &desc);
+  svOpenArrayHandle h = MakeHandle(nullptr, kRanges, 2, 0, &desc);
 
-  const int lo = svLow(h, 1);     // -2
-  const int size = svSize(h, 1);  // 6
-  EXPECT_EQ(lo, -2);
-  EXPECT_EQ(size, 6);
+  const int kLo = svLow(h, 1);     // -2
+  const int kSize = svSize(h, 1);  // 6
+  EXPECT_EQ(kLo, -2);
+  EXPECT_EQ(kSize, 6);
 
   int expected_c = 0;
-  for (int sv = lo; sv < lo + size; ++sv) {
-    EXPECT_EQ(sv - lo,
+  for (int sv = kLo; sv < kLo + kSize; ++sv) {
+    EXPECT_EQ(sv - kLo,
               expected_c);  // ascending SV index -> 0,1,2,... C indices.
     ++expected_c;
   }
-  EXPECT_EQ(expected_c, size);
+  EXPECT_EQ(expected_c, kSize);
 }
 
 }  // namespace

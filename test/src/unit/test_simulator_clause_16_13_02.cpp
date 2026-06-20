@@ -35,21 +35,21 @@ TEST(MulticlockedProperty, BooleanAndRequiresBothOperandMatches) {
 // the nearest strictly future tick of the consequent's clock. A
 // consequent-clock tick coincident with the antecedent end does not qualify.
 TEST(MulticlockedProperty, NonOverlappingAdvancesToStrictlyFutureTick) {
-  const std::vector<uint64_t> consequent_ticks = {10, 20, 30};
+  const std::vector<uint64_t> kConsequentTicks = {10, 20, 30};
   EXPECT_EQ(MulticlockedConsequentEvalTick(/*antecedent_end_time=*/20,
-                                           consequent_ticks,
+                                           kConsequentTicks,
                                            /*overlapping=*/false),
             30u);
   EXPECT_FALSE(MulticlockedImplicationChecksImmediately(
-      /*antecedent_end_time=*/20, consequent_ticks, /*overlapping=*/false));
+      /*antecedent_end_time=*/20, kConsequentTicks, /*overlapping=*/false));
 }
 
 // §16.13.2: when the consequent clock has no strictly future tick, the
 // nonoverlapping implication has nowhere to evaluate the consequent.
 TEST(MulticlockedProperty, NonOverlappingHasNoTickPastTheEnd) {
-  const std::vector<uint64_t> consequent_ticks = {10, 20};
+  const std::vector<uint64_t> kConsequentTicks = {10, 20};
   EXPECT_EQ(MulticlockedConsequentEvalTick(/*antecedent_end_time=*/20,
-                                           consequent_ticks,
+                                           kConsequentTicks,
                                            /*overlapping=*/false),
             kNoMulticlockTick);
 }
@@ -58,26 +58,26 @@ TEST(MulticlockedProperty, NonOverlappingHasNoTickPastTheEnd) {
 // consequent-clock tick. When that clock ticks at the antecedent end the
 // consequent is checked there immediately.
 TEST(MulticlockedProperty, OverlappingChecksImmediatelyOnCoincidentTick) {
-  const std::vector<uint64_t> consequent_ticks = {10, 20, 30};
+  const std::vector<uint64_t> kConsequentTicks = {10, 20, 30};
   EXPECT_EQ(MulticlockedConsequentEvalTick(/*antecedent_end_time=*/20,
-                                           consequent_ticks,
+                                           kConsequentTicks,
                                            /*overlapping=*/true),
             20u);
   EXPECT_TRUE(MulticlockedImplicationChecksImmediately(
-      /*antecedent_end_time=*/20, consequent_ticks, /*overlapping=*/true));
+      /*antecedent_end_time=*/20, kConsequentTicks, /*overlapping=*/true));
 }
 
 // §16.13.2: when the consequent clock does not tick at the antecedent end, the
 // overlapping implication behaves as the nonoverlapping one — it advances to
 // the nearest strictly future tick and does not check immediately.
 TEST(MulticlockedProperty, OverlappingWithoutCoincidentTickActsNonOverlapping) {
-  const std::vector<uint64_t> consequent_ticks = {10, 25, 30};
+  const std::vector<uint64_t> kConsequentTicks = {10, 25, 30};
   EXPECT_EQ(MulticlockedConsequentEvalTick(/*antecedent_end_time=*/20,
-                                           consequent_ticks,
+                                           kConsequentTicks,
                                            /*overlapping=*/true),
             25u);
   EXPECT_FALSE(MulticlockedImplicationChecksImmediately(
-      /*antecedent_end_time=*/20, consequent_ticks, /*overlapping=*/true));
+      /*antecedent_end_time=*/20, kConsequentTicks, /*overlapping=*/true));
 }
 
 // §16.13.2: combination example `@(posedge clk0) s0 |=> (@(posedge clk1) s1)
@@ -85,14 +85,16 @@ TEST(MulticlockedProperty, OverlappingWithoutCoincidentTickActsNonOverlapping) {
 // (@(posedge clk2) s2)`. After the antecedent advances to the consequent clock,
 // the Boolean `and` of the two differently clocked consequents must both match.
 TEST(MulticlockedProperty, ImplicationConsequentIsMulticlockedAnd) {
-  const std::vector<uint64_t> clk1_ticks = {15, 25};
-  const uint64_t eval_tick = MulticlockedConsequentEvalTick(
-      /*antecedent_end_time=*/10, clk1_ticks, /*overlapping=*/false);
-  EXPECT_EQ(eval_tick, 15u);
+  const std::vector<uint64_t> kClk1Ticks = {15, 25};
+  const uint64_t kEvalTick = MulticlockedConsequentEvalTick(
+      /*antecedent_end_time=*/10, kClk1Ticks, /*overlapping=*/false);
+  EXPECT_EQ(kEvalTick, 15u);
 
-  EXPECT_EQ(EvalMulticlockedAnd(/*s1=*/true, /*s2=*/true),
+  EXPECT_EQ(EvalMulticlockedAnd(/*left_operand_has_match=*/true,
+                                /*right_operand_has_match=*/true),
             PropertyResult::kPass);
-  EXPECT_EQ(EvalMulticlockedAnd(/*s1=*/true, /*s2=*/false),
+  EXPECT_EQ(EvalMulticlockedAnd(/*left_operand_has_match=*/true,
+                                /*right_operand_has_match=*/false),
             PropertyResult::kFail);
 }
 
@@ -101,8 +103,8 @@ TEST(MulticlockedProperty, ImplicationConsequentIsMulticlockedAnd) {
 // overlapping tick of its clock — a tick coincident with the condition check
 // qualifies.
 TEST(MulticlockedProperty, IfThenBranchAllowsOverlappingTick) {
-  const std::vector<uint64_t> then_ticks = {12, 18, 24};
-  EXPECT_EQ(MulticlockedIfBranchEvalTick(/*condition_time=*/12, then_ticks),
+  const std::vector<uint64_t> kThenTicks = {12, 18, 24};
+  EXPECT_EQ(MulticlockedIfBranchEvalTick(/*condition_time=*/12, kThenTicks),
             12u);
 }
 
@@ -110,8 +112,8 @@ TEST(MulticlockedProperty, IfThenBranchAllowsOverlappingTick) {
 // tick of its clock, which likewise admits a coincident tick and otherwise
 // takes the next available one.
 TEST(MulticlockedProperty, IfElseBranchTakesNearestNonStrictlySubsequentTick) {
-  const std::vector<uint64_t> else_ticks = {10, 22, 33};
-  EXPECT_EQ(MulticlockedIfBranchEvalTick(/*condition_time=*/15, else_ticks),
+  const std::vector<uint64_t> kElseTicks = {10, 22, 33};
+  EXPECT_EQ(MulticlockedIfBranchEvalTick(/*condition_time=*/15, kElseTicks),
             22u);
 }
 
@@ -135,11 +137,11 @@ TEST(MulticlockedProperty, IfElseRoutesByCondition) {
 // locate a multiclocked operand, so the search yields the no-tick sentinel
 // under both the inclusive and strictly-future readings.
 TEST(MulticlockedProperty, NoClockTicksYieldsSentinel) {
-  const std::vector<uint64_t> no_ticks = {};
-  EXPECT_EQ(NearestClockTickAtOrAfter(/*from=*/0, no_ticks, /*inclusive=*/true),
+  const std::vector<uint64_t> kNoTicks = {};
+  EXPECT_EQ(NearestClockTickAtOrAfter(/*from=*/0, kNoTicks, /*inclusive=*/true),
             kNoMulticlockTick);
   EXPECT_EQ(
-      NearestClockTickAtOrAfter(/*from=*/0, no_ticks, /*inclusive=*/false),
+      NearestClockTickAtOrAfter(/*from=*/0, kNoTicks, /*inclusive=*/false),
       kNoMulticlockTick);
 }
 
@@ -148,17 +150,17 @@ TEST(MulticlockedProperty, NoClockTicksYieldsSentinel) {
 // the overlapping forms advance to that first tick and neither checks
 // immediately.
 TEST(MulticlockedProperty, ConsequentTickWhenAntecedentEndsBeforeFirstTick) {
-  const std::vector<uint64_t> consequent_ticks = {10, 20};
+  const std::vector<uint64_t> kConsequentTicks = {10, 20};
   EXPECT_EQ(MulticlockedConsequentEvalTick(/*antecedent_end_time=*/3,
-                                           consequent_ticks,
+                                           kConsequentTicks,
                                            /*overlapping=*/false),
             10u);
   EXPECT_EQ(MulticlockedConsequentEvalTick(/*antecedent_end_time=*/3,
-                                           consequent_ticks,
+                                           kConsequentTicks,
                                            /*overlapping=*/true),
             10u);
   EXPECT_FALSE(MulticlockedImplicationChecksImmediately(
-      /*antecedent_end_time=*/3, consequent_ticks, /*overlapping=*/true));
+      /*antecedent_end_time=*/3, kConsequentTicks, /*overlapping=*/true));
 }
 
 // §16.13.2 error case: when the antecedent ends after the consequent clock's
@@ -166,20 +168,20 @@ TEST(MulticlockedProperty, ConsequentTickWhenAntecedentEndsBeforeFirstTick) {
 // the consequent cannot be located and the implication never checks
 // immediately.
 TEST(MulticlockedProperty, OverlappingImplicationHasNoTickFromTheEnd) {
-  const std::vector<uint64_t> consequent_ticks = {5, 10};
+  const std::vector<uint64_t> kConsequentTicks = {5, 10};
   EXPECT_EQ(MulticlockedConsequentEvalTick(/*antecedent_end_time=*/15,
-                                           consequent_ticks,
+                                           kConsequentTicks,
                                            /*overlapping=*/true),
             kNoMulticlockTick);
   EXPECT_FALSE(MulticlockedImplicationChecksImmediately(
-      /*antecedent_end_time=*/15, consequent_ticks, /*overlapping=*/true));
+      /*antecedent_end_time=*/15, kConsequentTicks, /*overlapping=*/true));
 }
 
 // §16.13.2 error case: when the branch clock has no tick at or after the
 // condition check, the if / if-else branch cannot be located.
 TEST(MulticlockedProperty, IfBranchHasNoTickFromCondition) {
-  const std::vector<uint64_t> branch_ticks = {10, 20, 30};
-  EXPECT_EQ(MulticlockedIfBranchEvalTick(/*condition_time=*/40, branch_ticks),
+  const std::vector<uint64_t> kBranchTicks = {10, 20, 30};
+  EXPECT_EQ(MulticlockedIfBranchEvalTick(/*condition_time=*/40, kBranchTicks),
             kNoMulticlockTick);
 }
 

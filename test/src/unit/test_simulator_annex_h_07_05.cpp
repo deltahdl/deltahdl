@@ -29,16 +29,16 @@ namespace {
 // most-significant occupied word, matching word = index/32, bit = index%32.
 TEST(NormalizedLinearizedRanges, PackedPartIndexedFromLeastSignificantBit) {
   // A 40-bit packed array spans two canonical 32-bit elements (n = 40).
-  const int n = 40;
+  const int kN = 40;
   svBitVecVal vec[2] = {0u, 0u};
 
   // Normalized index 0 - the LSB end of the [n-1:0] range.
   svPutBitselBit(vec, 0, 1);
   // Normalized index n-1 - the MSB end of the [n-1:0] range.
-  svPutBitselBit(vec, n - 1, 1);
+  svPutBitselBit(vec, kN - 1, 1);
 
   EXPECT_EQ(svGetBitselBit(vec, 0), 1u);
-  EXPECT_EQ(svGetBitselBit(vec, n - 1), 1u);
+  EXPECT_EQ(svGetBitselBit(vec, kN - 1), 1u);
 
   // Index 0 sits in word 0 bit 0; index 39 sits in word 1 bit 7.
   EXPECT_EQ(vec[0], 1u);
@@ -51,19 +51,19 @@ TEST(NormalizedLinearizedRanges, PackedPartIndexedFromLeastSignificantBit) {
 // the middle index moves by k, and advancing the first index moves by j*k - the
 // signature of a row-major layout where the last subscript varies fastest.
 TEST(NormalizedLinearizedRanges, LinearizedReferenceFollowsRowMajorFormula) {
-  const int i = 2, j = 3, k = 4;  // 24-bit packed array, one canonical word.
-  auto linear = [&](int l, int m, int n) { return n + m * k + l * j * k; };
+  const int kI = 2, kJ = 3, kK = 4;  // 24-bit packed array, one canonical word.
+  auto linear = [&](int l, int m, int n) { return n + m * kK + l * kJ * kK; };
 
   EXPECT_EQ(linear(1, 2, 3), 23);  // last element of the linearized array.
-  EXPECT_EQ(linear(1, 2, 3) - linear(1, 2, 2), 1);      // step in n is 1 bit.
-  EXPECT_EQ(linear(1, 2, 3) - linear(1, 1, 3), k);      // step in m is k bits.
-  EXPECT_EQ(linear(1, 2, 3) - linear(0, 2, 3), j * k);  // step in l is j*k.
+  EXPECT_EQ(linear(1, 2, 3) - linear(1, 2, 2), 1);   // step in n is 1 bit.
+  EXPECT_EQ(linear(1, 2, 3) - linear(1, 1, 3), kK);  // step in m is k bits.
+  EXPECT_EQ(linear(1, 2, 3) - linear(0, 2, 3), kJ * kK);  // step in l is j*k.
 
   // Writing through the computed flat index and reading it back proves the
   // formula addresses exactly one canonical bit and nothing else.
   svBitVecVal vec = 0u;
   svPutBitselBit(&vec, linear(1, 1, 2), 1);  // 2 + 4 + 12 = 18
-  for (int b = 0; b < i * j * k; ++b) {
+  for (int b = 0; b < kI * kJ * kK; ++b) {
     EXPECT_EQ(svGetBitselBit(&vec, b), b == 18 ? 1u : 0u);
   }
 }
@@ -74,26 +74,26 @@ TEST(NormalizedLinearizedRanges, LinearizedReferenceFollowsRowMajorFormula) {
 // i.e., the linearized view and a plain one-dimensional array coincide bit for
 // bit.
 TEST(NormalizedLinearizedRanges, RowMajorIterationIsContiguousOneDimensional) {
-  const int i = 2, j = 3, k = 4;
-  auto linear = [&](int l, int m, int n) { return n + m * k + l * j * k; };
+  const int kI = 2, kJ = 3, kK = 4;
+  auto linear = [&](int l, int m, int n) { return n + m * kK + l * kJ * kK; };
 
   svBitVecVal vec = 0u;
   int counter = 0;
   // Row-major nesting: the last subscript (n) is the innermost loop.
-  for (int l = 0; l < i; ++l) {
-    for (int m = 0; m < j; ++m) {
-      for (int n = 0; n < k; ++n) {
+  for (int l = 0; l < kI; ++l) {
+    for (int m = 0; m < kJ; ++m) {
+      for (int n = 0; n < kK; ++n) {
         EXPECT_EQ(linear(l, m, n), counter);  // contiguous, no gaps/overlaps.
         svPutBitselBit(&vec, linear(l, m, n), counter & 1);
         ++counter;
       }
     }
   }
-  EXPECT_EQ(counter, i * j * k);
+  EXPECT_EQ(counter, kI * kJ * kK);
 
   // Read straight down the flat one-dimensional index: each bit equals the
   // alternating pattern written in row-major order.
-  for (int b = 0; b < i * j * k; ++b) {
+  for (int b = 0; b < kI * kJ * kK; ++b) {
     EXPECT_EQ(svGetBitselBit(&vec, b), static_cast<svBit>(b & 1));
   }
 }
@@ -103,27 +103,27 @@ TEST(NormalizedLinearizedRanges, RowMajorIterationIsContiguousOneDimensional) {
 // words exactly as the packed-array canonical representation of H.7.7
 // prescribes.
 TEST(NormalizedLinearizedRanges, LinearizedIndexCrossesCanonicalWordBoundary) {
-  const int i = 2, j = 2,
-            k = 20;  // 80-bit packed array, three canonical words.
-  auto linear = [&](int l, int m, int n) { return n + m * k + l * j * k; };
+  const int kI = 2, kJ = 2,
+            kK = 20;  // 80-bit packed array, three canonical words.
+  auto linear = [&](int l, int m, int n) { return n + m * kK + l * kJ * kK; };
 
   svBitVecVal vec[3] = {0u, 0u, 0u};
 
   // (0,1,12) -> 12 + 20 = 32: the first bit of the second canonical word.
-  const int idx_lo = linear(0, 1, 12);
-  EXPECT_EQ(idx_lo, 32);
-  svPutBitselBit(vec, idx_lo, 1);
+  const int kIdxLo = linear(0, 1, 12);
+  EXPECT_EQ(kIdxLo, 32);
+  svPutBitselBit(vec, kIdxLo, 1);
   EXPECT_EQ(vec[0], 0u);
   EXPECT_EQ(vec[1], 1u);
 
   // (1,1,19) -> 19 + 20 + 40 = 79: the final bit, in the third canonical word.
-  const int idx_hi = linear(1, 1, 19);
-  EXPECT_EQ(idx_hi, 79);
-  svPutBitselBit(vec, idx_hi, 1);
+  const int kIdxHi = linear(1, 1, 19);
+  EXPECT_EQ(kIdxHi, 79);
+  svPutBitselBit(vec, kIdxHi, 1);
   EXPECT_EQ(vec[2], 1u << 15);  // 79 % 32 = 15
 
-  EXPECT_EQ(svGetBitselBit(vec, idx_lo), 1u);
-  EXPECT_EQ(svGetBitselBit(vec, idx_hi), 1u);
+  EXPECT_EQ(svGetBitselBit(vec, kIdxLo), 1u);
+  EXPECT_EQ(svGetBitselBit(vec, kIdxHi), 1u);
 }
 
 // N6/N1 (element granularity): linearization is not limited to single bits - a
@@ -132,16 +132,16 @@ TEST(NormalizedLinearizedRanges, LinearizedIndexCrossesCanonicalWordBoundary) {
 // write that row directly at its computed normalized offset, treating the
 // multidimensional packed array as one flat dimension.
 TEST(NormalizedLinearizedRanges, LinearizedElementFieldAccessedByPartSelect) {
-  const int i = 2, j = 3, k = 4;  // 24-bit packed array, one canonical word.
-  auto row_offset = [&](int l, int m) { return m * k + l * j * k; };
+  const int kI = 2, kJ = 3, kK = 4;  // 24-bit packed array, one canonical word.
+  auto row_offset = [&](int l, int m) { return m * kK + l * kJ * kK; };
 
   svBitVecVal vec = 0u;
   // Write a distinct k-bit value into each row, visiting rows in row-major
   // order.
   svBitVecVal value = 1u;
-  for (int l = 0; l < i; ++l) {
-    for (int m = 0; m < j; ++m) {
-      svPutPartselBit(&vec, value, row_offset(l, m), k);
+  for (int l = 0; l < kI; ++l) {
+    for (int m = 0; m < kJ; ++m) {
+      svPutPartselBit(&vec, value, row_offset(l, m), kK);
       ++value;
     }
   }
@@ -149,11 +149,11 @@ TEST(NormalizedLinearizedRanges, LinearizedElementFieldAccessedByPartSelect) {
   // Read every row back through the part-select path at its linearized offset;
   // each k-bit field returns exactly the value written to that row.
   value = 1u;
-  for (int l = 0; l < i; ++l) {
-    for (int m = 0; m < j; ++m) {
+  for (int l = 0; l < kI; ++l) {
+    for (int m = 0; m < kJ; ++m) {
       svBitVecVal out = 0u;
-      svGetPartselBit(&out, &vec, row_offset(l, m), k);
-      EXPECT_EQ(out, value & SV_MASK(k));
+      svGetPartselBit(&out, &vec, row_offset(l, m), kK);
+      EXPECT_EQ(out, value & SV_MASK(kK));
       ++value;
     }
   }
@@ -166,8 +166,9 @@ TEST(NormalizedLinearizedRanges, LinearizedElementFieldAccessedByPartSelect) {
 // and no other position is disturbed.
 TEST(NormalizedLinearizedRanges,
      FourStateLinearizedAccessPreservesLogicValues) {
-  const int i = 2, j = 2, k = 3;  // 12-bit 4-state packed array, one element.
-  auto linear = [&](int l, int m, int n) { return n + m * k + l * j * k; };
+  const int kI = 2, kJ = 2,
+            kK = 3;  // 12-bit 4-state packed array, one element.
+  auto linear = [&](int l, int m, int n) { return n + m * kK + l * kJ * kK; };
 
   svLogicVecVal vec = {0u, 0u};
   svPutBitselLogic(&vec, linear(0, 0, 0), sv_1);  // index 0
@@ -182,10 +183,10 @@ TEST(NormalizedLinearizedRanges,
 
   // Every unwritten position stays at logic 0, confirming each reference
   // addressed exactly its own linearized bit and nothing adjacent.
-  for (int b = 0; b < i * j * k; ++b) {
-    const bool written = b == linear(0, 0, 0) || b == linear(0, 1, 2) ||
-                         b == linear(1, 0, 1) || b == linear(1, 1, 2);
-    if (!written) EXPECT_EQ(svGetBitselLogic(&vec, b), sv_0);
+  for (int b = 0; b < kI * kJ * kK; ++b) {
+    const bool kWritten = b == linear(0, 0, 0) || b == linear(0, 1, 2) ||
+                          b == linear(1, 0, 1) || b == linear(1, 1, 2);
+    if (!kWritten) EXPECT_EQ(svGetBitselLogic(&vec, b), sv_0);
   }
 }
 

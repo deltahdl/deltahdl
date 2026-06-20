@@ -33,7 +33,7 @@ struct StmtObject {
   const char* label;
 };
 
-constexpr StmtObject kTable38_6Objects[] = {
+constexpr StmtObject kTable386Objects[] = {
     {vpiBegin, "begin"},
     {vpiNamedBegin, "named begin"},
     {vpiFork, "fork"},
@@ -88,7 +88,7 @@ class VpiStmtCallbackByType : public ::testing::Test {
 // Table 38-6 succeeds and yields a callback handle.
 TEST_F(VpiStmtCallbackByType, EveryTable38_6ObjectQualifies) {
   int suffix = 0;
-  for (const StmtObject& obj : kTable38_6Objects) {
+  for (const StmtObject& obj : kTable386Objects) {
     std::string name = "s" + std::to_string(suffix++);
     vpiHandle stmt = MakeHandleOfType(name.c_str(), obj.type);
     ASSERT_NE(stmt, nullptr) << obj.label;

@@ -53,26 +53,26 @@ TEST(MappingSvRangesToCRanges, PackedRangeNormalizedLsbZeroMsbAbsLminusR) {
   };
   // Descending [7:4], ascending [4:7], and a negative-spanning [2:-3] all carry
   // the same width abs(L-R)+1 and the same normalized MSB index abs(L-R).
-  const Case cases[] = {{7, 4}, {4, 7}, {2, -3}};
-  for (const Case& c : cases) {
-    const int msb = std::abs(c.l - c.r);  // normalized index of the MSB.
-    const int width = msb + 1;
-    const int words = SV_PACKED_DATA_NELEMS(width);
-    ASSERT_LE(words, 2);
+  const Case kCases[] = {{7, 4}, {4, 7}, {2, -3}};
+  for (const Case& c : kCases) {
+    const int kMsb = std::abs(c.l - c.r);  // normalized index of the MSB.
+    const int kWidth = kMsb + 1;
+    const int kWords = SV_PACKED_DATA_NELEMS(kWidth);
+    ASSERT_LE(kWords, 2);
     svBitVecVal vec[2] = {0u, 0u};
 
     // Drive the two endpoints of the normalized [abs(L-R):0] range.
-    svPutBitselBit(vec, 0, 1);    // LSB -> normalized index 0.
-    svPutBitselBit(vec, msb, 1);  // MSB -> normalized index abs(L-R).
+    svPutBitselBit(vec, 0, 1);     // LSB -> normalized index 0.
+    svPutBitselBit(vec, kMsb, 1);  // MSB -> normalized index abs(L-R).
 
     EXPECT_EQ(svGetBitselBit(vec, 0), 1u);
-    EXPECT_EQ(svGetBitselBit(vec, msb), 1u);
+    EXPECT_EQ(svGetBitselBit(vec, kMsb), 1u);
 
     // Nothing outside the two endpoints is set: the normalized range spans
     // exactly indices 0 .. abs(L-R) and no more.
-    for (int i = 0; i < width; ++i) {
-      const svBit expected = (i == 0 || i == msb) ? 1u : 0u;
-      EXPECT_EQ(svGetBitselBit(vec, i), expected)
+    for (int i = 0; i < kWidth; ++i) {
+      const svBit kExpected = (i == 0 || i == kMsb) ? 1u : 0u;
+      EXPECT_EQ(svGetBitselBit(vec, i), kExpected)
           << "L=" << c.l << " R=" << c.r;
     }
   }
@@ -82,8 +82,8 @@ TEST(MappingSvRangesToCRanges, PackedRangeNormalizedLsbZeroMsbAbsLminusR) {
 // abs(L-R) == 0, so it normalizes to [0:0] - the MSB and LSB coincide at C
 // index 0. This is the degenerate endpoint of the normalization formula.
 TEST(MappingSvRangesToCRanges, SingleElementPackedRangeNormalizesToZeroZero) {
-  const int l = 5, r = 5;
-  EXPECT_EQ(std::abs(l - r), 0);
+  const int kL = 5, kR = 5;
+  EXPECT_EQ(std::abs(kL - kR), 0);
 
   svBitVecVal vec = 0u;
   svPutBitselBit(&vec, 0, 1);
@@ -101,12 +101,12 @@ TEST(MappingSvRangesToCRanges, UnpackedNaturalOrderMinToZeroMaxToAbs) {
     int l;
     int r;
   };
-  const Case cases[] = {{0, 7}, {7, 0}, {-1, -8}};
-  for (const Case& c : cases) {
+  const Case kCases[] = {{0, 7}, {7, 0}, {-1, -8}};
+  for (const Case& c : kCases) {
     // Dimension 0 is an unused packed placeholder; dimension 1 is under test.
-    const SvOpenArrayDimRange ranges[] = {{0, 0}, {c.l, c.r}};
+    const SvOpenArrayDimRange kRanges[] = {{0, 0}, {c.l, c.r}};
     SvOpenArrayDesc desc;
-    svOpenArrayHandle h = MakeHandle(ranges, 2, &desc);
+    svOpenArrayHandle h = MakeHandle(kRanges, 2, &desc);
 
     ExpectUnpackedNaturalOrderMinToZeroMaxToAbs(h, 1, c.l, c.r);
   }
@@ -117,21 +117,22 @@ TEST(MappingSvRangesToCRanges, UnpackedNaturalOrderMinToZeroMaxToAbs) {
 // layout preserves the ascending element order independent of the declared
 // range orientation. Verified against a descending declaration [3:-2].
 TEST(MappingSvRangesToCRanges, UnpackedLowerIndicesGoFirst) {
-  const SvOpenArrayDimRange ranges[] = {{0, 0}, {3, -2}};  // unpacked [3:-2].
+  const SvOpenArrayDimRange kRanges[] = {{0, 0}, {3, -2}};  // unpacked [3:-2].
   SvOpenArrayDesc desc;
-  svOpenArrayHandle h = MakeHandle(ranges, 2, &desc);
+  svOpenArrayHandle h = MakeHandle(kRanges, 2, &desc);
 
-  const int lo = svLow(h, 1);     // -2
-  const int size = svSize(h, 1);  // 6
-  EXPECT_EQ(lo, -2);
-  EXPECT_EQ(size, 6);
+  const int kLo = svLow(h, 1);     // -2
+  const int kSize = svSize(h, 1);  // 6
+  EXPECT_EQ(kLo, -2);
+  EXPECT_EQ(kSize, 6);
 
   int expected_c = 0;
-  for (int sv = lo; sv < lo + size; ++sv) {
-    EXPECT_EQ(sv - lo, expected_c);  // contiguous 0,1,2,... in ascending order.
+  for (int sv = kLo; sv < kLo + kSize; ++sv) {
+    EXPECT_EQ(sv - kLo,
+              expected_c);  // contiguous 0,1,2,... in ascending order.
     ++expected_c;
   }
-  EXPECT_EQ(expected_c, size);
+  EXPECT_EQ(expected_c, kSize);
 }
 
 // The worked example from H.7.6: logic [2:3][1:3][2:0] b [1:10][31:0] must be
@@ -142,17 +143,17 @@ TEST(MappingSvRangesToCRanges, UnpackedLowerIndicesGoFirst) {
 // index 0 and the unpacked dimensions after it.
 TEST(MappingSvRangesToCRanges, WorkedExampleNormalizedForm) {
   // Original packed dimension sizes, before linearization.
-  const int packed_sizes[] = {std::abs(2 - 3) + 1, std::abs(1 - 3) + 1,
+  const int kPackedSizes[] = {std::abs(2 - 3) + 1, std::abs(1 - 3) + 1,
                               std::abs(2 - 0) + 1};
   int packed_width = 1;
-  for (int s : packed_sizes) packed_width *= s;
+  for (int s : kPackedSizes) packed_width *= s;
   EXPECT_EQ(packed_width, 18);  // 2 * 3 * 3.
 
   // Descriptor: dim 0 = linearized+normalized packed part [17:0];
   // dim 1 = unpacked [1:10]; dim 2 = unpacked [31:0].
-  const SvOpenArrayDimRange ranges[] = {{17, 0}, {1, 10}, {31, 0}};
+  const SvOpenArrayDimRange kRanges[] = {{17, 0}, {1, 10}, {31, 0}};
   SvOpenArrayDesc desc;
-  svOpenArrayHandle h = MakeHandle(ranges, 3, &desc);
+  svOpenArrayHandle h = MakeHandle(kRanges, 3, &desc);
 
   // Packed part normalizes to [17:0]: size 18, MSB normalized index 17.
   EXPECT_EQ(svSize(h, 0), 18);
@@ -180,23 +181,24 @@ TEST(MappingSvRangesToCRanges, WorkedExampleNormalizedForm) {
 // Writing through the normalized indices of a packed [L:R] and reading them
 // back yields the identical mapping in both directions.
 TEST(MappingSvRangesToCRanges, MappingAppliesInBothCallDirections) {
-  const int l = 11, r = 4;          // packed [11:4].
-  const int msb = std::abs(l - r);  // 7
-  const int width = msb + 1;        // 8
+  const int kL = 11, kR = 4;           // packed [11:4].
+  const int kMsb = std::abs(kL - kR);  // 7
+  const int kWidth = kMsb + 1;         // 8
   svBitVecVal vec = 0u;
 
   // C->SV direction: C writes the value SystemVerilog will observe.
-  for (int i = 0; i < width; ++i) {
+  for (int i = 0; i < kWidth; ++i) {
     if (i % 2 == 0) svPutBitselBit(&vec, i, 1);
   }
 
   // SV->C direction: C reads the value back at the same normalized indices.
-  for (int i = 0; i < width; ++i) {
+  for (int i = 0; i < kWidth; ++i) {
     EXPECT_EQ(svGetBitselBit(&vec, i),
               static_cast<svBit>(i % 2 == 0 ? 1u : 0u));
   }
-  EXPECT_EQ(svGetBitselBit(&vec, 0), 1u);    // LSB normalized index 0.
-  EXPECT_EQ(svGetBitselBit(&vec, msb), 0u);  // MSB normalized index abs(L-R)=7.
+  EXPECT_EQ(svGetBitselBit(&vec, 0), 1u);  // LSB normalized index 0.
+  EXPECT_EQ(svGetBitselBit(&vec, kMsb),
+            0u);  // MSB normalized index abs(L-R)=7.
 }
 
 // Rule b edge: the normalization holds when the packed range is wider than one
@@ -205,17 +207,17 @@ TEST(MappingSvRangesToCRanges, MappingAppliesInBothCallDirections) {
 // canonical word (39 / 32 = word 1, 39 % 32 = bit 7) while the LSB stays at
 // normalized index 0 in the first word.
 TEST(MappingSvRangesToCRanges, PackedRangeWiderThanCanonicalWordNormalizes) {
-  const int l = 40, r = 1;
-  const int msb = std::abs(l - r);  // 39
-  const int width = msb + 1;        // 40
-  ASSERT_EQ(SV_PACKED_DATA_NELEMS(width), 2);
+  const int kL = 40, kR = 1;
+  const int kMsb = std::abs(kL - kR);  // 39
+  const int kWidth = kMsb + 1;         // 40
+  ASSERT_EQ(SV_PACKED_DATA_NELEMS(kWidth), 2);
   svBitVecVal vec[2] = {0u, 0u};
 
-  svPutBitselBit(vec, 0, 1);    // LSB -> normalized index 0.
-  svPutBitselBit(vec, msb, 1);  // MSB -> normalized index abs(L-R) = 39.
+  svPutBitselBit(vec, 0, 1);     // LSB -> normalized index 0.
+  svPutBitselBit(vec, kMsb, 1);  // MSB -> normalized index abs(L-R) = 39.
 
   EXPECT_EQ(svGetBitselBit(vec, 0), 1u);
-  EXPECT_EQ(svGetBitselBit(vec, msb), 1u);
+  EXPECT_EQ(svGetBitselBit(vec, kMsb), 1u);
   EXPECT_EQ(vec[0], 1u);       // only bit 0 of the low canonical word.
   EXPECT_EQ(vec[1], 1u << 7);  // MSB lands in the high word at bit 7.
 }
@@ -225,9 +227,10 @@ TEST(MappingSvRangesToCRanges, PackedRangeWiderThanCanonicalWordNormalizes) {
 // coincident bound and unit count, and the lone element's C index (sv - svLow)
 // is zero even for a negative declared index.
 TEST(MappingSvRangesToCRanges, SingleElementUnpackedDimensionMapsToZero) {
-  const SvOpenArrayDimRange ranges[] = {{0, 0}, {-4, -4}};  // unpacked [-4:-4].
+  const SvOpenArrayDimRange kRanges[] = {{0, 0},
+                                         {-4, -4}};  // unpacked [-4:-4].
   SvOpenArrayDesc desc;
-  svOpenArrayHandle h = MakeHandle(ranges, 2, &desc);
+  svOpenArrayHandle h = MakeHandle(kRanges, 2, &desc);
 
   EXPECT_EQ(svLow(h, 1), -4);
   EXPECT_EQ(svHigh(h, 1), -4);

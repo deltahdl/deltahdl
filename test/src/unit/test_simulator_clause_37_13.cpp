@@ -55,8 +55,9 @@ TEST(IoDeclModel, ExprTargetKindFollowsPassingMode) {
       VpiIoDeclExprType(true, true, /*is_virtual_interface=*/true, kVpiNet),
       vpiVirtualInterfaceVar);
   // An ordinary input port keeps its connected kind (here a net).
-  EXPECT_EQ(VpiIoDeclExprType(false, false, false, /*default=*/kVpiNet),
-            kVpiNet);
+  EXPECT_EQ(
+      VpiIoDeclExprType(false, false, false, /*default_expr_type=*/kVpiNet),
+      kVpiNet);
 }
 
 // D2: traversing vpiExpr through the public handle path returns the io decl's

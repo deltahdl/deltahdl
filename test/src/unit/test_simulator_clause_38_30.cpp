@@ -34,12 +34,12 @@ TEST_F(VpiPrintfSim,
   PLI_BYTE8 format[] = "value=%d name=%s";
   int written = vpi_printf(format, 42, "ok");
 
-  const std::string expected = "value=42 name=ok";
+  const std::string kExpected = "value=42 name=ok";
   // The same expanded text reached both the output channel and the log file.
-  EXPECT_EQ(vpi_ctx_.OutputChannelBuffer(), expected);
-  EXPECT_EQ(vpi_ctx_.LogFileBuffer(), expected);
+  EXPECT_EQ(vpi_ctx_.OutputChannelBuffer(), kExpected);
+  EXPECT_EQ(vpi_ctx_.LogFileBuffer(), kExpected);
   // The return value is the number of characters printed.
-  EXPECT_EQ(written, static_cast<int>(expected.size()));
+  EXPECT_EQ(written, static_cast<int>(kExpected.size()));
 }
 
 // §38.30: a missing format string names nothing to print, so the routine

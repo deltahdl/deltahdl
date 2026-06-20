@@ -102,7 +102,7 @@ TEST(ExpressionSim, PostfixDecrement) {
 
 TEST(ExpressionSim, PrefixIncReturnsNewValue) {
   SimFixture f;
-  Variable *vx, *vy;
+  Variable *vx = nullptr, *vy = nullptr;
   RunXYBody(f, "x = 5; y = ++x;", &vx, &vy);
   EXPECT_EQ(vx->value.ToUint64(), 6u);
   EXPECT_EQ(vy->value.ToUint64(), 6u);
@@ -110,7 +110,7 @@ TEST(ExpressionSim, PrefixIncReturnsNewValue) {
 
 TEST(ExpressionSim, PostfixIncReturnsOldValue) {
   SimFixture f;
-  Variable *vx, *vy;
+  Variable *vx = nullptr, *vy = nullptr;
   RunXYBody(f, "x = 5; y = x++;", &vx, &vy);
   EXPECT_EQ(vx->value.ToUint64(), 6u);
   EXPECT_EQ(vy->value.ToUint64(), 5u);
@@ -118,7 +118,7 @@ TEST(ExpressionSim, PostfixIncReturnsOldValue) {
 
 TEST(ExpressionSim, PrefixDecReturnsNewValue) {
   SimFixture f;
-  Variable *vx, *vy;
+  Variable *vx = nullptr, *vy = nullptr;
   RunXYBody(f, "x = 10; y = --x;", &vx, &vy);
   EXPECT_EQ(vx->value.ToUint64(), 9u);
   EXPECT_EQ(vy->value.ToUint64(), 9u);
@@ -126,7 +126,7 @@ TEST(ExpressionSim, PrefixDecReturnsNewValue) {
 
 TEST(ExpressionSim, PostfixDecReturnsOldValue) {
   SimFixture f;
-  Variable *vx, *vy;
+  Variable *vx = nullptr, *vy = nullptr;
   RunXYBody(f, "x = 10; y = x--;", &vx, &vy);
   EXPECT_EQ(vx->value.ToUint64(), 9u);
   EXPECT_EQ(vy->value.ToUint64(), 10u);

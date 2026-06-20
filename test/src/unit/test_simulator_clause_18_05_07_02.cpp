@@ -54,14 +54,14 @@ ConstraintExpr Reduction(ArrayReductionOp op,
 // succeeds; the solver folds exactly those element values.
 TEST(ArrayReductionConstraint, SumReductionJoinsElementsByAddition) {
   ConstraintSolver solver(42);
-  const std::vector<std::string> elems = {"e0", "e1", "e2", "e3", "e4"};
-  for (const auto& e : elems) solver.AddVariable(MakeVar(e, 0, 255));
+  const std::vector<std::string> kElems = {"e0", "e1", "e2", "e3", "e4"};
+  for (const auto& e : kElems) solver.AddVariable(MakeVar(e, 0, 255));
 
   ConstraintBlock pins;
   pins.name = "pins";
-  const std::vector<int64_t> vals = {100, 200, 50, 30, 20};  // sum 400 < 1000
-  for (size_t i = 0; i < elems.size(); ++i)
-    pins.constraints.push_back(Pin(elems[i], vals[i]));
+  const std::vector<int64_t> kVals = {100, 200, 50, 30, 20};  // sum 400 < 1000
+  for (size_t i = 0; i < kElems.size(); ++i)
+    pins.constraints.push_back(Pin(kElems[i], kVals[i]));
   solver.AddConstraintBlock(pins);
 
   // c2: A.sum() with (int'(item)) < 1000. int' of an in-range 8-bit value is
@@ -69,13 +69,13 @@ TEST(ArrayReductionConstraint, SumReductionJoinsElementsByAddition) {
   // result type leaves the sum un-truncated.
   ConstraintBlock rc;
   rc.name = "reduce";
-  rc.constraints.push_back(Reduction(ArrayReductionOp::kSum, elems,
+  rc.constraints.push_back(Reduction(ArrayReductionOp::kSum, kElems,
                                      ConstraintKind::kLessThan, 1000));
   solver.AddConstraintBlock(rc);
 
   ASSERT_TRUE(solver.Solve());
   int64_t sum = 0;
-  for (const auto& e : elems) sum += solver.GetValue(e);
+  for (const auto& e : kElems) sum += solver.GetValue(e);
   EXPECT_EQ(sum, 400);
   EXPECT_LT(sum, 1000);
 }
@@ -86,8 +86,8 @@ TEST(ArrayReductionConstraint, SumReductionJoinsElementsByAddition) {
 // elements sum to 1500, which is not < 1000.
 TEST(ArrayReductionConstraint, ReductionViolationFailsRandomize) {
   ConstraintSolver solver(7);
-  const std::vector<std::string> elems = {"e0", "e1", "e2"};
-  for (const auto& e : elems) solver.AddVariable(MakeVar(e, 0, 1000, 32));
+  const std::vector<std::string> kElems = {"e0", "e1", "e2"};
+  for (const auto& e : kElems) solver.AddVariable(MakeVar(e, 0, 1000, 32));
 
   ConstraintBlock pins;
   pins.name = "pins";
@@ -98,7 +98,7 @@ TEST(ArrayReductionConstraint, ReductionViolationFailsRandomize) {
 
   ConstraintBlock rc;
   rc.name = "reduce";
-  rc.constraints.push_back(Reduction(ArrayReductionOp::kSum, elems,
+  rc.constraints.push_back(Reduction(ArrayReductionOp::kSum, kElems,
                                      ConstraintKind::kLessThan, 1000));
   solver.AddConstraintBlock(rc);
 
@@ -111,8 +111,8 @@ TEST(ArrayReductionConstraint, ReductionViolationFailsRandomize) {
 // that value.
 TEST(ArrayReductionConstraint, WithClauseExpressionTransformsEachElement) {
   ConstraintSolver solver(11);
-  const std::vector<std::string> elems = {"e0", "e1", "e2"};
-  for (const auto& e : elems) solver.AddVariable(MakeVar(e, 0, 15, 8));
+  const std::vector<std::string> kElems = {"e0", "e1", "e2"};
+  for (const auto& e : kElems) solver.AddVariable(MakeVar(e, 0, 15, 8));
 
   ConstraintBlock pins;
   pins.name = "pins";
@@ -122,7 +122,7 @@ TEST(ArrayReductionConstraint, WithClauseExpressionTransformsEachElement) {
   solver.AddConstraintBlock(pins);
 
   ConstraintExpr r =
-      Reduction(ArrayReductionOp::kSum, elems, ConstraintKind::kEqual, 14);
+      Reduction(ArrayReductionOp::kSum, kElems, ConstraintKind::kEqual, 14);
   r.reduce_with = [](int64_t item) { return item * item; };
   ConstraintBlock rc;
   rc.name = "reduce";
@@ -133,9 +133,9 @@ TEST(ArrayReductionConstraint, WithClauseExpressionTransformsEachElement) {
 
   // A different target must fail, confirming the transform is what is folded.
   ConstraintSolver solver2(11);
-  for (const auto& e : elems) solver2.AddVariable(MakeVar(e, 0, 15, 8));
+  for (const auto& e : kElems) solver2.AddVariable(MakeVar(e, 0, 15, 8));
   solver2.AddConstraintBlock(pins);
-  ConstraintExpr r2 = Reduction(ArrayReductionOp::kSum, elems,
+  ConstraintExpr r2 = Reduction(ArrayReductionOp::kSum, kElems,
                                 ConstraintKind::kEqual, 6);  // plain sum, wrong
   r2.reduce_with = [](int64_t item) { return item * item; };
   ConstraintBlock rc2;
@@ -151,11 +151,11 @@ TEST(ArrayReductionConstraint, WithClauseExpressionTransformsEachElement) {
 // to a 32-bit with-clause type (int'(item)) preserves the full sum (300). The
 // two solves observe the result type governing the folded value.
 TEST(ArrayReductionConstraint, ResultTypeGovernsTruncation) {
-  const std::vector<std::string> elems = {"e0", "e1"};
+  const std::vector<std::string> kElems = {"e0", "e1"};
 
   // Element-type (8-bit) result: 300 truncates to 44.
   ConstraintSolver narrow(5);
-  for (const auto& e : elems) narrow.AddVariable(MakeVar(e, 0, 255, 8));
+  for (const auto& e : kElems) narrow.AddVariable(MakeVar(e, 0, 255, 8));
   ConstraintBlock pins;
   pins.name = "pins";
   pins.constraints.push_back(Pin("e0", 200));
@@ -163,7 +163,7 @@ TEST(ArrayReductionConstraint, ResultTypeGovernsTruncation) {
   narrow.AddConstraintBlock(pins);
   ConstraintBlock nrc;
   nrc.name = "reduce";
-  nrc.constraints.push_back(Reduction(ArrayReductionOp::kSum, elems,
+  nrc.constraints.push_back(Reduction(ArrayReductionOp::kSum, kElems,
                                       ConstraintKind::kEqual, 44,
                                       /*result_width=*/8));
   narrow.AddConstraintBlock(nrc);
@@ -171,11 +171,11 @@ TEST(ArrayReductionConstraint, ResultTypeGovernsTruncation) {
 
   // The same fold against the full sum must fail under the 8-bit result type.
   ConstraintSolver narrow2(5);
-  for (const auto& e : elems) narrow2.AddVariable(MakeVar(e, 0, 255, 8));
+  for (const auto& e : kElems) narrow2.AddVariable(MakeVar(e, 0, 255, 8));
   narrow2.AddConstraintBlock(pins);
   ConstraintBlock nrc2;
   nrc2.name = "reduce";
-  nrc2.constraints.push_back(Reduction(ArrayReductionOp::kSum, elems,
+  nrc2.constraints.push_back(Reduction(ArrayReductionOp::kSum, kElems,
                                        ConstraintKind::kEqual, 300,
                                        /*result_width=*/8));
   narrow2.AddConstraintBlock(nrc2);
@@ -183,11 +183,11 @@ TEST(ArrayReductionConstraint, ResultTypeGovernsTruncation) {
 
   // with (int'(item)): a 32-bit result type preserves the full sum 300.
   ConstraintSolver wide(5);
-  for (const auto& e : elems) wide.AddVariable(MakeVar(e, 0, 255, 8));
+  for (const auto& e : kElems) wide.AddVariable(MakeVar(e, 0, 255, 8));
   wide.AddConstraintBlock(pins);
   ConstraintBlock wrc;
   wrc.name = "reduce";
-  wrc.constraints.push_back(Reduction(ArrayReductionOp::kSum, elems,
+  wrc.constraints.push_back(Reduction(ArrayReductionOp::kSum, kElems,
                                       ConstraintKind::kEqual, 300,
                                       /*result_width=*/32));
   wide.AddConstraintBlock(wrc);
@@ -198,8 +198,8 @@ TEST(ArrayReductionConstraint, ResultTypeGovernsTruncation) {
 // joins the elements by multiplication. {2,3,4} folds to 24.
 TEST(ArrayReductionConstraint, ProductReductionJoinsByMultiplication) {
   ConstraintSolver solver(13);
-  const std::vector<std::string> elems = {"e0", "e1", "e2"};
-  for (const auto& e : elems) solver.AddVariable(MakeVar(e, 0, 255, 32));
+  const std::vector<std::string> kElems = {"e0", "e1", "e2"};
+  for (const auto& e : kElems) solver.AddVariable(MakeVar(e, 0, 255, 32));
 
   ConstraintBlock pins;
   pins.name = "pins";
@@ -210,8 +210,8 @@ TEST(ArrayReductionConstraint, ProductReductionJoinsByMultiplication) {
 
   ConstraintBlock rc;
   rc.name = "reduce";
-  rc.constraints.push_back(
-      Reduction(ArrayReductionOp::kProduct, elems, ConstraintKind::kEqual, 24));
+  rc.constraints.push_back(Reduction(ArrayReductionOp::kProduct, kElems,
+                                     ConstraintKind::kEqual, 24));
   solver.AddConstraintBlock(rc);
 
   EXPECT_TRUE(solver.Solve());
@@ -223,8 +223,8 @@ TEST(ArrayReductionConstraint, ProductReductionJoinsByMultiplication) {
 // all of them set.
 TEST(ArrayReductionConstraint, AndReductionJoinsByBitwiseAnd) {
   ConstraintSolver solver(21);
-  const std::vector<std::string> elems = {"e0", "e1", "e2"};
-  for (const auto& e : elems) solver.AddVariable(MakeVar(e, 0, 255, 8));
+  const std::vector<std::string> kElems = {"e0", "e1", "e2"};
+  for (const auto& e : kElems) solver.AddVariable(MakeVar(e, 0, 255, 8));
 
   ConstraintBlock pins;
   pins.name = "pins";
@@ -236,19 +236,19 @@ TEST(ArrayReductionConstraint, AndReductionJoinsByBitwiseAnd) {
   ConstraintBlock rc;
   rc.name = "reduce";
   rc.constraints.push_back(
-      Reduction(ArrayReductionOp::kAnd, elems, ConstraintKind::kEqual, 0x0C));
+      Reduction(ArrayReductionOp::kAnd, kElems, ConstraintKind::kEqual, 0x0C));
   solver.AddConstraintBlock(rc);
 
   EXPECT_TRUE(solver.Solve());
 
   // A different target must fail, confirming the AND fold is what is computed.
   ConstraintSolver solver2(21);
-  for (const auto& e : elems) solver2.AddVariable(MakeVar(e, 0, 255, 8));
+  for (const auto& e : kElems) solver2.AddVariable(MakeVar(e, 0, 255, 8));
   solver2.AddConstraintBlock(pins);
   ConstraintBlock rc2;
   rc2.name = "reduce";
   rc2.constraints.push_back(
-      Reduction(ArrayReductionOp::kAnd, elems, ConstraintKind::kEqual, 0x0F));
+      Reduction(ArrayReductionOp::kAnd, kElems, ConstraintKind::kEqual, 0x0F));
   solver2.AddConstraintBlock(rc2);
   EXPECT_FALSE(solver2.Solve());
 }
@@ -257,8 +257,8 @@ TEST(ArrayReductionConstraint, AndReductionJoinsByBitwiseAnd) {
 // the elements by bitwise OR. {0x01, 0x02, 0x04} folds to 0x07.
 TEST(ArrayReductionConstraint, OrReductionJoinsByBitwiseOr) {
   ConstraintSolver solver(22);
-  const std::vector<std::string> elems = {"e0", "e1", "e2"};
-  for (const auto& e : elems) solver.AddVariable(MakeVar(e, 0, 255, 8));
+  const std::vector<std::string> kElems = {"e0", "e1", "e2"};
+  for (const auto& e : kElems) solver.AddVariable(MakeVar(e, 0, 255, 8));
 
   ConstraintBlock pins;
   pins.name = "pins";
@@ -270,7 +270,7 @@ TEST(ArrayReductionConstraint, OrReductionJoinsByBitwiseOr) {
   ConstraintBlock rc;
   rc.name = "reduce";
   rc.constraints.push_back(
-      Reduction(ArrayReductionOp::kOr, elems, ConstraintKind::kEqual, 0x07));
+      Reduction(ArrayReductionOp::kOr, kElems, ConstraintKind::kEqual, 0x07));
   solver.AddConstraintBlock(rc);
 
   EXPECT_TRUE(solver.Solve());
@@ -281,8 +281,8 @@ TEST(ArrayReductionConstraint, OrReductionJoinsByBitwiseOr) {
 // identity makes an even pairing of a bit cancel out.
 TEST(ArrayReductionConstraint, XorReductionJoinsByBitwiseXor) {
   ConstraintSolver solver(23);
-  const std::vector<std::string> elems = {"e0", "e1", "e2"};
-  for (const auto& e : elems) solver.AddVariable(MakeVar(e, 0, 255, 8));
+  const std::vector<std::string> kElems = {"e0", "e1", "e2"};
+  for (const auto& e : kElems) solver.AddVariable(MakeVar(e, 0, 255, 8));
 
   ConstraintBlock pins;
   pins.name = "pins";
@@ -294,7 +294,7 @@ TEST(ArrayReductionConstraint, XorReductionJoinsByBitwiseXor) {
   ConstraintBlock rc;
   rc.name = "reduce";
   rc.constraints.push_back(
-      Reduction(ArrayReductionOp::kXor, elems, ConstraintKind::kEqual, 0x0D));
+      Reduction(ArrayReductionOp::kXor, kElems, ConstraintKind::kEqual, 0x0D));
   solver.AddConstraintBlock(rc);
 
   EXPECT_TRUE(solver.Solve());
@@ -311,8 +311,8 @@ TEST(ArrayReductionConstraint, SizeConstraintBoundsReduction) {
   RandVariable n = MakeVar("n", 2, 2, 32);
   n.is_array_size = true;
   solver.AddVariable(n);
-  const std::vector<std::string> elems = {"e0", "e1", "e2", "e3"};
-  for (const auto& e : elems) solver.AddVariable(MakeVar(e, 0, 255, 32));
+  const std::vector<std::string> kElems = {"e0", "e1", "e2", "e3"};
+  for (const auto& e : kElems) solver.AddVariable(MakeVar(e, 0, 255, 32));
 
   ConstraintBlock pins;
   pins.name = "pins";
@@ -323,7 +323,7 @@ TEST(ArrayReductionConstraint, SizeConstraintBoundsReduction) {
   solver.AddConstraintBlock(pins);
 
   ConstraintExpr r =
-      Reduction(ArrayReductionOp::kSum, elems, ConstraintKind::kLessThan, 100);
+      Reduction(ArrayReductionOp::kSum, kElems, ConstraintKind::kLessThan, 100);
   r.size_var = "n";  // dynamically sized: size committed before the reduction
   ConstraintBlock rc;
   rc.name = "reduce";
@@ -343,7 +343,7 @@ TEST(ArrayReductionConstraint, SizeConstraintBoundsReduction) {
 // therefore holds, while demanding a nonzero sum fails — confirming the empty
 // fold is what production computes rather than folding the out-of-bounds tail.
 TEST(ArrayReductionConstraint, EmptyReductionYieldsOperatorIdentity) {
-  const std::vector<std::string> elems = {"e0", "e1"};
+  const std::vector<std::string> kElems = {"e0", "e1"};
   ConstraintBlock pins;
   pins.name = "pins";
   pins.constraints.push_back(Pin("e0", 255));  // beyond size 0
@@ -353,10 +353,10 @@ TEST(ArrayReductionConstraint, EmptyReductionYieldsOperatorIdentity) {
   RandVariable n = MakeVar("n", 0, 0, 32);
   n.is_array_size = true;
   solver.AddVariable(n);
-  for (const auto& e : elems) solver.AddVariable(MakeVar(e, 0, 255, 32));
+  for (const auto& e : kElems) solver.AddVariable(MakeVar(e, 0, 255, 32));
   solver.AddConstraintBlock(pins);
   ConstraintExpr r =
-      Reduction(ArrayReductionOp::kSum, elems, ConstraintKind::kEqual, 0);
+      Reduction(ArrayReductionOp::kSum, kElems, ConstraintKind::kEqual, 0);
   r.size_var = "n";  // dynamically sized: size committed before the reduction
   ConstraintBlock rc;
   rc.name = "reduce";
@@ -370,10 +370,10 @@ TEST(ArrayReductionConstraint, EmptyReductionYieldsOperatorIdentity) {
   RandVariable n2 = MakeVar("n", 0, 0, 32);
   n2.is_array_size = true;
   solver2.AddVariable(n2);
-  for (const auto& e : elems) solver2.AddVariable(MakeVar(e, 0, 255, 32));
+  for (const auto& e : kElems) solver2.AddVariable(MakeVar(e, 0, 255, 32));
   solver2.AddConstraintBlock(pins);
-  ConstraintExpr r2 =
-      Reduction(ArrayReductionOp::kSum, elems, ConstraintKind::kGreaterThan, 0);
+  ConstraintExpr r2 = Reduction(ArrayReductionOp::kSum, kElems,
+                                ConstraintKind::kGreaterThan, 0);
   r2.size_var = "n";
   ConstraintBlock rc2;
   rc2.name = "reduce";

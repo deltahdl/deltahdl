@@ -47,8 +47,8 @@ TEST(SysTask, StimeTruncatesToLow32Bits) {
   SysTaskFixture f;
   f.ctx.SetGlobalPrecision(TimeUnit::kNs);
   f.ctx.SetCurrentTimeScale(TimeScale{TimeUnit::kNs, 1, TimeUnit::kNs, 1});
-  constexpr uint64_t big = (uint64_t{1} << 32) + 5u;  // 0x1_0000_0005
-  EXPECT_EQ(StimeAtTick(f, big), 5u);
+  constexpr uint64_t kBig = (uint64_t{1} << 32) + 5u;  // 0x1_0000_0005
+  EXPECT_EQ(StimeAtTick(f, kBig), 5u);
 }
 
 // §20.3.2 (ordering of scaling and truncation): when the raw tick count exceeds
@@ -72,8 +72,8 @@ TEST(SysTask, StimeWrapsToZeroAtExact32BitBoundary) {
   SysTaskFixture f;
   f.ctx.SetGlobalPrecision(TimeUnit::kNs);
   f.ctx.SetCurrentTimeScale(TimeScale{TimeUnit::kNs, 1, TimeUnit::kNs, 1});
-  constexpr uint64_t boundary = uint64_t{1} << 32;  // 0x1_0000_0000
-  EXPECT_EQ(StimeAtTick(f, boundary), 0u);
+  constexpr uint64_t kBoundary = uint64_t{1} << 32;  // 0x1_0000_0000
+  EXPECT_EQ(StimeAtTick(f, kBoundary), 0u);
 }
 
 // §20.3.2 (unsigned 32-bit return, boundary): a value whose top 32-bit bit is
@@ -82,8 +82,8 @@ TEST(SysTask, StimeReportsFullUnsigned32BitRange) {
   SysTaskFixture f;
   f.ctx.SetGlobalPrecision(TimeUnit::kNs);
   f.ctx.SetCurrentTimeScale(TimeScale{TimeUnit::kNs, 1, TimeUnit::kNs, 1});
-  constexpr uint64_t high = uint64_t{0x80000001};
-  EXPECT_EQ(StimeAtTick(f, high), 0x80000001u);
+  constexpr auto kHigh = uint64_t{0x80000001};
+  EXPECT_EQ(StimeAtTick(f, kHigh), 0x80000001u);
 }
 
 }  // namespace

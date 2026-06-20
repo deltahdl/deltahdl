@@ -14,7 +14,7 @@ TEST(UntypedKeyword, RecognizedAsKwUntyped) {
   // parser cannot distinguish "untyped" from a user type alias.
   auto kind = LookupKeyword("untyped");
   ASSERT_TRUE(kind.has_value());
-  EXPECT_EQ(*kind, TokenKind::kKwUntyped);
+  EXPECT_EQ(kind.value(), TokenKind::kKwUntyped);
 }
 
 }  // namespace

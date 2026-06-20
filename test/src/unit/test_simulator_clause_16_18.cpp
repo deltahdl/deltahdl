@@ -39,17 +39,17 @@ TEST(ClockingConcurrentAssertion, PlainVariableKeepsOrdinarySample) {
 // clocking block, or through a property declared inside the block — all observe
 // the same value (the a1/a2/a3/a4 equivalence of the LRM example).
 TEST(ClockingConcurrentAssertion, AllNamingsObserveTheSameBlockSample) {
-  const uint64_t block_sample = 0x42;
+  const uint64_t kBlockSample = 0x42;
   // Each naming arrives with its own distinct ordinary sample, but all are
   // clocking block variables, so the block sample overrides every one of them.
   SampledValue direct = ConcurrentAssertionVariableSample(
-      true, block_sample, SampleStaticVariable(0x11, SimTime{2}, 0));
+      true, kBlockSample, SampleStaticVariable(0x11, SimTime{2}, 0));
   SampledValue via_block = ConcurrentAssertionVariableSample(
-      true, block_sample, SampleStaticVariable(0x22, SimTime{2}, 0));
+      true, kBlockSample, SampleStaticVariable(0x22, SimTime{2}, 0));
   SampledValue via_inner_prop = ConcurrentAssertionVariableSample(
-      true, block_sample, SampleStaticVariable(0x33, SimTime{2}, 0));
+      true, kBlockSample, SampleStaticVariable(0x33, SimTime{2}, 0));
 
-  EXPECT_EQ(direct.value, block_sample);
+  EXPECT_EQ(direct.value, kBlockSample);
   EXPECT_EQ(via_block.value, direct.value);
   EXPECT_EQ(via_inner_prop.value, direct.value);
 }

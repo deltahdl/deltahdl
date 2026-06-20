@@ -8,7 +8,7 @@ namespace {
 
 TEST(DelayControlPreprocessor, MacroExpansionInDelayValue) {
   PreprocFixture f;
-  auto result = Preprocess(
+  Preprocess(
       "`define DELAY 10\n"
       "module m;\n"
       "  initial #`DELAY a = 1;\n"
@@ -19,7 +19,7 @@ TEST(DelayControlPreprocessor, MacroExpansionInDelayValue) {
 
 TEST(DelayControlPreprocessor, MacroExpansionInDelayedStatement) {
   PreprocFixture f;
-  auto result = Preprocess(
+  Preprocess(
       "`define ASSIGN a = 1;\n"
       "module m;\n"
       "  initial #10 `ASSIGN\n"
@@ -30,7 +30,7 @@ TEST(DelayControlPreprocessor, MacroExpansionInDelayedStatement) {
 
 TEST(DelayControlPreprocessor, MacroExpansionInParenthesizedDelay) {
   PreprocFixture f;
-  auto result = Preprocess(
+  Preprocess(
       "`define EXPR (a + b)\n"
       "module m;\n"
       "  initial #`EXPR c = 1;\n"

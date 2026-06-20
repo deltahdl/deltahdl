@@ -34,10 +34,10 @@ TEST_F(OverrideBuiltinSystf, UnclaimedBuiltinNameResolvesToNothing) {
 // built-in. After registering an application under the built-in name, resolving
 // that name returns the user application (here, its calltf), not the built-in.
 TEST_F(OverrideBuiltinSystf, UserApplicationOverridesBuiltinName) {
-  static int kCalled = 0;
-  kCalled = 0;
+  static int called = 0;
+  called = 0;
   auto user_random = [](const char*) -> int {
-    kCalled = 1;
+    called = 1;
     return 0;
   };
 
@@ -56,7 +56,7 @@ TEST_F(OverrideBuiltinSystf, UserApplicationOverridesBuiltinName) {
   // The resolved application is the user's: invoking its calltf runs the
   // user-provided functionality that replaced the built-in $random.
   resolved->calltf(nullptr);
-  EXPECT_EQ(kCalled, 1);
+  EXPECT_EQ(called, 1);
 }
 
 // §36.3.2: the override replaces the built-in's functionality. Modelling a

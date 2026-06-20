@@ -44,8 +44,8 @@ class VpiGetTimeSim : public ::testing::Test {
 // simulation time; a vpiSimTime result is the full 64-bit count split across
 // the high and low 32-bit halves.
 TEST_F(VpiGetTimeSim, SimTimeSplitsAcrossHighAndLow) {
-  const uint64_t ticks = (static_cast<uint64_t>(3) << 32) | 5u;
-  AdvanceTo(ticks);
+  const uint64_t kTicks = (static_cast<uint64_t>(3) << 32) | 5u;
+  AdvanceTo(kTicks);
 
   s_vpi_time out = {};
   out.type = vpiSimTime;

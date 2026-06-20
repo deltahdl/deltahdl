@@ -441,7 +441,7 @@ constexpr Logic4Word kOut1 = {1, 0};
 constexpr Logic4Word kOutX = {0, 1};
 
 TEST(BitwiseTruthTable, BinaryAndAllCells) {
-  const Logic4Word expected[4][4] = {
+  const Logic4Word kExpected[4][4] = {
       {kOut0, kOut0, kOut0, kOut0},
       {kOut0, kOut1, kOutX, kOutX},
       {kOut0, kOutX, kOutX, kOutX},
@@ -450,16 +450,16 @@ TEST(BitwiseTruthTable, BinaryAndAllCells) {
   for (int i = 0; i < 4; ++i) {
     for (int j = 0; j < 4; ++j) {
       auto r = Logic4And(kFour[i], kFour[j]);
-      EXPECT_EQ(r.aval & 1u, expected[i][j].aval)
+      EXPECT_EQ(r.aval & 1u, kExpected[i][j].aval)
           << "row=" << i << " col=" << j;
-      EXPECT_EQ(r.bval & 1u, expected[i][j].bval)
+      EXPECT_EQ(r.bval & 1u, kExpected[i][j].bval)
           << "row=" << i << " col=" << j;
     }
   }
 }
 
 TEST(BitwiseTruthTable, BinaryOrAllCells) {
-  const Logic4Word expected[4][4] = {
+  const Logic4Word kExpected[4][4] = {
       {kOut0, kOut1, kOutX, kOutX},
       {kOut1, kOut1, kOut1, kOut1},
       {kOutX, kOut1, kOutX, kOutX},
@@ -468,16 +468,16 @@ TEST(BitwiseTruthTable, BinaryOrAllCells) {
   for (int i = 0; i < 4; ++i) {
     for (int j = 0; j < 4; ++j) {
       auto r = Logic4Or(kFour[i], kFour[j]);
-      EXPECT_EQ(r.aval & 1u, expected[i][j].aval)
+      EXPECT_EQ(r.aval & 1u, kExpected[i][j].aval)
           << "row=" << i << " col=" << j;
-      EXPECT_EQ(r.bval & 1u, expected[i][j].bval)
+      EXPECT_EQ(r.bval & 1u, kExpected[i][j].bval)
           << "row=" << i << " col=" << j;
     }
   }
 }
 
 TEST(BitwiseTruthTable, BinaryXorAllCells) {
-  const Logic4Word expected[4][4] = {
+  const Logic4Word kExpected[4][4] = {
       {kOut0, kOut1, kOutX, kOutX},
       {kOut1, kOut0, kOutX, kOutX},
       {kOutX, kOutX, kOutX, kOutX},
@@ -486,16 +486,16 @@ TEST(BitwiseTruthTable, BinaryXorAllCells) {
   for (int i = 0; i < 4; ++i) {
     for (int j = 0; j < 4; ++j) {
       auto r = Logic4Xor(kFour[i], kFour[j]);
-      EXPECT_EQ(r.aval & 1u, expected[i][j].aval)
+      EXPECT_EQ(r.aval & 1u, kExpected[i][j].aval)
           << "row=" << i << " col=" << j;
-      EXPECT_EQ(r.bval & 1u, expected[i][j].bval)
+      EXPECT_EQ(r.bval & 1u, kExpected[i][j].bval)
           << "row=" << i << " col=" << j;
     }
   }
 }
 
 TEST(BitwiseTruthTable, BinaryXnorAllCells) {
-  const Logic4Word expected[4][4] = {
+  const Logic4Word kExpected[4][4] = {
       {kOut1, kOut0, kOutX, kOutX},
       {kOut0, kOut1, kOutX, kOutX},
       {kOutX, kOutX, kOutX, kOutX},
@@ -504,9 +504,9 @@ TEST(BitwiseTruthTable, BinaryXnorAllCells) {
   for (int i = 0; i < 4; ++i) {
     for (int j = 0; j < 4; ++j) {
       auto r = Logic4Not(Logic4Xor(kFour[i], kFour[j]));
-      EXPECT_EQ(r.aval & 1u, expected[i][j].aval)
+      EXPECT_EQ(r.aval & 1u, kExpected[i][j].aval)
           << "row=" << i << " col=" << j;
-      EXPECT_EQ(r.bval & 1u, expected[i][j].bval)
+      EXPECT_EQ(r.bval & 1u, kExpected[i][j].bval)
           << "row=" << i << " col=" << j;
     }
   }

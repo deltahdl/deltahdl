@@ -164,12 +164,15 @@ TEST(ExpressionModel, TypespecAvailabilityGuarantee) {
 
   // Assignment-pattern operations: only when the braces carry a data type
   // prefix.
-  EXPECT_TRUE(VpiTypespecAlwaysAvailable(vpiAssignmentPatternOp, false,
-                                         /*has_type_prefix=*/true));
-  EXPECT_TRUE(VpiTypespecAlwaysAvailable(vpiMultiAssignmentPatternOp, false,
-                                         /*has_type_prefix=*/true));
-  EXPECT_FALSE(VpiTypespecAlwaysAvailable(vpiAssignmentPatternOp, false,
-                                          /*has_type_prefix=*/false));
+  EXPECT_TRUE(
+      VpiTypespecAlwaysAvailable(vpiAssignmentPatternOp, false,
+                                 /*assignment_pattern_has_type_prefix=*/true));
+  EXPECT_TRUE(
+      VpiTypespecAlwaysAvailable(vpiMultiAssignmentPatternOp, false,
+                                 /*assignment_pattern_has_type_prefix=*/true));
+  EXPECT_FALSE(
+      VpiTypespecAlwaysAvailable(vpiAssignmentPatternOp, false,
+                                 /*assignment_pattern_has_type_prefix=*/false));
 
   // Any other expression: implementation dependent, so not guaranteed.
   EXPECT_FALSE(VpiTypespecAlwaysAvailable(vpiAddOp, false, false));

@@ -53,12 +53,12 @@ TEST(StringFormatTaskTest, SwriteSuffixesUseRadix) {
     uint64_t value;
     const char* expected;
   };
-  const Case cases[] = {
+  const Case kCases[] = {
       {"$swriteh", 0xab, "ab"},
       {"$swriteo", 8, "10"},
       {"$swriteb", 5, "101"},
   };
-  for (const auto& c : cases) {
+  for (const auto& c : kCases) {
     std::string name = std::string("v_") + c.task;
     auto* dest = f.ctx.CreateVariable(name, 64);
     EvalExpr(MakeSysCall(f.arena, c.task,

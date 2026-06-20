@@ -198,21 +198,21 @@ TEST(NonVacuityLocals, EmptyContextEntryPoint) {
 TEST(NonVacuityLocals, PropertyDeclarationStripsTheNameFromTheContext) {
   auto body = Trig("a");
   auto decl = LvLocalVarDecl("int", "v", body);
-  const LocalContext ctx{{"v", L({"old"})}, {"u", L({"z"})}};
+  const LocalContext kCtx{{"v", L({"old"})}, {"u", L({"z"})}};
 
   // The declaration's verdict is exactly the body's verdict under L_0\v, for a
   // word where the body is nonvacuous and one where it is not.
-  EXPECT_EQ(NonVacuouslyEvaluatesWithLocals(Word{L({"a"})}, *decl, ctx),
+  EXPECT_EQ(NonVacuouslyEvaluatesWithLocals(Word{L({"a"})}, *decl, kCtx),
             NonVacuouslyEvaluatesWithLocals(Word{L({"a"})}, *body,
-                                            RemoveName(ctx, "v")));
-  EXPECT_EQ(NonVacuouslyEvaluatesWithLocals(Word{L({"x"})}, *decl, ctx),
+                                            RemoveName(kCtx, "v")));
+  EXPECT_EQ(NonVacuouslyEvaluatesWithLocals(Word{L({"x"})}, *decl, kCtx),
             NonVacuouslyEvaluatesWithLocals(Word{L({"x"})}, *body,
-                                            RemoveName(ctx, "v")));
+                                            RemoveName(kCtx, "v")));
 
   // The verdict passes through: nonvacuous body -> nonvacuous declaration;
   // vacuous body -> vacuous declaration. The incoming v does not change either.
-  EXPECT_TRUE(NonVacuouslyEvaluatesWithLocals(Word{L({"a"})}, *decl, ctx));
-  EXPECT_FALSE(NonVacuouslyEvaluatesWithLocals(Word{L({"x"})}, *decl, ctx));
+  EXPECT_TRUE(NonVacuouslyEvaluatesWithLocals(Word{L({"a"})}, *decl, kCtx));
+  EXPECT_FALSE(NonVacuouslyEvaluatesWithLocals(Word{L({"x"})}, *decl, kCtx));
 
   // Removing v from the empty context is a no-op; the body's verdict stands.
   EXPECT_TRUE(
@@ -233,15 +233,15 @@ TEST(NonVacuityLocals, PropertyDeclarationStripsTheNameFromTheContext) {
 TEST(NonVacuityLocals, TopLevelDeclarationStripsTheNameFromTheContext) {
   auto body = LvTopProperty(Trig("a"));
   auto top = LvTopLocalVarDecl("int", "v", body);
-  const LocalContext ctx{{"v", L({"old"})}};
+  const LocalContext kCtx{{"v", L({"old"})}};
 
-  EXPECT_EQ(NonVacuouslyEvaluatesTopLevelWithLocals(Word{L({"a"})}, *top, ctx),
+  EXPECT_EQ(NonVacuouslyEvaluatesTopLevelWithLocals(Word{L({"a"})}, *top, kCtx),
             NonVacuouslyEvaluatesTopLevelWithLocals(Word{L({"a"})}, *body,
-                                                    RemoveName(ctx, "v")));
+                                                    RemoveName(kCtx, "v")));
   EXPECT_TRUE(
-      NonVacuouslyEvaluatesTopLevelWithLocals(Word{L({"a"})}, *top, ctx));
+      NonVacuouslyEvaluatesTopLevelWithLocals(Word{L({"a"})}, *top, kCtx));
   EXPECT_FALSE(
-      NonVacuouslyEvaluatesTopLevelWithLocals(Word{L({"x"})}, *top, ctx));
+      NonVacuouslyEvaluatesTopLevelWithLocals(Word{L({"x"})}, *top, kCtx));
 }
 
 // --- §F.5.6.3 C1: error conditions and edge cases of the §F.5.3.3 rules,

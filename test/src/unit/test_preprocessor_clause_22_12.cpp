@@ -264,14 +264,14 @@ TEST(Preprocessor, Line_NaturalCountingStartsAtOne) {
   PreprocFixture f;
   auto out = Preprocess("`__LINE__\n", f);
   EXPECT_FALSE(f.diag.HasErrors());
-  EXPECT_NE(out.find("1"), std::string::npos);
+  EXPECT_NE(out.find('1'), std::string::npos);
 }
 
 TEST(Preprocessor, Line_NaturalCountingIncrements) {
   PreprocFixture f;
   auto out = Preprocess("a\nb\n`__LINE__\n", f);
   EXPECT_FALSE(f.diag.HasErrors());
-  EXPECT_NE(out.find("3"), std::string::npos);
+  EXPECT_NE(out.find('3'), std::string::npos);
 }
 
 TEST(Preprocessor, Line_IncludeSavesAndRestores) {
@@ -292,8 +292,8 @@ TEST(Preprocessor, Line_IncludeSavesAndRestores) {
       "`__LINE__\n",
       f, cfg);
   EXPECT_FALSE(f.diag.HasErrors());
-  EXPECT_NE(result.find("1"), std::string::npos);
-  EXPECT_NE(result.find("3"), std::string::npos);
+  EXPECT_NE(result.find('1'), std::string::npos);
+  EXPECT_NE(result.find('3'), std::string::npos);
 
   std::remove(inc_path.c_str());
   std::filesystem::remove_all(tmp_dir);

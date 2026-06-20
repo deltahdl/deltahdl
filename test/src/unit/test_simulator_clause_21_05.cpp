@@ -132,7 +132,7 @@ TEST(IoSystemTaskTest, StartFinishBoundsAndOrdersTheDump) {
   SetupMem(f, "src", 0, 5, 8);
   for (int i = 0; i < 5; ++i) {
     Cell(f, "src", i)->value =
-        MakeLogic4VecVal(f.arena, 8, static_cast<uint64_t>(0x10 + i));
+        MakeLogic4VecVal(f.arena, 8, 0x10 + static_cast<uint64_t>(i));
   }
 
   // Write addresses 3 down to 1: words 0x13, 0x12, 0x11 in that order.

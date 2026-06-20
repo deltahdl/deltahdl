@@ -604,7 +604,7 @@ TEST(DesignElementPreprocessing, MacroExpandsInsideModule) {
       "endmodule\n",
       f);
   EXPECT_FALSE(f.diag.HasErrors());
-  EXPECT_NE(result.find("8"), std::string::npos);
+  EXPECT_NE(result.find('8'), std::string::npos);
 }
 
 TEST(DesignElementPreprocessing, MacroExpandsToDesignElement) {
@@ -629,8 +629,8 @@ TEST(DesignElementPreprocessing, MultipleMacrosExpandInSameDesignElement) {
       "endmodule\n",
       f);
   EXPECT_FALSE(f.diag.HasErrors());
-  EXPECT_NE(result.find("4"), std::string::npos);
-  EXPECT_NE(result.find("8"), std::string::npos);
+  EXPECT_NE(result.find('4'), std::string::npos);
+  EXPECT_NE(result.find('8'), std::string::npos);
 }
 
 TEST(Preprocessor, EscapedIdentifierRequiresWhitespaceBeforeParen) {

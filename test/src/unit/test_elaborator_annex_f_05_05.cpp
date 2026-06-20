@@ -20,15 +20,16 @@ namespace {
 // §F.5.5 (C1): dom(L), L|_D, L\v, and L[v] are the domain and the three domain
 // restrictions the rest of the subclause builds on.
 TEST(TightSatisfactionLocals, ContextDomainAndRestrictions) {
-  const LocalContext ctx{{"v", A({"x"})}, {"w", A({"y"})}};
-  EXPECT_EQ(ContextDomain(ctx), (NameSet{"v", "w"}));
-  EXPECT_TRUE(LocalContextEqual(RestrictContext(ctx, {"v"}),
+  const LocalContext kCtx{{"v", A({"x"})}, {"w", A({"y"})}};
+  EXPECT_EQ(ContextDomain(kCtx), (NameSet{"v", "w"}));
+  EXPECT_TRUE(LocalContextEqual(RestrictContext(kCtx, {"v"}),
                                 LocalContext{{"v", A({"x"})}}));
   EXPECT_TRUE(
-      LocalContextEqual(RemoveName(ctx, "v"), LocalContext{{"w", A({"y"})}}));
-  EXPECT_TRUE(LocalContextEqual(RestrictToName(ctx, "w"),
+      LocalContextEqual(RemoveName(kCtx, "v"), LocalContext{{"w", A({"y"})}}));
+  EXPECT_TRUE(LocalContextEqual(RestrictToName(kCtx, "w"),
                                 LocalContext{{"w", A({"y"})}}));
-  EXPECT_TRUE(LocalContextEqual(RestrictToName(ctx, "absent"), LocalContext{}));
+  EXPECT_TRUE(
+      LocalContextEqual(RestrictToName(kCtx, "absent"), LocalContext{}));
 }
 
 // §F.5.5 (C1): LetterEqual compares alphabet elements; T and _|_ are distinct
@@ -44,14 +45,14 @@ TEST(TightSatisfactionLocals, LetterEquality) {
 // §F.5.5 (R3): w, L_0, L_1 |== b iff |w| = 1 and w^0 |= b[L_0] and L_1 = L_0.
 // A Boolean leaves the context untouched and matches exactly one letter.
 TEST(TightSatisfactionLocals, BooleanPreservesContextAndNeedsOneLetter) {
-  const LocalContext input{{"w", A({"y"})}};
+  const LocalContext kInput{{"w", A({"y"})}};
   EXPECT_TRUE(SameContexts(
-      TightSatisfactionOutputs(Word{A({"a"})}, *Bool("a"), input), {input}));
+      TightSatisfactionOutputs(Word{A({"a"})}, *Bool("a"), kInput), {kInput}));
   EXPECT_TRUE(
-      TightSatisfactionOutputs(Word{A({"x"})}, *Bool("a"), input).empty());
-  EXPECT_TRUE(TightSatisfactionOutputs(Word{}, *Bool("a"), input).empty());
+      TightSatisfactionOutputs(Word{A({"x"})}, *Bool("a"), kInput).empty());
+  EXPECT_TRUE(TightSatisfactionOutputs(Word{}, *Bool("a"), kInput).empty());
   EXPECT_TRUE(
-      TightSatisfactionOutputs(Word{A({"a"}), A({"a"})}, *Bool("a"), input)
+      TightSatisfactionOutputs(Word{A({"a"}), A({"a"})}, *Bool("a"), kInput)
           .empty());
 }
 
@@ -176,13 +177,13 @@ TEST(TightSatisfactionLocals, FirstMatchRejectsWhenAProperPrefixMatches) {
 
 // §F.5.5 (R10): w, L_0, L_1 |== R[*0] iff |w| = 0 and L_1 = L_0.
 TEST(TightSatisfactionLocals, NullRepeatMatchesEmptyWordAndPreservesContext) {
-  const LocalContext input{{"w", A({"y"})}};
+  const LocalContext kInput{{"w", A({"y"})}};
   EXPECT_TRUE(SameContexts(
-      TightSatisfactionOutputs(Word{}, *SeqNullRepeat(Samp("v")), input),
-      {input}));
-  EXPECT_TRUE(
-      TightSatisfactionOutputs(Word{A({"x"})}, *SeqNullRepeat(Samp("v")), input)
-          .empty());
+      TightSatisfactionOutputs(Word{}, *SeqNullRepeat(Samp("v")), kInput),
+      {kInput}));
+  EXPECT_TRUE(TightSatisfactionOutputs(Word{A({"x"})},
+                                       *SeqNullRepeat(Samp("v")), kInput)
+                  .empty());
 }
 
 // §F.5.5 (R11): w, L_0, L_1 |== R[*1:$] chains the context through each piece,
@@ -213,23 +214,24 @@ TEST(TightSatisfactionLocals, FourWayPredicateAcceptsOnlyYieldedContexts) {
 // §F.5.5 (C3): every yielded output context has domain flow(dom(L_0), R). Each
 // sequence is paired with a word it matches so the check is not vacuous.
 TEST(TightSatisfactionLocals, OutputDomainEqualsFlowOfInputDomain) {
-  const Letter x = A({"x"});
-  const Letter y = A({"y"});
-  const std::vector<std::pair<std::shared_ptr<const SequenceExpr>, Word>> cases{
-      {Samp("v"), Word{x}},
-      {SeqConcat(Samp("v"), Samp("w")), Word{x, y}},
-      {SeqOr(Samp("v"), Samp("w")), Word{x}},
-      {SeqIntersect(Samp("v"), Samp("w")), Word{x}},
-      {SeqLocalVarDecl("int", "v", Samp("v")), Word{x}},
-  };
-  const LocalContext input{{"u", A({"z"})}};
-  for (const auto& item : cases) {
-    const NameSet expected = FlowLocals(ContextDomain(input), *item.first);
-    const auto outputs =
-        TightSatisfactionOutputs(item.second, *item.first, input);
-    EXPECT_FALSE(outputs.empty());
-    for (const LocalContext& out : outputs) {
-      EXPECT_EQ(ContextDomain(out), expected);
+  const Letter kX = A({"x"});
+  const Letter kY = A({"y"});
+  const std::vector<std::pair<std::shared_ptr<const SequenceExpr>, Word>>
+      kCases{
+          {Samp("v"), Word{kX}},
+          {SeqConcat(Samp("v"), Samp("w")), Word{kX, kY}},
+          {SeqOr(Samp("v"), Samp("w")), Word{kX}},
+          {SeqIntersect(Samp("v"), Samp("w")), Word{kX}},
+          {SeqLocalVarDecl("int", "v", Samp("v")), Word{kX}},
+      };
+  const LocalContext kInput{{"u", A({"z"})}};
+  for (const auto& item : kCases) {
+    const NameSet kExpected = FlowLocals(ContextDomain(kInput), *item.first);
+    const auto kOutputs =
+        TightSatisfactionOutputs(item.second, *item.first, kInput);
+    EXPECT_FALSE(kOutputs.empty());
+    for (const LocalContext& out : kOutputs) {
+      EXPECT_EQ(ContextDomain(out), kExpected);
     }
   }
 }
@@ -239,14 +241,14 @@ TEST(TightSatisfactionLocals, OutputDomainEqualsFlowOfInputDomain) {
 TEST(TightSatisfactionLocals, ClockedSequenceMatchesItsUnclockedRewrite) {
   auto clocked = SeqClock(BoolAtom("clk"), Samp("v"));
   auto unclocked = RewriteClockedSequence(*clocked);
-  const std::vector<Letter> alphabet{LetterTop(), A({}), A({"clk"})};
+  const std::vector<Letter> kAlphabet{LetterTop(), A({}), A({"clk"})};
   // Enumerate every word up to length three over the small alphabet.
   std::vector<Word> words{Word{}};
-  for (const Letter& l0 : alphabet) {
+  for (const Letter& l0 : kAlphabet) {
     words.push_back(Word{l0});
-    for (const Letter& l1 : alphabet) {
+    for (const Letter& l1 : kAlphabet) {
       words.push_back(Word{l0, l1});
-      for (const Letter& l2 : alphabet) {
+      for (const Letter& l2 : kAlphabet) {
         words.push_back(Word{l0, l1, l2});
       }
     }
@@ -292,10 +294,11 @@ TEST(TightSatisfactionLocals, SamplingOverUnknownLetterStillBinds) {
 // Boolean (so the context flows through) while the bottom letter _|_ satisfies
 // none (so no output context results).
 TEST(TightSatisfactionLocals, BooleanMatchesTopRejectsBottom) {
-  const LocalContext input{{"w", A({"y"})}};
+  const LocalContext kInput{{"w", A({"y"})}};
   EXPECT_TRUE(SameContexts(
-      TightSatisfactionOutputs(Word{LetterTop()}, *Bool("a"), input), {input}));
-  EXPECT_TRUE(TightSatisfactionOutputs(Word{LetterBottom()}, *Bool("a"), input)
+      TightSatisfactionOutputs(Word{LetterTop()}, *Bool("a"), kInput),
+      {kInput}));
+  EXPECT_TRUE(TightSatisfactionOutputs(Word{LetterBottom()}, *Bool("a"), kInput)
                   .empty());
 }
 

@@ -135,19 +135,19 @@ TEST(SvDpi, GetScopeFromNameUnrecognizedIsNull) {
 // svGetScopeFromName hands back its handle and svGetNameFromScope reverses that
 // handle to the same fully qualified name.
 TEST(SvDpi, ScopeNameAndHandleRoundTrip) {
-  const char* kName = "top.dut_h_09_03.u_alu";
-  const DpiScope* registered = DpiRegisterScope(kName);
+  const char* name = "top.dut_h_09_03.u_alu";
+  const DpiScope* registered = DpiRegisterScope(name);
   ASSERT_NE(registered, nullptr);
 
-  svScope handle = svGetScopeFromName(kName);
+  svScope handle = svGetScopeFromName(name);
   EXPECT_EQ(handle, static_cast<svScope>(const_cast<DpiScope*>(registered)));
   ASSERT_NE(handle, nullptr);
 
-  EXPECT_STREQ(svGetNameFromScope(handle), kName);
+  EXPECT_STREQ(svGetNameFromScope(handle), name);
 
   // Registering the same name again is idempotent: the same recognized handle
   // comes back, so the name resolves deterministically.
-  EXPECT_EQ(svGetScopeFromName(kName), handle);
+  EXPECT_EQ(svGetScopeFromName(name), handle);
 }
 
 // §H.9.3: an unrecognized handle (one this simulator never produced) and a null

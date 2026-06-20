@@ -79,7 +79,7 @@ TEST(CheckerProcedures, UnconditionalAlwaysStatementsAllowedInEveryForm) {
   // §17.5: nonblocking assignments, selection and loop statements, subroutine
   // calls, the three assertion kinds, and let declarations are allowed in every
   // checker always form.
-  const CheckerAlwaysStatement unconditional[] = {
+  const CheckerAlwaysStatement kUnconditional[] = {
       CheckerAlwaysStatement::kNonblockingAssignment,
       CheckerAlwaysStatement::kSelectionStatement,
       CheckerAlwaysStatement::kLoopStatement,
@@ -89,13 +89,13 @@ TEST(CheckerProcedures, UnconditionalAlwaysStatementsAllowedInEveryForm) {
       CheckerAlwaysStatement::kConcurrentAssertion,
       CheckerAlwaysStatement::kLetDeclaration,
   };
-  const CheckerAlwaysForm forms[] = {
+  const CheckerAlwaysForm kForms[] = {
       CheckerAlwaysForm::kAlwaysComb,
       CheckerAlwaysForm::kAlwaysLatch,
       CheckerAlwaysForm::kAlwaysFf,
   };
-  for (auto stmt : unconditional) {
-    for (auto form : forms) {
+  for (auto stmt : kUnconditional) {
+    for (auto form : kForms) {
       EXPECT_TRUE(CheckerAlwaysStatementAllowed(stmt, form));
     }
   }

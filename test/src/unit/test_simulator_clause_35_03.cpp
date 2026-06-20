@@ -37,9 +37,9 @@ TEST(DpiTwoLayers, SvLayerCallsForeignImplBySvName) {
   };
   rt.RegisterImport(func);
 
-  const DpiArgValue result =
+  const DpiArgValue kResult =
       rt.CallImport("sv_add_one", {DpiArgValue::FromInt(41)});
-  EXPECT_EQ(result.AsInt(), 42);
+  EXPECT_EQ(kResult.AsInt(), 42);
 }
 
 // §35.3 / S1, S2, S4: SystemVerilog code shall look identical and its semantics
@@ -63,16 +63,16 @@ TEST(DpiTwoLayers, ForeignImplIsOpaqueToSvLayer) {
   by_addition.c_name = "c_double_by_addition";
   by_addition.sv_name = "sv_double";
   by_addition.impl = [](const std::vector<DpiArgValue>& args) -> DpiArgValue {
-    const int32_t x = args[0].AsInt();
-    return DpiArgValue::FromInt(x + x);
+    const int32_t kX = args[0].AsInt();
+    return DpiArgValue::FromInt(kX + kX);
   };
   rt_b.RegisterImport(by_addition);
 
-  const std::vector<DpiArgValue> actual = {DpiArgValue::FromInt(21)};
+  const std::vector<DpiArgValue> kActual = {DpiArgValue::FromInt(21)};
   // Identical SystemVerilog-side call, two different foreign implementations:
   // the SystemVerilog layer observes the same result either way.
-  EXPECT_EQ(rt_a.CallImport("sv_double", actual).AsInt(),
-            rt_b.CallImport("sv_double", actual).AsInt());
+  EXPECT_EQ(rt_a.CallImport("sv_double", kActual).AsInt(),
+            rt_b.CallImport("sv_double", kActual).AsInt());
 }
 
 // §35.3 / S1: the SystemVerilog layer does not depend on the foreign linkage

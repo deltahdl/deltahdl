@@ -207,14 +207,14 @@ TEST(IoSystemTaskTest, DisplayStrobeMonitorRadixSuffixesAllDispatch) {
     uint64_t value;
     const char* expected;
   };
-  const Case cases[] = {
+  const Case kCases[] = {
       {"$fdisplayh", 0xab, "ab\n"}, {"$fdisplayo", 8, "10\n"},
       {"$fdisplayb", 5, "101\n"},   {"$fstrobeh", 0xcd, "cd\n"},
       {"$fstrobeo", 9, "11\n"},     {"$fstrobeb", 6, "110\n"},
       {"$fmonitorh", 0xef, "ef\n"}, {"$fmonitoro", 7, "7\n"},
       {"$fmonitorb", 3, "11\n"},
   };
-  for (const auto& c : cases) {
+  for (const auto& c : kCases) {
     std::string path =
         std::string("/tmp/deltahdl_test_radix_") + (c.task + 1) + ".txt";
     auto fd = EvalExpr(MakeSysCall(

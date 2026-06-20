@@ -91,7 +91,7 @@ TEST(BehaviorOfRandomizationMethods, FailedRandomizeRetainsPreviousValue) {
   solver.AddVariable(v);
 
   ASSERT_TRUE(solver.Solve());
-  const int64_t prev = solver.GetValue("x");
+  const int64_t kPrev = solver.GetValue("x");
 
   ConstraintBlock block;
   block.name = "c";
@@ -109,7 +109,7 @@ TEST(BehaviorOfRandomizationMethods, FailedRandomizeRetainsPreviousValue) {
 
   EXPECT_FALSE(solver.Solve());
   // The variable kept the value the previous, successful randomize() produced.
-  EXPECT_EQ(solver.GetValue("x"), prev);
+  EXPECT_EQ(solver.GetValue("x"), kPrev);
 }
 
 // 18.6.3: if randomize() fails, post_randomize() is not called. A post hook is
@@ -253,8 +253,8 @@ TEST(BehaviorOfRandomizationMethods, FailedRandomizeRetainsAllPreviousValues) {
   solver.AddVariable(b);
 
   ASSERT_TRUE(solver.Solve());
-  const int64_t prev_a = solver.GetValue("a");
-  const int64_t prev_b = solver.GetValue("b");
+  const int64_t kPrevA = solver.GetValue("a");
+  const int64_t kPrevB = solver.GetValue("b");
 
   // Make 'a' infeasible (pinned to two values); 'b' is left unconstrained.
   ConstraintBlock block;
@@ -273,8 +273,8 @@ TEST(BehaviorOfRandomizationMethods, FailedRandomizeRetainsAllPreviousValues) {
 
   EXPECT_FALSE(solver.Solve());
   // Both variables retain the values from the last successful randomize().
-  EXPECT_EQ(solver.GetValue("a"), prev_a);
-  EXPECT_EQ(solver.GetValue("b"), prev_b);
+  EXPECT_EQ(solver.GetValue("a"), kPrevA);
+  EXPECT_EQ(solver.GetValue("b"), kPrevB);
 }
 
 }  // namespace

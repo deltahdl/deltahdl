@@ -20,8 +20,9 @@ TEST(AttributeInstanceElaboration, SingleAttrNoValueResolves) {
   auto& m = *design->top_modules[0];
   ASSERT_GE(m.attrs.size(), 1u);
   EXPECT_EQ(m.attrs[0].name, "synthesis");
-  ASSERT_TRUE(m.attrs[0].resolved_value.has_value());
-  EXPECT_EQ(*m.attrs[0].resolved_value, 1);
+  const auto& resolved_value = m.attrs[0].resolved_value;
+  ASSERT_TRUE(resolved_value.has_value());
+  EXPECT_EQ(*resolved_value, 1);
 }
 
 TEST(AttributeInstanceElaboration, AttrSpecConstantExpressionFolds) {
@@ -37,8 +38,9 @@ TEST(AttributeInstanceElaboration, AttrSpecConstantExpressionFolds) {
   auto& m = *design->top_modules[0];
   ASSERT_GE(m.attrs.size(), 1u);
   EXPECT_EQ(m.attrs[0].name, "depth");
-  ASSERT_TRUE(m.attrs[0].resolved_value.has_value());
-  EXPECT_EQ(*m.attrs[0].resolved_value, 5);
+  const auto& resolved_value = m.attrs[0].resolved_value;
+  ASSERT_TRUE(resolved_value.has_value());
+  EXPECT_EQ(*resolved_value, 5);
 }
 
 TEST(AttributeInstanceElaboration, MultipleAttrSpecsResolveInOrder) {
@@ -75,8 +77,9 @@ TEST(AttributeInstanceElaboration, AttrValueConstantExpressionCrossLink) {
     for (auto& a : v.attrs) {
       if (a.name == "weight") {
         found = true;
-        ASSERT_TRUE(a.resolved_value.has_value());
-        EXPECT_EQ(*a.resolved_value, 8);
+        const auto& resolved_value = a.resolved_value;
+        ASSERT_TRUE(resolved_value.has_value());
+        EXPECT_EQ(*resolved_value, 8);
       }
     }
   }
@@ -112,8 +115,9 @@ TEST(AttributeInstanceElaboration, AttrSpecWithoutValueDefaultsToOne) {
   auto& m = *design->top_modules[0];
   ASSERT_GE(m.attrs.size(), 1u);
   EXPECT_EQ(m.attrs[0].name, "mark_debug");
-  ASSERT_TRUE(m.attrs[0].resolved_value.has_value());
-  EXPECT_EQ(*m.attrs[0].resolved_value, 1);
+  const auto& resolved_value = m.attrs[0].resolved_value;
+  ASSERT_TRUE(resolved_value.has_value());
+  EXPECT_EQ(*resolved_value, 1);
 }
 
 TEST(AttributeInstanceElaboration, AttrInstanceListPreservesOrder) {
@@ -131,12 +135,15 @@ TEST(AttributeInstanceElaboration, AttrInstanceListPreservesOrder) {
   EXPECT_EQ(m.attrs[0].name, "a");
   EXPECT_EQ(m.attrs[1].name, "b");
   EXPECT_EQ(m.attrs[2].name, "c");
-  ASSERT_TRUE(m.attrs[0].resolved_value.has_value());
-  ASSERT_TRUE(m.attrs[1].resolved_value.has_value());
-  ASSERT_TRUE(m.attrs[2].resolved_value.has_value());
-  EXPECT_EQ(*m.attrs[0].resolved_value, 1);
-  EXPECT_EQ(*m.attrs[1].resolved_value, 2);
-  EXPECT_EQ(*m.attrs[2].resolved_value, 3);
+  const auto& resolved_value0 = m.attrs[0].resolved_value;
+  const auto& resolved_value1 = m.attrs[1].resolved_value;
+  const auto& resolved_value2 = m.attrs[2].resolved_value;
+  ASSERT_TRUE(resolved_value0.has_value());
+  ASSERT_TRUE(resolved_value1.has_value());
+  ASSERT_TRUE(resolved_value2.has_value());
+  EXPECT_EQ(*resolved_value0, 1);
+  EXPECT_EQ(*resolved_value1, 2);
+  EXPECT_EQ(*resolved_value2, 3);
 }
 
 }  // namespace

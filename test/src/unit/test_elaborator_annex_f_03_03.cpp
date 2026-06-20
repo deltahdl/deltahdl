@@ -113,6 +113,9 @@ TEST(NotationConventions, SequenceLettersAreSequences) {
   for (const char* sym : {"R", "S", "r", "s"}) {
     auto category = ClassifyAnnexFNotation(sym);
     ASSERT_TRUE(category.has_value()) << "symbol: " << sym;
+    if (!category.has_value()) {
+      continue;
+    }
     EXPECT_TRUE(DenotesSequence(*category)) << "symbol: " << sym;
   }
 }
@@ -129,6 +132,9 @@ TEST(NotationConventions, PropertyLettersAreProperties) {
   for (const char* sym : {"P", "Q", "T", "U", "p", "q"}) {
     auto category = ClassifyAnnexFNotation(sym);
     ASSERT_TRUE(category.has_value()) << "symbol: " << sym;
+    if (!category.has_value()) {
+      continue;
+    }
     EXPECT_TRUE(DenotesProperty(*category)) << "symbol: " << sym;
   }
 }

@@ -8,11 +8,11 @@ using namespace delta;
 namespace {
 
 TEST(Lexer, KeywordVersion_Noconfig_AllExcludedKeywordsRejected) {
-  const char* kExcluded[] = {
+  const char* excluded[] = {
       "cell",    "config",   "design",  "endconfig", "incdir",
       "include", "instance", "liblist", "library",   "use",
   };
-  for (const char* kw : kExcluded) {
+  for (const char* kw : excluded) {
     auto result = LookupKeyword(kw, KeywordVersion::kVer13642001Noconfig);
     EXPECT_FALSE(result.has_value())
         << kw << " should be excluded in 1364-2001-noconfig";
@@ -20,7 +20,7 @@ TEST(Lexer, KeywordVersion_Noconfig_AllExcludedKeywordsRejected) {
 }
 
 TEST(Lexer, KeywordVersion_Noconfig_NonExcluded2001KeywordsRecognized) {
-  const char* kKept[] = {
+  const char* kept[] = {
       "automatic",
       "endgenerate",
       "generate",
@@ -33,7 +33,7 @@ TEST(Lexer, KeywordVersion_Noconfig_NonExcluded2001KeywordsRecognized) {
       "signed",
       "unsigned",
   };
-  for (const char* kw : kKept) {
+  for (const char* kw : kept) {
     auto result = LookupKeyword(kw, KeywordVersion::kVer13642001Noconfig);
     EXPECT_TRUE(result.has_value())
         << kw << " should be a keyword in 1364-2001-noconfig";
@@ -61,11 +61,11 @@ TEST(Lexer, KeywordVersion_Noconfig_LaterKeywordsNotRecognized) {
 }
 
 TEST(Lexer, KeywordVersion_Noconfig_ExcludedKeywordsStillInRegular2001) {
-  const char* kExcluded[] = {
+  const char* excluded[] = {
       "cell",    "config",   "design",  "endconfig", "incdir",
       "include", "instance", "liblist", "library",   "use",
   };
-  for (const char* kw : kExcluded) {
+  for (const char* kw : excluded) {
     auto result = LookupKeyword(kw, KeywordVersion::kVer13642001);
     EXPECT_TRUE(result.has_value())
         << kw << " should still be a keyword in regular 1364-2001";

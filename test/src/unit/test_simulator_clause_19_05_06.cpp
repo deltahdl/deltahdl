@@ -49,6 +49,7 @@ TEST(Coverage, IllegalValuesRemovedAfterDistribution) {
   auto distributed = CoverageDB::DistributeValues({1, 2, 3, 4, 5, 6}, 3);
   std::vector<int64_t> illegal = {3, 4};
   std::vector<std::vector<int64_t>> remaining;
+  remaining.reserve(distributed.size());
   for (const auto& bin : distributed) {
     remaining.push_back(CoverageDB::RemoveIllegalValues(bin, illegal));
   }

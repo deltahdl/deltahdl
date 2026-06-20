@@ -70,7 +70,7 @@ TEST(SpecifyXTransitionSim, TwelveDelaysPreserveExplicitXSlots) {
   PathDelay pd;
   pd.delay_count = 12;
   for (int i = 0; i < 12; ++i) {
-    pd.delays[i] = static_cast<uint64_t>(100 + i);
+    pd.delays[i] = 100 + static_cast<uint64_t>(i);
   }
   ExpandTransitionDelays(pd);
   for (int i = 6; i < 12; ++i) {

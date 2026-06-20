@@ -53,10 +53,10 @@ TEST_F(VpiFileAndLineProperty, GetStrFileReturnsTheObjectsSourceFile) {
 // lists, so vpi_get(vpiLineNo) on each of them is not a valid query and yields
 // vpiUndefined - even when a line was nonetheless stored on the object.
 TEST_F(VpiFileAndLineProperty, ExceptedKindsHaveNoLineNo) {
-  const int excepted[] = {vpiCallback,      vpiDelayTerm, vpiDelayDevice,
-                          vpiInterModPath,  vpiIterator,  vpiTimeQueue,
-                          vpiGenScopeArray, vpiGenScope};
-  for (int type : excepted) {
+  const int kExcepted[] = {vpiCallback,      vpiDelayTerm, vpiDelayDevice,
+                           vpiInterModPath,  vpiIterator,  vpiTimeQueue,
+                           vpiGenScopeArray, vpiGenScope};
+  for (int type : kExcepted) {
     VpiObject obj;
     obj.type = type;
     obj.line_no =
@@ -70,10 +70,10 @@ TEST_F(VpiFileAndLineProperty, ExceptedKindsHaveNoLineNo) {
 // vpi_get_str(vpiFile) yields null on each of them regardless of any file
 // string stored on the object.
 TEST_F(VpiFileAndLineProperty, ExceptedKindsHaveNoFile) {
-  const int excepted[] = {vpiCallback,      vpiDelayTerm, vpiDelayDevice,
-                          vpiInterModPath,  vpiIterator,  vpiTimeQueue,
-                          vpiGenScopeArray, vpiGenScope};
-  for (int type : excepted) {
+  const int kExcepted[] = {vpiCallback,      vpiDelayTerm, vpiDelayDevice,
+                           vpiInterModPath,  vpiIterator,  vpiTimeQueue,
+                           vpiGenScopeArray, vpiGenScope};
+  for (int type : kExcepted) {
     VpiObject obj;
     obj.type = type;
     obj.file = "ignored.sv";  // stored, yet not reportable for this kind

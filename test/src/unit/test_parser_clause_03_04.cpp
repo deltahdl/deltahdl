@@ -48,6 +48,7 @@ TEST(ProgramBlockParsing, ProgramScopeEncapsulatesItems) {
   EXPECT_GE(p2.items.size(), 3u);
   auto names_in = [](const ModuleDecl& m) {
     std::vector<std::string_view> ns;
+    ns.reserve(m.items.size());
     for (const auto* it : m.items) ns.push_back(it->name);
     return ns;
   };

@@ -13,18 +13,18 @@ namespace {
 // The production helper must report a strictly descending precedence in that
 // same order: repetition, ##, throughout, within, intersect, and, or.
 TEST(SequenceOperatorPrecedence, TableOrderStrictlyDescending) {
-  const SequenceOperator ordered[] = {
+  const SequenceOperator kOrdered[] = {
       SequenceOperator::kRepetition, SequenceOperator::kCycleDelay,
       SequenceOperator::kThroughout, SequenceOperator::kWithin,
       SequenceOperator::kIntersect,  SequenceOperator::kAnd,
       SequenceOperator::kOr,
   };
-  for (size_t i = 1; i < std::size(ordered); ++i) {
-    EXPECT_GT(SequenceOperatorPrecedence(ordered[i - 1]),
-              SequenceOperatorPrecedence(ordered[i]))
+  for (size_t i = 1; i < std::size(kOrdered); ++i) {
+    EXPECT_GT(SequenceOperatorPrecedence(kOrdered[i - 1]),
+              SequenceOperatorPrecedence(kOrdered[i]))
         << "operator at row " << (i - 1) << " must bind tighter than row " << i;
-    EXPECT_TRUE(SequenceOperatorBindsTighter(ordered[i - 1], ordered[i]));
-    EXPECT_FALSE(SequenceOperatorBindsTighter(ordered[i], ordered[i - 1]));
+    EXPECT_TRUE(SequenceOperatorBindsTighter(kOrdered[i - 1], kOrdered[i]));
+    EXPECT_FALSE(SequenceOperatorBindsTighter(kOrdered[i], kOrdered[i - 1]));
   }
 }
 

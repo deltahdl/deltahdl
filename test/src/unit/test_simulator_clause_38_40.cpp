@@ -37,7 +37,7 @@ TEST_F(VpiScanSim, ScanReturnsObjectsDirectedByIterator) {
   ASSERT_NE(iter, nullptr);
 
   std::vector<vpiHandle> scanned;
-  vpiHandle obj;
+  vpiHandle obj = nullptr;
   while ((obj = vpi_scan(iter)) != nullptr) {
     scanned.push_back(obj);
   }

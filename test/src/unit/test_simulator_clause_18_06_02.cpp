@@ -56,9 +56,9 @@ TEST(PrePostRandomize, DefaultBuiltinsAreNoOpsWhenNotOverridden) {
 
   // The random variable was still computed and assigned a value in range.
   ASSERT_EQ(solver.GetValues().size(), 1u);
-  const int64_t x = solver.GetValues().at("x");
-  EXPECT_GE(x, 0);
-  EXPECT_LE(x, 100);
+  const int64_t kX = solver.GetValues().at("x");
+  EXPECT_GE(kX, 0);
+  EXPECT_LE(kX, 100);
 }
 
 // 18.6.2: a single randomize() first invokes pre_randomize() and then, after
@@ -82,8 +82,8 @@ TEST(PrePostRandomize, PreThenPostInvokedExactlyOnceInOrder) {
   ASSERT_TRUE(solver.Solve());
 
   // pre fired once, then post fired once — no extra or missing invocations.
-  const std::vector<std::string> expected = {"pre", "post"};
-  EXPECT_EQ(events, expected);
+  const std::vector<std::string> kExpected = {"pre", "post"};
+  EXPECT_EQ(events, kExpected);
 }
 
 }  // namespace

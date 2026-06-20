@@ -27,7 +27,7 @@ TEST(PulseFiltering, PulseBelowRejectLimitIsRejected) {
 TEST(PulseFiltering, DefaultPulseLimitsMatchEveryTransitionDelay) {
   PathDelay pd;
   pd.delay_count = 12;
-  for (int i = 0; i < 12; ++i) pd.delays[i] = static_cast<uint64_t>(10 + i);
+  for (int i = 0; i < 12; ++i) pd.delays[i] = 10 + static_cast<uint64_t>(i);
   InitDefaultPulseLimits(pd);
   for (int i = 0; i < 12; ++i) {
     EXPECT_EQ(pd.reject_limit[i], static_cast<uint64_t>(10 + i))

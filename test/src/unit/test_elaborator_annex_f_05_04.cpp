@@ -195,23 +195,23 @@ TEST(LocalVariableFlow, FlowThroughRepetitionForms) {
 // §F.5.4 remark: flow(X, R) = (X U flow({}, R)) - block(R).
 TEST(LocalVariableFlow, RemarkFlowEqualsInputUnionEmptyFlowMinusBlock) {
   auto seq = SeqConcat(Samp("v"), SeqIntersect(Samp("w"), Samp("w")));
-  const NameSet x{"a", "w"};
+  const NameSet kX{"a", "w"};
   NameSet expected = FlowLocals({}, *seq);
-  expected.insert(x.begin(), x.end());
+  expected.insert(kX.begin(), kX.end());
   for (const std::string& name : BlockLocals(*seq)) {
     expected.erase(name);
   }
-  EXPECT_EQ(FlowLocals(x, *seq), expected);
+  EXPECT_EQ(FlowLocals(kX, *seq), expected);
 }
 
 // §F.5.4 remark: flow({}, R) and block(R) are disjoint.
 TEST(LocalVariableFlow, RemarkEmptyFlowAndBlockAreDisjoint) {
   auto seq = SeqConcat(Samp("v"), SeqIntersect(Samp("w"), Samp("w")));
   NameSet intersection;
-  const NameSet empty_flow = FlowLocals({}, *seq);
-  const NameSet blocked = BlockLocals(*seq);
-  for (const std::string& name : empty_flow) {
-    if (blocked.count(name) != 0) {
+  const NameSet kEmptyFlow = FlowLocals({}, *seq);
+  const NameSet kBlocked = BlockLocals(*seq);
+  for (const std::string& name : kEmptyFlow) {
+    if (kBlocked.count(name) != 0) {
       intersection.insert(name);
     }
   }
@@ -221,11 +221,11 @@ TEST(LocalVariableFlow, RemarkEmptyFlowAndBlockAreDisjoint) {
 // §F.5.4 remark: flow({}, R) is a subset of sample(R).
 TEST(LocalVariableFlow, RemarkEmptyFlowIsSubsetOfSample) {
   auto seq = SeqConcat(Samp("v"), SeqIntersect(Samp("w"), Samp("w")));
-  const NameSet empty_flow = FlowLocals({}, *seq);
-  const NameSet sampled = SampleLocals(*seq);
+  const NameSet kEmptyFlow = FlowLocals({}, *seq);
+  const NameSet kSampled = SampleLocals(*seq);
   NameSet outside;
-  for (const std::string& name : empty_flow) {
-    if (sampled.count(name) == 0) {
+  for (const std::string& name : kEmptyFlow) {
+    if (kSampled.count(name) == 0) {
       outside.insert(name);
     }
   }

@@ -434,8 +434,10 @@ TEST(NetModel, ScalarAndVectorRules) {
 TEST(NetModel, ValuePropertyAvailability) {
   EXPECT_FALSE(VpiNetHasValueProperty(vpiNetArray, false));
   EXPECT_FALSE(VpiNetHasValueProperty(vpiInterconnectArray, false));
-  EXPECT_FALSE(VpiNetHasValueProperty(vpiStructNet, /*packed=*/false));
-  EXPECT_TRUE(VpiNetHasValueProperty(vpiStructNet, /*packed=*/true));
+  EXPECT_FALSE(
+      VpiNetHasValueProperty(vpiStructNet, /*packed_struct_union=*/false));
+  EXPECT_TRUE(
+      VpiNetHasValueProperty(vpiStructNet, /*packed_struct_union=*/true));
   EXPECT_TRUE(VpiNetHasValueProperty(vpiNet, false));
   EXPECT_TRUE(VpiNetHasValueProperty(vpiBitNet, false));
 }

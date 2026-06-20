@@ -40,10 +40,10 @@ svOpenArrayHandle MakeHandle(void* data, const SvOpenArrayDimRange* ranges,
 // the value lands at the storage slot the index selects. The handle models a
 // scalar array: bit arr [0:3] (packed dimension one bit wide).
 TEST(ScalarElementAccess, BitPutGetRoundTrip) {
-  const SvOpenArrayDimRange ranges[] = {{0, 0}, {0, 3}};
+  const SvOpenArrayDimRange kRanges[] = {{0, 0}, {0, 3}};
   svBitVecVal data[4] = {0, 0, 0, 0};
   SvOpenArrayDesc desc;
-  svOpenArrayHandle h = MakeHandle(data, ranges, 2, &desc);
+  svOpenArrayHandle h = MakeHandle(data, kRanges, 2, &desc);
 
   svPutBitArrElem1(h, 1, 2);
 
@@ -60,24 +60,24 @@ TEST(ScalarElementAccess, BitPutGetRoundTrip) {
 // C1: every four-state logic value round-trips through simulator storage,
 // including z and x. The handle models: logic arr [0:3].
 TEST(ScalarElementAccess, LogicFourStateRoundTrip) {
-  const SvOpenArrayDimRange ranges[] = {{0, 0}, {0, 3}};
+  const SvOpenArrayDimRange kRanges[] = {{0, 0}, {0, 3}};
   svLogicVecVal data[4] = {{0, 0}, {0, 0}, {0, 0}, {0, 0}};
   SvOpenArrayDesc desc;
-  svOpenArrayHandle h = MakeHandle(data, ranges, 2, &desc);
+  svOpenArrayHandle h = MakeHandle(data, kRanges, 2, &desc);
 
-  const svLogic values[4] = {sv_0, sv_1, sv_z, sv_x};
-  for (int i = 0; i < 4; ++i) svPutLogicArrElem1(h, values[i], i);
+  const svLogic kValues[4] = {sv_0, sv_1, sv_z, sv_x};
+  for (int i = 0; i < 4; ++i) svPutLogicArrElem1(h, kValues[i], i);
 
-  for (int i = 0; i < 4; ++i) EXPECT_EQ(svGetLogicArrElem1(h, i), values[i]);
+  for (int i = 0; i < 4; ++i) EXPECT_EQ(svGetLogicArrElem1(h, i), kValues[i]);
 }
 
 // C1: a Put writes the canonical aval/bval encoding into bit 0, and a Get reads
 // that encoding back. The handle models: logic arr [0:1].
 TEST(ScalarElementAccess, LogicPutUsesCanonicalEncoding) {
-  const SvOpenArrayDimRange ranges[] = {{0, 0}, {0, 1}};
+  const SvOpenArrayDimRange kRanges[] = {{0, 0}, {0, 1}};
   svLogicVecVal data[2] = {{0, 0}, {0, 0}};
   SvOpenArrayDesc desc;
-  svOpenArrayHandle h = MakeHandle(data, ranges, 2, &desc);
+  svOpenArrayHandle h = MakeHandle(data, kRanges, 2, &desc);
 
   // z is aval bit 0 = 0, bval bit 0 = 1; x is both bits set.
   svPutLogicArrElem1(h, sv_z, 0);
@@ -93,10 +93,10 @@ TEST(ScalarElementAccess, LogicPutUsesCanonicalEncoding) {
 // the storage word are not part of the scalar value. The handle models: bit
 // arr[0:1] pre-seeded directly so the read cannot be echoing a prior Put.
 TEST(ScalarElementAccess, BitGetReadsOnlyBitZero) {
-  const SvOpenArrayDimRange ranges[] = {{0, 0}, {0, 1}};
+  const SvOpenArrayDimRange kRanges[] = {{0, 0}, {0, 1}};
   svBitVecVal data[2] = {0xFFFFFFFEu, 0x00000001u};
   SvOpenArrayDesc desc;
-  svOpenArrayHandle h = MakeHandle(data, ranges, 2, &desc);
+  svOpenArrayHandle h = MakeHandle(data, kRanges, 2, &desc);
 
   // Slot 0 has bit 0 clear (despite garbage above); slot 1 has bit 0 set.
   EXPECT_EQ(svGetBitArrElem1(h, 0), 0);
@@ -106,10 +106,10 @@ TEST(ScalarElementAccess, BitGetReadsOnlyBitZero) {
 // C1: a Put touches only bit 0 of the element's word, leaving the surrounding
 // bits of that storage word unchanged. The handle models: bit arr [0:1].
 TEST(ScalarElementAccess, BitPutTouchesOnlyBitZero) {
-  const SvOpenArrayDimRange ranges[] = {{0, 0}, {0, 1}};
+  const SvOpenArrayDimRange kRanges[] = {{0, 0}, {0, 1}};
   svBitVecVal data[2] = {0xFFFFFFF0u, 0x0000000Fu};
   SvOpenArrayDesc desc;
-  svOpenArrayHandle h = MakeHandle(data, ranges, 2, &desc);
+  svOpenArrayHandle h = MakeHandle(data, kRanges, 2, &desc);
 
   svPutBitArrElem1(h, 1, 0);  // set bit 0, keep the high nibble pattern
   EXPECT_EQ(data[0], 0xFFFFFFF1u);
@@ -124,13 +124,13 @@ TEST(ScalarElementAccess, BitPutTouchesOnlyBitZero) {
 // in the upper bits to prove they are ignored. The handle models: logic arr
 // [0:3].
 TEST(ScalarElementAccess, LogicGetReadsOnlyBitZero) {
-  const SvOpenArrayDimRange ranges[] = {{0, 0}, {0, 3}};
+  const SvOpenArrayDimRange kRanges[] = {{0, 0}, {0, 3}};
   svLogicVecVal data[4] = {{0xFFFFFFFEu, 0xFFFFFFFEu},   // bit0: a=0 b=0 -> 0
                            {0x00000001u, 0x00000000u},   // bit0: a=1 b=0 -> 1
                            {0xFFFFFFFEu, 0x00000001u},   // bit0: a=0 b=1 -> z
                            {0xFFFFFFFFu, 0xFFFFFFFFu}};  // bit0: a=1 b=1 -> x
   SvOpenArrayDesc desc;
-  svOpenArrayHandle h = MakeHandle(data, ranges, 2, &desc);
+  svOpenArrayHandle h = MakeHandle(data, kRanges, 2, &desc);
 
   EXPECT_EQ(svGetLogicArrElem1(h, 0), sv_0);
   EXPECT_EQ(svGetLogicArrElem1(h, 1), sv_1);
@@ -143,11 +143,11 @@ TEST(ScalarElementAccess, LogicGetReadsOnlyBitZero) {
 // distinct pattern in the upper bits to prove they survive. The handle models:
 // logic arr [0:1].
 TEST(ScalarElementAccess, LogicPutTouchesOnlyBitZero) {
-  const SvOpenArrayDimRange ranges[] = {{0, 0}, {0, 1}};
+  const SvOpenArrayDimRange kRanges[] = {{0, 0}, {0, 1}};
   svLogicVecVal data[2] = {{0xAAAAAAAAu, 0x55555555u},
                            {0xFFFFFFFFu, 0x00000000u}};
   SvOpenArrayDesc desc;
-  svOpenArrayHandle h = MakeHandle(data, ranges, 2, &desc);
+  svOpenArrayHandle h = MakeHandle(data, kRanges, 2, &desc);
 
   // sv_1 sets aval bit 0 and clears bval bit 0; the upper bits stay put.
   svPutLogicArrElem1(h, sv_1, 0);
@@ -165,10 +165,10 @@ TEST(ScalarElementAccess, LogicPutTouchesOnlyBitZero) {
 // 0 and positions advance toward the right bound. The handle models:
 // bit arr [3:1].
 TEST(ScalarElementAccess, BitDescendingOriginalRangeIndexing) {
-  const SvOpenArrayDimRange ranges[] = {{0, 0}, {3, 1}};
+  const SvOpenArrayDimRange kRanges[] = {{0, 0}, {3, 1}};
   svBitVecVal data[3] = {0, 0, 0};
   SvOpenArrayDesc desc;
-  svOpenArrayHandle h = MakeHandle(data, ranges, 2, &desc);
+  svOpenArrayHandle h = MakeHandle(data, kRanges, 2, &desc);
 
   svPutBitArrElem1(h, 1, 3);  // left bound -> position 0
   svPutBitArrElem1(h, 0, 2);  // -> position 1
@@ -185,10 +185,10 @@ TEST(ScalarElementAccess, BitDescendingOriginalRangeIndexing) {
 // (index -1) is position 0 and the right bound (index -4) is position 3. The
 // handle models: logic arr [-1:-4].
 TEST(ScalarElementAccess, LogicNegativeBoundRangeIndexing) {
-  const SvOpenArrayDimRange ranges[] = {{0, 0}, {-1, -4}};
+  const SvOpenArrayDimRange kRanges[] = {{0, 0}, {-1, -4}};
   svLogicVecVal data[4] = {{0, 0}, {0, 0}, {0, 0}, {0, 0}};
   SvOpenArrayDesc desc;
-  svOpenArrayHandle h = MakeHandle(data, ranges, 2, &desc);
+  svOpenArrayHandle h = MakeHandle(data, kRanges, 2, &desc);
 
   svPutLogicArrElem1(h, sv_1, -1);  // left bound -> position 0
   svPutLogicArrElem1(h, sv_z, -4);  // right bound -> position 3
@@ -201,10 +201,10 @@ TEST(ScalarElementAccess, LogicNegativeBoundRangeIndexing) {
 // C3: two unpacked indices select the element row-major. The handle models:
 // bit arr [0:1][0:2], so index (i,j) maps to storage position i*3 + j.
 TEST(ScalarElementAccess, BitTwoDimensionRowMajor) {
-  const SvOpenArrayDimRange ranges[] = {{0, 0}, {0, 1}, {0, 2}};
+  const SvOpenArrayDimRange kRanges[] = {{0, 0}, {0, 1}, {0, 2}};
   svBitVecVal data[6] = {0, 0, 0, 0, 0, 0};
   SvOpenArrayDesc desc;
-  svOpenArrayHandle h = MakeHandle(data, ranges, 3, &desc);
+  svOpenArrayHandle h = MakeHandle(data, kRanges, 3, &desc);
 
   svPutBitArrElem2(h, 1, 0, 1);  // 0*3 + 1 = 1
   svPutBitArrElem2(h, 1, 1, 2);  // 1*3 + 2 = 5
@@ -219,11 +219,11 @@ TEST(ScalarElementAccess, BitTwoDimensionRowMajor) {
 // unpacked dimensions. The handle models: logic arr [0:1][0:1][0:1], so index
 // (i,j,k) maps to ((i*2 + j)*2 + k).
 TEST(ScalarElementAccess, LogicThreeDimensionRowMajor) {
-  const SvOpenArrayDimRange ranges[] = {{0, 0}, {0, 1}, {0, 1}, {0, 1}};
+  const SvOpenArrayDimRange kRanges[] = {{0, 0}, {0, 1}, {0, 1}, {0, 1}};
   svLogicVecVal data[8];
   for (auto& w : data) w = svLogicVecVal{0, 0};
   SvOpenArrayDesc desc;
-  svOpenArrayHandle h = MakeHandle(data, ranges, 4, &desc);
+  svOpenArrayHandle h = MakeHandle(data, kRanges, 4, &desc);
 
   svPutLogicArrElem3(h, sv_x, 1, 0, 1);  // ((1*2+0)*2+1) = 5
 
@@ -236,10 +236,10 @@ TEST(ScalarElementAccess, LogicThreeDimensionRowMajor) {
 // svPutBitArrElem3/svGetBitArrElem3 functions. The handle models: bit arr
 // [0:1][0:1][0:1], so index (i,j,k) maps to ((i*2 + j)*2 + k).
 TEST(ScalarElementAccess, BitThreeDimensionRowMajor) {
-  const SvOpenArrayDimRange ranges[] = {{0, 0}, {0, 1}, {0, 1}, {0, 1}};
+  const SvOpenArrayDimRange kRanges[] = {{0, 0}, {0, 1}, {0, 1}, {0, 1}};
   svBitVecVal data[8] = {0, 0, 0, 0, 0, 0, 0, 0};
   SvOpenArrayDesc desc;
-  svOpenArrayHandle h = MakeHandle(data, ranges, 4, &desc);
+  svOpenArrayHandle h = MakeHandle(data, kRanges, 4, &desc);
 
   svPutBitArrElem3(h, 1, 1, 1, 0);  // ((1*2+1)*2+0) = 6
 
@@ -253,11 +253,11 @@ TEST(ScalarElementAccess, BitThreeDimensionRowMajor) {
 // svPutLogicArrElem2/svGetLogicArrElem2 functions. The handle models:
 // logic arr [0:1][0:2], so index (i,j) maps to i*3 + j.
 TEST(ScalarElementAccess, LogicTwoDimensionRowMajor) {
-  const SvOpenArrayDimRange ranges[] = {{0, 0}, {0, 1}, {0, 2}};
+  const SvOpenArrayDimRange kRanges[] = {{0, 0}, {0, 1}, {0, 2}};
   svLogicVecVal data[6];
   for (auto& w : data) w = svLogicVecVal{0, 0};
   SvOpenArrayDesc desc;
-  svOpenArrayHandle h = MakeHandle(data, ranges, 3, &desc);
+  svOpenArrayHandle h = MakeHandle(data, kRanges, 3, &desc);
 
   svPutLogicArrElem2(h, sv_z, 1, 2);  // 1*3 + 2 = 5
 
@@ -268,10 +268,10 @@ TEST(ScalarElementAccess, LogicTwoDimensionRowMajor) {
 // C3: the variadic forms resolve the same element as the matching numbered
 // form. The handle models: bit arr [0:1][0:2] (two unpacked dimensions).
 TEST(ScalarElementAccess, BitVariadicMatchesNumbered) {
-  const SvOpenArrayDimRange ranges[] = {{0, 0}, {0, 1}, {0, 2}};
+  const SvOpenArrayDimRange kRanges[] = {{0, 0}, {0, 1}, {0, 2}};
   svBitVecVal data[6] = {0, 0, 0, 0, 0, 0};
   SvOpenArrayDesc desc;
-  svOpenArrayHandle h = MakeHandle(data, ranges, 3, &desc);
+  svOpenArrayHandle h = MakeHandle(data, kRanges, 3, &desc);
 
   // Write via the variadic form, read back via both the numbered and variadic
   // forms - both must land on storage position 1*3 + 2 = 5.
@@ -284,10 +284,10 @@ TEST(ScalarElementAccess, BitVariadicMatchesNumbered) {
 // C3: the logic variadic forms likewise match the numbered form and carry the
 // full four-state value. The handle models: logic arr [0:3] (one unpacked dim).
 TEST(ScalarElementAccess, LogicVariadicMatchesNumbered) {
-  const SvOpenArrayDimRange ranges[] = {{0, 0}, {0, 3}};
+  const SvOpenArrayDimRange kRanges[] = {{0, 0}, {0, 3}};
   svLogicVecVal data[4] = {{0, 0}, {0, 0}, {0, 0}, {0, 0}};
   SvOpenArrayDesc desc;
-  svOpenArrayHandle h = MakeHandle(data, ranges, 2, &desc);
+  svOpenArrayHandle h = MakeHandle(data, kRanges, 2, &desc);
 
   svPutLogicArrElem(h, sv_z, 2);
   EXPECT_EQ(svGetLogicArrElem1(h, 2), sv_z);
@@ -299,13 +299,13 @@ TEST(ScalarElementAccess, LogicVariadicMatchesNumbered) {
 // to resolve, so a variadic Get returns the zero scalar and a variadic Put is a
 // no-op. The handle models a degenerate single-packed-dimension descriptor.
 TEST(ScalarElementAccess, VariadicNoUnpackedDimensionsIsNoOp) {
-  const SvOpenArrayDimRange ranges[] = {{0, 0}};
+  const SvOpenArrayDimRange kRanges[] = {{0, 0}};
   svBitVecVal bit_data[1] = {1};
   svLogicVecVal logic_data[1] = {{1, 1}};
   SvOpenArrayDesc bit_desc;
   SvOpenArrayDesc logic_desc;
-  svOpenArrayHandle bh = MakeHandle(bit_data, ranges, 1, &bit_desc);
-  svOpenArrayHandle lh = MakeHandle(logic_data, ranges, 1, &logic_desc);
+  svOpenArrayHandle bh = MakeHandle(bit_data, kRanges, 1, &bit_desc);
+  svOpenArrayHandle lh = MakeHandle(logic_data, kRanges, 1, &logic_desc);
 
   // Gets resolve no element and return the zero scalar.
   EXPECT_EQ(svGetBitArrElem(bh, 0), 0);
@@ -323,10 +323,10 @@ TEST(ScalarElementAccess, VariadicNoUnpackedDimensionsIsNoOp) {
 // the zero scalar and a Put leaves storage untouched. The handle models:
 // bit arr [0:3].
 TEST(ScalarElementAccess, OutOfRangeAndNullHandle) {
-  const SvOpenArrayDimRange ranges[] = {{0, 0}, {0, 3}};
+  const SvOpenArrayDimRange kRanges[] = {{0, 0}, {0, 3}};
   svBitVecVal data[4] = {1, 1, 1, 1};
   SvOpenArrayDesc desc;
-  svOpenArrayHandle h = MakeHandle(data, ranges, 2, &desc);
+  svOpenArrayHandle h = MakeHandle(data, kRanges, 2, &desc);
 
   // Put past the [0:3] range leaves storage untouched.
   svPutBitArrElem1(h, 0, 4);

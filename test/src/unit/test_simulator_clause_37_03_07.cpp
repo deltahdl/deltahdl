@@ -69,9 +69,9 @@ TEST(ObjectLifetimes, AutomaticIsAlsoAContainerAndClassProperty) {
   VpiContext ctx;
   SetGlobalVpiContext(&ctx);
 
-  const int kinds[] = {vpiModule, vpiProgram, vpiInterface, vpiPackage,
-                       vpiClassTypespec};
-  for (int kind : kinds) {
+  const int kKinds[] = {vpiModule, vpiProgram, vpiInterface, vpiPackage,
+                        vpiClassTypespec};
+  for (int kind : kKinds) {
     VpiObject automatic_container;
     automatic_container.type = kind;
     automatic_container.automatic = true;

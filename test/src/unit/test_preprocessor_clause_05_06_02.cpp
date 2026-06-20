@@ -32,7 +32,7 @@ TEST(KeywordPreprocessor, UppercaseKeywordAsIdentifierPassesThrough) {
 
 TEST(KeywordPreprocessor, KeywordInMacroExpansion) {
   PreprocFixture f;
-  auto result = Preprocess(
+  Preprocess(
       "`define BLOCK begin\n"
       "module t;\n"
       "  initial `BLOCK\n"

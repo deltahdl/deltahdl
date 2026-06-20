@@ -44,7 +44,7 @@ TEST(EscapedIdentifierPreprocessor, MultipleEscapedIdentifiersPreserved) {
 
 TEST(EscapedIdentifierPreprocessor, EscapedIdentifierInMacroContext) {
   PreprocFixture f;
-  auto result = Preprocess(
+  Preprocess(
       "`define SIG \\my+sig\n"
       "module t;\n"
       "  logic `SIG ;\n"

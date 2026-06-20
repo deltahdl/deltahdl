@@ -107,21 +107,21 @@ TEST(SyncEventSim, SlicedClockingInputUsesSynchronousBitAtFixedIndex) {
   // The dynamic index `a` is read a single time, at the instant the event
   // control executes. Capturing it once and reusing the captured value here
   // models §14.15's "evaluated once when the @ expression executes" rule.
-  const uint32_t captured_index = 1;
+  const uint32_t kCapturedIndex = 1;
 
   SchedulePosedge(f, clk, 5);   // drive clk high so prev==1 before the negedge
   ScheduleNegedge(f, clk, 10);  // negedge -> clocking event samples `sign`
   f.scheduler.Run();
 
-  // The synchronous slice value is bit `captured_index` of the snapshot taken
+  // The synchronous slice value is bit `kCapturedIndex` of the snapshot taken
   // by the production sampling path (SampleBlockInputs/SampleInput).
   uint64_t snapshot = cmgr.GetSampledValue("dom", "sign");
-  uint64_t sync_bit = (snapshot >> captured_index) & 1;
+  uint64_t sync_bit = (snapshot >> kCapturedIndex) & 1;
 
   // After the event, both the live signal and a later re-evaluation of the
   // index move on. The synchronous slice must ignore both changes.
   sign->value = MakeLogic4VecVal(f.arena, 4, 0b0000);
-  const uint32_t reindexed = 3;  // a value `a` might take on a later resume
+  const uint32_t kReindexed = 3;  // a value `a` might take on a later resume
 
   // Claim D: the snapshot is the value at the clocking event, immune to the
   // subsequent live mutation.
@@ -131,7 +131,7 @@ TEST(SyncEventSim, SlicedClockingInputUsesSynchronousBitAtFixedIndex) {
   EXPECT_EQ(sync_bit, 1u);
   // A live, re-indexed read would yield a different bit, confirming the
   // synchronous/once semantics are not equivalent to reading the live slice.
-  uint64_t live_reindexed_bit = (sign->value.ToUint64() >> reindexed) & 1;
+  uint64_t live_reindexed_bit = (sign->value.ToUint64() >> kReindexed) & 1;
   EXPECT_NE(sync_bit, live_reindexed_bit);
 }
 

@@ -446,12 +446,12 @@ TEST(WordSet, FeasibilityAndAssertSatisfaction) {
       BoolTrue()};
   std::vector<EnabledAssertion> assumptions{assumption};
 
-  const Word feasible = {A({"clk", "a"})};
-  const Word infeasible = {A({"clk"})};  // the assume (strong a at clk) fails
-  EXPECT_TRUE(WordIsFeasible(feasible, assumptions));
-  EXPECT_FALSE(WordIsFeasible(infeasible, assumptions));
+  const Word kFeasible = {A({"clk", "a"})};
+  const Word kInfeasible = {A({"clk"})};  // the assume (strong a at clk) fails
+  EXPECT_TRUE(WordIsFeasible(kFeasible, assumptions));
+  EXPECT_FALSE(WordIsFeasible(kInfeasible, assumptions));
 
-  std::vector<Word> words{feasible, infeasible};
+  std::vector<Word> words{kFeasible, kInfeasible};
 
   EnabledAssertion holds{
       *AssertionWithClock(AssertionStatement::Activation::kAlways,

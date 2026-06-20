@@ -15,7 +15,7 @@ Expr* MakeConcat(Arena& arena, std::vector<Expr*> elems) {
   return e;
 }
 
-QueueObject* MakeBoundedQueue(SimFixture& f, uint32_t bound,
+QueueObject* MakeBoundedQueue(SimFixture& f, int32_t bound,
                               const std::vector<uint64_t>& vals) {
   auto* q = f.ctx.CreateQueue("q", 32, bound);
   for (auto v : vals) {

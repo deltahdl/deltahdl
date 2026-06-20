@@ -36,14 +36,14 @@ TEST(SvDpi, BitAndLogicShareScalarType) {
 // Edge case: the four scalar codes must map to four different values, otherwise
 // two of the logic states would be indistinguishable once encoded.
 TEST(SvDpi, ScalarCodesAreDistinct) {
-  const int codes[] = {sv_0, sv_1, sv_z, sv_x};
+  const int kCodes[] = {sv_0, sv_1, sv_z, sv_x};
   for (int i = 0; i < 4; ++i) {
     for (int j = i + 1; j < 4; ++j) {
-      EXPECT_NE(codes[i], codes[j]) << "codes " << i << " and " << j;
+      EXPECT_NE(kCodes[i], kCodes[j]) << "codes " << i << " and " << j;
     }
   }
   // The codes occupy exactly the low two bits, so none exceeds the value 3.
-  for (int code : codes) {
+  for (int code : kCodes) {
     EXPECT_GE(code, 0);
     EXPECT_LE(code, 3);
   }
@@ -53,9 +53,9 @@ TEST(SvDpi, ScalarCodesAreDistinct) {
 // no truncation, since the carrier is the type used to pass scalars across the
 // DPI.
 TEST(SvDpi, AllScalarCodesRoundTripThroughCarrier) {
-  const int codes[] = {sv_0, sv_1, sv_z, sv_x};
-  for (int code : codes) {
-    svScalar stored = static_cast<svScalar>(code);
+  const int kCodes[] = {sv_0, sv_1, sv_z, sv_x};
+  for (int code : kCodes) {
+    auto stored = static_cast<svScalar>(code);
     EXPECT_EQ(static_cast<int>(stored), code);
   }
 }

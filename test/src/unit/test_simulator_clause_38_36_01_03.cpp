@@ -136,14 +136,14 @@ TEST_F(VpiModuleWideCallback, NestedModuleInstanceIsNotReached) {
   vpiHandle own = AddStmt(module, "m.s", vpiAssignment);
   vpiHandle sub = vpi_ctx_.CreateModule("m.sub", "m.sub");
   module->children.push_back(sub);
-  vpiHandle subStmt = AddStmt(sub, "m.sub.s", vpiAssignment);
+  vpiHandle sub_stmt = AddStmt(sub, "m.sub.s", vpiAssignment);
 
   ASSERT_NE(RegisterModuleWide(module), nullptr);
   vpi_ctx_.DispatchCallbacks(cbStmt);
 
   EXPECT_EQ(g_calls, 1);
   EXPECT_TRUE(Fired(own));
-  EXPECT_FALSE(Fired(subStmt));
+  EXPECT_FALSE(Fired(sub_stmt));
 }
 
 // §38.36.1.3: "every statement that can have a callback" is the empty set when

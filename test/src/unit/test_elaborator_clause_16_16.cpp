@@ -125,14 +125,17 @@ TEST(ClockResolution, MulticlockedMaximalPropertyNeedsUniqueLeadingClock) {
 // is legal only when its maximal property is an instance of a sequence or
 // property for which a unique leading clocking event is determined.
 TEST(ClockResolution, UnclockedAssertionLegalOnlyWithUniquelyClockedInstance) {
-  EXPECT_TRUE(UnclockedAssertionIsLegal(/*maximal_property_is_instance=*/true,
-                                        /*has_unique_leading_clock=*/true));
+  EXPECT_TRUE(
+      UnclockedAssertionIsLegal(/*maximal_property_is_instance=*/true,
+                                /*instance_has_unique_leading_clock=*/true));
   // Instance whose leading clock is not unique -> illegal.
-  EXPECT_FALSE(UnclockedAssertionIsLegal(/*maximal_property_is_instance=*/true,
-                                         /*has_unique_leading_clock=*/false));
+  EXPECT_FALSE(
+      UnclockedAssertionIsLegal(/*maximal_property_is_instance=*/true,
+                                /*instance_has_unique_leading_clock=*/false));
   // Maximal property that is not an instance at all -> illegal.
-  EXPECT_FALSE(UnclockedAssertionIsLegal(/*maximal_property_is_instance=*/false,
-                                         /*has_unique_leading_clock=*/true));
+  EXPECT_FALSE(
+      UnclockedAssertionIsLegal(/*maximal_property_is_instance=*/false,
+                                /*instance_has_unique_leading_clock=*/true));
 }
 
 }  // namespace

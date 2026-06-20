@@ -5,20 +5,22 @@ using namespace delta;
 
 namespace {
 
-const ModuleItem* FindParamInGenerate(const ModuleItem* item) {
-  if (!item) return nullptr;
-  for (const auto* child : item->gen_body) {
+const ModuleItem* FindParamInGenerate(const ModuleItem* item);
+
+const ModuleItem* FindParamInBody(const std::vector<ModuleItem*>& body) {
+  for (const auto* child : body) {
     if (child->kind == ModuleItemKind::kParamDecl) return child;
     if (const auto* found = FindParamInGenerate(child)) return found;
   }
-  if (item->gen_else) {
-    if (const auto* found = FindParamInGenerate(item->gen_else)) return found;
-  }
+  return nullptr;
+}
+
+const ModuleItem* FindParamInGenerate(const ModuleItem* item) {
+  if (!item) return nullptr;
+  if (const auto* found = FindParamInBody(item->gen_body)) return found;
+  if (const auto* found = FindParamInGenerate(item->gen_else)) return found;
   for (const auto& ci : item->gen_case_items) {
-    for (const auto* child : ci.body) {
-      if (child->kind == ModuleItemKind::kParamDecl) return child;
-      if (const auto* found = FindParamInGenerate(child)) return found;
-    }
+    if (const auto* found = FindParamInBody(ci.body)) return found;
   }
   return nullptr;
 }

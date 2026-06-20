@@ -10,7 +10,7 @@ namespace {
 // $rose_gclk, $fell_gclk, $stable_gclk, $changed_gclk and the future functions
 // $future_gclk, $rising_gclk, $falling_gclk, $steady_gclk, $changing_gclk.
 TEST(GlobalClockingSampledFunctions, RecognizesEveryProvidedFunction) {
-  GlobalClockingSampledFunction fn;
+  GlobalClockingSampledFunction fn{};
   EXPECT_TRUE(ClassifyGlobalClockingSampledFunction("$past_gclk", fn));
   EXPECT_EQ(fn, GlobalClockingSampledFunction::kPastGclk);
   EXPECT_TRUE(ClassifyGlobalClockingSampledFunction("$rose_gclk", fn));

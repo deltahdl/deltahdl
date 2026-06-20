@@ -43,7 +43,7 @@ TEST(ConditionalEventIffPreprocessor, MacroInIffCondition) {
 
 TEST(ConditionalEventIffPreprocessor, MacroExpandsToIffEvent) {
   PreprocFixture f;
-  auto result = Preprocess(
+  Preprocess(
       "`define SENS @(posedge clk iff en)\n"
       "module m;\n"
       "  always `SENS q <= d;\n"

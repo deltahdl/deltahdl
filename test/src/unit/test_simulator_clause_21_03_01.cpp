@@ -297,17 +297,17 @@ TEST(IoSystemTaskTest, FcloseDoesNotInvalidateReservedStdio) {
 // the path / mode at $fopen time.
 TEST(IoSystemTaskTest, FopenAcceptsIntegralCharacterStringForFilename) {
   SimFixture f;
-  const std::string path = "/tmp/x";
+  const std::string kPath = "/tmp/x";
   {
-    std::ofstream seed(path);
+    std::ofstream seed(kPath);
     seed << "ok\n";
   }
 
   auto* fname_var = f.ctx.CreateVariable("fname", 48);
   uint64_t packed = 0;
-  for (size_t i = 0; i < path.size(); ++i) {
-    uint64_t byte_idx = path.size() - 1 - i;
-    packed |= static_cast<uint64_t>(static_cast<unsigned char>(path[i]))
+  for (size_t i = 0; i < kPath.size(); ++i) {
+    uint64_t byte_idx = kPath.size() - 1 - i;
+    packed |= static_cast<uint64_t>(static_cast<unsigned char>(kPath[i]))
               << (byte_idx * 8);
   }
   fname_var->value = MakeLogic4VecVal(f.arena, 48, packed);
@@ -322,7 +322,7 @@ TEST(IoSystemTaskTest, FopenAcceptsIntegralCharacterStringForFilename) {
 
   EvalExpr(MakeSysCall(f.arena, "$fclose", {MakeInt(f.arena, fd)}), f.ctx,
            f.arena);
-  std::remove(path.c_str());
+  std::remove(kPath.c_str());
 }
 
 // §21.3.1: $fopen failure returns 0 for every read-style type string that

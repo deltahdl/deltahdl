@@ -67,17 +67,17 @@ void ExpectSingleMyFsmEnumPragma(const std::vector<FsmPragmaInfo>& pragmas) {
 // parameter (S0, s1, s2, s3) reaches the token stream — the raw material a
 // downstream extractor reads to learn the FSM's legal states.
 TEST(FsmPossibleStatesPragmaLexing, RecognizesEnumPragmaAfterParameterKeyword) {
-  const std::string src =
+  const std::string kSrc =
       "module fsm;\n"
       "  parameter /* tool enum myFSM */\n"
       "    S0 = 0, s1 = 1, s2 = 2, s3 = 3;\n"
       "endmodule\n";
 
-  auto pragmas = CollectFsmPragmas(src);
+  auto pragmas = CollectFsmPragmas(kSrc);
   // The enum-only pragma carries no signal name; it only binds the enumeration.
   ExpectSingleMyFsmEnumPragma(pragmas);
 
-  auto states = CollectStateParams(src);
+  auto states = CollectStateParams(kSrc);
   ASSERT_EQ(states.size(), 4u);
   EXPECT_EQ(states[0], "S0");
   EXPECT_EQ(states[1], "s1");
@@ -91,16 +91,16 @@ TEST(FsmPossibleStatesPragmaLexing, RecognizesEnumPragmaAfterParameterKeyword) {
 // pragma do not disturb it. The state-naming parameters still reach the stream.
 TEST(FsmPossibleStatesPragmaLexing,
      RecognizesEnumPragmaAfterParameterBitWidth) {
-  const std::string src =
+  const std::string kSrc =
       "module fsm;\n"
       "  parameter [1:0] /* tool enum myFSM */\n"
       "    S0 = 0, s1 = 1, s2 = 2, s3 = 3;\n"
       "endmodule\n";
 
-  auto pragmas = CollectFsmPragmas(src);
+  auto pragmas = CollectFsmPragmas(kSrc);
   ExpectSingleMyFsmEnumPragma(pragmas);
 
-  auto states = CollectStateParams(src);
+  auto states = CollectStateParams(kSrc);
   ASSERT_EQ(states.size(), 4u);
   EXPECT_EQ(states[0], "S0");
   EXPECT_EQ(states[3], "s3");

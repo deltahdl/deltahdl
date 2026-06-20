@@ -36,11 +36,11 @@ TEST(CheckerSchedulingSemantics, CheckerVariableNonblockingUpdatesAreReNBA) {
 // production helper assigns to a checker-variable nonblocking update, observe
 // that the scheduler drains Reactive and Re-Inactive before it.
 TEST(CheckerSchedulingSemantics, ReNBAIsProcessedAfterReactiveAndReInactive) {
-  const Region re_nba = HomeRegionForCheckerStatement(
+  const Region kReNba = HomeRegionForCheckerStatement(
       CheckerStatementKind::kCheckerVariableNonblocking);
   VerifyThreeRegionOrder({Region::kReactive, "reactive"},
                          {Region::kReInactive, "reinactive"},
-                         {re_nba, "renba"});
+                         {kReNba, "renba"});
 }
 
 // §17.7.3: these scheduling rules make possible assignment of sequence end
@@ -49,13 +49,13 @@ TEST(CheckerSchedulingSemantics, ReNBAIsProcessedAfterReactiveAndReInactive) {
 // while the update to checker variable `a` is scheduled in the Re-NBA region,
 // so the end point value is available when the update is applied.
 TEST(CheckerSchedulingSemantics, SequenceEndPointCaptureSpansReactiveToReNBA) {
-  const Region rhs_eval =
+  const Region kRhsEval =
       HomeRegionForCheckerStatement(CheckerStatementKind::kBlocking);
-  const Region var_update = HomeRegionForCheckerStatement(
+  const Region kVarUpdate = HomeRegionForCheckerStatement(
       CheckerStatementKind::kCheckerVariableNonblocking);
-  EXPECT_EQ(rhs_eval, Region::kReactive);
-  EXPECT_EQ(var_update, Region::kReNBA);
-  EXPECT_NE(rhs_eval, var_update);
+  EXPECT_EQ(kRhsEval, Region::kReactive);
+  EXPECT_EQ(kVarUpdate, Region::kReNBA);
+  EXPECT_NE(kRhsEval, kVarUpdate);
 }
 
 // §17.7.3: concurrent assertions have invariant scheduling semantics whether
@@ -75,8 +75,8 @@ TEST(CheckerSchedulingSemantics, ConcurrentAssertionSchedulingIsInvariant) {
 TEST(CheckerSchedulingSemantics,
      ConcurrentAssertionSchedulingInvariantAcrossAllRegions) {
   for (int i = 0; i < static_cast<int>(Region::kCOUNT); ++i) {
-    const Region r = static_cast<Region>(i);
-    EXPECT_EQ(ConcurrentAssertionRegionInChecker(r), r);
+    const auto kR = static_cast<Region>(i);
+    EXPECT_EQ(ConcurrentAssertionRegionInChecker(kR), kR);
   }
 }
 

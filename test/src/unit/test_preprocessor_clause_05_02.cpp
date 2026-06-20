@@ -32,14 +32,14 @@ TEST(LexicalConventionPreprocessor, FreeFormatMultilinePreserved) {
 
 TEST(LexicalConventionPreprocessor, MacroExpansionPreservesFreeFormat) {
   PreprocFixture f;
-  auto compact = Preprocess(
+  Preprocess(
       "`define WIDTH 8\n"
       "module t;logic [`WIDTH-1:0] a;endmodule\n",
       f);
   EXPECT_FALSE(f.diag.HasErrors());
 
   PreprocFixture f2;
-  auto spread = Preprocess(
+  Preprocess(
       "`define WIDTH 8\n"
       "module\n  t\n;\n  logic\n  [`WIDTH-1:0]\n  a\n;\nendmodule\n",
       f2);
@@ -48,13 +48,13 @@ TEST(LexicalConventionPreprocessor, MacroExpansionPreservesFreeFormat) {
 
 TEST(LexicalConventionPreprocessor, BlockCommentPreservedThroughPreprocessing) {
   PreprocFixture f;
-  auto result = Preprocess("module/**/t;endmodule\n", f);
+  Preprocess("module/**/t;endmodule\n", f);
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
 TEST(LexicalConventionPreprocessor, AllTokenCategoriesPassThroughPreprocessor) {
   PreprocFixture f;
-  auto result = Preprocess(
+  Preprocess(
       "module t; // line comment\n"
       "  /* block comment */\n"
       "  logic [7:0] data = 8'hAB;\n"
@@ -66,7 +66,7 @@ TEST(LexicalConventionPreprocessor, AllTokenCategoriesPassThroughPreprocessor) {
 
 TEST(LexicalConventionPreprocessor, TabsAndFormfeedsAsWhitespace) {
   PreprocFixture f;
-  auto result = Preprocess("module\tt\f;\flogic\ta\t;\tendmodule\n", f);
+  Preprocess("module\tt\f;\flogic\ta\t;\tendmodule\n", f);
   EXPECT_FALSE(f.diag.HasErrors());
 }
 

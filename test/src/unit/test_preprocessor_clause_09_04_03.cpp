@@ -8,7 +8,7 @@ namespace {
 
 TEST(LevelSensitiveEventPreprocessor, MacroExpansionInWaitCondition) {
   PreprocFixture f;
-  auto result = Preprocess(
+  Preprocess(
       "`define COND ready\n"
       "module m;\n"
       "  initial wait (`COND) a = 1;\n"
@@ -19,7 +19,7 @@ TEST(LevelSensitiveEventPreprocessor, MacroExpansionInWaitCondition) {
 
 TEST(LevelSensitiveEventPreprocessor, MacroExpansionInWaitBody) {
   PreprocFixture f;
-  auto result = Preprocess(
+  Preprocess(
       "`define ASSIGN a = 1;\n"
       "module m;\n"
       "  initial wait (done) `ASSIGN\n"

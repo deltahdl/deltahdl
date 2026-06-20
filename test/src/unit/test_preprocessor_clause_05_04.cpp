@@ -8,7 +8,7 @@ namespace {
 
 TEST(CommentPreprocessor, LineCommentPassesThrough) {
   PreprocFixture f;
-  auto result = Preprocess(
+  Preprocess(
       "module t; // line comment\n"
       "  logic a;\n"
       "endmodule\n",
@@ -18,7 +18,7 @@ TEST(CommentPreprocessor, LineCommentPassesThrough) {
 
 TEST(CommentPreprocessor, BlockCommentPassesThrough) {
   PreprocFixture f;
-  auto result = Preprocess(
+  Preprocess(
       "module t;\n"
       "  /* block comment */\n"
       "  logic a;\n"
@@ -29,7 +29,7 @@ TEST(CommentPreprocessor, BlockCommentPassesThrough) {
 
 TEST(CommentPreprocessor, MixedCommentsPassThrough) {
   PreprocFixture f;
-  auto result = Preprocess(
+  Preprocess(
       "module /* name */ t; // header\n"
       "  logic a; /* decl */\n"
       "  // trailing\n"
@@ -40,7 +40,7 @@ TEST(CommentPreprocessor, MixedCommentsPassThrough) {
 
 TEST(CommentPreprocessor, BlockCommentNotNested) {
   PreprocFixture f;
-  auto result = Preprocess(
+  Preprocess(
       "module t;\n"
       "  logic /* outer /* inner */ a;\n"
       "endmodule\n",
@@ -50,7 +50,7 @@ TEST(CommentPreprocessor, BlockCommentNotNested) {
 
 TEST(CommentPreprocessor, LineCommentInsideBlockIgnored) {
   PreprocFixture f;
-  auto result = Preprocess(
+  Preprocess(
       "module t;\n"
       "  /* // not special\n"
       "     still block */\n"
@@ -62,7 +62,7 @@ TEST(CommentPreprocessor, LineCommentInsideBlockIgnored) {
 
 TEST(CommentPreprocessor, BlockTokensInsideLineIgnored) {
   PreprocFixture f;
-  auto result = Preprocess(
+  Preprocess(
       "module t;\n"
       "  // /* not a block */ still line\n"
       "  logic a;\n"
@@ -73,7 +73,7 @@ TEST(CommentPreprocessor, BlockTokensInsideLineIgnored) {
 
 TEST(CommentPreprocessor, CommentOnlyInput) {
   PreprocFixture f;
-  auto result = Preprocess(
+  Preprocess(
       "// line comment\n"
       "/* block comment */\n",
       f);
@@ -82,7 +82,7 @@ TEST(CommentPreprocessor, CommentOnlyInput) {
 
 TEST(CommentPreprocessor, MultilineBlockCommentSpan) {
   PreprocFixture f;
-  auto result = Preprocess(
+  Preprocess(
       "module t;\n"
       "  /* spanning\n"
       "     multiple\n"
@@ -95,13 +95,13 @@ TEST(CommentPreprocessor, MultilineBlockCommentSpan) {
 
 TEST(CommentPreprocessor, BlockCommentAsSeparator) {
   PreprocFixture f;
-  auto result = Preprocess("module/**/t;logic/**/a;endmodule\n", f);
+  Preprocess("module/**/t;logic/**/a;endmodule\n", f);
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
 TEST(CommentPreprocessor, CommentAfterMacroDefinition) {
   PreprocFixture f;
-  auto result = Preprocess(
+  Preprocess(
       "`define WIDTH 8 // bus width\n"
       "module t;\n"
       "  logic [`WIDTH-1:0] a;\n"

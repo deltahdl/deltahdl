@@ -59,8 +59,8 @@ class SvGetTimeSim : public ::testing::Test {
 // full 64-bit count split across the high and low halves. Reaching the current
 // scheduler time through svGetTime is the rule being applied.
 TEST_F(SvGetTimeSim, NullScopeRetrievesCurrentSimulationTime) {
-  const uint64_t ticks = (static_cast<uint64_t>(3) << 32) | 5u;
-  AdvanceTo(ticks);
+  const uint64_t kTicks = (static_cast<uint64_t>(3) << 32) | 5u;
+  AdvanceTo(kTicks);
 
   VpiTime t = {};
   t.type = kSvSimTime;

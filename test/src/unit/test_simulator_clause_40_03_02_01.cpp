@@ -172,15 +172,15 @@ TEST(CoverageControl, ResetWithoutCoverageHasNoEffect) {
 // column) and fails without any effect.
 TEST(CoverageControl, UnknownScopeIsBadArgument) {
   SimFixture f;
-  const std::string missing = "$root.tb.nonesuch";
+  const std::string kMissing = "$root.tb.nonesuch";
 
-  EXPECT_EQ(RunControl(f, kStart, missing), kError);
-  EXPECT_EQ(RunControl(f, kStop, missing), kError);
-  EXPECT_EQ(RunControl(f, kReset, missing), kError);
-  EXPECT_EQ(RunControl(f, kCheck, missing), kError);
+  EXPECT_EQ(RunControl(f, kStart, kMissing), kError);
+  EXPECT_EQ(RunControl(f, kStop, kMissing), kError);
+  EXPECT_EQ(RunControl(f, kReset, kMissing), kError);
+  EXPECT_EQ(RunControl(f, kCheck, kMissing), kError);
 
-  EXPECT_FALSE(Cov(f).IsRegistered(missing));
-  EXPECT_FALSE(Cov(f).IsCollecting(missing));
+  EXPECT_FALSE(Cov(f).IsRegistered(kMissing));
+  EXPECT_FALSE(Cov(f).IsCollecting(kMissing));
 }
 
 // C7 (edge): a first argument outside the four §40.3.1 control constants is a

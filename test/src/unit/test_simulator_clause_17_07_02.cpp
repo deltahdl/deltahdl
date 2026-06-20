@@ -30,9 +30,11 @@ TEST(CheckerVariableRandomization, CheckersHaveNoRandomizeMethod) {
 // §17.7.2: an updated free checker variable holds its value until the next
 // assume set clock event or the end of the time step, whichever comes first.
 TEST(CheckerVariableRandomization, HoldEndsAtWhicheverComesFirst) {
-  EXPECT_EQ(FreeCheckerVariableHoldEndsAt(/*next_clock_event_before=*/true),
+  EXPECT_EQ(FreeCheckerVariableHoldEndsAt(
+                /*next_clock_event_before_end_of_time_step=*/true),
             AssumeRandomizationHoldBoundary::kNextAssumeSetClockEvent);
-  EXPECT_EQ(FreeCheckerVariableHoldEndsAt(/*next_clock_event_before=*/false),
+  EXPECT_EQ(FreeCheckerVariableHoldEndsAt(
+                /*next_clock_event_before_end_of_time_step=*/false),
             AssumeRandomizationHoldBoundary::kEndOfTimeStep);
 }
 
@@ -68,10 +70,10 @@ TEST(CheckerVariableRandomization, ElementActivenessGranularity) {
 // §17.7.2: every free checker variable is initialized with an unconstrained
 // random value unless explicitly initialized in its declaration.
 TEST(CheckerVariableRandomization, RandomInitialValueUnlessDeclared) {
-  EXPECT_TRUE(
-      FreeCheckerVariableTakesRandomInitialValue(/*has_initializer=*/false));
-  EXPECT_FALSE(
-      FreeCheckerVariableTakesRandomInitialValue(/*has_initializer=*/true));
+  EXPECT_TRUE(FreeCheckerVariableTakesRandomInitialValue(
+      /*has_declaration_initializer=*/false));
+  EXPECT_FALSE(FreeCheckerVariableTakesRandomInitialValue(
+      /*has_declaration_initializer=*/true));
 }
 
 // §17.7.2: each checker instance has one and only one assume set, which may be
@@ -118,9 +120,9 @@ TEST(CheckerVariableRandomization, AssumeSetMembership) {
 // §17.7.2: a solution attempt is successful exactly when satisfying values are
 // found for the active variables; otherwise it is unsuccessful.
 TEST(CheckerVariableRandomization, SolutionAttemptOutcome) {
-  EXPECT_EQ(AssumeSetSolutionAttempt(/*found=*/true),
+  EXPECT_EQ(AssumeSetSolutionAttempt(/*satisfying_values_found=*/true),
             SolutionAttemptOutcome::kSuccessful);
-  EXPECT_EQ(AssumeSetSolutionAttempt(/*found=*/false),
+  EXPECT_EQ(AssumeSetSolutionAttempt(/*satisfying_values_found=*/false),
             SolutionAttemptOutcome::kUnsuccessful);
 }
 

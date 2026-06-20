@@ -14,7 +14,7 @@
 namespace {
 
 TEST(SvVpiUserCoverageEnums, AllExtensionsDistinct) {
-  const std::set<int> values = {
+  const std::set<int> kValues = {
       // Coverage control.
       vpiCoverageStart,
       vpiCoverageStop,
@@ -45,7 +45,7 @@ TEST(SvVpiUserCoverageEnums, AllExtensionsDistinct) {
       vpiFsm,
       vpiFsmHandle,
   };
-  EXPECT_EQ(values.size(), 23u);
+  EXPECT_EQ(kValues.size(), 23u);
 }
 
 }  // namespace

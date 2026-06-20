@@ -14,13 +14,13 @@ namespace {
 // scope and no operand specifying its own clock, every operand is governed by
 // `c`. Mirrors `@(c) x |=> y` where `c` flows across the implication to `y`.
 TEST(ClockFlow, LinearOperatorFlowsScopeLeftToRight) {
-  const std::vector<ClockFlowOperand> operands = {{/*explicit_clock=*/""},
-                                                  {/*explicit_clock=*/""}};
-  const std::vector<ClockScope> resolved = ResolveOperandClocks(
-      ClockFlowOperator::kLinear, /*incoming=*/"c", operands);
-  ASSERT_EQ(resolved.size(), 2u);
-  EXPECT_EQ(resolved[0], "c");
-  EXPECT_EQ(resolved[1], "c");
+  const std::vector<ClockFlowOperand> kOperands = {{/*explicit_clock=*/""},
+                                                   {/*explicit_clock=*/""}};
+  const std::vector<ClockScope> kResolved = ResolveOperandClocks(
+      ClockFlowOperator::kLinear, /*incoming=*/"c", kOperands);
+  ASSERT_EQ(kResolved.size(), 2u);
+  EXPECT_EQ(kResolved[0], "c");
+  EXPECT_EQ(kResolved[1], "c");
 }
 
 // §16.13.3 (core flow rule): across a linear operator a clocking event written
@@ -28,15 +28,15 @@ TEST(ClockFlow, LinearOperatorFlowsScopeLeftToRight) {
 // operands that follow until replaced again. Mirrors `@(c) x ##1 @(d) y ##1 z`:
 // `x` is at `c`, then `@(d)` replaces, so `y` and the trailing `z` are at `d`.
 TEST(ClockFlow, LinearOperatorReplacementPersistsToLaterOperands) {
-  const std::vector<ClockFlowOperand> operands = {{/*explicit_clock=*/""},
-                                                  {/*explicit_clock=*/"d"},
-                                                  {/*explicit_clock=*/""}};
-  const std::vector<ClockScope> resolved = ResolveOperandClocks(
-      ClockFlowOperator::kLinear, /*incoming=*/"c", operands);
-  ASSERT_EQ(resolved.size(), 3u);
-  EXPECT_EQ(resolved[0], "c");
-  EXPECT_EQ(resolved[1], "d");
-  EXPECT_EQ(resolved[2], "d");
+  const std::vector<ClockFlowOperand> kOperands = {{/*explicit_clock=*/""},
+                                                   {/*explicit_clock=*/"d"},
+                                                   {/*explicit_clock=*/""}};
+  const std::vector<ClockScope> kResolved = ResolveOperandClocks(
+      ClockFlowOperator::kLinear, /*incoming=*/"c", kOperands);
+  ASSERT_EQ(kResolved.size(), 3u);
+  EXPECT_EQ(kResolved[0], "c");
+  EXPECT_EQ(kResolved[1], "d");
+  EXPECT_EQ(kResolved[2], "d");
 }
 
 // §16.13.3 (core flow rule): a branching operator distributes the incoming
@@ -44,13 +44,13 @@ TEST(ClockFlow, LinearOperatorReplacementPersistsToLaterOperands) {
 // specifying its own clock, every operand is governed by `c`. Mirrors `@(c) v
 // |=> p and q`, where `c` distributes to both operands of `and`.
 TEST(ClockFlow, BranchingOperatorDistributesIncomingScope) {
-  const std::vector<ClockFlowOperand> operands = {{/*explicit_clock=*/""},
-                                                  {/*explicit_clock=*/""}};
-  const std::vector<ClockScope> resolved = ResolveOperandClocks(
-      ClockFlowOperator::kBranching, /*incoming=*/"c", operands);
-  ASSERT_EQ(resolved.size(), 2u);
-  EXPECT_EQ(resolved[0], "c");
-  EXPECT_EQ(resolved[1], "c");
+  const std::vector<ClockFlowOperand> kOperands = {{/*explicit_clock=*/""},
+                                                   {/*explicit_clock=*/""}};
+  const std::vector<ClockScope> kResolved = ResolveOperandClocks(
+      ClockFlowOperator::kBranching, /*incoming=*/"c", kOperands);
+  ASSERT_EQ(kResolved.size(), 2u);
+  EXPECT_EQ(kResolved[0], "c");
+  EXPECT_EQ(kResolved[1], "c");
 }
 
 // §16.13.3 (core flow rule): a clocking event written in one operand of a
@@ -59,13 +59,13 @@ TEST(ClockFlow, BranchingOperatorDistributesIncomingScope) {
 // `@(d)` in the first operand of `and` does not affect the second, which stays
 // at `c`.
 TEST(ClockFlow, BranchingOperatorDoesNotLeakClockToSibling) {
-  const std::vector<ClockFlowOperand> operands = {{/*explicit_clock=*/"d"},
-                                                  {/*explicit_clock=*/""}};
-  const std::vector<ClockScope> resolved = ResolveOperandClocks(
-      ClockFlowOperator::kBranching, /*incoming=*/"c", operands);
-  ASSERT_EQ(resolved.size(), 2u);
-  EXPECT_EQ(resolved[0], "d");
-  EXPECT_EQ(resolved[1], "c");
+  const std::vector<ClockFlowOperand> kOperands = {{/*explicit_clock=*/"d"},
+                                                   {/*explicit_clock=*/""}};
+  const std::vector<ClockScope> kResolved = ResolveOperandClocks(
+      ClockFlowOperator::kBranching, /*incoming=*/"c", kOperands);
+  ASSERT_EQ(kResolved.size(), 2u);
+  EXPECT_EQ(kResolved[0], "d");
+  EXPECT_EQ(kResolved[1], "c");
 }
 
 // §16.13.3 (parentheses rule): the scope of a clocking event flows into a
@@ -133,13 +133,13 @@ TEST(ClockFlow, OperatorWithNoOperandsResolvesToNoClocks) {
 // operands flows no clock — none is fabricated. The empty scope is represented
 // by the empty string.
 TEST(ClockFlow, LinearOperatorWithNoClockInScopeFlowsNoClock) {
-  const std::vector<ClockFlowOperand> operands = {{/*explicit_clock=*/""},
-                                                  {/*explicit_clock=*/""}};
-  const std::vector<ClockScope> resolved = ResolveOperandClocks(
-      ClockFlowOperator::kLinear, /*incoming=*/"", operands);
-  ASSERT_EQ(resolved.size(), 2u);
-  EXPECT_EQ(resolved[0], "");
-  EXPECT_EQ(resolved[1], "");
+  const std::vector<ClockFlowOperand> kOperands = {{/*explicit_clock=*/""},
+                                                   {/*explicit_clock=*/""}};
+  const std::vector<ClockScope> kResolved = ResolveOperandClocks(
+      ClockFlowOperator::kLinear, /*incoming=*/"", kOperands);
+  ASSERT_EQ(kResolved.size(), 2u);
+  EXPECT_EQ(kResolved[0], "");
+  EXPECT_EQ(kResolved[1], "");
 }
 
 // §16.13.3 (core flow rule), edge: a clocking event written at the leading
@@ -147,32 +147,32 @@ TEST(ClockFlow, LinearOperatorWithNoClockInScopeFlowsNoClock) {
 // the replacement persists onward. Mirrors `@(c) (@(d) x ##1 y)` viewed at the
 // inner concatenation: `d` governs `x` and flows to `y`.
 TEST(ClockFlow, LinearOperatorLeadingClockReplacesIncomingScope) {
-  const std::vector<ClockFlowOperand> operands = {{/*explicit_clock=*/"d"},
-                                                  {/*explicit_clock=*/""}};
-  const std::vector<ClockScope> resolved = ResolveOperandClocks(
-      ClockFlowOperator::kLinear, /*incoming=*/"c", operands);
-  ASSERT_EQ(resolved.size(), 2u);
-  EXPECT_EQ(resolved[0], "d");
-  EXPECT_EQ(resolved[1], "d");
+  const std::vector<ClockFlowOperand> kOperands = {{/*explicit_clock=*/"d"},
+                                                   {/*explicit_clock=*/""}};
+  const std::vector<ClockScope> kResolved = ResolveOperandClocks(
+      ClockFlowOperator::kLinear, /*incoming=*/"c", kOperands);
+  ASSERT_EQ(kResolved.size(), 2u);
+  EXPECT_EQ(kResolved[0], "d");
+  EXPECT_EQ(kResolved[1], "d");
 }
 
 // §16.13.3 (core flow rule), edge: across a linear operator each successive
 // clocking event replaces the previous one, and every replacement persists
 // until the next. Exercises more than one replacement in a single chain.
 TEST(ClockFlow, LinearOperatorAppliesSuccessiveReplacements) {
-  const std::vector<ClockFlowOperand> operands = {{/*explicit_clock=*/""},
-                                                  {/*explicit_clock=*/"d"},
-                                                  {/*explicit_clock=*/""},
-                                                  {/*explicit_clock=*/"e"},
-                                                  {/*explicit_clock=*/""}};
-  const std::vector<ClockScope> resolved = ResolveOperandClocks(
-      ClockFlowOperator::kLinear, /*incoming=*/"c", operands);
-  ASSERT_EQ(resolved.size(), 5u);
-  EXPECT_EQ(resolved[0], "c");
-  EXPECT_EQ(resolved[1], "d");
-  EXPECT_EQ(resolved[2], "d");
-  EXPECT_EQ(resolved[3], "e");
-  EXPECT_EQ(resolved[4], "e");
+  const std::vector<ClockFlowOperand> kOperands = {{/*explicit_clock=*/""},
+                                                   {/*explicit_clock=*/"d"},
+                                                   {/*explicit_clock=*/""},
+                                                   {/*explicit_clock=*/"e"},
+                                                   {/*explicit_clock=*/""}};
+  const std::vector<ClockScope> kResolved = ResolveOperandClocks(
+      ClockFlowOperator::kLinear, /*incoming=*/"c", kOperands);
+  ASSERT_EQ(kResolved.size(), 5u);
+  EXPECT_EQ(kResolved[0], "c");
+  EXPECT_EQ(kResolved[1], "d");
+  EXPECT_EQ(kResolved[2], "d");
+  EXPECT_EQ(kResolved[3], "e");
+  EXPECT_EQ(kResolved[4], "e");
 }
 
 // §16.13.3 (core flow rule), edge: a branching operator distributes the
@@ -180,15 +180,15 @@ TEST(ClockFlow, LinearOperatorAppliesSuccessiveReplacements) {
 // written in different operands stay confined to their own operand and never
 // affect a sibling.
 TEST(ClockFlow, BranchingOperatorKeepsDistinctOperandClocksIndependent) {
-  const std::vector<ClockFlowOperand> operands = {{/*explicit_clock=*/"d"},
-                                                  {/*explicit_clock=*/""},
-                                                  {/*explicit_clock=*/"e"}};
-  const std::vector<ClockScope> resolved = ResolveOperandClocks(
-      ClockFlowOperator::kBranching, /*incoming=*/"c", operands);
-  ASSERT_EQ(resolved.size(), 3u);
-  EXPECT_EQ(resolved[0], "d");
-  EXPECT_EQ(resolved[1], "c");
-  EXPECT_EQ(resolved[2], "e");
+  const std::vector<ClockFlowOperand> kOperands = {{/*explicit_clock=*/"d"},
+                                                   {/*explicit_clock=*/""},
+                                                   {/*explicit_clock=*/"e"}};
+  const std::vector<ClockScope> kResolved = ResolveOperandClocks(
+      ClockFlowOperator::kBranching, /*incoming=*/"c", kOperands);
+  ASSERT_EQ(kResolved.size(), 3u);
+  EXPECT_EQ(kResolved[0], "d");
+  EXPECT_EQ(kResolved[1], "c");
+  EXPECT_EQ(kResolved[2], "e");
 }
 
 // §16.13.3 (parentheses rule), edge: when no clock is in scope around the

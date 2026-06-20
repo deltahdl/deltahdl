@@ -87,12 +87,17 @@ TEST(SvaEngine, EmptyAtZeroDelayNeverMatchesButFusionDoes) {
 // is evaluated as the OR of its empty and nonempty cases; a range that excludes
 // zero (a[*1:2]) keeps only the nonempty case.
 TEST(SvaEngine, RangeAdmittingEmptyIsOrOfCases) {
-  EXPECT_TRUE(MatchEmptyOrNonempty(0, /*empty=*/true, /*nonempty=*/false));
-  EXPECT_TRUE(MatchEmptyOrNonempty(0, /*empty=*/false, /*nonempty=*/true));
-  EXPECT_FALSE(MatchEmptyOrNonempty(0, /*empty=*/false, /*nonempty=*/false));
+  EXPECT_TRUE(MatchEmptyOrNonempty(0, /*empty_case_match=*/true,
+                                   /*nonempty_case_match=*/false));
+  EXPECT_TRUE(MatchEmptyOrNonempty(0, /*empty_case_match=*/false,
+                                   /*nonempty_case_match=*/true));
+  EXPECT_FALSE(MatchEmptyOrNonempty(0, /*empty_case_match=*/false,
+                                    /*nonempty_case_match=*/false));
 
-  EXPECT_FALSE(MatchEmptyOrNonempty(1, /*empty=*/true, /*nonempty=*/false));
-  EXPECT_TRUE(MatchEmptyOrNonempty(1, /*empty=*/false, /*nonempty=*/true));
+  EXPECT_FALSE(MatchEmptyOrNonempty(1, /*empty_case_match=*/true,
+                                    /*nonempty_case_match=*/false));
+  EXPECT_TRUE(MatchEmptyOrNonempty(1, /*empty_case_match=*/false,
+                                   /*nonempty_case_match=*/true));
 }
 
 // §16.9.2.1 edge case for (seq ##n empty), n>0: at the minimal positive delay
@@ -109,7 +114,8 @@ TEST(SvaEngine, EmptyConcatRightMinimalDelayStillAppendsTrue) {
 // range yields a match under both its empty and nonempty interpretations, the
 // disjunction still matches.
 TEST(SvaEngine, RangeAdmittingEmptyBothCasesMatch) {
-  EXPECT_TRUE(MatchEmptyOrNonempty(0, /*empty=*/true, /*nonempty=*/true));
+  EXPECT_TRUE(MatchEmptyOrNonempty(0, /*empty_case_match=*/true,
+                                   /*nonempty_case_match=*/true));
 }
 
 }  // namespace

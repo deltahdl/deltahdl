@@ -133,7 +133,7 @@ TEST(NInputGateElaboration, FirstTerminalIsOutputLhs) {
 TEST(NInputGateElaboration, PropagationDelayIndependentOfInputCount) {
   // For each input arity, the elaborator emits one continuous assign carrying
   // the same #(7) delay; adding more inputs only widens the AND chain.
-  const char* kSources[] = {
+  const char* sources[] = {
       "module m;\n"
       "  wire y, a, b;\n"
       "  and #(7) g(y, a, b);\n"
@@ -151,7 +151,7 @@ TEST(NInputGateElaboration, PropagationDelayIndependentOfInputCount) {
       "  and #(7) g(y, a, b, c, d, e, f, g0, h);\n"
       "endmodule\n",
   };
-  for (const char* src : kSources) {
+  for (const char* src : sources) {
     ElabFixture f;
     auto* design = ElaborateSrc(src, f);
     ASSERT_NE(design, nullptr) << src;
