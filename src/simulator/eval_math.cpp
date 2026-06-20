@@ -178,7 +178,7 @@ static Logic4Vec EvalAtanh(const Expr* expr, SimContext& ctx, Arena& arena) {
 // rescales it onto [start, end).
 static double RefUniform(int32_t* seed, int32_t start, int32_t end) {
   const double d = 0.00000011920928955078125;  // 2^-23
-  double a, b;
+  double a = 0.0, b = 0.0;
   if (*seed == 0) *seed = 259341593;
   if (start >= end) {
     a = 0.0;
@@ -191,7 +191,7 @@ static double RefUniform(int32_t* seed, int32_t start, int32_t end) {
   // arithmetic without relying on signed overflow.
   *seed = static_cast<int32_t>(69069u * static_cast<uint32_t>(*seed) + 1u);
   uint32_t bits = (static_cast<uint32_t>(*seed) >> 9) | 0x3f800000u;
-  float fs;
+  float fs = 0.0F;
   std::memcpy(&fs, &bits, sizeof(fs));
   double c = static_cast<double>(fs);
   c = c + (c * d);
@@ -235,7 +235,7 @@ static int32_t RefPoisson(int32_t* seed, int32_t mean) {
 // §N.2 chi_square(): an odd degree contributes one squared normal; every pair
 // of degrees adds twice an exponential(1).
 static double RefChiSquare(int32_t* seed, int32_t deg_of_free) {
-  double x;
+  double x = 0.0;
   if (deg_of_free % 2) {
     x = RefNormal(seed, 0, 1);
     x = x * x;
@@ -279,7 +279,7 @@ static int32_t RoundDistResult(double r) {
 // way the reference does (its long is the 32-bit integer modeled here).
 static int32_t RtlDistUniform(int32_t* seed, int32_t start, int32_t end) {
   if (start >= end) return start;
-  int32_t i;
+  int32_t i = 0;
   if (end != INT32_MAX) {
     end++;
     double r = RefUniform(seed, start, end);

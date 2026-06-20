@@ -146,7 +146,7 @@ static void ReadBit(const Logic4Vec& val, uint32_t i, bool& a, bool& b) {
 static XZClass ClassifyBits(const Logic4Vec& val, uint32_t lo, uint32_t hi) {
   bool has_known = false, has_x = false, has_z = false;
   for (uint32_t i = lo; i < hi; ++i) {
-    bool a, b;
+    bool a = false, b = false;
     ReadBit(val, i, a, b);
     if (!b)
       has_known = true;
@@ -199,7 +199,7 @@ static std::string FormatRadixXZ(const Logic4Vec& val, uint32_t group_size) {
     }
     uint32_t digit = 0;
     for (uint32_t i = lo; i < hi; ++i) {
-      bool a, b;
+      bool a = false, b = false;
       ReadBit(val, i, a, b);
       if (a) digit |= (1u << (i - lo));
     }

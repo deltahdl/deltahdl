@@ -42,7 +42,7 @@ ExecTask ExecRandcase(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   // can never be selected. A sum wider than 32 bits cannot be covered by a
   // single 32-bit draw, so compose the random number from more than one draw
   // to reach the full [0, sum) range.
-  uint64_t pick;
+  uint64_t pick = 0;
   if (total_weight > 0xFFFFFFFFull) {
     uint64_t hi = ctx.Urandom32();
     uint64_t lo = ctx.Urandom32();
@@ -200,7 +200,7 @@ static const RsRule& SelectRule(const RsProduction& production, SimContext& ctx,
 static double EvalRandJoinBias(Expr* expr, SimContext& ctx, Arena& arena) {
   if (!expr) return 0.5;
   auto v = EvalExpr(expr, ctx, arena);
-  double f;
+  double f = 0.0;
   if (v.is_real) {
     if (v.width == 32) {
       float ff = 0.0f;
@@ -371,7 +371,7 @@ static ExecTask ExecRuleProds(const Stmt* stmt, const RsRule& selected,
       uint32_t w = EvalTypeWidth(child->return_type);
       if (w == 0) w = ret_value.width ? ret_value.width : 32;
       int idx = ++seen_count[prod.item.name];
-      Variable* var;
+      Variable* var = nullptr;
       if (total_count[prod.item.name] > 1) {
         // Indexed element names are built at run time, so intern the name in
         // the arena: the scope map keys on the string_view and needs stable

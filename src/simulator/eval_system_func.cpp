@@ -125,7 +125,7 @@ static Logic4Vec EvalTimescaleQuery(const Expr* expr, SimContext& ctx,
       scale = found;
     }
   }
-  int order;
+  int order = 0;
   if (use_sim_time_unit) {
     order = static_cast<int>(ctx.StepTimeUnit());
   } else if (want_precision) {
@@ -139,7 +139,7 @@ static Logic4Vec EvalTimescaleQuery(const Expr* expr, SimContext& ctx,
 }
 
 static Logic4Vec EvalSystemCommand(const Expr* expr, Arena& arena) {
-  int ret;
+  int ret = 0;
   if (expr->args.empty()) {
     // §20.17.1: invoked with no string argument, $system calls the C system()
     // with the NULL string rather than executing any command.
@@ -239,7 +239,7 @@ static std::string TimeOrderToUnitString(int order) {
   int base = (order >= 0) ? (order / 3) * 3 : -(((-order) + 2) / 3) * 3;
   int diff = order - base;  // 0, 1, or 2
   const char* mantissa = diff == 2 ? "100" : (diff == 1 ? "10" : "1");
-  const char* unit;
+  const char* unit = nullptr;
   switch (base) {
     case 0:
       unit = "s";
@@ -291,8 +291,8 @@ std::string BuildPrinttimescaleReport(const Expr* expr, SimContext& ctx) {
   } else {
     name = ctx.CurrentScopeName();
   }
-  int unit_order;
-  int prec_order;
+  int unit_order = 0;
+  int prec_order = 0;
   if (use_sim_time_unit) {
     // The simulation time unit and the global precision are synonymous, so
     // $root reports the same value for both fields (see 3.14.3).

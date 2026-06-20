@@ -23,7 +23,7 @@ bool ClassifyAbortOperator(std::string_view keyword, AbortOperator& out) {
 }
 
 bool IsAbortOperator(std::string_view keyword) {
-  AbortOperator ignored;
+  AbortOperator ignored{};
   return ClassifyAbortOperator(keyword, ignored);
 }
 

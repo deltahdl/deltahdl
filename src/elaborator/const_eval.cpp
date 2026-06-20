@@ -344,7 +344,7 @@ static std::optional<ConstVal> ConstEvalFull(const Expr* expr,
       if (!lhs || !rhs) return std::nullopt;
       uint32_t w = std::max(lhs->width, rhs->width);
       bool s = lhs->is_signed && rhs->is_signed;
-      int64_t lv, rv;
+      int64_t lv = 0, rv = 0;
       if (s) {
         lv = SignExtendFromWidth(lhs->value, lhs->width);
         rv = SignExtendFromWidth(rhs->value, rhs->width);

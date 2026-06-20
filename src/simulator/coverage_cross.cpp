@@ -269,7 +269,7 @@ std::vector<size_t> CoverageDB::SelectCrossBinTuples(
     }
     const auto& sets = candidate_bin_tuples[c];
     uint64_t satisfying = CountSatisfyingValueTuples(sets, *pred);
-    bool keep;
+    bool keep = false;
     if (policy.require_all) {
       // The $ form requires every value tuple to satisfy the expression.
       uint64_t total = sets.empty() ? 0 : 1;

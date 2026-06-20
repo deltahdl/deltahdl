@@ -410,7 +410,7 @@ ExecTask ExecCase(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   auto qual = stmt->qualifier;
   auto sel = EvalExpr(stmt->condition, ctx, arena);
 
-  StmtResult r;
+  StmtResult r{};
   if (qual == CaseQualifier::kUnique || qual == CaseQualifier::kUnique0) {
     r = co_await ExecUniqueCase(stmt, sel, qual, ctx, arena);
   } else {

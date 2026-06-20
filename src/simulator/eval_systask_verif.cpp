@@ -75,7 +75,7 @@ static Logic4Vec EvalStochasticQueue(const Expr* expr, SimContext& ctx,
     uint64_t q_id = EvalExpr(args[0], ctx, arena).ToUint64();
     int64_t q_type = QueueSignedArg(EvalExpr(args[1], ctx, arena));
     int64_t max_length = QueueSignedArg(EvalExpr(args[2], ctx, arena));
-    uint64_t status;
+    uint64_t status = 0;
     if (q_type != 1 && q_type != 2) {
       status = kQUnsupportedType;
     } else if (max_length <= 0) {
@@ -94,7 +94,7 @@ static Logic4Vec EvalStochasticQueue(const Expr* expr, SimContext& ctx,
     if (args.size() < 4) return MakeLogic4VecVal(arena, 32, 0);
     uint64_t q_id = EvalExpr(args[0], ctx, arena).ToUint64();
     auto it = queues.find(q_id);
-    uint64_t status;
+    uint64_t status = 0;
     if (it == queues.end()) {
       status = kQUndefinedId;
     } else if (static_cast<int64_t>(it->second.count) >=
@@ -130,7 +130,7 @@ static Logic4Vec EvalStochasticQueue(const Expr* expr, SimContext& ctx,
     if (args.size() < 4) return MakeLogic4VecVal(arena, 32, 0);
     uint64_t q_id = EvalExpr(args[0], ctx, arena).ToUint64();
     auto it = queues.find(q_id);
-    uint64_t status;
+    uint64_t status = 0;
     if (it == queues.end()) {
       status = kQUndefinedId;
     } else if (it->second.count == 0) {
@@ -253,7 +253,7 @@ static Logic4Vec EvalCoverageControl(const Expr* expr, SimContext& ctx,
   if (expr->args.empty()) return status_vec(CoverageStatus::Error);
   int control_value =
       static_cast<int>(EvalExpr(expr->args[0], ctx, arena).ToUint64());
-  CoverageControl control;
+  CoverageControl control{};
   if (!CoverageControlFromInt(control_value, &control)) {
     return status_vec(CoverageStatus::Error);
   }

@@ -177,7 +177,7 @@ static bool ParsePlusargInteger(const std::string& s, char conv, uint64_t& out,
   if (i >= s.size()) return false;
   for (; i < s.size(); ++i) {
     char c = s[i];
-    int digit;
+    int digit = 0;
     if (c >= '0' && c <= '9')
       digit = c - '0';
     else if (c >= 'a' && c <= 'f')

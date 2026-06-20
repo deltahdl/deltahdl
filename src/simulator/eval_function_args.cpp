@@ -416,7 +416,7 @@ static bool ExecFuncIf(const Stmt* stmt, Variable* ret_var,
   if (labeled) ctx.PushStaticScope(stmt->label);
 
   auto qual = stmt->qualifier;
-  bool r;
+  bool r = false;
   if (qual == CaseQualifier::kUnique || qual == CaseQualifier::kUnique0) {
     r = ExecFuncUniqueIf(stmt, qual, ret_var, func_name, ctx, arena);
   } else if (qual == CaseQualifier::kPriority) {

@@ -186,7 +186,7 @@ bool AlwaysStrongTicksAllPresent(int range_max, int future_clock_ticks) {
 // operand never holds the requirement spans the whole trace.
 bool UntilLeftHoldsRequired(bool overlapping, int lhs_run_length,
                             int first_rhs_index, int trace_length) {
-  int required_count;
+  int required_count = 0;
   if (first_rhs_index == kUntilRhsNever) {
     required_count = trace_length;
   } else if (overlapping) {

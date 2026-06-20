@@ -318,7 +318,7 @@ void Elaborator::ValidateEnumDecl(const DataType& dtype, SourceLoc loc) {
       if (!prev_had_xz) {
         auto v = ConstEvalInt(member.value);
         if (v) {
-          bool out_of_range;
+          bool out_of_range = false;
           if (dtype.is_signed) {
             out_of_range =
                 *v < signed_min || *v > static_cast<int64_t>(max_val);

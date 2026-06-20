@@ -336,7 +336,7 @@ static uint32_t BuildPatternMatch(const Expr* sel_expr, const Expr* pat,
   for (uint32_t b = 0; b < sel_width; ++b) {
     if (has_dc && ((pbits.dc_mask >> b) & 1u)) continue;
     uint32_t sb = synth.LowerExprBit(sel_expr, aig, b);
-    uint32_t pb;
+    uint32_t pb = 0;
     if (has_dc) {
       pb = ((pbits.aval >> b) & 1u) ? AigGraph::kConstTrue
                                     : AigGraph::kConstFalse;

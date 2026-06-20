@@ -32,7 +32,7 @@ bool ClassifySampledValueFunction(std::string_view name,
 }
 
 bool IsSampledValueFunction(std::string_view name) {
-  SampledValueFunction fn;
+  SampledValueFunction fn{};
   return ClassifySampledValueFunction(name, fn);
 }
 

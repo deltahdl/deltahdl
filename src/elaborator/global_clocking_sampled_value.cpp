@@ -48,7 +48,7 @@ bool ClassifyGlobalClockingSampledFunction(std::string_view name,
 }
 
 bool IsGlobalClockingSampledFunction(std::string_view name) {
-  GlobalClockingSampledFunction fn;
+  GlobalClockingSampledFunction fn{};
   return ClassifyGlobalClockingSampledFunction(name, fn);
 }
 

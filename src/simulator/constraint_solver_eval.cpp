@@ -166,7 +166,7 @@ bool ConstraintSolver::EvalImplication(const ConstraintExpr& expr) const {
   // consequent b must be satisfied. Because the solver only accepts an
   // assignment for which the whole expression evaluates true, the converse is
   // enforced as well: if b cannot be satisfied, a must come out false.
-  bool antecedent;
+  bool antecedent = false;
   if (expr.cond_fn) {
     // The antecedent is an arbitrary integral/real expression.
     antecedent = expr.cond_fn(values_);
@@ -191,7 +191,7 @@ bool ConstraintSolver::EvalIfElse(const ConstraintExpr& expr) const {
   // imposes nothing). The condition and the guarded sets are interdependent:
   // because the solver only accepts an assignment for which the whole
   // expression evaluates true, the chosen branch also constrains the condition.
-  bool cond;
+  bool cond = false;
   if (expr.cond_fn) {
     // The condition is an arbitrary integral or real expression.
     cond = expr.cond_fn(values_);
