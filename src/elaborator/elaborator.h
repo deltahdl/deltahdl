@@ -117,6 +117,9 @@ class Elaborator {
   // module-item kinds and returns true when it consumed `item->kind`.
   bool ElaborateDeclItem(ModuleItem* item, RtlirModule* mod);
   bool ElaborateBehavioralItem(ModuleItem* item, RtlirModule* mod);
+  // Third-level dispatch for the §16 assertion/sequence/property/clocking
+  // module items; returns true for those kinds and is a no-op (true) otherwise.
+  bool ElaborateAssertionItem(ModuleItem* item, RtlirModule* mod);
   void ElaborateParamDecl(ModuleItem* item, RtlirModule* mod);
   void ElaborateNetDecl(ModuleItem* item, RtlirModule* mod);
   void ElaborateVarDecl(ModuleItem* item, RtlirModule* mod);

@@ -474,6 +474,30 @@ bool Elaborator::ElaborateBehavioralItem(ModuleItem* item, RtlirModule* mod) {
       ValidateFunctionArgDefaultsScope(item);
       mod->function_decls.push_back(item);
       return true;
+    case ModuleItemKind::kElabSystemTask:
+      ValidateElabSystemTask(item, mod);
+      return true;
+    case ModuleItemKind::kDpiImport:
+      ValidateDpiImport(item);
+      mod->let_decls.push_back(item);
+      return true;
+    case ModuleItemKind::kLetDecl:
+      ValidateLetDecl(item);
+      mod->let_decls.push_back(item);
+      return true;
+    case ModuleItemKind::kCovergroupDecl:
+    case ModuleItemKind::kSpecifyBlock:
+    case ModuleItemKind::kDpiExport:
+      mod->let_decls.push_back(item);
+      return true;
+    default:
+      return ElaborateAssertionItem(item, mod);
+  }
+}
+
+bool Elaborator::ElaborateAssertionItem(ModuleItem* item, RtlirModule* mod) {
+  const ProcessBuildEnv kEnv{arena_, diag_, &func_decls_};
+  switch (item->kind) {
     case ModuleItemKind::kSequenceDecl:
       sequence_names_.insert(item->name);
       mod->sequence_decls.push_back(item);
@@ -520,28 +544,9 @@ bool Elaborator::ElaborateBehavioralItem(ModuleItem* item, RtlirModule* mod) {
     case ModuleItemKind::kClockingBlock:
       ValidateClockingBlock(item, mod);
       return true;
-    case ModuleItemKind::kElabSystemTask:
-      ValidateElabSystemTask(item, mod);
-      return true;
-    case ModuleItemKind::kDpiImport:
-      ValidateDpiImport(item);
-      mod->let_decls.push_back(item);
-      return true;
-    case ModuleItemKind::kLetDecl:
-      ValidateLetDecl(item);
-      mod->let_decls.push_back(item);
-      return true;
-    case ModuleItemKind::kCovergroupDecl:
-    case ModuleItemKind::kSpecifyBlock:
-    case ModuleItemKind::kDpiExport:
-      mod->let_decls.push_back(item);
-      return true;
-    case ModuleItemKind::kDefparam:
-    case ModuleItemKind::kExportDecl:
-    case ModuleItemKind::kDefaultDisableIff:
-    case ModuleItemKind::kNestedModuleDecl:
-      return true;
     default:
+      // §23.10.4 kDefparam, kExportDecl, kDefaultDisableIff, kNestedModuleDecl,
+      // and any remaining kind are no-ops at behavioral elaboration.
       return true;
   }
 }
@@ -839,9 +844,7 @@ bool IsImplicitNestedInstantiationCandidate(std::string_view name,
 
 }  // namespace
 
-void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
-  ReclassifyForwardUdpInstances(decl);
-
+void Elaborator::ResetItemElaborationState() {
   forward_typedef_kinds_.clear();
   declared_names_.clear();
   net_names_.clear();
@@ -878,6 +881,41 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
   task_names_.clear();
   sequence_names_.clear();
   func_decls_.clear();
+}
+
+void Elaborator::RunPostItemValidations(const ModuleDecl* decl,
+                                        RtlirModule* mod) {
+  CheckAlwaysCombMultiDriver(decl, mod);
+  ValidateModuleConstraints(decl);
+  ValidateValueParams(decl, mod);
+  ValidateLhsPatternWidths(decl, mod);
+  ValidateClockvarAccess(decl);
+  ValidateCycleDelayDefaultClocking(decl);
+  ValidateIntraAssignCycleDelay(decl);
+  ValidateDuplicateDefaultClocking(decl);
+  ValidateDefaultClockingReference(decl);
+  ValidateDuplicateGlobalClocking(decl);
+  ValidateGlobalClockReference(decl);
+  ValidateContAssignToClockvar(decl);
+  ValidatePrimitiveDriveToClockvar(decl);
+  ValidateSyncDriveForm(decl);
+  ValidateConstantFunctionCalls(decl);
+  ValidateDpiOpenArrayArgs(decl);
+  ValidateBackgroundFuncCallContext(decl);
+  ValidateSequenceEventArgs(decl);
+  ValidateHierRefIntoChecker(decl);
+  ValidateHierRefIntoProgram(decl);
+  ValidateProgramSubroutineCall(decl);
+  ValidateHierRefToAutomatic(decl);
+  ValidateHierRefToImportedName(decl, mod);
+  ValidateHierRefInstanceArray(decl);
+  ValidateForwardTypedefsInScope(decl);
+  ValidateForwardTypedefScopePrefix(decl);
+}
+
+void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
+  ReclassifyForwardUdpInstances(decl);
+  ResetItemElaborationState();
   CollectNestedModulesAndCheckVif(decl, nested_module_decls_, diag_);
   const bool kParentIsProgram = decl->decl_kind == ModuleDeclKind::kProgram;
   const bool kParentIsChecker = decl->decl_kind == ModuleDeclKind::kChecker;
@@ -925,32 +963,7 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
     mod->children.push_back(inst);
   }
 
-  CheckAlwaysCombMultiDriver(decl, mod);
-  ValidateModuleConstraints(decl);
-  ValidateValueParams(decl, mod);
-  ValidateLhsPatternWidths(decl, mod);
-  ValidateClockvarAccess(decl);
-  ValidateCycleDelayDefaultClocking(decl);
-  ValidateIntraAssignCycleDelay(decl);
-  ValidateDuplicateDefaultClocking(decl);
-  ValidateDefaultClockingReference(decl);
-  ValidateDuplicateGlobalClocking(decl);
-  ValidateGlobalClockReference(decl);
-  ValidateContAssignToClockvar(decl);
-  ValidatePrimitiveDriveToClockvar(decl);
-  ValidateSyncDriveForm(decl);
-  ValidateConstantFunctionCalls(decl);
-  ValidateDpiOpenArrayArgs(decl);
-  ValidateBackgroundFuncCallContext(decl);
-  ValidateSequenceEventArgs(decl);
-  ValidateHierRefIntoChecker(decl);
-  ValidateHierRefIntoProgram(decl);
-  ValidateProgramSubroutineCall(decl);
-  ValidateHierRefToAutomatic(decl);
-  ValidateHierRefToImportedName(decl, mod);
-  ValidateHierRefInstanceArray(decl);
-  ValidateForwardTypedefsInScope(decl);
-  ValidateForwardTypedefScopePrefix(decl);
+  RunPostItemValidations(decl, mod);
 }
 
 }  // namespace delta
