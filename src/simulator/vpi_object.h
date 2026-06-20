@@ -290,13 +290,6 @@ struct VpiObject {
   // for statement is a scope if and only if this is true. False by default.
   bool local_var_decls = false;
 
-  // §37.12 detail 4: whether an object was imported into its enclosing scope
-  // through an import declaration and is actually referenced there. A scope's
-  // vpiImport iteration returns exactly the children carrying this mark, so an
-  // item merely made visible by an import (but not referenced) is not flagged.
-  // False by default.
-  bool imported = false;
-
   // §37.35 detail 4 / §37.9 detail 1: whether an object is an element within an
   // array. It gates the vpiIndex transition for both an array-member primitive
   // and a program that is an element of an instance array: such an object

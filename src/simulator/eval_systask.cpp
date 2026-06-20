@@ -296,7 +296,7 @@ static Logic4Vec EvalValuePlusargs(const Expr* expr, SimContext& ctx,
 }
 
 static std::string TypenameForVariable(const Variable* var) {
-  uint32_t w = var->width;
+  uint32_t w = var->value.width;
 
   if (!var->is_4state && var->is_signed && w == 32) return "int";
   std::string base = var->is_4state ? "logic" : "bit";

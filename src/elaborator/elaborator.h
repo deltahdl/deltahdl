@@ -261,8 +261,12 @@ class Elaborator {
 
   void WalkStmtsForVirtualInterfaceClocking(const Stmt* s);
 
+  // Public so the free recursive walker in elaborator_validate_interface.cpp
+  // can drive it over a statement tree.
+ public:
   void ValidateArrayOfVifInitStmt(const Stmt* s);
 
+ private:
   void ValidateInterfaceObjectAccess(const ModuleDecl* decl);
 
   void ValidatePackedUnion(const DataType& dtype, SourceLoc loc);
@@ -469,6 +473,7 @@ class Elaborator {
 
   void ValidateAbstractClassRules();
   void ValidateAbstractClassUnimplemented(const ClassDecl* cls);
+  void ValidateSuperInNonDerivedClass();
 
   void ValidateOutOfBlockDeclarations();
 
@@ -790,6 +795,9 @@ class Elaborator {
   std::unordered_set<std::string_view> cu_scope_names_;
   ScopeMap cu_param_scope_;
 
+  // Public so free helpers (e.g. FormalArrayInfo in
+  // elaborator_validate_class_array_*.cpp) can name and build this type.
+ public:
   struct VarArrayInfo {
     DataTypeKind elem_type = DataTypeKind::kImplicit;
     uint32_t unpacked_size = 0;
@@ -804,6 +812,7 @@ class Elaborator {
     bool is_queue = false;
   };
 
+ private:
   std::unordered_set<std::string_view> declared_names_;
   std::unordered_set<std::string_view> net_names_;
   std::unordered_map<std::string_view, SourceLoc> cont_assign_targets_;

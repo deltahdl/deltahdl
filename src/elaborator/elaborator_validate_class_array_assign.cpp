@@ -569,7 +569,7 @@ static void CheckTraversalArgTypeExpr(
   CheckTraversalArgTypeExpr(e->false_expr, assoc_keys, var_types, diag);
   for (const auto* a : e->args)
     CheckTraversalArgTypeExpr(a, assoc_keys, var_types, diag);
-  for (const auto* el : e->elems)
+  for (const auto* el : e->elements)
     CheckTraversalArgTypeExpr(el, assoc_keys, var_types, diag);
 }
 

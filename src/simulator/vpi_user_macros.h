@@ -5,6 +5,7 @@
 
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_model_helpers3.h"
+#include "simulator/vpi_pli_types.h"
 
 using vpiHandle = delta::VpiHandle;
 using s_vpi_value = delta::VpiValue;
@@ -111,16 +112,9 @@ using SVpiVlogInfo = delta::VpiVlogInfo;
 // callback reasons, control codes, value formats, etc.) are not repeated.
 // ----------------------------------------------------------------------------
 // §K.2: the vpi_user.h portability layer fixes the width of the integer types
-// every VPI routine and structure is expressed in. These aliases are the
-// DeltaHDL realization of those typedefs.
-using PLI_INT32 = int32_t;
-using PLI_UINT32 = uint32_t;
-using PLI_INT64 = int64_t;
-using PLI_UINT64 = uint64_t;
-using PLI_INT16 = short;
-using PLI_UINT16 = unsigned short;
-using PLI_BYTE8 = char;
-using PLI_UBYTE8 = unsigned char;
+// every VPI routine and structure is expressed in. The PLI_* aliases now live
+// in vpi_pli_types.h (included above) so headers pulled in earlier can see
+// them.
 
 #define vpiAlways 1
 #define vpiAssignStmt 2

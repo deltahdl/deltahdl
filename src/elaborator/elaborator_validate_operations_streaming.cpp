@@ -409,10 +409,19 @@ static void WalkStmtsForCheckerRef(
   if (s->rhs && ExprRefersToChecker(s->rhs, checker_names))
     diag.Error(s->range.start,
                "hierarchical reference into a checker is not permitted");
-  for (auto* child : s->children)
-    WalkStmtsForCheckerRef(child, checker_names, diag);
-  if (s->if_body) WalkStmtsForCheckerRef(s->if_body, checker_names, diag);
-  if (s->else_body) WalkStmtsForCheckerRef(s->else_body, checker_names, diag);
+  for (auto* sub : s->stmts) WalkStmtsForCheckerRef(sub, checker_names, diag);
+  WalkStmtsForCheckerRef(s->then_branch, checker_names, diag);
+  WalkStmtsForCheckerRef(s->else_branch, checker_names, diag);
+  WalkStmtsForCheckerRef(s->body, checker_names, diag);
+  WalkStmtsForCheckerRef(s->for_body, checker_names, diag);
+  for (auto* init : s->for_inits)
+    WalkStmtsForCheckerRef(init, checker_names, diag);
+  for (auto* step : s->for_steps)
+    WalkStmtsForCheckerRef(step, checker_names, diag);
+  for (auto* fs : s->fork_stmts)
+    WalkStmtsForCheckerRef(fs, checker_names, diag);
+  for (auto& ci : s->case_items)
+    WalkStmtsForCheckerRef(ci.body, checker_names, diag);
 }
 
 void Elaborator::ValidateHierRefIntoChecker(const ModuleDecl* decl) {

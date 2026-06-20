@@ -389,12 +389,12 @@ void Elaborator::ValidateUnsizedInConcat(const ModuleDecl* decl) {
       WalkExprForUnsizedInConcat(item->assign_lhs);
       WalkExprForUnsizedInConcat(item->assign_rhs);
     }
-    if (item->init_value) {
-      WalkExprForUnsizedInConcat(item->init_value);
+    if (item->init_expr) {
+      WalkExprForUnsizedInConcat(item->init_expr);
     }
   }
   for (const auto& p : decl->params) {
-    WalkExprForUnsizedInConcat(p.init_value);
+    WalkExprForUnsizedInConcat(p.second);
   }
 }
 
@@ -633,14 +633,14 @@ void Elaborator::ValidateReplicateMultiplier(const ModuleDecl* decl) {
       CheckZeroReplicateStandalone(item->assign_lhs, diag_);
       CheckZeroReplicateStandalone(item->assign_rhs, diag_);
     }
-    if (item->init_value) {
-      WalkExprForReplicateMultiplier(item->init_value);
-      CheckZeroReplicateStandalone(item->init_value, diag_);
+    if (item->init_expr) {
+      WalkExprForReplicateMultiplier(item->init_expr);
+      CheckZeroReplicateStandalone(item->init_expr, diag_);
     }
   }
   for (const auto& p : decl->params) {
-    WalkExprForReplicateMultiplier(p.init_value);
-    CheckZeroReplicateStandalone(p.init_value, diag_);
+    WalkExprForReplicateMultiplier(p.second);
+    CheckZeroReplicateStandalone(p.second, diag_);
   }
 }
 

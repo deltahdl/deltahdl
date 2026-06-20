@@ -535,7 +535,7 @@ static ExecTask ExecInlineTaskCall(const Stmt* stmt, SimContext& ctx,
   if (expr && expr->kind == ExprKind::kSystemCall && expr->callee == "$cast") {
     auto result = EvalExpr(expr, ctx, arena);
     if (result.ToUint64() == 0) {
-      ctx.GetDiag().Error(expr->loc,
+      ctx.GetDiag().Error(expr->range.start,
                           "$cast task could not assign the source expression "
                           "to the destination; assignment is invalid");
     }

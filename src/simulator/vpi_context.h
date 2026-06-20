@@ -10,6 +10,7 @@
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_data_structs.h"
 #include "simulator/vpi_object.h"
+#include "simulator/vpi_pli_types.h"
 
 namespace delta {
 

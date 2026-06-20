@@ -235,7 +235,7 @@ static void CollectRandJoinSteps(const RsRule& rule, Arena& arena,
                                  std::vector<const RsProd*>& steps) {
   if (rule.is_rand_join) {
     for (const auto& item : rule.rand_join_items) {
-      auto* p = arena.New<RsProd>();
+      auto* p = arena.Create<RsProd>();
       p->kind = RsProdKind::kItem;
       p->item = item;
       steps.push_back(p);

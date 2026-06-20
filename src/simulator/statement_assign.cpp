@@ -21,6 +21,11 @@
 
 namespace delta {
 
+// Defined below; forward-declared so the queue-write helpers above its
+// definition can call it. The default argument lives on the definition.
+static int64_t EvalQueueIndex(const Expr* expr, QueueObject* q, SimContext& ctx,
+                              Arena& arena, bool* has_xz);
+
 void BuildLhsName(const Expr* expr, std::string& out) {
   if (expr->kind == ExprKind::kIdentifier) {
     if (!expr->scope_prefix.empty()) {

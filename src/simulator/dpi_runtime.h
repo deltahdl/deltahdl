@@ -10,6 +10,7 @@
 
 #include "common/types.h"
 #include "parser/ast.h"
+#include "simulator/coverage_control.h"
 #include "simulator/dpi.h"
 
 namespace delta {
@@ -688,13 +689,9 @@ class AssertionApi {
   void FlushAllPendingAssertionReports();
 };
 
-enum class CoverageControl : uint8_t {
-  kStop = 0,
-  kStart = 1,
-  kReset = 2,
-  kCheck = 3,
-};
-
+// CoverageControl is the §40.3.1 control enum defined canonically in
+// coverage_control.h (included above); CoverageApi reuses it rather than
+// declaring a second, conflicting copy.
 class CoverageApi {
  public:
   void SetControl(CoverageControl ctrl);
@@ -710,7 +707,7 @@ class CoverageApi {
   double GetValue(std::string_view key) const;
 
  private:
-  CoverageControl control_ = CoverageControl::kStart;
+  CoverageControl control_ = CoverageControl::Start;
   uint32_t max_bins_ = 64;
   bool active_ = true;
   std::unordered_map<std::string, double> values_;
