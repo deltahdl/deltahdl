@@ -8,7 +8,7 @@ using namespace delta;
 namespace {
 
 TEST(Lexer, KeywordVersion_1364_2001_AllAdditionalKeywordsRecognized) {
-  const char* kTable22Dot2[] = {
+  const char* table22_dot2[] = {
       "automatic",
       "cell",
       "config",
@@ -31,7 +31,7 @@ TEST(Lexer, KeywordVersion_1364_2001_AllAdditionalKeywordsRecognized) {
       "unsigned",
       "use",
   };
-  for (const char* kw : kTable22Dot2) {
+  for (const char* kw : table22_dot2) {
     auto result = LookupKeyword(kw, KeywordVersion::kVer13642001);
     EXPECT_TRUE(result.has_value())
         << kw << " should be a keyword in 1364-2001";

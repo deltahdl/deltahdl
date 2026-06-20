@@ -54,22 +54,31 @@ Variable* SetupSingleBlockEvent(ClockingSimFixture& f, ClockingManager& cmgr,
   return clk;
 }
 
-// Wire two posedge blocks "cb1"/"cb2" (on signals `sig1`/`sig2`), bind their
-// "__cb1_event"/"__cb2_event" events, attach, and install watchers that set
-// *fired1/*fired2 true when the respective event fires.
+// Parameters for SetupTwoBlockEvents: the two clock signals to register blocks
+// on (`sig1`/`sig2`) and the two flags (`fired1`/`fired2`) set when each event
+// fires.
+struct TwoBlockEventSpec {
+  const char* sig1;
+  const char* sig2;
+  bool* fired1;
+  bool* fired2;
+};
+
+// Wire two posedge blocks "cb1"/"cb2" (on signals `spec.sig1`/`spec.sig2`),
+// bind their "__cb1_event"/"__cb2_event" events, attach, and install watchers
+// that set *spec.fired1/*spec.fired2 true when the respective event fires.
 void SetupTwoBlockEvents(ClockingSimFixture& f, ClockingManager& cmgr,
-                         const char* sig1, const char* sig2, bool* fired1,
-                         bool* fired2) {
-  RegisterClockBlock(cmgr, "cb1", sig1, Edge::kPosedge);
-  RegisterClockBlock(cmgr, "cb2", sig2, Edge::kPosedge);
+                         const TwoBlockEventSpec& spec) {
+  RegisterClockBlock(cmgr, "cb1", spec.sig1, Edge::kPosedge);
+  RegisterClockBlock(cmgr, "cb2", spec.sig2, Edge::kPosedge);
 
   auto* ev1 = MakeBlockEvent(f, cmgr, "__cb1_event", "cb1");
   auto* ev2 = MakeBlockEvent(f, cmgr, "__cb2_event", "cb2");
 
   cmgr.Attach(f.ctx, f.scheduler);
 
-  WatchFlag(ev1, fired1);
-  WatchFlag(ev2, fired2);
+  WatchFlag(ev1, spec.fired1);
+  WatchFlag(ev2, spec.fired2);
 }
 
 // Region-ordering check: schedule an event tagged `pre_label` in `pre_region`
@@ -182,7 +191,8 @@ TEST(ClockingBlockEventSim, MultipleBlocksTriggerIndependentEvents) {
   ClockingManager cmgr;
   bool ev1_fired = false;
   bool ev2_fired = false;
-  SetupTwoBlockEvents(f, cmgr, "clk1", "clk2", &ev1_fired, &ev2_fired);
+  SetupTwoBlockEvents(
+      f, cmgr, TwoBlockEventSpec{"clk1", "clk2", &ev1_fired, &ev2_fired});
 
   SchedulePosedge(f, clk1, 10);
   f.scheduler.Run();
@@ -222,7 +232,8 @@ TEST(ClockingBlockEventSim, SharedClockBothBlocksFireEvents) {
   ClockingManager cmgr;
   bool ev1_fired = false;
   bool ev2_fired = false;
-  SetupTwoBlockEvents(f, cmgr, "clk", "clk", &ev1_fired, &ev2_fired);
+  SetupTwoBlockEvents(f, cmgr,
+                      TwoBlockEventSpec{"clk", "clk", &ev1_fired, &ev2_fired});
 
   SchedulePosedge(f, clk, 10);
   f.scheduler.Run();

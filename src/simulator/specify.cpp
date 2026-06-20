@@ -344,7 +344,7 @@ void SpecifyManager::SetSpecparamValue(SpecparamValue spec) {
 }
 
 void SpecifyManager::IncrementSpecparamValue(SpecparamValue delta) {
-  std::string name = delta.name;
+  std::string name = std::move(delta.name);
   uint64_t added = delta.value;
   uint64_t new_value = added;
   auto it = specparam_index_.find(name);

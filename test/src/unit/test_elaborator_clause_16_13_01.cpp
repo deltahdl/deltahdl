@@ -38,7 +38,8 @@ TEST(MulticlockSequenceLegality, EmptyMatchingTrailingSubsequenceIsIllegal) {
   const std::optional<std::string> kError =
       CheckMulticlockSequenceLegality(kSubsequences);
   ASSERT_TRUE(kError.has_value());
-  EXPECT_FALSE(kError->empty());
+  const std::string& error = *kError;
+  EXPECT_FALSE(error.empty());
 }
 
 // R1 (§16.13.1): the empty-match restriction also rejects an empty-matching
@@ -72,7 +73,8 @@ TEST(MulticlockSequenceLegality, DifferentlyClockedOtherJoinIsIllegal) {
   const std::optional<std::string> kError =
       CheckMulticlockSequenceLegality(kSubsequences);
   ASSERT_TRUE(kError.has_value());
-  EXPECT_FALSE(kError->empty());
+  const std::string& error = *kError;
+  EXPECT_FALSE(error.empty());
 }
 
 // R2 (§16.13.1): when the joined operands share a clock the context is singly
@@ -109,7 +111,8 @@ TEST(MulticlockSequenceLegality, EmptyMatchingInteriorSubsequenceIsIllegal) {
   const std::optional<std::string> kError =
       CheckMulticlockSequenceLegality(kSubsequences);
   ASSERT_TRUE(kError.has_value());
-  EXPECT_FALSE(kError->empty());
+  const std::string& error = *kError;
+  EXPECT_FALSE(error.empty());
 }
 
 // R2 (§16.13.1): the operator restriction is decided per boundary by the clocks
@@ -137,7 +140,8 @@ TEST(MulticlockSequenceLegality, CrossClockOtherJoinInInteriorIsIllegal) {
   const std::optional<std::string> kError =
       CheckMulticlockSequenceLegality(kSubsequences);
   ASSERT_TRUE(kError.has_value());
-  EXPECT_FALSE(kError->empty());
+  const std::string& error = *kError;
+  EXPECT_FALSE(error.empty());
 }
 
 }  // namespace

@@ -48,9 +48,16 @@ TEST(SvDpi, MaskCoversLowBits) {
 TEST(SvDpi, GetSignedBits) {
   // Bit N decides extension: set -> sign-extend into the high bits,
   // clear -> mask to the low N bits; width 32 passes the value through.
-  EXPECT_EQ(static_cast<uint32_t>(SV_GET_SIGNED_BITS(0x1F, 4)), 0xFFFFFFFFu);
-  EXPECT_EQ(static_cast<uint32_t>(SV_GET_SIGNED_BITS(0x0F, 4)), 0x0000000Fu);
-  EXPECT_EQ(static_cast<uint32_t>(SV_GET_SIGNED_BITS(0x12345678, 32)),
+  // Feed the inputs through runtime values so the macro does not collapse
+  // into compile-time-constant bitwise sub-expressions.
+  uint32_t sign_set_4 = 0x1F;
+  uint32_t sign_clear_4 = 0x0F;
+  uint32_t passthrough_32 = 0x12345678;
+  EXPECT_EQ(static_cast<uint32_t>(SV_GET_SIGNED_BITS(sign_set_4, 4)),
+            0xFFFFFFFFu);
+  EXPECT_EQ(static_cast<uint32_t>(SV_GET_SIGNED_BITS(sign_clear_4, 4)),
+            0x0000000Fu);
+  EXPECT_EQ(static_cast<uint32_t>(SV_GET_SIGNED_BITS(passthrough_32, 32)),
             0x12345678u);
   // High junk above the width is discarded regardless of the sign bit:
   // bit N clear -> masked to low bits; bit N set -> still sign-extended.

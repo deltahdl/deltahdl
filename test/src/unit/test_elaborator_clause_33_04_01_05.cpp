@@ -16,6 +16,35 @@ using namespace delta;
 
 namespace {
 
+// Bundles the per-call inputs for BindLeafUnderTop so the helper stays under
+// the parameter-count threshold.
+struct BindLeafParams {
+  const std::string& config_body;
+  std::string_view lib_leaf0;
+  std::string_view lib_leaf1;
+  std::string_view lib_top;
+};
+
+// Parses the fixed two-leaf/one-top source plus the supplied config body,
+// assigns the three modules their libraries, and returns the parsed unit.
+CompilationUnit* ParseTwoLeafTop(SourceManager& mgr, Arena& arena,
+                                 DiagEngine& diag,
+                                 const BindLeafParams& params) {
+  std::string src;
+  src += "module leaf; endmodule\n";
+  src += "module leaf; endmodule\n";
+  src += "module top; leaf u(); endmodule\n";
+  src += params.config_body;
+  auto fid = mgr.AddFile("<test>", std::move(src));
+  Lexer lex(mgr.FileContent(fid), fid, diag);
+  Parser parser(lex, arena, diag);
+  auto* cu = parser.Parse();
+  cu->modules[0]->library = params.lib_leaf0;
+  cu->modules[1]->library = params.lib_leaf1;
+  cu->modules[2]->library = params.lib_top;
+  return cu;
+}
+
 // Elaborates `config c` (whose body is supplied) over two same-named `leaf`
 // cells and a `top` that instantiates one `leaf`, assigning the three modules
 // the given libraries, and returns the cell bound to top.u (or nullptr).
@@ -24,18 +53,9 @@ RtlirModule* BindLeafUnderTop(SourceManager& mgr, Arena& arena,
                               std::string_view lib_leaf0,
                               std::string_view lib_leaf1,
                               std::string_view lib_top) {
-  std::string src;
-  src += "module leaf; endmodule\n";
-  src += "module leaf; endmodule\n";
-  src += "module top; leaf u(); endmodule\n";
-  src += config_body;
-  auto fid = mgr.AddFile("<test>", std::move(src));
-  Lexer lex(mgr.FileContent(fid), fid, diag);
-  Parser parser(lex, arena, diag);
-  auto* cu = parser.Parse();
-  cu->modules[0]->library = lib_leaf0;
-  cu->modules[1]->library = lib_leaf1;
-  cu->modules[2]->library = lib_top;
+  auto* cu = ParseTwoLeafTop(
+      mgr, arena, diag,
+      BindLeafParams{config_body, lib_leaf0, lib_leaf1, lib_top});
   Elaborator elab(arena, diag, cu);
   auto* design = elab.Elaborate(cu->configs[0]);
   if (design == nullptr || design->top_modules.empty()) return nullptr;

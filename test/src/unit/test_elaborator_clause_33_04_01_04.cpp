@@ -2,26 +2,40 @@
 
 namespace {
 
-// Config-elaborates `adder`, `alt`, and a `top` that instantiates `adder`
-// (libraries set to la/lb/lt) under the supplied config body, and returns the
-// cell bound to top.u, so a library-qualified cell clause can be observed
-// through Elaborate(ConfigDecl).
-RtlirModule* BindAdderChild(SourceManager& mgr, Arena& arena, DiagEngine& diag,
-                            const std::string& config_body, std::string_view la,
-                            std::string_view lb, std::string_view lt) {
+// Inputs for BindAdderChild, bundled to keep the helper parameter list small.
+struct BindAdderInputs {
+  SourceManager& mgr;
+  Arena& arena;
+  DiagEngine& diag;
+  const std::string& config_body;
+  std::string_view la;
+  std::string_view lb;
+  std::string_view lt;
+};
+
+// Parses `adder`, `alt`, and a `top` that instantiates `adder` under the
+// supplied config body, then tags the three modules with libraries la/lb/lt.
+CompilationUnit* ParseAdderUnit(const BindAdderInputs& in) {
   std::string src;
   src += "module adder; endmodule\n";
   src += "module alt; endmodule\n";
   src += "module top; adder u(); endmodule\n";
-  src += config_body;
-  auto fid = mgr.AddFile("<test>", std::move(src));
-  Lexer lex(mgr.FileContent(fid), fid, diag);
-  Parser parser(lex, arena, diag);
+  src += in.config_body;
+  auto fid = in.mgr.AddFile("<test>", std::move(src));
+  Lexer lex(in.mgr.FileContent(fid), fid, in.diag);
+  Parser parser(lex, in.arena, in.diag);
   auto* cu = parser.Parse();
-  cu->modules[0]->library = la;
-  cu->modules[1]->library = lb;
-  cu->modules[2]->library = lt;
-  Elaborator elab(arena, diag, cu);
+  cu->modules[0]->library = in.la;
+  cu->modules[1]->library = in.lb;
+  cu->modules[2]->library = in.lt;
+  return cu;
+}
+
+// Config-elaborates the parsed unit and returns the cell bound to top.u, so a
+// library-qualified cell clause can be observed through Elaborate(ConfigDecl).
+RtlirModule* BindAdderChild(const BindAdderInputs& in) {
+  auto* cu = ParseAdderUnit(in);
+  Elaborator elab(in.arena, in.diag, cu);
   auto* design = elab.Elaborate(cu->configs[0]);
   EXPECT_NE(design, nullptr);
   return design->top_modules[0]->children[0].resolved;
@@ -70,9 +84,9 @@ TEST(ConfigCellClause, LibQualifiedCellClauseRebindsMatchingCell) {
   Arena arena;
   DiagEngine diag(mgr);
   auto* bound = BindAdderChild(
-      mgr, arena, diag,
-      "config c; design top; cell rtlLib.adder use gateLib.alt; endconfig\n",
-      "rtlLib", "gateLib", "rtlLib");
+      {mgr, arena, diag,
+       "config c; design top; cell rtlLib.adder use gateLib.alt; endconfig\n",
+       "rtlLib", "gateLib", "rtlLib"});
   ASSERT_NE(bound, nullptr);
   EXPECT_EQ(bound->name, "alt");
   EXPECT_EQ(bound->library, "gateLib");
@@ -86,9 +100,9 @@ TEST(ConfigCellClause, UnqualifiedCellClauseAppliesToNamedCell) {
   Arena arena;
   DiagEngine diag(mgr);
   auto* bound = BindAdderChild(
-      mgr, arena, diag,
-      "config c; design top; cell adder use gateLib.alt; endconfig\n", "rtlLib",
-      "gateLib", "rtlLib");
+      {mgr, arena, diag,
+       "config c; design top; cell adder use gateLib.alt; endconfig\n",
+       "rtlLib", "gateLib", "rtlLib"});
   ASSERT_NE(bound, nullptr);
   EXPECT_EQ(bound->name, "alt");
   EXPECT_EQ(bound->library, "gateLib");
@@ -102,9 +116,9 @@ TEST(ConfigCellClause, LibQualifiedCellClauseDoesNotApplyToOtherLibraries) {
   Arena arena;
   DiagEngine diag(mgr);
   auto* bound = BindAdderChild(
-      mgr, arena, diag,
-      "config c; design top; cell zzzLib.adder use gateLib.alt; endconfig\n",
-      "rtlLib", "gateLib", "rtlLib");
+      {mgr, arena, diag,
+       "config c; design top; cell zzzLib.adder use gateLib.alt; endconfig\n",
+       "rtlLib", "gateLib", "rtlLib"});
   ASSERT_NE(bound, nullptr);
   EXPECT_EQ(bound->name, "adder");
 }

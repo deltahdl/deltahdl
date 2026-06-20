@@ -9,18 +9,23 @@ using namespace delta;
 
 namespace {
 
-TimingCheckEntry MakeSv(TimingCheckKind kind, const char* ref_signal,
-                        const char* data_signal,
-                        SpecifyEdge ref_edge = SpecifyEdge::kNone,
-                        SpecifyEdge data_edge = SpecifyEdge::kNone,
-                        const char* condition = "") {
+struct SvSpec {
+  TimingCheckKind kind;
+  const char* ref_signal;
+  const char* data_signal;
+  SpecifyEdge ref_edge = SpecifyEdge::kNone;
+  SpecifyEdge data_edge = SpecifyEdge::kNone;
+  const char* condition = "";
+};
+
+TimingCheckEntry MakeSv(const SvSpec& spec) {
   TimingCheckEntry tc;
-  tc.kind = kind;
-  tc.ref_signal = ref_signal;
-  tc.data_signal = data_signal;
-  tc.ref_edge = ref_edge;
-  tc.data_edge = data_edge;
-  tc.condition = condition;
+  tc.kind = spec.kind;
+  tc.ref_signal = spec.ref_signal;
+  tc.data_signal = spec.data_signal;
+  tc.ref_edge = spec.ref_edge;
+  tc.data_edge = spec.data_edge;
+  tc.condition = spec.condition;
   return tc;
 }
 
@@ -34,10 +39,10 @@ SdfFile WrapTimingCheck(SdfTimingCheck tc) {
 
 TEST(SdfTimingCheckMapping, SetupExpandsToSetupAndSetupholdSetupSlot) {
   SpecifyManager mgr;
-  TimingCheckEntry sv_setup = MakeSv(TimingCheckKind::kSetup, "clk", "d");
+  TimingCheckEntry sv_setup = MakeSv({TimingCheckKind::kSetup, "clk", "d"});
   sv_setup.limit = 1;
   mgr.AddTimingCheck(sv_setup);
-  TimingCheckEntry sv_sh = MakeSv(TimingCheckKind::kSetuphold, "clk", "d");
+  TimingCheckEntry sv_sh = MakeSv({TimingCheckKind::kSetuphold, "clk", "d"});
   sv_sh.limit = 2;
   sv_sh.limit2 = 7;
   mgr.AddTimingCheck(sv_sh);
@@ -64,10 +69,10 @@ TEST(SdfTimingCheckMapping, SetupExpandsToSetupAndSetupholdSetupSlot) {
 
 TEST(SdfTimingCheckMapping, HoldExpandsToHoldAndSetupholdHoldSlot) {
   SpecifyManager mgr;
-  TimingCheckEntry sv_hold = MakeSv(TimingCheckKind::kHold, "clk", "d");
+  TimingCheckEntry sv_hold = MakeSv({TimingCheckKind::kHold, "clk", "d"});
   sv_hold.limit = 1;
   mgr.AddTimingCheck(sv_hold);
-  TimingCheckEntry sv_sh = MakeSv(TimingCheckKind::kSetuphold, "clk", "d");
+  TimingCheckEntry sv_sh = MakeSv({TimingCheckKind::kSetuphold, "clk", "d"});
   sv_sh.limit = 7;
   sv_sh.limit2 = 2;
   mgr.AddTimingCheck(sv_sh);
@@ -94,9 +99,9 @@ TEST(SdfTimingCheckMapping, HoldExpandsToHoldAndSetupholdHoldSlot) {
 
 TEST(SdfTimingCheckMapping, SetupholdExpandsToSetupHoldAndSetuphold) {
   SpecifyManager mgr;
-  mgr.AddTimingCheck(MakeSv(TimingCheckKind::kSetup, "clk", "d"));
-  mgr.AddTimingCheck(MakeSv(TimingCheckKind::kHold, "clk", "d"));
-  mgr.AddTimingCheck(MakeSv(TimingCheckKind::kSetuphold, "clk", "d"));
+  mgr.AddTimingCheck(MakeSv({TimingCheckKind::kSetup, "clk", "d"}));
+  mgr.AddTimingCheck(MakeSv({TimingCheckKind::kHold, "clk", "d"}));
+  mgr.AddTimingCheck(MakeSv({TimingCheckKind::kSetuphold, "clk", "d"}));
 
   SdfTimingCheck tc;
   tc.check_type = SdfCheckType::kSetuphold;
@@ -121,8 +126,8 @@ TEST(SdfTimingCheckMapping, SetupholdExpandsToSetupHoldAndSetuphold) {
 
 TEST(SdfTimingCheckMapping, RecoveryExpandsToRecoveryAndRecremRecoverySlot) {
   SpecifyManager mgr;
-  mgr.AddTimingCheck(MakeSv(TimingCheckKind::kRecovery, "clk", "rst"));
-  TimingCheckEntry sv_rr = MakeSv(TimingCheckKind::kRecrem, "clk", "rst");
+  mgr.AddTimingCheck(MakeSv({TimingCheckKind::kRecovery, "clk", "rst"}));
+  TimingCheckEntry sv_rr = MakeSv({TimingCheckKind::kRecrem, "clk", "rst"});
   sv_rr.limit = 3;
   sv_rr.limit2 = 9;
   mgr.AddTimingCheck(sv_rr);
@@ -146,8 +151,8 @@ TEST(SdfTimingCheckMapping, RecoveryExpandsToRecoveryAndRecremRecoverySlot) {
 
 TEST(SdfTimingCheckMapping, RemovalExpandsToRemovalAndRecremRemovalSlot) {
   SpecifyManager mgr;
-  mgr.AddTimingCheck(MakeSv(TimingCheckKind::kRemoval, "clk", "rst"));
-  TimingCheckEntry sv_rr = MakeSv(TimingCheckKind::kRecrem, "clk", "rst");
+  mgr.AddTimingCheck(MakeSv({TimingCheckKind::kRemoval, "clk", "rst"}));
+  TimingCheckEntry sv_rr = MakeSv({TimingCheckKind::kRecrem, "clk", "rst"});
   sv_rr.limit = 9;
   sv_rr.limit2 = 3;
   mgr.AddTimingCheck(sv_rr);
@@ -171,9 +176,9 @@ TEST(SdfTimingCheckMapping, RemovalExpandsToRemovalAndRecremRemovalSlot) {
 
 TEST(SdfTimingCheckMapping, RecremExpandsToRecoveryRemovalAndRecrem) {
   SpecifyManager mgr;
-  mgr.AddTimingCheck(MakeSv(TimingCheckKind::kRecovery, "clk", "rst"));
-  mgr.AddTimingCheck(MakeSv(TimingCheckKind::kRemoval, "clk", "rst"));
-  mgr.AddTimingCheck(MakeSv(TimingCheckKind::kRecrem, "clk", "rst"));
+  mgr.AddTimingCheck(MakeSv({TimingCheckKind::kRecovery, "clk", "rst"}));
+  mgr.AddTimingCheck(MakeSv({TimingCheckKind::kRemoval, "clk", "rst"}));
+  mgr.AddTimingCheck(MakeSv({TimingCheckKind::kRecrem, "clk", "rst"}));
 
   SdfTimingCheck tc;
   tc.check_type = SdfCheckType::kRecrem;
@@ -198,8 +203,8 @@ TEST(SdfTimingCheckMapping, RecremExpandsToRecoveryRemovalAndRecrem) {
 
 TEST(SdfTimingCheckMapping, SkewExpandsToSkewAndTimeskew) {
   SpecifyManager mgr;
-  mgr.AddTimingCheck(MakeSv(TimingCheckKind::kSkew, "clk1", "clk2"));
-  mgr.AddTimingCheck(MakeSv(TimingCheckKind::kTimeskew, "clk1", "clk2"));
+  mgr.AddTimingCheck(MakeSv({TimingCheckKind::kSkew, "clk1", "clk2"}));
+  mgr.AddTimingCheck(MakeSv({TimingCheckKind::kTimeskew, "clk1", "clk2"}));
 
   SdfTimingCheck tc;
   tc.check_type = SdfCheckType::kSkew;
@@ -222,7 +227,7 @@ TEST(SdfTimingCheckMapping, SkewExpandsToSkewAndTimeskew) {
 
 TEST(SdfTimingCheckMapping, BidirectskewExpandsToFullskewWithBothLimits) {
   SpecifyManager mgr;
-  mgr.AddTimingCheck(MakeSv(TimingCheckKind::kFullskew, "clk1", "clk2"));
+  mgr.AddTimingCheck(MakeSv({TimingCheckKind::kFullskew, "clk1", "clk2"}));
 
   SdfTimingCheck tc;
   tc.check_type = SdfCheckType::kBidirectskew;
@@ -240,7 +245,7 @@ TEST(SdfTimingCheckMapping, BidirectskewExpandsToFullskewWithBothLimits) {
 
 TEST(SdfTimingCheckMapping, WidthExpandsToWidthAndPreservesThreshold) {
   SpecifyManager mgr;
-  TimingCheckEntry sv = MakeSv(TimingCheckKind::kWidth, "clk", "");
+  TimingCheckEntry sv = MakeSv({TimingCheckKind::kWidth, "clk", ""});
   sv.limit = 1;
   sv.threshold = 13;
   mgr.AddTimingCheck(sv);
@@ -258,7 +263,7 @@ TEST(SdfTimingCheckMapping, WidthExpandsToWidthAndPreservesThreshold) {
 
 TEST(SdfTimingCheckMapping, PeriodExpandsToPeriod) {
   SpecifyManager mgr;
-  TimingCheckEntry sv = MakeSv(TimingCheckKind::kPeriod, "clk", "");
+  TimingCheckEntry sv = MakeSv({TimingCheckKind::kPeriod, "clk", ""});
   sv.limit = 1;
   mgr.AddTimingCheck(sv);
 
@@ -275,7 +280,7 @@ TEST(SdfTimingCheckMapping, PeriodExpandsToPeriod) {
 
 TEST(SdfTimingCheckMapping, NochangeExpandsToNochangeWithEdgeOffsets) {
   SpecifyManager mgr;
-  mgr.AddTimingCheck(MakeSv(TimingCheckKind::kNochange, "clk", "d"));
+  mgr.AddTimingCheck(MakeSv({TimingCheckKind::kNochange, "clk", "d"}));
 
   SdfTimingCheck tc;
   tc.check_type = SdfCheckType::kNochange;
@@ -294,15 +299,15 @@ TEST(SdfTimingCheckMapping, NochangeExpandsToNochangeWithEdgeOffsets) {
 TEST(SdfTimingCheckMapping, SdfWithRefEdgeAnnotatesOnlyMatchingSvEdge) {
   SpecifyManager mgr;
   TimingCheckEntry pos =
-      MakeSv(TimingCheckKind::kSetup, "clk", "d", SpecifyEdge::kPosedge);
+      MakeSv({TimingCheckKind::kSetup, "clk", "d", SpecifyEdge::kPosedge});
   pos.limit = 1;
   mgr.AddTimingCheck(pos);
   TimingCheckEntry neg =
-      MakeSv(TimingCheckKind::kSetup, "clk", "d", SpecifyEdge::kNegedge);
+      MakeSv({TimingCheckKind::kSetup, "clk", "d", SpecifyEdge::kNegedge});
   neg.limit = 2;
   mgr.AddTimingCheck(neg);
   TimingCheckEntry any =
-      MakeSv(TimingCheckKind::kSetup, "clk", "d", SpecifyEdge::kEdge);
+      MakeSv({TimingCheckKind::kSetup, "clk", "d", SpecifyEdge::kEdge});
   any.limit = 3;
   mgr.AddTimingCheck(any);
 
@@ -331,12 +336,12 @@ TEST(SdfTimingCheckMapping, SdfWithRefEdgeAnnotatesOnlyMatchingSvEdge) {
 // data edge before annotation. Only the matching-edge sibling is updated.
 TEST(SdfTimingCheckMapping, SdfWithDataEdgeAnnotatesOnlyMatchingSvDataEdge) {
   SpecifyManager mgr;
-  TimingCheckEntry pos = MakeSv(TimingCheckKind::kSetup, "clk", "d",
-                                SpecifyEdge::kNone, SpecifyEdge::kPosedge);
+  TimingCheckEntry pos = MakeSv({TimingCheckKind::kSetup, "clk", "d",
+                                 SpecifyEdge::kNone, SpecifyEdge::kPosedge});
   pos.limit = 1;
   mgr.AddTimingCheck(pos);
-  TimingCheckEntry neg = MakeSv(TimingCheckKind::kSetup, "clk", "d",
-                                SpecifyEdge::kNone, SpecifyEdge::kNegedge);
+  TimingCheckEntry neg = MakeSv({TimingCheckKind::kSetup, "clk", "d",
+                                 SpecifyEdge::kNone, SpecifyEdge::kNegedge});
   neg.limit = 2;
   mgr.AddTimingCheck(neg);
 
@@ -360,12 +365,13 @@ TEST(SdfTimingCheckMapping, SdfWithDataEdgeAnnotatesOnlyMatchingSvDataEdge) {
 
 TEST(SdfTimingCheckMapping, SdfWithConditionAnnotatesOnlyMatchingSvCondition) {
   SpecifyManager mgr;
-  TimingCheckEntry m = MakeSv(TimingCheckKind::kSetup, "clk", "d",
-                              SpecifyEdge::kNone, SpecifyEdge::kNone, "mode");
+  TimingCheckEntry m = MakeSv({TimingCheckKind::kSetup, "clk", "d",
+                               SpecifyEdge::kNone, SpecifyEdge::kNone, "mode"});
   m.limit = 1;
   mgr.AddTimingCheck(m);
-  TimingCheckEntry nm = MakeSv(TimingCheckKind::kSetup, "clk", "d",
-                               SpecifyEdge::kNone, SpecifyEdge::kNone, "!mode");
+  TimingCheckEntry nm =
+      MakeSv({TimingCheckKind::kSetup, "clk", "d", SpecifyEdge::kNone,
+              SpecifyEdge::kNone, "!mode"});
   nm.limit = 2;
   mgr.AddTimingCheck(nm);
 
@@ -391,15 +397,15 @@ TEST(SdfTimingCheckMapping,
      BareSdfSetupholdMatchesAllSvSetupholdsRegardlessOfEdgeOrCondition) {
   SpecifyManager mgr;
   TimingCheckEntry a =
-      MakeSv(TimingCheckKind::kSetuphold, "clk", "data", SpecifyEdge::kPosedge,
-             SpecifyEdge::kNone, "mode");
+      MakeSv({TimingCheckKind::kSetuphold, "clk", "data", SpecifyEdge::kPosedge,
+              SpecifyEdge::kNone, "mode"});
   mgr.AddTimingCheck(a);
   TimingCheckEntry b =
-      MakeSv(TimingCheckKind::kSetuphold, "clk", "data", SpecifyEdge::kNegedge,
-             SpecifyEdge::kNone, "!mode");
+      MakeSv({TimingCheckKind::kSetuphold, "clk", "data", SpecifyEdge::kNegedge,
+              SpecifyEdge::kNone, "!mode"});
   mgr.AddTimingCheck(b);
   TimingCheckEntry c =
-      MakeSv(TimingCheckKind::kSetuphold, "clk", "data", SpecifyEdge::kEdge);
+      MakeSv({TimingCheckKind::kSetuphold, "clk", "data", SpecifyEdge::kEdge});
   mgr.AddTimingCheck(c);
 
   SdfTimingCheck tc;
@@ -423,8 +429,8 @@ TEST(SdfTimingCheckMapping,
 TEST(SdfTimingCheckMapping, SdfWithRefEdgeMatchesSvDespiteSvCondition) {
   SpecifyManager mgr;
   TimingCheckEntry sv =
-      MakeSv(TimingCheckKind::kSetuphold, "clk", "data", SpecifyEdge::kPosedge,
-             SpecifyEdge::kNone, "mode");
+      MakeSv({TimingCheckKind::kSetuphold, "clk", "data", SpecifyEdge::kPosedge,
+              SpecifyEdge::kNone, "mode"});
   sv.limit = 1;
   sv.limit2 = 2;
   mgr.AddTimingCheck(sv);
@@ -517,19 +523,19 @@ TEST(SdfTimingCheckMapping,
      ParsedCondWrappedSetupholdAnnotatesNoneOfMismatchedSiblings) {
   SpecifyManager mgr;
   TimingCheckEntry mode_pos =
-      MakeSv(TimingCheckKind::kSetuphold, "clk", "data", SpecifyEdge::kPosedge,
-             SpecifyEdge::kNone, "mode");
+      MakeSv({TimingCheckKind::kSetuphold, "clk", "data", SpecifyEdge::kPosedge,
+              SpecifyEdge::kNone, "mode"});
   mode_pos.limit = 11;
   mode_pos.limit2 = 12;
   mgr.AddTimingCheck(mode_pos);
   TimingCheckEntry notmode_neg =
-      MakeSv(TimingCheckKind::kSetuphold, "clk", "data", SpecifyEdge::kNegedge,
-             SpecifyEdge::kNone, "!mode");
+      MakeSv({TimingCheckKind::kSetuphold, "clk", "data", SpecifyEdge::kNegedge,
+              SpecifyEdge::kNone, "!mode"});
   notmode_neg.limit = 21;
   notmode_neg.limit2 = 22;
   mgr.AddTimingCheck(notmode_neg);
   TimingCheckEntry edge_only =
-      MakeSv(TimingCheckKind::kSetuphold, "clk", "data", SpecifyEdge::kEdge);
+      MakeSv({TimingCheckKind::kSetuphold, "clk", "data", SpecifyEdge::kEdge});
   edge_only.limit = 31;
   edge_only.limit2 = 32;
   mgr.AddTimingCheck(edge_only);

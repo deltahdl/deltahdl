@@ -11,15 +11,24 @@
 using namespace delta;
 namespace {
 
-// Builds and evaluates a $sreadmem* call:
+// Parameters of a $sreadmem* call:
 //   task(mem, start, finish, str0, str1, ...)
-void Sreadmem(SimFixture& f, const char* task, const char* mem, int start,
-              int finish, const std::vector<const char*>& strings) {
-  std::vector<Expr*> args = {MakeId(f.arena, mem),
-                             MakeInt(f.arena, static_cast<uint64_t>(start)),
-                             MakeInt(f.arena, static_cast<uint64_t>(finish))};
-  for (const char* s : strings) args.push_back(MkStr(f.arena, s));
-  EvalExpr(MakeSysCall(f.arena, task, args), f.ctx, f.arena);
+struct SreadmemCall {
+  const char* task;
+  const char* mem;
+  int start;
+  int finish;
+  std::vector<const char*> strings;
+};
+
+// Builds and evaluates a $sreadmem* call.
+void Sreadmem(SimFixture& f, const SreadmemCall& call) {
+  std::vector<Expr*> args = {
+      MakeId(f.arena, call.mem),
+      MakeInt(f.arena, static_cast<uint64_t>(call.start)),
+      MakeInt(f.arena, static_cast<uint64_t>(call.finish))};
+  for (const char* s : call.strings) args.push_back(MkStr(f.arena, s));
+  EvalExpr(MakeSysCall(f.arena, call.task, args), f.ctx, f.arena);
 }
 
 // Annex D.14 (C2): $sreadmemh loads data into the memory from a character
@@ -28,7 +37,7 @@ TEST(OptionalSreadmemSim, SreadmemhLoadsHexFromString) {
   SimFixture f;
   SetupMem(f, "mem", 0, 4, 8);
 
-  Sreadmem(f, "$sreadmemh", "mem", 0, 3, {"0A 14 1E 28"});
+  Sreadmem(f, {"$sreadmemh", "mem", 0, 3, {"0A 14 1E 28"}});
 
   EXPECT_EQ(Cell(f, "mem", 0)->value.ToUint64(), 0x0Au);
   EXPECT_EQ(Cell(f, "mem", 1)->value.ToUint64(), 0x14u);
@@ -41,7 +50,7 @@ TEST(OptionalSreadmemSim, SreadmembParsesBinaryFromString) {
   SimFixture f;
   SetupMem(f, "mem", 0, 4, 8);
 
-  Sreadmem(f, "$sreadmemb", "mem", 0, 1, {"1010 0110"});
+  Sreadmem(f, {"$sreadmemb", "mem", 0, 1, {"1010 0110"}});
 
   EXPECT_EQ(Cell(f, "mem", 0)->value.ToUint64(), 0b1010u);
   EXPECT_EQ(Cell(f, "mem", 1)->value.ToUint64(), 0b0110u);
@@ -53,7 +62,7 @@ TEST(OptionalSreadmemSim, MultipleStringArgumentsAreConcatenated) {
   SimFixture f;
   SetupMem(f, "mem", 0, 4, 8);
 
-  Sreadmem(f, "$sreadmemh", "mem", 0, 3, {"0A 14", "1E 28"});
+  Sreadmem(f, {"$sreadmemh", "mem", 0, 3, {"0A 14", "1E 28"}});
 
   EXPECT_EQ(Cell(f, "mem", 0)->value.ToUint64(), 0x0Au);
   EXPECT_EQ(Cell(f, "mem", 1)->value.ToUint64(), 0x14u);
@@ -68,7 +77,7 @@ TEST(OptionalSreadmemSim, StartFinishBoundTheStoredRange) {
   SimFixture f;
   SetupMem(f, "mem", 0, 4, 8);
 
-  Sreadmem(f, "$sreadmemh", "mem", 1, 2, {"AA BB"});
+  Sreadmem(f, {"$sreadmemh", "mem", 1, 2, {"AA BB"}});
 
   EXPECT_EQ(Cell(f, "mem", 0)->value.ToUint64(), 0x00u);
   EXPECT_EQ(Cell(f, "mem", 1)->value.ToUint64(), 0xAAu);
@@ -82,7 +91,7 @@ TEST(OptionalSreadmemSim, StartGreaterThanFinishLoadsDescending) {
   SimFixture f;
   SetupMem(f, "mem", 0, 4, 8);
 
-  Sreadmem(f, "$sreadmemh", "mem", 2, 0, {"01 02 03"});
+  Sreadmem(f, {"$sreadmemh", "mem", 2, 0, {"01 02 03"}});
 
   EXPECT_EQ(Cell(f, "mem", 2)->value.ToUint64(), 0x01u);
   EXPECT_EQ(Cell(f, "mem", 1)->value.ToUint64(), 0x02u);
@@ -95,7 +104,7 @@ TEST(OptionalSreadmemSim, AtAddressInStringRepositionsCursor) {
   SimFixture f;
   SetupMem(f, "mem", 0, 4, 8);
 
-  Sreadmem(f, "$sreadmemh", "mem", 0, 3, {"@2 FF"});
+  Sreadmem(f, {"$sreadmemh", "mem", 0, 3, {"@2 FF"}});
 
   EXPECT_EQ(Cell(f, "mem", 0)->value.ToUint64(), 0x00u);
   EXPECT_EQ(Cell(f, "mem", 1)->value.ToUint64(), 0x00u);
@@ -111,7 +120,7 @@ TEST(OptionalSreadmemSim, AdjacentStringsAreTokenSeparated) {
   SimFixture f;
   SetupMem(f, "mem", 0, 4, 8);
 
-  Sreadmem(f, "$sreadmemh", "mem", 0, 1, {"0A", "14"});
+  Sreadmem(f, {"$sreadmemh", "mem", 0, 1, {"0A", "14"}});
 
   EXPECT_EQ(Cell(f, "mem", 0)->value.ToUint64(), 0x0Au);
   EXPECT_EQ(Cell(f, "mem", 1)->value.ToUint64(), 0x14u);
@@ -124,7 +133,7 @@ TEST(OptionalSreadmemSim, MissingDataStringLeavesMemoryUnchanged) {
   SimFixture f;
   SetupMem(f, "mem", 0, 4, 8);
 
-  Sreadmem(f, "$sreadmemh", "mem", 0, 1, {});
+  Sreadmem(f, {"$sreadmemh", "mem", 0, 1, {}});
 
   EXPECT_EQ(Cell(f, "mem", 0)->value.ToUint64(), 0x00u);
   EXPECT_EQ(Cell(f, "mem", 1)->value.ToUint64(), 0x00u);

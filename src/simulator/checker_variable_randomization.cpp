@@ -35,13 +35,11 @@ bool IsActiveForAssumeRandomization(AssumeRandomizationVariable var) {
       // active.
       return true;
     case AssumeRandomizationVariable::kFreeNonConstAssigned:
-      // §17.7.2: a free checker variable appearing on the left-hand side of a
-      // checker variable assignment is inactive.
-      return false;
     case AssumeRandomizationVariable::kNonFreeCheckerVariable:
     case AssumeRandomizationVariable::kCheckerFormal:
-      // §17.7.2: all other variables — non-free checker variables and checker
-      // formals — are always treated as inactive.
+      // §17.7.2: a free checker variable on the left-hand side of a checker
+      // variable assignment, non-free checker variables, and checker formals
+      // are all treated as inactive.
       return false;
   }
   return false;

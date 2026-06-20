@@ -16,20 +16,36 @@ using namespace delta;
 
 namespace {
 
+// Bundles the elaboration context and the three module libraries so the
+// BindOnlyChild helper stays under the parameter-count threshold.
+struct BindOnlyChildArgs {
+  SourceManager& mgr;
+  Arena& arena;
+  DiagEngine& diag;
+  const std::string& src;
+  std::string_view lib0;
+  std::string_view lib1;
+  std::string_view lib2;
+};
+
+// Parses the source and assigns the three modules' libraries to lib0/lib1/lib2.
+CompilationUnit* ParseWithLibraries(const BindOnlyChildArgs& args) {
+  auto fid = args.mgr.AddFile("<test>", args.src);
+  Lexer lex(args.mgr.FileContent(fid), fid, args.diag);
+  Parser parser(lex, args.arena, args.diag);
+  auto* cu = parser.Parse();
+  cu->modules[0]->library = args.lib0;
+  cu->modules[1]->library = args.lib1;
+  cu->modules[2]->library = args.lib2;
+  return cu;
+}
+
 // Parses and config-elaborates the given source (three modules whose libraries
 // are set to lib0/lib1/lib2), returning the cell bound to the single child of
 // the design's top module.
-RtlirModule* BindOnlyChild(SourceManager& mgr, Arena& arena, DiagEngine& diag,
-                           const std::string& src, std::string_view lib0,
-                           std::string_view lib1, std::string_view lib2) {
-  auto fid = mgr.AddFile("<test>", src);
-  Lexer lex(mgr.FileContent(fid), fid, diag);
-  Parser parser(lex, arena, diag);
-  auto* cu = parser.Parse();
-  cu->modules[0]->library = lib0;
-  cu->modules[1]->library = lib1;
-  cu->modules[2]->library = lib2;
-  Elaborator elab(arena, diag, cu);
+RtlirModule* BindOnlyChild(const BindOnlyChildArgs& args) {
+  auto* cu = ParseWithLibraries(args);
+  Elaborator elab(args.arena, args.diag, cu);
   auto* design = elab.Elaborate(cu->configs[0]);
   EXPECT_NE(design, nullptr);
   auto* top = design->top_modules[0];
@@ -49,8 +65,8 @@ TEST(ConfigUseClause, UseWithoutLibraryInheritsParentLibrary) {
   SourceManager mgr;
   Arena arena;
   DiagEngine diag(mgr);
-  auto* bound = BindOnlyChild(mgr, arena, diag, kSubUsesWidget, "mainLib",
-                              "otherLib", "mainLib");
+  auto* bound = BindOnlyChild(
+      {mgr, arena, diag, kSubUsesWidget, "mainLib", "otherLib", "mainLib"});
   ASSERT_NE(bound, nullptr);
   EXPECT_EQ(bound->name, "widget");
   EXPECT_EQ(bound->library, "mainLib");
@@ -62,8 +78,8 @@ TEST(ConfigUseClause, InheritedUseLibraryTracksParent) {
   SourceManager mgr;
   Arena arena;
   DiagEngine diag(mgr);
-  auto* bound = BindOnlyChild(mgr, arena, diag, kSubUsesWidget, "mainLib",
-                              "otherLib", "otherLib");
+  auto* bound = BindOnlyChild(
+      {mgr, arena, diag, kSubUsesWidget, "mainLib", "otherLib", "otherLib"});
   ASSERT_NE(bound, nullptr);
   EXPECT_EQ(bound->name, "widget");
   EXPECT_EQ(bound->library, "otherLib");

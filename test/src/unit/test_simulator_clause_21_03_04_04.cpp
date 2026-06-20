@@ -34,23 +34,31 @@ void Close(SysTaskFixture& f, uint64_t fd) {
   EvalExpr(MkSysCall(f.arena, "$fclose", {MkInt(f.arena, fd)}), f.ctx, f.arena);
 }
 
-// Registers a struct/union type `type` with the given fields and a
-// zero-initialized variable `var` of that type, so $fread can load into it.
+// Description of a struct/union type plus the variable to create for it.
 // Field entries are {name, bit_offset, width}. An unpacked type (the default)
 // is read member by member; a packed type is read as one whole value.
-void SetupStruct(SysTaskFixture& f, const char* type, const char* var,
-                 uint32_t total_width, bool is_union,
-                 std::vector<StructFieldInfo> fields, bool is_packed = false) {
+struct StructSpec {
+  const char* type;
+  const char* var;
+  uint32_t total_width;
+  bool is_union;
+  std::vector<StructFieldInfo> fields;
+  bool is_packed = false;
+};
+
+// Registers `spec`'s struct/union type with the given fields and a
+// zero-initialized variable of that type, so $fread can load into it.
+void SetupStruct(SysTaskFixture& f, StructSpec spec) {
   StructTypeInfo info;
-  info.type_name = type;
-  info.is_packed = is_packed;
-  info.is_union = is_union;
-  info.total_width = total_width;
-  info.fields = std::move(fields);
-  f.ctx.RegisterStructType(type, info);
-  auto* v = f.ctx.CreateVariable(var, total_width);
-  v->value = MakeLogic4VecVal(f.arena, total_width, 0);
-  f.ctx.SetVariableStructType(var, type);
+  info.type_name = spec.type;
+  info.is_packed = spec.is_packed;
+  info.is_union = spec.is_union;
+  info.total_width = spec.total_width;
+  info.fields = std::move(spec.fields);
+  f.ctx.RegisterStructType(spec.type, info);
+  auto* v = f.ctx.CreateVariable(spec.var, spec.total_width);
+  v->value = MakeLogic4VecVal(f.arena, spec.total_width, 0);
+  f.ctx.SetVariableStructType(spec.var, spec.type);
 }
 
 // Creates a fresh zero-initialized `width`-bit variable `v`, reads it with
@@ -318,8 +326,11 @@ TEST(FreadBinary, StopsWhenFileExhausted) {
 // would use), with the first member taking the first byte.
 TEST(FreadBinary, UnpackedStructReadsEachMemberInDeclarationOrder) {
   SysTaskFixture f;
-  SetupStruct(f, "pair_t", "s", 8, /*is_union=*/false,
-              {{"a", 4, 4}, {"b", 0, 4}});
+  SetupStruct(f, {.type = "pair_t",
+                  .var = "s",
+                  .total_width = 8,
+                  .is_union = false,
+                  .fields = {{"a", 4, 4}, {"b", 0, 4}}});
   std::string path = WriteBytes("struct", {0x01, 0x02});
   uint64_t fd = OpenRead(f, path);
   ASSERT_NE(fd, 0u);
@@ -338,7 +349,11 @@ TEST(FreadBinary, UnpackedStructReadsEachMemberInDeclarationOrder) {
 // member in declaration order; only that member's bytes are consumed.
 TEST(FreadBinary, UnpackedUnionReadsOnlyFirstMember) {
   SysTaskFixture f;
-  SetupStruct(f, "u_t", "u", 8, /*is_union=*/true, {{"a", 0, 8}, {"b", 0, 8}});
+  SetupStruct(f, {.type = "u_t",
+                  .var = "u",
+                  .total_width = 8,
+                  .is_union = true,
+                  .fields = {{"a", 0, 8}, {"b", 0, 8}}});
   std::string path = WriteBytes("union", {0xAB, 0xCD});
   uint64_t fd = OpenRead(f, path);
   ASSERT_NE(fd, 0u);
@@ -359,8 +374,12 @@ TEST(FreadBinary, UnpackedUnionReadsOnlyFirstMember) {
 // unpacked counterpart consumes two), and that byte becomes the whole value.
 TEST(FreadBinary, PackedStructReadsAsWholeValue) {
   SysTaskFixture f;
-  SetupStruct(f, "packed_t", "p", 8, /*is_union=*/false,
-              {{"a", 4, 4}, {"b", 0, 4}}, /*is_packed=*/true);
+  SetupStruct(f, {.type = "packed_t",
+                  .var = "p",
+                  .total_width = 8,
+                  .is_union = false,
+                  .fields = {{"a", 4, 4}, {"b", 0, 4}},
+                  .is_packed = true});
   std::string path = WriteBytes("packed", {0x12, 0x34});
   uint64_t fd = OpenRead(f, path);
   ASSERT_NE(fd, 0u);
@@ -380,8 +399,11 @@ TEST(FreadBinary, PackedStructReadsAsWholeValue) {
 // actually read.
 TEST(FreadBinary, UnpackedStructStopsWhenFileEndsMidStruct) {
   SysTaskFixture f;
-  SetupStruct(f, "wide_t", "w", 16, /*is_union=*/false,
-              {{"hi", 8, 8}, {"lo", 0, 8}});
+  SetupStruct(f, {.type = "wide_t",
+                  .var = "w",
+                  .total_width = 16,
+                  .is_union = false,
+                  .fields = {{"hi", 8, 8}, {"lo", 0, 8}}});
   std::string path = WriteBytes("struct_eof", {0x77});
   uint64_t fd = OpenRead(f, path);
   ASSERT_NE(fd, 0u);

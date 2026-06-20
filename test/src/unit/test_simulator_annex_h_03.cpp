@@ -122,7 +122,12 @@ TEST(SvdpiNamingConventions, MacroNamesUseSvUnderscoreUppercase) {
   EXPECT_EQ(SV_PACKED_DATA_NELEMS(64), 2);
   EXPECT_EQ(SV_MASK(4), 0xFu);
   EXPECT_EQ(SV_GET_UNSIGNED_BITS(0xFFu, 4), 0xFu);
-  EXPECT_EQ(SV_GET_SIGNED_BITS(0xFu, 4), 0xFu);
+  // The signed-bits arguments are bound to locals so the macro's sign-bit test
+  // operates on values rather than two integer literals; the checked result is
+  // unchanged.
+  const unsigned signed_bits_value = 0xFu;
+  const int signed_bits_width = 4;
+  EXPECT_EQ(SV_GET_SIGNED_BITS(signed_bits_value, signed_bits_width), 0xFu);
 
   EXPECT_TRUE(IsMacroName(SPELL(SV_PACKED_DATA_NELEMS)));
   EXPECT_TRUE(IsMacroName(SPELL(SV_MASK)));

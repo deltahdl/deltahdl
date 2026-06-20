@@ -108,34 +108,33 @@ TEST(AbstractGrammar, AssertionProductionForms) {
 // production carries exactly the category §F.3.3 assigns to its letter. This
 // ties the abstract grammar to the notation that describes it.
 TEST(AbstractGrammar, ProductionCategoriesMatchNotation) {
-  const auto r_category = ClassifyAnnexFNotation("R");
-  ASSERT_TRUE(r_category.has_value());
+  const auto kRCategory = ClassifyAnnexFNotation("R");
+  ASSERT_TRUE(kRCategory.has_value());
   EXPECT_EQ(CategoryOfProduction(GrammarProduction::kUnclockedSequence),
-            r_category.value());
-  const auto s_category = ClassifyAnnexFNotation("S");
-  ASSERT_TRUE(s_category.has_value());
+            *kRCategory);
+  const auto kSCategory = ClassifyAnnexFNotation("S");
+  ASSERT_TRUE(kSCategory.has_value());
   EXPECT_EQ(CategoryOfProduction(GrammarProduction::kClockedSequence),
-            s_category.value());
-  const auto p_category = ClassifyAnnexFNotation("P");
-  ASSERT_TRUE(p_category.has_value());
+            *kSCategory);
+  const auto kPCategory = ClassifyAnnexFNotation("P");
+  ASSERT_TRUE(kPCategory.has_value());
   EXPECT_EQ(CategoryOfProduction(GrammarProduction::kUnclockedProperty),
-            p_category.value());
-  const auto q_category = ClassifyAnnexFNotation("Q");
-  ASSERT_TRUE(q_category.has_value());
+            *kPCategory);
+  const auto kQCategory = ClassifyAnnexFNotation("Q");
+  ASSERT_TRUE(kQCategory.has_value());
   EXPECT_EQ(CategoryOfProduction(GrammarProduction::kClockedProperty),
-            q_category.value());
-  const auto t_category = ClassifyAnnexFNotation("T");
-  ASSERT_TRUE(t_category.has_value());
+            *kQCategory);
+  const auto kTCategory = ClassifyAnnexFNotation("T");
+  ASSERT_TRUE(kTCategory.has_value());
   EXPECT_EQ(CategoryOfProduction(GrammarProduction::kUnclockedTopLevelProperty),
-            t_category.value());
-  const auto u_category = ClassifyAnnexFNotation("U");
-  ASSERT_TRUE(u_category.has_value());
+            *kTCategory);
+  const auto kUCategory = ClassifyAnnexFNotation("U");
+  ASSERT_TRUE(kUCategory.has_value());
   EXPECT_EQ(CategoryOfProduction(GrammarProduction::kClockedTopLevelProperty),
-            u_category.value());
-  const auto a_category = ClassifyAnnexFNotation("A");
-  ASSERT_TRUE(a_category.has_value());
-  EXPECT_EQ(CategoryOfProduction(GrammarProduction::kAssertion),
-            a_category.value());
+            *kUCategory);
+  const auto kACategory = ClassifyAnnexFNotation("A");
+  ASSERT_TRUE(kACategory.has_value());
+  EXPECT_EQ(CategoryOfProduction(GrammarProduction::kAssertion), *kACategory);
 }
 
 // §F.3.2: each R form is representable in the shared sequence model and keeps

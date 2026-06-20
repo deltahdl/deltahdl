@@ -6,22 +6,31 @@ using namespace delta;
 
 namespace {
 
-// Elaborates and runs `src`, then fills the four element pointers of a 2x2
-// integer array named `arr`. Returns void; callers ASSERT on the pointers and
-// their values to keep each test's distinct expectations local.
-void RunAndFetch2x2(const std::string& src, SimFixture& f, Variable** e00,
-                    Variable** e01, Variable** e10, Variable** e11) {
+// The four element pointers of a 2x2 integer array named `arr`.
+struct Array2x2 {
+  Variable* e00 = nullptr;
+  Variable* e01 = nullptr;
+  Variable* e10 = nullptr;
+  Variable* e11 = nullptr;
+};
+
+// Elaborates and runs `src`, then returns the four element pointers of a 2x2
+// integer array named `arr`. Callers ASSERT on the pointers and their values to
+// keep each test's distinct expectations local.
+Array2x2 RunAndFetch2x2(const std::string& src, SimFixture& f) {
   auto* design = ElaborateSrc(src, f);
-  ASSERT_NE(design, nullptr);
+  EXPECT_NE(design, nullptr);
   LowerAndRun(design, f);
-  *e00 = f.ctx.FindVariable("arr[0][0]");
-  *e01 = f.ctx.FindVariable("arr[0][1]");
-  *e10 = f.ctx.FindVariable("arr[1][0]");
-  *e11 = f.ctx.FindVariable("arr[1][1]");
-  ASSERT_NE(*e00, nullptr);
-  ASSERT_NE(*e01, nullptr);
-  ASSERT_NE(*e10, nullptr);
-  ASSERT_NE(*e11, nullptr);
+  Array2x2 out;
+  out.e00 = f.ctx.FindVariable("arr[0][0]");
+  out.e01 = f.ctx.FindVariable("arr[0][1]");
+  out.e10 = f.ctx.FindVariable("arr[1][0]");
+  out.e11 = f.ctx.FindVariable("arr[1][1]");
+  EXPECT_NE(out.e00, nullptr);
+  EXPECT_NE(out.e01, nullptr);
+  EXPECT_NE(out.e10, nullptr);
+  EXPECT_NE(out.e11, nullptr);
+  return out;
 }
 
 TEST(ArrayLiteralSim, PositionalAssignment) {
@@ -312,32 +321,38 @@ TEST(ArrayLiteralSim, WideToNarrowContextEval) {
 
 TEST(ArrayLiteralSim, PositionalMultidimensionalValues) {
   SimFixture f;
-  Variable *e00 = nullptr, *e01 = nullptr, *e10 = nullptr, *e11 = nullptr;
-  RunAndFetch2x2(
+  Array2x2 arr = RunAndFetch2x2(
       "module m;\n"
       "  int arr [0:1][0:1];\n"
       "  initial arr = '{'{1, 2}, '{3, 4}};\n"
       "endmodule\n",
-      f, &e00, &e01, &e10, &e11);
-  EXPECT_EQ(e00->value.ToUint64(), 1u);
-  EXPECT_EQ(e01->value.ToUint64(), 2u);
-  EXPECT_EQ(e10->value.ToUint64(), 3u);
-  EXPECT_EQ(e11->value.ToUint64(), 4u);
+      f);
+  ASSERT_NE(arr.e00, nullptr);
+  ASSERT_NE(arr.e01, nullptr);
+  ASSERT_NE(arr.e10, nullptr);
+  ASSERT_NE(arr.e11, nullptr);
+  EXPECT_EQ(arr.e00->value.ToUint64(), 1u);
+  EXPECT_EQ(arr.e01->value.ToUint64(), 2u);
+  EXPECT_EQ(arr.e10->value.ToUint64(), 3u);
+  EXPECT_EQ(arr.e11->value.ToUint64(), 4u);
 }
 
 TEST(ArrayLiteralSim, DefaultMultidimensionalValues) {
   SimFixture f;
-  Variable *e00 = nullptr, *e01 = nullptr, *e10 = nullptr, *e11 = nullptr;
-  RunAndFetch2x2(
+  Array2x2 arr = RunAndFetch2x2(
       "module m;\n"
       "  int arr [0:1][0:1];\n"
       "  initial arr = '{default: '{default: 42}};\n"
       "endmodule\n",
-      f, &e00, &e01, &e10, &e11);
-  EXPECT_EQ(e00->value.ToUint64(), 42u);
-  EXPECT_EQ(e01->value.ToUint64(), 42u);
-  EXPECT_EQ(e10->value.ToUint64(), 42u);
-  EXPECT_EQ(e11->value.ToUint64(), 42u);
+      f);
+  ASSERT_NE(arr.e00, nullptr);
+  ASSERT_NE(arr.e01, nullptr);
+  ASSERT_NE(arr.e10, nullptr);
+  ASSERT_NE(arr.e11, nullptr);
+  EXPECT_EQ(arr.e00->value.ToUint64(), 42u);
+  EXPECT_EQ(arr.e01->value.ToUint64(), 42u);
+  EXPECT_EQ(arr.e10->value.ToUint64(), 42u);
+  EXPECT_EQ(arr.e11->value.ToUint64(), 42u);
 }
 
 // §10.9.1: a type key sets every element whose type matches it and that an

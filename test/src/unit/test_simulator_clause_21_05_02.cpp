@@ -40,24 +40,38 @@ TEST(IoSystemTaskTest, TwoStateIntegerArrayIsWritten) {
   std::remove(path.c_str());
 }
 
-// Registers an enum type `tname` with members carrying explicit ordinal values,
-// and marks each element of array `name` as that enum type, so the array is a
-// genuine unpacked array of an enumerated type.
-void SetupEnumMem(SimFixture& f, const char* name, const char* tname,
-                  const std::vector<std::pair<const char*, uint64_t>>& members,
-                  int lo, int size, uint32_t width) {
+// Registers an enum type `tname` carrying the explicit ordinal member values.
+void RegisterEnum(
+    SimFixture& f, const char* tname,
+    const std::vector<std::pair<const char*, uint64_t>>& members) {
   EnumTypeInfo info;
   info.type_name = tname;
   for (auto& m : members) {
     info.members.push_back({m.first, m.second});
   }
   f.ctx.RegisterEnumType(tname, info);
-  SetupMem(f, name, lo, size, width, /*four_state=*/false);
+}
+
+// Marks each element of array `name` (indices lo..lo+size-1) as enum type
+// `tname`, so the array is a genuine unpacked array of an enumerated type.
+void MarkArrayElementsEnum(SimFixture& f, const char* name, const char* tname,
+                           int lo, int size) {
   for (int i = 0; i < size; ++i) {
     std::string nm = std::string(name) + "[" + std::to_string(lo + i) + "]";
     auto* s = f.arena.AllocString(nm.c_str(), nm.size());
     f.ctx.SetVariableEnumType(std::string_view(s, nm.size()), tname);
   }
+}
+
+// Registers an enum type `tname` with members carrying explicit ordinal values,
+// and marks each element of array `name` as that enum type, so the array is a
+// genuine unpacked array of an enumerated type.
+void SetupEnumMem(SimFixture& f, const char* name, const char* tname,
+                  const std::vector<std::pair<const char*, uint64_t>>& members,
+                  int lo, int size, uint32_t width) {
+  RegisterEnum(f, tname, members);
+  SetupMem(f, name, lo, size, width, /*four_state=*/false);
+  MarkArrayElementsEnum(f, name, tname, lo, size);
 }
 
 // §21.5.2: for an enumerated array, the file holds each element's ordinal value

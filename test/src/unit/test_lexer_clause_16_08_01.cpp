@@ -12,9 +12,9 @@ TEST(UntypedKeyword, RecognizedAsKwUntyped) {
   // marks the formal as truly untyped. The lexer must recognize it as a
   // dedicated keyword token, not as a plain identifier — otherwise the
   // parser cannot distinguish "untyped" from a user type alias.
-  auto kind = LookupKeyword("untyped");
+  const auto kind = LookupKeyword("untyped");
   ASSERT_TRUE(kind.has_value());
-  EXPECT_EQ(kind.value(), TokenKind::kKwUntyped);
+  EXPECT_EQ(*kind, TokenKind::kKwUntyped);
 }
 
 }  // namespace

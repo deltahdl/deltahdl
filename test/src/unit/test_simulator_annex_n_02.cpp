@@ -106,32 +106,48 @@ double RefErlangian(int32_t* seed, int32_t k, int32_t mean) {
 }
 
 int32_t RoundDistResult(double r) {
-  if (r >= 0) return static_cast<int32_t>(r + 0.5);
-  r = -r;
-  return -static_cast<int32_t>(r + 0.5);
+  // Round half away from zero, matching the §N.2 reference's
+  // (int)(r + 0.5) / -(int)(-r + 0.5) idiom. std::lround rounds halves away
+  // from zero, so it reproduces both the positive and negative branches.
+  return static_cast<int32_t>(std::lround(r));
+}
+
+// §N.2 reference's truncation-toward-the-draw step: positive draws truncate
+// directly, negative draws subtract one before truncating.
+int32_t DistTruncate(double r) {
+  return r >= 0 ? static_cast<int32_t>(r) : static_cast<int32_t>(r - 1);
+}
+
+// §N.2 rtl_dist_uniform, common (end != INT32_MAX) branch.
+int32_t RtlDistUniformIncEnd(int32_t* seed, int32_t start, int32_t end) {
+  end++;
+  int32_t i = DistTruncate(RefUniform(seed, start, end));
+  if (i < start) i = start;
+  if (i >= end) i = end - 1;
+  return i;
+}
+
+// §N.2 rtl_dist_uniform, end-at-INT32_MAX branch (decrements start).
+int32_t RtlDistUniformDecStart(int32_t* seed, int32_t start, int32_t end) {
+  start--;
+  int32_t i = DistTruncate(RefUniform(seed, start, end) + 1.0);
+  if (i <= start) i = start + 1;
+  if (i > end) i = end;
+  return i;
+}
+
+// §N.2 rtl_dist_uniform, full signed-range branch (rescales the draw).
+int32_t RtlDistUniformFullRange(int32_t* seed, int32_t start, int32_t end) {
+  double r = (RefUniform(seed, start, end) + 2147483648.0) / 4294967295.0;
+  r = r * 4294967296.0 - 2147483648.0;
+  return DistTruncate(r);
 }
 
 int32_t RtlDistUniform(int32_t* seed, int32_t start, int32_t end) {
   if (start >= end) return start;
-  int32_t i = 0;
-  if (end != INT32_MAX) {
-    end++;
-    double r = RefUniform(seed, start, end);
-    i = r >= 0 ? static_cast<int32_t>(r) : static_cast<int32_t>(r - 1);
-    if (i < start) i = start;
-    if (i >= end) i = end - 1;
-  } else if (start != INT32_MIN) {
-    start--;
-    double r = RefUniform(seed, start, end) + 1.0;
-    i = r >= 0 ? static_cast<int32_t>(r) : static_cast<int32_t>(r - 1);
-    if (i <= start) i = start + 1;
-    if (i > end) i = end;
-  } else {
-    double r = (RefUniform(seed, start, end) + 2147483648.0) / 4294967295.0;
-    r = r * 4294967296.0 - 2147483648.0;
-    i = r >= 0 ? static_cast<int32_t>(r) : static_cast<int32_t>(r - 1);
-  }
-  return i;
+  if (end != INT32_MAX) return RtlDistUniformIncEnd(seed, start, end);
+  if (start != INT32_MIN) return RtlDistUniformDecStart(seed, start, end);
+  return RtlDistUniformFullRange(seed, start, end);
 }
 
 int32_t RtlDistNormal(int32_t* seed, int32_t mean, int32_t sd) {

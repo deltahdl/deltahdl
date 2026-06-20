@@ -55,9 +55,9 @@ TEST(ConstEval, RightShiftSignedVersusLogicalFill) {
   EXPECT_EQ(ConstEvalInt(ParseExprFrom("(-8) >>> 1", f)), -4);
   auto logical = ConstEvalInt(ParseExprFrom("(-8) >> 1", f));
   ASSERT_TRUE(logical.has_value());
-  const auto logical_value = logical.value();
-  EXPECT_NE(logical_value, -4);
-  EXPECT_GT(logical_value, 0);
+  const auto kLogicalValue = *logical;
+  EXPECT_NE(kLogicalValue, -4);
+  EXPECT_GT(kLogicalValue, 0);
 }
 
 TEST(ConstEval, LeftShiftAndArithLeftShiftEquivalent) {

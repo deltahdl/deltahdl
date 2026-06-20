@@ -161,7 +161,7 @@ bool PrecompiledLibrary::Load(const std::filesystem::path& path,
     std::string library;
     std::string source;
     if (!ReadRecord(is, library, source)) return false;
-    if (!LoadRecord(path, std::move(library), std::move(source), ctx)) {
+    if (!LoadRecord(path, library, source, ctx)) {
       return false;
     }
   }

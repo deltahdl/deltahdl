@@ -4,6 +4,21 @@ using namespace delta;
 
 namespace {
 
+RtlirParamDecl* FindParamUnderChild(RtlirModule* parent,
+                                    std::string_view inst_name,
+                                    std::string_view param_name) {
+  for (auto& child : parent->children) {
+    if (child.inst_name == inst_name && child.resolved) {
+      for (auto& q : child.resolved->params) {
+        if (q.name == param_name) {
+          return &q;
+        }
+      }
+    }
+  }
+  return nullptr;
+}
+
 TEST(ElaborationOrder, GenerateConditionObservesInstanceParameterOverride) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -97,17 +112,7 @@ TEST(ElaborationOrder, DefparamResolvesTargetCreatedByGenerate) {
   EXPECT_FALSE(f.has_errors);
   auto* u = design->top_modules[0]->children[0].resolved;
   ASSERT_NE(u, nullptr);
-  RtlirParamDecl* p = nullptr;
-  for (auto& child : u->children) {
-    if (child.inst_name == "i1" && child.resolved) {
-      for (auto& q : child.resolved->params) {
-        if (q.name == "P") {
-          p = &q;
-          break;
-        }
-      }
-    }
-  }
+  RtlirParamDecl* p = FindParamUnderChild(u, "i1", "P");
   ASSERT_NE(p, nullptr);
   EXPECT_TRUE(p->is_resolved);
   EXPECT_EQ(p->resolved_value, 99);

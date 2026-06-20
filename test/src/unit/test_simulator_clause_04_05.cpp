@@ -93,36 +93,54 @@ TEST(SimulationAlgorithmSim, ExecuteRegionDrainsAllEventsInFIFOOrder) {
   }
 }
 
+// One stage of a cascading event chain: a region to schedule into and the
+// label the stage records when it runs.
+struct CascadeStage {
+  Region region;
+  const char* label;
+};
+
+// Builds a chain of events from `stages` such that the first stage's callback
+// records its label and schedules the second stage in the current time slot,
+// the second schedules the third, and so on. The first stage is scheduled into
+// its own region at time {0}; each later stage is scheduled (in the current
+// time slot) from within the preceding stage's callback. Returns nothing; the
+// chain is wired into `sched`.
+void ScheduleReactiveCascade(Scheduler& sched, std::vector<std::string>& order,
+                             const std::vector<CascadeStage>& stages) {
+  // Build callbacks back-to-front so each stage can capture an already-wired
+  // pointer to the next stage's event.
+  std::vector<Event*> events(stages.size(), nullptr);
+  for (size_t idx = stages.size(); idx-- > 0;) {
+    Event* ev = sched.GetEventPool().Acquire();
+    events[idx] = ev;
+    const char* label = stages[idx].label;
+    if (idx + 1 == stages.size()) {
+      ev->callback = [&order, label]() { order.push_back(label); };
+    } else {
+      Event* next = events[idx + 1];
+      Region next_region = stages[idx + 1].region;
+      ev->callback = [&order, &sched, label, next, next_region]() {
+        order.push_back(label);
+        sched.ScheduleEvent(sched.CurrentTime(), next_region, next);
+      };
+    }
+  }
+  sched.ScheduleEvent({0}, stages.front().region, events.front());
+}
+
 TEST(SimulationAlgorithmSim,
      PrePostponedWaitsForCascadeThroughAllFiveReactiveRegions) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
 
-  auto* reactive = sched.GetEventPool().Acquire();
-  reactive->callback = [&]() {
-    order.push_back("reactive");
-    auto* re_inactive = sched.GetEventPool().Acquire();
-    re_inactive->callback = [&]() {
-      order.push_back("re_inactive");
-      auto* pre_re_nba = sched.GetEventPool().Acquire();
-      pre_re_nba->callback = [&]() {
-        order.push_back("pre_re_nba");
-        auto* re_nba = sched.GetEventPool().Acquire();
-        re_nba->callback = [&]() {
-          order.push_back("re_nba");
-          auto* post_re_nba = sched.GetEventPool().Acquire();
-          post_re_nba->callback = [&]() { order.push_back("post_re_nba"); };
-          sched.ScheduleEvent(sched.CurrentTime(), Region::kPostReNBA,
-                              post_re_nba);
-        };
-        sched.ScheduleEvent(sched.CurrentTime(), Region::kReNBA, re_nba);
-      };
-      sched.ScheduleEvent(sched.CurrentTime(), Region::kPreReNBA, pre_re_nba);
-    };
-    sched.ScheduleEvent(sched.CurrentTime(), Region::kReInactive, re_inactive);
-  };
-  sched.ScheduleEvent({0}, Region::kReactive, reactive);
+  ScheduleReactiveCascade(sched, order,
+                          {{Region::kReactive, "reactive"},
+                           {Region::kReInactive, "re_inactive"},
+                           {Region::kPreReNBA, "pre_re_nba"},
+                           {Region::kReNBA, "re_nba"},
+                           {Region::kPostReNBA, "post_re_nba"}});
 
   auto* pp = sched.GetEventPool().Acquire();
   pp->callback = [&]() { order.push_back("pre_postponed"); };
