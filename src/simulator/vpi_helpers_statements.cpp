@@ -186,6 +186,31 @@ VpiHandle VpiLoopConditionExpr(VpiHandle loop) {
   return nullptr;
 }
 
+VpiHandle VpiDoWhileConditionExpr(VpiHandle loop) {
+  // §37.66: a do-while statement reaches its controlling condition through
+  // vpiCondition. As with the other loops, the condition is found as the first
+  // expression child, whose own type is an expression kind rather than the
+  // vpiCondition relation tag. Null when none is attached.
+  if (!loop) return nullptr;
+  for (auto* child : loop->children) {
+    if (VpiIsExprType(child->type)) return child;
+  }
+  return nullptr;
+}
+
+VpiHandle VpiReturnConditionExpr(VpiHandle return_stmt) {
+  // §37.78: a return statement reaches the value it returns through
+  // vpiCondition - the single edge the return statement diagram draws. The
+  // value's own type is an expression kind rather than the vpiCondition
+  // relation tag, so it is found as the first expression child. A return that
+  // yields no value (a void function or task return) reports null.
+  if (!return_stmt) return nullptr;
+  for (auto* child : return_stmt->children) {
+    if (VpiIsExprType(child->type)) return child;
+  }
+  return nullptr;
+}
+
 bool VpiIsWaitType(int type) {
   // §37.67: the wait statements the diagram groups under the abstract "waits"
   // label - a wait, an ordered wait, and a wait fork. All three reach a body

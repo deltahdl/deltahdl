@@ -58,7 +58,10 @@ struct ClassTypeInfo {
 
   std::vector<VTableEntry> vtable;
 
-  std::unordered_map<std::string, Logic4Vec> static_properties;
+  // §8.9: static class properties are shared state that changes at run time,
+  // even though the type descriptor itself is referenced as const. mutable lets
+  // a const ClassTypeInfo* update the shared values.
+  mutable std::unordered_map<std::string, Logic4Vec> static_properties;
 
   std::unordered_map<std::string, uint64_t> enum_members;
 

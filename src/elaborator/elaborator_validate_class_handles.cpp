@@ -320,7 +320,11 @@ void Elaborator::WalkStmtsForClassHandleOps(const Stmt* s) {
       }
     }
 
-    if (s->rhs && s->rhs->kind == ExprKind::kLiteral) {
+    if (s->rhs && (s->rhs->kind == ExprKind::kIntegerLiteral ||
+                   s->rhs->kind == ExprKind::kRealLiteral ||
+                   s->rhs->kind == ExprKind::kTimeLiteral ||
+                   s->rhs->kind == ExprKind::kStringLiteral ||
+                   s->rhs->kind == ExprKind::kUnbasedUnsizedLiteral)) {
       diag_.Error(s->range.start,
                   "cannot assign non-class value to class object handle");
     }

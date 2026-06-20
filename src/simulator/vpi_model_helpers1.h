@@ -630,6 +630,15 @@ bool VpiIsWhileOrRepeatType(int type);
 // public vpi_handle(vpiCondition, while/repeat) dispatch.
 VpiHandle VpiLoopConditionExpr(VpiHandle loop);
 
+// §37.66: the controlling condition a do-while statement reaches through
+// vpiCondition, found as its first expression child (the value's own type is an
+// expression kind, not the vpiCondition tag). Null when none is attached.
+VpiHandle VpiDoWhileConditionExpr(VpiHandle loop);
+
+// §37.78: the value a return statement yields, reached through vpiCondition and
+// found as the statement's first expression child. Null for a valueless return.
+VpiHandle VpiReturnConditionExpr(VpiHandle return_stmt);
+
 // §37.67 Waits: whether an object kind is one of the wait statements the
 // diagram groups under "waits" - a wait, an ordered wait, or a wait fork. The
 // grouping shares a body statement (vpiStmt) and, for the wait and ordered

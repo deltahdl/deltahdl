@@ -73,7 +73,7 @@ Logic4Vec EvalClassNew(std::string_view class_type, const Expr* new_expr,
   obj->type = info;
 
   std::vector<const ClassTypeInfo*> chain;
-  for (auto* cur = info; cur; cur = cur->parent) chain.push_back(cur);
+  for (const auto* cur = info; cur; cur = cur->parent) chain.push_back(cur);
   std::reverse(chain.begin(), chain.end());
 
   auto handle = ctx.AllocateClassObject(obj);

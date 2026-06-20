@@ -61,7 +61,7 @@ struct DelayAwaiter {
     auto region = SelectDelayRegion();
     auto* event = ctx.GetScheduler().GetEventPool().Acquire();
     auto* proc = ctx.CurrentProcess();
-    event->callback = [h, proc, &ctx]() mutable {
+    event->callback = [h, proc, &ctx = ctx]() mutable {
       if (proc && !proc->active) return;
 
       if (proc && proc->is_suspended) return;
