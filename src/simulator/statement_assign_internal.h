@@ -8,6 +8,7 @@
 namespace delta {
 
 struct Expr;
+struct Stmt;
 class SimContext;
 class Arena;
 enum class DataTypeKind : uint8_t;
@@ -18,6 +19,25 @@ enum class DataTypeKind : uint8_t;
 
 // Defined in statement_assign_core.cpp.
 void CoerceTo2State(Logic4Vec& v);
+
+// Defined in statement_assign_core.cpp; also used by the §11.4.2 nonblocking
+// path in statement_assign_nonblocking.cpp. Convert the rhs value when the lhs
+// and rhs differ in real-ness or real width before a write.
+Logic4Vec ConvertRealOnAssign(Logic4Vec rhs_val, const Expr* lhs,
+                              uint32_t target_width, SimContext& ctx,
+                              Arena& arena);
+
+// Defined in statement_assign_core.cpp; also used by the §11.4.2 nonblocking
+// path in statement_assign_nonblocking.cpp. Evaluate the rhs with the lhs as
+// the assignment context (width and, for named patterns, struct type).
+Logic4Vec EvalRhsWithStructContext(const Stmt* stmt, SimContext& ctx,
+                                   Arena& arena);
+
+// Defined in statement_assign_core.cpp; also used by the §11.4.2 nonblocking
+// path in statement_assign_nonblocking.cpp. §11.4.14: left-align a streaming
+// concatenation source in a wider fixed-size target.
+Logic4Vec ApplyStreamPackToTargetWidening(const Stmt* stmt, Logic4Vec rhs_val,
+                                          SimContext& ctx, Arena& arena);
 
 // Defined in statement_assign_stream.cpp.
 void UnpackStreamingConcatLhs(const Expr* lhs, const Logic4Vec& rhs_val,

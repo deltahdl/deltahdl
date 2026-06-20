@@ -22,6 +22,7 @@ add_library(deltahdl_lib STATIC
     parser/expr_parser_patterns.cpp
     parser/parser_stmt.cpp
     parser/parser_assert.cpp
+    parser/parser_sequence_property_decl.cpp
     parser/sequence_operator_precedence.cpp
     parser/parser_clocking.cpp
     parser/parser_verify.cpp
@@ -102,6 +103,7 @@ add_library(deltahdl_lib STATIC
     elaborator/elaborator_validate_classes.cpp
     elaborator/elaborator_validate_operations.cpp
     elaborator/elaborator_validate_types.cpp
+    elaborator/elaborator_validate_struct_types.cpp
     elaborator/type_eval.cpp
     elaborator/const_eval.cpp
     elaborator/sensitivity.cpp
@@ -127,7 +129,9 @@ add_library(deltahdl_lib STATIC
     simulator/stmt_exec.cpp
     simulator/statement_assign.cpp
     simulator/statement_assign_core.cpp
+    simulator/statement_assign_nonblocking.cpp
     simulator/lowerer.cpp
+    simulator/lowerer_import.cpp
     simulator/vcd_writer.cpp
     simulator/adv_sim.cpp
     simulator/vpi.cpp
@@ -207,6 +211,7 @@ add_library(deltahdl_lib STATIC
     simulator/eval_systask_pla.cpp
     simulator/eval_systask_query.cpp
     simulator/eval_systask_readmem.cpp
+    simulator/eval_systask_writemem.cpp
     simulator/eval_systask_verif.cpp
     simulator/eval_system_func.cpp
     simulator/eval_system_task.cpp

@@ -1,0 +1,192 @@
+#include <algorithm>
+#include <string>
+#include <string_view>
+#include <unordered_set>
+#include <vector>
+
+#include "common/arena.h"
+#include "common/diagnostic.h"
+#include "elaborator/rtlir.h"
+#include "elaborator/sensitivity.h"
+#include "parser/ast.h"
+#include "simulator/awaiters.h"
+#include "simulator/class_object.h"
+#include "simulator/evaluation.h"
+#include "simulator/lowerer.h"
+#include "simulator/net.h"
+#include "simulator/process.h"
+#include "simulator/sim_context.h"
+#include "simulator/statement_assign.h"
+#include "simulator/stmt_exec.h"
+
+namespace delta {
+
+PackageDecl* Lowerer::FindPackage(std::string_view name) const {
+  if (!design_) return nullptr;
+  for (auto* pkg : design_->packages) {
+    if (pkg->name == name) return pkg;
+  }
+  return nullptr;
+}
+
+void Lowerer::LowerPackageItem(ModuleItem* item) {
+  if (item->kind == ModuleItemKind::kClassDecl && item->class_decl) {
+    if (!ctx_.FindClassType(item->class_decl->name)) {
+      LowerClassDecl(item->class_decl);
+    }
+  } else if (item->kind == ModuleItemKind::kFunctionDecl ||
+             item->kind == ModuleItemKind::kTaskDecl) {
+    if (!ctx_.FindFunction(item->name)) {
+      ctx_.RegisterFunction(item->name, item);
+    }
+  }
+}
+
+static bool PackageItemHasName(const ModuleItem* item, std::string_view name) {
+  if (item->name == name) return true;
+  if (item->kind == ModuleItemKind::kClassDecl && item->class_decl &&
+      item->class_decl->name == name)
+    return true;
+  return false;
+}
+
+static bool IsImportOrExportDecl(const ModuleItem* item) {
+  return item->kind == ModuleItemKind::kImportDecl ||
+         item->kind == ModuleItemKind::kExportDecl;
+}
+
+static ModuleItem* FindNamedPackageItem(PackageDecl* pkg,
+                                        std::string_view name) {
+  for (auto* item : pkg->items) {
+    if (IsImportOrExportDecl(item)) continue;
+    if (PackageItemHasName(item, name)) return item;
+  }
+  return nullptr;
+}
+
+// Collects the package names imported by `pkg`, which a wildcard ("*")
+// export re-exports from. The caller resolves each name and recurses.
+static std::vector<std::string_view> WildcardExportImportNames(
+    const PackageDecl* pkg) {
+  std::vector<std::string_view> names;
+  for (auto* imp_item : pkg->items) {
+    if (imp_item->kind != ModuleItemKind::kImportDecl) continue;
+    names.push_back(imp_item->import_item.package_name);
+  }
+  return names;
+}
+
+void Lowerer::LowerImportedName(
+    PackageDecl* pkg, std::string_view name,
+    std::unordered_set<const PackageDecl*>& visited) {
+  if (!visited.insert(pkg).second) return;
+  if (auto* found = FindNamedPackageItem(pkg, name)) {
+    LowerPackageItem(found);
+    return;
+  }
+
+  auto recurse = [&](std::string_view pkg_name) {
+    auto* src = FindPackage(pkg_name);
+    if (!src) return;
+    auto sub = visited;
+    LowerImportedName(src, name, sub);
+  };
+  auto handle_export = [&](const ImportItem& ex) {
+    if (ex.package_name == "*") {
+      for (std::string_view src_name : WildcardExportImportNames(pkg))
+        recurse(src_name);
+    } else if (ex.is_wildcard || ex.item_name == name) {
+      recurse(ex.package_name);
+    }
+  };
+
+  for (auto* item : pkg->items) {
+    if (item->kind != ModuleItemKind::kExportDecl) continue;
+    handle_export(item->import_item);
+  }
+}
+
+void Lowerer::LowerAllImported(
+    PackageDecl* pkg, std::unordered_set<const PackageDecl*>& visited) {
+  if (!visited.insert(pkg).second) return;
+  for (auto* item : pkg->items) {
+    if (IsImportOrExportDecl(item)) continue;
+    LowerPackageItem(item);
+  }
+
+  auto recurse_all = [&](PackageDecl* src) {
+    auto sub = visited;
+    LowerAllImported(src, sub);
+  };
+  auto handle_export = [&](const ImportItem& ex) {
+    if (ex.package_name == "*") {
+      for (std::string_view src_name : WildcardExportImportNames(pkg)) {
+        if (auto* src = FindPackage(src_name)) recurse_all(src);
+      }
+      return;
+    }
+    auto* src = FindPackage(ex.package_name);
+    if (!src) return;
+    if (ex.is_wildcard) {
+      recurse_all(src);
+    } else {
+      auto sub = visited;
+      LowerImportedName(src, ex.item_name, sub);
+    }
+  };
+
+  for (auto* item : pkg->items) {
+    if (item->kind != ModuleItemKind::kExportDecl) continue;
+    handle_export(item->import_item);
+  }
+}
+
+static void AliasPackageDataItem(const PackageDecl* pkg, const ModuleItem* item,
+                                 SimContext& ctx) {
+  bool is_param = item->kind == ModuleItemKind::kParamDecl;
+  bool is_var = item->kind == ModuleItemKind::kVarDecl;
+  if (!(is_param || is_var) || !item->init_expr) return;
+  if (ctx.FindVariable(item->name)) return;
+  std::string qname = std::string(pkg->name) + "." + std::string(item->name);
+  ctx.AliasVariable(item->name, qname);
+}
+
+static void AliasAllPackageDataItems(const PackageDecl* pkg, SimContext& ctx) {
+  for (const auto* item : pkg->items) AliasPackageDataItem(pkg, item, ctx);
+}
+
+static void AliasNamedPackageDataItem(const PackageDecl* pkg,
+                                      std::string_view item_name,
+                                      SimContext& ctx) {
+  for (const auto* item : pkg->items) {
+    if (item->name == item_name) AliasPackageDataItem(pkg, item, ctx);
+  }
+}
+
+void Lowerer::LowerImports(const RtlirModule* mod) {
+  auto apply_import = [&](const RtlirImport& imp) {
+    auto* pkg = FindPackage(imp.package_name);
+    if (!pkg) return;
+    std::unordered_set<const PackageDecl*> visited;
+    if (imp.is_wildcard) {
+      LowerAllImported(pkg, visited);
+      AliasAllPackageDataItems(pkg, ctx_);
+    } else {
+      LowerImportedName(pkg, imp.item_name, visited);
+      AliasNamedPackageDataItem(pkg, imp.item_name, ctx_);
+    }
+  };
+
+  // §26.5: an explicit import of a name takes precedence over a wildcard import
+  // of the same name. Because alias_data_item lets the first binding of a name
+  // win, the explicitly imported names must be bound before any wildcard import
+  // is applied, regardless of the order the import declarations appear in the
+  // source. Module-local declarations are materialized before LowerImports
+  // runs, so they already shadow both kinds of import.
+  for (const auto& imp : mod->imports)
+    if (!imp.is_wildcard) apply_import(imp);
+  for (const auto& imp : mod->imports)
+    if (imp.is_wildcard) apply_import(imp);
+}
+
+}  // namespace delta
