@@ -2,6 +2,67 @@
 
 namespace delta {
 
+// Builds the scoped identifier expression produced by a "$unit::id" or
+// "$root.id" system-keyword prefix (see 23.7.1 scope resolution /
+// hierarchical names). The named scope keyword is recorded in scope_prefix.
+Expr* Parser::MakeSysScopePrefix(const Token& sys_tok) {
+  auto id = ExpectIdentifier();
+  auto* expr = arena_.Create<Expr>();
+  expr->kind = ExprKind::kIdentifier;
+  expr->text = id.text;
+  expr->scope_prefix = sys_tok.text;
+  expr->range.start = sys_tok.loc;
+  return expr;
+}
+
+// Parses the trailing select/event syntax of a "$root.id..." hierarchical
+// name: any further member accesses followed by an optional bit/part select.
+Expr* Parser::ParseSysRootTail(Expr* expr) {
+  while (Check(TokenKind::kDot) || Check(TokenKind::kColonColon)) {
+    expr = MakeMemberAccess(expr);
+  }
+  if (Check(TokenKind::kLBracket)) expr = ParseSelectExpr(expr);
+  return expr;
+}
+
+// Consumes one "@event" clocking-event argument. Annex C.2.2: the clocking
+// event argument to $sampled was removed, so $sampled no longer accepts one
+// (other sampled value functions still take a clocking event, see 16.9.3).
+void Parser::ParseSysClockingEventArg(Expr* call) {
+  if (call->callee == "$sampled") {
+    diag_.Error(CurrentLoc(),
+                "$sampled does not accept a clocking event argument");
+  }
+  Consume();
+  if (Match(TokenKind::kLParen)) {
+    ParseEventList();
+    Expect(TokenKind::kRParen);
+  } else {
+    Consume();
+  }
+}
+
+// Parses the comma-separated argument list, appending each argument (or
+// nullptr for an empty slot) to call->args; an "@event" terminates the list.
+void Parser::ParseSysCallArgs(Expr* call) {
+  if (Check(TokenKind::kComma)) {
+    call->args.push_back(nullptr);
+  } else {
+    call->args.push_back(ParseExpr());
+  }
+  while (Match(TokenKind::kComma)) {
+    if (Check(TokenKind::kAt)) {
+      ParseSysClockingEventArg(call);
+      break;
+    }
+    if (Check(TokenKind::kComma) || Check(TokenKind::kRParen)) {
+      call->args.push_back(nullptr);
+    } else {
+      call->args.push_back(ParseExpr());
+    }
+  }
+}
+
 Expr* Parser::ParseSystemCall() {
   auto tok = Consume();
 
@@ -9,36 +70,13 @@ Expr* Parser::ParseSystemCall() {
     diag_.Error(tok.loc, "timing check cannot appear in procedural code");
   }
 
-  // Builds the scoped identifier expression produced by a "$unit::id" or
-  // "$root.id" system-keyword prefix (see 23.7.1 scope resolution /
-  // hierarchical names). The named scope keyword is recorded in scope_prefix.
-  auto make_scope_prefix = [&]() -> Expr* {
-    auto id = ExpectIdentifier();
-    auto* expr = arena_.Create<Expr>();
-    expr->kind = ExprKind::kIdentifier;
-    expr->text = id.text;
-    expr->scope_prefix = tok.text;
-    expr->range.start = tok.loc;
-    return expr;
-  };
-
-  // Parses the trailing select/event syntax of a "$root.id..." hierarchical
-  // name: any further member accesses followed by an optional bit/part select.
-  auto parse_root_tail = [&](Expr* expr) -> Expr* {
-    while (Check(TokenKind::kDot) || Check(TokenKind::kColonColon)) {
-      expr = MakeMemberAccess(expr);
-    }
-    if (Check(TokenKind::kLBracket)) expr = ParseSelectExpr(expr);
-    return expr;
-  };
-
   if (tok.text == "$unit" && Check(TokenKind::kColonColon)) {
     Consume();
-    return make_scope_prefix();
+    return MakeSysScopePrefix(tok);
   }
   if (tok.text == "$root" && Check(TokenKind::kDot)) {
     Consume();
-    return parse_root_tail(make_scope_prefix());
+    return ParseSysRootTail(MakeSysScopePrefix(tok));
   }
 
   auto* call = arena_.Create<Expr>();
@@ -47,49 +85,8 @@ Expr* Parser::ParseSystemCall() {
   call->range.start = tok.loc;
   if (!Match(TokenKind::kLParen)) return call;
 
-  // Consumes one "@event" clocking-event argument. Annex C.2.2: the clocking
-  // event argument to $sampled was removed, so $sampled no longer accepts one
-  // (other sampled value functions still take a clocking event, see 16.9.3).
-  auto parse_clocking_event_arg = [&] {
-    if (call->callee == "$sampled") {
-      diag_.Error(CurrentLoc(),
-                  "$sampled does not accept a clocking event argument");
-    }
-    Consume();
-    if (Match(TokenKind::kLParen)) {
-      ParseEventList();
-      Expect(TokenKind::kRParen);
-    } else {
-      Consume();
-    }
-  };
-
-  // Parses the comma-separated argument list, appending each argument (or
-  // nullptr for an empty slot) to call->args; an "@event" terminates the list.
-  auto parse_args = [&] {
-    auto append_arg = [&] {
-      if (Check(TokenKind::kComma) || Check(TokenKind::kRParen)) {
-        call->args.push_back(nullptr);
-      } else {
-        call->args.push_back(ParseExpr());
-      }
-    };
-    if (Check(TokenKind::kComma)) {
-      call->args.push_back(nullptr);
-    } else {
-      call->args.push_back(ParseExpr());
-    }
-    while (Match(TokenKind::kComma)) {
-      if (Check(TokenKind::kAt)) {
-        parse_clocking_event_arg();
-        break;
-      }
-      append_arg();
-    }
-  };
-
   if (!Check(TokenKind::kRParen)) {
-    parse_args();
+    ParseSysCallArgs(call);
   }
   Expect(TokenKind::kRParen);
   return call;

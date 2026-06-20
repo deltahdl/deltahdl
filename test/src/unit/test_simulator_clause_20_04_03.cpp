@@ -96,7 +96,7 @@ TEST(TimeformatSysTask, PercentTUsesConfiguredSuffixAndFieldWidth) {
   EvalExpr(MkTimeformatCall(f.arena, -9, 0, " ns", 12), f.ctx, f.arena);
   Logic4Vec v = MakeLogic4VecVal(f.arena, 64, 7);
   std::string out =
-      FormatDisplay("%t", {v}, /*p_fmts=*/{}, &f.ctx.GetTimeFormat());
+      FormatDisplay("%t", {v}, {.time_format = &f.ctx.GetTimeFormat()});
   EXPECT_GE(out.size(), 12u);
   EXPECT_NE(out.find(" ns"), std::string::npos);
 }
@@ -129,7 +129,7 @@ TEST(TimeformatSysTask, PercentTScalesTicksToConfiguredUnit) {
   EvalExpr(MkTimeformatCall(f.arena, -9, 2, "", 0), f.ctx, f.arena);
   Logic4Vec v = MakeLogic4VecVal(f.arena, 64, 42);
   std::string out =
-      FormatDisplay("%t", {v}, /*p_fmts=*/{}, &f.ctx.GetTimeFormat());
+      FormatDisplay("%t", {v}, {.time_format = &f.ctx.GetTimeFormat()});
   EXPECT_NE(out.find("42.00"), std::string::npos);
 }
 

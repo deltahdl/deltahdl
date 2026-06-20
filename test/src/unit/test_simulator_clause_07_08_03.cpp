@@ -11,7 +11,7 @@ namespace {
 
 TEST(ClassIndexAssocArraySimulation, ClassIndex_NullKeyValid) {
   SimFixture f;
-  auto* aa = f.ctx.CreateAssocArray("aa", 32, false, 64);
+  auto* aa = f.ctx.CreateAssocArray("aa", 32, false, AssocArraySpec{64});
   auto null_key = static_cast<int64_t>(kNullClassHandle);
   aa->int_data[null_key] = MakeLogic4VecVal(f.arena, 32, 99);
   EXPECT_EQ(aa->int_data.size(), 1u);
@@ -24,7 +24,7 @@ TEST(ClassIndexAssocArraySimulation, ClassIndex_DistinctHandles) {
   auto [h1, _1] = MakeObj(f, type);
   auto [h2, _2] = MakeObj(f, type);
 
-  auto* aa = f.ctx.CreateAssocArray("aa", 32, false, 64);
+  auto* aa = f.ctx.CreateAssocArray("aa", 32, false, AssocArraySpec{64});
   auto k1 = static_cast<int64_t>(h1);
   auto k2 = static_cast<int64_t>(h2);
   aa->int_data[k1] = MakeLogic4VecVal(f.arena, 32, 10);
@@ -40,7 +40,7 @@ TEST(ClassIndexAssocArraySimulation, ClassIndex_NullAndObjectCoexist) {
   auto* type = MakeClassType(f, "Bar", {"x"});
   auto [h1, _1] = MakeObj(f, type);
 
-  auto* aa = f.ctx.CreateAssocArray("aa", 32, false, 64);
+  auto* aa = f.ctx.CreateAssocArray("aa", 32, false, AssocArraySpec{64});
   auto null_key = static_cast<int64_t>(kNullClassHandle);
   auto obj_key = static_cast<int64_t>(h1);
   aa->int_data[null_key] = MakeLogic4VecVal(f.arena, 32, 100);
@@ -56,7 +56,7 @@ TEST(ClassIndexAssocArraySimulation, ClassIndex_OverwriteEntry) {
   auto* type = MakeClassType(f, "Key", {"v"});
   auto [h1, _1] = MakeObj(f, type);
 
-  auto* aa = f.ctx.CreateAssocArray("aa", 32, false, 64);
+  auto* aa = f.ctx.CreateAssocArray("aa", 32, false, AssocArraySpec{64});
   auto k1 = static_cast<int64_t>(h1);
   aa->int_data[k1] = MakeLogic4VecVal(f.arena, 32, 10);
   EXPECT_EQ(aa->int_data[k1].ToUint64(), 10u);
@@ -73,7 +73,7 @@ TEST(ClassIndexAssocArraySimulation, ClassIndex_DeterministicOrdering) {
   auto [h2, _2] = MakeObj(f, type);
   auto [h3, _3] = MakeObj(f, type);
 
-  auto* aa = f.ctx.CreateAssocArray("aa", 32, false, 64);
+  auto* aa = f.ctx.CreateAssocArray("aa", 32, false, AssocArraySpec{64});
 
   auto k2 = static_cast<int64_t>(h2);
   auto k3 = static_cast<int64_t>(h3);
@@ -94,7 +94,7 @@ TEST(ClassIndexAssocArraySimulation, ClassIndex_DeterministicOrdering) {
 
 TEST(ClassIndexAssocArraySimulation, ClassIndex_EmptySize) {
   SimFixture f;
-  auto* aa = f.ctx.CreateAssocArray("aa", 32, false, 64);
+  auto* aa = f.ctx.CreateAssocArray("aa", 32, false, AssocArraySpec{64});
   EXPECT_EQ(aa->Size(), 0u);
 }
 

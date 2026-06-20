@@ -367,56 +367,37 @@ bool IsStaticDeferredAssertion(const ModuleItem* item) {  // §16.4.3
 }  // namespace
 
 void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
+  if (ElaborateDeclItem(item, mod)) return;
+  ElaborateBehavioralItem(item, mod);
+}
+
+// Declarations, types, instances, and structural items (§6, §23, §25, §28).
+bool Elaborator::ElaborateDeclItem(ModuleItem* item, RtlirModule* mod) {
   auto make_implicit_net = [&](std::string_view n, SourceLoc l) {  // §6.10
     MaybeCreateImplicitNet(n, l, mod);
   };
   switch (item->kind) {
     case ModuleItemKind::kNetDecl:
       ElaborateNetDecl(item, mod);
-      break;
+      return true;
     case ModuleItemKind::kVarDecl:
       ElaborateVarDecl(item, mod);
-      break;
+      return true;
     case ModuleItemKind::kContAssign:
       ElaborateContAssign(item, mod);
-      break;
-    case ModuleItemKind::kInitialBlock:
-      AddProcess(RtlirProcessKind::kInitial, item, mod, arena_, diag_);
-      break;
-    case ModuleItemKind::kFinalBlock:
-      AddProcess(RtlirProcessKind::kFinal, item, mod, arena_, diag_);
-      break;
-    case ModuleItemKind::kAlwaysBlock:
-    case ModuleItemKind::kAlwaysCombBlock:
-    case ModuleItemKind::kAlwaysFFBlock:
-    case ModuleItemKind::kAlwaysLatchBlock:
-      AddProcess(MapAlwaysKind(item->always_kind), item, mod, arena_, diag_,
-                 &func_decls_);
-      break;
+      return true;
     case ModuleItemKind::kModuleInst:
       ElaborateModuleInst(item, mod);
-      break;
+      return true;
     case ModuleItemKind::kParamDecl:
       ElaborateParamDecl(item, mod);
-      break;
-    case ModuleItemKind::kGenerateIf:
-    case ModuleItemKind::kGenerateCase:
-    case ModuleItemKind::kGenerateFor:
-      pending_generates_.push_back({item, mod});
-      break;
+      return true;
     case ModuleItemKind::kTypedef:
       ElaborateTypedef(item, mod);
-      break;
+      return true;
     case ModuleItemKind::kNettypeDecl:
       ElaborateNettypeDecl(item, mod);
-      break;
-    case ModuleItemKind::kFunctionDecl:
-    case ModuleItemKind::kTaskDecl:
-      CheckFunctionDeclDiagnostics(item, declared_names_, diag_);
-      ValidateFunctionBody(item);
-      ValidateFunctionArgDefaultsScope(item);
-      mod->function_decls.push_back(item);
-      break;
+      return true;
     case ModuleItemKind::kGateInst:
       CheckGateInstNameDiagnostics(item, declared_names_, diag_);
       CreateImplicitNetsForTerminals(item->gate_terminals, item->loc,
@@ -430,18 +411,18 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
       ValidatePrimitiveOutputTerminalWidths(item, mod, diag_);
       ElaborateGateInst(item, mod, arena_);
       ResolveInterconnectPrimitiveTerminals(item->gate_terminals, mod);
-      break;
+      return true;
     case ModuleItemKind::kUdpInst:
       CheckUdpInstNameDiagnostics(item, declared_names_, diag_);
       CreateImplicitNetsForTerminals(item->gate_terminals, item->loc,
                                      make_implicit_net);
       ResolveInterconnectPrimitiveTerminals(item->gate_terminals, mod);
-      break;
+      return true;
     case ModuleItemKind::kSpecparam:
       specparam_names_.insert(item->name);
       const_names_.insert(item->name);
       ElaborateSpecparam(item, mod);
-      break;
+      return true;
     case ModuleItemKind::kAlias: {
       CreateImplicitNetsForTerminals(item->alias_nets, item->loc,
                                      make_implicit_net);
@@ -449,8 +430,50 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
       RtlirAlias alias;
       alias.nets = item->alias_nets;
       mod->aliases.push_back(alias);
-      break;
+      return true;
     }
+    case ModuleItemKind::kImportDecl:
+      RecordImportDecl(item, mod);
+      return true;
+    case ModuleItemKind::kClassDecl:
+      RecordClassDecl(item, mod, class_names_, parameterized_class_names_);
+      return true;
+    default:
+      return false;
+  }
+}
+
+// Processes, generates, subroutines, assertions, and remaining items (§9, §16,
+// §13, §27).
+bool Elaborator::ElaborateBehavioralItem(ModuleItem* item, RtlirModule* mod) {
+  const ProcessBuildEnv kEnv{arena_, diag_, &func_decls_};
+  switch (item->kind) {
+    case ModuleItemKind::kInitialBlock:
+      AddProcess(RtlirProcessKind::kInitial, item, mod,
+                 ProcessBuildEnv{arena_, diag_});
+      return true;
+    case ModuleItemKind::kFinalBlock:
+      AddProcess(RtlirProcessKind::kFinal, item, mod,
+                 ProcessBuildEnv{arena_, diag_});
+      return true;
+    case ModuleItemKind::kAlwaysBlock:
+    case ModuleItemKind::kAlwaysCombBlock:
+    case ModuleItemKind::kAlwaysFFBlock:
+    case ModuleItemKind::kAlwaysLatchBlock:
+      AddProcess(MapAlwaysKind(item->always_kind), item, mod, kEnv);
+      return true;
+    case ModuleItemKind::kGenerateIf:
+    case ModuleItemKind::kGenerateCase:
+    case ModuleItemKind::kGenerateFor:
+      pending_generates_.push_back({item, mod});
+      return true;
+    case ModuleItemKind::kFunctionDecl:
+    case ModuleItemKind::kTaskDecl:
+      CheckFunctionDeclDiagnostics(item, declared_names_, diag_);
+      ValidateFunctionBody(item);
+      ValidateFunctionArgDefaultsScope(item);
+      mod->function_decls.push_back(item);
+      return true;
     case ModuleItemKind::kSequenceDecl:
       sequence_names_.insert(item->name);
       mod->sequence_decls.push_back(item);
@@ -465,14 +488,7 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
       // §16.10: a formal-argument name may not be redeclared as a body local.
       ValidateNoFormalShadowedByBodyLocal(item);
       ValidateClockingBlock(item, mod);
-      break;
-    case ModuleItemKind::kDefparam:
-      break;
-    case ModuleItemKind::kImportDecl:
-      RecordImportDecl(item, mod);
-      break;
-    case ModuleItemKind::kExportDecl:
-      break;
+      return true;
     case ModuleItemKind::kPropertyDecl: {
       // §16.12: nesting of disable iff (explicitly or via property
       // instantiation) is forbidden; the §F.4.1 flattened count catches both.
@@ -486,47 +502,47 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
       // §16.12.17 / §F.7: enforce the restrictions on recursive properties.
       ValidateRecursiveProperty(item);
       ValidateClockingBlock(item, mod);
-      break;
+      return true;
     }
     case ModuleItemKind::kAssertProperty:
       // §16.4.3: a module-item deferred immediate assertion is a static
       // deferred assertion, modeled as an implicit always_comb procedure.
       if (IsStaticDeferredAssertion(item)) {
-        AddProcess(RtlirProcessKind::kAlwaysComb, item, mod, arena_, diag_,
-                   &func_decls_);
-        break;
+        AddProcess(RtlirProcessKind::kAlwaysComb, item, mod, kEnv);
+        return true;
       }
       ValidateClockingBlock(item, mod);
-      break;
+      return true;
     case ModuleItemKind::kAssumeProperty:
     case ModuleItemKind::kCoverProperty:
     case ModuleItemKind::kCoverSequence:
     case ModuleItemKind::kRestrictProperty:
     case ModuleItemKind::kClockingBlock:
       ValidateClockingBlock(item, mod);
-      break;
+      return true;
     case ModuleItemKind::kElabSystemTask:
       ValidateElabSystemTask(item, mod);
-      break;
+      return true;
     case ModuleItemKind::kDpiImport:
       ValidateDpiImport(item);
       mod->let_decls.push_back(item);
-      break;
+      return true;
     case ModuleItemKind::kLetDecl:
       ValidateLetDecl(item);
       mod->let_decls.push_back(item);
-      break;
+      return true;
     case ModuleItemKind::kCovergroupDecl:
     case ModuleItemKind::kSpecifyBlock:
     case ModuleItemKind::kDpiExport:
       mod->let_decls.push_back(item);
-      break;
+      return true;
+    case ModuleItemKind::kDefparam:
+    case ModuleItemKind::kExportDecl:
     case ModuleItemKind::kDefaultDisableIff:
     case ModuleItemKind::kNestedModuleDecl:
-      break;
-    case ModuleItemKind::kClassDecl:
-      RecordClassDecl(item, mod, class_names_, parameterized_class_names_);
-      break;
+      return true;
+    default:
+      return true;
   }
 }
 
@@ -935,64 +951,6 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
   ValidateHierRefInstanceArray(decl);
   ValidateForwardTypedefsInScope(decl);
   ValidateForwardTypedefScopePrefix(decl);
-}
-
-ScopeMap Elaborator::BuildParamScope(const RtlirModule* mod) const {
-  ScopeMap scope = cu_param_scope_;
-  for (const auto& p : mod->params) {
-    if (p.is_resolved) {
-      scope[p.name] = p.resolved_value;
-    }
-  }
-  return scope;
-}
-
-bool Elaborator::RefersToUnboundedParam(const RtlirModule* mod,
-                                        std::string_view name) const {
-  for (const auto& p : mod->params) {
-    if (p.is_unbounded && p.name == name) return true;
-  }
-  return false;
-}
-
-namespace {
-
-bool ExprContainsDollarSubexpr(const Expr* e);
-
-// Returns true if any of the fixed scalar child-expression pointers of `e`
-// contains a self-contained `$` subexpression. Factored out of the recursive
-// walk so the driver stays below the cognitive-complexity threshold.
-bool AnyScalarChildContainsDollar(const Expr* e) {
-  const Expr* const kChildren[] = {
-      e->lhs,  e->rhs,   e->condition, e->true_expr, e->false_expr,
-      e->base, e->index, e->index_end, e->with_expr, e->repeat_count};
-  for (const Expr* c : kChildren) {
-    if (ExprContainsDollarSubexpr(c)) return true;
-  }
-  return false;
-}
-
-bool ExprContainsDollarSubexpr(const Expr* e) {
-  if (e == nullptr) return false;
-  if (e->kind == ExprKind::kIdentifier && e->text == "$") return true;
-  if (AnyScalarChildContainsDollar(e)) return true;
-  for (const Expr* a : e->args)
-    if (ExprContainsDollarSubexpr(a)) return true;
-  for (const Expr* el : e->elements)
-    if (ExprContainsDollarSubexpr(el)) return true;
-  return false;
-}
-
-}  // namespace
-
-bool Elaborator::ContainsDollarSubexpr(const Expr* e) const {
-  return ExprContainsDollarSubexpr(e);
-}
-
-std::string_view Elaborator::ScopedName(std::string_view base) {
-  if (gen_prefix_.empty()) return base;
-  std::string full = gen_prefix_ + std::string(base);
-  return {arena_.AllocString(full.c_str(), full.size()), full.size()};
 }
 
 }  // namespace delta

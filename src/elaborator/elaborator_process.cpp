@@ -240,13 +240,12 @@ static void ValidateProcess(RtlirProcessKind kind, ModuleItem* item,
   }
 }
 
-void AddProcess(
-    RtlirProcessKind kind, ModuleItem* item, RtlirModule* mod, Arena& arena,
-    DiagEngine& diag,
-    const std::unordered_map<std::string_view, const ModuleItem*>* func_map) {
-  RtlirProcess proc = BuildProcessWithSensitivity(kind, item, arena, func_map);
-  ValidateProcess(kind, item, proc, diag);
-  proc.attrs = ResolveAttributes(item->attrs, diag);
+void AddProcess(RtlirProcessKind kind, ModuleItem* item, RtlirModule* mod,
+                const ProcessBuildEnv& env) {
+  RtlirProcess proc =
+      BuildProcessWithSensitivity(kind, item, env.arena, env.func_map);
+  ValidateProcess(kind, item, proc, env.diag);
+  proc.attrs = ResolveAttributes(item->attrs, env.diag);
   mod->processes.push_back(proc);
 }
 

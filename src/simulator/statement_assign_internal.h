@@ -43,13 +43,25 @@ Logic4Vec ApplyStreamPackToTargetWidening(const Stmt* stmt, Logic4Vec rhs_val,
 void UnpackStreamingConcatLhs(const Expr* lhs, const Logic4Vec& rhs_val,
                               SimContext& ctx, Arena& arena);
 
+// Geometry of an array/queue target addressed by a `with` clause (§11.4.14.3):
+// `size` is the element count and `lo` is the declared low index.
+struct ArrayGeom {
+  uint32_t size;
+  uint32_t lo;
+};
+
+// Half-open slice window [start, start + count) selected by a `with` clause.
+struct StreamSliceRange {
+  uint32_t start;
+  uint32_t count;
+};
+
 // Resolves an optional `with` range expression on an array target into a
-// 0-based [out_start, out_start + out_count) window. Returns false when an
-// explicit single-index selection lands out of bounds. Defined in
+// 0-based [out_range.start, out_range.start + out_range.count) window. Returns
+// false when an explicit single-index selection lands out of bounds. Defined in
 // statement_assign_stream.cpp; also used by eval_streaming.cpp.
 bool ResolveWithRange(const Expr* with_expr, SimContext& ctx, Arena& arena,
-                      uint32_t array_size, uint32_t array_lo,
-                      uint32_t& out_start, uint32_t& out_count);
+                      ArrayGeom geom, StreamSliceRange& out_range);
 
 // Assignment-pattern key helpers (defined in statement_assign.cpp; also used by
 // lowerer_var.cpp). IsTypeKeyword recognizes a type-name pattern key;

@@ -520,9 +520,10 @@ static void RegisterInstanceKeyBinding(const std::string& inst_prefix,
 
 static void RegisterModuleNets(const RtlirModule* mod, SimContext& ctx) {
   for (const auto& net : mod->nets) {
-    ctx.CreateNet(net.name, net.net_type, net.width, net.charge_strength,
-                  net.decay_ticks, net.is_user_nettype, net.resolve_func,
-                  net.is_signed);
+    ctx.CreateNet(
+        net.name, net.net_type, net.width,
+        NetSpec{net.charge_strength, net.decay_ticks, net.is_user_nettype,
+                net.resolve_func, net.is_signed});
   }
 }
 

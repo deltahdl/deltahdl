@@ -36,13 +36,13 @@ static std::string BuildStringTaskOutput(const std::vector<Expr*>& args,
              args[i + 1]->kind != ExprKind::kStringLiteral) {
         vals.push_back(EvalExpr(args[++i], ctx, arena));
       }
-      out += FormatDisplay(fmt, vals, {}, nullptr, {}, &ctx);
+      out += FormatDisplay(fmt, vals, {.ctx = &ctx});
       continue;
     }
     auto val = EvalExpr(a, ctx, arena);
     char spec = val.is_string ? 's' : default_radix;
     char fmt_buf[3] = {'%', spec, 0};
-    out += FormatDisplay(fmt_buf, {val}, {}, nullptr, {}, &ctx);
+    out += FormatDisplay(fmt_buf, {val}, {.ctx = &ctx});
   }
   return out;
 }
@@ -94,7 +94,7 @@ static Logic4Vec EvalSformatTask(const Expr* expr, SimContext& ctx,
     vals.push_back(EvalExpr(expr->args[i], ctx, arena));
   }
   WarnIfArgCountMismatch(ctx, "$sformat", fmt, vals.size());
-  std::string out = FormatDisplay(fmt, vals, {}, nullptr, {}, &ctx);
+  std::string out = FormatDisplay(fmt, vals, {.ctx = &ctx});
   if (dst) dst->value = StringToLogic4Vec(arena, out);
   return MakeLogic4VecVal(arena, 1, 0);
 }
@@ -187,12 +187,12 @@ static Logic4Vec EvalFdisplayWrite(const Expr* expr, SimContext& ctx,
   }
   std::string output;
   if (!fmt.empty()) {
-    output = FormatDisplay(fmt, arg_vals, {}, nullptr, {}, &ctx);
+    output = FormatDisplay(fmt, arg_vals, {.ctx = &ctx});
   } else if (suffix != '\0') {
     // §21.3.2 derives b/h/o radix from the task-name suffix when no format
     // string is supplied.
     char fmt_buf[3] = {'%', suffix, 0};
-    output = FormatDisplay(fmt_buf, arg_vals, {}, nullptr, {}, &ctx);
+    output = FormatDisplay(fmt_buf, arg_vals, {.ctx = &ctx});
   }
   for (FILE* fp : targets) {
     std::fputs(output.c_str(), fp);
@@ -485,12 +485,12 @@ bool HandleScanSpecifier(const std::string& fmt, size_t& fi,
 // §21.3.4.3 scan engine shared in spirit with $fscanf. Interprets `fmt` against
 // `input`, assigning converted fields to the destination arguments; returns the
 // count of assigned items and reports the consumed input length.
-uint32_t RunScanf(const std::string& input, const std::string& fmt,
-                  Expr* const* dest, size_t ndest, SimContext& ctx,
-                  Arena& arena, size_t& consumed) {
+uint32_t RunScanf(const ScanRequest& req, SimContext& ctx, Arena& arena) {
+  const std::string& input = req.input;
+  const std::string& fmt = req.fmt;
   size_t pos = 0;
   ScanCursor cur{input, pos};
-  ScanArgs args{dest, ndest, ctx};
+  ScanArgs args{req.dest, req.ndest, ctx};
 
   for (size_t fi = 0; fi < fmt.size(); ++fi) {
     char fc = fmt[fi];
@@ -513,7 +513,7 @@ uint32_t RunScanf(const std::string& input, const std::string& fmt,
     if (!HandleScanSpecifier(fmt, fi, cur, args, arena)) break;
   }
 
-  consumed = pos;
+  req.consumed = pos;
   return args.matched;
 }
 
@@ -531,8 +531,9 @@ static Logic4Vec EvalSscanf(const Expr* expr, SimContext& ctx, Arena& arena) {
   std::string fmt = ExtractStrArg(expr->args[1]);
 
   size_t consumed = 0;
-  uint32_t matched = RunScanf(input, fmt, expr->args.data() + 2,
-                              expr->args.size() - 2, ctx, arena, consumed);
+  ScanRequest req{input, fmt, expr->args.data() + 2, expr->args.size() - 2,
+                  consumed};
+  uint32_t matched = RunScanf(req, ctx, arena);
 
   // §21.3.4.3: zero signals a matching failure against present input, while EOF
   // (-1) is returned when the input is exhausted before any field converts.

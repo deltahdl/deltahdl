@@ -99,9 +99,10 @@ bool ReportUnpackedDimCountMismatch(const ArrayAssignPair& p,
 // Reports an element-type mismatch between two tracked arrays. Returns true
 // (with a diagnostic emitted) when found.
 bool ReportElementTypeMismatch(const ArrayAssignPair& p, DiagEngine& diag) {
-  if (!ElementTypesEquivalent(p.l.elem_type, p.l.elem_width, p.l.elem_is_signed,
-                              p.l.elem_is_4state, p.r.elem_type, p.r.elem_width,
-                              p.r.elem_is_signed, p.r.elem_is_4state)) {
+  if (!ElementTypesEquivalent({p.l.elem_type, p.l.elem_width,
+                               p.l.elem_is_signed, p.l.elem_is_4state},
+                              {p.r.elem_type, p.r.elem_width,
+                               p.r.elem_is_signed, p.r.elem_is_4state})) {
     diag.Error(p.loc, std::format("array element type mismatch in assignment "
                                   "('{}' vs '{}')",
                                   p.lhs->text, p.rhs->text));
@@ -271,10 +272,10 @@ static void CheckArrayArgCompat(const Expr* actual,
   // value type of the associative formal it binds to.
   if (actual_info.is_assoc && formal_info.is_assoc &&
       !ElementTypesEquivalent(
-          actual_info.elem_type, actual_info.elem_width,
-          actual_info.elem_is_signed, actual_info.elem_is_4state,
-          formal_info.elem_type, formal_info.elem_width,
-          formal_info.elem_is_signed, formal_info.elem_is_4state)) {
+          {actual_info.elem_type, actual_info.elem_width,
+           actual_info.elem_is_signed, actual_info.elem_is_4state},
+          {formal_info.elem_type, formal_info.elem_width,
+           formal_info.elem_is_signed, formal_info.elem_is_4state})) {
     diag.Error(actual->range.start,
                "associative array element type mismatch in argument");
     return;

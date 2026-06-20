@@ -156,40 +156,28 @@ void InitNetDefaultValue(Variable* var, NetType type, bool is_user_nettype) {
   }
 }
 
-// §6.7.1: the defining attributes of a net — its nettype, charge strength and
-// decay (for trireg), user-nettype flag and resolution function name.
-struct NetAttrs {
-  NetType type;
-  Strength charge_strength;
-  uint64_t decay_ticks;
-  bool is_user_nettype;
-  std::string_view resolve_func;
-};
-
-// Populates a freshly created Net's fields from the CreateNet arguments.
-void PopulateNetFields(Net* net, Variable* var, const NetAttrs& attrs) {
-  net->type = attrs.type;
+// Populates a freshly created Net's fields from the CreateNet arguments
+// (§6.7.1: nettype, charge strength/decay, user-nettype flag, resolve func).
+void PopulateNetFields(Net* net, Variable* var, NetType type,
+                       const NetSpec& spec) {
+  net->type = type;
   net->resolved = var;
-  net->charge_strength = attrs.charge_strength;
-  net->base_charge_strength = attrs.charge_strength;
-  net->decay_ticks = attrs.decay_ticks;
-  net->is_user_nettype = attrs.is_user_nettype;
-  net->resolve_func = attrs.resolve_func;
+  net->charge_strength = spec.charge_strength;
+  net->base_charge_strength = spec.charge_strength;
+  net->decay_ticks = spec.decay_ticks;
+  net->is_user_nettype = spec.is_user_nettype;
+  net->resolve_func = spec.resolve_func;
 }
 
 }  // namespace
 
 Net* SimContext::CreateNet(std::string_view name, NetType type, uint32_t width,
-                           Strength charge_strength, uint64_t decay_ticks,
-                           bool is_user_nettype, std::string_view resolve_func,
-                           bool is_signed) {
+                           const NetSpec& spec) {
   auto* var = CreateVariable(name, width);
-  if (is_signed) var->is_signed = true;
-  InitNetDefaultValue(var, type, is_user_nettype);
+  if (spec.is_signed) var->is_signed = true;
+  InitNetDefaultValue(var, type, spec.is_user_nettype);
   auto* net = arena_.Create<Net>();
-  NetAttrs attrs{type, charge_strength, decay_ticks, is_user_nettype,
-                 resolve_func};
-  PopulateNetFields(net, var, attrs);
+  PopulateNetFields(net, var, type, spec);
   nets_[name] = net;
   return net;
 }
@@ -734,27 +722,16 @@ uint32_t AssocArrayObject::Size() const {
 
 namespace {
 
-// §7.8: the defining shape of an associative array — element width/4-state-ness
-// and the index type (string vs integral, width, wildcard, signedness).
-struct AssocArrayAttrs {
-  uint32_t elem_width;
-  bool is_string_key;
-  uint32_t index_width;
-  bool is_wildcard;
-  bool is_4state;
-  bool is_index_signed;
-};
-
 // Populates a freshly created AssocArrayObject's fields from the
-// CreateAssocArray arguments.
-void PopulateAssocArrayFields(AssocArrayObject* aa,
-                              const AssocArrayAttrs& attrs) {
-  aa->elem_width = attrs.elem_width;
-  aa->is_string_key = attrs.is_string_key;
-  aa->is_wildcard = attrs.is_wildcard;
-  aa->index_width = attrs.index_width;
-  aa->is_4state = attrs.is_4state;
-  aa->is_index_signed = attrs.is_index_signed;
+// CreateAssocArray arguments (§7.8: element shape + index type).
+void PopulateAssocArrayFields(AssocArrayObject* aa, uint32_t elem_width,
+                              bool is_string_key, const AssocArraySpec& spec) {
+  aa->elem_width = elem_width;
+  aa->is_string_key = is_string_key;
+  aa->is_wildcard = spec.is_wildcard;
+  aa->index_width = spec.index_width;
+  aa->is_4state = spec.is_4state;
+  aa->is_index_signed = spec.is_index_signed;
 }
 
 }  // namespace
@@ -762,13 +739,9 @@ void PopulateAssocArrayFields(AssocArrayObject* aa,
 AssocArrayObject* SimContext::CreateAssocArray(std::string_view name,
                                                uint32_t elem_width,
                                                bool is_string_key,
-                                               uint32_t index_width,
-                                               bool is_wildcard, bool is_4state,
-                                               bool is_index_signed) {
+                                               const AssocArraySpec& spec) {
   auto* aa = arena_.Create<AssocArrayObject>();
-  AssocArrayAttrs attrs{elem_width,  is_string_key, index_width,
-                        is_wildcard, is_4state,     is_index_signed};
-  PopulateAssocArrayFields(aa, attrs);
+  PopulateAssocArrayFields(aa, elem_width, is_string_key, spec);
   assoc_arrays_[name] = aa;
   return aa;
 }

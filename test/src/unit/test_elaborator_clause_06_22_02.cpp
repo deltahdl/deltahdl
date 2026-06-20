@@ -20,8 +20,8 @@ TEST(EquivalentTypesElaboration, MatchingTypesAreEquivalent) {
 }
 
 TEST(EquivalentTypesElaboration, PackedSameBitsSameStateAreEquivalent) {
-  EXPECT_TRUE(ElementTypesEquivalent(DataTypeKind::kInt, 32, true, false,
-                                     DataTypeKind::kBit, 32, true, false));
+  EXPECT_TRUE(ElementTypesEquivalent({DataTypeKind::kInt, 32, true, false},
+                                     {DataTypeKind::kBit, 32, true, false}));
 }
 
 TEST(EquivalentTypesElaboration, DifferentStateNotEquivalent) {

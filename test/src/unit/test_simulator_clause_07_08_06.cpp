@@ -35,7 +35,7 @@ TEST(AssocArray, ReadExistingKeyNoWarning) {
 
 TEST(AssocArray, XzIndexWriteWarns) {
   SimFixture f;
-  f.ctx.CreateAssocArray("aa", 32, false, 32);
+  f.ctx.CreateAssocArray("aa", 32, false, AssocArraySpec{32});
 
   MakeXTaintedKeyVar(f);
   auto* sel = MakeAssocSelectIdent(f.arena, "aa", "__xkey");
@@ -51,7 +51,7 @@ TEST(AssocArray, XzIndexWriteWarns) {
 
 TEST(AssocArray, XzIndexReadWarns) {
   SimFixture f;
-  auto* aa = f.ctx.CreateAssocArray("aa", 32, false, 32);
+  auto* aa = f.ctx.CreateAssocArray("aa", 32, false, AssocArraySpec{32});
   aa->int_data[5] = MakeLogic4VecVal(f.arena, 32, 42);
 
   MakeXTaintedKeyVar(f);
@@ -79,7 +79,7 @@ TEST(AssocArray, ReadMissingKeyWithDefaultDoesNotWarn) {
 
 TEST(AssocArray, XzIndexReadWithDefaultDoesNotWarn) {
   SimFixture f;
-  auto* aa = f.ctx.CreateAssocArray("aa", 32, false, 32);
+  auto* aa = f.ctx.CreateAssocArray("aa", 32, false, AssocArraySpec{32});
   aa->has_default = true;
   aa->default_value = MakeLogic4VecVal(f.arena, 32, 55);
   aa->int_data[5] = MakeLogic4VecVal(f.arena, 32, 42);
@@ -108,7 +108,7 @@ TEST(AssocArray, ReadMissingStringKeyWarns) {
 
 TEST(AssocArray, XzIndexWriteDoesNotClobberExistingEntries) {
   SimFixture f;
-  auto* aa = f.ctx.CreateAssocArray("aa", 32, false, 32);
+  auto* aa = f.ctx.CreateAssocArray("aa", 32, false, AssocArraySpec{32});
   aa->int_data[5] = MakeLogic4VecVal(f.arena, 32, 42);
 
   MakeXTaintedKeyVar(f);
@@ -126,7 +126,7 @@ TEST(AssocArray, ReadMissing4StateKeyReturnsX) {
   // For a 4-state element type, the nonexistent-entry value (Table 7-1, §7.4.5)
   // is all-x. §7.8.6 requires an invalid read to return that type value, so a
   // missing key must yield x rather than zero.
-  f.ctx.CreateAssocArray("aa", 32, false, 32, false, true);
+  f.ctx.CreateAssocArray("aa", 32, false, AssocArraySpec{32, false, true});
 
   auto* sel = MakeAssocSelect(f.arena, 7);
   uint32_t before = f.diag.WarningCount();

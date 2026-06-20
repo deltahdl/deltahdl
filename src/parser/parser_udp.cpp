@@ -414,82 +414,82 @@ static void ValidateUdpInitialHeader(DiagEngine& diag, const UdpDecl* udp,
   }
 }
 
+// Parses the ANSI-style header that begins with the output port declaration
+// (output [reg] name [= initial], {input name}). Consumes through the closing
+// parenthesis and the terminating semicolon.
+void Parser::ParseUdpAnsiOutputHeader(UdpDecl* udp) {
+  Consume();
+  if (Match(TokenKind::kKwReg)) {
+    udp->is_sequential = true;
+  }
+  RejectUdpPortDimension();
+  udp->output_name = Expect(TokenKind::kIdentifier).text;
+  if (Match(TokenKind::kEq)) {
+    udp->has_initial = true;
+    udp->initial_value =
+        ParseUdpInitialValue(TokenKind::kComma, TokenKind::kRParen);
+  }
+  while (Match(TokenKind::kComma)) {
+    ParseAttributes();
+    if (Check(TokenKind::kKwInout)) {
+      RejectUdpInoutPort();
+    } else {
+      Match(TokenKind::kKwInput);
+    }
+    RejectUdpPortDimension();
+    udp->input_names.push_back(Expect(TokenKind::kIdentifier).text);
+  }
+  Expect(TokenKind::kRParen);
+  Expect(TokenKind::kSemicolon);
+}
+
+// Parses the non-ANSI header (a bare port-name list) followed by the separate
+// port declarations, then reconciles the port-list order against them.
+void Parser::ParseUdpNonAnsiHeader(UdpDecl* udp) {
+  auto first_tok = Expect(TokenKind::kIdentifier);
+  std::string_view first_name = first_tok.text;
+  SourceLoc first_loc = first_tok.loc;
+  std::vector<std::string_view> port_list_inputs;
+  while (Match(TokenKind::kComma)) {
+    port_list_inputs.push_back(Expect(TokenKind::kIdentifier).text);
+  }
+  Expect(TokenKind::kRParen);
+  Expect(TokenKind::kSemicolon);
+  ParseUdpPortDecls(udp);
+  ReconcileUdpNonAnsiPortList(diag_, udp, first_name, first_loc,
+                              port_list_inputs);
+}
+
+// Parses the optional UDP initial statement (initial out = literal;),
+// validating its restricted form along the way.
+void Parser::ParseUdpInitialStatement(UdpDecl* udp) {
+  udp->has_initial = true;
+
+  UdpInitialHeaderScan scan;
+  scan.saw_begin = Check(TokenKind::kKwBegin);
+  scan.begin_loc = CurrentLoc();
+  scan.saw_hash = Check(TokenKind::kHash);
+  scan.hash_loc = CurrentLoc();
+  auto id_tok = Expect(TokenKind::kIdentifier);
+  ValidateUdpInitialHeader(diag_, udp, scan, id_tok);
+  Expect(TokenKind::kEq);
+
+  auto rhs_tok = CurrentToken();
+  udp->initial_value =
+      ParseUdpInitialValue(TokenKind::kSemicolon, TokenKind::kSemicolon);
+  if (!IsValidUdpInitialLiteral(rhs_tok.text)) {
+    diag_.Error(rhs_tok.loc,
+                "UDP initial statement RHS shall be 0, 1, or a single-bit "
+                "literal");
+  }
+  Expect(TokenKind::kSemicolon);
+}
+
 UdpDecl* Parser::ParseUdpDecl() {
   auto* udp = arena_.Create<UdpDecl>();
   udp->range.start = CurrentLoc();
   Expect(TokenKind::kKwPrimitive);
   udp->name = Expect(TokenKind::kIdentifier).text;
-
-  // Parses the ANSI-style header that begins with the output port declaration
-  // (output [reg] name [= initial], {input name}). Consumes through the closing
-  // parenthesis and the terminating semicolon.
-  auto parse_ansi_output_header = [&] {
-    Consume();
-    if (Match(TokenKind::kKwReg)) {
-      udp->is_sequential = true;
-    }
-    RejectUdpPortDimension();
-    udp->output_name = Expect(TokenKind::kIdentifier).text;
-    if (Match(TokenKind::kEq)) {
-      udp->has_initial = true;
-      udp->initial_value =
-          ParseUdpInitialValue(TokenKind::kComma, TokenKind::kRParen);
-    }
-    while (Match(TokenKind::kComma)) {
-      ParseAttributes();
-      if (Check(TokenKind::kKwInout)) {
-        RejectUdpInoutPort();
-      } else {
-        Match(TokenKind::kKwInput);
-      }
-      RejectUdpPortDimension();
-      udp->input_names.push_back(Expect(TokenKind::kIdentifier).text);
-    }
-    Expect(TokenKind::kRParen);
-    Expect(TokenKind::kSemicolon);
-  };
-
-  // Parses the non-ANSI header (a bare port-name list) followed by the separate
-  // port declarations, then reconciles the port-list order against them.
-  auto parse_non_ansi_header = [&] {
-    auto first_tok = Expect(TokenKind::kIdentifier);
-    std::string_view first_name = first_tok.text;
-    SourceLoc first_loc = first_tok.loc;
-    std::vector<std::string_view> port_list_inputs;
-    while (Match(TokenKind::kComma)) {
-      port_list_inputs.push_back(Expect(TokenKind::kIdentifier).text);
-    }
-    Expect(TokenKind::kRParen);
-    Expect(TokenKind::kSemicolon);
-    ParseUdpPortDecls(udp);
-    ReconcileUdpNonAnsiPortList(diag_, udp, first_name, first_loc,
-                                port_list_inputs);
-  };
-
-  // Parses the optional UDP initial statement (initial out = literal;),
-  // validating its restricted form along the way.
-  auto parse_initial_statement = [&] {
-    udp->has_initial = true;
-
-    UdpInitialHeaderScan scan;
-    scan.saw_begin = Check(TokenKind::kKwBegin);
-    scan.begin_loc = CurrentLoc();
-    scan.saw_hash = Check(TokenKind::kHash);
-    scan.hash_loc = CurrentLoc();
-    auto id_tok = Expect(TokenKind::kIdentifier);
-    ValidateUdpInitialHeader(diag_, udp, scan, id_tok);
-    Expect(TokenKind::kEq);
-
-    auto rhs_tok = CurrentToken();
-    udp->initial_value =
-        ParseUdpInitialValue(TokenKind::kSemicolon, TokenKind::kSemicolon);
-    if (!IsValidUdpInitialLiteral(rhs_tok.text)) {
-      diag_.Error(rhs_tok.loc,
-                  "UDP initial statement RHS shall be 0, 1, or a single-bit "
-                  "literal");
-    }
-    Expect(TokenKind::kSemicolon);
-  };
 
   Expect(TokenKind::kLParen);
   if (Check(TokenKind::kDotStar)) {
@@ -503,14 +503,14 @@ UdpDecl* Parser::ParseUdpDecl() {
       RejectUdpInoutPort();
     }
     if (Check(TokenKind::kKwOutput)) {
-      parse_ansi_output_header();
+      ParseUdpAnsiOutputHeader(udp);
     } else {
-      parse_non_ansi_header();
+      ParseUdpNonAnsiHeader(udp);
     }
   }
 
   if (Match(TokenKind::kKwInitial)) {
-    parse_initial_statement();
+    ParseUdpInitialStatement(udp);
   }
 
   ParseUdpTable(udp);

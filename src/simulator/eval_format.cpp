@@ -521,12 +521,16 @@ static bool ProcessFormatSpec(const std::string& fmt, size_t& i,
 
 std::string FormatDisplay(const std::string& fmt,
                           const std::vector<Logic4Vec>& vals,
-                          const std::vector<std::string>& p_fmts,
-                          const TimeFormatSpec* time_format,
-                          const std::vector<std::string>& v_fmts,
-                          SimContext* ctx) {
+                          const DisplayFormatOpts& opts) {
   std::string out;
-  FormatArgs args{vals, 0, p_fmts, time_format, v_fmts, ctx};
+  // §21.2.1.4 / §21.2.1: a null precomputed-string pointer means the calling
+  // task supplied none, so bind the argument cursor to a shared empty list.
+  static const std::vector<std::string> kEmpty;
+  const std::vector<std::string>& p_fmts =
+      opts.p_fmts != nullptr ? *opts.p_fmts : kEmpty;
+  const std::vector<std::string>& v_fmts =
+      opts.v_fmts != nullptr ? *opts.v_fmts : kEmpty;
+  FormatArgs args{vals, 0, p_fmts, opts.time_format, v_fmts, opts.ctx};
   for (size_t i = 0; i < fmt.size(); ++i) {
     if (fmt[i] != '%' || i + 1 >= fmt.size()) {
       AppendLiteralChar(fmt, i, out);

@@ -269,8 +269,9 @@ static Logic4Vec EvalFscanf(const Expr* expr, SimContext& ctx, Arena& arena) {
 
   std::string fmt = ExtractFmtStr(expr->args[1]->text);
   size_t consumed = 0;
-  uint32_t matched = RunScanf(input, fmt, expr->args.data() + 2,
-                              expr->args.size() - 2, ctx, arena, consumed);
+  ScanRequest req{input, fmt, expr->args.data() + 2, expr->args.size() - 2,
+                  consumed};
+  uint32_t matched = RunScanf(req, ctx, arena);
 
   // §21.3.4.3: leave the descriptor positioned just past the consumed input so
   // a later read continues where the scan stopped.

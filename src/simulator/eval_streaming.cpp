@@ -102,11 +102,8 @@ static void ExpandArrayElements(std::string_view name, SimContext& ctx,
   }
 }
 
-// Half-open slice range [start, start + count) selected by a `with` clause.
-struct StreamSliceRange {
-  uint32_t start;
-  uint32_t count;
-};
+// StreamSliceRange (half-open [start, start + count) `with` window) is declared
+// in statement_assign_internal.h and shared with ResolveWithRange.
 
 static void ExpandArrayElementsSliced(std::string_view name, SimContext& ctx,
                                       std::vector<Logic4Vec>& parts,
@@ -233,11 +230,11 @@ struct StreamExpandSink {
 static void ExpandArrayAggregate(const Expr* elem, const ArrayInfo* ainfo,
                                  StreamExpandSink& sink) {
   if (elem->with_expr) {
-    uint32_t start = 0, count = 0;
-    ResolveWithRange(elem->with_expr, sink.ctx, sink.arena, ainfo->size,
-                     ainfo->lo, start, count);
+    StreamSliceRange r{0, 0};
+    ResolveWithRange(elem->with_expr, sink.ctx, sink.arena,
+                     {ainfo->size, ainfo->lo}, r);
     ExpandArrayElementsSliced(elem->text, sink.ctx, sink.parts,
-                              sink.total_width, {start, count});
+                              sink.total_width, r);
   } else {
     ExpandArrayElements(elem->text, sink.ctx, sink.parts, sink.total_width);
   }
@@ -248,12 +245,11 @@ static void ExpandArrayAggregate(const Expr* elem, const ArrayInfo* ainfo,
 static void ExpandQueueAggregate(const Expr* elem, QueueObject* queue,
                                  StreamExpandSink& sink) {
   if (elem->with_expr) {
-    uint32_t start = 0, count = 0;
+    StreamSliceRange r{0, 0};
     ResolveWithRange(elem->with_expr, sink.ctx, sink.arena,
-                     static_cast<uint32_t>(queue->elements.size()), 0, start,
-                     count);
+                     {static_cast<uint32_t>(queue->elements.size()), 0}, r);
     ExpandQueueElementsSliced(queue, sink.parts, sink.total_width, sink.arena,
-                              {start, count});
+                              r);
   } else {
     ExpandQueueElements(queue, sink.parts, sink.total_width, sink.arena);
   }

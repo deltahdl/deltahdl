@@ -57,7 +57,7 @@ TEST_F(ExtendedVcdNodeInfoSim, MatchesNodeInformationExample) {
     auto* data = arena_.Create<Variable>();
     data->value = MakeBits(arena_, 4, 0);
     // input [0:3] data -> msb 0, lsb 3.
-    vcd.RegisterSignal("data", 4, data, NetType::kWire, 0, 3);
+    vcd.RegisterSignal(VcdSignalSpec{"data", 4, data, NetType::kWire, 0, 3});
     auto* reset = arena_.Create<Variable>();
     reset->value = MakeBits(arena_, 1, 0);
     vcd.RegisterSignal("reset", 1, reset);
@@ -92,7 +92,7 @@ TEST_F(ExtendedVcdNodeInfoSim, BusIndexRangePreservesDeclaredMsbLsbOrder) {
     auto* data = arena_.Create<Variable>();
     data->value = MakeBits(arena_, 8, 0);
     // input [7:0] data -> msb 7, lsb 0.
-    vcd.RegisterSignal("data", 8, data, NetType::kWire, 7, 0);
+    vcd.RegisterSignal(VcdSignalSpec{"data", 8, data, NetType::kWire, 7, 0});
     vcd.EndDefinitions();
   }
   auto content = ReadVcd();

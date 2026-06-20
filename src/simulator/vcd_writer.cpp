@@ -99,27 +99,6 @@ static uint32_t VcdDataTypeSize(VcdDataType type, uint32_t width) {
   return width;
 }
 
-namespace {
-
-// The descriptive identity of one dumped object, gathered from the
-// RegisterSignal arguments (§21.7.5, Table 21-11; §21.7.2.3; §21.7.4.2): its
-// name and width, the backing Variable, the net type and SystemVerilog data
-// type that pick the $var var_type keyword, and the declared index range
-// (msb/lsb negative when no vector_index applies). This is everything that
-// describes the signal itself, distinct from the writer's per-registration
-// counter state (the identifier and port-id sequences).
-struct VcdSignalSpec {
-  std::string_view name;
-  uint32_t width = 1;
-  Variable* var = nullptr;
-  NetType net_type = NetType::kWire;
-  int32_t msb = -1;
-  int32_t lsb = -1;
-  VcdDataType data_type = VcdDataType::kNet;
-};
-
-}  // namespace
-
 // Copy the descriptive registration arguments (everything except the counter
 // state) into a fresh VcdSignal. No writer state is consulted or mutated.
 static VcdSignal MakeVcdSignalFields(const VcdSignalSpec& spec) {
@@ -199,14 +178,11 @@ static void WriteSignalVarDecl(std::ofstream& ofs, const VcdSignal& sig,
   WriteVarDecl(ofs, sig, name, width);
 }
 
-void VcdWriter::RegisterSignal(std::string_view name, uint32_t width,
-                               Variable* var, NetType net_type, int32_t msb,
-                               int32_t lsb, VcdDataType data_type) {
-  VcdSignalSpec spec{name, width, var, net_type, msb, lsb, data_type};
+void VcdWriter::RegisterSignal(const VcdSignalSpec& spec) {
   VcdSignal sig = MakeVcdSignal(spec, next_ident_, next_port_id_);
   signals_.push_back(sig);
   if (!ofs_.is_open()) return;
-  WriteSignalVarDecl(ofs_, sig, name, width, port_nodes_);
+  WriteSignalVarDecl(ofs_, sig, spec.name, spec.width, port_nodes_);
 }
 
 void VcdWriter::EndDefinitions() {

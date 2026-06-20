@@ -56,7 +56,7 @@ TEST_F(VcdHeaderAndScopeSim, UwireNetIsRecordedAsWire) {
     vcd.WriteHeader("1ns");
     auto* var = arena_.Create<Variable>();
     var->value = MakeLogic4VecVal(arena_, 1, 0);
-    vcd.RegisterSignal("uw", 1, var, NetType::kUwire);
+    vcd.RegisterSignal(VcdSignalSpec{"uw", 1, var, NetType::kUwire});
     vcd.EndDefinitions();
   }
   auto content = ReadVcd();

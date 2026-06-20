@@ -56,9 +56,17 @@ bool TypesMatch(const DataType& a, const DataType& b);
 
 bool TypesEquivalent(const DataType& a, const DataType& b);
 
-bool ElementTypesEquivalent(DataTypeKind a_kind, uint32_t a_width,
-                            bool a_signed, bool a_4state, DataTypeKind b_kind,
-                            uint32_t b_width, bool b_signed, bool b_4state);
+// §6.22.2 — the element-type descriptor compared when deciding whether two
+// array element types are equivalent: the kind, packed bit width, signedness,
+// and whether the element is 4-state.
+struct ElementTypeInfo {
+  DataTypeKind kind;
+  uint32_t width;
+  bool is_signed;
+  bool is_4state;
+};
+
+bool ElementTypesEquivalent(const ElementTypeInfo& a, const ElementTypeInfo& b);
 
 bool IsAssignmentCompatible(const DataType& a, const DataType& b);
 

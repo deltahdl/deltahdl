@@ -609,60 +609,62 @@ void Parser::ParseTypedItemOrInst(std::vector<ModuleItem*>& items,
   ParseImplicitTypeOrInst(items);
 }
 
-void Parser::ParseImplicitTypeOrInst(std::vector<ModuleItem*>& items) {
-  auto name_tok = Consume();
-  // §1800 forbids instantiating modules/primitives inside a program. Emits the
-  // matching diagnostic at the call site so each dispatch branch stays flat
-  // instead of nesting its own in-program guard.
-  auto reject_inst_in_program = [&](const char* msg) {
-    if (InProgramBlock()) diag_.Error(name_tok.loc, msg);
-  };
+// §1800 forbids instantiating modules/primitives inside a program. Emits the
+// matching diagnostic so each dispatch branch stays flat instead of nesting its
+// own in-program guard.
+void Parser::RejectInstInProgram(SourceLoc loc, const char* msg) {
+  if (InProgramBlock()) diag_.Error(loc, msg);
+}
+
+// Parses a `name :: type_identifier ...` form (the `::` is consumed here) as
+// either a scoped module instantiation or a variable declaration of a
+// package/class-scoped type.
+void Parser::ParseScopedTypeOrInst(const Token& name_tok,
+                                   std::vector<ModuleItem*>& items) {
+  Consume();  // ::
+  auto type_tok = ExpectIdentifier();
+  // The built-in package name `std` is reserved (it cannot hold modules), so
+  // `std :: type_identifier` is a built_in_data_type. A declarator that follows
+  // is a variable declaration of that scoped type rather than a scoped module
+  // instantiation.
+  bool is_builtin_pkg = name_tok.text == "std";
+  bool is_scoped_inst =
+      !is_builtin_pkg && (CheckIdentifier() || Check(TokenKind::kHash));
+  if (is_scoped_inst) {
+    RejectInstInProgram(name_tok.loc, "instantiations not allowed in programs");
+    auto start = items.size();
+    ParseModuleInstList(type_tok, &items);
+    StampInstScope(items, start, name_tok.text);
+    return;
+  }
+  DataType dtype = MakeScopedNamedType(name_tok.text, type_tok.text);
   // Parses the trailing `# (...)` parameter assignments of a scoped named type
   // (e.g. `pkg :: t #(...)`) onto the data type, if present.
-  auto attach_scoped_type_params = [&](DataType& dtype) {
-    if (Check(TokenKind::kHash)) {
-      Consume();
-      dtype.type_params = ParseTypeParamList();
-    }
-  };
-  // Parses a `name :: type_identifier ...` form (the `::` is consumed here) as
-  // either a scoped module instantiation or a variable declaration of a
-  // package/class-scoped type.
-  auto parse_scoped_name = [&] {
-    Consume();  // ::
-    auto type_tok = ExpectIdentifier();
-    // The built-in package name `std` is reserved (it cannot hold modules), so
-    // `std :: type_identifier` is a built_in_data_type. A declarator that
-    // follows is a variable declaration of that scoped type rather than a
-    // scoped module instantiation.
-    bool is_builtin_pkg = name_tok.text == "std";
-    bool is_scoped_inst =
-        !is_builtin_pkg && (CheckIdentifier() || Check(TokenKind::kHash));
-    if (is_scoped_inst) {
-      reject_inst_in_program("instantiations not allowed in programs");
-      auto start = items.size();
-      ParseModuleInstList(type_tok, &items);
-      StampInstScope(items, start, name_tok.text);
-      return;
-    }
-    DataType dtype = MakeScopedNamedType(name_tok.text, type_tok.text);
-    attach_scoped_type_params(dtype);
-    ParseVarDeclList(items, dtype);
-  };
-  // Builds the fallback bare-identifier variable declaration with optional
-  // initializer when the name is neither a scope, known type, UDP, nor inst.
-  auto parse_plain_var_decl = [&] {
-    auto* item = arena_.Create<ModuleItem>();
-    item->kind = ModuleItemKind::kVarDecl;
-    item->loc = name_tok.loc;
-    item->name = name_tok.text;
-    if (Match(TokenKind::kEq)) item->init_expr = ParseExpr();
-    Expect(TokenKind::kSemicolon);
-    items.push_back(item);
-  };
+  if (Check(TokenKind::kHash)) {
+    Consume();
+    dtype.type_params = ParseTypeParamList();
+  }
+  ParseVarDeclList(items, dtype);
+}
+
+// Builds the fallback bare-identifier variable declaration with optional
+// initializer when the name is neither a scope, known type, UDP, nor inst.
+void Parser::ParsePlainVarDecl(const Token& name_tok,
+                               std::vector<ModuleItem*>& items) {
+  auto* item = arena_.Create<ModuleItem>();
+  item->kind = ModuleItemKind::kVarDecl;
+  item->loc = name_tok.loc;
+  item->name = name_tok.text;
+  if (Match(TokenKind::kEq)) item->init_expr = ParseExpr();
+  Expect(TokenKind::kSemicolon);
+  items.push_back(item);
+}
+
+void Parser::ParseImplicitTypeOrInst(std::vector<ModuleItem*>& items) {
+  auto name_tok = Consume();
 
   if (Check(TokenKind::kColonColon)) {
-    parse_scoped_name();
+    ParseScopedTypeOrInst(name_tok, items);
     return;
   }
   if (known_types_.count(name_tok.text) != 0) {
@@ -670,16 +672,17 @@ void Parser::ParseImplicitTypeOrInst(std::vector<ModuleItem*>& items) {
     return;
   }
   if (known_udps_.count(name_tok.text) != 0) {
-    reject_inst_in_program("primitive instances not allowed in programs");
+    RejectInstInProgram(name_tok.loc,
+                        "primitive instances not allowed in programs");
     ParseUdpInstList(name_tok, items);
     return;
   }
   if (CheckIdentifier() || Check(TokenKind::kHash)) {
-    reject_inst_in_program("instantiations not allowed in programs");
+    RejectInstInProgram(name_tok.loc, "instantiations not allowed in programs");
     ParseModuleInstList(name_tok, &items);
     return;
   }
-  parse_plain_var_decl();
+  ParsePlainVarDecl(name_tok, items);
 }
 
 }  // namespace delta

@@ -601,10 +601,11 @@ bool LeafClosesQualifier(const Token& tok) {
 
 }  // namespace
 
-ClassMember* Parser::ParseConstraintStub(ClassMember* member) {
-  member->kind = ClassMemberKind::kConstraint;
-  Consume();
-
+// 18.5.1: parse the qualifier list ('static'/'initial'/'extends'/'final' after
+// one or two ':' separators) and the constraint name. Returns true when the
+// constraint is a bodyless prototype (terminated by ';'), in which case the
+// caller is done; otherwise the opening '{' has been consumed.
+bool Parser::ParseConstraintHeader(ClassMember* member) {
   if (Match(TokenKind::kColon)) {
     if (Match(TokenKind::kKwInitial)) {
       member->is_constraint_initial = true;
@@ -623,9 +624,69 @@ ClassMember* Parser::ParseConstraintStub(ClassMember* member) {
   // an external constraint block.
   if (Match(TokenKind::kSemicolon)) {
     member->is_constraint_prototype = true;
-    return member;
+    return true;
   }
   Expect(TokenKind::kLBrace);
+  return false;
+}
+
+// One step of the constraint-block body scan. Consumes the next structural or
+// leaf token, updating depth/in_soft and recording references on member.
+// carried_qualifier carries the previous leaf's '.'/'::' state; the function
+// returns it updated for the next iteration.
+bool Parser::ScanConstraintBodyToken(ClassMember* member, int& depth,
+                                     bool& in_soft, bool carried_qualifier) {
+  TokenKind kind = CurrentToken().kind;
+  // 18.5.7.1: 'foreach ( array_id [ loop_variables ] )' heads an iterative
+  // constraint; validate its header (the loop-variable naming rule) and
+  // record it for the elaborator's dimension check before the scan resumes.
+  if (kind == TokenKind::kKwForeach) {
+    CheckForeachConstraintHeader(member);
+    return false;
+  }
+  // 18.5.9: 'solve solve_before_list before solve_before_list ;' is consumed
+  // through its ';', recording the two lists for the elaborator's ordering
+  // and circular-dependency checks.
+  if (kind == TokenKind::kKwSolve) {
+    CheckSolveBeforeConstraint(member);
+    return false;
+  }
+  // 18.5.3: 'expression dist { dist_list }' hands the brace-enclosed
+  // dist_list to a dedicated scan so its default-item rules are enforced.
+  if (kind == TokenKind::kKwDist) {
+    Consume();
+    CheckDistSet();
+    return false;
+  }
+  // 18.5.13.1/structural: 'soft' opens a soft constraint and a brace adjusts
+  // the block-nesting depth; consume the token and apply its pure scan effect.
+  if (kind == TokenKind::kKwSoft || kind == TokenKind::kLBrace ||
+      kind == TokenKind::kRBrace) {
+    Consume();
+    ApplyConstraintStructuralToken(kind, depth, in_soft);
+    return false;
+  }
+  Token t = CurrentToken();
+  CheckConstraintExprToken(t);
+  Consume();
+  // 18.5.11/18.5.13.1: with the leaf token consumed, look at the next token
+  // to recognize an unqualified call ('identifier (') and a bare local
+  // variable named in a soft constraint, then record them on the member.
+  RecordConstraintTokenRefs(
+      member, t,
+      ConstraintTokenContext{carried_qualifier, Check(TokenKind::kLParen),
+                             Check(TokenKind::kDot),
+                             Check(TokenKind::kColonColon)},
+      in_soft);
+  return LeafClosesQualifier(t);
+}
+
+ClassMember* Parser::ParseConstraintStub(ClassMember* member) {
+  member->kind = ClassMemberKind::kConstraint;
+  Consume();
+
+  if (ParseConstraintHeader(member)) return member;
+
   int depth = 1;
   // 18.5.11: track whether the token just before the current identifier was a
   // '.' or '::' qualifier, so a member/scope-qualified name (obj.f, pkg::f) is
@@ -637,55 +698,12 @@ ClassMember* Parser::ParseConstraintStub(ClassMember* member) {
   // specified on a randc variable.
   bool in_soft = false;
   while (depth > 0 && !AtEnd()) {
-    // Every structural token below re-enters the loop with the qualifier flag
-    // cleared, so clear it once up front and remember its carried-in value for
-    // the leaf-token tail (which alone consults the previous leaf's qualifier).
+    // Every structural token re-enters the loop with the qualifier flag
+    // cleared, so remember its carried-in value for the leaf-token tail (which
+    // alone consults the previous leaf's qualifier) and reset it.
     bool carried_qualifier = prev_was_qualifier;
-    prev_was_qualifier = false;
-    TokenKind kind = CurrentToken().kind;
-    // 18.5.7.1: 'foreach ( array_id [ loop_variables ] )' heads an iterative
-    // constraint; validate its header (the loop-variable naming rule) and
-    // record it for the elaborator's dimension check before the scan resumes.
-    if (kind == TokenKind::kKwForeach) {
-      CheckForeachConstraintHeader(member);
-      continue;
-    }
-    // 18.5.9: 'solve solve_before_list before solve_before_list ;' is consumed
-    // through its ';', recording the two lists for the elaborator's ordering
-    // and circular-dependency checks.
-    if (kind == TokenKind::kKwSolve) {
-      CheckSolveBeforeConstraint(member);
-      continue;
-    }
-    // 18.5.3: 'expression dist { dist_list }' hands the brace-enclosed
-    // dist_list to a dedicated scan so its default-item rules are enforced.
-    if (kind == TokenKind::kKwDist) {
-      Consume();
-      CheckDistSet();
-      continue;
-    }
-    // 18.5.13.1/structural: 'soft' opens a soft constraint and a brace adjusts
-    // the block-nesting depth; consume the token and apply its pure scan
-    // effect.
-    if (kind == TokenKind::kKwSoft || kind == TokenKind::kLBrace ||
-        kind == TokenKind::kRBrace) {
-      Consume();
-      ApplyConstraintStructuralToken(kind, depth, in_soft);
-      continue;
-    }
-    Token t = CurrentToken();
-    CheckConstraintExprToken(t);
-    Consume();
-    // 18.5.11/18.5.13.1: with the leaf token consumed, look at the next token
-    // to recognize an unqualified call ('identifier (') and a bare local
-    // variable named in a soft constraint, then record them on the member.
-    RecordConstraintTokenRefs(
-        member, t,
-        ConstraintTokenContext{carried_qualifier, Check(TokenKind::kLParen),
-                               Check(TokenKind::kDot),
-                               Check(TokenKind::kColonColon)},
-        in_soft);
-    prev_was_qualifier = LeafClosesQualifier(t);
+    prev_was_qualifier =
+        ScanConstraintBodyToken(member, depth, in_soft, carried_qualifier);
   }
   return member;
 }

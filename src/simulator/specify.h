@@ -218,6 +218,20 @@ struct SdfTcAnnotation {
   bool set_end_edge_offset = false;
 };
 
+// An SDF PATHPULSE pulse-limit specification applied to the module path that
+// runs from src to dst. reject/error are the reject and error pulse limits;
+// when has_error is false the reject limit also serves as the error limit. When
+// is_percent is set the limits are percentages of the path delay rather than
+// absolute time values.
+struct SdfPulseLimitSpec {
+  std::string_view src;
+  std::string_view dst;
+  uint64_t reject = 0;
+  uint64_t error = 0;
+  bool has_error = false;
+  bool is_percent = false;
+};
+
 class SpecifyManager {
  public:
   void AddPathDelay(PathDelay delay, bool preserve_pulse_limits = false);
@@ -238,9 +252,7 @@ class SpecifyManager {
   void RegisterSpecparamReevaluation(std::string name,
                                      std::function<void(uint64_t)> reevaluate);
 
-  void AddSdfPulseLimit(std::string_view src, std::string_view dst,
-                        uint64_t reject, bool has_error, uint64_t error,
-                        bool is_percent);
+  void AddSdfPulseLimit(const SdfPulseLimitSpec& spec);
 
   void IncrementSdfPulseLimit(std::string_view src, std::string_view dst,
                               int64_t reject_delta, bool has_error,

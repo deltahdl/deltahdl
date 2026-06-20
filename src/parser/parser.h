@@ -109,6 +109,9 @@ class Parser {
   void ParseExtraPropertyDecls(std::vector<ClassMember*>& members,
                                const ClassMember* first, const DataType& dtype);
   ClassMember* ParseConstraintStub(ClassMember* member);
+  bool ParseConstraintHeader(ClassMember* member);
+  bool ScanConstraintBodyToken(ClassMember* member, int& depth, bool& in_soft,
+                               bool carried_qualifier);
   void CheckConstraintExprToken(const Token& tok);
   void CheckForeachConstraintHeader(ClassMember* member);
   void CheckSolveBeforeConstraint(ClassMember* member);
@@ -125,6 +128,9 @@ class Parser {
   void ParseGateDelay(Expr*& d1, Expr*& d2, Expr*& d3);
 
   UdpDecl* ParseUdpDecl();
+  void ParseUdpAnsiOutputHeader(UdpDecl* udp);
+  void ParseUdpNonAnsiHeader(UdpDecl* udp);
+  void ParseUdpInitialStatement(UdpDecl* udp);
   UdpDecl* ParseExternUdpDecl();
   char ParseUdpInitialValue(TokenKind stop1, TokenKind stop2);
   void ParseUdpOutputDecl(UdpDecl* udp);
@@ -151,6 +157,9 @@ class Parser {
   void ParseRsRuleRandJoin(RsRule& rule);
   void ParseRsRuleWeight(RsRule& rule);
   RsProd ParseRsProd();
+  void ParseRsProdIf(RsProd& prod);
+  void ParseRsProdRepeat(RsProd& prod);
+  void ParseRsProdCase(RsProd& prod);
   void ParseRsCodeBlockStmts(std::vector<Stmt*>& stmts);
   bool CheckColonEq();
   bool MatchColonEq();
@@ -219,12 +228,21 @@ class Parser {
 
   ModuleItem* ParseDefparam();
   ModuleItem* ParseTypedef();
+  bool TryForwardClassTypedef(ModuleItem* item);
+  bool TryForwardAggregateTypedef(ModuleItem* item);
+  bool TryForwardBareTypedef(ModuleItem* item);
+  void SkipBracketedDims();
+  bool TryInterfacePortTypedef(ModuleItem* item);
   ModuleItem* ParseNettypeDecl();
   DataType ParseEnumType();
   DataType ParseEnumBody(const DataType& base);
   DataType ParseStructOrUnionType();
   DataType ParseStructOrUnionBody(TokenKind kw);
   void ParseStructMembers(DataType& dtype);
+  DataType ParseStructMemberType();
+  void ParseStructMemberList(DataType& dtype, const DataType& member_type,
+                             const std::vector<Attribute>& member_attrs,
+                             bool is_rand, bool is_randc);
   DataType ParseFunctionReturnType();
   void ParseDynamicOverrideSpecifiers(ModuleItem* item);
   void ParseOneOverrideSpecifier(ModuleItem* item);
@@ -234,8 +252,34 @@ class Parser {
   void ParseFuncBody(ModuleItem* item);
   ModuleItem* ParseFunctionDecl(bool prototype_only = false);
   ModuleItem* ParseTaskDecl(bool prototype_only = false);
+  // Carried state of the tf_port_item scan in ParseFunctionArgs (§8.17/§13.3):
+  // sticky direction, whether a 'default' sentinel was seen, the previous
+  // argument's data type, whether this is the first argument, and whether the
+  // previous slot was the 'default' sentinel.
+  struct FuncArgScan {
+    Direction sticky_dir = Direction::kInput;
+    bool seen_default = false;
+    DataType prev_data_type;
+    bool first_arg = true;
+    bool prev_was_default = false;
+  };
   std::vector<FunctionArg> ParseFunctionArgs(bool require_identifiers = true);
+  bool TryParseDefaultArgSentinel(std::vector<FunctionArg>& args,
+                                  FuncArgScan& scan);
+  void ParseFunctionArgTrailer(FunctionArg& arg, bool require_identifiers);
+  void ParseOneFunctionArg(std::vector<FunctionArg>& args, FuncArgScan& scan,
+                           bool require_identifiers);
+  // Shared header of one tf_port_declaration (direction/const/static + type)
+  // whose declarator list is parsed by ParseTfPortDeclarators.
+  struct TfPortHeader {
+    Direction dir = Direction::kInput;
+    bool is_const = false;
+    bool is_ref_static = false;
+    DataType dt;
+  };
   void ParseOldStylePortDecls(ModuleItem* item, TokenKind end_kw);
+  Direction ParseTfPortDirection();
+  void ParseTfPortDeclarators(ModuleItem* item, const TfPortHeader& hdr);
 
   uint8_t ParseChargeStrength();
   void ParseDriveStrength(uint8_t& s0, uint8_t& s1);
@@ -253,6 +297,11 @@ class Parser {
   void ParseTypedItemOrInst(std::vector<ModuleItem*>& items,
                             bool had_lifetime = false);
   void ParseImplicitTypeOrInst(std::vector<ModuleItem*>& items);
+  void RejectInstInProgram(SourceLoc loc, const char* msg);
+  void ParseScopedTypeOrInst(const Token& name_tok,
+                             std::vector<ModuleItem*>& items);
+  void ParsePlainVarDecl(const Token& name_tok,
+                         std::vector<ModuleItem*>& items);
   ModuleItem* ParseModuleInst(const Token& module_tok);
   ModuleItem* ParseModuleInstList(const Token& module_tok,
                                   std::vector<ModuleItem*>* extra_items);
@@ -335,6 +384,8 @@ class Parser {
   Expr* TryParseSpecialInfix(Expr*& lhs, const Token& tok, int min_bp);
   Expr* ParsePrefixExpr();
   Expr* ParsePrimaryExpr();
+  Expr* ParseIntLiteralPrimary(const Token& tok);
+  Expr* ParseTypeRefPrimary();
   Expr* ParseThisOrSuperExpr();
   Expr* ParseCastOrTypedPattern();
   Expr* MakeLiteral(ExprKind kind, const Token& tok);
@@ -349,8 +400,15 @@ class Parser {
   Expr* ParseParameterizedScope(Expr* base);
   Expr* TryParseUserTypeCast(const Token& tok);
   Expr* ParseIdentifierExpr();
+  Expr* TryParseIdentifierCast(Expr* base, bool* handled);
+  Expr* ParseIdentifierPostfixChain(Expr* result);
+  Expr* ParseWithClauseTail(Expr* result);
   Expr* ParseSelectExpr(Expr* base);
   Expr* ParseSystemCall();
+  Expr* MakeSysScopePrefix(const Token& sys_tok);
+  Expr* ParseSysRootTail(Expr* expr);
+  void ParseSysClockingEventArg(Expr* call);
+  void ParseSysCallArgs(Expr* call);
   Expr* ParseConcatenation();
   Expr* ParseAssignmentPattern();
   Expr* ParsePatternReplication(Expr* count, SourceLoc loc);

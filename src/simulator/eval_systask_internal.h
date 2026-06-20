@@ -29,12 +29,22 @@ Logic4Vec ScanStringToVec(Arena& arena, const std::string& str, uint32_t width);
 // Stores a converted real value (its IEEE-754 bit pattern) into a real
 // destination variable.
 void StoreRealField(Variable* var, Arena& arena, double d);
-// scanf control-string engine: interprets `fmt` against `input`, assigning
-// converted fields to the destination arguments; returns the number of items
-// assigned and reports the consumed input length via `consumed`.
-uint32_t RunScanf(const std::string& input, const std::string& fmt,
-                  Expr* const* dest, size_t ndest, SimContext& ctx,
-                  Arena& arena, size_t& consumed);
+// §21.3.4.3 scan operation: the control string `fmt`, the `input` text it is
+// matched against, the window of unevaluated destination expressions (`dest`
+// holds `ndest` items, the arguments following the format string), and the
+// out-param `consumed` reporting how much of `input` the scan absorbed.
+struct ScanRequest {
+  const std::string& input;
+  const std::string& fmt;
+  Expr* const* dest;
+  size_t ndest;
+  size_t& consumed;
+};
+
+// scanf control-string engine: interprets `req.fmt` against `req.input`,
+// assigning converted fields to the destination arguments; returns the number
+// of items assigned and reports the consumed input length via `req.consumed`.
+uint32_t RunScanf(const ScanRequest& req, SimContext& ctx, Arena& arena);
 
 // String/format-argument helpers (defined in eval_systask.cpp).
 std::string ExtractStrArg(const Expr* arg);

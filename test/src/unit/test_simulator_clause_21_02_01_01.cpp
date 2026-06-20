@@ -228,7 +228,7 @@ TEST(SysTask, FormatTimeUsesTimeformatSpec) {
   spec.precision_number = 2;
   spec.minimum_field_width = 1;
   spec.suffix_string = " ns";
-  auto out = FormatDisplay("%t", vals, {}, &spec);
+  auto out = FormatDisplay("%t", vals, {.time_format = &spec});
   EXPECT_NE(out.find("42.00"), std::string::npos);
   EXPECT_NE(out.find(" ns"), std::string::npos);
 }
@@ -248,8 +248,8 @@ TEST(SysTask, FormatTimeUppercaseUsesTimeformatSpec) {
   spec.precision_number = 1;
   spec.minimum_field_width = 1;
   spec.suffix_string = " ps";
-  auto lower = FormatDisplay("%t", vals_lower, {}, &spec);
-  auto upper = FormatDisplay("%T", vals_upper, {}, &spec);
+  auto lower = FormatDisplay("%t", vals_lower, {.time_format = &spec});
+  auto upper = FormatDisplay("%T", vals_upper, {.time_format = &spec});
   EXPECT_EQ(lower, upper);
 }
 

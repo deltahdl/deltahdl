@@ -92,13 +92,15 @@ TEST(ValueResolution, WarnedSingletonDoesNotParticipate) {
 // whose values would all warn, drops out entirely.
 TEST(ValueResolution, RangeDropsWhenEndpointUnknownOrAllValuesWarn) {
   // x/z endpoint removes the range (non-wildcard).
-  EXPECT_TRUE(CoverageDB::ResolveBinRange(2, 5, /*low_has_xz=*/false,
-                                          /*high_has_xz=*/true,
-                                          /*is_wildcard=*/false, Unsigned(3))
-                  .empty());
+  EXPECT_TRUE(
+      CoverageDB::ResolveBinRange({/*low=*/2, /*high=*/5, /*low_has_xz=*/false,
+                                   /*high_has_xz=*/true, /*is_wildcard=*/false},
+                                  Unsigned(3))
+          .empty());
   // [6:10] under signed bit[2:0] (domain -4..3) has no expressible value.
-  EXPECT_TRUE(CoverageDB::ResolveBinRange(6, 10, false, false, false, Signed(3))
-                  .empty());
+  EXPECT_TRUE(
+      CoverageDB::ResolveBinRange({6, 10, false, false, false}, Signed(3))
+          .empty());
 }
 
 // LRM 19.5.7, third range bullet: a range with at least one non-warning value
@@ -106,14 +108,14 @@ TEST(ValueResolution, RangeDropsWhenEndpointUnknownOrAllValuesWarn) {
 TEST(ValueResolution, RangeBecomesIntersectionWithEffectiveDomain) {
   // [6:10] under bit[2:0] (0..7) -> [6:7].
   EXPECT_EQ(
-      CoverageDB::ResolveBinRange(6, 10, false, false, false, Unsigned(3)),
+      CoverageDB::ResolveBinRange({6, 10, false, false, false}, Unsigned(3)),
       (std::vector<int64_t>{6, 7}));
   // [1:10] under bit[2:0] (0..7) -> [1:7].
   EXPECT_EQ(
-      CoverageDB::ResolveBinRange(1, 10, false, false, false, Unsigned(3)),
+      CoverageDB::ResolveBinRange({1, 10, false, false, false}, Unsigned(3)),
       (std::vector<int64_t>{1, 2, 3, 4, 5, 6, 7}));
   // [2:5] under signed bit[2:0] (-4..3) -> [2:3].
-  EXPECT_EQ(CoverageDB::ResolveBinRange(2, 5, false, false, false, Signed(3)),
+  EXPECT_EQ(CoverageDB::ResolveBinRange({2, 5, false, false, false}, Signed(3)),
             (std::vector<int64_t>{2, 3}));
 }
 
@@ -123,9 +125,9 @@ TEST(ValueResolution, ExampleB1UnsignedThreeBit) {
   CoverpointEffectiveType eff = Unsigned(3);
   EXPECT_TRUE(CoverageDB::SingletonValueParticipates(
       CoverageDB::ResolveBinValue(1, false, false, false, eff)));
-  EXPECT_EQ(CoverageDB::ResolveBinRange(2, 5, false, false, false, eff),
+  EXPECT_EQ(CoverageDB::ResolveBinRange({2, 5, false, false, false}, eff),
             (std::vector<int64_t>{2, 3, 4, 5}));
-  EXPECT_EQ(CoverageDB::ResolveBinRange(6, 10, false, false, false, eff),
+  EXPECT_EQ(CoverageDB::ResolveBinRange({6, 10, false, false, false}, eff),
             (std::vector<int64_t>{6, 7}));
 }
 
@@ -137,7 +139,7 @@ TEST(ValueResolution, ExampleB2UnsignedThreeBit) {
       CoverageDB::ResolveBinValue(-1, true, false, false, eff)));
   EXPECT_FALSE(CoverageDB::SingletonValueParticipates(
       CoverageDB::ResolveBinValue(15, false, false, false, eff)));
-  EXPECT_EQ(CoverageDB::ResolveBinRange(1, 10, false, false, false, eff),
+  EXPECT_EQ(CoverageDB::ResolveBinRange({1, 10, false, false, false}, eff),
             (std::vector<int64_t>{1, 2, 3, 4, 5, 6, 7}));
 }
 
@@ -147,10 +149,10 @@ TEST(ValueResolution, ExampleB3SignedThreeBit) {
   CoverpointEffectiveType eff = Signed(3);
   EXPECT_TRUE(CoverageDB::SingletonValueParticipates(
       CoverageDB::ResolveBinValue(1, false, false, false, eff)));
-  EXPECT_EQ(CoverageDB::ResolveBinRange(2, 5, false, false, false, eff),
+  EXPECT_EQ(CoverageDB::ResolveBinRange({2, 5, false, false, false}, eff),
             (std::vector<int64_t>{2, 3}));
   EXPECT_TRUE(
-      CoverageDB::ResolveBinRange(6, 10, false, false, false, eff).empty());
+      CoverageDB::ResolveBinRange({6, 10, false, false, false}, eff).empty());
 }
 
 // LRM 19.5.7 worked example b4: bit signed [2:0] p2, bins b4 = {-1,[1:10],15}
@@ -161,7 +163,7 @@ TEST(ValueResolution, ExampleB4SignedThreeBit) {
       CoverageDB::ResolveBinValue(-1, true, false, false, eff)));
   EXPECT_FALSE(CoverageDB::SingletonValueParticipates(
       CoverageDB::ResolveBinValue(15, false, false, false, eff)));
-  EXPECT_EQ(CoverageDB::ResolveBinRange(1, 10, false, false, false, eff),
+  EXPECT_EQ(CoverageDB::ResolveBinRange({1, 10, false, false, false}, eff),
             (std::vector<int64_t>{1, 2, 3}));
 }
 
@@ -170,14 +172,16 @@ TEST(ValueResolution, ExampleB4SignedThreeBit) {
 // unknown bits are resolved to 0/1 beforehand, so the range survives and
 // clamps to the effective type's domain instead of dropping out.
 TEST(ValueResolution, WildcardRangeEndpointDoesNotDropRange) {
-  EXPECT_TRUE(CoverageDB::ResolveBinRange(2, 5, /*low_has_xz=*/false,
-                                          /*high_has_xz=*/true,
-                                          /*is_wildcard=*/false, Unsigned(3))
-                  .empty());
-  EXPECT_EQ(CoverageDB::ResolveBinRange(2, 5, /*low_has_xz=*/false,
-                                        /*high_has_xz=*/true,
-                                        /*is_wildcard=*/true, Unsigned(3)),
-            (std::vector<int64_t>{2, 3, 4, 5}));
+  EXPECT_TRUE(
+      CoverageDB::ResolveBinRange({/*low=*/2, /*high=*/5, /*low_has_xz=*/false,
+                                   /*high_has_xz=*/true, /*is_wildcard=*/false},
+                                  Unsigned(3))
+          .empty());
+  EXPECT_EQ(
+      CoverageDB::ResolveBinRange({/*low=*/2, /*high=*/5, /*low_has_xz=*/false,
+                                   /*high_has_xz=*/true, /*is_wildcard=*/true},
+                                  Unsigned(3)),
+      (std::vector<int64_t>{2, 3, 4, 5}));
 }
 
 // LRM 19.5.7, third range bullet: the values expressible by the effective type

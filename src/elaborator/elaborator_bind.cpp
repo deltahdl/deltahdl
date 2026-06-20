@@ -80,7 +80,8 @@ void Elaborator::ApplyBindDirectives(RtlirModule* top) {
   if (binds.empty()) return;
   std::unordered_set<RtlirModule*> visited;
   std::unordered_set<BindDirective*> applied;
-  WalkForBind(top, std::string(top->name), binds, false, visited, applied);
+  BindWalkCtx ctx{binds, visited, applied};
+  WalkForBind(top, std::string(top->name), false, ctx);
 
   ReportUnmatchedBindTargets(binds, applied, unit_, diag_);
 }
@@ -113,18 +114,15 @@ static std::string BindChildPath(const std::string& hier_path,
 }
 
 void Elaborator::WalkForBind(RtlirModule* mod, const std::string& hier_path,
-                             const std::vector<BindDirective*>& binds,
-                             bool under_bind,
-                             std::unordered_set<RtlirModule*>& visited,
-                             std::unordered_set<BindDirective*>& applied) {
+                             bool under_bind, BindWalkCtx& ctx) {
   if (!mod) return;
-  if (!visited.insert(mod).second) return;
+  if (!ctx.visited.insert(mod).second) return;
 
-  for (auto* bd : binds) {
+  for (auto* bd : ctx.binds) {
     if (!BindAppliesToModule(bd, mod, hier_path, unit_)) continue;
     // The target resolved to a real scope or instance, so it is bindable even
     // if elaboration of the instantiation later reports a different error.
-    applied.insert(bd);
+    ctx.applied.insert(bd);
     if (under_bind) {
       diag_.Error(bd->loc,
                   "bind target shall not be a scope created by a bind");
@@ -136,8 +134,8 @@ void Elaborator::WalkForBind(RtlirModule* mod, const std::string& hier_path,
   for (auto& c : mod->children) {
     if (!c.resolved) continue;
     bool child_under_bind = under_bind || c.is_bound;
-    WalkForBind(c.resolved, BindChildPath(hier_path, c.inst_name), binds,
-                child_under_bind, visited, applied);
+    WalkForBind(c.resolved, BindChildPath(hier_path, c.inst_name),
+                child_under_bind, ctx);
   }
 }
 

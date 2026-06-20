@@ -57,6 +57,23 @@ struct VcdSignal {
   uint32_t port_id = 0;
 };
 
+// The descriptive identity of one dumped object passed to
+// VcdWriter::RegisterSignal (§21.7.5, Table 21-11; §21.7.2.3; §21.7.4.2): its
+// name and width, the backing Variable, the net type and SystemVerilog data
+// type that pick the $var var_type keyword, and the declared index range
+// (msb/lsb negative when no vector_index applies). This is everything that
+// describes the signal itself, distinct from the writer's per-registration
+// counter state (the identifier and port-id sequences).
+struct VcdSignalSpec {
+  std::string_view name;
+  uint32_t width = 1;
+  Variable* var = nullptr;
+  NetType net_type = NetType::kWire;
+  int32_t msb = -1;
+  int32_t lsb = -1;
+  VcdDataType data_type = VcdDataType::kNet;
+};
+
 class VcdWriter {
  public:
   explicit VcdWriter(const std::string& filename);
@@ -77,10 +94,17 @@ class VcdWriter {
   void BeginScope(std::string_view name,
                   VcdScopeKind kind = VcdScopeKind::kModule);
   void EndScope();
-  void RegisterSignal(std::string_view name, uint32_t width, Variable* var,
-                      NetType net_type = NetType::kWire, int32_t msb = -1,
-                      int32_t lsb = -1,
-                      VcdDataType data_type = VcdDataType::kNet);
+  // Register one dumped object from its descriptive identity (§21.7.5). The
+  // spec bundles the name/width/Variable plus the net type, declared index
+  // range, and SystemVerilog data type so the registration carries one entity
+  // rather than a long positional argument list.
+  void RegisterSignal(const VcdSignalSpec& spec);
+  // Convenience overload for the common case of a plain net (§21.7.2.3): only
+  // the name, width, and backing Variable vary; the net type, index range, and
+  // data type take their defaults.
+  void RegisterSignal(std::string_view name, uint32_t width, Variable* var) {
+    RegisterSignal(VcdSignalSpec{name, width, var});
+  }
   void EndDefinitions();
 
   void WriteTimestamp(uint64_t time);

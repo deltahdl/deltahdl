@@ -33,10 +33,12 @@ inline void MakeFixedArray(SimFixture& f, std::string_view name,
 inline void MakeIntAssoc(SimFixture& f, std::string_view name,
                          const std::vector<std::pair<int64_t, uint64_t>>& kv,
                          uint32_t index_width = 32) {
-  auto* aa = f.ctx.CreateAssocArray(name, /*elem_width=*/32,
-                                    /*is_string_key=*/false, index_width,
-                                    /*is_wildcard=*/false, /*is_4state=*/false,
-                                    /*is_index_signed=*/true);
+  auto* aa = f.ctx.CreateAssocArray(
+      name, /*elem_width=*/32,
+      /*is_string_key=*/false,
+      AssocArraySpec{index_width,
+                     /*is_wildcard=*/false, /*is_4state=*/false,
+                     /*is_index_signed=*/true});
   for (const auto& [k, v] : kv)
     aa->int_data[k] = MakeLogic4VecVal(f.arena, 32, v);
 }

@@ -11,7 +11,7 @@ namespace {
 
 TEST(IntegralIndexAssocArraySimulation, WriteAndRead) {
   SimFixture f;
-  auto* aa = f.ctx.CreateAssocArray("aa", 32, false, 32);
+  auto* aa = f.ctx.CreateAssocArray("aa", 32, false, AssocArraySpec{32});
   aa->int_data[5] = MakeLogic4VecVal(f.arena, 32, 42);
 
   EXPECT_EQ(aa->int_data[5].ToUint64(), 42u);
@@ -19,13 +19,13 @@ TEST(IntegralIndexAssocArraySimulation, WriteAndRead) {
 
 TEST(IntegralIndexAssocArraySimulation, MultipleKeys) {
   SimFixture f;
-  auto* aa = f.ctx.CreateAssocArray("aa", 32, false, 32);
+  auto* aa = f.ctx.CreateAssocArray("aa", 32, false, AssocArraySpec{32});
   FillAndCheckThreeKeys(f, aa);
 }
 
 TEST(IntegralIndexAssocArraySimulation, OverwriteKey) {
   SimFixture f;
-  auto* aa = f.ctx.CreateAssocArray("aa", 32, false, 32);
+  auto* aa = f.ctx.CreateAssocArray("aa", 32, false, AssocArraySpec{32});
   aa->int_data[7] = MakeLogic4VecVal(f.arena, 32, 100);
   aa->int_data[7] = MakeLogic4VecVal(f.arena, 32, 200);
 
@@ -34,7 +34,7 @@ TEST(IntegralIndexAssocArraySimulation, OverwriteKey) {
 
 TEST(IntegralIndexAssocArraySimulation, SignedOrdering) {
   SimFixture f;
-  auto* aa = f.ctx.CreateAssocArray("aa", 32, false, 32);
+  auto* aa = f.ctx.CreateAssocArray("aa", 32, false, AssocArraySpec{32});
   aa->int_data[10] = MakeLogic4VecVal(f.arena, 32, 1);
   aa->int_data[-5] = MakeLogic4VecVal(f.arena, 32, 2);
   aa->int_data[3] = MakeLogic4VecVal(f.arena, 32, 3);
@@ -49,7 +49,7 @@ TEST(IntegralIndexAssocArraySimulation, SignedOrdering) {
 
 TEST(IntegralIndexAssocArraySimulation, NegativeKeyAccess) {
   SimFixture f;
-  f.ctx.CreateAssocArray("aa", 32, false, 32);
+  f.ctx.CreateAssocArray("aa", 32, false, AssocArraySpec{32});
 
   auto* sel = MakeAssocSelect(f.arena, -3);
   auto* stmt = f.arena.Create<Stmt>();
@@ -80,8 +80,10 @@ static void WriteAssoc(SimFixture& f, std::string_view name, int64_t idx,
 // holding an all-x value, and the select expression aa[ix]. Returns the array
 // so callers can assert on its contents.
 static AssocArrayObject* MakeXZArrayAndSel(SimFixture& f, Expr** out_sel) {
-  auto* aa = f.ctx.CreateAssocArray("aa", 32, false, /*index_width=*/8,
-                                    /*is_wildcard=*/false, /*is_4state=*/true);
+  auto* aa = f.ctx.CreateAssocArray(
+      "aa", 32, false,
+      AssocArraySpec{/*index_width=*/8,
+                     /*is_wildcard=*/false, /*is_4state=*/true});
   auto* ix = f.ctx.CreateVariable("ix", 8);
   ix->value = MakeAllX(f.arena, 8);
   *out_sel = MakeAssocSelectIdent(f.arena, "aa", "ix");
@@ -93,9 +95,11 @@ static AssocArrayObject* MakeXZArrayAndSel(SimFixture& f, Expr** out_sel) {
 // alias the sign-extended key -56.
 TEST(IntegralIndexAssocArraySimulation, UnsignedIndexZeroExtension) {
   SimFixture f;
-  auto* aa = f.ctx.CreateAssocArray("aa", 32, false, /*index_width=*/8,
-                                    /*is_wildcard=*/false, /*is_4state=*/false,
-                                    /*is_index_signed=*/false);
+  auto* aa = f.ctx.CreateAssocArray(
+      "aa", 32, false,
+      AssocArraySpec{/*index_width=*/8,
+                     /*is_wildcard=*/false, /*is_4state=*/false,
+                     /*is_index_signed=*/false});
   WriteAssoc(f, "aa", 200, 77);
 
   EXPECT_EQ(aa->int_data.count(200), 1u);
@@ -106,9 +110,11 @@ TEST(IntegralIndexAssocArraySimulation, UnsignedIndexZeroExtension) {
 // width, so 456 (0x1C8) collapses onto the 8-bit key 200 (0xC8).
 TEST(IntegralIndexAssocArraySimulation, IndexTruncatedToWidth) {
   SimFixture f;
-  auto* aa = f.ctx.CreateAssocArray("aa", 32, false, /*index_width=*/8,
-                                    /*is_wildcard=*/false, /*is_4state=*/false,
-                                    /*is_index_signed=*/false);
+  auto* aa = f.ctx.CreateAssocArray(
+      "aa", 32, false,
+      AssocArraySpec{/*index_width=*/8,
+                     /*is_wildcard=*/false, /*is_4state=*/false,
+                     /*is_index_signed=*/false});
   WriteAssoc(f, "aa", 456, 77);
 
   EXPECT_EQ(aa->int_data.count(200), 1u);
@@ -119,9 +125,11 @@ TEST(IntegralIndexAssocArraySimulation, IndexTruncatedToWidth) {
 // §7.8.4: a signed 8-bit index type sign-extends, so 200 becomes the key -56.
 TEST(IntegralIndexAssocArraySimulation, SignedIndexSignExtension) {
   SimFixture f;
-  auto* aa = f.ctx.CreateAssocArray("aa", 32, false, /*index_width=*/8,
-                                    /*is_wildcard=*/false, /*is_4state=*/false,
-                                    /*is_index_signed=*/true);
+  auto* aa = f.ctx.CreateAssocArray(
+      "aa", 32, false,
+      AssocArraySpec{/*index_width=*/8,
+                     /*is_wildcard=*/false, /*is_4state=*/false,
+                     /*is_index_signed=*/true});
   WriteAssoc(f, "aa", 200, 77);
 
   EXPECT_EQ(aa->int_data.count(-56), 1u);
@@ -132,9 +140,11 @@ TEST(IntegralIndexAssocArraySimulation, SignedIndexSignExtension) {
 // so 200 follows 10 rather than preceding it as a sign-extended key would.
 TEST(IntegralIndexAssocArraySimulation, UnsignedOrdering) {
   SimFixture f;
-  auto* aa = f.ctx.CreateAssocArray("aa", 32, false, /*index_width=*/8,
-                                    /*is_wildcard=*/false, /*is_4state=*/false,
-                                    /*is_index_signed=*/false);
+  auto* aa = f.ctx.CreateAssocArray(
+      "aa", 32, false,
+      AssocArraySpec{/*index_width=*/8,
+                     /*is_wildcard=*/false, /*is_4state=*/false,
+                     /*is_index_signed=*/false});
   WriteAssoc(f, "aa", 200, 1);
   WriteAssoc(f, "aa", 10, 2);
 
@@ -169,9 +179,11 @@ TEST(IntegralIndexAssocArraySimulation, XZIndexInvalid) {
 // to -56.
 TEST(IntegralIndexAssocArraySimulation, UnsignedCastReadRoundtrip) {
   SimFixture f;
-  f.ctx.CreateAssocArray("aa", 32, false, /*index_width=*/8,
-                         /*is_wildcard=*/false, /*is_4state=*/false,
-                         /*is_index_signed=*/false);
+  f.ctx.CreateAssocArray(
+      "aa", 32, false,
+      AssocArraySpec{/*index_width=*/8,
+                     /*is_wildcard=*/false, /*is_4state=*/false,
+                     /*is_index_signed=*/false});
   WriteAssoc(f, "aa", 200, 99);
 
   auto* rd = MakeAssocSelect(f.arena, 200);

@@ -12,6 +12,7 @@
 
 #include "common/source_loc.h"
 #include "elaborator/const_eval.h"
+#include "elaborator/elaborator_helpers.h"
 #include "elaborator/property_rewrite.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
@@ -43,6 +44,13 @@ class Elaborator {
   void RunPreElaborationValidations();
 
   RtlirDesign* ElaborateTops(const std::vector<ModuleDecl*>& top_decls);
+  // Elaborates each top-level module declaration into `design`; returns false
+  // (after reporting) if any top fails to elaborate.
+  bool ElaborateTopModules(const std::vector<ModuleDecl*>& top_decls,
+                           RtlirDesign* design);
+  // §23.10.4 / §27: runs the defparam-application and pending-generate
+  // expansion fixpoint over every top in `design` until no generates remain.
+  void ResolveDefparamsAndGenerates(RtlirDesign* design);
 
   void ValidateNameSpaces();
 
@@ -105,6 +113,10 @@ class Elaborator {
   static bool HasParamPortWithoutDefault(const ModuleDecl* decl);
 
   void ElaborateItem(ModuleItem* item, RtlirModule* mod);
+  // Two-level dispatch for ElaborateItem: each handles a cohesive subset of
+  // module-item kinds and returns true when it consumed `item->kind`.
+  bool ElaborateDeclItem(ModuleItem* item, RtlirModule* mod);
+  bool ElaborateBehavioralItem(ModuleItem* item, RtlirModule* mod);
   void ElaborateParamDecl(ModuleItem* item, RtlirModule* mod);
   void ElaborateNetDecl(ModuleItem* item, RtlirModule* mod);
   void ElaborateVarDecl(ModuleItem* item, RtlirModule* mod);
@@ -125,6 +137,10 @@ class Elaborator {
   void ElaborateNettypeDecl(ModuleItem* item, RtlirModule* mod);
 
   void ElaborateItems(const ModuleDecl* decl, RtlirModule* mod);
+  // Clears every per-module bookkeeping table before a module's items are
+  // elaborated, and runs the post-item legality validations for `decl`/`mod`.
+  void ResetItemElaborationState();
+  void RunPostItemValidations(const ModuleDecl* decl, RtlirModule* mod);
 
   void ElaborateModuleInst(ModuleItem* item, RtlirModule* mod);
 
@@ -694,10 +710,16 @@ class Elaborator {
   ModuleItem* FindCuScopeItem(std::string_view name) const;
 
   void ApplyBindDirectives(RtlirModule* top);
+  // §23.11: the invariant context carried through the bind hierarchy walk --
+  // the set of bind directives being matched, the modules already visited
+  // (cycle guard), and the directives that have matched a target so far.
+  struct BindWalkCtx {
+    const std::vector<BindDirective*>& binds;
+    std::unordered_set<RtlirModule*>& visited;
+    std::unordered_set<BindDirective*>& applied;
+  };
   void WalkForBind(RtlirModule* mod, const std::string& hier_path,
-                   const std::vector<BindDirective*>& binds, bool under_bind,
-                   std::unordered_set<RtlirModule*>& visited,
-                   std::unordered_set<BindDirective*>& applied);
+                   bool under_bind, BindWalkCtx& ctx);
   void ApplyBindInstance(BindDirective* bd, RtlirModule* target);
 
   void ValidateModportExportConflicts(RtlirModule* top);
@@ -916,77 +938,5 @@ class Elaborator {
   };
   std::vector<EarlyDefparamResolution> early_defparam_resolutions_;
 };
-
-struct ResolvedAttribute;
-enum class RtlirProcessKind : uint8_t;
-
-std::vector<ResolvedAttribute> ResolveAttributes(
-    const std::vector<Attribute>& attrs, DiagEngine& diag);
-uint32_t LookupLhsWidth(const Expr* lhs, const RtlirModule* mod);
-RtlirProcessKind MapAlwaysKind(AlwaysKind ak);
-void AddProcess(RtlirProcessKind kind, ModuleItem* item, RtlirModule* mod,
-                Arena& arena, DiagEngine& diag,
-                const std::unordered_map<std::string_view, const ModuleItem*>*
-                    func_map = nullptr);
-
-void ElaborateGateInst(ModuleItem* item, RtlirModule* mod, Arena& arena);
-
-// §6.22.6: a nettype matches itself and the nettype of nets declared using it,
-// and a renaming alias of a user-defined nettype matches the nettype it
-// renames. Two nettype names match when they resolve to the same canonical
-// (source) nettype; `nettype_canonical` maps each nettype name to its canonical
-// name.
-bool NettypesMatch(std::string_view a, std::string_view b,
-                   const std::unordered_map<std::string_view, std::string_view>&
-                       nettype_canonical);
-
-void ValidateBidirectionalSwitchConnections(
-    const ModuleItem* item, const RtlirModule* mod, DiagEngine& diag,
-    const std::unordered_map<std::string_view, std::string_view>&
-        nettype_canonical);
-
-void ValidatePrimitiveOutputTerminalWidths(const ModuleItem* item,
-                                           const RtlirModule* mod,
-                                           DiagEngine& diag);
-
-void PopulateParamTypeInfo(RtlirParamDecl& pd, const DataType& dtype);
-
-void PopulateParamTypeInfo(RtlirParamDecl& pd, const DataType& dtype,
-                           const TypedefMap& typedefs, const ScopeMap& scope);
-
-int64_t ConvertOverrideValue(int64_t value, const RtlirParamDecl& pd);
-
-bool ParamExpectsIntegerValue(const RtlirParamDecl& pd, const DataType& dtype);
-
-std::string_view ExprIdent(const Expr* e);
-const ClassDecl* FindClassDecl(std::string_view name,
-                               const CompilationUnit* unit);
-bool IsRealType(DataTypeKind k);
-
-// Constructs the implicit net that an identifier acquires when it is used as a
-// port expression. This is the single point shared by two subclauses: §6.10
-// fixes the net's kind and size -- the default net type, sized to the vector
-// width of the port expression declaration -- while §23.2.2.1 fixes its
-// signedness -- such a net is unsigned unless the port itself is declared
-// signed. Both subclauses depend on the same materialization, so they share it.
-RtlirNet MakeImplicitPortNet(std::string_view name, uint32_t port_width,
-                             bool port_is_signed, NetType default_nettype);
-
-// §6.6.7: the structural constraints a user-defined resolution function for a
-// nettype whose data type is T must satisfy. The function shall return T, take
-// a single input argument that is a dynamic array of T, and be automatic (hold
-// no state). A class method used as a resolution function shall be a static
-// method, since it is called in a context where no class object is involved.
-struct NettypeResolutionSig {
-  bool return_type_matches_nettype = false;
-  bool single_input_argument = false;
-  bool argument_is_dynamic_array_of_type = false;
-  bool is_automatic = false;
-  bool is_class_method = false;
-  bool is_static_method = false;
-};
-
-// Returns true iff the resolution-function signature conforms to §6.6.7.
-bool ValidateNettypeResolutionFunction(const NettypeResolutionSig& sig);
 
 }  // namespace delta

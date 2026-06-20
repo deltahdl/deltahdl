@@ -451,17 +451,16 @@ bool TypesEquivalent(const DataType& a, const DataType& b) {
   return Is4stateForEquivalence(a) == Is4stateForEquivalence(b);
 }
 
-bool ElementTypesEquivalent(DataTypeKind a_kind, uint32_t a_width,
-                            bool a_signed, bool a_4state, DataTypeKind b_kind,
-                            uint32_t b_width, bool b_signed, bool b_4state) {
-  if (CanonKind(a_kind) == CanonKind(b_kind) && a_signed == b_signed &&
-      a_width == b_width && a_4state == b_4state) {
+bool ElementTypesEquivalent(const ElementTypeInfo& a,
+                            const ElementTypeInfo& b) {
+  if (CanonKind(a.kind) == CanonKind(b.kind) && a.is_signed == b.is_signed &&
+      a.width == b.width && a.is_4state == b.is_4state) {
     return true;
   }
 
-  if (IsIntegralType(a_kind) && IsIntegralType(b_kind)) {
-    return a_width == b_width && a_width > 0 && a_signed == b_signed &&
-           a_4state == b_4state;
+  if (IsIntegralType(a.kind) && IsIntegralType(b.kind)) {
+    return a.width == b.width && a.width > 0 && a.is_signed == b.is_signed &&
+           a.is_4state == b.is_4state;
   }
   return false;
 }

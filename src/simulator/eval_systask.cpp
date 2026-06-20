@@ -452,7 +452,7 @@ static Logic4Vec EvalSformatf(const Expr* expr, SimContext& ctx, Arena& arena) {
     arg_vals.push_back(EvalExpr(expr->args[i], ctx, arena));
   }
   WarnIfArgCountMismatch(ctx, "$sformatf", fmt, arg_vals.size());
-  std::string result = FormatDisplay(fmt, arg_vals, {}, nullptr, {}, &ctx);
+  std::string result = FormatDisplay(fmt, arg_vals, {.ctx = &ctx});
   return StringToLogic4Vec(arena, result);
 }
 

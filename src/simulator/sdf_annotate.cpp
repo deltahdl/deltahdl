@@ -470,9 +470,14 @@ void AnnotateSdfDelayEntry(const SdfCell& cell, const SdfDelayEntryRef& entry,
       break;
     case SdfDelayEntryKind::kPulseLimit: {
       const auto& pl = cell.pulse_limits[entry.index];
-      mgr.AddSdfPulseLimit(pl.src_port, pl.dst_port, SelectMtm(pl.reject, mtm),
-                           pl.has_error, SelectMtm(pl.error, mtm),
-                           pl.is_percent);
+      mgr.AddSdfPulseLimit(SdfPulseLimitSpec{
+          /*src=*/pl.src_port,
+          /*dst=*/pl.dst_port,
+          /*reject=*/SelectMtm(pl.reject, mtm),
+          /*error=*/SelectMtm(pl.error, mtm),
+          /*has_error=*/pl.has_error,
+          /*is_percent=*/pl.is_percent,
+      });
       break;
     }
     case SdfDelayEntryKind::kInterconnect:

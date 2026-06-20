@@ -34,7 +34,7 @@ TEST(LibraryBindingDisplay, FormatSpecifierLowerLProducesBindingInfo) {
   // empty prefix; %l reports its resolved library.cell.
   fx.ctx.RegisterInstanceBinding("", "rtlLib", "adder");
   std::vector<Logic4Vec> vals;
-  auto out = FormatDisplay("%l", vals, {}, nullptr, {}, &fx.ctx);
+  auto out = FormatDisplay("%l", vals, {.ctx = &fx.ctx});
   EXPECT_EQ(out, "rtlLib.adder");
 }
 
@@ -43,7 +43,7 @@ TEST(LibraryBindingDisplay, FormatSpecifierUpperLProducesBindingInfo) {
   fx.ctx.RegisterInstanceBinding("", "rtlLib", "adder");
   std::vector<Logic4Vec> vals;
   // %L is the same specifier as %l and reports the same binding.
-  auto out = FormatDisplay("%L", vals, {}, nullptr, {}, &fx.ctx);
+  auto out = FormatDisplay("%L", vals, {.ctx = &fx.ctx});
   EXPECT_EQ(out, "rtlLib.adder");
 }
 
@@ -51,7 +51,7 @@ TEST(LibraryBindingDisplay, FormatSpecifierLDoesNotConsumeArg) {
   BindingDisplayFixture fx;
   fx.ctx.RegisterInstanceBinding("", "rtlLib", "adder");
   std::vector<Logic4Vec> vals{MakeLogic4VecVal(fx.arena, 8, 42)};
-  auto out = FormatDisplay("%l %d", vals, {}, nullptr, {}, &fx.ctx);
+  auto out = FormatDisplay("%l %d", vals, {.ctx = &fx.ctx});
   // %l takes no argument (like %m), so the following %d still renders the
   // value.
   EXPECT_NE(out.find("rtlLib.adder"), std::string::npos);
@@ -69,7 +69,7 @@ TEST(LibraryBindingDisplay, FormatSpecifierLSelectsContainingInstanceBinding) {
   proc.inst_prefix = "a2.";
   fx.ctx.SetCurrentProcess(&proc);
   std::vector<Logic4Vec> vals;
-  auto out = FormatDisplay("%l", vals, {}, nullptr, {}, &fx.ctx);
+  auto out = FormatDisplay("%l", vals, {.ctx = &fx.ctx});
   fx.ctx.SetCurrentProcess(nullptr);
   EXPECT_EQ(out, "gateLib.adder");
 }
@@ -80,7 +80,7 @@ TEST(LibraryBindingDisplay, FormatSpecifierLFallsBackWhenInstanceHasNoBinding) {
   // With no recorded binding for the containing instance, %l still substitutes
   // a non-empty library.cell-shaped token between the surrounding literal text
   // rather than vanishing.
-  auto out = FormatDisplay("x%ly", vals, {}, nullptr, {}, &fx.ctx);
+  auto out = FormatDisplay("x%ly", vals, {.ctx = &fx.ctx});
   EXPECT_EQ(out.front(), 'x');
   EXPECT_EQ(out.back(), 'y');
   EXPECT_NE(out.find('.'), std::string::npos);

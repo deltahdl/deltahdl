@@ -460,27 +460,42 @@ Expr* MakeErrorExpr(Arena& arena, SourceLoc loc) {
 
 }  // namespace
 
+// casting_type allows constant_primary; an integer literal followed by '(expr)
+// is a width-cast (the literal is the target width). Otherwise it is just the
+// integer literal.
+Expr* Parser::ParseIntLiteralPrimary(const Token& tok) {
+  auto* lit = MakeLiteral(ExprKind::kIntegerLiteral, tok);
+  if (!Check(TokenKind::kApostrophe)) return lit;
+  auto saved = lexer_.SavePos();
+  Consume();
+  if (!Check(TokenKind::kLParen)) {
+    lexer_.RestorePos(saved);
+    return lit;
+  }
+  Consume();
+  auto* value = ParseExpr();
+  auto* cast = MakeNodeCast(arena_, lit, value);
+  Expect(TokenKind::kRParen);
+  return cast;
+}
+
+// type_reference primary ('type(...)' or the 'type' keyword), optionally used
+// as the casting_type of an assignment-pattern cast.
+Expr* Parser::ParseTypeRefPrimary() {
+  auto* ref = ParseTypeRefExpr();
+  if (Check(TokenKind::kApostropheLBrace)) {
+    auto* pat = ParseAssignmentPattern();
+    return MakeNodeCast(arena_, ref, pat);
+  }
+  return ref;
+}
+
 Expr* Parser::ParsePrimaryExpr() {
   auto tok = CurrentToken();
 
   switch (tok.kind) {
-    case TokenKind::kIntLiteral: {
-      auto* lit = MakeLiteral(ExprKind::kIntegerLiteral, tok);
-      // casting_type allows constant_primary; an integer literal followed by
-      // '(expr) is a width-cast (the literal is the target width).
-      if (!Check(TokenKind::kApostrophe)) return lit;
-      auto saved = lexer_.SavePos();
-      Consume();
-      if (!Check(TokenKind::kLParen)) {
-        lexer_.RestorePos(saved);
-        return lit;
-      }
-      Consume();
-      auto* value = ParseExpr();
-      auto* cast = MakeNodeCast(arena_, lit, value);
-      Expect(TokenKind::kRParen);
-      return cast;
-    }
+    case TokenKind::kIntLiteral:
+      return ParseIntLiteralPrimary(tok);
     case TokenKind::kUnbasedUnsizedLiteral:
       return MakeLiteral(ExprKind::kUnbasedUnsizedLiteral, tok);
     case TokenKind::kRealLiteral:
@@ -500,15 +515,8 @@ Expr* Parser::ParsePrimaryExpr() {
       return ParseConcatenation();
     case TokenKind::kApostropheLBrace:
       return ParseAssignmentPattern();
-    case TokenKind::kKwType: {
-      auto* ref = ParseTypeRefExpr();
-
-      if (Check(TokenKind::kApostropheLBrace)) {
-        auto* pat = ParseAssignmentPattern();
-        return MakeNodeCast(arena_, ref, pat);
-      }
-      return ref;
-    }
+    case TokenKind::kKwType:
+      return ParseTypeRefPrimary();
     case TokenKind::kDollar:
     case TokenKind::kKwNull:
       return MakeLiteral(ExprKind::kIdentifier, tok);
@@ -645,20 +653,15 @@ Expr* Parser::TryParseUserTypeCast(const Token& tok) {
   return cast;
 }
 
-Expr* Parser::ParseIdentifierExpr() {
-  auto tok = Consume();
-
-  if (auto* cast = TryParseUserTypeCast(tok)) return cast;
-
-  Expr* result = ParseMemberAccessChain(tok);
-
-  if (Check(TokenKind::kHash) && known_types_.count(tok.text) != 0) {
-    result = ParseParameterizedScope(result);
-  }
-
+// An identifier or scoped name may be the casting_type of a cast: "id'{...}"
+// (assignment-pattern cast) or "id'(expr)" (value cast). Returns the cast node
+// when one is recognized, leaving *handled true; otherwise returns base with
+// *handled false and the lexer position restored.
+Expr* Parser::TryParseIdentifierCast(Expr* base, bool* handled) {
+  *handled = true;
   if (Check(TokenKind::kApostropheLBrace)) {
     auto* pat = ParseAssignmentPattern();
-    return MakeNodeCast(arena_, result, pat);
+    return MakeNodeCast(arena_, base, pat);
   }
   if (Check(TokenKind::kApostrophe)) {
     auto saved = lexer_.SavePos();
@@ -666,13 +669,19 @@ Expr* Parser::ParseIdentifierExpr() {
     if (Check(TokenKind::kLParen)) {
       Consume();
       auto* value = ParseExpr();
-      auto* cast = MakeNodeCast(arena_, result, value);
+      auto* cast = MakeNodeCast(arena_, base, value);
       Expect(TokenKind::kRParen);
       return cast;
     }
     lexer_.RestorePos(saved);
   }
+  *handled = false;
+  return base;
+}
 
+// Parse the run of postfix call/select operators (with optional intervening
+// attribute lists and trailing member accesses) that follow a name primary.
+Expr* Parser::ParseIdentifierPostfixChain(Expr* result) {
   while (Check(TokenKind::kLParen) || Check(TokenKind::kLBracket) ||
          Check(TokenKind::kAttrStart)) {
     if (Check(TokenKind::kAttrStart)) {
@@ -688,15 +697,11 @@ Expr* Parser::ParseIdentifierExpr() {
       result = MakeMemberAccess(result);
     }
   }
+  return result;
+}
 
-  if (Check(TokenKind::kPlusPlus) || Check(TokenKind::kMinusMinus)) {
-    auto op_tok = Consume();
-    return MakePostfixUnary(arena_, op_tok.kind, result);
-  }
-
-  result = ParseWithClause(result);
-  if (!result->with_expr) return result;
-
+// Parse the member/select tail that may follow a 'with' clause expression.
+Expr* Parser::ParseWithClauseTail(Expr* result) {
   while (Check(TokenKind::kDot) || Check(TokenKind::kLBracket)) {
     if (!Check(TokenKind::kDot)) {
       result = ParseSelectExpr(result);
@@ -706,6 +711,34 @@ Expr* Parser::ParseIdentifierExpr() {
     if (Check(TokenKind::kLParen)) result = ParseCallExpr(result);
   }
   return result;
+}
+
+Expr* Parser::ParseIdentifierExpr() {
+  auto tok = Consume();
+
+  if (auto* cast = TryParseUserTypeCast(tok)) return cast;
+
+  Expr* result = ParseMemberAccessChain(tok);
+
+  if (Check(TokenKind::kHash) && known_types_.count(tok.text) != 0) {
+    result = ParseParameterizedScope(result);
+  }
+
+  bool cast_handled = false;
+  Expr* cast = TryParseIdentifierCast(result, &cast_handled);
+  if (cast_handled) return cast;
+
+  result = ParseIdentifierPostfixChain(result);
+
+  if (Check(TokenKind::kPlusPlus) || Check(TokenKind::kMinusMinus)) {
+    auto op_tok = Consume();
+    return MakePostfixUnary(arena_, op_tok.kind, result);
+  }
+
+  result = ParseWithClause(result);
+  if (!result->with_expr) return result;
+
+  return ParseWithClauseTail(result);
 }
 
 void Parser::ParseTrailingNamedArgs(Expr* call) {

@@ -507,22 +507,19 @@ static std::vector<int64_t> EnumerateInclusiveRange(int64_t lo, int64_t hi) {
   return out;
 }
 
-std::vector<int64_t> CoverageDB::ResolveBinRange(int64_t low, int64_t high,
-                                                 bool low_has_xz,
-                                                 bool high_has_xz,
-                                                 bool is_wildcard,
+std::vector<int64_t> CoverageDB::ResolveBinRange(const BinRangeSpec& range,
                                                  CoverpointEffectiveType eff) {
   // An x/z bit in either endpoint removes the whole range, unless this is a
   // wildcard bin whose unknown bits were already resolved (LRM 19.5.7, second
   // range bullet).
-  if (!is_wildcard && (low_has_xz || high_has_xz)) return {};
-  if (low > high) return {};
+  if (!range.is_wildcard && (range.low_has_xz || range.high_has_xz)) return {};
+  if (range.low > range.high) return {};
   // The surviving range is the intersection of [low:high] with the domain the
   // effective type can express. An empty intersection means every value in the
   // range would warn, so the range drops out (LRM 19.5.7, second and third
   // range bullets).
-  int64_t lo = std::max(low, EffectiveTypeMin(eff));
-  int64_t hi = std::min(high, EffectiveTypeMax(eff));
+  int64_t lo = std::max(range.low, EffectiveTypeMin(eff));
+  int64_t hi = std::min(range.high, EffectiveTypeMax(eff));
   if (lo > hi) return {};
   return EnumerateInclusiveRange(lo, hi);
 }

@@ -33,9 +33,9 @@ namespace {
 // which matches from clock tick 3 to clock tick 11.
 TEST(SvaEngine, WithinContainedSubintervalMatches) {
   // seq2 spans ticks [3,11]; seq1 spans the contained [4,10].
-  auto m = EvalSequenceWithin(/*inner_match=*/true, /*inner_start=*/4,
-                              /*inner_end=*/10, /*outer_match=*/true,
-                              /*outer_start=*/3, /*outer_end=*/11);
+  auto m = EvalSequenceWithin(
+      SequenceMatchSpan{/*matched=*/true, /*start_time=*/4, /*end_time=*/10},
+      SequenceMatchSpan{/*matched=*/true, /*start_time=*/3, /*end_time=*/11});
   EXPECT_TRUE(m.matched);
   // The composite spans seq2's interval, so it completes when seq2 completes.
   EXPECT_EQ(m.end_time, 11u);
@@ -44,9 +44,15 @@ TEST(SvaEngine, WithinContainedSubintervalMatches) {
 // §16.9.10: both operands shall match. A non-matching operand defeats the
 // containment even when the time bounds would otherwise be satisfied.
 TEST(SvaEngine, WithinRequiresBothOperandsToMatch) {
-  EXPECT_FALSE(EvalSequenceWithin(false, 4, 10, true, 3, 11).matched);
-  EXPECT_FALSE(EvalSequenceWithin(true, 4, 10, false, 3, 11).matched);
-  EXPECT_FALSE(EvalSequenceWithin(false, 4, 10, false, 3, 11).matched);
+  EXPECT_FALSE(EvalSequenceWithin(SequenceMatchSpan{false, 4, 10},
+                                  SequenceMatchSpan{true, 3, 11})
+                   .matched);
+  EXPECT_FALSE(EvalSequenceWithin(SequenceMatchSpan{true, 4, 10},
+                                  SequenceMatchSpan{false, 3, 11})
+                   .matched);
+  EXPECT_FALSE(EvalSequenceWithin(SequenceMatchSpan{false, 4, 10},
+                                  SequenceMatchSpan{false, 3, 11})
+                   .matched);
 }
 
 // §16.9.10 first bullet: the start point of seq1 shall be no earlier than the
@@ -54,9 +60,13 @@ TEST(SvaEngine, WithinRequiresBothOperandsToMatch) {
 // contained and so does not match. Coincident starts are allowed (no earlier).
 TEST(SvaEngine, WithinStartNoEarlierThanOuterStart) {
   // seq1 starts at tick 2, before seq2's start at 3: not contained.
-  EXPECT_FALSE(EvalSequenceWithin(true, 2, 10, true, 3, 11).matched);
+  EXPECT_FALSE(EvalSequenceWithin(SequenceMatchSpan{true, 2, 10},
+                                  SequenceMatchSpan{true, 3, 11})
+                   .matched);
   // Coincident start at tick 3 satisfies the "no earlier" bound.
-  EXPECT_TRUE(EvalSequenceWithin(true, 3, 10, true, 3, 11).matched);
+  EXPECT_TRUE(EvalSequenceWithin(SequenceMatchSpan{true, 3, 10},
+                                 SequenceMatchSpan{true, 3, 11})
+                  .matched);
 }
 
 // §16.9.10 second bullet: the match point of seq1 shall be no later than the
@@ -64,9 +74,13 @@ TEST(SvaEngine, WithinStartNoEarlierThanOuterStart) {
 // Coincident completion points are allowed (no later).
 TEST(SvaEngine, WithinEndNoLaterThanOuterEnd) {
   // seq1 completes at tick 12, after seq2's completion at 11: not contained.
-  EXPECT_FALSE(EvalSequenceWithin(true, 4, 12, true, 3, 11).matched);
+  EXPECT_FALSE(EvalSequenceWithin(SequenceMatchSpan{true, 4, 12},
+                                  SequenceMatchSpan{true, 3, 11})
+                   .matched);
   // Coincident completion at tick 11 satisfies the "no later" bound.
-  EXPECT_TRUE(EvalSequenceWithin(true, 4, 11, true, 3, 11).matched);
+  EXPECT_TRUE(EvalSequenceWithin(SequenceMatchSpan{true, 4, 11},
+                                 SequenceMatchSpan{true, 3, 11})
+                  .matched);
 }
 
 // §16.9.10 both bullets at once: the contained match may span the whole of
@@ -75,9 +89,9 @@ TEST(SvaEngine, WithinEndNoLaterThanOuterEnd) {
 // hold at equality simultaneously, and the containment still matches. This is
 // the largest subinterval the construct admits.
 TEST(SvaEngine, WithinSeq1SpanningEntireOuterIntervalMatches) {
-  auto m = EvalSequenceWithin(/*inner_match=*/true, /*inner_start=*/3,
-                              /*inner_end=*/11, /*outer_match=*/true,
-                              /*outer_start=*/3, /*outer_end=*/11);
+  auto m = EvalSequenceWithin(
+      SequenceMatchSpan{/*matched=*/true, /*start_time=*/3, /*end_time=*/11},
+      SequenceMatchSpan{/*matched=*/true, /*start_time=*/3, /*end_time=*/11});
   EXPECT_TRUE(m.matched);
   // The composite still completes at seq2's match point.
   EXPECT_EQ(m.end_time, 11u);

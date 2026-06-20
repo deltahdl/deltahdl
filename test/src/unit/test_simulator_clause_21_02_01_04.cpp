@@ -174,7 +174,7 @@ TEST(StrengthFormat, PercentVConsumesOneArgumentEach) {
   std::vector<Logic4Vec> vals{MakeLogic4VecVal(arena, 1, 1),
                               MakeLogic4VecVal(arena, 1, 0)};
   std::vector<std::string> v_fmts{"St1", "Pu0"};
-  auto out = FormatDisplay("a=%v b=%v", vals, {}, nullptr, v_fmts);
+  auto out = FormatDisplay("a=%v b=%v", vals, {.v_fmts = &v_fmts});
   EXPECT_EQ(out, "a=St1 b=Pu0");
 }
 
@@ -184,8 +184,8 @@ TEST(StrengthFormat, PercentVUppercaseMatchesLowercase) {
   Arena arena;
   std::vector<Logic4Vec> vals{MakeLogic4VecVal(arena, 1, 0)};
   std::vector<std::string> v_fmts{"StX"};
-  EXPECT_EQ(FormatDisplay("%V", vals, {}, nullptr, v_fmts),
-            FormatDisplay("%v", vals, {}, nullptr, v_fmts));
+  EXPECT_EQ(FormatDisplay("%V", vals, {.v_fmts = &v_fmts}),
+            FormatDisplay("%v", vals, {.v_fmts = &v_fmts}));
 }
 
 // End-to-end: a wire driven to a known logic 1 by a continuous assignment
@@ -246,7 +246,7 @@ TEST(StrengthFormat, PercentVConsumesItsArgumentWithoutAStrengthString) {
   std::vector<Logic4Vec> vals{MakeLogic4VecVal(arena, 8, 5),
                               MakeLogic4VecVal(arena, 8, 9)};
   std::vector<std::string> v_fmts{""};
-  auto out = FormatDisplay("%v=%d", vals, {}, nullptr, v_fmts);
+  auto out = FormatDisplay("%v=%d", vals, {.v_fmts = &v_fmts});
   // The 5 was consumed by the %v (which had no strength string), so it never
   // prints; the %d therefore binds to the second argument, 9.
   EXPECT_EQ(out.find('5'), std::string::npos);
@@ -257,7 +257,7 @@ TEST(StrengthFormat, PercentVConsumesItsArgumentWithoutAStrengthString) {
 // crash nor leave a stray percent sign -- it simply renders nothing.
 TEST(StrengthFormat, PercentVWithoutArgumentEmitsNothing) {
   std::vector<Logic4Vec> vals;
-  auto out = FormatDisplay("%v", vals, {}, nullptr, {});
+  auto out = FormatDisplay("%v", vals);
   EXPECT_TRUE(out.empty());
 }
 

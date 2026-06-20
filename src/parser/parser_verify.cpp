@@ -85,6 +85,50 @@ void Parser::ParseRsCodeBlockStmts(std::vector<Stmt*>& stmts) {
   }
 }
 
+void Parser::ParseRsProdIf(RsProd& prod) {
+  prod.kind = RsProdKind::kIf;
+  Consume();
+  Expect(TokenKind::kLParen);
+  prod.condition = ParseExpr();
+  Expect(TokenKind::kRParen);
+  prod.if_true = ParseRsProductionItem();
+  if (Match(TokenKind::kKwElse)) {
+    prod.has_else = true;
+    prod.if_false = ParseRsProductionItem();
+  }
+}
+
+void Parser::ParseRsProdRepeat(RsProd& prod) {
+  prod.kind = RsProdKind::kRepeat;
+  Consume();
+  Expect(TokenKind::kLParen);
+  prod.repeat_count = ParseExpr();
+  Expect(TokenKind::kRParen);
+  prod.repeat_item = ParseRsProductionItem();
+}
+
+void Parser::ParseRsProdCase(RsProd& prod) {
+  prod.kind = RsProdKind::kCase;
+  Consume();
+  Expect(TokenKind::kLParen);
+  prod.case_expr = ParseExpr();
+  Expect(TokenKind::kRParen);
+  bool seen_default = false;
+  // 18.17.3: a case production statement shall contain at most one default
+  // item; flag any additional default as illegal.
+  while (!Check(TokenKind::kKwEndcase) && !AtEnd()) {
+    auto item_loc = CurrentLoc();
+    bool is_default_here = Check(TokenKind::kKwDefault);
+    prod.case_items.push_back(ParseRsCaseItem());
+    if (is_default_here && seen_default) {
+      diag_.Error(item_loc,
+                  "case production shall have at most one 'default' item");
+    }
+    if (is_default_here) seen_default = true;
+  }
+  Expect(TokenKind::kKwEndcase);
+}
+
 RsProd Parser::ParseRsProd() {
   RsProd prod;
 
@@ -93,58 +137,16 @@ RsProd Parser::ParseRsProd() {
     Consume();
     ParseRsCodeBlockStmts(prod.code_stmts);
     Expect(TokenKind::kRBrace);
-    return prod;
+  } else if (Check(TokenKind::kKwIf)) {
+    ParseRsProdIf(prod);
+  } else if (Check(TokenKind::kKwRepeat)) {
+    ParseRsProdRepeat(prod);
+  } else if (Check(TokenKind::kKwCase)) {
+    ParseRsProdCase(prod);
+  } else {
+    prod.kind = RsProdKind::kItem;
+    prod.item = ParseRsProductionItem();
   }
-
-  if (Check(TokenKind::kKwIf)) {
-    prod.kind = RsProdKind::kIf;
-    Consume();
-    Expect(TokenKind::kLParen);
-    prod.condition = ParseExpr();
-    Expect(TokenKind::kRParen);
-    prod.if_true = ParseRsProductionItem();
-    if (Match(TokenKind::kKwElse)) {
-      prod.has_else = true;
-      prod.if_false = ParseRsProductionItem();
-    }
-    return prod;
-  }
-
-  if (Check(TokenKind::kKwRepeat)) {
-    prod.kind = RsProdKind::kRepeat;
-    Consume();
-    Expect(TokenKind::kLParen);
-    prod.repeat_count = ParseExpr();
-    Expect(TokenKind::kRParen);
-    prod.repeat_item = ParseRsProductionItem();
-    return prod;
-  }
-
-  if (Check(TokenKind::kKwCase)) {
-    prod.kind = RsProdKind::kCase;
-    Consume();
-    Expect(TokenKind::kLParen);
-    prod.case_expr = ParseExpr();
-    Expect(TokenKind::kRParen);
-    bool seen_default = false;
-    // 18.17.3: a case production statement shall contain at most one default
-    // item; flag any additional default as illegal.
-    while (!Check(TokenKind::kKwEndcase) && !AtEnd()) {
-      auto item_loc = CurrentLoc();
-      bool is_default_here = Check(TokenKind::kKwDefault);
-      prod.case_items.push_back(ParseRsCaseItem());
-      if (is_default_here && seen_default) {
-        diag_.Error(item_loc,
-                    "case production shall have at most one 'default' item");
-      }
-      if (is_default_here) seen_default = true;
-    }
-    Expect(TokenKind::kKwEndcase);
-    return prod;
-  }
-
-  prod.kind = RsProdKind::kItem;
-  prod.item = ParseRsProductionItem();
   return prod;
 }
 

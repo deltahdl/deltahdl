@@ -100,8 +100,9 @@ TEST(WildcardAssocArraySimulation, OverwriteKey) {
 // not a sign-extended negative.
 TEST(WildcardAssocArraySimulation, IndexTreatedAsUnsigned) {
   SimFixture f;
-  auto* aa = f.ctx.CreateAssocArray("aa", 32, /*is_string_key=*/false,
-                                    /*index_width=*/32, /*is_wildcard=*/true);
+  auto* aa = f.ctx.CreateAssocArray(
+      "aa", 32, /*is_string_key=*/false,
+      AssocArraySpec{/*index_width=*/32, /*is_wildcard=*/true});
 
   auto* sel = MakeAssocSelect(f.arena, 0xFFFFFFFF);
   auto* stmt = f.arena.Create<Stmt>();
@@ -136,8 +137,9 @@ TEST(WildcardAssocArraySimulation, EquivalentWidthsCollapse) {
 // rejected and no entry is created.
 TEST(WildcardAssocArraySimulation, UnknownIndexNotStored) {
   SimFixture f;
-  auto* aa = f.ctx.CreateAssocArray("aa", 32, /*is_string_key=*/false,
-                                    /*index_width=*/32, /*is_wildcard=*/true);
+  auto* aa = f.ctx.CreateAssocArray(
+      "aa", 32, /*is_string_key=*/false,
+      AssocArraySpec{/*index_width=*/32, /*is_wildcard=*/true});
 
   auto* sel = f.arena.Create<Expr>();
   sel->kind = ExprKind::kSelect;
@@ -198,8 +200,9 @@ TEST(WildcardAssocArraySimulation, SingleCharStringLiteralIndex) {
 // value. Exercises the read path (distinct from the rejected write).
 TEST(WildcardAssocArraySimulation, UnknownIndexReadReturnsDefault) {
   SimFixture f;
-  auto* aa = f.ctx.CreateAssocArray("aa", 32, /*is_string_key=*/false,
-                                    /*index_width=*/32, /*is_wildcard=*/true);
+  auto* aa = f.ctx.CreateAssocArray(
+      "aa", 32, /*is_string_key=*/false,
+      AssocArraySpec{/*index_width=*/32, /*is_wildcard=*/true});
   aa->int_data[5] = MakeLogic4VecVal(f.arena, 32, 77);
 
   auto* rd = f.arena.Create<Expr>();
@@ -222,8 +225,9 @@ TEST(WildcardAssocArraySimulation, UnknownIndexReadReturnsDefault) {
 // as it would under a signed interpretation.
 TEST(WildcardAssocArraySimulation, UnsignedKeyOrdering) {
   SimFixture f;
-  auto* aa = f.ctx.CreateAssocArray("aa", 32, /*is_string_key=*/false,
-                                    /*index_width=*/32, /*is_wildcard=*/true);
+  auto* aa = f.ctx.CreateAssocArray(
+      "aa", 32, /*is_string_key=*/false,
+      AssocArraySpec{/*index_width=*/32, /*is_wildcard=*/true});
 
   for (int64_t k : {int64_t{1}, int64_t{0xFFFFFFFF}}) {
     auto* sel = MakeAssocSelect(f.arena, k);

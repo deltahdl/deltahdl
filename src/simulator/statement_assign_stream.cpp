@@ -140,27 +140,28 @@ static void ResolveExplicitRange(int64_t idx, int64_t idx2, uint32_t array_lo,
 }
 
 bool ResolveWithRange(const Expr* with_expr, SimContext& ctx, Arena& arena,
-                      uint32_t array_size, uint32_t array_lo,
-                      uint32_t& out_start, uint32_t& out_count) {
+                      ArrayGeom geom, StreamSliceRange& out_range) {
+  uint32_t& out_start = out_range.start;
+  uint32_t& out_count = out_range.count;
   if (!with_expr || with_expr->kind != ExprKind::kSelect) {
     out_start = 0;
-    out_count = array_size;
+    out_count = geom.size;
     return true;
   }
   int64_t idx =
       static_cast<int64_t>(EvalExpr(with_expr->index, ctx, arena).ToUint64());
   if (!with_expr->index_end) {
-    return ResolveSingleIndexRange(idx, array_size, array_lo, out_start,
+    return ResolveSingleIndexRange(idx, geom.size, geom.lo, out_start,
                                    out_count);
   }
   int64_t idx2 = static_cast<int64_t>(
       EvalExpr(with_expr->index_end, ctx, arena).ToUint64());
   if (with_expr->is_part_select_plus) {
-    ResolvePlusPartSelectRange(idx, idx2, array_lo, out_start, out_count);
+    ResolvePlusPartSelectRange(idx, idx2, geom.lo, out_start, out_count);
   } else if (with_expr->is_part_select_minus) {
-    ResolveMinusPartSelectRange(idx, idx2, array_lo, out_start, out_count);
+    ResolveMinusPartSelectRange(idx, idx2, geom.lo, out_start, out_count);
   } else {
-    ResolveExplicitRange(idx, idx2, array_lo, out_start, out_count);
+    ResolveExplicitRange(idx, idx2, geom.lo, out_start, out_count);
   }
   return true;
 }
@@ -182,19 +183,17 @@ static bool LhsHasGreedyDynamicElement(const Expr* lhs, SimContext& ctx) {
 static uint32_t FixedWithRangeElementWidth(const Expr* elem, SimContext& ctx,
                                            Arena& arena) {
   if (auto* ainfo = ctx.FindArrayInfo(elem->text)) {
-    uint32_t start = 0, count = 0;
-    ResolveWithRange(elem->with_expr, ctx, arena, ainfo->size, ainfo->lo, start,
-                     count);
-    if (start + count > ainfo->size)
-      count = (start < ainfo->size) ? ainfo->size - start : 0;
-    return count * ainfo->elem_width;
+    StreamSliceRange r{0, 0};
+    ResolveWithRange(elem->with_expr, ctx, arena, {ainfo->size, ainfo->lo}, r);
+    if (r.start + r.count > ainfo->size)
+      r.count = (r.start < ainfo->size) ? ainfo->size - r.start : 0;
+    return r.count * ainfo->elem_width;
   }
   if (auto* queue = ctx.FindQueue(elem->text)) {
-    uint32_t start = 0, count = 0;
+    StreamSliceRange r{0, 0};
     ResolveWithRange(elem->with_expr, ctx, arena,
-                     static_cast<uint32_t>(queue->elements.size()), 0, start,
-                     count);
-    return count * queue->elem_width;
+                     {static_cast<uint32_t>(queue->elements.size()), 0}, r);
+    return r.count * queue->elem_width;
   }
   return 0;
 }
@@ -221,9 +220,11 @@ static uint32_t SumFixedElementWidths(const Expr* lhs, SimContext& ctx,
 static uint32_t CollectArrayWithRangeElements(
     const Expr* elem, ArrayInfo* ainfo, SimContext& ctx, Arena& arena,
     std::vector<StreamElemInfo>& elems) {
-  uint32_t start = 0, count = 0;
-  bool in_range = ResolveWithRange(elem->with_expr, ctx, arena, ainfo->size,
-                                   ainfo->lo, start, count);
+  StreamSliceRange r{0, 0};
+  bool in_range = ResolveWithRange(elem->with_expr, ctx, arena,
+                                   {ainfo->size, ainfo->lo}, r);
+  uint32_t start = r.start;
+  uint32_t count = r.count;
   if (!in_range || start + count > ainfo->size) {
     uint32_t clamped = (start < ainfo->size) ? ainfo->size - start : 0;
     ctx.GetDiag().Error(
@@ -246,10 +247,11 @@ static uint32_t CollectArrayWithRangeElements(
 static uint32_t CollectQueueWithRangeElements(
     const Expr* elem, QueueObject* queue, SimContext& ctx, Arena& arena,
     std::vector<StreamElemInfo>& elems) {
-  uint32_t start = 0, count = 0;
+  StreamSliceRange r{0, 0};
   ResolveWithRange(elem->with_expr, ctx, arena,
-                   static_cast<uint32_t>(queue->elements.size()), 0, start,
-                   count);
+                   {static_cast<uint32_t>(queue->elements.size()), 0}, r);
+  uint32_t start = r.start;
+  uint32_t count = r.count;
   uint32_t needed = start + count;
   while (queue->elements.size() < needed) {
     queue->elements.push_back(MakeLogic4Vec(arena, queue->elem_width));
@@ -463,9 +465,11 @@ using StreamTaker = std::function<Logic4Vec(uint32_t w)>;
 static void ForwardUnpackArrayWithRange(const Expr* elem, ArrayInfo* ainfo,
                                         StreamEnv env, const StreamTaker& take,
                                         uint32_t& cursor) {
-  uint32_t start = 0, count = 0;
+  StreamSliceRange r{0, 0};
   bool in_range = ResolveWithRange(elem->with_expr, env.ctx, env.arena,
-                                   ainfo->size, ainfo->lo, start, count);
+                                   {ainfo->size, ainfo->lo}, r);
+  uint32_t start = r.start;
+  uint32_t count = r.count;
   if (!in_range || start + count > ainfo->size) {
     env.ctx.GetDiag().Error(
         {}, "streaming unpack with-range exceeds fixed array bounds");
@@ -490,10 +494,11 @@ static void ForwardUnpackArrayWithRange(const Expr* elem, ArrayInfo* ainfo,
 static void ForwardUnpackQueueWithRange(const Expr* elem, QueueObject* queue,
                                         StreamEnv env, const StreamTaker& take,
                                         uint32_t& cursor) {
-  uint32_t start = 0, count = 0;
+  StreamSliceRange r{0, 0};
   ResolveWithRange(elem->with_expr, env.ctx, env.arena,
-                   static_cast<uint32_t>(queue->elements.size()), 0, start,
-                   count);
+                   {static_cast<uint32_t>(queue->elements.size()), 0}, r);
+  uint32_t start = r.start;
+  uint32_t count = r.count;
   uint32_t needed = start + count;
   while (queue->elements.size() < needed)
     queue->elements.push_back(MakeLogic4Vec(env.arena, queue->elem_width));

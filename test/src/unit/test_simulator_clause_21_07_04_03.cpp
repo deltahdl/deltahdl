@@ -97,7 +97,7 @@ TEST_F(ExtendedVcdValueChangeSim, WholeVectorPortValueDumpsEveryBit) {
     auto* bus = arena_.Create<Variable>();
     bus->value = MakeBits(arena_, 4, 0xA);  // 1010, port_id 0
     // input [3:0] bus -> msb 3, lsb 0.
-    vcd.RegisterSignal("bus", 4, bus, NetType::kWire, 3, 0);
+    vcd.RegisterSignal(VcdSignalSpec{"bus", 4, bus, NetType::kWire, 3, 0});
     vcd.EndDefinitions();
     vcd.WriteTimestamp(0);
     vcd.DumpAllValues();

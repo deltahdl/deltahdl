@@ -75,33 +75,29 @@ LocalContext MergeTriggeredOutput(const LocalContext& input,
 
 }  // namespace
 
-std::vector<LocalContext> TriggeredOutputs(const Word& word, std::size_t j,
-                                           const SequenceExpr& sequence,
-                                           const std::set<std::string>& actuals,
+std::vector<LocalContext> TriggeredOutputs(const ExtendedBooleanQuery& query,
                                            const LocalContext& input) {
   std::vector<LocalContext> result;
-  if (j >= word.size()) {
+  if (query.j >= query.word.size()) {
     return result;  // §F.6.1 requires 0 <= j < |w|.
   }
   const std::set<std::string> kInDomain = ContextDomain(input);
   // §F.6.1: try every start point 0 <= i <= j; the subword w^{i,j} must tightly
   // satisfy T from the empty context.
-  for (std::size_t i = 0; i <= j; ++i) {
-    const Word kSlice = Subword(word, i, j + 1);
+  for (std::size_t i = 0; i <= query.j; ++i) {
+    const Word kSlice = Subword(query.word, i, query.j + 1);
     for (const LocalContext& inner :
-         TightSatisfactionOutputs(kSlice, sequence, LocalContext{})) {
-      AddUnique(result, MergeTriggeredOutput(input, kInDomain, actuals, inner));
+         TightSatisfactionOutputs(kSlice, query.sequence, LocalContext{})) {
+      AddUnique(result,
+                MergeTriggeredOutput(input, kInDomain, query.actuals, inner));
     }
   }
   return result;
 }
 
-bool TriggeredSatisfies(const Word& word, std::size_t j,
-                        const SequenceExpr& sequence,
-                        const std::set<std::string>& actuals,
+bool TriggeredSatisfies(const ExtendedBooleanQuery& query,
                         const LocalContext& input, const LocalContext& output) {
-  for (const LocalContext& candidate :
-       TriggeredOutputs(word, j, sequence, actuals, input)) {
+  for (const LocalContext& candidate : TriggeredOutputs(query, input)) {
     if (LocalContextEqual(candidate, output)) {
       return true;
     }
@@ -110,39 +106,36 @@ bool TriggeredSatisfies(const Word& word, std::size_t j,
 }
 
 std::vector<LocalContext> MatchedOutputs(
-    const Word& word, std::size_t j, const SequenceExpr& sequence,
-    const std::set<std::string>& actuals,
+    const ExtendedBooleanQuery& query,
     const std::shared_ptr<const BooleanExpr>& clock,
     const LocalContext& input) {
   std::vector<LocalContext> result;
-  if (j >= word.size()) {
+  if (query.j >= query.word.size()) {
     return result;  // §F.6.1 requires 0 <= j < |w|.
   }
   const std::shared_ptr<const SequenceExpr> kGotoOnce = GotoOnce(clock);
   // §F.6.1: try every earlier trigger point 0 <= i < j. The clock c must tick
   // exactly once over the gap w^{i+1,j}; that gap is independent of the output
   // context, so it is checked once per i.
-  for (std::size_t i = 0; i < j; ++i) {
-    const Word kGap = Subword(word, i + 1, j + 1);
+  for (std::size_t i = 0; i < query.j; ++i) {
+    const Word kGap = Subword(query.word, i + 1, query.j + 1);
     if (!TightlySatisfiesWithLocals(kGap, *kGotoOnce, LocalContext{},
                                     LocalContext{})) {
       continue;
     }
-    for (LocalContext out :
-         TriggeredOutputs(word, i, sequence, actuals, input)) {
+    const ExtendedBooleanQuery kTriggerQuery{query.word, i, query.sequence,
+                                             query.actuals};
+    for (LocalContext out : TriggeredOutputs(kTriggerQuery, input)) {
       AddUnique(result, std::move(out));
     }
   }
   return result;
 }
 
-bool MatchedSatisfies(const Word& word, std::size_t j,
-                      const SequenceExpr& sequence,
-                      const std::set<std::string>& actuals,
+bool MatchedSatisfies(const ExtendedBooleanQuery& query,
                       const std::shared_ptr<const BooleanExpr>& clock,
                       const LocalContext& input, const LocalContext& output) {
-  for (const LocalContext& candidate :
-       MatchedOutputs(word, j, sequence, actuals, clock, input)) {
+  for (const LocalContext& candidate : MatchedOutputs(query, clock, input)) {
     if (LocalContextEqual(candidate, output)) {
       return true;
     }

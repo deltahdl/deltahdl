@@ -152,7 +152,7 @@ TEST(ReadmemPackedDataTest, AssocEnumIndexUsesNumericValues) {
   // An enum-indexed associative array resolves to a numeric (integral) key.
   auto* aa = f.ctx.CreateAssocArray("am", /*elem_width=*/8,
                                     /*is_string_key=*/false,
-                                    /*index_width=*/8);
+                                    AssocArraySpec{/*index_width=*/8});
   std::string path = WriteTmp(kTmpPrefix, "assoc_enum", "@2 41\n@3 42\n");
 
   Readmem(f, "$readmemh", path, "am");

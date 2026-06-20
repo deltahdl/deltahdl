@@ -135,16 +135,29 @@ struct MethodCallParts {
 };
 bool ExtractMethodCallParts(const Expr* expr, MethodCallParts& out);
 
+// §21.2: the optional rendering inputs a display task threads into
+// FormatDisplay alongside the format string and its value list. Each member
+// backs a format specifier that draws on something other than the raw value
+// stream: `p_fmts` carries the precomputed %p assignment-pattern strings,
+// `v_fmts` the precomputed %v net-strength strings (§21.2.1.4), `time_format`
+// the $timeformat configuration for %t (§20.4.3), and `ctx` the run-time
+// context %m / %l need to name the invoking scope (§21.2.1.5, §33.7). A null
+// vector pointer means "no precomputed strings"; every member defaults so an
+// ordinary "%d"-style call passes only fmt and vals.
+struct DisplayFormatOpts {
+  const std::vector<std::string>* p_fmts = nullptr;
+  const TimeFormatSpec* time_format = nullptr;
+  const std::vector<std::string>* v_fmts = nullptr;
+  SimContext* ctx = nullptr;
+};
+
 // §21.2.1.5: the %m specifier prints the hierarchical name of the scope that
 // invokes the display task. Rendering it requires the run-time context, so an
-// optional SimContext is threaded through; when null (no simulation context),
-// %m yields nothing.
+// optional SimContext is threaded through `opts`; when null (no simulation
+// context), %m yields nothing.
 std::string FormatDisplay(const std::string& fmt,
                           const std::vector<Logic4Vec>& vals,
-                          const std::vector<std::string>& p_fmts = {},
-                          const TimeFormatSpec* time_format = nullptr,
-                          const std::vector<std::string>& v_fmts = {},
-                          SimContext* ctx = nullptr);
+                          const DisplayFormatOpts& opts = {});
 std::string FormatArg(const Logic4Vec& val, char spec);
 std::string FormatStrength(const NetStrength& ns);
 std::string FormatTimeUnderTimeformat(const Logic4Vec& val,

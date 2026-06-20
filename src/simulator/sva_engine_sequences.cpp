@@ -158,20 +158,19 @@ bool EvalThroughout(const std::function<bool(uint64_t)>& check,
   return std::all_of(values.begin(), values.end(), check);
 }
 
-SequenceWithinMatch EvalSequenceWithin(bool inner_match, uint32_t inner_start,
-                                       uint32_t inner_end, bool outer_match,
-                                       uint32_t outer_start,
-                                       uint32_t outer_end) {
+SequenceWithinMatch EvalSequenceWithin(const SequenceMatchSpan& inner,
+                                       const SequenceMatchSpan& outer) {
   SequenceWithinMatch result;
   // seq1 within seq2 ≡ (1[*0:$] ##1 seq1 ##1 1[*0:$]) intersect seq2: both
   // operands match and the match of seq1 falls inside the match of seq2. The
   // leading 1[*0:$] lets seq1 start no earlier than seq2's start, and the
   // trailing 1[*0:$] lets seq1 complete no later than seq2's completion.
-  result.matched = inner_match && outer_match && inner_start >= outer_start &&
-                   inner_end <= outer_end;
+  result.matched = inner.matched && outer.matched &&
+                   inner.start_time >= outer.start_time &&
+                   inner.end_time <= outer.end_time;
   // The intersection makes the composite cover seq2's whole interval, so it
   // completes at seq2's match point.
-  result.end_time = outer_end;
+  result.end_time = outer.end_time;
   return result;
 }
 

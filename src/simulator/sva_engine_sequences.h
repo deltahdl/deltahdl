@@ -154,10 +154,20 @@ struct SequenceWithinMatch {
   bool matched = false;
   uint32_t end_time = 0;
 };
-SequenceWithinMatch EvalSequenceWithin(bool inner_match, uint32_t inner_start,
-                                       uint32_t inner_end, bool outer_match,
-                                       uint32_t outer_start,
-                                       uint32_t outer_end);
+
+// A single match of a sequence operand, as referenced by the §16.9.10 bullets:
+// the match decision together with the clock ticks on which the match starts
+// and completes. `seq1 within seq2` compares one such span per operand, so the
+// same struct describes both the contained (inner) operand and the containing
+// (outer) operand.
+struct SequenceMatchSpan {
+  bool matched = false;
+  uint32_t start_time = 0;
+  uint32_t end_time = 0;
+};
+
+SequenceWithinMatch EvalSequenceWithin(const SequenceMatchSpan& inner,
+                                       const SequenceMatchSpan& outer);
 
 }  // namespace delta
 

@@ -175,6 +175,28 @@ struct TimeFormatSpec {
   int minimum_field_width = 20;
 };
 
+// §6.7.1: the optional defining attributes of a net beyond its name, nettype
+// and width — charge strength and decay (for trireg), the user-nettype flag,
+// the resolution-function name, and whether the net is signed.
+struct NetSpec {
+  Strength charge_strength = Strength::kMedium;
+  uint64_t decay_ticks = 0;
+  bool is_user_nettype = false;
+  std::string_view resolve_func = {};
+  bool is_signed = false;
+};
+
+// §7.8: the optional defining attributes of an associative array beyond its
+// name, element width and string-key flag — the index width, the wildcard
+// (index type [*]) flag, the 4-state-element flag, and whether the integral
+// index type is signed.
+struct AssocArraySpec {
+  uint32_t index_width = 32;
+  bool is_wildcard = false;
+  bool is_4state = false;
+  bool is_index_signed = true;
+};
+
 class SimContext {
  public:
   SimContext(Scheduler& sched, Arena& arena, DiagEngine& diag,
@@ -189,9 +211,7 @@ class SimContext {
 
   Net* FindNet(std::string_view name);
   Net* CreateNet(std::string_view name, NetType type, uint32_t width,
-                 Strength charge_strength = Strength::kMedium,
-                 uint64_t decay_ticks = 0, bool is_user_nettype = false,
-                 std::string_view resolve_func = {}, bool is_signed = false);
+                 const NetSpec& spec = {});
 
   Scheduler& GetScheduler() { return scheduler_; }
   Arena& GetArena() { return arena_; }
@@ -560,10 +580,7 @@ class SimContext {
 
   AssocArrayObject* CreateAssocArray(std::string_view name, uint32_t elem_width,
                                      bool is_string_key,
-                                     uint32_t index_width = 32,
-                                     bool is_wildcard = false,
-                                     bool is_4state = false,
-                                     bool is_index_signed = true);
+                                     const AssocArraySpec& spec = {});
   AssocArrayObject* FindAssocArray(std::string_view name);
 
   void SetVariableTag(std::string_view var_name, std::string_view tag);

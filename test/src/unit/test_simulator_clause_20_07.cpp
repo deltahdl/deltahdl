@@ -136,7 +136,7 @@ TEST(SysTask, EmptyQueueRightReturnsMinusOne) {
 TEST(SysTask, AssocLeftReturnsZero) {
   SysTaskFixture f;
   auto* a = f.ctx.CreateAssocArray("a", 32, /*is_string_key=*/false,
-                                   /*index_width=*/8);
+                                   AssocArraySpec{/*index_width=*/8});
   a->int_data[3] = MakeLogic4VecVal(f.arena, 32, 30);
   auto* expr = MkSysCall(f.arena, "$left", {MkId(f.arena, "a")});
   EXPECT_EQ(EvalExpr(expr, f.ctx, f.arena).ToUint64(), 0u);
@@ -145,7 +145,7 @@ TEST(SysTask, AssocLeftReturnsZero) {
 TEST(SysTask, AssocIncrementReturnsMinusOne) {
   SysTaskFixture f;
   auto* a = f.ctx.CreateAssocArray("a", 32, /*is_string_key=*/false,
-                                   /*index_width=*/8);
+                                   AssocArraySpec{/*index_width=*/8});
   a->int_data[3] = MakeLogic4VecVal(f.arena, 32, 30);
   auto* expr = MkSysCall(f.arena, "$increment", {MkId(f.arena, "a")});
   EXPECT_EQ(static_cast<int32_t>(EvalExpr(expr, f.ctx, f.arena).ToUint64()),
@@ -155,7 +155,7 @@ TEST(SysTask, AssocIncrementReturnsMinusOne) {
 TEST(SysTask, AssocSizeReturnsAllocatedCount) {
   SysTaskFixture f;
   auto* a = f.ctx.CreateAssocArray("a", 32, /*is_string_key=*/false,
-                                   /*index_width=*/8);
+                                   AssocArraySpec{/*index_width=*/8});
   a->int_data[3] = MakeLogic4VecVal(f.arena, 32, 30);
   a->int_data[9] = MakeLogic4VecVal(f.arena, 32, 90);
   auto* expr = MkSysCall(f.arena, "$size", {MkId(f.arena, "a")});
@@ -166,7 +166,7 @@ TEST(SysTask, AssocSizeReturnsAllocatedCount) {
 TEST(SysTask, AssocLowReturnsLowestIndex) {
   SysTaskFixture f;
   auto* a = f.ctx.CreateAssocArray("a", 32, /*is_string_key=*/false,
-                                   /*index_width=*/8);
+                                   AssocArraySpec{/*index_width=*/8});
   a->int_data[3] = MakeLogic4VecVal(f.arena, 32, 30);
   a->int_data[9] = MakeLogic4VecVal(f.arena, 32, 90);
   auto* expr = MkSysCall(f.arena, "$low", {MkId(f.arena, "a")});
@@ -176,7 +176,7 @@ TEST(SysTask, AssocLowReturnsLowestIndex) {
 TEST(SysTask, AssocHighReturnsHighestIndex) {
   SysTaskFixture f;
   auto* a = f.ctx.CreateAssocArray("a", 32, /*is_string_key=*/false,
-                                   /*index_width=*/8);
+                                   AssocArraySpec{/*index_width=*/8});
   a->int_data[3] = MakeLogic4VecVal(f.arena, 32, 30);
   a->int_data[9] = MakeLogic4VecVal(f.arena, 32, 90);
   auto* expr = MkSysCall(f.arena, "$high", {MkId(f.arena, "a")});
@@ -188,7 +188,7 @@ TEST(SysTask, AssocHighReturnsHighestIndex) {
 TEST(SysTask, AssocRightReturnsHighestIndexValue) {
   SysTaskFixture f;
   auto* a = f.ctx.CreateAssocArray("a", 32, /*is_string_key=*/false,
-                                   /*index_width=*/8);
+                                   AssocArraySpec{/*index_width=*/8});
   a->int_data[3] = MakeLogic4VecVal(f.arena, 32, 30);
   auto* expr = MkSysCall(f.arena, "$right", {MkId(f.arena, "a")});
   EXPECT_EQ(EvalExpr(expr, f.ctx, f.arena).ToUint64(), 255u);
@@ -197,7 +197,8 @@ TEST(SysTask, AssocRightReturnsHighestIndexValue) {
 // §20.7: $low/$high of an associative array with no allocated elements is 'x.
 TEST(SysTask, EmptyAssocLowReturnsUnknown) {
   SysTaskFixture f;
-  f.ctx.CreateAssocArray("a", 32, /*is_string_key=*/false, /*index_width=*/8);
+  f.ctx.CreateAssocArray("a", 32, /*is_string_key=*/false,
+                         AssocArraySpec{/*index_width=*/8});
   auto* expr = MkSysCall(f.arena, "$low", {MkId(f.arena, "a")});
   EXPECT_FALSE(EvalExpr(expr, f.ctx, f.arena).IsKnown());
 }
@@ -206,7 +207,8 @@ TEST(SysTask, EmptyAssocLowReturnsUnknown) {
 // 'x (no largest allocated index exists to report).
 TEST(SysTask, EmptyAssocHighReturnsUnknown) {
   SysTaskFixture f;
-  f.ctx.CreateAssocArray("a", 32, /*is_string_key=*/false, /*index_width=*/8);
+  f.ctx.CreateAssocArray("a", 32, /*is_string_key=*/false,
+                         AssocArraySpec{/*index_width=*/8});
   auto* expr = MkSysCall(f.arena, "$high", {MkId(f.arena, "a")});
   EXPECT_FALSE(EvalExpr(expr, f.ctx, f.arena).IsKnown());
 }

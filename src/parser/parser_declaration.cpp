@@ -214,57 +214,58 @@ DataType Parser::ParseStructOrUnionBody(TokenKind kw) {
   return dtype;
 }
 
+// Parse the data_type that prefixes a struct/union member declaration,
+// including any nested struct/union/enum with its packed dimensions.
+DataType Parser::ParseStructMemberType() {
+  DataType member_type;
+  if (IsStructOrUnionKw(CurrentToken().kind)) {
+    member_type = ParseStructOrUnionType();
+    ParsePackedDims(member_type);
+  } else if (Check(TokenKind::kKwEnum)) {
+    member_type = ParseEnumType();
+    ParsePackedDims(member_type);
+  } else {
+    member_type = ParseDataType();
+  }
+  return member_type;
+}
+
+// Parse the comma-separated list of declarators sharing one member type and
+// append them to dtype.
+void Parser::ParseStructMemberList(DataType& dtype, const DataType& member_type,
+                                   const std::vector<Attribute>& member_attrs,
+                                   bool is_rand, bool is_randc) {
+  do {
+    StructMember member;
+    ApplyMemberType(member, member_type);
+    member.is_rand = is_rand;
+    member.is_randc = is_randc;
+    member.attrs = member_attrs;
+    member.name = Expect(TokenKind::kIdentifier).text;
+    ParseUnpackedDims(member.unpacked_dims);
+    if (Match(TokenKind::kEq)) {
+      member.init_expr = ParseExpr();
+    }
+    dtype.struct_members.push_back(member);
+  } while (Match(TokenKind::kComma));
+  Expect(TokenKind::kSemicolon);
+}
+
 void Parser::ParseStructMembers(DataType& dtype) {
   auto open_brace_loc = CurrentLoc();
   Expect(TokenKind::kLBrace);
-
-  // Parse the data_type that prefixes a struct/union member declaration,
-  // including any nested struct/union/enum with its packed dimensions.
-  auto parse_member_type = [&]() {
-    DataType member_type;
-    if (IsStructOrUnionKw(CurrentToken().kind)) {
-      member_type = ParseStructOrUnionType();
-      ParsePackedDims(member_type);
-    } else if (Check(TokenKind::kKwEnum)) {
-      member_type = ParseEnumType();
-      ParsePackedDims(member_type);
-    } else {
-      member_type = ParseDataType();
-    }
-    return member_type;
-  };
-
-  // Parse the comma-separated list of declarators sharing one member type.
-  auto parse_member_list = [&](const DataType& member_type,
-                               const std::vector<Attribute>& member_attrs,
-                               bool is_rand, bool is_randc) {
-    do {
-      StructMember member;
-      ApplyMemberType(member, member_type);
-      member.is_rand = is_rand;
-      member.is_randc = is_randc;
-      member.attrs = member_attrs;
-      member.name = Expect(TokenKind::kIdentifier).text;
-      ParseUnpackedDims(member.unpacked_dims);
-      if (Match(TokenKind::kEq)) {
-        member.init_expr = ParseExpr();
-      }
-      dtype.struct_members.push_back(member);
-    } while (Match(TokenKind::kComma));
-    Expect(TokenKind::kSemicolon);
-  };
 
   while (!Check(TokenKind::kRBrace) && !AtEnd()) {
     auto member_attrs = ParseAttributes();
     bool is_rand = Match(TokenKind::kKwRand);
     bool is_randc = !is_rand && Match(TokenKind::kKwRandc);
 
-    DataType member_type = parse_member_type();
+    DataType member_type = ParseStructMemberType();
     if (member_type.kind == DataTypeKind::kImplicit && !CheckIdentifier()) {
       Synchronize();
       continue;
     }
-    parse_member_list(member_type, member_attrs, is_rand, is_randc);
+    ParseStructMemberList(dtype, member_type, member_attrs, is_rand, is_randc);
   }
   if (dtype.struct_members.empty()) {
     diag_.Error(open_brace_loc,
@@ -275,112 +276,112 @@ void Parser::ParseStructMembers(DataType& dtype) {
   Expect(TokenKind::kRBrace);
 }
 
+// Forward class/interface typedef: `typedef class foo;` (§6.18).
+bool Parser::TryForwardClassTypedef(ModuleItem* item) {
+  if (!Check(TokenKind::kKwClass) && !Check(TokenKind::kKwInterface)) {
+    return false;
+  }
+  Consume();
+  if (Check(TokenKind::kKwClass)) Consume();
+  item->name = Expect(TokenKind::kIdentifier).text;
+  known_types_.insert(item->name);
+  Expect(TokenKind::kSemicolon);
+  return true;
+}
+
+// Forward enum/struct/union typedef: `typedef struct foo;` (§6.18). Leaves the
+// lexer position unchanged when the form does not match.
+bool Parser::TryForwardAggregateTypedef(ModuleItem* item) {
+  if (!IsAggregateKw(CurrentToken().kind)) {
+    return false;
+  }
+  auto saved = lexer_.SavePos();
+  DataTypeKind fwd_kind = ForwardAggregateKind(CurrentToken().kind);
+  Consume();
+  if (CheckIdentifier()) {
+    auto id_saved = lexer_.SavePos();
+    auto id_tok = Consume();
+    if (Check(TokenKind::kSemicolon)) {
+      item->name = id_tok.text;
+      item->forward_type_kind = fwd_kind;
+      known_types_.insert(item->name);
+      Expect(TokenKind::kSemicolon);
+      return true;
+    }
+    lexer_.RestorePos(id_saved);
+  }
+  lexer_.RestorePos(saved);
+  return false;
+}
+
+// Forward bare typedef: `typedef foo;` (§6.18).
+bool Parser::TryForwardBareTypedef(ModuleItem* item) {
+  if (!CheckIdentifier()) return false;
+  auto saved = lexer_.SavePos();
+  auto id_tok = Consume();
+  if (Check(TokenKind::kSemicolon)) {
+    item->name = id_tok.text;
+    known_types_.insert(item->name);
+    Expect(TokenKind::kSemicolon);
+    return true;
+  }
+  lexer_.RestorePos(saved);
+  return false;
+}
+
+// Skip a (possibly nested) run of bracketed unpacked-dimension tokens while
+// probing for the interface-port '.'-form.
+void Parser::SkipBracketedDims() {
+  while (Check(TokenKind::kLBracket)) {
+    Consume();
+    int depth = 1;
+    while (depth > 0 && !Check(TokenKind::kEof)) {
+      if (CurrentToken().kind == TokenKind::kLBracket)
+        depth++;
+      else if (CurrentToken().kind == TokenKind::kRBracket)
+        depth--;
+      if (depth > 0) Consume();
+    }
+    if (Check(TokenKind::kRBracket)) Consume();
+  }
+}
+
+// Interface-port typedef: `typedef intf.T name;` (§6.18).
+bool Parser::TryInterfacePortTypedef(ModuleItem* item) {
+  if (!CheckIdentifier()) return false;
+  auto saved = lexer_.SavePos();
+  Consume();
+  SkipBracketedDims();
+  if (!Check(TokenKind::kDot)) {
+    lexer_.RestorePos(saved);
+    return false;
+  }
+  lexer_.RestorePos(saved);
+  item->typedef_ifc_port = Consume().text;
+  while (Check(TokenKind::kLBracket)) {
+    Consume();
+    item->unpacked_dims.push_back(ParseExpr());
+    Expect(TokenKind::kRBracket);
+  }
+  Expect(TokenKind::kDot);
+  item->typedef_type.kind = DataTypeKind::kNamed;
+  item->typedef_type.type_name = Expect(TokenKind::kIdentifier).text;
+  item->name = Expect(TokenKind::kIdentifier).text;
+  known_types_.insert(item->name);
+  Expect(TokenKind::kSemicolon);
+  return true;
+}
+
 ModuleItem* Parser::ParseTypedef() {
   auto* item = arena_.Create<ModuleItem>();
   item->kind = ModuleItemKind::kTypedef;
   item->loc = CurrentLoc();
   Expect(TokenKind::kKwTypedef);
 
-  // Forward class/interface typedef: `typedef class foo;` (§6.18).
-  auto try_forward_class = [&]() -> bool {
-    if (!Check(TokenKind::kKwClass) && !Check(TokenKind::kKwInterface)) {
-      return false;
-    }
-    Consume();
-    if (Check(TokenKind::kKwClass)) Consume();
-    item->name = Expect(TokenKind::kIdentifier).text;
-    known_types_.insert(item->name);
-    Expect(TokenKind::kSemicolon);
-    return true;
-  };
-
-  // Forward enum/struct/union typedef: `typedef struct foo;` (§6.18). Leaves
-  // the lexer position unchanged when the form does not match.
-  auto try_forward_aggregate = [&]() -> bool {
-    if (!IsAggregateKw(CurrentToken().kind)) {
-      return false;
-    }
-    auto saved = lexer_.SavePos();
-    DataTypeKind fwd_kind = ForwardAggregateKind(CurrentToken().kind);
-    Consume();
-    if (CheckIdentifier()) {
-      auto id_saved = lexer_.SavePos();
-      auto id_tok = Consume();
-      if (Check(TokenKind::kSemicolon)) {
-        item->name = id_tok.text;
-        item->forward_type_kind = fwd_kind;
-        known_types_.insert(item->name);
-        Expect(TokenKind::kSemicolon);
-        return true;
-      }
-      lexer_.RestorePos(id_saved);
-    }
-    lexer_.RestorePos(saved);
-    return false;
-  };
-
-  // Forward bare typedef: `typedef foo;` (§6.18).
-  auto try_forward_bare = [&]() -> bool {
-    if (!CheckIdentifier()) return false;
-    auto saved = lexer_.SavePos();
-    auto id_tok = Consume();
-    if (Check(TokenKind::kSemicolon)) {
-      item->name = id_tok.text;
-      known_types_.insert(item->name);
-      Expect(TokenKind::kSemicolon);
-      return true;
-    }
-    lexer_.RestorePos(saved);
-    return false;
-  };
-
-  // Skip a (possibly nested) run of bracketed unpacked-dimension tokens while
-  // probing for the interface-port '.'-form below.
-  auto skip_bracketed_dims = [&]() {
-    while (Check(TokenKind::kLBracket)) {
-      Consume();
-      int depth = 1;
-      while (depth > 0 && !Check(TokenKind::kEof)) {
-        if (CurrentToken().kind == TokenKind::kLBracket)
-          depth++;
-        else if (CurrentToken().kind == TokenKind::kRBracket)
-          depth--;
-        if (depth > 0) Consume();
-      }
-      if (Check(TokenKind::kRBracket)) Consume();
-    }
-  };
-
-  // Interface-port typedef: `typedef intf.T name;` (§6.18).
-  auto try_interface_port = [&]() -> bool {
-    if (!CheckIdentifier()) return false;
-    auto saved = lexer_.SavePos();
-    Consume();
-    skip_bracketed_dims();
-    if (!Check(TokenKind::kDot)) {
-      lexer_.RestorePos(saved);
-      return false;
-    }
-    lexer_.RestorePos(saved);
-    item->typedef_ifc_port = Consume().text;
-    while (Check(TokenKind::kLBracket)) {
-      Consume();
-      item->unpacked_dims.push_back(ParseExpr());
-      Expect(TokenKind::kRBracket);
-    }
-    Expect(TokenKind::kDot);
-    item->typedef_type.kind = DataTypeKind::kNamed;
-    item->typedef_type.type_name = Expect(TokenKind::kIdentifier).text;
-    item->name = Expect(TokenKind::kIdentifier).text;
-    known_types_.insert(item->name);
-    Expect(TokenKind::kSemicolon);
-    return true;
-  };
-
-  if (try_forward_class()) return item;
-  if (try_forward_aggregate()) return item;
-  if (try_forward_bare()) return item;
-  if (try_interface_port()) return item;
+  if (TryForwardClassTypedef(item)) return item;
+  if (TryForwardAggregateTypedef(item)) return item;
+  if (TryForwardBareTypedef(item)) return item;
+  if (TryInterfacePortTypedef(item)) return item;
 
   if (Check(TokenKind::kKwEnum)) {
     item->typedef_type = ParseEnumType();
@@ -465,6 +466,79 @@ Direction Parser::ParseArgDirection(FunctionArg& arg, Direction sticky_dir,
   return sticky_dir;
 }
 
+// §8.17: the 'default' sentinel in a class constructor argument list. Records
+// a default placeholder argument; returns true when consumed so the caller
+// skips to the next argument.
+bool Parser::TryParseDefaultArgSentinel(std::vector<FunctionArg>& args,
+                                        FuncArgScan& scan) {
+  if (!Check(TokenKind::kKwDefault)) return false;
+  if (scan.seen_default) {
+    diag_.Error(CurrentLoc(),
+                "'default' keyword shall appear at most once "
+                "in a class constructor argument list");
+  }
+  scan.seen_default = true;
+  FunctionArg arg;
+  arg.is_default = true;
+  Consume();
+  args.push_back(arg);
+  scan.prev_was_default = true;
+  return true;
+}
+
+// tf_port_item trailer: the port identifier, unpacked dimensions, and an
+// optional default value (§13.3 / §8.17).
+void Parser::ParseFunctionArgTrailer(FunctionArg& arg,
+                                     bool require_identifiers) {
+  if (CheckIdentifier()) {
+    arg.name = Consume().text;
+  } else if (require_identifiers) {
+    diag_.Error(CurrentLoc(),
+                "tf_port_item shall include a port_identifier outside of a "
+                "function_prototype or task_prototype");
+  }
+  ParseUnpackedDims(arg.unpacked_dims);
+  if (Match(TokenKind::kEq)) {
+    arg.default_value = ParseExpr();
+  }
+}
+
+// Parse one tf_port_item and append it to args, advancing the carried scan
+// state (sticky direction, default/data-type inheritance per §8.17/§13.3).
+void Parser::ParseOneFunctionArg(std::vector<FunctionArg>& args,
+                                 FuncArgScan& scan, bool require_identifiers) {
+  // tf_port_item permits a leading attribute_instance list; consume and
+  // discard any such list before the rest of the port item.
+  if (Check(TokenKind::kAttrStart)) {
+    ParseAttributes();
+  }
+
+  if (TryParseDefaultArgSentinel(args, scan)) return;
+
+  FunctionArg arg;
+  if (Match(TokenKind::kKwConst)) {
+    arg.is_const = true;
+  }
+  // §8.17: the argument following 'default' starts from the default direction
+  // (input) rather than inheriting the previous argument's direction via
+  // stickiness.
+  if (scan.prev_was_default) scan.sticky_dir = Direction::kInput;
+  bool dir_explicit = false;
+  scan.sticky_dir = ParseArgDirection(arg, scan.sticky_dir, &dir_explicit);
+
+  InheritRefQualifiers(args, arg, dir_explicit);
+  Match(TokenKind::kKwVar);
+  arg.data_type = ParseDataType();
+  ResolveImplicitArgDataType(arg, scan.prev_data_type, dir_explicit,
+                             scan.first_arg, scan.prev_was_default);
+
+  ParseFunctionArgTrailer(arg, require_identifiers);
+  scan.prev_data_type = arg.data_type;
+  scan.first_arg = false;
+  scan.prev_was_default = false;
+  args.push_back(arg);
+}
+
 std::vector<FunctionArg> Parser::ParseFunctionArgs(bool require_identifiers) {
   std::vector<FunctionArg> args;
   Expect(TokenKind::kLParen);
@@ -472,82 +546,13 @@ std::vector<FunctionArg> Parser::ParseFunctionArgs(bool require_identifiers) {
     Consume();
     return args;
   }
-  Direction sticky_dir = Direction::kInput;
-  bool seen_default = false;
-  DataType prev_data_type;
-  bool first_arg = true;
   // §8.17: an argument that directly follows the 'default' keyword in a
   // constructor argument list does not inherit the preceding argument's
-  // direction or data type; it falls back to the default direction (input)
-  // and default data type (logic).
-  bool prev_was_default = false;
-
-  // §8.17: the 'default' sentinel in a class constructor argument list. Records
-  // a default placeholder argument; returns true when consumed so the caller
-  // skips to the next argument.
-  auto try_parse_default_sentinel = [&]() -> bool {
-    if (!Check(TokenKind::kKwDefault)) return false;
-    if (seen_default) {
-      diag_.Error(CurrentLoc(),
-                  "'default' keyword shall appear at most once "
-                  "in a class constructor argument list");
-    }
-    seen_default = true;
-    FunctionArg arg;
-    arg.is_default = true;
-    Consume();
-    args.push_back(arg);
-    prev_was_default = true;
-    return true;
-  };
-
-  // tf_port_item trailer: the port identifier, unpacked dimensions, and an
-  // optional default value (§13.3 / §8.17).
-  auto parse_arg_trailer = [&](FunctionArg& arg) {
-    if (CheckIdentifier()) {
-      arg.name = Consume().text;
-    } else if (require_identifiers) {
-      diag_.Error(CurrentLoc(),
-                  "tf_port_item shall include a port_identifier outside of a "
-                  "function_prototype or task_prototype");
-    }
-    ParseUnpackedDims(arg.unpacked_dims);
-    if (Match(TokenKind::kEq)) {
-      arg.default_value = ParseExpr();
-    }
-  };
-
+  // direction or data type; it falls back to the default direction (input) and
+  // default data type (logic). That carried state lives in FuncArgScan.
+  FuncArgScan scan;
   do {
-    // tf_port_item permits a leading attribute_instance list; consume and
-    // discard any such list before the rest of the port item.
-    if (Check(TokenKind::kAttrStart)) {
-      ParseAttributes();
-    }
-
-    if (try_parse_default_sentinel()) continue;
-
-    FunctionArg arg;
-    if (Match(TokenKind::kKwConst)) {
-      arg.is_const = true;
-    }
-    // §8.17: the argument following 'default' starts from the default
-    // direction (input) rather than inheriting the previous argument's
-    // direction via stickiness.
-    if (prev_was_default) sticky_dir = Direction::kInput;
-    bool dir_explicit = false;
-    sticky_dir = ParseArgDirection(arg, sticky_dir, &dir_explicit);
-
-    InheritRefQualifiers(args, arg, dir_explicit);
-    Match(TokenKind::kKwVar);
-    arg.data_type = ParseDataType();
-    ResolveImplicitArgDataType(arg, prev_data_type, dir_explicit, first_arg,
-                               prev_was_default);
-
-    parse_arg_trailer(arg);
-    prev_data_type = arg.data_type;
-    first_arg = false;
-    prev_was_default = false;
-    args.push_back(arg);
+    ParseOneFunctionArg(args, scan, require_identifiers);
   } while (Match(TokenKind::kComma));
   Expect(TokenKind::kRParen);
   return args;
@@ -760,46 +765,45 @@ EventExpr Parser::ParseSingleEvent() {
   return ev;
 }
 
-void Parser::ParseOldStylePortDecls(ModuleItem* item, TokenKind end_kw) {
-  // Consume the leading direction keyword of a tf_port_declaration. The 'const'
-  // qualifier (already consumed by the caller) is mapped to 'ref'.
-  auto parse_port_direction = [&]() -> Direction {
-    if (Check(TokenKind::kKwInput)) {
-      Consume();
-      return Direction::kInput;
-    }
-    if (Check(TokenKind::kKwOutput)) {
-      Consume();
-      return Direction::kOutput;
-    }
-    if (Check(TokenKind::kKwInout)) {
-      Consume();
-      return Direction::kInout;
-    }
+// Consume the leading direction keyword of a tf_port_declaration. The 'const'
+// qualifier (already consumed by the caller) is mapped to 'ref'.
+Direction Parser::ParseTfPortDirection() {
+  if (Check(TokenKind::kKwInput)) {
     Consume();
-    return Direction::kRef;
-  };
+    return Direction::kInput;
+  }
+  if (Check(TokenKind::kKwOutput)) {
+    Consume();
+    return Direction::kOutput;
+  }
+  if (Check(TokenKind::kKwInout)) {
+    Consume();
+    return Direction::kInout;
+  }
+  Consume();
+  return Direction::kRef;
+}
 
-  // Parse the comma-separated declarators that share one tf_port_declaration
-  // header (direction/const/static and data type).
-  auto parse_port_declarators = [&](Direction dir, bool is_const,
-                                    bool is_ref_static, const DataType& dt) {
-    do {
-      FunctionArg arg;
-      arg.is_const = is_const;
-      arg.is_ref_static = is_ref_static;
-      arg.direction = dir;
-      arg.data_type = dt;
-      arg.name = Expect(TokenKind::kIdentifier).text;
-      ParseUnpackedDims(arg.unpacked_dims);
-      if (Match(TokenKind::kEq)) {
-        arg.default_value = ParseExpr();
-      }
-      item->func_args.push_back(arg);
-    } while (Match(TokenKind::kComma));
-    Expect(TokenKind::kSemicolon);
-  };
+// Parse the comma-separated declarators that share one tf_port_declaration
+// header (direction/const/static and data type), appending each to item.
+void Parser::ParseTfPortDeclarators(ModuleItem* item, const TfPortHeader& hdr) {
+  do {
+    FunctionArg arg;
+    arg.is_const = hdr.is_const;
+    arg.is_ref_static = hdr.is_ref_static;
+    arg.direction = hdr.dir;
+    arg.data_type = hdr.dt;
+    arg.name = Expect(TokenKind::kIdentifier).text;
+    ParseUnpackedDims(arg.unpacked_dims);
+    if (Match(TokenKind::kEq)) {
+      arg.default_value = ParseExpr();
+    }
+    item->func_args.push_back(arg);
+  } while (Match(TokenKind::kComma));
+  Expect(TokenKind::kSemicolon);
+}
 
+void Parser::ParseOldStylePortDecls(ModuleItem* item, TokenKind end_kw) {
   while (true) {
     // tf_port_declaration permits a leading attribute_instance list. Peek
     // past any attributes and only commit to the declaration if a direction
@@ -812,15 +816,16 @@ void Parser::ParseOldStylePortDecls(ModuleItem* item, TokenKind end_kw) {
       lexer_.RestorePos(saved);
       break;
     }
-    bool is_const = Match(TokenKind::kKwConst);
-    Direction dir = parse_port_direction();
-    bool is_ref_static =
-        (dir == Direction::kRef) && Match(TokenKind::kKwStatic);
+    TfPortHeader hdr;
+    hdr.is_const = Match(TokenKind::kKwConst);
+    hdr.dir = ParseTfPortDirection();
+    hdr.is_ref_static =
+        (hdr.dir == Direction::kRef) && Match(TokenKind::kKwStatic);
     Match(TokenKind::kKwVar);
-    DataType dt = ParseDataType();
-    DefaultImplicitToLogic(dt);
+    hdr.dt = ParseDataType();
+    DefaultImplicitToLogic(hdr.dt);
 
-    parse_port_declarators(dir, is_const, is_ref_static, dt);
+    ParseTfPortDeclarators(item, hdr);
   }
   (void)end_kw;
 }

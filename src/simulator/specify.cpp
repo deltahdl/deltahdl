@@ -390,16 +390,13 @@ void ClampPulseLimitsToDelays(PathDelay& pd) {
 
 }  // namespace
 
-void SpecifyManager::AddSdfPulseLimit(std::string_view src,
-                                      std::string_view dst, uint64_t reject,
-                                      bool has_error, uint64_t error,
-                                      bool is_percent) {
+void SpecifyManager::AddSdfPulseLimit(const SdfPulseLimitSpec& spec) {
   for (auto& pd : path_delays_) {
-    if (pd.src_port != src || pd.dst_port != dst) continue;
-    if (is_percent) {
-      ApplySdfPercentPulseLimits(pd, reject, has_error, error);
+    if (pd.src_port != spec.src || pd.dst_port != spec.dst) continue;
+    if (spec.is_percent) {
+      ApplySdfPercentPulseLimits(pd, spec.reject, spec.has_error, spec.error);
     } else {
-      ApplySdfPulseLimits(pd, reject, has_error, error);
+      ApplySdfPulseLimits(pd, spec.reject, spec.has_error, spec.error);
     }
     ClampPulseLimitsToDelays(pd);
   }

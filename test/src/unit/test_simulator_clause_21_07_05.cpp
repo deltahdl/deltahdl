@@ -46,11 +46,13 @@ TEST_F(VcdTypeMappingSim, BitAndLogicDumpAsReg) {
   {
     VcdWriter vcd(tmp_path_);
     vcd.WriteHeader("1ns");
-    vcd.RegisterSignal("flags", 4, MakeVar(arena_, 4), NetType::kWire, -1, -1,
-                       VcdDataType::kBit);
+    vcd.RegisterSignal(VcdSignalSpec{"flags", 4, MakeVar(arena_, 4),
+                                     NetType::kWire, -1, -1,
+                                     VcdDataType::kBit});
     // logic [3:0][7:0] -> a single reg vector of the collapsed 32-bit width.
-    vcd.RegisterSignal("word", 32, MakeVar(arena_, 32), NetType::kWire, -1, -1,
-                       VcdDataType::kLogic);
+    vcd.RegisterSignal(VcdSignalSpec{"word", 32, MakeVar(arena_, 32),
+                                     NetType::kWire, -1, -1,
+                                     VcdDataType::kLogic});
     vcd.EndDefinitions();
   }
   auto content = ReadVcd();
@@ -72,16 +74,21 @@ TEST_F(VcdTypeMappingSim, FixedWidthIntegerTypesUseTableSizes) {
   {
     VcdWriter vcd(tmp_path_);
     vcd.WriteHeader("1ns");
-    vcd.RegisterSignal("myint", 8, MakeVar(arena_, 8), NetType::kWire, -1, -1,
-                       VcdDataType::kInt);
-    vcd.RegisterSignal("myshort", 8, MakeVar(arena_, 8), NetType::kWire, -1, -1,
-                       VcdDataType::kShortint);
-    vcd.RegisterSignal("mylong", 8, MakeVar(arena_, 8), NetType::kWire, -1, -1,
-                       VcdDataType::kLongint);
-    vcd.RegisterSignal("mybyte", 4, MakeVar(arena_, 4), NetType::kWire, -1, -1,
-                       VcdDataType::kByte);
-    vcd.RegisterSignal("myenum", 8, MakeVar(arena_, 8), NetType::kWire, -1, -1,
-                       VcdDataType::kEnum);
+    vcd.RegisterSignal(VcdSignalSpec{"myint", 8, MakeVar(arena_, 8),
+                                     NetType::kWire, -1, -1,
+                                     VcdDataType::kInt});
+    vcd.RegisterSignal(VcdSignalSpec{"myshort", 8, MakeVar(arena_, 8),
+                                     NetType::kWire, -1, -1,
+                                     VcdDataType::kShortint});
+    vcd.RegisterSignal(VcdSignalSpec{"mylong", 8, MakeVar(arena_, 8),
+                                     NetType::kWire, -1, -1,
+                                     VcdDataType::kLongint});
+    vcd.RegisterSignal(VcdSignalSpec{"mybyte", 4, MakeVar(arena_, 4),
+                                     NetType::kWire, -1, -1,
+                                     VcdDataType::kByte});
+    vcd.RegisterSignal(VcdSignalSpec{"myenum", 8, MakeVar(arena_, 8),
+                                     NetType::kWire, -1, -1,
+                                     VcdDataType::kEnum});
     vcd.EndDefinitions();
   }
   auto content = ReadVcd();
@@ -106,8 +113,9 @@ TEST_F(VcdTypeMappingSim, ShortrealDumpsAsReal) {
   {
     VcdWriter vcd(tmp_path_);
     vcd.WriteHeader("1ns");
-    vcd.RegisterSignal("sr", 32, MakeVar(arena_, 32), NetType::kWire, -1, -1,
-                       VcdDataType::kReal);
+    vcd.RegisterSignal(VcdSignalSpec{"sr", 32, MakeVar(arena_, 32),
+                                     NetType::kWire, -1, -1,
+                                     VcdDataType::kReal});
     vcd.EndDefinitions();
   }
   auto content = ReadVcd();
@@ -127,10 +135,12 @@ TEST_F(VcdTypeMappingSim, UnpackedStructUsesForkScope) {
     VcdWriter vcd(tmp_path_);
     vcd.WriteHeader("1ns");
     vcd.BeginScope("pkt", VcdScopeKind::kFork);
-    vcd.RegisterSignal("header", 8, MakeVar(arena_, 8), NetType::kWire, -1, -1,
-                       VcdDataType::kByte);
-    vcd.RegisterSignal("valid", 1, MakeVar(arena_, 1), NetType::kWire, -1, -1,
-                       VcdDataType::kBit);
+    vcd.RegisterSignal(VcdSignalSpec{"header", 8, MakeVar(arena_, 8),
+                                     NetType::kWire, -1, -1,
+                                     VcdDataType::kByte});
+    vcd.RegisterSignal(VcdSignalSpec{"valid", 1, MakeVar(arena_, 1),
+                                     NetType::kWire, -1, -1,
+                                     VcdDataType::kBit});
     vcd.EndScope();
     vcd.EndDefinitions();
   }

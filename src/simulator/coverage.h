@@ -547,6 +547,18 @@ class CoverageDB {
   // bullet).
   static bool SingletonValueParticipates(BinValueResolution resolution);
 
+  // A bin range [low:high] as written in a bins specification (LRM 19.5.7,
+  // range bullets). Each endpoint carries its value and whether it had x or z
+  // bits, and `is_wildcard` records that the range belongs to a wildcard bin
+  // whose unknown endpoint bits were resolved to 0/1 beforehand.
+  struct BinRangeSpec {
+    int64_t low = 0;
+    int64_t high = 0;
+    bool low_has_xz = false;
+    bool high_has_xz = false;
+    bool is_wildcard = false;
+  };
+
   // Resolves a bin range [low:high] against the effective type of e, returning
   // the values that participate in the bin. The range drops out entirely when
   // an endpoint carries x or z bits or when every value in the range would
@@ -554,9 +566,7 @@ class CoverageDB {
   // expressible by the effective type (LRM 19.5.7, second and third range
   // bullets). Wildcard endpoints' x/z bits are resolved beforehand and do not
   // force the range out.
-  static std::vector<int64_t> ResolveBinRange(int64_t low, int64_t high,
-                                              bool low_has_xz, bool high_has_xz,
-                                              bool is_wildcard,
+  static std::vector<int64_t> ResolveBinRange(const BinRangeSpec& range,
                                               CoverpointEffectiveType eff);
 
   // --- LRM 19.7: instance coverage options ----------------------------------

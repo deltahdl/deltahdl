@@ -221,8 +221,22 @@ static void AppendDefineLine(std::string_view line, std::string& joined) {
   }
 }
 
-static std::string JoinDefineBody(std::string_view src, size_t pos, size_t& eol,
-                                  uint32_t& line_num) {
+// Per-line scan position over the source buffer driven by the preprocessing
+// loop (22.x): `src` is the whole file text, `pos` the start offset of the
+// current physical line, `eol` its end offset (advanced when a `define body is
+// joined across continuation lines), and `line_num` the 1-based line counter.
+struct LineCursor {
+  std::string_view src;
+  size_t pos;
+  size_t& eol;
+  uint32_t& line_num;
+};
+
+static std::string JoinDefineBody(LineCursor& cursor) {
+  std::string_view src = cursor.src;
+  size_t pos = cursor.pos;
+  size_t& eol = cursor.eol;
+  uint32_t& line_num = cursor.line_num;
   std::string_view first_line = src.substr(pos, eol - pos);
   std::string joined;
   AppendDefineLine(first_line, joined);
@@ -542,12 +556,11 @@ struct PreprocLoopOps {
 // spans multiple physical lines is first joined, then the line is run as a
 // directive, emitted as active text, or (inside an ignored block) only scanned
 // so an opening block comment is tracked across lines (22.6).
-static void ProcessOrdinaryLine(std::string_view line, std::string_view src,
-                                size_t pos, size_t& eol, uint32_t& line_num,
+static void ProcessOrdinaryLine(std::string_view line, LineCursor& cursor,
                                 const PreprocLoopOps& ops) {
   std::string joined;
   if (DefineSpansMultipleLines(line)) {
-    joined = JoinDefineBody(src, pos, eol, line_num);
+    joined = JoinDefineBody(cursor);
     line = joined;
   }
   if (ops.run_directive(line)) return;
@@ -571,7 +584,8 @@ static void RunPreprocLoop(std::string_view src, uint32_t& line_num,
     if (ops.in_block_comment()) {
       ops.continue_block_comment(line);
     } else {
-      ProcessOrdinaryLine(line, src, pos, eol, line_num, ops);
+      LineCursor cursor{src, pos, eol, line_num};
+      ProcessOrdinaryLine(line, cursor, ops);
       output.push_back('\n');
     }
     pos = eol + 1;

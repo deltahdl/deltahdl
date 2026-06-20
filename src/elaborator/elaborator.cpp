@@ -334,23 +334,21 @@ void Elaborator::RunPreElaborationValidations() {
   ResolveExternModules();
 }
 
-RtlirDesign* Elaborator::ElaborateTops(
-    const std::vector<ModuleDecl*>& top_decls) {
-  auto* design = arena_.Create<RtlirDesign>();
+bool Elaborator::ElaborateTopModules(const std::vector<ModuleDecl*>& top_decls,
+                                     RtlirDesign* design) {
   ParamList empty_params;
-  pending_generates_.clear();
-  applied_defparams_.clear();
-  early_defparam_resolutions_.clear();
-
   for (auto* mod_decl : top_decls) {
     std::string saved_path = std::move(current_inst_path_);
     current_inst_path_.assign(mod_decl->name.data(), mod_decl->name.size());
     auto* top = ElaborateModule(mod_decl, empty_params);
     current_inst_path_ = std::move(saved_path);
-    if (!top) return nullptr;
+    if (!top) return false;
     design->top_modules.push_back(top);
   }
+  return true;
+}
 
+void Elaborator::ResolveDefparamsAndGenerates(RtlirDesign* design) {
   while (true) {
     for (auto* top : design->top_modules) {
       ApplyDefparamsRecursively(top);
@@ -363,6 +361,18 @@ RtlirDesign* Elaborator::ElaborateTops(
     }
   }
   VerifyEarlyResolvedDefparams();
+}
+
+RtlirDesign* Elaborator::ElaborateTops(
+    const std::vector<ModuleDecl*>& top_decls) {
+  auto* design = arena_.Create<RtlirDesign>();
+  pending_generates_.clear();
+  applied_defparams_.clear();
+  early_defparam_resolutions_.clear();
+
+  if (!ElaborateTopModules(top_decls, design)) return nullptr;
+
+  ResolveDefparamsAndGenerates(design);
 
   for (auto* top : design->top_modules) {
     WarnUnresolvedDefparams(top);
