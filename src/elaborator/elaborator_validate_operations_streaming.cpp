@@ -522,10 +522,19 @@ static void WalkStmtsForProgramRef(
     diag.Error(s->range.start,
                "hierarchical reference to program signal from outside the "
                "program is not permitted");
-  for (auto* child : s->children)
-    WalkStmtsForProgramRef(child, program_names, diag);
-  if (s->if_body) WalkStmtsForProgramRef(s->if_body, program_names, diag);
-  if (s->else_body) WalkStmtsForProgramRef(s->else_body, program_names, diag);
+  for (auto* sub : s->stmts) WalkStmtsForProgramRef(sub, program_names, diag);
+  WalkStmtsForProgramRef(s->then_branch, program_names, diag);
+  WalkStmtsForProgramRef(s->else_branch, program_names, diag);
+  WalkStmtsForProgramRef(s->body, program_names, diag);
+  WalkStmtsForProgramRef(s->for_body, program_names, diag);
+  for (auto* init : s->for_inits)
+    WalkStmtsForProgramRef(init, program_names, diag);
+  for (auto* step : s->for_steps)
+    WalkStmtsForProgramRef(step, program_names, diag);
+  for (auto* fs : s->fork_stmts)
+    WalkStmtsForProgramRef(fs, program_names, diag);
+  for (auto& ci : s->case_items)
+    WalkStmtsForProgramRef(ci.body, program_names, diag);
 }
 
 void Elaborator::ValidateHierRefIntoProgram(const ModuleDecl* decl) {
@@ -606,9 +615,15 @@ static void WalkStmtsForAutoRef(
     diag.Error(s->range.start,
                "hierarchical reference to object in automatic task or "
                "function is not permitted");
-  for (auto* child : s->children) WalkStmtsForAutoRef(child, auto_names, diag);
-  if (s->if_body) WalkStmtsForAutoRef(s->if_body, auto_names, diag);
-  if (s->else_body) WalkStmtsForAutoRef(s->else_body, auto_names, diag);
+  for (auto* sub : s->stmts) WalkStmtsForAutoRef(sub, auto_names, diag);
+  WalkStmtsForAutoRef(s->then_branch, auto_names, diag);
+  WalkStmtsForAutoRef(s->else_branch, auto_names, diag);
+  WalkStmtsForAutoRef(s->body, auto_names, diag);
+  WalkStmtsForAutoRef(s->for_body, auto_names, diag);
+  for (auto* init : s->for_inits) WalkStmtsForAutoRef(init, auto_names, diag);
+  for (auto* step : s->for_steps) WalkStmtsForAutoRef(step, auto_names, diag);
+  for (auto* fs : s->fork_stmts) WalkStmtsForAutoRef(fs, auto_names, diag);
+  for (auto& ci : s->case_items) WalkStmtsForAutoRef(ci.body, auto_names, diag);
 }
 
 void Elaborator::ValidateHierRefToAutomatic(const ModuleDecl* decl) {
