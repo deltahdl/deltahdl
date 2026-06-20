@@ -253,22 +253,18 @@ uint32_t EvalTypeWidth(const DataType& dtype, const TypedefMap& typedefs,
   return EvalTypeWidth(dtype);
 }
 
-bool Is4stateType(const DataType& dtype, const TypedefMap& typedefs) {
-  const auto* resolved = ResolveNamed(dtype, typedefs);
-  if (resolved) return Is4stateType(*resolved, typedefs);
-
-  if (dtype.kind == DataTypeKind::kEnum) {
-    if (!dtype.enum_base_name.empty()) {
-      auto it = typedefs.find(dtype.enum_base_name);
-      if (it != typedefs.end()) return Is4stateType(it->second, typedefs);
-    }
-    if (dtype.enum_base_kind != DataTypeKind::kImplicit) {
-      return Is4stateType(dtype.enum_base_kind);
-    }
-    return false;
+static bool Is4stateEnum(const DataType& dtype, const TypedefMap& typedefs) {
+  if (!dtype.enum_base_name.empty()) {
+    auto it = typedefs.find(dtype.enum_base_name);
+    if (it != typedefs.end()) return Is4stateType(it->second, typedefs);
   }
-  if (Is4stateType(dtype.kind)) return true;
+  if (dtype.enum_base_kind != DataTypeKind::kImplicit) {
+    return Is4stateType(dtype.enum_base_kind);
+  }
+  return false;
+}
 
+static bool Is4statePackedAggregate(const DataType& dtype) {
   if ((dtype.kind == DataTypeKind::kStruct ||
        dtype.kind == DataTypeKind::kUnion) &&
       (dtype.is_packed || dtype.is_soft)) {
@@ -276,6 +272,16 @@ bool Is4stateType(const DataType& dtype, const TypedefMap& typedefs) {
       if (Is4stateType(m.type_kind)) return true;
     }
   }
+  return false;
+}
+
+bool Is4stateType(const DataType& dtype, const TypedefMap& typedefs) {
+  const auto* resolved = ResolveNamed(dtype, typedefs);
+  if (resolved) return Is4stateType(*resolved, typedefs);
+
+  if (dtype.kind == DataTypeKind::kEnum) return Is4stateEnum(dtype, typedefs);
+  if (Is4stateType(dtype.kind)) return true;
+  if (Is4statePackedAggregate(dtype)) return true;
 
   if (dtype.kind == DataTypeKind::kUnion && !dtype.is_packed &&
       !dtype.is_soft && !dtype.struct_members.empty()) {
@@ -386,6 +392,17 @@ static DataTypeKind CanonKind(DataTypeKind k) {
   return k == DataTypeKind::kReg ? DataTypeKind::kLogic : k;
 }
 
+static bool VectorMatchesPredef(const DataType& vec, const DataType& predef) {
+  if (Is4stateType(vec.kind) != Is4stateType(predef.kind)) return false;
+  if (!vec.packed_dim_left || !vec.packed_dim_right) return false;
+  if (!vec.extra_packed_dims.empty()) return false;
+  auto left = ConstEvalInt(vec.packed_dim_left);
+  auto right = ConstEvalInt(vec.packed_dim_right);
+  if (!left || !right || *right != 0 || *left < 0) return false;
+  auto vec_width = static_cast<uint32_t>(*left + 1);
+  return vec_width == EvalTypeWidth(predef);
+}
+
 bool TypesMatch(const DataType& a, const DataType& b) {
   if (a.is_signed != b.is_signed) return false;
 
@@ -394,26 +411,12 @@ bool TypesMatch(const DataType& a, const DataType& b) {
     return true;
   }
 
-  const DataType* vec = nullptr;
-  const DataType* predef = nullptr;
   if (IsSimpleBitVector(a.kind) && HasPredefinedWidth(b.kind)) {
-    vec = &a;
-    predef = &b;
-  } else if (HasPredefinedWidth(a.kind) && IsSimpleBitVector(b.kind)) {
-    vec = &b;
-    predef = &a;
+    return VectorMatchesPredef(a, b);
   }
-  if (vec && predef) {
-    if (Is4stateType(vec->kind) != Is4stateType(predef->kind)) return false;
-    if (!vec->packed_dim_left || !vec->packed_dim_right) return false;
-    if (!vec->extra_packed_dims.empty()) return false;
-    auto left = ConstEvalInt(vec->packed_dim_left);
-    auto right = ConstEvalInt(vec->packed_dim_right);
-    if (!left || !right || *right != 0 || *left < 0) return false;
-    auto vec_width = static_cast<uint32_t>(*left + 1);
-    return vec_width == EvalTypeWidth(*predef);
+  if (HasPredefinedWidth(a.kind) && IsSimpleBitVector(b.kind)) {
+    return VectorMatchesPredef(b, a);
   }
-
   return false;
 }
 
@@ -528,7 +531,8 @@ static bool IsReductionOp(TokenKind op) {
          op == TokenKind::kCaretTilde;
 }
 
-uint32_t CastTargetWidth(std::string_view type_name) {
+static uint32_t KeywordCastWidth(std::string_view type_name, bool* matched) {
+  *matched = true;
   if (type_name == "byte") return 8;
   if (type_name == "shortint") return 16;
   if (type_name == "int") return 32;
@@ -540,22 +544,69 @@ uint32_t CastTargetWidth(std::string_view type_name) {
   if (type_name == "logic") return 1;
   if (type_name == "reg") return 1;
   if (type_name == "string") return 0;
-  if (!type_name.empty() && type_name[0] >= '0' && type_name[0] <= '9') {
-    uint32_t w = 0;
-    for (char c : type_name) {
-      if (c >= '0' && c <= '9')
-        w = w * 10 + (c - '0');
-      else
-        break;
-    }
-    return w;
-  }
+  *matched = false;
   return 0;
+}
+
+static uint32_t LeadingDecimalWidth(std::string_view type_name) {
+  if (type_name.empty() || type_name[0] < '0' || type_name[0] > '9') return 0;
+  uint32_t w = 0;
+  for (char c : type_name) {
+    if (c >= '0' && c <= '9')
+      w = w * 10 + (c - '0');
+    else
+      break;
+  }
+  return w;
+}
+
+uint32_t CastTargetWidth(std::string_view type_name) {
+  bool matched = false;
+  uint32_t kw = KeywordCastWidth(type_name, &matched);
+  if (matched) return kw;
+  return LeadingDecimalWidth(type_name);
 }
 
 static bool IsShiftOp(TokenKind op) {
   return op == TokenKind::kLtLt || op == TokenKind::kGtGt ||
          op == TokenKind::kLtLtLt || op == TokenKind::kGtGtGt;
+}
+
+static uint32_t InferBinaryWidth(const Expr* expr, const TypedefMap& typedefs) {
+  if (IsOneBitResultOp(expr->op)) return 1;
+  if (IsShiftOp(expr->op)) return InferExprWidth(expr->lhs, typedefs);
+  if (expr->op == TokenKind::kPower) return InferExprWidth(expr->lhs, typedefs);
+  uint32_t lw = InferExprWidth(expr->lhs, typedefs);
+  uint32_t rw = InferExprWidth(expr->rhs, typedefs);
+  return std::max(lw, rw);
+}
+
+static uint32_t InferElementsTotalWidth(const Expr* expr,
+                                        const TypedefMap& typedefs) {
+  uint32_t total = 0;
+  for (const auto* el : expr->elements) {
+    total += InferExprWidth(el, typedefs);
+  }
+  return total;
+}
+
+static uint32_t InferReplicateWidth(const Expr* expr,
+                                    const TypedefMap& typedefs) {
+  auto count = ConstEvalInt(expr->repeat_count);
+  uint32_t inner = InferElementsTotalWidth(expr, typedefs);
+  return count ? static_cast<uint32_t>(*count) * inner : inner;
+}
+
+static uint32_t InferCastWidth(const Expr* expr, const TypedefMap& typedefs) {
+  if (expr->text == "signed" || expr->text == "unsigned" ||
+      expr->text == "const")
+    return InferExprWidth(expr->lhs, typedefs);
+  if (expr->text == "void") return 0;
+  uint32_t w = CastTargetWidth(expr->text);
+  if (w > 0) return w;
+  auto it = typedefs.find(expr->text);
+  if (it != typedefs.end()) return EvalTypeWidth(it->second);
+  return InferExprWidth(expr->lhs, typedefs);
 }
 
 uint32_t InferExprWidth(const Expr* expr, const TypedefMap& typedefs) {
@@ -577,48 +628,21 @@ uint32_t InferExprWidth(const Expr* expr, const TypedefMap& typedefs) {
     case ExprKind::kUnary:
       if (expr->op == TokenKind::kBang || IsReductionOp(expr->op)) return 1;
       return InferExprWidth(expr->lhs, typedefs);
-    case ExprKind::kBinary: {
-      if (IsOneBitResultOp(expr->op)) return 1;
-      if (IsShiftOp(expr->op)) return InferExprWidth(expr->lhs, typedefs);
-      if (expr->op == TokenKind::kPower)
-        return InferExprWidth(expr->lhs, typedefs);
-      uint32_t lw = InferExprWidth(expr->lhs, typedefs);
-      uint32_t rw = InferExprWidth(expr->rhs, typedefs);
-      return std::max(lw, rw);
-    }
+    case ExprKind::kBinary:
+      return InferBinaryWidth(expr, typedefs);
     case ExprKind::kTernary: {
       uint32_t tw = InferExprWidth(expr->true_expr, typedefs);
       uint32_t fw = InferExprWidth(expr->false_expr, typedefs);
       return std::max(tw, fw);
     }
-    case ExprKind::kConcatenation: {
-      uint32_t total = 0;
-      for (const auto* el : expr->elements) {
-        total += InferExprWidth(el, typedefs);
-      }
-      return total;
-    }
-    case ExprKind::kReplicate: {
-      auto count = ConstEvalInt(expr->repeat_count);
-      uint32_t inner = 0;
-      for (const auto* el : expr->elements) {
-        inner += InferExprWidth(el, typedefs);
-      }
-      return count ? static_cast<uint32_t>(*count) * inner : inner;
-    }
+    case ExprKind::kConcatenation:
+      return InferElementsTotalWidth(expr, typedefs);
+    case ExprKind::kReplicate:
+      return InferReplicateWidth(expr, typedefs);
     case ExprKind::kTypeRef:
       return InferExprWidth(expr->lhs, typedefs);
-    case ExprKind::kCast: {
-      if (expr->text == "signed" || expr->text == "unsigned" ||
-          expr->text == "const")
-        return InferExprWidth(expr->lhs, typedefs);
-      if (expr->text == "void") return 0;
-      uint32_t w = CastTargetWidth(expr->text);
-      if (w > 0) return w;
-      auto it = typedefs.find(expr->text);
-      if (it != typedefs.end()) return EvalTypeWidth(it->second);
-      return InferExprWidth(expr->lhs, typedefs);
-    }
+    case ExprKind::kCast:
+      return InferCastWidth(expr, typedefs);
     case ExprKind::kSelect:
     case ExprKind::kMemberAccess:
     case ExprKind::kCall:

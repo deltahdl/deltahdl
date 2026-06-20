@@ -273,6 +273,57 @@ AssertionAction AssertionApi::GetAction(std::string_view name) const {
   return it->second;
 }
 
+namespace {
+
+// §39.5.1 system-wide flag bundle mutated by the §39.5.3 controls that discard
+// attempts and reconfigure starting/actions. Holding references lets the
+// control-case helpers below run without naming the private member set.
+struct SysControlState {
+  uint32_t& attempts_in_progress;
+  bool& started;
+  bool& ended;
+  bool& fail_action_enabled;
+  bool& vacuous_action_enabled;
+  bool& nonvacuous_action_enabled;
+};
+
+// True for the two §39.4.2 step reasons removed by a system reset.
+bool IsStepCallbackReason(int reason) {
+  return reason == cbAssertionStepSuccess || reason == cbAssertionStepFailure;
+}
+
+// vpiAssertionSysReset: restore the system to its initial running state, drop
+// the step success/failure callbacks, and leave all others installed. Templated
+// on the callback container so the private CbEntry type need not be named.
+template <typename CallbackVec>
+void ApplySysReset(const SysControlState& s, CallbackVec& callbacks) {
+  s.attempts_in_progress = 0;
+  s.started = true;
+  s.fail_action_enabled = true;
+  s.vacuous_action_enabled = true;
+  s.nonvacuous_action_enabled = true;
+  std::erase_if(callbacks,
+                [](const auto& e) { return IsStepCallbackReason(e.reason); });
+}
+
+// vpiAssertionSysKill: discard attempts in progress and disable further starts.
+void ApplySysKill(const SysControlState& s) {
+  s.attempts_in_progress = 0;
+  s.started = false;
+}
+
+// vpiAssertionSysEnd: discard attempts, disable further starts, remove all
+// installed callbacks, and mark the system ended so no further action proceeds.
+template <typename CallbackVec>
+void ApplySysEnd(const SysControlState& s, CallbackVec& callbacks) {
+  s.attempts_in_progress = 0;
+  s.started = false;
+  s.ended = true;
+  callbacks.clear();
+}
+
+}  // namespace
+
 bool AssertionApi::SysControl(int control, std::string_view scope) {
   // Once the system has ended, no further assertion-related actions are
   // permitted.
@@ -285,19 +336,16 @@ bool AssertionApi::SysControl(int control, std::string_view scope) {
   // regardless of scope.
   last_control_global_ = scope.empty();
 
+  const SysControlState state{attempts_in_progress_,
+                              started_,
+                              ended_,
+                              fail_action_enabled_,
+                              vacuous_action_enabled_,
+                              nonvacuous_action_enabled_};
+
   switch (control) {
     case vpiAssertionSysReset:
-      // Discard attempts in progress and restore the system to its initial
-      // state. Step success/failure callbacks are removed; all others remain.
-      attempts_in_progress_ = 0;
-      started_ = true;
-      fail_action_enabled_ = true;
-      vacuous_action_enabled_ = true;
-      nonvacuous_action_enabled_ = true;
-      std::erase_if(callbacks_, [](const CbEntry& e) {
-        return e.reason == cbAssertionStepSuccess ||
-               e.reason == cbAssertionStepFailure;
-      });
+      ApplySysReset(state, callbacks_);
       // §39.5.3: discarding all attempts in progress also flushes the
       // not-yet-matured deferred/procedural-concurrent instances of every
       // assertion.
@@ -308,9 +356,7 @@ bool AssertionApi::SysControl(int control, std::string_view scope) {
       started_ = false;
       return true;
     case vpiAssertionSysKill:
-      // Discard attempts in progress and disable further starts.
-      attempts_in_progress_ = 0;
-      started_ = false;
+      ApplySysKill(state);
       // §39.5.3: the discarded attempts' pending deferred/procedural-concurrent
       // instances are flushed along with them.
       FlushAllPendingAssertionReports();
@@ -326,12 +372,7 @@ bool AssertionApi::SysControl(int control, std::string_view scope) {
       started_ = true;
       return true;
     case vpiAssertionSysEnd:
-      // Discard attempts, disable further starts, remove all installed
-      // callbacks, and permit no further actions.
-      attempts_in_progress_ = 0;
-      started_ = false;
-      ended_ = true;
-      callbacks_.clear();
+      ApplySysEnd(state, callbacks_);
       // §39.5.3: discarding all attempts in progress also flushes their pending
       // deferred/procedural-concurrent instances.
       FlushAllPendingAssertionReports();

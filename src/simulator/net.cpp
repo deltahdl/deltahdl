@@ -58,6 +58,27 @@ static StrengthComponent ReduceWiredPair(StrengthComponent a,
   return {resolved, a.level};
 }
 
+struct WiredLevelRange {
+  bool present = false;
+  uint8_t min = 255;
+  uint8_t max = 0;
+};
+
+static void FoldWiredComponent(StrengthComponent rc, WiredLevelRange& side0,
+                               WiredLevelRange& side1) {
+  WiredLevelRange& side = (rc.val == 0) ? side0 : side1;
+  side.present = true;
+  if (rc.level < side.min) side.min = rc.level;
+  if (rc.level > side.max) side.max = rc.level;
+}
+
+static void ApplyWiredRange(const WiredLevelRange& side, Strength& lo,
+                            Strength& hi) {
+  if (!side.present) return;
+  lo = static_cast<Strength>(side.min);
+  hi = static_cast<Strength>(side.max);
+}
+
 }  // namespace
 
 NetStrength CombineWiredLogicAmbiguous(NetStrength a, NetStrength b,
@@ -70,34 +91,15 @@ NetStrength CombineWiredLogicAmbiguous(NetStrength a, NetStrength b,
   NetStrength r;
   if (ca.empty() || cb.empty()) return r;
 
-  bool has0 = false;
-  bool has1 = false;
-  uint8_t s0_min = 255;
-  uint8_t s0_max = 0;
-  uint8_t s1_min = 255;
-  uint8_t s1_max = 0;
+  WiredLevelRange side0;
+  WiredLevelRange side1;
   for (const auto& x : ca) {
     for (const auto& y : cb) {
-      auto rc = ReduceWiredPair(x, y, kind);
-      if (rc.val == 0) {
-        has0 = true;
-        if (rc.level < s0_min) s0_min = rc.level;
-        if (rc.level > s0_max) s0_max = rc.level;
-      } else {
-        has1 = true;
-        if (rc.level < s1_min) s1_min = rc.level;
-        if (rc.level > s1_max) s1_max = rc.level;
-      }
+      FoldWiredComponent(ReduceWiredPair(x, y, kind), side0, side1);
     }
   }
-  if (has0) {
-    r.s0_lo = static_cast<Strength>(s0_min);
-    r.s0_hi = static_cast<Strength>(s0_max);
-  }
-  if (has1) {
-    r.s1_lo = static_cast<Strength>(s1_min);
-    r.s1_hi = static_cast<Strength>(s1_max);
-  }
+  ApplyWiredRange(side0, r.s0_lo, r.s0_hi);
+  ApplyWiredRange(side1, r.s1_lo, r.s1_hi);
   return r;
 }
 
@@ -460,55 +462,64 @@ static bool ResolveTriPullDefault(Net& net, Arena& arena) {
   return true;
 }
 
-static bool ResolveSpecialNet(Net& net, Arena& arena, Scheduler* sched) {
-  // §6.6.6: supply0 and supply1 nets model the power supplies in a circuit and
-  // shall carry supply strength. The value is pinned to 0 (supply0) or 1
-  // (supply1) and the resolved strength is forced to supply on the driven side,
-  // overriding whatever the drivers contribute.
-  if (net.type == NetType::kSupply0) {
-    net.resolved->value = MakeLogic4VecVal(arena, net.resolved->value.width, 0);
-    net.resolved_strength = NetStrength{};
-    net.resolved_strength.s0_hi = Strength::kSupply;
-    net.resolved_strength.s0_lo = Strength::kSupply;
-    net.resolved->NotifyWatchers();
-    return true;
-  }
-  if (net.type == NetType::kSupply1) {
+// §6.6.6: supply0 and supply1 nets model the power supplies in a circuit and
+// shall carry supply strength. The value is pinned to 0 (supply0) or 1
+// (supply1) and the resolved strength is forced to supply on the driven side,
+// overriding whatever the drivers contribute.
+static void ResolveSupplyNet(Net& net, Arena& arena) {
+  bool is_supply1 = net.type == NetType::kSupply1;
+  if (is_supply1) {
     auto result = MakeLogic4Vec(arena, net.resolved->value.width);
     for (uint32_t w = 0; w < result.nwords; ++w) {
       result.words[w] = {~uint64_t{0}, 0};
     }
     net.resolved->value = result;
-    net.resolved_strength = NetStrength{};
-    net.resolved_strength.s1_hi = Strength::kSupply;
-    net.resolved_strength.s1_lo = Strength::kSupply;
-    net.resolved->NotifyWatchers();
+  } else {
+    net.resolved->value = MakeLogic4VecVal(arena, net.resolved->value.width, 0);
+  }
+  net.resolved_strength = NetStrength{};
+  Strength& hi =
+      is_supply1 ? net.resolved_strength.s1_hi : net.resolved_strength.s0_hi;
+  Strength& lo =
+      is_supply1 ? net.resolved_strength.s1_lo : net.resolved_strength.s0_lo;
+  hi = Strength::kSupply;
+  lo = Strength::kSupply;
+  net.resolved->NotifyWatchers();
+}
+
+// §28.15.2: once every driver goes to high impedance the trireg enters the
+// charge storage state, retaining its last value. The drive resulting from
+// that retained value carries the trireg's charge strength -- one of large,
+// medium, or small, medium by default. Reflect that charge strength on the
+// resolved drive (on the side matching the held value) so the stored charge
+// competes with other sources at the correct level.
+static void ResolveTriregCharge(Net& net, Scheduler* sched) {
+  net.resolved_strength = NetStrength{};
+  if (net.resolved->value.nwords > 0) {
+    bool unknown = (net.resolved->value.words[0].bval & 1ull) != 0;
+    bool high = (net.resolved->value.words[0].aval & 1ull) != 0;
+    if (unknown || !high) {
+      net.resolved_strength.s0_hi = net.charge_strength;
+      net.resolved_strength.s0_lo = net.charge_strength;
+    }
+    if (unknown || high) {
+      net.resolved_strength.s1_hi = net.charge_strength;
+      net.resolved_strength.s1_lo = net.charge_strength;
+    }
+  }
+  if (net.decay_ticks > 0 && sched != nullptr) {
+    ScheduleDecay(net, sched);
+  }
+  net.resolved->NotifyWatchers();
+}
+
+static bool ResolveSpecialNet(Net& net, Arena& arena, Scheduler* sched) {
+  if (net.type == NetType::kSupply0 || net.type == NetType::kSupply1) {
+    ResolveSupplyNet(net, arena);
     return true;
   }
   if (net.type == NetType::kTrireg && AllDriversZ(net.drivers)) {
-    // §28.15.2: once every driver goes to high impedance the trireg enters the
-    // charge storage state, retaining its last value. The drive resulting from
-    // that retained value carries the trireg's charge strength -- one of large,
-    // medium, or small, medium by default. Reflect that charge strength on the
-    // resolved drive (on the side matching the held value) so the stored charge
-    // competes with other sources at the correct level.
-    net.resolved_strength = NetStrength{};
-    if (net.resolved->value.nwords > 0) {
-      bool unknown = (net.resolved->value.words[0].bval & 1ull) != 0;
-      bool high = (net.resolved->value.words[0].aval & 1ull) != 0;
-      if (unknown || !high) {
-        net.resolved_strength.s0_hi = net.charge_strength;
-        net.resolved_strength.s0_lo = net.charge_strength;
-      }
-      if (unknown || high) {
-        net.resolved_strength.s1_hi = net.charge_strength;
-        net.resolved_strength.s1_lo = net.charge_strength;
-      }
-    }
-    if (net.decay_ticks > 0 && sched != nullptr) {
-      ScheduleDecay(net, sched);
-    }
-    net.resolved->NotifyWatchers();
+    ResolveTriregCharge(net, sched);
     return true;
   }
   if (ResolveTriPullDefault(net, arena)) return true;
@@ -517,6 +528,32 @@ static bool ResolveSpecialNet(Net& net, Arena& arena, Scheduler* sched) {
 
 bool Net::InCapacitiveState() const {
   return type == NetType::kTrireg && AllDriversZ(drivers);
+}
+
+static void ResolveStrengthDriven(Net& net, Arena& arena) {
+  auto result = MakeLogic4Vec(arena, net.resolved->value.width);
+  for (uint32_t b = 0; b < result.width; ++b) {
+    ResolveStrengthBit(net.drivers, net.driver_strengths, result, b, net.type);
+  }
+  FixupTriPull(result, net.type);
+  net.resolved->value = result;
+  ComputeSingleBitStrength(net.drivers, net.driver_strengths,
+                           net.resolved_strength, net.type);
+  net.resolved->NotifyWatchers();
+}
+
+static Logic4Vec CombineAllDrivers(const std::vector<Logic4Vec>& drivers,
+                                   Arena& arena, NetType type) {
+  Logic4Vec result = drivers[0];
+  for (size_t i = 1; i < drivers.size(); ++i) {
+    auto combined = MakeLogic4Vec(arena, result.width);
+    for (uint32_t w = 0; w < result.nwords; ++w) {
+      combined.words[w] =
+          ResolveWord(result.words[w], drivers[i].words[w], type);
+    }
+    result = combined;
+  }
+  return result;
 }
 
 void Net::Resolve(Arena& arena, Scheduler* sched) {
@@ -535,15 +572,7 @@ void Net::Resolve(Arena& arena, Scheduler* sched) {
   if (ResolveSpecialNet(*this, arena, sched)) return;
 
   if (!is_user_nettype && !driver_strengths.empty()) {
-    auto result = MakeLogic4Vec(arena, resolved->value.width);
-    for (uint32_t b = 0; b < result.width; ++b) {
-      ResolveStrengthBit(drivers, driver_strengths, result, b, type);
-    }
-    FixupTriPull(result, type);
-    resolved->value = result;
-    ComputeSingleBitStrength(drivers, driver_strengths, resolved_strength,
-                             type);
-    resolved->NotifyWatchers();
+    ResolveStrengthDriven(*this, arena);
     return;
   }
 
@@ -554,15 +583,7 @@ void Net::Resolve(Arena& arena, Scheduler* sched) {
     return;
   }
 
-  Logic4Vec result = drivers[0];
-  for (size_t i = 1; i < drivers.size(); ++i) {
-    auto combined = MakeLogic4Vec(arena, result.width);
-    for (uint32_t w = 0; w < result.nwords; ++w) {
-      combined.words[w] =
-          ResolveWord(result.words[w], drivers[i].words[w], type);
-    }
-    result = combined;
-  }
+  Logic4Vec result = CombineAllDrivers(drivers, arena, type);
   FixupTriPull(result, type);
   resolved->value = result;
   resolved->NotifyWatchers();

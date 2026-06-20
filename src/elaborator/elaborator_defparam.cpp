@@ -1,4 +1,6 @@
+#include <set>
 #include <string_view>
+#include <tuple>
 #include <unordered_set>
 #include <vector>
 
@@ -22,19 +24,25 @@ static void CollectPathComponents(const Expr* expr,
   }
 }
 
-static bool RhsContainsHierarchicalRef(const Expr* e) {
-  if (!e) return false;
-  if (e->kind == ExprKind::kMemberAccess) return true;
-  if (e->kind == ExprKind::kIdentifier && !e->scope_prefix.empty()) return true;
-  if (RhsContainsHierarchicalRef(e->lhs)) return true;
-  if (RhsContainsHierarchicalRef(e->rhs)) return true;
-  if (RhsContainsHierarchicalRef(e->base)) return true;
-  if (RhsContainsHierarchicalRef(e->index)) return true;
-  if (RhsContainsHierarchicalRef(e->index_end)) return true;
-  if (RhsContainsHierarchicalRef(e->condition)) return true;
-  if (RhsContainsHierarchicalRef(e->true_expr)) return true;
-  if (RhsContainsHierarchicalRef(e->false_expr)) return true;
-  if (RhsContainsHierarchicalRef(e->repeat_count)) return true;
+static bool RhsContainsHierarchicalRef(const Expr* e);
+
+// True if any scalar (single-Expr) child slot of `e` contains a hierarchical
+// reference. Kept separate so the top-level node check stays simple.
+static bool AnyScalarChildContainsHierarchicalRef(const Expr* e) {
+  return RhsContainsHierarchicalRef(e->lhs) ||
+         RhsContainsHierarchicalRef(e->rhs) ||
+         RhsContainsHierarchicalRef(e->base) ||
+         RhsContainsHierarchicalRef(e->index) ||
+         RhsContainsHierarchicalRef(e->index_end) ||
+         RhsContainsHierarchicalRef(e->condition) ||
+         RhsContainsHierarchicalRef(e->true_expr) ||
+         RhsContainsHierarchicalRef(e->false_expr) ||
+         RhsContainsHierarchicalRef(e->repeat_count);
+}
+
+// True if any element of one of `e`'s child-Expr lists contains a hierarchical
+// reference.
+static bool AnyListChildContainsHierarchicalRef(const Expr* e) {
   for (const auto* a : e->args) {
     if (RhsContainsHierarchicalRef(a)) return true;
   }
@@ -44,13 +52,19 @@ static bool RhsContainsHierarchicalRef(const Expr* e) {
   return false;
 }
 
-RtlirParamDecl* Elaborator::ResolveDefparamPath(RtlirModule* root,
-                                                const Expr* path_expr,
-                                                RtlirModule** out_mod) {
-  std::vector<std::string_view> parts;
-  CollectPathComponents(path_expr, parts);
-  if (parts.size() < 2) return nullptr;
+static bool RhsContainsHierarchicalRef(const Expr* e) {
+  if (!e) return false;
+  if (e->kind == ExprKind::kMemberAccess) return true;
+  if (e->kind == ExprKind::kIdentifier && !e->scope_prefix.empty()) return true;
+  if (AnyScalarChildContainsHierarchicalRef(e)) return true;
+  return AnyListChildContainsHierarchicalRef(e);
+}
 
+// Follows the leading (all-but-last) components of a defparam path from `root`
+// down the instance hierarchy. Returns the module reached, or nullptr if any
+// component names no resolved child instance.
+static RtlirModule* DescendDefparamPath(
+    RtlirModule* root, const std::vector<std::string_view>& parts) {
   RtlirModule* cur = root;
   for (size_t i = 0; i + 1 < parts.size(); ++i) {
     bool found = false;
@@ -63,6 +77,18 @@ RtlirParamDecl* Elaborator::ResolveDefparamPath(RtlirModule* root,
     }
     if (!found) return nullptr;
   }
+  return cur;
+}
+
+RtlirParamDecl* Elaborator::ResolveDefparamPath(RtlirModule* root,
+                                                const Expr* path_expr,
+                                                RtlirModule** out_mod) {
+  std::vector<std::string_view> parts;
+  CollectPathComponents(path_expr, parts);
+  if (parts.size() < 2) return nullptr;
+
+  RtlirModule* cur = DescendDefparamPath(root, parts);
+  if (!cur) return nullptr;
 
   auto param_name = parts.back();
   for (auto& p : cur->params) {
@@ -90,6 +116,37 @@ void Elaborator::RecomputeDependentParams(RtlirModule* mod) {
   }
 }
 
+// Checks whether a defparam may legally override the resolved target `param`
+// whose right-hand side is `val_expr`. On a violation it emits the matching
+// diagnostic against `loc` and returns false (the caller then records the
+// defparam as handled and skips it). Returns true when the override may
+// proceed.
+static bool DefparamOverrideAllowed(DiagEngine& diag,
+                                    const RtlirParamDecl* param,
+                                    const Expr* val_expr, SourceLoc loc) {
+  if (param->is_type_param) {
+    diag.Error(loc, "defparam cannot override a type parameter");
+    return false;
+  }
+  if (param->is_localparam) {
+    diag.Error(loc, "defparam cannot override a local parameter");
+    return false;
+  }
+  if (param->config_locked) {
+    // A configuration's parameter override takes precedence over a defparam
+    // targeting the same parameter (§33.4.3); leave the config value in
+    // place and treat this defparam as resolved against it.
+    return false;
+  }
+  if (RhsContainsHierarchicalRef(val_expr)) {
+    diag.Error(loc,
+               "defparam right-hand side may only reference parameters "
+               "declared in the same module");
+    return false;
+  }
+  return true;
+}
+
 void Elaborator::ApplyDefparams(RtlirModule* mod, const ModuleDecl* decl) {
   ScopeMap scope = BuildParamScope(mod);
   for (const auto* item : decl->items) {
@@ -101,27 +158,7 @@ void Elaborator::ApplyDefparams(RtlirModule* mod, const ModuleDecl* decl) {
       RtlirModule* target_mod = nullptr;
       auto* param = ResolveDefparamPath(mod, path_expr, &target_mod);
       if (!param) continue;
-      if (param->is_type_param) {
-        diag_.Error(item->loc, "defparam cannot override a type parameter");
-        applied_defparams_.insert(key);
-        continue;
-      }
-      if (param->is_localparam) {
-        diag_.Error(item->loc, "defparam cannot override a local parameter");
-        applied_defparams_.insert(key);
-        continue;
-      }
-      if (param->config_locked) {
-        // A configuration's parameter override takes precedence over a defparam
-        // targeting the same parameter (§33.4.3); leave the config value in
-        // place and treat this defparam as resolved against it.
-        applied_defparams_.insert(key);
-        continue;
-      }
-      if (RhsContainsHierarchicalRef(val_expr)) {
-        diag_.Error(item->loc,
-                    "defparam right-hand side may only reference parameters "
-                    "declared in the same module");
+      if (!DefparamOverrideAllowed(diag_, param, val_expr, item->loc)) {
         applied_defparams_.insert(key);
         continue;
       }
@@ -188,6 +225,26 @@ static void CollectLocalGenerateBlockNames(
 // module of the same name), but once the block exists the same name would bind
 // to the local block instead, changing the target. We flag that collision; per
 // the LRM it is fixed by renaming the generate block.
+// Flags each defparam assignment in `item` whose leading path component names
+// both a local generate block and a top-level scope: that name resolves
+// outward now but would bind to the local block once it is elaborated.
+static void CheckDefparamItemEarlyAmbiguity(
+    DiagEngine& diag, const ModuleItem* item,
+    const std::unordered_set<std::string_view>& block_names,
+    const std::unordered_set<std::string_view>& top_names) {
+  for (const auto& assign : item->defparam_assigns) {
+    std::vector<std::string_view> parts;
+    CollectPathComponents(assign.first, parts);
+    if (parts.size() < 2) continue;
+    auto lead = parts.front();
+    if (block_names.count(lead) && top_names.count(lead)) {
+      diag.Error(item->loc,
+                 "defparam hierarchical name would resolve differently once "
+                 "the like-named generate block is elaborated");
+    }
+  }
+}
+
 void Elaborator::CheckEarlyResolutionAmbiguity(
     RtlirModule* mod, const std::unordered_set<std::string_view>& top_names) {
   if (!mod) return;
@@ -201,17 +258,7 @@ void Elaborator::CheckEarlyResolutionAmbiguity(
 
   for (const auto* item : decl->items) {
     if (item->kind != ModuleItemKind::kDefparam) continue;
-    for (const auto& assign : item->defparam_assigns) {
-      std::vector<std::string_view> parts;
-      CollectPathComponents(assign.first, parts);
-      if (parts.size() < 2) continue;
-      auto lead = parts.front();
-      if (block_names.count(lead) && top_names.count(lead)) {
-        diag_.Error(item->loc,
-                    "defparam hierarchical name would resolve differently once "
-                    "the like-named generate block is elaborated");
-      }
-    }
+    CheckDefparamItemEarlyAmbiguity(diag_, item, block_names, top_names);
   }
 }
 
@@ -225,18 +272,27 @@ void Elaborator::ApplyDefparamsRecursively(RtlirModule* mod) {
   }
 }
 
+// Emits a "target not found" warning for every defparam assignment in `decl`
+// (belonging to `mod`) that was never recorded as applied.
+static void WarnUnresolvedDefparamsInDecl(
+    DiagEngine& diag, RtlirModule* mod, const ModuleDecl* decl,
+    const std::set<std::tuple<RtlirModule*, const ModuleItem*, size_t>>&
+        applied) {
+  for (const auto* item : decl->items) {
+    if (item->kind != ModuleItemKind::kDefparam) continue;
+    for (size_t idx = 0; idx < item->defparam_assigns.size(); ++idx) {
+      auto key = std::make_tuple(mod, item, idx);
+      if (!applied.count(key)) {
+        diag.Warning(item->loc, "defparam target not found");
+      }
+    }
+  }
+}
+
 void Elaborator::WarnUnresolvedDefparams(RtlirModule* mod) {
   if (!mod) return;
   if (auto* decl = FindModule(mod->name)) {
-    for (const auto* item : decl->items) {
-      if (item->kind != ModuleItemKind::kDefparam) continue;
-      for (size_t idx = 0; idx < item->defparam_assigns.size(); ++idx) {
-        auto key = std::make_tuple(mod, item, idx);
-        if (!applied_defparams_.count(key)) {
-          diag_.Warning(item->loc, "defparam target not found");
-        }
-      }
-    }
+    WarnUnresolvedDefparamsInDecl(diag_, mod, decl, applied_defparams_);
   }
   for (auto& child : mod->children) {
     WarnUnresolvedDefparams(child.resolved);

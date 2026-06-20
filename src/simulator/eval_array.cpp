@@ -136,17 +136,13 @@ IterNames ExtractIterNames(const Expr* expr) {
   return IterNames{iter_name, index_name, std::move(idx_var_name)};
 }
 
-static Logic4Vec ReduceWithExpr(std::string_view var_name,
-                                const ArrayInfo& info, const Expr* expr,
-                                SimContext& ctx, Arena& arena) {
-  auto elems = CollectVecElements(var_name, info, ctx, arena);
-  auto names = ExtractIterNames(expr);
-  std::string_view iter_name = names.iter_name;
-  const std::string& idx_var_name = names.idx_var_name;
-
+static std::vector<uint64_t> EvalReduceWithValues(
+    const std::vector<Logic4Vec>& elems, const Expr* expr,
+    std::string_view iter_name, const std::string& idx_var_name,
+    SimContext& ctx, Arena& arena, uint32_t& result_width) {
   std::vector<uint64_t> vals;
   vals.reserve(elems.size());
-  uint32_t result_width = 0;
+  result_width = 0;
   for (size_t i = 0; i < elems.size(); ++i) {
     ctx.PushScope();
     auto* item_var = ctx.CreateLocalVariable(iter_name, elems[i].width);
@@ -158,10 +154,11 @@ static Logic4Vec ReduceWithExpr(std::string_view var_name,
     vals.push_back(ev.ToUint64());
     if (i == 0) result_width = ev.width;
   }
-  if (result_width == 0) result_width = info.elem_width;
+  return vals;
+}
 
-  std::string_view method = expr->lhs->rhs->text;
-
+static uint64_t ApplyReduction(std::string_view method,
+                               const std::vector<uint64_t>& vals) {
   uint64_t result = 0;
   if (method == "sum") {
     for (auto v : vals) result += v;
@@ -176,6 +173,24 @@ static Logic4Vec ReduceWithExpr(std::string_view var_name,
   } else if (method == "xor") {
     for (auto v : vals) result ^= v;
   }
+  return result;
+}
+
+static Logic4Vec ReduceWithExpr(std::string_view var_name,
+                                const ArrayInfo& info, const Expr* expr,
+                                SimContext& ctx, Arena& arena) {
+  auto elems = CollectVecElements(var_name, info, ctx, arena);
+  auto names = ExtractIterNames(expr);
+  std::string_view iter_name = names.iter_name;
+  const std::string& idx_var_name = names.idx_var_name;
+
+  uint32_t result_width = 0;
+  auto vals = EvalReduceWithValues(elems, expr, iter_name, idx_var_name, ctx,
+                                   arena, result_width);
+  if (result_width == 0) result_width = info.elem_width;
+
+  std::string_view method = expr->lhs->rhs->text;
+  uint64_t result = ApplyReduction(method, vals);
   return MakeLogic4VecVal(arena, result_width, result);
 }
 
@@ -389,6 +404,55 @@ static bool IsOrderingMethod(std::string_view name) {
          name == "shuffle";
 }
 
+// Validates the 'with'-clause usage for ordering methods. Returns true if
+// execution should continue; sets *handled when the call has already been
+// fully resolved (diagnostic emitted) and the caller should return *result.
+static bool CheckOrderingWithClause(const MethodCallParts& parts,
+                                    const Expr* expr, SimContext& ctx,
+                                    bool& handled, bool& result) {
+  handled = false;
+  result = false;
+  if (!expr->args.empty() && !expr->with_expr) {
+    ctx.GetDiag().Error({}, "iterator argument without 'with' clause");
+    handled = true;
+    result = false;
+    return false;
+  }
+  if ((parts.method_name == "reverse" || parts.method_name == "shuffle") &&
+      expr->with_expr) {
+    ctx.GetDiag().Error({}, "'" + std::string(parts.method_name) +
+                                "' does not accept a 'with' clause");
+    handled = true;
+    result = true;
+    return false;
+  }
+  return true;
+}
+
+static void ExecOrderingMethod(const MethodCallParts& parts,
+                               const ArrayInfo& info, const Expr* expr,
+                               SimContext& ctx, Arena& arena) {
+  if (parts.method_name == "sort") {
+    if (expr->with_expr)
+      ArraySortWithExpr(parts.var_name, info, expr, true, ctx, arena);
+    else
+      ArraySort(parts.var_name, info, ctx, arena);
+    return;
+  }
+  if (parts.method_name == "rsort") {
+    if (expr->with_expr)
+      ArraySortWithExpr(parts.var_name, info, expr, false, ctx, arena);
+    else
+      ArrayRsort(parts.var_name, info, ctx, arena);
+    return;
+  }
+  if (parts.method_name == "reverse") {
+    ArrayReverse(parts.var_name, info, ctx, arena);
+    return;
+  }
+  ArrayShuffle(parts.var_name, info, ctx, arena);
+}
+
 bool TryExecArrayMethodStmt(const Expr* expr, SimContext& ctx, Arena& arena) {
   MethodCallParts parts;
   if (!ExtractMethodCallParts(expr, parts)) return false;
@@ -396,40 +460,14 @@ bool TryExecArrayMethodStmt(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (!info) return false;
   if (!IsOrderingMethod(parts.method_name)) return false;
 
-  if (!expr->args.empty() && !expr->with_expr) {
-    ctx.GetDiag().Error({}, "iterator argument without 'with' clause");
-    return false;
+  bool handled = false;
+  bool result = false;
+  if (!CheckOrderingWithClause(parts, expr, ctx, handled, result)) {
+    if (handled) return result;
   }
 
-  if ((parts.method_name == "reverse" || parts.method_name == "shuffle") &&
-      expr->with_expr) {
-    ctx.GetDiag().Error({}, "'" + std::string(parts.method_name) +
-                                "' does not accept a 'with' clause");
-    return true;
-  }
-  if (parts.method_name == "sort") {
-    if (expr->with_expr)
-      ArraySortWithExpr(parts.var_name, *info, expr, true, ctx, arena);
-    else
-      ArraySort(parts.var_name, *info, ctx, arena);
-    return true;
-  }
-  if (parts.method_name == "rsort") {
-    if (expr->with_expr)
-      ArraySortWithExpr(parts.var_name, *info, expr, false, ctx, arena);
-    else
-      ArrayRsort(parts.var_name, *info, ctx, arena);
-    return true;
-  }
-  if (parts.method_name == "reverse") {
-    ArrayReverse(parts.var_name, *info, ctx, arena);
-    return true;
-  }
-  if (parts.method_name == "shuffle") {
-    ArrayShuffle(parts.var_name, *info, ctx, arena);
-    return true;
-  }
-  return false;
+  ExecOrderingMethod(parts, *info, expr, ctx, arena);
+  return true;
 }
 
 bool TryEvalArrayProperty(std::string_view var_name, std::string_view prop,

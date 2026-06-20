@@ -207,6 +207,72 @@ bool WeakHolds(const Word& word, const SequenceExpr& seq) {
   return true;
 }
 
+// §F.5.3.1: w |= ( R |-> P ) iff for every 0 <= j < |w| with w-bar^{0,j} |= R,
+// w^{j.} |= P.
+bool ImplicationHolds(const Word& word, const PropertyExpr& property) {
+  if (!property.sequence || !property.lhs) {
+    return false;
+  }
+  const Word kComplement = ComplementWord(word);
+  for (std::size_t j = 0; j < word.size(); ++j) {
+    if (TightlySatisfies(PrefixInclusive(kComplement, j), *property.sequence) &&
+        !Satisfies(Suffix(word, j), *property.lhs)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+// §F.5.3.1: w |= ( P1 until P2 ) iff some 0 <= j < |w| has w^{j.} |= P2 with
+// w^{i.} |= P1 for all 0 <= i < j, or w^{i.} |= P1 for all i.
+bool UntilHolds(const Word& word, const PropertyExpr& property) {
+  if (!property.lhs || !property.rhs) {
+    return false;
+  }
+  for (std::size_t j = 0; j < word.size(); ++j) {
+    if (Satisfies(Suffix(word, j), *property.rhs)) {
+      bool prefix_holds = true;
+      for (std::size_t i = 0; i < j; ++i) {
+        if (!Satisfies(Suffix(word, i), *property.lhs)) {
+          prefix_holds = false;
+          break;
+        }
+      }
+      if (prefix_holds) {
+        return true;
+      }
+    }
+  }
+  for (std::size_t i = 0; i < word.size(); ++i) {
+    if (!Satisfies(Suffix(word, i), *property.lhs)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+// §F.5.3.1: w |= ( accept_on (b) P ) iff w |= P, or for some 0 <= i < |w| with
+// w^i |= b, w^{0,i-1} T^omega |= P.
+bool AcceptOnHolds(const Word& word, const PropertyExpr& property) {
+  if (!property.boolean || !property.lhs) {
+    return false;
+  }
+  if (Satisfies(word, *property.lhs)) {
+    return true;
+  }
+  const std::size_t kReach = PropertyReach(*property.lhs);
+  for (std::size_t i = 0; i < word.size(); ++i) {
+    if (LetterSatisfiesBoolean(word[i], *property.boolean)) {
+      const Word kCompleted =
+          PrefixWithTail(FirstLetters(word, i), LetterTop(), kReach);
+      if (Satisfies(kCompleted, *property.lhs)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 bool Satisfies(const Word& word, const PropertyExpr& property) {
   switch (property.kind) {
     case PropertyExpr::Kind::kParen:
@@ -222,22 +288,8 @@ bool Satisfies(const Word& word, const PropertyExpr& property) {
       // §F.5.3.1: w |= weak(R) iff every T^omega-completed prefix satisfies
       // strong(R).
       return property.sequence && WeakHolds(word, *property.sequence);
-    case PropertyExpr::Kind::kImplication: {
-      // §F.5.3.1: w |= ( R |-> P ) iff for every 0 <= j < |w| with
-      // w-bar^{0,j} |= R, w^{j.} |= P.
-      if (!property.sequence || !property.lhs) {
-        return false;
-      }
-      const Word kComplement = ComplementWord(word);
-      for (std::size_t j = 0; j < word.size(); ++j) {
-        if (TightlySatisfies(PrefixInclusive(kComplement, j),
-                             *property.sequence) &&
-            !Satisfies(Suffix(word, j), *property.lhs)) {
-          return false;
-        }
-      }
-      return true;
-    }
+    case PropertyExpr::Kind::kImplication:
+      return ImplicationHolds(word, property);
     case PropertyExpr::Kind::kOr:
       // §F.5.3.1: w |= ( P1 or P2 ) iff w |= P1 or w |= P2.
       return (property.lhs && Satisfies(word, *property.lhs)) ||
@@ -250,54 +302,10 @@ bool Satisfies(const Word& word, const PropertyExpr& property) {
       // §F.5.3.1: w |= ( nexttime P ) iff |w| = 0 or w^{1.} |= P.
       return word.empty() ||
              (property.lhs && Satisfies(Suffix(word, 1), *property.lhs));
-    case PropertyExpr::Kind::kUntil: {
-      // §F.5.3.1: w |= ( P1 until P2 ) iff some 0 <= j < |w| has w^{j.} |= P2
-      // with w^{i.} |= P1 for all 0 <= i < j, or w^{i.} |= P1 for all i.
-      if (!property.lhs || !property.rhs) {
-        return false;
-      }
-      for (std::size_t j = 0; j < word.size(); ++j) {
-        if (Satisfies(Suffix(word, j), *property.rhs)) {
-          bool prefix_holds = true;
-          for (std::size_t i = 0; i < j; ++i) {
-            if (!Satisfies(Suffix(word, i), *property.lhs)) {
-              prefix_holds = false;
-              break;
-            }
-          }
-          if (prefix_holds) {
-            return true;
-          }
-        }
-      }
-      for (std::size_t i = 0; i < word.size(); ++i) {
-        if (!Satisfies(Suffix(word, i), *property.lhs)) {
-          return false;
-        }
-      }
-      return true;
-    }
-    case PropertyExpr::Kind::kAcceptOn: {
-      // §F.5.3.1: w |= ( accept_on (b) P ) iff w |= P, or for some 0 <= i < |w|
-      // with w^i |= b, w^{0,i-1} T^omega |= P.
-      if (!property.boolean || !property.lhs) {
-        return false;
-      }
-      if (Satisfies(word, *property.lhs)) {
-        return true;
-      }
-      const std::size_t kReach = PropertyReach(*property.lhs);
-      for (std::size_t i = 0; i < word.size(); ++i) {
-        if (LetterSatisfiesBoolean(word[i], *property.boolean)) {
-          const Word kCompleted =
-              PrefixWithTail(FirstLetters(word, i), LetterTop(), kReach);
-          if (Satisfies(kCompleted, *property.lhs)) {
-            return true;
-          }
-        }
-      }
-      return false;
-    }
+    case PropertyExpr::Kind::kUntil:
+      return UntilHolds(word, property);
+    case PropertyExpr::Kind::kAcceptOn:
+      return AcceptOnHolds(word, property);
   }
   return false;
 }
@@ -435,6 +443,29 @@ std::shared_ptr<const SequenceExpr> FirstClockTickSequence(
                    SeqBoolean(clock));
 }
 
+// §F.5.3.1: every rule guards an activation point i by the enabling condition
+// (w-bar^i |= b) and, depending on activation and form, by the clock. The
+// always forms scan every index; the initial forms fire only at the first
+// clock tick (clocked) or at index 0 (the U column). kComplement is w-bar.
+bool ActivationPointEnabled(std::size_t i, const Word& complement,
+                            const BooleanExpr& enabling,
+                            const AssertionStatement& assertion) {
+  if (!LetterSatisfiesBoolean(complement[i], enabling)) {
+    return false;
+  }
+  if (assertion.activation == AssertionStatement::Activation::kAlways) {
+    if (assertion.form == AssertionStatement::Form::kExplicitClock) {
+      return LetterSatisfiesBoolean(complement[i], *assertion.clock);
+    }
+    return true;
+  }
+  if (assertion.form == AssertionStatement::Form::kExplicitClock) {
+    return TightlySatisfies(PrefixInclusive(complement, i),
+                            *FirstClockTickSequence(assertion.clock));
+  }
+  return i == 0;
+}
+
 }  // namespace
 
 bool NeutrallySatisfies(const Word& word, const PropertyExpr& property) {
@@ -550,29 +581,8 @@ bool NeutrallySatisfiesAssertion(const Word& word, const BooleanExpr& enabling,
   const Word kComplement = ComplementWord(word);
   const bool kCover = assertion.role == AssertionStatement::Role::kCover;
 
-  // §F.5.3.1: every rule guards an activation point i by the enabling condition
-  // (w-bar^i |= b) and, depending on activation and form, by the clock. The
-  // always forms scan every index; the initial forms fire only at the first
-  // clock tick (clocked) or at index 0 (the U column).
-  auto activated = [&](std::size_t i) -> bool {
-    if (!LetterSatisfiesBoolean(kComplement[i], enabling)) {
-      return false;
-    }
-    if (assertion.activation == AssertionStatement::Activation::kAlways) {
-      if (assertion.form == AssertionStatement::Form::kExplicitClock) {
-        return LetterSatisfiesBoolean(kComplement[i], *assertion.clock);
-      }
-      return true;
-    }
-    if (assertion.form == AssertionStatement::Form::kExplicitClock) {
-      return TightlySatisfies(PrefixInclusive(kComplement, i),
-                              *FirstClockTickSequence(assertion.clock));
-    }
-    return i == 0;
-  };
-
   for (std::size_t i = 0; i < word.size(); ++i) {
-    if (!activated(i)) {
+    if (!ActivationPointEnabled(i, kComplement, enabling, assertion)) {
       continue;
     }
     const Word kSuffix = Suffix(word, i);

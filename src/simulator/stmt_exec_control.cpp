@@ -16,6 +16,17 @@
 
 namespace delta {
 
+// Tears down the static and named scope a named begin/end block pushed on
+// entry. A no-op for unnamed blocks. Always called immediately before
+// ExecBlock returns so the scope stack is balanced on every exit path.
+static void TeardownNamedBlockScope(const Stmt* stmt, SimContext& ctx,
+                                    bool named) {
+  if (!named) return;
+  ctx.PopActiveNamedScope();
+  ctx.UnregisterNamedScope(stmt->label, ctx.CurrentProcess());
+  ctx.PopStaticScope(stmt->label);
+}
+
 ExecTask ExecBlock(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   bool named = !stmt->label.empty();
   if (named) {
@@ -28,49 +39,27 @@ ExecTask ExecBlock(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     if (result == StmtResult::kDisable) {
       if (named && ctx.GetDisableTarget() == stmt->label) {
         ctx.ClearDisableTarget();
-        ctx.PopActiveNamedScope();
-        ctx.UnregisterNamedScope(stmt->label, ctx.CurrentProcess());
-        ctx.PopStaticScope(stmt->label);
+        TeardownNamedBlockScope(stmt, ctx, named);
         co_return StmtResult::kDone;
       }
-      if (named) {
-        ctx.PopActiveNamedScope();
-        ctx.UnregisterNamedScope(stmt->label, ctx.CurrentProcess());
-        ctx.PopStaticScope(stmt->label);
-      }
+      TeardownNamedBlockScope(stmt, ctx, named);
       co_return StmtResult::kDisable;
     }
     if (result != StmtResult::kDone) {
-      if (named) {
-        ctx.PopActiveNamedScope();
-        ctx.UnregisterNamedScope(stmt->label, ctx.CurrentProcess());
-        ctx.PopStaticScope(stmt->label);
-      }
+      TeardownNamedBlockScope(stmt, ctx, named);
       co_return result;
     }
     if (ctx.StopRequested()) {
-      if (named) {
-        ctx.PopActiveNamedScope();
-        ctx.UnregisterNamedScope(stmt->label, ctx.CurrentProcess());
-        ctx.PopStaticScope(stmt->label);
-      }
+      TeardownNamedBlockScope(stmt, ctx, named);
       co_return StmtResult::kDone;
     }
 
     if (auto* cur = ctx.CurrentProcess(); cur && !cur->active) {
-      if (named) {
-        ctx.PopActiveNamedScope();
-        ctx.UnregisterNamedScope(stmt->label, ctx.CurrentProcess());
-        ctx.PopStaticScope(stmt->label);
-      }
+      TeardownNamedBlockScope(stmt, ctx, named);
       co_return StmtResult::kDone;
     }
   }
-  if (named) {
-    ctx.PopActiveNamedScope();
-    ctx.UnregisterNamedScope(stmt->label, ctx.CurrentProcess());
-    ctx.PopStaticScope(stmt->label);
-  }
+  TeardownNamedBlockScope(stmt, ctx, named);
   co_return StmtResult::kDone;
 }
 
@@ -234,30 +223,34 @@ static bool CaseInsideValueMatch(const Logic4Vec& sel, const Logic4Vec& pat) {
   return true;
 }
 
-static bool CaseInsideRangeMatch(const Logic4Vec& sel, const Expr* pat,
-                                 SimContext& ctx, Arena& arena) {
-  if (!sel.IsKnown()) return false;
-  uint64_t sv = sel.ToUint64();
-
-  if (pat->op == TokenKind::kPlusSlashMinus ||
-      pat->op == TokenKind::kPlusPercentMinus) {
-    auto a_v = EvalExpr(pat->index, ctx, arena);
-    auto b_v = EvalExpr(pat->index_end, ctx, arena);
-    if (!a_v.IsKnown() || !b_v.IsKnown()) return false;
-    uint64_t a = a_v.ToUint64();
-    uint64_t b = b_v.ToUint64();
-    uint64_t tol = b;
-    if (pat->op == TokenKind::kPlusPercentMinus) tol = a * b / 100;
-    uint64_t lo = (a >= tol) ? a - tol : 0;
-    uint64_t hi = a + tol;
-    if (lo > hi) {
-      uint64_t t = lo;
-      lo = hi;
-      hi = t;
-    }
-    return sv >= lo && sv <= hi;
+// Evaluates a value +/- tolerance or value +%- percent-tolerance inside-range
+// pattern and reports whether the (known) selector value falls in the closed
+// interval. Returns false if either bound is unknown.
+static bool CaseInsideToleranceMatch(uint64_t sv, const Expr* pat,
+                                     SimContext& ctx, Arena& arena) {
+  auto a_v = EvalExpr(pat->index, ctx, arena);
+  auto b_v = EvalExpr(pat->index_end, ctx, arena);
+  if (!a_v.IsKnown() || !b_v.IsKnown()) return false;
+  uint64_t a = a_v.ToUint64();
+  uint64_t b = b_v.ToUint64();
+  uint64_t tol = b;
+  if (pat->op == TokenKind::kPlusPercentMinus) tol = a * b / 100;
+  uint64_t lo = (a >= tol) ? a - tol : 0;
+  uint64_t hi = a + tol;
+  if (lo > hi) {
+    uint64_t t = lo;
+    lo = hi;
+    hi = t;
   }
+  return sv >= lo && sv <= hi;
+}
 
+// Evaluates a [lo:hi] inside-range pattern, where either bound may be the open
+// range token '$'. A '$' low bound is zero; a '$' high bound is the maximum
+// value representable in the selector's width.
+static bool CaseInsideBracketRangeMatch(uint64_t sv, const Logic4Vec& sel,
+                                        const Expr* pat, SimContext& ctx,
+                                        Arena& arena) {
   auto is_dollar = [](const Expr* e) {
     return e->kind == ExprKind::kIdentifier && e->text == "$";
   };
@@ -273,6 +266,19 @@ static bool CaseInsideRangeMatch(const Logic4Vec& sel, const Expr* pat,
     hi = t;
   }
   return sv >= lo && sv <= hi;
+}
+
+static bool CaseInsideRangeMatch(const Logic4Vec& sel, const Expr* pat,
+                                 SimContext& ctx, Arena& arena) {
+  if (!sel.IsKnown()) return false;
+  uint64_t sv = sel.ToUint64();
+
+  if (pat->op == TokenKind::kPlusSlashMinus ||
+      pat->op == TokenKind::kPlusPercentMinus) {
+    return CaseInsideToleranceMatch(sv, pat, ctx, arena);
+  }
+
+  return CaseInsideBracketRangeMatch(sv, sel, pat, ctx, arena);
 }
 
 static bool CaseInsidePatternMatch(const Logic4Vec& sel, const Expr* pat,
@@ -440,6 +446,15 @@ static bool HasTypedForInit(const Stmt* stmt) {
   return false;
 }
 
+// Pops the dynamic scope a typed for-init introduced and the static scope a
+// label introduced, in the order ExecFor pushed them. Called on every ExecFor
+// exit path to keep the scope stack balanced.
+static void TeardownForScopes(const Stmt* stmt, SimContext& ctx, bool scoped,
+                              bool labeled) {
+  if (scoped) ctx.PopScope();
+  if (labeled) ctx.PopStaticScope(stmt->label);
+}
+
 ExecTask ExecFor(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   bool labeled = !stmt->label.empty();
   if (labeled) ctx.PushStaticScope(stmt->label);
@@ -455,14 +470,12 @@ ExecTask ExecFor(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     auto result = co_await ExecStmt(stmt->for_body, ctx, arena);
     if (result == StmtResult::kBreak) break;
     if (result != StmtResult::kDone && result != StmtResult::kContinue) {
-      if (scoped) ctx.PopScope();
-      if (labeled) ctx.PopStaticScope(stmt->label);
+      TeardownForScopes(stmt, ctx, scoped, labeled);
       co_return result;
     }
     for (auto* step : stmt->for_steps) co_await ExecStmt(step, ctx, arena);
   }
-  if (scoped) ctx.PopScope();
-  if (labeled) ctx.PopStaticScope(stmt->label);
+  TeardownForScopes(stmt, ctx, scoped, labeled);
   co_return StmtResult::kDone;
 }
 
@@ -571,19 +584,38 @@ static uint32_t GetArraySize(const Stmt* stmt, SimContext& ctx) {
   return var->value.width;
 }
 
+// §12.7.3: foreach is illegal on a wildcard-indexed associative array. Reports
+// the diagnostic and returns true when the named array is such a wildcard
+// array, signalling that ExecForeach must abandon the loop.
+static bool ForeachOnWildcardAssoc(const std::string& arr_name,
+                                   SimContext& ctx) {
+  if (arr_name.empty()) return false;
+  auto* aa = ctx.FindAssocArray(arr_name);
+  if (aa && aa->is_wildcard) {
+    ctx.GetDiag().Error(
+        {},
+        "foreach not allowed on wildcard associative array '" + arr_name + "'");
+    return true;
+  }
+  return false;
+}
+
+// §12.7.3: maps a zero-based iteration counter to the array's declared index
+// value. With array-info present the index walks the declared range, counting
+// down for a descending dimension; otherwise it stays zero-based.
+static uint32_t ForeachIndexForIteration(const ArrayInfo* info, uint32_t size,
+                                         uint32_t i) {
+  if (!info) return i;
+  return info->is_descending ? (info->lo + size - 1 - i) : (info->lo + i);
+}
+
 ExecTask ExecForeach(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   bool labeled = !stmt->label.empty();
   if (labeled) ctx.PushStaticScope(stmt->label);
   std::string arr_name = GetForeachArrayName(stmt->expr);
-  if (!arr_name.empty()) {
-    auto* aa = ctx.FindAssocArray(arr_name);
-    if (aa && aa->is_wildcard) {
-      ctx.GetDiag().Error(
-          {}, "foreach not allowed on wildcard associative array '" + arr_name +
-                  "'");
-      if (labeled) ctx.PopStaticScope(stmt->label);
-      co_return StmtResult::kDone;
-    }
+  if (ForeachOnWildcardAssoc(arr_name, ctx)) {
+    if (labeled) ctx.PopStaticScope(stmt->label);
+    co_return StmtResult::kDone;
   }
   uint32_t size = GetArraySize(stmt, ctx);
   if (size == 0) {
@@ -611,11 +643,7 @@ ExecTask ExecForeach(const Stmt* stmt, SimContext& ctx, Arena& arena) {
 
   for (uint32_t i = 0; i < size && !ctx.StopRequested(); ++i) {
     if (iter_var) {
-      uint32_t index = i;
-      if (info) {
-        index =
-            info->is_descending ? (info->lo + size - 1 - i) : (info->lo + i);
-      }
+      uint32_t index = ForeachIndexForIteration(info, size, i);
       iter_var->value = MakeLogic4VecVal(arena, 32, index);
     }
     auto result = co_await ExecStmt(stmt->body, ctx, arena);

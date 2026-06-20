@@ -1,4 +1,7 @@
 #include <cstdint>
+#include <functional>
+#include <string>
+#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
@@ -113,48 +116,83 @@ void CollectConstraints(const std::vector<ConstraintBlock>& blocks,
   for (const auto& c : extra) classify(c);
 }
 
+namespace {
+
+// Result of resolving a constraint's guard for CheckAllConstraints below.
+enum class GuardCheckResult { kFail, kSkip, kProceed };
+
+// 18.5.12: evaluate a hard constraint's guard before imposing the guarded
+// constraint. The guard prevents the solver from generating evaluation errors
+// on the guarded set, sifting away subexpressions that would otherwise error.
+// Sets guard_error when an ERROR guard is hit.
+GuardCheckResult ResolveConstraintGuard(
+    const ConstraintExpr& c,
+    const std::unordered_map<std::string, int64_t>& values, bool& guard_error) {
+  if (!c.has_guard) return GuardCheckResult::kProceed;
+  switch (GuardFinalOutcome(EvaluateGuard(c.guard, values))) {
+    case GuardOutcome::kError:
+      // An ERROR guard generates an unconditional error; the constraint
+      // fails and no resampling can recover it.
+      guard_error = true;
+      return GuardCheckResult::kFail;
+    case GuardOutcome::kEliminated:
+      // A FALSE guard eliminates the constraint and generates no error.
+      return GuardCheckResult::kSkip;
+    case GuardOutcome::kUnconditional:
+    case GuardOutcome::kConditional:
+      // A TRUE or RANDOM guard lets the guarded constraint be generated.
+      break;
+  }
+  return GuardCheckResult::kProceed;
+}
+
+// 18.5.13: while the soft constraints are still active, the solver attempts to
+// satisfy them together with the hard constraints. A soft constraint is an
+// inner expression_or_dist preceded by soft; enforce that inner relation here
+// so a candidate assignment must honor it. Returns false when a still-active
+// soft constraint's inner relation is violated. eval evaluates one constraint
+// against the current assignment.
+bool CheckActiveSoftConstraints(
+    const std::vector<const ConstraintExpr*>& soft,
+    const std::unordered_set<const ConstraintExpr*>& dropped_soft,
+    const std::unordered_set<const ConstraintExpr*>& disabled_soft,
+    const std::function<bool(const ConstraintExpr&)>& eval) {
+  for (const auto* c : soft) {
+    // 18.5.13.1 / 18.5.13.2: a soft constraint discarded by the priority
+    // resolution, or by a 'disable soft' directive, is treated as true, so
+    // its inner relation imposes nothing.
+    if (dropped_soft.count(c) || disabled_soft.count(c)) continue;
+    const ConstraintExpr* inner = c->inner ? c->inner : nullptr;
+    if (inner && !eval(*inner)) return false;
+  }
+  return true;
+}
+
+}  // namespace
+
 bool ConstraintSolver::CheckAllConstraints(
     const std::vector<ConstraintExpr>& extra, bool include_soft) {
   std::vector<const ConstraintExpr*> hard;
   std::vector<const ConstraintExpr*> soft;
   CollectConstraints(blocks_, extra, hard, soft);
   for (const auto* c : hard) {
-    if (c->has_guard) {
-      // 18.5.12: evaluate the guard before imposing the guarded constraint.
-      // The guard prevents the solver from generating evaluation errors on the
-      // guarded set, sifting away subexpressions that would otherwise error.
-      switch (GuardFinalOutcome(EvaluateGuard(c->guard, values_))) {
-        case GuardOutcome::kError:
-          // An ERROR guard generates an unconditional error; the constraint
-          // fails and no resampling can recover it.
-          guard_error_ = true;
-          return false;
-        case GuardOutcome::kEliminated:
-          // A FALSE guard eliminates the constraint and generates no error.
-          continue;
-        case GuardOutcome::kUnconditional:
-        case GuardOutcome::kConditional:
-          // A TRUE or RANDOM guard lets the guarded constraint be generated.
-          break;
-      }
+    switch (ResolveConstraintGuard(*c, values_, guard_error_)) {
+      case GuardCheckResult::kFail:
+        return false;
+      case GuardCheckResult::kSkip:
+        continue;
+      case GuardCheckResult::kProceed:
+        break;
     }
     if (!EvalConstraint(*c)) return false;
   }
-  if (include_soft) {
-    // 18.5.13: while the soft constraints are still active, the solver attempts
-    // to satisfy them together with the hard constraints. A soft constraint is
-    // an inner expression_or_dist preceded by soft; enforce that inner relation
-    // here so a candidate assignment must honor it. When this set proves
-    // jointly unsatisfiable the caller drops the soft constraints and retries
-    // with include_soft clear.
-    for (const auto* c : soft) {
-      // 18.5.13.1 / 18.5.13.2: a soft constraint discarded by the priority
-      // resolution, or by a 'disable soft' directive, is treated as true, so
-      // its inner relation imposes nothing.
-      if (dropped_soft_.count(c) || disabled_soft_.count(c)) continue;
-      const ConstraintExpr* inner = c->inner ? c->inner : nullptr;
-      if (inner && !EvalConstraint(*inner)) return false;
-    }
+  // When the still-active soft set proves jointly unsatisfiable the caller
+  // drops the soft constraints and retries with include_soft clear.
+  if (include_soft &&
+      !CheckActiveSoftConstraints(
+          soft, dropped_soft_, disabled_soft_,
+          [this](const ConstraintExpr& e) { return EvalConstraint(e); })) {
+    return false;
   }
   return true;
 }
@@ -230,38 +268,67 @@ bool ConstraintSolver::EvalForeach(const ConstraintExpr& expr) const {
   return true;
 }
 
+namespace {
+
+// 18.5.7.2: the identity element for a reduction operand, so a fold over any
+// number of elements is well defined.
+int64_t ReductionIdentity(ArrayReductionOp op) {
+  switch (op) {
+    case ArrayReductionOp::kSum:
+    case ArrayReductionOp::kOr:
+    case ArrayReductionOp::kXor:
+      return 0;
+    case ArrayReductionOp::kProduct:
+      return 1;
+    case ArrayReductionOp::kAnd:
+      return -1;  // all ones: the identity of bitwise AND
+  }
+  return 0;
+}
+
+// Combine one element value v into the running accumulator acc per the operand.
+int64_t FoldReductionElement(ArrayReductionOp op, int64_t acc, int64_t v) {
+  switch (op) {
+    case ArrayReductionOp::kSum:
+      return acc + v;
+    case ArrayReductionOp::kProduct:
+      return acc * v;
+    case ArrayReductionOp::kAnd:
+      return acc & v;
+    case ArrayReductionOp::kOr:
+      return acc | v;
+    case ArrayReductionOp::kXor:
+      return acc ^ v;
+  }
+  return acc;
+}
+
+// As with a foreach iterative constraint, an array's size method is a state
+// variable: the size constraints are solved first, so only the elements whose
+// index is below the committed size participate. An empty size_var (a
+// fixed-size array) leaves the natural count unchanged.
+size_t ClampCountToSize(
+    size_t count, const std::string& size_var,
+    const std::unordered_map<std::string, int64_t>& values) {
+  if (size_var.empty()) return count;
+  auto sit = values.find(size_var);
+  if (sit == values.end()) return count;
+  int64_t sz = sit->second < 0 ? 0 : sit->second;
+  if (static_cast<size_t>(sz) < count) return static_cast<size_t>(sz);
+  return count;
+}
+
+}  // namespace
+
 bool ConstraintSolver::EvalArrayReduction(const ConstraintExpr& expr) const {
   // 18.5.7.2: an array reduction method in a constraint is treated as an
   // expression iterated over each element of the array, joined by the relevant
   // operand for the method. Begin from the operand's identity so a fold over
   // any number of elements is well defined, then combine each element in turn.
-  int64_t acc = 0;
-  switch (expr.reduce_op) {
-    case ArrayReductionOp::kSum:
-    case ArrayReductionOp::kOr:
-    case ArrayReductionOp::kXor:
-      acc = 0;
-      break;
-    case ArrayReductionOp::kProduct:
-      acc = 1;
-      break;
-    case ArrayReductionOp::kAnd:
-      acc = -1;  // all ones: the identity of bitwise AND
-      break;
-  }
+  int64_t acc = ReductionIdentity(expr.reduce_op);
 
-  // As with a foreach iterative constraint, an array's size method is a state
-  // variable here: the size constraints are solved first, so only the elements
-  // whose index is below the committed size participate in the reduction. A
-  // fixed-size array leaves size_var empty, so every named element is folded.
-  size_t count = expr.reduce_vars.size();
-  if (!expr.size_var.empty()) {
-    auto sit = values_.find(expr.size_var);
-    if (sit != values_.end()) {
-      int64_t sz = sit->second < 0 ? 0 : sit->second;
-      if (static_cast<size_t>(sz) < count) count = static_cast<size_t>(sz);
-    }
-  }
+  size_t count =
+      ClampCountToSize(expr.reduce_vars.size(), expr.size_var, values_);
 
   for (size_t i = 0; i < count; ++i) {
     auto it = values_.find(expr.reduce_vars[i]);
@@ -270,23 +337,7 @@ bool ConstraintSolver::EvalArrayReduction(const ConstraintExpr& expr) const {
     // value folded into the reduction; absent a with clause the element value
     // itself is folded.
     int64_t v = expr.reduce_with ? expr.reduce_with(it->second) : it->second;
-    switch (expr.reduce_op) {
-      case ArrayReductionOp::kSum:
-        acc += v;
-        break;
-      case ArrayReductionOp::kProduct:
-        acc *= v;
-        break;
-      case ArrayReductionOp::kAnd:
-        acc &= v;
-        break;
-      case ArrayReductionOp::kOr:
-        acc |= v;
-        break;
-      case ArrayReductionOp::kXor:
-        acc ^= v;
-        break;
-    }
+    acc = FoldReductionElement(expr.reduce_op, acc, v);
   }
 
   // 18.5.7.2: the reduction returns a single value of the array element type,

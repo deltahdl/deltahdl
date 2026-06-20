@@ -22,48 +22,149 @@
 
 namespace delta {
 
-int VpiContext::Get(int property, VpiHandle obj) {
-  // §37.10 detail 7: a null handle paired with a time property is a query for
-  // the design-wide smallest time precision of all modules, for both
-  // vpiTimePrecision and vpiTimeUnit.
-  if (!obj) {
-    if (property == vpiTimePrecision || property == vpiTimeUnit) {
-      return SmallestModuleTimePrecision();
+namespace {
+
+// §37.59 detail 8 / §37.3.6: a protected object refuses every integer property
+// query except vpiType and vpiIsProtected, with one extra exception - a
+// protected *expression* still permits vpiSize. Reports whether the (property,
+// obj) pair must be refused as a protected-access error.
+bool VpiGetProtectedRefused(int property, VpiHandle obj) {
+  return obj->is_protected && property != kVpiType &&
+         property != vpiIsProtected &&
+         (property != kVpiSize || !VpiIsExprType(obj->type));
+}
+
+// §37.85/§37.47/§37.14/§37.35: computes vpiSize for the kinds whose size is not
+// simply obj->size - a gen scope array reports its element count, a cont assign
+// bit is always scalar, a port reports its width (0 for a null port) - and
+// falls back to the object's stored size for everything else.
+int VpiGetSize(VpiHandle obj) {
+  if (obj->type == vpiGenScopeArray) return VpiGenScopeArraySize(obj);
+  if (obj->type == vpiContAssignBit) return 1;
+  if (obj->type == vpiPort) return VpiPortSize(obj->null_port, obj->size);
+  return obj->size;
+}
+
+// §37.34/§37.8/§37.41: computes vpiAccessType, whose legal values depend on the
+// object kind - a constraint reports vpiExternAcc or 0, an interface tf decl
+// reports vpiForkJoinAcc/vpiExternAcc or vpiUndefined, a DPI task/function
+// reports its import/export access - everything else reports its stored access
+// type.
+int VpiGetAccessType(VpiHandle obj) {
+  if (obj->type == vpiConstraint)
+    return obj->access_type == vpiExternAcc ? vpiExternAcc : 0;
+  if (obj->type == vpiInterfaceTfDecl)
+    return (obj->access_type == vpiForkJoinAcc ||
+            obj->access_type == vpiExternAcc)
+               ? obj->access_type
+               : vpiUndefined;
+  if ((obj->type == vpiFunction || obj->type == vpiTask) && obj->is_dpi)
+    return obj->dpi_export ? vpiDPIExportAcc : vpiDPIImportAcc;
+  return obj->access_type;
+}
+
+// Handles the integer properties whose value depends on the object kind (each
+// drawn only on certain kinds, reporting vpiUndefined/0 otherwise). On a match
+// sets handled=true and returns the property value; otherwise leaves handled
+// false so the caller's switch can take over. The per-case spec references are
+// kept inline so the dispatch table stays self-documenting.
+int VpiGetTypeRestricted(int property, VpiHandle obj, bool& handled) {
+  handled = true;
+  switch (property) {
+    // §37.33: a class var reports the id of the object it references (0 when it
+    // references none); any other object reports its own id.
+    case vpiObjId:
+      if (obj->type == vpiClassVar) {
+        return obj->referenced_object
+                   ? static_cast<int>(obj->referenced_object->obj_id)
+                   : 0;
+      }
+      return static_cast<int>(obj->obj_id);
+    // §37.14 detail 6: a port reports whether it is scalar/vector by its width;
+    // any other object reports 0.
+    case vpiScalar:
+      if (obj->type == vpiPort) return VpiPortScalar(obj->size) ? 1 : 0;
+      return 0;
+    case vpiVector:
+      if (obj->type == vpiPort) return VpiPortVector(obj->size) ? 1 : 0;
+      return 0;
+    // §37.14 details 7 and 9: the port index gives port order; it does not
+    // apply to a port bit, which reports vpiUndefined.
+    case vpiPortIndex:
+      if (obj->type == vpiPortBit) return vpiUndefined;
+      return obj->index;
+    // §37.15 detail 5: a ref obj reports whether it refers to a generic
+    // interface; any other ref obj reports vpiUndefined.
+    case vpiGeneric: {
+      if (obj->type != vpiRefObj) return vpiUndefined;
+      bool refers_to_interface =
+          obj->actual && (obj->actual->type == vpiInterface ||
+                          obj->actual->type == vpiInterfaceArray);
+      return VpiRefObjGeneric(refers_to_interface, obj->generic_interface);
     }
-    return 0;
+    // §37.61 detail 2: an object reached through a class var or virtual
+    // interface var prefix shares that prefix's allocation scheme; otherwise it
+    // reports its own.
+    case kVpiAllocScheme:
+      if (obj->prefix && (obj->prefix->type == vpiClassVar ||
+                          obj->prefix->type == vpiVirtualInterfaceVar)) {
+        return obj->prefix->alloc_scheme;
+      }
+      return obj->alloc_scheme;
+    // §37.62: vpiBlocking is drawn only on the event statement; any other kind
+    // reports vpiUndefined.
+    case vpiBlocking:
+      if (obj->type != vpiEventStmt) return vpiUndefined;
+      return obj->blocking ? 1 : 0;
+    // §37.83: vpiDefAttribute and vpiDefLineNo are drawn only on the attribute
+    // object; any other kind reports vpiUndefined.
+    case vpiDefAttribute:
+      if (obj->type != vpiAttribute) return vpiUndefined;
+      return obj->def_attribute ? 1 : 0;
+    case vpiDefLineNo:
+      if (obj->type != vpiAttribute) return vpiUndefined;
+      return obj->def_line_no;
+    // §37.61 detail 3: vpiHasActual is drawn only on the dynamic-prefix source
+    // kinds; any other kind reports vpiUndefined.
+    case vpiHasActual:
+      if (!VpiIsDynamicPrefixSourceType(obj->type)) return vpiUndefined;
+      return VpiObjectHasActual(obj->actual_origin, obj->actual != nullptr) ? 1
+                                                                            : 0;
+    // §37.55: vpiIsDeferred and vpiIsFinal are drawn only on the immediate
+    // assertion kinds; any other kind reports vpiUndefined.
+    case vpiIsDeferred:
+      if (!VpiIsImmediateAssertionType(obj->type)) return vpiUndefined;
+      return obj->is_deferred ? 1 : 0;
+    case vpiIsFinal:
+      if (!VpiIsImmediateAssertionType(obj->type)) return vpiUndefined;
+      return obj->is_final ? 1 : 0;
+    // §37.16 detail 21: vpiExpanded on a net bit reports the parent net's
+    // value; otherwise the object's own expansion (vectored => 0, else 1).
+    case vpiExpanded:
+      if (obj->type == vpiNetBit) return VpiNetBitExpanded(obj) ? 1 : 0;
+      return obj->is_vectored ? 0 : 1;
+    // §37.3.3: vpiLineNo applies only to objects with location properties; the
+    // excepted kinds report vpiUndefined.
+    case vpiLineNo:
+      if (!VpiHasLocationProperties(obj->type)) return vpiUndefined;
+      return obj->line_no;
+    // §37.41 detail 9: vpiDPICStr is meaningful only for a DPI tf; report 0
+    // (none) otherwise, else vpiDPIC/vpiDPI by flavor.
+    case vpiDPICStr:
+      if (!obj->is_dpi) return 0;
+      return obj->is_dpi_c ? vpiDPIC : vpiDPI;
+    default:
+      handled = false;
+      return 0;
   }
-  // §37.3.6: unless otherwise specified, asking vpi_get() for a property of a
-  // protected object is an error - it represents code sealed in a decryption
-  // envelope. Access to the vpiType and vpiIsProtected properties is the stated
-  // exception: it shall be permitted for all objects, so those two are let
-  // through to the switch below while every other property records the error
-  // and returns vpiUndefined, the value vpi_get() yields whenever an error
-  // occurs. §37.59 detail 8 carves out one more case: a protected *expression*
-  // shall still permit access to vpiSize, so that property passes through too
-  // when the object is one of the expr-class kinds.
-  if (obj->is_protected && property != kVpiType && property != vpiIsProtected &&
-      (property != kVpiSize || !VpiIsExprType(obj->type))) {
-    last_error_.state = kVpiError;
-    last_error_.level = kVpiError;
-    last_error_.message = "vpi_get() on a protected object is an error";
-    return vpiUndefined;
-  }
-  // §37.3.5: it is an error to ask for a property of an expression when the
-  // implementation cannot determine that property without also evaluating an
-  // expression that has side effects (for instance the vpiSize of a function
-  // call that cannot be sized without calling it). The query is refused rather
-  // than silently triggering the side effect. The object's kind is always
-  // available structurally, so vpiType is let through; every other property
-  // records the error and returns vpiUndefined, the value vpi_get() yields on
-  // error.
-  if (obj->property_needs_side_effect_eval && property != kVpiType) {
-    last_error_.state = kVpiError;
-    last_error_.level = kVpiError;
-    last_error_.message =
-        "vpi_get(): this property cannot be determined without evaluating an "
-        "expression with side effects";
-    return vpiUndefined;
-  }
+}
+
+// Handles the remaining integer/Boolean/ternary properties - the simple
+// field-, flag-, and stored-value queries that need no protected/side-effect
+// gating and no kind-dependent dispatch beyond their own case. Factored out of
+// VpiContext::Get so the entry point stays small; the per-case spec references
+// are kept inline so the dispatch table stays self-documenting.
+int VpiGetSimpleProperty(int property, VpiHandle obj) {
   switch (property) {
     case kVpiType:
       return obj->type;
@@ -72,31 +173,11 @@ int VpiContext::Get(int property, VpiHandle obj) {
     // protected code; TRUE when protected, FALSE otherwise.
     case vpiIsProtected:
       return obj->is_protected ? 1 : 0;
-    // §37.33 detail 1: a class object reports its own unique identifier. §37.33
-    // detail 2: a class variable reports the identifier of the object it
-    // currently references, or 0 when it references no object (it holds null).
-    // The identifier is a 64-bit value; tiny identifiers are returned as-is.
-    case vpiObjId:
-      if (obj->type == vpiClassVar) {
-        return obj->referenced_object
-                   ? static_cast<int>(obj->referenced_object->obj_id)
-                   : 0;
-      }
-      return static_cast<int>(obj->obj_id);
     case kVpiSize:
-      // §37.85 detail 1: a gen scope array reports the number of elements in
-      // the array - the gen scopes it holds - rather than any stored width.
-      if (obj->type == vpiGenScopeArray) return VpiGenScopeArraySize(obj);
-      // §37.47 detail 1: a cont assign bit models a single bit of a continuous
-      // assignment, so its size is always scalar (one) regardless of any stored
-      // width.
-      if (obj->type == vpiContAssignBit) return 1;
-      // §37.14 detail 11: a null port reports size 0; any other port reports
-      // its bit width. Every other object reports its own stored size. §37.35
-      // detail 1: for a primitive that stored size is its number of inputs, so
-      // vpiSize returns the input count through this same path.
-      if (obj->type == vpiPort) return VpiPortSize(obj->null_port, obj->size);
-      return obj->size;
+      // §37.85/§37.47/§37.14/§37.35: gen scope array element count, scalar cont
+      // assign bit, port width (0 for a null port), else the stored size (for a
+      // primitive that stored size is its number of inputs).
+      return VpiGetSize(obj);
     // §37.36 detail 2: a UDP reports its primitive type - vpiSeqPrim for a
     // sequential UDP, vpiCombPrim for a combinational one - through
     // vpiPrimType. The udp defn carries the type code; the property hands it
@@ -114,32 +195,9 @@ int VpiContext::Get(int property, VpiHandle obj) {
     // vpiModportPort), fixed by the formal.
     case vpiPortType:
       return obj->port_type;
-    // §37.14 detail 6: a port reports whether it is scalar (exactly one bit) or
-    // a vector (more than one bit), based on its own width.
-    case vpiScalar:
-      if (obj->type == vpiPort) return VpiPortScalar(obj->size) ? 1 : 0;
-      return 0;
-    case vpiVector:
-      if (obj->type == vpiPort) return VpiPortVector(obj->size) ? 1 : 0;
-      return 0;
     // §37.14 detail 8: whether a port carries an explicit name.
     case vpiExplicitName:
       return obj->explicit_name ? 1 : 0;
-    // §37.14 details 7 and 9: the port index gives port order (the first port
-    // is 0); it does not apply to a port bit, which reports vpiUndefined.
-    case vpiPortIndex:
-      if (obj->type == vpiPortBit) return vpiUndefined;
-      return obj->index;
-    // §37.15 detail 5: a ref obj reports whether it refers to a generic
-    // interface (TRUE/FALSE for an interface reference, vpiUndefined for any
-    // other ref obj).
-    case vpiGeneric: {
-      if (obj->type != vpiRefObj) return vpiUndefined;
-      bool refers_to_interface =
-          obj->actual && (obj->actual->type == vpiInterface ||
-                          obj->actual->type == vpiInterfaceArray);
-      return VpiRefObjGeneric(refers_to_interface, obj->generic_interface);
-    }
     // §37.30: an interface typespec reports whether it represents a modport
     // (rather than the interface itself) as the vpiIsModPort Boolean property.
     case vpiIsModPort:
@@ -170,42 +228,9 @@ int VpiContext::Get(int property, VpiHandle obj) {
     // §37.3.7: declared lifetime as a Boolean (0 static, 1 non-static).
     case kVpiAutomatic:
       return obj->automatic ? 1 : 0;
-    // §37.3.7: the object's allocation scheme; defaults to kVpiOtherScheme.
-    case kVpiAllocScheme:
-      // §37.61 detail 2: an object reached through a class var or virtual
-      // interface var prefix shares that prefix's memory allocation scheme, so
-      // report the prefix's scheme rather than the object's own. A clocking-
-      // block prefix is not subject to this rule, nor is an unprefixed object.
-      if (obj->prefix && (obj->prefix->type == vpiClassVar ||
-                          obj->prefix->type == vpiVirtualInterfaceVar)) {
-        return obj->prefix->alloc_scheme;
-      }
-      return obj->alloc_scheme;
     // §37.54 (D2): an operation reports its operation type as an int property.
     case vpiOpType:
       return obj->op_type;
-    // §37.62: an event statement reports through vpiBlocking whether it is a
-    // blocking event trigger (->) as opposed to a nonblocking one (->>). The
-    // property is drawn only on the event statement object, so asking any other
-    // object kind is not a valid query and yields vpiUndefined; for an event
-    // statement the answer is the stored Boolean, reported as 1 or 0.
-    case vpiBlocking:
-      if (obj->type != vpiEventStmt) return vpiUndefined;
-      return obj->blocking ? 1 : 0;
-    // §37.83: an attribute reports through vpiDefAttribute whether it was
-    // specified on a definition rather than on an instance. The property is
-    // drawn only on the attribute object, so asking any other object kind is
-    // not a valid query and yields vpiUndefined; for an attribute the answer is
-    // the stored Boolean.
-    case vpiDefAttribute:
-      if (obj->type != vpiAttribute) return vpiUndefined;
-      return obj->def_attribute ? 1 : 0;
-    // §37.83: an attribute reports the source line of its definition through
-    // the vpiDefLineNo integer property, again drawn only on the attribute
-    // object.
-    case vpiDefLineNo:
-      if (obj->type != vpiAttribute) return vpiUndefined;
-      return obj->def_line_no;
     // §37.63 detail 1: a process reports which kind of always procedure it is
     // through vpiAlwaysType, restricted to vpiAlways/vpiAlwaysComb/vpiAlwaysFF/
     // vpiAlwaysLatch. A process carrying none of those - an initial or final
@@ -214,16 +239,6 @@ int VpiContext::Get(int property, VpiHandle obj) {
     case vpiAlwaysType:
       return VpiIsAlwaysType(obj->always_type) ? obj->always_type
                                                : vpiUndefined;
-    // §37.61 detail 3: a dynamically prefixed object reports through
-    // vpiHasActual whether it has a corresponding actual. The property is drawn
-    // only on the dynamic-prefix source kinds, so asking any other object kind
-    // is not a valid query and yields vpiUndefined; for a source kind the
-    // answer follows the object's provenance (and, when that leaves it open,
-    // whether an actual is bound at the current simulation time).
-    case vpiHasActual:
-      if (!VpiIsDynamicPrefixSourceType(obj->type)) return vpiUndefined;
-      return VpiObjectHasActual(obj->actual_origin, obj->actual != nullptr) ? 1
-                                                                            : 0;
     // §37.72: a case statement reports its case kind (vpiCaseExact/vpiCaseX/
     // vpiCaseZ) as an int property.
     case vpiCaseType:
@@ -329,24 +344,10 @@ int VpiContext::Get(int property, VpiHandle obj) {
     // the only two values the property takes for a constraint. Any other stored
     // value collapses to zero so the constraint never reports a third value.
     case vpiAccessType:
-      if (obj->type == vpiConstraint)
-        return obj->access_type == vpiExternAcc ? vpiExternAcc : 0;
-      // §37.8 detail 2: an interface task or function declaration reports an
-      // access type that is only ever vpiForkJoinAcc or vpiExternAcc. Any other
-      // stored value is not a legal access type here, so it collapses to
-      // vpiUndefined rather than letting a third value escape the property.
-      if (obj->type == vpiInterfaceTfDecl)
-        return (obj->access_type == vpiForkJoinAcc ||
-                obj->access_type == vpiExternAcc)
-                   ? obj->access_type
-                   : vpiUndefined;
-      // §37.41 detail 6: a DPI ("DPI" or "DPI-C") task or function reports
-      // vpiDPIExportAcc when it is an export and vpiDPIImportAcc when it is an
-      // import. A non-DPI task or function falls through to its stored access
-      // type.
-      if ((obj->type == vpiFunction || obj->type == vpiTask) && obj->is_dpi)
-        return obj->dpi_export ? vpiDPIExportAcc : vpiDPIImportAcc;
-      return obj->access_type;
+      // §37.34/§37.8/§37.41: a constraint reports vpiExternAcc or 0; an
+      // interface tf decl reports vpiForkJoinAcc/vpiExternAcc or vpiUndefined;
+      // a DPI tf reports its import/export access; else the stored access type.
+      return VpiGetAccessType(obj);
     // §37.41 detail 7: vpiDPIPure reports TRUE for a pure DPI import function
     // and FALSE otherwise - the value of the stored flag, which is set only for
     // such a function.
@@ -407,6 +408,60 @@ int VpiContext::Get(int property, VpiHandle obj) {
     default:
       return 0;
   }
+}
+
+}  // namespace
+
+int VpiContext::Get(int property, VpiHandle obj) {
+  // §37.10 detail 7: a null handle paired with a time property is a query for
+  // the design-wide smallest time precision of all modules, for both
+  // vpiTimePrecision and vpiTimeUnit.
+  if (!obj) {
+    if (property == vpiTimePrecision || property == vpiTimeUnit) {
+      return SmallestModuleTimePrecision();
+    }
+    return 0;
+  }
+  // §37.3.6: unless otherwise specified, asking vpi_get() for a property of a
+  // protected object is an error - it represents code sealed in a decryption
+  // envelope. Access to the vpiType and vpiIsProtected properties is the stated
+  // exception: it shall be permitted for all objects, so those two are let
+  // through to the switch below while every other property records the error
+  // and returns vpiUndefined, the value vpi_get() yields whenever an error
+  // occurs. §37.59 detail 8 carves out one more case: a protected *expression*
+  // shall still permit access to vpiSize, so that property passes through too
+  // when the object is one of the expr-class kinds.
+  if (VpiGetProtectedRefused(property, obj)) {
+    last_error_.state = kVpiError;
+    last_error_.level = kVpiError;
+    last_error_.message = "vpi_get() on a protected object is an error";
+    return vpiUndefined;
+  }
+  // §37.3.5: it is an error to ask for a property of an expression when the
+  // implementation cannot determine that property without also evaluating an
+  // expression that has side effects (for instance the vpiSize of a function
+  // call that cannot be sized without calling it). The query is refused rather
+  // than silently triggering the side effect. The object's kind is always
+  // available structurally, so vpiType is let through; every other property
+  // records the error and returns vpiUndefined, the value vpi_get() yields on
+  // error.
+  if (obj->property_needs_side_effect_eval && property != kVpiType) {
+    last_error_.state = kVpiError;
+    last_error_.level = kVpiError;
+    last_error_.message =
+        "vpi_get(): this property cannot be determined without evaluating an "
+        "expression with side effects";
+    return vpiUndefined;
+  }
+  // The integer properties whose value depends on the object kind are
+  // dispatched first; if one of them matches, its value is returned directly.
+  // Everything else is a simple field/Boolean/ternary property handled by the
+  // switch below.
+  bool handled = false;
+  int restricted = VpiGetTypeRestricted(property, obj, handled);
+  if (handled) return restricted;
+  // Everything else is a simple field/Boolean/ternary property.
+  return VpiGetSimpleProperty(property, obj);
 }
 
 // §38.7: vpi_get64() returns the value of a 64-bit integer object property -
@@ -515,6 +570,100 @@ static const char* VpiTypeConstantName(int type) {
   }
 }
 
+// §37.41 detail 10 / §37.15 / §37.30 / §37.36: resolves vpiDefName, whose value
+// depends on the object kind - a module/UDP defn reports its own name, a ref
+// obj reports its actual interface/modport name, an interface typespec reports
+// its modport/interface identifier, and any other kind has no definition name.
+static const char* VpiDefNameStr(VpiHandle obj) {
+  if (obj->type == kVpiModule) return obj->name.data();
+  // §37.15 detail 6: a ref obj whose actual is an interface or modport
+  // reports that interface's definition name or the modport name.
+  if (obj->type == vpiRefObj) return VpiRefObjDefName(obj);
+  // §37.30 detail 1: an interface typespec reports the modport identifier
+  // or the interface declaration's identifier as its definition name.
+  if (obj->type == vpiInterfaceTypespec) {
+    return VpiInterfaceTypespecDefName(obj);
+  }
+  // §37.36: a udp defn reports its definition name - the UDP declaration's
+  // identifier - through vpiDefName.
+  if (obj->type == vpiUdpDefn) return obj->name.data();
+  return nullptr;
+}
+
+// §37.14 / §37.60: resolves vpiName, which does not apply to a port bit,
+// prefers a port's explicit/inferred name, treats an unlabeled atomic statement
+// as nameless, and otherwise hands back the stored name.
+static const char* VpiNameStr(VpiHandle obj) {
+  // §37.14 detail 7: vpiName does not apply to a port bit.
+  if (obj->type == vpiPortBit) return nullptr;
+  // §37.14 detail 8: a port returns its name - explicit name preferred,
+  // then any inferred name, else NULL. The model stores one name, so an
+  // unnamed (null) port yields NULL while a named port yields its name.
+  if (obj->type == vpiPort) {
+    return VpiPortName(obj->explicit_name, obj->name.data(), obj->name.data());
+  }
+  // §37.60 detail 1: an atomic statement's vpiName is its label when one
+  // was written, and NULL otherwise - never an empty string for an
+  // unlabeled statement.
+  if (VpiIsAtomicStmtType(obj->type)) {
+    return obj->name.empty() ? nullptr : obj->name.data();
+  }
+  return obj->name.data();
+}
+
+// §38.11: resolves the string-valued property switch for vpi_get_str(), after
+// the caller has handled the null- and protected-object gating. Factored out of
+// VpiContext::GetStrRaw so the entry point stays small; the per-case spec
+// references are kept inline so the dispatch table stays self-documenting.
+static const char* VpiGetStrRawProperty(int property, VpiHandle obj) {
+  switch (property) {
+    // §37.3.2: every object carries a vpiType property; queried as a string it
+    // yields the name of that type constant (see 37.3 for how the names
+    // derive).
+    case kVpiType:
+      return VpiTypeConstantName(obj->type);
+    case kVpiName:
+      return VpiNameStr(obj);
+    // §37.3.3: vpiFile names the source file an object came from - one of the
+    // two location properties, alongside vpiLineNo. It applies to every object
+    // that corresponds to source text; the object kinds §37.3.3 excepts have no
+    // source file and yield null regardless of any stored string. The `line
+    // directive (§22.12) may shift the reported file. §37.49 stores an
+    // assertion's file in the same field, and it is handed back here.
+    case vpiFile:
+      if (!VpiHasLocationProperties(obj->type)) return nullptr;
+      return obj->file.empty() ? nullptr : obj->file.c_str();
+    // §37.83: an attribute reports the source file of its definition through
+    // the vpiDefFile string property. It is drawn only on the attribute object;
+    // an attribute with no recorded definition file - and any other object kind
+    // - yields null rather than an empty string.
+    case vpiDefFile:
+      if (obj->type != vpiAttribute) return nullptr;
+      return obj->def_file.empty() ? nullptr : obj->def_file.c_str();
+    case kVpiFullName:
+      return obj->full_name.empty() ? obj->name.data() : obj->full_name.c_str();
+    // §37.41 detail 10: vpiDPICIdentifier reports the C linkage name of a "DPI"
+    // or "DPI-C" task or function. An object that carries no such name yields
+    // null rather than an empty string.
+    case vpiDPICIdentifier:
+      return obj->dpi_c_identifier.empty() ? nullptr
+                                           : obj->dpi_c_identifier.c_str();
+    case kVpiDefName:
+      return VpiDefNameStr(obj);
+    case kVpiLibrary:
+      if (obj->type != kVpiModule) return nullptr;
+      return obj->library_name.c_str();
+    case kVpiCell:
+      if (obj->type != kVpiModule) return nullptr;
+      return obj->cell_name.empty() ? obj->name.data() : obj->cell_name.c_str();
+    case kVpiConfig:
+      if (obj->type != kVpiModule) return nullptr;
+      return obj->config_name.c_str();
+    default:
+      return nullptr;
+  }
+}
+
 const char* VpiContext::GetStr(int property, VpiHandle obj) {
   // §38.11: vpi_get_str() returns string property values. The value is placed
   // in a single temporary buffer reused by every call - so a pointer from an
@@ -544,80 +693,7 @@ const char* VpiContext::GetStrRaw(int property, VpiHandle obj) {
     last_error_.message = "vpi_get_str() on a protected object is an error";
     return nullptr;
   }
-  switch (property) {
-    // §37.3.2: every object carries a vpiType property; queried as a string it
-    // yields the name of that type constant (see 37.3 for how the names
-    // derive).
-    case kVpiType:
-      return VpiTypeConstantName(obj->type);
-    case kVpiName:
-      // §37.14 detail 7: vpiName does not apply to a port bit.
-      if (obj->type == vpiPortBit) return nullptr;
-      // §37.14 detail 8: a port returns its name - explicit name preferred,
-      // then any inferred name, else NULL. The model stores one name, so an
-      // unnamed (null) port yields NULL while a named port yields its name.
-      if (obj->type == vpiPort) {
-        return VpiPortName(obj->explicit_name, obj->name.data(),
-                           obj->name.data());
-      }
-      // §37.60 detail 1: an atomic statement's vpiName is its label when one
-      // was written, and NULL otherwise - never an empty string for an
-      // unlabeled statement.
-      if (VpiIsAtomicStmtType(obj->type)) {
-        return obj->name.empty() ? nullptr : obj->name.data();
-      }
-      return obj->name.data();
-    // §37.3.3: vpiFile names the source file an object came from - one of the
-    // two location properties, alongside vpiLineNo. It applies to every object
-    // that corresponds to source text; the object kinds §37.3.3 excepts have no
-    // source file and yield null regardless of any stored string. The `line
-    // directive (§22.12) may shift the reported file. §37.49 stores an
-    // assertion's file in the same field, and it is handed back here.
-    case vpiFile:
-      if (!VpiHasLocationProperties(obj->type)) return nullptr;
-      return obj->file.empty() ? nullptr : obj->file.c_str();
-    // §37.83: an attribute reports the source file of its definition through
-    // the vpiDefFile string property. It is drawn only on the attribute object;
-    // an attribute with no recorded definition file - and any other object kind
-    // - yields null rather than an empty string.
-    case vpiDefFile:
-      if (obj->type != vpiAttribute) return nullptr;
-      return obj->def_file.empty() ? nullptr : obj->def_file.c_str();
-    case kVpiFullName:
-      return obj->full_name.empty() ? obj->name.data() : obj->full_name.c_str();
-    // §37.41 detail 10: vpiDPICIdentifier reports the C linkage name of a "DPI"
-    // or "DPI-C" task or function. An object that carries no such name yields
-    // null rather than an empty string.
-    case vpiDPICIdentifier:
-      return obj->dpi_c_identifier.empty() ? nullptr
-                                           : obj->dpi_c_identifier.c_str();
-    case kVpiDefName:
-      if (obj->type == kVpiModule) return obj->name.data();
-      // §37.15 detail 6: a ref obj whose actual is an interface or modport
-      // reports that interface's definition name or the modport name.
-      if (obj->type == vpiRefObj) return VpiRefObjDefName(obj);
-      // §37.30 detail 1: an interface typespec reports the modport identifier
-      // or the interface declaration's identifier as its definition name.
-      if (obj->type == vpiInterfaceTypespec) {
-        return VpiInterfaceTypespecDefName(obj);
-      }
-      // §37.36: a udp defn reports its definition name - the UDP declaration's
-      // identifier - through vpiDefName.
-      if (obj->type == vpiUdpDefn) return obj->name.data();
-      return nullptr;
-
-    case kVpiLibrary:
-      if (obj->type != kVpiModule) return nullptr;
-      return obj->library_name.c_str();
-    case kVpiCell:
-      if (obj->type != kVpiModule) return nullptr;
-      return obj->cell_name.empty() ? obj->name.data() : obj->cell_name.c_str();
-    case kVpiConfig:
-      if (obj->type != kVpiModule) return nullptr;
-      return obj->config_name.c_str();
-    default:
-      return nullptr;
-  }
+  return VpiGetStrRawProperty(property, obj);
 }
 
 int VpiContext::FreeObject(VpiHandle obj) {

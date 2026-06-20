@@ -165,6 +165,33 @@ static void GetValueStringVal(VpiHandle obj, VpiValue* value,
   value->value.str = pool.back().c_str();
 }
 
+static void GetValueIntVal(VpiHandle obj, VpiValue* value) {
+  // §38.15, Table 38-3: any x or z bit of the object maps to a 0 in the
+  // returned integer, so drop every unknown bit before handing it back.
+  uint64_t aval = obj->var->value.words[0].aval;
+  uint64_t bval = obj->var->value.words[0].bval;
+  value->value.integer = static_cast<int>(aval & ~bval);
+}
+
+static void GetValueObjType(VpiHandle obj, VpiValue* value,
+                            std::vector<std::vector<VpiVectorVal>>& pool) {
+  // §38.15: fill in the value and rewrite the format field to the closest
+  // format for the object's type. A real object reports vpiRealVal, a
+  // single-bit object is a scalar, and anything wider is a vector.
+  const auto& v = obj->var->value;
+  if (v.is_real) {
+    value->format = kVpiRealVal;
+    value->value.real = static_cast<double>(v.ToUint64());
+  } else if (v.width == 1) {
+    value->format = kVpiScalarVal;
+    value->value.scalar =
+        ScalarFromBits(v.words[0].aval & 1, v.words[0].bval & 1);
+  } else {
+    value->format = kVpiVectorVal;
+    GetValueVector(obj, value, pool);
+  }
+}
+
 // ===========================================================================
 // §37.3.4 Delays and values.
 // ===========================================================================
@@ -215,6 +242,103 @@ bool VpiExpressionHasSideEffects(const VpiObject* obj) {
   return obj && obj->has_side_effects;
 }
 
+static void RecordVpiError(VpiErrorInfo& error, const char* message) {
+  error.state = kVpiError;
+  error.level = kVpiError;
+  error.message = message;
+}
+
+// Applies the §37.31/§37.26/§37.36 read-side restrictions. Returns true (with
+// last_error recorded) when the read must be refused and the value buffer left
+// untouched.
+static bool GetValueIsRefused(VpiHandle obj, VpiValue* value,
+                              VpiErrorInfo& error) {
+  // §37.31 detail 2: vpi_get_value() is not allowed for variable and event
+  // handles obtained from a class defn handle. Such a handle denotes a class
+  // member rather than a free-standing object, so the read is refused, an error
+  // is recorded, and the caller's value buffer is left untouched.
+  if (obj->parent && obj->parent->type == vpiClassDefn &&
+      VpiIsClassMemberValueType(obj->type)) {
+    RecordVpiError(
+        error,
+        "vpi_get_value(): a variable or event handle obtained from a "
+        "class definition handle has no accessible value");
+    return true;
+  }
+  // §37.26 detail 1: the value of an entire unpacked structure or unpacked
+  // union is not accessible through vpi_get_value(). Such an aggregate holds no
+  // single scalar or vector value to hand back, so the read is refused, an
+  // error is recorded, and the caller's value buffer is left untouched. A
+  // packed struct/union is excluded by the helper and reads normally.
+  if (VpiIsEntireUnpackedStructOrUnion(obj->type, obj->packed)) {
+    RecordVpiError(error,
+                   "vpi_get_value(): the value of an entire unpacked structure "
+                   "or union cannot be accessed");
+    return true;
+  }
+  // §37.36 detail 1: only a string value (the decompiled symbol row) and a
+  // vector value (the row's ASCII symbol codes) shall be obtained for a table
+  // entry object through vpi_get_value(). Any other requested format is
+  // refused, an error is recorded, and the caller's value buffer is left
+  // untouched.
+  if (obj->type == vpiTableEntry && value->format != kVpiStringVal &&
+      value->format != kVpiVectorVal) {
+    RecordVpiError(
+        error,
+        "vpi_get_value(): a table entry value is available only as a "
+        "string or a vector");
+    return true;
+  }
+  return false;
+}
+
+static void DispatchGetValueByFormat(
+    VpiHandle obj, VpiValue* value, std::vector<std::string>& str_pool,
+    std::vector<std::vector<VpiVectorVal>>& vec_pool,
+    std::vector<std::vector<VpiStrengthVal>>& strength_pool) {
+  // §38.15, Table 38-3: fill the value buffer according to the requested
+  // format. Each arm is the format-specific conversion; most delegate to a
+  // dedicated helper, while the scalar/real/time arms are short inline reads.
+  switch (value->format) {
+    case kVpiIntVal:
+      GetValueIntVal(obj, value);
+      break;
+    case kVpiRealVal:
+      value->value.real = static_cast<double>(obj->var->value.ToUint64());
+      break;
+    case kVpiScalarVal:
+      value->value.scalar = ScalarFromBits(obj->var->value.words[0].aval & 1,
+                                           obj->var->value.words[0].bval & 1);
+      break;
+    case kVpiBinStrVal:
+      GetValueBinStr(obj, value, str_pool);
+      break;
+    case kVpiHexStrVal:
+      GetValueHexStr(obj, value, str_pool);
+      break;
+    case kVpiOctStrVal:
+      GetValueOctStr(obj, value, str_pool);
+      break;
+    case kVpiStringVal:
+      GetValueStringVal(obj, value, str_pool);
+      break;
+    case kVpiTimeVal:
+      value->value.integer = static_cast<int>(obj->var->value.ToUint64());
+      break;
+    case kVpiVectorVal:
+      GetValueVector(obj, value, vec_pool);
+      break;
+    case kVpiStrengthVal:
+      GetValueStrength(obj, value, strength_pool);
+      break;
+    case kVpiObjTypeVal:
+      GetValueObjType(obj, value, vec_pool);
+      break;
+    default:
+      break;
+  }
+}
+
 void VpiContext::GetValue(VpiHandle obj, VpiValue* value) {
   if (!obj || !value) return;
   // §37.3.5: applying vpi_get_value() to an expression with side effects shall
@@ -225,123 +349,26 @@ void VpiContext::GetValue(VpiHandle obj, VpiValue* value) {
   if (VpiExpressionHasSideEffects(obj)) {
     ++obj->side_effect_count;
   }
-  // §37.31 detail 2: vpi_get_value() is not allowed for variable and event
-  // handles obtained from a class defn handle. Such a handle denotes a class
-  // member rather than a free-standing object, so the read is refused, an error
-  // is recorded, and the caller's value buffer is left untouched.
-  if (obj->parent && obj->parent->type == vpiClassDefn &&
-      VpiIsClassMemberValueType(obj->type)) {
-    last_error_.state = kVpiError;
-    last_error_.level = kVpiError;
-    last_error_.message =
-        "vpi_get_value(): a variable or event handle obtained from a class "
-        "definition handle has no accessible value";
-    return;
-  }
-  // §37.26 detail 1: the value of an entire unpacked structure or unpacked
-  // union is not accessible through vpi_get_value(). Such an aggregate holds no
-  // single scalar or vector value to hand back, so the read is refused, an
-  // error is recorded, and the caller's value buffer is left untouched. A
-  // packed struct/union is excluded by the helper and reads normally.
-  if (VpiIsEntireUnpackedStructOrUnion(obj->type, obj->packed)) {
-    last_error_.state = kVpiError;
-    last_error_.level = kVpiError;
-    last_error_.message =
-        "vpi_get_value(): the value of an entire unpacked structure or union "
-        "cannot be accessed";
-    return;
-  }
-  // §37.36 detail 1: only a string value (the decompiled symbol row) and a
-  // vector value (the row's ASCII symbol codes) shall be obtained for a table
-  // entry object through vpi_get_value(). Any other requested format is
-  // refused, an error is recorded, and the caller's value buffer is left
-  // untouched.
-  if (obj->type == vpiTableEntry && value->format != kVpiStringVal &&
-      value->format != kVpiVectorVal) {
-    last_error_.state = kVpiError;
-    last_error_.level = kVpiError;
-    last_error_.message =
-        "vpi_get_value(): a table entry value is available only as a string or "
-        "a vector";
-    return;
-  }
+  if (GetValueIsRefused(obj, value, last_error_)) return;
   if (!obj->var) return;
-  switch (value->format) {
-    case kVpiIntVal: {
-      // §38.15, Table 38-3: any x or z bit of the object maps to a 0 in the
-      // returned integer, so drop every unknown bit before handing it back.
-      uint64_t aval = obj->var->value.words[0].aval;
-      uint64_t bval = obj->var->value.words[0].bval;
-      value->value.integer = static_cast<int>(aval & ~bval);
-      break;
-    }
-    case kVpiRealVal:
-      value->value.real = static_cast<double>(obj->var->value.ToUint64());
-      break;
-    case kVpiScalarVal:
-      value->value.scalar = ScalarFromBits(obj->var->value.words[0].aval & 1,
-                                           obj->var->value.words[0].bval & 1);
-      break;
-    case kVpiBinStrVal:
-      GetValueBinStr(obj, value, str_pool_);
-      break;
-    case kVpiHexStrVal:
-      GetValueHexStr(obj, value, str_pool_);
-      break;
-    case kVpiOctStrVal:
-      GetValueOctStr(obj, value, str_pool_);
-      break;
-    case kVpiStringVal:
-      GetValueStringVal(obj, value, str_pool_);
-      break;
-    case kVpiTimeVal:
-      value->value.integer = static_cast<int>(obj->var->value.ToUint64());
-      break;
-    case kVpiVectorVal:
-      GetValueVector(obj, value, vec_pool_);
-      break;
-    case kVpiStrengthVal:
-      GetValueStrength(obj, value, strength_pool_);
-      break;
-    case kVpiObjTypeVal: {
-      // §38.15: fill in the value and rewrite the format field to the closest
-      // format for the object's type. A real object reports vpiRealVal, a
-      // single-bit object is a scalar, and anything wider is a vector.
-      const auto& v = obj->var->value;
-      if (v.is_real) {
-        value->format = kVpiRealVal;
-        value->value.real = static_cast<double>(v.ToUint64());
-      } else if (v.width == 1) {
-        value->format = kVpiScalarVal;
-        value->value.scalar =
-            ScalarFromBits(v.words[0].aval & 1, v.words[0].bval & 1);
-      } else {
-        value->format = kVpiVectorVal;
-        GetValueVector(obj, value, vec_pool_);
-      }
-      break;
-    }
-    default:
-      break;
-  }
+  DispatchGetValueByFormat(obj, value, str_pool_, vec_pool_, strength_pool_);
 }
 
-VpiHandle VpiContext::PutValue(VpiHandle obj, VpiValue* value, VpiTime* time,
-                               int flags) {
-  if (!obj) return nullptr;
-
+// Applies the §37.31/§37.26/§37.35/§37.3.5 target-kind restrictions that hold
+// regardless of the requested delay mode. Returns true (with error recorded)
+// when the put must be refused and the target left unchanged.
+static bool PutValueTargetIsRejected(VpiHandle obj, VpiErrorInfo& error) {
   // §37.31 detail 2: vpi_put_value() is not allowed for variable and event
   // handles obtained from a class defn handle, the write side of the same
   // restriction vpi_get_value() observes. The put is rejected, an error is
   // recorded, and the member is left unchanged.
   if (obj->parent && obj->parent->type == vpiClassDefn &&
       VpiIsClassMemberValueType(obj->type)) {
-    last_error_.state = kVpiError;
-    last_error_.level = kVpiError;
-    last_error_.message =
-        "vpi_put_value(): a variable or event handle obtained from a class "
-        "definition handle has no accessible value";
-    return nullptr;
+    RecordVpiError(
+        error,
+        "vpi_put_value(): a variable or event handle obtained from a "
+        "class definition handle has no accessible value");
+    return true;
   }
 
   // §37.26 detail 1: an entire unpacked structure or union cannot be written
@@ -350,12 +377,10 @@ VpiHandle VpiContext::PutValue(VpiHandle obj, VpiValue* value, VpiTime* time,
   // aggregate is left unchanged. A packed struct/union is excluded by the
   // helper and is written through the normal path below.
   if (VpiIsEntireUnpackedStructOrUnion(obj->type, obj->packed)) {
-    last_error_.state = kVpiError;
-    last_error_.level = kVpiError;
-    last_error_.message =
-        "vpi_put_value(): the value of an entire unpacked structure or union "
-        "cannot be accessed";
-    return nullptr;
+    RecordVpiError(error,
+                   "vpi_put_value(): the value of an entire unpacked structure "
+                   "or union cannot be accessed");
+    return true;
   }
 
   // §37.35 detail 2: among primitives, vpi_put_value() may be applied only to a
@@ -364,11 +389,10 @@ VpiHandle VpiContext::PutValue(VpiHandle obj, VpiValue* value, VpiTime* time,
   // put is rejected before any value is written. (The complementary delay-mode
   // restriction on a sequential UDP itself is checked further below.)
   if (VpiObjectIsPrimitive(obj->type) && obj->type != vpiSeqPrim) {
-    last_error_.state = kVpiError;
-    last_error_.level = kVpiError;
-    last_error_.message =
-        "vpi_put_value(): only a sequential UDP primitive may be written";
-    return nullptr;
+    RecordVpiError(
+        error,
+        "vpi_put_value(): only a sequential UDP primitive may be written");
+    return true;
   }
 
   // §37.3.5: it is an error to apply vpi_put_value() to an object when any of
@@ -378,14 +402,66 @@ VpiHandle VpiContext::PutValue(VpiHandle obj, VpiValue* value, VpiTime* time,
   // not evaluated.
   for (const VpiObject* index : obj->index_expressions) {
     if (VpiExpressionHasSideEffects(index)) {
-      last_error_.state = kVpiError;
-      last_error_.level = kVpiError;
-      last_error_.message =
-          "vpi_put_value(): an index expression with side effects is not "
-          "allowed";
-      return nullptr;
+      RecordVpiError(
+          error,
+          "vpi_put_value(): an index expression with side effects is "
+          "not allowed");
+      return true;
     }
   }
+  return false;
+}
+
+// Applies the §38.34 format-legality checks for the (now known) target
+// variable. Returns true (with error recorded) when the requested format is not
+// legal for the object and the put must be refused.
+static bool PutValueFormatIsRejected(VpiHandle obj, const VpiValue* value,
+                                     VpiErrorInfo& error) {
+  // §38.34: it is illegal to give the value the vpiStringVal format when the
+  // target is a real object. Record the error and leave the object unchanged.
+  if (value->format == kVpiStringVal && obj->var->value.is_real) {
+    RecordVpiError(error,
+                   "vpi_put_value(): vpiStringVal is not a legal format for a "
+                   "real object");
+    return true;
+  }
+
+  // §38.34: it is illegal to give the value the vpiStrengthVal format when the
+  // target is a vector object (more than one bit wide).
+  if (value->format == kVpiStrengthVal && obj->var->value.width > 1) {
+    RecordVpiError(
+        error,
+        "vpi_put_value(): vpiStrengthVal is not a legal format for a "
+        "vector object");
+    return true;
+  }
+  return false;
+}
+
+// §38.34: stores the supplied scalar/integer/real value into the target
+// variable's first four-state word. Formats with no direct word encoding here
+// (e.g. string/vector) are left for the caller's other paths and are ignored.
+static void PutValueWriteWord(VpiHandle obj, const VpiValue* value) {
+  if (value->format == kVpiIntVal) {
+    auto new_val = static_cast<uint64_t>(value->value.integer);
+    obj->var->value.words[0].aval = new_val;
+    obj->var->value.words[0].bval = 0;
+  } else if (value->format == kVpiRealVal) {
+    auto new_val = static_cast<uint64_t>(value->value.real);
+    obj->var->value.words[0].aval = new_val;
+    obj->var->value.words[0].bval = 0;
+  } else if (value->format == kVpiScalarVal) {
+    int s = value->value.scalar;
+    obj->var->value.words[0].aval = (s == kVpi1 || s == kVpiZ) ? 1 : 0;
+    obj->var->value.words[0].bval = (s == kVpiX || s == kVpiZ) ? 1 : 0;
+  }
+}
+
+VpiHandle VpiContext::PutValue(VpiHandle obj, VpiValue* value, VpiTime* time,
+                               int flags) {
+  if (!obj) return nullptr;
+
+  if (PutValueTargetIsRejected(obj, last_error_)) return nullptr;
 
   // §38.34: vpiReturnEvent is an independent bit mask layered on top of the
   // delay-mode selector that lives in the low bits of the flags word.
@@ -417,11 +493,9 @@ VpiHandle VpiContext::PutValue(VpiHandle obj, VpiValue* value, VpiTime* time,
   if (obj->type == vpiSeqPrim &&
       (mode == vpiInertialDelay || mode == vpiTransportDelay ||
        mode == vpiPureTransportDelay)) {
-    last_error_.state = kVpiError;
-    last_error_.level = kVpiError;
-    last_error_.message =
-        "vpi_put_value(): a sequential UDP must be written with the vpiNoDelay "
-        "flag";
+    RecordVpiError(last_error_,
+                   "vpi_put_value(): a sequential UDP must be written with the "
+                   "vpiNoDelay flag");
     return nullptr;
   }
 
@@ -430,11 +504,9 @@ VpiHandle VpiContext::PutValue(VpiHandle obj, VpiValue* value, VpiTime* time,
   // automatic object's storage may no longer exist by then. Reject the put
   // rather than applying it.
   if (obj->automatic && has_delay) {
-    last_error_.state = kVpiError;
-    last_error_.level = kVpiError;
-    last_error_.message =
-        "vpi_put_value(): a value with a delay may not be put on an automatic "
-        "variable";
+    RecordVpiError(last_error_,
+                   "vpi_put_value(): a value with a delay may not be put on an "
+                   "automatic variable");
     return nullptr;
   }
 
@@ -454,26 +526,7 @@ VpiHandle VpiContext::PutValue(VpiHandle obj, VpiValue* value, VpiTime* time,
 
   if (!value) return nullptr;
 
-  // §38.34: it is illegal to give the value the vpiStringVal format when the
-  // target is a real object. Record the error and leave the object unchanged.
-  if (value->format == kVpiStringVal && obj->var->value.is_real) {
-    last_error_.state = kVpiError;
-    last_error_.level = kVpiError;
-    last_error_.message =
-        "vpi_put_value(): vpiStringVal is not a legal format for a real object";
-    return nullptr;
-  }
-
-  // §38.34: it is illegal to give the value the vpiStrengthVal format when the
-  // target is a vector object (more than one bit wide).
-  if (value->format == kVpiStrengthVal && obj->var->value.width > 1) {
-    last_error_.state = kVpiError;
-    last_error_.level = kVpiError;
-    last_error_.message =
-        "vpi_put_value(): vpiStrengthVal is not a legal format for a vector "
-        "object";
-    return nullptr;
-  }
+  if (PutValueFormatIsRejected(obj, value, last_error_)) return nullptr;
 
   // §38.34: vpiReleaseFlag releases a forced value, the same operation as the
   // procedural release of §10.6.2, and writes the object's post-release value
@@ -486,19 +539,7 @@ VpiHandle VpiContext::PutValue(VpiHandle obj, VpiValue* value, VpiTime* time,
 
   if (scheduler_) scheduler_->NoteWriteAttempt();
 
-  if (value->format == kVpiIntVal) {
-    auto new_val = static_cast<uint64_t>(value->value.integer);
-    obj->var->value.words[0].aval = new_val;
-    obj->var->value.words[0].bval = 0;
-  } else if (value->format == kVpiRealVal) {
-    auto new_val = static_cast<uint64_t>(value->value.real);
-    obj->var->value.words[0].aval = new_val;
-    obj->var->value.words[0].bval = 0;
-  } else if (value->format == kVpiScalarVal) {
-    int s = value->value.scalar;
-    obj->var->value.words[0].aval = (s == kVpi1 || s == kVpiZ) ? 1 : 0;
-    obj->var->value.words[0].bval = (s == kVpiX || s == kVpiZ) ? 1 : 0;
-  }
+  PutValueWriteWord(obj, value);
 
   // §38.34: vpiForceFlag performs a procedural force (§10.6.2): the supplied
   // value takes effect now and is held as the forced value.

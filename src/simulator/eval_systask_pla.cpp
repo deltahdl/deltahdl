@@ -32,6 +32,49 @@ struct PlaTaskKind {
   bool is_plane = false;  // §20.16.4 format: array vs plane
 };
 
+// §20.16, Table 20-12: decode the array-type component, setting is_async.
+// Returns false when the component is not "sync" or "async".
+bool DecodePlaType(std::string_view type, PlaTaskKind& k) {
+  if (type == "sync") {
+    k.is_async = false;
+  } else if (type == "async") {
+    k.is_async = true;
+  } else {
+    return false;
+  }
+  return true;
+}
+
+// §20.16, Table 20-12: decode the logic component, setting the logic field.
+// Returns false when the component is not one of and/or/nand/nor.
+bool DecodePlaLogic(std::string_view logic, PlaTaskKind& k) {
+  if (logic == "and") {
+    k.logic = PlaTaskKind::Logic::kAnd;
+  } else if (logic == "or") {
+    k.logic = PlaTaskKind::Logic::kOr;
+  } else if (logic == "nand") {
+    k.logic = PlaTaskKind::Logic::kNand;
+  } else if (logic == "nor") {
+    k.logic = PlaTaskKind::Logic::kNor;
+  } else {
+    return false;
+  }
+  return true;
+}
+
+// §20.16.4: decode the format component, setting is_plane. Returns false when
+// the component is not "array" or "plane".
+bool DecodePlaFormat(std::string_view format, PlaTaskKind& k) {
+  if (format == "array") {
+    k.is_plane = false;
+  } else if (format == "plane") {
+    k.is_plane = true;
+  } else {
+    return false;
+  }
+  return true;
+}
+
 // §20.16: split a callee into its three dollar-separated components and decide
 // whether it names one of the sixteen tasks of Table 20-12. This mirrors the
 // elaborator's IsPlaSystemTask recognizer but also keeps the decoded fields.
@@ -50,31 +93,9 @@ PlaTaskKind ClassifyPlaTask(std::string_view callee) {
   std::string_view logic = take();
   std::string_view format = take();
   if (!rest.empty()) return k;  // more than three components
-  if (type == "sync") {
-    k.is_async = false;
-  } else if (type == "async") {
-    k.is_async = true;
-  } else {
-    return k;
-  }
-  if (logic == "and") {
-    k.logic = PlaTaskKind::Logic::kAnd;
-  } else if (logic == "or") {
-    k.logic = PlaTaskKind::Logic::kOr;
-  } else if (logic == "nand") {
-    k.logic = PlaTaskKind::Logic::kNand;
-  } else if (logic == "nor") {
-    k.logic = PlaTaskKind::Logic::kNor;
-  } else {
-    return k;
-  }
-  if (format == "array") {
-    k.is_plane = false;
-  } else if (format == "plane") {
-    k.is_plane = true;
-  } else {
-    return k;
-  }
+  if (!DecodePlaType(type, k)) return k;
+  if (!DecodePlaLogic(logic, k)) return k;
+  if (!DecodePlaFormat(format, k)) return k;
   k.valid = true;
   return k;
 }
@@ -106,6 +127,33 @@ void PlaSetBit(Logic4Vec& v, uint32_t pos, Logic4Word bit) {
 // don't-care (z, and the equivalent ?) drops the input from the reduction, and
 // x takes the worst case by contributing an unknown. In the 4-state encoding a
 // personality bit holds 0 as {0,0}, 1 as {1,0}, x as {1,1} and z/? as {0,1}.
+// §20.16.4: map one personality code and its input bit to the term that the
+// input contributes to the reduction. Sets `participates` to false when the
+// personality code drops the input from the reduction (array format != 1, or
+// plane-format z/? don't-care). The returned term is meaningful only when
+// `participates` is true.
+Logic4Word PlaInputTerm(const PlaTaskKind& k, Logic4Word code,
+                        Logic4Word in_bit, bool& participates) {
+  participates = true;
+  if (k.is_plane) {
+    // §20.16.4 plane-format (Espresso) personality codes.
+    if (code.bval == 0) {
+      // 1 takes the true input value, 0 takes the complemented input value.
+      return code.aval == 1 ? in_bit : Logic4Not(in_bit);
+    }
+    if (code.aval == 1) {
+      // x: take the worst case of the input value - contribute an unknown.
+      return Logic4Word{0, 1};
+    }
+    // z (and the equivalent ?): do-not-care, the input does not participate.
+    participates = false;
+    return Logic4Word{0, 0};
+  }
+  // §20.16.4 array-format personality codes: 1 takes the input value.
+  participates = code.aval == 1 && code.bval == 0;
+  return in_bit;
+}
+
 Logic4Word PlaReduceWord(const PlaTaskKind& k, const Logic4Vec& mem_word,
                          const Logic4Vec& inputs, uint32_t n) {
   bool is_and = k.logic == PlaTaskKind::Logic::kAnd ||
@@ -114,26 +162,8 @@ Logic4Word PlaReduceWord(const PlaTaskKind& k, const Logic4Vec& mem_word,
   for (uint32_t p = 0; p < n; ++p) {
     Logic4Word code = PlaBitAt(mem_word, p);
     Logic4Word in_bit = PlaBitAt(inputs, p);
-    Logic4Word term;
     bool participates = true;
-    if (k.is_plane) {
-      // §20.16.4 plane-format (Espresso) personality codes.
-      if (code.bval == 0) {
-        // 1 takes the true input value, 0 takes the complemented input value.
-        term = code.aval == 1 ? in_bit : Logic4Not(in_bit);
-      } else if (code.aval == 1) {
-        // x: take the worst case of the input value - contribute an unknown.
-        term = Logic4Word{0, 1};
-      } else {
-        // z (and the equivalent ?): do-not-care, the input does not
-        // participate.
-        participates = false;
-      }
-    } else {
-      // §20.16.4 array-format personality codes: 1 takes the input value.
-      participates = code.aval == 1 && code.bval == 0;
-      term = in_bit;
-    }
+    Logic4Word term = PlaInputTerm(k, code, in_bit, participates);
     if (participates) {
       acc = is_and ? Logic4And(acc, term) : Logic4Or(acc, term);
     }
@@ -190,6 +220,33 @@ void CollectPlaInputSignals(const Expr* e, std::vector<std::string_view>& out) {
   for (auto* el : e->elements) CollectPlaInputSignals(el, out);
 }
 
+// §20.16.1: the asynchronous forms re-evaluate on their own whenever an input
+// term changes value or any word of the personality memory is changed. Install
+// a persistent watcher on each input signal and each memory word that
+// recomputes and re-drives the outputs.
+void InstallAsyncPlaWatchers(const Expr* expr, const PlaTaskKind& k,
+                             SimContext& ctx, Arena& arena) {
+  auto reeval = [expr, k, &ctx, &arena]() -> bool {
+    EvaluatePla(expr, k, ctx, arena);
+    return false;  // keep watching
+  };
+  std::vector<std::string_view> names;
+  if (expr->args.size() >= 2) CollectPlaInputSignals(expr->args[1], names);
+  for (auto name : names) {
+    if (Variable* v = ctx.FindVariable(name)) v->AddWatcher(reeval);
+  }
+  if (!expr->args.empty() && expr->args[0] &&
+      expr->args[0]->kind == ExprKind::kIdentifier) {
+    if (const ArrayInfo* ai = ctx.FindArrayInfo(expr->args[0]->text)) {
+      std::string mem_name(expr->args[0]->text);
+      for (uint32_t j = 0; j < ai->size; ++j) {
+        std::string elem = mem_name + "[" + std::to_string(ai->lo + j) + "]";
+        if (Variable* v = ctx.FindVariable(elem)) v->AddWatcher(reeval);
+      }
+    }
+  }
+}
+
 }  // namespace
 
 bool TryEvalPlaSystemTask(const Expr* expr, SimContext& ctx, Arena& arena) {
@@ -201,29 +258,7 @@ bool TryEvalPlaSystemTask(const Expr* expr, SimContext& ctx, Arena& arena) {
   // the array is evaluated and the outputs updated.
   EvaluatePla(expr, k, ctx, arena);
   if (k.is_async) {
-    // §20.16.1: the asynchronous forms additionally re-evaluate on their own
-    // whenever an input term changes value or any word of the personality
-    // memory is changed. Install a persistent watcher on each input signal and
-    // each memory word that recomputes and re-drives the outputs.
-    auto reeval = [expr, k, &ctx, &arena]() -> bool {
-      EvaluatePla(expr, k, ctx, arena);
-      return false;  // keep watching
-    };
-    std::vector<std::string_view> names;
-    if (expr->args.size() >= 2) CollectPlaInputSignals(expr->args[1], names);
-    for (auto name : names) {
-      if (Variable* v = ctx.FindVariable(name)) v->AddWatcher(reeval);
-    }
-    if (!expr->args.empty() && expr->args[0] &&
-        expr->args[0]->kind == ExprKind::kIdentifier) {
-      if (const ArrayInfo* ai = ctx.FindArrayInfo(expr->args[0]->text)) {
-        std::string mem_name(expr->args[0]->text);
-        for (uint32_t j = 0; j < ai->size; ++j) {
-          std::string elem = mem_name + "[" + std::to_string(ai->lo + j) + "]";
-          if (Variable* v = ctx.FindVariable(elem)) v->AddWatcher(reeval);
-        }
-      }
-    }
+    InstallAsyncPlaWatchers(expr, k, ctx, arena);
   }
   return true;
 }

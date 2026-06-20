@@ -30,6 +30,158 @@ static void CollectAllModules(
   }
 }
 
+namespace {
+
+// Copies an AST liblist (string_views into the source) into owning strings.
+std::vector<std::string> LiblistToStrings(
+    const std::vector<std::string_view>& liblist) {
+  std::vector<std::string> libs;
+  libs.reserve(liblist.size());
+  for (auto lib : liblist) libs.emplace_back(lib);
+  return libs;
+}
+
+// Finds the configuration named want among configs, excluding self. Returns
+// nullptr when no such configuration exists (§33.4.1 config delegation).
+const ConfigDecl* FindDelegatedConfig(const std::vector<ConfigDecl*>& configs,
+                                      const ConfigDecl* self,
+                                      std::string_view want) {
+  for (auto* other : configs) {
+    if (other != self && other->name == want) return other;
+  }
+  return nullptr;
+}
+
+// Translates the default/instance liblist rules of a delegated inner config
+// (§33.4.1) into instance liblist overrides rooted at outer_path, appending
+// them to overrides. inner_top names the inner config's top cell, used to
+// match and rewrite inner instance paths onto the outer hierarchy.
+void CollectInnerConfigLiblistOverrides(
+    const ConfigDecl* inner, const std::string& outer_path,
+    std::string_view inner_top,
+    std::vector<std::pair<std::string, std::vector<std::string>>>& overrides) {
+  for (auto* irule : inner->rules) {
+    if (irule->kind == ConfigRuleKind::kDefault) {
+      if (irule->liblist.empty()) continue;
+      overrides.emplace_back(outer_path, LiblistToStrings(irule->liblist));
+    } else if (irule->kind == ConfigRuleKind::kInstance) {
+      if (irule->liblist.empty()) continue;
+      std::string_view ipath = irule->inst_path;
+      bool path_matches =
+          ipath == inner_top ||
+          (ipath.size() > inner_top.size() && ipath.starts_with(inner_top) &&
+           ipath[inner_top.size()] == '.');
+      if (!path_matches) continue;
+      std::string translated = outer_path;
+      if (ipath.size() > inner_top.size()) {
+        translated.append(ipath.substr(inner_top.size()));
+      }
+      overrides.emplace_back(std::move(translated),
+                             LiblistToStrings(irule->liblist));
+    }
+  }
+}
+
+// Sorts the compilation-unit items into the design's function/task and let
+// declaration lists, preserving source order (§3.12 compilation-unit scope).
+void ClassifyCuItems(const std::vector<ModuleItem*>& cu_items,
+                     std::vector<ModuleItem*>& function_decls,
+                     std::vector<ModuleItem*>& let_decls) {
+  for (auto* item : cu_items) {
+    if (item->kind == ModuleItemKind::kFunctionDecl ||
+        item->kind == ModuleItemKind::kTaskDecl) {
+      function_decls.push_back(item);
+    } else if (item->kind == ModuleItemKind::kLetDecl) {
+      let_decls.push_back(item);
+    }
+  }
+}
+
+// Computes the elaborated bit width of each named typedef into widths.
+void PopulateTypeWidths(
+    const TypedefMap& typedefs,
+    std::unordered_map<std::string_view, uint32_t>& widths) {
+  for (const auto& [name, dtype] : typedefs) {
+    widths[name] = EvalTypeWidth(dtype, typedefs);
+  }
+}
+
+// True when an instance clause carries a parameter override to record: either
+// an explicit override list or an empty "#()" reset-all marker (§33.4.3).
+bool RuleCarriesParamOverride(const ConfigRule* rule) {
+  return !rule->use_params.empty() || rule->use_param_reset_all;
+}
+
+// Evaluates each config localparam (restricted to a literal value, §33.4.3)
+// and records it in scope so later overrides may reference earlier ones.
+void EvalConfigLocalparams(const ConfigDecl* cfg, ScopeMap& scope) {
+  for (const auto& [name, expr] : cfg->local_params) {
+    if (!expr) continue;
+    if (auto val = ConstEvalInt(expr, scope)) {
+      scope[name] = *val;
+    }
+  }
+}
+
+// Applies the configuration's default clause library list (§33.4.1), taking the
+// first default rule. order/strict are set only when such a rule is present.
+void ApplyConfigDefaultLiblist(const ConfigDecl* cfg,
+                               std::vector<std::string>& order, bool& strict) {
+  for (auto* rule : cfg->rules) {
+    if (rule->kind != ConfigRuleKind::kDefault) continue;
+    order = LiblistToStrings(rule->liblist);
+    strict = true;
+    break;
+  }
+}
+
+// Records the instance-clause library lists (§33.4.1.4) as instance liblist
+// overrides keyed by their instance path.
+void CollectInstanceLiblistOverrides(
+    const ConfigDecl* cfg,
+    std::vector<std::pair<std::string, std::vector<std::string>>>& overrides) {
+  for (auto* rule : cfg->rules) {
+    if (rule->kind != ConfigRuleKind::kInstance) continue;
+    if (rule->liblist.empty()) continue;
+    overrides.emplace_back(std::string(rule->inst_path),
+                           LiblistToStrings(rule->liblist));
+  }
+}
+
+// Expands instance clauses that delegate to another configuration (use config,
+// §33.4.1) into instance use overrides plus translated liblist overrides.
+void CollectConfigDelegationOverrides(
+    const ConfigDecl* cfg, const std::vector<ConfigDecl*>& configs,
+    DiagEngine& diag,
+    std::vector<std::tuple<std::string, std::string, std::string>>&
+        use_overrides,
+    std::vector<std::pair<std::string, std::vector<std::string>>>&
+        liblist_overrides) {
+  for (auto* rule : cfg->rules) {
+    if (rule->kind != ConfigRuleKind::kInstance) continue;
+    if (!rule->use_config) continue;
+    const ConfigDecl* inner = FindDelegatedConfig(configs, cfg, rule->use_cell);
+    if (!inner) {
+      diag.Error(cfg->range.start,
+                 std::format("config '{}' delegates instance '{}' to unknown "
+                             "config '{}'",
+                             cfg->name, rule->inst_path, rule->use_cell));
+      continue;
+    }
+    if (inner->design_cells.empty()) continue;
+    std::string outer_path(rule->inst_path);
+    const auto& [inner_lib, inner_cell] = inner->design_cells.front();
+    use_overrides.emplace_back(outer_path, std::string(inner_lib),
+                               std::string(inner_cell));
+
+    std::string_view inner_top = inner_cell;
+    CollectInnerConfigLiblistOverrides(inner, outer_path, inner_top,
+                                       liblist_overrides);
+  }
+}
+
+}  // namespace
+
 void Elaborator::RunPreElaborationValidations() {
   ValidateNameSpaces();
 
@@ -167,19 +319,13 @@ RtlirDesign* Elaborator::ElaborateTops(
       CheckEarlyResolutionAmbiguity(entry.second, top_names);
   }
 
-  for (auto* item : unit_->cu_items) {
-    if (item->kind == ModuleItemKind::kFunctionDecl ||
-        item->kind == ModuleItemKind::kTaskDecl) {
-      design->cu_function_decls.push_back(item);
-    } else if (item->kind == ModuleItemKind::kLetDecl) {
-      ValidateLetDecl(item);
-      design->cu_let_decls.push_back(item);
-    }
+  ClassifyCuItems(unit_->cu_items, design->cu_function_decls,
+                  design->cu_let_decls);
+  for (auto* item : design->cu_let_decls) {
+    ValidateLetDecl(item);
   }
 
-  for (const auto& [name, dtype] : typedefs_) {
-    design->type_widths[name] = EvalTypeWidth(dtype, typedefs_);
-  }
+  PopulateTypeWidths(typedefs_, design->type_widths);
 
   design->packages = unit_->packages;
 
@@ -215,18 +361,13 @@ RtlirDesign* Elaborator::Elaborate(const ConfigDecl* cfg) {
   // A config localparam is restricted to a literal value (§33.4.3), so it can
   // be evaluated once here and made available to parameter-override
   // expressions that reference it.
-  for (const auto& [name, expr] : cfg->local_params) {
-    if (!expr) continue;
-    if (auto val = ConstEvalInt(expr, config_localparam_scope_)) {
-      config_localparam_scope_[name] = *val;
-    }
-  }
+  EvalConfigLocalparams(cfg, config_localparam_scope_);
 
   // Record the parameter overrides each instance clause carries so they can be
   // applied as the matching instance is elaborated (§33.4.3).
   for (auto* rule : cfg->rules) {
     if (rule->kind != ConfigRuleKind::kInstance) continue;
-    if (rule->use_params.empty() && !rule->use_param_reset_all) continue;
+    if (!RuleCarriesParamOverride(rule)) continue;
     ConfigParamOverride ov;
     ov.inst_path.assign(rule->inst_path.data(), rule->inst_path.size());
     ov.reset_all = rule->use_param_reset_all;
@@ -234,16 +375,7 @@ RtlirDesign* Elaborator::Elaborate(const ConfigDecl* cfg) {
     instance_param_overrides_.push_back(std::move(ov));
   }
 
-  for (auto* rule : cfg->rules) {
-    if (rule->kind != ConfigRuleKind::kDefault) continue;
-    library_order_.clear();
-    library_order_.reserve(rule->liblist.size());
-    for (auto lib : rule->liblist) {
-      library_order_.emplace_back(lib);
-    }
-    library_order_strict_ = true;
-    break;
-  }
+  ApplyConfigDefaultLiblist(cfg, library_order_, library_order_strict_);
 
   for (auto* rule : cfg->rules) {
     if (rule->kind != ConfigRuleKind::kCell) continue;
@@ -259,74 +391,15 @@ RtlirDesign* Elaborator::Elaborate(const ConfigDecl* cfg) {
     }
     // Otherwise the cell clause selects a library list to search for the named
     // cell (§33.4.1.4 selecting the list of §33.4.1.5).
-    std::vector<std::string> libs;
-    libs.reserve(rule->liblist.size());
-    for (auto lib : rule->liblist) libs.emplace_back(lib);
     cell_clause_liblist_overrides_[std::string(rule->cell_name)] =
-        std::move(libs);
+        LiblistToStrings(rule->liblist);
   }
 
-  for (auto* rule : cfg->rules) {
-    if (rule->kind != ConfigRuleKind::kInstance) continue;
-    if (rule->liblist.empty()) continue;
-    std::vector<std::string> libs;
-    libs.reserve(rule->liblist.size());
-    for (auto lib : rule->liblist) libs.emplace_back(lib);
-    instance_liblist_overrides_.emplace_back(std::string(rule->inst_path),
-                                             std::move(libs));
-  }
+  CollectInstanceLiblistOverrides(cfg, instance_liblist_overrides_);
 
-  for (auto* rule : cfg->rules) {
-    if (rule->kind != ConfigRuleKind::kInstance) continue;
-    if (!rule->use_config) continue;
-    const ConfigDecl* inner = nullptr;
-    for (auto* other : unit_->configs) {
-      if (other != cfg && other->name == rule->use_cell) {
-        inner = other;
-        break;
-      }
-    }
-    if (!inner) {
-      diag_.Error(cfg->range.start,
-                  std::format("config '{}' delegates instance '{}' to unknown "
-                              "config '{}'",
-                              cfg->name, rule->inst_path, rule->use_cell));
-      continue;
-    }
-    if (inner->design_cells.empty()) continue;
-    std::string outer_path(rule->inst_path);
-    const auto& [inner_lib, inner_cell] = inner->design_cells.front();
-    instance_use_overrides_.emplace_back(outer_path, std::string(inner_lib),
-                                         std::string(inner_cell));
-
-    std::string_view inner_top = inner_cell;
-    for (auto* irule : inner->rules) {
-      if (irule->kind == ConfigRuleKind::kDefault) {
-        if (irule->liblist.empty()) continue;
-        std::vector<std::string> libs;
-        libs.reserve(irule->liblist.size());
-        for (auto lib : irule->liblist) libs.emplace_back(lib);
-        instance_liblist_overrides_.emplace_back(outer_path, std::move(libs));
-      } else if (irule->kind == ConfigRuleKind::kInstance) {
-        if (irule->liblist.empty()) continue;
-        std::string_view ipath = irule->inst_path;
-        bool path_matches =
-            ipath == inner_top ||
-            (ipath.size() > inner_top.size() && ipath.starts_with(inner_top) &&
-             ipath[inner_top.size()] == '.');
-        if (!path_matches) continue;
-        std::string translated = outer_path;
-        if (ipath.size() > inner_top.size()) {
-          translated.append(ipath.substr(inner_top.size()));
-        }
-        std::vector<std::string> libs;
-        libs.reserve(irule->liblist.size());
-        for (auto lib : irule->liblist) libs.emplace_back(lib);
-        instance_liblist_overrides_.emplace_back(std::move(translated),
-                                                 std::move(libs));
-      }
-    }
-  }
+  CollectConfigDelegationOverrides(cfg, unit_->configs, diag_,
+                                   instance_use_overrides_,
+                                   instance_liblist_overrides_);
 
   std::vector<ModuleDecl*> top_decls;
   top_decls.reserve(cfg->design_cells.size());

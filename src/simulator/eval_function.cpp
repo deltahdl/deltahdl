@@ -55,6 +55,56 @@ static void RunConstructorForLevel(const ClassTypeInfo* info, ClassObject* obj,
   ctx.PopScope();
 }
 
+static const Expr* SynthDefaultExtendsArgs(const ClassTypeInfo* base,
+                                           const ModuleItem* child_decl,
+                                           const Expr* new_expr, Arena& arena) {
+  size_t default_pos = 0;
+  for (const auto* m : child_decl->members) {
+    if (m->kind == ClassMemberKind::kMethod && m->method &&
+        m->method->name == "new") {
+      for (size_t j = 0; j < m->method->func_args.size(); ++j) {
+        if (m->method->func_args[j].is_default) {
+          default_pos = j;
+          break;
+        }
+      }
+      break;
+    }
+  }
+
+  size_t base_argc = 0;
+  auto base_it = base->methods.find("new");
+  if (base_it != base->methods.end() && base_it->second) {
+    base_argc = base_it->second->func_args.size();
+  }
+  auto* synth = arena.Create<Expr>();
+  synth->kind = ExprKind::kCall;
+  for (size_t j = 0; j < base_argc && default_pos + j < new_expr->args.size();
+       ++j) {
+    synth->args.push_back(new_expr->args[default_pos + j]);
+  }
+  return synth;
+}
+
+static const Expr* ResolveConstructorArgsForLevel(
+    const std::vector<const ClassTypeInfo*>& chain, size_t i,
+    const Expr* new_expr, Arena& arena) {
+  const Expr* args = (i == chain.size() - 1) ? new_expr : nullptr;
+  if (args || i + 1 >= chain.size() || !chain[i + 1]->decl) return args;
+
+  const auto* child_decl = chain[i + 1]->decl;
+  if (!child_decl->extends_args.empty()) {
+    auto* synth = arena.Create<Expr>();
+    synth->kind = ExprKind::kCall;
+    synth->args = child_decl->extends_args;
+    return synth;
+  }
+  if (child_decl->extends_has_default && new_expr) {
+    return SynthDefaultExtendsArgs(chain[i], child_decl, new_expr, arena);
+  }
+  return args;
+}
+
 Logic4Vec EvalClassNew(std::string_view class_type, const Expr* new_expr,
                        SimContext& ctx, Arena& arena) {
   auto* info = ctx.FindClassType(class_type);
@@ -81,44 +131,8 @@ Logic4Vec EvalClassNew(std::string_view class_type, const Expr* new_expr,
 
   for (size_t i = 0; i < chain.size(); ++i) {
     InitClassPropertyDefaults(chain[i], obj, ctx, arena);
-    const Expr* args = (i == chain.size() - 1) ? new_expr : nullptr;
-
-    if (!args && i + 1 < chain.size() && chain[i + 1]->decl) {
-      const auto* child_decl = chain[i + 1]->decl;
-      if (!child_decl->extends_args.empty()) {
-        auto* synth = arena.Create<Expr>();
-        synth->kind = ExprKind::kCall;
-        synth->args = child_decl->extends_args;
-        args = synth;
-      } else if (child_decl->extends_has_default && new_expr) {
-        size_t default_pos = 0;
-        for (const auto* m : child_decl->members) {
-          if (m->kind == ClassMemberKind::kMethod && m->method &&
-              m->method->name == "new") {
-            for (size_t j = 0; j < m->method->func_args.size(); ++j) {
-              if (m->method->func_args[j].is_default) {
-                default_pos = j;
-                break;
-              }
-            }
-            break;
-          }
-        }
-
-        size_t base_argc = 0;
-        auto base_it = chain[i]->methods.find("new");
-        if (base_it != chain[i]->methods.end() && base_it->second) {
-          base_argc = base_it->second->func_args.size();
-        }
-        auto* synth = arena.Create<Expr>();
-        synth->kind = ExprKind::kCall;
-        for (size_t j = 0;
-             j < base_argc && default_pos + j < new_expr->args.size(); ++j) {
-          synth->args.push_back(new_expr->args[default_pos + j]);
-        }
-        args = synth;
-      }
-    }
+    const Expr* args =
+        ResolveConstructorArgsForLevel(chain, i, new_expr, arena);
     RunConstructorForLevel(chain[i], obj, args, ctx, arena);
   }
 
@@ -144,16 +158,9 @@ void ApplyClassParamOverrides(std::string_view var_name, uint64_t handle,
   }
 }
 
-static Logic4Vec EvalDpiCall(const Expr* expr, SimContext& ctx, Arena& arena) {
-  auto* dpi = ctx.GetDpiContext();
-  if (!dpi || !dpi->HasImport(expr->callee)) {
-    return MakeLogic4VecVal(arena, 1, 0);
-  }
-  // §35.6: calling an imported function uses the same usage and syntax as a
-  // native function call. When the import's formals are known, resolve the
-  // call-site actuals against them so that named-argument binding and omitted
-  // arguments backed by defaults behave exactly as for native subroutine calls.
-  const DpiFunction* import = dpi->FindImport(expr->callee);
+static std::vector<uint64_t> BindDpiCallActuals(const DpiFunction* import,
+                                                const Expr* expr,
+                                                SimContext& ctx, Arena& arena) {
   std::vector<uint64_t> args;
   if (import && !import->args.empty()) {
     size_t positional_count = expr->args.size() - expr->arg_names.size();
@@ -186,6 +193,20 @@ static Logic4Vec EvalDpiCall(const Expr* expr, SimContext& ctx, Arena& arena) {
       args.push_back(EvalExpr(arg, ctx, arena).ToUint64());
     }
   }
+  return args;
+}
+
+static Logic4Vec EvalDpiCall(const Expr* expr, SimContext& ctx, Arena& arena) {
+  auto* dpi = ctx.GetDpiContext();
+  if (!dpi || !dpi->HasImport(expr->callee)) {
+    return MakeLogic4VecVal(arena, 1, 0);
+  }
+  // §35.6: calling an imported function uses the same usage and syntax as a
+  // native function call. When the import's formals are known, resolve the
+  // call-site actuals against them so that named-argument binding and omitted
+  // arguments backed by defaults behave exactly as for native subroutine calls.
+  const DpiFunction* import = dpi->FindImport(expr->callee);
+  std::vector<uint64_t> args = BindDpiCallActuals(import, expr, ctx, arena);
   uint64_t result = dpi->Call(expr->callee, args);
   return MakeLogic4VecVal(arena, 32, result);
 }
@@ -412,6 +433,108 @@ static bool IsRestrictedTarget(const Process* proc) {
          proc->kind == ProcessKind::kContAssign;
 }
 
+static void EvalProcessKill(Process* proc, SimContext& ctx, Arena& arena,
+                            Logic4Vec& out) {
+  if (IsRestrictedTarget(proc)) {
+    ctx.GetDiag().Error(
+        {},
+        "kill() shall only target a process created by an initial "
+        "procedure, always procedure, or fork block");
+    out = MakeLogic4VecVal(arena, 1, 0);
+    return;
+  }
+  if (proc && proc->sv_state != ProcessState::kFinished &&
+      proc->sv_state != ProcessState::kKilled) {
+    proc->active = false;
+    proc->sv_state = ProcessState::kKilled;
+
+    std::vector<Process*> stack(proc->children.begin(), proc->children.end());
+    while (!stack.empty()) {
+      auto* child = stack.back();
+      stack.pop_back();
+      if (child->sv_state != ProcessState::kFinished &&
+          child->sv_state != ProcessState::kKilled) {
+        child->active = false;
+        child->sv_state = ProcessState::kKilled;
+        for (auto* gc : child->children) stack.push_back(gc);
+      }
+    }
+
+    for (auto& w : proc->await_waiters) {
+      if (w) w.resume();
+    }
+    proc->await_waiters.clear();
+  }
+  out = MakeLogic4VecVal(arena, 1, 0);
+}
+
+static void EvalProcessSuspend(Process* proc, SimContext& ctx, Arena& arena,
+                               Logic4Vec& out) {
+  if (IsRestrictedTarget(proc)) {
+    ctx.GetDiag().Error(
+        {},
+        "suspend() shall only target a process created by an initial "
+        "procedure, always procedure, or fork block");
+    out = MakeLogic4VecVal(arena, 1, 0);
+    return;
+  }
+
+  if (proc && proc == ctx.CurrentProcess() && ctx.InFunction()) {
+    ctx.GetDiag().Error({}, "function cannot suspend its own execution");
+    out = MakeLogic4VecVal(arena, 1, 0);
+    return;
+  }
+  if (proc && proc->sv_state != ProcessState::kFinished &&
+      proc->sv_state != ProcessState::kKilled) {
+    proc->is_suspended = true;
+    proc->sv_state = ProcessState::kSuspended;
+  }
+  out = MakeLogic4VecVal(arena, 1, 0);
+}
+
+static void EvalProcessResume(Process* proc, SimContext& ctx, Arena& arena,
+                              Logic4Vec& out) {
+  if (IsRestrictedTarget(proc)) {
+    ctx.GetDiag().Error(
+        {},
+        "resume() shall only target a process created by an initial "
+        "procedure, always procedure, or fork block");
+    out = MakeLogic4VecVal(arena, 1, 0);
+    return;
+  }
+  if (proc && proc->is_suspended) {
+    proc->is_suspended = false;
+    if (proc->sv_state == ProcessState::kSuspended) {
+      proc->sv_state = ProcessState::kRunning;
+    }
+
+    auto* event = ctx.GetScheduler().GetEventPool().Acquire();
+    Process* target = proc;
+    event->callback = [target, &ctx]() {
+      if (target->active && !target->Done()) {
+        ctx.SetCurrentProcess(target);
+        target->Resume();
+      }
+    };
+    ctx.GetScheduler().ScheduleEvent(ctx.CurrentTime(), Region::kActive, event);
+  }
+  out = MakeLogic4VecVal(arena, 1, 0);
+}
+
+static void EvalProcessSrandom(Process* proc, const Expr* expr, SimContext& ctx,
+                               Arena& arena, Logic4Vec& out) {
+  if (proc && !expr->args.empty()) {
+    auto seed_val = EvalExpr(expr->args[0], ctx, arena);
+    auto seed = static_cast<uint32_t>(seed_val.ToUint64());
+    proc->rng_seed = seed;
+    // Reset the per-thread stream now so subsequent draws from this thread
+    // replay the sequence keyed by the requested seed.
+    proc->rng.seed(seed);
+    proc->rng_initialized = true;
+  }
+  out = MakeLogic4VecVal(arena, 1, 0);
+}
+
 static bool TryEvalProcessMethodCall(const Expr* expr, SimContext& ctx,
                                      Arena& arena, Logic4Vec& out) {
   MethodCallParts parts;
@@ -430,102 +553,19 @@ static bool TryEvalProcessMethodCall(const Expr* expr, SimContext& ctx,
     return true;
   }
   if (parts.method_name == "kill") {
-    if (IsRestrictedTarget(proc)) {
-      ctx.GetDiag().Error(
-          {},
-          "kill() shall only target a process created by an initial "
-          "procedure, always procedure, or fork block");
-      out = MakeLogic4VecVal(arena, 1, 0);
-      return true;
-    }
-    if (proc && proc->sv_state != ProcessState::kFinished &&
-        proc->sv_state != ProcessState::kKilled) {
-      proc->active = false;
-      proc->sv_state = ProcessState::kKilled;
-
-      std::vector<Process*> stack(proc->children.begin(), proc->children.end());
-      while (!stack.empty()) {
-        auto* child = stack.back();
-        stack.pop_back();
-        if (child->sv_state != ProcessState::kFinished &&
-            child->sv_state != ProcessState::kKilled) {
-          child->active = false;
-          child->sv_state = ProcessState::kKilled;
-          for (auto* gc : child->children) stack.push_back(gc);
-        }
-      }
-
-      for (auto& w : proc->await_waiters) {
-        if (w) w.resume();
-      }
-      proc->await_waiters.clear();
-    }
-    out = MakeLogic4VecVal(arena, 1, 0);
+    EvalProcessKill(proc, ctx, arena, out);
     return true;
   }
   if (parts.method_name == "suspend") {
-    if (IsRestrictedTarget(proc)) {
-      ctx.GetDiag().Error(
-          {},
-          "suspend() shall only target a process created by an initial "
-          "procedure, always procedure, or fork block");
-      out = MakeLogic4VecVal(arena, 1, 0);
-      return true;
-    }
-
-    if (proc && proc == ctx.CurrentProcess() && ctx.InFunction()) {
-      ctx.GetDiag().Error({}, "function cannot suspend its own execution");
-      out = MakeLogic4VecVal(arena, 1, 0);
-      return true;
-    }
-    if (proc && proc->sv_state != ProcessState::kFinished &&
-        proc->sv_state != ProcessState::kKilled) {
-      proc->is_suspended = true;
-      proc->sv_state = ProcessState::kSuspended;
-    }
-    out = MakeLogic4VecVal(arena, 1, 0);
+    EvalProcessSuspend(proc, ctx, arena, out);
     return true;
   }
   if (parts.method_name == "srandom") {
-    if (proc && !expr->args.empty()) {
-      auto seed_val = EvalExpr(expr->args[0], ctx, arena);
-      auto seed = static_cast<uint32_t>(seed_val.ToUint64());
-      proc->rng_seed = seed;
-      // Reset the per-thread stream now so subsequent draws from this thread
-      // replay the sequence keyed by the requested seed.
-      proc->rng.seed(seed);
-      proc->rng_initialized = true;
-    }
-    out = MakeLogic4VecVal(arena, 1, 0);
+    EvalProcessSrandom(proc, expr, ctx, arena, out);
     return true;
   }
   if (parts.method_name == "resume") {
-    if (IsRestrictedTarget(proc)) {
-      ctx.GetDiag().Error(
-          {},
-          "resume() shall only target a process created by an initial "
-          "procedure, always procedure, or fork block");
-      out = MakeLogic4VecVal(arena, 1, 0);
-      return true;
-    }
-    if (proc && proc->is_suspended) {
-      proc->is_suspended = false;
-      if (proc->sv_state == ProcessState::kSuspended) {
-        proc->sv_state = ProcessState::kRunning;
-      }
-
-      auto* event = ctx.GetScheduler().GetEventPool().Acquire();
-      Process* target = proc;
-      event->callback = [target, &ctx]() {
-        if (target->active && !target->Done()) {
-          ctx.SetCurrentProcess(target);
-          target->Resume();
-        }
-      };
-      ctx.GetScheduler().ScheduleEvent(ctx.CurrentTime(), Region::kActive,
-                                       event);
-    }
-    out = MakeLogic4VecVal(arena, 1, 0);
+    EvalProcessResume(proc, ctx, arena, out);
     return true;
   }
   return false;
@@ -544,6 +584,43 @@ static bool TryBuiltinMethodCall(const Expr* expr, SimContext& ctx,
 
 static thread_local std::unordered_set<std::string_view> expanding_lets;
 
+static Logic4Vec EvalLetActualForFormal(const FunctionArg& formal,
+                                        const Expr* call, size_t i,
+                                        size_t positional_count,
+                                        SimContext& ctx, Arena& arena) {
+  if (i < positional_count) {
+    return EvalExpr(call->args[i], ctx, arena);
+  }
+  int found = -1;
+  for (size_t j = 0; j < call->arg_names.size(); ++j) {
+    if (call->arg_names[j] == formal.name) {
+      found = static_cast<int>(positional_count + j);
+      break;
+    }
+  }
+  if (found >= 0 && call->args[static_cast<size_t>(found)]) {
+    return EvalExpr(call->args[static_cast<size_t>(found)], ctx, arena);
+  }
+  if (formal.default_value) {
+    return EvalExpr(formal.default_value, ctx, arena);
+  }
+  return MakeLogic4Vec(arena, 32);
+}
+
+static Logic4Vec ResizeLetActualToFormal(Logic4Vec val,
+                                         const FunctionArg& formal,
+                                         Arena& arena) {
+  const auto& dt = formal.data_type;
+  if (dt.kind != DataTypeKind::kImplicit && dt.packed_dim_left &&
+      dt.packed_dim_right) {
+    uint32_t formal_width = EvalTypeWidth(dt);
+    if (formal_width > 0 && formal_width != val.width) {
+      val = ResizeToWidth(val, formal_width, arena);
+    }
+  }
+  return val;
+}
+
 static std::vector<Logic4Vec> EvalLetActuals(ModuleItem* decl, const Expr* call,
                                              SimContext& ctx, Arena& arena) {
   auto& formals = decl->func_args;
@@ -551,34 +628,9 @@ static std::vector<Logic4Vec> EvalLetActuals(ModuleItem* decl, const Expr* call,
   std::vector<Logic4Vec> vals;
   vals.reserve(formals.size());
   for (size_t i = 0; i < formals.size(); ++i) {
-    Logic4Vec val;
-    if (i < positional_count) {
-      val = EvalExpr(call->args[i], ctx, arena);
-    } else {
-      int found = -1;
-      for (size_t j = 0; j < call->arg_names.size(); ++j) {
-        if (call->arg_names[j] == formals[i].name) {
-          found = static_cast<int>(positional_count + j);
-          break;
-        }
-      }
-      if (found >= 0 && call->args[static_cast<size_t>(found)]) {
-        val = EvalExpr(call->args[static_cast<size_t>(found)], ctx, arena);
-      } else if (formals[i].default_value) {
-        val = EvalExpr(formals[i].default_value, ctx, arena);
-      } else {
-        val = MakeLogic4Vec(arena, 32);
-      }
-    }
-
-    const auto& dt = formals[i].data_type;
-    if (dt.kind != DataTypeKind::kImplicit && dt.packed_dim_left &&
-        dt.packed_dim_right) {
-      uint32_t formal_width = EvalTypeWidth(dt);
-      if (formal_width > 0 && formal_width != val.width) {
-        val = ResizeToWidth(val, formal_width, arena);
-      }
-    }
+    Logic4Vec val = EvalLetActualForFormal(formals[i], call, i,
+                                           positional_count, ctx, arena);
+    val = ResizeLetActualToFormal(val, formals[i], arena);
     vals.push_back(val);
   }
   return vals;
@@ -673,35 +725,7 @@ Logic4Vec EvalFunctionCall(const Expr* expr, SimContext& ctx, Arena& arena) {
   return result;
 }
 
-const ModuleItem* SetupTaskCall(const Expr* expr, SimContext& ctx,
-                                Arena& arena) {
-  if (!expr) return nullptr;
-
-  if (expr->kind == ExprKind::kIdentifier) {
-    auto* func = ctx.FindFunction(expr->text);
-    if (!func) return nullptr;
-    bool is_task = func->kind == ModuleItemKind::kTaskDecl;
-    bool is_void_func = func->kind == ModuleItemKind::kFunctionDecl &&
-                        func->return_type.kind == DataTypeKind::kVoid;
-    if (!is_task && !is_void_func) return nullptr;
-
-    bool is_static = func->is_static && !func->is_automatic;
-    if (is_static) {
-      ctx.PushStaticScope(func->name);
-    } else {
-      ctx.PushScope();
-    }
-    ctx.PushQueueRefFrame();
-    ctx.PushAssocRefFrame();
-    ctx.PushFuncName(func->name);
-    if (is_void_func) ctx.EnterFunction();
-    if (!func->func_args.empty()) BindFunctionArgs(func, expr, ctx, arena);
-    return func;
-  }
-  if (expr->kind != ExprKind::kCall) return nullptr;
-  auto* func = ctx.FindFunction(expr->callee);
-  if (!func || func->kind != ModuleItemKind::kTaskDecl) return nullptr;
-
+static void PushTaskCallScope(const ModuleItem* func, SimContext& ctx) {
   bool is_static = func->is_static && !func->is_automatic;
   if (is_static) {
     ctx.PushStaticScope(func->name);
@@ -711,6 +735,36 @@ const ModuleItem* SetupTaskCall(const Expr* expr, SimContext& ctx,
   ctx.PushQueueRefFrame();
   ctx.PushAssocRefFrame();
   ctx.PushFuncName(func->name);
+}
+
+static const ModuleItem* SetupTaskCallFromIdentifier(const Expr* expr,
+                                                     SimContext& ctx,
+                                                     Arena& arena) {
+  auto* func = ctx.FindFunction(expr->text);
+  if (!func) return nullptr;
+  bool is_task = func->kind == ModuleItemKind::kTaskDecl;
+  bool is_void_func = func->kind == ModuleItemKind::kFunctionDecl &&
+                      func->return_type.kind == DataTypeKind::kVoid;
+  if (!is_task && !is_void_func) return nullptr;
+
+  PushTaskCallScope(func, ctx);
+  if (is_void_func) ctx.EnterFunction();
+  if (!func->func_args.empty()) BindFunctionArgs(func, expr, ctx, arena);
+  return func;
+}
+
+const ModuleItem* SetupTaskCall(const Expr* expr, SimContext& ctx,
+                                Arena& arena) {
+  if (!expr) return nullptr;
+
+  if (expr->kind == ExprKind::kIdentifier) {
+    return SetupTaskCallFromIdentifier(expr, ctx, arena);
+  }
+  if (expr->kind != ExprKind::kCall) return nullptr;
+  auto* func = ctx.FindFunction(expr->callee);
+  if (!func || func->kind != ModuleItemKind::kTaskDecl) return nullptr;
+
+  PushTaskCallScope(func, ctx);
   BindFunctionArgs(func, expr, ctx, arena);
   return func;
 }

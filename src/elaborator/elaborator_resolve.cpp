@@ -15,6 +15,144 @@
 
 namespace delta {
 
+namespace {
+
+// §33.4.1.4: a library-qualified cell clause applies only when a cell of the
+// given name is actually defined in that library; an unqualified clause (empty
+// src_lib) always applies.
+bool CellUseOverrideApplies(std::string_view src_lib, std::string_view name,
+                            CompilationUnit* unit) {
+  if (src_lib.empty()) return true;
+  for (auto* mod : unit->modules) {
+    if (mod->name != name) continue;
+    if (mod->library == src_lib) return true;
+  }
+  return false;
+}
+
+// Returns the non-extern module named use_cell defined in target_lib, or
+// nullptr when no such cell exists.
+ModuleDecl* FindCellInLibrary(std::string_view target_lib,
+                              std::string_view use_cell,
+                              CompilationUnit* unit) {
+  for (auto* mod : unit->modules) {
+    if (mod->is_extern) continue;
+    if (mod->library == target_lib && mod->name == use_cell) return mod;
+  }
+  return nullptr;
+}
+
+// §33.4.1.3: when the instance currently being elaborated has an explicit use
+// clause naming this cell, it binds the named cell. Returns nullopt when no
+// instance use override applies (so normal resolution should continue), or the
+// override result (which may be nullptr if the named cell does not exist).
+std::optional<ModuleDecl*> FindInstanceUseOverride(
+    const std::string& current_inst_path, std::string_view name,
+    const std::vector<std::tuple<std::string, std::string, std::string>>&
+        instance_use_overrides,
+    CompilationUnit* unit) {
+  if (current_inst_path.empty()) return std::nullopt;
+  for (const auto& [path, ulib, ucell] : instance_use_overrides) {
+    if (path != current_inst_path) continue;
+    if (name != ucell) continue;
+    return FindCellInLibrary(ulib, ucell, unit);
+  }
+  return std::nullopt;
+}
+
+// Partitions modules named `name` into the non-extern candidates and the first
+// extern declaration encountered.
+void CollectModuleCandidates(std::string_view name, CompilationUnit* unit,
+                             std::vector<ModuleDecl*>& candidates,
+                             ModuleDecl*& extern_decl) {
+  for (auto* mod : unit->modules) {
+    if (mod->name != name) continue;
+    if (mod->is_extern) {
+      if (!extern_decl) extern_decl = mod;
+    } else {
+      candidates.push_back(mod);
+    }
+  }
+}
+
+// Returns the candidates whose library appears in `liblist`, preserving order.
+std::vector<ModuleDecl*> FilterCandidatesByLibrary(
+    const std::vector<ModuleDecl*>& candidates,
+    const std::vector<std::string>& liblist) {
+  std::vector<ModuleDecl*> filtered;
+  filtered.reserve(candidates.size());
+  for (auto* c : candidates) {
+    for (const auto& lib : liblist) {
+      if (lib == c->library) {
+        filtered.push_back(c);
+        break;
+      }
+    }
+  }
+  return filtered;
+}
+
+// Selects the candidate whose library ranks earliest in `order` (libraries not
+// listed rank last). On ties the earlier candidate wins. `candidates` must be
+// non-empty.
+ModuleDecl* PickByLibraryOrder(const std::vector<ModuleDecl*>& candidates,
+                               const std::vector<std::string>& order) {
+  auto priority = [&order](std::string_view lib) -> size_t {
+    for (size_t i = 0; i < order.size(); ++i) {
+      if (order[i] == lib) return i;
+    }
+    return order.size();
+  };
+  ModuleDecl* best = candidates.front();
+  size_t best_pri = priority(best->library);
+  for (size_t i = 1; i < candidates.size(); ++i) {
+    size_t pri = priority(candidates[i]->library);
+    if (pri < best_pri) {
+      best = candidates[i];
+      best_pri = pri;
+    }
+  }
+  return best;
+}
+
+// Resolves `name` to a program, interface, or checker (in that order) when no
+// module matched, returning nullptr if none exists.
+ModuleDecl* FindNonModuleDesign(std::string_view name, CompilationUnit* unit) {
+  auto pit = std::find_if(unit->programs.begin(), unit->programs.end(),
+                          [name](auto* p) { return p->name == name; });
+  if (pit != unit->programs.end()) return *pit;
+
+  auto iit = std::find_if(unit->interfaces.begin(), unit->interfaces.end(),
+                          [name](auto* i) { return i->name == name; });
+  if (iit != unit->interfaces.end()) return *iit;
+
+  auto cit = std::find_if(unit->checkers.begin(), unit->checkers.end(),
+                          [name](auto* c) { return c->name == name; });
+  if (cit != unit->checkers.end()) return *cit;
+
+  return nullptr;
+}
+
+// Records each package's value parameters in the compilation-unit parameter
+// scope under their fully qualified "package.name" key (§26.3).
+void RegisterPackageParams(CompilationUnit* unit, ScopeMap& cu_param_scope,
+                           Arena& arena) {
+  for (auto* pkg : unit->packages) {
+    for (auto* item : pkg->items) {
+      if (item->kind == ModuleItemKind::kParamDecl && item->init_expr) {
+        auto val = ConstEvalInt(item->init_expr, cu_param_scope);
+        if (val) {
+          auto* qname = arena.Create<std::string>(std::string(pkg->name) + "." +
+                                                  std::string(item->name));
+          cu_param_scope[*qname] = *val;
+        }
+      }
+    }
+  }
+}
+
+}  // namespace
+
 void Elaborator::RegisterCuScopeItems() {
   class_names_.insert("semaphore");
 
@@ -44,18 +182,7 @@ void Elaborator::RegisterCuScopeItems() {
     if (!cls->params.empty()) parameterized_class_names_.insert(cls->name);
   }
 
-  for (auto* pkg : unit_->packages) {
-    for (auto* item : pkg->items) {
-      if (item->kind == ModuleItemKind::kParamDecl && item->init_expr) {
-        auto val = ConstEvalInt(item->init_expr, cu_param_scope_);
-        if (val) {
-          auto* qname = arena_.Create<std::string>(
-              std::string(pkg->name) + "." + std::string(item->name));
-          cu_param_scope_[*qname] = *val;
-        }
-      }
-    }
-  }
+  RegisterPackageParams(unit_, cu_param_scope_, arena_);
 }
 
 ModuleItem* Elaborator::FindCuScopeItem(std::string_view name) const {
@@ -75,17 +202,104 @@ static bool ExternPortTypesEquivalent(const DataType& a, const DataType& b) {
          a.type_name == b.type_name;
 }
 
+// Returns the matching extern declaration for an actual module, or nullptr.
+static ModuleDecl* FindExternDeclFor(const ModuleDecl* mod,
+                                     CompilationUnit* unit) {
+  for (auto* other : unit->modules) {
+    if (other->is_extern && other->name == mod->name) return other;
+  }
+  return nullptr;
+}
+
+// §23.5: checks that each port of the actual module corresponds to the extern
+// declaration in name, direction, and (when both sides state it) type. Reports
+// the first mismatch found.
+static void CheckExternPortMatch(const ModuleDecl* mod,
+                                 const ModuleDecl* extern_decl,
+                                 DiagEngine& diag) {
+  for (size_t i = 0; i < mod->ports.size(); ++i) {
+    const PortDecl& ep = extern_decl->ports[i];
+    const PortDecl& mp = mod->ports[i];
+    if (!mp.name.empty() && !ep.name.empty() && mp.name != ep.name) {
+      diag.Error(mod->range.start,
+                 std::format("module '{}' port '{}' at position {} does not "
+                             "match extern declaration port '{}'",
+                             mod->name, mp.name, i, ep.name));
+      break;
+    }
+    // §23.5 requires the extern declaration to match the actual module in the
+    // equivalent types of corresponding ports. Direction and data type are
+    // only compared when the extern header states them: a non-ANSI extern
+    // port list supplies names and positions alone and leaves the type to the
+    // actual definition, so an unspecified side is treated as a match.
+    if (ep.direction != Direction::kNone && mp.direction != Direction::kNone &&
+        ep.direction != mp.direction) {
+      diag.Error(mp.loc,
+                 std::format("module '{}' port '{}' direction does not match "
+                             "extern declaration",
+                             mod->name, mp.name));
+      break;
+    }
+    if (ep.data_type.kind != DataTypeKind::kImplicit &&
+        mp.data_type.kind != DataTypeKind::kImplicit &&
+        !ExternPortTypesEquivalent(ep.data_type, mp.data_type)) {
+      diag.Error(mp.loc,
+                 std::format("module '{}' port '{}' type does not match "
+                             "extern declaration",
+                             mod->name, mp.name));
+      break;
+    }
+  }
+}
+
+// §23.5: checks the parameter list of the actual module against the extern
+// declaration by name, position, and parameter kind (type vs. value). Reports
+// the first mismatch found.
+static void CheckExternParamMatch(const ModuleDecl* mod,
+                                  const ModuleDecl* extern_decl,
+                                  DiagEngine& diag) {
+  if (extern_decl->params.size() != mod->params.size()) {
+    diag.Error(
+        mod->range.start,
+        std::format("module '{}' parameter count ({}) does not match "
+                    "extern declaration ({})",
+                    mod->name, mod->params.size(), extern_decl->params.size()));
+    return;
+  }
+  // The parameter lists must also correspond by name and position.
+  for (size_t i = 0; i < mod->params.size(); ++i) {
+    std::string_view mp_name = mod->params[i].first;
+    std::string_view ep_name = extern_decl->params[i].first;
+    if (!mp_name.empty() && !ep_name.empty() && mp_name != ep_name) {
+      diag.Error(mod->range.start,
+                 std::format("module '{}' parameter '{}' at position {} "
+                             "does not match extern declaration "
+                             "parameter '{}'",
+                             mod->name, mp_name, i, ep_name));
+      break;
+    }
+    // §23.5 also calls for equivalent parameter types. A type parameter and
+    // a value parameter at the same position are not equivalent, so the
+    // two declarations must agree on whether each entry is a type
+    // parameter.
+    bool mp_is_type = mod->type_param_names.count(mp_name) != 0;
+    bool ep_is_type = extern_decl->type_param_names.count(ep_name) != 0;
+    if (mp_is_type != ep_is_type) {
+      diag.Error(mod->range.start,
+                 std::format("module '{}' parameter '{}' at position {} "
+                             "does not match the parameter kind of the "
+                             "extern declaration",
+                             mod->name, mp_name, i));
+      break;
+    }
+  }
+}
+
 void Elaborator::ResolveExternModules() {
   for (auto* mod : unit_->modules) {
     if (mod->is_extern) continue;
 
-    ModuleDecl* extern_decl = nullptr;
-    for (auto* other : unit_->modules) {
-      if (other->is_extern && other->name == mod->name) {
-        extern_decl = other;
-        break;
-      }
-    }
+    ModuleDecl* extern_decl = FindExternDeclFor(mod, unit_);
     if (!extern_decl) continue;
 
     if (mod->has_wildcard_ports) {
@@ -106,75 +320,8 @@ void Elaborator::ResolveExternModules() {
                       mod->name, mod->ports.size(), extern_decl->ports.size()));
       continue;
     }
-    for (size_t i = 0; i < mod->ports.size(); ++i) {
-      const PortDecl& ep = extern_decl->ports[i];
-      const PortDecl& mp = mod->ports[i];
-      if (!mp.name.empty() && !ep.name.empty() && mp.name != ep.name) {
-        diag_.Error(mod->range.start,
-                    std::format("module '{}' port '{}' at position {} does not "
-                                "match extern declaration port '{}'",
-                                mod->name, mp.name, i, ep.name));
-        break;
-      }
-      // §23.5 requires the extern declaration to match the actual module in the
-      // equivalent types of corresponding ports. Direction and data type are
-      // only compared when the extern header states them: a non-ANSI extern
-      // port list supplies names and positions alone and leaves the type to the
-      // actual definition, so an unspecified side is treated as a match.
-      if (ep.direction != Direction::kNone &&
-          mp.direction != Direction::kNone && ep.direction != mp.direction) {
-        diag_.Error(
-            mp.loc,
-            std::format("module '{}' port '{}' direction does not match "
-                        "extern declaration",
-                        mod->name, mp.name));
-        break;
-      }
-      if (ep.data_type.kind != DataTypeKind::kImplicit &&
-          mp.data_type.kind != DataTypeKind::kImplicit &&
-          !ExternPortTypesEquivalent(ep.data_type, mp.data_type)) {
-        diag_.Error(mp.loc,
-                    std::format("module '{}' port '{}' type does not match "
-                                "extern declaration",
-                                mod->name, mp.name));
-        break;
-      }
-    }
-    if (extern_decl->params.size() != mod->params.size()) {
-      diag_.Error(mod->range.start,
-                  std::format("module '{}' parameter count ({}) does not match "
-                              "extern declaration ({})",
-                              mod->name, mod->params.size(),
-                              extern_decl->params.size()));
-    } else {
-      // The parameter lists must also correspond by name and position.
-      for (size_t i = 0; i < mod->params.size(); ++i) {
-        std::string_view mp_name = mod->params[i].first;
-        std::string_view ep_name = extern_decl->params[i].first;
-        if (!mp_name.empty() && !ep_name.empty() && mp_name != ep_name) {
-          diag_.Error(mod->range.start,
-                      std::format("module '{}' parameter '{}' at position {} "
-                                  "does not match extern declaration "
-                                  "parameter '{}'",
-                                  mod->name, mp_name, i, ep_name));
-          break;
-        }
-        // §23.5 also calls for equivalent parameter types. A type parameter and
-        // a value parameter at the same position are not equivalent, so the
-        // two declarations must agree on whether each entry is a type
-        // parameter.
-        bool mp_is_type = mod->type_param_names.count(mp_name) != 0;
-        bool ep_is_type = extern_decl->type_param_names.count(ep_name) != 0;
-        if (mp_is_type != ep_is_type) {
-          diag_.Error(mod->range.start,
-                      std::format("module '{}' parameter '{}' at position {} "
-                                  "does not match the parameter kind of the "
-                                  "extern declaration",
-                                  mod->name, mp_name, i));
-          break;
-        }
-      }
-    }
+    CheckExternPortMatch(mod, extern_decl, diag_);
+    CheckExternParamMatch(mod, extern_decl, diag_);
   }
 }
 
@@ -187,68 +334,36 @@ std::optional<ModuleDecl*> Elaborator::ResolveCellUseOverride(
   // A library-qualified cell clause applies only to the cell as defined in
   // that library (§33.4.1.4); if no such cell exists the clause matches
   // nothing and resolution proceeds normally.
-  bool applies = ov.src_lib.empty();
-  if (!applies) {
-    for (auto* mod : unit_->modules) {
-      if (mod->name != name) continue;
-      if (mod->library == ov.src_lib) {
-        applies = true;
-        break;
-      }
-    }
-  }
-  if (!applies) return std::nullopt;
+  if (!CellUseOverrideApplies(ov.src_lib, name, unit_)) return std::nullopt;
 
   // An omitted target library is inherited from the parent cell (§33.4.1.6).
   std::string_view target_lib = ov.use_lib.empty()
                                     ? std::string_view(current_library_)
                                     : std::string_view(ov.use_lib);
-  for (auto* mod : unit_->modules) {
-    if (mod->is_extern) continue;
-    if (mod->library == target_lib && mod->name == ov.use_cell) return mod;
-  }
-  return static_cast<ModuleDecl*>(nullptr);
+  return FindCellInLibrary(target_lib, ov.use_cell, unit_);
 }
 
-ModuleDecl* Elaborator::FindModule(std::string_view name) const {
-  if (!current_inst_path_.empty()) {
-    for (const auto& [path, ulib, ucell] : instance_use_overrides_) {
-      if (path != current_inst_path_) continue;
-      if (name != ucell) continue;
-      for (auto* mod : unit_->modules) {
-        if (mod->is_extern) continue;
-        if (mod->library == ulib && mod->name == ucell) return mod;
-      }
-      return nullptr;
-    }
-  }
-
-  if (auto hit = ResolveCellUseOverride(name); hit.has_value()) {
-    return *hit;
-  }
-
-  ModuleDecl* extern_decl = nullptr;
-  std::vector<ModuleDecl*> candidates;
-  for (auto* mod : unit_->modules) {
-    if (mod->name != name) continue;
-    if (mod->is_extern) {
-      if (!extern_decl) extern_decl = mod;
-    } else {
-      candidates.push_back(mod);
-    }
-  }
-
+// §33.4.1.4, §33.4.1.5: selects the library list that governs resolution of
+// `name`, preferring the most specific instance-scoped liblist rule and falling
+// back to a cell-clause liblist. Returns nullptr when no liblist clause
+// applies.
+static const std::vector<std::string>* SelectOverrideLiblist(
+    std::string_view name, const std::string& current_inst_path,
+    const std::vector<std::pair<std::string, std::vector<std::string>>>&
+        instance_liblist_overrides,
+    const std::unordered_map<std::string, std::vector<std::string>>&
+        cell_clause_liblist_overrides) {
   const std::vector<std::string>* override_liblist = nullptr;
   size_t best_match_len = 0;
-  if (!current_inst_path_.empty()) {
-    for (const auto& [rule_path, libs] : instance_liblist_overrides_) {
+  if (!current_inst_path.empty()) {
+    for (const auto& [rule_path, libs] : instance_liblist_overrides) {
       bool matches = false;
-      if (current_inst_path_ == rule_path) {
+      if (current_inst_path == rule_path) {
         matches = true;
-      } else if (current_inst_path_.size() > rule_path.size() &&
-                 current_inst_path_.compare(0, rule_path.size(), rule_path) ==
+      } else if (current_inst_path.size() > rule_path.size() &&
+                 current_inst_path.compare(0, rule_path.size(), rule_path) ==
                      0 &&
-                 current_inst_path_[rule_path.size()] == '.') {
+                 current_inst_path[rule_path.size()] == '.') {
         matches = true;
       }
       if (matches && rule_path.size() >= best_match_len) {
@@ -261,105 +376,74 @@ ModuleDecl* Elaborator::FindModule(std::string_view name) const {
   // Absent an instance-scoped library list, a cell selection clause may name
   // the library list for this cell (§33.4.1.4, §33.4.1.5).
   if (override_liblist == nullptr) {
-    if (auto it = cell_clause_liblist_overrides_.find(std::string(name));
-        it != cell_clause_liblist_overrides_.end()) {
+    if (auto it = cell_clause_liblist_overrides.find(std::string(name));
+        it != cell_clause_liblist_overrides.end()) {
       override_liblist = &it->second;
     }
   }
+  return override_liblist;
+}
+
+// Chooses among `candidates` using the global library order, applying strict
+// library-order filtering and the config-elaboration parent-library preference
+// (§33.4.1.5). Returns nullptr when no candidate survives filtering.
+static ModuleDecl* PickCandidateByGlobalOrder(
+    std::vector<ModuleDecl*> candidates,
+    const std::vector<std::string>& library_order, bool library_order_strict,
+    bool in_config_elaboration, std::string_view current_library) {
+  // An empty selected library list selects no libraries to filter against;
+  // it is treated here as no list being selected (§33.4.1.5).
+  if (library_order_strict && !library_order.empty() && !candidates.empty()) {
+    candidates = FilterCandidatesByLibrary(candidates, library_order);
+  }
+  if (candidates.empty()) return nullptr;
+
+  // §33.4.1.5: when no library list clause is selected (or the selected
+  // list is empty), the list holds only the parent cell's library, so an
+  // instance binds to the cell defined in its parent's library.
+  bool no_list_selected = !library_order_strict || library_order.empty();
+  if (in_config_elaboration && no_list_selected && !current_library.empty()) {
+    for (auto* c : candidates) {
+      if (c->library == current_library) return c;
+    }
+  }
+  return PickByLibraryOrder(candidates, library_order);
+}
+
+ModuleDecl* Elaborator::FindModule(std::string_view name) const {
+  if (auto hit = FindInstanceUseOverride(current_inst_path_, name,
+                                         instance_use_overrides_, unit_);
+      hit.has_value()) {
+    return *hit;
+  }
+
+  if (auto hit = ResolveCellUseOverride(name); hit.has_value()) {
+    return *hit;
+  }
+
+  ModuleDecl* extern_decl = nullptr;
+  std::vector<ModuleDecl*> candidates;
+  CollectModuleCandidates(name, unit_, candidates, extern_decl);
+
+  const std::vector<std::string>* override_liblist = SelectOverrideLiblist(
+      name, current_inst_path_, instance_liblist_overrides_,
+      cell_clause_liblist_overrides_);
 
   if (override_liblist != nullptr && !candidates.empty()) {
-    std::vector<ModuleDecl*> filtered;
-    filtered.reserve(candidates.size());
-    for (auto* c : candidates) {
-      for (const auto& lib : *override_liblist) {
-        if (lib == c->library) {
-          filtered.push_back(c);
-          break;
-        }
-      }
-    }
-    candidates = std::move(filtered);
+    candidates = FilterCandidatesByLibrary(candidates, *override_liblist);
     if (!candidates.empty()) {
-      auto pri = [override_liblist](std::string_view lib) -> size_t {
-        for (size_t i = 0; i < override_liblist->size(); ++i) {
-          if ((*override_liblist)[i] == lib) return i;
-        }
-        return override_liblist->size();
-      };
-      ModuleDecl* best = candidates.front();
-      size_t best_pri = pri(best->library);
-      for (size_t i = 1; i < candidates.size(); ++i) {
-        size_t p = pri(candidates[i]->library);
-        if (p < best_pri) {
-          best = candidates[i];
-          best_pri = p;
-        }
-      }
-      return best;
+      return PickByLibraryOrder(candidates, *override_liblist);
     }
   } else {
-    // An empty selected library list selects no libraries to filter against;
-    // it is treated below as no list being selected (§33.4.1.5).
-    if (library_order_strict_ && !library_order_.empty() &&
-        !candidates.empty()) {
-      std::vector<ModuleDecl*> filtered;
-      filtered.reserve(candidates.size());
-      for (auto* c : candidates) {
-        bool listed = false;
-        for (const auto& lib : library_order_) {
-          if (lib == c->library) {
-            listed = true;
-            break;
-          }
-        }
-        if (listed) filtered.push_back(c);
-      }
-      candidates = std::move(filtered);
-    }
-    if (!candidates.empty()) {
-      // §33.4.1.5: when no library list clause is selected (or the selected
-      // list is empty), the list holds only the parent cell's library, so an
-      // instance binds to the cell defined in its parent's library.
-      bool no_list_selected = !library_order_strict_ || library_order_.empty();
-      if (in_config_elaboration_ && no_list_selected &&
-          !current_library_.empty()) {
-        for (auto* c : candidates) {
-          if (c->library == current_library_) return c;
-        }
-      }
-      auto priority = [this](std::string_view lib) -> size_t {
-        for (size_t i = 0; i < library_order_.size(); ++i) {
-          if (library_order_[i] == lib) return i;
-        }
-        return library_order_.size();
-      };
-      ModuleDecl* best = candidates.front();
-      size_t best_pri = priority(best->library);
-      for (size_t i = 1; i < candidates.size(); ++i) {
-        size_t pri = priority(candidates[i]->library);
-        if (pri < best_pri) {
-          best = candidates[i];
-          best_pri = pri;
-        }
-      }
-      return best;
+    if (ModuleDecl* picked = PickCandidateByGlobalOrder(
+            std::move(candidates), library_order_, library_order_strict_,
+            in_config_elaboration_, current_library_)) {
+      return picked;
     }
   }
   if (extern_decl) return extern_decl;
 
-  auto pit = std::find_if(unit_->programs.begin(), unit_->programs.end(),
-                          [name](auto* p) { return p->name == name; });
-  if (pit != unit_->programs.end()) return *pit;
-
-  auto iit = std::find_if(unit_->interfaces.begin(), unit_->interfaces.end(),
-                          [name](auto* i) { return i->name == name; });
-  if (iit != unit_->interfaces.end()) return *iit;
-
-  auto cit = std::find_if(unit_->checkers.begin(), unit_->checkers.end(),
-                          [name](auto* c) { return c->name == name; });
-  if (cit != unit_->checkers.end()) return *cit;
-
-  return nullptr;
+  return FindNonModuleDesign(name, unit_);
 }
 
 ModuleDecl* Elaborator::FindModuleInScope(std::string_view name) const {

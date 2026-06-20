@@ -43,6 +43,36 @@ std::shared_ptr<const SequenceExpr> GotoOnce(
   return SeqConcat(SeqZeroOrMoreRepeat(SeqBoolean(BoolNot(c))), SeqBoolean(c));
 }
 
+// Compute the merged output context L_1 for one tight-satisfaction witness
+// `inner` of T, given the incoming context `input` (with precomputed domain
+// `in_domain`) and the actual-argument set `actuals` = V. Per §F.6.1:
+// D = dom(L_0) - (dom(L) & V) is the set of incoming names the call leaves
+// intact, and L_1 = L_0|_D U L|_V. The two restricted domains are disjoint by
+// construction, so the union is taken directly.
+LocalContext MergeTriggeredOutput(const LocalContext& input,
+                                  const std::set<std::string>& in_domain,
+                                  const std::set<std::string>& actuals,
+                                  const LocalContext& inner) {
+  const std::set<std::string> kInnerDomain = ContextDomain(inner);
+  std::set<std::string> overwritten;  // dom(L) & V
+  for (const std::string& name : kInnerDomain) {
+    if (actuals.count(name) != 0) {
+      overwritten.insert(name);
+    }
+  }
+  std::set<std::string> d;
+  for (const std::string& name : in_domain) {
+    if (overwritten.count(name) == 0) {
+      d.insert(name);
+    }
+  }
+  LocalContext out = RestrictContext(input, d);
+  for (const auto& entry : RestrictContext(inner, actuals)) {
+    out.insert(entry);
+  }
+  return out;
+}
+
 }  // namespace
 
 std::vector<LocalContext> TriggeredOutputs(const Word& word, std::size_t j,
@@ -60,27 +90,7 @@ std::vector<LocalContext> TriggeredOutputs(const Word& word, std::size_t j,
     const Word kSlice = Subword(word, i, j + 1);
     for (const LocalContext& inner :
          TightSatisfactionOutputs(kSlice, sequence, LocalContext{})) {
-      // D = dom(L_0) - (dom(L) & V): the incoming names the call leaves intact.
-      const std::set<std::string> kInnerDomain = ContextDomain(inner);
-      std::set<std::string> overwritten;  // dom(L) & V
-      for (const std::string& name : kInnerDomain) {
-        if (actuals.count(name) != 0) {
-          overwritten.insert(name);
-        }
-      }
-      std::set<std::string> d;
-      for (const std::string& name : kInDomain) {
-        if (overwritten.count(name) == 0) {
-          d.insert(name);
-        }
-      }
-      // L_1 = L_0|_D U L|_V. The two domains, D and dom(L) & V, are disjoint by
-      // construction, so the union is taken directly.
-      LocalContext out = RestrictContext(input, d);
-      for (const auto& entry : RestrictContext(inner, actuals)) {
-        out.insert(entry);
-      }
-      AddUnique(result, std::move(out));
+      AddUnique(result, MergeTriggeredOutput(input, kInDomain, actuals, inner));
     }
   }
   return result;

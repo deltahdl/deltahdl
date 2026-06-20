@@ -127,6 +127,34 @@ static bool IsZorX(char c) {
 
 static bool IsZeroOrOne(char c) { return c == '0' || c == '1'; }
 
+// Two-character edge descriptors are either (z|x, 0|1) or two distinct binary
+// values (e.g. "01", "10").
+static bool IsTwoCharEdgeDescriptor(std::string_view text) {
+  if (text.size() != 2) return false;
+  if (IsZorX(text[0]) && IsZeroOrOne(text[1])) return true;
+  return IsZeroOrOne(text[0]) && IsZeroOrOne(text[1]) && text[0] != text[1];
+}
+
+static bool IsSingleBinaryDigit(std::string_view text) {
+  return text.size() == 1 && IsZeroOrOne(text[0]);
+}
+
+static bool IsSingleZorX(std::string_view text) {
+  return text.size() == 1 && IsZorX(text[0]);
+}
+
+static void CheckEdgeDescriptorCount(DiagEngine& diag, SourceLoc list_loc,
+                                     std::size_t count) {
+  if (count == 0) {
+    diag.Error(list_loc,
+               "edge-control specifier requires at least one edge_descriptor");
+  }
+  if (count > 6) {
+    diag.Error(list_loc,
+               "edge-control specifier accepts at most six edge_descriptors");
+  }
+}
+
 void Parser::ParseEdgeDescriptorList(
     std::vector<std::pair<char, char>>& descriptors) {
   auto list_loc = CurrentLoc();
@@ -136,19 +164,14 @@ void Parser::ParseEdgeDescriptorList(
     auto tok_loc = CurrentLoc();
 
     if ((Check(TokenKind::kIntLiteral) || Check(TokenKind::kIdentifier)) &&
-        text.size() == 2 &&
-        ((IsZorX(text[0]) && IsZeroOrOne(text[1])) ||
-         (IsZeroOrOne(text[0]) && IsZeroOrOne(text[1]) &&
-          text[0] != text[1]))) {
+        IsTwoCharEdgeDescriptor(text)) {
       descriptors.push_back({text[0], text[1]});
       Consume();
-    } else if (Check(TokenKind::kIntLiteral) && text.size() == 1 &&
-               IsZeroOrOne(text[0])) {
+    } else if (Check(TokenKind::kIntLiteral) && IsSingleBinaryDigit(text)) {
       char first = text[0];
       Consume();
       auto next_text = CurrentToken().text;
-      if (Check(TokenKind::kIdentifier) && next_text.size() == 1 &&
-          IsZorX(next_text[0])) {
+      if (Check(TokenKind::kIdentifier) && IsSingleZorX(next_text)) {
         descriptors.push_back({first, next_text[0]});
         Consume();
       } else {
@@ -159,14 +182,7 @@ void Parser::ParseEdgeDescriptorList(
       Consume();
     }
   } while (Match(TokenKind::kComma));
-  if (descriptors.empty()) {
-    diag_.Error(list_loc,
-                "edge-control specifier requires at least one edge_descriptor");
-  }
-  if (descriptors.size() > 6) {
-    diag_.Error(list_loc,
-                "edge-control specifier accepts at most six edge_descriptors");
-  }
+  CheckEdgeDescriptorCount(diag_, list_loc, descriptors.size());
   Expect(TokenKind::kRBracket);
 }
 
@@ -286,6 +302,19 @@ SpecifyPolarity Parser::ParseSpecifyPolarity() {
   return SpecifyPolarity::kNone;
 }
 
+// Every parallel ('=>') form — plain, edge-sensitive, or with a data-source
+// expression — is described with a single input and a single output terminal
+// descriptor. Only the full ('*>') forms accept terminal lists.
+static void CheckParallelPathTerminalCount(DiagEngine& diag, SourceLoc loc,
+                                           const SpecifyPathDecl& path) {
+  if (path.path_kind == SpecifyPathKind::kParallel &&
+      (path.src_ports.size() != 1 || path.dst_ports.size() != 1)) {
+    diag.Error(loc,
+               "parallel path '=>' requires a single source and "
+               "destination terminal");
+  }
+}
+
 SpecifyItem* Parser::ParseSpecifyPathDecl() {
   auto* item = arena_.Create<SpecifyItem>();
   item->kind = SpecifyItemKind::kPathDecl;
@@ -338,15 +367,7 @@ SpecifyItem* Parser::ParseSpecifyPathDecl() {
   ParsePathDelays(item->path.delays);
   Expect(TokenKind::kSemicolon);
 
-  // Every parallel ('=>') form — plain, edge-sensitive, or with a data-source
-  // expression — is described with a single input and a single output terminal
-  // descriptor. Only the full ('*>') forms accept terminal lists.
-  if (item->path.path_kind == SpecifyPathKind::kParallel &&
-      (item->path.src_ports.size() != 1 || item->path.dst_ports.size() != 1)) {
-    diag_.Error(item->loc,
-                "parallel path '=>' requires a single source and "
-                "destination terminal");
-  }
+  CheckParallelPathTerminalCount(diag_, item->loc, item->path);
 
   return item;
 }
@@ -478,6 +499,45 @@ void Parser::ParseExtendedTimingCheckArgs(TimingCheckDecl& tc) {
   ParseSetupholdExtendedArgs(tc);
 }
 
+static void ValidateTimingCheckDecl(DiagEngine& diag, SourceLoc loc,
+                                    const TimingCheckDecl& tc) {
+  if (tc.check_kind == TimingCheckKind::kSetuphold && tc.limits.size() < 2) {
+    diag.Error(loc, "$setuphold requires two timing_check_limit arguments");
+  }
+
+  if (tc.check_kind == TimingCheckKind::kRecrem && tc.limits.size() < 2) {
+    diag.Error(loc, "$recrem requires two timing_check_limit arguments");
+  }
+
+  if (tc.check_kind == TimingCheckKind::kFullskew && tc.limits.size() < 2) {
+    diag.Error(loc, "$fullskew requires two timing_check_limit arguments");
+  }
+
+  if (tc.check_kind == TimingCheckKind::kWidth &&
+      tc.ref_edge == SpecifyEdge::kNone) {
+    diag.Error(loc, "$width reference_event must be an edge specification");
+  }
+
+  if (tc.check_kind == TimingCheckKind::kPeriod &&
+      tc.ref_edge == SpecifyEdge::kNone) {
+    diag.Error(loc, "$period reference_event must be an edge specification");
+  }
+
+  if (tc.check_kind == TimingCheckKind::kNochange) {
+    if (tc.limits.size() < 2) {
+      diag.Error(loc,
+                 "$nochange requires both start_edge_offset and "
+                 "end_edge_offset arguments");
+    }
+    if (tc.ref_edge != SpecifyEdge::kPosedge &&
+        tc.ref_edge != SpecifyEdge::kNegedge) {
+      diag.Error(loc,
+                 "$nochange reference_event must use posedge or negedge "
+                 "(edge-control specifiers are not allowed)");
+    }
+  }
+}
+
 SpecifyItem* Parser::ParseTimingCheck() {
   auto* item = arena_.Create<SpecifyItem>();
   item->kind = SpecifyItemKind::kTimingCheck;
@@ -511,48 +571,7 @@ SpecifyItem* Parser::ParseTimingCheck() {
   item->timing_check.limits.push_back(ParseMinTypMaxExpr());
   ParseTimingCheckTrailingArgs(item->timing_check);
 
-  if (item->timing_check.check_kind == TimingCheckKind::kSetuphold &&
-      item->timing_check.limits.size() < 2) {
-    diag_.Error(item->loc,
-                "$setuphold requires two timing_check_limit arguments");
-  }
-
-  if (item->timing_check.check_kind == TimingCheckKind::kRecrem &&
-      item->timing_check.limits.size() < 2) {
-    diag_.Error(item->loc, "$recrem requires two timing_check_limit arguments");
-  }
-
-  if (item->timing_check.check_kind == TimingCheckKind::kFullskew &&
-      item->timing_check.limits.size() < 2) {
-    diag_.Error(item->loc,
-                "$fullskew requires two timing_check_limit arguments");
-  }
-
-  if (item->timing_check.check_kind == TimingCheckKind::kWidth &&
-      item->timing_check.ref_edge == SpecifyEdge::kNone) {
-    diag_.Error(item->loc,
-                "$width reference_event must be an edge specification");
-  }
-
-  if (item->timing_check.check_kind == TimingCheckKind::kPeriod &&
-      item->timing_check.ref_edge == SpecifyEdge::kNone) {
-    diag_.Error(item->loc,
-                "$period reference_event must be an edge specification");
-  }
-
-  if (item->timing_check.check_kind == TimingCheckKind::kNochange) {
-    if (item->timing_check.limits.size() < 2) {
-      diag_.Error(item->loc,
-                  "$nochange requires both start_edge_offset and "
-                  "end_edge_offset arguments");
-    }
-    if (item->timing_check.ref_edge != SpecifyEdge::kPosedge &&
-        item->timing_check.ref_edge != SpecifyEdge::kNegedge) {
-      diag_.Error(item->loc,
-                  "$nochange reference_event must use posedge or negedge "
-                  "(edge-control specifiers are not allowed)");
-    }
-  }
+  ValidateTimingCheckDecl(diag_, item->loc, item->timing_check);
   Expect(TokenKind::kRParen);
   Expect(TokenKind::kSemicolon);
   return item;
@@ -594,6 +613,22 @@ SpecifyItem* Parser::ParseShowcancelledDecl() {
   return item;
 }
 
+// Decode the input/output terminal names embedded in a "PATHPULSE$in$out"
+// specparam name and mark the item as a PATHPULSE specparam.
+static void DecodePathpulseName(SpecifyItem& sp) {
+  sp.is_pathpulse = true;
+  constexpr std::string_view kPrefix = "PATHPULSE$";
+  std::string_view rest = sp.param_name.substr(kPrefix.size());
+  if (rest.empty()) return;
+  auto sep = rest.find('$');
+  if (sep == std::string_view::npos) {
+    sp.pathpulse_input = rest;
+    return;
+  }
+  sp.pathpulse_input = rest.substr(0, sep);
+  sp.pathpulse_output = rest.substr(sep + 1);
+}
+
 void Parser::ParseSpecparamInSpecify(std::vector<SpecifyItem*>& items) {
   auto kw_loc = CurrentLoc();
   Expect(TokenKind::kKwSpecparam);
@@ -606,6 +641,17 @@ void Parser::ParseSpecparamInSpecify(std::vector<SpecifyItem*>& items) {
     Expect(TokenKind::kRBracket);
   }
 
+  auto parse_pathpulse_value = [&](SpecifyItem* sp) {
+    DecodePathpulseName(*sp);
+    Expect(TokenKind::kLParen);
+    sp->pathpulse_reject = ParseMinTypMaxExpr();
+    sp->param_value = sp->pathpulse_reject;
+    if (Match(TokenKind::kComma)) {
+      sp->pathpulse_error = ParseMinTypMaxExpr();
+    }
+    Expect(TokenKind::kRParen);
+  };
+
   auto parse_one = [&]() {
     auto* sp = arena_.Create<SpecifyItem>();
     sp->kind = SpecifyItemKind::kSpecparam;
@@ -613,25 +659,7 @@ void Parser::ParseSpecparamInSpecify(std::vector<SpecifyItem*>& items) {
     sp->param_name = Expect(TokenKind::kIdentifier).text;
     Expect(TokenKind::kEq);
     if (sp->param_name.starts_with("PATHPULSE$")) {
-      sp->is_pathpulse = true;
-      constexpr std::string_view kPrefix = "PATHPULSE$";
-      std::string_view rest = sp->param_name.substr(kPrefix.size());
-      if (!rest.empty()) {
-        auto sep = rest.find('$');
-        if (sep == std::string_view::npos) {
-          sp->pathpulse_input = rest;
-        } else {
-          sp->pathpulse_input = rest.substr(0, sep);
-          sp->pathpulse_output = rest.substr(sep + 1);
-        }
-      }
-      Expect(TokenKind::kLParen);
-      sp->pathpulse_reject = ParseMinTypMaxExpr();
-      sp->param_value = sp->pathpulse_reject;
-      if (Match(TokenKind::kComma)) {
-        sp->pathpulse_error = ParseMinTypMaxExpr();
-      }
-      Expect(TokenKind::kRParen);
+      parse_pathpulse_value(sp);
     } else {
       sp->param_value = ParseMinTypMaxExpr();
     }

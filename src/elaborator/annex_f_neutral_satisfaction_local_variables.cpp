@@ -181,6 +181,79 @@ bool WeakHolds(const Word& word, const SequenceExpr& seq,
   return true;
 }
 
+// §F.5.6.1: w, L_0 |= ( R |-> P ) iff for every 0 <= j < |w| and every output
+// context L_1 with w-bar^{0,j}, L_0, L_1 |== R, w^{j.}, L_1 |= P. Each L_1 the
+// antecedent yields is threaded into the consequent.
+bool ImplicationHolds(const Word& word, const LvProperty& property,
+                      const LocalContext& context) {
+  if (!property.sequence || !property.lhs) {
+    return false;
+  }
+  const Word kComplement = ComplementWord(word);
+  for (std::size_t j = 0; j < word.size(); ++j) {
+    for (const LocalContext& out : TightSatisfactionOutputs(
+             PrefixInclusive(kComplement, j), *property.sequence, context)) {
+      if (!Satisfies(Suffix(word, j), *property.lhs, out)) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
+// §F.5.6.1: w, L_0 |= ( P1 until P2 ) iff some 0 <= j < |w| has
+// w^{j.}, L_0 |= P2 with w^{i.}, L_0 |= P1 for all 0 <= i < j, or
+// w^{i.}, L_0 |= P1 for all i.
+bool UntilHolds(const Word& word, const LvProperty& property,
+                const LocalContext& context) {
+  if (!property.lhs || !property.rhs) {
+    return false;
+  }
+  for (std::size_t j = 0; j < word.size(); ++j) {
+    if (Satisfies(Suffix(word, j), *property.rhs, context)) {
+      bool prefix_holds = true;
+      for (std::size_t i = 0; i < j; ++i) {
+        if (!Satisfies(Suffix(word, i), *property.lhs, context)) {
+          prefix_holds = false;
+          break;
+        }
+      }
+      if (prefix_holds) {
+        return true;
+      }
+    }
+  }
+  for (std::size_t i = 0; i < word.size(); ++i) {
+    if (!Satisfies(Suffix(word, i), *property.lhs, context)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+// §F.5.6.1: w, L_0 |= ( accept_on (b) P ) iff w, L_0 |= P, or for some
+// 0 <= i < |w| with w^i |= b, w^{0,i-1} T^omega, L_0 |= P.
+bool AcceptOnHolds(const Word& word, const LvProperty& property,
+                   const LocalContext& context) {
+  if (!property.boolean || !property.lhs) {
+    return false;
+  }
+  if (Satisfies(word, *property.lhs, context)) {
+    return true;
+  }
+  const std::size_t kReach = PropertyReach(*property.lhs);
+  for (std::size_t i = 0; i < word.size(); ++i) {
+    if (LetterSatisfiesBoolean(word[i], *property.boolean)) {
+      const Word kCompleted =
+          PrefixWithTail(FirstLetters(word, i), LetterTop(), kReach);
+      if (Satisfies(kCompleted, *property.lhs, context)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 bool Satisfies(const Word& word, const LvProperty& property,
                const LocalContext& context) {
   switch (property.kind) {
@@ -204,25 +277,8 @@ bool Satisfies(const Word& word, const LvProperty& property,
     case LvProperty::Kind::kWeak:
       // §F.5.6.1: weak(R) over the four-way tight-satisfaction relation.
       return property.sequence && WeakHolds(word, *property.sequence, context);
-    case LvProperty::Kind::kImplication: {
-      // §F.5.6.1: w, L_0 |= ( R |-> P ) iff for every 0 <= j < |w| and every
-      // output context L_1 with w-bar^{0,j}, L_0, L_1 |== R, w^{j.}, L_1 |= P.
-      // Each L_1 the antecedent yields is threaded into the consequent.
-      if (!property.sequence || !property.lhs) {
-        return false;
-      }
-      const Word kComplement = ComplementWord(word);
-      for (std::size_t j = 0; j < word.size(); ++j) {
-        for (const LocalContext& out :
-             TightSatisfactionOutputs(PrefixInclusive(kComplement, j),
-                                      *property.sequence, context)) {
-          if (!Satisfies(Suffix(word, j), *property.lhs, out)) {
-            return false;
-          }
-        }
-      }
-      return true;
-    }
+    case LvProperty::Kind::kImplication:
+      return ImplicationHolds(word, property, context);
     case LvProperty::Kind::kOr:
       // §F.5.6.1: w, L_0 |= ( P1 or P2 ) iff w, L_0 |= P1 or w, L_0 |= P2.
       return (property.lhs && Satisfies(word, *property.lhs, context)) ||
@@ -237,55 +293,10 @@ bool Satisfies(const Word& word, const LvProperty& property,
       return word.empty() ||
              (property.lhs &&
               Satisfies(Suffix(word, 1), *property.lhs, context));
-    case LvProperty::Kind::kUntil: {
-      // §F.5.6.1: w, L_0 |= ( P1 until P2 ) iff some 0 <= j < |w| has
-      // w^{j.}, L_0 |= P2 with w^{i.}, L_0 |= P1 for all 0 <= i < j, or
-      // w^{i.}, L_0 |= P1 for all i.
-      if (!property.lhs || !property.rhs) {
-        return false;
-      }
-      for (std::size_t j = 0; j < word.size(); ++j) {
-        if (Satisfies(Suffix(word, j), *property.rhs, context)) {
-          bool prefix_holds = true;
-          for (std::size_t i = 0; i < j; ++i) {
-            if (!Satisfies(Suffix(word, i), *property.lhs, context)) {
-              prefix_holds = false;
-              break;
-            }
-          }
-          if (prefix_holds) {
-            return true;
-          }
-        }
-      }
-      for (std::size_t i = 0; i < word.size(); ++i) {
-        if (!Satisfies(Suffix(word, i), *property.lhs, context)) {
-          return false;
-        }
-      }
-      return true;
-    }
-    case LvProperty::Kind::kAcceptOn: {
-      // §F.5.6.1: w, L_0 |= ( accept_on (b) P ) iff w, L_0 |= P, or for some
-      // 0 <= i < |w| with w^i |= b, w^{0,i-1} T^omega, L_0 |= P.
-      if (!property.boolean || !property.lhs) {
-        return false;
-      }
-      if (Satisfies(word, *property.lhs, context)) {
-        return true;
-      }
-      const std::size_t kReach = PropertyReach(*property.lhs);
-      for (std::size_t i = 0; i < word.size(); ++i) {
-        if (LetterSatisfiesBoolean(word[i], *property.boolean)) {
-          const Word kCompleted =
-              PrefixWithTail(FirstLetters(word, i), LetterTop(), kReach);
-          if (Satisfies(kCompleted, *property.lhs, context)) {
-            return true;
-          }
-        }
-      }
-      return false;
-    }
+    case LvProperty::Kind::kUntil:
+      return UntilHolds(word, property, context);
+    case LvProperty::Kind::kAcceptOn:
+      return AcceptOnHolds(word, property, context);
   }
   return false;
 }

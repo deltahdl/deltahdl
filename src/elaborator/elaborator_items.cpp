@@ -90,59 +90,102 @@ void Elaborator::ValidateTypenameAsElabConstant(const Expr* init) {
               "shall not reference elements of dynamic objects");
 }
 
+namespace {
+
+// §6.20.3: a data type parameter (parameter type) can only be set to a data
+// type. The parser marks a type parameter with a void data type; if such a
+// parameter received an ordinary value expression instead of a type, it has
+// been set to a non-type and must be rejected.
+void CheckTypeParamNotSetToValue(const ModuleItem* item, DiagEngine& diag) {
+  if (item->data_type.kind == DataTypeKind::kVoid &&
+      item->typedef_type.kind == DataTypeKind::kImplicit &&
+      item->init_expr != nullptr) {
+    diag.Error(item->loc,
+               std::format("type parameter '{}' can only be set to a data "
+                           "type, not a value expression",
+                           item->name));
+  }
+}
+
+// §6.20.3: a type parameter declared with a leading enum, struct, or union
+// keyword restricts its valid types; assigning a type that does not conform
+// to that basic data type is an error. Resolve the assigned type through any
+// typedef chain and flag only a definite kind mismatch, leaving an
+// unresolved named type alone.
+void CheckTypeParamConformsToForwardKind(const ModuleItem* item, bool is_type,
+                                         const TypedefMap& typedefs,
+                                         DiagEngine& diag) {
+  if (!is_type || (item->forward_type_kind != DataTypeKind::kEnum &&
+                   item->forward_type_kind != DataTypeKind::kStruct &&
+                   item->forward_type_kind != DataTypeKind::kUnion)) {
+    return;
+  }
+  const DataType* resolved = &item->typedef_type;
+  for (int hops = 0; hops < 8 && resolved->kind == DataTypeKind::kNamed;
+       ++hops) {
+    auto td = typedefs.find(resolved->type_name);
+    if (td == typedefs.end()) break;
+    resolved = &td->second;
+  }
+  if (resolved->kind != DataTypeKind::kNamed &&
+      resolved->kind != item->forward_type_kind) {
+    static const auto kBasicName = [](DataTypeKind k) -> std::string_view {
+      switch (k) {
+        case DataTypeKind::kEnum:
+          return "enum";
+        case DataTypeKind::kStruct:
+          return "struct";
+        case DataTypeKind::kUnion:
+          return "union";
+        default:
+          return "type";
+      }
+    };
+    diag.Error(item->loc,
+               std::format("type parameter '{}' is assigned a type that does "
+                           "not conform to the required {} kind",
+                           item->name, kBasicName(item->forward_type_kind)));
+  }
+}
+
+// Fills the value-parameter type information on `pd` and, per §11.5.1, records
+// a real-typed parameter as a scalar so any later bit/part select is rejected.
+void PopulateValueParamInfo(
+    RtlirParamDecl& pd, const ModuleItem* item,
+    std::unordered_set<std::string_view>& scalar_var_names) {
+  PopulateParamTypeInfo(pd, item->data_type);
+  DataTypeKind pk = item->data_type.kind;
+  if (pk == DataTypeKind::kReal || pk == DataTypeKind::kShortreal ||
+      pk == DataTypeKind::kRealtime) {
+    scalar_var_names.insert(item->name);
+  }
+}
+
+// Const-evaluates a parameter's initializer against `scope` and records the
+// resolved value on `pd`. §6.20.2: an integer-typed parameter initialized from
+// a real constant rounds to the nearest integer (ties away from zero).
+void ResolveParamConstValue(RtlirParamDecl& pd, const ModuleItem* item,
+                            bool is_type, const ScopeMap& scope) {
+  auto val = ConstEvalInt(item->init_expr, scope);
+  if (val) {
+    pd.resolved_value = *val;
+    pd.is_resolved = true;
+  } else if (!is_type && ParamExpectsIntegerValue(pd, item->data_type)) {
+    if (auto rval = ConstEvalReal(item->init_expr, scope)) {
+      pd.resolved_value = std::llround(*rval);
+      pd.is_resolved = true;
+    }
+  }
+}
+
+}  // namespace
+
 void Elaborator::ElaborateParamDecl(ModuleItem* item, RtlirModule* mod) {
   bool is_type = item->data_type.kind == DataTypeKind::kVoid &&
                  item->typedef_type.kind != DataTypeKind::kImplicit;
 
-  // §6.20.3: a data type parameter (parameter type) can only be set to a data
-  // type. The parser marks a type parameter with a void data type; if such a
-  // parameter received an ordinary value expression instead of a type, it has
-  // been set to a non-type and must be rejected.
-  if (item->data_type.kind == DataTypeKind::kVoid &&
-      item->typedef_type.kind == DataTypeKind::kImplicit &&
-      item->init_expr != nullptr) {
-    diag_.Error(item->loc,
-                std::format("type parameter '{}' can only be set to a data "
-                            "type, not a value expression",
-                            item->name));
-  }
-
-  // §6.20.3: a type parameter declared with a leading enum, struct, or union
-  // keyword restricts its valid types; assigning a type that does not conform
-  // to that basic data type is an error. Resolve the assigned type through any
-  // typedef chain and flag only a definite kind mismatch, leaving an
-  // unresolved named type alone.
-  if (is_type && (item->forward_type_kind == DataTypeKind::kEnum ||
-                  item->forward_type_kind == DataTypeKind::kStruct ||
-                  item->forward_type_kind == DataTypeKind::kUnion)) {
-    const DataType* resolved = &item->typedef_type;
-    for (int hops = 0; hops < 8 && resolved->kind == DataTypeKind::kNamed;
-         ++hops) {
-      auto td = typedefs_.find(resolved->type_name);
-      if (td == typedefs_.end()) break;
-      resolved = &td->second;
-    }
-    if (resolved->kind != DataTypeKind::kNamed &&
-        resolved->kind != item->forward_type_kind) {
-      static const auto kBasicName = [](DataTypeKind k) -> std::string_view {
-        switch (k) {
-          case DataTypeKind::kEnum:
-            return "enum";
-          case DataTypeKind::kStruct:
-            return "struct";
-          case DataTypeKind::kUnion:
-            return "union";
-          default:
-            return "type";
-        }
-      };
-      diag_.Error(
-          item->loc,
-          std::format("type parameter '{}' is assigned a type that does "
-                      "not conform to the required {} kind",
-                      item->name, kBasicName(item->forward_type_kind)));
-    }
-  }
+  CheckTypeParamNotSetToValue(item, diag_);
+  CheckTypeParamConformsToForwardKind(item, is_type, typedefs_, diag_);
 
   if (is_type) {
     typedefs_[item->name] = item->typedef_type;
@@ -154,15 +197,7 @@ void Elaborator::ElaborateParamDecl(ModuleItem* item, RtlirModule* mod) {
   pd.is_localparam = item->is_localparam || mod->has_param_port_list;
   pd.default_value = item->init_expr;
   if (!is_type) {
-    PopulateParamTypeInfo(pd, item->data_type);
-    // §11.5.1: a bit-select or part-select of a real parameter is illegal.
-    // A real parameter holds a single scalar value, so record it alongside
-    // scalar variables; any select applied to it is then rejected.
-    DataTypeKind pk = item->data_type.kind;
-    if (pk == DataTypeKind::kReal || pk == DataTypeKind::kShortreal ||
-        pk == DataTypeKind::kRealtime) {
-      scalar_var_names_.insert(item->name);
-    }
+    PopulateValueParamInfo(pd, item, scalar_var_names_);
   }
 
   if (item->init_expr && item->init_expr->kind == ExprKind::kIdentifier &&
@@ -185,24 +220,59 @@ void Elaborator::ElaborateParamDecl(ModuleItem* item, RtlirModule* mod) {
     }
     ValidateTypenameAsElabConstant(item->init_expr);
     auto scope = BuildParamScope(mod);
-    auto val = ConstEvalInt(item->init_expr, scope);
-    if (val) {
-      pd.resolved_value = *val;
-      pd.is_resolved = true;
-    } else if (!is_type && ParamExpectsIntegerValue(pd, item->data_type)) {
-      // §6.20.2: the real-to-integer conversion of §6.12.1 applies to
-      // parameters, so an integer-typed parameter initialized from a real
-      // constant rounds to the nearest integer (ties away from zero).
-      if (auto rval = ConstEvalReal(item->init_expr, scope)) {
-        pd.resolved_value = std::llround(*rval);
-        pd.is_resolved = true;
-      }
-    }
+    ResolveParamConstValue(pd, item, is_type, scope);
   }
   mod->params.push_back(pd);
 
   const_names_.insert(item->name);
 }
+
+namespace {
+
+// §28.3.6: validates the per-terminal bit-lengths of a gate/switch instance
+// array whose instance range has already been confirmed present. `scope` is the
+// caller's parameter scope used to evaluate the range bounds. An interconnect
+// terminal must match the instance-array length exactly; an ordinary terminal
+// must be either scalar-width (broadcast) or equal to the array length.
+void CheckGateInstanceArrayTerminalWidths(
+    const ModuleItem* item, const RtlirModule* mod, const ScopeMap& scope,
+    const std::unordered_set<std::string_view>& interconnect_names,
+    DiagEngine& diag) {
+  auto lhi = ConstEvalInt(item->inst_range_left, scope);
+  auto rhi = ConstEvalInt(item->inst_range_right, scope);
+  if (!lhi || !rhi) {
+    diag.Error(item->loc,
+               "gate or switch instance range bound is not a constant "
+               "expression");
+    return;
+  }
+  auto array_len = static_cast<uint32_t>(std::abs(*lhi - *rhi) + 1);
+  for (auto* term : item->gate_terminals) {
+    uint32_t w = LookupLhsWidth(term, mod);
+    if (w == 0) continue;
+    bool is_interconnect = term && term->kind == ExprKind::kIdentifier &&
+                           interconnect_names.count(term->text) != 0;
+    if (is_interconnect) {
+      if (w != array_len) {
+        diag.Error(item->loc,
+                   "interconnect terminal of a gate instance array "
+                   "must have a bit-length equal to the instance-array "
+                   "length");
+        break;
+      }
+      continue;
+    }
+    if (w != 1 && w != array_len) {
+      diag.Error(item->loc,
+                 "gate array terminal width does not match either "
+                 "the per-instance port width or the instance-array "
+                 "length");
+      break;
+    }
+  }
+}
+
+}  // namespace
 
 void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
   switch (item->kind) {
@@ -292,45 +362,8 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
       }
 
       if (item->inst_range_left && item->inst_range_right) {
-        auto range_scope = BuildParamScope(mod);
-        auto lhi = ConstEvalInt(item->inst_range_left, range_scope);
-        auto rhi = ConstEvalInt(item->inst_range_right, range_scope);
-        if (!lhi || !rhi) {
-          diag_.Error(item->loc,
-                      "gate or switch instance range bound is not a constant "
-                      "expression");
-        } else {
-          auto array_len = static_cast<uint32_t>(std::abs(*lhi - *rhi) + 1);
-          for (auto* term : item->gate_terminals) {
-            uint32_t w = LookupLhsWidth(term, mod);
-            if (w == 0) continue;
-            // §28.3.6: an interconnect port or interconnect net expression
-            // connected to an instance array shall have a bit-length equal to
-            // the instance-array length. Unlike an ordinary scalar terminal it
-            // cannot be broadcast (width 1) across the instances.
-            bool is_interconnect = term &&
-                                   term->kind == ExprKind::kIdentifier &&
-                                   interconnect_names_.count(term->text) != 0;
-            if (is_interconnect) {
-              if (w != array_len) {
-                diag_.Error(
-                    item->loc,
-                    "interconnect terminal of a gate instance array "
-                    "must have a bit-length equal to the instance-array "
-                    "length");
-                break;
-              }
-              continue;
-            }
-            if (w != 1 && w != array_len) {
-              diag_.Error(item->loc,
-                          "gate array terminal width does not match either "
-                          "the per-instance port width or the instance-array "
-                          "length");
-              break;
-            }
-          }
-        }
+        CheckGateInstanceArrayTerminalWidths(item, mod, BuildParamScope(mod),
+                                             interconnect_names_, diag_);
       }
       ValidateBidirectionalSwitchConnections(item, mod, diag_,
                                              nettype_canonical_);
@@ -495,6 +528,27 @@ void Elaborator::ReclassifyForwardUdpInstances(const ModuleDecl* decl) {
   }
 }
 
+namespace {
+
+// §25.9: returns the constant parameter-override values of a module instance
+// when every override evaluates to a constant, or nullopt if the instance has
+// no overrides or any override is non-constant.
+std::optional<std::vector<int64_t>> TryConstEvalInstParams(
+    const ModuleItem* item) {
+  if (item->inst_params.empty()) return std::nullopt;
+  std::vector<int64_t> values;
+  for (const auto& param : item->inst_params) {
+    const Expr* pexpr = param.second;
+    if (pexpr == nullptr) return std::nullopt;
+    auto v = ConstEvalInt(pexpr);
+    if (!v) return std::nullopt;
+    values.push_back(*v);
+  }
+  return values;
+}
+
+}  // namespace
+
 void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
   ReclassifyForwardUdpInstances(decl);
 
@@ -562,25 +616,8 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
         // §25.9: record explicit parameter overrides (when they evaluate to
         // constants) so a later virtual-interface assignment can confirm the
         // actual parameter values match.
-        if (!item->inst_params.empty()) {
-          std::vector<int64_t> values;
-          bool all_const = true;
-          for (const auto& param : item->inst_params) {
-            const Expr* pexpr = param.second;
-            if (pexpr == nullptr) {
-              all_const = false;
-              break;
-            }
-            auto v = ConstEvalInt(pexpr);
-            if (!v) {
-              all_const = false;
-              break;
-            }
-            values.push_back(*v);
-          }
-          if (all_const) {
-            interface_inst_param_values_[item->inst_name] = std::move(values);
-          }
+        if (auto values = TryConstEvalInstParams(item)) {
+          interface_inst_param_values_[item->inst_name] = std::move(*values);
         }
       }
       if (child && child->decl_kind == ModuleDeclKind::kChecker) {
@@ -786,24 +823,38 @@ bool Elaborator::RefersToUnboundedParam(const RtlirModule* mod,
   return false;
 }
 
-bool Elaborator::ContainsDollarSubexpr(const Expr* e) const {
+namespace {
+
+bool ExprContainsDollarSubexpr(const Expr* e);
+
+// Returns true if any of the fixed scalar child-expression pointers of `e`
+// contains a self-contained `$` subexpression. Factored out of the recursive
+// walk so the driver stays below the cognitive-complexity threshold.
+bool AnyScalarChildContainsDollar(const Expr* e) {
+  const Expr* const kChildren[] = {
+      e->lhs,  e->rhs,   e->condition, e->true_expr, e->false_expr,
+      e->base, e->index, e->index_end, e->with_expr, e->repeat_count};
+  for (const Expr* c : kChildren) {
+    if (ExprContainsDollarSubexpr(c)) return true;
+  }
+  return false;
+}
+
+bool ExprContainsDollarSubexpr(const Expr* e) {
   if (e == nullptr) return false;
   if (e->kind == ExprKind::kIdentifier && e->text == "$") return true;
-  if (ContainsDollarSubexpr(e->lhs)) return true;
-  if (ContainsDollarSubexpr(e->rhs)) return true;
-  if (ContainsDollarSubexpr(e->condition)) return true;
-  if (ContainsDollarSubexpr(e->true_expr)) return true;
-  if (ContainsDollarSubexpr(e->false_expr)) return true;
-  if (ContainsDollarSubexpr(e->base)) return true;
-  if (ContainsDollarSubexpr(e->index)) return true;
-  if (ContainsDollarSubexpr(e->index_end)) return true;
-  if (ContainsDollarSubexpr(e->with_expr)) return true;
-  if (ContainsDollarSubexpr(e->repeat_count)) return true;
+  if (AnyScalarChildContainsDollar(e)) return true;
   for (const Expr* a : e->args)
-    if (ContainsDollarSubexpr(a)) return true;
+    if (ExprContainsDollarSubexpr(a)) return true;
   for (const Expr* el : e->elements)
-    if (ContainsDollarSubexpr(el)) return true;
+    if (ExprContainsDollarSubexpr(el)) return true;
   return false;
+}
+
+}  // namespace
+
+bool Elaborator::ContainsDollarSubexpr(const Expr* e) const {
+  return ExprContainsDollarSubexpr(e);
 }
 
 std::string_view Elaborator::ScopedName(std::string_view base) {

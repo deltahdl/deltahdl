@@ -89,10 +89,24 @@ static bool ComputeStartOrdinal(const std::vector<std::vector<int>>& dims,
   return true;
 }
 
-void VpiContext::PutValueArray(VpiHandle obj, VpiArrayValue* arrayvalue_p,
-                               int* index_p, unsigned int num) {
-  if (!obj || !arrayvalue_p) return;
+namespace {
 
+// §38.2: record a VPI error into err and return false, so a validation step can
+// report a rejected precondition in a single statement.
+bool RecordArrayError(VpiErrorInfo* err, const char* msg) {
+  err->state = kVpiError;
+  err->level = kVpiError;
+  err->message = msg;
+  return false;
+}
+
+// §38.35: validate the target handle, flags, format, and starting coordinate
+// for vpi_put_value_array(). On any rejected precondition the error is recorded
+// into *err (§38.2) and false is returned; on success *out_start_ordinal holds
+// the flat ordinal of the first element to write.
+bool ValidatePutValueArrayRequest(VpiHandle obj, VpiArrayValue* arrayvalue_p,
+                                  int* index_p, long long* out_start_ordinal,
+                                  VpiErrorInfo* err) {
   // §38.35: the routine modifies only static unpacked variable or net arrays -
   // arrays whose vpiArrayType is vpiStaticArray, which also have a static
   // lifetime and contain no dynamic array or dynamic element. A handle that is
@@ -101,11 +115,8 @@ void VpiContext::PutValueArray(VpiHandle obj, VpiArrayValue* arrayvalue_p,
   bool is_unpacked_array =
       VpiIsArrayVarType(obj->type) || obj->type == vpiNetArray;
   if (!is_unpacked_array || obj->array_type != vpiStaticArray) {
-    last_error_.state = kVpiError;
-    last_error_.level = kVpiError;
-    last_error_.message =
-        "vpi_put_value_array() requires a static unpacked array object";
-    return;
+    return RecordArrayError(
+        err, "vpi_put_value_array() requires a static unpacked array object");
   }
 
   // §38.35: vpiNoDelay is the only scheduling mode allowed here - the delay and
@@ -114,22 +125,17 @@ void VpiContext::PutValueArray(VpiHandle obj, VpiArrayValue* arrayvalue_p,
   // the flags word); any other flag bit is an error.
   const unsigned int kAllowed = kVpiOneValue | kVpiPropagateOff;
   if (arrayvalue_p->flags & ~kAllowed) {
-    last_error_.state = kVpiError;
-    last_error_.level = kVpiError;
-    last_error_.message =
+    return RecordArrayError(
+        err,
         "vpi_put_value_array() allows only the vpiOneValue and vpiPropagateOff "
-        "flags";
-    return;
+        "flags");
   }
 
   // §38.35: every format outside the supported set is unsupported and is an
   // error if specified.
   if (!VpiArrayPutFormatSupported(static_cast<int>(arrayvalue_p->format))) {
-    last_error_.state = kVpiError;
-    last_error_.level = kVpiError;
-    last_error_.message =
-        "vpi_put_value_array() was given an unsupported value format";
-    return;
+    return RecordArrayError(
+        err, "vpi_put_value_array() was given an unsupported value format");
   }
 
   // §38.35: index_p carries the starting element's coordinate, one entry per
@@ -137,23 +143,310 @@ void VpiContext::PutValueArray(VpiHandle obj, VpiArrayValue* arrayvalue_p,
   // an HDL reference. With no coordinate there is no element to start from.
   const auto& dims = obj->array_dim_indices;
   if (index_p == nullptr || dims.empty()) {
-    last_error_.state = kVpiError;
-    last_error_.level = kVpiError;
-    last_error_.message =
+    return RecordArrayError(
+        err,
         "vpi_put_value_array() requires a starting index for each unpacked "
-        "dimension";
-    return;
+        "dimension");
   }
 
   // §38.35: turn the starting coordinate into the flat ordinal of the first
   // element. A coordinate value that names no declared index is not a legal
   // element reference.
+  if (!ComputeStartOrdinal(dims, index_p, out_start_ordinal)) {
+    return RecordArrayError(
+        err, "vpi_put_value_array() starting index is out of range");
+  }
+  return true;
+}
+
+// §38.35: decode one supplied source value (at source position src in the
+// arrayvalue arm the format selects) into the element's aval/bval words. width
+// is the destination element's bit width; elem_4state says whether the element
+// keeps unknown bits. The byte/word group layouts follow the standard's
+// per-format descriptions.
+void DecodePutSourceValue(const VpiArrayValue* arrayvalue_p, unsigned int src,
+                          uint32_t width, bool elem_4state, uint64_t* out_aval,
+                          uint64_t* out_bval) {
+  uint64_t aval = 0;
+  uint64_t bval = 0;
+  switch (static_cast<int>(arrayvalue_p->format)) {
+    case kVpiIntVal:
+      aval = static_cast<uint64_t>(
+          static_cast<uint32_t>(arrayvalue_p->value.integers[src]));
+      break;
+    case kVpiShortIntVal:
+      aval = static_cast<uint64_t>(
+          static_cast<uint16_t>(arrayvalue_p->value.shortints[src]));
+      break;
+    case kVpiLongIntVal:
+      aval = static_cast<uint64_t>(arrayvalue_p->value.longints[src]);
+      break;
+    case kVpiRealVal:
+      aval = static_cast<uint64_t>(arrayvalue_p->value.reals[src]);
+      break;
+    case kVpiShortRealVal:
+      aval = static_cast<uint64_t>(arrayvalue_p->value.shortreals[src]);
+      break;
+    case kVpiTimeVal: {
+      const VpiTime& t = arrayvalue_p->value.times[src];
+      aval = (static_cast<uint64_t>(t.high) << 32) | t.low;
+      break;
+    }
+    case kVpiVectorVal: {
+      const VpiVectorVal& vv = arrayvalue_p->value.vectors[src];
+      aval = vv.aval;
+      bval = elem_4state ? vv.bval : 0;
+      break;
+    }
+    case kVpiRawFourStateVal: {
+      int ngroups = (static_cast<int>(width) + 7) / 8;
+      const char* abase =
+          arrayvalue_p->value.rawvals + static_cast<size_t>(src) * ngroups * 2;
+      aval = VpiReadRawGroup(abase, ngroups);
+      // §38.35: when this 4-state format is used for a 2-state array, the
+      // bvalbits group is ignored.
+      bval = elem_4state ? VpiReadRawGroup(abase + ngroups, ngroups) : 0;
+      break;
+    }
+    case kVpiRawTwoStateVal: {
+      int ngroups = (static_cast<int>(width) + 7) / 8;
+      const char* abase =
+          arrayvalue_p->value.rawvals + static_cast<size_t>(src) * ngroups;
+      aval = VpiReadRawGroup(abase, ngroups);
+      // §38.35: this 2-state format carries no bvalbits; for a 4-state array
+      // its bval bits are taken to be 0.
+      bval = 0;
+      break;
+    }
+    default:
+      break;
+  }
+  *out_aval = aval;
+  *out_bval = bval;
+}
+
+// §38.35: find the element child of obj whose flat ordinal equals the target,
+// or nullptr if no such element exists.
+VpiObject* FindElementByOrdinal(VpiHandle obj, long long ordinal) {
+  for (auto* child : obj->children) {
+    if (child->index == ordinal) {
+      return child;
+    }
+  }
+  return nullptr;
+}
+
+// §38.35: write one supplied source value (at source position src) into the
+// element at the given flat ordinal of obj. A missing element or one without a
+// backing variable is skipped silently, exactly as the consecutive fill loop
+// requires. The decoded aval/bval are masked to the element's width before they
+// replace word 0 of its value.
+void PutValueArrayElement(VpiHandle obj, const VpiArrayValue* arrayvalue_p,
+                          long long ordinal, unsigned int src) {
+  VpiObject* element = FindElementByOrdinal(obj, ordinal);
+  if (!element || !element->var) return;
+
+  Logic4Vec& ev = element->var->value;
+  uint32_t width = ev.width;
+  uint64_t mask = (width >= 64) ? ~uint64_t{0} : ((uint64_t{1} << width) - 1);
+  bool elem_4state = element->var->is_4state;
+  uint64_t aval = 0;
+  uint64_t bval = 0;
+  DecodePutSourceValue(arrayvalue_p, src, width, elem_4state, &aval, &bval);
+
+  if (ev.nwords > 0) {
+    ev.words[0].aval = aval & mask;
+    ev.words[0].bval = bval & mask;
+  }
+}
+
+// §38.16: validate the target handle, format, and starting coordinate for
+// vpi_get_value_array(). On a rejected precondition false is returned and
+// *out_err_msg names the failure; on success *out_start_ordinal holds the flat
+// ordinal of the first element to read.
+bool ValidateGetValueArrayRequest(VpiHandle obj, VpiArrayValue* arrayvalue_p,
+                                  int* index_p, long long* out_start_ordinal,
+                                  const char** out_err_msg) {
+  // §38.16: the routine retrieves values only from static unpacked variable or
+  // net arrays - arrays whose vpiArrayType is vpiStaticArray, with static
+  // lifetimes and no dynamic array or dynamic element. Anything else has no
+  // element section to read.
+  bool is_unpacked_array =
+      VpiIsArrayVarType(obj->type) || obj->type == vpiNetArray;
+  if (!is_unpacked_array || obj->array_type != vpiStaticArray) {
+    *out_err_msg =
+        "vpi_get_value_array() requires a static unpacked array object";
+    return false;
+  }
+
+  // §38.16: every format outside the supported set is unsupported and is an
+  // error if requested. The supported set is the vpi_get_value() formats reused
+  // from §38.15 plus the raw/short/long/short-real additions.
+  if (!VpiArrayPutFormatSupported(static_cast<int>(arrayvalue_p->format))) {
+    *out_err_msg =
+        "vpi_get_value_array() was given an unsupported value format";
+    return false;
+  }
+
+  // §38.16: index_p carries the starting element's coordinate, one entry per
+  // unpacked dimension of obj, ordered left to right as the indices appear in
+  // an HDL reference. Without a coordinate there is no element to start from.
+  const auto& dims = obj->array_dim_indices;
+  if (index_p == nullptr || dims.empty()) {
+    *out_err_msg =
+        "vpi_get_value_array() requires a starting index for each unpacked "
+        "dimension";
+    return false;
+  }
+
+  // §38.16: turn the starting coordinate into the flat ordinal of the first
+  // element. A coordinate naming no declared index is not a legal element
+  // reference.
+  if (!ComputeStartOrdinal(dims, index_p, out_start_ordinal)) {
+    *out_err_msg = "vpi_get_value_array() starting index is out of range";
+    return false;
+  }
+  return true;
+}
+
+// §38.16: locate the section's element children in fastest-varying order
+// (consecutive flat ordinals from the start), filling section[rel] with the
+// child whose ordinal is start_ordinal+rel for each rel within [0, num).
+void CollectGetValueArraySection(VpiHandle obj, long long start_ordinal,
+                                 unsigned int num,
+                                 std::vector<VpiObject*>* section) {
+  for (auto* child : obj->children) {
+    long long rel = static_cast<long long>(child->index) - start_ordinal;
+    if (rel >= 0 && rel < static_cast<long long>(num)) {
+      (*section)[static_cast<size_t>(rel)] = child;
+    }
+  }
+}
+
+// §38.16: size the VPI-owned return buffer per the requested format - the raw
+// formats follow their byte-group instructions, the others are num entries of
+// the arm's element type.
+size_t ComputeGetValueArrayBytes(int fmt, int ngroups, int words_per_elem,
+                                 unsigned int num) {
+  size_t bytes = 0;
+  switch (fmt) {
+    case kVpiRawFourStateVal:
+      bytes = static_cast<size_t>(ngroups) * 2 * num;
+      break;
+    case kVpiRawTwoStateVal:
+      bytes = static_cast<size_t>(ngroups) * num;
+      break;
+    case kVpiShortIntVal:
+      bytes = sizeof(int16_t) * num;
+      break;
+    case kVpiLongIntVal:
+      bytes = sizeof(int64_t) * num;
+      break;
+    case kVpiShortRealVal:
+      bytes = sizeof(float) * num;
+      break;
+    case kVpiRealVal:
+      bytes = sizeof(double) * num;
+      break;
+    case kVpiTimeVal:
+      bytes = sizeof(VpiTime) * num;
+      break;
+    case kVpiVectorVal:
+      bytes = sizeof(VpiVectorVal) * static_cast<size_t>(words_per_elem) * num;
+      break;
+    case kVpiIntVal:
+    default:
+      bytes = sizeof(int32_t) * num;
+      break;
+  }
+  return bytes;
+}
+
+// §38.16: read an element's current value into aval/bval words and report
+// whether it keeps unknown bits. A missing element, one without a backing
+// variable, or one with no value words leaves the outputs at their zero
+// defaults.
+void ReadGetElementValue(VpiObject* element, uint64_t* out_aval,
+                         uint64_t* out_bval, bool* out_4state) {
+  *out_aval = 0;
+  *out_bval = 0;
+  *out_4state = false;
+  if (element && element->var) {
+    const Logic4Vec& ev = element->var->value;
+    if (ev.nwords > 0) {
+      *out_aval = ev.words[0].aval;
+      *out_bval = ev.words[0].bval;
+    }
+    *out_4state = element->var->is_4state;
+  }
+}
+
+// §38.16: encode one element's current value (aval/bval words, elem_4state)
+// into position k of the arm the format selects. The raw and vector formats lay
+// the element bits out per their byte/word group descriptions; the scalar arms
+// widen the element value into one C scalar.
+void EncodeGetElementValue(VpiArrayValue* arrayvalue_p, unsigned int k, int fmt,
+                           int ngroups, uint64_t aval, uint64_t bval,
+                           bool elem_4state) {
+  switch (fmt) {
+    case kVpiIntVal:
+      arrayvalue_p->value.integers[k] = static_cast<int32_t>(aval);
+      break;
+    case kVpiShortIntVal:
+      arrayvalue_p->value.shortints[k] = static_cast<int16_t>(aval);
+      break;
+    case kVpiLongIntVal:
+      arrayvalue_p->value.longints[k] = static_cast<int64_t>(aval);
+      break;
+    case kVpiRealVal:
+      arrayvalue_p->value.reals[k] = static_cast<double>(aval);
+      break;
+    case kVpiShortRealVal:
+      arrayvalue_p->value.shortreals[k] = static_cast<float>(aval);
+      break;
+    case kVpiTimeVal:
+      arrayvalue_p->value.times[k].high = static_cast<uint32_t>(aval >> 32);
+      arrayvalue_p->value.times[k].low =
+          static_cast<uint32_t>(aval & 0xFFFFFFFFu);
+      break;
+    case kVpiVectorVal:
+      arrayvalue_p->value.vectors[k].aval = static_cast<uint32_t>(aval);
+      // §38.16: bvalbits carry the unknown/high-impedance state for a 4-state
+      // element; a 2-state element reports a known (bval 0) value.
+      arrayvalue_p->value.vectors[k].bval =
+          elem_4state ? static_cast<uint32_t>(bval) : 0;
+      break;
+    case kVpiRawFourStateVal: {
+      // §38.16: each element occupies ngroups*2 bytes - an aval group
+      // followed by a bval group - loaded least-significant byte first.
+      char* abase =
+          arrayvalue_p->value.rawvals + static_cast<size_t>(k) * ngroups * 2;
+      VpiWriteRawGroup(abase, ngroups, aval);
+      VpiWriteRawGroup(abase + ngroups, ngroups, elem_4state ? bval : 0);
+      break;
+    }
+    case kVpiRawTwoStateVal: {
+      // §38.16: the 2-state raw format omits the bval group, so each element
+      // occupies just ngroups bytes.
+      char* abase =
+          arrayvalue_p->value.rawvals + static_cast<size_t>(k) * ngroups;
+      VpiWriteRawGroup(abase, ngroups, aval);
+      break;
+    }
+    default:
+      break;
+  }
+}
+
+}  // namespace
+
+void VpiContext::PutValueArray(VpiHandle obj, VpiArrayValue* arrayvalue_p,
+                               int* index_p, unsigned int num) {
+  if (!obj || !arrayvalue_p) return;
+
   long long start_ordinal = 0;
-  if (!ComputeStartOrdinal(dims, index_p, &start_ordinal)) {
-    last_error_.state = kVpiError;
-    last_error_.level = kVpiError;
-    last_error_.message =
-        "vpi_put_value_array() starting index is out of range";
+  if (!ValidatePutValueArrayRequest(obj, arrayvalue_p, index_p,
+                                    &start_ordinal)) {
     return;
   }
 
@@ -164,80 +457,8 @@ void VpiContext::PutValueArray(VpiHandle obj, VpiArrayValue* arrayvalue_p,
   bool one_value = (arrayvalue_p->flags & kVpiOneValue) != 0;
   for (unsigned int k = 0; k < num; ++k) {
     long long ordinal = start_ordinal + static_cast<long long>(k);
-    VpiObject* element = nullptr;
-    for (auto* child : obj->children) {
-      if (child->index == ordinal) {
-        element = child;
-        break;
-      }
-    }
-    if (!element || !element->var) continue;
-
     unsigned int src = one_value ? 0u : k;
-    Logic4Vec& ev = element->var->value;
-    uint32_t width = ev.width;
-    uint64_t mask = (width >= 64) ? ~uint64_t{0} : ((uint64_t{1} << width) - 1);
-    bool elem_4state = element->var->is_4state;
-    uint64_t aval = 0;
-    uint64_t bval = 0;
-
-    switch (static_cast<int>(arrayvalue_p->format)) {
-      case kVpiIntVal:
-        aval = static_cast<uint64_t>(
-            static_cast<uint32_t>(arrayvalue_p->value.integers[src]));
-        break;
-      case kVpiShortIntVal:
-        aval = static_cast<uint64_t>(
-            static_cast<uint16_t>(arrayvalue_p->value.shortints[src]));
-        break;
-      case kVpiLongIntVal:
-        aval = static_cast<uint64_t>(arrayvalue_p->value.longints[src]);
-        break;
-      case kVpiRealVal:
-        aval = static_cast<uint64_t>(arrayvalue_p->value.reals[src]);
-        break;
-      case kVpiShortRealVal:
-        aval = static_cast<uint64_t>(arrayvalue_p->value.shortreals[src]);
-        break;
-      case kVpiTimeVal: {
-        const VpiTime& t = arrayvalue_p->value.times[src];
-        aval = (static_cast<uint64_t>(t.high) << 32) | t.low;
-        break;
-      }
-      case kVpiVectorVal: {
-        const VpiVectorVal& vv = arrayvalue_p->value.vectors[src];
-        aval = vv.aval;
-        bval = elem_4state ? vv.bval : 0;
-        break;
-      }
-      case kVpiRawFourStateVal: {
-        int ngroups = (static_cast<int>(width) + 7) / 8;
-        const char* abase = arrayvalue_p->value.rawvals +
-                            static_cast<size_t>(src) * ngroups * 2;
-        aval = VpiReadRawGroup(abase, ngroups);
-        // §38.35: when this 4-state format is used for a 2-state array, the
-        // bvalbits group is ignored.
-        bval = elem_4state ? VpiReadRawGroup(abase + ngroups, ngroups) : 0;
-        break;
-      }
-      case kVpiRawTwoStateVal: {
-        int ngroups = (static_cast<int>(width) + 7) / 8;
-        const char* abase =
-            arrayvalue_p->value.rawvals + static_cast<size_t>(src) * ngroups;
-        aval = VpiReadRawGroup(abase, ngroups);
-        // §38.35: this 2-state format carries no bvalbits; for a 4-state array
-        // its bval bits are taken to be 0.
-        bval = 0;
-        break;
-      }
-      default:
-        break;
-    }
-
-    if (ev.nwords > 0) {
-      ev.words[0].aval = aval & mask;
-      ev.words[0].bval = bval & mask;
-    }
+    PutValueArrayElement(obj, arrayvalue_p, ordinal, src);
   }
 
   // §38.35: for a vpiArrayNet target the written values override the resolved
@@ -263,42 +484,13 @@ void VpiContext::GetValueArray(VpiHandle obj, VpiArrayValue* arrayvalue_p,
     arrayvalue_p->value.rawvals = nullptr;
   };
 
-  // §38.16: the routine retrieves values only from static unpacked variable or
-  // net arrays - arrays whose vpiArrayType is vpiStaticArray, with static
-  // lifetimes and no dynamic array or dynamic element. Anything else has no
-  // element section to read.
-  bool is_unpacked_array =
-      VpiIsArrayVarType(obj->type) || obj->type == vpiNetArray;
-  if (!is_unpacked_array || obj->array_type != vpiStaticArray) {
-    fail("vpi_get_value_array() requires a static unpacked array object");
-    return;
-  }
-
-  // §38.16: every format outside the supported set is unsupported and is an
-  // error if requested. The supported set is the vpi_get_value() formats reused
-  // from §38.15 plus the raw/short/long/short-real additions.
-  if (!VpiArrayPutFormatSupported(static_cast<int>(arrayvalue_p->format))) {
-    fail("vpi_get_value_array() was given an unsupported value format");
-    return;
-  }
-
-  // §38.16: index_p carries the starting element's coordinate, one entry per
-  // unpacked dimension of obj, ordered left to right as the indices appear in
-  // an HDL reference. Without a coordinate there is no element to start from.
-  const auto& dims = obj->array_dim_indices;
-  if (index_p == nullptr || dims.empty()) {
-    fail(
-        "vpi_get_value_array() requires a starting index for each unpacked "
-        "dimension");
-    return;
-  }
-
-  // §38.16: turn the starting coordinate into the flat ordinal of the first
-  // element. A coordinate naming no declared index is not a legal element
-  // reference.
+  // §38.16: validate the handle, format, and starting coordinate; on a rejected
+  // precondition signal the VPI error and stop.
   long long start_ordinal = 0;
-  if (!ComputeStartOrdinal(dims, index_p, &start_ordinal)) {
-    fail("vpi_get_value_array() starting index is out of range");
+  const char* err_msg = nullptr;
+  if (!ValidateGetValueArrayRequest(obj, arrayvalue_p, index_p, &start_ordinal,
+                                    &err_msg)) {
+    fail(err_msg);
     return;
   }
 
@@ -306,12 +498,7 @@ void VpiContext::GetValueArray(VpiHandle obj, VpiArrayValue* arrayvalue_p,
   // order (consecutive flat ordinals from the start). The element width fixes
   // the raw-group and vector word counts and the size of any VPI-owned buffer.
   std::vector<VpiObject*> section(num, nullptr);
-  for (auto* child : obj->children) {
-    long long rel = static_cast<long long>(child->index) - start_ordinal;
-    if (rel >= 0 && rel < static_cast<long long>(num)) {
-      section[static_cast<size_t>(rel)] = child;
-    }
-  }
+  CollectGetValueArraySection(obj, start_ordinal, num, &section);
   uint32_t width = 0;
   for (auto* el : section) {
     if (el && el->var) {
@@ -331,38 +518,7 @@ void VpiContext::GetValueArray(VpiHandle obj, VpiArrayValue* arrayvalue_p,
   // type.
   bool user_alloc = (arrayvalue_p->flags & kVpiUserAllocFlag) != 0;
   if (!user_alloc) {
-    size_t bytes = 0;
-    switch (fmt) {
-      case kVpiRawFourStateVal:
-        bytes = static_cast<size_t>(ngroups) * 2 * num;
-        break;
-      case kVpiRawTwoStateVal:
-        bytes = static_cast<size_t>(ngroups) * num;
-        break;
-      case kVpiShortIntVal:
-        bytes = sizeof(int16_t) * num;
-        break;
-      case kVpiLongIntVal:
-        bytes = sizeof(int64_t) * num;
-        break;
-      case kVpiShortRealVal:
-        bytes = sizeof(float) * num;
-        break;
-      case kVpiRealVal:
-        bytes = sizeof(double) * num;
-        break;
-      case kVpiTimeVal:
-        bytes = sizeof(VpiTime) * num;
-        break;
-      case kVpiVectorVal:
-        bytes =
-            sizeof(VpiVectorVal) * static_cast<size_t>(words_per_elem) * num;
-        break;
-      case kVpiIntVal:
-      default:
-        bytes = sizeof(int32_t) * num;
-        break;
-    }
+    size_t bytes = ComputeGetValueArrayBytes(fmt, ngroups, words_per_elem, num);
     value_array_storage_.assign(bytes, 0);
     arrayvalue_p->value.rawvals =
         reinterpret_cast<char*>(value_array_storage_.data());
@@ -373,67 +529,12 @@ void VpiContext::GetValueArray(VpiHandle obj, VpiArrayValue* arrayvalue_p,
   // raw and vector formats lay the element bits out per their byte/word group
   // descriptions; the scalar arms widen the element value into one C scalar.
   for (unsigned int k = 0; k < num; ++k) {
-    VpiObject* element = section[k];
     uint64_t aval = 0;
     uint64_t bval = 0;
     bool elem_4state = false;
-    if (element && element->var) {
-      const Logic4Vec& ev = element->var->value;
-      if (ev.nwords > 0) {
-        aval = ev.words[0].aval;
-        bval = ev.words[0].bval;
-      }
-      elem_4state = element->var->is_4state;
-    }
-
-    switch (fmt) {
-      case kVpiIntVal:
-        arrayvalue_p->value.integers[k] = static_cast<int32_t>(aval);
-        break;
-      case kVpiShortIntVal:
-        arrayvalue_p->value.shortints[k] = static_cast<int16_t>(aval);
-        break;
-      case kVpiLongIntVal:
-        arrayvalue_p->value.longints[k] = static_cast<int64_t>(aval);
-        break;
-      case kVpiRealVal:
-        arrayvalue_p->value.reals[k] = static_cast<double>(aval);
-        break;
-      case kVpiShortRealVal:
-        arrayvalue_p->value.shortreals[k] = static_cast<float>(aval);
-        break;
-      case kVpiTimeVal:
-        arrayvalue_p->value.times[k].high = static_cast<uint32_t>(aval >> 32);
-        arrayvalue_p->value.times[k].low =
-            static_cast<uint32_t>(aval & 0xFFFFFFFFu);
-        break;
-      case kVpiVectorVal:
-        arrayvalue_p->value.vectors[k].aval = static_cast<uint32_t>(aval);
-        // §38.16: bvalbits carry the unknown/high-impedance state for a 4-state
-        // element; a 2-state element reports a known (bval 0) value.
-        arrayvalue_p->value.vectors[k].bval =
-            elem_4state ? static_cast<uint32_t>(bval) : 0;
-        break;
-      case kVpiRawFourStateVal: {
-        // §38.16: each element occupies ngroups*2 bytes - an aval group
-        // followed by a bval group - loaded least-significant byte first.
-        char* abase =
-            arrayvalue_p->value.rawvals + static_cast<size_t>(k) * ngroups * 2;
-        VpiWriteRawGroup(abase, ngroups, aval);
-        VpiWriteRawGroup(abase + ngroups, ngroups, elem_4state ? bval : 0);
-        break;
-      }
-      case kVpiRawTwoStateVal: {
-        // §38.16: the 2-state raw format omits the bval group, so each element
-        // occupies just ngroups bytes.
-        char* abase =
-            arrayvalue_p->value.rawvals + static_cast<size_t>(k) * ngroups;
-        VpiWriteRawGroup(abase, ngroups, aval);
-        break;
-      }
-      default:
-        break;
-    }
+    ReadGetElementValue(section[k], &aval, &bval, &elem_4state);
+    EncodeGetElementValue(arrayvalue_p, k, fmt, ngroups, aval, bval,
+                          elem_4state);
   }
 }
 

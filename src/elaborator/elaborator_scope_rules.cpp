@@ -84,8 +84,9 @@ void WalkExprIdents(const Expr* e, std::vector<const Expr*>& out) {
   for (const auto* el : e->elements) WalkExprIdents(el, out);
 }
 
-void WalkStmtIdents(const Stmt* s, std::vector<const Expr*>& out) {
-  if (!s) return;
+void WalkStmtIdents(const Stmt* s, std::vector<const Expr*>& out);
+
+void WalkStmtScalarIdents(const Stmt* s, std::vector<const Expr*>& out) {
   WalkExprIdents(s->condition, out);
   WalkExprIdents(s->lhs, out);
   WalkExprIdents(s->rhs, out);
@@ -97,6 +98,9 @@ void WalkStmtIdents(const Stmt* s, std::vector<const Expr*>& out) {
   WalkExprIdents(s->repeat_event_count, out);
   WalkExprIdents(s->var_init, out);
   for (const auto* e : s->wait_order_events) WalkExprIdents(e, out);
+}
+
+void WalkStmtCaseIdents(const Stmt* s, std::vector<const Expr*>& out) {
   for (const auto& ci : s->case_items) {
     for (const auto* p : ci.patterns) WalkExprIdents(p, out);
     WalkStmtIdents(ci.body, out);
@@ -105,6 +109,9 @@ void WalkStmtIdents(const Stmt* s, std::vector<const Expr*>& out) {
     WalkExprIdents(w, out);
     WalkStmtIdents(body, out);
   }
+}
+
+void WalkStmtChildIdents(const Stmt* s, std::vector<const Expr*>& out) {
   for (const auto* sub : s->stmts) WalkStmtIdents(sub, out);
   for (const auto* sub : s->fork_stmts) WalkStmtIdents(sub, out);
   WalkStmtIdents(s->then_branch, out);
@@ -117,6 +124,44 @@ void WalkStmtIdents(const Stmt* s, std::vector<const Expr*>& out) {
   WalkStmtIdents(s->assert_fail_stmt, out);
 }
 
+void WalkStmtIdents(const Stmt* s, std::vector<const Expr*>& out) {
+  if (!s) return;
+  WalkStmtScalarIdents(s, out);
+  WalkStmtCaseIdents(s, out);
+  WalkStmtChildIdents(s, out);
+}
+
+bool PackageDeclared(const CompilationUnit* unit, std::string_view pkg_name) {
+  if (pkg_name == "std") return true;
+  for (const auto* pkg : unit->packages) {
+    if (pkg->name == pkg_name) return true;
+  }
+  return false;
+}
+
+bool PackageProvidesName(
+    const CompilationUnit* unit,
+    std::unordered_map<std::string_view, std::unordered_set<std::string_view>>&
+        provided_cache,
+    std::string_view pkg_name, std::string_view name) {
+  auto it = provided_cache.find(pkg_name);
+  if (it == provided_cache.end()) {
+    auto& s = provided_cache[pkg_name];
+    for (const auto* pkg : unit->packages) {
+      if (pkg->name != pkg_name) continue;
+      for (const auto* pi : pkg->items) {
+        if (!pi->name.empty()) s.insert(pi->name);
+        if (pi->kind == ModuleItemKind::kClassDecl && pi->class_decl &&
+            !pi->class_decl->name.empty()) {
+          s.insert(pi->class_decl->name);
+        }
+      }
+    }
+    it = provided_cache.find(pkg_name);
+  }
+  return it->second.count(name) != 0;
+}
+
 }  // namespace
 
 void Elaborator::ValidatePackageImportRules(const ModuleDecl* decl) {
@@ -126,32 +171,9 @@ void Elaborator::ValidatePackageImportRules(const ModuleDecl* decl) {
 
   wildcard_packages_.push_back("std");
 
-  auto package_declared = [&](std::string_view pkg_name) {
-    if (pkg_name == "std") return true;
-    for (const auto* pkg : unit_->packages) {
-      if (pkg->name == pkg_name) return true;
-    }
-    return false;
-  };
-
   auto provides = [&](std::string_view pkg_name,
                       std::string_view name) -> bool {
-    auto it = pkg_provided_names_.find(pkg_name);
-    if (it == pkg_provided_names_.end()) {
-      auto& s = pkg_provided_names_[pkg_name];
-      for (const auto* pkg : unit_->packages) {
-        if (pkg->name != pkg_name) continue;
-        for (const auto* pi : pkg->items) {
-          if (!pi->name.empty()) s.insert(pi->name);
-          if (pi->kind == ModuleItemKind::kClassDecl && pi->class_decl &&
-              !pi->class_decl->name.empty()) {
-            s.insert(pi->class_decl->name);
-          }
-        }
-      }
-      it = pkg_provided_names_.find(pkg_name);
-    }
-    return it->second.count(name) != 0;
+    return PackageProvidesName(unit_, pkg_provided_names_, pkg_name, name);
   };
 
   std::unordered_set<std::string_view> seen_decls;
@@ -194,58 +216,64 @@ void Elaborator::ValidatePackageImportRules(const ModuleDecl* decl) {
     }
   };
 
+  auto handle_explicit_import = [&](const ModuleItem* item,
+                                    std::string_view pkg_name) {
+    auto name = item->import_item.item_name;
+    auto eit = explicit_imports_.find(name);
+    if (eit != explicit_imports_.end()) {
+      if (eit->second.first == pkg_name) return;
+      diag_.Error(
+          item->loc,
+          std::format("explicit import of '{}::{}' conflicts with earlier "
+                      "explicit import from '{}'",
+                      pkg_name, name, eit->second.first));
+      return;
+    }
+    if (seen_decls.count(name)) {
+      if (wildcard_claimed_.find(name) != wildcard_claimed_.end()) {
+        diag_.Error(
+            item->loc,
+            std::format("explicit import of '{}::{}' is illegal because "
+                        "'{}' was already referenced through a wildcard "
+                        "package import",
+                        pkg_name, name, name));
+      } else {
+        diag_.Error(item->loc,
+                    std::format("explicit import of '{}::{}' collides with "
+                                "existing declaration of '{}'",
+                                pkg_name, name, name));
+      }
+      return;
+    }
+    explicit_imports_[name] = {pkg_name, item->loc};
+    seen_decls.insert(name);
+  };
+
+  auto handle_import_decl = [&](const ModuleItem* item) {
+    auto pkg_name = item->import_item.package_name;
+    if (!PackageDeclared(unit_, pkg_name)) {
+      diag_.Error(item->loc,
+                  std::format("import from unknown package '{}'; the package "
+                              "must be declared before any scope that imports "
+                              "from it",
+                              pkg_name));
+      return;
+    }
+    if (item->import_item.is_wildcard) {
+      if (std::find(wildcard_packages_.begin(), wildcard_packages_.end(),
+                    pkg_name) == wildcard_packages_.end()) {
+        wildcard_packages_.push_back(pkg_name);
+      }
+      return;
+    }
+    handle_explicit_import(item, pkg_name);
+  };
+
   for (const auto* item : decl->items) {
     switch (item->kind) {
-      case ModuleItemKind::kImportDecl: {
-        auto pkg_name = item->import_item.package_name;
-        if (!package_declared(pkg_name)) {
-          diag_.Error(
-              item->loc,
-              std::format("import from unknown package '{}'; the package "
-                          "must be declared before any scope that imports "
-                          "from it",
-                          pkg_name));
-          break;
-        }
-        if (item->import_item.is_wildcard) {
-          if (std::find(wildcard_packages_.begin(), wildcard_packages_.end(),
-                        pkg_name) == wildcard_packages_.end()) {
-            wildcard_packages_.push_back(pkg_name);
-          }
-          break;
-        }
-        auto name = item->import_item.item_name;
-        auto eit = explicit_imports_.find(name);
-        if (eit != explicit_imports_.end()) {
-          if (eit->second.first == pkg_name) break;
-          diag_.Error(
-              item->loc,
-              std::format("explicit import of '{}::{}' conflicts with earlier "
-                          "explicit import from '{}'",
-                          pkg_name, name, eit->second.first));
-          break;
-        }
-        if (seen_decls.count(name)) {
-          auto wit = wildcard_claimed_.find(name);
-          if (wit != wildcard_claimed_.end()) {
-            diag_.Error(
-                item->loc,
-                std::format("explicit import of '{}::{}' is illegal because "
-                            "'{}' was already referenced through a wildcard "
-                            "package import",
-                            pkg_name, name, name));
-          } else {
-            diag_.Error(item->loc,
-                        std::format("explicit import of '{}::{}' collides with "
-                                    "existing declaration of '{}'",
-                                    pkg_name, name, name));
-          }
-          break;
-        }
-        explicit_imports_[name] = {pkg_name, item->loc};
-        seen_decls.insert(name);
+      case ModuleItemKind::kImportDecl:
+        handle_import_decl(item);
         break;
-      }
       case ModuleItemKind::kInitialBlock:
       case ModuleItemKind::kFinalBlock:
       case ModuleItemKind::kAlwaysBlock:
@@ -317,25 +345,46 @@ bool Elaborator::IsNameInModuleScope(std::string_view name) const {
   return false;
 }
 
+namespace {
+
+bool ForwardTypedefHasDefinition(const ModuleDecl* decl,
+                                 const ModuleItem* item) {
+  for (const auto* other : decl->items) {
+    if (other == item) continue;
+    if (other->kind == ModuleItemKind::kTypedef && other->name == item->name &&
+        other->typedef_type.kind != DataTypeKind::kImplicit) {
+      return true;
+    }
+    if (other->kind == ModuleItemKind::kClassDecl && other->class_decl &&
+        other->class_decl->name == item->name) {
+      return true;
+    }
+  }
+  return false;
+}
+
+void ScanForwardScopePrefix(const ModuleDecl* decl, std::string_view scope,
+                            bool& is_forward_in_scope,
+                            bool& resolves_to_class) {
+  for (const auto* other : decl->items) {
+    if (other->kind == ModuleItemKind::kTypedef && other->name == scope &&
+        other->typedef_type.kind == DataTypeKind::kImplicit) {
+      is_forward_in_scope = true;
+    }
+    if (other->kind == ModuleItemKind::kClassDecl && other->class_decl &&
+        other->class_decl->name == scope) {
+      resolves_to_class = true;
+    }
+  }
+}
+
+}  // namespace
+
 void Elaborator::ValidateForwardTypedefsInScope(const ModuleDecl* decl) {
   for (const auto* item : decl->items) {
     if (item->kind != ModuleItemKind::kTypedef) continue;
     if (item->typedef_type.kind != DataTypeKind::kImplicit) continue;
-    bool resolved = false;
-    for (const auto* other : decl->items) {
-      if (other == item) continue;
-      if (other->kind == ModuleItemKind::kTypedef &&
-          other->name == item->name &&
-          other->typedef_type.kind != DataTypeKind::kImplicit) {
-        resolved = true;
-        break;
-      }
-      if (other->kind == ModuleItemKind::kClassDecl && other->class_decl &&
-          other->class_decl->name == item->name) {
-        resolved = true;
-        break;
-      }
-    }
+    bool resolved = ForwardTypedefHasDefinition(decl, item);
     if (!resolved && class_names_.count(item->name) > 0) {
       resolved = true;
     }
@@ -356,16 +405,7 @@ void Elaborator::ValidateForwardTypedefScopePrefix(const ModuleDecl* decl) {
     auto scope = item->typedef_type.scope_name;
     bool is_forward_in_scope = false;
     bool resolves_to_class = class_names_.count(scope) > 0;
-    for (const auto* other : decl->items) {
-      if (other->kind == ModuleItemKind::kTypedef && other->name == scope &&
-          other->typedef_type.kind == DataTypeKind::kImplicit) {
-        is_forward_in_scope = true;
-      }
-      if (other->kind == ModuleItemKind::kClassDecl && other->class_decl &&
-          other->class_decl->name == scope) {
-        resolves_to_class = true;
-      }
-    }
+    ScanForwardScopePrefix(decl, scope, is_forward_in_scope, resolves_to_class);
     if (!is_forward_in_scope) continue;
     if (!resolves_to_class) {
       diag_.Error(item->loc,
@@ -427,6 +467,70 @@ void CollectMemberAccessInStmt(const Stmt* s, std::vector<const Expr*>& out) {
   CollectMemberAccessInStmt(s->assert_fail_stmt, out);
 }
 
+struct InstanceArrayBounds {
+  int64_t low;
+  int64_t high;
+};
+
+bool DecodeInstanceArrayBase(const Expr* ma, std::string_view& name,
+                             const Expr*& select_index) {
+  if (!ma || ma->kind != ExprKind::kMemberAccess || !ma->lhs) return false;
+  const Expr* base = ma->lhs;
+  if (base->kind == ExprKind::kIdentifier) {
+    name = base->text;
+    select_index = nullptr;
+    return true;
+  }
+  if (base->kind == ExprKind::kSelect && base->base &&
+      base->base->kind == ExprKind::kIdentifier) {
+    name = base->base->text;
+    select_index = base->index;
+    return true;
+  }
+  return false;
+}
+
+void CollectModuleMemberAccesses(const ModuleDecl* decl,
+                                 std::vector<const Expr*>& accesses) {
+  for (const auto* item : decl->items) {
+    if (item->kind == ModuleItemKind::kContAssign) {
+      CollectMemberAccess(item->assign_lhs, accesses);
+      CollectMemberAccess(item->assign_rhs, accesses);
+    }
+    if (IsProcBodyItem(item->kind)) {
+      CollectMemberAccessInStmt(item->body, accesses);
+    }
+  }
+}
+
+bool ImportWildcardProvides(const CompilationUnit* unit,
+                            std::string_view package_name,
+                            std::string_view name) {
+  for (const auto* pkg : unit->packages) {
+    if (pkg->name != package_name) continue;
+    for (const auto* pi : pkg->items) {
+      if (pi->name == name) return true;
+      if (pi->kind == ModuleItemKind::kClassDecl && pi->class_decl &&
+          pi->class_decl->name == name) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+bool ImportedIntoModule(const CompilationUnit* unit, const RtlirModule* m,
+                        std::string_view name) {
+  for (const auto& imp : m->imports) {
+    if (!imp.is_wildcard && imp.item_name == name) return true;
+    if (imp.is_wildcard &&
+        ImportWildcardProvides(unit, imp.package_name, name)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 }  // namespace
 
 void Elaborator::ValidateHierRefToImportedName(const ModuleDecl* decl,
@@ -438,31 +542,13 @@ void Elaborator::ValidateHierRefToImportedName(const ModuleDecl* decl,
   }
   if (inst_type.empty()) return;
 
-  auto imported_into = [&](const RtlirModule* m, std::string_view name) {
-    for (const auto& imp : m->imports) {
-      if (!imp.is_wildcard && imp.item_name == name) return true;
-      if (imp.is_wildcard) {
-        for (const auto* pkg : unit_->packages) {
-          if (pkg->name != imp.package_name) continue;
-          for (const auto* pi : pkg->items) {
-            if (pi->name == name) return true;
-            if (pi->kind == ModuleItemKind::kClassDecl && pi->class_decl &&
-                pi->class_decl->name == name)
-              return true;
-          }
-        }
-      }
-    }
-    return false;
-  };
-
   auto check_member_access = [&](const Expr* ma) {
     if (!ma || ma->kind != ExprKind::kMemberAccess) return;
     if (!ma->lhs || ma->lhs->kind != ExprKind::kIdentifier) return;
     if (!ma->rhs || ma->rhs->kind != ExprKind::kIdentifier) return;
     auto it = inst_type.find(ma->lhs->text);
     if (it == inst_type.end()) return;
-    if (imported_into(it->second, ma->rhs->text)) {
+    if (ImportedIntoModule(unit_, it->second, ma->rhs->text)) {
       diag_.Error(
           ma->range.start,
           std::format("hierarchical reference '{}.{}' targets a name imported "
@@ -473,31 +559,19 @@ void Elaborator::ValidateHierRefToImportedName(const ModuleDecl* decl,
   };
 
   std::vector<const Expr*> accesses;
-  for (const auto* item : decl->items) {
-    if (item->kind == ModuleItemKind::kContAssign) {
-      CollectMemberAccess(item->assign_lhs, accesses);
-      CollectMemberAccess(item->assign_rhs, accesses);
-    }
-    if (IsProcBodyItem(item->kind)) {
-      CollectMemberAccessInStmt(item->body, accesses);
-    }
-  }
+  CollectModuleMemberAccesses(decl, accesses);
   for (const auto* ma : accesses) check_member_access(ma);
 }
 
 void Elaborator::ValidateHierRefInstanceArray(const ModuleDecl* decl) {
-  struct ArrayBounds {
-    int64_t low;
-    int64_t high;
-  };
-  std::unordered_map<std::string_view, ArrayBounds> arrayed;
+  std::unordered_map<std::string_view, InstanceArrayBounds> arrayed;
   for (const auto* item : decl->items) {
     if (item->kind != ModuleItemKind::kModuleInst) continue;
     if (!item->inst_range_left || !item->inst_range_right) continue;
     auto lhi = ConstEvalInt(item->inst_range_left);
     auto rhi = ConstEvalInt(item->inst_range_right);
     if (!lhi || !rhi) continue;
-    ArrayBounds b;
+    InstanceArrayBounds b;
     b.low = std::min(*lhi, *rhi);
     b.high = std::max(*lhi, *rhi);
     arrayed[item->inst_name] = b;
@@ -505,48 +579,32 @@ void Elaborator::ValidateHierRefInstanceArray(const ModuleDecl* decl) {
   if (arrayed.empty()) return;
 
   std::vector<const Expr*> accesses;
-  for (const auto* item : decl->items) {
-    if (item->kind == ModuleItemKind::kContAssign) {
-      CollectMemberAccess(item->assign_lhs, accesses);
-      CollectMemberAccess(item->assign_rhs, accesses);
-    }
-    if (IsProcBodyItem(item->kind)) {
-      CollectMemberAccessInStmt(item->body, accesses);
-    }
-  }
+  CollectModuleMemberAccesses(decl, accesses);
 
-  for (const auto* ma : accesses) {
-    if (!ma || ma->kind != ExprKind::kMemberAccess || !ma->lhs) continue;
-    const Expr* base = ma->lhs;
+  auto check_array_access = [&](const Expr* ma) {
     std::string_view name;
     const Expr* select_index = nullptr;
-    if (base->kind == ExprKind::kIdentifier) {
-      name = base->text;
-    } else if (base->kind == ExprKind::kSelect && base->base &&
-               base->base->kind == ExprKind::kIdentifier) {
-      name = base->base->text;
-      select_index = base->index;
-    } else {
-      continue;
-    }
+    if (!DecodeInstanceArrayBase(ma, name, select_index)) return;
     auto it = arrayed.find(name);
-    if (it == arrayed.end()) continue;
+    if (it == arrayed.end()) return;
     if (!select_index) {
       diag_.Error(ma->range.start,
                   std::format("hierarchical reference to instance array '{}' "
                               "requires an instance select",
                               name));
-      continue;
+      return;
     }
     auto idx = ConstEvalInt(select_index);
-    if (!idx) continue;
+    if (!idx) return;
     if (*idx < it->second.low || *idx > it->second.high) {
       diag_.Error(select_index->range.start,
                   std::format("instance select [{}] is out of range for "
                               "instance array '{}' [{}:{}]",
                               *idx, name, it->second.high, it->second.low));
     }
-  }
+  };
+
+  for (const auto* ma : accesses) check_array_access(ma);
 }
 
 }  // namespace delta

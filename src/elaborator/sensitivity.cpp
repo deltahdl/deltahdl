@@ -192,6 +192,52 @@ static std::unordered_set<std::string_view> ResolveCalledFunctions(
   return visited;
 }
 
+static void MergeCalledFunctionSignals(
+    const Stmt* body, const FuncMap& funcs, bool exclude_written,
+    std::unordered_set<std::string>& reads,
+    std::unordered_set<std::string>& locals,
+    std::unordered_set<std::string>& written) {
+  auto called = ResolveCalledFunctions(body, funcs);
+  for (auto& fname : called) {
+    auto it = funcs.find(fname);
+    if (it == funcs.end()) continue;
+    const auto* func = it->second;
+    for (auto* s : func->func_body_stmts) {
+      CollectStmtReads(s, reads);
+    }
+    for (const auto& arg : func->func_args) {
+      if (!arg.name.empty()) locals.insert(std::string(arg.name));
+    }
+    for (auto* s : func->func_body_stmts) {
+      CollectBlockLocalNames(s, locals);
+    }
+    if (exclude_written) {
+      for (auto* s : func->func_body_stmts) {
+        CollectWrittenNames(s, written);
+      }
+    }
+  }
+}
+
+static std::vector<EventExpr> BuildSensitivityEvents(
+    const std::unordered_set<std::string>& reads,
+    const std::unordered_set<std::string>& locals,
+    const std::unordered_set<std::string>& written, bool exclude_written,
+    Arena& arena) {
+  std::vector<EventExpr> events;
+  events.reserve(reads.size());
+  for (const auto& name : reads) {
+    if (locals.count(name)) continue;
+    if (exclude_written && written.count(name)) continue;
+    auto* expr = arena.Create<Expr>();
+    expr->kind = ExprKind::kIdentifier;
+    expr->text = std::string_view(arena.AllocString(name.data(), name.size()),
+                                  name.size());
+    events.push_back({Edge::kNone, expr});
+  }
+  return events;
+}
+
 std::vector<EventExpr> InferSensitivity(const Stmt* body, Arena& arena,
                                         const FuncMap* funcs,
                                         bool exclude_written) {
@@ -207,40 +253,11 @@ std::vector<EventExpr> InferSensitivity(const Stmt* body, Arena& arena,
   }
 
   if (funcs && !funcs->empty()) {
-    auto called = ResolveCalledFunctions(body, *funcs);
-    for (auto& fname : called) {
-      auto it = funcs->find(fname);
-      if (it == funcs->end()) continue;
-      const auto* func = it->second;
-      for (auto* s : func->func_body_stmts) {
-        CollectStmtReads(s, reads);
-      }
-      for (const auto& arg : func->func_args) {
-        if (!arg.name.empty()) locals.insert(std::string(arg.name));
-      }
-      for (auto* s : func->func_body_stmts) {
-        CollectBlockLocalNames(s, locals);
-      }
-      if (exclude_written) {
-        for (auto* s : func->func_body_stmts) {
-          CollectWrittenNames(s, written);
-        }
-      }
-    }
+    MergeCalledFunctionSignals(body, *funcs, exclude_written, reads, locals,
+                               written);
   }
 
-  std::vector<EventExpr> events;
-  events.reserve(reads.size());
-  for (const auto& name : reads) {
-    if (locals.count(name)) continue;
-    if (exclude_written && written.count(name)) continue;
-    auto* expr = arena.Create<Expr>();
-    expr->kind = ExprKind::kIdentifier;
-    expr->text = std::string_view(arena.AllocString(name.data(), name.size()),
-                                  name.size());
-    events.push_back({Edge::kNone, expr});
-  }
-  return events;
+  return BuildSensitivityEvents(reads, locals, written, exclude_written, arena);
 }
 
 }  // namespace delta

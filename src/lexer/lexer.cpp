@@ -6,6 +6,163 @@
 
 namespace delta {
 
+namespace {
+
+// Split a pragma comment body into whitespace-delimited words.
+std::vector<std::string_view> SplitPragmaWords(std::string_view body) {
+  std::vector<std::string_view> words;
+  size_t i = 0;
+  while (i < body.size()) {
+    while (i < body.size() &&
+           std::isspace(static_cast<unsigned char>(body[i]))) {
+      ++i;
+    }
+    size_t start = i;
+    while (i < body.size() &&
+           !std::isspace(static_cast<unsigned char>(body[i]))) {
+      ++i;
+    }
+    if (i > start) {
+      words.push_back(body.substr(start, i - start));
+    }
+  }
+  return words;
+}
+
+// Build the simple §40.4.1 current-state / enum-only pragma from a word list
+// whose leading `tool` keyword the caller has already matched. Returns true and
+// fills `out` for a recognized simple form, false otherwise. A `state_vector`
+// word whose state operand is not a simple identifier is a descendant form
+// (§40.4.2 / §40.4.3); the caller handles that case before calling this.
+bool BuildSimpleFsmStatePragma(const std::vector<std::string_view>& words,
+                               SourceLoc loc, Lexer::FsmStatePragma& out) {
+  out.loc = loc;
+  if (words.size() >= 3 && words[1] == "state_vector") {
+    out.form = Lexer::FsmStatePragma::Form::kStateVector;
+    out.signal_name = words[2];
+    if (words.size() == 3) {
+      // Bare current-state pragma; the enum name is supplied separately.
+      return true;
+    }
+    if (words.size() == 5 && words[3] == "enum" &&
+        Lexer::IsSimplePragmaIdentifier(words[4])) {
+      out.has_enum = true;
+      out.enum_name = words[4];
+      return true;
+    }
+    // An interposed FSM name or other trailing tokens belong to the descendant
+    // pragma forms, not the simple §40.4.1 signal pragma.
+    return false;
+  }
+  if (words.size() == 3 && words[1] == "enum" &&
+      Lexer::IsSimplePragmaIdentifier(words[2])) {
+    // Separate `tool enum enumeration_name` pragma placed after the bit range.
+    out.form = Lexer::FsmStatePragma::Form::kEnumOnly;
+    out.has_enum = true;
+    out.enum_name = words[2];
+    return true;
+  }
+  return false;
+}
+
+// Find the index of the word carrying the closing brace of a §40.4.3
+// concatenation. The braced list may span several whitespace-delimited words.
+// Returns words.size() when no closing brace is present.
+size_t FindConcatCloseBrace(const std::vector<std::string_view>& words) {
+  for (size_t k = 2; k < words.size(); ++k) {
+    if (words[k].find('}') != std::string_view::npos) {
+      return k;
+    }
+  }
+  return words.size();
+}
+
+// Reconstruct the `{...}` region as one contiguous view of the source, so the
+// internal spaces and commas are preserved regardless of how the comment body
+// split into words, and return the text between the braces. Returns true and
+// fills `inside` on success.
+bool ExtractBracedInside(const std::vector<std::string_view>& words,
+                         size_t close, std::string_view& inside) {
+  const char* region_begin = words[2].data();
+  const char* region_end = words[close].data() + words[close].size();
+  std::string_view region(region_begin,
+                          static_cast<size_t>(region_end - region_begin));
+  size_t open_brace = region.find('{');
+  size_t close_brace = region.rfind('}');
+  if (open_brace == std::string_view::npos ||
+      close_brace == std::string_view::npos || close_brace <= open_brace) {
+    return false;
+  }
+  inside = region.substr(open_brace + 1, close_brace - open_brace - 1);
+  return true;
+}
+
+// Split a concatenation body on commas and collect every member. Each member
+// must be a whole signal: §40.4.3 forbids bit-selects or part-selects here,
+// which IsSimplePragmaIdentifier rejects (a `[` is not an identifier
+// character). Returns true and fills `names` when every member is valid.
+bool ParseConcatMembers(std::string_view inside,
+                        std::vector<std::string_view>& names) {
+  size_t i = 0;
+  while (i <= inside.size()) {
+    size_t comma = inside.find(',', i);
+    std::string_view piece = comma == std::string_view::npos
+                                 ? inside.substr(i)
+                                 : inside.substr(i, comma - i);
+    // Trim surrounding whitespace from the member.
+    size_t b = 0;
+    size_t e = piece.size();
+    while (b < e && std::isspace(static_cast<unsigned char>(piece[b]))) {
+      ++b;
+    }
+    while (e > b && std::isspace(static_cast<unsigned char>(piece[e - 1]))) {
+      --e;
+    }
+    std::string_view member = piece.substr(b, e - b);
+    if (!Lexer::IsSimplePragmaIdentifier(member)) {
+      return false;
+    }
+    names.push_back(member);
+    if (comma == std::string_view::npos) {
+      break;
+    }
+    i = comma + 1;
+  }
+  return !names.empty();
+}
+
+// Returns true if a pragma carrying this exact source location was already
+// recorded, so the lexer does not double-record a comment it backtracks over.
+template <typename PragmaVec>
+bool PragmaAlreadyRecorded(const PragmaVec& recorded, SourceLoc loc) {
+  for (const auto& existing : recorded) {
+    if (existing.loc.file_id == loc.file_id && existing.loc.line == loc.line &&
+        existing.loc.column == loc.column) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// Decide whether the apostrophe at `apostrophe_pos` opens a size-prefixed
+// integer literal. The grammar requires the apostrophe to be followed by an
+// optional s/S signed marker and one of the base letters d/D/b/B/o/O/h/H.
+// Anything else — most importantly a left parenthesis or left brace — keeps the
+// apostrophe a separate token so that size'(expr) and size'{...}
+// cast/assignment-pattern forms tokenize correctly.
+bool ApostropheStartsBaseSpecifier(std::string_view source,
+                                   uint32_t apostrophe_pos) {
+  uint32_t look = apostrophe_pos + 1;
+  if (look < source.size() && (source[look] == 's' || source[look] == 'S')) {
+    ++look;
+  }
+  char base = (look < source.size()) ? source[look] : '\0';
+  return base == 'd' || base == 'D' || base == 'b' || base == 'B' ||
+         base == 'o' || base == 'O' || base == 'h' || base == 'H';
+}
+
+}  // namespace
+
 Lexer::Lexer(std::string_view source, uint32_t file_id, DiagEngine& diag)
     : source_(source), file_id_(file_id), diag_(diag) {}
 
@@ -119,80 +276,41 @@ bool Lexer::ParsePartSelect(std::string_view word, std::string_view& base,
 
 void Lexer::TryRecognizeFsmStatePragma(std::string_view body, SourceLoc loc) {
   // Split the comment body into whitespace-delimited words.
-  std::vector<std::string_view> words;
-  size_t i = 0;
-  while (i < body.size()) {
-    while (i < body.size() &&
-           std::isspace(static_cast<unsigned char>(body[i]))) {
-      ++i;
-    }
-    size_t start = i;
-    while (i < body.size() &&
-           !std::isspace(static_cast<unsigned char>(body[i]))) {
-      ++i;
-    }
-    if (i > start) {
-      words.push_back(body.substr(start, i - start));
-    }
-  }
+  std::vector<std::string_view> words = SplitPragmaWords(body);
 
   // Every §40.4.1 FSM pragma opens with the required `tool` keyword.
   if (words.empty() || words[0] != "tool") {
     return;
   }
 
-  FsmStatePragma pragma;
-  pragma.loc = loc;
-
-  if (words.size() >= 3 && words[1] == "state_vector") {
-    // Current-state form: `tool state_vector signal_name`, optionally with a
-    // trailing `enum enumeration_name` binding the signal to the FSM.
-    if (!IsSimplePragmaIdentifier(words[2])) {
-      // A bracketed part-select or braced concatenation is a descendant form
-      // (§40.4.2 / §40.4.3), not the simple signal named by §40.4.1.
-      if (!words[2].empty() && words[2].front() == '{') {
-        // §40.4.3: a concatenation of signals can hold the current state. The
-        // pragma supplies an FSM name and an enumeration name:
-        //   `tool state_vector {sig , sig, ...} FSM_name enum enum_name`.
-        TryRecognizeFsmConcatPragma(words, loc);
-      } else {
-        // §40.4.2: a part-select of a vector signal can hold the current state.
-        // Such a pragma must also supply an FSM name for the coverage tool to
-        // report under, distinct from the enumeration name:
-        //   `tool state_vector signal_name[msb:lsb] FSM_name enum enum_name`.
-        TryRecognizeFsmPartSelectPragma(words, loc);
-      }
-      return;
-    }
-    pragma.form = FsmStatePragma::Form::kStateVector;
-    pragma.signal_name = words[2];
-    if (words.size() == 3) {
-      // Bare current-state pragma; the enum name is supplied separately.
-    } else if (words.size() == 5 && words[3] == "enum" &&
-               IsSimplePragmaIdentifier(words[4])) {
-      pragma.has_enum = true;
-      pragma.enum_name = words[4];
+  // A `state_vector` word whose state operand is not a simple identifier is a
+  // descendant form (§40.4.2 part-select / §40.4.3 concatenation), not the
+  // simple signal named by §40.4.1; dispatch to the matching recognizer.
+  if (words.size() >= 3 && words[1] == "state_vector" &&
+      !IsSimplePragmaIdentifier(words[2])) {
+    if (!words[2].empty() && words[2].front() == '{') {
+      // §40.4.3: a concatenation of signals can hold the current state. The
+      // pragma supplies an FSM name and an enumeration name:
+      //   `tool state_vector {sig , sig, ...} FSM_name enum enum_name`.
+      TryRecognizeFsmConcatPragma(words, loc);
     } else {
-      // An interposed FSM name or other trailing tokens belong to the
-      // descendant pragma forms, not the simple §40.4.1 signal pragma.
-      return;
+      // §40.4.2: a part-select of a vector signal can hold the current state.
+      // Such a pragma must also supply an FSM name for the coverage tool to
+      // report under, distinct from the enumeration name:
+      //   `tool state_vector signal_name[msb:lsb] FSM_name enum enum_name`.
+      TryRecognizeFsmPartSelectPragma(words, loc);
     }
-  } else if (words.size() == 3 && words[1] == "enum" &&
-             IsSimplePragmaIdentifier(words[2])) {
-    // Separate `tool enum enumeration_name` pragma placed after the bit range.
-    pragma.form = FsmStatePragma::Form::kEnumOnly;
-    pragma.has_enum = true;
-    pragma.enum_name = words[2];
-  } else {
+    return;
+  }
+
+  FsmStatePragma pragma;
+  if (!BuildSimpleFsmStatePragma(words, loc, pragma)) {
     return;
   }
 
   // Avoid re-recording the same comment if the lexer backtracks over it.
-  for (const auto& existing : fsm_state_pragmas_) {
-    if (existing.loc.file_id == loc.file_id && existing.loc.line == loc.line &&
-        existing.loc.column == loc.column) {
-      return;
-    }
+  if (PragmaAlreadyRecorded(fsm_state_pragmas_, loc)) {
+    return;
   }
   fsm_state_pragmas_.push_back(pragma);
 }
@@ -221,11 +339,8 @@ void Lexer::TryRecognizeFsmPartSelectPragma(
   pragma.loc = loc;
 
   // Avoid re-recording the same comment if the lexer backtracks over it.
-  for (const auto& existing : fsm_part_select_pragmas_) {
-    if (existing.loc.file_id == loc.file_id && existing.loc.line == loc.line &&
-        existing.loc.column == loc.column) {
-      return;
-    }
+  if (PragmaAlreadyRecorded(fsm_part_select_pragmas_, loc)) {
+    return;
   }
   fsm_part_select_pragmas_.push_back(pragma);
 }
@@ -241,13 +356,7 @@ void Lexer::TryRecognizeFsmConcatPragma(
   if (words.size() < 3 || words[2].empty() || words[2].front() != '{') {
     return;
   }
-  size_t close = words.size();
-  for (size_t k = 2; k < words.size(); ++k) {
-    if (words[k].find('}') != std::string_view::npos) {
-      close = k;
-      break;
-    }
-  }
+  size_t close = FindConcatCloseBrace(words);
   if (close == words.size()) {
     return;  // no closing brace for the concatenation
   }
@@ -261,51 +370,13 @@ void Lexer::TryRecognizeFsmConcatPragma(
     return;
   }
 
-  // Reconstruct the `{...}` region as one contiguous view of the source so the
-  // internal spaces and commas are preserved regardless of how the body split.
-  const char* region_begin = words[2].data();
-  const char* region_end = words[close].data() + words[close].size();
-  std::string_view region(region_begin,
-                          static_cast<size_t>(region_end - region_begin));
-  size_t open_brace = region.find('{');
-  size_t close_brace = region.rfind('}');
-  if (open_brace == std::string_view::npos ||
-      close_brace == std::string_view::npos || close_brace <= open_brace) {
+  std::string_view inside;
+  if (!ExtractBracedInside(words, close, inside)) {
     return;
   }
-  std::string_view inside =
-      region.substr(open_brace + 1, close_brace - open_brace - 1);
 
-  // Split the concatenation on commas and record every member. Each member must
-  // be a whole signal: §40.4.3 forbids bit-selects or part-selects here, which
-  // IsSimplePragmaIdentifier rejects (a `[` is not an identifier character).
   FsmConcatPragma pragma;
-  size_t i = 0;
-  while (i <= inside.size()) {
-    size_t comma = inside.find(',', i);
-    std::string_view piece = comma == std::string_view::npos
-                                 ? inside.substr(i)
-                                 : inside.substr(i, comma - i);
-    // Trim surrounding whitespace from the member.
-    size_t b = 0;
-    size_t e = piece.size();
-    while (b < e && std::isspace(static_cast<unsigned char>(piece[b]))) {
-      ++b;
-    }
-    while (e > b && std::isspace(static_cast<unsigned char>(piece[e - 1]))) {
-      --e;
-    }
-    std::string_view member = piece.substr(b, e - b);
-    if (!IsSimplePragmaIdentifier(member)) {
-      return;
-    }
-    pragma.signal_names.push_back(member);
-    if (comma == std::string_view::npos) {
-      break;
-    }
-    i = comma + 1;
-  }
-  if (pragma.signal_names.empty()) {
+  if (!ParseConcatMembers(inside, pragma.signal_names)) {
     return;
   }
 
@@ -314,11 +385,8 @@ void Lexer::TryRecognizeFsmConcatPragma(
   pragma.loc = loc;
 
   // Avoid re-recording the same comment if the lexer backtracks over it.
-  for (const auto& existing : fsm_concat_pragmas_) {
-    if (existing.loc.file_id == loc.file_id && existing.loc.line == loc.line &&
-        existing.loc.column == loc.column) {
-      return;
-    }
+  if (PragmaAlreadyRecorded(fsm_concat_pragmas_, loc)) {
+    return;
   }
   fsm_concat_pragmas_.push_back(pragma);
 }
@@ -657,25 +725,9 @@ Token Lexer::LexNumber() {
     Advance();
   }
 
-  if (!AtEnd() && Current() == '\'') {
-    // The size-prefixed integer literal grammar requires the apostrophe to be
-    // followed by an optional s/S signed marker and one of the base letters
-    // d/D/b/B/o/O/h/H. Anything else — most importantly a left parenthesis or
-    // left brace — keeps the apostrophe as a separate token so that
-    // size'(expr) and size'{...} cast/assignment-pattern forms tokenize
-    // correctly.
-    uint32_t look = pos_ + 1;
-    if (look < source_.size() &&
-        (source_[look] == 's' || source_[look] == 'S')) {
-      ++look;
-    }
-    char base = (look < source_.size()) ? source_[look] : '\0';
-    bool looks_like_base = base == 'd' || base == 'D' || base == 'b' ||
-                           base == 'B' || base == 'o' || base == 'O' ||
-                           base == 'h' || base == 'H';
-    if (looks_like_base) {
-      return LexBasedNumber(loc, start);
-    }
+  if (!AtEnd() && Current() == '\'' &&
+      ApostropheStartsBaseSpecifier(source_, pos_)) {
+    return LexBasedNumber(loc, start);
   }
   pos_ = before_ws;
 

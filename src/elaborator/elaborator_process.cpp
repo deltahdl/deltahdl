@@ -383,20 +383,25 @@ static void CheckMultiProcDriver(const std::string& prefix, size_t i,
   }
 }
 
+static void CheckContAssignConflict(
+    const std::string& var, const ProcInfo& proc,
+    const std::unordered_set<std::string>& cont_assign_lhs, DiagEngine& diag) {
+  for (const auto& ca : cont_assign_lhs) {
+    if (PrefixesOverlap(var, ca)) {
+      diag.Error(proc.loc, std::format("variable '{}' driven by {} and "
+                                       "continuous assignment",
+                                       var, ProcessKindLabel(proc.kind)));
+      break;
+    }
+  }
+}
+
 static void CheckDriverConflicts(
     const std::vector<ProcInfo>& procs,
     const std::unordered_set<std::string>& cont_assign_lhs, DiagEngine& diag) {
   for (size_t i = 0; i < procs.size(); ++i) {
     for (const auto& var : procs[i].lhs) {
-      for (const auto& ca : cont_assign_lhs) {
-        if (PrefixesOverlap(var, ca)) {
-          diag.Error(procs[i].loc,
-                     std::format("variable '{}' driven by {} and "
-                                 "continuous assignment",
-                                 var, ProcessKindLabel(procs[i].kind)));
-          break;
-        }
-      }
+      CheckContAssignConflict(var, procs[i], cont_assign_lhs, diag);
       CheckMultiProcDriver(var, i, procs, diag);
     }
   }

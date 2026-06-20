@@ -155,6 +155,28 @@ struct ContAssignParams {
   const Expr* data_input = nullptr;
 };
 
+static uint64_t SelectScalarContAssignDelay(const Logic4Vec& old_val,
+                                            const Logic4Vec& new_val,
+                                            const ContAssignDelays& d) {
+  bool new_has_x = HasUnknownBits(new_val);
+  if (new_has_x) {
+    uint64_t m = std::min(d.rise, d.fall);
+    if (d.has_decay) m = std::min(m, d.decay);
+    return m;
+  }
+  if (HasUnknownBits(old_val) || IsAllHighZ(old_val)) {
+    // Old value is x or z, new value is a known 0 or 1. The destination
+    // logic level selects the slot: 0 routes through the fall delay and 1
+    // through the rise delay, matching the x/z-source rows of Table 28-9.
+    return new_val.ToUint64() == 0 ? d.fall : d.rise;
+  }
+  uint64_t nv = new_val.ToUint64();
+  uint64_t ov = old_val.ToUint64();
+  if (nv > ov) return d.rise;
+  if (nv < ov) return d.fall;
+  return d.rise;
+}
+
 static uint64_t SelectContAssignDelay(const Logic4Vec& old_val,
                                       const Logic4Vec& new_val,
                                       const ContAssignDelays& d,
@@ -168,23 +190,7 @@ static uint64_t SelectContAssignDelay(const Logic4Vec& old_val,
   }
 
   if (width <= 1) {
-    bool new_has_x = HasUnknownBits(new_val);
-    if (new_has_x) {
-      uint64_t m = std::min(d.rise, d.fall);
-      if (d.has_decay) m = std::min(m, d.decay);
-      return m;
-    }
-    if (HasUnknownBits(old_val) || IsAllHighZ(old_val)) {
-      // Old value is x or z, new value is a known 0 or 1. The destination
-      // logic level selects the slot: 0 routes through the fall delay and 1
-      // through the rise delay, matching the x/z-source rows of Table 28-9.
-      return new_val.ToUint64() == 0 ? d.fall : d.rise;
-    }
-    uint64_t nv = new_val.ToUint64();
-    uint64_t ov = old_val.ToUint64();
-    if (nv > ov) return d.rise;
-    if (nv < ov) return d.fall;
-    return d.rise;
+    return SelectScalarContAssignDelay(old_val, new_val, d);
   }
 
   if (!HasUnknownBits(new_val) && new_val.ToUint64() == 0 &&
@@ -193,6 +199,57 @@ static uint64_t SelectContAssignDelay(const Logic4Vec& old_val,
     return d.fall;
   }
   return d.rise;
+}
+
+static ContAssignDelays BuildContAssignDelays(const ContAssignDelayExprs& exprs,
+                                              SimContext& ctx, Arena& arena) {
+  ContAssignDelays d;
+  d.rise = EvalExpr(exprs.rise, ctx, arena).ToUint64();
+  d.fall = exprs.fall ? EvalExpr(exprs.fall, ctx, arena).ToUint64() : 0;
+  d.decay = exprs.decay ? EvalExpr(exprs.decay, ctx, arena).ToUint64() : 0;
+  d.has_fall = exprs.fall != nullptr;
+  d.has_decay = exprs.decay != nullptr;
+  return d;
+}
+
+static DriverStrength ComputeEffectiveDriverStrength(
+    const ContAssignParams& params, SimContext& ctx) {
+  DriverStrength effective_ds = params.ds;
+  if ((params.nonresistive_switch || params.resistive_switch) &&
+      params.data_input && params.data_input->kind == ExprKind::kIdentifier) {
+    auto* data_net = ctx.FindNet(params.data_input->text);
+    if (data_net) {
+      const NetStrength& ns = data_net->resolved_strength;
+      auto reduce =
+          params.resistive_switch ? &ReduceResistive : &ReduceNonresistive;
+      effective_ds.s0 = reduce(ns.s0_hi);
+      effective_ds.s1 = reduce(ns.s1_hi);
+    }
+  }
+  return effective_ds;
+}
+
+static void ApplyContAssignResult(const ContAssignParams& params, Net* net,
+                                  size_t driver_idx, bool first,
+                                  const Logic4Vec& driven_val,
+                                  DriverStrength effective_ds, SimContext& ctx,
+                                  Arena& arena) {
+  if (net) {
+    if (first) {
+      net->drivers.push_back(driven_val);
+      net->driver_strengths.push_back(effective_ds);
+    } else {
+      net->drivers[driver_idx] = driven_val;
+      net->driver_strengths[driver_idx] = effective_ds;
+    }
+    net->Resolve(arena);
+  } else {
+    auto* var = ctx.FindVariable(params.lhs->text);
+    if (var && !var->is_forced) {
+      var->value = ResizeToWidth(driven_val, var->value.width, arena);
+      var->NotifyWatchers();
+    }
+  }
 }
 
 static SimCoroutine MakeContAssignCoroutine(ContAssignParams params,
@@ -211,16 +268,7 @@ static SimCoroutine MakeContAssignCoroutine(ContAssignParams params,
     auto val = EvalExpr(params.rhs, ctx, arena, params.width);
 
     if (params.delays.rise) {
-      ContAssignDelays d;
-      d.rise = EvalExpr(params.delays.rise, ctx, arena).ToUint64();
-      d.fall = params.delays.fall
-                   ? EvalExpr(params.delays.fall, ctx, arena).ToUint64()
-                   : 0;
-      d.decay = params.delays.decay
-                    ? EvalExpr(params.delays.decay, ctx, arena).ToUint64()
-                    : 0;
-      d.has_fall = params.delays.fall != nullptr;
-      d.has_decay = params.delays.decay != nullptr;
+      ContAssignDelays d = BuildContAssignDelays(params.delays, ctx, arena);
 
       Logic4Vec old_val = MakeLogic4VecVal(arena, 1, 0);
       auto* var = ctx.FindVariable(params.lhs->text);
@@ -260,37 +308,12 @@ static SimCoroutine MakeContAssignCoroutine(ContAssignParams params,
       }
     }
 
-    DriverStrength effective_ds = params.ds;
-    if ((params.nonresistive_switch || params.resistive_switch) &&
-        params.data_input && params.data_input->kind == ExprKind::kIdentifier) {
-      auto* data_net = ctx.FindNet(params.data_input->text);
-      if (data_net) {
-        const NetStrength& ns = data_net->resolved_strength;
-        auto reduce =
-            params.resistive_switch ? &ReduceResistive : &ReduceNonresistive;
-        effective_ds.s0 = reduce(ns.s0_hi);
-        effective_ds.s1 = reduce(ns.s1_hi);
-      }
-    }
+    DriverStrength effective_ds = ComputeEffectiveDriverStrength(params, ctx);
 
     auto driven_val = ApplyHighzStrengthsToValue(val, effective_ds, arena);
 
-    if (net) {
-      if (first) {
-        net->drivers.push_back(driven_val);
-        net->driver_strengths.push_back(effective_ds);
-      } else {
-        net->drivers[driver_idx] = driven_val;
-        net->driver_strengths[driver_idx] = effective_ds;
-      }
-      net->Resolve(arena);
-    } else {
-      auto* var = ctx.FindVariable(params.lhs->text);
-      if (var && !var->is_forced) {
-        var->value = ResizeToWidth(driven_val, var->value.width, arena);
-        var->NotifyWatchers();
-      }
-    }
+    ApplyContAssignResult(params, net, driver_idx, first, driven_val,
+                          effective_ds, ctx, arena);
 
     first = false;
 
@@ -352,60 +375,83 @@ void Lowerer::LowerAliases(const RtlirModule* mod) {
   }
 }
 
-void Lowerer::LowerModule(const RtlirModule* mod) {
-  {
-    std::string key = inst_prefix_;
-    if (!key.empty() && key.back() == '.') key.pop_back();
-    ctx_.RegisterInstanceType(key, mod->name);
-    // §33.7: record this instance's resolved library.cell so the %l/%L display
-    // specifier can report its binding. The cell is the module's design-element
-    // name; the library is the one it was compiled into.
-    ctx_.RegisterInstanceBinding(key, mod->library, mod->name);
-  }
-  LowerParams(mod);
+static void RegisterInstanceKeyBinding(const std::string& inst_prefix,
+                                       std::string_view library,
+                                       std::string_view name, SimContext& ctx) {
+  std::string key = inst_prefix;
+  if (!key.empty() && key.back() == '.') key.pop_back();
+  ctx.RegisterInstanceType(key, name);
+  // §33.7: record this instance's resolved library.cell so the %l/%L display
+  // specifier can report its binding. The cell is the module's design-element
+  // name; the library is the one it was compiled into.
+  ctx.RegisterInstanceBinding(key, library, name);
+}
+
+static void RegisterModuleNets(const RtlirModule* mod, SimContext& ctx) {
   for (const auto& net : mod->nets) {
-    ctx_.CreateNet(net.name, net.net_type, net.width, net.charge_strength,
-                   net.decay_ticks, net.is_user_nettype, net.resolve_func,
-                   net.is_signed);
+    ctx.CreateNet(net.name, net.net_type, net.width, net.charge_strength,
+                  net.decay_ticks, net.is_user_nettype, net.resolve_func,
+                  net.is_signed);
   }
-  RegisterEnumTypes(mod);
-  for (const auto& var : mod->variables) LowerVar(var);
+}
+
+static void RegisterModulePorts(const RtlirModule* mod, SimContext& ctx) {
   for (const auto& port : mod->ports) {
-    if (!ctx_.FindVariable(port.name)) {
-      auto* v = ctx_.CreateVariable(port.name, port.width);
+    if (!ctx.FindVariable(port.name)) {
+      auto* v = ctx.CreateVariable(port.name, port.width);
       if (port.is_signed) v->is_signed = true;
     }
   }
+}
+
+static void RegisterModuleSubroutines(const RtlirModule* mod, SimContext& ctx) {
   for (auto* func : mod->function_decls) {
-    ctx_.RegisterFunction(func->name, func);
+    ctx.RegisterFunction(func->name, func);
   }
   for (auto* let_decl : mod->let_decls) {
-    ctx_.RegisterLetDecl(let_decl->name, let_decl);
+    ctx.RegisterLetDecl(let_decl->name, let_decl);
   }
+}
+
+static void RegisterModuleSequenceDecls(const RtlirModule* mod,
+                                        SimContext& ctx) {
   for (auto* seq_decl : mod->sequence_decls) {
-    ctx_.RegisterSequenceDecl(seq_decl->name, seq_decl);
+    ctx.RegisterSequenceDecl(seq_decl->name, seq_decl);
 
     std::string ep_name = std::string("__seq_") + std::string(seq_decl->name);
-    if (!ctx_.FindVariable(ep_name)) {
-      auto* ep_var = ctx_.CreateVariable(ep_name, 1);
+    if (!ctx.FindVariable(ep_name)) {
+      auto* ep_var = ctx.CreateVariable(ep_name, 1);
       ep_var->is_event = true;
     }
   }
+}
+
+static void RegisterProcessClassType(SimContext& ctx, Arena& arena) {
+  auto* proc_type = arena.Create<ClassTypeInfo>();
+  proc_type->name = "process";
+  proc_type->enum_members["FINISHED"] = 0;
+  proc_type->enum_members["RUNNING"] = 1;
+  proc_type->enum_members["WAITING"] = 2;
+  proc_type->enum_members["SUSPENDED"] = 3;
+  proc_type->enum_members["KILLED"] = 4;
+  ctx.RegisterClassType("process", proc_type);
+}
+
+void Lowerer::LowerModule(const RtlirModule* mod) {
+  RegisterInstanceKeyBinding(inst_prefix_, mod->library, mod->name, ctx_);
+  LowerParams(mod);
+  RegisterModuleNets(mod, ctx_);
+  RegisterEnumTypes(mod);
+  for (const auto& var : mod->variables) LowerVar(var);
+  RegisterModulePorts(mod, ctx_);
+  RegisterModuleSubroutines(mod, ctx_);
+  RegisterModuleSequenceDecls(mod, ctx_);
   for (auto* cls : mod->class_decls) {
     LowerClassDecl(cls);
   }
 
   LowerImports(mod);
-  {
-    auto* proc_type = arena_.Create<ClassTypeInfo>();
-    proc_type->name = "process";
-    proc_type->enum_members["FINISHED"] = 0;
-    proc_type->enum_members["RUNNING"] = 1;
-    proc_type->enum_members["WAITING"] = 2;
-    proc_type->enum_members["SUSPENDED"] = 3;
-    proc_type->enum_members["KILLED"] = 4;
-    ctx_.RegisterClassType("process", proc_type);
-  }
+  RegisterProcessClassType(ctx_, arena_);
   LowerAliases(mod);
   uint32_t program_block_id = mod->is_program ? next_program_block_id_++ : 0;
   LowerProcesses(mod->processes, mod->is_program, program_block_id);
@@ -536,37 +582,52 @@ static bool PackageItemHasName(const ModuleItem* item, std::string_view name) {
   return false;
 }
 
+static bool IsImportOrExportDecl(const ModuleItem* item) {
+  return item->kind == ModuleItemKind::kImportDecl ||
+         item->kind == ModuleItemKind::kExportDecl;
+}
+
+static ModuleItem* FindNamedPackageItem(PackageDecl* pkg,
+                                        std::string_view name) {
+  for (auto* item : pkg->items) {
+    if (IsImportOrExportDecl(item)) continue;
+    if (PackageItemHasName(item, name)) return item;
+  }
+  return nullptr;
+}
+
+// Collects the package names imported by `pkg`, which a wildcard ("*")
+// export re-exports from. The caller resolves each name and recurses.
+static std::vector<std::string_view> WildcardExportImportNames(
+    const PackageDecl* pkg) {
+  std::vector<std::string_view> names;
+  for (auto* imp_item : pkg->items) {
+    if (imp_item->kind != ModuleItemKind::kImportDecl) continue;
+    names.push_back(imp_item->import_item.package_name);
+  }
+  return names;
+}
+
 void Lowerer::LowerImportedName(
     PackageDecl* pkg, std::string_view name,
     std::unordered_set<const PackageDecl*>& visited) {
   if (!visited.insert(pkg).second) return;
-  for (auto* item : pkg->items) {
-    if (item->kind == ModuleItemKind::kImportDecl ||
-        item->kind == ModuleItemKind::kExportDecl)
-      continue;
-    if (PackageItemHasName(item, name)) {
-      LowerPackageItem(item);
-      return;
-    }
+  if (auto* found = FindNamedPackageItem(pkg, name)) {
+    LowerPackageItem(found);
+    return;
   }
 
   for (auto* item : pkg->items) {
     if (item->kind != ModuleItemKind::kExportDecl) continue;
     const auto& ex = item->import_item;
     if (ex.package_name == "*") {
-      for (auto* imp_item : pkg->items) {
-        if (imp_item->kind != ModuleItemKind::kImportDecl) continue;
-        auto* src = FindPackage(imp_item->import_item.package_name);
+      for (std::string_view src_name : WildcardExportImportNames(pkg)) {
+        auto* src = FindPackage(src_name);
         if (!src) continue;
         auto sub = visited;
         LowerImportedName(src, name, sub);
       }
-    } else if (ex.is_wildcard) {
-      auto* src = FindPackage(ex.package_name);
-      if (!src) continue;
-      auto sub = visited;
-      LowerImportedName(src, name, sub);
-    } else if (ex.item_name == name) {
+    } else if (ex.is_wildcard || ex.item_name == name) {
       auto* src = FindPackage(ex.package_name);
       if (!src) continue;
       auto sub = visited;
@@ -579,9 +640,7 @@ void Lowerer::LowerAllImported(
     PackageDecl* pkg, std::unordered_set<const PackageDecl*>& visited) {
   if (!visited.insert(pkg).second) return;
   for (auto* item : pkg->items) {
-    if (item->kind == ModuleItemKind::kImportDecl ||
-        item->kind == ModuleItemKind::kExportDecl)
-      continue;
+    if (IsImportOrExportDecl(item)) continue;
     LowerPackageItem(item);
   }
 
@@ -589,9 +648,8 @@ void Lowerer::LowerAllImported(
     if (item->kind != ModuleItemKind::kExportDecl) continue;
     const auto& ex = item->import_item;
     if (ex.package_name == "*") {
-      for (auto* imp_item : pkg->items) {
-        if (imp_item->kind != ModuleItemKind::kImportDecl) continue;
-        auto* src = FindPackage(imp_item->import_item.package_name);
+      for (std::string_view src_name : WildcardExportImportNames(pkg)) {
+        auto* src = FindPackage(src_name);
         if (!src) continue;
         auto sub = visited;
         LowerAllImported(src, sub);
@@ -610,27 +668,28 @@ void Lowerer::LowerAllImported(
   }
 }
 
-void Lowerer::LowerImports(const RtlirModule* mod) {
-  auto alias_data_item = [&](const PackageDecl* pkg, const ModuleItem* item) {
-    bool is_param = item->kind == ModuleItemKind::kParamDecl;
-    bool is_var = item->kind == ModuleItemKind::kVarDecl;
-    if (!(is_param || is_var) || !item->init_expr) return;
-    if (ctx_.FindVariable(item->name)) return;
-    std::string qname = std::string(pkg->name) + "." + std::string(item->name);
-    ctx_.AliasVariable(item->name, qname);
-  };
+static void AliasPackageDataItem(const PackageDecl* pkg, const ModuleItem* item,
+                                 SimContext& ctx) {
+  bool is_param = item->kind == ModuleItemKind::kParamDecl;
+  bool is_var = item->kind == ModuleItemKind::kVarDecl;
+  if (!(is_param || is_var) || !item->init_expr) return;
+  if (ctx.FindVariable(item->name)) return;
+  std::string qname = std::string(pkg->name) + "." + std::string(item->name);
+  ctx.AliasVariable(item->name, qname);
+}
 
+void Lowerer::LowerImports(const RtlirModule* mod) {
   auto apply_import = [&](const RtlirImport& imp) {
     auto* pkg = FindPackage(imp.package_name);
     if (!pkg) return;
     std::unordered_set<const PackageDecl*> visited;
     if (imp.is_wildcard) {
       LowerAllImported(pkg, visited);
-      for (const auto* item : pkg->items) alias_data_item(pkg, item);
+      for (const auto* item : pkg->items) AliasPackageDataItem(pkg, item, ctx_);
     } else {
       LowerImportedName(pkg, imp.item_name, visited);
       for (const auto* item : pkg->items) {
-        if (item->name == imp.item_name) alias_data_item(pkg, item);
+        if (item->name == imp.item_name) AliasPackageDataItem(pkg, item, ctx_);
       }
     }
   };
@@ -647,21 +706,28 @@ void Lowerer::LowerImports(const RtlirModule* mod) {
     if (imp.is_wildcard) apply_import(imp);
 }
 
+static bool IsConnectablePortBinding(const RtlirPortBinding& binding) {
+  if (!binding.connection) return false;
+  if (binding.width == 0) return false;
+  return binding.direction == Direction::kInput ||
+         binding.direction == Direction::kOutput ||
+         binding.direction == Direction::kInout;
+}
+
+static Expr* MakeLocalPortId(std::string_view port_name, Arena& arena) {
+  auto* name_str = arena.Create<std::string>(std::string(port_name));
+  auto* local_id = arena.Create<Expr>();
+  local_id->kind = ExprKind::kIdentifier;
+  local_id->text = *name_str;
+  return local_id;
+}
+
 void Lowerer::LowerPortBindings(const RtlirModuleInst& inst,
                                 bool from_program) {
   for (const auto& binding : inst.port_bindings) {
-    if (!binding.connection) continue;
-    if (binding.width == 0) continue;
-    if (binding.direction != Direction::kInput &&
-        binding.direction != Direction::kOutput &&
-        binding.direction != Direction::kInout) {
-      continue;
-    }
+    if (!IsConnectablePortBinding(binding)) continue;
 
-    auto* name_str = arena_.Create<std::string>(std::string(binding.port_name));
-    auto* local_id = arena_.Create<Expr>();
-    local_id->kind = ExprKind::kIdentifier;
-    local_id->text = *name_str;
+    auto* local_id = MakeLocalPortId(binding.port_name, arena_);
 
     if (binding.direction == Direction::kInout) {
       if (binding.connection->kind != ExprKind::kIdentifier) continue;
@@ -689,44 +755,46 @@ void Lowerer::LowerPortBindings(const RtlirModuleInst& inst,
   }
 }
 
+static void CreateChildModuleVariables(const std::string& inst_prefix,
+                                       const RtlirModule* resolved,
+                                       SimContext& ctx, Arena& arena) {
+  for (const auto& var : resolved->variables) {
+    auto* name = arena.Create<std::string>(inst_prefix + std::string(var.name));
+    uint32_t width = var.class_type_name.empty() ? var.width : 64;
+    if (var.is_real && width < 64) width = 64;
+    auto* v = ctx.CreateVariable(*name, width);
+    if (!var.is_4state && !var.is_event && !var.is_string && !var.is_chandle)
+      v->value = MakeLogic4VecVal(arena, width, 0);
+    if (var.is_chandle) v->value = MakeLogic4VecVal(arena, width, 0);
+    v->is_4state = var.is_4state;
+    if (var.is_event) v->is_event = true;
+    if (var.is_signed) v->is_signed = true;
+  }
+}
+
+static void CreateChildModulePorts(const std::string& inst_prefix,
+                                   const RtlirModule* resolved, SimContext& ctx,
+                                   Arena& arena) {
+  for (const auto& port : resolved->ports) {
+    auto* name =
+        arena.Create<std::string>(inst_prefix + std::string(port.name));
+    if (!ctx.FindVariable(*name)) {
+      auto* v = ctx.CreateVariable(*name, port.width);
+      if (port.is_signed) v->is_signed = true;
+    }
+  }
+}
+
 void Lowerer::LowerChildModules(const RtlirModule* mod) {
   for (const auto& child : mod->children) {
     if (!child.resolved) continue;
     auto saved_prefix = inst_prefix_;
     inst_prefix_ = inst_prefix_ + std::string(child.inst_name) + ".";
 
-    {
-      std::string key = inst_prefix_;
-      if (!key.empty() && key.back() == '.') key.pop_back();
-      ctx_.RegisterInstanceType(key, child.resolved->name);
-      // §33.7: record the child instance's resolved library.cell binding for
-      // the %l/%L display specifier.
-      ctx_.RegisterInstanceBinding(key, child.resolved->library,
-                                   child.resolved->name);
-    }
-
-    for (const auto& var : child.resolved->variables) {
-      auto* name =
-          arena_.Create<std::string>(inst_prefix_ + std::string(var.name));
-      uint32_t width = var.class_type_name.empty() ? var.width : 64;
-      if (var.is_real && width < 64) width = 64;
-      auto* v = ctx_.CreateVariable(*name, width);
-      if (!var.is_4state && !var.is_event && !var.is_string && !var.is_chandle)
-        v->value = MakeLogic4VecVal(arena_, width, 0);
-      if (var.is_chandle) v->value = MakeLogic4VecVal(arena_, width, 0);
-      v->is_4state = var.is_4state;
-      if (var.is_event) v->is_event = true;
-      if (var.is_signed) v->is_signed = true;
-    }
-
-    for (const auto& port : child.resolved->ports) {
-      auto* name =
-          arena_.Create<std::string>(inst_prefix_ + std::string(port.name));
-      if (!ctx_.FindVariable(*name)) {
-        auto* v = ctx_.CreateVariable(*name, port.width);
-        if (port.is_signed) v->is_signed = true;
-      }
-    }
+    RegisterInstanceKeyBinding(inst_prefix_, child.resolved->library,
+                               child.resolved->name, ctx_);
+    CreateChildModuleVariables(inst_prefix_, child.resolved, ctx_, arena_);
+    CreateChildModulePorts(inst_prefix_, child.resolved, ctx_, arena_);
 
     LowerPortBindings(child, child.resolved->is_program);
 
@@ -744,6 +812,47 @@ void Lowerer::LowerChildModules(const RtlirModule* mod) {
   }
 }
 
+static void RegisterDesignTypeWidths(const RtlirDesign* design,
+                                     SimContext& ctx) {
+  for (const auto& [name, width] : design->type_widths) {
+    ctx.RegisterTypeWidth(name, width);
+  }
+}
+
+static void InitPackageDataVariables(const RtlirDesign* design, SimContext& ctx,
+                                     Arena& arena) {
+  for (auto* pkg : design->packages) {
+    for (auto* item : pkg->items) {
+      bool is_param = item->kind == ModuleItemKind::kParamDecl;
+      bool is_var = item->kind == ModuleItemKind::kVarDecl;
+      if (!(is_param || is_var) || !item->init_expr) continue;
+      auto* qname = arena.Create<std::string>(std::string(pkg->name) + "." +
+                                              std::string(item->name));
+      auto* var = ctx.CreateVariable(*qname, 32);
+      var->value = EvalExpr(item->init_expr, ctx, arena);
+    }
+  }
+}
+
+static void RegisterFreeCuFunctions(const RtlirDesign* design,
+                                    SimContext& ctx) {
+  for (auto* item : design->cu_function_decls) {
+    if (!item->method_class.empty()) continue;
+    ctx.RegisterFunction(item->name, item);
+  }
+}
+
+static void AttachCuMethodsToClasses(const RtlirDesign* design,
+                                     SimContext& ctx) {
+  for (auto* item : design->cu_function_decls) {
+    if (item->method_class.empty()) continue;
+    auto* cls = ctx.FindClassType(item->method_class);
+    if (!cls) continue;
+    std::string name(item->name);
+    cls->methods[name] = item;
+  }
+}
+
 void Lowerer::Lower(const RtlirDesign* design) {
   if (!design) return;
   // §20.10.1: a $fatal or $error elaboration severity task that survived
@@ -757,21 +866,8 @@ void Lowerer::Lower(const RtlirDesign* design) {
   if (!design->top_modules.empty()) {
     ctx_.SetInteractiveScope(design->top_modules.front()->name);
   }
-  for (const auto& [name, width] : design->type_widths) {
-    ctx_.RegisterTypeWidth(name, width);
-  }
-
-  for (auto* pkg : design->packages) {
-    for (auto* item : pkg->items) {
-      bool is_param = item->kind == ModuleItemKind::kParamDecl;
-      bool is_var = item->kind == ModuleItemKind::kVarDecl;
-      if (!(is_param || is_var) || !item->init_expr) continue;
-      auto* qname = arena_.Create<std::string>(std::string(pkg->name) + "." +
-                                               std::string(item->name));
-      auto* var = ctx_.CreateVariable(*qname, 32);
-      var->value = EvalExpr(item->init_expr, ctx_, arena_);
-    }
-  }
+  RegisterDesignTypeWidths(design, ctx_);
+  InitPackageDataVariables(design, ctx_, arena_);
 
   for (auto* cls : design->cu_class_decls) {
     if (!ctx_.FindClassType(cls->name)) {
@@ -779,10 +875,7 @@ void Lowerer::Lower(const RtlirDesign* design) {
     }
   }
 
-  for (auto* item : design->cu_function_decls) {
-    if (!item->method_class.empty()) continue;
-    ctx_.RegisterFunction(item->name, item);
-  }
+  RegisterFreeCuFunctions(design, ctx_);
   for (auto* mod : design->top_modules) {
     LowerModule(mod);
   }
@@ -791,13 +884,7 @@ void Lowerer::Lower(const RtlirDesign* design) {
     ctx_.RegisterLetDecl(let_decl->name, let_decl);
   }
 
-  for (auto* item : design->cu_function_decls) {
-    if (item->method_class.empty()) continue;
-    auto* cls = ctx_.FindClassType(item->method_class);
-    if (!cls) continue;
-    std::string name(item->name);
-    cls->methods[name] = item;
-  }
+  AttachCuMethodsToClasses(design, ctx_);
 }
 
 }  // namespace delta

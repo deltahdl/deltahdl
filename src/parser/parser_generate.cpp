@@ -12,25 +12,30 @@ void Parser::ParseGenerateBody(std::vector<ModuleItem*>& body,
 
   if (Match(TokenKind::kSemicolon)) return;
 
-  bool has_gen_label = false;
-  if (CheckIdentifier()) {
+  // Detect an optional `label :` prefix that introduces a named generate
+  // block. Only commit to it when it is immediately followed by `begin`;
+  // otherwise restore the lexer so the tokens are reparsed as an item.
+  auto detect_gen_label = [&]() -> bool {
+    if (!CheckIdentifier()) return false;
     auto saved = lexer_.SavePos();
     auto ident = Consume();
-    if (Check(TokenKind::kColon)) {
-      Consume();
-      if (Check(TokenKind::kKwBegin)) {
-        has_gen_label = true;
-
-        out_label = ident.text;
-      } else {
-        lexer_.RestorePos(saved);
-      }
-    } else {
+    if (!Check(TokenKind::kColon)) {
       lexer_.RestorePos(saved);
+      return false;
     }
-  }
+    Consume();
+    if (!Check(TokenKind::kKwBegin)) {
+      lexer_.RestorePos(saved);
+      return false;
+    }
+    out_label = ident.text;
+    return true;
+  };
+  bool has_gen_label = detect_gen_label();
 
-  if (Match(TokenKind::kKwBegin)) {
+  // Parse the body of a `begin ... end` generate block, including an
+  // optional `: name` and the matching trailing `: name`.
+  auto parse_begin_body = [&]() {
     if (!has_gen_label && Match(TokenKind::kColon)) {
       if (CheckIdentifier()) {
         out_label = Consume().text;
@@ -45,6 +50,10 @@ void Parser::ParseGenerateBody(std::vector<ModuleItem*>& body,
     }
     Expect(TokenKind::kKwEnd);
     if (Match(TokenKind::kColon)) Match(TokenKind::kIdentifier);
+  };
+
+  if (Match(TokenKind::kKwBegin)) {
+    parse_begin_body();
   } else {
     ParseModuleItem(body);
   }

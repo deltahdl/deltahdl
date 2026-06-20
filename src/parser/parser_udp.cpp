@@ -159,12 +159,24 @@ void Parser::ParseUdpOutputDecl(UdpDecl* udp) {
   Expect(TokenKind::kSemicolon);
 }
 
+namespace {
+struct PendingUdpReg {
+  std::string_view name;
+  SourceLoc loc;
+};
+
+void ValidatePendingUdpRegs(DiagEngine& diag, const UdpDecl* udp,
+                            const std::vector<PendingUdpReg>& reg_decls) {
+  for (const auto& reg : reg_decls) {
+    if (!udp->output_name.empty() && reg.name != udp->output_name) {
+      diag.Error(reg.loc, "UDP reg declaration shall name the output port");
+    }
+  }
+}
+}  // namespace
+
 void Parser::ParseUdpPortDecls(UdpDecl* udp) {
-  struct PendingReg {
-    std::string_view name;
-    SourceLoc loc;
-  };
-  std::vector<PendingReg> reg_decls;
+  std::vector<PendingUdpReg> reg_decls;
   while (!Check(TokenKind::kKwTable) && !Check(TokenKind::kKwInitial) &&
          !AtEnd()) {
     ParseAttributes();
@@ -193,11 +205,93 @@ void Parser::ParseUdpPortDecls(UdpDecl* udp) {
     }
   }
 
-  for (const auto& reg : reg_decls) {
-    if (!udp->output_name.empty() && reg.name != udp->output_name) {
-      diag_.Error(reg.loc, "UDP reg declaration shall name the output port");
+  ValidatePendingUdpRegs(diag_, udp, reg_decls);
+}
+
+static bool UdpRowContainsZ(const UdpTableRow& row) {
+  for (char c : row.inputs) {
+    if (UdpSymbolIsZ(c)) return true;
+  }
+  for (const auto& pe : row.paren_edges) {
+    if (UdpSymbolIsZ(pe.first) || UdpSymbolIsZ(pe.second)) return true;
+  }
+  return UdpSymbolIsZ(row.current_state) || UdpSymbolIsZ(row.output);
+}
+
+static void ValidateUdpRowInputTransitions(DiagEngine& diag,
+                                           const UdpTableRow& row,
+                                           SourceLoc row_loc) {
+  int edge_count = 0;
+  for (char c : row.inputs) {
+    if (UdpInputIsEdge(c)) ++edge_count;
+  }
+  if (edge_count > 1) {
+    diag.Error(row_loc,
+               "UDP table row shall contain at most one input transition");
+  }
+
+  if (!row.inputs.empty()) {
+    bool all_x = true;
+    for (char c : row.inputs) {
+      if (c != 'x' && c != 'X') {
+        all_x = false;
+        break;
+      }
+    }
+    if (all_x && row.output != 'x' && row.output != 'X') {
+      diag.Error(row_loc,
+                 "UDP table row with all-x inputs shall specify x output");
     }
   }
+
+  for (char c : row.inputs) {
+    if (c == '-') {
+      diag.Error(row_loc, "- shall not appear in a UDP input field");
+      break;
+    }
+  }
+}
+
+static void ValidateUdpRowStateAndOutput(DiagEngine& diag, UdpDecl* udp,
+                                         const UdpTableRow& row,
+                                         SourceLoc row_loc) {
+  if (udp->is_sequential) {
+    char cs = row.current_state;
+    if (cs == '-') {
+      diag.Error(row_loc, "- shall not appear in the current-state field");
+    } else if (UdpInputIsEdge(cs)) {
+      diag.Error(row_loc,
+                 "edge symbols shall not appear in the current-state field");
+    }
+  }
+
+  {
+    char out = row.output;
+    bool ok = (out == '0' || out == '1' || out == 'x' || out == 'X');
+    if (udp->is_sequential && out == '-') ok = true;
+    if (!ok) {
+      diag.Error(row_loc,
+                 "UDP output field shall be 0, 1, or x (- is sequential only)");
+    }
+  }
+
+  for (const auto& pe : row.paren_edges) {
+    if (pe.first == 0 && pe.second == 0) continue;
+    if (!UdpIsLevelSymbol(pe.first) || !UdpIsLevelSymbol(pe.second)) {
+      diag.Error(row_loc,
+                 "parenthesized edge endpoints shall be level symbols");
+      break;
+    }
+  }
+}
+
+static void ValidateUdpTableRow(DiagEngine& diag, UdpDecl* udp,
+                                const UdpTableRow& row, SourceLoc row_loc) {
+  if (UdpRowContainsZ(row)) {
+    diag.Error(row_loc, "UDP table row shall not contain z");
+  }
+  ValidateUdpRowInputTransitions(diag, row, row_loc);
+  ValidateUdpRowStateAndOutput(diag, udp, row, row_loc);
 }
 
 void Parser::ParseUdpTableRow(UdpDecl* udp) {
@@ -233,78 +327,7 @@ void Parser::ParseUdpTableRow(UdpDecl* udp) {
   row.output = UdpCharFromToken(Consume());
   Expect(TokenKind::kSemicolon);
 
-  bool saw_z = false;
-  for (char c : row.inputs) {
-    if (UdpSymbolIsZ(c)) saw_z = true;
-  }
-  for (const auto& pe : row.paren_edges) {
-    if (UdpSymbolIsZ(pe.first) || UdpSymbolIsZ(pe.second)) saw_z = true;
-  }
-  if (UdpSymbolIsZ(row.current_state) || UdpSymbolIsZ(row.output)) {
-    saw_z = true;
-  }
-  if (saw_z) {
-    diag_.Error(row_loc, "UDP table row shall not contain z");
-  }
-
-  int edge_count = 0;
-  for (char c : row.inputs) {
-    if (UdpInputIsEdge(c)) ++edge_count;
-  }
-  if (edge_count > 1) {
-    diag_.Error(row_loc,
-                "UDP table row shall contain at most one input transition");
-  }
-
-  if (!row.inputs.empty()) {
-    bool all_x = true;
-    for (char c : row.inputs) {
-      if (c != 'x' && c != 'X') {
-        all_x = false;
-        break;
-      }
-    }
-    if (all_x && row.output != 'x' && row.output != 'X') {
-      diag_.Error(row_loc,
-                  "UDP table row with all-x inputs shall specify x output");
-    }
-  }
-
-  for (char c : row.inputs) {
-    if (c == '-') {
-      diag_.Error(row_loc, "- shall not appear in a UDP input field");
-      break;
-    }
-  }
-  if (udp->is_sequential) {
-    char cs = row.current_state;
-    if (cs == '-') {
-      diag_.Error(row_loc, "- shall not appear in the current-state field");
-    } else if (UdpInputIsEdge(cs)) {
-      diag_.Error(row_loc,
-                  "edge symbols shall not appear in the current-state field");
-    }
-  }
-
-  {
-    char out = row.output;
-    bool ok = (out == '0' || out == '1' || out == 'x' || out == 'X');
-    if (udp->is_sequential && out == '-') ok = true;
-    if (!ok) {
-      diag_.Error(
-          row_loc,
-          "UDP output field shall be 0, 1, or x (- is sequential only)");
-    }
-  }
-
-  for (const auto& pe : row.paren_edges) {
-    if (pe.first == 0 && pe.second == 0) continue;
-    if (!UdpIsLevelSymbol(pe.first) || !UdpIsLevelSymbol(pe.second)) {
-      diag_.Error(row_loc,
-                  "parenthesized edge endpoints shall be level symbols");
-      break;
-    }
-  }
+  ValidateUdpTableRow(diag_, udp, row, row_loc);
 
   udp->table.push_back(row);
 }
@@ -315,6 +338,35 @@ void Parser::ParseUdpTable(UdpDecl* udp) {
     ParseUdpTableRow(udp);
   }
   Expect(TokenKind::kKwEndtable);
+}
+
+// Validates that the non-ANSI port list's first port matches the declared
+// output, then reorders udp->input_names to follow the order in which the
+// inputs appeared in the parenthesized port list (only when every port-list
+// input maps to a declared input).
+static void ReconcileUdpNonAnsiPortList(
+    DiagEngine& diag, UdpDecl* udp, std::string_view first_name,
+    SourceLoc first_loc,
+    const std::vector<std::string_view>& port_list_inputs) {
+  if (!udp->output_name.empty() && !first_name.empty() &&
+      first_name != udp->output_name) {
+    diag.Error(first_loc,
+               "UDP output port shall be the first port in the port list");
+  }
+
+  std::vector<std::string_view> reordered;
+  reordered.reserve(port_list_inputs.size());
+  for (auto name : port_list_inputs) {
+    for (auto decl_name : udp->input_names) {
+      if (decl_name == name) {
+        reordered.push_back(decl_name);
+        break;
+      }
+    }
+  }
+  if (reordered.size() == udp->input_names.size()) {
+    udp->input_names = std::move(reordered);
+  }
 }
 
 UdpDecl* Parser::ParseUdpDecl() {
@@ -369,25 +421,8 @@ UdpDecl* Parser::ParseUdpDecl() {
       Expect(TokenKind::kRParen);
       Expect(TokenKind::kSemicolon);
       ParseUdpPortDecls(udp);
-      if (!udp->output_name.empty() && !first_name.empty() &&
-          first_name != udp->output_name) {
-        diag_.Error(first_loc,
-                    "UDP output port shall be the first port in the port list");
-      }
-
-      std::vector<std::string_view> reordered;
-      reordered.reserve(port_list_inputs.size());
-      for (auto name : port_list_inputs) {
-        for (auto decl_name : udp->input_names) {
-          if (decl_name == name) {
-            reordered.push_back(decl_name);
-            break;
-          }
-        }
-      }
-      if (reordered.size() == udp->input_names.size()) {
-        udp->input_names = std::move(reordered);
-      }
+      ReconcileUdpNonAnsiPortList(diag_, udp, first_name, first_loc,
+                                  port_list_inputs);
     }
   }
 

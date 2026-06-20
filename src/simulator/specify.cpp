@@ -127,36 +127,59 @@ void ApplySdfPulseLimits(PathDelay& pd, uint64_t reject, bool has_error,
   }
 }
 
+namespace {
+
+// Overwrites `existing` with `replacement` while optionally retaining the
+// original pulse (reject/error) limits.
+void ReplacePathDelayPreservingPulse(PathDelay& existing, PathDelay replacement,
+                                     bool preserve_pulse_limits) {
+  uint64_t saved_reject[12];
+  uint64_t saved_error[12];
+  if (preserve_pulse_limits) {
+    for (int i = 0; i < 12; ++i) {
+      saved_reject[i] = existing.reject_limit[i];
+      saved_error[i] = existing.error_limit[i];
+    }
+  }
+  existing = std::move(replacement);
+  if (preserve_pulse_limits) {
+    for (int i = 0; i < 12; ++i) {
+      existing.reject_limit[i] = saved_reject[i];
+      existing.error_limit[i] = saved_error[i];
+    }
+  }
+}
+
+// Nonconditional SDF update: overwrites every existing path delay between the
+// same ports, but keeps each entry's original condition/ifnone (and optionally
+// its pulse limits). Returns true if at least one entry matched.
+bool UpdateNonconditionalPathDelays(std::vector<PathDelay>& path_delays,
+                                    const PathDelay& delay,
+                                    bool preserve_pulse_limits) {
+  bool matched = false;
+  for (auto& existing : path_delays) {
+    if (existing.src_port == delay.src_port &&
+        existing.dst_port == delay.dst_port) {
+      std::string saved_cond = existing.condition;
+      bool saved_ifnone = existing.is_ifnone;
+      ReplacePathDelayPreservingPulse(existing, delay, preserve_pulse_limits);
+      existing.condition = std::move(saved_cond);
+      existing.is_ifnone = saved_ifnone;
+      matched = true;
+    }
+  }
+  return matched;
+}
+
+}  // namespace
+
 void SpecifyManager::AddPathDelay(PathDelay delay, bool preserve_pulse_limits) {
   const bool kSdfIsNonconditional = delay.condition.empty() && !delay.is_ifnone;
   if (kSdfIsNonconditional) {
-    bool matched = false;
-    for (auto& existing : path_delays_) {
-      if (existing.src_port == delay.src_port &&
-          existing.dst_port == delay.dst_port) {
-        std::string saved_cond = existing.condition;
-        bool saved_ifnone = existing.is_ifnone;
-        uint64_t saved_reject[12];
-        uint64_t saved_error[12];
-        if (preserve_pulse_limits) {
-          for (int i = 0; i < 12; ++i) {
-            saved_reject[i] = existing.reject_limit[i];
-            saved_error[i] = existing.error_limit[i];
-          }
-        }
-        existing = delay;
-        existing.condition = std::move(saved_cond);
-        existing.is_ifnone = saved_ifnone;
-        if (preserve_pulse_limits) {
-          for (int i = 0; i < 12; ++i) {
-            existing.reject_limit[i] = saved_reject[i];
-            existing.error_limit[i] = saved_error[i];
-          }
-        }
-        matched = true;
-      }
+    if (!UpdateNonconditionalPathDelays(path_delays_, delay,
+                                        preserve_pulse_limits)) {
+      path_delays_.push_back(std::move(delay));
     }
-    if (!matched) path_delays_.push_back(std::move(delay));
     return;
   }
   for (auto& existing : path_delays_) {
@@ -164,51 +187,60 @@ void SpecifyManager::AddPathDelay(PathDelay delay, bool preserve_pulse_limits) {
         existing.dst_port == delay.dst_port &&
         existing.condition == delay.condition &&
         existing.is_ifnone == delay.is_ifnone) {
-      uint64_t saved_reject[12];
-      uint64_t saved_error[12];
-      if (preserve_pulse_limits) {
-        for (int i = 0; i < 12; ++i) {
-          saved_reject[i] = existing.reject_limit[i];
-          saved_error[i] = existing.error_limit[i];
-        }
-      }
-      existing = std::move(delay);
-      if (preserve_pulse_limits) {
-        for (int i = 0; i < 12; ++i) {
-          existing.reject_limit[i] = saved_reject[i];
-          existing.error_limit[i] = saved_error[i];
-        }
-      }
+      ReplacePathDelayPreservingPulse(existing, std::move(delay),
+                                      preserve_pulse_limits);
       return;
     }
   }
   path_delays_.push_back(std::move(delay));
 }
 
-void SpecifyManager::IncrementPathDelay(const PathDelay& delta) {
-  const bool kSdfIsNonconditional = delta.condition.empty() && !delta.is_ifnone;
+namespace {
+
+void AddPathDelayValues(PathDelay& existing, const PathDelay& delta) {
+  for (int i = 0; i < 12; ++i) existing.delays[i] += delta.delays[i];
+}
+
+// Adds `delta` to every existing path delay between the same ports (ignoring
+// condition/ifnone). Returns true if at least one entry matched.
+bool IncrementNonconditionalPathDelays(std::vector<PathDelay>& path_delays,
+                                       const PathDelay& delta) {
   bool matched = false;
-  if (kSdfIsNonconditional) {
-    for (auto& existing : path_delays_) {
-      if (existing.src_port == delta.src_port &&
-          existing.dst_port == delta.dst_port) {
-        for (int i = 0; i < 12; ++i) existing.delays[i] += delta.delays[i];
-        matched = true;
-      }
-    }
-  } else {
-    for (auto& existing : path_delays_) {
-      if (existing.src_port == delta.src_port &&
-          existing.dst_port == delta.dst_port &&
-          existing.condition == delta.condition &&
-          existing.is_ifnone == delta.is_ifnone) {
-        for (int i = 0; i < 12; ++i) existing.delays[i] += delta.delays[i];
-        matched = true;
-        break;
-      }
+  for (auto& existing : path_delays) {
+    if (existing.src_port == delta.src_port &&
+        existing.dst_port == delta.dst_port) {
+      AddPathDelayValues(existing, delta);
+      matched = true;
     }
   }
-  if (!matched) path_delays_.push_back(delta);
+  return matched;
+}
+
+// Adds `delta` to the first existing path delay matching ports plus
+// condition/ifnone. Returns true if a matching entry was found.
+bool IncrementConditionalPathDelay(std::vector<PathDelay>& path_delays,
+                                   const PathDelay& delta) {
+  for (auto& existing : path_delays) {
+    if (existing.src_port == delta.src_port &&
+        existing.dst_port == delta.dst_port &&
+        existing.condition == delta.condition &&
+        existing.is_ifnone == delta.is_ifnone) {
+      AddPathDelayValues(existing, delta);
+      return true;
+    }
+  }
+  return false;
+}
+
+}  // namespace
+
+void SpecifyManager::IncrementPathDelay(const PathDelay& delta) {
+  const bool kSdfIsNonconditional = delta.condition.empty() && !delta.is_ifnone;
+  const bool kMatched =
+      kSdfIsNonconditional
+          ? IncrementNonconditionalPathDelays(path_delays_, delta)
+          : IncrementConditionalPathDelay(path_delays_, delta);
+  if (!kMatched) path_delays_.push_back(delta);
 }
 
 void SpecifyManager::IncrementInterconnectDelay(
@@ -242,27 +274,30 @@ void SpecifyManager::AddTimingCheck(TimingCheckEntry check) {
   timing_checks_.push_back(std::move(check));
 }
 
-void SpecifyManager::AnnotateSdfTimingCheck(const SdfTcAnnotation& a) {
-  bool matched = false;
-  for (auto& existing : timing_checks_) {
-    if (existing.kind != a.kind) continue;
-    if (existing.ref_signal != a.ref_signal) continue;
-    if (existing.data_signal != a.data_signal) continue;
-    if (a.ref_edge != SpecifyEdge::kNone && existing.ref_edge != a.ref_edge)
-      continue;
-    if (a.data_edge != SpecifyEdge::kNone && existing.data_edge != a.data_edge)
-      continue;
-    if (!a.condition.empty() && existing.condition != a.condition) continue;
+namespace {
 
-    if (a.set_limit) existing.limit = a.limit;
-    if (a.set_limit2) existing.limit2 = a.limit2;
-    if (a.set_start_edge_offset)
-      existing.start_edge_offset = a.start_edge_offset;
-    if (a.set_end_edge_offset) existing.end_edge_offset = a.end_edge_offset;
-    matched = true;
-  }
-  if (matched) return;
+bool SdfAnnotationMatchesCheck(const TimingCheckEntry& existing,
+                               const SdfTcAnnotation& a) {
+  if (existing.kind != a.kind) return false;
+  if (existing.ref_signal != a.ref_signal) return false;
+  if (existing.data_signal != a.data_signal) return false;
+  if (a.ref_edge != SpecifyEdge::kNone && existing.ref_edge != a.ref_edge)
+    return false;
+  if (a.data_edge != SpecifyEdge::kNone && existing.data_edge != a.data_edge)
+    return false;
+  if (!a.condition.empty() && existing.condition != a.condition) return false;
+  return true;
+}
 
+void ApplySdfAnnotationFields(TimingCheckEntry& check,
+                              const SdfTcAnnotation& a) {
+  if (a.set_limit) check.limit = a.limit;
+  if (a.set_limit2) check.limit2 = a.limit2;
+  if (a.set_start_edge_offset) check.start_edge_offset = a.start_edge_offset;
+  if (a.set_end_edge_offset) check.end_edge_offset = a.end_edge_offset;
+}
+
+TimingCheckEntry BuildTimingCheckFromAnnotation(const SdfTcAnnotation& a) {
   TimingCheckEntry e;
   e.kind = a.kind;
   e.ref_signal = a.ref_signal;
@@ -270,11 +305,22 @@ void SpecifyManager::AnnotateSdfTimingCheck(const SdfTcAnnotation& a) {
   e.data_signal = a.data_signal;
   e.data_edge = a.data_edge;
   e.condition = a.condition;
-  if (a.set_limit) e.limit = a.limit;
-  if (a.set_limit2) e.limit2 = a.limit2;
-  if (a.set_start_edge_offset) e.start_edge_offset = a.start_edge_offset;
-  if (a.set_end_edge_offset) e.end_edge_offset = a.end_edge_offset;
-  timing_checks_.push_back(std::move(e));
+  ApplySdfAnnotationFields(e, a);
+  return e;
+}
+
+}  // namespace
+
+void SpecifyManager::AnnotateSdfTimingCheck(const SdfTcAnnotation& a) {
+  bool matched = false;
+  for (auto& existing : timing_checks_) {
+    if (!SdfAnnotationMatchesCheck(existing, a)) continue;
+    ApplySdfAnnotationFields(existing, a);
+    matched = true;
+  }
+  if (matched) return;
+
+  timing_checks_.push_back(BuildTimingCheckFromAnnotation(a));
 }
 
 void SpecifyManager::AnnotateSdf(SdfAnnotation annotation) {
@@ -322,6 +368,28 @@ void SpecifyManager::RegisterSpecparamReevaluation(
   specparam_reevaluators_.emplace_back(std::move(name), std::move(reevaluate));
 }
 
+namespace {
+
+void ApplySdfPercentPulseLimits(PathDelay& pd, uint64_t reject, bool has_error,
+                                uint64_t error) {
+  uint64_t reject_pct = reject;
+  uint64_t error_pct = has_error ? error : reject;
+  if (error_pct < reject_pct) error_pct = reject_pct;
+  for (int i = 0; i < 12; ++i) {
+    pd.reject_limit[i] = pd.delays[i] * reject_pct / 100;
+    pd.error_limit[i] = pd.delays[i] * error_pct / 100;
+  }
+}
+
+void ClampPulseLimitsToDelays(PathDelay& pd) {
+  for (int i = 0; i < 12; ++i) {
+    if (pd.reject_limit[i] > pd.delays[i]) pd.reject_limit[i] = pd.delays[i];
+    if (pd.error_limit[i] > pd.delays[i]) pd.error_limit[i] = pd.delays[i];
+  }
+}
+
+}  // namespace
+
 void SpecifyManager::AddSdfPulseLimit(std::string_view src,
                                       std::string_view dst, uint64_t reject,
                                       bool has_error, uint64_t error,
@@ -329,21 +397,11 @@ void SpecifyManager::AddSdfPulseLimit(std::string_view src,
   for (auto& pd : path_delays_) {
     if (pd.src_port != src || pd.dst_port != dst) continue;
     if (is_percent) {
-      uint64_t reject_pct = reject;
-      uint64_t error_pct = has_error ? error : reject;
-      if (error_pct < reject_pct) error_pct = reject_pct;
-      for (int i = 0; i < 12; ++i) {
-        pd.reject_limit[i] = pd.delays[i] * reject_pct / 100;
-        pd.error_limit[i] = pd.delays[i] * error_pct / 100;
-      }
+      ApplySdfPercentPulseLimits(pd, reject, has_error, error);
     } else {
       ApplySdfPulseLimits(pd, reject, has_error, error);
     }
-
-    for (int i = 0; i < 12; ++i) {
-      if (pd.reject_limit[i] > pd.delays[i]) pd.reject_limit[i] = pd.delays[i];
-      if (pd.error_limit[i] > pd.delays[i]) pd.error_limit[i] = pd.delays[i];
-    }
+    ClampPulseLimitsToDelays(pd);
   }
 }
 
@@ -478,6 +536,34 @@ bool SpecifyManager::CheckRecoveryViolation(std::string_view ref,
 // the "after" side, while setuphold uses the opposite. `lower_side_limit`
 // selects which member is compared when data_time <= ref_time, and
 // `upper_side_limit` when data_time > ref_time.
+namespace {
+
+// True when `data_time` falls inside the negative-timing-check window centered
+// on `ref_time` and spanning [-signed_limit, +signed_limit2].
+bool NegativeTimingWindowViolated(const TimingCheckEntry& check,
+                                  uint64_t ref_time, uint64_t data_time) {
+  const auto kRefT = static_cast<int64_t>(ref_time);
+  const auto kDataT = static_cast<int64_t>(data_time);
+  const int64_t kLower = kRefT - check.signed_limit;
+  const int64_t kUpper = kRefT + check.signed_limit2;
+  return kDataT > kLower && kDataT < kUpper;
+}
+
+// True when the elapsed time between `ref_time` and `data_time` violates the
+// side-specific limit (lower side for data on/before ref, upper side after).
+bool TwoSidedLimitViolated(const TimingCheckEntry& check, uint64_t ref_time,
+                           uint64_t data_time,
+                           uint64_t TimingCheckEntry::* lower_side_limit,
+                           uint64_t TimingCheckEntry::* upper_side_limit) {
+  if (check.limit == 0 && check.limit2 == 0) return false;
+  if (data_time <= ref_time) {
+    return ref_time - data_time < check.*lower_side_limit;
+  }
+  return data_time - ref_time < check.*upper_side_limit;
+}
+
+}  // namespace
+
 static bool CheckTimingViolation(
     const std::vector<TimingCheckEntry>& timing_checks, TimingCheckKind kind,
     std::string_view ref, uint64_t ref_time, std::string_view data,
@@ -488,19 +574,12 @@ static bool CheckTimingViolation(
     if (check.ref_signal != ref) continue;
     if (check.data_signal != data) continue;
     if (check.negative_timing_check_enabled) {
-      const auto kRefT = static_cast<int64_t>(ref_time);
-      const auto kDataT = static_cast<int64_t>(data_time);
-      const int64_t kLower = kRefT - check.signed_limit;
-      const int64_t kUpper = kRefT + check.signed_limit2;
-      if (kDataT > kLower && kDataT < kUpper) return true;
+      if (NegativeTimingWindowViolated(check, ref_time, data_time)) return true;
       continue;
     }
-
-    if (check.limit == 0 && check.limit2 == 0) continue;
-    if (data_time <= ref_time) {
-      if (ref_time - data_time < check.*lower_side_limit) return true;
-    } else {
-      if (data_time - ref_time < check.*upper_side_limit) return true;
+    if (TwoSidedLimitViolated(check, ref_time, data_time, lower_side_limit,
+                              upper_side_limit)) {
+      return true;
     }
   }
   return false;
@@ -542,6 +621,21 @@ bool SpecifyManager::CheckTimeskewViolation(std::string_view ref,
   return false;
 }
 
+namespace {
+
+bool FullskewWindowViolated(const TimingCheckEntry& check, uint64_t ref_time,
+                            uint64_t data_time) {
+  if (ref_time < data_time) {
+    return data_time - ref_time > check.limit;
+  }
+  if (data_time < ref_time) {
+    return ref_time - data_time > check.limit2;
+  }
+  return false;
+}
+
+}  // namespace
+
 bool SpecifyManager::CheckFullskewViolation(std::string_view ref,
                                             uint64_t ref_time,
                                             std::string_view data,
@@ -551,11 +645,7 @@ bool SpecifyManager::CheckFullskewViolation(std::string_view ref,
     if (check.ref_signal != ref) continue;
     if (check.data_signal != data) continue;
 
-    if (ref_time < data_time) {
-      if (data_time - ref_time > check.limit) return true;
-    } else if (data_time < ref_time) {
-      if (ref_time - data_time > check.limit2) return true;
-    }
+    if (FullskewWindowViolated(check, ref_time, data_time)) return true;
   }
   return false;
 }

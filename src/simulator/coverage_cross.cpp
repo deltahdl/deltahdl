@@ -43,29 +43,72 @@ bool CoverageDB::CrossItemsInSameGroup(const CoverGroup* group,
   return true;
 }
 
+namespace {
+
+// Collects, for one crossed coverpoint name, the value lists of the bins that
+// may contribute a cross product. Default, ignore, and illegal bins are skipped
+// (LRM 19.6). Returns an empty list when the coverpoint is absent.
+std::vector<std::vector<int64_t>> CollectContributingBinValues(
+    CoverGroup* group, const std::string& name) {
+  CoverPoint* cp = nullptr;
+  for (auto& candidate : group->coverpoints) {
+    if (candidate.name == name) {
+      cp = &candidate;
+      break;
+    }
+  }
+  std::vector<std::vector<int64_t>> contributing;
+  if (cp != nullptr) {
+    for (const auto& bin : cp->bins) {
+      if (bin.kind == CoverBinKind::kDefault) continue;
+      if (bin.kind == CoverBinKind::kIgnore) continue;
+      if (bin.kind == CoverBinKind::kIllegal) continue;
+      contributing.push_back(bin.values);
+    }
+  }
+  return contributing;
+}
+
+// Builds one cross bin from the current per-coverpoint bin index combination.
+CrossBin MakeCrossProductBin(
+    const std::vector<std::vector<std::vector<int64_t>>>& per_point,
+    const std::vector<size_t>& idx) {
+  CrossBin cbin;
+  cbin.value_sets.reserve(per_point.size());
+  cbin.name = "<";
+  for (size_t i = 0; i < per_point.size(); ++i) {
+    cbin.value_sets.push_back(per_point[i][idx[i]]);
+    if (i != 0) cbin.name += ",";
+    cbin.name += std::to_string(idx[i]);
+  }
+  cbin.name += ">";
+  return cbin;
+}
+
+// Advances the per-coverpoint bin index combination to the next Cartesian
+// product position. Returns false when the product has been exhausted.
+bool AdvanceCrossProductIndex(
+    const std::vector<std::vector<std::vector<int64_t>>>& per_point,
+    std::vector<size_t>& idx) {
+  size_t pos = per_point.size();
+  while (pos > 0) {
+    --pos;
+    if (++idx[pos] < per_point[pos].size()) return true;
+    idx[pos] = 0;
+    if (pos == 0) return false;
+  }
+  return false;
+}
+
+}  // namespace
+
 void CoverageDB::AutoCreateCrossBins(CoverGroup* group, CrossCover* cross) {
   // Collect, for each crossed coverpoint, the value lists of the bins that may
   // contribute a cross product. Default, ignore, and illegal bins are skipped
   // (LRM 19.6).
   std::vector<std::vector<std::vector<int64_t>>> per_point;
   for (const auto& name : cross->coverpoint_names) {
-    CoverPoint* cp = nullptr;
-    for (auto& candidate : group->coverpoints) {
-      if (candidate.name == name) {
-        cp = &candidate;
-        break;
-      }
-    }
-    std::vector<std::vector<int64_t>> contributing;
-    if (cp != nullptr) {
-      for (const auto& bin : cp->bins) {
-        if (bin.kind == CoverBinKind::kDefault) continue;
-        if (bin.kind == CoverBinKind::kIgnore) continue;
-        if (bin.kind == CoverBinKind::kIllegal) continue;
-        contributing.push_back(bin.values);
-      }
-    }
-    per_point.push_back(std::move(contributing));
+    per_point.push_back(CollectContributingBinValues(group, name));
   }
 
   cross->bins.clear();
@@ -78,24 +121,8 @@ void CoverageDB::AutoCreateCrossBins(CoverGroup* group, CrossCover* cross) {
   // Iterate the Cartesian product of the per-coverpoint bin lists.
   std::vector<size_t> idx(per_point.size(), 0);
   while (true) {
-    CrossBin cbin;
-    cbin.value_sets.reserve(per_point.size());
-    cbin.name = "<";
-    for (size_t i = 0; i < per_point.size(); ++i) {
-      cbin.value_sets.push_back(per_point[i][idx[i]]);
-      if (i != 0) cbin.name += ",";
-      cbin.name += std::to_string(idx[i]);
-    }
-    cbin.name += ">";
-    cross->bins.push_back(std::move(cbin));
-
-    size_t pos = per_point.size();
-    while (pos > 0) {
-      --pos;
-      if (++idx[pos] < per_point[pos].size()) break;
-      idx[pos] = 0;
-      if (pos == 0) return;
-    }
+    cross->bins.push_back(MakeCrossProductBin(per_point, idx));
+    if (!AdvanceCrossProductIndex(per_point, idx)) return;
   }
 }
 
@@ -229,15 +256,41 @@ std::vector<std::vector<size_t>> CoverageDB::RetainedAutoCrossProducts(
 
 // --- LRM 19.6.1.2: cross bin with covergroup expressions --------------------
 
+namespace {
+
+// True when the value-set list produces at least one value tuple: it must be
+// non-empty and every coverpoint must contribute at least one value.
+bool ValueSetsYieldAnyTuple(
+    const std::vector<std::vector<int64_t>>& bin_tuple_value_sets) {
+  if (bin_tuple_value_sets.empty()) return false;
+  for (const auto& values : bin_tuple_value_sets) {
+    if (values.empty()) return false;
+  }
+  return true;
+}
+
+// Advances the per-coverpoint value index combination to the next value tuple.
+// Returns false when every tuple has been visited.
+bool AdvanceValueTupleIndex(
+    const std::vector<std::vector<int64_t>>& bin_tuple_value_sets,
+    std::vector<size_t>& idx) {
+  size_t pos = bin_tuple_value_sets.size();
+  while (true) {
+    --pos;
+    if (++idx[pos] < bin_tuple_value_sets[pos].size()) return true;
+    idx[pos] = 0;
+    if (pos == 0) return false;
+  }
+}
+
+}  // namespace
+
 uint64_t CoverageDB::CountSatisfyingValueTuples(
     const std::vector<std::vector<int64_t>>& bin_tuple_value_sets,
     const std::function<bool(const std::vector<int64_t>&)>& pred) {
   // No coverpoints, or any coverpoint with an empty value set, yields no value
   // tuples, hence nothing can satisfy the expression.
-  if (bin_tuple_value_sets.empty()) return 0;
-  for (const auto& values : bin_tuple_value_sets) {
-    if (values.empty()) return 0;
-  }
+  if (!ValueSetsYieldAnyTuple(bin_tuple_value_sets)) return 0;
   uint64_t satisfying = 0;
   std::vector<size_t> idx(bin_tuple_value_sets.size(), 0);
   std::vector<int64_t> tuple(bin_tuple_value_sets.size());
@@ -246,13 +299,7 @@ uint64_t CoverageDB::CountSatisfyingValueTuples(
       tuple[i] = bin_tuple_value_sets[i][idx[i]];
     }
     if (pred(tuple)) ++satisfying;
-    size_t pos = bin_tuple_value_sets.size();
-    while (true) {
-      --pos;
-      if (++idx[pos] < bin_tuple_value_sets[pos].size()) break;
-      idx[pos] = 0;
-      if (pos == 0) return satisfying;
-    }
+    if (!AdvanceValueTupleIndex(bin_tuple_value_sets, idx)) return satisfying;
   }
 }
 

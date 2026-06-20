@@ -128,12 +128,11 @@ static StmtResult ExecNbEventTriggerImpl(const Stmt* stmt, SimContext& ctx,
   return StmtResult::kDone;
 }
 
-static ExecTask ExecWait(const Stmt* stmt, SimContext& ctx, Arena& arena) {
-  bool labeled = !stmt->label.empty();
-  if (labeled) ctx.PushStaticScope(stmt->label);
-  std::unordered_set<std::string> reads;
-  CollectExprReads(stmt->condition, reads);
-
+// Rewrites any sequence name in the wait condition's read set to its synthetic
+// endpoint event variable (creating that event variable on demand), so the wait
+// suspends on the sequence's completion event rather than on the name itself.
+static void SubstituteSequenceEndpoints(std::unordered_set<std::string>& reads,
+                                        SimContext& ctx) {
   std::unordered_set<std::string> seq_adds;
   std::unordered_set<std::string> seq_removes;
   for (const auto& name : reads) {
@@ -150,6 +149,15 @@ static ExecTask ExecWait(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   }
   for (const auto& r : seq_removes) reads.erase(r);
   for (auto& a : seq_adds) reads.insert(std::move(a));
+}
+
+static ExecTask ExecWait(const Stmt* stmt, SimContext& ctx, Arena& arena) {
+  bool labeled = !stmt->label.empty();
+  if (labeled) ctx.PushStaticScope(stmt->label);
+  std::unordered_set<std::string> reads;
+  CollectExprReads(stmt->condition, reads);
+
+  SubstituteSequenceEndpoints(reads, ctx);
   std::vector<std::string_view> read_vars(reads.begin(), reads.end());
   bool suspended = false;
   while (!ctx.StopRequested()) {
@@ -201,6 +209,17 @@ struct WaitOrderStepAwaiter {
   std::string_view await_resume() const noexcept { return triggered_name; }
 };
 
+// Collects the names of the wait_order events from index `start` onward, the
+// set the next step must wait on while honoring the required ordering.
+static std::vector<std::string_view> RemainingWaitOrderNames(
+    const std::vector<Expr*>& events, size_t start) {
+  std::vector<std::string_view> remaining;
+  for (size_t j = start; j < events.size(); ++j) {
+    remaining.push_back(events[j]->text);
+  }
+  return remaining;
+}
+
 static ExecTask ExecWaitOrder(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   auto& events = stmt->wait_order_events;
   if (events.empty()) {
@@ -219,10 +238,8 @@ static ExecTask ExecWaitOrder(const Stmt* stmt, SimContext& ctx, Arena& arena) {
       continue;
     }
 
-    std::vector<std::string_view> remaining;
-    for (size_t j = i; j < events.size(); ++j) {
-      remaining.push_back(events[j]->text);
-    }
+    std::vector<std::string_view> remaining =
+        RemainingWaitOrderNames(events, i);
 
     auto triggered = co_await WaitOrderStepAwaiter{ctx, remaining, {}};
 
@@ -250,12 +267,9 @@ static ExecTask ExecWaitOrder(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   co_return StmtResult::kDone;
 }
 
-static SimCoroutine ForkChildCoroutine(const Stmt* body, SimContext& ctx,
-                                       Arena& arena, ForkJoinState* state,
-                                       WaitForkState* parent_wfs,
-                                       Process* parent_proc) {
-  co_await ExecStmt(body, ctx, arena);
-
+// Marks the just-completed fork child process finished and wakes any thread
+// blocked on its await(). No-op for a process that was killed.
+static void FinalizeForkChildProcess(SimContext& ctx) {
   auto* child_proc = ctx.CurrentProcess();
   if (child_proc && child_proc->sv_state != ProcessState::kKilled) {
     child_proc->sv_state = ProcessState::kFinished;
@@ -264,6 +278,13 @@ static SimCoroutine ForkChildCoroutine(const Stmt* body, SimContext& ctx,
     }
     child_proc->await_waiters.clear();
   }
+}
+
+// Decrements the join/wait-fork tallies for one finished child and resumes the
+// join site and/or the wait-fork waiter when their conditions are met.
+static void NotifyForkChildDone(SimContext& ctx, ForkJoinState* state,
+                                WaitForkState* parent_wfs,
+                                Process* parent_proc) {
   state->remaining--;
   bool should_resume =
       state->join_any ? !state->resumed : (state->remaining == 0);
@@ -281,8 +302,98 @@ static SimCoroutine ForkChildCoroutine(const Stmt* body, SimContext& ctx,
   }
 }
 
+static SimCoroutine ForkChildCoroutine(const Stmt* body, SimContext& ctx,
+                                       Arena& arena, ForkJoinState* state,
+                                       WaitForkState* parent_wfs,
+                                       Process* parent_proc) {
+  co_await ExecStmt(body, ctx, arena);
+
+  FinalizeForkChildProcess(ctx);
+  NotifyForkChildDone(ctx, state, parent_wfs, parent_proc);
+}
+
 static bool IsForkBlockItemDecl(const Stmt* s) {
   return s->kind == StmtKind::kVarDecl || s->kind == StmtKind::kBlockItemDecl;
+}
+
+// Registers the spawned child process under any named scopes it should answer
+// to: a named task/function call form, a labeled block, and every named scope
+// active at the fork site.
+static void RegisterForkChildScopes(const Stmt* s, Process* p,
+                                    SimContext& ctx) {
+  if (s->kind == StmtKind::kExprStmt && s->expr) {
+    std::string_view task_name;
+    if (s->expr->kind == ExprKind::kCall)
+      task_name = s->expr->callee;
+    else if (s->expr->kind == ExprKind::kIdentifier)
+      task_name = s->expr->text;
+    if (!task_name.empty() && ctx.FindFunction(task_name))
+      ctx.RegisterNamedScope(task_name, p);
+  }
+  if (s->kind == StmtKind::kBlock && !s->label.empty())
+    ctx.RegisterNamedScope(s->label, p);
+
+  for (auto scope : ctx.ActiveNamedScopes()) ctx.RegisterNamedScope(scope, p);
+}
+
+// Creates and schedules one fork child process for the statement s, wiring it
+// into the shared join state and the spawning process's wait-fork tally.
+static void SpawnForkChild(const Stmt* s, SimContext& ctx, Arena& arena,
+                           ForkJoinState* state, Process* spawning_proc,
+                           WaitForkState* parent_wfs, Process* parent_proc) {
+  if (parent_wfs) parent_wfs->remaining++;
+  auto* p = arena.Create<Process>();
+  if (spawning_proc) spawning_proc->children.push_back(p);
+  p->kind = ProcessKind::kInitial;
+  if (spawning_proc) {
+    p->is_reactive = spawning_proc->is_reactive;
+    p->home_region = spawning_proc->home_region;
+    p->program_block_id = spawning_proc->program_block_id;
+  }
+  // §18.14.2: a new thread's RNG is initialized with the next random value
+  // drawn from the thread that creates it. Each child therefore receives a
+  // unique seed determined solely by the parent, and the per-child seed
+  // material is settled in fork order rather than execution order.
+  p->rng_seed = ctx.DrawSeedForChild();
+  p->coro = ForkChildCoroutine(s, ctx, arena, state, parent_wfs, parent_proc)
+                .Release();
+
+  RegisterForkChildScopes(s, p, ctx);
+  auto* event = ctx.GetScheduler().GetEventPool().Acquire();
+  event->callback = [p, &ctx, state, parent_wfs, parent_proc]() {
+    if (!p->active) {
+      state->remaining--;
+      bool should_resume =
+          state->join_any ? !state->resumed : (state->remaining == 0);
+      if (should_resume && state->parent) {
+        state->resumed = true;
+        state->parent.resume();
+      }
+      if (parent_wfs && --parent_wfs->remaining == 0 && parent_wfs->waiter) {
+        ctx.SetCurrentProcess(parent_proc);
+        parent_wfs->waiter.resume();
+      }
+      return;
+    }
+    ctx.SetCurrentProcess(p);
+    p->Resume();
+  };
+  auto fork_region = (spawning_proc && spawning_proc->is_reactive)
+                         ? Region::kReactive
+                         : Region::kActive;
+  ctx.GetScheduler().ScheduleEvent(ctx.CurrentTime(), fork_region, event);
+}
+
+// Spawns one fork child per non-declaration statement in the fork block, each
+// wired into the shared join state and the spawning process's wait-fork tally.
+static void SpawnForkChildren(const Stmt* stmt, SimContext& ctx, Arena& arena,
+                              ForkJoinState* state, Process* spawning_proc,
+                              WaitForkState* parent_wfs, Process* parent_proc) {
+  for (auto* s : stmt->fork_stmts) {
+    if (IsForkBlockItemDecl(s)) continue;
+    SpawnForkChild(s, ctx, arena, state, spawning_proc, parent_wfs,
+                   parent_proc);
+  }
 }
 
 static ExecTask ExecFork(const Stmt* stmt, SimContext& ctx, Arena& arena) {
@@ -325,62 +436,8 @@ static ExecTask ExecFork(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   WaitForkState* parent_wfs =
       parent_proc ? &parent_proc->wait_fork_state : nullptr;
 
-  for (auto* s : stmt->fork_stmts) {
-    if (IsForkBlockItemDecl(s)) continue;
-    if (parent_wfs) parent_wfs->remaining++;
-    auto* p = arena.Create<Process>();
-    if (spawning_proc) spawning_proc->children.push_back(p);
-    p->kind = ProcessKind::kInitial;
-    if (spawning_proc) {
-      p->is_reactive = spawning_proc->is_reactive;
-      p->home_region = spawning_proc->home_region;
-      p->program_block_id = spawning_proc->program_block_id;
-    }
-    // §18.14.2: a new thread's RNG is initialized with the next random value
-    // drawn from the thread that creates it. Each child therefore receives a
-    // unique seed determined solely by the parent, and the per-child seed
-    // material is settled in fork order rather than execution order.
-    p->rng_seed = ctx.DrawSeedForChild();
-    p->coro = ForkChildCoroutine(s, ctx, arena, state, parent_wfs, parent_proc)
-                  .Release();
-
-    if (s->kind == StmtKind::kExprStmt && s->expr) {
-      std::string_view task_name;
-      if (s->expr->kind == ExprKind::kCall)
-        task_name = s->expr->callee;
-      else if (s->expr->kind == ExprKind::kIdentifier)
-        task_name = s->expr->text;
-      if (!task_name.empty() && ctx.FindFunction(task_name))
-        ctx.RegisterNamedScope(task_name, p);
-    }
-    if (s->kind == StmtKind::kBlock && !s->label.empty())
-      ctx.RegisterNamedScope(s->label, p);
-
-    for (auto scope : ctx.ActiveNamedScopes()) ctx.RegisterNamedScope(scope, p);
-    auto* event = ctx.GetScheduler().GetEventPool().Acquire();
-    event->callback = [p, &ctx, state, parent_wfs, parent_proc]() {
-      if (!p->active) {
-        state->remaining--;
-        bool should_resume =
-            state->join_any ? !state->resumed : (state->remaining == 0);
-        if (should_resume && state->parent) {
-          state->resumed = true;
-          state->parent.resume();
-        }
-        if (parent_wfs && --parent_wfs->remaining == 0 && parent_wfs->waiter) {
-          ctx.SetCurrentProcess(parent_proc);
-          parent_wfs->waiter.resume();
-        }
-        return;
-      }
-      ctx.SetCurrentProcess(p);
-      p->Resume();
-    };
-    auto fork_region = (spawning_proc && spawning_proc->is_reactive)
-                           ? Region::kReactive
-                           : Region::kActive;
-    ctx.GetScheduler().ScheduleEvent(ctx.CurrentTime(), fork_region, event);
-  }
+  SpawnForkChildren(stmt, ctx, arena, state, spawning_proc, parent_wfs,
+                    parent_proc);
 
   if (stmt->join_kind != TokenKind::kKwJoinNone) {
     co_await ForkJoinAwaiter{state};
@@ -457,31 +514,45 @@ static void ScheduleDeferredAction(const Stmt* action, bool is_final_deferred,
   ctx.GetScheduler().ScheduleEvent(ctx.CurrentTime(), region, ev);
 }
 
+// If this assertion is deferred, schedules its pass/fail action in the
+// reactive/postponed region and reports true (the caller should return without
+// running the action inline); otherwise reports false so the caller executes
+// the action immediately.
+static bool TryScheduleDeferredAssertAction(const Stmt* action,
+                                            const Stmt* stmt, SimContext& ctx,
+                                            Arena& arena) {
+  if (!stmt->is_deferred) return false;
+  ScheduleDeferredAction(action, stmt->is_final_deferred, ctx, arena);
+  return true;
+}
+
+// Records a cover-immediate sampling: bumps the evaluation count and, when the
+// covered expression held, the success count. No-op for assert/assume forms.
+static void RecordCoverImmediateSample(const Stmt* stmt, bool is_true,
+                                       SimContext& ctx) {
+  if (stmt->kind != StmtKind::kCoverImmediate) return;
+  ctx.IncrementCoverEvalCount();
+  if (is_true) ctx.IncrementCoverSuccessCount();
+}
+
 static ExecTask ExecImmediateAssert(const Stmt* stmt, SimContext& ctx,
                                     Arena& arena) {
   auto cond = EvalExpr(stmt->assert_expr, ctx, arena);
 
   bool is_true = cond.IsTruthy();
-  if (stmt->kind == StmtKind::kCoverImmediate) {
-    ctx.IncrementCoverEvalCount();
-  }
+  RecordCoverImmediateSample(stmt, is_true, ctx);
   if (is_true) {
-    if (stmt->kind == StmtKind::kCoverImmediate) {
-      ctx.IncrementCoverSuccessCount();
-    }
     if (stmt->assert_pass_stmt) {
-      if (stmt->is_deferred) {
-        ScheduleDeferredAction(stmt->assert_pass_stmt, stmt->is_final_deferred,
-                               ctx, arena);
+      if (TryScheduleDeferredAssertAction(stmt->assert_pass_stmt, stmt, ctx,
+                                          arena)) {
         co_return StmtResult::kDone;
       }
       co_return co_await ExecStmt(stmt->assert_pass_stmt, ctx, arena);
     }
   } else {
     if (stmt->assert_fail_stmt) {
-      if (stmt->is_deferred) {
-        ScheduleDeferredAction(stmt->assert_fail_stmt, stmt->is_final_deferred,
-                               ctx, arena);
+      if (TryScheduleDeferredAssertAction(stmt->assert_fail_stmt, stmt, ctx,
+                                          arena)) {
         co_return StmtResult::kDone;
       }
       co_return co_await ExecStmt(stmt->assert_fail_stmt, ctx, arena);
@@ -493,71 +564,125 @@ static ExecTask ExecImmediateAssert(const Stmt* stmt, SimContext& ctx,
   co_return StmtResult::kDone;
 }
 
+// Resolves the process targeted by a `<handle>.await()` call and validates it,
+// emitting the relevant diagnostic and returning nullptr when the call does not
+// resolve to a process that may legally be awaited. A non-null result is a
+// process the caller should suspend on.
+static Process* ResolveProcessAwaitTarget(const Expr* expr, SimContext& ctx) {
+  MethodCallParts parts;
+  if (!ExtractMethodCallParts(expr, parts) ||
+      ctx.GetVariableClassType(parts.var_name) != "process" ||
+      parts.method_name != "await") {
+    return nullptr;
+  }
+  auto* var = ctx.FindVariable(parts.var_name);
+  if (!var) return nullptr;
+  auto proc_handle = var->value.ToUint64();
+  auto* proc = ctx.FindProcessByHandle(proc_handle);
+  if (!proc) return nullptr;
+  if (proc->kind == ProcessKind::kFinal ||
+      proc->kind == ProcessKind::kContAssign) {
+    ctx.GetDiag().Error(
+        {},
+        "await() shall only target a process created by an initial "
+        "procedure, always procedure, or fork block");
+    return nullptr;
+  }
+  if (proc == ctx.CurrentProcess()) {
+    ctx.GetDiag().Error({}, "process cannot await its own termination");
+    return nullptr;
+  }
+  return proc;
+}
+
 static ExecTask ExecProcessAwait(const Expr* expr, SimContext& ctx,
                                  Arena& arena) {
-  MethodCallParts parts;
-  if (ExtractMethodCallParts(expr, parts) &&
-      ctx.GetVariableClassType(parts.var_name) == "process" &&
-      parts.method_name == "await") {
-    auto* var = ctx.FindVariable(parts.var_name);
-    if (var) {
-      auto proc_handle = var->value.ToUint64();
-      auto* proc = ctx.FindProcessByHandle(proc_handle);
-      if (proc) {
-        if (proc->kind == ProcessKind::kFinal ||
-            proc->kind == ProcessKind::kContAssign) {
-          ctx.GetDiag().Error(
-              {},
-              "await() shall only target a process created by an initial "
-              "procedure, always procedure, or fork block");
-          co_return StmtResult::kDone;
-        }
-
-        if (proc == ctx.CurrentProcess()) {
-          ctx.GetDiag().Error({}, "process cannot await its own termination");
-          co_return StmtResult::kDone;
-        }
-        co_await ProcessAwaitAwaiter{proc};
-      }
-    }
+  (void)arena;
+  auto* proc = ResolveProcessAwaitTarget(expr, ctx);
+  if (proc) {
+    co_await ProcessAwaitAwaiter{proc};
   }
   co_return StmtResult::kDone;
 }
 
-static ExecTask ExecInlineTaskCall(const Stmt* stmt, SimContext& ctx,
-                                   Arena& arena) {
-  auto* expr = stmt->expr;
+// Handles the system-call task forms ($cast and $stacktrace) that this
+// statement may name. Returns true when the expression was one of those forms
+// (and has now been fully handled); false otherwise.
+static bool TryExecSystemCallTask(const Expr* expr, SimContext& ctx,
+                                  Arena& arena) {
+  if (!expr || expr->kind != ExprKind::kSystemCall) return false;
 
   // $cast invoked as a task: the evaluation performs the assignment when the
   // cast is valid and leaves the destination untouched otherwise. Unlike the
   // function form (which simply reports 0), the task form signals an invalid
   // assignment with a run-time error.
-  if (expr && expr->kind == ExprKind::kSystemCall && expr->callee == "$cast") {
+  if (expr->callee == "$cast") {
     auto result = EvalExpr(expr, ctx, arena);
     if (result.ToUint64() == 0) {
       ctx.GetDiag().Error(expr->range.start,
                           "$cast task could not assign the source expression "
                           "to the destination; assignment is invalid");
     }
-    co_return StmtResult::kDone;
+    return true;
   }
 
   // §20.17.2: invoked as a task, $stacktrace displays the call stack of the
   // context calling it, up to the top-level process. The function form, which
   // instead returns the same text as a string, is evaluated as an expression.
-  if (expr && expr->kind == ExprKind::kSystemCall &&
-      expr->callee == "$stacktrace") {
+  if (expr->callee == "$stacktrace") {
     std::cout << BuildStackTraceReport(ctx) << "\n";
+    return true;
+  }
+  return false;
+}
+
+// Reports whether the expression is a `<process handle>.await()` method call.
+static bool IsProcessAwaitCall(const Expr* expr, SimContext& ctx) {
+  MethodCallParts parts;
+  return ExtractMethodCallParts(expr, parts) &&
+         ctx.GetVariableClassType(parts.var_name) == "process" &&
+         parts.method_name == "await";
+}
+
+// Drops the named-scope registration and active-scope push established for a
+// named task call before its body started executing.
+static void UnregisterTaskNamedScope(const ModuleItem* func, SimContext& ctx) {
+  ctx.PopActiveNamedScope();
+  ctx.UnregisterNamedScope(func->name, ctx.CurrentProcess());
+}
+
+// Outcome of a kDisable bubbling out of a named-task body statement.
+enum class InlineTaskDisable {
+  kStopHere,   // the disable targeted this task; stop running its body.
+  kPropagate,  // the disable targets an outer scope; unwind out of the task.
+};
+
+// Handles a kDisable result from a statement in a named/anonymous task body.
+// For the self-targeted case it clears the disable target; for the propagating
+// case it performs the task teardown (so the caller need only co_return).
+static InlineTaskDisable HandleInlineTaskDisable(const ModuleItem* func,
+                                                 const Expr* expr,
+                                                 bool has_name, SimContext& ctx,
+                                                 Arena& arena) {
+  if (has_name && ctx.GetDisableTarget() == func->name) {
+    ctx.ClearDisableTarget();
+    return InlineTaskDisable::kStopHere;
+  }
+  if (has_name) UnregisterTaskNamedScope(func, ctx);
+  TeardownTaskCall(func, expr, ctx, arena);
+  return InlineTaskDisable::kPropagate;
+}
+
+static ExecTask ExecInlineTaskCall(const Stmt* stmt, SimContext& ctx,
+                                   Arena& arena) {
+  auto* expr = stmt->expr;
+
+  if (TryExecSystemCallTask(expr, ctx, arena)) {
     co_return StmtResult::kDone;
   }
 
-  {
-    MethodCallParts parts;
-    if (ExtractMethodCallParts(expr, parts) &&
-        ctx.GetVariableClassType(parts.var_name) == "process" &&
-        parts.method_name == "await") {
-      co_return co_await ExecProcessAwait(expr, ctx, arena);
-    }
+  if (IsProcessAwaitCall(expr, ctx)) {
+    co_return co_await ExecProcessAwait(expr, ctx, arena);
   }
   auto* func = SetupTaskCall(expr, ctx, arena);
   if (!func) {
@@ -573,22 +698,14 @@ static ExecTask ExecInlineTaskCall(const Stmt* stmt, SimContext& ctx,
     auto result = co_await ExecStmt(s, ctx, arena);
     if (result == StmtResult::kReturn) break;
     if (result == StmtResult::kDisable) {
-      if (has_name && ctx.GetDisableTarget() == func->name) {
-        ctx.ClearDisableTarget();
+      if (HandleInlineTaskDisable(func, expr, has_name, ctx, arena) ==
+          InlineTaskDisable::kStopHere) {
         break;
       }
-      if (has_name) {
-        ctx.PopActiveNamedScope();
-        ctx.UnregisterNamedScope(func->name, ctx.CurrentProcess());
-      }
-      TeardownTaskCall(func, expr, ctx, arena);
       co_return StmtResult::kDisable;
     }
   }
-  if (has_name) {
-    ctx.PopActiveNamedScope();
-    ctx.UnregisterNamedScope(func->name, ctx.CurrentProcess());
-  }
+  if (has_name) UnregisterTaskNamedScope(func, ctx);
   TeardownTaskCall(func, expr, ctx, arena);
   co_return StmtResult::kDone;
 }
@@ -736,6 +853,31 @@ static StmtResult ExecDisableForkImpl(SimContext& ctx) {
   return StmtResult::kDone;
 }
 
+// Selects the blocking-assignment execution form (timed, event/repeat-event,
+// or immediate) for a kBlockingAssign statement.
+static ExecTask DispatchBlockingAssign(const Stmt* stmt, SimContext& ctx,
+                                       Arena& arena) {
+  if (stmt->delay) return ExecBlockingAssignTimed(stmt, ctx, arena);
+  if (!stmt->events.empty()) {
+    if (stmt->repeat_event_count)
+      return ExecBlockingAssignRepeatEvent(stmt, ctx, arena);
+    return ExecBlockingAssignEvent(stmt, ctx, arena);
+  }
+  return ExecTask::Immediate(ExecBlockingAssignImpl(stmt, ctx, arena));
+}
+
+// Executes a kReturn statement: when inside a randsequence production with a
+// return value (§18.17.7) it evaluates the expression into the production's
+// return slot, then unwinds with kReturn.
+static StmtResult DispatchReturn(const Stmt* stmt, SimContext& ctx,
+                                 Arena& arena) {
+  if (stmt->expr && ctx.RsReturnSlot() != nullptr) {
+    *ctx.RsReturnSlot() =
+        EvalExpr(stmt->expr, ctx, arena, ctx.RsReturnSlot()->width);
+  }
+  return StmtResult::kReturn;
+}
+
 ExecTask ExecStmt(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   if (!stmt) return ExecTask::Immediate(StmtResult::kDone);
 
@@ -761,13 +903,7 @@ ExecTask ExecStmt(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     case StmtKind::kDoWhile:
       return ExecDoWhile(stmt, ctx, arena);
     case StmtKind::kBlockingAssign:
-      if (stmt->delay) return ExecBlockingAssignTimed(stmt, ctx, arena);
-      if (!stmt->events.empty()) {
-        if (stmt->repeat_event_count)
-          return ExecBlockingAssignRepeatEvent(stmt, ctx, arena);
-        return ExecBlockingAssignEvent(stmt, ctx, arena);
-      }
-      return ExecTask::Immediate(ExecBlockingAssignImpl(stmt, ctx, arena));
+      return DispatchBlockingAssign(stmt, ctx, arena);
     case StmtKind::kNonblockingAssign:
       if (!stmt->events.empty())
         return ExecTask::Immediate(ExecNbaWithEvent(stmt, ctx, arena));
@@ -803,16 +939,7 @@ ExecTask ExecStmt(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     case StmtKind::kContinue:
       return ExecTask::Immediate(StmtResult::kContinue);
     case StmtKind::kReturn:
-      // §18.17.7: inside a randsequence production with a non-void return type,
-      // a 'return <expr>' assigns its value to the production. The engine has
-      // pointed the return slot at the production's return storage, so evaluate
-      // the expression into it here. Outside that context the slot is null and
-      // the return simply unwinds.
-      if (stmt->expr && ctx.RsReturnSlot() != nullptr) {
-        *ctx.RsReturnSlot() =
-            EvalExpr(stmt->expr, ctx, arena, ctx.RsReturnSlot()->width);
-      }
-      return ExecTask::Immediate(StmtResult::kReturn);
+      return ExecTask::Immediate(DispatchReturn(stmt, ctx, arena));
     case StmtKind::kAssertImmediate:
     case StmtKind::kAssumeImmediate:
     case StmtKind::kCoverImmediate:

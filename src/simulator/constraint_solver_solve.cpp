@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <functional>
+#include <random>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -12,6 +13,206 @@
 #include "simulator/constraint_solver_internal.h"
 
 namespace delta {
+
+namespace {
+
+// depth(v) = the longest chain of variables that must be solved after v in the
+// solve...before successor graph. Variables with nothing ordered after them
+// have depth 0; a variable solved before others has a strictly greater depth
+// than each of them. Memoizes into 'depth' and guards self-referential cycles
+// (the elaborator rejects real cycles) with the on-stack set.
+int SolveGroupDepth(
+    const std::string& v,
+    const std::unordered_map<std::string, std::vector<std::string>>& succ,
+    std::unordered_map<std::string, int>& depth,
+    std::unordered_set<std::string>& on_stack) {
+  auto cached = depth.find(v);
+  if (cached != depth.end()) return cached->second;
+  if (on_stack.count(v)) return 0;  // cycle guard (elaborator rejects cycles)
+  on_stack.insert(v);
+  int best = 0;
+  auto it = succ.find(v);
+  if (it != succ.end()) {
+    for (const auto& w : it->second) {
+      best = std::max(best, 1 + SolveGroupDepth(w, succ, depth, on_stack));
+    }
+  }
+  on_stack.erase(v);
+  depth[v] = best;
+  return best;
+}
+
+// Depth-first walk of the function-argument priority digraph (higher -> lower)
+// that sets 'cycle' true on encountering a gray (on-stack) successor — a back
+// edge that closes a cycle. 'color': 0 white, 1 gray, 2 black.
+void PriorityCycleDfs(
+    const std::string& v,
+    const std::unordered_map<std::string, std::vector<std::string>>& succ,
+    std::unordered_map<std::string, int>& color, bool& cycle) {
+  color[v] = 1;
+  auto it = succ.find(v);
+  if (it != succ.end()) {
+    for (const auto& w : it->second) {
+      if (color[w] == 1) {
+        cycle = true;
+        return;
+      }
+      if (color[w] == 0) {
+        PriorityCycleDfs(w, succ, color, cycle);
+        if (cycle) return;
+      }
+    }
+  }
+  color[v] = 2;
+}
+
+// True when the soft constraint directly references 'var' in its own relation
+// (the single variable a simple relation names, or any variable recorded in
+// ref_vars) or in its inner expression_or_dist. A variable that only gates the
+// constraint — for instance the antecedent p of p -> soft q — is not among
+// these, so 'disable soft' on such a variable leaves the soft constraint in
+// place, as the clause requires.
+bool SoftDirectlyReferences(const ConstraintExpr& soft,
+                            const std::string& var) {
+  if (soft.var_name == var) return true;
+  for (const auto& r : soft.ref_vars)
+    if (r == var) return true;
+  if (soft.inner) {
+    if (soft.inner->var_name == var) return true;
+    for (const auto& r : soft.inner->ref_vars)
+      if (r == var) return true;
+  }
+  return false;
+}
+
+// prank(v) = how many variables must be solved before v, i.e. its distance from
+// a source of the priority digraph (higher -> lower successor edges). A
+// variable with nothing ordered before it has rank 0; each successor sits at
+// least one rank past every predecessor. Computed by iteratively relaxing along
+// the edges from the sources; the graph is acyclic here, so |vars| passes
+// suffice to reach the fixpoint.
+std::unordered_map<std::string, int> ComputePriorityRanks(
+    const std::vector<std::string>& vars,
+    const std::unordered_map<std::string, std::vector<std::string>>& succ) {
+  std::unordered_map<std::string, int> prank;
+  for (const auto& v : vars) prank[v] = 0;
+  for (size_t pass = 0; pass < vars.size(); ++pass) {
+    bool changed = false;
+    for (const auto& [h, ls] : succ) {
+      for (const auto& l : ls) {
+        if (prank[l] < prank[h] + 1) {
+          prank[l] = prank[h] + 1;
+          changed = true;
+        }
+      }
+    }
+    if (!changed) break;
+  }
+  return prank;
+}
+
+// 18.8 / 18.5.8: an inactive variable (rand_mode() OFF) is not one of the
+// active random variables, so it is not randomized. The solver instead seeds
+// its current value as a constant before solving (the real value into
+// 'real_values', the integral value into 'values') so a global constraint
+// relating it to an active variable is evaluated against that fixed value
+// rather than dropped.
+void SeedInactiveVariables(
+    std::unordered_map<std::string, RandVariable>& variables,
+    std::unordered_map<std::string, int64_t>& values,
+    std::unordered_map<std::string, double>& real_values) {
+  for (auto& [name, var] : variables) {
+    // 18.4.1: a real variable's value lives in real_values, not the integral
+    // values map; an inactive one likewise holds its current real value.
+    if (var.is_real) {
+      if (!var.enabled) real_values[name] = var.real_value;
+      continue;
+    }
+    if (!var.enabled) values[name] = var.value;
+  }
+}
+
+// 18.4.2: the cyclic (randc) variables shall be solved before the noncyclical
+// rand variables. Draw every still-uncommitted active randc value here so the
+// rand variables that follow are solved with the cyclic values already fixed
+// for this attempt.
+void DrawRandcVariables(
+    std::unordered_map<std::string, RandVariable>& variables,
+    std::unordered_map<std::string, int64_t>& values,
+    const std::function<int64_t(RandVariable&)>& gen) {
+  for (auto& [name, var] : variables) {
+    if (!var.enabled || var.is_real) continue;
+    if (var.qualifier != RandQualifier::kRandc) continue;
+    if (values.find(name) != values.end()) continue;
+    values[name] = gen(var);
+  }
+}
+
+// 18.5.7.1: an array's size method is solved with the size constraints, ahead
+// of the iterative (foreach) constraints over that array. Commit every active,
+// non-randc, still-uncommitted array-size variable here so a foreach reading
+// the size sees the chosen value and treats it as a state variable.
+void DrawArraySizeVariables(
+    std::unordered_map<std::string, RandVariable>& variables,
+    std::unordered_map<std::string, int64_t>& values,
+    const std::function<int64_t(RandVariable&)>& gen) {
+  for (auto& [name, var] : variables) {
+    if (!var.enabled || var.is_real) continue;
+    if (!var.is_array_size) continue;
+    if (var.qualifier == RandQualifier::kRandc) continue;
+    if (values.find(name) != values.end()) continue;
+    values[name] = gen(var);
+  }
+}
+
+// The default single (flat) general pass: draw every active variable not
+// already committed. 18.4.1 draws an active real variable from its uniform real
+// range; the already-committed randc/array-size integral variables are skipped.
+void DrawGeneralPass(std::unordered_map<std::string, RandVariable>& variables,
+                     std::unordered_map<std::string, int64_t>& values,
+                     std::unordered_map<std::string, double>& real_values,
+                     const std::function<int64_t(RandVariable&)>& gen,
+                     const std::function<double(RandVariable&)>& gen_real) {
+  for (auto& [name, var] : variables) {
+    if (!var.enabled) continue;
+    if (var.is_real) {
+      real_values[name] = gen_real(var);
+      continue;
+    }
+    if (values.find(name) != values.end()) continue;
+    values[name] = gen(var);
+  }
+}
+
+// A constraint is checkable in a partial assignment only once every variable it
+// references has been committed. A constraint that references nothing is
+// deferred to the final pass (treated as not ready here).
+bool ConstraintReady(const ConstraintExpr& c,
+                     const std::unordered_set<std::string>& committed) {
+  if (c.ref_vars.empty()) return false;  // checked only in the final pass
+  for (const auto& v : c.ref_vars) {
+    if (!committed.count(v)) return false;
+  }
+  return true;
+}
+
+// Seed a single concrete constraint directly into 'values': an equality fixes
+// the variable to its constant, and a set-membership picks one of the listed
+// values at random. Other kinds leave 'values' untouched.
+void ApplyConcreteConstraint(const ConstraintExpr& c,
+                             std::unordered_map<std::string, int64_t>& values,
+                             std::mt19937& rng) {
+  if (c.kind == ConstraintKind::kEqual) {
+    values[c.var_name] = c.lo;
+  } else if (c.kind == ConstraintKind::kSetMembership) {
+    if (!c.set_values.empty()) {
+      std::uniform_int_distribution<size_t> pick(0, c.set_values.size() - 1);
+      values[c.var_name] = c.set_values[pick(rng)];
+    }
+  }
+}
+
+}  // namespace
 
 bool ConstraintSolver::Solve() { return SolveWith({}); }
 
@@ -50,14 +251,7 @@ bool ConstraintSolver::InlineConstraintCheck(
 void ConstraintSolver::ApplyDirectConstraints(
     const std::vector<ConstraintExpr>& extra, bool include_soft) {
   auto apply = [this](const ConstraintExpr& c) {
-    if (c.kind == ConstraintKind::kEqual) {
-      values_[c.var_name] = c.lo;
-    } else if (c.kind == ConstraintKind::kSetMembership) {
-      if (!c.set_values.empty()) {
-        std::uniform_int_distribution<size_t> pick(0, c.set_values.size() - 1);
-        values_[c.var_name] = c.set_values[pick(rng_)];
-      }
-    }
+    ApplyConcreteConstraint(c, values_, rng_);
   };
   // 18.5.13: when the soft constraints are still active, seed their inner
   // expression_or_dist exactly as a hard constraint so a satisfiable soft
@@ -172,25 +366,6 @@ void ConstraintSolver::ComputeDisabledSoft(
     const std::vector<ConstraintExpr>& extra) {
   disabled_soft_.clear();
 
-  // The variables that directly appear in a soft constraint's relation: the
-  // single variable a simple relation names, plus any variables the relation
-  // records as referenced (and likewise of its inner expression_or_dist). A
-  // variable that only gates the constraint — for instance the antecedent p of
-  // p -> soft q — is not among these, so 'disable soft' on such a variable
-  // leaves the soft constraint in place, as the clause requires.
-  auto directly_references = [](const ConstraintExpr& soft,
-                                const std::string& var) {
-    if (soft.var_name == var) return true;
-    for (const auto& r : soft.ref_vars)
-      if (r == var) return true;
-    if (soft.inner) {
-      if (soft.inner->var_name == var) return true;
-      for (const auto& r : soft.inner->ref_vars)
-        if (r == var) return true;
-    }
-    return false;
-  };
-
   // Walk the soft constraints and 'disable soft' directives in declaration
   // order (every enabled block, then the inline constraints last) — the order
   // that fixes priority in 18.5.13.1. A directive discards the soft constraints
@@ -202,7 +377,7 @@ void ConstraintSolver::ComputeDisabledSoft(
       seen_soft.push_back(&c);
     } else if (c.kind == ConstraintKind::kDisableSoft) {
       for (const auto* s : seen_soft) {
-        if (directly_references(*s, c.var_name)) disabled_soft_.insert(s);
+        if (SoftDirectlyReferences(*s, c.var_name)) disabled_soft_.insert(s);
       }
     }
   };
@@ -284,28 +459,10 @@ std::vector<std::vector<std::string>> ConstraintSolver::ComputeSolveGroups(
   // descending depth therefore honors every ordering edge while deferring each
   // variable as late as the ordering allows.
   std::unordered_map<std::string, int> depth;
-  std::function<int(const std::string&, std::unordered_set<std::string>&)> dfs =
-      [&](const std::string& v,
-          std::unordered_set<std::string>& on_stack) -> int {
-    auto cached = depth.find(v);
-    if (cached != depth.end()) return cached->second;
-    if (on_stack.count(v)) return 0;  // cycle guard (elaborator rejects cycles)
-    on_stack.insert(v);
-    int best = 0;
-    auto it = succ.find(v);
-    if (it != succ.end()) {
-      for (const auto& w : it->second) {
-        best = std::max(best, 1 + dfs(w, on_stack));
-      }
-    }
-    on_stack.erase(v);
-    depth[v] = best;
-    return best;
-  };
   int max_depth = 0;
   for (const auto& v : vars) {
     std::unordered_set<std::string> on_stack;
-    max_depth = std::max(max_depth, dfs(v, on_stack));
+    max_depth = std::max(max_depth, SolveGroupDepth(v, succ, depth, on_stack));
   }
   // Bucket by depth, highest depth (solved first) into the earliest group; the
   // unordered variables sit at depth 0 and so form the final, last-solved
@@ -354,26 +511,9 @@ bool ConstraintSolver::HasFunctionArgPriorityCycle() const {
   }
   std::unordered_map<std::string, int> color;  // 0 white, 1 gray, 2 black
   bool cycle = false;
-  std::function<void(const std::string&)> dfs = [&](const std::string& v) {
-    color[v] = 1;
-    auto it = succ.find(v);
-    if (it != succ.end()) {
-      for (const auto& w : it->second) {
-        if (color[w] == 1) {
-          cycle = true;
-          return;
-        }
-        if (color[w] == 0) {
-          dfs(w);
-          if (cycle) return;
-        }
-      }
-    }
-    color[v] = 2;
-  };
   for (const auto& v : nodes) {
     if (color[v] == 0) {
-      dfs(v);
+      PriorityCycleDfs(v, succ, color, cycle);
       if (cycle) break;
     }
   }
@@ -396,23 +536,7 @@ std::vector<std::vector<std::string>> ConstraintSolver::ComputePriorityLayers(
   // ascending rank therefore honors every priority edge and gathers the
   // unordered variables into layer 0. The rank is computed by relaxing along
   // the edges from the sources.
-  std::unordered_map<std::string, int> prank;
-  for (const auto& v : vars) prank[v] = 0;
-  // Iteratively relax: a successor's rank is at least one past its
-  // predecessor's. The graph is acyclic here, so |vars| passes suffice to reach
-  // the fixpoint.
-  for (size_t pass = 0; pass < vars.size(); ++pass) {
-    bool changed = false;
-    for (const auto& [h, ls] : succ) {
-      for (const auto& l : ls) {
-        if (prank[l] < prank[h] + 1) {
-          prank[l] = prank[h] + 1;
-          changed = true;
-        }
-      }
-    }
-    if (!changed) break;
-  }
+  std::unordered_map<std::string, int> prank = ComputePriorityRanks(vars, succ);
   int max_rank = 0;
   for (const auto& v : vars) max_rank = std::max(max_rank, prank[v]);
   std::vector<std::vector<std::string>> layers(max_rank + 1);
@@ -430,20 +554,13 @@ bool ConstraintSolver::CheckCommittedConstraints(
   std::vector<const ConstraintExpr*> hard;
   std::vector<const ConstraintExpr*> soft;
   CollectConstraints(blocks_, extra, hard, soft);
-  auto ready = [&](const ConstraintExpr* c) {
-    if (c->ref_vars.empty()) return false;  // checked only in the final pass
-    for (const auto& v : c->ref_vars) {
-      if (!committed.count(v)) return false;
-    }
-    return true;
-  };
   for (const auto* c : hard) {
-    if (!ready(c)) continue;
+    if (!ConstraintReady(*c, committed)) continue;
     if (!EvalConstraint(*c)) return false;
   }
   if (include_soft) {
     for (const auto* c : soft) {
-      if (!ready(c)) continue;
+      if (!ConstraintReady(*c, committed)) continue;
       const ConstraintExpr* inner = c->inner ? c->inner : nullptr;
       if (inner && !EvalConstraint(*inner)) return false;
     }
@@ -461,8 +578,10 @@ bool ConstraintSolver::SolvePriorityLayers(
   std::unordered_set<std::string> committed;
   for (const auto& kv : values_) committed.insert(kv.first);
   for (const auto& kv : real_values_) committed.insert(kv.first);
-  for (const auto& layer : layers) {
-    bool ok = false;
+  // Draw one layer up to kLayerAttempts times, returning true as soon as a draw
+  // leaves the now-checkable constraints satisfied against 'committed' plus
+  // this layer.
+  auto solve_one_layer = [&](const std::vector<std::string>& layer) {
     for (int attempt = 0; attempt < kLayerAttempts; ++attempt) {
       for (const auto& name : layer) {
         auto it = variables_.find(name);
@@ -472,14 +591,16 @@ bool ConstraintSolver::SolvePriorityLayers(
       std::unordered_set<std::string> with_layer = committed;
       for (const auto& name : layer) with_layer.insert(name);
       if (CheckCommittedConstraints(extra, include_soft, with_layer)) {
-        ok = true;
-        break;
+        return true;
       }
     }
+    return false;
+  };
+  for (const auto& layer : layers) {
     // 18.5.11: an earlier, higher-priority layer is never reconsidered. If no
     // draw of this layer satisfies the constraints that have become checkable,
     // the overall solve fails — the subdivision can make the set unsolvable.
-    if (!ok) return false;
+    if (!solve_one_layer(layer)) return false;
     for (const auto& name : layer) committed.insert(name);
   }
   // Every layer committed: accept only if the complete assignment satisfies all
@@ -530,50 +651,18 @@ bool ConstraintSolver::SolveIterative(const std::vector<ConstraintExpr>& extra,
                                       bool include_soft) {
   static constexpr int kMaxAttempts = 500;
   guard_error_ = false;
+  auto gen = [this](RandVariable& var) { return GenerateRandValue(var); };
+  auto gen_real = [this](RandVariable& var) {
+    return GenerateRandRealValue(var);
+  };
   for (int attempt = 0; attempt < kMaxAttempts; ++attempt) {
     values_.clear();
     real_values_.clear();
-    // 18.8 / 18.5.8: an inactive variable (rand_mode() OFF) is not one of the
-    // active random variables, so it is not randomized. The solver instead
-    // treats it as a state variable: its current value is seeded as a constant
-    // before solving, so a global constraint relating it to an active variable
-    // is evaluated against that fixed value rather than dropped.
-    for (auto& [name, var] : variables_) {
-      // 18.4.1: a real variable's value lives in real_values_, not the integral
-      // values_ map; an inactive one likewise holds its current real value.
-      if (var.is_real) {
-        if (!var.enabled) real_values_[name] = var.real_value;
-        continue;
-      }
-      if (!var.enabled) values_[name] = var.value;
-    }
+    SeedInactiveVariables(variables_, values_, real_values_);
     ApplyDistConstraints();
     ApplyDirectConstraints(extra, include_soft);
-    // 18.4.2: the cyclic (randc) variables shall be solved before the
-    // noncyclical rand variables. Draw every active randc value first so that
-    // the rand variables that follow are solved with the cyclic values already
-    // committed for this attempt; a constraint set that mixes rand and randc
-    // therefore resolves the randc variables first, as the cyclic semantics
-    // require.
-    for (auto& [name, var] : variables_) {
-      if (!var.enabled || var.is_real) continue;
-      if (var.qualifier != RandQualifier::kRandc) continue;
-      if (values_.find(name) != values_.end()) continue;
-      values_[name] = GenerateRandValue(var);
-    }
-    // 18.5.7.1: an array's size method is solved with the size constraints,
-    // ahead of the iterative (foreach) constraints over that array. Commit
-    // every active array-size variable here, before the general rand pass
-    // below, so that a foreach reading the size sees the value already chosen
-    // and treats it as a state variable rather than one it may itself
-    // constrain. The general pass then skips these already-committed variables.
-    for (auto& [name, var] : variables_) {
-      if (!var.enabled || var.is_real) continue;
-      if (!var.is_array_size) continue;
-      if (var.qualifier == RandQualifier::kRandc) continue;
-      if (values_.find(name) != values_.end()) continue;
-      values_[name] = GenerateRandValue(var);
-    }
+    DrawRandcVariables(variables_, values_, gen);
+    DrawArraySizeVariables(variables_, values_, gen);
     // 18.5.9: when a solve...before ordering applies, solve the active integral
     // rand variables in ordered groups rather than in one flat pass. An earlier
     // group is committed before the later groups are solved against it, which
@@ -589,7 +678,7 @@ bool ConstraintSolver::SolveIterative(const std::vector<ConstraintExpr>& extra,
     if (!function_arg_priority_edges_.empty()) {
       if (RunStagedSolve(
               variables_, real_values_, values_, /*use_priority=*/true,
-              [this](RandVariable& var) { return GenerateRandRealValue(var); },
+              gen_real,
               [this](const std::vector<std::string>& general) {
                 return ComputePriorityLayers(general);
               },
@@ -604,7 +693,7 @@ bool ConstraintSolver::SolveIterative(const std::vector<ConstraintExpr>& extra,
     if (!solve_before_edges_.empty()) {
       if (RunStagedSolve(
               variables_, real_values_, values_, /*use_priority=*/false,
-              [this](RandVariable& var) { return GenerateRandRealValue(var); },
+              gen_real,
               [this](const std::vector<std::string>& general) {
                 return ComputeSolveGroups(general);
               },
@@ -616,17 +705,7 @@ bool ConstraintSolver::SolveIterative(const std::vector<ConstraintExpr>& extra,
       if (guard_error_) return false;
       continue;
     }
-    for (auto& [name, var] : variables_) {
-      if (!var.enabled) continue;
-      // 18.4.1: draw an active real variable from its uniform real range.
-      if (var.is_real) {
-        real_values_[name] = GenerateRandRealValue(var);
-        continue;
-      }
-      // randc variables are already committed above; skip them here.
-      if (values_.find(name) != values_.end()) continue;
-      values_[name] = GenerateRandValue(var);
-    }
+    DrawGeneralPass(variables_, values_, real_values_, gen, gen_real);
     if (CheckAllConstraints(extra, include_soft)) return true;
     // 18.5.12: an ERROR guard fails randomize() outright; do not retry it.
     if (guard_error_) return false;

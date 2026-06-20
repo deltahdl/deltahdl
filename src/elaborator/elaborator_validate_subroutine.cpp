@@ -11,6 +11,16 @@
 
 namespace delta {
 
+// §7.7: returns true when a positional DPI formal is an open-array (unsized)
+// output formal that may not receive a dynamic array or queue actual.
+static bool IsDpiOpenArrayOutputFormal(const FunctionArg& formal) {
+  bool is_open =
+      !formal.unpacked_dims.empty() && formal.unpacked_dims[0] == nullptr;
+  bool is_output = formal.direction == Direction::kOutput ||
+                   formal.direction == Direction::kInout;
+  return is_open && is_output;
+}
+
 // §7.7: at a DPI import call, an open-array (unsized) formal with an output
 // direction may not receive a dynamic array or queue actual. The unsized
 // dimension means the C side has no agreed-upon element count to write back
@@ -26,12 +36,7 @@ void Elaborator::CheckDpiOpenArrayCall(const Expr* call) {
   }
   size_t count = std::min(call->args.size(), imp->func_args.size());
   for (size_t i = 0; i < count; ++i) {
-    const FunctionArg& formal = imp->func_args[i];
-    bool is_open =
-        !formal.unpacked_dims.empty() && formal.unpacked_dims[0] == nullptr;
-    bool is_output = formal.direction == Direction::kOutput ||
-                     formal.direction == Direction::kInout;
-    if (!is_open || !is_output) continue;
+    if (!IsDpiOpenArrayOutputFormal(imp->func_args[i])) continue;
     const Expr* actual = call->args[i];
     if (!actual || actual->kind != ExprKind::kIdentifier) continue;
     auto vit = var_array_info_.find(actual->text);
@@ -88,15 +93,22 @@ void Elaborator::ValidateDpiOpenArrayArgs(const ModuleDecl* decl) {
   }
 }
 
-// §13.4.4
-static bool StmtSpawnsBackgroundProcess(const Stmt* s) {
-  if (!s) return false;
+// §13.4.4: true when this statement node itself (ignoring substatements) is a
+// background-process-spawning construct.
+static bool StmtNodeSpawnsBackgroundProcess(const Stmt* s) {
   if (s->kind == StmtKind::kNonblockingAssign) return true;
   if (s->kind == StmtKind::kEventTrigger) return true;
   if (s->kind == StmtKind::kNbEventTrigger) return true;
   if (s->kind == StmtKind::kFork && s->join_kind == TokenKind::kKwJoinNone) {
     return true;
   }
+  return false;
+}
+
+static bool StmtSpawnsBackgroundProcess(const Stmt* s);
+
+// §13.4.4: true when any substatement of `s` spawns a background process.
+static bool ChildStmtSpawnsBackgroundProcess(const Stmt* s) {
   for (auto* sub : s->stmts)
     if (StmtSpawnsBackgroundProcess(sub)) return true;
   for (auto* sub : s->fork_stmts)
@@ -112,6 +124,13 @@ static bool StmtSpawnsBackgroundProcess(const Stmt* s) {
   for (auto& ri : s->randcase_items)
     if (StmtSpawnsBackgroundProcess(ri.second)) return true;
   return false;
+}
+
+// §13.4.4
+static bool StmtSpawnsBackgroundProcess(const Stmt* s) {
+  if (!s) return false;
+  if (StmtNodeSpawnsBackgroundProcess(s)) return true;
+  return ChildStmtSpawnsBackgroundProcess(s);
 }
 
 // §13.4.4
@@ -476,87 +495,91 @@ static void WalkExprForCallArgs(
     WalkExprForCallArgs(e, func_decls, net_names, diag);
 }
 
+// §13.5.5: a bare-identifier expression statement that names a subroutine is a
+// paren-omitted call; check that the omission is legal here.
+static void CheckParenOmittedCall(
+    const Stmt* s,
+    const std::unordered_map<std::string_view, const ModuleItem*>& func_decls,
+    DiagEngine& diag) {
+  auto it = func_decls.find(s->expr->text);
+  if (it == func_decls.end()) return;
+  const auto* func = it->second;
+  bool is_task = func->kind == ModuleItemKind::kTaskDecl;
+  bool is_void_func = func->kind == ModuleItemKind::kFunctionDecl &&
+                      func->return_type.kind == DataTypeKind::kVoid;
+  if (!is_task && !is_void_func) {
+    diag.Error(s->expr->range.start,
+               std::format("cannot omit parentheses in call to nonvoid "
+                           "function '{}'",
+                           s->expr->text));
+    return;
+  }
+  // §13.5.5: parentheses may be omitted only when the subroutine has
+  // no formal arguments, or when every formal has a default value.
+  bool all_have_defaults = true;
+  for (const auto& arg : func->func_args) {
+    if (!arg.default_value) {
+      all_have_defaults = false;
+      break;
+    }
+  }
+  if (!all_have_defaults) {
+    diag.Error(s->expr->range.start,
+               std::format("cannot omit parentheses in call to '{}': "
+                           "not all formal arguments have defaults",
+                           s->expr->text));
+  }
+}
+
+// §13.4.1: an expression-statement call discards its result; warn if it is a
+// nonvoid function (a void'(...) cast wraps the call in a kCast and so does not
+// reach this check). Also checks the argument expressions for void operands.
+static void CheckDiscardedCallStmt(
+    const Stmt* s,
+    const std::unordered_map<std::string_view, const ModuleItem*>& func_decls,
+    DiagEngine& diag) {
+  for (auto* a : s->expr->args) CheckVoidCallInExpr(a, func_decls, diag);
+
+  auto fit = func_decls.find(s->expr->callee);
+  if (fit == func_decls.end()) return;
+  const auto* func = fit->second;
+  if (func->kind == ModuleItemKind::kFunctionDecl &&
+      func->return_type.kind != DataTypeKind::kVoid) {
+    diag.Warning(
+        s->expr->range.start,
+        std::format("return value of nonvoid function '{}' is discarded; "
+                    "cast to void to silence this warning",
+                    s->expr->callee));
+  }
+}
+
+// §9.4.2: an event expression cannot call functions with out/inout/ref
+// arguments, cannot call tasks, and must yield singular values.
+static void CheckEventControlCalls(
+    const Stmt* s,
+    const std::unordered_map<std::string_view, const ModuleItem*>& func_decls,
+    DiagEngine& diag) {
+  for (const auto& ev : s->events) {
+    CheckCallNoOutInoutRefInExpr(ev.signal, func_decls, diag,
+                                 "an event expression");
+    CheckCallNoOutInoutRefInExpr(ev.iff_condition, func_decls, diag,
+                                 "an event expression");
+
+    CheckNoTaskCallInExpr(ev.signal, func_decls, diag);
+    CheckNoTaskCallInExpr(ev.iff_condition, func_decls, diag);
+  }
+}
+
 static void WalkStmtForCallArgs(
     const Stmt* s,
     const std::unordered_map<std::string_view, const ModuleItem*>& func_decls,
+    const std::unordered_set<std::string_view>& net_names, DiagEngine& diag);
+
+// Recurse into every substatement / sub-expression of `s`.
+static void WalkChildStmtsForCallArgs(
+    const Stmt* s,
+    const std::unordered_map<std::string_view, const ModuleItem*>& func_decls,
     const std::unordered_set<std::string_view>& net_names, DiagEngine& diag) {
-  if (!s) return;
-
-  if (s->kind == StmtKind::kExprStmt && s->expr &&
-      s->expr->kind == ExprKind::kIdentifier) {
-    auto it = func_decls.find(s->expr->text);
-    if (it != func_decls.end()) {
-      const auto* func = it->second;
-      bool is_task = func->kind == ModuleItemKind::kTaskDecl;
-      bool is_void_func = func->kind == ModuleItemKind::kFunctionDecl &&
-                          func->return_type.kind == DataTypeKind::kVoid;
-      if (!is_task && !is_void_func) {
-        diag.Error(s->expr->range.start,
-                   std::format("cannot omit parentheses in call to nonvoid "
-                               "function '{}'",
-                               s->expr->text));
-      } else {
-        // §13.5.5: parentheses may be omitted only when the subroutine has
-        // no formal arguments, or when every formal has a default value.
-        bool all_have_defaults = true;
-        for (const auto& arg : func->func_args) {
-          if (!arg.default_value) {
-            all_have_defaults = false;
-            break;
-          }
-        }
-        if (!all_have_defaults) {
-          diag.Error(s->expr->range.start,
-                     std::format("cannot omit parentheses in call to '{}': "
-                                 "not all formal arguments have defaults",
-                                 s->expr->text));
-        }
-      }
-    }
-  }
-
-  if (s->kind == StmtKind::kExprStmt && s->expr &&
-      s->expr->kind == ExprKind::kCall) {
-    for (auto* a : s->expr->args) CheckVoidCallInExpr(a, func_decls, diag);
-
-    // §13.4.1: calling a nonvoid function as if it had no return value is
-    // legal but shall issue a warning. A void'(...) cast wraps the call in a
-    // kCast at the top of the expression statement and so does not reach
-    // this branch, which is how the cast form suppresses the warning.
-    auto fit = func_decls.find(s->expr->callee);
-    if (fit != func_decls.end()) {
-      const auto* func = fit->second;
-      if (func->kind == ModuleItemKind::kFunctionDecl &&
-          func->return_type.kind != DataTypeKind::kVoid) {
-        diag.Warning(
-            s->expr->range.start,
-            std::format("return value of nonvoid function '{}' is discarded; "
-                        "cast to void to silence this warning",
-                        s->expr->callee));
-      }
-    }
-  } else {
-    CheckVoidCallInExpr(s->expr, func_decls, diag);
-  }
-  CheckVoidCallInExpr(s->rhs, func_decls, diag);
-  CheckVoidCallInExpr(s->condition, func_decls, diag);
-  CheckVoidCallInExpr(s->for_cond, func_decls, diag);
-
-  if (s->kind == StmtKind::kAssign || s->kind == StmtKind::kForce) {
-    CheckCallNoOutInoutRefInExpr(s->rhs, func_decls, diag,
-                                 "a procedural continuous assignment");
-  }
-  if (s->kind == StmtKind::kEventControl) {
-    for (const auto& ev : s->events) {
-      CheckCallNoOutInoutRefInExpr(ev.signal, func_decls, diag,
-                                   "an event expression");
-      CheckCallNoOutInoutRefInExpr(ev.iff_condition, func_decls, diag,
-                                   "an event expression");
-
-      CheckNoTaskCallInExpr(ev.signal, func_decls, diag);
-      CheckNoTaskCallInExpr(ev.iff_condition, func_decls, diag);
-    }
-  }
   WalkExprForCallArgs(s->expr, func_decls, net_names, diag);
   WalkExprForCallArgs(s->lhs, func_decls, net_names, diag);
   WalkExprForCallArgs(s->rhs, func_decls, net_names, diag);
@@ -574,6 +597,37 @@ static void WalkStmtForCallArgs(
   WalkExprForCallArgs(s->for_cond, func_decls, net_names, diag);
   for (auto& ci : s->case_items)
     WalkStmtForCallArgs(ci.body, func_decls, net_names, diag);
+}
+
+static void WalkStmtForCallArgs(
+    const Stmt* s,
+    const std::unordered_map<std::string_view, const ModuleItem*>& func_decls,
+    const std::unordered_set<std::string_view>& net_names, DiagEngine& diag) {
+  if (!s) return;
+
+  if (s->kind == StmtKind::kExprStmt && s->expr &&
+      s->expr->kind == ExprKind::kIdentifier) {
+    CheckParenOmittedCall(s, func_decls, diag);
+  }
+
+  if (s->kind == StmtKind::kExprStmt && s->expr &&
+      s->expr->kind == ExprKind::kCall) {
+    CheckDiscardedCallStmt(s, func_decls, diag);
+  } else {
+    CheckVoidCallInExpr(s->expr, func_decls, diag);
+  }
+  CheckVoidCallInExpr(s->rhs, func_decls, diag);
+  CheckVoidCallInExpr(s->condition, func_decls, diag);
+  CheckVoidCallInExpr(s->for_cond, func_decls, diag);
+
+  if (s->kind == StmtKind::kAssign || s->kind == StmtKind::kForce) {
+    CheckCallNoOutInoutRefInExpr(s->rhs, func_decls, diag,
+                                 "a procedural continuous assignment");
+  }
+  if (s->kind == StmtKind::kEventControl) {
+    CheckEventControlCalls(s, func_decls, diag);
+  }
+  WalkChildStmtsForCallArgs(s, func_decls, net_names, diag);
 }
 
 // A scope randomize is a randomize_call that is not a method on a class
@@ -649,27 +703,46 @@ static void WalkStmtForScopeRandomize(const Stmt* s, DiagEngine& diag) {
   for (const auto& ci : s->case_items) WalkStmtForScopeRandomize(ci.body, diag);
 }
 
-void Elaborator::ValidateSubroutineCallArgs(const ModuleDecl* decl) {
+static bool IsProceduralBlock(const ModuleItem* item) {
+  return item->kind == ModuleItemKind::kInitialBlock ||
+         item->kind == ModuleItemKind::kAlwaysBlock ||
+         item->kind == ModuleItemKind::kAlwaysCombBlock ||
+         item->kind == ModuleItemKind::kAlwaysFFBlock ||
+         item->kind == ModuleItemKind::kAlwaysLatchBlock ||
+         item->kind == ModuleItemKind::kFinalBlock;
+}
+
+// Builds a name→decl map of all callable subroutines (the elaborator's known
+// functions plus the task declarations local to `decl`).
+static std::unordered_map<std::string_view, const ModuleItem*> BuildAllDecls(
+    const ModuleDecl* decl,
+    const std::unordered_map<std::string_view, const ModuleItem*>& func_decls) {
   std::unordered_map<std::string_view, const ModuleItem*> all_decls =
-      func_decls_;
+      func_decls;
   for (const auto* item : decl->items) {
     if (item->kind == ModuleItemKind::kTaskDecl) all_decls[item->name] = item;
   }
+  return all_decls;
+}
+
+// Footnote 43 (§A.8.2): walk every procedural and subroutine body for illegal
+// scope randomize_call forms.
+static void ValidateScopeRandomizeInDecl(const ModuleDecl* decl,
+                                         DiagEngine& diag) {
   for (const auto* item : decl->items) {
-    bool is_proc_block = item->kind == ModuleItemKind::kInitialBlock ||
-                         item->kind == ModuleItemKind::kAlwaysBlock ||
-                         item->kind == ModuleItemKind::kAlwaysCombBlock ||
-                         item->kind == ModuleItemKind::kAlwaysFFBlock ||
-                         item->kind == ModuleItemKind::kAlwaysLatchBlock ||
-                         item->kind == ModuleItemKind::kFinalBlock;
-    if (is_proc_block) WalkStmtForScopeRandomize(item->body, diag_);
+    if (IsProceduralBlock(item)) WalkStmtForScopeRandomize(item->body, diag);
     if (item->kind == ModuleItemKind::kFunctionDecl ||
         item->kind == ModuleItemKind::kTaskDecl) {
       for (const auto* s : item->func_body_stmts)
-        WalkStmtForScopeRandomize(s, diag_);
+        WalkStmtForScopeRandomize(s, diag);
     }
   }
+}
 
+// Collects names of variables whose declared type is non-singular (an unpacked
+// array or unpacked struct/union).
+static std::unordered_set<std::string_view> CollectNonSingularVars(
+    const ModuleDecl* decl) {
   std::unordered_set<std::string_view> non_singular_vars;
   for (const auto* item : decl->items) {
     if (item->kind != ModuleItemKind::kVarDecl) continue;
@@ -680,7 +753,14 @@ void Elaborator::ValidateSubroutineCallArgs(const ModuleDecl* decl) {
     if (unpacked_array || unpacked_aggregate)
       non_singular_vars.insert(item->name);
   }
+  return non_singular_vars;
+}
 
+// Collects names of functions whose return type is non-singular (an unpacked
+// struct/union), drawn from `decl` and the elaborator's known functions.
+static std::unordered_set<std::string_view> CollectNonSingularFuncs(
+    const ModuleDecl* decl,
+    const std::unordered_map<std::string_view, const ModuleItem*>& func_decls) {
   std::unordered_set<std::string_view> non_singular_funcs;
   auto add_if_non_singular_return = [&](const ModuleItem* item) {
     if (item->kind != ModuleItemKind::kFunctionDecl) return;
@@ -691,48 +771,81 @@ void Elaborator::ValidateSubroutineCallArgs(const ModuleDecl* decl) {
     if (unpacked_aggregate) non_singular_funcs.insert(item->name);
   };
   for (const auto* item : decl->items) add_if_non_singular_return(item);
-  for (const auto& [name, item] : func_decls_) add_if_non_singular_return(item);
+  for (const auto& [name, item] : func_decls) add_if_non_singular_return(item);
+  return non_singular_funcs;
+}
+
+// Validates the event expressions in a procedural block's body and sensitivity
+// list: call legality, no task calls, and singular-value requirements.
+static void ValidateProcBlockEvents(
+    const ModuleItem* item,
+    const std::unordered_map<std::string_view, const ModuleItem*>& all_decls,
+    const std::unordered_set<std::string_view>& net_names,
+    const std::unordered_set<std::string_view>& non_singular_vars,
+    const std::unordered_set<std::string_view>& non_singular_funcs,
+    DiagEngine& diag) {
+  WalkStmtForCallArgs(item->body, all_decls, net_names, diag);
+
+  WalkStmtForEventSingular(item->body, non_singular_vars, non_singular_funcs,
+                           diag);
+
+  for (const auto& ev : item->sensitivity) {
+    CheckCallNoOutInoutRefInExpr(ev.signal, all_decls, diag,
+                                 "an event expression");
+    CheckCallNoOutInoutRefInExpr(ev.iff_condition, all_decls, diag,
+                                 "an event expression");
+
+    CheckNoTaskCallInExpr(ev.signal, all_decls, diag);
+    CheckNoTaskCallInExpr(ev.iff_condition, all_decls, diag);
+
+    CheckEventExprSingular(ev.signal, non_singular_vars, non_singular_funcs,
+                           diag);
+    CheckEventExprSingular(ev.iff_condition, non_singular_vars,
+                           non_singular_funcs, diag);
+  }
+}
+
+// Validates the subroutine-call rules in one top-level item.
+static void ValidateCallArgsInItem(
+    const ModuleItem* item,
+    const std::unordered_map<std::string_view, const ModuleItem*>& all_decls,
+    const std::unordered_set<std::string_view>& net_names,
+    const std::unordered_set<std::string_view>& non_singular_vars,
+    const std::unordered_set<std::string_view>& non_singular_funcs,
+    DiagEngine& diag) {
+  if (IsProceduralBlock(item)) {
+    ValidateProcBlockEvents(item, all_decls, net_names, non_singular_vars,
+                            non_singular_funcs, diag);
+  }
+
+  if (item->kind == ModuleItemKind::kFunctionDecl ||
+      item->kind == ModuleItemKind::kTaskDecl) {
+    for (auto* s : item->func_body_stmts) {
+      WalkStmtForCallArgs(s, all_decls, net_names, diag);
+    }
+  }
+  if (item->kind == ModuleItemKind::kContAssign) {
+    CheckVoidCallInExpr(item->assign_rhs, all_decls, diag);
+
+    CheckCallNoOutInoutRefInExpr(item->assign_rhs, all_decls, diag,
+                                 "a continuous assignment");
+  }
+}
+
+void Elaborator::ValidateSubroutineCallArgs(const ModuleDecl* decl) {
+  std::unordered_map<std::string_view, const ModuleItem*> all_decls =
+      BuildAllDecls(decl, func_decls_);
+
+  ValidateScopeRandomizeInDecl(decl, diag_);
+
+  std::unordered_set<std::string_view> non_singular_vars =
+      CollectNonSingularVars(decl);
+  std::unordered_set<std::string_view> non_singular_funcs =
+      CollectNonSingularFuncs(decl, func_decls_);
+
   for (const auto* item : decl->items) {
-    bool is_proc_block = item->kind == ModuleItemKind::kInitialBlock ||
-                         item->kind == ModuleItemKind::kAlwaysBlock ||
-                         item->kind == ModuleItemKind::kAlwaysCombBlock ||
-                         item->kind == ModuleItemKind::kAlwaysFFBlock ||
-                         item->kind == ModuleItemKind::kAlwaysLatchBlock ||
-                         item->kind == ModuleItemKind::kFinalBlock;
-    if (is_proc_block) {
-      WalkStmtForCallArgs(item->body, all_decls, net_names_, diag_);
-
-      WalkStmtForEventSingular(item->body, non_singular_vars,
-                               non_singular_funcs, diag_);
-
-      for (const auto& ev : item->sensitivity) {
-        CheckCallNoOutInoutRefInExpr(ev.signal, all_decls, diag_,
-                                     "an event expression");
-        CheckCallNoOutInoutRefInExpr(ev.iff_condition, all_decls, diag_,
-                                     "an event expression");
-
-        CheckNoTaskCallInExpr(ev.signal, all_decls, diag_);
-        CheckNoTaskCallInExpr(ev.iff_condition, all_decls, diag_);
-
-        CheckEventExprSingular(ev.signal, non_singular_vars, non_singular_funcs,
-                               diag_);
-        CheckEventExprSingular(ev.iff_condition, non_singular_vars,
-                               non_singular_funcs, diag_);
-      }
-    }
-
-    if (item->kind == ModuleItemKind::kFunctionDecl ||
-        item->kind == ModuleItemKind::kTaskDecl) {
-      for (auto* s : item->func_body_stmts) {
-        WalkStmtForCallArgs(s, all_decls, net_names_, diag_);
-      }
-    }
-    if (item->kind == ModuleItemKind::kContAssign) {
-      CheckVoidCallInExpr(item->assign_rhs, all_decls, diag_);
-
-      CheckCallNoOutInoutRefInExpr(item->assign_rhs, all_decls, diag_,
-                                   "a continuous assignment");
-    }
+    ValidateCallArgsInItem(item, all_decls, net_names_, non_singular_vars,
+                           non_singular_funcs, diag_);
   }
 }
 

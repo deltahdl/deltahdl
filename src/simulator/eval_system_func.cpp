@@ -204,6 +204,22 @@ static bool IsVerifSysCall(std::string_view n) {
          n.starts_with("$sync$");
 }
 
+// §21.3.2 file-output tasks: $fdisplay, $fwrite, $fstrobe, $fmonitor and their
+// b/h/o radix variants ($fdisplayb, $fwriteh, …). Returns true when `n` is one
+// of those base names or a base name with a single b/h/o radix suffix.
+static bool IsFileOutputTask(std::string_view n) {
+  for (auto base : {"$fdisplay", "$fwrite", "$fstrobe", "$fmonitor"}) {
+    if (n == base) return true;
+    std::string_view base_view = base;
+    if (n.size() == base_view.size() + 1 &&
+        n.substr(0, base_view.size()) == base_view) {
+      char c = n.back();
+      if (c == 'b' || c == 'h' || c == 'o') return true;
+    }
+  }
+  return false;
+}
+
 static bool IsIOSysCall(std::string_view n) {
   if (n == "$fopen" || n == "$fclose" || n == "$readmemh" || n == "$readmemb" ||
       n == "$writememh" || n == "$writememb" || n == "$sscanf") {
@@ -217,18 +233,7 @@ static bool IsIOSysCall(std::string_view n) {
       n == "$sformat") {
     return true;
   }
-  // §21.3.2 file-output tasks: $fdisplay, $fwrite, $fstrobe, $fmonitor and
-  // their b/h/o radix variants.
-  for (auto base : {"$fdisplay", "$fwrite", "$fstrobe", "$fmonitor"}) {
-    if (n == base) return true;
-    std::string_view base_view = base;
-    if (n.size() == base_view.size() + 1 &&
-        n.substr(0, base_view.size()) == base_view) {
-      char c = n.back();
-      if (c == 'b' || c == 'h' || c == 'o') return true;
-    }
-  }
-  return false;
+  return IsFileOutputTask(n);
 }
 
 // Render a Table 20-2 base-10 order (in the range 2 .. -15) as the
@@ -327,6 +332,26 @@ static std::string ExtractStringArg(const Expr* arg) {
   return std::string(text);
 }
 
+// Evaluate one $timeformat integer field (units_number or precision_number),
+// range-check it against Table 20-2, and store it into `out`. Returns false and
+// emits a diagnostic naming `field` when the value is out of range, in which
+// case `out` is left untouched and the caller must abort.
+static bool ApplyTimeformatRangeField(const Expr* arg, SimContext& ctx,
+                                      Arena& arena, const char* field,
+                                      int& out) {
+  auto v = static_cast<int64_t>(EvalExpr(arg, ctx, arena).ToUint64());
+  // The value arrives as an unsigned 64-bit word, so widen the negative
+  // 32-bit pattern back into a signed integer for the range check.
+  auto field_value = static_cast<int32_t>(v);
+  if (!TimeformatRangeOk(field_value)) {
+    ctx.GetDiag().Error(
+        {}, std::string("$timeformat ") + field + " out of range [2 .. -15]");
+    return false;
+  }
+  out = field_value;
+  return true;
+}
+
 static Logic4Vec EvalTimeformatTask(const Expr* expr, SimContext& ctx,
                                     Arena& arena) {
   // Bare $timeformat with no parens block leaves the configured state alone.
@@ -334,28 +359,16 @@ static Logic4Vec EvalTimeformatTask(const Expr* expr, SimContext& ctx,
 
   TimeFormatSpec spec = ctx.GetTimeFormat();
   if (expr->args.size() >= 1 && expr->args[0]) {
-    auto v =
-        static_cast<int64_t>(EvalExpr(expr->args[0], ctx, arena).ToUint64());
-    // The value arrives as an unsigned 64-bit word, so widen the negative
-    // 32-bit pattern back into a signed integer for the range check.
-    auto units = static_cast<int32_t>(v);
-    if (!TimeformatRangeOk(units)) {
-      ctx.GetDiag().Error({},
-                          "$timeformat units_number out of range [2 .. -15]");
+    if (!ApplyTimeformatRangeField(expr->args[0], ctx, arena, "units_number",
+                                   spec.units_number)) {
       return MakeLogic4VecVal(arena, 1, 0);
     }
-    spec.units_number = units;
   }
   if (expr->args.size() >= 2 && expr->args[1]) {
-    auto v =
-        static_cast<int64_t>(EvalExpr(expr->args[1], ctx, arena).ToUint64());
-    auto prec = static_cast<int32_t>(v);
-    if (!TimeformatRangeOk(prec)) {
-      ctx.GetDiag().Error(
-          {}, "$timeformat precision_number out of range [2 .. -15]");
+    if (!ApplyTimeformatRangeField(expr->args[1], ctx, arena,
+                                   "precision_number", spec.precision_number)) {
       return MakeLogic4VecVal(arena, 1, 0);
     }
-    spec.precision_number = prec;
   }
   if (expr->args.size() >= 3 && expr->args[2]) {
     if (expr->args[2]->kind == ExprKind::kStringLiteral) {
@@ -372,6 +385,23 @@ static Logic4Vec EvalTimeformatTask(const Expr* expr, SimContext& ctx,
   }
   ctx.SetTimeFormat(spec);
   return MakeLogic4VecVal(arena, 1, 0);
+}
+
+// Dispatch the system calls selected by a name-family classifier (math,
+// utility, IO, file IO, array-query, verification) and, when none match, the
+// PRNG family that consumes any remaining name. Kept separate from the
+// timekeeping/output dispatch so each chain stays self-contained.
+static Logic4Vec EvalClassifiedSysCall(const Expr* expr, SimContext& ctx,
+                                       Arena& arena, std::string_view name) {
+  if (IsMathSysCall(name)) return EvalMathSysCall(expr, ctx, arena, name);
+  if (IsUtilitySysCall(name)) return EvalUtilitySysCall(expr, ctx, arena, name);
+  if (IsIOSysCall(name)) return EvalIOSysCall(expr, ctx, arena, name);
+  if (IsExtFileIOSysCall(name))
+    return EvalFileIOSysCall(expr, ctx, arena, name);
+  if (IsArrayQuerySysCall(name))
+    return EvalArrayQuerySysCall(expr, ctx, arena, name);
+  if (IsVerifSysCall(name)) return EvalVerifSysCall(expr, ctx, arena, name);
+  return EvalPrngCall(expr, ctx, arena, name);
 }
 
 static Logic4Vec EvalMiscSysCall(const Expr* expr, SimContext& ctx,
@@ -400,15 +430,7 @@ static Logic4Vec EvalMiscSysCall(const Expr* expr, SimContext& ctx,
     return StringToLogic4Vec(arena, BuildStackTraceReport(ctx));
   }
   if (name.starts_with("$dump")) return EvalVcdSysCall(expr, ctx, arena, name);
-  if (IsMathSysCall(name)) return EvalMathSysCall(expr, ctx, arena, name);
-  if (IsUtilitySysCall(name)) return EvalUtilitySysCall(expr, ctx, arena, name);
-  if (IsIOSysCall(name)) return EvalIOSysCall(expr, ctx, arena, name);
-  if (IsExtFileIOSysCall(name))
-    return EvalFileIOSysCall(expr, ctx, arena, name);
-  if (IsArrayQuerySysCall(name))
-    return EvalArrayQuerySysCall(expr, ctx, arena, name);
-  if (IsVerifSysCall(name)) return EvalVerifSysCall(expr, ctx, arena, name);
-  return EvalPrngCall(expr, ctx, arena, name);
+  return EvalClassifiedSysCall(expr, ctx, arena, name);
 }
 
 static Logic4Vec EvalSeveritySysCall(const Expr* expr, SimContext& ctx,
@@ -531,45 +553,55 @@ static void EmitSimControlDiagnostic(const Expr* expr, SimContext& ctx,
 // present they receive, in declared order, the per-state tallies of Table D.1:
 // net_is_forced, number_of_01x_drivers, number_of_0_drivers,
 // number_of_1_drivers, number_of_x_drivers.
+// Resolve which net and which bit of it the $countdrivers net argument names. A
+// bare identifier is a scalar net (bit 0); a bit-select names a vector net bit.
+// `net_name` is left empty when the argument is neither form.
+static void ResolveCountDriversNet(const Expr* net_arg, SimContext& ctx,
+                                   Arena& arena, std::string_view& net_name,
+                                   uint32_t& bit) {
+  if (net_arg == nullptr) return;
+  if (net_arg->kind == ExprKind::kIdentifier) {
+    net_name = net_arg->text;
+  } else if (net_arg->kind == ExprKind::kSelect && net_arg->base != nullptr &&
+             net_arg->base->kind == ExprKind::kIdentifier &&
+             net_arg->index != nullptr) {
+    net_name = net_arg->base->text;
+    bit =
+        static_cast<uint32_t>(EvalExpr(net_arg->index, ctx, arena).ToUint64());
+  }
+}
+
+// Tally the selected bit's state across every driver registered on `net`. A
+// driver in the high-impedance (z) state is not actively driving and is not
+// counted; the 0/1/x tallies cover the drivers that are.
+static void TallyCountDriversBit(const Net* net, uint32_t bit, uint64_t& n0,
+                                 uint64_t& n1, uint64_t& nx) {
+  if (net == nullptr) return;
+  const uint32_t kWord = bit / 64;
+  const uint64_t kMask = uint64_t{1} << (bit % 64);
+  for (const auto& drv : net->drivers) {
+    if (kWord >= drv.nwords) continue;
+    const bool kA = (drv.words[kWord].aval & kMask) != 0;
+    const bool kB = (drv.words[kWord].bval & kMask) != 0;
+    if (!kB && !kA)
+      ++n0;
+    else if (!kB && kA)
+      ++n1;
+    else if (kB && kA)
+      ++nx;
+  }
+}
+
 static Logic4Vec EvalCountDrivers(const Expr* expr, SimContext& ctx,
                                   Arena& arena) {
-  // Resolve which net and which bit of it the net argument names. A bare
-  // identifier is a scalar net (bit 0); a bit-select names the vector net bit.
   const Expr* net_arg = expr->args.empty() ? nullptr : expr->args[0];
   std::string_view net_name;
   uint32_t bit = 0;
-  if (net_arg != nullptr) {
-    if (net_arg->kind == ExprKind::kIdentifier) {
-      net_name = net_arg->text;
-    } else if (net_arg->kind == ExprKind::kSelect && net_arg->base != nullptr &&
-               net_arg->base->kind == ExprKind::kIdentifier &&
-               net_arg->index != nullptr) {
-      net_name = net_arg->base->text;
-      bit = static_cast<uint32_t>(
-          EvalExpr(net_arg->index, ctx, arena).ToUint64());
-    }
-  }
+  ResolveCountDriversNet(net_arg, ctx, arena, net_name, bit);
 
-  // Tally the selected bit's state across every driver registered on the net.
-  // A driver in the high-impedance (z) state is not actively driving and is not
-  // counted; the 0/1/x tallies cover the drivers that are.
   uint64_t n0 = 0, n1 = 0, nx = 0;
   Net* net = net_name.empty() ? nullptr : ctx.FindNet(net_name);
-  if (net != nullptr) {
-    const uint32_t kWord = bit / 64;
-    const uint64_t kMask = uint64_t{1} << (bit % 64);
-    for (const auto& drv : net->drivers) {
-      if (kWord >= drv.nwords) continue;
-      const bool kA = (drv.words[kWord].aval & kMask) != 0;
-      const bool kB = (drv.words[kWord].bval & kMask) != 0;
-      if (!kB && !kA)
-        ++n0;
-      else if (!kB && kA)
-        ++n1;
-      else if (kB && kA)
-        ++nx;
-    }
-  }
+  TallyCountDriversBit(net, bit, n0, n1, nx);
   const uint64_t kN01x = n0 + n1 + nx;
 
   // Write back any supplied output arguments per Table D.1, in declared order.
@@ -585,6 +617,116 @@ static Logic4Vec EvalCountDrivers(const Expr* expr, SimContext& ctx,
 
   // Returns 0 with no more than one driver, 1 otherwise to flag contention.
   return MakeLogic4VecVal(arena, 1, kN01x > 1 ? 1 : 0);
+}
+
+// Dispatch the optional Annex-D interactive/diagnostic tasks ($reset family,
+// $scope, $list, $showscopes, $showvars, $nolog, $log). Returns true and writes
+// the call's value to `out` when `name` is one of them; returns false otherwise
+// so the caller continues its own dispatch. The branches and their semantics
+// are exactly those of the original inline chain.
+static bool TryEvalAnnexDInteractiveTask(const Expr* expr, SimContext& ctx,
+                                         Arena& arena, std::string_view name,
+                                         Logic4Vec& out) {
+  // Optional $reset family (Annex D.8). $reset tallies a reset of the tool and
+  // captures its reset_value argument (the second argument, after stop_value)
+  // so that the value can be communicated to after the reset; the other
+  // arguments are accepted but carry no observable state here.
+  if (name == "$reset") {
+    int64_t reset_value = 0;
+    if (expr->args.size() > 1 && expr->args[1]) {
+      reset_value =
+          static_cast<int64_t>(EvalExpr(expr->args[1], ctx, arena).ToUint64());
+    }
+    ctx.RecordReset(reset_value);
+    out = MakeLogic4VecVal(arena, 1, 0);
+    return true;
+  }
+  // $reset_count reports how many times the tool has been reset.
+  if (name == "$reset_count") {
+    out = MakeLogic4VecVal(arena, 32, ctx.ResetCount());
+    return true;
+  }
+  // $reset_value returns the reset_value argument supplied to the last $reset.
+  if (name == "$reset_value") {
+    out = MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(ctx.ResetValue()));
+    return true;
+  }
+  // Optional $scope system task (Annex D.11). It selects a level of hierarchy
+  // as the interactive scope used to identify objects. Its single argument is
+  // the complete hierarchical name of a module, task, function, or named block;
+  // record that name as the new interactive scope.
+  if (name == "$scope") {
+    if (!expr->args.empty() && expr->args[0]) {
+      ctx.SetInteractiveScope(HierarchicalScopeName(expr->args[0]));
+    }
+    out = MakeLogic4VecVal(arena, 1, 0);
+    return true;
+  }
+  // Optional $list system task (Annex D.6). It produces a listing of a module,
+  // task, function, or named block. With no argument the object listed is the
+  // current scope setting (the interactive scope established by $scope); with
+  // an argument, the argument is the complete hierarchical name of the specific
+  // scope to list. Resolve which scope is selected and record it.
+  if (name == "$list") {
+    std::string target = (!expr->args.empty() && expr->args[0])
+                             ? HierarchicalScopeName(expr->args[0])
+                             : ctx.InteractiveScope();
+    ctx.RecordListing(target);
+    out = MakeLogic4VecVal(arena, 1, 0);
+    return true;
+  }
+  // Optional $showscopes system task (Annex D.12). It produces a complete list
+  // of the modules, tasks, functions, and named blocks defined at the current
+  // scope level (the interactive scope established by $scope). An optional
+  // integer argument widens the listing: a nonzero value lists every such
+  // object in or below the current hierarchical scope, while no argument or a
+  // zero value lists only the objects at the current scope level itself.
+  // Evaluate the optional argument to decide the depth and record the request.
+  if (name == "$showscopes") {
+    bool recursive = false;
+    if (!expr->args.empty() && expr->args[0]) {
+      recursive = EvalExpr(expr->args[0], ctx, arena).ToUint64() != 0;
+    }
+    ctx.RecordShowScopes(ctx.InteractiveScope(), recursive);
+    out = MakeLogic4VecVal(arena, 1, 0);
+    return true;
+  }
+  // Optional $showvars system task (Annex D.13). It produces status information
+  // for the reg and net variables, scalar and vector, in the current scope (the
+  // interactive scope established by $scope). With no argument every variable
+  // in that scope is reported; with a list of variables only the named ones
+  // are. A bit-select or part-select of a vector reports the status of all bits
+  // of that vector, so such a selection is reduced to the name of its
+  // underlying vector. Collect the requested variable names and record the
+  // request against the current scope.
+  if (name == "$showvars") {
+    std::vector<std::string> vars;
+    for (const Expr* arg : expr->args) {
+      if (arg) vars.push_back(ShowVarsVariableName(arg));
+    }
+    ctx.RecordShowVars(ctx.InteractiveScope(), std::move(vars));
+    out = MakeLogic4VecVal(arena, 1, 0);
+    return true;
+  }
+  // Optional $nolog and $log system tasks (Annex D.7). The log file holds a
+  // copy of everything printed to standard output. $nolog disables that copy;
+  // $log reenables it. An optional filename argument to $log closes the current
+  // log file and starts a new one, directing subsequent output there.
+  if (name == "$nolog") {
+    ctx.DisableLogging();
+    out = MakeLogic4VecVal(arena, 1, 0);
+    return true;
+  }
+  if (name == "$log") {
+    if (!expr->args.empty() && expr->args[0]) {
+      ctx.SetLogFile(ExtractStringArg(expr->args[0]));
+    } else {
+      ctx.EnableLogging();
+    }
+    out = MakeLogic4VecVal(arena, 1, 0);
+    return true;
+  }
+  return false;
 }
 
 Logic4Vec EvalSystemCall(const Expr* expr, SimContext& ctx, Arena& arena) {
@@ -611,95 +753,9 @@ Logic4Vec EvalSystemCall(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (name == "$countdrivers") {
     return EvalCountDrivers(expr, ctx, arena);
   }
-  // Optional $reset family (Annex D.8). $reset tallies a reset of the tool and
-  // captures its reset_value argument (the second argument, after stop_value)
-  // so that the value can be communicated to after the reset; the other
-  // arguments are accepted but carry no observable state here.
-  if (name == "$reset") {
-    int64_t reset_value = 0;
-    if (expr->args.size() > 1 && expr->args[1]) {
-      reset_value =
-          static_cast<int64_t>(EvalExpr(expr->args[1], ctx, arena).ToUint64());
-    }
-    ctx.RecordReset(reset_value);
-    return MakeLogic4VecVal(arena, 1, 0);
-  }
-  // $reset_count reports how many times the tool has been reset.
-  if (name == "$reset_count") {
-    return MakeLogic4VecVal(arena, 32, ctx.ResetCount());
-  }
-  // $reset_value returns the reset_value argument supplied to the last $reset.
-  if (name == "$reset_value") {
-    return MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(ctx.ResetValue()));
-  }
-  // Optional $scope system task (Annex D.11). It selects a level of hierarchy
-  // as the interactive scope used to identify objects. Its single argument is
-  // the complete hierarchical name of a module, task, function, or named block;
-  // record that name as the new interactive scope.
-  if (name == "$scope") {
-    if (!expr->args.empty() && expr->args[0]) {
-      ctx.SetInteractiveScope(HierarchicalScopeName(expr->args[0]));
-    }
-    return MakeLogic4VecVal(arena, 1, 0);
-  }
-  // Optional $list system task (Annex D.6). It produces a listing of a module,
-  // task, function, or named block. With no argument the object listed is the
-  // current scope setting (the interactive scope established by $scope); with
-  // an argument, the argument is the complete hierarchical name of the specific
-  // scope to list. Resolve which scope is selected and record it.
-  if (name == "$list") {
-    std::string target = (!expr->args.empty() && expr->args[0])
-                             ? HierarchicalScopeName(expr->args[0])
-                             : ctx.InteractiveScope();
-    ctx.RecordListing(target);
-    return MakeLogic4VecVal(arena, 1, 0);
-  }
-  // Optional $showscopes system task (Annex D.12). It produces a complete list
-  // of the modules, tasks, functions, and named blocks defined at the current
-  // scope level (the interactive scope established by $scope). An optional
-  // integer argument widens the listing: a nonzero value lists every such
-  // object in or below the current hierarchical scope, while no argument or a
-  // zero value lists only the objects at the current scope level itself.
-  // Evaluate the optional argument to decide the depth and record the request.
-  if (name == "$showscopes") {
-    bool recursive = false;
-    if (!expr->args.empty() && expr->args[0]) {
-      recursive = EvalExpr(expr->args[0], ctx, arena).ToUint64() != 0;
-    }
-    ctx.RecordShowScopes(ctx.InteractiveScope(), recursive);
-    return MakeLogic4VecVal(arena, 1, 0);
-  }
-  // Optional $showvars system task (Annex D.13). It produces status information
-  // for the reg and net variables, scalar and vector, in the current scope (the
-  // interactive scope established by $scope). With no argument every variable
-  // in that scope is reported; with a list of variables only the named ones
-  // are. A bit-select or part-select of a vector reports the status of all bits
-  // of that vector, so such a selection is reduced to the name of its
-  // underlying vector. Collect the requested variable names and record the
-  // request against the current scope.
-  if (name == "$showvars") {
-    std::vector<std::string> vars;
-    for (const Expr* arg : expr->args) {
-      if (arg) vars.push_back(ShowVarsVariableName(arg));
-    }
-    ctx.RecordShowVars(ctx.InteractiveScope(), std::move(vars));
-    return MakeLogic4VecVal(arena, 1, 0);
-  }
-  // Optional $nolog and $log system tasks (Annex D.7). The log file holds a
-  // copy of everything printed to standard output. $nolog disables that copy;
-  // $log reenables it. An optional filename argument to $log closes the current
-  // log file and starts a new one, directing subsequent output there.
-  if (name == "$nolog") {
-    ctx.DisableLogging();
-    return MakeLogic4VecVal(arena, 1, 0);
-  }
-  if (name == "$log") {
-    if (!expr->args.empty() && expr->args[0]) {
-      ctx.SetLogFile(ExtractStringArg(expr->args[0]));
-    } else {
-      ctx.EnableLogging();
-    }
-    return MakeLogic4VecVal(arena, 1, 0);
+  Logic4Vec annex_d_result;
+  if (TryEvalAnnexDInteractiveTask(expr, ctx, arena, name, annex_d_result)) {
+    return annex_d_result;
   }
   // Optional $scale function (Annex D.10). It reads the time value named by a
   // hierarchical reference and converts it from the time unit of the module

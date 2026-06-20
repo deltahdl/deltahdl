@@ -310,66 +310,124 @@ static int64_t SignExtendFromWidth(int64_t val, uint32_t width) {
 }
 
 static std::optional<ConstVal> ConstEvalFull(const Expr* expr,
+                                             const ScopeMap& scope);
+
+static std::optional<ConstVal> ConstEvalLiteral(const Expr* expr) {
+  uint32_t w = ConstLiteralWidth(expr);
+  bool s = IsSignedLiteral(expr->text);
+  int64_t v = TruncateToWidth(static_cast<int64_t>(expr->int_val), w);
+  if (s) v = SignExtendFromWidth(v, w);
+  return ConstVal{v, w, s};
+}
+
+static std::optional<ConstVal> ConstEvalUnaryFull(const Expr* expr,
+                                                  const ScopeMap& scope) {
+  auto operand = ConstEvalFull(expr->lhs, scope);
+  if (!operand) return std::nullopt;
+  if (expr->op == TokenKind::kMinus) {
+    int64_t v = TruncateToWidth(-operand->value, operand->width);
+    if (operand->is_signed) v = SignExtendFromWidth(v, operand->width);
+    return ConstVal{v, operand->width, operand->is_signed};
+  }
+  auto result = EvalUnary(expr->op, operand->value);
+  if (!result) return std::nullopt;
+  return ConstVal{*result, operand->width, operand->is_signed};
+}
+
+static std::optional<ConstVal> ConstEvalBinaryFull(const Expr* expr,
+                                                   const ScopeMap& scope) {
+  auto lhs = ConstEvalFull(expr->lhs, scope);
+  auto rhs = ConstEvalFull(expr->rhs, scope);
+  if (!lhs || !rhs) return std::nullopt;
+  uint32_t w = std::max(lhs->width, rhs->width);
+  bool s = lhs->is_signed && rhs->is_signed;
+  int64_t lv = 0, rv = 0;
+  if (s) {
+    lv = SignExtendFromWidth(lhs->value, lhs->width);
+    rv = SignExtendFromWidth(rhs->value, rhs->width);
+  } else {
+    lv = TruncateToWidth(lhs->value, lhs->width);
+    rv = TruncateToWidth(rhs->value, rhs->width);
+  }
+  if (!s &&
+      (expr->op == TokenKind::kSlash || expr->op == TokenKind::kSlashEq)) {
+    auto ul = static_cast<uint64_t>(lv);
+    auto ur = static_cast<uint64_t>(rv);
+    if (ur == 0) return std::nullopt;
+    return ConstVal{static_cast<int64_t>(ul / ur), w, false};
+  }
+  if (!s &&
+      (expr->op == TokenKind::kPercent || expr->op == TokenKind::kPercentEq)) {
+    auto ul = static_cast<uint64_t>(lv);
+    auto ur = static_cast<uint64_t>(rv);
+    if (ur == 0) return std::nullopt;
+    return ConstVal{static_cast<int64_t>(ul % ur), w, false};
+  }
+  auto result = EvalBinary(expr->op, lv, rv);
+  if (!result) return std::nullopt;
+  return ConstVal{*result, w, s};
+}
+
+static std::optional<ConstVal> ConstEvalSelectFull(const Expr* expr,
+                                                   const ScopeMap& scope) {
+  auto base_val = ConstEvalFull(expr->base, scope);
+  if (!base_val) return std::nullopt;
+  auto idx = ConstEvalFull(expr->index, scope);
+  if (!idx) return std::nullopt;
+  if (expr->index_end) {
+    auto end = ConstEvalFull(expr->index_end, scope);
+    if (!end) return std::nullopt;
+    int64_t hi = std::max(idx->value, end->value);
+    int64_t lo = std::min(idx->value, end->value);
+    int64_t width = hi - lo + 1;
+    if (width <= 0 || width > 63) return std::nullopt;
+    int64_t v = (base_val->value >> lo) & ((int64_t{1} << width) - 1);
+    return ConstVal{v, static_cast<uint32_t>(width), false};
+  }
+  return ConstVal{(base_val->value >> idx->value) & 1, 1, false};
+}
+
+static std::optional<ConstVal> ConstEvalSysCallFull(const Expr* expr,
+                                                    const ScopeMap& scope) {
+  if (expr->callee == "$signed" || expr->callee == "$unsigned") {
+    if (expr->args.empty()) return std::nullopt;
+    auto arg = ConstEvalFull(expr->args[0], scope);
+    if (!arg) return std::nullopt;
+    return ConstVal{arg->value, arg->width, expr->callee == "$signed"};
+  }
+  auto val = EvalConstSysCall(expr, scope);
+  if (!val) return std::nullopt;
+  return ConstVal{*val, 32, true};
+}
+
+static std::optional<ConstVal> ConstEvalMemberAccessFull(
+    const Expr* expr, const ScopeMap& scope) {
+  if (expr->lhs && expr->rhs && expr->lhs->kind == ExprKind::kIdentifier &&
+      expr->rhs->kind == ExprKind::kIdentifier) {
+    std::string compound =
+        std::string(expr->lhs->text) + "." + std::string(expr->rhs->text);
+    auto it = scope.find(compound);
+    if (it != scope.end()) return ConstVal{it->second, 32, true};
+  }
+  return std::nullopt;
+}
+
+static std::optional<ConstVal> ConstEvalFull(const Expr* expr,
                                              const ScopeMap& scope) {
   if (!expr) return std::nullopt;
 
   switch (expr->kind) {
-    case ExprKind::kIntegerLiteral: {
-      uint32_t w = ConstLiteralWidth(expr);
-      bool s = IsSignedLiteral(expr->text);
-      int64_t v = TruncateToWidth(static_cast<int64_t>(expr->int_val), w);
-      if (s) v = SignExtendFromWidth(v, w);
-      return ConstVal{v, w, s};
-    }
+    case ExprKind::kIntegerLiteral:
+      return ConstEvalLiteral(expr);
     case ExprKind::kIdentifier: {
       auto it = scope.find(expr->text);
       if (it != scope.end()) return ConstVal{it->second, 32, true};
       return std::nullopt;
     }
-    case ExprKind::kUnary: {
-      auto operand = ConstEvalFull(expr->lhs, scope);
-      if (!operand) return std::nullopt;
-      if (expr->op == TokenKind::kMinus) {
-        int64_t v = TruncateToWidth(-operand->value, operand->width);
-        if (operand->is_signed) v = SignExtendFromWidth(v, operand->width);
-        return ConstVal{v, operand->width, operand->is_signed};
-      }
-      auto result = EvalUnary(expr->op, operand->value);
-      if (!result) return std::nullopt;
-      return ConstVal{*result, operand->width, operand->is_signed};
-    }
-    case ExprKind::kBinary: {
-      auto lhs = ConstEvalFull(expr->lhs, scope);
-      auto rhs = ConstEvalFull(expr->rhs, scope);
-      if (!lhs || !rhs) return std::nullopt;
-      uint32_t w = std::max(lhs->width, rhs->width);
-      bool s = lhs->is_signed && rhs->is_signed;
-      int64_t lv = 0, rv = 0;
-      if (s) {
-        lv = SignExtendFromWidth(lhs->value, lhs->width);
-        rv = SignExtendFromWidth(rhs->value, rhs->width);
-      } else {
-        lv = TruncateToWidth(lhs->value, lhs->width);
-        rv = TruncateToWidth(rhs->value, rhs->width);
-      }
-      if (!s &&
-          (expr->op == TokenKind::kSlash || expr->op == TokenKind::kSlashEq)) {
-        auto ul = static_cast<uint64_t>(lv);
-        auto ur = static_cast<uint64_t>(rv);
-        if (ur == 0) return std::nullopt;
-        return ConstVal{static_cast<int64_t>(ul / ur), w, false};
-      }
-      if (!s && (expr->op == TokenKind::kPercent ||
-                 expr->op == TokenKind::kPercentEq)) {
-        auto ul = static_cast<uint64_t>(lv);
-        auto ur = static_cast<uint64_t>(rv);
-        if (ur == 0) return std::nullopt;
-        return ConstVal{static_cast<int64_t>(ul % ur), w, false};
-      }
-      auto result = EvalBinary(expr->op, lv, rv);
-      if (!result) return std::nullopt;
-      return ConstVal{*result, w, s};
-    }
+    case ExprKind::kUnary:
+      return ConstEvalUnaryFull(expr, scope);
+    case ExprKind::kBinary:
+      return ConstEvalBinaryFull(expr, scope);
     case ExprKind::kTernary: {
       auto cond = ConstEvalFull(expr->condition, scope);
       if (!cond) return std::nullopt;
@@ -386,44 +444,12 @@ static std::optional<ConstVal> ConstEvalFull(const Expr* expr,
       if (!val) return std::nullopt;
       return ConstVal{*val, 32, false};
     }
-    case ExprKind::kSelect: {
-      auto base_val = ConstEvalFull(expr->base, scope);
-      if (!base_val) return std::nullopt;
-      auto idx = ConstEvalFull(expr->index, scope);
-      if (!idx) return std::nullopt;
-      if (expr->index_end) {
-        auto end = ConstEvalFull(expr->index_end, scope);
-        if (!end) return std::nullopt;
-        int64_t hi = std::max(idx->value, end->value);
-        int64_t lo = std::min(idx->value, end->value);
-        int64_t width = hi - lo + 1;
-        if (width <= 0 || width > 63) return std::nullopt;
-        int64_t v = (base_val->value >> lo) & ((int64_t{1} << width) - 1);
-        return ConstVal{v, static_cast<uint32_t>(width), false};
-      }
-      return ConstVal{(base_val->value >> idx->value) & 1, 1, false};
-    }
-    case ExprKind::kSystemCall: {
-      if (expr->callee == "$signed" || expr->callee == "$unsigned") {
-        if (expr->args.empty()) return std::nullopt;
-        auto arg = ConstEvalFull(expr->args[0], scope);
-        if (!arg) return std::nullopt;
-        return ConstVal{arg->value, arg->width, expr->callee == "$signed"};
-      }
-      auto val = EvalConstSysCall(expr, scope);
-      if (!val) return std::nullopt;
-      return ConstVal{*val, 32, true};
-    }
-    case ExprKind::kMemberAccess: {
-      if (expr->lhs && expr->rhs && expr->lhs->kind == ExprKind::kIdentifier &&
-          expr->rhs->kind == ExprKind::kIdentifier) {
-        std::string compound =
-            std::string(expr->lhs->text) + "." + std::string(expr->rhs->text);
-        auto it = scope.find(compound);
-        if (it != scope.end()) return ConstVal{it->second, 32, true};
-      }
-      return std::nullopt;
-    }
+    case ExprKind::kSelect:
+      return ConstEvalSelectFull(expr, scope);
+    case ExprKind::kSystemCall:
+      return ConstEvalSysCallFull(expr, scope);
+    case ExprKind::kMemberAccess:
+      return ConstEvalMemberAccessFull(expr, scope);
     default:
       return std::nullopt;
   }
@@ -628,6 +654,25 @@ static bool IsConstantBuiltinMethodCall(const Expr* expr,
   return false;
 }
 
+static bool IsConstantSelectExpr(const Expr* expr, const ScopeMap& scope) {
+  if (!IsConstantExpr(expr->base, scope)) return false;
+  if (!IsConstantExpr(expr->index, scope)) return false;
+  if (expr->index_end && !IsConstantExpr(expr->index_end, scope)) return false;
+  return true;
+}
+
+static bool IsConstantMemberAccessExpr(const Expr* expr,
+                                       const ScopeMap& scope) {
+  if (IsConstantBuiltinMethodCall(expr, scope)) return true;
+  if (expr->lhs && expr->rhs && expr->lhs->kind == ExprKind::kIdentifier &&
+      expr->rhs->kind == ExprKind::kIdentifier) {
+    std::string compound =
+        std::string(expr->lhs->text) + "." + std::string(expr->rhs->text);
+    return scope.count(compound) > 0;
+  }
+  return false;
+}
+
 bool IsConstantExpr(const Expr* expr, const ScopeMap& scope) {
   if (!expr) return false;
 
@@ -655,32 +700,18 @@ bool IsConstantExpr(const Expr* expr, const ScopeMap& scope) {
       return IsConstantExpr(expr->repeat_count, scope) &&
              AllElementsConstant(expr->elements, scope);
     case ExprKind::kSelect:
-      if (!IsConstantExpr(expr->base, scope)) return false;
-      if (!IsConstantExpr(expr->index, scope)) return false;
-      if (expr->index_end && !IsConstantExpr(expr->index_end, scope))
-        return false;
-      return true;
+      return IsConstantSelectExpr(expr, scope);
     case ExprKind::kSystemCall:
       return IsConstantSysCallExpr(expr, scope);
     case ExprKind::kCast:
       return IsConstantExpr(expr->lhs, scope);
     case ExprKind::kAssignmentPattern:
       return AllElementsConstant(expr->elements, scope);
-    case ExprKind::kCall: {
+    case ExprKind::kCall:
       if (IsConstantBuiltinMethodCall(expr, scope)) return true;
-
       return AllElementsConstant(expr->args, scope);
-    }
-    case ExprKind::kMemberAccess: {
-      if (IsConstantBuiltinMethodCall(expr, scope)) return true;
-      if (expr->lhs && expr->rhs && expr->lhs->kind == ExprKind::kIdentifier &&
-          expr->rhs->kind == ExprKind::kIdentifier) {
-        std::string compound =
-            std::string(expr->lhs->text) + "." + std::string(expr->rhs->text);
-        return scope.count(compound) > 0;
-      }
-      return false;
-    }
+    case ExprKind::kMemberAccess:
+      return IsConstantMemberAccessExpr(expr, scope);
     default:
       return false;
   }
@@ -692,30 +723,47 @@ struct StaticPrefixResult {
 };
 
 static StaticPrefixResult BuildStaticPrefix(const Expr* expr,
+                                            const ScopeMap& scope);
+
+static StaticPrefixResult BuildIdentifierPrefix(const Expr* expr) {
+  std::string result;
+  if (!expr->scope_prefix.empty()) result += expr->scope_prefix;
+  result += expr->text;
+  return {result, true};
+}
+
+static StaticPrefixResult BuildMemberAccessPrefix(const Expr* expr,
+                                                  const ScopeMap& scope) {
+  if (!expr->lhs || !expr->rhs) return {"", false};
+  auto base = BuildStaticPrefix(expr->lhs, scope);
+  if (!base.is_static) return {base.text, false};
+  return {base.text + "." + std::string(expr->rhs->text), true};
+}
+
+static StaticPrefixResult BuildSelectPrefix(const Expr* expr,
+                                            const ScopeMap& scope) {
+  auto base = BuildStaticPrefix(expr->base, scope);
+  if (base.text.empty()) return {"", false};
+  if (!base.is_static) return {base.text, false};
+  auto idx = ConstEvalInt(expr->index, scope);
+  if (!idx) return {base.text, false};
+  return {base.text + "[" + std::to_string(*idx) + "]", true};
+}
+
+static StaticPrefixResult BuildStaticPrefix(const Expr* expr,
                                             const ScopeMap& scope) {
   if (!expr) return {"", false};
 
   if (expr->kind == ExprKind::kIdentifier) {
-    std::string result;
-    if (!expr->scope_prefix.empty()) result += expr->scope_prefix;
-    result += expr->text;
-    return {result, true};
+    return BuildIdentifierPrefix(expr);
   }
 
   if (expr->kind == ExprKind::kMemberAccess) {
-    if (!expr->lhs || !expr->rhs) return {"", false};
-    auto base = BuildStaticPrefix(expr->lhs, scope);
-    if (!base.is_static) return {base.text, false};
-    return {base.text + "." + std::string(expr->rhs->text), true};
+    return BuildMemberAccessPrefix(expr, scope);
   }
 
   if (expr->kind == ExprKind::kSelect && expr->base) {
-    auto base = BuildStaticPrefix(expr->base, scope);
-    if (base.text.empty()) return {"", false};
-    if (!base.is_static) return {base.text, false};
-    auto idx = ConstEvalInt(expr->index, scope);
-    if (!idx) return {base.text, false};
-    return {base.text + "[" + std::to_string(*idx) + "]", true};
+    return BuildSelectPrefix(expr, scope);
   }
 
   return {"", false};

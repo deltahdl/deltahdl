@@ -13,6 +13,35 @@
 
 namespace delta {
 
+static Logic4Vec NonexistentQueueElement(const QueueObject* q, Arena& arena) {
+  // Empty queue: yield the value of a nonexistent element of the queue's
+  // element type (Table 7-1, see 7.4.5) and leave the queue unchanged.
+  return q->is_4state ? MakeAllX(arena, q->elem_width)
+                      : MakeLogic4VecVal(arena, q->elem_width, 0);
+}
+
+static void PopQueueFront(QueueObject* q, Arena& arena, Logic4Vec& out) {
+  if (q->elements.empty()) {
+    out = NonexistentQueueElement(q, arena);
+  } else {
+    out = q->elements.front();
+    q->elements.erase(q->elements.begin());
+    if (!q->element_ids.empty()) q->element_ids.erase(q->element_ids.begin());
+    ++q->generation;
+  }
+}
+
+static void PopQueueBack(QueueObject* q, Arena& arena, Logic4Vec& out) {
+  if (q->elements.empty()) {
+    out = NonexistentQueueElement(q, arena);
+  } else {
+    out = q->elements.back();
+    q->elements.pop_back();
+    if (!q->element_ids.empty()) q->element_ids.pop_back();
+    ++q->generation;
+  }
+}
+
 static bool DispatchQueueEval(std::string_view method, QueueObject* q,
                               Arena& arena, Logic4Vec& out) {
   if (method == "size") {
@@ -20,85 +49,78 @@ static bool DispatchQueueEval(std::string_view method, QueueObject* q,
     return true;
   }
   if (method == "pop_front") {
-    if (q->elements.empty()) {
-      // Empty queue: yield the value of a nonexistent element of the queue's
-      // element type (Table 7-1, see 7.4.5) and leave the queue unchanged.
-      out = q->is_4state ? MakeAllX(arena, q->elem_width)
-                         : MakeLogic4VecVal(arena, q->elem_width, 0);
-    } else {
-      out = q->elements.front();
-      q->elements.erase(q->elements.begin());
-      if (!q->element_ids.empty()) q->element_ids.erase(q->element_ids.begin());
-      ++q->generation;
-    }
+    PopQueueFront(q, arena, out);
     return true;
   }
   if (method == "pop_back") {
-    if (q->elements.empty()) {
-      // Empty queue: yield the value of a nonexistent element of the queue's
-      // element type (Table 7-1, see 7.4.5) and leave the queue unchanged.
-      out = q->is_4state ? MakeAllX(arena, q->elem_width)
-                         : MakeLogic4VecVal(arena, q->elem_width, 0);
-    } else {
-      out = q->elements.back();
-      q->elements.pop_back();
-      if (!q->element_ids.empty()) q->element_ids.pop_back();
-      ++q->generation;
-    }
+    PopQueueBack(q, arena, out);
     return true;
   }
   return false;
 }
 
-static bool DispatchQueuePush(std::string_view method, QueueObject* q,
-                              const Expr* expr, SimContext& ctx, Arena& arena) {
-  if (method == "push_back" && !expr->args.empty()) {
-    auto val = EvalExpr(expr->args[0], ctx, arena);
-    bool has_room = (q->max_size < 0) ||
-                    (static_cast<int32_t>(q->elements.size()) < q->max_size);
-    if (has_room) {
-      q->elements.push_back(val);
-      q->element_ids.push_back(q->AllocateId());
-      ++q->generation;
-    } else {
-      ctx.GetDiag().Warning({}, "bounded queue overflow in push_back");
-    }
-    return true;
+static void QueuePushBack(QueueObject* q, const Expr* expr, SimContext& ctx,
+                          Arena& arena) {
+  auto val = EvalExpr(expr->args[0], ctx, arena);
+  bool has_room = (q->max_size < 0) ||
+                  (static_cast<int32_t>(q->elements.size()) < q->max_size);
+  if (has_room) {
+    q->elements.push_back(val);
+    q->element_ids.push_back(q->AllocateId());
+    ++q->generation;
+  } else {
+    ctx.GetDiag().Warning({}, "bounded queue overflow in push_back");
   }
-  if (method == "push_front" && !expr->args.empty()) {
-    auto val = EvalExpr(expr->args[0], ctx, arena);
-    q->elements.insert(q->elements.begin(), val);
-    q->element_ids.insert(q->element_ids.begin(), q->AllocateId());
+}
+
+static void QueuePushFront(QueueObject* q, const Expr* expr, SimContext& ctx,
+                           Arena& arena) {
+  auto val = EvalExpr(expr->args[0], ctx, arena);
+  q->elements.insert(q->elements.begin(), val);
+  q->element_ids.insert(q->element_ids.begin(), q->AllocateId());
+  if (q->max_size > 0 &&
+      static_cast<int32_t>(q->elements.size()) > q->max_size) {
+    q->elements.pop_back();
+    q->element_ids.pop_back();
+    ctx.GetDiag().Warning({}, "bounded queue overflow in push_front");
+  }
+  ++q->generation;
+}
+
+static void QueueInsertAt(QueueObject* q, const Expr* expr, SimContext& ctx,
+                          Arena& arena) {
+  auto idx_val = EvalExpr(expr->args[0], ctx, arena);
+  auto val = EvalExpr(expr->args[1], ctx, arena);
+  if (!idx_val.IsKnown()) return;
+  auto raw = static_cast<int64_t>(idx_val.ToUint64());
+  if (idx_val.is_signed && raw < 0) return;
+  auto idx = static_cast<size_t>(raw);
+  if (idx <= q->elements.size()) {
+    q->elements.insert(q->elements.begin() + static_cast<ptrdiff_t>(idx), val);
+    q->element_ids.insert(q->element_ids.begin() + static_cast<ptrdiff_t>(idx),
+                          q->AllocateId());
     if (q->max_size > 0 &&
         static_cast<int32_t>(q->elements.size()) > q->max_size) {
       q->elements.pop_back();
       q->element_ids.pop_back();
-      ctx.GetDiag().Warning({}, "bounded queue overflow in push_front");
+      ctx.GetDiag().Warning({}, "bounded queue overflow in insert");
     }
     ++q->generation;
+  }
+}
+
+static bool DispatchQueuePush(std::string_view method, QueueObject* q,
+                              const Expr* expr, SimContext& ctx, Arena& arena) {
+  if (method == "push_back" && !expr->args.empty()) {
+    QueuePushBack(q, expr, ctx, arena);
+    return true;
+  }
+  if (method == "push_front" && !expr->args.empty()) {
+    QueuePushFront(q, expr, ctx, arena);
     return true;
   }
   if (method == "insert" && expr->args.size() >= 2) {
-    auto idx_val = EvalExpr(expr->args[0], ctx, arena);
-    auto val = EvalExpr(expr->args[1], ctx, arena);
-    if (!idx_val.IsKnown()) return true;
-    auto raw = static_cast<int64_t>(idx_val.ToUint64());
-    if (idx_val.is_signed && raw < 0) return true;
-    auto idx = static_cast<size_t>(raw);
-    if (idx <= q->elements.size()) {
-      q->elements.insert(q->elements.begin() + static_cast<ptrdiff_t>(idx),
-                         val);
-      q->element_ids.insert(
-          q->element_ids.begin() + static_cast<ptrdiff_t>(idx),
-          q->AllocateId());
-      if (q->max_size > 0 &&
-          static_cast<int32_t>(q->elements.size()) > q->max_size) {
-        q->elements.pop_back();
-        q->element_ids.pop_back();
-        ctx.GetDiag().Warning({}, "bounded queue overflow in insert");
-      }
-      ++q->generation;
-    }
+    QueueInsertAt(q, expr, ctx, arena);
     return true;
   }
   return false;

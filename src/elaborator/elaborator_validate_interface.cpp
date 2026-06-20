@@ -77,6 +77,98 @@ const ModuleDecl* FindInterfaceDeclByName(const CompilationUnit* unit,
   return nullptr;
 }
 
+// Diagnoses a virtual-interface clocking-block access of the form
+// `vif.block.signal` for one resolved member-access expression `e`, where
+// `vif_it` is the entry that resolved the base identifier to its interface
+// type. Reports the same set of errors the inlined block did.
+void CheckResolvedVifClockingAccess(const Expr* e,
+                                    const VifTypeMap::const_iterator& vif_it,
+                                    const VifModportMap& vif_mps,
+                                    const CompilationUnit* unit,
+                                    DiagEngine& diag) {
+  std::string_view block_name;
+  if (e->lhs->rhs && e->lhs->rhs->kind == ExprKind::kIdentifier) {
+    block_name = e->lhs->rhs->text;
+  } else if (!e->lhs->text.empty()) {
+    block_name = e->lhs->text;
+  }
+  std::string_view sig_name;
+  if (e->rhs && e->rhs->kind == ExprKind::kIdentifier) {
+    sig_name = e->rhs->text;
+  } else if (!e->text.empty()) {
+    sig_name = e->text;
+  }
+  const auto* iface = FindInterfaceDeclByName(unit, vif_it->second);
+  if (!iface || block_name.empty()) return;
+
+  std::string_view modport_name;
+  auto mp_it = vif_mps.find(e->lhs->lhs->text);
+  if (mp_it != vif_mps.end()) modport_name = mp_it->second;
+
+  const ModportDecl* modport = nullptr;
+  if (!modport_name.empty()) {
+    for (const auto* mp : iface->modports) {
+      if (mp && mp->name == modport_name) {
+        modport = mp;
+        break;
+      }
+    }
+  }
+
+  const ModuleItem* cb_item = nullptr;
+  bool member_exists = false;
+  for (const auto* it : iface->items) {
+    if (it->kind == ModuleItemKind::kClockingBlock && it->name == block_name) {
+      cb_item = it;
+      break;
+    }
+    if ((it->kind == ModuleItemKind::kVarDecl ||
+         it->kind == ModuleItemKind::kNetDecl) &&
+        it->name == block_name) {
+      member_exists = true;
+    }
+  }
+
+  if (cb_item && modport) {
+    bool clocking_in_modport = false;
+    for (const auto& p : modport->ports) {
+      if (p.is_clocking && p.name == block_name) {
+        clocking_in_modport = true;
+        break;
+      }
+    }
+    if (!clocking_in_modport) {
+      diag.Error(
+          e->range.start,
+          std::format("clocking block '{}' is not accessible through modport "
+                      "'{}' of interface '{}'",
+                      block_name, modport_name, vif_it->second));
+      cb_item = nullptr;
+    }
+  }
+
+  if (!cb_item && !member_exists) {
+    diag.Error(e->range.start,
+               std::format("'{}' is not a clocking block or member of "
+                           "interface '{}'",
+                           block_name, vif_it->second));
+  } else if (cb_item && !sig_name.empty()) {
+    bool signal_found = false;
+    for (const auto& sig : cb_item->clocking_signals) {
+      if (sig.name == sig_name) {
+        signal_found = true;
+        break;
+      }
+    }
+    if (!signal_found) {
+      diag.Error(e->range.start,
+                 std::format("'{}' is not a signal of clocking block '{}' in "
+                             "interface '{}'",
+                             sig_name, block_name, vif_it->second));
+    }
+  }
+}
+
 void CheckVifClockingExpr(const Expr* e, const VifTypeMap& vifs,
                           const VifModportMap& vif_mps,
                           const CompilationUnit* unit, DiagEngine& diag) {
@@ -86,90 +178,7 @@ void CheckVifClockingExpr(const Expr* e, const VifTypeMap& vifs,
       e->lhs->lhs->kind == ExprKind::kIdentifier) {
     auto vif_it = vifs.find(e->lhs->lhs->text);
     if (vif_it != vifs.end()) {
-      std::string_view block_name;
-      if (e->lhs->rhs && e->lhs->rhs->kind == ExprKind::kIdentifier) {
-        block_name = e->lhs->rhs->text;
-      } else if (!e->lhs->text.empty()) {
-        block_name = e->lhs->text;
-      }
-      std::string_view sig_name;
-      if (e->rhs && e->rhs->kind == ExprKind::kIdentifier) {
-        sig_name = e->rhs->text;
-      } else if (!e->text.empty()) {
-        sig_name = e->text;
-      }
-      const auto* iface = FindInterfaceDeclByName(unit, vif_it->second);
-      if (iface && !block_name.empty()) {
-        std::string_view modport_name;
-        auto mp_it = vif_mps.find(e->lhs->lhs->text);
-        if (mp_it != vif_mps.end()) modport_name = mp_it->second;
-
-        const ModportDecl* modport = nullptr;
-        if (!modport_name.empty()) {
-          for (const auto* mp : iface->modports) {
-            if (mp && mp->name == modport_name) {
-              modport = mp;
-              break;
-            }
-          }
-        }
-
-        const ModuleItem* cb_item = nullptr;
-        bool member_exists = false;
-        for (const auto* it : iface->items) {
-          if (it->kind == ModuleItemKind::kClockingBlock &&
-              it->name == block_name) {
-            cb_item = it;
-            break;
-          }
-          if ((it->kind == ModuleItemKind::kVarDecl ||
-               it->kind == ModuleItemKind::kNetDecl) &&
-              it->name == block_name) {
-            member_exists = true;
-          }
-        }
-
-        if (cb_item && modport) {
-          bool clocking_in_modport = false;
-          for (const auto& p : modport->ports) {
-            if (p.is_clocking && p.name == block_name) {
-              clocking_in_modport = true;
-              break;
-            }
-          }
-          if (!clocking_in_modport) {
-            diag.Error(
-                e->range.start,
-                std::format(
-                    "clocking block '{}' is not accessible through modport "
-                    "'{}' of interface '{}'",
-                    block_name, modport_name, vif_it->second));
-            cb_item = nullptr;
-          }
-        }
-
-        if (!cb_item && !member_exists) {
-          diag.Error(e->range.start,
-                     std::format("'{}' is not a clocking block or member of "
-                                 "interface '{}'",
-                                 block_name, vif_it->second));
-        } else if (cb_item && !sig_name.empty()) {
-          bool signal_found = false;
-          for (const auto& sig : cb_item->clocking_signals) {
-            if (sig.name == sig_name) {
-              signal_found = true;
-              break;
-            }
-          }
-          if (!signal_found) {
-            diag.Error(
-                e->range.start,
-                std::format("'{}' is not a signal of clocking block '{}' in "
-                            "interface '{}'",
-                            sig_name, block_name, vif_it->second));
-          }
-        }
-      }
+      CheckResolvedVifClockingAccess(e, vif_it, vif_mps, unit, diag);
     }
   }
   CheckVifClockingExpr(e->lhs, vifs, vif_mps, unit, diag);
@@ -207,6 +216,38 @@ void WalkStmtsForVifClocking(const Stmt* s, const VifTypeMap& vifs,
   }
 }
 
+// Checks one assignment-pattern element `elem` of an array-of-virtual-interface
+// initializer against the declared element interface type `iface_type`, using
+// the elaborator's interface-instance and virtual-interface type maps.
+void CheckArrayOfVifInitElement(const Expr* elem, std::string_view iface_type,
+                                const VifTypeMap& interface_inst_types,
+                                const VifTypeMap& vi_var_interface_types,
+                                DiagEngine& diag) {
+  if (!elem) return;
+  if (elem->kind != ExprKind::kIdentifier) return;
+  auto inst_it = interface_inst_types.find(elem->text);
+  if (inst_it != interface_inst_types.end()) {
+    if (inst_it->second != iface_type) {
+      diag.Error(
+          elem->range.start,
+          std::format("interface instance '{}' of type '{}' is not compatible "
+                      "with virtual interface element type '{}'",
+                      elem->text, inst_it->second, iface_type));
+    }
+    return;
+  }
+  auto vif_it = vi_var_interface_types.find(elem->text);
+  if (vif_it != vi_var_interface_types.end()) {
+    if (vif_it->second != iface_type) {
+      diag.Error(
+          elem->range.start,
+          std::format("virtual interface '{}' of type '{}' is not compatible "
+                      "with element type '{}'",
+                      elem->text, vif_it->second, iface_type));
+    }
+  }
+}
+
 }  // namespace
 
 void Elaborator::ValidateArrayOfVifInitStmt(const Stmt* s) {
@@ -230,30 +271,8 @@ void Elaborator::ValidateArrayOfVifInitStmt(const Stmt* s) {
   }
 
   for (const auto* elem : s->var_init->elements) {
-    if (!elem) continue;
-    if (elem->kind != ExprKind::kIdentifier) continue;
-    auto inst_it = interface_inst_types_.find(elem->text);
-    if (inst_it != interface_inst_types_.end()) {
-      if (inst_it->second != iface_type) {
-        diag_.Error(
-            elem->range.start,
-            std::format(
-                "interface instance '{}' of type '{}' is not compatible "
-                "with virtual interface element type '{}'",
-                elem->text, inst_it->second, iface_type));
-      }
-      continue;
-    }
-    auto vif_it = vi_var_interface_types_.find(elem->text);
-    if (vif_it != vi_var_interface_types_.end()) {
-      if (vif_it->second != iface_type) {
-        diag_.Error(
-            elem->range.start,
-            std::format("virtual interface '{}' of type '{}' is not compatible "
-                        "with element type '{}'",
-                        elem->text, vif_it->second, iface_type));
-      }
-    }
+    CheckArrayOfVifInitElement(elem, iface_type, interface_inst_types_,
+                               vi_var_interface_types_, diag_);
   }
 }
 
@@ -359,6 +378,56 @@ const ModportDecl* FindModport(const ModuleDecl* iface,
   return nullptr;
 }
 
+// Diagnoses a `base.member` access expression `e` against the interface-port
+// and virtual-interface modport maps: if `base` resolves to a modport-scoped
+// interface and `member` is a modport-listable item not exposed by that
+// modport, reports the inaccessibility error.
+void CheckInterfaceObjectMemberAccess(const Expr* e,
+                                      const IfacePortTypeMap& iface_ports,
+                                      const IfacePortModportMap& port_mps,
+                                      const VifTypeMap& vifs,
+                                      const VifModportMap& vif_mps,
+                                      const CompilationUnit* unit,
+                                      DiagEngine& diag) {
+  auto base_name = e->lhs->text;
+  auto member_name = e->rhs->text;
+
+  std::string_view iface_type;
+  std::string_view modport_name;
+  bool bound = false;
+
+  auto pit = iface_ports.find(base_name);
+  if (pit != iface_ports.end()) {
+    iface_type = pit->second;
+    auto mp_it = port_mps.find(base_name);
+    if (mp_it != port_mps.end()) modport_name = mp_it->second;
+    bound = true;
+  } else {
+    auto vit = vifs.find(base_name);
+    if (vit != vifs.end()) {
+      iface_type = vit->second;
+      auto mp_it = vif_mps.find(base_name);
+      if (mp_it != vif_mps.end()) modport_name = mp_it->second;
+      bound = true;
+    }
+  }
+
+  if (!bound || modport_name.empty() || member_name.empty()) return;
+  const auto* iface = LookupInterfaceDecl(unit, iface_type);
+  const auto* mp = FindModport(iface, modport_name);
+  if (!iface || !mp) return;
+  const auto* member = FindInterfaceItemByName(iface, member_name);
+  if (member && IsListableInModport(member->kind) &&
+      member->kind != ModuleItemKind::kClockingBlock &&
+      !ModportListsMember(mp, member_name)) {
+    diag.Error(
+        e->range.start,
+        std::format(
+            "'{}' is not accessible through modport '{}' of interface '{}'",
+            member_name, modport_name, iface_type));
+  }
+}
+
 void CheckInterfaceObjectAccessExpr(const Expr* e,
                                     const IfacePortTypeMap& iface_ports,
                                     const IfacePortModportMap& port_mps,
@@ -370,46 +439,8 @@ void CheckInterfaceObjectAccessExpr(const Expr* e,
   if (e->kind == ExprKind::kMemberAccess && e->lhs &&
       e->lhs->kind == ExprKind::kIdentifier && e->rhs &&
       e->rhs->kind == ExprKind::kIdentifier) {
-    auto base_name = e->lhs->text;
-    auto member_name = e->rhs->text;
-
-    std::string_view iface_type;
-    std::string_view modport_name;
-    bool bound = false;
-
-    auto pit = iface_ports.find(base_name);
-    if (pit != iface_ports.end()) {
-      iface_type = pit->second;
-      auto mp_it = port_mps.find(base_name);
-      if (mp_it != port_mps.end()) modport_name = mp_it->second;
-      bound = true;
-    } else {
-      auto vit = vifs.find(base_name);
-      if (vit != vifs.end()) {
-        iface_type = vit->second;
-        auto mp_it = vif_mps.find(base_name);
-        if (mp_it != vif_mps.end()) modport_name = mp_it->second;
-        bound = true;
-      }
-    }
-
-    if (bound && !modport_name.empty() && !member_name.empty()) {
-      const auto* iface = LookupInterfaceDecl(unit, iface_type);
-      const auto* mp = FindModport(iface, modport_name);
-      if (iface && mp) {
-        const auto* member = FindInterfaceItemByName(iface, member_name);
-        if (member && IsListableInModport(member->kind) &&
-            member->kind != ModuleItemKind::kClockingBlock &&
-            !ModportListsMember(mp, member_name)) {
-          diag.Error(
-              e->range.start,
-              std::format(
-                  "'{}' is not accessible through modport '{}' of interface "
-                  "'{}'",
-                  member_name, modport_name, iface_type));
-        }
-      }
-    }
+    CheckInterfaceObjectMemberAccess(e, iface_ports, port_mps, vifs, vif_mps,
+                                     unit, diag);
   }
   CheckInterfaceObjectAccessExpr(e->lhs, iface_ports, port_mps, vifs, vif_mps,
                                  unit, diag);
@@ -441,8 +472,17 @@ void WalkStmtsForInterfaceObjectAccess(const Stmt* s,
                                        const VifTypeMap& vifs,
                                        const VifModportMap& vif_mps,
                                        const CompilationUnit* unit,
-                                       DiagEngine& diag) {
-  if (!s) return;
+                                       DiagEngine& diag);
+
+// Runs the interface-object-access check on every expression field carried
+// directly by statement `s`.
+void CheckInterfaceObjectAccessStmtExprs(const Stmt* s,
+                                         const IfacePortTypeMap& iface_ports,
+                                         const IfacePortModportMap& port_mps,
+                                         const VifTypeMap& vifs,
+                                         const VifModportMap& vif_mps,
+                                         const CompilationUnit* unit,
+                                         DiagEngine& diag) {
   CheckInterfaceObjectAccessExpr(s->lhs, iface_ports, port_mps, vifs, vif_mps,
                                  unit, diag);
   CheckInterfaceObjectAccessExpr(s->rhs, iface_ports, port_mps, vifs, vif_mps,
@@ -453,6 +493,16 @@ void WalkStmtsForInterfaceObjectAccess(const Stmt* s,
                                  vif_mps, unit, diag);
   CheckInterfaceObjectAccessExpr(s->var_init, iface_ports, port_mps, vifs,
                                  vif_mps, unit, diag);
+}
+
+// Recurses the interface-object-access walk into every child statement of `s`.
+void WalkInterfaceObjectAccessChildStmts(const Stmt* s,
+                                         const IfacePortTypeMap& iface_ports,
+                                         const IfacePortModportMap& port_mps,
+                                         const VifTypeMap& vifs,
+                                         const VifModportMap& vif_mps,
+                                         const CompilationUnit* unit,
+                                         DiagEngine& diag) {
   for (const auto* sub : s->stmts) {
     WalkStmtsForInterfaceObjectAccess(sub, iface_ports, port_mps, vifs, vif_mps,
                                       unit, diag);
@@ -468,6 +518,57 @@ void WalkStmtsForInterfaceObjectAccess(const Stmt* s,
   for (auto& ci : s->case_items) {
     WalkStmtsForInterfaceObjectAccess(ci.body, iface_ports, port_mps, vifs,
                                       vif_mps, unit, diag);
+  }
+}
+
+void WalkStmtsForInterfaceObjectAccess(const Stmt* s,
+                                       const IfacePortTypeMap& iface_ports,
+                                       const IfacePortModportMap& port_mps,
+                                       const VifTypeMap& vifs,
+                                       const VifModportMap& vif_mps,
+                                       const CompilationUnit* unit,
+                                       DiagEngine& diag) {
+  if (!s) return;
+  CheckInterfaceObjectAccessStmtExprs(s, iface_ports, port_mps, vifs, vif_mps,
+                                      unit, diag);
+  WalkInterfaceObjectAccessChildStmts(s, iface_ports, port_mps, vifs, vif_mps,
+                                      unit, diag);
+}
+
+bool IsProceduralBlockItem(ModuleItemKind kind) {
+  return kind == ModuleItemKind::kAlwaysBlock ||
+         kind == ModuleItemKind::kAlwaysCombBlock ||
+         kind == ModuleItemKind::kAlwaysFFBlock ||
+         kind == ModuleItemKind::kAlwaysLatchBlock ||
+         kind == ModuleItemKind::kInitialBlock ||
+         kind == ModuleItemKind::kFinalBlock;
+}
+
+// Runs the interface-object-access checks for one module item, using the
+// module-level interface-port and virtual-interface maps. Task/function bodies
+// are walked with their formal-argument-scoped maps, continuous assignments are
+// checked directly, and procedural blocks are walked with the module maps.
+void CheckInterfaceObjectAccessItem(
+    const ModuleItem* item, const IfacePortTypeMap& iface_ports,
+    const IfacePortModportMap& port_mps, const VifTypeMap& module_vifs,
+    const VifModportMap& module_mps, const TypedefMap& typedefs,
+    const CompilationUnit* unit, DiagEngine& diag) {
+  if (item->kind == ModuleItemKind::kTaskDecl ||
+      item->kind == ModuleItemKind::kFunctionDecl) {
+    auto [scoped, scoped_mps] =
+        BuildScopedVifMaps(item, module_vifs, module_mps, typedefs);
+    if (item->body) {
+      WalkStmtsForInterfaceObjectAccess(item->body, iface_ports, port_mps,
+                                        scoped, scoped_mps, unit, diag);
+    }
+  } else if (item->kind == ModuleItemKind::kContAssign) {
+    CheckInterfaceObjectAccessExpr(item->assign_lhs, iface_ports, port_mps,
+                                   module_vifs, module_mps, unit, diag);
+    CheckInterfaceObjectAccessExpr(item->assign_rhs, iface_ports, port_mps,
+                                   module_vifs, module_mps, unit, diag);
+  } else if (IsProceduralBlockItem(item->kind) && item->body) {
+    WalkStmtsForInterfaceObjectAccess(item->body, iface_ports, port_mps,
+                                      module_vifs, module_mps, unit, diag);
   }
 }
 
@@ -492,32 +593,8 @@ void Elaborator::ValidateInterfaceObjectAccess(const ModuleDecl* decl) {
   VifTypeMap module_vifs = vi_var_interface_types_;
   VifModportMap module_mps = vi_var_modports_;
   for (const auto* item : decl->items) {
-    if (item->kind == ModuleItemKind::kTaskDecl ||
-        item->kind == ModuleItemKind::kFunctionDecl) {
-      auto [scoped, scoped_mps] =
-          BuildScopedVifMaps(item, module_vifs, module_mps, typedefs_);
-      if (item->body) {
-        WalkStmtsForInterfaceObjectAccess(item->body, iface_ports, port_mps,
-                                          scoped, scoped_mps, unit_, diag_);
-      }
-    } else if (item->kind == ModuleItemKind::kContAssign) {
-      CheckInterfaceObjectAccessExpr(item->assign_lhs, iface_ports, port_mps,
-                                     module_vifs, module_mps, unit_, diag_);
-      CheckInterfaceObjectAccessExpr(item->assign_rhs, iface_ports, port_mps,
-                                     module_vifs, module_mps, unit_, diag_);
-    } else {
-      bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
-                     item->kind == ModuleItemKind::kAlwaysCombBlock ||
-                     item->kind == ModuleItemKind::kAlwaysFFBlock ||
-                     item->kind == ModuleItemKind::kAlwaysLatchBlock ||
-                     item->kind == ModuleItemKind::kInitialBlock ||
-                     item->kind == ModuleItemKind::kFinalBlock;
-      if (is_proc && item->body) {
-        WalkStmtsForInterfaceObjectAccess(item->body, iface_ports, port_mps,
-                                          module_vifs, module_mps, unit_,
-                                          diag_);
-      }
-    }
+    CheckInterfaceObjectAccessItem(item, iface_ports, port_mps, module_vifs,
+                                   module_mps, typedefs_, unit_, diag_);
   }
 }
 

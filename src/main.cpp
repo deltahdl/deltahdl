@@ -440,6 +440,32 @@ void DumpIr(const delta::RtlirDesign* design) {
   }
 }
 
+void MarkCellModules(delta::CompilationUnit* cu,
+                     const std::vector<std::string>& cell_module_names) {
+  for (auto* mod : cu->modules) {
+    for (const auto& cell_name : cell_module_names) {
+      if (mod->name == cell_name) {
+        mod->is_cell = true;
+        break;
+      }
+    }
+  }
+}
+
+void ApplyPreprocMetadata(delta::CompilationUnit* cu, const PreprocResult& pp) {
+  cu->default_nettype = pp.default_nettype;
+  cu->unconnected_drive = pp.unconnected_drive;
+  MarkCellModules(cu, pp.cell_module_names);
+  cu->default_decay_time = pp.default_decay_time;
+  cu->default_decay_time_real = pp.default_decay_time_real;
+  cu->default_decay_time_infinite = pp.default_decay_time_infinite;
+  cu->default_trireg_strength = pp.default_trireg_strength;
+  cu->has_default_trireg_strength = pp.has_default_trireg_strength;
+  cu->delay_mode_directive = pp.delay_mode_directive;
+  cu->preproc_timescale = pp.timescale;
+  cu->has_preproc_timescale = pp.has_timescale;
+}
+
 std::string ResolveTopModule(const CliOptions& opts,
                              delta::CompilationUnit* cu) {
   if (!opts.top_module.empty()) return opts.top_module;
@@ -549,25 +575,7 @@ int main(int argc, char* argv[]) {
   if (diag.HasErrors()) {
     return 1;
   }
-  cu->default_nettype = pp.default_nettype;
-  cu->unconnected_drive = pp.unconnected_drive;
-
-  for (auto* mod : cu->modules) {
-    for (const auto& cell_name : pp.cell_module_names) {
-      if (mod->name == cell_name) {
-        mod->is_cell = true;
-        break;
-      }
-    }
-  }
-  cu->default_decay_time = pp.default_decay_time;
-  cu->default_decay_time_real = pp.default_decay_time_real;
-  cu->default_decay_time_infinite = pp.default_decay_time_infinite;
-  cu->default_trireg_strength = pp.default_trireg_strength;
-  cu->has_default_trireg_strength = pp.has_default_trireg_strength;
-  cu->delay_mode_directive = pp.delay_mode_directive;
-  cu->preproc_timescale = pp.timescale;
-  cu->has_preproc_timescale = pp.has_timescale;
+  ApplyPreprocMetadata(cu, pp);
 
   if (opts.dump_ast) {
     DumpAst(cu);

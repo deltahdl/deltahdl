@@ -56,6 +56,57 @@ static void MergeLoadedCross(CrossCover* live, const CrossCover& loaded) {
   }
 }
 
+// Copies a covergroup seen only in the persisted database onto a freshly
+// created live group in full (LRM 19.9).
+static void CopyLoadedGroupInFull(CoverGroup* live, const CoverGroup& loaded) {
+  live->coverpoints = loaded.coverpoints;
+  live->crosses = loaded.crosses;
+  live->options = loaded.options;
+  live->type_option = loaded.type_option;
+  live->collecting = loaded.collecting;
+  live->sample_count = loaded.sample_count;
+}
+
+// Accumulates the loaded coverpoints onto the live group: a coverpoint matched
+// by name accumulates per-bin counts, otherwise it is appended (LRM 19.9).
+static void MergeLoadedGroupCoverPoints(CoverGroup* live,
+                                        const CoverGroup& loaded) {
+  for (const auto& lcp : loaded.coverpoints) {
+    CoverPoint* match = nullptr;
+    for (auto& cp : live->coverpoints) {
+      if (cp.name == lcp.name) {
+        match = &cp;
+        break;
+      }
+    }
+    if (match != nullptr) {
+      MergeLoadedCoverPoint(match, lcp);
+    } else {
+      live->coverpoints.push_back(lcp);
+    }
+  }
+}
+
+// Accumulates the loaded crosses onto the live group, mirroring the per-cross
+// accumulation used for coverpoints (LRM 19.9).
+static void MergeLoadedGroupCrosses(CoverGroup* live,
+                                    const CoverGroup& loaded) {
+  for (const auto& lcross : loaded.crosses) {
+    CrossCover* match = nullptr;
+    for (auto& cross : live->crosses) {
+      if (cross.name == lcross.name) {
+        match = &cross;
+        break;
+      }
+    }
+    if (match != nullptr) {
+      MergeLoadedCross(match, lcross);
+    } else {
+      live->crosses.push_back(lcross);
+    }
+  }
+}
+
 void CoverageDB::MergeCumulativeCoverage(
     const std::vector<CoverGroup>& cumulative) {
   for (const auto& loaded : cumulative) {
@@ -63,45 +114,14 @@ void CoverageDB::MergeCumulativeCoverage(
     if (live == nullptr) {
       // A covergroup type seen only in the persisted database is added in full.
       live = CreateGroup(loaded.name);
-      live->coverpoints = loaded.coverpoints;
-      live->crosses = loaded.crosses;
-      live->options = loaded.options;
-      live->type_option = loaded.type_option;
-      live->collecting = loaded.collecting;
-      live->sample_count = loaded.sample_count;
+      CopyLoadedGroupInFull(live, loaded);
       continue;
     }
 
     // The loaded coverage is cumulative, so its counts add to the live ones.
     live->sample_count += loaded.sample_count;
-    for (const auto& lcp : loaded.coverpoints) {
-      CoverPoint* match = nullptr;
-      for (auto& cp : live->coverpoints) {
-        if (cp.name == lcp.name) {
-          match = &cp;
-          break;
-        }
-      }
-      if (match != nullptr) {
-        MergeLoadedCoverPoint(match, lcp);
-      } else {
-        live->coverpoints.push_back(lcp);
-      }
-    }
-    for (const auto& lcross : loaded.crosses) {
-      CrossCover* match = nullptr;
-      for (auto& cross : live->crosses) {
-        if (cross.name == lcross.name) {
-          match = &cross;
-          break;
-        }
-      }
-      if (match != nullptr) {
-        MergeLoadedCross(match, lcross);
-      } else {
-        live->crosses.push_back(lcross);
-      }
-    }
+    MergeLoadedGroupCoverPoints(live, loaded);
+    MergeLoadedGroupCrosses(live, loaded);
   }
 }
 

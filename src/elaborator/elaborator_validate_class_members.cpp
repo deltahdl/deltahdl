@@ -25,20 +25,19 @@ static bool ExprRefsThisOrSuper(const Expr* e) {
   if (e->kind == ExprKind::kIdentifier &&
       (e->text == "this" || e->text == "super"))
     return true;
-  if (ExprRefsThisOrSuper(e->lhs)) return true;
-  if (ExprRefsThisOrSuper(e->rhs)) return true;
-  if (ExprRefsThisOrSuper(e->base)) return true;
-  if (ExprRefsThisOrSuper(e->index)) return true;
-  if (ExprRefsThisOrSuper(e->condition)) return true;
-  if (ExprRefsThisOrSuper(e->true_expr)) return true;
-  if (ExprRefsThisOrSuper(e->false_expr)) return true;
+  if (ExprRefsThisOrSuper(e->lhs) || ExprRefsThisOrSuper(e->rhs) ||
+      ExprRefsThisOrSuper(e->base) || ExprRefsThisOrSuper(e->index) ||
+      ExprRefsThisOrSuper(e->condition) || ExprRefsThisOrSuper(e->true_expr) ||
+      ExprRefsThisOrSuper(e->false_expr) || ExprRefsThisOrSuper(e->with_expr)) {
+    return true;
+  }
   for (const auto* elem : e->elements) {
     if (ExprRefsThisOrSuper(elem)) return true;
   }
   for (const auto* arg : e->args) {
     if (ExprRefsThisOrSuper(arg)) return true;
   }
-  return ExprRefsThisOrSuper(e->with_expr);
+  return false;
 }
 
 static bool StmtRefsThisOrSuper(const Stmt* s) {
@@ -88,20 +87,23 @@ static bool ExprRefsNonStaticMember(
   if (e->kind == ExprKind::kCall && !e->callee.empty() &&
       non_static.count(e->callee) && !locals.count(e->callee))
     return true;
-  if (ExprRefsNonStaticMember(e->lhs, non_static, locals)) return true;
-  if (ExprRefsNonStaticMember(e->rhs, non_static, locals)) return true;
-  if (ExprRefsNonStaticMember(e->base, non_static, locals)) return true;
-  if (ExprRefsNonStaticMember(e->index, non_static, locals)) return true;
-  if (ExprRefsNonStaticMember(e->condition, non_static, locals)) return true;
-  if (ExprRefsNonStaticMember(e->true_expr, non_static, locals)) return true;
-  if (ExprRefsNonStaticMember(e->false_expr, non_static, locals)) return true;
+  if (ExprRefsNonStaticMember(e->lhs, non_static, locals) ||
+      ExprRefsNonStaticMember(e->rhs, non_static, locals) ||
+      ExprRefsNonStaticMember(e->base, non_static, locals) ||
+      ExprRefsNonStaticMember(e->index, non_static, locals) ||
+      ExprRefsNonStaticMember(e->condition, non_static, locals) ||
+      ExprRefsNonStaticMember(e->true_expr, non_static, locals) ||
+      ExprRefsNonStaticMember(e->false_expr, non_static, locals) ||
+      ExprRefsNonStaticMember(e->with_expr, non_static, locals)) {
+    return true;
+  }
   for (const auto* elem : e->elements) {
     if (ExprRefsNonStaticMember(elem, non_static, locals)) return true;
   }
   for (const auto* arg : e->args) {
     if (ExprRefsNonStaticMember(arg, non_static, locals)) return true;
   }
-  return ExprRefsNonStaticMember(e->with_expr, non_static, locals);
+  return false;
 }
 
 static bool StmtRefsNonStaticMember(
@@ -125,20 +127,28 @@ static bool StmtRefsNonStaticMember(
   return false;
 }
 
-void Elaborator::ValidateOneClassStaticMethods(const ClassDecl* cls) {
+// §8.11: a static method shall not reference 'this' or 'super'. Reports the
+// first offending statement in each static method body.
+static void CheckStaticMethodsForThisSuper(const ClassDecl* cls,
+                                           DiagEngine& diag) {
   for (const auto* m : cls->members) {
     if (m->kind != ClassMemberKind::kMethod || !m->is_static) continue;
     if (!m->method) continue;
     for (const auto* s : m->method->func_body_stmts) {
       if (StmtRefsThisOrSuper(s)) {
-        diag_.Error(m->method->loc,
-                    "'this' and 'super' shall not be used in "
-                    "a static method");
+        diag.Error(m->method->loc,
+                   "'this' and 'super' shall not be used in "
+                   "a static method");
         break;
       }
     }
   }
+}
 
+// §8.11: collects the names of all non-static properties and (non-'new')
+// methods of the class — the members a static method is forbidden to access.
+static std::unordered_set<std::string_view> CollectNonStaticMemberNames(
+    const ClassDecl* cls) {
   std::unordered_set<std::string_view> non_static;
   for (const auto* member : cls->members) {
     if (member->is_static) continue;
@@ -149,22 +159,39 @@ void Elaborator::ValidateOneClassStaticMethods(const ClassDecl* cls) {
       non_static.insert(member->method->name);
     }
   }
+  return non_static;
+}
+
+// §8.11: collects names that are local to a static method body (arguments, the
+// function's own result name, and declared locals) and so shadow class members.
+static std::unordered_set<std::string_view> CollectStaticMethodLocalNames(
+    const ModuleItem* method) {
+  std::unordered_set<std::string_view> locals;
+  for (const auto& arg : method->func_args) {
+    if (!arg.name.empty()) locals.insert(arg.name);
+  }
+  if (method->kind == ModuleItemKind::kFunctionDecl) {
+    locals.insert(method->name);
+  }
+  for (const auto* s : method->func_body_stmts) {
+    CollectLocalNames(s, locals);
+  }
+  return locals;
+}
+
+void Elaborator::ValidateOneClassStaticMethods(const ClassDecl* cls) {
+  CheckStaticMethodsForThisSuper(cls, diag_);
+
+  std::unordered_set<std::string_view> non_static =
+      CollectNonStaticMemberNames(cls);
   if (non_static.empty()) return;
 
   for (const auto* m : cls->members) {
     if (m->kind != ClassMemberKind::kMethod || !m->is_static) continue;
     if (!m->method) continue;
 
-    std::unordered_set<std::string_view> locals;
-    for (const auto& arg : m->method->func_args) {
-      if (!arg.name.empty()) locals.insert(arg.name);
-    }
-    if (m->method->kind == ModuleItemKind::kFunctionDecl) {
-      locals.insert(m->method->name);
-    }
-    for (const auto* s : m->method->func_body_stmts) {
-      CollectLocalNames(s, locals);
-    }
+    std::unordered_set<std::string_view> locals =
+        CollectStaticMethodLocalNames(m->method);
 
     for (const auto* s : m->method->func_body_stmts) {
       if (StmtRefsNonStaticMember(s, non_static, locals)) {
@@ -238,18 +265,20 @@ void Elaborator::ValidateFinalClassExtension() {
 // type argument is a compile error, mirroring the variable-declaration and
 // subroutine-argument checks elsewhere in the elaborator.
 void Elaborator::ValidateWeakReferenceMembers() {
+  auto check_member = [&](const ClassMember* m) {
+    if (m->kind != ClassMemberKind::kProperty) return;
+    if (m->data_type.kind != DataTypeKind::kNamed) return;
+    if (m->data_type.type_name != "weak_reference") return;
+    if (m->data_type.type_params.empty()) return;
+    const auto& tp = m->data_type.type_params[0];
+    if (tp.kind != DataTypeKind::kNamed || !class_names_.count(tp.type_name)) {
+      diag_.Error(m->loc,
+                  "weak_reference type parameter shall be a class type");
+    }
+  };
   for (const auto* cls : unit_->classes) {
     for (const auto* m : cls->members) {
-      if (m->kind != ClassMemberKind::kProperty) continue;
-      if (m->data_type.kind != DataTypeKind::kNamed) continue;
-      if (m->data_type.type_name != "weak_reference") continue;
-      if (m->data_type.type_params.empty()) continue;
-      const auto& tp = m->data_type.type_params[0];
-      if (tp.kind != DataTypeKind::kNamed ||
-          !class_names_.count(tp.type_name)) {
-        diag_.Error(m->loc,
-                    "weak_reference type parameter shall be a class type");
-      }
+      check_member(m);
     }
   }
 }
@@ -330,25 +359,39 @@ static void CheckCovergroupAssignStmt(
   }
 }
 
+// §19.4: collects the names of all embedded covergroups declared in the class.
+static std::unordered_set<std::string_view> CollectCovergroupNames(
+    const ClassDecl* cls) {
+  std::unordered_set<std::string_view> cg_names;
+  for (const auto* m : cls->members) {
+    if (m->kind == ClassMemberKind::kCovergroup && !m->name.empty()) {
+      cg_names.insert(m->name);
+    }
+  }
+  return cg_names;
+}
+
+// §19.4: checks every non-constructor method of the class for assignments to an
+// embedded covergroup identifier, which are forbidden outside new().
+static void CheckClassMethodsForCovergroupAssign(
+    const ClassDecl* cls, const std::unordered_set<std::string_view>& cg_names,
+    DiagEngine& diag) {
+  for (const auto* m : cls->members) {
+    if (m->kind != ClassMemberKind::kMethod || !m->method) continue;
+    // The constructor is the one place an embedded covergroup may be
+    // instantiated, so assignments there are permitted.
+    if (m->method->name == "new") continue;
+    for (const auto* s : m->method->func_body_stmts) {
+      CheckCovergroupAssignStmt(s, cg_names, diag);
+    }
+  }
+}
+
 void Elaborator::ValidateEmbeddedCovergroupAssign() {
   for (const auto* cls : unit_->classes) {
-    std::unordered_set<std::string_view> cg_names;
-    for (const auto* m : cls->members) {
-      if (m->kind == ClassMemberKind::kCovergroup && !m->name.empty()) {
-        cg_names.insert(m->name);
-      }
-    }
+    std::unordered_set<std::string_view> cg_names = CollectCovergroupNames(cls);
     if (cg_names.empty()) continue;
-
-    for (const auto* m : cls->members) {
-      if (m->kind != ClassMemberKind::kMethod || !m->method) continue;
-      // The constructor is the one place an embedded covergroup may be
-      // instantiated, so assignments there are permitted.
-      if (m->method->name == "new") continue;
-      for (const auto* s : m->method->func_body_stmts) {
-        CheckCovergroupAssignStmt(s, cg_names, diag_);
-      }
-    }
+    CheckClassMethodsForCovergroupAssign(cls, cg_names, diag_);
   }
 }
 
@@ -393,18 +436,18 @@ void Elaborator::ValidateDerivedCovergroupBase() {
 }
 
 void Elaborator::ValidateClassMethodBodies(const ModuleDecl* decl) {
-  for (const auto* cls : unit_->classes) {
+  auto validate_class_methods = [&](const ClassDecl* cls) {
     for (const auto* m : cls->members) {
       if (m->kind != ClassMemberKind::kMethod || !m->method) continue;
       ValidateFunctionBody(m->method);
     }
+  };
+  for (const auto* cls : unit_->classes) {
+    validate_class_methods(cls);
   }
   for (const auto* item : decl->items) {
     if (item->kind != ModuleItemKind::kClassDecl || !item->class_decl) continue;
-    for (const auto* m : item->class_decl->members) {
-      if (m->kind != ClassMemberKind::kMethod || !m->method) continue;
-      ValidateFunctionBody(m->method);
-    }
+    validate_class_methods(item->class_decl);
   }
 }
 
@@ -443,18 +486,17 @@ void Elaborator::ApplyClassMethodAutomaticDefault() {
 static bool ExprRefsSuper(const Expr* e) {
   if (!e) return false;
   if (e->kind == ExprKind::kIdentifier && e->text == "super") return true;
-  if (ExprRefsSuper(e->lhs)) return true;
-  if (ExprRefsSuper(e->rhs)) return true;
-  if (ExprRefsSuper(e->base)) return true;
-  if (ExprRefsSuper(e->index)) return true;
-  if (ExprRefsSuper(e->condition)) return true;
-  if (ExprRefsSuper(e->true_expr)) return true;
-  if (ExprRefsSuper(e->false_expr)) return true;
+  if (ExprRefsSuper(e->lhs) || ExprRefsSuper(e->rhs) ||
+      ExprRefsSuper(e->base) || ExprRefsSuper(e->index) ||
+      ExprRefsSuper(e->condition) || ExprRefsSuper(e->true_expr) ||
+      ExprRefsSuper(e->false_expr) || ExprRefsSuper(e->with_expr)) {
+    return true;
+  }
   for (const auto* elem : e->elements)
     if (ExprRefsSuper(elem)) return true;
   for (const auto* arg : e->args)
     if (ExprRefsSuper(arg)) return true;
-  return ExprRefsSuper(e->with_expr);
+  return false;
 }
 
 static bool StmtRefsSuper(const Stmt* s) {
@@ -474,19 +516,26 @@ static bool StmtRefsSuper(const Stmt* s) {
   return false;
 }
 
+// §8.15: in a class that does not extend another, no method body may reference
+// 'super'. Reports the first offending method statement.
+static void CheckNonDerivedClassMethodsForSuper(const ClassDecl* cls,
+                                                DiagEngine& diag) {
+  for (const auto* m : cls->members) {
+    if (m->kind != ClassMemberKind::kMethod || !m->method) continue;
+    for (const auto* s : m->method->func_body_stmts) {
+      if (StmtRefsSuper(s)) {
+        diag.Error(m->method->loc,
+                   "'super' shall only be used in a derived class");
+        break;
+      }
+    }
+  }
+}
+
 void Elaborator::ValidateSuperInNonDerivedClass() {
   for (const auto* cls : unit_->classes) {
     if (!cls->base_class.empty()) continue;
-    for (const auto* m : cls->members) {
-      if (m->kind != ClassMemberKind::kMethod || !m->method) continue;
-      for (const auto* s : m->method->func_body_stmts) {
-        if (StmtRefsSuper(s)) {
-          diag_.Error(m->method->loc,
-                      "'super' shall only be used in a derived class");
-          break;
-        }
-      }
-    }
+    CheckNonDerivedClassMethodsForSuper(cls, diag_);
   }
 }
 
@@ -524,20 +573,83 @@ static bool ExprRefsAnyName(const Expr* e,
   return false;
 }
 
+// §8.17: returns whether a constructor's argument list uses the 'default'
+// keyword.
+static bool CtorArgListUsesDefault(const ModuleItem* ctor) {
+  if (!ctor) return false;
+  for (const auto& arg : ctor->func_args) {
+    if (arg.is_default) return true;
+  }
+  return false;
+}
+
+// §8.17: 'default' may be passed as the sole argument to super.new() only when
+// the enclosing constructor's own argument list used the 'default' keyword.
+// This handles the case where it did not, flagging any such super.new() call.
+static void CheckDefaultArgInSuperNewCall(const ModuleItem* ctor,
+                                          DiagEngine& diag) {
+  for (const auto* s : ctor->func_body_stmts) {
+    if (!IsSuperNewCall(s)) continue;
+    const auto& call_args = s->expr->args;
+    if (call_args.size() == 1 && call_args[0] &&
+        call_args[0]->kind == ExprKind::kIdentifier &&
+        call_args[0]->text == "default") {
+      diag.Error(s->range.start,
+                 "'default' may be passed to super.new() only when the "
+                 "constructor argument list uses the 'default' keyword");
+    }
+  }
+}
+
+// §8.17: because 'default' expands to the superclass constructor arguments, an
+// explicit argument in the subclass constructor shall not share a name with any
+// superclass constructor argument.
+static void CheckDefaultCtorArgNameConflicts(const ModuleItem* ctor,
+                                             const ModuleItem* base_ctor,
+                                             DiagEngine& diag) {
+  std::unordered_set<std::string_view> base_arg_names;
+  for (const auto& a : base_ctor->func_args) {
+    if (!a.name.empty()) base_arg_names.insert(a.name);
+  }
+  for (const auto& a : ctor->func_args) {
+    if (a.is_default || a.name.empty()) continue;
+    if (base_arg_names.count(a.name)) {
+      diag.Error(ctor->loc,
+                 std::format("constructor argument '{}' shall not share a "
+                             "name with a superclass constructor argument "
+                             "when 'default' is used",
+                             a.name));
+    }
+  }
+}
+
+// §8.17: 'default' shall not be used when a superclass constructor argument's
+// default value refers to a local member of the superclass.
+static void CheckDefaultCtorArgRefsBaseLocal(const ClassDecl* base,
+                                             const ModuleItem* ctor,
+                                             const ModuleItem* base_ctor,
+                                             DiagEngine& diag) {
+  std::unordered_set<std::string_view> base_locals;
+  for (const auto* m : base->members) {
+    if (m->is_local && !m->name.empty()) base_locals.insert(m->name);
+  }
+  if (base_locals.empty()) return;
+  for (const auto& a : base_ctor->func_args) {
+    if (a.default_value && ExprRefsAnyName(a.default_value, base_locals)) {
+      diag.Error(ctor->loc,
+                 "'default' shall not be used when a superclass constructor "
+                 "argument default value refers to a local member");
+      break;
+    }
+  }
+}
+
 // §8.17: enforces the rules governing the 'default' keyword in a subclass
 // constructor argument list and in an explicit super.new() call.
 void Elaborator::ValidateOneClassDefaultKeyword(const ClassDecl* cls) {
   const ModuleItem* ctor = FindClassCtorMethod(cls);
 
-  bool ctor_has_default = false;
-  if (ctor) {
-    for (const auto& arg : ctor->func_args) {
-      if (arg.is_default) {
-        ctor_has_default = true;
-        break;
-      }
-    }
-  }
+  bool ctor_has_default = CtorArgListUsesDefault(ctor);
 
   // §8.17: 'default' expands to the superclass constructor's arguments, so the
   // class shall extend another class for the expansion to have a source.
@@ -559,17 +671,7 @@ void Elaborator::ValidateOneClassDefaultKeyword(const ClassDecl* cls) {
   // §8.17: 'default' may be passed as the sole argument to super.new() only
   // when the constructor's own argument list used the 'default' keyword.
   if (ctor && !ctor_has_default) {
-    for (const auto* s : ctor->func_body_stmts) {
-      if (!IsSuperNewCall(s)) continue;
-      const auto& call_args = s->expr->args;
-      if (call_args.size() == 1 && call_args[0] &&
-          call_args[0]->kind == ExprKind::kIdentifier &&
-          call_args[0]->text == "default") {
-        diag_.Error(s->range.start,
-                    "'default' may be passed to super.new() only when the "
-                    "constructor argument list uses the 'default' keyword");
-      }
-    }
+    CheckDefaultArgInSuperNewCall(ctor, diag_);
   }
 
   if (!ctor_has_default || cls->base_class.empty()) return;
@@ -578,40 +680,8 @@ void Elaborator::ValidateOneClassDefaultKeyword(const ClassDecl* cls) {
   const ModuleItem* base_ctor = FindClassCtorMethod(base);
   if (!base_ctor) return;
 
-  // §8.17: because 'default' expands to the superclass constructor arguments,
-  // an explicit argument in the subclass constructor shall not share a name
-  // with any superclass constructor argument.
-  std::unordered_set<std::string_view> base_arg_names;
-  for (const auto& a : base_ctor->func_args) {
-    if (!a.name.empty()) base_arg_names.insert(a.name);
-  }
-  for (const auto& a : ctor->func_args) {
-    if (a.is_default || a.name.empty()) continue;
-    if (base_arg_names.count(a.name)) {
-      diag_.Error(ctor->loc,
-                  std::format("constructor argument '{}' shall not share a "
-                              "name with a superclass constructor argument "
-                              "when 'default' is used",
-                              a.name));
-    }
-  }
-
-  // §8.17: 'default' shall not be used when a superclass constructor argument's
-  // default value refers to a local member of the superclass.
-  std::unordered_set<std::string_view> base_locals;
-  for (const auto* m : base->members) {
-    if (m->is_local && !m->name.empty()) base_locals.insert(m->name);
-  }
-  if (!base_locals.empty()) {
-    for (const auto& a : base_ctor->func_args) {
-      if (a.default_value && ExprRefsAnyName(a.default_value, base_locals)) {
-        diag_.Error(ctor->loc,
-                    "'default' shall not be used when a superclass constructor "
-                    "argument default value refers to a local member");
-        break;
-      }
-    }
-  }
+  CheckDefaultCtorArgNameConflicts(ctor, base_ctor, diag_);
+  CheckDefaultCtorArgRefsBaseLocal(base, ctor, base_ctor, diag_);
 }
 
 void Elaborator::ValidateChainingConstructors() {

@@ -139,27 +139,31 @@ static ExecTask ExecRsProdCase(const Stmt* stmt, const RsProd& prod,
   co_return StmtResult::kDone;
 }
 
+// 18.17: every code block inside a randsequence is its own anonymous automatic
+// scope. Variables it declares are recreated on each execution and do not leak
+// to sibling code blocks or outlive the block, so we bracket the statements
+// with a fresh automatic scope.
+static ExecTask ExecRsProdCodeBlock(const RsProd& prod, SimContext& ctx,
+                                    Arena& arena) {
+  ctx.PushScope();
+  StmtResult block_result = StmtResult::kDone;
+  for (auto* s : prod.code_stmts) {
+    auto result = co_await ExecStmt(s, ctx, arena);
+    if (result == StmtResult::kBreak || result == StmtResult::kReturn) {
+      block_result = result;
+      break;
+    }
+  }
+  ctx.PopScope();
+  co_return block_result;
+}
+
 static ExecTask ExecRsProd(const Stmt* stmt, const RsProd& prod,
                            SimContext& ctx, Arena& arena,
                            Logic4Vec* out_value) {
   switch (prod.kind) {
-    case RsProdKind::kCodeBlock: {
-      // 18.17: every code block inside a randsequence is its own anonymous
-      // automatic scope. Variables it declares are recreated on each execution
-      // and do not leak to sibling code blocks or outlive the block, so we
-      // bracket the statements with a fresh automatic scope.
-      ctx.PushScope();
-      StmtResult block_result = StmtResult::kDone;
-      for (auto* s : prod.code_stmts) {
-        auto result = co_await ExecStmt(s, ctx, arena);
-        if (result == StmtResult::kBreak || result == StmtResult::kReturn) {
-          block_result = result;
-          break;
-        }
-      }
-      ctx.PopScope();
-      co_return block_result;
-    }
+    case RsProdKind::kCodeBlock:
+      co_return co_await ExecRsProdCodeBlock(prod, ctx, arena);
     case RsProdKind::kItem:
       co_return co_await ExecRsProduction(stmt, prod.item, ctx, arena,
                                           out_value);
@@ -245,6 +249,81 @@ static void CollectRandJoinSteps(const RsRule& rule, Arena& arena,
   for (const auto& prod : rule.prods) steps.push_back(&prod);
 }
 
+// 18.17.5: at each step choose one operand and emit its next production. A
+// sequence's length is the number of productions it has not yet contributed.
+// The bias maps to an exponent on that length: 0.5 (exponent 1) keeps the
+// choice proportional to remaining length so no length is prioritized, values
+// toward 0.0 (negative exponent) favor the shortest remaining sequences, and
+// values toward 1.0 favor the longest. Returns seqs.size() when every operand
+// sequence has been drained.
+static size_t ChooseRandJoinOperand(const std::vector<RandJoinSeq>& seqs,
+                                    double exponent, SimContext& ctx) {
+  double total = 0.0;
+  for (const auto& seq : seqs) {
+    if (seq.Remaining() > 0)
+      total += std::pow(static_cast<double>(seq.Remaining()), exponent);
+  }
+  if (total <= 0.0)
+    return seqs.size();  // every operand sequence has been drained
+
+  double draw = (ctx.Urandom32() / 4294967296.0) * total;
+  double cumulative = 0.0;
+  size_t chosen = seqs.size();
+  for (size_t i = 0; i < seqs.size(); ++i) {
+    if (seqs[i].Remaining() == 0) continue;
+    cumulative += std::pow(static_cast<double>(seqs[i].Remaining()), exponent);
+    if (draw < cumulative) {
+      chosen = i;
+      break;
+    }
+  }
+  if (chosen == seqs.size()) {
+    // Floating point rounding can leave draw just past the running total;
+    // fall back to the last operand that still has productions to emit.
+    for (size_t i = seqs.size(); i-- > 0;) {
+      if (seqs[i].Remaining() > 0) {
+        chosen = i;
+        break;
+      }
+    }
+  }
+  return chosen;
+}
+
+// 18.17.5: expand each rand join operand one level into the production items of
+// its selected rule, running that rule's weight code in declaration order
+// first. A rule whose weight code breaks aborts the whole interleaving; one
+// that returns contributes no steps. Returns false (with abort set) when a
+// break must propagate out of the caller.
+static ExecTask BuildRandJoinSeqs(const Stmt* stmt, const RsRule& selected,
+                                  SimContext& ctx, Arena& arena,
+                                  std::vector<RandJoinSeq>& seqs,
+                                  bool& aborted) {
+  seqs.reserve(selected.rand_join_items.size());
+  for (const auto& item : selected.rand_join_items) {
+    const auto* production = FindProduction(stmt, item.name);
+    RandJoinSeq seq;
+    if (production) {
+      const auto& rule = SelectRule(*production, ctx, arena);
+      bool rule_aborted = false;
+      for (auto* s : rule.weight_code) {
+        auto r = co_await ExecStmt(s, ctx, arena);
+        if (r == StmtResult::kBreak) {
+          aborted = true;
+          co_return StmtResult::kBreak;
+        }
+        if (r == StmtResult::kReturn) {
+          rule_aborted = true;
+          break;
+        }
+      }
+      if (!rule_aborted) CollectRandJoinSteps(rule, arena, seq.steps);
+    }
+    seqs.push_back(std::move(seq));
+  }
+  co_return StmtResult::kDone;
+}
+
 static ExecTask ExecRandJoinItems(const Stmt* stmt, const RsRule& selected,
                                   SimContext& ctx, Arena& arena) {
   // 18.17.5: rand join randomly interleaves its operand sequences while keeping
@@ -254,63 +333,15 @@ static ExecTask ExecRandJoinItems(const Stmt* stmt, const RsRule& selected,
   double bias = EvalRandJoinBias(selected.rand_join_expr, ctx, arena);
 
   std::vector<RandJoinSeq> seqs;
-  seqs.reserve(selected.rand_join_items.size());
-  for (const auto& item : selected.rand_join_items) {
-    const auto* production = FindProduction(stmt, item.name);
-    RandJoinSeq seq;
-    if (production) {
-      const auto& rule = SelectRule(*production, ctx, arena);
-      bool aborted = false;
-      for (auto* s : rule.weight_code) {
-        auto r = co_await ExecStmt(s, ctx, arena);
-        if (r == StmtResult::kBreak) co_return StmtResult::kBreak;
-        if (r == StmtResult::kReturn) {
-          aborted = true;
-          break;
-        }
-      }
-      if (!aborted) CollectRandJoinSteps(rule, arena, seq.steps);
-    }
-    seqs.push_back(std::move(seq));
-  }
+  bool aborted = false;
+  auto build =
+      co_await BuildRandJoinSeqs(stmt, selected, ctx, arena, seqs, aborted);
+  if (aborted) co_return build;
 
-  // 18.17.5: at each step choose one operand and emit its next production. A
-  // sequence's length is the number of productions it has not yet contributed.
-  // The bias maps to an exponent on that length: 0.5 (exponent 1) keeps the
-  // choice proportional to remaining length so no length is prioritized, values
-  // toward 0.0 (negative exponent) favor the shortest remaining sequences, and
-  // values toward 1.0 favor the longest.
   double exponent = 4.0 * bias - 1.0;
   for (;;) {
-    double total = 0.0;
-    for (const auto& seq : seqs) {
-      if (seq.Remaining() > 0)
-        total += std::pow(static_cast<double>(seq.Remaining()), exponent);
-    }
-    if (total <= 0.0) break;  // every operand sequence has been drained
-
-    double draw = (ctx.Urandom32() / 4294967296.0) * total;
-    double cumulative = 0.0;
-    size_t chosen = seqs.size();
-    for (size_t i = 0; i < seqs.size(); ++i) {
-      if (seqs[i].Remaining() == 0) continue;
-      cumulative +=
-          std::pow(static_cast<double>(seqs[i].Remaining()), exponent);
-      if (draw < cumulative) {
-        chosen = i;
-        break;
-      }
-    }
-    if (chosen == seqs.size()) {
-      // Floating point rounding can leave draw just past the running total;
-      // fall back to the last operand that still has productions to emit.
-      for (size_t i = seqs.size(); i-- > 0;) {
-        if (seqs[i].Remaining() > 0) {
-          chosen = i;
-          break;
-        }
-      }
-    }
+    size_t chosen = ChooseRandJoinOperand(seqs, exponent, ctx);
+    if (chosen == seqs.size()) break;
 
     const RsProd* step = seqs[chosen].steps[seqs[chosen].cursor++];
     auto result = co_await ExecRsProd(stmt, *step, ctx, arena, nullptr);
@@ -324,16 +355,16 @@ static ExecTask ExecRandJoinItems(const Stmt* stmt, const RsRule& selected,
   co_return StmtResult::kDone;
 }
 
-static ExecTask ExecRuleProds(const Stmt* stmt, const RsRule& selected,
-                              SimContext& ctx, Arena& arena) {
-  // §18.17.7: within a rule, a variable is implicitly declared for each
-  // value-returning production that appears. A production appearing once yields
-  // a scalar named after the production; a production appearing more than once
-  // yields an array indexed 1..N, with element i holding the value returned by
-  // the i-th appearance in syntactic order. Pre-scan the rule's production
-  // items to count each name's appearances so a multiply appearing
-  // value-returning production can be registered as an array before any code
-  // block reads it.
+// §18.17.7: within a rule, a variable is implicitly declared for each
+// value-returning production that appears. A production appearing once yields a
+// scalar named after the production; a production appearing more than once
+// yields an array indexed 1..N, with element i holding the value returned by
+// the i-th appearance in syntactic order. Pre-scan the rule's production items
+// to count each name's appearances so a multiply appearing value-returning
+// production can be registered as an array before any code block reads it. The
+// per-name appearance counts are returned for reuse during generation.
+static std::unordered_map<std::string_view, int> RegisterRuleProductionArrays(
+    const Stmt* stmt, const RsRule& selected, SimContext& ctx) {
   std::unordered_map<std::string_view, int> total_count;
   for (const auto& prod : selected.prods) {
     if (prod.kind != RsProdKind::kItem) continue;
@@ -350,6 +381,37 @@ static ExecTask ExecRuleProds(const Stmt* stmt, const RsRule& selected,
     info.elem_width = w ? w : 32;
     ctx.RegisterArray(name, info);
   }
+  return total_count;
+}
+
+// §18.17.7: store one generated production's return value into its implicit
+// variable, immediately so later code blocks observe it. A multiply appearing
+// production stores into its 1..N indexed element for this (idx-th) appearance;
+// a singly appearing one stores into the scalar named after the production.
+static void StoreRuleProductionValue(const RsProd& prod,
+                                     const RsProduction* child,
+                                     const Logic4Vec& ret_value, int idx,
+                                     int total_count, SimContext& ctx,
+                                     Arena& arena) {
+  uint32_t w = EvalTypeWidth(child->return_type);
+  if (w == 0) w = ret_value.width ? ret_value.width : 32;
+  Variable* var = nullptr;
+  if (total_count > 1) {
+    // Indexed element names are built at run time, so intern the name in the
+    // arena: the scope map keys on the string_view and needs stable storage.
+    auto name = std::string(prod.item.name) + "[" + std::to_string(idx) + "]";
+    var =
+        ctx.CreateLocalVariable(*arena.Create<std::string>(std::move(name)), w);
+  } else {
+    var = ctx.CreateLocalVariable(prod.item.name, w);
+  }
+  var->value = ret_value;
+}
+
+static ExecTask ExecRuleProds(const Stmt* stmt, const RsRule& selected,
+                              SimContext& ctx, Arena& arena) {
+  std::unordered_map<std::string_view, int> total_count =
+      RegisterRuleProductionArrays(stmt, selected, ctx);
 
   // §18.17.7: only the return values of productions already generated (to the
   // left of a code block) are available. Each generation stores its value into
@@ -368,22 +430,9 @@ static ExecTask ExecRuleProds(const Stmt* stmt, const RsRule& selected,
     auto result = co_await ExecRsProd(stmt, prod, ctx, arena, slot);
 
     if (slot != nullptr) {
-      uint32_t w = EvalTypeWidth(child->return_type);
-      if (w == 0) w = ret_value.width ? ret_value.width : 32;
       int idx = ++seen_count[prod.item.name];
-      Variable* var = nullptr;
-      if (total_count[prod.item.name] > 1) {
-        // Indexed element names are built at run time, so intern the name in
-        // the arena: the scope map keys on the string_view and needs stable
-        // storage.
-        auto name =
-            std::string(prod.item.name) + "[" + std::to_string(idx) + "]";
-        var = ctx.CreateLocalVariable(
-            *arena.Create<std::string>(std::move(name)), w);
-      } else {
-        var = ctx.CreateLocalVariable(prod.item.name, w);
-      }
-      var->value = ret_value;
+      StoreRuleProductionValue(prod, child, ret_value, idx,
+                               total_count[prod.item.name], ctx, arena);
     }
 
     if (result == StmtResult::kBreak) co_return StmtResult::kBreak;
@@ -406,16 +455,12 @@ static ExecTask ExecSelectedRule(const Stmt* stmt, const RsRule& selected,
   co_return co_await ExecRuleProds(stmt, selected, ctx, arena);
 }
 
-static ExecTask ExecRsProduction(const Stmt* stmt, const RsProductionItem& call,
-                                 SimContext& ctx, Arena& arena,
-                                 Logic4Vec* out_value) {
-  const auto* production = FindProduction(stmt, call.name);
-  if (!production) co_return StmtResult::kDone;
-
-  // §18.17.7: passing data to a production uses the same syntax as a task call.
-  // Evaluate the actual arguments in the caller's scope, before the
-  // production's own scope is entered, sizing each to its formal's declared
-  // width.
+// §18.17.7: passing data to a production uses the same syntax as a task call.
+// Evaluate the actual arguments in the caller's scope, before the production's
+// own scope is entered, sizing each to its formal's declared width.
+static std::vector<Logic4Vec> EvalProductionActuals(
+    const RsProduction* production, const RsProductionItem& call,
+    SimContext& ctx, Arena& arena) {
   std::vector<Logic4Vec> actuals;
   actuals.reserve(call.args.size());
   for (size_t i = 0; i < call.args.size(); ++i) {
@@ -424,12 +469,17 @@ static ExecTask ExecRsProduction(const Stmt* stmt, const RsProductionItem& call,
                      : 0;
     actuals.push_back(EvalExpr(call.args[i], ctx, arena, w));
   }
+  return actuals;
+}
 
-  // §18.17.7: a production creates a scope that encompasses all its rules and
-  // code blocks; formal arguments bound here are therefore available throughout
-  // the production. Bind each formal by position, falling back to its default
-  // value, then to zero, when no actual is supplied.
-  ctx.PushScope();
+// §18.17.7: a production creates a scope that encompasses all its rules and
+// code blocks; formal arguments bound here are therefore available throughout
+// the production. Bind each formal by position, falling back to its default
+// value, then to zero, when no actual is supplied. The caller must have entered
+// the production's scope.
+static void BindProductionFormals(const RsProduction* production,
+                                  const std::vector<Logic4Vec>& actuals,
+                                  SimContext& ctx, Arena& arena) {
   for (size_t i = 0; i < production->ports.size(); ++i) {
     const auto& port = production->ports[i];
     uint32_t w = EvalTypeWidth(port.data_type);
@@ -445,6 +495,19 @@ static ExecTask ExecRsProduction(const Stmt* stmt, const RsProductionItem& call,
     auto* var = ctx.CreateLocalVariable(port.name, vw);
     var->value = val;
   }
+}
+
+static ExecTask ExecRsProduction(const Stmt* stmt, const RsProductionItem& call,
+                                 SimContext& ctx, Arena& arena,
+                                 Logic4Vec* out_value) {
+  const auto* production = FindProduction(stmt, call.name);
+  if (!production) co_return StmtResult::kDone;
+
+  std::vector<Logic4Vec> actuals =
+      EvalProductionActuals(production, call, ctx, arena);
+
+  ctx.PushScope();
+  BindProductionFormals(production, actuals, ctx, arena);
 
   // §18.17.7: returning data requires a (non-void) return type. Provide storage
   // for this production's return value and point the engine's return slot at it

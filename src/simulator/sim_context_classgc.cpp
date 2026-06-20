@@ -58,65 +58,118 @@ Reachability SimContext::GetReachability(uint64_t handle) const {
   return Reachability::kUnreachable;
 }
 
-void SimContext::CollectGarbage() {
-  if (class_objects_.empty()) return;
+namespace {
 
-  std::unordered_set<uint64_t> live;
+// Records the class handle held by a single variable (and its pending NBA
+// value, if any) into the live set, mirroring the original scan_var lambda.
+void ScanVarForLiveHandles(
+    std::string_view name, Variable* var,
+    const std::unordered_map<std::string_view, std::string_view>&
+        var_class_types,
+    std::unordered_set<uint64_t>& live) {
+  if (!var || !var_class_types.count(name)) return;
+  uint64_t h = var->value.ToUint64();
+  if (h != kNullClassHandle) live.insert(h);
+  if (var->has_pending_nba) {
+    uint64_t ph = var->pending_nba.ToUint64();
+    if (ph != kNullClassHandle) live.insert(ph);
+  }
+}
 
-  auto scan_var = [&](std::string_view name, Variable* var) {
-    if (!var || !var_class_types_.count(name)) return;
-    uint64_t h = var->value.ToUint64();
-    if (h != kNullClassHandle) live.insert(h);
-    if (var->has_pending_nba) {
-      uint64_t ph = var->pending_nba.ToUint64();
-      if (ph != kNullClassHandle) live.insert(ph);
+// Seeds the live set with the class handles directly reachable from the
+// global variable map, every local scope and every static frame.
+void CollectRootLiveHandles(
+    const std::unordered_map<std::string_view, Variable*>& variables,
+    const std::vector<std::unordered_map<std::string_view, Variable*>>&
+        scope_stack,
+    const std::unordered_map<std::string_view,
+                             std::unordered_map<std::string_view, Variable*>>&
+        static_frames,
+    const std::unordered_map<std::string_view, std::string_view>&
+        var_class_types,
+    std::unordered_set<uint64_t>& live) {
+  for (const auto& [name, var] : variables) {
+    ScanVarForLiveHandles(name, var, var_class_types, live);
+  }
+  for (const auto& scope : scope_stack) {
+    for (const auto& [name, var] : scope) {
+      ScanVarForLiveHandles(name, var, var_class_types, live);
     }
-  };
-
-  for (const auto& [name, var] : variables_) scan_var(name, var);
-  for (const auto& scope : scope_stack_) {
-    for (const auto& [name, var] : scope) scan_var(name, var);
   }
-  for (const auto& [func, frame] : static_frames_) {
-    for (const auto& [name, var] : frame) scan_var(name, var);
+  for (const auto& [func, frame] : static_frames) {
+    for (const auto& [name, var] : frame) {
+      ScanVarForLiveHandles(name, var, var_class_types, live);
+    }
   }
+}
 
-  std::unordered_set<ClassObject*> this_live;
-  for (auto* obj : this_stack_) {
-    if (obj) this_live.insert(obj);
-  }
-
+// Expands the live set to its transitive closure by following class handles
+// stored in the properties of objects already known to be live.
+void PropagateLiveHandles(
+    const std::unordered_map<uint64_t, ClassObject*>& class_objects,
+    std::unordered_set<uint64_t>& live) {
   std::vector<uint64_t> worklist(live.begin(), live.end());
   while (!worklist.empty()) {
     uint64_t h = worklist.back();
     worklist.pop_back();
-    auto it = class_objects_.find(h);
-    if (it == class_objects_.end()) continue;
+    auto it = class_objects.find(h);
+    if (it == class_objects.end()) continue;
     for (const auto& [pname, pval] : it->second->properties) {
       uint64_t ph = pval.ToUint64();
-      if (ph != kNullClassHandle && class_objects_.count(ph) &&
+      if (ph != kNullClassHandle && class_objects.count(ph) &&
           !live.count(ph)) {
         live.insert(ph);
         worklist.push_back(ph);
       }
     }
   }
+}
 
-  for (auto* wr : weak_references_) {
+// Clears every weak reference whose referent is no longer in the live set.
+void ClearDeadWeakReferences(
+    const std::unordered_set<WeakReference*>& weak_references,
+    const std::unordered_set<uint64_t>& live) {
+  for (auto* wr : weak_references) {
     if (wr->referent_handle != kNullClassHandle &&
         !live.count(wr->referent_handle)) {
       wr->Clear();
     }
   }
+}
 
-  for (auto it = class_objects_.begin(); it != class_objects_.end();) {
+// Erases every class object that is neither live nor pinned by an active
+// `this` pointer, zeroing its ref count before removal.
+void SweepDeadObjects(
+    const std::unordered_set<uint64_t>& live,
+    const std::unordered_set<ClassObject*>& this_live,
+    std::unordered_map<uint64_t, ClassObject*>& class_objects) {
+  for (auto it = class_objects.begin(); it != class_objects.end();) {
     if (!live.count(it->first) && !this_live.count(it->second)) {
       it->second->ref_count = 0;
-      it = class_objects_.erase(it);
+      it = class_objects.erase(it);
     } else {
       ++it;
     }
   }
+}
+
+}  // namespace
+
+void SimContext::CollectGarbage() {
+  if (class_objects_.empty()) return;
+
+  std::unordered_set<uint64_t> live;
+  CollectRootLiveHandles(variables_, scope_stack_, static_frames_,
+                         var_class_types_, live);
+
+  std::unordered_set<ClassObject*> this_live;
+  for (auto* obj : this_stack_) {
+    if (obj) this_live.insert(obj);
+  }
+
+  PropagateLiveHandles(class_objects_, live);
+  ClearDeadWeakReferences(weak_references_, live);
+  SweepDeadObjects(live, this_live, class_objects_);
 }
 
 void SimContext::RegisterWeakReference(WeakReference* wr) {

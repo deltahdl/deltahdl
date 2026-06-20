@@ -20,6 +20,30 @@
 
 namespace delta {
 
+// Resolves a member-access event-control signal down to a Variable*. Tries a
+// clocking-block member first, then falls back to a flattened hierarchical
+// name lookup. Returns nullptr when neither resolves.
+inline Variable* ResolveMemberAccessSignal(const Expr* signal,
+                                           SimContext& ctx) {
+  Variable* var = nullptr;
+  if (signal->lhs && signal->lhs->kind == ExprKind::kIdentifier) {
+    auto* mgr = ctx.GetClockingManager();
+    std::string_view member;
+    if (signal->rhs && signal->rhs->kind == ExprKind::kIdentifier)
+      member = signal->rhs->text;
+    else if (!signal->text.empty())
+      member = signal->text;
+    if (mgr && !member.empty())
+      var = mgr->ResolveClockingMember(signal->lhs->text, member, ctx);
+  }
+  if (!var) {
+    std::string hier_name;
+    BuildLhsName(signal, hier_name);
+    var = ctx.FindVariable(hier_name);
+  }
+  return var;
+}
+
 // Resolves an event-control signal expression down to a Variable*. Handles
 // plain identifiers, clocking-block member accesses, and hierarchical names.
 // Returns nullptr when the expression is not one of these forms (e.g. a
@@ -29,23 +53,7 @@ inline Variable* ResolveSignalToVariable(const Expr* signal, SimContext& ctx) {
     return ctx.FindVariable(signal->text);
   }
   if (signal->kind == ExprKind::kMemberAccess) {
-    Variable* var = nullptr;
-    if (signal->lhs && signal->lhs->kind == ExprKind::kIdentifier) {
-      auto* mgr = ctx.GetClockingManager();
-      std::string_view member;
-      if (signal->rhs && signal->rhs->kind == ExprKind::kIdentifier)
-        member = signal->rhs->text;
-      else if (!signal->text.empty())
-        member = signal->text;
-      if (mgr && !member.empty())
-        var = mgr->ResolveClockingMember(signal->lhs->text, member, ctx);
-    }
-    if (!var) {
-      std::string hier_name;
-      BuildLhsName(signal, hier_name);
-      var = ctx.FindVariable(hier_name);
-    }
-    return var;
+    return ResolveMemberAccessSignal(signal, ctx);
   }
   return nullptr;
 }
@@ -88,6 +96,36 @@ struct EventAwaiter {
 
   bool await_ready() const noexcept { return false; }
 
+  // Arms a watcher on a named-event variable that resumes the suspended
+  // coroutine (respecting active/suspended process state) once when triggered.
+  static void AttachEventVarWatcher(Variable* var, std::coroutine_handle<> h,
+                                    SimContext& ctx, Process* proc) {
+    auto* ctx_ptr = &ctx;
+    var->AddWatcher([h, proc, ctx_ptr]() mutable {
+      if (proc && !proc->active) return true;
+
+      if (proc && proc->is_suspended) return false;
+      ResumeMaybeReactive(h, proc, *ctx_ptr);
+      return true;
+    });
+  }
+
+  // Arms an edge-sensitive watcher on a value-carrying variable, delegating
+  // the edge/iff evaluation and resume decision to HandleEdgeEvent.
+  static void AttachEdgeVarWatcher(Variable* var, const EventExpr& ev,
+                                   std::coroutine_handle<> h, SimContext& ctx,
+                                   Process* proc) {
+    var->prev_value = var->value;
+    auto* ctx_ptr = &ctx;
+    var->AddWatcher([h, var, edge = ev.edge, iff_cond = ev.iff_condition,
+                     ctx_ptr, proc]() mutable {
+      if (proc && !proc->active) return true;
+
+      if (proc && proc->is_suspended) return false;
+      return HandleEdgeEvent(h, var, edge, iff_cond, *ctx_ptr, proc);
+    });
+  }
+
   void await_suspend(std::coroutine_handle<> h) {
     auto* proc = ctx.CurrentProcess();
     for (const auto& ev : events) {
@@ -100,25 +138,10 @@ struct EventAwaiter {
       Variable* var = ResolveSignalToVariable(ev.signal, ctx);
       if (!var) continue;
       if (var->is_event) {
-        auto* ctx_ptr = &ctx;
-        var->AddWatcher([h, proc, ctx_ptr]() mutable {
-          if (proc && !proc->active) return true;
-
-          if (proc && proc->is_suspended) return false;
-          ResumeMaybeReactive(h, proc, *ctx_ptr);
-          return true;
-        });
+        AttachEventVarWatcher(var, h, ctx, proc);
         continue;
       }
-      var->prev_value = var->value;
-      auto* ctx_ptr = &ctx;
-      var->AddWatcher([h, var, edge = ev.edge, iff_cond = ev.iff_condition,
-                       ctx_ptr, proc]() mutable {
-        if (proc && !proc->active) return true;
-
-        if (proc && proc->is_suspended) return false;
-        return HandleEdgeEvent(h, var, edge, iff_cond, *ctx_ptr, proc);
-      });
+      AttachEdgeVarWatcher(var, ev, h, ctx, proc);
     }
   }
 
@@ -210,6 +233,37 @@ struct EventAwaiter {
     return pos || neg;
   }
 
+  // Body of a compound-expression operand watcher. Re-evaluates the whole
+  // signal expression, applies the change/edge/iff gates against the shared
+  // previous value, and on a genuine triggering change marks the shared guard
+  // consumed and resumes the process once. Returns the AddWatcher convention
+  // (true removes the watcher, false keeps it armed).
+  static bool EvalCompoundWatcher(std::coroutine_handle<> h,
+                                  const std::shared_ptr<Logic4Vec>& prev,
+                                  const std::shared_ptr<bool>& consumed,
+                                  const Expr* signal, Edge edge,
+                                  const Expr* iff_cond, SimContext& ctx,
+                                  Process* proc) {
+    if (*consumed) return true;
+    if (proc && !proc->active) return true;
+    auto cur = EvalExpr(signal, ctx, ctx.GetArena());
+    if (Logic4VecBitsEqual(cur, *prev)) {
+      return false;
+    }
+    if (edge != Edge::kNone && !CheckEdgeOnValues(*prev, cur, edge)) {
+      *prev = cur;
+      return false;
+    }
+    *prev = cur;
+    if (iff_cond) {
+      auto val = EvalExpr(iff_cond, ctx, ctx.GetArena());
+      if (val.ToUint64() == 0) return false;
+    }
+    *consumed = true;
+    ResumeMaybeReactive(h, proc, ctx);
+    return true;
+  }
+
   void AttachCompoundWatchers(const EventExpr& ev, std::coroutine_handle<> h,
                               Process* proc) {
     std::vector<std::string_view> names;
@@ -227,24 +281,8 @@ struct EventAwaiter {
       if (!op_var) continue;
       op_var->AddWatcher(
           [h, prev, consumed, signal, edge, iff_cond, ctx_ptr, proc]() mutable {
-            if (*consumed) return true;
-            if (proc && !proc->active) return true;
-            auto cur = EvalExpr(signal, *ctx_ptr, ctx_ptr->GetArena());
-            if (Logic4VecBitsEqual(cur, *prev)) {
-              return false;
-            }
-            if (edge != Edge::kNone && !CheckEdgeOnValues(*prev, cur, edge)) {
-              *prev = cur;
-              return false;
-            }
-            *prev = cur;
-            if (iff_cond) {
-              auto val = EvalExpr(iff_cond, *ctx_ptr, ctx_ptr->GetArena());
-              if (val.ToUint64() == 0) return false;
-            }
-            *consumed = true;
-            ResumeMaybeReactive(h, proc, *ctx_ptr);
-            return true;
+            return EvalCompoundWatcher(h, prev, consumed, signal, edge,
+                                       iff_cond, *ctx_ptr, proc);
           });
     }
   }
@@ -294,61 +332,78 @@ struct RepeatEventAwaiter {
 
   bool await_ready() const noexcept { return count == 0; }
 
+  // Arms a persistent watcher on a named-event operand. Each occurrence is
+  // forwarded to tally once the active/suspended gates pass.
+  template <typename TallyFn>
+  static void ArmEventOperand(Variable* var, std::shared_ptr<bool> done,
+                              Process* proc, TallyFn tally) {
+    var->AddWatcher([proc, done, tally]() mutable {
+      if (*done) return true;
+      if (proc && !proc->active) return true;
+      if (proc && proc->is_suspended) return false;
+      return tally();
+    });
+  }
+
+  // Arms a persistent edge-sensitive watcher on a value-carrying operand,
+  // forwarding qualifying edges (after the iff gate) to tally.
+  template <typename TallyFn>
+  static void ArmEdgeOperand(Variable* var, const EventExpr& ev,
+                             std::shared_ptr<bool> done, SimContext& ctx,
+                             Process* proc, TallyFn tally) {
+    var->prev_value = var->value;
+    Edge edge = ev.edge;
+    const Expr* iff_cond = ev.iff_condition;
+    auto* ctx_ptr = &ctx;
+    var->AddWatcher(
+        [var, edge, iff_cond, ctx_ptr, proc, done, tally]() mutable {
+          if (*done) return true;
+          if (proc && !proc->active) return true;
+          if (proc && proc->is_suspended) return false;
+          if (!EventAwaiter::CheckEdge(var, edge)) {
+            var->prev_value = var->value;
+            return false;
+          }
+          if (iff_cond) {
+            auto val = EvalExpr(iff_cond, *ctx_ptr, ctx_ptr->GetArena());
+            if (val.ToUint64() == 0) {
+              var->prev_value = var->value;
+              return false;
+            }
+          }
+          var->prev_value = var->value;
+          return tally();
+        });
+  }
+
   void await_suspend(std::coroutine_handle<> h) {
     auto* proc = ctx.CurrentProcess();
     auto remaining = std::make_shared<uint64_t>(count);
     auto done = std::make_shared<bool>(false);
     auto* ctx_ptr = &ctx;
+
+    // Counts one occurrence and, when the target is reached, resumes the
+    // process once. Returning false keeps the watcher armed for the next
+    // occurrence; returning true removes it.
+    auto tally = [h, proc, ctx_ptr, remaining, done]() {
+      if (*remaining > 0) --(*remaining);
+      if (*remaining == 0) {
+        *done = true;
+        EventAwaiter::ResumeMaybeReactive(h, proc, *ctx_ptr);
+        return true;
+      }
+      return false;
+    };
+
     for (const auto& ev : events) {
       if (!ev.signal) continue;
       Variable* var = ResolveSignalToVariable(ev.signal, ctx);
       if (!var) continue;
-
-      // Counts one occurrence and, when the target is reached, resumes the
-      // process once. Returning false keeps the watcher armed for the next
-      // occurrence; returning true removes it.
-      auto tally = [h, proc, ctx_ptr, remaining, done]() {
-        if (*remaining > 0) --(*remaining);
-        if (*remaining == 0) {
-          *done = true;
-          EventAwaiter::ResumeMaybeReactive(h, proc, *ctx_ptr);
-          return true;
-        }
-        return false;
-      };
-
       if (var->is_event) {
-        var->AddWatcher([proc, done, tally]() mutable {
-          if (*done) return true;
-          if (proc && !proc->active) return true;
-          if (proc && proc->is_suspended) return false;
-          return tally();
-        });
+        ArmEventOperand(var, done, proc, tally);
         continue;
       }
-
-      var->prev_value = var->value;
-      Edge edge = ev.edge;
-      const Expr* iff_cond = ev.iff_condition;
-      var->AddWatcher(
-          [var, edge, iff_cond, ctx_ptr, proc, done, tally]() mutable {
-            if (*done) return true;
-            if (proc && !proc->active) return true;
-            if (proc && proc->is_suspended) return false;
-            if (!EventAwaiter::CheckEdge(var, edge)) {
-              var->prev_value = var->value;
-              return false;
-            }
-            if (iff_cond) {
-              auto val = EvalExpr(iff_cond, *ctx_ptr, ctx_ptr->GetArena());
-              if (val.ToUint64() == 0) {
-                var->prev_value = var->value;
-                return false;
-              }
-            }
-            var->prev_value = var->value;
-            return tally();
-          });
+      ArmEdgeOperand(var, ev, done, ctx, proc, tally);
     }
   }
 
@@ -443,9 +498,10 @@ struct InertialDelayAwaiter {
 
   bool await_ready() const noexcept { return false; }
 
-  void await_suspend(std::coroutine_handle<> h) {
-    auto* proc = ctx.CurrentProcess();
-
+  // Schedules the timeout event that, if it fires first, marks the delay as
+  // expired and resumes the coroutine. The shared `fired` guard ensures the
+  // timeout and the cancel watchers race for a single resume.
+  void ScheduleTimeoutEvent(std::coroutine_handle<> h, Process* proc) {
     auto time = ctx.CurrentTime() + SimTime{delay_ticks};
     auto* event = ctx.GetScheduler().GetEventPool().Acquire();
     auto f = fired;
@@ -459,7 +515,12 @@ struct InertialDelayAwaiter {
       h.resume();
     };
     ctx.GetScheduler().ScheduleEvent(time, Region::kActive, event);
+  }
 
+  // Arms cancel-on-change watchers on every named variable. The first change
+  // before the timeout wins the shared `fired` guard and resumes immediately,
+  // leaving `expired` false so await_resume reports the inertial cancellation.
+  void ArmCancelWatchers(std::coroutine_handle<> h, Process* proc) {
     for (auto name : var_names) {
       auto* var = ctx.FindVariable(name);
       if (!var) continue;
@@ -473,6 +534,12 @@ struct InertialDelayAwaiter {
         return true;
       });
     }
+  }
+
+  void await_suspend(std::coroutine_handle<> h) {
+    auto* proc = ctx.CurrentProcess();
+    ScheduleTimeoutEvent(h, proc);
+    ArmCancelWatchers(h, proc);
   }
 
   bool await_resume() const noexcept { return *expired; }

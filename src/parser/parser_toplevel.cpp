@@ -98,6 +98,20 @@ static bool IsNetLvalue(const Expr* e) {
   }
 }
 
+static void ValidateInoutNetLvalues(const std::vector<Expr*>& terms,
+                                    DiagEngine& diag, SourceLoc loc) {
+  for (size_t i = 0; i < terms.size() && i < 2; ++i)
+    if (!IsNetLvalue(terms[i]))
+      diag.Error(loc, "inout terminal must be a net lvalue");
+}
+
+static void ValidateOutputNetLvalues(const std::vector<Expr*>& terms,
+                                     DiagEngine& diag, SourceLoc loc) {
+  for (size_t i = 0; i + 1 < terms.size(); ++i)
+    if (!IsNetLvalue(terms[i]))
+      diag.Error(loc, "output terminal must be a net lvalue");
+}
+
 static void ValidateGateTerminalLvalues(GateKind kind,
                                         const std::vector<Expr*>& terms,
                                         DiagEngine& diag, SourceLoc loc) {
@@ -106,25 +120,19 @@ static void ValidateGateTerminalLvalues(GateKind kind,
     case GateKind::kTran:
     case GateKind::kRtran:
 
-      for (size_t i = 0; i < terms.size() && i < 2; ++i)
-        if (!IsNetLvalue(terms[i]))
-          diag.Error(loc, "inout terminal must be a net lvalue");
+      ValidateInoutNetLvalues(terms, diag, loc);
       break;
     case GateKind::kTranif0:
     case GateKind::kTranif1:
     case GateKind::kRtranif0:
     case GateKind::kRtranif1:
 
-      for (size_t i = 0; i < terms.size() && i < 2; ++i)
-        if (!IsNetLvalue(terms[i]))
-          diag.Error(loc, "inout terminal must be a net lvalue");
+      ValidateInoutNetLvalues(terms, diag, loc);
       break;
     case GateKind::kBuf:
     case GateKind::kNot:
 
-      for (size_t i = 0; i + 1 < terms.size(); ++i)
-        if (!IsNetLvalue(terms[i]))
-          diag.Error(loc, "output terminal must be a net lvalue");
+      ValidateOutputNetLvalues(terms, diag, loc);
       break;
     case GateKind::kPullup:
     case GateKind::kPulldown:
@@ -318,6 +326,21 @@ uint8_t Parser::ParseStrength1() {
   }
 }
 
+static void CheckGateArrayNameUnique(ModuleItem* mi,
+                                     std::vector<std::string_view>& array_names,
+                                     DiagEngine& diag) {
+  if (mi->gate_inst_name.empty() || mi->inst_range_left == nullptr) return;
+  for (const auto& n : array_names) {
+    if (n == mi->gate_inst_name) {
+      diag.Error(mi->loc,
+                 "instance identifier reused for another array of "
+                 "instances in the same declaration");
+      return;
+    }
+  }
+  array_names.push_back(mi->gate_inst_name);
+}
+
 void Parser::ParseInlineGateTerminals(GateKind kind, SourceLoc loc,
                                       std::vector<ModuleItem*>& items) {
   auto* item = arena_.Create<ModuleItem>();
@@ -337,22 +360,7 @@ void Parser::ParseInlineGateTerminals(GateKind kind, SourceLoc loc,
   std::vector<std::string_view> array_names;
   while (Match(TokenKind::kComma)) {
     auto* next = ParseOneGateInstance(kind, loc);
-    if (!next->gate_inst_name.empty() && next->inst_range_left != nullptr) {
-      bool dup = false;
-      for (auto n : array_names) {
-        if (n == next->gate_inst_name) {
-          dup = true;
-          break;
-        }
-      }
-      if (dup) {
-        diag_.Error(next->loc,
-                    "instance identifier reused for another array of "
-                    "instances in the same declaration");
-      } else {
-        array_names.push_back(next->gate_inst_name);
-      }
-    }
+    CheckGateArrayNameUnique(next, array_names, diag_);
     items.push_back(next);
   }
   Expect(TokenKind::kSemicolon);
@@ -427,6 +435,23 @@ void Parser::ParseGateDelay(Expr*& d1, Expr*& d2, Expr*& d3) {
   }
 }
 
+static void ValidateGateStrength(GateKind gate_kind, SourceLoc loc,
+                                 uint8_t str0, uint8_t str1, DiagEngine& diag) {
+  if (!GateAllowsStrength(gate_kind))
+    diag.Error(loc, "drive strength not allowed on this gate type");
+
+  if (gate_kind == GateKind::kPulldown && str0 == 0 && str1 != 0)
+    diag.Error(loc, "pulldown single-strength must be a strength0 keyword");
+  if (gate_kind == GateKind::kPullup && str1 == 0 && str0 != 0)
+    diag.Error(loc, "pullup single-strength must be a strength1 keyword");
+
+  if (GateAllowsStrength(gate_kind) && gate_kind != GateKind::kPullup &&
+      gate_kind != GateKind::kPulldown && (str0 == 0 || str1 == 0))
+    diag.Error(loc,
+               "drive strength on this gate type requires both a "
+               "strength0 and a strength1 keyword");
+}
+
 void Parser::ParseGateInst(std::vector<ModuleItem*>& items) {
   auto loc = CurrentLoc();
   auto gate_kind = TokenToGateKind(CurrentToken().kind);
@@ -452,19 +477,7 @@ void Parser::ParseGateInst(std::vector<ModuleItem*>& items) {
       if (Match(TokenKind::kComma)) str0 = ParseStrength0();
     }
     Expect(TokenKind::kRParen);
-    if (!GateAllowsStrength(gate_kind))
-      diag_.Error(loc, "drive strength not allowed on this gate type");
-
-    if (gate_kind == GateKind::kPulldown && str0 == 0 && str1 != 0)
-      diag_.Error(loc, "pulldown single-strength must be a strength0 keyword");
-    if (gate_kind == GateKind::kPullup && str1 == 0 && str0 != 0)
-      diag_.Error(loc, "pullup single-strength must be a strength1 keyword");
-
-    if (GateAllowsStrength(gate_kind) && gate_kind != GateKind::kPullup &&
-        gate_kind != GateKind::kPulldown && (str0 == 0 || str1 == 0))
-      diag_.Error(loc,
-                  "drive strength on this gate type requires both a "
-                  "strength0 and a strength1 keyword");
+    ValidateGateStrength(gate_kind, loc, str0, str1, diag_);
   }
 
   Expr* delay = nullptr;
@@ -477,37 +490,20 @@ void Parser::ParseGateInst(std::vector<ModuleItem*>& items) {
     diag_.Error(loc, "this gate type allows at most 2 delay values");
 
   std::vector<std::string_view> array_names;
-  auto check_continuous_range = [&](ModuleItem* mi) {
-    if (mi->gate_inst_name.empty() || mi->inst_range_left == nullptr) return;
-    for (const auto& n : array_names) {
-      if (n == mi->gate_inst_name) {
-        diag_.Error(mi->loc,
-                    "instance identifier reused for another array of "
-                    "instances in the same declaration");
-        return;
-      }
-    }
-    array_names.push_back(mi->gate_inst_name);
+  auto parse_instance = [&]() -> ModuleItem* {
+    auto* mi = ParseOneGateInstance(gate_kind, loc);
+    mi->drive_strength0 = str0;
+    mi->drive_strength1 = str1;
+    mi->gate_delay = delay;
+    mi->gate_delay_fall = delay_fall;
+    mi->gate_delay_decay = delay_decay;
+    CheckGateArrayNameUnique(mi, array_names, diag_);
+    return mi;
   };
 
-  auto* first = ParseOneGateInstance(gate_kind, loc);
-  first->drive_strength0 = str0;
-  first->drive_strength1 = str1;
-  first->gate_delay = delay;
-  first->gate_delay_fall = delay_fall;
-  first->gate_delay_decay = delay_decay;
-  check_continuous_range(first);
-  items.push_back(first);
-
+  items.push_back(parse_instance());
   while (Match(TokenKind::kComma)) {
-    auto* next = ParseOneGateInstance(gate_kind, loc);
-    next->drive_strength0 = str0;
-    next->drive_strength1 = str1;
-    next->gate_delay = delay;
-    next->gate_delay_fall = delay_fall;
-    next->gate_delay_decay = delay_decay;
-    check_continuous_range(next);
-    items.push_back(next);
+    items.push_back(parse_instance());
   }
   Expect(TokenKind::kSemicolon);
 }

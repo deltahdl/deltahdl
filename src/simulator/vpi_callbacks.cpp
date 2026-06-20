@@ -23,33 +23,29 @@
 
 namespace delta {
 
-VpiHandle VpiContext::RegisterCb(VpiCbData* data) {
-  if (!data) return nullptr;
+namespace {
 
+// §36.10.2 / §37.43 / §38.36.1 / §38.36.1.1: the placement rules that do not
+// depend on simulator timing state. Each returns the rejection message for the
+// first rule the registration violates, or an empty string when none apply.
+std::string VpiCheckCallbackPlacement(const VpiCbData& data,
+                                      VpiToolPhase tool_phase) {
   // §36.10.2: while VPI functionality is restricted - the startup phase, and
   // the sizetf phase after it that permits no additional access - a callback
   // may be registered only for the six early-phase reasons. Reject any other
   // reason rather than register a callback the phase does not allow.
-  if (VpiPhaseRestrictsFunctionality(tool_phase_) &&
-      !VpiStartupCallbackReasonAllowed(data->reason)) {
-    last_error_.state = kVpiError;
-    last_error_.level = kVpiError;
-    last_error_.message =
-        "vpi_register_cb() may register only an early-phase callback reason "
-        "while VPI functionality is restricted";
-    return nullptr;
+  if (VpiPhaseRestrictsFunctionality(tool_phase) &&
+      !VpiStartupCallbackReasonAllowed(data.reason)) {
+    return "vpi_register_cb() may register only an early-phase callback reason "
+           "while VPI functionality is restricted";
   }
 
   // §37.43 detail 2: it is illegal to place a value change callback on an
   // automatic variable - automatic storage exists only while its frame is
   // active, so there is no persistent object to watch. Reject the registration.
-  if (data->reason == cbValueChange && data->obj && data->obj->automatic) {
-    last_error_.state = kVpiError;
-    last_error_.level = kVpiError;
-    last_error_.message =
-        "vpi_register_cb(): a value change callback may not be placed on an "
-        "automatic variable";
-    return nullptr;
+  if (data.reason == cbValueChange && data.obj && data.obj->automatic) {
+    return "vpi_register_cb(): a value change callback may not be placed on an "
+           "automatic variable";
   }
 
   // §38.36.1: it is illegal to place a cbForce, cbRelease, or cbDisable
@@ -57,82 +53,98 @@ VpiHandle VpiContext::RegisterCb(VpiCbData* data) {
   // of a variable is not a legal target for a force/release/disable callback,
   // so reject the registration instead of handing back a callback that could
   // never fire correctly.
-  if ((data->reason == cbForce || data->reason == cbRelease ||
-       data->reason == cbDisable) &&
-      data->obj && data->obj->type == vpiBitSelect) {
-    last_error_.state = kVpiError;
-    last_error_.level = kVpiError;
-    last_error_.message =
-        "vpi_register_cb(): a cbForce, cbRelease, or cbDisable callback may "
-        "not "
-        "be placed on a variable bit-select";
-    return nullptr;
+  if ((data.reason == cbForce || data.reason == cbRelease ||
+       data.reason == cbDisable) &&
+      data.obj && data.obj->type == vpiBitSelect) {
+    return "vpi_register_cb(): a cbForce, cbRelease, or cbDisable callback may "
+           "not "
+           "be placed on a variable bit-select";
   }
 
   // §38.36.1.1: placing a cbStmt callback on a statement that resides in a
   // protected portion of the code is not allowed. Such a statement is sealed
   // behind encryption, so a per-statement callback cannot be placed on it;
   // reject the registration with a null handle and a recorded error message.
-  if (data->reason == cbStmt && data->obj && data->obj->is_protected) {
+  if (data.reason == cbStmt && data.obj && data.obj->is_protected) {
+    return "vpi_register_cb(): a cbStmt callback may not be placed on a "
+           "statement "
+           "in a protected portion of the code";
+  }
+
+  return std::string();
+}
+
+// §38.36.2: a simulation-time callback carries its timing in the s_cb_data
+// time structure, and the standard constrains how that structure - and a delay
+// of zero - may be used. These checks apply only to the time-related reasons;
+// every other reason ignores the time field. Returns the rejection message for
+// the first rule violated, or an empty string when the timing is acceptable.
+std::string VpiCheckCallbackTiming(const VpiCbData& data,
+                                   bool sim_progressed_into_time_slice,
+                                   int current_callback_reason,
+                                   bool at_read_only_synch_time) {
+  if (!VpiIsSimulationTimeCallbackReason(data.reason)) return std::string();
+
+  // §38.36.2: the time->type field shall be vpiSimTime or vpiScaledRealTime.
+  // A vpiSuppressTime type, or a null time pointer, leaves no time for the
+  // callback to fire at, so registration is an error and no callback is made.
+  if (data.time == nullptr || data.time->type == vpiSuppressTime) {
+    return "vpi_register_cb(): a simulation-time callback requires a time "
+           "structure with type vpiSimTime or vpiScaledRealTime";
+  }
+
+  // §38.36.2: the requested time, or the delay before the callback, lives in
+  // time->{low,high,real}; a delay of zero is all three being zero.
+  bool delay_is_zero =
+      data.time->low == 0 && data.time->high == 0 && data.time->real == 0.0;
+
+  // §38.36.2: a zero-delay cbAtStartOfSimTime callback may not be placed once
+  // simulation has progressed into a time slice - unless the application is
+  // itself running inside a cbAtStartOfSimTime callback, where it is allowed
+  // and produces another cbAtStartOfSimTime callback in the same time slice.
+  if (data.reason == cbAtStartOfSimTime && delay_is_zero &&
+      sim_progressed_into_time_slice &&
+      current_callback_reason != cbAtStartOfSimTime) {
+    return "vpi_register_cb(): a zero-delay cbAtStartOfSimTime callback may "
+           "not "
+           "be placed after simulation has entered a time slice, except from "
+           "within a cbAtStartOfSimTime callback";
+  }
+
+  // §38.36.2: a zero-delay cbReadWriteSynch callback may not be placed at
+  // read-only synch time, where scheduling an event for the current time is
+  // not permitted.
+  if (data.reason == cbReadWriteSynch && delay_is_zero &&
+      at_read_only_synch_time) {
+    return "vpi_register_cb(): a zero-delay cbReadWriteSynch callback may not "
+           "be "
+           "placed at read-only synch time";
+  }
+
+  return std::string();
+}
+
+}  // namespace
+
+VpiHandle VpiContext::RegisterCb(VpiCbData* data) {
+  if (!data) return nullptr;
+
+  std::string placement_error = VpiCheckCallbackPlacement(*data, tool_phase_);
+  if (!placement_error.empty()) {
     last_error_.state = kVpiError;
     last_error_.level = kVpiError;
-    last_error_.message =
-        "vpi_register_cb(): a cbStmt callback may not be placed on a statement "
-        "in a protected portion of the code";
+    last_error_.message = placement_error;
     return nullptr;
   }
 
-  // §38.36.2: a simulation-time callback carries its timing in the s_cb_data
-  // time structure, and the standard constrains how that structure - and a
-  // delay of zero - may be used. These checks apply only to the time-related
-  // reasons; every other reason ignores the time field.
-  if (VpiIsSimulationTimeCallbackReason(data->reason)) {
-    // §38.36.2: the time->type field shall be vpiSimTime or vpiScaledRealTime.
-    // A vpiSuppressTime type, or a null time pointer, leaves no time for the
-    // callback to fire at, so registration is an error and no callback is made.
-    if (data->time == nullptr || data->time->type == vpiSuppressTime) {
-      last_error_.state = kVpiError;
-      last_error_.level = kVpiError;
-      last_error_.message =
-          "vpi_register_cb(): a simulation-time callback requires a time "
-          "structure with type vpiSimTime or vpiScaledRealTime";
-      return nullptr;
-    }
-
-    // §38.36.2: the requested time, or the delay before the callback, lives in
-    // time->{low,high,real}; a delay of zero is all three being zero.
-    bool delay_is_zero = data->time->low == 0 && data->time->high == 0 &&
-                         data->time->real == 0.0;
-
-    // §38.36.2: a zero-delay cbAtStartOfSimTime callback may not be placed once
-    // simulation has progressed into a time slice - unless the application is
-    // itself running inside a cbAtStartOfSimTime callback, where it is allowed
-    // and produces another cbAtStartOfSimTime callback in the same time slice.
-    if (data->reason == cbAtStartOfSimTime && delay_is_zero &&
-        sim_progressed_into_time_slice_ &&
-        current_callback_reason_ != cbAtStartOfSimTime) {
-      last_error_.state = kVpiError;
-      last_error_.level = kVpiError;
-      last_error_.message =
-          "vpi_register_cb(): a zero-delay cbAtStartOfSimTime callback may not "
-          "be placed after simulation has entered a time slice, except from "
-          "within a cbAtStartOfSimTime callback";
-      return nullptr;
-    }
-
-    // §38.36.2: a zero-delay cbReadWriteSynch callback may not be placed at
-    // read-only synch time, where scheduling an event for the current time is
-    // not permitted.
-    if (data->reason == cbReadWriteSynch && delay_is_zero &&
-        at_read_only_synch_time_) {
-      last_error_.state = kVpiError;
-      last_error_.level = kVpiError;
-      last_error_.message =
-          "vpi_register_cb(): a zero-delay cbReadWriteSynch callback may not "
-          "be "
-          "placed at read-only synch time";
-      return nullptr;
-    }
+  std::string timing_error = VpiCheckCallbackTiming(
+      *data, sim_progressed_into_time_slice_, current_callback_reason_,
+      at_read_only_synch_time_);
+  if (!timing_error.empty()) {
+    last_error_.state = kVpiError;
+    last_error_.level = kVpiError;
+    last_error_.message = timing_error;
+    return nullptr;
   }
 
   callbacks_.push_back(*data);
@@ -204,6 +216,32 @@ static void VpiCollectModuleWideStmtTargets(VpiObject* scope,
   }
 }
 
+namespace {
+
+// §38.36.1.1: the s_cb_data delivered for a cbStmt callback has fixed contents
+// regardless of what was supplied at registration - the value field is always
+// NULL and the index field is always 0. In addition, when the callback was
+// registered with a vpiSuppressTime time type, no time is passed to the routine
+// and the time pointer is set to NULL. A non-cbStmt callback is left untouched.
+void VpiNormalizeCbStmtData(VpiCbData& data) {
+  if (data.reason != cbStmt) return;
+  data.value = nullptr;
+  data.index = 0;
+  if (data.time != nullptr && data.time->type == vpiSuppressTime) {
+    data.time = nullptr;
+  }
+}
+
+// §38.36.1.3: report whether this delivery targets a module instance through a
+// cbStmt callback, which must fan out to every statement in the module rather
+// than fire once for the module as a whole.
+bool VpiIsModuleWideCbStmt(const VpiCbData& data) {
+  return data.reason == cbStmt && data.obj != nullptr &&
+         data.obj->type == kVpiModule;
+}
+
+}  // namespace
+
 int VpiContext::DispatchCallbacks(int reason, VpiHandle obj, void* user_data) {
   int fired = 0;
   // §38.36.3: only callbacks still registered for this reason are delivered.
@@ -217,18 +255,9 @@ int VpiContext::DispatchCallbacks(int reason, VpiHandle obj, void* user_data) {
   // (§38.36.1.1) and the current-reason bookkeeping (§38.9), then counts the
   // firing.
   auto deliver = [&](VpiCbData data) {
-    // §38.36.1.1: the s_cb_data delivered for a cbStmt callback has fixed
-    // contents regardless of what was supplied at registration - the value
-    // field is always NULL and the index field is always 0. In addition, when
-    // the callback was registered with a vpiSuppressTime time type, no time is
-    // passed to the routine and the time pointer is set to NULL.
-    if (data.reason == cbStmt) {
-      data.value = nullptr;
-      data.index = 0;
-      if (data.time != nullptr && data.time->type == vpiSuppressTime) {
-        data.time = nullptr;
-      }
-    }
+    // §38.36.1.1: apply the fixed s_cb_data field contents a cbStmt callback
+    // requires before the routine sees them.
+    VpiNormalizeCbStmtData(data);
     // §38.9: record the reason of the routine about to run so that a routine
     // gated on its callback reason (e.g. vpi_get_data, legal only under
     // cbStartOfRestart/cbEndOfRestart) can observe it. Restore the prior value
@@ -260,8 +289,7 @@ int VpiContext::DispatchCallbacks(int reason, VpiHandle obj, void* user_data) {
     // once per such statement - each with obj set to that statement - rather
     // than once for the module as a whole. Statements in protected portions are
     // skipped by the collector and never receive a callback.
-    if (data.reason == cbStmt && data.obj != nullptr &&
-        data.obj->type == kVpiModule) {
+    if (VpiIsModuleWideCbStmt(data)) {
       std::vector<VpiObject*> stmts;
       VpiCollectModuleWideStmtTargets(data.obj, stmts);
       for (VpiObject* stmt : stmts) {

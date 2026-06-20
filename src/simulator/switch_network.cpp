@@ -89,23 +89,34 @@ void FirstPass(std::vector<BidirSwitchInst>& switches) {
   }
 }
 
+bool SwitchEligibleForChainPropagate(const BidirSwitchInst& sw) {
+  if (!TerminalsValid(sw)) return false;
+  if (!BidirSwitchConducts(sw.kind, sw.control)) return false;
+  if (BidirSwitchControlIsUnknown(sw.kind, sw.control)) return false;
+  return true;
+}
+
+bool ChainPropagateOnce(BidirSwitchInst& sw) {
+  if (!SwitchEligibleForChainPropagate(sw)) return false;
+  auto& va = *sw.terminal_a->resolved;
+  auto& vb = *sw.terminal_b->resolved;
+  if (IsZWord(va.value.words[0]) && !IsZWord(vb.value.words[0])) {
+    va.value.words[0] = vb.value.words[0];
+    return true;
+  }
+  if (IsZWord(vb.value.words[0]) && !IsZWord(va.value.words[0])) {
+    vb.value.words[0] = va.value.words[0];
+    return true;
+  }
+  return false;
+}
+
 void ChainPropagate(std::vector<BidirSwitchInst>& switches) {
   bool changed = true;
   while (changed) {
     changed = false;
     for (auto& sw : switches) {
-      if (!TerminalsValid(sw)) continue;
-      if (!BidirSwitchConducts(sw.kind, sw.control)) continue;
-      if (BidirSwitchControlIsUnknown(sw.kind, sw.control)) continue;
-      auto& va = *sw.terminal_a->resolved;
-      auto& vb = *sw.terminal_b->resolved;
-      if (IsZWord(va.value.words[0]) && !IsZWord(vb.value.words[0])) {
-        va.value.words[0] = vb.value.words[0];
-        changed = true;
-      } else if (IsZWord(vb.value.words[0]) && !IsZWord(va.value.words[0])) {
-        vb.value.words[0] = va.value.words[0];
-        changed = true;
-      }
+      if (ChainPropagateOnce(sw)) changed = true;
     }
   }
 }

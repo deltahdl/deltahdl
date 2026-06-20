@@ -241,6 +241,142 @@ static bool ExtractLocatorParts(const Expr* expr, MethodCallParts& out) {
   return ExtractMethodCallParts(expr, out);
 }
 
+// Holds the per-entry state shared by the associative-array locator helpers:
+// the source keys/values, the iterator-binding context, and the index-type
+// width. It also caches the small lambdas (key vector builder, with-expr
+// evaluator, match predicate, and sort key) so each dispatch arm reads the same
+// way as the indexed-array path.
+struct AssocLocatorState {
+  const std::vector<int64_t>& keys;
+  const std::vector<Logic4Vec>& vals;
+  const LocatorCtx& lc;
+  uint32_t iw;
+  SimContext& ctx;
+  Arena& arena;
+
+  Logic4Vec KeyVec(size_t i) const {
+    return MakeLogic4VecVal(arena, iw, static_cast<uint64_t>(keys[i]));
+  }
+  // Evaluates the with expression for entry i, binding the element iterator to
+  // the value and the index iterator to the key.
+  Logic4Vec EvalWith(size_t i) const {
+    ctx.PushScope();
+    auto* item_var = ctx.CreateLocalVariable(lc.iter_name, vals[i].width);
+    item_var->value = vals[i];
+    auto* idx_var = ctx.CreateLocalVariable(lc.idx_var_name, iw);
+    idx_var->value = KeyVec(i);
+    Logic4Vec r = EvalExpr(lc.with_expr, ctx, arena);
+    ctx.PopScope();
+    return r;
+  }
+  bool Matches(size_t i) const { return EvalWith(i).ToUint64() != 0; }
+  uint64_t SortKey(size_t i) const {
+    return lc.with_expr ? EvalWith(i).ToUint64() : vals[i].ToUint64();
+  }
+};
+
+static void AssocLocatorFind(std::string_view method,
+                             const AssocLocatorState& st,
+                             std::vector<Logic4Vec>& out) {
+  const auto& vals = st.vals;
+  if (method == "find") {
+    for (size_t i = 0; i < vals.size(); ++i)
+      if (st.Matches(i)) out.push_back(vals[i]);
+  } else if (method == "find_first") {
+    for (size_t i = 0; i < vals.size(); ++i)
+      if (st.Matches(i)) {
+        out.push_back(vals[i]);
+        break;
+      }
+  } else {  // find_last
+    for (size_t i = vals.size(); i > 0; --i)
+      if (st.Matches(i - 1)) {
+        out.push_back(vals[i - 1]);
+        break;
+      }
+  }
+}
+
+static void AssocLocatorFindIndex(std::string_view method,
+                                  const AssocLocatorState& st,
+                                  std::vector<Logic4Vec>& out) {
+  const auto& vals = st.vals;
+  if (method == "find_index") {
+    for (size_t i = 0; i < vals.size(); ++i)
+      if (st.Matches(i)) out.push_back(st.KeyVec(i));
+  } else if (method == "find_first_index") {
+    for (size_t i = 0; i < vals.size(); ++i)
+      if (st.Matches(i)) {
+        out.push_back(st.KeyVec(i));
+        break;
+      }
+  } else {  // find_last_index
+    for (size_t i = vals.size(); i > 0; --i)
+      if (st.Matches(i - 1)) {
+        out.push_back(st.KeyVec(i - 1));
+        break;
+      }
+  }
+}
+
+static void AssocLocatorMinMax(std::string_view method,
+                               const AssocLocatorState& st,
+                               std::vector<Logic4Vec>& out) {
+  const auto& vals = st.vals;
+  if (vals.empty()) return;
+  size_t best = 0;
+  uint64_t best_key = st.SortKey(0);
+  for (size_t i = 1; i < vals.size(); ++i) {
+    uint64_t k = st.SortKey(i);
+    if ((method == "min" && k < best_key) ||
+        (method == "max" && k > best_key)) {
+      best_key = k;
+      best = i;
+    }
+  }
+  out.push_back(vals[best]);
+}
+
+static void AssocLocatorUnique(std::string_view method,
+                               const AssocLocatorState& st,
+                               std::vector<Logic4Vec>& out) {
+  const auto& vals = st.vals;
+  std::vector<uint64_t> seen;
+  for (size_t i = 0; i < vals.size(); ++i) {
+    uint64_t v = st.SortKey(i);
+    bool dup = false;
+    for (uint64_t s : seen)
+      if (s == v) {
+        dup = true;
+        break;
+      }
+    if (dup) continue;
+    seen.push_back(v);
+    out.push_back(method == "unique" ? vals[i] : st.KeyVec(i));
+  }
+}
+
+// Dispatches a single associative-array locator method to its dedicated helper.
+// Returns false for any method name that is not a 7.12.1 locator (mirroring the
+// indexed-array fall-through), true otherwise.
+static bool DispatchAssocLocator(std::string_view method,
+                                 const AssocLocatorState& st,
+                                 std::vector<Logic4Vec>& out) {
+  if (method == "find" || method == "find_first" || method == "find_last") {
+    AssocLocatorFind(method, st, out);
+  } else if (method == "find_index" || method == "find_first_index" ||
+             method == "find_last_index") {
+    AssocLocatorFindIndex(method, st, out);
+  } else if (method == "min" || method == "max") {
+    AssocLocatorMinMax(method, st, out);
+  } else if (method == "unique" || method == "unique_index") {
+    AssocLocatorUnique(method, st, out);
+  } else {
+    return false;
+  }
+  return true;
+}
+
 // §7.12.1 — array locator methods over an associative array. Two rules differ
 // from the indexed-array case: index locators (find_index/.../unique_index)
 // return a queue of the *index type* holding the matching keys rather than a
@@ -276,85 +412,71 @@ static bool TryCollectAssocLocatorResult(const Expr* expr,
   }
 
   LocatorCtx lc = MakeLocatorCtx(vals, /*is_str=*/false, expr, ctx, arena);
-  const uint32_t kIw = aa.index_width;
-  auto key_vec = [&](size_t i) {
-    return MakeLogic4VecVal(arena, kIw, static_cast<uint64_t>(keys[i]));
-  };
-  // Evaluates the with expression for entry i, binding the element iterator to
-  // the value and the index iterator to the key.
-  auto eval_with = [&](size_t i) {
-    ctx.PushScope();
-    auto* item_var = ctx.CreateLocalVariable(lc.iter_name, vals[i].width);
-    item_var->value = vals[i];
-    auto* idx_var = ctx.CreateLocalVariable(lc.idx_var_name, kIw);
-    idx_var->value = key_vec(i);
-    Logic4Vec r = EvalExpr(lc.with_expr, ctx, arena);
-    ctx.PopScope();
-    return r;
-  };
-  auto matches = [&](size_t i) { return eval_with(i).ToUint64() != 0; };
-  auto sort_key = [&](size_t i) {
-    return lc.with_expr ? eval_with(i).ToUint64() : vals[i].ToUint64();
-  };
+  AssocLocatorState st{keys, vals, lc, aa.index_width, ctx, arena};
+  return DispatchAssocLocator(method, st, out);
+}
 
-  if (method == "find") {
-    for (size_t i = 0; i < vals.size(); ++i)
-      if (matches(i)) out.push_back(vals[i]);
-  } else if (method == "find_first") {
-    for (size_t i = 0; i < vals.size(); ++i)
-      if (matches(i)) {
-        out.push_back(vals[i]);
-        break;
-      }
-  } else if (method == "find_last") {
-    for (size_t i = vals.size(); i > 0; --i)
-      if (matches(i - 1)) {
-        out.push_back(vals[i - 1]);
-        break;
-      }
-  } else if (method == "find_index") {
-    for (size_t i = 0; i < vals.size(); ++i)
-      if (matches(i)) out.push_back(key_vec(i));
-  } else if (method == "find_first_index") {
-    for (size_t i = 0; i < vals.size(); ++i)
-      if (matches(i)) {
-        out.push_back(key_vec(i));
-        break;
-      }
-  } else if (method == "find_last_index") {
-    for (size_t i = vals.size(); i > 0; --i)
-      if (matches(i - 1)) {
-        out.push_back(key_vec(i - 1));
-        break;
-      }
-  } else if (method == "min" || method == "max") {
-    if (vals.empty()) return true;
-    size_t best = 0;
-    uint64_t best_key = sort_key(0);
-    for (size_t i = 1; i < vals.size(); ++i) {
-      uint64_t k = sort_key(i);
-      if ((method == "min" && k < best_key) ||
-          (method == "max" && k > best_key)) {
-        best_key = k;
-        best = i;
-      }
+// Handles the indexed-array locators whose with clause is optional (unique,
+// unique_index, min, max): builds the iterator context only when a with clause
+// is present and routes to the matching helper. Sets *handled when the method
+// is one of these and returns the result the caller should propagate.
+static bool TryIndexedOptionalWithLocator(
+    std::string_view method, const Expr* expr,
+    const std::vector<Logic4Vec>& elems, bool is_str, SimContext& ctx,
+    Arena& arena, std::vector<Logic4Vec>& out, bool& handled) {
+  handled = true;
+  if (method == "unique") {
+    if (expr->with_expr) {
+      LocatorCtx lc = MakeLocatorCtx(elems, is_str, expr, ctx, arena);
+      LocatorUniqueWith(lc, out);
+    } else {
+      LocatorUnique(elems, arena, out);
     }
-    out.push_back(vals[best]);
-  } else if (method == "unique" || method == "unique_index") {
-    std::vector<uint64_t> seen;
-    for (size_t i = 0; i < vals.size(); ++i) {
-      uint64_t v = sort_key(i);
-      bool dup = false;
-      for (uint64_t s : seen)
-        if (s == v) {
-          dup = true;
-          break;
-        }
-      if (dup) continue;
-      seen.push_back(v);
-      out.push_back(method == "unique" ? vals[i] : key_vec(i));
+    return true;
+  }
+  if (method == "unique_index") {
+    if (expr->with_expr) {
+      LocatorCtx lc = MakeLocatorCtx(elems, is_str, expr, ctx, arena);
+      LocatorUniqueIndexWith(lc, out);
+    } else {
+      LocatorUniqueIndex(elems, arena, out);
     }
-  } else {
+    return true;
+  }
+  if (method == "min" || method == "max") {
+    LocatorCtx lc = MakeLocatorCtx(elems, is_str, expr, ctx, arena);
+    LocatorMinMax(method, lc, out);
+    return true;
+  }
+  handled = false;
+  return false;
+}
+
+// Emits the mandatory-with-clause diagnostics for the indexed-array locators
+// that have no value without a predicate (map and the find* family). Returns
+// false when an error was raised so the caller can short-circuit; returns true
+// when the with clause is present and evaluation may proceed.
+static bool CheckIndexedWithClauseRequired(std::string_view method,
+                                           const Expr* expr, SimContext& ctx) {
+  // §7.12.5 — map() replaces each element with the value of its with clause,
+  // and that clause is required: there is nothing to evaluate without it, so a
+  // bare map() is illegal rather than a silent no-op.
+  if (method == "map" && !expr->with_expr) {
+    ctx.GetDiag().Error({}, "array method 'map' requires a 'with' clause");
+    return false;
+  }
+
+  if (!expr->with_expr) {
+    // §7.12.1 — the with clause is mandatory for the element- and
+    // index-finding locators; it carries the Boolean predicate they filter on.
+    // A bare find* call is illegal, so flag it instead of silently yielding
+    // nothing.
+    if (method == "find" || method == "find_index" || method == "find_first" ||
+        method == "find_first_index" || method == "find_last" ||
+        method == "find_last_index") {
+      ctx.GetDiag().Error({}, "array locator method '" + std::string(method) +
+                                  "' requires a 'with' clause");
+    }
     return false;
   }
   return true;
@@ -383,54 +505,13 @@ bool TryCollectLocatorResult(const Expr* expr, SimContext& ctx, Arena& arena,
   auto elems = CollectVecElements(parts.var_name, *info, ctx, arena);
   bool is_str = IsStringArray(parts.var_name, *info, ctx);
 
-  if (parts.method_name == "unique") {
-    if (expr->with_expr) {
-      LocatorCtx lc = MakeLocatorCtx(elems, is_str, expr, ctx, arena);
-      LocatorUniqueWith(lc, out);
-    } else {
-      LocatorUnique(elems, arena, out);
-    }
-    return true;
-  }
-  if (parts.method_name == "unique_index") {
-    if (expr->with_expr) {
-      LocatorCtx lc = MakeLocatorCtx(elems, is_str, expr, ctx, arena);
-      LocatorUniqueIndexWith(lc, out);
-    } else {
-      LocatorUniqueIndex(elems, arena, out);
-    }
-    return true;
-  }
-  if (parts.method_name == "min" || parts.method_name == "max") {
-    LocatorCtx lc = MakeLocatorCtx(elems, is_str, expr, ctx, arena);
-    LocatorMinMax(parts.method_name, lc, out);
-    return true;
-  }
+  bool handled = false;
+  bool optional_result = TryIndexedOptionalWithLocator(
+      parts.method_name, expr, elems, is_str, ctx, arena, out, handled);
+  if (handled) return optional_result;
 
-  // §7.12.5 — map() replaces each element with the value of its with clause,
-  // and that clause is required: there is nothing to evaluate without it, so a
-  // bare map() is illegal rather than a silent no-op.
-  if (parts.method_name == "map" && !expr->with_expr) {
-    ctx.GetDiag().Error({}, "array method 'map' requires a 'with' clause");
+  if (!CheckIndexedWithClauseRequired(parts.method_name, expr, ctx))
     return false;
-  }
-
-  if (!expr->with_expr) {
-    // §7.12.1 — the with clause is mandatory for the element- and
-    // index-finding locators; it carries the Boolean predicate they filter on.
-    // A bare find* call is illegal, so flag it instead of silently yielding
-    // nothing.
-    if (parts.method_name == "find" || parts.method_name == "find_index" ||
-        parts.method_name == "find_first" ||
-        parts.method_name == "find_first_index" ||
-        parts.method_name == "find_last" ||
-        parts.method_name == "find_last_index") {
-      ctx.GetDiag().Error({}, "array locator method '" +
-                                  std::string(parts.method_name) +
-                                  "' requires a 'with' clause");
-    }
-    return false;
-  }
 
   LocatorCtx lc = MakeLocatorCtx(elems, is_str, expr, ctx, arena);
   if (parts.method_name == "map") {

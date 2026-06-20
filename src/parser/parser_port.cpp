@@ -28,6 +28,9 @@ static std::string_view StripStringLiteralQuotes(std::string_view text) {
   return text.substr(1, text.size() - 2);
 }
 
+static void ResolvePortDefaults(PortDecl& port, const PortDecl* prev,
+                                bool is_checker);
+
 // CPD-dedup: the dpi_spec_string parse/validation and the optional
 // "= c_identifier" tail are identical between DPI import and export.
 struct ParserPortHelpers {
@@ -62,6 +65,284 @@ struct ParserPortHelpers {
         p.lexer_.RestorePos(saved);
       }
     }
+  }
+
+  // Apply one non-ANSI body port declaration (a single name + dims) to the
+  // matching already-declared port(s), reporting a duplicate-direction error.
+  static void ApplyNonAnsiPortDecl(Parser& p, ModuleDecl& mod, Direction dir,
+                                   const DataType& dtype) {
+    auto loc = p.CurrentLoc();
+    auto name = p.Expect(TokenKind::kIdentifier).text;
+    std::vector<Expr*> dims;
+    p.ParseUnpackedDims(dims);
+    bool found = false;
+    for (auto& port : mod.ports) {
+      if (port.name != name) continue;
+
+      if (!found && port.direction != Direction::kNone) {
+        p.diag_.Error(loc,
+                      std::format("duplicate port declaration for '{}'", name));
+      }
+      found = true;
+      port.direction = dir;
+      port.data_type = dtype;
+      port.unpacked_dims = dims;
+    }
+  }
+
+  // Parse a single non-ANSI list_of_ports bit-/part-select on a bare port name
+  // (`name[idx]` / `name[msb:lsb]`), captured as a select port_expr.
+  static Expr* ParseNonAnsiPortSelect(Parser& p, std::string_view name) {
+    auto* ref = p.arena_.Create<Expr>();
+    ref->kind = ExprKind::kIdentifier;
+    ref->text = name;
+    p.Consume();
+    auto* idx = p.ParseExpr();
+    auto* sel = p.arena_.Create<Expr>();
+    sel->kind = ExprKind::kSelect;
+    sel->base = ref;
+    sel->index = idx;
+    if (p.Match(TokenKind::kColon)) {
+      sel->index_end = p.ParseExpr();
+    }
+    p.Expect(TokenKind::kRBracket);
+    return sel;
+  }
+
+  // Parse a single non-ANSI list_of_ports entry (.name(expr), {concat}, or a
+  // bare name with an optional bit-/part-select).
+  static PortDecl ParseNonAnsiPortEntry(Parser& p) {
+    PortDecl port;
+    port.loc = p.CurrentLoc();
+    if (p.Match(TokenKind::kDot)) {
+      port.is_explicit_named = true;
+      port.name = p.ExpectIdentifier().text;
+      p.Expect(TokenKind::kLParen);
+      if (!p.Check(TokenKind::kRParen)) {
+        port.port_expr = p.ParseExpr();
+      }
+      p.Expect(TokenKind::kRParen);
+    } else if (p.Check(TokenKind::kLBrace)) {
+      port.port_expr = p.ParseExpr();
+    } else {
+      port.name = p.ExpectIdentifier().text;
+      if (p.Check(TokenKind::kLBracket)) {
+        port.port_expr = ParseNonAnsiPortSelect(p, port.name);
+      }
+    }
+    return port;
+  }
+
+  // §23.2.2.3: an ANSI `interface[.modport] name [dims] [= default]` port.
+  // The `interface` keyword has already been peeked but not consumed.
+  static void ParseAnsiInterfacePort(Parser& p, PortDecl& port) {
+    p.Consume();
+    port.is_interface_port = true;
+    if (p.Match(TokenKind::kDot)) {
+      port.data_type.modport_name = p.ExpectIdentifier().text;
+    }
+    port.name = p.ExpectIdentifier().text;
+    p.ParseUnpackedDims(port.unpacked_dims);
+    if (p.Match(TokenKind::kEq)) {
+      port.default_value = p.ParseExpr();
+    }
+  }
+
+  // Disambiguate `iface_name.modport_name port_name` (a named interface port
+  // with an explicit modport) from an ordinary typed port. Returns true and
+  // fully parses the port when the modport form is matched; otherwise restores
+  // the lexer position and returns false so the caller parses a data type.
+  static bool TryParseAnsiModportPort(Parser& p, PortDecl& port) {
+    auto saved = p.lexer_.SavePos();
+    auto id_tok = p.Consume();
+    if (p.Check(TokenKind::kDot)) {
+      p.Consume();
+      if (p.CheckIdentifier()) {
+        auto modport_tok = p.Consume();
+        if (p.CheckIdentifier()) {
+          port.data_type.kind = DataTypeKind::kNamed;
+          port.data_type.type_name = id_tok.text;
+          port.data_type.modport_name = modport_tok.text;
+          port.name = p.ExpectIdentifier().text;
+          p.ParseUnpackedDims(port.unpacked_dims);
+          if (p.Match(TokenKind::kEq)) {
+            port.default_value = p.ParseExpr();
+          }
+          return true;
+        }
+      }
+    }
+    p.lexer_.RestorePos(saved);
+    return false;
+  }
+
+  // Parse the data type of an ANSI port, handling the explicit `var`, packed
+  // struct/union, `interconnect`, and ordinary data-type forms.
+  static void ParseAnsiPortDataType(Parser& p, PortDecl& port) {
+    if (p.Match(TokenKind::kKwVar)) {
+      port.has_explicit_var = true;
+      port.data_type = p.ParseDataType();
+      if (port.data_type.kind == DataTypeKind::kImplicit &&
+          p.Check(TokenKind::kLBracket)) {
+        p.ParsePackedDims(port.data_type);
+      }
+    } else if (p.Check(TokenKind::kKwStruct) || p.Check(TokenKind::kKwUnion)) {
+      port.data_type = p.ParseStructOrUnionType();
+      p.ParsePackedDims(port.data_type);
+    } else if (p.Match(TokenKind::kKwInterconnect)) {
+      port.data_type.kind = DataTypeKind::kWire;
+      port.data_type.is_net = true;
+      port.data_type.is_interconnect = true;
+      if (p.Match(TokenKind::kKwSigned)) {
+        port.data_type.is_signed = true;
+      } else {
+        p.Match(TokenKind::kKwUnsigned);
+      }
+      p.ParsePackedDims(port.data_type);
+    } else {
+      port.data_type = p.ParseDataType();
+    }
+  }
+
+  // Lookahead at the head of a port list: a bare identifier immediately
+  // followed by `)`, `,`, or `[` (and not a known type name) indicates the
+  // non-ANSI list_of_ports style rather than an ANSI declaration.
+  static bool LooksLikeNonAnsiPortList(Parser& p) {
+    if (!p.CheckIdentifier()) return false;
+    if (p.known_types_.count(p.CurrentToken().text) != 0) return false;
+    auto saved = p.lexer_.SavePos();
+    p.Consume();
+    bool is_non_ansi = p.Check(TokenKind::kRParen) ||
+                       p.Check(TokenKind::kComma) ||
+                       p.Check(TokenKind::kLBracket);
+    p.lexer_.RestorePos(saved);
+    return is_non_ansi;
+  }
+
+  // After a comma in an ANSI port list, a bare identifier (with no preceding
+  // type) continues the previous port's type/direction. Returns true and
+  // appends the port when this form is matched; otherwise leaves the lexer
+  // untouched and returns false.
+  static bool TryParseBareContinuationPort(Parser& p, ModuleDecl& mod,
+                                           const PortDecl& prev,
+                                           bool is_checker) {
+    if (!p.CheckIdentifier() ||
+        p.known_types_.count(p.CurrentToken().text) != 0) {
+      return false;
+    }
+    auto saved = p.lexer_.SavePos();
+    p.Consume();
+    bool looks_bare = p.Check(TokenKind::kLBracket) ||
+                      p.Check(TokenKind::kEq) || p.Check(TokenKind::kComma) ||
+                      p.Check(TokenKind::kRParen);
+    p.lexer_.RestorePos(saved);
+    if (!looks_bare) return false;
+
+    PortDecl port;
+    port.loc = p.CurrentLoc();
+    port.name = p.ExpectIdentifier().text;
+    p.ParseUnpackedDims(port.unpacked_dims);
+    if (p.Match(TokenKind::kEq)) port.default_value = p.ParseExpr();
+    if (!prev.is_explicit_named) {
+      port.direction = prev.direction;
+      port.data_type = prev.data_type;
+    } else {
+      ResolvePortDefaults(port, &prev, is_checker);
+    }
+    mod.ports.push_back(port);
+    return true;
+  }
+
+  // A type_parameter_declaration in a parameter_port_list. The `type` keyword
+  // has already been consumed by the caller.
+  static void ParseTypeParamPortDecl(
+      Parser& p, std::vector<std::pair<std::string_view, Expr*>>& params,
+      std::unordered_set<std::string_view>& type_param_names,
+      std::unordered_set<std::string_view>& localparam_port_names,
+      bool is_localparam_group, std::vector<DataType>* param_types) {
+    // A type_parameter_declaration may carry an optional forward_type keyword
+    // (enum, struct, union, class, or interface class) before the identifier
+    // to restrict the kinds of type the parameter accepts.
+    if (p.Match(TokenKind::kKwInterface)) {
+      p.Expect(TokenKind::kKwClass);
+    } else if (p.Check(TokenKind::kKwEnum) || p.Check(TokenKind::kKwStruct) ||
+               p.Check(TokenKind::kKwUnion) || p.Check(TokenKind::kKwClass)) {
+      p.Consume();
+    }
+    auto name = p.Expect(TokenKind::kIdentifier);
+    bool has_default = false;
+    if (p.Match(TokenKind::kEq)) {
+      has_default = true;
+      if (p.Check(TokenKind::kKwType)) {
+        p.ParseExpr();
+      } else {
+        p.ParseDataType();
+      }
+    }
+
+    if (is_localparam_group && !has_default) {
+      p.diag_.Error(name.loc,
+                    std::format("localparam type '{}' in parameter port list "
+                                "must have a default type",
+                                name.text));
+    }
+    params.push_back({name.text, nullptr});
+    if (param_types) param_types->push_back(DataType{});
+    type_param_names.insert(name.text);
+    if (is_localparam_group) localparam_port_names.insert(name.text);
+    p.known_types_.insert(name.text);
+  }
+
+  // A value parameter declaration in a parameter_port_list.
+  static void ParseValueParamPortDecl(
+      Parser& p, std::vector<std::pair<std::string_view, Expr*>>& params,
+      std::unordered_set<std::string_view>& localparam_port_names,
+      bool is_localparam_group, std::vector<DataType>* param_types) {
+    DataType dtype = p.ParseDataType();
+    auto name = p.Expect(TokenKind::kIdentifier);
+    Expr* default_val = nullptr;
+    if (p.Match(TokenKind::kEq)) {
+      default_val = p.ParseExpr();
+    }
+
+    if (is_localparam_group && default_val == nullptr) {
+      p.diag_.Error(name.loc,
+                    std::format("localparam '{}' in parameter port list must "
+                                "have a default value",
+                                name.text));
+    }
+    params.push_back({name.text, default_val});
+    if (param_types) param_types->push_back(dtype);
+    if (is_localparam_group) localparam_port_names.insert(name.text);
+  }
+
+  // Parse a leading timeunit/timeprecision declaration and, if the first one
+  // was not already paired, its complementary declaration when it follows.
+  static void ParseLeadingTimeunitPair(Parser& p, ModuleDecl& mod) {
+    bool first_is_unit = p.Check(TokenKind::kKwTimeunit);
+    p.ParseTimeunitDecl(&mod);
+    if (first_is_unit && !mod.has_timeprecision &&
+        p.Check(TokenKind::kKwTimeprecision)) {
+      p.ParseTimeunitDecl(&mod);
+    } else if (!first_is_unit && !mod.has_timeunit &&
+               p.Check(TokenKind::kKwTimeunit)) {
+      p.ParseTimeunitDecl(&mod);
+    }
+  }
+
+  // §A.1.3: peek past leading attribute_instances; if a port direction follows
+  // this is a non-ANSI body port declaration, which is parsed and reported via
+  // the true return. Otherwise the lexer position is restored and false is
+  // returned so the caller treats it as a generic module item.
+  static bool TryParseAttributedNonAnsiPortDecls(Parser& p, ModuleDecl& mod) {
+    auto saved = p.lexer_.SavePos();
+    p.ParseAttributes();
+    if (IsPortDirection(p.CurrentToken().kind)) {
+      p.ParseNonAnsiPortDecls(mod);
+      return true;
+    }
+    p.lexer_.RestorePos(saved);
+    return false;
   }
 };
 
@@ -134,6 +415,62 @@ static bool IsPermittedDpiResultType(const DataType& type) {
       return type.packed_dim_left == nullptr && type.extra_packed_dims.empty();
     default:
       return false;
+  }
+}
+
+// §35.5.5: validate the (already-parsed) result type of a DPI imported
+// function. The type must be stated explicitly and restricted to small values.
+static void ValidateDpiResultType(DiagEngine& diag, const ModuleItem* item) {
+  if (item->return_type.kind == DataTypeKind::kImplicit) {
+    // §35.5.5: an imported function declaration shall explicitly specify a data
+    // type or void for its result. Unlike a native function declaration, an
+    // omitted (implicit) return type is not allowed.
+    diag.Error(item->loc,
+               "an imported function must explicitly specify a data type or "
+               "void for its result");
+  } else if (!IsPermittedDpiResultType(item->return_type)) {
+    // §35.5.5: function results are restricted to small values; the type is
+    // outside the permitted set.
+    diag.Error(item->loc,
+               "result type is not permitted for a DPI imported function; "
+               "function results are restricted to small values");
+  }
+}
+
+// §35.5.4: the ref qualifier is forbidden on the formal arguments of a DPI
+// import declaration.
+static void ValidateDpiImportNoRefArgs(DiagEngine& diag,
+                                       const ModuleItem* item) {
+  for (const auto& arg : item->func_args) {
+    if (arg.direction == Direction::kRef) {
+      diag.Error(item->loc,
+                 "ref qualifier cannot be used in a DPI import declaration");
+      break;
+    }
+  }
+}
+
+// §35.5.6: the listed types are the only permitted types for formal arguments
+// of imported subroutines; a union argument must additionally be packed.
+static void ValidateDpiImportFormalTypes(DiagEngine& diag,
+                                         const ModuleItem* item) {
+  for (const auto& arg : item->func_args) {
+    if (!IsPermittedDpiFormalType(arg.data_type.kind)) {
+      diag.Error(item->loc,
+                 std::format("type of formal argument '{}' is not permitted "
+                             "for a DPI imported subroutine",
+                             arg.name));
+    } else if (arg.data_type.kind == DataTypeKind::kUnion &&
+               !arg.data_type.is_packed) {
+      // §35.5.6: among the type-constructing forms in the permitted set, a
+      // union is allowed in its packed form only. An unpacked union is
+      // therefore not a permitted formal-argument type.
+      diag.Error(item->loc,
+                 std::format("unpacked union formal argument '{}' is not "
+                             "permitted for a DPI imported subroutine; only "
+                             "the packed form of a union is allowed",
+                             arg.name));
+    }
   }
 }
 
@@ -268,55 +605,15 @@ ModuleItem* Parser::ParseDpiImport() {
 
   if (!item->dpi_is_task) {
     item->return_type = ParseDataType();
-    // §35.5.5: an imported function declaration shall explicitly specify a data
-    // type or void for its result. Unlike a native function declaration, an
-    // omitted (implicit) return type is not allowed.
-    if (item->return_type.kind == DataTypeKind::kImplicit) {
-      diag_.Error(item->loc,
-                  "an imported function must explicitly specify a data type or "
-                  "void for its result");
-    } else if (!IsPermittedDpiResultType(item->return_type)) {
-      // §35.5.5: function results are restricted to small values; the type is
-      // outside the permitted set.
-      diag_.Error(item->loc,
-                  "result type is not permitted for a DPI imported function; "
-                  "function results are restricted to small values");
-    }
+    ValidateDpiResultType(diag_, item);
   }
   item->name = Expect(TokenKind::kIdentifier).text;
 
   if (Check(TokenKind::kLParen)) {
     item->func_args = ParseFunctionArgs(false);
   }
-  // §35.5.4: ref qualifier is forbidden in import declarations.
-  for (const auto& arg : item->func_args) {
-    if (arg.direction == Direction::kRef) {
-      diag_.Error(item->loc,
-                  "ref qualifier cannot be used in a DPI import declaration");
-      break;
-    }
-  }
-  // §35.5.6: the listed types are the only permitted types for formal
-  // arguments of imported subroutines. Reject any formal argument whose type
-  // falls outside that closed set.
-  for (const auto& arg : item->func_args) {
-    if (!IsPermittedDpiFormalType(arg.data_type.kind)) {
-      diag_.Error(item->loc,
-                  std::format("type of formal argument '{}' is not permitted "
-                              "for a DPI imported subroutine",
-                              arg.name));
-    } else if (arg.data_type.kind == DataTypeKind::kUnion &&
-               !arg.data_type.is_packed) {
-      // §35.5.6: among the type-constructing forms in the permitted set, a
-      // union is allowed in its packed form only. An unpacked union is
-      // therefore not a permitted formal-argument type.
-      diag_.Error(item->loc,
-                  std::format("unpacked union formal argument '{}' is not "
-                              "permitted for a DPI imported subroutine; only "
-                              "the packed form of a union is allowed",
-                              arg.name));
-    }
-  }
+  ValidateDpiImportNoRefArgs(diag_, item);
+  ValidateDpiImportFormalTypes(diag_, item);
   Expect(TokenKind::kSemicolon);
   return item;
 }
@@ -351,55 +648,13 @@ void Parser::ParseParamPortDecl(
   }
 
   if (Match(TokenKind::kKwType)) {
-    // A type_parameter_declaration may carry an optional forward_type keyword
-    // (enum, struct, union, class, or interface class) before the identifier
-    // to restrict the kinds of type the parameter accepts.
-    if (Match(TokenKind::kKwInterface)) {
-      Expect(TokenKind::kKwClass);
-    } else if (Check(TokenKind::kKwEnum) || Check(TokenKind::kKwStruct) ||
-               Check(TokenKind::kKwUnion) || Check(TokenKind::kKwClass)) {
-      Consume();
-    }
-    auto name = Expect(TokenKind::kIdentifier);
-    bool has_default = false;
-    if (Match(TokenKind::kEq)) {
-      has_default = true;
-      if (Check(TokenKind::kKwType)) {
-        ParseExpr();
-      } else {
-        ParseDataType();
-      }
-    }
-
-    if (is_localparam_group && !has_default) {
-      diag_.Error(name.loc,
-                  std::format("localparam type '{}' in parameter port list "
-                              "must have a default type",
-                              name.text));
-    }
-    params.push_back({name.text, nullptr});
-    if (param_types) param_types->push_back(DataType{});
-    type_param_names.insert(name.text);
-    if (is_localparam_group) localparam_port_names.insert(name.text);
-    known_types_.insert(name.text);
+    ParserPortHelpers::ParseTypeParamPortDecl(*this, params, type_param_names,
+                                              localparam_port_names,
+                                              is_localparam_group, param_types);
     return;
   }
-  DataType dtype = ParseDataType();
-  auto name = Expect(TokenKind::kIdentifier);
-  Expr* default_val = nullptr;
-  if (Match(TokenKind::kEq)) {
-    default_val = ParseExpr();
-  }
-
-  if (is_localparam_group && default_val == nullptr) {
-    diag_.Error(name.loc,
-                std::format("localparam '{}' in parameter port list must "
-                            "have a default value",
-                            name.text));
-  }
-  params.push_back({name.text, default_val});
-  if (param_types) param_types->push_back(dtype);
-  if (is_localparam_group) localparam_port_names.insert(name.text);
+  ParserPortHelpers::ParseValueParamPortDecl(
+      *this, params, localparam_port_names, is_localparam_group, param_types);
 }
 
 void Parser::ParseParamsPortsAndSemicolon(ModuleDecl& decl) {
@@ -443,6 +698,25 @@ void Parser::ParseParamsPortsAndSemicolon(ModuleDecl& decl) {
   Expect(TokenKind::kSemicolon);
 }
 
+// A port with an inferred (non-var, non-net) type becomes an implicit net when
+// its direction allows it: inputs/inouts always, outputs only when the type was
+// left implicit.
+static void InferImplicitNetForPort(PortDecl& port) {
+  if (port.has_explicit_var || port.data_type.is_net) return;
+  switch (port.direction) {
+    case Direction::kInput:
+    case Direction::kInout:
+      port.data_type.is_net = true;
+      break;
+    case Direction::kOutput:
+      if (port.data_type.kind == DataTypeKind::kImplicit)
+        port.data_type.is_net = true;
+      break;
+    default:
+      break;
+  }
+}
+
 static void ResolvePortDefaults(PortDecl& port, const PortDecl* prev,
                                 bool is_checker) {
   if (port.is_interface_port) return;
@@ -464,20 +738,7 @@ static void ResolvePortDefaults(PortDecl& port, const PortDecl* prev,
                          ? prev->direction
                          : (is_checker ? Direction::kInput : Direction::kInout);
 
-  if (!port.has_explicit_var && !port.data_type.is_net) {
-    switch (port.direction) {
-      case Direction::kInput:
-      case Direction::kInout:
-        port.data_type.is_net = true;
-        break;
-      case Direction::kOutput:
-        if (port.data_type.kind == DataTypeKind::kImplicit)
-          port.data_type.is_net = true;
-        break;
-      default:
-        break;
-    }
-  }
+  InferImplicitNetForPort(port);
 
   if (port.data_type.kind == DataTypeKind::kImplicit)
     port.data_type.kind = DataTypeKind::kLogic;
@@ -502,48 +763,20 @@ void Parser::ParsePortList(ModuleDecl& mod) {
     return;
   }
 
-  if (CheckIdentifier()) {
-    if (known_types_.count(CurrentToken().text) != 0) {
-    } else {
-      auto saved = lexer_.SavePos();
-      Consume();
-      bool is_non_ansi = Check(TokenKind::kRParen) ||
-                         Check(TokenKind::kComma) ||
-                         Check(TokenKind::kLBracket);
-      lexer_.RestorePos(saved);
-      if (is_non_ansi) {
-        ParseNonAnsiPortList(mod);
-        return;
-      }
-    }
+  if (ParserPortHelpers::LooksLikeNonAnsiPortList(*this)) {
+    ParseNonAnsiPortList(mod);
+    return;
   }
+
   const bool kIsChecker = mod.decl_kind == ModuleDeclKind::kChecker;
   mod.ports.push_back(ParsePortDecl());
   ResolvePortDefaults(mod.ports.back(), nullptr, kIsChecker);
   while (Match(TokenKind::kComma)) {
     PortDecl prev = mod.ports.back();
 
-    if (CheckIdentifier() && known_types_.count(CurrentToken().text) == 0) {
-      auto saved = lexer_.SavePos();
-      Consume();
-      bool looks_bare = Check(TokenKind::kLBracket) || Check(TokenKind::kEq) ||
-                        Check(TokenKind::kComma) || Check(TokenKind::kRParen);
-      lexer_.RestorePos(saved);
-      if (looks_bare) {
-        PortDecl port;
-        port.loc = CurrentLoc();
-        port.name = ExpectIdentifier().text;
-        ParseUnpackedDims(port.unpacked_dims);
-        if (Match(TokenKind::kEq)) port.default_value = ParseExpr();
-        if (!prev.is_explicit_named) {
-          port.direction = prev.direction;
-          port.data_type = prev.data_type;
-        } else {
-          ResolvePortDefaults(port, &prev, kIsChecker);
-        }
-        mod.ports.push_back(port);
-        continue;
-      }
+    if (ParserPortHelpers::TryParseBareContinuationPort(*this, mod, prev,
+                                                        kIsChecker)) {
+      continue;
     }
     mod.ports.push_back(ParsePortDecl());
     ResolvePortDefaults(mod.ports.back(), &prev, kIsChecker);
@@ -561,38 +794,7 @@ void Parser::ParseNonAnsiPortList(ModuleDecl& mod) {
       mod.ports.push_back(port);
       continue;
     }
-    PortDecl port;
-    port.loc = CurrentLoc();
-    if (Match(TokenKind::kDot)) {
-      port.is_explicit_named = true;
-      port.name = ExpectIdentifier().text;
-      Expect(TokenKind::kLParen);
-      if (!Check(TokenKind::kRParen)) {
-        port.port_expr = ParseExpr();
-      }
-      Expect(TokenKind::kRParen);
-    } else if (Check(TokenKind::kLBrace)) {
-      port.port_expr = ParseExpr();
-    } else {
-      port.name = ExpectIdentifier().text;
-      if (Check(TokenKind::kLBracket)) {
-        auto* ref = arena_.Create<Expr>();
-        ref->kind = ExprKind::kIdentifier;
-        ref->text = port.name;
-        Consume();
-        auto* idx = ParseExpr();
-        auto* sel = arena_.Create<Expr>();
-        sel->kind = ExprKind::kSelect;
-        sel->base = ref;
-        sel->index = idx;
-        if (Match(TokenKind::kColon)) {
-          sel->index_end = ParseExpr();
-        }
-        Expect(TokenKind::kRBracket);
-        port.port_expr = sel;
-      }
-    }
-    mod.ports.push_back(port);
+    mod.ports.push_back(ParserPortHelpers::ParseNonAnsiPortEntry(*this));
   } while (Match(TokenKind::kComma));
   Expect(TokenKind::kRParen);
 }
@@ -626,66 +828,18 @@ PortDecl Parser::ParsePortDecl() {
   }
 
   if (Check(TokenKind::kKwInterface)) {
-    Consume();
-    port.is_interface_port = true;
-    if (Match(TokenKind::kDot)) {
-      port.data_type.modport_name = ExpectIdentifier().text;
-    }
-    port.name = ExpectIdentifier().text;
-    ParseUnpackedDims(port.unpacked_dims);
-    if (Match(TokenKind::kEq)) {
-      port.default_value = ParseExpr();
-    }
+    ParserPortHelpers::ParseAnsiInterfacePort(*this, port);
     return port;
   }
 
   if (dir == Direction::kNone && CheckIdentifier() &&
       known_types_.count(CurrentToken().text) == 0) {
-    auto saved = lexer_.SavePos();
-    auto id_tok = Consume();
-    if (Check(TokenKind::kDot)) {
-      Consume();
-      if (CheckIdentifier()) {
-        auto modport_tok = Consume();
-        if (CheckIdentifier()) {
-          port.data_type.kind = DataTypeKind::kNamed;
-          port.data_type.type_name = id_tok.text;
-          port.data_type.modport_name = modport_tok.text;
-          port.name = ExpectIdentifier().text;
-          ParseUnpackedDims(port.unpacked_dims);
-          if (Match(TokenKind::kEq)) {
-            port.default_value = ParseExpr();
-          }
-          return port;
-        }
-      }
+    if (ParserPortHelpers::TryParseAnsiModportPort(*this, port)) {
+      return port;
     }
-    lexer_.RestorePos(saved);
   }
 
-  if (Match(TokenKind::kKwVar)) {
-    port.has_explicit_var = true;
-    port.data_type = ParseDataType();
-    if (port.data_type.kind == DataTypeKind::kImplicit &&
-        Check(TokenKind::kLBracket)) {
-      ParsePackedDims(port.data_type);
-    }
-  } else if (Check(TokenKind::kKwStruct) || Check(TokenKind::kKwUnion)) {
-    port.data_type = ParseStructOrUnionType();
-    ParsePackedDims(port.data_type);
-  } else if (Match(TokenKind::kKwInterconnect)) {
-    port.data_type.kind = DataTypeKind::kWire;
-    port.data_type.is_net = true;
-    port.data_type.is_interconnect = true;
-    if (Match(TokenKind::kKwSigned)) {
-      port.data_type.is_signed = true;
-    } else {
-      Match(TokenKind::kKwUnsigned);
-    }
-    ParsePackedDims(port.data_type);
-  } else {
-    port.data_type = ParseDataType();
-  }
+  ParserPortHelpers::ParseAnsiPortDataType(*this, port);
 
   if (port.data_type.kind == DataTypeKind::kNamed && Check(TokenKind::kDot)) {
     Consume();
@@ -728,15 +882,7 @@ void Parser::ParseModuleBody(ModuleDecl& mod) {
   bool non_ansi = HasNonAnsiPorts(mod);
 
   if (Check(TokenKind::kKwTimeunit) || Check(TokenKind::kKwTimeprecision)) {
-    bool first_is_unit = Check(TokenKind::kKwTimeunit);
-    ParseTimeunitDecl(&mod);
-    if (first_is_unit && !mod.has_timeprecision &&
-        Check(TokenKind::kKwTimeprecision)) {
-      ParseTimeunitDecl(&mod);
-    } else if (!first_is_unit && !mod.has_timeunit &&
-               Check(TokenKind::kKwTimeunit)) {
-      ParseTimeunitDecl(&mod);
-    }
+    ParserPortHelpers::ParseLeadingTimeunitPair(*this, mod);
   }
   while (!Check(TokenKind::kKwEndmodule) && !AtEnd()) {
     if (Match(TokenKind::kSemicolon)) continue;
@@ -747,14 +893,9 @@ void Parser::ParseModuleBody(ModuleDecl& mod) {
     // §A.1.3: a non-ANSI body port_declaration may carry leading
     // attribute_instances. Peek past them; if a port direction follows, this is
     // a port declaration rather than a generic module item.
-    if (non_ansi && Check(TokenKind::kAttrStart)) {
-      auto saved = lexer_.SavePos();
-      ParseAttributes();
-      if (IsPortDirection(CurrentToken().kind)) {
-        ParseNonAnsiPortDecls(mod);
-        continue;
-      }
-      lexer_.RestorePos(saved);
+    if (non_ansi && Check(TokenKind::kAttrStart) &&
+        ParserPortHelpers::TryParseAttributedNonAnsiPortDecls(*this, mod)) {
+      continue;
     }
     ParseModuleItem(mod.items);
   }
@@ -797,23 +938,7 @@ void Parser::ParseNonAnsiPortDecls(ModuleDecl& mod) {
   }
 
   do {
-    auto loc = CurrentLoc();
-    auto name = Expect(TokenKind::kIdentifier).text;
-    std::vector<Expr*> dims;
-    ParseUnpackedDims(dims);
-    bool found = false;
-    for (auto& port : mod.ports) {
-      if (port.name != name) continue;
-
-      if (!found && port.direction != Direction::kNone) {
-        diag_.Error(loc,
-                    std::format("duplicate port declaration for '{}'", name));
-      }
-      found = true;
-      port.direction = dir;
-      port.data_type = dtype;
-      port.unpacked_dims = dims;
-    }
+    ParserPortHelpers::ApplyNonAnsiPortDecl(*this, mod, dir, dtype);
   } while (Match(TokenKind::kComma));
   Expect(TokenKind::kSemicolon);
 }

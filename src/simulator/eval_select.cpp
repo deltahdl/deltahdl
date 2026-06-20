@@ -101,6 +101,19 @@ static bool BuildCompoundName(const Expr* expr, SimContext& ctx, Arena& arena,
   return true;
 }
 
+// Fills `out` with the default element value (x for four-state, 0 otherwise)
+// for the array a compound select reads from, when the addressed element does
+// not exist. Returns false when the root is not a recognized array.
+static bool TryCompoundDefaultElem(const Expr* expr, SimContext& ctx,
+                                   Arena& arena, Logic4Vec& out) {
+  if (auto* info = FindRootArrayInfo(expr, ctx)) {
+    out = info->is_4state ? MakeAllX(arena, info->elem_width)
+                          : MakeLogic4VecVal(arena, info->elem_width, 0);
+    return true;
+  }
+  return false;
+}
+
 static bool TryCompoundArraySelect(const Expr* expr, SimContext& ctx,
                                    Arena& arena, Logic4Vec& out) {
   if (!expr->base || expr->base->kind != ExprKind::kSelect) return false;
@@ -109,23 +122,10 @@ static bool TryCompoundArraySelect(const Expr* expr, SimContext& ctx,
   bool xz = false;
   if (!BuildCompoundName(expr, ctx, arena, compound, &xz)) {
     if (!xz) return false;
-
-    if (auto* info = FindRootArrayInfo(expr, ctx)) {
-      out = info->is_4state ? MakeAllX(arena, info->elem_width)
-                            : MakeLogic4VecVal(arena, info->elem_width, 0);
-      return true;
-    }
-    return false;
+    return TryCompoundDefaultElem(expr, ctx, arena, out);
   }
   auto* elem = ctx.FindVariable(compound);
-  if (!elem) {
-    if (auto* info = FindRootArrayInfo(expr, ctx)) {
-      out = info->is_4state ? MakeAllX(arena, info->elem_width)
-                            : MakeLogic4VecVal(arena, info->elem_width, 0);
-      return true;
-    }
-    return false;
-  }
+  if (!elem) return TryCompoundDefaultElem(expr, ctx, arena, out);
   out = elem->value;
   return true;
 }
@@ -258,44 +258,56 @@ static Logic4Vec EvalPackedPartSelect(const Expr* expr, const Logic4Vec& base,
   return EvalPartSelect(base, idx, end_val, arena);
 }
 
+// Computes the result of a select whose index evaluates to x/z. A single-bit
+// select over a known array yields that array's default element; a part-select
+// yields all-x of the part width; a bit-select otherwise yields x or 0
+// depending on whether the selected object is four-state.
+static Logic4Vec EvalUnknownIndexSelect(const Expr* expr, SimContext& ctx,
+                                        Arena& arena) {
+  if (!expr->index_end) {
+    if (auto* info = FindRootArrayInfo(expr, ctx)) {
+      return info->is_4state ? MakeAllX(arena, info->elem_width)
+                             : MakeLogic4VecVal(arena, info->elem_width, 0);
+    }
+  }
+
+  if (expr->index_end) {
+    auto w =
+        static_cast<uint32_t>(EvalExpr(expr->index_end, ctx, arena).ToUint64());
+    return MakeAllX(arena, w > 0 ? w : 1);
+  }
+  return SelectBaseIs4State(expr, ctx) ? MakeAllX(arena, 1)
+                                       : MakeLogic4VecVal(arena, 1, 0);
+}
+
+// Reads byte `idx` from a string value (indexed from the low end), returning an
+// 8-bit result; out-of-range indices read as 0.
+static Logic4Vec EvalStringByteSelect(const Logic4Vec& base_val, uint64_t idx,
+                                      Arena& arena) {
+  uint32_t nbytes = base_val.width / 8;
+  if (idx >= nbytes) return MakeLogic4VecVal(arena, 8, 0);
+  uint32_t byte_idx = nbytes - 1 - static_cast<uint32_t>(idx);
+  uint32_t word = (byte_idx * 8) / 64;
+  uint32_t bit = (byte_idx * 8) % 64;
+  uint64_t ch =
+      (word < base_val.nwords) ? (base_val.words[word].aval >> bit) & 0xFF : 0;
+  return MakeLogic4VecVal(arena, 8, ch);
+}
+
 Logic4Vec EvalSelect(const Expr* expr, SimContext& ctx, Arena& arena) {
   Logic4Vec result;
   if (TryQueueSelect(expr, ctx, arena, result)) return result;
   if (TryAssocSelect(expr, ctx, arena, result)) return result;
   auto idx_val = EvalExpr(expr->index, ctx, arena);
-  if (HasUnknownBits(idx_val)) {
-    if (!expr->index_end) {
-      if (auto* info = FindRootArrayInfo(expr, ctx)) {
-        return info->is_4state ? MakeAllX(arena, info->elem_width)
-                               : MakeLogic4VecVal(arena, info->elem_width, 0);
-      }
-    }
-
-    if (expr->index_end) {
-      auto w = static_cast<uint32_t>(
-          EvalExpr(expr->index_end, ctx, arena).ToUint64());
-      return MakeAllX(arena, w > 0 ? w : 1);
-    }
-    return SelectBaseIs4State(expr, ctx) ? MakeAllX(arena, 1)
-                                         : MakeLogic4VecVal(arena, 1, 0);
-  }
+  if (HasUnknownBits(idx_val)) return EvalUnknownIndexSelect(expr, ctx, arena);
   uint64_t idx = idx_val.ToUint64();
   if (TryArrayElementSelect(expr, idx, ctx, arena, result)) return result;
   if (TryCompoundArraySelect(expr, ctx, arena, result)) return result;
   if (TryArraySliceSelect(expr, ctx, arena, result)) return result;
   auto base_val = EvalExpr(expr->base, ctx, arena);
 
-  if (base_val.is_string && !expr->index_end) {
-    uint32_t nbytes = base_val.width / 8;
-    if (idx >= nbytes) return MakeLogic4VecVal(arena, 8, 0);
-    uint32_t byte_idx = nbytes - 1 - static_cast<uint32_t>(idx);
-    uint32_t word = (byte_idx * 8) / 64;
-    uint32_t bit = (byte_idx * 8) % 64;
-    uint64_t ch = (word < base_val.nwords)
-                      ? (base_val.words[word].aval >> bit) & 0xFF
-                      : 0;
-    return MakeLogic4VecVal(arena, 8, ch);
-  }
+  if (base_val.is_string && !expr->index_end)
+    return EvalStringByteSelect(base_val, idx, arena);
   if (expr->index_end)
     return EvalPackedPartSelect(expr, base_val, idx, ctx, arena);
   if (idx >= base_val.width)

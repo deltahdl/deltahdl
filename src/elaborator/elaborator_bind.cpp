@@ -41,34 +41,65 @@ static std::unordered_set<std::string_view> CollectDeclaredNames(
   return names;
 }
 
+static std::vector<BindDirective*> CollectBindDirectives(
+    const CompilationUnit* unit) {
+  std::vector<BindDirective*> binds;
+  for (auto* bd : unit->bind_directives) binds.push_back(bd);
+  for (auto* m : unit->modules)
+    for (auto* bd : m->bind_directives) binds.push_back(bd);
+  for (auto* i : unit->interfaces)
+    for (auto* bd : i->bind_directives) binds.push_back(bd);
+  for (auto* p : unit->programs)
+    for (auto* bd : p->bind_directives) binds.push_back(bd);
+  return binds;
+}
+
+// §23.11: the bind_target_scope shall be a module or an interface, and a
+// bind_target_instance shall be an instance of a module or an interface. A
+// target naming a known scope is honored designwide even when that scope is
+// never instantiated, but a target that resolves to neither a known scope
+// nor any instance in the hierarchy denotes nothing bindable and is an error.
+static void ReportUnmatchedBindTargets(
+    const std::vector<BindDirective*>& binds,
+    const std::unordered_set<BindDirective*>& applied,
+    const CompilationUnit* unit, DiagEngine& diag) {
+  for (auto* bd : binds) {
+    if (applied.count(bd)) continue;
+    if (IsBindTargetScope(bd->target, unit)) continue;
+    diag.Error(bd->loc,
+               std::format("bind target '{}' is neither a module or interface "
+                           "scope nor an instance",
+                           bd->target));
+  }
+}
+
 void Elaborator::ApplyBindDirectives(RtlirModule* top) {
   if (!top) return;
-  std::vector<BindDirective*> binds;
-  for (auto* bd : unit_->bind_directives) binds.push_back(bd);
-  for (auto* m : unit_->modules)
-    for (auto* bd : m->bind_directives) binds.push_back(bd);
-  for (auto* i : unit_->interfaces)
-    for (auto* bd : i->bind_directives) binds.push_back(bd);
-  for (auto* p : unit_->programs)
-    for (auto* bd : p->bind_directives) binds.push_back(bd);
+  std::vector<BindDirective*> binds = CollectBindDirectives(unit_);
   if (binds.empty()) return;
   std::unordered_set<RtlirModule*> visited;
   std::unordered_set<BindDirective*> applied;
   WalkForBind(top, std::string(top->name), binds, false, visited, applied);
 
-  // §23.11: the bind_target_scope shall be a module or an interface, and a
-  // bind_target_instance shall be an instance of a module or an interface. A
-  // target naming a known scope is honored designwide even when that scope is
-  // never instantiated, but a target that resolves to neither a known scope
-  // nor any instance in the hierarchy denotes nothing bindable and is an error.
-  for (auto* bd : binds) {
-    if (applied.count(bd)) continue;
-    if (IsBindTargetScope(bd->target, unit_)) continue;
-    diag_.Error(bd->loc,
-                std::format("bind target '{}' is neither a module or interface "
-                            "scope nor an instance",
-                            bd->target));
+  ReportUnmatchedBindTargets(binds, applied, unit_, diag_);
+}
+
+static bool BindAppliesToModule(const BindDirective* bd, const RtlirModule* mod,
+                                const std::string& hier_path,
+                                const CompilationUnit* unit) {
+  bool has_instances = !bd->target_instances.empty();
+  bool is_scope = IsBindTargetScope(bd->target, unit);
+  if (is_scope && !has_instances) {
+    return mod->name == bd->target;
   }
+  if (is_scope && has_instances) {
+    if (mod->name != bd->target) return false;
+    for (auto inst_path : bd->target_instances) {
+      if (hier_path == inst_path) return true;
+    }
+    return false;
+  }
+  return hier_path == bd->target;
 }
 
 void Elaborator::WalkForBind(RtlirModule* mod, const std::string& hier_path,
@@ -80,24 +111,7 @@ void Elaborator::WalkForBind(RtlirModule* mod, const std::string& hier_path,
   if (!visited.insert(mod).second) return;
 
   for (auto* bd : binds) {
-    bool applies = false;
-    bool has_instances = !bd->target_instances.empty();
-    bool is_scope = IsBindTargetScope(bd->target, unit_);
-    if (is_scope && !has_instances) {
-      if (mod->name == bd->target) applies = true;
-    } else if (is_scope && has_instances) {
-      if (mod->name == bd->target) {
-        for (auto inst_path : bd->target_instances) {
-          if (hier_path == inst_path) {
-            applies = true;
-            break;
-          }
-        }
-      }
-    } else {
-      if (hier_path == bd->target) applies = true;
-    }
-    if (!applies) continue;
+    if (!BindAppliesToModule(bd, mod, hier_path, unit_)) continue;
     // The target resolved to a real scope or instance, so it is bindable even
     // if elaboration of the instantiation later reports a different error.
     applied.insert(bd);
@@ -119,6 +133,70 @@ void Elaborator::WalkForBind(RtlirModule* mod, const std::string& hier_path,
     child_path.append(c.inst_name.data(), c.inst_name.size());
     WalkForBind(c.resolved, child_path, binds, child_under_bind, visited,
                 applied);
+  }
+}
+
+static bool TargetHasSignal(const RtlirModule* target, std::string_view name) {
+  for (const auto& v : target->variables)
+    if (v.name == name) return true;
+  for (const auto& n : target->nets)
+    if (n.name == name) return true;
+  for (const auto& p : target->ports)
+    if (p.name == name) return true;
+  return false;
+}
+
+// Every identifier port connection in the bind instantiation must name a signal
+// declared in the target scope. Returns false (after reporting) on the first
+// connection that refers to an undeclared signal.
+static bool ValidateBindPortConnections(const BindDirective* bd,
+                                        const ModuleItem* item,
+                                        const RtlirModule* target,
+                                        DiagEngine& diag) {
+  for (const auto& [pname, conn_expr] : item->inst_ports) {
+    if (!conn_expr || conn_expr->kind != ExprKind::kIdentifier) continue;
+    auto name = conn_expr->text;
+    if (!TargetHasSignal(target, name)) {
+      diag.Error(bd->loc,
+                 std::format("bind port connection '{}' references "
+                             "undeclared signal '{}' in target scope '{}'",
+                             pname, name, target->name));
+      return false;
+    }
+  }
+  return true;
+}
+
+static void BuildBoundPortBindings(const ModuleItem* item,
+                                   const RtlirModule* resolved,
+                                   RtlirModuleInst& inst) {
+  const auto& child_ports = resolved->ports;
+  const bool kIsOrdered =
+      !item->inst_ports.empty() && item->inst_ports[0].first.empty();
+  for (size_t i = 0; i < item->inst_ports.size(); ++i) {
+    const auto& [port_name, conn_expr] = item->inst_ports[i];
+    RtlirPortBinding binding;
+    binding.connection = conn_expr;
+    auto it = child_ports.end();
+    if (kIsOrdered) {
+      if (i < child_ports.size()) {
+        it = child_ports.begin() + static_cast<ptrdiff_t>(i);
+        binding.port_name = it->name;
+      }
+    } else {
+      binding.port_name = port_name;
+      it =
+          std::find_if(child_ports.begin(), child_ports.end(),
+                       [&](const RtlirPort& p) { return p.name == port_name; });
+    }
+    if (it != child_ports.end()) {
+      binding.direction = it->direction;
+      binding.width = it->width;
+    } else {
+      binding.direction = Direction::kInput;
+      binding.width = 1;
+    }
+    inst.port_bindings.push_back(binding);
   }
 }
 
@@ -154,40 +232,7 @@ void Elaborator::ApplyBindInstance(BindDirective* bd, RtlirModule* target) {
     return;
   }
 
-  for (const auto& [pname, conn_expr] : item->inst_ports) {
-    if (!conn_expr || conn_expr->kind != ExprKind::kIdentifier) continue;
-    auto name = conn_expr->text;
-    bool found = false;
-    for (const auto& v : target->variables) {
-      if (v.name == name) {
-        found = true;
-        break;
-      }
-    }
-    if (!found) {
-      for (const auto& n : target->nets) {
-        if (n.name == name) {
-          found = true;
-          break;
-        }
-      }
-    }
-    if (!found) {
-      for (const auto& p : target->ports) {
-        if (p.name == name) {
-          found = true;
-          break;
-        }
-      }
-    }
-    if (!found) {
-      diag_.Error(bd->loc,
-                  std::format("bind port connection '{}' references "
-                              "undeclared signal '{}' in target scope '{}'",
-                              pname, name, target->name));
-      return;
-    }
-  }
+  if (!ValidateBindPortConnections(bd, item, target, diag_)) return;
 
   ParamList empty_params;
   auto* resolved = ElaborateModule(child_decl, empty_params);
@@ -198,34 +243,7 @@ void Elaborator::ApplyBindInstance(BindDirective* bd, RtlirModule* target) {
   inst.is_bound = true;
 
   if (resolved) {
-    const auto& child_ports = resolved->ports;
-    const bool kIsOrdered =
-        !item->inst_ports.empty() && item->inst_ports[0].first.empty();
-    for (size_t i = 0; i < item->inst_ports.size(); ++i) {
-      auto& [port_name, conn_expr] = item->inst_ports[i];
-      RtlirPortBinding binding;
-      binding.connection = conn_expr;
-      auto it = child_ports.end();
-      if (kIsOrdered) {
-        if (i < child_ports.size()) {
-          it = child_ports.begin() + static_cast<ptrdiff_t>(i);
-          binding.port_name = it->name;
-        }
-      } else {
-        binding.port_name = port_name;
-        it = std::find_if(
-            child_ports.begin(), child_ports.end(),
-            [&](const RtlirPort& p) { return p.name == port_name; });
-      }
-      if (it != child_ports.end()) {
-        binding.direction = it->direction;
-        binding.width = it->width;
-      } else {
-        binding.direction = Direction::kInput;
-        binding.width = 1;
-      }
-      inst.port_bindings.push_back(binding);
-    }
+    BuildBoundPortBindings(item, resolved, inst);
   }
 
   target->children.push_back(inst);
@@ -309,6 +327,153 @@ bool ExportPrototypeMatchesBody(const ModuleItem* proto,
            !TypesMatch(proto->data_type, body->return_type));
 }
 
+using FindModuleFn = std::function<ModuleDecl*(std::string_view)>;
+
+std::unordered_map<std::string_view, std::string_view>
+CollectInterfaceInstances(const RtlirModule* mod,
+                          const FindModuleFn& find_module) {
+  std::unordered_map<std::string_view, std::string_view> iface_inst_to_type;
+  for (const auto& c : mod->children) {
+    if (auto* cd = find_module(c.module_name);
+        cd && cd->decl_kind == ModuleDeclKind::kInterface) {
+      iface_inst_to_type[c.inst_name] = c.module_name;
+    }
+  }
+  return iface_inst_to_type;
+}
+
+// Decode a port connection expression into the interface instance name and, if
+// the connection names a modport, the modport name. Returns false when the
+// connection is not a plain identifier or interface.modport member access.
+bool DecodeInterfaceConnection(const Expr* conn,
+                               std::string_view& iface_inst_name,
+                               std::string_view& modport_name) {
+  if (conn->kind == ExprKind::kIdentifier) {
+    iface_inst_name = conn->text;
+    return true;
+  }
+  if (conn->kind == ExprKind::kMemberAccess && conn->lhs &&
+      conn->lhs->kind == ExprKind::kIdentifier && conn->rhs &&
+      conn->rhs->kind == ExprKind::kIdentifier) {
+    iface_inst_name = conn->lhs->text;
+    modport_name = conn->rhs->text;
+    return true;
+  }
+  return false;
+}
+
+void CollectModportExportSites(
+    const std::vector<ModportPort>& mp_ports, const ModuleDecl* child_decl,
+    const RtlirModuleInst& child, const RtlirPortBinding& binding,
+    std::string_view iface_inst_name, std::string_view modport_name,
+    std::unordered_map<ExportKey, std::vector<ExportSite>, ExportKeyHash>&
+        buckets,
+    DiagEngine& diag) {
+  for (const auto& pp : mp_ports) {
+    if (!pp.is_export) continue;
+    if (pp.name.empty()) continue;
+    const auto* body =
+        FindOutOfBlockBodyInChild(child_decl, binding.port_name, pp.name);
+    if (!body) continue;
+    // §25.7: an export written as a full prototype pins the signature
+    // the defining module must provide; a definition that does not
+    // match it exactly is an elaboration error.
+    if (pp.prototype && !ExportPrototypeMatchesBody(pp.prototype, body)) {
+      diag.Error(
+          body->loc,
+          std::format("definition of exported subroutine '{}' in module '{}' "
+                      "does not match the prototype declared in the modport",
+                      pp.name, child.module_name));
+    }
+    ExportKey key{iface_inst_name, modport_name, pp.name};
+    ExportSite site;
+    site.child_inst = child.inst_name;
+    site.is_task = body->kind == ModuleItemKind::kTaskDecl;
+    site.loc = body->loc;
+    buckets[key].push_back(site);
+  }
+}
+
+// Walk one child instance's port bindings, mapping every modport export it
+// satisfies into the per-export-key buckets used to detect conflicts.
+void CollectChildExportSites(
+    const RtlirModuleInst& child, const ModuleDecl* child_decl,
+    const std::unordered_map<std::string_view, std::string_view>&
+        iface_inst_to_type,
+    const FindModuleFn& find_module,
+    std::unordered_map<ExportKey, std::vector<ExportSite>, ExportKeyHash>&
+        buckets,
+    DiagEngine& diag) {
+  for (const auto& binding : child.port_bindings) {
+    if (!binding.connection) continue;
+    const auto* conn = binding.connection;
+
+    std::string_view iface_inst_name;
+    std::string_view modport_name;
+    if (!DecodeInterfaceConnection(conn, iface_inst_name, modport_name))
+      continue;
+
+    auto it = iface_inst_to_type.find(iface_inst_name);
+    if (it == iface_inst_to_type.end()) continue;
+
+    auto* iface_decl = find_module(it->second);
+    if (!iface_decl) continue;
+
+    if (!modport_name.empty()) {
+      const auto* mp = FindModportInInterface(iface_decl, modport_name);
+      if (!mp) continue;
+      CollectModportExportSites(mp->ports, child_decl, child, binding,
+                                iface_inst_name, modport_name, buckets, diag);
+    } else {
+      for (const auto* mp : iface_decl->modports) {
+        CollectModportExportSites(mp->ports, child_decl, child, binding,
+                                  iface_inst_name, modport_name, buckets, diag);
+      }
+    }
+  }
+}
+
+void ReportDuplicateExports(
+    const std::unordered_map<ExportKey, std::vector<ExportSite>, ExportKeyHash>&
+        buckets,
+    const std::unordered_map<std::string_view, std::string_view>&
+        iface_inst_to_type,
+    const FindModuleFn& find_module, DiagEngine& diag) {
+  for (const auto& [key, sites] : buckets) {
+    if (sites.size() < 2) continue;
+
+    auto type_it = iface_inst_to_type.find(key.iface_inst);
+    if (type_it == iface_inst_to_type.end()) continue;
+    auto* iface_decl = find_module(type_it->second);
+    if (!iface_decl) continue;
+
+    const ModuleItem* prototype =
+        FindInterfaceExternPrototype(iface_decl, key.name);
+    bool is_task_export = sites[0].is_task;
+    bool is_forkjoin_task = prototype && prototype->is_extern &&
+                            prototype->is_forkjoin &&
+                            prototype->kind == ModuleItemKind::kTaskDecl;
+
+    if (is_task_export && is_forkjoin_task) continue;
+
+    if (!is_task_export) {
+      diag.Error(sites[0].loc,
+                 std::format("function '{}' exported by more than one module "
+                             "connected to interface instance '{}' (§25.7.4: "
+                             "multiple export of functions is not allowed)",
+                             key.name, key.iface_inst));
+    } else {
+      diag.Error(
+          sites[0].loc,
+          std::format("task '{}' exported by more than one module connected "
+                      "to interface instance '{}' (§25.7.4: declare the task "
+                      "as `extern forkjoin` in the interface to allow "
+                      "multiple exports)",
+                      key.name, key.iface_inst));
+    }
+  }
+}
+
 }  // namespace
 
 void Elaborator::ValidateModportExportConflicts(RtlirModule* top) {
@@ -322,13 +487,11 @@ void Elaborator::WalkForExportConflicts(
   if (!mod) return;
   if (!visited.insert(mod).second) return;
 
-  std::unordered_map<std::string_view, std::string_view> iface_inst_to_type;
-  for (const auto& c : mod->children) {
-    if (auto* cd = FindModule(c.module_name);
-        cd && cd->decl_kind == ModuleDeclKind::kInterface) {
-      iface_inst_to_type[c.inst_name] = c.module_name;
-    }
-  }
+  FindModuleFn find_module = [this](std::string_view name) {
+    return FindModule(name);
+  };
+
+  auto iface_inst_to_type = CollectInterfaceInstances(mod, find_module);
 
   std::unordered_map<ExportKey, std::vector<ExportSite>, ExportKeyHash> buckets;
 
@@ -338,101 +501,11 @@ void Elaborator::WalkForExportConflicts(
     if (!child_decl) continue;
     if (child_decl->decl_kind == ModuleDeclKind::kInterface) continue;
 
-    for (const auto& binding : child.port_bindings) {
-      if (!binding.connection) continue;
-      const auto* conn = binding.connection;
-
-      std::string_view iface_inst_name;
-      std::string_view modport_name;
-      if (conn->kind == ExprKind::kIdentifier) {
-        iface_inst_name = conn->text;
-      } else if (conn->kind == ExprKind::kMemberAccess && conn->lhs &&
-                 conn->lhs->kind == ExprKind::kIdentifier && conn->rhs &&
-                 conn->rhs->kind == ExprKind::kIdentifier) {
-        iface_inst_name = conn->lhs->text;
-        modport_name = conn->rhs->text;
-      } else {
-        continue;
-      }
-
-      auto it = iface_inst_to_type.find(iface_inst_name);
-      if (it == iface_inst_to_type.end()) continue;
-
-      auto* iface_decl = FindModule(it->second);
-      if (!iface_decl) continue;
-
-      auto collect_exports = [&](const std::vector<ModportPort>& mp_ports) {
-        for (const auto& pp : mp_ports) {
-          if (!pp.is_export) continue;
-          if (pp.name.empty()) continue;
-          const auto* body =
-              FindOutOfBlockBodyInChild(child_decl, binding.port_name, pp.name);
-          if (!body) continue;
-          // §25.7: an export written as a full prototype pins the signature
-          // the defining module must provide; a definition that does not
-          // match it exactly is an elaboration error.
-          if (pp.prototype && !ExportPrototypeMatchesBody(pp.prototype, body)) {
-            diag_.Error(
-                body->loc,
-                std::format(
-                    "definition of exported subroutine '{}' in module '{}' "
-                    "does not match the prototype declared in the modport",
-                    pp.name, child.module_name));
-          }
-          ExportKey key{iface_inst_name, modport_name, pp.name};
-          ExportSite site;
-          site.child_inst = child.inst_name;
-          site.is_task = body->kind == ModuleItemKind::kTaskDecl;
-          site.loc = body->loc;
-          buckets[key].push_back(site);
-        }
-      };
-
-      if (!modport_name.empty()) {
-        const auto* mp = FindModportInInterface(iface_decl, modport_name);
-        if (!mp) continue;
-        collect_exports(mp->ports);
-      } else {
-        for (const auto* mp : iface_decl->modports) {
-          collect_exports(mp->ports);
-        }
-      }
-    }
+    CollectChildExportSites(child, child_decl, iface_inst_to_type, find_module,
+                            buckets, diag_);
   }
 
-  for (const auto& [key, sites] : buckets) {
-    if (sites.size() < 2) continue;
-
-    auto type_it = iface_inst_to_type.find(key.iface_inst);
-    if (type_it == iface_inst_to_type.end()) continue;
-    auto* iface_decl = FindModule(type_it->second);
-    if (!iface_decl) continue;
-
-    const ModuleItem* prototype =
-        FindInterfaceExternPrototype(iface_decl, key.name);
-    bool is_task_export = sites[0].is_task;
-    bool is_forkjoin_task = prototype && prototype->is_extern &&
-                            prototype->is_forkjoin &&
-                            prototype->kind == ModuleItemKind::kTaskDecl;
-
-    if (is_task_export && is_forkjoin_task) continue;
-
-    if (!is_task_export) {
-      diag_.Error(sites[0].loc,
-                  std::format("function '{}' exported by more than one module "
-                              "connected to interface instance '{}' (§25.7.4: "
-                              "multiple export of functions is not allowed)",
-                              key.name, key.iface_inst));
-    } else {
-      diag_.Error(
-          sites[0].loc,
-          std::format("task '{}' exported by more than one module connected "
-                      "to interface instance '{}' (§25.7.4: declare the task "
-                      "as `extern forkjoin` in the interface to allow "
-                      "multiple exports)",
-                      key.name, key.iface_inst));
-    }
-  }
+  ReportDuplicateExports(buckets, iface_inst_to_type, find_module, diag_);
 
   for (const auto& child : mod->children) {
     if (!child.resolved) continue;

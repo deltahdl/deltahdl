@@ -14,14 +14,13 @@ namespace delta {
 
 namespace {
 
-// Walks one statement subtree enforcing §12.8 rules for break, continue, and
-// return. `loop_depth` counts loops reachable from this point without
-// crossing a fork-join boundary; `fork_depth` counts enclosing fork-joins.
-// `in_subroutine` is true when the walk originated in a function or task body.
 void CheckJumpRules(const Stmt* s, int loop_depth, int fork_depth,
-                    bool in_subroutine, DiagEngine& diag) {
-  if (!s) return;
+                    bool in_subroutine, DiagEngine& diag);
 
+// Returns true when `s` is itself a jump leaf (break/continue/return) and
+// reports any §12.8 violation for it. Caller stops descending on true.
+bool CheckJumpLeaf(const Stmt* s, int loop_depth, int fork_depth,
+                   bool in_subroutine, DiagEngine& diag) {
   switch (s->kind) {
     case StmtKind::kBreak:
       if (loop_depth == 0) {
@@ -33,7 +32,7 @@ void CheckJumpRules(const Stmt* s, int loop_depth, int fork_depth,
           diag.Error(s->range.start, "break statement is not inside a loop");
         }
       }
-      return;
+      return true;
     case StmtKind::kContinue:
       if (loop_depth == 0) {
         if (fork_depth > 0) {
@@ -44,20 +43,53 @@ void CheckJumpRules(const Stmt* s, int loop_depth, int fork_depth,
           diag.Error(s->range.start, "continue statement is not inside a loop");
         }
       }
-      return;
+      return true;
     case StmtKind::kReturn:
       if (!in_subroutine) {
         diag.Error(s->range.start,
                    "return statement is only allowed inside a subroutine");
       }
-      return;
+      return true;
     default:
-      break;
+      return false;
   }
+}
 
-  if (s->kind == StmtKind::kFor || s->kind == StmtKind::kForeach ||
-      s->kind == StmtKind::kWhile || s->kind == StmtKind::kForever ||
-      s->kind == StmtKind::kRepeat || s->kind == StmtKind::kDoWhile) {
+bool IsLoopStmtKind(StmtKind k) {
+  return k == StmtKind::kFor || k == StmtKind::kForeach ||
+         k == StmtKind::kWhile || k == StmtKind::kForever ||
+         k == StmtKind::kRepeat || k == StmtKind::kDoWhile;
+}
+
+// Recurses into every generic child statement of `s` carrying the current
+// jump-context depths unchanged (used for non-loop, non-fork statements).
+void CheckJumpRulesChildren(const Stmt* s, int loop_depth, int fork_depth,
+                            bool in_subroutine, DiagEngine& diag) {
+  for (auto* sub : s->stmts)
+    CheckJumpRules(sub, loop_depth, fork_depth, in_subroutine, diag);
+  CheckJumpRules(s->then_branch, loop_depth, fork_depth, in_subroutine, diag);
+  CheckJumpRules(s->else_branch, loop_depth, fork_depth, in_subroutine, diag);
+  for (auto& ci : s->case_items)
+    CheckJumpRules(ci.body, loop_depth, fork_depth, in_subroutine, diag);
+  for (auto& ri : s->randcase_items)
+    CheckJumpRules(ri.second, loop_depth, fork_depth, in_subroutine, diag);
+  CheckJumpRules(s->assert_pass_stmt, loop_depth, fork_depth, in_subroutine,
+                 diag);
+  CheckJumpRules(s->assert_fail_stmt, loop_depth, fork_depth, in_subroutine,
+                 diag);
+}
+
+// Walks one statement subtree enforcing §12.8 rules for break, continue, and
+// return. `loop_depth` counts loops reachable from this point without
+// crossing a fork-join boundary; `fork_depth` counts enclosing fork-joins.
+// `in_subroutine` is true when the walk originated in a function or task body.
+void CheckJumpRules(const Stmt* s, int loop_depth, int fork_depth,
+                    bool in_subroutine, DiagEngine& diag) {
+  if (!s) return;
+
+  if (CheckJumpLeaf(s, loop_depth, fork_depth, in_subroutine, diag)) return;
+
+  if (IsLoopStmtKind(s->kind)) {
     int next_loop = loop_depth + 1;
     CheckJumpRules(s->body, next_loop, fork_depth, in_subroutine, diag);
     CheckJumpRules(s->for_body, next_loop, fork_depth, in_subroutine, diag);
@@ -74,18 +106,7 @@ void CheckJumpRules(const Stmt* s, int loop_depth, int fork_depth,
     return;
   }
 
-  for (auto* sub : s->stmts)
-    CheckJumpRules(sub, loop_depth, fork_depth, in_subroutine, diag);
-  CheckJumpRules(s->then_branch, loop_depth, fork_depth, in_subroutine, diag);
-  CheckJumpRules(s->else_branch, loop_depth, fork_depth, in_subroutine, diag);
-  for (auto& ci : s->case_items)
-    CheckJumpRules(ci.body, loop_depth, fork_depth, in_subroutine, diag);
-  for (auto& ri : s->randcase_items)
-    CheckJumpRules(ri.second, loop_depth, fork_depth, in_subroutine, diag);
-  CheckJumpRules(s->assert_pass_stmt, loop_depth, fork_depth, in_subroutine,
-                 diag);
-  CheckJumpRules(s->assert_fail_stmt, loop_depth, fork_depth, in_subroutine,
-                 diag);
+  CheckJumpRulesChildren(s, loop_depth, fork_depth, in_subroutine, diag);
 }
 
 // Map literal expression kinds whose type is obvious from the syntax alone
@@ -261,6 +282,46 @@ static int ForeachDimCount(const ModuleItem* decl) {
   return packed + unpacked;
 }
 
+// §12.7.3 — applies the foreach-loop semantic rules to a single foreach
+// statement `s` (already known to be StmtKind::kForeach).
+static void CheckOneForeachStmt(
+    const Stmt* s,
+    const std::unordered_map<std::string_view, const ModuleItem*>& arrays,
+    DiagEngine& diag) {
+  std::string_view arr_name = ForeachArrayName(s->expr);
+
+  std::unordered_set<std::string_view> named_vars;
+  for (auto v : s->foreach_vars) {
+    if (v.empty()) continue;
+    named_vars.insert(v);
+    // A loop variable shall not reuse the array's identifier.
+    if (!arr_name.empty() && v == arr_name) {
+      diag.Error(s->range.start,
+                 std::format("foreach loop variable '{}' may not have the "
+                             "same name as the array it iterates over",
+                             v));
+    }
+  }
+
+  if (!named_vars.empty()) CheckForeachVarsReadOnly(s->body, named_vars, diag);
+
+  // The loop-variable count may not exceed the array's dimensionality. Only
+  // checked for module-level integral/vector arrays whose dimension count is
+  // fully determined by the declaration (typedef'd or aggregate types may
+  // contribute hidden packed dimensions, so they are left alone).
+  auto it = arrays.find(arr_name);
+  if (it != arrays.end() && IsIntegralVectorKind(it->second->data_type.kind)) {
+    int dims = ForeachDimCount(it->second);
+    if (static_cast<int>(s->foreach_vars.size()) > dims) {
+      diag.Error(
+          s->range.start,
+          std::format("foreach lists {} loop variables but array '{}' has "
+                      "only {} dimension(s)",
+                      s->foreach_vars.size(), arr_name, dims));
+    }
+  }
+}
+
 // §12.7.3 — applies the foreach-loop semantic rules to every foreach statement
 // reachable from `s`.
 static void CheckForeachInStmt(
@@ -268,42 +329,7 @@ static void CheckForeachInStmt(
     const std::unordered_map<std::string_view, const ModuleItem*>& arrays,
     DiagEngine& diag) {
   if (!s) return;
-  if (s->kind == StmtKind::kForeach) {
-    std::string_view arr_name = ForeachArrayName(s->expr);
-
-    std::unordered_set<std::string_view> named_vars;
-    for (auto v : s->foreach_vars) {
-      if (v.empty()) continue;
-      named_vars.insert(v);
-      // A loop variable shall not reuse the array's identifier.
-      if (!arr_name.empty() && v == arr_name) {
-        diag.Error(s->range.start,
-                   std::format("foreach loop variable '{}' may not have the "
-                               "same name as the array it iterates over",
-                               v));
-      }
-    }
-
-    if (!named_vars.empty())
-      CheckForeachVarsReadOnly(s->body, named_vars, diag);
-
-    // The loop-variable count may not exceed the array's dimensionality. Only
-    // checked for module-level integral/vector arrays whose dimension count is
-    // fully determined by the declaration (typedef'd or aggregate types may
-    // contribute hidden packed dimensions, so they are left alone).
-    auto it = arrays.find(arr_name);
-    if (it != arrays.end() &&
-        IsIntegralVectorKind(it->second->data_type.kind)) {
-      int dims = ForeachDimCount(it->second);
-      if (static_cast<int>(s->foreach_vars.size()) > dims) {
-        diag.Error(
-            s->range.start,
-            std::format("foreach lists {} loop variables but array '{}' has "
-                        "only {} dimension(s)",
-                        s->foreach_vars.size(), arr_name, dims));
-      }
-    }
-  }
+  if (s->kind == StmtKind::kForeach) CheckOneForeachStmt(s, arrays, diag);
   for (auto* sub : s->stmts) CheckForeachInStmt(sub, arrays, diag);
   CheckForeachInStmt(s->then_branch, arrays, diag);
   CheckForeachInStmt(s->else_branch, arrays, diag);
@@ -315,6 +341,32 @@ static void CheckForeachInStmt(
   for (auto& ci : s->case_items) CheckForeachInStmt(ci.body, arrays, diag);
 }
 
+// True for the procedural-block module items (initial/final/always*) whose
+// jump and foreach rules are checked against their single `body` statement.
+static bool IsProceduralBlock(const ModuleItem* item) {
+  return item->kind == ModuleItemKind::kInitialBlock ||
+         item->kind == ModuleItemKind::kFinalBlock ||
+         item->kind == ModuleItemKind::kAlwaysBlock ||
+         item->kind == ModuleItemKind::kAlwaysCombBlock ||
+         item->kind == ModuleItemKind::kAlwaysFFBlock ||
+         item->kind == ModuleItemKind::kAlwaysLatchBlock;
+}
+
+// §12.8 — applies the jump rules to a function/task body and, for a
+// value-returning function, also checks each return statement's expression.
+static void CheckSubroutineJumpRules(const ModuleItem* item, DiagEngine& diag) {
+  bool is_value_returning = false;
+  if (item->kind == ModuleItemKind::kFunctionDecl) {
+    is_value_returning = (item->return_type.kind != DataTypeKind::kVoid);
+  }
+  for (auto* s : item->func_body_stmts) {
+    CheckJumpRules(s, 0, 0, /*in_subroutine=*/true, diag);
+    if (is_value_returning) {
+      CheckValueReturningFuncReturn(s, item->name, item->return_type, diag);
+    }
+  }
+}
+
 }  // namespace
 
 void Elaborator::ValidateForeachLoops(const ModuleDecl* decl) {
@@ -324,13 +376,7 @@ void Elaborator::ValidateForeachLoops(const ModuleDecl* decl) {
       arrays.emplace(item->name, item);
   }
   for (const auto* item : decl->items) {
-    bool is_proc = item->kind == ModuleItemKind::kInitialBlock ||
-                   item->kind == ModuleItemKind::kFinalBlock ||
-                   item->kind == ModuleItemKind::kAlwaysBlock ||
-                   item->kind == ModuleItemKind::kAlwaysCombBlock ||
-                   item->kind == ModuleItemKind::kAlwaysFFBlock ||
-                   item->kind == ModuleItemKind::kAlwaysLatchBlock;
-    if (is_proc && item->body) {
+    if (IsProceduralBlock(item) && item->body) {
       CheckForeachInStmt(item->body, arrays, diag_);
     } else if (item->kind == ModuleItemKind::kFunctionDecl ||
                item->kind == ModuleItemKind::kTaskDecl) {
@@ -342,29 +388,13 @@ void Elaborator::ValidateForeachLoops(const ModuleDecl* decl) {
 
 void Elaborator::ValidateJumpStatements(const ModuleDecl* decl) {
   for (const auto* item : decl->items) {
-    bool is_proc = item->kind == ModuleItemKind::kInitialBlock ||
-                   item->kind == ModuleItemKind::kFinalBlock ||
-                   item->kind == ModuleItemKind::kAlwaysBlock ||
-                   item->kind == ModuleItemKind::kAlwaysCombBlock ||
-                   item->kind == ModuleItemKind::kAlwaysFFBlock ||
-                   item->kind == ModuleItemKind::kAlwaysLatchBlock;
-    if (is_proc && item->body) {
+    if (IsProceduralBlock(item) && item->body) {
       CheckJumpRules(item->body, 0, 0, /*in_subroutine=*/false, diag_);
       continue;
     }
     if (item->kind == ModuleItemKind::kFunctionDecl ||
         item->kind == ModuleItemKind::kTaskDecl) {
-      bool is_value_returning = false;
-      if (item->kind == ModuleItemKind::kFunctionDecl) {
-        is_value_returning = (item->return_type.kind != DataTypeKind::kVoid);
-      }
-      for (auto* s : item->func_body_stmts) {
-        CheckJumpRules(s, 0, 0, /*in_subroutine=*/true, diag_);
-        if (is_value_returning) {
-          CheckValueReturningFuncReturn(s, item->name, item->return_type,
-                                        diag_);
-        }
-      }
+      CheckSubroutineJumpRules(item, diag_);
     }
   }
 }
@@ -497,98 +527,109 @@ static void WalkConstFuncExprChildren(const Expr* e, ConstFuncBodyCheck& chk) {
   for (auto* el : e->elements) WalkConstFuncExpr(el, chk);
 }
 
+// §13.4.3 (h) — an identifier referenced inside a constant function must name
+// the function itself, a local, a parameter, or another function.
+static void CheckConstFuncIdentifier(const Expr* e, ConstFuncBodyCheck& chk) {
+  if (e->text == chk.func_name) return;
+  if (chk.local_names.count(e->text)) return;
+  if (chk.param_names.count(e->text)) return;
+  if (chk.function_names.count(e->text)) return;
+  chk.diag.Error(
+      chk.loc,
+      std::format(
+          "constant function '{}' references identifier '{}' that is not "
+          "a parameter, function name, or local declaration",
+          chk.func_name, e->text));
+  chk.failed = true;
+}
+
+// §13.4.3 (e) — `.` paths from a non-local root mean a hierarchical reach
+// outside the function.
+static void CheckConstFuncMemberAccess(const Expr* e, ConstFuncBodyCheck& chk) {
+  const Expr* root = LeftmostIdentifier(e);
+  if (root && root->kind == ExprKind::kIdentifier &&
+      !chk.local_names.count(root->text) &&
+      !chk.param_names.count(root->text)) {
+    chk.diag.Error(
+        chk.loc,
+        std::format("constant function '{}' shall not contain hierarchical "
+                    "references",
+                    chk.func_name));
+    chk.failed = true;
+    return;
+  }
+  WalkConstFuncExprChildren(e, chk);
+}
+
+// §13.4.3 (g) — only the §11.2.1 constant-system-function whitelist is legal
+// inside a constant function body. The single carve-out is the elaboration
+// severity tasks (§20.10.1), which are statements, not expressions, so they
+// are handled when the simulator evaluates the function body.
+static void CheckConstFuncSystemCall(const Expr* e, ConstFuncBodyCheck& chk) {
+  if (!IsConstantSysFunc(e->callee)) {
+    chk.diag.Error(
+        chk.loc,
+        std::format("constant function '{}' calls non-constant system function "
+                    "'{}'",
+                    chk.func_name, e->callee));
+    chk.failed = true;
+    return;
+  }
+  WalkConstFuncExprChildren(e, chk);
+}
+
+// §13.4.3 (f) — built-in methods invoked on a local variable are the explicit
+// exception in the LRM; otherwise the callee must be a known function so that
+// the recursive constant-function check applies.
+static void CheckConstFuncCall(const Expr* e, ConstFuncBodyCheck& chk) {
+  if (IsBuiltinMethodOnLocal(e, chk.local_names)) {
+    for (auto* a : e->args) WalkConstFuncExpr(a, chk);
+    return;
+  }
+  if (!e->callee.empty() && !chk.function_names.count(e->callee) &&
+      e->callee != chk.func_name) {
+    chk.diag.Error(
+        chk.loc,
+        std::format(
+            "constant function '{}' invokes '{}' which is not a constant "
+            "function",
+            chk.func_name, e->callee));
+    chk.failed = true;
+    return;
+  }
+  // The nested callee must itself satisfy the constant-function constraints.
+  // Recurse into its body, guarding against direct or mutual recursion by
+  // tracking visited names.
+  if (!e->callee.empty() && chk.func_decls && chk.visited &&
+      e->callee != chk.func_name && !chk.visited->count(e->callee)) {
+    auto it = chk.func_decls->find(e->callee);
+    if (it != chk.func_decls->end()) {
+      if (!ValidateConstantFunction(it->second, chk.loc, chk.param_names,
+                                    chk.function_names, chk.func_decls,
+                                    chk.visited, chk.diag)) {
+        chk.failed = true;
+        return;
+      }
+    }
+  }
+  WalkConstFuncExprChildren(e, chk);
+}
+
 static void WalkConstFuncExpr(const Expr* e, ConstFuncBodyCheck& chk) {
   if (!e || chk.failed) return;
   switch (e->kind) {
-    case ExprKind::kIdentifier: {
-      // §13.4.3 (h)
-      if (e->text == chk.func_name) return;
-      if (chk.local_names.count(e->text)) return;
-      if (chk.param_names.count(e->text)) return;
-      if (chk.function_names.count(e->text)) return;
-      chk.diag.Error(
-          chk.loc,
-          std::format(
-              "constant function '{}' references identifier '{}' that is not "
-              "a parameter, function name, or local declaration",
-              chk.func_name, e->text));
-      chk.failed = true;
+    case ExprKind::kIdentifier:
+      CheckConstFuncIdentifier(e, chk);
       return;
-    }
-    case ExprKind::kMemberAccess: {
-      // §13.4.3 (e) — `.` paths from a non-local root mean a hierarchical
-      // reach outside the function.
-      const Expr* root = LeftmostIdentifier(e);
-      if (root && root->kind == ExprKind::kIdentifier &&
-          !chk.local_names.count(root->text) &&
-          !chk.param_names.count(root->text)) {
-        chk.diag.Error(
-            chk.loc,
-            std::format("constant function '{}' shall not contain hierarchical "
-                        "references",
-                        chk.func_name));
-        chk.failed = true;
-        return;
-      }
-      WalkConstFuncExprChildren(e, chk);
+    case ExprKind::kMemberAccess:
+      CheckConstFuncMemberAccess(e, chk);
       return;
-    }
-    case ExprKind::kSystemCall: {
-      // §13.4.3 (g) — only the §11.2.1 constant-system-function whitelist is
-      // legal inside a constant function body. The single carve-out is the
-      // elaboration severity tasks (§20.10.1), which are statements, not
-      // expressions, so they are handled when the simulator evaluates the
-      // function body.
-      if (!IsConstantSysFunc(e->callee)) {
-        chk.diag.Error(
-            chk.loc,
-            std::format(
-                "constant function '{}' calls non-constant system function "
-                "'{}'",
-                chk.func_name, e->callee));
-        chk.failed = true;
-        return;
-      }
-      WalkConstFuncExprChildren(e, chk);
+    case ExprKind::kSystemCall:
+      CheckConstFuncSystemCall(e, chk);
       return;
-    }
-    case ExprKind::kCall: {
-      // §13.4.3 (f) — built-in methods invoked on a local variable are the
-      // explicit exception in the LRM; otherwise the callee must be a known
-      // function so that the recursive constant-function check applies.
-      if (IsBuiltinMethodOnLocal(e, chk.local_names)) {
-        for (auto* a : e->args) WalkConstFuncExpr(a, chk);
-        return;
-      }
-      if (!e->callee.empty() && !chk.function_names.count(e->callee) &&
-          e->callee != chk.func_name) {
-        chk.diag.Error(
-            chk.loc,
-            std::format(
-                "constant function '{}' invokes '{}' which is not a constant "
-                "function",
-                chk.func_name, e->callee));
-        chk.failed = true;
-        return;
-      }
-      // §13.4.3 (f) — the nested callee must itself satisfy the
-      // constant-function constraints. Recurse into its body, guarding
-      // against direct or mutual recursion by tracking visited names.
-      if (!e->callee.empty() && chk.func_decls && chk.visited &&
-          e->callee != chk.func_name && !chk.visited->count(e->callee)) {
-        auto it = chk.func_decls->find(e->callee);
-        if (it != chk.func_decls->end()) {
-          if (!ValidateConstantFunction(it->second, chk.loc, chk.param_names,
-                                        chk.function_names, chk.func_decls,
-                                        chk.visited, chk.diag)) {
-            chk.failed = true;
-            return;
-          }
-        }
-      }
-      WalkConstFuncExprChildren(e, chk);
+    case ExprKind::kCall:
+      CheckConstFuncCall(e, chk);
       return;
-    }
     default:
       WalkConstFuncExprChildren(e, chk);
       return;
@@ -629,15 +670,11 @@ static void WalkConstFuncStmt(const Stmt* s, ConstFuncBodyCheck& chk) {
   }
 }
 
-static bool ValidateConstantFunction(
-    const ModuleItem* func, SourceLoc loc,
-    const std::unordered_set<std::string_view>& param_names,
-    const std::unordered_set<std::string_view>& function_names,
-    const std::unordered_map<std::string_view, const ModuleItem*>* func_decls,
-    std::unordered_set<std::string_view>* visited, DiagEngine& diag) {
-  if (visited && !func->name.empty()) {
-    if (!visited->insert(func->name).second) return true;
-  }
+// §13.4.3 — a constant function may not take output/inout/ref arguments, and
+// each default argument value must itself be a constant expression. Returns
+// false (after reporting) on the first violation.
+static bool ValidateConstFuncArgs(const ModuleItem* func, SourceLoc loc,
+                                  DiagEngine& diag) {
   for (const auto& arg : func->func_args) {
     if (arg.direction == Direction::kOutput ||
         arg.direction == Direction::kInout ||
@@ -663,6 +700,14 @@ static bool ValidateConstantFunction(
       return false;
     }
   }
+  return true;
+}
+
+// §13.4.3 (c) — a constant function body may not contain fork, nonblocking
+// assignments, or anything that schedules a post-return event. Returns false
+// (after reporting) on the first violating top-level body statement.
+static bool ValidateConstFuncBodyContent(const ModuleItem* func, SourceLoc loc,
+                                         DiagEngine& diag) {
   for (auto* s : func->func_body_stmts) {
     if (BodyContainsFork(s)) {
       diag.Error(loc,
@@ -685,6 +730,20 @@ static bool ValidateConstantFunction(
       return false;
     }
   }
+  return true;
+}
+
+static bool ValidateConstantFunction(
+    const ModuleItem* func, SourceLoc loc,
+    const std::unordered_set<std::string_view>& param_names,
+    const std::unordered_set<std::string_view>& function_names,
+    const std::unordered_map<std::string_view, const ModuleItem*>* func_decls,
+    std::unordered_set<std::string_view>* visited, DiagEngine& diag) {
+  if (visited && !func->name.empty()) {
+    if (!visited->insert(func->name).second) return true;
+  }
+  if (!ValidateConstFuncArgs(func, loc, diag)) return false;
+  if (!ValidateConstFuncBodyContent(func, loc, diag)) return false;
 
   std::unordered_set<std::string_view> local_names;
   for (const auto& arg : func->func_args)
@@ -707,42 +766,50 @@ struct ConstFuncCallCtx {
   DiagEngine& diag;
 };
 
+// §13.4.3 — the arguments to a constant function call must all be constant
+// expressions per §11.2.1. The only names in scope are the enclosing
+// (constant) context's parameters; the arguments are otherwise self-contained.
+static void CheckConstFuncCallArgs(const Expr* expr, SourceLoc loc,
+                                   const ConstFuncCallCtx& ctx) {
+  ScopeMap arg_scope;
+  for (auto p : ctx.param_names) arg_scope[p] = 0;
+  for (auto* a : expr->args) {
+    if (a && !IsConstantExpr(a, arg_scope)) {
+      ctx.diag.Error(
+          loc,
+          std::format("constant function call '{}' has a non-constant argument",
+                      expr->callee));
+      break;
+    }
+  }
+}
+
+// Validates a single call node `expr` (already known to be a non-empty-callee
+// kCall) used in a constant context, recursing into a resolved callee.
+static void ValidateConstFuncCallNode(const Expr* expr, SourceLoc loc,
+                                      const ConstFuncCallCtx& ctx) {
+  // §13.4.3 (b) — DPI imports cannot be constant functions, so any attempt to
+  // invoke one in a constant context is rejected here.
+  if (ctx.dpi_import_names.count(expr->callee)) {
+    ctx.diag.Error(
+        loc,
+        std::format("DPI import '{}' shall not be used as a constant function",
+                    expr->callee));
+    return;
+  }
+  auto it = ctx.func_decls.find(expr->callee);
+  if (it == ctx.func_decls.end()) return;
+  std::unordered_set<std::string_view> visited;
+  ValidateConstantFunction(it->second, loc, ctx.param_names, ctx.function_names,
+                           &ctx.func_decls, &visited, ctx.diag);
+  CheckConstFuncCallArgs(expr, loc, ctx);
+}
+
 static void ValidateConstantFuncCallsInExpr(const Expr* expr, SourceLoc loc,
                                             const ConstFuncCallCtx& ctx) {
   if (!expr) return;
   if (expr->kind == ExprKind::kCall && !expr->callee.empty()) {
-    // §13.4.3 (b) — DPI imports cannot be constant functions, so any
-    // attempt to invoke one in a constant context is rejected here.
-    if (ctx.dpi_import_names.count(expr->callee)) {
-      ctx.diag.Error(
-          loc, std::format(
-                   "DPI import '{}' shall not be used as a constant function",
-                   expr->callee));
-    } else {
-      auto it = ctx.func_decls.find(expr->callee);
-      if (it != ctx.func_decls.end()) {
-        std::unordered_set<std::string_view> visited;
-        ValidateConstantFunction(it->second, loc, ctx.param_names,
-                                 ctx.function_names, &ctx.func_decls, &visited,
-                                 ctx.diag);
-        // §13.4.3: the arguments to a constant function call must all be
-        // constant expressions per §11.2.1. The scope is empty here — the
-        // call's arguments must be self-contained constants from the outer
-        // (constant) context.
-        ScopeMap arg_scope;
-        for (auto p : ctx.param_names) arg_scope[p] = 0;
-        for (auto* a : expr->args) {
-          if (a && !IsConstantExpr(a, arg_scope)) {
-            ctx.diag.Error(
-                loc,
-                std::format(
-                    "constant function call '{}' has a non-constant argument",
-                    expr->callee));
-            break;
-          }
-        }
-      }
-    }
+    ValidateConstFuncCallNode(expr, loc, ctx);
   }
   ValidateConstantFuncCallsInExpr(expr->lhs, loc, ctx);
   ValidateConstantFuncCallsInExpr(expr->rhs, loc, ctx);
@@ -755,6 +822,25 @@ static void ValidateConstantFuncCallsInExpr(const Expr* expr, SourceLoc loc,
 }
 
 static void ValidateConstFuncCallsInItems(const std::vector<ModuleItem*>& items,
+                                          const ConstFuncCallCtx& ctx);
+
+// Validates constant-function calls within a generate construct's condition
+// and all of its nested bodies (then/else/case arms).
+static void ValidateConstFuncCallsInGenerate(const ModuleItem* item,
+                                             const ConstFuncCallCtx& ctx) {
+  if (item->gen_cond) {
+    ValidateConstantFuncCallsInExpr(item->gen_cond, item->loc, ctx);
+  }
+  ValidateConstFuncCallsInItems(item->gen_body, ctx);
+  if (item->gen_else) {
+    ValidateConstFuncCallsInItems(item->gen_else->gen_body, ctx);
+  }
+  for (const auto& ci : item->gen_case_items) {
+    ValidateConstFuncCallsInItems(ci.body, ctx);
+  }
+}
+
+static void ValidateConstFuncCallsInItems(const std::vector<ModuleItem*>& items,
                                           const ConstFuncCallCtx& ctx) {
   for (const auto* item : items) {
     if (item->kind == ModuleItemKind::kParamDecl && item->init_expr) {
@@ -764,16 +850,7 @@ static void ValidateConstFuncCallsInItems(const std::vector<ModuleItem*>& items,
     if (item->kind == ModuleItemKind::kGenerateIf ||
         item->kind == ModuleItemKind::kGenerateCase ||
         item->kind == ModuleItemKind::kGenerateFor) {
-      if (item->gen_cond) {
-        ValidateConstantFuncCallsInExpr(item->gen_cond, item->loc, ctx);
-      }
-      ValidateConstFuncCallsInItems(item->gen_body, ctx);
-      if (item->gen_else) {
-        ValidateConstFuncCallsInItems(item->gen_else->gen_body, ctx);
-      }
-      for (const auto& ci : item->gen_case_items) {
-        ValidateConstFuncCallsInItems(ci.body, ctx);
-      }
+      ValidateConstFuncCallsInGenerate(item, ctx);
     }
   }
 }

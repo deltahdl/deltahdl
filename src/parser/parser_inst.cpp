@@ -15,14 +15,7 @@ ModuleItem* Parser::ParseModuleInstList(const Token& module_tok,
     ParseParamValueAssignment(params);
   }
 
-  auto parse_one_instance = [&]() -> ModuleItem* {
-    auto* item = arena_.Create<ModuleItem>();
-    item->kind = ModuleItemKind::kModuleInst;
-    item->loc = module_tok.loc;
-    item->inst_module = module_tok.text;
-    item->inst_params = params;
-    item->inst_name = Expect(TokenKind::kIdentifier).text;
-
+  auto parse_inst_dims = [&](ModuleItem* item) {
     while (Check(TokenKind::kLBracket)) {
       Consume();
       Expr* left = ParseExpr();
@@ -37,6 +30,9 @@ ModuleItem* Parser::ParseModuleInstList(const Token& module_tok,
       item->inst_range_left = item->inst_dims[0].first;
       item->inst_range_right = item->inst_dims[0].second;
     }
+  };
+
+  auto parse_inst_port_list = [&](ModuleItem* item) {
     Expect(TokenKind::kLParen);
     if (!Check(TokenKind::kRParen)) {
       bool named = ParsePortConnection(item);
@@ -52,6 +48,17 @@ ModuleItem* Parser::ParseModuleInstList(const Token& module_tok,
       }
     }
     Expect(TokenKind::kRParen);
+  };
+
+  auto parse_one_instance = [&]() -> ModuleItem* {
+    auto* item = arena_.Create<ModuleItem>();
+    item->kind = ModuleItemKind::kModuleInst;
+    item->loc = module_tok.loc;
+    item->inst_module = module_tok.text;
+    item->inst_params = params;
+    item->inst_name = Expect(TokenKind::kIdentifier).text;
+    parse_inst_dims(item);
+    parse_inst_port_list(item);
     return item;
   };
 

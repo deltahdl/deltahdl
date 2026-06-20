@@ -84,41 +84,57 @@ int64_t ConvertOverrideValue(int64_t value, const RtlirParamDecl& pd) {
   return static_cast<int64_t>(masked);
 }
 
-void Elaborator::ApplyHeaderImports(const ModuleDecl* decl) {
-  auto register_item = [&](const ModuleItem* pi, std::string_view name) {
-    if (pi->kind == ModuleItemKind::kTypedef) {
-      typedefs_[name] = pi->typedef_type;
-    } else if (pi->kind == ModuleItemKind::kParamDecl && pi->init_expr) {
-      auto val = ConstEvalInt(pi->init_expr, cu_param_scope_);
-      if (val) cu_param_scope_[name] = *val;
-    }
-  };
+// Register a single imported package item into a module's elaboration scopes:
+// typedefs become available by name, and const parameters are folded into the
+// compilation-unit parameter scope. Shared by the wildcard and named-import
+// branches of ApplyHeaderImports.
+static void RegisterHeaderImportItem(const ModuleItem* pi,
+                                     std::string_view name,
+                                     TypedefMap& typedefs,
+                                     ScopeMap& cu_param_scope) {
+  if (pi->kind == ModuleItemKind::kTypedef) {
+    typedefs[name] = pi->typedef_type;
+  } else if (pi->kind == ModuleItemKind::kParamDecl && pi->init_expr) {
+    auto val = ConstEvalInt(pi->init_expr, cu_param_scope);
+    if (val) cu_param_scope[name] = *val;
+  }
+}
 
-  for (const auto* item : decl->items) {
-    if (item->kind != ModuleItemKind::kImportDecl) continue;
-    if (!item->import_item.is_header) continue;
-    auto pkg_name = item->import_item.package_name;
-    const PackageDecl* pkg = nullptr;
-    for (const auto* p : unit_->packages) {
-      if (p->name == pkg_name) {
-        pkg = p;
+// Apply one header (package) import directive, resolving the named package and
+// registering either all of its items (wildcard) or a single named item.
+static void ApplyHeaderImport(const ImportItem& import_item,
+                              const CompilationUnit* unit, TypedefMap& typedefs,
+                              ScopeMap& cu_param_scope) {
+  auto pkg_name = import_item.package_name;
+  const PackageDecl* pkg = nullptr;
+  for (const auto* p : unit->packages) {
+    if (p->name == pkg_name) {
+      pkg = p;
+      break;
+    }
+  }
+  if (!pkg) return;
+  if (import_item.is_wildcard) {
+    for (const auto* pi : pkg->items) {
+      if (!pi->name.empty())
+        RegisterHeaderImportItem(pi, pi->name, typedefs, cu_param_scope);
+    }
+  } else {
+    auto target = import_item.item_name;
+    for (const auto* pi : pkg->items) {
+      if (pi->name == target) {
+        RegisterHeaderImportItem(pi, target, typedefs, cu_param_scope);
         break;
       }
     }
-    if (!pkg) continue;
-    if (item->import_item.is_wildcard) {
-      for (const auto* pi : pkg->items) {
-        if (!pi->name.empty()) register_item(pi, pi->name);
-      }
-    } else {
-      auto target = item->import_item.item_name;
-      for (const auto* pi : pkg->items) {
-        if (pi->name == target) {
-          register_item(pi, target);
-          break;
-        }
-      }
-    }
+  }
+}
+
+void Elaborator::ApplyHeaderImports(const ModuleDecl* decl) {
+  for (const auto* item : decl->items) {
+    if (item->kind != ModuleItemKind::kImportDecl) continue;
+    if (!item->import_item.is_header) continue;
+    ApplyHeaderImport(item->import_item, unit_, typedefs_, cu_param_scope_);
   }
 }
 
@@ -177,6 +193,65 @@ static void ResolveExplicitPortTypes(const ModuleDecl* decl, RtlirModule* mod) {
   }
 }
 
+// Resolve the value of a parameter that has a default expression (pval) but no
+// instantiation override. Handles the §6.20.7 unbounded-parameter forms and the
+// §6.20.2 integer/real constant folding. refers_to_unbounded and
+// contains_dollar are precomputed by the caller because they require Elaborator
+// member helpers; has_param_type / param_type describe the optional declared
+// data type.
+static void ResolveUnresolvedParamValue(
+    RtlirParamDecl& pd, const Expr* pval, std::string_view pname,
+    const ScopeMap& scope, bool refers_to_unbounded, bool contains_dollar,
+    bool has_param_type, const DataType* param_type, DiagEngine& diag) {
+  if (pval->kind == ExprKind::kIdentifier && pval->text == "$") {
+    pd.is_unbounded = true;
+    return;
+  }
+  if (pval->kind == ExprKind::kIdentifier && refers_to_unbounded) {
+    // §6.20.7: assigning a $ (unbounded) parameter to another parameter is
+    // legal; the assigned-to parameter is itself unbounded.
+    pd.is_unbounded = true;
+    return;
+  }
+  if (contains_dollar) {
+    // §6.20.7: $ must be the entire, self-contained parameter value; it
+    // may not be combined with operators or selects in this context.
+    diag.Error(pval->range.start,
+               std::format("'$' may only be assigned to parameter '{}' "
+                           "as a complete, self-contained expression",
+                           pname));
+  }
+  auto val = ConstEvalInt(pval, scope);
+  if (val) {
+    pd.resolved_value = *val;
+    pd.is_resolved = true;
+  } else if (!pd.is_type_param && has_param_type &&
+             ParamExpectsIntegerValue(pd, *param_type)) {
+    // §6.20.2: an integer-typed parameter set from a real constant is
+    // converted to an integer per §6.12.1 (round to nearest, ties away
+    // from zero).
+    if (auto rval = ConstEvalReal(pval, scope)) {
+      pd.resolved_value = std::llround(*rval);
+      pd.is_resolved = true;
+    }
+  }
+}
+
+// §6.20: report every value parameter that ends up with neither a default
+// expression nor an instantiation override.
+static void ReportParamsMissingValue(const ModuleDecl* decl,
+                                     const RtlirModule* mod, DiagEngine& diag) {
+  for (const auto& pd : mod->params) {
+    if (pd.is_localparam || pd.is_type_param) continue;
+    if (pd.default_value != nullptr) continue;
+    if (pd.from_override) continue;
+    diag.Error(decl->range.start,
+               std::format("parameter '{}' of '{}' has no default value and "
+                           "no override at instantiation",
+                           pd.name, decl->name));
+  }
+}
+
 RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
                                          const ParamList& params) {
   auto* mod = arena_.Create<RtlirModule>();
@@ -226,51 +301,21 @@ RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
       pd.from_override = true;
     }
     if (!pd.is_resolved && pval) {
-      if (pval->kind == ExprKind::kIdentifier && pval->text == "$") {
-        pd.is_unbounded = true;
-      } else if (pval->kind == ExprKind::kIdentifier &&
-                 RefersToUnboundedParam(mod, pval->text)) {
-        // §6.20.7: assigning a $ (unbounded) parameter to another parameter is
-        // legal; the assigned-to parameter is itself unbounded.
-        pd.is_unbounded = true;
-      } else {
-        if (ContainsDollarSubexpr(pval)) {
-          // §6.20.7: $ must be the entire, self-contained parameter value; it
-          // may not be combined with operators or selects in this context.
-          diag_.Error(pval->range.start,
-                      std::format("'$' may only be assigned to parameter '{}' "
-                                  "as a complete, self-contained expression",
-                                  pname));
-        }
-        auto val = ConstEvalInt(pval, scope);
-        if (val) {
-          pd.resolved_value = *val;
-          pd.is_resolved = true;
-        } else if (!pd.is_type_param && i < decl->param_types.size() &&
-                   ParamExpectsIntegerValue(pd, decl->param_types[i])) {
-          // §6.20.2: an integer-typed parameter set from a real constant is
-          // converted to an integer per §6.12.1 (round to nearest, ties away
-          // from zero).
-          if (auto rval = ConstEvalReal(pval, scope)) {
-            pd.resolved_value = std::llround(*rval);
-            pd.is_resolved = true;
-          }
-        }
-      }
+      bool has_param_type = !pd.is_type_param && i < decl->param_types.size();
+      const DataType* param_type =
+          has_param_type ? &decl->param_types[i] : nullptr;
+      bool refers_to_unbounded = pval->kind == ExprKind::kIdentifier &&
+                                 RefersToUnboundedParam(mod, pval->text);
+      bool contains_dollar = ContainsDollarSubexpr(pval);
+      ResolveUnresolvedParamValue(pd, pval, pname, scope, refers_to_unbounded,
+                                  contains_dollar, has_param_type, param_type,
+                                  diag_);
     }
 
     mod->params.push_back(pd);
   }
 
-  for (const auto& pd : mod->params) {
-    if (pd.is_localparam || pd.is_type_param) continue;
-    if (pd.default_value != nullptr) continue;
-    if (pd.from_override) continue;
-    diag_.Error(decl->range.start,
-                std::format("parameter '{}' of '{}' has no default value and "
-                            "no override at instantiation",
-                            pd.name, decl->name));
-  }
+  ReportParamsMissingValue(decl, mod, diag_);
 
   ElaboratePorts(decl, mod);
 
@@ -282,16 +327,19 @@ RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
   return mod;
 }
 
-void Elaborator::ElaboratePorts(const ModuleDecl* decl, RtlirModule* mod) {
-  auto param_scope = BuildParamScope(mod);
-
+// Diagnose repeated port names: explicitly named (.name) ports in a non-ANSI
+// header, and ordinary port names in an ANSI header (tracked across the run via
+// ansi_port_names).
+static void CheckDuplicatePortNames(
+    const ModuleDecl* decl,
+    std::unordered_set<std::string_view>& ansi_port_names, DiagEngine& diag) {
   if (decl->is_non_ansi_ports) {
     std::unordered_set<std::string_view> explicit_names;
     for (const auto& port : decl->ports) {
       if (port.is_explicit_named && !port.name.empty()) {
         if (!explicit_names.insert(port.name).second) {
-          diag_.Error(port.loc,
-                      std::format("duplicate port name '.{}'", port.name));
+          diag.Error(port.loc,
+                     std::format("duplicate port name '.{}'", port.name));
         }
       }
     }
@@ -300,13 +348,70 @@ void Elaborator::ElaboratePorts(const ModuleDecl* decl, RtlirModule* mod) {
   if (!decl->is_non_ansi_ports) {
     for (const auto& port : decl->ports) {
       if (!port.name.empty()) {
-        if (!ansi_port_names_.insert(port.name).second) {
-          diag_.Error(port.loc,
-                      std::format("duplicate port name '{}'", port.name));
+        if (!ansi_port_names.insert(port.name).second) {
+          diag.Error(port.loc,
+                     std::format("duplicate port name '{}'", port.name));
         }
       }
     }
   }
+}
+
+// §23.2.2: validate the contexts in which a port default value may appear —
+// input ports only, ANSI-style declarations only, and singular non-interconnect
+// types only.
+static void ValidatePortDefaultValue(const PortDecl& port, bool is_non_ansi,
+                                     DiagEngine& diag) {
+  if (port.direction != Direction::kInput) {
+    diag.Error(port.loc,
+               std::format("default value on {} port '{}'; defaults are "
+                           "only allowed on input ports",
+                           port.direction == Direction::kOutput  ? "output"
+                           : port.direction == Direction::kInout ? "inout"
+                                                                 : "ref",
+                           port.name));
+  }
+  if (is_non_ansi) {
+    diag.Error(port.loc, std::format("default value on port '{}'; defaults are "
+                                     "only allowed with ANSI-style port "
+                                     "declarations",
+                                     port.name));
+  }
+  if (port.data_type.is_interconnect) {
+    diag.Error(port.loc, std::format("default value on interconnect port '{}'",
+                                     port.name));
+  }
+  if (!port.unpacked_dims.empty() || !IsSingularType(port.data_type)) {
+    diag.Error(port.loc, std::format("default value on non-singular port '{}'",
+                                     port.name));
+  }
+}
+
+// Fold each unpacked-dimension expression of a port into a concrete size,
+// supporting both [msb:lsb] ranges and single-size [n] forms.
+static void ComputePortUnpackedDimSizes(const PortDecl& port, RtlirPort& rp) {
+  for (auto* dim : port.unpacked_dims) {
+    if (!dim) continue;
+    if (dim->kind == ExprKind::kBinary && dim->op == TokenKind::kColon) {
+      auto lv = ConstEvalInt(dim->lhs);
+      auto rv = ConstEvalInt(dim->rhs);
+      if (lv && rv) {
+        rp.unpacked_dim_sizes.push_back(
+            static_cast<uint32_t>(std::abs(*lv - *rv) + 1));
+      }
+    } else {
+      auto sv = ConstEvalInt(dim);
+      if (sv && *sv > 0)
+        rp.unpacked_dim_sizes.push_back(static_cast<uint32_t>(*sv));
+    }
+  }
+  rp.num_unpacked_dims = static_cast<uint32_t>(rp.unpacked_dim_sizes.size());
+}
+
+void Elaborator::ElaboratePorts(const ModuleDecl* decl, RtlirModule* mod) {
+  auto param_scope = BuildParamScope(mod);
+
+  CheckDuplicatePortNames(decl, ansi_port_names_, diag_);
 
   for (const auto& port : decl->ports) {
     if (port.data_type.kind == DataTypeKind::kChandle) {
@@ -340,32 +445,7 @@ void Elaborator::ElaboratePorts(const ModuleDecl* decl, RtlirModule* mod) {
     }
 
     if (port.default_value) {
-      if (port.direction != Direction::kInput) {
-        diag_.Error(port.loc,
-                    std::format("default value on {} port '{}'; defaults are "
-                                "only allowed on input ports",
-                                port.direction == Direction::kOutput  ? "output"
-                                : port.direction == Direction::kInout ? "inout"
-                                                                      : "ref",
-                                port.name));
-      }
-      if (decl->is_non_ansi_ports) {
-        diag_.Error(port.loc,
-                    std::format("default value on port '{}'; defaults are "
-                                "only allowed with ANSI-style port "
-                                "declarations",
-                                port.name));
-      }
-      if (port.data_type.is_interconnect) {
-        diag_.Error(
-            port.loc,
-            std::format("default value on interconnect port '{}'", port.name));
-      }
-      if (!port.unpacked_dims.empty() || !IsSingularType(port.data_type)) {
-        diag_.Error(
-            port.loc,
-            std::format("default value on non-singular port '{}'", port.name));
-      }
+      ValidatePortDefaultValue(port, decl->is_non_ansi_ports, diag_);
     }
 
     // §23.2.2.1: it is illegal to specify `signed` for a port declared as an
@@ -398,22 +478,7 @@ void Elaborator::ElaboratePorts(const ModuleDecl* decl, RtlirModule* mod) {
     rp.is_interconnect = port.data_type.is_interconnect;
     rp.default_value = port.default_value;
 
-    for (auto* dim : port.unpacked_dims) {
-      if (!dim) continue;
-      if (dim->kind == ExprKind::kBinary && dim->op == TokenKind::kColon) {
-        auto lv = ConstEvalInt(dim->lhs);
-        auto rv = ConstEvalInt(dim->rhs);
-        if (lv && rv) {
-          rp.unpacked_dim_sizes.push_back(
-              static_cast<uint32_t>(std::abs(*lv - *rv) + 1));
-        }
-      } else {
-        auto sv = ConstEvalInt(dim);
-        if (sv && *sv > 0)
-          rp.unpacked_dim_sizes.push_back(static_cast<uint32_t>(*sv));
-      }
-    }
-    rp.num_unpacked_dims = static_cast<uint32_t>(rp.unpacked_dim_sizes.size());
+    ComputePortUnpackedDimSizes(port, rp);
 
     if (port.is_interface_port) {
       rp.is_interface_port = true;

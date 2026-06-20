@@ -1,6 +1,9 @@
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <string_view>
+#include <unordered_map>
+#include <vector>
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
@@ -27,6 +30,11 @@ enum QueueStatus : std::uint8_t {
   kQNonPositiveLength = 5,  // specified length <= 0, cannot create
   kQDuplicateId = 6,        // duplicate q_id, cannot create
 };
+
+// Local aliases matching the concrete types of expr->args and
+// SimContext::StochasticQueues(), shared by the per-task helpers below.
+using QueueArgList = std::vector<Expr*>;
+using StochasticQueueMap = std::unordered_map<uint64_t, StochasticQueue>;
 
 // Read an argument as a signed value, sign-extending from its own width so a
 // negative max_length is recognized as such (Table 20-11 status 5 keys on
@@ -58,6 +66,184 @@ static void WriteQueueOutput(const Expr* out_arg, uint64_t value,
   if (var) var->value = MakeLogic4VecVal(arena, var->value.width, value);
 }
 
+// §20.15.2 $q_initialize(q_id, q_type, max_length, status): create a queue of
+// the named type and capacity, reporting the Table 20-11 outcome.
+static Logic4Vec EvalQueueInitialize(const QueueArgList& args,
+                                     StochasticQueueMap& queues,
+                                     SimContext& ctx, Arena& arena) {
+  if (args.size() < 4) return MakeLogic4VecVal(arena, 32, 0);
+  uint64_t q_id = EvalExpr(args[0], ctx, arena).ToUint64();
+  int64_t q_type = QueueSignedArg(EvalExpr(args[1], ctx, arena));
+  int64_t max_length = QueueSignedArg(EvalExpr(args[2], ctx, arena));
+  uint64_t status = 0;
+  if (q_type != 1 && q_type != 2) {
+    status = kQUnsupportedType;
+  } else if (max_length <= 0) {
+    status = kQNonPositiveLength;
+  } else if (queues.count(q_id)) {
+    status = kQDuplicateId;
+  } else {
+    queues[q_id] = StochasticQueue{q_type, max_length, 0};
+    status = kQOk;
+  }
+  WriteQueueStatus(args[3], status, ctx, arena);
+  return MakeLogic4VecVal(arena, 32, status);
+}
+
+// §20.15.2 $q_add(q_id, job_id, inform_id, status): append an entry to the
+// queue named by q_id, stamping it for the §20.15.5 statistics.
+static Logic4Vec EvalQueueAdd(const QueueArgList& args,
+                              StochasticQueueMap& queues, SimContext& ctx,
+                              Arena& arena) {
+  if (args.size() < 4) return MakeLogic4VecVal(arena, 32, 0);
+  uint64_t q_id = EvalExpr(args[0], ctx, arena).ToUint64();
+  auto it = queues.find(q_id);
+  uint64_t status = 0;
+  if (it == queues.end()) {
+    status = kQUndefinedId;
+  } else if (static_cast<int64_t>(it->second.count) >= it->second.max_length) {
+    status = kQFullCannotAdd;
+  } else {
+    // Retain the entry's identifiers so §20.15.3 $q_remove can return them;
+    // the inform_id holds whatever value $q_add was handed (its meaning is
+    // user-defined).
+    uint64_t job_id = EvalExpr(args[1], ctx, arena).ToUint64();
+    uint64_t inform_id = EvalExpr(args[2], ctx, arena).ToUint64();
+    // §20.15.5: stamp the arrival time and fold it into the queue's activity
+    // statistics so $q_exam can report mean interarrival time, peak occupancy
+    // and wait times.
+    uint64_t now = ctx.CurrentTime().ticks;
+    auto& q = it->second;
+    q.entries.push_back(StochasticQueueEntry{job_id, inform_id, now});
+    if (q.arrivals == 0) q.first_arrival_tick = now;
+    q.last_arrival_tick = now;
+    ++q.arrivals;
+    ++q.count;
+    if (q.count > q.max_count) q.max_count = q.count;
+    status = kQOk;
+  }
+  WriteQueueStatus(args[3], status, ctx, arena);
+  return MakeLogic4VecVal(arena, 32, status);
+}
+
+// §20.15.3 $q_remove(q_id, job_id, inform_id, status): take an entry off the
+// queue selected by q_id (an integer input) and report the removed entry's
+// identifiers through the job_id and inform_id outputs.
+static Logic4Vec EvalQueueRemove(const QueueArgList& args,
+                                 StochasticQueueMap& queues, SimContext& ctx,
+                                 Arena& arena) {
+  if (args.size() < 4) return MakeLogic4VecVal(arena, 32, 0);
+  uint64_t q_id = EvalExpr(args[0], ctx, arena).ToUint64();
+  auto it = queues.find(q_id);
+  uint64_t status = 0;
+  if (it == queues.end()) {
+    status = kQUndefinedId;
+  } else if (it->second.count == 0) {
+    status = kQEmptyCannotRemove;
+  } else {
+    // Choose the entry per the discipline fixed at $q_initialize: q_type 2
+    // (LIFO) returns the most recently added entry, otherwise q_type 1
+    // (FIFO) returns the oldest. $q_add always appends to the back.
+    auto& q = it->second;
+    StochasticQueueEntry entry;
+    if (q.q_type == 2) {
+      entry = q.entries.back();
+      q.entries.pop_back();
+    } else {
+      entry = q.entries.front();
+      q.entries.pop_front();
+    }
+    --q.count;
+    // §20.15.5: a removed entry's residence time completes a wait sample,
+    // feeding the shortest-ever and average wait-time statistics reported by
+    // $q_exam.
+    uint64_t now = ctx.CurrentTime().ticks;
+    uint64_t wait = now >= entry.arrival_tick ? now - entry.arrival_tick : 0;
+    if (q.departures == 0 || wait < q.shortest_wait) q.shortest_wait = wait;
+    q.total_wait += wait;
+    ++q.departures;
+    WriteQueueOutput(args[1], entry.job_id, ctx, arena);
+    WriteQueueOutput(args[2], entry.inform_id, ctx, arena);
+    status = kQOk;
+  }
+  WriteQueueStatus(args[3], status, ctx, arena);
+  return MakeLogic4VecVal(arena, 32, status);
+}
+
+// §20.15.4: $q_full checks whether the queue named by q_id has room for
+// another entry, returning 1 when it is full and 0 when it is not. A queue is
+// full once its occupancy reaches the capacity fixed at $q_initialize. The
+// trailing status reports the operation outcome (§20.15.6); the only error
+// condition that applies is an undefined q_id.
+static Logic4Vec EvalQueueFull(const QueueArgList& args,
+                               StochasticQueueMap& queues, SimContext& ctx,
+                               Arena& arena) {
+  if (args.size() < 2) return MakeLogic4VecVal(arena, 32, 0);
+  uint64_t q_id = EvalExpr(args[0], ctx, arena).ToUint64();
+  auto it = queues.find(q_id);
+  WriteQueueStatus(args[1], it == queues.end() ? kQUndefinedId : kQOk, ctx,
+                   arena);
+  uint64_t full =
+      (it != queues.end() &&
+       static_cast<int64_t>(it->second.count) >= it->second.max_length)
+          ? 1u
+          : 0u;
+  return MakeLogic4VecVal(arena, 32, full);
+}
+
+// §20.15.5: compute the Table 20-10 statistic selected by `code` for queue `q`
+// at the current time `now`. Unknown codes report 0, matching $q_exam's
+// default.
+static uint64_t QueueExamStatistic(const StochasticQueue& q, int64_t code,
+                                   uint64_t now) {
+  switch (code) {
+    case 1:  // Current queue length.
+      return q.count;
+    case 2:  // Mean interarrival time: total span between the first and last
+             // arrival divided by the number of gaps between arrivals.
+      return q.arrivals > 1 ? (q.last_arrival_tick - q.first_arrival_tick) /
+                                  (q.arrivals - 1)
+                            : 0;
+    case 3:  // Maximum queue length ever reached.
+      return q.max_count;
+    case 4:  // Shortest wait time ever, across removed entries.
+      return q.departures ? q.shortest_wait : 0;
+    case 5:  // Longest wait among entries still queued: the oldest entry is
+             // at the front, as $q_add appends in arrival order.
+      return q.entries.empty() ? 0
+                               : (now >= q.entries.front().arrival_tick
+                                      ? now - q.entries.front().arrival_tick
+                                      : 0);
+    case 6:  // Average wait time over removed entries.
+      return q.departures ? q.total_wait / q.departures : 0;
+    default:
+      return 0;
+  }
+}
+
+// §20.15.5 $q_exam(q_id, q_stat_code, q_stat_value, status): report a
+// statistic about activity on the queue named by q_id. The q_stat_code selects
+// which statistic is delivered through the q_stat_value output, per Table
+// 20-10. An undefined q_id is the only applicable error (§20.15.6).
+static Logic4Vec EvalQueueExam(const QueueArgList& args,
+                               StochasticQueueMap& queues, SimContext& ctx,
+                               Arena& arena) {
+  if (args.size() < 4) return MakeLogic4VecVal(arena, 32, 0);
+  uint64_t q_id = EvalExpr(args[0], ctx, arena).ToUint64();
+  auto it = queues.find(q_id);
+  if (it == queues.end()) {
+    WriteQueueStatus(args[3], kQUndefinedId, ctx, arena);
+    return MakeLogic4VecVal(arena, 32, kQUndefinedId);
+  }
+  const auto& q = it->second;
+  int64_t code = QueueSignedArg(EvalExpr(args[1], ctx, arena));
+  uint64_t now = ctx.CurrentTime().ticks;
+  uint64_t value = QueueExamStatistic(q, code, now);
+  WriteQueueOutput(args[2], value, ctx, arena);
+  WriteQueueStatus(args[3], kQOk, ctx, arena);
+  return MakeLogic4VecVal(arena, 32, kQOk);
+}
+
 // §20.15.6: resolve and report the Table 20-11 status code for each
 // stochastic-analysis queue task/function. The queue type/capacity validated
 // at $q_initialize and the occupancy tracked across $q_add/$q_remove supply
@@ -70,170 +256,12 @@ static Logic4Vec EvalStochasticQueue(const Expr* expr, SimContext& ctx,
   auto& queues = ctx.StochasticQueues();
   const auto& args = expr->args;
 
-  if (name == "$q_initialize") {
-    if (args.size() < 4) return MakeLogic4VecVal(arena, 32, 0);
-    uint64_t q_id = EvalExpr(args[0], ctx, arena).ToUint64();
-    int64_t q_type = QueueSignedArg(EvalExpr(args[1], ctx, arena));
-    int64_t max_length = QueueSignedArg(EvalExpr(args[2], ctx, arena));
-    uint64_t status = 0;
-    if (q_type != 1 && q_type != 2) {
-      status = kQUnsupportedType;
-    } else if (max_length <= 0) {
-      status = kQNonPositiveLength;
-    } else if (queues.count(q_id)) {
-      status = kQDuplicateId;
-    } else {
-      queues[q_id] = StochasticQueue{q_type, max_length, 0};
-      status = kQOk;
-    }
-    WriteQueueStatus(args[3], status, ctx, arena);
-    return MakeLogic4VecVal(arena, 32, status);
-  }
-
-  if (name == "$q_add") {
-    if (args.size() < 4) return MakeLogic4VecVal(arena, 32, 0);
-    uint64_t q_id = EvalExpr(args[0], ctx, arena).ToUint64();
-    auto it = queues.find(q_id);
-    uint64_t status = 0;
-    if (it == queues.end()) {
-      status = kQUndefinedId;
-    } else if (static_cast<int64_t>(it->second.count) >=
-               it->second.max_length) {
-      status = kQFullCannotAdd;
-    } else {
-      // Retain the entry's identifiers so §20.15.3 $q_remove can return them;
-      // the inform_id holds whatever value $q_add was handed (its meaning is
-      // user-defined).
-      uint64_t job_id = EvalExpr(args[1], ctx, arena).ToUint64();
-      uint64_t inform_id = EvalExpr(args[2], ctx, arena).ToUint64();
-      // §20.15.5: stamp the arrival time and fold it into the queue's activity
-      // statistics so $q_exam can report mean interarrival time, peak occupancy
-      // and wait times.
-      uint64_t now = ctx.CurrentTime().ticks;
-      auto& q = it->second;
-      q.entries.push_back(StochasticQueueEntry{job_id, inform_id, now});
-      if (q.arrivals == 0) q.first_arrival_tick = now;
-      q.last_arrival_tick = now;
-      ++q.arrivals;
-      ++q.count;
-      if (q.count > q.max_count) q.max_count = q.count;
-      status = kQOk;
-    }
-    WriteQueueStatus(args[3], status, ctx, arena);
-    return MakeLogic4VecVal(arena, 32, status);
-  }
-
-  if (name == "$q_remove") {
-    // §20.15.3 $q_remove(q_id, job_id, inform_id, status): take an entry off
-    // the queue selected by q_id (an integer input) and report the removed
-    // entry's identifiers through the job_id and inform_id outputs.
-    if (args.size() < 4) return MakeLogic4VecVal(arena, 32, 0);
-    uint64_t q_id = EvalExpr(args[0], ctx, arena).ToUint64();
-    auto it = queues.find(q_id);
-    uint64_t status = 0;
-    if (it == queues.end()) {
-      status = kQUndefinedId;
-    } else if (it->second.count == 0) {
-      status = kQEmptyCannotRemove;
-    } else {
-      // Choose the entry per the discipline fixed at $q_initialize: q_type 2
-      // (LIFO) returns the most recently added entry, otherwise q_type 1
-      // (FIFO) returns the oldest. $q_add always appends to the back.
-      auto& q = it->second;
-      StochasticQueueEntry entry;
-      if (q.q_type == 2) {
-        entry = q.entries.back();
-        q.entries.pop_back();
-      } else {
-        entry = q.entries.front();
-        q.entries.pop_front();
-      }
-      --q.count;
-      // §20.15.5: a removed entry's residence time completes a wait sample,
-      // feeding the shortest-ever and average wait-time statistics reported by
-      // $q_exam.
-      uint64_t now = ctx.CurrentTime().ticks;
-      uint64_t wait = now >= entry.arrival_tick ? now - entry.arrival_tick : 0;
-      if (q.departures == 0 || wait < q.shortest_wait) q.shortest_wait = wait;
-      q.total_wait += wait;
-      ++q.departures;
-      WriteQueueOutput(args[1], entry.job_id, ctx, arena);
-      WriteQueueOutput(args[2], entry.inform_id, ctx, arena);
-      status = kQOk;
-    }
-    WriteQueueStatus(args[3], status, ctx, arena);
-    return MakeLogic4VecVal(arena, 32, status);
-  }
-
-  if (name == "$q_full") {
-    // §20.15.4: $q_full checks whether the queue named by q_id has room for
-    // another entry, returning 1 when it is full and 0 when it is not. A queue
-    // is full once its occupancy reaches the capacity fixed at $q_initialize.
-    // The trailing status reports the operation outcome (§20.15.6); the only
-    // error condition that applies is an undefined q_id.
-    if (args.size() < 2) return MakeLogic4VecVal(arena, 32, 0);
-    uint64_t q_id = EvalExpr(args[0], ctx, arena).ToUint64();
-    auto it = queues.find(q_id);
-    WriteQueueStatus(args[1], it == queues.end() ? kQUndefinedId : kQOk, ctx,
-                     arena);
-    uint64_t full =
-        (it != queues.end() &&
-         static_cast<int64_t>(it->second.count) >= it->second.max_length)
-            ? 1u
-            : 0u;
-    return MakeLogic4VecVal(arena, 32, full);
-  }
-
-  if (name == "$q_exam") {
-    // §20.15.5 $q_exam(q_id, q_stat_code, q_stat_value, status): report a
-    // statistic about activity on the queue named by q_id. The q_stat_code
-    // selects which statistic is delivered through the q_stat_value output, per
-    // Table 20-10. An undefined q_id is the only applicable error (§20.15.6).
-    if (args.size() < 4) return MakeLogic4VecVal(arena, 32, 0);
-    uint64_t q_id = EvalExpr(args[0], ctx, arena).ToUint64();
-    auto it = queues.find(q_id);
-    if (it == queues.end()) {
-      WriteQueueStatus(args[3], kQUndefinedId, ctx, arena);
-      return MakeLogic4VecVal(arena, 32, kQUndefinedId);
-    }
-    const auto& q = it->second;
-    int64_t code = QueueSignedArg(EvalExpr(args[1], ctx, arena));
-    uint64_t now = ctx.CurrentTime().ticks;
-    uint64_t value = 0;
-    switch (code) {
-      case 1:  // Current queue length.
-        value = q.count;
-        break;
-      case 2:  // Mean interarrival time: total span between the first and last
-               // arrival divided by the number of gaps between arrivals.
-        value = q.arrivals > 1 ? (q.last_arrival_tick - q.first_arrival_tick) /
-                                     (q.arrivals - 1)
-                               : 0;
-        break;
-      case 3:  // Maximum queue length ever reached.
-        value = q.max_count;
-        break;
-      case 4:  // Shortest wait time ever, across removed entries.
-        value = q.departures ? q.shortest_wait : 0;
-        break;
-      case 5:  // Longest wait among entries still queued: the oldest entry is
-               // at the front, as $q_add appends in arrival order.
-        value = q.entries.empty() ? 0
-                                  : (now >= q.entries.front().arrival_tick
-                                         ? now - q.entries.front().arrival_tick
-                                         : 0);
-        break;
-      case 6:  // Average wait time over removed entries.
-        value = q.departures ? q.total_wait / q.departures : 0;
-        break;
-      default:
-        value = 0;
-        break;
-    }
-    WriteQueueOutput(args[2], value, ctx, arena);
-    WriteQueueStatus(args[3], kQOk, ctx, arena);
-    return MakeLogic4VecVal(arena, 32, kQOk);
-  }
+  if (name == "$q_initialize")
+    return EvalQueueInitialize(args, queues, ctx, arena);
+  if (name == "$q_add") return EvalQueueAdd(args, queues, ctx, arena);
+  if (name == "$q_remove") return EvalQueueRemove(args, queues, ctx, arena);
+  if (name == "$q_full") return EvalQueueFull(args, queues, ctx, arena);
+  if (name == "$q_exam") return EvalQueueExam(args, queues, ctx, arena);
 
   return MakeLogic4VecVal(arena, 32, 0);
 }
@@ -380,8 +408,11 @@ static Logic4Vec EvalCoverageSave(const Expr* expr, SimContext& ctx,
                            /*str_arg_index=*/1);
 }
 
-Logic4Vec EvalVerifSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
-                           std::string_view name) {
+// §16.9/§16.13: the sampled-value functions and immediate-assertion-control
+// queries. Returns the result when `name` selects one of these, or nullopt so
+// the caller can fall through to the other system-call families.
+static std::optional<Logic4Vec> EvalSampledValueOrAssert(
+    const Expr* expr, SimContext& ctx, Arena& arena, std::string_view name) {
   if (name == "$sampled") {
     if (expr->args.empty()) return MakeLogic4VecVal(arena, 1, 0);
     return EvalExpr(expr->args[0], ctx, arena);
@@ -412,6 +443,15 @@ Logic4Vec EvalVerifSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
 
   if (name.starts_with("$assert")) return MakeLogic4VecVal(arena, 1, 0);
 
+  return std::nullopt;
+}
+
+// §40.3.2: the coverage query/control system functions. Returns the result
+// when `name` is in the $coverage_* family, or nullopt otherwise.
+static std::optional<Logic4Vec> EvalCoverageSysCall(const Expr* expr,
+                                                    SimContext& ctx,
+                                                    Arena& arena,
+                                                    std::string_view name) {
   if (name == "$coverage_control") return EvalCoverageControl(expr, ctx, arena);
 
   if (name == "$coverage_get_max") return EvalCoverageGetMax(expr, ctx, arena);
@@ -423,6 +463,17 @@ Logic4Vec EvalVerifSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
   if (name == "$coverage_save") return EvalCoverageSave(expr, ctx, arena);
 
   if (name.starts_with("$coverage")) return MakeLogic4VecVal(arena, 32, 0);
+
+  return std::nullopt;
+}
+
+Logic4Vec EvalVerifSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
+                           std::string_view name) {
+  if (auto sampled = EvalSampledValueOrAssert(expr, ctx, arena, name))
+    return *sampled;
+
+  if (auto coverage = EvalCoverageSysCall(expr, ctx, arena, name))
+    return *coverage;
 
   if (name.starts_with("$q_"))
     return EvalStochasticQueue(expr, ctx, arena, name);

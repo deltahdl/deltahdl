@@ -192,22 +192,30 @@ static void WalkExprForMatchesOp(const Expr* e, DiagEngine& diag) {
   for (auto* x : e->elements) WalkExprForMatchesOp(x, diag);
 }
 
-static void WalkStmtForMatchesPattern(const Stmt* s, DiagEngine& diag) {
-  if (!s) return;
-  if (s->kind == StmtKind::kCase && s->case_matches) {
-    for (const auto& ci : s->case_items) {
-      if (ci.is_default) continue;
-      for (const auto* pat : ci.patterns) {
-        CheckMatchesPattern(pat, diag);
-        WalkExprForMatchesOp(pat, diag);
-      }
+static void CheckCaseMatchesPatterns(const Stmt* s, DiagEngine& diag) {
+  for (const auto& ci : s->case_items) {
+    if (ci.is_default) continue;
+    for (const auto* pat : ci.patterns) {
+      CheckMatchesPattern(pat, diag);
+      WalkExprForMatchesOp(pat, diag);
     }
   }
+}
+
+static void WalkMatchesPatternStmtExprs(const Stmt* s, DiagEngine& diag) {
   if (s->condition) WalkExprForMatchesOp(s->condition, diag);
   if (s->expr) WalkExprForMatchesOp(s->expr, diag);
   if (s->lhs) WalkExprForMatchesOp(s->lhs, diag);
   if (s->rhs) WalkExprForMatchesOp(s->rhs, diag);
   if (s->for_cond) WalkExprForMatchesOp(s->for_cond, diag);
+}
+
+static void WalkStmtForMatchesPattern(const Stmt* s, DiagEngine& diag) {
+  if (!s) return;
+  if (s->kind == StmtKind::kCase && s->case_matches) {
+    CheckCaseMatchesPatterns(s, diag);
+  }
+  WalkMatchesPatternStmtExprs(s, diag);
   for (auto* sub : s->stmts) WalkStmtForMatchesPattern(sub, diag);
   for (auto* sub : s->fork_stmts) WalkStmtForMatchesPattern(sub, diag);
   WalkStmtForMatchesPattern(s->then_branch, diag);
@@ -250,6 +258,21 @@ static bool IsIntegralLiteralPattern(const Expr* pat) {
   return p && p->kind == ExprKind::kIntegerLiteral;
 }
 
+static void CheckRealSelectorAgainstIntegralPatterns(const Stmt* s,
+                                                     DiagEngine& diag) {
+  for (const auto& ci : s->case_items) {
+    if (ci.is_default) continue;
+    for (const auto* pat : ci.patterns) {
+      if (IsIntegralLiteralPattern(pat)) {
+        diag.Error(s->condition->range.start,
+                   "pattern-matching case selector type differs from the "
+                   "type of its integral pattern");
+        break;
+      }
+    }
+  }
+}
+
 static void CheckMatchesCaseSelectorType(const Stmt* s, const TypeMap& types,
                                          DiagEngine& diag) {
   if (!s) return;
@@ -257,17 +280,7 @@ static void CheckMatchesCaseSelectorType(const Stmt* s, const TypeMap& types,
     auto name = ExprIdent(s->condition);
     auto it = types.find(name);
     if (!name.empty() && it != types.end() && IsRealType(it->second)) {
-      for (const auto& ci : s->case_items) {
-        if (ci.is_default) continue;
-        for (const auto* pat : ci.patterns) {
-          if (IsIntegralLiteralPattern(pat)) {
-            diag.Error(s->condition->range.start,
-                       "pattern-matching case selector type differs from the "
-                       "type of its integral pattern");
-            break;
-          }
-        }
-      }
+      CheckRealSelectorAgainstIntegralPatterns(s, diag);
     }
   }
   for (auto* sub : s->stmts) CheckMatchesCaseSelectorType(sub, types, diag);

@@ -58,6 +58,42 @@ int VpiContext::Control(int operation, int arg0, int arg1, int arg2,
   return 0;
 }
 
+namespace {
+
+// §40.5.3: map a Start/Stop/Reset/Check coverage-control operation onto the
+// matching CoverageControl request.
+CoverageControl CoverageControlForOperation(int operation) {
+  switch (operation) {
+    case vpiCoverageStart:
+      return CoverageControl::kStart;
+    case vpiCoverageStop:
+      return CoverageControl::kStop;
+    case vpiCoverageReset:
+      return CoverageControl::kReset;
+    case vpiCoverageCheck:
+      return CoverageControl::kCheck;
+  }
+  return CoverageControl::kStart;
+}
+
+// The handle names the controlled scope. A handle's hierarchical name
+// identifies the instance; a handle with no full name falls back to its simple
+// name. A null handle names no scope, which the control rules treat as a
+// nonexisting scope (a bad argument).
+std::string CoverageScopeName(VpiHandle scope_handle) {
+  std::string scope;
+  if (scope_handle != nullptr) {
+    if (!scope_handle->full_name.empty()) {
+      scope = scope_handle->full_name;
+    } else {
+      scope = std::string(scope_handle->name);
+    }
+  }
+  return scope;
+}
+
+}  // namespace
+
 int VpiContext::ControlCoverage(int operation, int coverage_type,
                                 VpiHandle scope_handle,
                                 const std::string& name) {
@@ -72,33 +108,8 @@ int VpiContext::ControlCoverage(int operation, int coverage_type,
       // statement, toggle, and FSM coverage are not individually controllable,
       // the control acts on the instance (or assertion) the handle names as a
       // whole rather than on any sub-object of it.
-      CoverageControl control = CoverageControl::kStart;
-      switch (operation) {
-        case vpiCoverageStart:
-          control = CoverageControl::kStart;
-          break;
-        case vpiCoverageStop:
-          control = CoverageControl::kStop;
-          break;
-        case vpiCoverageReset:
-          control = CoverageControl::kReset;
-          break;
-        case vpiCoverageCheck:
-          control = CoverageControl::kCheck;
-          break;
-      }
-      // The handle names the controlled scope. A handle's hierarchical name
-      // identifies the instance; a handle with no full name falls back to its
-      // simple name. A null handle names no scope, which the control rules
-      // treat as a nonexisting scope (a bad argument).
-      std::string scope;
-      if (scope_handle != nullptr) {
-        if (!scope_handle->full_name.empty()) {
-          scope = scope_handle->full_name;
-        } else {
-          scope = std::string(scope_handle->name);
-        }
-      }
+      CoverageControl control = CoverageControlForOperation(operation);
+      std::string scope = CoverageScopeName(scope_handle);
       return static_cast<int>(coverage_control_.Control(control, scope));
     }
     case vpiCoverageSave:
@@ -155,16 +166,33 @@ bool VpiContext::GetVlogInfo(VpiVlogInfo* info) {
   return true;
 }
 
+namespace {
+
+// §38.22: a request for an intermodule path names the output-port and
+// input-port reference objects the path runs between. Those two ports shall be
+// of the same size; they may, however, sit at different levels of the
+// hierarchy, which is deliberately left unconstrained. A size mismatch cannot
+// describe a valid intermodule path, so it is rejected by the caller.
+bool InterModPathSizeMismatch(int type, VpiHandle ref1, VpiHandle ref2) {
+  return type == vpiInterModPath && ref1 && ref2 && ref1->size != ref2->size;
+}
+
+// Append every child of `ref` whose kind matches `type` to `out`. A null `ref`
+// contributes nothing.
+void CollectChildrenOfType(VpiHandle ref, int type,
+                           std::vector<VpiObject*>& out) {
+  if (!ref) return;
+  for (auto* child : ref->children) {
+    if (child->type == type) out.push_back(child);
+  }
+}
+
+}  // namespace
+
 VpiHandle VpiContext::HandleMulti(int type, VpiHandle ref1, VpiHandle ref2) {
   if (!ref1 && !ref2) return nullptr;
 
-  // §38.22: a request for an intermodule path names the output-port and
-  // input-port reference objects the path runs between. Those two ports shall
-  // be of the same size; they may, however, sit at different levels of the
-  // hierarchy, which is deliberately left unconstrained. A size mismatch cannot
-  // describe a valid intermodule path, so report it (§38.2) and return no
-  // handle.
-  if (type == vpiInterModPath && ref1 && ref2 && ref1->size != ref2->size) {
+  if (InterModPathSizeMismatch(type, ref1, ref2)) {
     last_error_.state = kVpiError;
     last_error_.level = kVpiError;
     last_error_.message =
@@ -175,16 +203,8 @@ VpiHandle VpiContext::HandleMulti(int type, VpiHandle ref1, VpiHandle ref2) {
 
   auto* result = AllocObject();
   result->type = type;
-  if (ref1) {
-    for (auto* child : ref1->children) {
-      if (child->type == type) result->children.push_back(child);
-    }
-  }
-  if (ref2) {
-    for (auto* child : ref2->children) {
-      if (child->type == type) result->children.push_back(child);
-    }
-  }
+  CollectChildrenOfType(ref1, type, result->children);
+  CollectChildrenOfType(ref2, type, result->children);
   if (result->children.empty()) return nullptr;
   return result;
 }

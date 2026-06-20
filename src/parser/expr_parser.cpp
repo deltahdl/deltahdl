@@ -105,6 +105,24 @@ static double ParseRealText(std::string_view text) {
   return std::strtod(buf.c_str(), nullptr);
 }
 
+// Scales a time-literal's real value from the unit named by its suffix into the
+// enclosing module's time unit (defaulting to ns when no module is active).
+static double ScaleTimeLiteral(double real_val, std::string_view text,
+                               TimeUnit current_unit) {
+  TimeUnit literal_unit = TimeUnit::kNs;
+  auto t = text;
+  if (t.size() < 2 || !ParseTimeUnitStr(t.substr(t.size() - 2), literal_unit)) {
+    if (!t.empty()) {
+      ParseTimeUnitStr(t.substr(t.size() - 1), literal_unit);
+    }
+  }
+  int exp = static_cast<int>(literal_unit) - static_cast<int>(current_unit);
+  if (exp != 0) {
+    real_val *= std::pow(10.0, exp);
+  }
+  return real_val;
+}
+
 static std::pair<int, int> InfixBp(TokenKind kind) {
   switch (kind) {
     case TokenKind::kPipeDashGt:
@@ -293,20 +311,9 @@ Expr* Parser::MakeLiteral(ExprKind kind, const Token& tok) {
   } else if (kind == ExprKind::kRealLiteral || kind == ExprKind::kTimeLiteral) {
     lit->real_val = ParseRealText(tok.text);
     if (kind == ExprKind::kTimeLiteral) {
-      TimeUnit literal_unit = TimeUnit::kNs;
-      auto t = tok.text;
-      if (t.size() < 2 ||
-          !ParseTimeUnitStr(t.substr(t.size() - 2), literal_unit)) {
-        if (!t.empty()) {
-          ParseTimeUnitStr(t.substr(t.size() - 1), literal_unit);
-        }
-      }
       TimeUnit current_unit =
           current_module_ ? current_module_->time_unit : TimeUnit::kNs;
-      int exp = static_cast<int>(literal_unit) - static_cast<int>(current_unit);
-      if (exp != 0) {
-        lit->real_val *= std::pow(10.0, exp);
-      }
+      lit->real_val = ScaleTimeLiteral(lit->real_val, tok.text, current_unit);
     }
   }
   return lit;

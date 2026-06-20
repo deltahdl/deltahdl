@@ -82,6 +82,35 @@ void AppendCells(CompilationUnit& target, const CompilationUnit& src) {
                         src.configs.end());
 }
 
+// Reads a single (library, source) record header from the stream into the
+// provided buffers. Returns false on any read failure.
+bool ReadRecord(std::ifstream& is, std::string& library, std::string& source) {
+  uint32_t lib_len = 0;
+  if (!ReadU32(is, lib_len)) return false;
+  if (!ReadBytes(is, library, lib_len)) return false;
+
+  uint32_t src_len = 0;
+  if (!ReadU32(is, src_len)) return false;
+  if (!ReadBytes(is, source, src_len)) return false;
+  return true;
+}
+
+// Parses one record's source into the target compilation unit, tagging cells
+// with the record's library name. Returns false on parse failure.
+bool LoadRecord(const std::filesystem::path& path, std::string library,
+                std::string source, CompilationUnit& target, SourceManager& mgr,
+                Arena& arena, DiagEngine& diag) {
+  uint32_t fid = mgr.AddFile(path.string(), std::move(source));
+  Lexer lex(mgr.FileContent(fid), fid, diag);
+  Parser parser(lex, arena, diag);
+  auto* cu = parser.Parse();
+  if (cu == nullptr || diag.HasErrors()) return false;
+
+  TagCells(*cu, library, arena);
+  AppendCells(target, *cu);
+  return true;
+}
+
 }  // namespace
 
 bool PrecompiledLibrary::Save(std::string_view source, std::string_view library,
@@ -119,24 +148,13 @@ bool PrecompiledLibrary::Load(const std::filesystem::path& path,
 
   while (true) {
     if (is.peek() == EOF) break;
-    uint32_t lib_len = 0;
-    if (!ReadU32(is, lib_len)) return false;
     std::string library;
-    if (!ReadBytes(is, library, lib_len)) return false;
-
-    uint32_t src_len = 0;
-    if (!ReadU32(is, src_len)) return false;
     std::string source;
-    if (!ReadBytes(is, source, src_len)) return false;
-
-    uint32_t fid = mgr.AddFile(path.string(), std::move(source));
-    Lexer lex(mgr.FileContent(fid), fid, diag);
-    Parser parser(lex, arena, diag);
-    auto* cu = parser.Parse();
-    if (cu == nullptr || diag.HasErrors()) return false;
-
-    TagCells(*cu, library, arena);
-    AppendCells(target, *cu);
+    if (!ReadRecord(is, library, source)) return false;
+    if (!LoadRecord(path, std::move(library), std::move(source), target, mgr,
+                    arena, diag)) {
+      return false;
+    }
   }
   return true;
 }

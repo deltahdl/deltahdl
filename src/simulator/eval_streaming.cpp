@@ -102,13 +102,20 @@ static void ExpandArrayElements(std::string_view name, SimContext& ctx,
   }
 }
 
+// Half-open slice range [start, start + count) selected by a `with` clause.
+struct StreamSliceRange {
+  uint32_t start;
+  uint32_t count;
+};
+
 static void ExpandArrayElementsSliced(std::string_view name, SimContext& ctx,
                                       std::vector<Logic4Vec>& parts,
-                                      uint32_t& total_width, uint32_t start,
-                                      uint32_t count) {
+                                      uint32_t& total_width,
+                                      StreamSliceRange range) {
   auto* info = ctx.FindArrayInfo(name);
   if (!info) return;
-  for (uint32_t i = 0; i < count; ++i) {
+  uint32_t start = range.start;
+  for (uint32_t i = 0; i < range.count; ++i) {
     uint32_t abs_idx = info->lo + start + i;
     if (start + i < info->size) {
       std::string elem_name =
@@ -138,8 +145,9 @@ static void ExpandQueueElements(QueueObject* queue,
 static void ExpandQueueElementsSliced(QueueObject* queue,
                                       std::vector<Logic4Vec>& parts,
                                       uint32_t& total_width, Arena& arena,
-                                      uint32_t start, uint32_t count) {
-  for (uint32_t i = 0; i < count; ++i) {
+                                      StreamSliceRange range) {
+  uint32_t start = range.start;
+  for (uint32_t i = 0; i < range.count; ++i) {
     if (start + i < queue->elements.size()) {
       parts.push_back(queue->elements[start + i]);
     } else {
@@ -209,73 +217,103 @@ static void ExpandClassProperties(ClassObject* obj,
   }
 }
 
+// Tries to expand an unpacked aggregate identifier (array/queue/assoc/struct/
+// class) into its constituent parts. Returns true if the identifier named such
+// an aggregate (and was handled, possibly contributing zero parts); false if
+// the element should be evaluated as an ordinary expression by the caller.
+static bool TryExpandAggregateElement(const Expr* elem, SimContext& ctx,
+                                      Arena& arena,
+                                      std::vector<Logic4Vec>& parts,
+                                      uint32_t& total_width) {
+  if (auto* ainfo = ctx.FindArrayInfo(elem->text)) {
+    if (elem->with_expr) {
+      uint32_t start = 0, count = 0;
+      ResolveWithRange(elem->with_expr, ctx, arena, ainfo->size, ainfo->lo,
+                       start, count);
+      ExpandArrayElementsSliced(elem->text, ctx, parts, total_width,
+                                {start, count});
+    } else {
+      ExpandArrayElements(elem->text, ctx, parts, total_width);
+    }
+    return true;
+  }
+
+  if (auto* queue = ctx.FindQueue(elem->text)) {
+    if (elem->with_expr) {
+      uint32_t start = 0, count = 0;
+      ResolveWithRange(elem->with_expr, ctx, arena,
+                       static_cast<uint32_t>(queue->elements.size()), 0, start,
+                       count);
+      ExpandQueueElementsSliced(queue, parts, total_width, arena,
+                                {start, count});
+    } else {
+      ExpandQueueElements(queue, parts, total_width, arena);
+    }
+    return true;
+  }
+
+  if (auto* aa = ctx.FindAssocArray(elem->text)) {
+    ExpandAssocArrayElements(aa, parts, total_width);
+    return true;
+  }
+
+  if (auto* sinfo = ctx.GetVariableStructType(elem->text)) {
+    auto* var = ctx.FindVariable(elem->text);
+    if (var) {
+      if (sinfo->is_union) {
+        ExpandUnionFirstMember(var, sinfo, parts, total_width, arena);
+      } else {
+        ExpandStructFields(var, sinfo, parts, total_width, arena);
+      }
+      return true;
+    }
+  }
+
+  if (auto class_type = ctx.GetVariableClassType(elem->text);
+      !class_type.empty()) {
+    auto* var = ctx.FindVariable(elem->text);
+    if (var) {
+      uint64_t handle = var->value.ToUint64();
+      if (handle == kNullClassHandle) {
+        return true;
+      }
+      auto* obj = ctx.GetClassObject(handle);
+      if (obj) {
+        ExpandClassProperties(obj, parts, total_width, arena);
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+// Reverses the concatenation in slice_size-wide chunks (the `<<` streaming
+// reorder), mapping each source slice to its mirrored destination position.
+static Logic4Vec StreamReorderSlices(const Logic4Vec& concat,
+                                     uint32_t total_width, uint32_t slice_size,
+                                     Arena& arena) {
+  uint32_t nslices = (total_width + slice_size - 1) / slice_size;
+  auto result = MakeLogic4Vec(arena, total_width);
+  for (uint32_t i = 0; i < nslices; ++i) {
+    uint32_t src_start = i * slice_size;
+    uint32_t dst_start = total_width > (i + 1) * slice_size
+                             ? total_width - (i + 1) * slice_size
+                             : 0;
+    uint64_t slice = ExtractSlice(concat, src_start, slice_size);
+    PlaceSlice(result, dst_start, slice, slice_size);
+  }
+  return result;
+}
+
 Logic4Vec EvalStreamingConcat(const Expr* expr, SimContext& ctx, Arena& arena) {
   uint32_t total_width = 0;
   std::vector<Logic4Vec> parts;
   for (auto* elem : expr->elements) {
-    if (elem->kind == ExprKind::kIdentifier) {
-      if (auto* ainfo = ctx.FindArrayInfo(elem->text)) {
-        if (elem->with_expr) {
-          uint32_t start = 0, count = 0;
-          ResolveWithRange(elem->with_expr, ctx, arena, ainfo->size, ainfo->lo,
-                           start, count);
-          ExpandArrayElementsSliced(elem->text, ctx, parts, total_width, start,
-                                    count);
-        } else {
-          ExpandArrayElements(elem->text, ctx, parts, total_width);
-        }
-        continue;
-      }
-
-      if (auto* queue = ctx.FindQueue(elem->text)) {
-        if (elem->with_expr) {
-          uint32_t start = 0, count = 0;
-          ResolveWithRange(elem->with_expr, ctx, arena,
-                           static_cast<uint32_t>(queue->elements.size()), 0,
-                           start, count);
-          ExpandQueueElementsSliced(queue, parts, total_width, arena, start,
-                                    count);
-        } else {
-          ExpandQueueElements(queue, parts, total_width, arena);
-        }
-        continue;
-      }
-
-      if (auto* aa = ctx.FindAssocArray(elem->text)) {
-        ExpandAssocArrayElements(aa, parts, total_width);
-        continue;
-      }
-
-      if (auto* sinfo = ctx.GetVariableStructType(elem->text)) {
-        auto* var = ctx.FindVariable(elem->text);
-        if (var) {
-          if (sinfo->is_union) {
-            ExpandUnionFirstMember(var, sinfo, parts, total_width, arena);
-          } else {
-            ExpandStructFields(var, sinfo, parts, total_width, arena);
-          }
-          continue;
-        }
-      }
-
-      if (auto class_type = ctx.GetVariableClassType(elem->text);
-          !class_type.empty()) {
-        auto* var = ctx.FindVariable(elem->text);
-        if (var) {
-          uint64_t handle = var->value.ToUint64();
-          if (handle == kNullClassHandle) {
-            continue;
-          }
-
-          auto* obj = ctx.GetClassObject(handle);
-          if (obj) {
-            ExpandClassProperties(obj, parts, total_width, arena);
-            continue;
-          }
-        }
-      }
+    if (elem->kind == ExprKind::kIdentifier &&
+        TryExpandAggregateElement(elem, ctx, arena, parts, total_width)) {
+      continue;
     }
-
     parts.push_back(EvalExpr(elem, ctx, arena));
     total_width += parts.back().width;
   }
@@ -291,16 +329,7 @@ Logic4Vec EvalStreamingConcat(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (expr->op != TokenKind::kLtLt) return concat;
 
   uint32_t ss = StreamSliceSize(expr->lhs, ctx, arena);
-  uint32_t nslices = (total_width + ss - 1) / ss;
-  auto result = MakeLogic4Vec(arena, total_width);
-  for (uint32_t i = 0; i < nslices; ++i) {
-    uint32_t src_start = i * ss;
-    uint32_t dst_start =
-        total_width > (i + 1) * ss ? total_width - (i + 1) * ss : 0;
-    uint64_t slice = ExtractSlice(concat, src_start, ss);
-    PlaceSlice(result, dst_start, slice, ss);
-  }
-  return result;
+  return StreamReorderSlices(concat, total_width, ss, arena);
 }
 
 Logic4Vec EvalAssignmentPattern(const Expr* expr, SimContext& ctx,

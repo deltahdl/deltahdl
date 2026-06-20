@@ -67,6 +67,31 @@ void CollectSequenceAtoms(const SequenceExpr& seq, std::set<std::string>& out,
 // finite; that is ample for the sequences this model evaluates.
 std::vector<Letter> CandidateAlphabet(const std::set<std::string>& atoms);
 
+template <typename Property>
+std::size_t PropertyReach(const Property& property);
+
+// The reach contributed by a property's optional embedded sequence: its
+// SequenceReach when present, otherwise `absent`. Factoring the optional-child
+// ternaries out of PropertyReach keeps that switch's per-case arms flat.
+template <typename Property>
+std::size_t SequenceChildReach(const Property& property, std::size_t absent) {
+  return property.sequence ? SequenceReach(*property.sequence) : absent;
+}
+
+// The reach of a property's optional left operand: PropertyReach of it when
+// present, otherwise `absent`.
+template <typename Property>
+std::size_t LhsChildReach(const Property& property, std::size_t absent) {
+  return property.lhs ? PropertyReach(*property.lhs) : absent;
+}
+
+// The reach of a property's optional right operand: PropertyReach of it when
+// present, otherwise `absent`.
+template <typename Property>
+std::size_t RhsChildReach(const Property& property, std::size_t absent) {
+  return property.rhs ? PropertyReach(*property.rhs) : absent;
+}
+
 // A structural bound on how far a property can reach into a word; once a word's
 // suffix lies entirely inside a constant tail this many letters past the
 // explicit prefix, extending the tail cannot change the verdict. Templated on
@@ -78,27 +103,24 @@ std::size_t PropertyReach(const Property& property) {
   switch (property.kind) {
     case Property::Kind::kStrong:
     case Property::Kind::kWeak:
-      return property.sequence ? SequenceReach(*property.sequence) : 1;
+      return SequenceChildReach(property, 1);
     case Property::Kind::kParen:
     case Property::Kind::kNot:
-      return property.lhs ? PropertyReach(*property.lhs) : 1;
+      return LhsChildReach(property, 1);
     case Property::Kind::kImplication:
-      return (property.sequence ? SequenceReach(*property.sequence) : 0) +
-             (property.lhs ? PropertyReach(*property.lhs) : 0);
+      return SequenceChildReach(property, 0) + LhsChildReach(property, 0);
     case Property::Kind::kOr:
     case Property::Kind::kAnd:
-      return std::max(property.lhs ? PropertyReach(*property.lhs) : 0,
-                      property.rhs ? PropertyReach(*property.rhs) : 0);
+      return std::max(LhsChildReach(property, 0), RhsChildReach(property, 0));
     case Property::Kind::kUntil:
-      return (property.lhs ? PropertyReach(*property.lhs) : 0) +
-             (property.rhs ? PropertyReach(*property.rhs) : 0) + 1;
+      return LhsChildReach(property, 0) + RhsChildReach(property, 0) + 1;
     case Property::Kind::kNexttime:
     case Property::Kind::kAcceptOn:
-      return (property.lhs ? PropertyReach(*property.lhs) : 0) + 1;
+      return LhsChildReach(property, 0) + 1;
     default:
       // §F.5.6's local-variable declaration form ( t v ; P ) reaches as far as
       // its body, exactly like the parenthesized form above.
-      return property.lhs ? PropertyReach(*property.lhs) : 1;
+      return LhsChildReach(property, 1);
   }
 }
 

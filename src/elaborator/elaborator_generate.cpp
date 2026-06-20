@@ -160,19 +160,10 @@ static void CollectGenerateBlockNames(
   }
 }
 
-// §27.5: enforce the naming rules for conditional generate constructs. A named
-// generate block shares the enclosing scope's namespace, so the name of a block
-// in an if-generate or case-generate must not also name another declaration in
-// that scope, nor a generate block belonging to a different generate construct
-// in the same scope. The check looks at every alternative of the construct,
-// independent of which one (if any) elaboration selects for instantiation, so a
-// collision is reported even when the offending block is not instantiated.
-// Reusing a name across the alternatives of one conditional construct is left
-// untouched: those names are deduplicated per construct, so only one will be
-// counted.
-void Elaborator::CheckConditionalGenerateNaming(const ModuleDecl* decl) {
-  // Names of ordinary declarations in this scope: ports, parameters, and the
-  // named module items that are not themselves generate constructs.
+// Names of ordinary declarations in this scope: ports, parameters, and the
+// named module items that are not themselves generate constructs.
+static std::unordered_set<std::string_view> CollectNonGenerateDeclNames(
+    const ModuleDecl* decl) {
   std::unordered_set<std::string_view> decl_names;
   for (const auto& port : decl->ports)
     if (!port.name.empty()) decl_names.insert(port.name);
@@ -184,10 +175,14 @@ void Elaborator::CheckConditionalGenerateNaming(const ModuleDecl* decl) {
     if (!item->inst_name.empty()) decl_names.insert(item->inst_name);
     if (!item->gate_inst_name.empty()) decl_names.insert(item->gate_inst_name);
   }
+  return decl_names;
+}
 
-  // How many distinct generate constructs in this scope declare a block of each
-  // name. A name claimed by more than one construct violates the rule against
-  // sharing a block name across conditional or loop generate constructs.
+// How many distinct generate constructs in this scope declare a block of each
+// name. A name claimed by more than one construct violates the rule against
+// sharing a block name across conditional or loop generate constructs.
+static std::unordered_map<std::string_view, int> CountGenerateConstructUses(
+    const ModuleDecl* decl) {
   std::unordered_map<std::string_view, int> construct_uses;
   for (const auto* item : decl->items) {
     if (!IsGenerateConstruct(item->kind)) continue;
@@ -195,28 +190,59 @@ void Elaborator::CheckConditionalGenerateNaming(const ModuleDecl* decl) {
     CollectGenerateBlockNames(item, names);
     for (auto n : names) ++construct_uses[n];
   }
+  return construct_uses;
+}
+
+// Report any conditional-generate naming conflicts for the block names declared
+// by a single if/case generate construct. A name colliding with an ordinary
+// declaration in the same scope, or with a generate block of a different
+// construct, is an error; names are deduplicated per construct so that reusing
+// one across the alternatives of the same construct is not flagged.
+static void ReportConditionalGenerateNameConflicts(
+    DiagEngine& diag, const ModuleItem* item,
+    const std::unordered_set<std::string_view>& decl_names,
+    std::unordered_map<std::string_view, int>& construct_uses) {
+  std::unordered_set<std::string_view> names;
+  CollectGenerateBlockNames(item, names);
+  for (auto n : names) {
+    if (decl_names.count(n)) {
+      diag.Error(item->loc,
+                 std::format("generate block '{}' conflicts with another "
+                             "declaration in the same scope",
+                             n));
+    } else if (construct_uses[n] > 1) {
+      diag.Error(item->loc,
+                 std::format("generate block '{}' has the same name as a "
+                             "generate block in another generate construct "
+                             "in the same scope",
+                             n));
+    }
+  }
+}
+
+// §27.5: enforce the naming rules for conditional generate constructs. A named
+// generate block shares the enclosing scope's namespace, so the name of a block
+// in an if-generate or case-generate must not also name another declaration in
+// that scope, nor a generate block belonging to a different generate construct
+// in the same scope. The check looks at every alternative of the construct,
+// independent of which one (if any) elaboration selects for instantiation, so a
+// collision is reported even when the offending block is not instantiated.
+// Reusing a name across the alternatives of one conditional construct is left
+// untouched: those names are deduplicated per construct, so only one will be
+// counted.
+void Elaborator::CheckConditionalGenerateNaming(const ModuleDecl* decl) {
+  std::unordered_set<std::string_view> decl_names =
+      CollectNonGenerateDeclNames(decl);
+  std::unordered_map<std::string_view, int> construct_uses =
+      CountGenerateConstructUses(decl);
 
   for (const auto* item : decl->items) {
     if (item->kind != ModuleItemKind::kGenerateIf &&
         item->kind != ModuleItemKind::kGenerateCase) {
       continue;
     }
-    std::unordered_set<std::string_view> names;
-    CollectGenerateBlockNames(item, names);
-    for (auto n : names) {
-      if (decl_names.count(n)) {
-        diag_.Error(item->loc,
-                    std::format("generate block '{}' conflicts with another "
-                                "declaration in the same scope",
-                                n));
-      } else if (construct_uses[n] > 1) {
-        diag_.Error(item->loc,
-                    std::format("generate block '{}' has the same name as a "
-                                "generate block in another generate construct "
-                                "in the same scope",
-                                n));
-      }
-    }
+    ReportConditionalGenerateNameConflicts(diag_, item, decl_names,
+                                           construct_uses);
   }
 }
 
@@ -265,37 +291,73 @@ static bool ExprHasXZLiteral(const Expr* e) {
   return ExprHasXZLiteral(e->lhs) || ExprHasXZLiteral(e->rhs);
 }
 
-void Elaborator::ElaborateGenerateFor(ModuleItem* item, RtlirModule* mod,
-                                      const ScopeMap& scope) {
+// §27.4: validate the static form of a generate-for header before any
+// iteration. Returns the genvar name when the init/step are well formed (init
+// does not reference the loop index, step assigns the same genvar, and the init
+// value has no x/z bit); returns nullopt and reports the offending diagnostic
+// otherwise.
+static std::optional<std::string_view> ValidateGenerateForHeader(
+    DiagEngine& diag, const ModuleItem* item) {
   if (!item->gen_init || !item->gen_init->lhs) {
-    diag_.Warning(item->loc, "malformed generate-for initializer");
-    return;
+    diag.Warning(item->loc, "malformed generate-for initializer");
+    return std::nullopt;
   }
   auto genvar_name = item->gen_init->lhs->text;
 
   if (ExprReferencesName(item->gen_init->rhs, genvar_name)) {
-    diag_.Error(item->loc,
-                "generate-for init shall not reference the loop index on the "
-                "right-hand side");
-    return;
+    diag.Error(item->loc,
+               "generate-for init shall not reference the loop index on the "
+               "right-hand side");
+    return std::nullopt;
   }
 
   auto step_lhs = StepLhsName(item->gen_step);
   if (!step_lhs.empty() && step_lhs != genvar_name) {
-    diag_.Error(item->loc,
-                "generate-for init and step shall assign to the same genvar");
-    return;
+    diag.Error(item->loc,
+               "generate-for init and step shall assign to the same genvar");
+    return std::nullopt;
   }
 
   // §27.4: it shall be an error if any bit of the genvar is set to x or z
   // during evaluation. An x/z initialization value triggers a dedicated
   // error rather than the generic non-constant warning.
   if (ExprHasXZLiteral(item->gen_init->rhs)) {
-    diag_.Error(item->loc,
-                "generate-for genvar shall not have any bit set to x or z "
-                "during evaluation");
-    return;
+    diag.Error(item->loc,
+               "generate-for genvar shall not have any bit set to x or z "
+               "during evaluation");
+    return std::nullopt;
   }
+  return genvar_name;
+}
+
+// §27.4: compute the genvar value for the next iteration of a generate-for
+// loop. Supports a right-hand-side step expression as well as ++/-- on the
+// genvar. Returns nullopt when no valid next value can be determined, which
+// terminates the loop.
+static std::optional<int64_t> ComputeGenerateForNextValue(
+    const ModuleItem* item, const ScopeMap& loop_scope) {
+  if (item->gen_step->rhs) {
+    return ConstEvalInt(item->gen_step->rhs, loop_scope);
+  }
+  if (item->gen_step->expr) {
+    auto* e = item->gen_step->expr;
+    if ((e->kind == ExprKind::kUnary || e->kind == ExprKind::kPostfixUnary) &&
+        e->lhs && e->lhs->kind == ExprKind::kIdentifier) {
+      auto it = loop_scope.find(e->lhs->text);
+      if (it != loop_scope.end()) {
+        if (e->op == TokenKind::kPlusPlus) return it->second + 1;
+        if (e->op == TokenKind::kMinusMinus) return it->second - 1;
+      }
+    }
+  }
+  return std::nullopt;
+}
+
+void Elaborator::ElaborateGenerateFor(ModuleItem* item, RtlirModule* mod,
+                                      const ScopeMap& scope) {
+  auto genvar_name_opt = ValidateGenerateForHeader(diag_, item);
+  if (!genvar_name_opt) return;
+  auto genvar_name = *genvar_name_opt;
 
   // §27.4: a named loop generate block declares an array of generate block
   // instances, and it shall be an error if that array's name collides with any
@@ -355,22 +417,7 @@ void Elaborator::ElaborateGenerateFor(ModuleItem* item, RtlirModule* mod,
       return;
     }
 
-    std::optional<int64_t> next;
-    if (item->gen_step->rhs) {
-      next = ConstEvalInt(item->gen_step->rhs, loop_scope);
-    } else if (item->gen_step->expr) {
-      auto* e = item->gen_step->expr;
-      if ((e->kind == ExprKind::kUnary || e->kind == ExprKind::kPostfixUnary) &&
-          e->lhs && e->lhs->kind == ExprKind::kIdentifier) {
-        auto it = loop_scope.find(e->lhs->text);
-        if (it != loop_scope.end()) {
-          if (e->op == TokenKind::kPlusPlus)
-            next = it->second + 1;
-          else if (e->op == TokenKind::kMinusMinus)
-            next = it->second - 1;
-        }
-      }
-    }
+    std::optional<int64_t> next = ComputeGenerateForNextValue(item, loop_scope);
     if (!next) break;
     loop_scope[genvar_name] = *next;
   }

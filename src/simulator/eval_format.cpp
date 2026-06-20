@@ -411,48 +411,47 @@ static void AppendLiteralChar(const std::string& fmt, size_t& i,
   }
 }
 
-static bool ProcessFormatSpec(const std::string& fmt, size_t& i,
-                              FormatArgs& args, std::string& out) {
-  if (fmt[i + 1] == '%') {
-    out += '%';
-    ++i;
-    return false;
-  }
-
-  // §21.2.1.2: an optional field width may sit between the '%' and the radix
-  // letter. It shall be a non-negative decimal integer constant; collect it
-  // here so the value rendering below can size its result accordingly.
-  size_t j = i + 1;
-  bool has_width = false;
-  uint32_t width = 0;
-  while (j < fmt.size() && fmt[j] >= '0' && fmt[j] <= '9') {
+// §21.2.1.2: parse the optional field width that may sit between the '%' and
+// the radix letter. It shall be a non-negative decimal integer constant.
+// Starting at fmt[start] (the character after the '%'), advance past the run of
+// digits and report whether any were seen along with their value; leave start
+// pointing at the first non-digit (the radix letter).
+static void ParseFieldWidth(const std::string& fmt, size_t& start,
+                            bool& has_width, uint32_t& width) {
+  has_width = false;
+  width = 0;
+  while (start < fmt.size() && fmt[start] >= '0' && fmt[start] <= '9') {
     has_width = true;
-    width = width * 10 + static_cast<uint32_t>(fmt[j] - '0');
-    ++j;
+    width = width * 10 + static_cast<uint32_t>(fmt[start] - '0');
+    ++start;
   }
-  char spec = (j < fmt.size()) ? fmt[j] : 'd';
+}
 
-  // Table 21-1 and Table 21-2 give each specifier in both cases (e.g.
-  // "%m or %M"); collapse to a single case before deciding what to do.
-  if (spec >= 'A' && spec <= 'Z') spec = static_cast<char>(spec - 'A' + 'a');
-
-  // §21.2.1.5: %m takes no argument; it expands to the hierarchical name of the
-  // scope that invokes the system task. Returning false leaves the argument
-  // cursor untouched so no expression value is consumed.
+// Specifiers that take no expression argument (%m, %l) substitute a scope-
+// derived token directly. Returns true when the spec was handled here; the
+// caller then leaves the argument cursor untouched.
+static bool TryNoArgScopeSpec(char spec, FormatArgs& args, std::string& out) {
+  // §21.2.1.5: %m expands to the hierarchical name of the scope that invokes
+  // the system task.
   if (spec == 'm') {
     out += BuildScopeHierName(args.ctx);
-    i = j;
-    return false;
+    return true;
   }
-
   // §33.7: %l / %L expand to the library.cell binding of the module instance
   // that contains the display task, consuming no argument the way %m does.
   if (spec == 'l') {
     out += BuildInstanceBinding(args.ctx);
-    i = j;
-    return false;
+    return true;
   }
+  return false;
+}
 
+// Specifiers whose substitution is precomputed by the calling task and held in
+// a parallel string vector indexed by the argument cursor: %v (§21.2.1.4 net
+// strength) and %p (assignment-pattern rendering). Returns true when the spec
+// was handled here; in that case the argument cursor has been advanced.
+static bool TryPrecomputedArgSpec(char spec, FormatArgs& args,
+                                  std::string& out) {
   // §21.2.1.4: %v prints the strength of a scalar net. Each %v consumes one
   // argument; the strength string is precomputed by the calling task, which
   // holds the net reference, and is substituted verbatim here.
@@ -461,17 +460,21 @@ static bool ProcessFormatSpec(const std::string& fmt, size_t& i,
       out += args.v_fmts[args.vi];
     }
     ++args.vi;
-    i = j;
     return true;
   }
-
   if (spec == 'p' && args.vi < args.p_fmts.size() &&
       !args.p_fmts[args.vi].empty()) {
     out += args.p_fmts[args.vi];
     ++args.vi;
-    i = j;
     return true;
   }
+  return false;
+}
+
+// Render the next value argument for an ordinary radix/real/time specifier,
+// advancing the argument cursor when a value is consumed.
+static void AppendValueArg(char spec, bool has_width, uint32_t width,
+                           FormatArgs& args, std::string& out) {
   if (args.vi < args.vals.size()) {
     if (spec == 't' && args.time_format != nullptr) {
       out += FormatTimeUnderTimeformat(args.vals[args.vi++], *args.time_format);
@@ -479,6 +482,39 @@ static bool ProcessFormatSpec(const std::string& fmt, size_t& i,
       out += FormatArgWidth(args.vals[args.vi++], spec, has_width, width);
     }
   }
+}
+
+static bool ProcessFormatSpec(const std::string& fmt, size_t& i,
+                              FormatArgs& args, std::string& out) {
+  if (fmt[i + 1] == '%') {
+    out += '%';
+    ++i;
+    return false;
+  }
+
+  size_t j = i + 1;
+  bool has_width = false;
+  uint32_t width = 0;
+  ParseFieldWidth(fmt, j, has_width, width);
+  char spec = (j < fmt.size()) ? fmt[j] : 'd';
+
+  // Table 21-1 and Table 21-2 give each specifier in both cases (e.g.
+  // "%m or %M"); collapse to a single case before deciding what to do.
+  if (spec >= 'A' && spec <= 'Z') spec = static_cast<char>(spec - 'A' + 'a');
+
+  // No-argument scope specifiers leave the argument cursor untouched, so report
+  // false to the caller.
+  if (TryNoArgScopeSpec(spec, args, out)) {
+    i = j;
+    return false;
+  }
+
+  if (TryPrecomputedArgSpec(spec, args, out)) {
+    i = j;
+    return true;
+  }
+
+  AppendValueArg(spec, has_width, width, args, out);
   i = j;
   return true;
 }

@@ -118,6 +118,37 @@ static bool IsUserDefinedType(
   return typedefs.count(name) > 0 || class_names.count(name) > 0;
 }
 
+static void ApplyUserDefinedAssocDim(
+    const Expr* dim, RtlirVariable& var, const TypedefMap& typedefs,
+    const std::unordered_set<std::string_view>& class_names) {
+  var.is_assoc = true;
+  if (class_names.count(dim->text) > 0) {
+    var.is_class_index = true;
+    var.assoc_index_class_name = dim->text;
+    var.assoc_index_width = 64;
+    return;
+  }
+  auto it = typedefs.find(dim->text);
+  if (it != typedefs.end()) {
+    var.assoc_index_width = EvalTypeWidth(it->second, typedefs);
+    // A typedef'd integral index follows the signedness of its underlying
+    // type, so e.g. `bit signed [4:1]` orders signed and `bit [4:1]`
+    // orders unsigned (§7.8.4).
+    var.is_index_signed = IsSignedType(it->second, typedefs);
+  }
+}
+
+static void ApplyConstSizedUnpackedDim(const Expr* dim, RtlirVariable& var,
+                                       DiagEngine& diag, SourceLoc loc) {
+  auto size_val = ConstEvalInt(dim);
+  if (!size_val) return;
+  if (*size_val <= 0) {
+    diag.Error(loc, "unpacked dimension size shall be a positive integer");
+  } else {
+    var.unpacked_size = static_cast<uint32_t>(*size_val);
+  }
+}
+
 static void ComputeUnpackedDims(
     const std::vector<Expr*>& dims, RtlirVariable& var,
     const TypedefMap& typedefs,
@@ -130,34 +161,12 @@ static void ComputeUnpackedDims(
 
   if (dim->kind == ExprKind::kIdentifier &&
       IsUserDefinedType(dim->text, typedefs, class_names)) {
-    var.is_assoc = true;
-
-    if (class_names.count(dim->text) > 0) {
-      var.is_class_index = true;
-      var.assoc_index_class_name = dim->text;
-      var.assoc_index_width = 64;
-    } else {
-      auto it = typedefs.find(dim->text);
-      if (it != typedefs.end()) {
-        var.assoc_index_width = EvalTypeWidth(it->second, typedefs);
-        // A typedef'd integral index follows the signedness of its underlying
-        // type, so e.g. `bit signed [4:1]` orders signed and `bit [4:1]`
-        // orders unsigned (§7.8.4).
-        var.is_index_signed = IsSignedType(it->second, typedefs);
-      }
-    }
+    ApplyUserDefinedAssocDim(dim, var, typedefs, class_names);
     return;
   }
   if (TryParseRangeDim(dim, var)) return;
 
-  auto size_val = ConstEvalInt(dim);
-  if (size_val) {
-    if (*size_val <= 0) {
-      diag.Error(loc, "unpacked dimension size shall be a positive integer");
-    } else {
-      var.unpacked_size = static_cast<uint32_t>(*size_val);
-    }
-  }
+  ApplyConstSizedUnpackedDim(dim, var, diag, loc);
 }
 
 bool Elaborator::ReconcilePartialPortSignedness(std::string_view name,
@@ -176,33 +185,136 @@ bool Elaborator::ReconcilePartialPortSignedness(std::string_view name,
   return effective;
 }
 
-void Elaborator::ElaborateNetDecl(ModuleItem* item, RtlirModule* mod) {
-  if (ansi_port_names_.count(item->name)) {
-    diag_.Error(item->loc,
-                std::format("redeclaration of ANSI port '{}'", item->name));
-  }
+// §23.2.2.1: bundle of name-table state that a net/variable declaration checks
+// against (and updates) for redeclaration and partial-port reconciliation.
+struct DeclNameTables {
+  const std::unordered_set<std::string_view>& ansi_port_names;
+  const std::unordered_set<std::string_view>& non_ansi_complete_ports;
+  const std::unordered_map<std::string_view, uint32_t>& non_ansi_partial_ports;
+  std::unordered_set<std::string_view>& declared_names;
+};
 
-  if (non_ansi_complete_ports_.count(item->name)) {
-    diag_.Error(
+// §23.2.2.1: diagnose redeclaration of a declared name and width mismatches
+// against an earlier partial (direction-only) port declaration. `kind_word`
+// selects "net" or "variable" in the vector-range message.
+static void CheckDeclRedeclaration(
+    const ModuleItem* item, const DataType& dtype, const TypedefMap& typedefs,
+    DeclNameTables tables, std::string_view kind_word, DiagEngine& diag) {
+  if (tables.ansi_port_names.count(item->name)) {
+    diag.Error(item->loc,
+               std::format("redeclaration of ANSI port '{}'", item->name));
+  }
+  if (tables.non_ansi_complete_ports.count(item->name)) {
+    diag.Error(
         item->loc,
         std::format("redeclaration of port '{}' that has a complete port "
                     "declaration",
                     item->name));
   }
-
-  auto it = non_ansi_partial_ports_.find(item->name);
-  if (it != non_ansi_partial_ports_.end()) {
-    uint32_t net_width = EvalTypeWidth(item->data_type, typedefs_);
-    if (net_width != it->second) {
-      diag_.Error(
-          item->loc,
-          std::format(
-              "vector range of net '{}' does not match its port declaration",
-              item->name));
+  auto it = tables.non_ansi_partial_ports.find(item->name);
+  if (it != tables.non_ansi_partial_ports.end()) {
+    uint32_t decl_width = EvalTypeWidth(dtype, typedefs);
+    if (decl_width != it->second) {
+      diag.Error(item->loc,
+                 std::format("vector range of {} '{}' does not match its port "
+                             "declaration",
+                             kind_word, item->name));
     }
-  } else if (!declared_names_.insert(item->name).second) {
-    diag_.Error(item->loc, std::format("redeclaration of '{}'", item->name));
+  } else if (!tables.declared_names.insert(item->name).second) {
+    diag.Error(item->loc, std::format("redeclaration of '{}'", item->name));
   }
+}
+
+// §6.7.1 / §23.2.2.1: a net declared with a vector type that cannot carry a
+// 4-state value is rejected.
+static void ValidateNetDataTypeIs4State(const DataType& dtype, DiagEngine& diag,
+                                        SourceLoc loc) {
+  if (dtype.is_interconnect) return;
+  DataTypeKind k = dtype.kind;
+  if (k != DataTypeKind::kStruct && k != DataTypeKind::kUnion &&
+      k != DataTypeKind::kEnum && k != DataTypeKind::kNamed &&
+      DataTypeToNetType(k) == NetType::kWire && k != DataTypeKind::kWire &&
+      !Is4stateType(k)) {
+    diag.Error(loc, "net data type must be 4-state");
+  }
+}
+
+// §28.12: a vectored/scalared modifier requires at least one packed dimension.
+static void ValidateVectoredScalaredNet(const DataType& dtype,
+                                        const RtlirNet& net, DiagEngine& diag,
+                                        SourceLoc loc) {
+  if ((dtype.is_vectored || dtype.is_scalared) && net.width <= 1 &&
+      dtype.packed_dim_left == nullptr) {
+    diag.Error(loc,
+               "vectored or scalared requires at least one packed dimension");
+  }
+}
+
+// §10.3.1: drive strengths on a continuous assignment apply only to scalar
+// nets (and never to supply nets).
+static void ValidateNetDriveStrength(const DataType& dtype, const RtlirNet& net,
+                                     DiagEngine& diag, SourceLoc loc) {
+  if ((dtype.drive_strength0 != 0 || dtype.drive_strength1 != 0) &&
+      net.width > 1 && net.net_type != NetType::kSupply0 &&
+      net.net_type != NetType::kSupply1) {
+    diag.Error(loc,
+               "drive strength on continuous assignment applies only to "
+               "scalar nets");
+  }
+}
+
+// §6.10: a net declaration assignment lowers to a continuous assignment of the
+// initializer to the net (illegal on interconnect nets).
+static void LowerNetDeclAssignment(
+    const ModuleItem* item, const RtlirNet& net, RtlirModule* mod, Arena& arena,
+    std::unordered_map<std::string_view, SourceLoc>& cont_assign_targets,
+    DiagEngine& diag) {
+  if (!item->init_expr) return;
+  if (item->data_type.is_interconnect) {
+    diag.Error(item->loc,
+               "interconnect net shall not have a net declaration assignment");
+    return;
+  }
+  auto* lhs = arena.Create<Expr>();
+  lhs->kind = ExprKind::kIdentifier;
+  lhs->text = item->name;
+  lhs->range = item->init_expr->range;
+  cont_assign_targets.emplace(item->name, item->loc);
+  RtlirContAssign ca;
+  ca.lhs = lhs;
+  ca.rhs = item->init_expr;
+  ca.width = net.width;
+  ca.drive_strength0 = item->data_type.drive_strength0;
+  ca.drive_strength1 = item->data_type.drive_strength1;
+  ca.delay = item->net_delay;
+  ca.delay_fall = item->net_delay_fall;
+  ca.delay_decay = item->net_delay_decay;
+  mod->assigns.push_back(ca);
+}
+
+// §6.10 / §28.16: apply the compilation unit's default trireg charge strength
+// and decay-time settings to a freshly built trireg net.
+static void ApplyTriregNetDefaults(const ModuleItem* item, RtlirNet& net,
+                                   const CompilationUnit* unit) {
+  if (net.net_type == NetType::kTrireg &&
+      item->data_type.charge_strength == 0 &&
+      unit->has_default_trireg_strength) {
+    net.trireg_capacitance = unit->default_trireg_strength;
+  }
+  if (item->net_delay_decay) {
+    net.decay_ticks =
+        static_cast<uint64_t>(ConstEvalInt(item->net_delay_decay).value_or(0));
+  } else if (net.net_type == NetType::kTrireg &&
+             !unit->default_decay_time_infinite) {
+    net.decay_ticks = unit->default_decay_time;
+  }
+}
+
+void Elaborator::ElaborateNetDecl(ModuleItem* item, RtlirModule* mod) {
+  CheckDeclRedeclaration(item, item->data_type, typedefs_,
+                         {ansi_port_names_, non_ansi_complete_ports_,
+                          non_ansi_partial_ports_, declared_names_},
+                         "net", diag_);
   net_names_.insert(item->name);
   var_types_[item->name] = item->data_type.kind;
   if (!item->data_type.packed_dim_left)
@@ -226,15 +338,7 @@ void Elaborator::ElaborateNetDecl(ModuleItem* item, RtlirModule* mod) {
   }
   ValidatePackedDimRange(item->data_type, item->loc);
 
-  if (!item->data_type.is_interconnect) {
-    DataTypeKind k = item->data_type.kind;
-    if (k != DataTypeKind::kStruct && k != DataTypeKind::kUnion &&
-        k != DataTypeKind::kEnum && k != DataTypeKind::kNamed &&
-        DataTypeToNetType(k) == NetType::kWire && k != DataTypeKind::kWire &&
-        !Is4stateType(k)) {
-      diag_.Error(item->loc, "net data type must be 4-state");
-    }
-  }
+  ValidateNetDataTypeIs4State(item->data_type, diag_, item->loc);
 
   if (item->data_type.charge_strength != 0 &&
       net.net_type != NetType::kTrireg) {
@@ -243,65 +347,21 @@ void Elaborator::ElaborateNetDecl(ModuleItem* item, RtlirModule* mod) {
   net.is_vectored = item->data_type.is_vectored;
   net.is_scalared = item->data_type.is_scalared;
 
-  if ((item->data_type.is_vectored || item->data_type.is_scalared) &&
-      net.width <= 1 && item->data_type.packed_dim_left == nullptr) {
-    diag_.Error(item->loc,
-                "vectored or scalared requires at least one packed dimension");
-  }
+  ValidateVectoredScalaredNet(item->data_type, net, diag_, item->loc);
 
   if (item->data_type.charge_strength != 0) {
     net.charge_strength =
         static_cast<Strength>(item->data_type.charge_strength);
   }
 
-  if (net.net_type == NetType::kTrireg &&
-      item->data_type.charge_strength == 0 &&
-      unit_->has_default_trireg_strength) {
-    net.trireg_capacitance = unit_->default_trireg_strength;
-  }
-  if (item->net_delay_decay) {
-    net.decay_ticks =
-        static_cast<uint64_t>(ConstEvalInt(item->net_delay_decay).value_or(0));
-  } else if (net.net_type == NetType::kTrireg &&
-             !unit_->default_decay_time_infinite) {
-    net.decay_ticks = unit_->default_decay_time;
-  }
+  ApplyTriregNetDefaults(item, net, unit_);
 
   net.attrs = ResolveAttributes(item->attrs, diag_);
   mod->nets.push_back(net);
 
-  if ((item->data_type.drive_strength0 != 0 ||
-       item->data_type.drive_strength1 != 0) &&
-      net.width > 1 && net.net_type != NetType::kSupply0 &&
-      net.net_type != NetType::kSupply1) {
-    diag_.Error(item->loc,
-                "drive strength on continuous assignment applies only to "
-                "scalar nets");
-  }
+  ValidateNetDriveStrength(item->data_type, net, diag_, item->loc);
 
-  if (item->init_expr) {
-    if (item->data_type.is_interconnect) {
-      diag_.Error(
-          item->loc,
-          "interconnect net shall not have a net declaration assignment");
-      return;
-    }
-    auto* lhs = arena_.Create<Expr>();
-    lhs->kind = ExprKind::kIdentifier;
-    lhs->text = item->name;
-    lhs->range = item->init_expr->range;
-    cont_assign_targets_.emplace(item->name, item->loc);
-    RtlirContAssign ca;
-    ca.lhs = lhs;
-    ca.rhs = item->init_expr;
-    ca.width = net.width;
-    ca.drive_strength0 = item->data_type.drive_strength0;
-    ca.drive_strength1 = item->data_type.drive_strength1;
-    ca.delay = item->net_delay;
-    ca.delay_fall = item->net_delay_fall;
-    ca.delay_decay = item->net_delay_decay;
-    mod->assigns.push_back(ca);
-  }
+  LowerNetDeclAssignment(item, net, mod, arena_, cont_assign_targets_, diag_);
 }
 
 static void SetEnumTypeInfo(const ModuleItem* item, RtlirVariable& var,
@@ -337,37 +397,45 @@ void Elaborator::SetStructTypeInfo(const ModuleItem* item, RtlirVariable& var) {
   var.dtype = arena_.Create<DataType>(td->second);
 }
 
+static void ValidateParameterizedClassDefaults(const ModuleItem* item,
+                                               const CompilationUnit* unit,
+                                               DiagEngine& diag) {
+  if (!item->data_type.type_params.empty()) return;
+  const auto* cls = FindClassDecl(item->data_type.type_name, unit);
+  if (!cls || cls->params.empty()) return;
+  for (const auto& [pname, pexpr] : cls->params) {
+    if (!pexpr && !cls->type_param_names.count(pname)) {
+      diag.Error(item->loc,
+                 std::format("parameterized class '{}' has no default "
+                             "specialization; parameter '{}' has no "
+                             "default value",
+                             cls->name, pname));
+      break;
+    }
+  }
+}
+
+static void ValidateWeakReferenceTypeParam(
+    const ModuleItem* item,
+    const std::unordered_set<std::string_view>& class_names, DiagEngine& diag) {
+  if (item->data_type.type_name != "weak_reference" ||
+      item->data_type.type_params.empty()) {
+    return;
+  }
+  const auto& tp = item->data_type.type_params[0];
+  if (tp.kind != DataTypeKind::kNamed || !class_names.count(tp.type_name)) {
+    diag.Error(item->loc,
+               "weak_reference type parameter shall be a class type");
+  }
+}
+
 void Elaborator::ValidateVarDeclTypes(ModuleItem* item) {
   if (item->data_type.kind == DataTypeKind::kNamed &&
       class_names_.count(item->data_type.type_name)) {
     class_var_names_.insert(item->name);
     class_var_types_[item->name] = item->data_type.type_name;
-
-    if (item->data_type.type_params.empty()) {
-      const auto* cls = FindClassDecl(item->data_type.type_name, unit_);
-      if (cls && !cls->params.empty()) {
-        for (const auto& [pname, pexpr] : cls->params) {
-          if (!pexpr && !cls->type_param_names.count(pname)) {
-            diag_.Error(item->loc,
-                        std::format("parameterized class '{}' has no default "
-                                    "specialization; parameter '{}' has no "
-                                    "default value",
-                                    cls->name, pname));
-            break;
-          }
-        }
-      }
-    }
-
-    if (item->data_type.type_name == "weak_reference" &&
-        !item->data_type.type_params.empty()) {
-      const auto& tp = item->data_type.type_params[0];
-      if (tp.kind != DataTypeKind::kNamed ||
-          !class_names_.count(tp.type_name)) {
-        diag_.Error(item->loc,
-                    "weak_reference type parameter shall be a class type");
-      }
-    }
+    ValidateParameterizedClassDefaults(item, unit_, diag_);
+    ValidateWeakReferenceTypeParam(item, class_names_, diag_);
   }
   if (item->data_type.kind == DataTypeKind::kEnum) {
     ValidateEnumDecl(item->data_type, item->loc);
@@ -390,6 +458,23 @@ void Elaborator::ValidateVarDeclTypes(ModuleItem* item) {
   ValidateAssocIndexType(item);
 }
 
+static void CollectUnpackedDimSizes(const std::vector<Expr*>& dims,
+                                    std::vector<uint32_t>& dim_sizes) {
+  for (auto* dim : dims) {
+    if (!dim) continue;
+    if (dim->kind == ExprKind::kBinary && dim->op == TokenKind::kColon) {
+      auto lv = ConstEvalInt(dim->lhs);
+      auto rv = ConstEvalInt(dim->rhs);
+      if (lv && rv) {
+        dim_sizes.push_back(static_cast<uint32_t>(std::abs(*lv - *rv) + 1));
+      }
+    } else {
+      auto sv = ConstEvalInt(dim);
+      if (sv && *sv > 0) dim_sizes.push_back(static_cast<uint32_t>(*sv));
+    }
+  }
+}
+
 void Elaborator::TrackVarArrayInfo(const ModuleItem* item,
                                    const RtlirVariable& var) {
   if (item->unpacked_dims.empty()) return;
@@ -408,20 +493,7 @@ void Elaborator::TrackVarArrayInfo(const ModuleItem* item,
       item->unpacked_dims[0]->kind == ExprKind::kIdentifier) {
     info.assoc_index_type = item->unpacked_dims[0]->text;
   }
-  for (auto* dim : item->unpacked_dims) {
-    if (!dim) continue;
-    if (dim->kind == ExprKind::kBinary && dim->op == TokenKind::kColon) {
-      auto lv = ConstEvalInt(dim->lhs);
-      auto rv = ConstEvalInt(dim->rhs);
-      if (lv && rv) {
-        info.dim_sizes.push_back(
-            static_cast<uint32_t>(std::abs(*lv - *rv) + 1));
-      }
-    } else {
-      auto sv = ConstEvalInt(dim);
-      if (sv && *sv > 0) info.dim_sizes.push_back(static_cast<uint32_t>(*sv));
-    }
-  }
+  CollectUnpackedDimSizes(item->unpacked_dims, info.dim_sizes);
   var_array_info_[item->name] = info;
 }
 
@@ -446,9 +518,11 @@ std::string_view ReferenceRootName(const Expr* e) {
 // §25.9: a reference is "external" to an interface when it is a hierarchical
 // (dotted or scope-qualified) reference whose root name is not declared
 // within the interface body.
-bool ExprRefsOutsideInterface(
+// §25.9: the node itself (ignoring children) is an external hierarchical
+// reference — either a member access whose root is not local, or a
+// scope-qualified identifier that is not local.
+bool NodeIsExternalReference(
     const Expr* e, const std::unordered_set<std::string_view>& local) {
-  if (e == nullptr) return false;
   if (e->kind == ExprKind::kMemberAccess) {
     auto root = ReferenceRootName(e);
     if (!root.empty() && local.find(root) == local.end()) return true;
@@ -457,6 +531,26 @@ bool ExprRefsOutsideInterface(
       local.find(e->text) == local.end()) {
     return true;
   }
+  return false;
+}
+
+bool ExprRefsOutsideInterface(
+    const Expr* e, const std::unordered_set<std::string_view>& local);
+
+// §25.9: recurse into the argument and element collections of a node.
+bool ChildListRefsOutsideInterface(
+    const Expr* e, const std::unordered_set<std::string_view>& local) {
+  for (const auto* a : e->args)
+    if (ExprRefsOutsideInterface(a, local)) return true;
+  for (const auto* el : e->elements)
+    if (ExprRefsOutsideInterface(el, local)) return true;
+  return false;
+}
+
+bool ExprRefsOutsideInterface(
+    const Expr* e, const std::unordered_set<std::string_view>& local) {
+  if (e == nullptr) return false;
+  if (NodeIsExternalReference(e, local)) return true;
   if (ExprRefsOutsideInterface(e->lhs, local)) return true;
   if (ExprRefsOutsideInterface(e->rhs, local)) return true;
   if (ExprRefsOutsideInterface(e->base, local)) return true;
@@ -466,21 +560,14 @@ bool ExprRefsOutsideInterface(
   if (ExprRefsOutsideInterface(e->true_expr, local)) return true;
   if (ExprRefsOutsideInterface(e->false_expr, local)) return true;
   if (ExprRefsOutsideInterface(e->repeat_count, local)) return true;
-  for (const auto* a : e->args)
-    if (ExprRefsOutsideInterface(a, local)) return true;
-  for (const auto* el : e->elements)
-    if (ExprRefsOutsideInterface(el, local)) return true;
+  if (ChildListRefsOutsideInterface(e, local)) return true;
   return false;
 }
 
-// §25.9: does the interface body reach outside itself through a hierarchical
-// reference in a net/variable initializer or a continuous assignment?
-bool InterfaceContainsExternalReference(const ModuleDecl* iface) {
-  // §25.9: a port that references another interface also disqualifies the
-  // interface from being used as a virtual interface type.
-  for (const auto& p : iface->ports) {
-    if (p.is_interface_port) return true;
-  }
+// §25.9: collect the names declared within an interface body (ports,
+// parameters, modports, items and instance names) that count as "local".
+std::unordered_set<std::string_view> CollectInterfaceLocalNames(
+    const ModuleDecl* iface) {
   std::unordered_set<std::string_view> local;
   for (const auto& p : iface->ports)
     if (!p.name.empty()) local.insert(p.name);
@@ -493,6 +580,17 @@ bool InterfaceContainsExternalReference(const ModuleDecl* iface) {
     if (!it->name.empty()) local.insert(it->name);
     if (!it->inst_name.empty()) local.insert(it->inst_name);
   }
+  return local;
+}
+
+bool InterfaceContainsExternalReference(const ModuleDecl* iface) {
+  // §25.9: a port that references another interface also disqualifies the
+  // interface from being used as a virtual interface type.
+  for (const auto& p : iface->ports) {
+    if (p.is_interface_port) return true;
+  }
+  std::unordered_set<std::string_view> local =
+      CollectInterfaceLocalNames(iface);
   for (const auto* it : iface->items) {
     if (it == nullptr) continue;
     if (ExprRefsOutsideInterface(it->init_expr, local)) return true;
@@ -500,6 +598,98 @@ bool InterfaceContainsExternalReference(const ModuleDecl* iface) {
     if (ExprRefsOutsideInterface(it->assign_rhs, local)) return true;
   }
   return false;
+}
+
+// §25.9: record explicit parameter overrides of a virtual interface variable
+// when they all evaluate to constants, so a later assignment can confirm the
+// actual parameter values match the interface it is assigned from.
+void RecordViParamOverrides(
+    const ModuleItem* item,
+    std::unordered_map<std::string_view, std::vector<int64_t>>& param_values) {
+  if (item->data_type.type_params.empty()) return;
+  std::vector<int64_t> values;
+  bool all_const = true;
+  for (const auto& tp : item->data_type.type_params) {
+    if (tp.type_ref_expr == nullptr) {
+      all_const = false;
+      break;
+    }
+    auto v = ConstEvalInt(tp.type_ref_expr);
+    if (!v) {
+      all_const = false;
+      break;
+    }
+    values.push_back(*v);
+  }
+  if (all_const) {
+    param_values[item->name] = std::move(values);
+  }
+}
+
+// §6.8 / §6.11: classify a scalar variable's element kind flags from its data
+// type. Width/signedness/struct/enum info is filled in separately.
+void SetVariableKindFlags(const ModuleItem* item, RtlirVariable& var,
+                          const TypedefMap& typedefs) {
+  var.is_4state = Is4stateType(item->data_type, typedefs);
+  var.is_event = (item->data_type.kind == DataTypeKind::kEvent);
+  var.is_chandle = (item->data_type.kind == DataTypeKind::kChandle);
+  var.is_string = (item->data_type.kind == DataTypeKind::kString);
+  var.is_real = (item->data_type.kind == DataTypeKind::kReal ||
+                 item->data_type.kind == DataTypeKind::kShortreal ||
+                 item->data_type.kind == DataTypeKind::kRealtime);
+}
+
+// §6.6.7: tag a net produced from a user-defined nettype with its nettype name
+// and resolution function (if any).
+void TagUserNettypeNet(
+    const ModuleItem* item, RtlirNet& net,
+    const std::unordered_map<std::string_view, std::string_view>&
+        resolve_funcs) {
+  net.is_user_nettype = true;
+  net.nettype_name = item->data_type.type_name;
+  auto it = resolve_funcs.find(item->data_type.type_name);
+  if (it != resolve_funcs.end()) {
+    net.resolve_func = it->second;
+  }
+}
+
+// §25.9: validate that a virtual interface declaration names a real interface,
+// a modport that exists on it, and an interface free of external references.
+void ValidateVirtualInterfaceTarget(const ModuleItem* item,
+                                    const ModuleDecl* iface_decl,
+                                    std::string_view iface_name,
+                                    std::string_view modport_name,
+                                    DiagEngine& diag) {
+  if (!iface_decl || iface_decl->decl_kind != ModuleDeclKind::kInterface) {
+    diag.Error(item->loc,
+               std::format("unknown interface '{}' in virtual interface "
+                           "declaration",
+                           iface_name));
+  } else if (!modport_name.empty()) {
+    bool found = false;
+    for (const auto* mp : iface_decl->modports) {
+      if (mp && mp->name == modport_name) {
+        found = true;
+        break;
+      }
+    }
+    if (!found) {
+      diag.Error(item->loc,
+                 std::format("modport '{}' not found in interface '{}'",
+                             modport_name, iface_name));
+    }
+  }
+  // §25.9: an interface containing hierarchical references to objects outside
+  // its body (or ports that reference other interfaces) shall not be used as
+  // the type of a virtual interface.
+  if (iface_decl && iface_decl->decl_kind == ModuleDeclKind::kInterface &&
+      InterfaceContainsExternalReference(iface_decl)) {
+    diag.Error(item->loc,
+               std::format("interface '{}' contains references to objects "
+                           "outside its body and cannot be used as a "
+                           "virtual interface",
+                           iface_name));
+  }
 }
 
 }  // namespace
@@ -515,14 +705,7 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
     item->kind = ModuleItemKind::kNetDecl;
     nettype_net_names_.insert(item->name);
     ElaborateNetDecl(item, mod);
-
-    auto& net = mod->nets.back();
-    net.is_user_nettype = true;
-    net.nettype_name = item->data_type.type_name;
-    auto it = nettype_resolve_funcs_.find(item->data_type.type_name);
-    if (it != nettype_resolve_funcs_.end()) {
-      net.resolve_func = it->second;
-    }
+    TagUserNettypeNet(item, mod->nets.back(), nettype_resolve_funcs_);
     return;
   }
 
@@ -530,32 +713,10 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
     diag_.Error(item->loc,
                 "automatic lifetime is not allowed on module-level variables");
   }
-  if (ansi_port_names_.count(item->name)) {
-    diag_.Error(item->loc,
-                std::format("redeclaration of ANSI port '{}'", item->name));
-  }
-
-  if (non_ansi_complete_ports_.count(item->name)) {
-    diag_.Error(
-        item->loc,
-        std::format("redeclaration of port '{}' that has a complete port "
-                    "declaration",
-                    item->name));
-  }
-
-  auto partial_it = non_ansi_partial_ports_.find(item->name);
-  if (partial_it != non_ansi_partial_ports_.end()) {
-    uint32_t var_width = EvalTypeWidth(item->data_type, typedefs_);
-    if (var_width != partial_it->second) {
-      diag_.Error(
-          item->loc,
-          std::format("vector range of variable '{}' does not match its port "
-                      "declaration",
-                      item->name));
-    }
-  } else if (!declared_names_.insert(item->name).second) {
-    diag_.Error(item->loc, std::format("redeclaration of '{}'", item->name));
-  }
+  CheckDeclRedeclaration(item, item->data_type, typedefs_,
+                         {ansi_port_names_, non_ansi_complete_ports_,
+                          non_ansi_partial_ports_, declared_names_},
+                         "variable", diag_);
 
   if (item->data_type.is_const) {
     if (!item->init_expr) {
@@ -577,71 +738,15 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
     auto modport_name = item->data_type.modport_name;
     vi_var_interface_types_[item->name] = iface_name;
     vi_var_modports_[item->name] = modport_name;
-    // §25.9: record explicit parameter overrides (when they evaluate to
-    // constants) so a later assignment can confirm the actual parameter
-    // values match the interface it is assigned from.
-    if (!item->data_type.type_params.empty()) {
-      std::vector<int64_t> values;
-      bool all_const = true;
-      for (const auto& tp : item->data_type.type_params) {
-        if (tp.type_ref_expr == nullptr) {
-          all_const = false;
-          break;
-        }
-        auto v = ConstEvalInt(tp.type_ref_expr);
-        if (!v) {
-          all_const = false;
-          break;
-        }
-        values.push_back(*v);
-      }
-      if (all_const) {
-        vi_var_param_values_[item->name] = std::move(values);
-      }
-    }
-    auto* iface_decl = FindModule(iface_name);
-    if (!iface_decl || iface_decl->decl_kind != ModuleDeclKind::kInterface) {
-      diag_.Error(item->loc,
-                  std::format("unknown interface '{}' in virtual interface "
-                              "declaration",
-                              iface_name));
-    } else if (!modport_name.empty()) {
-      bool found = false;
-      for (const auto* mp : iface_decl->modports) {
-        if (mp && mp->name == modport_name) {
-          found = true;
-          break;
-        }
-      }
-      if (!found) {
-        diag_.Error(item->loc,
-                    std::format("modport '{}' not found in interface '{}'",
-                                modport_name, iface_name));
-      }
-    }
-    // §25.9: an interface containing hierarchical references to objects
-    // outside its body (or ports that reference other interfaces) shall not
-    // be used as the type of a virtual interface.
-    if (iface_decl && iface_decl->decl_kind == ModuleDeclKind::kInterface &&
-        InterfaceContainsExternalReference(iface_decl)) {
-      diag_.Error(item->loc,
-                  std::format("interface '{}' contains references to objects "
-                              "outside its body and cannot be used as a "
-                              "virtual interface",
-                              iface_name));
-    }
+    RecordViParamOverrides(item, vi_var_param_values_);
+    ValidateVirtualInterfaceTarget(item, FindModule(iface_name), iface_name,
+                                   modport_name, diag_);
   }
   RtlirVariable var;
   var.name = ScopedName(item->name);
   var.width = EvalTypeWidth(item->data_type, typedefs_);
   ValidatePackedDimRange(item->data_type, item->loc);
-  var.is_4state = Is4stateType(item->data_type, typedefs_);
-  var.is_event = (item->data_type.kind == DataTypeKind::kEvent);
-  var.is_chandle = (item->data_type.kind == DataTypeKind::kChandle);
-  var.is_string = (item->data_type.kind == DataTypeKind::kString);
-  var.is_real = (item->data_type.kind == DataTypeKind::kReal ||
-                 item->data_type.kind == DataTypeKind::kShortreal ||
-                 item->data_type.kind == DataTypeKind::kRealtime);
+  SetVariableKindFlags(item, var, typedefs_);
   var.is_signed = IsSignedType(item->data_type, typedefs_);
   if (non_ansi_partial_ports_.count(item->name)) {
     var.is_signed =

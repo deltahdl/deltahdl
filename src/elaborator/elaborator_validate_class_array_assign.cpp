@@ -12,6 +12,82 @@
 
 namespace delta {
 
+namespace {
+
+// Reports the first faster-varying (non-leftmost) unpacked dimension whose
+// size differs between the two fixed-size arrays. Returns true (with a
+// diagnostic emitted) when a mismatch is found, mirroring the early return of
+// the caller.
+bool ReportFasterVaryingDimMismatch(const Elaborator::VarArrayInfo& l,
+                                    const Elaborator::VarArrayInfo& r,
+                                    const Expr* lhs, const Expr* rhs,
+                                    SourceLoc loc, DiagEngine& diag) {
+  if (l.is_dynamic || r.is_dynamic || l.is_assoc || r.is_assoc ||
+      l.dim_sizes.size() != r.dim_sizes.size() || l.dim_sizes.size() <= 1) {
+    return false;
+  }
+  for (size_t i = 1; i < l.dim_sizes.size(); ++i) {
+    if (l.dim_sizes[i] != r.dim_sizes[i]) {
+      diag.Error(
+          loc, std::format("faster-varying array dimension size mismatch in "
+                           "assignment ('{}' dim {} is {}, '{}' dim {} is {})",
+                           lhs->text, i, l.dim_sizes[i], rhs->text, i,
+                           r.dim_sizes[i]));
+      return true;
+    }
+  }
+  return false;
+}
+
+// Validates the kind/shape compatibility of two tracked arrays in an
+// assignment (associativity, index type, dimension count, element type, and
+// fixed-size element count). Returns true (with a diagnostic emitted) when the
+// first incompatibility is found, mirroring the caller's early returns.
+bool ReportArrayShapeMismatch(const Elaborator::VarArrayInfo& l,
+                              const Elaborator::VarArrayInfo& r,
+                              const Expr* lhs, const Expr* rhs, SourceLoc loc,
+                              DiagEngine& diag) {
+  if (l.is_assoc != r.is_assoc) {
+    diag.Error(loc,
+               "associative array cannot be assigned to or from a "
+               "non-associative array");
+    return true;
+  }
+  if (l.is_assoc && r.is_assoc && l.assoc_index_type != r.assoc_index_type) {
+    diag.Error(loc, "associative array index type mismatch in assignment");
+    return true;
+  }
+
+  if (l.num_unpacked_dims != r.num_unpacked_dims) {
+    diag.Error(loc,
+               std::format("array assignment requires the same number of "
+                           "unpacked dimensions ('{}' has {}, '{}' has {})",
+                           lhs->text, l.num_unpacked_dims, rhs->text,
+                           r.num_unpacked_dims));
+    return true;
+  }
+
+  if (!ElementTypesEquivalent(l.elem_type, l.elem_width, l.elem_is_signed,
+                              l.elem_is_4state, r.elem_type, r.elem_width,
+                              r.elem_is_signed, r.elem_is_4state)) {
+    diag.Error(loc, std::format("array element type mismatch in assignment "
+                                "('{}' vs '{}')",
+                                lhs->text, rhs->text));
+    return true;
+  }
+  if (l.unpacked_size > 0 && !l.is_dynamic && r.unpacked_size > 0 &&
+      !r.is_dynamic && l.unpacked_size != r.unpacked_size) {
+    diag.Error(loc, std::format("array size mismatch: '{}' has {} elements but "
+                                "'{}' has {}",
+                                lhs->text, l.unpacked_size, rhs->text,
+                                r.unpacked_size));
+    return true;
+  }
+  return false;
+}
+
+}  // namespace
+
 void Elaborator::CheckArrayAssignExprs(const Expr* lhs, const Expr* rhs,
                                        SourceLoc loc) {
   if (!lhs || !rhs) return;
@@ -32,58 +108,8 @@ void Elaborator::CheckArrayAssignExprs(const Expr* lhs, const Expr* rhs,
   const auto& l = lhs_it->second;
   const auto& r = rhs_it->second;
 
-  if (l.is_assoc != r.is_assoc) {
-    diag_.Error(loc,
-                "associative array cannot be assigned to or from a "
-                "non-associative array");
-    return;
-  }
-  if (l.is_assoc && r.is_assoc && l.assoc_index_type != r.assoc_index_type) {
-    diag_.Error(loc, "associative array index type mismatch in assignment");
-    return;
-  }
-
-  if (l.num_unpacked_dims != r.num_unpacked_dims) {
-    diag_.Error(loc,
-                std::format("array assignment requires the same number of "
-                            "unpacked dimensions ('{}' has {}, '{}' has {})",
-                            lhs->text, l.num_unpacked_dims, rhs->text,
-                            r.num_unpacked_dims));
-    return;
-  }
-
-  if (!ElementTypesEquivalent(l.elem_type, l.elem_width, l.elem_is_signed,
-                              l.elem_is_4state, r.elem_type, r.elem_width,
-                              r.elem_is_signed, r.elem_is_4state)) {
-    diag_.Error(loc, std::format("array element type mismatch in assignment "
-                                 "('{}' vs '{}')",
-                                 lhs->text, rhs->text));
-    return;
-  }
-  if (l.unpacked_size > 0 && !l.is_dynamic && r.unpacked_size > 0 &&
-      !r.is_dynamic && l.unpacked_size != r.unpacked_size) {
-    diag_.Error(
-        loc,
-        std::format("array size mismatch: '{}' has {} elements but "
-                    "'{}' has {}",
-                    lhs->text, l.unpacked_size, rhs->text, r.unpacked_size));
-    return;
-  }
-
-  if (!l.is_dynamic && !r.is_dynamic && !l.is_assoc && !r.is_assoc &&
-      l.dim_sizes.size() == r.dim_sizes.size() && l.dim_sizes.size() > 1) {
-    for (size_t i = 1; i < l.dim_sizes.size(); ++i) {
-      if (l.dim_sizes[i] != r.dim_sizes[i]) {
-        diag_.Error(
-            loc,
-            std::format("faster-varying array dimension size mismatch in "
-                        "assignment ('{}' dim {} is {}, '{}' dim {} is {})",
-                        lhs->text, i, l.dim_sizes[i], rhs->text, i,
-                        r.dim_sizes[i]));
-        return;
-      }
-    }
-  }
+  if (ReportArrayShapeMismatch(l, r, lhs, rhs, loc, diag_)) return;
+  if (ReportFasterVaryingDimMismatch(l, r, lhs, rhs, loc, diag_)) return;
 }
 
 void Elaborator::ValidateOneArrayAssignment(const ModuleItem* item) {
@@ -153,6 +179,58 @@ static Elaborator::VarArrayInfo FormalArrayInfo(
   return info;
 }
 
+// Resolves the index into `expr->args` that binds to the formal at position
+// `formal_index` (named `formal_name`), handling pure-positional, mixed, and
+// named-argument call forms. Returns -1 when no actual binds to the formal.
+static int ResolveActualArgIndex(const Expr* expr, size_t formal_index,
+                                 std::string_view formal_name,
+                                 size_t positional_count) {
+  if (expr->arg_names.empty()) {
+    return (formal_index < expr->args.size()) ? static_cast<int>(formal_index)
+                                              : -1;
+  }
+  if (formal_index < positional_count) return static_cast<int>(formal_index);
+  for (size_t j = 0; j < expr->arg_names.size(); ++j) {
+    if (expr->arg_names[j] == formal_name) {
+      return static_cast<int>(positional_count + j);
+    }
+  }
+  return -1;
+}
+
+// Reports the associative-array compatibility errors for binding a single
+// identifier actual to an array-typed formal (associativity, index type, and
+// element type). At most one diagnostic is emitted per actual.
+static void CheckArrayArgCompat(const Expr* actual,
+                                const Elaborator::VarArrayInfo& actual_info,
+                                const Elaborator::VarArrayInfo& formal_info,
+                                DiagEngine& diag) {
+  if (actual_info.is_assoc != formal_info.is_assoc) {
+    diag.Error(actual->range.start,
+               "associative array cannot be passed to or from a "
+               "non-associative array parameter");
+    return;
+  }
+  if (actual_info.is_assoc && formal_info.is_assoc &&
+      actual_info.assoc_index_type != formal_info.assoc_index_type) {
+    diag.Error(actual->range.start,
+               "associative array index type mismatch in argument");
+    return;
+  }
+  // The value type carried by an associative actual must be equivalent to the
+  // value type of the associative formal it binds to.
+  if (actual_info.is_assoc && formal_info.is_assoc &&
+      !ElementTypesEquivalent(
+          actual_info.elem_type, actual_info.elem_width,
+          actual_info.elem_is_signed, actual_info.elem_is_4state,
+          formal_info.elem_type, formal_info.elem_width,
+          formal_info.elem_is_signed, formal_info.elem_is_4state)) {
+    diag.Error(actual->range.start,
+               "associative array element type mismatch in argument");
+    return;
+  }
+}
+
 static void CheckArrayArgTypes(
     const Expr* expr,
     const std::unordered_map<std::string_view, const ModuleItem*>& func_decls,
@@ -171,118 +249,57 @@ static void CheckArrayArgTypes(
 
     if (formal.unpacked_dims.empty()) continue;
 
-    int ai = -1;
-    if (expr->arg_names.empty()) {
-      ai = (i < expr->args.size()) ? static_cast<int>(i) : -1;
-    } else if (i < positional_count) {
-      ai = static_cast<int>(i);
-    } else {
-      for (size_t j = 0; j < expr->arg_names.size(); ++j) {
-        if (expr->arg_names[j] == formal.name) {
-          ai = static_cast<int>(positional_count + j);
-          break;
-        }
-      }
-    }
+    int ai = ResolveActualArgIndex(expr, i, formal.name, positional_count);
     if (ai < 0) continue;
     auto* actual = expr->args[static_cast<size_t>(ai)];
     if (!actual || actual->kind != ExprKind::kIdentifier) continue;
     auto ait = var_array_info.find(actual->text);
     if (ait == var_array_info.end()) continue;
-    const auto& actual_info = ait->second;
-    if (actual_info.is_assoc != formal_info.is_assoc) {
-      diag.Error(actual->range.start,
-                 "associative array cannot be passed to or from a "
-                 "non-associative array parameter");
-      continue;
-    }
-    if (actual_info.is_assoc && formal_info.is_assoc &&
-        actual_info.assoc_index_type != formal_info.assoc_index_type) {
-      diag.Error(actual->range.start,
-                 "associative array index type mismatch in argument");
-      continue;
-    }
-    // The value type carried by an associative actual must be equivalent to the
-    // value type of the associative formal it binds to.
-    if (actual_info.is_assoc && formal_info.is_assoc &&
-        !ElementTypesEquivalent(
-            actual_info.elem_type, actual_info.elem_width,
-            actual_info.elem_is_signed, actual_info.elem_is_4state,
-            formal_info.elem_type, formal_info.elem_width,
-            formal_info.elem_is_signed, formal_info.elem_is_4state)) {
-      diag.Error(actual->range.start,
-                 "associative array element type mismatch in argument");
-      continue;
-    }
+    CheckArrayArgCompat(actual, ait->second, formal_info, diag);
   }
 }
 
-static void WalkExprForArrayArgTypes(
-    const Expr* expr,
-    const std::unordered_map<std::string_view, const ModuleItem*>& func_decls,
-    const std::unordered_map<std::string_view, Elaborator::VarArrayInfo>&
-        var_array_info,
-    const std::unordered_set<std::string_view>& class_names,
-    const TypedefMap& typedefs, DiagEngine& diag) {
+// Immutable context threaded through the argument-type tree walk so each
+// recursive visit is a single short call rather than a six-argument forward.
+struct ArrayArgTypeCtx {
+  const std::unordered_map<std::string_view, const ModuleItem*>& func_decls;
+  const std::unordered_map<std::string_view, Elaborator::VarArrayInfo>&
+      var_array_info;
+  const std::unordered_set<std::string_view>& class_names;
+  const TypedefMap& typedefs;
+  DiagEngine& diag;
+};
+
+static void WalkExprForArrayArgTypes(const Expr* expr,
+                                     const ArrayArgTypeCtx& ctx) {
   if (!expr) return;
-  CheckArrayArgTypes(expr, func_decls, var_array_info, class_names, typedefs,
-                     diag);
-  WalkExprForArrayArgTypes(expr->lhs, func_decls, var_array_info, class_names,
-                           typedefs, diag);
-  WalkExprForArrayArgTypes(expr->rhs, func_decls, var_array_info, class_names,
-                           typedefs, diag);
-  WalkExprForArrayArgTypes(expr->condition, func_decls, var_array_info,
-                           class_names, typedefs, diag);
-  WalkExprForArrayArgTypes(expr->true_expr, func_decls, var_array_info,
-                           class_names, typedefs, diag);
-  WalkExprForArrayArgTypes(expr->false_expr, func_decls, var_array_info,
-                           class_names, typedefs, diag);
-  for (auto* a : expr->args)
-    WalkExprForArrayArgTypes(a, func_decls, var_array_info, class_names,
-                             typedefs, diag);
-  for (auto* e : expr->elements)
-    WalkExprForArrayArgTypes(e, func_decls, var_array_info, class_names,
-                             typedefs, diag);
+  CheckArrayArgTypes(expr, ctx.func_decls, ctx.var_array_info, ctx.class_names,
+                     ctx.typedefs, ctx.diag);
+  WalkExprForArrayArgTypes(expr->lhs, ctx);
+  WalkExprForArrayArgTypes(expr->rhs, ctx);
+  WalkExprForArrayArgTypes(expr->condition, ctx);
+  WalkExprForArrayArgTypes(expr->true_expr, ctx);
+  WalkExprForArrayArgTypes(expr->false_expr, ctx);
+  for (auto* a : expr->args) WalkExprForArrayArgTypes(a, ctx);
+  for (auto* e : expr->elements) WalkExprForArrayArgTypes(e, ctx);
 }
 
-static void WalkStmtForArrayArgTypes(
-    const Stmt* s,
-    const std::unordered_map<std::string_view, const ModuleItem*>& func_decls,
-    const std::unordered_map<std::string_view, Elaborator::VarArrayInfo>&
-        var_array_info,
-    const std::unordered_set<std::string_view>& class_names,
-    const TypedefMap& typedefs, DiagEngine& diag) {
+static void WalkStmtForArrayArgTypes(const Stmt* s,
+                                     const ArrayArgTypeCtx& ctx) {
   if (!s) return;
-  WalkExprForArrayArgTypes(s->expr, func_decls, var_array_info, class_names,
-                           typedefs, diag);
-  WalkExprForArrayArgTypes(s->lhs, func_decls, var_array_info, class_names,
-                           typedefs, diag);
-  WalkExprForArrayArgTypes(s->rhs, func_decls, var_array_info, class_names,
-                           typedefs, diag);
-  WalkExprForArrayArgTypes(s->condition, func_decls, var_array_info,
-                           class_names, typedefs, diag);
-  for (auto* sub : s->stmts)
-    WalkStmtForArrayArgTypes(sub, func_decls, var_array_info, class_names,
-                             typedefs, diag);
-  WalkStmtForArrayArgTypes(s->then_branch, func_decls, var_array_info,
-                           class_names, typedefs, diag);
-  WalkStmtForArrayArgTypes(s->else_branch, func_decls, var_array_info,
-                           class_names, typedefs, diag);
-  WalkStmtForArrayArgTypes(s->body, func_decls, var_array_info, class_names,
-                           typedefs, diag);
-  for (auto* fi : s->for_inits)
-    WalkStmtForArrayArgTypes(fi, func_decls, var_array_info, class_names,
-                             typedefs, diag);
-  WalkStmtForArrayArgTypes(s->for_body, func_decls, var_array_info, class_names,
-                           typedefs, diag);
-  for (auto* fs : s->for_steps)
-    WalkStmtForArrayArgTypes(fs, func_decls, var_array_info, class_names,
-                             typedefs, diag);
-  WalkExprForArrayArgTypes(s->for_cond, func_decls, var_array_info, class_names,
-                           typedefs, diag);
-  for (auto& ci : s->case_items)
-    WalkStmtForArrayArgTypes(ci.body, func_decls, var_array_info, class_names,
-                             typedefs, diag);
+  WalkExprForArrayArgTypes(s->expr, ctx);
+  WalkExprForArrayArgTypes(s->lhs, ctx);
+  WalkExprForArrayArgTypes(s->rhs, ctx);
+  WalkExprForArrayArgTypes(s->condition, ctx);
+  for (auto* sub : s->stmts) WalkStmtForArrayArgTypes(sub, ctx);
+  WalkStmtForArrayArgTypes(s->then_branch, ctx);
+  WalkStmtForArrayArgTypes(s->else_branch, ctx);
+  WalkStmtForArrayArgTypes(s->body, ctx);
+  for (auto* fi : s->for_inits) WalkStmtForArrayArgTypes(fi, ctx);
+  WalkStmtForArrayArgTypes(s->for_body, ctx);
+  for (auto* fs : s->for_steps) WalkStmtForArrayArgTypes(fs, ctx);
+  WalkExprForArrayArgTypes(s->for_cond, ctx);
+  for (auto& ci : s->case_items) WalkStmtForArrayArgTypes(ci.body, ctx);
 }
 
 void Elaborator::ValidateArrayArgTypes(const ModuleDecl* decl) {
@@ -291,18 +308,18 @@ void Elaborator::ValidateArrayArgTypes(const ModuleDecl* decl) {
   for (const auto* item : decl->items) {
     if (item->kind == ModuleItemKind::kTaskDecl) all_decls[item->name] = item;
   }
+  const ArrayArgTypeCtx ctx{all_decls, var_array_info_, class_names_, typedefs_,
+                            diag_};
   for (const auto* item : decl->items) {
     if (item->kind == ModuleItemKind::kInitialBlock ||
         item->kind == ModuleItemKind::kAlwaysBlock ||
         item->kind == ModuleItemKind::kFinalBlock) {
-      WalkStmtForArrayArgTypes(item->body, all_decls, var_array_info_,
-                               class_names_, typedefs_, diag_);
+      WalkStmtForArrayArgTypes(item->body, ctx);
     }
     if (item->kind == ModuleItemKind::kFunctionDecl ||
         item->kind == ModuleItemKind::kTaskDecl) {
       for (auto* s : item->func_body_stmts) {
-        WalkStmtForArrayArgTypes(s, all_decls, var_array_info_, class_names_,
-                                 typedefs_, diag_);
+        WalkStmtForArrayArgTypes(s, ctx);
       }
     }
   }
@@ -535,30 +552,40 @@ static bool TraversalArgIsIntegral(const Expr* arg, const TypeMap& var_types) {
   return it != var_types.end() && IsIntegralType(it->second);
 }
 
+// Reports a traversal-method call (`arr.first(x)` etc.) whose argument type is
+// not assignment compatible with the associative array's index category. Only
+// the call node itself is examined; child expressions are walked by the caller.
+static void CheckTraversalCallSite(
+    const Expr* e,
+    const std::unordered_map<std::string_view, AssocKeyCategory>& assoc_keys,
+    const TypeMap& var_types, DiagEngine& diag) {
+  if (e->kind != ExprKind::kCall || !e->base ||
+      e->base->kind != ExprKind::kIdentifier || !IsTraversalMethod(e->callee) ||
+      e->args.empty()) {
+    return;
+  }
+  auto it = assoc_keys.find(e->base->text);
+  if (it == assoc_keys.end()) return;
+  const Expr* arg = e->args[0];
+  bool wrong = (it->second == AssocKeyCategory::kStringKey &&
+                TraversalArgIsIntegral(arg, var_types)) ||
+               (it->second == AssocKeyCategory::kIntegralKey &&
+                TraversalArgIsString(arg, var_types));
+  if (wrong) {
+    diag.Error(arg ? arg->range.start : e->range.start,
+               std::format("traversal method '{}' argument is not "
+                           "assignment compatible with the index type of "
+                           "associative array '{}'",
+                           e->callee, e->base->text));
+  }
+}
+
 static void CheckTraversalArgTypeExpr(
     const Expr* e,
     const std::unordered_map<std::string_view, AssocKeyCategory>& assoc_keys,
     const TypeMap& var_types, DiagEngine& diag) {
   if (!e) return;
-  if (e->kind == ExprKind::kCall && e->base &&
-      e->base->kind == ExprKind::kIdentifier && IsTraversalMethod(e->callee) &&
-      !e->args.empty()) {
-    auto it = assoc_keys.find(e->base->text);
-    if (it != assoc_keys.end()) {
-      const Expr* arg = e->args[0];
-      bool wrong = (it->second == AssocKeyCategory::kStringKey &&
-                    TraversalArgIsIntegral(arg, var_types)) ||
-                   (it->second == AssocKeyCategory::kIntegralKey &&
-                    TraversalArgIsString(arg, var_types));
-      if (wrong) {
-        diag.Error(arg ? arg->range.start : e->range.start,
-                   std::format("traversal method '{}' argument is not "
-                               "assignment compatible with the index type of "
-                               "associative array '{}'",
-                               e->callee, e->base->text));
-      }
-    }
-  }
+  CheckTraversalCallSite(e, assoc_keys, var_types, diag);
   CheckTraversalArgTypeExpr(e->lhs, assoc_keys, var_types, diag);
   CheckTraversalArgTypeExpr(e->rhs, assoc_keys, var_types, diag);
   CheckTraversalArgTypeExpr(e->base, assoc_keys, var_types, diag);

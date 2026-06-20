@@ -83,10 +83,9 @@ static void InitArrayFromReplicate(const RtlirVariable& var, uint32_t elem_idx,
   elem->value = EvalExpr(rep->elements[elem_idx % inner_count], ctx, arena);
 }
 
-static void InitArrayFromNamed(const RtlirVariable& var, uint32_t idx,
-                               Variable* elem, SimContext& ctx, Arena& arena) {
-  auto* init = var.init_expr;
-
+static bool InitArrayFromIndexKey(const Expr* init, uint32_t idx,
+                                  Variable* elem, SimContext& ctx,
+                                  Arena& arena) {
   for (size_t i = 0; i < init->pattern_keys.size(); ++i) {
     if (i >= init->elements.size()) break;
     auto& key = init->pattern_keys[i];
@@ -94,26 +93,45 @@ static void InitArrayFromNamed(const RtlirVariable& var, uint32_t idx,
     auto key_idx = static_cast<uint32_t>(std::stoul(std::string(key)));
     if (key_idx == idx) {
       elem->value = EvalExpr(init->elements[i], ctx, arena);
-      return;
+      return true;
     }
   }
+  return false;
+}
 
+static bool InitArrayFromTypeKey(const Expr* init, DataTypeKind elem_type_kind,
+                                 Variable* elem, SimContext& ctx,
+                                 Arena& arena) {
   for (size_t i = 0; i < init->pattern_keys.size(); ++i) {
     if (i >= init->elements.size()) break;
     auto& key = init->pattern_keys[i];
-    if (IsTypeKeyword(key) && TypeKeyMatchesKind(key, var.elem_type_kind)) {
+    if (IsTypeKeyword(key) && TypeKeyMatchesKind(key, elem_type_kind)) {
       elem->value = EvalExpr(init->elements[i], ctx, arena);
-      return;
+      return true;
     }
   }
+  return false;
+}
 
+static bool InitArrayFromDefaultKey(const Expr* init, Variable* elem,
+                                    SimContext& ctx, Arena& arena) {
   for (size_t i = 0; i < init->pattern_keys.size(); ++i) {
     if (i >= init->elements.size()) break;
     if (init->pattern_keys[i] == "default") {
       elem->value = EvalExpr(init->elements[i], ctx, arena);
-      return;
+      return true;
     }
   }
+  return false;
+}
+
+static void InitArrayFromNamed(const RtlirVariable& var, uint32_t idx,
+                               Variable* elem, SimContext& ctx, Arena& arena) {
+  auto* init = var.init_expr;
+
+  if (InitArrayFromIndexKey(init, idx, elem, ctx, arena)) return;
+  if (InitArrayFromTypeKey(init, var.elem_type_kind, elem, ctx, arena)) return;
+  if (InitArrayFromDefaultKey(init, elem, ctx, arena)) return;
   elem->value = MakeLogic4VecVal(arena, var.width, 0);
 }
 
@@ -154,37 +172,43 @@ static std::string StripQuotes(std::string_view s) {
   return std::string(s);
 }
 
+// §7.5.1: a dynamic array declaration may use the new[] constructor as its
+// declaration-assignment right-hand side. Size the array, default-initialize
+// its elements, then copy from the optional initialization array. Returns true
+// when the init_expr was a new[] constructor (handled here).
+static bool LowerDynArrayNewInit(const Expr* init_expr, QueueObject* q,
+                                 SimContext& ctx, Arena& arena) {
+  if (!(init_expr->kind == ExprKind::kCall && init_expr->text == "new" &&
+        !init_expr->args.empty()))
+    return false;
+
+  auto sz_val = EvalExpr(init_expr->args[0], ctx, arena);
+  int64_t sz = SignExtend(sz_val.ToUint64(), sz_val.width);
+  if (sz < 0) {
+    ctx.GetDiag().Error({}, "dynamic array new[] size is negative");
+    return true;
+  }
+  q->elements.assign(static_cast<size_t>(sz),
+                     MakeLogic4VecVal(arena, q->elem_width, 0));
+  if (init_expr->args.size() >= 2) {
+    auto* src_expr = init_expr->args[1];
+    if (src_expr && src_expr->kind == ExprKind::kIdentifier) {
+      if (auto* src = ctx.FindQueue(src_expr->text)) {
+        size_t copy_len = std::min(q->elements.size(), src->elements.size());
+        for (size_t i = 0; i < copy_len; ++i) q->elements[i] = src->elements[i];
+      }
+    }
+  }
+  q->AssignFreshIds();
+  return true;
+}
+
 void Lowerer::LowerDynArrayInit(const RtlirVariable& var) {
   if (!var.init_expr) return;
   auto* q = ctx_.FindQueue(var.name);
   if (!q) return;
 
-  // §7.5.1: a dynamic array declaration may use the new[] constructor as its
-  // declaration-assignment right-hand side. Size the array, default-initialize
-  // its elements, then copy from the optional initialization array.
-  if (var.init_expr->kind == ExprKind::kCall && var.init_expr->text == "new" &&
-      !var.init_expr->args.empty()) {
-    auto sz_val = EvalExpr(var.init_expr->args[0], ctx_, arena_);
-    int64_t sz = SignExtend(sz_val.ToUint64(), sz_val.width);
-    if (sz < 0) {
-      ctx_.GetDiag().Error({}, "dynamic array new[] size is negative");
-      return;
-    }
-    q->elements.assign(static_cast<size_t>(sz),
-                       MakeLogic4VecVal(arena_, q->elem_width, 0));
-    if (var.init_expr->args.size() >= 2) {
-      auto* init_expr = var.init_expr->args[1];
-      if (init_expr && init_expr->kind == ExprKind::kIdentifier) {
-        if (auto* src = ctx_.FindQueue(init_expr->text)) {
-          size_t copy_len = std::min(q->elements.size(), src->elements.size());
-          for (size_t i = 0; i < copy_len; ++i)
-            q->elements[i] = src->elements[i];
-        }
-      }
-    }
-    q->AssignFreshIds();
-    return;
-  }
+  if (LowerDynArrayNewInit(var.init_expr, q, ctx_, arena_)) return;
 
   if (var.init_expr->kind != ExprKind::kAssignmentPattern &&
       var.init_expr->kind != ExprKind::kConcatenation)

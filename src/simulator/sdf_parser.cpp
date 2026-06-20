@@ -216,11 +216,10 @@ static bool LooksLikeExtendedIopathDirection(std::string_view s) {
   return i < s.size() && s[i] == '(';
 }
 
-static SdfIopath ParseIopath(std::string_view& s) {
-  SdfIopath io;
-  io.src_port = ParseSdfPort(s);
-  io.dst_port = ParseSdfPort(s);
-
+// Optionally consumes a leading (RETAIN ...) sub-expression. The IOPATH
+// retain spec is parsed and discarded; if the parenthesized form is not a
+// RETAIN, the input is restored to its original position.
+static void SkipOptionalIopathRetain(std::string_view& s) {
   SkipWhitespace(s);
   if (s.size() >= 7 && s[0] == '(') {
     auto save = s;
@@ -232,43 +231,69 @@ static SdfIopath ParseIopath(std::string_view& s) {
       s = save;
     }
   }
+}
+
+static void ApplyRiseDirection(const ExtendedIopathDir& dir, SdfIopath& io) {
+  if (dir.delay_present) io.rise = dir.delay;
+  io.rise_delay_present = dir.delay_present;
+  io.rise_reject = dir.reject;
+  io.rise_reject_present = dir.reject_present;
+  io.rise_error = dir.error;
+  io.rise_error_present = dir.error_present;
+}
+
+static void ApplyFallDirection(const ExtendedIopathDir& dir, SdfIopath& io) {
+  if (dir.delay_present) io.fall = dir.delay;
+  io.fall_delay_present = dir.delay_present;
+  io.fall_reject = dir.reject;
+  io.fall_reject_present = dir.reject_present;
+  io.fall_error = dir.error;
+  io.fall_error_present = dir.error_present;
+}
+
+// Parses the extended (parenthesized-direction) form of an IOPATH delay list:
+// up to three directions for rise, fall, and turnoff.
+static void ParseExtendedIopathDelays(std::string_view& s, SdfIopath& io) {
+  ApplyRiseDirection(ParseExtendedDirection(s), io);
+  SkipWhitespace(s);
+  if (!s.empty() && s[0] == '(') {
+    ApplyFallDirection(ParseExtendedDirection(s), io);
+  }
+  SkipWhitespace(s);
+  if (!s.empty() && s[0] == '(') {
+    auto turnoff_dir = ParseExtendedDirection(s);
+
+    if (turnoff_dir.delay_present) io.turnoff = turnoff_dir.delay;
+  }
+}
+
+// Parses the simple form of an IOPATH delay list: bare rise, fall, and turnoff
+// delay triples.
+static void ParseSimpleIopathDelays(std::string_view& s, SdfIopath& io) {
+  io.rise = ParseDelayVal(s);
+  SkipWhitespace(s);
+  if (!s.empty() && s[0] == '(') {
+    io.fall = ParseDelayVal(s);
+  }
+  SkipWhitespace(s);
+  if (!s.empty() && s[0] == '(') {
+    io.turnoff = ParseDelayVal(s);
+  }
+}
+
+static SdfIopath ParseIopath(std::string_view& s) {
+  SdfIopath io;
+  io.src_port = ParseSdfPort(s);
+  io.dst_port = ParseSdfPort(s);
+
+  SkipOptionalIopathRetain(s);
 
   SkipWhitespace(s);
   io.extended_form = LooksLikeExtendedIopathDirection(s);
   if (io.extended_form) {
-    auto rise_dir = ParseExtendedDirection(s);
-    if (rise_dir.delay_present) io.rise = rise_dir.delay;
-    io.rise_delay_present = rise_dir.delay_present;
-    io.rise_reject = rise_dir.reject;
-    io.rise_reject_present = rise_dir.reject_present;
-    io.rise_error = rise_dir.error;
-    io.rise_error_present = rise_dir.error_present;
-    SkipWhitespace(s);
-    if (!s.empty() && s[0] == '(') {
-      auto fall_dir = ParseExtendedDirection(s);
-      if (fall_dir.delay_present) io.fall = fall_dir.delay;
-      io.fall_delay_present = fall_dir.delay_present;
-      io.fall_reject = fall_dir.reject;
-      io.fall_reject_present = fall_dir.reject_present;
-      io.fall_error = fall_dir.error;
-      io.fall_error_present = fall_dir.error_present;
-    }
-    SkipWhitespace(s);
-    if (!s.empty() && s[0] == '(') {
-      auto turnoff_dir = ParseExtendedDirection(s);
-
-      if (turnoff_dir.delay_present) io.turnoff = turnoff_dir.delay;
-    }
+    ParseExtendedIopathDelays(s, io);
   } else {
-    io.rise = ParseDelayVal(s);
-    SkipWhitespace(s);
-    if (!s.empty() && s[0] == '(') {
-      io.fall = ParseDelayVal(s);
-    }
-    SkipWhitespace(s);
-    if (!s.empty() && s[0] == '(') {
-      io.turnoff = ParseDelayVal(s);
-    }
+    ParseSimpleIopathDelays(s, io);
   }
   Expect(s, SdfTokKind::kRParen);
   return io;
@@ -297,6 +322,31 @@ struct SdfSignalRef {
   std::string condition;
 };
 
+// Parses the condition text and the (optionally edge-qualified) port that
+// follow a leading COND keyword inside a signal reference. The opening '(' of
+// the COND form has already been consumed.
+static SdfSignalRef ParseSdfCondSignal(std::string_view& s) {
+  SdfSignalRef ref;
+  ref.condition = ParseSdfConditionText(s);
+  SkipWhitespace(s);
+  if (!s.empty() && s[0] == '(') {
+    Expect(s, SdfTokKind::kLParen);
+    auto edge_tok = NextSdfToken(s);
+    if (edge_tok.text == "posedge")
+      ref.edge = SpecifyEdge::kPosedge;
+    else if (edge_tok.text == "negedge")
+      ref.edge = SpecifyEdge::kNegedge;
+    auto port_tok = NextSdfToken(s);
+    ref.port = std::string(port_tok.text);
+    Expect(s, SdfTokKind::kRParen);
+  } else {
+    auto port_tok = NextSdfToken(s);
+    ref.port = std::string(port_tok.text);
+  }
+  Expect(s, SdfTokKind::kRParen);
+  return ref;
+}
+
 static SdfSignalRef ParseSdfSignal(std::string_view& s) {
   SdfSignalRef ref;
   SkipWhitespace(s);
@@ -305,24 +355,7 @@ static SdfSignalRef ParseSdfSignal(std::string_view& s) {
     auto first_tok = NextSdfToken(s);
 
     if (first_tok.text == "COND") {
-      ref.condition = ParseSdfConditionText(s);
-      SkipWhitespace(s);
-      if (!s.empty() && s[0] == '(') {
-        Expect(s, SdfTokKind::kLParen);
-        auto edge_tok = NextSdfToken(s);
-        if (edge_tok.text == "posedge")
-          ref.edge = SpecifyEdge::kPosedge;
-        else if (edge_tok.text == "negedge")
-          ref.edge = SpecifyEdge::kNegedge;
-        auto port_tok = NextSdfToken(s);
-        ref.port = std::string(port_tok.text);
-        Expect(s, SdfTokKind::kRParen);
-      } else {
-        auto port_tok = NextSdfToken(s);
-        ref.port = std::string(port_tok.text);
-      }
-      Expect(s, SdfTokKind::kRParen);
-      return ref;
+      return ParseSdfCondSignal(s);
     }
     if (first_tok.text == "posedge") ref.edge = SpecifyEdge::kPosedge;
     if (first_tok.text == "negedge") ref.edge = SpecifyEdge::kNegedge;
@@ -422,6 +455,80 @@ static void RecordDelayEntry(SdfCell& cell, SdfDelayEntryKind kind,
   cell.delay_entry_order.push_back(ref);
 }
 
+// Appends an already-parsed iopath to the cell and records its delay-entry
+// order slot.
+static void AddIopathToCell(SdfCell& cell, const SdfIopath& io) {
+  cell.iopaths.push_back(io);
+  RecordDelayEntry(cell, SdfDelayEntryKind::kIopath, cell.iopaths.size() - 1);
+}
+
+// Appends an already-parsed interconnect to the cell and records its
+// delay-entry order slot.
+static void AddInterconnectToCell(SdfCell& cell, SdfInterconnect&& ic) {
+  cell.interconnects.push_back(std::move(ic));
+  RecordDelayEntry(cell, SdfDelayEntryKind::kInterconnect,
+                   cell.interconnects.size() - 1);
+}
+
+// Parses a load-only interconnect (PORT/NETDELAY) of the given kind and adds it
+// to the cell.
+static void ParseAndAddLoadOnlyInterconnect(std::string_view& s, SdfCell& cell,
+                                            SdfInterconnectKind kind,
+                                            bool increment) {
+  auto ic = ParseLoadOnlyInterconnect(s, kind);
+  ic.is_increment = increment;
+  AddInterconnectToCell(cell, std::move(ic));
+}
+
+// Handles a (COND ...) delay-section entry: a conditioned IOPATH is recorded,
+// any other inner construct is skipped and reported unannotatable.
+static void ParseCondDelayEntry(std::string_view& s, SdfCell& cell,
+                                SdfFile& file, bool increment) {
+  std::string cond = ParseSdfConditionText(s);
+  SkipWhitespace(s);
+  if (!s.empty() && s[0] == '(') {
+    Expect(s, SdfTokKind::kLParen);
+    auto inner = NextSdfToken(s);
+    if (inner.text == "IOPATH") {
+      auto io = ParseIopath(s);
+      io.is_increment = increment;
+      io.condition = std::move(cond);
+      AddIopathToCell(cell, io);
+      Expect(s, SdfTokKind::kRParen);
+      return;
+    }
+
+    SkipSdfParen(s);
+  }
+  file.unannotatable.emplace_back("COND");
+
+  SkipWhitespace(s);
+  if (!s.empty() && s[0] == ')') Expect(s, SdfTokKind::kRParen);
+}
+
+// Handles a (CONDELSE ...) delay-section entry: an ifnone IOPATH is recorded,
+// any other inner construct is skipped and reported unannotatable.
+static void ParseCondElseDelayEntry(std::string_view& s, SdfCell& cell,
+                                    SdfFile& file, bool increment) {
+  SkipWhitespace(s);
+  if (!s.empty() && s[0] == '(') {
+    Expect(s, SdfTokKind::kLParen);
+    auto inner = NextSdfToken(s);
+    if (inner.text == "IOPATH") {
+      auto io = ParseIopath(s);
+      io.is_increment = increment;
+      io.is_ifnone = true;
+      AddIopathToCell(cell, io);
+      Expect(s, SdfTokKind::kRParen);
+      return;
+    }
+    SkipSdfParen(s);
+  }
+  file.unannotatable.emplace_back("CONDELSE");
+  SkipWhitespace(s);
+  if (!s.empty() && s[0] == ')') Expect(s, SdfTokKind::kRParen);
+}
+
 static void ParseDelaySection(std::string_view& s, SdfCell& cell, SdfFile& file,
                               bool increment) {
   while (true) {
@@ -441,76 +548,27 @@ static void ParseDelaySection(std::string_view& s, SdfCell& cell, SdfFile& file,
     if (kw.text == "INTERCONNECT") {
       auto ic = ParseInterconnectEntry(s);
       ic.is_increment = increment;
-      cell.interconnects.push_back(std::move(ic));
-      RecordDelayEntry(cell, SdfDelayEntryKind::kInterconnect,
-                       cell.interconnects.size() - 1);
+      AddInterconnectToCell(cell, std::move(ic));
       continue;
     }
     if (kw.text == "PORT") {
-      auto ic = ParseLoadOnlyInterconnect(s, SdfInterconnectKind::kPort);
-      ic.is_increment = increment;
-      cell.interconnects.push_back(std::move(ic));
-      RecordDelayEntry(cell, SdfDelayEntryKind::kInterconnect,
-                       cell.interconnects.size() - 1);
+      ParseAndAddLoadOnlyInterconnect(s, cell, SdfInterconnectKind::kPort,
+                                      increment);
       continue;
     }
     if (kw.text == "NETDELAY") {
-      auto ic = ParseLoadOnlyInterconnect(s, SdfInterconnectKind::kNetdelay);
-      ic.is_increment = increment;
-      cell.interconnects.push_back(std::move(ic));
-      RecordDelayEntry(cell, SdfDelayEntryKind::kInterconnect,
-                       cell.interconnects.size() - 1);
+      ParseAndAddLoadOnlyInterconnect(s, cell, SdfInterconnectKind::kNetdelay,
+                                      increment);
       continue;
     }
     if (kw.text == "IOPATH") {
       auto io = ParseIopath(s);
       io.is_increment = increment;
-      cell.iopaths.push_back(io);
-      RecordDelayEntry(cell, SdfDelayEntryKind::kIopath,
-                       cell.iopaths.size() - 1);
+      AddIopathToCell(cell, io);
     } else if (kw.text == "COND") {
-      std::string cond = ParseSdfConditionText(s);
-      SkipWhitespace(s);
-      if (!s.empty() && s[0] == '(') {
-        Expect(s, SdfTokKind::kLParen);
-        auto inner = NextSdfToken(s);
-        if (inner.text == "IOPATH") {
-          auto io = ParseIopath(s);
-          io.is_increment = increment;
-          io.condition = std::move(cond);
-          cell.iopaths.push_back(io);
-          RecordDelayEntry(cell, SdfDelayEntryKind::kIopath,
-                           cell.iopaths.size() - 1);
-          Expect(s, SdfTokKind::kRParen);
-          continue;
-        }
-
-        SkipSdfParen(s);
-      }
-      file.unannotatable.emplace_back("COND");
-
-      SkipWhitespace(s);
-      if (!s.empty() && s[0] == ')') Expect(s, SdfTokKind::kRParen);
+      ParseCondDelayEntry(s, cell, file, increment);
     } else if (kw.text == "CONDELSE") {
-      SkipWhitespace(s);
-      if (!s.empty() && s[0] == '(') {
-        Expect(s, SdfTokKind::kLParen);
-        auto inner = NextSdfToken(s);
-        if (inner.text == "IOPATH") {
-          auto io = ParseIopath(s);
-          io.is_increment = increment;
-          io.is_ifnone = true;
-          cell.iopaths.push_back(io);
-          RecordDelayEntry(cell, SdfDelayEntryKind::kIopath,
-                           cell.iopaths.size() - 1);
-          Expect(s, SdfTokKind::kRParen);
-          continue;
-        }
-        SkipSdfParen(s);
-      }
-      file.unannotatable.emplace_back("CONDELSE");
-      SkipWhitespace(s);
-      if (!s.empty() && s[0] == ')') Expect(s, SdfTokKind::kRParen);
+      ParseCondElseDelayEntry(s, cell, file, increment);
     } else {
       file.unannotatable.emplace_back(kw.text);
       SkipSdfParen(s);

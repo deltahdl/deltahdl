@@ -165,18 +165,23 @@ CrossCover* CoverageDB::AddCross(CoverGroup* group, CrossCover cross) {
   return &group->crosses.back();
 }
 
-void CoverageDB::SampleCoverPoint(CoverPoint* cp, int64_t value) {
-  if (cp->has_iff_guard && !cp->iff_guard_value) return;
-  // An illegal bin takes precedence over every other bin: a sampled value that
-  // hits an illegal state bin is a run-time error and is counted toward no
-  // coverage bin, even when it also belongs to another bin (LRM 19.5.6).
-  bool value_is_illegal = false;
+// An illegal bin takes precedence over every other bin: a sampled value that
+// hits an illegal state bin is a run-time error and is counted toward no
+// coverage bin, even when it also belongs to another bin (LRM 19.5.6).
+static bool ValueHitsIllegalBin(const CoverPoint* cp, int64_t value) {
   for (const auto& bin : cp->bins) {
     if (bin.kind == CoverBinKind::kIllegal && MatchesBin(bin, value)) {
-      value_is_illegal = true;
-      break;
+      return true;
     }
   }
+  return false;
+}
+
+// Increments every value bin the sample lands in, honoring illegal dominance
+// and per-bin iff guards, and reports whether the value lies within any
+// defined (non-default) bin (LRM 19.5, 19.5.1, 19.5.6).
+static bool ScoreValueBins(CoverPoint* cp, int64_t value,
+                           bool value_is_illegal) {
   // A value "lies within a defined bin" if it matches any non-default bin,
   // including illegal and ignore bins. The default bin catches only what the
   // defined bins miss (LRM 19.5).
@@ -195,6 +200,79 @@ void CoverageDB::SampleCoverPoint(CoverPoint* cp, int64_t value) {
     if (bin.has_iff_guard && !bin.iff_guard_value) continue;
     ++bin.hit_count;
   }
+  return matched_defined;
+}
+
+// Transition bins count whenever the most recent samples complete one of their
+// value-transition sequences (LRM 19.5). An illegal_bins transition bin (kind
+// kIllegal carrying transition sequences) is tracked alongside ordinary
+// transition bins so that a completed illegal sequence can raise its run-time
+// error (LRM 19.5.6).
+static bool IsTransitionBin(const CoverBin& bin) {
+  return bin.kind == CoverBinKind::kTransition ||
+         (bin.kind == CoverBinKind::kIllegal && !bin.transitions.empty());
+}
+
+// Reports whether the coverpoint has any transition bin, and through max_seq
+// the longest transition sequence across all of them.
+static bool CollectTransitionBins(const CoverPoint* cp, size_t& max_seq) {
+  max_seq = 0;
+  bool any_transition = false;
+  for (const auto& bin : cp->bins) {
+    if (!IsTransitionBin(bin)) continue;
+    any_transition = true;
+    for (const auto& seq : bin.transitions) {
+      if (seq.size() > max_seq) max_seq = seq.size();
+    }
+  }
+  return any_transition;
+}
+
+// Appends the new sample and trims the history to the longest transition
+// sequence so older samples that can no longer complete a sequence are dropped.
+static void AppendSampleHistory(CoverPoint* cp, int64_t value, size_t max_seq) {
+  cp->sample_history.push_back(value);
+  if (max_seq > 0 && cp->sample_history.size() > max_seq) {
+    size_t excess = cp->sample_history.size() - max_seq;
+    cp->sample_history.erase(
+        cp->sample_history.begin(),
+        cp->sample_history.begin() + static_cast<std::ptrdiff_t>(excess));
+  }
+}
+
+// Reports whether the most recent samples match this transition sequence.
+static bool SampleHistoryMatchesSeq(const CoverPoint* cp,
+                                    const std::vector<int64_t>& seq) {
+  if (seq.empty() || cp->sample_history.size() < seq.size()) return false;
+  size_t off = cp->sample_history.size() - seq.size();
+  for (size_t i = 0; i < seq.size(); ++i) {
+    if (cp->sample_history[off + i] != seq[i]) return false;
+  }
+  return true;
+}
+
+// Scores any transition bin whose sequence was completed by the latest sample.
+static void ScoreTransitionBins(CoverPoint* cp) {
+  for (auto& bin : cp->bins) {
+    if (!IsTransitionBin(bin)) continue;
+    for (const auto& seq : bin.transitions) {
+      if (!SampleHistoryMatchesSeq(cp, seq)) continue;
+      // A completed illegal transition is a run-time error and counts toward
+      // no coverage bin; an ordinary transition bin increments (LRM 19.5.6).
+      if (bin.kind == CoverBinKind::kIllegal) {
+        ++cp->illegal_violations;
+      } else {
+        ++bin.hit_count;
+      }
+      break;
+    }
+  }
+}
+
+void CoverageDB::SampleCoverPoint(CoverPoint* cp, int64_t value) {
+  if (cp->has_iff_guard && !cp->iff_guard_value) return;
+  bool value_is_illegal = ValueHitsIllegalBin(cp, value);
+  bool matched_defined = ScoreValueBins(cp, value, value_is_illegal);
   // Issue the run-time error for an illegal value occurrence (LRM 19.5.6).
   if (value_is_illegal) ++cp->illegal_violations;
   if (!matched_defined) {
@@ -203,58 +281,11 @@ void CoverageDB::SampleCoverPoint(CoverPoint* cp, int64_t value) {
     }
   }
 
-  // Transition bins count whenever the most recent samples complete one of
-  // their value-transition sequences (LRM 19.5).
-  // An illegal_bins transition bin (kind kIllegal carrying transition
-  // sequences) is tracked alongside ordinary transition bins so that a
-  // completed illegal sequence can raise its run-time error (LRM 19.5.6).
-  auto is_transition_bin = [](const CoverBin& bin) {
-    return bin.kind == CoverBinKind::kTransition ||
-           (bin.kind == CoverBinKind::kIllegal && !bin.transitions.empty());
-  };
   size_t max_seq = 0;
-  bool any_transition = false;
-  for (const auto& bin : cp->bins) {
-    if (!is_transition_bin(bin)) continue;
-    any_transition = true;
-    for (const auto& seq : bin.transitions) {
-      if (seq.size() > max_seq) max_seq = seq.size();
-    }
-  }
-  if (!any_transition) return;
+  if (!CollectTransitionBins(cp, max_seq)) return;
 
-  cp->sample_history.push_back(value);
-  if (max_seq > 0 && cp->sample_history.size() > max_seq) {
-    size_t excess = cp->sample_history.size() - max_seq;
-    cp->sample_history.erase(
-        cp->sample_history.begin(),
-        cp->sample_history.begin() + static_cast<std::ptrdiff_t>(excess));
-  }
-
-  for (auto& bin : cp->bins) {
-    if (!is_transition_bin(bin)) continue;
-    for (const auto& seq : bin.transitions) {
-      if (seq.empty() || cp->sample_history.size() < seq.size()) continue;
-      size_t off = cp->sample_history.size() - seq.size();
-      bool match = true;
-      for (size_t i = 0; i < seq.size(); ++i) {
-        if (cp->sample_history[off + i] != seq[i]) {
-          match = false;
-          break;
-        }
-      }
-      if (match) {
-        // A completed illegal transition is a run-time error and counts toward
-        // no coverage bin; an ordinary transition bin increments (LRM 19.5.6).
-        if (bin.kind == CoverBinKind::kIllegal) {
-          ++cp->illegal_violations;
-        } else {
-          ++bin.hit_count;
-        }
-        break;
-      }
-    }
-  }
+  AppendSampleHistory(cp, value, max_seq);
+  ScoreTransitionBins(cp);
 }
 
 void CoverageDB::SampleCross(

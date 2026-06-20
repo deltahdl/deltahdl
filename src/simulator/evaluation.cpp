@@ -116,25 +116,29 @@ static Logic4Vec CombineBranches(Logic4Vec tv, Logic4Vec fv, Arena& arena) {
   if (tv.is_real || fv.is_real) result.is_real = true;
   return result;
 }
+static Logic4Vec EvalTernaryUnknownCond(const Expr* expr, SimContext& ctx,
+                                        Arena& arena, uint32_t context_width) {
+  auto tv = EvalExpr(expr->true_expr, ctx, arena, context_width);
+  auto fv = EvalExpr(expr->false_expr, ctx, arena, context_width);
+  bool result_signed = tv.is_signed && fv.is_signed;
+  uint32_t width = (tv.width > fv.width) ? tv.width : fv.width;
+  if (context_width > width) width = context_width;
+  if (tv.width < width) tv = ExtendVec(tv, width, result_signed, arena);
+  if (fv.width < width) fv = ExtendVec(fv, width, result_signed, arena);
+  if (EvalCaseEquality(tv, fv)) {
+    tv.is_signed = result_signed;
+    return tv;
+  }
+  auto result = CombineBranches(tv, fv, arena);
+  result.is_signed = result_signed;
+  return result;
+}
 static Logic4Vec EvalTernary(const Expr* expr, SimContext& ctx, Arena& arena,
                              uint32_t context_width = 0) {
   auto cond = EvalExpr(expr->condition, ctx, arena);
 
   if (HasUnknownBits(cond)) {
-    auto tv = EvalExpr(expr->true_expr, ctx, arena, context_width);
-    auto fv = EvalExpr(expr->false_expr, ctx, arena, context_width);
-    bool result_signed = tv.is_signed && fv.is_signed;
-    uint32_t width = (tv.width > fv.width) ? tv.width : fv.width;
-    if (context_width > width) width = context_width;
-    if (tv.width < width) tv = ExtendVec(tv, width, result_signed, arena);
-    if (fv.width < width) fv = ExtendVec(fv, width, result_signed, arena);
-    if (EvalCaseEquality(tv, fv)) {
-      tv.is_signed = result_signed;
-      return tv;
-    }
-    auto result = CombineBranches(tv, fv, arena);
-    result.is_signed = result_signed;
-    return result;
+    return EvalTernaryUnknownCond(expr, ctx, arena, context_width);
   }
   auto tv = EvalExpr(expr->true_expr, ctx, arena, context_width);
   auto fv = EvalExpr(expr->false_expr, ctx, arena, context_width);
@@ -267,6 +271,65 @@ static Logic4Vec EvalLogicalEquiv(const Expr* expr, SimContext& ctx,
   bool rv = r.ToUint64() != 0;
   return MakeLogic4VecVal(arena, 1, (lv == rv) ? 1 : 0);
 }
+// Handles equality comparisons (==, !=, ===, !==) whose operands are event
+// variables or virtual interfaces, per the special object-identity semantics.
+// Returns true and sets `out` when the special handling applies; otherwise
+// returns false so the caller falls through to the generic binary operator.
+static bool TryEvalIdentityEquality(const Expr* expr, SimContext& ctx,
+                                    Arena& arena, Logic4Vec& out) {
+  if (expr->op != TokenKind::kEqEq && expr->op != TokenKind::kBangEq &&
+      expr->op != TokenKind::kEqEqEq && expr->op != TokenKind::kBangEqEq) {
+    return false;
+  }
+  auto* lhs_id = (expr->lhs && expr->lhs->kind == ExprKind::kIdentifier)
+                     ? expr->lhs
+                     : nullptr;
+  auto* rhs_id = (expr->rhs && expr->rhs->kind == ExprKind::kIdentifier)
+                     ? expr->rhs
+                     : nullptr;
+  Variable* lv = lhs_id ? ctx.FindVariable(lhs_id->text) : nullptr;
+  Variable* rv = rhs_id ? ctx.FindVariable(rhs_id->text) : nullptr;
+  bool lhs_is_event = lv && lv->is_event;
+  bool rhs_is_event = rv && rv->is_event;
+  bool lhs_is_null = lhs_id && lhs_id->text == "null" && !lv;
+  bool rhs_is_null = rhs_id && rhs_id->text == "null" && !rv;
+  bool is_eq_op =
+      (expr->op == TokenKind::kEqEq || expr->op == TokenKind::kEqEqEq);
+  if (lhs_is_event || rhs_is_event) {
+    bool equal = false;
+    if (lhs_is_event && rhs_is_event) {
+      equal = (lv == rv);
+    } else if (lhs_is_event && rhs_is_null) {
+      equal = lv->is_null_event;
+    } else if (rhs_is_event && lhs_is_null) {
+      equal = rv->is_null_event;
+    }
+    out = MakeLogic4VecVal(arena, 1, (is_eq_op == equal) ? 1u : 0u);
+    return true;
+  }
+
+  // §25.9: equality of a virtual interface against another virtual interface,
+  // an interface instance, or null compares the interface instance each side
+  // refers to (an unbound virtual interface and null compare equal).
+  bool lhs_is_vi = ctx.IsVirtualInterfaceVar(lv);
+  bool rhs_is_vi = ctx.IsVirtualInterfaceVar(rv);
+  if (lhs_is_vi || rhs_is_vi) {
+    auto operand_scope = [&](Variable* v, const Expr* id, bool is_vi,
+                             bool is_null) -> std::string {
+      if (is_vi) return std::string(ctx.VirtualInterfaceBinding(v));
+      if (is_null) return std::string();
+      if (id) return ctx.ResolveInstanceScope(id->text);
+      return std::string();
+    };
+    std::string ls = operand_scope(lv, lhs_id, lhs_is_vi, lhs_is_null);
+    std::string rs = operand_scope(rv, rhs_id, rhs_is_vi, rhs_is_null);
+    bool equal = (ls == rs);
+    out = MakeLogic4VecVal(arena, 1, (is_eq_op == equal) ? 1u : 0u);
+    return true;
+  }
+  return false;
+}
+
 static Logic4Vec EvalBinaryExpr(const Expr* expr, SimContext& ctx, Arena& arena,
                                 uint32_t context_width = 0) {
   if (expr->op == TokenKind::kEq) return EvalAssignInExpr(expr, ctx, arena);
@@ -287,54 +350,10 @@ static Logic4Vec EvalBinaryExpr(const Expr* expr, SimContext& ctx, Arena& arena,
   if (expr->op == TokenKind::kLtDashGt)
     return EvalLogicalEquiv(expr, ctx, arena);
 
-  if (expr->op == TokenKind::kEqEq || expr->op == TokenKind::kBangEq ||
-      expr->op == TokenKind::kEqEqEq || expr->op == TokenKind::kBangEqEq) {
-    auto* lhs_id = (expr->lhs && expr->lhs->kind == ExprKind::kIdentifier)
-                       ? expr->lhs
-                       : nullptr;
-    auto* rhs_id = (expr->rhs && expr->rhs->kind == ExprKind::kIdentifier)
-                       ? expr->rhs
-                       : nullptr;
-    Variable* lv = lhs_id ? ctx.FindVariable(lhs_id->text) : nullptr;
-    Variable* rv = rhs_id ? ctx.FindVariable(rhs_id->text) : nullptr;
-    bool lhs_is_event = lv && lv->is_event;
-    bool rhs_is_event = rv && rv->is_event;
-    bool lhs_is_null = lhs_id && lhs_id->text == "null" && !lv;
-    bool rhs_is_null = rhs_id && rhs_id->text == "null" && !rv;
-    if (lhs_is_event || rhs_is_event) {
-      bool equal = false;
-      if (lhs_is_event && rhs_is_event) {
-        equal = (lv == rv);
-      } else if (lhs_is_event && rhs_is_null) {
-        equal = lv->is_null_event;
-      } else if (rhs_is_event && lhs_is_null) {
-        equal = rv->is_null_event;
-      }
-      bool is_eq_op =
-          (expr->op == TokenKind::kEqEq || expr->op == TokenKind::kEqEqEq);
-      return MakeLogic4VecVal(arena, 1, (is_eq_op == equal) ? 1u : 0u);
-    }
-
-    // §25.9: equality of a virtual interface against another virtual interface,
-    // an interface instance, or null compares the interface instance each side
-    // refers to (an unbound virtual interface and null compare equal).
-    bool lhs_is_vi = ctx.IsVirtualInterfaceVar(lv);
-    bool rhs_is_vi = ctx.IsVirtualInterfaceVar(rv);
-    if (lhs_is_vi || rhs_is_vi) {
-      auto operand_scope = [&](Variable* v, const Expr* id, bool is_vi,
-                               bool is_null) -> std::string {
-        if (is_vi) return std::string(ctx.VirtualInterfaceBinding(v));
-        if (is_null) return std::string();
-        if (id) return ctx.ResolveInstanceScope(id->text);
-        return std::string();
-      };
-      std::string ls = operand_scope(lv, lhs_id, lhs_is_vi, lhs_is_null);
-      std::string rs = operand_scope(rv, rhs_id, rhs_is_vi, rhs_is_null);
-      bool equal = (ls == rs);
-      bool is_eq_op =
-          (expr->op == TokenKind::kEqEq || expr->op == TokenKind::kEqEqEq);
-      return MakeLogic4VecVal(arena, 1, (is_eq_op == equal) ? 1u : 0u);
-    }
+  {
+    Logic4Vec identity_result;
+    if (TryEvalIdentityEquality(expr, ctx, arena, identity_result))
+      return identity_result;
   }
   return EvalBinaryOp(expr->op, EvalExpr(expr->lhs, ctx, arena),
                       EvalExpr(expr->rhs, ctx, arena), arena, context_width);
@@ -345,6 +364,44 @@ static Logic4Vec EvalTaggedExpr(const Expr* expr, SimContext& ctx, Arena& arena,
   if (expr->lhs) return EvalExpr(expr->lhs, ctx, arena, context_width);
 
   return MakeLogic4VecVal(arena, 1, 0);
+}
+
+static Logic4Vec EvalRealOrTimeLiteral(const Expr* expr, Arena& arena) {
+  double v = expr->real_val;
+  uint64_t bits = 0;
+  std::memcpy(&bits, &v, sizeof(double));
+  auto rv = MakeLogic4VecVal(arena, 64, bits);
+  rv.is_real = true;
+  return rv;
+}
+
+static Logic4Vec EvalUnaryExpr(const Expr* expr, SimContext& ctx,
+                               Arena& arena) {
+  if (expr->op == TokenKind::kPlusPlus || expr->op == TokenKind::kMinusMinus) {
+    return EvalPrefixUnary(expr, ctx, arena);
+  }
+  return EvalUnaryOp(expr->op, EvalExpr(expr->lhs, ctx, arena), arena);
+}
+
+static Logic4Vec EvalBinaryDispatch(const Expr* expr, SimContext& ctx,
+                                    Arena& arena, uint32_t context_width) {
+  if (IsCompoundAssignOp(expr->op)) {
+    return EvalCompoundAssign(expr, ctx, arena);
+  }
+  if (expr->op == TokenKind::kKwMatches) {
+    return EvalMatches(expr, ctx, arena);
+  }
+  return EvalBinaryExpr(expr, ctx, arena, context_width);
+}
+
+static Logic4Vec EvalMinTypMax(const Expr* expr, SimContext& ctx, Arena& arena,
+                               uint32_t context_width) {
+  DelayMode mode = ctx.GetDelayMode();
+  if (mode == DelayMode::kMin)
+    return EvalExpr(expr->lhs, ctx, arena, context_width);
+  if (mode == DelayMode::kMax)
+    return EvalExpr(expr->rhs, ctx, arena, context_width);
+  return EvalExpr(expr->condition, ctx, arena, context_width);
 }
 
 Logic4Vec EvalExpr(const Expr* expr, SimContext& ctx, Arena& arena,
@@ -362,30 +419,14 @@ Logic4Vec EvalExpr(const Expr* expr, SimContext& ctx, Arena& arena,
     case ExprKind::kStringLiteral:
       return EvalStringLiteral(expr, arena);
     case ExprKind::kRealLiteral:
-    case ExprKind::kTimeLiteral: {
-      double v = expr->real_val;
-      uint64_t bits = 0;
-      std::memcpy(&bits, &v, sizeof(double));
-      auto rv = MakeLogic4VecVal(arena, 64, bits);
-      rv.is_real = true;
-      return rv;
-    }
+    case ExprKind::kTimeLiteral:
+      return EvalRealOrTimeLiteral(expr, arena);
     case ExprKind::kIdentifier:
       return EvalIdentifier(expr, ctx, arena);
     case ExprKind::kUnary:
-      if (expr->op == TokenKind::kPlusPlus ||
-          expr->op == TokenKind::kMinusMinus) {
-        return EvalPrefixUnary(expr, ctx, arena);
-      }
-      return EvalUnaryOp(expr->op, EvalExpr(expr->lhs, ctx, arena), arena);
+      return EvalUnaryExpr(expr, ctx, arena);
     case ExprKind::kBinary:
-      if (IsCompoundAssignOp(expr->op)) {
-        return EvalCompoundAssign(expr, ctx, arena);
-      }
-      if (expr->op == TokenKind::kKwMatches) {
-        return EvalMatches(expr, ctx, arena);
-      }
-      return EvalBinaryExpr(expr, ctx, arena, context_width);
+      return EvalBinaryDispatch(expr, ctx, arena, context_width);
     case ExprKind::kTernary:
       return EvalTernary(expr, ctx, arena, context_width);
     case ExprKind::kConcatenation:
@@ -412,14 +453,8 @@ Logic4Vec EvalExpr(const Expr* expr, SimContext& ctx, Arena& arena,
       return EvalAssignmentPattern(expr, ctx, arena);
     case ExprKind::kTagged:
       return EvalTaggedExpr(expr, ctx, arena, context_width);
-    case ExprKind::kMinTypMax: {
-      DelayMode mode = ctx.GetDelayMode();
-      if (mode == DelayMode::kMin)
-        return EvalExpr(expr->lhs, ctx, arena, context_width);
-      if (mode == DelayMode::kMax)
-        return EvalExpr(expr->rhs, ctx, arena, context_width);
-      return EvalExpr(expr->condition, ctx, arena, context_width);
-    }
+    case ExprKind::kMinTypMax:
+      return EvalMinTypMax(expr, ctx, arena, context_width);
     default:
       return MakeLogic4Vec(arena, 1);
   }

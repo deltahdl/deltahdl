@@ -24,6 +24,55 @@ static uint64_t SelectMtm(const SdfDelayValue& dv, SdfMtm mtm) {
   return dv.typ_val;
 }
 
+static void ExpandSdfDelaysTwo(std::vector<uint64_t>& out, uint64_t v1,
+                               uint64_t v2) {
+  out[0] = v1;
+  out[1] = v2;
+  out[2] = v1;
+  out[3] = v1;
+  out[4] = v2;
+  out[5] = v2;
+  out[6] = v1;
+  out[7] = v1;
+  out[8] = v2;
+  out[9] = v2;
+  out[10] = std::max(v1, v2);
+  out[11] = std::min(v1, v2);
+}
+
+static void ExpandSdfDelaysThree(std::vector<uint64_t>& out, uint64_t v1,
+                                 uint64_t v2, uint64_t v3) {
+  out[0] = v1;
+  out[1] = v2;
+  out[2] = v3;
+  out[3] = v1;
+  out[4] = v3;
+  out[5] = v2;
+  out[6] = std::min(v1, v3);
+  out[7] = std::max(v1, v3);
+  out[8] = std::min(v2, v3);
+  out[9] = v2;
+  out[10] = v3;
+  out[11] = std::min(v1, v2);
+}
+
+static void ExpandSdfDelaysSix(std::vector<uint64_t>& out, uint64_t v1,
+                               uint64_t v2, uint64_t v3, uint64_t v4,
+                               uint64_t v5, uint64_t v6) {
+  out[0] = v1;
+  out[1] = v2;
+  out[2] = v3;
+  out[3] = v4;
+  out[4] = v5;
+  out[5] = v6;
+  out[6] = std::min(v1, v3);
+  out[7] = std::max(v1, v4);
+  out[8] = std::min(v2, v5);
+  out[9] = std::max(v2, v6);
+  out[10] = std::max(v3, v5);
+  out[11] = std::min(v4, v6);
+}
+
 std::vector<uint64_t> ExpandSdfDelays(const std::vector<SdfDelayValue>& vals,
                                       SdfMtm mtm) {
   std::vector<uint64_t> out(12, 0);
@@ -44,35 +93,13 @@ std::vector<uint64_t> ExpandSdfDelays(const std::vector<SdfDelayValue>& vals,
 
   const uint64_t kV2 = SelectMtm(vals[1], mtm);
   if (kN == 2) {
-    out[0] = kV1;
-    out[1] = kV2;
-    out[2] = kV1;
-    out[3] = kV1;
-    out[4] = kV2;
-    out[5] = kV2;
-    out[6] = kV1;
-    out[7] = kV1;
-    out[8] = kV2;
-    out[9] = kV2;
-    out[10] = std::max(kV1, kV2);
-    out[11] = std::min(kV1, kV2);
+    ExpandSdfDelaysTwo(out, kV1, kV2);
     return out;
   }
 
   const uint64_t kV3 = SelectMtm(vals[2], mtm);
   if (kN == 3) {
-    out[0] = kV1;
-    out[1] = kV2;
-    out[2] = kV3;
-    out[3] = kV1;
-    out[4] = kV3;
-    out[5] = kV2;
-    out[6] = std::min(kV1, kV3);
-    out[7] = std::max(kV1, kV3);
-    out[8] = std::min(kV2, kV3);
-    out[9] = kV2;
-    out[10] = kV3;
-    out[11] = std::min(kV1, kV2);
+    ExpandSdfDelaysThree(out, kV1, kV2, kV3);
     return out;
   }
 
@@ -80,18 +107,7 @@ std::vector<uint64_t> ExpandSdfDelays(const std::vector<SdfDelayValue>& vals,
   const uint64_t kV5 = SelectMtm(vals[4], mtm);
   const uint64_t kV6 = SelectMtm(vals[5], mtm);
   if (kN == 6) {
-    out[0] = kV1;
-    out[1] = kV2;
-    out[2] = kV3;
-    out[3] = kV4;
-    out[4] = kV5;
-    out[5] = kV6;
-    out[6] = std::min(kV1, kV3);
-    out[7] = std::max(kV1, kV4);
-    out[8] = std::min(kV2, kV5);
-    out[9] = std::max(kV2, kV6);
-    out[10] = std::max(kV3, kV5);
-    out[11] = std::min(kV4, kV6);
+    ExpandSdfDelaysSix(out, kV1, kV2, kV3, kV4, kV5, kV6);
     return out;
   }
 
@@ -114,124 +130,178 @@ std::array<uint64_t, 4> ReduceSdfDelaysToThree(
   return out;
 }
 
+namespace {
+
+// Mirrors the `push` lambda in ExpandSdfTimingCheckTargets: appends a new
+// annotation seeded from the timing check and returns a reference to it.
+SdfTcAnnotation& PushSdfTcAnnotation(std::vector<SdfTcAnnotation>& targets,
+                                     const SdfTimingCheck& tc,
+                                     TimingCheckKind kind) {
+  SdfTcAnnotation a;
+  a.kind = kind;
+  a.ref_signal = tc.ref_port;
+  a.ref_edge = tc.ref_edge;
+  a.data_signal = tc.data_port;
+  a.data_edge = tc.data_edge;
+  a.condition = tc.condition;
+  targets.push_back(std::move(a));
+  return targets.back();
+}
+
+void PopulateSdfTcSetupHold(std::vector<SdfTcAnnotation>& targets,
+                            const SdfTimingCheck& tc, SdfCheckType check_type,
+                            uint64_t v1, uint64_t v2) {
+  switch (check_type) {
+    case SdfCheckType::kSetup: {
+      auto& s = PushSdfTcAnnotation(targets, tc, TimingCheckKind::kSetup);
+      s.set_limit = true;
+      s.limit = v1;
+      auto& sh = PushSdfTcAnnotation(targets, tc, TimingCheckKind::kSetuphold);
+      sh.set_limit = true;
+      sh.limit = v1;
+      break;
+    }
+    case SdfCheckType::kHold: {
+      auto& h = PushSdfTcAnnotation(targets, tc, TimingCheckKind::kHold);
+      h.set_limit = true;
+      h.limit = v1;
+      auto& sh = PushSdfTcAnnotation(targets, tc, TimingCheckKind::kSetuphold);
+      sh.set_limit2 = true;
+      sh.limit2 = v1;
+      break;
+    }
+    case SdfCheckType::kSetuphold: {
+      auto& s = PushSdfTcAnnotation(targets, tc, TimingCheckKind::kSetup);
+      s.set_limit = true;
+      s.limit = v1;
+      auto& h = PushSdfTcAnnotation(targets, tc, TimingCheckKind::kHold);
+      h.set_limit = true;
+      h.limit = v2;
+      auto& sh = PushSdfTcAnnotation(targets, tc, TimingCheckKind::kSetuphold);
+      sh.set_limit = true;
+      sh.limit = v1;
+      sh.set_limit2 = true;
+      sh.limit2 = v2;
+      break;
+    }
+    default:
+      break;
+  }
+}
+
+void PopulateSdfTcRecRem(std::vector<SdfTcAnnotation>& targets,
+                         const SdfTimingCheck& tc, SdfCheckType check_type,
+                         uint64_t v1, uint64_t v2) {
+  switch (check_type) {
+    case SdfCheckType::kRecovery: {
+      auto& r = PushSdfTcAnnotation(targets, tc, TimingCheckKind::kRecovery);
+      r.set_limit = true;
+      r.limit = v1;
+      auto& rr = PushSdfTcAnnotation(targets, tc, TimingCheckKind::kRecrem);
+      rr.set_limit = true;
+      rr.limit = v1;
+      break;
+    }
+    case SdfCheckType::kRemoval: {
+      auto& r = PushSdfTcAnnotation(targets, tc, TimingCheckKind::kRemoval);
+      r.set_limit = true;
+      r.limit = v1;
+      auto& rr = PushSdfTcAnnotation(targets, tc, TimingCheckKind::kRecrem);
+      rr.set_limit2 = true;
+      rr.limit2 = v1;
+      break;
+    }
+    case SdfCheckType::kRecrem: {
+      auto& r = PushSdfTcAnnotation(targets, tc, TimingCheckKind::kRecovery);
+      r.set_limit = true;
+      r.limit = v1;
+      auto& rm = PushSdfTcAnnotation(targets, tc, TimingCheckKind::kRemoval);
+      rm.set_limit = true;
+      rm.limit = v2;
+      auto& rr = PushSdfTcAnnotation(targets, tc, TimingCheckKind::kRecrem);
+      rr.set_limit = true;
+      rr.limit = v1;
+      rr.set_limit2 = true;
+      rr.limit2 = v2;
+      break;
+    }
+    default:
+      break;
+  }
+}
+
+void PopulateSdfTcSkewWidthPeriod(std::vector<SdfTcAnnotation>& targets,
+                                  const SdfTimingCheck& tc,
+                                  SdfCheckType check_type, uint64_t v1,
+                                  uint64_t v2) {
+  switch (check_type) {
+    case SdfCheckType::kSkew: {
+      auto& s = PushSdfTcAnnotation(targets, tc, TimingCheckKind::kSkew);
+      s.set_limit = true;
+      s.limit = v1;
+      auto& ts = PushSdfTcAnnotation(targets, tc, TimingCheckKind::kTimeskew);
+      ts.set_limit = true;
+      ts.limit = v1;
+      break;
+    }
+    case SdfCheckType::kBidirectskew: {
+      auto& fs = PushSdfTcAnnotation(targets, tc, TimingCheckKind::kFullskew);
+      fs.set_limit = true;
+      fs.limit = v1;
+      fs.set_limit2 = true;
+      fs.limit2 = v2;
+      break;
+    }
+    case SdfCheckType::kWidth: {
+      auto& w = PushSdfTcAnnotation(targets, tc, TimingCheckKind::kWidth);
+      w.set_limit = true;
+      w.limit = v1;
+      break;
+    }
+    case SdfCheckType::kPeriod: {
+      auto& p = PushSdfTcAnnotation(targets, tc, TimingCheckKind::kPeriod);
+      p.set_limit = true;
+      p.limit = v1;
+      break;
+    }
+    case SdfCheckType::kNochange: {
+      auto& nc = PushSdfTcAnnotation(targets, tc, TimingCheckKind::kNochange);
+      nc.set_start_edge_offset = true;
+      nc.start_edge_offset = static_cast<int64_t>(v1);
+      nc.set_end_edge_offset = true;
+      nc.end_edge_offset = static_cast<int64_t>(v2);
+      break;
+    }
+    default:
+      break;
+  }
+}
+
+}  // namespace
+
 static std::vector<SdfTcAnnotation> ExpandSdfTimingCheckTargets(
     const SdfTimingCheck& tc, SdfMtm mtm) {
   const uint64_t kV1 = SelectMtm(tc.limit, mtm);
   const uint64_t kV2 = SelectMtm(tc.limit2, mtm);
   std::vector<SdfTcAnnotation> targets;
-  auto push = [&](TimingCheckKind kind) -> SdfTcAnnotation& {
-    SdfTcAnnotation a;
-    a.kind = kind;
-    a.ref_signal = tc.ref_port;
-    a.ref_edge = tc.ref_edge;
-    a.data_signal = tc.data_port;
-    a.data_edge = tc.data_edge;
-    a.condition = tc.condition;
-    targets.push_back(std::move(a));
-    return targets.back();
-  };
   switch (tc.check_type) {
-    case SdfCheckType::kSetup: {
-      auto& s = push(TimingCheckKind::kSetup);
-      s.set_limit = true;
-      s.limit = kV1;
-      auto& sh = push(TimingCheckKind::kSetuphold);
-      sh.set_limit = true;
-      sh.limit = kV1;
+    case SdfCheckType::kSetup:
+    case SdfCheckType::kHold:
+    case SdfCheckType::kSetuphold:
+      PopulateSdfTcSetupHold(targets, tc, tc.check_type, kV1, kV2);
       break;
-    }
-    case SdfCheckType::kHold: {
-      auto& h = push(TimingCheckKind::kHold);
-      h.set_limit = true;
-      h.limit = kV1;
-      auto& sh = push(TimingCheckKind::kSetuphold);
-      sh.set_limit2 = true;
-      sh.limit2 = kV1;
+    case SdfCheckType::kRecovery:
+    case SdfCheckType::kRemoval:
+    case SdfCheckType::kRecrem:
+      PopulateSdfTcRecRem(targets, tc, tc.check_type, kV1, kV2);
       break;
-    }
-    case SdfCheckType::kSetuphold: {
-      auto& s = push(TimingCheckKind::kSetup);
-      s.set_limit = true;
-      s.limit = kV1;
-      auto& h = push(TimingCheckKind::kHold);
-      h.set_limit = true;
-      h.limit = kV2;
-      auto& sh = push(TimingCheckKind::kSetuphold);
-      sh.set_limit = true;
-      sh.limit = kV1;
-      sh.set_limit2 = true;
-      sh.limit2 = kV2;
+    case SdfCheckType::kSkew:
+    case SdfCheckType::kBidirectskew:
+    case SdfCheckType::kWidth:
+    case SdfCheckType::kPeriod:
+    case SdfCheckType::kNochange:
+      PopulateSdfTcSkewWidthPeriod(targets, tc, tc.check_type, kV1, kV2);
       break;
-    }
-    case SdfCheckType::kRecovery: {
-      auto& r = push(TimingCheckKind::kRecovery);
-      r.set_limit = true;
-      r.limit = kV1;
-      auto& rr = push(TimingCheckKind::kRecrem);
-      rr.set_limit = true;
-      rr.limit = kV1;
-      break;
-    }
-    case SdfCheckType::kRemoval: {
-      auto& r = push(TimingCheckKind::kRemoval);
-      r.set_limit = true;
-      r.limit = kV1;
-      auto& rr = push(TimingCheckKind::kRecrem);
-      rr.set_limit2 = true;
-      rr.limit2 = kV1;
-      break;
-    }
-    case SdfCheckType::kRecrem: {
-      auto& r = push(TimingCheckKind::kRecovery);
-      r.set_limit = true;
-      r.limit = kV1;
-      auto& rm = push(TimingCheckKind::kRemoval);
-      rm.set_limit = true;
-      rm.limit = kV2;
-      auto& rr = push(TimingCheckKind::kRecrem);
-      rr.set_limit = true;
-      rr.limit = kV1;
-      rr.set_limit2 = true;
-      rr.limit2 = kV2;
-      break;
-    }
-    case SdfCheckType::kSkew: {
-      auto& s = push(TimingCheckKind::kSkew);
-      s.set_limit = true;
-      s.limit = kV1;
-      auto& ts = push(TimingCheckKind::kTimeskew);
-      ts.set_limit = true;
-      ts.limit = kV1;
-      break;
-    }
-    case SdfCheckType::kBidirectskew: {
-      auto& fs = push(TimingCheckKind::kFullskew);
-      fs.set_limit = true;
-      fs.limit = kV1;
-      fs.set_limit2 = true;
-      fs.limit2 = kV2;
-      break;
-    }
-    case SdfCheckType::kWidth: {
-      auto& w = push(TimingCheckKind::kWidth);
-      w.set_limit = true;
-      w.limit = kV1;
-      break;
-    }
-    case SdfCheckType::kPeriod: {
-      auto& p = push(TimingCheckKind::kPeriod);
-      p.set_limit = true;
-      p.limit = kV1;
-      break;
-    }
-    case SdfCheckType::kNochange: {
-      auto& nc = push(TimingCheckKind::kNochange);
-      nc.set_start_edge_offset = true;
-      nc.start_edge_offset = static_cast<int64_t>(kV1);
-      nc.set_end_edge_offset = true;
-      nc.end_edge_offset = static_cast<int64_t>(kV2);
-      break;
-    }
   }
   return targets;
 }
@@ -245,6 +315,160 @@ static bool CellInScope(std::string_view instance, std::string_view scope) {
   return kSep == '/' || kSep == '.';
 }
 
+namespace {
+
+// Builds the implicit delay-entry ordering used when a cell does not carry an
+// explicit one: all iopaths, then pulse limits, then interconnects.
+std::vector<SdfDelayEntryRef> BuildDerivedSdfDelayOrder(const SdfCell& cell) {
+  std::vector<SdfDelayEntryRef> derived;
+  derived.reserve(cell.iopaths.size() + cell.pulse_limits.size() +
+                  cell.interconnects.size());
+  for (uint32_t i = 0; i < cell.iopaths.size(); ++i) {
+    derived.push_back({SdfDelayEntryKind::kIopath, i});
+  }
+  for (uint32_t i = 0; i < cell.pulse_limits.size(); ++i) {
+    derived.push_back({SdfDelayEntryKind::kPulseLimit, i});
+  }
+  for (uint32_t i = 0; i < cell.interconnects.size(); ++i) {
+    derived.push_back({SdfDelayEntryKind::kInterconnect, i});
+  }
+  return derived;
+}
+
+void AnnotateSdfIopathEntry(const SdfIopath& io, SpecifyManager& mgr,
+                            SdfMtm mtm) {
+  PathDelay pd;
+  pd.src_port = io.src_port;
+  pd.dst_port = io.dst_port;
+
+  pd.condition = io.condition;
+  pd.is_ifnone = io.is_ifnone;
+
+  {
+    const auto kExpanded = ExpandSdfDelays({io.rise, io.fall, io.turnoff}, mtm);
+    pd.delay_count = 12;
+    for (int i = 0; i < 12; ++i) pd.delays[i] = kExpanded[i];
+  }
+  if (!io.extended_form) {
+    if (io.is_increment) {
+      mgr.IncrementPathDelay(pd);
+      return;
+    }
+
+    ApplyGlobalPulseLimits(pd, mgr.RejectPulseLimitPercent(),
+                           mgr.ErrorPulseLimitPercent());
+    mgr.AddPathDelay(pd);
+    return;
+  }
+
+  const bool kAnyPulseSupplied =
+      io.rise_reject_present || io.rise_error_present ||
+      io.fall_reject_present || io.fall_error_present;
+  if (!kAnyPulseSupplied) {
+    mgr.AddPathDelay(pd, true);
+    return;
+  }
+
+  ApplyGlobalPulseLimits(pd, mgr.RejectPulseLimitPercent(),
+                         mgr.ErrorPulseLimitPercent());
+  if (io.rise_reject_present || io.fall_reject_present) {
+    const SdfDelayValue& src_dv =
+        io.rise_reject_present ? io.rise_reject : io.fall_reject;
+    const uint64_t kReject = SelectMtm(src_dv, mtm);
+    for (int i = 0; i < 12; ++i) pd.reject_limit[i] = kReject;
+  }
+  if (io.rise_error_present || io.fall_error_present) {
+    const SdfDelayValue& src_dv =
+        io.rise_error_present ? io.rise_error : io.fall_error;
+    const uint64_t kErr = SelectMtm(src_dv, mtm);
+    for (int i = 0; i < 12; ++i) pd.error_limit[i] = kErr;
+  }
+  mgr.AddPathDelay(pd);
+}
+
+void AnnotateSdfInterconnectEntry(const SdfInterconnect& ic,
+                                  SpecifyManager& mgr, SdfMtm mtm) {
+  InterconnectDelay delay;
+  delay.src_port = ic.src_port;
+  delay.dst_port = ic.dst_port;
+  delay.rise = SelectMtm(ic.rise, mtm);
+  delay.fall = SelectMtm(ic.fall, mtm);
+
+  const bool kFallSupplied =
+      ic.fall.min_val != 0 || ic.fall.typ_val != 0 || ic.fall.max_val != 0;
+  std::vector<SdfDelayValue> ic_vals;
+  ic_vals.push_back(ic.rise);
+  if (kFallSupplied) ic_vals.push_back(ic.fall);
+  const auto kExpanded = ExpandSdfDelays(ic_vals, mtm);
+  for (int i = 0; i < 12; ++i) {
+    delay.delays[i] = kExpanded[i];
+
+    delay.reject_limit[i] = kExpanded[i];
+    delay.error_limit[i] = kExpanded[i];
+  }
+
+  if (ic.is_increment) {
+    mgr.IncrementInterconnectDelay(delay);
+    return;
+  }
+  mgr.AddInterconnectDelay(std::move(delay));
+}
+
+void AnnotateSdfDelayEntry(const SdfCell& cell, const SdfDelayEntryRef& entry,
+                           SpecifyManager& mgr, SdfMtm mtm) {
+  switch (entry.kind) {
+    case SdfDelayEntryKind::kIopath:
+      AnnotateSdfIopathEntry(cell.iopaths[entry.index], mgr, mtm);
+      break;
+    case SdfDelayEntryKind::kPulseLimit: {
+      const auto& pl = cell.pulse_limits[entry.index];
+      mgr.AddSdfPulseLimit(pl.src_port, pl.dst_port, SelectMtm(pl.reject, mtm),
+                           pl.has_error, SelectMtm(pl.error, mtm),
+                           pl.is_percent);
+      break;
+    }
+    case SdfDelayEntryKind::kInterconnect:
+      AnnotateSdfInterconnectEntry(cell.interconnects[entry.index], mgr, mtm);
+      break;
+  }
+}
+
+void AnnotateSdfSpecparams(const SdfCell& cell, SpecifyManager& mgr,
+                           SdfMtm mtm) {
+  for (const auto& sp : cell.specparams) {
+    SpecparamValue value;
+    value.name = sp.name;
+    value.value = SelectMtm(sp.value, mtm);
+
+    if (sp.is_increment) {
+      mgr.IncrementSpecparamValue(std::move(value));
+    } else {
+      mgr.SetSpecparamValue(std::move(value));
+    }
+  }
+}
+
+void AnnotateSdfCell(const SdfCell& cell, SpecifyManager& mgr, SdfMtm mtm) {
+  std::vector<SdfDelayEntryRef> derived;
+  const std::vector<SdfDelayEntryRef>* order = &cell.delay_entry_order;
+  if (order->empty() && (!cell.iopaths.empty() || !cell.pulse_limits.empty() ||
+                         !cell.interconnects.empty())) {
+    derived = BuildDerivedSdfDelayOrder(cell);
+    order = &derived;
+  }
+  for (const auto& entry : *order) {
+    AnnotateSdfDelayEntry(cell, entry, mgr, mtm);
+  }
+  AnnotateSdfSpecparams(cell, mgr, mtm);
+  for (const auto& tc : cell.timing_checks) {
+    for (const auto& target : ExpandSdfTimingCheckTargets(tc, mtm)) {
+      mgr.AnnotateSdfTimingCheck(target);
+    }
+  }
+}
+
+}  // namespace
+
 SdfAnnotationResult AnnotateSdfToManager(const SdfFile& file,
                                          SpecifyManager& mgr, SdfMtm mtm,
                                          std::string_view scope) {
@@ -257,133 +481,7 @@ SdfAnnotationResult AnnotateSdfToManager(const SdfFile& file,
 
   for (const auto& cell : file.cells) {
     if (!CellInScope(cell.instance, scope)) continue;
-    std::vector<SdfDelayEntryRef> derived;
-    const std::vector<SdfDelayEntryRef>* order = &cell.delay_entry_order;
-    if (order->empty() &&
-        (!cell.iopaths.empty() || !cell.pulse_limits.empty() ||
-         !cell.interconnects.empty())) {
-      derived.reserve(cell.iopaths.size() + cell.pulse_limits.size() +
-                      cell.interconnects.size());
-      for (uint32_t i = 0; i < cell.iopaths.size(); ++i) {
-        derived.push_back({SdfDelayEntryKind::kIopath, i});
-      }
-      for (uint32_t i = 0; i < cell.pulse_limits.size(); ++i) {
-        derived.push_back({SdfDelayEntryKind::kPulseLimit, i});
-      }
-      for (uint32_t i = 0; i < cell.interconnects.size(); ++i) {
-        derived.push_back({SdfDelayEntryKind::kInterconnect, i});
-      }
-      order = &derived;
-    }
-    for (const auto& entry : *order) {
-      switch (entry.kind) {
-        case SdfDelayEntryKind::kIopath: {
-          const auto& io = cell.iopaths[entry.index];
-          PathDelay pd;
-          pd.src_port = io.src_port;
-          pd.dst_port = io.dst_port;
-
-          pd.condition = io.condition;
-          pd.is_ifnone = io.is_ifnone;
-
-          {
-            const auto kExpanded =
-                ExpandSdfDelays({io.rise, io.fall, io.turnoff}, mtm);
-            pd.delay_count = 12;
-            for (int i = 0; i < 12; ++i) pd.delays[i] = kExpanded[i];
-          }
-          if (!io.extended_form) {
-            if (io.is_increment) {
-              mgr.IncrementPathDelay(pd);
-              break;
-            }
-
-            ApplyGlobalPulseLimits(pd, mgr.RejectPulseLimitPercent(),
-                                   mgr.ErrorPulseLimitPercent());
-            mgr.AddPathDelay(pd);
-            break;
-          }
-
-          const bool kAnyPulseSupplied =
-              io.rise_reject_present || io.rise_error_present ||
-              io.fall_reject_present || io.fall_error_present;
-          if (!kAnyPulseSupplied) {
-            mgr.AddPathDelay(pd, true);
-            break;
-          }
-
-          ApplyGlobalPulseLimits(pd, mgr.RejectPulseLimitPercent(),
-                                 mgr.ErrorPulseLimitPercent());
-          if (io.rise_reject_present || io.fall_reject_present) {
-            const SdfDelayValue& src_dv =
-                io.rise_reject_present ? io.rise_reject : io.fall_reject;
-            const uint64_t kReject = SelectMtm(src_dv, mtm);
-            for (int i = 0; i < 12; ++i) pd.reject_limit[i] = kReject;
-          }
-          if (io.rise_error_present || io.fall_error_present) {
-            const SdfDelayValue& src_dv =
-                io.rise_error_present ? io.rise_error : io.fall_error;
-            const uint64_t kErr = SelectMtm(src_dv, mtm);
-            for (int i = 0; i < 12; ++i) pd.error_limit[i] = kErr;
-          }
-          mgr.AddPathDelay(pd);
-          break;
-        }
-        case SdfDelayEntryKind::kPulseLimit: {
-          const auto& pl = cell.pulse_limits[entry.index];
-
-          mgr.AddSdfPulseLimit(pl.src_port, pl.dst_port,
-                               SelectMtm(pl.reject, mtm), pl.has_error,
-                               SelectMtm(pl.error, mtm), pl.is_percent);
-          break;
-        }
-        case SdfDelayEntryKind::kInterconnect: {
-          const auto& ic = cell.interconnects[entry.index];
-          InterconnectDelay delay;
-          delay.src_port = ic.src_port;
-          delay.dst_port = ic.dst_port;
-          delay.rise = SelectMtm(ic.rise, mtm);
-          delay.fall = SelectMtm(ic.fall, mtm);
-
-          const bool kFallSupplied = ic.fall.min_val != 0 ||
-                                     ic.fall.typ_val != 0 ||
-                                     ic.fall.max_val != 0;
-          std::vector<SdfDelayValue> ic_vals;
-          ic_vals.push_back(ic.rise);
-          if (kFallSupplied) ic_vals.push_back(ic.fall);
-          const auto kExpanded = ExpandSdfDelays(ic_vals, mtm);
-          for (int i = 0; i < 12; ++i) {
-            delay.delays[i] = kExpanded[i];
-
-            delay.reject_limit[i] = kExpanded[i];
-            delay.error_limit[i] = kExpanded[i];
-          }
-
-          if (ic.is_increment) {
-            mgr.IncrementInterconnectDelay(delay);
-            break;
-          }
-          mgr.AddInterconnectDelay(std::move(delay));
-          break;
-        }
-      }
-    }
-    for (const auto& sp : cell.specparams) {
-      SpecparamValue value;
-      value.name = sp.name;
-      value.value = SelectMtm(sp.value, mtm);
-
-      if (sp.is_increment) {
-        mgr.IncrementSpecparamValue(std::move(value));
-      } else {
-        mgr.SetSpecparamValue(std::move(value));
-      }
-    }
-    for (const auto& tc : cell.timing_checks) {
-      for (const auto& target : ExpandSdfTimingCheckTargets(tc, mtm)) {
-        mgr.AnnotateSdfTimingCheck(target);
-      }
-    }
+    AnnotateSdfCell(cell, mgr, mtm);
   }
   return result;
 }

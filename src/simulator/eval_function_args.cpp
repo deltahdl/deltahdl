@@ -163,94 +163,128 @@ static bool TryBindAssocArg(const Expr* call_arg, std::string_view param_name,
   return true;
 }
 
+// Binds a dynamic-array/queue actual to a fixed-size formal: the sizes must
+// match, after which the formal is materialized as per-element variables.
+static bool BindQueueToFixedFormal(QueueObject* src_q,
+                                   const FunctionArg& formal, SimContext& ctx,
+                                   Arena& arena) {
+  // A fixed-size formal accepts a dynamic array or queue only when the
+  // sizes are equal; this can only be verified at the time of the call.
+  auto formal_size = EvalExpr(formal.unpacked_dims[0], ctx, arena).ToUint64();
+  if (src_q->elements.size() != formal_size) {
+    ctx.GetDiag().Error({}, "array size mismatch: formal expects " +
+                                std::to_string(formal_size) +
+                                " elements, actual has " +
+                                std::to_string(src_q->elements.size()));
+    return true;
+  }
+  ArrayInfo finfo;
+  finfo.size = static_cast<uint32_t>(formal_size);
+  finfo.elem_width = src_q->elem_width;
+  finfo.is_4state = src_q->is_4state;
+  ctx.RegisterArray(formal.name, finfo);
+  for (uint32_t j = 0; j < finfo.size; ++j) {
+    auto dst = std::string(formal.name) + "[" + std::to_string(j) + "]";
+    auto* dst_var = ctx.CreateLocalVariable(
+        *arena.Create<std::string>(std::move(dst)), src_q->elements[j].width);
+    dst_var->value = src_q->elements[j];
+  }
+  return true;
+}
+
+// Dynamic arrays and queues hold their elements in a QueueObject rather than
+// as per-element variables, so a by-value bind copies through that object;
+// the formal becomes a fresh, independent copy of the actual.
+static bool TryBindQueueArg(QueueObject* src_q, const FunctionArg& formal,
+                            SimContext& ctx, Arena& arena) {
+  if (formal.unpacked_dims.empty()) return false;
+  if (formal.unpacked_dims[0] != nullptr) {
+    return BindQueueToFixedFormal(src_q, formal, ctx, arena);
+  }
+  // An unsized formal keeps the dynamic-array/queue representation, so the
+  // callee reads the copy through the same queue-backed select path.
+  auto* dst_q = ctx.CreateQueue(formal.name, src_q->elem_width, src_q->max_size,
+                                src_q->is_4state);
+  dst_q->elements = src_q->elements;
+  dst_q->AssignFreshIds();
+  return true;
+}
+
+// Binds a fixed-size unpacked-array actual by copying each element variable
+// into a fresh per-element formal variable.
+static void BindFixedArrayArg(const Expr* call_arg, const FunctionArg& formal,
+                              const ArrayInfo& info, SimContext& ctx,
+                              Arena& arena) {
+  ctx.RegisterArray(formal.name, info);
+  for (uint32_t j = 0; j < info.size; ++j) {
+    uint32_t idx = info.lo + j;
+    auto src = std::string(call_arg->text) + "[" + std::to_string(idx) + "]";
+    auto dst = std::string(formal.name) + "[" + std::to_string(idx) + "]";
+    auto* src_var = ctx.FindVariable(src);
+    auto val =
+        src_var ? src_var->value : MakeLogic4VecVal(arena, info.elem_width, 0);
+    auto* dst_var = ctx.CreateLocalVariable(
+        *arena.Create<std::string>(std::move(dst)), val.width);
+    dst_var->value = val;
+  }
+}
+
 static bool TryBindArrayArg(const Expr* call_arg, const FunctionArg& formal,
                             SimContext& ctx, Arena& arena) {
   if (!call_arg || call_arg->kind != ExprKind::kIdentifier) return false;
   if (TryBindAssocArg(call_arg, formal.name, ctx)) return true;
 
-  // Dynamic arrays and queues hold their elements in a QueueObject rather than
-  // as per-element variables, so a by-value bind copies through that object;
-  // the formal becomes a fresh, independent copy of the actual.
   if (auto* src_q = ctx.FindQueue(call_arg->text)) {
-    if (formal.unpacked_dims.empty()) return false;
-    if (formal.unpacked_dims[0] != nullptr) {
-      // A fixed-size formal accepts a dynamic array or queue only when the
-      // sizes are equal; this can only be verified at the time of the call.
-      auto formal_size =
-          EvalExpr(formal.unpacked_dims[0], ctx, arena).ToUint64();
-      if (src_q->elements.size() != formal_size) {
-        ctx.GetDiag().Error({}, "array size mismatch: formal expects " +
-                                    std::to_string(formal_size) +
-                                    " elements, actual has " +
-                                    std::to_string(src_q->elements.size()));
-        return true;
-      }
-      ArrayInfo finfo;
-      finfo.size = static_cast<uint32_t>(formal_size);
-      finfo.elem_width = src_q->elem_width;
-      finfo.is_4state = src_q->is_4state;
-      ctx.RegisterArray(formal.name, finfo);
-      for (uint32_t j = 0; j < finfo.size; ++j) {
-        auto dst = std::string(formal.name) + "[" + std::to_string(j) + "]";
-        auto* dst_var =
-            ctx.CreateLocalVariable(*arena.Create<std::string>(std::move(dst)),
-                                    src_q->elements[j].width);
-        dst_var->value = src_q->elements[j];
-      }
-      return true;
-    }
-    // An unsized formal keeps the dynamic-array/queue representation, so the
-    // callee reads the copy through the same queue-backed select path.
-    auto* dst_q = ctx.CreateQueue(formal.name, src_q->elem_width,
-                                  src_q->max_size, src_q->is_4state);
-    dst_q->elements = src_q->elements;
-    dst_q->AssignFreshIds();
-    return true;
+    return TryBindQueueArg(src_q, formal, ctx, arena);
   }
 
   auto* info = ctx.FindArrayInfo(call_arg->text);
   if (!info) return false;
 
-  ctx.RegisterArray(formal.name, *info);
-  for (uint32_t j = 0; j < info->size; ++j) {
-    uint32_t idx = info->lo + j;
-    auto src = std::string(call_arg->text) + "[" + std::to_string(idx) + "]";
-    auto dst = std::string(formal.name) + "[" + std::to_string(idx) + "]";
-    auto* src_var = ctx.FindVariable(src);
-    auto val =
-        src_var ? src_var->value : MakeLogic4VecVal(arena, info->elem_width, 0);
-    auto* dst_var = ctx.CreateLocalVariable(
-        *arena.Create<std::string>(std::move(dst)), val.width);
-    dst_var->value = val;
-  }
+  BindFixedArrayArg(call_arg, formal, *info, ctx, arena);
   return true;
+}
+
+// Attempts the ref-binding strategies (plain ref, queue element, assoc element)
+// for a ref-direction formal. Returns true when one of them bound the argument.
+static bool TryBindRefDirectionArg(const Expr* expr, int arg_index,
+                                   const FunctionArg& param, SimContext& ctx,
+                                   Arena& arena) {
+  if (TryBindRefArg(expr, arg_index, param.name, ctx)) return true;
+  if (TryBindQueueElementRef(expr, arg_index, param, ctx, arena)) return true;
+  if (TryBindAssocElementRef(expr, arg_index, param, ctx, arena)) return true;
+  return false;
+}
+
+// Performs the default by-value bind: resolves the argument value, widens it to
+// the formal's declared width when applicable, and creates the local variable.
+static void BindValueArg(const FunctionArg& param, const Expr* expr,
+                         int arg_index, SimContext& ctx, Arena& arena) {
+  auto val = ResolveArgValue(param, expr, arg_index, ctx, arena);
+  const auto& dt = param.data_type;
+  if (dt.kind != DataTypeKind::kImplicit) {
+    uint32_t formal_width = EvalTypeWidth(dt);
+    if (formal_width > 0 && formal_width != val.width)
+      val = ResizeToWidth(val, formal_width, arena);
+  }
+  auto* var = ctx.CreateLocalVariable(param.name, val.width);
+  var->value = val;
 }
 
 void BindFunctionArgs(const ModuleItem* func, const Expr* expr, SimContext& ctx,
                       Arena& arena) {
   for (size_t i = 0; i < func->func_args.size(); ++i) {
     int ai = ResolveArgIndex(func, expr, i);
-    auto dir = func->func_args[i].direction;
-    if (dir == Direction::kRef) {
-      if (TryBindRefArg(expr, ai, func->func_args[i].name, ctx)) continue;
-      if (TryBindQueueElementRef(expr, ai, func->func_args[i], ctx, arena))
-        continue;
-      if (TryBindAssocElementRef(expr, ai, func->func_args[i], ctx, arena))
-        continue;
-    }
-    if (ai >= 0 && TryBindArrayArg(expr->args[static_cast<size_t>(ai)],
-                                   func->func_args[i], ctx, arena)) {
+    const auto& param = func->func_args[i];
+    if (param.direction == Direction::kRef &&
+        TryBindRefDirectionArg(expr, ai, param, ctx, arena)) {
       continue;
     }
-    auto val = ResolveArgValue(func->func_args[i], expr, ai, ctx, arena);
-    const auto& dt = func->func_args[i].data_type;
-    if (dt.kind != DataTypeKind::kImplicit) {
-      uint32_t formal_width = EvalTypeWidth(dt);
-      if (formal_width > 0 && formal_width != val.width)
-        val = ResizeToWidth(val, formal_width, arena);
+    if (ai >= 0 && TryBindArrayArg(expr->args[static_cast<size_t>(ai)], param,
+                                   ctx, arena)) {
+      continue;
     }
-    auto* var = ctx.CreateLocalVariable(func->func_args[i].name, val.width);
-    var->value = val;
+    BindValueArg(param, expr, ai, ctx, arena);
   }
 }
 
@@ -290,18 +324,34 @@ static void ExecFuncSelectAssign(const Expr* lhs, const Logic4Vec& val,
   if (elem) elem->value = val;
 }
 
+// True when lhs is a `<base>.<member>` member access whose base identifier name
+// matches base_name and whose member is a plain identifier.
+static bool IsMemberAccessOn(const Expr* lhs, std::string_view base_name) {
+  return lhs->kind == ExprKind::kMemberAccess && lhs->lhs &&
+         lhs->lhs->kind == ExprKind::kIdentifier &&
+         lhs->lhs->text == base_name && lhs->rhs &&
+         lhs->rhs->kind == ExprKind::kIdentifier;
+}
+
+// Assigns to a plain identifier lhs: writes the local variable when present,
+// otherwise falls back to a property on the current `this` object.
+static void ExecFuncIdentifierAssign(const Expr* lhs, const Logic4Vec& val,
+                                     SimContext& ctx) {
+  auto* var = ctx.FindVariable(lhs->text);
+  if (var) {
+    var->value = val;
+    return;
+  }
+  auto* self = ctx.CurrentThis();
+  if (self) self->SetProperty(std::string(lhs->text), val);
+}
+
 static void ExecFuncBlockingAssign(const Stmt* stmt, SimContext& ctx,
                                    Arena& arena) {
   if (!stmt->lhs) return;
   auto val = EvalExpr(stmt->rhs, ctx, arena);
   if (stmt->lhs->kind == ExprKind::kIdentifier) {
-    auto* var = ctx.FindVariable(stmt->lhs->text);
-    if (var) {
-      var->value = val;
-      return;
-    }
-    auto* self = ctx.CurrentThis();
-    if (self) self->SetProperty(std::string(stmt->lhs->text), val);
+    ExecFuncIdentifierAssign(stmt->lhs, val, ctx);
     return;
   }
   if (stmt->lhs->kind == ExprKind::kSelect) {
@@ -309,19 +359,13 @@ static void ExecFuncBlockingAssign(const Stmt* stmt, SimContext& ctx,
     return;
   }
 
-  if (stmt->lhs->kind == ExprKind::kMemberAccess && stmt->lhs->lhs &&
-      stmt->lhs->lhs->kind == ExprKind::kIdentifier &&
-      stmt->lhs->lhs->text == "this" && stmt->lhs->rhs &&
-      stmt->lhs->rhs->kind == ExprKind::kIdentifier) {
+  if (IsMemberAccessOn(stmt->lhs, "this")) {
     auto* self = ctx.CurrentThis();
     if (self) self->SetProperty(std::string(stmt->lhs->rhs->text), val);
     return;
   }
 
-  if (stmt->lhs->kind == ExprKind::kMemberAccess && stmt->lhs->lhs &&
-      stmt->lhs->lhs->kind == ExprKind::kIdentifier &&
-      stmt->lhs->lhs->text == "super" && stmt->lhs->rhs &&
-      stmt->lhs->rhs->kind == ExprKind::kIdentifier) {
+  if (IsMemberAccessOn(stmt->lhs, "super")) {
     auto* self = ctx.CurrentThis();
     if (self && self->type && self->type->parent) {
       self->SetPropertyForType(std::string(stmt->lhs->rhs->text),
@@ -347,6 +391,32 @@ static const Stmt* FuncFindFinalElse(const Stmt* stmt) {
   return cur->else_branch;
 }
 
+// Aggregated result of evaluating the conditions of a unique-if chain.
+struct UniqueIfScan {
+  int match_count = 0;
+  const Stmt* first_match = nullptr;
+  bool has_final_else = false;
+};
+
+// Evaluates every condition in the if/else-if chain in source order, recording
+// how many matched, the first match, and whether the chain ends in a final
+// else.
+static UniqueIfScan ScanUniqueIfChain(const Stmt* stmt, SimContext& ctx,
+                                      Arena& arena) {
+  UniqueIfScan scan;
+  for (const Stmt* cur = stmt; cur && cur->kind == StmtKind::kIf;
+       cur = cur->else_branch) {
+    if (EvalExpr(cur->condition, ctx, arena).IsTruthy()) {
+      scan.match_count++;
+      if (!scan.first_match) scan.first_match = cur;
+    }
+    if (cur->else_branch && cur->else_branch->kind != StmtKind::kIf) {
+      scan.has_final_else = true;
+    }
+  }
+  return scan;
+}
+
 // A unique/unique0/priority if encountered while running a function or task
 // body performs the same violation checks as one in a process body (§12.4.2).
 // Because the report queue is keyed on the calling process (§12.4.2.2), routing
@@ -356,19 +426,10 @@ static const Stmt* FuncFindFinalElse(const Stmt* stmt) {
 static bool ExecFuncUniqueIf(const Stmt* stmt, CaseQualifier qual,
                              Variable* ret_var, std::string_view func_name,
                              SimContext& ctx, Arena& arena) {
-  int match_count = 0;
-  const Stmt* first_match = nullptr;
-  bool has_final_else = false;
-  for (const Stmt* cur = stmt; cur && cur->kind == StmtKind::kIf;
-       cur = cur->else_branch) {
-    if (EvalExpr(cur->condition, ctx, arena).IsTruthy()) {
-      match_count++;
-      if (!first_match) first_match = cur;
-    }
-    if (cur->else_branch && cur->else_branch->kind != StmtKind::kIf) {
-      has_final_else = true;
-    }
-  }
+  UniqueIfScan scan = ScanUniqueIfChain(stmt, ctx, arena);
+  int match_count = scan.match_count;
+  const Stmt* first_match = scan.first_match;
+  bool has_final_else = scan.has_final_else;
   if (match_count > 1) {
     ctx.AddPendingViolation("unique if: multiple conditions matched");
   }
@@ -451,19 +512,20 @@ static bool ExecFuncBlock(const Stmt* stmt, Variable* ret_var,
   return false;
 }
 
-static bool ExecFuncFor(const Stmt* stmt, Variable* ret_var,
-                        std::string_view func_name, SimContext& ctx,
-                        Arena& arena) {
-  bool labeled = !stmt->label.empty();
-  if (labeled) ctx.PushStaticScope(stmt->label);
-  bool scoped = false;
+// True when any for-loop init declares a new variable (has an explicit type),
+// which requires a fresh scope to hold the loop-local declarations.
+static bool ForInitNeedsScope(const Stmt* stmt) {
   for (const auto& t : stmt->for_init_types) {
-    if (t.kind != DataTypeKind::kImplicit) {
-      scoped = true;
-      break;
-    }
+    if (t.kind != DataTypeKind::kImplicit) return true;
   }
-  if (scoped) ctx.PushScope();
+  return false;
+}
+
+// Runs the for-loop initializers: typed inits create loop-local variables,
+// while untyped inits execute as ordinary statements.
+static void ExecFuncForInits(const Stmt* stmt, Variable* ret_var,
+                             std::string_view func_name, SimContext& ctx,
+                             Arena& arena) {
   for (size_t i = 0; i < stmt->for_inits.size(); ++i) {
     auto* init = stmt->for_inits[i];
     if (i < stmt->for_init_types.size() &&
@@ -477,6 +539,16 @@ static bool ExecFuncFor(const Stmt* stmt, Variable* ret_var,
       ExecFuncStmt(init, ret_var, func_name, ctx, arena);
     }
   }
+}
+
+static bool ExecFuncFor(const Stmt* stmt, Variable* ret_var,
+                        std::string_view func_name, SimContext& ctx,
+                        Arena& arena) {
+  bool labeled = !stmt->label.empty();
+  if (labeled) ctx.PushStaticScope(stmt->label);
+  bool scoped = ForInitNeedsScope(stmt);
+  if (scoped) ctx.PushScope();
+  ExecFuncForInits(stmt, ret_var, func_name, ctx, arena);
   while (stmt->for_cond && EvalExpr(stmt->for_cond, ctx, arena).IsTruthy()) {
     if (stmt->for_body &&
         ExecFuncStmt(stmt->for_body, ret_var, func_name, ctx, arena)) {
@@ -594,6 +666,15 @@ static bool ExecFuncForever(const Stmt* stmt, Variable* ret_var,
   return false;
 }
 
+// Resolves the iteration count for a foreach over the named array: the array's
+// element count when known, otherwise the bit width of a matching variable.
+static uint32_t ResolveForeachSize(std::string_view name, SimContext& ctx) {
+  auto* info = ctx.FindArrayInfo(name);
+  if (info) return info->size;
+  auto* var = ctx.FindVariable(name);
+  return var ? var->value.width : 0;
+}
+
 static bool ExecFuncForeach(const Stmt* stmt, Variable* ret_var,
                             std::string_view func_name, SimContext& ctx,
                             Arena& arena) {
@@ -604,14 +685,7 @@ static bool ExecFuncForeach(const Stmt* stmt, Variable* ret_var,
     if (labeled) ctx.PopStaticScope(stmt->label);
     return false;
   }
-  uint32_t size = 0;
-  auto* info = ctx.FindArrayInfo(name);
-  if (info) {
-    size = info->size;
-  } else {
-    auto* var = ctx.FindVariable(name);
-    if (var) size = var->value.width;
-  }
+  uint32_t size = ResolveForeachSize(name, ctx);
   if (size == 0) {
     if (labeled) ctx.PopStaticScope(stmt->label);
     return false;

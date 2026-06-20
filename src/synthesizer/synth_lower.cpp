@@ -252,52 +252,35 @@ struct PatternBits {
   uint64_t dc_mask = 0;
 };
 
-static PatternBits ParsePatternLiteral(std::string_view text,
-                                       TokenKind case_kind) {
-  PatternBits result{};
+static std::string StripPatternSeparators(std::string_view text) {
   std::string buf;
   buf.reserve(text.size());
   for (char c : text) {
     if (c != '_' && c != ' ' && c != '\t') buf.push_back(c);
   }
-  auto tick = buf.find('\'');
-  if (tick == std::string::npos) return result;
+  return buf;
+}
 
-  size_t i = tick + 1;
-  if (i < buf.size() && (buf[i] == 's' || buf[i] == 'S')) ++i;
-  if (i >= buf.size()) return result;
-
-  int bits_per_digit = 0;
-  switch (buf[i]) {
-    case 'b':
-    case 'B':
-      bits_per_digit = 1;
-      break;
-    case 'o':
-    case 'O':
-      bits_per_digit = 3;
-      break;
-    case 'h':
-    case 'H':
-      bits_per_digit = 4;
-      break;
-    case 'd':
-    case 'D':
-      for (size_t j = i + 1; j < buf.size(); ++j) {
-        char c = buf[j];
-        bool is_z = (c == 'z' || c == 'Z' || c == '?');
-        bool is_x = (c == 'x' || c == 'X');
-        if (is_z || (is_x && case_kind == TokenKind::kKwCasex)) {
-          result.dc_mask = ~uint64_t{0};
-          return result;
-        }
-      }
-      return result;
-    default:
-      return result;
+// Decimal literals carry no per-bit data, so any z/? (or x under casex) makes
+// the entire pattern don't-care. Returns true if such a token was found and
+// the result was set accordingly.
+static bool ScanDecimalForDontCare(const std::string& buf, size_t start,
+                                   TokenKind case_kind, PatternBits& result) {
+  for (size_t j = start; j < buf.size(); ++j) {
+    char c = buf[j];
+    bool is_z = (c == 'z' || c == 'Z' || c == '?');
+    bool is_x = (c == 'x' || c == 'X');
+    if (is_z || (is_x && case_kind == TokenKind::kKwCasex)) {
+      result.dc_mask = ~uint64_t{0};
+      return true;
+    }
   }
-  ++i;
+  return false;
+}
 
+static void DecodePatternDigits(const std::string& buf, size_t i,
+                                int bits_per_digit, TokenKind case_kind,
+                                PatternBits& result) {
   uint32_t bit_pos = 0;
   for (size_t j = buf.size(); j > i; --j) {
     char c = buf[j - 1];
@@ -321,7 +304,54 @@ static PatternBits ParsePatternLiteral(std::string_view text,
     }
     bit_pos += bits_per_digit;
   }
+}
+
+static PatternBits ParsePatternLiteral(std::string_view text,
+                                       TokenKind case_kind) {
+  PatternBits result{};
+  std::string buf = StripPatternSeparators(text);
+  auto tick = buf.find('\'');
+  if (tick == std::string::npos) return result;
+
+  size_t i = tick + 1;
+  if (i < buf.size() && (buf[i] == 's' || buf[i] == 'S')) ++i;
+  if (i >= buf.size()) return result;
+
+  int bits_per_digit = 0;
+  switch (buf[i]) {
+    case 'b':
+    case 'B':
+      bits_per_digit = 1;
+      break;
+    case 'o':
+    case 'O':
+      bits_per_digit = 3;
+      break;
+    case 'h':
+    case 'H':
+      bits_per_digit = 4;
+      break;
+    case 'd':
+    case 'D':
+      ScanDecimalForDontCare(buf, i + 1, case_kind, result);
+      return result;
+    default:
+      return result;
+  }
+  ++i;
+
+  DecodePatternDigits(buf, i, bits_per_digit, case_kind, result);
   return result;
+}
+
+static uint32_t PatternBitLit(const Expr* pat, AigGraph& aig, SynthLower& synth,
+                              const PatternBits& pbits, bool has_dc,
+                              uint32_t b) {
+  if (has_dc) {
+    return ((pbits.aval >> b) & 1u) ? AigGraph::kConstTrue
+                                    : AigGraph::kConstFalse;
+  }
+  return synth.LowerExprBit(pat, aig, b);
 }
 
 static uint32_t BuildPatternMatch(const Expr* sel_expr, const Expr* pat,
@@ -336,13 +366,7 @@ static uint32_t BuildPatternMatch(const Expr* sel_expr, const Expr* pat,
   for (uint32_t b = 0; b < sel_width; ++b) {
     if (has_dc && ((pbits.dc_mask >> b) & 1u)) continue;
     uint32_t sb = synth.LowerExprBit(sel_expr, aig, b);
-    uint32_t pb = 0;
-    if (has_dc) {
-      pb = ((pbits.aval >> b) & 1u) ? AigGraph::kConstTrue
-                                    : AigGraph::kConstFalse;
-    } else {
-      pb = synth.LowerExprBit(pat, aig, b);
-    }
+    uint32_t pb = PatternBitLit(pat, aig, synth, pbits, has_dc, b);
     eq = aig.AddAnd(eq, aig.AddNot(aig.AddXor(sb, pb)));
   }
   return eq;

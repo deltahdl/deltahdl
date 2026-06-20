@@ -56,58 +56,74 @@ std::vector<ResolvedAttribute> ResolveAttributes(
   return result;
 }
 
-void Elaborator::ValidateNameSpaces() {
+namespace {
+
+void ValidateNameSpaceDefinitions(const CompilationUnit* unit,
+                                  DiagEngine& diag) {
   std::map<std::pair<std::string_view, std::string_view>, SourceRange>
       def_names;
   auto check_def = [&](std::string_view library, std::string_view name,
                        SourceRange range) {
     auto [it, inserted] = def_names.try_emplace({library, name}, range);
     if (!inserted) {
-      diag_.Error(range.start,
-                  std::format("duplicate definition of '{}'", name));
+      diag.Error(range.start,
+                 std::format("duplicate definition of '{}'", name));
     }
   };
-  for (auto* m : unit_->modules) check_def(m->library, m->name, m->range);
-  for (auto* p : unit_->programs) check_def(p->library, p->name, p->range);
-  for (auto* i : unit_->interfaces) check_def(i->library, i->name, i->range);
-  for (auto* u : unit_->udps) check_def(u->library, u->name, u->range);
+  for (auto* m : unit->modules) check_def(m->library, m->name, m->range);
+  for (auto* p : unit->programs) check_def(p->library, p->name, p->range);
+  for (auto* i : unit->interfaces) check_def(i->library, i->name, i->range);
+  for (auto* u : unit->udps) check_def(u->library, u->name, u->range);
 
-  for (auto* cfg : unit_->configs)
+  for (auto* cfg : unit->configs)
     check_def(cfg->library, cfg->name, cfg->range);
+}
 
+void ValidateNameSpacePackages(const CompilationUnit* unit, DiagEngine& diag) {
   std::unordered_set<std::string_view> pkg_names;
-  for (auto* pkg : unit_->packages) {
+  for (auto* pkg : unit->packages) {
     if (!pkg_names.insert(pkg->name).second) {
-      diag_.Error(pkg->range.start,
-                  std::format("duplicate package '{}'", pkg->name));
+      diag.Error(pkg->range.start,
+                 std::format("duplicate package '{}'", pkg->name));
     }
 
     if (pkg->name == "std") {
-      diag_.Error(pkg->range.start,
-                  "'std' is reserved for the built-in package and cannot "
-                  "be declared by the user");
+      diag.Error(pkg->range.start,
+                 "'std' is reserved for the built-in package and cannot "
+                 "be declared by the user");
     }
   }
+}
 
+void ValidateNameSpaceCompilationUnit(const CompilationUnit* unit,
+                                      DiagEngine& diag) {
   std::unordered_map<std::string_view, SourceLoc> cu_scope_names;
   auto check_cu = [&](std::string_view name, SourceLoc loc) {
     if (name.empty()) return;
     auto [it, inserted] = cu_scope_names.try_emplace(name, loc);
     if (!inserted) {
-      diag_.Error(
+      diag.Error(
           loc,
           std::format("redeclaration of '{}' in compilation-unit scope", name));
     }
   };
-  for (auto* item : unit_->cu_items) {
+  for (auto* item : unit->cu_items) {
     if (item->kind == ModuleItemKind::kImportDecl ||
         item->kind == ModuleItemKind::kExportDecl)
       continue;
     if (item->from_anonymous_program) continue;
     check_cu(item->name, item->loc);
   }
-  for (auto* cls : unit_->classes) check_cu(cls->name, cls->range.start);
-  for (auto* chk : unit_->checkers) check_cu(chk->name, chk->range.start);
+  for (auto* cls : unit->classes) check_cu(cls->name, cls->range.start);
+  for (auto* chk : unit->checkers) check_cu(chk->name, chk->range.start);
+}
+
+}  // namespace
+
+void Elaborator::ValidateNameSpaces() {
+  ValidateNameSpaceDefinitions(unit_, diag_);
+  ValidateNameSpacePackages(unit_, diag_);
+  ValidateNameSpaceCompilationUnit(unit_, diag_);
 }
 
 void Elaborator::ValidateConfigDesignStatements() {
@@ -156,28 +172,35 @@ void Elaborator::ValidateConfigDefaultClauses() {
   }
 }
 
+namespace {
+
+void ValidateConfigInstanceClausesOne(const ConfigDecl* cfg, DiagEngine& diag) {
+  if (cfg->design_cells.empty()) return;
+  std::unordered_set<std::string_view> design_cells;
+  for (const auto& [lib, cell] : cfg->design_cells) {
+    design_cells.insert(cell);
+  }
+  for (auto* rule : cfg->rules) {
+    if (rule->kind != ConfigRuleKind::kInstance) continue;
+    std::string_view path = rule->inst_path;
+    size_t dot = path.find('.');
+    std::string_view first =
+        (dot == std::string_view::npos) ? path : path.substr(0, dot);
+    if (!design_cells.contains(first)) {
+      diag.Error(cfg->range.start,
+                 std::format("instance path '{}' in config '{}' does not start "
+                             "at a top-level cell of the config's design "
+                             "statement",
+                             rule->inst_path, cfg->name));
+    }
+  }
+}
+
+}  // namespace
+
 void Elaborator::ValidateConfigInstanceClauses() {
   for (auto* cfg : unit_->configs) {
-    if (cfg->design_cells.empty()) continue;
-    std::unordered_set<std::string_view> design_cells;
-    for (const auto& [lib, cell] : cfg->design_cells) {
-      design_cells.insert(cell);
-    }
-    for (auto* rule : cfg->rules) {
-      if (rule->kind != ConfigRuleKind::kInstance) continue;
-      std::string_view path = rule->inst_path;
-      size_t dot = path.find('.');
-      std::string_view first =
-          (dot == std::string_view::npos) ? path : path.substr(0, dot);
-      if (!design_cells.contains(first)) {
-        diag_.Error(
-            cfg->range.start,
-            std::format("instance path '{}' in config '{}' does not start "
-                        "at a top-level cell of the config's design "
-                        "statement",
-                        rule->inst_path, cfg->name));
-      }
-    }
+    ValidateConfigInstanceClausesOne(cfg, diag_);
   }
 }
 
@@ -233,32 +256,46 @@ void Elaborator::ValidateConfigPackageBinding() {
   }
 }
 
+namespace {
+
+std::vector<std::string_view> CollectDelegatedSubhierarchies(
+    const ConfigDecl* cfg) {
+  std::vector<std::string_view> delegated;
+  for (auto* rule : cfg->rules) {
+    if (rule->kind == ConfigRuleKind::kInstance && rule->use_config) {
+      delegated.push_back(rule->inst_path);
+    }
+  }
+  return delegated;
+}
+
+void ValidateConfigHierarchicalRulesOne(const ConfigDecl* cfg,
+                                        DiagEngine& diag) {
+  std::vector<std::string_view> delegated = CollectDelegatedSubhierarchies(cfg);
+
+  for (auto* rule : cfg->rules) {
+    if (rule->kind != ConfigRuleKind::kInstance) continue;
+    auto path = rule->inst_path;
+    for (auto root : delegated) {
+      if (path == root) continue;
+      if (path.size() > root.size() + 1 && path.starts_with(root) &&
+          path[root.size()] == '.') {
+        diag.Error(cfg->range.start,
+                   std::format("instance '{}' in config '{}' lies within "
+                               "subhierarchy '{}' that is delegated to another "
+                               "config",
+                               path, cfg->name, root));
+        break;
+      }
+    }
+  }
+}
+
+}  // namespace
+
 void Elaborator::ValidateConfigHierarchicalRules() {
   for (auto* cfg : unit_->configs) {
-    std::vector<std::string_view> delegated;
-    for (auto* rule : cfg->rules) {
-      if (rule->kind == ConfigRuleKind::kInstance && rule->use_config) {
-        delegated.push_back(rule->inst_path);
-      }
-    }
-
-    for (auto* rule : cfg->rules) {
-      if (rule->kind != ConfigRuleKind::kInstance) continue;
-      auto path = rule->inst_path;
-      for (auto root : delegated) {
-        if (path == root) continue;
-        if (path.size() > root.size() + 1 && path.starts_with(root) &&
-            path[root.size()] == '.') {
-          diag_.Error(
-              cfg->range.start,
-              std::format("instance '{}' in config '{}' lies within "
-                          "subhierarchy '{}' that is delegated to another "
-                          "config",
-                          path, cfg->name, root));
-          break;
-        }
-      }
-    }
+    ValidateConfigHierarchicalRulesOne(cfg, diag_);
   }
 }
 
@@ -278,19 +315,24 @@ bool IsLiteralKind(ExprKind k) {
 }
 
 template <typename Visitor>
+bool WalkExprAnyChildren(const Expr* expr, Visitor&& v);
+
+template <typename Visitor>
 bool WalkExprAny(const Expr* expr, Visitor&& v) {
   if (!expr) return false;
   if (v(expr)) return true;
-  if (WalkExprAny(expr->lhs, v)) return true;
-  if (WalkExprAny(expr->rhs, v)) return true;
-  if (WalkExprAny(expr->condition, v)) return true;
-  if (WalkExprAny(expr->true_expr, v)) return true;
-  if (WalkExprAny(expr->false_expr, v)) return true;
-  if (WalkExprAny(expr->base, v)) return true;
-  if (WalkExprAny(expr->index, v)) return true;
-  if (WalkExprAny(expr->index_end, v)) return true;
-  if (WalkExprAny(expr->repeat_count, v)) return true;
-  if (WalkExprAny(expr->with_expr, v)) return true;
+  return WalkExprAnyChildren(expr, v);
+}
+
+template <typename Visitor>
+bool WalkExprAnyChildren(const Expr* expr, Visitor&& v) {
+  const Expr* const scalar_children[] = {
+      expr->lhs,          expr->rhs,      expr->condition, expr->true_expr,
+      expr->false_expr,   expr->base,     expr->index,     expr->index_end,
+      expr->repeat_count, expr->with_expr};
+  for (const Expr* child : scalar_children) {
+    if (WalkExprAny(child, v)) return true;
+  }
   for (auto* a : expr->args) {
     if (WalkExprAny(a, v)) return true;
   }
@@ -316,120 +358,135 @@ void Elaborator::ValidateConfigLocalparams() {
   }
 }
 
+namespace {
+
+bool IsPureTermTree(const Expr* e) {
+  while (e) {
+    switch (e->kind) {
+      case ExprKind::kIdentifier:
+        return true;
+      case ExprKind::kMemberAccess:
+        e = e->lhs;
+        break;
+      case ExprKind::kSelect:
+        e = e->base;
+        break;
+      default:
+        return false;
+    }
+  }
+  return false;
+}
+
+void CheckParamOverrideSelectIndices(
+    const ConfigDecl* cfg, std::string_view pname, const Expr* expr,
+    const std::unordered_set<std::string_view>& lp_names, DiagEngine& diag) {
+  auto check_index = [&](const Expr* idx) {
+    WalkExprAny(idx, [&](const Expr* sub) {
+      if (sub->kind == ExprKind::kIdentifier &&
+          lp_names.count(sub->text) == 0) {
+        diag.Error(cfg->range.start,
+                   std::format("config '{}' override of parameter '{}' uses "
+                               "index identifier '{}' that is neither a "
+                               "literal nor a localparam of the config",
+                               cfg->name, pname, sub->text));
+      }
+      return false;
+    });
+  };
+  WalkExprAny(expr, [&](const Expr* e) {
+    if (e->kind == ExprKind::kSelect) {
+      if (e->index) check_index(e->index);
+      if (e->index_end) check_index(e->index_end);
+    }
+    return false;
+  });
+}
+
+void ValidateOneParamOverride(
+    const ConfigDecl* cfg, std::string_view pname, const Expr* expr,
+    const std::unordered_set<std::string_view>& lp_names, DiagEngine& diag) {
+  bool has_hier = WalkExprAny(
+      expr, [](const Expr* e) { return e->kind == ExprKind::kMemberAccess; });
+
+  if (has_hier && !IsPureTermTree(expr)) {
+    diag.Error(cfg->range.start,
+               std::format("config '{}' override of parameter '{}' embeds a "
+                           "hierarchical identifier inside a larger "
+                           "expression",
+                           cfg->name, pname));
+  }
+
+  bool has_mid_chain_select = WalkExprAny(expr, [](const Expr* e) {
+    return e->kind == ExprKind::kMemberAccess && e->lhs &&
+           e->lhs->kind == ExprKind::kSelect;
+  });
+  if (has_mid_chain_select) {
+    diag.Error(cfg->range.start,
+               std::format("config '{}' override of parameter '{}' uses a "
+                           "hierarchical reference that traverses an array of "
+                           "instances",
+                           cfg->name, pname));
+  }
+
+  CheckParamOverrideSelectIndices(cfg, pname, expr, lp_names, diag);
+
+  bool has_user_call = WalkExprAny(
+      expr, [](const Expr* e) { return e->kind == ExprKind::kCall; });
+  if (has_user_call) {
+    diag.Error(cfg->range.start,
+               std::format("config '{}' override of parameter '{}' calls a "
+                           "user-defined function; only built-in constant "
+                           "functions are permitted",
+                           cfg->name, pname));
+  }
+}
+
+}  // namespace
+
 void Elaborator::ValidateConfigParamOverrides() {
   for (auto* cfg : unit_->configs) {
     std::unordered_set<std::string_view> lp_names;
     for (const auto& [name, _] : cfg->local_params) lp_names.insert(name);
 
-    auto is_pure_term_tree = [](const Expr* e) {
-      while (e) {
-        switch (e->kind) {
-          case ExprKind::kIdentifier:
-            return true;
-          case ExprKind::kMemberAccess:
-            e = e->lhs;
-            break;
-          case ExprKind::kSelect:
-            e = e->base;
-            break;
-          default:
-            return false;
-        }
-      }
-      return false;
-    };
-
     for (auto* rule : cfg->rules) {
       for (const auto& [pname, expr] : rule->use_params) {
         if (!expr) continue;
-
-        bool has_hier = WalkExprAny(expr, [](const Expr* e) {
-          return e->kind == ExprKind::kMemberAccess;
-        });
-
-        if (has_hier && !is_pure_term_tree(expr)) {
-          diag_.Error(
-              cfg->range.start,
-              std::format("config '{}' override of parameter '{}' embeds a "
-                          "hierarchical identifier inside a larger "
-                          "expression",
-                          cfg->name, pname));
-        }
-
-        bool has_mid_chain_select = WalkExprAny(expr, [](const Expr* e) {
-          return e->kind == ExprKind::kMemberAccess && e->lhs &&
-                 e->lhs->kind == ExprKind::kSelect;
-        });
-        if (has_mid_chain_select) {
-          diag_.Error(
-              cfg->range.start,
-              std::format("config '{}' override of parameter '{}' uses a "
-                          "hierarchical reference that traverses an array of "
-                          "instances",
-                          cfg->name, pname));
-        }
-
-        auto check_index = [&](const Expr* idx) {
-          WalkExprAny(idx, [&](const Expr* sub) {
-            if (sub->kind == ExprKind::kIdentifier &&
-                lp_names.count(sub->text) == 0) {
-              diag_.Error(
-                  cfg->range.start,
-                  std::format("config '{}' override of parameter '{}' uses "
-                              "index identifier '{}' that is neither a "
-                              "literal nor a localparam of the config",
-                              cfg->name, pname, sub->text));
-            }
-            return false;
-          });
-        };
-        WalkExprAny(expr, [&](const Expr* e) {
-          if (e->kind == ExprKind::kSelect) {
-            if (e->index) check_index(e->index);
-            if (e->index_end) check_index(e->index_end);
-          }
-          return false;
-        });
-
-        bool has_user_call = WalkExprAny(
-            expr, [](const Expr* e) { return e->kind == ExprKind::kCall; });
-        if (has_user_call) {
-          diag_.Error(
-              cfg->range.start,
-              std::format("config '{}' override of parameter '{}' calls a "
-                          "user-defined function; only built-in constant "
-                          "functions are permitted",
-                          cfg->name, pname));
-        }
+        ValidateOneParamOverride(cfg, pname, expr, lp_names, diag_);
       }
     }
   }
 }
 
-void Elaborator::ValidateAnonymousProgramNameSharing() {
-  auto check_scope = [&](const std::vector<ModuleItem*>& items) {
-    std::unordered_map<std::string_view, const ModuleItem*> seen;
-    for (const auto* item : items) {
-      if (item->name.empty()) continue;
-      if (item->kind != ModuleItemKind::kFunctionDecl &&
-          item->kind != ModuleItemKind::kTaskDecl) {
-        continue;
-      }
-      auto [it, inserted] = seen.try_emplace(item->name, item);
-      if (inserted) continue;
-      if (item->from_anonymous_program || it->second->from_anonymous_program) {
-        diag_.Error(
-            item->loc,
-            std::format(
-                "'{}' declared in anonymous program collides with name in "
-                "surrounding package or compilation-unit scope",
-                item->name));
-      }
+namespace {
+
+void CheckAnonymousProgramScope(const std::vector<ModuleItem*>& items,
+                                DiagEngine& diag) {
+  std::unordered_map<std::string_view, const ModuleItem*> seen;
+  for (const auto* item : items) {
+    if (item->name.empty()) continue;
+    if (item->kind != ModuleItemKind::kFunctionDecl &&
+        item->kind != ModuleItemKind::kTaskDecl) {
+      continue;
     }
-  };
-  check_scope(unit_->cu_items);
+    auto [it, inserted] = seen.try_emplace(item->name, item);
+    if (inserted) continue;
+    if (item->from_anonymous_program || it->second->from_anonymous_program) {
+      diag.Error(item->loc,
+                 std::format(
+                     "'{}' declared in anonymous program collides with name in "
+                     "surrounding package or compilation-unit scope",
+                     item->name));
+    }
+  }
+}
+
+}  // namespace
+
+void Elaborator::ValidateAnonymousProgramNameSharing() {
+  CheckAnonymousProgramScope(unit_->cu_items, diag_);
   for (const auto* pkg : unit_->packages) {
-    check_scope(pkg->items);
+    CheckAnonymousProgramScope(pkg->items, diag_);
   }
 }
 
@@ -459,277 +516,361 @@ void Elaborator::ValidatePackageItems() {
   }
 }
 
-void Elaborator::ValidatePackageReferences() {
-  std::unordered_set<std::string_view> known_package_names;
-  for (const auto* pkg : unit_->packages) known_package_names.insert(pkg->name);
+namespace {
 
+struct PackageRefContext {
+  const CompilationUnit* unit;
+  const std::unordered_set<std::string_view>* known_package_names;
+  const std::unordered_set<std::string_view>* cu_top_names;
+  std::unordered_set<std::string_view> pkg_names;
+  std::unordered_set<std::string_view> imported_names;
+  std::unordered_set<std::string_view> wildcard_pkgs;
+  DiagEngine* diag;
+};
+
+std::unordered_set<std::string_view> CollectCuTopNames(
+    const CompilationUnit* unit) {
   std::unordered_set<std::string_view> cu_top_names;
-  for (const auto* item : unit_->cu_items) {
+  for (const auto* item : unit->cu_items) {
     if (!item->name.empty()) cu_top_names.insert(item->name);
     if (item->kind == ModuleItemKind::kClassDecl && item->class_decl) {
       cu_top_names.insert(item->class_decl->name);
     }
   }
-  for (const auto* cls : unit_->classes) cu_top_names.insert(cls->name);
+  for (const auto* cls : unit->classes) cu_top_names.insert(cls->name);
+  return cu_top_names;
+}
 
-  for (const auto* pkg : unit_->packages) {
-    std::unordered_set<std::string_view> pkg_names;
-    std::unordered_set<std::string_view> imported_names;
-    std::unordered_set<std::string_view> wildcard_pkgs;
-    for (const auto* it : pkg->items) {
-      if (!it->name.empty()) pkg_names.insert(it->name);
-      if (it->kind == ModuleItemKind::kClassDecl && it->class_decl) {
-        pkg_names.insert(it->class_decl->name);
-      }
-      if (it->kind == ModuleItemKind::kImportDecl) {
-        if (it->import_item.is_wildcard) {
-          wildcard_pkgs.insert(it->import_item.package_name);
-        } else {
-          imported_names.insert(it->import_item.item_name);
-        }
-      }
+void CollectPackageLocalNames(const PackageDecl* pkg, PackageRefContext& ctx) {
+  for (const auto* it : pkg->items) {
+    if (!it->name.empty()) ctx.pkg_names.insert(it->name);
+    if (it->kind == ModuleItemKind::kClassDecl && it->class_decl) {
+      ctx.pkg_names.insert(it->class_decl->name);
     }
-
-    auto is_provided_by_wildcard = [&](std::string_view name) {
-      for (auto pname : wildcard_pkgs) {
-        for (const auto* p : unit_->packages) {
-          if (p->name != pname) continue;
-          for (const auto* pi : p->items) {
-            if (pi->name == name) return true;
-            if (pi->kind == ModuleItemKind::kClassDecl && pi->class_decl &&
-                pi->class_decl->name == name)
-              return true;
-          }
-        }
+    if (it->kind == ModuleItemKind::kImportDecl) {
+      if (it->import_item.is_wildcard) {
+        ctx.wildcard_pkgs.insert(it->import_item.package_name);
+      } else {
+        ctx.imported_names.insert(it->import_item.item_name);
       }
-      return false;
-    };
-
-    std::function<void(const Expr*)> walk;
-    walk = [&](const Expr* e) {
-      if (!e) return;
-      if (e->kind == ExprKind::kIdentifier) {
-        if (!e->scope_prefix.empty()) {
-          diag_.Error(
-              e->range.start,
-              std::format("package item uses scope prefix '{}', which targets "
-                          "a scope outside the package",
-                          e->scope_prefix));
-        } else if (cu_top_names.count(e->text) && !pkg_names.count(e->text) &&
-                   !imported_names.count(e->text) &&
-                   !is_provided_by_wildcard(e->text)) {
-          diag_.Error(
-              e->range.start,
-              std::format("package item references '{}' from the "
-                          "compilation-unit scope; packages cannot refer to "
-                          "compilation-unit-scope items",
-                          e->text));
-        }
-      } else if (e->kind == ExprKind::kMemberAccess) {
-        if (e->lhs && e->lhs->kind == ExprKind::kIdentifier && e->rhs) {
-          auto root = e->lhs->text;
-          bool is_pkg = known_package_names.count(root) > 0;
-          bool is_self = pkg_names.count(root) > 0;
-          if (!is_pkg && !is_self) {
-            diag_.Error(
-                e->range.start,
-                std::format("package item contains a hierarchical reference "
-                            "'{}' that does not target the package itself or "
-                            "an imported package",
-                            root));
-          }
-        }
-
-        walk(e->lhs);
-        walk(e->base);
-        walk(e->index);
-        walk(e->index_end);
-        return;
-      }
-      walk(e->lhs);
-      walk(e->rhs);
-      walk(e->base);
-      walk(e->index);
-      walk(e->index_end);
-      walk(e->condition);
-      walk(e->true_expr);
-      walk(e->false_expr);
-      walk(e->repeat_count);
-      walk(e->with_expr);
-      for (const auto* a : e->args) walk(a);
-      for (const auto* el : e->elements) walk(el);
-    };
-
-    for (const auto* item : pkg->items) {
-      if (item->init_expr) walk(item->init_expr);
     }
   }
 }
 
+bool IsProvidedByWildcard(const PackageRefContext& ctx, std::string_view name) {
+  for (auto pname : ctx.wildcard_pkgs) {
+    for (const auto* p : ctx.unit->packages) {
+      if (p->name != pname) continue;
+      for (const auto* pi : p->items) {
+        if (pi->name == name) return true;
+        if (pi->kind == ModuleItemKind::kClassDecl && pi->class_decl &&
+            pi->class_decl->name == name)
+          return true;
+      }
+    }
+  }
+  return false;
+}
+
+void CheckPackageRefIdentifier(const PackageRefContext& ctx, const Expr* e) {
+  if (!e->scope_prefix.empty()) {
+    ctx.diag->Error(
+        e->range.start,
+        std::format("package item uses scope prefix '{}', which targets "
+                    "a scope outside the package",
+                    e->scope_prefix));
+  } else if (ctx.cu_top_names->count(e->text) &&
+             !ctx.pkg_names.count(e->text) &&
+             !ctx.imported_names.count(e->text) &&
+             !IsProvidedByWildcard(ctx, e->text)) {
+    ctx.diag->Error(
+        e->range.start,
+        std::format("package item references '{}' from the "
+                    "compilation-unit scope; packages cannot refer to "
+                    "compilation-unit-scope items",
+                    e->text));
+  }
+}
+
+void CheckPackageRefMemberRoot(const PackageRefContext& ctx, const Expr* e) {
+  if (e->lhs && e->lhs->kind == ExprKind::kIdentifier && e->rhs) {
+    auto root = e->lhs->text;
+    bool is_pkg = ctx.known_package_names->count(root) > 0;
+    bool is_self = ctx.pkg_names.count(root) > 0;
+    if (!is_pkg && !is_self) {
+      ctx.diag->Error(
+          e->range.start,
+          std::format("package item contains a hierarchical reference "
+                      "'{}' that does not target the package itself or "
+                      "an imported package",
+                      root));
+    }
+  }
+}
+
+void WalkPackageRefExpr(const PackageRefContext& ctx, const Expr* e) {
+  if (!e) return;
+  if (e->kind == ExprKind::kIdentifier) {
+    CheckPackageRefIdentifier(ctx, e);
+  } else if (e->kind == ExprKind::kMemberAccess) {
+    CheckPackageRefMemberRoot(ctx, e);
+    WalkPackageRefExpr(ctx, e->lhs);
+    WalkPackageRefExpr(ctx, e->base);
+    WalkPackageRefExpr(ctx, e->index);
+    WalkPackageRefExpr(ctx, e->index_end);
+    return;
+  }
+  WalkPackageRefExpr(ctx, e->lhs);
+  WalkPackageRefExpr(ctx, e->rhs);
+  WalkPackageRefExpr(ctx, e->base);
+  WalkPackageRefExpr(ctx, e->index);
+  WalkPackageRefExpr(ctx, e->index_end);
+  WalkPackageRefExpr(ctx, e->condition);
+  WalkPackageRefExpr(ctx, e->true_expr);
+  WalkPackageRefExpr(ctx, e->false_expr);
+  WalkPackageRefExpr(ctx, e->repeat_count);
+  WalkPackageRefExpr(ctx, e->with_expr);
+  for (const auto* a : e->args) WalkPackageRefExpr(ctx, a);
+  for (const auto* el : e->elements) WalkPackageRefExpr(ctx, el);
+}
+
+}  // namespace
+
+void Elaborator::ValidatePackageReferences() {
+  std::unordered_set<std::string_view> known_package_names;
+  for (const auto* pkg : unit_->packages) known_package_names.insert(pkg->name);
+
+  std::unordered_set<std::string_view> cu_top_names = CollectCuTopNames(unit_);
+
+  for (const auto* pkg : unit_->packages) {
+    PackageRefContext ctx;
+    ctx.unit = unit_;
+    ctx.known_package_names = &known_package_names;
+    ctx.cu_top_names = &cu_top_names;
+    ctx.diag = &diag_;
+    CollectPackageLocalNames(pkg, ctx);
+
+    for (const auto* item : pkg->items) {
+      if (item->init_expr) WalkPackageRefExpr(ctx, item->init_expr);
+    }
+  }
+}
+
+namespace {
+
+using PkgByName = std::unordered_map<std::string_view, const PackageDecl*>;
+
+bool PackageDeclaresName(const PackageDecl* src_pkg, std::string_view name) {
+  for (const auto* it : src_pkg->items) {
+    if (it->kind == ModuleItemKind::kImportDecl ||
+        it->kind == ModuleItemKind::kExportDecl)
+      continue;
+    if (it->kind == ModuleItemKind::kClassDecl && it->class_decl &&
+        it->class_decl->name == name)
+      return true;
+    if (!it->name.empty() && it->name == name) return true;
+  }
+  return false;
+}
+
+bool PackageProvidesName(const PackageDecl* src_pkg, std::string_view name,
+                         const PkgByName& pkg_by_name,
+                         std::unordered_set<const PackageDecl*>& visited) {
+  if (!visited.insert(src_pkg).second) return false;
+  if (PackageDeclaresName(src_pkg, name)) return true;
+  for (const auto* it : src_pkg->items) {
+    if (it->kind != ModuleItemKind::kExportDecl) continue;
+    const auto& ex = it->import_item;
+    if (ex.package_name == "*") {
+      for (const auto* imp : src_pkg->items) {
+        if (imp->kind != ModuleItemKind::kImportDecl) continue;
+        auto sit = pkg_by_name.find(imp->import_item.package_name);
+        if (sit == pkg_by_name.end()) continue;
+        auto sub = visited;
+        if (PackageProvidesName(sit->second, name, pkg_by_name, sub))
+          return true;
+      }
+    } else {
+      auto sit = pkg_by_name.find(ex.package_name);
+      if (sit == pkg_by_name.end()) continue;
+      if (ex.is_wildcard || ex.item_name == name) {
+        auto sub = visited;
+        if (PackageProvidesName(sit->second, name, pkg_by_name, sub))
+          return true;
+      }
+    }
+  }
+  return false;
+}
+
+void CollectPackageImports(
+    const PackageDecl* pkg, std::unordered_set<std::string>& direct_imports,
+    std::unordered_set<std::string_view>& wildcard_sources) {
+  for (const auto* item : pkg->items) {
+    if (item->kind != ModuleItemKind::kImportDecl) continue;
+    const auto& imp = item->import_item;
+    if (imp.is_wildcard) {
+      wildcard_sources.insert(imp.package_name);
+    } else {
+      direct_imports.insert(std::string(imp.package_name) +
+                            "::" + std::string(imp.item_name));
+    }
+  }
+}
+
+void ValidateOnePackageExportItem(
+    const PackageDecl* pkg, const ModuleItem* item,
+    const PkgByName& pkg_by_name,
+    const std::unordered_set<std::string>& direct_imports,
+    const std::unordered_set<std::string_view>& wildcard_sources,
+    DiagEngine& diag) {
+  const auto& ex = item->import_item;
+
+  if (ex.package_name == "*" || ex.is_wildcard) return;
+
+  auto src_it = pkg_by_name.find(ex.package_name);
+  if (src_it == pkg_by_name.end()) {
+    diag.Error(item->loc, std::format("export from unknown package '{}'",
+                                      ex.package_name));
+    return;
+  }
+  std::unordered_set<const PackageDecl*> visited;
+  if (!PackageProvidesName(src_it->second, ex.item_name, pkg_by_name,
+                           visited)) {
+    diag.Error(
+        item->loc,
+        std::format("'{}' is not a candidate for import from package '{}'",
+                    ex.item_name, ex.package_name));
+    return;
+  }
+  auto key = std::string(ex.package_name) + "::" + std::string(ex.item_name);
+
+  if (direct_imports.count(key) == 0 &&
+      wildcard_sources.count(ex.package_name) == 0) {
+    diag.Error(
+        item->loc,
+        std::format("export '{}::{}': '{}' is not imported in package '{}'",
+                    ex.package_name, ex.item_name, ex.item_name, pkg->name));
+  }
+}
+
+}  // namespace
+
 void Elaborator::ValidatePackageExports() {
-  std::unordered_map<std::string_view, const PackageDecl*> pkg_by_name;
+  PkgByName pkg_by_name;
   for (const auto* pkg : unit_->packages) {
     pkg_by_name[pkg->name] = pkg;
   }
 
-  std::function<bool(const PackageDecl*, std::string_view,
-                     std::unordered_set<const PackageDecl*>&)>
-      provides;
-  provides = [&](const PackageDecl* src_pkg, std::string_view name,
-                 std::unordered_set<const PackageDecl*>& visited) -> bool {
-    if (!visited.insert(src_pkg).second) return false;
-    for (const auto* it : src_pkg->items) {
-      if (it->kind == ModuleItemKind::kImportDecl ||
-          it->kind == ModuleItemKind::kExportDecl)
-        continue;
-      if (it->kind == ModuleItemKind::kClassDecl && it->class_decl &&
-          it->class_decl->name == name)
-        return true;
-      if (!it->name.empty() && it->name == name) return true;
-    }
-    for (const auto* it : src_pkg->items) {
-      if (it->kind != ModuleItemKind::kExportDecl) continue;
-      const auto& ex = it->import_item;
-      if (ex.package_name == "*") {
-        for (const auto* imp : src_pkg->items) {
-          if (imp->kind != ModuleItemKind::kImportDecl) continue;
-          auto sit = pkg_by_name.find(imp->import_item.package_name);
-          if (sit == pkg_by_name.end()) continue;
-          auto sub = visited;
-          if (provides(sit->second, name, sub)) return true;
-        }
-      } else {
-        auto sit = pkg_by_name.find(ex.package_name);
-        if (sit == pkg_by_name.end()) continue;
-        if (ex.is_wildcard || ex.item_name == name) {
-          auto sub = visited;
-          if (provides(sit->second, name, sub)) return true;
-        }
-      }
-    }
-    return false;
-  };
-
   for (const auto* pkg : unit_->packages) {
     std::unordered_set<std::string> direct_imports;
     std::unordered_set<std::string_view> wildcard_sources;
-    for (const auto* item : pkg->items) {
-      if (item->kind != ModuleItemKind::kImportDecl) continue;
-      const auto& imp = item->import_item;
-      if (imp.is_wildcard) {
-        wildcard_sources.insert(imp.package_name);
-      } else {
-        direct_imports.insert(std::string(imp.package_name) +
-                              "::" + std::string(imp.item_name));
-      }
-    }
+    CollectPackageImports(pkg, direct_imports, wildcard_sources);
 
     for (const auto* item : pkg->items) {
       if (item->kind != ModuleItemKind::kExportDecl) continue;
-      const auto& ex = item->import_item;
-
-      if (ex.package_name == "*" || ex.is_wildcard) continue;
-
-      auto src_it = pkg_by_name.find(ex.package_name);
-      if (src_it == pkg_by_name.end()) {
-        diag_.Error(item->loc, std::format("export from unknown package '{}'",
-                                           ex.package_name));
-        continue;
-      }
-      std::unordered_set<const PackageDecl*> visited;
-      if (!provides(src_it->second, ex.item_name, visited)) {
-        diag_.Error(
-            item->loc,
-            std::format("'{}' is not a candidate for import from package '{}'",
-                        ex.item_name, ex.package_name));
-        continue;
-      }
-      auto key =
-          std::string(ex.package_name) + "::" + std::string(ex.item_name);
-
-      if (direct_imports.count(key) == 0 &&
-          wildcard_sources.count(ex.package_name) == 0) {
-        diag_.Error(
-            item->loc,
-            std::format("export '{}::{}': '{}' is not imported in package '{}'",
-                        ex.package_name, ex.item_name, ex.item_name,
-                        pkg->name));
-      }
+      ValidateOnePackageExportItem(pkg, item, pkg_by_name, direct_imports,
+                                   wildcard_sources, diag_);
     }
   }
 }
 
-void Elaborator::ValidateModports() {
-  auto is_literal_expr = [](const Expr* e) {
-    if (!e) return false;
-    switch (e->kind) {
-      case ExprKind::kIntegerLiteral:
-      case ExprKind::kRealLiteral:
-      case ExprKind::kTimeLiteral:
-      case ExprKind::kStringLiteral:
-      case ExprKind::kUnbasedUnsizedLiteral:
-        return true;
-      default:
-        return false;
+namespace {
+
+bool IsModportLiteralExpr(const Expr* e) {
+  if (!e) return false;
+  switch (e->kind) {
+    case ExprKind::kIntegerLiteral:
+    case ExprKind::kRealLiteral:
+    case ExprKind::kTimeLiteral:
+    case ExprKind::kStringLiteral:
+    case ExprKind::kUnbasedUnsizedLiteral:
+      return true;
+    default:
+      return false;
+  }
+}
+
+// §25.5: a modport may only reference names that this interface itself
+// declares. Collect every such name — the interface's own ports plus the
+// signals, subprograms, and other items declared in its body — so a modport
+// item naming anything outside this set can be rejected below.
+void CollectModportDeclaredNames(
+    const ModuleDecl* iface,
+    std::unordered_set<std::string_view>& declared_names,
+    std::unordered_set<std::string_view>& clocking_names) {
+  for (const auto& port : iface->ports) {
+    if (!port.name.empty()) declared_names.insert(port.name);
+  }
+  for (const auto* item : iface->items) {
+    if (item->kind == ModuleItemKind::kClockingBlock && !item->name.empty()) {
+      clocking_names.insert(item->name);
     }
-  };
+    if (!item->name.empty()) declared_names.insert(item->name);
+  }
+}
+
+void ValidateOneModportPort(
+    const ModuleDecl* iface, const ModportDecl* mp, const ModportPort& port,
+    const std::unordered_set<std::string_view>& declared_names,
+    const std::unordered_set<std::string_view>& clocking_names,
+    DiagEngine& diag) {
+  // §25.5: a plain simple modport item (one written as a bare identifier,
+  // not a `.name(expr)` modport expression, and not an imported/exported
+  // subprogram or a clocking item) names an object that this interface
+  // shall already declare. Naming something declared only by an enclosing
+  // scope, or nowhere at all, would implicitly create a new port and is
+  // illegal.
+  if (!port.is_clocking && !port.is_import && !port.is_export &&
+      port.expr == nullptr && !declared_names.contains(port.name)) {
+    diag.Error(mp->loc,
+               std::format("modport '{}' references '{}', which interface '{}' "
+                           "does not declare",
+                           mp->name, port.name, iface->name));
+  }
+  if (IsModportLiteralExpr(port.expr) &&
+      (port.direction == Direction::kOutput ||
+       port.direction == Direction::kInout)) {
+    diag.Error(mp->loc,
+               std::format("port-id '{}' in modport '{}' has a constant port "
+                           "expression and cannot be declared as output or "
+                           "inout",
+                           port.name, mp->name));
+  }
+  if (port.is_clocking && !clocking_names.contains(port.name)) {
+    diag.Error(mp->loc,
+               std::format("clocking identifier '{}' in modport '{}' is not "
+                           "declared in interface '{}'",
+                           port.name, mp->name, iface->name));
+  }
+}
+
+void ValidateOneModport(
+    const ModuleDecl* iface, const ModportDecl* mp,
+    const std::unordered_set<std::string_view>& declared_names,
+    const std::unordered_set<std::string_view>& clocking_names,
+    DiagEngine& diag) {
+  std::unordered_set<std::string_view> port_names;
+  for (const auto& port : mp->ports) {
+    if (port.name.empty()) continue;
+    if (!port_names.insert(port.name).second) {
+      diag.Error(mp->loc, std::format("duplicate port-id '{}' in modport '{}'",
+                                      port.name, mp->name));
+    }
+    ValidateOneModportPort(iface, mp, port, declared_names, clocking_names,
+                           diag);
+  }
+}
+
+}  // namespace
+
+void Elaborator::ValidateModports() {
   for (auto* iface : unit_->interfaces) {
     std::unordered_set<std::string_view> clocking_names;
-    // §25.5: a modport may only reference names that this interface itself
-    // declares. Collect every such name — the interface's own ports plus the
-    // signals, subprograms, and other items declared in its body — so a modport
-    // item naming anything outside this set can be rejected below.
     std::unordered_set<std::string_view> declared_names;
-    for (const auto& port : iface->ports) {
-      if (!port.name.empty()) declared_names.insert(port.name);
-    }
-    for (const auto* item : iface->items) {
-      if (item->kind == ModuleItemKind::kClockingBlock && !item->name.empty()) {
-        clocking_names.insert(item->name);
-      }
-      if (!item->name.empty()) declared_names.insert(item->name);
-    }
+    CollectModportDeclaredNames(iface, declared_names, clocking_names);
     for (auto* mp : iface->modports) {
-      std::unordered_set<std::string_view> port_names;
-      for (const auto& port : mp->ports) {
-        if (port.name.empty()) continue;
-        if (!port_names.insert(port.name).second) {
-          diag_.Error(mp->loc,
-                      std::format("duplicate port-id '{}' in modport '{}'",
-                                  port.name, mp->name));
-        }
-        // §25.5: a plain simple modport item (one written as a bare identifier,
-        // not a `.name(expr)` modport expression, and not an imported/exported
-        // subprogram or a clocking item) names an object that this interface
-        // shall already declare. Naming something declared only by an enclosing
-        // scope, or nowhere at all, would implicitly create a new port and is
-        // illegal.
-        if (!port.is_clocking && !port.is_import && !port.is_export &&
-            port.expr == nullptr && !declared_names.contains(port.name)) {
-          diag_.Error(
-              mp->loc,
-              std::format("modport '{}' references '{}', which interface '{}' "
-                          "does not declare",
-                          mp->name, port.name, iface->name));
-        }
-        if (is_literal_expr(port.expr) &&
-            (port.direction == Direction::kOutput ||
-             port.direction == Direction::kInout)) {
-          diag_.Error(
-              mp->loc,
-              std::format("port-id '{}' in modport '{}' has a constant port "
-                          "expression and cannot be declared as output or "
-                          "inout",
-                          port.name, mp->name));
-        }
-        if (port.is_clocking && !clocking_names.contains(port.name)) {
-          diag_.Error(
-              mp->loc,
-              std::format("clocking identifier '{}' in modport '{}' is not "
-                          "declared in interface '{}'",
-                          port.name, mp->name, iface->name));
-        }
-      }
+      ValidateOneModport(iface, mp, declared_names, clocking_names, diag_);
     }
   }
 }

@@ -101,25 +101,34 @@ void Elaborator::ValidateModuleConstraints(const ModuleDecl* decl) {
   }
 }
 
-void Elaborator::ValidateTimescaleConsistency() {
-  bool cu_fallback_unit =
-      unit_->has_preproc_timescale || unit_->has_cu_timeunit;
-  bool cu_fallback_prec =
-      unit_->has_preproc_timescale || unit_->has_cu_timeprecision;
+namespace {
 
+void ClassifyTimescaleElement(bool el_has_unit, bool el_has_prec,
+                              bool cu_fallback_unit, bool cu_fallback_prec,
+                              SourceLoc loc, bool& any_specified,
+                              bool& any_unspecified,
+                              SourceLoc& unspecified_loc) {
+  bool has_unit = el_has_unit || cu_fallback_unit;
+  bool has_prec = el_has_prec || cu_fallback_prec;
+  if (has_unit && has_prec) {
+    any_specified = true;
+  } else {
+    if (!any_unspecified) unspecified_loc = loc;
+    any_unspecified = true;
+  }
+}
+
+}  // namespace
+
+void Elaborator::ValidateTimescaleConsistency() {
+  bool cu_unit = unit_->has_preproc_timescale || unit_->has_cu_timeunit;
+  bool cu_prec = unit_->has_preproc_timescale || unit_->has_cu_timeprecision;
   bool any_specified = false;
   bool any_unspecified = false;
   SourceLoc unspecified_loc;
-
   auto inspect = [&](bool el_has_unit, bool el_has_prec, SourceLoc loc) {
-    bool has_unit = el_has_unit || cu_fallback_unit;
-    bool has_prec = el_has_prec || cu_fallback_prec;
-    if (has_unit && has_prec) {
-      any_specified = true;
-    } else {
-      if (!any_unspecified) unspecified_loc = loc;
-      any_unspecified = true;
-    }
+    ClassifyTimescaleElement(el_has_unit, el_has_prec, cu_unit, cu_prec, loc,
+                             any_specified, any_unspecified, unspecified_loc);
   };
 
   for (const auto* mod : unit_->modules)
@@ -166,19 +175,23 @@ static bool ExprContainsXZ(const Expr* e) {
   return ExprContainsXZ(e->repeat_count);
 }
 
+static bool ExprContainsHierarchicalRef(const Expr* e);
+
+static bool AnyScalarChildContainsHierarchicalRef(const Expr* e) {
+  const Expr* const kChildren[] = {
+      e->lhs,       e->rhs,       e->base,       e->index,       e->index_end,
+      e->condition, e->true_expr, e->false_expr, e->repeat_count};
+  for (const Expr* child : kChildren) {
+    if (ExprContainsHierarchicalRef(child)) return true;
+  }
+  return false;
+}
+
 static bool ExprContainsHierarchicalRef(const Expr* e) {
   if (!e) return false;
   if (e->kind == ExprKind::kMemberAccess) return true;
   if (e->kind == ExprKind::kIdentifier && !e->scope_prefix.empty()) return true;
-  if (ExprContainsHierarchicalRef(e->lhs)) return true;
-  if (ExprContainsHierarchicalRef(e->rhs)) return true;
-  if (ExprContainsHierarchicalRef(e->base)) return true;
-  if (ExprContainsHierarchicalRef(e->index)) return true;
-  if (ExprContainsHierarchicalRef(e->index_end)) return true;
-  if (ExprContainsHierarchicalRef(e->condition)) return true;
-  if (ExprContainsHierarchicalRef(e->true_expr)) return true;
-  if (ExprContainsHierarchicalRef(e->false_expr)) return true;
-  if (ExprContainsHierarchicalRef(e->repeat_count)) return true;
+  if (AnyScalarChildContainsHierarchicalRef(e)) return true;
   for (const auto* a : e->args) {
     if (ExprContainsHierarchicalRef(a)) return true;
   }
@@ -189,29 +202,33 @@ static bool ExprContainsHierarchicalRef(const Expr* e) {
 }
 
 static std::string_view FindConstVarRef(
+    const Expr* e, const std::unordered_set<std::string_view>& const_names);
+
+static std::string_view FindConstVarRefInScalarChildren(
+    const Expr* e, const std::unordered_set<std::string_view>& const_names) {
+  const Expr* const kChildren[] = {
+      e->lhs,       e->rhs,       e->base,       e->index,       e->index_end,
+      e->condition, e->true_expr, e->false_expr, e->repeat_count};
+  for (const Expr* child : kChildren) {
+    if (auto n = FindConstVarRef(child, const_names); !n.empty()) return n;
+  }
+  return {};
+}
+
+static std::string_view FindConstVarRef(
     const Expr* e, const std::unordered_set<std::string_view>& const_names) {
   if (!e) return {};
   if (e->kind == ExprKind::kIdentifier && e->scope_prefix.empty() &&
       const_names.count(e->text)) {
     return e->text;
   }
-  auto walk = [&](const Expr* sub) {
-    return FindConstVarRef(sub, const_names);
-  };
-  if (auto n = walk(e->lhs); !n.empty()) return n;
-  if (auto n = walk(e->rhs); !n.empty()) return n;
-  if (auto n = walk(e->base); !n.empty()) return n;
-  if (auto n = walk(e->index); !n.empty()) return n;
-  if (auto n = walk(e->index_end); !n.empty()) return n;
-  if (auto n = walk(e->condition); !n.empty()) return n;
-  if (auto n = walk(e->true_expr); !n.empty()) return n;
-  if (auto n = walk(e->false_expr); !n.empty()) return n;
-  if (auto n = walk(e->repeat_count); !n.empty()) return n;
+  if (auto n = FindConstVarRefInScalarChildren(e, const_names); !n.empty())
+    return n;
   for (const auto* a : e->args) {
-    if (auto n = walk(a); !n.empty()) return n;
+    if (auto n = FindConstVarRef(a, const_names); !n.empty()) return n;
   }
   for (const auto* elem : e->elements) {
-    if (auto n = walk(elem); !n.empty()) return n;
+    if (auto n = FindConstVarRef(elem, const_names); !n.empty()) return n;
   }
   return {};
 }

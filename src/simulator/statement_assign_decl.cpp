@@ -77,6 +77,34 @@ static bool TryExecWeakRefVarDecl(const Stmt* stmt, SimContext& ctx,
   return true;
 }
 
+// Records the class type-parameter override expressions (if any) for the
+// just-created class variable `var_name`.
+static void SetClassParamExprs(std::string_view var_name,
+                               const std::vector<DataType>& type_params,
+                               SimContext& ctx) {
+  if (type_params.empty()) return;
+  std::vector<Expr*> exprs;
+  for (const auto& tp : type_params) {
+    exprs.push_back(tp.type_ref_expr);
+  }
+  ctx.SetVariableClassParamExprs(var_name, std::move(exprs));
+}
+
+// Handles `T v = new src;` shallow-copy construction. Returns true if `init`
+// names a copyable source object and the copy was installed into `var_name`.
+static bool TryExecClassShallowCopy(std::string_view var_name, const Expr* init,
+                                    SimContext& ctx, Arena& arena) {
+  if (!init->lhs || init->lhs->kind != ExprKind::kIdentifier) return false;
+  auto src_val = EvalExpr(init->lhs, ctx, arena);
+  auto* src_obj = ctx.GetClassObject(src_val.ToUint64());
+  if (!src_obj) return false;
+  auto* copy = src_obj->ShallowCopy(arena);
+  auto copy_handle = ctx.AllocateClassObject(copy);
+  auto* var = ctx.FindVariable(var_name);
+  if (var) var->value = MakeLogic4VecVal(arena, 64, copy_handle);
+  return true;
+}
+
 static bool TryExecClassVarDecl(const Stmt* stmt, SimContext& ctx,
                                 Arena& arena) {
   auto class_type = stmt->var_decl_type.type_name;
@@ -84,29 +112,14 @@ static bool TryExecClassVarDecl(const Stmt* stmt, SimContext& ctx,
   ctx.CreateVariable(stmt->var_name, 64);
   ctx.SetVariableClassType(stmt->var_name, class_type);
 
-  const auto& type_params = stmt->var_decl_type.type_params;
-  if (!type_params.empty()) {
-    std::vector<Expr*> exprs;
-    for (const auto& tp : type_params) {
-      exprs.push_back(tp.type_ref_expr);
-    }
-    ctx.SetVariableClassParamExprs(stmt->var_name, std::move(exprs));
-  }
+  SetClassParamExprs(stmt->var_name, stmt->var_decl_type.type_params, ctx);
+
   if (!stmt->var_init) return true;
   if (stmt->var_init->kind != ExprKind::kCall) return true;
   if (stmt->var_init->text != "new") return true;
 
-  if (stmt->var_init->lhs &&
-      stmt->var_init->lhs->kind == ExprKind::kIdentifier) {
-    auto src_val = EvalExpr(stmt->var_init->lhs, ctx, arena);
-    auto* src_obj = ctx.GetClassObject(src_val.ToUint64());
-    if (src_obj) {
-      auto* copy = src_obj->ShallowCopy(arena);
-      auto copy_handle = ctx.AllocateClassObject(copy);
-      auto* var = ctx.FindVariable(stmt->var_name);
-      if (var) var->value = MakeLogic4VecVal(arena, 64, copy_handle);
-      return true;
-    }
+  if (TryExecClassShallowCopy(stmt->var_name, stmt->var_init, ctx, arena)) {
+    return true;
   }
 
   auto handle = EvalClassNew(class_type, stmt->var_init, ctx, arena);
@@ -136,22 +149,49 @@ static void CreateDeclVariable(const Stmt* stmt, uint32_t width, bool is_real,
   }
 }
 
+// Returns true if the declaration resolves to an already-existing variable
+// (a static-func var to alias, or a local already present) and so needs no
+// fresh creation.
+static bool TryReuseExistingDeclVar(const Stmt* stmt,
+                                    std::string_view func_name,
+                                    SimContext& ctx) {
+  if (stmt->var_is_static && !func_name.empty()) {
+    auto* existing = ctx.FindStaticFuncVar(func_name, stmt->var_name);
+    if (existing) {
+      ctx.AliasLocalVariable(stmt->var_name, existing);
+      return true;
+    }
+  } else if (!stmt->var_is_automatic) {
+    if (ctx.HasLocalScope() && ctx.FindLocalVariable(stmt->var_name)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// Applies 4-state coercion and the optional initializer to a freshly created
+// variable, then records it as a static-func var when applicable.
+static void InitializeDeclVariable(const Stmt* stmt, Variable* var,
+                                   std::string_view func_name, SimContext& ctx,
+                                   Arena& arena) {
+  var->is_4state = Is4stateType(stmt->var_decl_type.kind);
+  if (!var->is_4state) CoerceTo2State(var->value);
+  if (stmt->var_init) {
+    var->value = EvalExpr(stmt->var_init, ctx, arena);
+    if (!var->is_4state) CoerceTo2State(var->value);
+  }
+
+  if (stmt->var_is_static && !func_name.empty()) {
+    ctx.SaveStaticFuncVar(func_name, stmt->var_name, var);
+  }
+}
+
 StmtResult ExecVarDeclImpl(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   if (TryExecWeakRefVarDecl(stmt, ctx, arena)) return StmtResult::kDone;
   if (TryExecClassVarDecl(stmt, ctx, arena)) return StmtResult::kDone;
 
   auto func_name = ctx.CurrentFuncName();
-  if (stmt->var_is_static && !func_name.empty()) {
-    auto* existing = ctx.FindStaticFuncVar(func_name, stmt->var_name);
-    if (existing) {
-      ctx.AliasLocalVariable(stmt->var_name, existing);
-      return StmtResult::kDone;
-    }
-  } else if (!stmt->var_is_automatic) {
-    if (ctx.HasLocalScope() && ctx.FindLocalVariable(stmt->var_name)) {
-      return StmtResult::kDone;
-    }
-  }
+  if (TryReuseExistingDeclVar(stmt, func_name, ctx)) return StmtResult::kDone;
 
   uint32_t width = EvalTypeWidth(stmt->var_decl_type);
   bool is_real = (stmt->var_decl_type.kind == DataTypeKind::kReal ||
@@ -160,16 +200,7 @@ StmtResult ExecVarDeclImpl(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   CreateDeclVariable(stmt, width, is_real, ctx, arena);
   auto* var = ctx.FindVariable(stmt->var_name);
   if (var) {
-    var->is_4state = Is4stateType(stmt->var_decl_type.kind);
-    if (!var->is_4state) CoerceTo2State(var->value);
-    if (stmt->var_init) {
-      var->value = EvalExpr(stmt->var_init, ctx, arena);
-      if (!var->is_4state) CoerceTo2State(var->value);
-    }
-
-    if (stmt->var_is_static && !func_name.empty()) {
-      ctx.SaveStaticFuncVar(func_name, stmt->var_name, var);
-    }
+    InitializeDeclVariable(stmt, var, func_name, ctx, arena);
   }
   return StmtResult::kDone;
 }

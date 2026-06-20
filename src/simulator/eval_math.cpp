@@ -274,30 +274,53 @@ static int32_t RoundDistResult(double r) {
   return -static_cast<int32_t>(r + 0.5);
 }
 
+// §N.2 rtl_dist_uniform() common rounding: the reference floors a non-negative
+// draw and rounds a negative draw toward minus infinity.
+static int32_t FloorDistDraw(double r) {
+  return r >= 0 ? static_cast<int32_t>(r) : static_cast<int32_t>(r - 1);
+}
+
+// §N.2 rtl_dist_uniform() general case (end is not LONG_MAX): widens the
+// interval by one, draws, floors, and clamps back into [start, end].
+static int32_t RtlDistUniformGeneral(int32_t* seed, int32_t start,
+                                     int32_t end) {
+  end++;
+  double r = RefUniform(seed, start, end);
+  int32_t i = FloorDistDraw(r);
+  if (i < start) i = start;
+  if (i >= end) i = end - 1;
+  return i;
+}
+
+// §N.2 rtl_dist_uniform() LONG_MAX edge (end == INT32_MAX but start is not
+// INT32_MIN): widens the low end by one and offsets the draw upward by one.
+static int32_t RtlDistUniformHighEdge(int32_t* seed, int32_t start,
+                                      int32_t end) {
+  start--;
+  double r = RefUniform(seed, start, end) + 1.0;
+  int32_t i = FloorDistDraw(r);
+  if (i <= start) i = start + 1;
+  if (i > end) i = end;
+  return i;
+}
+
+// §N.2 rtl_dist_uniform() full-range edge (start == INT32_MIN and
+// end == INT32_MAX): maps the draw across the entire 32-bit span.
+static int32_t RtlDistUniformFullRange(int32_t* seed, int32_t start,
+                                       int32_t end) {
+  double r = (RefUniform(seed, start, end) + 2147483648.0) / 4294967295.0;
+  r = r * 4294967296.0 - 2147483648.0;
+  return FloorDistDraw(r);
+}
+
 // §N.2 rtl_dist_uniform(): rounds toward the interval and clamps the result so
 // it stays inside [start, end], handling the LONG_MAX and LONG_MIN edges the
 // way the reference does (its long is the 32-bit integer modeled here).
 static int32_t RtlDistUniform(int32_t* seed, int32_t start, int32_t end) {
   if (start >= end) return start;
-  int32_t i = 0;
-  if (end != INT32_MAX) {
-    end++;
-    double r = RefUniform(seed, start, end);
-    i = r >= 0 ? static_cast<int32_t>(r) : static_cast<int32_t>(r - 1);
-    if (i < start) i = start;
-    if (i >= end) i = end - 1;
-  } else if (start != INT32_MIN) {
-    start--;
-    double r = RefUniform(seed, start, end) + 1.0;
-    i = r >= 0 ? static_cast<int32_t>(r) : static_cast<int32_t>(r - 1);
-    if (i <= start) i = start + 1;
-    if (i > end) i = end;
-  } else {
-    double r = (RefUniform(seed, start, end) + 2147483648.0) / 4294967295.0;
-    r = r * 4294967296.0 - 2147483648.0;
-    i = r >= 0 ? static_cast<int32_t>(r) : static_cast<int32_t>(r - 1);
-  }
-  return i;
+  if (end != INT32_MAX) return RtlDistUniformGeneral(seed, start, end);
+  if (start != INT32_MIN) return RtlDistUniformHighEdge(seed, start, end);
+  return RtlDistUniformFullRange(seed, start, end);
 }
 
 // §N.2 rtl_dist_*: each guards the argument the reference requires to be

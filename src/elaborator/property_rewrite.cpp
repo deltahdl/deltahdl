@@ -1,9 +1,37 @@
 #include "elaborator/property_rewrite.h"
 
+#include <string_view>
+#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
 namespace delta {
+
+namespace {
+
+using SequenceByName = std::unordered_map<std::string_view, const ModuleItem*>;
+
+// §16.8 three-color DFS body: `path` marks nodes on the current descent —
+// re-visiting one means there is a back-edge, which is exactly the cycle.
+// Only sequence-to-sequence edges count for the cycle rule.
+bool SequenceCycleDfs(const SequenceByName& by_name, const ModuleItem* node,
+                      std::unordered_set<const ModuleItem*>& path,
+                      std::unordered_set<const ModuleItem*>& done) {
+  if (!path.insert(node).second) return true;
+  for (auto ref : node->prop_instance_refs) {
+    auto it = by_name.find(ref);
+    if (it == by_name.end()) continue;
+    const ModuleItem* next = it->second;
+    if (next->kind != ModuleItemKind::kSequenceDecl) continue;
+    if (done.count(next) != 0) continue;
+    if (SequenceCycleDfs(by_name, next, path, done)) return true;
+  }
+  path.erase(node);
+  done.insert(node);
+  return false;
+}
+
+}  // namespace
 
 void PropertyRegistry::Register(const ModuleItem* decl) {
   if (decl == nullptr) return;
@@ -73,28 +101,11 @@ bool PropertyRegistry::HasCyclicSequenceDependency(
   if (decl == nullptr) return false;
   if (decl->kind != ModuleItemKind::kSequenceDecl) return false;
 
-  // Three-color DFS: `path` marks nodes on the current descent — re-visiting
-  // one means there is a back-edge, which is exactly §16.8's cycle.
+  // Three-color DFS over sequence-to-sequence instance references (see
+  // SequenceCycleDfs); `decl` is on a cycle iff that walk finds a back-edge.
   std::unordered_set<const ModuleItem*> path;
   std::unordered_set<const ModuleItem*> done;
-
-  auto dfs = [&](auto& self, const ModuleItem* node) -> bool {
-    if (!path.insert(node).second) return true;
-    for (auto ref : node->prop_instance_refs) {
-      auto it = by_name_.find(ref);
-      if (it == by_name_.end()) continue;
-      const ModuleItem* next = it->second;
-      // Only sequence-to-sequence edges count for §16.8's cycle rule.
-      if (next->kind != ModuleItemKind::kSequenceDecl) continue;
-      if (done.count(next) != 0) continue;
-      if (self(self, next)) return true;
-    }
-    path.erase(node);
-    done.insert(node);
-    return false;
-  };
-
-  return dfs(dfs, decl);
+  return SequenceCycleDfs(by_name_, decl, path, done);
 }
 
 bool PropertyRegistry::IsRecursiveProperty(const ModuleItem* decl) const {

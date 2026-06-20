@@ -2,6 +2,8 @@
 
 namespace delta {
 
+static bool IsDataTypeKeyword(TokenKind tk);
+
 // CPD-dedup: a label preceding begin/fork is equivalent to a block name, so the
 // matching name after end/join* may be the inline name or that prefix label.
 // Validates the optional trailing ": name" against the effective block name.
@@ -21,6 +23,69 @@ struct ParserStmtHelpers {
                                       std::string(block_name) + "'");
       }
     }
+  }
+
+  static void ApplyStmtLabel(Parser& p, Stmt* stmt,
+                             std::string_view prefix_label) {
+    if (!prefix_label.empty() && stmt->label.empty()) {
+      stmt->label = prefix_label;
+    } else if (!prefix_label.empty() && !stmt->label.empty()) {
+      p.diag_.Error(stmt->range.start,
+                    "cannot have both a statement label and a block name");
+    }
+  }
+
+  static void CheckQualifiedElseIfBranches(Parser& p, Stmt* stmt) {
+    for (Stmt* cur = stmt->else_branch; cur && cur->kind == StmtKind::kIf;
+         cur = cur->else_branch) {
+      if (cur->qualifier != CaseQualifier::kNone) {
+        p.diag_.Error(cur->range.start,
+                      "unique, unique0, or priority cannot appear on an "
+                      "else-if branch; wrap the nested if in begin-end");
+        break;
+      }
+    }
+  }
+
+  static void ApplyStmtQualifierAndAttrs(Parser& p, Stmt* stmt,
+                                         CaseQualifier qual,
+                                         std::vector<Attribute>& attrs) {
+    if (!attrs.empty()) stmt->attrs = std::move(attrs);
+    if (qual != CaseQualifier::kNone) stmt->qualifier = qual;
+    if (qual != CaseQualifier::kNone && stmt->kind == StmtKind::kIf) {
+      CheckQualifiedElseIfBranches(p, stmt);
+    }
+  }
+
+  static void ParseForLocalDeclInits(Parser& p, Stmt* stmt) {
+    do {
+      p.Match(TokenKind::kKwVar);
+      stmt->for_init_types.push_back(p.ParseDataType());
+      stmt->for_inits.push_back(p.ParseAssignmentOrExprNoSemi());
+    } while (p.Match(TokenKind::kComma));
+    p.Expect(TokenKind::kSemicolon);
+  }
+
+  static void ParseForPlainInits(Parser& p, Stmt* stmt) {
+    do {
+      if (p.Check(TokenKind::kKwVar) ||
+          IsDataTypeKeyword(p.CurrentToken().kind)) {
+        // The first control variable was a plain assignment, so a later item
+        // attempting a local declaration mixes declared and non-declared
+        // control variables, which is not allowed.
+        p.diag_.Error(
+            p.CurrentLoc(),
+            "for-loop initialization shall declare either all or none "
+            "of its control variables locally");
+        p.Match(TokenKind::kKwVar);
+        stmt->for_init_types.push_back(p.ParseDataType());
+        stmt->for_inits.push_back(p.ParseAssignmentOrExprNoSemi());
+      } else {
+        stmt->for_init_types.emplace_back();
+        stmt->for_inits.push_back(p.ParseAssignmentOrExprNoSemi());
+      }
+    } while (p.Match(TokenKind::kComma));
+    p.Expect(TokenKind::kSemicolon);
   }
 };
 
@@ -89,25 +154,8 @@ Stmt* Parser::ParseStmt() {
 
   Stmt* stmt = ParseStmtBody(prefix_label);
   if (stmt != nullptr) {
-    if (!prefix_label.empty() && stmt->label.empty()) {
-      stmt->label = prefix_label;
-    } else if (!prefix_label.empty() && !stmt->label.empty()) {
-      diag_.Error(stmt->range.start,
-                  "cannot have both a statement label and a block name");
-    }
-    if (!attrs.empty()) stmt->attrs = std::move(attrs);
-    if (qual != CaseQualifier::kNone) stmt->qualifier = qual;
-    if (qual != CaseQualifier::kNone && stmt->kind == StmtKind::kIf) {
-      for (Stmt* cur = stmt->else_branch; cur && cur->kind == StmtKind::kIf;
-           cur = cur->else_branch) {
-        if (cur->qualifier != CaseQualifier::kNone) {
-          diag_.Error(cur->range.start,
-                      "unique, unique0, or priority cannot appear on an "
-                      "else-if branch; wrap the nested if in begin-end");
-          break;
-        }
-      }
-    }
+    ParserStmtHelpers::ApplyStmtLabel(*this, stmt, prefix_label);
+    ParserStmtHelpers::ApplyStmtQualifierAndAttrs(*this, stmt, qual, attrs);
   }
   return stmt;
 }
@@ -508,30 +556,9 @@ Stmt* Parser::ParseForStmt() {
     Consume();
   } else if (Check(TokenKind::kKwVar) ||
              IsDataTypeKeyword(CurrentToken().kind)) {
-    do {
-      Match(TokenKind::kKwVar);
-      stmt->for_init_types.push_back(ParseDataType());
-      stmt->for_inits.push_back(ParseAssignmentOrExprNoSemi());
-    } while (Match(TokenKind::kComma));
-    Expect(TokenKind::kSemicolon);
+    ParserStmtHelpers::ParseForLocalDeclInits(*this, stmt);
   } else {
-    do {
-      if (Check(TokenKind::kKwVar) || IsDataTypeKeyword(CurrentToken().kind)) {
-        // The first control variable was a plain assignment, so a later item
-        // attempting a local declaration mixes declared and non-declared
-        // control variables, which is not allowed.
-        diag_.Error(CurrentLoc(),
-                    "for-loop initialization shall declare either all or none "
-                    "of its control variables locally");
-        Match(TokenKind::kKwVar);
-        stmt->for_init_types.push_back(ParseDataType());
-        stmt->for_inits.push_back(ParseAssignmentOrExprNoSemi());
-      } else {
-        stmt->for_init_types.emplace_back();
-        stmt->for_inits.push_back(ParseAssignmentOrExprNoSemi());
-      }
-    } while (Match(TokenKind::kComma));
-    Expect(TokenKind::kSemicolon);
+    ParserStmtHelpers::ParseForPlainInits(*this, stmt);
   }
 
   if (!Check(TokenKind::kSemicolon)) {

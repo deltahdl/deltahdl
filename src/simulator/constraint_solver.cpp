@@ -121,6 +121,74 @@ const std::unordered_map<std::string, int64_t>& ConstraintSolver::GetValues()
   return values_;
 }
 
+namespace {
+
+// 18.4.2: draw a randc value from an enum's named constants, cycling through
+// the permutation before repeating. Reject already-drawn values; once the full
+// set has been seen, clear the history and start a fresh permutation. Falls
+// back to the first unseen value (then to a reset to the first constant) if the
+// random draws keep colliding.
+int64_t DrawRandcEnumValue(RandVariable& var,
+                           std::unordered_set<int64_t>& history,
+                           std::mt19937& rng) {
+  if (history.size() >= var.enum_values.size()) {
+    history.clear();
+  }
+  for (int attempt = 0; attempt < 1000; ++attempt) {
+    std::uniform_int_distribution<size_t> pick(0, var.enum_values.size() - 1);
+    int64_t val = var.enum_values[pick(rng)];
+    if (history.find(val) == history.end()) {
+      history.insert(val);
+      return val;
+    }
+  }
+  for (int64_t v : var.enum_values) {
+    if (history.find(v) == history.end()) {
+      history.insert(v);
+      return v;
+    }
+  }
+  history.clear();
+  history.insert(var.enum_values.front());
+  return var.enum_values.front();
+}
+
+// 18.4.2: draw a randc value from the variable's declared integer range,
+// cycling through the permutation before repeating. Reject already-drawn
+// values; once the full range has been seen, clear the history and start a
+// fresh permutation. Falls back to the first unseen value (then to a reset to
+// the range minimum) if the random draws keep colliding.
+int64_t DrawRandcRangeValue(RandVariable& var,
+                            std::unordered_set<int64_t>& history,
+                            std::mt19937& rng) {
+  int64_t range_size = var.max_val - var.min_val + 1;
+
+  if (static_cast<int64_t>(history.size()) >= range_size) {
+    history.clear();
+  }
+
+  for (int attempt = 0; attempt < 1000; ++attempt) {
+    std::uniform_int_distribution<int64_t> dist(var.min_val, var.max_val);
+    int64_t val = dist(rng);
+    if (history.find(val) == history.end()) {
+      history.insert(val);
+      return val;
+    }
+  }
+
+  for (int64_t v = var.min_val; v <= var.max_val; ++v) {
+    if (history.find(v) == history.end()) {
+      history.insert(v);
+      return v;
+    }
+  }
+  history.clear();
+  history.insert(var.min_val);
+  return var.min_val;
+}
+
+}  // namespace
+
 int64_t ConstraintSolver::GenerateRandValue(RandVariable& var) {
   // 18.4.2: a static randc variable shares one cyclic permutation across every
   // instance of the class, so its history lives in the shared state when one is
@@ -136,56 +204,13 @@ int64_t ConstraintSolver::GenerateRandValue(RandVariable& var) {
   // the value is drawn from the full declared range below.
   if (!var.enum_values.empty() && var.apply_enum_restriction) {
     if (var.qualifier == RandQualifier::kRandc) {
-      if (history.size() >= var.enum_values.size()) {
-        history.clear();
-      }
-      for (int attempt = 0; attempt < 1000; ++attempt) {
-        std::uniform_int_distribution<size_t> pick(0,
-                                                   var.enum_values.size() - 1);
-        int64_t val = var.enum_values[pick(rng_)];
-        if (history.find(val) == history.end()) {
-          history.insert(val);
-          return val;
-        }
-      }
-      for (int64_t v : var.enum_values) {
-        if (history.find(v) == history.end()) {
-          history.insert(v);
-          return v;
-        }
-      }
-      history.clear();
-      history.insert(var.enum_values.front());
-      return var.enum_values.front();
+      return DrawRandcEnumValue(var, history, rng_);
     }
     std::uniform_int_distribution<size_t> pick(0, var.enum_values.size() - 1);
     return var.enum_values[pick(rng_)];
   }
   if (var.qualifier == RandQualifier::kRandc) {
-    int64_t range_size = var.max_val - var.min_val + 1;
-
-    if (static_cast<int64_t>(history.size()) >= range_size) {
-      history.clear();
-    }
-
-    for (int attempt = 0; attempt < 1000; ++attempt) {
-      std::uniform_int_distribution<int64_t> dist(var.min_val, var.max_val);
-      int64_t val = dist(rng_);
-      if (history.find(val) == history.end()) {
-        history.insert(val);
-        return val;
-      }
-    }
-
-    for (int64_t v = var.min_val; v <= var.max_val; ++v) {
-      if (history.find(v) == history.end()) {
-        history.insert(v);
-        return v;
-      }
-    }
-    history.clear();
-    history.insert(var.min_val);
-    return var.min_val;
+    return DrawRandcRangeValue(var, history, rng_);
   }
   std::uniform_int_distribution<int64_t> dist(var.min_val, var.max_val);
   return dist(rng_);
@@ -221,6 +246,21 @@ int64_t DistItemRepresentative(const DistWeight& w) {
   return w.is_range ? w.lo : w.value;
 }
 
+// 18.5.3: a value is covered by the distribution's non-default items when it
+// equals a named single value or falls inside a named range. Default items name
+// no specific value, so they never cover anything here.
+bool DistValueCovered(const std::vector<DistWeight>& weights, int64_t v) {
+  for (const auto& w : weights) {
+    if (w.is_default) continue;
+    if (w.is_range) {
+      if (v >= w.lo && v <= w.hi) return true;
+    } else if (v == w.value) {
+      return true;
+    }
+  }
+  return false;
+}
+
 }  // namespace
 
 // 18.5.3: a value covered only by 'default :/ weight' is any domain value not
@@ -230,21 +270,10 @@ int64_t ConstraintSolver::SampleDefaultValue(
     const std::vector<DistWeight>& weights, int64_t domain_lo,
     int64_t domain_hi) {
   if (domain_hi < domain_lo) return domain_lo;
-  auto covered = [&weights](int64_t v) {
-    for (const auto& w : weights) {
-      if (w.is_default) continue;
-      if (w.is_range) {
-        if (v >= w.lo && v <= w.hi) return true;
-      } else if (v == w.value) {
-        return true;
-      }
-    }
-    return false;
-  };
   std::uniform_int_distribution<int64_t> within(domain_lo, domain_hi);
   for (int attempt = 0; attempt < 1000; ++attempt) {
     int64_t v = within(rng_);
-    if (!covered(v)) return v;
+    if (!DistValueCovered(weights, v)) return v;
   }
   return domain_lo;
 }
@@ -326,6 +355,46 @@ bool ConstraintSolver::DistLacksRandVariable() const {
   return false;
 }
 
+namespace {
+
+// 18.5.4: a uniqueness group violates the no-randc rule when any of its known
+// members is declared randc.
+bool UniqueGroupHasRandcMember(
+    const ConstraintExpr& c,
+    const std::unordered_map<std::string, RandVariable>& variables) {
+  for (const auto& name : c.unique_vars) {
+    auto it = variables.find(name);
+    if (it != variables.end() &&
+        it->second.qualifier == RandQualifier::kRandc) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// 18.5.4: a uniqueness group mixes inequivalent types when any known member
+// differs from the first known member in real-ness or bit width. Members the
+// solver does not know are skipped, mirroring the lenient treatment elsewhere.
+bool UniqueGroupHasInequivalentTypes(
+    const ConstraintExpr& c,
+    const std::unordered_map<std::string, RandVariable>& variables) {
+  const RandVariable* ref = nullptr;
+  for (const auto& name : c.unique_vars) {
+    auto it = variables.find(name);
+    if (it == variables.end()) continue;
+    if (ref == nullptr) {
+      ref = &it->second;
+      continue;
+    }
+    if (it->second.is_real != ref->is_real || it->second.width != ref->width) {
+      return true;
+    }
+  }
+  return false;
+}
+
+}  // namespace
+
 // 18.5.4: no randc variable shall appear in the group of a uniqueness
 // constraint. Scan every enabled unique constraint and report a randc member.
 bool ConstraintSolver::HasRandcInUnique() const {
@@ -333,13 +402,7 @@ bool ConstraintSolver::HasRandcInUnique() const {
     if (!block.enabled) continue;
     for (const auto& c : block.constraints) {
       if (c.kind != ConstraintKind::kUnique) continue;
-      for (const auto& name : c.unique_vars) {
-        auto it = variables_.find(name);
-        if (it != variables_.end() &&
-            it->second.qualifier == RandQualifier::kRandc) {
-          return true;
-        }
-      }
+      if (UniqueGroupHasRandcMember(c, variables_)) return true;
     }
   }
   return false;
@@ -355,19 +418,7 @@ bool ConstraintSolver::UniqueMembersNotEquivalentType() const {
     if (!block.enabled) continue;
     for (const auto& c : block.constraints) {
       if (c.kind != ConstraintKind::kUnique) continue;
-      const RandVariable* ref = nullptr;
-      for (const auto& name : c.unique_vars) {
-        auto it = variables_.find(name);
-        if (it == variables_.end()) continue;
-        if (ref == nullptr) {
-          ref = &it->second;
-          continue;
-        }
-        if (it->second.is_real != ref->is_real ||
-            it->second.width != ref->width) {
-          return true;
-        }
-      }
+      if (UniqueGroupHasInequivalentTypes(c, variables_)) return true;
     }
   }
   return false;

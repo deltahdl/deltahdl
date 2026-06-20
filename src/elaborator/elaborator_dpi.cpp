@@ -138,6 +138,183 @@ DpiExportSignature BuildDpiExportSignature(const ModuleItem* callable) {
   return key;
 }
 
+// §35.5.4: "multiple imports of the same subroutine name into the same scope
+// are forbidden." We treat each module declaration as one scope, so this scans
+// a single module's items for repeated DPI import subroutine names.
+void CheckDuplicateImportNamesInScope(const ModuleDecl* mod, DiagEngine& diag) {
+  std::unordered_set<std::string_view> sv_names_in_scope;
+  for (const auto* item : mod->items) {
+    if (item == nullptr) continue;
+    if (item->kind != ModuleItemKind::kDpiImport) continue;
+    auto [it, inserted] = sv_names_in_scope.insert(item->name);
+    if (!inserted) {
+      diag.Error(
+          item->loc,
+          std::format("DPI import name '{}' already declared in this scope",
+                      item->name));
+    }
+  }
+}
+
+// §35.7: an exported function adheres to the same restrictions on argument
+// types as imports. The §35.5.4 prohibition on the ref qualifier in a DPI
+// declaration therefore carries through to the exported routine's formal
+// arguments.
+void CheckExportRefArguments(const ModuleItem* callable, const ModuleItem* item,
+                             DiagEngine& diag) {
+  for (const auto& arg : callable->func_args) {
+    if (arg.direction == Direction::kRef) {
+      diag.Error(item->loc,
+                 std::format("SystemVerilog function '{}' has a ref argument "
+                             "and therefore cannot be exported (§35.7)",
+                             item->name));
+      break;
+    }
+  }
+}
+
+// §35.5.6: it is erroneous for an exported DPI subroutine to declare a formal
+// argument of a dynamic array type. (Unsized "open" array formals are a
+// relaxation reserved for imports under §35.5.6.1; exports get no such
+// allowance.) A dynamic array shows up as an unpacked dimension with no bounds
+// -- the empty-bracket "[]" form, recorded by the parser as a null dimension
+// entry. Queues ("[$]"), associative arrays ("[*]" / "[type]") and fixed-size
+// unpacked arrays all carry a non-null dimension marker, so they are not
+// mistaken for dynamic arrays here.
+void CheckExportDynamicArrayArguments(const ModuleItem* callable,
+                                      const ModuleItem* item,
+                                      DiagEngine& diag) {
+  for (const auto& arg : callable->func_args) {
+    bool has_dynamic_dim = false;
+    for (const Expr* dim : arg.unpacked_dims) {
+      if (dim == nullptr) {
+        has_dynamic_dim = true;
+        break;
+      }
+    }
+    if (has_dynamic_dim) {
+      diag.Error(item->loc,
+                 std::format("SystemVerilog function '{}' has a dynamic array "
+                             "formal argument and therefore cannot be exported "
+                             "for DPI (§35.5.6)",
+                             item->name));
+      break;
+    }
+  }
+}
+
+// §35.5.5: an exported function's result type is subject to the same
+// small-value restriction as an imported function's result. Tasks carry no
+// result, so the check applies only when the exported routine is a function.
+void CheckExportResultType(const ModuleItem* callable, const ModuleItem* item,
+                           DiagEngine& diag) {
+  if (callable->kind == ModuleItemKind::kFunctionDecl &&
+      !IsPermittedDpiResultType(callable->return_type)) {
+    diag.Error(item->loc,
+               std::format("exported function '{}' has a result type that is "
+                           "not permitted for DPI; function results are "
+                           "restricted to small values (§35.5.5)",
+                           item->name));
+  }
+}
+
+// §35.4 claim 14: exports sharing one linkage name across scopes must have
+// equivalent type signatures. Records the signature the first time the linkage
+// name is seen and compares against it on later exports.
+void CheckExportSignatureEquivalence(
+    const ModuleItem* callable, std::string_view link_name,
+    const ModuleItem* item,
+    std::unordered_map<std::string_view, DpiExportSignature>& export_signatures,
+    DiagEngine& diag) {
+  auto sig = BuildDpiExportSignature(callable);
+  auto [sig_it, sig_was_new] = export_signatures.emplace(link_name, sig);
+  if (!sig_was_new && !(sig_it->second == sig)) {
+    diag.Error(item->loc,
+               std::format("DPI export linkage name '{}' was previously "
+                           "declared with a different type signature; "
+                           "exports sharing one linkage name across scopes "
+                           "must have equivalent signatures",
+                           link_name));
+  }
+}
+
+// §35.4/§35.7: run the full battery of export-declaration checks for one export
+// item, given the SystemVerilog callables indexed for its enclosing scope and
+// the per-scope / cross-scope bookkeeping sets.
+void ValidateExportDeclaration(
+    const ModuleItem* item, std::string_view link_name,
+    const std::unordered_map<std::string_view, const ModuleItem*>& sv_callables,
+    std::unordered_set<std::string_view>& export_link_in_scope,
+    std::unordered_set<std::string_view>& exported_sv_func_in_scope,
+    std::unordered_map<std::string_view, DpiExportSignature>& export_signatures,
+    DiagEngine& diag) {
+  auto [_, inserted] = export_link_in_scope.insert(link_name);
+  if (!inserted) {
+    diag.Error(item->loc,
+               std::format("DPI export linkage name '{}' already declared in "
+                           "this scope",
+                           link_name));
+  }
+
+  // §35.7: at most one export per SystemVerilog function in a scope.
+  auto [_func, func_inserted] = exported_sv_func_in_scope.insert(item->name);
+  if (!func_inserted) {
+    diag.Error(item->loc,
+               std::format("SystemVerilog function '{}' is already exported in "
+                           "this scope; only one export declaration per "
+                           "function is permitted (§35.7)",
+                           item->name));
+  }
+
+  auto callable_it = sv_callables.find(item->name);
+  if (callable_it == sv_callables.end()) {
+    // §35.7: an export declaration is allowed only in the scope where the
+    // function being exported is defined. If the scope contains no
+    // SystemVerilog function or task with the named identifier, the export
+    // has nothing to attach to.
+    diag.Error(item->loc,
+               std::format("DPI export names '{}', which is not a "
+                           "SystemVerilog function or task defined in the "
+                           "enclosing scope (§35.7)",
+                           item->name));
+    return;
+  }
+
+  const ModuleItem* callable = callable_it->second;
+  CheckExportRefArguments(callable, item, diag);
+  CheckExportDynamicArrayArguments(callable, item, diag);
+  CheckExportResultType(callable, item, diag);
+  CheckExportSignatureEquivalence(callable, link_name, item, export_signatures,
+                                  diag);
+}
+
+// §35.5.4: "all declarations, regardless of scope, shall have exactly the same
+// type signature." Compares one import's signature against the first one seen
+// under the same linkage name, recording it the first time. Argument names and
+// defaults may differ.
+void CheckImportSignatureAgreement(
+    const ModuleItem* item,
+    std::unordered_map<std::string_view, DpiSignatureKey>& signatures,
+    std::unordered_map<std::string_view, SourceLoc>& first_decl_loc,
+    DiagEngine& diag) {
+  auto link_name = DpiLinkageName(item);
+  auto sig = BuildDpiSignature(item);
+
+  auto found = signatures.find(link_name);
+  if (found == signatures.end()) {
+    signatures.emplace(link_name, std::move(sig));
+    first_decl_loc[link_name] = item->loc;
+    return;
+  }
+  if (!DpiSignaturesMatch(found->second, sig)) {
+    diag.Error(
+        item->loc,
+        std::format("DPI declaration of linkage name '{}' disagrees with the "
+                    "earlier declaration's type signature",
+                    link_name));
+  }
+}
+
 }  // namespace
 
 void Elaborator::ValidateDpiDeclarations() {
@@ -149,20 +326,7 @@ void Elaborator::ValidateDpiDeclarations() {
   for (const auto* mod : unit_->modules) {
     if (mod == nullptr) continue;
 
-    // §35.5.4: "multiple imports of the same subroutine name into the same
-    // scope are forbidden." We treat each module declaration as one scope.
-    std::unordered_set<std::string_view> sv_names_in_scope;
-    for (const auto* item : mod->items) {
-      if (item == nullptr) continue;
-      if (item->kind != ModuleItemKind::kDpiImport) continue;
-      auto [it, inserted] = sv_names_in_scope.insert(item->name);
-      if (!inserted) {
-        diag_.Error(
-            item->loc,
-            std::format("DPI import name '{}' already declared in this scope",
-                        item->name));
-      }
-    }
+    CheckDuplicateImportNamesInScope(mod, diag_);
 
     for (const auto* item : mod->items) {
       if (item == nullptr) continue;
@@ -170,26 +334,7 @@ void Elaborator::ValidateDpiDeclarations() {
       // carries no signature in its syntax (the signature comes from the
       // SystemVerilog function being exported).
       if (item->kind != ModuleItemKind::kDpiImport) continue;
-
-      auto link_name = DpiLinkageName(item);
-      auto sig = BuildDpiSignature(item);
-
-      auto found = signatures.find(link_name);
-      if (found == signatures.end()) {
-        signatures.emplace(link_name, std::move(sig));
-        first_decl_loc[link_name] = item->loc;
-        continue;
-      }
-      // §35.5.4: "all declarations, regardless of scope, shall have exactly
-      // the same type signature." Argument names and defaults may differ.
-      if (!DpiSignaturesMatch(found->second, sig)) {
-        diag_.Error(
-            item->loc,
-            std::format(
-                "DPI declaration of linkage name '{}' disagrees with the "
-                "earlier declaration's type signature",
-                link_name));
-      }
+      CheckImportSignatureAgreement(item, signatures, first_decl_loc, diag_);
     }
   }
 }
@@ -246,111 +391,9 @@ void Elaborator::ValidateDpiGlobalNameSpace() {
       auto link_name = DpiLinkageName(item);
 
       if (item->kind == ModuleItemKind::kDpiExport) {
-        auto [_, inserted] = export_link_in_scope.insert(link_name);
-        if (!inserted) {
-          diag_.Error(
-              item->loc,
-              std::format("DPI export linkage name '{}' already declared in "
-                          "this scope",
-                          link_name));
-        }
-
-        // §35.7: at most one export per SystemVerilog function in a scope.
-        auto [_func, func_inserted] =
-            exported_sv_func_in_scope.insert(item->name);
-        if (!func_inserted) {
-          diag_.Error(
-              item->loc,
-              std::format("SystemVerilog function '{}' is already exported in "
-                          "this scope; only one export declaration per "
-                          "function is permitted (§35.7)",
-                          item->name));
-        }
-
-        auto callable_it = sv_callables.find(item->name);
-        if (callable_it == sv_callables.end()) {
-          // §35.7: an export declaration is allowed only in the scope where
-          // the function being exported is defined. If the scope contains no
-          // SystemVerilog function or task with the named identifier, the
-          // export has nothing to attach to.
-          diag_.Error(
-              item->loc,
-              std::format("DPI export names '{}', which is not a "
-                          "SystemVerilog function or task defined in the "
-                          "enclosing scope (§35.7)",
-                          item->name));
-        } else {
-          // §35.7: an exported function adheres to the same restrictions on
-          // argument types as imports. The §35.5.4 prohibition on the ref
-          // qualifier in a DPI declaration therefore carries through to the
-          // exported routine's formal arguments.
-          for (const auto& arg : callable_it->second->func_args) {
-            if (arg.direction == Direction::kRef) {
-              diag_.Error(
-                  item->loc,
-                  std::format("SystemVerilog function '{}' has a ref argument "
-                              "and therefore cannot be exported (§35.7)",
-                              item->name));
-              break;
-            }
-          }
-
-          // §35.5.6: it is erroneous for an exported DPI subroutine to declare
-          // a formal argument of a dynamic array type. (Unsized "open" array
-          // formals are a relaxation reserved for imports under §35.5.6.1;
-          // exports get no such allowance.) A dynamic array shows up as an
-          // unpacked dimension with no bounds -- the empty-bracket "[]" form,
-          // recorded by the parser as a null dimension entry. Queues ("[$]"),
-          // associative arrays ("[*]" / "[type]") and fixed-size unpacked
-          // arrays all carry a non-null dimension marker, so they are not
-          // mistaken for dynamic arrays here.
-          for (const auto& arg : callable_it->second->func_args) {
-            bool has_dynamic_dim = false;
-            for (const Expr* dim : arg.unpacked_dims) {
-              if (dim == nullptr) {
-                has_dynamic_dim = true;
-                break;
-              }
-            }
-            if (has_dynamic_dim) {
-              diag_.Error(
-                  item->loc,
-                  std::format(
-                      "SystemVerilog function '{}' has a dynamic array "
-                      "formal argument and therefore cannot be exported "
-                      "for DPI (§35.5.6)",
-                      item->name));
-              break;
-            }
-          }
-
-          // §35.5.5: an exported function's result type is subject to the same
-          // small-value restriction as an imported function's result. Tasks
-          // carry no result, so the check applies only when the exported
-          // routine is a function.
-          if (callable_it->second->kind == ModuleItemKind::kFunctionDecl &&
-              !IsPermittedDpiResultType(callable_it->second->return_type)) {
-            diag_.Error(
-                item->loc,
-                std::format("exported function '{}' has a result type that is "
-                            "not permitted for DPI; function results are "
-                            "restricted to small values (§35.5.5)",
-                            item->name));
-          }
-
-          auto sig = BuildDpiExportSignature(callable_it->second);
-          auto [sig_it, sig_was_new] =
-              export_signatures.emplace(link_name, sig);
-          if (!sig_was_new && !(sig_it->second == sig)) {
-            diag_.Error(
-                item->loc,
-                std::format("DPI export linkage name '{}' was previously "
-                            "declared with a different type signature; "
-                            "exports sharing one linkage name across scopes "
-                            "must have equivalent signatures",
-                            link_name));
-          }
-        }
+        ValidateExportDeclaration(
+            item, link_name, sv_callables, export_link_in_scope,
+            exported_sv_func_in_scope, export_signatures, diag_);
       }
 
       auto found = link_version.find(link_name);
@@ -370,6 +413,87 @@ void Elaborator::ValidateDpiGlobalNameSpace() {
   }
 }
 
+namespace {
+
+// Per §20.10.1, the first argument of $fatal is an optional finish_number that
+// must be 0, 1, or 2. Returns the index of the first message-list argument: 1
+// when a leading integer literal was consumed as the finish_number, else 0.
+size_t CheckFatalFinishNumber(const Expr* expr, bool is_fatal,
+                              DiagEngine& diag) {
+  if (is_fatal && !expr->args.empty()) {
+    auto* first_arg = expr->args[0];
+    if (first_arg->kind == ExprKind::kIntegerLiteral) {
+      auto val = first_arg->int_val;
+      if (val < 0 || val > 2) {
+        diag.Error(first_arg->range.start, "finish_number must be 0, 1, or 2");
+      }
+      return 1;
+    }
+  }
+  return 0;
+}
+
+// Per §20.10.1, list_of_arguments may only contain a formatting string and
+// constant expressions, including constant function calls.
+void CheckElabTaskArgsConstant(const Expr* expr, size_t arg_start,
+                               std::string_view name, const ScopeMap& scope,
+                               DiagEngine& diag) {
+  for (size_t i = arg_start; i < expr->args.size(); ++i) {
+    auto* arg = expr->args[i];
+    if (!arg) continue;
+    if (i == arg_start && arg->kind == ExprKind::kStringLiteral) continue;
+    if (arg->kind == ExprKind::kStringLiteral) continue;
+    if (!IsConstantExpr(arg, scope)) {
+      diag.Error(arg->range.start,
+                 std::format("argument to {} must be a constant expression "
+                             "(§20.10.1)",
+                             name));
+    }
+  }
+}
+
+// Compose the diagnostic scope name: the module name (if any) joined to the
+// trailing generate prefix with underscores trimmed, separated by a dot.
+std::string BuildElabTaskScopeName(const RtlirModule* mod,
+                                   const std::string& gen_prefix) {
+  std::string scope_name = mod ? std::string(mod->name) : std::string{};
+  if (!gen_prefix.empty()) {
+    std::string trimmed = gen_prefix;
+    while (!trimmed.empty() && trimmed.back() == '_') trimmed.pop_back();
+    if (!trimmed.empty()) {
+      if (!scope_name.empty()) scope_name.push_back('.');
+      scope_name += trimmed;
+    }
+  }
+  return scope_name;
+}
+
+// Map the elaboration system task name flags to the severity label embedded in
+// the emitted message.
+std::string ElabTaskSeverity(bool is_fatal, bool is_error, bool is_warning) {
+  if (is_fatal) return "FATAL";
+  if (is_error) return "ERROR";
+  if (is_warning) return "WARNING";
+  return "INFO";
+}
+
+// Extract the optional user message: the leading string-literal argument of the
+// message list, with surrounding double quotes stripped.
+std::string ExtractElabTaskUserMsg(const Expr* expr, size_t arg_start) {
+  std::string user_msg;
+  if (arg_start < expr->args.size() &&
+      expr->args[arg_start]->kind == ExprKind::kStringLiteral) {
+    user_msg = std::string(expr->args[arg_start]->text);
+    if (user_msg.size() >= 2 && user_msg.front() == '"' &&
+        user_msg.back() == '"') {
+      user_msg = user_msg.substr(1, user_msg.size() - 2);
+    }
+  }
+  return user_msg;
+}
+
+}  // namespace
+
 void Elaborator::ValidateElabSystemTask(const ModuleItem* item,
                                         const RtlirModule* mod) {
   auto* expr = item->init_expr;
@@ -382,63 +506,14 @@ void Elaborator::ValidateElabSystemTask(const ModuleItem* item,
   bool is_info = name == "$info";
   if (!is_fatal && !is_error && !is_warning && !is_info) return;
 
-  size_t arg_start = 0;
-  if (is_fatal && !expr->args.empty()) {
-    auto* first_arg = expr->args[0];
-    if (first_arg->kind == ExprKind::kIntegerLiteral) {
-      auto val = first_arg->int_val;
-      if (val < 0 || val > 2) {
-        diag_.Error(first_arg->range.start, "finish_number must be 0, 1, or 2");
-      }
-      arg_start = 1;
-    }
-  }
+  size_t arg_start = CheckFatalFinishNumber(expr, is_fatal, diag_);
 
-  // Per §20.10.1, list_of_arguments may only contain a formatting string and
-  // constant expressions, including constant function calls.
   ScopeMap scope = mod ? BuildParamScope(mod) : ScopeMap{};
-  for (size_t i = arg_start; i < expr->args.size(); ++i) {
-    auto* arg = expr->args[i];
-    if (!arg) continue;
-    if (i == arg_start && arg->kind == ExprKind::kStringLiteral) continue;
-    if (arg->kind == ExprKind::kStringLiteral) continue;
-    if (!IsConstantExpr(arg, scope)) {
-      diag_.Error(arg->range.start,
-                  std::format("argument to {} must be a constant expression "
-                              "(§20.10.1)",
-                              name));
-    }
-  }
+  CheckElabTaskArgsConstant(expr, arg_start, name, scope, diag_);
 
-  std::string scope_name = mod ? std::string(mod->name) : std::string{};
-  if (!gen_prefix_.empty()) {
-    std::string trimmed = gen_prefix_;
-    while (!trimmed.empty() && trimmed.back() == '_') trimmed.pop_back();
-    if (!trimmed.empty()) {
-      if (!scope_name.empty()) scope_name.push_back('.');
-      scope_name += trimmed;
-    }
-  }
-
-  std::string severity;
-  if (is_fatal)
-    severity = "FATAL";
-  else if (is_error)
-    severity = "ERROR";
-  else if (is_warning)
-    severity = "WARNING";
-  else
-    severity = "INFO";
-
-  std::string user_msg;
-  if (arg_start < expr->args.size() &&
-      expr->args[arg_start]->kind == ExprKind::kStringLiteral) {
-    user_msg = std::string(expr->args[arg_start]->text);
-    if (user_msg.size() >= 2 && user_msg.front() == '"' &&
-        user_msg.back() == '"') {
-      user_msg = user_msg.substr(1, user_msg.size() - 2);
-    }
-  }
+  std::string scope_name = BuildElabTaskScopeName(mod, gen_prefix_);
+  std::string severity = ElabTaskSeverity(is_fatal, is_error, is_warning);
+  std::string user_msg = ExtractElabTaskUserMsg(expr, arg_start);
 
   std::string message =
       scope_name.empty() ? std::format("elaboration {}: {}", severity, user_msg)

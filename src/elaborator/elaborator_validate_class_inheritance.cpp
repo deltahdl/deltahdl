@@ -674,12 +674,12 @@ static void CollectImplementedInterfaces(const ClassDecl* cls,
   }
 }
 
-static void ValidateMethodNameConflicts(const ClassDecl* cls,
-                                        const CompilationUnit* unit,
-                                        DiagEngine& diag) {
-  IfaceMethodMap iface_methods;
+// Gathers the pure virtual methods contributed by every interface in scope for
+// `cls`, keyed by method name, into `iface_methods`.
+static void CollectInScopeInterfaceMethods(const ClassDecl* cls,
+                                           const CompilationUnit* unit,
+                                           IfaceMethodMap& iface_methods) {
   std::unordered_set<std::string> visited;
-
   if (cls->is_interface) {
     if (!cls->base_class.empty()) {
       const auto* base = FindClassDecl(cls->base_class, unit);
@@ -711,7 +711,13 @@ static void ValidateMethodNameConflicts(const ClassDecl* cls,
                                          visited);
     }
   }
+}
 
+// Reports two interfaces in scope contributing the same method name with
+// incompatible signatures.
+static void DiagnoseInterfaceSignatureConflicts(
+    const ClassDecl* cls, const IfaceMethodMap& iface_methods,
+    DiagEngine& diag) {
   for (const auto& [method_name, entries] : iface_methods) {
     if (entries.size() < 2) continue;
     if (method_name == "pre_randomize" || method_name == "post_randomize")
@@ -729,72 +735,66 @@ static void ValidateMethodNameConflicts(const ClassDecl* cls,
       }
     }
   }
+}
 
-  if (!cls->is_interface) {
-    for (const auto& [method_name, entries] : iface_methods) {
-      const ModuleItem* impl = nullptr;
-      for (const auto* cm : cls->members) {
-        if (cm->kind == ClassMemberKind::kMethod && cm->method &&
-            cm->method->name == method_name &&
-            (cm->is_virtual || cm->is_pure_virtual)) {
-          impl = cm->method;
-          break;
-        }
-      }
-      if (!impl) {
-        for (const auto* walk = cls->base_class.empty()
-                                    ? nullptr
-                                    : FindClassDecl(cls->base_class, unit);
-             walk; walk = walk->base_class.empty()
+// Locates the concrete (virtual) implementation of `method_name` for `cls`,
+// searching the class itself first and then walking the base-class chain.
+static const ModuleItem* FindMethodNameConflictImpl(
+    const ClassDecl* cls, std::string_view method_name,
+    const CompilationUnit* unit) {
+  for (const auto* cm : cls->members) {
+    if (cm->kind == ClassMemberKind::kMethod && cm->method &&
+        cm->method->name == method_name &&
+        (cm->is_virtual || cm->is_pure_virtual)) {
+      return cm->method;
+    }
+  }
+  for (const auto* walk = cls->base_class.empty()
                               ? nullptr
-                              : FindClassDecl(walk->base_class, unit)) {
-          for (const auto* bm : walk->members) {
-            if (bm->kind == ClassMemberKind::kMethod && bm->method &&
-                bm->method->name == method_name && bm->is_virtual) {
-              impl = bm->method;
-              break;
-            }
-          }
-          if (impl) break;
-        }
+                              : FindClassDecl(cls->base_class, unit);
+       walk; walk = walk->base_class.empty()
+                        ? nullptr
+                        : FindClassDecl(walk->base_class, unit)) {
+    for (const auto* bm : walk->members) {
+      if (bm->kind == ClassMemberKind::kMethod && bm->method &&
+          bm->method->name == method_name && bm->is_virtual) {
+        return bm->method;
       }
-      if (!impl) continue;
-      for (const auto& [iface_name, iface_method] : entries) {
-        if (!MethodSignaturesCompatible(impl, iface_method)) {
-          diag.Error(impl->loc,
-                     std::format("method '{}' does not match signature of pure "
-                                 "virtual method '{}' in interface '{}'",
-                                 method_name, method_name, iface_name));
-          break;
-        }
+    }
+  }
+  return nullptr;
+}
+
+// Checks that each implementing method matches the signature of every interface
+// pure virtual method of the same name.
+static void DiagnoseImplSignatureMismatches(const ClassDecl* cls,
+                                            const IfaceMethodMap& iface_methods,
+                                            const CompilationUnit* unit,
+                                            DiagEngine& diag) {
+  for (const auto& [method_name, entries] : iface_methods) {
+    const ModuleItem* impl = FindMethodNameConflictImpl(cls, method_name, unit);
+    if (!impl) continue;
+    for (const auto& [iface_name, iface_method] : entries) {
+      if (!MethodSignaturesCompatible(impl, iface_method)) {
+        diag.Error(impl->loc,
+                   std::format("method '{}' does not match signature of pure "
+                               "virtual method '{}' in interface '{}'",
+                               method_name, method_name, iface_name));
+        break;
       }
     }
   }
 }
 
-static bool HasConcreteVirtualMethodInHierarchy(const ClassDecl* cls,
-                                                std::string_view method_name,
-                                                const CompilationUnit* unit) {
-  for (const auto* cm : cls->members) {
-    if (cm->kind == ClassMemberKind::kMethod && cm->method &&
-        cm->method->name == method_name && cm->is_virtual) {
-      return true;
-    }
+static void ValidateMethodNameConflicts(const ClassDecl* cls,
+                                        const CompilationUnit* unit,
+                                        DiagEngine& diag) {
+  IfaceMethodMap iface_methods;
+  CollectInScopeInterfaceMethods(cls, unit, iface_methods);
+  DiagnoseInterfaceSignatureConflicts(cls, iface_methods, diag);
+  if (!cls->is_interface) {
+    DiagnoseImplSignatureMismatches(cls, iface_methods, unit, diag);
   }
-  if (cls->base_class.empty()) return false;
-  const auto* walk = FindClassDecl(cls->base_class, unit);
-  while (walk) {
-    for (const auto* bm : walk->members) {
-      if (bm->kind == ClassMemberKind::kMethod && bm->method &&
-          bm->method->name == method_name && bm->is_virtual &&
-          !bm->is_pure_virtual) {
-        return true;
-      }
-    }
-    walk = walk->base_class.empty() ? nullptr
-                                    : FindClassDecl(walk->base_class, unit);
-  }
-  return false;
 }
 
 static const ModuleItem* FindConcreteMethodInHierarchy(

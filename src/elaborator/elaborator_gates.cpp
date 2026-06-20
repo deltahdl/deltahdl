@@ -62,23 +62,29 @@ static const char* DisallowedControlVariableKind(const Expr* term,
   return nullptr;
 }
 
-void ValidateBidirectionalSwitchConnections(
-    const ModuleItem* item, const RtlirModule* mod, DiagEngine& diag,
-    const std::unordered_map<std::string_view, std::string_view>&
-        nettype_canonical) {
-  if (!item || item->kind != ModuleItemKind::kGateInst) return;
-  auto kind = item->gate_kind;
-  bool is_bidir = (kind == GateKind::kTran || kind == GateKind::kRtran ||
-                   kind == GateKind::kTranif0 || kind == GateKind::kTranif1 ||
-                   kind == GateKind::kRtranif0 || kind == GateKind::kRtranif1);
-  if (!is_bidir) return;
-  const auto& terms = item->gate_terminals;
-  if (terms.size() < 2) return;
+static bool IsBidirectionalSwitch(GateKind kind) {
+  return (kind == GateKind::kTran || kind == GateKind::kRtran ||
+          kind == GateKind::kTranif0 || kind == GateKind::kTranif1 ||
+          kind == GateKind::kRtranif0 || kind == GateKind::kRtranif1);
+}
 
-  // §6.6.2: a uwire net allows only a single driver, so it shall not be
-  // connected to a bidirectional terminal of a bidirectional pass switch
-  // (which is itself a potential driver). The first two terminals are the
-  // bidirectional ones for every tran/tranif variant.
+static bool IsResistiveBidirectionalSwitch(GateKind kind) {
+  return (kind == GateKind::kRtran || kind == GateKind::kRtranif0 ||
+          kind == GateKind::kRtranif1);
+}
+
+static bool IsControlBidirectionalSwitch(GateKind kind) {
+  return (kind == GateKind::kTranif0 || kind == GateKind::kTranif1 ||
+          kind == GateKind::kRtranif0 || kind == GateKind::kRtranif1);
+}
+
+// §6.6.2: a uwire net allows only a single driver, so it shall not be
+// connected to a bidirectional terminal of a bidirectional pass switch
+// (which is itself a potential driver). The first two terminals are the
+// bidirectional ones for every tran/tranif variant.
+static void CheckBidirUwireTerminals(const ModuleItem* item,
+                                     const RtlirModule* mod, DiagEngine& diag) {
+  const auto& terms = item->gate_terminals;
   for (size_t i = 0; i < 2; ++i) {
     auto* net = TerminalNet(terms[i], mod);
     if (net && net->net_type == NetType::kUwire) {
@@ -87,40 +93,46 @@ void ValidateBidirectionalSwitchConnections(
                  "bidirectional pass switch");
     }
   }
+}
 
-  bool is_resistive =
-      (kind == GateKind::kRtran || kind == GateKind::kRtranif0 ||
-       kind == GateKind::kRtranif1);
-  if (is_resistive) {
-    for (size_t i = 0; i < 2; ++i) {
-      auto* net = TerminalNet(terms[i], mod);
-      if (net && net->is_user_nettype) {
-        diag.Error(item->loc,
-                   "resistive bidirectional pass switch terminal cannot "
-                   "connect to a user-defined net type");
-        continue;
-      }
-      if (!IsScalarNetOrBitSelect(terms[i], mod)) {
-        diag.Error(item->loc,
-                   "resistive bidirectional pass switch terminal must be a "
-                   "scalar net or a bit-select of a vector net");
-      }
-    }
-  }
-
-  bool has_control =
-      (kind == GateKind::kTranif0 || kind == GateKind::kTranif1 ||
-       kind == GateKind::kRtranif0 || kind == GateKind::kRtranif1);
-  if (has_control && terms.size() >= 3) {
-    if (auto* bad = DisallowedControlVariableKind(terms[2], mod)) {
+static void CheckResistiveBidirTerminals(const ModuleItem* item,
+                                         const RtlirModule* mod,
+                                         DiagEngine& diag) {
+  const auto& terms = item->gate_terminals;
+  for (size_t i = 0; i < 2; ++i) {
+    auto* net = TerminalNet(terms[i], mod);
+    if (net && net->is_user_nettype) {
       diag.Error(item->loc,
-                 std::format("control input of pass-enable switch cannot be "
-                             "of type '{}'; expected a 4-state net, 4-state "
-                             "variable, or 2-state variable",
-                             bad));
+                 "resistive bidirectional pass switch terminal cannot "
+                 "connect to a user-defined net type");
+      continue;
+    }
+    if (!IsScalarNetOrBitSelect(terms[i], mod)) {
+      diag.Error(item->loc,
+                 "resistive bidirectional pass switch terminal must be a "
+                 "scalar net or a bit-select of a vector net");
     }
   }
+}
 
+static void CheckBidirControlInputType(const ModuleItem* item,
+                                       const RtlirModule* mod,
+                                       DiagEngine& diag) {
+  const auto& terms = item->gate_terminals;
+  if (auto* bad = DisallowedControlVariableKind(terms[2], mod)) {
+    diag.Error(item->loc,
+               std::format("control input of pass-enable switch cannot be "
+                           "of type '{}'; expected a 4-state net, 4-state "
+                           "variable, or 2-state variable",
+                           bad));
+  }
+}
+
+static void CheckBidirNettypeCompatibility(
+    const ModuleItem* item, const RtlirModule* mod, DiagEngine& diag,
+    const std::unordered_map<std::string_view, std::string_view>&
+        nettype_canonical) {
+  const auto& terms = item->gate_terminals;
   auto* n0 = TerminalNet(terms[0], mod);
   auto* n1 = TerminalNet(terms[1], mod);
   if (!n0 || !n1) return;
@@ -140,6 +152,29 @@ void ValidateBidirectionalSwitchConnections(
                            "different user-defined nettypes ('{}' and '{}')",
                            n0->nettype_name, n1->nettype_name));
   }
+}
+
+void ValidateBidirectionalSwitchConnections(
+    const ModuleItem* item, const RtlirModule* mod, DiagEngine& diag,
+    const std::unordered_map<std::string_view, std::string_view>&
+        nettype_canonical) {
+  if (!item || item->kind != ModuleItemKind::kGateInst) return;
+  auto kind = item->gate_kind;
+  if (!IsBidirectionalSwitch(kind)) return;
+  const auto& terms = item->gate_terminals;
+  if (terms.size() < 2) return;
+
+  CheckBidirUwireTerminals(item, mod, diag);
+
+  if (IsResistiveBidirectionalSwitch(kind)) {
+    CheckResistiveBidirTerminals(item, mod, diag);
+  }
+
+  if (IsControlBidirectionalSwitch(kind) && terms.size() >= 3) {
+    CheckBidirControlInputType(item, mod, diag);
+  }
+
+  CheckBidirNettypeCompatibility(item, mod, diag, nettype_canonical);
 }
 
 static std::vector<size_t> OutputOrInoutTerminalIndices(GateKind kind,
@@ -284,117 +319,117 @@ static Expr* BuildOutputGateExpr(Arena& arena, GateKind kind,
   }
 }
 
-void ElaborateGateInst(ModuleItem* item, RtlirModule* mod, Arena& arena) {
+static void ElaborateBufNotGate(ModuleItem* item, RtlirModule* mod,
+                                Arena& arena) {
   auto kind = item->gate_kind;
   auto& terms = item->gate_terminals;
-  if (terms.empty()) return;
-
-  if (kind == GateKind::kBuf || kind == GateKind::kNot) {
-    if (terms.size() < 2) return;
-    auto* input = terms.back();
-    for (size_t i = 0; i + 1 < terms.size(); ++i) {
-      Expr* rhs = (kind == GateKind::kNot) ? WrapInvert(arena, input) : input;
-      RtlirContAssign ca;
-      ca.lhs = terms[i];
-      ca.rhs = rhs;
-      ca.width = LookupLhsWidth(ca.lhs, mod);
-      ApplyGateDelays(ca, item);
-      mod->assigns.push_back(ca);
-    }
-    return;
-  }
-
-  if (kind == GateKind::kBufif0 || kind == GateKind::kBufif1 ||
-      kind == GateKind::kNotif0 || kind == GateKind::kNotif1) {
-    if (terms.size() != 3) return;
-    auto* data = terms[1];
-    auto* ctrl = terms[2];
-    bool invert = (kind == GateKind::kNotif0 || kind == GateKind::kNotif1);
-    bool conduct_on_one =
-        (kind == GateKind::kBufif1 || kind == GateKind::kNotif1);
-    Expr* pass = invert ? WrapInvert(arena, data) : data;
-    Expr* hi_z = MakeHighZ(arena);
-    Expr* rhs = conduct_on_one ? MakeTernary(arena, ctrl, pass, hi_z)
-                               : MakeTernary(arena, ctrl, hi_z, pass);
+  if (terms.size() < 2) return;
+  auto* input = terms.back();
+  for (size_t i = 0; i + 1 < terms.size(); ++i) {
+    Expr* rhs = (kind == GateKind::kNot) ? WrapInvert(arena, input) : input;
     RtlirContAssign ca;
-    ca.lhs = terms[0];
+    ca.lhs = terms[i];
     ca.rhs = rhs;
     ca.width = LookupLhsWidth(ca.lhs, mod);
     ApplyGateDelays(ca, item);
     mod->assigns.push_back(ca);
-    return;
   }
+}
 
-  if (kind == GateKind::kTran || kind == GateKind::kRtran ||
-      kind == GateKind::kTranif0 || kind == GateKind::kTranif1 ||
-      kind == GateKind::kRtranif0 || kind == GateKind::kRtranif1) {
-    return;
+static void ElaborateBufifNotifGate(ModuleItem* item, RtlirModule* mod,
+                                    Arena& arena) {
+  auto kind = item->gate_kind;
+  auto& terms = item->gate_terminals;
+  if (terms.size() != 3) return;
+  auto* data = terms[1];
+  auto* ctrl = terms[2];
+  bool invert = (kind == GateKind::kNotif0 || kind == GateKind::kNotif1);
+  bool conduct_on_one =
+      (kind == GateKind::kBufif1 || kind == GateKind::kNotif1);
+  Expr* pass = invert ? WrapInvert(arena, data) : data;
+  Expr* hi_z = MakeHighZ(arena);
+  Expr* rhs = conduct_on_one ? MakeTernary(arena, ctrl, pass, hi_z)
+                             : MakeTernary(arena, ctrl, hi_z, pass);
+  RtlirContAssign ca;
+  ca.lhs = terms[0];
+  ca.rhs = rhs;
+  ca.width = LookupLhsWidth(ca.lhs, mod);
+  ApplyGateDelays(ca, item);
+  mod->assigns.push_back(ca);
+}
+
+static void ElaborateMosGate(ModuleItem* item, RtlirModule* mod, Arena& arena) {
+  auto kind = item->gate_kind;
+  auto& terms = item->gate_terminals;
+  if (terms.size() != 3) return;
+  auto* data = terms[1];
+  auto* ctrl = terms[2];
+  bool conduct_on_one = (kind == GateKind::kNmos || kind == GateKind::kRnmos);
+  Expr* hi_z = MakeHighZ(arena);
+  Expr* rhs = conduct_on_one ? MakeTernary(arena, ctrl, data, hi_z)
+                             : MakeTernary(arena, ctrl, hi_z, data);
+  RtlirContAssign ca;
+  ca.lhs = terms[0];
+  ca.rhs = rhs;
+  ca.width = LookupLhsWidth(ca.lhs, mod);
+
+  ca.from_nonresistive_switch =
+      (kind == GateKind::kNmos || kind == GateKind::kPmos);
+  ca.from_resistive_switch =
+      (kind == GateKind::kRnmos || kind == GateKind::kRpmos);
+  if (ca.from_nonresistive_switch || ca.from_resistive_switch) {
+    ca.data_input = data;
   }
+  ApplyGateDelays(ca, item);
+  mod->assigns.push_back(ca);
+}
 
-  if (kind == GateKind::kNmos || kind == GateKind::kPmos ||
-      kind == GateKind::kRnmos || kind == GateKind::kRpmos) {
-    if (terms.size() != 3) return;
-    auto* data = terms[1];
-    auto* ctrl = terms[2];
-    bool conduct_on_one = (kind == GateKind::kNmos || kind == GateKind::kRnmos);
-    Expr* hi_z = MakeHighZ(arena);
-    Expr* rhs = conduct_on_one ? MakeTernary(arena, ctrl, data, hi_z)
-                               : MakeTernary(arena, ctrl, hi_z, data);
-    RtlirContAssign ca;
-    ca.lhs = terms[0];
-    ca.rhs = rhs;
-    ca.width = LookupLhsWidth(ca.lhs, mod);
+static void ElaboratePullGate(ModuleItem* item, RtlirModule* mod,
+                              Arena& arena) {
+  auto kind = item->gate_kind;
+  auto& terms = item->gate_terminals;
+  if (terms.size() != 1) return;
+  bool is_up = (kind == GateKind::kPullup);
+  uint8_t driving = is_up ? item->drive_strength1 : item->drive_strength0;
+  if (driving == 0) driving = 3;
+  RtlirContAssign ca;
+  ca.lhs = terms[0];
+  ca.rhs = MakeIntLiteral(arena, is_up ? 1 : 0);
+  ca.width = LookupLhsWidth(ca.lhs, mod);
+  ca.drive_strength0 = is_up ? 0 : driving;
+  ca.drive_strength1 = is_up ? driving : 0;
+  mod->assigns.push_back(ca);
+}
 
-    ca.from_nonresistive_switch =
-        (kind == GateKind::kNmos || kind == GateKind::kPmos);
-    ca.from_resistive_switch =
-        (kind == GateKind::kRnmos || kind == GateKind::kRpmos);
-    if (ca.from_nonresistive_switch || ca.from_resistive_switch) {
-      ca.data_input = data;
-    }
-    ApplyGateDelays(ca, item);
-    mod->assigns.push_back(ca);
-    return;
+static void ElaborateCmosGate(ModuleItem* item, RtlirModule* mod,
+                              Arena& arena) {
+  auto kind = item->gate_kind;
+  auto& terms = item->gate_terminals;
+  if (terms.size() != 4) return;
+  auto* data = terms[1];
+  auto* nctrl = terms[2];
+  auto* pctrl = terms[3];
+  Expr* hi_z = MakeHighZ(arena);
+  Expr* pmos_branch = MakeTernary(arena, pctrl, hi_z, data);
+  Expr* rhs = MakeTernary(arena, nctrl, data, pmos_branch);
+  RtlirContAssign ca;
+  ca.lhs = terms[0];
+  ca.rhs = rhs;
+  ca.width = LookupLhsWidth(ca.lhs, mod);
+
+  ca.from_nonresistive_switch = (kind == GateKind::kCmos);
+  ca.from_resistive_switch = (kind == GateKind::kRcmos);
+  if (ca.from_nonresistive_switch || ca.from_resistive_switch) {
+    ca.data_input = data;
   }
+  ApplyGateDelays(ca, item);
+  mod->assigns.push_back(ca);
+}
 
-  if (kind == GateKind::kPullup || kind == GateKind::kPulldown) {
-    if (terms.size() != 1) return;
-    bool is_up = (kind == GateKind::kPullup);
-    uint8_t driving = is_up ? item->drive_strength1 : item->drive_strength0;
-    if (driving == 0) driving = 3;
-    RtlirContAssign ca;
-    ca.lhs = terms[0];
-    ca.rhs = MakeIntLiteral(arena, is_up ? 1 : 0);
-    ca.width = LookupLhsWidth(ca.lhs, mod);
-    ca.drive_strength0 = is_up ? 0 : driving;
-    ca.drive_strength1 = is_up ? driving : 0;
-    mod->assigns.push_back(ca);
-    return;
-  }
-
-  if (kind == GateKind::kCmos || kind == GateKind::kRcmos) {
-    if (terms.size() != 4) return;
-    auto* data = terms[1];
-    auto* nctrl = terms[2];
-    auto* pctrl = terms[3];
-    Expr* hi_z = MakeHighZ(arena);
-    Expr* pmos_branch = MakeTernary(arena, pctrl, hi_z, data);
-    Expr* rhs = MakeTernary(arena, nctrl, data, pmos_branch);
-    RtlirContAssign ca;
-    ca.lhs = terms[0];
-    ca.rhs = rhs;
-    ca.width = LookupLhsWidth(ca.lhs, mod);
-
-    ca.from_nonresistive_switch = (kind == GateKind::kCmos);
-    ca.from_resistive_switch = (kind == GateKind::kRcmos);
-    if (ca.from_nonresistive_switch || ca.from_resistive_switch) {
-      ca.data_input = data;
-    }
-    ApplyGateDelays(ca, item);
-    mod->assigns.push_back(ca);
-    return;
-  }
-
+static void ElaborateLogicOrOutputGate(ModuleItem* item, RtlirModule* mod,
+                                       Arena& arena) {
+  auto kind = item->gate_kind;
+  auto& terms = item->gate_terminals;
   Expr* rhs = nullptr;
   switch (kind) {
     case GateKind::kAnd:
@@ -418,6 +453,45 @@ void ElaborateGateInst(ModuleItem* item, RtlirModule* mod, Arena& arena) {
   ca.width = LookupLhsWidth(ca.lhs, mod);
   ApplyGateDelays(ca, item);
   mod->assigns.push_back(ca);
+}
+
+void ElaborateGateInst(ModuleItem* item, RtlirModule* mod, Arena& arena) {
+  auto kind = item->gate_kind;
+  auto& terms = item->gate_terminals;
+  if (terms.empty()) return;
+
+  if (kind == GateKind::kBuf || kind == GateKind::kNot) {
+    ElaborateBufNotGate(item, mod, arena);
+    return;
+  }
+
+  if (kind == GateKind::kBufif0 || kind == GateKind::kBufif1 ||
+      kind == GateKind::kNotif0 || kind == GateKind::kNotif1) {
+    ElaborateBufifNotifGate(item, mod, arena);
+    return;
+  }
+
+  if (IsBidirectionalSwitch(kind)) {
+    return;
+  }
+
+  if (kind == GateKind::kNmos || kind == GateKind::kPmos ||
+      kind == GateKind::kRnmos || kind == GateKind::kRpmos) {
+    ElaborateMosGate(item, mod, arena);
+    return;
+  }
+
+  if (kind == GateKind::kPullup || kind == GateKind::kPulldown) {
+    ElaboratePullGate(item, mod, arena);
+    return;
+  }
+
+  if (kind == GateKind::kCmos || kind == GateKind::kRcmos) {
+    ElaborateCmosGate(item, mod, arena);
+    return;
+  }
+
+  ElaborateLogicOrOutputGate(item, mod, arena);
 }
 
 }  // namespace delta

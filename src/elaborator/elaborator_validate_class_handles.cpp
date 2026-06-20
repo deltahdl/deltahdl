@@ -43,6 +43,19 @@ static bool IsAllowedClassBinaryOp(TokenKind op) {
          op == TokenKind::kEqEqQuestion || op == TokenKind::kBangEqQuestion;
 }
 
+// Returns true when any of *cls*'s directly listed interface types (the
+// implements and extends-interface lists) is itself derived from *b*.
+static bool AnyInterfaceDerivedFrom(const ClassDecl* cls, std::string_view b,
+                                    const CompilationUnit* unit) {
+  for (const auto& iface : cls->implements_types) {
+    if (IsClassDerivedFrom(iface.name, b, unit)) return true;
+  }
+  for (const auto& iface : cls->extends_interfaces) {
+    if (IsClassDerivedFrom(iface.name, b, unit)) return true;
+  }
+  return false;
+}
+
 bool IsClassDerivedFrom(std::string_view a, std::string_view b,
                         const CompilationUnit* unit) {
   if (a == b) return true;
@@ -50,12 +63,7 @@ bool IsClassDerivedFrom(std::string_view a, std::string_view b,
        cls = cls->base_class.empty() ? nullptr
                                      : FindClassDecl(cls->base_class, unit)) {
     if (cls->base_class == b) return true;
-    for (const auto& iface : cls->implements_types) {
-      if (IsClassDerivedFrom(iface.name, b, unit)) return true;
-    }
-    for (const auto& iface : cls->extends_interfaces) {
-      if (IsClassDerivedFrom(iface.name, b, unit)) return true;
-    }
+    if (AnyInterfaceDerivedFrom(cls, b, unit)) return true;
   }
   return false;
 }
@@ -89,6 +97,54 @@ static std::string_view TypedConstructorScopeType(const Expr* rhs) {
   return access->lhs->text;
 }
 
+// Validates the operands of a binary expression that involves at least one
+// class-handle variable: rejects disallowed operators and, for comparisons of
+// two handles, requires assignment-compatible types.
+static void CheckClassHandleBinary(
+    const Expr* e, const std::unordered_set<std::string_view>& class_vars,
+    const std::unordered_map<std::string_view, std::string_view>&
+        class_var_types,
+    const CompilationUnit* unit, DiagEngine& diag) {
+  bool lhs_class = e->lhs && IsClassVar(e->lhs, class_vars);
+  bool rhs_class = e->rhs && IsClassVar(e->rhs, class_vars);
+  if ((lhs_class || rhs_class) && !IsAllowedClassBinaryOp(e->op)) {
+    diag.Error(e->range.start,
+               "operator is not allowed on class object handles");
+  }
+
+  if (lhs_class && rhs_class && IsAllowedClassBinaryOp(e->op)) {
+    auto lhs_name = ExprIdent(e->lhs);
+    auto rhs_name = ExprIdent(e->rhs);
+    auto lt = class_var_types.find(lhs_name);
+    auto rt = class_var_types.find(rhs_name);
+    if (lt != class_var_types.end() && rt != class_var_types.end() &&
+        !AreClassTypesComparable(lt->second, rt->second, unit)) {
+      diag.Error(e->range.start,
+                 "class handle comparison requires assignment compatible "
+                 "types");
+    }
+  }
+}
+
+// Validates a cast expression: a class handle may not be cast to a non-class
+// type, and a non-class value (other than 'null') may not be cast to a class
+// type.
+static void CheckClassHandleCast(
+    const Expr* e, const std::unordered_set<std::string_view>& class_vars,
+    const CompilationUnit* unit, DiagEngine& diag) {
+  if (e->lhs && IsClassVar(e->lhs, class_vars) && !e->text.empty() &&
+      !FindClassDecl(e->text, unit)) {
+    diag.Error(e->range.start,
+               "cannot cast class object handle to a non-class type");
+  }
+
+  if (!e->text.empty() && FindClassDecl(e->text, unit) != nullptr && e->lhs &&
+      !IsClassVar(e->lhs, class_vars) &&
+      (e->lhs->kind != ExprKind::kIdentifier || e->lhs->text != "null")) {
+    diag.Error(e->range.start, "cannot cast non-class value to a class type");
+  }
+}
+
 static void CheckClassHandleExpr(
     const Expr* e, const std::unordered_set<std::string_view>& class_vars,
     const std::unordered_map<std::string_view, std::string_view>&
@@ -97,25 +153,7 @@ static void CheckClassHandleExpr(
   if (!e) return;
 
   if (e->kind == ExprKind::kBinary) {
-    bool lhs_class = e->lhs && IsClassVar(e->lhs, class_vars);
-    bool rhs_class = e->rhs && IsClassVar(e->rhs, class_vars);
-    if ((lhs_class || rhs_class) && !IsAllowedClassBinaryOp(e->op)) {
-      diag.Error(e->range.start,
-                 "operator is not allowed on class object handles");
-    }
-
-    if (lhs_class && rhs_class && IsAllowedClassBinaryOp(e->op)) {
-      auto lhs_name = ExprIdent(e->lhs);
-      auto rhs_name = ExprIdent(e->rhs);
-      auto lt = class_var_types.find(lhs_name);
-      auto rt = class_var_types.find(rhs_name);
-      if (lt != class_var_types.end() && rt != class_var_types.end() &&
-          !AreClassTypesComparable(lt->second, rt->second, unit)) {
-        diag.Error(e->range.start,
-                   "class handle comparison requires assignment compatible "
-                   "types");
-      }
-    }
+    CheckClassHandleBinary(e, class_vars, class_var_types, unit, diag);
   }
 
   if (e->kind == ExprKind::kUnary && IsClassVar(e->lhs, class_vars)) {
@@ -133,17 +171,8 @@ static void CheckClassHandleExpr(
     diag.Error(e->range.start, "bit-select on class object handle is illegal");
   }
 
-  if (e->kind == ExprKind::kCast && e->lhs && IsClassVar(e->lhs, class_vars) &&
-      !e->text.empty() && !FindClassDecl(e->text, unit)) {
-    diag.Error(e->range.start,
-               "cannot cast class object handle to a non-class type");
-  }
-
-  if (e->kind == ExprKind::kCast && !e->text.empty() &&
-      FindClassDecl(e->text, unit) != nullptr && e->lhs &&
-      !IsClassVar(e->lhs, class_vars) &&
-      (e->lhs->kind != ExprKind::kIdentifier || e->lhs->text != "null")) {
-    diag.Error(e->range.start, "cannot cast non-class value to a class type");
+  if (e->kind == ExprKind::kCast) {
+    CheckClassHandleCast(e, class_vars, unit, diag);
   }
 
   CheckClassHandleExpr(e->lhs, class_vars, class_var_types, unit, diag);
@@ -199,6 +228,24 @@ static void CheckInterfaceHandleRandConstraintMode(
                          method_name, var_name));
 }
 
+// Returns true when *cls* or any of its base classes declares a constraint
+// block named *constraint_name*.
+static bool ClassHierarchyHasConstraint(const ClassDecl* cls,
+                                        std::string_view constraint_name,
+                                        const CompilationUnit* unit) {
+  for (const auto* c = cls; c; c = c->base_class.empty()
+                                       ? nullptr
+                                       : FindClassDecl(c->base_class, unit)) {
+    for (const auto* m : c->members) {
+      if (m->kind == ClassMemberKind::kConstraint &&
+          m->name == constraint_name) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 // 18.9: the constraint named in a constraint_mode() call shall be a constraint
 // block that exists in the object's class hierarchy; naming one that does not
 // exist is a compile-time error. This applies only to the named form
@@ -234,22 +281,113 @@ static void CheckNamedConstraintModeExists(
   const auto* cls = FindClassDecl(it->second, unit);
   if (!cls || cls->is_interface) return;
 
-  // Walk the class and its base classes for a constraint block of that name.
-  for (const auto* c = cls; c; c = c->base_class.empty()
-                                       ? nullptr
-                                       : FindClassDecl(c->base_class, unit)) {
-    for (const auto* m : c->members) {
-      if (m->kind == ClassMemberKind::kConstraint &&
-          m->name == constraint_name) {
-        return;
-      }
-    }
-  }
+  if (ClassHierarchyHasConstraint(cls, constraint_name, unit)) return;
 
   diag.Error(prefix->rhs->range.start,
              std::format("constraint '{}' does not exist in the hierarchy of "
                          "class '{}'",
                          constraint_name, it->second));
+}
+
+// Reject a 'new' constructor call assigned to a handle whose declared type
+// cannot be constructed: the built-in 'process' class and interface classes.
+static void CheckNewOnUnconstructibleHandle(
+    const Stmt* s,
+    const std::unordered_map<std::string_view, std::string_view>&
+        class_var_types,
+    const CompilationUnit* unit, DiagEngine& diag) {
+  if (!(s->rhs && s->rhs->kind == ExprKind::kCall && s->rhs->text == "new")) {
+    return;
+  }
+  auto lhs_name = ExprIdent(s->lhs);
+  auto lt = class_var_types.find(lhs_name);
+  if (lt == class_var_types.end()) return;
+  if (lt->second == "process") {
+    diag.Error(s->range.start, "cannot construct a process object with 'new'");
+    return;
+  }
+  const auto* cls = FindClassDecl(lt->second, unit);
+  if (cls && cls->is_interface) {
+    diag.Error(s->range.start,
+               std::format("cannot construct object of interface class '{}'",
+                           cls->name));
+  }
+}
+
+// §8.8: a typed constructor call may name a type different from the assignment
+// target, but that specified type shall be assignment compatible with the
+// target — i.e. the same class or one derived from it. Reject a scope type
+// that is an unrelated class.
+static void CheckTypedConstructorCompatibility(
+    const Stmt* s, const std::unordered_set<std::string_view>& class_names,
+    const std::unordered_map<std::string_view, std::string_view>&
+        class_var_types,
+    const CompilationUnit* unit, DiagEngine& diag) {
+  auto specified = TypedConstructorScopeType(s->rhs);
+  if (specified.empty() || !class_names.count(specified)) return;
+  auto lhs_name = ExprIdent(s->lhs);
+  auto lt = class_var_types.find(lhs_name);
+  if (lt != class_var_types.end() &&
+      !IsClassDerivedFrom(specified, lt->second, unit)) {
+    diag.Error(s->range.start,
+               "typed constructor call type is not assignment compatible "
+               "with the target");
+  }
+}
+
+// Reject assignment of one class handle to another when the source type is not
+// assignment compatible with the target type.
+static void CheckClassHandleAssignCompatibility(
+    const Stmt* s, const std::unordered_set<std::string_view>& class_var_names,
+    const std::unordered_map<std::string_view, std::string_view>&
+        class_var_types,
+    const CompilationUnit* unit, DiagEngine& diag) {
+  if (!(s->rhs && IsClassVar(s->rhs, class_var_names))) return;
+  auto lhs_name = ExprIdent(s->lhs);
+  auto rhs_name = ExprIdent(s->rhs);
+  auto lt = class_var_types.find(lhs_name);
+  auto rt = class_var_types.find(rhs_name);
+  if (lt != class_var_types.end() && rt != class_var_types.end() &&
+      !IsClassDerivedFrom(rt->second, lt->second, unit)) {
+    diag.Error(s->range.start,
+               "class handle assignment requires assignment compatible types");
+  }
+}
+
+// Returns true when *e* is a literal value (integer/real/time/string/unbased
+// unsized) that cannot be assigned to a class object handle.
+static bool IsNonClassLiteral(const Expr* e) {
+  return e && (e->kind == ExprKind::kIntegerLiteral ||
+               e->kind == ExprKind::kRealLiteral ||
+               e->kind == ExprKind::kTimeLiteral ||
+               e->kind == ExprKind::kStringLiteral ||
+               e->kind == ExprKind::kUnbasedUnsizedLiteral);
+}
+
+// Runs every assignment-target check that applies when a blocking/nonblocking
+// assignment writes a class-handle variable.
+static void CheckClassHandleAssignTarget(
+    const Stmt* s, const std::unordered_set<std::string_view>& class_names,
+    const std::unordered_set<std::string_view>& class_var_names,
+    const std::unordered_map<std::string_view, std::string_view>&
+        class_var_types,
+    const CompilationUnit* unit, DiagEngine& diag) {
+  if (s->rhs && s->rhs->kind == ExprKind::kBinary &&
+      IsCompoundAssignOp(s->rhs->op)) {
+    diag.Error(s->range.start,
+               "operator is not allowed on class object handles");
+  }
+
+  CheckNewOnUnconstructibleHandle(s, class_var_types, unit, diag);
+  CheckTypedConstructorCompatibility(s, class_names, class_var_types, unit,
+                                     diag);
+  CheckClassHandleAssignCompatibility(s, class_var_names, class_var_types, unit,
+                                      diag);
+
+  if (IsNonClassLiteral(s->rhs)) {
+    diag.Error(s->range.start,
+               "cannot assign non-class value to class object handle");
+  }
 }
 
 void Elaborator::WalkStmtsForClassHandleOps(const Stmt* s) {
@@ -265,69 +403,8 @@ void Elaborator::WalkStmtsForClassHandleOps(const Stmt* s) {
   if ((s->kind == StmtKind::kBlockingAssign ||
        s->kind == StmtKind::kNonblockingAssign) &&
       s->lhs && IsClassVar(s->lhs, class_var_names_)) {
-    if (s->rhs && s->rhs->kind == ExprKind::kBinary &&
-        IsCompoundAssignOp(s->rhs->op)) {
-      diag_.Error(s->range.start,
-                  "operator is not allowed on class object handles");
-    }
-
-    if (s->rhs && s->rhs->kind == ExprKind::kCall && s->rhs->text == "new") {
-      auto lhs_name = ExprIdent(s->lhs);
-      auto lt = class_var_types_.find(lhs_name);
-      if (lt != class_var_types_.end()) {
-        if (lt->second == "process") {
-          diag_.Error(s->range.start,
-                      "cannot construct a process object with 'new'");
-        } else {
-          const auto* cls = FindClassDecl(lt->second, unit_);
-          if (cls && cls->is_interface) {
-            diag_.Error(
-                s->range.start,
-                std::format("cannot construct object of interface class "
-                            "'{}'",
-                            cls->name));
-          }
-        }
-      }
-    }
-
-    // §8.8: a typed constructor call may name a type different from the
-    // assignment target, but that specified type shall be assignment
-    // compatible with the target — i.e. the same class or one derived from
-    // it. Reject a scope type that is an unrelated class.
-    auto specified = TypedConstructorScopeType(s->rhs);
-    if (!specified.empty() && class_names_.count(specified)) {
-      auto lhs_name = ExprIdent(s->lhs);
-      auto lt = class_var_types_.find(lhs_name);
-      if (lt != class_var_types_.end() &&
-          !IsClassDerivedFrom(specified, lt->second, unit_)) {
-        diag_.Error(s->range.start,
-                    "typed constructor call type is not assignment compatible "
-                    "with the target");
-      }
-    }
-
-    if (s->rhs && IsClassVar(s->rhs, class_var_names_)) {
-      auto lhs_name = ExprIdent(s->lhs);
-      auto rhs_name = ExprIdent(s->rhs);
-      auto lt = class_var_types_.find(lhs_name);
-      auto rt = class_var_types_.find(rhs_name);
-      if (lt != class_var_types_.end() && rt != class_var_types_.end() &&
-          !IsClassDerivedFrom(rt->second, lt->second, unit_)) {
-        diag_.Error(s->range.start,
-                    "class handle assignment requires assignment compatible "
-                    "types");
-      }
-    }
-
-    if (s->rhs && (s->rhs->kind == ExprKind::kIntegerLiteral ||
-                   s->rhs->kind == ExprKind::kRealLiteral ||
-                   s->rhs->kind == ExprKind::kTimeLiteral ||
-                   s->rhs->kind == ExprKind::kStringLiteral ||
-                   s->rhs->kind == ExprKind::kUnbasedUnsizedLiteral)) {
-      diag_.Error(s->range.start,
-                  "cannot assign non-class value to class object handle");
-    }
+    CheckClassHandleAssignTarget(s, class_names_, class_var_names_,
+                                 class_var_types_, unit_, diag_);
   }
 
   if ((s->kind == StmtKind::kBlockingAssign ||

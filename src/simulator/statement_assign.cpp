@@ -100,6 +100,69 @@ Variable* ResolveLhsVariable(const Expr* lhs, SimContext& ctx) {
   return nullptr;
 }
 
+// Checks the tagged-union tag against the field being written. Returns true
+// (with an emitted error) when the write targets a member that does not match
+// the union's current tag; the caller treats that as a handled no-op write.
+static bool TaggedUnionTagMismatch(std::string_view base_name,
+                                   std::string_view field_name,
+                                   SimContext& ctx) {
+  auto tag = ctx.GetVariableTag(base_name);
+  if (tag.empty()) return false;
+  auto top = field_name;
+  auto subdot = top.find('.');
+  if (subdot != std::string_view::npos) top = top.substr(0, subdot);
+  if (tag == top) return false;
+  ctx.GetDiag().Error(
+      {}, "run-time error: assigning member '" + std::string(field_name) +
+              "' of tagged union '" + std::string(base_name) +
+              "' which currently has tag '" + std::string(tag) + "'");
+  return true;
+}
+
+// Writes a packed struct/union member into base_var when field_name names one
+// of info's fields. Returns true when the field was found and written.
+static bool WriteStructFieldBits(Variable* base_var, const StructTypeInfo* info,
+                                 std::string_view field_name,
+                                 const Logic4Vec& rhs_val, Arena& arena) {
+  for (const auto& f : info->fields) {
+    if (f.name != field_name) continue;
+    uint64_t old_val = base_var->value.ToUint64();
+    uint64_t mask =
+        (f.width >= 64) ? ~uint64_t{0} : (uint64_t{1} << f.width) - 1;
+    uint64_t new_bits = (rhs_val.ToUint64() & mask) << f.bit_offset;
+    uint64_t cleared = old_val & ~(mask << f.bit_offset);
+    base_var->value =
+        MakeLogic4VecVal(arena, base_var->value.width, cleared | new_bits);
+    base_var->NotifyWatchers();
+    return true;
+  }
+  return false;
+}
+
+// Writes field_name into the class object referenced by base_var. Returns true
+// when base_var refers to a live class object (the write is always performed in
+// that case).
+static bool WriteClassObjectField(Variable* base_var,
+                                  std::string_view base_name,
+                                  std::string_view field_name,
+                                  const Logic4Vec& rhs_val, SimContext& ctx) {
+  auto handle = base_var->value.ToUint64();
+  auto* obj = ctx.GetClassObject(handle);
+  if (!obj) return false;
+  auto declared = ctx.GetVariableClassType(base_name);
+  if (!declared.empty()) {
+    auto* declared_type = ctx.FindClassType(declared);
+    if (declared_type) {
+      obj->SetPropertyForType(field_name, declared_type, rhs_val);
+      base_var->NotifyWatchers();
+      return true;
+    }
+  }
+  obj->SetProperty(std::string(field_name), rhs_val);
+  base_var->NotifyWatchers();
+  return true;
+}
+
 bool WriteStructField(const Expr* lhs, const Logic4Vec& rhs_val,
                       SimContext& ctx, Arena& arena) {
   std::string name;
@@ -141,54 +204,13 @@ bool WriteStructField(const Expr* lhs, const Logic4Vec& rhs_val,
   if (!base_var) return false;
   auto* info = ctx.GetVariableStructType(base_name);
   if (info) {
-    if (info->is_union) {
-      auto tag = ctx.GetVariableTag(base_name);
-      if (!tag.empty()) {
-        auto top = field_name;
-        auto subdot = top.find('.');
-        if (subdot != std::string_view::npos) top = top.substr(0, subdot);
-        if (tag != top) {
-          ctx.GetDiag().Error(
-              {}, "run-time error: assigning member '" +
-                      std::string(field_name) + "' of tagged union '" +
-                      std::string(base_name) + "' which currently has tag '" +
-                      std::string(tag) + "'");
-          return true;
-        }
-      }
-    }
-    for (const auto& f : info->fields) {
-      if (f.name != field_name) continue;
-      uint64_t old_val = base_var->value.ToUint64();
-      uint64_t mask =
-          (f.width >= 64) ? ~uint64_t{0} : (uint64_t{1} << f.width) - 1;
-      uint64_t new_bits = (rhs_val.ToUint64() & mask) << f.bit_offset;
-      uint64_t cleared = old_val & ~(mask << f.bit_offset);
-      base_var->value =
-          MakeLogic4VecVal(arena, base_var->value.width, cleared | new_bits);
-      base_var->NotifyWatchers();
+    if (info->is_union && TaggedUnionTagMismatch(base_name, field_name, ctx)) {
       return true;
     }
+    if (WriteStructFieldBits(base_var, info, field_name, rhs_val, arena))
+      return true;
   }
-  auto handle = base_var->value.ToUint64();
-  auto* obj = ctx.GetClassObject(handle);
-  if (obj) {
-    auto declared = ctx.GetVariableClassType(base_name);
-    if (!declared.empty()) {
-      auto* declared_type = ctx.FindClassType(declared);
-      if (declared_type) {
-        obj->SetPropertyForType(field_name, declared_type, rhs_val);
-
-        base_var->NotifyWatchers();
-        return true;
-      }
-    }
-    obj->SetProperty(std::string(field_name), rhs_val);
-
-    base_var->NotifyWatchers();
-    return true;
-  }
-  return false;
+  return WriteClassObjectField(base_var, base_name, field_name, rhs_val, ctx);
 }
 
 static void WritePartSelect(Variable* var, uint32_t lo, uint32_t width,
@@ -235,6 +257,52 @@ void WriteBitSelect(Variable* var, const Expr* lhs, const Logic4Vec& rhs_val,
   WritePartSelect(var, lo, w, rhs_val, arena);
 }
 
+// Single-word resize for known (no x/z) values that fit in 64 bits, applying
+// sign extension when the source is signed and being widened.
+static Logic4Vec ResizeNarrowKnown(const Logic4Vec& val, uint32_t target_width,
+                                   Arena& arena) {
+  uint64_t v = val.ToUint64();
+  if (val.is_signed && target_width > val.width && val.width > 0 &&
+      val.width < 64) {
+    uint64_t sign_bit = uint64_t{1} << (val.width - 1);
+    if (v & sign_bit) v |= ~uint64_t{0} << val.width;
+  }
+  return MakeLogic4VecVal(arena, target_width, v);
+}
+
+// Replicates the source MSB across the widened high bits of result when val is
+// signed and being widened past its original width.
+static void SignExtendWideResult(const Logic4Vec& val, uint32_t target_width,
+                                 Logic4Vec& result) {
+  if (!(val.is_signed && target_width > val.width && val.width > 0)) return;
+  uint32_t msb_idx = (val.width - 1) / 64;
+  uint64_t msb_mask = uint64_t{1} << ((val.width - 1) % 64);
+  uint64_t a_fill = (val.words[msb_idx].aval & msb_mask) ? ~uint64_t{0} : 0;
+  uint64_t b_fill = (val.words[msb_idx].bval & msb_mask) ? ~uint64_t{0} : 0;
+  if (!(a_fill || b_fill)) return;
+  uint32_t fill_bit = val.width % 64;
+  if (fill_bit != 0) {
+    uint64_t fill_mask = ~((uint64_t{1} << fill_bit) - 1);
+    result.words[val.width / 64].aval |= a_fill & fill_mask;
+    result.words[val.width / 64].bval |= b_fill & fill_mask;
+  }
+  uint32_t first_full = val.width / 64 + (fill_bit != 0 ? 1 : 0);
+  for (uint32_t i = first_full; i < result.nwords; ++i) {
+    result.words[i].aval = a_fill;
+    result.words[i].bval = b_fill;
+  }
+}
+
+// Clears any bits above target_width in the final (partial) word of result.
+static void MaskHighBits(uint32_t target_width, Logic4Vec& result) {
+  uint32_t last_bit = target_width % 64;
+  if (last_bit == 0) return;
+  uint32_t last_word = (target_width - 1) / 64;
+  uint64_t mask = (uint64_t{1} << last_bit) - 1;
+  result.words[last_word].aval &= mask;
+  result.words[last_word].bval &= mask;
+}
+
 Logic4Vec ResizeToWidth(Logic4Vec val, uint32_t target_width, Arena& arena) {
   if (val.width == target_width || target_width == 0) return val;
 
@@ -242,15 +310,8 @@ Logic4Vec ResizeToWidth(Logic4Vec val, uint32_t target_width, Arena& arena) {
   for (uint32_t i = 0; i < val.nwords && !has_xz; ++i)
     has_xz = val.words[i].bval != 0;
 
-  if (!has_xz && val.width <= 64 && target_width <= 64) {
-    uint64_t v = val.ToUint64();
-    if (val.is_signed && target_width > val.width && val.width > 0 &&
-        val.width < 64) {
-      uint64_t sign_bit = uint64_t{1} << (val.width - 1);
-      if (v & sign_bit) v |= ~uint64_t{0} << val.width;
-    }
-    return MakeLogic4VecVal(arena, target_width, v);
-  }
+  if (!has_xz && val.width <= 64 && target_width <= 64)
+    return ResizeNarrowKnown(val, target_width, arena);
 
   auto result = MakeLogic4Vec(arena, target_width);
   result.is_signed = val.is_signed;
@@ -259,33 +320,8 @@ Logic4Vec ResizeToWidth(Logic4Vec val, uint32_t target_width, Arena& arena) {
     result.words[i].aval = val.words[i].aval;
     result.words[i].bval = val.words[i].bval;
   }
-  if (val.is_signed && target_width > val.width && val.width > 0) {
-    uint32_t msb_idx = (val.width - 1) / 64;
-    uint64_t msb_mask = uint64_t{1} << ((val.width - 1) % 64);
-    uint64_t a_fill = (val.words[msb_idx].aval & msb_mask) ? ~uint64_t{0} : 0;
-    uint64_t b_fill = (val.words[msb_idx].bval & msb_mask) ? ~uint64_t{0} : 0;
-    if (a_fill || b_fill) {
-      uint32_t fill_bit = val.width % 64;
-      if (fill_bit != 0) {
-        uint64_t fill_mask = ~((uint64_t{1} << fill_bit) - 1);
-        result.words[val.width / 64].aval |= a_fill & fill_mask;
-        result.words[val.width / 64].bval |= b_fill & fill_mask;
-      }
-      uint32_t first_full = val.width / 64 + (fill_bit != 0 ? 1 : 0);
-      for (uint32_t i = first_full; i < result.nwords; ++i) {
-        result.words[i].aval = a_fill;
-        result.words[i].bval = b_fill;
-      }
-    }
-  }
-
-  uint32_t last_bit = target_width % 64;
-  if (last_bit != 0) {
-    uint32_t last_word = (target_width - 1) / 64;
-    uint64_t mask = (uint64_t{1} << last_bit) - 1;
-    result.words[last_word].aval &= mask;
-    result.words[last_word].bval &= mask;
-  }
+  SignExtendWideResult(val, target_width, result);
+  MaskHighBits(target_width, result);
   return result;
 }
 
@@ -349,29 +385,48 @@ bool TypeKeyMatchesKind(std::string_view key, DataTypeKind kind) {
   }
 }
 
-static Logic4Vec FindArrayKeyedValue(const Expr* rhs, uint32_t idx,
-                                     uint32_t width, DataTypeKind elem_type,
-                                     SimContext& ctx, Arena& arena) {
+// Finds the pattern element whose explicit integer key equals idx. Returns the
+// matching element index, or rhs->elements.size() when none matches.
+static size_t FindIndexKeyedElement(const Expr* rhs, uint32_t idx) {
   for (size_t i = 0; i < rhs->pattern_keys.size(); ++i) {
     if (i >= rhs->elements.size()) break;
     auto& key = rhs->pattern_keys[i];
     if (key == "default" || IsTypeKeyword(key)) continue;
-    if (static_cast<uint32_t>(std::stoul(std::string(key))) == idx)
-      return EvalExpr(rhs->elements[i], ctx, arena);
+    if (static_cast<uint32_t>(std::stoul(std::string(key))) == idx) return i;
   }
+  return rhs->elements.size();
+}
 
+// Finds the pattern element keyed by a type keyword matching elem_type. Returns
+// the matching element index, or rhs->elements.size() when none matches.
+static size_t FindTypeKeyedElement(const Expr* rhs, DataTypeKind elem_type) {
   for (size_t i = 0; i < rhs->pattern_keys.size(); ++i) {
     if (i >= rhs->elements.size()) break;
     auto& key = rhs->pattern_keys[i];
-    if (IsTypeKeyword(key) && TypeKeyMatchesKind(key, elem_type))
-      return EvalExpr(rhs->elements[i], ctx, arena);
+    if (IsTypeKeyword(key) && TypeKeyMatchesKind(key, elem_type)) return i;
   }
+  return rhs->elements.size();
+}
 
+// Finds the pattern element keyed by "default". Returns the matching element
+// index, or rhs->elements.size() when none matches.
+static size_t FindDefaultKeyedElement(const Expr* rhs) {
   for (size_t i = 0; i < rhs->pattern_keys.size(); ++i) {
     if (i >= rhs->elements.size()) break;
-    if (rhs->pattern_keys[i] == "default")
-      return EvalExpr(rhs->elements[i], ctx, arena);
+    if (rhs->pattern_keys[i] == "default") return i;
   }
+  return rhs->elements.size();
+}
+
+static Logic4Vec FindArrayKeyedValue(const Expr* rhs, uint32_t idx,
+                                     uint32_t width, DataTypeKind elem_type,
+                                     SimContext& ctx, Arena& arena) {
+  size_t match = FindIndexKeyedElement(rhs, idx);
+  if (match >= rhs->elements.size())
+    match = FindTypeKeyedElement(rhs, elem_type);
+  if (match >= rhs->elements.size()) match = FindDefaultKeyedElement(rhs);
+  if (match < rhs->elements.size())
+    return EvalExpr(rhs->elements[match], ctx, arena);
   return MakeLogic4VecVal(arena, width, 0);
 }
 
@@ -456,6 +511,57 @@ static void DistributeConcatToArray(std::string_view arr_name,
   }
 }
 
+// Copies the resizable (queue) source elements into the fixed/dynamic array
+// destination dst named dst_name, element by element.
+static void CopyResizableSourceToArray(std::string_view dst_name,
+                                       const ArrayInfo& dst,
+                                       const QueueObject& src_q,
+                                       uint32_t src_size, SimContext& ctx) {
+  uint32_t n = std::min(dst.size, src_size);
+  for (uint32_t i = 0; i < n; ++i) {
+    uint32_t di =
+        dst.is_descending ? (dst.lo + dst.size - 1 - i) : (dst.lo + i);
+    auto dn = std::string(dst_name) + "[" + std::to_string(di) + "]";
+    auto* dv = ctx.FindVariable(dn);
+    if (dv) {
+      dv->value = src_q.elements[i];
+      dv->NotifyWatchers();
+    }
+  }
+}
+
+// Handles "array = identifier" where the destination names an array. Sets
+// *handled to true and returns true/false matching the caller's return value
+// when the destination is an array; leaves *handled false (fall through) when
+// the destination is not an array.
+static bool TryArrayIdentifierCopy(const Stmt* stmt, SimContext& ctx,
+                                   bool* handled) {
+  *handled = false;
+  auto* dst = ctx.FindArrayInfo(stmt->lhs->text);
+  if (!dst) return false;
+  *handled = true;
+  auto* src = ctx.FindArrayInfo(stmt->rhs->text);
+  auto* src_q = ctx.FindQueue(stmt->rhs->text);
+  bool src_is_aggregate = (src != nullptr) || (src_q != nullptr);
+  if (!src_is_aggregate) return false;
+  bool src_resizable = src_q != nullptr;
+  uint32_t src_size =
+      src_resizable ? static_cast<uint32_t>(src_q->elements.size()) : src->size;
+
+  if (!dst->is_dynamic && !dst->is_queue && src_resizable &&
+      dst->size != src_size) {
+    ctx.GetDiag().Error(
+        {}, "array size mismatch in assignment to fixed-size array");
+    return true;
+  }
+  if (src_resizable) {
+    CopyResizableSourceToArray(stmt->lhs->text, *dst, *src_q, src_size, ctx);
+    return true;
+  }
+  CopyArrayElements(stmt->lhs->text, *dst, stmt->rhs->text, *src, ctx);
+  return true;
+}
+
 bool TryArrayBlockingAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   if (stmt->lhs->kind != ExprKind::kIdentifier) return false;
   if (stmt->rhs && stmt->rhs->kind == ExprKind::kAssignmentPattern) {
@@ -474,42 +580,9 @@ bool TryArrayBlockingAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     }
   }
   if (stmt->rhs->kind == ExprKind::kIdentifier) {
-    auto* dst = ctx.FindArrayInfo(stmt->lhs->text);
-    auto* src = ctx.FindArrayInfo(stmt->rhs->text);
-
-    auto* src_q = ctx.FindQueue(stmt->rhs->text);
-    if (dst) {
-      bool src_is_aggregate = (src != nullptr) || (src_q != nullptr);
-      if (!src_is_aggregate) return false;
-      bool src_resizable = src_q != nullptr;
-      uint32_t src_size = src_resizable
-                              ? static_cast<uint32_t>(src_q->elements.size())
-                              : src->size;
-
-      if (!dst->is_dynamic && !dst->is_queue && src_resizable &&
-          dst->size != src_size) {
-        ctx.GetDiag().Error(
-            {}, "array size mismatch in assignment to fixed-size array");
-        return true;
-      }
-      if (src_resizable) {
-        uint32_t n = std::min(dst->size, src_size);
-        for (uint32_t i = 0; i < n; ++i) {
-          uint32_t di = dst->is_descending ? (dst->lo + dst->size - 1 - i)
-                                           : (dst->lo + i);
-          auto dn =
-              std::string(stmt->lhs->text) + "[" + std::to_string(di) + "]";
-          auto* dv = ctx.FindVariable(dn);
-          if (dv) {
-            dv->value = src_q->elements[i];
-            dv->NotifyWatchers();
-          }
-        }
-        return true;
-      }
-      CopyArrayElements(stmt->lhs->text, *dst, stmt->rhs->text, *src, ctx);
-      return true;
-    }
+    bool handled = false;
+    bool result = TryArrayIdentifierCopy(stmt, ctx, &handled);
+    if (handled) return result;
   }
   return false;
 }

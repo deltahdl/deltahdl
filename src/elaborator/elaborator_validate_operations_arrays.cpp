@@ -69,6 +69,22 @@ void Elaborator::ValidateAssocOperandInExpr(const ModuleDecl* decl) {
   }
 }
 
+namespace {
+// Flags a single assignment-pattern item that names an array-typed identifier,
+// which is illegal as an element of a pattern targeting an unpacked array.
+void CheckArrayPatternIdentElem(
+    const Expr* elem,
+    const std::unordered_map<std::string_view, Elaborator::VarArrayInfo>&
+        var_array_info,
+    DiagEngine& diag) {
+  if (elem->kind == ExprKind::kIdentifier && var_array_info.count(elem->text)) {
+    diag.Error(elem->range.start,
+               "array-typed identifier in assignment pattern targeting "
+               "unpacked array");
+  }
+}
+}  // namespace
+
 void Elaborator::CheckArrayPatternElemTypeInAssign(const Stmt* s) {
   if (!s->lhs || !s->rhs) return;
   if (s->lhs->kind != ExprKind::kIdentifier) return;
@@ -80,18 +96,10 @@ void Elaborator::CheckArrayPatternElemTypeInAssign(const Stmt* s) {
   for (auto* elem : s->rhs->elements) {
     if (elem->kind == ExprKind::kReplicate) {
       for (auto* inner : elem->elements) {
-        if (inner->kind == ExprKind::kIdentifier &&
-            var_array_info_.count(inner->text)) {
-          diag_.Error(inner->range.start,
-                      "array-typed identifier in assignment pattern targeting "
-                      "unpacked array");
-        }
+        CheckArrayPatternIdentElem(inner, var_array_info_, diag_);
       }
-    } else if (elem->kind == ExprKind::kIdentifier &&
-               var_array_info_.count(elem->text)) {
-      diag_.Error(elem->range.start,
-                  "array-typed identifier in assignment pattern targeting "
-                  "unpacked array");
+    } else {
+      CheckArrayPatternIdentElem(elem, var_array_info_, diag_);
     }
   }
 }
@@ -326,18 +334,26 @@ void Elaborator::ValidateUnpackedArrayConcatNesting(const ModuleDecl* decl) {
   }
 }
 
+namespace {
+// Flags any unsized integer literal sitting directly inside a concatenation;
+// such literals lack a self-determined width and are illegal there.
+void CheckConcatElementsForUnsized(const Expr* concat, DiagEngine& diag) {
+  for (auto* elem : concat->elements) {
+    if (elem->kind == ExprKind::kIntegerLiteral) {
+      auto tick = elem->text.find('\'');
+      if (tick == std::string_view::npos || tick == 0) {
+        diag.Error(elem->range.start,
+                   "unsized constant is not allowed in a concatenation");
+      }
+    }
+  }
+}
+}  // namespace
+
 void Elaborator::WalkExprForUnsizedInConcat(const Expr* expr) {
   if (!expr) return;
   if (expr->kind == ExprKind::kConcatenation) {
-    for (auto* elem : expr->elements) {
-      if (elem->kind == ExprKind::kIntegerLiteral) {
-        auto tick = elem->text.find('\'');
-        if (tick == std::string_view::npos || tick == 0) {
-          diag_.Error(elem->range.start,
-                      "unsized constant is not allowed in a concatenation");
-        }
-      }
-    }
+    CheckConcatElementsForUnsized(expr, diag_);
   }
   WalkExprForUnsizedInConcat(expr->lhs);
   WalkExprForUnsizedInConcat(expr->rhs);
@@ -512,23 +528,31 @@ static bool RepeatCountHasXZ(const Expr* e) {
   return false;
 }
 
+namespace {
+// Validates the repeat count of a single replication: it must not contain x/z
+// and, when constant, must not be negative.
+void CheckReplicateRepeatCount(const Expr* replicate, DiagEngine& diag) {
+  const Expr* rc = replicate->repeat_count;
+  if (RepeatCountHasXZ(rc)) {
+    diag.Error(rc->range.start,
+               "replication multiplier shall not contain x or z");
+  } else {
+    auto val = ConstEvalInt(rc);
+    if (val) {
+      if (*val < 0) {
+        diag.Error(rc->range.start,
+                   "replication multiplier shall not be negative");
+      } else if (*val == 0) {
+      }
+    }
+  }
+}
+}  // namespace
+
 void Elaborator::WalkExprForReplicateMultiplier(const Expr* expr) {
   if (!expr) return;
   if (expr->kind == ExprKind::kReplicate) {
-    const Expr* rc = expr->repeat_count;
-    if (RepeatCountHasXZ(rc)) {
-      diag_.Error(rc->range.start,
-                  "replication multiplier shall not contain x or z");
-    } else {
-      auto val = ConstEvalInt(rc);
-      if (val) {
-        if (*val < 0) {
-          diag_.Error(rc->range.start,
-                      "replication multiplier shall not be negative");
-        } else if (*val == 0) {
-        }
-      }
-    }
+    CheckReplicateRepeatCount(expr, diag_);
   }
   WalkExprForReplicateMultiplier(expr->lhs);
   WalkExprForReplicateMultiplier(expr->rhs);
@@ -545,6 +569,34 @@ static bool IsZeroReplicate(const Expr* expr) {
   return val && *val == 0;
 }
 
+static void CheckZeroReplicateStandalone(const Expr* expr, DiagEngine& diag);
+
+// True when a concatenation is non-empty and every operand is a zero
+// replication, which leaves no positive-size operand to host them.
+static bool ConcatIsAllZeroReplicate(const Expr* concat) {
+  if (concat->elements.empty()) return false;
+  for (const auto* elem : concat->elements) {
+    if (!IsZeroReplicate(elem)) return false;
+  }
+  return true;
+}
+
+// Handles the concatenation arm of CheckZeroReplicateStandalone: a
+// concatenation built entirely of zero replications is illegal, and any
+// non-zero-replication operand is recursed into.
+static void CheckZeroReplicateInConcat(const Expr* concat, DiagEngine& diag) {
+  if (ConcatIsAllZeroReplicate(concat)) {
+    diag.Error(concat->range.start,
+               "zero replication shall appear only within a concatenation "
+               "in which at least one operand has a positive size");
+  }
+  for (const auto* elem : concat->elements) {
+    if (!IsZeroReplicate(elem)) {
+      CheckZeroReplicateStandalone(elem, diag);
+    }
+  }
+}
+
 static void CheckZeroReplicateStandalone(const Expr* expr, DiagEngine& diag) {
   if (!expr) return;
   if (IsZeroReplicate(expr)) {
@@ -553,24 +605,7 @@ static void CheckZeroReplicateStandalone(const Expr* expr, DiagEngine& diag) {
                "in which at least one operand has a positive size");
   }
   if (expr->kind == ExprKind::kConcatenation) {
-    bool all_zero = true;
-    for (const auto* elem : expr->elements) {
-      if (!IsZeroReplicate(elem)) {
-        all_zero = false;
-        break;
-      }
-    }
-    if (all_zero && !expr->elements.empty()) {
-      diag.Error(expr->range.start,
-                 "zero replication shall appear only within a concatenation "
-                 "in which at least one operand has a positive size");
-    }
-
-    for (const auto* elem : expr->elements) {
-      if (!IsZeroReplicate(elem)) {
-        CheckZeroReplicateStandalone(elem, diag);
-      }
-    }
+    CheckZeroReplicateInConcat(expr, diag);
     return;
   }
   CheckZeroReplicateStandalone(expr->lhs, diag);

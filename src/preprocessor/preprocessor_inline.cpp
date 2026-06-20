@@ -452,30 +452,41 @@ static std::string_view ExtractModuleName(std::string_view trimmed,
   return rest.substr(0, end);
 }
 
+static bool IsDesignElementStart(std::string_view trimmed) {
+  return trimmed.starts_with("module ") || trimmed.starts_with("program ") ||
+         trimmed.starts_with("interface ") || trimmed.starts_with("checker ") ||
+         trimmed.starts_with("package ") || trimmed.starts_with("primitive ") ||
+         trimmed.starts_with("config ") || trimmed.starts_with("macromodule ");
+}
+
+static bool IsDesignElementEnd(std::string_view trimmed) {
+  return trimmed.find("endmodule") != std::string_view::npos ||
+         trimmed.find("endprogram") != std::string_view::npos ||
+         trimmed.find("endinterface") != std::string_view::npos ||
+         trimmed.find("endchecker") != std::string_view::npos ||
+         trimmed.find("endpackage") != std::string_view::npos ||
+         trimmed.find("endprimitive") != std::string_view::npos ||
+         trimmed.find("endconfig") != std::string_view::npos;
+}
+
+static void TrackCellModuleName(std::string_view trimmed,
+                                std::vector<std::string>& cell_module_names) {
+  if (trimmed.starts_with("module ")) {
+    auto name = ExtractModuleName(trimmed, "module ");
+    if (!name.empty()) cell_module_names.emplace_back(name);
+  } else if (trimmed.starts_with("macromodule ")) {
+    auto name = ExtractModuleName(trimmed, "macromodule ");
+    if (!name.empty()) cell_module_names.emplace_back(name);
+  }
+}
+
 void Preprocessor::TrackDesignElement(std::string_view trimmed) {
-  if (trimmed.starts_with("module ") || trimmed.starts_with("program ") ||
-      trimmed.starts_with("interface ") || trimmed.starts_with("checker ") ||
-      trimmed.starts_with("package ") || trimmed.starts_with("primitive ") ||
-      trimmed.starts_with("config ") || trimmed.starts_with("macromodule ")) {
-    if (in_celldefine_) {
-      if (trimmed.starts_with("module ")) {
-        auto name = ExtractModuleName(trimmed, "module ");
-        if (!name.empty()) cell_module_names_.emplace_back(name);
-      } else if (trimmed.starts_with("macromodule ")) {
-        auto name = ExtractModuleName(trimmed, "macromodule ");
-        if (!name.empty()) cell_module_names_.emplace_back(name);
-      }
-    }
+  if (IsDesignElementStart(trimmed)) {
+    if (in_celldefine_) TrackCellModuleName(trimmed, cell_module_names_);
     ++design_element_depth_;
   }
 
-  if (trimmed.find("endmodule") != std::string_view::npos ||
-      trimmed.find("endprogram") != std::string_view::npos ||
-      trimmed.find("endinterface") != std::string_view::npos ||
-      trimmed.find("endchecker") != std::string_view::npos ||
-      trimmed.find("endpackage") != std::string_view::npos ||
-      trimmed.find("endprimitive") != std::string_view::npos ||
-      trimmed.find("endconfig") != std::string_view::npos) {
+  if (IsDesignElementEnd(trimmed)) {
     if (design_element_depth_ > 0) --design_element_depth_;
   }
 }

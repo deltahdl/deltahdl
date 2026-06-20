@@ -99,14 +99,18 @@ static uint32_t VcdDataTypeSize(VcdDataType type, uint32_t width) {
   return width;
 }
 
-void VcdWriter::RegisterSignal(std::string_view name, uint32_t width,
+// Populate a VcdSignal from the registration arguments, advancing the writer's
+// identifier and port counters as §21.7.4.2 requires (the port identifier code
+// ascends one unit per registration, in module-declaration order).
+static VcdSignal MakeVcdSignal(std::string_view name, uint32_t width,
                                Variable* var, NetType net_type, int32_t msb,
-                               int32_t lsb, VcdDataType data_type) {
+                               int32_t lsb, VcdDataType data_type,
+                               char& next_ident, uint32_t& next_port_id) {
   VcdSignal sig;
   sig.name = name;
   sig.width = width;
   sig.var = var;
-  sig.ident = next_ident_++;
+  sig.ident = next_ident++;
   sig.net_type = net_type;
   sig.data_type = data_type;
   sig.msb = msb;
@@ -114,35 +118,52 @@ void VcdWriter::RegisterSignal(std::string_view name, uint32_t width,
   // §21.7.4.2: the identifier code of a port is an integer that ascends in
   // one-unit increments for each port, in the order found in the module
   // declaration. Each registration is one such port.
-  sig.port_id = next_port_id_++;
+  sig.port_id = next_port_id++;
 
-  if (next_ident_ > '~') next_ident_ = '!';
-  signals_.push_back(sig);
-  if (!ofs_.is_open()) return;
-  if (port_nodes_) {
-    // §21.7.4.2 (Syntax 21-28): $var port <size> <<id> <reference> $end. The
-    // var_type keyword is always port; the size is the declared index range of
-    // a bus or 1 for a single-bit port; the identifier code is the integer
-    // preceded by <. At least one space separates each syntactical element.
-    ofs_ << "$var port ";
-    if (sig.msb >= 0 && sig.lsb >= 0) {
-      ofs_ << "[" << sig.msb << ":" << sig.lsb << "]";
-    } else {
-      ofs_ << "1";
-    }
-    ofs_ << " <" << sig.port_id << " " << name << " $end\n";
-    return;
+  if (next_ident > '~') next_ident = '!';
+  return sig;
+}
+
+// §21.7.4.2 (Syntax 21-28): $var port <size> <<id> <reference> $end. The
+// var_type keyword is always port; the size is the declared index range of a
+// bus or 1 for a single-bit port; the identifier code is the integer preceded
+// by <. At least one space separates each syntactical element.
+static void WritePortVarDecl(std::ofstream& ofs, const VcdSignal& sig,
+                             std::string_view name) {
+  ofs << "$var port ";
+  if (sig.msb >= 0 && sig.lsb >= 0) {
+    ofs << "[" << sig.msb << ":" << sig.lsb << "]";
+  } else {
+    ofs << "1";
   }
-  // §21.7.5 (Table 21-11): a SystemVerilog data type masquerades as a 1364-2005
-  // type. A net keeps the §21.7.2.3 mapping (and a real object dumped through
-  // that path is still detected by its value); a data type uses its table
-  // entry.
+  ofs << " <" << sig.port_id << " " << name << " $end\n";
+}
+
+// §21.7.5 (Table 21-11): a SystemVerilog data type masquerades as a 1364-2005
+// type. A net keeps the §21.7.2.3 mapping (and a real object dumped through
+// that path is still detected by its value); a data type uses its table entry.
+static void WriteVarDecl(std::ofstream& ofs, const VcdSignal& sig,
+                         std::string_view name, uint32_t width) {
   const char* keyword = sig.data_type == VcdDataType::kNet
                             ? VcdVarTypeKeyword(sig)
                             : VcdDataTypeKeyword(sig.data_type);
   uint32_t size = VcdDataTypeSize(sig.data_type, width);
-  ofs_ << "$var " << keyword << " " << size << " " << sig.ident << " " << name
-       << " $end\n";
+  ofs << "$var " << keyword << " " << size << " " << sig.ident << " " << name
+      << " $end\n";
+}
+
+void VcdWriter::RegisterSignal(std::string_view name, uint32_t width,
+                               Variable* var, NetType net_type, int32_t msb,
+                               int32_t lsb, VcdDataType data_type) {
+  VcdSignal sig = MakeVcdSignal(name, width, var, net_type, msb, lsb, data_type,
+                                next_ident_, next_port_id_);
+  signals_.push_back(sig);
+  if (!ofs_.is_open()) return;
+  if (port_nodes_) {
+    WritePortVarDecl(ofs_, sig, name);
+    return;
+  }
+  WriteVarDecl(ofs_, sig, name, width);
 }
 
 void VcdWriter::EndDefinitions() {

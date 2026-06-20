@@ -70,6 +70,80 @@ void Elaborator::ValidateStringConcatLvalue(const ModuleDecl* decl) {
 
 static bool ClassHasHiddenMember(const ClassDecl* cls);
 
+namespace {
+
+// §11.4.14.1: validate a single streaming-concatenation operand for the two
+// statically recognisable illegal cases (a class handle exposing local or
+// protected members, and a non-bit-stream scalar type).
+void CheckStreamingConcatOperand(
+    const Expr* elem, DiagEngine& diag,
+    const std::unordered_map<std::string_view, std::string_view>&
+        class_var_types,
+    const std::unordered_map<std::string_view, DataTypeKind>& var_types,
+    CompilationUnit* unit) {
+  // §11.4.14.1: when a non-null class handle is streamed, its data members
+  // are packed in turn. Streaming a handle whose class exposes local or
+  // protected members is illegal unless those members are accessible at
+  // the streaming operator, approximated here (as in the bit-stream cast
+  // rule of §6.24.3) by allowing only the current instance `this`.
+  if (elem && elem->kind == ExprKind::kIdentifier && elem->text != "this") {
+    auto it = class_var_types.find(elem->text);
+    if (it != class_var_types.end() &&
+        ClassHasHiddenMember(FindClassDecl(it->second, unit))) {
+      diag.Error(elem->range.start,
+                 std::format("class handle '{}' is illegal as a streaming "
+                             "concatenation operand: its class has local "
+                             "or protected members",
+                             elem->text));
+    }
+  }
+  // §11.4.14.1: an operand that is none of a bit-stream type, an unpacked
+  // array, a struct, an untagged union, or a class handle cannot be packed
+  // into the stream; such an operand is skipped and an error is issued. The
+  // statically recognizable non-bit-stream scalar types are the real
+  // family, event, chandle, and virtual interface.
+  if (elem && elem->kind == ExprKind::kIdentifier) {
+    auto vt = var_types.find(elem->text);
+    if (vt != var_types.end()) {
+      auto k = vt->second;
+      if (IsRealType(k) || k == DataTypeKind::kEvent ||
+          k == DataTypeKind::kChandle || k == DataTypeKind::kVirtualInterface) {
+        diag.Error(elem->range.start,
+                   std::format("'{}' is not a bit-stream type and cannot "
+                               "be a streaming concatenation operand",
+                               elem->text));
+      }
+    }
+  }
+}
+
+// §11.4.14.2: a slice_size written as a constant integral expression names
+// the block width used to re-order the generic stream, so its value must be
+// positive; a zero or negative slice size is illegal. A slice_size given as
+// a simple type instead names a block width equal to that type's size,
+// which is inherently positive and therefore exempt from this check. The
+// parser records a bare numeric slice_size as an identifier carrying the
+// literal text, while a non-numeric identifier names a type.
+void CheckStreamingSliceSize(const Expr* slice, DiagEngine& diag) {
+  if (!slice) return;
+  std::optional<int64_t> value;
+  if (slice->kind == ExprKind::kIdentifier) {
+    int64_t parsed = 0;
+    const char* begin = slice->text.data();
+    const char* end = begin + slice->text.size();
+    auto [ptr, ec] = std::from_chars(begin, end, parsed);
+    if (ec == std::errc() && ptr == end) value = parsed;
+  } else {
+    value = ConstEvalInt(slice);
+  }
+  if (value && *value <= 0) {
+    diag.Error(slice->range.start,
+               "streaming slice_size shall be a positive constant");
+  }
+}
+
+}  // namespace
+
 void Elaborator::WalkExprForStreamingContext(const Expr* expr,
                                              bool is_valid_context) {
   if (!expr) return;
@@ -82,67 +156,12 @@ void Elaborator::WalkExprForStreamingContext(const Expr* expr,
     }
 
     for (auto* elem : expr->elements) {
-      // §11.4.14.1: when a non-null class handle is streamed, its data members
-      // are packed in turn. Streaming a handle whose class exposes local or
-      // protected members is illegal unless those members are accessible at
-      // the streaming operator, approximated here (as in the bit-stream cast
-      // rule of §6.24.3) by allowing only the current instance `this`.
-      if (elem && elem->kind == ExprKind::kIdentifier && elem->text != "this") {
-        auto it = class_var_types_.find(elem->text);
-        if (it != class_var_types_.end() &&
-            ClassHasHiddenMember(FindClassDecl(it->second, unit_))) {
-          diag_.Error(elem->range.start,
-                      std::format("class handle '{}' is illegal as a streaming "
-                                  "concatenation operand: its class has local "
-                                  "or protected members",
-                                  elem->text));
-        }
-      }
-      // §11.4.14.1: an operand that is none of a bit-stream type, an unpacked
-      // array, a struct, an untagged union, or a class handle cannot be packed
-      // into the stream; such an operand is skipped and an error is issued. The
-      // statically recognizable non-bit-stream scalar types are the real
-      // family, event, chandle, and virtual interface.
-      if (elem && elem->kind == ExprKind::kIdentifier) {
-        auto vt = var_types_.find(elem->text);
-        if (vt != var_types_.end()) {
-          auto k = vt->second;
-          if (IsRealType(k) || k == DataTypeKind::kEvent ||
-              k == DataTypeKind::kChandle ||
-              k == DataTypeKind::kVirtualInterface) {
-            diag_.Error(elem->range.start,
-                        std::format("'{}' is not a bit-stream type and cannot "
-                                    "be a streaming concatenation operand",
-                                    elem->text));
-          }
-        }
-      }
+      CheckStreamingConcatOperand(elem, diag_, class_var_types_, var_types_,
+                                  unit_);
       WalkExprForStreamingContext(elem, true);
     }
 
-    // §11.4.14.2: a slice_size written as a constant integral expression names
-    // the block width used to re-order the generic stream, so its value must be
-    // positive; a zero or negative slice size is illegal. A slice_size given as
-    // a simple type instead names a block width equal to that type's size,
-    // which is inherently positive and therefore exempt from this check. The
-    // parser records a bare numeric slice_size as an identifier carrying the
-    // literal text, while a non-numeric identifier names a type.
-    if (const Expr* slice = expr->lhs) {
-      std::optional<int64_t> value;
-      if (slice->kind == ExprKind::kIdentifier) {
-        int64_t parsed = 0;
-        const char* begin = slice->text.data();
-        const char* end = begin + slice->text.size();
-        auto [ptr, ec] = std::from_chars(begin, end, parsed);
-        if (ec == std::errc() && ptr == end) value = parsed;
-      } else {
-        value = ConstEvalInt(slice);
-      }
-      if (value && *value <= 0) {
-        diag_.Error(slice->range.start,
-                    "streaming slice_size shall be a positive constant");
-      }
-    }
+    CheckStreamingSliceSize(expr->lhs, diag_);
 
     WalkExprForStreamingContext(expr->lhs, false);
     return;
@@ -248,6 +267,69 @@ static uint32_t CastTargetSimpleWidth(std::string_view t) {
   return 0;
 }
 
+namespace {
+
+// §6.24.3: a class handle whose class exposes local or protected members is an
+// illegal bit-stream-cast source, except for the current instance `this` and
+// when the destination is itself a class type. Returns true if the operand was
+// flagged (the caller must then stop checking this cast).
+bool CheckBitStreamCastClassSource(
+    const Expr* expr, std::string_view target, DiagEngine& diag,
+    const std::unordered_set<std::string_view>& class_names,
+    const std::unordered_map<std::string_view, std::string_view>&
+        class_var_types,
+    CompilationUnit* unit) {
+  if (expr->lhs && expr->lhs->kind == ExprKind::kIdentifier &&
+      expr->lhs->text != "this" && class_names.count(target) == 0) {
+    auto it = class_var_types.find(expr->lhs->text);
+    if (it != class_var_types.end()) {
+      const auto* cls = FindClassDecl(it->second, unit);
+      if (ClassHasHiddenMember(cls)) {
+        diag.Error(expr->range.start,
+                   std::format("class handle '{}' is illegal as a bit-stream "
+                               "cast source: its class has local or "
+                               "protected members",
+                               expr->lhs->text));
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+// §6.24.3: when both source and destination are fixed-size types of different
+// sizes and either is unpacked, the cast generates a compile-time error. This
+// handles the case where the operand is a fixed-size unpacked-array variable.
+void CheckBitStreamCastUnpackedOperand(
+    const Expr* expr, std::string_view target, DiagEngine& diag,
+    const std::unordered_map<std::string_view, Elaborator::VarArrayInfo>&
+        var_array_info,
+    const TypedefMap& typedefs) {
+  if (expr->lhs->kind != ExprKind::kIdentifier) return;
+  auto src_name = expr->lhs->text;
+  auto var_it = var_array_info.find(src_name);
+  if (var_it == var_array_info.end()) return;
+  const auto& info = var_it->second;
+  if (info.is_dynamic || info.is_assoc) return;
+  if (info.unpacked_size == 0 || info.elem_width == 0) return;
+  uint32_t src_width = info.unpacked_size * info.elem_width;
+
+  uint32_t dst_width = CastTargetSimpleWidth(target);
+  if (dst_width == 0) {
+    auto td = typedefs.find(target);
+    if (td != typedefs.end()) dst_width = EvalTypeWidth(td->second, typedefs);
+  }
+  if (dst_width == 0) return;
+  if (src_width == dst_width) return;
+  diag.Error(expr->range.start,
+             std::format("bit-stream cast between fixed-size types of "
+                         "different sizes ({} bits to {} bits) with an "
+                         "unpacked operand is illegal",
+                         src_width, dst_width));
+}
+
+}  // namespace
+
 void Elaborator::CheckBitStreamCastExpr(const Expr* expr) {
   if (!expr || expr->kind != ExprKind::kCast) return;
   auto target = expr->text;
@@ -267,20 +349,9 @@ void Elaborator::CheckBitStreamCastExpr(const Expr* expr) {
   // shall be illegal as a source type, except when the handle is the current
   // instance `this`. The rule applies to a bit-stream cast, i.e., when the
   // destination is not itself a class type.
-  if (expr->lhs && expr->lhs->kind == ExprKind::kIdentifier &&
-      expr->lhs->text != "this" && class_names_.count(target) == 0) {
-    auto it = class_var_types_.find(expr->lhs->text);
-    if (it != class_var_types_.end()) {
-      const auto* cls = FindClassDecl(it->second, unit_);
-      if (ClassHasHiddenMember(cls)) {
-        diag_.Error(expr->range.start,
-                    std::format("class handle '{}' is illegal as a bit-stream "
-                                "cast source: its class has local or "
-                                "protected members",
-                                expr->lhs->text));
-        return;
-      }
-    }
+  if (CheckBitStreamCastClassSource(expr, target, diag_, class_names_,
+                                    class_var_types_, unit_)) {
+    return;
   }
 
   // §6.24.3: when both source and destination are fixed-size types of
@@ -303,27 +374,8 @@ void Elaborator::CheckBitStreamCastExpr(const Expr* expr) {
     }
   }
 
-  if (expr->lhs->kind != ExprKind::kIdentifier) return;
-  auto src_name = expr->lhs->text;
-  auto var_it = var_array_info_.find(src_name);
-  if (var_it == var_array_info_.end()) return;
-  const auto& info = var_it->second;
-  if (info.is_dynamic || info.is_assoc) return;
-  if (info.unpacked_size == 0 || info.elem_width == 0) return;
-  uint32_t src_width = info.unpacked_size * info.elem_width;
-
-  uint32_t dst_width = CastTargetSimpleWidth(target);
-  if (dst_width == 0) {
-    auto td = typedefs_.find(target);
-    if (td != typedefs_.end()) dst_width = EvalTypeWidth(td->second, typedefs_);
-  }
-  if (dst_width == 0) return;
-  if (src_width == dst_width) return;
-  diag_.Error(expr->range.start,
-              std::format("bit-stream cast between fixed-size types of "
-                          "different sizes ({} bits to {} bits) with an "
-                          "unpacked operand is illegal",
-                          src_width, dst_width));
+  CheckBitStreamCastUnpackedOperand(expr, target, diag_, var_array_info_,
+                                    typedefs_);
 }
 
 void Elaborator::WalkExprForBitStreamCast(const Expr* expr) {

@@ -121,6 +121,63 @@ bool GlobMatchSegments(const std::vector<std::string_view>& pat_segs, size_t pi,
   return GlobMatchSegments(pat_segs, pi + 1, path_segs, si + 1);
 }
 
+bool StackContainsPath(const std::vector<std::filesystem::path>& stack,
+                       const std::filesystem::path& canon,
+                       std::vector<std::string>* errors) {
+  for (const auto& p : stack) {
+    if (p == canon) {
+      if (errors) {
+        errors->push_back("library map cycle including " + canon.string());
+      }
+      return true;
+    }
+  }
+  return false;
+}
+
+bool ReadFileContent(const std::filesystem::path& canon, std::string& content,
+                     std::vector<std::string>* errors) {
+  std::ifstream ifs(canon);
+  if (!ifs.good()) {
+    if (errors) {
+      errors->push_back("cannot open library map file " + canon.string());
+    }
+    return false;
+  }
+  std::ostringstream buf;
+  buf << ifs.rdbuf();
+  content = buf.str();
+  return true;
+}
+
+CompilationUnit* ParseLibraryMapContent(const std::filesystem::path& canon,
+                                        std::string content, Arena& arena,
+                                        std::vector<std::string>* errors) {
+  SourceManager mgr;
+  DiagEngine diag(mgr);
+  uint32_t fid = mgr.AddFile(canon.string(), std::move(content));
+  Lexer lexer(mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, arena, diag);
+  auto* cu = parser.ParseLibraryText();
+
+  if (diag.HasErrors() || cu == nullptr) {
+    if (errors) {
+      errors->push_back("parse errors in library map file " + canon.string());
+    }
+    return nullptr;
+  }
+  return cu;
+}
+
+std::filesystem::path ResolveIncludePath(std::string_view file_path,
+                                         const std::filesystem::path& canon) {
+  std::filesystem::path inc_path{std::string{file_path}};
+  if (inc_path.is_relative()) {
+    inc_path = canon.parent_path() / inc_path;
+  }
+  return inc_path;
+}
+
 }  // namespace
 
 std::string LibraryMap::ResolveSpec(std::string_view spec,
@@ -265,40 +322,14 @@ bool LibraryMap::LoadMapFileImpl(const std::filesystem::path& map_file,
   fs::path canon = fs::weakly_canonical(map_file, ec);
   if (ec) canon = map_file;
 
-  for (const auto& p : stack) {
-    if (p == canon) {
-      if (errors) {
-        errors->push_back("library map cycle including " + canon.string());
-      }
-      return false;
-    }
-  }
+  if (StackContainsPath(stack, canon, errors)) return false;
 
-  std::ifstream ifs(canon);
-  if (!ifs.good()) {
-    if (errors) {
-      errors->push_back("cannot open library map file " + canon.string());
-    }
-    return false;
-  }
-  std::ostringstream buf;
-  buf << ifs.rdbuf();
-  std::string content = buf.str();
+  std::string content;
+  if (!ReadFileContent(canon, content, errors)) return false;
 
-  SourceManager mgr;
   Arena arena;
-  DiagEngine diag(mgr);
-  uint32_t fid = mgr.AddFile(canon.string(), std::move(content));
-  Lexer lexer(mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, arena, diag);
-  auto* cu = parser.ParseLibraryText();
-
-  if (diag.HasErrors() || cu == nullptr) {
-    if (errors) {
-      errors->push_back("parse errors in library map file " + canon.string());
-    }
-    return false;
-  }
+  auto* cu = ParseLibraryMapContent(canon, std::move(content), arena, errors);
+  if (cu == nullptr) return false;
 
   std::string base_dir = canon.parent_path().string();
   for (auto* lib_decl : cu->libraries) {
@@ -312,10 +343,7 @@ bool LibraryMap::LoadMapFileImpl(const std::filesystem::path& map_file,
       ok = false;
       continue;
     }
-    fs::path inc_path(std::string{inc->file_path});
-    if (inc_path.is_relative()) {
-      inc_path = canon.parent_path() / inc_path;
-    }
+    fs::path inc_path = ResolveIncludePath(inc->file_path, canon);
     if (!LoadMapFileImpl(inc_path, stack, errors)) ok = false;
   }
   stack.pop_back();

@@ -82,31 +82,23 @@ void Elaborator::ValidateContAssignDriveStrength(ModuleItem* item,
   }
 }
 
-void Elaborator::ElaborateContAssign(ModuleItem* item, RtlirModule* mod) {
-  if (item->assign_lhs && item->assign_lhs->kind == ExprKind::kIdentifier) {
-    ValidateContAssignIdentLhs(item, mod);
+namespace {
 
-    bool is_var_target = net_names_.count(item->assign_lhs->text) == 0;
-    if (is_var_target) {
-      if (item->drive_strength0 != 0 || item->drive_strength1 != 0) {
-        diag_.Error(item->loc,
-                    "drive strength not allowed on continuous assignment "
-                    "to a variable");
-      }
-      if (item->assign_delay_fall || item->assign_delay_decay) {
-        diag_.Error(item->loc,
-                    "multiple delays not allowed on continuous assignment "
-                    "to a variable");
-      }
-    }
+void ValidateContAssignVarTarget(ModuleItem* item, DiagEngine& diag) {
+  if (item->drive_strength0 != 0 || item->drive_strength1 != 0) {
+    diag.Error(item->loc,
+               "drive strength not allowed on continuous assignment "
+               "to a variable");
   }
-  if (item->assign_lhs) {
-    ValidateContAssignNettypeAndDelay(item);
+  if (item->assign_delay_fall || item->assign_delay_decay) {
+    diag.Error(item->loc,
+               "multiple delays not allowed on continuous assignment "
+               "to a variable");
   }
-  if ((item->drive_strength0 != 0 || item->drive_strength1 != 0) &&
-      item->assign_lhs) {
-    ValidateContAssignDriveStrength(item, mod);
-  }
+}
+
+RtlirContAssign BuildContAssign(ModuleItem* item, RtlirModule* mod,
+                                DiagEngine& diag) {
   RtlirContAssign ca;
   ca.lhs = item->assign_lhs;
   ca.rhs = item->assign_rhs;
@@ -116,9 +108,29 @@ void Elaborator::ElaborateContAssign(ModuleItem* item, RtlirModule* mod) {
   ca.delay = item->assign_delay;
   ca.delay_fall = item->assign_delay_fall;
   ca.delay_decay = item->assign_delay_decay;
+  ca.attrs = ResolveAttributes(item->attrs, diag);
+  return ca;
+}
 
-  ca.attrs = ResolveAttributes(item->attrs, diag_);
-  mod->assigns.push_back(ca);
+}  // namespace
+
+void Elaborator::ElaborateContAssign(ModuleItem* item, RtlirModule* mod) {
+  if (item->assign_lhs && item->assign_lhs->kind == ExprKind::kIdentifier) {
+    ValidateContAssignIdentLhs(item, mod);
+
+    bool is_var_target = net_names_.count(item->assign_lhs->text) == 0;
+    if (is_var_target) {
+      ValidateContAssignVarTarget(item, diag_);
+    }
+  }
+  if (item->assign_lhs) {
+    ValidateContAssignNettypeAndDelay(item);
+  }
+  if ((item->drive_strength0 != 0 || item->drive_strength1 != 0) &&
+      item->assign_lhs) {
+    ValidateContAssignDriveStrength(item, mod);
+  }
+  mod->assigns.push_back(BuildContAssign(item, mod, diag_));
 }
 
 }  // namespace delta

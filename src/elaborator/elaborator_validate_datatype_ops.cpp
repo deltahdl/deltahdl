@@ -235,6 +235,87 @@ static void CheckVirtualInterfaceExpr(const Expr* e, const TypeMap& types,
   }
 }
 
+using ViStringMap = std::unordered_map<std::string_view, std::string_view>;
+using ViParamMap = std::unordered_map<std::string_view, std::vector<int64_t>>;
+
+// §25.9: two virtual interfaces are of the same type, and hence assignment
+// compatible, only when their interface types, modports, and actual parameter
+// values all match.
+static void CheckViToViAssign(std::string_view lhs_name,
+                              std::string_view rhs_name,
+                              const ViStringMap& vi_var_interface_types,
+                              const ViStringMap& vi_var_modports,
+                              const ViParamMap& vi_var_param_values,
+                              SourceLoc loc, DiagEngine& diag) {
+  auto lit = vi_var_interface_types.find(lhs_name);
+  auto rit = vi_var_interface_types.find(rhs_name);
+  if (lit != vi_var_interface_types.end() &&
+      rit != vi_var_interface_types.end() && lit->second != rit->second) {
+    diag.Error(loc,
+               "virtual interface assignment between incompatible "
+               "interface types");
+  }
+  auto lmp = vi_var_modports.find(lhs_name);
+  auto rmp = vi_var_modports.find(rhs_name);
+  bool lhs_has_mp = lmp != vi_var_modports.end() && !lmp->second.empty();
+  bool rhs_has_mp = rmp != vi_var_modports.end() && !rmp->second.empty();
+  if (!lhs_has_mp && rhs_has_mp) {
+    diag.Error(loc,
+               "virtual interface with modport cannot be assigned to "
+               "virtual interface without modport");
+  } else if (lhs_has_mp && rhs_has_mp && lmp->second != rmp->second) {
+    diag.Error(loc, "virtual interface modports do not match");
+  }
+  // §25.9: the actual parameter values shall match for two virtual
+  // interfaces to be of the same type and assignment compatible.
+  auto lpv = vi_var_param_values.find(lhs_name);
+  auto rpv = vi_var_param_values.find(rhs_name);
+  if (lpv != vi_var_param_values.end() && rpv != vi_var_param_values.end() &&
+      lpv->second != rpv->second) {
+    diag.Error(loc, "virtual interface parameter values do not match");
+  }
+}
+
+// §25.9: assigning an interface instance to a virtual interface requires
+// matching interface type and actual parameter values, and is forbidden when a
+// defparam declared outside the interface targets that instance.
+static void CheckViFromInstanceAssign(
+    std::string_view lhs_name, std::string_view rhs_name,
+    const ViStringMap& vi_var_interface_types,
+    const ViStringMap& interface_inst_types,
+    const ViParamMap& vi_var_param_values,
+    const ViParamMap& interface_inst_param_values,
+    const std::unordered_set<std::string_view>& vi_external_defparam_insts,
+    SourceLoc loc, DiagEngine& diag) {
+  auto lit = vi_var_interface_types.find(lhs_name);
+  auto iit = interface_inst_types.find(rhs_name);
+  if (lit != vi_var_interface_types.end() &&
+      iit != interface_inst_types.end() && lit->second != iit->second) {
+    diag.Error(loc,
+               "virtual interface assignment from interface instance of "
+               "incompatible type");
+  }
+  // §25.9: the actual parameter values of the interface instance shall
+  // match those of the virtual interface.
+  auto lpv = vi_var_param_values.find(lhs_name);
+  auto ipv = interface_inst_param_values.find(rhs_name);
+  if (lpv != vi_var_param_values.end() &&
+      ipv != interface_inst_param_values.end() && lpv->second != ipv->second) {
+    diag.Error(loc,
+               "virtual interface parameter values do not match the "
+               "interface instance");
+  }
+  // §25.9: it is illegal to assign an interface instance to a virtual
+  // interface when a defparam targeting that instance is declared outside
+  // the interface.
+  if (vi_external_defparam_insts.count(rhs_name)) {
+    diag.Error(loc,
+               "interface instance targeted by a defparam declared "
+               "outside the interface cannot be assigned to a virtual "
+               "interface");
+  }
+}
+
 void Elaborator::WalkStmtsForVirtualInterfaceOps(const Stmt* s) {
   if (!s) return;
   if ((s->kind == StmtKind::kBlockingAssign ||
@@ -251,66 +332,16 @@ void Elaborator::WalkStmtsForVirtualInterfaceOps(const Stmt* s) {
                   "virtual interface, an interface instance, or null");
     }
     if (lhs_vi && rhs_vi) {
-      auto lhs_name = ExprIdent(s->lhs);
-      auto lit = vi_var_interface_types_.find(lhs_name);
-      auto rit = vi_var_interface_types_.find(rhs_name);
-      if (lit != vi_var_interface_types_.end() &&
-          rit != vi_var_interface_types_.end() && lit->second != rit->second) {
-        diag_.Error(s->range.start,
-                    "virtual interface assignment between incompatible "
-                    "interface types");
-      }
-      auto lmp = vi_var_modports_.find(lhs_name);
-      auto rmp = vi_var_modports_.find(rhs_name);
-      bool lhs_has_mp = lmp != vi_var_modports_.end() && !lmp->second.empty();
-      bool rhs_has_mp = rmp != vi_var_modports_.end() && !rmp->second.empty();
-      if (!lhs_has_mp && rhs_has_mp) {
-        diag_.Error(s->range.start,
-                    "virtual interface with modport cannot be assigned to "
-                    "virtual interface without modport");
-      } else if (lhs_has_mp && rhs_has_mp && lmp->second != rmp->second) {
-        diag_.Error(s->range.start, "virtual interface modports do not match");
-      }
-      // §25.9: the actual parameter values shall match for two virtual
-      // interfaces to be of the same type and assignment compatible.
-      auto lpv = vi_var_param_values_.find(lhs_name);
-      auto rpv = vi_var_param_values_.find(rhs_name);
-      if (lpv != vi_var_param_values_.end() &&
-          rpv != vi_var_param_values_.end() && lpv->second != rpv->second) {
-        diag_.Error(s->range.start,
-                    "virtual interface parameter values do not match");
-      }
+      CheckViToViAssign(ExprIdent(s->lhs), rhs_name, vi_var_interface_types_,
+                        vi_var_modports_, vi_var_param_values_, s->range.start,
+                        diag_);
     }
     if (lhs_vi && rhs_is_iface_inst) {
-      auto lhs_name = ExprIdent(s->lhs);
-      auto lit = vi_var_interface_types_.find(lhs_name);
-      auto iit = interface_inst_types_.find(rhs_name);
-      if (lit != vi_var_interface_types_.end() &&
-          iit != interface_inst_types_.end() && lit->second != iit->second) {
-        diag_.Error(s->range.start,
-                    "virtual interface assignment from interface instance of "
-                    "incompatible type");
-      }
-      // §25.9: the actual parameter values of the interface instance shall
-      // match those of the virtual interface.
-      auto lpv = vi_var_param_values_.find(lhs_name);
-      auto ipv = interface_inst_param_values_.find(rhs_name);
-      if (lpv != vi_var_param_values_.end() &&
-          ipv != interface_inst_param_values_.end() &&
-          lpv->second != ipv->second) {
-        diag_.Error(s->range.start,
-                    "virtual interface parameter values do not match the "
-                    "interface instance");
-      }
-      // §25.9: it is illegal to assign an interface instance to a virtual
-      // interface when a defparam targeting that instance is declared outside
-      // the interface.
-      if (vi_external_defparam_insts_.count(rhs_name)) {
-        diag_.Error(s->range.start,
-                    "interface instance targeted by a defparam declared "
-                    "outside the interface cannot be assigned to a virtual "
-                    "interface");
-      }
+      CheckViFromInstanceAssign(
+          ExprIdent(s->lhs), rhs_name, vi_var_interface_types_,
+          interface_inst_types_, vi_var_param_values_,
+          interface_inst_param_values_, vi_external_defparam_insts_,
+          s->range.start, diag_);
     }
     if (!lhs_vi && rhs_vi) {
       diag_.Error(s->range.start,
@@ -329,28 +360,35 @@ void Elaborator::WalkStmtsForVirtualInterfaceOps(const Stmt* s) {
   for (auto& ci : s->case_items) WalkStmtsForVirtualInterfaceOps(ci.body);
 }
 
-void Elaborator::ValidateVirtualInterfaceOps(const ModuleDecl* decl) {
-  bool has_vi = false;
-  for (const auto& [name, kind] : var_types_) {
-    if (kind == DataTypeKind::kVirtualInterface) {
-      has_vi = true;
-      break;
-    }
+static bool ScopeHasVirtualInterfaceVar(const TypeMap& types) {
+  for (const auto& [name, kind] : types) {
+    if (kind == DataTypeKind::kVirtualInterface) return true;
   }
-  if (!has_vi) return;
-  // §25.9: a defparam declared in this scope (i.e. outside the interface)
-  // targeting an interface instance taints that instance for assignment to a
-  // virtual interface.
-  vi_external_defparam_insts_.clear();
+  return false;
+}
+
+// §25.9: a defparam declared in this scope (i.e. outside the interface)
+// targeting an interface instance taints that instance for assignment to a
+// virtual interface.
+static void CollectExternalDefparamInsts(
+    const ModuleDecl* decl, const ViStringMap& interface_inst_types,
+    std::unordered_set<std::string_view>& vi_external_defparam_insts) {
+  vi_external_defparam_insts.clear();
   for (const auto* item : decl->items) {
     if (item->kind != ModuleItemKind::kDefparam) continue;
     for (const auto& assign : item->defparam_assigns) {
       auto root = ReferenceRootName(assign.first);
-      if (!root.empty() && interface_inst_types_.count(root)) {
-        vi_external_defparam_insts_.insert(root);
+      if (!root.empty() && interface_inst_types.count(root)) {
+        vi_external_defparam_insts.insert(root);
       }
     }
   }
+}
+
+void Elaborator::ValidateVirtualInterfaceOps(const ModuleDecl* decl) {
+  if (!ScopeHasVirtualInterfaceVar(var_types_)) return;
+  CollectExternalDefparamInsts(decl, interface_inst_types_,
+                               vi_external_defparam_insts_);
   for (const auto* item : decl->items) {
     bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
                    item->kind == ModuleItemKind::kInitialBlock;

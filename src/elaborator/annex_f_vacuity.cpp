@@ -173,6 +173,52 @@ bool NonVacuousAbortShape(const Word& word, const BooleanExpr& boolean,
       });
 }
 
+// §F.5.3.3: w |=^non R |-> P iff there exists i >= 0 such that w^{0,i} |= R
+// (tight satisfaction of the sequence trigger) and w^{i.} |=^non P. Unlike
+// §F.5.3.1's neutral implication, the trigger is measured on w itself, not on
+// w-bar.
+bool NonVacuousImplication(const Word& word, const PropertyExpr& property) {
+  if (!property.sequence || !property.lhs) {
+    return false;
+  }
+  for (std::size_t i = 0; i < word.size(); ++i) {
+    if (TightlySatisfies(PrefixInclusive(word, i), *property.sequence) &&
+        NonVacuous(Suffix(word, i), *property.lhs)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// §F.5.3.3: w |=^non ( P1 until P2 ) iff there exists 0 <= i < |w| with
+// ( w^{i.} |=^non P1 or w^{i.} |=^non P2 ) and, for all 0 <= j < i,
+// w^{j.} |= ( P1 and not P2 ) under neutral satisfaction.
+bool NonVacuousUntil(const Word& word, const PropertyExpr& property) {
+  if (!property.lhs || !property.rhs) {
+    return false;
+  }
+  const std::shared_ptr<const PropertyExpr> kGuard =
+      PropAnd(property.lhs, PropNot(property.rhs));
+  for (std::size_t i = 0; i < word.size(); ++i) {
+    const Word kSuffixI = Suffix(word, i);
+    if (!NonVacuous(kSuffixI, *property.lhs) &&
+        !NonVacuous(kSuffixI, *property.rhs)) {
+      continue;
+    }
+    bool prefix_holds = true;
+    for (std::size_t j = 0; j < i; ++j) {
+      if (!NeutrallySatisfies(Suffix(word, j), *kGuard)) {
+        prefix_holds = false;
+        break;
+      }
+    }
+    if (prefix_holds) {
+      return true;
+    }
+  }
+  return false;
+}
+
 bool NonVacuous(const Word& word, const PropertyExpr& property) {
   switch (property.kind) {
     case PropertyExpr::Kind::kStrong:
@@ -186,22 +232,8 @@ bool NonVacuous(const Word& word, const PropertyExpr& property) {
     case PropertyExpr::Kind::kNot:
       // §F.5.3.3: w |=^non not P iff w-bar |=^non P.
       return property.lhs && NonVacuous(ComplementWord(word), *property.lhs);
-    case PropertyExpr::Kind::kImplication: {
-      // §F.5.3.3: w |=^non R |-> P iff there exists i >= 0 such that
-      // w^{0,i} |= R (tight satisfaction of the sequence trigger) and
-      // w^{i.} |=^non P. Unlike §F.5.3.1's neutral implication, the trigger is
-      // measured on w itself, not on w-bar.
-      if (!property.sequence || !property.lhs) {
-        return false;
-      }
-      for (std::size_t i = 0; i < word.size(); ++i) {
-        if (TightlySatisfies(PrefixInclusive(word, i), *property.sequence) &&
-            NonVacuous(Suffix(word, i), *property.lhs)) {
-          return true;
-        }
-      }
-      return false;
-    }
+    case PropertyExpr::Kind::kImplication:
+      return NonVacuousImplication(word, property);
     case PropertyExpr::Kind::kOr:
       // §F.5.3.3: w |=^non ( P1 or P2 ) iff w |=^non P1 or w |=^non P2.
       return (property.lhs && NonVacuous(word, *property.lhs)) ||
@@ -215,34 +247,8 @@ bool NonVacuous(const Word& word, const PropertyExpr& property) {
       // §F.5.3.3: w |=^non ( nexttime P ) iff |w| > 0 and w^{1.} |=^non P.
       return !word.empty() && property.lhs &&
              NonVacuous(Suffix(word, 1), *property.lhs);
-    case PropertyExpr::Kind::kUntil: {
-      // §F.5.3.3: w |=^non ( P1 until P2 ) iff there exists 0 <= i < |w| with
-      // ( w^{i.} |=^non P1 or w^{i.} |=^non P2 ) and, for all 0 <= j < i,
-      // w^{j.} |= ( P1 and not P2 ) under neutral satisfaction.
-      if (!property.lhs || !property.rhs) {
-        return false;
-      }
-      const std::shared_ptr<const PropertyExpr> kGuard =
-          PropAnd(property.lhs, PropNot(property.rhs));
-      for (std::size_t i = 0; i < word.size(); ++i) {
-        const Word kSuffixI = Suffix(word, i);
-        if (!NonVacuous(kSuffixI, *property.lhs) &&
-            !NonVacuous(kSuffixI, *property.rhs)) {
-          continue;
-        }
-        bool prefix_holds = true;
-        for (std::size_t j = 0; j < i; ++j) {
-          if (!NeutrallySatisfies(Suffix(word, j), *kGuard)) {
-            prefix_holds = false;
-            break;
-          }
-        }
-        if (prefix_holds) {
-          return true;
-        }
-      }
-      return false;
-    }
+    case PropertyExpr::Kind::kUntil:
+      return NonVacuousUntil(word, property);
     case PropertyExpr::Kind::kAcceptOn:
       // §F.5.3.3: w |=^non ( accept_on (b) P ) shares the abort/disable shape.
       return property.boolean && property.lhs &&

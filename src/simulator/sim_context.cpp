@@ -13,6 +13,43 @@ SimContext::SimContext(Scheduler& sched, Arena& arena, DiagEngine& diag,
                        uint32_t seed)
     : scheduler_(sched), arena_(arena), diag_(diag), rng_(seed) {}
 
+namespace {
+
+// Walks progressively shorter instance prefixes searching for `name` (or its
+// rest under a matching instance head) in the variable table. Extracted from
+// FindVariable so the lookup body stays a single cohesive step.
+Variable* FindVariableByPrefixWalk(
+    std::string_view name, std::string_view head, std::string_view rest,
+    const std::string& prefix,
+    const std::unordered_map<std::string, std::string>& instance_types,
+    const std::unordered_map<std::string_view, Variable*>& variables) {
+  std::string p = prefix;
+  while (!p.empty()) {
+    size_t last =
+        (p.size() >= 2) ? p.find_last_of('.', p.size() - 2) : std::string::npos;
+    if (last == std::string::npos) {
+      p.clear();
+    } else {
+      p = p.substr(0, last + 1);
+    }
+    std::string prefix_no_dot = p;
+    if (!prefix_no_dot.empty() && prefix_no_dot.back() == '.')
+      prefix_no_dot.pop_back();
+    auto type_it = instance_types.find(prefix_no_dot);
+    if (type_it != instance_types.end() && type_it->second == head) {
+      std::string cand = p + std::string(rest);
+      auto cit = variables.find(cand);
+      if (cit != variables.end()) return cit->second;
+    }
+    std::string cand = p + std::string(name);
+    auto cit = variables.find(cand);
+    if (cit != variables.end()) return cit->second;
+  }
+  return nullptr;
+}
+
+}  // namespace
+
 Variable* SimContext::FindVariable(std::string_view name) {
   auto* local = FindLocalVariable(name);
   if (local) return local;
@@ -31,29 +68,8 @@ Variable* SimContext::FindVariable(std::string_view name) {
   if (dot == std::string_view::npos) return nullptr;
   std::string_view head = name.substr(0, dot);
   std::string_view rest = name.substr(dot + 1);
-  std::string p = prefix;
-  while (!p.empty()) {
-    size_t last =
-        (p.size() >= 2) ? p.find_last_of('.', p.size() - 2) : std::string::npos;
-    if (last == std::string::npos) {
-      p.clear();
-    } else {
-      p = p.substr(0, last + 1);
-    }
-    std::string prefix_no_dot = p;
-    if (!prefix_no_dot.empty() && prefix_no_dot.back() == '.')
-      prefix_no_dot.pop_back();
-    auto type_it = instance_types_.find(prefix_no_dot);
-    if (type_it != instance_types_.end() && type_it->second == head) {
-      std::string cand = p + std::string(rest);
-      auto cit = variables_.find(cand);
-      if (cit != variables_.end()) return cit->second;
-    }
-    std::string cand = p + std::string(name);
-    auto cit = variables_.find(cand);
-    if (cit != variables_.end()) return cit->second;
-  }
-  return nullptr;
+  return FindVariableByPrefixWalk(name, head, rest, prefix, instance_types_,
+                                  variables_);
 }
 
 Variable* SimContext::CreateVariable(std::string_view name, uint32_t width) {
@@ -86,28 +102,37 @@ Net* SimContext::FindNet(std::string_view name) {
   return (it != nets_.end()) ? it->second : nullptr;
 }
 
+namespace {
+
+// §6.7.1: install a net's default value before it is driven. A user-defined
+// nettype keeps the variable's existing initialization; a trireg defaults to x
+// (it holds charge, unknown until driven); every other net defaults to z.
+void InitNetDefaultValue(Variable* var, NetType type, bool is_user_nettype) {
+  if (is_user_nettype) {
+  } else if (type == NetType::kTrireg) {
+    // Encode x as aval=0, bval=1 per bit.
+    for (uint32_t i = 0; i < var->value.nwords; ++i) {
+      var->value.words[i].aval = uint64_t{0};
+      var->value.words[i].bval = ~uint64_t{0};
+    }
+  } else {
+    // z (high impedance) until driven.
+    for (uint32_t i = 0; i < var->value.nwords; ++i) {
+      var->value.words[i].aval = ~uint64_t{0};
+      var->value.words[i].bval = ~uint64_t{0};
+    }
+  }
+}
+
+}  // namespace
+
 Net* SimContext::CreateNet(std::string_view name, NetType type, uint32_t width,
                            Strength charge_strength, uint64_t decay_ticks,
                            bool is_user_nettype, std::string_view resolve_func,
                            bool is_signed) {
   auto* var = CreateVariable(name, width);
   if (is_signed) var->is_signed = true;
-  if (is_user_nettype) {
-  } else if (type == NetType::kTrireg) {
-    // §6.7.1: a trireg net is the exception to the default-z rule -- it holds
-    // charge and defaults to x (the retained value is unknown until something
-    // drives it). Encode x as aval=0, bval=1 per bit.
-    for (uint32_t i = 0; i < var->value.nwords; ++i) {
-      var->value.words[i].aval = uint64_t{0};
-      var->value.words[i].bval = ~uint64_t{0};
-    }
-  } else {
-    // §6.7.1: every other net defaults to z (high impedance) until driven.
-    for (uint32_t i = 0; i < var->value.nwords; ++i) {
-      var->value.words[i].aval = ~uint64_t{0};
-      var->value.words[i].bval = ~uint64_t{0};
-    }
-  }
+  InitNetDefaultValue(var, type, is_user_nettype);
   auto* net = arena_.Create<Net>();
   net->type = type;
   net->resolved = var;

@@ -302,76 +302,52 @@ static Logic4Vec PackWordBigEndian(Arena& arena, const uint8_t* buf,
   return MakeLogic4VecVal(arena, width, val);
 }
 
-static Logic4Vec EvalFread(const Expr* expr, SimContext& ctx, Arena& arena) {
-  if (expr->args.size() < 2) return MakeLogic4VecVal(arena, 32, 0);
-  // §21.3.4.4: the file descriptor is the second argument in every form.
-  uint32_t fd = FdFromArg(expr->args[1], ctx, arena);
-  FILE* fp = ReadableHandle(fd, ctx);
-  if (!fp) return MakeLogic4VecVal(arena, 32, 0);
+// §21.3.4.4: an unpacked struct is read as though a separate $fread were
+// performed on each member in declaration order; an unpacked union reads only
+// its first member. Each member therefore takes its own whole number of bytes.
+// Loads into var and returns the count of bytes read.
+static Logic4Vec FreadUnpackedStruct(const StructTypeInfo* sinfo, Variable* var,
+                                     FILE* fp, Arena& arena) {
+  size_t count = sinfo->is_union ? 1 : sinfo->fields.size();
+  uint64_t whole = var->value.ToUint64();
+  uint64_t total_bytes = 0;
+  for (size_t i = 0; i < count; ++i) {
+    const StructFieldInfo& fld = sinfo->fields[i];
+    uint32_t fbytes = (fld.width + 7) / 8;
+    if (fbytes == 0) fbytes = 1;
+    auto* fbuf = new uint8_t[fbytes];
+    size_t fread_n = std::fread(fbuf, 1, fbytes, fp);
+    Logic4Vec fv = PackWordBigEndian(arena, fbuf, fread_n, fbytes, fld.width);
+    delete[] fbuf;
 
-  const Expr* dst = expr->args[0];
-  // §21.3.4.4: a destination that names an unpacked array selects the memory
-  // form; anything else is the integral-variable form, which the standard
-  // defines as the one applied for all packed data.
-  const ArrayInfo* ai = (dst->kind == ExprKind::kIdentifier)
-                            ? ctx.FindArrayInfo(dst->text)
-                            : nullptr;
-
-  if (!ai) {
-    // §21.3.4.4: an unpacked struct is read as though a separate $fread were
-    // performed on each member in declaration order; an unpacked union reads
-    // only its first member. Each member therefore takes its own whole number
-    // of bytes. A packed aggregate is not handled here -- it falls through to
-    // the integral-variable form, which loads the whole value at once.
-    const StructTypeInfo* sinfo = (dst->kind == ExprKind::kIdentifier)
-                                      ? ctx.GetVariableStructType(dst->text)
-                                      : nullptr;
-    if (sinfo && !sinfo->is_packed && !sinfo->fields.empty()) {
-      Variable* var = ctx.FindVariable(dst->text);
-      if (!var) return MakeLogic4VecVal(arena, 32, 0);
-
-      size_t count = sinfo->is_union ? 1 : sinfo->fields.size();
-      uint64_t whole = var->value.ToUint64();
-      uint64_t total_bytes = 0;
-      for (size_t i = 0; i < count; ++i) {
-        const StructFieldInfo& fld = sinfo->fields[i];
-        uint32_t fbytes = (fld.width + 7) / 8;
-        if (fbytes == 0) fbytes = 1;
-        auto* fbuf = new uint8_t[fbytes];
-        size_t fread_n = std::fread(fbuf, 1, fbytes, fp);
-        Logic4Vec fv =
-            PackWordBigEndian(arena, fbuf, fread_n, fbytes, fld.width);
-        delete[] fbuf;
-
-        uint64_t fmask =
-            (fld.width >= 64) ? ~uint64_t{0} : (uint64_t{1} << fld.width) - 1;
-        whole &= ~(fmask << fld.bit_offset);
-        whole |= (fv.ToUint64() & fmask) << fld.bit_offset;
-        total_bytes += fread_n;
-        if (fread_n < fbytes) break;  // file ran out mid-member
-      }
-      var->value = MakeLogic4VecVal(arena, var->value.width, whole);
-      return MakeLogic4VecVal(arena, 32, total_bytes);
-    }
-
-    // Integral-variable variant: $fread(integral_var, fd). Any start/count
-    // arguments are ignored when loading a single packed value.
-    Variable* var = (dst->kind == ExprKind::kIdentifier)
-                        ? ctx.FindVariable(dst->text)
-                        : nullptr;
-    if (!var) return MakeLogic4VecVal(arena, 32, 0);
-
-    uint32_t nbytes = (var->value.width + 7) / 8;
-    if (nbytes == 0) nbytes = 1;
-    auto* buf = new uint8_t[nbytes];
-    size_t nread = std::fread(buf, 1, nbytes, fp);
-    var->value = PackWordBigEndian(arena, buf, nread, nbytes, var->value.width);
-    delete[] buf;
-    return MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(nread));
+    uint64_t fmask =
+        (fld.width >= 64) ? ~uint64_t{0} : (uint64_t{1} << fld.width) - 1;
+    whole &= ~(fmask << fld.bit_offset);
+    whole |= (fv.ToUint64() & fmask) << fld.bit_offset;
+    total_bytes += fread_n;
+    if (fread_n < fbytes) break;  // file ran out mid-member
   }
+  var->value = MakeLogic4VecVal(arena, var->value.width, whole);
+  return MakeLogic4VecVal(arena, 32, total_bytes);
+}
 
-  // Memory variant: $fread(mem, fd [, start [, count]]), including the
-  // $fread(mem, fd, , count) form whose start argument is omitted (a null arg).
+// Integral-variable variant: $fread(integral_var, fd). Any start/count
+// arguments are ignored when loading a single packed value.
+static Logic4Vec FreadIntegralVar(Variable* var, FILE* fp, Arena& arena) {
+  uint32_t nbytes = (var->value.width + 7) / 8;
+  if (nbytes == 0) nbytes = 1;
+  auto* buf = new uint8_t[nbytes];
+  size_t nread = std::fread(buf, 1, nbytes, fp);
+  var->value = PackWordBigEndian(arena, buf, nread, nbytes, var->value.width);
+  delete[] buf;
+  return MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(nread));
+}
+
+// Memory variant: $fread(mem, fd [, start [, count]]), including the
+// $fread(mem, fd, , count) form whose start argument is omitted (a null arg).
+static Logic4Vec FreadMemoryArray(const Expr* expr, const ArrayInfo* ai,
+                                  FILE* fp, SimContext& ctx, Arena& arena) {
+  const Expr* dst = expr->args[0];
   std::string mem_name(dst->text);
   int64_t low_addr = ai->lo;
   int64_t high_addr = ai->lo + static_cast<int64_t>(ai->size) - 1;
@@ -419,6 +395,44 @@ static Logic4Vec EvalFread(const Expr* expr, SimContext& ctx, Arena& arena) {
   }
   delete[] buf;
   return MakeLogic4VecVal(arena, 32, total_bytes);
+}
+
+static Logic4Vec EvalFread(const Expr* expr, SimContext& ctx, Arena& arena) {
+  if (expr->args.size() < 2) return MakeLogic4VecVal(arena, 32, 0);
+  // §21.3.4.4: the file descriptor is the second argument in every form.
+  uint32_t fd = FdFromArg(expr->args[1], ctx, arena);
+  FILE* fp = ReadableHandle(fd, ctx);
+  if (!fp) return MakeLogic4VecVal(arena, 32, 0);
+
+  const Expr* dst = expr->args[0];
+  // §21.3.4.4: a destination that names an unpacked array selects the memory
+  // form; anything else is the integral-variable form, which the standard
+  // defines as the one applied for all packed data.
+  const ArrayInfo* ai = (dst->kind == ExprKind::kIdentifier)
+                            ? ctx.FindArrayInfo(dst->text)
+                            : nullptr;
+
+  if (!ai) {
+    // §21.3.4.4: a packed aggregate is not handled by the struct form -- it
+    // falls through to the integral-variable form, which loads the whole value
+    // at once.
+    const StructTypeInfo* sinfo = (dst->kind == ExprKind::kIdentifier)
+                                      ? ctx.GetVariableStructType(dst->text)
+                                      : nullptr;
+    if (sinfo && !sinfo->is_packed && !sinfo->fields.empty()) {
+      Variable* var = ctx.FindVariable(dst->text);
+      if (!var) return MakeLogic4VecVal(arena, 32, 0);
+      return FreadUnpackedStruct(sinfo, var, fp, arena);
+    }
+
+    Variable* var = (dst->kind == ExprKind::kIdentifier)
+                        ? ctx.FindVariable(dst->text)
+                        : nullptr;
+    if (!var) return MakeLogic4VecVal(arena, 32, 0);
+    return FreadIntegralVar(var, fp, arena);
+  }
+
+  return FreadMemoryArray(expr, ai, fp, ctx, arena);
 }
 
 Logic4Vec EvalFileIOSysCall(const Expr* expr, SimContext& ctx, Arena& arena,

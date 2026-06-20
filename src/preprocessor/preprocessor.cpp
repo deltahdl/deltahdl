@@ -204,26 +204,29 @@ static bool HasOpenBlockComment(std::string_view text) {
   return in_block;
 }
 
+static bool DefineNeedsContinuation(std::string_view line_text,
+                                    const std::string& accumulated) {
+  if (EndsWithBackslash(line_text)) return true;
+  if (HasOpenTripleQuote(accumulated)) return true;
+  if (HasOpenBlockComment(accumulated)) return true;
+  return false;
+}
+
+static void AppendDefineLine(std::string_view line, std::string& joined) {
+  if (EndsWithBackslash(line)) {
+    joined.append(line.substr(0, line.size() - 1));
+  } else {
+    joined.append(line);
+  }
+}
+
 static std::string JoinDefineBody(std::string_view src, size_t pos, size_t& eol,
                                   uint32_t& line_num) {
   std::string_view first_line = src.substr(pos, eol - pos);
   std::string joined;
+  AppendDefineLine(first_line, joined);
 
-  if (EndsWithBackslash(first_line)) {
-    joined.assign(first_line.substr(0, first_line.size() - 1));
-  } else {
-    joined.assign(first_line);
-  }
-
-  auto needs_continuation = [](std::string_view line_text,
-                               const std::string& accumulated) {
-    if (EndsWithBackslash(line_text)) return true;
-    if (HasOpenTripleQuote(accumulated)) return true;
-    if (HasOpenBlockComment(accumulated)) return true;
-    return false;
-  };
-
-  while (eol < src.size() && needs_continuation(first_line, joined)) {
+  while (eol < src.size() && DefineNeedsContinuation(first_line, joined)) {
     size_t next_start = eol + 1;
     size_t next_eol = src.find('\n', next_start);
     if (next_eol == std::string_view::npos) next_eol = src.size();
@@ -235,11 +238,7 @@ static std::string JoinDefineBody(std::string_view src, size_t pos, size_t& eol,
     if (HasOpenBacktickTripleQuote(joined)) {
       joined += '\n';
     }
-    if (EndsWithBackslash(next_line)) {
-      joined.append(next_line.substr(0, next_line.size() - 1));
-    } else {
-      joined.append(next_line);
-    }
+    AppendDefineLine(next_line, joined);
   }
   return joined;
 }
@@ -403,6 +402,13 @@ static size_t FindDirectiveInStripped(std::string_view stripped) {
 // and the directive still acts. Backticks inside string literals are not
 // directives, and a backtick that introduces a name absent from the directive
 // set is a macro usage rather than a directive, so both are skipped.
+static bool BacktickIntroducesDirective(std::string_view s, size_t i) {
+  size_t start = i + 1;
+  size_t end = start;
+  while (end < s.size() && IsIdentChar(s[end])) ++end;
+  return end > start && IsCompilerDirective(s.substr(start, end - start));
+}
+
 static size_t FindMidLineDirective(std::string_view s) {
   bool in_string = false;
   for (size_t i = 0; i < s.size(); ++i) {
@@ -413,13 +419,8 @@ static size_t FindMidLineDirective(std::string_view s) {
       continue;
     }
     if (in_string) continue;
-    if (c == '`') {
-      size_t start = i + 1;
-      size_t end = start;
-      while (end < s.size() && IsIdentChar(s[end])) ++end;
-      if (end > start && IsCompilerDirective(s.substr(start, end - start))) {
-        return i;
-      }
+    if (c == '`' && BacktickIntroducesDirective(s, i)) {
+      return i;
     }
   }
   return std::string_view::npos;
@@ -467,6 +468,13 @@ void Preprocessor::SkipBlockCommentLine(std::string_view line, uint32_t file_id,
   output.push_back('\n');
 }
 
+static bool DefineSpansMultipleLines(std::string_view line) {
+  if (!StartsWithDirective(line, "define")) return false;
+  auto body_start = AfterDirective(line, "define");
+  return EndsWithBackslash(line) || HasOpenTripleQuote(body_start) ||
+         HasOpenBlockComment(body_start);
+}
+
 std::string Preprocessor::ProcessSource(std::string_view src, uint32_t file_id,
                                         int depth) {
   if (depth > kMaxIncludeDepth) {
@@ -496,13 +504,9 @@ std::string Preprocessor::ProcessSource(std::string_view src, uint32_t file_id,
     }
 
     std::string joined;
-    if (StartsWithDirective(line, "define")) {
-      auto body_start = AfterDirective(line, "define");
-      if (EndsWithBackslash(line) || HasOpenTripleQuote(body_start) ||
-          HasOpenBlockComment(body_start)) {
-        joined = JoinDefineBody(src, pos, eol, line_num);
-        line = joined;
-      }
+    if (DefineSpansMultipleLines(line)) {
+      joined = JoinDefineBody(src, pos, eol, line_num);
+      line = joined;
     }
 
     bool handled = ProcessDirective(line, file_id, line_num, depth, output);

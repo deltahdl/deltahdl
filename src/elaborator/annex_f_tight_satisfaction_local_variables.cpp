@@ -113,6 +113,206 @@ bool MergeContexts(const LocalContext& a, const LocalContext& b,
   return true;
 }
 
+// Forward declaration: the per-kind helpers below recurse back through the
+// dispatcher to evaluate operand sequences over sub-slices of the word.
+std::vector<LocalContext> OutputsForSlice(const Word& word, std::size_t lo,
+                                          std::size_t hi,
+                                          const SequenceExpr& seq,
+                                          const LocalContext& input);
+
+// §F.5.5: w, L_0, L_1 |== b iff |w| = 1 and w^0 |= b[L_0] and L_1 = L_0.
+// Boolean leaves model atomic propositions rather than local-variable
+// expressions, so b[L_0] is b; the context passes through unchanged.
+std::vector<LocalContext> OutputsForBoolean(const Word& word, std::size_t lo,
+                                            std::size_t length,
+                                            const SequenceExpr& seq,
+                                            const LocalContext& input) {
+  std::vector<LocalContext> result;
+  if (length == 1 && LetterSatisfiesBoolean(word[lo], *seq.boolean)) {
+    result.push_back(input);
+  }
+  return result;
+}
+
+// §F.5.5: w, L_0, L_1 |== (1, v = e) iff |w| = 1 and w^0 |= 1 and
+// L_1 = {(v, e[L_0, w^0])} U L_0\v. The "1" Boolean always holds; the
+// assigned value is the observed letter, the realization of e[L_0, w^0].
+std::vector<LocalContext> OutputsForLocalVarSampling(
+    const Word& word, std::size_t lo, std::size_t length,
+    const SequenceExpr& seq, const LocalContext& input) {
+  std::vector<LocalContext> result;
+  if (length == 1) {
+    LocalContext out = RemoveName(input, seq.local_var_name);
+    out[seq.local_var_name] = word[lo];
+    result.push_back(std::move(out));
+  }
+  return result;
+}
+
+// §F.5.5: w, L_0, L_1 |== (t v; R) iff there exists L with
+// w, L_0\v, L |== R and L_1 = L_0[v] U (L\v). The declared name is hidden
+// from the body and its outer binding, if any, is restored afterwards.
+std::vector<LocalContext> OutputsForLocalVarDecl(const Word& word,
+                                                 std::size_t lo, std::size_t hi,
+                                                 const SequenceExpr& seq,
+                                                 const LocalContext& input) {
+  std::vector<LocalContext> result;
+  const std::string& v = seq.local_var_name;
+  const LocalContext kOuterV = RestrictToName(input, v);
+  const LocalContext kBodyInput = RemoveName(input, v);
+  for (LocalContext inner :
+       OutputsForSlice(word, lo, hi, *seq.lhs, kBodyInput)) {
+    LocalContext out = RemoveName(inner, v);
+    for (const auto& entry : kOuterV) {
+      out.insert(entry);
+    }
+    AddUnique(result, std::move(out));
+  }
+  return result;
+}
+
+// §F.5.5: w, L_0, L_1 |== (R1 ##1 R2) iff w = xy and x, L_0, L' |== R1
+// and y, L', L_1 |== R2 for some split point and intermediate context L'.
+std::vector<LocalContext> OutputsForConcat(const Word& word, std::size_t lo,
+                                           std::size_t hi,
+                                           const SequenceExpr& seq,
+                                           const LocalContext& input) {
+  std::vector<LocalContext> result;
+  for (std::size_t mid = lo; mid <= hi; ++mid) {
+    for (const LocalContext& mid_ctx :
+         OutputsForSlice(word, lo, mid, *seq.lhs, input)) {
+      for (LocalContext out :
+           OutputsForSlice(word, mid, hi, *seq.rhs, mid_ctx)) {
+        AddUnique(result, std::move(out));
+      }
+    }
+  }
+  return result;
+}
+
+// §F.5.5: w, L_0, L_1 |== (R1 ##0 R2) iff w = xyz with |y| = 1, and
+// xy, L_0, L' |== R1 and yz, L', L_1 |== R2. The overlap letter y sits at
+// position p, so R1 covers [lo, p+1) and R2 covers [p, hi).
+std::vector<LocalContext> OutputsForFusion(const Word& word, std::size_t lo,
+                                           std::size_t hi,
+                                           const SequenceExpr& seq,
+                                           const LocalContext& input) {
+  std::vector<LocalContext> result;
+  for (std::size_t p = lo; p < hi; ++p) {
+    for (const LocalContext& mid_ctx :
+         OutputsForSlice(word, lo, p + 1, *seq.lhs, input)) {
+      for (LocalContext out : OutputsForSlice(word, p, hi, *seq.rhs, mid_ctx)) {
+        AddUnique(result, std::move(out));
+      }
+    }
+  }
+  return result;
+}
+
+// §F.5.5: w, L_0, L_1 |== (R1 or R2) iff some L' satisfies one operand
+// and L_1 = L'|_D with D = flow(dom(L_0), (R1 or R2)). Restricting to the
+// flow domain discards names that do not escape the chosen alternative.
+std::vector<LocalContext> OutputsForOr(const Word& word, std::size_t lo,
+                                       std::size_t hi, const SequenceExpr& seq,
+                                       const LocalContext& input) {
+  std::vector<LocalContext> result;
+  const std::set<std::string> kDomain = FlowLocals(ContextDomain(input), seq);
+  std::vector<LocalContext> branch =
+      OutputsForSlice(word, lo, hi, *seq.lhs, input);
+  for (LocalContext out : OutputsForSlice(word, lo, hi, *seq.rhs, input)) {
+    branch.push_back(std::move(out));
+  }
+  for (const LocalContext& candidate : branch) {
+    AddUnique(result, RestrictContext(candidate, kDomain));
+  }
+  return result;
+}
+
+// §F.5.5 intersect output domains:
+//   D'  = flow(dom(L_0), R1) - (block(R1 intersect R2) U sample(R2))
+//   D'' = flow(dom(L_0), R2) - (block(R1 intersect R2) U sample(R1))
+// Computes the escaping-name domain for one operand given the blocked names and
+// the sibling operand's sampled names.
+std::set<std::string> IntersectOutputDomain(
+    const std::set<std::string>& in_domain, const SequenceExpr& operand,
+    const std::set<std::string>& blocked,
+    const std::set<std::string>& sibling_sample) {
+  std::set<std::string> domain;
+  for (const std::string& name : FlowLocals(in_domain, operand)) {
+    if (blocked.count(name) == 0 && sibling_sample.count(name) == 0) {
+      domain.insert(name);
+    }
+  }
+  return domain;
+}
+
+// §F.5.5: w, L_0, L_1 |== (R1 intersect R2) iff w, L_0, L' |== R1 and
+// w, L_0, L'' |== R2 and L_1 = L'|_D' U L''|_D''.
+std::vector<LocalContext> OutputsForIntersect(const Word& word, std::size_t lo,
+                                              std::size_t hi,
+                                              const SequenceExpr& seq,
+                                              const LocalContext& input) {
+  std::vector<LocalContext> result;
+  const std::set<std::string> kInDomain = ContextDomain(input);
+  const std::set<std::string> kBlocked = BlockLocals(seq);
+  const std::set<std::string> kSampleLhs = SampleLocals(*seq.lhs);
+  const std::set<std::string> kSampleRhs = SampleLocals(*seq.rhs);
+  const std::set<std::string> d_lhs =
+      IntersectOutputDomain(kInDomain, *seq.lhs, kBlocked, kSampleRhs);
+  const std::set<std::string> d_rhs =
+      IntersectOutputDomain(kInDomain, *seq.rhs, kBlocked, kSampleLhs);
+  for (const LocalContext& lhs_ctx :
+       OutputsForSlice(word, lo, hi, *seq.lhs, input)) {
+    for (const LocalContext& rhs_ctx :
+         OutputsForSlice(word, lo, hi, *seq.rhs, input)) {
+      LocalContext merged;
+      if (MergeContexts(RestrictContext(lhs_ctx, d_lhs),
+                        RestrictContext(rhs_ctx, d_rhs), merged)) {
+        AddUnique(result, std::move(merged));
+      }
+    }
+  }
+  return result;
+}
+
+// §F.5.5: w, L_0, L_1 |== first_match(R) iff w, L_0, L_1 |== R and no
+// proper prefix of w tightly satisfies R; a shorter match would leave a
+// nonempty remainder, which the rule forbids.
+std::vector<LocalContext> OutputsForFirstMatch(const Word& word, std::size_t lo,
+                                               std::size_t hi,
+                                               const SequenceExpr& seq,
+                                               const LocalContext& input) {
+  for (std::size_t mid = lo; mid < hi; ++mid) {
+    if (!OutputsForSlice(word, lo, mid, *seq.lhs, input).empty()) {
+      // a proper prefix matches, so first_match yields none
+      return std::vector<LocalContext>{};
+    }
+  }
+  return OutputsForSlice(word, lo, hi, *seq.lhs, input);
+}
+
+// §F.5.5: w, L_0, L_1 |== R[*1:$] iff w = w1 w2 ... wj (j >= 1) and the
+// contexts chain L_0 = L_(0), ..., L_(j) = L_1 with each wi, L_(i-1),
+// L_(i) |== R. One piece covering the whole slice is the j = 1 case;
+// longer chains peel off a nonempty first piece and recurse.
+std::vector<LocalContext> OutputsForUnboundedRepeat(const Word& word,
+                                                    std::size_t lo,
+                                                    std::size_t hi,
+                                                    const SequenceExpr& seq,
+                                                    const LocalContext& input) {
+  std::vector<LocalContext> result;
+  AppendUniqueBranches(result, OutputsForSlice(word, lo, hi, *seq.lhs, input));
+  for (std::size_t mid = lo + 1; mid < hi; ++mid) {
+    for (const LocalContext& mid_ctx :
+         OutputsForSlice(word, lo, mid, *seq.lhs, input)) {
+      for (LocalContext out : OutputsForSlice(word, mid, hi, seq, mid_ctx)) {
+        AddUnique(result, std::move(out));
+      }
+    }
+  }
+  return result;
+}
+
 // §F.5.5: the set of output contexts L_1 such that w[lo,hi), L_0, L_1 |== seq,
 // where the half-open slice [lo, hi) of `word` plays the role of w. The slice
 // representation lets the recursive cases split a word without copying.
@@ -123,136 +323,25 @@ std::vector<LocalContext> OutputsForSlice(const Word& word, std::size_t lo,
   const std::size_t kLength = hi - lo;
   std::vector<LocalContext> result;
   switch (seq.kind) {
-    case SequenceExpr::Kind::kBoolean: {
-      // §F.5.5: w, L_0, L_1 |== b iff |w| = 1 and w^0 |= b[L_0] and L_1 = L_0.
-      // Boolean leaves model atomic propositions rather than local-variable
-      // expressions, so b[L_0] is b; the context passes through unchanged.
-      if (kLength == 1 && LetterSatisfiesBoolean(word[lo], *seq.boolean)) {
-        result.push_back(input);
-      }
-      return result;
-    }
-    case SequenceExpr::Kind::kLocalVarSampling: {
-      // §F.5.5: w, L_0, L_1 |== (1, v = e) iff |w| = 1 and w^0 |= 1 and
-      // L_1 = {(v, e[L_0, w^0])} U L_0\v. The "1" Boolean always holds; the
-      // assigned value is the observed letter, the realization of e[L_0, w^0].
-      if (kLength == 1) {
-        LocalContext out = RemoveName(input, seq.local_var_name);
-        out[seq.local_var_name] = word[lo];
-        result.push_back(std::move(out));
-      }
-      return result;
-    }
-    case SequenceExpr::Kind::kLocalVarDecl: {
-      // §F.5.5: w, L_0, L_1 |== (t v; R) iff there exists L with
-      // w, L_0\v, L |== R and L_1 = L_0[v] U (L\v). The declared name is hidden
-      // from the body and its outer binding, if any, is restored afterwards.
-      const std::string& v = seq.local_var_name;
-      const LocalContext kOuterV = RestrictToName(input, v);
-      const LocalContext kBodyInput = RemoveName(input, v);
-      for (LocalContext inner :
-           OutputsForSlice(word, lo, hi, *seq.lhs, kBodyInput)) {
-        LocalContext out = RemoveName(inner, v);
-        for (const auto& entry : kOuterV) {
-          out.insert(entry);
-        }
-        AddUnique(result, std::move(out));
-      }
-      return result;
-    }
+    case SequenceExpr::Kind::kBoolean:
+      return OutputsForBoolean(word, lo, kLength, seq, input);
+    case SequenceExpr::Kind::kLocalVarSampling:
+      return OutputsForLocalVarSampling(word, lo, kLength, seq, input);
+    case SequenceExpr::Kind::kLocalVarDecl:
+      return OutputsForLocalVarDecl(word, lo, hi, seq, input);
     case SequenceExpr::Kind::kParen:
       // §F.5.5: w, L_0, L_1 |== (R) iff w, L_0, L_1 |== R.
       return OutputsForSlice(word, lo, hi, *seq.lhs, input);
-    case SequenceExpr::Kind::kConcat: {
-      // §F.5.5: w, L_0, L_1 |== (R1 ##1 R2) iff w = xy and x, L_0, L' |== R1
-      // and y, L', L_1 |== R2 for some split point and intermediate context L'.
-      for (std::size_t mid = lo; mid <= hi; ++mid) {
-        for (const LocalContext& mid_ctx :
-             OutputsForSlice(word, lo, mid, *seq.lhs, input)) {
-          for (LocalContext out :
-               OutputsForSlice(word, mid, hi, *seq.rhs, mid_ctx)) {
-            AddUnique(result, std::move(out));
-          }
-        }
-      }
-      return result;
-    }
-    case SequenceExpr::Kind::kFusion: {
-      // §F.5.5: w, L_0, L_1 |== (R1 ##0 R2) iff w = xyz with |y| = 1, and
-      // xy, L_0, L' |== R1 and yz, L', L_1 |== R2. The overlap letter y sits at
-      // position p, so R1 covers [lo, p+1) and R2 covers [p, hi).
-      for (std::size_t p = lo; p < hi; ++p) {
-        for (const LocalContext& mid_ctx :
-             OutputsForSlice(word, lo, p + 1, *seq.lhs, input)) {
-          for (LocalContext out :
-               OutputsForSlice(word, p, hi, *seq.rhs, mid_ctx)) {
-            AddUnique(result, std::move(out));
-          }
-        }
-      }
-      return result;
-    }
-    case SequenceExpr::Kind::kOr: {
-      // §F.5.5: w, L_0, L_1 |== (R1 or R2) iff some L' satisfies one operand
-      // and L_1 = L'|_D with D = flow(dom(L_0), (R1 or R2)). Restricting to the
-      // flow domain discards names that do not escape the chosen alternative.
-      const std::set<std::string> kDomain =
-          FlowLocals(ContextDomain(input), seq);
-      std::vector<LocalContext> branch =
-          OutputsForSlice(word, lo, hi, *seq.lhs, input);
-      for (LocalContext out : OutputsForSlice(word, lo, hi, *seq.rhs, input)) {
-        branch.push_back(std::move(out));
-      }
-      for (const LocalContext& candidate : branch) {
-        AddUnique(result, RestrictContext(candidate, kDomain));
-      }
-      return result;
-    }
-    case SequenceExpr::Kind::kIntersect: {
-      // §F.5.5: w, L_0, L_1 |== (R1 intersect R2) iff w, L_0, L' |== R1 and
-      // w, L_0, L'' |== R2 and L_1 = L'|_D' U L''|_D'', where
-      //   D'  = flow(dom(L_0), R1) - (block(R1 intersect R2) U sample(R2))
-      //   D'' = flow(dom(L_0), R2) - (block(R1 intersect R2) U sample(R1))
-      const std::set<std::string> kInDomain = ContextDomain(input);
-      const std::set<std::string> kBlocked = BlockLocals(seq);
-      const std::set<std::string> kSampleLhs = SampleLocals(*seq.lhs);
-      const std::set<std::string> kSampleRhs = SampleLocals(*seq.rhs);
-      std::set<std::string> d_lhs;
-      for (const std::string& name : FlowLocals(kInDomain, *seq.lhs)) {
-        if (kBlocked.count(name) == 0 && kSampleRhs.count(name) == 0) {
-          d_lhs.insert(name);
-        }
-      }
-      std::set<std::string> d_rhs;
-      for (const std::string& name : FlowLocals(kInDomain, *seq.rhs)) {
-        if (kBlocked.count(name) == 0 && kSampleLhs.count(name) == 0) {
-          d_rhs.insert(name);
-        }
-      }
-      for (const LocalContext& lhs_ctx :
-           OutputsForSlice(word, lo, hi, *seq.lhs, input)) {
-        for (const LocalContext& rhs_ctx :
-             OutputsForSlice(word, lo, hi, *seq.rhs, input)) {
-          LocalContext merged;
-          if (MergeContexts(RestrictContext(lhs_ctx, d_lhs),
-                            RestrictContext(rhs_ctx, d_rhs), merged)) {
-            AddUnique(result, std::move(merged));
-          }
-        }
-      }
-      return result;
-    }
-    case SequenceExpr::Kind::kFirstMatch: {
-      // §F.5.5: w, L_0, L_1 |== first_match(R) iff w, L_0, L_1 |== R and no
-      // proper prefix of w tightly satisfies R; a shorter match would leave a
-      // nonempty remainder, which the rule forbids.
-      for (std::size_t mid = lo; mid < hi; ++mid) {
-        if (!OutputsForSlice(word, lo, mid, *seq.lhs, input).empty()) {
-          return result;  // a proper prefix matches, so first_match yields none
-        }
-      }
-      return OutputsForSlice(word, lo, hi, *seq.lhs, input);
-    }
+    case SequenceExpr::Kind::kConcat:
+      return OutputsForConcat(word, lo, hi, seq, input);
+    case SequenceExpr::Kind::kFusion:
+      return OutputsForFusion(word, lo, hi, seq, input);
+    case SequenceExpr::Kind::kOr:
+      return OutputsForOr(word, lo, hi, seq, input);
+    case SequenceExpr::Kind::kIntersect:
+      return OutputsForIntersect(word, lo, hi, seq, input);
+    case SequenceExpr::Kind::kFirstMatch:
+      return OutputsForFirstMatch(word, lo, hi, seq, input);
     case SequenceExpr::Kind::kNullRepeat: {
       // §F.5.5: w, L_0, L_1 |== R[*0] iff |w| = 0 and L_1 = L_0.
       if (kLength == 0) {
@@ -269,24 +358,8 @@ std::vector<LocalContext> OutputsForSlice(const Word& word, std::size_t lo,
         return result;
       }
       [[fallthrough]];
-    case SequenceExpr::Kind::kUnboundedRepeat: {
-      // §F.5.5: w, L_0, L_1 |== R[*1:$] iff w = w1 w2 ... wj (j >= 1) and the
-      // contexts chain L_0 = L_(0), ..., L_(j) = L_1 with each wi, L_(i-1),
-      // L_(i) |== R. One piece covering the whole slice is the j = 1 case;
-      // longer chains peel off a nonempty first piece and recurse.
-      AppendUniqueBranches(result,
-                           OutputsForSlice(word, lo, hi, *seq.lhs, input));
-      for (std::size_t mid = lo + 1; mid < hi; ++mid) {
-        for (const LocalContext& mid_ctx :
-             OutputsForSlice(word, lo, mid, *seq.lhs, input)) {
-          for (LocalContext out :
-               OutputsForSlice(word, mid, hi, seq, mid_ctx)) {
-            AddUnique(result, std::move(out));
-          }
-        }
-      }
-      return result;
-    }
+    case SequenceExpr::Kind::kUnboundedRepeat:
+      return OutputsForUnboundedRepeat(word, lo, hi, seq, input);
     case SequenceExpr::Kind::kClock:
       // Clocks are removed by the §F.5.1.1 rewrite before evaluation, so a raw
       // clock form never reaches this point and yields no output context.

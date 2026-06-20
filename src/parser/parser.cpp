@@ -18,6 +18,68 @@ void CheckAnonymousProgramItem(DiagEngine& diag, ModuleItem* item) {
                "program");
   }
 }
+
+// Each top-level design element defaults to the "work" library unless one was
+// assigned during parsing. Apply that default to every element in a collection.
+template <typename Collection>
+void DefaultLibraryToWork(Collection& elements) {
+  for (auto* element : elements) {
+    if (element->library.empty()) element->library = "work";
+  }
+}
+
+// Snapshot of the compilation unit's timeunit/timeprecision state captured
+// before a compilation-unit-scope timeunit declaration is parsed, used to
+// detect mismatches and out-of-order declarations afterward.
+struct CuTimeunitSnapshot {
+  bool was_unit_set = false;
+  bool was_prec_set = false;
+  TimeUnit old_unit = TimeUnit::kNs;
+  int old_unit_mag = 0;
+  TimeUnit old_prec = TimeUnit::kNs;
+  int old_prec_mag = 0;
+  bool has_other_items = false;
+};
+
+CuTimeunitSnapshot CaptureCuTimeunitState(const CompilationUnit* unit) {
+  CuTimeunitSnapshot snap;
+  snap.was_unit_set = unit->has_cu_timeunit;
+  snap.was_prec_set = unit->has_cu_timeprecision;
+  snap.old_unit = unit->cu_time_unit;
+  snap.old_unit_mag = unit->cu_time_unit_magnitude;
+  snap.old_prec = unit->cu_time_prec;
+  snap.old_prec_mag = unit->cu_time_prec_magnitude;
+  snap.has_other_items = !unit->modules.empty() || !unit->packages.empty() ||
+                         !unit->interfaces.empty() || !unit->programs.empty() ||
+                         !unit->classes.empty() || !unit->udps.empty() ||
+                         !unit->checkers.empty() || !unit->configs.empty() ||
+                         !unit->cu_items.empty();
+  return snap;
+}
+
+void CheckCuTimeunitConsistency(DiagEngine& diag, SourceLoc loc,
+                                const CuTimeunitSnapshot& snap,
+                                const CompilationUnit* unit) {
+  if (unit->has_cu_timeunit && !snap.was_unit_set && snap.has_other_items) {
+    diag.Error(loc,
+               "timeunit as a later item requires a matching prior "
+               "declaration in the same time scope");
+  } else if (snap.was_unit_set &&
+             (unit->cu_time_unit != snap.old_unit ||
+              unit->cu_time_unit_magnitude != snap.old_unit_mag)) {
+    diag.Error(loc, "timeunit does not match prior declaration");
+  }
+  if (unit->has_cu_timeprecision && !snap.was_prec_set &&
+      snap.has_other_items) {
+    diag.Error(loc,
+               "timeprecision as a later item requires a matching prior "
+               "declaration in the same time scope");
+  } else if (snap.was_prec_set &&
+             (unit->cu_time_prec != snap.old_prec ||
+              unit->cu_time_prec_magnitude != snap.old_prec_mag)) {
+    diag.Error(loc, "timeprecision does not match prior declaration");
+  }
+}
 }  // namespace
 
 Parser::Parser(Lexer& lexer, Arena& arena, DiagEngine& diag)
@@ -133,24 +195,12 @@ CompilationUnit* Parser::Parse() {
     ParseTopLevel(unit);
   }
 
-  for (auto* m : unit->modules) {
-    if (m->library.empty()) m->library = "work";
-  }
-  for (auto* i : unit->interfaces) {
-    if (i->library.empty()) i->library = "work";
-  }
-  for (auto* p : unit->programs) {
-    if (p->library.empty()) p->library = "work";
-  }
-  for (auto* u : unit->udps) {
-    if (u->library.empty()) u->library = "work";
-  }
-  for (auto* p : unit->packages) {
-    if (p->library.empty()) p->library = "work";
-  }
-  for (auto* c : unit->configs) {
-    if (c->library.empty()) c->library = "work";
-  }
+  DefaultLibraryToWork(unit->modules);
+  DefaultLibraryToWork(unit->interfaces);
+  DefaultLibraryToWork(unit->programs);
+  DefaultLibraryToWork(unit->udps);
+  DefaultLibraryToWork(unit->packages);
+  DefaultLibraryToWork(unit->configs);
   return unit;
 }
 
@@ -447,35 +497,10 @@ bool Parser::TryParseCuScopeItem(CompilationUnit* unit) {
   if (TryParseCuScopeDataDecl(unit)) return true;
 
   if (Check(TokenKind::kKwTimeunit) || Check(TokenKind::kKwTimeprecision)) {
-    bool was_unit_set = unit->has_cu_timeunit;
-    bool was_prec_set = unit->has_cu_timeprecision;
-    TimeUnit old_unit = unit->cu_time_unit;
-    int old_unit_mag = unit->cu_time_unit_magnitude;
-    TimeUnit old_prec = unit->cu_time_prec;
-    int old_prec_mag = unit->cu_time_prec_magnitude;
-    bool has_other_items = !unit->modules.empty() || !unit->packages.empty() ||
-                           !unit->interfaces.empty() ||
-                           !unit->programs.empty() || !unit->classes.empty() ||
-                           !unit->udps.empty() || !unit->checkers.empty() ||
-                           !unit->configs.empty() || !unit->cu_items.empty();
+    CuTimeunitSnapshot snap = CaptureCuTimeunitState(unit);
     auto loc = CurrentLoc();
     ParseTimeunitDecl(nullptr, unit);
-    if (unit->has_cu_timeunit && !was_unit_set && has_other_items) {
-      diag_.Error(loc,
-                  "timeunit as a later item requires a matching prior "
-                  "declaration in the same time scope");
-    } else if (was_unit_set && (unit->cu_time_unit != old_unit ||
-                                unit->cu_time_unit_magnitude != old_unit_mag)) {
-      diag_.Error(loc, "timeunit does not match prior declaration");
-    }
-    if (unit->has_cu_timeprecision && !was_prec_set && has_other_items) {
-      diag_.Error(loc,
-                  "timeprecision as a later item requires a matching prior "
-                  "declaration in the same time scope");
-    } else if (was_prec_set && (unit->cu_time_prec != old_prec ||
-                                unit->cu_time_prec_magnitude != old_prec_mag)) {
-      diag_.Error(loc, "timeprecision does not match prior declaration");
-    }
+    CheckCuTimeunitConsistency(diag_, loc, snap, unit);
     return true;
   }
 
@@ -715,42 +740,45 @@ void Parser::ParseGenvarDecl(std::vector<ModuleItem*>& items) {
   Expect(TokenKind::kSemicolon);
 }
 
+namespace {
+// Apply a timeunit/timeprecision setting to a single scope (module, package, or
+// any type whose timeunit fields are named time_unit/time_prec). The
+// compilation-unit scope uses differently named fields and is handled
+// separately by ApplyCuTimeUnit.
+template <typename Scope>
+void ApplyScopeTimeUnit(Scope* scope, bool is_unit, TimeUnit tu, int mag) {
+  if (!scope) return;
+  if (is_unit) {
+    scope->time_unit = tu;
+    scope->time_unit_magnitude = mag;
+    scope->has_timeunit = true;
+  } else {
+    scope->time_prec = tu;
+    scope->time_prec_magnitude = mag;
+    scope->has_timeprecision = true;
+  }
+}
+
+void ApplyCuTimeUnit(CompilationUnit* cu, bool is_unit, TimeUnit tu, int mag) {
+  if (!cu) return;
+  if (is_unit) {
+    cu->cu_time_unit = tu;
+    cu->cu_time_unit_magnitude = mag;
+    cu->has_cu_timeunit = true;
+  } else {
+    cu->cu_time_prec = tu;
+    cu->cu_time_prec_magnitude = mag;
+    cu->has_cu_timeprecision = true;
+  }
+}
+}  // namespace
+
 static void ApplyTimeUnit(ModuleDecl* mod, CompilationUnit* cu,
                           PackageDecl* pkg, bool is_unit, TimeUnit tu,
                           int mag) {
-  if (mod) {
-    if (is_unit) {
-      mod->time_unit = tu;
-      mod->time_unit_magnitude = mag;
-      mod->has_timeunit = true;
-    } else {
-      mod->time_prec = tu;
-      mod->time_prec_magnitude = mag;
-      mod->has_timeprecision = true;
-    }
-  }
-  if (cu) {
-    if (is_unit) {
-      cu->cu_time_unit = tu;
-      cu->cu_time_unit_magnitude = mag;
-      cu->has_cu_timeunit = true;
-    } else {
-      cu->cu_time_prec = tu;
-      cu->cu_time_prec_magnitude = mag;
-      cu->has_cu_timeprecision = true;
-    }
-  }
-  if (pkg) {
-    if (is_unit) {
-      pkg->time_unit = tu;
-      pkg->time_unit_magnitude = mag;
-      pkg->has_timeunit = true;
-    } else {
-      pkg->time_prec = tu;
-      pkg->time_prec_magnitude = mag;
-      pkg->has_timeprecision = true;
-    }
-  }
+  ApplyScopeTimeUnit(mod, is_unit, tu, mag);
+  ApplyCuTimeUnit(cu, is_unit, tu, mag);
+  ApplyScopeTimeUnit(pkg, is_unit, tu, mag);
 }
 
 static void ApplyTimePrecision(ModuleDecl* mod, CompilationUnit* cu,
@@ -771,6 +799,32 @@ static void ApplyTimePrecision(ModuleDecl* mod, CompilationUnit* cu,
     pkg->has_timeprecision = true;
   }
 }
+
+namespace {
+// Validate the precision side of a "timeunit <unit> / <precision>" declaration
+// (its token already consumed and known not to be 'step'), reporting a bad
+// literal or a precision coarser than the unit, then store it when the
+// declaration is a timeunit. Mirrors the inline logic it replaces exactly.
+void ParsePrecisionFromToken(DiagEngine& diag, Token prec_tok, bool is_unit,
+                             bool unit_is_step, TimeUnit tu, int mag,
+                             ModuleDecl* mod, CompilationUnit* cu,
+                             PackageDecl* pkg) {
+  TimeUnit prec = TimeUnit::kNs;
+  int prec_mag = 1;
+  if (!TryParseTimeMagnitudeAndUnit(prec_tok.text, prec_mag, prec)) {
+    diag.Error(prec_tok.loc,
+               "time literal must use magnitude 1, 10, or 100 and unit "
+               "s/ms/us/ns/ps/fs");
+  }
+
+  if (!unit_is_step &&
+      EffectiveTimeOrder(prec, prec_mag) > EffectiveTimeOrder(tu, mag)) {
+    diag.Error(prec_tok.loc,
+               "time precision is less precise than the time unit");
+  }
+  if (is_unit) ApplyTimePrecision(mod, cu, pkg, prec, prec_mag);
+}
+}  // namespace
 
 void Parser::ParseTimeunitDecl(ModuleDecl* mod, CompilationUnit* cu,
                                PackageDecl* pkg) {
@@ -804,20 +858,8 @@ void Parser::ParseTimeunitDecl(ModuleDecl* mod, CompilationUnit* cu,
           "step cannot be used to set or modify the time unit or precision");
       Consume();
     } else {
-      TimeUnit prec = TimeUnit::kNs;
-      int prec_mag = 1;
-      if (!TryParseTimeMagnitudeAndUnit(prec_tok.text, prec_mag, prec)) {
-        diag_.Error(prec_tok.loc,
-                    "time literal must use magnitude 1, 10, or 100 and unit "
-                    "s/ms/us/ns/ps/fs");
-      }
-
-      if (!unit_is_step &&
-          EffectiveTimeOrder(prec, prec_mag) > EffectiveTimeOrder(tu, mag)) {
-        diag_.Error(prec_tok.loc,
-                    "time precision is less precise than the time unit");
-      }
-      if (is_unit) ApplyTimePrecision(mod, cu, pkg, prec, prec_mag);
+      ParsePrecisionFromToken(diag_, prec_tok, is_unit, unit_is_step, tu, mag,
+                              mod, cu, pkg);
     }
   }
   Expect(TokenKind::kSemicolon);

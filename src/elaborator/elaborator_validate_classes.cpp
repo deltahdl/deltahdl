@@ -55,6 +55,23 @@ static void CheckMemberAccessVisibility(
 // invoked through an external class handle, its arguments name members of that
 // handle's class, so the same visibility rule that governs an obj.member access
 // applies to each argument here.
+static void CheckRandomizeArgItemVisibility(const Expr* arg,
+                                            const ClassDecl* cls,
+                                            const CompilationUnit* unit,
+                                            DiagEngine& diag) {
+  if (!arg || arg->kind != ExprKind::kIdentifier) return;
+  const auto* m = FindMemberInClass(cls, arg->text, unit);
+  if (m && m->is_local) {
+    diag.Error(arg->range.start,
+               "cannot change random mode of local member from outside "
+               "its class");
+  } else if (m && m->is_protected) {
+    diag.Error(arg->range.start,
+               "cannot change random mode of protected member from "
+               "outside its class hierarchy");
+  }
+}
+
 static void CheckRandomizeArgVisibility(
     const Expr* e,
     const std::unordered_map<std::string_view, std::string_view>& var_types,
@@ -72,17 +89,7 @@ static void CheckRandomizeArgVisibility(
   const auto* cls = FindClassDecl(it->second, unit);
   if (!cls) return;
   for (const auto* arg : e->args) {
-    if (!arg || arg->kind != ExprKind::kIdentifier) continue;
-    const auto* m = FindMemberInClass(cls, arg->text, unit);
-    if (m && m->is_local) {
-      diag.Error(arg->range.start,
-                 "cannot change random mode of local member from outside "
-                 "its class");
-    } else if (m && m->is_protected) {
-      diag.Error(arg->range.start,
-                 "cannot change random mode of protected member from "
-                 "outside its class hierarchy");
-    }
+    CheckRandomizeArgItemVisibility(arg, cls, unit, diag);
   }
 }
 
@@ -174,21 +181,27 @@ static void WalkStmtsForConstClassProp(
                                in_constructor, diag);
 }
 
+static void CollectConstClassProperties(
+    const ClassDecl* cls, std::unordered_set<std::string_view>& global_consts,
+    std::unordered_set<std::string_view>& instance_consts, DiagEngine& diag) {
+  for (const auto* m : cls->members) {
+    if (m->kind != ClassMemberKind::kProperty || !m->is_const) continue;
+    if (!m->init_expr && m->is_static) {
+      diag.Error(m->loc, "instance constant cannot be declared static");
+    }
+    if (m->init_expr) {
+      global_consts.insert(m->name);
+    } else {
+      instance_consts.insert(m->name);
+    }
+  }
+}
+
 void Elaborator::ValidateConstClassProperties() {
   for (const auto* cls : unit_->classes) {
     std::unordered_set<std::string_view> global_consts;
     std::unordered_set<std::string_view> instance_consts;
-    for (const auto* m : cls->members) {
-      if (m->kind != ClassMemberKind::kProperty || !m->is_const) continue;
-      if (!m->init_expr && m->is_static) {
-        diag_.Error(m->loc, "instance constant cannot be declared static");
-      }
-      if (m->init_expr) {
-        global_consts.insert(m->name);
-      } else {
-        instance_consts.insert(m->name);
-      }
-    }
+    CollectConstClassProperties(cls, global_consts, instance_consts, diag_);
     if (global_consts.empty() && instance_consts.empty()) continue;
     for (const auto* m : cls->members) {
       if (m->kind != ClassMemberKind::kMethod || !m->method) continue;
@@ -338,13 +351,10 @@ void Elaborator::ValidateTypeParamScopeUsage(const ModuleDecl* decl) {
   }
 }
 
-void Elaborator::ValidateTypeParamScopePrefixResolvesToClass(
-    const ModuleDecl* decl) {
-  // §6.20.3: a type parameter may prefix the class scope resolution operator in
-  // an allowed context (such as a typedef declaration) only when it resolves to
-  // a class type; it shall be an error if the prefix does not resolve to a
-  // class. Collect each body type parameter and the type it is bound to.
-  std::unordered_map<std::string_view, const DataType*> type_param_bound;
+// Collects each body type parameter and the type it is bound to.
+static void CollectBoundTypeParams(
+    const ModuleDecl* decl,
+    std::unordered_map<std::string_view, const DataType*>& type_param_bound) {
   for (const auto* item : decl->items) {
     if (item->kind == ModuleItemKind::kParamDecl &&
         item->data_type.kind == DataTypeKind::kVoid &&
@@ -352,55 +362,70 @@ void Elaborator::ValidateTypeParamScopePrefixResolvesToClass(
       type_param_bound[item->name] = &item->typedef_type;
     }
   }
+}
+
+// Checks one typedef whose named type carries a scope prefix: if that prefix
+// names a body type parameter bound to a type that is definitely not a class
+// (any non-named type), report the error.
+static void CheckTypedefScopePrefixResolvesToClass(
+    const ModuleItem* item,
+    const std::unordered_map<std::string_view, const DataType*>&
+        type_param_bound,
+    DiagEngine& diag) {
+  if (item->kind != ModuleItemKind::kTypedef) return;
+  if (item->typedef_type.kind != DataTypeKind::kNamed) return;
+  auto scope = item->typedef_type.scope_name;
+  if (scope.empty()) return;
+  auto it = type_param_bound.find(scope);
+  if (it == type_param_bound.end()) return;
+  // A built-in or otherwise non-named type can never be a class; a named type
+  // is left alone (it may name a class, possibly one declared elsewhere) to
+  // avoid false positives.
+  if (it->second->kind != DataTypeKind::kNamed) {
+    diag.Error(item->loc,
+               std::format("type parameter '{}' used as a class scope "
+                           "resolution prefix does not resolve to a class",
+                           scope));
+  }
+}
+
+void Elaborator::ValidateTypeParamScopePrefixResolvesToClass(
+    const ModuleDecl* decl) {
+  // §6.20.3: a type parameter may prefix the class scope resolution operator in
+  // an allowed context (such as a typedef declaration) only when it resolves to
+  // a class type; it shall be an error if the prefix does not resolve to a
+  // class.
+  std::unordered_map<std::string_view, const DataType*> type_param_bound;
+  CollectBoundTypeParams(decl, type_param_bound);
   if (type_param_bound.empty()) return;
 
-  // Returns true when the bound type is definitely not a class. A built-in or
-  // otherwise non-named type can never be a class; a named type is left alone
-  // (it may name a class, possibly one declared elsewhere) to avoid false
-  // positives.
-  auto definitely_not_a_class = [&](const DataType* bound) -> bool {
-    return bound->kind != DataTypeKind::kNamed;
-  };
-
   for (const auto* item : decl->items) {
-    if (item->kind != ModuleItemKind::kTypedef) continue;
-    if (item->typedef_type.kind != DataTypeKind::kNamed) continue;
-    auto scope = item->typedef_type.scope_name;
-    if (scope.empty()) continue;
-    auto it = type_param_bound.find(scope);
-    if (it == type_param_bound.end()) continue;
-    if (definitely_not_a_class(it->second)) {
-      diag_.Error(item->loc,
-                  std::format("type parameter '{}' used as a class scope "
-                              "resolution prefix does not resolve to a class",
-                              scope));
+    CheckTypedefScopePrefixResolvesToClass(item, type_param_bound, diag_);
+  }
+}
+
+// A forward typedef is resolved if a class of the same name exists, or another
+// non-forward typedef in the same scope shares its name.
+static bool ForwardClassTypedefIsResolved(const ModuleItem* item,
+                                          const CompilationUnit* unit) {
+  for (const auto* cls : unit->classes) {
+    if (cls->name == item->name) return true;
+  }
+  for (const auto* other : unit->cu_items) {
+    if (other == item) continue;
+    if (other->kind == ModuleItemKind::kTypedef && other->name == item->name &&
+        other->typedef_type.kind != DataTypeKind::kImplicit) {
+      return true;
     }
   }
+  return false;
 }
 
 void Elaborator::ValidateForwardClassTypedefs() {
   for (const auto* item : unit_->cu_items) {
     if (item->kind != ModuleItemKind::kTypedef) continue;
     if (item->typedef_type.kind != DataTypeKind::kImplicit) continue;
-    bool resolved = false;
-    for (const auto* cls : unit_->classes) {
-      if (cls->name == item->name) {
-        resolved = true;
-        break;
-      }
-    }
-    if (!resolved) {
-      for (const auto* other : unit_->cu_items) {
-        if (other == item) continue;
-        if (other->kind == ModuleItemKind::kTypedef &&
-            other->name == item->name &&
-            other->typedef_type.kind != DataTypeKind::kImplicit) {
-          resolved = true;
-          break;
-        }
-      }
-    }
-    if (!resolved) {
+    if (!ForwardClassTypedefIsResolved(item, unit_)) {
       diag_.Error(item->loc,
                   std::format("forward typedef '{}' is never resolved by a "
                               "definition in the same scope",

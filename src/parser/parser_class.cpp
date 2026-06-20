@@ -181,29 +181,50 @@ void Parser::ParseExtendsArgList(ClassDecl* decl) {
   Expect(TokenKind::kRParen);
 }
 
+namespace {
+
+// Record one base named in a class's extends/implements clause onto decl. The
+// first non-implements base becomes the class's primary base_class (and carries
+// its type parameters into base_class_type_params when has_type_params is set);
+// every other entry is collected as an implemented interface or an additional
+// extended interface. has_type_params distinguishes 'base #(...)' from a bare
+// 'base' so the no-parameter case leaves base_class_type_params untouched.
+// Returns whether this base was the primary base, so the caller can route its
+// following '(...)' argument list correctly.
+bool RecordClassExtendsBase(ClassDecl* decl, std::string_view name,
+                            std::vector<DataType> tparams, bool is_implements,
+                            bool has_type_params) {
+  bool is_first_base = !is_implements && decl->base_class.empty();
+  if (is_first_base) {
+    decl->base_class = name;
+  }
+  if (has_type_params && is_first_base) {
+    decl->base_class_type_params = tparams;
+  }
+  if (is_implements) {
+    decl->implements_types.push_back({name, std::move(tparams)});
+  } else if (!is_first_base) {
+    decl->extends_interfaces.push_back({name, std::move(tparams)});
+  }
+  return is_first_base;
+}
+
+}  // namespace
+
 void Parser::ParseClassExtendsClause(ClassDecl* decl, bool is_implements) {
   do {
     auto name = Expect(TokenKind::kIdentifier).text;
     while (Match(TokenKind::kColonColon)) {
       name = Expect(TokenKind::kIdentifier).text;
     }
-    bool is_first_base = !is_implements && decl->base_class.empty();
-    if (is_first_base) {
-      decl->base_class = name;
-    }
     std::vector<DataType> tparams;
-    if (Check(TokenKind::kHash)) {
+    bool has_type_params = Check(TokenKind::kHash);
+    if (has_type_params) {
       Consume();
       tparams = ParseTypeParamList();
-      if (is_first_base) {
-        decl->base_class_type_params = tparams;
-      }
     }
-    if (is_implements) {
-      decl->implements_types.push_back({name, std::move(tparams)});
-    } else if (!is_first_base) {
-      decl->extends_interfaces.push_back({name, std::move(tparams)});
-    }
+    RecordClassExtendsBase(decl, name, std::move(tparams), is_implements,
+                           has_type_params);
 
     if (Check(TokenKind::kLParen)) {
       if (is_implements) {
@@ -504,6 +525,41 @@ void Parser::ParseExtraPropertyDecls(std::vector<ClassMember*>& members,
   }
 }
 
+namespace {
+
+// 18.5.11/18.5.13.1: from the leaf identifier token just consumed inside a
+// constraint block body, record an unqualified function call (the 'identifier (
+// ' form) and, while scanning a soft constraint, a bare local variable
+// reference. The lookahead results (whether the next token opens a call or
+// continues a qualified reference) are computed by the caller and passed in so
+// this stays a pure operation on the recorded member. in_soft is cleared when
+// the soft constraint's expression terminates at its ';'.
+void RecordConstraintTokenRefs(ClassMember* member, const Token& tok,
+                               bool prev_was_qualifier, bool& in_soft,
+                               bool next_is_lparen, bool next_is_dot,
+                               bool next_is_coloncolon) {
+  if (tok.kind == TokenKind::kIdentifier && !prev_was_qualifier &&
+      next_is_lparen) {
+    ConstraintFunctionCallRef ref;
+    ref.callee = tok.text;
+    ref.loc = tok.loc;
+    if (member) member->constraint_function_call_refs.push_back(ref);
+  }
+  if (in_soft && tok.kind == TokenKind::kIdentifier && !prev_was_qualifier &&
+      !next_is_lparen && !next_is_dot && !next_is_coloncolon) {
+    if (member) {
+      ConstraintSoftVarRef sref;
+      sref.name = tok.text;
+      sref.loc = tok.loc;
+      member->constraint_soft_refs.push_back(sref);
+    }
+  }
+  // The soft constraint's expression ends at its ';'.
+  if (tok.kind == TokenKind::kSemicolon) in_soft = false;
+}
+
+}  // namespace
+
 ClassMember* Parser::ParseConstraintStub(ClassMember* member) {
   member->kind = ClassMemberKind::kConstraint;
   Consume();
@@ -540,77 +596,65 @@ ClassMember* Parser::ParseConstraintStub(ClassMember* member) {
   // specified on a randc variable.
   bool in_soft = false;
   while (depth > 0 && !AtEnd()) {
-    if (Check(TokenKind::kKwForeach)) {
-      // 18.5.7.1: a foreach iterative constraint heads its constraint_set with
-      // 'foreach ( array_id [ loop_variables ] )'. Validate that header (in
-      // particular the loop-variable naming rule) and record it on the member
-      // for the elaborator's dimension check before the surrounding scan
-      // resumes over the constraint_set body.
-      CheckForeachConstraintHeader(member);
-      prev_was_qualifier = false;
-    } else if (Check(TokenKind::kKwSolve)) {
-      // 18.5.9: 'solve solve_before_list before solve_before_list ;' defines a
-      // partial ordering on the evaluation of random variables. Record the two
-      // lists on the member so the elaborator can enforce the ordering
-      // restrictions and reject circular dependencies; the statement is
-      // consumed through its terminating ';' before the surrounding scan
-      // resumes.
-      CheckSolveBeforeConstraint(member);
-      prev_was_qualifier = false;
-    } else if (Check(TokenKind::kKwSoft)) {
-      // 18.5.13.1: 'soft' introduces a soft constraint ('soft
-      // expression_or_dist
-      // ;'). Begin collecting the bare local variables its expression names;
-      // the collection ends at the constraint_expression's terminating ';'.
-      Consume();
-      in_soft = true;
-      prev_was_qualifier = false;
-    } else if (Check(TokenKind::kKwDist)) {
-      // 18.5.3: 'expression dist { dist_list }'. Hand the brace-enclosed
-      // dist_list to a dedicated scan so its default-item rules are enforced.
-      Consume();
-      CheckDistSet();
-      prev_was_qualifier = false;
-    } else if (Match(TokenKind::kLBrace)) {
-      ++depth;
-      prev_was_qualifier = false;
-    } else if (Match(TokenKind::kRBrace)) {
-      --depth;
-      prev_was_qualifier = false;
-    } else {
-      Token t = CurrentToken();
-      CheckConstraintExprToken(t);
-      Consume();
-      // 18.5.11: an unqualified 'identifier (' opens a function call (a
-      // user-defined function or an array built-in such as size()). Record the
-      // callee so the elaborator can resolve it and, when it is a class method,
-      // apply the argument restrictions on functions used in constraints.
-      if (t.kind == TokenKind::kIdentifier && !prev_was_qualifier &&
-          Check(TokenKind::kLParen)) {
-        ConstraintFunctionCallRef ref;
-        ref.callee = t.text;
-        ref.loc = t.loc;
-        if (member) member->constraint_function_call_refs.push_back(ref);
-      }
-      // 18.5.13.1: record a bare local variable named in a soft constraint
-      // expression — an identifier that is not the leaf of a qualified
-      // reference (no preceding '.'/'::'), not the head of one (no following
-      // '.'/'::'), and not a function call (no following '(').
-      if (in_soft && t.kind == TokenKind::kIdentifier && !prev_was_qualifier &&
-          !Check(TokenKind::kLParen) && !Check(TokenKind::kDot) &&
-          !Check(TokenKind::kColonColon)) {
-        if (member) {
-          ConstraintSoftVarRef sref;
-          sref.name = t.text;
-          sref.loc = t.loc;
-          member->constraint_soft_refs.push_back(sref);
-        }
-      }
-      // The soft constraint's expression ends at its ';'.
-      if (t.kind == TokenKind::kSemicolon) in_soft = false;
-      prev_was_qualifier =
-          t.kind == TokenKind::kDot || t.kind == TokenKind::kColonColon;
+    switch (CurrentToken().kind) {
+      case TokenKind::kKwForeach:
+        // 18.5.7.1: a foreach iterative constraint heads its constraint_set
+        // with 'foreach ( array_id [ loop_variables ] )'. Validate that header
+        // (in particular the loop-variable naming rule) and record it on the
+        // member for the elaborator's dimension check before the surrounding
+        // scan resumes over the constraint_set body.
+        CheckForeachConstraintHeader(member);
+        prev_was_qualifier = false;
+        continue;
+      case TokenKind::kKwSolve:
+        // 18.5.9: 'solve solve_before_list before solve_before_list ;' defines
+        // a partial ordering on the evaluation of random variables. Record the
+        // two lists on the member so the elaborator can enforce the ordering
+        // restrictions and reject circular dependencies; the statement is
+        // consumed through its terminating ';' before the surrounding scan
+        // resumes.
+        CheckSolveBeforeConstraint(member);
+        prev_was_qualifier = false;
+        continue;
+      case TokenKind::kKwSoft:
+        // 18.5.13.1: 'soft' introduces a soft constraint ('soft
+        // expression_or_dist ;'). Begin collecting the bare local variables its
+        // expression names; the collection ends at the terminating ';'.
+        Consume();
+        in_soft = true;
+        prev_was_qualifier = false;
+        continue;
+      case TokenKind::kKwDist:
+        // 18.5.3: 'expression dist { dist_list }'. Hand the brace-enclosed
+        // dist_list to a dedicated scan so its default-item rules are enforced.
+        Consume();
+        CheckDistSet();
+        prev_was_qualifier = false;
+        continue;
+      case TokenKind::kLBrace:
+        Consume();
+        ++depth;
+        prev_was_qualifier = false;
+        continue;
+      case TokenKind::kRBrace:
+        Consume();
+        --depth;
+        prev_was_qualifier = false;
+        continue;
+      default:
+        break;
     }
+    Token t = CurrentToken();
+    CheckConstraintExprToken(t);
+    Consume();
+    // 18.5.11/18.5.13.1: with the leaf token consumed, look at the next token
+    // to recognize an unqualified call ('identifier (') and a bare local
+    // variable named in a soft constraint, then record them on the member.
+    RecordConstraintTokenRefs(member, t, prev_was_qualifier, in_soft,
+                              Check(TokenKind::kLParen), Check(TokenKind::kDot),
+                              Check(TokenKind::kColonColon));
+    prev_was_qualifier =
+        t.kind == TokenKind::kDot || t.kind == TokenKind::kColonColon;
   }
   return member;
 }
@@ -674,6 +718,58 @@ static bool LiteralHasFourStateDigit(std::string_view text) {
 // array name, on the constraint member so the elaborator can check it against
 // the array's dimensionality. The constraint_set that follows the header is
 // left to the surrounding scan.
+namespace {
+
+// 18.5.7.1: handle one token of a foreach header's bracketed loop_variables
+// list, the token having just been consumed by the caller. '[' and ']' adjust
+// the bracket nesting depth; at the top level a ',' opens the next
+// loop-variable slot, and a loop-variable identifier records the last named
+// slot and is an error when it reuses the iterated array's name. Tokens at a
+// deeper bracket depth (such as a select expression's contents) only need to be
+// skipped, which the caller's consume already accomplished.
+void HandleForeachBracketToken(DiagEngine& diag, const Token& t,
+                               std::string_view array_name, int& bracket_depth,
+                               int& slot, int& loop_var_count) {
+  if (t.kind == TokenKind::kLBracket) {
+    ++bracket_depth;
+    return;
+  }
+  if (t.kind == TokenKind::kRBracket) {
+    --bracket_depth;
+    return;
+  }
+  if (bracket_depth == 1 && t.kind == TokenKind::kComma) {
+    ++slot;
+    return;
+  }
+  if (bracket_depth == 1 && t.kind == TokenKind::kIdentifier) {
+    loop_var_count = slot;
+    if (!array_name.empty() && t.text == array_name) {
+      diag.Error(t.loc, std::string("foreach loop variable '") +
+                            std::string(t.text) +
+                            "' may not have the same name as the array it "
+                            "iterates over");
+    }
+  }
+}
+
+// 18.5.7.1: record a parsed foreach iterative constraint header on the member
+// so the elaborator can check the loop-variable count against the array's
+// dimensionality. Headers with no resolvable array name are dropped.
+void RecordForeachConstraintRef(ClassMember* member,
+                                std::string_view array_name, int loop_var_count,
+                                SourceLoc foreach_loc) {
+  if (member && !array_name.empty()) {
+    ConstraintForeachRef ref;
+    ref.array_name = array_name;
+    ref.loop_var_count = loop_var_count;
+    ref.loc = foreach_loc;
+    member->constraint_foreach_refs.push_back(ref);
+  }
+}
+
+}  // namespace
+
 void Parser::CheckForeachConstraintHeader(ClassMember* member) {
   SourceLoc foreach_loc = CurrentLoc();
   Consume();  // 'foreach'
@@ -689,39 +785,16 @@ void Parser::CheckForeachConstraintHeader(ClassMember* member) {
   if (Match(TokenKind::kLBracket)) {
     slot = 1;
     int bracket_depth = 1;
+    // Every token of the list is consumed exactly once; the per-token bracket
+    // depth, slot, and loop-variable bookkeeping is delegated.
     while (bracket_depth > 0 && !AtEnd()) {
-      if (Check(TokenKind::kLBracket)) {
-        ++bracket_depth;
-        Consume();
-      } else if (Check(TokenKind::kRBracket)) {
-        --bracket_depth;
-        Consume();
-      } else if (bracket_depth == 1 && Check(TokenKind::kComma)) {
-        ++slot;
-        Consume();
-      } else {
-        Token t = Consume();
-        if (bracket_depth == 1 && t.kind == TokenKind::kIdentifier) {
-          loop_var_count = slot;
-          if (!array_name.empty() && t.text == array_name) {
-            diag_.Error(t.loc,
-                        std::string("foreach loop variable '") +
-                            std::string(t.text) +
-                            "' may not have the same name as the array it "
-                            "iterates over");
-          }
-        }
-      }
+      Token t = Consume();
+      HandleForeachBracketToken(diag_, t, array_name, bracket_depth, slot,
+                                loop_var_count);
     }
   }
   Match(TokenKind::kRParen);
-  if (member && !array_name.empty()) {
-    ConstraintForeachRef ref;
-    ref.array_name = array_name;
-    ref.loop_var_count = loop_var_count;
-    ref.loc = foreach_loc;
-    member->constraint_foreach_refs.push_back(ref);
-  }
+  RecordForeachConstraintRef(member, array_name, loop_var_count, foreach_loc);
 }
 
 // 18.5.9: scan one solve_before_list,

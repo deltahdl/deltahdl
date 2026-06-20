@@ -2,6 +2,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <iostream>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -109,6 +110,102 @@ static std::string FormatMember(const StructFieldInfo& f, const Logic4Vec& val,
   return std::string(f.name) + ":" + FormatSingularForP(slice, f.type_kind);
 }
 
+// §21.2.1.6 (C4): a tagged union prints its currently valid member as
+// "tag:value". The active member's width and type come from the union type.
+// Returns the formatted text, or no value when the variable is not a tagged
+// union (the caller falls through to the next aggregate form).
+static std::optional<std::string> BuildFormatPTaggedUnion(std::string_view name,
+                                                          const Logic4Vec& val,
+                                                          SimContext& ctx,
+                                                          Arena& arena) {
+  auto tag = ctx.GetVariableTag(name);
+  if (tag.empty()) return std::nullopt;
+  DataTypeKind kind = DataTypeKind::kImplicit;
+  uint32_t width = val.width;
+  if (auto* st = ctx.GetVariableStructType(name)) {
+    for (const auto& f : st->fields) {
+      if (f.name == tag) {
+        kind = f.type_kind;
+        width = f.width;
+        break;
+      }
+    }
+  }
+  Logic4Vec slice = SliceField(val, 0, width, kind, arena);
+  return "'{" + std::string(tag) + ":" + FormatSingularForP(slice, kind) + "}";
+}
+
+// §21.2.1.6 (C2/C3/C7a): a struct prints every member as "name:value"; a
+// plain (untagged) union prints only its first declared member. Returns no
+// value when the variable is not a struct/union type.
+static std::optional<std::string> BuildFormatPStruct(std::string_view name,
+                                                     const Logic4Vec& val,
+                                                     SimContext& ctx,
+                                                     Arena& arena) {
+  auto* st = ctx.GetVariableStructType(name);
+  if (st == nullptr) return std::nullopt;
+  std::string out = "'{";
+  size_t count =
+      st->is_union ? std::min<size_t>(1, st->fields.size()) : st->fields.size();
+  for (size_t i = 0; i < count; ++i) {
+    if (i) out += ", ";
+    out += FormatMember(st->fields[i], val, arena);
+  }
+  out += "}";
+  return out;
+}
+
+// §21.2.1.6 (C5): an unpacked array prints as an assignment pattern of its
+// elements in index order. Elements live as their own variables, named
+// "arr[idx]" by the lowerer. Returns no value when the variable is not a
+// non-empty unpacked array.
+static std::optional<std::string> BuildFormatPArray(std::string_view name,
+                                                    SimContext& ctx,
+                                                    Arena& arena) {
+  auto* ai = ctx.FindArrayInfo(name);
+  if (ai == nullptr || ai->size == 0) return std::nullopt;
+  std::string out = "'{";
+  for (uint32_t i = 0; i < ai->size; ++i) {
+    if (i) out += ", ";
+    uint32_t idx = ai->lo + i;
+    std::string elem_name = std::string(name) + "[" + std::to_string(idx) + "]";
+    Variable* elem = ctx.FindVariable(elem_name);
+    Logic4Vec ev =
+        elem ? elem->value : MakeLogic4VecVal(arena, ai->elem_width, 0);
+    out += FormatSingularForP(ev, ai->elem_type_kind);
+  }
+  out += "}";
+  return out;
+}
+
+// §21.2.1.6 (C7d): a class handle prints in an implementation-dependent form,
+// except that a null handle prints the word "null". A null handle is the known
+// zero value. Returns no value when the variable is not a class handle.
+static std::optional<std::string> BuildFormatPClassHandle(std::string_view name,
+                                                          const Logic4Vec& val,
+                                                          SimContext& ctx) {
+  if (ctx.GetVariableClassType(name).empty()) return std::nullopt;
+  if (val.IsKnown() && val.ToUint64() == 0) return "null";
+  return FormatArg(val, 'd');
+}
+
+// §21.2.1.6 (C7b): an enumerated value prints as the matching member name when
+// the value is one named by the type; otherwise it prints in the base type's
+// (decimal) form. Returns no value when the variable is not an enum type.
+static std::optional<std::string> BuildFormatPEnum(std::string_view name,
+                                                   const Logic4Vec& val,
+                                                   SimContext& ctx) {
+  auto* et = ctx.GetVariableEnumType(name);
+  if (et == nullptr) return std::nullopt;
+  if (val.IsKnown()) {
+    uint64_t v = val.ToUint64();
+    for (const auto& m : et->members) {
+      if (m.value == v) return std::string(m.name);
+    }
+  }
+  return FormatArg(val, 'd');
+}
+
 // §21.2.1.6: build the text the %p (and %0p) format specifier substitutes for
 // an argument. An aggregate operand prints as an assignment pattern; a singular
 // operand prints as a single element of one. The use of white space is left to
@@ -121,79 +218,11 @@ static std::string BuildFormatP(const Expr* arg, const Logic4Vec& val,
                               : std::string_view{};
 
   if (!name.empty()) {
-    // §21.2.1.6 (C4): a tagged union prints its currently valid member as
-    // "tag:value". The active member's width and type come from the union type.
-    auto tag = ctx.GetVariableTag(name);
-    if (!tag.empty()) {
-      DataTypeKind kind = DataTypeKind::kImplicit;
-      uint32_t width = val.width;
-      if (auto* st = ctx.GetVariableStructType(name)) {
-        for (const auto& f : st->fields) {
-          if (f.name == tag) {
-            kind = f.type_kind;
-            width = f.width;
-            break;
-          }
-        }
-      }
-      Logic4Vec slice = SliceField(val, 0, width, kind, arena);
-      return "'{" + std::string(tag) + ":" + FormatSingularForP(slice, kind) +
-             "}";
-    }
-
-    // §21.2.1.6 (C2/C3/C7a): a struct prints every member as "name:value"; a
-    // plain (untagged) union prints only its first declared member.
-    if (auto* st = ctx.GetVariableStructType(name)) {
-      std::string out = "'{";
-      size_t count = st->is_union ? std::min<size_t>(1, st->fields.size())
-                                  : st->fields.size();
-      for (size_t i = 0; i < count; ++i) {
-        if (i) out += ", ";
-        out += FormatMember(st->fields[i], val, arena);
-      }
-      out += "}";
-      return out;
-    }
-
-    // §21.2.1.6 (C5): an unpacked array prints as an assignment pattern of its
-    // elements in index order. Elements live as their own variables, named
-    // "arr[idx]" by the lowerer.
-    if (auto* ai = ctx.FindArrayInfo(name); ai != nullptr && ai->size > 0) {
-      std::string out = "'{";
-      for (uint32_t i = 0; i < ai->size; ++i) {
-        if (i) out += ", ";
-        uint32_t idx = ai->lo + i;
-        std::string elem_name =
-            std::string(name) + "[" + std::to_string(idx) + "]";
-        Variable* elem = ctx.FindVariable(elem_name);
-        Logic4Vec ev =
-            elem ? elem->value : MakeLogic4VecVal(arena, ai->elem_width, 0);
-        out += FormatSingularForP(ev, ai->elem_type_kind);
-      }
-      out += "}";
-      return out;
-    }
-
-    // §21.2.1.6 (C7d): a class handle prints in an implementation-dependent
-    // form, except that a null handle prints the word "null". A null handle is
-    // the known zero value.
-    if (!ctx.GetVariableClassType(name).empty()) {
-      if (val.IsKnown() && val.ToUint64() == 0) return "null";
-      return FormatArg(val, 'd');
-    }
-
-    // §21.2.1.6 (C7b): an enumerated value prints as the matching member name
-    // when the value is one named by the type; otherwise it prints in the base
-    // type's (decimal) form.
-    if (auto* et = ctx.GetVariableEnumType(name)) {
-      if (val.IsKnown()) {
-        uint64_t v = val.ToUint64();
-        for (const auto& m : et->members) {
-          if (m.value == v) return std::string(m.name);
-        }
-      }
-      return FormatArg(val, 'd');
-    }
+    if (auto r = BuildFormatPTaggedUnion(name, val, ctx, arena)) return *r;
+    if (auto r = BuildFormatPStruct(name, val, ctx, arena)) return *r;
+    if (auto r = BuildFormatPArray(name, ctx, arena)) return *r;
+    if (auto r = BuildFormatPClassHandle(name, val, ctx)) return *r;
+    if (auto r = BuildFormatPEnum(name, val, ctx)) return *r;
   }
 
   // §21.2.1.6 (C10): %p on a singular expression formats it as one element of
@@ -515,6 +544,96 @@ static std::string DumpportsControlFileArg(const Expr* expr) {
   return std::string(text);
 }
 
+// §21.7.1.2: dump the variables named by a $dumpvars call. With no arguments
+// every variable in the model is dumped. When arguments are present the first
+// is the level count and the remaining arguments name the scopes (modules or
+// individual variables) to dump.
+static void ExecDumpvars(const Expr* expr, VcdWriter* vcd) {
+  if (!vcd) return;
+  std::vector<std::string_view> scopes;
+  for (size_t i = 1; i < expr->args.size(); ++i) {
+    auto scope = DumpvarsScopeName(expr->args[i]);
+    if (!scope.empty()) scopes.push_back(scope);
+  }
+  if (scopes.empty()) {
+    vcd->DumpAllValues();
+  } else {
+    vcd->DumpSelectedValues(scopes);
+  }
+}
+
+// §21.7.3.1: gather the unique module scopes named in a $dumpports scope_list.
+// scope_end excludes a trailing filename argument. A string-literal entry is
+// not a valid module_identifier and is rejected; duplicate scopes within this
+// call and across earlier $dumpports calls are reported rather than dumped.
+static std::vector<std::string_view> CollectDumpportsScopes(const Expr* expr,
+                                                            size_t scope_end,
+                                                            SimContext& ctx) {
+  std::vector<std::string_view> scopes;
+  for (size_t i = 0; i < scope_end; ++i) {
+    if (!expr->args[i]) continue;
+    // §21.7.3.1: scope_list entries name modules; a string literal is not a
+    // valid module_identifier, so reject it rather than treating it as a
+    // scope name.
+    if (expr->args[i]->kind == ExprKind::kStringLiteral) {
+      ctx.GetDiag().Error(
+          {},
+          "$dumpports scope_list entry must be a module, not a string "
+          "literal");
+      continue;
+    }
+    auto scope = DumpvarsScopeName(expr->args[i]);
+    if (scope.empty()) continue;
+    // §21.7.3.1: each scope named in a $dumpports scope_list shall be
+    // unique; a repeated scope is reported rather than dumped twice.
+    if (std::find(scopes.begin(), scopes.end(), scope) != scopes.end()) {
+      ctx.GetDiag().Error({}, "$dumpports scope_list entries must be unique");
+      continue;
+    }
+    // §21.7.3.1: scope names must also be unique across separate $dumpports
+    // calls, not just within one call.
+    if (!ctx.RegisterDumpportsScope(std::string(scope))) {
+      ctx.GetDiag().Error({},
+                          "$dumpports scope already named by an earlier call");
+      continue;
+    }
+    scopes.push_back(scope);
+  }
+  return scopes;
+}
+
+// §21.7.3.1: name the (extended) VCD output and start dumping the ports in
+// scope. A trailing string-literal argument names the file, defaulting to
+// dumpports.vcd when omitted. The leading arguments form the scope_list naming
+// the modules whose ports are dumped; with no scope_list the scope is the
+// calling module, so every port registered from the point of the call is
+// treated as a primary I/O pin and dumped. Dumping reuses the 4-state VCD
+// machinery, which the extended VCD file inherits unless otherwise stated.
+static void ExecDumpports(const Expr* expr, SimContext& ctx, VcdWriter* vcd) {
+  ctx.SetDumpFileName(ResolveDumpportsFileName(expr));
+  bool last_is_file = !expr->args.empty() && expr->args.back() &&
+                      expr->args.back()->kind == ExprKind::kStringLiteral;
+  // §21.7.3.1: a file name spelled out in the call may not be reused by a
+  // later $dumpports call. A defaulted name is not "specified", so repeated
+  // default calls are allowed.
+  if (last_is_file && !ctx.RegisterDumpportsFile(ctx.GetDumpFileName())) {
+    ctx.GetDiag().Error(
+        {}, "$dumpports may not name the same output file more than once");
+  }
+  if (!vcd) return;
+  // $dumpports produces an extended VCD file, which closes with the
+  // $vcdclose keyword command (§21.7.3.6.1).
+  vcd->SetExtended();
+  size_t scope_end = expr->args.size() - (last_is_file ? 1 : 0);
+  std::vector<std::string_view> scopes =
+      CollectDumpportsScopes(expr, scope_end, ctx);
+  if (scopes.empty()) {
+    vcd->DumpAllValues();
+  } else {
+    vcd->DumpSelectedValues(scopes);
+  }
+}
+
 Logic4Vec EvalVcdSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
                          std::string_view name) {
   auto* vcd = ctx.GetVcdWriter();
@@ -533,21 +652,7 @@ Logic4Vec EvalVcdSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
   if (name == "$dumpfile") {
     ctx.SetDumpFileName(ResolveDumpFileName(expr, ctx, arena));
   } else if (name == "$dumpvars") {
-    // With no arguments every variable in the model is dumped. When
-    // arguments are present the first is the level count and the remaining
-    // arguments name the scopes (modules or individual variables) to dump.
-    if (vcd) {
-      std::vector<std::string_view> scopes;
-      for (size_t i = 1; i < expr->args.size(); ++i) {
-        auto scope = DumpvarsScopeName(expr->args[i]);
-        if (!scope.empty()) scopes.push_back(scope);
-      }
-      if (scopes.empty()) {
-        vcd->DumpAllValues();
-      } else {
-        vcd->DumpSelectedValues(scopes);
-      }
-    }
+    ExecDumpvars(expr, vcd);
   } else if (name == "$dumpall") {
     // Emit a checkpoint of every selected variable's current value (§21.7.1.4).
     if (vcd) vcd->DumpAll();
@@ -568,66 +673,7 @@ Logic4Vec EvalVcdSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
     // as before so no value changes are lost.
     if (vcd) vcd->Flush();
   } else if (name == "$dumpports") {
-    // §21.7.3.1: name the (extended) VCD output and start dumping the ports in
-    // scope. A trailing string-literal argument names the file, defaulting to
-    // dumpports.vcd when omitted. The leading arguments form the scope_list
-    // naming the modules whose ports are dumped; with no scope_list the scope
-    // is the calling module, so every port registered from the point of the
-    // call is treated as a primary I/O pin and dumped. Dumping reuses the
-    // 4-state VCD machinery, which the extended VCD file inherits unless
-    // otherwise stated.
-    ctx.SetDumpFileName(ResolveDumpportsFileName(expr));
-    bool last_is_file = !expr->args.empty() && expr->args.back() &&
-                        expr->args.back()->kind == ExprKind::kStringLiteral;
-    // §21.7.3.1: a file name spelled out in the call may not be reused by a
-    // later $dumpports call. A defaulted name is not "specified", so repeated
-    // default calls are allowed.
-    if (last_is_file && !ctx.RegisterDumpportsFile(ctx.GetDumpFileName())) {
-      ctx.GetDiag().Error(
-          {}, "$dumpports may not name the same output file more than once");
-    }
-    if (vcd) {
-      // $dumpports produces an extended VCD file, which closes with the
-      // $vcdclose keyword command (§21.7.3.6.1).
-      vcd->SetExtended();
-      size_t scope_end = expr->args.size() - (last_is_file ? 1 : 0);
-      std::vector<std::string_view> scopes;
-      for (size_t i = 0; i < scope_end; ++i) {
-        if (!expr->args[i]) continue;
-        // §21.7.3.1: scope_list entries name modules; a string literal is not a
-        // valid module_identifier, so reject it rather than treating it as a
-        // scope name.
-        if (expr->args[i]->kind == ExprKind::kStringLiteral) {
-          ctx.GetDiag().Error(
-              {},
-              "$dumpports scope_list entry must be a module, not a string "
-              "literal");
-          continue;
-        }
-        auto scope = DumpvarsScopeName(expr->args[i]);
-        if (scope.empty()) continue;
-        // §21.7.3.1: each scope named in a $dumpports scope_list shall be
-        // unique; a repeated scope is reported rather than dumped twice.
-        if (std::find(scopes.begin(), scopes.end(), scope) != scopes.end()) {
-          ctx.GetDiag().Error({},
-                              "$dumpports scope_list entries must be unique");
-          continue;
-        }
-        // §21.7.3.1: scope names must also be unique across separate $dumpports
-        // calls, not just within one call.
-        if (!ctx.RegisterDumpportsScope(std::string(scope))) {
-          ctx.GetDiag().Error(
-              {}, "$dumpports scope already named by an earlier call");
-          continue;
-        }
-        scopes.push_back(scope);
-      }
-      if (scopes.empty()) {
-        vcd->DumpAllValues();
-      } else {
-        vcd->DumpSelectedValues(scopes);
-      }
-    }
+    ExecDumpports(expr, ctx, vcd);
   } else if (name == "$dumpportsoff") {
     // §21.7.3.2: suspend the extended VCD port dump. A checkpoint marking every
     // selected port as x is written and recording stops from this simulation

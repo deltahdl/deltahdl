@@ -174,24 +174,22 @@ static Logic4Vec StringSubstr(const std::string& str, const Expr* call_expr,
   return StringToLogic4Vec(arena, str.substr(i, j - i + 1));
 }
 
+static int DigitValueForBase(char c, int base) {
+  if (base == 10 && c >= '0' && c <= '9') return c - '0';
+  if (base == 16 && c >= '0' && c <= '9') return c - '0';
+  if (base == 16 && c >= 'a' && c <= 'f') return c - 'a' + 10;
+  if (base == 16 && c >= 'A' && c <= 'F') return c - 'A' + 10;
+  if (base == 8 && c >= '0' && c <= '7') return c - '0';
+  if (base == 2 && (c == '0' || c == '1')) return c - '0';
+  return -1;
+}
+
 static Logic4Vec StringAtoBase(const std::string& str, int base, Arena& arena) {
   uint64_t val = 0;
   bool found_digit = false;
   for (char c : str) {
     if (c == '_') continue;
-    int digit = -1;
-    if (base == 10 && c >= '0' && c <= '9')
-      digit = c - '0';
-    else if (base == 16 && c >= '0' && c <= '9')
-      digit = c - '0';
-    else if (base == 16 && c >= 'a' && c <= 'f')
-      digit = c - 'a' + 10;
-    else if (base == 16 && c >= 'A' && c <= 'F')
-      digit = c - 'A' + 10;
-    else if (base == 8 && c >= '0' && c <= '7')
-      digit = c - '0';
-    else if (base == 2 && (c == '0' || c == '1'))
-      digit = c - '0';
+    int digit = DigitValueForBase(c, base);
     if (digit < 0) break;
     val = val * static_cast<uint64_t>(base) + static_cast<uint64_t>(digit);
     found_digit = true;

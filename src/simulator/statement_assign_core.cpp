@@ -131,6 +131,36 @@ static bool TryAssocLiteralAssign(const Stmt* stmt, SimContext& ctx,
   return true;
 }
 
+// `new src_obj` shallow-copy form: returns true (and writes the copy handle to
+// the target) when the rhs argument resolves to an existing class object.
+static bool TryClassCopyNewAssign(const Stmt* stmt, SimContext& ctx,
+                                  Arena& arena) {
+  if (!stmt->rhs->lhs || stmt->rhs->lhs->kind != ExprKind::kIdentifier)
+    return false;
+  auto src_val = EvalExpr(stmt->rhs->lhs, ctx, arena);
+  auto* src_obj = ctx.GetClassObject(src_val.ToUint64());
+  if (!src_obj) return false;
+  auto* copy = src_obj->ShallowCopy(arena);
+  auto copy_handle = ctx.AllocateClassObject(copy);
+  auto* var = ctx.FindVariable(stmt->lhs->text);
+  if (var) var->value = MakeLogic4VecVal(arena, 64, copy_handle);
+  return true;
+}
+
+// `new (referent)` for a weak_reference-typed target: allocate the weak
+// reference wrapper and write its handle to the target.
+static void AssignWeakReferenceNew(const Stmt* stmt, SimContext& ctx,
+                                   Arena& arena) {
+  uint64_t referent = kNullClassHandle;
+  if (!stmt->rhs->args.empty()) {
+    auto val = EvalExpr(stmt->rhs->args[0], ctx, arena);
+    referent = val.ToUint64();
+  }
+  auto wr_handle = ctx.AllocateWeakReference(referent, arena);
+  auto* var = ctx.FindVariable(stmt->lhs->text);
+  if (var) var->value = MakeLogic4VecVal(arena, 64, wr_handle);
+}
+
 static bool TryClassNewAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   if (!stmt->rhs || stmt->rhs->kind != ExprKind::kCall) return false;
   if (stmt->rhs->text != "new") return false;
@@ -138,27 +168,10 @@ static bool TryClassNewAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   auto type_name = ctx.GetVariableClassType(stmt->lhs->text);
   if (type_name.empty()) return false;
 
-  if (stmt->rhs->lhs && stmt->rhs->lhs->kind == ExprKind::kIdentifier) {
-    auto src_val = EvalExpr(stmt->rhs->lhs, ctx, arena);
-    auto* src_obj = ctx.GetClassObject(src_val.ToUint64());
-    if (src_obj) {
-      auto* copy = src_obj->ShallowCopy(arena);
-      auto copy_handle = ctx.AllocateClassObject(copy);
-      auto* var = ctx.FindVariable(stmt->lhs->text);
-      if (var) var->value = MakeLogic4VecVal(arena, 64, copy_handle);
-      return true;
-    }
-  }
+  if (TryClassCopyNewAssign(stmt, ctx, arena)) return true;
 
   if (type_name == "weak_reference") {
-    uint64_t referent = kNullClassHandle;
-    if (!stmt->rhs->args.empty()) {
-      auto val = EvalExpr(stmt->rhs->args[0], ctx, arena);
-      referent = val.ToUint64();
-    }
-    auto wr_handle = ctx.AllocateWeakReference(referent, arena);
-    auto* var = ctx.FindVariable(stmt->lhs->text);
-    if (var) var->value = MakeLogic4VecVal(arena, 64, wr_handle);
+    AssignWeakReferenceNew(stmt, ctx, arena);
     return true;
   }
 
@@ -241,6 +254,36 @@ static void CollectSliceSourceElements(const Expr* rhs, SimContext& ctx,
   }
 }
 
+// When no element-wise source was collected, evaluate the rhs as a single
+// packed value and split it into `dst_count` element-width slices.
+static void FillSliceSourceFromPacked(const Stmt* stmt, uint32_t elem_width,
+                                      uint32_t dst_count, SimContext& ctx,
+                                      Arena& arena,
+                                      std::vector<Logic4Vec>& src) {
+  auto val = EvalExpr(stmt->rhs, ctx, arena);
+  uint64_t mask =
+      (elem_width >= 64) ? ~uint64_t{0} : (uint64_t{1} << elem_width) - 1;
+  for (uint32_t i = 0; i < dst_count; ++i)
+    src.push_back(MakeLogic4VecVal(
+        arena, elem_width, (val.ToUint64() >> (i * elem_width)) & mask));
+}
+
+// Write the collected source elements into the destination slice elements
+// `base[dst_lo .. dst_lo+dst_count)`, resizing/coercing as for a scalar write.
+static void WriteUnpackedSliceElements(std::string_view base, uint32_t dst_lo,
+                                       uint32_t dst_count,
+                                       const std::vector<Logic4Vec>& src,
+                                       SimContext& ctx, Arena& arena) {
+  for (uint32_t i = 0; i < dst_count && i < src.size(); ++i) {
+    auto n = std::string(base) + "[" + std::to_string(dst_lo + i) + "]";
+    auto* var = ctx.FindVariable(n);
+    if (!var) continue;
+    var->value = ResizeToWidth(src[i], var->value.width, arena);
+    if (!var->is_4state) CoerceTo2State(var->value);
+    var->NotifyWatchers();
+  }
+}
+
 static bool TryUnpackedSliceAssign(const Stmt* stmt, SimContext& ctx,
                                    Arena& arena) {
   auto* lhs = stmt->lhs;
@@ -252,22 +295,11 @@ static bool TryUnpackedSliceAssign(const Stmt* stmt, SimContext& ctx,
   std::vector<Logic4Vec> src;
   CollectSliceSourceElements(stmt->rhs, ctx, arena, src);
   if (src.empty()) {
-    auto val = EvalExpr(stmt->rhs, ctx, arena);
-    uint32_t ew = dst_info->elem_width;
-    uint64_t mask = (ew >= 64) ? ~uint64_t{0} : (uint64_t{1} << ew) - 1;
-    for (uint32_t i = 0; i < dst_count; ++i)
-      src.push_back(
-          MakeLogic4VecVal(arena, ew, (val.ToUint64() >> (i * ew)) & mask));
+    FillSliceSourceFromPacked(stmt, dst_info->elem_width, dst_count, ctx, arena,
+                              src);
   }
-  for (uint32_t i = 0; i < dst_count && i < src.size(); ++i) {
-    auto n =
-        std::string(lhs->base->text) + "[" + std::to_string(dst_lo + i) + "]";
-    auto* var = ctx.FindVariable(n);
-    if (!var) continue;
-    var->value = ResizeToWidth(src[i], var->value.width, arena);
-    if (!var->is_4state) CoerceTo2State(var->value);
-    var->NotifyWatchers();
-  }
+  WriteUnpackedSliceElements(lhs->base->text, dst_lo, dst_count, src, ctx,
+                             arena);
   return true;
 }
 
@@ -427,6 +459,45 @@ static Logic4Vec ExtractWidenedSlice(const Logic4Vec& src, uint32_t start,
 // target. Resize the target to the smallest number of elements that is at
 // least as wide as the stream; if the resized total exceeds the stream width,
 // pad the stream with zero bits on the right before unpacking.
+// Left-shift `stream` (stream_w bits) into a `total_w`-bit vector, padding the
+// LSB side with zero bits. When no padding is needed the input is returned.
+static Logic4Vec RightPadStreamToWidth(const Logic4Vec& stream,
+                                       uint32_t stream_w, uint32_t total_w,
+                                       Arena& arena) {
+  if (total_w <= stream_w) return stream;
+  auto widened = MakeLogic4Vec(arena, total_w);
+  uint32_t shift = total_w - stream_w;
+  for (uint32_t b = 0; b < stream_w; ++b) {
+    uint32_t sw = b / 64, sb = b % 64;
+    uint32_t dst_bit = shift + b;
+    uint32_t dw = dst_bit / 64, db = dst_bit % 64;
+    if (sw < stream.nwords) {
+      if ((stream.words[sw].aval >> sb) & 1ull)
+        widened.words[dw].aval |= uint64_t{1} << db;
+      if ((stream.words[sw].bval >> sb) & 1ull)
+        widened.words[dw].bval |= uint64_t{1} << db;
+    }
+  }
+  return widened;
+}
+
+// Repopulate `queue` from the `total_w`-bit `widened` stream, carving out
+// `n_elems` element-width slices (MSB-first into successive elements).
+static void PopulateQueueFromWidenedStream(QueueObject* queue,
+                                           const Logic4Vec& widened,
+                                           uint32_t n_elems, uint32_t total_w,
+                                           uint32_t elem_w, Arena& arena) {
+  queue->elements.clear();
+  queue->elements.reserve(n_elems);
+  for (uint32_t i = 0; i < n_elems; ++i) {
+    uint32_t src_start = total_w - (i + 1) * elem_w;
+    queue->elements.push_back(
+        ExtractWidenedSlice(widened, src_start, elem_w, arena));
+  }
+  queue->AssignFreshIds();
+  ++queue->generation;
+}
+
 static bool TryStreamingConcatToQueueTarget(const Stmt* stmt, SimContext& ctx,
                                             Arena& arena) {
   if (!stmt->rhs || stmt->rhs->kind != ExprKind::kStreamingConcat) return false;
@@ -449,32 +520,9 @@ static bool TryStreamingConcatToQueueTarget(const Stmt* stmt, SimContext& ctx,
   uint32_t n_elems = (stream_w + elem_w - 1) / elem_w;
   uint32_t total_w = n_elems * elem_w;
 
-  Logic4Vec widened = stream;
-  if (total_w > stream_w) {
-    widened = MakeLogic4Vec(arena, total_w);
-    uint32_t shift = total_w - stream_w;
-    for (uint32_t b = 0; b < stream_w; ++b) {
-      uint32_t sw = b / 64, sb = b % 64;
-      uint32_t dst_bit = shift + b;
-      uint32_t dw = dst_bit / 64, db = dst_bit % 64;
-      if (sw < stream.nwords) {
-        if ((stream.words[sw].aval >> sb) & 1ull)
-          widened.words[dw].aval |= uint64_t{1} << db;
-        if ((stream.words[sw].bval >> sb) & 1ull)
-          widened.words[dw].bval |= uint64_t{1} << db;
-      }
-    }
-  }
-
-  queue->elements.clear();
-  queue->elements.reserve(n_elems);
-  for (uint32_t i = 0; i < n_elems; ++i) {
-    uint32_t src_start = total_w - (i + 1) * elem_w;
-    queue->elements.push_back(
-        ExtractWidenedSlice(widened, src_start, elem_w, arena));
-  }
-  queue->AssignFreshIds();
-  ++queue->generation;
+  Logic4Vec widened = RightPadStreamToWidth(stream, stream_w, total_w, arena);
+  PopulateQueueFromWidenedStream(queue, widened, n_elems, total_w, elem_w,
+                                 arena);
   return true;
 }
 
@@ -509,20 +557,7 @@ static Logic4Vec ApplyStreamPackToTargetWidening(const Stmt* stmt,
     return rhs_val;
   }
 
-  uint32_t shift = target_width - stream_width;
-  auto widened = MakeLogic4Vec(arena, target_width);
-  for (uint32_t b = 0; b < stream_width; ++b) {
-    uint32_t sw = b / 64, sb = b % 64;
-    uint32_t dst_bit = shift + b;
-    uint32_t dw = dst_bit / 64, db = dst_bit % 64;
-    if (sw < rhs_val.nwords) {
-      if ((rhs_val.words[sw].aval >> sb) & 1ull)
-        widened.words[dw].aval |= uint64_t{1} << db;
-      if ((rhs_val.words[sw].bval >> sb) & 1ull)
-        widened.words[dw].bval |= uint64_t{1} << db;
-    }
-  }
-  return widened;
+  return RightPadStreamToWidth(rhs_val, stream_width, target_width, arena);
 }
 
 // §25.9: assignment to a virtual interface variable. The right-hand side is
@@ -557,6 +592,60 @@ static bool TryVirtualInterfaceAssign(const Stmt* stmt, SimContext& ctx) {
   return false;
 }
 
+// §6.18: assignment between named event variables. `e = null` nullifies the
+// event; `e1 = e2` (both events) aliases the lhs to the rhs trigger.
+static bool TryEventVarAssign(const Stmt* stmt, SimContext& ctx) {
+  if (stmt->lhs->kind != ExprKind::kIdentifier || !stmt->rhs ||
+      stmt->rhs->kind != ExprKind::kIdentifier) {
+    return false;
+  }
+  auto* lhs_var = ctx.FindVariable(stmt->lhs->text);
+  if (!lhs_var || !lhs_var->is_event) return false;
+
+  if (stmt->rhs->text == "null") {
+    ctx.NullifyEventVariable(stmt->lhs->text);
+    return true;
+  }
+  auto* rhs_var = ctx.FindVariable(stmt->rhs->text);
+  if (rhs_var && rhs_var->is_event) {
+    ctx.AliasVariable(stmt->lhs->text, stmt->rhs->text);
+    return true;
+  }
+  return false;
+}
+
+// §11.4.1 compound assignment operators (`+=`, `<<=`, etc.): read-modify-write
+// the lhs through the appropriate target kind.
+static void ApplyCompoundAssignOp(const Stmt* stmt, SimContext& ctx,
+                                  Arena& arena) {
+  auto base_op = CompoundAssignBaseOp(stmt->rhs->op);
+  auto actual_rhs = EvalExpr(stmt->rhs->rhs, ctx, arena);
+
+  if (stmt->lhs->kind == ExprKind::kIdentifier) {
+    auto* var = ResolveLhsVariable(stmt->lhs, ctx);
+    if (var) {
+      auto result = EvalBinaryOp(base_op, var->value, actual_rhs, arena);
+      WriteVar(var, result, arena);
+    }
+  } else if (stmt->lhs->kind == ExprKind::kSelect) {
+    if (auto* elem = TryResolveArrayElement(stmt->lhs, ctx)) {
+      auto result = EvalBinaryOp(base_op, elem->value, actual_rhs, arena);
+      WriteVar(elem, result, arena);
+    } else {
+      auto lhs_val = EvalExpr(stmt->lhs, ctx, arena);
+      auto result = EvalBinaryOp(base_op, lhs_val, actual_rhs, arena);
+      TrySelectBlockingAssign(stmt->lhs, result, ctx, arena);
+    }
+  } else if (stmt->lhs->kind == ExprKind::kMemberAccess) {
+    auto lhs_val = EvalExpr(stmt->lhs, ctx, arena);
+    auto result = EvalBinaryOp(base_op, lhs_val, actual_rhs, arena);
+    WriteStructField(stmt->lhs, result, ctx, arena);
+  } else {
+    auto result = EvalExpr(stmt->rhs, ctx, arena);
+    AssignToScalarLhs(stmt, result, ctx, arena);
+  }
+}
+
 StmtResult ExecBlockingAssignImpl(const Stmt* stmt, SimContext& ctx,
                                   Arena& arena) {
   if (!stmt->lhs) return StmtResult::kDone;
@@ -570,24 +659,7 @@ StmtResult ExecBlockingAssignImpl(const Stmt* stmt, SimContext& ctx,
     return StmtResult::kDone;
   if (TryQueueBlockingAssign(stmt, ctx, arena)) return StmtResult::kDone;
 
-  if (stmt->lhs->kind == ExprKind::kIdentifier && stmt->rhs &&
-      stmt->rhs->kind == ExprKind::kIdentifier && stmt->rhs->text == "null") {
-    auto* lhs_var = ctx.FindVariable(stmt->lhs->text);
-    if (lhs_var && lhs_var->is_event) {
-      ctx.NullifyEventVariable(stmt->lhs->text);
-      return StmtResult::kDone;
-    }
-  }
-
-  if (stmt->lhs->kind == ExprKind::kIdentifier && stmt->rhs &&
-      stmt->rhs->kind == ExprKind::kIdentifier) {
-    auto* lhs_var = ctx.FindVariable(stmt->lhs->text);
-    auto* rhs_var = ctx.FindVariable(stmt->rhs->text);
-    if (lhs_var && lhs_var->is_event && rhs_var && rhs_var->is_event) {
-      ctx.AliasVariable(stmt->lhs->text, stmt->rhs->text);
-      return StmtResult::kDone;
-    }
-  }
+  if (TryEventVarAssign(stmt, ctx)) return StmtResult::kDone;
 
   if (TryUnpackedSliceAssign(stmt, ctx, arena)) return StmtResult::kDone;
 
@@ -595,32 +667,7 @@ StmtResult ExecBlockingAssignImpl(const Stmt* stmt, SimContext& ctx,
 
   if (stmt->rhs && stmt->rhs->kind == ExprKind::kBinary &&
       IsCompoundAssignOp(stmt->rhs->op)) {
-    auto base_op = CompoundAssignBaseOp(stmt->rhs->op);
-    auto actual_rhs = EvalExpr(stmt->rhs->rhs, ctx, arena);
-
-    if (stmt->lhs->kind == ExprKind::kIdentifier) {
-      auto* var = ResolveLhsVariable(stmt->lhs, ctx);
-      if (var) {
-        auto result = EvalBinaryOp(base_op, var->value, actual_rhs, arena);
-        WriteVar(var, result, arena);
-      }
-    } else if (stmt->lhs->kind == ExprKind::kSelect) {
-      if (auto* elem = TryResolveArrayElement(stmt->lhs, ctx)) {
-        auto result = EvalBinaryOp(base_op, elem->value, actual_rhs, arena);
-        WriteVar(elem, result, arena);
-      } else {
-        auto lhs_val = EvalExpr(stmt->lhs, ctx, arena);
-        auto result = EvalBinaryOp(base_op, lhs_val, actual_rhs, arena);
-        TrySelectBlockingAssign(stmt->lhs, result, ctx, arena);
-      }
-    } else if (stmt->lhs->kind == ExprKind::kMemberAccess) {
-      auto lhs_val = EvalExpr(stmt->lhs, ctx, arena);
-      auto result = EvalBinaryOp(base_op, lhs_val, actual_rhs, arena);
-      WriteStructField(stmt->lhs, result, ctx, arena);
-    } else {
-      auto result = EvalExpr(stmt->rhs, ctx, arena);
-      AssignToScalarLhs(stmt, result, ctx, arena);
-    }
+    ApplyCompoundAssignOp(stmt, ctx, arena);
     return StmtResult::kDone;
   }
 
@@ -650,16 +697,13 @@ StmtResult ExecBlockingAssignImpl(const Stmt* stmt, SimContext& ctx,
   return StmtResult::kDone;
 }
 
-static bool TryArrayConcatNba(const Stmt* stmt, SimContext& ctx, Arena& arena) {
-  if (!stmt->lhs || stmt->lhs->kind != ExprKind::kIdentifier) return false;
-  if (!stmt->rhs || stmt->rhs->kind != ExprKind::kConcatenation) return false;
-
-  auto* ainfo = ctx.FindArrayInfo(stmt->lhs->text);
-  auto* q = ctx.FindQueue(stmt->lhs->text);
-  if (!ainfo && !q) return false;
-
-  std::vector<Logic4Vec> elems;
-  for (auto* item : stmt->rhs->elements) {
+// Flatten the elements of an unpacked-array concatenation rhs into `elems`:
+// array identifiers expand to their elements (in declared order), queue
+// identifiers splice their elements, anything else evaluates as a scalar.
+static void CollectArrayConcatElements(const Expr* rhs, SimContext& ctx,
+                                       Arena& arena,
+                                       std::vector<Logic4Vec>& elems) {
+  for (auto* item : rhs->elements) {
     if (item->kind == ExprKind::kIdentifier) {
       auto* src_arr = ctx.FindArrayInfo(item->text);
       if (src_arr) {
@@ -682,6 +726,46 @@ static bool TryArrayConcatNba(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     }
     elems.push_back(EvalExpr(item, ctx, arena));
   }
+}
+
+// Schedule the per-element NBA writes for an unpacked-array concatenation
+// target. Reports a size mismatch (and stops) when element counts differ.
+static void ScheduleArrayConcatNbaElements(const Stmt* stmt,
+                                           const ArrayInfo* ainfo,
+                                           const std::vector<Logic4Vec>& elems,
+                                           SimTime schedule_time,
+                                           Region nba_region, SimContext& ctx,
+                                           Arena& arena) {
+  if (elems.size() != ainfo->size) {
+    ctx.GetDiag().Error(
+        {}, "unpacked array concatenation size mismatch: expected " +
+                std::to_string(ainfo->size) + " elements, got " +
+                std::to_string(elems.size()));
+    return;
+  }
+  for (uint32_t i = 0; i < ainfo->size; ++i) {
+    uint32_t idx = ainfo->is_descending ? (ainfo->lo + ainfo->size - 1 - i)
+                                        : (ainfo->lo + i);
+    auto name = std::string(stmt->lhs->text) + "[" + std::to_string(idx) + "]";
+    auto* var = ctx.FindVariable(name);
+    if (!var) continue;
+    auto val = ResizeToWidth(elems[i], ainfo->elem_width, arena);
+    auto* event = ctx.GetScheduler().GetEventPool().Acquire();
+    SetupWholeVarNbaCallback(event, var, val);
+    ctx.GetScheduler().ScheduleEvent(schedule_time, nba_region, event);
+  }
+}
+
+static bool TryArrayConcatNba(const Stmt* stmt, SimContext& ctx, Arena& arena) {
+  if (!stmt->lhs || stmt->lhs->kind != ExprKind::kIdentifier) return false;
+  if (!stmt->rhs || stmt->rhs->kind != ExprKind::kConcatenation) return false;
+
+  auto* ainfo = ctx.FindArrayInfo(stmt->lhs->text);
+  auto* q = ctx.FindQueue(stmt->lhs->text);
+  if (!ainfo && !q) return false;
+
+  std::vector<Logic4Vec> elems;
+  CollectArrayConcatElements(stmt->rhs, ctx, arena, elems);
 
   uint64_t delay = 0;
   if (stmt->delay) delay = EvalExpr(stmt->delay, ctx, arena).ToUint64();
@@ -689,25 +773,8 @@ static bool TryArrayConcatNba(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   auto schedule_time = ctx.CurrentTime() + SimTime{delay};
 
   if (ainfo) {
-    if (elems.size() != ainfo->size) {
-      ctx.GetDiag().Error(
-          {}, "unpacked array concatenation size mismatch: expected " +
-                  std::to_string(ainfo->size) + " elements, got " +
-                  std::to_string(elems.size()));
-      return true;
-    }
-    for (uint32_t i = 0; i < ainfo->size; ++i) {
-      uint32_t idx = ainfo->is_descending ? (ainfo->lo + ainfo->size - 1 - i)
-                                          : (ainfo->lo + i);
-      auto name =
-          std::string(stmt->lhs->text) + "[" + std::to_string(idx) + "]";
-      auto* var = ctx.FindVariable(name);
-      if (!var) continue;
-      auto val = ResizeToWidth(elems[i], ainfo->elem_width, arena);
-      auto* event = ctx.GetScheduler().GetEventPool().Acquire();
-      SetupWholeVarNbaCallback(event, var, val);
-      ctx.GetScheduler().ScheduleEvent(schedule_time, nba_region, event);
-    }
+    ScheduleArrayConcatNbaElements(stmt, ainfo, elems, schedule_time,
+                                   nba_region, ctx, arena);
   } else {
     auto* event = ctx.GetScheduler().GetEventPool().Acquire();
 
@@ -783,26 +850,80 @@ static void SetupWholeVarNbaCallback(Event* event, Variable* var,
   };
 }
 
+// §11.4.14.3: a streaming_concatenation can be the target of a nonblocking
+// assignment too, performing the same reverse (unpack) operation. The source
+// is sampled now; defer the per-target writes to the NBA region so the
+// streaming semantics match the blocking form.
+static void ScheduleStreamingConcatNba(const Stmt* stmt,
+                                       const Logic4Vec& rhs_val,
+                                       uint64_t delay_ticks, SimContext& ctx,
+                                       Arena& arena) {
+  auto* stream_event = ctx.GetScheduler().GetEventPool().Acquire();
+  stream_event->kind = EventKind::kUpdate;
+  const Expr* lhs = stmt->lhs;
+  stream_event->callback = [lhs, rhs_val, &ctx, &arena]() {
+    UnpackStreamingConcatLhs(lhs, rhs_val, ctx, arena);
+  };
+  auto stream_region = ctx.IsReactiveContext() ? Region::kReNBA : Region::kNBA;
+  auto stream_time = ctx.CurrentTime() + SimTime{delay_ticks};
+  ctx.GetScheduler().ScheduleEvent(stream_time, stream_region, stream_event);
+}
+
+// Configure the deferred update callback for an NBA whose target is an
+// unresolved bit-select or part-select of `var`. Returns false (without
+// setting a callback) when the assignment must be dropped: an unknown index,
+// or a part-select that resolves to zero width / falls entirely out of range.
+static bool SetupSelectNbaCallback(Event* event, Variable* var, const Expr* lhs,
+                                   const Logic4Vec& rhs_val, SimContext& ctx,
+                                   Arena& arena) {
+  auto idx_val = EvalExpr(lhs->index, ctx, arena);
+  if (HasUnknownBits(idx_val)) return false;
+  auto idx = static_cast<uint32_t>(idx_val.ToUint64());
+
+  if (!lhs->index_end) {
+    event->callback = [var, idx, rhs_val, &arena]() {
+      if (idx >= var->value.width) return;
+      uint64_t old_val = var->value.ToUint64();
+      uint64_t bit = rhs_val.ToUint64() & 1;
+      uint64_t cleared = old_val & ~(uint64_t{1} << idx);
+      var->value =
+          MakeLogic4VecVal(arena, var->value.width, cleared | (bit << idx));
+      var->NotifyWatchers();
+    };
+    return true;
+  }
+
+  uint32_t end_val =
+      static_cast<uint32_t>(EvalExpr(lhs->index_end, ctx, arena).ToUint64());
+  uint32_t lo = idx;
+  uint32_t w = end_val;
+  if (lhs->is_part_select_plus) {
+  } else if (lhs->is_part_select_minus) {
+    lo = (idx >= w - 1) ? idx - w + 1 : 0;
+  } else {
+    lo = std::min(idx, end_val);
+    w = std::max(idx, end_val) - lo + 1;
+  }
+  if (w == 0 || lo >= var->value.width) return false;
+  if (lo + w > var->value.width) w = var->value.width - lo;
+  event->callback = [var, lo, w, rhs_val, &arena]() {
+    uint64_t mask = (w >= 64) ? ~uint64_t{0} : (uint64_t{1} << w) - 1;
+    uint64_t old_val = var->value.ToUint64();
+    uint64_t new_bits = (rhs_val.ToUint64() & mask) << lo;
+    uint64_t cleared = old_val & ~(mask << lo);
+    var->value = MakeLogic4VecVal(arena, var->value.width, cleared | new_bits);
+    var->NotifyWatchers();
+  };
+  return true;
+}
+
 void ScheduleNonblockingAssign(const Stmt* stmt, const Logic4Vec& rhs_val,
                                uint64_t delay_ticks, SimContext& ctx,
                                Arena& arena) {
   if (!stmt->lhs) return;
 
-  // §11.4.14.3: a streaming_concatenation can be the target of a nonblocking
-  // assignment too, performing the same reverse (unpack) operation. The source
-  // is sampled now; defer the per-target writes to the NBA region so the
-  // streaming semantics match the blocking form.
   if (stmt->lhs->kind == ExprKind::kStreamingConcat) {
-    auto* stream_event = ctx.GetScheduler().GetEventPool().Acquire();
-    stream_event->kind = EventKind::kUpdate;
-    const Expr* lhs = stmt->lhs;
-    stream_event->callback = [lhs, rhs_val, &ctx, &arena]() {
-      UnpackStreamingConcatLhs(lhs, rhs_val, ctx, arena);
-    };
-    auto stream_region =
-        ctx.IsReactiveContext() ? Region::kReNBA : Region::kNBA;
-    auto stream_time = ctx.CurrentTime() + SimTime{delay_ticks};
-    ctx.GetScheduler().ScheduleEvent(stream_time, stream_region, stream_event);
+    ScheduleStreamingConcatNba(stmt, rhs_val, delay_ticks, ctx, arena);
     return;
   }
 
@@ -815,45 +936,8 @@ void ScheduleNonblockingAssign(const Stmt* stmt, const Logic4Vec& rhs_val,
 
   event->kind = EventKind::kUpdate;
   if (is_select && !elem) {
-    const Expr* lhs = stmt->lhs;
-    auto idx_val = EvalExpr(lhs->index, ctx, arena);
-    if (HasUnknownBits(idx_val)) return;
-    auto idx = static_cast<uint32_t>(idx_val.ToUint64());
-
-    if (!lhs->index_end) {
-      event->callback = [var, idx, rhs_val, &arena]() {
-        if (idx >= var->value.width) return;
-        uint64_t old_val = var->value.ToUint64();
-        uint64_t bit = rhs_val.ToUint64() & 1;
-        uint64_t cleared = old_val & ~(uint64_t{1} << idx);
-        var->value =
-            MakeLogic4VecVal(arena, var->value.width, cleared | (bit << idx));
-        var->NotifyWatchers();
-      };
-    } else {
-      uint32_t end_val = static_cast<uint32_t>(
-          EvalExpr(lhs->index_end, ctx, arena).ToUint64());
-      uint32_t lo = idx;
-      uint32_t w = end_val;
-      if (lhs->is_part_select_plus) {
-      } else if (lhs->is_part_select_minus) {
-        lo = (idx >= w - 1) ? idx - w + 1 : 0;
-      } else {
-        lo = std::min(idx, end_val);
-        w = std::max(idx, end_val) - lo + 1;
-      }
-      if (w == 0 || lo >= var->value.width) return;
-      if (lo + w > var->value.width) w = var->value.width - lo;
-      event->callback = [var, lo, w, rhs_val, &arena]() {
-        uint64_t mask = (w >= 64) ? ~uint64_t{0} : (uint64_t{1} << w) - 1;
-        uint64_t old_val = var->value.ToUint64();
-        uint64_t new_bits = (rhs_val.ToUint64() & mask) << lo;
-        uint64_t cleared = old_val & ~(mask << lo);
-        var->value =
-            MakeLogic4VecVal(arena, var->value.width, cleared | new_bits);
-        var->NotifyWatchers();
-      };
-    }
+    if (!SetupSelectNbaCallback(event, var, stmt->lhs, rhs_val, ctx, arena))
+      return;
   } else {
     auto converted =
         ConvertRealOnAssign(rhs_val, stmt->lhs, var->value.width, ctx, arena);

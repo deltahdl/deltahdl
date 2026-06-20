@@ -144,6 +144,43 @@ static char SplitUserString(const std::string& user, std::string& prefix_out) {
   return c;
 }
 
+// §21.6: map an integer conversion code (%d/%o/%h/%x/%b) to its radix; returns
+// 0 for any other conversion letter so the caller can reject it.
+static int PlusargIntegerBase(char conv) {
+  switch (conv) {
+    case 'd':
+      return 10;
+    case 'o':
+      return 8;
+    case 'h':
+    case 'x':
+      return 16;
+    case 'b':
+      return 2;
+    default:
+      return 0;
+  }
+}
+
+// §21.6: decode a single text digit into its numeric value. Returns false when
+// the character is not a valid hexadecimal digit, so callers can reject any
+// character illegal for their radix.
+static bool DecodePlusargDigit(char c, int& digit) {
+  if (c >= '0' && c <= '9') {
+    digit = c - '0';
+    return true;
+  }
+  if (c >= 'a' && c <= 'f') {
+    digit = c - 'a' + 10;
+    return true;
+  }
+  if (c >= 'A' && c <= 'F') {
+    digit = c - 'A' + 10;
+    return true;
+  }
+  return false;
+}
+
 // §21.6: validate and convert a plusarg remainder under an integer conversion
 // (%d/%o/%h/%x/%b). Returns false if any character is illegal for the radix so
 // the caller can store the 'bx fill the clause mandates.
@@ -151,24 +188,8 @@ static bool ParsePlusargInteger(const std::string& s, char conv, uint64_t& out,
                                 bool& negative) {
   out = 0;
   negative = false;
-  int base = 0;
-  switch (conv) {
-    case 'd':
-      base = 10;
-      break;
-    case 'o':
-      base = 8;
-      break;
-    case 'h':
-    case 'x':
-      base = 16;
-      break;
-    case 'b':
-      base = 2;
-      break;
-    default:
-      return false;
-  }
+  int base = PlusargIntegerBase(conv);
+  if (base == 0) return false;
   size_t i = 0;
   if (base == 10 && i < s.size() && (s[i] == '+' || s[i] == '-')) {
     negative = (s[i] == '-');
@@ -176,16 +197,8 @@ static bool ParsePlusargInteger(const std::string& s, char conv, uint64_t& out,
   }
   if (i >= s.size()) return false;
   for (; i < s.size(); ++i) {
-    char c = s[i];
     int digit = 0;
-    if (c >= '0' && c <= '9')
-      digit = c - '0';
-    else if (c >= 'a' && c <= 'f')
-      digit = c - 'a' + 10;
-    else if (c >= 'A' && c <= 'F')
-      digit = c - 'A' + 10;
-    else
-      return false;
+    if (!DecodePlusargDigit(s[i], digit)) return false;
     if (digit >= base) return false;
     out = out * static_cast<uint64_t>(base) + static_cast<uint64_t>(digit);
   }
@@ -211,6 +224,52 @@ static Logic4Vec PackStringIntoWidth(Arena& arena, const std::string& s,
   return vec;
 }
 
+// §21.6: %e/%f/%g convert the remainder to a real value, stored as its 64-bit
+// IEEE pattern. An empty remainder stores zero; an unparseable remainder is
+// written with 'bx.
+static void StorePlusargReal(Variable* var, const std::string& name,
+                             const std::string& remainder, SimContext& ctx,
+                             Arena& arena, uint32_t width) {
+  if (remainder.empty()) {
+    var->value = MakeLogic4VecVal(arena, width, 0);
+    return;
+  }
+  const char* begin = remainder.c_str();
+  char* end = nullptr;
+  double d = std::strtod(begin, &end);
+  if (end != begin + remainder.size()) {
+    var->value = MakeAllX(arena, width);
+    return;
+  }
+  uint64_t bits = 0;
+  std::memcpy(&bits, &d, sizeof(double));
+  auto vec = MakeLogic4VecVal(arena, width, bits);
+  if (ctx.IsRealVariable(name)) vec.is_real = true;
+  var->value = vec;
+}
+
+// §21.6: integer conversions (%d/%o/%h/%x/%b) store the parsed magnitude. An
+// empty remainder stores zero; an illegal-character remainder is written with
+// 'bx; a negative value falls through MakeLogic4VecVal's two's-complement
+// truncation.
+static void StorePlusargInteger(Variable* var, char conv,
+                                const std::string& remainder, Arena& arena,
+                                uint32_t width) {
+  if (remainder.empty()) {
+    var->value = MakeLogic4VecVal(arena, width, 0);
+    return;
+  }
+  uint64_t mag = 0;
+  bool negative = false;
+  if (!ParsePlusargInteger(remainder, conv, mag, negative)) {
+    var->value = MakeAllX(arena, width);
+    return;
+  }
+  uint64_t stored =
+      negative ? static_cast<uint64_t>(-static_cast<int64_t>(mag)) : mag;
+  var->value = MakeLogic4VecVal(arena, width, stored);
+}
+
 // §21.6: convert the remainder of a matching plusarg into `var` according to
 // the format string's conversion code. The stored value is automatically zero-
 // padded or truncated to the variable width by MakeLogic4VecVal.
@@ -226,46 +285,12 @@ static void StorePlusargValue(Variable* var, const std::string& name, char conv,
     return;
   }
 
-  // §21.6: %e/%f/%g convert to a real value, stored as its 64-bit IEEE pattern.
   if (conv == 'e' || conv == 'f' || conv == 'g') {
-    if (remainder.empty()) {
-      var->value = MakeLogic4VecVal(arena, width, 0);
-      return;
-    }
-    const char* begin = remainder.c_str();
-    char* end = nullptr;
-    double d = std::strtod(begin, &end);
-    if (end != begin + remainder.size()) {
-      var->value = MakeAllX(arena, width);
-      return;
-    }
-    uint64_t bits = 0;
-    std::memcpy(&bits, &d, sizeof(double));
-    auto vec = MakeLogic4VecVal(arena, width, bits);
-    if (ctx.IsRealVariable(name)) vec.is_real = true;
-    var->value = vec;
+    StorePlusargReal(var, name, remainder, ctx, arena, width);
     return;
   }
 
-  // §21.6: an empty remainder stores the value zero for integer conversions.
-  if (remainder.empty()) {
-    var->value = MakeLogic4VecVal(arena, width, 0);
-    return;
-  }
-
-  uint64_t mag = 0;
-  bool negative = false;
-  if (!ParsePlusargInteger(remainder, conv, mag, negative)) {
-    // §21.6: a remainder containing characters illegal for the conversion is
-    // reported by writing the destination with 'bx.
-    var->value = MakeAllX(arena, width);
-    return;
-  }
-  // §21.6: a negative value is treated as larger than the variable, so its
-  // two's-complement low-order bits fall through MakeLogic4VecVal's truncation.
-  uint64_t stored =
-      negative ? static_cast<uint64_t>(-static_cast<int64_t>(mag)) : mag;
-  var->value = MakeLogic4VecVal(arena, width, stored);
+  StorePlusargInteger(var, conv, remainder, arena, width);
 }
 
 static Logic4Vec EvalValuePlusargs(const Expr* expr, SimContext& ctx,
@@ -348,24 +373,43 @@ std::string ResolveFormatArg(const Expr* arg, SimContext& ctx, Arena& arena) {
   return EvalStringArg(arg, ctx, arena);
 }
 
+// Outcome of scanning one '%'-introduced specifier.
+enum class SpecifierScan { kLiteralPercent, kTruncated, kComplete };
+
+// §21.3.3: scan the specifier that begins at fmt[i] (which is '%'). Advances
+// `i` past the consumed characters and reports whether the specifier consumes
+// an argument value (%m/%l and %% do not). Mirrors the control flow of the
+// caller: a `%%` literal advances one and consumes nothing; a specifier whose
+// body runs off the end of the string is reported truncated.
+static SpecifierScan ScanFormatSpecifier(const std::string& fmt, size_t& i,
+                                         bool& consumes) {
+  consumes = false;
+  char c = fmt[i + 1];
+  if (c == '%') {
+    ++i;
+    return SpecifierScan::kLiteralPercent;
+  }
+  size_t j = i + 1;
+  while (j < fmt.size() && fmt[j] >= '0' && fmt[j] <= '9') ++j;
+  if (j >= fmt.size()) return SpecifierScan::kTruncated;
+  char spec = fmt[j];
+  if (spec >= 'A' && spec <= 'Z') spec = static_cast<char>(spec - 'A' + 'a');
+  consumes = (spec != 'm' && spec != 'l');
+  i = j;
+  return SpecifierScan::kComplete;
+}
+
 // §21.3.3: counts %-introduced specifiers that consume an argument value,
 // excluding %% literals and %m/%l self-supplied specifiers.
 size_t CountConsumingSpecifiers(const std::string& fmt) {
   size_t n = 0;
   for (size_t i = 0; i + 1 < fmt.size(); ++i) {
     if (fmt[i] != '%') continue;
-    char c = fmt[i + 1];
-    if (c == '%') {
-      ++i;
-      continue;
-    }
-    size_t j = i + 1;
-    while (j < fmt.size() && fmt[j] >= '0' && fmt[j] <= '9') ++j;
-    if (j >= fmt.size()) break;
-    char spec = fmt[j];
-    if (spec >= 'A' && spec <= 'Z') spec = static_cast<char>(spec - 'A' + 'a');
-    if (spec != 'm' && spec != 'l') ++n;
-    i = j;
+    bool consumes = false;
+    SpecifierScan scan = ScanFormatSpecifier(fmt, i, consumes);
+    if (scan == SpecifierScan::kLiteralPercent) continue;
+    if (scan == SpecifierScan::kTruncated) break;
+    if (consumes) ++n;
   }
   return n;
 }
@@ -535,6 +579,22 @@ static bool AreCastCompatible(const ClassTypeInfo* a, const ClassTypeInfo* b) {
   return a->IsA(b) || b->IsA(a) || a->is_interface || b->is_interface;
 }
 
+// Static-type screen for a $cast to a class handle: if the source expression
+// names a typed class variable whose declared type is not cast-compatible with
+// the destination type, the cast fails outright.
+static bool SrcClassTypeIncompatible(const Expr* src_expr,
+                                     const ClassTypeInfo* dest_type,
+                                     SimContext& ctx) {
+  if (!src_expr || src_expr->kind != ExprKind::kIdentifier ||
+      src_expr->text == "null") {
+    return false;
+  }
+  auto src_class = ctx.GetVariableClassType(src_expr->text);
+  if (src_class.empty()) return false;
+  auto* src_type = ctx.FindClassType(src_class);
+  return src_type && !AreCastCompatible(src_type, dest_type);
+}
+
 static bool TryCastClassHandle(std::string_view dest_name, uint64_t src_val,
                                const Expr* src_expr, SimContext& ctx,
                                Arena& arena, Logic4Vec& out) {
@@ -546,16 +606,9 @@ static bool TryCastClassHandle(std::string_view dest_name, uint64_t src_val,
     return true;
   }
 
-  if (src_expr && src_expr->kind == ExprKind::kIdentifier &&
-      src_expr->text != "null") {
-    auto src_class = ctx.GetVariableClassType(src_expr->text);
-    if (!src_class.empty()) {
-      auto* src_type = ctx.FindClassType(src_class);
-      if (src_type && !AreCastCompatible(src_type, dest_type)) {
-        out = MakeLogic4VecVal(arena, 32, 0);
-        return true;
-      }
-    }
+  if (SrcClassTypeIncompatible(src_expr, dest_type, ctx)) {
+    out = MakeLogic4VecVal(arena, 32, 0);
+    return true;
   }
 
   if (src_val == kNullClassHandle) {

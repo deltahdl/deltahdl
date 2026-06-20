@@ -31,6 +31,58 @@ bool NonVacuousAbortShape(const Word& word, const BooleanExpr& boolean,
       });
 }
 
+// §F.5.3.3: w, L_0 |=^non R |-> P iff there exists i >= 0 with w^{0,i}
+// tightly satisfying the trigger R -- on w itself, not w-bar -- under
+// some output context L_1, and w^{i.}, L_1 |=^non P. The four-way
+// relation yields the L_1 the antecedent produces; each is threaded into
+// P.
+bool NonVacuousImplication(const Word& word, const LvProperty& property,
+                           const LocalContext& context) {
+  if (!property.sequence || !property.lhs) {
+    return false;
+  }
+  for (std::size_t i = 0; i < word.size(); ++i) {
+    for (const LocalContext& out : TightSatisfactionOutputs(
+             PrefixInclusive(word, i), *property.sequence, context)) {
+      if (NonVacuous(Suffix(word, i), *property.lhs, out)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+// §F.5.3.3: w, L_0 |=^non ( P1 until P2 ) iff there exists 0 <= i < |w|
+// with ( w^{i.}, L_0 |=^non P1 or w^{i.}, L_0 |=^non P2 ) and, for all
+// 0 <= j < i, w^{j.}, L_0 |= ( P1 and not P2 ) under §F.5.6.1's neutral
+// satisfaction with locals.
+bool NonVacuousUntil(const Word& word, const LvProperty& property,
+                     const LocalContext& context) {
+  if (!property.lhs || !property.rhs) {
+    return false;
+  }
+  const std::shared_ptr<const LvProperty> kGuard =
+      LvAnd(property.lhs, LvNot(property.rhs));
+  for (std::size_t i = 0; i < word.size(); ++i) {
+    const Word kSuffixI = Suffix(word, i);
+    if (!NonVacuous(kSuffixI, *property.lhs, context) &&
+        !NonVacuous(kSuffixI, *property.rhs, context)) {
+      continue;
+    }
+    bool prefix_holds = true;
+    for (std::size_t j = 0; j < i; ++j) {
+      if (!NeutrallySatisfiesWithLocals(Suffix(word, j), *kGuard, context)) {
+        prefix_holds = false;
+        break;
+      }
+    }
+    if (prefix_holds) {
+      return true;
+    }
+  }
+  return false;
+}
+
 bool NonVacuous(const Word& word, const LvProperty& property,
                 const LocalContext& context) {
   switch (property.kind) {
@@ -53,25 +105,8 @@ bool NonVacuous(const Word& word, const LvProperty& property,
       // §F.5.3.3: w, L_0 |=^non not P iff w-bar, L_0 |=^non P.
       return property.lhs &&
              NonVacuous(ComplementWord(word), *property.lhs, context);
-    case LvProperty::Kind::kImplication: {
-      // §F.5.3.3: w, L_0 |=^non R |-> P iff there exists i >= 0 with w^{0,i}
-      // tightly satisfying the trigger R -- on w itself, not w-bar -- under
-      // some output context L_1, and w^{i.}, L_1 |=^non P. The four-way
-      // relation yields the L_1 the antecedent produces; each is threaded into
-      // P.
-      if (!property.sequence || !property.lhs) {
-        return false;
-      }
-      for (std::size_t i = 0; i < word.size(); ++i) {
-        for (const LocalContext& out : TightSatisfactionOutputs(
-                 PrefixInclusive(word, i), *property.sequence, context)) {
-          if (NonVacuous(Suffix(word, i), *property.lhs, out)) {
-            return true;
-          }
-        }
-      }
-      return false;
-    }
+    case LvProperty::Kind::kImplication:
+      return NonVacuousImplication(word, property, context);
     case LvProperty::Kind::kOr:
       // §F.5.3.3: w, L_0 |=^non ( P1 or P2 ) iff w, L_0 |=^non P1 or
       // w, L_0 |=^non P2.
@@ -87,36 +122,8 @@ bool NonVacuous(const Word& word, const LvProperty& property,
       // w^{1.}, L_0 |=^non P.
       return !word.empty() && property.lhs &&
              NonVacuous(Suffix(word, 1), *property.lhs, context);
-    case LvProperty::Kind::kUntil: {
-      // §F.5.3.3: w, L_0 |=^non ( P1 until P2 ) iff there exists 0 <= i < |w|
-      // with ( w^{i.}, L_0 |=^non P1 or w^{i.}, L_0 |=^non P2 ) and, for all
-      // 0 <= j < i, w^{j.}, L_0 |= ( P1 and not P2 ) under §F.5.6.1's neutral
-      // satisfaction with locals.
-      if (!property.lhs || !property.rhs) {
-        return false;
-      }
-      const std::shared_ptr<const LvProperty> kGuard =
-          LvAnd(property.lhs, LvNot(property.rhs));
-      for (std::size_t i = 0; i < word.size(); ++i) {
-        const Word kSuffixI = Suffix(word, i);
-        if (!NonVacuous(kSuffixI, *property.lhs, context) &&
-            !NonVacuous(kSuffixI, *property.rhs, context)) {
-          continue;
-        }
-        bool prefix_holds = true;
-        for (std::size_t j = 0; j < i; ++j) {
-          if (!NeutrallySatisfiesWithLocals(Suffix(word, j), *kGuard,
-                                            context)) {
-            prefix_holds = false;
-            break;
-          }
-        }
-        if (prefix_holds) {
-          return true;
-        }
-      }
-      return false;
-    }
+    case LvProperty::Kind::kUntil:
+      return NonVacuousUntil(word, property, context);
     case LvProperty::Kind::kAcceptOn:
       // §F.5.3.3: w, L_0 |=^non ( accept_on (b) P ) shares the abort shape.
       return property.boolean && property.lhs &&

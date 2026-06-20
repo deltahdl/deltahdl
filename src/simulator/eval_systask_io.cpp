@@ -263,6 +263,115 @@ void StoreRealField(Variable* var, Arena& arena, double d) {
   var->value = vec;
 }
 
+// Outcome of handling one §21.3.4.3 conversion specifier. `kStop` ends the
+// scan with no further bookkeeping; `kMatched` means a field converted (the
+// caller advances the match/arg counters unless the field was suppressed);
+// `kSkipped` means the specifier consumed input but produces no assigned field
+// (the %% literal match), so the caller only continues.
+enum class ScanFieldResult { kStop, kMatched, kSkipped };
+
+// State carried across the per-specifier handlers. `pos` is the current read
+// offset into the input; the helpers advance it in place.
+namespace {
+struct ScanCursor {
+  const std::string& input;
+  size_t& pos;
+};
+
+// §21.3.4.3 (c) maximum-field-width clamp: the field ends at `pos+width` when a
+// positive width still leaves room inside the input, otherwise at end of input.
+size_t ScanUpperLimit(const ScanCursor& cur, int width) {
+  if (width > 0 && cur.pos + static_cast<size_t>(width) < cur.input.size())
+    return cur.pos + static_cast<size_t>(width);
+  return cur.input.size();
+}
+
+// §21.3.4.3: the character conversion does not skip leading white space; it
+// copies `width` (default 1) raw characters into the destination.
+ScanFieldResult ScanCharField(ScanCursor cur, int width, Variable* var,
+                              Arena& arena) {
+  int cnt = width > 0 ? width : 1;
+  if (cur.pos >= cur.input.size()) return ScanFieldResult::kStop;
+  std::string chars;
+  for (int k = 0; k < cnt && cur.pos < cur.input.size(); ++k)
+    chars += cur.input[cur.pos++];
+  if (var) {
+    if (chars.size() == 1) {
+      var->value = MakeLogic4VecVal(arena, var->value.width,
+                                    static_cast<uint8_t>(chars[0]));
+    } else {
+      var->value = ScanStringToVec(arena, chars, var->value.width);
+    }
+  }
+  return ScanFieldResult::kMatched;
+}
+
+// §21.3.4.3: %s gathers a run of non-white-space characters (bounded by the
+// field width) into the destination.
+ScanFieldResult ScanStringField(ScanCursor cur, int width, Variable* var,
+                                Arena& arena) {
+  size_t limit = ScanUpperLimit(cur, width);
+  std::string s;
+  while (cur.pos < limit && !IsScanSpace(cur.input[cur.pos]))
+    s += cur.input[cur.pos++];
+  if (s.empty()) return ScanFieldResult::kStop;
+  if (var) var->value = ScanStringToVec(arena, s, var->value.width);
+  return ScanFieldResult::kMatched;
+}
+
+// §21.3.4.3: the real conversions (%f/%e/%g/%t) parse a floating-point token
+// with strtod and store its IEEE-754 bit pattern.
+ScanFieldResult ScanRealField(ScanCursor cur, int width, Variable* var,
+                              Arena& arena) {
+  size_t limit = ScanUpperLimit(cur, width);
+  std::string sub = cur.input.substr(cur.pos, limit - cur.pos);
+  const char* c = sub.c_str();
+  char* end = nullptr;
+  double d = std::strtod(c, &end);
+  if (end == c) return ScanFieldResult::kStop;
+  cur.pos += static_cast<size_t>(end - c);
+  StoreRealField(var, arena, d);
+  return ScanFieldResult::kMatched;
+}
+
+// §21.3.4.3, Table 21-7: %u transfers unformatted 2-value binary data, pulling
+// enough raw bytes to fill the destination in the host's native (little-endian)
+// byte order. The bytes are known, so the stored value carries no x or z.
+ScanFieldResult ScanRawBinaryField(ScanCursor cur, Variable* var,
+                                   Arena& arena) {
+  uint32_t w = var ? var->value.width : 8;
+  size_t nbytes = (w + 7) / 8;
+  if (cur.pos + nbytes > cur.input.size())
+    return ScanFieldResult::kStop;  // too little data to fill target
+  uint64_t v = 0;
+  for (size_t k = 0; k < nbytes && k < sizeof(uint64_t); ++k) {
+    v |= static_cast<uint64_t>(static_cast<uint8_t>(cur.input[cur.pos + k]))
+         << (8 * k);
+  }
+  cur.pos += nbytes;
+  if (var) var->value = MakeLogic4VecVal(arena, var->value.width, v);
+  return ScanFieldResult::kMatched;
+}
+
+// §21.3.4.3: the integer conversions (%d/%h/%x/%b/%o) parse a token in the
+// base named by the specifier and store it into the destination.
+ScanFieldResult ScanIntegerField(ScanCursor cur, int base, int width,
+                                 Variable* var, Arena& arena) {
+  size_t limit = ScanUpperLimit(cur, width);
+  std::string sub = cur.input.substr(cur.pos, limit - cur.pos);
+  const char* c = sub.c_str();
+  char* end = nullptr;
+  unsigned long long v = std::strtoull(c, &end, base);
+  if (end == c) return ScanFieldResult::kStop;
+  cur.pos += static_cast<size_t>(end - c);
+  if (var) {
+    var->value =
+        MakeLogic4VecVal(arena, var->value.width, static_cast<uint64_t>(v));
+  }
+  return ScanFieldResult::kMatched;
+}
+}  // namespace
+
 // §21.3.4.3 scan engine shared in spirit with $fscanf. Interprets `fmt` against
 // `input`, assigning converted fields to the destination arguments; returns the
 // count of assigned items and reports the consumed input length.
@@ -272,17 +381,13 @@ uint32_t RunScanf(const std::string& input, const std::string& fmt,
   size_t pos = 0;
   size_t ai = 0;
   uint32_t matched = 0;
+  ScanCursor cur{input, pos};
 
   auto field_var = [&](bool suppress) -> Variable* {
     if (suppress || ai >= ndest) return nullptr;
     const Expr* a = dest[ai];
     if (a->kind == ExprKind::kIdentifier) return ctx.FindVariable(a->text);
     return nullptr;
-  };
-  auto upper_limit = [&](int width) -> size_t {
-    if (width > 0 && pos + static_cast<size_t>(width) < input.size())
-      return pos + static_cast<size_t>(width);
-    return input.size();
   };
 
   for (size_t fi = 0; fi < fmt.size(); ++fi) {
@@ -327,99 +432,29 @@ uint32_t RunScanf(const std::string& input, const std::string& fmt,
       continue;
     }
 
+    ScanFieldResult result;
     if (lc == 'c') {
       // §21.3.4.3: the character conversion does not skip leading white space.
-      int cnt = width > 0 ? width : 1;
-      if (pos >= input.size()) break;
-      std::string chars;
-      for (int k = 0; k < cnt && pos < input.size(); ++k) chars += input[pos++];
-      Variable* var = field_var(suppress);
-      if (var) {
-        if (chars.size() == 1) {
-          var->value = MakeLogic4VecVal(arena, var->value.width,
-                                        static_cast<uint8_t>(chars[0]));
-        } else {
-          var->value = ScanStringToVec(arena, chars, var->value.width);
-        }
+      result = ScanCharField(cur, width, field_var(suppress), arena);
+    } else {
+      // §21.3.4.3: every remaining conversion ignores leading white space.
+      while (pos < input.size() && IsScanSpace(input[pos])) ++pos;
+
+      if (lc == 's') {
+        result = ScanStringField(cur, width, field_var(suppress), arena);
+      } else if (lc == 'f' || lc == 'e' || lc == 'g' || lc == 't') {
+        result = ScanRealField(cur, width, field_var(suppress), arena);
+      } else if (lc == 'u') {
+        result = ScanRawBinaryField(cur, field_var(suppress), arena);
+      } else {
+        int base = SpecToBase(lc);
+        if (base == 0) break;  // unsupported conversion code: stop scanning
+        result = ScanIntegerField(cur, base, width, field_var(suppress), arena);
       }
-      if (!suppress) {
-        ++matched;
-        ++ai;
-      }
-      continue;
     }
 
-    // §21.3.4.3: every remaining conversion ignores leading white space.
-    while (pos < input.size() && IsScanSpace(input[pos])) ++pos;
-
-    if (lc == 's') {
-      size_t limit = upper_limit(width);
-      std::string s;
-      while (pos < limit && !IsScanSpace(input[pos])) s += input[pos++];
-      if (s.empty()) break;
-      Variable* var = field_var(suppress);
-      if (var) var->value = ScanStringToVec(arena, s, var->value.width);
-      if (!suppress) {
-        ++matched;
-        ++ai;
-      }
-      continue;
-    }
-
-    if (lc == 'f' || lc == 'e' || lc == 'g' || lc == 't') {
-      size_t limit = upper_limit(width);
-      std::string sub = input.substr(pos, limit - pos);
-      const char* c = sub.c_str();
-      char* end = nullptr;
-      double d = std::strtod(c, &end);
-      if (end == c) break;
-      pos += static_cast<size_t>(end - c);
-      StoreRealField(field_var(suppress), arena, d);
-      if (!suppress) {
-        ++matched;
-        ++ai;
-      }
-      continue;
-    }
-
-    if (lc == 'u') {
-      // §21.3.4.3, Table 21-7: %u transfers unformatted 2-value binary data,
-      // pulling enough raw bytes to fill the destination in the host's native
-      // (little-endian) byte order. The bytes are known, so the stored value
-      // carries no x or z.
-      Variable* var = field_var(suppress);
-      uint32_t w = var ? var->value.width : 8;
-      size_t nbytes = (w + 7) / 8;
-      if (pos + nbytes > input.size()) break;  // too little data to fill target
-      uint64_t v = 0;
-      for (size_t k = 0; k < nbytes && k < sizeof(uint64_t); ++k) {
-        v |= static_cast<uint64_t>(static_cast<uint8_t>(input[pos + k]))
-             << (8 * k);
-      }
-      pos += nbytes;
-      if (var) var->value = MakeLogic4VecVal(arena, var->value.width, v);
-      if (!suppress) {
-        ++matched;
-        ++ai;
-      }
-      continue;
-    }
-
-    int base = SpecToBase(lc);
-    if (base == 0) break;  // unsupported conversion code: stop scanning
-    size_t limit = upper_limit(width);
-    std::string sub = input.substr(pos, limit - pos);
-    const char* c = sub.c_str();
-    char* end = nullptr;
-    unsigned long long v = std::strtoull(c, &end, base);
-    if (end == c) break;
-    pos += static_cast<size_t>(end - c);
-    Variable* var = field_var(suppress);
-    if (var) {
-      var->value =
-          MakeLogic4VecVal(arena, var->value.width, static_cast<uint64_t>(v));
-    }
-    if (!suppress) {
+    if (result == ScanFieldResult::kStop) break;
+    if (result == ScanFieldResult::kMatched && !suppress) {
       ++matched;
       ++ai;
     }

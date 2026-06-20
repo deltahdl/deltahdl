@@ -213,6 +213,22 @@ void CheckPlaAscendingStmt(const Stmt* s, const PlaRangeMap& ranges,
   for (auto& ci : s->case_items) CheckPlaAscendingStmt(ci.body, ranges, diag);
 }
 
+// §20.16.3: fold a single declaration's packed and constant unpacked ranges
+// into the PlaDeclRanges record used by the ascending-order check.
+PlaDeclRanges CollectPlaDeclRanges(const ModuleItem* item) {
+  PlaDeclRanges r;
+  r.packed_left = ConstEvalInt(item->data_type.packed_dim_left);
+  r.packed_right = ConstEvalInt(item->data_type.packed_dim_right);
+  for (auto* dim : item->unpacked_dims) {
+    if (dim && dim->kind == ExprKind::kBinary && dim->op == TokenKind::kColon) {
+      auto l = ConstEvalInt(dim->lhs);
+      auto rr = ConstEvalInt(dim->rhs);
+      if (l && rr) r.unpacked.push_back({*l, *rr});
+    }
+  }
+  return r;
+}
+
 }  // namespace
 
 void Elaborator::ValidatePlaAscendingOrder(const ModuleDecl* decl) {
@@ -224,18 +240,7 @@ void Elaborator::ValidatePlaAscendingOrder(const ModuleDecl* decl) {
     if (item->kind != ModuleItemKind::kVarDecl &&
         item->kind != ModuleItemKind::kNetDecl)
       continue;
-    PlaDeclRanges r;
-    r.packed_left = ConstEvalInt(item->data_type.packed_dim_left);
-    r.packed_right = ConstEvalInt(item->data_type.packed_dim_right);
-    for (auto* dim : item->unpacked_dims) {
-      if (dim && dim->kind == ExprKind::kBinary &&
-          dim->op == TokenKind::kColon) {
-        auto l = ConstEvalInt(dim->lhs);
-        auto rr = ConstEvalInt(dim->rhs);
-        if (l && rr) r.unpacked.push_back({*l, *rr});
-      }
-    }
-    ranges.emplace(item->name, std::move(r));
+    ranges.emplace(item->name, CollectPlaDeclRanges(item));
   }
   if (ranges.empty()) return;
   for (const auto* item : decl->items) {
@@ -348,6 +353,41 @@ bool IsBitsCall(const Expr* e) {
          e->args.size() == 1 && e->args[0];
 }
 
+// §20.6.2: report the restricted forms of a confirmed $bits call: a bare
+// identifier naming a dynamically sized typedef (NC12) or an interface-class
+// object (NC13), or a call to a function with a dynamically sized return type
+// (NC9).
+void CheckBitsCallArg(const Expr* call, const Expr* a,
+                      const std::unordered_set<std::string_view>& dyn_types,
+                      const std::unordered_set<std::string_view>& dyn_funcs,
+                      const std::unordered_set<std::string_view>& iface_vars,
+                      DiagEngine& diag) {
+  if (a->kind == ExprKind::kIdentifier) {
+    if (dyn_types.count(a->text) != 0) {
+      diag.Error(call->range.start,
+                 std::format("'$bits' cannot be applied directly to "
+                             "dynamically sized type '{}'",
+                             a->text));
+    }
+    if (iface_vars.count(a->text) != 0) {
+      diag.Error(call->range.start,
+                 std::format("'$bits' shall not be applied to interface "
+                             "class object '{}'",
+                             a->text));
+    }
+  } else if (a->kind == ExprKind::kCall) {
+    std::string_view name = a->callee;
+    if (name.empty() && a->lhs && a->lhs->kind == ExprKind::kIdentifier)
+      name = a->lhs->text;
+    if (!name.empty() && dyn_funcs.count(name) != 0) {
+      diag.Error(call->range.start,
+                 std::format("'$bits' shall not enclose function '{}' "
+                             "whose return type is dynamically sized",
+                             name));
+    }
+  }
+}
+
 // §20.6.2: a single argument that is a bare identifier names either the
 // dynamically sized typedef itself (NC12) or an interface-class object (NC13);
 // in either case there is no defined bit-stream size.
@@ -358,31 +398,7 @@ void CheckBitsCallExpr(const Expr* e,
                        DiagEngine& diag) {
   if (!e) return;
   if (IsBitsCall(e)) {
-    const Expr* a = e->args[0];
-    if (a->kind == ExprKind::kIdentifier) {
-      if (dyn_types.count(a->text) != 0) {
-        diag.Error(e->range.start,
-                   std::format("'$bits' cannot be applied directly to "
-                               "dynamically sized type '{}'",
-                               a->text));
-      }
-      if (iface_vars.count(a->text) != 0) {
-        diag.Error(e->range.start,
-                   std::format("'$bits' shall not be applied to interface "
-                               "class object '{}'",
-                               a->text));
-      }
-    } else if (a->kind == ExprKind::kCall) {
-      std::string_view name = a->callee;
-      if (name.empty() && a->lhs && a->lhs->kind == ExprKind::kIdentifier)
-        name = a->lhs->text;
-      if (!name.empty() && dyn_funcs.count(name) != 0) {
-        diag.Error(e->range.start,
-                   std::format("'$bits' shall not enclose function '{}' "
-                               "whose return type is dynamically sized",
-                               name));
-      }
-    }
+    CheckBitsCallArg(e, e->args[0], dyn_types, dyn_funcs, iface_vars, diag);
   }
   CheckBitsCallExpr(e->lhs, dyn_types, dyn_funcs, iface_vars, diag);
   CheckBitsCallExpr(e->rhs, dyn_types, dyn_funcs, iface_vars, diag);
@@ -426,13 +442,10 @@ void CheckBitsCallStmt(const Stmt* s,
     CheckBitsCallStmt(ci.body, dyn_types, dyn_funcs, iface_vars, diag);
 }
 
-}  // namespace
-
-void Elaborator::ValidateBitsCallRestrictions(const ModuleDecl* decl) {
-  // §20.6.2: $bits cannot be used directly on a dynamically sized type
-  // identifier (NC12), cannot enclose a function whose return type is
-  // dynamically sized (NC9), and cannot be applied to an object whose type is
-  // an interface class (NC13, see §8.26).
+// §20.6.2 (NC12): the typedefs in the module whose declared unpacked dimensions
+// are dynamically sized.
+std::unordered_set<std::string_view> CollectDynamicTypes(
+    const ModuleDecl* decl) {
   std::unordered_set<std::string_view> dyn_types;
   for (const auto* item : decl->items) {
     if (item->kind == ModuleItemKind::kTypedef &&
@@ -440,6 +453,14 @@ void Elaborator::ValidateBitsCallRestrictions(const ModuleDecl* decl) {
       dyn_types.insert(item->name);
     }
   }
+  return dyn_types;
+}
+
+// §20.6.2 (NC9): the functions in the module whose return type names one of the
+// dynamically sized typedefs.
+std::unordered_set<std::string_view> CollectDynamicFuncs(
+    const ModuleDecl* decl,
+    const std::unordered_set<std::string_view>& dyn_types) {
   std::unordered_set<std::string_view> dyn_funcs;
   for (const auto* item : decl->items) {
     if (item->kind != ModuleItemKind::kFunctionDecl) continue;
@@ -448,6 +469,19 @@ void Elaborator::ValidateBitsCallRestrictions(const ModuleDecl* decl) {
       dyn_funcs.insert(item->name);
     }
   }
+  return dyn_funcs;
+}
+
+}  // namespace
+
+void Elaborator::ValidateBitsCallRestrictions(const ModuleDecl* decl) {
+  // §20.6.2: $bits cannot be used directly on a dynamically sized type
+  // identifier (NC12), cannot enclose a function whose return type is
+  // dynamically sized (NC9), and cannot be applied to an object whose type is
+  // an interface class (NC13, see §8.26).
+  std::unordered_set<std::string_view> dyn_types = CollectDynamicTypes(decl);
+  std::unordered_set<std::string_view> dyn_funcs =
+      CollectDynamicFuncs(decl, dyn_types);
   std::unordered_set<std::string_view> iface_vars;
   for (const auto& [vname, cls_name] : class_var_types_) {
     const auto* cls = FindClassDecl(cls_name, unit_);
@@ -504,19 +538,28 @@ namespace {
 // (module variables or nets). A part-select bound that does so cannot be a
 // constant expression.
 bool ExprNamesSignal(const Expr* e,
+                     const std::unordered_set<std::string_view>& signals);
+
+// Whether any of an expression's scalar (single-pointer) child slots names one
+// of the given run-time signals.
+bool ScalarChildNamesSignal(
+    const Expr* e, const std::unordered_set<std::string_view>& signals) {
+  return ExprNamesSignal(e->lhs, signals) || ExprNamesSignal(e->rhs, signals) ||
+         ExprNamesSignal(e->condition, signals) ||
+         ExprNamesSignal(e->true_expr, signals) ||
+         ExprNamesSignal(e->false_expr, signals) ||
+         ExprNamesSignal(e->base, signals) ||
+         ExprNamesSignal(e->index, signals) ||
+         ExprNamesSignal(e->index_end, signals) ||
+         ExprNamesSignal(e->with_expr, signals) ||
+         ExprNamesSignal(e->repeat_count, signals);
+}
+
+bool ExprNamesSignal(const Expr* e,
                      const std::unordered_set<std::string_view>& signals) {
   if (!e) return false;
   if (e->kind == ExprKind::kIdentifier) return signals.count(e->text) > 0;
-  if (ExprNamesSignal(e->lhs, signals)) return true;
-  if (ExprNamesSignal(e->rhs, signals)) return true;
-  if (ExprNamesSignal(e->condition, signals)) return true;
-  if (ExprNamesSignal(e->true_expr, signals)) return true;
-  if (ExprNamesSignal(e->false_expr, signals)) return true;
-  if (ExprNamesSignal(e->base, signals)) return true;
-  if (ExprNamesSignal(e->index, signals)) return true;
-  if (ExprNamesSignal(e->index_end, signals)) return true;
-  if (ExprNamesSignal(e->with_expr, signals)) return true;
-  if (ExprNamesSignal(e->repeat_count, signals)) return true;
+  if (ScalarChildNamesSignal(e, signals)) return true;
   for (const auto* a : e->args)
     if (ExprNamesSignal(a, signals)) return true;
   for (const auto* el : e->elements)
@@ -533,6 +576,32 @@ struct PartSelectBoundsCtx {
   DiagEngine& diag;
 };
 
+// §11.5.1: check one qualifying non-indexed part-select (vect[msb:lsb] on a
+// simple packed vector) for constant bounds and correct index ordering.
+void CheckOnePartSelectBounds(const Expr* e, const PartSelectBoundsCtx& ctx) {
+  if (ExprNamesSignal(e->index, ctx.signals) ||
+      ExprNamesSignal(e->index_end, ctx.signals)) {
+    ctx.diag.Error(e->range.start,
+                   "non-indexed part-select bounds shall be constant "
+                   "expressions");
+    return;
+  }
+  auto msb = ConstEvalInt(e->index);
+  auto lsb = ConstEvalInt(e->index_end);
+  if (!msb || !lsb) return;
+  const auto& range = ctx.ranges.at(e->base->text);
+  bool descending = range.first >= range.second;
+  // The first index shall name a more significant bit than the second. For a
+  // descending declaration the more significant bit has the larger index; for
+  // an ascending one it has the smaller index. Equal indices (a one-bit
+  // part-select) are permitted.
+  bool reversed = descending ? (*msb < *lsb) : (*msb > *lsb);
+  if (reversed)
+    ctx.diag.Error(e->range.start,
+                   "part-select's first index must address a more "
+                   "significant bit than its second index");
+}
+
 void CheckPartSelectBoundsExpr(const Expr* e, const PartSelectBoundsCtx& ctx) {
   if (!e) return;
   // Only a non-indexed part-select (vect[msb:lsb], not an indexed +:/-: form
@@ -542,28 +611,7 @@ void CheckPartSelectBoundsExpr(const Expr* e, const PartSelectBoundsCtx& ctx) {
       !e->is_part_select_plus && !e->is_part_select_minus && e->base &&
       e->base->kind == ExprKind::kIdentifier &&
       ctx.ranges.count(e->base->text)) {
-    if (ExprNamesSignal(e->index, ctx.signals) ||
-        ExprNamesSignal(e->index_end, ctx.signals)) {
-      ctx.diag.Error(e->range.start,
-                     "non-indexed part-select bounds shall be constant "
-                     "expressions");
-    } else {
-      auto msb = ConstEvalInt(e->index);
-      auto lsb = ConstEvalInt(e->index_end);
-      if (msb && lsb) {
-        const auto& range = ctx.ranges.at(e->base->text);
-        bool descending = range.first >= range.second;
-        // The first index shall name a more significant bit than the second.
-        // For a descending declaration the more significant bit has the larger
-        // index; for an ascending one it has the smaller index. Equal indices
-        // (a one-bit part-select) are permitted.
-        bool reversed = descending ? (*msb < *lsb) : (*msb > *lsb);
-        if (reversed)
-          ctx.diag.Error(e->range.start,
-                         "part-select's first index must address a more "
-                         "significant bit than its second index");
-      }
-    }
+    CheckOnePartSelectBounds(e, ctx);
   }
   CheckPartSelectBoundsExpr(e->lhs, ctx);
   CheckPartSelectBoundsExpr(e->rhs, ctx);
@@ -643,6 +691,46 @@ void Elaborator::ValidateSpecparamInParams(const ModuleDecl* decl) {
   }
 }
 
+namespace {
+
+// §6.20.5: flag a single declaration range expression that references any
+// specify parameter.
+void CheckSpecparamInRange(
+    const Expr* range, SourceLoc loc,
+    const std::unordered_set<std::string_view>& specparam_names,
+    DiagEngine& diag) {
+  if (!range) return;
+  for (const auto& sp : specparam_names) {
+    if (ExprContainsIdent(range, sp)) {
+      diag.Error(loc, std::format("specparam '{}' may not appear in a "
+                                  "declaration range specification",
+                                  sp));
+      break;
+    }
+  }
+}
+
+// §6.20.5: check every packed and unpacked dimension expression of one net or
+// variable declaration for a specparam reference.
+void CheckDeclRangesForSpecparam(
+    const ModuleItem* item,
+    const std::unordered_set<std::string_view>& specparam_names,
+    DiagEngine& diag) {
+  CheckSpecparamInRange(item->data_type.packed_dim_left, item->loc,
+                        specparam_names, diag);
+  CheckSpecparamInRange(item->data_type.packed_dim_right, item->loc,
+                        specparam_names, diag);
+  for (const auto& [left, right] : item->data_type.extra_packed_dims) {
+    CheckSpecparamInRange(left, item->loc, specparam_names, diag);
+    CheckSpecparamInRange(right, item->loc, specparam_names, diag);
+  }
+  for (const auto* dim : item->unpacked_dims) {
+    CheckSpecparamInRange(dim, item->loc, specparam_names, diag);
+  }
+}
+
+}  // namespace
+
 void Elaborator::ValidateSpecparamInDeclRange(const ModuleDecl* decl) {
   if (specparam_names_.empty()) return;
 
@@ -650,31 +738,11 @@ void Elaborator::ValidateSpecparamInDeclRange(const ModuleDecl* decl) {
   // not participate in the range specification of a declaration. Flag any
   // packed or unpacked dimension expression of a net or variable declaration
   // that references a specparam.
-  auto check_range = [&](const Expr* range, SourceLoc loc) {
-    if (!range) return;
-    for (const auto& sp : specparam_names_) {
-      if (ExprContainsIdent(range, sp)) {
-        diag_.Error(loc, std::format("specparam '{}' may not appear in a "
-                                     "declaration range specification",
-                                     sp));
-        break;
-      }
-    }
-  };
-
   for (const auto* item : decl->items) {
     if (item->kind != ModuleItemKind::kNetDecl &&
         item->kind != ModuleItemKind::kVarDecl)
       continue;
-    check_range(item->data_type.packed_dim_left, item->loc);
-    check_range(item->data_type.packed_dim_right, item->loc);
-    for (const auto& [left, right] : item->data_type.extra_packed_dims) {
-      check_range(left, item->loc);
-      check_range(right, item->loc);
-    }
-    for (const auto* dim : item->unpacked_dims) {
-      check_range(dim, item->loc);
-    }
+    CheckDeclRangesForSpecparam(item, specparam_names_, diag_);
   }
 }
 
@@ -695,47 +763,65 @@ static bool ExprContainsHierRef(const Expr* e) {
   return false;
 }
 
-void Elaborator::ValidateValueParams(const ModuleDecl* decl,
-                                     const RtlirModule* mod) {
-  for (const auto* item : decl->items) {
-    if (item->kind != ModuleItemKind::kParamDecl) continue;
+namespace {
 
-    if (item->data_type.kind == DataTypeKind::kVoid &&
-        item->typedef_type.kind != DataTypeKind::kImplicit)
-      continue;
-    if (!item->init_expr) {
-      diag_.Error(
-          item->loc,
-          std::format("value parameter '{}' has no default value", item->name));
-      continue;
-    }
-
-    if (ExprContainsHierRef(item->init_expr)) {
-      diag_.Error(item->loc,
-                  std::format("parameter '{}' value contains a hierarchical "
-                              "reference",
-                              item->name));
-    }
-
-    if (item->is_localparam &&
-        item->init_expr->kind == ExprKind::kAssignmentPattern &&
-        !IsConstantExpr(item->init_expr, BuildParamScope(mod))) {
-      diag_.Error(item->loc,
-                  std::format("localparam '{}' initializer is not a constant "
-                              "expression",
-                              item->name));
-    }
-  }
-
+// Flag the elaborated parameter overrides in decl->params whose value contains
+// a hierarchical reference.
+void CheckParamMapHierRefs(const ModuleDecl* decl, DiagEngine& diag) {
   for (const auto& [pname, pval] : decl->params) {
     if (!pval) continue;
     if (ExprContainsHierRef(pval)) {
-      diag_.Error(pval->range.start,
-                  std::format("parameter '{}' value contains a hierarchical "
-                              "reference",
-                              pname));
+      diag.Error(pval->range.start,
+                 std::format("parameter '{}' value contains a hierarchical "
+                             "reference",
+                             pname));
     }
   }
+}
+
+// Validate one parameter declaration item: it must carry a default value, its
+// value may not contain a hierarchical reference, and a localparam initialized
+// with an assignment pattern must be a constant expression in param_scope.
+void ValidateOneValueParam(const ModuleItem* item, const ScopeMap& param_scope,
+                           DiagEngine& diag) {
+  if (item->data_type.kind == DataTypeKind::kVoid &&
+      item->typedef_type.kind != DataTypeKind::kImplicit)
+    return;
+  if (!item->init_expr) {
+    diag.Error(
+        item->loc,
+        std::format("value parameter '{}' has no default value", item->name));
+    return;
+  }
+
+  if (ExprContainsHierRef(item->init_expr)) {
+    diag.Error(item->loc,
+               std::format("parameter '{}' value contains a hierarchical "
+                           "reference",
+                           item->name));
+  }
+
+  if (item->is_localparam &&
+      item->init_expr->kind == ExprKind::kAssignmentPattern &&
+      !IsConstantExpr(item->init_expr, param_scope)) {
+    diag.Error(item->loc,
+               std::format("localparam '{}' initializer is not a constant "
+                           "expression",
+                           item->name));
+  }
+}
+
+}  // namespace
+
+void Elaborator::ValidateValueParams(const ModuleDecl* decl,
+                                     const RtlirModule* mod) {
+  ScopeMap param_scope = BuildParamScope(mod);
+  for (const auto* item : decl->items) {
+    if (item->kind != ModuleItemKind::kParamDecl) continue;
+    ValidateOneValueParam(item, param_scope, diag_);
+  }
+
+  CheckParamMapHierRefs(decl, diag_);
 }
 
 }  // namespace delta

@@ -76,15 +76,7 @@ void Parser::ParseUseClause(ConfigRule* rule) {
     }
     if (!Check(TokenKind::kRParen)) {
       do {
-        Expect(TokenKind::kDot);
-        auto pname = ExpectIdentifier().text;
-        Expect(TokenKind::kLParen);
-        Expr* val = nullptr;
-        if (!Check(TokenKind::kRParen)) {
-          val = ParseExpr();
-        }
-        Expect(TokenKind::kRParen);
-        rule->use_params.emplace_back(pname, val);
+        ParseNamedParamAssignment(rule);
       } while (Match(TokenKind::kComma));
     }
     Expect(TokenKind::kRParen);

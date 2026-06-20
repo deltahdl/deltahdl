@@ -298,43 +298,64 @@ PLI_UINT32 VpiContext::McdOpen(const std::string& filename) {
   return 0;
 }
 
+namespace {
+
+// §38.24: drop one closed channel from the shared mcd/fd file namespace. Each
+// file entry records the set of channels naming it; clearing this channel's bit
+// removes its claim, and an entry left naming no channel is erased. The
+// namespace is shared with $fopen (§21.3.1), so an fd opened there is closed
+// here the same way.
+void CloseMcdChannelFiles(
+    std::unordered_map<std::string, PLI_UINT32>& open_files,
+    PLI_UINT32 channel) {
+  for (auto it = open_files.begin(); it != open_files.end();) {
+    if ((it->second & channel) != 0) {
+      it->second &= ~channel;
+      if (it->second == 0) {
+        it = open_files.erase(it);
+        continue;
+      }
+    }
+    ++it;
+  }
+}
+
+// §38.24: close a single channel bit of an mcd. Returns true when the channel
+// could not be closed and must be reported back to the caller, false when it
+// was closed (or was not requested) and needs no report.
+bool CloseMcdChannelBit(
+    int bit, PLI_UINT32 mcd, PLI_UINT32& allocated_channels,
+    std::unordered_map<std::string, PLI_UINT32>& open_files) {
+  PLI_UINT32 channel = PLI_UINT32{1} << bit;
+  if ((mcd & channel) == 0) return false;
+
+  // §38.24: descriptor 1 (the LSB) is predefined for the tool's output
+  // channel and current log file; it shall not be closed and so is reported
+  // as still open.
+  if (bit == 0) return true;
+
+  // §38.24: a bit naming no open channel has nothing to close, so it too is
+  // reported back rather than silently succeeding.
+  if ((allocated_channels & channel) == 0) return true;
+
+  // §38.24: close the channel - free it in the shared namespace and drop any
+  // file that named it.
+  allocated_channels &= ~channel;
+  CloseMcdChannelFiles(open_files, channel);
+  return false;
+}
+
+}  // namespace
+
 PLI_UINT32 VpiContext::McdClose(PLI_UINT32 mcd) {
   // §38.24: walk the descriptor bit by bit. Each channel is a discrete bit, so
   // a single call closes several channels at once. A bit that cannot be closed
   // is gathered into the error result and reported back to the caller.
   PLI_UINT32 unclosed = 0;
   for (int bit = 0; bit < 32; ++bit) {
-    PLI_UINT32 channel = PLI_UINT32{1} << bit;
-    if ((mcd & channel) == 0) continue;
-
-    // §38.24: descriptor 1 (the LSB) is predefined for the tool's output
-    // channel and current log file; it shall not be closed and so is reported
-    // as still open.
-    if (bit == 0) {
-      unclosed |= channel;
-      continue;
-    }
-
-    // §38.24: a bit naming no open channel has nothing to close, so it too is
-    // reported back rather than silently succeeding.
-    if ((mcd_allocated_channels_ & channel) == 0) {
-      unclosed |= channel;
-      continue;
-    }
-
-    // §38.24: close the channel - free it in the shared namespace and drop any
-    // file that named it. The namespace is shared with $fopen (§21.3.1), so an
-    // fd opened there is closed here the same way.
-    mcd_allocated_channels_ &= ~channel;
-    for (auto it = mcd_open_files_.begin(); it != mcd_open_files_.end();) {
-      if ((it->second & channel) != 0) {
-        it->second &= ~channel;
-        if (it->second == 0) {
-          it = mcd_open_files_.erase(it);
-          continue;
-        }
-      }
-      ++it;
+    if (CloseMcdChannelBit(bit, mcd, mcd_allocated_channels_,
+                           mcd_open_files_)) {
+      unclosed |= PLI_UINT32{1} << bit;
     }
   }
 

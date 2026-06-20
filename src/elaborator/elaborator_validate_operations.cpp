@@ -187,23 +187,29 @@ static bool TypeRefArgHasMemberAccess(const Expr* e) {
   return false;
 }
 
+// True when this node is itself a select on a dynamic/associative array; the
+// recursive descent into children is handled separately by the caller.
+static bool TypeRefArgSelectsDynamicElement(
+    const Expr* e,
+    const std::unordered_map<std::string_view, VarArrayInfo>& array_info) {
+  if (e->kind != ExprKind::kSelect || !e->base ||
+      e->base->kind != ExprKind::kIdentifier) {
+    return false;
+  }
+  auto it = array_info.find(e->base->text);
+  return it != array_info.end() &&
+         (it->second.is_dynamic || it->second.is_assoc);
+}
+
 bool Elaborator::TypeRefArgUsesDynamicElement(const Expr* e) const {
   if (!e) return false;
-  if (e->kind == ExprKind::kSelect && e->base &&
-      e->base->kind == ExprKind::kIdentifier) {
-    auto it = var_array_info_.find(e->base->text);
-    if (it != var_array_info_.end() &&
-        (it->second.is_dynamic || it->second.is_assoc)) {
-      return true;
-    }
+  if (TypeRefArgSelectsDynamicElement(e, var_array_info_)) return true;
+  const Expr* const kChildren[] = {e->lhs,       e->rhs,       e->base,
+                                   e->index,     e->condition, e->true_expr,
+                                   e->false_expr};
+  for (const Expr* child : kChildren) {
+    if (TypeRefArgUsesDynamicElement(child)) return true;
   }
-  if (TypeRefArgUsesDynamicElement(e->lhs)) return true;
-  if (TypeRefArgUsesDynamicElement(e->rhs)) return true;
-  if (TypeRefArgUsesDynamicElement(e->base)) return true;
-  if (TypeRefArgUsesDynamicElement(e->index)) return true;
-  if (TypeRefArgUsesDynamicElement(e->condition)) return true;
-  if (TypeRefArgUsesDynamicElement(e->true_expr)) return true;
-  if (TypeRefArgUsesDynamicElement(e->false_expr)) return true;
   for (const auto* elem : e->elements) {
     if (TypeRefArgUsesDynamicElement(elem)) return true;
   }
@@ -523,98 +529,137 @@ static bool ExprContainsHierarchicalRef(const Expr* e) {
   return false;
 }
 
-void Elaborator::ValidateAlias(const ModuleItem* item, RtlirModule* mod) {
+namespace {
+
+void CheckAliasSelfAlias(const ModuleItem* item, DiagEngine& diag) {
   std::unordered_set<std::string_view> seen;
   for (auto* net : item->alias_nets) {
     auto name = AliasNetIdent(net);
     if (name.empty()) continue;
     if (!seen.insert(name).second) {
-      diag_.Error(item->loc, std::format("net '{}' aliased to itself", name));
+      diag.Error(item->loc, std::format("net '{}' aliased to itself", name));
     }
   }
+}
 
+void CheckAliasOperandKinds(
+    const ModuleItem* item, DiagEngine& diag,
+    const std::unordered_set<std::string_view>& net_names,
+    const std::unordered_set<std::string_view>& declared_names) {
   for (auto* net : item->alias_nets) {
     if (ExprContainsHierarchicalRef(net)) {
-      diag_.Error(item->loc,
-                  "hierarchical references cannot be used in alias statements");
+      diag.Error(item->loc,
+                 "hierarchical references cannot be used in alias statements");
     }
     auto name = AliasNetIdent(net);
     if (name.empty()) continue;
-    if (!net_names_.count(name) && declared_names_.count(name)) {
-      diag_.Error(item->loc,
-                  std::format("'{}' is a variable, not a net; "
-                              "variables cannot appear in alias statements",
-                              name));
+    if (!net_names.count(name) && declared_names.count(name)) {
+      diag.Error(item->loc,
+                 std::format("'{}' is a variable, not a net; "
+                             "variables cannot appear in alias statements",
+                             name));
     }
   }
+}
 
+std::vector<std::string_view> CollectAliasNetNames(
+    const ModuleItem* item,
+    const std::unordered_set<std::string_view>& net_names) {
   std::vector<std::string_view> ident_names;
   for (auto* net : item->alias_nets) {
     auto name = AliasNetIdent(net);
-    if (!name.empty() && net_names_.count(name)) ident_names.push_back(name);
+    if (!name.empty() && net_names.count(name)) ident_names.push_back(name);
   }
-  if (ident_names.size() >= 2) {
-    auto first_type_it = var_types_.find(ident_names[0]);
-    NetType first_net_type = NetType::kWire;
-    if (first_type_it != var_types_.end())
-      first_net_type = DataTypeToNetType(first_type_it->second);
-    for (size_t i = 1; i < ident_names.size(); ++i) {
-      NetType cur_net_type = NetType::kWire;
-      auto cur_type_it = var_types_.find(ident_names[i]);
-      if (cur_type_it != var_types_.end())
-        cur_net_type = DataTypeToNetType(cur_type_it->second);
-      if (cur_net_type != first_net_type) {
-        diag_.Error(
-            item->loc,
-            std::format("nets in alias statement have incompatible types; "
-                        "'{}' and '{}' are different net types",
-                        ident_names[0], ident_names[i]));
-        break;
-      }
+  return ident_names;
+}
+
+void CheckAliasNetTypeCompat(
+    const ModuleItem* item, DiagEngine& diag,
+    const std::unordered_map<std::string_view, DataTypeKind>& var_types,
+    const std::vector<std::string_view>& ident_names) {
+  if (ident_names.size() < 2) return;
+  auto first_type_it = var_types.find(ident_names[0]);
+  NetType first_net_type = NetType::kWire;
+  if (first_type_it != var_types.end())
+    first_net_type = DataTypeToNetType(first_type_it->second);
+  for (size_t i = 1; i < ident_names.size(); ++i) {
+    NetType cur_net_type = NetType::kWire;
+    auto cur_type_it = var_types.find(ident_names[i]);
+    if (cur_type_it != var_types.end())
+      cur_net_type = DataTypeToNetType(cur_type_it->second);
+    if (cur_net_type != first_net_type) {
+      diag.Error(item->loc,
+                 std::format("nets in alias statement have incompatible types; "
+                             "'{}' and '{}' are different net types",
+                             ident_names[0], ident_names[i]));
+      break;
     }
   }
+}
 
-  if (ident_names.size() >= 2) {
-    auto scoped_first = ScopedName(ident_names[0]);
-    uint32_t first_width = 0;
+template <typename ScopeFn>
+void CheckAliasNetWidthCompat(const ModuleItem* item, DiagEngine& diag,
+                              RtlirModule* mod,
+                              const std::vector<std::string_view>& ident_names,
+                              ScopeFn scope) {
+  if (ident_names.size() < 2) return;
+  auto scoped_first = scope(ident_names[0]);
+  uint32_t first_width = 0;
+  for (const auto& n : mod->nets) {
+    if (n.name == scoped_first) {
+      first_width = n.width;
+      break;
+    }
+  }
+  for (size_t i = 1; i < ident_names.size(); ++i) {
+    auto scoped = scope(ident_names[i]);
+    uint32_t w = 0;
     for (const auto& n : mod->nets) {
-      if (n.name == scoped_first) {
-        first_width = n.width;
+      if (n.name == scoped) {
+        w = n.width;
         break;
       }
     }
-    for (size_t i = 1; i < ident_names.size(); ++i) {
-      auto scoped = ScopedName(ident_names[i]);
-      uint32_t w = 0;
-      for (const auto& n : mod->nets) {
-        if (n.name == scoped) {
-          w = n.width;
-          break;
-        }
-      }
-      if (w != first_width) {
-        diag_.Error(
-            item->loc,
-            std::format("nets in alias statement have different widths; "
-                        "'{}' has width {} but '{}' has width {}",
-                        ident_names[0], first_width, ident_names[i], w));
-        break;
-      }
+    if (w != first_width) {
+      diag.Error(item->loc,
+                 std::format("nets in alias statement have different widths; "
+                             "'{}' has width {} but '{}' has width {}",
+                             ident_names[0], first_width, ident_names[i], w));
+      break;
     }
   }
+}
 
+void CheckAliasDuplicatePairs(
+    const ModuleItem* item, DiagEngine& diag,
+    std::set<std::pair<std::string_view, std::string_view>>& alias_pairs,
+    const std::vector<std::string_view>& ident_names) {
   for (size_t i = 0; i < ident_names.size(); ++i) {
     for (size_t j = i + 1; j < ident_names.size(); ++j) {
       auto a = ident_names[i];
       auto b = ident_names[j];
       auto pair = (a < b) ? std::make_pair(a, b) : std::make_pair(b, a);
-      if (!alias_pairs_.insert(pair).second) {
-        diag_.Error(item->loc, std::format("alias between '{}' and '{}' "
-                                           "specified more than once",
-                                           a, b));
+      if (!alias_pairs.insert(pair).second) {
+        diag.Error(item->loc, std::format("alias between '{}' and '{}' "
+                                          "specified more than once",
+                                          a, b));
       }
     }
   }
+}
+
+}  // namespace
+
+void Elaborator::ValidateAlias(const ModuleItem* item, RtlirModule* mod) {
+  CheckAliasSelfAlias(item, diag_);
+  CheckAliasOperandKinds(item, diag_, net_names_, declared_names_);
+  std::vector<std::string_view> ident_names =
+      CollectAliasNetNames(item, net_names_);
+  CheckAliasNetTypeCompat(item, diag_, var_types_, ident_names);
+  CheckAliasNetWidthCompat(
+      item, diag_, mod, ident_names,
+      [this](std::string_view n) { return ScopedName(n); });
+  CheckAliasDuplicatePairs(item, diag_, alias_pairs_, ident_names);
 }
 
 void Elaborator::CheckAssocConcatTargetInAssign(const Stmt* s) {

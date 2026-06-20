@@ -23,8 +23,7 @@ static void AddOrUpdateVTableEntry(ClassTypeInfo* info,
   }
 }
 
-static void BuildVTable(ClassTypeInfo* info, const ClassDecl* cls) {
-  if (info->parent) info->vtable = info->parent->vtable;
+static void MergeInterfaceVTables(ClassTypeInfo* info) {
   for (const auto* iface : info->extended_interfaces) {
     if (!iface) continue;
     for (const auto& entry : iface->vtable) {
@@ -38,19 +37,27 @@ static void BuildVTable(ClassTypeInfo* info, const ClassDecl* cls) {
       if (!found) info->vtable.push_back(entry);
     }
   }
+}
+
+static bool MemberContributesToVTable(ClassTypeInfo* info,
+                                      const ClassMember* member) {
+  // A method that redeclares an inherited virtual entry overrides it and
+  // stays virtual even when the 'virtual' keyword is omitted (8.20). A
+  // ':initial' method is excluded: it explicitly does not act as a virtual
+  // override, so it never updates an inherited slot.
+  bool overrides_inherited_virtual =
+      !member->method->is_method_initial &&
+      info->FindVTableIndex(member->method->name) >= 0;
+  return member->is_virtual || member->is_pure_virtual ||
+         member->method->is_method_extends || overrides_inherited_virtual;
+}
+
+static void BuildVTable(ClassTypeInfo* info, const ClassDecl* cls) {
+  if (info->parent) info->vtable = info->parent->vtable;
+  MergeInterfaceVTables(info);
   for (auto* member : cls->members) {
     if (member->kind != ClassMemberKind::kMethod || !member->method) continue;
-
-    // A method that redeclares an inherited virtual entry overrides it and
-    // stays virtual even when the 'virtual' keyword is omitted (8.20). A
-    // ':initial' method is excluded: it explicitly does not act as a virtual
-    // override, so it never updates an inherited slot.
-    bool overrides_inherited_virtual =
-        !member->method->is_method_initial &&
-        info->FindVTableIndex(member->method->name) >= 0;
-    if (!member->is_virtual && !member->is_pure_virtual &&
-        !member->method->is_method_extends && !overrides_inherited_virtual)
-      continue;
+    if (!MemberContributesToVTable(info, member)) continue;
     AddOrUpdateVTableEntry(info, member);
   }
 }
@@ -70,6 +77,99 @@ static void InitStaticProperties(ClassTypeInfo* info, SimContext& ctx,
   }
 }
 
+static void CollectClassMembers(ClassTypeInfo* info, const ClassDecl* cls) {
+  for (auto* member : cls->members) {
+    if (member->kind == ClassMemberKind::kProperty) {
+      uint32_t w = EvalTypeWidth(member->data_type, {});
+      if (w == 0) w = 32;
+      info->properties.push_back({member->name, w, member->is_static,
+                                  member->is_local, member->is_protected,
+                                  member->is_const, member->init_expr});
+    } else if (member->kind == ClassMemberKind::kMethod && member->method) {
+      std::string name(member->method->name);
+      info->methods[name] = member->method;
+    }
+  }
+}
+
+static void InitClassParams(ClassTypeInfo* info, const ClassDecl* cls,
+                            SimContext& ctx, Arena& arena) {
+  for (const auto& [pname, pexpr] : cls->params) {
+    info->properties.push_back({pname, 32, false});
+    if (pexpr) {
+      info->static_properties[std::string(pname)] = EvalExpr(pexpr, ctx, arena);
+    } else {
+      info->static_properties[std::string(pname)] =
+          MakeLogic4VecVal(arena, 32, 0);
+    }
+  }
+}
+
+static void CollectClassEnumMembers(ClassTypeInfo* info, const ClassDecl* cls) {
+  for (const auto* member : cls->members) {
+    if (member->kind != ClassMemberKind::kTypedef || !member->typedef_item)
+      continue;
+    const auto& enum_members = member->typedef_item->typedef_type.enum_members;
+    int64_t next_val = 0;
+    for (const auto& em : enum_members) {
+      if (em.value) next_val = static_cast<int64_t>(em.value->int_val);
+      info->enum_members[std::string(em.name)] =
+          static_cast<uint64_t>(next_val);
+      ++next_val;
+    }
+  }
+}
+
+static void InheritInterfaceStaticsAndEnums(ClassTypeInfo* info,
+                                            const ClassTypeInfo* src) {
+  for (const auto& [k, v] : src->static_properties) {
+    if (info->static_properties.find(k) == info->static_properties.end())
+      info->static_properties[k] = v;
+  }
+  for (const auto& [k, v] : src->enum_members) {
+    if (info->enum_members.find(k) == info->enum_members.end())
+      info->enum_members[k] = v;
+  }
+}
+
+static void InheritInterfaceMembers(ClassTypeInfo* info) {
+  if (info->parent && info->parent->is_interface)
+    InheritInterfaceStaticsAndEnums(info, info->parent);
+  for (const auto* iface : info->extended_interfaces)
+    InheritInterfaceStaticsAndEnums(info, iface);
+}
+
+static void CollectNestedClassMembers(ClassTypeInfo* nested_info,
+                                      const ClassDecl* nested_class) {
+  for (auto* m : nested_class->members) {
+    if (m->kind == ClassMemberKind::kProperty) {
+      uint32_t w = EvalTypeWidth(m->data_type, {});
+      if (w == 0) w = 32;
+      nested_info->properties.push_back({m->name, w, m->is_static, m->is_local,
+                                         m->is_protected, m->is_const,
+                                         m->init_expr});
+    } else if (m->kind == ClassMemberKind::kMethod && m->method) {
+      nested_info->methods[std::string(m->method->name)] = m->method;
+    }
+  }
+}
+
+static void LowerNestedClass(const ClassDecl* outer, const ClassMember* member,
+                             SimContext& ctx, Arena& arena) {
+  auto qualified =
+      std::string(outer->name) + "::" + std::string(member->nested_class->name);
+  auto* nested_info = arena.Create<ClassTypeInfo>();
+  nested_info->name = *arena.Create<std::string>(std::move(qualified));
+  nested_info->decl = member->nested_class;
+  nested_info->is_abstract = member->nested_class->is_virtual;
+  nested_info->is_interface = member->nested_class->is_interface;
+  if (!member->nested_class->base_class.empty())
+    nested_info->parent = ctx.FindClassType(member->nested_class->base_class);
+  CollectNestedClassMembers(nested_info, member->nested_class);
+  InitStaticProperties(nested_info, ctx, arena);
+  ctx.RegisterClassType(nested_info->name, nested_info);
+}
+
 void Lowerer::LowerClassDecl(const ClassDecl* cls) {
   auto* info = arena_.Create<ClassTypeInfo>();
   info->name = cls->name;
@@ -87,87 +187,18 @@ void Lowerer::LowerClassDecl(const ClassDecl* cls) {
     auto* iface = ctx_.FindClassType(ref.name);
     if (iface) info->extended_interfaces.push_back(iface);
   }
-  for (auto* member : cls->members) {
-    if (member->kind == ClassMemberKind::kProperty) {
-      uint32_t w = EvalTypeWidth(member->data_type, {});
-      if (w == 0) w = 32;
-      info->properties.push_back({member->name, w, member->is_static,
-                                  member->is_local, member->is_protected,
-                                  member->is_const, member->init_expr});
-    } else if (member->kind == ClassMemberKind::kMethod && member->method) {
-      std::string name(member->method->name);
-      info->methods[name] = member->method;
-    }
-  }
+  CollectClassMembers(info, cls);
   BuildVTable(info, cls);
   InitStaticProperties(info, ctx_, arena_);
+  InitClassParams(info, cls, ctx_, arena_);
+  CollectClassEnumMembers(info, cls);
 
-  for (const auto& [pname, pexpr] : cls->params) {
-    info->properties.push_back({pname, 32, false});
-    if (pexpr) {
-      info->static_properties[std::string(pname)] =
-          EvalExpr(pexpr, ctx_, arena_);
-    } else {
-      info->static_properties[std::string(pname)] =
-          MakeLogic4VecVal(arena_, 32, 0);
-    }
-  }
-
-  for (const auto* member : cls->members) {
-    if (member->kind != ClassMemberKind::kTypedef || !member->typedef_item)
-      continue;
-    const auto& enum_members = member->typedef_item->typedef_type.enum_members;
-    int64_t next_val = 0;
-    for (const auto& em : enum_members) {
-      if (em.value) next_val = static_cast<int64_t>(em.value->int_val);
-      info->enum_members[std::string(em.name)] =
-          static_cast<uint64_t>(next_val);
-      ++next_val;
-    }
-  }
-
-  if (cls->is_interface) {
-    auto inherit_from = [&](const ClassTypeInfo* src) {
-      for (const auto& [k, v] : src->static_properties) {
-        if (info->static_properties.find(k) == info->static_properties.end())
-          info->static_properties[k] = v;
-      }
-      for (const auto& [k, v] : src->enum_members) {
-        if (info->enum_members.find(k) == info->enum_members.end())
-          info->enum_members[k] = v;
-      }
-    };
-    if (info->parent && info->parent->is_interface) inherit_from(info->parent);
-    for (const auto* iface : info->extended_interfaces) inherit_from(iface);
-  }
+  if (cls->is_interface) InheritInterfaceMembers(info);
   ctx_.RegisterClassType(cls->name, info);
 
   for (const auto* member : cls->members) {
-    if (member->kind == ClassMemberKind::kClassDecl && member->nested_class) {
-      auto qualified = std::string(cls->name) +
-                       "::" + std::string(member->nested_class->name);
-      auto* nested_info = arena_.Create<ClassTypeInfo>();
-      nested_info->name = *arena_.Create<std::string>(std::move(qualified));
-      nested_info->decl = member->nested_class;
-      nested_info->is_abstract = member->nested_class->is_virtual;
-      nested_info->is_interface = member->nested_class->is_interface;
-      if (!member->nested_class->base_class.empty())
-        nested_info->parent =
-            ctx_.FindClassType(member->nested_class->base_class);
-      for (auto* m : member->nested_class->members) {
-        if (m->kind == ClassMemberKind::kProperty) {
-          uint32_t w = EvalTypeWidth(m->data_type, {});
-          if (w == 0) w = 32;
-          nested_info->properties.push_back({m->name, w, m->is_static,
-                                             m->is_local, m->is_protected,
-                                             m->is_const, m->init_expr});
-        } else if (m->kind == ClassMemberKind::kMethod && m->method) {
-          nested_info->methods[std::string(m->method->name)] = m->method;
-        }
-      }
-      InitStaticProperties(nested_info, ctx_, arena_);
-      ctx_.RegisterClassType(nested_info->name, nested_info);
-    }
+    if (member->kind == ClassMemberKind::kClassDecl && member->nested_class)
+      LowerNestedClass(cls, member, ctx_, arena_);
   }
 }
 

@@ -59,10 +59,9 @@ static void CheckExprForRefArgs(
   for (auto* elem : e->elements) CheckExprForRefArgs(elem, ref_names, diag);
 }
 
-static void CheckStmtForRefArgs(
+static void CheckStmtExprsForRefArgs(
     const Stmt* s, const std::unordered_set<std::string_view>& ref_names,
     bool is_fork_block_item, DiagEngine& diag) {
-  if (!s) return;
   if (!is_fork_block_item || s->kind != StmtKind::kVarDecl)
     CheckExprForRefArgs(s->var_init, ref_names, diag);
   CheckExprForRefArgs(s->expr, ref_names, diag);
@@ -86,6 +85,13 @@ static void CheckStmtForRefArgs(
     CheckExprForRefArgs(ri.first, ref_names, diag);
   for (auto* we : s->wait_order_events)
     CheckExprForRefArgs(we, ref_names, diag);
+}
+
+static void CheckStmtForRefArgs(
+    const Stmt* s, const std::unordered_set<std::string_view>& ref_names,
+    bool is_fork_block_item, DiagEngine& diag) {
+  if (!s) return;
+  CheckStmtExprsForRefArgs(s, ref_names, is_fork_block_item, diag);
   for (auto* sub : s->stmts) CheckStmtForRefArgs(sub, ref_names, false, diag);
   for (auto* sub : s->fork_stmts)
     CheckStmtForRefArgs(sub, ref_names, false, diag);
@@ -129,11 +135,10 @@ static void CheckRefArgsInForkBlocks(
     CheckRefArgsInForkBlocks(ri.second, ref_names, diag);
 }
 
-static void CheckFuncBodyStmt(
+static void CheckFuncBodyStmtSelf(
     const Stmt* s, bool is_void,
     const std::unordered_set<std::string_view>& task_names,
     std::string_view func_name, DiagEngine& diag) {
-  if (!s) return;
   if (s->kind == StmtKind::kReturn && s->expr && is_void) {
     diag.Error(s->range.start, "void function returns a value");
   }
@@ -181,6 +186,14 @@ static void CheckFuncBodyStmt(
   if (s->kind == StmtKind::kFork) {
     for (auto* sub : s->fork_stmts) CheckNoReturnInFork(sub, diag);
   }
+}
+
+static void CheckFuncBodyStmt(
+    const Stmt* s, bool is_void,
+    const std::unordered_set<std::string_view>& task_names,
+    std::string_view func_name, DiagEngine& diag) {
+  if (!s) return;
+  CheckFuncBodyStmtSelf(s, is_void, task_names, func_name, diag);
 
   if (s->kind == StmtKind::kFork && s->join_kind == TokenKind::kKwJoinNone)
     return;
@@ -202,26 +215,29 @@ static void CheckFuncBodyStmt(
 // so a reference to one must not outlive the call. Walk an expression tree
 // looking for any leaf identifier naming such a variable.
 static bool ExprRefsAutoVar(
+    const Expr* e, const std::unordered_set<std::string_view>& auto_vars);
+
+static bool AnyChildExprRefsAutoVar(
     const Expr* e, const std::unordered_set<std::string_view>& auto_vars) {
-  if (!e) return false;
-  if (e->kind == ExprKind::kIdentifier && !e->text.empty() &&
-      auto_vars.count(e->text) != 0)
-    return true;
-  if (ExprRefsAutoVar(e->lhs, auto_vars)) return true;
-  if (ExprRefsAutoVar(e->rhs, auto_vars)) return true;
-  if (ExprRefsAutoVar(e->base, auto_vars)) return true;
-  if (ExprRefsAutoVar(e->index, auto_vars)) return true;
-  if (ExprRefsAutoVar(e->index_end, auto_vars)) return true;
-  if (ExprRefsAutoVar(e->condition, auto_vars)) return true;
-  if (ExprRefsAutoVar(e->true_expr, auto_vars)) return true;
-  if (ExprRefsAutoVar(e->false_expr, auto_vars)) return true;
-  if (ExprRefsAutoVar(e->with_expr, auto_vars)) return true;
-  if (ExprRefsAutoVar(e->repeat_count, auto_vars)) return true;
+  const Expr* const kChildren[] = {
+      e->lhs,       e->rhs,       e->base,       e->index,     e->index_end,
+      e->condition, e->true_expr, e->false_expr, e->with_expr, e->repeat_count};
+  for (const Expr* child : kChildren)
+    if (ExprRefsAutoVar(child, auto_vars)) return true;
   for (auto* a : e->args)
     if (ExprRefsAutoVar(a, auto_vars)) return true;
   for (auto* el : e->elements)
     if (ExprRefsAutoVar(el, auto_vars)) return true;
   return false;
+}
+
+static bool ExprRefsAutoVar(
+    const Expr* e, const std::unordered_set<std::string_view>& auto_vars) {
+  if (!e) return false;
+  if (e->kind == ExprKind::kIdentifier && !e->text.empty() &&
+      auto_vars.count(e->text) != 0)
+    return true;
+  return AnyChildExprRefsAutoVar(e, auto_vars);
 }
 
 // §13.3.2: the nonblocking-assignment restriction applies to a write into an
@@ -235,10 +251,29 @@ static std::string_view NbaAutoTargetRoot(const Expr* e) {
   return {};
 }
 
-static void CheckTaskBodyStmt(
+// §13.3.2: an automatic task variable shall not appear in the
+// intra-assignment event control of a nonblocking assignment, since the
+// event control can defer evaluation past the variable's lifetime.
+static void CheckNbaEventControlForAutoVar(
     const Stmt* s, const std::unordered_set<std::string_view>& auto_vars,
     DiagEngine& diag) {
-  if (!s) return;
+  bool in_event_control = ExprRefsAutoVar(s->repeat_event_count, auto_vars);
+  for (const auto& ev : s->events) {
+    if (ExprRefsAutoVar(ev.signal, auto_vars) ||
+        ExprRefsAutoVar(ev.iff_condition, auto_vars)) {
+      in_event_control = true;
+    }
+  }
+  if (in_event_control) {
+    diag.Error(s->range.start,
+               "automatic task variable in intra-assignment event control "
+               "of nonblocking assignment");
+  }
+}
+
+static void CheckTaskBodyStmtSelf(
+    const Stmt* s, const std::unordered_set<std::string_view>& auto_vars,
+    DiagEngine& diag) {
   if (s->kind == StmtKind::kReturn && s->expr) {
     diag.Error(s->range.start, "task returns a value");
   }
@@ -251,22 +286,8 @@ static void CheckTaskBodyStmt(
     }
   }
 
-  // §13.3.2: an automatic task variable shall not appear in the
-  // intra-assignment event control of a nonblocking assignment, since the
-  // event control can defer evaluation past the variable's lifetime.
   if (s->kind == StmtKind::kNonblockingAssign) {
-    bool in_event_control = ExprRefsAutoVar(s->repeat_event_count, auto_vars);
-    for (const auto& ev : s->events) {
-      if (ExprRefsAutoVar(ev.signal, auto_vars) ||
-          ExprRefsAutoVar(ev.iff_condition, auto_vars)) {
-        in_event_control = true;
-      }
-    }
-    if (in_event_control) {
-      diag.Error(s->range.start,
-                 "automatic task variable in intra-assignment event control "
-                 "of nonblocking assignment");
-    }
+    CheckNbaEventControlForAutoVar(s, auto_vars, diag);
   }
 
   // §13.3.2: an automatic task variable shall not be traced by continuous
@@ -300,6 +321,13 @@ static void CheckTaskBodyStmt(
   if (s->kind == StmtKind::kFork) {
     for (auto* sub : s->fork_stmts) CheckNoReturnInFork(sub, diag);
   }
+}
+
+static void CheckTaskBodyStmt(
+    const Stmt* s, const std::unordered_set<std::string_view>& auto_vars,
+    DiagEngine& diag) {
+  if (!s) return;
+  CheckTaskBodyStmtSelf(s, auto_vars, diag);
   for (auto* sub : s->stmts) CheckTaskBodyStmt(sub, auto_vars, diag);
   for (auto* sub : s->fork_stmts) CheckTaskBodyStmt(sub, auto_vars, diag);
   CheckTaskBodyStmt(s->then_branch, auto_vars, diag);
@@ -328,58 +356,70 @@ static void CollectAutoVarNames(const Stmt* s, bool task_is_auto,
     CollectAutoVarNames(ci.body, task_is_auto, out);
 }
 
-void Elaborator::ValidateFunctionBody(const ModuleItem* item) {
-  ValidateRefLifetime(item, diag_);
-
-  ValidateConstRefWriteProtection(item, diag_);
-
+static void ValidateFunctionArgDecls(
+    const ModuleItem* item,
+    const std::unordered_set<std::string_view>& class_names, DiagEngine& diag) {
   for (const auto& arg : item->func_args) {
     if (arg.data_type.kind == DataTypeKind::kNamed &&
         arg.data_type.type_name == "weak_reference" &&
         !arg.data_type.type_params.empty()) {
       const auto& tp = arg.data_type.type_params[0];
-      if (tp.kind != DataTypeKind::kNamed ||
-          !class_names_.count(tp.type_name)) {
-        diag_.Error(item->loc,
-                    "weak_reference type parameter shall be a class type");
+      if (tp.kind != DataTypeKind::kNamed || !class_names.count(tp.type_name)) {
+        diag.Error(item->loc,
+                   "weak_reference type parameter shall be a class type");
       }
     }
     if (arg.default_value && !item->is_ansi_ports) {
-      diag_.Error(item->loc,
-                  std::format("default argument values are only allowed with "
-                              "ANSI-style port declarations for '{}'",
-                              arg.name));
+      diag.Error(item->loc,
+                 std::format("default argument values are only allowed with "
+                             "ANSI-style port declarations for '{}'",
+                             arg.name));
     }
   }
+}
 
-  {
-    std::unordered_set<std::string_view> ref_names;
-    for (const auto& arg : item->func_args) {
-      if (arg.direction == Direction::kRef && !arg.is_ref_static) {
-        ref_names.insert(arg.name);
-      }
-    }
-    if (!ref_names.empty()) {
-      for (auto* s : item->func_body_stmts)
-        CheckRefArgsInForkBlocks(s, ref_names, diag_);
+static void ValidateRefArgsInForkBlocks(const ModuleItem* item,
+                                        DiagEngine& diag) {
+  std::unordered_set<std::string_view> ref_names;
+  for (const auto& arg : item->func_args) {
+    if (arg.direction == Direction::kRef && !arg.is_ref_static) {
+      ref_names.insert(arg.name);
     }
   }
+  if (!ref_names.empty()) {
+    for (auto* s : item->func_body_stmts)
+      CheckRefArgsInForkBlocks(s, ref_names, diag);
+  }
+}
+
+static void ValidateTaskBody(const ModuleItem* item, DiagEngine& diag) {
+  bool is_auto = item->is_automatic;
+
+  std::unordered_set<std::string_view> auto_vars;
+  if (is_auto) {
+    for (const auto& arg : item->func_args) {
+      auto_vars.insert(arg.name);
+    }
+  }
+  for (auto* s : item->func_body_stmts) {
+    CollectAutoVarNames(s, is_auto, auto_vars);
+  }
+  for (auto* s : item->func_body_stmts) {
+    CheckTaskBodyStmt(s, auto_vars, diag);
+  }
+}
+
+void Elaborator::ValidateFunctionBody(const ModuleItem* item) {
+  ValidateRefLifetime(item, diag_);
+
+  ValidateConstRefWriteProtection(item, diag_);
+
+  ValidateFunctionArgDecls(item, class_names_, diag_);
+
+  ValidateRefArgsInForkBlocks(item, diag_);
 
   if (item->kind == ModuleItemKind::kTaskDecl) {
-    bool is_auto = item->is_automatic;
-
-    std::unordered_set<std::string_view> auto_vars;
-    if (is_auto) {
-      for (const auto& arg : item->func_args) {
-        auto_vars.insert(arg.name);
-      }
-    }
-    for (auto* s : item->func_body_stmts) {
-      CollectAutoVarNames(s, is_auto, auto_vars);
-    }
-    for (auto* s : item->func_body_stmts) {
-      CheckTaskBodyStmt(s, auto_vars, diag_);
-    }
+    ValidateTaskBody(item, diag_);
     return;
   }
   if (item->kind != ModuleItemKind::kFunctionDecl) return;

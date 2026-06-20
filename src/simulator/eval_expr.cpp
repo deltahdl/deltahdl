@@ -244,11 +244,11 @@ static bool TryClassEnumAccess(Variable* base_var, std::string_view field_name,
   return true;
 }
 
-static bool TryStaticMemberAccess(std::string_view base_name,
-                                  std::string_view field_name, SimContext& ctx,
-                                  Arena& arena, Logic4Vec& out) {
-  auto* cls_type = ctx.FindClassType(base_name);
-  if (!cls_type) return false;
+// Looks up a static property or enum member named `field_name` directly on
+// `cls_type` (no inheritance walk). Returns true and fills `out` on a hit.
+static bool TryLocalStaticMember(const ClassTypeInfo* cls_type,
+                                 std::string_view field_name, Arena& arena,
+                                 Logic4Vec& out) {
   auto it = cls_type->static_properties.find(std::string(field_name));
   if (it != cls_type->static_properties.end()) {
     out = it->second;
@@ -259,87 +259,110 @@ static bool TryStaticMemberAccess(std::string_view base_name,
     out = MakeLogic4VecVal(arena, 32, eit->second);
     return true;
   }
+  return false;
+}
 
-  if (cls_type->is_interface) {
-    std::vector<const ClassTypeInfo*> stack;
-    if (cls_type->parent && cls_type->parent->is_interface)
-      stack.push_back(cls_type->parent);
-    for (const auto* ei : cls_type->extended_interfaces) stack.push_back(ei);
-    while (!stack.empty()) {
-      const auto* cur = stack.back();
-      stack.pop_back();
-      auto sit = cur->static_properties.find(std::string(field_name));
-      if (sit != cur->static_properties.end()) {
-        out = sit->second;
-        return true;
-      }
-      auto seit = cur->enum_members.find(std::string(field_name));
-      if (seit != cur->enum_members.end()) {
-        out = MakeLogic4VecVal(arena, 32, seit->second);
-        return true;
-      }
-      if (cur->parent && cur->parent->is_interface)
-        stack.push_back(cur->parent);
-      for (const auto* ei : cur->extended_interfaces) stack.push_back(ei);
-    }
+// Walks the interface-class inheritance graph rooted at `cls_type` (parent
+// interface plus all extended interfaces) searching for a static property or
+// enum member named `field_name`. Returns true and fills `out` on a hit.
+static bool TryInterfaceStaticMember(const ClassTypeInfo* cls_type,
+                                     std::string_view field_name, Arena& arena,
+                                     Logic4Vec& out) {
+  std::vector<const ClassTypeInfo*> stack;
+  if (cls_type->parent && cls_type->parent->is_interface)
+    stack.push_back(cls_type->parent);
+  for (const auto* ei : cls_type->extended_interfaces) stack.push_back(ei);
+  while (!stack.empty()) {
+    const auto* cur = stack.back();
+    stack.pop_back();
+    if (TryLocalStaticMember(cur, field_name, arena, out)) return true;
+    if (cur->parent && cur->parent->is_interface) stack.push_back(cur->parent);
+    for (const auto* ei : cur->extended_interfaces) stack.push_back(ei);
   }
   return false;
 }
 
-static Logic4Vec ResolveMemberByType(std::string_view base_name,
-                                     std::string_view field_name,
-                                     SimContext& ctx, Arena& arena) {
+static bool TryStaticMemberAccess(std::string_view base_name,
+                                  std::string_view field_name, SimContext& ctx,
+                                  Arena& arena, Logic4Vec& out) {
+  auto* cls_type = ctx.FindClassType(base_name);
+  if (!cls_type) return false;
+  if (TryLocalStaticMember(cls_type, field_name, arena, out)) return true;
+  if (cls_type->is_interface &&
+      TryInterfaceStaticMember(cls_type, field_name, arena, out)) {
+    return true;
+  }
+  return false;
+}
+
+// Resolves member access on the implicit `this`/`super` object. `is_super`
+// selects the parent-type property view used by super. Returns true and fills
+// `out` when `base_name` named one of those keywords.
+static bool TryThisSuperMember(std::string_view base_name,
+                               std::string_view field_name, SimContext& ctx,
+                               Arena& arena, Logic4Vec& out) {
   if (base_name == "this") {
     auto* self = ctx.CurrentThis();
-    if (self) return self->GetProperty(field_name, arena);
-    return MakeLogic4Vec(arena, 1);
+    out = self ? self->GetProperty(field_name, arena) : MakeLogic4Vec(arena, 1);
+    return true;
   }
-
   if (base_name == "super") {
     auto* self = ctx.CurrentThis();
     if (self && self->type && self->type->parent) {
-      return self->GetPropertyForType(field_name, self->type->parent, arena);
+      out = self->GetPropertyForType(field_name, self->type->parent, arena);
+    } else {
+      out = MakeLogic4Vec(arena, 1);
     }
-    return MakeLogic4Vec(arena, 1);
+    return true;
   }
-  auto* base_var = ctx.FindVariable(base_name);
-  auto* sinfo = ctx.GetVariableStructType(base_name);
-  Logic4Vec out;
+  return false;
+}
 
-  if (base_var && sinfo) {
-    if (sinfo->is_union) {
-      auto tag = ctx.GetVariableTag(base_name);
-      if (!tag.empty()) {
-        auto top = field_name;
-        auto subdot = top.find('.');
-        if (subdot != std::string_view::npos) top = top.substr(0, subdot);
-        if (tag != top) {
-          ctx.GetDiag().Error(
-              {}, "run-time error: accessing member '" +
-                      std::string(field_name) + "' of tagged union '" +
-                      std::string(base_name) + "' which currently has tag '" +
-                      std::string(tag) + "'");
-          return MakeAllX(arena, sinfo->total_width);
-        }
-      }
-    }
-    return ExtractStructField(base_var, sinfo, field_name, arena);
-  }
+// §11.4.13 union access: if `sinfo` describes a tagged union with an active
+// tag that does not match the (top-level) field being read, reports the
+// runtime error and fills `out` with all-X. Returns true when the mismatch
+// fired and `out` was set.
+static bool TryUnionTagMismatch(std::string_view base_name,
+                                std::string_view field_name,
+                                const StructTypeInfo* sinfo, SimContext& ctx,
+                                Arena& arena, Logic4Vec& out) {
+  if (!sinfo->is_union) return false;
+  auto tag = ctx.GetVariableTag(base_name);
+  if (tag.empty()) return false;
+  auto top = field_name;
+  auto subdot = top.find('.');
+  if (subdot != std::string_view::npos) top = top.substr(0, subdot);
+  if (tag == top) return false;
+  ctx.GetDiag().Error(
+      {}, "run-time error: accessing member '" + std::string(field_name) +
+              "' of tagged union '" + std::string(base_name) +
+              "' which currently has tag '" + std::string(tag) + "'");
+  out = MakeAllX(arena, sinfo->total_width);
+  return true;
+}
 
+// Handles the named-event `.triggered` and named-sequence `.triggered`/`.ended`
+// pseudo-methods. Returns true and fills `out` when `field_name` named one of
+// these and the base referred to a matching event/sequence.
+static bool TryEventSequenceMethod(std::string_view base_name,
+                                   std::string_view field_name,
+                                   Variable* base_var, SimContext& ctx,
+                                   Arena& arena, Logic4Vec& out) {
   if (base_var && base_var->is_event && field_name == "triggered") {
     // §15.5.3: the triggered method of a null named event evaluates to false,
     // independent of any triggered state recorded for the current time step.
-    if (base_var->is_null_event) return MakeLogic4VecVal(arena, 1, 0u);
-    return MakeLogic4VecVal(arena, 1,
-                            ctx.IsEventTriggered(base_name) ? 1u : 0u);
+    out = base_var->is_null_event
+              ? MakeLogic4VecVal(arena, 1, 0u)
+              : MakeLogic4VecVal(arena, 1,
+                                 ctx.IsEventTriggered(base_name) ? 1u : 0u);
+    return true;
   }
-
   if (!base_var && field_name == "triggered" &&
       ctx.FindSequenceDecl(base_name)) {
     std::string ep_name = std::string("__seq_") + std::string(base_name);
-    return MakeLogic4VecVal(arena, 1, ctx.IsEventTriggered(ep_name) ? 1u : 0u);
+    out = MakeLogic4VecVal(arena, 1, ctx.IsEventTriggered(ep_name) ? 1u : 0u);
+    return true;
   }
-
   if (!base_var && field_name == "ended" && ctx.FindSequenceDecl(base_name)) {
     // Annex C.2.3: IEEE 1800-2005 supplied the ended sequence method to detect
     // a sequence end point inside a sequence expression, while triggered served
@@ -352,8 +375,33 @@ static Logic4Vec ResolveMemberByType(std::string_view base_name,
         "the ended sequence method has been removed; use the triggered "
         "method to detect the end point of sequence '" +
             std::string(base_name) + "'");
-    return MakeLogic4Vec(arena, 1);
+    out = MakeLogic4Vec(arena, 1);
+    return true;
   }
+  return false;
+}
+
+static Logic4Vec ResolveMemberByType(std::string_view base_name,
+                                     std::string_view field_name,
+                                     SimContext& ctx, Arena& arena) {
+  Logic4Vec out;
+  if (TryThisSuperMember(base_name, field_name, ctx, arena, out)) return out;
+
+  auto* base_var = ctx.FindVariable(base_name);
+  auto* sinfo = ctx.GetVariableStructType(base_name);
+
+  if (base_var && sinfo) {
+    if (TryUnionTagMismatch(base_name, field_name, sinfo, ctx, arena, out)) {
+      return out;
+    }
+    return ExtractStructField(base_var, sinfo, field_name, arena);
+  }
+
+  if (TryEventSequenceMethod(base_name, field_name, base_var, ctx, arena,
+                             out)) {
+    return out;
+  }
+
   if (TryClassPropertyAccess(base_var, field_name, base_name, ctx, arena, out))
     return out;
   if (TryClassEnumAccess(base_var, field_name, ctx, arena, out)) return out;
@@ -363,27 +411,34 @@ static Logic4Vec ResolveMemberByType(std::string_view base_name,
   return MakeLogic4Vec(arena, 1);
 }
 
-Logic4Vec EvalMemberAccess(const Expr* expr, SimContext& ctx, Arena& arena) {
-  // §25.9: a component referenced through a virtual interface redirects to the
-  // bound interface instance. Referencing a component of an unbound (null or
-  // uninitialized) virtual interface is a fatal runtime error.
-  if (expr->lhs && expr->lhs->kind == ExprKind::kIdentifier) {
-    auto* base = ctx.FindVariable(expr->lhs->text);
-    if (ctx.IsVirtualInterfaceVar(base)) {
-      if (!ctx.VirtualInterfaceIsBound(base)) {
-        ctx.GetDiag().Error({}, "reference through a null virtual interface");
-        return MakeLogic4Vec(arena, 1);
-      }
-      std::string_view field =
-          (expr->rhs && expr->rhs->kind == ExprKind::kIdentifier)
-              ? expr->rhs->text
-              : std::string_view(expr->text);
-      std::string target = std::string(ctx.VirtualInterfaceBinding(base)) +
-                           "." + std::string(field);
-      if (auto* tv = ctx.FindVariable(target)) return tv->value;
-      return MakeLogic4Vec(arena, 1);
-    }
+// §25.9: a component referenced through a virtual interface redirects to the
+// bound interface instance. Referencing a component of an unbound (null or
+// uninitialized) virtual interface is a fatal runtime error. Returns true and
+// fills `out` when `expr` accessed a member through a virtual interface var.
+static bool TryVirtualInterfaceMember(const Expr* expr, SimContext& ctx,
+                                      Arena& arena, Logic4Vec& out) {
+  if (!expr->lhs || expr->lhs->kind != ExprKind::kIdentifier) return false;
+  auto* base = ctx.FindVariable(expr->lhs->text);
+  if (!ctx.IsVirtualInterfaceVar(base)) return false;
+  if (!ctx.VirtualInterfaceIsBound(base)) {
+    ctx.GetDiag().Error({}, "reference through a null virtual interface");
+    out = MakeLogic4Vec(arena, 1);
+    return true;
   }
+  std::string_view field =
+      (expr->rhs && expr->rhs->kind == ExprKind::kIdentifier)
+          ? expr->rhs->text
+          : std::string_view(expr->text);
+  std::string target =
+      std::string(ctx.VirtualInterfaceBinding(base)) + "." + std::string(field);
+  auto* tv = ctx.FindVariable(target);
+  out = tv ? tv->value : MakeLogic4Vec(arena, 1);
+  return true;
+}
+
+Logic4Vec EvalMemberAccess(const Expr* expr, SimContext& ctx, Arena& arena) {
+  Logic4Vec vif_out;
+  if (TryVirtualInterfaceMember(expr, ctx, arena, vif_out)) return vif_out;
 
   std::string name;
   BuildMemberName(expr, name);
@@ -414,6 +469,44 @@ static double ExtractDouble(const Logic4Vec& vec) {
 // array) takes the most significant bit positions of the result. The aval
 // and bval (4-state mask) are propagated independently so a source carrying
 // any X or Z bit yields a 4-state packed value.
+// Packs the low word of each queue element into `packed_a`/`packed_b` using the
+// element-major shift expected by PackArrayBitStream (element 0 most
+// significant).
+static void PackQueueElements(std::string_view name, const ArrayInfo& info,
+                              uint32_t elem_count, uint32_t total_bits,
+                              uint32_t elem_mask, SimContext& ctx,
+                              uint64_t& packed_a, uint64_t& packed_b) {
+  auto* q = ctx.FindQueue(name);
+  if (!q) return;
+  for (uint32_t i = 0; i < elem_count; ++i) {
+    const auto& v = q->elements[i];
+    uint64_t aval = v.nwords > 0 ? v.words[0].aval : 0;
+    uint64_t bval = v.nwords > 0 ? v.words[0].bval : 0;
+    uint32_t shift = total_bits - (i + 1) * info.elem_width;
+    packed_a |= (aval & elem_mask) << shift;
+    packed_b |= (bval & elem_mask) << shift;
+  }
+}
+
+// Packs the low word of each fixed-unpacked-array element into
+// `packed_a`/`packed_b` using the same element-major shift.
+static void PackFixedArrayElements(std::string_view name, const ArrayInfo& info,
+                                   uint32_t elem_count, uint32_t total_bits,
+                                   uint32_t elem_mask, SimContext& ctx,
+                                   uint64_t& packed_a, uint64_t& packed_b) {
+  for (uint32_t i = 0; i < elem_count; ++i) {
+    uint32_t idx = info.lo + i;
+    auto elem_name = std::string(name) + "[" + std::to_string(idx) + "]";
+    auto* elem = ctx.FindVariable(elem_name);
+    if (!elem) continue;
+    uint64_t aval = elem->value.nwords > 0 ? elem->value.words[0].aval : 0;
+    uint64_t bval = elem->value.nwords > 0 ? elem->value.words[0].bval : 0;
+    uint32_t shift = total_bits - (i + 1) * info.elem_width;
+    packed_a |= (aval & elem_mask) << shift;
+    packed_b |= (bval & elem_mask) << shift;
+  }
+}
+
 static Logic4Vec PackArrayBitStream(std::string_view name,
                                     const ArrayInfo& info, SimContext& ctx,
                                     Arena& arena) {
@@ -429,31 +522,12 @@ static Logic4Vec PackArrayBitStream(std::string_view name,
   uint32_t elem_mask = info.elem_width >= 64
                            ? ~uint32_t{0}
                            : (uint32_t{1} << info.elem_width) - 1;
-  auto append_elem = [&](uint64_t aval, uint64_t bval, uint32_t i) {
-    uint32_t shift = total_bits - (i + 1) * info.elem_width;
-    packed_a |= (aval & elem_mask) << shift;
-    packed_b |= (bval & elem_mask) << shift;
-  };
   if (info.is_queue) {
-    auto* q = ctx.FindQueue(name);
-    if (q) {
-      for (uint32_t i = 0; i < elem_count; ++i) {
-        const auto& v = q->elements[i];
-        uint64_t aval = v.nwords > 0 ? v.words[0].aval : 0;
-        uint64_t bval = v.nwords > 0 ? v.words[0].bval : 0;
-        append_elem(aval, bval, i);
-      }
-    }
+    PackQueueElements(name, info, elem_count, total_bits, elem_mask, ctx,
+                      packed_a, packed_b);
   } else {
-    for (uint32_t i = 0; i < elem_count; ++i) {
-      uint32_t idx = info.lo + i;
-      auto elem_name = std::string(name) + "[" + std::to_string(idx) + "]";
-      auto* elem = ctx.FindVariable(elem_name);
-      if (!elem) continue;
-      uint64_t aval = elem->value.nwords > 0 ? elem->value.words[0].aval : 0;
-      uint64_t bval = elem->value.nwords > 0 ? elem->value.words[0].bval : 0;
-      append_elem(aval, bval, i);
-    }
+    PackFixedArrayElements(name, info, elem_count, total_bits, elem_mask, ctx,
+                           packed_a, packed_b);
   }
   auto vec = MakeLogic4Vec(arena, total_bits);
   if (vec.nwords > 0) {
@@ -492,46 +566,66 @@ uint32_t ResolveCastWidth(std::string_view type_name, SimContext& ctx) {
   return tw > 0 ? tw : 32;
 }
 
-Logic4Vec EvalCast(const Expr* expr, SimContext& ctx, Arena& arena) {
-  if (expr->lhs && expr->lhs->kind == ExprKind::kIdentifier) {
-    auto* arr_info = ctx.FindArrayInfo(expr->lhs->text);
-    bool source_present =
-        arr_info &&
-        (arr_info->size > 0 || arr_info->is_queue || arr_info->is_dynamic);
-    if (source_present) {
-      auto inner = PackArrayBitStream(expr->lhs->text, *arr_info, ctx, arena);
-      uint32_t target_width = ResolveCastWidth(expr->text, ctx);
-      // §6.24.3: width-mask the packed bit-stream into the destination, but
-      // carry forward both halves of the 4-state encoding so any X/Z in the
-      // source propagates into the result.
-      auto result = MakeLogic4Vec(arena, target_width);
-      if (result.nwords > 0 && inner.nwords > 0) {
-        uint64_t width_mask = target_width >= 64
-                                  ? ~uint64_t{0}
-                                  : (uint64_t{1} << target_width) - 1;
-        result.words[0].aval = inner.words[0].aval & width_mask;
-        result.words[0].bval = inner.words[0].bval & width_mask;
-      }
-      return result;
-    }
+// §6.24.3 bit-stream cast: when the cast source names an unpacked/dynamic/queue
+// array, packs it and width-masks into the destination, carrying both halves of
+// the 4-state encoding so any X/Z in the source propagates. Returns true and
+// fills `out` when `expr` named such an array source.
+static bool TryArrayBitStreamCast(const Expr* expr, SimContext& ctx,
+                                  Arena& arena, Logic4Vec& out) {
+  if (!expr->lhs || expr->lhs->kind != ExprKind::kIdentifier) return false;
+  auto* arr_info = ctx.FindArrayInfo(expr->lhs->text);
+  bool source_present = arr_info && (arr_info->size > 0 || arr_info->is_queue ||
+                                     arr_info->is_dynamic);
+  if (!source_present) return false;
+  auto inner = PackArrayBitStream(expr->lhs->text, *arr_info, ctx, arena);
+  uint32_t target_width = ResolveCastWidth(expr->text, ctx);
+  auto result = MakeLogic4Vec(arena, target_width);
+  if (result.nwords > 0 && inner.nwords > 0) {
+    uint64_t width_mask =
+        target_width >= 64 ? ~uint64_t{0} : (uint64_t{1} << target_width) - 1;
+    result.words[0].aval = inner.words[0].aval & width_mask;
+    result.words[0].bval = inner.words[0].bval & width_mask;
   }
-  auto inner = EvalExpr(expr->lhs, ctx, arena);
-  std::string_view type_name = expr->text;
+  out = result;
+  return true;
+}
 
+// Handles the signedness/const/void cast keywords that simply re-tag or empty
+// the inner value. Returns true and fills `out` when `type_name` was one of
+// those keywords. `inner` may be mutated in place for the signedness cases.
+static bool TryKeywordCast(std::string_view type_name, Logic4Vec& inner,
+                           Arena& arena, Logic4Vec& out) {
   if (type_name == "signed") {
     inner.is_signed = true;
-    return inner;
+    out = inner;
+    return true;
   }
   if (type_name == "unsigned") {
     inner.is_signed = false;
-    return inner;
+    out = inner;
+    return true;
   }
   if (type_name == "const") {
-    return inner;
+    out = inner;
+    return true;
   }
   if (type_name == "void") {
-    return MakeLogic4Vec(arena, 0);
+    out = MakeLogic4Vec(arena, 0);
+    return true;
   }
+  return false;
+}
+
+Logic4Vec EvalCast(const Expr* expr, SimContext& ctx, Arena& arena) {
+  Logic4Vec stream_out;
+  if (TryArrayBitStreamCast(expr, ctx, arena, stream_out)) return stream_out;
+
+  auto inner = EvalExpr(expr->lhs, ctx, arena);
+  std::string_view type_name = expr->text;
+
+  Logic4Vec kw_out;
+  if (TryKeywordCast(type_name, inner, arena, kw_out)) return kw_out;
+
   uint32_t target_width = ResolveCastWidth(type_name, ctx);
 
   if (inner.is_real != IsRealCastTarget(type_name)) {
@@ -637,25 +731,35 @@ static bool CollectUnpackedSetMembers(const Expr* elem, SimContext& ctx,
   return false;
 }
 
+// Evaluates `lhs inside { elem }` for one set member. Returns 1 on a match, 0
+// on a definite mismatch, and 2 when the comparison was ambiguous (x). Handles
+// ranges, unpacked-array members (traversed to singular values per §11.4.13),
+// and plain singular values.
+static int EvalInsideElement(const Logic4Vec& lhs, const Expr* elem,
+                             SimContext& ctx, Arena& arena) {
+  bool is_range =
+      elem->kind == ExprKind::kSelect && elem->index && elem->index_end;
+  if (!is_range) {
+    std::vector<Logic4Vec> members;
+    if (CollectUnpackedSetMembers(elem, ctx, members)) {
+      int result = 0;
+      for (const auto& member : members) {
+        int mr = CompareInsideValue(lhs, member);
+        if (mr == 1) return 1;
+        if (mr == 2) result = 2;
+      }
+      return result;
+    }
+  }
+  return is_range ? InsideMatchRange(lhs, elem, ctx, arena)
+                  : InsideMatchValue(lhs, elem, ctx, arena);
+}
+
 Logic4Vec EvalInside(const Expr* expr, SimContext& ctx, Arena& arena) {
   auto lhs = EvalExpr(expr->lhs, ctx, arena);
   bool ambiguous = false;
   for (auto* elem : expr->elements) {
-    bool is_range =
-        elem->kind == ExprKind::kSelect && elem->index && elem->index_end;
-    if (!is_range) {
-      std::vector<Logic4Vec> members;
-      if (CollectUnpackedSetMembers(elem, ctx, members)) {
-        for (const auto& member : members) {
-          int mr = CompareInsideValue(lhs, member);
-          if (mr == 1) return MakeLogic4VecVal(arena, 1, 1);
-          if (mr == 2) ambiguous = true;
-        }
-        continue;
-      }
-    }
-    int r = is_range ? InsideMatchRange(lhs, elem, ctx, arena)
-                     : InsideMatchValue(lhs, elem, ctx, arena);
+    int r = EvalInsideElement(lhs, elem, ctx, arena);
     if (r == 1) return MakeLogic4VecVal(arena, 1, 1);
     if (r == 2) ambiguous = true;
   }

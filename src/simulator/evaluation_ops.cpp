@@ -64,46 +64,52 @@ static bool IsReductionOp(TokenKind op) {
       return false;
   }
 }
+static Logic4Vec EvalUnaryNot(Logic4Vec operand, Arena& arena) {
+  auto result = MakeLogic4Vec(arena, operand.width);
+  for (uint32_t i = 0; i < result.nwords; ++i) {
+    result.words[i] = Logic4Not(operand.words[i]);
+  }
+
+  uint32_t bit_pos = operand.width % 64;
+  if (bit_pos != 0) {
+    uint64_t mask = (uint64_t{1} << bit_pos) - 1;
+    result.words[result.nwords - 1].aval &= mask;
+    result.words[result.nwords - 1].bval &= mask;
+  }
+  result.is_signed = operand.is_signed;
+  return result;
+}
+
+static Logic4Vec EvalUnaryMinus(Logic4Vec operand, Arena& arena) {
+  if (operand.is_real) {
+    double d = 0.0;
+    uint64_t bits = operand.ToUint64();
+    std::memcpy(&d, &bits, sizeof(double));
+    d = -d;
+    std::memcpy(&bits, &d, sizeof(double));
+    auto r = MakeLogic4VecVal(arena, operand.width, bits);
+    r.is_real = true;
+    return r;
+  }
+  if (HasUnknownBits(operand)) return MakeAllX(arena, operand.width);
+  uint64_t val = operand.ToUint64();
+  auto r = MakeLogic4VecVal(arena, operand.width, -val);
+  r.is_signed = operand.is_signed;
+  return r;
+}
+
 Logic4Vec EvalUnaryOp(TokenKind op, Logic4Vec operand, Arena& arena) {
   if (operand.nwords == 0) return operand;
   if (IsReductionOp(op)) return EvalReductionOp(op, operand, arena);
-  auto result = MakeLogic4Vec(arena, operand.width);
   switch (op) {
-    case TokenKind::kTilde: {
-      for (uint32_t i = 0; i < result.nwords; ++i) {
-        result.words[i] = Logic4Not(operand.words[i]);
-      }
-
-      uint32_t bit_pos = operand.width % 64;
-      if (bit_pos != 0) {
-        uint64_t mask = (uint64_t{1} << bit_pos) - 1;
-        result.words[result.nwords - 1].aval &= mask;
-        result.words[result.nwords - 1].bval &= mask;
-      }
-      result.is_signed = operand.is_signed;
-      return result;
-    }
+    case TokenKind::kTilde:
+      return EvalUnaryNot(operand, arena);
     case TokenKind::kBang:
 
       if (HasUnknownBits(operand)) return MakeAllX(arena, 1);
       return MakeLogic4VecVal(arena, 1, operand.ToUint64() == 0 ? 1 : 0);
-    case TokenKind::kMinus: {
-      if (operand.is_real) {
-        double d = 0.0;
-        uint64_t bits = operand.ToUint64();
-        std::memcpy(&d, &bits, sizeof(double));
-        d = -d;
-        std::memcpy(&bits, &d, sizeof(double));
-        auto r = MakeLogic4VecVal(arena, operand.width, bits);
-        r.is_real = true;
-        return r;
-      }
-      if (HasUnknownBits(operand)) return MakeAllX(arena, operand.width);
-      uint64_t val = operand.ToUint64();
-      auto r = MakeLogic4VecVal(arena, operand.width, -val);
-      r.is_signed = operand.is_signed;
-      return r;
-    }
+    case TokenKind::kMinus:
+      return EvalUnaryMinus(operand, arena);
     case TokenKind::kPlus:
       if (!operand.is_real && HasUnknownBits(operand))
         return MakeAllX(arena, operand.width);
@@ -234,25 +240,8 @@ static Logic4Vec EvalRealArith(TokenKind op, const Logic4Vec& lhs,
       return MakeRealResult(arena, 0.0, w);
   }
 }
-static Logic4Vec EvalBinaryArith(TokenKind op, Logic4Vec lhs, Logic4Vec rhs,
-                                 Arena& arena, uint32_t context_width = 0) {
-  if (lhs.is_real || rhs.is_real) return EvalRealArith(op, lhs, rhs, arena);
-  uint32_t self_w = (op == TokenKind::kPower)
-                        ? lhs.width
-                        : ((lhs.width > rhs.width) ? lhs.width : rhs.width);
-  uint32_t width = (context_width > self_w) ? context_width : self_w;
-  if (HasUnknownBits(lhs) || HasUnknownBits(rhs)) {
-    // §11.8.4: any x/z bit in an operand makes a nonlogical operation produce
-    // an entirely unknown result whose type stays consistent with the
-    // expression's type, so a signed result must remain signed.
-    auto result = MakeAllX(arena, width);
-    result.is_signed = lhs.is_signed && rhs.is_signed;
-    return result;
-  }
-
-  if (lhs.is_signed && rhs.is_signed) {
-    return EvalSignedArith(op, lhs, rhs, width, arena);
-  }
+static Logic4Vec EvalUnsignedArith(TokenKind op, Logic4Vec lhs, Logic4Vec rhs,
+                                   uint32_t width, Arena& arena) {
   uint64_t lv = lhs.ToUint64();
   uint64_t rv = rhs.ToUint64();
   uint64_t result = 0;
@@ -281,6 +270,28 @@ static Logic4Vec EvalBinaryArith(TokenKind op, Logic4Vec lhs, Logic4Vec rhs,
       break;
   }
   return MakeLogic4VecVal(arena, width, result);
+}
+
+static Logic4Vec EvalBinaryArith(TokenKind op, Logic4Vec lhs, Logic4Vec rhs,
+                                 Arena& arena, uint32_t context_width = 0) {
+  if (lhs.is_real || rhs.is_real) return EvalRealArith(op, lhs, rhs, arena);
+  uint32_t self_w = (op == TokenKind::kPower)
+                        ? lhs.width
+                        : ((lhs.width > rhs.width) ? lhs.width : rhs.width);
+  uint32_t width = (context_width > self_w) ? context_width : self_w;
+  if (HasUnknownBits(lhs) || HasUnknownBits(rhs)) {
+    // §11.8.4: any x/z bit in an operand makes a nonlogical operation produce
+    // an entirely unknown result whose type stays consistent with the
+    // expression's type, so a signed result must remain signed.
+    auto result = MakeAllX(arena, width);
+    result.is_signed = lhs.is_signed && rhs.is_signed;
+    return result;
+  }
+
+  if (lhs.is_signed && rhs.is_signed) {
+    return EvalSignedArith(op, lhs, rhs, width, arena);
+  }
+  return EvalUnsignedArith(op, lhs, rhs, width, arena);
 }
 static Logic4Vec EvalBinaryBitwise(TokenKind op, Logic4Vec lhs, Logic4Vec rhs,
                                    Arena& arena, uint32_t context_width = 0) {
@@ -326,6 +337,32 @@ static Logic4Vec EvalBinaryBitwise(TokenKind op, Logic4Vec lhs, Logic4Vec rhs,
   }
   return result;
 }
+static void ApplySignFill(Logic4Vec& result, const Logic4Vec& v,
+                          uint32_t target_width) {
+  uint32_t msb_idx = (v.width - 1) / 64;
+  uint64_t msb_mask = uint64_t{1} << ((v.width - 1) % 64);
+  uint64_t a_fill = (v.words[msb_idx].aval & msb_mask) ? ~uint64_t{0} : 0;
+  uint64_t b_fill = (v.words[msb_idx].bval & msb_mask) ? ~uint64_t{0} : 0;
+  if (!(a_fill || b_fill)) return;
+  uint32_t fill_bit = v.width % 64;
+  if (fill_bit != 0) {
+    uint64_t mask = ~((uint64_t{1} << fill_bit) - 1);
+    result.words[v.width / 64].aval |= a_fill & mask;
+    result.words[v.width / 64].bval |= b_fill & mask;
+  }
+  uint32_t first_full = v.width / 64 + (fill_bit != 0 ? 1 : 0);
+  for (uint32_t i = first_full; i < result.nwords; ++i) {
+    result.words[i].aval = a_fill;
+    result.words[i].bval = b_fill;
+  }
+  uint32_t top_bit = target_width % 64;
+  if (top_bit != 0 && result.nwords > 0) {
+    uint64_t top_mask = (uint64_t{1} << top_bit) - 1;
+    result.words[result.nwords - 1].aval &= top_mask;
+    result.words[result.nwords - 1].bval &= top_mask;
+  }
+}
+
 Logic4Vec ExtendVec(const Logic4Vec& v, uint32_t target_width, bool sign_ext,
                     Arena& arena) {
   auto result = MakeLogic4Vec(arena, target_width);
@@ -333,29 +370,7 @@ Logic4Vec ExtendVec(const Logic4Vec& v, uint32_t target_width, bool sign_ext,
     result.words[i] = v.words[i];
   }
   if (sign_ext && v.width > 0) {
-    uint32_t msb_idx = (v.width - 1) / 64;
-    uint64_t msb_mask = uint64_t{1} << ((v.width - 1) % 64);
-    uint64_t a_fill = (v.words[msb_idx].aval & msb_mask) ? ~uint64_t{0} : 0;
-    uint64_t b_fill = (v.words[msb_idx].bval & msb_mask) ? ~uint64_t{0} : 0;
-    if (a_fill || b_fill) {
-      uint32_t fill_bit = v.width % 64;
-      if (fill_bit != 0) {
-        uint64_t mask = ~((uint64_t{1} << fill_bit) - 1);
-        result.words[v.width / 64].aval |= a_fill & mask;
-        result.words[v.width / 64].bval |= b_fill & mask;
-      }
-      uint32_t first_full = v.width / 64 + (fill_bit != 0 ? 1 : 0);
-      for (uint32_t i = first_full; i < result.nwords; ++i) {
-        result.words[i].aval = a_fill;
-        result.words[i].bval = b_fill;
-      }
-      uint32_t top_bit = target_width % 64;
-      if (top_bit != 0 && result.nwords > 0) {
-        uint64_t top_mask = (uint64_t{1} << top_bit) - 1;
-        result.words[result.nwords - 1].aval &= top_mask;
-        result.words[result.nwords - 1].bval &= top_mask;
-      }
-    }
+    ApplySignFill(result, v, target_width);
   }
   result.is_signed = v.is_signed;
   result.is_real = v.is_real;
@@ -586,6 +601,26 @@ static Logic4Vec EvalStringCompare(TokenKind op, const Logic4Vec& lhs,
   return MakeLogic4VecVal(arena, 1, r ? 1 : 0);
 }
 
+static Logic4Vec EvalEqualityCompare(TokenKind op, Logic4Vec lhs, Logic4Vec rhs,
+                                     Arena& arena) {
+  if ((lhs.is_real || rhs.is_real) &&
+      (op == TokenKind::kEqEq || op == TokenKind::kBangEq)) {
+    double ld = ToDouble(lhs);
+    double rd = ToDouble(rhs);
+    bool eq = (ld == rd);
+    return MakeLogic4VecVal(arena, 1, (op == TokenKind::kEqEq) == eq ? 1 : 0);
+  }
+  if (lhs.width != rhs.width) {
+    bool sign_ext = lhs.is_signed && rhs.is_signed;
+    uint32_t w = std::max(lhs.width, rhs.width);
+    if (lhs.width < w) lhs = ExtendVec(lhs, w, sign_ext, arena);
+    if (rhs.width < w) rhs = ExtendVec(rhs, w, sign_ext, arena);
+  }
+  uint64_t val = EvalEqualityOp(op, lhs, rhs);
+  if (val == kResultX) return MakeAllX(arena, 1);
+  return MakeLogic4VecVal(arena, 1, val);
+}
+
 static Logic4Vec EvalBinaryCompare(TokenKind op, Logic4Vec lhs, Logic4Vec rhs,
                                    Arena& arena) {
   if (op == TokenKind::kLtLt || op == TokenKind::kLtLtLt ||
@@ -598,22 +633,7 @@ static Logic4Vec EvalBinaryCompare(TokenKind op, Logic4Vec lhs, Logic4Vec rhs,
     return EvalStringCompare(op, lhs, rhs, arena);
   }
   if (IsEqualityOp(op)) {
-    if ((lhs.is_real || rhs.is_real) &&
-        (op == TokenKind::kEqEq || op == TokenKind::kBangEq)) {
-      double ld = ToDouble(lhs);
-      double rd = ToDouble(rhs);
-      bool eq = (ld == rd);
-      return MakeLogic4VecVal(arena, 1, (op == TokenKind::kEqEq) == eq ? 1 : 0);
-    }
-    if (lhs.width != rhs.width) {
-      bool sign_ext = lhs.is_signed && rhs.is_signed;
-      uint32_t w = std::max(lhs.width, rhs.width);
-      if (lhs.width < w) lhs = ExtendVec(lhs, w, sign_ext, arena);
-      if (rhs.width < w) rhs = ExtendVec(rhs, w, sign_ext, arena);
-    }
-    uint64_t val = EvalEqualityOp(op, lhs, rhs);
-    if (val == kResultX) return MakeAllX(arena, 1);
-    return MakeLogic4VecVal(arena, 1, val);
+    return EvalEqualityCompare(op, lhs, rhs, arena);
   }
   return EvalRelational(op, lhs, rhs, arena);
 }

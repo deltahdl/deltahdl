@@ -441,24 +441,43 @@ void Parser::ParseVarDeclList(std::vector<ModuleItem*>& items,
   Expect(TokenKind::kSemicolon);
 }
 
+static bool IsForwardTypeParamToken(TokenKind tk) {
+  switch (tk) {
+    case TokenKind::kKwEnum:
+    case TokenKind::kKwStruct:
+    case TokenKind::kKwUnion:
+    case TokenKind::kKwClass:
+    case TokenKind::kKwInterface:
+      return true;
+    default:
+      return false;
+  }
+}
+
+static DataTypeKind ForwardTypeKindForToken(TokenKind tk) {
+  switch (tk) {
+    case TokenKind::kKwEnum:
+      return DataTypeKind::kEnum;
+    case TokenKind::kKwStruct:
+      return DataTypeKind::kStruct;
+    case TokenKind::kKwUnion:
+      return DataTypeKind::kUnion;
+    case TokenKind::kKwClass:
+      return DataTypeKind::kNamed;
+    default:
+      return DataTypeKind::kImplicit;
+  }
+}
+
 void Parser::ParseTypeParamDecl(std::vector<ModuleItem*>& items, SourceLoc loc,
                                 bool localparam) {
   DataTypeKind fwd = DataTypeKind::kImplicit;
-  if (Check(TokenKind::kKwEnum) || Check(TokenKind::kKwStruct) ||
-      Check(TokenKind::kKwUnion) || Check(TokenKind::kKwClass) ||
-      Check(TokenKind::kKwInterface)) {
+  if (IsForwardTypeParamToken(CurrentToken().kind)) {
     if (Match(TokenKind::kKwInterface)) {
       Expect(TokenKind::kKwClass);
       fwd = DataTypeKind::kVoid;
     } else {
-      if (Check(TokenKind::kKwEnum))
-        fwd = DataTypeKind::kEnum;
-      else if (Check(TokenKind::kKwStruct))
-        fwd = DataTypeKind::kStruct;
-      else if (Check(TokenKind::kKwUnion))
-        fwd = DataTypeKind::kUnion;
-      else if (Check(TokenKind::kKwClass))
-        fwd = DataTypeKind::kNamed;
+      fwd = ForwardTypeKindForToken(CurrentToken().kind);
       Consume();
     }
   }
