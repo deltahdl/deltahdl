@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <cctype>
+#include <string>
+
 #include "fixture_lexer.h"
 #include "lexer/keywords.h"
 
@@ -265,15 +268,8 @@ static const KwEntry kTableB1[] = {
 
 static constexpr size_t kTableB1Count = sizeof(kTableB1) / sizeof(kTableB1[0]);
 
-TEST(KeywordListLexing, TableB1CountIs248) { EXPECT_EQ(kTableB1Count, 248u); }
-
-TEST(KeywordListLexing, AllKeywordsAreReserved) {
-  for (size_t i = 0; i < kTableB1Count; ++i) {
-    auto tokens = Lex(kTableB1[i].text);
-    ASSERT_GE(tokens.size(), 2u) << "keyword: " << kTableB1[i].text;
-    EXPECT_NE(tokens[0].kind, TokenKind::kIdentifier)
-        << kTableB1[i].text << " should be a keyword, not an identifier";
-  }
+TEST(KeywordListLexing, ReservedKeywordCountIs248) {
+  EXPECT_EQ(kTableB1Count, 248u);
 }
 
 TEST(KeywordListLexing, EachKeywordMapsToCorrectTokenKind) {
@@ -310,7 +306,7 @@ TEST(KeywordListLexing, NonKeywordsAreIdentifiers) {
   }
 }
 
-TEST(KeywordListLexing, TableB1IsAlphabetical) {
+TEST(KeywordListLexing, ReservedKeywordListIsAlphabetical) {
   for (size_t i = 1; i < kTableB1Count; ++i) {
     EXPECT_LT(std::string_view(kTableB1[i - 1].text),
               std::string_view(kTableB1[i].text))
@@ -345,6 +341,56 @@ TEST(KeywordListLexing, NoDuplicateTokenKinds) {
     EXPECT_TRUE(inserted) << kTableB1[i].text << " has a duplicate TokenKind";
   }
   EXPECT_EQ(seen.size(), kTableB1Count);
+}
+
+// Boundary of the reservation rule: only the exact lowercase spellings in
+// Table B.1 are reserved. A differently-cased spelling must fall through to an
+// ordinary identifier, both at the keyword-lookup layer and through the lexer.
+TEST(KeywordListLexing, KeywordsAreCaseSensitive) {
+  for (size_t i = 0; i < kTableB1Count; ++i) {
+    std::string upper(kTableB1[i].text);
+    for (char& c : upper) {
+      c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
+    }
+    ASSERT_NE(upper, std::string(kTableB1[i].text))
+        << "every keyword has a letter to upcase";
+    EXPECT_FALSE(LookupKeyword(upper).has_value())
+        << upper << " must not be reserved; keywords are case-sensitive";
+    auto tokens = Lex(upper);
+    ASSERT_GE(tokens.size(), 2u) << "input: " << upper;
+    EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier)
+        << upper << " should lex as an identifier, not a keyword";
+  }
+}
+
+// Reservation matches a complete token, not a leading substring. A keyword
+// immediately followed by identifier characters is one ordinary identifier.
+TEST(KeywordListLexing, KeywordWithIdentifierSuffixIsIdentifier) {
+  for (size_t i = 0; i < kTableB1Count; ++i) {
+    std::string extended = std::string(kTableB1[i].text) + "_x";
+    EXPECT_FALSE(LookupKeyword(extended).has_value())
+        << extended << " must not be reserved";
+    auto tokens = Lex(extended);
+    ASSERT_GE(tokens.size(), 2u) << "input: " << extended;
+    EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier)
+        << extended << " should lex as a single identifier";
+    EXPECT_EQ(tokens[0].text, extended)
+        << extended << " should be consumed as one token";
+  }
+}
+
+// An underscore prefix yields a valid identifier whose spelling is not the
+// reserved keyword, so it must not be treated as one.
+TEST(KeywordListLexing, KeywordWithLeadingUnderscoreIsIdentifier) {
+  for (size_t i = 0; i < kTableB1Count; ++i) {
+    std::string prefixed = "_" + std::string(kTableB1[i].text);
+    EXPECT_FALSE(LookupKeyword(prefixed).has_value())
+        << prefixed << " must not be reserved";
+    auto tokens = Lex(prefixed);
+    ASSERT_GE(tokens.size(), 2u) << "input: " << prefixed;
+    EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier)
+        << prefixed << " should lex as an identifier";
+  }
 }
 
 }
