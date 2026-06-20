@@ -1180,6 +1180,70 @@ static void EmitSimControlDiagnostic(const Expr* expr, SimContext& ctx,
   }
 }
 
+// Optional $countdrivers system function (Annex D.2). It counts the drivers on
+// a net so that bus contention can be identified. The net argument shall be a
+// scalar net or a bit-select of a vector net; the selected bit is the one whose
+// drivers are tallied. The function returns 0 when at most one driver drives the
+// net and 1 otherwise (contention). When the optional output arguments are
+// present they receive, in declared order, the per-state tallies of Table D.1:
+// net_is_forced, number_of_01x_drivers, number_of_0_drivers,
+// number_of_1_drivers, number_of_x_drivers.
+static Logic4Vec EvalCountDrivers(const Expr* expr, SimContext& ctx,
+                                  Arena& arena) {
+  // Resolve which net and which bit of it the net argument names. A bare
+  // identifier is a scalar net (bit 0); a bit-select names the vector net bit.
+  const Expr* net_arg = expr->args.empty() ? nullptr : expr->args[0];
+  std::string_view net_name;
+  uint32_t bit = 0;
+  if (net_arg != nullptr) {
+    if (net_arg->kind == ExprKind::kIdentifier) {
+      net_name = net_arg->text;
+    } else if (net_arg->kind == ExprKind::kSelect && net_arg->base != nullptr &&
+               net_arg->base->kind == ExprKind::kIdentifier &&
+               net_arg->index != nullptr) {
+      net_name = net_arg->base->text;
+      bit = static_cast<uint32_t>(
+          EvalExpr(net_arg->index, ctx, arena).ToUint64());
+    }
+  }
+
+  // Tally the selected bit's state across every driver registered on the net.
+  // A driver in the high-impedance (z) state is not actively driving and is not
+  // counted; the 0/1/x tallies cover the drivers that are.
+  uint64_t n0 = 0, n1 = 0, nx = 0;
+  Net* net = net_name.empty() ? nullptr : ctx.FindNet(net_name);
+  if (net != nullptr) {
+    const uint32_t word = bit / 64;
+    const uint64_t mask = uint64_t{1} << (bit % 64);
+    for (const auto& drv : net->drivers) {
+      if (word >= drv.nwords) continue;
+      const bool a = (drv.words[word].aval & mask) != 0;
+      const bool b = (drv.words[word].bval & mask) != 0;
+      if (!b && !a)
+        ++n0;
+      else if (!b && a)
+        ++n1;
+      else if (b && a)
+        ++nx;
+    }
+  }
+  const uint64_t n01x = n0 + n1 + nx;
+
+  // Write back any supplied output arguments per Table D.1, in declared order.
+  const bool forced =
+      net != nullptr && net->resolved != nullptr && net->resolved->is_forced;
+  const uint64_t outs[5] = {forced ? 1u : 0u, n01x, n0, n1, nx};
+  for (size_t i = 1; i < expr->args.size() && i <= 5u; ++i) {
+    if (expr->args[i] != nullptr) {
+      PerformBlockingAssign(expr->args[i], MakeLogic4VecVal(arena, 32, outs[i - 1]),
+                            ctx, arena);
+    }
+  }
+
+  // Returns 0 with no more than one driver, 1 otherwise to flag contention.
+  return MakeLogic4VecVal(arena, 1, n01x > 1 ? 1 : 0);
+}
+
 Logic4Vec EvalSystemCall(const Expr* expr, SimContext& ctx, Arena& arena) {
   auto name = expr->callee;
 
@@ -1199,6 +1263,10 @@ Logic4Vec EvalSystemCall(const Expr* expr, SimContext& ctx, Arena& arena) {
     EmitSimControlDiagnostic(expr, ctx, arena, name, std::cout);
     ctx.RequestStop();
     return MakeLogic4VecVal(arena, 1, 0);
+  }
+  // Optional $countdrivers function (Annex D.2).
+  if (name == "$countdrivers") {
+    return EvalCountDrivers(expr, ctx, arena);
   }
   // Optional $reset family (Annex D.8). $reset tallies a reset of the tool and
   // captures its reset_value argument (the second argument, after stop_value)
