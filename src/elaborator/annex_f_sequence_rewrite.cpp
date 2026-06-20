@@ -110,7 +110,8 @@ bool AllClockEventsIndependent(const SequenceExpr& sequence,
 }  // namespace
 
 std::shared_ptr<const SequenceExpr> RewriteSequenceUnderClock(
-    const SequenceExpr& sequence, std::shared_ptr<const BooleanExpr> clock) {
+    const SequenceExpr& sequence,
+    const std::shared_ptr<const BooleanExpr>& clock) {
   switch (sequence.kind) {
     case SequenceExpr::Kind::kBoolean: {
       // §F.5.1.1: T^s(b, c) = (!c[*0:$] ##1 c & b). The clock may tick any

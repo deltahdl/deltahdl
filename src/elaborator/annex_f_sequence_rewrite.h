@@ -16,7 +16,8 @@ namespace delta {
 // rule rewrites a Boolean b into (!c[*0:$] ##1 c & b), and a nested clock form
 // @(c2) r discards the incoming clock in favor of c2.
 std::shared_ptr<const SequenceExpr> RewriteSequenceUnderClock(
-    const SequenceExpr& sequence, std::shared_ptr<const BooleanExpr> clock);
+    const SequenceExpr& sequence,
+    const std::shared_ptr<const BooleanExpr>& clock);
 
 // §F.5.2 refers to "the unclocked sequence that results from S by applying the
 // rewrite rules". A clocked sequence carries its own leading clock in its

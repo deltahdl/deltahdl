@@ -156,7 +156,8 @@ bool ClockedPropertyEqual(const ClockedProperty& lhs,
 }
 
 std::shared_ptr<const ClockedProperty> RewritePropertyUnderClock(
-    const ClockedProperty& property, std::shared_ptr<const BooleanExpr> clock) {
+    const ClockedProperty& property,
+    const std::shared_ptr<const BooleanExpr>& clock) {
   switch (property.kind) {
     case ClockedProperty::Kind::kBoolean:
       // A Boolean already names a level-sensitive condition; nothing to push.

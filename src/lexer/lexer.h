@@ -100,7 +100,12 @@ class Lexer {
       const std::vector<std::string_view>& words, SourceLoc loc);
   void TryRecognizeFsmConcatPragma(const std::vector<std::string_view>& words,
                                    SourceLoc loc);
+
+ public:
+  // Public so the free pragma-recognition helpers in lexer.cpp can call it.
   static bool IsSimplePragmaIdentifier(std::string_view word);
+
+ private:
   static bool ParsePartSelect(std::string_view word, std::string_view& base,
                               int& msb, int& lsb);
 

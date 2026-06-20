@@ -28,7 +28,7 @@ namespace {
 // §36.10.2 / §37.43 / §38.36.1 / §38.36.1.1: the placement rules that do not
 // depend on simulator timing state. Each returns the rejection message for the
 // first rule the registration violates, or an empty string when none apply.
-std::string VpiCheckCallbackPlacement(const VpiCbData& data,
+const char* VpiCheckCallbackPlacement(const VpiCbData& data,
                                       VpiToolPhase tool_phase) {
   // §36.10.2: while VPI functionality is restricted - the startup phase, and
   // the sizetf phase after it that permits no additional access - a callback
@@ -71,7 +71,7 @@ std::string VpiCheckCallbackPlacement(const VpiCbData& data,
            "in a protected portion of the code";
   }
 
-  return std::string();
+  return nullptr;
 }
 
 // §38.36.2: a simulation-time callback carries its timing in the s_cb_data
@@ -79,11 +79,11 @@ std::string VpiCheckCallbackPlacement(const VpiCbData& data,
 // of zero - may be used. These checks apply only to the time-related reasons;
 // every other reason ignores the time field. Returns the rejection message for
 // the first rule violated, or an empty string when the timing is acceptable.
-std::string VpiCheckCallbackTiming(const VpiCbData& data,
+const char* VpiCheckCallbackTiming(const VpiCbData& data,
                                    bool sim_progressed_into_time_slice,
                                    int current_callback_reason,
                                    bool at_read_only_synch_time) {
-  if (!VpiIsSimulationTimeCallbackReason(data.reason)) return std::string();
+  if (!VpiIsSimulationTimeCallbackReason(data.reason)) return nullptr;
 
   // §38.36.2: the time->type field shall be vpiSimTime or vpiScaledRealTime.
   // A vpiSuppressTime type, or a null time pointer, leaves no time for the
@@ -121,7 +121,7 @@ std::string VpiCheckCallbackTiming(const VpiCbData& data,
            "placed at read-only synch time";
   }
 
-  return std::string();
+  return nullptr;
 }
 
 }  // namespace
@@ -129,18 +129,18 @@ std::string VpiCheckCallbackTiming(const VpiCbData& data,
 VpiHandle VpiContext::RegisterCb(VpiCbData* data) {
   if (!data) return nullptr;
 
-  std::string placement_error = VpiCheckCallbackPlacement(*data, tool_phase_);
-  if (!placement_error.empty()) {
+  const char* placement_error = VpiCheckCallbackPlacement(*data, tool_phase_);
+  if (placement_error != nullptr) {
     last_error_.state = kVpiError;
     last_error_.level = kVpiError;
     last_error_.message = placement_error;
     return nullptr;
   }
 
-  std::string timing_error = VpiCheckCallbackTiming(
+  const char* timing_error = VpiCheckCallbackTiming(
       *data, sim_progressed_into_time_slice_, current_callback_reason_,
       at_read_only_synch_time_);
-  if (!timing_error.empty()) {
+  if (timing_error != nullptr) {
     last_error_.state = kVpiError;
     last_error_.level = kVpiError;
     last_error_.message = timing_error;

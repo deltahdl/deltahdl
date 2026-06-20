@@ -56,7 +56,7 @@ static void RunConstructorForLevel(const ClassTypeInfo* info, ClassObject*,
 }
 
 static const Expr* SynthDefaultExtendsArgs(const ClassTypeInfo* base,
-                                           const ModuleItem* child_decl,
+                                           const ClassDecl* child_decl,
                                            const Expr* new_expr, Arena& arena) {
   size_t default_pos = 0;
   for (const auto* m : child_decl->members) {

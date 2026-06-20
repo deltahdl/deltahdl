@@ -32,8 +32,9 @@ namespace {
 
 // Removes any existing override for `pname` from `child_params`, preserving the
 // relative order of the remaining entries.
-void DropParamOverride(ParamList& child_params, std::string_view pname) {
-  ParamList kept;
+void DropParamOverride(Elaborator::ParamList& child_params,
+                       std::string_view pname) {
+  Elaborator::ParamList kept;
   kept.reserve(child_params.size());
   for (const auto& e : child_params) {
     if (e.first != pname) kept.push_back(e);
@@ -43,7 +44,8 @@ void DropParamOverride(ParamList& child_params, std::string_view pname) {
 
 // "#()" returns every parameter to its module default: discard the
 // instantiation's overrides and let the configuration own each one (§33.4.3).
-void ResetAllConfigParams(const ModuleDecl* child_decl, ParamList& child_params,
+void ResetAllConfigParams(const ModuleDecl* child_decl,
+                          Elaborator::ParamList& child_params,
                           std::vector<std::string_view>& locked) {
   child_params.clear();
   for (const auto& [dname, dexpr] : child_decl->params) {
@@ -59,7 +61,8 @@ void ResetAllConfigParams(const ModuleDecl* child_decl, ParamList& child_params,
 void ResolvePositionalInstParams(const ModuleItem* item,
                                  const ModuleDecl* child_decl,
                                  const ScopeMap& parent_scope,
-                                 ParamList& child_params, DiagEngine& diag) {
+                                 Elaborator::ParamList& child_params,
+                                 DiagEngine& diag) {
   std::vector<std::string_view> targets;
   for (const auto& [dname, dexpr] : child_decl->params) {
     if (child_decl->localparam_port_names.count(dname) > 0) continue;
@@ -86,7 +89,8 @@ void ResolvePositionalInstParams(const ModuleItem* item,
 void ResolveNamedInstParams(const ModuleItem* item,
                             const ModuleDecl* child_decl,
                             const ScopeMap& parent_scope,
-                            ParamList& child_params, DiagEngine& diag) {
+                            Elaborator::ParamList& child_params,
+                            DiagEngine& diag) {
   std::unordered_set<std::string_view> overridable;
   for (const auto& [dname, dexpr] : child_decl->params) {
     if (child_decl->localparam_port_names.count(dname) > 0) continue;
@@ -137,7 +141,7 @@ uint32_t ComputeInstDimSizes(const ModuleItem* item,
 }  // namespace
 
 void Elaborator::ApplyConfigParamOverrides(
-    const ModuleDecl* child_decl, ParamList& child_params,
+    const ModuleDecl* child_decl, Elaborator::ParamList& child_params,
     const ScopeMap& parent_scope, std::vector<std::string_view>& locked) {
   if (instance_param_overrides_.empty() || current_inst_path_.empty()) return;
 
@@ -198,7 +202,7 @@ void Elaborator::ElaborateModuleInst(ModuleItem* item, RtlirModule* mod) {
   }
 
   auto saved_nested = nested_module_decls_;
-  ParamList child_params;
+  Elaborator::ParamList child_params;
   auto parent_scope = BuildParamScope(mod);
 
   bool is_positional = false;

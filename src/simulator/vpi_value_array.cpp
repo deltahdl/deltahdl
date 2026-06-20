@@ -446,8 +446,8 @@ void VpiContext::PutValueArray(VpiHandle obj, VpiArrayValue* arrayvalue_p,
   if (!obj || !arrayvalue_p) return;
 
   long long start_ordinal = 0;
-  if (!ValidatePutValueArrayRequest(obj, arrayvalue_p, index_p,
-                                    &start_ordinal)) {
+  if (!ValidatePutValueArrayRequest(obj, arrayvalue_p, index_p, &start_ordinal,
+                                    &last_error_)) {
     return;
   }
 

@@ -191,7 +191,8 @@ static bool TypeRefArgHasMemberAccess(const Expr* e) {
 // recursive descent into children is handled separately by the caller.
 static bool TypeRefArgSelectsDynamicElement(
     const Expr* e,
-    const std::unordered_map<std::string_view, VarArrayInfo>& array_info) {
+    const std::unordered_map<std::string_view, Elaborator::VarArrayInfo>&
+        array_info) {
   if (e->kind != ExprKind::kSelect || !e->base ||
       e->base->kind != ExprKind::kIdentifier) {
     return false;

@@ -88,6 +88,7 @@ bool ClockedPropertyEqual(const ClockedProperty& lhs,
 // contains no clock, sync_accept_on, nexttime, or until-over-clock forms beyond
 // the level-sensitive shapes the rules emit, so it is an unclocked property.
 std::shared_ptr<const ClockedProperty> RewritePropertyUnderClock(
-    const ClockedProperty& property, std::shared_ptr<const BooleanExpr> clock);
+    const ClockedProperty& property,
+    const std::shared_ptr<const BooleanExpr>& clock);
 
 }  // namespace delta
