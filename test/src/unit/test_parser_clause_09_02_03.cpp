@@ -128,7 +128,7 @@ TEST(FinalProcedureParsing, SourceLocationTracked) {
   EXPECT_FALSE(r.has_errors);
   auto* item = FindItemByKind(r, ModuleItemKind::kFinalBlock);
   ASSERT_NE(item, nullptr);
-  EXPECT_NE(item->loc.file_id, FileId{});
+  EXPECT_NE(item->loc.file_id, 0u);
 }
 
 }  // namespace

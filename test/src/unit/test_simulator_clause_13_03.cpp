@@ -24,7 +24,7 @@ TEST(TaskCall, SetupReturnsTaskItem) {
   ASSERT_NE(result, nullptr);
   EXPECT_EQ(result->name, "my_task");
 
-  TeardownTaskCall(result, call, f.ctx);
+  TeardownTaskCall(result, call, f.ctx, f.arena);
 }
 
 TEST(TaskCall, SetupReturnsNullForFunction) {

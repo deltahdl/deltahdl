@@ -121,10 +121,12 @@ TEST(BlockingAssignSim, IntraAssignmentDelayEvaluatesLvalueAfterDelay) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto* arr = f.ctx.FindVariable("arr");
-  ASSERT_NE(arr, nullptr);
-  EXPECT_EQ(arr->unpacked_array[1].ToUint64(), 0u);
-  EXPECT_EQ(arr->unpacked_array[3].ToUint64(), 99u);
+  auto* arr1 = f.ctx.FindVariable("arr[1]");
+  ASSERT_NE(arr1, nullptr);
+  auto* arr3 = f.ctx.FindVariable("arr[3]");
+  ASSERT_NE(arr3, nullptr);
+  EXPECT_EQ(arr1->value.ToUint64(), 0u);
+  EXPECT_EQ(arr3->value.ToUint64(), 99u);
 }
 
 }  // namespace

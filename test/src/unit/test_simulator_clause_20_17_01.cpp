@@ -29,7 +29,7 @@ uint64_t RunAndRead(SimFixture& f, const std::string& src,
   return v ? v->value.ToUint64() : 0;
 }
 
-void Run(SimFixture& f, const std::string& src) {
+void RunSrc(SimFixture& f, const std::string& src) {
   auto* design = ElaborateSrc(src, f);
   EXPECT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -62,12 +62,12 @@ TEST(SystemTask, TaskExecutesCommandFromTerminal) {
   fs::remove(marker, ec);
 
   SimFixture f;
-  Run(f,
-      "module t;\n"
-      "  initial $system(\"touch '" +
-          marker.string() +
-          "'\");\n"
-          "endmodule\n");
+  RunSrc(f,
+         "module t;\n"
+         "  initial $system(\"touch '" +
+             marker.string() +
+             "'\");\n"
+             "endmodule\n");
 
   EXPECT_TRUE(fs::exists(marker));
   fs::remove(marker, ec);

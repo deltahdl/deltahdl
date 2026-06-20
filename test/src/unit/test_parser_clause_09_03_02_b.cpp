@@ -192,7 +192,7 @@ TEST(ParallelBlockParsing, LetDeclInForkJoin) {
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kFork);
   ASSERT_GE(stmt->fork_stmts.size(), 2u);
-  EXPECT_EQ(stmt->fork_stmts[0]->kind, StmtKind::kLetDecl);
+  EXPECT_EQ(stmt->fork_stmts[0]->kind, StmtKind::kBlockItemDecl);
 }
 
 TEST(ParallelBlockParsing, ReturnInForkBody) {

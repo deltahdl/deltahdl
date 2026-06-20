@@ -124,9 +124,9 @@ TEST(LvalueSim, CompoundAssignWithIndexedLhs) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("arr");
+  auto* var = f.ctx.FindVariable("arr[2]");
   ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->unpacked_array[2].ToUint64(), 15u);
+  EXPECT_EQ(var->value.ToUint64(), 15u);
 }
 
 TEST(CompoundAssignOpEval, LtLtEq) {
@@ -178,7 +178,9 @@ TEST(LvalueSim, CompoundAssignEvaluatesLvalueIndexOnce) {
   auto* calls = f.ctx.FindVariable("idx_calls");
   ASSERT_NE(arr, nullptr);
   ASSERT_NE(calls, nullptr);
-  EXPECT_EQ(arr->unpacked_array[2].ToUint64(), 15u);
+  auto* arr_elem = f.ctx.FindVariable("arr[2]");
+  ASSERT_NE(arr_elem, nullptr);
+  EXPECT_EQ(arr_elem->value.ToUint64(), 15u);
   EXPECT_EQ(calls->value.ToUint64(), 1u);
 }
 

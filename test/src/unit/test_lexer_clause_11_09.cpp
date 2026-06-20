@@ -9,5 +9,5 @@ TEST(TaggedUnionExprLexing, TaggedMemberSequence) {
   ASSERT_GE(tokens.size(), 4);
   EXPECT_EQ(tokens[0].kind, TokenKind::kKwTagged);
   EXPECT_EQ(tokens[1].kind, TokenKind::kIdentifier);
-  EXPECT_EQ(tokens[2].kind, TokenKind::kIntegerLiteral);
+  EXPECT_EQ(tokens[2].kind, TokenKind::kIntLiteral);
 }

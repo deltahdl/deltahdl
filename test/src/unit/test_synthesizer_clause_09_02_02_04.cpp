@@ -17,7 +17,7 @@ TEST(AlwaysFFSynthesis, AlwaysFFRegistersLatch) {
                            "  end\n"
                            "endmodule");
   ASSERT_NE(mod, nullptr);
-  AlwaysFFSynthesis synth(f.arena, f.diag);
+  SynthLower synth(f.arena, f.diag);
   auto* aig = synth.Lower(mod);
   ASSERT_NE(aig, nullptr);
   EXPECT_EQ(aig->outputs.size(), 1);

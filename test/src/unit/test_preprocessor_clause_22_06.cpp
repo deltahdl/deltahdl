@@ -2,6 +2,7 @@
 
 #include "fixture_parser.h"
 #include "fixture_preprocessor.h"
+#include "helpers_parser_verify.h"
 
 using namespace delta;
 

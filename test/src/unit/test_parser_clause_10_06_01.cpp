@@ -425,8 +425,6 @@ TEST(ProceduralAssignDeassignParsing, AssignInForkJoin) {
   EXPECT_EQ(stmt->fork_stmts[1]->kind, StmtKind::kAssign);
 }
 
-}
-
 TEST(ProceduralAssignDeassignParsing, AssignSystemFuncRhs) {
   auto r = Parse(
       "module m;\n"
@@ -568,4 +566,4 @@ TEST(ProceduralAssignDeassignParsing, AssignToVector) {
   EXPECT_EQ(stmt->lhs->text, "vec");
   ASSERT_NE(stmt->rhs, nullptr);
 }
-}
+}  // namespace

@@ -52,7 +52,7 @@ TEST(IfMatchesParsing, IfMatchesWithElse) {
   auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kIf);
-  EXPECT_NE(stmt->else_body, nullptr);
+  EXPECT_NE(stmt->else_branch, nullptr);
 }
 
 TEST(IfMatchesParsing, IfMatchesElseIfChain) {

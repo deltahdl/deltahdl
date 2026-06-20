@@ -72,7 +72,7 @@ std::string ElaborateAndBoundLibrary(Arena& arena, DiagEngine& diag,
   if (bound == nullptr) {
     return std::string();
   }
-  return bound->library;
+  return std::string(bound->library);
 }
 
 TEST(DefaultLibraryBinding, FirstLibraryContainingCellWinsForAdder) {

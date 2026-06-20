@@ -206,7 +206,7 @@ TEST(OrderedPortElaboration, ExcessOrderedPortsWarns) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_GT(f.diag.WarningCount() + f.diag.ErrorCount(), 0u);
+  EXPECT_GT(f.diag.WarningCount() + (f.diag.HasErrors() ? 1u : 0u), 0u);
 }
 
 TEST(OrderedPortElaboration, OrderedPortConnectionExpressionPreserved) {

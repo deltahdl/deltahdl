@@ -1,6 +1,9 @@
 #include <gtest/gtest.h>
 
+#include "fixture_elaborator.h"
 #include "model_gate_declaration.h"
+
+using namespace delta;
 
 namespace {
 
