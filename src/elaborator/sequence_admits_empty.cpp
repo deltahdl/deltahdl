@@ -51,8 +51,8 @@ bool AdmitsEmpty(AdmitsEmptyForm form, bool first_child_admits_empty,
       // §F.4.3: r[*0] always admits the empty match.
       return true;
     case AdmitsEmptyForm::kPlusBounded:
-      // §F.4.3: r[*1:$] admits empty iff r does.
-      return first_child_admits_empty;
+      // §F.4.3: r[*1:$] admits empty iff r does; the clocked form @(c) r
+      // (kClockedAt) inherits the same rule from its inner sequence.
     case AdmitsEmptyForm::kClockedAt:
       return first_child_admits_empty;
   }
@@ -66,14 +66,12 @@ PushRouting RoutePush(PushSite site, bool list_empty, bool right_admits_empty) {
     case PushSite::kLocalVarAssignThenProp:
       return PushRouting::kPrependLocalVarAssignment;
     case PushSite::kSequenceAsProperty:
-      // §F.4.3: if the local var list is empty, the rewrite collapses to the
-      // sequence itself; otherwise it must splice in κ(r) ##0 r so the
-      // assignments fire at the correct alignment.
-      if (list_empty) return PushRouting::kRecurseInner;
-      return PushRouting::kAttachKappaWithDelayZero;
+      // §F.4.3: when the local var list is empty both the sequence-as-property
+      // form and the overlapping-implication antecedent
+      // (kOverlappingImplication) collapse to the inner construct; otherwise
+      // both splice κ(r) ##0 r so the assignments fire at the correct
+      // alignment.
     case PushSite::kOverlappingImplication:
-      // §F.4.3: if the list is empty the implication's antecedent is left as
-      // is; otherwise the rule splices κ(r) ##0 r |-> push(<>, p).
       if (list_empty) return PushRouting::kRecurseInner;
       return PushRouting::kAttachKappaWithDelayZero;
     case PushSite::kNonoverlappingImplication:
@@ -86,12 +84,11 @@ PushRouting RoutePush(PushSite site, bool list_empty, bool right_admits_empty) {
     case PushSite::kIfElse:
       return PushRouting::kRecurseBothBranches;
     case PushSite::kDisableIff:
-      return PushRouting::kRecurseInner;
     case PushSite::kClockedAtProp:
-      return PushRouting::kRecurseInner;
     case PushSite::kParenthesized:
-      return PushRouting::kRecurseInner;
     case PushSite::kNot:
+      // §F.4.3: these property wrappers carry no local var list of their own,
+      // so the rewrite simply recurses into the single inner property.
       return PushRouting::kRecurseInner;
     case PushSite::kOr:
     case PushSite::kAnd:

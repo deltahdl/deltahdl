@@ -156,10 +156,10 @@ void Elaborator::CheckArrayAssignExprs(const Expr* lhs, const Expr* rhs,
     }
     return;
   }
-  const ArrayAssignPair pair{lhs_it->second, rhs_it->second, lhs, rhs, loc};
+  const ArrayAssignPair kPair{lhs_it->second, rhs_it->second, lhs, rhs, loc};
 
-  if (ReportArrayShapeMismatch(pair, diag_)) return;
-  if (ReportFasterVaryingDimMismatch(pair, diag_)) return;
+  if (ReportArrayShapeMismatch(kPair, diag_)) return;
+  if (ReportFasterVaryingDimMismatch(kPair, diag_)) return;
 }
 
 void Elaborator::ValidateOneArrayAssignment(const ModuleItem* item) {
@@ -363,18 +363,18 @@ void Elaborator::ValidateArrayArgTypes(const ModuleDecl* decl) {
   for (const auto* item : decl->items) {
     if (item->kind == ModuleItemKind::kTaskDecl) all_decls[item->name] = item;
   }
-  const ArrayArgTypeCtx ctx{all_decls, var_array_info_, class_names_, typedefs_,
-                            diag_};
+  const ArrayArgTypeCtx kCtx{all_decls, var_array_info_, class_names_,
+                             typedefs_, diag_};
   for (const auto* item : decl->items) {
     if (item->kind == ModuleItemKind::kInitialBlock ||
         item->kind == ModuleItemKind::kAlwaysBlock ||
         item->kind == ModuleItemKind::kFinalBlock) {
-      WalkStmtForArrayArgTypes(item->body, ctx);
+      WalkStmtForArrayArgTypes(item->body, kCtx);
     }
     if (item->kind == ModuleItemKind::kFunctionDecl ||
         item->kind == ModuleItemKind::kTaskDecl) {
       for (auto* s : item->func_body_stmts) {
-        WalkStmtForArrayArgTypes(s, ctx);
+        WalkStmtForArrayArgTypes(s, kCtx);
       }
     }
   }

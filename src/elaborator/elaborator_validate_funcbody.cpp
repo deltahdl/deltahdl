@@ -298,9 +298,9 @@ static void CheckTaskBodyNbaForAutoVar(
 static void CheckTaskBodyMonitorTrace(
     const Stmt* s, const std::unordered_set<std::string_view>& auto_vars,
     DiagEngine& diag) {
-  if (!(s->kind == StmtKind::kExprStmt && s->expr &&
-        s->expr->kind == ExprKind::kSystemCall &&
-        (s->expr->callee == "$monitor" || s->expr->callee == "$dumpvars")))
+  if (s->kind != StmtKind::kExprStmt || !s->expr ||
+      s->expr->kind != ExprKind::kSystemCall ||
+      (s->expr->callee != "$monitor" && s->expr->callee != "$dumpvars"))
     return;
   for (auto* a : s->expr->args) {
     if (ExprRefsAutoVar(a, auto_vars)) {
@@ -362,9 +362,8 @@ static void CollectAutoVarNames(const Stmt* s, bool task_is_auto,
                                 std::unordered_set<std::string_view>& out) {
   if (!s) return;
   if (s->kind == StmtKind::kVarDecl && !s->var_name.empty()) {
-    if (task_is_auto && !s->var_is_static) {
-      out.insert(s->var_name);
-    } else if (!task_is_auto && s->var_is_automatic) {
+    if ((task_is_auto && !s->var_is_static) ||
+        (!task_is_auto && s->var_is_automatic)) {
       out.insert(s->var_name);
     }
   }

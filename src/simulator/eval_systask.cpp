@@ -384,7 +384,11 @@ std::string ResolveFormatArg(const Expr* arg, SimContext& ctx, Arena& arena) {
 }
 
 // Outcome of scanning one '%'-introduced specifier.
-enum class SpecifierScan { kLiteralPercent, kTruncated, kComplete };
+enum class SpecifierScan : std::uint8_t {
+  kLiteralPercent,
+  kTruncated,
+  kComplete
+};
 
 // §21.3.3: scan the specifier that begins at fmt[i] (which is '%'). Advances
 // `i` past the consumed characters and reports whether the specifier consumes

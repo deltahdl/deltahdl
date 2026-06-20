@@ -305,44 +305,79 @@ static const ClassMember* ResolveSolveBeforeEntry(
   return prop;
 }
 
-void Elaborator::ValidateOneClassSolveBeforeConstraints(const ClassDecl* cls) {
-  auto properties = BuildClassPropertyMap(cls, unit_);
-
-  // Aggregate every ordering edge (a variable solved before another) across the
-  // class's constraint blocks so a circular dependency that spans more than one
-  // solve statement is still detected.
+// The aggregate solve...before ordering graph for one class, collected across
+// all of its constraint blocks so a circular dependency that spans more than
+// one solve statement is still detected. 'report_loc' is the location of the
+// first ordering reference, used to anchor a circular-dependency diagnostic.
+struct SolveBeforeOrdering {
   std::unordered_map<std::string_view, std::vector<std::string_view>> succ;
   std::unordered_set<std::string_view> nodes;
   bool have_loc = false;
   SourceLoc report_loc;
+};
 
-  auto check_entry = [&](const ConstraintSolveBeforeEntry& e,
-                         const SourceLoc& loc) {
-    const ClassMember* prop =
-        ResolveSolveBeforeEntry(e, loc, properties, diag_);
-    if (prop && !IsSolveOrderableType(prop->data_type)) {
-      diag_.Error(loc,
-                  std::format("solve...before ordering variable '{}' shall be "
-                              "of integral or real type",
-                              e.name));
-    }
-  };
+// 18.5.9: resolve one solve...before entry and emit the rand/randc and
+// integral/real-type diagnostics for it. The orderability check mirrors
+// Elaborator::IsSolveOrderableType, kept here as a free helper so the per-entry
+// check needs no Elaborator instance.
+static bool IsSolveOrderableTypeFree(const DataType& dt,
+                                     const CompilationUnit* unit) {
+  switch (dt.kind) {
+    case DataTypeKind::kString:
+    case DataTypeKind::kEvent:
+    case DataTypeKind::kChandle:
+    case DataTypeKind::kVirtualInterface:
+    case DataTypeKind::kVoid:
+      return false;
+    case DataTypeKind::kNamed:
+      return FindClassDecl(dt.type_name, unit) == nullptr;
+    default:
+      return true;
+  }
+}
 
+static void CheckSolveBeforeEntry(
+    const ConstraintSolveBeforeEntry& e, const SourceLoc& loc,
+    const std::unordered_map<std::string_view, const ClassMember*>& properties,
+    const CompilationUnit* unit, DiagEngine& diag) {
+  const ClassMember* prop = ResolveSolveBeforeEntry(e, loc, properties, diag);
+  if (prop && !IsSolveOrderableTypeFree(prop->data_type, unit)) {
+    diag.Error(loc,
+               std::format("solve...before ordering variable '{}' shall be "
+                           "of integral or real type",
+                           e.name));
+  }
+}
+
+// 18.5.9: fold one solve...before reference into the class ordering: emit the
+// per-entry rand/randc/type diagnostics and accumulate its ordering edges.
+static void CollectSolveBeforeRef(
+    const ConstraintSolveBeforeRef& ref,
+    const std::unordered_map<std::string_view, const ClassMember*>& properties,
+    const CompilationUnit* unit, DiagEngine& diag, SolveBeforeOrdering& order) {
+  if (!order.have_loc) {
+    order.report_loc = ref.loc;
+    order.have_loc = true;
+  }
+  for (const auto& e : ref.before)
+    CheckSolveBeforeEntry(e, ref.loc, properties, unit, diag);
+  for (const auto& e : ref.after)
+    CheckSolveBeforeEntry(e, ref.loc, properties, unit, diag);
+  AddSolveBeforeEdges(ref, order.succ, order.nodes);
+}
+
+void Elaborator::ValidateOneClassSolveBeforeConstraints(const ClassDecl* cls) {
+  auto properties = BuildClassPropertyMap(cls, unit_);
+
+  SolveBeforeOrdering order;
   for (const auto* m : cls->members) {
     if (m->kind != ClassMemberKind::kConstraint) continue;
-    for (const auto& ref : m->constraint_solve_before_refs) {
-      if (!have_loc) {
-        report_loc = ref.loc;
-        have_loc = true;
-      }
-      for (const auto& e : ref.before) check_entry(e, ref.loc);
-      for (const auto& e : ref.after) check_entry(e, ref.loc);
-      AddSolveBeforeEdges(ref, succ, nodes);
-    }
+    for (const auto& ref : m->constraint_solve_before_refs)
+      CollectSolveBeforeRef(ref, properties, unit_, diag_, order);
   }
 
-  if (SolveBeforeGraphHasCycle(succ, nodes)) {
-    diag_.Error(report_loc,
+  if (SolveBeforeGraphHasCycle(order.succ, order.nodes)) {
+    diag_.Error(order.report_loc,
                 "circular dependency in solve...before variable ordering");
   }
 }

@@ -682,14 +682,13 @@ static bool ExecBasicVcdControl(std::string_view name, VcdWriter* vcd) {
   return true;
 }
 
-// §21.7.3.x: the extended-VCD ($dumpports) port control tasks. Each reuses the
-// 4-state machinery the extended VCD file inherits and treats its optional
-// trailing filename as selecting this single-file writer (already validated by
-// DumpportsControlTaskTargetsUnknownFile). Returns true when name named one of
-// these tasks so the caller stops dispatching.
-static bool ExecDumpportsControl(const Expr* expr, SimContext& ctx,
-                                 Arena& arena, VcdWriter* vcd,
-                                 std::string_view name) {
+// §21.7.3.x: the writer-acting extended-VCD ($dumpports) port control tasks.
+// Each reuses the 4-state machinery the extended VCD file inherits and treats
+// its optional trailing filename as selecting this single-file writer (already
+// validated by DumpportsControlTaskTargetsUnknownFile). Returns true when name
+// named one of them (whether or not a writer is present) so the caller stops
+// dispatching.
+static bool ExecDumpportsWriterAction(std::string_view name, VcdWriter* vcd) {
   if (name == "$dumpportsoff") {
     // §21.7.3.2: suspend the extended VCD port dump. A checkpoint marking every
     // selected port as x is written and recording stops from this simulation
@@ -717,17 +716,6 @@ static bool ExecDumpportsControl(const Expr* expr, SimContext& ctx,
     // file opened by $dumpports. The checkpoint reuses the 4-state machinery
     // the extended VCD file inherits (§21.7.1.4).
     if (vcd) vcd->DumpAll();
-  } else if (name == "$dumpportslimit") {
-    // §21.7.3.4: bound the extended VCD file size. The required leading
-    // filesize argument gives the maximum number of bytes; once the dump
-    // reaches it, recording stops and a comment noting the limit is inserted. A
-    // trailing filename argument may denote which $dumpports output the limit
-    // applies to; with no filename the limit covers every file opened by
-    // $dumpports. With this single-file writer both cases bound the one dump,
-    // so the optional filename is parsed but does not change which dump is
-    // limited. The byte budget reuses the 4-state size-limit machinery the
-    // extended VCD file inherits (§21.7.1.5).
-    ExecDumpLimit(expr, ctx, arena, vcd);
   } else if (name == "$dumpportsflush") {
     // §21.7.3.5: push the buffered extended-VCD port values out to the dump
     // file, clearing the simulator's VCD buffer so a reader sees everything
@@ -744,6 +732,29 @@ static bool ExecDumpportsControl(const Expr* expr, SimContext& ctx,
     return false;
   }
   return true;
+}
+
+// §21.7.3.x: the extended-VCD ($dumpports) port control tasks. The
+// writer-acting tasks are handled by ExecDumpportsWriterAction; $dumpportslimit
+// additionally needs the call expression to read its byte budget. Returns true
+// when name named one of these tasks so the caller stops dispatching.
+static bool ExecDumpportsControl(const Expr* expr, SimContext& ctx,
+                                 Arena& arena, VcdWriter* vcd,
+                                 std::string_view name) {
+  if (name == "$dumpportslimit") {
+    // §21.7.3.4: bound the extended VCD file size. The required leading
+    // filesize argument gives the maximum number of bytes; once the dump
+    // reaches it, recording stops and a comment noting the limit is inserted. A
+    // trailing filename argument may denote which $dumpports output the limit
+    // applies to; with no filename the limit covers every file opened by
+    // $dumpports. With this single-file writer both cases bound the one dump,
+    // so the optional filename is parsed but does not change which dump is
+    // limited. The byte budget reuses the 4-state size-limit machinery the
+    // extended VCD file inherits (§21.7.1.5).
+    ExecDumpLimit(expr, ctx, arena, vcd);
+    return true;
+  }
+  return ExecDumpportsWriterAction(name, vcd);
 }
 
 Logic4Vec EvalVcdSysCall(const Expr* expr, SimContext& ctx, Arena& arena,

@@ -107,6 +107,7 @@ void CoverageDB::AutoCreateCrossBins(CoverGroup* group, CrossCover* cross) {
   // contribute a cross product. Default, ignore, and illegal bins are skipped
   // (LRM 19.6).
   std::vector<std::vector<std::vector<int64_t>>> per_point;
+  per_point.reserve(cross->coverpoint_names.size());
   for (const auto& name : cross->coverpoint_names) {
     per_point.push_back(CollectContributingBinValues(group, name));
   }

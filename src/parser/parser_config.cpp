@@ -73,8 +73,7 @@ void Parser::ParseUseClause(ConfigRule* rule) {
     // valid in a configuration.
     if (Check(TokenKind::kRParen)) {
       rule->use_param_reset_all = true;
-    }
-    if (!Check(TokenKind::kRParen)) {
+    } else {
       do {
         ParseNamedParamAssignment(rule);
       } while (Match(TokenKind::kComma));
@@ -82,11 +81,9 @@ void Parser::ParseUseClause(ConfigRule* rule) {
     Expect(TokenKind::kRParen);
   }
 
-  if (Match(TokenKind::kColon)) {
-    if (Check(TokenKind::kKwConfig)) {
-      Consume();
-      rule->use_config = true;
-    }
+  if (Match(TokenKind::kColon) && Check(TokenKind::kKwConfig)) {
+    Consume();
+    rule->use_config = true;
   }
 }
 

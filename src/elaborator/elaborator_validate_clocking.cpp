@@ -649,11 +649,11 @@ void CheckGateInstOutputTerminals(
 
 void Elaborator::ValidatePrimitiveDriveToClockvar(const ModuleDecl* decl) {
   if (clocking_signals_.empty()) return;
-  const OutputClockvarNamePredicate is_output_clockvar =
+  const OutputClockvarNamePredicate kIsOutputClockvar =
       [this](std::string_view name) { return IsOutputClockvarSignal(name); };
   for (const auto* item : decl->items) {
     if (item->kind != ModuleItemKind::kGateInst) continue;
-    CheckGateInstOutputTerminals(item, is_output_clockvar, diag_);
+    CheckGateInstOutputTerminals(item, kIsOutputClockvar, diag_);
   }
 }
 
@@ -744,17 +744,16 @@ void CheckSyncDriveProcContAssign(
 
 void Elaborator::WalkStmtsForSyncDriveForm(const Stmt* s) {
   if (!s) return;
-  const ClockvarPredicate targets_writable = [this](const Expr* e) {
+  const ClockvarPredicate kTargetsWritable = [this](const Expr* e) {
     return ExprTargetsWritableClockvar(e);
   };
   if (s->kind == StmtKind::kBlockingAssign ||
       s->kind == StmtKind::kNonblockingAssign) {
-    CheckSyncDriveAssign(s, targets_writable, diag_);
+    CheckSyncDriveAssign(s, kTargetsWritable, diag_);
   } else if (s->kind == StmtKind::kForce || s->kind == StmtKind::kAssign) {
-    const OutputClockvarNamePredicate is_output_clockvar =
+    const OutputClockvarNamePredicate kIsOutputClockvar =
         [this](std::string_view name) { return IsOutputClockvarSignal(name); };
-    CheckSyncDriveProcContAssign(s, targets_writable, is_output_clockvar,
-                                 diag_);
+    CheckSyncDriveProcContAssign(s, kTargetsWritable, kIsOutputClockvar, diag_);
   }
   for (auto* sub : s->stmts) WalkStmtsForSyncDriveForm(sub);
   WalkStmtsForSyncDriveForm(s->then_branch);

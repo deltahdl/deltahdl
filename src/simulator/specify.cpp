@@ -14,8 +14,8 @@ uint64_t ClampPathDelay(int64_t signed_value) {
 void ExpandTransitionDelays(PathDelay& pd) {
   switch (pd.delay_count) {
     case 1: {
-      const uint64_t t = pd.delays[0];
-      for (int i = 1; i < 6; ++i) pd.delays[i] = t;
+      const uint64_t kT = pd.delays[0];
+      for (int i = 1; i < 6; ++i) pd.delays[i] = kT;
       break;
     }
     case 2: {

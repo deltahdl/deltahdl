@@ -576,11 +576,11 @@ int DpiRuntime::ReturnFromExportUnderDisable(DpiDisableTarget target) {
       // §35.9: when the exported task is itself the disable target, the disable
       // stops there — its parent import is not considered disabled, the task
       // returns 0, and svIsDisabledState() reports 0.
-      DpiSetCurrentDisabledState(false);
-      return 0;
+      //
+      // §35.9 item a): a task that does not return due to a disable likewise
+      // clears the disabled state and returns 0, so kNone shares this body.
     case DpiDisableTarget::kNone:
     default:
-      // §35.9 item a): a task that does not return due to a disable returns 0.
       DpiSetCurrentDisabledState(false);
       return 0;
   }

@@ -721,14 +721,14 @@ VpiHandle VpiContext::Iterate(int type, VpiHandle ref) {
   // Classify this (type, ref) iteration into its special modes. The detailed
   // §37.x reasoning for each mode lives in ComputeVpiIterateModes; collecting
   // them there keeps this routine focused on dispatch.
-  const VpiIterateModes modes = ComputeVpiIterateModes(type, ref);
+  const VpiIterateModes kModes = ComputeVpiIterateModes(type, ref);
 
   // §38.23: unless otherwise specified, iterating the relationships of a
   // protected object is an error, so no iterator is produced. §37.42 detail 10
   // carves out one exception: a protected system task or function call shall
   // still allow iteration over its vpiArgument relation. Every other protected
   // iteration is still refused.
-  if (ref && ref->is_protected && !modes.tf_argument) return nullptr;
+  if (ref && ref->is_protected && !kModes.tf_argument) return nullptr;
 
   // §37.72 detail 2: a default case item has no condition expression, so
   // iterating its match expressions (vpi_iterate(vpiExpr, item)) returns NULL.
@@ -756,7 +756,7 @@ VpiHandle VpiContext::Iterate(int type, VpiHandle ref) {
   // empty-children check below.
   VpiIterateStores stores{all_objects_, time_queue_slots_, cb_handles_,
                           callbacks_};
-  DispatchVpiIterate(type, ref, modes, stores, iter);
+  DispatchVpiIterate(type, ref, kModes, stores, iter);
 
   if (iter->children.empty()) {
     delete iter;

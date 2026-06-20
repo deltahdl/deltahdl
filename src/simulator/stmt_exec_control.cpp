@@ -459,7 +459,7 @@ static void TeardownForScopes(const Stmt* stmt, SimContext& ctx, bool scoped,
 // of the repeated "break / propagate / keep looping" branch shared by every
 // loop executor in this file. kPropagate means the caller must unwind its
 // scopes and co_return the body's result unchanged.
-enum class LoopAction { kKeepLooping, kBreakLoop, kPropagate };
+enum class LoopAction : std::uint8_t { kKeepLooping, kBreakLoop, kPropagate };
 
 static LoopAction ClassifyLoopBodyResult(StmtResult result) {
   if (result == StmtResult::kBreak) return LoopAction::kBreakLoop;

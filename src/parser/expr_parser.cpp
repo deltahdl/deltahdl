@@ -458,19 +458,18 @@ Expr* Parser::ParsePrimaryExpr() {
       auto* lit = MakeLiteral(ExprKind::kIntegerLiteral, tok);
       // casting_type allows constant_primary; an integer literal followed by
       // '(expr) is a width-cast (the literal is the target width).
-      if (Check(TokenKind::kApostrophe)) {
-        auto saved = lexer_.SavePos();
-        Consume();
-        if (Check(TokenKind::kLParen)) {
-          Consume();
-          auto* value = ParseExpr();
-          auto* cast = MakeNodeCast(arena_, lit, value);
-          Expect(TokenKind::kRParen);
-          return cast;
-        }
+      if (!Check(TokenKind::kApostrophe)) return lit;
+      auto saved = lexer_.SavePos();
+      Consume();
+      if (!Check(TokenKind::kLParen)) {
         lexer_.RestorePos(saved);
+        return lit;
       }
-      return lit;
+      Consume();
+      auto* value = ParseExpr();
+      auto* cast = MakeNodeCast(arena_, lit, value);
+      Expect(TokenKind::kRParen);
+      return cast;
     }
     case TokenKind::kUnbasedUnsizedLiteral:
       return MakeLiteral(ExprKind::kUnbasedUnsizedLiteral, tok);
@@ -689,18 +688,16 @@ Expr* Parser::ParseIdentifierExpr() {
   }
 
   result = ParseWithClause(result);
+  if (!result->with_expr) return result;
 
-  if (result->with_expr) {
-    while (Check(TokenKind::kDot) || Check(TokenKind::kLBracket)) {
-      if (Check(TokenKind::kDot)) {
-        result = MakeMemberAccess(result);
-        if (Check(TokenKind::kLParen)) result = ParseCallExpr(result);
-      } else {
-        result = ParseSelectExpr(result);
-      }
+  while (Check(TokenKind::kDot) || Check(TokenKind::kLBracket)) {
+    if (!Check(TokenKind::kDot)) {
+      result = ParseSelectExpr(result);
+      continue;
     }
+    result = MakeMemberAccess(result);
+    if (Check(TokenKind::kLParen)) result = ParseCallExpr(result);
   }
-
   return result;
 }
 

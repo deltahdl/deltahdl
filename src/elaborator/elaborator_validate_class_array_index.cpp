@@ -60,8 +60,8 @@ struct ClassIndexCtx {
 // diagnostic when its index expression is illegal. Non-select nodes are
 // ignored.
 static void CheckClassIndexSelectNode(const Expr* e, const ClassIndexCtx& ctx) {
-  if (!(e->kind == ExprKind::kSelect && e->base && e->index &&
-        e->base->kind == ExprKind::kIdentifier)) {
+  if (e->kind != ExprKind::kSelect || !e->base || !e->index ||
+      e->base->kind != ExprKind::kIdentifier) {
     return;
   }
   auto it = ctx.var_array_info.find(e->base->text);
@@ -179,8 +179,8 @@ static void CheckStringIndexSelectNode(
     const TypeMap& var_types, DiagEngine& diag) {
   // Plain element selects only; a slice on an associative array is reported
   // separately, so skip it here to avoid a second diagnostic on one site.
-  if (!(e->kind == ExprKind::kSelect && e->base && e->index &&
-        e->base->kind == ExprKind::kIdentifier && !IsSliceSelect(e))) {
+  if (e->kind != ExprKind::kSelect || !e->base || !e->index ||
+      e->base->kind != ExprKind::kIdentifier || IsSliceSelect(e)) {
     return;
   }
   auto it = var_array_info.find(e->base->text);

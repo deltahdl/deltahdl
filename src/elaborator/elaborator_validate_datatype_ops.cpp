@@ -410,14 +410,14 @@ void Elaborator::WalkStmtsForVirtualInterfaceOps(const Stmt* s) {
   if ((s->kind == StmtKind::kBlockingAssign ||
        s->kind == StmtKind::kNonblockingAssign) &&
       s->lhs && s->rhs) {
-    const ViAssignContext ctx{var_types_,
-                              interface_inst_types_,
-                              vi_var_interface_types_,
-                              vi_var_modports_,
-                              vi_var_param_values_,
-                              interface_inst_param_values_,
-                              vi_external_defparam_insts_};
-    CheckVirtualInterfaceAssignStmt(s, ctx, diag_);
+    const ViAssignContext kCtx{var_types_,
+                               interface_inst_types_,
+                               vi_var_interface_types_,
+                               vi_var_modports_,
+                               vi_var_param_values_,
+                               interface_inst_param_values_,
+                               vi_external_defparam_insts_};
+    CheckVirtualInterfaceAssignStmt(s, kCtx, diag_);
   }
   CheckVirtualInterfaceExpr(s->rhs, var_types_, diag_);
   CheckVirtualInterfaceExpr(s->expr, var_types_, diag_);

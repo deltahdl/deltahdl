@@ -196,7 +196,7 @@ std::string LibraryMap::ResolveSpec(std::string_view spec,
 
   bool absolute = false;
   auto segs = SplitSegments(combined, absolute);
-  segs = Normalize(std::move(segs));
+  segs = Normalize(segs);
   return Join(segs, absolute);
 }
 
@@ -208,7 +208,7 @@ bool LibraryMap::PathMatches(std::string_view spec, std::string_view base_dir,
   bool pat_abs = false, path_abs = false;
   auto pat_segs = SplitSegments(resolved_pat, pat_abs);
   auto path_segs = SplitSegments(path, path_abs);
-  path_segs = Normalize(std::move(path_segs));
+  path_segs = Normalize(path_segs);
   if (pat_abs != path_abs) return false;
   return GlobMatchSegments(pat_segs, 0, path_segs, 0);
 }

@@ -8,7 +8,6 @@ RewriteStage NextRewriteStage(RewriteStage stage) {
   // Properties are drained first, then sequences; sequences is the last stage.
   switch (stage) {
     case RewriteStage::kProperties:
-      return RewriteStage::kSequences;
     case RewriteStage::kSequences:
       return RewriteStage::kSequences;
   }

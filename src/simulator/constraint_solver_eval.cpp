@@ -119,7 +119,7 @@ void CollectConstraints(const std::vector<ConstraintBlock>& blocks,
 namespace {
 
 // Result of resolving a constraint's guard for CheckAllConstraints below.
-enum class GuardCheckResult { kFail, kSkip, kProceed };
+enum class GuardCheckResult : std::uint8_t { kFail, kSkip, kProceed };
 
 // 18.5.12: evaluate a hard constraint's guard before imposing the guarded
 // constraint. The guard prevents the solver from generating evaluation errors
@@ -188,13 +188,10 @@ bool ConstraintSolver::CheckAllConstraints(
   }
   // When the still-active soft set proves jointly unsatisfiable the caller
   // drops the soft constraints and retries with include_soft clear.
-  if (include_soft &&
-      !CheckActiveSoftConstraints(
-          soft, dropped_soft_, disabled_soft_,
-          [this](const ConstraintExpr& e) { return EvalConstraint(e); })) {
-    return false;
-  }
-  return true;
+  return !include_soft ||
+         CheckActiveSoftConstraints(
+             soft, dropped_soft_, disabled_soft_,
+             [this](const ConstraintExpr& e) { return EvalConstraint(e); });
 }
 
 bool ConstraintSolver::EvalImplication(const ConstraintExpr& expr) const {

@@ -341,11 +341,11 @@ struct ParserPortHelpers {
   static void ParseLeadingTimeunitPair(Parser& p, ModuleDecl& mod) {
     bool first_is_unit = p.Check(TokenKind::kKwTimeunit);
     p.ParseTimeunitDecl(&mod);
-    if (first_is_unit && !mod.has_timeprecision &&
-        p.Check(TokenKind::kKwTimeprecision)) {
-      p.ParseTimeunitDecl(&mod);
-    } else if (!first_is_unit && !mod.has_timeunit &&
-               p.Check(TokenKind::kKwTimeunit)) {
+    bool complement_unit_follows = first_is_unit && !mod.has_timeprecision &&
+                                   p.Check(TokenKind::kKwTimeprecision);
+    bool complement_precision_follows =
+        !first_is_unit && !mod.has_timeunit && p.Check(TokenKind::kKwTimeunit);
+    if (complement_unit_follows || complement_precision_follows) {
       p.ParseTimeunitDecl(&mod);
     }
   }

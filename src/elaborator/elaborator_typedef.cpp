@@ -130,17 +130,20 @@ std::optional<uint32_t> ComputeFixedUnpackedWidth(ModuleItem* item,
   return std::nullopt;
 }
 
-// Expands the enum members of an enum typedef into backing variables and an
-// ordered member list, reserving each member name. Mirrors the running-value
-// semantics of §6.19 (explicit values, ranges, and implicit increments).
-std::vector<RtlirEnumMember> BuildEnumMembers(
-    ModuleItem* item, uint32_t width, Arena& arena, RtlirModule* mod,
-    std::unordered_set<std::string_view>& enum_member_names) {
+// Shared state for expanding the members of one enum typedef into backing
+// variables and an ordered member list (§6.19 running-value semantics). Bundles
+// the otherwise-many parameters the per-member helpers need.
+struct EnumMemberBuilder {
+  uint32_t width;
+  Arena& arena;
+  RtlirModule* mod;
+  std::unordered_set<std::string_view>& enum_member_names;
   int64_t next_val = 0;
   std::vector<RtlirEnumMember> members;
+
   // Records one enum member (name + current value), reserving its name and
   // emitting a backing variable, then advances the running value.
-  auto emit_member = [&](std::string_view name) {
+  void EmitMember(std::string_view name) {
     enum_member_names.insert(name);
     members.push_back({name, next_val});
     RtlirVariable var;
@@ -149,43 +152,55 @@ std::vector<RtlirEnumMember> BuildEnumMembers(
     var.is_4state = false;
     mod->variables.push_back(var);
     ++next_val;
-  };
+  }
+
   // Builds an arena-owned "<base><index>" name and emits it as a member.
-  auto emit_indexed_member = [&](std::string_view base, int64_t index) {
+  void EmitIndexedMember(std::string_view base, int64_t index) {
     auto s = std::format("{}{}", base, index);
     auto* p = arena.AllocString(s.c_str(), s.size());
-    emit_member(std::string_view{p, s.size()});
-  };
+    EmitMember(std::string_view{p, s.size()});
+  }
+
   // Expands a `name[range_start:range_end]` member into one indexed member per
   // step from range_start toward range_end (inclusive).
-  auto emit_inclusive_range = [&](std::string_view name, int64_t n, int64_t m) {
+  void EmitInclusiveRange(std::string_view name, int64_t n, int64_t m) {
     int step = (m >= n) ? 1 : -1;
     for (auto i = n;; i += step) {
-      emit_indexed_member(name, i);
+      EmitIndexedMember(name, i);
       if (i == m) break;
     }
-  };
+  }
+
   // Emits one declared enum member entry, expanding any `[range]` suffix.
-  auto emit_declared_member = [&](const EnumMember& member) {
+  void EmitDeclaredMember(const EnumMember& member) {
     if (!member.range_start) {
-      emit_member(member.name);
+      EmitMember(member.name);
       return;
     }
     auto n = ConstEvalInt(member.range_start).value_or(0);
     if (member.range_end) {
-      emit_inclusive_range(member.name, n,
-                           ConstEvalInt(member.range_end).value_or(0));
+      EmitInclusiveRange(member.name, n,
+                         ConstEvalInt(member.range_end).value_or(0));
     } else {
-      for (int64_t i = 0; i < n; ++i) emit_indexed_member(member.name, i);
+      for (int64_t i = 0; i < n; ++i) EmitIndexedMember(member.name, i);
     }
-  };
+  }
+};
+
+// Expands the enum members of an enum typedef into backing variables and an
+// ordered member list, reserving each member name. Mirrors the running-value
+// semantics of §6.19 (explicit values, ranges, and implicit increments).
+std::vector<RtlirEnumMember> BuildEnumMembers(
+    ModuleItem* item, uint32_t width, Arena& arena, RtlirModule* mod,
+    std::unordered_set<std::string_view>& enum_member_names) {
+  EnumMemberBuilder builder{width, arena, mod, enum_member_names};
   for (const auto& member : item->typedef_type.enum_members) {
     if (member.value) {
-      next_val = ConstEvalInt(member.value).value_or(next_val);
+      builder.next_val = ConstEvalInt(member.value).value_or(builder.next_val);
     }
-    emit_declared_member(member);
+    builder.EmitDeclaredMember(member);
   }
-  return members;
+  return std::move(builder.members);
 }
 
 }  // namespace

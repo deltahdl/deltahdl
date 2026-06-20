@@ -268,7 +268,7 @@ void StoreRealField(Variable* var, Arena& arena, double d) {
 // caller advances the match/arg counters unless the field was suppressed);
 // `kSkipped` means the specifier consumed input but produces no assigned field
 // (the %% literal match), so the caller only continues.
-enum class ScanFieldResult { kStop, kMatched, kSkipped };
+enum class ScanFieldResult : std::uint8_t { kStop, kMatched, kSkipped };
 
 // State carried across the per-specifier handlers. `pos` is the current read
 // offset into the input; the helpers advance it in place.
@@ -406,6 +406,28 @@ ScanSpec ParseScanSpec(const std::string& fmt, size_t& fi) {
   return spec;
 }
 
+// Destination-argument list and binding state for one §21.3.4.3 scan. `dest`
+// holds the `ndest` unevaluated destination expressions; `ai` is the index of
+// the next destination to fill and `matched` counts assigned (non-suppressed)
+// fields as they convert.
+struct ScanArgs {
+  Expr* const* dest;
+  size_t ndest;
+  SimContext& ctx;
+  size_t ai = 0;
+  uint32_t matched = 0;
+};
+
+// §21.3.4.3: resolve the Variable* that the next field assigns to, or nullptr
+// when the field is suppressed, the arguments are exhausted, or the destination
+// expression is not a plain identifier.
+Variable* ResolveScanVar(ScanArgs& args, bool suppress) {
+  if (suppress || args.ai >= args.ndest) return nullptr;
+  const Expr* a = args.dest[args.ai];
+  if (a->kind == ExprKind::kIdentifier) return args.ctx.FindVariable(a->text);
+  return nullptr;
+}
+
 // §21.3.4.3: dispatch a single conversion (other than the %% literal, which the
 // caller handles) to the matching field handler. Leading white space is skipped
 // for every code except %c. Returns kStop on an unsupported conversion code.
@@ -427,6 +449,37 @@ ScanFieldResult DispatchScanField(char lc, const ScanCursor& cur, int width,
   if (base == 0) return ScanFieldResult::kStop;  // unsupported conversion code
   return ScanIntegerField(cur, base, width, var, arena);
 }
+
+// §21.3.4.3 (c): handle one conversion specifier beginning at the '%' that `fi`
+// currently points at. Advances `fi` past the specifier, mutates the cursor and
+// `args` binding state, and returns false when the scan must stop (malformed
+// specifier, %% mismatch, or a field that failed to convert).
+bool HandleScanSpecifier(const std::string& fmt, size_t& fi,
+                         const ScanCursor& cur, ScanArgs& args, Arena& arena) {
+  if (fi + 1 >= fmt.size()) return false;
+  ++fi;
+  ScanSpec spec = ParseScanSpec(fmt, fi);
+  if (spec.stop) return false;
+  char lc = (spec.code >= 'A' && spec.code <= 'Z')
+                ? static_cast<char>(spec.code - 'A' + 'a')
+                : spec.code;
+
+  if (lc == '%') {
+    // §21.3.4.3: %% matches a literal '%' in the input.
+    if (cur.pos >= cur.input.size() || cur.input[cur.pos] != '%') return false;
+    ++cur.pos;
+    return true;
+  }
+
+  ScanFieldResult result = DispatchScanField(
+      lc, cur, spec.width, ResolveScanVar(args, spec.suppress), arena);
+  if (result == ScanFieldResult::kStop) return false;
+  if (result == ScanFieldResult::kMatched && !spec.suppress) {
+    ++args.matched;
+    ++args.ai;
+  }
+  return true;
+}
 }  // namespace
 
 // §21.3.4.3 scan engine shared in spirit with $fscanf. Interprets `fmt` against
@@ -436,16 +489,8 @@ uint32_t RunScanf(const std::string& input, const std::string& fmt,
                   Expr* const* dest, size_t ndest, SimContext& ctx,
                   Arena& arena, size_t& consumed) {
   size_t pos = 0;
-  size_t ai = 0;
-  uint32_t matched = 0;
   ScanCursor cur{input, pos};
-
-  auto field_var = [&](bool suppress) -> Variable* {
-    if (suppress || ai >= ndest) return nullptr;
-    const Expr* a = dest[ai];
-    if (a->kind == ExprKind::kIdentifier) return ctx.FindVariable(a->text);
-    return nullptr;
-  };
+  ScanArgs args{dest, ndest, ctx};
 
   for (size_t fi = 0; fi < fmt.size(); ++fi) {
     char fc = fmt[fi];
@@ -464,32 +509,12 @@ uint32_t RunScanf(const std::string& input, const std::string& fmt,
       continue;
     }
 
-    if (fi + 1 >= fmt.size()) break;
-    ++fi;
-    ScanSpec spec = ParseScanSpec(fmt, fi);
-    if (spec.stop) break;
-    char lc = (spec.code >= 'A' && spec.code <= 'Z')
-                  ? static_cast<char>(spec.code - 'A' + 'a')
-                  : spec.code;
-
-    if (lc == '%') {
-      if (pos >= input.size() || input[pos] != '%') break;
-      ++pos;
-      continue;
-    }
-
-    ScanFieldResult result =
-        DispatchScanField(lc, cur, spec.width, field_var(spec.suppress), arena);
-
-    if (result == ScanFieldResult::kStop) break;
-    if (result == ScanFieldResult::kMatched && !spec.suppress) {
-      ++matched;
-      ++ai;
-    }
+    // §21.3.4.3 (c): a conversion specifier; stop the scan if it fails.
+    if (!HandleScanSpecifier(fmt, fi, cur, args, arena)) break;
   }
 
   consumed = pos;
-  return matched;
+  return args.matched;
 }
 
 static Logic4Vec EvalSscanf(const Expr* expr, SimContext& ctx, Arena& arena) {

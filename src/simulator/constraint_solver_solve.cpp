@@ -753,7 +753,7 @@ static bool RunStagedSolve(
 namespace {
 
 // The outcome of one staged or flat attempt within SolveIterative's retry loop.
-enum class AttemptOutcome {
+enum class AttemptOutcome : std::uint8_t {
   kSolved,  // a complete satisfying assignment was found; return true
   kAbort,   // a guard ERROR was hit; randomize() fails outright (return false)
   kRetry,   // no solution this attempt; the loop should try again

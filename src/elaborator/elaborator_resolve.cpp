@@ -398,15 +398,11 @@ static const std::vector<std::string>* SelectOverrideLiblist(
   size_t best_match_len = 0;
   if (!current_inst_path.empty()) {
     for (const auto& [rule_path, libs] : instance_liblist_overrides) {
-      bool matches = false;
-      if (current_inst_path == rule_path) {
-        matches = true;
-      } else if (current_inst_path.size() > rule_path.size() &&
-                 current_inst_path.compare(0, rule_path.size(), rule_path) ==
-                     0 &&
-                 current_inst_path[rule_path.size()] == '.') {
-        matches = true;
-      }
+      bool matches =
+          current_inst_path == rule_path ||
+          (current_inst_path.size() > rule_path.size() &&
+           current_inst_path.compare(0, rule_path.size(), rule_path) == 0 &&
+           current_inst_path[rule_path.size()] == '.');
       if (matches && rule_path.size() >= best_match_len) {
         override_liblist = &libs;
         best_match_len = rule_path.size();

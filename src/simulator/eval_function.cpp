@@ -55,22 +55,29 @@ static void RunConstructorForLevel(const ClassTypeInfo* info, ClassObject*,
   ctx.PopScope();
 }
 
-static const Expr* SynthDefaultExtendsArgs(const ClassTypeInfo* base,
-                                           const ClassDecl* child_decl,
-                                           const Expr* new_expr, Arena& arena) {
-  size_t default_pos = 0;
+static size_t FindFirstDefaultArgPos(const ModuleItem* method) {
+  for (size_t j = 0; j < method->func_args.size(); ++j) {
+    if (method->func_args[j].is_default) {
+      return j;
+    }
+  }
+  return 0;
+}
+
+static size_t FindChildNewDefaultPos(const ClassDecl* child_decl) {
   for (const auto* m : child_decl->members) {
     if (m->kind == ClassMemberKind::kMethod && m->method &&
         m->method->name == "new") {
-      for (size_t j = 0; j < m->method->func_args.size(); ++j) {
-        if (m->method->func_args[j].is_default) {
-          default_pos = j;
-          break;
-        }
-      }
-      break;
+      return FindFirstDefaultArgPos(m->method);
     }
   }
+  return 0;
+}
+
+static const Expr* SynthDefaultExtendsArgs(const ClassTypeInfo* base,
+                                           const ClassDecl* child_decl,
+                                           const Expr* new_expr, Arena& arena) {
+  size_t default_pos = FindChildNewDefaultPos(child_decl);
 
   size_t base_argc = 0;
   auto base_it = base->methods.find("new");

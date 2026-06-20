@@ -310,7 +310,7 @@ static Logic4Vec ResizeNarrowKnown(const Logic4Vec& val, uint32_t target_width,
 // signed and being widened past its original width.
 static void SignExtendWideResult(const Logic4Vec& val, uint32_t target_width,
                                  Logic4Vec& result) {
-  if (!(val.is_signed && target_width > val.width && val.width > 0)) return;
+  if (!val.is_signed || target_width <= val.width || val.width == 0) return;
   uint32_t msb_idx = (val.width - 1) / 64;
   uint64_t msb_mask = uint64_t{1} << ((val.width - 1) % 64);
   uint64_t a_fill = (val.words[msb_idx].aval & msb_mask) ? ~uint64_t{0} : 0;

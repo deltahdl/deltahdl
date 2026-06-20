@@ -675,7 +675,7 @@ static void UnregisterTaskNamedScope(const ModuleItem* func, SimContext& ctx) {
 }
 
 // Outcome of a kDisable bubbling out of a named-task body statement.
-enum class InlineTaskDisable {
+enum class InlineTaskDisable : std::uint8_t {
   kStopHere,   // the disable targeted this task; stop running its body.
   kPropagate,  // the disable targets an outer scope; unwind out of the task.
 };

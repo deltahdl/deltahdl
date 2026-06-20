@@ -107,7 +107,7 @@ struct LoadContext {
 
 // Parses one record's source into the target compilation unit, tagging cells
 // with the record's library name. Returns false on parse failure.
-bool LoadRecord(const std::filesystem::path& path, std::string library,
+bool LoadRecord(const std::filesystem::path& path, const std::string& library,
                 std::string source, LoadContext& ctx) {
   uint32_t fid = ctx.mgr.AddFile(path.string(), std::move(source));
   Lexer lex(ctx.mgr.FileContent(fid), fid, ctx.diag);

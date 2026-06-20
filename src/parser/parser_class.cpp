@@ -608,6 +608,11 @@ ClassMember* Parser::ParseConstraintStub(ClassMember* member) {
   // specified on a randc variable.
   bool in_soft = false;
   while (depth > 0 && !AtEnd()) {
+    // Every structural token below re-enters the loop with the qualifier flag
+    // cleared, so clear it once up front and remember its carried-in value for
+    // the leaf-token tail (which alone consults the previous leaf's qualifier).
+    bool carried_qualifier = prev_was_qualifier;
+    prev_was_qualifier = false;
     switch (CurrentToken().kind) {
       case TokenKind::kKwForeach:
         // 18.5.7.1: a foreach iterative constraint heads its constraint_set
@@ -616,7 +621,6 @@ ClassMember* Parser::ParseConstraintStub(ClassMember* member) {
         // member for the elaborator's dimension check before the surrounding
         // scan resumes over the constraint_set body.
         CheckForeachConstraintHeader(member);
-        prev_was_qualifier = false;
         continue;
       case TokenKind::kKwSolve:
         // 18.5.9: 'solve solve_before_list before solve_before_list ;' defines
@@ -626,7 +630,6 @@ ClassMember* Parser::ParseConstraintStub(ClassMember* member) {
         // consumed through its terminating ';' before the surrounding scan
         // resumes.
         CheckSolveBeforeConstraint(member);
-        prev_was_qualifier = false;
         continue;
       case TokenKind::kKwSoft:
         // 18.5.13.1: 'soft' introduces a soft constraint ('soft
@@ -634,24 +637,20 @@ ClassMember* Parser::ParseConstraintStub(ClassMember* member) {
         // expression names; the collection ends at the terminating ';'.
         Consume();
         in_soft = true;
-        prev_was_qualifier = false;
         continue;
       case TokenKind::kKwDist:
         // 18.5.3: 'expression dist { dist_list }'. Hand the brace-enclosed
         // dist_list to a dedicated scan so its default-item rules are enforced.
         Consume();
         CheckDistSet();
-        prev_was_qualifier = false;
         continue;
       case TokenKind::kLBrace:
         Consume();
         ++depth;
-        prev_was_qualifier = false;
         continue;
       case TokenKind::kRBrace:
         Consume();
         --depth;
-        prev_was_qualifier = false;
         continue;
       default:
         break;
@@ -662,10 +661,12 @@ ClassMember* Parser::ParseConstraintStub(ClassMember* member) {
     // 18.5.11/18.5.13.1: with the leaf token consumed, look at the next token
     // to recognize an unqualified call ('identifier (') and a bare local
     // variable named in a soft constraint, then record them on the member.
-    ConstraintTokenContext ctx{prev_was_qualifier, Check(TokenKind::kLParen),
+    RecordConstraintTokenRefs(
+        member, t,
+        ConstraintTokenContext{carried_qualifier, Check(TokenKind::kLParen),
                                Check(TokenKind::kDot),
-                               Check(TokenKind::kColonColon)};
-    RecordConstraintTokenRefs(member, t, ctx, in_soft);
+                               Check(TokenKind::kColonColon)},
+        in_soft);
     prev_was_qualifier =
         t.kind == TokenKind::kDot || t.kind == TokenKind::kColonColon;
   }

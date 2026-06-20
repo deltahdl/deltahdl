@@ -725,13 +725,10 @@ void CollectNestedModulesAndCheckVif(
   }
 }
 
-// Records task and function declaration names, defaults their lifetime from the
-// enclosing decl (§6.21), and collects the automatic ones. Mutates the three
-// member tables passed by reference.
-void ClassifyTaskFuncDecls(
+// Records task names and indexes function declarations by name.
+void RecordTaskFuncNames(
     const ModuleDecl* decl, std::unordered_set<std::string_view>& task_names,
-    std::unordered_map<std::string_view, const ModuleItem*>& func_decls,
-    std::unordered_set<std::string_view>& auto_task_func_names) {
+    std::unordered_map<std::string_view, const ModuleItem*>& func_decls) {
   for (const auto* item : decl->items) {
     if (item->kind == ModuleItemKind::kTaskDecl) {
       task_names.insert(item->name);
@@ -740,6 +737,11 @@ void ClassifyTaskFuncDecls(
       func_decls[item->name] = item;
     }
   }
+}
+
+// §6.21: a task/function with no explicit lifetime inherits the enclosing
+// decl's lifetime (automatic if the decl is automatic, otherwise static).
+void DefaultTaskFuncLifetimes(const ModuleDecl* decl) {
   for (auto* item : decl->items) {
     if ((item->kind == ModuleItemKind::kFunctionDecl ||
          item->kind == ModuleItemKind::kTaskDecl) &&
@@ -751,6 +753,12 @@ void ClassifyTaskFuncDecls(
       }
     }
   }
+}
+
+// Collects the names of the automatic-lifetime tasks and functions.
+void CollectAutoTaskFuncNames(
+    const ModuleDecl* decl,
+    std::unordered_set<std::string_view>& auto_task_func_names) {
   for (const auto* item : decl->items) {
     if ((item->kind == ModuleItemKind::kTaskDecl ||
          item->kind == ModuleItemKind::kFunctionDecl) &&
@@ -758,6 +766,18 @@ void ClassifyTaskFuncDecls(
       auto_task_func_names.insert(item->name);
     }
   }
+}
+
+// Records task and function declaration names, defaults their lifetime from the
+// enclosing decl (§6.21), and collects the automatic ones. Mutates the three
+// member tables passed by reference.
+void ClassifyTaskFuncDecls(
+    const ModuleDecl* decl, std::unordered_set<std::string_view>& task_names,
+    std::unordered_map<std::string_view, const ModuleItem*>& func_decls,
+    std::unordered_set<std::string_view>& auto_task_func_names) {
+  RecordTaskFuncNames(decl, task_names, func_decls);
+  DefaultTaskFuncLifetimes(decl);
+  CollectAutoTaskFuncNames(decl, auto_task_func_names);
 }
 
 }  // namespace

@@ -573,7 +573,7 @@ static Logic4Vec BuildLeftAlignedStream(const Logic4Vec& rhs_val,
 
 // Write `value` into `var`, coercing to 2-state if needed and notifying.
 static void StoreStreamValueToVar(Variable* var, Logic4Vec value) {
-  var->value = std::move(value);
+  var->value = value;
   if (!var->is_4state) CoerceTo2State(var->value);
   var->NotifyWatchers();
 }

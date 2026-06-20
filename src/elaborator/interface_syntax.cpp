@@ -24,8 +24,8 @@ bool ArrayedInterfaceDefparamIsLegal(bool instance_has_arrayed_interface_actual,
                                      DefparamReach reach) {
   // The restriction only bites for an instance whose port actuals refer to an
   // arrayed interface; there, the defparam must stay within the instance.
-  return !(instance_has_arrayed_interface_actual &&
-           reach == DefparamReach::kOutsideInstance);
+  return !instance_has_arrayed_interface_actual ||
+         reach != DefparamReach::kOutsideInstance;
 }
 
 }  // namespace delta

@@ -4,6 +4,19 @@
 
 namespace delta {
 
+namespace {
+
+// Record the leading instance dimension of `item` as its instance range. This
+// is pure AST manipulation over an already-parsed instance, so it lives outside
+// the parser proper to keep ParseModuleInstList readable.
+void RecordInstRange(ModuleItem* item) {
+  if (item->inst_dims.empty()) return;
+  item->inst_range_left = item->inst_dims[0].first;
+  item->inst_range_right = item->inst_dims[0].second;
+}
+
+}  // namespace
+
 ModuleItem* Parser::ParseModuleInst(const Token& module_tok) {
   return ParseModuleInstList(module_tok, nullptr);
 }
@@ -24,30 +37,30 @@ ModuleItem* Parser::ParseModuleInstList(const Token& module_tok,
     item->inst_dims.push_back({left, right});
   };
 
+  // Parse the instance dimensions `( [ expr ( : expr )? ] )*` into `item`.
   auto parse_inst_dims = [&](ModuleItem* item) {
     while (Check(TokenKind::kLBracket)) parse_one_dim(item);
-    if (item->inst_dims.empty()) return;
-    item->inst_range_left = item->inst_dims[0].first;
-    item->inst_range_right = item->inst_dims[0].second;
   };
 
   // Parse one trailing port connection, diagnosing a named/ordered mix once.
   auto parse_next_port = [&](ModuleItem* item, bool named, bool& mixed) {
     auto conn_loc = CurrentLoc();
     bool next_named = ParsePortConnection(item);
-    if (mixed || next_named == named) return;
-    diag_.Error(conn_loc, "ordered and named port connections cannot be mixed");
-    mixed = true;
+    bool inconsistent = !mixed && next_named != named;
+    if (inconsistent) {
+      diag_.Error(conn_loc,
+                  "ordered and named port connections cannot be mixed");
+      mixed = true;
+    }
   };
 
+  // Parse the parenthesized port connection list into `item`.
   auto parse_inst_port_list = [&](ModuleItem* item) {
     Expect(TokenKind::kLParen);
-    if (!Check(TokenKind::kRParen)) {
-      bool named = ParsePortConnection(item);
-      bool mixed = false;
-      while (Match(TokenKind::kComma)) parse_next_port(item, named, mixed);
-    }
-    Expect(TokenKind::kRParen);
+    if (Check(TokenKind::kRParen)) return;
+    bool named = ParsePortConnection(item);
+    bool mixed = false;
+    while (Match(TokenKind::kComma)) parse_next_port(item, named, mixed);
   };
 
   auto parse_one_instance = [&]() -> ModuleItem* {
@@ -58,20 +71,19 @@ ModuleItem* Parser::ParseModuleInstList(const Token& module_tok,
     item->inst_params = params;
     item->inst_name = Expect(TokenKind::kIdentifier).text;
     parse_inst_dims(item);
+    RecordInstRange(item);
     parse_inst_port_list(item);
+    Expect(TokenKind::kRParen);
     return item;
   };
 
-  auto collect_instance = [&]() {
-    auto* item = parse_one_instance();
-    if (extra_items) extra_items->push_back(item);
-    return item;
-  };
-
-  auto* first = collect_instance();
-  while (Match(TokenKind::kComma)) collect_instance();
+  std::vector<ModuleItem*> instances;
+  instances.push_back(parse_one_instance());
+  while (Match(TokenKind::kComma)) instances.push_back(parse_one_instance());
   Expect(TokenKind::kSemicolon);
-  return first;
+  if (extra_items)
+    extra_items->insert(extra_items->end(), instances.begin(), instances.end());
+  return instances.front();
 }
 
 void Parser::ParseParenList(std::vector<Expr*>& out) {

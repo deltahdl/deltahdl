@@ -26,7 +26,6 @@ bool IsSequenceUsageLegal(SequenceUsageContext ctx, SequenceMatchClass m) {
       // §16.12.22(a): must be nondegenerate AND not admit any empty match.
       // A nondegenerate sequence that happens to admit an empty match in
       // addition to nonempty ones is therefore illegal here.
-      return IsNondegenerate(m);
     case SequenceUsageContext::kOverlappingImplicationAntecedent:
       // §16.12.22(b): nondegenerate.
       return IsNondegenerate(m);

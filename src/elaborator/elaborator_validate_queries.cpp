@@ -498,11 +498,11 @@ void Elaborator::ValidateBitsCallRestrictions(const ModuleDecl* decl) {
   }
   if (dyn_types.empty() && dyn_funcs.empty() && iface_vars.empty()) return;
 
-  const BitsDynamicNames names{dyn_types, dyn_funcs, iface_vars};
+  const BitsDynamicNames kNames{dyn_types, dyn_funcs, iface_vars};
   for (const auto* item : decl->items) {
-    if (item->body) CheckBitsCallStmt(item->body, names, diag_);
-    for (auto* s : item->func_body_stmts) CheckBitsCallStmt(s, names, diag_);
-    CheckBitsCallExpr(item->init_expr, names, diag_);
+    if (item->body) CheckBitsCallStmt(item->body, kNames, diag_);
+    for (auto* s : item->func_body_stmts) CheckBitsCallStmt(s, kNames, diag_);
+    CheckBitsCallExpr(item->init_expr, kNames, diag_);
   }
 }
 

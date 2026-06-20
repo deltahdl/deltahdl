@@ -309,7 +309,7 @@ static void CheckNewOnUnconstructibleHandle(
     const std::unordered_map<std::string_view, std::string_view>&
         class_var_types,
     const CompilationUnit* unit, DiagEngine& diag) {
-  if (!(s->rhs && s->rhs->kind == ExprKind::kCall && s->rhs->text == "new")) {
+  if (!s->rhs || s->rhs->kind != ExprKind::kCall || s->rhs->text != "new") {
     return;
   }
   auto lhs_name = ExprIdent(s->lhs);

@@ -487,6 +487,42 @@ std::string Preprocessor::ProcessSource(std::string_view src, uint32_t file_id,
   uint32_t line_num = 0;
   size_t pos = 0;
 
+  // Conditionally expand a fragment (22.5.1 inline conditionals + macros),
+  // track any design element it introduces, then emit it.
+  auto expand_and_emit = [&](std::string_view fragment) {
+    auto conditioned = ExpandInlineConditionals(std::string(fragment));
+    auto expanded = ExpandInlineMacros(conditioned, file_id, line_num);
+    TrackDesignElement(Trim(expanded));
+    output.append(expanded);
+  };
+
+  // Run a fragment through ProcessDirective; if it was not a directive, emit
+  // it as ordinary text with full expansion.
+  auto emit_directive_or_text = [&](std::string_view fragment) {
+    if (!ProcessDirective(fragment, file_id, line_num, depth, output))
+      expand_and_emit(fragment);
+  };
+
+  // Handle a non-directive line while the conditional stack is active (22.2):
+  // a directive may appear at the start, mid-line after a language element, or
+  // the whole line may be ordinary text.
+  auto process_active_line = [&](std::string_view line) {
+    auto stripped = StripComments(std::string(line), in_block_comment_);
+    size_t dir_pos = FindDirectiveInStripped(stripped);
+    if (dir_pos != std::string_view::npos) {
+      if (dir_pos > 0) output.append(stripped, 0, dir_pos);
+      emit_directive_or_text(std::string_view(stripped).substr(dir_pos));
+      return;
+    }
+    size_t mid = FindMidLineDirective(stripped);
+    if (mid != std::string_view::npos) {
+      expand_and_emit(std::string_view(stripped).substr(0, mid));
+      emit_directive_or_text(std::string_view(stripped).substr(mid));
+      return;
+    }
+    expand_and_emit(stripped);
+  };
+
   while (pos < src.size()) {
     size_t eol = src.find('\n', pos);
     if (eol == std::string_view::npos) eol = src.size();
@@ -511,39 +547,7 @@ std::string Preprocessor::ProcessSource(std::string_view src, uint32_t file_id,
 
     bool handled = ProcessDirective(line, file_id, line_num, depth, output);
     if (!handled && IsActive()) {
-      auto stripped = StripComments(std::string(line), in_block_comment_);
-      size_t dir_pos = FindDirectiveInStripped(stripped);
-      if (dir_pos != std::string_view::npos) {
-        if (dir_pos > 0) output.append(stripped, 0, dir_pos);
-        auto dir_text = std::string_view(stripped).substr(dir_pos);
-        if (!ProcessDirective(dir_text, file_id, line_num, depth, output)) {
-          auto conditioned = ExpandInlineConditionals(std::string(dir_text));
-          auto expanded = ExpandInlineMacros(conditioned, file_id, line_num);
-          TrackDesignElement(Trim(expanded));
-          output.append(expanded);
-        }
-      } else if (size_t mid = FindMidLineDirective(stripped);
-                 mid != std::string_view::npos) {
-        // A language element precedes a directive on this line (22.2): emit the
-        // element with full expansion, then let the directive take effect.
-        auto prefix = std::string_view(stripped).substr(0, mid);
-        auto pre_cond = ExpandInlineConditionals(std::string(prefix));
-        auto pre_expanded = ExpandInlineMacros(pre_cond, file_id, line_num);
-        TrackDesignElement(Trim(pre_expanded));
-        output.append(pre_expanded);
-        auto dir_text = std::string_view(stripped).substr(mid);
-        if (!ProcessDirective(dir_text, file_id, line_num, depth, output)) {
-          auto cond = ExpandInlineConditionals(std::string(dir_text));
-          auto expanded = ExpandInlineMacros(cond, file_id, line_num);
-          TrackDesignElement(Trim(expanded));
-          output.append(expanded);
-        }
-      } else {
-        auto conditioned = ExpandInlineConditionals(stripped);
-        auto expanded = ExpandInlineMacros(conditioned, file_id, line_num);
-        TrackDesignElement(Trim(expanded));
-        output.append(expanded);
-      }
+      process_active_line(line);
     } else if (!handled) {
       // Inside an ignored block_of_text nothing is emitted, but a block
       // comment may open on this line. Track that state so a directive that

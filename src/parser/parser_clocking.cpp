@@ -2,6 +2,39 @@
 
 namespace delta {
 
+namespace {
+
+// §14.4: the input/output skews parsed for one clocking_item, together with the
+// resolved port direction. Bundled so the per-signal builder stays under the
+// parameter limit. The output skew fields are only meaningful when the
+// direction is not output-only.
+struct ClockingItemSkew {
+  Direction direction = Direction::kNone;
+  Edge in_edge = Edge::kNone;
+  Expr* in_delay = nullptr;
+  Edge out_edge = Edge::kNone;
+  Expr* out_delay = nullptr;
+};
+
+// Builds a single clocking signal declaration from the resolved direction/skew
+// and the parsed signal name plus optional hierarchical expression.
+ClockingSignalDecl MakeClockingSignal(const ClockingItemSkew& skew,
+                                      std::string_view name, Expr* hier_expr) {
+  ClockingSignalDecl sig;
+  sig.direction = skew.direction;
+  sig.skew_edge = skew.in_edge;
+  sig.skew_delay = skew.in_delay;
+  if (skew.direction != Direction::kOutput) {
+    sig.out_skew_edge = skew.out_edge;
+    sig.out_skew_delay = skew.out_delay;
+  }
+  sig.name = name;
+  sig.hier_expr = hier_expr;
+  return sig;
+}
+
+}  // namespace
+
 void Parser::ParseClockingSkew(Edge& edge, Expr*& delay) {
   edge = Edge::kNone;
   delay = nullptr;
@@ -162,28 +195,15 @@ void Parser::ParseClockingItem(ModuleItem* item) {
     return;
   }
 
-  Edge in_edge = Edge::kNone;
-  Expr* in_delay = nullptr;
-  Edge out_edge = Edge::kNone;
-  Expr* out_delay = nullptr;
-  Direction dir =
-      ParseClockingDirection(in_edge, in_delay, out_edge, out_delay);
-  if (dir == Direction::kNone) return;
+  ClockingItemSkew skew;
+  skew.direction = ParseClockingDirection(skew.in_edge, skew.in_delay,
+                                          skew.out_edge, skew.out_delay);
+  if (skew.direction == Direction::kNone) return;
 
   do {
-    ClockingSignalDecl sig;
-    sig.direction = dir;
-    sig.skew_edge = in_edge;
-    sig.skew_delay = in_delay;
-    if (dir != Direction::kOutput) {
-      sig.out_skew_edge = out_edge;
-      sig.out_skew_delay = out_delay;
-    }
-    sig.name = ExpectIdentifier().text;
-    if (Match(TokenKind::kEq)) {
-      sig.hier_expr = ParseExpr();
-    }
-    item->clocking_signals.push_back(sig);
+    std::string_view name = ExpectIdentifier().text;
+    Expr* hier_expr = Match(TokenKind::kEq) ? ParseExpr() : nullptr;
+    item->clocking_signals.push_back(MakeClockingSignal(skew, name, hier_expr));
   } while (Match(TokenKind::kComma));
 
   Expect(TokenKind::kSemicolon);

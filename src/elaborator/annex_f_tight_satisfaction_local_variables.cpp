@@ -257,17 +257,17 @@ std::vector<LocalContext> OutputsForIntersect(const Word& word, std::size_t lo,
   const std::set<std::string> kBlocked = BlockLocals(seq);
   const std::set<std::string> kSampleLhs = SampleLocals(*seq.lhs);
   const std::set<std::string> kSampleRhs = SampleLocals(*seq.rhs);
-  const std::set<std::string> d_lhs =
+  const std::set<std::string> kDLhs =
       IntersectOutputDomain(kInDomain, *seq.lhs, kBlocked, kSampleRhs);
-  const std::set<std::string> d_rhs =
+  const std::set<std::string> kDRhs =
       IntersectOutputDomain(kInDomain, *seq.rhs, kBlocked, kSampleLhs);
   for (const LocalContext& lhs_ctx :
        OutputsForSlice(word, lo, hi, *seq.lhs, input)) {
     for (const LocalContext& rhs_ctx :
          OutputsForSlice(word, lo, hi, *seq.rhs, input)) {
       LocalContext merged;
-      if (MergeContexts(RestrictContext(lhs_ctx, d_lhs),
-                        RestrictContext(rhs_ctx, d_rhs), merged)) {
+      if (MergeContexts(RestrictContext(lhs_ctx, kDLhs),
+                        RestrictContext(rhs_ctx, kDRhs), merged)) {
         AddUnique(result, std::move(merged));
       }
     }

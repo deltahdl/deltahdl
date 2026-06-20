@@ -178,8 +178,8 @@ static std::string StripQuotes(std::string_view s) {
 // when the init_expr was a new[] constructor (handled here).
 static bool LowerDynArrayNewInit(const Expr* init_expr, QueueObject* q,
                                  SimContext& ctx, Arena& arena) {
-  if (!(init_expr->kind == ExprKind::kCall && init_expr->text == "new" &&
-        !init_expr->args.empty()))
+  if (init_expr->kind != ExprKind::kCall || init_expr->text != "new" ||
+      init_expr->args.empty())
     return false;
 
   auto sz_val = EvalExpr(init_expr->args[0], ctx, arena);

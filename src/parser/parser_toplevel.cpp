@@ -119,9 +119,6 @@ static void ValidateGateTerminalLvalues(GateKind kind,
   switch (kind) {
     case GateKind::kTran:
     case GateKind::kRtran:
-
-      ValidateInoutNetLvalues(terms, diag, loc);
-      break;
     case GateKind::kTranif0:
     case GateKind::kTranif1:
     case GateKind::kRtranif0:

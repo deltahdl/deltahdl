@@ -61,6 +61,48 @@ void Parser::ParseSpecparamDecl(std::vector<ModuleItem*>& items) {
 }
 
 void Parser::ParseSpecifyItem(std::vector<SpecifyItem*>& items) {
+  // Recover from a malformed specify item by skipping tokens up to (and
+  // including) the terminating semicolon, without crossing the block end.
+  auto skip_to_item_end = [&]() {
+    while (!AtEnd() && !Check(TokenKind::kSemicolon) &&
+           !Check(TokenKind::kKwEndspecify) &&
+           !Check(TokenKind::kKwEndmodule)) {
+      Consume();
+    }
+    if (Check(TokenKind::kSemicolon)) Consume();
+  };
+
+  // Handle a system identifier: either a timing check or an erroneous system
+  // task. Returns false if the leading token is not a system identifier.
+  auto parse_system_item = [&]() {
+    if (!Check(TokenKind::kSystemIdentifier)) return false;
+    if (IsTimingCheckName(CurrentToken().text)) {
+      items.push_back(ParseTimingCheck());
+      return true;
+    }
+    diag_.Error(CurrentLoc(), "system task cannot appear in specify block");
+    skip_to_item_end();
+    return true;
+  };
+
+  // Handle an 'if' or 'ifnone' module path declaration. Returns false if the
+  // leading token is neither keyword.
+  auto parse_conditional_item = [&]() {
+    if (Check(TokenKind::kKwIfnone)) {
+      items.push_back(ParseIfnonePathDecl());
+      return true;
+    }
+    if (Check(TokenKind::kKwIf)) {
+      Consume();
+      Expect(TokenKind::kLParen);
+      auto* cond = ParseExpr();
+      Expect(TokenKind::kRParen);
+      items.push_back(ParseConditionalPathDecl(cond));
+      return true;
+    }
+    return false;
+  };
+
   if (Check(TokenKind::kKwPulsestyleOnevent) ||
       Check(TokenKind::kKwPulsestyleOndetect)) {
     items.push_back(ParsePulsestyleDecl());
@@ -78,35 +120,9 @@ void Parser::ParseSpecifyItem(std::vector<SpecifyItem*>& items) {
     return;
   }
 
-  if (Check(TokenKind::kSystemIdentifier)) {
-    auto name = CurrentToken().text;
-    if (IsTimingCheckName(name)) {
-      items.push_back(ParseTimingCheck());
-      return;
-    }
-    diag_.Error(CurrentLoc(), "system task cannot appear in specify block");
-    while (!AtEnd() && !Check(TokenKind::kSemicolon) &&
-           !Check(TokenKind::kKwEndspecify) &&
-           !Check(TokenKind::kKwEndmodule)) {
-      Consume();
-    }
-    if (Check(TokenKind::kSemicolon)) Consume();
-    return;
-  }
+  if (parse_system_item()) return;
 
-  if (Check(TokenKind::kKwIfnone)) {
-    items.push_back(ParseIfnonePathDecl());
-    return;
-  }
-
-  if (Check(TokenKind::kKwIf)) {
-    Consume();
-    Expect(TokenKind::kLParen);
-    auto* cond = ParseExpr();
-    Expect(TokenKind::kRParen);
-    items.push_back(ParseConditionalPathDecl(cond));
-    return;
-  }
+  if (parse_conditional_item()) return;
 
   if (Check(TokenKind::kLParen)) {
     items.push_back(ParseSpecifyPathDecl());
@@ -114,11 +130,7 @@ void Parser::ParseSpecifyItem(std::vector<SpecifyItem*>& items) {
   }
 
   diag_.Error(CurrentLoc(), "unexpected token in specify block");
-  while (!AtEnd() && !Check(TokenKind::kSemicolon) &&
-         !Check(TokenKind::kKwEndspecify) && !Check(TokenKind::kKwEndmodule)) {
-    Consume();
-  }
-  if (Check(TokenKind::kSemicolon)) Consume();
+  skip_to_item_end();
 }
 
 static bool IsZorX(char c) {
@@ -320,29 +332,24 @@ SpecifyItem* Parser::ParseSpecifyPathDecl() {
   item->kind = SpecifyItemKind::kPathDecl;
   item->loc = CurrentLoc();
 
-  Expect(TokenKind::kLParen);
-  item->path.edge = ParseSpecifyEdge();
-  ParsePathPorts(item->path.src_ports);
-
-  item->path.polarity = ParseSpecifyPolarity();
-
-  bool polarity_eq_gt_handled = false;
-  if (item->path.polarity == SpecifyPolarity::kNone &&
-      (Check(TokenKind::kPlusEq) || Check(TokenKind::kMinusEq))) {
-    auto saved = lexer_.SavePos();
-    bool is_plus = Check(TokenKind::kPlusEq);
-    Consume();
-    if (Match(TokenKind::kGt)) {
-      item->path.polarity =
-          is_plus ? SpecifyPolarity::kPositive : SpecifyPolarity::kNegative;
-      item->path.path_kind = SpecifyPathKind::kParallel;
-      polarity_eq_gt_handled = true;
-    } else {
+  // Consume the path operator that separates source and destination terminals,
+  // handling the polarity-prefixed '+=>'/'-=>' spelling whose polarity is
+  // lexed as a single '+='/'-=' token followed by '>'.
+  auto parse_path_operator = [&]() {
+    if (item->path.polarity == SpecifyPolarity::kNone &&
+        (Check(TokenKind::kPlusEq) || Check(TokenKind::kMinusEq))) {
+      auto saved = lexer_.SavePos();
+      bool is_plus = Check(TokenKind::kPlusEq);
+      Consume();
+      if (Match(TokenKind::kGt)) {
+        item->path.polarity =
+            is_plus ? SpecifyPolarity::kPositive : SpecifyPolarity::kNegative;
+        item->path.path_kind = SpecifyPathKind::kParallel;
+        return;
+      }
       lexer_.RestorePos(saved);
     }
-  }
 
-  if (!polarity_eq_gt_handled) {
     if (Match(TokenKind::kEqGt)) {
       item->path.path_kind = SpecifyPathKind::kParallel;
     } else if (Match(TokenKind::kStarGt)) {
@@ -350,17 +357,29 @@ SpecifyItem* Parser::ParseSpecifyPathDecl() {
     } else {
       Consume();
     }
-  }
+  };
 
-  if (Match(TokenKind::kLParen)) {
-    ParsePathPorts(item->path.dst_ports);
-    item->path.dst_polarity = ParseSpecifyPolarity();
-    Expect(TokenKind::kColon);
-    item->path.data_source = ParseExpr();
-    Expect(TokenKind::kRParen);
-  } else {
-    ParsePathPorts(item->path.dst_ports);
-  }
+  // Parse the destination terminal descriptor, which is parenthesized only when
+  // it carries a destination polarity and data-source expression.
+  auto parse_destination = [&]() {
+    if (Match(TokenKind::kLParen)) {
+      ParsePathPorts(item->path.dst_ports);
+      item->path.dst_polarity = ParseSpecifyPolarity();
+      Expect(TokenKind::kColon);
+      item->path.data_source = ParseExpr();
+      Expect(TokenKind::kRParen);
+    } else {
+      ParsePathPorts(item->path.dst_ports);
+    }
+  };
+
+  Expect(TokenKind::kLParen);
+  item->path.edge = ParseSpecifyEdge();
+  ParsePathPorts(item->path.src_ports);
+
+  item->path.polarity = ParseSpecifyPolarity();
+  parse_path_operator();
+  parse_destination();
 
   Expect(TokenKind::kRParen);
   Expect(TokenKind::kEq);

@@ -329,7 +329,7 @@ void svGetLogicElem(svLogicVecVal* d, svOpenArrayHandle s, const int* idx,
   int words = 0;
   void* base = svElemBase(s, idx, n, sizeof(svLogicVecVal), &words);
   if (base == nullptr) return;
-  const svLogicVecVal* src = static_cast<const svLogicVecVal*>(base);
+  const auto* src = static_cast<const svLogicVecVal*>(base);
   for (int w = 0; w < words; ++w) d[w] = src[w];
 }
 

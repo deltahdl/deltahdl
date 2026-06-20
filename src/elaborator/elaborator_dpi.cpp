@@ -382,6 +382,25 @@ void CheckDpiVersionStringAgreement(
   }
 }
 
+// §35.4: validate one DPI declaration (import or export) against the global
+// linkage-name namespace. Export declarations additionally run the full
+// per-scope export battery via ValidateExportDeclaration; every DPI
+// declaration, import or export, contributes to the shared version-string
+// agreement check.
+void ProcessDpiGlobalNameItem(
+    const ModuleItem* item, ExportScopeContext& scope,
+    std::unordered_map<std::string_view, DpiExportSignature>& export_signatures,
+    std::unordered_map<std::string_view, std::string_view>& link_version,
+    DiagEngine& diag) {
+  auto link_name = DpiLinkageName(item);
+
+  if (item->kind == ModuleItemKind::kDpiExport) {
+    ValidateExportDeclaration(item, link_name, scope, export_signatures, diag);
+  }
+
+  CheckDpiVersionStringAgreement(item, link_name, link_version, diag);
+}
+
 }  // namespace
 
 void Elaborator::ValidateDpiDeclarations() {
@@ -442,23 +461,17 @@ void Elaborator::ValidateDpiGlobalNameSpace() {
     // Tracking SV function names per scope catches that case directly.
     std::unordered_set<std::string_view> exported_sv_func_in_scope;
 
+    ExportScopeContext scope{sv_callables, export_link_in_scope,
+                             exported_sv_func_in_scope};
+
     for (const auto* item : mod->items) {
       if (item == nullptr) continue;
       if (item->kind != ModuleItemKind::kDpiImport &&
           item->kind != ModuleItemKind::kDpiExport) {
         continue;
       }
-
-      auto link_name = DpiLinkageName(item);
-
-      if (item->kind == ModuleItemKind::kDpiExport) {
-        ExportScopeContext scope{sv_callables, export_link_in_scope,
-                                 exported_sv_func_in_scope};
-        ValidateExportDeclaration(item, link_name, scope, export_signatures,
-                                  diag_);
-      }
-
-      CheckDpiVersionStringAgreement(item, link_name, link_version, diag_);
+      ProcessDpiGlobalNameItem(item, scope, export_signatures, link_version,
+                               diag_);
     }
   }
 }

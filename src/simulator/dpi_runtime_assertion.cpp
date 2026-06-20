@@ -336,16 +336,16 @@ bool AssertionApi::SysControl(int control, std::string_view scope) {
   // regardless of scope.
   last_control_global_ = scope.empty();
 
-  const SysControlState state{attempts_in_progress_,
-                              started_,
-                              ended_,
-                              fail_action_enabled_,
-                              vacuous_action_enabled_,
-                              nonvacuous_action_enabled_};
+  const SysControlState kState{attempts_in_progress_,
+                               started_,
+                               ended_,
+                               fail_action_enabled_,
+                               vacuous_action_enabled_,
+                               nonvacuous_action_enabled_};
 
   switch (control) {
     case vpiAssertionSysReset:
-      ApplySysReset(state, callbacks_);
+      ApplySysReset(kState, callbacks_);
       // §39.5.3: discarding all attempts in progress also flushes the
       // not-yet-matured deferred/procedural-concurrent instances of every
       // assertion.
@@ -356,7 +356,7 @@ bool AssertionApi::SysControl(int control, std::string_view scope) {
       started_ = false;
       return true;
     case vpiAssertionSysKill:
-      ApplySysKill(state);
+      ApplySysKill(kState);
       // §39.5.3: the discarded attempts' pending deferred/procedural-concurrent
       // instances are flushed along with them.
       FlushAllPendingAssertionReports();
@@ -372,7 +372,7 @@ bool AssertionApi::SysControl(int control, std::string_view scope) {
       started_ = true;
       return true;
     case vpiAssertionSysEnd:
-      ApplySysEnd(state, callbacks_);
+      ApplySysEnd(kState, callbacks_);
       // §39.5.3: discarding all attempts in progress also flushes their pending
       // deferred/procedural-concurrent instances.
       FlushAllPendingAssertionReports();
