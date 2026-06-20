@@ -351,7 +351,7 @@ TEST(WiredLogicAmbig, AndPairwiseAcrossStrengthRanges) {
   b.s1_lo = Strength::kLarge;
   b.s1_hi = Strength::kPull;
 
-  auto r = CombineWiredLogicAmbiguous(a, b, WiredLogicKind::kAnd);
+  auto r = CombineWiredLogicAmbiguous(a, b, ModelWiredLogicKind::kAnd);
 
   EXPECT_EQ(r.s0_lo, Strength::kPull);
   EXPECT_EQ(r.s0_hi, Strength::kStrong);
@@ -367,7 +367,7 @@ TEST(WiredLogicAmbig, OrPairwiseAcrossStrengthRanges) {
   b.s1_lo = Strength::kLarge;
   b.s1_hi = Strength::kPull;
 
-  auto r = CombineWiredLogicAmbiguous(a, b, WiredLogicKind::kOr);
+  auto r = CombineWiredLogicAmbiguous(a, b, ModelWiredLogicKind::kOr);
 
   EXPECT_EQ(r.s0_lo, Strength::kPull);
   EXPECT_EQ(r.s0_hi, Strength::kStrong);
@@ -383,8 +383,8 @@ TEST(WiredLogicAmbig, LikeValuesKeepSingleSideUnionedRange) {
   b.s1_lo = Strength::kLarge;
   b.s1_hi = Strength::kStrong;
 
-  auto r_and = CombineWiredLogicAmbiguous(a, b, WiredLogicKind::kAnd);
-  auto r_or = CombineWiredLogicAmbiguous(a, b, WiredLogicKind::kOr);
+  auto r_and = CombineWiredLogicAmbiguous(a, b, ModelWiredLogicKind::kAnd);
+  auto r_or = CombineWiredLogicAmbiguous(a, b, ModelWiredLogicKind::kOr);
 
   EXPECT_EQ(r_and.s0_hi, Strength::kHighz);
   EXPECT_EQ(r_and.s1_lo, Strength::kLarge);
@@ -402,8 +402,8 @@ TEST(WiredLogicAmbig, UnambigInputsAgreeWithPerPairRule) {
   b.s1_lo = Strength::kStrong;
   b.s1_hi = Strength::kStrong;
 
-  auto r_and = CombineWiredLogicAmbiguous(a, b, WiredLogicKind::kAnd);
-  auto r_or = CombineWiredLogicAmbiguous(a, b, WiredLogicKind::kOr);
+  auto r_and = CombineWiredLogicAmbiguous(a, b, ModelWiredLogicKind::kAnd);
+  auto r_or = CombineWiredLogicAmbiguous(a, b, ModelWiredLogicKind::kOr);
 
   EXPECT_EQ(r_and.s0_lo, Strength::kStrong);
   EXPECT_EQ(r_and.s0_hi, Strength::kStrong);
@@ -423,7 +423,7 @@ TEST(WiredLogicAmbig, AndProducesDualSidedRange) {
   b.s1_lo = Strength::kPull;
   b.s1_hi = Strength::kPull;
 
-  auto r = CombineWiredLogicAmbiguous(a, b, WiredLogicKind::kAnd);
+  auto r = CombineWiredLogicAmbiguous(a, b, ModelWiredLogicKind::kAnd);
 
   EXPECT_EQ(r.s0_lo, Strength::kPull);
   EXPECT_EQ(r.s0_hi, Strength::kPull);
@@ -438,7 +438,7 @@ TEST(WiredLogicAmbig, EmptyInputProducesEmptyRange) {
   b.s0_lo = Strength::kPull;
   b.s0_hi = Strength::kPull;
 
-  auto r = CombineWiredLogicAmbiguous(a, b, WiredLogicKind::kAnd);
+  auto r = CombineWiredLogicAmbiguous(a, b, ModelWiredLogicKind::kAnd);
 
   EXPECT_EQ(r.s0_hi, Strength::kHighz);
   EXPECT_EQ(r.s1_hi, Strength::kHighz);

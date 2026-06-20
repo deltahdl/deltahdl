@@ -30,7 +30,7 @@ struct StrengthSignal {
   StrengthLevel strength1_lo = StrengthLevel::kHighz;
 };
 
-enum class WiredLogicKind : uint8_t { kNone, kAnd, kOr };
+enum class ModelWiredLogicKind : uint8_t { kNone, kAnd, kOr };
 
 inline StrengthLevel MapStrengthKeyword0(uint8_t keyword_index);
 
@@ -41,7 +41,7 @@ inline bool ValidateStrengthPair(StrengthLevel s0, StrengthLevel s1);
 inline StrengthSignal CombineUnambiguous(StrengthSignal a, StrengthSignal b);
 
 inline StrengthSignal CombineWithWiredLogic(StrengthSignal a, StrengthSignal b,
-                                            WiredLogicKind logic);
+                                            ModelWiredLogicKind logic);
 
 inline StrengthSignal CombineAmbiguous(StrengthSignal a, StrengthSignal b);
 
@@ -137,7 +137,7 @@ inline StrengthSignal CombineUnambiguous(StrengthSignal a, StrengthSignal b) {
 }
 
 inline StrengthSignal CombineWithWiredLogic(StrengthSignal a, StrengthSignal b,
-                                            WiredLogicKind logic) {
+                                            ModelWiredLogicKind logic) {
   // For different strengths, the stronger signal dominates (same as
   // unambiguous combination). Wired logic only applies when two
   // same-strength opposite-value signals combine.
@@ -156,7 +156,7 @@ inline StrengthSignal CombineWithWiredLogic(StrengthSignal a, StrengthSignal b,
 
   // Same strength, opposite values: apply wired logic.
   Val4 resolved = Val4::kX;
-  if (logic == WiredLogicKind::kAnd) {
+  if (logic == ModelWiredLogicKind::kAnd) {
     // AND: 1&0=0, 1&1=1, 0&0=0
     if (a.value == Val4::kV1 && b.value == Val4::kV1) {
       resolved = Val4::kV1;
@@ -217,8 +217,8 @@ inline StrengthSignal CombineAmbiguousWithUnambiguous(StrengthSignal unambig,
   auto apply_rule_ab = [&](StrengthLevel a_lo, StrengthLevel a_hi,
                            StrengthLevel& r_lo, StrengthLevel& r_hi) {
     if (static_cast<uint8_t>(a_hi) > s_u_idx) {
-      uint8_t lo_idx = std::max<uint8_t>(static_cast<uint8_t>(a_lo),
-                                         s_u_idx + 1);
+      uint8_t lo_idx =
+          std::max<uint8_t>(static_cast<uint8_t>(a_lo), s_u_idx + 1);
       r_lo = static_cast<StrengthLevel>(lo_idx);
       r_hi = a_hi;
     }

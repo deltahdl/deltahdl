@@ -30,7 +30,7 @@ TEST(NettypeInitialization, ResolutionActivatedAtTimeZero) {
   Net net = MakeNettypeNet(MakeVar(arena, 1));
 
   bool activated = false;
-  UserNettype nt;
+  ModelUserNettype nt;
   nt.resolution = [&](Arena& a, const std::vector<Logic4Vec>&) -> Logic4Vec {
     activated = true;
     return MakeLogic4Vec(a, 1);
@@ -47,7 +47,7 @@ TEST(NettypeInitialization, ResolutionAtTimeZeroEvenNoDrivers) {
   Net net = MakeNettypeNet(MakeVar(arena, 1));
 
   bool activated = false;
-  UserNettype nt;
+  ModelUserNettype nt;
   nt.resolution = [&](Arena& a,
                       const std::vector<Logic4Vec>& drivers) -> Logic4Vec {
     activated = true;
@@ -65,7 +65,7 @@ TEST(NettypeInitialization, DefaultIsDataTypeDefault) {
   auto* var = MakeVar(arena, 1);
   Net net = MakeNettypeNet(var);
 
-  UserNettype nt;
+  ModelUserNettype nt;
   nt.data_kind = NettypeDataKind::k4StateIntegral;
   InitializeUserDefinedNet(net, nt, arena);
 
@@ -78,7 +78,7 @@ TEST(NettypeInitialization, MultiBitDefaultIsAllX) {
   auto* var = MakeVar(arena, 8);
   Net net = MakeNettypeNet(var);
 
-  UserNettype nt;
+  ModelUserNettype nt;
   nt.data_kind = NettypeDataKind::k4StateIntegral;
   InitializeUserDefinedNet(net, nt, arena);
 
@@ -92,7 +92,7 @@ TEST(NettypeInitialization, TwoStateDefaultIsZero) {
   auto* var = MakeVar(arena, 4);
   Net net = MakeNettypeNet(var);
 
-  UserNettype nt;
+  ModelUserNettype nt;
   nt.data_kind = NettypeDataKind::k2StateIntegral;
   InitializeUserDefinedNet(net, nt, arena);
 
@@ -109,7 +109,7 @@ TEST(NettypeInitialization, InitialValueSetBeforeResolution) {
   Net net = MakeNettypeNet(var);
 
   uint8_t value_seen_by_resolution = 0xFF;
-  UserNettype nt;
+  ModelUserNettype nt;
   nt.data_kind = NettypeDataKind::k4StateIntegral;
   nt.resolution = [&](Arena& a, const std::vector<Logic4Vec>&) -> Logic4Vec {
     value_seen_by_resolution = ValOf(*var);
@@ -128,7 +128,7 @@ TEST(NettypeInitialization, ResolutionWithEmptyDriversSetsResolvedValue) {
   auto* var = MakeVar(arena, 1);
   Net net = MakeNettypeNet(var);
 
-  UserNettype nt;
+  ModelUserNettype nt;
   nt.resolution = [](Arena& a,
                      const std::vector<Logic4Vec>& drivers) -> Logic4Vec {
     EXPECT_TRUE(drivers.empty());
@@ -145,7 +145,7 @@ TEST(NettypeInitialization, DefaultIsXNotZ) {
   auto* var = MakeVar(arena, 1);
   Net net = MakeNettypeNet(var);
 
-  UserNettype nt;
+  ModelUserNettype nt;
   nt.data_kind = NettypeDataKind::k4StateIntegral;
   InitializeUserDefinedNet(net, nt, arena);
 
@@ -159,7 +159,7 @@ TEST(NettypeInitialization, ResolutionOverwritesDefault) {
   auto* var = MakeVar(arena, 1);
   Net net = MakeNettypeNet(var);
 
-  UserNettype nt;
+  ModelUserNettype nt;
   nt.data_kind = NettypeDataKind::k4StateIntegral;
   nt.resolution = [](Arena& a, const std::vector<Logic4Vec>&) -> Logic4Vec {
     return MakeLogic4VecVal(a, 1, 1);
@@ -175,7 +175,7 @@ TEST(NettypeInitialization, NoResolvedStorageFails) {
   Net net;
   net.is_user_nettype = true;
 
-  UserNettype nt;
+  ModelUserNettype nt;
   EXPECT_FALSE(InitializeUserDefinedNet(net, nt, arena));
 }
 
@@ -216,7 +216,7 @@ TEST(NettypeInitialization, ResolutionAtTimeZeroWithDriverPresent) {
 
   bool activated = false;
   size_t drivers_seen = 0;
-  UserNettype nt;
+  ModelUserNettype nt;
   nt.resolution = [&](Arena& a,
                       const std::vector<Logic4Vec>& drivers) -> Logic4Vec {
     activated = true;
@@ -236,7 +236,7 @@ TEST(NettypeInitialization, RealDataTypeDefaultIsZero) {
   auto* var = MakeVar(arena, 1);
   Net net = MakeNettypeNet(var);
 
-  UserNettype nt;
+  ModelUserNettype nt;
   nt.data_kind = NettypeDataKind::kReal;
   InitializeUserDefinedNet(net, nt, arena);
 

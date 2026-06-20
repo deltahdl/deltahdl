@@ -28,7 +28,7 @@ TEST(InterfaceClassPartialImplementationParsing,
   EXPECT_TRUE(cls->is_virtual);
   EXPECT_FALSE(cls->is_interface);
   ASSERT_EQ(cls->implements_types.size(), 1u);
-  EXPECT_EQ(cls->implements_types[0], "IntfClass");
+  EXPECT_EQ(cls->implements_types[0].name, "IntfClass");
 
   ASSERT_EQ(cls->members.size(), 2u);
   EXPECT_EQ(cls->members[0]->kind, ClassMemberKind::kMethod);

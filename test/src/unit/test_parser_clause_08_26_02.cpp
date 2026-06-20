@@ -60,9 +60,9 @@ TEST(ExtendsVsImplementsParsing, ImplementsMultipleInterfaces) {
   ASSERT_EQ(r.cu->classes.size(), 1u);
   auto* cls = r.cu->classes[0];
   ASSERT_EQ(cls->implements_types.size(), 3u);
-  EXPECT_EQ(cls->implements_types[0], "IFace1");
-  EXPECT_EQ(cls->implements_types[1], "IFace2");
-  EXPECT_EQ(cls->implements_types[2], "IFace3");
+  EXPECT_EQ(cls->implements_types[0].name, "IFace1");
+  EXPECT_EQ(cls->implements_types[1].name, "IFace2");
+  EXPECT_EQ(cls->implements_types[2].name, "IFace3");
 }
 
 TEST(ExtendsVsImplementsParsing, ImplementsWithParamAssignment) {
@@ -72,7 +72,7 @@ TEST(ExtendsVsImplementsParsing, ImplementsWithParamAssignment) {
   ASSERT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->classes.size(), 1u);
   ASSERT_EQ(r.cu->classes[0]->implements_types.size(), 1u);
-  EXPECT_EQ(r.cu->classes[0]->implements_types[0], "IFace");
+  EXPECT_EQ(r.cu->classes[0]->implements_types[0].name, "IFace");
 }
 
 TEST(ExtendsVsImplementsParsing, ImplementsSingleInterface) {
@@ -83,7 +83,7 @@ TEST(ExtendsVsImplementsParsing, ImplementsSingleInterface) {
   ASSERT_EQ(r.cu->classes.size(), 1u);
   auto* cls = r.cu->classes[0];
   ASSERT_EQ(cls->implements_types.size(), 1u);
-  EXPECT_EQ(cls->implements_types[0], "IFace");
+  EXPECT_EQ(cls->implements_types[0].name, "IFace");
 }
 
 TEST(ExtendsVsImplementsParsing, ExtendsAndImplementsCombined) {
@@ -97,7 +97,7 @@ TEST(ExtendsVsImplementsParsing, ExtendsAndImplementsCombined) {
   auto* cls = r.cu->classes[2];
   EXPECT_EQ(cls->base_class, "Base");
   ASSERT_EQ(cls->implements_types.size(), 1u);
-  EXPECT_EQ(cls->implements_types[0], "IA");
+  EXPECT_EQ(cls->implements_types[0].name, "IA");
 }
 
 TEST(ExtendsVsImplementsParsing, VirtualClassImplementsInterface) {
@@ -114,7 +114,7 @@ TEST(ExtendsVsImplementsParsing, VirtualClassImplementsInterface) {
   auto* cls = r.cu->classes[1];
   EXPECT_TRUE(cls->is_virtual);
   ASSERT_EQ(cls->implements_types.size(), 1u);
-  EXPECT_EQ(cls->implements_types[0], "IC");
+  EXPECT_EQ(cls->implements_types[0].name, "IC");
 }
 
 TEST(ExtendsVsImplementsParsing, InterfaceClassNoExtends) {

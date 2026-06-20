@@ -50,7 +50,7 @@ TEST(InterfaceClassSyntax, InterfaceClassExtendsMultiple) {
   EXPECT_TRUE(r.cu->classes[0]->is_interface);
   EXPECT_EQ(r.cu->classes[0]->base_class, "IBase1");
   ASSERT_EQ(r.cu->classes[0]->extends_interfaces.size(), 1u);
-  EXPECT_EQ(r.cu->classes[0]->extends_interfaces[0], "IBase2");
+  EXPECT_EQ(r.cu->classes[0]->extends_interfaces[0].name, "IBase2");
 }
 
 TEST(InterfaceClassSyntax, InterfaceClassWithExtends) {
@@ -160,8 +160,8 @@ TEST(InterfaceClassSyntax, ExtendsThreeBases) {
   ASSERT_EQ(r.cu->classes.size(), 1u);
   EXPECT_EQ(r.cu->classes[0]->base_class, "IA");
   ASSERT_EQ(r.cu->classes[0]->extends_interfaces.size(), 2u);
-  EXPECT_EQ(r.cu->classes[0]->extends_interfaces[0], "IB");
-  EXPECT_EQ(r.cu->classes[0]->extends_interfaces[1], "ICBase");
+  EXPECT_EQ(r.cu->classes[0]->extends_interfaces[0].name, "IB");
+  EXPECT_EQ(r.cu->classes[0]->extends_interfaces[1].name, "ICBase");
 }
 
 TEST(InterfaceClassSyntax, SingleExtendsNoAdditionalBases) {
