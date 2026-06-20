@@ -318,30 +318,43 @@ static void CheckParallelPathTerminalCount(DiagEngine& diag, SourceLoc loc,
   }
 }
 
+// Maps a leading '+='/'-=' token to the polarity of a polarity-prefixed
+// '+=>'/'-=>' parallel-path operator, or kNone when it is not a candidate.
+static SpecifyPolarity PolarityPrefixOf(TokenKind kind) {
+  if (kind == TokenKind::kPlusEq) return SpecifyPolarity::kPositive;
+  if (kind == TokenKind::kMinusEq) return SpecifyPolarity::kNegative;
+  return SpecifyPolarity::kNone;
+}
+
 SpecifyItem* Parser::ParseSpecifyPathDecl() {
   auto* item = arena_.Create<SpecifyItem>();
   item->kind = SpecifyItemKind::kPathDecl;
   item->loc = CurrentLoc();
 
-  // Consume the path operator that separates source and destination terminals,
-  // handling the polarity-prefixed '+=>'/'-=>' spelling whose polarity is
-  // lexed as a single '+='/'-=' token followed by '>'.
-  auto parse_path_operator = [&]() {
-    if (item->path.polarity == SpecifyPolarity::kNone &&
-        (Check(TokenKind::kPlusEq) || Check(TokenKind::kMinusEq))) {
-      auto saved = lexer_.SavePos();
-      SpecifyPolarity prefix = Check(TokenKind::kPlusEq)
-                                   ? SpecifyPolarity::kPositive
-                                   : SpecifyPolarity::kNegative;
-      Consume();
-      if (Match(TokenKind::kGt)) {
-        item->path.polarity = prefix;
-        item->path.path_kind = SpecifyPathKind::kParallel;
-        return;
-      }
-      lexer_.RestorePos(saved);
+  // Consume the polarity-prefixed '+=>'/'-=>' spelling, whose polarity is lexed
+  // as a single '+='/'-=' token followed by '>'. Returns true (recording the
+  // polarity and parallel kind) only on a complete match; a partial match
+  // restores the saved position so the plain operators are reconsidered.
+  auto parse_polarity_prefixed_parallel = [&]() -> bool {
+    SpecifyPolarity prefix = PolarityPrefixOf(CurrentToken().kind);
+    if (item->path.polarity != SpecifyPolarity::kNone ||
+        prefix == SpecifyPolarity::kNone) {
+      return false;
     }
+    auto saved = lexer_.SavePos();
+    Consume();
+    if (Match(TokenKind::kGt)) {
+      item->path.polarity = prefix;
+      item->path.path_kind = SpecifyPathKind::kParallel;
+      return true;
+    }
+    lexer_.RestorePos(saved);
+    return false;
+  };
 
+  // Consume the path operator that separates source and destination terminals.
+  auto parse_path_operator = [&]() {
+    if (parse_polarity_prefixed_parallel()) return;
     if (Match(TokenKind::kEqGt)) {
       item->path.path_kind = SpecifyPathKind::kParallel;
     } else if (Match(TokenKind::kStarGt)) {

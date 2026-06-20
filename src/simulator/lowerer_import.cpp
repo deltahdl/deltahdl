@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <functional>
 #include <string>
 #include <string_view>
 #include <unordered_set>
@@ -106,6 +107,50 @@ void Lowerer::LowerImportedName(
   }
 }
 
+// State shared by the free helpers that walk one package's export declarations
+// for a wildcard import (§26.5). `lower_all`/`lower_named` forward back into
+// the owning Lowerer so the recursion lives outside LowerAllImported's own
+// body, keeping its cognitive complexity low. Each callback already snapshots
+// the visited set, so it is passed by const reference here.
+namespace {
+struct ReExportWalk {
+  PackageDecl* pkg;
+  const std::unordered_set<const PackageDecl*>& visited;
+  std::function<PackageDecl*(std::string_view)> find_pkg;
+  std::function<void(PackageDecl*)> lower_all;
+  std::function<void(PackageDecl*, std::string_view)> lower_named;
+};
+
+void ReExportAll(const ReExportWalk& w, PackageDecl* src) { w.lower_all(src); }
+
+// Handles `export *::*;`: re-exports everything from each package `pkg`
+// imports.
+void ReExportWildcardStar(const ReExportWalk& w) {
+  for (std::string_view src_name : WildcardExportImportNames(w.pkg)) {
+    if (auto* src = w.find_pkg(src_name)) ReExportAll(w, src);
+  }
+}
+
+// Handles one resolved `export pkg::item;` / `export pkg::*;`.
+void ReExportFromPackage(const ReExportWalk& w, PackageDecl* src,
+                         const ImportItem& ex) {
+  if (ex.is_wildcard) {
+    ReExportAll(w, src);
+  } else {
+    w.lower_named(src, ex.item_name);
+  }
+}
+
+// Dispatches one export declaration to the matching re-export handler.
+void HandleReExport(const ReExportWalk& w, const ImportItem& ex) {
+  if (ex.package_name == "*") {
+    ReExportWildcardStar(w);
+  } else if (auto* src = w.find_pkg(ex.package_name)) {
+    ReExportFromPackage(w, src, ex);
+  }
+}
+}  // namespace
+
 void Lowerer::LowerAllImported(
     PackageDecl* pkg, std::unordered_set<const PackageDecl*>& visited) {
   if (!visited.insert(pkg).second) return;
@@ -114,34 +159,19 @@ void Lowerer::LowerAllImported(
     LowerPackageItem(item);
   }
 
-  auto recurse_all = [&](PackageDecl* src) {
-    auto sub = visited;
-    LowerAllImported(src, sub);
-  };
-  auto reexport_star = [&] {
-    for (std::string_view src_name : WildcardExportImportNames(pkg)) {
-      if (auto* src = FindPackage(src_name)) recurse_all(src);
-    }
-  };
-  auto reexport_one = [&](PackageDecl* src, const ImportItem& ex) {
-    if (ex.is_wildcard) {
-      recurse_all(src);
-    } else {
-      auto sub = visited;
-      LowerImportedName(src, ex.item_name, sub);
-    }
-  };
-  auto handle_export = [&](const ImportItem& ex) {
-    if (ex.package_name == "*") {
-      reexport_star();
-    } else if (auto* src = FindPackage(ex.package_name)) {
-      reexport_one(src, ex);
-    }
-  };
-
+  ReExportWalk walk{pkg, visited,
+                    [this](std::string_view name) { return FindPackage(name); },
+                    [this, &visited](PackageDecl* src) {
+                      auto sub = visited;
+                      LowerAllImported(src, sub);
+                    },
+                    [this, &visited](PackageDecl* src, std::string_view name) {
+                      auto sub = visited;
+                      LowerImportedName(src, name, sub);
+                    }};
   for (auto* item : pkg->items) {
     if (item->kind != ModuleItemKind::kExportDecl) continue;
-    handle_export(item->import_item);
+    HandleReExport(walk, item->import_item);
   }
 }
 

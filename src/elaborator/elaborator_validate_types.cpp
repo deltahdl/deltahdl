@@ -35,79 +35,97 @@ void Elaborator::ValidateModuleConstraints(const ModuleDecl* decl) {
     ValidateItemConstraints(item);
   }
   // The bulk of module-level validation is an ordered series of independent
-  // single-element checks; running them through a list keeps the dispatch in
-  // one place while preserving their exact execution order.
-  const std::initializer_list<std::function<void()>> checks = {
-      [&] { ValidatePackageImportRules(decl); },
-      [&] { ValidateScopeRules(decl); },
-      [&] { ValidateMixedAssignments(); },
-      [&] { ValidateInputPortAssignments(decl); },
-      [&] { ValidateMatchesPatternIntegral(decl); },
-      [&] { ValidateMatchesCaseSelectorType(decl); },
-      [&] { ValidateMatchesIfPredicateType(decl); },
-      [&] { ValidateDisableTargets(decl); },
-      [&] { ValidateProceduralNetAssign(); },
-      [&] { ValidateDynamicArrayNba(decl); },
-      [&] { ValidateArrayQueryOnDynamicType(decl); },
-      [&] { ValidateArrayQueryOnVariableDim(decl); },
-      [&] { ValidateRandomSeedType(decl); },
-      [&] { ValidatePlaOutputTerms(decl); },
-      [&] { ValidatePlaAscendingOrder(decl); },
-      [&] { ValidateBitsCallRestrictions(decl); },
-      [&] { ValidateAutomaticVarProcWrites(decl); },
-      [&] { ValidateJumpStatements(decl); },
-      [&] { ValidateForeachLoops(decl); },
-      [&] { ValidateContAssignConstSelect(decl); },
-      [&] { ValidatePartSelectBounds(decl); },
-      [&] { ValidateSpecparamInParams(decl); },
-      [&] { ValidateSpecparamInDeclRange(decl); },
-      [&] { ValidateEnumAssignments(decl); },
-      [&] { ValidateConstAssignments(decl); },
-      [&] { ValidateArrayAssignments(decl); },
-      [&] { ValidateAssocArraySlices(decl); },
-      [&] { ValidateAssocWildcardTraversal(decl); },
-      [&] { ValidateAssocTraversalArgType(decl); },
-      [&] { ValidateArrayOrderingMethods(decl); },
-      [&] { ValidateClassIndexSelect(decl); },
-      [&] { ValidateStringIndexSelect(decl); },
-      [&] { ValidateIntegralIndexSelect(decl); },
-      [&] { ValidateAssocConcatTarget(decl); },
-      [&] { ValidateAssocOperandInExpr(decl); },
-      [&] { ValidateArrayPatternElemType(decl); },
-      [&] { ValidateReplicateTargetingArray(decl); },
-      [&] { ValidateArrayElementPartSelect(decl); },
-      [&] { ValidateUnpackedArrayConcatNesting(decl); },
-      [&] { ValidateClassHandleOps(decl); },
-      [&] { ValidateChandleOps(decl); },
-      [&] { ValidateVirtualInterfaceOps(decl); },
-      [&] { ValidateEventOps(decl); },
-      [&] { ValidateVirtualInterfaceClocking(decl); },
-      [&] { ValidateInterfaceObjectAccess(decl); },
-      [&] { ValidateDeferredAssertionActions(decl); },
-      [&] { ValidateAggregateComparisons(decl); },
-      [&] { ValidateTypeRefComparisons(decl); },
-      [&] { ValidateTypeRefArgs(decl); },
-      [&] { ValidateTaggedUnionMembers(decl); },
-      [&] { ValidateRealOperatorRestrictions(decl); },
-      [&] { ValidateAssignInExprRestrictions(decl); },
-      [&] { ValidateUnsizedInConcat(decl); },
-      [&] { ValidateSelectOnConcatLvalue(decl); },
-      [&] { ValidateReplicateLvalue(decl); },
-      [&] { ValidateStringConcatLvalue(decl); },
-      [&] { ValidateReplicateMultiplier(decl); },
-      [&] { ValidateStreamingConcatContext(decl); },
-      [&] { ValidateBitStreamCast(decl); },
-      [&] { ValidateSubroutineCallArgs(decl); },
-      [&] { ValidateArrayArgTypes(decl); },
-      [&] { ValidateLocalProtectedAccess(decl); },
-      [&] { ValidateParameterizedScopeResolution(decl); },
-      [&] { ValidateTypeParamScopeUsage(decl); },
-      [&] { ValidateTypeParamScopePrefixResolvesToClass(decl); },
-      [&] { ValidateStaticMethodBodies(decl); },
-      [&] { ValidateClassMethodBodies(decl); },
-      [&] { ValidateThisUsage(decl); },
+  // single-element checks. Two of them inspect elaborator-wide state rather
+  // than the module declaration and must run in their original positions, so
+  // the dispatch is driven by an ordered table of pointer-to-member checks; a
+  // null decl-check entry is the cursor for the next no-argument check. This
+  // keeps the dispatch (and its exact execution order) in one place while
+  // staying well under the per-function statement budget.
+  using DeclCheck = void (Elaborator::*)(const ModuleDecl*);
+  using PlainCheck = void (Elaborator::*)();
+  static constexpr DeclCheck kDeclChecks[] = {
+      &Elaborator::ValidatePackageImportRules,
+      &Elaborator::ValidateScopeRules,
+      nullptr,  // ValidateMixedAssignments
+      &Elaborator::ValidateInputPortAssignments,
+      &Elaborator::ValidateMatchesPatternIntegral,
+      &Elaborator::ValidateMatchesCaseSelectorType,
+      &Elaborator::ValidateMatchesIfPredicateType,
+      &Elaborator::ValidateDisableTargets,
+      nullptr,  // ValidateProceduralNetAssign
+      &Elaborator::ValidateDynamicArrayNba,
+      &Elaborator::ValidateArrayQueryOnDynamicType,
+      &Elaborator::ValidateArrayQueryOnVariableDim,
+      &Elaborator::ValidateRandomSeedType,
+      &Elaborator::ValidatePlaOutputTerms,
+      &Elaborator::ValidatePlaAscendingOrder,
+      &Elaborator::ValidateBitsCallRestrictions,
+      &Elaborator::ValidateAutomaticVarProcWrites,
+      &Elaborator::ValidateJumpStatements,
+      &Elaborator::ValidateForeachLoops,
+      &Elaborator::ValidateContAssignConstSelect,
+      &Elaborator::ValidatePartSelectBounds,
+      &Elaborator::ValidateSpecparamInParams,
+      &Elaborator::ValidateSpecparamInDeclRange,
+      &Elaborator::ValidateEnumAssignments,
+      &Elaborator::ValidateConstAssignments,
+      &Elaborator::ValidateArrayAssignments,
+      &Elaborator::ValidateAssocArraySlices,
+      &Elaborator::ValidateAssocWildcardTraversal,
+      &Elaborator::ValidateAssocTraversalArgType,
+      &Elaborator::ValidateArrayOrderingMethods,
+      &Elaborator::ValidateClassIndexSelect,
+      &Elaborator::ValidateStringIndexSelect,
+      &Elaborator::ValidateIntegralIndexSelect,
+      &Elaborator::ValidateAssocConcatTarget,
+      &Elaborator::ValidateAssocOperandInExpr,
+      &Elaborator::ValidateArrayPatternElemType,
+      &Elaborator::ValidateReplicateTargetingArray,
+      &Elaborator::ValidateArrayElementPartSelect,
+      &Elaborator::ValidateUnpackedArrayConcatNesting,
+      &Elaborator::ValidateClassHandleOps,
+      &Elaborator::ValidateChandleOps,
+      &Elaborator::ValidateVirtualInterfaceOps,
+      &Elaborator::ValidateEventOps,
+      &Elaborator::ValidateVirtualInterfaceClocking,
+      &Elaborator::ValidateInterfaceObjectAccess,
+      &Elaborator::ValidateDeferredAssertionActions,
+      &Elaborator::ValidateAggregateComparisons,
+      &Elaborator::ValidateTypeRefComparisons,
+      &Elaborator::ValidateTypeRefArgs,
+      &Elaborator::ValidateTaggedUnionMembers,
+      &Elaborator::ValidateRealOperatorRestrictions,
+      &Elaborator::ValidateAssignInExprRestrictions,
+      &Elaborator::ValidateUnsizedInConcat,
+      &Elaborator::ValidateSelectOnConcatLvalue,
+      &Elaborator::ValidateReplicateLvalue,
+      &Elaborator::ValidateStringConcatLvalue,
+      &Elaborator::ValidateReplicateMultiplier,
+      &Elaborator::ValidateStreamingConcatContext,
+      &Elaborator::ValidateBitStreamCast,
+      &Elaborator::ValidateSubroutineCallArgs,
+      &Elaborator::ValidateArrayArgTypes,
+      &Elaborator::ValidateLocalProtectedAccess,
+      &Elaborator::ValidateParameterizedScopeResolution,
+      &Elaborator::ValidateTypeParamScopeUsage,
+      &Elaborator::ValidateTypeParamScopePrefixResolvesToClass,
+      &Elaborator::ValidateStaticMethodBodies,
+      &Elaborator::ValidateClassMethodBodies,
+      &Elaborator::ValidateThisUsage,
   };
-  for (const auto& check : checks) check();
+  // No-argument checks, consumed in order at each null table entry.
+  static constexpr PlainCheck kPlainChecks[] = {
+      &Elaborator::ValidateMixedAssignments,
+      &Elaborator::ValidateProceduralNetAssign,
+  };
+  size_t plain_idx = 0;
+  for (DeclCheck check : kDeclChecks) {
+    if (check) {
+      (this->*check)(decl);
+    } else {
+      (this->*kPlainChecks[plain_idx++])();
+    }
+  }
   CheckModuleTimescaleOrder(decl, diag_);
 }
 
@@ -579,28 +597,56 @@ static bool IsBareEnumAssignable(const Expr* e) {
   return e && (e->kind == ExprKind::kIdentifier || e->kind == ExprKind::kCast);
 }
 
+namespace {
+
+// True when a procedural statement declares an enum variable (Stmt-level
+// var_decl) — used to register the name and screen its initializer.
+bool StmtDeclaresEnumVar(const Stmt* s, const TypedefMap& typedefs) {
+  return s->kind == StmtKind::kVarDecl &&
+         DataTypeIsEnum(s->var_decl_type, typedefs);
+}
+
+// True when a statement is a blocking or nonblocking assignment.
+bool StmtIsProceduralAssign(const Stmt* s) {
+  return s->kind == StmtKind::kBlockingAssign ||
+         s->kind == StmtKind::kNonblockingAssign;
+}
+
+// True when a statement is a bare ++/-- expression statement.
+bool StmtIsPostfixIncDec(const Stmt* s) {
+  return s->kind == StmtKind::kExprStmt && s->expr &&
+         s->expr->kind == ExprKind::kPostfixUnary;
+}
+
+// Reports an unguarded ++/-- on an enum variable (callers ensure the statement
+// is a postfix unary expression statement).
+void CheckEnumIncDecStmt(const Stmt* s,
+                         const std::unordered_set<std::string_view>& enum_vars,
+                         DiagEngine& diag) {
+  auto name = ExprIdent(s->expr->lhs);
+  if (!name.empty() && enum_vars.count(name) != 0) {
+    diag.Error(s->range.start,
+               "increment/decrement of enum variable without cast");
+  }
+}
+
+}  // namespace
+
 void Elaborator::WalkStmtsForEnumAssign(const Stmt* s) {
   if (!s) return;
   WalkExprForEnumCalls(s->rhs);
   WalkExprForEnumCalls(s->expr);
   WalkExprForEnumCalls(s->condition);
-  if (s->kind == StmtKind::kVarDecl &&
-      DataTypeIsEnum(s->var_decl_type, typedefs_)) {
+  if (StmtDeclaresEnumVar(s, typedefs_)) {
     enum_var_names_.insert(s->var_name);
     if (s->var_init && !IsBareEnumAssignable(s->var_init)) {
       diag_.Error(s->range.start,
                   "integer assigned to enum variable without cast");
     }
-  } else if (s->kind == StmtKind::kBlockingAssign ||
-             s->kind == StmtKind::kNonblockingAssign) {
+  } else if (StmtIsProceduralAssign(s)) {
     CheckEnumAssignStmt(s);
-  } else if (s->kind == StmtKind::kExprStmt && s->expr &&
-             s->expr->kind == ExprKind::kPostfixUnary) {
-    auto name = ExprIdent(s->expr->lhs);
-    if (!name.empty() && enum_var_names_.count(name) != 0) {
-      diag_.Error(s->range.start,
-                  "increment/decrement of enum variable without cast");
-    }
+  } else if (StmtIsPostfixIncDec(s)) {
+    CheckEnumIncDecStmt(s, enum_var_names_, diag_);
   }
   for (const Stmt* branch :
        {s->then_branch, s->else_branch, s->body, s->for_body}) {

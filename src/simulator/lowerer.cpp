@@ -397,6 +397,27 @@ static bool ApplyInertialReeval(const InertialLoopCtx& loop,
   return false;
 }
 
+// Runs the inertial-delay wait loop for one pending continuous-assignment
+// transition (IEEE 1800 §28 inertial delays). Each iteration waits out the
+// remaining ticks; an operand change during the wait re-evaluates the
+// right-hand side, which either collapses the pending value onto the
+// left-hand side (loop stops) or reschedules the fire time. Factored into its
+// own awaitable coroutine so the driver coroutine stays flat; the two awaiters
+// run exactly as they would inline because they reference the shared context.
+static ExecTask RunInertialContAssignDelay(
+    const InertialLoopCtx& loop, const std::vector<std::string_view>& read_vars,
+    const Logic4Vec& old_val, Logic4Vec& val, uint64_t ticks) {
+  SimTime target = loop.ctx.CurrentTime() + SimTime{ticks};
+  for (uint64_t remaining = RemainingTicks(target, loop.ctx); remaining > 0;
+       remaining = RemainingTicks(target, loop.ctx)) {
+    if (co_await InertialDelayAwaiter{loop.ctx, remaining, read_vars}) break;
+    if (ApplyInertialReeval(loop, PendingContAssignTransition{old_val, val},
+                            target))
+      break;
+  }
+  co_return StmtResult::kDone;
+}
+
 static SimCoroutine MakeContAssignCoroutine(ContAssignParams params,
                                             SimContext& ctx, Arena& arena) {
   if (!params.lhs || params.lhs->kind != ExprKind::kIdentifier) co_return;
@@ -417,14 +438,8 @@ static SimCoroutine MakeContAssignCoroutine(ContAssignParams params,
 
       if (ticks > 0 && !read_vars.empty()) {
         InertialLoopCtx loop{params, d, ctx, arena};
-        SimTime target = ctx.CurrentTime() + SimTime{ticks};
-        for (uint64_t remaining = RemainingTicks(target, ctx); remaining > 0;
-             remaining = RemainingTicks(target, ctx)) {
-          if (co_await InertialDelayAwaiter{ctx, remaining, read_vars}) break;
-          if (ApplyInertialReeval(
-                  loop, PendingContAssignTransition{old_val, val}, target))
-            break;
-        }
+        co_await RunInertialContAssignDelay(loop, read_vars, old_val, val,
+                                            ticks);
       } else if (ticks > 0) {
         co_await DelayAwaiter{ctx, ticks};
       }

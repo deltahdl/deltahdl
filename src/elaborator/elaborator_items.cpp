@@ -344,9 +344,32 @@ void RecordClassDecl(
   mod->class_decls.push_back(item->class_decl);
 }
 
+// §6.10: every undeclared identifier in a primitive/alias terminal list becomes
+// an implicit scalar net; `make_net` creates one net per identifier terminal.
+template <typename MakeNet>
+void CreateImplicitNetsForTerminals(const std::vector<Expr*>& terminals,
+                                    SourceLoc loc, MakeNet&& make_net) {
+  for (auto* term : terminals) {
+    if (term && term->kind == ExprKind::kIdentifier) {
+      make_net(term->text, loc);
+    }
+  }
+}
+
+bool HasInstanceArrayRange(const ModuleItem* item) {  // §28.3.6
+  return item->inst_range_left != nullptr && item->inst_range_right != nullptr;
+}
+
+bool IsStaticDeferredAssertion(const ModuleItem* item) {  // §16.4.3
+  return item->body != nullptr && item->body->is_deferred;
+}
+
 }  // namespace
 
 void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
+  auto make_implicit_net = [&](std::string_view n, SourceLoc l) {  // §6.10
+    MaybeCreateImplicitNet(n, l, mod);
+  };
   switch (item->kind) {
     case ModuleItemKind::kNetDecl:
       ElaborateNetDecl(item, mod);
@@ -396,16 +419,9 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
       break;
     case ModuleItemKind::kGateInst:
       CheckGateInstNameDiagnostics(item, declared_names_, diag_);
-      // §6.10: an undeclared identifier used in a primitive instance's
-      // terminal list is assumed to be an implicit scalar net of the default
-      // net type, the same assumption made for a module instance's port
-      // connections.
-      for (auto* term : item->gate_terminals) {
-        if (term && term->kind == ExprKind::kIdentifier)
-          MaybeCreateImplicitNet(term->text, item->loc, mod);
-      }
-
-      if (item->inst_range_left && item->inst_range_right) {
+      CreateImplicitNetsForTerminals(item->gate_terminals, item->loc,
+                                     make_implicit_net);
+      if (HasInstanceArrayRange(item)) {
         CheckGateInstanceArrayTerminalWidths(item, mod, BuildParamScope(mod),
                                              interconnect_names_, diag_);
       }
@@ -417,12 +433,8 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
       break;
     case ModuleItemKind::kUdpInst:
       CheckUdpInstNameDiagnostics(item, declared_names_, diag_);
-      // §6.10: undeclared identifiers in a UDP instance's terminal list also
-      // become implicit scalar nets of the default net type.
-      for (auto* term : item->gate_terminals) {
-        if (term && term->kind == ExprKind::kIdentifier)
-          MaybeCreateImplicitNet(term->text, item->loc, mod);
-      }
+      CreateImplicitNetsForTerminals(item->gate_terminals, item->loc,
+                                     make_implicit_net);
       ResolveInterconnectPrimitiveTerminals(item->gate_terminals, mod);
       break;
     case ModuleItemKind::kSpecparam:
@@ -431,11 +443,8 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
       ElaborateSpecparam(item, mod);
       break;
     case ModuleItemKind::kAlias: {
-      for (auto* net : item->alias_nets) {
-        if (net && net->kind == ExprKind::kIdentifier) {
-          MaybeCreateImplicitNet(net->text, item->loc, mod);
-        }
-      }
+      CreateImplicitNetsForTerminals(item->alias_nets, item->loc,
+                                     make_implicit_net);
       ValidateAlias(item, mod);
       RtlirAlias alias;
       alias.nets = item->alias_nets;
@@ -445,17 +454,15 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
     case ModuleItemKind::kSequenceDecl:
       sequence_names_.insert(item->name);
       mod->sequence_decls.push_back(item);
-      // §16.8: a cyclic dependency among named sequences is an error.
-      // PropertyRegistry has all sequence decls registered before any item
-      // is elaborated (see ElaborateModule), so this DFS sees the full
-      // graph regardless of declaration order.
+      // §16.8: a cyclic dependency among named sequences is an error. All
+      // sequence decls are registered before elaboration (see ElaborateModule),
+      // so this DFS sees the full graph regardless of declaration order.
       if (property_registry_.HasCyclicSequenceDependency(item)) {
         diag_.Error(item->loc,
                     "cyclic dependency among named sequences involving \"" +
                         std::string(item->name) + "\" (§16.8)");
       }
-      // §16.10: a name that is already a formal argument of the sequence
-      // declaration may not be redeclared as a body-scope local variable.
+      // §16.10: a formal-argument name may not be redeclared as a body local.
       ValidateNoFormalShadowedByBodyLocal(item);
       ValidateClockingBlock(item, mod);
       break;
@@ -465,20 +472,16 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
       RecordImportDecl(item, mod);
       break;
     case ModuleItemKind::kExportDecl:
-
       break;
     case ModuleItemKind::kPropertyDecl: {
-      // §16.12: nesting of disable iff is forbidden, explicitly or through
-      // property instantiations. The flattened count via §F.4.1's rewriter
-      // catches both cases.
+      // §16.12: nesting of disable iff (explicitly or via property
+      // instantiation) is forbidden; the §F.4.1 flattened count catches both.
       int flat_disable_iff = property_registry_.FlattenedDisableIffCount(item);
       if (flat_disable_iff > 1) {
         diag_.Error(item->loc, "property \"" + std::string(item->name) +
                                    "\" nests disable iff clauses (§16.12)");
       }
-      // §16.10: same formal-vs-body shadow rule applies to a property
-      // declaration: a formal-argument name cannot be redeclared as a
-      // body-scope local variable.
+      // §16.10: a formal-argument name may not be redeclared as a body local.
       ValidateNoFormalShadowedByBodyLocal(item);
       // §16.12.17 / §F.7: enforce the restrictions on recursive properties.
       ValidateRecursiveProperty(item);
@@ -486,14 +489,9 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
       break;
     }
     case ModuleItemKind::kAssertProperty:
-      // §16.4.3: a deferred immediate assertion (assert/assume/cover with #0
-      // or final) written directly as a module item, outside any procedure, is
-      // a static deferred assertion. It is treated as if it were the sole
-      // statement of an always_comb procedure, so build that implicit process
-      // here rather than routing it through the concurrent-assertion path. The
-      // parser wraps every module-level deferred immediate form under the
-      // kAssertProperty kind, distinguished by a deferred statement body.
-      if (item->body && item->body->is_deferred) {
+      // §16.4.3: a module-item deferred immediate assertion is a static
+      // deferred assertion, modeled as an implicit always_comb procedure.
+      if (IsStaticDeferredAssertion(item)) {
         AddProcess(RtlirProcessKind::kAlwaysComb, item, mod, arena_, diag_,
                    &func_decls_);
         break;
@@ -780,6 +778,49 @@ void ClassifyTaskFuncDecls(
   CollectAutoTaskFuncNames(decl, auto_task_func_names);
 }
 
+// §17.2/§17.7/§25.9: applies instance-classification and parent-scope legality
+// rules to every item of `decl`; `find_child` resolves an instance's target.
+template <typename FindChild>
+void ClassifyAndCheckItems(const ModuleDecl* decl,
+                           const ParentScopeKind& parent_scope,
+                           InstClassTables& inst_class_tables, DiagEngine& diag,
+                           FindChild&& find_child) {
+  for (const auto* item : decl->items) {
+    if (item->kind == ModuleItemKind::kModuleInst) {
+      const ModuleDecl* child = find_child(item->inst_module);
+      if (child) {
+        ClassifyInstantiatedChild(item, child, inst_class_tables);
+        CheckModuleInstParentRules(item, decl, child, parent_scope, diag);
+      }
+    }
+    CheckProgramCheckerItemRules(item, decl, parent_scope,
+                                 inst_class_tables.program_inst_names, diag);
+  }
+}
+
+// §16.12/§F.4.1: registers every property/sequence decl of `decl` into
+// `registry` so a property may be referenced before its declaration.
+void BuildPropertyRegistry(const ModuleDecl* decl, PropertyRegistry& registry) {
+  registry = PropertyRegistry();
+  for (const auto* item : decl->items) {
+    if (item->kind == ModuleItemKind::kPropertyDecl ||
+        item->kind == ModuleItemKind::kSequenceDecl) {
+      registry.Register(item);
+    }
+  }
+}
+
+// True if port-less nested module `nested_decl` (named `name`) is an implicit-
+// instantiation candidate: not an interface and not explicitly instantiated.
+bool IsImplicitNestedInstantiationCandidate(std::string_view name,
+                                            const ModuleDecl* nested_decl,
+                                            const RtlirModule* mod) {
+  if (!nested_decl->ports.empty()) return false;
+  if (nested_decl->decl_kind == ModuleDeclKind::kInterface) return false;
+  if (ModuleExplicitlyInstantiated(mod, name)) return false;
+  return true;
+}
+
 }  // namespace
 
 void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
@@ -832,19 +873,11 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
                                     interface_inst_param_values_,
                                     checker_inst_names_, program_inst_names_};
 
-  for (const auto* item : decl->items) {
-    if (item->kind == ModuleItemKind::kModuleInst) {
-      auto* child = FindModuleInScope(item->inst_module);
-      if (child) {
-        ClassifyInstantiatedChild(item, child, inst_class_tables);
-        CheckModuleInstParentRules(item, decl, child, kParentScope, diag_);
-      }
-    }
-    CheckProgramCheckerItemRules(item, decl, kParentScope, program_inst_names_,
-                                 diag_);
-  }
+  ClassifyAndCheckItems(
+      decl, kParentScope, inst_class_tables, diag_,
+      [&](std::string_view name) { return FindModuleInScope(name); });
 
-  for (const auto& [pname, pval] : decl->params) {
+  for (const auto& [pname, pval] : decl->params) {  // §6.20: params are consts.
     const_names_.insert(pname);
   }
 
@@ -853,27 +886,16 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
   std::vector<std::pair<std::string_view, ModuleDecl*>> local_nested_modules(
       nested_module_decls_.begin(), nested_module_decls_.end());
 
-  // §16.12 lets a property be instantiated before its declaration, and
-  // §F.4.1 assumes names are resolved before the rewriter runs. Build the
-  // property/sequence registry up-front so flatten works for any decl.
-  property_registry_ = PropertyRegistry();
-  for (const auto* item : decl->items) {
-    if (item->kind == ModuleItemKind::kPropertyDecl ||
-        item->kind == ModuleItemKind::kSequenceDecl) {
-      property_registry_.Register(item);
-    }
-  }
+  BuildPropertyRegistry(decl, property_registry_);
 
   for (auto* item : decl->items) {
     ElaborateItem(item, mod);
   }
 
   for (const auto& [name, nested_decl] : local_nested_modules) {
-    if (!nested_decl->ports.empty()) continue;
-    if (nested_decl->decl_kind == ModuleDeclKind::kInterface) continue;
-
+    if (!IsImplicitNestedInstantiationCandidate(name, nested_decl, mod))
+      continue;
     if (HasParamPortWithoutDefault(nested_decl)) continue;
-    if (ModuleExplicitlyInstantiated(mod, name)) continue;
     RtlirModuleInst inst;
     inst.module_name = name;
     inst.inst_name = name;

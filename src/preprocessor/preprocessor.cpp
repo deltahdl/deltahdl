@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cstdint>
 #include <fstream>
 #include <sstream>
 
@@ -480,7 +481,11 @@ static bool DefineSpansMultipleLines(std::string_view line) {
 // ordinary text. The directive part begins at split_pos; any leading text spans
 // [0, split_pos).
 struct ActiveLineSplit {
-  enum class Kind { kLeadingDirective, kMidLineDirective, kPlainText } kind;
+  enum class Kind : std::uint8_t {
+    kLeadingDirective,
+    kMidLineDirective,
+    kPlainText
+  } kind;
   size_t split_pos;
 };
 

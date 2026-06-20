@@ -236,6 +236,16 @@ void CopyDesignMetadata(RtlirDesign* design, const CompilationUnit* unit,
   design->last_elab_severity_loc = meta.last_severity_loc;
 }
 
+// Performs the order-independent data tail of elaboration: computing each
+// typedef's bit width and transferring the CU declarations plus the captured
+// severity metadata (§20.10.1) onto the finished design.
+void FinalizeDesignTail(RtlirDesign* design, const CompilationUnit* unit,
+                        const TypedefMap& typedefs,
+                        const DesignMetadata& meta) {
+  PopulateTypeWidths(typedefs, design->type_widths);
+  CopyDesignMetadata(design, unit, meta);
+}
+
 }  // namespace
 
 void Elaborator::RunPreElaborationValidations() {
@@ -381,10 +391,8 @@ RtlirDesign* Elaborator::ElaborateTops(
     ValidateLetDecl(item);
   }
 
-  PopulateTypeWidths(typedefs_, design->type_widths);
-
-  CopyDesignMetadata(
-      design, unit_,
+  FinalizeDesignTail(
+      design, unit_, typedefs_,
       DesignMetadata{elab_simulation_blocked_, elab_last_severity_,
                      elab_last_severity_msg_, elab_last_severity_scope_,
                      elab_last_severity_loc_});

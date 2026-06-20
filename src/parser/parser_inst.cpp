@@ -15,6 +15,29 @@ void RecordInstRange(ModuleItem* item) {
   item->inst_range_right = item->inst_dims[0].second;
 }
 
+// Allocate and seed the shared (non-name) fields of one module instance. These
+// fields are pure AST data copied from the surrounding instantiation header, so
+// the construction lives outside the parser proper. The caller fills in the
+// instance name and the parsed dimensions/ports.
+ModuleItem* MakeInstanceItem(
+    Arena& arena, const Token& module_tok,
+    const std::vector<std::pair<std::string_view, Expr*>>& params) {
+  auto* item = arena.Create<ModuleItem>();
+  item->kind = ModuleItemKind::kModuleInst;
+  item->loc = module_tok.loc;
+  item->inst_module = module_tok.text;
+  item->inst_params = params;
+  return item;
+}
+
+// Publish the fully parsed instance list to the caller's overflow vector when
+// one was supplied. Pure container manipulation, kept out of the parser proper.
+void PublishInstances(std::vector<ModuleItem*>* extra_items,
+                      const std::vector<ModuleItem*>& instances) {
+  if (!extra_items) return;
+  extra_items->insert(extra_items->end(), instances.begin(), instances.end());
+}
+
 }  // namespace
 
 ModuleItem* Parser::ParseModuleInst(const Token& module_tok) {
@@ -28,25 +51,20 @@ ModuleItem* Parser::ParseModuleInstList(const Token& module_tok,
     ParseParamValueAssignment(params);
   }
 
-  // Parse a single instance dimension: `[ expr ( : expr )? ]`.
-  auto parse_one_dim = [&](ModuleItem* item) {
-    Consume();
-    Expr* left = ParseExpr();
-    Expr* right = Match(TokenKind::kColon) ? ParseExpr() : nullptr;
-    Expect(TokenKind::kRBracket);
-    item->inst_dims.push_back({left, right});
-  };
-
   // Parse the instance dimensions `( [ expr ( : expr )? ] )*` into `item`.
   auto parse_inst_dims = [&](ModuleItem* item) {
-    while (Check(TokenKind::kLBracket)) parse_one_dim(item);
+    while (Match(TokenKind::kLBracket)) {
+      Expr* left = ParseExpr();
+      Expr* right = Match(TokenKind::kColon) ? ParseExpr() : nullptr;
+      Expect(TokenKind::kRBracket);
+      item->inst_dims.push_back({left, right});
+    }
   };
 
   // Parse one trailing port connection, diagnosing a named/ordered mix once.
   auto parse_next_port = [&](ModuleItem* item, bool named, bool& mixed) {
     auto conn_loc = CurrentLoc();
-    bool next_named = ParsePortConnection(item);
-    bool inconsistent = !mixed && next_named != named;
+    bool inconsistent = ParsePortConnection(item) != named && !mixed;
     if (inconsistent) {
       diag_.Error(conn_loc,
                   "ordered and named port connections cannot be mixed");
@@ -64,11 +82,7 @@ ModuleItem* Parser::ParseModuleInstList(const Token& module_tok,
   };
 
   auto parse_one_instance = [&]() -> ModuleItem* {
-    auto* item = arena_.Create<ModuleItem>();
-    item->kind = ModuleItemKind::kModuleInst;
-    item->loc = module_tok.loc;
-    item->inst_module = module_tok.text;
-    item->inst_params = params;
+    auto* item = MakeInstanceItem(arena_, module_tok, params);
     item->inst_name = Expect(TokenKind::kIdentifier).text;
     parse_inst_dims(item);
     RecordInstRange(item);
@@ -78,11 +92,11 @@ ModuleItem* Parser::ParseModuleInstList(const Token& module_tok,
   };
 
   std::vector<ModuleItem*> instances;
-  instances.push_back(parse_one_instance());
-  while (Match(TokenKind::kComma)) instances.push_back(parse_one_instance());
+  do {
+    instances.push_back(parse_one_instance());
+  } while (Match(TokenKind::kComma));
   Expect(TokenKind::kSemicolon);
-  if (extra_items)
-    extra_items->insert(extra_items->end(), instances.begin(), instances.end());
+  PublishInstances(extra_items, instances);
   return instances.front();
 }
 

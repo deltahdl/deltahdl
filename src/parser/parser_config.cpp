@@ -137,7 +137,9 @@ ConfigDecl* Parser::ParseConfigDecl() {
   // Optional 'localparam <id> = <expr>;' declarations precede the design
   // statement and rules in a config_declaration.
   auto parse_local_params = [this, decl]() {
-    while (Check(TokenKind::kKwLocalparam) && !AtEnd()) {
+    // Check(kKwLocalparam) is already false at EOF (the current token is kEof),
+    // so an explicit !AtEnd() guard would be redundant here.
+    while (Check(TokenKind::kKwLocalparam)) {
       Consume();
       auto pname = ExpectIdentifier().text;
       Expect(TokenKind::kEq);
@@ -158,7 +160,9 @@ ConfigDecl* Parser::ParseConfigDecl() {
            !AtEnd()) {
       Consume();
     }
-    if (Check(TokenKind::kSemicolon)) Consume();
+    // Match consumes the terminating ';' iff present, equivalent to the
+    // guarded 'if (Check(kSemicolon)) Consume()' but without a nested branch.
+    Match(TokenKind::kSemicolon);
   };
 
   parse_local_params();

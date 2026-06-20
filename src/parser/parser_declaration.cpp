@@ -4,6 +4,101 @@
 
 namespace delta {
 
+namespace {
+
+// §8.17: a tf_port_item with no explicit direction that is 'ref' inherits the
+// const/static qualifiers of the immediately preceding 'ref' argument. Operates
+// purely on already-parsed argument state (no lexer access).
+void InheritRefQualifiers(const std::vector<FunctionArg>& args,
+                          FunctionArg& arg, bool dir_explicit) {
+  if (dir_explicit || arg.direction != Direction::kRef || args.empty()) return;
+  const auto& prev = args.back();
+  if (prev.direction != Direction::kRef) return;
+  arg.is_const = arg.is_const || prev.is_const;
+  arg.is_ref_static = arg.is_ref_static || prev.is_ref_static;
+}
+
+// §8.17: resolve an implicit tf_port data type — the first argument and any
+// argument with an explicit direction (or following 'default') default to
+// logic; otherwise it inherits the previous argument's data type. Pure state
+// update.
+void ResolveImplicitArgDataType(FunctionArg& arg,
+                                const DataType& prev_data_type,
+                                bool dir_explicit, bool first_arg,
+                                bool prev_was_default) {
+  if (arg.data_type.kind != DataTypeKind::kImplicit ||
+      arg.data_type.packed_dim_left != nullptr || arg.data_type.is_signed) {
+    return;
+  }
+  if (first_arg || dir_explicit || prev_was_default) {
+    arg.data_type.kind = DataTypeKind::kLogic;
+  } else {
+    arg.data_type = prev_data_type;
+  }
+}
+
+// §6.18 forward-typedef discriminator: the DataTypeKind named by a leading
+// enum/struct/union keyword, or kImplicit for any other token.
+DataTypeKind ForwardAggregateKind(TokenKind kw) {
+  switch (kw) {
+    case TokenKind::kKwEnum:
+      return DataTypeKind::kEnum;
+    case TokenKind::kKwStruct:
+      return DataTypeKind::kStruct;
+    case TokenKind::kKwUnion:
+      return DataTypeKind::kUnion;
+    default:
+      return DataTypeKind::kImplicit;
+  }
+}
+
+// §7.2.1: a struct/union member declarator inherits the shared member type's
+// kind, sign, packed dimensions, and type name. Pure field copy.
+void ApplyMemberType(StructMember& member, const DataType& member_type) {
+  member.type_kind = member_type.kind;
+  member.is_signed = member_type.is_signed;
+  member.packed_dim_left = member_type.packed_dim_left;
+  member.packed_dim_right = member_type.packed_dim_right;
+  member.extra_packed_dims = member_type.extra_packed_dims;
+  member.type_name = member_type.type_name;
+}
+
+// §7.2: a struct or union keyword introduces an aggregate member type.
+bool IsStructOrUnionKw(TokenKind tk) {
+  return tk == TokenKind::kKwStruct || tk == TokenKind::kKwUnion;
+}
+
+// §6.18: enum/struct/union introduce a forward-typedef aggregate kind.
+bool IsAggregateKw(TokenKind tk) {
+  return tk == TokenKind::kKwEnum || IsStructOrUnionKw(tk);
+}
+
+// §13.3: a leading direction keyword (or the const-as-ref qualifier) opens a
+// tf_port_declaration.
+bool IsTfPortDirectionKw(TokenKind tk) {
+  return tk == TokenKind::kKwInput || tk == TokenKind::kKwOutput ||
+         tk == TokenKind::kKwInout || tk == TokenKind::kKwRef ||
+         tk == TokenKind::kKwConst;
+}
+
+// §13.3: any directional qualifier keyword (used to detect an illegal second
+// qualifier after a ref/direction has already been parsed).
+bool IsDirectionQualifierKw(TokenKind tk) {
+  return tk == TokenKind::kKwRef || tk == TokenKind::kKwInput ||
+         tk == TokenKind::kKwOutput || tk == TokenKind::kKwInout;
+}
+
+// §6.6/§13.3: a tf_port_declaration data type that is implicit with no packed
+// dimensions and no sign defaults to logic. Pure state update.
+void DefaultImplicitToLogic(DataType& dt) {
+  if (dt.kind == DataTypeKind::kImplicit && dt.packed_dim_left == nullptr &&
+      !dt.is_signed) {
+    dt.kind = DataTypeKind::kLogic;
+  }
+}
+
+}  // namespace
+
 ModuleItem* Parser::ParseDefparam() {
   auto* item = arena_.Create<ModuleItem>();
   item->kind = ModuleItemKind::kDefparam;
@@ -127,7 +222,7 @@ void Parser::ParseStructMembers(DataType& dtype) {
   // including any nested struct/union/enum with its packed dimensions.
   auto parse_member_type = [&]() {
     DataType member_type;
-    if (Check(TokenKind::kKwStruct) || Check(TokenKind::kKwUnion)) {
+    if (IsStructOrUnionKw(CurrentToken().kind)) {
       member_type = ParseStructOrUnionType();
       ParsePackedDims(member_type);
     } else if (Check(TokenKind::kKwEnum)) {
@@ -145,15 +240,10 @@ void Parser::ParseStructMembers(DataType& dtype) {
                                bool is_rand, bool is_randc) {
     do {
       StructMember member;
-      member.type_kind = member_type.kind;
-      member.is_signed = member_type.is_signed;
+      ApplyMemberType(member, member_type);
       member.is_rand = is_rand;
       member.is_randc = is_randc;
       member.attrs = member_attrs;
-      member.packed_dim_left = member_type.packed_dim_left;
-      member.packed_dim_right = member_type.packed_dim_right;
-      member.extra_packed_dims = member_type.extra_packed_dims;
-      member.type_name = member_type.type_name;
       member.name = Expect(TokenKind::kIdentifier).text;
       ParseUnpackedDims(member.unpacked_dims);
       if (Match(TokenKind::kEq)) {
@@ -207,25 +297,11 @@ ModuleItem* Parser::ParseTypedef() {
   // Forward enum/struct/union typedef: `typedef struct foo;` (§6.18). Leaves
   // the lexer position unchanged when the form does not match.
   auto try_forward_aggregate = [&]() -> bool {
-    if (!Check(TokenKind::kKwEnum) && !Check(TokenKind::kKwStruct) &&
-        !Check(TokenKind::kKwUnion)) {
+    if (!IsAggregateKw(CurrentToken().kind)) {
       return false;
     }
     auto saved = lexer_.SavePos();
-    DataTypeKind fwd_kind = DataTypeKind::kImplicit;
-    switch (CurrentToken().kind) {
-      case TokenKind::kKwEnum:
-        fwd_kind = DataTypeKind::kEnum;
-        break;
-      case TokenKind::kKwStruct:
-        fwd_kind = DataTypeKind::kStruct;
-        break;
-      case TokenKind::kKwUnion:
-        fwd_kind = DataTypeKind::kUnion;
-        break;
-      default:
-        break;
-    }
+    DataTypeKind fwd_kind = ForwardAggregateKind(CurrentToken().kind);
     Consume();
     if (CheckIdentifier()) {
       auto id_saved = lexer_.SavePos();
@@ -308,7 +384,7 @@ ModuleItem* Parser::ParseTypedef() {
 
   if (Check(TokenKind::kKwEnum)) {
     item->typedef_type = ParseEnumType();
-  } else if (Check(TokenKind::kKwStruct) || Check(TokenKind::kKwUnion)) {
+  } else if (IsStructOrUnionKw(CurrentToken().kind)) {
     item->typedef_type = ParseStructOrUnionType();
   } else {
     item->typedef_type = ParseDataType();
@@ -406,32 +482,6 @@ std::vector<FunctionArg> Parser::ParseFunctionArgs(bool require_identifiers) {
   // and default data type (logic).
   bool prev_was_default = false;
 
-  // §8.17: a tf_port_item with no explicit direction that is 'ref' inherits the
-  // const/static qualifiers of the immediately preceding 'ref' argument.
-  auto inherit_ref_qualifiers = [&](FunctionArg& arg, bool dir_explicit) {
-    if (dir_explicit || arg.direction != Direction::kRef || args.empty())
-      return;
-    const auto& prev = args.back();
-    if (prev.direction != Direction::kRef) return;
-    arg.is_const = arg.is_const || prev.is_const;
-    arg.is_ref_static = arg.is_ref_static || prev.is_ref_static;
-  };
-
-  // §8.17: resolve an implicit tf_port data type — the first argument and any
-  // argument with an explicit direction (or following 'default') default to
-  // logic; otherwise it inherits the previous argument's data type.
-  auto resolve_implicit_data_type = [&](FunctionArg& arg, bool dir_explicit) {
-    if (arg.data_type.kind != DataTypeKind::kImplicit ||
-        arg.data_type.packed_dim_left != nullptr || arg.data_type.is_signed) {
-      return;
-    }
-    if (first_arg || dir_explicit || prev_was_default) {
-      arg.data_type.kind = DataTypeKind::kLogic;
-    } else {
-      arg.data_type = prev_data_type;
-    }
-  };
-
   // §8.17: the 'default' sentinel in a class constructor argument list. Records
   // a default placeholder argument; returns true when consumed so the caller
   // skips to the next argument.
@@ -487,10 +537,11 @@ std::vector<FunctionArg> Parser::ParseFunctionArgs(bool require_identifiers) {
     bool dir_explicit = false;
     sticky_dir = ParseArgDirection(arg, sticky_dir, &dir_explicit);
 
-    inherit_ref_qualifiers(arg, dir_explicit);
+    InheritRefQualifiers(args, arg, dir_explicit);
     Match(TokenKind::kKwVar);
     arg.data_type = ParseDataType();
-    resolve_implicit_data_type(arg, dir_explicit);
+    ResolveImplicitArgDataType(arg, prev_data_type, dir_explicit, first_arg,
+                               prev_was_default);
 
     parse_arg_trailer(arg);
     prev_data_type = arg.data_type;
@@ -757,9 +808,7 @@ void Parser::ParseOldStylePortDecls(ModuleItem* item, TokenKind end_kw) {
     if (Check(TokenKind::kAttrStart)) {
       ParseAttributes();
     }
-    if (!(Check(TokenKind::kKwInput) || Check(TokenKind::kKwOutput) ||
-          Check(TokenKind::kKwInout) || Check(TokenKind::kKwRef) ||
-          Check(TokenKind::kKwConst))) {
+    if (!IsTfPortDirectionKw(CurrentToken().kind)) {
       lexer_.RestorePos(saved);
       break;
     }
@@ -769,11 +818,7 @@ void Parser::ParseOldStylePortDecls(ModuleItem* item, TokenKind end_kw) {
         (dir == Direction::kRef) && Match(TokenKind::kKwStatic);
     Match(TokenKind::kKwVar);
     DataType dt = ParseDataType();
-
-    if (dt.kind == DataTypeKind::kImplicit && dt.packed_dim_left == nullptr &&
-        !dt.is_signed) {
-      dt.kind = DataTypeKind::kLogic;
-    }
+    DefaultImplicitToLogic(dt);
 
     parse_port_declarators(dir, is_const, is_ref_static, dt);
   }

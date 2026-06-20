@@ -129,19 +129,15 @@ RsProd Parser::ParseRsProd() {
     bool seen_default = false;
     // 18.17.3: a case production statement shall contain at most one default
     // item; flag any additional default as illegal.
-    auto parse_one_case_item = [&]() {
+    while (!Check(TokenKind::kKwEndcase) && !AtEnd()) {
       auto item_loc = CurrentLoc();
       bool is_default_here = Check(TokenKind::kKwDefault);
       prod.case_items.push_back(ParseRsCaseItem());
-      if (!is_default_here) return;
-      if (seen_default) {
+      if (is_default_here && seen_default) {
         diag_.Error(item_loc,
                     "case production shall have at most one 'default' item");
       }
-      seen_default = true;
-    };
-    while (!Check(TokenKind::kKwEndcase) && !AtEnd()) {
-      parse_one_case_item();
+      if (is_default_here) seen_default = true;
     }
     Expect(TokenKind::kKwEndcase);
     return prod;
@@ -406,6 +402,20 @@ void Parser::ParseCovergroupFormalList(std::vector<std::string>& names) {
   if (Check(TokenKind::kRParen)) Consume();
 }
 
+// §19.8.1: a sample method formal shares the covergroup argument scope, so a
+// name appearing in both the covergroup formal list and the sample formal list
+// is illegal. Returns true when the pending sample formal name reuses one of
+// the covergroup formal-argument names. Free of Parser state so it stays out of
+// the caller's cognitive-complexity budget.
+static bool ReusesCovergroupFormal(
+    const std::vector<std::string>& covergroup_formals,
+    std::string_view pending) {
+  for (const auto& formal : covergroup_formals) {
+    if (formal == pending) return true;
+  }
+  return false;
+}
+
 void Parser::ParseSampleFormalList(
     const std::vector<std::string>& covergroup_formals) {
   // Scan across the formal-argument list of an overridden sample method
@@ -415,14 +425,9 @@ void Parser::ParseSampleFormalList(
   // argument scope (the formals consumed by the covergroup new operator), a
   // name shall not be specified in both the covergroup and sample lists.
   TfPortFormalScan st;
-  auto reuses_covergroup_formal = [&]() {
-    for (const auto& formal : covergroup_formals) {
-      if (formal == st.pending) return true;
-    }
-    return false;
-  };
   auto flush = [&]() {
-    if (st.have_pending && reuses_covergroup_formal()) {
+    if (st.have_pending &&
+        ReusesCovergroupFormal(covergroup_formals, st.pending)) {
       diag_.Error(st.pending_loc,
                   "sample method formal argument '" + std::string(st.pending) +
                       "' shares the covergroup argument scope and cannot "

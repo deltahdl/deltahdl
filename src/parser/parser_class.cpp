@@ -570,6 +570,35 @@ void RecordConstraintTokenRefs(ClassMember* member, const Token& tok,
   if (tok.kind == TokenKind::kSemicolon) in_soft = false;
 }
 
+// 18.5.3/18.5.7.1/18.5.11/18.5.13.1: the structural tokens that the constraint
+// block scan tracks for their own sake rather than as expression leaves: a
+// brace adjusts the block-nesting depth, and 'soft' opens a soft-constraint
+// expression whose bare local variables are collected until its ';'. The token
+// has just been consumed by the caller, so this only applies its pure effect on
+// the running depth/in_soft scan state.
+void ApplyConstraintStructuralToken(TokenKind kind, int& depth, bool& in_soft) {
+  switch (kind) {
+    case TokenKind::kLBrace:
+      ++depth;
+      break;
+    case TokenKind::kRBrace:
+      --depth;
+      break;
+    case TokenKind::kKwSoft:
+      in_soft = true;
+      break;
+    default:
+      break;
+  }
+}
+
+// 18.5.11: a leaf token closes a member/scope qualifier when it is a '.' or
+// '::', so the identifier that follows is part of a qualified name rather than
+// an unqualified call on the enclosing class.
+bool LeafClosesQualifier(const Token& tok) {
+  return tok.kind == TokenKind::kDot || tok.kind == TokenKind::kColonColon;
+}
+
 }  // namespace
 
 ClassMember* Parser::ParseConstraintStub(ClassMember* member) {
@@ -613,47 +642,36 @@ ClassMember* Parser::ParseConstraintStub(ClassMember* member) {
     // the leaf-token tail (which alone consults the previous leaf's qualifier).
     bool carried_qualifier = prev_was_qualifier;
     prev_was_qualifier = false;
-    switch (CurrentToken().kind) {
-      case TokenKind::kKwForeach:
-        // 18.5.7.1: a foreach iterative constraint heads its constraint_set
-        // with 'foreach ( array_id [ loop_variables ] )'. Validate that header
-        // (in particular the loop-variable naming rule) and record it on the
-        // member for the elaborator's dimension check before the surrounding
-        // scan resumes over the constraint_set body.
-        CheckForeachConstraintHeader(member);
-        continue;
-      case TokenKind::kKwSolve:
-        // 18.5.9: 'solve solve_before_list before solve_before_list ;' defines
-        // a partial ordering on the evaluation of random variables. Record the
-        // two lists on the member so the elaborator can enforce the ordering
-        // restrictions and reject circular dependencies; the statement is
-        // consumed through its terminating ';' before the surrounding scan
-        // resumes.
-        CheckSolveBeforeConstraint(member);
-        continue;
-      case TokenKind::kKwSoft:
-        // 18.5.13.1: 'soft' introduces a soft constraint ('soft
-        // expression_or_dist ;'). Begin collecting the bare local variables its
-        // expression names; the collection ends at the terminating ';'.
-        Consume();
-        in_soft = true;
-        continue;
-      case TokenKind::kKwDist:
-        // 18.5.3: 'expression dist { dist_list }'. Hand the brace-enclosed
-        // dist_list to a dedicated scan so its default-item rules are enforced.
-        Consume();
-        CheckDistSet();
-        continue;
-      case TokenKind::kLBrace:
-        Consume();
-        ++depth;
-        continue;
-      case TokenKind::kRBrace:
-        Consume();
-        --depth;
-        continue;
-      default:
-        break;
+    TokenKind kind = CurrentToken().kind;
+    // 18.5.7.1: 'foreach ( array_id [ loop_variables ] )' heads an iterative
+    // constraint; validate its header (the loop-variable naming rule) and
+    // record it for the elaborator's dimension check before the scan resumes.
+    if (kind == TokenKind::kKwForeach) {
+      CheckForeachConstraintHeader(member);
+      continue;
+    }
+    // 18.5.9: 'solve solve_before_list before solve_before_list ;' is consumed
+    // through its ';', recording the two lists for the elaborator's ordering
+    // and circular-dependency checks.
+    if (kind == TokenKind::kKwSolve) {
+      CheckSolveBeforeConstraint(member);
+      continue;
+    }
+    // 18.5.3: 'expression dist { dist_list }' hands the brace-enclosed
+    // dist_list to a dedicated scan so its default-item rules are enforced.
+    if (kind == TokenKind::kKwDist) {
+      Consume();
+      CheckDistSet();
+      continue;
+    }
+    // 18.5.13.1/structural: 'soft' opens a soft constraint and a brace adjusts
+    // the block-nesting depth; consume the token and apply its pure scan
+    // effect.
+    if (kind == TokenKind::kKwSoft || kind == TokenKind::kLBrace ||
+        kind == TokenKind::kRBrace) {
+      Consume();
+      ApplyConstraintStructuralToken(kind, depth, in_soft);
+      continue;
     }
     Token t = CurrentToken();
     CheckConstraintExprToken(t);
@@ -667,8 +685,7 @@ ClassMember* Parser::ParseConstraintStub(ClassMember* member) {
                                Check(TokenKind::kDot),
                                Check(TokenKind::kColonColon)},
         in_soft);
-    prev_was_qualifier =
-        t.kind == TokenKind::kDot || t.kind == TokenKind::kColonColon;
+    prev_was_qualifier = LeafClosesQualifier(t);
   }
   return member;
 }

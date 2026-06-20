@@ -31,14 +31,12 @@ uint32_t FindSignalWidth(std::string_view name, const RtlirModule* mod) {
   }
   return 0;
 }
-
 NetType FindSignalNetType(std::string_view name, const RtlirModule* mod) {
   for (const auto& n : mod->nets) {
     if (n.name == name) return n.net_type;
   }
   return NetType::kNone;
 }
-
 DataTypeKind NormalizeForCompatibility(DataTypeKind kind) {
   switch (kind) {
     case DataTypeKind::kWire:
@@ -58,7 +56,6 @@ DataTypeKind NormalizeForCompatibility(DataTypeKind kind) {
       return kind;
   }
 }
-
 int NetTypeGroup(NetType t) {
   switch (t) {
     case NetType::kWire:
@@ -86,7 +83,6 @@ int NetTypeGroup(NetType t) {
       return -1;
   }
 }
-
 bool DissimilarNetTypeRequiresWarning(NetType internal, NetType external) {
   static constexpr bool kWarnTable[9][9] = {
       {false, false, false, false, false, false, false, false, false},
@@ -104,7 +100,6 @@ bool DissimilarNetTypeRequiresWarning(NetType internal, NetType external) {
   if (ig < 0 || eg < 0) return false;
   return kWarnTable[ig][eg];
 }
-
 NetType PortNetType(DataTypeKind kind) {
   switch (kind) {
     case DataTypeKind::kWire:
@@ -135,24 +130,27 @@ NetType PortNetType(DataTypeKind kind) {
       return NetType::kNone;
   }
 }
-
 Expr* MakePullExprIn(Arena& arena, NetType drive) {
   auto* expr = arena.Create<Expr>();
   expr->kind = ExprKind::kIntegerLiteral;
   expr->int_val = (drive == NetType::kTri1) ? 1 : 0;
   return expr;
 }
-
 Expr* MakeHighZExprIn(Arena& arena) {
   auto* expr = arena.Create<Expr>();
   expr->kind = ExprKind::kUnbasedUnsizedLiteral;
   expr->text = "'z";
   return expr;
 }
-
-// Synthesized connection for an unconnected input port: a pull expression when
-// an unconnected drive is set, else high-Z for a net-typed (non-var) port, else
-// nullptr. Shared by the wildcard and trailing-input completion loops.
+// Identifier reference expression naming `name`, for synthesized connections.
+Expr* MakeIdentExprIn(Arena& arena, std::string_view name) {
+  auto* expr = arena.Create<Expr>();
+  expr->kind = ExprKind::kIdentifier;
+  expr->text = name;
+  return expr;
+}
+// Synthesized connection for an unconnected input: pull, else high-Z net, else
+// null.
 Expr* DefaultInputConnection(Arena& arena, const RtlirPort& port, bool has_pull,
                              NetType drive) {
   if (has_pull) return MakePullExprIn(arena, drive);
@@ -161,9 +159,7 @@ Expr* DefaultInputConnection(Arena& arena, const RtlirPort& port, bool has_pull,
   }
   return nullptr;
 }
-
-// True when `port_name` already appears among the instance's explicit port
-// connections; lets the completion loops skip already-bound ports.
+// True when `port_name` already appears among the explicit port connections.
 bool PortExplicitlyConnected(
     const std::vector<std::pair<std::string_view, Expr*>>& inst_ports,
     std::string_view port_name) {
@@ -172,19 +168,7 @@ bool PortExplicitlyConnected(
   return false;
 }
 
-}  // namespace
-
-Expr* Elaborator::MakePullExpr(NetType drive) {
-  return MakePullExprIn(arena_, drive);
-}
-
-Expr* Elaborator::MakeHighZExpr() { return MakeHighZExprIn(arena_); }
-
-namespace {
-
-// §23.3.3 per-instance port-binding context: the diagnostic sink and
-// instantiation site errors report against, the instantiating module, and its
-// signal classifications consulted by the connection checks.
+// §23.3.3 per-instance port-binding context shared by the connection checks.
 struct PortBindCtx {
   DiagEngine& diag;
   const ModuleItem* item;
@@ -204,9 +188,7 @@ struct IdentConnection {
   std::string_view port_name;
   bool is_var;
 };
-
-// §23.3.2.3 implicit .name form: the connected signal shall have an equivalent
-// width and (for a net port) a non-dissimilar net type; both mismatches error.
+// §23.3.2.3 implicit .name form: connected signal shall match width/net type.
 void CheckImplicitNamedPortNetTypes(const PortBindCtx& ctx,
                                     std::string_view port_name,
                                     const Expr* conn_expr,
@@ -219,7 +201,6 @@ void CheckImplicitNamedPortNetTypes(const PortBindCtx& ctx,
                                "signal width {})",
                                port_name, port_it->width, sig_width));
   }
-
   NetType pnet = PortNetType(port_it->type_kind);
   if (pnet == NetType::kNone) return;
   NetType snet = FindSignalNetType(conn_expr->text, ctx.parent_mod);
@@ -234,9 +215,7 @@ void CheckImplicitNamedPortNetTypes(const PortBindCtx& ctx,
                                port_name));
   }
 }
-
-// §23.3.3.7: an explicit named or ordered connection between dissimilar net
-// types warns. Applies only to the non-implicit identifier connection form.
+// §23.3.3.7: explicit identifier connection between dissimilar net types warns.
 void CheckExplicitNamedPortNetTypes(const PortBindCtx& ctx, bool is_implicit,
                                     const Expr* conn_expr,
                                     const RtlirPort* port_it,
@@ -255,9 +234,8 @@ void CheckExplicitNamedPortNetTypes(const PortBindCtx& ctx, bool is_implicit,
                                  binding_port_name));
   }
 }
-
-// §23.3.3.x: every ref port of the instantiated module shall have a connected
-// binding; emits an error for each that is left unconnected.
+// §23.3.3.x: every ref port shall be connected; errors on each left
+// unconnected.
 void CheckRefPortsConnected(DiagEngine& diag,
                             const std::vector<RtlirPort>& child_ports,
                             const RtlirModuleInst& inst,
@@ -279,7 +257,6 @@ void CheckRefPortsConnected(DiagEngine& diag,
     }
   }
 }
-
 // Interface type named by `conn_name`; `found` reports whether it is known.
 std::string_view ResolveConnectedInterfaceType(const PortBindCtx& ctx,
                                                std::string_view conn_name,
@@ -298,9 +275,7 @@ std::string_view ResolveConnectedInterfaceType(const PortBindCtx& ctx,
   found = false;
   return {};
 }
-
-// Validates one interface port binding: it must be connected, name an interface
-// instance or interface port, and match the port's declared interface type.
+// Validates one interface port binding (connected, type-matched interface).
 void CheckOneInterfacePortConnected(const PortBindCtx& ctx,
                                     const RtlirPort& port,
                                     const RtlirModuleInst& inst) {
@@ -326,7 +301,6 @@ void CheckOneInterfacePortConnected(const PortBindCtx& ctx,
              conn->rhs->kind == ExprKind::kIdentifier) {
     conn_name = conn->lhs->text;
   }
-
   bool found = false;
   std::string_view conn_ifc_type =
       conn_name.empty() ? std::string_view{}
@@ -338,7 +312,6 @@ void CheckOneInterfacePortConnected(const PortBindCtx& ctx,
                                port.name));
     return;
   }
-
   if (!port.interface_type_name.empty() && !conn_ifc_type.empty() &&
       port.interface_type_name != conn_ifc_type) {
     ctx.diag.Error(
@@ -348,7 +321,6 @@ void CheckOneInterfacePortConnected(const PortBindCtx& ctx,
                     port.name, port.interface_type_name, conn_ifc_type));
   }
 }
-
 void CheckInterfacePortsConnected(const PortBindCtx& ctx,
                                   const std::vector<RtlirPort>& child_ports,
                                   const RtlirModuleInst& inst) {
@@ -357,9 +329,7 @@ void CheckInterfacePortsConnected(const PortBindCtx& ctx,
     CheckOneInterfacePortConnected(ctx, port, inst);
   }
 }
-
-// §23.3.3.2: true when `conn_name` resolves to an interconnect signal of the
-// instantiating module (a local interconnect net or interconnect port).
+// §23.3.3.2: true when `conn_name` is an interconnect net or interconnect port.
 bool ConnectsToInterconnect(
     std::string_view conn_name,
     const std::unordered_set<std::string_view>& interconnect_names,
@@ -369,9 +339,7 @@ bool ConnectsToInterconnect(
     if (p.name == conn_name && p.is_interconnect) return true;
   return false;
 }
-
-// §23.3.x directional connection legality for an identifier connection bound to
-// a port; the four independent rules match the original inline sequence.
+// §23.3.x directional legality (four rules) for an identifier connection.
 void CheckDirectionalConnectionLegality(const PortBindCtx& ctx,
                                         const IdentConnection& conn) {
   DiagEngine& diag = ctx.diag;
@@ -401,9 +369,8 @@ void CheckDirectionalConnectionLegality(const PortBindCtx& ctx,
                                 pn, cn));
   }
 }
-
-// §23.3.3 assignment-compatibility check for an identifier connection to a
-// non-interface port, followed by the shared directional legality checks.
+// §23.3.3 assignment-compat + directional legality for an identifier
+// connection.
 void CheckExplicitIdentifierConnection(const PortBindCtx& ctx,
                                        const Expr* conn_expr,
                                        const RtlirPort& port,
@@ -430,12 +397,10 @@ void CheckExplicitIdentifierConnection(const PortBindCtx& ctx,
       }
     }
   }
-
   CheckDirectionalConnectionLegality(
       ctx, IdentConnection{port.direction, conn_expr->text, binding_port_name,
                            port.is_var});
 }
-
 // True when a replication operator appears anywhere in `e`.
 bool ConnectionHasReplication(const Expr* e) {
   if (!e) return false;
@@ -446,8 +411,227 @@ bool ConnectionHasReplication(const Expr* e) {
   }
   return false;
 }
+// §23.3.3 extra state the completion loops need beyond PortBindCtx.
+struct PortCompletionCtx {
+  Arena& arena;
+  std::unordered_map<std::string_view, SourceLoc>& output_port_targets;
+  bool has_pull;
+  NetType drive;
+};
+// §23.3.2.3 implicit named connection: named signal shall be declared in scope.
+void CheckImplicitNamedDeclared(const PortBindCtx& ctx,
+                                std::string_view port_name,
+                                const Expr* conn_expr) {
+  if (IsNameDeclared(conn_expr->text, ctx.parent_mod)) return;
+  ctx.diag.Error(
+      ctx.item->loc,
+      std::format("implicit named port connection '.{}' requires signal '{}' "
+                  "to be declared in the instantiating scope",
+                  port_name, conn_expr->text));
+}
+// §23.3.x resolves a connection's child port, fills binding fields, runs
+// checks.
+std::vector<RtlirPort>::const_iterator ResolveBindingPort(
+    const PortBindCtx& ctx, const std::vector<RtlirPort>& child_ports,
+    const RtlirModuleInst& inst, RtlirPortBinding& binding, size_t i,
+    std::string_view port_name, const Expr* conn_expr, bool is_implicit,
+    bool is_ordered, bool& overflow) {
+  overflow = false;
+  auto it = child_ports.end();
+  if (is_ordered) {
+    if (i < child_ports.size()) {
+      it = child_ports.begin() + static_cast<ptrdiff_t>(i);
+      binding.port_name = it->name;
+    } else {
+      ctx.diag.Warning(
+          ctx.item->loc,
+          std::format("too many ordered port connections for module '{}'"
+                      " (expected {}, got {})",
+                      inst.module_name, child_ports.size(),
+                      ctx.item->inst_ports.size()));
+      overflow = true;
+      return child_ports.end();
+    }
+  } else {
+    binding.port_name = port_name;
+    it = std::find_if(child_ports.begin(), child_ports.end(),
+                      [&](const RtlirPort& p) { return p.name == port_name; });
+  }
+  if (it == child_ports.end()) {
+    ctx.diag.Warning(ctx.item->loc,
+                     std::format("port '{}' not found on module '{}'",
+                                 port_name, inst.module_name));
+    binding.direction = Direction::kInput;
+    binding.width = 1;
+    return it;
+  }
+  binding.direction = it->direction;
+  binding.width = it->width;
+  if (is_implicit && conn_expr &&
+      IsNameDeclared(conn_expr->text, ctx.parent_mod)) {
+    CheckImplicitNamedPortNetTypes(ctx, port_name, conn_expr, &*it);
+  }
+  CheckExplicitNamedPortNetTypes(ctx, is_implicit, conn_expr, &*it,
+                                 binding.port_name);
+  return it;
+}
+// §23.3.3 syntactic legality: no replication in output/inout, no
+// assign-pattern.
+void CheckConnectionExprLegality(const PortBindCtx& ctx, const Expr* conn_expr,
+                                 Direction direction) {
+  if (!conn_expr) return;
+  if (direction != Direction::kInput && ConnectionHasReplication(conn_expr)) {
+    ctx.diag.Error(conn_expr->range.start,
+                   "replication shall not appear in an output or inout "
+                   "port connection");
+  }
+  bool is_pattern = conn_expr->kind == ExprKind::kAssignmentPattern ||
+                    (conn_expr->kind == ExprKind::kCast && conn_expr->lhs &&
+                     conn_expr->lhs->kind == ExprKind::kAssignmentPattern);
+  if (is_pattern) {
+    ctx.diag.Error(conn_expr->range.start,
+                   "assignment pattern expression shall not be used in a "
+                   "port expression");
+  }
+}
+// §23.3.3.2: records a non-input port's driven name; errors on a second driver.
+void RegisterOutputTarget(const PortBindCtx& ctx, PortCompletionCtx& comp,
+                          Direction direction, std::string_view name) {
+  if (direction == Direction::kInput || ctx.net_names.count(name) != 0) return;
+  if (!comp.output_port_targets.emplace(name, ctx.item->loc).second) {
+    ctx.diag.Error(
+        ctx.item->loc,
+        std::format("variable '{}' driven by multiple outputs", name));
+  }
+}
+// §25.5: header and instance modport selections shall name the same modport.
+void CheckModportHeaderMatch(const PortBindCtx& ctx,
+                             const ModuleDecl* child_decl,
+                             const RtlirPort& port, const Expr* conn_expr,
+                             std::string_view binding_port_name) {
+  if (!port.is_interface_port || !conn_expr ||
+      conn_expr->kind != ExprKind::kMemberAccess || !conn_expr->lhs ||
+      conn_expr->lhs->kind != ExprKind::kIdentifier || !conn_expr->rhs ||
+      conn_expr->rhs->kind != ExprKind::kIdentifier) {
+    return;
+  }
+  std::string_view header_modport;
+  if (child_decl) {
+    for (const auto& p : child_decl->ports) {
+      if (p.name == binding_port_name) {
+        header_modport = p.data_type.modport_name;
+        break;
+      }
+    }
+  }
+  auto connection_modport = conn_expr->rhs->text;
+  if (!header_modport.empty() && !connection_modport.empty() &&
+      header_modport != connection_modport) {
+    ctx.diag.Error(
+        ctx.item->loc,
+        std::format("interface port '{}' selects modport '{}' in the module "
+                    "header but '{}' in the instance connection; both shall "
+                    "name the same modport",
+                    binding_port_name, header_modport, connection_modport));
+  }
+}
+// §23.3.2.4 default for an unconnected port: declared default, else input
+// synth.
+Expr* DefaultUnconnectedConnection(const PortCompletionCtx& comp,
+                                   const RtlirPort& port) {
+  if (port.default_value) return port.default_value;
+  if (port.direction == Direction::kInput) {
+    return DefaultInputConnection(comp.arena, port, comp.has_pull, comp.drive);
+  }
+  return nullptr;
+}
+// §23.3.2.4 synthesizes a wildcard (.*) binding for one unconnected child port.
+void BindOneWildcardPort(const PortBindCtx& ctx, PortCompletionCtx& comp,
+                         const RtlirModuleInst& inst, const RtlirPort& port,
+                         RtlirModuleInst& out_inst) {
+  RtlirPortBinding binding;
+  binding.port_name = port.name;
+  binding.direction = port.direction;
+  binding.width = port.width;
+  if (port.is_interface_port) {
+    if (port.interface_type_name.empty()) {
+      ctx.diag.Error(ctx.item->loc,
+                     std::format("implicit .* port connection cannot reference "
+                                 "generic interface port '{}' of module '{}'",
+                                 port.name, inst.module_name));
+    } else if (ctx.interface_inst_types.count(port.name)) {
+      binding.connection = MakeIdentExprIn(comp.arena, port.name);
+    }
+  } else if (IsNameDeclared(port.name, ctx.parent_mod)) {
+    uint32_t sig_width = FindSignalWidth(port.name, ctx.parent_mod);
+    if (sig_width != 0 && sig_width != port.width) {
+      ctx.diag.Error(ctx.item->loc,
+                     std::format("implicit .* port connection '.{}' requires "
+                                 "equivalent data types (port width {}, "
+                                 "signal width {})",
+                                 port.name, port.width, sig_width));
+    }
+    NetType pnet = PortNetType(port.type_kind);
+    if (pnet != NetType::kNone) {
+      NetType snet = FindSignalNetType(port.name, ctx.parent_mod);
+      if (snet != NetType::kNone && snet != pnet &&
+          snet != NetType::kInterconnect && !port.is_interconnect) {
+        ctx.diag.Error(ctx.item->loc,
+                       std::format("implicit .* port connection '.{}' between "
+                                   "dissimilar net types",
+                                   port.name));
+      }
+    }
+    CheckDirectionalConnectionLegality(
+        ctx,
+        IdentConnection{port.direction, port.name, port.name, port.is_var});
+    binding.connection = MakeIdentExprIn(comp.arena, port.name);
+    RegisterOutputTarget(ctx, comp, binding.direction, port.name);
+  } else {
+    binding.connection = DefaultUnconnectedConnection(comp, port);
+  }
+  if (binding.connection) {
+    out_inst.port_bindings.push_back(binding);
+  }
+}
+
+// §23.3.2.4 completes unconnected ports (wildcard binds all; else trailing in).
+void CompleteUnconnectedPorts(const PortBindCtx& ctx, PortCompletionCtx& comp,
+                              const RtlirModuleInst& inst,
+                              const std::vector<RtlirPort>& child_ports,
+                              bool is_ordered, RtlirModuleInst& out_inst) {
+  if (ctx.item->inst_wildcard) {
+    for (const auto& port : child_ports) {
+      if (PortExplicitlyConnected(ctx.item->inst_ports, port.name)) continue;
+      BindOneWildcardPort(ctx, comp, inst, port, out_inst);
+    }
+    return;
+  }
+  size_t first_unconnected = is_ordered ? ctx.item->inst_ports.size() : 0;
+  for (size_t i = first_unconnected; i < child_ports.size(); ++i) {
+    const auto& port = child_ports[i];
+    if (port.direction != Direction::kInput) continue;
+    if (!is_ordered &&
+        PortExplicitlyConnected(ctx.item->inst_ports, port.name)) {
+      continue;
+    }
+    RtlirPortBinding binding;
+    binding.port_name = port.name;
+    binding.direction = port.direction;
+    binding.width = port.width;
+    binding.connection = DefaultUnconnectedConnection(comp, port);
+    if (binding.connection) {
+      out_inst.port_bindings.push_back(binding);
+    }
+  }
+}
 
 }  // namespace
+
+Expr* Elaborator::MakePullExpr(NetType drive) {
+  return MakePullExprIn(arena_, drive);
+}
+Expr* Elaborator::MakeHighZExpr() { return MakeHighZExprIn(arena_); }
 
 void Elaborator::BindPorts(RtlirModuleInst& inst, const ModuleItem* item,
                            RtlirModule* parent_mod) {
@@ -463,6 +647,10 @@ void Elaborator::BindPorts(RtlirModuleInst& inst, const ModuleItem* item,
       diag_,      item,       parent_mod,          nettype_net_names_,
       var_types_, net_names_, interconnect_names_, interface_inst_types_};
 
+  const ModuleDecl* child_decl = FindModule(inst.module_name);
+  PortCompletionCtx kCompCtx{arena_, output_port_targets_, kHasPull,
+                             unit_->unconnected_drive};
+
   for (size_t i = 0; i < item->inst_ports.size(); ++i) {
     auto& [port_name, conn_expr] = item->inst_ports[i];
     const bool kIsImplicit =
@@ -470,237 +658,51 @@ void Elaborator::BindPorts(RtlirModuleInst& inst, const ModuleItem* item,
 
     if (conn_expr && conn_expr->kind == ExprKind::kIdentifier) {
       if (kIsImplicit) {
-        if (!IsNameDeclared(conn_expr->text, parent_mod)) {
-          diag_.Error(
-              item->loc,
-              std::format(
-                  "implicit named port connection '.{}' requires "
-                  "signal '{}' to be declared in the instantiating scope",
-                  port_name, conn_expr->text));
-        }
+        CheckImplicitNamedDeclared(kPortCtx, port_name, conn_expr);
       } else if (!interface_inst_types_.count(conn_expr->text)) {
         MaybeCreateImplicitNet(conn_expr->text, item->loc, parent_mod);
       }
     }
     RtlirPortBinding binding;
     binding.connection = conn_expr;
-
-    auto it = child_ports.end();
-    if (kIsOrdered) {
-      if (i < child_ports.size()) {
-        it = child_ports.begin() + static_cast<ptrdiff_t>(i);
-        binding.port_name = it->name;
-      } else {
-        diag_.Warning(
-            item->loc,
-            std::format("too many ordered port connections for module '{}'"
-                        " (expected {}, got {})",
-                        inst.module_name, child_ports.size(),
-                        item->inst_ports.size()));
-        break;
-      }
-    } else {
-      binding.port_name = port_name;
-      it =
-          std::find_if(child_ports.begin(), child_ports.end(),
-                       [&](const RtlirPort& p) { return p.name == port_name; });
-    }
-
-    if (it == child_ports.end()) {
-      diag_.Warning(item->loc, std::format("port '{}' not found on module '{}'",
-                                           port_name, inst.module_name));
-      binding.direction = Direction::kInput;
-      binding.width = 1;
-    } else {
-      binding.direction = it->direction;
-      binding.width = it->width;
-
-      if (kIsImplicit && conn_expr &&
-          IsNameDeclared(conn_expr->text, parent_mod)) {
-        CheckImplicitNamedPortNetTypes(kPortCtx, port_name, conn_expr, &*it);
-      }
-
-      CheckExplicitNamedPortNetTypes(kPortCtx, kIsImplicit, conn_expr, &*it,
-                                     binding.port_name);
-    }
-
+    bool overflow = false;
+    auto it =
+        ResolveBindingPort(kPortCtx, child_ports, inst, binding, i, port_name,
+                           conn_expr, kIsImplicit, kIsOrdered, overflow);
+    if (overflow) break;
     if (conn_expr && conn_expr->kind == ExprKind::kIdentifier &&
         it != child_ports.end() && !it->is_interface_port) {
       CheckExplicitIdentifierConnection(kPortCtx, conn_expr, *it,
                                         binding.port_name);
     }
-
-    if (conn_expr && binding.direction != Direction::kInput &&
-        ConnectionHasReplication(conn_expr)) {
-      diag_.Error(conn_expr->range.start,
-                  "replication shall not appear in an output or inout "
-                  "port connection");
+    CheckConnectionExprLegality(kPortCtx, conn_expr, binding.direction);
+    if (conn_expr && conn_expr->kind == ExprKind::kIdentifier) {
+      RegisterOutputTarget(kPortCtx, kCompCtx, binding.direction,
+                           conn_expr->text);
     }
-
-    if (conn_expr) {
-      bool is_pattern = conn_expr->kind == ExprKind::kAssignmentPattern ||
-                        (conn_expr->kind == ExprKind::kCast && conn_expr->lhs &&
-                         conn_expr->lhs->kind == ExprKind::kAssignmentPattern);
-      if (is_pattern) {
-        diag_.Error(conn_expr->range.start,
-                    "assignment pattern expression shall not be used in a "
-                    "port expression");
-      }
-    }
-
-    if (conn_expr && conn_expr->kind == ExprKind::kIdentifier &&
-        binding.direction != Direction::kInput &&
-        net_names_.count(conn_expr->text) == 0) {
-      auto name = conn_expr->text;
-      if (!output_port_targets_.emplace(name, item->loc).second) {
-        diag_.Error(
-            item->loc,
-            std::format("variable '{}' driven by multiple outputs", name));
-      }
-    }
-
     if (kIsOrdered && !binding.connection &&
         binding.direction == Direction::kInput && it != child_ports.end() &&
         it->default_value) {
       binding.connection = it->default_value;
     }
-
     if (kHasPull && !binding.connection &&
         binding.direction == Direction::kInput) {
       binding.connection = MakePullExpr(unit_->unconnected_drive);
     }
-
     if (!binding.connection && binding.direction == Direction::kInput &&
         it != child_ports.end() && !it->is_var &&
         PortNetType(it->type_kind) != NetType::kNone) {
       binding.connection = MakeHighZExpr();
     }
-
-    // §25.5: when a modport is selected in both the module header and the
-    // instance connection, both shall name the same modport.
-    if (it != child_ports.end() && it->is_interface_port && conn_expr &&
-        conn_expr->kind == ExprKind::kMemberAccess && conn_expr->lhs &&
-        conn_expr->lhs->kind == ExprKind::kIdentifier && conn_expr->rhs &&
-        conn_expr->rhs->kind == ExprKind::kIdentifier) {
-      std::string_view header_modport;
-      if (const auto* child_decl = FindModule(inst.module_name)) {
-        for (const auto& p : child_decl->ports) {
-          if (p.name == binding.port_name) {
-            header_modport = p.data_type.modport_name;
-            break;
-          }
-        }
-      }
-      auto connection_modport = conn_expr->rhs->text;
-      if (!header_modport.empty() && !connection_modport.empty() &&
-          header_modport != connection_modport) {
-        diag_.Error(
-            item->loc,
-            std::format(
-                "interface port '{}' selects modport '{}' in the module "
-                "header but '{}' in the instance connection; both shall "
-                "name the same modport",
-                binding.port_name, header_modport, connection_modport));
-      }
+    if (it != child_ports.end()) {
+      CheckModportHeaderMatch(kPortCtx, child_decl, *it, conn_expr,
+                              binding.port_name);
     }
-
     inst.port_bindings.push_back(binding);
   }
 
-  if (item->inst_wildcard) {
-    for (const auto& port : child_ports) {
-      if (PortExplicitlyConnected(item->inst_ports, port.name)) continue;
-
-      RtlirPortBinding binding;
-      binding.port_name = port.name;
-      binding.direction = port.direction;
-      binding.width = port.width;
-
-      if (port.is_interface_port) {
-        if (port.interface_type_name.empty()) {
-          diag_.Error(
-              item->loc,
-              std::format("implicit .* port connection cannot reference "
-                          "generic interface port '{}' of module '{}'",
-                          port.name, inst.module_name));
-        } else if (interface_inst_types_.count(port.name)) {
-          auto* expr = arena_.Create<Expr>();
-          expr->kind = ExprKind::kIdentifier;
-          expr->text = port.name;
-          binding.connection = expr;
-        }
-      } else if (IsNameDeclared(port.name, parent_mod)) {
-        uint32_t sig_width = FindSignalWidth(port.name, parent_mod);
-        if (sig_width != 0 && sig_width != port.width) {
-          diag_.Error(item->loc,
-                      std::format("implicit .* port connection '.{}' requires "
-                                  "equivalent data types (port width {}, "
-                                  "signal width {})",
-                                  port.name, port.width, sig_width));
-        }
-        NetType pnet = PortNetType(port.type_kind);
-        if (pnet != NetType::kNone) {
-          NetType snet = FindSignalNetType(port.name, parent_mod);
-          if (snet != NetType::kNone && snet != pnet &&
-              snet != NetType::kInterconnect && !port.is_interconnect) {
-            diag_.Error(item->loc,
-                        std::format("implicit .* port connection '.{}' between "
-                                    "dissimilar net types",
-                                    port.name));
-          }
-        }
-        CheckDirectionalConnectionLegality(
-            kPortCtx,
-            IdentConnection{port.direction, port.name, port.name, port.is_var});
-        auto* expr = arena_.Create<Expr>();
-        expr->kind = ExprKind::kIdentifier;
-        expr->text = port.name;
-        binding.connection = expr;
-        if (binding.direction != Direction::kInput &&
-            net_names_.count(port.name) == 0 &&
-            !output_port_targets_.emplace(port.name, item->loc).second) {
-          diag_.Error(item->loc,
-                      std::format("variable '{}' driven by multiple outputs",
-                                  port.name));
-        }
-      } else if (port.default_value) {
-        binding.connection = port.default_value;
-      } else if (port.direction == Direction::kInput) {
-        binding.connection = DefaultInputConnection(arena_, port, kHasPull,
-                                                    unit_->unconnected_drive);
-      }
-
-      if (binding.connection) {
-        inst.port_bindings.push_back(binding);
-      }
-    }
-  } else {
-    size_t first_unconnected = kIsOrdered ? item->inst_ports.size() : 0;
-    for (size_t i = first_unconnected; i < child_ports.size(); ++i) {
-      const auto& port = child_ports[i];
-      if (port.direction != Direction::kInput) continue;
-
-      if (!kIsOrdered && PortExplicitlyConnected(item->inst_ports, port.name)) {
-        continue;
-      }
-
-      RtlirPortBinding binding;
-      binding.port_name = port.name;
-      binding.direction = port.direction;
-      binding.width = port.width;
-
-      if (port.default_value) {
-        binding.connection = port.default_value;
-      } else {
-        binding.connection = DefaultInputConnection(arena_, port, kHasPull,
-                                                    unit_->unconnected_drive);
-      }
-
-      if (binding.connection) {
-        inst.port_bindings.push_back(binding);
-      }
-    }
-  }
+  CompleteUnconnectedPorts(kPortCtx, kCompCtx, inst, child_ports, kIsOrdered,
+                           inst);
 
   CheckRefPortsConnected(diag_, child_ports, inst, item);
   CheckInterfacePortsConnected(kPortCtx, child_ports, inst);
@@ -745,8 +747,7 @@ static const RtlirPort* FindChildPortByName(
   return &*port_it;
 }
 
-// Resolves the child port a binding connects to; nullptr when the binding has
-// no connection or names no matching child port.
+// Resolves the child port a binding connects to; nullptr when none/unconnected.
 static const RtlirPort* FindBoundChildPort(
     const std::vector<RtlirPort>& child_ports,
     const RtlirPortBinding& binding) {
@@ -832,8 +833,7 @@ void Elaborator::ResolveInterconnectPrimitiveTerminals(
   }
 }
 
-// Validates one unpacked-array port binding: the connection must be an
-// identifier naming an unpacked array with matching dimension count and sizes.
+// Validates one unpacked-array port binding (matching dim count and sizes).
 static void CheckUnpackedArrayPortBinding(
     DiagEngine& diag, const ModuleItem* item, const RtlirPortBinding& binding,
     const RtlirPort* port_it,
@@ -899,8 +899,7 @@ void Elaborator::ValidateUnpackedArrayPorts(const RtlirModuleInst& inst,
   }
 }
 
-// The connecting signal's unpacked-array shape: total dimension count and, when
-// known, the per-dimension sizes consulted by the instance-array check.
+// The connecting signal's unpacked-array shape: dim count and known dim sizes.
 struct ConnArrayShape {
   uint32_t num_dims;
   const std::vector<uint32_t>* dim_sizes;
@@ -949,6 +948,42 @@ static void CheckInstanceArrayUnpackedConn(
   }
 }
 
+// Validates one binding vs an instance-array port (unpacked shape or width).
+static void ValidateOneInstanceArrayPort(
+    const PortBindCtx& ctx, const RtlirPortBinding& binding,
+    const RtlirPort* port_it,
+    const std::unordered_map<std::string_view, Elaborator::VarArrayInfo>&
+        var_array_info,
+    const std::vector<uint32_t>& inst_dim_sizes, uint32_t total_instances) {
+  bool conn_is_unpacked = false;
+  ConnArrayShape shape{0, nullptr};
+  uint32_t conn_width = 0;
+  if (binding.connection->kind == ExprKind::kIdentifier) {
+    auto it = var_array_info.find(binding.connection->text);
+    if (it != var_array_info.end()) {
+      conn_is_unpacked = true;
+      shape =
+          ConnArrayShape{it->second.num_unpacked_dims, &it->second.dim_sizes};
+    }
+    conn_width = FindSignalWidth(binding.connection->text, ctx.parent_mod);
+  }
+  if (conn_is_unpacked) {
+    CheckInstanceArrayUnpackedConn(ctx, binding, port_it, shape,
+                                   inst_dim_sizes);
+    return;
+  }
+  if (conn_width == 0 || conn_width == port_it->width) return;
+  uint32_t expected_width = port_it->width * total_instances;
+  if (conn_width != expected_width) {
+    ctx.diag.Error(
+        ctx.item->loc,
+        std::format("packed array connection to port '{}' has width {} "
+                    "but expected {} ({} instances * port width {})",
+                    binding.port_name, conn_width, expected_width,
+                    total_instances, port_it->width));
+  }
+}
+
 void Elaborator::ValidateInstanceArrayPorts(
     const RtlirModuleInst& inst, const ModuleItem* item,
     RtlirModule* parent_mod, const std::vector<uint32_t>& inst_dim_sizes,
@@ -958,41 +993,11 @@ void Elaborator::ValidateInstanceArrayPorts(
   const PortBindCtx kPortCtx{
       diag_,      item,       parent_mod,          nettype_net_names_,
       var_types_, net_names_, interconnect_names_, interface_inst_types_};
-
   for (const auto& binding : inst.port_bindings) {
     const RtlirPort* port_it = FindBoundChildPort(child_ports, binding);
     if (!port_it) continue;
-
-    bool conn_is_unpacked = false;
-    uint32_t conn_num_dims = 0;
-    const std::vector<uint32_t>* conn_dim_sizes_ptr = nullptr;
-    uint32_t conn_width = 0;
-
-    if (binding.connection->kind == ExprKind::kIdentifier) {
-      auto it = var_array_info_.find(binding.connection->text);
-      if (it != var_array_info_.end()) {
-        conn_is_unpacked = true;
-        conn_num_dims = it->second.num_unpacked_dims;
-        conn_dim_sizes_ptr = &it->second.dim_sizes;
-      }
-      conn_width = FindSignalWidth(binding.connection->text, parent_mod);
-    }
-
-    if (conn_is_unpacked) {
-      CheckInstanceArrayUnpackedConn(
-          kPortCtx, binding, port_it,
-          ConnArrayShape{conn_num_dims, conn_dim_sizes_ptr}, inst_dim_sizes);
-    } else if (conn_width != 0 && conn_width != port_it->width) {
-      uint32_t expected_width = port_it->width * total_instances;
-      if (conn_width != expected_width) {
-        diag_.Error(
-            item->loc,
-            std::format("packed array connection to port '{}' has width {} "
-                        "but expected {} ({} instances * port width {})",
-                        binding.port_name, conn_width, expected_width,
-                        total_instances, port_it->width));
-      }
-    }
+    ValidateOneInstanceArrayPort(kPortCtx, binding, port_it, var_array_info_,
+                                 inst_dim_sizes, total_instances);
   }
 }
 

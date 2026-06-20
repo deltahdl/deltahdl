@@ -448,6 +448,16 @@ Expr* MakePostfixUnary(Arena& arena, TokenKind op, Expr* operand) {
   return post;
 }
 
+// Builds the placeholder integer-literal node returned after an "expected
+// expression" diagnostic, so parsing can continue past the offending token.
+// Pure node construction.
+Expr* MakeErrorExpr(Arena& arena, SourceLoc loc) {
+  auto* err = arena.Create<Expr>();
+  err->kind = ExprKind::kIntegerLiteral;
+  err->range.start = loc;
+  return err;
+}
+
 }  // namespace
 
 Expr* Parser::ParsePrimaryExpr() {
@@ -528,10 +538,7 @@ Expr* Parser::ParsePrimaryExpr() {
 
   diag_.Error(tok.loc, "expected expression");
   Consume();
-  auto* err = arena_.Create<Expr>();
-  err->kind = ExprKind::kIntegerLiteral;
-  err->range.start = tok.loc;
-  return err;
+  return MakeErrorExpr(arena_, tok.loc);
 }
 
 Expr* Parser::ParseCastOrTypedPattern() {

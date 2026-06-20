@@ -146,63 +146,91 @@ struct PropertyPortScan {
     saw_local = false;
   }
 
+  // depth==1 built-in type keyword: a built-in type keyword that does not
+  // directly follow `local` or `input` starts a fresh formal item whose
+  // qualifiers do not include `local`, so the local-variable run ends here.
+  void HandleBuiltinTypeKw(Lexer& lexer) {
+    if (prev_kind != TokenKind::kKwLocal && prev_kind != TokenKind::kKwInput) {
+      local_run = false;
+    }
+    lexer.Next();
+  }
+
+  // §16.12.19: a local variable formal argument of a named property shall have
+  // direction `input`; declaring one with direction `inout` or `output` is
+  // illegal. The borrowed A.2.10 production property_lvar_port_direction admits
+  // only `input`, so `output` and `inout` have no legal role inside a property
+  // port, with or without a preceding `local`.
+  void HandleIllegalDirection(Lexer& lexer, DiagEngine& diag) {
+    diag.Error(lexer.Peek().loc, "property port direction must be 'input'");
+    lexer.Next();
+    saw_local = false;
+  }
+
+  // `input` is permitted only after `local`.
+  void HandleInputDirection(Lexer& lexer, DiagEngine& diag) {
+    if (!saw_local) {
+      diag.Error(lexer.Peek().loc,
+                 "property port direction 'input' requires 'local'");
+    }
+    lexer.Next();
+    saw_local = false;
+  }
+
+  // Handles the depth==1 (top-level) tokens of the property port list. Returns
+  // true if the current token was consumed here; false means the caller falls
+  // through to the default skip. All branches assume depth==1 already holds.
+  bool DispatchTopLevel(Lexer& lexer, DiagEngine& diag, ModuleItem* item) {
+    if (LexerCheck(lexer, TokenKind::kComma)) {
+      lexer.Next();
+      expect_formal_name = true;
+      saw_local = false;
+    } else if (LexerCheck(lexer, TokenKind::kEq)) {
+      lexer.Next();
+      expect_formal_name = false;
+    } else if (LexerCheck(lexer, TokenKind::kKwLocal)) {
+      lexer.Next();
+      saw_local = true;
+      local_run = true;
+    } else if (IsBuiltinTypeKwForLocalVar(lexer.Peek().kind)) {
+      HandleBuiltinTypeKw(lexer);
+    } else if (LexerCheck(lexer, TokenKind::kKwOutput) ||
+               LexerCheck(lexer, TokenKind::kKwInout)) {
+      HandleIllegalDirection(lexer, diag);
+    } else if (LexerCheck(lexer, TokenKind::kKwInput)) {
+      HandleInputDirection(lexer, diag);
+    } else if (expect_formal_name &&
+               LexerCheck(lexer, TokenKind::kIdentifier)) {
+      HarvestFormalName(lexer, item);
+    } else {
+      return false;
+    }
+    return true;
+  }
+
+  // Dispatches one token to its handler, updating scan state. Returns false
+  // once the matching ')' for the opening '(' has been consumed.
+  bool Dispatch(Lexer& lexer, DiagEngine& diag, ModuleItem* item) {
+    if (LexerCheck(lexer, TokenKind::kLParen)) {
+      lexer.Next();
+      ++depth;
+      return true;
+    }
+    if (LexerCheck(lexer, TokenKind::kRParen)) {
+      lexer.Next();
+      --depth;
+      return depth != 0;
+    }
+    if (depth == 1 && DispatchTopLevel(lexer, diag, item)) return true;
+    lexer.Next();
+    return true;
+  }
+
   // Consumes one token of the port list. Returns false once the matching ')'
   // for the opening '(' has been consumed (list complete).
   bool Step(Lexer& lexer, DiagEngine& diag, ModuleItem* item) {
     TokenKind this_kind = lexer.Peek().kind;
-    bool keep_going = true;
-    if (LexerCheck(lexer, TokenKind::kLParen)) {
-      lexer.Next();
-      ++depth;
-    } else if (LexerCheck(lexer, TokenKind::kRParen)) {
-      lexer.Next();
-      --depth;
-      if (depth == 0) keep_going = false;
-    } else if (depth == 1 && LexerCheck(lexer, TokenKind::kComma)) {
-      lexer.Next();
-      expect_formal_name = true;
-      saw_local = false;
-    } else if (depth == 1 && LexerCheck(lexer, TokenKind::kEq)) {
-      lexer.Next();
-      expect_formal_name = false;
-    } else if (depth == 1 && LexerCheck(lexer, TokenKind::kKwLocal)) {
-      lexer.Next();
-      saw_local = true;
-      local_run = true;
-    } else if (depth == 1 && IsBuiltinTypeKwForLocalVar(lexer.Peek().kind)) {
-      // A built-in type keyword that does not directly follow `local` or
-      // `input` starts a fresh formal item whose qualifiers do not include
-      // `local`, so the local-variable run ends here.
-      if (prev_kind != TokenKind::kKwLocal &&
-          prev_kind != TokenKind::kKwInput) {
-        local_run = false;
-      }
-      lexer.Next();
-    } else if (depth == 1 && (LexerCheck(lexer, TokenKind::kKwOutput) ||
-                              LexerCheck(lexer, TokenKind::kKwInout))) {
-      // §16.12.19: a local variable formal argument of a named property
-      // shall have direction `input`; declaring one with direction `inout`
-      // or `output` is illegal. The borrowed A.2.10 production
-      // property_lvar_port_direction admits only `input`, so `output` and
-      // `inout` have no legal role inside a property port, with or without a
-      // preceding `local`.
-      diag.Error(lexer.Peek().loc, "property port direction must be 'input'");
-      lexer.Next();
-      saw_local = false;
-    } else if (depth == 1 && LexerCheck(lexer, TokenKind::kKwInput)) {
-      // `input` is permitted only after `local`.
-      if (!saw_local) {
-        diag.Error(lexer.Peek().loc,
-                   "property port direction 'input' requires 'local'");
-      }
-      lexer.Next();
-      saw_local = false;
-    } else if (expect_formal_name && depth == 1 &&
-               LexerCheck(lexer, TokenKind::kIdentifier)) {
-      HarvestFormalName(lexer, item);
-    } else {
-      lexer.Next();
-    }
+    bool keep_going = Dispatch(lexer, diag, item);
     prev_kind = this_kind;
     return keep_going;
   }
@@ -634,44 +662,67 @@ struct SequencePortScan {
     expect_formal_name = false;
   }
 
+  // depth==1 comma: finalize the closing port item, then prepare for the next.
+  void HandleComma(Lexer& lexer, DiagEngine& diag, ModuleItem* item) {
+    FinalizePortItem(diag, item);
+    lexer.Next();
+    item_start = lexer.Peek().loc;
+    ResetAfterComma(lexer);
+  }
+
+  // depth==1 `local`: opens a local-formal port item declared explicitly here.
+  void HandleLocal(Lexer& lexer) {
+    if (!item_saw_local) item_start = lexer.Peek().loc;
+    item_saw_local = true;
+    item_local_explicit_here = true;
+    lexer.Next();
+  }
+
+  // Handles the depth==1 (top-level) tokens of a port item. Returns true if the
+  // current token was consumed here; false means the caller falls through to
+  // the default skip. All branches assume depth==1 has already been
+  // established.
+  bool DispatchTopLevel(Lexer& lexer, DiagEngine& diag, ModuleItem* item) {
+    if (LexerCheck(lexer, TokenKind::kComma)) {
+      HandleComma(lexer, diag, item);
+    } else if (LexerCheck(lexer, TokenKind::kKwLocal)) {
+      HandleLocal(lexer);
+    } else if (LexerCheck(lexer, TokenKind::kKwInput) ||
+               LexerCheck(lexer, TokenKind::kKwOutput) ||
+               LexerCheck(lexer, TokenKind::kKwInout)) {
+      HandleDirection(lexer, diag);
+    } else if (IsBuiltinTypeKwForLocalVar(lexer.Peek().kind)) {
+      lexer.Next();
+      item_saw_explicit_type = true;
+    } else if (LexerCheck(lexer, TokenKind::kEq)) {
+      item_saw_eq = true;
+      lexer.Next();
+      expect_formal_name = false;
+    } else if (expect_formal_name &&
+               LexerCheck(lexer, TokenKind::kIdentifier)) {
+      HarvestFormalName(lexer, item);
+    } else {
+      return false;
+    }
+    return true;
+  }
+
   // Consumes one token of the port list. Returns false once the matching ')'
   // for the opening '(' has been consumed (list complete).
   bool Step(Lexer& lexer, DiagEngine& diag, ModuleItem* item) {
     if (LexerCheck(lexer, TokenKind::kLParen)) {
       lexer.Next();
       ++depth;
-    } else if (LexerCheck(lexer, TokenKind::kRParen)) {
+      return true;
+    }
+    if (LexerCheck(lexer, TokenKind::kRParen)) {
       if (depth == 1) FinalizePortItem(diag, item);
       lexer.Next();
       --depth;
-      if (depth == 0) return false;
-    } else if (depth == 1 && LexerCheck(lexer, TokenKind::kComma)) {
-      FinalizePortItem(diag, item);
-      lexer.Next();
-      item_start = lexer.Peek().loc;
-      ResetAfterComma(lexer);
-    } else if (depth == 1 && LexerCheck(lexer, TokenKind::kKwLocal)) {
-      if (!item_saw_local) item_start = lexer.Peek().loc;
-      item_saw_local = true;
-      item_local_explicit_here = true;
-      lexer.Next();
-    } else if (depth == 1 && (LexerCheck(lexer, TokenKind::kKwInput) ||
-                              LexerCheck(lexer, TokenKind::kKwOutput) ||
-                              LexerCheck(lexer, TokenKind::kKwInout))) {
-      HandleDirection(lexer, diag);
-    } else if (depth == 1 && IsBuiltinTypeKwForLocalVar(lexer.Peek().kind)) {
-      lexer.Next();
-      item_saw_explicit_type = true;
-    } else if (depth == 1 && LexerCheck(lexer, TokenKind::kEq)) {
-      item_saw_eq = true;
-      lexer.Next();
-      expect_formal_name = false;
-    } else if (depth == 1 && expect_formal_name &&
-               LexerCheck(lexer, TokenKind::kIdentifier)) {
-      HarvestFormalName(lexer, item);
-    } else {
-      lexer.Next();
+      return depth != 0;
     }
+    if (depth == 1 && DispatchTopLevel(lexer, diag, item)) return true;
+    lexer.Next();
     return true;
   }
 };
