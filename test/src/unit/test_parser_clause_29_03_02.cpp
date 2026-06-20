@@ -5,6 +5,28 @@ using namespace delta;
 
 namespace {
 
+// Parses a four-input `gate(out, a, b, c, d)` UDP whose only variation is the
+// `input` declaration style, then asserts the canonical a/b/c/d port list.
+void ExpectGateFourInputs(const std::string& input_decls) {
+  auto r = Parse(
+      "primitive gate(out, a, b, c, d);\n"
+      "  output out;\n" +
+      input_decls +
+      "  table\n"
+      "    0 0 0 0 : 0;\n"
+      "    1 1 1 1 : 1;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* udp = r.cu->udps[0];
+  ASSERT_EQ(udp->input_names.size(), 4u);
+  EXPECT_EQ(udp->input_names[0], "a");
+  EXPECT_EQ(udp->input_names[1], "b");
+  EXPECT_EQ(udp->input_names[2], "c");
+  EXPECT_EQ(udp->input_names[3], "d");
+}
+
 TEST(UdpPortDeclaration, UdpCombinational) {
   auto r = Parse(
       "primitive mux2(output y, input a, input b, input s);\n"
@@ -178,23 +200,7 @@ TEST(UdpPortDeclaration, InputDeclSingleId) {
 }
 
 TEST(UdpPortDeclaration, InputDeclMultipleIds) {
-  auto r = Parse(
-      "primitive gate(out, a, b, c, d);\n"
-      "  output out;\n"
-      "  input a, b, c, d;\n"
-      "  table\n"
-      "    0 0 0 0 : 0;\n"
-      "    1 1 1 1 : 1;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* udp = r.cu->udps[0];
-  ASSERT_EQ(udp->input_names.size(), 4u);
-  EXPECT_EQ(udp->input_names[0], "a");
-  EXPECT_EQ(udp->input_names[1], "b");
-  EXPECT_EQ(udp->input_names[2], "c");
-  EXPECT_EQ(udp->input_names[3], "d");
+  ExpectGateFourInputs("  input a, b, c, d;\n");
 }
 
 TEST(UdpPortDeclaration, AttrOnOutputDecl) {
@@ -231,25 +237,10 @@ TEST(UdpPortDeclaration, AttrOnRegDecl) {
 }
 
 TEST(UdpPortDeclaration, InputDeclMixedListAndSeparate) {
-  auto r = Parse(
-      "primitive gate(out, a, b, c, d);\n"
-      "  output out;\n"
+  ExpectGateFourInputs(
       "  input a, b;\n"
       "  input c;\n"
-      "  input d;\n"
-      "  table\n"
-      "    0 0 0 0 : 0;\n"
-      "    1 1 1 1 : 1;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* udp = r.cu->udps[0];
-  ASSERT_EQ(udp->input_names.size(), 4u);
-  EXPECT_EQ(udp->input_names[0], "a");
-  EXPECT_EQ(udp->input_names[1], "b");
-  EXPECT_EQ(udp->input_names[2], "c");
-  EXPECT_EQ(udp->input_names[3], "d");
+      "  input d;\n");
 }
 
 TEST(UdpPortDeclaration, InputDeclSeparateDecls) {

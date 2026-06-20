@@ -2,6 +2,7 @@
 
 #include "builders_ast.h"
 #include "fixture_simulator.h"
+#include "helpers_stream_unpack_ab.h"
 #include "parser/ast.h"
 #include "simulator/evaluation.h"
 #include "simulator/lowerer.h"
@@ -337,22 +338,11 @@ TEST(StreamingUnpack, FourStateStreamCastIntoTwoStateTarget) {
 // targets would keep their initial value.
 TEST(StreamingUnpack, NonblockingStreamingUnpackIntegration) {
   SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] a, b;\n"
-      "  initial {>> {a, b}} <= 16'hABCD;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* va = f.ctx.FindVariable("a");
-  auto* vb = f.ctx.FindVariable("b");
-  ASSERT_NE(va, nullptr);
-  ASSERT_NE(vb, nullptr);
-  EXPECT_EQ(va->value.ToUint64(), 0xABu);
-  EXPECT_EQ(vb->value.ToUint64(), 0xCDu);
+  RunStreamUnpackAbcdIntoAB(f,
+                            "module t;\n"
+                            "  logic [7:0] a, b;\n"
+                            "  initial {>> {a, b}} <= 16'hABCD;\n"
+                            "endmodule\n");
 }
 
 TEST(StreamingUnpack, SourceWiderConsumesMsbWithMixedWidths) {

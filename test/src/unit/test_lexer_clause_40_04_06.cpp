@@ -5,6 +5,7 @@
 
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "helpers_fsm_pragma_lexing.h"
 #include "lexer/lexer.h"
 
 using namespace delta;
@@ -37,44 +38,27 @@ using namespace delta;
 
 namespace {
 
-// Plain-data copy of a recognized FSM pragma so assertions do not depend on
-// string_views that point into a transient SourceManager.
-struct FsmPragmaInfo {
-  std::string form;
-  std::string signal;
-  std::string enum_name;
-  bool has_enum = false;
-};
-
-std::vector<FsmPragmaInfo> CollectFsmPragmas(const std::string& src) {
-  SourceManager mgr;
-  DiagEngine diag(mgr);
-  auto fid = mgr.AddFile("<test>", src);
-  Lexer lexer(mgr.FileContent(fid), fid, diag);
-  lexer.LexAll();
-  std::vector<FsmPragmaInfo> out;
-  for (const auto& p : lexer.FsmStatePragmas()) {
-    out.push_back(
-        {p.form == Lexer::FsmStatePragma::Form::kStateVector ? "state_vector"
-                                                             : "enum_only",
-         std::string(p.signal_name), std::string(p.enum_name), p.has_enum});
-  }
-  return out;
-}
-
-std::vector<std::string> CollectIdentifiers(const std::string& src) {
-  SourceManager mgr;
-  DiagEngine diag(mgr);
-  auto fid = mgr.AddFile("<test>", src);
-  Lexer lexer(mgr.FileContent(fid), fid, diag);
-  auto tokens = lexer.LexAll();
-  std::vector<std::string> out;
-  for (const auto& t : tokens) {
-    if (t.kind == TokenKind::kIdentifier) {
-      out.push_back(std::string(t.text));
+// Collects the state-naming parameters S0, s1, s2, s3 from `src` in the order
+// they appear in the token stream.
+std::vector<std::string> CollectStateParams(const std::string& src) {
+  auto idents = CollectIdentifiers(src);
+  std::vector<std::string> states;
+  for (const auto& id : idents) {
+    if (id == "S0" || id == "s1" || id == "s2" || id == "s3") {
+      states.push_back(id);
     }
   }
-  return out;
+  return states;
+}
+
+// Asserts the single enum-only `myFSM` pragma surfaced by a §40.4.6 parameter
+// declaration; the pragma binds the enumeration and carries no signal name.
+void ExpectSingleMyFsmEnumPragma(const std::vector<FsmPragmaInfo>& pragmas) {
+  ASSERT_EQ(pragmas.size(), 1u);
+  EXPECT_EQ(pragmas[0].form, "enum_only");
+  EXPECT_TRUE(pragmas[0].has_enum);
+  EXPECT_EQ(pragmas[0].enum_name, "myFSM");
+  EXPECT_TRUE(pragmas[0].signal.empty());
 }
 
 // Claim A — the possible states are specified with the enum-only pragma placed
@@ -90,20 +74,10 @@ TEST(FsmPossibleStatesPragmaLexing, RecognizesEnumPragmaAfterParameterKeyword) {
       "endmodule\n";
 
   auto pragmas = CollectFsmPragmas(src);
-  ASSERT_EQ(pragmas.size(), 1u);
-  EXPECT_EQ(pragmas[0].form, "enum_only");
-  EXPECT_TRUE(pragmas[0].has_enum);
-  EXPECT_EQ(pragmas[0].enum_name, "myFSM");
   // The enum-only pragma carries no signal name; it only binds the enumeration.
-  EXPECT_TRUE(pragmas[0].signal.empty());
+  ExpectSingleMyFsmEnumPragma(pragmas);
 
-  auto idents = CollectIdentifiers(src);
-  std::vector<std::string> states;
-  for (const auto& id : idents) {
-    if (id == "S0" || id == "s1" || id == "s2" || id == "s3") {
-      states.push_back(id);
-    }
-  }
+  auto states = CollectStateParams(src);
   ASSERT_EQ(states.size(), 4u);
   EXPECT_EQ(states[0], "S0");
   EXPECT_EQ(states[1], "s1");
@@ -124,19 +98,9 @@ TEST(FsmPossibleStatesPragmaLexing,
       "endmodule\n";
 
   auto pragmas = CollectFsmPragmas(src);
-  ASSERT_EQ(pragmas.size(), 1u);
-  EXPECT_EQ(pragmas[0].form, "enum_only");
-  EXPECT_TRUE(pragmas[0].has_enum);
-  EXPECT_EQ(pragmas[0].enum_name, "myFSM");
-  EXPECT_TRUE(pragmas[0].signal.empty());
+  ExpectSingleMyFsmEnumPragma(pragmas);
 
-  auto idents = CollectIdentifiers(src);
-  std::vector<std::string> states;
-  for (const auto& id : idents) {
-    if (id == "S0" || id == "s1" || id == "s2" || id == "s3") {
-      states.push_back(id);
-    }
-  }
+  auto states = CollectStateParams(src);
   ASSERT_EQ(states.size(), 4u);
   EXPECT_EQ(states[0], "S0");
   EXPECT_EQ(states[3], "s3");

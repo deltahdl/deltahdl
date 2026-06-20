@@ -1,6 +1,7 @@
 
 
 #include "fixture_elaborator.h"
+#include "helpers_gate_elab.h"
 
 using namespace delta;
 
@@ -8,79 +9,25 @@ namespace {
 
 TEST(TristateGateElaboration, OutputIsFirstTerminal) {
   ElabFixture f;
-  auto* design = Elaborate(
-      "module m;\n"
-      "  wire y, a, en;\n"
-      "  bufif1 b1(y, a, en);\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* mod = design->top_modules[0];
-  ASSERT_GE(mod->assigns.size(), 1u);
-  ASSERT_NE(mod->assigns[0].lhs, nullptr);
-  EXPECT_EQ(mod->assigns[0].lhs->text, "y");
+  const auto* assign = ElaborateSingleGateAssign("bufif1 b1(y, a, en);", f);
+  ASSERT_NE(assign, nullptr);
+  ASSERT_NE(assign->lhs, nullptr);
+  EXPECT_EQ(assign->lhs->text, "y");
 }
 
 TEST(TristateGateElaboration, Bufif1LowersToTernaryWithZOnBlocked) {
   ElabFixture f;
-  auto* design = Elaborate(
-      "module m;\n"
-      "  wire y, a, en;\n"
-      "  bufif1 b1(y, a, en);\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* mod = design->top_modules[0];
-  ASSERT_GE(mod->assigns.size(), 1u);
-  auto* rhs = mod->assigns[0].rhs;
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kTernary);
-  ASSERT_NE(rhs->condition, nullptr);
-  EXPECT_EQ(rhs->condition->text, "en");
-  ASSERT_NE(rhs->true_expr, nullptr);
-  EXPECT_EQ(rhs->true_expr->kind, ExprKind::kIdentifier);
-  EXPECT_EQ(rhs->true_expr->text, "a");
-  ASSERT_NE(rhs->false_expr, nullptr);
-  EXPECT_EQ(rhs->false_expr->kind, ExprKind::kUnbasedUnsizedLiteral);
+  ExpectConductsAOnEnableElseZ("bufif1 b1(y, a, en);", f);
 }
 
 TEST(TristateGateElaboration, Bufif0LowersToTernaryWithZOnActiveControl) {
   ElabFixture f;
-  auto* design = Elaborate(
-      "module m;\n"
-      "  wire y, a, en;\n"
-      "  bufif0 b1(y, a, en);\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* mod = design->top_modules[0];
-  ASSERT_GE(mod->assigns.size(), 1u);
-  auto* rhs = mod->assigns[0].rhs;
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kTernary);
-  ASSERT_NE(rhs->true_expr, nullptr);
-  EXPECT_EQ(rhs->true_expr->kind, ExprKind::kUnbasedUnsizedLiteral);
-  ASSERT_NE(rhs->false_expr, nullptr);
-  EXPECT_EQ(rhs->false_expr->kind, ExprKind::kIdentifier);
-  EXPECT_EQ(rhs->false_expr->text, "a");
+  ExpectZOnTrueArmConductsAOnFalseArm("bufif0 b1(y, a, en);", f);
 }
 
 TEST(TristateGateElaboration, Notif1InvertsDataArm) {
   ElabFixture f;
-  auto* design = Elaborate(
-      "module m;\n"
-      "  wire y, a, en;\n"
-      "  notif1 n1(y, a, en);\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* mod = design->top_modules[0];
-  ASSERT_GE(mod->assigns.size(), 1u);
-  auto* rhs = mod->assigns[0].rhs;
+  const auto* rhs = ElaborateSingleGateRhs("notif1 n1(y, a, en);", f);
   ASSERT_NE(rhs, nullptr);
   ASSERT_EQ(rhs->kind, ExprKind::kTernary);
   ASSERT_NE(rhs->true_expr, nullptr);
@@ -94,17 +41,7 @@ TEST(TristateGateElaboration, Notif1InvertsDataArm) {
 
 TEST(TristateGateElaboration, Notif0InvertsDataArmAndSwapsArms) {
   ElabFixture f;
-  auto* design = Elaborate(
-      "module m;\n"
-      "  wire y, a, en;\n"
-      "  notif0 n1(y, a, en);\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* mod = design->top_modules[0];
-  ASSERT_GE(mod->assigns.size(), 1u);
-  auto* rhs = mod->assigns[0].rhs;
+  const auto* rhs = ElaborateSingleGateRhs("notif0 n1(y, a, en);", f);
   ASSERT_NE(rhs, nullptr);
   ASSERT_EQ(rhs->kind, ExprKind::kTernary);
   ASSERT_NE(rhs->true_expr, nullptr);

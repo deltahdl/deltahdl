@@ -89,16 +89,7 @@ TEST(StructuredProcedureSimulation, InitialAndAlwaysEnabledAtBeginning) {
       "  always begin b = 1; #1 $finish; end\n"
       "endmodule\n",
       f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* va = f.ctx.FindVariable("a");
-  auto* vb = f.ctx.FindVariable("b");
-  ASSERT_NE(va, nullptr);
-  ASSERT_NE(vb, nullptr);
-  EXPECT_EQ(va->value.ToUint64(), 1u);
-  EXPECT_EQ(vb->value.ToUint64(), 1u);
+  LowerRunAndCheck(f, design, {{"a", 1u}, {"b", 1u}});
 }
 
 TEST(StructuredProcedureSimulation, InitialExecutesOnlyOnce) {

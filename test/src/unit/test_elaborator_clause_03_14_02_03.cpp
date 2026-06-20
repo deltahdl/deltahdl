@@ -8,11 +8,7 @@ static RtlirDesign* ElaborateWithPreprocAndCu(const std::string& src,
                                               ElabFixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Preprocessor preproc(f.mgr, f.diag, {});
-  auto pp = preproc.Preprocess(fid);
-  auto pp_fid = f.mgr.AddFile("<preprocessed>", pp);
-  Lexer lexer(f.mgr.FileContent(pp_fid), pp_fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
+  auto* cu = PreprocessAndParseCu(f, fid, preproc);
   cu->preproc_timescale = preproc.CurrentTimescale();
   cu->has_preproc_timescale = preproc.HasTimescale();
   Elaborator elab(f.arena, f.diag, cu);

@@ -6,6 +6,7 @@
 #include "builders_ast.h"
 #include "builders_systask.h"
 #include "fixture_simulator.h"
+#include "helpers_memload.h"
 #include "helpers_parser_verify.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
@@ -19,41 +20,6 @@ namespace {
 // array, the value placed in the file is the enum member's ordinal value (its
 // underlying integer value per 6.19), not its position or name -- which is
 // exactly the form the matching $readmem task reads back.
-
-// Registers an unpacked array of `width`-bit elements, each backed by an
-// element variable named `name[index]` (the simulator's convention).
-// `four_state` selects whether the array element type is 4-state or a 2-state
-// type.
-void SetupMem(SimFixture& f, const char* name, int lo, int size, uint32_t width,
-              bool four_state) {
-  f.ctx.RegisterArray(
-      name, {static_cast<uint32_t>(lo), static_cast<uint32_t>(size), width,
-             false, false, false, four_state});
-  for (int i = 0; i < size; ++i) {
-    std::string nm = std::string(name) + "[" + std::to_string(lo + i) + "]";
-    auto* s = f.arena.AllocString(nm.c_str(), nm.size());
-    auto* v = f.ctx.CreateVariable(std::string_view(s, nm.size()), width);
-    v->value = MakeLogic4VecVal(f.arena, width, 0);
-  }
-}
-
-Variable* Cell(SimFixture& f, const char* name, int addr) {
-  std::string nm = std::string(name) + "[" + std::to_string(addr) + "]";
-  return f.ctx.FindVariable(nm);
-}
-
-void Writemem(SimFixture& f, const char* task, const std::string& path,
-              const char* mem) {
-  EvalExpr(MakeSysCall(f.arena, task,
-                       {MkStr(f.arena, path.c_str()), MakeId(f.arena, mem)}),
-           f.ctx, f.arena);
-}
-
-std::string ReadFile(const std::string& path) {
-  std::ifstream ifs(path);
-  return std::string((std::istreambuf_iterator<char>(ifs)),
-                     std::istreambuf_iterator<char>());
-}
 
 // §21.5.2: an unpacked array of a 2-state type (e.g. int) is dumped one word
 // per line. Because a 2-state word has no x or z bits, every element is written

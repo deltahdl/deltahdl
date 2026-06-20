@@ -2,6 +2,7 @@
 
 #include <vector>
 
+#include "helpers_vpi_two_fixed_unpacked_dims.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi.h"
 
@@ -165,15 +166,8 @@ TEST(InstanceArrayPublic, HandleExprDivertsForPrimitiveArray) {
 // rightmost. A dynamic/queue/associative dimension contributes an empty range.
 TEST(InstanceArrayModel, RangesRunLeftmostToRightmost) {
   VpiObject l0, r0, l1, r1;
-  std::vector<VpiArrayDimension> dims(2);
-  dims[0].kind = VpiDimensionKind::kFixedUnpacked;
-  dims[0].left_expr = &l0;
-  dims[0].right_expr = &r0;
-  dims[0].size = 4;
-  dims[1].kind = VpiDimensionKind::kFixedUnpacked;
-  dims[1].left_expr = &l1;
-  dims[1].right_expr = &r1;
-  dims[1].size = 2;
+  std::vector<VpiArrayDimension> dims =
+      MakeTwoFixedUnpackedDims(&l0, &r0, 4, &l1, &r1, 2);
 
   std::vector<VpiRangeDesc> ranges = VpiInstanceArrayRanges(dims);
   ASSERT_EQ(ranges.size(), 2u);

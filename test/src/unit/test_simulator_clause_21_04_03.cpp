@@ -79,13 +79,12 @@ void Readmem(SimFixture& f, const char* task, const std::string& path,
            f.ctx, f.arena);
 }
 
-// §21.4.3: the file is read in row-major order, the lowest (rightmost-declared)
-// dimension varying the most rapidly. A 2x2 array therefore fills [0][0],
-// [0][1], [1][0], [1][1] in turn.
-TEST(IoMultiDimReadmemTest, RowMajorInnermostVariesFastest) {
-  SimFixture f;
-  SetupMultiMem(f, "mem", {{0, 2}, {0, 2}}, 8);
-  std::string path = WriteTmp("rowmajor", "11\n22\n33\n44\n");
+// Writes the canonical four-word hex file (11/22/33/44) under `tag`, loads it
+// into a freshly set-up 2x2 "mem", and asserts the row-major fill. Shared by
+// the tests that confirm the load order is independent of any per-test framing
+// (e.g. ascending vs descending highest-dimension declaration).
+void ExpectFourWordRowMajorFill(SimFixture& f, const char* tag) {
+  std::string path = WriteTmp(tag, "11\n22\n33\n44\n");
 
   Readmem(f, "$readmemh", path, "mem");
 
@@ -94,6 +93,15 @@ TEST(IoMultiDimReadmemTest, RowMajorInnermostVariesFastest) {
   EXPECT_EQ(MCell(f, "mem", {1, 0})->value.ToUint64(), 0x33u);
   EXPECT_EQ(MCell(f, "mem", {1, 1})->value.ToUint64(), 0x44u);
   std::remove(path.c_str());
+}
+
+// §21.4.3: the file is read in row-major order, the lowest (rightmost-declared)
+// dimension varying the most rapidly. A 2x2 array therefore fills [0][0],
+// [0][1], [1][0], [1][1] in turn.
+TEST(IoMultiDimReadmemTest, RowMajorInnermostVariesFastest) {
+  SimFixture f;
+  SetupMultiMem(f, "mem", {{0, 2}, {0, 2}}, 8);
+  ExpectFourWordRowMajorFill(f, "rowmajor");
 }
 
 // §21.4.3: when a file without address entries contains incomplete data, the
@@ -177,15 +185,9 @@ TEST(IoMultiDimReadmemTest, ThreeDimensionalHierarchicalOrder) {
 TEST(IoMultiDimReadmemTest, DeclarationDirectionDoesNotAffectLayout) {
   SimFixture f;
   SetupMultiMem(f, "mem", {{0, 2}, {0, 2}}, 8, /*descending_top=*/true);
-  std::string path = WriteTmp("reversed", "11\n22\n33\n44\n");
-
-  Readmem(f, "$readmemh", path, "mem");
-
-  EXPECT_EQ(MCell(f, "mem", {0, 0})->value.ToUint64(), 0x11u);  // lowest first
-  EXPECT_EQ(MCell(f, "mem", {0, 1})->value.ToUint64(), 0x22u);
-  EXPECT_EQ(MCell(f, "mem", {1, 0})->value.ToUint64(), 0x33u);
-  EXPECT_EQ(MCell(f, "mem", {1, 1})->value.ToUint64(), 0x44u);
-  std::remove(path.c_str());
+  // The loader still fills low-address-first ([0][0]..[1][1]) despite the
+  // highest dimension being declared descending.
+  ExpectFourWordRowMajorFill(f, "reversed");
 }
 
 // §21.4.3: when a multidimensional unpacked array's element spans multiple

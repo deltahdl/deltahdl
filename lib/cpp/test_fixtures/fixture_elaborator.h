@@ -30,16 +30,36 @@ inline RtlirDesign* Elaborate(const std::string& src, ElabFixture& f,
   return ElaborateSrc(src, f, top);
 }
 
+// Runs the preprocess -> parse prologue on an already-registered source file
+// and returns the resulting CompilationUnit. The caller owns `preproc` so that
+// it can read back preprocessor state after parsing.
+inline CompilationUnit* PreprocessAndParseCu(ElabFixture& f, uint32_t fid,
+                                             Preprocessor& preproc) {
+  auto pp = preproc.Preprocess(fid);
+  auto pp_fid = f.mgr.AddFile("<preprocessed>", pp);
+  Lexer lexer(f.mgr.FileContent(pp_fid), pp_fid, f.diag);
+  Parser parser(lexer, f.arena, f.diag);
+  return parser.Parse();
+}
+
+// Propagates the decay-time, trireg-strength, and delay-mode directives from
+// the preprocessor onto the CompilationUnit.
+inline void PropagateDecayAndDelayToCu(CompilationUnit* cu,
+                                       Preprocessor& preproc) {
+  cu->default_decay_time = preproc.DefaultDecayTime();
+  cu->default_decay_time_real = preproc.DefaultDecayTimeReal();
+  cu->default_decay_time_infinite = preproc.DefaultDecayTimeInfinite();
+  cu->default_trireg_strength = preproc.DefaultTriregStrength();
+  cu->has_default_trireg_strength = preproc.HasDefaultTriregStrength();
+  cu->delay_mode_directive = preproc.DelayModeDirective();
+}
+
 inline RtlirDesign* ElaborateWithPreprocessor(const std::string& src,
                                               ElabFixture& f,
                                               std::string_view top = "") {
   auto fid = f.mgr.AddFile("<test>", src);
   Preprocessor preproc(f.mgr, f.diag, {});
-  auto pp = preproc.Preprocess(fid);
-  auto pp_fid = f.mgr.AddFile("<preprocessed>", pp);
-  Lexer lexer(f.mgr.FileContent(pp_fid), pp_fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
+  auto* cu = PreprocessAndParseCu(f, fid, preproc);
   // Propagate preprocessor state to CompilationUnit.
   cu->default_nettype = preproc.DefaultNetType();
   cu->unconnected_drive = preproc.UnconnectedDrive();
@@ -51,12 +71,7 @@ inline RtlirDesign* ElaborateWithPreprocessor(const std::string& src,
       }
     }
   }
-  cu->default_decay_time = preproc.DefaultDecayTime();
-  cu->default_decay_time_real = preproc.DefaultDecayTimeReal();
-  cu->default_decay_time_infinite = preproc.DefaultDecayTimeInfinite();
-  cu->default_trireg_strength = preproc.DefaultTriregStrength();
-  cu->has_default_trireg_strength = preproc.HasDefaultTriregStrength();
-  cu->delay_mode_directive = preproc.DelayModeDirective();
+  PropagateDecayAndDelayToCu(cu, preproc);
   Elaborator elab(f.arena, f.diag, cu);
   auto name = top.empty() ? cu->modules.back()->name : top;
   auto* design = elab.Elaborate(name);

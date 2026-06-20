@@ -1,6 +1,7 @@
 
 
 #include "fixture_simulator.h"
+#include "helpers_lower_run.h"
 #include "simulator/lowerer.h"
 #include "simulator/process.h"
 #include "simulator/stmt_exec.h"
@@ -195,22 +196,16 @@ TEST(UniqueIfViolationSim, UniqueIfOverlapWarning) {
 
 TEST(UniqueIfViolationSim, Unique0IfOverlapWarning) {
   SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial begin\n"
-      "    unique0 if (1) x = 8'd10;\n"
-      "    else if (1) x = 8'd20;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 10u);
+  EXPECT_EQ(RunModule(f,
+                      "module t;\n"
+                      "  logic [7:0] x;\n"
+                      "  initial begin\n"
+                      "    unique0 if (1) x = 8'd10;\n"
+                      "    else if (1) x = 8'd20;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "x"),
+            10u);
 
   EXPECT_GE(f.diag.WarningCount(), 1u);
 }

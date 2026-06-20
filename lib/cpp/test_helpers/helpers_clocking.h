@@ -58,6 +58,35 @@ inline void SetupClockingBlock(Fixture& f, ClockingManager& cmgr,
   cmgr.Attach(f.ctx, f.scheduler);
 }
 
+// Full output-drive test: create clk + data_out, setup an output clocking block
+// with skew 5, schedule a drive of drive_val at t=10, run, and verify data_out
+// holds drive_val afterward.
+template <typename Fixture>
+inline void TestOutputSkewDrive(Fixture& f, ClockingManager& cmgr,
+                                uint64_t drive_val) {
+  auto* clk = f.ctx.CreateVariable("clk", 1);
+  clk->value = MakeLogic4VecVal(f.arena, 1, 0);
+  auto* data_out = f.ctx.CreateVariable("data_out", 8);
+  data_out->value = MakeLogic4VecVal(f.arena, 8, 0);
+
+  SetupClockingBlock(f, cmgr,
+                     {"cb",
+                      Edge::kPosedge,
+                      {0},
+                      SimTime{5},
+                      "data_out",
+                      ClockingDir::kOutput});
+
+  auto* ev = f.scheduler.GetEventPool().Acquire();
+  ev->callback = [&cmgr, &f, drive_val]() {
+    cmgr.ScheduleOutputDrive("cb", "data_out", drive_val, f.ctx, f.scheduler);
+  };
+  f.scheduler.ScheduleEvent(SimTime{10}, Region::kActive, ev);
+  f.scheduler.Run();
+
+  EXPECT_EQ(data_out->value.ToUint64(), drive_val);
+}
+
 // Full negedge sampling test: create clk + data, setup clocking, schedule
 // negedge, run, verify sampled value.
 template <typename Fixture>

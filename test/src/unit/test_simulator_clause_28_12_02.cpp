@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "common/arena.h"
+#include "helpers_net_strength.h"
 #include "model_strength.h"
 #include "simulator/net.h"
 #include "simulator/scheduler.h"
@@ -12,21 +13,15 @@ namespace {
 
 TEST(StrengthResolution, EqualStrengthConflictProducesX) {
   Arena arena;
-  auto* var = arena.Create<Variable>();
-  var->value = MakeLogic4Vec(arena, 1);
-  Net net;
-  net.type = NetType::kWire;
-  net.resolved = var;
+  StrengthNet sn = MakeStrengthNet(arena, 1);
+  Net& net = sn.net;
 
-  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 0));
-  net.driver_strengths.push_back({Strength::kStrong, Strength::kStrong});
-
-  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 1));
-  net.driver_strengths.push_back({Strength::kStrong, Strength::kStrong});
+  AddDriver(arena, net, 1, 0, Strength::kStrong);
+  AddDriver(arena, net, 1, 1, Strength::kStrong);
   net.Resolve(arena);
 
-  EXPECT_EQ(var->value.words[0].aval & 1u, 0u);
-  EXPECT_EQ(var->value.words[0].bval & 1u, 1u);
+  EXPECT_EQ(sn.var->value.words[0].aval & 1u, 0u);
+  EXPECT_EQ(sn.var->value.words[0].bval & 1u, 1u);
 }
 
 TEST(StrengthCombine, EqualWeakOppositeValueProducesX) {
@@ -51,40 +46,28 @@ TEST(StrengthCombine, EqualStrengthConflictCarriesStrengthRange) {
 
 TEST(StrengthResolution, EqualSupplyConflictProducesX) {
   Arena arena;
-  auto* var = arena.Create<Variable>();
-  var->value = MakeLogic4Vec(arena, 1);
-  Net net;
-  net.type = NetType::kWire;
-  net.resolved = var;
+  StrengthNet sn = MakeStrengthNet(arena, 1);
+  Net& net = sn.net;
 
-  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 0));
-  net.driver_strengths.push_back({Strength::kSupply, Strength::kSupply});
-
-  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 1));
-  net.driver_strengths.push_back({Strength::kSupply, Strength::kSupply});
+  AddDriver(arena, net, 1, 0, Strength::kSupply);
+  AddDriver(arena, net, 1, 1, Strength::kSupply);
   net.Resolve(arena);
 
-  EXPECT_EQ(var->value.words[0].aval & 1u, 0u);
-  EXPECT_EQ(var->value.words[0].bval & 1u, 1u);
+  EXPECT_EQ(sn.var->value.words[0].aval & 1u, 0u);
+  EXPECT_EQ(sn.var->value.words[0].bval & 1u, 1u);
 }
 
 TEST(StrengthResolution, EqualStrengthConflictPerBit) {
   Arena arena;
-  auto* var = arena.Create<Variable>();
-  var->value = MakeLogic4Vec(arena, 8);
-  Net net;
-  net.type = NetType::kWire;
-  net.resolved = var;
+  StrengthNet sn = MakeStrengthNet(arena, 8);
+  Net& net = sn.net;
 
-  net.drivers.push_back(MakeLogic4VecVal(arena, 8, 0xF0));
-  net.driver_strengths.push_back({Strength::kStrong, Strength::kStrong});
-
-  net.drivers.push_back(MakeLogic4VecVal(arena, 8, 0x0F));
-  net.driver_strengths.push_back({Strength::kStrong, Strength::kStrong});
+  AddDriver(arena, net, 8, 0xF0, Strength::kStrong);
+  AddDriver(arena, net, 8, 0x0F, Strength::kStrong);
   net.Resolve(arena);
 
-  EXPECT_EQ(var->value.words[0].aval & 0xFFu, 0u);
-  EXPECT_EQ(var->value.words[0].bval & 0xFFu, 0xFFu);
+  EXPECT_EQ(sn.var->value.words[0].aval & 0xFFu, 0u);
+  EXPECT_EQ(sn.var->value.words[0].bval & 0xFFu, 0xFFu);
 }
 
 TEST(StrengthCombine, AmbiguousSameRangePreserved) {
@@ -127,37 +110,25 @@ TEST(StrengthCombine, AmbiguousSupplyDominatesStrongPerSide) {
 
 TEST(StrengthResolution, EqualStrengthPartialConflictPerBit) {
   Arena arena;
-  auto* var = arena.Create<Variable>();
-  var->value = MakeLogic4Vec(arena, 4);
-  Net net;
-  net.type = NetType::kWire;
-  net.resolved = var;
+  StrengthNet sn = MakeStrengthNet(arena, 4);
+  Net& net = sn.net;
 
-  net.drivers.push_back(MakeLogic4VecVal(arena, 4, 0b1100));
-  net.driver_strengths.push_back({Strength::kStrong, Strength::kStrong});
-
-  net.drivers.push_back(MakeLogic4VecVal(arena, 4, 0b1010));
-  net.driver_strengths.push_back({Strength::kStrong, Strength::kStrong});
+  AddDriver(arena, net, 4, 0b1100, Strength::kStrong);
+  AddDriver(arena, net, 4, 0b1010, Strength::kStrong);
   net.Resolve(arena);
 
-  EXPECT_EQ(var->value.words[0].aval & 0xFu, 0b1000u);
-  EXPECT_EQ(var->value.words[0].bval & 0xFu, 0b0110u);
+  EXPECT_EQ(sn.var->value.words[0].aval & 0xFu, 0b1000u);
+  EXPECT_EQ(sn.var->value.words[0].bval & 0xFu, 0b0110u);
 }
 
 TEST(StrengthResolution,
      EqualStrengthConflictPopulatesAmbiguousResolvedStrength) {
   Arena arena;
-  auto* var = arena.Create<Variable>();
-  var->value = MakeLogic4Vec(arena, 1);
-  Net net;
-  net.type = NetType::kWire;
-  net.resolved = var;
+  StrengthNet sn = MakeStrengthNet(arena, 1);
+  Net& net = sn.net;
 
-  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 0));
-  net.driver_strengths.push_back({Strength::kPull, Strength::kPull});
-
-  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 1));
-  net.driver_strengths.push_back({Strength::kPull, Strength::kPull});
+  AddDriver(arena, net, 1, 0, Strength::kPull);
+  AddDriver(arena, net, 1, 1, Strength::kPull);
   net.Resolve(arena);
 
   EXPECT_EQ(net.resolved_strength.s0_hi, Strength::kPull);
@@ -168,17 +139,11 @@ TEST(StrengthResolution,
 TEST(StrengthResolution,
      EqualSupplyConflictPopulatesAmbiguousResolvedStrength) {
   Arena arena;
-  auto* var = arena.Create<Variable>();
-  var->value = MakeLogic4Vec(arena, 1);
-  Net net;
-  net.type = NetType::kWire;
-  net.resolved = var;
+  StrengthNet sn = MakeStrengthNet(arena, 1);
+  Net& net = sn.net;
 
-  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 0));
-  net.driver_strengths.push_back({Strength::kSupply, Strength::kSupply});
-
-  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 1));
-  net.driver_strengths.push_back({Strength::kSupply, Strength::kSupply});
+  AddDriver(arena, net, 1, 0, Strength::kSupply);
+  AddDriver(arena, net, 1, 1, Strength::kSupply);
   net.Resolve(arena);
 
   EXPECT_EQ(net.resolved_strength.s0_hi, Strength::kSupply);
@@ -188,17 +153,11 @@ TEST(StrengthResolution,
 
 TEST(StrengthResolution, EqualStrengthConflictLeavesLoAtHighz) {
   Arena arena;
-  auto* var = arena.Create<Variable>();
-  var->value = MakeLogic4Vec(arena, 1);
-  Net net;
-  net.type = NetType::kWire;
-  net.resolved = var;
+  StrengthNet sn = MakeStrengthNet(arena, 1);
+  Net& net = sn.net;
 
-  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 0));
-  net.driver_strengths.push_back({Strength::kStrong, Strength::kStrong});
-
-  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 1));
-  net.driver_strengths.push_back({Strength::kStrong, Strength::kStrong});
+  AddDriver(arena, net, 1, 0, Strength::kStrong);
+  AddDriver(arena, net, 1, 1, Strength::kStrong);
   net.Resolve(arena);
 
   EXPECT_EQ(net.resolved_strength.s0_lo, Strength::kHighz);
@@ -219,21 +178,15 @@ TEST(StrengthCombine, AmbiguousThreeSignalsFoldPreservesRange) {
 TEST(StrengthResolution,
      EqualMediumConflictPopulatesAmbiguousResolvedStrength) {
   Arena arena;
-  auto* var = arena.Create<Variable>();
-  var->value = MakeLogic4Vec(arena, 1);
-  Net net;
-  net.type = NetType::kWire;
-  net.resolved = var;
+  StrengthNet sn = MakeStrengthNet(arena, 1);
+  Net& net = sn.net;
 
-  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 0));
-  net.driver_strengths.push_back({Strength::kMedium, Strength::kMedium});
-
-  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 1));
-  net.driver_strengths.push_back({Strength::kMedium, Strength::kMedium});
+  AddDriver(arena, net, 1, 0, Strength::kMedium);
+  AddDriver(arena, net, 1, 1, Strength::kMedium);
   net.Resolve(arena);
 
-  EXPECT_EQ(var->value.words[0].aval & 1u, 0u);
-  EXPECT_EQ(var->value.words[0].bval & 1u, 1u);
+  EXPECT_EQ(sn.var->value.words[0].aval & 1u, 0u);
+  EXPECT_EQ(sn.var->value.words[0].bval & 1u, 1u);
   EXPECT_EQ(net.resolved_strength.s0_hi, Strength::kMedium);
   EXPECT_EQ(net.resolved_strength.s1_hi, Strength::kMedium);
   EXPECT_TRUE(net.resolved_strength.IsAmbiguous());
@@ -241,21 +194,15 @@ TEST(StrengthResolution,
 
 TEST(StrengthResolution, EqualStrengthConflictOnTriNetPopulatesAmbiguous) {
   Arena arena;
-  auto* var = arena.Create<Variable>();
-  var->value = MakeLogic4Vec(arena, 1);
-  Net net;
-  net.type = NetType::kTri;
-  net.resolved = var;
+  StrengthNet sn = MakeStrengthNet(arena, 1, NetType::kTri);
+  Net& net = sn.net;
 
-  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 0));
-  net.driver_strengths.push_back({Strength::kStrong, Strength::kStrong});
-
-  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 1));
-  net.driver_strengths.push_back({Strength::kStrong, Strength::kStrong});
+  AddDriver(arena, net, 1, 0, Strength::kStrong);
+  AddDriver(arena, net, 1, 1, Strength::kStrong);
   net.Resolve(arena);
 
-  EXPECT_EQ(var->value.words[0].aval & 1u, 0u);
-  EXPECT_EQ(var->value.words[0].bval & 1u, 1u);
+  EXPECT_EQ(sn.var->value.words[0].aval & 1u, 0u);
+  EXPECT_EQ(sn.var->value.words[0].bval & 1u, 1u);
   EXPECT_EQ(net.resolved_strength.s0_hi, Strength::kStrong);
   EXPECT_EQ(net.resolved_strength.s1_hi, Strength::kStrong);
   EXPECT_TRUE(net.resolved_strength.IsAmbiguous());

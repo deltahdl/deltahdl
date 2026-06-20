@@ -4,34 +4,14 @@
 #include <vector>
 
 #include "common/arena.h"
+#include "helpers_vpi_delays_fixture.h"
 #include "simulator/scheduler.h"
 #include "simulator/vpi.h"
 
 namespace delta {
 namespace {
 
-class VpiPutDelaysSim : public ::testing::Test {
- protected:
-  void SetUp() override {
-    vpi_ctx_.SetScheduler(&scheduler_);
-    SetGlobalVpiContext(&vpi_ctx_);
-  }
-  void TearDown() override { SetGlobalVpiContext(nullptr); }
-
-  // Build a delay-bearing object of the given type carrying the supplied
-  // delays, in source order. The handle is a VpiObject*, so the test sets the
-  // category and seeds the stored delays directly.
-  VpiHandle MakeDelayObject(int type, std::vector<VpiDelayInfo> delays) {
-    VpiHandle obj = vpi_ctx_.CreateModule("u", "u");
-    obj->type = type;
-    obj->delays = std::move(delays);
-    return obj;
-  }
-
-  Arena arena_;
-  Scheduler scheduler_{arena_};
-  VpiContext vpi_ctx_;
-};
+using VpiPutDelaysSim = VpiDelaysSimBase;
 
 // §38.32 shall #1 + the "same order" rule: vpi_put_delays() sets the object's
 // delays from the caller-allocated da array, one source value per delay (mtm

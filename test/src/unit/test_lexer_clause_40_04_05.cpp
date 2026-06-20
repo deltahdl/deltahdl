@@ -5,6 +5,7 @@
 
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "helpers_fsm_pragma_lexing.h"
 #include "lexer/lexer.h"
 
 using namespace delta;
@@ -33,44 +34,46 @@ using namespace delta;
 
 namespace {
 
-// Plain-data copy of a recognized FSM pragma so assertions do not depend on
-// string_views that point into a transient SourceManager.
-struct FsmPragmaInfo {
-  std::string form;
-  std::string signal;
-  std::string enum_name;
-  bool has_enum = false;
-};
-
-std::vector<FsmPragmaInfo> CollectFsmPragmas(const std::string& src) {
-  SourceManager mgr;
-  DiagEngine diag(mgr);
-  auto fid = mgr.AddFile("<test>", src);
-  Lexer lexer(mgr.FileContent(fid), fid, diag);
-  lexer.LexAll();
-  std::vector<FsmPragmaInfo> out;
-  for (const auto& p : lexer.FsmStatePragmas()) {
-    out.push_back(
-        {p.form == Lexer::FsmStatePragma::Form::kStateVector ? "state_vector"
-                                                             : "enum_only",
-         std::string(p.signal_name), std::string(p.enum_name), p.has_enum});
-  }
-  return out;
+// Shared setup: the §40.4.5 declarations all carry a `state_vector cs` pragma
+// followed by an `enum myFSM` pragma. Asserts that exact two-pragma shape.
+void ExpectCsThenMyFsmPragmas(const std::vector<FsmPragmaInfo>& pragmas) {
+  ASSERT_EQ(pragmas.size(), 2u);
+  EXPECT_EQ(pragmas[0].form, "state_vector");
+  EXPECT_EQ(pragmas[0].signal, "cs");
+  EXPECT_FALSE(pragmas[0].has_enum);
+  EXPECT_EQ(pragmas[1].form, "enum_only");
+  EXPECT_TRUE(pragmas[1].has_enum);
+  EXPECT_EQ(pragmas[1].enum_name, "myFSM");
 }
 
-std::vector<std::string> CollectIdentifiers(const std::string& src) {
-  SourceManager mgr;
-  DiagEngine diag(mgr);
-  auto fid = mgr.AddFile("<test>", src);
-  Lexer lexer(mgr.FileContent(fid), fid, diag);
-  auto tokens = lexer.LexAll();
-  std::vector<std::string> out;
-  for (const auto& t : tokens) {
-    if (t.kind == TokenKind::kIdentifier) {
-      out.push_back(std::string(t.text));
+// Exactly one pragma binds a signal name (cs); the enum-only pragma leaves it
+// empty, so no lexer output ties any trailing signal to the FSM.
+void ExpectOnlyCsIsSignalBearing(const std::vector<FsmPragmaInfo>& pragmas) {
+  int signal_bearing = 0;
+  for (const auto& p : pragmas) {
+    if (!p.signal.empty()) {
+      ++signal_bearing;
+      EXPECT_EQ(p.signal, "cs");
     }
   }
-  return out;
+  EXPECT_EQ(signal_bearing, 1);
+}
+
+// Collects the identifiers from `src` that belong to `names`, in declaration
+// order, so a test can assert which signal is current/next and which trail.
+std::vector<std::string> CollectDeclOrder(
+    const std::string& src, const std::vector<std::string>& names) {
+  auto idents = CollectIdentifiers(src);
+  std::vector<std::string> decl_order;
+  for (const auto& id : idents) {
+    for (const auto& want : names) {
+      if (id == want) {
+        decl_order.push_back(id);
+        break;
+      }
+    }
+  }
+  return decl_order;
 }
 
 // R1 + R2: the §40.4.5 example. The state_vector pragma names cs and the
@@ -88,26 +91,12 @@ TEST(FsmSameDeclarationPragmaLexing,
       "endmodule\n";
 
   auto pragmas = CollectFsmPragmas(src);
-  ASSERT_EQ(pragmas.size(), 2u);
-
-  EXPECT_EQ(pragmas[0].form, "state_vector");
-  EXPECT_EQ(pragmas[0].signal, "cs");
-  EXPECT_FALSE(pragmas[0].has_enum);
-
-  EXPECT_EQ(pragmas[1].form, "enum_only");
-  EXPECT_TRUE(pragmas[1].has_enum);
-  EXPECT_EQ(pragmas[1].enum_name, "myFSM");
+  ExpectCsThenMyFsmPragmas(pragmas);
 
   // The pragmas are comments: all three declared signals still lex, and they
   // appear in declaration order. The first following the enum pragma is the
   // current state (cs) and the next is the next state (ns).
-  auto idents = CollectIdentifiers(src);
-  std::vector<std::string> decl_order;
-  for (const auto& id : idents) {
-    if (id == "cs" || id == "ns" || id == "nonstate") {
-      decl_order.push_back(id);
-    }
-  }
+  auto decl_order = CollectDeclOrder(src, {"cs", "ns", "nonstate"});
   ASSERT_EQ(decl_order.size(), 3u);
   EXPECT_EQ(decl_order[0], "cs");
   EXPECT_EQ(decl_order[1], "ns");
@@ -134,14 +123,7 @@ TEST(FsmSameDeclarationPragmaLexing, NothingIsAssumedAboutAdditionalSignals) {
 
   // Exactly one pragma binds a signal name (cs); the enum-only pragma leaves it
   // empty, so no lexer output ties ns or nonstate to the FSM.
-  int signal_bearing = 0;
-  for (const auto& p : pragmas) {
-    if (!p.signal.empty()) {
-      ++signal_bearing;
-      EXPECT_EQ(p.signal, "cs");
-    }
-  }
-  EXPECT_EQ(signal_bearing, 1);
+  ExpectOnlyCsIsSignalBearing(pragmas);
 }
 
 // R1 + R2 at the minimal "declaration of multiple signals": exactly two
@@ -159,33 +141,14 @@ TEST(FsmSameDeclarationPragmaLexing,
       "endmodule\n";
 
   auto pragmas = CollectFsmPragmas(src);
-  ASSERT_EQ(pragmas.size(), 2u);
-  EXPECT_EQ(pragmas[0].form, "state_vector");
-  EXPECT_EQ(pragmas[0].signal, "cs");
-  EXPECT_FALSE(pragmas[0].has_enum);
-  EXPECT_EQ(pragmas[1].form, "enum_only");
-  EXPECT_TRUE(pragmas[1].has_enum);
-  EXPECT_EQ(pragmas[1].enum_name, "myFSM");
+  ExpectCsThenMyFsmPragmas(pragmas);
 
-  auto idents = CollectIdentifiers(src);
-  std::vector<std::string> decl_order;
-  for (const auto& id : idents) {
-    if (id == "cs" || id == "ns") {
-      decl_order.push_back(id);
-    }
-  }
+  auto decl_order = CollectDeclOrder(src, {"cs", "ns"});
   ASSERT_EQ(decl_order.size(), 2u);
   EXPECT_EQ(decl_order[0], "cs");  // current state
   EXPECT_EQ(decl_order[1], "ns");  // next state
 
-  int signal_bearing = 0;
-  for (const auto& p : pragmas) {
-    if (!p.signal.empty()) {
-      ++signal_bearing;
-      EXPECT_EQ(p.signal, "cs");
-    }
-  }
-  EXPECT_EQ(signal_bearing, 1);
+  ExpectOnlyCsIsSignalBearing(pragmas);
 }
 
 // R3 generalized beyond the single `nonstate` of the LRM example: when more
@@ -208,22 +171,9 @@ TEST(FsmSameDeclarationPragmaLexing, MultipleTrailingSignalsAreAllIgnored) {
     EXPECT_NE(p.signal, "extra");
   }
 
-  int signal_bearing = 0;
-  for (const auto& p : pragmas) {
-    if (!p.signal.empty()) {
-      ++signal_bearing;
-      EXPECT_EQ(p.signal, "cs");
-    }
-  }
-  EXPECT_EQ(signal_bearing, 1);
+  ExpectOnlyCsIsSignalBearing(pragmas);
 
-  auto idents = CollectIdentifiers(src);
-  std::vector<std::string> decl_order;
-  for (const auto& id : idents) {
-    if (id == "cs" || id == "ns" || id == "idle" || id == "extra") {
-      decl_order.push_back(id);
-    }
-  }
+  auto decl_order = CollectDeclOrder(src, {"cs", "ns", "idle", "extra"});
   ASSERT_EQ(decl_order.size(), 4u);
   EXPECT_EQ(decl_order[0], "cs");     // current state
   EXPECT_EQ(decl_order[1], "ns");     // next state

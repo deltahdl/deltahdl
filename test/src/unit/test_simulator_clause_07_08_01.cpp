@@ -1,4 +1,6 @@
 #include "fixture_simulator.h"
+#include "helpers_assoc.h"
+#include "helpers_assoc_multikey.h"
 #include "helpers_scheduler.h"
 #include "parser/ast.h"
 #include "simulator/eval_array.h"
@@ -7,28 +9,13 @@
 
 using namespace delta;
 
-static Expr* MakeAssocSelect(Arena& arena, std::string_view base_name,
-                             int64_t idx_val) {
-  auto* sel = arena.Create<Expr>();
-  sel->kind = ExprKind::kSelect;
-  auto* base = arena.Create<Expr>();
-  base->kind = ExprKind::kIdentifier;
-  base->text = base_name;
-  sel->base = base;
-  auto* idx = arena.Create<Expr>();
-  idx->kind = ExprKind::kIntegerLiteral;
-  idx->int_val = idx_val;
-  sel->index = idx;
-  return sel;
-}
-
 namespace {
 
 TEST(WildcardAssocArraySimulation, WriteAndRead) {
   SimFixture f;
   f.ctx.CreateAssocArray("aa", 32, false);
 
-  auto* sel = MakeAssocSelect(f.arena, "aa", 42);
+  auto* sel = MakeAssocSelect(f.arena, 42);
   auto* stmt = f.arena.Create<Stmt>();
   stmt->kind = StmtKind::kBlockingAssign;
   stmt->lhs = sel;
@@ -37,7 +24,7 @@ TEST(WildcardAssocArraySimulation, WriteAndRead) {
   stmt->rhs->int_val = 100;
   ExecBlockingAssignImpl(stmt, f.ctx, f.arena);
 
-  auto* rd = MakeAssocSelect(f.arena, "aa", 42);
+  auto* rd = MakeAssocSelect(f.arena, 42);
   auto result = EvalExpr(rd, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 100u);
 }
@@ -60,14 +47,7 @@ TEST(WildcardAssocArraySimulation, NumericalOrdering) {
 TEST(WildcardAssocArraySimulation, MultipleKeys) {
   SimFixture f;
   auto* aa = f.ctx.CreateAssocArray("aa", 32, false);
-  aa->int_data[1] = MakeLogic4VecVal(f.arena, 32, 10);
-  aa->int_data[2] = MakeLogic4VecVal(f.arena, 32, 20);
-  aa->int_data[3] = MakeLogic4VecVal(f.arena, 32, 30);
-
-  EXPECT_EQ(aa->Size(), 3u);
-  EXPECT_EQ(aa->int_data[1].ToUint64(), 10u);
-  EXPECT_EQ(aa->int_data[2].ToUint64(), 20u);
-  EXPECT_EQ(aa->int_data[3].ToUint64(), 30u);
+  FillAndCheckThreeKeys(f, aa);
 }
 
 TEST(WildcardAssocArraySimulation, EndToEndWriteRead) {
@@ -123,7 +103,7 @@ TEST(WildcardAssocArraySimulation, IndexTreatedAsUnsigned) {
   auto* aa = f.ctx.CreateAssocArray("aa", 32, /*is_string_key=*/false,
                                     /*index_width=*/32, /*is_wildcard=*/true);
 
-  auto* sel = MakeAssocSelect(f.arena, "aa", 0xFFFFFFFF);
+  auto* sel = MakeAssocSelect(f.arena, 0xFFFFFFFF);
   auto* stmt = f.arena.Create<Stmt>();
   stmt->kind = StmtKind::kBlockingAssign;
   stmt->lhs = sel;
@@ -246,7 +226,7 @@ TEST(WildcardAssocArraySimulation, UnsignedKeyOrdering) {
                                     /*index_width=*/32, /*is_wildcard=*/true);
 
   for (int64_t k : {int64_t{1}, int64_t{0xFFFFFFFF}}) {
-    auto* sel = MakeAssocSelect(f.arena, "aa", k);
+    auto* sel = MakeAssocSelect(f.arena, k);
     auto* stmt = f.arena.Create<Stmt>();
     stmt->kind = StmtKind::kBlockingAssign;
     stmt->lhs = sel;

@@ -8,6 +8,28 @@ using namespace delta;
 
 namespace {
 
+// Builds an identifier-reference expression `name`.
+Expr* MakeIdentExpr(Arena& arena, const char* name) {
+  auto* expr = arena.Create<Expr>();
+  expr->kind = ExprKind::kIdentifier;
+  expr->text = name;
+  return expr;
+}
+
+// Builds a blocking-assign statement `lhs_name = rhs_value;` where the RHS is
+// an integer literal.
+Stmt* MakeAssignStmt(Arena& arena, const char* lhs_name, uint64_t rhs_value) {
+  auto* lhs = MakeIdentExpr(arena, lhs_name);
+  auto* rhs = arena.Create<Expr>();
+  rhs->kind = ExprKind::kIntegerLiteral;
+  rhs->int_val = rhs_value;
+  auto* stmt = arena.Create<Stmt>();
+  stmt->kind = StmtKind::kBlockingAssign;
+  stmt->lhs = lhs;
+  stmt->rhs = rhs;
+  return stmt;
+}
+
 TEST(ConditionalStatementSim, ExecuteIfElse) {
   CompiledSimFixture f;
   auto* sel = f.ctx.CreateVariable("sel", 1);
@@ -15,31 +37,9 @@ TEST(ConditionalStatementSim, ExecuteIfElse) {
   auto* out = f.ctx.CreateVariable("out", 32);
   out->value = MakeLogic4VecVal(f.arena, 32, 0);
 
-  auto* cond = f.arena.Create<Expr>();
-  cond->kind = ExprKind::kIdentifier;
-  cond->text = "sel";
-
-  auto* then_lhs = f.arena.Create<Expr>();
-  then_lhs->kind = ExprKind::kIdentifier;
-  then_lhs->text = "out";
-  auto* one = f.arena.Create<Expr>();
-  one->kind = ExprKind::kIntegerLiteral;
-  one->int_val = 1;
-  auto* then_stmt = f.arena.Create<Stmt>();
-  then_stmt->kind = StmtKind::kBlockingAssign;
-  then_stmt->lhs = then_lhs;
-  then_stmt->rhs = one;
-
-  auto* else_lhs = f.arena.Create<Expr>();
-  else_lhs->kind = ExprKind::kIdentifier;
-  else_lhs->text = "out";
-  auto* zero = f.arena.Create<Expr>();
-  zero->kind = ExprKind::kIntegerLiteral;
-  zero->int_val = 0;
-  auto* else_stmt = f.arena.Create<Stmt>();
-  else_stmt->kind = StmtKind::kBlockingAssign;
-  else_stmt->lhs = else_lhs;
-  else_stmt->rhs = zero;
+  auto* cond = MakeIdentExpr(f.arena, "sel");
+  auto* then_stmt = MakeAssignStmt(f.arena, "out", 1);
+  auto* else_stmt = MakeAssignStmt(f.arena, "out", 0);
 
   auto* if_stmt = f.arena.Create<Stmt>();
   if_stmt->kind = StmtKind::kIf;
@@ -464,20 +464,8 @@ TEST(ConditionalStatementSim, CompiledIfXSkipsThenBranch) {
   auto* out = f.ctx.CreateVariable("out", 32);
   out->value = MakeLogic4VecVal(f.arena, 32, 99);
 
-  auto* cond = f.arena.Create<Expr>();
-  cond->kind = ExprKind::kIdentifier;
-  cond->text = "sel";
-
-  auto* then_lhs = f.arena.Create<Expr>();
-  then_lhs->kind = ExprKind::kIdentifier;
-  then_lhs->text = "out";
-  auto* then_rhs = f.arena.Create<Expr>();
-  then_rhs->kind = ExprKind::kIntegerLiteral;
-  then_rhs->int_val = 42;
-  auto* then_stmt = f.arena.Create<Stmt>();
-  then_stmt->kind = StmtKind::kBlockingAssign;
-  then_stmt->lhs = then_lhs;
-  then_stmt->rhs = then_rhs;
+  auto* cond = MakeIdentExpr(f.arena, "sel");
+  auto* then_stmt = MakeAssignStmt(f.arena, "out", 42);
 
   auto* if_stmt = f.arena.Create<Stmt>();
   if_stmt->kind = StmtKind::kIf;
@@ -502,31 +490,9 @@ TEST(ConditionalStatementSim, CompiledIfZRunsElseBranch) {
   auto* out = f.ctx.CreateVariable("out", 32);
   out->value = MakeLogic4VecVal(f.arena, 32, 7);
 
-  auto* cond = f.arena.Create<Expr>();
-  cond->kind = ExprKind::kIdentifier;
-  cond->text = "sel";
-
-  auto* then_lhs = f.arena.Create<Expr>();
-  then_lhs->kind = ExprKind::kIdentifier;
-  then_lhs->text = "out";
-  auto* then_rhs = f.arena.Create<Expr>();
-  then_rhs->kind = ExprKind::kIntegerLiteral;
-  then_rhs->int_val = 42;
-  auto* then_stmt = f.arena.Create<Stmt>();
-  then_stmt->kind = StmtKind::kBlockingAssign;
-  then_stmt->lhs = then_lhs;
-  then_stmt->rhs = then_rhs;
-
-  auto* else_lhs = f.arena.Create<Expr>();
-  else_lhs->kind = ExprKind::kIdentifier;
-  else_lhs->text = "out";
-  auto* else_rhs = f.arena.Create<Expr>();
-  else_rhs->kind = ExprKind::kIntegerLiteral;
-  else_rhs->int_val = 11;
-  auto* else_stmt = f.arena.Create<Stmt>();
-  else_stmt->kind = StmtKind::kBlockingAssign;
-  else_stmt->lhs = else_lhs;
-  else_stmt->rhs = else_rhs;
+  auto* cond = MakeIdentExpr(f.arena, "sel");
+  auto* then_stmt = MakeAssignStmt(f.arena, "out", 42);
+  auto* else_stmt = MakeAssignStmt(f.arena, "out", 11);
 
   auto* if_stmt = f.arena.Create<Stmt>();
   if_stmt->kind = StmtKind::kIf;

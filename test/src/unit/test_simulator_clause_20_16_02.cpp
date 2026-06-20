@@ -1,4 +1,5 @@
 #include "fixture_simulator.h"
+#include "helpers_lower_run.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
 
@@ -18,17 +19,6 @@ namespace {
 // observable from the output term, and exercise the nor/nand planes in the
 // plane format and the asynchronous type to confirm the functions apply across
 // types and formats.
-
-uint64_t RunModule(SimFixture& f, const char* src, std::string_view var) {
-  auto* design = ElaborateSrc(src, f);
-  EXPECT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* v = f.ctx.FindVariable(var);
-  EXPECT_NE(v, nullptr);
-  return v ? v->value.ToUint64() : 0;
-}
 
 // §20.16.2: all four logic planes are modeled. Driving the identical
 // personality memory (both inputs taken) and inputs (one high, one low) through

@@ -1,6 +1,7 @@
 #include "builders_systask.h"
 #include "fixture_simulator.h"
 #include "fixture_vcd.h"
+#include "helpers_vcd_dump.h"
 #include "simulator/evaluation.h"
 #include "simulator/variable.h"
 #include "simulator/vcd_writer.h"
@@ -19,16 +20,9 @@ class DumpportsallSysTask : public VcdTestBase {};
 // accepted.
 TEST_F(DumpportsallSysTask, WritesCheckpointOfCurrentValues) {
   SimFixture f;
-  auto* clk = MakeVar(f, "clk", 1, 1);
-  auto* data = MakeVar(f, "data", 8, 0xA5);
   {
     VcdWriter vcd(tmp_path_);
-    vcd.WriteHeader("1ns");
-    vcd.RegisterSignal("clk", 1, clk);    // ident '!'
-    vcd.RegisterSignal("data", 8, data);  // ident '"'
-    vcd.EndDefinitions();
-    vcd.WriteTimestamp(0);
-    f.ctx.SetVcdWriter(&vcd);
+    SetupClkDataDump(f, vcd);
     EvalExpr(MkSysCall(f.arena, "$dumpportsall", {MkStr(f.arena, "ports.vcd")}),
              f.ctx, f.arena);
   }

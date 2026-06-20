@@ -1,9 +1,41 @@
+#include <string>
+
 #include "fixture_simulator.h"
+#include "helpers_lower_run.h"
 #include "simulator/lowerer.h"
 
 using namespace delta;
 
 namespace {
+
+// Builds a module whose case_expression is a side-effecting function `sel_fn`
+// (bumping `cnt` and returning `sel_ret`), selected by a `qualifier`-case over
+// three literal items. Shared by the unique and unique0 "evaluated exactly
+// once" tests, which differ only in the qualifier and the selector return.
+std::string ExactlyOnceSrc(const char* qualifier, const char* sel_ret) {
+  return std::string(
+             "module t;\n"
+             "  int cnt;\n"
+             "  logic [7:0] x;\n"
+             "  function automatic logic [7:0] sel_fn();\n"
+             "    cnt = cnt + 1;\n"
+             "    return ") +
+         sel_ret +
+         ";\n"
+         "  endfunction\n"
+         "  initial begin\n"
+         "    cnt = 0;\n"
+         "    x = 8'd0;\n"
+         "    " +
+         qualifier +
+         " case (sel_fn())\n"
+         "      8'd1: x = 8'd11;\n"
+         "      8'd2: x = 8'd22;\n"
+         "      8'd3: x = 8'd33;\n"
+         "    endcase\n"
+         "  end\n"
+         "endmodule\n";
+}
 
 // §12.5.3 (N4): in unique-case and unique0-case, the case_expression is
 // evaluated exactly once before any case_item_expression. We observe this by
@@ -11,32 +43,7 @@ namespace {
 // its counter is incremented exactly one time over the whole case statement.
 TEST(CaseQualifierSim, UniqueCaseExpressionEvaluatedExactlyOnce) {
   SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  int cnt;\n"
-      "  logic [7:0] x;\n"
-      "  function automatic logic [7:0] sel_fn();\n"
-      "    cnt = cnt + 1;\n"
-      "    return 8'd1;\n"
-      "  endfunction\n"
-      "  initial begin\n"
-      "    cnt = 0;\n"
-      "    x = 8'd0;\n"
-      "    unique case (sel_fn())\n"
-      "      8'd1: x = 8'd11;\n"
-      "      8'd2: x = 8'd22;\n"
-      "      8'd3: x = 8'd33;\n"
-      "    endcase\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* cnt = f.ctx.FindVariable("cnt");
-  ASSERT_NE(cnt, nullptr);
-  EXPECT_EQ(cnt->value.ToUint64(), 1u);
+  EXPECT_EQ(RunModule(f, ExactlyOnceSrc("unique", "8'd1").c_str(), "cnt"), 1u);
   auto* x = f.ctx.FindVariable("x");
   ASSERT_NE(x, nullptr);
   EXPECT_EQ(x->value.ToUint64(), 11u);
@@ -48,7 +55,8 @@ TEST(CaseQualifierSim, UniqueCaseExpressionEvaluatedExactlyOnce) {
 // counter; the case_expression's stamp must be strictly less than the item's.
 TEST(CaseQualifierSim, UniqueCaseExprEvaluatedBeforeItemExpr) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto [case_seq, item_seq] = RunModuleTwoVars(
+      f,
       "module t;\n"
       "  int seq, case_seq, item_seq;\n"
       "  logic [7:0] x;\n"
@@ -71,17 +79,9 @@ TEST(CaseQualifierSim, UniqueCaseExprEvaluatedBeforeItemExpr) {
       "    endcase\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* case_seq = f.ctx.FindVariable("case_seq");
-  auto* item_seq = f.ctx.FindVariable("item_seq");
-  ASSERT_NE(case_seq, nullptr);
-  ASSERT_NE(item_seq, nullptr);
-  EXPECT_EQ(case_seq->value.ToUint64(), 1u);
-  EXPECT_GT(item_seq->value.ToUint64(), case_seq->value.ToUint64());
+      "case_seq", "item_seq");
+  EXPECT_EQ(case_seq, 1u);
+  EXPECT_GT(item_seq, case_seq);
 }
 
 // §12.5.3 (N4 for unique0): in unique0-case, the case_expression is also
@@ -90,32 +90,7 @@ TEST(CaseQualifierSim, UniqueCaseExprEvaluatedBeforeItemExpr) {
 // for this rule.
 TEST(CaseQualifierSim, Unique0CaseExpressionEvaluatedExactlyOnce) {
   SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  int cnt;\n"
-      "  logic [7:0] x;\n"
-      "  function automatic logic [7:0] sel_fn();\n"
-      "    cnt = cnt + 1;\n"
-      "    return 8'd2;\n"
-      "  endfunction\n"
-      "  initial begin\n"
-      "    cnt = 0;\n"
-      "    x = 8'd0;\n"
-      "    unique0 case (sel_fn())\n"
-      "      8'd1: x = 8'd11;\n"
-      "      8'd2: x = 8'd22;\n"
-      "      8'd3: x = 8'd33;\n"
-      "    endcase\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* cnt = f.ctx.FindVariable("cnt");
-  ASSERT_NE(cnt, nullptr);
-  EXPECT_EQ(cnt->value.ToUint64(), 1u);
+  EXPECT_EQ(RunModule(f, ExactlyOnceSrc("unique0", "8'd2").c_str(), "cnt"), 1u);
   auto* x = f.ctx.FindVariable("x");
   ASSERT_NE(x, nullptr);
   EXPECT_EQ(x->value.ToUint64(), 22u);
@@ -127,25 +102,19 @@ TEST(CaseQualifierSim, Unique0CaseExpressionEvaluatedExactlyOnce) {
 // item's body, even when the qualifier is unique0.
 TEST(CaseQualifierSim, Unique0OverlapRunsOnlyFirstMatch) {
   SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial begin\n"
-      "    x = 8'd0;\n"
-      "    unique0 case (8'd1)\n"
-      "      8'd1: x = 8'd11;\n"
-      "      8'd1: x = 8'd22;\n"
-      "    endcase\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 11u);
+  EXPECT_EQ(RunModule(f,
+                      "module t;\n"
+                      "  logic [7:0] x;\n"
+                      "  initial begin\n"
+                      "    x = 8'd0;\n"
+                      "    unique0 case (8'd1)\n"
+                      "      8'd1: x = 8'd11;\n"
+                      "      8'd1: x = 8'd22;\n"
+                      "    endcase\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "x"),
+            11u);
   EXPECT_GE(f.diag.WarningCount(), 1u);
 }
 
@@ -153,25 +122,19 @@ TEST(CaseQualifierSim, Unique0OverlapRunsOnlyFirstMatch) {
 // statement of the FIRST matching case_item; no other matching item runs.
 TEST(CaseQualifierSim, UniqueOverlapRunsOnlyFirstMatch) {
   SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial begin\n"
-      "    x = 8'd0;\n"
-      "    unique case (8'd1)\n"
-      "      8'd1: x = 8'd11;\n"
-      "      8'd1: x = 8'd22;\n"
-      "    endcase\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 11u);
+  EXPECT_EQ(RunModule(f,
+                      "module t;\n"
+                      "  logic [7:0] x;\n"
+                      "  initial begin\n"
+                      "    x = 8'd0;\n"
+                      "    unique case (8'd1)\n"
+                      "      8'd1: x = 8'd11;\n"
+                      "      8'd1: x = 8'd22;\n"
+                      "    endcase\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "x"),
+            11u);
   EXPECT_GE(f.diag.WarningCount(), 1u);
 }
 
@@ -179,25 +142,19 @@ TEST(CaseQualifierSim, UniqueOverlapRunsOnlyFirstMatch) {
 // situation this should run cleanly and only the earliest matching item.
 TEST(CaseQualifierSim, PriorityFirstMatchRunsExactlyOneBody) {
   SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial begin\n"
-      "    x = 8'd0;\n"
-      "    priority casez (8'b00000011)\n"
-      "      8'b000000?1: x = 8'd11;\n"
-      "      8'b0000001?: x = 8'd22;\n"
-      "    endcase\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 11u);
+  EXPECT_EQ(RunModule(f,
+                      "module t;\n"
+                      "  logic [7:0] x;\n"
+                      "  initial begin\n"
+                      "    x = 8'd0;\n"
+                      "    priority casez (8'b00000011)\n"
+                      "      8'b000000?1: x = 8'd11;\n"
+                      "      8'b0000001?: x = 8'd22;\n"
+                      "    endcase\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "x"),
+            11u);
 }
 
 // §12.5.3 (N9): when a single case_item holds multiple case_item_expressions,
@@ -205,94 +162,72 @@ TEST(CaseQualifierSim, PriorityFirstMatchRunsExactlyOneBody) {
 // violation. The item runs once with no violation report.
 TEST(CaseQualifierSim, UniqueSingleItemMultiplePatternsIsNotViolation) {
   SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial begin\n"
-      "    x = 8'd0;\n"
-      "    unique casez (8'b00000011)\n"
-      "      8'b000000?1, 8'b0000001?: x = 8'd77;\n"
-      "      8'b11111111: x = 8'd99;\n"
-      "    endcase\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 77u);
+  EXPECT_EQ(RunModule(f,
+                      "module t;\n"
+                      "  logic [7:0] x;\n"
+                      "  initial begin\n"
+                      "    x = 8'd0;\n"
+                      "    unique casez (8'b00000011)\n"
+                      "      8'b000000?1, 8'b0000001?: x = 8'd77;\n"
+                      "      8'b11111111: x = 8'd99;\n"
+                      "    endcase\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "x"),
+            77u);
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
 // §12.5.3 (N13): unique0 with no matching item shall NOT issue a violation.
 TEST(CaseQualifierSim, Unique0NoMatchProducesNoViolation) {
   SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial begin\n"
-      "    x = 8'd42;\n"
-      "    unique0 case (8'd9)\n"
-      "      8'd0: x = 8'd1;\n"
-      "      8'd1: x = 8'd2;\n"
-      "    endcase\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 42u);
+  EXPECT_EQ(RunModule(f,
+                      "module t;\n"
+                      "  logic [7:0] x;\n"
+                      "  initial begin\n"
+                      "    x = 8'd42;\n"
+                      "    unique0 case (8'd9)\n"
+                      "      8'd0: x = 8'd1;\n"
+                      "      8'd1: x = 8'd2;\n"
+                      "    endcase\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "x"),
+            42u);
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
 // §12.5.3 (N10): priority-case with no matching item shall issue a violation.
 TEST(CaseQualifierSim, PriorityNoMatchIssuesViolation) {
   SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial begin\n"
-      "    x = 8'd0;\n"
-      "    priority case (8'd9)\n"
-      "      8'd0: x = 8'd1;\n"
-      "      8'd1: x = 8'd2;\n"
-      "    endcase\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
+  RunModuleNoVar(f,
+                 "module t;\n"
+                 "  logic [7:0] x;\n"
+                 "  initial begin\n"
+                 "    x = 8'd0;\n"
+                 "    priority case (8'd9)\n"
+                 "      8'd0: x = 8'd1;\n"
+                 "      8'd1: x = 8'd2;\n"
+                 "    endcase\n"
+                 "  end\n"
+                 "endmodule\n");
   EXPECT_GE(f.diag.WarningCount(), 1u);
 }
 
 // §12.5.3 (N10): unique-case with no matching item shall issue a violation.
 TEST(CaseQualifierSim, UniqueNoMatchIssuesViolation) {
   SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial begin\n"
-      "    x = 8'd0;\n"
-      "    unique case (8'd9)\n"
-      "      8'd0: x = 8'd1;\n"
-      "      8'd1: x = 8'd2;\n"
-      "    endcase\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
+  RunModuleNoVar(f,
+                 "module t;\n"
+                 "  logic [7:0] x;\n"
+                 "  initial begin\n"
+                 "    x = 8'd0;\n"
+                 "    unique case (8'd9)\n"
+                 "      8'd0: x = 8'd1;\n"
+                 "      8'd1: x = 8'd2;\n"
+                 "    endcase\n"
+                 "  end\n"
+                 "endmodule\n");
   EXPECT_GE(f.diag.WarningCount(), 1u);
 }
 
@@ -300,26 +235,20 @@ TEST(CaseQualifierSim, UniqueNoMatchIssuesViolation) {
 // the no-match violation when execution falls through to default.
 TEST(CaseQualifierSim, UniqueNoMatchWithDefaultSilent) {
   SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial begin\n"
-      "    x = 8'd0;\n"
-      "    unique case (8'd9)\n"
-      "      8'd0: x = 8'd1;\n"
-      "      8'd1: x = 8'd2;\n"
-      "      default: x = 8'd55;\n"
-      "    endcase\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 55u);
+  EXPECT_EQ(RunModule(f,
+                      "module t;\n"
+                      "  logic [7:0] x;\n"
+                      "  initial begin\n"
+                      "    x = 8'd0;\n"
+                      "    unique case (8'd9)\n"
+                      "      8'd0: x = 8'd1;\n"
+                      "      8'd1: x = 8'd2;\n"
+                      "      default: x = 8'd55;\n"
+                      "    endcase\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "x"),
+            55u);
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 

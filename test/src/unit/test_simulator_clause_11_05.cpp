@@ -1,5 +1,6 @@
 #include "builders_ast.h"
 #include "fixture_simulator.h"
+#include "helpers_eval_op.h"
 #include "helpers_scheduler.h"
 #include "simulator/evaluation.h"
 
@@ -29,15 +30,7 @@ TEST(Eval, SingleBitVariableUsesAllBits) {
 
 TEST(Eval, ConcatenationAsOperand) {
   ExprFixture f;
-  auto* va = f.ctx.CreateVariable("hi", 4);
-  va->value = MakeLogic4VecVal(f.arena, 4, 0xA);
-  auto* vb = f.ctx.CreateVariable("lo", 4);
-  vb->value = MakeLogic4VecVal(f.arena, 4, 0x5);
-
-  auto* concat = f.arena.Create<Expr>();
-  concat->kind = ExprKind::kConcatenation;
-  concat->elements.push_back(MakeId(f.arena, "hi"));
-  concat->elements.push_back(MakeId(f.arena, "lo"));
+  auto* concat = MakeConcatOfTwoVars(f, "hi", 4, 0xA, "lo", 4, 0x5);
 
   auto result = EvalExpr(concat, f.ctx, f.arena);
   EXPECT_EQ(result.width, 8u);

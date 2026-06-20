@@ -1,6 +1,7 @@
 #include "builders_systask.h"
 #include "fixture_simulator.h"
 #include "fixture_vcd.h"
+#include "helpers_vcd_dump.h"
 #include "simulator/evaluation.h"
 #include "simulator/variable.h"
 #include "simulator/vcd_writer.h"
@@ -17,16 +18,9 @@ class DumpOffOnSysTask : public VcdTestBase {};
 // variable is recorded as x.
 TEST_F(DumpOffOnSysTask, DumpOffWritesAllXCheckpoint) {
   SimFixture f;
-  auto* clk = MakeVar(f, "clk", 1, 1);
-  auto* data = MakeVar(f, "data", 8, 0xA5);
   {
     VcdWriter vcd(tmp_path_);
-    vcd.WriteHeader("1ns");
-    vcd.RegisterSignal("clk", 1, clk);    // ident '!'
-    vcd.RegisterSignal("data", 8, data);  // ident '"'
-    vcd.EndDefinitions();
-    vcd.WriteTimestamp(0);
-    f.ctx.SetVcdWriter(&vcd);
+    SetupClkDataDump(f, vcd);
     EvalExpr(MkSysCall(f.arena, "$dumpoff", {}), f.ctx, f.arena);
   }
   auto content = ReadVcd();
@@ -128,16 +122,8 @@ TEST_F(DumpOffOnSysTask, RepeatedSuspendResumeCycles) {
     EvalExpr(MkSysCall(f.arena, "$dumpoff", {}), f.ctx, f.arena);
   }
   auto content = ReadVcd();
-  auto count = [](const std::string& s, const std::string& sub) {
-    size_t n = 0;
-    for (size_t pos = s.find(sub); pos != std::string::npos;
-         pos = s.find(sub, pos + sub.size())) {
-      ++n;
-    }
-    return n;
-  };
-  EXPECT_EQ(count(content, "$dumpoff"), 2u);
-  EXPECT_EQ(count(content, "$dumpon"), 1u);
+  EXPECT_EQ(CountOccurrences(content, "$dumpoff"), 2u);
+  EXPECT_EQ(CountOccurrences(content, "$dumpon"), 1u);
 }
 
 }  // namespace

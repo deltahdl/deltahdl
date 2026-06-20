@@ -1,4 +1,5 @@
 #include "fixture_simulator.h"
+#include "helpers_lower_run.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
 
@@ -17,17 +18,6 @@ namespace {
 // the array. What counts as an "evaluation" is the array-type behavior defined
 // by §20.16.1; these tests exercise that shared PLA evaluation engine through
 // the personality memory.
-
-uint64_t RunModule(SimFixture& f, const char* src, std::string_view var) {
-  auto* design = ElaborateSrc(src, f);
-  EXPECT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* v = f.ctx.FindVariable(var);
-  EXPECT_NE(v, nullptr);
-  return v ? v->value.ToUint64() : 0;
-}
 
 // §20.16.3: the personality can be written directly into the memory with
 // procedural assignment statements rather than loaded from a file. A memory

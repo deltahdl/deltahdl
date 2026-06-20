@@ -9,6 +9,35 @@
 
 using namespace delta;
 
+namespace {
+
+// Schedules the shared "q = 0" Active-region evaluation that, when it fires,
+// enqueues the enabled net update (p = q) ahead of the continuation read
+// (display_result = p) into the same Active region. Used by the tests whose
+// intermingling places the update before the read. The captured references
+// (q, p, display_result) and the trigger time are the only varying parts.
+void ScheduleAssignThenUpdateBeforeRead(Scheduler& sched, int& q, int& p,
+                                        int& display_result, SimTime when) {
+  auto* assign_zero = sched.GetEventPool().Acquire();
+  assign_zero->kind = EventKind::kEvaluation;
+  assign_zero->callback = [&sched, &q, &p, &display_result]() {
+    q = 0;
+
+    auto* update_p = sched.GetEventPool().Acquire();
+    update_p->kind = EventKind::kUpdate;
+    update_p->callback = [&p, &q]() { p = q; };
+    sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, update_p);
+
+    auto* display = sched.GetEventPool().Acquire();
+    display->kind = EventKind::kEvaluation;
+    display->callback = [&display_result, &p]() { display_result = p; };
+    sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, display);
+  };
+  sched.ScheduleEvent(when, Region::kActive, assign_zero);
+}
+
+}  // namespace
+
 TEST(RaceConditionSim, EvalAndUpdateEventsIntermingleInActive) {
   Arena arena;
   Scheduler sched(arena);
@@ -72,22 +101,7 @@ TEST(RaceConditionSim, ProcessContinuationRacesEnabledNetUpdate) {
   };
   sched.ScheduleEvent({0}, Region::kActive, init_q);
 
-  auto* assign_zero = sched.GetEventPool().Acquire();
-  assign_zero->kind = EventKind::kEvaluation;
-  assign_zero->callback = [&]() {
-    q = 0;
-
-    auto* update_p = sched.GetEventPool().Acquire();
-    update_p->kind = EventKind::kUpdate;
-    update_p->callback = [&]() { p = q; };
-    sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, update_p);
-
-    auto* display = sched.GetEventPool().Acquire();
-    display->kind = EventKind::kEvaluation;
-    display->callback = [&]() { display_result = p; };
-    sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, display);
-  };
-  sched.ScheduleEvent({1}, Region::kActive, assign_zero);
+  ScheduleAssignThenUpdateBeforeRead(sched, q, p, display_result, {1});
 
   sched.Run();
 
@@ -144,22 +158,7 @@ TEST(RaceConditionSim, ReadObservesNewValueWhenEnabledUpdatePrecedesIt) {
   int p = 1;
   int display_result = -1;
 
-  auto* assign_zero = sched.GetEventPool().Acquire();
-  assign_zero->kind = EventKind::kEvaluation;
-  assign_zero->callback = [&]() {
-    q = 0;
-
-    auto* update_p = sched.GetEventPool().Acquire();
-    update_p->kind = EventKind::kUpdate;
-    update_p->callback = [&]() { p = q; };
-    sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, update_p);
-
-    auto* display = sched.GetEventPool().Acquire();
-    display->kind = EventKind::kEvaluation;
-    display->callback = [&]() { display_result = p; };
-    sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, display);
-  };
-  sched.ScheduleEvent({1}, Region::kActive, assign_zero);
+  ScheduleAssignThenUpdateBeforeRead(sched, q, p, display_result, {1});
 
   sched.Run();
 

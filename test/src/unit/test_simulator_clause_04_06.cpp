@@ -2,6 +2,7 @@
 
 #include "common/types.h"
 #include "fixture_simulator.h"
+#include "helpers_lower_run.h"
 #include "helpers_scheduler.h"
 #include "helpers_scheduler_event.h"
 #include "simulator/lowerer.h"
@@ -116,23 +117,19 @@ TEST(DeterminismSim, NBALastSourceStatementWinsRegardlessOfValue) {
 // reordering across the nested-block boundary would change the observed values.
 TEST(DeterminismSim, NestedBlockStatementsExecuteInSourceOrder) {
   SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] a, b, c, d;\n"
-      "  initial begin\n"
-      "    a = 8'd1;\n"
-      "    begin\n"
-      "      b = a + 8'd1;\n"
-      "      c = b + 8'd1;\n"
-      "    end\n"
-      "    d = c + 8'd1;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
+  auto* design = ElaborateLowerRun(f,
+                                   "module t;\n"
+                                   "  logic [7:0] a, b, c, d;\n"
+                                   "  initial begin\n"
+                                   "    a = 8'd1;\n"
+                                   "    begin\n"
+                                   "      b = a + 8'd1;\n"
+                                   "      c = b + 8'd1;\n"
+                                   "    end\n"
+                                   "    d = c + 8'd1;\n"
+                                   "  end\n"
+                                   "endmodule\n");
   ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
   EXPECT_EQ(f.ctx.FindVariable("a")->value.ToUint64(), 1u);
   EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 2u);
   EXPECT_EQ(f.ctx.FindVariable("c")->value.ToUint64(), 3u);

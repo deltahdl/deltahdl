@@ -27,6 +27,7 @@
 
 #include "builders_systask.h"
 #include "fixture_simulator.h"
+#include "helpers_coverage_syscall.h"
 #include "parser/ast.h"
 #include "simulator/coverage_control.h"
 #include "simulator/evaluation.h"
@@ -47,21 +48,11 @@ constexpr int kNoCov = static_cast<int>(CoverageStatus::NoCoverage);
 constexpr std::string_view kName = "run.cov";
 
 // Evaluates $coverage_save(coverage_type, "name") through the production
-// evaluator and returns the reported value as a signed integer.
+// evaluator and returns the reported value as a signed integer. RunMerge
+// (§40.3.2.4), used to observe the save/merge round trip, comes from the shared
+// helper.
 int RunSave(SimFixture& f, int coverage_type, std::string_view name) {
-  auto* call = MkSysCall(f.arena, "$coverage_save",
-                         {MkInt(f.arena, static_cast<uint64_t>(coverage_type)),
-                          MkStr(f.arena, name)});
-  return static_cast<int32_t>(EvalExpr(call, f.ctx, f.arena).ToUint64());
-}
-
-// Evaluates $coverage_merge(coverage_type, "name") through the production
-// evaluator (§40.3.2.4), used to observe the save/merge round trip.
-int RunMerge(SimFixture& f, int coverage_type, std::string_view name) {
-  auto* call = MkSysCall(f.arena, "$coverage_merge",
-                         {MkInt(f.arena, static_cast<uint64_t>(coverage_type)),
-                          MkStr(f.arena, name)});
-  return static_cast<int32_t>(EvalExpr(call, f.ctx, f.arena).ToUint64());
+  return RunCoverageSysCall(f, "$coverage_save", coverage_type, name);
 }
 
 CoverageControlState& Cov(SimFixture& f) {

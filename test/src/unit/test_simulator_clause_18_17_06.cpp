@@ -1,4 +1,5 @@
 #include "fixture_simulator.h"
+#include "helpers_lower_run.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
 
@@ -11,17 +12,6 @@ namespace {
 // (12.8 for break) appearing inside randsequence code blocks. The rules are
 // purely about how each statement unwinds sequence generation, so the whole
 // subclause lives at the simulator stage (stmt_exec.cpp randsequence engine).
-
-uint64_t RunModule(SimFixture& f, const char* src, std::string_view var) {
-  auto* design = ElaborateSrc(src, f);
-  EXPECT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* v = f.ctx.FindVariable(var);
-  EXPECT_NE(v, nullptr);
-  return v ? v->value.ToUint64() : 0;
-}
 
 // break terminates the sequence generation: once a break fires in a production
 // code block, the productions that would follow are never generated.
@@ -48,32 +38,24 @@ TEST(RandsequenceSim, BreakTerminatesRandsequence) {
 // the randsequence still execute (execution continues at the next statement).
 TEST(RandsequenceSim, BreakResumesExecutionAfterRandsequence) {
   SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  logic [7:0] y;\n"
-      "  initial begin\n"
-      "    x = 8'd0;\n"
-      "    y = 8'd0;\n"
-      "    randsequence(main)\n"
-      "      main : a b;\n"
-      "      a : { x = 8'd1; break; };\n"
-      "      b : { x = 8'd2; };\n"
-      "    endsequence\n"
-      "    y = 8'd5;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* vx = f.ctx.FindVariable("x");
-  auto* vy = f.ctx.FindVariable("y");
-  ASSERT_NE(vx, nullptr);
-  ASSERT_NE(vy, nullptr);
-  EXPECT_EQ(vx->value.ToUint64(), 1u);  // b never generated
-  EXPECT_EQ(vy->value.ToUint64(), 5u);  // statement after randsequence ran
+  auto [x, y] = RunModuleTwoVars(f,
+                                 "module t;\n"
+                                 "  logic [7:0] x;\n"
+                                 "  logic [7:0] y;\n"
+                                 "  initial begin\n"
+                                 "    x = 8'd0;\n"
+                                 "    y = 8'd0;\n"
+                                 "    randsequence(main)\n"
+                                 "      main : a b;\n"
+                                 "      a : { x = 8'd1; break; };\n"
+                                 "      b : { x = 8'd2; };\n"
+                                 "    endsequence\n"
+                                 "    y = 8'd5;\n"
+                                 "  end\n"
+                                 "endmodule\n",
+                                 "x", "y");
+  EXPECT_EQ(x, 1u);  // b never generated
+  EXPECT_EQ(y, 5u);  // statement after randsequence ran
 }
 
 // With no enclosing loop, break unwinds immediately: statements written after
@@ -103,34 +85,27 @@ TEST(RandsequenceSim, BreakSkipsRemainingStatementsInSameCodeBlock) {
 // subsequent production is still generated.
 TEST(RandsequenceSim, BreakInsideLoopTerminatesLoopNotRandsequence) {
   SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  int x;\n"
-      "  int y;\n"
-      "  initial begin\n"
-      "    x = 0;\n"
-      "    y = 0;\n"
-      "    randsequence(main)\n"
-      "      main : a b;\n"
-      "      a : { for (int i = 0; i < 10; i++) begin\n"
-      "              if (i == 3) break;\n"
-      "              x = i;\n"
-      "            end };\n"
-      "      b : { y = 7; };\n"
-      "    endsequence\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* vx = f.ctx.FindVariable("x");
-  auto* vy = f.ctx.FindVariable("y");
-  ASSERT_NE(vx, nullptr);
-  ASSERT_NE(vy, nullptr);
-  EXPECT_EQ(vx->value.ToUint64(), 2u);  // loop broke at i==3, last write i==2
-  EXPECT_EQ(vy->value.ToUint64(), 7u);  // production b still generated
+  auto [x, y] =
+      RunModuleTwoVars(f,
+                       "module t;\n"
+                       "  int x;\n"
+                       "  int y;\n"
+                       "  initial begin\n"
+                       "    x = 0;\n"
+                       "    y = 0;\n"
+                       "    randsequence(main)\n"
+                       "      main : a b;\n"
+                       "      a : { for (int i = 0; i < 10; i++) begin\n"
+                       "              if (i == 3) break;\n"
+                       "              x = i;\n"
+                       "            end };\n"
+                       "      b : { y = 7; };\n"
+                       "    endsequence\n"
+                       "  end\n"
+                       "endmodule\n",
+                       "x", "y");
+  EXPECT_EQ(x, 2u);  // loop broke at i==3, last write i==2
+  EXPECT_EQ(y, 7u);  // production b still generated
 }
 
 // return aborts the current production: the remaining production items of the

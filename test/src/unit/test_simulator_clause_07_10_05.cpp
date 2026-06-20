@@ -15,13 +15,19 @@ Expr* MakeConcat(Arena& arena, std::vector<Expr*> elems) {
   return e;
 }
 
+QueueObject* MakeBoundedQueue(SimFixture& f, uint32_t bound,
+                              const std::vector<uint64_t>& vals) {
+  auto* q = f.ctx.CreateQueue("q", 32, bound);
+  for (auto v : vals) {
+    q->elements.push_back(MakeLogic4VecVal(f.arena, 32, v));
+  }
+  q->AssignFreshIds();
+  return q;
+}
+
 TEST(BoundedQueue, PushBackRespectsMax) {
   SimFixture f;
-  auto* q = f.ctx.CreateQueue("q", 32, 3);
-  q->elements.push_back(MakeLogic4VecVal(f.arena, 32, 10));
-  q->elements.push_back(MakeLogic4VecVal(f.arena, 32, 20));
-  q->elements.push_back(MakeLogic4VecVal(f.arena, 32, 30));
-  q->AssignFreshIds();
+  auto* q = MakeBoundedQueue(f, 3, {10, 20, 30});
 
   auto* call =
       MakeMethodCall(f.arena, "q", "push_back", {MakeInt(f.arena, 40)});
@@ -31,11 +37,7 @@ TEST(BoundedQueue, PushBackRespectsMax) {
 
 TEST(BoundedQueue, PushBackOnFullPreservesContents) {
   SimFixture f;
-  auto* q = f.ctx.CreateQueue("q", 32, 3);
-  q->elements.push_back(MakeLogic4VecVal(f.arena, 32, 10));
-  q->elements.push_back(MakeLogic4VecVal(f.arena, 32, 20));
-  q->elements.push_back(MakeLogic4VecVal(f.arena, 32, 30));
-  q->AssignFreshIds();
+  auto* q = MakeBoundedQueue(f, 3, {10, 20, 30});
 
   auto* call =
       MakeMethodCall(f.arena, "q", "push_back", {MakeInt(f.arena, 40)});
@@ -47,10 +49,7 @@ TEST(BoundedQueue, PushBackOnFullPreservesContents) {
 
 TEST(BoundedQueue, PushBackWarnsOnDiscard) {
   SimFixture f;
-  auto* q = f.ctx.CreateQueue("q", 32, 2);
-  q->elements.push_back(MakeLogic4VecVal(f.arena, 32, 10));
-  q->elements.push_back(MakeLogic4VecVal(f.arena, 32, 20));
-  q->AssignFreshIds();
+  auto* q = MakeBoundedQueue(f, 2, {10, 20});
 
   auto before = f.diag.WarningCount();
   auto* call =
@@ -61,11 +60,7 @@ TEST(BoundedQueue, PushBackWarnsOnDiscard) {
 
 TEST(BoundedQueue, PushFrontRespectsMax) {
   SimFixture f;
-  auto* q = f.ctx.CreateQueue("q", 32, 3);
-  q->elements.push_back(MakeLogic4VecVal(f.arena, 32, 10));
-  q->elements.push_back(MakeLogic4VecVal(f.arena, 32, 20));
-  q->elements.push_back(MakeLogic4VecVal(f.arena, 32, 30));
-  q->AssignFreshIds();
+  auto* q = MakeBoundedQueue(f, 3, {10, 20, 30});
 
   auto* call =
       MakeMethodCall(f.arena, "q", "push_front", {MakeInt(f.arena, 5)});
@@ -75,11 +70,7 @@ TEST(BoundedQueue, PushFrontRespectsMax) {
 
 TEST(BoundedQueue, PushFrontDiscardsLastElement) {
   SimFixture f;
-  auto* q = f.ctx.CreateQueue("q", 32, 3);
-  q->elements.push_back(MakeLogic4VecVal(f.arena, 32, 10));
-  q->elements.push_back(MakeLogic4VecVal(f.arena, 32, 20));
-  q->elements.push_back(MakeLogic4VecVal(f.arena, 32, 30));
-  q->AssignFreshIds();
+  auto* q = MakeBoundedQueue(f, 3, {10, 20, 30});
 
   auto* call =
       MakeMethodCall(f.arena, "q", "push_front", {MakeInt(f.arena, 5)});
@@ -91,10 +82,7 @@ TEST(BoundedQueue, PushFrontDiscardsLastElement) {
 
 TEST(BoundedQueue, PushFrontWarnsOnDiscard) {
   SimFixture f;
-  auto* q = f.ctx.CreateQueue("q", 32, 2);
-  q->elements.push_back(MakeLogic4VecVal(f.arena, 32, 10));
-  q->elements.push_back(MakeLogic4VecVal(f.arena, 32, 20));
-  q->AssignFreshIds();
+  auto* q = MakeBoundedQueue(f, 2, {10, 20});
 
   auto before = f.diag.WarningCount();
   auto* call =
@@ -105,11 +93,7 @@ TEST(BoundedQueue, PushFrontWarnsOnDiscard) {
 
 TEST(BoundedQueue, InsertOnFullDiscardsLastElement) {
   SimFixture f;
-  auto* q = f.ctx.CreateQueue("q", 32, 3);
-  q->elements.push_back(MakeLogic4VecVal(f.arena, 32, 10));
-  q->elements.push_back(MakeLogic4VecVal(f.arena, 32, 20));
-  q->elements.push_back(MakeLogic4VecVal(f.arena, 32, 30));
-  q->AssignFreshIds();
+  auto* q = MakeBoundedQueue(f, 3, {10, 20, 30});
 
   auto* call = MakeMethodCall(f.arena, "q", "insert",
                               {MakeInt(f.arena, 1), MakeInt(f.arena, 15)});
@@ -122,10 +106,7 @@ TEST(BoundedQueue, InsertOnFullDiscardsLastElement) {
 
 TEST(BoundedQueue, InsertWarnsOnDiscard) {
   SimFixture f;
-  auto* q = f.ctx.CreateQueue("q", 32, 2);
-  q->elements.push_back(MakeLogic4VecVal(f.arena, 32, 10));
-  q->elements.push_back(MakeLogic4VecVal(f.arena, 32, 20));
-  q->AssignFreshIds();
+  auto* q = MakeBoundedQueue(f, 2, {10, 20});
 
   auto before = f.diag.WarningCount();
   auto* call = MakeMethodCall(f.arena, "q", "insert",
@@ -136,11 +117,7 @@ TEST(BoundedQueue, InsertWarnsOnDiscard) {
 
 TEST(BoundedQueue, IndexedWriteDollarPlusOneOnFullIsNoop) {
   SimFixture f;
-  auto* q = f.ctx.CreateQueue("q", 32, 3);
-  q->elements.push_back(MakeLogic4VecVal(f.arena, 32, 10));
-  q->elements.push_back(MakeLogic4VecVal(f.arena, 32, 20));
-  q->elements.push_back(MakeLogic4VecVal(f.arena, 32, 30));
-  q->AssignFreshIds();
+  auto* q = MakeBoundedQueue(f, 3, {10, 20, 30});
 
   auto* dollar = MakeId(f.arena, "$");
   auto* idx =
@@ -156,10 +133,7 @@ TEST(BoundedQueue, IndexedWriteDollarPlusOneOnFullIsNoop) {
 
 TEST(BoundedQueue, IndexedWriteWarnsOnDiscard) {
   SimFixture f;
-  auto* q = f.ctx.CreateQueue("q", 32, 2);
-  q->elements.push_back(MakeLogic4VecVal(f.arena, 32, 10));
-  q->elements.push_back(MakeLogic4VecVal(f.arena, 32, 20));
-  q->AssignFreshIds();
+  auto* q = MakeBoundedQueue(f, 2, {10, 20});
 
   auto before = f.diag.WarningCount();
   auto* dollar = MakeId(f.arena, "$");
@@ -205,11 +179,7 @@ TEST(BoundedQueue, ConcatAssignWarnsOnTruncate) {
 
 TEST(BoundedQueue, AllowsPushAfterDelete) {
   SimFixture f;
-  auto* q = f.ctx.CreateQueue("q", 32, 3);
-  q->elements.push_back(MakeLogic4VecVal(f.arena, 32, 10));
-  q->elements.push_back(MakeLogic4VecVal(f.arena, 32, 20));
-  q->elements.push_back(MakeLogic4VecVal(f.arena, 32, 30));
-  q->AssignFreshIds();
+  auto* q = MakeBoundedQueue(f, 3, {10, 20, 30});
 
   auto* del = MakeMethodCall(f.arena, "q", "delete", {MakeInt(f.arena, 0)});
   TryExecQueueMethodStmt(del, f.ctx, f.arena);
@@ -266,9 +236,7 @@ TEST(BoundedQueue, AssignWithinBoundNoWarning) {
 
 TEST(BoundedQueue, PushBackBelowBoundNoWarning) {
   SimFixture f;
-  auto* q = f.ctx.CreateQueue("q", 32, 3);
-  q->elements.push_back(MakeLogic4VecVal(f.arena, 32, 10));
-  q->AssignFreshIds();
+  auto* q = MakeBoundedQueue(f, 3, {10});
 
   auto before = f.diag.WarningCount();
   auto* call =

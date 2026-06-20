@@ -1,4 +1,5 @@
 #include "fixture_simulator.h"
+#include "helpers_lower_run.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
 
@@ -14,17 +15,6 @@ namespace {
 // cannot be aborted partway through -- a break unwinds the whole randsequence
 // (the break machinery itself is owned by 18.17.6). All of that is observed at
 // the simulator stage in the randsequence engine (stmt_exec.cpp).
-
-uint64_t RunModule(SimFixture& f, const char* src, std::string_view var) {
-  auto* design = ElaborateSrc(src, f);
-  EXPECT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* v = f.ctx.FindVariable(var);
-  EXPECT_NE(v, nullptr);
-  return v ? v->value.ToUint64() : 0;
-}
 
 // The count specifies exactly how many times the production is generated: a
 // fixed count of 3 generates the inc production three times.
@@ -95,35 +85,28 @@ TEST(RandsequenceSim, RepeatCountFromExpression) {
 // randsequence block. Productions following the repeat are never generated.
 TEST(RandsequenceSim, RepeatBreakTerminatesEntireRandsequence) {
   SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  int x;\n"
-      "  int y;\n"
-      "  initial begin\n"
-      "    x = 0;\n"
-      "    y = 0;\n"
-      "    randsequence(main)\n"
-      "      main   : looped after;\n"
-      "      looped : repeat(3) body;\n"
-      "      body   : { x = x + 1; if (x == 2) break; };\n"
-      "      after  : { y = 5; };\n"
-      "    endsequence\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* vx = f.ctx.FindVariable("x");
-  auto* vy = f.ctx.FindVariable("y");
-  ASSERT_NE(vx, nullptr);
-  ASSERT_NE(vy, nullptr);
+  auto [x, y] =
+      RunModuleTwoVars(f,
+                       "module t;\n"
+                       "  int x;\n"
+                       "  int y;\n"
+                       "  initial begin\n"
+                       "    x = 0;\n"
+                       "    y = 0;\n"
+                       "    randsequence(main)\n"
+                       "      main   : looped after;\n"
+                       "      looped : repeat(3) body;\n"
+                       "      body   : { x = x + 1; if (x == 2) break; };\n"
+                       "      after  : { y = 5; };\n"
+                       "    endsequence\n"
+                       "  end\n"
+                       "endmodule\n",
+                       "x", "y");
   // body runs twice (x->1, x->2) then breaks before the third iteration; the
   // break terminates the whole randsequence, so after never generates (y stays
   // 0).
-  EXPECT_EQ(vx->value.ToUint64(), 2u);
-  EXPECT_EQ(vy->value.ToUint64(), 0u);
+  EXPECT_EQ(x, 2u);
+  EXPECT_EQ(y, 0u);
 }
 
 }  // namespace

@@ -9,6 +9,31 @@ using namespace delta;
 
 namespace {
 
+// Two solvers (seeds 5 and 9) standing in for two instances of one class, each
+// holding the same static random variable "x" backed by a single shared cell.
+struct SharedStaticSetup {
+  std::shared_ptr<int64_t> shared;
+  ConstraintSolver inst_a;
+  ConstraintSolver inst_b;
+};
+
+static SharedStaticSetup MakeSharedStaticSetup() {
+  SharedStaticSetup s{std::make_shared<int64_t>(0), ConstraintSolver(5),
+                      ConstraintSolver(9)};
+  auto make_static = [&]() {
+    RandVariable v;
+    v.name = "x";
+    v.min_val = 0;
+    v.max_val = 1000;
+    v.is_static = true;
+    v.shared_value = s.shared;
+    return v;
+  };
+  s.inst_a.AddVariable(make_static());
+  s.inst_b.AddVariable(make_static());
+  return s;
+}
+
 // 18.6.3: random variables declared static are shared by all instances of the
 // class in which they are declared, and each randomize() changes the variable
 // in every class instance. Two solvers stand in for two instances; both name
@@ -17,22 +42,9 @@ namespace {
 // again. Each instance is forced to a distinct value so the propagation is
 // unambiguous rather than coincidental.
 TEST(BehaviorOfRandomizationMethods, StaticVariableSharedAcrossInstances) {
-  auto shared = std::make_shared<int64_t>(0);
-
-  auto make_static = [&]() {
-    RandVariable v;
-    v.name = "x";
-    v.min_val = 0;
-    v.max_val = 1000;
-    v.is_static = true;
-    v.shared_value = shared;
-    return v;
-  };
-
-  ConstraintSolver inst_a(5);
-  ConstraintSolver inst_b(9);
-  inst_a.AddVariable(make_static());
-  inst_b.AddVariable(make_static());
+  SharedStaticSetup setup = MakeSharedStaticSetup();
+  ConstraintSolver& inst_a = setup.inst_a;
+  ConstraintSolver& inst_b = setup.inst_b;
 
   // Instance A pins the shared variable to 5.
   ConstraintBlock pin_a;
@@ -182,22 +194,9 @@ TEST(BehaviorOfRandomizationMethods, ObjectRandomStabilityIsSeedDetermined) {
 // previous values on failure.
 TEST(BehaviorOfRandomizationMethods,
      FailedRandomizeLeavesSharedStaticUnchanged) {
-  auto shared = std::make_shared<int64_t>(0);
-
-  auto make_static = [&]() {
-    RandVariable v;
-    v.name = "x";
-    v.min_val = 0;
-    v.max_val = 1000;
-    v.is_static = true;
-    v.shared_value = shared;
-    return v;
-  };
-
-  ConstraintSolver inst_a(5);
-  ConstraintSolver inst_b(9);
-  inst_a.AddVariable(make_static());
-  inst_b.AddVariable(make_static());
+  SharedStaticSetup setup = MakeSharedStaticSetup();
+  ConstraintSolver& inst_a = setup.inst_a;
+  ConstraintSolver& inst_b = setup.inst_b;
 
   // Instance A pins the static variable to 7 and commits it for all instances.
   ConstraintBlock pin_a;

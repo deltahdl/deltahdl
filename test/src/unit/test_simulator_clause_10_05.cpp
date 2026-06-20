@@ -1,4 +1,5 @@
 #include "fixture_simulator.h"
+#include "helpers_lower_run.h"
 #include "helpers_scheduler.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
@@ -87,15 +88,11 @@ TEST(VariableInitSim, VarInitWithExpression) {
 
 TEST(VariableInitSim, MultipleVarInitSameDecl) {
   SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  int a = 1, b = 2, c = 3;\n"
-      "endmodule\n",
-      f);
+  auto* design = ElaborateLowerRun(f,
+                                   "module t;\n"
+                                   "  int a = 1, b = 2, c = 3;\n"
+                                   "endmodule\n");
   ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
   EXPECT_EQ(f.ctx.FindVariable("a")->value.ToUint64(), 1u);
   EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 2u);
   EXPECT_EQ(f.ctx.FindVariable("c")->value.ToUint64(), 3u);

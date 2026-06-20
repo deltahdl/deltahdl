@@ -4,33 +4,12 @@
 #include "builders_ast.h"
 #include "builders_systask.h"
 #include "fixture_simulator.h"
+#include "helpers_memload.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
 
 using namespace delta;
 namespace {
-
-// Registers an unpacked array `name[lo .. lo+size-1]` of `width`-bit elements,
-// each backed by a zero-initialized element variable, so $sreadmemb /
-// $sreadmemh have a memory to load into (element variables follow the
-// `name[index]` naming convention the simulator uses).
-void SetupMem(SimFixture& f, const char* name, int lo, int size,
-              uint32_t width) {
-  f.ctx.RegisterArray(
-      name, {static_cast<uint32_t>(lo), static_cast<uint32_t>(size), width,
-             false, false, false});
-  for (int i = 0; i < size; ++i) {
-    std::string nm = std::string(name) + "[" + std::to_string(lo + i) + "]";
-    auto* s = f.arena.AllocString(nm.c_str(), nm.size());
-    auto* v = f.ctx.CreateVariable(std::string_view(s, nm.size()), width);
-    v->value = MakeLogic4VecVal(f.arena, width, 0);
-  }
-}
-
-Variable* Cell(SimFixture& f, const char* name, int addr) {
-  std::string nm = std::string(name) + "[" + std::to_string(addr) + "]";
-  return f.ctx.FindVariable(nm);
-}
 
 // Builds and evaluates a $sreadmem* call:
 //   task(mem, start, finish, str0, str1, ...)

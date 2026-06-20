@@ -8,6 +8,66 @@
 
 using namespace delta;
 
+// Build a select expression  base_name[int_literal].
+inline Expr* MakeAssocSelect(Arena& arena, int64_t idx_val,
+                             std::string_view base_name = "aa") {
+  auto* sel = arena.Create<Expr>();
+  sel->kind = ExprKind::kSelect;
+  auto* base = arena.Create<Expr>();
+  base->kind = ExprKind::kIdentifier;
+  base->text = base_name;
+  sel->base = base;
+  auto* idx = arena.Create<Expr>();
+  idx->kind = ExprKind::kIntegerLiteral;
+  idx->int_val = idx_val;
+  sel->index = idx;
+  return sel;
+}
+
+// Build a select expression  base_name[string_literal].
+inline Expr* MakeAssocSelectStr(Arena& arena, std::string_view base_name,
+                                std::string_view key) {
+  auto* sel = arena.Create<Expr>();
+  sel->kind = ExprKind::kSelect;
+  auto* base = arena.Create<Expr>();
+  base->kind = ExprKind::kIdentifier;
+  base->text = base_name;
+  sel->base = base;
+  auto* idx = arena.Create<Expr>();
+  idx->kind = ExprKind::kStringLiteral;
+  idx->text = key;
+  sel->index = idx;
+  return sel;
+}
+
+// Build a select expression  base_name[ident_name]  (index is an identifier
+// reference to another variable rather than a literal).
+inline Expr* MakeAssocSelectIdent(Arena& arena, std::string_view base_name,
+                                  std::string_view ident_name) {
+  auto* sel = arena.Create<Expr>();
+  sel->kind = ExprKind::kSelect;
+  auto* base = arena.Create<Expr>();
+  base->kind = ExprKind::kIdentifier;
+  base->text = base_name;
+  sel->base = base;
+  auto* xref = arena.Create<Expr>();
+  xref->kind = ExprKind::kIdentifier;
+  xref->text = ident_name;
+  sel->index = xref;
+  return sel;
+}
+
+// Create a local variable holding an x/z-tainted index key. The value's low
+// word has its b-plane bit set so the key is partially unknown.
+inline Variable* MakeXTaintedKeyVar(SimFixture& f,
+                                    std::string_view name = "__xkey",
+                                    uint64_t base_val = 5) {
+  auto* var = f.ctx.CreateLocalVariable(name, 32);
+  var->value = MakeLogic4VecVal(f.arena, 32, base_val);
+  var->value.words[0].bval = 0x1;
+  return var;
+}
+
 // Build aa.method() call expression (no arguments).
 inline Expr* MkAssocCallNoArg(Arena& arena, std::string_view var,
                               std::string_view method) {

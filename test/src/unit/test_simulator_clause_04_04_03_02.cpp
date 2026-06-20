@@ -64,22 +64,8 @@ TEST(PliPreActiveSim, PreActiveCanCreateEvents) {
 }
 
 TEST(PliPreActiveSim, PreActiveExecutesBeforeActive) {
-  Arena arena;
-  Scheduler sched(arena);
-  std::vector<std::string> order;
-
-  auto* active = sched.GetEventPool().Acquire();
-  active->callback = [&]() { order.push_back("active"); };
-  sched.ScheduleEvent({0}, Region::kActive, active);
-
-  auto* pre_active = sched.GetEventPool().Acquire();
-  pre_active->callback = [&]() { order.push_back("pre_active"); };
-  sched.ScheduleEvent({0}, Region::kPreActive, pre_active);
-
-  sched.Run();
-  ASSERT_EQ(order.size(), 2u);
-  EXPECT_EQ(order[0], "pre_active");
-  EXPECT_EQ(order[1], "active");
+  VerifyTwoRegionOrder({Region::kPreActive, "pre_active"},
+                       {Region::kActive, "active"});
 }
 
 TEST(PliPreActiveSim, PreActiveExecutesAfterPreponedBeforeActive) {

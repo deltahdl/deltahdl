@@ -50,18 +50,19 @@ RandVariable Pinned(const std::string& name, int64_t value) {
   return v;
 }
 
-// 18.5.5: when the antecedent of "a -> b" is true, every constraint in the
-// consequent shall be satisfied. With a pinned to 0 the antecedent (a == 0)
-// always holds, so the solved value of b must obey the consequent b == 1.
-TEST(ConstraintImplication, ConsequentSatisfiedWhenAntecedentTrue) {
-  ConstraintSolver solver(7);
-  solver.AddVariable(Pinned("a", 0));
-  RandVariable b;
-  b.name = "b";
-  b.min_val = 0;
-  b.max_val = 1;
-  solver.AddVariable(b);
+// Helper: a free variable ranging over [min_val, max_val].
+RandVariable Ranged(const std::string& name, int64_t min_val, int64_t max_val) {
+  RandVariable v;
+  v.name = name;
+  v.min_val = min_val;
+  v.max_val = max_val;
+  return v;
+}
 
+// Helper: build and register the standard "a == 0 -> b == 1" implication block.
+// Used by every test that exercises the equality-consequent form, varying only
+// in how a and b are pinned/ranged before the block is added.
+void AddAEqualsZeroImpliesBEqualsOne(ConstraintSolver& solver) {
   ConstraintBlock block;
   block.name = "c_impl";
   ConstraintExpr impl;
@@ -75,6 +76,37 @@ TEST(ConstraintImplication, ConsequentSatisfiedWhenAntecedentTrue) {
   impl.sub_constraints.push_back(cons);
   block.constraints.push_back(impl);
   solver.AddConstraintBlock(block);
+}
+
+// Helper: build and register the general-predicate implication block
+// "(mode > 100) -> (len < 10)" used by the GeneralExpressionAntecedent tests.
+void AddModeGtImpliesLenLt(ConstraintSolver& solver) {
+  ConstraintBlock block;
+  block.name = "c_impl";
+  ConstraintExpr impl;
+  impl.kind = ConstraintKind::kImplication;
+  impl.cond_fn = [](const std::unordered_map<std::string, int64_t>& vals) {
+    auto it = vals.find("mode");
+    return it != vals.end() && it->second > 100;
+  };
+  ConstraintExpr cons;
+  cons.kind = ConstraintKind::kLessThan;
+  cons.var_name = "len";
+  cons.lo = 10;
+  impl.sub_constraints.push_back(cons);
+  block.constraints.push_back(impl);
+  solver.AddConstraintBlock(block);
+}
+
+// 18.5.5: when the antecedent of "a -> b" is true, every constraint in the
+// consequent shall be satisfied. With a pinned to 0 the antecedent (a == 0)
+// always holds, so the solved value of b must obey the consequent b == 1.
+TEST(ConstraintImplication, ConsequentSatisfiedWhenAntecedentTrue) {
+  ConstraintSolver solver(7);
+  solver.AddVariable(Pinned("a", 0));
+  solver.AddVariable(Ranged("b", 0, 1));
+
+  AddAEqualsZeroImpliesBEqualsOne(solver);
 
   ASSERT_TRUE(solver.Solve());
   EXPECT_EQ(solver.GetValue("b"), 1);
@@ -89,19 +121,7 @@ TEST(ConstraintImplication, ConsequentIgnoredWhenAntecedentFalse) {
   solver.AddVariable(Pinned("a", 1));
   solver.AddVariable(Pinned("b", 0));
 
-  ConstraintBlock block;
-  block.name = "c_impl";
-  ConstraintExpr impl;
-  impl.kind = ConstraintKind::kImplication;
-  impl.cond_var = "a";
-  impl.cond_value = 0;
-  ConstraintExpr cons;
-  cons.kind = ConstraintKind::kEqual;
-  cons.var_name = "b";
-  cons.lo = 1;
-  impl.sub_constraints.push_back(cons);
-  block.constraints.push_back(impl);
-  solver.AddConstraintBlock(block);
+  AddAEqualsZeroImpliesBEqualsOne(solver);
 
   ASSERT_TRUE(solver.Solve());
   EXPECT_EQ(solver.GetValue("b"), 0);
@@ -114,26 +134,10 @@ TEST(ConstraintImplication, ConsequentIgnoredWhenAntecedentFalse) {
 // free to range over {0, 1}. This exercises the contrapositive direction.
 TEST(ConstraintImplication, AntecedentConstrainedByUnsatisfiableConsequent) {
   ConstraintSolver solver(7);
-  RandVariable a;
-  a.name = "a";
-  a.min_val = 0;
-  a.max_val = 1;
-  solver.AddVariable(a);
+  solver.AddVariable(Ranged("a", 0, 1));
   solver.AddVariable(Pinned("b", 0));
 
-  ConstraintBlock block;
-  block.name = "c_impl";
-  ConstraintExpr impl;
-  impl.kind = ConstraintKind::kImplication;
-  impl.cond_var = "a";
-  impl.cond_value = 0;
-  ConstraintExpr cons;
-  cons.kind = ConstraintKind::kEqual;
-  cons.var_name = "b";
-  cons.lo = 1;
-  impl.sub_constraints.push_back(cons);
-  block.constraints.push_back(impl);
-  solver.AddConstraintBlock(block);
+  AddAEqualsZeroImpliesBEqualsOne(solver);
 
   ASSERT_TRUE(solver.Solve());
   EXPECT_EQ(solver.GetValue("a"), 1);
@@ -179,27 +183,9 @@ TEST(ConstraintImplication, ConsequentMayBeARangeConstraint) {
 TEST(ConstraintImplication, GeneralExpressionAntecedentTrue) {
   ConstraintSolver solver(7);
   solver.AddVariable(Pinned("mode", 200));
-  RandVariable len;
-  len.name = "len";
-  len.min_val = 0;
-  len.max_val = 100;
-  solver.AddVariable(len);
+  solver.AddVariable(Ranged("len", 0, 100));
 
-  ConstraintBlock block;
-  block.name = "c_impl";
-  ConstraintExpr impl;
-  impl.kind = ConstraintKind::kImplication;
-  impl.cond_fn = [](const std::unordered_map<std::string, int64_t>& vals) {
-    auto it = vals.find("mode");
-    return it != vals.end() && it->second > 100;
-  };
-  ConstraintExpr cons;
-  cons.kind = ConstraintKind::kLessThan;
-  cons.var_name = "len";
-  cons.lo = 10;
-  impl.sub_constraints.push_back(cons);
-  block.constraints.push_back(impl);
-  solver.AddConstraintBlock(block);
+  AddModeGtImpliesLenLt(solver);
 
   ASSERT_TRUE(solver.Solve());
   EXPECT_LT(solver.GetValue("len"), 10);
@@ -213,21 +199,7 @@ TEST(ConstraintImplication, GeneralExpressionAntecedentFalse) {
   solver.AddVariable(Pinned("mode", 50));
   solver.AddVariable(Pinned("len", 999));
 
-  ConstraintBlock block;
-  block.name = "c_impl";
-  ConstraintExpr impl;
-  impl.kind = ConstraintKind::kImplication;
-  impl.cond_fn = [](const std::unordered_map<std::string, int64_t>& vals) {
-    auto it = vals.find("mode");
-    return it != vals.end() && it->second > 100;
-  };
-  ConstraintExpr cons;
-  cons.kind = ConstraintKind::kLessThan;
-  cons.var_name = "len";
-  cons.lo = 10;
-  impl.sub_constraints.push_back(cons);
-  block.constraints.push_back(impl);
-  solver.AddConstraintBlock(block);
+  AddModeGtImpliesLenLt(solver);
 
   ASSERT_TRUE(solver.Solve());
   EXPECT_EQ(solver.GetValue("len"), 999);
@@ -286,19 +258,7 @@ TEST(ConstraintImplication,
   solver.AddVariable(Pinned("a", 0));
   solver.AddVariable(Pinned("b", 0));
 
-  ConstraintBlock block;
-  block.name = "c_impl";
-  ConstraintExpr impl;
-  impl.kind = ConstraintKind::kImplication;
-  impl.cond_var = "a";
-  impl.cond_value = 0;
-  ConstraintExpr cons;
-  cons.kind = ConstraintKind::kEqual;
-  cons.var_name = "b";
-  cons.lo = 1;
-  impl.sub_constraints.push_back(cons);
-  block.constraints.push_back(impl);
-  solver.AddConstraintBlock(block);
+  AddAEqualsZeroImpliesBEqualsOne(solver);
 
   EXPECT_FALSE(solver.Solve());
 }

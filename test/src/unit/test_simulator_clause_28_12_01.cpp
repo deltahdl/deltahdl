@@ -10,6 +10,25 @@ using namespace delta;
 
 namespace {
 
+// Builds a 1-bit net driven by two identical pull-strength drivers of the
+// given value, resolves it, and returns the resolved variable via |out_var|.
+static void ResolveTwoIdenticalPullDrivers(Arena& arena, uint64_t value,
+                                           Variable** out_var, Net* net) {
+  auto* var = arena.Create<Variable>();
+  var->value = MakeLogic4Vec(arena, 1);
+  net->type = NetType::kWire;
+  net->resolved = var;
+
+  net->drivers.push_back(MakeLogic4VecVal(arena, 1, value));
+  net->driver_strengths.push_back({Strength::kPull, Strength::kPull});
+
+  net->drivers.push_back(MakeLogic4VecVal(arena, 1, value));
+  net->driver_strengths.push_back({Strength::kPull, Strength::kPull});
+  net->Resolve(arena);
+
+  *out_var = var;
+}
+
 TEST(StrengthCombine, StrongerSignalDominates) {
   StrengthSignal strong_one{Val4::kV1, StrengthLevel::kHighz,
                             StrengthLevel::kStrong};
@@ -105,36 +124,18 @@ TEST(StrengthResolution, LikeValueDifferentStrengthsAgree) {
 
 TEST(StrengthResolution, IdenticalDriversResolveSameValue) {
   Arena arena;
-  auto* var = arena.Create<Variable>();
-  var->value = MakeLogic4Vec(arena, 1);
+  Variable* var = nullptr;
   Net net;
-  net.type = NetType::kWire;
-  net.resolved = var;
-
-  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 0));
-  net.driver_strengths.push_back({Strength::kPull, Strength::kPull});
-
-  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 0));
-  net.driver_strengths.push_back({Strength::kPull, Strength::kPull});
-  net.Resolve(arena);
+  ResolveTwoIdenticalPullDrivers(arena, 0, &var, &net);
 
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
 TEST(StrengthResolution, IdenticalDriversPreserveResolvedStrength) {
   Arena arena;
-  auto* var = arena.Create<Variable>();
-  var->value = MakeLogic4Vec(arena, 1);
+  Variable* var = nullptr;
   Net net;
-  net.type = NetType::kWire;
-  net.resolved = var;
-
-  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 0));
-  net.driver_strengths.push_back({Strength::kPull, Strength::kPull});
-
-  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 0));
-  net.driver_strengths.push_back({Strength::kPull, Strength::kPull});
-  net.Resolve(arena);
+  ResolveTwoIdenticalPullDrivers(arena, 0, &var, &net);
 
   EXPECT_EQ(net.resolved_strength.s0_hi, Strength::kPull);
   EXPECT_EQ(net.resolved_strength.s0_lo, Strength::kPull);

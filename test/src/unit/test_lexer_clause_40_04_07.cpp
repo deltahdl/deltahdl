@@ -5,6 +5,7 @@
 
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "helpers_fsm_pragma_lexing.h"
 #include "lexer/lexer.h"
 
 using namespace delta;
@@ -28,31 +29,6 @@ using namespace delta;
 // block comment.
 
 namespace {
-
-// Plain-data copy of a recognized current-state / enum-only FSM pragma so
-// assertions do not depend on string_views into a transient SourceManager.
-struct FsmPragmaInfo {
-  std::string form;
-  std::string signal;
-  std::string enum_name;
-  bool has_enum = false;
-};
-
-std::vector<FsmPragmaInfo> CollectFsmPragmas(const std::string& src) {
-  SourceManager mgr;
-  DiagEngine diag(mgr);
-  auto fid = mgr.AddFile("<test>", src);
-  Lexer lexer(mgr.FileContent(fid), fid, diag);
-  lexer.LexAll();
-  std::vector<FsmPragmaInfo> out;
-  for (const auto& p : lexer.FsmStatePragmas()) {
-    out.push_back(
-        {p.form == Lexer::FsmStatePragma::Form::kStateVector ? "state_vector"
-                                                             : "enum_only",
-         std::string(p.signal_name), std::string(p.enum_name), p.has_enum});
-  }
-  return out;
-}
 
 // Plain-data copy of a recognized part-select (§40.4.2) FSM pragma.
 struct FsmPartSelectInfo {
@@ -100,21 +76,6 @@ std::vector<FsmConcatInfo> CollectConcatPragmas(const std::string& src) {
     info.fsm_name = std::string(p.fsm_name);
     info.enum_name = std::string(p.enum_name);
     out.push_back(info);
-  }
-  return out;
-}
-
-std::vector<std::string> CollectIdentifiers(const std::string& src) {
-  SourceManager mgr;
-  DiagEngine diag(mgr);
-  auto fid = mgr.AddFile("<test>", src);
-  Lexer lexer(mgr.FileContent(fid), fid, diag);
-  auto tokens = lexer.LexAll();
-  std::vector<std::string> out;
-  for (const auto& t : tokens) {
-    if (t.kind == TokenKind::kIdentifier) {
-      out.push_back(std::string(t.text));
-    }
   }
   return out;
 }

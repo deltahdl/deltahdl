@@ -2,13 +2,35 @@
 
 #include <cstdint>
 #include <string>
+#include <utility>
 #include <vector>
 
+#include "helpers_coverage_point_setup.h"
 #include "simulator/coverage.h"
 
 using namespace delta;
 
 namespace {
+
+// Build a covergroup whose only coverage item is a cross "xy" over coverpoints
+// "x" and "y" with two cross bins, <0,0> and <1,1>.
+CoverGroup* SetupCrossOnlyGroup(CoverageDB& db) {
+  auto* g = db.CreateGroup("cg");
+
+  CrossCover cross;
+  cross.name = "xy";
+  cross.coverpoint_names = {"x", "y"};
+  CrossBin cb0;
+  cb0.name = "<0,0>";
+  cb0.value_sets = {{0}, {0}};
+  cross.bins.push_back(cb0);
+  CrossBin cb1;
+  cb1.name = "<1,1>";
+  cb1.value_sets = {{1}, {1}};
+  cross.bins.push_back(cb1);
+  CoverageDB::AddCross(g, std::move(cross));
+  return g;
+}
 
 TEST(Coverage, SampleCountIncremented) {
   CoverageDB db;
@@ -138,20 +160,7 @@ TEST(Coverage, GetInstCoverageReportsBinCounts) {
 // coverage item is a cross, so its bins drive the reported totals.
 TEST(Coverage, GetCoverageAggregatesCrossBins) {
   CoverageDB db;
-  auto* g = db.CreateGroup("cg");
-
-  CrossCover cross;
-  cross.name = "xy";
-  cross.coverpoint_names = {"x", "y"};
-  CrossBin cb0;
-  cb0.name = "<0,0>";
-  cb0.value_sets = {{0}, {0}};
-  cross.bins.push_back(cb0);
-  CrossBin cb1;
-  cb1.name = "<1,1>";
-  cb1.value_sets = {{1}, {1}};
-  cross.bins.push_back(cb1);
-  CoverageDB::AddCross(g, std::move(cross));
+  auto* g = SetupCrossOnlyGroup(db);
 
   db.Sample(g, {{"x", 0}, {"y", 0}});
 
@@ -166,20 +175,7 @@ TEST(Coverage, GetCoverageAggregatesCrossBins) {
 // covering both cross bins yields a full count and 100% coverage.
 TEST(Coverage, GetInstCoverageAggregatesCrossBins) {
   CoverageDB db;
-  auto* g = db.CreateGroup("cg");
-
-  CrossCover cross;
-  cross.name = "xy";
-  cross.coverpoint_names = {"x", "y"};
-  CrossBin cb0;
-  cb0.name = "<0,0>";
-  cb0.value_sets = {{0}, {0}};
-  cross.bins.push_back(cb0);
-  CrossBin cb1;
-  cb1.name = "<1,1>";
-  cb1.value_sets = {{1}, {1}};
-  cross.bins.push_back(cb1);
-  CoverageDB::AddCross(g, std::move(cross));
+  auto* g = SetupCrossOnlyGroup(db);
 
   db.Sample(g, {{"x", 0}, {"y", 0}});
   db.Sample(g, {{"x", 1}, {"y", 1}});
@@ -209,15 +205,7 @@ TEST(Coverage, GetCoverageEmptyGroupReportsZeroBins) {
 TEST(Coverage, StopRetainsCollectedCoverage) {
   CoverageDB db;
   auto* g = db.CreateGroup("cg");
-  auto* cp = CoverageDB::AddCoverPoint(g, "x");
-  CoverBin b0;
-  b0.name = "b0";
-  b0.values = {0};
-  CoverageDB::AddBin(cp, b0);
-  CoverBin b1;
-  b1.name = "b1";
-  b1.values = {1};
-  CoverageDB::AddBin(cp, b1);
+  AddTwoValueBinPoint(g);
 
   db.Sample(g, {{"x", 0}});
   EXPECT_DOUBLE_EQ(CoverageDB::GetCoverage(g), 50.0);

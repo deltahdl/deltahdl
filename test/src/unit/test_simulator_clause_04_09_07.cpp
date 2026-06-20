@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "fixture_simulator.h"
+#include "helpers_lower_run.h"
 #include "simulator/lowerer.h"
 #include "simulator/sim_context.h"
 
@@ -235,26 +236,23 @@ TEST(SubroutineArgSchedulingSim,
 
 TEST(SubroutineArgSchedulingSim, MultipleOutputArgsAllWrittenOnReturn) {
   SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] a, b, c;\n"
-      "  task triple(output logic [7:0] x, y, z);\n"
-      "    x = 8'd1;\n"
-      "    y = 8'd2;\n"
-      "    z = 8'd3;\n"
-      "  endtask\n"
-      "  initial begin\n"
-      "    a = 8'd0;\n"
-      "    b = 8'd0;\n"
-      "    c = 8'd0;\n"
-      "    triple(a, b, c);\n"
-      "  end\n"
-      "endmodule\n",
-      f);
+  auto* design =
+      ElaborateLowerRun(f,
+                        "module t;\n"
+                        "  logic [7:0] a, b, c;\n"
+                        "  task triple(output logic [7:0] x, y, z);\n"
+                        "    x = 8'd1;\n"
+                        "    y = 8'd2;\n"
+                        "    z = 8'd3;\n"
+                        "  endtask\n"
+                        "  initial begin\n"
+                        "    a = 8'd0;\n"
+                        "    b = 8'd0;\n"
+                        "    c = 8'd0;\n"
+                        "    triple(a, b, c);\n"
+                        "  end\n"
+                        "endmodule\n");
   ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
   EXPECT_EQ(f.ctx.FindVariable("a")->value.ToUint64(), 1u);
   EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 2u);
   EXPECT_EQ(f.ctx.FindVariable("c")->value.ToUint64(), 3u);

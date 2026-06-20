@@ -1,4 +1,5 @@
 #include "fixture_simulator.h"
+#include "helpers_randseq_sim.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
 
@@ -10,24 +11,19 @@ namespace {
 // optional else is generated.
 TEST(RandsequenceSim, IfElseProductionFalseSelectsElse) {
   SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial begin\n"
-      "    x = 8'd0;\n"
-      "    randsequence(main)\n"
-      "      main : if (0) a else b;\n"
-      "      a : { x = 8'd1; };\n"
-      "      b : { x = 8'd2; };\n"
-      "    endsequence\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+  auto* var = RunRandseqAndFindVar(f,
+                                   "module t;\n"
+                                   "  logic [7:0] x;\n"
+                                   "  initial begin\n"
+                                   "    x = 8'd0;\n"
+                                   "    randsequence(main)\n"
+                                   "      main : if (0) a else b;\n"
+                                   "      a : { x = 8'd1; };\n"
+                                   "      b : { x = 8'd2; };\n"
+                                   "    endsequence\n"
+                                   "  end\n"
+                                   "endmodule\n",
+                                   "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 2u);
 }
@@ -36,24 +32,19 @@ TEST(RandsequenceSim, IfElseProductionFalseSelectsElse) {
 // expression is generated (and the else production is not).
 TEST(RandsequenceSim, IfElseProductionTrueSelectsThen) {
   SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial begin\n"
-      "    x = 8'd0;\n"
-      "    randsequence(main)\n"
-      "      main : if (1) a else b;\n"
-      "      a : { x = 8'd1; };\n"
-      "      b : { x = 8'd2; };\n"
-      "    endsequence\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+  auto* var = RunRandseqAndFindVar(f,
+                                   "module t;\n"
+                                   "  logic [7:0] x;\n"
+                                   "  initial begin\n"
+                                   "    x = 8'd0;\n"
+                                   "    randsequence(main)\n"
+                                   "      main : if (1) a else b;\n"
+                                   "      a : { x = 8'd1; };\n"
+                                   "      b : { x = 8'd2; };\n"
+                                   "    endsequence\n"
+                                   "  end\n"
+                                   "endmodule\n",
+                                   "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
@@ -63,23 +54,18 @@ TEST(RandsequenceSim, IfElseProductionTrueSelectsThen) {
 // surrounding state is left untouched.
 TEST(RandsequenceSim, IfWithoutElseFalseGeneratesNothing) {
   SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial begin\n"
-      "    x = 8'd5;\n"
-      "    randsequence(main)\n"
-      "      main : if (0) a;\n"
-      "      a : { x = 8'd1; };\n"
-      "    endsequence\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+  auto* var = RunRandseqAndFindVar(f,
+                                   "module t;\n"
+                                   "  logic [7:0] x;\n"
+                                   "  initial begin\n"
+                                   "    x = 8'd5;\n"
+                                   "    randsequence(main)\n"
+                                   "      main : if (0) a;\n"
+                                   "      a : { x = 8'd1; };\n"
+                                   "    endsequence\n"
+                                   "  end\n"
+                                   "endmodule\n",
+                                   "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 5u);
 }
@@ -89,23 +75,18 @@ TEST(RandsequenceSim, IfWithoutElseFalseGeneratesNothing) {
 // generated.
 TEST(RandsequenceSim, IfWithoutElseTrueGeneratesThen) {
   SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial begin\n"
-      "    x = 8'd5;\n"
-      "    randsequence(main)\n"
-      "      main : if (1) a;\n"
-      "      a : { x = 8'd1; };\n"
-      "    endsequence\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+  auto* var = RunRandseqAndFindVar(f,
+                                   "module t;\n"
+                                   "  logic [7:0] x;\n"
+                                   "  initial begin\n"
+                                   "    x = 8'd5;\n"
+                                   "    randsequence(main)\n"
+                                   "      main : if (1) a;\n"
+                                   "      a : { x = 8'd1; };\n"
+                                   "    endsequence\n"
+                                   "  end\n"
+                                   "endmodule\n",
+                                   "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
@@ -114,24 +95,19 @@ TEST(RandsequenceSim, IfWithoutElseTrueGeneratesThen) {
 // not just literal 1, so a condition of 5 still selects the then production.
 TEST(RandsequenceSim, NonOneTruthyConditionSelectsThen) {
   SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial begin\n"
-      "    x = 8'd0;\n"
-      "    randsequence(main)\n"
-      "      main : if (5) a else b;\n"
-      "      a : { x = 8'd1; };\n"
-      "      b : { x = 8'd2; };\n"
-      "    endsequence\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+  auto* var = RunRandseqAndFindVar(f,
+                                   "module t;\n"
+                                   "  logic [7:0] x;\n"
+                                   "  initial begin\n"
+                                   "    x = 8'd0;\n"
+                                   "    randsequence(main)\n"
+                                   "      main : if (5) a else b;\n"
+                                   "      a : { x = 8'd1; };\n"
+                                   "      b : { x = 8'd2; };\n"
+                                   "    endsequence\n"
+                                   "  end\n"
+                                   "endmodule\n",
+                                   "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
@@ -141,26 +117,21 @@ TEST(RandsequenceSim, NonOneTruthyConditionSelectsThen) {
 // so n < 2 is false and the else production is generated.
 TEST(RandsequenceSim, ConditionFromExpressionSelectsBranch) {
   SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  logic [7:0] n;\n"
-      "  initial begin\n"
-      "    x = 8'd0;\n"
-      "    n = 8'd3;\n"
-      "    randsequence(main)\n"
-      "      main : if (n < 2) a else b;\n"
-      "      a : { x = 8'd1; };\n"
-      "      b : { x = 8'd2; };\n"
-      "    endsequence\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+  auto* var = RunRandseqAndFindVar(f,
+                                   "module t;\n"
+                                   "  logic [7:0] x;\n"
+                                   "  logic [7:0] n;\n"
+                                   "  initial begin\n"
+                                   "    x = 8'd0;\n"
+                                   "    n = 8'd3;\n"
+                                   "    randsequence(main)\n"
+                                   "      main : if (n < 2) a else b;\n"
+                                   "      a : { x = 8'd1; };\n"
+                                   "      b : { x = 8'd2; };\n"
+                                   "    endsequence\n"
+                                   "  end\n"
+                                   "endmodule\n",
+                                   "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 2u);
 }

@@ -50,15 +50,7 @@ TEST(EvalOp, ConcatWidthIsSumOfElements) {
 TEST(EvalOp, ConcatPartSelectUsesPackedRangeNMinus1Down0) {
   SimFixture f;
 
-  auto* va = f.ctx.CreateVariable("hi", 4);
-  va->value = MakeLogic4VecVal(f.arena, 4, 0xA);
-  auto* vb = f.ctx.CreateVariable("lo", 4);
-  vb->value = MakeLogic4VecVal(f.arena, 4, 0x5);
-
-  auto* concat = f.arena.Create<Expr>();
-  concat->kind = ExprKind::kConcatenation;
-  concat->elements.push_back(MakeId(f.arena, "hi"));
-  concat->elements.push_back(MakeId(f.arena, "lo"));
+  auto* concat = MakeConcatOfTwoVars(f, "hi", 4, 0xA, "lo", 4, 0x5);
 
   auto* sel = f.arena.Create<Expr>();
   sel->kind = ExprKind::kSelect;
@@ -74,15 +66,7 @@ TEST(EvalOp, ConcatPartSelectUsesPackedRangeNMinus1Down0) {
 TEST(EvalOp, ConcatBitSelectUsesPackedRangeNMinus1Down0) {
   SimFixture f;
 
-  auto* va = f.ctx.CreateVariable("hi", 4);
-  va->value = MakeLogic4VecVal(f.arena, 4, 0x8);
-  auto* vb = f.ctx.CreateVariable("lo", 4);
-  vb->value = MakeLogic4VecVal(f.arena, 4, 0x1);
-
-  auto* concat = f.arena.Create<Expr>();
-  concat->kind = ExprKind::kConcatenation;
-  concat->elements.push_back(MakeId(f.arena, "hi"));
-  concat->elements.push_back(MakeId(f.arena, "lo"));
+  auto* concat = MakeConcatOfTwoVars(f, "hi", 4, 0x8, "lo", 4, 0x1);
 
   auto* sel_msb = MakeSelectExpr(f.arena, concat, MakeInt(f.arena, 7));
   auto msb = EvalExpr(sel_msb, f.ctx, f.arena);

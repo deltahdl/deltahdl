@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "fixture_simulator.h"
+#include "helpers_seeded_run.h"
 #include "simulator/class_object.h"
 #include "simulator/process.h"
 
@@ -143,7 +144,6 @@ TEST(RandomStabilityProperties, ObjectSeedSequenceReplaysInSameOrder) {
 // or not the child drew at all.
 TEST(RandomStabilityProperties, ChildThreadDrawDoesNotAdvanceParentStream) {
   auto run = [](bool child_draws, uint64_t& parent_after) {
-    SimFixtureSeeded f;
     std::string src = std::string(
         "module t;\n"
         "  int unsigned a;\n"
@@ -156,12 +156,7 @@ TEST(RandomStabilityProperties, ChildThreadDrawDoesNotAdvanceParentStream) {
         "    b = $urandom;\n"
         "  end\n"
         "endmodule\n");
-    auto* design = ElaborateSrc(src, f);
-    ASSERT_NE(design, nullptr);
-    Lowerer lowerer(f.ctx, f.arena, f.diag);
-    lowerer.Lower(design);
-    f.scheduler.Run();
-    parent_after = f.ctx.FindVariable("b")->value.ToUint64();
+    parent_after = RunSeededAndRead(src, {"b"})[0];
   };
   uint64_t with_child = 0, without_child = 0;
   run(/*child_draws=*/true, with_child);
@@ -174,7 +169,6 @@ TEST(RandomStabilityProperties, ChildThreadDrawDoesNotAdvanceParentStream) {
 // fork changes the seed material the children inherit, so their draws shift.
 TEST(RandomStabilityProperties, DynamicThreadSeededFromParent) {
   auto run = [](uint32_t parent_seed, uint64_t& a, uint64_t& b) {
-    SimFixtureSeeded f;
     std::string src =
         "module t;\n"
         "  int unsigned a;\n"
@@ -190,13 +184,9 @@ TEST(RandomStabilityProperties, DynamicThreadSeededFromParent) {
         "    join\n"
         "  end\n"
         "endmodule\n";
-    auto* design = ElaborateSrc(src, f);
-    ASSERT_NE(design, nullptr);
-    Lowerer lowerer(f.ctx, f.arena, f.diag);
-    lowerer.Lower(design);
-    f.scheduler.Run();
-    a = f.ctx.FindVariable("a")->value.ToUint64();
-    b = f.ctx.FindVariable("b")->value.ToUint64();
+    auto vals = RunSeededAndRead(src, {"a", "b"});
+    a = vals[0];
+    b = vals[1];
   };
   uint64_t a1 = 0, b1 = 0, a2 = 0, b2 = 0;
   run(/*parent_seed=*/1, a1, b1);
@@ -232,8 +222,7 @@ TEST(RandomStabilityProperties, DistinctStaticProcessesGetDistinctStreams) {
 // children gives each its own stream, so all of their first draws differ
 // pairwise.
 TEST(RandomStabilityProperties, ManyForkedSiblingsGetDistinctStreams) {
-  SimFixtureSeeded f;
-  auto* design = ElaborateSrc(
+  auto vals = RunSeededAndRead(
       "module t;\n"
       "  int unsigned a;\n"
       "  int unsigned b;\n"
@@ -248,15 +237,11 @@ TEST(RandomStabilityProperties, ManyForkedSiblingsGetDistinctStreams) {
       "    join\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto a = f.ctx.FindVariable("a")->value.ToUint64();
-  auto b = f.ctx.FindVariable("b")->value.ToUint64();
-  auto c = f.ctx.FindVariable("c")->value.ToUint64();
-  auto d = f.ctx.FindVariable("d")->value.ToUint64();
+      {"a", "b", "c", "d"});
+  auto a = vals[0];
+  auto b = vals[1];
+  auto c = vals[2];
+  auto d = vals[3];
   EXPECT_NE(a, b);
   EXPECT_NE(a, c);
   EXPECT_NE(a, d);
@@ -271,7 +256,6 @@ TEST(RandomStabilityProperties, ManyForkedSiblingsGetDistinctStreams) {
 // not the grandchild drew.
 TEST(RandomStabilityProperties, NestedForkPreservesAncestorStream) {
   auto run = [](bool grandchild_draws, uint64_t& outer_after) {
-    SimFixtureSeeded f;
     std::string src = std::string(
         "module t;\n"
         "  int unsigned outer;\n"
@@ -291,12 +275,7 @@ TEST(RandomStabilityProperties, NestedForkPreservesAncestorStream) {
         "    outer = $urandom;\n"
         "  end\n"
         "endmodule\n");
-    auto* design = ElaborateSrc(src, f);
-    ASSERT_NE(design, nullptr);
-    Lowerer lowerer(f.ctx, f.arena, f.diag);
-    lowerer.Lower(design);
-    f.scheduler.Run();
-    outer_after = f.ctx.FindVariable("outer")->value.ToUint64();
+    outer_after = RunSeededAndRead(src, {"outer"})[0];
   };
   uint64_t with_draw = 0, without_draw = 0;
   run(/*grandchild_draws=*/true, with_draw);

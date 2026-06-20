@@ -4,35 +4,11 @@
 #include <vector>
 
 #include "fixture_simulator.h"
+#include "helpers_semaphore_blocking_getter.h"
 #include "simulator/awaiters.h"
 #include "simulator/sync_objects.h"
 
 namespace {
-
-// Minimal coroutine modelling a process that blocks in get(). It starts
-// suspended; the first resume() runs it to the co_await, which either acquires
-// keys or parks the handle on the semaphore's FIFO waiter queue. The body
-// records its id when it finally runs, so a sequence of resumes reveals the
-// order in which blocked processes were served.
-struct BlockingGetter {
-  struct promise_type {
-    BlockingGetter get_return_object() {
-      return BlockingGetter{
-          std::coroutine_handle<promise_type>::from_promise(*this)};
-    }
-    std::suspend_always initial_suspend() noexcept { return {}; }
-    std::suspend_always final_suspend() noexcept { return {}; }
-    void return_void() {}
-    void unhandled_exception() {}
-  };
-  std::coroutine_handle<promise_type> h;
-};
-
-inline BlockingGetter SpawnGetter(delta::SemaphoreObject& sem, int count,
-                                  std::vector<int>& ran, int id) {
-  co_await delta::SemaphoreGetAwaiter{sem, count};
-  ran.push_back(id);
-}
 
 TEST(IpcSync, SemaphoreGetAcquiresKeys) {
   SemaphoreObject sem(5);

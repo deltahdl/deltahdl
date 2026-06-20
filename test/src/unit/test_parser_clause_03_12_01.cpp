@@ -6,6 +6,25 @@ using namespace delta;
 
 namespace {
 
+// Parses `src` and asserts it yields a valid, error-free compilation unit whose
+// design-element collections are all empty. Returns the parse result so callers
+// can make additional assertions (e.g. on classes or cu_items).
+static ParseResult ParseEmptyCompilationUnit(const char* src) {
+  auto r = Parse(src);
+  EXPECT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  if (r.cu != nullptr) {
+    EXPECT_TRUE(r.cu->modules.empty());
+    EXPECT_TRUE(r.cu->programs.empty());
+    EXPECT_TRUE(r.cu->interfaces.empty());
+    EXPECT_TRUE(r.cu->checkers.empty());
+    EXPECT_TRUE(r.cu->packages.empty());
+    EXPECT_TRUE(r.cu->udps.empty());
+    EXPECT_TRUE(r.cu->configs.empty());
+  }
+  return r;
+}
+
 TEST(CompilationUnitParsing, CuScopeTaskParsed) {
   auto r = Parse("task my_task; endtask\n");
   ASSERT_NE(r.cu, nullptr);
@@ -153,80 +172,36 @@ TEST(CompilationUnitParsing, MultipleCuScopeItems) {
 }
 
 TEST(CompilationUnitStructure, EmptySourceProducesValidCompilationUnit) {
-  auto r = Parse("");
+  auto r = ParseEmptyCompilationUnit("");
   ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(r.cu->modules.empty());
-  EXPECT_TRUE(r.cu->programs.empty());
-  EXPECT_TRUE(r.cu->interfaces.empty());
-  EXPECT_TRUE(r.cu->checkers.empty());
-  EXPECT_TRUE(r.cu->packages.empty());
-  EXPECT_TRUE(r.cu->udps.empty());
-  EXPECT_TRUE(r.cu->configs.empty());
   EXPECT_TRUE(r.cu->classes.empty());
   EXPECT_TRUE(r.cu->cu_items.empty());
 }
 
 TEST(CompilationUnitStructure,
      WhitespaceOnlySourceProducesValidCompilationUnit) {
-  auto r = Parse("   \t\n\n  \t  ");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(r.cu->modules.empty());
-  EXPECT_TRUE(r.cu->programs.empty());
-  EXPECT_TRUE(r.cu->interfaces.empty());
-  EXPECT_TRUE(r.cu->checkers.empty());
-  EXPECT_TRUE(r.cu->packages.empty());
-  EXPECT_TRUE(r.cu->udps.empty());
-  EXPECT_TRUE(r.cu->configs.empty());
+  ParseEmptyCompilationUnit("   \t\n\n  \t  ");
 }
 
 TEST(CompilationUnitStructure,
      LineCommentOnlySourceProducesValidCompilationUnit) {
-  auto r = Parse("// this file is intentionally empty\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(r.cu->modules.empty());
-  EXPECT_TRUE(r.cu->programs.empty());
-  EXPECT_TRUE(r.cu->interfaces.empty());
-  EXPECT_TRUE(r.cu->checkers.empty());
-  EXPECT_TRUE(r.cu->packages.empty());
-  EXPECT_TRUE(r.cu->udps.empty());
-  EXPECT_TRUE(r.cu->configs.empty());
+  ParseEmptyCompilationUnit("// this file is intentionally empty\n");
 }
 
 TEST(CompilationUnitStructure,
      BlockCommentOnlySourceProducesValidCompilationUnit) {
-  auto r = Parse("/* nothing here */");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(r.cu->modules.empty());
-  EXPECT_TRUE(r.cu->programs.empty());
-  EXPECT_TRUE(r.cu->interfaces.empty());
-  EXPECT_TRUE(r.cu->checkers.empty());
-  EXPECT_TRUE(r.cu->packages.empty());
-  EXPECT_TRUE(r.cu->udps.empty());
-  EXPECT_TRUE(r.cu->configs.empty());
+  ParseEmptyCompilationUnit("/* nothing here */");
 }
 
 TEST(CompilationUnitStructure,
      MixedWhitespaceAndCommentsProducesValidCompilationUnit) {
-  auto r = Parse(
+  ParseEmptyCompilationUnit(
       "\n"
       "  // line comment\n"
       "\t/* block comment */\n"
       "  /* multi-line\n"
       "     block comment */\n"
       "\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(r.cu->modules.empty());
-  EXPECT_TRUE(r.cu->programs.empty());
-  EXPECT_TRUE(r.cu->interfaces.empty());
-  EXPECT_TRUE(r.cu->checkers.empty());
-  EXPECT_TRUE(r.cu->packages.empty());
-  EXPECT_TRUE(r.cu->udps.empty());
-  EXPECT_TRUE(r.cu->configs.empty());
 }
 
 TEST(CompilationUnitStructure, DefaultFieldValues) {

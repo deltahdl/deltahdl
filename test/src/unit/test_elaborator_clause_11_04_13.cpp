@@ -1,6 +1,7 @@
 #include "fixture_simulator.h"
 #include "helpers_clocking.h"
 #include "helpers_eval_op.h"
+#include "helpers_lower_run.h"
 #include "helpers_scheduler.h"
 
 using namespace delta;
@@ -129,25 +130,17 @@ TEST(ExpressionSim, InsideWildcardRhsMatch) {
 
 TEST(ExpressionSim, InsideRangeBoundaryInclusive) {
   SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic x, y;\n"
-      "  initial begin\n"
-      "    x = 8'd5 inside {[8'd5:8'd10]};\n"
-      "    y = 8'd10 inside {[8'd5:8'd10]};\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* vx = f.ctx.FindVariable("x");
-  auto* vy = f.ctx.FindVariable("y");
-  ASSERT_NE(vx, nullptr);
-  ASSERT_NE(vy, nullptr);
-  EXPECT_EQ(vx->value.ToUint64(), 1u);
-  EXPECT_EQ(vy->value.ToUint64(), 1u);
+  auto [x, y] = RunModuleTwoVars(f,
+                                 "module t;\n"
+                                 "  logic x, y;\n"
+                                 "  initial begin\n"
+                                 "    x = 8'd5 inside {[8'd5:8'd10]};\n"
+                                 "    y = 8'd10 inside {[8'd5:8'd10]};\n"
+                                 "  end\n"
+                                 "endmodule\n",
+                                 "x", "y");
+  EXPECT_EQ(x, 1u);
+  EXPECT_EQ(y, 1u);
 }
 
 }  // namespace

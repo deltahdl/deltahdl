@@ -1,4 +1,5 @@
 #include "fixture_simulator.h"
+#include "helpers_lower_run.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
 
@@ -13,17 +14,6 @@ namespace {
 // both update their output terms without any delay. These tests drive a small
 // AND-array (one output, two inputs) so the array-type behavior is observable
 // from the final value of the output term.
-
-uint64_t RunModule(SimFixture& f, const char* src, std::string_view var) {
-  auto* design = ElaborateSrc(src, f);
-  EXPECT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* v = f.ctx.FindVariable(var);
-  EXPECT_NE(v, nullptr);
-  return v ? v->value.ToUint64() : 0;
-}
 
 // §20.16.1: "the output terms are updated without any delay." The output is
 // readable as its newly computed value in the same time step, with no

@@ -5,6 +5,7 @@
 
 #include "builders_systask.h"
 #include "fixture_simulator.h"
+#include "helpers_memload.h"
 #include "parser/ast.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
@@ -12,27 +13,6 @@
 using namespace delta;
 
 namespace {
-
-// Registers an unpacked array `name[lo .. lo+size-1]` of `width`-bit words,
-// each backed by a zero-initialized element variable, so $fread has a memory to
-// load into. The simulator names array elements `name[index]`.
-void SetupMem(SysTaskFixture& f, const char* name, int lo, int size,
-              uint32_t width, bool descending = false) {
-  f.ctx.RegisterArray(
-      name, {static_cast<uint32_t>(lo), static_cast<uint32_t>(size), width,
-             descending, false, false});
-  for (int i = 0; i < size; ++i) {
-    std::string nm = std::string(name) + "[" + std::to_string(lo + i) + "]";
-    auto* s = f.arena.AllocString(nm.c_str(), nm.size());
-    auto* v = f.ctx.CreateVariable(std::string_view(s, nm.size()), width);
-    v->value = MakeLogic4VecVal(f.arena, width, 0);
-  }
-}
-
-Variable* Cell(SysTaskFixture& f, const char* name, int addr) {
-  std::string nm = std::string(name) + "[" + std::to_string(addr) + "]";
-  return f.ctx.FindVariable(nm);
-}
 
 // Writes raw bytes to a temp file and returns its path.
 std::string WriteBytes(const char* tag, const std::vector<uint8_t>& bytes) {
@@ -73,6 +53,19 @@ void SetupStruct(SysTaskFixture& f, const char* type, const char* var,
   f.ctx.SetVariableStructType(var, type);
 }
 
+// Creates a fresh zero-initialized `width`-bit variable `v`, reads it with
+// $fread(v, fd), and returns the read-count result. `out_var` receives the
+// variable so the caller can inspect its loaded value.
+Logic4Vec FreadIntoVar(SysTaskFixture& f, uint64_t fd, uint32_t width,
+                       Variable** out_var) {
+  auto* var = f.ctx.CreateVariable("v", width);
+  var->value = MakeLogic4VecVal(f.arena, width, 0);
+  *out_var = var;
+  return EvalExpr(
+      MkSysCall(f.arena, "$fread", {MkId(f.arena, "v"), MkInt(f.arena, fd)}),
+      f.ctx, f.arena);
+}
+
 // §21.3.4.4: the integral-variable variant is the one applied for all packed
 // data. The file is read byte by byte and the first byte fills the most
 // significant byte position of the value (big endian).
@@ -82,12 +75,8 @@ TEST(FreadBinary, IntegralVariantPacksBigEndian) {
   uint64_t fd = OpenRead(f, path);
   ASSERT_NE(fd, 0u);
 
-  auto* var = f.ctx.CreateVariable("v", 32);
-  var->value = MakeLogic4VecVal(f.arena, 32, 0);
-
-  auto result = EvalExpr(
-      MkSysCall(f.arena, "$fread", {MkId(f.arena, "v"), MkInt(f.arena, fd)}),
-      f.ctx, f.arena);
+  Variable* var = nullptr;
+  auto result = FreadIntoVar(f, fd, 32, &var);
   EXPECT_EQ(result.ToUint64(), 4u);
   EXPECT_EQ(var->value.ToUint64(), 0xDEADBEEFu);
 
@@ -103,12 +92,8 @@ TEST(FreadBinary, LoadedDataIsTwoValue) {
   uint64_t fd = OpenRead(f, path);
   ASSERT_NE(fd, 0u);
 
-  auto* var = f.ctx.CreateVariable("v", 8);
-  var->value = MakeLogic4VecVal(f.arena, 8, 0);
-
-  EvalExpr(
-      MkSysCall(f.arena, "$fread", {MkId(f.arena, "v"), MkInt(f.arena, fd)}),
-      f.ctx, f.arena);
+  Variable* var = nullptr;
+  FreadIntoVar(f, fd, 8, &var);
   EXPECT_EQ(var->value.ToUint64(), 0xFFu);
   EXPECT_TRUE(var->value.IsKnown());
 
@@ -188,7 +173,7 @@ TEST(FreadBinary, StartAddressSelectsFirstElement) {
 // the highest address index regardless of the declared direction.
 TEST(FreadBinary, DescendingMemoryLoadsTowardHighestIndex) {
   SysTaskFixture f;
-  SetupMem(f, "down", 10, 11, 8, /*descending=*/true);
+  SetupMem(f, "down", 10, 11, 8, /*four_state=*/true, /*descending=*/true);
   std::string path = WriteBytes("desc", {0x55, 0x66});
   uint64_t fd = OpenRead(f, path);
   ASSERT_NE(fd, 0u);
@@ -298,12 +283,8 @@ TEST(FreadBinary, ReturnsZeroWhenNothingToRead) {
   uint64_t fd = OpenRead(f, path);
   ASSERT_NE(fd, 0u);
 
-  auto* var = f.ctx.CreateVariable("v", 32);
-  var->value = MakeLogic4VecVal(f.arena, 32, 0);
-
-  auto result = EvalExpr(
-      MkSysCall(f.arena, "$fread", {MkId(f.arena, "v"), MkInt(f.arena, fd)}),
-      f.ctx, f.arena);
+  Variable* var = nullptr;
+  auto result = FreadIntoVar(f, fd, 32, &var);
   EXPECT_EQ(result.ToUint64(), 0u);
 
   Close(f, fd);

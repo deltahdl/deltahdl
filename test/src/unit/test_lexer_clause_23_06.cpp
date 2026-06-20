@@ -1,20 +1,12 @@
 #include "fixture_lexer.h"
+#include "helpers_dotted_name_tokens.h"
 
 using namespace delta;
 
 namespace {
 
 TEST(HierarchicalNameLexing, DotSeparatedPathTokens) {
-  auto tokens = Lex("a.b.c");
-  ASSERT_GE(tokens.size(), 6u);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);
-  EXPECT_EQ(tokens[0].text, "a");
-  EXPECT_EQ(tokens[1].kind, TokenKind::kDot);
-  EXPECT_EQ(tokens[2].kind, TokenKind::kIdentifier);
-  EXPECT_EQ(tokens[2].text, "b");
-  EXPECT_EQ(tokens[3].kind, TokenKind::kDot);
-  EXPECT_EQ(tokens[4].kind, TokenKind::kIdentifier);
-  EXPECT_EQ(tokens[4].text, "c");
+  ExpectThreeComponentDottedNameTokens("a", "b", "c");
 }
 
 TEST(HierarchicalNameLexing, EscapedIdentInHierarchicalPath) {

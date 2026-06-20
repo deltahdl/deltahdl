@@ -11,6 +11,42 @@ using namespace delta;
 
 namespace {
 
+// Builds a 2x2 cross "ab" over coverpoints a and b (each with bins {0},{1})
+// inside a fresh group on the caller-owned db, auto-creates the cross bins, and
+// returns the cross. The group is reported through out_group so callers can
+// sample it.
+CrossCover* BuildTwoByTwoCross(CoverageDB& db, CoverGroup*& out_group) {
+  auto* g = db.CreateGroup("cg");
+  auto* a = CoverageDB::AddCoverPoint(g, "a");
+  CoverBin a0;
+  a0.name = "a0";
+  a0.values = {0};
+  CoverageDB::AddBin(a, a0);
+  CoverBin a1;
+  a1.name = "a1";
+  a1.values = {1};
+  CoverageDB::AddBin(a, a1);
+
+  auto* b = CoverageDB::AddCoverPoint(g, "b");
+  CoverBin b0;
+  b0.name = "b0";
+  b0.values = {0};
+  CoverageDB::AddBin(b, b0);
+  CoverBin b1;
+  b1.name = "b1";
+  b1.values = {1};
+  CoverageDB::AddBin(b, b1);
+
+  CrossCover cross;
+  cross.name = "ab";
+  cross.coverpoint_names = {"a", "b"};
+  auto* xc = CoverageDB::AddCross(g, std::move(cross));
+  CoverageDB::AutoCreateCrossBins(g, xc);
+
+  out_group = g;
+  return xc;
+}
+
 // LRM 19.11.2: the auto-cross bin count B_c is the product of the crossed
 // coverpoints' bin cardinalities, ∏ B_j, less the cross products B_b comprised
 // by user-defined cross bins. With cardinalities 3 and 2 and two products taken
@@ -51,32 +87,8 @@ TEST(CrossCoverage, OnlyCountingBinsContributeToUserBinCount) {
 // auto cross. A 2x2 cross has four bins.
 TEST(CrossCoverage, AutoCreatedBinDenominatorMatchesFormula) {
   CoverageDB db;
-  auto* g = db.CreateGroup("cg");
-  auto* a = CoverageDB::AddCoverPoint(g, "a");
-  CoverBin a0;
-  a0.name = "a0";
-  a0.values = {0};
-  CoverageDB::AddBin(a, a0);
-  CoverBin a1;
-  a1.name = "a1";
-  a1.values = {1};
-  CoverageDB::AddBin(a, a1);
-
-  auto* b = CoverageDB::AddCoverPoint(g, "b");
-  CoverBin b0;
-  b0.name = "b0";
-  b0.values = {0};
-  CoverageDB::AddBin(b, b0);
-  CoverBin b1;
-  b1.name = "b1";
-  b1.values = {1};
-  CoverageDB::AddBin(b, b1);
-
-  CrossCover cross;
-  cross.name = "ab";
-  cross.coverpoint_names = {"a", "b"};
-  auto* xc = CoverageDB::AddCross(g, std::move(cross));
-  CoverageDB::AutoCreateCrossBins(g, xc);
+  CoverGroup* g = nullptr;
+  auto* xc = BuildTwoByTwoCross(db, g);
 
   // ∏ B_j = 2*2 = 4, matching the formula's denominator for a pure auto cross.
   int32_t covered = -1;
@@ -91,32 +103,8 @@ TEST(CrossCoverage, AutoCreatedBinDenominatorMatchesFormula) {
 // the four bins of a 2x2 cross gives 50%.
 TEST(CrossCoverage, CoverageIsCoveredOverDenominator) {
   CoverageDB db;
-  auto* g = db.CreateGroup("cg");
-  auto* a = CoverageDB::AddCoverPoint(g, "a");
-  CoverBin a0;
-  a0.name = "a0";
-  a0.values = {0};
-  CoverageDB::AddBin(a, a0);
-  CoverBin a1;
-  a1.name = "a1";
-  a1.values = {1};
-  CoverageDB::AddBin(a, a1);
-
-  auto* b = CoverageDB::AddCoverPoint(g, "b");
-  CoverBin b0;
-  b0.name = "b0";
-  b0.values = {0};
-  CoverageDB::AddBin(b, b0);
-  CoverBin b1;
-  b1.name = "b1";
-  b1.values = {1};
-  CoverageDB::AddBin(b, b1);
-
-  CrossCover cross;
-  cross.name = "ab";
-  cross.coverpoint_names = {"a", "b"};
-  auto* xc = CoverageDB::AddCross(g, std::move(cross));
-  CoverageDB::AutoCreateCrossBins(g, xc);
+  CoverGroup* g = nullptr;
+  auto* xc = BuildTwoByTwoCross(db, g);
 
   // Hit two of the four cross products.
   db.Sample(g, {{"a", 0}, {"b", 0}});

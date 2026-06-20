@@ -1,28 +1,9 @@
 #include "fixture_elaborator.h"
+#include "helpers_generate_elab.h"
 
 using namespace delta;
 
 namespace {
-
-struct GenElab {
-  ElabFixture f;
-  CompilationUnit* cu = nullptr;
-  RtlirDesign* design = nullptr;
-};
-
-GenElab RunElaboration(const std::string& src, std::string_view top = "") {
-  GenElab r;
-  auto fid = r.f.mgr.AddFile("<test>", src);
-  Lexer lexer(r.f.mgr.FileContent(fid), fid, r.f.diag);
-  Parser parser(lexer, r.f.arena, r.f.diag);
-  r.cu = parser.Parse();
-  if (!r.cu) return r;
-  auto name = top.empty() ? r.cu->modules.back()->name : top;
-  Elaborator elab(r.f.arena, r.f.diag, r.cu);
-  r.design = elab.Elaborate(name);
-  r.f.has_errors = r.f.diag.HasErrors();
-  return r;
-}
 
 int CountVariablesNamed(const RtlirModule* mod, char last) {
   int count = 0;
@@ -37,7 +18,7 @@ int CountVariablesNamed(const RtlirModule* mod, char last) {
 // condition is a module parameter elaborates cleanly and instantiates the
 // selected block's declarations into the module.
 TEST(GenerateConstructSyntax, ConstantConditionFromEnclosingScopeElaborates) {
-  auto r = RunElaboration(
+  auto r = RunGenerateElaboration(
       "module top;\n"
       "  parameter P = 1;\n"
       "  if (P == 1) begin\n"
@@ -54,7 +35,7 @@ TEST(GenerateConstructSyntax, ConstantConditionFromEnclosingScopeElaborates) {
 // deterministic at elaboration time. A condition that depends on a runtime
 // variable is not constant, and the elaborator flags it.
 TEST(GenerateConstructSyntax, NonConstantGenerateSchemeIsDiagnosed) {
-  auto r = RunElaboration(
+  auto r = RunGenerateElaboration(
       "module top;\n"
       "  logic v;\n"
       "  if (v) begin\n"
@@ -69,7 +50,7 @@ TEST(GenerateConstructSyntax, NonConstantGenerateSchemeIsDiagnosed) {
 // expression, including a case-generate selector. A selector that depends on
 // a runtime variable is not constant and is flagged.
 TEST(GenerateConstructSyntax, NonConstantCaseSelectorIsDiagnosed) {
-  auto r = RunElaboration(
+  auto r = RunGenerateElaboration(
       "module top;\n"
       "  logic v;\n"
       "  case (v)\n"
@@ -89,7 +70,7 @@ TEST(GenerateConstructSyntax, NonConstantCaseSelectorIsDiagnosed) {
 // instances of a generate block. A false condition yields zero, so the
 // block's declarations never reach the module.
 TEST(GenerateConstructSyntax, FalseConditionYieldsZeroInstances) {
-  auto r = RunElaboration(
+  auto r = RunGenerateElaboration(
       "module top;\n"
       "  if (0) begin\n"
       "    logic a;\n"
@@ -104,7 +85,7 @@ TEST(GenerateConstructSyntax, FalseConditionYieldsZeroInstances) {
 // generate block; each iteration contributes its own copy of the block's
 // declarations.
 TEST(GenerateConstructSyntax, LoopProducesMultipleInstances) {
-  auto r = RunElaboration(
+  auto r = RunGenerateElaboration(
       "module top;\n"
       "  genvar i;\n"
       "  for (i = 0; i < 3; i = i + 1) begin\n"

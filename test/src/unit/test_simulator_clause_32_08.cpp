@@ -2,6 +2,7 @@
 
 #include <vector>
 
+#include "helpers_sdf_interconnect.h"
 #include "simulator/sdf_parser.h"
 #include "simulator/specify.h"
 
@@ -149,19 +150,8 @@ TEST(SdfAnnotation, IopathExpansionPopulatesAllTwelveTransitionSlots) {
 // Claim T applied by the production carrier on the other construct §32.8 names
 // (interconnect delays): a two-value INTERCONNECT is expanded to 12 slots.
 TEST(SdfAnnotation, InterconnectTwoValuesPopulateXStateSlotsThroughAnnotator) {
-  SdfFile file;
-  SdfCell cell;
-  SdfInterconnect ic;
-  ic.kind = SdfInterconnectKind::kInterconnect;
-  ic.src_port = "a";
-  ic.dst_port = "b";
-  ic.rise.typ_val = 7;
-  ic.fall.typ_val = 11;
-  cell.interconnects.push_back(ic);
-  file.cells.push_back(cell);
-
   SpecifyManager mgr;
-  AnnotateSdfToManager(file, mgr, SdfMtm::kTypical);
+  AnnotateSingleInterconnect(mgr, "a", "b", 7, 11);
   ASSERT_EQ(mgr.GetInterconnectDelays().size(), 1u);
   const auto& got = mgr.GetInterconnectDelays()[0];
   EXPECT_EQ(got.delays[0], 7u);

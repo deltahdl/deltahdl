@@ -3,6 +3,7 @@
 #include <gtest/gtest.h>
 
 #include "fixture_lexer.h"
+#include "helpers_gate_instantiation_tokens.h"
 
 using namespace delta;
 
@@ -22,15 +23,7 @@ TEST(BufNotLexing, NotKeyword) {
 
 TEST(BufNotLexing, NamedBufGateTokenSequence) {
   auto tokens = Lex("buf b1(out, in);");
-  ASSERT_GE(tokens.size(), 8u);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kKwBuf);
-  EXPECT_EQ(tokens[1].kind, TokenKind::kIdentifier);
-  EXPECT_EQ(tokens[2].kind, TokenKind::kLParen);
-  EXPECT_EQ(tokens[3].kind, TokenKind::kIdentifier);
-  EXPECT_EQ(tokens[4].kind, TokenKind::kComma);
-  EXPECT_EQ(tokens[5].kind, TokenKind::kIdentifier);
-  EXPECT_EQ(tokens[6].kind, TokenKind::kRParen);
-  EXPECT_EQ(tokens[7].kind, TokenKind::kSemicolon);
+  ExpectNamedGateInstantiation(tokens, TokenKind::kKwBuf, 2);
 }
 
 }  // namespace

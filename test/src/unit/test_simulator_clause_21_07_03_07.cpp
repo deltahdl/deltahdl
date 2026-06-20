@@ -1,6 +1,7 @@
 #include "builders_systask.h"
 #include "fixture_simulator.h"
 #include "fixture_vcd.h"
+#include "helpers_vcd_dumplimit.h"
 #include "simulator/evaluation.h"
 #include "simulator/variable.h"
 #include "simulator/vcd_writer.h"
@@ -36,9 +37,7 @@ TEST_F(ExtendedVcdControlRules, IgnoresControlTaskNamingUnopenedFile) {
   auto* clk = MakeVar(f, "clk", 1, 1);
   {
     VcdWriter vcd(tmp_path_);
-    vcd.WriteHeader("1ns");
-    vcd.RegisterSignal("clk", 1, clk);  // ident '!'
-    vcd.EndDefinitions();
+    SetupVcdDump(f, vcd, "clk", 1, clk);
     OpenPortsDump(f, vcd);
 
     EvalExpr(
@@ -57,9 +56,7 @@ TEST_F(ExtendedVcdControlRules, AppliesControlTaskNamingOpenedFile) {
   auto* clk = MakeVar(f, "clk", 1, 1);
   {
     VcdWriter vcd(tmp_path_);
-    vcd.WriteHeader("1ns");
-    vcd.RegisterSignal("clk", 1, clk);  // ident '!'
-    vcd.EndDefinitions();
+    SetupVcdDump(f, vcd, "clk", 1, clk);
     OpenPortsDump(f, vcd);
 
     EvalExpr(MkSysCall(f.arena, "$dumpportsoff", {MkStr(f.arena, "ports.vcd")}),
@@ -79,9 +76,7 @@ TEST_F(ExtendedVcdControlRules, NoArgumentFormRunsDefaultAction) {
   auto* clk = MakeVar(f, "clk", 1, 1);
   {
     VcdWriter vcd(tmp_path_);
-    vcd.WriteHeader("1ns");
-    vcd.RegisterSignal("clk", 1, clk);  // ident '!'
-    vcd.EndDefinitions();
+    SetupVcdDump(f, vcd, "clk", 1, clk);
     OpenPortsDump(f, vcd);
 
     EvalExpr(MkSysCall(f.arena, "$dumpportsoff", {}), f.ctx, f.arena);
@@ -101,11 +96,8 @@ TEST_F(ExtendedVcdControlRules,
   auto* clk = MakeVar(f, "clk", 1, 1);
   {
     VcdWriter vcd(tmp_path_);
-    vcd.WriteHeader("1ns");
-    vcd.RegisterSignal("clk", 1, clk);  // ident '!'
-    vcd.EndDefinitions();
+    SetupVcdDump(f, vcd, "clk", 1, clk);
     vcd.WriteTimestamp(0);
-    f.ctx.SetVcdWriter(&vcd);
 
     EvalExpr(MkSysCall(f.arena, "$dumpportsoff", {MkStr(f.arena, "any.vcd")}),
              f.ctx, f.arena);
@@ -124,20 +116,10 @@ TEST_F(ExtendedVcdControlRules, LimitTaskAppliesWithoutFilename) {
   auto* data = MakeVar(f, "data", 8, 0x00);
   {
     VcdWriter vcd(tmp_path_);
-    vcd.WriteHeader("1ns");
-    vcd.RegisterSignal("data", 8, data);  // ident '!'
-    vcd.EndDefinitions();
+    SetupVcdDump(f, vcd, "data", 8, data);
     OpenPortsDump(f, vcd);  // registers the explicit file name "ports.vcd"
 
-    EvalExpr(MkSysCall(f.arena, "$dumpportslimit", {MkInt(f.arena, 200)}),
-             f.ctx, f.arena);
-    data->prev_value = MakeLogic4VecVal(f.arena, 8, 0x00);
-    for (uint64_t t = 1; t <= 40; ++t) {
-      data->value = MakeLogic4VecVal(f.arena, 8, t & 0xFF);
-      vcd.WriteTimestamp(t * 10);
-      vcd.DumpChangedValues(0);
-      data->prev_value = data->value;
-    }
+    ApplyLimitAndDrive(f, vcd, data, 8, "$dumpportslimit", 200);
   }
   auto content = ReadVcd();
   EXPECT_NE(content.find("$comment"), std::string::npos);  // limit enforced
@@ -153,21 +135,13 @@ TEST_F(ExtendedVcdControlRules, LimitTaskIgnoredWhenTrailingFilenameUnmatched) {
   auto* data = MakeVar(f, "data", 8, 0x00);
   {
     VcdWriter vcd(tmp_path_);
-    vcd.WriteHeader("1ns");
-    vcd.RegisterSignal("data", 8, data);  // ident '!'
-    vcd.EndDefinitions();
+    SetupVcdDump(f, vcd, "data", 8, data);
     OpenPortsDump(f, vcd);  // registers the explicit file name "ports.vcd"
 
     EvalExpr(MkSysCall(f.arena, "$dumpportslimit",
                        {MkInt(f.arena, 200), MkStr(f.arena, "nomatch.vcd")}),
              f.ctx, f.arena);
-    data->prev_value = MakeLogic4VecVal(f.arena, 8, 0x00);
-    for (uint64_t t = 1; t <= 40; ++t) {
-      data->value = MakeLogic4VecVal(f.arena, 8, t & 0xFF);
-      vcd.WriteTimestamp(t * 10);
-      vcd.DumpChangedValues(0);
-      data->prev_value = data->value;
-    }
+    DriveValueChanges(f, vcd, data, 8);
   }
   auto content = ReadVcd();
   EXPECT_EQ(content.find("$comment"), std::string::npos);  // limit never set

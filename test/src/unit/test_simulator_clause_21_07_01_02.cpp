@@ -1,6 +1,7 @@
 #include "builders_systask.h"
 #include "fixture_simulator.h"
 #include "fixture_vcd.h"
+#include "helpers_vcd_dump.h"
 #include "simulator/evaluation.h"
 #include "simulator/variable.h"
 #include "simulator/vcd_writer.h"
@@ -48,16 +49,9 @@ class DumpvarsSysTask : public VcdTestBase {};
 // With no arguments, $dumpvars dumps every variable in the model.
 TEST_F(DumpvarsSysTask, NoArgumentsDumpsEveryVariable) {
   SimFixture f;
-  auto* clk = MakeVar(f, "clk", 1, 1);
-  auto* data = MakeVar(f, "data", 8, 0xA5);
   {
     VcdWriter vcd(tmp_path_);
-    vcd.WriteHeader("1ns");
-    vcd.RegisterSignal("clk", 1, clk);
-    vcd.RegisterSignal("data", 8, data);
-    vcd.EndDefinitions();
-    vcd.WriteTimestamp(0);
-    f.ctx.SetVcdWriter(&vcd);
+    SetupClkDataDump(f, vcd);
     EvalExpr(MkSysCall(f.arena, "$dumpvars", {}), f.ctx, f.arena);
   }
   auto content = ReadVcd();
@@ -70,16 +64,9 @@ TEST_F(DumpvarsSysTask, NoArgumentsDumpsEveryVariable) {
 // level count and is not treated as a variable to dump.
 TEST_F(DumpvarsSysTask, NamedVariableSelectsOnlyThatVariable) {
   SimFixture f;
-  auto* clk = MakeVar(f, "clk", 1, 1);
-  auto* data = MakeVar(f, "data", 8, 0xA5);
   {
     VcdWriter vcd(tmp_path_);
-    vcd.WriteHeader("1ns");
-    vcd.RegisterSignal("clk", 1, clk);
-    vcd.RegisterSignal("data", 8, data);
-    vcd.EndDefinitions();
-    vcd.WriteTimestamp(0);
-    f.ctx.SetVcdWriter(&vcd);
+    SetupClkDataDump(f, vcd);
     EvalExpr(MkSysCall(f.arena, "$dumpvars",
                        {MkInt(f.arena, 0), MkId(f.arena, "data")}),
              f.ctx, f.arena);
@@ -93,16 +80,9 @@ TEST_F(DumpvarsSysTask, NamedVariableSelectsOnlyThatVariable) {
 // level (no scope list) still dumps every variable rather than selecting none.
 TEST_F(DumpvarsSysTask, LevelCountAloneDumpsEveryVariable) {
   SimFixture f;
-  auto* clk = MakeVar(f, "clk", 1, 1);
-  auto* data = MakeVar(f, "data", 8, 0xA5);
   {
     VcdWriter vcd(tmp_path_);
-    vcd.WriteHeader("1ns");
-    vcd.RegisterSignal("clk", 1, clk);
-    vcd.RegisterSignal("data", 8, data);
-    vcd.EndDefinitions();
-    vcd.WriteTimestamp(0);
-    f.ctx.SetVcdWriter(&vcd);
+    SetupClkDataDump(f, vcd);
     EvalExpr(MkSysCall(f.arena, "$dumpvars", {MkInt(f.arena, 0)}), f.ctx,
              f.arena);
   }

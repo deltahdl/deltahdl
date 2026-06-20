@@ -3,6 +3,7 @@
 #include <gtest/gtest.h>
 
 #include "fixture_lexer.h"
+#include "helpers_gate_instantiation_tokens.h"
 
 using namespace delta;
 
@@ -46,30 +47,12 @@ TEST(BidirectionalSwitchLexing, Rtranif1Keyword) {
 
 TEST(BidirectionalSwitchLexing, TranInstantiationTokenSequence) {
   auto tokens = Lex("tran t1(a, b);");
-  ASSERT_GE(tokens.size(), 8u);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kKwTran);
-  EXPECT_EQ(tokens[1].kind, TokenKind::kIdentifier);
-  EXPECT_EQ(tokens[2].kind, TokenKind::kLParen);
-  EXPECT_EQ(tokens[3].kind, TokenKind::kIdentifier);
-  EXPECT_EQ(tokens[4].kind, TokenKind::kComma);
-  EXPECT_EQ(tokens[5].kind, TokenKind::kIdentifier);
-  EXPECT_EQ(tokens[6].kind, TokenKind::kRParen);
-  EXPECT_EQ(tokens[7].kind, TokenKind::kSemicolon);
+  ExpectNamedGateInstantiation(tokens, TokenKind::kKwTran, 2);
 }
 
 TEST(BidirectionalSwitchLexing, Tranif1InstantiationTokenSequence) {
   auto tokens = Lex("tranif1 t1(a, b, en);");
-  ASSERT_GE(tokens.size(), 10u);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kKwTranif1);
-  EXPECT_EQ(tokens[1].kind, TokenKind::kIdentifier);
-  EXPECT_EQ(tokens[2].kind, TokenKind::kLParen);
-  EXPECT_EQ(tokens[3].kind, TokenKind::kIdentifier);
-  EXPECT_EQ(tokens[4].kind, TokenKind::kComma);
-  EXPECT_EQ(tokens[5].kind, TokenKind::kIdentifier);
-  EXPECT_EQ(tokens[6].kind, TokenKind::kComma);
-  EXPECT_EQ(tokens[7].kind, TokenKind::kIdentifier);
-  EXPECT_EQ(tokens[8].kind, TokenKind::kRParen);
-  EXPECT_EQ(tokens[9].kind, TokenKind::kSemicolon);
+  ExpectNamedGateInstantiation(tokens, TokenKind::kKwTranif1, 3);
 }
 
 }  // namespace

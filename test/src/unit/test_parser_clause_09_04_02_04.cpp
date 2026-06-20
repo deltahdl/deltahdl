@@ -6,7 +6,7 @@ using namespace delta;
 namespace {
 
 TEST(SequenceEventParsing, SequenceEventAstStructure) {
-  auto r = Parse(
+  VerifySingleNoneEventControlSignalKind(
       "module m;\n"
       "  sequence abc;\n"
       "    @(posedge clk) a ##1 b ##1 c;\n"
@@ -14,16 +14,8 @@ TEST(SequenceEventParsing, SequenceEventAstStructure) {
       "  initial begin\n"
       "    @(abc) $display(\"match\");\n"
       "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
-  ASSERT_EQ(stmt->events.size(), 1u);
-  EXPECT_EQ(stmt->events[0].edge, Edge::kNone);
-  ASSERT_NE(stmt->events[0].signal, nullptr);
-  EXPECT_EQ(stmt->events[0].signal->kind, ExprKind::kIdentifier);
+      "endmodule\n",
+      ExprKind::kIdentifier);
 }
 
 TEST(SequenceEventParsing, SequenceEventWithIffGuard) {

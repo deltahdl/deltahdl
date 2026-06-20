@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "common/arena.h"
+#include "helpers_dpi_bump_import.h"
 #include "simulator/dpi_runtime.h"
 #include "simulator/scheduler.h"
 
@@ -195,16 +196,7 @@ TEST(DpiInstantCompletion, ChangeDetectingImportCallConsumesZeroTime) {
   Arena arena;
   Scheduler sched(arena);
   DpiRuntime rt;
-  DpiRtFunction func;
-  func.c_name = "c_bump";
-  func.sv_name = "bump";
-  func.return_type = DataTypeKind::kVoid;
-  func.args = {DpiArg{"io", DataTypeKind::kInt, Direction::kInout}};
-  func.arg_impl = [](std::vector<DpiArgValue>& a) {
-    a[0] = DpiArgValue::FromInt(a[0].AsInt() + 1);
-    return DpiArgValue::FromInt(0);
-  };
-  rt.RegisterImport(std::move(func));
+  RegisterBumpImport(rt);
 
   uint64_t time_before = 0;
   uint64_t time_after = 0;

@@ -9,31 +9,107 @@ using namespace delta;
 
 namespace {
 
-TEST(ClockingBlockEventSim, EventVarTriggeredOnClockEdge) {
-  ClockingSimFixture f;
+// Register a clocking block named `name` on signal `signal` with the given
+// clock `edge` and zero default input/output skews.
+void RegisterClockBlock(ClockingManager& cmgr, const char* name,
+                        const char* signal, Edge edge) {
+  ClockingBlock block;
+  block.name = name;
+  block.clock_signal = signal;
+  block.clock_edge = edge;
+  block.default_input_skew = SimTime{0};
+  block.default_output_skew = SimTime{0};
+  cmgr.Register(block);
+}
+
+// Create an event variable named `var_name`, flag it as an event, and bind it
+// to the clocking block `block_name`.
+Variable* MakeBlockEvent(ClockingSimFixture& f, ClockingManager& cmgr,
+                         const char* var_name, const char* block_name) {
+  auto* ev = f.ctx.CreateVariable(var_name, 1);
+  ev->is_event = true;
+  cmgr.SetBlockEventVar(block_name, ev);
+  return ev;
+}
+
+// Add a watcher to `ev` that sets *flag true when fired.
+void WatchFlag(Variable* ev, bool* flag) {
+  ev->AddWatcher([flag]() {
+    *flag = true;
+    return true;
+  });
+}
+
+// Standard single-block event setup: create clk (initial `clk_init`), register
+// a "cb" block on "clk" with the given edge, create+bind its "__cb_event", and
+// attach. Returns clk; fills *out_event with the bound event variable.
+Variable* SetupSingleBlockEvent(ClockingSimFixture& f, ClockingManager& cmgr,
+                                Edge edge, uint64_t clk_init,
+                                Variable** out_event) {
+  auto* clk = f.ctx.CreateVariable("clk", 1);
+  clk->value = MakeLogic4VecVal(f.arena, 1, clk_init);
+  RegisterClockBlock(cmgr, "cb", "clk", edge);
+  *out_event = MakeBlockEvent(f, cmgr, "__cb_event", "cb");
+  cmgr.Attach(f.ctx, f.scheduler);
+  return clk;
+}
+
+// Wire two posedge blocks "cb1"/"cb2" (on signals `sig1`/`sig2`), bind their
+// "__cb1_event"/"__cb2_event" events, attach, and install watchers that set
+// *fired1/*fired2 true when the respective event fires.
+void SetupTwoBlockEvents(ClockingSimFixture& f, ClockingManager& cmgr,
+                         const char* sig1, const char* sig2, bool* fired1,
+                         bool* fired2) {
+  RegisterClockBlock(cmgr, "cb1", sig1, Edge::kPosedge);
+  RegisterClockBlock(cmgr, "cb2", sig2, Edge::kPosedge);
+
+  auto* ev1 = MakeBlockEvent(f, cmgr, "__cb1_event", "cb1");
+  auto* ev2 = MakeBlockEvent(f, cmgr, "__cb2_event", "cb2");
+
+  cmgr.Attach(f.ctx, f.scheduler);
+
+  WatchFlag(ev1, fired1);
+  WatchFlag(ev2, fired2);
+}
+
+// Region-ordering check: schedule an event tagged `pre_label` in `pre_region`
+// at t=10, register an "observed"-region edge callback on a posedge "cb" block,
+// then verify the pre-region event fires before the clocking edge callback.
+void RunRegionOrderingTest(ClockingSimFixture& f, Region pre_region,
+                           const char* pre_label) {
   auto* clk = f.ctx.CreateVariable("clk", 1);
   clk->value = MakeLogic4VecVal(f.arena, 1, 0);
 
   ClockingManager cmgr;
-  ClockingBlock block;
-  block.name = "cb";
-  block.clock_signal = "clk";
-  block.clock_edge = Edge::kPosedge;
-  block.default_input_skew = SimTime{0};
-  block.default_output_skew = SimTime{0};
-  cmgr.Register(block);
+  RegisterClockBlock(cmgr, "cb", "clk", Edge::kPosedge);
 
-  auto* cb_event = f.ctx.CreateVariable("__cb_event", 1);
-  cb_event->is_event = true;
-  cmgr.SetBlockEventVar("cb", cb_event);
+  std::vector<std::string> order;
+
+  auto* pre_ev = f.scheduler.GetEventPool().Acquire();
+  pre_ev->callback = [&order, pre_label]() { order.push_back(pre_label); };
+  f.scheduler.ScheduleEvent(SimTime{10}, pre_region, pre_ev);
+
+  cmgr.RegisterEdgeCallback("cb", f.ctx, f.scheduler,
+                            [&order]() { order.push_back("observed"); });
 
   cmgr.Attach(f.ctx, f.scheduler);
 
+  SchedulePosedge(f, clk, 10);
+  f.scheduler.Run();
+
+  ASSERT_GE(order.size(), 2u);
+  EXPECT_EQ(order[0], pre_label);
+  EXPECT_EQ(order[1], "observed");
+}
+
+TEST(ClockingBlockEventSim, EventVarTriggeredOnClockEdge) {
+  ClockingSimFixture f;
+  ClockingManager cmgr;
+  Variable* cb_event = nullptr;
+  auto* clk = SetupSingleBlockEvent(f, cmgr, Edge::kPosedge, 0, &cb_event);
+
   bool triggered = false;
-  cb_event->AddWatcher([&triggered]() {
-    triggered = true;
-    return true;
-  });
+  WatchFlag(cb_event, &triggered);
 
   SchedulePosedge(f, clk, 10);
   f.scheduler.Run();
@@ -47,13 +123,7 @@ TEST(ClockingBlockEventSim, EdgeCallbackInvokedOnPosedge) {
   clk->value = MakeLogic4VecVal(f.arena, 1, 0);
 
   ClockingManager cmgr;
-  ClockingBlock block;
-  block.name = "cb";
-  block.clock_signal = "clk";
-  block.clock_edge = Edge::kPosedge;
-  block.default_input_skew = SimTime{0};
-  block.default_output_skew = SimTime{0};
-  cmgr.Register(block);
+  RegisterClockBlock(cmgr, "cb", "clk", Edge::kPosedge);
 
   uint32_t count = 0;
   cmgr.RegisterEdgeCallback("cb", f.ctx, f.scheduler, [&count]() { count++; });
@@ -69,29 +139,12 @@ TEST(ClockingBlockEventSim, EdgeCallbackInvokedOnPosedge) {
 
 TEST(ClockingBlockEventSim, EventNotTriggeredOnWrongEdge) {
   ClockingSimFixture f;
-  auto* clk = f.ctx.CreateVariable("clk", 1);
-  clk->value = MakeLogic4VecVal(f.arena, 1, 0);
-
   ClockingManager cmgr;
-  ClockingBlock block;
-  block.name = "cb";
-  block.clock_signal = "clk";
-  block.clock_edge = Edge::kPosedge;
-  block.default_input_skew = SimTime{0};
-  block.default_output_skew = SimTime{0};
-  cmgr.Register(block);
-
-  auto* cb_event = f.ctx.CreateVariable("__cb_event", 1);
-  cb_event->is_event = true;
-  cmgr.SetBlockEventVar("cb", cb_event);
-
-  cmgr.Attach(f.ctx, f.scheduler);
+  Variable* cb_event = nullptr;
+  auto* clk = SetupSingleBlockEvent(f, cmgr, Edge::kPosedge, 0, &cb_event);
 
   bool triggered = false;
-  cb_event->AddWatcher([&triggered]() {
-    triggered = true;
-    return true;
-  });
+  WatchFlag(cb_event, &triggered);
 
   ScheduleNegedge(f, clk, 10);
   f.scheduler.Run();
@@ -101,62 +154,17 @@ TEST(ClockingBlockEventSim, EventNotTriggeredOnWrongEdge) {
 
 TEST(ClockingBlockEventSim, EventFiresInObservedRegion) {
   ClockingSimFixture f;
-  auto* clk = f.ctx.CreateVariable("clk", 1);
-  clk->value = MakeLogic4VecVal(f.arena, 1, 0);
-
-  ClockingManager cmgr;
-  ClockingBlock block;
-  block.name = "cb";
-  block.clock_signal = "clk";
-  block.clock_edge = Edge::kPosedge;
-  block.default_input_skew = SimTime{0};
-  block.default_output_skew = SimTime{0};
-  cmgr.Register(block);
-
-  std::vector<std::string> order;
-
-  auto* active_ev = f.scheduler.GetEventPool().Acquire();
-  active_ev->callback = [&order]() { order.push_back("active"); };
-  f.scheduler.ScheduleEvent(SimTime{10}, Region::kActive, active_ev);
-
-  cmgr.RegisterEdgeCallback("cb", f.ctx, f.scheduler,
-                            [&order]() { order.push_back("observed"); });
-
-  cmgr.Attach(f.ctx, f.scheduler);
-
-  SchedulePosedge(f, clk, 10);
-  f.scheduler.Run();
-
-  ASSERT_GE(order.size(), 2u);
-  EXPECT_EQ(order[0], "active");
-  EXPECT_EQ(order[1], "observed");
+  RunRegionOrderingTest(f, Region::kActive, "active");
 }
 
 TEST(ClockingBlockEventSim, NegedgeBlockTriggersOnNegedge) {
   ClockingSimFixture f;
-  auto* clk = f.ctx.CreateVariable("clk", 1);
-  clk->value = MakeLogic4VecVal(f.arena, 1, 1);
-
   ClockingManager cmgr;
-  ClockingBlock block;
-  block.name = "cb";
-  block.clock_signal = "clk";
-  block.clock_edge = Edge::kNegedge;
-  block.default_input_skew = SimTime{0};
-  block.default_output_skew = SimTime{0};
-  cmgr.Register(block);
-
-  auto* cb_event = f.ctx.CreateVariable("__cb_event", 1);
-  cb_event->is_event = true;
-  cmgr.SetBlockEventVar("cb", cb_event);
-
-  cmgr.Attach(f.ctx, f.scheduler);
+  Variable* cb_event = nullptr;
+  auto* clk = SetupSingleBlockEvent(f, cmgr, Edge::kNegedge, 1, &cb_event);
 
   bool triggered = false;
-  cb_event->AddWatcher([&triggered]() {
-    triggered = true;
-    return true;
-  });
+  WatchFlag(cb_event, &triggered);
 
   ScheduleNegedge(f, clk, 10);
   f.scheduler.Run();
@@ -172,43 +180,9 @@ TEST(ClockingBlockEventSim, MultipleBlocksTriggerIndependentEvents) {
   clk2->value = MakeLogic4VecVal(f.arena, 1, 0);
 
   ClockingManager cmgr;
-
-  ClockingBlock b1;
-  b1.name = "cb1";
-  b1.clock_signal = "clk1";
-  b1.clock_edge = Edge::kPosedge;
-  b1.default_input_skew = SimTime{0};
-  b1.default_output_skew = SimTime{0};
-  cmgr.Register(b1);
-
-  ClockingBlock b2;
-  b2.name = "cb2";
-  b2.clock_signal = "clk2";
-  b2.clock_edge = Edge::kPosedge;
-  b2.default_input_skew = SimTime{0};
-  b2.default_output_skew = SimTime{0};
-  cmgr.Register(b2);
-
-  auto* ev1 = f.ctx.CreateVariable("__cb1_event", 1);
-  ev1->is_event = true;
-  cmgr.SetBlockEventVar("cb1", ev1);
-
-  auto* ev2 = f.ctx.CreateVariable("__cb2_event", 1);
-  ev2->is_event = true;
-  cmgr.SetBlockEventVar("cb2", ev2);
-
-  cmgr.Attach(f.ctx, f.scheduler);
-
   bool ev1_fired = false;
   bool ev2_fired = false;
-  ev1->AddWatcher([&ev1_fired]() {
-    ev1_fired = true;
-    return true;
-  });
-  ev2->AddWatcher([&ev2_fired]() {
-    ev2_fired = true;
-    return true;
-  });
+  SetupTwoBlockEvents(f, cmgr, "clk1", "clk2", &ev1_fired, &ev2_fired);
 
   SchedulePosedge(f, clk1, 10);
   f.scheduler.Run();
@@ -219,67 +193,19 @@ TEST(ClockingBlockEventSim, MultipleBlocksTriggerIndependentEvents) {
 
 TEST(ClockingBlockEventSim, EventFiresAfterNBARegion) {
   ClockingSimFixture f;
-  auto* clk = f.ctx.CreateVariable("clk", 1);
-  clk->value = MakeLogic4VecVal(f.arena, 1, 0);
-
-  ClockingManager cmgr;
-  ClockingBlock block;
-  block.name = "cb";
-  block.clock_signal = "clk";
-  block.clock_edge = Edge::kPosedge;
-  block.default_input_skew = SimTime{0};
-  block.default_output_skew = SimTime{0};
-  cmgr.Register(block);
-
-  std::vector<std::string> order;
-
-  auto* nba_ev = f.scheduler.GetEventPool().Acquire();
-  nba_ev->callback = [&order]() { order.push_back("nba"); };
-  f.scheduler.ScheduleEvent(SimTime{10}, Region::kNBA, nba_ev);
-
-  cmgr.RegisterEdgeCallback("cb", f.ctx, f.scheduler,
-                            [&order]() { order.push_back("observed"); });
-
-  cmgr.Attach(f.ctx, f.scheduler);
-
-  SchedulePosedge(f, clk, 10);
-  f.scheduler.Run();
-
-  ASSERT_GE(order.size(), 2u);
-  EXPECT_EQ(order[0], "nba");
-  EXPECT_EQ(order[1], "observed");
+  RunRegionOrderingTest(f, Region::kNBA, "nba");
 }
 
 TEST(ClockingBlockEventSim, MultipleWatchersAllFireOnEdge) {
   ClockingSimFixture f;
-  auto* clk = f.ctx.CreateVariable("clk", 1);
-  clk->value = MakeLogic4VecVal(f.arena, 1, 0);
-
   ClockingManager cmgr;
-  ClockingBlock block;
-  block.name = "cb";
-  block.clock_signal = "clk";
-  block.clock_edge = Edge::kPosedge;
-  block.default_input_skew = SimTime{0};
-  block.default_output_skew = SimTime{0};
-  cmgr.Register(block);
-
-  auto* cb_event = f.ctx.CreateVariable("__cb_event", 1);
-  cb_event->is_event = true;
-  cmgr.SetBlockEventVar("cb", cb_event);
-
-  cmgr.Attach(f.ctx, f.scheduler);
+  Variable* cb_event = nullptr;
+  auto* clk = SetupSingleBlockEvent(f, cmgr, Edge::kPosedge, 0, &cb_event);
 
   bool watcher_a = false;
   bool watcher_b = false;
-  cb_event->AddWatcher([&watcher_a]() {
-    watcher_a = true;
-    return true;
-  });
-  cb_event->AddWatcher([&watcher_b]() {
-    watcher_b = true;
-    return true;
-  });
+  WatchFlag(cb_event, &watcher_a);
+  WatchFlag(cb_event, &watcher_b);
 
   SchedulePosedge(f, clk, 10);
   f.scheduler.Run();
@@ -294,43 +220,9 @@ TEST(ClockingBlockEventSim, SharedClockBothBlocksFireEvents) {
   clk->value = MakeLogic4VecVal(f.arena, 1, 0);
 
   ClockingManager cmgr;
-
-  ClockingBlock b1;
-  b1.name = "cb1";
-  b1.clock_signal = "clk";
-  b1.clock_edge = Edge::kPosedge;
-  b1.default_input_skew = SimTime{0};
-  b1.default_output_skew = SimTime{0};
-  cmgr.Register(b1);
-
-  ClockingBlock b2;
-  b2.name = "cb2";
-  b2.clock_signal = "clk";
-  b2.clock_edge = Edge::kPosedge;
-  b2.default_input_skew = SimTime{0};
-  b2.default_output_skew = SimTime{0};
-  cmgr.Register(b2);
-
-  auto* ev1 = f.ctx.CreateVariable("__cb1_event", 1);
-  ev1->is_event = true;
-  cmgr.SetBlockEventVar("cb1", ev1);
-
-  auto* ev2 = f.ctx.CreateVariable("__cb2_event", 1);
-  ev2->is_event = true;
-  cmgr.SetBlockEventVar("cb2", ev2);
-
-  cmgr.Attach(f.ctx, f.scheduler);
-
   bool ev1_fired = false;
   bool ev2_fired = false;
-  ev1->AddWatcher([&ev1_fired]() {
-    ev1_fired = true;
-    return true;
-  });
-  ev2->AddWatcher([&ev2_fired]() {
-    ev2_fired = true;
-    return true;
-  });
+  SetupTwoBlockEvents(f, cmgr, "clk", "clk", &ev1_fired, &ev2_fired);
 
   SchedulePosedge(f, clk, 10);
   f.scheduler.Run();

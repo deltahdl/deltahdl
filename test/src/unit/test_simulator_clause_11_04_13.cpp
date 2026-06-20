@@ -356,34 +356,29 @@ TEST(EvalAdv, InsideRelToleranceTruncationMiss) {
 
 // §11.4.13: a set member naming an unpacked array is traversed down to its
 // singular elements, so {1, 2, q} with q = '{3,4,5} behaves like {1,2,3,4,5}.
-TEST(EvalOp, InsideQueueMemberDescends) {
-  SimFixture f;
+// Builds `ex inside {1, 2, q}` for a 32-bit `ex` holding `ex_val` and returns
+// the evaluated match result; q is '{3,4,5}.
+static uint64_t EvalInsideQueueMember(SimFixture& f, uint64_t ex_val) {
   MakeQueue(f, "q", {3, 4, 5});
   auto* var = f.ctx.CreateVariable("ex", 32);
-  var->value = MakeLogic4VecVal(f.arena, 32, 4);
+  var->value = MakeLogic4VecVal(f.arena, 32, ex_val);
   auto* inside = f.arena.Create<Expr>();
   inside->kind = ExprKind::kInside;
   inside->lhs = MakeId(f.arena, "ex");
   inside->elements.push_back(MakeInt(f.arena, 1));
   inside->elements.push_back(MakeInt(f.arena, 2));
   inside->elements.push_back(MakeId(f.arena, "q"));
-  auto result = EvalExpr(inside, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 1u);
+  return EvalExpr(inside, f.ctx, f.arena).ToUint64();
+}
+
+TEST(EvalOp, InsideQueueMemberDescends) {
+  SimFixture f;
+  EXPECT_EQ(EvalInsideQueueMember(f, 4), 1u);
 }
 
 TEST(EvalOp, InsideQueueMemberNoMatch) {
   SimFixture f;
-  MakeQueue(f, "q", {3, 4, 5});
-  auto* var = f.ctx.CreateVariable("ex", 32);
-  var->value = MakeLogic4VecVal(f.arena, 32, 9);
-  auto* inside = f.arena.Create<Expr>();
-  inside->kind = ExprKind::kInside;
-  inside->lhs = MakeId(f.arena, "ex");
-  inside->elements.push_back(MakeInt(f.arena, 1));
-  inside->elements.push_back(MakeInt(f.arena, 2));
-  inside->elements.push_back(MakeId(f.arena, "q"));
-  auto result = EvalExpr(inside, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 0u);
+  EXPECT_EQ(EvalInsideQueueMember(f, 9), 0u);
 }
 
 // A fixed-size unpacked array member descends the same way. MakeArray4 fills

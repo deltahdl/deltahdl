@@ -14,50 +14,50 @@ using namespace delta;
 
 namespace {
 
-TEST(BidirectionalSwitchNetwork,
-     NetworkResolutionPropagatesAcrossCascadedSwitches) {
+// Holds the three variables of a cascaded a->b->c switch network so the
+// resolved logic values can be asserted after resolution.
+struct CascadeVars {
   Arena arena;
-  auto* va = arena.Create<Variable>();
-  va->value = MakeLogic4Vec(arena, 1);
-  auto* vb = arena.Create<Variable>();
-  vb->value = MakeLogic4Vec(arena, 1);
-  auto* vc = arena.Create<Variable>();
-  vc->value = MakeLogic4Vec(arena, 1);
+  Variable* va = nullptr;
+  Variable* vb = nullptr;
+  Variable* vc = nullptr;
+};
 
-  Net a = MakeNet1(arena, va, 1);
-  Net b = MakeUndrivenNet(arena, vb);
-  Net c = MakeUndrivenNet(arena, vc);
+// Builds and resolves a two-switch cascade: net a (driven to 1) connects to
+// undriven net b via a kTran switch, and b connects to undriven net c via a
+// switch of kind `second_kind`. Returns the variables for value assertions.
+static CascadeVars ResolveCascade(BidirSwitchKind second_kind) {
+  CascadeVars cv;
+  cv.va = cv.arena.Create<Variable>();
+  cv.va->value = MakeLogic4Vec(cv.arena, 1);
+  cv.vb = cv.arena.Create<Variable>();
+  cv.vb->value = MakeLogic4Vec(cv.arena, 1);
+  cv.vc = cv.arena.Create<Variable>();
+  cv.vc->value = MakeLogic4Vec(cv.arena, 1);
+
+  Net a = MakeNet1(cv.arena, cv.va, 1);
+  Net b = MakeUndrivenNet(cv.arena, cv.vb);
+  Net c = MakeUndrivenNet(cv.arena, cv.vc);
 
   std::vector<BidirSwitchInst> sw;
   sw.push_back({&a, &b, BidirSwitchKind::kTran, {0, 0}, false});
-  sw.push_back({&b, &c, BidirSwitchKind::kTran, {0, 0}, false});
-  ResolveBidirSwitchNetwork(sw, arena);
+  sw.push_back({&b, &c, second_kind, {0, 0}, false});
+  ResolveBidirSwitchNetwork(sw, cv.arena);
+  return cv;
+}
 
-  EXPECT_EQ(ValOf(*vb), kVal1);
-  EXPECT_EQ(ValOf(*vc), kVal1);
+TEST(BidirectionalSwitchNetwork,
+     NetworkResolutionPropagatesAcrossCascadedSwitches) {
+  CascadeVars cv = ResolveCascade(BidirSwitchKind::kTran);
+  EXPECT_EQ(ValOf(*cv.vb), kVal1);
+  EXPECT_EQ(ValOf(*cv.vc), kVal1);
 }
 
 TEST(BidirectionalSwitchNetwork,
      NonConductingSwitchBlocksDownstreamPropagation) {
-  Arena arena;
-  auto* va = arena.Create<Variable>();
-  va->value = MakeLogic4Vec(arena, 1);
-  auto* vb = arena.Create<Variable>();
-  vb->value = MakeLogic4Vec(arena, 1);
-  auto* vc = arena.Create<Variable>();
-  vc->value = MakeLogic4Vec(arena, 1);
-
-  Net a = MakeNet1(arena, va, 1);
-  Net b = MakeUndrivenNet(arena, vb);
-  Net c = MakeUndrivenNet(arena, vc);
-
-  std::vector<BidirSwitchInst> sw;
-  sw.push_back({&a, &b, BidirSwitchKind::kTran, {0, 0}, false});
-  sw.push_back({&b, &c, BidirSwitchKind::kTranif1, {0, 0}, false});
-  ResolveBidirSwitchNetwork(sw, arena);
-
-  EXPECT_EQ(ValOf(*vb), kVal1);
-  EXPECT_EQ(ValOf(*vc), kValZ);
+  CascadeVars cv = ResolveCascade(BidirSwitchKind::kTranif1);
+  EXPECT_EQ(ValOf(*cv.vb), kVal1);
+  EXPECT_EQ(ValOf(*cv.vc), kValZ);
 }
 
 TEST(BidirectionalSwitchNetwork, AllSixSourceElementsAreBidirectional) {

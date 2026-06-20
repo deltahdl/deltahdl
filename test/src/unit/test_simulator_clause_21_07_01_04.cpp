@@ -1,6 +1,7 @@
 #include "builders_systask.h"
 #include "fixture_simulator.h"
 #include "fixture_vcd.h"
+#include "helpers_vcd_dump.h"
 #include "simulator/evaluation.h"
 #include "simulator/variable.h"
 #include "simulator/vcd_writer.h"
@@ -16,16 +17,9 @@ class DumpallSysTask : public VcdTestBase {};
 // selected variable, delimited by the $dumpall/$end keywords.
 TEST_F(DumpallSysTask, DumpallWritesCheckpointOfCurrentValues) {
   SimFixture f;
-  auto* clk = MakeVar(f, "clk", 1, 1);
-  auto* data = MakeVar(f, "data", 8, 0xA5);
   {
     VcdWriter vcd(tmp_path_);
-    vcd.WriteHeader("1ns");
-    vcd.RegisterSignal("clk", 1, clk);    // ident '!'
-    vcd.RegisterSignal("data", 8, data);  // ident '"'
-    vcd.EndDefinitions();
-    vcd.WriteTimestamp(0);
-    f.ctx.SetVcdWriter(&vcd);
+    SetupClkDataDump(f, vcd);
     EvalExpr(MkSysCall(f.arena, "$dumpall", {}), f.ctx, f.arena);
   }
   auto content = ReadVcd();

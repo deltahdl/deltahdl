@@ -1,4 +1,5 @@
 #include "fixture_parser.h"
+#include "helpers_concurrent_assertion_types.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
@@ -617,22 +618,7 @@ TEST(AssertionDeclParsing, AllFiveConcurrentAssertionTypes) {
       "  cover sequence (g ##1 h);\n"
       "  restrict property (i |-> j);\n"
       "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_NE(
-      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kAssertProperty),
-      nullptr);
-  ASSERT_NE(
-      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kAssumeProperty),
-      nullptr);
-  ASSERT_NE(
-      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kCoverProperty),
-      nullptr);
-  ASSERT_NE(
-      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kCoverSequence),
-      nullptr);
-  ASSERT_NE(FindItemByKind(r.cu->modules[0]->items,
-                           ModuleItemKind::kRestrictProperty),
-            nullptr);
+  VerifyAllFiveConcurrentAssertionTypes(r);
 }
 
 TEST(AssertionParsing, PropertyDeclAndAssertProperty) {

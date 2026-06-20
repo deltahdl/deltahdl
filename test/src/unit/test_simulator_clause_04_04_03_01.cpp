@@ -87,19 +87,8 @@ TEST(PliPreponedSim, LegalSchedulesFromPreponedAreNotFlagged) {
 }
 
 TEST(PliPreponedSim, ScheduleFromActiveIntoOtherRegionIsNotFlagged) {
-  Arena arena;
-  Scheduler sched(arena);
-
-  auto* active = sched.GetEventPool().Acquire();
-  active->callback = [&]() {
-    auto* nba = sched.GetEventPool().Acquire();
-    nba->callback = []() {};
-    sched.ScheduleEvent(sched.CurrentTime(), Region::kNBA, nba);
-  };
-  sched.ScheduleEvent({0}, Region::kActive, active);
-
-  sched.Run();
-  EXPECT_EQ(sched.IllegalPreponedScheduleCount(), 0u);
+  VerifyScheduleFromActiveIsNotFlagged(
+      [](Scheduler& s) { return s.IllegalPreponedScheduleCount(); });
 }
 
 TEST(PliPreponedSim, MultipleIllegalSchedulesAreEachCounted) {
@@ -211,32 +200,8 @@ TEST(PliPreponedSim, MultipleIllegalWritesAreEachCounted) {
 }
 
 TEST(PliPreponedSim, VpiPutValueOutsidePreponedDoesNotRecordViolation) {
-  Arena arena;
-  Scheduler sched(arena);
-  VpiContext vpi;
-  vpi.SetScheduler(&sched);
-
-  Logic4Word storage{};
-  Variable var{};
-  var.value.width = 32;
-  var.value.nwords = 1;
-  var.value.words = &storage;
-
-  VpiObject obj{};
-  obj.var = &var;
-
-  auto* active = sched.GetEventPool().Acquire();
-  active->callback = [&]() {
-    VpiValue value{};
-    value.format = kVpiIntVal;
-    value.value.integer = 42;
-    vpi.PutValue(&obj, &value, nullptr, 0);
-  };
-  sched.ScheduleEvent({0}, Region::kActive, active);
-
-  sched.Run();
-  EXPECT_EQ(sched.IllegalPreponedWriteCount(), 0u);
-  EXPECT_EQ(var.value.words[0].aval, 42u);
+  VerifyVpiWriteFromActiveIsNotFlagged(
+      [](Scheduler& s) { return s.IllegalPreponedWriteCount(); });
 }
 
 TEST(PliPreponedSim,

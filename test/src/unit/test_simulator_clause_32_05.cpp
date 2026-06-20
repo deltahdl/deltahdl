@@ -9,17 +9,25 @@ using namespace delta;
 
 namespace {
 
-// §32.5 C1 (ordered process): a later construct overwrites an earlier one even
-// when the two are different constructs. PATHPULSE seeds pulse limits, then a
-// plain IOPATH resets them to the delay-derived defaults.
-TEST(SdfMultipleAnnotations, IopathAfterPathpulseOverwritesPulseLimits) {
+// Seeds a SpecifyManager with a single A->Z PathDelay whose first delay slot is
+// set to |delay0|. Shared by the §32.5 ordered-process tests that need a prior
+// annotation in place before applying an SDF overwrite.
+SpecifyManager SeedManagerWithPathDelay(unsigned delay0) {
   SpecifyManager mgr;
   PathDelay pre;
   pre.src_port = "A";
   pre.dst_port = "Z";
   pre.delay_count = 1;
-  pre.delays[0] = 1;
+  pre.delays[0] = delay0;
   mgr.AddPathDelay(pre);
+  return mgr;
+}
+
+// §32.5 C1 (ordered process): a later construct overwrites an earlier one even
+// when the two are different constructs. PATHPULSE seeds pulse limits, then a
+// plain IOPATH resets them to the delay-derived defaults.
+TEST(SdfMultipleAnnotations, IopathAfterPathpulseOverwritesPulseLimits) {
+  SpecifyManager mgr = SeedManagerWithPathDelay(1);
 
   SdfFile file;
   std::string sdf = R"(
@@ -48,13 +56,7 @@ TEST(SdfMultipleAnnotations, IopathAfterPathpulseOverwritesPulseLimits) {
 // §32.5 C1 order sensitivity: the same two constructs in the opposite order
 // yield the opposite outcome. With PATHPULSE last, its pulse limits survive.
 TEST(SdfMultipleAnnotations, PathpulseAfterIopathSetsPulseLimits) {
-  SpecifyManager mgr;
-  PathDelay pre;
-  pre.src_port = "A";
-  pre.dst_port = "Z";
-  pre.delay_count = 1;
-  pre.delays[0] = 1;
-  mgr.AddPathDelay(pre);
+  SpecifyManager mgr = SeedManagerWithPathDelay(1);
 
   SdfFile file;
   std::string sdf = R"(
@@ -201,14 +203,7 @@ TEST(SdfMultipleAnnotations,
 // PATHPULSE limits are preserved rather than reset.
 TEST(SdfMultipleAnnotations,
      ExtendedIopathWithEmptyPulseSlotsPreservesPriorPathpulse) {
-  SpecifyManager mgr;
-  PathDelay pre;
-  pre.src_port = "A";
-  pre.dst_port = "Z";
-  pre.delay_count = 1;
-
-  pre.delays[0] = 20;
-  mgr.AddPathDelay(pre);
+  SpecifyManager mgr = SeedManagerWithPathDelay(20);
 
   SdfFile file;
   std::string sdf = R"(

@@ -105,12 +105,7 @@ TEST(QueueDelete, XzIndexIsNoop) {
 
 TEST(QueueDelete, NegativeIndexIsNoop) {
   SimFixture f;
-  auto* q = MakeQueue(f, "q", {10, 20});
-  auto* idx_var = f.ctx.CreateVariable("idx", 32);
-  idx_var->value = MakeLogic4Vec(f.arena, 32);
-  idx_var->value.words[0].aval = static_cast<uint64_t>(-1);
-  idx_var->value.words[0].bval = 0;
-  idx_var->value.is_signed = true;
+  auto* q = MakeQueueWithNegativeIdx(f, "q", {10, 20}, "idx");
   auto* call = MakeMethodCall(f.arena, "q", "delete", {MakeId(f.arena, "idx")});
   TryExecQueueMethodStmt(call, f.ctx, f.arena);
   EXPECT_EQ(q->elements.size(), 2u);

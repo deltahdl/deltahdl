@@ -9,6 +9,24 @@
 
 namespace {
 
+// Evaluates the `triggered` method of a named event under a fresh SimFixture.
+// The event `ev` is created and optionally marked as triggered, then the
+// member-access expression `ev.triggered` is evaluated and its result returned.
+static Logic4Vec EvalEvTriggered(bool set_triggered) {
+  SimFixture f;
+  auto* ev = f.ctx.CreateVariable("ev", 1);
+  ev->is_event = true;
+  ev->value = MakeLogic4VecVal(f.arena, 1, 0);
+  if (set_triggered) f.ctx.SetEventTriggered("ev");
+
+  auto* access = f.arena.Create<Expr>();
+  access->kind = ExprKind::kMemberAccess;
+  access->lhs = MakeId(f.arena, "ev");
+  access->rhs = MakeId(f.arena, "triggered");
+
+  return EvalExpr(access, f.ctx, f.arena);
+}
+
 TEST(IpcSync, NonblockingTriggerSetsTriggeredState) {
   SyncFixture f;
 
@@ -30,51 +48,19 @@ TEST(IpcSync, NonblockingTriggerSetsTriggeredState) {
 }
 
 TEST(IpcSync, TriggeredMethodReturnsOneWhenTriggered) {
-  SimFixture f;
-  auto* ev = f.ctx.CreateVariable("ev", 1);
-  ev->is_event = true;
-  ev->value = MakeLogic4VecVal(f.arena, 1, 0);
-  f.ctx.SetEventTriggered("ev");
-
-  auto* access = f.arena.Create<Expr>();
-  access->kind = ExprKind::kMemberAccess;
-  access->lhs = MakeId(f.arena, "ev");
-  access->rhs = MakeId(f.arena, "triggered");
-
-  auto result = EvalExpr(access, f.ctx, f.arena);
+  auto result = EvalEvTriggered(/*set_triggered=*/true);
   EXPECT_EQ(result.ToUint64(), 1u);
 }
 
 TEST(IpcSync, TriggeredMethodYieldsSingleBit) {
   // §15.5.3: triggered is prototyped as a bit-valued method, so the evaluated
   // result is a single-bit quantity regardless of the event's triggered state.
-  SimFixture f;
-  auto* ev = f.ctx.CreateVariable("ev", 1);
-  ev->is_event = true;
-  ev->value = MakeLogic4VecVal(f.arena, 1, 0);
-  f.ctx.SetEventTriggered("ev");
-
-  auto* access = f.arena.Create<Expr>();
-  access->kind = ExprKind::kMemberAccess;
-  access->lhs = MakeId(f.arena, "ev");
-  access->rhs = MakeId(f.arena, "triggered");
-
-  auto result = EvalExpr(access, f.ctx, f.arena);
+  auto result = EvalEvTriggered(/*set_triggered=*/true);
   EXPECT_EQ(result.width, 1u);
 }
 
 TEST(IpcSync, TriggeredMethodReturnsZeroByDefault) {
-  SimFixture f;
-  auto* ev = f.ctx.CreateVariable("ev", 1);
-  ev->is_event = true;
-  ev->value = MakeLogic4VecVal(f.arena, 1, 0);
-
-  auto* access = f.arena.Create<Expr>();
-  access->kind = ExprKind::kMemberAccess;
-  access->lhs = MakeId(f.arena, "ev");
-  access->rhs = MakeId(f.arena, "triggered");
-
-  auto result = EvalExpr(access, f.ctx, f.arena);
+  auto result = EvalEvTriggered(/*set_triggered=*/false);
   EXPECT_EQ(result.ToUint64(), 0u);
 }
 

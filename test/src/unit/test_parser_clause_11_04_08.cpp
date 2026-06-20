@@ -5,63 +5,33 @@ using namespace delta;
 namespace {
 
 TEST(OperatorParsing, BinaryBitwiseAnd) {
-  auto r = Parse("module m; initial x = a & b; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kBinary);
-  EXPECT_EQ(rhs->op, TokenKind::kAmp);
+  VerifyInitialRhsOp("module m; initial x = a & b; endmodule\n",
+                     ExprKind::kBinary, TokenKind::kAmp);
 }
 
 TEST(OperatorParsing, BinaryBitwiseOr) {
-  auto r = Parse("module m; initial x = a | b; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kBinary);
-  EXPECT_EQ(rhs->op, TokenKind::kPipe);
+  VerifyInitialRhsOp("module m; initial x = a | b; endmodule\n",
+                     ExprKind::kBinary, TokenKind::kPipe);
 }
 
 TEST(OperatorParsing, BinaryBitwiseXor) {
-  auto r = Parse("module m; initial x = a ^ b; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kBinary);
-  EXPECT_EQ(rhs->op, TokenKind::kCaret);
+  VerifyInitialRhsOp("module m; initial x = a ^ b; endmodule\n",
+                     ExprKind::kBinary, TokenKind::kCaret);
 }
 
 TEST(OperatorParsing, BinaryBitwiseXnor) {
-  auto r = Parse("module m; initial x = a ^~ b; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kBinary);
-  EXPECT_EQ(rhs->op, TokenKind::kCaretTilde);
+  VerifyInitialRhsOp("module m; initial x = a ^~ b; endmodule\n",
+                     ExprKind::kBinary, TokenKind::kCaretTilde);
 }
 
 TEST(OperatorParsing, BinaryBitwiseXnorAlt) {
-  auto r = Parse("module m; initial x = a ~^ b; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kBinary);
-  EXPECT_EQ(rhs->op, TokenKind::kTildeCaret);
+  VerifyInitialRhsOp("module m; initial x = a ~^ b; endmodule\n",
+                     ExprKind::kBinary, TokenKind::kTildeCaret);
 }
 
 TEST(OperatorParsing, UnaryBitwiseNot) {
-  auto r = Parse("module m; initial x = ~a; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kUnary);
-  EXPECT_EQ(rhs->op, TokenKind::kTilde);
+  VerifyInitialRhsOp("module m; initial x = ~a; endmodule\n", ExprKind::kUnary,
+                     TokenKind::kTilde);
 }
 
 }  // namespace

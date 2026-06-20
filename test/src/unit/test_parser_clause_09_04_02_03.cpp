@@ -5,6 +5,24 @@ using namespace delta;
 
 namespace {
 
+// Parses an always block whose two-event sensitivity list should resolve to a
+// guarded posedge first event (with an iff condition) followed by an
+// unguarded negedge second event. Shared by tests that exercise different
+// surface syntaxes (or-chained vs. parenthesized group) yielding this same
+// structure.
+void ExpectGuardedPosedgeThenUnguardedNegedge(const char* src) {
+  auto r = Parse(src);
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstAlwaysItem(r);
+  ASSERT_NE(item, nullptr);
+  ASSERT_EQ(item->sensitivity.size(), 2u);
+  EXPECT_EQ(item->sensitivity[0].edge, Edge::kPosedge);
+  EXPECT_NE(item->sensitivity[0].iff_condition, nullptr);
+  EXPECT_EQ(item->sensitivity[1].edge, Edge::kNegedge);
+  EXPECT_EQ(item->sensitivity[1].iff_condition, nullptr);
+}
+
 TEST(ConditionalEventIffParsing, IffGuardCommaStmtLevel) {
   auto r = Parse(
       "module m;\n"
@@ -339,19 +357,10 @@ TEST(ConditionalEventIffParsing, IffGuardComplexCondition) {
 }
 
 TEST(ConditionalEventIffParsing, IffGuardMultipleOrFirst) {
-  auto r = Parse(
+  ExpectGuardedPosedgeThenUnguardedNegedge(
       "module m;\n"
       "  always @(posedge clk iff en or negedge rst) q <= d;\n"
       "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysItem(r);
-  ASSERT_NE(item, nullptr);
-  ASSERT_EQ(item->sensitivity.size(), 2u);
-  EXPECT_EQ(item->sensitivity[0].edge, Edge::kPosedge);
-  EXPECT_NE(item->sensitivity[0].iff_condition, nullptr);
-  EXPECT_EQ(item->sensitivity[1].edge, Edge::kNegedge);
-  EXPECT_EQ(item->sensitivity[1].iff_condition, nullptr);
 }
 
 TEST(ConditionalEventIffParsing, IffGuardMultipleOrSecond) {
@@ -477,19 +486,10 @@ TEST(ConditionalEventIffParsing, IffWithoutConditionIsError) {
 // the same structure as the unparenthesized form -- two events with the iff
 // attached only to the first.
 TEST(ConditionalEventIffParsing, IffPrecedenceParenthesizedGroup) {
-  auto r = Parse(
+  ExpectGuardedPosedgeThenUnguardedNegedge(
       "module m;\n"
       "  always @((posedge clk iff en) or negedge rst) q <= d;\n"
       "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysItem(r);
-  ASSERT_NE(item, nullptr);
-  ASSERT_EQ(item->sensitivity.size(), 2u);
-  EXPECT_EQ(item->sensitivity[0].edge, Edge::kPosedge);
-  EXPECT_NE(item->sensitivity[0].iff_condition, nullptr);
-  EXPECT_EQ(item->sensitivity[1].edge, Edge::kNegedge);
-  EXPECT_EQ(item->sensitivity[1].iff_condition, nullptr);
 }
 
 }  // namespace

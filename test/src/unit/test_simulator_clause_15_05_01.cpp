@@ -3,6 +3,7 @@
 #include <string_view>
 
 #include "fixture_simulator.h"
+#include "helpers_lower_run.h"
 #include "simulator/lowerer.h"
 #include "simulator/net.h"
 #include "simulator/variable.h"
@@ -123,36 +124,26 @@ TEST(EventTriggerSimulator, NonblockingTriggerDefersToNbaRegion) {
 
 TEST(EventTriggerSimulator, TriggerUnblocksMultipleWaiters) {
   LowerFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  event ev;\n"
-      "  logic [7:0] a, b;\n"
-      "  initial begin\n"
-      "    @(ev);\n"
-      "    a = 8'd11;\n"
-      "  end\n"
-      "  initial begin\n"
-      "    @(ev);\n"
-      "    b = 8'd22;\n"
-      "  end\n"
-      "  initial begin\n"
-      "    #5 -> ev;\n"
-      "    #1 $finish;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* va = f.ctx.FindVariable("a");
-  auto* vb = f.ctx.FindVariable("b");
-  ASSERT_NE(va, nullptr);
-  ASSERT_NE(vb, nullptr);
-  EXPECT_EQ(va->value.ToUint64(), 11u);
-  EXPECT_EQ(vb->value.ToUint64(), 22u);
+  auto [a, b] = RunModuleTwoVars(f,
+                                 "module t;\n"
+                                 "  event ev;\n"
+                                 "  logic [7:0] a, b;\n"
+                                 "  initial begin\n"
+                                 "    @(ev);\n"
+                                 "    a = 8'd11;\n"
+                                 "  end\n"
+                                 "  initial begin\n"
+                                 "    @(ev);\n"
+                                 "    b = 8'd22;\n"
+                                 "  end\n"
+                                 "  initial begin\n"
+                                 "    #5 -> ev;\n"
+                                 "    #1 $finish;\n"
+                                 "  end\n"
+                                 "endmodule\n",
+                                 "a", "b");
+  EXPECT_EQ(a, 11u);
+  EXPECT_EQ(b, 22u);
 }
 
 // ->> with an event control creates its update event when the event control

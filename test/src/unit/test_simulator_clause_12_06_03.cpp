@@ -1,6 +1,7 @@
 
 
 #include "fixture_simulator.h"
+#include "helpers_matches_short_circuit.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
 
@@ -168,27 +169,8 @@ TEST(TernaryMatchesSim, ChainedLaterClauseFailureSelectsAlternative) {
 // right are not evaluated. Here the matches clause fails, so the side-effecting
 // filter after `&&&` must not run and the counter it would bump stays at zero.
 TEST(TernaryMatchesSim, FailedClauseSkipsLaterClauseEvaluation) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x, y, cnt;\n"
-      "  initial begin\n"
-      "    x = 8'd5;\n"
-      "    cnt = 8'd0;\n"
-      "    y = (x matches 8'd99 &&& cnt++) ? 8'd1 : 8'd2;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* cnt = f.ctx.FindVariable("cnt");
-  ASSERT_NE(cnt, nullptr);
-  EXPECT_EQ(cnt->value.ToUint64(), 0u);
-  auto* y = f.ctx.FindVariable("y");
-  ASSERT_NE(y, nullptr);
-  EXPECT_EQ(y->value.ToUint64(), 2u);
+  RunMatchesShortCircuitSkipsLaterClause(
+      "y = (x matches 8'd99 &&& cnt++) ? 8'd1 : 8'd2;");
 }
 
 }  // namespace

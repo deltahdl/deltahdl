@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <vector>
 
+#include "helpers_dpi_take_int.h"
 #include "simulator/dpi_runtime.h"
 
 using namespace delta;
@@ -47,19 +48,8 @@ TEST(DpiArgumentPassing, InputActualCoercedToFormalTypeOnCopyIn) {
 // nearest integer, just as a real-to-integer assignment would.
 TEST(DpiArgumentPassing, RealInputCoercedToIntegerFormalRoundsLikeAssignment) {
   DpiRuntime rt;
-  DpiRtFunction func;
-  func.c_name = "c_take_int";
-  func.sv_name = "take_int";
-  func.return_type = DataTypeKind::kInt;
-  func.args = {DpiArg{"x", DataTypeKind::kInt, Direction::kInput}};
-  func.arg_impl = [](std::vector<DpiArgValue>& a) {
-    return DpiArgValue::FromInt(a[0].type == DataTypeKind::kInt ? a[0].AsInt()
-                                                                : -1);
-  };
-  rt.RegisterImport(std::move(func));
-
-  std::vector<DpiArgValue> actuals = {DpiArgValue::FromReal(3.7)};
-  DpiArgValue result = rt.CallImportWithArgs("take_int", actuals);
+  DpiArgValue result =
+      CallTakeIntReportingFormal(rt, DpiArgValue::FromReal(3.7));
 
   EXPECT_EQ(result.AsInt(), 4);  // 3.7 rounds to 4 as for an assignment
 }
@@ -170,21 +160,10 @@ TEST(DpiArgumentPassing, MatchingTypeArgumentPassesWithoutCoercion) {
 // longint-to-int assignment would be.
 TEST(DpiArgumentPassing, NarrowingInputCoercionTruncatesLikeAssignment) {
   DpiRuntime rt;
-  DpiRtFunction func;
-  func.c_name = "c_take_int";
-  func.sv_name = "take_int";
-  func.return_type = DataTypeKind::kInt;
-  func.args = {DpiArg{"x", DataTypeKind::kInt, Direction::kInput}};
-  func.arg_impl = [](std::vector<DpiArgValue>& a) {
-    return DpiArgValue::FromInt(a[0].type == DataTypeKind::kInt ? a[0].AsInt()
-                                                                : -1);
-  };
-  rt.RegisterImport(std::move(func));
-
   // 0x1_0000_0007 — the low 32 bits are 7; the high bit beyond int width is
   // dropped by the narrowing coercion.
-  std::vector<DpiArgValue> actuals = {DpiArgValue::FromLongint(0x100000007LL)};
-  DpiArgValue result = rt.CallImportWithArgs("take_int", actuals);
+  DpiArgValue result =
+      CallTakeIntReportingFormal(rt, DpiArgValue::FromLongint(0x100000007LL));
 
   EXPECT_EQ(result.AsInt(), 7);  // truncated to the formal's 32-bit width
 }

@@ -2,56 +2,14 @@
 
 #include <vector>
 
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
-#include "simulator/net.h"
-#include "simulator/sim_context.h"
-#include "simulator/sv_vpi_user.h"
-#include "simulator/vpi.h"
+#include "helpers_vpi_value_array.h"
 
 namespace delta {
 namespace {
 
-class VpiGetValueArraySim : public ::testing::Test {
- protected:
-  void SetUp() override { SetGlobalVpiContext(&vpi_ctx_); }
-  void TearDown() override { SetGlobalVpiContext(nullptr); }
-
-  // Build a static unpacked array with `count` freshly created element
-  // variables and retain the variable pointers so a test can install known
-  // element values that vpi_get_value_array() then reads back.
-  VpiHandle MakeArray(std::string_view name,
-                      const std::vector<std::vector<int>>& dims, int count,
-                      uint32_t elem_width, int array_type = vpiStaticArray,
-                      bool four_state = true) {
-    elems_.clear();
-    name_pool_.reserve(name_pool_.size() + count);
-    for (int i = 0; i < count; ++i) {
-      auto* v = sim_ctx_.CreateVariable(
-          name_pool_.emplace_back(std::string(name) + std::to_string(i)),
-          elem_width);
-      v->is_4state = four_state;
-      elems_.push_back(v);
-    }
-    return vpi_ctx_.CreateRegArray(name, array_type, dims, elems_);
-  }
-
-  // Install a known (aval, bval) into one element's first value word.
-  void SetElem(int i, uint64_t aval, uint64_t bval = 0) {
-    elems_[i]->value.words[0].aval = aval;
-    elems_[i]->value.words[0].bval = bval;
-  }
-
-  SourceManager mgr_;
-  Arena arena_;
-  Scheduler scheduler_{arena_};
-  DiagEngine diag_{mgr_};
-  SimContext sim_ctx_{scheduler_, arena_, diag_};
-  VpiContext vpi_ctx_;
-  std::vector<Variable*> elems_;
-  std::vector<std::string> name_pool_;
-};
+// The vpi_get_value_array() tests read back element values that the routine
+// retrieves from a static unpacked array built by the shared base fixture.
+using VpiGetValueArraySim = VpiValueArraySimBase;
 
 // §38.16: the routine retrieves values only from static unpacked arrays
 // (vpiArrayType vpiStaticArray). A non-static array is rejected, an error is

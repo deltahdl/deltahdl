@@ -1,4 +1,5 @@
 #include "fixture_simulator.h"
+#include "helpers_assoc.h"
 #include "helpers_scheduler.h"
 #include "parser/ast.h"
 #include "simulator/evaluation.h"
@@ -6,28 +7,13 @@
 
 using namespace delta;
 
-static Expr* MakeAssocSelect(Arena& arena, std::string_view base_name,
-                             int64_t idx_val) {
-  auto* sel = arena.Create<Expr>();
-  sel->kind = ExprKind::kSelect;
-  auto* base = arena.Create<Expr>();
-  base->kind = ExprKind::kIdentifier;
-  base->text = base_name;
-  sel->base = base;
-  auto* idx = arena.Create<Expr>();
-  idx->kind = ExprKind::kIntegerLiteral;
-  idx->int_val = idx_val;
-  sel->index = idx;
-  return sel;
-}
-
 namespace {
 
 TEST(AssocArrayAllocation, AssignToNonexistentIntKeyCreatesEntry) {
   SimFixture f;
   f.ctx.CreateAssocArray("aa", 32, false);
 
-  auto* sel = MakeAssocSelect(f.arena, "aa", 42);
+  auto* sel = MakeAssocSelect(f.arena, 42);
   auto rhs = MakeLogic4VecVal(f.arena, 32, 100);
   TryAssocIndexedWrite(sel, rhs, f.ctx, f.arena);
 
@@ -50,7 +36,7 @@ TEST(AssocArrayAllocation, AssignToExistingKeyOverwrites) {
   SimFixture f;
   f.ctx.CreateAssocArray("aa", 32, false);
 
-  auto* sel = MakeAssocSelect(f.arena, "aa", 5);
+  auto* sel = MakeAssocSelect(f.arena, 5);
   auto rhs1 = MakeLogic4VecVal(f.arena, 32, 100);
   TryAssocIndexedWrite(sel, rhs1, f.ctx, f.arena);
 
@@ -67,7 +53,7 @@ TEST(AssocArrayAllocation, MultipleNonexistentKeysEachAllocated) {
   f.ctx.CreateAssocArray("aa", 32, false);
 
   for (int64_t k = 0; k < 5; ++k) {
-    auto* sel = MakeAssocSelect(f.arena, "aa", k);
+    auto* sel = MakeAssocSelect(f.arena, k);
     auto rhs = MakeLogic4VecVal(f.arena, 32, static_cast<uint64_t>(k * 10));
     TryAssocIndexedWrite(sel, rhs, f.ctx, f.arena);
   }

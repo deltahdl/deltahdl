@@ -9,6 +9,34 @@ using namespace delta;
 
 namespace {
 
+// An integer literal carrying an x bit. The queue operators treat any index
+// whose value has x or z bits as invalid, so this drives those paths.
+Expr* MakeXLiteral(Arena& arena) {
+  auto* e = arena.Create<Expr>();
+  e->kind = ExprKind::kIntegerLiteral;
+  e->text = "1'bx";
+  return e;
+}
+
+// Builds a queue slice expression q[lo:hi].
+Expr* MakeQueueSlice(Arena& arena, std::string_view base, Expr* lo, Expr* hi) {
+  auto* slice = arena.Create<Expr>();
+  slice->kind = ExprKind::kSelect;
+  slice->base = MakeId(arena, base);
+  slice->index = lo;
+  slice->index_end = hi;
+  return slice;
+}
+
+// Assigns {expr} into the queue named dst and applies the write.
+void AssignSliceToDst(SimFixture& f, std::string_view dst, Expr* expr) {
+  auto* rhs = f.arena.Create<Expr>();
+  rhs->kind = ExprKind::kConcatenation;
+  rhs->elements = {expr};
+  auto* stmt = MakeAssign(f.arena, dst, rhs);
+  TryQueueBlockingAssign(stmt, f.ctx, f.arena);
+}
+
 TEST(QueueOps, IndexReturnsElement) {
   SimFixture f;
   MakeQueue(f, "q", {10, 20, 30});
@@ -103,16 +131,9 @@ TEST(QueueOps, SliceYieldsCorrectElements) {
   MakeQueue(f, "q", {10, 20, 30, 40, 50});
   MakeQueue(f, "dst", {});
 
-  auto* slice = f.arena.Create<Expr>();
-  slice->kind = ExprKind::kSelect;
-  slice->base = MakeId(f.arena, "q");
-  slice->index = MakeInt(f.arena, 1);
-  slice->index_end = MakeInt(f.arena, 3);
-  auto* rhs = f.arena.Create<Expr>();
-  rhs->kind = ExprKind::kConcatenation;
-  rhs->elements = {slice};
-  auto* stmt = MakeAssign(f.arena, "dst", rhs);
-  TryQueueBlockingAssign(stmt, f.ctx, f.arena);
+  AssignSliceToDst(
+      f, "dst",
+      MakeQueueSlice(f.arena, "q", MakeInt(f.arena, 1), MakeInt(f.arena, 3)));
 
   auto* dst = f.ctx.FindQueue("dst");
   ASSERT_EQ(dst->elements.size(), 3u);
@@ -126,16 +147,9 @@ TEST(QueueOps, SliceAGreaterThanBYieldsEmpty) {
   MakeQueue(f, "q", {10, 20, 30});
   MakeQueue(f, "dst", {99});
 
-  auto* slice = f.arena.Create<Expr>();
-  slice->kind = ExprKind::kSelect;
-  slice->base = MakeId(f.arena, "q");
-  slice->index = MakeInt(f.arena, 2);
-  slice->index_end = MakeInt(f.arena, 0);
-  auto* rhs = f.arena.Create<Expr>();
-  rhs->kind = ExprKind::kConcatenation;
-  rhs->elements = {slice};
-  auto* stmt = MakeAssign(f.arena, "dst", rhs);
-  TryQueueBlockingAssign(stmt, f.ctx, f.arena);
+  AssignSliceToDst(
+      f, "dst",
+      MakeQueueSlice(f.arena, "q", MakeInt(f.arena, 2), MakeInt(f.arena, 0)));
 
   auto* dst = f.ctx.FindQueue("dst");
   EXPECT_EQ(dst->elements.size(), 0u);
@@ -146,16 +160,9 @@ TEST(QueueOps, SliceSingleElementYieldsOneItem) {
   MakeQueue(f, "q", {10, 20, 30});
   MakeQueue(f, "dst", {});
 
-  auto* slice = f.arena.Create<Expr>();
-  slice->kind = ExprKind::kSelect;
-  slice->base = MakeId(f.arena, "q");
-  slice->index = MakeInt(f.arena, 1);
-  slice->index_end = MakeInt(f.arena, 1);
-  auto* rhs = f.arena.Create<Expr>();
-  rhs->kind = ExprKind::kConcatenation;
-  rhs->elements = {slice};
-  auto* stmt = MakeAssign(f.arena, "dst", rhs);
-  TryQueueBlockingAssign(stmt, f.ctx, f.arena);
+  AssignSliceToDst(
+      f, "dst",
+      MakeQueueSlice(f.arena, "q", MakeInt(f.arena, 1), MakeInt(f.arena, 1)));
 
   auto* dst = f.ctx.FindQueue("dst");
   ASSERT_EQ(dst->elements.size(), 1u);
@@ -167,16 +174,9 @@ TEST(QueueOps, SliceBBeyondDollarClampsToDollar) {
   MakeQueue(f, "q", {10, 20, 30});
   MakeQueue(f, "dst", {});
 
-  auto* slice = f.arena.Create<Expr>();
-  slice->kind = ExprKind::kSelect;
-  slice->base = MakeId(f.arena, "q");
-  slice->index = MakeInt(f.arena, 1);
-  slice->index_end = MakeInt(f.arena, 100);
-  auto* rhs = f.arena.Create<Expr>();
-  rhs->kind = ExprKind::kConcatenation;
-  rhs->elements = {slice};
-  auto* stmt = MakeAssign(f.arena, "dst", rhs);
-  TryQueueBlockingAssign(stmt, f.ctx, f.arena);
+  AssignSliceToDst(
+      f, "dst",
+      MakeQueueSlice(f.arena, "q", MakeInt(f.arena, 1), MakeInt(f.arena, 100)));
 
   auto* dst = f.ctx.FindQueue("dst");
   ASSERT_EQ(dst->elements.size(), 2u);
@@ -220,49 +220,14 @@ TEST(QueueOps, SliceFullRangeCopiesAll) {
   MakeQueue(f, "q", {10, 20, 30});
   MakeQueue(f, "dst", {});
 
-  auto* slice = f.arena.Create<Expr>();
-  slice->kind = ExprKind::kSelect;
-  slice->base = MakeId(f.arena, "q");
-  slice->index = MakeInt(f.arena, 0);
-  slice->index_end = MakeInt(f.arena, 2);
-  auto* rhs = f.arena.Create<Expr>();
-  rhs->kind = ExprKind::kConcatenation;
-  rhs->elements = {slice};
-  auto* stmt = MakeAssign(f.arena, "dst", rhs);
-  TryQueueBlockingAssign(stmt, f.ctx, f.arena);
+  AssignSliceToDst(
+      f, "dst",
+      MakeQueueSlice(f.arena, "q", MakeInt(f.arena, 0), MakeInt(f.arena, 2)));
 
   auto* dst = f.ctx.FindQueue("dst");
   ASSERT_EQ(dst->elements.size(), 3u);
   EXPECT_EQ(dst->elements[0].ToUint64(), 10u);
   EXPECT_EQ(dst->elements[2].ToUint64(), 30u);
-}
-
-// An integer literal carrying an x bit. The queue operators treat any index
-// whose value has x or z bits as invalid, so this drives those paths.
-Expr* MakeXLiteral(Arena& arena) {
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kIntegerLiteral;
-  e->text = "1'bx";
-  return e;
-}
-
-// Builds a queue slice expression q[lo:hi].
-Expr* MakeQueueSlice(Arena& arena, std::string_view base, Expr* lo, Expr* hi) {
-  auto* slice = arena.Create<Expr>();
-  slice->kind = ExprKind::kSelect;
-  slice->base = MakeId(arena, base);
-  slice->index = lo;
-  slice->index_end = hi;
-  return slice;
-}
-
-// Assigns {expr} into the queue named dst and applies the write.
-void AssignSliceToDst(SimFixture& f, std::string_view dst, Expr* expr) {
-  auto* rhs = f.arena.Create<Expr>();
-  rhs->kind = ExprKind::kConcatenation;
-  rhs->elements = {expr};
-  auto* stmt = MakeAssign(f.arena, dst, rhs);
-  TryQueueBlockingAssign(stmt, f.ctx, f.arena);
 }
 
 // A slice bound that is a 4-state value containing x/z yields the empty queue.

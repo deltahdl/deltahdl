@@ -1,8 +1,8 @@
 #include <gtest/gtest.h>
 
-#include <algorithm>
 #include <vector>
 
+#include "helpers_vpi_driver_load_iter.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi.h"
 
@@ -22,18 +22,6 @@ namespace {
 //              variable and of any member nested inside it;
 //   detail 2 - the variable-array recommendation is a "should", carrying no
 //              enforced behaviour, so it is not exercised here.
-
-// Walk an iterator to completion, collecting every object it yields in order.
-std::vector<VpiHandle> Collect(VpiContext& ctx, VpiHandle iterator) {
-  std::vector<VpiHandle> objects;
-  if (!iterator) return objects;
-  while (VpiHandle next = ctx.Scan(iterator)) objects.push_back(next);
-  return objects;
-}
-
-bool Contains(const std::vector<VpiHandle>& objects, VpiHandle wanted) {
-  return std::find(objects.begin(), objects.end(), wanted) != objects.end();
-}
 
 // Figure: vpiDriver on a variable reaches every kind of driver object - a port,
 // a force, a continuous assignment, a single bit of a continuous assignment,
@@ -60,14 +48,15 @@ TEST(VariableDriversAndLoads, DriverIterationReachesEveryDriverKind) {
   var.children = {&port,        &unrelated,       &force,
                   &cont_assign, &cont_assign_bit, &assign_stmt};
 
-  std::vector<VpiHandle> drivers = Collect(ctx, ctx.Iterate(vpiDriver, &var));
+  std::vector<VpiHandle> drivers =
+      CollectVpiIteration(ctx, ctx.Iterate(vpiDriver, &var));
   ASSERT_EQ(drivers.size(), 5u);
-  EXPECT_TRUE(Contains(drivers, &port));
-  EXPECT_TRUE(Contains(drivers, &force));
-  EXPECT_TRUE(Contains(drivers, &cont_assign));
-  EXPECT_TRUE(Contains(drivers, &cont_assign_bit));
-  EXPECT_TRUE(Contains(drivers, &assign_stmt));
-  EXPECT_FALSE(Contains(drivers, &unrelated));
+  EXPECT_TRUE(VpiIterationContains(drivers, &port));
+  EXPECT_TRUE(VpiIterationContains(drivers, &force));
+  EXPECT_TRUE(VpiIterationContains(drivers, &cont_assign));
+  EXPECT_TRUE(VpiIterationContains(drivers, &cont_assign_bit));
+  EXPECT_TRUE(VpiIterationContains(drivers, &assign_stmt));
+  EXPECT_FALSE(VpiIterationContains(drivers, &unrelated));
 }
 
 // Figure: vpiLoad reaches the load object kinds but never a port. A port drives
@@ -92,13 +81,14 @@ TEST(VariableDriversAndLoads, LoadIterationExcludesPorts) {
   var.type = vpiLogicVar;
   var.children = {&port, &force, &cont_assign, &cont_assign_bit, &assign_stmt};
 
-  std::vector<VpiHandle> loads = Collect(ctx, ctx.Iterate(vpiLoad, &var));
+  std::vector<VpiHandle> loads =
+      CollectVpiIteration(ctx, ctx.Iterate(vpiLoad, &var));
   ASSERT_EQ(loads.size(), 4u);
-  EXPECT_FALSE(Contains(loads, &port));
-  EXPECT_TRUE(Contains(loads, &force));
-  EXPECT_TRUE(Contains(loads, &cont_assign));
-  EXPECT_TRUE(Contains(loads, &cont_assign_bit));
-  EXPECT_TRUE(Contains(loads, &assign_stmt));
+  EXPECT_FALSE(VpiIterationContains(loads, &port));
+  EXPECT_TRUE(VpiIterationContains(loads, &force));
+  EXPECT_TRUE(VpiIterationContains(loads, &cont_assign));
+  EXPECT_TRUE(VpiIterationContains(loads, &cont_assign_bit));
+  EXPECT_TRUE(VpiIterationContains(loads, &assign_stmt));
 }
 
 // Detail 1: a structure variable's vpiDriver iteration includes the driver of
@@ -130,11 +120,11 @@ TEST(VariableDriversAndLoads, AggregateDriverIncludesSelectsAndMembers) {
   struct_var.children = {&whole_driver, &part_select, &member};
 
   std::vector<VpiHandle> drivers =
-      Collect(ctx, ctx.Iterate(vpiDriver, &struct_var));
+      CollectVpiIteration(ctx, ctx.Iterate(vpiDriver, &struct_var));
   ASSERT_EQ(drivers.size(), 3u);
-  EXPECT_TRUE(Contains(drivers, &whole_driver));
-  EXPECT_TRUE(Contains(drivers, &select_driver));
-  EXPECT_TRUE(Contains(drivers, &member_driver));
+  EXPECT_TRUE(VpiIterationContains(drivers, &whole_driver));
+  EXPECT_TRUE(VpiIterationContains(drivers, &select_driver));
+  EXPECT_TRUE(VpiIterationContains(drivers, &member_driver));
 }
 
 // Detail 1 (load side, class variable): the load of a member nested inside a
@@ -158,11 +148,12 @@ TEST(VariableDriversAndLoads, AggregateLoadIncludesNestedMembersNotPorts) {
   class_var.type = vpiClassVar;
   class_var.children = {&whole_load, &member};
 
-  std::vector<VpiHandle> loads = Collect(ctx, ctx.Iterate(vpiLoad, &class_var));
+  std::vector<VpiHandle> loads =
+      CollectVpiIteration(ctx, ctx.Iterate(vpiLoad, &class_var));
   ASSERT_EQ(loads.size(), 2u);
-  EXPECT_TRUE(Contains(loads, &whole_load));
-  EXPECT_TRUE(Contains(loads, &member_load));
-  EXPECT_FALSE(Contains(loads, &member_port));
+  EXPECT_TRUE(VpiIterationContains(loads, &whole_load));
+  EXPECT_TRUE(VpiIterationContains(loads, &member_load));
+  EXPECT_FALSE(VpiIterationContains(loads, &member_port));
 }
 
 // Detail 1 is scoped to structure/union/class variables: a plain
@@ -185,10 +176,11 @@ TEST(VariableDriversAndLoads, NonAggregateVariableDoesNotDescend) {
   var.type = vpiLogicVar;
   var.children = {&direct_driver, &bit_select};
 
-  std::vector<VpiHandle> drivers = Collect(ctx, ctx.Iterate(vpiDriver, &var));
+  std::vector<VpiHandle> drivers =
+      CollectVpiIteration(ctx, ctx.Iterate(vpiDriver, &var));
   ASSERT_EQ(drivers.size(), 1u);
-  EXPECT_TRUE(Contains(drivers, &direct_driver));
-  EXPECT_FALSE(Contains(drivers, &select_driver));
+  EXPECT_TRUE(VpiIterationContains(drivers, &direct_driver));
+  EXPECT_FALSE(VpiIterationContains(drivers, &select_driver));
 }
 
 // Detail 1 (union variable, nested aggregate member): the rule names structure,
@@ -219,10 +211,10 @@ TEST(VariableDriversAndLoads, UnionDriverDescendsThroughNestedAggregateMember) {
   union_var.children = {&whole_driver, &struct_member};
 
   std::vector<VpiHandle> drivers =
-      Collect(ctx, ctx.Iterate(vpiDriver, &union_var));
+      CollectVpiIteration(ctx, ctx.Iterate(vpiDriver, &union_var));
   ASSERT_EQ(drivers.size(), 2u);
-  EXPECT_TRUE(Contains(drivers, &whole_driver));
-  EXPECT_TRUE(Contains(drivers, &deep_driver));
+  EXPECT_TRUE(VpiIterationContains(drivers, &whole_driver));
+  EXPECT_TRUE(VpiIterationContains(drivers, &deep_driver));
 }
 
 }  // namespace

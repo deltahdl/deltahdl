@@ -8,6 +8,22 @@ using namespace delta;
 
 namespace {
 
+// Collects every typedef in the first module into `typedefs` and returns the
+// single variable declaration item (or nullptr if none was found).
+static const ModuleItem* CollectTypedefsAndVar(ParseResult& r,
+                                               TypedefMap& typedefs) {
+  auto& items = r.cu->modules[0]->items;
+  const ModuleItem* var = nullptr;
+  for (auto* it : items) {
+    if (it->kind == ModuleItemKind::kTypedef) {
+      typedefs.emplace(it->name, it->data_type);
+    } else if (it->kind == ModuleItemKind::kVarDecl) {
+      var = it;
+    }
+  }
+  return var;
+}
+
 TEST(ScalarAndVectorDeclaration, ScalarNoRange) {
   auto r = Parse(
       "module t;\n"
@@ -171,16 +187,8 @@ TEST(ScalarAndVectorDeclaration, MatchingUserDefinedTypeVectorIsVector) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto& items = r.cu->modules[0]->items;
   TypedefMap typedefs;
-  const ModuleItem* var = nullptr;
-  for (auto* it : items) {
-    if (it->kind == ModuleItemKind::kTypedef) {
-      typedefs.emplace(it->name, it->data_type);
-    } else if (it->kind == ModuleItemKind::kVarDecl) {
-      var = it;
-    }
-  }
+  const ModuleItem* var = CollectTypedefsAndVar(r, typedefs);
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->data_type.kind, DataTypeKind::kNamed);
   EXPECT_FALSE(IsVector(var->data_type));
@@ -195,16 +203,8 @@ TEST(ScalarAndVectorDeclaration, BitTypedefVectorIsVector) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto& items = r.cu->modules[0]->items;
   TypedefMap typedefs;
-  const ModuleItem* var = nullptr;
-  for (auto* it : items) {
-    if (it->kind == ModuleItemKind::kTypedef) {
-      typedefs.emplace(it->name, it->data_type);
-    } else if (it->kind == ModuleItemKind::kVarDecl) {
-      var = it;
-    }
-  }
+  const ModuleItem* var = CollectTypedefsAndVar(r, typedefs);
   ASSERT_NE(var, nullptr);
   EXPECT_TRUE(IsVector(var->data_type, typedefs));
 }
@@ -217,16 +217,8 @@ TEST(ScalarAndVectorDeclaration, RegTypedefVectorIsVector) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto& items = r.cu->modules[0]->items;
   TypedefMap typedefs;
-  const ModuleItem* var = nullptr;
-  for (auto* it : items) {
-    if (it->kind == ModuleItemKind::kTypedef) {
-      typedefs.emplace(it->name, it->data_type);
-    } else if (it->kind == ModuleItemKind::kVarDecl) {
-      var = it;
-    }
-  }
+  const ModuleItem* var = CollectTypedefsAndVar(r, typedefs);
   ASSERT_NE(var, nullptr);
   EXPECT_TRUE(IsVector(var->data_type, typedefs));
 }
@@ -239,16 +231,8 @@ TEST(ScalarAndVectorDeclaration, MatchingUserDefinedTypeScalarIsNotVector) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto& items = r.cu->modules[0]->items;
   TypedefMap typedefs;
-  const ModuleItem* var = nullptr;
-  for (auto* it : items) {
-    if (it->kind == ModuleItemKind::kTypedef) {
-      typedefs.emplace(it->name, it->data_type);
-    } else if (it->kind == ModuleItemKind::kVarDecl) {
-      var = it;
-    }
-  }
+  const ModuleItem* var = CollectTypedefsAndVar(r, typedefs);
   ASSERT_NE(var, nullptr);
   EXPECT_FALSE(IsVector(var->data_type, typedefs));
 }

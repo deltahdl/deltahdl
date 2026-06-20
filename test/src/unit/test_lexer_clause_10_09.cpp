@@ -1,4 +1,5 @@
 #include "fixture_lexer.h"
+#include "helpers_assignment_pattern_lex.h"
 
 using namespace delta;
 
@@ -55,14 +56,7 @@ TEST(AssignmentPatternLex, PsTypeIdentifierPrefixTokenization) {
 }
 
 TEST(AssignmentPatternLex, ConstantExpressionReplicationPrefix) {
-  auto tokens = Lex("'{4{8'hAB}}");
-  ASSERT_GE(tokens.size(), 6u);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kApostropheLBrace);
-  EXPECT_EQ(tokens[1].kind, TokenKind::kIntLiteral);
-  EXPECT_EQ(tokens[2].kind, TokenKind::kLBrace);
-  EXPECT_EQ(tokens[3].kind, TokenKind::kIntLiteral);
-  EXPECT_EQ(tokens[4].kind, TokenKind::kRBrace);
-  EXPECT_EQ(tokens[5].kind, TokenKind::kRBrace);
+  ExpectReplicationPatternTokens("'{4{8'hAB}}");
 }
 
 TEST(AssignmentPatternLex, EmptyAssignmentPatternTokens) {

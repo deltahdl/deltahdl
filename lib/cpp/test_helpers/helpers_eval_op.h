@@ -2,9 +2,29 @@
 
 #include <cstring>
 
+#include "builders_ast.h"
 #include "fixture_simulator.h"
+#include "parser/ast.h"
 
 using namespace delta;
+
+// Builds two 4-state variables and returns a concatenation Expr {a, b} over
+// them. The variables are created in f.ctx with the given names/widths/values.
+inline Expr* MakeConcatOfTwoVars(SimFixture& f, std::string_view name_a,
+                                 uint32_t width_a, uint64_t val_a,
+                                 std::string_view name_b, uint32_t width_b,
+                                 uint64_t val_b) {
+  auto* va = f.ctx.CreateVariable(name_a, width_a);
+  va->value = MakeLogic4VecVal(f.arena, width_a, val_a);
+  auto* vb = f.ctx.CreateVariable(name_b, width_b);
+  vb->value = MakeLogic4VecVal(f.arena, width_b, val_b);
+
+  auto* concat = f.arena.Create<Expr>();
+  concat->kind = ExprKind::kConcatenation;
+  concat->elements.push_back(MakeId(f.arena, name_a));
+  concat->elements.push_back(MakeId(f.arena, name_b));
+  return concat;
+}
 
 inline Variable* MakeVar4(SimFixture& f, std::string_view name, uint32_t width,
                           uint64_t aval, uint64_t bval) {

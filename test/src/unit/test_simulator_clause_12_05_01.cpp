@@ -18,6 +18,71 @@ using namespace delta;
 
 namespace {
 
+// Runs a case statement whose single non-default item matches the selector via
+// a pattern variable holding a don't-care (z) bit, returning the result value.
+// Shared by the casex and casez "Z in item treated as don't-care" tests, which
+// differ only in case_kind.
+uint64_t RunZInItemDontCare(StmtFixture& f, TokenKind case_kind) {
+  auto* result_var = f.ctx.CreateVariable("czit", 32);
+  result_var->value = MakeLogic4VecVal(f.arena, 32, 0);
+
+  auto* stmt = f.arena.Create<Stmt>();
+  stmt->kind = StmtKind::kCase;
+  stmt->case_kind = case_kind;
+  stmt->condition = MakeInt(f.arena, 2);
+
+  auto* pat_var = f.ctx.CreateVariable("pat_z", 4);
+  pat_var->value = MakeLogic4Vec(f.arena, 4);
+  pat_var->value.words[0].aval = 0x03;
+  pat_var->value.words[0].bval = 0x01;
+
+  CaseItem item1;
+  item1.patterns.push_back(MakeId(f.arena, "pat_z"));
+  item1.body = MakeBlockAssign(f.arena, "czit", 77);
+  stmt->case_items.push_back(item1);
+
+  CaseItem def;
+  def.is_default = true;
+  def.body = MakeBlockAssign(f.arena, "czit", 0);
+  stmt->case_items.push_back(def);
+
+  RunStmt(stmt, f.ctx, f.arena);
+  return result_var->value.ToUint64();
+}
+
+// Runs a case statement where an earlier item (a pattern variable with a
+// don't-care bit) and a later literal item both nominally match the selector,
+// verifying first-match-wins behavior. Shared by the casex and casez
+// "first match wins" tests, which differ in case_kind and the pattern aval.
+uint64_t RunFirstMatchWins(StmtFixture& f, TokenKind case_kind,
+                           uint32_t pat_aval) {
+  auto* result_var = f.ctx.CreateVariable("cfm", 32);
+  result_var->value = MakeLogic4VecVal(f.arena, 32, 0);
+
+  auto* stmt = f.arena.Create<Stmt>();
+  stmt->kind = StmtKind::kCase;
+  stmt->case_kind = case_kind;
+  stmt->condition = MakeInt(f.arena, 5);
+
+  auto* pat1 = f.ctx.CreateVariable("p1", 8);
+  pat1->value = MakeLogic4Vec(f.arena, 8);
+  pat1->value.words[0].aval = pat_aval;
+  pat1->value.words[0].bval = 0x01;
+
+  CaseItem item1;
+  item1.patterns.push_back(MakeId(f.arena, "p1"));
+  item1.body = MakeBlockAssign(f.arena, "cfm", 10);
+  stmt->case_items.push_back(item1);
+
+  CaseItem item2;
+  item2.patterns.push_back(MakeInt(f.arena, 5));
+  item2.body = MakeBlockAssign(f.arena, "cfm", 20);
+  stmt->case_items.push_back(item2);
+
+  RunStmt(stmt, f.ctx, f.arena);
+  return result_var->value.ToUint64();
+}
+
 TEST(CasexStatementSim, CasexMatchesIgnoringXZ) {
   StmtFixture f;
   auto* result_var = f.ctx.CreateVariable("cx", 32);
@@ -122,31 +187,7 @@ TEST(CasexStatementSim, CasexXInSelectorTreatedAsDontCare) {
 
 TEST(CasexStatementSim, CasexZInItemTreatedAsDontCare) {
   StmtFixture f;
-  auto* result_var = f.ctx.CreateVariable("czit", 32);
-  result_var->value = MakeLogic4VecVal(f.arena, 32, 0);
-
-  auto* stmt = f.arena.Create<Stmt>();
-  stmt->kind = StmtKind::kCase;
-  stmt->case_kind = TokenKind::kKwCasex;
-  stmt->condition = MakeInt(f.arena, 2);
-
-  auto* pat_var = f.ctx.CreateVariable("pat_z", 4);
-  pat_var->value = MakeLogic4Vec(f.arena, 4);
-  pat_var->value.words[0].aval = 0x03;
-  pat_var->value.words[0].bval = 0x01;
-
-  CaseItem item1;
-  item1.patterns.push_back(MakeId(f.arena, "pat_z"));
-  item1.body = MakeBlockAssign(f.arena, "czit", 77);
-  stmt->case_items.push_back(item1);
-
-  CaseItem def;
-  def.is_default = true;
-  def.body = MakeBlockAssign(f.arena, "czit", 0);
-  stmt->case_items.push_back(def);
-
-  RunStmt(stmt, f.ctx, f.arena);
-  EXPECT_EQ(result_var->value.ToUint64(), 77u);
+  EXPECT_EQ(RunZInItemDontCare(f, TokenKind::kKwCasex), 77u);
 }
 
 TEST(CasexStatementSim, CasexSymmetricDontCareBothSides) {
@@ -186,31 +227,7 @@ TEST(CasexStatementSim, CasexSymmetricDontCareBothSides) {
 
 TEST(CasexStatementSim, CasexFirstMatchWins) {
   StmtFixture f;
-  auto* result_var = f.ctx.CreateVariable("cfm", 32);
-  result_var->value = MakeLogic4VecVal(f.arena, 32, 0);
-
-  auto* stmt = f.arena.Create<Stmt>();
-  stmt->kind = StmtKind::kCase;
-  stmt->case_kind = TokenKind::kKwCasex;
-  stmt->condition = MakeInt(f.arena, 5);
-
-  auto* pat1 = f.ctx.CreateVariable("p1", 8);
-  pat1->value = MakeLogic4Vec(f.arena, 8);
-  pat1->value.words[0].aval = 0x04;
-  pat1->value.words[0].bval = 0x01;
-
-  CaseItem item1;
-  item1.patterns.push_back(MakeId(f.arena, "p1"));
-  item1.body = MakeBlockAssign(f.arena, "cfm", 10);
-  stmt->case_items.push_back(item1);
-
-  CaseItem item2;
-  item2.patterns.push_back(MakeInt(f.arena, 5));
-  item2.body = MakeBlockAssign(f.arena, "cfm", 20);
-  stmt->case_items.push_back(item2);
-
-  RunStmt(stmt, f.ctx, f.arena);
-  EXPECT_EQ(result_var->value.ToUint64(), 10u);
+  EXPECT_EQ(RunFirstMatchWins(f, TokenKind::kKwCasex, 0x04), 10u);
 }
 
 TEST(CasexStatementSim, CasexEmptyNoItems) {
@@ -434,31 +451,7 @@ TEST(CasezStatementSim, CasezDontCareInPatternOnly) {
 
 TEST(CasezStatementSim, CasezZInItemTreatedAsDontCare) {
   StmtFixture f;
-  auto* result_var = f.ctx.CreateVariable("czit", 32);
-  result_var->value = MakeLogic4VecVal(f.arena, 32, 0);
-
-  auto* stmt = f.arena.Create<Stmt>();
-  stmt->kind = StmtKind::kCase;
-  stmt->case_kind = TokenKind::kKwCasez;
-  stmt->condition = MakeInt(f.arena, 2);
-
-  auto* pat_var = f.ctx.CreateVariable("pat_z", 4);
-  pat_var->value = MakeLogic4Vec(f.arena, 4);
-  pat_var->value.words[0].aval = 0x03;
-  pat_var->value.words[0].bval = 0x01;
-
-  CaseItem item1;
-  item1.patterns.push_back(MakeId(f.arena, "pat_z"));
-  item1.body = MakeBlockAssign(f.arena, "czit", 77);
-  stmt->case_items.push_back(item1);
-
-  CaseItem def;
-  def.is_default = true;
-  def.body = MakeBlockAssign(f.arena, "czit", 0);
-  stmt->case_items.push_back(def);
-
-  RunStmt(stmt, f.ctx, f.arena);
-  EXPECT_EQ(result_var->value.ToUint64(), 77u);
+  EXPECT_EQ(RunZInItemDontCare(f, TokenKind::kKwCasez), 77u);
 }
 
 TEST(CasezStatementSim, CasezXInSelectorIsNotDontCare) {
@@ -542,31 +535,7 @@ TEST(CasezStatementSim, CasezEmptyNoItems) {
 
 TEST(CasezStatementSim, CasezFirstMatchWins) {
   StmtFixture f;
-  auto* result_var = f.ctx.CreateVariable("cfm", 32);
-  result_var->value = MakeLogic4VecVal(f.arena, 32, 0);
-
-  auto* stmt = f.arena.Create<Stmt>();
-  stmt->kind = StmtKind::kCase;
-  stmt->case_kind = TokenKind::kKwCasez;
-  stmt->condition = MakeInt(f.arena, 5);
-
-  auto* pat1 = f.ctx.CreateVariable("p1", 8);
-  pat1->value = MakeLogic4Vec(f.arena, 8);
-  pat1->value.words[0].aval = 0x05;
-  pat1->value.words[0].bval = 0x01;
-
-  CaseItem item1;
-  item1.patterns.push_back(MakeId(f.arena, "p1"));
-  item1.body = MakeBlockAssign(f.arena, "cfm", 10);
-  stmt->case_items.push_back(item1);
-
-  CaseItem item2;
-  item2.patterns.push_back(MakeInt(f.arena, 5));
-  item2.body = MakeBlockAssign(f.arena, "cfm", 20);
-  stmt->case_items.push_back(item2);
-
-  RunStmt(stmt, f.ctx, f.arena);
-  EXPECT_EQ(result_var->value.ToUint64(), 10u);
+  EXPECT_EQ(RunFirstMatchWins(f, TokenKind::kKwCasez, 0x05), 10u);
 }
 
 }  // namespace

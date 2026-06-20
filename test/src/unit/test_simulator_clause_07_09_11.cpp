@@ -8,36 +8,25 @@
 
 using namespace delta;
 
-static Expr* MakeAssocSelect(Arena& arena, int64_t idx_val) {
-  auto* sel = arena.Create<Expr>();
-  sel->kind = ExprKind::kSelect;
-  auto* base = arena.Create<Expr>();
-  base->kind = ExprKind::kIdentifier;
-  base->text = "aa";
-  sel->base = base;
-  auto* idx = arena.Create<Expr>();
-  idx->kind = ExprKind::kIntegerLiteral;
-  idx->int_val = idx_val;
-  sel->index = idx;
-  return sel;
-}
-
-static Expr* MakeAssocSelectStr(Arena& arena, std::string_view base_name,
-                                std::string_view key) {
-  auto* sel = arena.Create<Expr>();
-  sel->kind = ExprKind::kSelect;
-  auto* base = arena.Create<Expr>();
-  base->kind = ExprKind::kIdentifier;
-  base->text = base_name;
-  sel->base = base;
-  auto* idx = arena.Create<Expr>();
-  idx->kind = ExprKind::kStringLiteral;
-  idx->text = key;
-  sel->index = idx;
-  return sel;
-}
-
 namespace {
+
+// Build assoc array "aa" = {10:1, 20:2} with a default value and a ref
+// variable "k" seeded with start_key, then return both. Shared setup for the
+// DefaultDoesNotAffect{First,Last,Next,Prev} tests, which all exercise an
+// ordered-traversal method whose result must ignore the configured default.
+static std::pair<AssocArrayObject*, Variable*> MakeTwoEntryAaWithDefaultAndRef(
+    SimFixture& f, uint64_t start_key) {
+  auto* aa = f.ctx.CreateAssocArray("aa", 32, false);
+  aa->index_width = 32;
+  aa->int_data[10] = MakeLogic4VecVal(f.arena, 32, 1);
+  aa->int_data[20] = MakeLogic4VecVal(f.arena, 32, 2);
+  aa->has_default = true;
+  aa->default_value = MakeLogic4VecVal(f.arena, 32, 0);
+
+  auto* ref = f.ctx.CreateVariable("k", 32);
+  ref->value = MakeLogic4VecVal(f.arena, 32, start_key);
+  return {aa, ref};
+}
 
 TEST(AssocMethods, LiteralInitIntKeys) {
   SimFixture f;
@@ -221,15 +210,7 @@ TEST(AssocMethods, DefaultDoesNotAffectExists) {
 
 TEST(AssocMethods, DefaultDoesNotAffectFirst) {
   SimFixture f;
-  auto* aa = f.ctx.CreateAssocArray("aa", 32, false);
-  aa->index_width = 32;
-  aa->int_data[10] = MakeLogic4VecVal(f.arena, 32, 1);
-  aa->int_data[20] = MakeLogic4VecVal(f.arena, 32, 2);
-  aa->has_default = true;
-  aa->default_value = MakeLogic4VecVal(f.arena, 32, 0);
-
-  auto* ref = f.ctx.CreateVariable("k", 32);
-  ref->value = MakeLogic4VecVal(f.arena, 32, 0);
+  auto [aa, ref] = MakeTwoEntryAaWithDefaultAndRef(f, 0);
 
   Logic4Vec out{};
   auto* call = MkAssocCall(f.arena, "aa", "first", "k");
@@ -240,15 +221,7 @@ TEST(AssocMethods, DefaultDoesNotAffectFirst) {
 
 TEST(AssocMethods, DefaultDoesNotAffectLast) {
   SimFixture f;
-  auto* aa = f.ctx.CreateAssocArray("aa", 32, false);
-  aa->index_width = 32;
-  aa->int_data[10] = MakeLogic4VecVal(f.arena, 32, 1);
-  aa->int_data[20] = MakeLogic4VecVal(f.arena, 32, 2);
-  aa->has_default = true;
-  aa->default_value = MakeLogic4VecVal(f.arena, 32, 0);
-
-  auto* ref = f.ctx.CreateVariable("k", 32);
-  ref->value = MakeLogic4VecVal(f.arena, 32, 0);
+  auto [aa, ref] = MakeTwoEntryAaWithDefaultAndRef(f, 0);
 
   Logic4Vec out{};
   auto* call = MkAssocCall(f.arena, "aa", "last", "k");
@@ -259,15 +232,7 @@ TEST(AssocMethods, DefaultDoesNotAffectLast) {
 
 TEST(AssocMethods, DefaultDoesNotAffectNext) {
   SimFixture f;
-  auto* aa = f.ctx.CreateAssocArray("aa", 32, false);
-  aa->index_width = 32;
-  aa->int_data[10] = MakeLogic4VecVal(f.arena, 32, 1);
-  aa->int_data[20] = MakeLogic4VecVal(f.arena, 32, 2);
-  aa->has_default = true;
-  aa->default_value = MakeLogic4VecVal(f.arena, 32, 0);
-
-  auto* ref = f.ctx.CreateVariable("k", 32);
-  ref->value = MakeLogic4VecVal(f.arena, 32, 10);
+  auto [aa, ref] = MakeTwoEntryAaWithDefaultAndRef(f, 10);
 
   Logic4Vec out{};
   auto* call = MkAssocCall(f.arena, "aa", "next", "k");
@@ -278,15 +243,7 @@ TEST(AssocMethods, DefaultDoesNotAffectNext) {
 
 TEST(AssocMethods, DefaultDoesNotAffectPrev) {
   SimFixture f;
-  auto* aa = f.ctx.CreateAssocArray("aa", 32, false);
-  aa->index_width = 32;
-  aa->int_data[10] = MakeLogic4VecVal(f.arena, 32, 1);
-  aa->int_data[20] = MakeLogic4VecVal(f.arena, 32, 2);
-  aa->has_default = true;
-  aa->default_value = MakeLogic4VecVal(f.arena, 32, 0);
-
-  auto* ref = f.ctx.CreateVariable("k", 32);
-  ref->value = MakeLogic4VecVal(f.arena, 32, 20);
+  auto [aa, ref] = MakeTwoEntryAaWithDefaultAndRef(f, 20);
 
   Logic4Vec out{};
   auto* call = MkAssocCall(f.arena, "aa", "prev", "k");

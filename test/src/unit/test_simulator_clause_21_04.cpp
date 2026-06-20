@@ -6,49 +6,14 @@
 #include "builders_ast.h"
 #include "builders_systask.h"
 #include "fixture_simulator.h"
+#include "helpers_memload.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
 
 using namespace delta;
 namespace {
 
-// Registers an unpacked array `name[lo .. lo+size-1]` of `width`-bit elements,
-// each backed by a zero-initialized element variable, so that $readmemb /
-// $readmemh have a memory to load into (the element naming convention the
-// simulator uses for array elements is `name[index]`).
-void SetupMem(SimFixture& f, const char* name, int lo, int size,
-              uint32_t width) {
-  f.ctx.RegisterArray(
-      name, {static_cast<uint32_t>(lo), static_cast<uint32_t>(size), width,
-             false, false, false});
-  for (int i = 0; i < size; ++i) {
-    std::string nm = std::string(name) + "[" + std::to_string(lo + i) + "]";
-    auto* s = f.arena.AllocString(nm.c_str(), nm.size());
-    auto* v = f.ctx.CreateVariable(std::string_view(s, nm.size()), width);
-    v->value = MakeLogic4VecVal(f.arena, width, 0);
-  }
-}
-
-Variable* Cell(SimFixture& f, const char* name, int addr) {
-  std::string nm = std::string(name) + "[" + std::to_string(addr) + "]";
-  return f.ctx.FindVariable(nm);
-}
-
-std::string WriteTmp(const char* tag, const std::string& data) {
-  std::string path = std::string("/tmp/deltahdl_test_21_04_") + tag + ".txt";
-  std::ofstream ofs(path);
-  ofs << data;
-  ofs.close();
-  return path;
-}
-
-void Readmem(SimFixture& f, const char* task, const std::string& path,
-             const char* mem, std::vector<Expr*> extra = {}) {
-  std::vector<Expr*> args = {MkStr(f.arena, path.c_str()),
-                             MakeId(f.arena, mem)};
-  for (auto* e : extra) args.push_back(e);
-  EvalExpr(MakeSysCall(f.arena, task, args), f.ctx, f.arena);
-}
+constexpr char kTmpPrefix[] = "/tmp/deltahdl_test_21_04_";
 
 // Builds a plain range slice `base[a:b]` to use as a memory_name argument.
 Expr* MakeSliceArg(Arena& arena, const char* base, uint64_t a, uint64_t b) {
@@ -65,7 +30,7 @@ Expr* MakeSliceArg(Arena& arena, const char* base, uint64_t a, uint64_t b) {
 TEST(IoSystemTaskTest, ReadmemhLoadsSuccessiveElements) {
   SimFixture f;
   SetupMem(f, "mem", 0, 4, 8);
-  std::string path = WriteTmp("succ_h", "0A\n14\n1E\n");
+  std::string path = WriteTmp(kTmpPrefix, "succ_h", "0A\n14\n1E\n");
 
   Readmem(f, "$readmemh", path, "mem");
 
@@ -79,7 +44,7 @@ TEST(IoSystemTaskTest, ReadmemhLoadsSuccessiveElements) {
 TEST(IoSystemTaskTest, ReadmembParsesBinaryDigits) {
   SimFixture f;
   SetupMem(f, "mem", 0, 4, 8);
-  std::string path = WriteTmp("succ_b", "1010\n0110\n");
+  std::string path = WriteTmp(kTmpPrefix, "succ_b", "1010\n0110\n");
 
   Readmem(f, "$readmemb", path, "mem");
 
@@ -94,7 +59,7 @@ TEST(IoSystemTaskTest, CommentsAndWhitespaceSeparateNumbers) {
   SimFixture f;
   SetupMem(f, "mem", 0, 8, 8);
   std::string path = WriteTmp(
-      "comments",
+      kTmpPrefix, "comments",
       "// leading line comment\n0A /* inline block */ 14\n\t1E    1F\n");
 
   Readmem(f, "$readmemh", path, "mem");
@@ -111,7 +76,7 @@ TEST(IoSystemTaskTest, CommentsAndWhitespaceSeparateNumbers) {
 TEST(IoSystemTaskTest, UnknownHighZAndUnderscoreInNumbers) {
   SimFixture f;
   SetupMem(f, "mem", 0, 4, 8);
-  std::string path = WriteTmp("xzu", "Ax z5 1_F\n");
+  std::string path = WriteTmp(kTmpPrefix, "xzu", "Ax z5 1_F\n");
 
   Readmem(f, "$readmemh", path, "mem");
 
@@ -132,7 +97,7 @@ TEST(IoSystemTaskTest, UnknownHighZAndUnderscoreInNumbers) {
 TEST(IoSystemTaskTest, ReadmembAcceptsXZAndUnderscore) {
   SimFixture f;
   SetupMem(f, "mem", 0, 4, 8);
-  std::string path = WriteTmp("b_xzu", "10x1\n1_0_1\n");
+  std::string path = WriteTmp(kTmpPrefix, "b_xzu", "10x1\n1_0_1\n");
 
   Readmem(f, "$readmemb", path, "mem");
 
@@ -150,7 +115,7 @@ TEST(IoSystemTaskTest, ReadmembAcceptsXZAndUnderscore) {
 TEST(IoSystemTaskTest, AtAddressRepositionsLoadCursor) {
   SimFixture f;
   SetupMem(f, "mem", 0, 8, 8);
-  std::string path = WriteTmp("at", "@2\nAA\nBB\n");
+  std::string path = WriteTmp(kTmpPrefix, "at", "@2\nAA\nBB\n");
 
   Readmem(f, "$readmemh", path, "mem");
 
@@ -166,7 +131,7 @@ TEST(IoSystemTaskTest, AtAddressRepositionsLoadCursor) {
 TEST(IoSystemTaskTest, AtAddressAcceptsHexLetterDigits) {
   SimFixture f;
   SetupMem(f, "mem", 0, 64, 8);
-  std::string path = WriteTmp("at_hex", "@0a\nAA\n@1B\nBB\n");
+  std::string path = WriteTmp(kTmpPrefix, "at_hex", "@0a\nAA\n@1B\nBB\n");
 
   Readmem(f, "$readmemh", path, "mem");
 
@@ -180,7 +145,7 @@ TEST(IoSystemTaskTest, AtAddressAcceptsHexLetterDigits) {
 TEST(IoSystemTaskTest, MultipleAddressSpecificationsInFile) {
   SimFixture f;
   SetupMem(f, "mem", 0, 8, 8);
-  std::string path = WriteTmp("at_multi", "@2\nAA\n@5\nBB\n");
+  std::string path = WriteTmp(kTmpPrefix, "at_multi", "@2\nAA\n@5\nBB\n");
 
   Readmem(f, "$readmemh", path, "mem");
 
@@ -195,7 +160,7 @@ TEST(IoSystemTaskTest, MultipleAddressSpecificationsInFile) {
 TEST(IoSystemTaskTest, DefaultStartIsLowestAddress) {
   SimFixture f;
   SetupMem(f, "mem", 1, 4, 8);  // addresses 1..4
-  std::string path = WriteTmp("default", "01\n02\n");
+  std::string path = WriteTmp(kTmpPrefix, "default", "01\n02\n");
 
   Readmem(f, "$readmemh", path, "mem");
 
@@ -211,7 +176,7 @@ TEST(IoSystemTaskTest, DefaultStartIsLowestAddress) {
 TEST(IoSystemTaskTest, StartAddrOnlyLoadsUpward) {
   SimFixture f;
   SetupMem(f, "mem", 0, 8, 8);
-  std::string path = WriteTmp("start_only", "AA\nBB\n");
+  std::string path = WriteTmp(kTmpPrefix, "start_only", "AA\nBB\n");
 
   Readmem(f, "$readmemh", path, "mem", {MakeInt(f.arena, 4)});
 
@@ -226,7 +191,7 @@ TEST(IoSystemTaskTest, StartAddrOnlyLoadsUpward) {
 TEST(IoSystemTaskTest, StartGreaterThanFinishLoadsDownward) {
   SimFixture f;
   SetupMem(f, "mem", 0, 8, 8);
-  std::string path = WriteTmp("down", "11\n22\n33\n44\n");
+  std::string path = WriteTmp(kTmpPrefix, "down", "11\n22\n33\n44\n");
 
   Readmem(f, "$readmemh", path, "mem",
           {MakeInt(f.arena, 5), MakeInt(f.arena, 2)});
@@ -244,7 +209,7 @@ TEST(IoSystemTaskTest, StartGreaterThanFinishLoadsDownward) {
 TEST(IoSystemTaskTest, DirectionPersistsAfterAtAddress) {
   SimFixture f;
   SetupMem(f, "mem", 0, 8, 8);
-  std::string path = WriteTmp("dir_persist", "@5\nAA\nBB\n");
+  std::string path = WriteTmp(kTmpPrefix, "dir_persist", "@5\nAA\nBB\n");
 
   Readmem(f, "$readmemh", path, "mem",
           {MakeInt(f.arena, 7), MakeInt(f.arena, 0)});
@@ -259,7 +224,7 @@ TEST(IoSystemTaskTest, DirectionPersistsAfterAtAddress) {
 TEST(IoSystemTaskTest, FileAddressOutsideTaskRangeIsError) {
   SimFixture f;
   SetupMem(f, "mem", 0, 16, 8);
-  std::string path = WriteTmp("oob_addr", "@9\nAA\n");
+  std::string path = WriteTmp(kTmpPrefix, "oob_addr", "@9\nAA\n");
 
   Readmem(f, "$readmemh", path, "mem",
           {MakeInt(f.arena, 2), MakeInt(f.arena, 5)});
@@ -276,7 +241,8 @@ TEST(IoSystemTaskTest, FileAddressOutsideTaskRangeIsError) {
 TEST(IoSystemTaskTest, WordCountMismatchIssuesWarning) {
   SimFixture f;
   SetupMem(f, "mem", 0, 8, 8);
-  std::string path = WriteTmp("mismatch", "AA\nBB\n");  // 2 words, window of 4
+  std::string path =
+      WriteTmp(kTmpPrefix, "mismatch", "AA\nBB\n");  // 2 words, window of 4
 
   Readmem(f, "$readmemh", path, "mem",
           {MakeInt(f.arena, 1), MakeInt(f.arena, 4)});
@@ -294,7 +260,7 @@ TEST(IoSystemTaskTest, WordCountMismatchIssuesWarning) {
 TEST(IoSystemTaskTest, MatchingWordCountIssuesNoWarning) {
   SimFixture f;
   SetupMem(f, "mem", 0, 8, 8);
-  std::string path = WriteTmp("match", "AA\nBB\nCC\nDD\n");
+  std::string path = WriteTmp(kTmpPrefix, "match", "AA\nBB\nCC\nDD\n");
 
   Readmem(f, "$readmemh", path, "mem",
           {MakeInt(f.arena, 1), MakeInt(f.arena, 4)});
@@ -310,7 +276,7 @@ TEST(IoSystemTaskTest, MatchingWordCountIssuesNoWarning) {
 TEST(IoSystemTaskTest, FilenameFromNonLiteralExpression) {
   SimFixture f;
   SetupMem(f, "mem", 0, 4, 8);
-  std::string path = WriteTmp("nonlit", "07\n");
+  std::string path = WriteTmp(kTmpPrefix, "nonlit", "07\n");
 
   // Pack the path into an integral variable the way a SystemVerilog string is
   // stored: the last character occupies the least-significant byte.
@@ -341,7 +307,8 @@ TEST(IoSystemTaskTest, FilenameFromNonLiteralExpression) {
 TEST(IoSystemTaskTest, SliceMemoryNameConfinesLoadToSliceBounds) {
   SimFixture f;
   SetupMem(f, "mem", 0, 16, 8);
-  std::string path = WriteTmp("slice_default", "AA\nBB\nCC\nDD\nEE\n");
+  std::string path =
+      WriteTmp(kTmpPrefix, "slice_default", "AA\nBB\nCC\nDD\nEE\n");
 
   EvalExpr(MakeSysCall(f.arena, "$readmemh",
                        {MkStr(f.arena, path.c_str()),
@@ -361,7 +328,7 @@ TEST(IoSystemTaskTest, SliceMemoryNameConfinesLoadToSliceBounds) {
 TEST(IoSystemTaskTest, SliceStartFinishWithinBoundsLoads) {
   SimFixture f;
   SetupMem(f, "mem", 0, 16, 8);
-  std::string path = WriteTmp("slice_window", "11\n22\n33\n44\n");
+  std::string path = WriteTmp(kTmpPrefix, "slice_window", "11\n22\n33\n44\n");
 
   EvalExpr(MakeSysCall(f.arena, "$readmemh",
                        {MkStr(f.arena, path.c_str()),
@@ -380,7 +347,7 @@ TEST(IoSystemTaskTest, SliceStartFinishWithinBoundsLoads) {
 TEST(IoSystemTaskTest, SliceStartOutsideBoundsIsError) {
   SimFixture f;
   SetupMem(f, "mem", 0, 16, 8);
-  std::string path = WriteTmp("slice_oob", "11\n22\n");
+  std::string path = WriteTmp(kTmpPrefix, "slice_oob", "11\n22\n");
 
   EvalExpr(MakeSysCall(f.arena, "$readmemh",
                        {MkStr(f.arena, path.c_str()),

@@ -58,6 +58,31 @@ RtlirModule* FindChild(RtlirModule* parent, std::string_view inst_name) {
   return nullptr;
 }
 
+// Elaborates the adder fixture under the given library search order and returns
+// the resolved child module instance "a" (or nullptr on failure). The fatal
+// gtest assertions are scoped to this helper; callers append their distinct
+// per-test expectation on the returned module.
+RtlirModule* ElaborateAdderChild(SourceManager& mgr, Arena& arena,
+                                 DiagEngine& diag,
+                                 std::vector<std::string> search_order) {
+  auto* cu = ParseAdderFixture(mgr, arena, diag);
+  if (cu == nullptr || diag.HasErrors()) {
+    ADD_FAILURE() << "adder fixture failed to parse";
+    return nullptr;
+  }
+
+  Elaborator elab(arena, diag, cu);
+  elab.SetLibraryDeclarationOrder(std::move(search_order));
+  auto* design = elab.Elaborate("top");
+  if (diag.HasErrors() || design == nullptr ||
+      design->top_modules.size() != 1u) {
+    ADD_FAILURE() << "elaboration of top did not produce a single top module";
+    return nullptr;
+  }
+
+  return FindChild(design->top_modules[0], "a");
+}
+
 TEST(CommandLineLibrarySearchOrder, EmptyOverrideKeepsLibMapDeclarationOrder) {
   LibraryMap libmap;
   libmap.AddDeclaration(MakeDecl("aLib", {"a.v"}), "/proj");
@@ -74,18 +99,7 @@ TEST(CommandLineLibrarySearchOrder, EmptyOverrideKeepsLibMapDeclarationOrder) {
   SourceManager mgr;
   Arena arena;
   DiagEngine diag(mgr);
-  auto* cu = ParseAdderFixture(mgr, arena, diag);
-  ASSERT_NE(cu, nullptr);
-  ASSERT_FALSE(diag.HasErrors());
-
-  Elaborator elab(arena, diag, cu);
-  elab.SetLibraryDeclarationOrder(std::move(effective));
-  auto* design = elab.Elaborate("top");
-  ASSERT_FALSE(diag.HasErrors());
-  ASSERT_NE(design, nullptr);
-  ASSERT_EQ(design->top_modules.size(), 1u);
-
-  auto* a = FindChild(design->top_modules[0], "a");
+  auto* a = ElaborateAdderChild(mgr, arena, diag, std::move(effective));
   ASSERT_NE(a, nullptr);
   EXPECT_EQ(a->library, "aLib");
 }
@@ -104,20 +118,8 @@ TEST(CommandLineLibrarySearchOrder, CliOverrideReplacesLibMapDeclarationOrder) {
   SourceManager mgr;
   Arena arena;
   DiagEngine diag(mgr);
-  auto* cu = ParseAdderFixture(mgr, arena, diag);
-  ASSERT_NE(cu, nullptr);
-  ASSERT_FALSE(diag.HasErrors());
-
-  Elaborator elab(arena, diag, cu);
-  elab.SetLibraryDeclarationOrder(std::move(effective));
-  auto* design = elab.Elaborate("top");
-  ASSERT_FALSE(diag.HasErrors());
-  ASSERT_NE(design, nullptr);
-  ASSERT_EQ(design->top_modules.size(), 1u);
-
-  auto* a = FindChild(design->top_modules[0], "a");
+  auto* a = ElaborateAdderChild(mgr, arena, diag, std::move(effective));
   ASSERT_NE(a, nullptr);
-
   EXPECT_EQ(a->library, "gateLib");
 }
 
@@ -133,20 +135,8 @@ TEST(CommandLineLibrarySearchOrder,
   SourceManager mgr;
   Arena arena;
   DiagEngine diag(mgr);
-  auto* cu = ParseAdderFixture(mgr, arena, diag);
-  ASSERT_NE(cu, nullptr);
-  ASSERT_FALSE(diag.HasErrors());
-
-  Elaborator elab(arena, diag, cu);
-  elab.SetLibraryDeclarationOrder(std::move(effective));
-  auto* design = elab.Elaborate("top");
-  ASSERT_FALSE(diag.HasErrors());
-  ASSERT_NE(design, nullptr);
-  ASSERT_EQ(design->top_modules.size(), 1u);
-
-  auto* a = FindChild(design->top_modules[0], "a");
+  auto* a = ElaborateAdderChild(mgr, arena, diag, std::move(effective));
   ASSERT_NE(a, nullptr);
-
   EXPECT_EQ(a->library, "aLib");
 }
 

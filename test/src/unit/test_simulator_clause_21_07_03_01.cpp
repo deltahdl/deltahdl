@@ -13,6 +13,22 @@ namespace {
 // applies them.
 class DumpportsSysTask : public VcdTestBase {};
 
+// Standard two-port VCD setup shared by the $dumpports scope/file tests:
+// creates 1-bit ports "a" (value 1) and "b" (value 0), registers them with the
+// writer (idents '!' and '"'), finishes the header, writes the initial
+// timestamp and installs the writer on the context. The caller owns `vcd` so
+// its destructor flushes into the test scope before ReadVcd.
+static void SetupAbDump(SimFixture& f, VcdWriter& vcd) {
+  auto* a = MakeVar(f, "a", 1, 1);
+  auto* b = MakeVar(f, "b", 1, 0);
+  vcd.WriteHeader("1ns");
+  vcd.RegisterSignal("a", 1, a);  // ident '!'
+  vcd.RegisterSignal("b", 1, b);  // ident '"'
+  vcd.EndDefinitions();
+  vcd.WriteTimestamp(0);
+  f.ctx.SetVcdWriter(&vcd);
+}
+
 // §21.7.3.1: with no arguments ($dumpports; / $dumpports();) the default values
 // for the arguments are used, so the output file is named dumpports.vcd in the
 // working directory.
@@ -37,15 +53,8 @@ TEST_F(DumpportsSysTask, FilenameTakenFromTrailingStringLiteral) {
 // registered from the point of the call is then a primary I/O pin and dumped.
 TEST_F(DumpportsSysTask, IncludesRegisteredPortsWhenScopeOmitted) {
   SimFixture f;
-  auto* a = MakeVar(f, "a", 1, 1);
-  auto* b = MakeVar(f, "b", 1, 0);
   VcdWriter vcd(tmp_path_);
-  vcd.WriteHeader("1ns");
-  vcd.RegisterSignal("a", 1, a);  // ident '!'
-  vcd.RegisterSignal("b", 1, b);  // ident '"'
-  vcd.EndDefinitions();
-  vcd.WriteTimestamp(0);
-  f.ctx.SetVcdWriter(&vcd);
+  SetupAbDump(f, vcd);
 
   // Null scope_list expressed with a leading comma before the filename; the
   // parser represents the absent first argument as a null argument expression.
@@ -193,15 +202,8 @@ TEST_F(DumpportsSysTask, RejectsDuplicateScopeAcrossCalls) {
 // later $dumpports call, even when the scopes differ.
 TEST_F(DumpportsSysTask, RejectsDuplicateFileNameAcrossCalls) {
   SimFixture f;
-  auto* a = MakeVar(f, "a", 1, 1);
-  auto* b = MakeVar(f, "b", 1, 0);
   VcdWriter vcd(tmp_path_);
-  vcd.WriteHeader("1ns");
-  vcd.RegisterSignal("a", 1, a);
-  vcd.RegisterSignal("b", 1, b);
-  vcd.EndDefinitions();
-  vcd.WriteTimestamp(0);
-  f.ctx.SetVcdWriter(&vcd);
+  SetupAbDump(f, vcd);
 
   EvalExpr(MkSysCall(f.arena, "$dumpports",
                      {MkId(f.arena, "a"), MkStr(f.arena, "ports.vcd")}),

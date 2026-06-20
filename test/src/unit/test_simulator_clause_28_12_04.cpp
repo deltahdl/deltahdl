@@ -9,19 +9,41 @@ using namespace delta;
 
 namespace {
 
+// Creates the resolved Variable backing `net`, sets the net type and width, and
+// returns the variable. Shared setup for the StrengthResolution tests.
+Variable* SetupResolvedNet(Arena& arena, Net& net, NetType type,
+                           uint32_t width = 1) {
+  auto* var = arena.Create<Variable>();
+  var->value = MakeLogic4Vec(arena, width);
+  net.type = type;
+  net.resolved = var;
+  return var;
+}
+
+// Pushes a driver with value `val` (width bits) and a uniform strength on both
+// rails.
+void PushDriver(Arena& arena, Net& net, uint64_t val, Strength strength,
+                uint32_t width = 1) {
+  net.drivers.push_back(MakeLogic4VecVal(arena, width, val));
+  net.driver_strengths.push_back({strength, strength});
+}
+
+// Pushes a 1-bit X-valued driver with a uniform strength on both rails.
+void PushXDriver(Arena& arena, Net& net, Strength strength) {
+  auto x_val = MakeLogic4Vec(arena, 1);
+  x_val.words[0].aval = 0;
+  x_val.words[0].bval = 1;
+  net.drivers.push_back(x_val);
+  net.driver_strengths.push_back({strength, strength});
+}
+
 TEST(StrengthResolution, WandResolvesSameStrengthConflictToAnd) {
   Arena arena;
-  auto* var = arena.Create<Variable>();
-  var->value = MakeLogic4Vec(arena, 1);
   Net net;
-  net.type = NetType::kWand;
-  net.resolved = var;
+  auto* var = SetupResolvedNet(arena, net, NetType::kWand);
 
-  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 1));
-  net.driver_strengths.push_back({Strength::kStrong, Strength::kStrong});
-
-  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 0));
-  net.driver_strengths.push_back({Strength::kStrong, Strength::kStrong});
+  PushDriver(arena, net, 1, Strength::kStrong);
+  PushDriver(arena, net, 0, Strength::kStrong);
   net.Resolve(arena);
 
   EXPECT_EQ(var->value.ToUint64(), 0u);
@@ -29,17 +51,11 @@ TEST(StrengthResolution, WandResolvesSameStrengthConflictToAnd) {
 
 TEST(StrengthResolution, WorResolvesSameStrengthConflictToOr) {
   Arena arena;
-  auto* var = arena.Create<Variable>();
-  var->value = MakeLogic4Vec(arena, 1);
   Net net;
-  net.type = NetType::kWor;
-  net.resolved = var;
+  auto* var = SetupResolvedNet(arena, net, NetType::kWor);
 
-  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 1));
-  net.driver_strengths.push_back({Strength::kStrong, Strength::kStrong});
-
-  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 0));
-  net.driver_strengths.push_back({Strength::kStrong, Strength::kStrong});
+  PushDriver(arena, net, 1, Strength::kStrong);
+  PushDriver(arena, net, 0, Strength::kStrong);
   net.Resolve(arena);
 
   EXPECT_EQ(var->value.ToUint64(), 1u);
@@ -47,17 +63,11 @@ TEST(StrengthResolution, WorResolvesSameStrengthConflictToOr) {
 
 TEST(StrengthResolution, TriandResolvesSameStrengthConflictToAnd) {
   Arena arena;
-  auto* var = arena.Create<Variable>();
-  var->value = MakeLogic4Vec(arena, 1);
   Net net;
-  net.type = NetType::kTriand;
-  net.resolved = var;
+  auto* var = SetupResolvedNet(arena, net, NetType::kTriand);
 
-  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 1));
-  net.driver_strengths.push_back({Strength::kPull, Strength::kPull});
-
-  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 0));
-  net.driver_strengths.push_back({Strength::kPull, Strength::kPull});
+  PushDriver(arena, net, 1, Strength::kPull);
+  PushDriver(arena, net, 0, Strength::kPull);
   net.Resolve(arena);
 
   EXPECT_EQ(var->value.ToUint64(), 0u);
@@ -65,17 +75,11 @@ TEST(StrengthResolution, TriandResolvesSameStrengthConflictToAnd) {
 
 TEST(StrengthResolution, TriorResolvesSameStrengthConflictToOr) {
   Arena arena;
-  auto* var = arena.Create<Variable>();
-  var->value = MakeLogic4Vec(arena, 1);
   Net net;
-  net.type = NetType::kTrior;
-  net.resolved = var;
+  auto* var = SetupResolvedNet(arena, net, NetType::kTrior);
 
-  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 1));
-  net.driver_strengths.push_back({Strength::kPull, Strength::kPull});
-
-  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 0));
-  net.driver_strengths.push_back({Strength::kPull, Strength::kPull});
+  PushDriver(arena, net, 1, Strength::kPull);
+  PushDriver(arena, net, 0, Strength::kPull);
   net.Resolve(arena);
 
   EXPECT_EQ(var->value.ToUint64(), 1u);
@@ -83,17 +87,11 @@ TEST(StrengthResolution, TriorResolvesSameStrengthConflictToOr) {
 
 TEST(StrengthResolution, WandBothOnesResolveToOne) {
   Arena arena;
-  auto* var = arena.Create<Variable>();
-  var->value = MakeLogic4Vec(arena, 1);
   Net net;
-  net.type = NetType::kWand;
-  net.resolved = var;
+  auto* var = SetupResolvedNet(arena, net, NetType::kWand);
 
-  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 1));
-  net.driver_strengths.push_back({Strength::kStrong, Strength::kStrong});
-
-  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 1));
-  net.driver_strengths.push_back({Strength::kStrong, Strength::kStrong});
+  PushDriver(arena, net, 1, Strength::kStrong);
+  PushDriver(arena, net, 1, Strength::kStrong);
   net.Resolve(arena);
 
   EXPECT_EQ(var->value.ToUint64(), 1u);
@@ -101,17 +99,11 @@ TEST(StrengthResolution, WandBothOnesResolveToOne) {
 
 TEST(StrengthResolution, WorBothZerosResolveToZero) {
   Arena arena;
-  auto* var = arena.Create<Variable>();
-  var->value = MakeLogic4Vec(arena, 1);
   Net net;
-  net.type = NetType::kWor;
-  net.resolved = var;
+  auto* var = SetupResolvedNet(arena, net, NetType::kWor);
 
-  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 0));
-  net.driver_strengths.push_back({Strength::kStrong, Strength::kStrong});
-
-  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 0));
-  net.driver_strengths.push_back({Strength::kStrong, Strength::kStrong});
+  PushDriver(arena, net, 0, Strength::kStrong);
+  PushDriver(arena, net, 0, Strength::kStrong);
   net.Resolve(arena);
 
   EXPECT_EQ(var->value.ToUint64(), 0u);
@@ -119,17 +111,11 @@ TEST(StrengthResolution, WorBothZerosResolveToZero) {
 
 TEST(StrengthResolution, WandStrongerDriverDominatesWeaker) {
   Arena arena;
-  auto* var = arena.Create<Variable>();
-  var->value = MakeLogic4Vec(arena, 1);
   Net net;
-  net.type = NetType::kWand;
-  net.resolved = var;
+  auto* var = SetupResolvedNet(arena, net, NetType::kWand);
 
-  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 1));
-  net.driver_strengths.push_back({Strength::kStrong, Strength::kStrong});
-
-  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 0));
-  net.driver_strengths.push_back({Strength::kWeak, Strength::kWeak});
+  PushDriver(arena, net, 1, Strength::kStrong);
+  PushDriver(arena, net, 0, Strength::kWeak);
   net.Resolve(arena);
 
   EXPECT_EQ(var->value.ToUint64(), 1u);
@@ -137,17 +123,11 @@ TEST(StrengthResolution, WandStrongerDriverDominatesWeaker) {
 
 TEST(StrengthResolution, WandPerBitAnd) {
   Arena arena;
-  auto* var = arena.Create<Variable>();
-  var->value = MakeLogic4Vec(arena, 4);
   Net net;
-  net.type = NetType::kWand;
-  net.resolved = var;
+  auto* var = SetupResolvedNet(arena, net, NetType::kWand, 4);
 
-  net.drivers.push_back(MakeLogic4VecVal(arena, 4, 0b1100));
-  net.driver_strengths.push_back({Strength::kStrong, Strength::kStrong});
-
-  net.drivers.push_back(MakeLogic4VecVal(arena, 4, 0b1010));
-  net.driver_strengths.push_back({Strength::kStrong, Strength::kStrong});
+  PushDriver(arena, net, 0b1100, Strength::kStrong, 4);
+  PushDriver(arena, net, 0b1010, Strength::kStrong, 4);
   net.Resolve(arena);
 
   EXPECT_EQ(var->value.ToUint64(), 0b1000u);
@@ -155,17 +135,11 @@ TEST(StrengthResolution, WandPerBitAnd) {
 
 TEST(StrengthResolution, WorPerBitOr) {
   Arena arena;
-  auto* var = arena.Create<Variable>();
-  var->value = MakeLogic4Vec(arena, 4);
   Net net;
-  net.type = NetType::kWor;
-  net.resolved = var;
+  auto* var = SetupResolvedNet(arena, net, NetType::kWor, 4);
 
-  net.drivers.push_back(MakeLogic4VecVal(arena, 4, 0b1100));
-  net.driver_strengths.push_back({Strength::kStrong, Strength::kStrong});
-
-  net.drivers.push_back(MakeLogic4VecVal(arena, 4, 0b1010));
-  net.driver_strengths.push_back({Strength::kStrong, Strength::kStrong});
+  PushDriver(arena, net, 0b1100, Strength::kStrong, 4);
+  PushDriver(arena, net, 0b1010, Strength::kStrong, 4);
   net.Resolve(arena);
 
   EXPECT_EQ(var->value.ToUint64(), 0b1110u);
@@ -173,20 +147,11 @@ TEST(StrengthResolution, WorPerBitOr) {
 
 TEST(StrengthResolution, WandZeroAndXResolvesToZero) {
   Arena arena;
-  auto* var = arena.Create<Variable>();
-  var->value = MakeLogic4Vec(arena, 1);
   Net net;
-  net.type = NetType::kWand;
-  net.resolved = var;
+  auto* var = SetupResolvedNet(arena, net, NetType::kWand);
 
-  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 0));
-  net.driver_strengths.push_back({Strength::kStrong, Strength::kStrong});
-
-  auto x_val = MakeLogic4Vec(arena, 1);
-  x_val.words[0].aval = 0;
-  x_val.words[0].bval = 1;
-  net.drivers.push_back(x_val);
-  net.driver_strengths.push_back({Strength::kStrong, Strength::kStrong});
+  PushDriver(arena, net, 0, Strength::kStrong);
+  PushXDriver(arena, net, Strength::kStrong);
   net.Resolve(arena);
 
   EXPECT_EQ(var->value.ToUint64(), 0u);
@@ -194,20 +159,11 @@ TEST(StrengthResolution, WandZeroAndXResolvesToZero) {
 
 TEST(StrengthResolution, WorOneOrXResolvesToOne) {
   Arena arena;
-  auto* var = arena.Create<Variable>();
-  var->value = MakeLogic4Vec(arena, 1);
   Net net;
-  net.type = NetType::kWor;
-  net.resolved = var;
+  auto* var = SetupResolvedNet(arena, net, NetType::kWor);
 
-  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 1));
-  net.driver_strengths.push_back({Strength::kStrong, Strength::kStrong});
-
-  auto x_val = MakeLogic4Vec(arena, 1);
-  x_val.words[0].aval = 0;
-  x_val.words[0].bval = 1;
-  net.drivers.push_back(x_val);
-  net.driver_strengths.push_back({Strength::kStrong, Strength::kStrong});
+  PushDriver(arena, net, 1, Strength::kStrong);
+  PushXDriver(arena, net, Strength::kStrong);
   net.Resolve(arena);
 
   EXPECT_EQ(var->value.ToUint64(), 1u);
@@ -215,17 +171,11 @@ TEST(StrengthResolution, WorOneOrXResolvesToOne) {
 
 TEST(StrengthResolution, WorBothOnesResolveToOne) {
   Arena arena;
-  auto* var = arena.Create<Variable>();
-  var->value = MakeLogic4Vec(arena, 1);
   Net net;
-  net.type = NetType::kWor;
-  net.resolved = var;
+  auto* var = SetupResolvedNet(arena, net, NetType::kWor);
 
-  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 1));
-  net.driver_strengths.push_back({Strength::kStrong, Strength::kStrong});
-
-  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 1));
-  net.driver_strengths.push_back({Strength::kStrong, Strength::kStrong});
+  PushDriver(arena, net, 1, Strength::kStrong);
+  PushDriver(arena, net, 1, Strength::kStrong);
   net.Resolve(arena);
 
   EXPECT_EQ(var->value.ToUint64(), 1u);
@@ -233,17 +183,11 @@ TEST(StrengthResolution, WorBothOnesResolveToOne) {
 
 TEST(StrengthResolution, WandBothZerosResolveToZero) {
   Arena arena;
-  auto* var = arena.Create<Variable>();
-  var->value = MakeLogic4Vec(arena, 1);
   Net net;
-  net.type = NetType::kWand;
-  net.resolved = var;
+  auto* var = SetupResolvedNet(arena, net, NetType::kWand);
 
-  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 0));
-  net.driver_strengths.push_back({Strength::kStrong, Strength::kStrong});
-
-  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 0));
-  net.driver_strengths.push_back({Strength::kStrong, Strength::kStrong});
+  PushDriver(arena, net, 0, Strength::kStrong);
+  PushDriver(arena, net, 0, Strength::kStrong);
   net.Resolve(arena);
 
   EXPECT_EQ(var->value.ToUint64(), 0u);
@@ -251,20 +195,11 @@ TEST(StrengthResolution, WandBothZerosResolveToZero) {
 
 TEST(StrengthResolution, WandOneAndXResolvesToX) {
   Arena arena;
-  auto* var = arena.Create<Variable>();
-  var->value = MakeLogic4Vec(arena, 1);
   Net net;
-  net.type = NetType::kWand;
-  net.resolved = var;
+  auto* var = SetupResolvedNet(arena, net, NetType::kWand);
 
-  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 1));
-  net.driver_strengths.push_back({Strength::kStrong, Strength::kStrong});
-
-  auto x_val = MakeLogic4Vec(arena, 1);
-  x_val.words[0].aval = 0;
-  x_val.words[0].bval = 1;
-  net.drivers.push_back(x_val);
-  net.driver_strengths.push_back({Strength::kStrong, Strength::kStrong});
+  PushDriver(arena, net, 1, Strength::kStrong);
+  PushXDriver(arena, net, Strength::kStrong);
   net.Resolve(arena);
 
   EXPECT_EQ(var->value.words[0].aval, 0u);
@@ -273,20 +208,11 @@ TEST(StrengthResolution, WandOneAndXResolvesToX) {
 
 TEST(StrengthResolution, WorZeroOrXResolvesToX) {
   Arena arena;
-  auto* var = arena.Create<Variable>();
-  var->value = MakeLogic4Vec(arena, 1);
   Net net;
-  net.type = NetType::kWor;
-  net.resolved = var;
+  auto* var = SetupResolvedNet(arena, net, NetType::kWor);
 
-  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 0));
-  net.driver_strengths.push_back({Strength::kStrong, Strength::kStrong});
-
-  auto x_val = MakeLogic4Vec(arena, 1);
-  x_val.words[0].aval = 0;
-  x_val.words[0].bval = 1;
-  net.drivers.push_back(x_val);
-  net.driver_strengths.push_back({Strength::kStrong, Strength::kStrong});
+  PushDriver(arena, net, 0, Strength::kStrong);
+  PushXDriver(arena, net, Strength::kStrong);
   net.Resolve(arena);
 
   EXPECT_EQ(var->value.words[0].aval, 0u);
@@ -295,17 +221,11 @@ TEST(StrengthResolution, WorZeroOrXResolvesToX) {
 
 TEST(StrengthResolution, WandConflictResultRecordsStrengthOnZeroSide) {
   Arena arena;
-  auto* var = arena.Create<Variable>();
-  var->value = MakeLogic4Vec(arena, 1);
   Net net;
-  net.type = NetType::kWand;
-  net.resolved = var;
+  auto* var = SetupResolvedNet(arena, net, NetType::kWand);
 
-  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 1));
-  net.driver_strengths.push_back({Strength::kStrong, Strength::kStrong});
-
-  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 0));
-  net.driver_strengths.push_back({Strength::kStrong, Strength::kStrong});
+  PushDriver(arena, net, 1, Strength::kStrong);
+  PushDriver(arena, net, 0, Strength::kStrong);
   net.Resolve(arena);
 
   EXPECT_EQ(var->value.ToUint64(), 0u);
@@ -318,17 +238,11 @@ TEST(StrengthResolution, WandConflictResultRecordsStrengthOnZeroSide) {
 
 TEST(StrengthResolution, WorConflictResultRecordsStrengthOnOneSide) {
   Arena arena;
-  auto* var = arena.Create<Variable>();
-  var->value = MakeLogic4Vec(arena, 1);
   Net net;
-  net.type = NetType::kWor;
-  net.resolved = var;
+  auto* var = SetupResolvedNet(arena, net, NetType::kWor);
 
-  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 1));
-  net.driver_strengths.push_back({Strength::kPull, Strength::kPull});
-
-  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 0));
-  net.driver_strengths.push_back({Strength::kPull, Strength::kPull});
+  PushDriver(arena, net, 1, Strength::kPull);
+  PushDriver(arena, net, 0, Strength::kPull);
   net.Resolve(arena);
 
   EXPECT_EQ(var->value.ToUint64(), 1u);
@@ -341,20 +255,11 @@ TEST(StrengthResolution, WorConflictResultRecordsStrengthOnOneSide) {
 
 TEST(StrengthResolution, WandOneAndXRecordsCombinedStrength) {
   Arena arena;
-  auto* var = arena.Create<Variable>();
-  var->value = MakeLogic4Vec(arena, 1);
   Net net;
-  net.type = NetType::kWand;
-  net.resolved = var;
+  SetupResolvedNet(arena, net, NetType::kWand);
 
-  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 1));
-  net.driver_strengths.push_back({Strength::kStrong, Strength::kStrong});
-
-  auto x_val = MakeLogic4Vec(arena, 1);
-  x_val.words[0].aval = 0;
-  x_val.words[0].bval = 1;
-  net.drivers.push_back(x_val);
-  net.driver_strengths.push_back({Strength::kStrong, Strength::kStrong});
+  PushDriver(arena, net, 1, Strength::kStrong);
+  PushXDriver(arena, net, Strength::kStrong);
   net.Resolve(arena);
 
   EXPECT_EQ(net.resolved_strength.s0_hi, Strength::kStrong);
@@ -366,20 +271,11 @@ TEST(StrengthResolution, WandOneAndXRecordsCombinedStrength) {
 
 TEST(StrengthResolution, WorZeroOrXRecordsCombinedStrength) {
   Arena arena;
-  auto* var = arena.Create<Variable>();
-  var->value = MakeLogic4Vec(arena, 1);
   Net net;
-  net.type = NetType::kWor;
-  net.resolved = var;
+  SetupResolvedNet(arena, net, NetType::kWor);
 
-  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 0));
-  net.driver_strengths.push_back({Strength::kPull, Strength::kPull});
-
-  auto x_val = MakeLogic4Vec(arena, 1);
-  x_val.words[0].aval = 0;
-  x_val.words[0].bval = 1;
-  net.drivers.push_back(x_val);
-  net.driver_strengths.push_back({Strength::kPull, Strength::kPull});
+  PushDriver(arena, net, 0, Strength::kPull);
+  PushXDriver(arena, net, Strength::kPull);
   net.Resolve(arena);
 
   EXPECT_EQ(net.resolved_strength.s0_hi, Strength::kPull);
@@ -391,17 +287,11 @@ TEST(StrengthResolution, WorZeroOrXRecordsCombinedStrength) {
 
 TEST(StrengthResolution, WandLikeOnesRecordStrengthOnOneSide) {
   Arena arena;
-  auto* var = arena.Create<Variable>();
-  var->value = MakeLogic4Vec(arena, 1);
   Net net;
-  net.type = NetType::kWand;
-  net.resolved = var;
+  auto* var = SetupResolvedNet(arena, net, NetType::kWand);
 
-  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 1));
-  net.driver_strengths.push_back({Strength::kStrong, Strength::kStrong});
-
-  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 1));
-  net.driver_strengths.push_back({Strength::kStrong, Strength::kStrong});
+  PushDriver(arena, net, 1, Strength::kStrong);
+  PushDriver(arena, net, 1, Strength::kStrong);
   net.Resolve(arena);
 
   EXPECT_EQ(var->value.ToUint64(), 1u);
@@ -413,17 +303,11 @@ TEST(StrengthResolution, WandLikeOnesRecordStrengthOnOneSide) {
 
 TEST(StrengthResolution, WorLikeZerosRecordStrengthOnZeroSide) {
   Arena arena;
-  auto* var = arena.Create<Variable>();
-  var->value = MakeLogic4Vec(arena, 1);
   Net net;
-  net.type = NetType::kWor;
-  net.resolved = var;
+  auto* var = SetupResolvedNet(arena, net, NetType::kWor);
 
-  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 0));
-  net.driver_strengths.push_back({Strength::kStrong, Strength::kStrong});
-
-  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 0));
-  net.driver_strengths.push_back({Strength::kStrong, Strength::kStrong});
+  PushDriver(arena, net, 0, Strength::kStrong);
+  PushDriver(arena, net, 0, Strength::kStrong);
   net.Resolve(arena);
 
   EXPECT_EQ(var->value.ToUint64(), 0u);
@@ -435,18 +319,12 @@ TEST(StrengthResolution, WorLikeZerosRecordStrengthOnZeroSide) {
 
 TEST(StrengthResolution, WandThreeDriversFoldToAnd) {
   Arena arena;
-  auto* var = arena.Create<Variable>();
-  var->value = MakeLogic4Vec(arena, 1);
   Net net;
-  net.type = NetType::kWand;
-  net.resolved = var;
+  auto* var = SetupResolvedNet(arena, net, NetType::kWand);
 
-  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 1));
-  net.driver_strengths.push_back({Strength::kStrong, Strength::kStrong});
-  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 1));
-  net.driver_strengths.push_back({Strength::kStrong, Strength::kStrong});
-  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 0));
-  net.driver_strengths.push_back({Strength::kStrong, Strength::kStrong});
+  PushDriver(arena, net, 1, Strength::kStrong);
+  PushDriver(arena, net, 1, Strength::kStrong);
+  PushDriver(arena, net, 0, Strength::kStrong);
   net.Resolve(arena);
 
   EXPECT_EQ(var->value.ToUint64(), 0u);
@@ -454,18 +332,12 @@ TEST(StrengthResolution, WandThreeDriversFoldToAnd) {
 
 TEST(StrengthResolution, WorThreeDriversFoldToOr) {
   Arena arena;
-  auto* var = arena.Create<Variable>();
-  var->value = MakeLogic4Vec(arena, 1);
   Net net;
-  net.type = NetType::kWor;
-  net.resolved = var;
+  auto* var = SetupResolvedNet(arena, net, NetType::kWor);
 
-  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 0));
-  net.driver_strengths.push_back({Strength::kStrong, Strength::kStrong});
-  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 0));
-  net.driver_strengths.push_back({Strength::kStrong, Strength::kStrong});
-  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 1));
-  net.driver_strengths.push_back({Strength::kStrong, Strength::kStrong});
+  PushDriver(arena, net, 0, Strength::kStrong);
+  PushDriver(arena, net, 0, Strength::kStrong);
+  PushDriver(arena, net, 1, Strength::kStrong);
   net.Resolve(arena);
 
   EXPECT_EQ(var->value.ToUint64(), 1u);

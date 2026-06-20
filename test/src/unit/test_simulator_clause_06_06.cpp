@@ -2,29 +2,13 @@
 
 #include "common/arena.h"
 #include "fixture_simulator.h"
+#include "helpers_logic4vec_z.h"
 #include "simulator/net.h"
 #include "simulator/variable.h"
 
 using namespace delta;
 
 namespace {
-
-static Logic4Vec MakeZVec(Arena& arena, uint32_t width) {
-  auto v = MakeLogic4Vec(arena, width);
-  for (uint32_t w = 0; w < v.nwords; ++w) {
-    v.words[w].aval = ~uint64_t{0};
-    v.words[w].bval = ~uint64_t{0};
-  }
-  return v;
-}
-
-static bool IsAllZ(const Logic4Vec& v) {
-  for (uint32_t w = 0; w < v.nwords; ++w) {
-    if (v.words[w].aval != ~uint64_t{0}) return false;
-    if (v.words[w].bval != ~uint64_t{0}) return false;
-  }
-  return true;
-}
 
 TEST(NetTypesIntro, WireValueFollowsSingleDriver) {
   Arena arena;

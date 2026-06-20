@@ -1,31 +1,12 @@
 #include "fixture_elaborator.h"
+#include "helpers_generate_elab.h"
 
 using namespace delta;
 
 namespace {
 
-struct NamedElab {
-  ElabFixture f;
-  CompilationUnit* cu = nullptr;
-  RtlirDesign* design = nullptr;
-};
-
-NamedElab RunElaboration(const std::string& src, std::string_view top = "") {
-  NamedElab r;
-  auto fid = r.f.mgr.AddFile("<test>", src);
-  Lexer lexer(r.f.mgr.FileContent(fid), fid, r.f.diag);
-  Parser parser(lexer, r.f.arena, r.f.diag);
-  r.cu = parser.Parse();
-  if (!r.cu) return r;
-  auto name = top.empty() ? r.cu->modules.back()->name : top;
-  Elaborator elab(r.f.arena, r.f.diag, r.cu);
-  r.design = elab.Elaborate(name);
-  r.f.has_errors = r.f.diag.HasErrors();
-  return r;
-}
-
 TEST(GenerateBlockNaming, FirstUnnamedConstructIsGenblk1) {
-  auto r = RunElaboration(
+  auto r = RunGenerateElaboration(
       "module top;\n"
       "  if (1) begin\n"
       "    logic a;\n"
@@ -39,7 +20,7 @@ TEST(GenerateBlockNaming, FirstUnnamedConstructIsGenblk1) {
 }
 
 TEST(GenerateBlockNaming, SecondUnnamedConstructIsGenblk2) {
-  auto r = RunElaboration(
+  auto r = RunGenerateElaboration(
       "module top;\n"
       "  if (1) begin\n"
       "    logic a;\n"
@@ -56,7 +37,7 @@ TEST(GenerateBlockNaming, SecondUnnamedConstructIsGenblk2) {
 }
 
 TEST(GenerateBlockNaming, ExplicitLabelIsRetained) {
-  auto r = RunElaboration(
+  auto r = RunGenerateElaboration(
       "module top;\n"
       "  if (1) begin : my_block\n"
       "    logic a;\n"
@@ -69,7 +50,7 @@ TEST(GenerateBlockNaming, ExplicitLabelIsRetained) {
 }
 
 TEST(GenerateBlockNaming, NumberingCountsNamedConstructs) {
-  auto r = RunElaboration(
+  auto r = RunGenerateElaboration(
       "module top;\n"
       "  if (1) begin : first\n"
       "    logic a;\n"
@@ -87,7 +68,7 @@ TEST(GenerateBlockNaming, NumberingCountsNamedConstructs) {
 }
 
 TEST(GenerateBlockNaming, CollisionResolvedByLeadingZero) {
-  auto r = RunElaboration(
+  auto r = RunGenerateElaboration(
       "module top;\n"
       "  parameter genblk2 = 0;\n"
       "  if (1) begin\n"
@@ -121,7 +102,7 @@ TEST(GenerateBlockNaming, CollisionResolvedByLeadingZero) {
 // longer clashes. When both genblk2 and genblk02 are already taken, the
 // second construct must fall through to genblk002.
 TEST(GenerateBlockNaming, RepeatedCollisionAddsMoreLeadingZeros) {
-  auto r = RunElaboration(
+  auto r = RunGenerateElaboration(
       "module top;\n"
       "  parameter genblk2 = 0;\n"
       "  parameter genblk02 = 0;\n"

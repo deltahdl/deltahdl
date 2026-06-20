@@ -6,6 +6,24 @@ using namespace delta;
 
 namespace {
 
+// Elaborates and runs `src`, then fills the four element pointers of a 2x2
+// integer array named `arr`. Returns void; callers ASSERT on the pointers and
+// their values to keep each test's distinct expectations local.
+void RunAndFetch2x2(const std::string& src, SimFixture& f, Variable** e00,
+                    Variable** e01, Variable** e10, Variable** e11) {
+  auto* design = ElaborateSrc(src, f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  *e00 = f.ctx.FindVariable("arr[0][0]");
+  *e01 = f.ctx.FindVariable("arr[0][1]");
+  *e10 = f.ctx.FindVariable("arr[1][0]");
+  *e11 = f.ctx.FindVariable("arr[1][1]");
+  ASSERT_NE(*e00, nullptr);
+  ASSERT_NE(*e01, nullptr);
+  ASSERT_NE(*e10, nullptr);
+  ASSERT_NE(*e11, nullptr);
+}
+
 TEST(ArrayLiteralSim, PositionalAssignment) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -294,22 +312,13 @@ TEST(ArrayLiteralSim, WideToNarrowContextEval) {
 
 TEST(ArrayLiteralSim, PositionalMultidimensionalValues) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  Variable *e00, *e01, *e10, *e11;
+  RunAndFetch2x2(
       "module m;\n"
       "  int arr [0:1][0:1];\n"
       "  initial arr = '{'{1, 2}, '{3, 4}};\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* e00 = f.ctx.FindVariable("arr[0][0]");
-  auto* e01 = f.ctx.FindVariable("arr[0][1]");
-  auto* e10 = f.ctx.FindVariable("arr[1][0]");
-  auto* e11 = f.ctx.FindVariable("arr[1][1]");
-  ASSERT_NE(e00, nullptr);
-  ASSERT_NE(e01, nullptr);
-  ASSERT_NE(e10, nullptr);
-  ASSERT_NE(e11, nullptr);
+      f, &e00, &e01, &e10, &e11);
   EXPECT_EQ(e00->value.ToUint64(), 1u);
   EXPECT_EQ(e01->value.ToUint64(), 2u);
   EXPECT_EQ(e10->value.ToUint64(), 3u);
@@ -318,22 +327,13 @@ TEST(ArrayLiteralSim, PositionalMultidimensionalValues) {
 
 TEST(ArrayLiteralSim, DefaultMultidimensionalValues) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  Variable *e00, *e01, *e10, *e11;
+  RunAndFetch2x2(
       "module m;\n"
       "  int arr [0:1][0:1];\n"
       "  initial arr = '{default: '{default: 42}};\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* e00 = f.ctx.FindVariable("arr[0][0]");
-  auto* e01 = f.ctx.FindVariable("arr[0][1]");
-  auto* e10 = f.ctx.FindVariable("arr[1][0]");
-  auto* e11 = f.ctx.FindVariable("arr[1][1]");
-  ASSERT_NE(e00, nullptr);
-  ASSERT_NE(e01, nullptr);
-  ASSERT_NE(e10, nullptr);
-  ASSERT_NE(e11, nullptr);
+      f, &e00, &e01, &e10, &e11);
   EXPECT_EQ(e00->value.ToUint64(), 42u);
   EXPECT_EQ(e01->value.ToUint64(), 42u);
   EXPECT_EQ(e10->value.ToUint64(), 42u);

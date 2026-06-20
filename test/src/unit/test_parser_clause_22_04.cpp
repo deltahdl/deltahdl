@@ -1,30 +1,9 @@
-#include <cstdlib>
-#include <filesystem>
-#include <fstream>
-
 #include "fixture_parser.h"
+#include "helpers_include_test_dir.h"
 
 using namespace delta;
-namespace fs = std::filesystem;
 
 namespace {
-
-struct IncludeTestDir {
-  fs::path dir;
-  IncludeTestDir() {
-    dir =
-        fs::temp_directory_path() / ("delta_test_" + std::to_string(getpid()));
-    fs::create_directories(dir);
-  }
-  ~IncludeTestDir() { fs::remove_all(dir); }
-  fs::path WriteFile(const std::string& rel, const std::string& content) {
-    auto full = dir / rel;
-    fs::create_directories(full.parent_path());
-    std::ofstream ofs(full);
-    ofs << content;
-    return full;
-  }
-};
 
 static ParseResult ParseWithIncludes(IncludeTestDir& tmp,
                                      const std::string& main_src) {

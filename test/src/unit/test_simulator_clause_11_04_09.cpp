@@ -9,6 +9,20 @@ using namespace delta;
 
 namespace {
 
+// Evaluates a unary reduction `op` applied to variable "v" and returns the
+// 64-bit unsigned result. Shared by the AllReductions* value tests.
+uint64_t EvalReduceToU64(SimFixture& f, TokenKind op) {
+  auto* expr = MakeUnary(f.arena, op, MakeId(f.arena, "v"));
+  return EvalExpr(expr, f.ctx, f.arena).ToUint64();
+}
+
+// Evaluates a unary reduction `op` applied to variable "v" and returns the
+// low-word bval (x/z presence). Shared by the AllReductions* X/Z tests.
+uint64_t EvalReduceBval(SimFixture& f, TokenKind op) {
+  auto* expr = MakeUnary(f.arena, op, MakeId(f.arena, "v"));
+  return EvalExpr(expr, f.ctx, f.arena).words[0].bval;
+}
+
 TEST(EvalOpXZ, ReductionAndWithX) {
   SimFixture f;
 
@@ -434,219 +448,88 @@ TEST(EvalOp, AllReductionsOnAllZeros) {
   SimFixture f;
 
   MakeVar4(f, "v", 4, 0b0000, 0);
-  auto id = [&]() { return MakeId(f.arena, "v"); };
 
-  EXPECT_EQ(EvalExpr(MakeUnary(f.arena, TokenKind::kAmp, id()), f.ctx, f.arena)
-                .ToUint64(),
-            0u);
-  EXPECT_EQ(
-      EvalExpr(MakeUnary(f.arena, TokenKind::kTildeAmp, id()), f.ctx, f.arena)
-          .ToUint64(),
-      1u);
-  EXPECT_EQ(EvalExpr(MakeUnary(f.arena, TokenKind::kPipe, id()), f.ctx, f.arena)
-                .ToUint64(),
-            0u);
-  EXPECT_EQ(
-      EvalExpr(MakeUnary(f.arena, TokenKind::kTildePipe, id()), f.ctx, f.arena)
-          .ToUint64(),
-      1u);
-  EXPECT_EQ(
-      EvalExpr(MakeUnary(f.arena, TokenKind::kCaret, id()), f.ctx, f.arena)
-          .ToUint64(),
-      0u);
-  EXPECT_EQ(
-      EvalExpr(MakeUnary(f.arena, TokenKind::kTildeCaret, id()), f.ctx, f.arena)
-          .ToUint64(),
-      1u);
+  EXPECT_EQ(EvalReduceToU64(f, TokenKind::kAmp), 0u);
+  EXPECT_EQ(EvalReduceToU64(f, TokenKind::kTildeAmp), 1u);
+  EXPECT_EQ(EvalReduceToU64(f, TokenKind::kPipe), 0u);
+  EXPECT_EQ(EvalReduceToU64(f, TokenKind::kTildePipe), 1u);
+  EXPECT_EQ(EvalReduceToU64(f, TokenKind::kCaret), 0u);
+  EXPECT_EQ(EvalReduceToU64(f, TokenKind::kTildeCaret), 1u);
 }
 
 TEST(EvalOp, AllReductionsOnAllOnes) {
   SimFixture f;
 
   MakeVar4(f, "v", 4, 0b1111, 0);
-  auto id = [&]() { return MakeId(f.arena, "v"); };
 
-  EXPECT_EQ(EvalExpr(MakeUnary(f.arena, TokenKind::kAmp, id()), f.ctx, f.arena)
-                .ToUint64(),
-            1u);
-  EXPECT_EQ(
-      EvalExpr(MakeUnary(f.arena, TokenKind::kTildeAmp, id()), f.ctx, f.arena)
-          .ToUint64(),
-      0u);
-  EXPECT_EQ(EvalExpr(MakeUnary(f.arena, TokenKind::kPipe, id()), f.ctx, f.arena)
-                .ToUint64(),
-            1u);
-  EXPECT_EQ(
-      EvalExpr(MakeUnary(f.arena, TokenKind::kTildePipe, id()), f.ctx, f.arena)
-          .ToUint64(),
-      0u);
-  EXPECT_EQ(
-      EvalExpr(MakeUnary(f.arena, TokenKind::kCaret, id()), f.ctx, f.arena)
-          .ToUint64(),
-      0u);
-  EXPECT_EQ(
-      EvalExpr(MakeUnary(f.arena, TokenKind::kTildeCaret, id()), f.ctx, f.arena)
-          .ToUint64(),
-      1u);
+  EXPECT_EQ(EvalReduceToU64(f, TokenKind::kAmp), 1u);
+  EXPECT_EQ(EvalReduceToU64(f, TokenKind::kTildeAmp), 0u);
+  EXPECT_EQ(EvalReduceToU64(f, TokenKind::kPipe), 1u);
+  EXPECT_EQ(EvalReduceToU64(f, TokenKind::kTildePipe), 0u);
+  EXPECT_EQ(EvalReduceToU64(f, TokenKind::kCaret), 0u);
+  EXPECT_EQ(EvalReduceToU64(f, TokenKind::kTildeCaret), 1u);
 }
 
 TEST(EvalOp, AllReductionsOnEvenOnes) {
   SimFixture f;
 
   MakeVar4(f, "v", 4, 0b0110, 0);
-  auto id = [&]() { return MakeId(f.arena, "v"); };
 
-  EXPECT_EQ(EvalExpr(MakeUnary(f.arena, TokenKind::kAmp, id()), f.ctx, f.arena)
-                .ToUint64(),
-            0u);
-  EXPECT_EQ(
-      EvalExpr(MakeUnary(f.arena, TokenKind::kTildeAmp, id()), f.ctx, f.arena)
-          .ToUint64(),
-      1u);
-  EXPECT_EQ(EvalExpr(MakeUnary(f.arena, TokenKind::kPipe, id()), f.ctx, f.arena)
-                .ToUint64(),
-            1u);
-  EXPECT_EQ(
-      EvalExpr(MakeUnary(f.arena, TokenKind::kTildePipe, id()), f.ctx, f.arena)
-          .ToUint64(),
-      0u);
-  EXPECT_EQ(
-      EvalExpr(MakeUnary(f.arena, TokenKind::kCaret, id()), f.ctx, f.arena)
-          .ToUint64(),
-      0u);
-  EXPECT_EQ(
-      EvalExpr(MakeUnary(f.arena, TokenKind::kTildeCaret, id()), f.ctx, f.arena)
-          .ToUint64(),
-      1u);
+  EXPECT_EQ(EvalReduceToU64(f, TokenKind::kAmp), 0u);
+  EXPECT_EQ(EvalReduceToU64(f, TokenKind::kTildeAmp), 1u);
+  EXPECT_EQ(EvalReduceToU64(f, TokenKind::kPipe), 1u);
+  EXPECT_EQ(EvalReduceToU64(f, TokenKind::kTildePipe), 0u);
+  EXPECT_EQ(EvalReduceToU64(f, TokenKind::kCaret), 0u);
+  EXPECT_EQ(EvalReduceToU64(f, TokenKind::kTildeCaret), 1u);
 }
 
 TEST(EvalOp, AllReductionsOnOddOnes) {
   SimFixture f;
 
   MakeVar4(f, "v", 4, 0b1000, 0);
-  auto id = [&]() { return MakeId(f.arena, "v"); };
 
-  EXPECT_EQ(EvalExpr(MakeUnary(f.arena, TokenKind::kAmp, id()), f.ctx, f.arena)
-                .ToUint64(),
-            0u);
-  EXPECT_EQ(
-      EvalExpr(MakeUnary(f.arena, TokenKind::kTildeAmp, id()), f.ctx, f.arena)
-          .ToUint64(),
-      1u);
-  EXPECT_EQ(EvalExpr(MakeUnary(f.arena, TokenKind::kPipe, id()), f.ctx, f.arena)
-                .ToUint64(),
-            1u);
-  EXPECT_EQ(
-      EvalExpr(MakeUnary(f.arena, TokenKind::kTildePipe, id()), f.ctx, f.arena)
-          .ToUint64(),
-      0u);
-  EXPECT_EQ(
-      EvalExpr(MakeUnary(f.arena, TokenKind::kCaret, id()), f.ctx, f.arena)
-          .ToUint64(),
-      1u);
-  EXPECT_EQ(
-      EvalExpr(MakeUnary(f.arena, TokenKind::kTildeCaret, id()), f.ctx, f.arena)
-          .ToUint64(),
-      0u);
+  EXPECT_EQ(EvalReduceToU64(f, TokenKind::kAmp), 0u);
+  EXPECT_EQ(EvalReduceToU64(f, TokenKind::kTildeAmp), 1u);
+  EXPECT_EQ(EvalReduceToU64(f, TokenKind::kPipe), 1u);
+  EXPECT_EQ(EvalReduceToU64(f, TokenKind::kTildePipe), 0u);
+  EXPECT_EQ(EvalReduceToU64(f, TokenKind::kCaret), 1u);
+  EXPECT_EQ(EvalReduceToU64(f, TokenKind::kTildeCaret), 0u);
 }
 
 TEST(EvalOpXZ, AllReductionsOnAllX) {
   SimFixture f;
   MakeVar4(f, "v", 4, 0b0000, 0b1111);
-  auto id = [&]() { return MakeId(f.arena, "v"); };
 
-  EXPECT_NE(EvalExpr(MakeUnary(f.arena, TokenKind::kAmp, id()), f.ctx, f.arena)
-                .words[0]
-                .bval,
-            0u);
-  EXPECT_NE(EvalExpr(MakeUnary(f.arena, TokenKind::kPipe, id()), f.ctx, f.arena)
-                .words[0]
-                .bval,
-            0u);
-  EXPECT_NE(
-      EvalExpr(MakeUnary(f.arena, TokenKind::kCaret, id()), f.ctx, f.arena)
-          .words[0]
-          .bval,
-      0u);
-  EXPECT_NE(
-      EvalExpr(MakeUnary(f.arena, TokenKind::kTildeAmp, id()), f.ctx, f.arena)
-          .words[0]
-          .bval,
-      0u);
-  EXPECT_NE(
-      EvalExpr(MakeUnary(f.arena, TokenKind::kTildePipe, id()), f.ctx, f.arena)
-          .words[0]
-          .bval,
-      0u);
-  EXPECT_NE(
-      EvalExpr(MakeUnary(f.arena, TokenKind::kTildeCaret, id()), f.ctx, f.arena)
-          .words[0]
-          .bval,
-      0u);
+  EXPECT_NE(EvalReduceBval(f, TokenKind::kAmp), 0u);
+  EXPECT_NE(EvalReduceBval(f, TokenKind::kPipe), 0u);
+  EXPECT_NE(EvalReduceBval(f, TokenKind::kCaret), 0u);
+  EXPECT_NE(EvalReduceBval(f, TokenKind::kTildeAmp), 0u);
+  EXPECT_NE(EvalReduceBval(f, TokenKind::kTildePipe), 0u);
+  EXPECT_NE(EvalReduceBval(f, TokenKind::kTildeCaret), 0u);
 }
 
 TEST(EvalOpXZ, AllReductionsOnAllZ) {
   SimFixture f;
   MakeVar4(f, "v", 4, 0b1111, 0b1111);
-  auto id = [&]() { return MakeId(f.arena, "v"); };
 
-  EXPECT_NE(EvalExpr(MakeUnary(f.arena, TokenKind::kAmp, id()), f.ctx, f.arena)
-                .words[0]
-                .bval,
-            0u);
-  EXPECT_NE(EvalExpr(MakeUnary(f.arena, TokenKind::kPipe, id()), f.ctx, f.arena)
-                .words[0]
-                .bval,
-            0u);
-  EXPECT_NE(
-      EvalExpr(MakeUnary(f.arena, TokenKind::kCaret, id()), f.ctx, f.arena)
-          .words[0]
-          .bval,
-      0u);
-  EXPECT_NE(
-      EvalExpr(MakeUnary(f.arena, TokenKind::kTildeAmp, id()), f.ctx, f.arena)
-          .words[0]
-          .bval,
-      0u);
-  EXPECT_NE(
-      EvalExpr(MakeUnary(f.arena, TokenKind::kTildePipe, id()), f.ctx, f.arena)
-          .words[0]
-          .bval,
-      0u);
-  EXPECT_NE(
-      EvalExpr(MakeUnary(f.arena, TokenKind::kTildeCaret, id()), f.ctx, f.arena)
-          .words[0]
-          .bval,
-      0u);
+  EXPECT_NE(EvalReduceBval(f, TokenKind::kAmp), 0u);
+  EXPECT_NE(EvalReduceBval(f, TokenKind::kPipe), 0u);
+  EXPECT_NE(EvalReduceBval(f, TokenKind::kCaret), 0u);
+  EXPECT_NE(EvalReduceBval(f, TokenKind::kTildeAmp), 0u);
+  EXPECT_NE(EvalReduceBval(f, TokenKind::kTildePipe), 0u);
+  EXPECT_NE(EvalReduceBval(f, TokenKind::kTildeCaret), 0u);
 }
 
 TEST(EvalOp, ReductionFirstStepWidthTwo) {
   SimFixture f;
   MakeVar4(f, "v", 2, 0b10, 0);
-  auto id = [&]() { return MakeId(f.arena, "v"); };
 
-  EXPECT_EQ(EvalExpr(MakeUnary(f.arena, TokenKind::kAmp, id()), f.ctx, f.arena)
-                .ToUint64(),
-            0u);
-  EXPECT_EQ(EvalExpr(MakeUnary(f.arena, TokenKind::kPipe, id()), f.ctx, f.arena)
-                .ToUint64(),
-            1u);
-  EXPECT_EQ(
-      EvalExpr(MakeUnary(f.arena, TokenKind::kCaret, id()), f.ctx, f.arena)
-          .ToUint64(),
-      1u);
-  EXPECT_EQ(
-      EvalExpr(MakeUnary(f.arena, TokenKind::kTildeAmp, id()), f.ctx, f.arena)
-          .ToUint64(),
-      1u);
-  EXPECT_EQ(
-      EvalExpr(MakeUnary(f.arena, TokenKind::kTildePipe, id()), f.ctx, f.arena)
-          .ToUint64(),
-      0u);
-  EXPECT_EQ(
-      EvalExpr(MakeUnary(f.arena, TokenKind::kTildeCaret, id()), f.ctx, f.arena)
-          .ToUint64(),
-      0u);
+  EXPECT_EQ(EvalReduceToU64(f, TokenKind::kAmp), 0u);
+  EXPECT_EQ(EvalReduceToU64(f, TokenKind::kPipe), 1u);
+  EXPECT_EQ(EvalReduceToU64(f, TokenKind::kCaret), 1u);
+  EXPECT_EQ(EvalReduceToU64(f, TokenKind::kTildeAmp), 1u);
+  EXPECT_EQ(EvalReduceToU64(f, TokenKind::kTildePipe), 0u);
+  EXPECT_EQ(EvalReduceToU64(f, TokenKind::kTildeCaret), 0u);
 }
 
 }  // namespace

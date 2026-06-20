@@ -11,6 +11,39 @@ using namespace delta;
 
 namespace {
 
+// Common setup shared by the non-virtual / static method-binding tests: a base
+// "Packet" and a derived "LinkedPacket" each declaring a non-virtual "get"
+// method, plus a live object of the derived type. Callers parameterize nothing;
+// they apply their own distinct assertions to the returned members.
+struct OverriddenGetFixture {
+  ClassTypeInfo* base;
+  ModuleItem* base_get;
+  ClassTypeInfo* derived;
+  ModuleItem* derived_get;
+  ClassObject* obj;
+};
+
+static OverriddenGetFixture MakeOverriddenGetFixture(SimFixture& f) {
+  OverriddenGetFixture r;
+  r.base = MakeClassType(f, "Packet", {});
+  r.base_get = f.arena.Create<ModuleItem>();
+  r.base_get->kind = ModuleItemKind::kFunctionDecl;
+  r.base_get->name = "get";
+  r.base->methods["get"] = r.base_get;
+
+  r.derived = MakeClassType(f, "LinkedPacket", {});
+  r.derived->parent = r.base;
+  r.derived_get = f.arena.Create<ModuleItem>();
+  r.derived_get->kind = ModuleItemKind::kFunctionDecl;
+  r.derived_get->name = "get";
+  r.derived->methods["get"] = r.derived_get;
+
+  auto [handle, obj] = MakeObj(f, r.derived);
+  (void)handle;
+  r.obj = obj;
+  return r;
+}
+
 TEST(OverriddenMemberSimulation, SubclassIsValidBaseObject) {
   SimFixture f;
   auto* packet = MakeClassType(f, "Packet", {"i"});
@@ -36,25 +69,12 @@ TEST(OverriddenMemberSimulation, MultiLevelSubclassIsValidBaseObject) {
 
 TEST(OverriddenMemberSimulation, NonVirtualResolutionFromBaseType) {
   SimFixture f;
-  auto* base = MakeClassType(f, "Packet", {});
-  auto* base_get = f.arena.Create<ModuleItem>();
-  base_get->kind = ModuleItemKind::kFunctionDecl;
-  base_get->name = "get";
-  base->methods["get"] = base_get;
+  auto fx = MakeOverriddenGetFixture(f);
+  EXPECT_EQ(fx.obj->ResolveMethod("get"), fx.derived_get);
 
-  auto* derived = MakeClassType(f, "LinkedPacket", {});
-  derived->parent = base;
-  auto* derived_get = f.arena.Create<ModuleItem>();
-  derived_get->kind = ModuleItemKind::kFunctionDecl;
-  derived_get->name = "get";
-  derived->methods["get"] = derived_get;
-
-  auto [h1, obj1] = MakeObj(f, derived);
-  EXPECT_EQ(obj1->ResolveMethod("get"), derived_get);
-
-  auto it = base->methods.find("get");
-  ASSERT_NE(it, base->methods.end());
-  EXPECT_EQ(it->second, base_get);
+  auto it = fx.base->methods.find("get");
+  ASSERT_NE(it, fx.base->methods.end());
+  EXPECT_EQ(it->second, fx.base_get);
 }
 
 TEST(OverriddenMemberSimulation, OverriddenPropertyInDerived) {
@@ -237,22 +257,9 @@ TEST(OverriddenMemberSimulation, E2eNonOverriddenMemberAccessibleThroughBase) {
 // type yields the override -- the static-binding production helper itself.
 TEST(OverriddenMemberSimulation, StaticMethodBindingSelectsDeclaredType) {
   SimFixture f;
-  auto* base = MakeClassType(f, "Packet", {});
-  auto* base_get = f.arena.Create<ModuleItem>();
-  base_get->kind = ModuleItemKind::kFunctionDecl;
-  base_get->name = "get";
-  base->methods["get"] = base_get;
-
-  auto* derived = MakeClassType(f, "LinkedPacket", {});
-  derived->parent = base;
-  auto* derived_get = f.arena.Create<ModuleItem>();
-  derived_get->kind = ModuleItemKind::kFunctionDecl;
-  derived_get->name = "get";
-  derived->methods["get"] = derived_get;
-
-  auto [handle, obj] = MakeObj(f, derived);
-  EXPECT_EQ(obj->ResolveMethodForType("get", base), base_get);
-  EXPECT_EQ(obj->ResolveMethodForType("get", derived), derived_get);
+  auto fx = MakeOverriddenGetFixture(f);
+  EXPECT_EQ(fx.obj->ResolveMethodForType("get", fx.base), fx.base_get);
+  EXPECT_EQ(fx.obj->ResolveMethodForType("get", fx.derived), fx.derived_get);
 }
 
 // §8.14: a shadowed property is read through the slot of the handle's declared

@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <cstdlib>
 
+#include "helpers_open_array_natural_order.h"
 #include "simulator/svdpi.h"
 
 // Annex H.7.3 - Data representation.
@@ -303,16 +304,7 @@ TEST(DataRepresentation, UnpackedNaturalOrderMinToZeroMaxToAbs) {
     svOpenArrayDesc desc;
     svOpenArrayHandle h = MakeHandle(nullptr, ranges, 2, 0, &desc);
 
-    const int lo = svLow(h, 1);
-    const int hi = svHigh(h, 1);
-    const int abs_span = std::abs(c.l - c.r);
-
-    EXPECT_EQ(lo, std::min(c.l, c.r));      // svLow == min(L,R).
-    EXPECT_EQ(hi, std::max(c.l, c.r));      // svHigh == max(L,R).
-    EXPECT_EQ(svSize(h, 1), abs_span + 1);  // count == abs(L-R)+1.
-
-    EXPECT_EQ(lo - lo, 0);         // element at min(L,R) -> C index 0.
-    EXPECT_EQ(hi - lo, abs_span);  // element at max(L,R) -> C index abs(L-R).
+    ExpectUnpackedNaturalOrderMinToZeroMaxToAbs(h, 1, c.l, c.r);
   }
 }
 

@@ -10,6 +10,48 @@ using namespace delta;
 
 namespace {
 
+// Sets up a solver with two [0,100] variables x and y, a block fixing x to
+// `x_fixed_value`, and an implication block "x == 10 -> y < 20". Used by the
+// implication true/false-condition tests, which differ only in the fixed x
+// value and their final assertion.
+static void SetupImplicationSolver(ConstraintSolver& solver,
+                                   int64_t x_fixed_value) {
+  RandVariable vx;
+  vx.name = "x";
+  vx.min_val = 0;
+  vx.max_val = 100;
+  solver.AddVariable(vx);
+
+  RandVariable vy;
+  vy.name = "y";
+  vy.min_val = 0;
+  vy.max_val = 100;
+  solver.AddVariable(vy);
+
+  ConstraintBlock b1;
+  b1.name = "fix_x";
+  ConstraintExpr eq;
+  eq.kind = ConstraintKind::kEqual;
+  eq.var_name = "x";
+  eq.lo = x_fixed_value;
+  b1.constraints.push_back(eq);
+  solver.AddConstraintBlock(b1);
+
+  ConstraintBlock b2;
+  b2.name = "impl";
+  ConstraintExpr impl;
+  impl.kind = ConstraintKind::kImplication;
+  impl.cond_var = "x";
+  impl.cond_value = 10;
+  ConstraintExpr sub;
+  sub.kind = ConstraintKind::kLessThan;
+  sub.var_name = "y";
+  sub.lo = 20;
+  impl.sub_constraints.push_back(sub);
+  b2.constraints.push_back(impl);
+  solver.AddConstraintBlock(b2);
+}
+
 TEST(ConstraintSolving, EmptyConstraintBlock) {
   ConstraintSolver solver(42);
   RandVariable v;
@@ -30,40 +72,7 @@ TEST(ConstraintSolving, EmptyConstraintBlock) {
 
 TEST(ConstraintSolving, ImplicationTrueCondition) {
   ConstraintSolver solver(42);
-  RandVariable vx;
-  vx.name = "x";
-  vx.min_val = 0;
-  vx.max_val = 100;
-  solver.AddVariable(vx);
-
-  RandVariable vy;
-  vy.name = "y";
-  vy.min_val = 0;
-  vy.max_val = 100;
-  solver.AddVariable(vy);
-
-  ConstraintBlock b1;
-  b1.name = "fix_x";
-  ConstraintExpr eq;
-  eq.kind = ConstraintKind::kEqual;
-  eq.var_name = "x";
-  eq.lo = 50;
-  b1.constraints.push_back(eq);
-  solver.AddConstraintBlock(b1);
-
-  ConstraintBlock b2;
-  b2.name = "impl";
-  ConstraintExpr impl;
-  impl.kind = ConstraintKind::kImplication;
-  impl.cond_var = "x";
-  impl.cond_value = 10;
-  ConstraintExpr sub;
-  sub.kind = ConstraintKind::kLessThan;
-  sub.var_name = "y";
-  sub.lo = 20;
-  impl.sub_constraints.push_back(sub);
-  b2.constraints.push_back(impl);
-  solver.AddConstraintBlock(b2);
+  SetupImplicationSolver(solver, 50);
 
   ASSERT_TRUE(solver.Solve());
   EXPECT_LT(solver.GetValue("y"), 20);
@@ -71,40 +80,7 @@ TEST(ConstraintSolving, ImplicationTrueCondition) {
 
 TEST(ConstraintSolving, ImplicationFalseCondition) {
   ConstraintSolver solver(42);
-  RandVariable vx;
-  vx.name = "x";
-  vx.min_val = 0;
-  vx.max_val = 100;
-  solver.AddVariable(vx);
-
-  RandVariable vy;
-  vy.name = "y";
-  vy.min_val = 0;
-  vy.max_val = 100;
-  solver.AddVariable(vy);
-
-  ConstraintBlock b1;
-  b1.name = "fix_x";
-  ConstraintExpr eq;
-  eq.kind = ConstraintKind::kEqual;
-  eq.var_name = "x";
-  eq.lo = 5;
-  b1.constraints.push_back(eq);
-  solver.AddConstraintBlock(b1);
-
-  ConstraintBlock b2;
-  b2.name = "impl";
-  ConstraintExpr impl;
-  impl.kind = ConstraintKind::kImplication;
-  impl.cond_var = "x";
-  impl.cond_value = 10;
-  ConstraintExpr sub;
-  sub.kind = ConstraintKind::kLessThan;
-  sub.var_name = "y";
-  sub.lo = 20;
-  impl.sub_constraints.push_back(sub);
-  b2.constraints.push_back(impl);
-  solver.AddConstraintBlock(b2);
+  SetupImplicationSolver(solver, 5);
 
   ASSERT_TRUE(solver.Solve());
 

@@ -189,19 +189,8 @@ TEST(PliPreObservedSim, FutureScheduleFromPreObservedIsNotFlagged) {
 // A schedule into the current time slot from a non-Pre-Observed region carries
 // no Pre-Observed violation.
 TEST(PliPreObservedSim, ScheduleFromActiveIsNotFlaggedAgainstPreObserved) {
-  Arena arena;
-  Scheduler sched(arena);
-
-  auto* active = sched.GetEventPool().Acquire();
-  active->callback = [&]() {
-    auto* nba = sched.GetEventPool().Acquire();
-    nba->callback = []() {};
-    sched.ScheduleEvent(sched.CurrentTime(), Region::kNBA, nba);
-  };
-  sched.ScheduleEvent({0}, Region::kActive, active);
-
-  sched.Run();
-  EXPECT_EQ(sched.IllegalPreObservedScheduleCount(), 0u);
+  VerifyScheduleFromActiveIsNotFlagged(
+      [](Scheduler& s) { return s.IllegalPreObservedScheduleCount(); });
 }
 
 // §4.4.3.5: within the Pre-Observed region it is illegal to write values to any

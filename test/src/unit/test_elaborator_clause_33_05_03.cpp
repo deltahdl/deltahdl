@@ -39,6 +39,25 @@ struct TempPrecompDir {
   }
 };
 
+// Parses `top_src`, loads the precompiled library at `path` into the resulting
+// compilation unit, and asserts the parse/load succeeded without diagnostics.
+// Returns the parsed compilation unit ready for elaboration.
+static CompilationUnit* ParseAndLoadLibrary(const std::string& top_src,
+                                            const fs::path& path,
+                                            SourceManager& mgr, Arena& arena,
+                                            DiagEngine& diag) {
+  uint32_t fid = mgr.AddFile("<top>", top_src);
+  Lexer lex(mgr.FileContent(fid), fid, diag);
+  Parser parser(lex, arena, diag);
+  auto* cu = parser.Parse();
+  EXPECT_NE(cu, nullptr);
+  EXPECT_FALSE(diag.HasErrors());
+
+  EXPECT_TRUE(PrecompiledLibrary::Load(path, *cu, mgr, arena, diag));
+  EXPECT_FALSE(diag.HasErrors());
+  return cu;
+}
+
 TEST(SeparateCompilationToolDescend, TransitiveDescentThroughLibrary) {
   TempPrecompDir tmp;
   auto path = tmp.dir / "rtlLib.dpl";
@@ -60,14 +79,8 @@ TEST(SeparateCompilationToolDescend, TransitiveDescentThroughLibrary) {
       "module top;\n"
       "  mid m();\n"
       "endmodule\n";
-  uint32_t fid = mgr.AddFile("<top>", top_src);
-  Lexer lex(mgr.FileContent(fid), fid, diag);
-  Parser parser(lex, arena, diag);
-  auto* cu = parser.Parse();
+  auto* cu = ParseAndLoadLibrary(top_src, path, mgr, arena, diag);
   ASSERT_NE(cu, nullptr);
-  ASSERT_FALSE(diag.HasErrors());
-
-  ASSERT_TRUE(PrecompiledLibrary::Load(path, *cu, mgr, arena, diag));
   ASSERT_FALSE(diag.HasErrors());
 
   Elaborator elab(arena, diag, cu);
@@ -96,14 +109,8 @@ TEST(SeparateCompilationToolDescend, BindingFailsWhenLibraryMissingCell) {
       "module top;\n"
       "  child c();\n"
       "endmodule\n";
-  uint32_t fid = mgr.AddFile("<top>", top_src);
-  Lexer lex(mgr.FileContent(fid), fid, diag);
-  Parser parser(lex, arena, diag);
-  auto* cu = parser.Parse();
+  auto* cu = ParseAndLoadLibrary(top_src, path, mgr, arena, diag);
   ASSERT_NE(cu, nullptr);
-  ASSERT_FALSE(diag.HasErrors());
-
-  ASSERT_TRUE(PrecompiledLibrary::Load(path, *cu, mgr, arena, diag));
   ASSERT_FALSE(diag.HasErrors());
 
   Elaborator elab(arena, diag, cu);

@@ -7,6 +7,7 @@
 #include <unordered_set>
 #include <vector>
 
+#include "helpers_constraint_rel.h"
 #include "simulator/constraint_solver.h"
 
 using namespace delta;
@@ -70,18 +71,7 @@ TEST(Constraint, RandModeInactiveTreatedAsStateConstant) {
   solver.SetValue("y", 5);
   solver.SetRandMode("y", false);
 
-  ConstraintBlock block;
-  block.name = "c_rel";
-  ConstraintExpr c;
-  c.kind = ConstraintKind::kCustom;
-  c.eval_fn = [](const std::unordered_map<std::string, int64_t>& vals) {
-    auto itx = vals.find("x");
-    auto ity = vals.find("y");
-    if (itx == vals.end() || ity == vals.end()) return true;
-    return itx->second == ity->second + 1;
-  };
-  block.constraints.push_back(c);
-  solver.AddConstraintBlock(block);
+  AddXEqualsYPlusOneConstraint(solver);
 
   ASSERT_TRUE(solver.Solve());
   // y stays at its current value (state variable) and x is solved against it.

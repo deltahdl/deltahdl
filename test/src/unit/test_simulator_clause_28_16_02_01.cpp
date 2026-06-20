@@ -37,6 +37,21 @@ bool AllBitsX(const Logic4Vec& v) {
   return true;
 }
 
+// Builds an 8-bit trireg net storing 0x10 with decay_ticks 50, then turns the
+// driver off (all z) so the charge decay process is armed. Verifies a decay
+// event is pending before returning so callers can drive their own follow-up.
+void SetupArmedDecay(Arena& arena, Scheduler& sched, Variable*& var, Net& net) {
+  var = arena.Create<Variable>();
+  var->value = MakeLogic4VecVal(arena, 8, 0x10);
+  net.type = NetType::kTrireg;
+  net.resolved = var;
+  net.decay_ticks = 50;
+
+  net.drivers.push_back(MakeAllZ(arena, 8));
+  net.Resolve(arena, &sched);
+  ASSERT_TRUE(sched.HasEvents());
+}
+
 TEST(ChargeDecayProcess, StoredOneTransitionsToXAfterDelay) {
   Arena arena;
   Scheduler sched(arena);
@@ -123,16 +138,9 @@ TEST(ChargeDecayProcess, ProcessBeginsWhenDriversTurnOff) {
 TEST(ChargeDecayProcess, EndsWhenDriverPropagatesOne) {
   Arena arena;
   Scheduler sched(arena);
-  auto* var = arena.Create<Variable>();
-  var->value = MakeLogic4VecVal(arena, 8, 0x10);
+  Variable* var = nullptr;
   Net net;
-  net.type = NetType::kTrireg;
-  net.resolved = var;
-  net.decay_ticks = 50;
-
-  net.drivers.push_back(MakeAllZ(arena, 8));
-  net.Resolve(arena, &sched);
-  ASSERT_TRUE(sched.HasEvents());
+  SetupArmedDecay(arena, sched, var, net);
 
   net.drivers[0] = MakeLogic4VecVal(arena, 8, 0x01);
   net.Resolve(arena, &sched);
@@ -229,16 +237,9 @@ TEST(ChargeDecayProcess, OnlyKnownBitsTransitionToX) {
 TEST(ChargeDecayProcess, ReBeginsAfterDriverCyclesOffAgain) {
   Arena arena;
   Scheduler sched(arena);
-  auto* var = arena.Create<Variable>();
-  var->value = MakeLogic4VecVal(arena, 8, 0x10);
+  Variable* var = nullptr;
   Net net;
-  net.type = NetType::kTrireg;
-  net.resolved = var;
-  net.decay_ticks = 50;
-
-  net.drivers.push_back(MakeAllZ(arena, 8));
-  net.Resolve(arena, &sched);
-  ASSERT_TRUE(sched.HasEvents());
+  SetupArmedDecay(arena, sched, var, net);
 
   net.drivers[0] = MakeLogic4VecVal(arena, 8, 0x77);
   net.Resolve(arena, &sched);

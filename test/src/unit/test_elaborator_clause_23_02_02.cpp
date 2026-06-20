@@ -3,6 +3,23 @@
 
 namespace {
 
+void ExpectWideModuleElaborates(int port_count) {
+  std::string src = "module wide(";
+  for (int i = 0; i < port_count; ++i) {
+    if (i > 0) src += ", ";
+    src += "input logic p";
+    src += std::to_string(i);
+  }
+  src += ");\nendmodule\n";
+  ElabFixture f;
+  auto* design = ElaborateSrc(src, f, "wide");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  ASSERT_EQ(design->top_modules.size(), 1u);
+  EXPECT_EQ(design->top_modules[0]->ports.size(),
+            static_cast<size_t>(port_count));
+}
+
 TEST(PortDeclaration, StructPortElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -75,39 +92,11 @@ TEST(PortDeclaration, ArrayPortElaborates) {
 }
 
 TEST(PortDeclaration, ModuleWithAtLeast256PortsElaborates) {
-  std::string src = "module wide(";
-  const int port_count = 300;
-  for (int i = 0; i < port_count; ++i) {
-    if (i > 0) src += ", ";
-    src += "input logic p";
-    src += std::to_string(i);
-  }
-  src += ");\nendmodule\n";
-  ElabFixture f;
-  auto* design = ElaborateSrc(src, f, "wide");
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  ASSERT_EQ(design->top_modules.size(), 1u);
-  EXPECT_EQ(design->top_modules[0]->ports.size(),
-            static_cast<size_t>(port_count));
+  ExpectWideModuleElaborates(300);
 }
 
 TEST(PortDeclaration, ModuleWithExactly256PortsElaborates) {
-  std::string src = "module wide(";
-  const int port_count = 256;
-  for (int i = 0; i < port_count; ++i) {
-    if (i > 0) src += ", ";
-    src += "input logic p";
-    src += std::to_string(i);
-  }
-  src += ");\nendmodule\n";
-  ElabFixture f;
-  auto* design = ElaborateSrc(src, f, "wide");
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  ASSERT_EQ(design->top_modules.size(), 1u);
-  EXPECT_EQ(design->top_modules[0]->ports.size(),
-            static_cast<size_t>(port_count));
+  ExpectWideModuleElaborates(256);
 }
 
 TEST(PortDeclaration, UnpackedArrayOfStructPortElaborates) {

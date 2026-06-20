@@ -2,6 +2,7 @@
 
 #include <cstdlib>
 
+#include "helpers_open_array_natural_order.h"
 #include "simulator/svdpi.h"
 
 // Annex H.7.6 - Mapping between SystemVerilog ranges and C ranges.
@@ -107,17 +108,7 @@ TEST(MappingSvRangesToCRanges, UnpackedNaturalOrderMinToZeroMaxToAbs) {
     svOpenArrayDesc desc;
     svOpenArrayHandle h = MakeHandle(ranges, 2, &desc);
 
-    const int lo = svLow(h, 1);   // min(L,R)
-    const int hi = svHigh(h, 1);  // max(L,R)
-    const int abs_span = std::abs(c.l - c.r);
-
-    EXPECT_EQ(lo, std::min(c.l, c.r));
-    EXPECT_EQ(hi, std::max(c.l, c.r));
-    EXPECT_EQ(svSize(h, 1), abs_span + 1);
-
-    // The C index of an element is its SystemVerilog index minus the low bound.
-    EXPECT_EQ(lo - lo, 0);         // min(L,R) -> C index 0.
-    EXPECT_EQ(hi - lo, abs_span);  // max(L,R) -> C index abs(L-R).
+    ExpectUnpackedNaturalOrderMinToZeroMaxToAbs(h, 1, c.l, c.r);
   }
 }
 

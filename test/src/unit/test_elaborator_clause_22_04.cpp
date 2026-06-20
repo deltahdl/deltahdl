@@ -1,30 +1,9 @@
-#include <cstdlib>
-#include <filesystem>
-#include <fstream>
-
 #include "fixture_elaborator.h"
+#include "helpers_include_test_dir.h"
 
 using namespace delta;
-namespace fs = std::filesystem;
 
 namespace {
-
-struct IncludeTestDir {
-  fs::path dir;
-  IncludeTestDir() {
-    dir =
-        fs::temp_directory_path() / ("delta_test_" + std::to_string(getpid()));
-    fs::create_directories(dir);
-  }
-  ~IncludeTestDir() { fs::remove_all(dir); }
-  fs::path WriteFile(const std::string& rel, const std::string& content) {
-    auto full = dir / rel;
-    fs::create_directories(full.parent_path());
-    std::ofstream ofs(full);
-    ofs << content;
-    return full;
-  }
-};
 
 static RtlirDesign* ElaborateWithIncludes(IncludeTestDir& tmp,
                                           const std::string& main_src,
@@ -33,18 +12,9 @@ static RtlirDesign* ElaborateWithIncludes(IncludeTestDir& tmp,
   tmp.WriteFile("main.sv", main_src);
   auto fid = f.mgr.AddFile((tmp.dir / "main.sv").string(), main_src);
   Preprocessor preproc(f.mgr, f.diag, {});
-  auto pp = preproc.Preprocess(fid);
-  auto pp_fid = f.mgr.AddFile("<preprocessed>", pp);
-  Lexer lexer(f.mgr.FileContent(pp_fid), pp_fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
+  auto* cu = PreprocessAndParseCu(f, fid, preproc);
   cu->default_nettype = preproc.DefaultNetType();
-  cu->default_decay_time = preproc.DefaultDecayTime();
-  cu->default_decay_time_real = preproc.DefaultDecayTimeReal();
-  cu->default_decay_time_infinite = preproc.DefaultDecayTimeInfinite();
-  cu->default_trireg_strength = preproc.DefaultTriregStrength();
-  cu->has_default_trireg_strength = preproc.HasDefaultTriregStrength();
-  cu->delay_mode_directive = preproc.DelayModeDirective();
+  PropagateDecayAndDelayToCu(cu, preproc);
   Elaborator elab(f.arena, f.diag, cu);
   auto name = top.empty() ? cu->modules.back()->name : top;
   auto* design = elab.Elaborate(name);

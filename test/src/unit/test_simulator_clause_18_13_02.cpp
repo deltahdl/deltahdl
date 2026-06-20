@@ -1,5 +1,6 @@
 #include "builders_systask.h"
 #include "fixture_simulator.h"
+#include "helpers_seeded_run.h"
 #include "parser/ast.h"
 #include "simulator/evaluation.h"
 
@@ -71,8 +72,7 @@ TEST(SysTask, UrandomRangeZeroMaxvalReturnsZero) {
 // per-thread values regardless of the scheduler's interleaving.
 TEST(SysTask, UrandomRangeIsThreadStable) {
   auto run = [](uint64_t& a, uint64_t& b) {
-    SimFixtureSeeded f;
-    auto* design = ElaborateSrc(
+    auto vals = RunSeededAndRead(
         "module t;\n"
         "  int unsigned a;\n"
         "  int unsigned b;\n"
@@ -83,13 +83,9 @@ TEST(SysTask, UrandomRangeIsThreadStable) {
         "    join\n"
         "  end\n"
         "endmodule\n",
-        f);
-    ASSERT_NE(design, nullptr);
-    Lowerer lowerer(f.ctx, f.arena, f.diag);
-    lowerer.Lower(design);
-    f.scheduler.Run();
-    a = f.ctx.FindVariable("a")->value.ToUint64();
-    b = f.ctx.FindVariable("b")->value.ToUint64();
+        {"a", "b"});
+    a = vals[0];
+    b = vals[1];
   };
   uint64_t a1 = 0, b1 = 0, a2 = 0, b2 = 0;
   run(a1, b1);

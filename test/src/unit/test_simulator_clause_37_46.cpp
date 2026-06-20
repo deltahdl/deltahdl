@@ -1,8 +1,8 @@
 #include <gtest/gtest.h>
 
-#include <algorithm>
 #include <vector>
 
+#include "helpers_vpi_driver_load_iter.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi.h"
 
@@ -20,18 +20,6 @@ namespace {
 // port carrying it is the load object reported, and that expression is reached
 // through vpi_handle(vpiHighConn, port). These are exercised through the public
 // iterate/scan and handle API.
-
-// Walk an iterator to completion, collecting every object it yields in order.
-std::vector<VpiHandle> Collect(VpiContext& ctx, VpiHandle iterator) {
-  std::vector<VpiHandle> objects;
-  if (!iterator) return objects;
-  while (VpiHandle next = ctx.Scan(iterator)) objects.push_back(next);
-  return objects;
-}
-
-bool Contains(const std::vector<VpiHandle>& objects, VpiHandle wanted) {
-  return std::find(objects.begin(), objects.end(), wanted) != objects.end();
-}
 
 // Figure (net drivers): vpiDriver on a net reaches every net-driver kind - a
 // port, a force, a delay terminal, a continuous assignment, a single bit of
@@ -68,16 +56,17 @@ TEST(NetDriversAndLoads, DriverIterationReachesEveryNetDriverKind) {
                   &cont_assign, &cont_assign_bit, &prim_term,
                   &assign_stmt, &unrelated};
 
-  std::vector<VpiHandle> drivers = Collect(ctx, ctx.Iterate(vpiDriver, &net));
+  std::vector<VpiHandle> drivers =
+      CollectVpiIteration(ctx, ctx.Iterate(vpiDriver, &net));
   ASSERT_EQ(drivers.size(), 6u);
-  EXPECT_TRUE(Contains(drivers, &port));
-  EXPECT_TRUE(Contains(drivers, &force));
-  EXPECT_TRUE(Contains(drivers, &delay_term));
-  EXPECT_TRUE(Contains(drivers, &cont_assign));
-  EXPECT_TRUE(Contains(drivers, &cont_assign_bit));
-  EXPECT_TRUE(Contains(drivers, &prim_term));
-  EXPECT_FALSE(Contains(drivers, &assign_stmt));
-  EXPECT_FALSE(Contains(drivers, &unrelated));
+  EXPECT_TRUE(VpiIterationContains(drivers, &port));
+  EXPECT_TRUE(VpiIterationContains(drivers, &force));
+  EXPECT_TRUE(VpiIterationContains(drivers, &delay_term));
+  EXPECT_TRUE(VpiIterationContains(drivers, &cont_assign));
+  EXPECT_TRUE(VpiIterationContains(drivers, &cont_assign_bit));
+  EXPECT_TRUE(VpiIterationContains(drivers, &prim_term));
+  EXPECT_FALSE(VpiIterationContains(drivers, &assign_stmt));
+  EXPECT_FALSE(VpiIterationContains(drivers, &unrelated));
 }
 
 // Figure (net loads): vpiLoad on a net reaches the net-load kinds - a delay
@@ -111,15 +100,16 @@ TEST(NetDriversAndLoads, LoadIterationReachesNetLoadKindsExcludingPlainPort) {
   net.children = {&delay_term,      &assign_stmt, &force,      &cont_assign,
                   &cont_assign_bit, &prim_term,   &driver_port};
 
-  std::vector<VpiHandle> loads = Collect(ctx, ctx.Iterate(vpiLoad, &net));
+  std::vector<VpiHandle> loads =
+      CollectVpiIteration(ctx, ctx.Iterate(vpiLoad, &net));
   ASSERT_EQ(loads.size(), 6u);
-  EXPECT_TRUE(Contains(loads, &delay_term));
-  EXPECT_TRUE(Contains(loads, &assign_stmt));
-  EXPECT_TRUE(Contains(loads, &force));
-  EXPECT_TRUE(Contains(loads, &cont_assign));
-  EXPECT_TRUE(Contains(loads, &cont_assign_bit));
-  EXPECT_TRUE(Contains(loads, &prim_term));
-  EXPECT_FALSE(Contains(loads, &driver_port));
+  EXPECT_TRUE(VpiIterationContains(loads, &delay_term));
+  EXPECT_TRUE(VpiIterationContains(loads, &assign_stmt));
+  EXPECT_TRUE(VpiIterationContains(loads, &force));
+  EXPECT_TRUE(VpiIterationContains(loads, &cont_assign));
+  EXPECT_TRUE(VpiIterationContains(loads, &cont_assign_bit));
+  EXPECT_TRUE(VpiIterationContains(loads, &prim_term));
+  EXPECT_FALSE(VpiIterationContains(loads, &driver_port));
 }
 
 // Detail 1 (both shalls): a complex expression that is not a concatenation on
@@ -147,9 +137,10 @@ TEST(NetDriversAndLoads,
   net.type = vpiNet;
   net.children = {&port};
 
-  std::vector<VpiHandle> loads = Collect(ctx, ctx.Iterate(vpiLoad, &net));
+  std::vector<VpiHandle> loads =
+      CollectVpiIteration(ctx, ctx.Iterate(vpiLoad, &net));
   ASSERT_EQ(loads.size(), 1u);
-  EXPECT_TRUE(Contains(loads, &port));
+  EXPECT_TRUE(VpiIterationContains(loads, &port));
 
   // Shall #2: the complex expression is reached through the port's vpiHighConn.
   EXPECT_EQ(VpiHandleC(vpiHighConn, &port), &complex_expr);
@@ -174,8 +165,9 @@ TEST(NetDriversAndLoads, ConcatenationOnInputPortIsNotLoad) {
   net.type = vpiNet;
   net.children = {&port};
 
-  std::vector<VpiHandle> loads = Collect(ctx, ctx.Iterate(vpiLoad, &net));
-  EXPECT_FALSE(Contains(loads, &port));
+  std::vector<VpiHandle> loads =
+      CollectVpiIteration(ctx, ctx.Iterate(vpiLoad, &net));
+  EXPECT_FALSE(VpiIterationContains(loads, &port));
 }
 
 // Detail 1 (concatenation carve-out, replication form): a multiple
@@ -200,8 +192,9 @@ TEST(NetDriversAndLoads, MultipleConcatenationOnInputPortIsNotLoad) {
   net.type = vpiNet;
   net.children = {&port};
 
-  std::vector<VpiHandle> loads = Collect(ctx, ctx.Iterate(vpiLoad, &net));
-  EXPECT_FALSE(Contains(loads, &port));
+  std::vector<VpiHandle> loads =
+      CollectVpiIteration(ctx, ctx.Iterate(vpiLoad, &net));
+  EXPECT_FALSE(VpiIterationContains(loads, &port));
 }
 
 // Detail 1 (complex requirement): a simple reference on an input port is a
@@ -222,8 +215,9 @@ TEST(NetDriversAndLoads, SimpleReferenceOnInputPortIsNotComplexLoad) {
   net.type = vpiNet;
   net.children = {&port};
 
-  std::vector<VpiHandle> loads = Collect(ctx, ctx.Iterate(vpiLoad, &net));
-  EXPECT_FALSE(Contains(loads, &port));
+  std::vector<VpiHandle> loads =
+      CollectVpiIteration(ctx, ctx.Iterate(vpiLoad, &net));
+  EXPECT_FALSE(VpiIterationContains(loads, &port));
 }
 
 // Detail 1 (input requirement): the rule is scoped to input ports. A complex,
@@ -245,8 +239,9 @@ TEST(NetDriversAndLoads, ComplexExpressionOnOutputPortIsNotLoad) {
   net.type = vpiNet;
   net.children = {&port};
 
-  std::vector<VpiHandle> loads = Collect(ctx, ctx.Iterate(vpiLoad, &net));
-  EXPECT_FALSE(Contains(loads, &port));
+  std::vector<VpiHandle> loads =
+      CollectVpiIteration(ctx, ctx.Iterate(vpiLoad, &net));
+  EXPECT_FALSE(VpiIterationContains(loads, &port));
 }
 
 // Detail 1 (edge - no expression present): the rule applies to a complex
@@ -269,9 +264,10 @@ TEST(NetDriversAndLoads, InputPortWithoutHighConnectionIsNotLoad) {
   net.type = vpiNet;
   net.children = {&port, &force};
 
-  std::vector<VpiHandle> loads = Collect(ctx, ctx.Iterate(vpiLoad, &net));
-  EXPECT_TRUE(Contains(loads, &force));
-  EXPECT_FALSE(Contains(loads, &port));
+  std::vector<VpiHandle> loads =
+      CollectVpiIteration(ctx, ctx.Iterate(vpiLoad, &net));
+  EXPECT_TRUE(VpiIterationContains(loads, &force));
+  EXPECT_FALSE(VpiIterationContains(loads, &port));
 }
 
 }  // namespace

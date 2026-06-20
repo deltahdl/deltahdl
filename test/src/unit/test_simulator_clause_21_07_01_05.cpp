@@ -1,6 +1,7 @@
 #include "builders_systask.h"
 #include "fixture_simulator.h"
 #include "fixture_vcd.h"
+#include "helpers_vcd_dumplimit.h"
 #include "simulator/evaluation.h"
 #include "simulator/variable.h"
 #include "simulator/vcd_writer.h"
@@ -20,21 +21,10 @@ TEST_F(DumplimitSysTask, LimitReachedStopsDumpAndInsertsComment) {
   auto* data = MakeVar(f, "data", 8, 0x00);
   {
     VcdWriter vcd(tmp_path_);
-    vcd.WriteHeader("1ns");
-    vcd.RegisterSignal("data", 8, data);  // ident '!'
-    vcd.EndDefinitions();
-    f.ctx.SetVcdWriter(&vcd);
+    SetupVcdDump(f, vcd, "data", 8, data);
     // Set a modest byte budget through the production $dumplimit task path; the
     // header fits, but repeated value changes will eventually overrun it.
-    EvalExpr(MkSysCall(f.arena, "$dumplimit", {MkInt(f.arena, 200)}), f.ctx,
-             f.arena);
-    data->prev_value = MakeLogic4VecVal(f.arena, 8, 0x00);
-    for (uint64_t t = 1; t <= 40; ++t) {
-      data->value = MakeLogic4VecVal(f.arena, 8, t & 0xFF);
-      vcd.WriteTimestamp(t * 10);
-      vcd.DumpChangedValues(0);
-      data->prev_value = data->value;
-    }
+    ApplyLimitAndDrive(f, vcd, data, 8, "$dumplimit", 200);
   }
   auto content = ReadVcd();
   EXPECT_NE(content.find("#10\n"), std::string::npos);  // early dump retained
@@ -50,20 +40,9 @@ TEST_F(DumplimitSysTask, LimitCommentInsertedOnlyOnce) {
   auto* data = MakeVar(f, "data", 8, 0x00);
   {
     VcdWriter vcd(tmp_path_);
-    vcd.WriteHeader("1ns");
-    vcd.RegisterSignal("data", 8, data);  // ident '!'
-    vcd.EndDefinitions();
-    f.ctx.SetVcdWriter(&vcd);
-    EvalExpr(MkSysCall(f.arena, "$dumplimit", {MkInt(f.arena, 200)}), f.ctx,
-             f.arena);
-    data->prev_value = MakeLogic4VecVal(f.arena, 8, 0x00);
+    SetupVcdDump(f, vcd, "data", 8, data);
     // Keep dumping well past the limit so many post-limit attempts occur.
-    for (uint64_t t = 1; t <= 40; ++t) {
-      data->value = MakeLogic4VecVal(f.arena, 8, t & 0xFF);
-      vcd.WriteTimestamp(t * 10);
-      vcd.DumpChangedValues(0);
-      data->prev_value = data->value;
-    }
+    ApplyLimitAndDrive(f, vcd, data, 8, "$dumplimit", 200);
   }
   auto content = ReadVcd();
   size_t count = 0;
@@ -82,10 +61,7 @@ TEST_F(DumplimitSysTask, DumpingContinuesWhenBelowLimit) {
   auto* data = MakeVar(f, "data", 8, 0x00);
   {
     VcdWriter vcd(tmp_path_);
-    vcd.WriteHeader("1ns");
-    vcd.RegisterSignal("data", 8, data);  // ident '!'
-    vcd.EndDefinitions();
-    f.ctx.SetVcdWriter(&vcd);
+    SetupVcdDump(f, vcd, "data", 8, data);
     EvalExpr(MkSysCall(f.arena, "$dumplimit", {MkInt(f.arena, 1000000)}), f.ctx,
              f.arena);
     data->value = MakeLogic4VecVal(f.arena, 8, 0xFF);

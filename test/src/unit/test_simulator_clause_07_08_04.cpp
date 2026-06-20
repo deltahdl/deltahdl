@@ -1,24 +1,11 @@
 #include "fixture_simulator.h"
+#include "helpers_assoc.h"
+#include "helpers_assoc_multikey.h"
 #include "parser/ast.h"
 #include "simulator/evaluation.h"
 #include "simulator/statement_assign.h"
 
 using namespace delta;
-
-static Expr* MakeAssocSelect(Arena& arena, std::string_view base_name,
-                             int64_t idx_val) {
-  auto* sel = arena.Create<Expr>();
-  sel->kind = ExprKind::kSelect;
-  auto* base = arena.Create<Expr>();
-  base->kind = ExprKind::kIdentifier;
-  base->text = base_name;
-  sel->base = base;
-  auto* idx = arena.Create<Expr>();
-  idx->kind = ExprKind::kIntegerLiteral;
-  idx->int_val = idx_val;
-  sel->index = idx;
-  return sel;
-}
 
 namespace {
 
@@ -33,14 +20,7 @@ TEST(IntegralIndexAssocArraySimulation, WriteAndRead) {
 TEST(IntegralIndexAssocArraySimulation, MultipleKeys) {
   SimFixture f;
   auto* aa = f.ctx.CreateAssocArray("aa", 32, false, 32);
-  aa->int_data[1] = MakeLogic4VecVal(f.arena, 32, 10);
-  aa->int_data[2] = MakeLogic4VecVal(f.arena, 32, 20);
-  aa->int_data[3] = MakeLogic4VecVal(f.arena, 32, 30);
-
-  EXPECT_EQ(aa->Size(), 3u);
-  EXPECT_EQ(aa->int_data[1].ToUint64(), 10u);
-  EXPECT_EQ(aa->int_data[2].ToUint64(), 20u);
-  EXPECT_EQ(aa->int_data[3].ToUint64(), 30u);
+  FillAndCheckThreeKeys(f, aa);
 }
 
 TEST(IntegralIndexAssocArraySimulation, OverwriteKey) {
@@ -71,7 +51,7 @@ TEST(IntegralIndexAssocArraySimulation, NegativeKeyAccess) {
   SimFixture f;
   f.ctx.CreateAssocArray("aa", 32, false, 32);
 
-  auto* sel = MakeAssocSelect(f.arena, "aa", -3);
+  auto* sel = MakeAssocSelect(f.arena, -3);
   auto* stmt = f.arena.Create<Stmt>();
   stmt->kind = StmtKind::kBlockingAssign;
   stmt->lhs = sel;
@@ -80,7 +60,7 @@ TEST(IntegralIndexAssocArraySimulation, NegativeKeyAccess) {
   stmt->rhs->int_val = 77;
   ExecBlockingAssignImpl(stmt, f.ctx, f.arena);
 
-  auto* rd = MakeAssocSelect(f.arena, "aa", -3);
+  auto* rd = MakeAssocSelect(f.arena, -3);
   auto result = EvalExpr(rd, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 77u);
 }
@@ -89,11 +69,23 @@ static void WriteAssoc(SimFixture& f, std::string_view name, int64_t idx,
                        int64_t val) {
   auto* stmt = f.arena.Create<Stmt>();
   stmt->kind = StmtKind::kBlockingAssign;
-  stmt->lhs = MakeAssocSelect(f.arena, name, idx);
+  stmt->lhs = MakeAssocSelect(f.arena, idx, name);
   stmt->rhs = f.arena.Create<Expr>();
   stmt->rhs->kind = ExprKind::kIntegerLiteral;
   stmt->rhs->int_val = val;
   ExecBlockingAssignImpl(stmt, f.ctx, f.arena);
+}
+
+// Create a 4-state assoc array "aa" with an 8-bit index, a local variable "ix"
+// holding an all-x value, and the select expression aa[ix]. Returns the array
+// so callers can assert on its contents.
+static AssocArrayObject* MakeXZArrayAndSel(SimFixture& f, Expr** out_sel) {
+  auto* aa = f.ctx.CreateAssocArray("aa", 32, false, /*index_width=*/8,
+                                    /*is_wildcard=*/false, /*is_4state=*/true);
+  auto* ix = f.ctx.CreateVariable("ix", 8);
+  ix->value = MakeAllX(f.arena, 8);
+  *out_sel = MakeAssocSelectIdent(f.arena, "aa", "ix");
+  return aa;
 }
 
 // §7.8.4: the index expression is cast to the index type. For an unsigned
@@ -156,21 +148,8 @@ TEST(IntegralIndexAssocArraySimulation, UnsignedOrdering) {
 // is flagged with a diagnostic rather than allocating an entry.
 TEST(IntegralIndexAssocArraySimulation, XZIndexInvalid) {
   SimFixture f;
-  auto* aa = f.ctx.CreateAssocArray("aa", 32, false, /*index_width=*/8,
-                                    /*is_wildcard=*/false, /*is_4state=*/true);
-  auto* ix = f.ctx.CreateVariable("ix", 8);
-  ix->value = MakeAllX(f.arena, 8);
-
-  auto* sel = f.arena.Create<Expr>();
-  sel->kind = ExprKind::kSelect;
-  auto* base = f.arena.Create<Expr>();
-  base->kind = ExprKind::kIdentifier;
-  base->text = "aa";
-  sel->base = base;
-  auto* idx = f.arena.Create<Expr>();
-  idx->kind = ExprKind::kIdentifier;
-  idx->text = "ix";
-  sel->index = idx;
+  Expr* sel = nullptr;
+  auto* aa = MakeXZArrayAndSel(f, &sel);
 
   auto* stmt = f.arena.Create<Stmt>();
   stmt->kind = StmtKind::kBlockingAssign;
@@ -195,7 +174,7 @@ TEST(IntegralIndexAssocArraySimulation, UnsignedCastReadRoundtrip) {
                          /*is_index_signed=*/false);
   WriteAssoc(f, "aa", 200, 99);
 
-  auto* rd = MakeAssocSelect(f.arena, "aa", 200);
+  auto* rd = MakeAssocSelect(f.arena, 200);
   auto result = EvalExpr(rd, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 99u);
 }
@@ -204,21 +183,8 @@ TEST(IntegralIndexAssocArraySimulation, UnsignedCastReadRoundtrip) {
 // read is flagged with a diagnostic rather than treated as a valid lookup.
 TEST(IntegralIndexAssocArraySimulation, XZIndexInvalidOnRead) {
   SimFixture f;
-  f.ctx.CreateAssocArray("aa", 32, false, /*index_width=*/8,
-                         /*is_wildcard=*/false, /*is_4state=*/true);
-  auto* ix = f.ctx.CreateVariable("ix", 8);
-  ix->value = MakeAllX(f.arena, 8);
-
-  auto* sel = f.arena.Create<Expr>();
-  sel->kind = ExprKind::kSelect;
-  auto* base = f.arena.Create<Expr>();
-  base->kind = ExprKind::kIdentifier;
-  base->text = "aa";
-  sel->base = base;
-  auto* idx = f.arena.Create<Expr>();
-  idx->kind = ExprKind::kIdentifier;
-  idx->text = "ix";
-  sel->index = idx;
+  Expr* sel = nullptr;
+  MakeXZArrayAndSel(f, &sel);
 
   EvalExpr(sel, f.ctx, f.arena);
   EXPECT_GE(f.diag.WarningCount(), 1u);

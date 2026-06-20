@@ -1,7 +1,43 @@
 
+#include <string>
+
 #include "fixture_elaborator.h"
 
 namespace {
+
+// Elaborates a child with two defaulted 8-bit inputs instantiated via the given
+// instantiation line, then verifies the second (omitted/blank) input's binding
+// resolves to the port's declared default expression rather than being left
+// unconnected. Both the trailing-omitted and explicit-blank forms must observe
+// the default-substitution rule identically.
+void ExpectSecondInputUsesDeclaredDefault(const char* instantiation) {
+  ElabFixture f;
+  std::string src =
+      "module child(input logic [7:0] a, input logic [7:0] b = 8'hFF);\n"
+      "endmodule\n"
+      "module top;\n"
+      "  logic [7:0] x;\n";
+  src += instantiation;
+  src += "endmodule\n";
+  auto* design = ElaborateSrc(src, f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_EQ(mod->children.size(), 1u);
+  const auto& bindings = mod->children[0].port_bindings;
+  ASSERT_GE(bindings.size(), 2u);
+  EXPECT_EQ(bindings[0].port_name, "a");
+  EXPECT_NE(bindings[0].connection, nullptr);
+  EXPECT_EQ(bindings[1].port_name, "b");
+  // Observe the default actually being substituted: the binding points at the
+  // port's declared default expression, not at the high-Z sentinel that an
+  // unconnected input net would otherwise receive.
+  ASSERT_NE(mod->children[0].resolved, nullptr);
+  ASSERT_GE(mod->children[0].resolved->ports.size(), 2u);
+  EXPECT_EQ(bindings[1].connection,
+            mod->children[0].resolved->ports[1].default_value);
+  EXPECT_NE(bindings[1].connection, nullptr);
+}
 
 TEST(OrderedPortElaboration, SingleOrderedPortBindsByPosition) {
   ElabFixture f;
@@ -91,61 +127,16 @@ TEST(OrderedPortElaboration, BlankOrderedPortLeavesPortUnconnected) {
 }
 
 TEST(OrderedPortElaboration, TrailingOmittedInputUsesDefault) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module child(input logic [7:0] a, input logic [7:0] b = 8'hFF);\n"
-      "endmodule\n"
-      "module top;\n"
-      "  logic [7:0] x;\n"
-      "  child u(x);\n"
-      "endmodule\n",
-      f, "top");
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* mod = design->top_modules[0];
-  ASSERT_EQ(mod->children.size(), 1u);
-  const auto& bindings = mod->children[0].port_bindings;
-  ASSERT_GE(bindings.size(), 2u);
-  EXPECT_EQ(bindings[0].port_name, "a");
-  EXPECT_NE(bindings[0].connection, nullptr);
-  EXPECT_EQ(bindings[1].port_name, "b");
-  // Observe the default actually being substituted: the binding points at the
-  // port's declared default expression, not at the high-Z sentinel that an
-  // unconnected input net would otherwise receive.
-  ASSERT_NE(mod->children[0].resolved, nullptr);
-  ASSERT_GE(mod->children[0].resolved->ports.size(), 2u);
-  EXPECT_EQ(bindings[1].connection,
-            mod->children[0].resolved->ports[1].default_value);
-  EXPECT_NE(bindings[1].connection, nullptr);
+  // Trailing-omitted form: the second input is simply absent from the list.
+  ExpectSecondInputUsesDeclaredDefault("  child u(x);\n");
 }
 
 TEST(OrderedPortElaboration, BlankInputWithDefaultUsesDefault) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module child(input logic [7:0] a, input logic [7:0] b = 8'hFF);\n"
-      "endmodule\n"
-      "module top;\n"
-      "  logic [7:0] x;\n"
-      "  child u(x, );\n"
-      "endmodule\n",
-      f, "top");
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* mod = design->top_modules[0];
-  const auto& bindings = mod->children[0].port_bindings;
-  ASSERT_GE(bindings.size(), 2u);
-  EXPECT_EQ(bindings[0].port_name, "a");
-  EXPECT_NE(bindings[0].connection, nullptr);
-  EXPECT_EQ(bindings[1].port_name, "b");
-  // Observe the default actually being substituted: the binding points at the
-  // port's declared default expression. Absent the default rule this blank
-  // input would be left unconnected (a null connection), so pointer-equality
-  // with the declared default distinguishes substitution from non-connection.
-  ASSERT_NE(mod->children[0].resolved, nullptr);
-  ASSERT_GE(mod->children[0].resolved->ports.size(), 2u);
-  EXPECT_EQ(bindings[1].connection,
-            mod->children[0].resolved->ports[1].default_value);
-  EXPECT_NE(bindings[1].connection, nullptr);
+  // Explicit-blank form: the second input is named by an empty positional slot.
+  // Absent the default rule this blank input would be left unconnected (a null
+  // connection), so pointer-equality with the declared default distinguishes
+  // substitution from non-connection.
+  ExpectSecondInputUsesDeclaredDefault("  child u(x, );\n");
 }
 
 TEST(OrderedPortElaboration, BlankInputWithoutDefaultLeftUnconnected) {

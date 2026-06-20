@@ -1,6 +1,7 @@
 #include "builders_ast.h"
 #include "fixture_simulator.h"
 #include "helpers_queue.h"
+#include "helpers_queue_assign_assert.h"
 #include "simulator/lowerer.h"
 #include "simulator/statement_assign.h"
 
@@ -56,15 +57,9 @@ TEST(QueueAssign, ConcatAppendEquivPushBack) {
   MakeQueue(f, "q", {10, 20, 30});
 
   auto* rhs = MakeConcat(f.arena, {MakeId(f.arena, "q"), MakeInt(f.arena, 6)});
-  auto* stmt = MakeAssign(f.arena, "q", rhs);
-  TryQueueBlockingAssign(stmt, f.ctx, f.arena);
+  AssignRhsToQueueQ(rhs, f);
 
-  auto* q = f.ctx.FindQueue("q");
-  ASSERT_EQ(q->elements.size(), 4u);
-  EXPECT_EQ(q->elements[0].ToUint64(), 10u);
-  EXPECT_EQ(q->elements[1].ToUint64(), 20u);
-  EXPECT_EQ(q->elements[2].ToUint64(), 30u);
-  EXPECT_EQ(q->elements[3].ToUint64(), 6u);
+  ExpectQueueContents(f, "q", {10, 20, 30, 6});
 }
 
 TEST(QueueAssign, ConcatPrependEquivPushFront) {
@@ -72,15 +67,9 @@ TEST(QueueAssign, ConcatPrependEquivPushFront) {
   MakeQueue(f, "q", {10, 20, 30});
 
   auto* rhs = MakeConcat(f.arena, {MakeInt(f.arena, 5), MakeId(f.arena, "q")});
-  auto* stmt = MakeAssign(f.arena, "q", rhs);
-  TryQueueBlockingAssign(stmt, f.ctx, f.arena);
+  AssignRhsToQueueQ(rhs, f);
 
-  auto* q = f.ctx.FindQueue("q");
-  ASSERT_EQ(q->elements.size(), 4u);
-  EXPECT_EQ(q->elements[0].ToUint64(), 5u);
-  EXPECT_EQ(q->elements[1].ToUint64(), 10u);
-  EXPECT_EQ(q->elements[2].ToUint64(), 20u);
-  EXPECT_EQ(q->elements[3].ToUint64(), 30u);
+  ExpectQueueContents(f, "q", {5, 10, 20, 30});
 }
 
 TEST(QueueAssign, SliceFromOneEquivPopFront) {
@@ -89,14 +78,9 @@ TEST(QueueAssign, SliceFromOneEquivPopFront) {
 
   auto* slice =
       MakeSlice(f.arena, "q", MakeInt(f.arena, 1), MakeDollar(f.arena));
-  auto* rhs = MakeConcat(f.arena, {slice});
-  auto* stmt = MakeAssign(f.arena, "q", rhs);
-  TryQueueBlockingAssign(stmt, f.ctx, f.arena);
+  AssignRhsToQueueQ(MakeConcat(f.arena, {slice}), f);
 
-  auto* q = f.ctx.FindQueue("q");
-  ASSERT_EQ(q->elements.size(), 2u);
-  EXPECT_EQ(q->elements[0].ToUint64(), 20u);
-  EXPECT_EQ(q->elements[1].ToUint64(), 30u);
+  ExpectQueueContents(f, "q", {20, 30});
 }
 
 TEST(QueueAssign, SliceToLastMinus1EquivPopBack) {
@@ -105,14 +89,9 @@ TEST(QueueAssign, SliceToLastMinus1EquivPopBack) {
 
   auto* slice =
       MakeSlice(f.arena, "q", MakeInt(f.arena, 0), MakeDollarMinus1(f.arena));
-  auto* rhs = MakeConcat(f.arena, {slice});
-  auto* stmt = MakeAssign(f.arena, "q", rhs);
-  TryQueueBlockingAssign(stmt, f.ctx, f.arena);
+  AssignRhsToQueueQ(MakeConcat(f.arena, {slice}), f);
 
-  auto* q = f.ctx.FindQueue("q");
-  ASSERT_EQ(q->elements.size(), 2u);
-  EXPECT_EQ(q->elements[0].ToUint64(), 10u);
-  EXPECT_EQ(q->elements[1].ToUint64(), 20u);
+  ExpectQueueContents(f, "q", {10, 20});
 }
 
 TEST(QueueAssign, ConcatInsertAtPosEquivInsert) {
@@ -124,27 +103,17 @@ TEST(QueueAssign, ConcatInsertAtPosEquivInsert) {
   auto* right =
       MakeSlice(f.arena, "q", MakeInt(f.arena, 2), MakeDollar(f.arena));
   auto* rhs = MakeConcat(f.arena, {left, MakeInt(f.arena, 99), right});
-  auto* stmt = MakeAssign(f.arena, "q", rhs);
-  TryQueueBlockingAssign(stmt, f.ctx, f.arena);
+  AssignRhsToQueueQ(rhs, f);
 
-  auto* q = f.ctx.FindQueue("q");
-  ASSERT_EQ(q->elements.size(), 5u);
-  EXPECT_EQ(q->elements[0].ToUint64(), 10u);
-  EXPECT_EQ(q->elements[1].ToUint64(), 20u);
-  EXPECT_EQ(q->elements[2].ToUint64(), 99u);
-  EXPECT_EQ(q->elements[3].ToUint64(), 30u);
-  EXPECT_EQ(q->elements[4].ToUint64(), 40u);
+  ExpectQueueContents(f, "q", {10, 20, 99, 30, 40});
 }
 
 TEST(QueueAssign, EmptyConcatEquivDelete) {
   SimFixture f;
   MakeQueue(f, "q", {10, 20, 30});
-  auto* rhs = MakeConcat(f.arena, {});
-  auto* stmt = MakeAssign(f.arena, "q", rhs);
-  TryQueueBlockingAssign(stmt, f.ctx, f.arena);
+  AssignRhsToQueueQ(MakeConcat(f.arena, {}), f);
 
-  auto* q = f.ctx.FindQueue("q");
-  EXPECT_EQ(q->elements.size(), 0u);
+  ExpectQueueContents(f, "q", {});
 }
 
 TEST(QueueAssign, SliceDropFirstTwo) {
@@ -153,15 +122,9 @@ TEST(QueueAssign, SliceDropFirstTwo) {
 
   auto* slice =
       MakeSlice(f.arena, "q", MakeInt(f.arena, 2), MakeDollar(f.arena));
-  auto* rhs = MakeConcat(f.arena, {slice});
-  auto* stmt = MakeAssign(f.arena, "q", rhs);
-  TryQueueBlockingAssign(stmt, f.ctx, f.arena);
+  AssignRhsToQueueQ(MakeConcat(f.arena, {slice}), f);
 
-  auto* q = f.ctx.FindQueue("q");
-  ASSERT_EQ(q->elements.size(), 3u);
-  EXPECT_EQ(q->elements[0].ToUint64(), 30u);
-  EXPECT_EQ(q->elements[1].ToUint64(), 40u);
-  EXPECT_EQ(q->elements[2].ToUint64(), 50u);
+  ExpectQueueContents(f, "q", {30, 40, 50});
 }
 
 TEST(QueueAssign, SliceDropFirstAndLast) {
@@ -170,15 +133,9 @@ TEST(QueueAssign, SliceDropFirstAndLast) {
 
   auto* slice =
       MakeSlice(f.arena, "q", MakeInt(f.arena, 1), MakeDollarMinus1(f.arena));
-  auto* rhs = MakeConcat(f.arena, {slice});
-  auto* stmt = MakeAssign(f.arena, "q", rhs);
-  TryQueueBlockingAssign(stmt, f.ctx, f.arena);
+  AssignRhsToQueueQ(MakeConcat(f.arena, {slice}), f);
 
-  auto* q = f.ctx.FindQueue("q");
-  ASSERT_EQ(q->elements.size(), 3u);
-  EXPECT_EQ(q->elements[0].ToUint64(), 20u);
-  EXPECT_EQ(q->elements[1].ToUint64(), 30u);
-  EXPECT_EQ(q->elements[2].ToUint64(), 40u);
+  ExpectQueueContents(f, "q", {20, 30, 40});
 }
 
 TEST(QueueAssign, ConcatAssignOutdatesAllRefs) {
@@ -188,8 +145,7 @@ TEST(QueueAssign, ConcatAssignOutdatesAllRefs) {
   auto old_ids = q->element_ids;
 
   auto* rhs = MakeConcat(f.arena, {MakeId(f.arena, "q"), MakeInt(f.arena, 40)});
-  auto* stmt = MakeAssign(f.arena, "q", rhs);
-  TryQueueBlockingAssign(stmt, f.ctx, f.arena);
+  AssignRhsToQueueQ(rhs, f);
 
   EXPECT_GT(q->generation, old_gen);
 
@@ -204,9 +160,7 @@ TEST(QueueAssign, SliceAssignOutdatesAllRefs) {
 
   auto* slice =
       MakeSlice(f.arena, "q", MakeInt(f.arena, 1), MakeDollar(f.arena));
-  auto* rhs = MakeConcat(f.arena, {slice});
-  auto* stmt = MakeAssign(f.arena, "q", rhs);
-  TryQueueBlockingAssign(stmt, f.ctx, f.arena);
+  AssignRhsToQueueQ(MakeConcat(f.arena, {slice}), f);
 
   EXPECT_GT(q->generation, old_gen);
 }
@@ -216,12 +170,9 @@ TEST(QueueAssign, ConcatAppendToEmptyQueue) {
   f.ctx.CreateQueue("q", 32);
 
   auto* rhs = MakeConcat(f.arena, {MakeId(f.arena, "q"), MakeInt(f.arena, 7)});
-  auto* stmt = MakeAssign(f.arena, "q", rhs);
-  TryQueueBlockingAssign(stmt, f.ctx, f.arena);
+  AssignRhsToQueueQ(rhs, f);
 
-  auto* q = f.ctx.FindQueue("q");
-  ASSERT_EQ(q->elements.size(), 1u);
-  EXPECT_EQ(q->elements[0].ToUint64(), 7u);
+  ExpectQueueContents(f, "q", {7});
 }
 
 TEST(QueueAssign, ConcatPrependToEmptyQueue) {
@@ -229,12 +180,9 @@ TEST(QueueAssign, ConcatPrependToEmptyQueue) {
   f.ctx.CreateQueue("q", 32);
 
   auto* rhs = MakeConcat(f.arena, {MakeInt(f.arena, 7), MakeId(f.arena, "q")});
-  auto* stmt = MakeAssign(f.arena, "q", rhs);
-  TryQueueBlockingAssign(stmt, f.ctx, f.arena);
+  AssignRhsToQueueQ(rhs, f);
 
-  auto* q = f.ctx.FindQueue("q");
-  ASSERT_EQ(q->elements.size(), 1u);
-  EXPECT_EQ(q->elements[0].ToUint64(), 7u);
+  ExpectQueueContents(f, "q", {7});
 }
 
 TEST(QueueAssign, SlicePopFrontOnSingleElement) {
@@ -243,12 +191,9 @@ TEST(QueueAssign, SlicePopFrontOnSingleElement) {
 
   auto* slice =
       MakeSlice(f.arena, "q", MakeInt(f.arena, 1), MakeDollar(f.arena));
-  auto* rhs = MakeConcat(f.arena, {slice});
-  auto* stmt = MakeAssign(f.arena, "q", rhs);
-  TryQueueBlockingAssign(stmt, f.ctx, f.arena);
+  AssignRhsToQueueQ(MakeConcat(f.arena, {slice}), f);
 
-  auto* q = f.ctx.FindQueue("q");
-  EXPECT_EQ(q->elements.size(), 0u);
+  ExpectQueueContents(f, "q", {});
 }
 
 TEST(QueueAssign, SlicePopBackOnSingleElement) {
@@ -257,12 +202,9 @@ TEST(QueueAssign, SlicePopBackOnSingleElement) {
 
   auto* slice =
       MakeSlice(f.arena, "q", MakeInt(f.arena, 0), MakeDollarMinus1(f.arena));
-  auto* rhs = MakeConcat(f.arena, {slice});
-  auto* stmt = MakeAssign(f.arena, "q", rhs);
-  TryQueueBlockingAssign(stmt, f.ctx, f.arena);
+  AssignRhsToQueueQ(MakeConcat(f.arena, {slice}), f);
 
-  auto* q = f.ctx.FindQueue("q");
-  EXPECT_EQ(q->elements.size(), 0u);
+  ExpectQueueContents(f, "q", {});
 }
 
 TEST(QueueAssign, AssignReplacesContents) {
@@ -295,13 +237,9 @@ TEST(QueueAssign, BareSliceFromOneEquivPopFront) {
   MakeQueue(f, "q", {10, 20, 30});
 
   auto* rhs = MakeSlice(f.arena, "q", MakeInt(f.arena, 1), MakeDollar(f.arena));
-  auto* stmt = MakeAssign(f.arena, "q", rhs);
-  TryQueueBlockingAssign(stmt, f.ctx, f.arena);
+  AssignRhsToQueueQ(rhs, f);
 
-  auto* q = f.ctx.FindQueue("q");
-  ASSERT_EQ(q->elements.size(), 2u);
-  EXPECT_EQ(q->elements[0].ToUint64(), 20u);
-  EXPECT_EQ(q->elements[1].ToUint64(), 30u);
+  ExpectQueueContents(f, "q", {20, 30});
 }
 
 // Bare slice form of the pop_back equivalent: q = q[0:$-1].
@@ -311,13 +249,9 @@ TEST(QueueAssign, BareSliceToLastMinus1EquivPopBack) {
 
   auto* rhs =
       MakeSlice(f.arena, "q", MakeInt(f.arena, 0), MakeDollarMinus1(f.arena));
-  auto* stmt = MakeAssign(f.arena, "q", rhs);
-  TryQueueBlockingAssign(stmt, f.ctx, f.arena);
+  AssignRhsToQueueQ(rhs, f);
 
-  auto* q = f.ctx.FindQueue("q");
-  ASSERT_EQ(q->elements.size(), 2u);
-  EXPECT_EQ(q->elements[0].ToUint64(), 10u);
-  EXPECT_EQ(q->elements[1].ToUint64(), 20u);
+  ExpectQueueContents(f, "q", {10, 20});
 }
 
 // Bare slice form yielding a new queue lacking the first two items: q = q[2:$].
@@ -326,14 +260,9 @@ TEST(QueueAssign, BareSliceDropFirstTwo) {
   MakeQueue(f, "q", {10, 20, 30, 40, 50});
 
   auto* rhs = MakeSlice(f.arena, "q", MakeInt(f.arena, 2), MakeDollar(f.arena));
-  auto* stmt = MakeAssign(f.arena, "q", rhs);
-  TryQueueBlockingAssign(stmt, f.ctx, f.arena);
+  AssignRhsToQueueQ(rhs, f);
 
-  auto* q = f.ctx.FindQueue("q");
-  ASSERT_EQ(q->elements.size(), 3u);
-  EXPECT_EQ(q->elements[0].ToUint64(), 30u);
-  EXPECT_EQ(q->elements[1].ToUint64(), 40u);
-  EXPECT_EQ(q->elements[2].ToUint64(), 50u);
+  ExpectQueueContents(f, "q", {30, 40, 50});
 }
 
 // Bare slice form yielding a new queue lacking first and last: q = q[1:$-1].
@@ -343,14 +272,9 @@ TEST(QueueAssign, BareSliceDropFirstAndLast) {
 
   auto* rhs =
       MakeSlice(f.arena, "q", MakeInt(f.arena, 1), MakeDollarMinus1(f.arena));
-  auto* stmt = MakeAssign(f.arena, "q", rhs);
-  TryQueueBlockingAssign(stmt, f.ctx, f.arena);
+  AssignRhsToQueueQ(rhs, f);
 
-  auto* q = f.ctx.FindQueue("q");
-  ASSERT_EQ(q->elements.size(), 3u);
-  EXPECT_EQ(q->elements[0].ToUint64(), 20u);
-  EXPECT_EQ(q->elements[1].ToUint64(), 30u);
-  EXPECT_EQ(q->elements[2].ToUint64(), 40u);
+  ExpectQueueContents(f, "q", {20, 30, 40});
 }
 
 // Second insert example: q = {q[0:pos], e, q[pos+1:$]} mirrors insert(pos+1,
@@ -365,16 +289,9 @@ TEST(QueueAssign, ConcatInsertAfterPosEquivInsertPlus1) {
   auto* right =
       MakeSlice(f.arena, "q", MakeInt(f.arena, 3), MakeDollar(f.arena));
   auto* rhs = MakeConcat(f.arena, {left, MakeInt(f.arena, 99), right});
-  auto* stmt = MakeAssign(f.arena, "q", rhs);
-  TryQueueBlockingAssign(stmt, f.ctx, f.arena);
+  AssignRhsToQueueQ(rhs, f);
 
-  auto* q = f.ctx.FindQueue("q");
-  ASSERT_EQ(q->elements.size(), 5u);
-  EXPECT_EQ(q->elements[0].ToUint64(), 10u);
-  EXPECT_EQ(q->elements[1].ToUint64(), 20u);
-  EXPECT_EQ(q->elements[2].ToUint64(), 30u);
-  EXPECT_EQ(q->elements[3].ToUint64(), 99u);
-  EXPECT_EQ(q->elements[4].ToUint64(), 40u);
+  ExpectQueueContents(f, "q", {10, 20, 30, 99, 40});
 }
 
 }  // namespace

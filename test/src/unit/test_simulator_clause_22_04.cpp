@@ -1,30 +1,5 @@
-#include <cstdlib>
-#include <filesystem>
-#include <fstream>
-
-#include "fixture_simulator.h"
-#include "preprocessor/preprocessor.h"
-#include "simulator/variable.h"
-
-using namespace delta;
-namespace fs = std::filesystem;
-
-struct IncludeTestDir {
-  fs::path dir;
-  IncludeTestDir() {
-    dir =
-        fs::temp_directory_path() / ("delta_test_" + std::to_string(getpid()));
-    fs::create_directories(dir);
-  }
-  ~IncludeTestDir() { fs::remove_all(dir); }
-  fs::path WriteFile(const std::string& rel, const std::string& content) {
-    auto full = dir / rel;
-    fs::create_directories(full.parent_path());
-    std::ofstream ofs(full);
-    ofs << content;
-    return full;
-  }
-};
+#include "helpers_include_test_dir.h"
+#include "helpers_preprocess_and_get.h"
 
 static uint64_t PreprocessAndGet(IncludeTestDir& tmp,
                                  const std::string& main_src,
@@ -33,22 +8,7 @@ static uint64_t PreprocessAndGet(IncludeTestDir& tmp,
   tmp.WriteFile("main.sv", main_src);
   auto fid = f.mgr.AddFile((tmp.dir / "main.sv").string(), main_src);
   Preprocessor pp(f.mgr, f.diag, {});
-  auto preprocessed = pp.Preprocess(fid);
-  auto fid2 = f.mgr.AddFile("<preprocessed>", preprocessed);
-  Lexer lexer(f.mgr.FileContent(fid2), fid2, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  auto* design = elab.Elaborate(cu->modules.back()->name);
-  EXPECT_NE(design, nullptr);
-  if (!design) return 0;
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable(var_name);
-  EXPECT_NE(var, nullptr);
-  if (!var) return 0;
-  return var->value.ToUint64();
+  return RunPreprocessedSim(f, fid, var_name, pp);
 }
 
 TEST(IncludeFileSimulation, IncludedMacroValueSimulatesCorrectly) {

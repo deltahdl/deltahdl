@@ -3,6 +3,7 @@
 #include "builders_ast.h"
 #include "builders_systask.h"
 #include "fixture_simulator.h"
+#include "helpers_logic4vec_string.h"
 #include "helpers_parser_verify.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
@@ -12,17 +13,7 @@ namespace {
 
 static std::string ReadString(const Variable* var) {
   if (!var) return {};
-  std::string out;
-  uint32_t nbytes = var->value.width / 8;
-  for (uint32_t i = nbytes; i > 0; --i) {
-    uint32_t byte_idx = i - 1;
-    uint32_t word = (byte_idx * 8) / 64;
-    uint32_t bit = (byte_idx * 8) % 64;
-    if (word >= var->value.nwords) continue;
-    auto ch = static_cast<char>((var->value.words[word].aval >> bit) & 0xFF);
-    if (ch != 0) out += ch;
-  }
-  return out;
+  return Logic4VecToPackedString(var->value);
 }
 
 // §21.3.3 N17: $sformatf returns the formatted result as the function value.
@@ -34,16 +25,7 @@ TEST(StringFormatTaskTest, SformatfReturnsFormattedString) {
 
   EXPECT_EQ(result.width, 48u);
 
-  std::string formatted;
-  uint32_t nbytes = result.width / 8;
-  for (uint32_t i = nbytes; i > 0; --i) {
-    uint32_t byte_idx = i - 1;
-    uint32_t word = (byte_idx * 8) / 64;
-    uint32_t bit = (byte_idx * 8) % 64;
-    if (word >= result.nwords) continue;
-    auto ch = static_cast<char>((result.words[word].aval >> bit) & 0xFF);
-    if (ch != 0) formatted += ch;
-  }
+  std::string formatted = Logic4VecToPackedString(result);
   EXPECT_EQ(formatted, "val=42");
 }
 
@@ -146,16 +128,7 @@ TEST(StringFormatTaskTest, SformatfFormatStringFromStringVariable) {
       EvalExpr(MakeSysCall(f.arena, "$sformatf",
                            {MkId(f.arena, "fmt"), MakeInt(f.arena, 9)}),
                f.ctx, f.arena);
-  std::string formatted;
-  uint32_t nbytes = result.width / 8;
-  for (uint32_t i = nbytes; i > 0; --i) {
-    uint32_t byte_idx = i - 1;
-    uint32_t word = (byte_idx * 8) / 64;
-    uint32_t bit = (byte_idx * 8) % 64;
-    if (word >= result.nwords) continue;
-    auto ch = static_cast<char>((result.words[word].aval >> bit) & 0xFF);
-    if (ch != 0) formatted += ch;
-  }
+  std::string formatted = Logic4VecToPackedString(result);
   EXPECT_EQ(formatted, "n=9");
 }
 

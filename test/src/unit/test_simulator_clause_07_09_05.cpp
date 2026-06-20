@@ -1,5 +1,6 @@
 #include "fixture_simulator.h"
 #include "helpers_assoc.h"
+#include "helpers_assoc_first_last.h"
 #include "simulator/eval_array.h"
 
 using namespace delta;
@@ -48,12 +49,7 @@ TEST(AssocArrayLast, ByteIndexLastReturnsOneForByteRef) {
 
 TEST(AssocArrayLast, LastStringKeyReturnsLast) {
   SimFixture f;
-  auto* aa = f.ctx.CreateAssocArray("aa", 32, true);
-  aa->str_data["cherry"] = MakeLogic4VecVal(f.arena, 32, 3);
-  aa->str_data["apple"] = MakeLogic4VecVal(f.arena, 32, 1);
-  aa->str_data["banana"] = MakeLogic4VecVal(f.arena, 32, 2);
-  auto* ref = f.ctx.CreateVariable("s", 48);
-  ref->value = MakeLogic4VecVal(f.arena, 48, 0);
+  MakeAssocWith3StringEntries(f);
   Logic4Vec out{};
   auto* call = MkAssocCall(f.arena, "aa", "last", "s");
   bool ok = TryEvalAssocMethodCall(call, f.ctx, f.arena, out);

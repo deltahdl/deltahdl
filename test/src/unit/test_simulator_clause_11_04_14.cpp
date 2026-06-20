@@ -1,9 +1,24 @@
 #include "fixture_simulator.h"
+#include "helpers_stream_unpack_ab.h"
 #include "simulator/lowerer.h"
 
 using namespace delta;
 
 namespace {
+
+// Runs the full pipeline on `src`, which streams into the byte queue `q`, then
+// checks the resized queue holds exactly two elements with the given values.
+static void RunStreamUnpackIntoByteQueue(SimFixture& f, const std::string& src,
+                                         uint64_t elem0, uint64_t elem1) {
+  auto* design = ElaborateSrc(src, f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* queue = f.ctx.FindQueue("q");
+  ASSERT_NE(queue, nullptr);
+  ASSERT_EQ(queue->elements.size(), 2u);
+  EXPECT_EQ(queue->elements[0].ToUint64(), elem0);
+  EXPECT_EQ(queue->elements[1].ToUint64(), elem1);
+}
 
 TEST(StreamingOperatorSim, PackProducesUserSpecifiedOrder) {
   // §11.4.14: the streaming operators pack bit-stream operands into a
@@ -36,26 +51,15 @@ TEST(StreamingOperatorSim, LhsStreamingConcatUnpacks) {
   // operators perform the inverse of packing, splitting the source stream
   // back into the listed targets.
   SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] a, b;\n"
-      "  logic [15:0] src;\n"
-      "  initial begin\n"
-      "    src = 16'hABCD;\n"
-      "    {>> {a, b}} = src;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* va = f.ctx.FindVariable("a");
-  auto* vb = f.ctx.FindVariable("b");
-  ASSERT_NE(va, nullptr);
-  ASSERT_NE(vb, nullptr);
-  EXPECT_EQ(va->value.ToUint64(), 0xABu);
-  EXPECT_EQ(vb->value.ToUint64(), 0xCDu);
+  RunStreamUnpackAbcdIntoAB(f,
+                            "module t;\n"
+                            "  logic [7:0] a, b;\n"
+                            "  logic [15:0] src;\n"
+                            "  initial begin\n"
+                            "    src = 16'hABCD;\n"
+                            "    {>> {a, b}} = src;\n"
+                            "  end\n"
+                            "endmodule\n");
 }
 
 TEST(StreamingOperatorSim, TargetWiderThanStreamZeroPadsOnRight) {
@@ -109,25 +113,16 @@ TEST(StreamingOperatorSim, QueueTargetResizesToFitStream) {
   // stream bits left-aligned. A 16-bit stream packed into a `byte` queue
   // yields two 8-bit elements with the first byte at the MSB.
   SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  byte q[$];\n"
-      "  logic [15:0] src;\n"
-      "  initial begin\n"
-      "    src = 16'hABCD;\n"
-      "    q = {>> {src}};\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* queue = f.ctx.FindQueue("q");
-  ASSERT_NE(queue, nullptr);
-  ASSERT_EQ(queue->elements.size(), 2u);
-  EXPECT_EQ(queue->elements[0].ToUint64(), 0xABu);
-  EXPECT_EQ(queue->elements[1].ToUint64(), 0xCDu);
+  RunStreamUnpackIntoByteQueue(f,
+                               "module t;\n"
+                               "  byte q[$];\n"
+                               "  logic [15:0] src;\n"
+                               "  initial begin\n"
+                               "    src = 16'hABCD;\n"
+                               "    q = {>> {src}};\n"
+                               "  end\n"
+                               "endmodule\n",
+                               0xABu, 0xCDu);
 }
 
 TEST(StreamingOperatorSim, QueueTargetZeroPadsRemainderOnRight) {
@@ -136,25 +131,16 @@ TEST(StreamingOperatorSim, QueueTargetZeroPadsRemainderOnRight) {
   // a 12-bit stream packed into a `byte` queue produces two elements whose
   // combined 16 bits = stream << 4.
   SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  byte q[$];\n"
-      "  logic [11:0] src;\n"
-      "  initial begin\n"
-      "    src = 12'hABC;\n"
-      "    q = {>> {src}};\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* queue = f.ctx.FindQueue("q");
-  ASSERT_NE(queue, nullptr);
-  ASSERT_EQ(queue->elements.size(), 2u);
-  EXPECT_EQ(queue->elements[0].ToUint64(), 0xABu);
-  EXPECT_EQ(queue->elements[1].ToUint64(), 0xC0u);
+  RunStreamUnpackIntoByteQueue(f,
+                               "module t;\n"
+                               "  byte q[$];\n"
+                               "  logic [11:0] src;\n"
+                               "  initial begin\n"
+                               "    src = 12'hABC;\n"
+                               "    q = {>> {src}};\n"
+                               "  end\n"
+                               "endmodule\n",
+                               0xABu, 0xC0u);
 }
 
 TEST(StreamingOperatorSim, FourStateBitsPreservedThroughPack) {

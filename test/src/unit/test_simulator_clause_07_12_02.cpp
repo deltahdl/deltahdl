@@ -1,3 +1,9 @@
+#include <array>
+#include <cstddef>
+#include <cstdint>
+#include <string>
+#include <vector>
+
 #include "builders_ast.h"
 #include "fixture_simulator.h"
 #include "helpers_queue.h"
@@ -8,150 +14,125 @@ using namespace delta;
 
 namespace {
 
+// Checks that the queue named "arr" holds exactly the expected element values.
+void ExpectQueueValues(SimFixture& f, const std::vector<uint64_t>& expected) {
+  auto* q = f.ctx.FindQueue("arr");
+  ASSERT_NE(q, nullptr);
+  ASSERT_EQ(q->elements.size(), expected.size());
+  for (size_t i = 0; i < expected.size(); ++i) {
+    EXPECT_EQ(q->elements[i].ToUint64(), expected[i]);
+  }
+}
+
+// Registers a 3-element fixed array "arr", seeds its elements with `in`, runs
+// the ordering property `op`, then checks the elements against `expected`.
+void RunFixedArray3(SimFixture& f, const char* op,
+                    const std::array<uint64_t, 3>& in,
+                    const std::array<uint64_t, 3>& expected) {
+  ArrayInfo info;
+  info.lo = 0;
+  info.size = 3;
+  info.elem_width = 32;
+  info.is_dynamic = false;
+  f.ctx.RegisterArray("arr", info);
+  for (uint32_t i = 0; i < 3; ++i) {
+    auto name = "arr[" + std::to_string(i) + "]";
+    MakeVar(f, name, 32, 0);
+  }
+  for (uint32_t i = 0; i < 3; ++i) {
+    auto name = "arr[" + std::to_string(i) + "]";
+    f.ctx.FindVariable(name)->value = MakeLogic4VecVal(f.arena, 32, in[i]);
+  }
+  TryExecArrayPropertyStmt("arr", op, f.ctx, f.arena);
+  for (uint32_t i = 0; i < 3; ++i) {
+    auto name = "arr[" + std::to_string(i) + "]";
+    EXPECT_EQ(f.ctx.FindVariable(name)->value.ToUint64(), expected[i]);
+  }
+}
+
+// Sorts "arr" by the optional with-clause key (10 - item) using ordering `op`,
+// then checks the resulting element order against `expected`.
+void RunSortWithExpr(SimFixture& f, const char* op,
+                     const std::vector<uint64_t>& expected) {
+  auto* call = MakeMethodCall(f.arena, "arr", op, {});
+  call->with_expr = MakeBinary(f.arena, TokenKind::kMinus, MakeInt(f.arena, 10),
+                               MakeId(f.arena, "item"));
+  bool ok = TryExecArrayMethodStmt(call, f.ctx, f.arena);
+  ASSERT_TRUE(ok);
+  ExpectQueueValues(f, expected);
+}
+
 TEST(ArrayOrdering, SortAscending) {
   SimFixture f;
   MakeDynArray(f, "arr", {40, 10, 30, 20});
   TryExecArrayPropertyStmt("arr", "sort", f.ctx, f.arena);
-  auto* q = f.ctx.FindQueue("arr");
-  ASSERT_NE(q, nullptr);
-  ASSERT_EQ(q->elements.size(), 4u);
-  EXPECT_EQ(q->elements[0].ToUint64(), 10u);
-  EXPECT_EQ(q->elements[1].ToUint64(), 20u);
-  EXPECT_EQ(q->elements[2].ToUint64(), 30u);
-  EXPECT_EQ(q->elements[3].ToUint64(), 40u);
+  ExpectQueueValues(f, {10u, 20u, 30u, 40u});
 }
 
 TEST(ArrayOrdering, SortAlreadySorted) {
   SimFixture f;
   MakeDynArray(f, "arr", {1, 2, 3, 4});
   TryExecArrayPropertyStmt("arr", "sort", f.ctx, f.arena);
-  auto* q = f.ctx.FindQueue("arr");
-  ASSERT_NE(q, nullptr);
-  ASSERT_EQ(q->elements.size(), 4u);
-  EXPECT_EQ(q->elements[0].ToUint64(), 1u);
-  EXPECT_EQ(q->elements[1].ToUint64(), 2u);
-  EXPECT_EQ(q->elements[2].ToUint64(), 3u);
-  EXPECT_EQ(q->elements[3].ToUint64(), 4u);
+  ExpectQueueValues(f, {1u, 2u, 3u, 4u});
 }
 
 TEST(ArrayOrdering, SortSingleElement) {
   SimFixture f;
   MakeDynArray(f, "arr", {42});
   TryExecArrayPropertyStmt("arr", "sort", f.ctx, f.arena);
-  auto* q = f.ctx.FindQueue("arr");
-  ASSERT_NE(q, nullptr);
-  ASSERT_EQ(q->elements.size(), 1u);
-  EXPECT_EQ(q->elements[0].ToUint64(), 42u);
+  ExpectQueueValues(f, {42u});
 }
 
 TEST(ArrayOrdering, SortEmptyArray) {
   SimFixture f;
   MakeDynArray(f, "arr", {});
   TryExecArrayPropertyStmt("arr", "sort", f.ctx, f.arena);
-  auto* q = f.ctx.FindQueue("arr");
-  ASSERT_NE(q, nullptr);
-  EXPECT_EQ(q->elements.size(), 0u);
+  ExpectQueueValues(f, {});
 }
 
 TEST(ArrayOrdering, SortDuplicateValues) {
   SimFixture f;
   MakeDynArray(f, "arr", {30, 10, 30, 10});
   TryExecArrayPropertyStmt("arr", "sort", f.ctx, f.arena);
-  auto* q = f.ctx.FindQueue("arr");
-  ASSERT_NE(q, nullptr);
-  ASSERT_EQ(q->elements.size(), 4u);
-  EXPECT_EQ(q->elements[0].ToUint64(), 10u);
-  EXPECT_EQ(q->elements[1].ToUint64(), 10u);
-  EXPECT_EQ(q->elements[2].ToUint64(), 30u);
-  EXPECT_EQ(q->elements[3].ToUint64(), 30u);
+  ExpectQueueValues(f, {10u, 10u, 30u, 30u});
 }
 
 TEST(ArrayOrdering, SortFixedArray) {
   SimFixture f;
-  ArrayInfo info;
-  info.lo = 0;
-  info.size = 3;
-  info.elem_width = 32;
-  info.is_dynamic = false;
-  f.ctx.RegisterArray("arr", info);
-  for (uint32_t i = 0; i < 3; ++i) {
-    auto name = "arr[" + std::to_string(i) + "]";
-    MakeVar(f, name, 32, 0);
-  }
-  f.ctx.FindVariable("arr[0]")->value = MakeLogic4VecVal(f.arena, 32, 30);
-  f.ctx.FindVariable("arr[1]")->value = MakeLogic4VecVal(f.arena, 32, 10);
-  f.ctx.FindVariable("arr[2]")->value = MakeLogic4VecVal(f.arena, 32, 20);
-
-  TryExecArrayPropertyStmt("arr", "sort", f.ctx, f.arena);
-  EXPECT_EQ(f.ctx.FindVariable("arr[0]")->value.ToUint64(), 10u);
-  EXPECT_EQ(f.ctx.FindVariable("arr[1]")->value.ToUint64(), 20u);
-  EXPECT_EQ(f.ctx.FindVariable("arr[2]")->value.ToUint64(), 30u);
+  RunFixedArray3(f, "sort", {30, 10, 20}, {10u, 20u, 30u});
 }
 
 TEST(ArrayOrdering, RsortDescending) {
   SimFixture f;
   MakeDynArray(f, "arr", {40, 10, 30, 20});
   TryExecArrayPropertyStmt("arr", "rsort", f.ctx, f.arena);
-  auto* q = f.ctx.FindQueue("arr");
-  ASSERT_NE(q, nullptr);
-  ASSERT_EQ(q->elements.size(), 4u);
-  EXPECT_EQ(q->elements[0].ToUint64(), 40u);
-  EXPECT_EQ(q->elements[1].ToUint64(), 30u);
-  EXPECT_EQ(q->elements[2].ToUint64(), 20u);
-  EXPECT_EQ(q->elements[3].ToUint64(), 10u);
+  ExpectQueueValues(f, {40u, 30u, 20u, 10u});
 }
 
 TEST(ArrayOrdering, RsortFixedArray) {
   SimFixture f;
-  ArrayInfo info;
-  info.lo = 0;
-  info.size = 3;
-  info.elem_width = 32;
-  info.is_dynamic = false;
-  f.ctx.RegisterArray("arr", info);
-  for (uint32_t i = 0; i < 3; ++i) {
-    auto name = "arr[" + std::to_string(i) + "]";
-    MakeVar(f, name, 32, 0);
-  }
-  f.ctx.FindVariable("arr[0]")->value = MakeLogic4VecVal(f.arena, 32, 10);
-  f.ctx.FindVariable("arr[1]")->value = MakeLogic4VecVal(f.arena, 32, 30);
-  f.ctx.FindVariable("arr[2]")->value = MakeLogic4VecVal(f.arena, 32, 20);
-
-  TryExecArrayPropertyStmt("arr", "rsort", f.ctx, f.arena);
-  EXPECT_EQ(f.ctx.FindVariable("arr[0]")->value.ToUint64(), 30u);
-  EXPECT_EQ(f.ctx.FindVariable("arr[1]")->value.ToUint64(), 20u);
-  EXPECT_EQ(f.ctx.FindVariable("arr[2]")->value.ToUint64(), 10u);
+  RunFixedArray3(f, "rsort", {10, 30, 20}, {30u, 20u, 10u});
 }
 
 TEST(ArrayOrdering, ReverseOrder) {
   SimFixture f;
   MakeDynArray(f, "arr", {10, 20, 30});
   TryExecArrayPropertyStmt("arr", "reverse", f.ctx, f.arena);
-  auto* q = f.ctx.FindQueue("arr");
-  ASSERT_NE(q, nullptr);
-  ASSERT_EQ(q->elements.size(), 3u);
-  EXPECT_EQ(q->elements[0].ToUint64(), 30u);
-  EXPECT_EQ(q->elements[1].ToUint64(), 20u);
-  EXPECT_EQ(q->elements[2].ToUint64(), 10u);
+  ExpectQueueValues(f, {30u, 20u, 10u});
 }
 
 TEST(ArrayOrdering, ReverseSingleElement) {
   SimFixture f;
   MakeDynArray(f, "arr", {42});
   TryExecArrayPropertyStmt("arr", "reverse", f.ctx, f.arena);
-  auto* q = f.ctx.FindQueue("arr");
-  ASSERT_NE(q, nullptr);
-  ASSERT_EQ(q->elements.size(), 1u);
-  EXPECT_EQ(q->elements[0].ToUint64(), 42u);
+  ExpectQueueValues(f, {42u});
 }
 
 TEST(ArrayOrdering, ReverseEmptyArray) {
   SimFixture f;
   MakeDynArray(f, "arr", {});
   TryExecArrayPropertyStmt("arr", "reverse", f.ctx, f.arena);
-  auto* q = f.ctx.FindQueue("arr");
-  ASSERT_NE(q, nullptr);
-  EXPECT_EQ(q->elements.size(), 0u);
+  ExpectQueueValues(f, {});
 }
 
 TEST(ArrayOrdering, ReverseTwiceRestoresOriginal) {
@@ -159,35 +140,12 @@ TEST(ArrayOrdering, ReverseTwiceRestoresOriginal) {
   MakeDynArray(f, "arr", {10, 20, 30, 40});
   TryExecArrayPropertyStmt("arr", "reverse", f.ctx, f.arena);
   TryExecArrayPropertyStmt("arr", "reverse", f.ctx, f.arena);
-  auto* q = f.ctx.FindQueue("arr");
-  ASSERT_NE(q, nullptr);
-  ASSERT_EQ(q->elements.size(), 4u);
-  EXPECT_EQ(q->elements[0].ToUint64(), 10u);
-  EXPECT_EQ(q->elements[1].ToUint64(), 20u);
-  EXPECT_EQ(q->elements[2].ToUint64(), 30u);
-  EXPECT_EQ(q->elements[3].ToUint64(), 40u);
+  ExpectQueueValues(f, {10u, 20u, 30u, 40u});
 }
 
 TEST(ArrayOrdering, ReverseFixedArray) {
   SimFixture f;
-  ArrayInfo info;
-  info.lo = 0;
-  info.size = 3;
-  info.elem_width = 32;
-  info.is_dynamic = false;
-  f.ctx.RegisterArray("arr", info);
-  for (uint32_t i = 0; i < 3; ++i) {
-    auto name = "arr[" + std::to_string(i) + "]";
-    MakeVar(f, name, 32, 0);
-  }
-  f.ctx.FindVariable("arr[0]")->value = MakeLogic4VecVal(f.arena, 32, 0xAA);
-  f.ctx.FindVariable("arr[1]")->value = MakeLogic4VecVal(f.arena, 32, 0xBB);
-  f.ctx.FindVariable("arr[2]")->value = MakeLogic4VecVal(f.arena, 32, 0xCC);
-
-  TryExecArrayPropertyStmt("arr", "reverse", f.ctx, f.arena);
-  EXPECT_EQ(f.ctx.FindVariable("arr[0]")->value.ToUint64(), 0xCC);
-  EXPECT_EQ(f.ctx.FindVariable("arr[1]")->value.ToUint64(), 0xBB);
-  EXPECT_EQ(f.ctx.FindVariable("arr[2]")->value.ToUint64(), 0xAA);
+  RunFixedArray3(f, "reverse", {0xAA, 0xBB, 0xCC}, {0xCC, 0xBB, 0xAA});
 }
 
 TEST(ArrayOrdering, ShufflePreservesElements) {
@@ -234,11 +192,7 @@ TEST(ArrayOrdering, SortViaMethodCall) {
   auto* call = MakeMethodCall(f.arena, "arr", "sort", {});
   bool ok = TryExecArrayMethodStmt(call, f.ctx, f.arena);
   ASSERT_TRUE(ok);
-  auto* q = f.ctx.FindQueue("arr");
-  ASSERT_NE(q, nullptr);
-  EXPECT_EQ(q->elements[0].ToUint64(), 10u);
-  EXPECT_EQ(q->elements[1].ToUint64(), 20u);
-  EXPECT_EQ(q->elements[2].ToUint64(), 30u);
+  ExpectQueueValues(f, {10u, 20u, 30u});
 }
 
 TEST(ArrayOrdering, RsortViaMethodCall) {
@@ -247,11 +201,7 @@ TEST(ArrayOrdering, RsortViaMethodCall) {
   auto* call = MakeMethodCall(f.arena, "arr", "rsort", {});
   bool ok = TryExecArrayMethodStmt(call, f.ctx, f.arena);
   ASSERT_TRUE(ok);
-  auto* q = f.ctx.FindQueue("arr");
-  ASSERT_NE(q, nullptr);
-  EXPECT_EQ(q->elements[0].ToUint64(), 30u);
-  EXPECT_EQ(q->elements[1].ToUint64(), 20u);
-  EXPECT_EQ(q->elements[2].ToUint64(), 10u);
+  ExpectQueueValues(f, {30u, 20u, 10u});
 }
 
 TEST(ArrayOrdering, ReverseViaMethodCall) {
@@ -260,11 +210,7 @@ TEST(ArrayOrdering, ReverseViaMethodCall) {
   auto* call = MakeMethodCall(f.arena, "arr", "reverse", {});
   bool ok = TryExecArrayMethodStmt(call, f.ctx, f.arena);
   ASSERT_TRUE(ok);
-  auto* q = f.ctx.FindQueue("arr");
-  ASSERT_NE(q, nullptr);
-  EXPECT_EQ(q->elements[0].ToUint64(), 30u);
-  EXPECT_EQ(q->elements[1].ToUint64(), 20u);
-  EXPECT_EQ(q->elements[2].ToUint64(), 10u);
+  ExpectQueueValues(f, {30u, 20u, 10u});
 }
 
 TEST(ArrayOrdering, ShuffleViaMethodCall) {
@@ -295,17 +241,7 @@ TEST(ArrayOrdering, ShuffleViaMethodCall) {
 TEST(ArrayOrdering, SortWithExprUsesExpression) {
   SimFixture f;
   MakeDynArray(f, "arr", {3, 1, 2});
-  auto* call = MakeMethodCall(f.arena, "arr", "sort", {});
-  call->with_expr = MakeBinary(f.arena, TokenKind::kMinus, MakeInt(f.arena, 10),
-                               MakeId(f.arena, "item"));
-  bool ok = TryExecArrayMethodStmt(call, f.ctx, f.arena);
-  ASSERT_TRUE(ok);
-  auto* q = f.ctx.FindQueue("arr");
-  ASSERT_NE(q, nullptr);
-  ASSERT_EQ(q->elements.size(), 3u);
-  EXPECT_EQ(q->elements[0].ToUint64(), 3u);
-  EXPECT_EQ(q->elements[1].ToUint64(), 2u);
-  EXPECT_EQ(q->elements[2].ToUint64(), 1u);
+  RunSortWithExpr(f, "sort", {3u, 2u, 1u});
 }
 
 // §7.12.2: rsort() applies the same optional with-clause ordering but ranks
@@ -315,17 +251,7 @@ TEST(ArrayOrdering, SortWithExprUsesExpression) {
 TEST(ArrayOrdering, RsortWithExprUsesExpression) {
   SimFixture f;
   MakeDynArray(f, "arr", {3, 1, 2});
-  auto* call = MakeMethodCall(f.arena, "arr", "rsort", {});
-  call->with_expr = MakeBinary(f.arena, TokenKind::kMinus, MakeInt(f.arena, 10),
-                               MakeId(f.arena, "item"));
-  bool ok = TryExecArrayMethodStmt(call, f.ctx, f.arena);
-  ASSERT_TRUE(ok);
-  auto* q = f.ctx.FindQueue("arr");
-  ASSERT_NE(q, nullptr);
-  ASSERT_EQ(q->elements.size(), 3u);
-  EXPECT_EQ(q->elements[0].ToUint64(), 1u);
-  EXPECT_EQ(q->elements[1].ToUint64(), 2u);
-  EXPECT_EQ(q->elements[2].ToUint64(), 3u);
+  RunSortWithExpr(f, "rsort", {1u, 2u, 3u});
 }
 
 }  // namespace

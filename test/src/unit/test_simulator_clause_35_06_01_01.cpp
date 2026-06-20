@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <vector>
 
+#include "helpers_dpi_take_int.h"
 #include "simulator/dpi_runtime.h"
 
 using namespace delta;
@@ -76,20 +77,9 @@ TEST(DpiWysiwygOpenArray, EmptyActualYieldsEmptyOpenArray) {
 // formals: the type comes solely from the import declaration site.
 TEST(DpiWysiwygOpenArray, NonOpenFormalSeenAsDeclaredType) {
   DpiRuntime rt;
-  DpiRtFunction func;
-  func.c_name = "c_take_int";
-  func.sv_name = "take_int";
-  func.return_type = DataTypeKind::kInt;
-  func.args = {DpiArg{"x", DataTypeKind::kInt, Direction::kInput}};
   // The callee reports the value only if it observed the declared int formal.
-  func.arg_impl = [](std::vector<DpiArgValue>& a) {
-    return DpiArgValue::FromInt(a[0].type == DataTypeKind::kInt ? a[0].AsInt()
-                                                                : -1);
-  };
-  rt.RegisterImport(std::move(func));
-
-  std::vector<DpiArgValue> actuals = {DpiArgValue::FromLongint(7)};
-  DpiArgValue result = rt.CallImportWithArgs("take_int", actuals);
+  DpiArgValue result =
+      CallTakeIntReportingFormal(rt, DpiArgValue::FromLongint(7));
 
   EXPECT_EQ(result.AsInt(), 7);
 }

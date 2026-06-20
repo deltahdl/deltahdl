@@ -3,34 +3,14 @@
 #include <cstdint>
 
 #include "common/arena.h"
+#include "helpers_vpi_delays_fixture.h"
 #include "simulator/scheduler.h"
 #include "simulator/vpi.h"
 
 namespace delta {
 namespace {
 
-class VpiGetDelaysSim : public ::testing::Test {
- protected:
-  void SetUp() override {
-    vpi_ctx_.SetScheduler(&scheduler_);
-    SetGlobalVpiContext(&vpi_ctx_);
-  }
-  void TearDown() override { SetGlobalVpiContext(nullptr); }
-
-  // Build a delay-bearing object of the given type carrying the supplied
-  // delays, in source order. The handle is a VpiObject*, so the test sets the
-  // category and stores the delays on it directly.
-  VpiHandle MakeDelayObject(int type, std::vector<VpiDelayInfo> delays) {
-    VpiHandle obj = vpi_ctx_.CreateModule("u", "u");
-    obj->type = type;
-    obj->delays = std::move(delays);
-    return obj;
-  }
-
-  Arena arena_;
-  Scheduler scheduler_{arena_};
-  VpiContext vpi_ctx_;
-};
+using VpiGetDelaysSim = VpiDelaysSimBase;
 
 // §38.10 shall #1 + the "same order" rule: vpi_get_delays() places the object's
 // delays into the caller-allocated da array, one entry per delay (mtm and

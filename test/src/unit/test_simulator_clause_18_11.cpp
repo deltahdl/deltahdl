@@ -6,6 +6,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "helpers_constraint_rel.h"
 #include "simulator/constraint_solver.h"
 
 using namespace delta;
@@ -31,18 +32,7 @@ TEST(InlineRandomControl, ArgListDesignatesCompleteRandomSet) {
   solver.SetValue("y", 4);
   solver.SetValue("z", 7);
 
-  ConstraintBlock block;
-  block.name = "c_rel";
-  ConstraintExpr c;
-  c.kind = ConstraintKind::kCustom;
-  c.eval_fn = [](const std::unordered_map<std::string, int64_t>& vals) {
-    auto itx = vals.find("x");
-    auto ity = vals.find("y");
-    if (itx == vals.end() || ity == vals.end()) return true;
-    return itx->second == ity->second + 1;
-  };
-  block.constraints.push_back(c);
-  solver.AddConstraintBlock(block);
+  AddXEqualsYPlusOneConstraint(solver);
 
   // randomize(x): only x is random; y and z are state variables.
   solver.ApplyInlineRandomList({"x"});

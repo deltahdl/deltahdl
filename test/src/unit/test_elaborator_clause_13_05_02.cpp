@@ -8,6 +8,18 @@ using namespace delta;
 
 namespace {
 
+// Creates an automatic function with a single const-ref `data` argument and an
+// empty body. Shared setup for the const-ref write-protection tests below.
+static ModuleItem* MakeConstRefDataFunc(SimFixture& f, const char* name) {
+  auto* func = f.arena.Create<ModuleItem>();
+  func->kind = ModuleItemKind::kFunctionDecl;
+  func->name = name;
+  func->is_automatic = true;
+  func->func_args = {
+      {Direction::kRef, true, false, false, {}, "data", nullptr, {}}};
+  return func;
+}
+
 TEST(PassByRefValidation, RejectRefInStaticFunc) {
   SimFixture f;
 
@@ -246,12 +258,7 @@ TEST(PassByRefValidation, PlainRefWriteAccepted) {
 TEST(PassByRefValidation, ConstRefWriteInIfBranchRejected) {
   SimFixture f;
 
-  auto* func = f.arena.Create<ModuleItem>();
-  func->kind = ModuleItemKind::kFunctionDecl;
-  func->name = "guarded_write";
-  func->is_automatic = true;
-  func->func_args = {
-      {Direction::kRef, true, false, false, {}, "data", nullptr, {}}};
+  auto* func = MakeConstRefDataFunc(f, "guarded_write");
   auto* if_stmt = f.arena.Create<Stmt>();
   if_stmt->kind = StmtKind::kIf;
   if_stmt->condition = MakeInt(f.arena, 1);
@@ -265,12 +272,7 @@ TEST(PassByRefValidation, ConstRefWriteInIfBranchRejected) {
 TEST(PassByRefValidation, ConstRefWriteInElseBranchRejected) {
   SimFixture f;
 
-  auto* func = f.arena.Create<ModuleItem>();
-  func->kind = ModuleItemKind::kFunctionDecl;
-  func->name = "guarded_write";
-  func->is_automatic = true;
-  func->func_args = {
-      {Direction::kRef, true, false, false, {}, "data", nullptr, {}}};
+  auto* func = MakeConstRefDataFunc(f, "guarded_write");
   auto* if_stmt = f.arena.Create<Stmt>();
   if_stmt->kind = StmtKind::kIf;
   if_stmt->condition = MakeInt(f.arena, 0);

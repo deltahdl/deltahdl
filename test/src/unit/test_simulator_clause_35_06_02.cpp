@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <vector>
 
+#include "helpers_dpi_bump_import.h"
 #include "simulator/dpi_runtime.h"
 
 using namespace delta;
@@ -51,16 +52,7 @@ TEST(DpiOutputInoutValueChanges, OutputChangeRaisesEventAfterReturn) {
 // value-change event after the return.
 TEST(DpiOutputInoutValueChanges, InoutChangeRaisesEvent) {
   DpiRuntime rt;
-  DpiRtFunction func;
-  func.c_name = "c_bump";
-  func.sv_name = "bump";
-  func.return_type = DataTypeKind::kVoid;
-  func.args = {DpiArg{"io", DataTypeKind::kInt, Direction::kInout}};
-  func.arg_impl = [](std::vector<DpiArgValue>& a) {
-    a[0] = DpiArgValue::FromInt(a[0].AsInt() + 1);
-    return DpiArgValue::FromInt(0);
-  };
-  rt.RegisterImport(std::move(func));
+  RegisterBumpImport(rt);
 
   std::vector<DpiArgValue> actuals = {DpiArgValue::FromInt(41)};
   std::vector<DpiArgValueChange> changes;

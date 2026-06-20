@@ -1,4 +1,5 @@
 #include "fixture_simulator.h"
+#include "helpers_seeded_run.h"
 #include "simulator/process.h"
 
 using namespace delta;
@@ -12,8 +13,7 @@ namespace {
 // proving the values do not depend on the scheduler's interleaving choices.
 TEST(ThreadStability, ForkedUrandomDrawsAreReplayable) {
   auto run = [](uint64_t& a, uint64_t& b, uint64_t& c) {
-    SimFixtureSeeded f;
-    auto* design = ElaborateSrc(
+    auto vals = RunSeededAndRead(
         "module t;\n"
         "  int unsigned a;\n"
         "  int unsigned b;\n"
@@ -26,14 +26,10 @@ TEST(ThreadStability, ForkedUrandomDrawsAreReplayable) {
         "    join\n"
         "  end\n"
         "endmodule\n",
-        f);
-    ASSERT_NE(design, nullptr);
-    Lowerer lowerer(f.ctx, f.arena, f.diag);
-    lowerer.Lower(design);
-    f.scheduler.Run();
-    a = f.ctx.FindVariable("a")->value.ToUint64();
-    b = f.ctx.FindVariable("b")->value.ToUint64();
-    c = f.ctx.FindVariable("c")->value.ToUint64();
+        {"a", "b", "c"});
+    a = vals[0];
+    b = vals[1];
+    c = vals[2];
   };
   uint64_t a1 = 0, b1 = 0, c1 = 0;
   uint64_t a2 = 0, b2 = 0, c2 = 0;
@@ -48,8 +44,7 @@ TEST(ThreadStability, ForkedUrandomDrawsAreReplayable) {
 // parent." Two sibling threads forked from the same parent must obtain
 // distinct random streams; with high probability their first draws differ.
 TEST(ThreadStability, ForkedSiblingsHaveDistinctStreams) {
-  SimFixtureSeeded f;
-  auto* design = ElaborateSrc(
+  auto vals = RunSeededAndRead(
       "module t;\n"
       "  int unsigned a;\n"
       "  int unsigned b;\n"
@@ -60,22 +55,15 @@ TEST(ThreadStability, ForkedSiblingsHaveDistinctStreams) {
       "    join\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto a = f.ctx.FindVariable("a")->value.ToUint64();
-  auto b = f.ctx.FindVariable("b")->value.ToUint64();
-  EXPECT_NE(a, b);
+      {"a", "b"});
+  EXPECT_NE(vals[0], vals[1]);
 }
 
 // The §18.14.2 uniqueness guarantee scales with the number of siblings; a
 // fork that produces many children must give each of them its own stream so
 // that no two collide.
 TEST(ThreadStability, ManyForkedSiblingsHaveDistinctStreams) {
-  SimFixtureSeeded f;
-  auto* design = ElaborateSrc(
+  auto vals = RunSeededAndRead(
       "module t;\n"
       "  int unsigned a;\n"
       "  int unsigned b;\n"
@@ -90,15 +78,11 @@ TEST(ThreadStability, ManyForkedSiblingsHaveDistinctStreams) {
       "    join\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto a = f.ctx.FindVariable("a")->value.ToUint64();
-  auto b = f.ctx.FindVariable("b")->value.ToUint64();
-  auto c = f.ctx.FindVariable("c")->value.ToUint64();
-  auto d = f.ctx.FindVariable("d")->value.ToUint64();
+      {"a", "b", "c", "d"});
+  auto a = vals[0];
+  auto b = vals[1];
+  auto c = vals[2];
+  auto d = vals[3];
   EXPECT_NE(a, b);
   EXPECT_NE(a, c);
   EXPECT_NE(a, d);
@@ -113,7 +97,6 @@ TEST(ThreadStability, ManyForkedSiblingsHaveDistinctStreams) {
 // the children's draws shift accordingly.
 TEST(ThreadStability, HierarchicalSeedingFromParent) {
   auto run = [](uint32_t parent_seed, uint64_t& a, uint64_t& b) {
-    SimFixtureSeeded f;
     std::string src =
         "module t;\n"
         "  int unsigned a;\n"
@@ -129,13 +112,9 @@ TEST(ThreadStability, HierarchicalSeedingFromParent) {
         "    join\n"
         "  end\n"
         "endmodule\n";
-    auto* design = ElaborateSrc(src, f);
-    ASSERT_NE(design, nullptr);
-    Lowerer lowerer(f.ctx, f.arena, f.diag);
-    lowerer.Lower(design);
-    f.scheduler.Run();
-    a = f.ctx.FindVariable("a")->value.ToUint64();
-    b = f.ctx.FindVariable("b")->value.ToUint64();
+    auto vals = RunSeededAndRead(src, {"a", "b"});
+    a = vals[0];
+    b = vals[1];
   };
   uint64_t a1 = 0, b1 = 0, a2 = 0, b2 = 0;
   run(/*parent_seed=*/1, a1, b1);
@@ -150,7 +129,6 @@ TEST(ThreadStability, HierarchicalSeedingFromParent) {
 // drew at all.
 TEST(ThreadStability, NestedForkGrandchildDoesNotPerturbGrandparent) {
   auto run = [](bool with_grandchild_draw, uint64_t& outer_after) {
-    SimFixtureSeeded f;
     std::string src = std::string(
         "module t;\n"
         "  int unsigned outer;\n"
@@ -170,12 +148,7 @@ TEST(ThreadStability, NestedForkGrandchildDoesNotPerturbGrandparent) {
         "    outer = $urandom;\n"
         "  end\n"
         "endmodule\n");
-    auto* design = ElaborateSrc(src, f);
-    ASSERT_NE(design, nullptr);
-    Lowerer lowerer(f.ctx, f.arena, f.diag);
-    lowerer.Lower(design);
-    f.scheduler.Run();
-    outer_after = f.ctx.FindVariable("outer")->value.ToUint64();
+    outer_after = RunSeededAndRead(src, {"outer"})[0];
   };
   uint64_t with = 0, without = 0;
   run(/*with_grandchild_draw=*/true, with);
@@ -189,8 +162,7 @@ TEST(ThreadStability, NestedForkGrandchildDoesNotPerturbGrandparent) {
 // same branches both times.
 TEST(ThreadStability, ForkedRandcaseSelectionsAreReplayable) {
   auto run = [](uint64_t& a, uint64_t& b) {
-    SimFixtureSeeded f;
-    auto* design = ElaborateSrc(
+    auto vals = RunSeededAndRead(
         "module t;\n"
         "  int unsigned a;\n"
         "  int unsigned b;\n"
@@ -211,13 +183,9 @@ TEST(ThreadStability, ForkedRandcaseSelectionsAreReplayable) {
         "    join\n"
         "  end\n"
         "endmodule\n",
-        f);
-    ASSERT_NE(design, nullptr);
-    Lowerer lowerer(f.ctx, f.arena, f.diag);
-    lowerer.Lower(design);
-    f.scheduler.Run();
-    a = f.ctx.FindVariable("a")->value.ToUint64();
-    b = f.ctx.FindVariable("b")->value.ToUint64();
+        {"a", "b"});
+    a = vals[0];
+    b = vals[1];
   };
   uint64_t a1 = 0, b1 = 0, a2 = 0, b2 = 0;
   run(a1, b1);
@@ -232,7 +200,6 @@ TEST(ThreadStability, ForkedRandcaseSelectionsAreReplayable) {
 // own stream, unaffected by the child.
 TEST(ThreadStability, ChildDrawDoesNotAdvanceParentRng) {
   auto run = [](bool with_child_draw, uint64_t& parent_after) {
-    SimFixtureSeeded f;
     std::string src = std::string(
         "module t;\n"
         "  int unsigned a;\n"
@@ -249,12 +216,7 @@ TEST(ThreadStability, ChildDrawDoesNotAdvanceParentRng) {
         "    b = $urandom;\n"
         "  end\n"
         "endmodule\n");
-    auto* design = ElaborateSrc(src, f);
-    ASSERT_NE(design, nullptr);
-    Lowerer lowerer(f.ctx, f.arena, f.diag);
-    lowerer.Lower(design);
-    f.scheduler.Run();
-    parent_after = f.ctx.FindVariable("b")->value.ToUint64();
+    parent_after = RunSeededAndRead(src, {"b"})[0];
   };
   uint64_t with = 0, without = 0;
   run(/*with_child_draw=*/true, with);

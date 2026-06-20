@@ -8,6 +8,30 @@ using namespace delta;
 
 namespace {
 
+// Elaborates and runs a module with two ints `x` and `y` whose `initial` block
+// body is `body`, then returns the resolved `x` and `y` variables (both
+// asserted non-null). Used by the prefix/postfix inc/dec return-value tests
+// that differ only in the body and expected values.
+static void RunXYBody(SimFixture& f, const std::string& body, Variable** vx,
+                      Variable** vy) {
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int x, y;\n"
+      "  initial begin " +
+          body +
+          " end\n"
+          "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  *vx = f.ctx.FindVariable("x");
+  *vy = f.ctx.FindVariable("y");
+  ASSERT_NE(*vx, nullptr);
+  ASSERT_NE(*vy, nullptr);
+}
+
 TEST(ExpressionSim, PrefixIncrement) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -78,80 +102,32 @@ TEST(ExpressionSim, PostfixDecrement) {
 
 TEST(ExpressionSim, PrefixIncReturnsNewValue) {
   SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  int x, y;\n"
-      "  initial begin x = 5; y = ++x; end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* vx = f.ctx.FindVariable("x");
-  auto* vy = f.ctx.FindVariable("y");
-  ASSERT_NE(vx, nullptr);
-  ASSERT_NE(vy, nullptr);
+  Variable *vx, *vy;
+  RunXYBody(f, "x = 5; y = ++x;", &vx, &vy);
   EXPECT_EQ(vx->value.ToUint64(), 6u);
   EXPECT_EQ(vy->value.ToUint64(), 6u);
 }
 
 TEST(ExpressionSim, PostfixIncReturnsOldValue) {
   SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  int x, y;\n"
-      "  initial begin x = 5; y = x++; end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* vx = f.ctx.FindVariable("x");
-  auto* vy = f.ctx.FindVariable("y");
-  ASSERT_NE(vx, nullptr);
-  ASSERT_NE(vy, nullptr);
+  Variable *vx, *vy;
+  RunXYBody(f, "x = 5; y = x++;", &vx, &vy);
   EXPECT_EQ(vx->value.ToUint64(), 6u);
   EXPECT_EQ(vy->value.ToUint64(), 5u);
 }
 
 TEST(ExpressionSim, PrefixDecReturnsNewValue) {
   SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  int x, y;\n"
-      "  initial begin x = 10; y = --x; end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* vx = f.ctx.FindVariable("x");
-  auto* vy = f.ctx.FindVariable("y");
-  ASSERT_NE(vx, nullptr);
-  ASSERT_NE(vy, nullptr);
+  Variable *vx, *vy;
+  RunXYBody(f, "x = 10; y = --x;", &vx, &vy);
   EXPECT_EQ(vx->value.ToUint64(), 9u);
   EXPECT_EQ(vy->value.ToUint64(), 9u);
 }
 
 TEST(ExpressionSim, PostfixDecReturnsOldValue) {
   SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  int x, y;\n"
-      "  initial begin x = 10; y = x--; end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* vx = f.ctx.FindVariable("x");
-  auto* vy = f.ctx.FindVariable("y");
-  ASSERT_NE(vx, nullptr);
-  ASSERT_NE(vy, nullptr);
+  Variable *vx, *vy;
+  RunXYBody(f, "x = 10; y = x--;", &vx, &vy);
   EXPECT_EQ(vx->value.ToUint64(), 9u);
   EXPECT_EQ(vy->value.ToUint64(), 10u);
 }

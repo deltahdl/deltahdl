@@ -8,6 +8,19 @@ using namespace delta;
 
 namespace {
 
+// Builds a ternary expression `cond ? t : e` referencing existing variables by
+// name. Shared by the TernaryX signedness tests, whose only differences are the
+// variable declarations and the expected result.
+Expr* MakeTernarySelect(SimFixture& f, const char* cond, const char* t,
+                        const char* e) {
+  auto* tern = f.arena.Create<Expr>();
+  tern->kind = ExprKind::kTernary;
+  tern->condition = MakeId(f.arena, cond);
+  tern->true_expr = MakeId(f.arena, t);
+  tern->false_expr = MakeId(f.arena, e);
+  return tern;
+}
+
 TEST(ExprType, DecimalLiteralIsSigned) {
   SimFixture f;
   auto* lit = MakeInt(f.arena, 42);
@@ -397,12 +410,7 @@ TEST(ExprType, TernaryBothSignedYieldsSigned) {
   MakeVar(f, "c", 1, 1);
   MakeSignedVarAdv(f, "t", 8, 10);
   MakeSignedVarAdv(f, "e", 8, 20);
-  auto* tern = f.arena.Create<Expr>();
-  tern->kind = ExprKind::kTernary;
-  tern->condition = MakeId(f.arena, "c");
-  tern->true_expr = MakeId(f.arena, "t");
-  tern->false_expr = MakeId(f.arena, "e");
-  auto result = EvalExpr(tern, f.ctx, f.arena);
+  auto result = EvalExpr(MakeTernarySelect(f, "c", "t", "e"), f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 10u);
   EXPECT_TRUE(result.is_signed);
 }
@@ -412,12 +420,7 @@ TEST(ExprType, TernaryMixedSignednessYieldsUnsigned) {
   MakeVar(f, "c", 1, 0);
   MakeSignedVarAdv(f, "t", 8, 10);
   MakeVar(f, "e", 8, 20);
-  auto* tern = f.arena.Create<Expr>();
-  tern->kind = ExprKind::kTernary;
-  tern->condition = MakeId(f.arena, "c");
-  tern->true_expr = MakeId(f.arena, "t");
-  tern->false_expr = MakeId(f.arena, "e");
-  auto result = EvalExpr(tern, f.ctx, f.arena);
+  auto result = EvalExpr(MakeTernarySelect(f, "c", "t", "e"), f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 20u);
   EXPECT_FALSE(result.is_signed);
 }
@@ -427,12 +430,7 @@ TEST(ExprType, TernaryTrueBranchSelectedMixedStillUnsigned) {
   MakeVar(f, "c", 1, 1);
   MakeSignedVarAdv(f, "t", 8, 10);
   MakeVar(f, "e", 8, 20);
-  auto* tern = f.arena.Create<Expr>();
-  tern->kind = ExprKind::kTernary;
-  tern->condition = MakeId(f.arena, "c");
-  tern->true_expr = MakeId(f.arena, "t");
-  tern->false_expr = MakeId(f.arena, "e");
-  auto result = EvalExpr(tern, f.ctx, f.arena);
+  auto result = EvalExpr(MakeTernarySelect(f, "c", "t", "e"), f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 10u);
   EXPECT_FALSE(result.is_signed);
 }
@@ -442,12 +440,7 @@ TEST(ExprType, TernaryBothUnsignedYieldsUnsigned) {
   MakeVar(f, "c", 1, 1);
   MakeVar(f, "t", 8, 10);
   MakeVar(f, "e", 8, 20);
-  auto* tern = f.arena.Create<Expr>();
-  tern->kind = ExprKind::kTernary;
-  tern->condition = MakeId(f.arena, "c");
-  tern->true_expr = MakeId(f.arena, "t");
-  tern->false_expr = MakeId(f.arena, "e");
-  auto result = EvalExpr(tern, f.ctx, f.arena);
+  auto result = EvalExpr(MakeTernarySelect(f, "c", "t", "e"), f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 10u);
   EXPECT_FALSE(result.is_signed);
 }

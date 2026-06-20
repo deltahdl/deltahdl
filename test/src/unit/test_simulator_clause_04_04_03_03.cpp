@@ -64,22 +64,7 @@ TEST(PliPreNbaSim, PreNBACanCreateEvents) {
 }
 
 TEST(PliPreNbaSim, PreNBAExecutesBeforeNBA) {
-  Arena arena;
-  Scheduler sched(arena);
-  std::vector<std::string> order;
-
-  auto* nba = sched.GetEventPool().Acquire();
-  nba->callback = [&]() { order.push_back("nba"); };
-  sched.ScheduleEvent({0}, Region::kNBA, nba);
-
-  auto* pre_nba = sched.GetEventPool().Acquire();
-  pre_nba->callback = [&]() { order.push_back("pre_nba"); };
-  sched.ScheduleEvent({0}, Region::kPreNBA, pre_nba);
-
-  sched.Run();
-  ASSERT_EQ(order.size(), 2u);
-  EXPECT_EQ(order[0], "pre_nba");
-  EXPECT_EQ(order[1], "nba");
+  VerifyTwoRegionOrder({Region::kPreNBA, "pre_nba"}, {Region::kNBA, "nba"});
 }
 
 TEST(PliPreNbaSim, PreNBAExecutesAfterInactiveBeforeNBA) {
@@ -159,9 +144,7 @@ TEST(PliPreNbaSim, PreNBAReentrantEventStillRunsBeforeNBA) {
   Scheduler sched(arena);
   std::vector<std::string> order;
 
-  auto* nba = sched.GetEventPool().Acquire();
-  nba->callback = [&]() { order.push_back("nba"); };
-  sched.ScheduleEvent({0}, Region::kNBA, nba);
+  ScheduleLabeled(sched, Region::kNBA, "nba", order);
 
   auto* pre_nba = sched.GetEventPool().Acquire();
   pre_nba->callback = [&]() {

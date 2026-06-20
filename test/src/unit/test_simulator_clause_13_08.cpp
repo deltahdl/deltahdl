@@ -177,17 +177,7 @@ TEST(ParameterizedSubroutineSim, MultipleSpecializations) {
       "  end\n"
       "endmodule\n",
       f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* r1 = f.ctx.FindVariable("r1");
-  auto* r2 = f.ctx.FindVariable("r2");
-  ASSERT_NE(r1, nullptr);
-  ASSERT_NE(r2, nullptr);
-  EXPECT_EQ(r1->value.ToUint64(), 8u);
-  EXPECT_EQ(r2->value.ToUint64(), 32u);
+  LowerRunAndCheck(f, design, {{"r1", 8u}, {"r2", 32u}});
 }
 
 TEST(ParameterizedSubroutineSim, TwoParametersExplicit) {
@@ -292,17 +282,7 @@ TEST(ParameterizedSubroutineSim, TwoMethodsSameClass) {
       "  end\n"
       "endmodule\n",
       f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* r1 = f.ctx.FindVariable("r1");
-  auto* r2 = f.ctx.FindVariable("r2");
-  ASSERT_NE(r1, nullptr);
-  ASSERT_NE(r2, nullptr);
-  EXPECT_EQ(r1->value.ToUint64(), 10u);
-  EXPECT_EQ(r2->value.ToUint64(), 11u);
+  LowerRunAndCheck(f, design, {{"r1", 10u}, {"r2", 11u}});
 }
 
 TEST(ParameterizedSubroutineSim, ContinuousAssignCall) {
@@ -351,17 +331,7 @@ TEST(ParameterizedSubroutineSim, DifferentSpecsDifferentResults) {
       "  end\n"
       "endmodule\n",
       f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* r4 = f.ctx.FindVariable("r4");
-  auto* r8 = f.ctx.FindVariable("r8");
-  ASSERT_NE(r4, nullptr);
-  ASSERT_NE(r8, nullptr);
-  EXPECT_EQ(r4->value.ToUint64(), 15u);
-  EXPECT_EQ(r8->value.ToUint64(), 255u);
+  LowerRunAndCheck(f, design, {{"r4", 15u}, {"r8", 255u}});
 }
 
 TEST(ParameterizedSubroutineSim, ParameterSubtract) {
@@ -433,17 +403,7 @@ TEST(ParameterizedSubroutineSim, MultipleCallsSameSpec) {
       "  end\n"
       "endmodule\n",
       f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* r1 = f.ctx.FindVariable("r1");
-  auto* r2 = f.ctx.FindVariable("r2");
-  ASSERT_NE(r1, nullptr);
-  ASSERT_NE(r2, nullptr);
-  EXPECT_EQ(r1->value.ToUint64(), 11u);
-  EXPECT_EQ(r2->value.ToUint64(), 12u);
+  LowerRunAndCheck(f, design, {{"r1", 11u}, {"r2", 12u}});
 }
 
 TEST(ParameterizedSubroutineSim, ZeroParamValue) {
@@ -499,17 +459,7 @@ TEST(ParameterizedSubroutineSim, ForLoopDifferentSpecs) {
       "  end\n"
       "endmodule\n",
       f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* r3 = f.ctx.FindVariable("r3");
-  auto* r4 = f.ctx.FindVariable("r4");
-  ASSERT_NE(r3, nullptr);
-  ASSERT_NE(r4, nullptr);
-  EXPECT_EQ(r3->value.ToUint64(), 6u);
-  EXPECT_EQ(r4->value.ToUint64(), 10u);
+  LowerRunAndCheck(f, design, {{"r3", 6u}, {"r4", 10u}});
 }
 
 TEST(ParameterizedSubroutineSim, EncoderDecoderSameClass) {
@@ -535,17 +485,7 @@ TEST(ParameterizedSubroutineSim, EncoderDecoderSameClass) {
       "  end\n"
       "endmodule\n",
       f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* enc = f.ctx.FindVariable("enc_out");
-  auto* dec = f.ctx.FindVariable("dec_out");
-  ASSERT_NE(enc, nullptr);
-  ASSERT_NE(dec, nullptr);
-  EXPECT_EQ(enc->value.ToUint64(), 6u);
-  EXPECT_EQ(dec->value.ToUint64(), 8u);
+  LowerRunAndCheck(f, design, {{"enc_out", 6u}, {"dec_out", 8u}});
 }
 
 TEST(ParameterizedSubroutineSim, StaticTaskExecution) {
@@ -581,17 +521,7 @@ TEST(ParameterizedSubroutineSim, ParamControlsVariableWidth) {
       "  end\n"
       "endmodule\n",
       f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* r4 = f.ctx.FindVariable("r4");
-  auto* r8 = f.ctx.FindVariable("r8");
-  ASSERT_NE(r4, nullptr);
-  ASSERT_NE(r8, nullptr);
-  EXPECT_EQ(r4->value.ToUint64(), 15u);
-  EXPECT_EQ(r8->value.ToUint64(), 255u);
+  LowerRunAndCheck(f, design, {{"r4", 15u}, {"r8", 255u}});
 }
 
 }  // namespace

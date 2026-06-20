@@ -42,6 +42,22 @@ void RunRefOpThenWrite(SimFixture& f, std::vector<Stmt*> op_stmts,
   EvalExpr(call, f.ctx, f.arena);
 }
 
+// Shared body for the "front-prepending op never outdates an existing ref"
+// cases (insert at 0 and push_front), which prepend `5` to {10,20,30} and hold
+// a reference to original element 20 at its new index 2. The op leaves the
+// reference valid, so the write of 99 lands there, yielding {5,10,99,30}.
+void ExpectPrependKeepsRefValid(SimFixture& f, Stmt* op_stmt) {
+  auto* q = MakeQueue(f, "q", {10, 20, 30});
+
+  RunRefOpThenWrite(f, {op_stmt}, MakeSelect(f.arena, "q", 1));
+
+  ASSERT_EQ(q->elements.size(), 4u);
+  EXPECT_EQ(q->elements[0].ToUint64(), 5u);
+  EXPECT_EQ(q->elements[1].ToUint64(), 10u);
+  EXPECT_EQ(q->elements[2].ToUint64(), 99u);  // original element 20 survived
+  EXPECT_EQ(q->elements[3].ToUint64(), 30u);
+}
+
 // --- Rule A: methods outdate only the elements they remove
 // --------------------
 
@@ -155,20 +171,10 @@ TEST(QueueRefPersistence, PopBackLeavesRemainingRefValid) {
 // reference can never be outdated; the write lands at the element's new index.
 TEST(QueueRefPersistence, InsertNeverOutdatesExistingRef) {
   SimFixture f;
-  auto* q = MakeQueue(f, "q", {10, 20, 30});
-
-  RunRefOpThenWrite(
-      f,
-      {MakeExprStmt(
-          f.arena, MakeMethodCall(f.arena, "q", "insert",
-                                  {MakeInt(f.arena, 0), MakeInt(f.arena, 5)}))},
-      MakeSelect(f.arena, "q", 1));
-
-  ASSERT_EQ(q->elements.size(), 4u);
-  EXPECT_EQ(q->elements[0].ToUint64(), 5u);
-  EXPECT_EQ(q->elements[1].ToUint64(), 10u);
-  EXPECT_EQ(q->elements[2].ToUint64(), 99u);  // original element 20 survived
-  EXPECT_EQ(q->elements[3].ToUint64(), 30u);
+  ExpectPrependKeepsRefValid(
+      f, MakeExprStmt(f.arena, MakeMethodCall(f.arena, "q", "insert",
+                                              {MakeInt(f.arena, 0),
+                                               MakeInt(f.arena, 5)})));
 }
 
 // push_back never outdates an existing reference.
@@ -189,19 +195,9 @@ TEST(QueueRefPersistence, PushBackNeverOutdatesExistingRef) {
 // push_front never outdates an existing reference.
 TEST(QueueRefPersistence, PushFrontNeverOutdatesExistingRef) {
   SimFixture f;
-  auto* q = MakeQueue(f, "q", {10, 20, 30});
-
-  RunRefOpThenWrite(
-      f,
-      {MakeExprStmt(f.arena, MakeMethodCall(f.arena, "q", "push_front",
-                                            {MakeInt(f.arena, 5)}))},
-      MakeSelect(f.arena, "q", 1));
-
-  ASSERT_EQ(q->elements.size(), 4u);
-  EXPECT_EQ(q->elements[0].ToUint64(), 5u);
-  EXPECT_EQ(q->elements[1].ToUint64(), 10u);
-  EXPECT_EQ(q->elements[2].ToUint64(), 99u);  // original element 20 survived
-  EXPECT_EQ(q->elements[3].ToUint64(), 30u);
+  ExpectPrependKeepsRefValid(
+      f, MakeExprStmt(f.arena, MakeMethodCall(f.arena, "q", "push_front",
+                                              {MakeInt(f.arena, 5)})));
 }
 
 // Consequence noted in §7.10.3: insert/push_front on a *bounded* queue whose

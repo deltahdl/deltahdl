@@ -7,6 +7,7 @@
 #include "common/types.h"
 #include "fixture_simulator.h"
 #include "helpers_scheduler_event.h"
+#include "helpers_zero_delay_route.h"
 #include "simulator/lowerer.h"
 #include "simulator/scheduler.h"
 #include "simulator/variable.h"
@@ -185,26 +186,19 @@ TEST(ReInactiveRegionSim, ReInactiveIsReactiveSetDualOfInactive) {
 TEST(ReInactiveRegionSim,
      ZeroDelayFromReactiveContextRoutesToReInactiveAndResumesInSameSlot) {
   SimFixture f;
-  auto* design = ElaborateSrc(
-      "module top;\n"
-      "  logic [7:0] b, snap, done;\n"
-      "  program p;\n"
-      "    initial begin\n"
-      "      b = 8'd0;\n"
-      "      snap = 8'd0;\n"
-      "      b <= 8'd9;\n"
-      "      done = #0 8'd1;\n"
-      "      snap = b;\n"
-      "    end\n"
-      "  endprogram\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  EXPECT_EQ(f.ctx.FindVariable("done")->value.ToUint64(), 1u);
-  EXPECT_EQ(f.ctx.FindVariable("snap")->value.ToUint64(), 0u);
-  EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 9u);
+  RunZeroDelayRouteScenario(f,
+                            "module top;\n"
+                            "  logic [7:0] b, snap, done;\n"
+                            "  program p;\n"
+                            "    initial begin\n"
+                            "      b = 8'd0;\n"
+                            "      snap = 8'd0;\n"
+                            "      b <= 8'd9;\n"
+                            "      done = #0 8'd1;\n"
+                            "      snap = b;\n"
+                            "    end\n"
+                            "  endprogram\n"
+                            "endmodule\n",
+                            9u);
   EXPECT_EQ(f.scheduler.CurrentTime().ticks, 0u);
 }

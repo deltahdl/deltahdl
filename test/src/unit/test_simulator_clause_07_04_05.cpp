@@ -52,13 +52,7 @@ namespace {
 TEST(ArrayIndexingAndSlicing, OutOfBoundsReturnsX) {
   SimFixture f;
 
-  f.ctx.RegisterArray("arr", {0, 4, 8, false, false, false});
-  for (uint32_t i = 0; i < 4; ++i) {
-    auto tmp = "arr[" + std::to_string(i) + "]";
-    auto* s = f.arena.AllocString(tmp.c_str(), tmp.size());
-    auto* v = f.ctx.CreateVariable(std::string_view(s, tmp.size()), 8);
-    v->value = MakeLogic4VecVal(f.arena, 8, static_cast<uint64_t>(i + 1) * 10);
-  }
+  MakeArray4(f, "arr");
 
   auto in_result = EvalExpr(MakeSelect(f.arena, "arr", 2), f.ctx, f.arena);
   EXPECT_EQ(in_result.ToUint64(), 30u);
@@ -142,13 +136,7 @@ TEST(ArrayIndexingAndSlicing, ReadSliceConcat) {
 TEST(ArrayIndexingAndSlicing, WriteOutOfBoundsIsNoop) {
   SimFixture f;
 
-  f.ctx.RegisterArray("arr", {0, 4, 8, false, false, false});
-  for (uint32_t i = 0; i < 4; ++i) {
-    auto tmp = "arr[" + std::to_string(i) + "]";
-    auto* s = f.arena.AllocString(tmp.c_str(), tmp.size());
-    auto* v = f.ctx.CreateVariable(std::string_view(s, tmp.size()), 8);
-    v->value = MakeLogic4VecVal(f.arena, 8, static_cast<uint64_t>(i + 1) * 10);
-  }
+  MakeArray4(f, "arr");
 
   auto before = EvalExpr(MakeSelect(f.arena, "arr", 1), f.ctx, f.arena);
   EXPECT_EQ(before.ToUint64(), 20u);

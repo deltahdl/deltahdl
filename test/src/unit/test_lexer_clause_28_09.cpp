@@ -3,6 +3,7 @@
 #include <gtest/gtest.h>
 
 #include "fixture_lexer.h"
+#include "helpers_gate_instantiation_tokens.h"
 
 using namespace delta;
 
@@ -22,19 +23,7 @@ TEST(CmosSwitchLexing, RcmosKeyword) {
 
 TEST(CmosSwitchLexing, CmosInstantiationTokenSequence) {
   auto tokens = Lex("cmos c1(out, data, nctrl, pctrl);");
-  ASSERT_GE(tokens.size(), 12u);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kKwCmos);
-  EXPECT_EQ(tokens[1].kind, TokenKind::kIdentifier);
-  EXPECT_EQ(tokens[2].kind, TokenKind::kLParen);
-  EXPECT_EQ(tokens[3].kind, TokenKind::kIdentifier);
-  EXPECT_EQ(tokens[4].kind, TokenKind::kComma);
-  EXPECT_EQ(tokens[5].kind, TokenKind::kIdentifier);
-  EXPECT_EQ(tokens[6].kind, TokenKind::kComma);
-  EXPECT_EQ(tokens[7].kind, TokenKind::kIdentifier);
-  EXPECT_EQ(tokens[8].kind, TokenKind::kComma);
-  EXPECT_EQ(tokens[9].kind, TokenKind::kIdentifier);
-  EXPECT_EQ(tokens[10].kind, TokenKind::kRParen);
-  EXPECT_EQ(tokens[11].kind, TokenKind::kSemicolon);
+  ExpectNamedGateInstantiation(tokens, TokenKind::kKwCmos, 4);
 }
 
 TEST(CmosSwitchLexing, RcmosInstantiationTokenSequence) {

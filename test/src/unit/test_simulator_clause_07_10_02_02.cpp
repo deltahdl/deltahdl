@@ -96,12 +96,7 @@ TEST(QueueMethods, InsertWithXzIndexIsNoop) {
 
 TEST(QueueMethods, InsertWithNegativeIndexIsNoop) {
   SimFixture f;
-  auto* q = MakeQueue(f, "q", {10, 20});
-  auto* idx_var = f.ctx.CreateVariable("idx", 32);
-  idx_var->value = MakeLogic4Vec(f.arena, 32);
-  idx_var->value.words[0].aval = static_cast<uint64_t>(-1);
-  idx_var->value.words[0].bval = 0;
-  idx_var->value.is_signed = true;
+  auto* q = MakeQueueWithNegativeIdx(f, "q", {10, 20}, "idx");
   auto* call = MakeMethodCall(f.arena, "q", "insert",
                               {MakeId(f.arena, "idx"), MakeInt(f.arena, 99)});
   TryExecQueueMethodStmt(call, f.ctx, f.arena);

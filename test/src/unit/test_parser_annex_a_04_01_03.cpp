@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_three_comma_instances.h"
 
 using namespace delta;
 
@@ -129,16 +130,10 @@ TEST(ProgramInstantiationGrammar, MultipleInstancesWithParams) {
 }
 
 TEST(ProgramInstantiationGrammar, ThreeCommaSeparatedInstances) {
-  auto r = Parse(
+  ExpectThreeCommaSeparatedInstances(
       "program my_prog;\n"
       "endprogram\n"
       "module m; my_prog u0(), u1(), u2(); endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_GE(r.cu->modules[0]->items.size(), 3u);
-  EXPECT_EQ(r.cu->modules[0]->items[0]->inst_name, "u0");
-  EXPECT_EQ(r.cu->modules[0]->items[1]->inst_name, "u1");
-  EXPECT_EQ(r.cu->modules[0]->items[2]->inst_name, "u2");
 }
 
 TEST(ProgramInstantiationGrammar, ParamsWithEmptyPorts) {

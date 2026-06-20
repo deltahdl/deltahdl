@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <array>
 #include <vector>
 
 #include "simulator/specify.h"
@@ -17,6 +18,17 @@ PathDelay MakePath(std::string src, std::string dst,
   size_t i = 0;
   for (uint64_t v : values) pd.delays[i++] = v;
   return pd;
+}
+
+// The LRM Example 2 cases all share the same five paths (p5..p1) and differ
+// only in which candidates are active; this builds the five paths in that
+// fixed order: {p5, p4, p3, p2, p1}.
+std::array<PathDelay, 5> MakeLrmExample2Paths() {
+  return {
+      MakePath("a", "y", {5, 9}), MakePath("a", "y", {4, 8}),
+      MakePath("a", "y", {6, 5}), MakePath("a", "y", {3, 2}),
+      MakePath("a", "y", {7, 7}),
+  };
 }
 
 TEST(SpecifyDelaySelection, NoCandidatesReturnsZero) {
@@ -73,53 +85,37 @@ TEST(SpecifyDelaySelection, LrmExample1AMoreRecentFallIsNine) {
 }
 
 TEST(SpecifyDelaySelection, LrmExample2Mode2RiseIsFour) {
-  PathDelay p5 = MakePath("a", "y", {5, 9});
-  PathDelay p4 = MakePath("a", "y", {4, 8});
-  PathDelay p3 = MakePath("a", "y", {6, 5});
-  PathDelay p2 = MakePath("a", "y", {3, 2});
-  PathDelay p1 = MakePath("a", "y", {7, 7});
+  std::array<PathDelay, 5> p = MakeLrmExample2Paths();
   std::vector<PathCandidate> candidates = {
-      {&p5, 10, true},  {&p4, 10, true},  {&p3, 10, true},
-      {&p2, 10, false}, {&p1, 10, false},
+      {&p[0], 10, true},  {&p[1], 10, true},  {&p[2], 10, true},
+      {&p[3], 10, false}, {&p[4], 10, false},
   };
   EXPECT_EQ(SelectPathDelay(candidates, 0), 4u);
 }
 
 TEST(SpecifyDelaySelection, LrmExample2Mode2FallIsFive) {
-  PathDelay p5 = MakePath("a", "y", {5, 9});
-  PathDelay p4 = MakePath("a", "y", {4, 8});
-  PathDelay p3 = MakePath("a", "y", {6, 5});
-  PathDelay p2 = MakePath("a", "y", {3, 2});
-  PathDelay p1 = MakePath("a", "y", {7, 7});
+  std::array<PathDelay, 5> p = MakeLrmExample2Paths();
   std::vector<PathCandidate> candidates = {
-      {&p5, 10, true},  {&p4, 10, true},  {&p3, 10, true},
-      {&p2, 10, false}, {&p1, 10, false},
+      {&p[0], 10, true},  {&p[1], 10, true},  {&p[2], 10, true},
+      {&p[3], 10, false}, {&p[4], 10, false},
   };
   EXPECT_EQ(SelectPathDelay(candidates, 1), 5u);
 }
 
 TEST(SpecifyDelaySelection, LrmExample2Mode0RiseIsThree) {
-  PathDelay p5 = MakePath("a", "y", {5, 9});
-  PathDelay p4 = MakePath("a", "y", {4, 8});
-  PathDelay p3 = MakePath("a", "y", {6, 5});
-  PathDelay p2 = MakePath("a", "y", {3, 2});
-  PathDelay p1 = MakePath("a", "y", {7, 7});
+  std::array<PathDelay, 5> p = MakeLrmExample2Paths();
   std::vector<PathCandidate> candidates = {
-      {&p5, 10, true}, {&p4, 10, true}, {&p3, 10, true},
-      {&p2, 10, true}, {&p1, 10, true},
+      {&p[0], 10, true}, {&p[1], 10, true}, {&p[2], 10, true},
+      {&p[3], 10, true}, {&p[4], 10, true},
   };
   EXPECT_EQ(SelectPathDelay(candidates, 0), 3u);
 }
 
 TEST(SpecifyDelaySelection, LrmExample2Mode5NoActivePathsReturnsZero) {
-  PathDelay p5 = MakePath("a", "y", {5, 9});
-  PathDelay p4 = MakePath("a", "y", {4, 8});
-  PathDelay p3 = MakePath("a", "y", {6, 5});
-  PathDelay p2 = MakePath("a", "y", {3, 2});
-  PathDelay p1 = MakePath("a", "y", {7, 7});
+  std::array<PathDelay, 5> p = MakeLrmExample2Paths();
   std::vector<PathCandidate> candidates = {
-      {&p5, 10, false}, {&p4, 10, false}, {&p3, 10, false},
-      {&p2, 10, false}, {&p1, 10, false},
+      {&p[0], 10, false}, {&p[1], 10, false}, {&p[2], 10, false},
+      {&p[3], 10, false}, {&p[4], 10, false},
   };
   EXPECT_EQ(SelectPathDelay(candidates, 0), 0u);
 }

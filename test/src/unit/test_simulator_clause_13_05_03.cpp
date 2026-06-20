@@ -1,8 +1,8 @@
 #include "builders_ast.h"
 #include "fixture_simulator.h"
+#include "helpers_scheduler.h"
 #include "parser/ast.h"
 #include "simulator/evaluation.h"
-#include "simulator/lowerer.h"
 
 using namespace delta;
 
@@ -95,16 +95,7 @@ TEST(DefaultArgumentSim, DefaultArgOverride) {
       "  end\n"
       "endmodule\n",
       f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* xv = f.ctx.FindVariable("x");
-  auto* yv = f.ctx.FindVariable("y");
-  ASSERT_NE(xv, nullptr);
-  ASSERT_NE(yv, nullptr);
-  EXPECT_EQ(xv->value.ToUint64(), 10u);
-  EXPECT_EQ(yv->value.ToUint64(), 15u);
+  LowerRunAndCheck(f, design, {{"x", 10u}, {"y", 15u}});
 }
 
 TEST(DefaultArgumentSim, DefaultExpressionEvaluated) {
@@ -147,13 +138,7 @@ TEST(DefaultArgumentSim, DefaultEvalInDeclaringScope) {
       "  end\n"
       "endmodule\n",
       f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* xv = f.ctx.FindVariable("x");
-  ASSERT_NE(xv, nullptr);
-  EXPECT_EQ(xv->value.ToUint64(), 15u);
+  LowerRunAndCheck(f, design, {{"x", 15u}});
 }
 
 TEST(DefaultArgumentSim, TaskOutputArgWriteback) {
@@ -170,13 +155,7 @@ TEST(DefaultArgumentSim, TaskOutputArgWriteback) {
       "  end\n"
       "endmodule\n",
       f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* av = f.ctx.FindVariable("a");
-  ASSERT_NE(av, nullptr);
-  EXPECT_EQ(av->value.ToUint64(), 42u);
+  LowerRunAndCheck(f, design, {{"a", 42u}});
 }
 
 TEST(DefaultArgumentSim, DefaultReevaluatedEachCall) {
@@ -196,16 +175,7 @@ TEST(DefaultArgumentSim, DefaultReevaluatedEachCall) {
       "  end\n"
       "endmodule\n",
       f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* r1 = f.ctx.FindVariable("r1");
-  auto* r2 = f.ctx.FindVariable("r2");
-  ASSERT_NE(r1, nullptr);
-  ASSERT_NE(r2, nullptr);
-  EXPECT_EQ(r1->value.ToUint64(), 10u);
-  EXPECT_EQ(r2->value.ToUint64(), 20u);
+  LowerRunAndCheck(f, design, {{"r1", 10u}, {"r2", 20u}});
 }
 
 TEST(DefaultArgumentSim, EmptyPlaceholderUsesDefault) {

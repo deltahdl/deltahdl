@@ -6,50 +6,14 @@
 #include "builders_ast.h"
 #include "builders_systask.h"
 #include "fixture_simulator.h"
+#include "helpers_memload.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
 
 using namespace delta;
 namespace {
 
-// Writes the load data to a scratch file and returns its path.
-std::string WriteTmp(const char* tag, const std::string& data) {
-  std::string path = std::string("/tmp/deltahdl_test_21_04_01_") + tag + ".txt";
-  std::ofstream ofs(path);
-  ofs << data;
-  ofs.close();
-  return path;
-}
-
-// Invokes $readmemb / $readmemh on a memory named by a bare identifier, with
-// any extra (start/finish) address arguments appended.
-void Readmem(SimFixture& f, const char* task, const std::string& path,
-             const char* mem, std::vector<Expr*> extra = {}) {
-  std::vector<Expr*> args = {MkStr(f.arena, path.c_str()),
-                             MakeId(f.arena, mem)};
-  for (auto* e : extra) args.push_back(e);
-  EvalExpr(MakeSysCall(f.arena, task, args), f.ctx, f.arena);
-}
-
-// Registers a fixed unpacked array `name[lo .. lo+size-1]` of `width`-bit
-// packed elements, each backed by a zero-initialized element variable.
-void SetupMem(SimFixture& f, const char* name, int lo, int size,
-              uint32_t width) {
-  f.ctx.RegisterArray(
-      name, {static_cast<uint32_t>(lo), static_cast<uint32_t>(size), width,
-             false, false, false});
-  for (int i = 0; i < size; ++i) {
-    std::string nm = std::string(name) + "[" + std::to_string(lo + i) + "]";
-    auto* s = f.arena.AllocString(nm.c_str(), nm.size());
-    auto* v = f.ctx.CreateVariable(std::string_view(s, nm.size()), width);
-    v->value = MakeLogic4VecVal(f.arena, width, 0);
-  }
-}
-
-Variable* Cell(SimFixture& f, const char* name, int addr) {
-  std::string nm = std::string(name) + "[" + std::to_string(addr) + "]";
-  return f.ctx.FindVariable(nm);
-}
+constexpr char kTmpPrefix[] = "/tmp/deltahdl_test_21_04_01_";
 
 // Fills a queue object with `count` zero-initialized `width`-bit elements.
 QueueObject* SetupQueue(SimFixture& f, const char* name, int count,
@@ -67,7 +31,7 @@ QueueObject* SetupQueue(SimFixture& f, const char* name, int count,
 TEST(ReadmemPackedDataTest, PackedElementsLoadAsWholeVectors) {
   SimFixture f;
   SetupMem(f, "mem", 0, 2, 16);
-  std::string path = WriteTmp("packed", "ABCD\n1234\n");
+  std::string path = WriteTmp(kTmpPrefix, "packed", "ABCD\n1234\n");
 
   Readmem(f, "$readmemh", path, "mem");
 
@@ -81,7 +45,7 @@ TEST(ReadmemPackedDataTest, PackedElementsLoadAsWholeVectors) {
 TEST(ReadmemPackedDataTest, QueueLoadsIntoExistingElements) {
   SimFixture f;
   auto* q = SetupQueue(f, "q", 4, 8);
-  std::string path = WriteTmp("q_fit", "0A\n14\n");
+  std::string path = WriteTmp(kTmpPrefix, "q_fit", "0A\n14\n");
 
   Readmem(f, "$readmemh", path, "q");
 
@@ -103,7 +67,7 @@ TEST(ReadmemPackedDataTest, DynamicArrayLoadsWithoutResize) {
   info.is_dynamic = true;
   info.elem_width = 8;
   f.ctx.RegisterArray("dyn", info);
-  std::string path = WriteTmp("dyn", "@0 7E 7F 80");
+  std::string path = WriteTmp(kTmpPrefix, "dyn", "@0 7E 7F 80");
 
   Readmem(f, "$readmemh", path, "dyn");
 
@@ -119,7 +83,7 @@ TEST(ReadmemPackedDataTest, AssocLoadCreatesElementsAtAddresses) {
   SimFixture f;
   auto* aa = f.ctx.CreateAssocArray("am", /*elem_width=*/8,
                                     /*is_string_key=*/false);
-  std::string path = WriteTmp("assoc_addr", "@5 AB\n@10 CD\n");
+  std::string path = WriteTmp(kTmpPrefix, "assoc_addr", "@5 AB\n@10 CD\n");
 
   Readmem(f, "$readmemh", path, "am");
 
@@ -134,7 +98,7 @@ TEST(ReadmemPackedDataTest, AssocLoadCreatesElementsAtAddresses) {
 TEST(ReadmemPackedDataTest, AssocLoadCreatesConsecutiveElements) {
   SimFixture f;
   auto* aa = f.ctx.CreateAssocArray("am", 8, false);
-  std::string path = WriteTmp("assoc_seq", "01 02 03");
+  std::string path = WriteTmp(kTmpPrefix, "assoc_seq", "01 02 03");
 
   Readmem(f, "$readmemh", path, "am");
 
@@ -153,7 +117,7 @@ TEST(ReadmemPackedDataTest, AssocLoadUpdatesExistingElementInPlace) {
   SimFixture f;
   auto* aa = f.ctx.CreateAssocArray("am", 8, /*is_string_key=*/false);
   aa->int_data[7] = MakeLogic4VecVal(f.arena, 8, 0x11);  // pre-existing element
-  std::string path = WriteTmp("assoc_upd", "@7 22\n@8 33\n");
+  std::string path = WriteTmp(kTmpPrefix, "assoc_upd", "@7 22\n@8 33\n");
 
   Readmem(f, "$readmemh", path, "am");
 
@@ -170,7 +134,7 @@ TEST(ReadmemPackedDataTest, AssocLoadUpdatesExistingElementInPlace) {
 TEST(ReadmemPackedDataTest, AssocStringIndexRejected) {
   SimFixture f;
   auto* aa = f.ctx.CreateAssocArray("am", 8, /*is_string_key=*/true);
-  std::string path = WriteTmp("assoc_str", "@1 AA");
+  std::string path = WriteTmp(kTmpPrefix, "assoc_str", "@1 AA");
 
   Readmem(f, "$readmemh", path, "am");
 
@@ -189,7 +153,7 @@ TEST(ReadmemPackedDataTest, AssocEnumIndexUsesNumericValues) {
   auto* aa = f.ctx.CreateAssocArray("am", /*elem_width=*/8,
                                     /*is_string_key=*/false,
                                     /*index_width=*/8);
-  std::string path = WriteTmp("assoc_enum", "@2 41\n@3 42\n");
+  std::string path = WriteTmp(kTmpPrefix, "assoc_enum", "@2 41\n@3 42\n");
 
   Readmem(f, "$readmemh", path, "am");
 

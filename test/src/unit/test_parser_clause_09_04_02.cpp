@@ -235,21 +235,13 @@ TEST(EventControlParsing, EventControlHierarchicalSignal) {
 }
 
 TEST(EventControlParsing, MemberAccessInEventExpression) {
-  auto r = Parse(
+  VerifySingleNoneEventControlSignalKind(
       "module m;\n"
       "  initial begin\n"
       "    @(cb.ack) ;\n"
       "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
-  ASSERT_EQ(stmt->events.size(), 1u);
-  EXPECT_EQ(stmt->events[0].edge, Edge::kNone);
-  ASSERT_NE(stmt->events[0].signal, nullptr);
-  EXPECT_EQ(stmt->events[0].signal->kind, ExprKind::kMemberAccess);
+      "endmodule\n",
+      ExprKind::kMemberAccess);
 }
 
 }  // namespace

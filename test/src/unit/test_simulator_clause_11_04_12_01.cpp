@@ -10,6 +10,27 @@ using namespace delta;
 
 namespace {
 
+// Builds a replication of a side-effecting post-increment operand on a fresh
+// 8-bit variable "i" (initialized to 0) with the given multiplier, evaluates
+// it, and returns the result. The post-increment lets callers observe that the
+// operand is evaluated exactly once regardless of the multiplier.
+Logic4Vec EvalPostIncReplication(SimFixture& f, uint64_t repeat_count) {
+  auto* counter = f.ctx.CreateVariable("i", 8);
+  counter->value = MakeLogic4VecVal(f.arena, 8, 0);
+
+  auto* inc = f.arena.Create<Expr>();
+  inc->kind = ExprKind::kPostfixUnary;
+  inc->op = TokenKind::kPlusPlus;
+  inc->lhs = MakeId(f.arena, "i");
+
+  auto* rep = f.arena.Create<Expr>();
+  rep->kind = ExprKind::kReplicate;
+  rep->repeat_count = MakeInt(f.arena, repeat_count);
+  rep->elements.push_back(inc);
+
+  return EvalExpr(rep, f.ctx, f.arena);
+}
+
 TEST(ReplicationSim, ReplicationBasic) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -173,20 +194,7 @@ TEST(ReplicationSim, ZeroReplicationIgnoredInConcat) {
 TEST(ReplicationEval, OperandsEvaluatedOnce) {
   SimFixture f;
 
-  auto* counter = f.ctx.CreateVariable("i", 8);
-  counter->value = MakeLogic4VecVal(f.arena, 8, 0);
-
-  auto* inc = f.arena.Create<Expr>();
-  inc->kind = ExprKind::kPostfixUnary;
-  inc->op = TokenKind::kPlusPlus;
-  inc->lhs = MakeId(f.arena, "i");
-
-  auto* rep = f.arena.Create<Expr>();
-  rep->kind = ExprKind::kReplicate;
-  rep->repeat_count = MakeInt(f.arena, 4);
-  rep->elements.push_back(inc);
-
-  EvalExpr(rep, f.ctx, f.arena);
+  EvalPostIncReplication(f, 4);
 
   EXPECT_EQ(f.ctx.FindVariable("i")->value.ToUint64(), 1u);
 }
@@ -196,20 +204,7 @@ TEST(ReplicationEval, OperandsEvaluatedOnce) {
 TEST(ReplicationEval, OperandsEvaluatedOnceWithZeroMultiplier) {
   SimFixture f;
 
-  auto* counter = f.ctx.CreateVariable("i", 8);
-  counter->value = MakeLogic4VecVal(f.arena, 8, 0);
-
-  auto* inc = f.arena.Create<Expr>();
-  inc->kind = ExprKind::kPostfixUnary;
-  inc->op = TokenKind::kPlusPlus;
-  inc->lhs = MakeId(f.arena, "i");
-
-  auto* rep = f.arena.Create<Expr>();
-  rep->kind = ExprKind::kReplicate;
-  rep->repeat_count = MakeInt(f.arena, 0);
-  rep->elements.push_back(inc);
-
-  auto result = EvalExpr(rep, f.ctx, f.arena);
+  auto result = EvalPostIncReplication(f, 0);
 
   EXPECT_EQ(result.width, 0u);
   EXPECT_EQ(f.ctx.FindVariable("i")->value.ToUint64(), 1u);

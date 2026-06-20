@@ -1,6 +1,7 @@
 
 #include "fixture_simulator.h"
 #include "helpers_assoc.h"
+#include "helpers_assoc_first_last.h"
 #include "simulator/eval_array.h"
 
 using namespace delta;
@@ -110,14 +111,9 @@ TEST(AssocTraversalArgs, TruncationPreservesLSBsLRMExample) {
 
 TEST(AssocTraversalArgs, EqualWidthReturnsOneNotNegOne) {
   SimFixture f;
-  auto* aa = f.ctx.CreateAssocArray("aa", 32, false);
-  aa->index_width = 32;
-  aa->int_data[42] = MakeLogic4VecVal(f.arena, 32, 7);
-  auto* ref = f.ctx.CreateVariable("k", 32);
-  ref->value = MakeLogic4VecVal(f.arena, 32, 0);
+  Variable* ref = nullptr;
   Logic4Vec out{};
-  auto* call = MkAssocCall(f.arena, "aa", "first", "k");
-  bool ok = TryEvalAssocMethodCall(call, f.ctx, f.arena, out);
+  bool ok = EvalFirstSingleEntry42(f, 7, &ref, out);
   ASSERT_TRUE(ok);
   EXPECT_EQ(out.ToUint64(), 1u);
   EXPECT_EQ(ref->value.ToUint64(), 42u);

@@ -10,6 +10,44 @@ using namespace delta;
 
 namespace {
 
+// Builds the custom constraint left_v <= v used by every test in this file.
+ConstraintExpr MakeLeftLeConstraint() {
+  ConstraintExpr left_le;
+  left_le.kind = ConstraintKind::kCustom;
+  left_le.eval_fn = [](const std::unordered_map<std::string, int64_t>& vals) {
+    auto v = vals.find("v");
+    auto l = vals.find("left_v");
+    if (v == vals.end() || l == vals.end()) return true;
+    return l->second <= v->second;
+  };
+  return left_le;
+}
+
+// Builds a "heapcond" constraint block holding only the left_v <= v constraint,
+// the shared global-constraint setup for the inactive-member tests.
+ConstraintBlock MakeHeapCondLeftLe() {
+  ConstraintBlock heapcond;
+  heapcond.name = "heapcond";
+  heapcond.constraints.push_back(MakeLeftLeConstraint());
+  return heapcond;
+}
+
+// Adds a [min, max] random variable to the solver.
+void AddRangeVariable(ConstraintSolver& solver, const std::string& name,
+                      int64_t min_val, int64_t max_val) {
+  RandVariable var;
+  var.name = name;
+  var.min_val = min_val;
+  var.max_val = max_val;
+  solver.AddVariable(var);
+}
+
+// Holds v at a fixed current value as an inactive state constant.
+void HoldVAsStateConstant(ConstraintSolver& solver, int64_t value) {
+  solver.SetValue("v", value);
+  solver.SetRandMode("v", false);
+}
+
 // 18.5.8: when an object member is declared rand, its random variables and
 // constraints are randomized simultaneously with the enclosing object's
 // variables and constraints. A constraint relating random variables that come
@@ -21,25 +59,10 @@ TEST(GlobalConstraint, ActiveVariablesSolvedSimultaneously) {
   ConstraintSolver solver(42);
 
   for (const char* name : {"v", "left_v", "right_v"}) {
-    RandVariable var;
-    var.name = name;
-    var.min_val = 0;
-    var.max_val = 100;
-    solver.AddVariable(var);
+    AddRangeVariable(solver, name, 0, 100);
   }
 
-  ConstraintBlock heapcond;
-  heapcond.name = "heapcond";
-
-  ConstraintExpr left_le;
-  left_le.kind = ConstraintKind::kCustom;
-  left_le.eval_fn = [](const std::unordered_map<std::string, int64_t>& vals) {
-    auto v = vals.find("v");
-    auto l = vals.find("left_v");
-    if (v == vals.end() || l == vals.end()) return true;
-    return l->second <= v->second;
-  };
-  heapcond.constraints.push_back(left_le);
+  ConstraintBlock heapcond = MakeHeapCondLeftLe();
 
   ConstraintExpr right_gt;
   right_gt.kind = ConstraintKind::kCustom;
@@ -67,35 +90,14 @@ TEST(GlobalConstraint, ActiveVariablesSolvedSimultaneously) {
 TEST(GlobalConstraint, InactiveMemberIsStateConstantInGlobalConstraint) {
   ConstraintSolver solver(42);
 
-  RandVariable v;
-  v.name = "v";
-  v.min_val = 0;
-  v.max_val = 100;
-  solver.AddVariable(v);
-
-  RandVariable left_v;
-  left_v.name = "left_v";
-  left_v.min_val = 0;
-  left_v.max_val = 100;
-  solver.AddVariable(left_v);
+  AddRangeVariable(solver, "v", 0, 100);
+  AddRangeVariable(solver, "left_v", 0, 100);
 
   // v is not an active random variable: it holds its current value as a state
   // constant while left_v is randomized against it.
-  solver.SetValue("v", 8);
-  solver.SetRandMode("v", false);
+  HoldVAsStateConstant(solver, 8);
 
-  ConstraintBlock heapcond;
-  heapcond.name = "heapcond";
-  ConstraintExpr left_le;
-  left_le.kind = ConstraintKind::kCustom;
-  left_le.eval_fn = [](const std::unordered_map<std::string, int64_t>& vals) {
-    auto v = vals.find("v");
-    auto l = vals.find("left_v");
-    if (v == vals.end() || l == vals.end()) return true;
-    return l->second <= v->second;
-  };
-  heapcond.constraints.push_back(left_le);
-  solver.AddConstraintBlock(heapcond);
+  solver.AddConstraintBlock(MakeHeapCondLeftLe());
 
   ASSERT_TRUE(solver.Solve());
   EXPECT_EQ(solver.GetValue("v"), 8);
@@ -111,33 +113,12 @@ TEST(GlobalConstraint,
      InactiveStateConstantCanMakeGlobalConstraintUnsatisfiable) {
   ConstraintSolver solver(42);
 
-  RandVariable v;
-  v.name = "v";
-  v.min_val = 0;
-  v.max_val = 100;
-  solver.AddVariable(v);
+  AddRangeVariable(solver, "v", 0, 100);
+  AddRangeVariable(solver, "left_v", 5, 10);
 
-  RandVariable left_v;
-  left_v.name = "left_v";
-  left_v.min_val = 5;
-  left_v.max_val = 10;
-  solver.AddVariable(left_v);
+  HoldVAsStateConstant(solver, 0);
 
-  solver.SetValue("v", 0);
-  solver.SetRandMode("v", false);
-
-  ConstraintBlock heapcond;
-  heapcond.name = "heapcond";
-  ConstraintExpr left_le;
-  left_le.kind = ConstraintKind::kCustom;
-  left_le.eval_fn = [](const std::unordered_map<std::string, int64_t>& vals) {
-    auto v = vals.find("v");
-    auto l = vals.find("left_v");
-    if (v == vals.end() || l == vals.end()) return true;
-    return l->second <= v->second;
-  };
-  heapcond.constraints.push_back(left_le);
-  solver.AddConstraintBlock(heapcond);
+  solver.AddConstraintBlock(MakeHeapCondLeftLe());
 
   EXPECT_FALSE(solver.Solve());
 }

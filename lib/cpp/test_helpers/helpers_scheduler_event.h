@@ -2,11 +2,15 @@
 
 #include <gtest/gtest.h>
 
+#include <functional>
 #include <string>
 #include <vector>
 
 #include "common/arena.h"
+#include "common/types.h"
 #include "simulator/scheduler.h"
+#include "simulator/variable.h"
+#include "simulator/vpi.h"
 
 using namespace delta;
 
@@ -296,4 +300,57 @@ inline void VerifyCASchedulesActiveUpdateEvent() {
   ASSERT_EQ(order.size(), 2u);
   EXPECT_EQ(order[0], "active_update");
   EXPECT_EQ(order[1], "nba_update");
+}
+
+// Verify that scheduling an NBA event from an Active callback into the current
+// time slot is not flagged against the given region's illegal-schedule counter.
+// `illegal_schedule_count` reads the region-specific counter off the scheduler.
+inline void VerifyScheduleFromActiveIsNotFlagged(
+    const std::function<size_t(Scheduler&)>& illegal_schedule_count) {
+  Arena arena;
+  Scheduler sched(arena);
+
+  auto* active = sched.GetEventPool().Acquire();
+  active->callback = [&]() {
+    auto* nba = sched.GetEventPool().Acquire();
+    nba->callback = []() {};
+    sched.ScheduleEvent(sched.CurrentTime(), Region::kNBA, nba);
+  };
+  sched.ScheduleEvent({0}, Region::kActive, active);
+
+  sched.Run();
+  EXPECT_EQ(illegal_schedule_count(sched), 0u);
+}
+
+// Verify that a VPI write performed from an Active callback writes the value
+// and is not flagged against the given region's illegal-write counter.
+// `illegal_write_count` reads the region-specific counter off the scheduler.
+inline void VerifyVpiWriteFromActiveIsNotFlagged(
+    const std::function<size_t(Scheduler&)>& illegal_write_count) {
+  Arena arena;
+  Scheduler sched(arena);
+  VpiContext vpi;
+  vpi.SetScheduler(&sched);
+
+  Logic4Word storage{};
+  Variable var{};
+  var.value.width = 32;
+  var.value.nwords = 1;
+  var.value.words = &storage;
+
+  VpiObject obj{};
+  obj.var = &var;
+
+  auto* active = sched.GetEventPool().Acquire();
+  active->callback = [&]() {
+    VpiValue value{};
+    value.format = kVpiIntVal;
+    value.value.integer = 42;
+    vpi.PutValue(&obj, &value, nullptr, 0);
+  };
+  sched.ScheduleEvent({0}, Region::kActive, active);
+
+  sched.Run();
+  EXPECT_EQ(illegal_write_count(sched), 0u);
+  EXPECT_EQ(var.value.words[0].aval, 42u);
 }

@@ -442,14 +442,12 @@ TEST(IntegerLiteralElaboration, XZCaseInsensitive) {
   LowerRunAndCompareBitPatterns(f, design, 0xF);
 }
 
-TEST(IntegerLiteralElaboration, XDigitFillsThreeBits) {
+// Elaborates a 6-bit octal literal "6'o7<digit>" where <digit> is an x or z
+// fill digit, lowers and runs it, then asserts the top octal group is the known
+// value 7 and the low octal group is fully x/z (bval set).
+static void ExpectOctalFillDigitFillsThreeBits(const char* src) {
   SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [5:0] x;\n"
-      "  initial x = 6'o7x;\n"
-      "endmodule\n",
-      f);
+  auto* design = ElaborateSrc(src, f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -458,6 +456,14 @@ TEST(IntegerLiteralElaboration, XDigitFillsThreeBits) {
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.words[0].aval & 0x38, 0x38u);
   EXPECT_EQ(var->value.words[0].bval & 0x07, 0x07u);
+}
+
+TEST(IntegerLiteralElaboration, XDigitFillsThreeBits) {
+  ExpectOctalFillDigitFillsThreeBits(
+      "module t;\n"
+      "  logic [5:0] x;\n"
+      "  initial x = 6'o7x;\n"
+      "endmodule\n");
 }
 
 TEST(IntegerLiteralElaboration, BaseFormatCaseInsensitive) {
@@ -539,21 +545,11 @@ TEST(IntegerLiteralElaboration, ZDigitInBinaryLiteral) {
 }
 
 TEST(IntegerLiteralElaboration, ZDigitFillsThreeBitsInOctal) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
+  ExpectOctalFillDigitFillsThreeBits(
       "module t;\n"
       "  logic [5:0] x;\n"
       "  initial x = 6'o7z;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.words[0].aval & 0x38, 0x38u);
-  EXPECT_EQ(var->value.words[0].bval & 0x07, 0x07u);
+      "endmodule\n");
 }
 
 TEST(IntegerLiteralElaboration, LeftPadXWhenLeftmostIsX) {

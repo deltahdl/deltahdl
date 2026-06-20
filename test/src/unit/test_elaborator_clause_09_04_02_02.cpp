@@ -7,6 +7,22 @@ using namespace delta;
 
 namespace {
 
+// Validates a freshly elaborated @* design (non-null, error-free, exactly one
+// process) and collects the identifier names that appear in that process's
+// implicit sensitivity list. Shared by the AlwaysStarElab sensitivity tests.
+void CollectSensitivityNames(RtlirDesign* design, ElabFixture& f,
+                             std::unordered_set<std::string>& names) {
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_EQ(mod->processes.size(), 1u);
+  auto& sens = mod->processes[0].sensitivity;
+  for (const auto& ev : sens) {
+    if (ev.signal && ev.signal->kind == ExprKind::kIdentifier)
+      names.insert(std::string(ev.signal->text));
+  }
+}
+
 TEST(AlwaysStarSim, AlwaysStarIfElseTrueBranch) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -361,16 +377,8 @@ TEST(AlwaysStarElab, LhsIndexVarInSensitivity) {
       "  end\n"
       "endmodule\n",
       f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* mod = design->top_modules[0];
-  ASSERT_EQ(mod->processes.size(), 1u);
-  auto& sens = mod->processes[0].sensitivity;
   std::unordered_set<std::string> names;
-  for (const auto& ev : sens) {
-    if (ev.signal && ev.signal->kind == ExprKind::kIdentifier)
-      names.insert(std::string(ev.signal->text));
-  }
+  CollectSensitivityNames(design, f, names);
   EXPECT_TRUE(names.count("en")) << "en (RHS) must be in sensitivity";
   EXPECT_TRUE(names.count("a")) << "a (LHS index) must be in sensitivity";
   EXPECT_FALSE(names.count("y")) << "y (pure LHS) must not be in sensitivity";
@@ -389,16 +397,8 @@ TEST(AlwaysStarElab, ReadAfterWriteIntermediateInSensitivity) {
       "  end\n"
       "endmodule\n",
       f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* mod = design->top_modules[0];
-  ASSERT_EQ(mod->processes.size(), 1u);
-  auto& sens = mod->processes[0].sensitivity;
   std::unordered_set<std::string> names;
-  for (const auto& ev : sens) {
-    if (ev.signal && ev.signal->kind == ExprKind::kIdentifier)
-      names.insert(std::string(ev.signal->text));
-  }
+  CollectSensitivityNames(design, f, names);
   EXPECT_TRUE(names.count("a"));
   EXPECT_TRUE(names.count("b"));
   EXPECT_TRUE(names.count("c"));
@@ -420,16 +420,8 @@ TEST(AlwaysStarElab, ReadModifyWriteInSensitivity) {
       "  end\n"
       "endmodule\n",
       f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* mod = design->top_modules[0];
-  ASSERT_EQ(mod->processes.size(), 1u);
-  auto& sens = mod->processes[0].sensitivity;
   std::unordered_set<std::string> names;
-  for (const auto& ev : sens) {
-    if (ev.signal && ev.signal->kind == ExprKind::kIdentifier)
-      names.insert(std::string(ev.signal->text));
-  }
+  CollectSensitivityNames(design, f, names);
   EXPECT_TRUE(names.count("a"))
       << "a (appears on RHS) must be in sensitivity even though also on LHS";
 }
@@ -452,16 +444,8 @@ TEST(AlwaysStarElab, CaseItemVarsInSensitivity) {
       "  end\n"
       "endmodule\n",
       f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* mod = design->top_modules[0];
-  ASSERT_EQ(mod->processes.size(), 1u);
-  auto& sens = mod->processes[0].sensitivity;
   std::unordered_set<std::string> names;
-  for (const auto& ev : sens) {
-    if (ev.signal && ev.signal->kind == ExprKind::kIdentifier)
-      names.insert(std::string(ev.signal->text));
-  }
+  CollectSensitivityNames(design, f, names);
   EXPECT_TRUE(names.count("state"))
       << "state (case item expression) must be in sensitivity";
   EXPECT_TRUE(names.count("go"))
@@ -479,16 +463,8 @@ TEST(AlwaysStarElab, ConditionalExprInSensitivity) {
       "  end\n"
       "endmodule\n",
       f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* mod = design->top_modules[0];
-  ASSERT_EQ(mod->processes.size(), 1u);
-  auto& sens = mod->processes[0].sensitivity;
   std::unordered_set<std::string> names;
-  for (const auto& ev : sens) {
-    if (ev.signal && ev.signal->kind == ExprKind::kIdentifier)
-      names.insert(std::string(ev.signal->text));
-  }
+  CollectSensitivityNames(design, f, names);
   EXPECT_TRUE(names.count("sel"))
       << "sel (conditional expr) must be in sensitivity";
   EXPECT_TRUE(names.count("a"));
@@ -511,16 +487,8 @@ TEST(AlwaysStarElab, CaseSelectorExprInSensitivity) {
       "  end\n"
       "endmodule\n",
       f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* mod = design->top_modules[0];
-  ASSERT_EQ(mod->processes.size(), 1u);
-  auto& sens = mod->processes[0].sensitivity;
   std::unordered_set<std::string> names;
-  for (const auto& ev : sens) {
-    if (ev.signal && ev.signal->kind == ExprKind::kIdentifier)
-      names.insert(std::string(ev.signal->text));
-  }
+  CollectSensitivityNames(design, f, names);
   EXPECT_TRUE(names.count("sel"))
       << "sel (case selector) must be in sensitivity";
   EXPECT_FALSE(names.count("y")) << "y (pure LHS) must not be in sensitivity";
@@ -537,16 +505,8 @@ TEST(AlwaysStarElab, SubroutineArgInSensitivity) {
       "  always @* y = inc(a);\n"
       "endmodule\n",
       f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* mod = design->top_modules[0];
-  ASSERT_EQ(mod->processes.size(), 1u);
-  auto& sens = mod->processes[0].sensitivity;
   std::unordered_set<std::string> names;
-  for (const auto& ev : sens) {
-    if (ev.signal && ev.signal->kind == ExprKind::kIdentifier)
-      names.insert(std::string(ev.signal->text));
-  }
+  CollectSensitivityNames(design, f, names);
   EXPECT_TRUE(names.count("a")) << "a (subroutine arg) must be in sensitivity";
   EXPECT_FALSE(names.count("y")) << "y (pure LHS) must not be in sensitivity";
 }
@@ -563,16 +523,8 @@ TEST(AlwaysStarElab, BlockLocalExcludedFromSensitivity) {
       "  end\n"
       "endmodule\n",
       f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* mod = design->top_modules[0];
-  ASSERT_EQ(mod->processes.size(), 1u);
-  auto& sens = mod->processes[0].sensitivity;
   std::unordered_set<std::string> names;
-  for (const auto& ev : sens) {
-    if (ev.signal && ev.signal->kind == ExprKind::kIdentifier)
-      names.insert(std::string(ev.signal->text));
-  }
+  CollectSensitivityNames(design, f, names);
   EXPECT_TRUE(names.count("a"));
   EXPECT_TRUE(names.count("b"));
   EXPECT_FALSE(names.count("tmp"))
@@ -594,16 +546,8 @@ TEST(AlwaysStarElab, DelayControlOnlyVarExcludedFromSensitivity) {
       "  end\n"
       "endmodule\n",
       f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* mod = design->top_modules[0];
-  ASSERT_EQ(mod->processes.size(), 1u);
-  auto& sens = mod->processes[0].sensitivity;
   std::unordered_set<std::string> names;
-  for (const auto& ev : sens) {
-    if (ev.signal && ev.signal->kind == ExprKind::kIdentifier)
-      names.insert(std::string(ev.signal->text));
-  }
+  CollectSensitivityNames(design, f, names);
   EXPECT_TRUE(names.count("a")) << "a (RHS read) must be in sensitivity";
   EXPECT_FALSE(names.count("dly"))
       << "dly (only in delay control) must not be in sensitivity";
@@ -623,16 +567,8 @@ TEST(AlwaysStarElab, EventControlOnlySignalExcludedFromSensitivity) {
       "  end\n"
       "endmodule\n",
       f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* mod = design->top_modules[0];
-  ASSERT_EQ(mod->processes.size(), 1u);
-  auto& sens = mod->processes[0].sensitivity;
   std::unordered_set<std::string> names;
-  for (const auto& ev : sens) {
-    if (ev.signal && ev.signal->kind == ExprKind::kIdentifier)
-      names.insert(std::string(ev.signal->text));
-  }
+  CollectSensitivityNames(design, f, names);
   EXPECT_TRUE(names.count("a")) << "a (RHS read) must be in sensitivity";
   EXPECT_FALSE(names.count("clk"))
       << "clk (only in event control) must not be in sensitivity";
@@ -653,16 +589,8 @@ TEST(AlwaysStarElab, WaitConditionOnlyVarExcludedFromSensitivity) {
       "  end\n"
       "endmodule\n",
       f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* mod = design->top_modules[0];
-  ASSERT_EQ(mod->processes.size(), 1u);
-  auto& sens = mod->processes[0].sensitivity;
   std::unordered_set<std::string> names;
-  for (const auto& ev : sens) {
-    if (ev.signal && ev.signal->kind == ExprKind::kIdentifier)
-      names.insert(std::string(ev.signal->text));
-  }
+  CollectSensitivityNames(design, f, names);
   EXPECT_TRUE(names.count("a")) << "a (RHS read) must be in sensitivity";
   EXPECT_FALSE(names.count("en"))
       << "en (only in wait condition) must not be in sensitivity";
@@ -711,16 +639,8 @@ TEST(AlwaysStarElab, RhsIndexVarInSensitivity) {
       "  always @* y = vec[idx];\n"
       "endmodule\n",
       f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* mod = design->top_modules[0];
-  ASSERT_EQ(mod->processes.size(), 1u);
-  auto& sens = mod->processes[0].sensitivity;
   std::unordered_set<std::string> names;
-  for (const auto& ev : sens) {
-    if (ev.signal && ev.signal->kind == ExprKind::kIdentifier)
-      names.insert(std::string(ev.signal->text));
-  }
+  CollectSensitivityNames(design, f, names);
   EXPECT_TRUE(names.count("idx"))
       << "idx (RHS select index) must be in sensitivity";
   EXPECT_TRUE(names.count("vec"))
@@ -739,16 +659,8 @@ TEST(AlwaysStarElab, TimingControlSignalAlsoReadInSensitivity) {
       "  always @* #d y = d;\n"
       "endmodule\n",
       f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* mod = design->top_modules[0];
-  ASSERT_EQ(mod->processes.size(), 1u);
-  auto& sens = mod->processes[0].sensitivity;
   std::unordered_set<std::string> names;
-  for (const auto& ev : sens) {
-    if (ev.signal && ev.signal->kind == ExprKind::kIdentifier)
-      names.insert(std::string(ev.signal->text));
-  }
+  CollectSensitivityNames(design, f, names);
   EXPECT_TRUE(names.count("d"))
       << "d appears on the RHS as well, so it is not timing-control-only";
 }

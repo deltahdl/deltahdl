@@ -1,4 +1,5 @@
 #include "fixture_lexer.h"
+#include "helpers_assignment_pattern_lex.h"
 
 using namespace delta;
 
@@ -24,14 +25,7 @@ TEST(ArrayLiteralLexing, NestedArrayLiteralTokens) {
 }
 
 TEST(ArrayLiteralLexing, ReplicationArrayTokens) {
-  auto tokens = Lex("'{3{4}}");
-  ASSERT_GE(tokens.size(), 6u);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kApostropheLBrace);
-  EXPECT_EQ(tokens[1].kind, TokenKind::kIntLiteral);
-  EXPECT_EQ(tokens[2].kind, TokenKind::kLBrace);
-  EXPECT_EQ(tokens[3].kind, TokenKind::kIntLiteral);
-  EXPECT_EQ(tokens[4].kind, TokenKind::kRBrace);
-  EXPECT_EQ(tokens[5].kind, TokenKind::kRBrace);
+  ExpectReplicationPatternTokens("'{3{4}}");
 }
 
 TEST(ArrayLiteralLexing, IndexKeyDefaultTokens) {

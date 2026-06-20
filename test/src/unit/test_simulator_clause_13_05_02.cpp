@@ -1,6 +1,7 @@
 #include "builders_ast.h"
 #include "fixture_simulator.h"
 #include "helpers_queue.h"
+#include "helpers_queue_ref_method.h"
 #include "parser/ast.h"
 #include "simulator/evaluation.h"
 #include "simulator/statement_assign.h"
@@ -9,11 +10,12 @@ using namespace delta;
 
 namespace {
 
-TEST(PassByRef, WriteThroughRefModifiesCaller) {
-  FuncFixture f;
-
+// Registers a void function `add_ten(ref r) { r = r + 10; }` and creates a
+// caller variable `x` initialized to `x_init`, returning that variable. Shared
+// by the PassByRef tests that exercise the same add_ten setup.
+Variable* SetupAddTenFunc(FuncFixture& f, uint64_t x_init) {
   auto* x_var = f.ctx.CreateVariable("x", 32);
-  x_var->value = MakeLogic4VecVal(f.arena, 32, 50);
+  x_var->value = MakeLogic4VecVal(f.arena, 32, x_init);
 
   auto* func = f.arena.Create<ModuleItem>();
   func->kind = ModuleItemKind::kFunctionDecl;
@@ -25,6 +27,12 @@ TEST(PassByRef, WriteThroughRefModifiesCaller) {
                          MakeInt(f.arena, 10));
   func->func_body_stmts.push_back(MakeAssign(f.arena, "r", rhs));
   f.ctx.RegisterFunction("add_ten", func);
+  return x_var;
+}
+
+TEST(PassByRef, WriteThroughRefModifiesCaller) {
+  FuncFixture f;
+  auto* x_var = SetupAddTenFunc(f, 50);
 
   auto* call = MakeCall(f.arena, "add_ten", {MakeId(f.arena, "x")});
   EvalExpr(call, f.ctx, f.arena);
@@ -134,14 +142,7 @@ TEST(QueueRef, OutdatedByDelete) {
   SimFixture f;
   auto* q = MakeQueue(f, "q", {10, 20, 30});
 
-  RegAutoFunc(f, "test_fn",
-              {{Direction::kRef, false, false, false, {}, "v", nullptr, {}}},
-              {MakeExprStmt(f.arena, MakeMethodCall(f.arena, "q", "delete",
-                                                    {MakeInt(f.arena, 1)})),
-               MakeAssign(f.arena, "v", MakeInt(f.arena, 99))});
-
-  auto* call = MakeCall(f.arena, "test_fn", {MakeSelect(f.arena, "q", 1)});
-  EvalExpr(call, f.ctx, f.arena);
+  RunQueueRefMethodThenAssign(f, "q", "delete", {MakeInt(f.arena, 1)}, 1);
 
   ASSERT_EQ(q->elements.size(), 2u);
   EXPECT_EQ(q->elements[0].ToUint64(), 10u);
@@ -152,14 +153,7 @@ TEST(QueueRef, OutdatedByPopFront) {
   SimFixture f;
   auto* q = MakeQueue(f, "q", {10, 20, 30});
 
-  RegAutoFunc(
-      f, "test_fn",
-      {{Direction::kRef, false, false, false, {}, "v", nullptr, {}}},
-      {MakeExprStmt(f.arena, MakeMethodCall(f.arena, "q", "pop_front", {})),
-       MakeAssign(f.arena, "v", MakeInt(f.arena, 99))});
-
-  auto* call = MakeCall(f.arena, "test_fn", {MakeSelect(f.arena, "q", 0)});
-  EvalExpr(call, f.ctx, f.arena);
+  RunQueueRefMethodThenAssign(f, "q", "pop_front", {}, 0);
 
   ASSERT_EQ(q->elements.size(), 2u);
   EXPECT_EQ(q->elements[0].ToUint64(), 20u);
@@ -170,14 +164,7 @@ TEST(QueueRef, OutdatedByPopBack) {
   SimFixture f;
   auto* q = MakeQueue(f, "q", {10, 20, 30});
 
-  RegAutoFunc(
-      f, "test_fn",
-      {{Direction::kRef, false, false, false, {}, "v", nullptr, {}}},
-      {MakeExprStmt(f.arena, MakeMethodCall(f.arena, "q", "pop_back", {})),
-       MakeAssign(f.arena, "v", MakeInt(f.arena, 99))});
-
-  auto* call = MakeCall(f.arena, "test_fn", {MakeSelect(f.arena, "q", 2)});
-  EvalExpr(call, f.ctx, f.arena);
+  RunQueueRefMethodThenAssign(f, "q", "pop_back", {}, 2);
 
   ASSERT_EQ(q->elements.size(), 2u);
   EXPECT_EQ(q->elements[0].ToUint64(), 10u);
@@ -188,14 +175,7 @@ TEST(QueueRef, SurvivesPushBack) {
   SimFixture f;
   auto* q = MakeQueue(f, "q", {10, 20, 30});
 
-  RegAutoFunc(f, "test_fn",
-              {{Direction::kRef, false, false, false, {}, "v", nullptr, {}}},
-              {MakeExprStmt(f.arena, MakeMethodCall(f.arena, "q", "push_back",
-                                                    {MakeInt(f.arena, 40)})),
-               MakeAssign(f.arena, "v", MakeInt(f.arena, 99))});
-
-  auto* call = MakeCall(f.arena, "test_fn", {MakeSelect(f.arena, "q", 1)});
-  EvalExpr(call, f.ctx, f.arena);
+  RunQueueRefMethodThenAssign(f, "q", "push_back", {MakeInt(f.arena, 40)}, 1);
 
   ASSERT_EQ(q->elements.size(), 4u);
   EXPECT_EQ(q->elements[1].ToUint64(), 99u);
@@ -205,14 +185,7 @@ TEST(QueueRef, SurvivesPushFront) {
   SimFixture f;
   auto* q = MakeQueue(f, "q", {10, 20, 30});
 
-  RegAutoFunc(f, "test_fn",
-              {{Direction::kRef, false, false, false, {}, "v", nullptr, {}}},
-              {MakeExprStmt(f.arena, MakeMethodCall(f.arena, "q", "push_front",
-                                                    {MakeInt(f.arena, 5)})),
-               MakeAssign(f.arena, "v", MakeInt(f.arena, 99))});
-
-  auto* call = MakeCall(f.arena, "test_fn", {MakeSelect(f.arena, "q", 1)});
-  EvalExpr(call, f.ctx, f.arena);
+  RunQueueRefMethodThenAssign(f, "q", "push_front", {MakeInt(f.arena, 5)}, 1);
 
   ASSERT_EQ(q->elements.size(), 4u);
   EXPECT_EQ(q->elements[0].ToUint64(), 5u);
@@ -225,15 +198,8 @@ TEST(QueueRef, SurvivesInsert) {
   SimFixture f;
   auto* q = MakeQueue(f, "q", {10, 20, 30});
 
-  RegAutoFunc(f, "test_fn",
-              {{Direction::kRef, false, false, false, {}, "v", nullptr, {}}},
-              {MakeExprStmt(f.arena, MakeMethodCall(f.arena, "q", "insert",
-                                                    {MakeInt(f.arena, 0),
-                                                     MakeInt(f.arena, 5)})),
-               MakeAssign(f.arena, "v", MakeInt(f.arena, 99))});
-
-  auto* call = MakeCall(f.arena, "test_fn", {MakeSelect(f.arena, "q", 1)});
-  EvalExpr(call, f.ctx, f.arena);
+  RunQueueRefMethodThenAssign(f, "q", "insert",
+                              {MakeInt(f.arena, 0), MakeInt(f.arena, 5)}, 1);
 
   ASSERT_EQ(q->elements.size(), 4u);
   EXPECT_EQ(q->elements[0].ToUint64(), 5u);
@@ -291,14 +257,7 @@ TEST(QueueRef, DeletePreservesOtherRef) {
   SimFixture f;
   auto* q = MakeQueue(f, "q", {10, 20, 30});
 
-  RegAutoFunc(f, "test_fn",
-              {{Direction::kRef, false, false, false, {}, "v", nullptr, {}}},
-              {MakeExprStmt(f.arena, MakeMethodCall(f.arena, "q", "delete",
-                                                    {MakeInt(f.arena, 1)})),
-               MakeAssign(f.arena, "v", MakeInt(f.arena, 99))});
-
-  auto* call = MakeCall(f.arena, "test_fn", {MakeSelect(f.arena, "q", 0)});
-  EvalExpr(call, f.ctx, f.arena);
+  RunQueueRefMethodThenAssign(f, "q", "delete", {MakeInt(f.arena, 1)}, 0);
 
   ASSERT_EQ(q->elements.size(), 2u);
   EXPECT_EQ(q->elements[0].ToUint64(), 99u);
@@ -309,14 +268,7 @@ TEST(QueueRef, PopFrontPreservesOtherRef) {
   SimFixture f;
   auto* q = MakeQueue(f, "q", {10, 20, 30});
 
-  RegAutoFunc(
-      f, "test_fn",
-      {{Direction::kRef, false, false, false, {}, "v", nullptr, {}}},
-      {MakeExprStmt(f.arena, MakeMethodCall(f.arena, "q", "pop_front", {})),
-       MakeAssign(f.arena, "v", MakeInt(f.arena, 99))});
-
-  auto* call = MakeCall(f.arena, "test_fn", {MakeSelect(f.arena, "q", 2)});
-  EvalExpr(call, f.ctx, f.arena);
+  RunQueueRefMethodThenAssign(f, "q", "pop_front", {}, 2);
 
   ASSERT_EQ(q->elements.size(), 2u);
   EXPECT_EQ(q->elements[0].ToUint64(), 20u);
@@ -327,14 +279,7 @@ TEST(QueueRef, PopBackPreservesOtherRef) {
   SimFixture f;
   auto* q = MakeQueue(f, "q", {10, 20, 30});
 
-  RegAutoFunc(
-      f, "test_fn",
-      {{Direction::kRef, false, false, false, {}, "v", nullptr, {}}},
-      {MakeExprStmt(f.arena, MakeMethodCall(f.arena, "q", "pop_back", {})),
-       MakeAssign(f.arena, "v", MakeInt(f.arena, 99))});
-
-  auto* call = MakeCall(f.arena, "test_fn", {MakeSelect(f.arena, "q", 0)});
-  EvalExpr(call, f.ctx, f.arena);
+  RunQueueRefMethodThenAssign(f, "q", "pop_back", {}, 0);
 
   ASSERT_EQ(q->elements.size(), 2u);
   EXPECT_EQ(q->elements[0].ToUint64(), 99u);
@@ -343,19 +288,9 @@ TEST(QueueRef, PopBackPreservesOtherRef) {
 
 TEST(QueueRef, BoundedPushFrontOutdatesLastElement) {
   SimFixture f;
-  auto* q = f.ctx.CreateQueue("q", 32, 3);
-  for (auto v : {10u, 20u, 30u})
-    q->elements.push_back(MakeLogic4VecVal(f.arena, 32, v));
-  q->AssignFreshIds();
+  auto* q = MakeBoundedQueue(f, "q", 3, {10, 20, 30});
 
-  RegAutoFunc(f, "test_fn",
-              {{Direction::kRef, false, false, false, {}, "v", nullptr, {}}},
-              {MakeExprStmt(f.arena, MakeMethodCall(f.arena, "q", "push_front",
-                                                    {MakeInt(f.arena, 5)})),
-               MakeAssign(f.arena, "v", MakeInt(f.arena, 99))});
-
-  auto* call = MakeCall(f.arena, "test_fn", {MakeSelect(f.arena, "q", 2)});
-  EvalExpr(call, f.ctx, f.arena);
+  RunQueueRefMethodThenAssign(f, "q", "push_front", {MakeInt(f.arena, 5)}, 2);
 
   ASSERT_EQ(q->elements.size(), 3u);
   EXPECT_EQ(q->elements[0].ToUint64(), 5u);
@@ -365,20 +300,10 @@ TEST(QueueRef, BoundedPushFrontOutdatesLastElement) {
 
 TEST(QueueRef, BoundedInsertOutdatesLastElement) {
   SimFixture f;
-  auto* q = f.ctx.CreateQueue("q", 32, 3);
-  for (auto v : {10u, 20u, 30u})
-    q->elements.push_back(MakeLogic4VecVal(f.arena, 32, v));
-  q->AssignFreshIds();
+  auto* q = MakeBoundedQueue(f, "q", 3, {10, 20, 30});
 
-  RegAutoFunc(f, "test_fn",
-              {{Direction::kRef, false, false, false, {}, "v", nullptr, {}}},
-              {MakeExprStmt(f.arena, MakeMethodCall(f.arena, "q", "insert",
-                                                    {MakeInt(f.arena, 0),
-                                                     MakeInt(f.arena, 5)})),
-               MakeAssign(f.arena, "v", MakeInt(f.arena, 99))});
-
-  auto* call = MakeCall(f.arena, "test_fn", {MakeSelect(f.arena, "q", 2)});
-  EvalExpr(call, f.ctx, f.arena);
+  RunQueueRefMethodThenAssign(f, "q", "insert",
+                              {MakeInt(f.arena, 0), MakeInt(f.arena, 5)}, 2);
 
   ASSERT_EQ(q->elements.size(), 3u);
   EXPECT_EQ(q->elements[0].ToUint64(), 5u);
@@ -419,20 +344,7 @@ TEST(PassByRef, SwapViaRef) {
 
 TEST(PassByRef, NonIdentifierArgFallsBackToValueCopy) {
   FuncFixture f;
-
-  auto* x_var = f.ctx.CreateVariable("x", 32);
-  x_var->value = MakeLogic4VecVal(f.arena, 32, 5);
-
-  auto* func = f.arena.Create<ModuleItem>();
-  func->kind = ModuleItemKind::kFunctionDecl;
-  func->name = "add_ten";
-  func->return_type.kind = DataTypeKind::kVoid;
-  func->func_args = {
-      {Direction::kRef, false, false, false, {}, "r", nullptr, {}}};
-  auto* rhs = MakeBinary(f.arena, TokenKind::kPlus, MakeId(f.arena, "r"),
-                         MakeInt(f.arena, 10));
-  func->func_body_stmts.push_back(MakeAssign(f.arena, "r", rhs));
-  f.ctx.RegisterFunction("add_ten", func);
+  auto* x_var = SetupAddTenFunc(f, 5);
 
   auto* arg_expr = MakeBinary(f.arena, TokenKind::kPlus, MakeId(f.arena, "x"),
                               MakeInt(f.arena, 1));

@@ -756,6 +756,32 @@ inline void VerifyPatternKeys(const Expr* rhs,
   }
 }
 
+// Parse `src`, then verify the first initial assignment RHS is an expression of
+// the given kind with the given operator token.
+inline void VerifyInitialRhsOp(const std::string& src, ExprKind kind,
+                               TokenKind op) {
+  auto r = Parse(src);
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, kind);
+  EXPECT_EQ(rhs->op, op);
+}
+
+// Parse `src`, then verify the first initial statement expression is of the
+// given kind with the given operator token.
+inline void VerifyInitialExprOp(const std::string& src, ExprKind kind,
+                                TokenKind op) {
+  auto r = Parse(src);
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* expr = FirstInitialExpr(r);
+  ASSERT_NE(expr, nullptr);
+  EXPECT_EQ(expr->kind, kind);
+  EXPECT_EQ(expr->op, op);
+}
+
 template <typename T>
 inline void VerifyNestedPatternElements(T& r, size_t count) {
   ASSERT_NE(r.cu, nullptr);
@@ -767,5 +793,40 @@ inline void VerifyNestedPatternElements(T& r, size_t count) {
   ASSERT_EQ(stmt->rhs->elements.size(), count);
   for (size_t i = 0; i < count; ++i) {
     EXPECT_EQ(stmt->rhs->elements[i]->kind, ExprKind::kAssignmentPattern);
+  }
+}
+
+// Parse `src`, then verify the first initial statement is a single
+// event-control statement carrying exactly one non-edge (Edge::kNone) event
+// whose signal is non-null and of the given expression kind.
+inline void VerifySingleNoneEventControlSignalKind(const std::string& src,
+                                                   ExprKind signal_kind) {
+  auto r = Parse(src);
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
+  ASSERT_EQ(stmt->events.size(), 1u);
+  EXPECT_EQ(stmt->events[0].edge, Edge::kNone);
+  ASSERT_NE(stmt->events[0].signal, nullptr);
+  EXPECT_EQ(stmt->events[0].signal->kind, signal_kind);
+}
+
+// Verify a comma-separated list of hierarchical instances sharing one
+// module/interface identifier. The first `names.size()` module items are each
+// expected to be a kModuleInst with the given module name and the listed
+// instance names, in order.
+inline void VerifyHierarchicalInstanceList(
+    const std::vector<ModuleItem*>& items, const char* module_name,
+    std::initializer_list<const char*> names) {
+  ASSERT_GE(items.size(), names.size());
+  size_t i = 0;
+  for (const char* name : names) {
+    auto* inst = items[i];
+    EXPECT_EQ(inst->kind, ModuleItemKind::kModuleInst) << "instance " << i;
+    EXPECT_EQ(inst->inst_module, module_name) << "instance " << i;
+    EXPECT_EQ(inst->inst_name, name) << "instance " << i;
+    ++i;
   }
 }

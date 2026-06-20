@@ -1,6 +1,7 @@
 #include "builders_systask.h"
 #include "fixture_simulator.h"
 #include "fixture_vcd.h"
+#include "helpers_vcd_buffered_dump.h"
 #include "simulator/evaluation.h"
 #include "simulator/variable.h"
 #include "simulator/vcd_writer.h"
@@ -18,20 +19,9 @@ class DumpflushSysTask : public VcdTestBase {};
 // not yet in the file; after the production $dumpflush path runs they are.
 TEST_F(DumpflushSysTask, PushesBufferedOutputToFile) {
   SimFixture f;
-  auto* clk = MakeVar(f, "clk", 1, 1);
-  auto* data = MakeVar(f, "data", 8, 0xA5);
   VcdWriter vcd(tmp_path_);
-  vcd.WriteHeader("1ns");
-  vcd.RegisterSignal("clk", 1, clk);    // ident '!'
-  vcd.RegisterSignal("data", 8, data);  // ident '"'
-  vcd.EndDefinitions();
-  vcd.WriteTimestamp(0);
-  vcd.DumpAllValues();
+  SetupBufferedVcdDump(f, vcd, ReadVcd());
 
-  // Nothing has been flushed yet: the value records are still buffered.
-  EXPECT_EQ(ReadVcd().find("b10100101 \""), std::string::npos);
-
-  f.ctx.SetVcdWriter(&vcd);
   EvalExpr(MkSysCall(f.arena, "$dumpflush", {}), f.ctx, f.arena);
 
   // After the flush the file reflects everything dumped so far.

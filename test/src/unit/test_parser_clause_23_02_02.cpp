@@ -6,6 +6,21 @@ using namespace delta;
 
 namespace {
 
+static void ExpectWideModuleParses(int port_count) {
+  std::string src = "module wide(";
+  for (int i = 0; i < port_count; ++i) {
+    if (i > 0) src += ", ";
+    src += "input logic p";
+    src += std::to_string(i);
+  }
+  src += ");\nendmodule\n";
+  auto r = Parse(src);
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  EXPECT_EQ(r.cu->modules[0]->ports.size(), static_cast<size_t>(port_count));
+}
+
 TEST(PortDeclaration, StructAsPortType) {
   EXPECT_TRUE(ParseOk(
       "module inner(\n"
@@ -83,35 +98,11 @@ TEST(PortDeclaration, ArrayAsPortType) {
 }
 
 TEST(PortDeclaration, ModuleWithAtLeast256Ports) {
-  std::string src = "module wide(";
-  const int port_count = 300;
-  for (int i = 0; i < port_count; ++i) {
-    if (i > 0) src += ", ";
-    src += "input logic p";
-    src += std::to_string(i);
-  }
-  src += ");\nendmodule\n";
-  auto r = Parse(src);
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-  EXPECT_EQ(r.cu->modules[0]->ports.size(), static_cast<size_t>(port_count));
+  ExpectWideModuleParses(300);
 }
 
 TEST(PortDeclaration, ModuleWithExactly256Ports) {
-  std::string src = "module wide(";
-  const int port_count = 256;
-  for (int i = 0; i < port_count; ++i) {
-    if (i > 0) src += ", ";
-    src += "input logic p";
-    src += std::to_string(i);
-  }
-  src += ");\nendmodule\n";
-  auto r = Parse(src);
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-  EXPECT_EQ(r.cu->modules[0]->ports.size(), static_cast<size_t>(port_count));
+  ExpectWideModuleParses(256);
 }
 
 TEST(PortDeclaration, UnpackedArrayOfStructAsPortType) {

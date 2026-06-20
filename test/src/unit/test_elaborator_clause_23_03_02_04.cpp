@@ -1,9 +1,43 @@
 #include "common/types.h"
 #include "fixture_elaborator.h"
+#include "helpers_port_connection_elab.h"
 
 using namespace delta;
 
 namespace {
+
+// Elaborates a child with a defaulted port `b` instantiated via `connection`
+// against a top scope that declares only `a`, then resolves the port's default
+// expression and its binding so the caller can assert how `.* ` treats the
+// default (§23.3.2.4 exception 1). On success both out-params are non-null.
+void ResolveDefaultedPortB(ElabFixture& f, const std::string& connection,
+                           const Expr*& b_default,
+                           const RtlirPortBinding*& b_binding) {
+  auto* design = ElaborateSrc(
+      "module child(input logic a, input logic b = 1'b1);\n"
+      "endmodule\n"
+      "module top;\n"
+      "  logic a;\n"
+      "  child u0(" +
+          connection +
+          ");\n"
+          "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* inst = &design->top_modules[0]->children[0];
+  ASSERT_NE(inst->resolved, nullptr);
+  b_default = nullptr;
+  for (const auto& port : inst->resolved->ports) {
+    if (port.name == "b") b_default = port.default_value;
+  }
+  ASSERT_NE(b_default, nullptr);
+  b_binding = nullptr;
+  for (const auto& binding : inst->port_bindings) {
+    if (binding.port_name == "b") b_binding = &binding;
+  }
+  ASSERT_NE(b_binding, nullptr);
+}
 
 TEST(WildcardPortConnectionElaboration, WildcardCreatesBindings) {
   ElabFixture f;
@@ -28,24 +62,7 @@ TEST(WildcardPortConnectionElaboration, WildcardCreatesBindings) {
 
 TEST(WildcardPortConnectionElaboration, WildcardBindingHasCorrectDirection) {
   ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module child(input logic a, output logic b);\n"
-      "  assign b = a;\n"
-      "endmodule\n"
-      "module top;\n"
-      "  logic a, b;\n"
-      "  child u0(.*);\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* mod = design->top_modules[0];
-  const auto& bindings = mod->children[0].port_bindings;
-  ASSERT_EQ(bindings.size(), 2u);
-  EXPECT_EQ(bindings[0].port_name, "a");
-  EXPECT_EQ(bindings[0].direction, Direction::kInput);
-  EXPECT_EQ(bindings[1].port_name, "b");
-  EXPECT_EQ(bindings[1].direction, Direction::kOutput);
+  ExpectTwoPortDirections(f, ".*");
 }
 
 TEST(WildcardPortConnectionElaboration, WildcardDoesNotCreateImplicitNet) {
@@ -125,28 +142,9 @@ TEST(WildcardPortConnectionElaboration, EmptyPortOverrideSuppressesDefault) {
   // default (see DefaultValueUsedWhenNameNotInScope). Adding `.b()` to the .*
   // forces b genuinely unconnected, so the default is NOT used here.
   ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module child(input logic a, input logic b = 1'b1);\n"
-      "endmodule\n"
-      "module top;\n"
-      "  logic a;\n"
-      "  child u0(.b(), .*);\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* inst = &design->top_modules[0]->children[0];
-  ASSERT_NE(inst->resolved, nullptr);
   const Expr* b_default = nullptr;
-  for (const auto& port : inst->resolved->ports) {
-    if (port.name == "b") b_default = port.default_value;
-  }
-  ASSERT_NE(b_default, nullptr);
   const RtlirPortBinding* b_binding = nullptr;
-  for (const auto& binding : inst->port_bindings) {
-    if (binding.port_name == "b") b_binding = &binding;
-  }
-  ASSERT_NE(b_binding, nullptr);
+  ResolveDefaultedPortB(f, ".b(), .*", b_default, b_binding);
   EXPECT_NE(b_binding->connection, b_default);
 }
 
@@ -155,28 +153,9 @@ TEST(WildcardPortConnectionElaboration, DefaultValueUsedWhenNameNotInScope) {
   // when the name is absent), .* uses the port's default value for any port
   // whose name does not exist in the instantiating scope.
   ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module child(input logic a, input logic b = 1'b1);\n"
-      "endmodule\n"
-      "module top;\n"
-      "  logic a;\n"
-      "  child u0(.*);\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* inst = &design->top_modules[0]->children[0];
-  ASSERT_NE(inst->resolved, nullptr);
   const Expr* b_default = nullptr;
-  for (const auto& port : inst->resolved->ports) {
-    if (port.name == "b") b_default = port.default_value;
-  }
-  ASSERT_NE(b_default, nullptr);
   const RtlirPortBinding* b_binding = nullptr;
-  for (const auto& binding : inst->port_bindings) {
-    if (binding.port_name == "b") b_binding = &binding;
-  }
-  ASSERT_NE(b_binding, nullptr);
+  ResolveDefaultedPortB(f, ".*", b_default, b_binding);
   EXPECT_EQ(b_binding->connection, b_default);
 }
 

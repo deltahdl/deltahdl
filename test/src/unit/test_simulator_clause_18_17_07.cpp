@@ -1,4 +1,5 @@
 #include "fixture_simulator.h"
+#include "helpers_lower_run.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
 
@@ -15,45 +16,27 @@ namespace {
 // generation-time behavior, so the subclause lives at the simulator stage
 // (stmt_exec.cpp randsequence engine).
 
-uint64_t RunModule(SimFixture& f, const char* src, std::string_view var) {
-  auto* design = ElaborateSrc(src, f);
-  EXPECT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* v = f.ctx.FindVariable(var);
-  EXPECT_NE(v, nullptr);
-  return v ? v->value.ToUint64() : 0;
-}
-
 // §18.17.7: a production creates a scope encompassing all its rules and code
 // blocks, so an argument passed down is available throughout the production —
 // here read from two separate code blocks of the same production.
 TEST(RandseqValuePassingSim, ArgumentAvailableThroughoutProduction) {
   SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  int a;\n"
-      "  int b;\n"
-      "  initial begin\n"
-      "    a = 0; b = 0;\n"
-      "    randsequence(main)\n"
-      "      main : compute(9) ;\n"
-      "      compute( int v ) : { a = v; } { b = v + 1; } ;\n"
-      "    endsequence\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* va = f.ctx.FindVariable("a");
-  auto* vb = f.ctx.FindVariable("b");
-  ASSERT_NE(va, nullptr);
-  ASSERT_NE(vb, nullptr);
-  EXPECT_EQ(va->value.ToUint64(), 9u);
-  EXPECT_EQ(vb->value.ToUint64(), 10u);
+  auto [a, b] =
+      RunModuleTwoVars(f,
+                       "module t;\n"
+                       "  int a;\n"
+                       "  int b;\n"
+                       "  initial begin\n"
+                       "    a = 0; b = 0;\n"
+                       "    randsequence(main)\n"
+                       "      main : compute(9) ;\n"
+                       "      compute( int v ) : { a = v; } { b = v + 1; } ;\n"
+                       "    endsequence\n"
+                       "  end\n"
+                       "endmodule\n",
+                       "a", "b");
+  EXPECT_EQ(a, 9u);
+  EXPECT_EQ(b, 10u);
 }
 
 // §18.17.7: when no actual argument is supplied, the formal's declared default
@@ -101,30 +84,23 @@ TEST(RandseqValuePassingSim, ReturnValueReadByTriggeringProduction) {
 // and the left-to-right order in which return values become available.
 TEST(RandseqValuePassingSim, MultipleAppearancesIndexedInSyntacticOrder) {
   SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  int n;\n"
-      "  int r1;\n"
-      "  int r2;\n"
-      "  initial begin\n"
-      "    n = 0; r1 = 0; r2 = 0;\n"
-      "    randsequence(main)\n"
-      "      void main : a a { r1 = a[1]; r2 = a[2]; } ;\n"
-      "      int a : { n = n + 1; return n; } ;\n"
-      "    endsequence\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* r1 = f.ctx.FindVariable("r1");
-  auto* r2 = f.ctx.FindVariable("r2");
-  ASSERT_NE(r1, nullptr);
-  ASSERT_NE(r2, nullptr);
-  EXPECT_EQ(r1->value.ToUint64(), 1u);
-  EXPECT_EQ(r2->value.ToUint64(), 2u);
+  auto [r1, r2] =
+      RunModuleTwoVars(f,
+                       "module t;\n"
+                       "  int n;\n"
+                       "  int r1;\n"
+                       "  int r2;\n"
+                       "  initial begin\n"
+                       "    n = 0; r1 = 0; r2 = 0;\n"
+                       "    randsequence(main)\n"
+                       "      void main : a a { r1 = a[1]; r2 = a[2]; } ;\n"
+                       "      int a : { n = n + 1; return n; } ;\n"
+                       "    endsequence\n"
+                       "  end\n"
+                       "endmodule\n",
+                       "r1", "r2");
+  EXPECT_EQ(r1, 1u);
+  EXPECT_EQ(r2, 2u);
 }
 
 // §18.17.7: a production that does not specify a return type assumes a void
@@ -182,32 +158,25 @@ TEST(RandseqValuePassingSim, ArgumentInThenValueOut) {
 // left-to-right availability rule deterministically.
 TEST(RandseqValuePassingSim, OnlyAlreadyGeneratedValuesAreAvailable) {
   SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  int a;\n"
-      "  int before;\n"
-      "  int after;\n"
-      "  initial begin\n"
-      "    a = 99; before = 0; after = 0;\n"
-      "    randsequence(main)\n"
-      "      void main : { before = a; } a { after = a; } ;\n"
-      "      int a : { return 7; } ;\n"
-      "    endsequence\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* vb = f.ctx.FindVariable("before");
-  auto* va = f.ctx.FindVariable("after");
-  ASSERT_NE(vb, nullptr);
-  ASSERT_NE(va, nullptr);
+  auto [before, after] =
+      RunModuleTwoVars(f,
+                       "module t;\n"
+                       "  int a;\n"
+                       "  int before;\n"
+                       "  int after;\n"
+                       "  initial begin\n"
+                       "    a = 99; before = 0; after = 0;\n"
+                       "    randsequence(main)\n"
+                       "      void main : { before = a; } a { after = a; } ;\n"
+                       "      int a : { return 7; } ;\n"
+                       "    endsequence\n"
+                       "  end\n"
+                       "endmodule\n",
+                       "before", "after");
   // 'a' not yet generated -> outer variable; 'a' already generated -> its
   // value.
-  EXPECT_EQ(vb->value.ToUint64(), 99u);
-  EXPECT_EQ(va->value.ToUint64(), 7u);
+  EXPECT_EQ(before, 99u);
+  EXPECT_EQ(after, 7u);
 }
 
 // §18.17.7: more than one actual argument may be passed; the actuals bind to

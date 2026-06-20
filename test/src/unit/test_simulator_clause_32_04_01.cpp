@@ -9,6 +9,31 @@ using namespace delta;
 
 namespace {
 
+// Annotates `file` onto `mgr` (typical corner) and verifies that only the a->y
+// path picked up the SDF payload (13/17), while the b->y and a->z paths kept
+// their original delays. Used by the IOPATH/COND port-matching tests, whose
+// setup differs but whose post-annotation expectations are identical.
+void ExpectOnlyAToYAnnotated(const SdfFile& file, SpecifyManager& mgr) {
+  AnnotateSdfToManager(file, mgr, SdfMtm::kTypical);
+
+  ASSERT_EQ(mgr.GetPathDelays().size(), 3u);
+  bool saw_match = false;
+  for (const auto& pd : mgr.GetPathDelays()) {
+    if (pd.src_port == "a" && pd.dst_port == "y") {
+      EXPECT_EQ(pd.delays[0], 13u);
+      EXPECT_EQ(pd.delays[1], 17u);
+      saw_match = true;
+    } else if (pd.src_port == "b" && pd.dst_port == "y") {
+      EXPECT_EQ(pd.delays[0], 2u);
+    } else if (pd.src_port == "a" && pd.dst_port == "z") {
+      EXPECT_EQ(pd.delays[0], 3u);
+    } else {
+      ADD_FAILURE() << "unexpected path " << pd.src_port << "->" << pd.dst_port;
+    }
+  }
+  EXPECT_TRUE(saw_match);
+}
+
 TEST(SdfDelayMapping, BareIopathHasNoConditionAndIsNotIfnone) {
   SdfFile file;
   std::string sdf = R"(
@@ -152,24 +177,7 @@ TEST(SdfDelayMapping,
     )
   )";
   ASSERT_TRUE(ParseSdf(sdf, file));
-  AnnotateSdfToManager(file, mgr, SdfMtm::kTypical);
-
-  ASSERT_EQ(mgr.GetPathDelays().size(), 3u);
-  bool saw_match = false;
-  for (const auto& pd : mgr.GetPathDelays()) {
-    if (pd.src_port == "a" && pd.dst_port == "y") {
-      EXPECT_EQ(pd.delays[0], 13u);
-      EXPECT_EQ(pd.delays[1], 17u);
-      saw_match = true;
-    } else if (pd.src_port == "b" && pd.dst_port == "y") {
-      EXPECT_EQ(pd.delays[0], 2u);
-    } else if (pd.src_port == "a" && pd.dst_port == "z") {
-      EXPECT_EQ(pd.delays[0], 3u);
-    } else {
-      ADD_FAILURE() << "unexpected path " << pd.src_port << "->" << pd.dst_port;
-    }
-  }
-  EXPECT_TRUE(saw_match);
+  ExpectOnlyAToYAnnotated(file, mgr);
 }
 
 TEST(SdfDelayMapping, CondelseIopathAnnotatesOnlyIfnonePath) {
@@ -544,24 +552,7 @@ TEST(SdfDelayMapping, IopathOnlyAnnotatesPathsWhosePortNamesMatch) {
   cell.iopaths.push_back(io);
   file.cells.push_back(cell);
 
-  AnnotateSdfToManager(file, mgr, SdfMtm::kTypical);
-
-  ASSERT_EQ(mgr.GetPathDelays().size(), 3u);
-  bool saw_match = false;
-  for (const auto& pd : mgr.GetPathDelays()) {
-    if (pd.src_port == "a" && pd.dst_port == "y") {
-      EXPECT_EQ(pd.delays[0], 13u);
-      EXPECT_EQ(pd.delays[1], 17u);
-      saw_match = true;
-    } else if (pd.src_port == "b" && pd.dst_port == "y") {
-      EXPECT_EQ(pd.delays[0], 2u);
-    } else if (pd.src_port == "a" && pd.dst_port == "z") {
-      EXPECT_EQ(pd.delays[0], 3u);
-    } else {
-      ADD_FAILURE() << "unexpected path " << pd.src_port << "->" << pd.dst_port;
-    }
-  }
-  EXPECT_TRUE(saw_match);
+  ExpectOnlyAToYAnnotated(file, mgr);
 }
 
 TEST(SdfDelayMapping, ConditionalIopathDoesNotAnnotateIfnoneSibling) {

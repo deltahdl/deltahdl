@@ -5,6 +5,7 @@
 #include <utility>
 #include <vector>
 
+#include "helpers_coverage_point_setup.h"
 #include "simulator/coverage.h"
 
 using namespace delta;
@@ -17,15 +18,7 @@ namespace {
 TEST(PointCoverage, UserDefinedBinsCoveredOverDefined) {
   CoverageDB db;
   auto* g = db.CreateGroup("cg");
-  auto* cp = CoverageDB::AddCoverPoint(g, "x");
-  CoverBin b0;
-  b0.name = "b0";
-  b0.values = {0};
-  CoverageDB::AddBin(cp, b0);
-  CoverBin b1;
-  b1.name = "b1";
-  b1.values = {1};
-  CoverageDB::AddBin(cp, b1);
+  auto* cp = AddTwoValueBinPoint(g);
 
   db.Sample(g, {{"x", 0}});
 

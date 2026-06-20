@@ -1,5 +1,6 @@
 #include "fixture_simulator.h"
 #include "helpers_assoc.h"
+#include "helpers_assoc_first_last.h"
 #include "simulator/eval_array.h"
 
 using namespace delta;
@@ -21,14 +22,9 @@ TEST(AssocTraversal, FirstReturnsZeroOnEmpty) {
 
 TEST(AssocTraversal, FirstReturnsOneWhenWidthSufficient) {
   SimFixture f;
-  auto* aa = f.ctx.CreateAssocArray("aa", 32, false);
-  aa->index_width = 32;
-  aa->int_data[42] = MakeLogic4VecVal(f.arena, 32, 99);
-  auto* ref = f.ctx.CreateVariable("k", 32);
-  ref->value = MakeLogic4VecVal(f.arena, 32, 0);
+  Variable* ref = nullptr;
   Logic4Vec out{};
-  auto* call = MkAssocCall(f.arena, "aa", "first", "k");
-  bool ok = TryEvalAssocMethodCall(call, f.ctx, f.arena, out);
+  bool ok = EvalFirstSingleEntry42(f, 99, &ref, out);
   ASSERT_TRUE(ok);
   EXPECT_EQ(out.ToUint64(), 1u);
   EXPECT_EQ(ref->value.ToUint64(), 42u);
@@ -62,12 +58,7 @@ TEST(AssocTraversal, ByteIndexFirstReturnsOneForByteRef) {
 
 TEST(AssocTraversal, FirstStringKeyReturnsFirst) {
   SimFixture f;
-  auto* aa = f.ctx.CreateAssocArray("aa", 32, true);
-  aa->str_data["cherry"] = MakeLogic4VecVal(f.arena, 32, 3);
-  aa->str_data["apple"] = MakeLogic4VecVal(f.arena, 32, 1);
-  aa->str_data["banana"] = MakeLogic4VecVal(f.arena, 32, 2);
-  auto* ref = f.ctx.CreateVariable("s", 48);
-  ref->value = MakeLogic4VecVal(f.arena, 48, 0);
+  MakeAssocWith3StringEntries(f);
   Logic4Vec out{};
   auto* call = MkAssocCall(f.arena, "aa", "first", "s");
   bool ok = TryEvalAssocMethodCall(call, f.ctx, f.arena, out);

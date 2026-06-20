@@ -1,17 +1,15 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_precedence_rhs.h"
 
 using namespace delta;
 namespace {
 
 TEST(Precedence, ShiftLowerThanAdd) {
-  auto r = Parse(
+  auto* rhs = ParsePrecedenceRhs(
       "module t;\n"
       "  initial x = a + b << c;\n"
       "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kBinary);
   EXPECT_EQ(rhs->op, TokenKind::kLtLt);
@@ -20,12 +18,10 @@ TEST(Precedence, ShiftLowerThanAdd) {
 }
 
 TEST(Precedence, BitwiseAndHigherThanXor) {
-  auto r = Parse(
+  auto* rhs = ParsePrecedenceRhs(
       "module t;\n"
       "  initial x = a & b ^ c;\n"
       "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->op, TokenKind::kCaret);
   ASSERT_NE(rhs->lhs, nullptr);
@@ -33,12 +29,10 @@ TEST(Precedence, BitwiseAndHigherThanXor) {
 }
 
 TEST(Precedence, XorHigherThanOr) {
-  auto r = Parse(
+  auto* rhs = ParsePrecedenceRhs(
       "module t;\n"
       "  initial x = a ^ b | c;\n"
       "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->op, TokenKind::kPipe);
   ASSERT_NE(rhs->lhs, nullptr);
@@ -46,12 +40,10 @@ TEST(Precedence, XorHigherThanOr) {
 }
 
 TEST(Precedence, LogicalAndHigherThanOr) {
-  auto r = Parse(
+  auto* rhs = ParsePrecedenceRhs(
       "module t;\n"
       "  initial x = a && b || c;\n"
       "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->op, TokenKind::kPipePipe);
   ASSERT_NE(rhs->lhs, nullptr);
@@ -59,14 +51,11 @@ TEST(Precedence, LogicalAndHigherThanOr) {
 }
 
 TEST(Precedence, EquivalenceRightAssoc) {
-  auto r = Parse(
+  auto* rhs = ParsePrecedenceRhs(
       "module t;\n"
       "  logic a, b, c, d;\n"
       "  initial d = a <-> b <-> c;\n"
       "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kBinary);
   EXPECT_EQ(rhs->op, TokenKind::kLtDashGt);
@@ -76,13 +65,10 @@ TEST(Precedence, EquivalenceRightAssoc) {
 }
 
 TEST(Precedence, PowerLeftAssoc) {
-  auto r = Parse(
+  auto* rhs = ParsePrecedenceRhs(
       "module t;\n"
       "  initial x = 2 ** 3 ** 2;\n"
       "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->op, TokenKind::kPower);
   ASSERT_NE(rhs->lhs, nullptr);
@@ -90,10 +76,8 @@ TEST(Precedence, PowerLeftAssoc) {
 }
 
 TEST(Precedence, ShiftHigherThanComparison) {
-  auto r = Parse("module m; initial x = a < b << c; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
+  auto* rhs =
+      ParsePrecedenceRhs("module m; initial x = a < b << c; endmodule\n");
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kBinary);
   EXPECT_EQ(rhs->op, TokenKind::kLt);
@@ -103,10 +87,8 @@ TEST(Precedence, ShiftHigherThanComparison) {
 }
 
 TEST(Precedence, EqualityHigherThanBitwiseAnd) {
-  auto r = Parse("module m; initial x = a & b == c; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
+  auto* rhs =
+      ParsePrecedenceRhs("module m; initial x = a & b == c; endmodule\n");
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kBinary);
   EXPECT_EQ(rhs->op, TokenKind::kAmp);
@@ -116,10 +98,8 @@ TEST(Precedence, EqualityHigherThanBitwiseAnd) {
 }
 
 TEST(Precedence, BitwiseOrHigherThanLogicalAnd) {
-  auto r = Parse("module m; initial x = a && b | c; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
+  auto* rhs =
+      ParsePrecedenceRhs("module m; initial x = a && b | c; endmodule\n");
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kBinary);
   EXPECT_EQ(rhs->op, TokenKind::kAmpAmp);
@@ -129,10 +109,7 @@ TEST(Precedence, BitwiseOrHigherThanLogicalAnd) {
 }
 
 TEST(Precedence, UnaryHigherThanBinary) {
-  auto r = Parse("module m; initial x = ~a & b; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
+  auto* rhs = ParsePrecedenceRhs("module m; initial x = ~a & b; endmodule\n");
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kBinary);
   EXPECT_EQ(rhs->op, TokenKind::kAmp);
@@ -142,10 +119,8 @@ TEST(Precedence, UnaryHigherThanBinary) {
 }
 
 TEST(Precedence, PowerHigherThanMultiply) {
-  auto r = Parse("module m; initial x = a * b ** c; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
+  auto* rhs =
+      ParsePrecedenceRhs("module m; initial x = a * b ** c; endmodule\n");
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->op, TokenKind::kStar);
   ASSERT_NE(rhs->rhs, nullptr);
@@ -153,10 +128,8 @@ TEST(Precedence, PowerHigherThanMultiply) {
 }
 
 TEST(Precedence, LogicalOrHigherThanTernary) {
-  auto r = Parse("module m; initial x = a || b ? c : d; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
+  auto* rhs =
+      ParsePrecedenceRhs("module m; initial x = a || b ? c : d; endmodule\n");
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kTernary);
   ASSERT_NE(rhs->condition, nullptr);
@@ -164,14 +137,11 @@ TEST(Precedence, LogicalOrHigherThanTernary) {
 }
 
 TEST(Precedence, TernaryHigherThanImplication) {
-  auto r = Parse(
+  auto* rhs = ParsePrecedenceRhs(
       "module m;\n"
       "  logic a, b, c, d, e;\n"
       "  initial e = a -> b ? c : d;\n"
       "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kBinary);
   EXPECT_EQ(rhs->op, TokenKind::kArrow);
@@ -180,10 +150,8 @@ TEST(Precedence, TernaryHigherThanImplication) {
 }
 
 TEST(Precedence, ArithShiftSamePrecedenceAsLogicShift) {
-  auto r = Parse("module m; initial x = a <<< b >> c; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
+  auto* rhs =
+      ParsePrecedenceRhs("module m; initial x = a <<< b >> c; endmodule\n");
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->op, TokenKind::kGtGt);
   ASSERT_NE(rhs->lhs, nullptr);
@@ -191,10 +159,8 @@ TEST(Precedence, ArithShiftSamePrecedenceAsLogicShift) {
 }
 
 TEST(Precedence, MultiplyLeftAssoc) {
-  auto r = Parse("module m; initial x = a * b / c; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
+  auto* rhs =
+      ParsePrecedenceRhs("module m; initial x = a * b / c; endmodule\n");
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->op, TokenKind::kSlash);
   ASSERT_NE(rhs->lhs, nullptr);
@@ -202,10 +168,8 @@ TEST(Precedence, MultiplyLeftAssoc) {
 }
 
 TEST(Precedence, ModulusSamePrecedenceAsMultiply) {
-  auto r = Parse("module m; initial x = a % b * c; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
+  auto* rhs =
+      ParsePrecedenceRhs("module m; initial x = a % b * c; endmodule\n");
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->op, TokenKind::kStar);
   ASSERT_NE(rhs->lhs, nullptr);
@@ -213,10 +177,8 @@ TEST(Precedence, ModulusSamePrecedenceAsMultiply) {
 }
 
 TEST(Precedence, ShiftLeftAssoc) {
-  auto r = Parse("module m; initial x = a << b >> c; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
+  auto* rhs =
+      ParsePrecedenceRhs("module m; initial x = a << b >> c; endmodule\n");
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->op, TokenKind::kGtGt);
   ASSERT_NE(rhs->lhs, nullptr);
@@ -224,10 +186,8 @@ TEST(Precedence, ShiftLeftAssoc) {
 }
 
 TEST(Precedence, EqualityLeftAssoc) {
-  auto r = Parse("module m; initial x = a == b != c; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
+  auto* rhs =
+      ParsePrecedenceRhs("module m; initial x = a == b != c; endmodule\n");
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->op, TokenKind::kBangEq);
   ASSERT_NE(rhs->lhs, nullptr);
@@ -235,10 +195,8 @@ TEST(Precedence, EqualityLeftAssoc) {
 }
 
 TEST(Precedence, BitwiseAndLeftAssoc) {
-  auto r = Parse("module m; initial x = a & b & c; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
+  auto* rhs =
+      ParsePrecedenceRhs("module m; initial x = a & b & c; endmodule\n");
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->op, TokenKind::kAmp);
   ASSERT_NE(rhs->lhs, nullptr);
@@ -247,10 +205,8 @@ TEST(Precedence, BitwiseAndLeftAssoc) {
 }
 
 TEST(Precedence, BitwiseXorLeftAssoc) {
-  auto r = Parse("module m; initial x = a ^ b ^ c; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
+  auto* rhs =
+      ParsePrecedenceRhs("module m; initial x = a ^ b ^ c; endmodule\n");
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->op, TokenKind::kCaret);
   ASSERT_NE(rhs->lhs, nullptr);
@@ -259,10 +215,8 @@ TEST(Precedence, BitwiseXorLeftAssoc) {
 }
 
 TEST(Precedence, BitwiseOrLeftAssoc) {
-  auto r = Parse("module m; initial x = a | b | c; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
+  auto* rhs =
+      ParsePrecedenceRhs("module m; initial x = a | b | c; endmodule\n");
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->op, TokenKind::kPipe);
   ASSERT_NE(rhs->lhs, nullptr);
@@ -271,10 +225,8 @@ TEST(Precedence, BitwiseOrLeftAssoc) {
 }
 
 TEST(Precedence, LogicalAndLeftAssoc) {
-  auto r = Parse("module m; initial x = a && b && c; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
+  auto* rhs =
+      ParsePrecedenceRhs("module m; initial x = a && b && c; endmodule\n");
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->op, TokenKind::kAmpAmp);
   ASSERT_NE(rhs->lhs, nullptr);
@@ -283,10 +235,8 @@ TEST(Precedence, LogicalAndLeftAssoc) {
 }
 
 TEST(Precedence, LogicalOrLeftAssoc) {
-  auto r = Parse("module m; initial x = a || b || c; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
+  auto* rhs =
+      ParsePrecedenceRhs("module m; initial x = a || b || c; endmodule\n");
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->op, TokenKind::kPipePipe);
   ASSERT_NE(rhs->lhs, nullptr);
@@ -295,13 +245,10 @@ TEST(Precedence, LogicalOrLeftAssoc) {
 }
 
 TEST(Precedence, AllPrecedenceLevelsInOneExpression) {
-  auto r = Parse(
+  auto* rhs = ParsePrecedenceRhs(
       "module m;\n"
       "  initial x = a || b && c | d ^ e & f == g < h << i + j * k;\n"
       "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->op, TokenKind::kPipePipe);
 }

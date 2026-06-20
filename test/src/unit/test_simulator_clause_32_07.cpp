@@ -9,9 +9,16 @@ using namespace delta;
 
 namespace {
 
-TEST(SdfPulseLimitAnnotation,
-     IopathDelayDefaultsToFullDelayWithDefaultPercentages) {
+// Builds a manager seeded with a single-slot A->Z path delay (delays[0] = 1),
+// optionally sets the global pulse-limit percentages, then parses and annotates
+// an absolute IOPATH A Z (5) SDF cell. Fills `pd` with the resulting path
+// delay.
+static void AnnotateIopathFiveDelay(unsigned reject_pct, unsigned error_pct,
+                                    bool set_percents, PathDelay& pd) {
   SpecifyManager mgr;
+  if (set_percents) {
+    mgr.SetGlobalPulseLimitPercents(reject_pct, error_pct);
+  }
   PathDelay pre;
   pre.src_port = "A";
   pre.dst_port = "Z";
@@ -31,7 +38,13 @@ TEST(SdfPulseLimitAnnotation,
   AnnotateSdfToManager(file, mgr, SdfMtm::kTypical);
 
   ASSERT_EQ(mgr.GetPathDelays().size(), 1u);
-  const auto& pd = mgr.GetPathDelays()[0];
+  pd = mgr.GetPathDelays()[0];
+}
+
+TEST(SdfPulseLimitAnnotation,
+     IopathDelayDefaultsToFullDelayWithDefaultPercentages) {
+  PathDelay pd;
+  AnnotateIopathFiveDelay(0, 0, /*set_percents=*/false, pd);
   EXPECT_EQ(pd.delays[0], 5u);
   EXPECT_EQ(pd.reject_limit[0], 5u);
   EXPECT_EQ(pd.error_limit[0], 5u);
@@ -39,28 +52,8 @@ TEST(SdfPulseLimitAnnotation,
 
 TEST(SdfPulseLimitAnnotation,
      CustomPercentagesScaleIopathDelayIntoRejectAndErrorLimits) {
-  SpecifyManager mgr;
-  mgr.SetGlobalPulseLimitPercents(40, 80);
-  PathDelay pre;
-  pre.src_port = "A";
-  pre.dst_port = "Z";
-  pre.delay_count = 1;
-  pre.delays[0] = 1;
-  mgr.AddPathDelay(pre);
-
-  SdfFile file;
-  ASSERT_TRUE(ParseSdf(R"(
-    (DELAYFILE
-      (CELL
-        (CELLTYPE "buf")
-        (INSTANCE u1)
-        (DELAY (ABSOLUTE (IOPATH A Z (5))))))
-  )",
-                       file));
-  AnnotateSdfToManager(file, mgr, SdfMtm::kTypical);
-
-  ASSERT_EQ(mgr.GetPathDelays().size(), 1u);
-  const auto& pd = mgr.GetPathDelays()[0];
+  PathDelay pd;
+  AnnotateIopathFiveDelay(40, 80, /*set_percents=*/true, pd);
   EXPECT_EQ(pd.delays[0], 5u);
   EXPECT_EQ(pd.reject_limit[0], 2u);
   EXPECT_EQ(pd.error_limit[0], 4u);
