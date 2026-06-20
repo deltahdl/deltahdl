@@ -344,25 +344,14 @@ bool DisablesTopLevelWithLocals(const Word& word, const LvTopLevelProperty& top,
     case LvTopLevelProperty::Kind::kProperty:
       // §F.5.6.1: for T = P, w, L_0 |=^d T never holds.
       return false;
-    case LvTopLevelProperty::Kind::kDisableIff: {
+    case LvTopLevelProperty::Kind::kDisableIff:
       // §F.5.6.1: for T = disable iff (b) P, w, L_0 |=^d T iff some letter of w
       // satisfies b and both w^{0,i-1} T^omega, L_0 |= P and
       // w^{0,i-1} _|_^omega, L_0 |/= P for i the least index with w^i |= b.
-      if (!top.disable_condition || !top.property) {
-        return false;
-      }
-      const std::size_t i = FirstSatisfyingIndex(word, *top.disable_condition);
-      if (i == word.size()) {
-        return false;
-      }
-      const std::size_t reach = PropertyReach(*top.property);
-      const Word prefix = FirstLetters(word, i);
-      const Word top_completed = PrefixWithTail(prefix, LetterTop(), reach);
-      const Word bottom_completed =
-          PrefixWithTail(prefix, LetterBottom(), reach);
-      return Satisfies(top_completed, *top.property, context) &&
-             !Satisfies(bottom_completed, *top.property, context);
-    }
+      return DisableIffShape(word, top,
+                             [&context](const Word& w, const auto& p) {
+                               return Satisfies(w, p, context);
+                             });
     case LvTopLevelProperty::Kind::kParen:
       // §F.5.6.1: w, L_0 |=^d ( T ) iff w, L_0 |=^d T.
       return top.inner && DisablesTopLevelWithLocals(word, *top.inner, context);

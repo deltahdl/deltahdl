@@ -2,11 +2,13 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <memory>
 #include <set>
 #include <string>
 #include <vector>
 
 #include "elaborator/annex_f_grammar.h"
+#include "elaborator/annex_f_sequence_rewrite.h"
 #include "elaborator/annex_f_tight_satisfaction.h"
 
 // Internal helpers shared by the Annex F satisfaction layers (§F.5.2 / §F.5.3 /
@@ -125,6 +127,57 @@ bool SomeWordOfLengthSatisfies(const std::vector<Letter>& alphabet,
     }
   }
   return false;
+}
+
+// §F.5.5 (and §F.5.6.5): a sequence is nondegenerate iff some word over its
+// candidate alphabet tightly matches it. The witness search is identical
+// across the plain and local-variable layers; only the per-word slice test
+// differs, so it is passed in as a predicate. Mirrors §F.5.5's bounded search.
+template <typename SlicePredicate>
+bool IsNondegenerateSequenceImpl(const SequenceExpr& sequence,
+                                 SlicePredicate slice) {
+  std::shared_ptr<const SequenceExpr> owner;
+  const SequenceExpr* target = &sequence;
+  if (ContainsClock(sequence)) {
+    owner = RewriteClockedSequence(sequence);
+    target = owner.get();
+  }
+
+  std::set<std::string> atoms;
+  std::size_t leaf_count = 0;
+  CollectSequenceAtoms(*target, atoms, leaf_count);
+
+  const std::vector<Letter> alphabet = CandidateAlphabet(atoms);
+  const std::size_t max_length = leaf_count + 2;
+  for (std::size_t length = 1; length <= max_length; ++length) {
+    if (SomeWordOfLengthSatisfies(alphabet, length, *target, slice)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// §F.5.3.1 (and §F.5.6.1): T = disable iff (b) P disables on w iff some letter
+// of w satisfies b and, for i the least such index, w^{0,i-1} T^omega |= P and
+// w^{0,i-1} _|_^omega |/= P. Templated on the top-level property type plus the
+// satisfaction policy so the plain and local-variable (LocalContext-threading)
+// layers share one body.
+template <typename TopProperty, typename SatisfiesFn>
+bool DisableIffShape(const Word& word, const TopProperty& top,
+                     SatisfiesFn satisfies) {
+  if (!top.disable_condition || !top.property) {
+    return false;
+  }
+  const std::size_t i = FirstSatisfyingIndex(word, *top.disable_condition);
+  if (i == word.size()) {
+    return false;
+  }
+  const std::size_t reach = PropertyReach(*top.property);
+  const Word prefix = FirstLetters(word, i);
+  const Word top_completed = PrefixWithTail(prefix, LetterTop(), reach);
+  const Word bottom_completed = PrefixWithTail(prefix, LetterBottom(), reach);
+  return satisfies(top_completed, *top.property) &&
+         !satisfies(bottom_completed, *top.property);
 }
 
 // §F.5.3.3 (and §F.5.6.3): the abort/disable family shares one shape. The

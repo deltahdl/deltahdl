@@ -260,31 +260,20 @@ std::vector<LocalContext> OutputsForSlice(const Word& word, std::size_t lo,
       }
       return result;
     }
+    case SequenceExpr::Kind::kZeroOrMoreRepeat:
+      // [*0:$], produced by the §F.5.1.1 rewrite of a Boolean: the empty word
+      // leaves the context unchanged, otherwise it behaves exactly like [*1:$]
+      // and shares the kUnboundedRepeat body below.
+      if (length == 0) {
+        result.push_back(input);
+        return result;
+      }
+      [[fallthrough]];
     case SequenceExpr::Kind::kUnboundedRepeat: {
       // §F.5.5: w, L_0, L_1 |== R[*1:$] iff w = w1 w2 ... wj (j >= 1) and the
       // contexts chain L_0 = L_(0), ..., L_(j) = L_1 with each wi, L_(i-1),
       // L_(i) |== R. One piece covering the whole slice is the j = 1 case;
       // longer chains peel off a nonempty first piece and recurse.
-      AppendUniqueBranches(result,
-                           OutputsForSlice(word, lo, hi, *seq.lhs, input));
-      for (std::size_t mid = lo + 1; mid < hi; ++mid) {
-        for (const LocalContext& mid_ctx :
-             OutputsForSlice(word, lo, mid, *seq.lhs, input)) {
-          for (LocalContext out :
-               OutputsForSlice(word, mid, hi, seq, mid_ctx)) {
-            AddUnique(result, std::move(out));
-          }
-        }
-      }
-      return result;
-    }
-    case SequenceExpr::Kind::kZeroOrMoreRepeat: {
-      // [*0:$], produced by the §F.5.1.1 rewrite of a Boolean: the empty word
-      // leaves the context unchanged, otherwise it behaves like [*1:$].
-      if (length == 0) {
-        result.push_back(input);
-        return result;
-      }
       AppendUniqueBranches(result,
                            OutputsForSlice(word, lo, hi, *seq.lhs, input));
       for (std::size_t mid = lo + 1; mid < hi; ++mid) {
@@ -332,30 +321,11 @@ bool TightlySatisfiesWithLocals(const Word& word, const SequenceExpr& sequence,
 }
 
 bool IsNondegenerateSequenceWithLocals(const SequenceExpr& sequence) {
-  std::shared_ptr<const SequenceExpr> owner;
-  const SequenceExpr* target = &sequence;
-  if (ContainsClock(sequence)) {
-    owner = RewriteClockedSequence(sequence);
-    target = owner.get();
-  }
-
-  std::set<std::string> atoms;
-  std::size_t leaf_count = 0;
-  CollectSequenceAtoms(*target, atoms, leaf_count);
-
-  const std::vector<Letter> alphabet = CandidateAlphabet(atoms);
-  const std::size_t max_length = leaf_count + 2;
-  for (std::size_t length = 1; length <= max_length; ++length) {
-    if (SomeWordOfLengthSatisfies(
-            alphabet, length, *target,
-            [](const Word& word, std::size_t length, const SequenceExpr& seq) {
-              return !OutputsForSlice(word, 0, length, seq, LocalContext{})
-                          .empty();
-            })) {
-      return true;
-    }
-  }
-  return false;
+  return IsNondegenerateSequenceImpl(
+      sequence,
+      [](const Word& word, std::size_t length, const SequenceExpr& seq) {
+        return !OutputsForSlice(word, 0, length, seq, LocalContext{}).empty();
+      });
 }
 
 }  // namespace delta

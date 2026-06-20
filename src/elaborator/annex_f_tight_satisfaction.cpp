@@ -164,29 +164,11 @@ bool TightlySatisfiedByEmptyWord(const SequenceExpr& sequence) {
 }
 
 bool IsNondegenerateSequence(const SequenceExpr& sequence) {
-  std::shared_ptr<const SequenceExpr> owner;
-  const SequenceExpr* target = &sequence;
-  if (ContainsClock(sequence)) {
-    owner = RewriteClockedSequence(sequence);
-    target = owner.get();
-  }
-
-  std::set<std::string> atoms;
-  std::size_t leaf_count = 0;
-  CollectSequenceAtoms(*target, atoms, leaf_count);
-
-  const std::vector<Letter> alphabet = CandidateAlphabet(atoms);
-  const std::size_t max_length = leaf_count + 2;
-  for (std::size_t length = 1; length <= max_length; ++length) {
-    if (SomeWordOfLengthSatisfies(
-            alphabet, length, *target,
-            [](const Word& word, std::size_t length, const SequenceExpr& seq) {
-              return TightSlice(word, 0, length, seq);
-            })) {
-      return true;
-    }
-  }
-  return false;
+  return IsNondegenerateSequenceImpl(
+      sequence,
+      [](const Word& word, std::size_t length, const SequenceExpr& seq) {
+        return TightSlice(word, 0, length, seq);
+      });
 }
 
 }  // namespace delta

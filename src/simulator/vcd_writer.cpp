@@ -208,22 +208,28 @@ static char VcdLeftExtendFill(char digit) {
   return '0';
 }
 
+// Returns the 4-state digit character for bit i (numbered from the LSB) of the
+// signal's current value, treating bits beyond the stored words as 0.
+static char VcdBitChar(const VcdSignal& sig, int32_t i) {
+  uint32_t word_idx = static_cast<uint32_t>(i) / 64;
+  uint32_t bit_idx = static_cast<uint32_t>(i) % 64;
+  uint64_t mask = uint64_t{1} << bit_idx;
+  bool a = false;
+  bool b = false;
+  if (word_idx < sig.var->value.nwords) {
+    a = (sig.var->value.words[word_idx].aval & mask) != 0;
+    b = (sig.var->value.words[word_idx].bval & mask) != 0;
+  }
+  return LogicBitToChar(a, b);
+}
+
 void VcdWriter::WriteVectorChange(const VcdSignal& sig) {
   if (!sig.var) return;
   // Build the full-width value with the most significant bit first.
   std::string digits;
   digits.reserve(sig.width);
   for (int32_t i = static_cast<int32_t>(sig.width) - 1; i >= 0; --i) {
-    uint32_t word_idx = static_cast<uint32_t>(i) / 64;
-    uint32_t bit_idx = static_cast<uint32_t>(i) % 64;
-    uint64_t mask = uint64_t{1} << bit_idx;
-    bool a = false;
-    bool b = false;
-    if (word_idx < sig.var->value.nwords) {
-      a = (sig.var->value.words[word_idx].aval & mask) != 0;
-      b = (sig.var->value.words[word_idx].bval & mask) != 0;
-    }
-    digits.push_back(LogicBitToChar(a, b));
+    digits.push_back(VcdBitChar(sig, i));
   }
   // §21.7.2.2: vectors are written in the shortest right-justified form. A
   // leading digit is redundant when the left-extension rule applied to the
@@ -264,16 +270,7 @@ void VcdWriter::WritePortValueChange(const VcdSignal& sig) {
   // character.
   bool driven = false;
   for (int32_t i = static_cast<int32_t>(sig.width) - 1; i >= 0; --i) {
-    uint32_t word_idx = static_cast<uint32_t>(i) / 64;
-    uint32_t bit_idx = static_cast<uint32_t>(i) % 64;
-    uint64_t mask = uint64_t{1} << bit_idx;
-    bool a = false;
-    bool b = false;
-    if (word_idx < sig.var->value.nwords) {
-      a = (sig.var->value.words[word_idx].aval & mask) != 0;
-      b = (sig.var->value.words[word_idx].bval & mask) != 0;
-    }
-    char c = LogicBitToChar(a, b);
+    char c = VcdBitChar(sig, i);
     if (c != 'z') driven = true;
     ofs_ << c;
   }

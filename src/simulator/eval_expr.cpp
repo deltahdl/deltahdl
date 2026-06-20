@@ -113,7 +113,16 @@ static Logic4Vec ApplyRealUnaryOp(const Logic4Vec& old_val, double delta,
   return new_val;
 }
 
-Logic4Vec EvalPrefixUnary(const Expr* expr, SimContext& ctx, Arena& arena) {
+// Shared by the prefix and postfix ++/-- operators: evaluates the operand,
+// computes the incremented/decremented value, writes it back to the target,
+// and returns the {old, new} pair so each caller can return its own side.
+struct IncDecResult {
+  Logic4Vec old_val;
+  Logic4Vec new_val;
+};
+
+static IncDecResult EvalIncDec(const Expr* expr, SimContext& ctx,
+                               Arena& arena) {
   auto old_val = EvalExpr(expr->lhs, ctx, arena);
   Logic4Vec new_val;
   if (old_val.is_real) {
@@ -130,27 +139,15 @@ Logic4Vec EvalPrefixUnary(const Expr* expr, SimContext& ctx, Arena& arena) {
   } else if (expr->lhs->kind == ExprKind::kSelect) {
     TryAssocIndexedWrite(expr->lhs, new_val, ctx, arena);
   }
-  return new_val;
+  return {old_val, new_val};
+}
+
+Logic4Vec EvalPrefixUnary(const Expr* expr, SimContext& ctx, Arena& arena) {
+  return EvalIncDec(expr, ctx, arena).new_val;
 }
 
 Logic4Vec EvalPostfixUnary(const Expr* expr, SimContext& ctx, Arena& arena) {
-  auto old_val = EvalExpr(expr->lhs, ctx, arena);
-  Logic4Vec new_val;
-  if (old_val.is_real) {
-    new_val = ApplyRealUnaryOp(
-        old_val, (expr->op == TokenKind::kPlusPlus) ? 1.0 : -1.0, arena);
-  } else {
-    uint64_t v = old_val.ToUint64();
-    uint64_t nv = (expr->op == TokenKind::kPlusPlus) ? v + 1 : v - 1;
-    new_val = MakeLogic4VecVal(arena, old_val.width, nv);
-  }
-  if (expr->lhs->kind == ExprKind::kIdentifier) {
-    auto* var = ctx.FindVariable(expr->lhs->text);
-    if (var) var->value = new_val;
-  } else if (expr->lhs->kind == ExprKind::kSelect) {
-    TryAssocIndexedWrite(expr->lhs, new_val, ctx, arena);
-  }
-  return old_val;
+  return EvalIncDec(expr, ctx, arena).old_val;
 }
 
 static void BuildMemberName(const Expr* expr, std::string& out) {
