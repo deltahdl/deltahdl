@@ -490,8 +490,8 @@ static bool CheckTimingViolation(
     if (check.ref_signal != ref) continue;
     if (check.data_signal != data) continue;
     if (check.negative_timing_check_enabled) {
-      const int64_t ref_t = static_cast<int64_t>(ref_time);
-      const int64_t data_t = static_cast<int64_t>(data_time);
+      const auto ref_t = static_cast<int64_t>(ref_time);
+      const auto data_t = static_cast<int64_t>(data_time);
       const int64_t lower = ref_t - check.signed_limit;
       const int64_t upper = ref_t + check.signed_limit2;
       if (data_t > lower && data_t < upper) return true;
@@ -591,7 +591,7 @@ bool SpecifyManager::CheckNochangeViolation(std::string_view ref,
         static_cast<int64_t>(leading_ref_time) - check.start_edge_offset;
     int64_t end =
         static_cast<int64_t>(trailing_ref_time) + check.end_edge_offset;
-    int64_t t = static_cast<int64_t>(data_time);
+    auto t = static_cast<int64_t>(data_time);
 
     if (begin < t && t < end) return true;
   }
@@ -691,8 +691,8 @@ bool TimingCheckConditionEnables(TimingCheckConditionKind kind,
   if (!known) {
     return !IsDeterministicTimingCheckCondition(kind);
   }
-  const uint8_t bit = static_cast<uint8_t>(conditioning_lsb.aval & 1u);
-  const uint8_t rhs = static_cast<uint8_t>(scalar_constant_bit & 1u);
+  const auto bit = static_cast<uint8_t>(conditioning_lsb.aval & 1u);
+  const auto rhs = static_cast<uint8_t>(scalar_constant_bit & 1u);
   switch (kind) {
     case TimingCheckConditionKind::kPlain:
       return bit == 1u;

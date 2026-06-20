@@ -338,7 +338,7 @@ static Logic4Vec EvalTimeformatTask(const Expr* expr, SimContext& ctx,
         static_cast<int64_t>(EvalExpr(expr->args[0], ctx, arena).ToUint64());
     // The value arrives as an unsigned 64-bit word, so widen the negative
     // 32-bit pattern back into a signed integer for the range check.
-    int32_t units = static_cast<int32_t>(v);
+    auto units = static_cast<int32_t>(v);
     if (!TimeformatRangeOk(units)) {
       ctx.GetDiag().Error({},
                           "$timeformat units_number out of range [2 .. -15]");
@@ -349,7 +349,7 @@ static Logic4Vec EvalTimeformatTask(const Expr* expr, SimContext& ctx,
   if (expr->args.size() >= 2 && expr->args[1]) {
     auto v =
         static_cast<int64_t>(EvalExpr(expr->args[1], ctx, arena).ToUint64());
-    int32_t prec = static_cast<int32_t>(v);
+    auto prec = static_cast<int32_t>(v);
     if (!TimeformatRangeOk(prec)) {
       ctx.GetDiag().Error(
           {}, "$timeformat precision_number out of range [2 .. -15]");

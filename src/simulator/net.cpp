@@ -31,13 +31,13 @@ struct StrengthComponent {
 static void CollectComponents(NetStrength s,
                               std::vector<StrengthComponent>& out) {
   if (s.s0_hi != Strength::kHighz) {
-    for (uint8_t lvl = static_cast<uint8_t>(s.s0_lo);
+    for (auto lvl = static_cast<uint8_t>(s.s0_lo);
          lvl <= static_cast<uint8_t>(s.s0_hi); ++lvl) {
       out.push_back({0, lvl});
     }
   }
   if (s.s1_hi != Strength::kHighz) {
-    for (uint8_t lvl = static_cast<uint8_t>(s.s1_lo);
+    for (auto lvl = static_cast<uint8_t>(s.s1_lo);
          lvl <= static_cast<uint8_t>(s.s1_hi); ++lvl) {
       out.push_back({1, lvl});
     }

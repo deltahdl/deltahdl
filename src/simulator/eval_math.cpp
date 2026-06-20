@@ -193,7 +193,7 @@ static double RefUniform(int32_t* seed, int32_t start, int32_t end) {
   uint32_t bits = (static_cast<uint32_t>(*seed) >> 9) | 0x3f800000u;
   float fs = 0.0F;
   std::memcpy(&fs, &bits, sizeof(fs));
-  double c = static_cast<double>(fs);
+  auto c = static_cast<double>(fs);
   c = c + (c * d);
   c = ((b - a) * (c - 1.0)) + a;
   return c;
@@ -261,8 +261,8 @@ static double RefT(int32_t* seed, int32_t deg_of_free) {
 static double RefErlangian(int32_t* seed, int32_t k, int32_t mean) {
   double x = 1.0;
   for (int32_t i = 1; i <= k; i++) x = x * RefUniform(seed, 0, 1);
-  double a = static_cast<double>(mean);
-  double b = static_cast<double>(k);
+  auto a = static_cast<double>(mean);
+  auto b = static_cast<double>(k);
   return -a * std::log(x) / b;
 }
 

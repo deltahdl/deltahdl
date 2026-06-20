@@ -222,7 +222,7 @@ static std::string FormatDecimalXZ(const Logic4Vec& val) {
 // string.
 std::string FormatTimeUnderTimeformat(const Logic4Vec& val,
                                       const TimeFormatSpec& spec) {
-  double ticks = static_cast<double>(val.ToUint64());
+  auto ticks = static_cast<double>(val.ToUint64());
   char buf[64];
   std::snprintf(buf, sizeof(buf), "%.*f", spec.precision_number, ticks);
   std::string body(buf);

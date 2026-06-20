@@ -149,7 +149,7 @@ static int64_t Clog2(int64_t val) {
   // The argument is treated as an unsigned value, so reinterpret the bit
   // pattern as unsigned rather than special-casing negative inputs. An
   // argument of 0 (or 1) yields 0.
-  uint64_t v = static_cast<uint64_t>(val);
+  auto v = static_cast<uint64_t>(val);
   if (v <= 1) return 0;
   int64_t result = 0;
   uint64_t shifted = v - 1;

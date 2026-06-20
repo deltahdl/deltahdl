@@ -818,7 +818,7 @@ void ScheduleNonblockingAssign(const Stmt* stmt, const Logic4Vec& rhs_val,
     const Expr* lhs = stmt->lhs;
     auto idx_val = EvalExpr(lhs->index, ctx, arena);
     if (HasUnknownBits(idx_val)) return;
-    uint32_t idx = static_cast<uint32_t>(idx_val.ToUint64());
+    auto idx = static_cast<uint32_t>(idx_val.ToUint64());
 
     if (!lhs->index_end) {
       event->callback = [var, idx, rhs_val, &arena]() {

@@ -38,8 +38,7 @@ static bool ExprRefsThisOrSuper(const Expr* e) {
   for (const auto* arg : e->args) {
     if (ExprRefsThisOrSuper(arg)) return true;
   }
-  if (ExprRefsThisOrSuper(e->with_expr)) return true;
-  return false;
+  return ExprRefsThisOrSuper(e->with_expr);
 }
 
 static bool StmtRefsThisOrSuper(const Stmt* s) {
@@ -102,8 +101,7 @@ static bool ExprRefsNonStaticMember(
   for (const auto* arg : e->args) {
     if (ExprRefsNonStaticMember(arg, non_static, locals)) return true;
   }
-  if (ExprRefsNonStaticMember(e->with_expr, non_static, locals)) return true;
-  return false;
+  return ExprRefsNonStaticMember(e->with_expr, non_static, locals);
 }
 
 static bool StmtRefsNonStaticMember(
@@ -456,8 +454,7 @@ static bool ExprRefsSuper(const Expr* e) {
     if (ExprRefsSuper(elem)) return true;
   for (const auto* arg : e->args)
     if (ExprRefsSuper(arg)) return true;
-  if (ExprRefsSuper(e->with_expr)) return true;
-  return false;
+  return ExprRefsSuper(e->with_expr);
 }
 
 static bool StmtRefsSuper(const Stmt* s) {

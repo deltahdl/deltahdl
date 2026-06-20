@@ -81,10 +81,7 @@ bool IsEventTypedFormalCompatibleWithEdgeIdentifierUse(
     bool formal_typed_event, bool actual_combined_with_edge_identifier) {
   // §16.8.1: an event-typed formal is incompatible with an actual that will
   // be combined with an edge_identifier; every other combination is fine.
-  if (formal_typed_event && actual_combined_with_edge_identifier) {
-    return false;
-  }
-  return true;
+  return !(formal_typed_event && actual_combined_with_edge_identifier);
 }
 
 }  // namespace delta

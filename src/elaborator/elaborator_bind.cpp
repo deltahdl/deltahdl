@@ -305,10 +305,8 @@ bool ExportPrototypeMatchesBody(const ModuleItem* proto,
   }
   // A modport function prototype keeps its return type in `data_type`, while an
   // out-of-block body keeps it in `return_type`; compare the matching fields.
-  if (proto->kind == ModuleItemKind::kFunctionDecl &&
-      !TypesMatch(proto->data_type, body->return_type))
-    return false;
-  return true;
+  return !(proto->kind == ModuleItemKind::kFunctionDecl &&
+           !TypesMatch(proto->data_type, body->return_type));
 }
 
 }  // namespace

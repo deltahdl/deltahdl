@@ -172,7 +172,7 @@ std::string_view VpiClassTypespecParamRhs(const ClassTypespecParamAssign& pa) {
 // a non-static member reached only via the typespec.
 bool VpiClassTypespecValueAccessAllowed(bool obtained_from_class_typespec,
                                         bool is_static) {
-  return !(obtained_from_class_typespec && !is_static);
+  return !obtained_from_class_typespec || is_static;
 }
 
 // §37.32: drop inline constraints, then order the rest by declaration order,

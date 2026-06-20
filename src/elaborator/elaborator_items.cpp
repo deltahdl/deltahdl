@@ -300,7 +300,7 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
                       "gate or switch instance range bound is not a constant "
                       "expression");
         } else {
-          uint32_t array_len = static_cast<uint32_t>(std::abs(*lhi - *rhi) + 1);
+          auto array_len = static_cast<uint32_t>(std::abs(*lhi - *rhi) + 1);
           for (auto* term : item->gate_terminals) {
             uint32_t w = LookupLhsWidth(term, mod);
             if (w == 0) continue;

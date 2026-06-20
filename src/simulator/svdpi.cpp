@@ -154,7 +154,7 @@ void svPutPartselLogic(svLogicVecVal* d, svLogicVecVal s, int i, int w) {
 // queried quantity exactly as 20.7 prescribes.
 static const svOpenArrayDimRange* svResolveDim(svOpenArrayHandle h, int d) {
   if (h == nullptr) return nullptr;
-  const svOpenArrayDesc* desc = static_cast<const svOpenArrayDesc*>(h);
+  const auto* desc = static_cast<const svOpenArrayDesc*>(h);
   if (desc->ranges == nullptr || d < 0 || d >= desc->n_dims) return nullptr;
   return &desc->ranges[d];
 }
@@ -256,7 +256,7 @@ bool svUnpackedPos(const svOpenArrayDimRange& r, int idx, int* pos) {
 void* svElemBase(svOpenArrayHandle h, const int* idx, int n_idx,
                  size_t word_size, int* words) {
   if (h == nullptr) return nullptr;
-  const svOpenArrayDesc* desc = static_cast<const svOpenArrayDesc*>(h);
+  const auto* desc = static_cast<const svOpenArrayDesc*>(h);
   if (desc->data == nullptr || desc->ranges == nullptr) return nullptr;
   if (n_idx != desc->n_dims - 1) return nullptr;
   long linear = 0;
@@ -284,7 +284,7 @@ void* svElemBase(svOpenArrayHandle h, const int* idx, int n_idx,
 // requires nullptr.
 void* svElemAddr(svOpenArrayHandle h, const int* idx, int n_idx) {
   if (h == nullptr) return nullptr;
-  const svOpenArrayDesc* desc = static_cast<const svOpenArrayDesc*>(h);
+  const auto* desc = static_cast<const svOpenArrayDesc*>(h);
   if (desc->data == nullptr || desc->ranges == nullptr) return nullptr;
   if (desc->elem_size == 0) return nullptr;
   if (n_idx != desc->n_dims - 1) return nullptr;
@@ -303,7 +303,7 @@ void svPutBitElem(svOpenArrayHandle d, const svBitVecVal* s, const int* idx,
   int words = 0;
   void* base = svElemBase(d, idx, n, sizeof(svBitVecVal), &words);
   if (base == nullptr) return;
-  svBitVecVal* dst = static_cast<svBitVecVal*>(base);
+  auto* dst = static_cast<svBitVecVal*>(base);
   for (int w = 0; w < words; ++w) dst[w] = s[w];
 }
 
@@ -311,7 +311,7 @@ void svGetBitElem(svBitVecVal* d, svOpenArrayHandle s, const int* idx, int n) {
   int words = 0;
   void* base = svElemBase(s, idx, n, sizeof(svBitVecVal), &words);
   if (base == nullptr) return;
-  const svBitVecVal* src = static_cast<const svBitVecVal*>(base);
+  const auto* src = static_cast<const svBitVecVal*>(base);
   for (int w = 0; w < words; ++w) d[w] = src[w];
 }
 
@@ -320,7 +320,7 @@ void svPutLogicElem(svOpenArrayHandle d, const svLogicVecVal* s, const int* idx,
   int words = 0;
   void* base = svElemBase(d, idx, n, sizeof(svLogicVecVal), &words);
   if (base == nullptr) return;
-  svLogicVecVal* dst = static_cast<svLogicVecVal*>(base);
+  auto* dst = static_cast<svLogicVecVal*>(base);
   for (int w = 0; w < words; ++w) dst[w] = s[w];
 }
 
@@ -355,7 +355,7 @@ void svPutBitScalarElem(svOpenArrayHandle d, svBit value, const int* idx,
   void* base = svElemBase(d, idx, n, sizeof(svBitVecVal), &words);
   (void)words;
   if (base == nullptr) return;
-  svBitVecVal* dst = static_cast<svBitVecVal*>(base);
+  auto* dst = static_cast<svBitVecVal*>(base);
   if (value & 1u) {
     dst[0] |= 1u;
   } else {
@@ -368,7 +368,7 @@ svLogic svGetLogicScalarElem(svOpenArrayHandle s, const int* idx, int n) {
   void* base = svElemBase(s, idx, n, sizeof(svLogicVecVal), &words);
   (void)words;
   if (base == nullptr) return 0;
-  const svLogicVecVal* src = static_cast<const svLogicVecVal*>(base);
+  const auto* src = static_cast<const svLogicVecVal*>(base);
   uint32_t a_bit = src[0].aval & 1u;
   uint32_t b_bit = src[0].bval & 1u;
   // Decode bit 0 of the canonical aval/bval pair to a four-state scalar, the
@@ -384,7 +384,7 @@ void svPutLogicScalarElem(svOpenArrayHandle d, svLogic value, const int* idx,
   void* base = svElemBase(d, idx, n, sizeof(svLogicVecVal), &words);
   (void)words;
   if (base == nullptr) return;
-  svLogicVecVal* dst = static_cast<svLogicVecVal*>(base);
+  auto* dst = static_cast<svLogicVecVal*>(base);
   switch (value) {
     case sv_0:
       dst[0].aval &= ~1u;

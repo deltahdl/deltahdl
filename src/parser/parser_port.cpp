@@ -10,10 +10,10 @@ namespace delta {
 
 static bool IsValidCIdentifier(std::string_view text) {
   if (text.empty()) return false;
-  unsigned char first = static_cast<unsigned char>(text.front());
+  auto first = static_cast<unsigned char>(text.front());
   if (!std::isalpha(first) && first != '_') return false;
   for (char ch : text.substr(1)) {
-    unsigned char c = static_cast<unsigned char>(ch);
+    auto c = static_cast<unsigned char>(ch);
     if (!std::isalnum(c) && c != '_') return false;
   }
   return true;

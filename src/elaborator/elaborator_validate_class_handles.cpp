@@ -142,7 +142,7 @@ static void CheckClassHandleExpr(
   if (e->kind == ExprKind::kCast && !e->text.empty() &&
       FindClassDecl(e->text, unit) != nullptr && e->lhs &&
       !IsClassVar(e->lhs, class_vars) &&
-      !(e->lhs->kind == ExprKind::kIdentifier && e->lhs->text == "null")) {
+      (e->lhs->kind != ExprKind::kIdentifier || e->lhs->text != "null")) {
     diag.Error(e->range.start, "cannot cast non-class value to a class type");
   }
 

@@ -63,7 +63,7 @@ static void CheckStmtForRefArgs(
     const Stmt* s, const std::unordered_set<std::string_view>& ref_names,
     bool is_fork_block_item, DiagEngine& diag) {
   if (!s) return;
-  if (!(is_fork_block_item && s->kind == StmtKind::kVarDecl))
+  if (!is_fork_block_item || s->kind != StmtKind::kVarDecl)
     CheckExprForRefArgs(s->var_init, ref_names, diag);
   CheckExprForRefArgs(s->expr, ref_names, diag);
   CheckExprForRefArgs(s->lhs, ref_names, diag);

@@ -66,11 +66,11 @@ bool Lexer::IsSimplePragmaIdentifier(std::string_view word) {
     return false;
   }
   char first = word.front();
-  if (!(std::isalpha(static_cast<unsigned char>(first)) || first == '_')) {
+  if (!std::isalpha(static_cast<unsigned char>(first)) && first != '_') {
     return false;
   }
   for (char c : word) {
-    if (!(std::isalnum(static_cast<unsigned char>(c)) || c == '_')) {
+    if (!std::isalnum(static_cast<unsigned char>(c)) && c != '_') {
       return false;
     }
   }
@@ -783,7 +783,7 @@ Token Lexer::LexEscapedIdentifier() {
   Advance();
   uint32_t start = pos_;
   while (!AtEnd()) {
-    unsigned char c = static_cast<unsigned char>(Current());
+    auto c = static_cast<unsigned char>(Current());
     if (std::isspace(c)) {
       break;
     }

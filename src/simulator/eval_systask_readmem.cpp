@@ -116,7 +116,7 @@ static void ScanMemFile(const std::string& content, AddrFn on_addr,
     }
     if (c == '/' && pos + 1 < n && content[pos + 1] == '*') {
       pos += 2;
-      while (pos + 1 < n && !(content[pos] == '*' && content[pos + 1] == '/')) {
+      while (pos + 1 < n && (content[pos] != '*' || content[pos + 1] != '/')) {
         ++pos;
       }
       pos = (pos + 1 < n) ? pos + 2 : n;
@@ -140,7 +140,7 @@ static void ScanMemFile(const std::string& content, AddrFn on_addr,
     if (tok[0] == '@') {
       // §21.4: an @-address is a hexadecimal index that repositions the load
       // cursor; no white space separates the '@' from its digits.
-      int64_t addr =
+      auto addr =
           static_cast<int64_t>(std::strtoull(tok.c_str() + 1, nullptr, 16));
       if (!on_addr(addr)) return;
     } else {
@@ -241,7 +241,7 @@ static void EvalReadmemIndexed(SimContext& ctx, Arena& arena, bool is_hex,
   // issued. Addresses not covered by the file are left unmodified, which the
   // write loop above already guarantees.
   if (!aborted && has_start && has_finish && !addr_in_file) {
-    uint64_t span = static_cast<uint64_t>(task_hi - task_lo + 1);
+    auto span = static_cast<uint64_t>(task_hi - task_lo + 1);
     if (data_words != span) {
       ctx.GetDiag().Warning(
           {}, "$readmem" + std::string(is_hex ? "h" : "b") +
@@ -328,7 +328,7 @@ static void EvalReadmemMultiDim(SimContext& ctx, Arena& arena, bool is_hex,
   for (size_t d = 1; d < ndim; ++d) inner *= sizes[d];
   if (inner == 0) return;
 
-  const int64_t top_lo = static_cast<int64_t>(los[0]);
+  const auto top_lo = static_cast<int64_t>(los[0]);
   const int64_t top_hi = top_lo + static_cast<int64_t>(sizes[0]) - 1;
 
   // §21.4.3: a global position numbers every element of the array in row-major

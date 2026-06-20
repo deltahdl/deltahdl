@@ -410,7 +410,7 @@ bool TypesMatch(const DataType& a, const DataType& b) {
     auto left = ConstEvalInt(vec->packed_dim_left);
     auto right = ConstEvalInt(vec->packed_dim_right);
     if (!left || !right || *right != 0 || *left < 0) return false;
-    uint32_t vec_width = static_cast<uint32_t>(*left + 1);
+    auto vec_width = static_cast<uint32_t>(*left + 1);
     return vec_width == EvalTypeWidth(*predef);
   }
 

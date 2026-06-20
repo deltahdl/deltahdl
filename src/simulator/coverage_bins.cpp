@@ -141,7 +141,7 @@ std::vector<std::vector<int64_t>> CoverageDB::DistributeValues(
   std::vector<std::vector<int64_t>> bins;
   if (num_bins == 0) return bins;
   bins.resize(num_bins);
-  int64_t total = static_cast<int64_t>(values.size());
+  auto total = static_cast<int64_t>(values.size());
   int64_t per_bin = total / static_cast<int64_t>(num_bins);
   if (per_bin < 1) per_bin = 1;
   size_t cursor = 0;

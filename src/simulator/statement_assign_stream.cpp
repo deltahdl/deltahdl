@@ -430,7 +430,7 @@ void UnpackStreamingConcatLhs(const Expr* lhs, const Logic4Vec& rhs_val,
       if (qpos != std::string::npos) {
         auto qname = std::string_view(ei.target_name).substr(0, qpos);
         auto idx_str = ei.target_name.substr(qpos + 5);
-        uint32_t idx = static_cast<uint32_t>(std::stoul(idx_str));
+        auto idx = static_cast<uint32_t>(std::stoul(idx_str));
         auto* queue = ctx.FindQueue(qname);
         if (queue && idx < queue->elements.size()) {
           queue->elements[idx] = ExtractStreamBits(stream, bit_offset, ei.width,
