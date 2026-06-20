@@ -33,8 +33,8 @@
 
 namespace {
 
-svOpenArrayHandle MakeHandle(const svOpenArrayDimRange* ranges, int n_dims,
-                             svOpenArrayDesc* desc) {
+svOpenArrayHandle MakeHandle(const SvOpenArrayDimRange* ranges, int n_dims,
+                             SvOpenArrayDesc* desc) {
   desc->data = nullptr;
   desc->n_dims = n_dims;
   desc->ranges = ranges;
@@ -104,8 +104,8 @@ TEST(MappingSvRangesToCRanges, UnpackedNaturalOrderMinToZeroMaxToAbs) {
   const Case cases[] = {{0, 7}, {7, 0}, {-1, -8}};
   for (const Case& c : cases) {
     // Dimension 0 is an unused packed placeholder; dimension 1 is under test.
-    const svOpenArrayDimRange ranges[] = {{0, 0}, {c.l, c.r}};
-    svOpenArrayDesc desc;
+    const SvOpenArrayDimRange ranges[] = {{0, 0}, {c.l, c.r}};
+    SvOpenArrayDesc desc;
     svOpenArrayHandle h = MakeHandle(ranges, 2, &desc);
 
     ExpectUnpackedNaturalOrderMinToZeroMaxToAbs(h, 1, c.l, c.r);
@@ -117,8 +117,8 @@ TEST(MappingSvRangesToCRanges, UnpackedNaturalOrderMinToZeroMaxToAbs) {
 // layout preserves the ascending element order independent of the declared
 // range orientation. Verified against a descending declaration [3:-2].
 TEST(MappingSvRangesToCRanges, UnpackedLowerIndicesGoFirst) {
-  const svOpenArrayDimRange ranges[] = {{0, 0}, {3, -2}};  // unpacked [3:-2].
-  svOpenArrayDesc desc;
+  const SvOpenArrayDimRange ranges[] = {{0, 0}, {3, -2}};  // unpacked [3:-2].
+  SvOpenArrayDesc desc;
   svOpenArrayHandle h = MakeHandle(ranges, 2, &desc);
 
   const int lo = svLow(h, 1);     // -2
@@ -150,8 +150,8 @@ TEST(MappingSvRangesToCRanges, WorkedExampleNormalizedForm) {
 
   // Descriptor: dim 0 = linearized+normalized packed part [17:0];
   // dim 1 = unpacked [1:10]; dim 2 = unpacked [31:0].
-  const svOpenArrayDimRange ranges[] = {{17, 0}, {1, 10}, {31, 0}};
-  svOpenArrayDesc desc;
+  const SvOpenArrayDimRange ranges[] = {{17, 0}, {1, 10}, {31, 0}};
+  SvOpenArrayDesc desc;
   svOpenArrayHandle h = MakeHandle(ranges, 3, &desc);
 
   // Packed part normalizes to [17:0]: size 18, MSB normalized index 17.
@@ -225,8 +225,8 @@ TEST(MappingSvRangesToCRanges, PackedRangeWiderThanCanonicalWordNormalizes) {
 // coincident bound and unit count, and the lone element's C index (sv - svLow)
 // is zero even for a negative declared index.
 TEST(MappingSvRangesToCRanges, SingleElementUnpackedDimensionMapsToZero) {
-  const svOpenArrayDimRange ranges[] = {{0, 0}, {-4, -4}};  // unpacked [-4:-4].
-  svOpenArrayDesc desc;
+  const SvOpenArrayDimRange ranges[] = {{0, 0}, {-4, -4}};  // unpacked [-4:-4].
+  SvOpenArrayDesc desc;
   svOpenArrayHandle h = MakeHandle(ranges, 2, &desc);
 
   EXPECT_EQ(svLow(h, 1), -4);

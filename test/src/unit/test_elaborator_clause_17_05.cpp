@@ -126,7 +126,7 @@ TEST(CheckerProcedures, CombAndLatchExpressionsAreNotImplicitlySampled) {
 TEST(CheckerProcedures, ClockInferenceDefersToTheSharedInferenceRules) {
   // §17.5: clock inference for checker procedures follows the rules in
   // §16.14.6; those rules are owned there, not redefined here.
-  EXPECT_TRUE(CheckerProcedureClockInferenceFollowsSection16_14_6());
+  EXPECT_TRUE(CheckerProcedureClockInferenceFollowsSection16146());
 }
 
 TEST(CheckerProcedures, FinalProcedureMatchesModuleSemantics) {

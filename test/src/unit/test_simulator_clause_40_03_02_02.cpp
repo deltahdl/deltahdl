@@ -42,9 +42,9 @@ constexpr int kStart = 0;
 constexpr int kReset = 2;
 
 // §40.3.1 status values that $coverage_get_max can report, as signed integers.
-constexpr int kError = static_cast<int>(CoverageStatus::Error);
-constexpr int kNoCov = static_cast<int>(CoverageStatus::NoCoverage);
-constexpr int kOverflow = static_cast<int>(CoverageStatus::Overflow);
+constexpr int kError = static_cast<int>(CoverageStatus::kError);
+constexpr int kNoCov = static_cast<int>(CoverageStatus::kNoCoverage);
+constexpr int kOverflow = static_cast<int>(CoverageStatus::kOverflow);
 
 constexpr std::string_view kScope = "$root.tb.unit1";
 
@@ -117,7 +117,7 @@ TEST(CoverageGetMax, CountExceedingIntegerRangeOverflows) {
 TEST(CoverageGetMax, MaximumStaysConstantAcrossCollectionChanges) {
   SimFixture f;
   Cov(f).SetCoverableItems(std::string(kScope), kToggle, 48);
-  Cov(f).SetAvailability(std::string(kScope), CoverageAvailability::Full);
+  Cov(f).SetAvailability(std::string(kScope), CoverageAvailability::kFull);
 
   const int before = RunGetMax(f, kToggle, kScope);
   RunControl(f, kStart, kScope);

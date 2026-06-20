@@ -41,9 +41,9 @@ constexpr int kAssertion = 20;
 constexpr int kToggle = 23;
 
 // §40.3.1 status values that $coverage_save can report, as signed integers.
-constexpr int kOk = static_cast<int>(CoverageStatus::Ok);
-constexpr int kError = static_cast<int>(CoverageStatus::Error);
-constexpr int kNoCov = static_cast<int>(CoverageStatus::NoCoverage);
+constexpr int kOk = static_cast<int>(CoverageStatus::kOk);
+constexpr int kError = static_cast<int>(CoverageStatus::kError);
+constexpr int kNoCov = static_cast<int>(CoverageStatus::kNoCoverage);
 
 constexpr std::string_view kName = "run.cov";
 
@@ -133,8 +133,8 @@ TEST(CoverageSave, OverwritingAnExistingNameIsNotAnError) {
 TEST(CoverageSave, SavingDoesNotAffectCollectionState) {
   SimFixture f;
   const std::string scope = "top";
-  Cov(f).SetAvailability(scope, CoverageAvailability::Full);
-  Cov(f).Control(CoverageControl::Start, scope);
+  Cov(f).SetAvailability(scope, CoverageAvailability::kFull);
+  Cov(f).Control(CoverageControl::kStart, scope);
   Cov(f).SetCoveredItems(scope, kToggle, 7);
   Cov(f).SetCoverageAvailableForSave(kToggle, true);
 

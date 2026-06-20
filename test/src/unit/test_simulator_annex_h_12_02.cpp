@@ -15,14 +15,14 @@
 //        (which is one-dimensional) and dimensions greater than 0 refer to the
 //        unpacked part.
 //
-// These tests build an svOpenArrayHandle backed by an svOpenArrayDesc carrying
+// These tests build an svOpenArrayHandle backed by an SvOpenArrayDesc carrying
 // distinct packed and unpacked ranges and observe the svdpi.cpp query functions
 // applying those two rules.
 
 namespace {
 
-svOpenArrayHandle MakeHandle(const svOpenArrayDimRange* ranges, int n_dims,
-                             svOpenArrayDesc* desc) {
+svOpenArrayHandle MakeHandle(const SvOpenArrayDimRange* ranges, int n_dims,
+                             SvOpenArrayDesc* desc) {
   desc->data = nullptr;
   desc->n_dims = n_dims;
   desc->ranges = ranges;
@@ -34,8 +34,8 @@ svOpenArrayHandle MakeHandle(const svOpenArrayDimRange* ranges, int n_dims,
 // successive unpacked ranges, never confusing one for another. The handle
 // models: logic [15:0] arr [0:7] [-1:-8].
 TEST(ArrayQueryingFunctions, DimensionZeroIsPackedPart) {
-  const svOpenArrayDimRange ranges[] = {{15, 0}, {0, 7}, {-1, -8}};
-  svOpenArrayDesc desc;
+  const SvOpenArrayDimRange ranges[] = {{15, 0}, {0, 7}, {-1, -8}};
+  SvOpenArrayDesc desc;
   svOpenArrayHandle h = MakeHandle(ranges, 3, &desc);
 
   // Dimension 0 is the packed part [15:0].
@@ -53,8 +53,8 @@ TEST(ArrayQueryingFunctions, DimensionZeroIsPackedPart) {
 // the smaller bound, high the larger, size the element count - for an ascending
 // unpacked range.
 TEST(ArrayQueryingFunctions, LowHighSizeMatchTwentySevenSemanticsAscending) {
-  const svOpenArrayDimRange ranges[] = {{15, 0}, {0, 7}};
-  svOpenArrayDesc desc;
+  const SvOpenArrayDimRange ranges[] = {{15, 0}, {0, 7}};
+  SvOpenArrayDesc desc;
   svOpenArrayHandle h = MakeHandle(ranges, 2, &desc);
 
   // Unpacked [0:7]: low=0, high=7, size=8.
@@ -66,8 +66,8 @@ TEST(ArrayQueryingFunctions, LowHighSizeMatchTwentySevenSemanticsAscending) {
 // Q1: the same derivations hold for the descending packed range, and for a
 // range whose bounds are negative - low/high are orientation-independent.
 TEST(ArrayQueryingFunctions, LowHighSizeMatchTwentySevenSemanticsDescending) {
-  const svOpenArrayDimRange ranges[] = {{15, 0}, {-1, -8}};
-  svOpenArrayDesc desc;
+  const SvOpenArrayDimRange ranges[] = {{15, 0}, {-1, -8}};
+  SvOpenArrayDesc desc;
   svOpenArrayHandle h = MakeHandle(ranges, 2, &desc);
 
   // Packed [15:0]: low=0, high=15, size=16.
@@ -85,8 +85,8 @@ TEST(ArrayQueryingFunctions, LowHighSizeMatchTwentySevenSemanticsDescending) {
 // greater than or equal to the right bound (a descending range) and -1
 // otherwise (an ascending range).
 TEST(ArrayQueryingFunctions, IncrementMatchesTwentySevenSemantics) {
-  const svOpenArrayDimRange ranges[] = {{15, 0}, {0, 7}};
-  svOpenArrayDesc desc;
+  const SvOpenArrayDimRange ranges[] = {{15, 0}, {0, 7}};
+  SvOpenArrayDesc desc;
   svOpenArrayHandle h = MakeHandle(ranges, 2, &desc);
 
   EXPECT_EQ(svIncrement(h, 0), 1);   // [15:0] descending -> +1
@@ -97,8 +97,8 @@ TEST(ArrayQueryingFunctions, IncrementMatchesTwentySevenSemantics) {
 // single packed dimension plus every unpacked dimension - so that valid
 // dimension arguments span 0 .. svDimensions-1.
 TEST(ArrayQueryingFunctions, DimensionsCountsPackedPlusUnpacked) {
-  const svOpenArrayDimRange ranges[] = {{15, 0}, {0, 7}, {-1, -8}};
-  svOpenArrayDesc desc;
+  const SvOpenArrayDimRange ranges[] = {{15, 0}, {0, 7}, {-1, -8}};
+  SvOpenArrayDesc desc;
   svOpenArrayHandle h = MakeHandle(ranges, 3, &desc);
 
   // One packed part + two unpacked parts.
@@ -109,8 +109,8 @@ TEST(ArrayQueryingFunctions, DimensionsCountsPackedPlusUnpacked) {
 // right coincide, so low == high, size is 1, and the bound-equal case of
 // $increment yields +1.
 TEST(ArrayQueryingFunctions, DegenerateSingleElementRange) {
-  const svOpenArrayDimRange ranges[] = {{0, 0}, {0, 0}};
-  svOpenArrayDesc desc;
+  const SvOpenArrayDimRange ranges[] = {{0, 0}, {0, 0}};
+  SvOpenArrayDesc desc;
   svOpenArrayHandle h = MakeHandle(ranges, 2, &desc);
 
   EXPECT_EQ(svLow(h, 0), 0);
@@ -126,8 +126,8 @@ TEST(ArrayQueryingFunctions, DegenerateSingleElementRange) {
 // reading past the descriptor. This exercises the handle/dimension guard in
 // production.
 TEST(ArrayQueryingFunctions, OutOfRangeDimensionAndNullHandle) {
-  const svOpenArrayDimRange ranges[] = {{15, 0}, {0, 7}};
-  svOpenArrayDesc desc;
+  const SvOpenArrayDimRange ranges[] = {{15, 0}, {0, 7}};
+  SvOpenArrayDesc desc;
   svOpenArrayHandle h = MakeHandle(ranges, 2, &desc);
 
   // Index at and beyond the dimension count, and a negative index, are invalid.

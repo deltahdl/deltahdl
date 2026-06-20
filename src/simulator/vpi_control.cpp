@@ -72,19 +72,19 @@ int VpiContext::ControlCoverage(int operation, int coverage_type,
       // statement, toggle, and FSM coverage are not individually controllable,
       // the control acts on the instance (or assertion) the handle names as a
       // whole rather than on any sub-object of it.
-      CoverageControl control = CoverageControl::Start;
+      CoverageControl control = CoverageControl::kStart;
       switch (operation) {
         case vpiCoverageStart:
-          control = CoverageControl::Start;
+          control = CoverageControl::kStart;
           break;
         case vpiCoverageStop:
-          control = CoverageControl::Stop;
+          control = CoverageControl::kStop;
           break;
         case vpiCoverageReset:
-          control = CoverageControl::Reset;
+          control = CoverageControl::kReset;
           break;
         case vpiCoverageCheck:
-          control = CoverageControl::Check;
+          control = CoverageControl::kCheck;
           break;
       }
       // The handle names the controlled scope. A handle's hierarchical name

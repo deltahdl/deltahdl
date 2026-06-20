@@ -49,8 +49,8 @@ class ItemExpr {
   // re-derive it from the AST.
   static ItemExpr Wrap(const Expr* e, ItemOperandKind kind);
 
-  const Expr* wrapped() const { return wrapped_; }
-  ItemOperandKind kind() const { return kind_; }
+  const Expr* Wrapped() const { return wrapped_; }
+  ItemOperandKind Kind() const { return kind_; }
 
   // §F.4: item(e) behaves like e in all respects except for the operation
   // extensions modeled below; this accessor preserves identity of the

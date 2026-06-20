@@ -19,7 +19,7 @@ namespace {
 TEST(CoverageInformationQueries, AttemptCoveredReportsAttempts) {
   AssertionCoverageCounters c;
   c.attempts = 7;
-  EXPECT_EQ(assert_attempt_covered(c), 7U);
+  EXPECT_EQ(AssertAttemptCovered(c), 7U);
 }
 
 // C5: vpiAssertSuccessCovered reports nonvacuous successes, or, for a cover
@@ -27,40 +27,40 @@ TEST(CoverageInformationQueries, AttemptCoveredReportsAttempts) {
 TEST(CoverageInformationQueries, SuccessCoveredReportsNonvacuousSuccesses) {
   AssertionCoverageCounters c;
   c.successes = 4;
-  EXPECT_EQ(assert_success_covered(c), 4U);
+  EXPECT_EQ(AssertSuccessCovered(c), 4U);
 
   AssertionCoverageCounters seq;
   seq.is_cover_sequence = true;
   seq.successes = 9;  // matches of the cover sequence
-  EXPECT_EQ(assert_success_covered(seq), 9U);
+  EXPECT_EQ(AssertSuccessCovered(seq), 9U);
 }
 
 // C6: vpiAssertVacuousSuccessCovered reports vacuous successes.
 TEST(CoverageInformationQueries, VacuousSuccessCoveredReportsVacuousSuccesses) {
   AssertionCoverageCounters c;
   c.vacuous_successes = 3;
-  EXPECT_EQ(assert_vacuous_success_covered(c), 3U);
+  EXPECT_EQ(AssertVacuousSuccessCovered(c), 3U);
 }
 
 // C7: vpiAssertDisableCovered reports times the disabled state was reached.
 TEST(CoverageInformationQueries, DisableCoveredReportsDisabledCount) {
   AssertionCoverageCounters c;
   c.disabled = 2;
-  EXPECT_EQ(assert_disable_covered(c), 2U);
+  EXPECT_EQ(AssertDisableCovered(c), 2U);
 }
 
 // C8: vpiAssertKillCovered reports times the assertion was killed.
 TEST(CoverageInformationQueries, KillCoveredReportsKilledCount) {
   AssertionCoverageCounters c;
   c.killed = 5;
-  EXPECT_EQ(assert_kill_covered(c), 5U);
+  EXPECT_EQ(AssertKillCovered(c), 5U);
 }
 
 // C9: vpiAssertFailureCovered reports failures.
 TEST(CoverageInformationQueries, FailureCoveredReportsFailures) {
   AssertionCoverageCounters c;
   c.failures = 6;
-  EXPECT_EQ(assert_failure_covered(c), 6U);
+  EXPECT_EQ(AssertFailureCovered(c), 6U);
 }
 
 // C1 + C4-C9: the dispatch from a §40.5.1 assertion-status property to its
@@ -75,20 +75,20 @@ TEST(CoverageInformationQueries, StatusQueryDispatchesByProperty) {
   c.killed = 1;
   c.failures = 2;
 
-  EXPECT_EQ(assertion_status_query(CoverageProperty::AssertAttemptCovered, c),
+  EXPECT_EQ(AssertionStatusQuery(CoverageProperty::kAssertAttemptCovered, c),
             10U);
-  EXPECT_EQ(assertion_status_query(CoverageProperty::AssertSuccessCovered, c),
+  EXPECT_EQ(AssertionStatusQuery(CoverageProperty::kAssertSuccessCovered, c),
             4U);
   EXPECT_EQ(
-      assertion_status_query(CoverageProperty::AssertVacuousSuccessCovered, c),
+      AssertionStatusQuery(CoverageProperty::kAssertVacuousSuccessCovered, c),
       1U);
-  EXPECT_EQ(assertion_status_query(CoverageProperty::AssertDisableCovered, c),
+  EXPECT_EQ(AssertionStatusQuery(CoverageProperty::kAssertDisableCovered, c),
             2U);
-  EXPECT_EQ(assertion_status_query(CoverageProperty::AssertKillCovered, c), 1U);
-  EXPECT_EQ(assertion_status_query(CoverageProperty::AssertFailureCovered, c),
+  EXPECT_EQ(AssertionStatusQuery(CoverageProperty::kAssertKillCovered, c), 1U);
+  EXPECT_EQ(AssertionStatusQuery(CoverageProperty::kAssertFailureCovered, c),
             2U);
   // A property that is not an assertion-status count contributes nothing.
-  EXPECT_EQ(assertion_status_query(CoverageProperty::StatementCoverage, c), 0U);
+  EXPECT_EQ(AssertionStatusQuery(CoverageProperty::kStatementCoverage, c), 0U);
 }
 
 // C3: vpiCovered on an assertion is true only when the assertion has been
@@ -98,20 +98,20 @@ TEST(CoverageInformationQueries,
   AssertionCoverageCounters covered;
   covered.attempts = 3;
   covered.successes = 3;
-  EXPECT_TRUE(assertion_covered(covered));
+  EXPECT_TRUE(AssertionCovered(covered));
 
   AssertionCoverageCounters never_attempted;
-  EXPECT_FALSE(assertion_covered(never_attempted));
+  EXPECT_FALSE(AssertionCovered(never_attempted));
 
   AssertionCoverageCounters no_success;
   no_success.attempts = 3;
-  EXPECT_FALSE(assertion_covered(no_success));
+  EXPECT_FALSE(AssertionCovered(no_success));
 
   AssertionCoverageCounters has_failed;
   has_failed.attempts = 3;
   has_failed.successes = 2;
   has_failed.failures = 1;
-  EXPECT_FALSE(assertion_covered(has_failed));
+  EXPECT_FALSE(AssertionCovered(has_failed));
 }
 
 // C3 (edge): only nonvacuous successes count toward coverage. An assertion that
@@ -120,43 +120,43 @@ TEST(CoverageInformationQueries, AssertionCoveredExcludesVacuousOnlySuccess) {
   AssertionCoverageCounters vacuous_only;
   vacuous_only.attempts = 4;
   vacuous_only.vacuous_successes = 4;
-  EXPECT_FALSE(assertion_covered(vacuous_only));
+  EXPECT_FALSE(AssertionCovered(vacuous_only));
 }
 
 // C12: Table 40-3 worked example for anvr, aundf, afail, apass.
 TEST(CoverageInformationQueries, WorkedExampleAssertionCoverageResults) {
   // anvr: never attempted.
   AssertionCoverageCounters anvr;
-  EXPECT_FALSE(assertion_covered(anvr));
-  EXPECT_EQ(assert_attempt_covered(anvr), 0U);
-  EXPECT_EQ(assert_success_covered(anvr), 0U);
-  EXPECT_EQ(assert_failure_covered(anvr), 0U);
+  EXPECT_FALSE(AssertionCovered(anvr));
+  EXPECT_EQ(AssertAttemptCovered(anvr), 0U);
+  EXPECT_EQ(AssertSuccessCovered(anvr), 0U);
+  EXPECT_EQ(AssertFailureCovered(anvr), 0U);
 
   // aundf: attempted but never passes or fails.
   AssertionCoverageCounters aundf;
   aundf.attempts = 5;
-  EXPECT_FALSE(assertion_covered(aundf));
-  EXPECT_GT(assert_attempt_covered(aundf), 0U);
-  EXPECT_EQ(assert_success_covered(aundf), 0U);
-  EXPECT_EQ(assert_failure_covered(aundf), 0U);
+  EXPECT_FALSE(AssertionCovered(aundf));
+  EXPECT_GT(AssertAttemptCovered(aundf), 0U);
+  EXPECT_EQ(AssertSuccessCovered(aundf), 0U);
+  EXPECT_EQ(AssertFailureCovered(aundf), 0U);
 
   // afail: attempted, fails.
   AssertionCoverageCounters afail;
   afail.attempts = 5;
   afail.failures = 5;
-  EXPECT_FALSE(assertion_covered(afail));
-  EXPECT_GT(assert_attempt_covered(afail), 0U);
-  EXPECT_EQ(assert_success_covered(afail), 0U);
-  EXPECT_GT(assert_failure_covered(afail), 0U);
+  EXPECT_FALSE(AssertionCovered(afail));
+  EXPECT_GT(AssertAttemptCovered(afail), 0U);
+  EXPECT_EQ(AssertSuccessCovered(afail), 0U);
+  EXPECT_GT(AssertFailureCovered(afail), 0U);
 
   // apass: attempted, succeeds on each attempt.
   AssertionCoverageCounters apass;
   apass.attempts = 5;
   apass.successes = 5;
-  EXPECT_TRUE(assertion_covered(apass));
-  EXPECT_GT(assert_attempt_covered(apass), 0U);
-  EXPECT_GT(assert_success_covered(apass), 0U);
-  EXPECT_EQ(assert_failure_covered(apass), 0U);
+  EXPECT_TRUE(AssertionCovered(apass));
+  EXPECT_GT(AssertAttemptCovered(apass), 0U);
+  EXPECT_GT(AssertSuccessCovered(apass), 0U);
+  EXPECT_EQ(AssertFailureCovered(apass), 0U);
 }
 
 // C10: in-progress attempts derive from attempts minus all concluded outcomes.
@@ -170,14 +170,14 @@ TEST(CoverageInformationQueries,
   c.killed = 1;
   c.failures = 2;
   // 10 - (3 + 1 + 1 + 1 + 2) = 2 still in progress.
-  const std::optional<std::uint64_t> in_progress = assert_in_progress(c);
+  const std::optional<std::uint64_t> in_progress = AssertInProgress(c);
   ASSERT_TRUE(in_progress.has_value());
   EXPECT_EQ(*in_progress, 2U);
 
   AssertionCoverageCounters all_concluded;
   all_concluded.attempts = 4;
   all_concluded.successes = 4;
-  const std::optional<std::uint64_t> none = assert_in_progress(all_concluded);
+  const std::optional<std::uint64_t> none = AssertInProgress(all_concluded);
   ASSERT_TRUE(none.has_value());
   EXPECT_EQ(*none, 0U);
 }
@@ -190,7 +190,7 @@ TEST(CoverageInformationQueries, InProgressClampsWhenOutcomesExceedAttempts) {
   c.attempts = 2;
   c.successes = 3;  // more recorded conclusions than counted attempts
   c.failures = 2;
-  const std::optional<std::uint64_t> in_progress = assert_in_progress(c);
+  const std::optional<std::uint64_t> in_progress = AssertInProgress(c);
   ASSERT_TRUE(in_progress.has_value());
   EXPECT_EQ(*in_progress, 0U);
 }
@@ -201,7 +201,7 @@ TEST(CoverageInformationQueries, InProgressUndefinedForCoverSequence) {
   seq.is_cover_sequence = true;
   seq.attempts = 3;
   seq.successes = 7;  // more matches than attempts is legitimate here
-  EXPECT_FALSE(assert_in_progress(seq).has_value());
+  EXPECT_FALSE(AssertInProgress(seq).has_value());
 }
 
 // C2: vpiCovered on a multi-entity handle reports how many entities are covered
@@ -210,7 +210,7 @@ TEST(CoverageInformationQueries, CoveredEntityCountReportsCoveredEntities) {
   EntityCoverage e;
   e.total = 8;
   e.covered = 5;
-  EXPECT_EQ(covered_entity_count(e), 5U);
+  EXPECT_EQ(CoveredEntityCount(e), 5U);
 }
 
 // C13: vpiCoveredCount reports how many times an item has been covered.
@@ -219,7 +219,7 @@ TEST(CoverageInformationQueries, CoveredCountReportsHitCount) {
   e.total = 8;
   e.covered = 5;
   e.hit_count = 42;
-  EXPECT_EQ(covered_count(e), 42U);
+  EXPECT_EQ(CoveredCount(e), 42U);
 }
 
 // C1: vpi_get(<coverageType>, instance_handle) selects the covered-item count
@@ -231,16 +231,14 @@ TEST(CoverageInformationQueries, InstanceCoverageSelectsByCoverageType) {
   inst.statements.covered = 3;
   inst.toggles.covered = 4;
 
-  EXPECT_EQ(instance_coverage_count(CoverageProperty::AssertCoverage, inst),
-            1U);
-  EXPECT_EQ(instance_coverage_count(CoverageProperty::FsmStateCoverage, inst),
+  EXPECT_EQ(InstanceCoverageCount(CoverageProperty::kAssertCoverage, inst), 1U);
+  EXPECT_EQ(InstanceCoverageCount(CoverageProperty::kFsmStateCoverage, inst),
             2U);
-  EXPECT_EQ(instance_coverage_count(CoverageProperty::StatementCoverage, inst),
+  EXPECT_EQ(InstanceCoverageCount(CoverageProperty::kStatementCoverage, inst),
             3U);
-  EXPECT_EQ(instance_coverage_count(CoverageProperty::ToggleCoverage, inst),
-            4U);
+  EXPECT_EQ(InstanceCoverageCount(CoverageProperty::kToggleCoverage, inst), 4U);
   // A property that is not a coverage type selects nothing.
-  EXPECT_EQ(instance_coverage_count(CoverageProperty::Covered, inst), 0U);
+  EXPECT_EQ(InstanceCoverageCount(CoverageProperty::kCovered, inst), 0U);
 }
 
 }  // namespace

@@ -152,40 +152,40 @@ void svPutPartselLogic(svLogicVecVal* d, svLogicVecVal s, int i, int w) {
 // greater than 0 name the unpacked part. Each function resolves the requested
 // dimension's declared bounds from the handle's descriptor and then derives the
 // queried quantity exactly as 20.7 prescribes.
-static const svOpenArrayDimRange* svResolveDim(svOpenArrayHandle h, int d) {
+static const SvOpenArrayDimRange* svResolveDim(svOpenArrayHandle h, int d) {
   if (h == nullptr) return nullptr;
-  const auto* desc = static_cast<const svOpenArrayDesc*>(h);
+  const auto* desc = static_cast<const SvOpenArrayDesc*>(h);
   if (desc->ranges == nullptr || d < 0 || d >= desc->n_dims) return nullptr;
   return &desc->ranges[d];
 }
 
 int svLeft(svOpenArrayHandle h, int d) {
-  const svOpenArrayDimRange* r = svResolveDim(h, d);
+  const SvOpenArrayDimRange* r = svResolveDim(h, d);
   return r ? r->left : 0;
 }
 int svRight(svOpenArrayHandle h, int d) {
-  const svOpenArrayDimRange* r = svResolveDim(h, d);
+  const SvOpenArrayDimRange* r = svResolveDim(h, d);
   return r ? r->right : 0;
 }
 int svLow(svOpenArrayHandle h, int d) {
-  const svOpenArrayDimRange* r = svResolveDim(h, d);
+  const SvOpenArrayDimRange* r = svResolveDim(h, d);
   if (!r) return 0;
   return r->left < r->right ? r->left : r->right;
 }
 int svHigh(svOpenArrayHandle h, int d) {
-  const svOpenArrayDimRange* r = svResolveDim(h, d);
+  const SvOpenArrayDimRange* r = svResolveDim(h, d);
   if (!r) return 0;
   return r->left > r->right ? r->left : r->right;
 }
 int svIncrement(svOpenArrayHandle h, int d) {
-  const svOpenArrayDimRange* r = svResolveDim(h, d);
+  const SvOpenArrayDimRange* r = svResolveDim(h, d);
   if (!r) return 0;
   // 20.7: $increment is 1 when the left bound is greater than or equal to the
   // right bound, and -1 otherwise.
   return r->left >= r->right ? 1 : -1;
 }
 int svSize(svOpenArrayHandle h, int d) {
-  const svOpenArrayDimRange* r = svResolveDim(h, d);
+  const SvOpenArrayDimRange* r = svResolveDim(h, d);
   if (!r) return 0;
   int low = r->left < r->right ? r->left : r->right;
   int high = r->left > r->right ? r->left : r->right;
@@ -193,7 +193,7 @@ int svSize(svOpenArrayHandle h, int d) {
 }
 int svDimensions(svOpenArrayHandle h) {
   if (h == nullptr) return 0;
-  return static_cast<const svOpenArrayDesc*>(h)->n_dims;
+  return static_cast<const SvOpenArrayDesc*>(h)->n_dims;
 }
 // §H.12.4: svGetArrayPtr/svSizeOfArray expose the actual address and byte size
 // of an open array as a whole, but only when the SystemVerilog layout matches
@@ -222,13 +222,13 @@ namespace {
 // Number of canonical 32-bit words occupied by one packed element. Dimension 0
 // of the descriptor describes the array's single packed part (H.12.2); its bit
 // width fixes the per-element word count for both bit and logic arrays.
-int svPackedElemWords(const svOpenArrayDesc* desc) {
-  const svOpenArrayDimRange& p = desc->ranges[0];
+int svPackedElemWords(const SvOpenArrayDesc* desc) {
+  const SvOpenArrayDimRange& p = desc->ranges[0];
   int width = (p.left > p.right ? p.left - p.right : p.right - p.left) + 1;
   return (width + 31) / 32;
 }
 
-int svUnpackedExtent(const svOpenArrayDimRange& r) {
+int svUnpackedExtent(const SvOpenArrayDimRange& r) {
   int low = r.left < r.right ? r.left : r.right;
   int high = r.left > r.right ? r.left : r.right;
   return high - low + 1;
@@ -239,7 +239,7 @@ int svUnpackedExtent(const svOpenArrayDimRange& r) {
 // The element at the left bound occupies position 0 and positions advance
 // toward the right bound, independent of range direction. Returns false when
 // the index falls outside the dimension's original range.
-bool svUnpackedPos(const svOpenArrayDimRange& r, int idx, int* pos) {
+bool svUnpackedPos(const SvOpenArrayDimRange& r, int idx, int* pos) {
   int low = r.left < r.right ? r.left : r.right;
   int high = r.left > r.right ? r.left : r.right;
   if (idx < low || idx > high) return false;
@@ -256,12 +256,12 @@ bool svUnpackedPos(const svOpenArrayDimRange& r, int idx, int* pos) {
 void* svElemBase(svOpenArrayHandle h, const int* idx, int n_idx,
                  size_t word_size, int* words) {
   if (h == nullptr) return nullptr;
-  const auto* desc = static_cast<const svOpenArrayDesc*>(h);
+  const auto* desc = static_cast<const SvOpenArrayDesc*>(h);
   if (desc->data == nullptr || desc->ranges == nullptr) return nullptr;
   if (n_idx != desc->n_dims - 1) return nullptr;
   long linear = 0;
   for (int k = 0; k < n_idx; ++k) {
-    const svOpenArrayDimRange& r = desc->ranges[k + 1];
+    const SvOpenArrayDimRange& r = desc->ranges[k + 1];
     int pos = 0;
     if (!svUnpackedPos(r, idx[k], &pos)) return nullptr;
     linear = linear * svUnpackedExtent(r) + pos;
@@ -284,13 +284,13 @@ void* svElemBase(svOpenArrayHandle h, const int* idx, int n_idx,
 // requires nullptr.
 void* svElemAddr(svOpenArrayHandle h, const int* idx, int n_idx) {
   if (h == nullptr) return nullptr;
-  const auto* desc = static_cast<const svOpenArrayDesc*>(h);
+  const auto* desc = static_cast<const SvOpenArrayDesc*>(h);
   if (desc->data == nullptr || desc->ranges == nullptr) return nullptr;
   if (desc->elem_size == 0) return nullptr;
   if (n_idx != desc->n_dims - 1) return nullptr;
   long linear = 0;
   for (int k = 0; k < n_idx; ++k) {
-    const svOpenArrayDimRange& r = desc->ranges[k + 1];
+    const SvOpenArrayDimRange& r = desc->ranges[k + 1];
     int pos = 0;
     if (!svUnpackedPos(r, idx[k], &pos)) return nullptr;
     linear = linear * svUnpackedExtent(r) + pos;
@@ -679,7 +679,7 @@ void svAckDisabledState(void) { delta::DpiAckCurrentDisable(); }
 // design-wide simulation time. The value comes from the shared time source the
 // VPI time routines read, so svGetTime and vpi_get_time() always agree. Returns
 // -1 when there is nowhere to write the result, 0 otherwise.
-int svGetTime(const svScope scope, svTimeVal* time) {
+int svGetTime(svScope scope, svTimeVal* time) {
   (void)scope;
   if (time == nullptr) return -1;
   bool want_scaled_real = (time->type == sv_scaled_real_time);
@@ -691,7 +691,7 @@ int svGetTime(const svScope scope, svTimeVal* time) {
 // simulation time unit; with no per-scope timescale binding a non-NULL scope
 // reports that same unit. The value matches vpi_get(vpiTimeUnit) for the
 // design. Returns -1 when there is nowhere to write the result, 0 otherwise.
-int svGetTimeUnit(const svScope scope, int32_t* time_unit) {
+int svGetTimeUnit(svScope scope, int32_t* time_unit) {
   (void)scope;
   if (time_unit == nullptr) return -1;
   *time_unit = delta::DpiGetSimTimeUnit();
@@ -702,7 +702,7 @@ int svGetTimeUnit(const svScope scope, int32_t* time_unit) {
 // NULL scope retrieves the simulation time unit; the value matches
 // vpi_get(vpiTimePrecision) for the design. Returns -1 when there is nowhere to
 // write the result, 0 otherwise.
-int svGetTimePrecision(const svScope scope, int32_t* time_precision) {
+int svGetTimePrecision(svScope scope, int32_t* time_precision) {
   (void)scope;
   if (time_precision == nullptr) return -1;
   *time_precision = delta::DpiGetSimTimePrecision();

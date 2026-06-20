@@ -25,29 +25,29 @@ namespace delta {
 
 // §40.3.1 control-constant values accepted in the first argument.
 enum class CoverageControl : std::uint8_t {
-  Start = 0,
-  Stop = 1,
-  Reset = 2,
-  Check = 3,
+  kStart = 0,
+  kStop = 1,
+  kReset = 2,
+  kCheck = 3,
 };
 
 // §40.3.1 status values returned by $coverage_control. The numeric values match
 // the `SV_COV_* `define macros.
 enum class CoverageStatus : std::int8_t {
-  Overflow = -2,
-  Error = -1,
-  NoCoverage = 0,
-  Ok = 1,
-  Partial = 2,
+  kOverflow = -2,
+  kError = -1,
+  kNoCoverage = 0,
+  kOk = 1,
+  kPartial = 2,
 };
 
 // How much coverage a scope offers for the requested coverage type. A real
 // coverage engine derives this from the coverable items the design holds; the
 // model stores it so the control rules can be exercised without that engine.
 enum class CoverageAvailability : std::uint8_t {
-  None,     // scope exists but offers no coverage of the requested type
-  Partial,  // some, but not all, of the scope is coverable
-  Full,     // the whole scope is coverable
+  kNone,     // scope exists but offers no coverage of the requested type
+  kPartial,  // some, but not all, of the scope is coverable
+  kFull,     // the whole scope is coverable
 };
 
 // Decodes the first $coverage_control argument into a control action. Returns
@@ -55,16 +55,16 @@ enum class CoverageAvailability : std::uint8_t {
 inline bool CoverageControlFromInt(int value, CoverageControl *out) {
   switch (value) {
     case 0:
-      *out = CoverageControl::Start;
+      *out = CoverageControl::kStart;
       return true;
     case 1:
-      *out = CoverageControl::Stop;
+      *out = CoverageControl::kStop;
       return true;
     case 2:
-      *out = CoverageControl::Reset;
+      *out = CoverageControl::kReset;
       return true;
     case 3:
-      *out = CoverageControl::Check;
+      *out = CoverageControl::kCheck;
       return true;
     default:
       return false;
@@ -119,15 +119,15 @@ class CoverageControlState {
   int CoverageMax(const std::string &scope, int coverage_type) const {
     auto it = scopes_.find(scope);
     if (it == scopes_.end()) {
-      return static_cast<int>(CoverageStatus::Error);
+      return static_cast<int>(CoverageStatus::kError);
     }
     auto type_it = it->second.coverable_items.find(coverage_type);
     if (type_it == it->second.coverable_items.end() || type_it->second <= 0) {
-      return static_cast<int>(CoverageStatus::NoCoverage);
+      return static_cast<int>(CoverageStatus::kNoCoverage);
     }
     if (type_it->second >
         static_cast<std::int64_t>(std::numeric_limits<std::int32_t>::max())) {
-      return static_cast<int>(CoverageStatus::Overflow);
+      return static_cast<int>(CoverageStatus::kOverflow);
     }
     return static_cast<int>(type_it->second);
   }
@@ -147,15 +147,15 @@ class CoverageControlState {
   int CoverageGet(const std::string &scope, int coverage_type) const {
     auto it = scopes_.find(scope);
     if (it == scopes_.end()) {
-      return static_cast<int>(CoverageStatus::Error);
+      return static_cast<int>(CoverageStatus::kError);
     }
     auto type_it = it->second.covered_items.find(coverage_type);
     if (type_it == it->second.covered_items.end() || type_it->second <= 0) {
-      return static_cast<int>(CoverageStatus::NoCoverage);
+      return static_cast<int>(CoverageStatus::kNoCoverage);
     }
     if (type_it->second >
         static_cast<std::int64_t>(std::numeric_limits<std::int32_t>::max())) {
-      return static_cast<int>(CoverageStatus::Overflow);
+      return static_cast<int>(CoverageStatus::kOverflow);
     }
     return static_cast<int>(type_it->second);
   }
@@ -192,21 +192,21 @@ class CoverageControlState {
     // The name does not exist: no database to load. §40.3.2.4 requires an
     // error.
     if (it == databases_.end()) {
-      return CoverageStatus::Error;
+      return CoverageStatus::kError;
     }
     CoverageDatabase &db = it->second;
     // The database is from a different design: §40.3.2.4 requires an error.
     if (!db.from_this_design) {
-      return CoverageStatus::Error;
+      return CoverageStatus::kError;
     }
     // The database exists for this design but does not hold the requested type:
     // the data were found but did not contain the coverage type requested.
     if (db.coverage_types.find(coverage_type) == db.coverage_types.end()) {
-      return CoverageStatus::NoCoverage;
+      return CoverageStatus::kNoCoverage;
     }
     // The data are found and merged.
     ++db.merges;
-    return CoverageStatus::Ok;
+    return CoverageStatus::kOk;
   }
 
   // Number of successful merges performed against a named database. A merge
@@ -266,13 +266,13 @@ class CoverageControlState {
     // successful save left under the same name.
     if (coverage_save_should_fail_) {
       databases_.erase(name);
-      return CoverageStatus::Error;
+      return CoverageStatus::kError;
     }
     // No coverage of the requested type is available in this design: nothing is
     // saved and no entry is written.
     if (savable_coverage_types_.find(coverage_type) ==
         savable_coverage_types_.end()) {
-      return CoverageStatus::NoCoverage;
+      return CoverageStatus::kNoCoverage;
     }
     // Write (or overwrite) the entry to reflect the current state: it belongs
     // to this design and holds the saved coverage type.
@@ -280,7 +280,7 @@ class CoverageControlState {
     db.from_this_design = true;
     db.coverage_types = {coverage_type};
     ++db.saves;
-    return CoverageStatus::Ok;
+    return CoverageStatus::kOk;
   }
 
   bool IsCollecting(const std::string &scope) const {
@@ -307,34 +307,34 @@ class CoverageControlState {
     // A scope the design does not contain is a bad argument: §40.3.2.1 reports
     // `SV_COV_ERROR for errors such as a nonexisting module.
     if (it == scopes_.end()) {
-      return CoverageStatus::Error;
+      return CoverageStatus::kError;
     }
     ScopeState &s = it->second;
     switch (control) {
-      case CoverageControl::Start:
+      case CoverageControl::kStart:
         // `SV_COV_START starts collection where coverage is available. Starting
         // a scope that is already collecting has no effect, but still reports
         // success.
         switch (s.availability) {
-          case CoverageAvailability::None:
-            return CoverageStatus::NoCoverage;
-          case CoverageAvailability::Partial:
+          case CoverageAvailability::kNone:
+            return CoverageStatus::kNoCoverage;
+          case CoverageAvailability::kPartial:
             StartCollecting(s);
-            return CoverageStatus::Partial;
-          case CoverageAvailability::Full:
+            return CoverageStatus::kPartial;
+          case CoverageAvailability::kFull:
             StartCollecting(s);
-            return CoverageStatus::Ok;
+            return CoverageStatus::kOk;
         }
-        return CoverageStatus::Error;  // unreachable
-      case CoverageControl::Stop:
+        return CoverageStatus::kError;  // unreachable
+      case CoverageControl::kStop:
         // `SV_COV_STOP stops collection; stopping a scope that is not
         // collecting has no effect. The operation reports success regardless.
         if (s.collecting) {
           s.collecting = false;
           ++s.stopped;
         }
-        return CoverageStatus::Ok;
-      case CoverageControl::Reset:
+        return CoverageStatus::kOk;
+      case CoverageControl::kReset:
         // `SV_COV_RESET clears collected coverage; it has no effect when no
         // coverage has been collected, so repeated resets do nothing after the
         // first. The operation reports success regardless.
@@ -342,26 +342,26 @@ class CoverageControlState {
           s.has_data = false;
           ++s.resets;
         }
-        return CoverageStatus::Ok;
-      case CoverageControl::Check:
+        return CoverageStatus::kOk;
+      case CoverageControl::kCheck:
         // `SV_COV_CHECK reports whether coverage can be obtained without
         // changing the collection state.
         switch (s.availability) {
-          case CoverageAvailability::None:
-            return CoverageStatus::NoCoverage;
-          case CoverageAvailability::Partial:
-            return CoverageStatus::Partial;
-          case CoverageAvailability::Full:
-            return CoverageStatus::Ok;
+          case CoverageAvailability::kNone:
+            return CoverageStatus::kNoCoverage;
+          case CoverageAvailability::kPartial:
+            return CoverageStatus::kPartial;
+          case CoverageAvailability::kFull:
+            return CoverageStatus::kOk;
         }
-        return CoverageStatus::Error;  // unreachable
+        return CoverageStatus::kError;  // unreachable
     }
-    return CoverageStatus::Error;
+    return CoverageStatus::kError;
   }
 
  private:
   struct ScopeState {
-    CoverageAvailability availability = CoverageAvailability::None;
+    CoverageAvailability availability = CoverageAvailability::kNone;
     bool collecting = false;
     bool has_data = false;  // coverage accumulated since the last reset
     std::uint64_t started = 0;

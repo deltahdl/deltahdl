@@ -376,11 +376,11 @@ class VpiContext {
   }
   const std::string& McdChannelBuffer(PLI_UINT32 channel) const {
     auto it = mcd_channel_buffers_.find(channel);
-    return it == mcd_channel_buffers_.end() ? empty_mcd_buffer_ : it->second;
+    return it == mcd_channel_buffers_.end() ? kEmptyMcdBuffer : it->second;
   }
   const std::string& McdChannelFlushed(PLI_UINT32 channel) const {
     auto it = mcd_channel_flushed_.find(channel);
-    return it == mcd_channel_flushed_.end() ? empty_mcd_buffer_ : it->second;
+    return it == mcd_channel_flushed_.end() ? kEmptyMcdBuffer : it->second;
   }
   void SetMcdFlushShouldFail(bool fail) { mcd_flush_should_fail_ = fail; }
 
@@ -709,7 +709,7 @@ class VpiContext {
   bool mcd_flush_should_fail_ = false;
   // Returned by the channel accessors when a channel has no buffered or flushed
   // text, so they can hand back a reference without inserting an entry.
-  const std::string empty_mcd_buffer_;
+  const std::string kEmptyMcdBuffer;
 
   // §38.26: the single buffer vpi_mcd_name() reuses for its result, so each
   // call overwrites the previous returned value. Separate from get_str_buffer_.

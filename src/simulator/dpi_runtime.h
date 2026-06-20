@@ -707,7 +707,7 @@ class CoverageApi {
   double GetValue(std::string_view key) const;
 
  private:
-  CoverageControl control_ = CoverageControl::Start;
+  CoverageControl control_ = CoverageControl::kStart;
   uint32_t max_bins_ = 64;
   bool active_ = true;
   std::unordered_map<std::string, double> values_;

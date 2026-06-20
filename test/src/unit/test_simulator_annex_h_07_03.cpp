@@ -41,7 +41,7 @@
 // These rules are realized entirely by existing production code, so the pass is
 // test-only:
 //   - C-compatible representation (claims 1, 5, 6-other) is carried by the
-//     elem_size stride of svOpenArrayDesc: an element sits at data +
+//     elem_size stride of SvOpenArrayDesc: an element sits at data +
 //     i*elem_size, i.e. exactly where an individual value of that type would
 //     sit in a plain C array, and svGetArrElemPtr* expose that address.
 //   - Canonical form for packed/scalar open-array elements (claim 6-canonical)
@@ -67,9 +67,9 @@
 
 namespace {
 
-svOpenArrayHandle MakeHandle(void* data, const svOpenArrayDimRange* ranges,
+svOpenArrayHandle MakeHandle(void* data, const SvOpenArrayDimRange* ranges,
                              int n_dims, size_t elem_size,
-                             svOpenArrayDesc* desc) {
+                             SvOpenArrayDesc* desc) {
   desc->data = data;
   desc->n_dims = n_dims;
   desc->ranges = ranges;
@@ -86,9 +86,9 @@ svOpenArrayHandle MakeHandle(void* data, const svOpenArrayDimRange* ranges,
 // the individual-value representation.
 TEST(DataRepresentation, NonPackedTypeIsCCompatible) {
   int data[4] = {10, 20, 30, 40};
-  const svOpenArrayDimRange ranges[] = {{31, 0},
+  const SvOpenArrayDimRange ranges[] = {{31, 0},
                                         {0, 3}};  // int element, [0:3].
-  svOpenArrayDesc desc;
+  SvOpenArrayDesc desc;
   svOpenArrayHandle h = MakeHandle(data, ranges, 2, sizeof(int), &desc);
 
   for (int i = 0; i < 4; ++i) {
@@ -107,9 +107,9 @@ TEST(DataRepresentation, NonPackedTypeIsCCompatible) {
 // plain C double array element for element.
 TEST(DataRepresentation, SizedFormalAndStructEmbeddedAreCCompatible) {
   double data[3] = {1.5, -2.25, 100.0};
-  const svOpenArrayDimRange ranges[] = {{63, 0},
+  const SvOpenArrayDimRange ranges[] = {{63, 0},
                                         {0, 2}};  // double element, [0:2].
-  svOpenArrayDesc desc;
+  SvOpenArrayDesc desc;
   svOpenArrayHandle h = MakeHandle(data, ranges, 2, sizeof(double), &desc);
 
   for (int i = 0; i < 3; ++i) {
@@ -128,8 +128,8 @@ TEST(DataRepresentation, SizedFormalAndStructEmbeddedAreCCompatible) {
 // individual value stored there.
 TEST(DataRepresentation, OpenArrayCCompatibleElementMatchesIndividualValue) {
   int data[5] = {0, 11, 22, 33, 44};
-  const svOpenArrayDimRange ranges[] = {{31, 0}, {0, 4}};
-  svOpenArrayDesc desc;
+  const SvOpenArrayDimRange ranges[] = {{31, 0}, {0, 4}};
+  SvOpenArrayDesc desc;
   svOpenArrayHandle h = MakeHandle(data, ranges, 2, sizeof(int), &desc);
 
   int* base = static_cast<int*>(svGetArrElemPtr1(h, 0));
@@ -156,8 +156,8 @@ TEST(DataRepresentation, OpenArrayCCompatibleElementMatchesIndividualValue) {
 TEST(DataRepresentation, OpenArrayPackedElementUsesCanonicalForm) {
   // Element is logic [7:0] -> one canonical word; four such elements, [0:3].
   svBitVecVal data[4] = {0u, 0u, 0u, 0u};
-  const svOpenArrayDimRange ranges[] = {{7, 0}, {0, 3}};
-  svOpenArrayDesc desc;
+  const SvOpenArrayDimRange ranges[] = {{7, 0}, {0, 3}};
+  SvOpenArrayDesc desc;
   svOpenArrayHandle h = MakeHandle(data, ranges, 2, /*elem_size=*/0, &desc);
 
   // Canonical, not C-compatible: no individual-value address and no whole-array
@@ -182,9 +182,9 @@ TEST(DataRepresentation, OpenArrayPackedElementUsesCanonicalForm) {
 // round-trip, confirming the representation is the 4-state canonical one.
 TEST(DataRepresentation, OpenArrayScalarElementUsesCanonicalForm) {
   svLogicVecVal data[4] = {{0u, 0u}, {0u, 0u}, {0u, 0u}, {0u, 0u}};
-  const svOpenArrayDimRange ranges[] = {{0, 0},
+  const SvOpenArrayDimRange ranges[] = {{0, 0},
                                         {0, 3}};  // logic scalar, [0:3].
-  svOpenArrayDesc desc;
+  SvOpenArrayDesc desc;
   svOpenArrayHandle h = MakeHandle(data, ranges, 2, /*elem_size=*/0, &desc);
 
   // Canonical, not C-compatible: no individual-value element address.
@@ -206,9 +206,9 @@ TEST(DataRepresentation, OpenArrayScalarElementUsesCanonicalForm) {
 TEST(DataRepresentation, OpenArrayWidePackedElementUsesCanonicalForm) {
   // Two elements of a 40-bit packed type: two canonical words each.
   svBitVecVal data[4] = {0u, 0u, 0u, 0u};
-  const svOpenArrayDimRange ranges[] = {{39, 0},
+  const SvOpenArrayDimRange ranges[] = {{39, 0},
                                         {0, 1}};  // [39:0] element, [0:1].
-  svOpenArrayDesc desc;
+  SvOpenArrayDesc desc;
   svOpenArrayHandle h = MakeHandle(data, ranges, 2, /*elem_size=*/0, &desc);
 
   EXPECT_EQ(svGetArrElemPtr1(h, 0), nullptr);
@@ -299,9 +299,9 @@ TEST(DataRepresentation, UnpackedNaturalOrderMinToZeroMaxToAbs) {
   };
   const Case cases[] = {{0, 7}, {7, 0}, {-1, -8}};
   for (const Case& c : cases) {
-    const svOpenArrayDimRange ranges[] = {{0, 0},
+    const SvOpenArrayDimRange ranges[] = {{0, 0},
                                           {c.l, c.r}};  // dim 1 under test.
-    svOpenArrayDesc desc;
+    SvOpenArrayDesc desc;
     svOpenArrayHandle h = MakeHandle(nullptr, ranges, 2, 0, &desc);
 
     ExpectUnpackedNaturalOrderMinToZeroMaxToAbs(h, 1, c.l, c.r);
@@ -314,8 +314,8 @@ TEST(DataRepresentation, UnpackedNaturalOrderMinToZeroMaxToAbs) {
 // index, where svLow / svHigh report the coincident bound and svSize reports a
 // unit count.
 TEST(DataRepresentation, UnpackedSingleElementDimensionMapsToZero) {
-  const svOpenArrayDimRange ranges[] = {{0, 0}, {-4, -4}};  // unpacked [-4:-4].
-  svOpenArrayDesc desc;
+  const SvOpenArrayDimRange ranges[] = {{0, 0}, {-4, -4}};  // unpacked [-4:-4].
+  SvOpenArrayDesc desc;
   svOpenArrayHandle h = MakeHandle(nullptr, ranges, 2, 0, &desc);
 
   EXPECT_EQ(svLow(h, 1), -4);
@@ -329,8 +329,8 @@ TEST(DataRepresentation, UnpackedSingleElementDimensionMapsToZero) {
 // independent of the declared orientation. Verified against a descending,
 // negative-spanning declaration [3:-2].
 TEST(DataRepresentation, UnpackedLowerIndicesGoFirst) {
-  const svOpenArrayDimRange ranges[] = {{0, 0}, {3, -2}};  // unpacked [3:-2].
-  svOpenArrayDesc desc;
+  const SvOpenArrayDimRange ranges[] = {{0, 0}, {3, -2}};  // unpacked [3:-2].
+  SvOpenArrayDesc desc;
   svOpenArrayHandle h = MakeHandle(nullptr, ranges, 2, 0, &desc);
 
   const int lo = svLow(h, 1);     // -2

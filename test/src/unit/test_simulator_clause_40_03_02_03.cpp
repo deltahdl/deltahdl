@@ -41,9 +41,9 @@ constexpr int kAssertion = 20;
 constexpr int kToggle = 23;
 
 // §40.3.1 status values that $coverage_get can report, as signed integers.
-constexpr int kError = static_cast<int>(CoverageStatus::Error);
-constexpr int kNoCov = static_cast<int>(CoverageStatus::NoCoverage);
-constexpr int kOverflow = static_cast<int>(CoverageStatus::Overflow);
+constexpr int kError = static_cast<int>(CoverageStatus::kError);
+constexpr int kNoCov = static_cast<int>(CoverageStatus::kNoCoverage);
+constexpr int kOverflow = static_cast<int>(CoverageStatus::kOverflow);
 
 constexpr std::string_view kScope = "$root.tb.unit1";
 

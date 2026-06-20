@@ -19,7 +19,7 @@ TEST(RewriteItem, NotASystemVerilogFunction) {
 TEST(RewriteItem, WrapperRetainsWrappedExpression) {
   Expr e{};
   auto wrapped = ItemExpr::Wrap(&e, ItemOperandKind::kTypedExpr);
-  EXPECT_EQ(wrapped.wrapped(), &e);
+  EXPECT_EQ(wrapped.Wrapped(), &e);
   EXPECT_TRUE(wrapped.BehavesLikeWrapped());
 }
 
@@ -39,7 +39,7 @@ TEST(RewriteItem, WrapsVariedExpressionShapes) {
   call.kind = ExprKind::kCall;
   for (const Expr* node : {&ident, &cast, &bin, &call}) {
     auto wrapped = ItemExpr::Wrap(node, ItemOperandKind::kTypedExpr);
-    EXPECT_EQ(wrapped.wrapped(), node);
+    EXPECT_EQ(wrapped.Wrapped(), node);
     EXPECT_TRUE(wrapped.Admits(ItemOperation::kNamedItemOfTypeOp));
   }
 }

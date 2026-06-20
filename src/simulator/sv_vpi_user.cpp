@@ -19,32 +19,32 @@ namespace delta {
 // Maps a coverage property identifier from sv_vpi_user.h to the abstract
 // CoverageProperty used by the §40.5.2 query helpers. Returns nullopt for an
 // identifier that is not a coverage property.
-std::optional<CoverageProperty> coverage_property_from_vpi(int property) {
+std::optional<CoverageProperty> CoveragePropertyFromVpi(int property) {
   switch (property) {
     case vpiAssertCoverage:
-      return CoverageProperty::AssertCoverage;
+      return CoverageProperty::kAssertCoverage;
     case vpiFsmStateCoverage:
-      return CoverageProperty::FsmStateCoverage;
+      return CoverageProperty::kFsmStateCoverage;
     case vpiStatementCoverage:
-      return CoverageProperty::StatementCoverage;
+      return CoverageProperty::kStatementCoverage;
     case vpiToggleCoverage:
-      return CoverageProperty::ToggleCoverage;
+      return CoverageProperty::kToggleCoverage;
     case vpiCovered:
-      return CoverageProperty::Covered;
+      return CoverageProperty::kCovered;
     case vpiCoveredCount:
-      return CoverageProperty::CoveredCount;
+      return CoverageProperty::kCoveredCount;
     case vpiAssertAttemptCovered:
-      return CoverageProperty::AssertAttemptCovered;
+      return CoverageProperty::kAssertAttemptCovered;
     case vpiAssertSuccessCovered:
-      return CoverageProperty::AssertSuccessCovered;
+      return CoverageProperty::kAssertSuccessCovered;
     case vpiAssertFailureCovered:
-      return CoverageProperty::AssertFailureCovered;
+      return CoverageProperty::kAssertFailureCovered;
     case vpiAssertVacuousSuccessCovered:
-      return CoverageProperty::AssertVacuousSuccessCovered;
+      return CoverageProperty::kAssertVacuousSuccessCovered;
     case vpiAssertDisableCovered:
-      return CoverageProperty::AssertDisableCovered;
+      return CoverageProperty::kAssertDisableCovered;
     case vpiAssertKillCovered:
-      return CoverageProperty::AssertKillCovered;
+      return CoverageProperty::kAssertKillCovered;
     default:
       return std::nullopt;
   }

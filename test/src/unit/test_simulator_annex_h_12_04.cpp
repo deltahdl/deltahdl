@@ -18,7 +18,7 @@
 //        type (modeled here by a zero element stride), and likewise for an
 //        out-of-range index, a null handle, or a mismatched index count.
 //
-// These tests build an svOpenArrayHandle backed by a real svOpenArrayDesc
+// These tests build an svOpenArrayHandle backed by a real SvOpenArrayDesc
 // buffer and observe the svdpi.cpp functions applying those rules. The
 // descriptor's dimension 0 describes the single packed part (H.12.2) and
 // dimensions above 0 the unpacked part; elem_size records the per-element byte
@@ -26,9 +26,9 @@
 
 namespace {
 
-svOpenArrayHandle MakeHandle(void* data, const svOpenArrayDimRange* ranges,
+svOpenArrayHandle MakeHandle(void* data, const SvOpenArrayDimRange* ranges,
                              int n_dims, size_t elem_size,
-                             svOpenArrayDesc* desc) {
+                             SvOpenArrayDesc* desc) {
   desc->data = data;
   desc->n_dims = n_dims;
   desc->ranges = ranges;
@@ -39,9 +39,9 @@ svOpenArrayHandle MakeHandle(void* data, const svOpenArrayDimRange* ranges,
 // C1: each unpacked index resolves to the element's own slot in storage. The
 // handle models: bit [7:0] arr [0:3], one canonical word per element.
 TEST(ActualRepresentation, ElementAddress1D) {
-  const svOpenArrayDimRange ranges[] = {{7, 0}, {0, 3}};
+  const SvOpenArrayDimRange ranges[] = {{7, 0}, {0, 3}};
   svBitVecVal data[4] = {0, 0, 0, 0};
-  svOpenArrayDesc desc;
+  SvOpenArrayDesc desc;
   svOpenArrayHandle h = MakeHandle(data, ranges, 2, sizeof(svBitVecVal), &desc);
 
   for (int i = 0; i < 4; ++i)
@@ -53,9 +53,9 @@ TEST(ActualRepresentation, ElementAddress1D) {
 // 0 and positions advance toward the right bound, so index 1 lands two slots
 // in.
 TEST(ActualRepresentation, ElementAddressDescendingRange) {
-  const svOpenArrayDimRange ranges[] = {{7, 0}, {3, 1}};
+  const SvOpenArrayDimRange ranges[] = {{7, 0}, {3, 1}};
   svBitVecVal data[3] = {0, 0, 0};
-  svOpenArrayDesc desc;
+  SvOpenArrayDesc desc;
   svOpenArrayHandle h = MakeHandle(data, ranges, 2, sizeof(svBitVecVal), &desc);
 
   EXPECT_EQ(svGetArrElemPtr1(h, 3), static_cast<void*>(&data[0]));
@@ -67,10 +67,10 @@ TEST(ActualRepresentation, ElementAddressDescendingRange) {
 // handle models bit [39:0] arr [0:2]: two canonical words (8 bytes) per
 // element.
 TEST(ActualRepresentation, ElementAddressMultiWordStride) {
-  const svOpenArrayDimRange ranges[] = {{39, 0}, {0, 2}};
+  const SvOpenArrayDimRange ranges[] = {{39, 0}, {0, 2}};
   svBitVecVal data[6] = {0, 0, 0, 0, 0, 0};
   const size_t stride = 2 * sizeof(svBitVecVal);
-  svOpenArrayDesc desc;
+  SvOpenArrayDesc desc;
   svOpenArrayHandle h = MakeHandle(data, ranges, 2, stride, &desc);
 
   char* base = reinterpret_cast<char*>(data);
@@ -83,9 +83,9 @@ TEST(ActualRepresentation, ElementAddressMultiWordStride) {
 // unpacked dimensions. Handle: bit [7:0] arr [0:1][0:2] (then [0:1] added).
 TEST(ActualRepresentation, ElementAddress2DAnd3DRowMajor) {
   {
-    const svOpenArrayDimRange ranges[] = {{7, 0}, {0, 1}, {0, 2}};
+    const SvOpenArrayDimRange ranges[] = {{7, 0}, {0, 1}, {0, 2}};
     svBitVecVal data[6] = {0, 0, 0, 0, 0, 0};
-    svOpenArrayDesc desc;
+    SvOpenArrayDesc desc;
     svOpenArrayHandle h =
         MakeHandle(data, ranges, 3, sizeof(svBitVecVal), &desc);
     // Row-major: linear = i*3 + j.
@@ -95,10 +95,10 @@ TEST(ActualRepresentation, ElementAddress2DAnd3DRowMajor) {
     EXPECT_EQ(svGetArrElemPtr2(h, 1, 2), static_cast<void*>(&data[5]));
   }
   {
-    const svOpenArrayDimRange ranges[] = {{7, 0}, {0, 1}, {0, 1}, {0, 1}};
+    const SvOpenArrayDimRange ranges[] = {{7, 0}, {0, 1}, {0, 1}, {0, 1}};
     svBitVecVal data[8];
     for (int i = 0; i < 8; ++i) data[i] = 0;
-    svOpenArrayDesc desc;
+    SvOpenArrayDesc desc;
     svOpenArrayHandle h =
         MakeHandle(data, ranges, 4, sizeof(svBitVecVal), &desc);
     // Row-major: linear = ((i*2)+j)*2 + k.
@@ -112,17 +112,17 @@ TEST(ActualRepresentation, ElementAddress2DAnd3DRowMajor) {
 // C1: the general variadic entry point gathers one index per unpacked dimension
 // and resolves to the same address as the specialized functions.
 TEST(ActualRepresentation, VariadicMatchesSpecialized) {
-  const svOpenArrayDimRange ranges1[] = {{7, 0}, {0, 3}};
+  const SvOpenArrayDimRange ranges1[] = {{7, 0}, {0, 3}};
   svBitVecVal data1[4] = {0, 0, 0, 0};
-  svOpenArrayDesc desc1;
+  SvOpenArrayDesc desc1;
   svOpenArrayHandle h1 =
       MakeHandle(data1, ranges1, 2, sizeof(svBitVecVal), &desc1);
   for (int i = 0; i < 4; ++i)
     EXPECT_EQ(svGetArrElemPtr(h1, i), svGetArrElemPtr1(h1, i));
 
-  const svOpenArrayDimRange ranges2[] = {{7, 0}, {0, 1}, {0, 2}};
+  const SvOpenArrayDimRange ranges2[] = {{7, 0}, {0, 1}, {0, 2}};
   svBitVecVal data2[6] = {0, 0, 0, 0, 0, 0};
-  svOpenArrayDesc desc2;
+  SvOpenArrayDesc desc2;
   svOpenArrayHandle h2 =
       MakeHandle(data2, ranges2, 3, sizeof(svBitVecVal), &desc2);
   for (int i = 0; i < 2; ++i)
@@ -133,9 +133,9 @@ TEST(ActualRepresentation, VariadicMatchesSpecialized) {
 // C2: the whole-array address and size are undefined because the simulator's
 // canonical storage layout differs from the C layout; they are pinned to 0.
 TEST(ActualRepresentation, WholeArrayAddressAndSizeUndefined) {
-  const svOpenArrayDimRange ranges[] = {{7, 0}, {0, 3}};
+  const SvOpenArrayDimRange ranges[] = {{7, 0}, {0, 3}};
   svBitVecVal data[4] = {0, 0, 0, 0};
-  svOpenArrayDesc desc;
+  SvOpenArrayDesc desc;
   svOpenArrayHandle h = MakeHandle(data, ranges, 2, sizeof(svBitVecVal), &desc);
 
   EXPECT_EQ(svGetArrayPtr(h), nullptr);
@@ -144,9 +144,9 @@ TEST(ActualRepresentation, WholeArrayAddressAndSizeUndefined) {
 
 // C3: an index outside the element's original range yields a null pointer.
 TEST(ActualRepresentation, OutOfRangeIndexReturnsNull) {
-  const svOpenArrayDimRange ranges[] = {{7, 0}, {0, 3}};
+  const SvOpenArrayDimRange ranges[] = {{7, 0}, {0, 3}};
   svBitVecVal data[4] = {0, 0, 0, 0};
-  svOpenArrayDesc desc;
+  SvOpenArrayDesc desc;
   svOpenArrayHandle h = MakeHandle(data, ranges, 2, sizeof(svBitVecVal), &desc);
 
   EXPECT_EQ(svGetArrElemPtr1(h, -1), nullptr);
@@ -157,9 +157,9 @@ TEST(ActualRepresentation, OutOfRangeIndexReturnsNull) {
 TEST(ActualRepresentation, NullHandleAndWrongIndexCountReturnNull) {
   EXPECT_EQ(svGetArrElemPtr1(nullptr, 0), nullptr);
 
-  const svOpenArrayDimRange ranges[] = {{7, 0}, {0, 3}};
+  const SvOpenArrayDimRange ranges[] = {{7, 0}, {0, 3}};
   svBitVecVal data[4] = {0, 0, 0, 0};
-  svOpenArrayDesc desc;
+  SvOpenArrayDesc desc;
   svOpenArrayHandle h = MakeHandle(data, ranges, 2, sizeof(svBitVecVal), &desc);
 
   // The array has one unpacked dimension, so two indices is a mismatch.
@@ -170,9 +170,9 @@ TEST(ActualRepresentation, NullHandleAndWrongIndexCountReturnNull) {
 // an individual value of the same type, so element access returns a null
 // pointer.
 TEST(ActualRepresentation, RepresentationDiffersReturnsNull) {
-  const svOpenArrayDimRange ranges[] = {{7, 0}, {0, 3}};
+  const SvOpenArrayDimRange ranges[] = {{7, 0}, {0, 3}};
   svBitVecVal data[4] = {0, 0, 0, 0};
-  svOpenArrayDesc desc;
+  SvOpenArrayDesc desc;
   svOpenArrayHandle h = MakeHandle(data, ranges, 2, /*elem_size=*/0, &desc);
 
   EXPECT_EQ(svGetArrElemPtr1(h, 0), nullptr);
@@ -184,8 +184,8 @@ TEST(ActualRepresentation, RepresentationDiffersReturnsNull) {
 // index are otherwise valid. This is the listing's "null pointer" case,
 // distinct from passing a null handle.
 TEST(ActualRepresentation, NullArrayPointerReturnsNull) {
-  const svOpenArrayDimRange ranges[] = {{7, 0}, {0, 3}};
-  svOpenArrayDesc desc;
+  const SvOpenArrayDimRange ranges[] = {{7, 0}, {0, 3}};
+  SvOpenArrayDesc desc;
   svOpenArrayHandle h =
       MakeHandle(/*data=*/nullptr, ranges, 2, sizeof(svBitVecVal), &desc);
 

@@ -87,22 +87,22 @@ typedef void* svOpenArrayHandle;
 // defines them. The dimension at index 0 describes the single packed part of
 // the array and the dimensions at indices greater than 0 describe the unpacked
 // part, following H.12.2's dimension-numbering convention.
-typedef struct svOpenArrayDimRange {
+typedef struct SvOpenArrayDimRange {
   int left;
   int right;
-} svOpenArrayDimRange;
+} SvOpenArrayDimRange;
 
 // elem_size is the byte stride of one array element within the actual
 // representation that data points at. Annex H.12.4's element-address functions
 // use it to step between consecutive elements. A value of 0 marks an element
 // representation that differs from that of an individual value of the same
 // type, for which H.12.4 requires those functions to return a null pointer.
-typedef struct svOpenArrayDesc {
+typedef struct SvOpenArrayDesc {
   void* data;
   int n_dims;
-  const svOpenArrayDimRange* ranges;
+  const SvOpenArrayDimRange* ranges;
   size_t elem_size;
-} svOpenArrayDesc;
+} SvOpenArrayDesc;
 
 XXTERN const char* svDpiVersion(void);
 
@@ -206,9 +206,9 @@ XXTERN void svAckDisabledState(void);
  * simulation-time count. svGetTimeUnit and svGetTimePrecision retrieve the time
  * unit and precision of the scope (the simulation time unit for a NULL scope).
  * Each returns 0 on success and -1 on error. */
-XXTERN int svGetTime(const svScope scope, svTimeVal* time);
-XXTERN int svGetTimeUnit(const svScope scope, int32_t* time_unit);
-XXTERN int svGetTimePrecision(const svScope scope, int32_t* time_precision);
+XXTERN int svGetTime(svScope scope, svTimeVal* time);
+XXTERN int svGetTimeUnit(svScope scope, int32_t* time_unit);
+XXTERN int svGetTimePrecision(svScope scope, int32_t* time_precision);
 
 #undef DPI_EXTERN
 #ifdef DPI_PROTOTYPES

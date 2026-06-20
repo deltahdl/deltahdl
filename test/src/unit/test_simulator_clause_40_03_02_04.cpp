@@ -39,9 +39,9 @@ constexpr int kAssertion = 20;
 constexpr int kToggle = 23;
 
 // §40.3.1 status values that $coverage_merge can report, as signed integers.
-constexpr int kOk = static_cast<int>(CoverageStatus::Ok);
-constexpr int kError = static_cast<int>(CoverageStatus::Error);
-constexpr int kNoCov = static_cast<int>(CoverageStatus::NoCoverage);
+constexpr int kOk = static_cast<int>(CoverageStatus::kOk);
+constexpr int kError = static_cast<int>(CoverageStatus::kError);
+constexpr int kNoCov = static_cast<int>(CoverageStatus::kNoCoverage);
 
 constexpr std::string_view kName = "run.cov";
 

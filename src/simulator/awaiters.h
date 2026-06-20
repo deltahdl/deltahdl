@@ -438,8 +438,8 @@ struct InertialDelayAwaiter {
   SimContext& ctx;
   uint64_t delay_ticks;
   const std::vector<std::string_view>& var_names;
-  std::shared_ptr<bool> fired_ = std::make_shared<bool>(false);
-  std::shared_ptr<bool> expired_ = std::make_shared<bool>(false);
+  std::shared_ptr<bool> fired = std::make_shared<bool>(false);
+  std::shared_ptr<bool> expired = std::make_shared<bool>(false);
 
   bool await_ready() const noexcept { return false; }
 
@@ -448,8 +448,8 @@ struct InertialDelayAwaiter {
 
     auto time = ctx.CurrentTime() + SimTime{delay_ticks};
     auto* event = ctx.GetScheduler().GetEventPool().Acquire();
-    auto f = fired_;
-    auto e = expired_;
+    auto f = fired;
+    auto e = expired;
     event->callback = [h, proc, f, e, &ctx = ctx]() mutable {
       if (*f) return;
       *f = true;
@@ -464,7 +464,7 @@ struct InertialDelayAwaiter {
       auto* var = ctx.FindVariable(name);
       if (!var) continue;
       var->prev_value = var->value;
-      auto f2 = fired_;
+      auto f2 = fired;
       var->AddWatcher([h, proc, f2]() mutable {
         if (*f2) return true;
         *f2 = true;
@@ -475,7 +475,7 @@ struct InertialDelayAwaiter {
     }
   }
 
-  bool await_resume() const noexcept { return *expired_; }
+  bool await_resume() const noexcept { return *expired; }
 };
 
 struct ForkJoinState {

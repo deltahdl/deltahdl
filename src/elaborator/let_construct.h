@@ -17,10 +17,10 @@ namespace delta {
 // admits neither `sequence` nor `property`; the only choices beyond `untyped`
 // are `event` and the §16.6 type list.
 enum class LetFormalTypeKind : uint8_t {
-  kUntyped,            // the `untyped` keyword — the formal is not typed
-  kEvent,              // event
-  kTypeAllowedIn16_6,  // one of the types allowed in §16.6
-  kForbidden,          // anything else (e.g. sequence, property)
+  kUntyped,           // the `untyped` keyword — the formal is not typed
+  kEvent,             // event
+  kTypeAllowedIn166,  // one of the types allowed in §16.6
+  kForbidden,         // anything else (e.g. sequence, property)
 };
 
 bool IsLetFormalTypeAllowed(LetFormalTypeKind kind);

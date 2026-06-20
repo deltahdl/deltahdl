@@ -523,7 +523,7 @@ using SVpiVlogInfo = delta::VpiVlogInfo;
 // implementation can name it directly; these aliases expose it under the
 // standard PLI spellings.
 using s_vpi_delay = delta::VpiDelay;
-using p_vpi_delay = delta::VpiDelay*;
+typedef delta::VpiDelay* p_vpi_delay;
 
 // §K.2: scalar strength value. logic holds a vpi0/vpi1/vpiX/vpiZ code and the
 // s0/s1 fields carry the drive/charge strength components.
@@ -539,7 +539,7 @@ typedef struct t_vpi_strengthval {
 // simulator can name it directly; these aliases expose it under the standard
 // PLI spellings.
 using s_vpi_arrayvalue = delta::VpiArrayValue;
-using p_vpi_arrayvalue = delta::VpiArrayValue*;
+typedef delta::VpiArrayValue* p_vpi_arrayvalue;
 
 vpiHandle vpi_register_systf(s_vpi_systf_data* data);
 void vpi_get_systf_info(vpiHandle obj, s_vpi_systf_data* systf_data_p);

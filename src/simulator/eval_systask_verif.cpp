@@ -250,12 +250,12 @@ static Logic4Vec EvalCoverageControl(const Expr* expr, SimContext& ctx,
   };
   // A control constant outside the §40.3.1 set (or a missing one) is a bad
   // argument, reported as `SV_COV_ERROR.
-  if (expr->args.empty()) return status_vec(CoverageStatus::Error);
+  if (expr->args.empty()) return status_vec(CoverageStatus::kError);
   int control_value =
       static_cast<int>(EvalExpr(expr->args[0], ctx, arena).ToUint64());
   CoverageControl control{};
   if (!CoverageControlFromInt(control_value, &control)) {
-    return status_vec(CoverageStatus::Error);
+    return status_vec(CoverageStatus::kError);
   }
   // The fourth argument names the module definition or instance. When given as
   // a string literal it is used directly; otherwise the scope is left empty.
@@ -297,7 +297,7 @@ static Logic4Vec EvalCoverageQuery(const Expr* expr, SimContext& ctx,
   // The first argument selects the coverage type; without it the arguments are
   // incorrect, reported as `SV_COV_ERROR.
   if (expr->args.empty()) {
-    return CoverageIntResult(arena, static_cast<int>(CoverageStatus::Error));
+    return CoverageIntResult(arena, static_cast<int>(CoverageStatus::kError));
   }
   int coverage_type =
       static_cast<int>(EvalExpr(expr->args[0], ctx, arena).ToUint64());
@@ -317,7 +317,7 @@ static Logic4Vec EvalCoverageQuery(const Expr* expr, SimContext& ctx,
       return CoverageIntResult(
           arena, static_cast<int>(state.CoverageSave(coverage_type, str_arg)));
   }
-  return CoverageIntResult(arena, static_cast<int>(CoverageStatus::Error));
+  return CoverageIntResult(arena, static_cast<int>(CoverageStatus::kError));
 }
 
 // §40.3.2.2: $coverage_get_max(coverage_type, scope_def, modules_or_instance)

@@ -33,10 +33,10 @@ constexpr int kReset = 2;
 constexpr int kCheck = 3;
 
 // §40.3.1 status values, as signed integers.
-constexpr int kOk = static_cast<int>(CoverageStatus::Ok);
-constexpr int kError = static_cast<int>(CoverageStatus::Error);
-constexpr int kNoCov = static_cast<int>(CoverageStatus::NoCoverage);
-constexpr int kPartial = static_cast<int>(CoverageStatus::Partial);
+constexpr int kOk = static_cast<int>(CoverageStatus::kOk);
+constexpr int kError = static_cast<int>(CoverageStatus::kError);
+constexpr int kNoCov = static_cast<int>(CoverageStatus::kNoCoverage);
+constexpr int kPartial = static_cast<int>(CoverageStatus::kPartial);
 
 constexpr std::string_view kScope = "$root.tb.unit1";
 
@@ -61,7 +61,7 @@ CoverageControlState& Cov(SimFixture& f) {
 // (Table 40-1, START/OK column) and begins collecting.
 TEST(CoverageControl, StartOnFullScopeCollectsAndReportsOk) {
   SimFixture f;
-  Cov(f).SetAvailability(std::string(kScope), CoverageAvailability::Full);
+  Cov(f).SetAvailability(std::string(kScope), CoverageAvailability::kFull);
 
   EXPECT_EQ(RunControl(f, kStart, kScope), kOk);
   EXPECT_TRUE(Cov(f).IsCollecting(std::string(kScope)));
@@ -71,7 +71,7 @@ TEST(CoverageControl, StartOnFullScopeCollectsAndReportsOk) {
 // (Table 40-1, START/PARTIAL column) and still starts what it can.
 TEST(CoverageControl, StartOnPartialScopeReportsPartial) {
   SimFixture f;
-  Cov(f).SetAvailability(std::string(kScope), CoverageAvailability::Partial);
+  Cov(f).SetAvailability(std::string(kScope), CoverageAvailability::kPartial);
 
   EXPECT_EQ(RunControl(f, kStart, kScope), kPartial);
   EXPECT_TRUE(Cov(f).IsCollecting(std::string(kScope)));
@@ -81,7 +81,7 @@ TEST(CoverageControl, StartOnPartialScopeReportsPartial) {
 // `SV_COV_NOCOV (Table 40-1, START/NOCOV column) and starts nothing.
 TEST(CoverageControl, StartOnUncoverableScopeReportsNoCoverage) {
   SimFixture f;
-  Cov(f).SetAvailability(std::string(kScope), CoverageAvailability::None);
+  Cov(f).SetAvailability(std::string(kScope), CoverageAvailability::kNone);
 
   EXPECT_EQ(RunControl(f, kStart, kScope), kNoCov);
   EXPECT_FALSE(Cov(f).IsCollecting(std::string(kScope)));
@@ -92,9 +92,9 @@ TEST(CoverageControl, StartOnUncoverableScopeReportsNoCoverage) {
 // NOCOV) and never begins collecting.
 TEST(CoverageControl, CheckReportsAvailabilityWithoutCollecting) {
   SimFixture f;
-  Cov(f).SetAvailability("full", CoverageAvailability::Full);
-  Cov(f).SetAvailability("part", CoverageAvailability::Partial);
-  Cov(f).SetAvailability("none", CoverageAvailability::None);
+  Cov(f).SetAvailability("full", CoverageAvailability::kFull);
+  Cov(f).SetAvailability("part", CoverageAvailability::kPartial);
+  Cov(f).SetAvailability("none", CoverageAvailability::kNone);
 
   EXPECT_EQ(RunControl(f, kCheck, "full"), kOk);
   EXPECT_EQ(RunControl(f, kCheck, "part"), kPartial);
@@ -105,7 +105,7 @@ TEST(CoverageControl, CheckReportsAvailabilityWithoutCollecting) {
 // C2/C4: `SV_COV_STOP halts an active collection and reports success.
 TEST(CoverageControl, StopHaltsCollectionAndReportsOk) {
   SimFixture f;
-  Cov(f).SetAvailability(std::string(kScope), CoverageAvailability::Full);
+  Cov(f).SetAvailability(std::string(kScope), CoverageAvailability::kFull);
   RunControl(f, kStart, kScope);
 
   EXPECT_EQ(RunControl(f, kStop, kScope), kOk);
@@ -115,7 +115,7 @@ TEST(CoverageControl, StopHaltsCollectionAndReportsOk) {
 // C2/C4: `SV_COV_RESET clears collected coverage and reports success.
 TEST(CoverageControl, ResetClearsCoverageAndReportsOk) {
   SimFixture f;
-  Cov(f).SetAvailability(std::string(kScope), CoverageAvailability::Full);
+  Cov(f).SetAvailability(std::string(kScope), CoverageAvailability::kFull);
   RunControl(f, kStart, kScope);
 
   EXPECT_EQ(RunControl(f, kReset, kScope), kOk);
@@ -127,7 +127,7 @@ TEST(CoverageControl, ResetClearsCoverageAndReportsOk) {
 // reports success.
 TEST(CoverageControl, RepeatedStartHasNoEffect) {
   SimFixture f;
-  Cov(f).SetAvailability(std::string(kScope), CoverageAvailability::Full);
+  Cov(f).SetAvailability(std::string(kScope), CoverageAvailability::kFull);
 
   EXPECT_EQ(RunControl(f, kStart, kScope), kOk);
   EXPECT_EQ(RunControl(f, kStart, kScope), kOk);
@@ -138,7 +138,7 @@ TEST(CoverageControl, RepeatedStartHasNoEffect) {
 // C6 (shall): repeated stops have no effect.
 TEST(CoverageControl, RepeatedStopHasNoEffect) {
   SimFixture f;
-  Cov(f).SetAvailability(std::string(kScope), CoverageAvailability::Full);
+  Cov(f).SetAvailability(std::string(kScope), CoverageAvailability::kFull);
   RunControl(f, kStart, kScope);
 
   EXPECT_EQ(RunControl(f, kStop, kScope), kOk);
@@ -150,7 +150,7 @@ TEST(CoverageControl, RepeatedStopHasNoEffect) {
 // second reset finds nothing to clear.
 TEST(CoverageControl, RepeatedResetHasNoEffect) {
   SimFixture f;
-  Cov(f).SetAvailability(std::string(kScope), CoverageAvailability::Full);
+  Cov(f).SetAvailability(std::string(kScope), CoverageAvailability::kFull);
   RunControl(f, kStart, kScope);
 
   EXPECT_EQ(RunControl(f, kReset, kScope), kOk);
@@ -161,7 +161,7 @@ TEST(CoverageControl, RepeatedResetHasNoEffect) {
 // C2: a reset has no effect when no coverage is available, but still succeeds.
 TEST(CoverageControl, ResetWithoutCoverageHasNoEffect) {
   SimFixture f;
-  Cov(f).SetAvailability(std::string(kScope), CoverageAvailability::None);
+  Cov(f).SetAvailability(std::string(kScope), CoverageAvailability::kNone);
 
   EXPECT_EQ(RunControl(f, kReset, kScope), kOk);
   EXPECT_EQ(Cov(f).ResetCount(std::string(kScope)), 0U);
@@ -187,7 +187,7 @@ TEST(CoverageControl, UnknownScopeIsBadArgument) {
 // bad argument, reported as `SV_COV_ERROR even on a fully coverable scope.
 TEST(CoverageControl, InvalidControlConstantIsBadArgument) {
   SimFixture f;
-  Cov(f).SetAvailability(std::string(kScope), CoverageAvailability::Full);
+  Cov(f).SetAvailability(std::string(kScope), CoverageAvailability::kFull);
 
   EXPECT_EQ(RunControl(f, 99, kScope), kError);
   EXPECT_FALSE(Cov(f).IsCollecting(std::string(kScope)));

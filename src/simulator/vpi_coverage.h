@@ -24,20 +24,20 @@ namespace delta {
 // constants (vpiAssertCoverage, vpiCovered, ...) without redefining them.
 enum class CoverageProperty : std::uint8_t {
   // Instance-level coverage types.
-  AssertCoverage,
-  FsmStateCoverage,
-  StatementCoverage,
-  ToggleCoverage,
+  kAssertCoverage,
+  kFsmStateCoverage,
+  kStatementCoverage,
+  kToggleCoverage,
   // Item-level status.
-  Covered,
-  CoveredCount,
+  kCovered,
+  kCoveredCount,
   // Per-assertion status counts.
-  AssertAttemptCovered,
-  AssertSuccessCovered,
-  AssertFailureCovered,
-  AssertVacuousSuccessCovered,
-  AssertDisableCovered,
-  AssertKillCovered,
+  kAssertAttemptCovered,
+  kAssertSuccessCovered,
+  kAssertFailureCovered,
+  kAssertVacuousSuccessCovered,
+  kAssertDisableCovered,
+  kAssertKillCovered,
 };
 
 // Running tallies for one assertion's evaluation history. These back the
@@ -78,47 +78,43 @@ struct InstanceCoverage {
 };
 
 // vpiAssertAttemptCovered: the number of attempts of the assertion.
-inline std::uint64_t assert_attempt_covered(
-    const AssertionCoverageCounters &c) {
+inline std::uint64_t AssertAttemptCovered(const AssertionCoverageCounters &c) {
   return c.attempts;
 }
 
 // vpiAssertSuccessCovered: the number of nonvacuous successes of the assertion,
 // or, for a cover sequence handle, the number of sequence matches. Both are
 // recorded in the same field, so the value is reported uniformly.
-inline std::uint64_t assert_success_covered(
-    const AssertionCoverageCounters &c) {
+inline std::uint64_t AssertSuccessCovered(const AssertionCoverageCounters &c) {
   return c.successes;
 }
 
 // vpiAssertVacuousSuccessCovered: the number of vacuous successes.
-inline std::uint64_t assert_vacuous_success_covered(
+inline std::uint64_t AssertVacuousSuccessCovered(
     const AssertionCoverageCounters &c) {
   return c.vacuous_successes;
 }
 
 // vpiAssertDisableCovered: the number of times the assertion reached the
 // disabled state.
-inline std::uint64_t assert_disable_covered(
-    const AssertionCoverageCounters &c) {
+inline std::uint64_t AssertDisableCovered(const AssertionCoverageCounters &c) {
   return c.disabled;
 }
 
 // vpiAssertKillCovered: the number of times the assertion was killed.
-inline std::uint64_t assert_kill_covered(const AssertionCoverageCounters &c) {
+inline std::uint64_t AssertKillCovered(const AssertionCoverageCounters &c) {
   return c.killed;
 }
 
 // vpiAssertFailureCovered: the number of failures of the assertion.
-inline std::uint64_t assert_failure_covered(
-    const AssertionCoverageCounters &c) {
+inline std::uint64_t AssertFailureCovered(const AssertionCoverageCounters &c) {
   return c.failures;
 }
 
 // vpiCovered for an assertion handle: the assertion counts as covered only once
 // it has been attempted, has produced at least one nonvacuous success, and has
 // never failed.
-inline bool assertion_covered(const AssertionCoverageCounters &c) {
+inline bool AssertionCovered(const AssertionCoverageCounters &c) {
   return c.attempts > 0 && c.successes > 0 && c.failures == 0;
 }
 
@@ -127,7 +123,7 @@ inline bool assertion_covered(const AssertionCoverageCounters &c) {
 // kill, or failure). This identity does not describe a cover sequence, where a
 // single attempt may match many times, so the result is absent for one. Should
 // the recorded outcomes ever exceed the attempts the count is clamped to zero.
-inline std::optional<std::uint64_t> assert_in_progress(
+inline std::optional<std::uint64_t> AssertInProgress(
     const AssertionCoverageCounters &c) {
   if (c.is_cover_sequence) {
     return std::nullopt;
@@ -142,21 +138,21 @@ inline std::optional<std::uint64_t> assert_in_progress(
 
 // Dispatches an assertion-status property to the matching tally. Properties
 // that are not per-assertion status counts contribute nothing.
-inline std::uint64_t assertion_status_query(
-    CoverageProperty property, const AssertionCoverageCounters &c) {
+inline std::uint64_t AssertionStatusQuery(CoverageProperty property,
+                                          const AssertionCoverageCounters &c) {
   switch (property) {
-    case CoverageProperty::AssertAttemptCovered:
-      return assert_attempt_covered(c);
-    case CoverageProperty::AssertSuccessCovered:
-      return assert_success_covered(c);
-    case CoverageProperty::AssertVacuousSuccessCovered:
-      return assert_vacuous_success_covered(c);
-    case CoverageProperty::AssertDisableCovered:
-      return assert_disable_covered(c);
-    case CoverageProperty::AssertKillCovered:
-      return assert_kill_covered(c);
-    case CoverageProperty::AssertFailureCovered:
-      return assert_failure_covered(c);
+    case CoverageProperty::kAssertAttemptCovered:
+      return AssertAttemptCovered(c);
+    case CoverageProperty::kAssertSuccessCovered:
+      return AssertSuccessCovered(c);
+    case CoverageProperty::kAssertVacuousSuccessCovered:
+      return AssertVacuousSuccessCovered(c);
+    case CoverageProperty::kAssertDisableCovered:
+      return AssertDisableCovered(c);
+    case CoverageProperty::kAssertKillCovered:
+      return AssertKillCovered(c);
+    case CoverageProperty::kAssertFailureCovered:
+      return AssertFailureCovered(c);
     default:
       return 0;
   }
@@ -164,29 +160,29 @@ inline std::uint64_t assertion_status_query(
 
 // vpiCovered for a handle that holds several coverable entities: how many of
 // those entities are covered (covered statements, FSM states, or signal bits).
-inline std::uint64_t covered_entity_count(const EntityCoverage &e) {
+inline std::uint64_t CoveredEntityCount(const EntityCoverage &e) {
   return e.covered;
 }
 
 // vpiCoveredCount: how many times the item has been covered.
-inline std::uint64_t covered_count(const EntityCoverage &e) {
+inline std::uint64_t CoveredCount(const EntityCoverage &e) {
   return e.hit_count;
 }
 
 // vpi_get(<coverageType>, instance_handle): the number of covered items of the
 // requested coverage type within the instance. A property that is not one of
 // the four coverage types selects nothing.
-inline std::uint64_t instance_coverage_count(CoverageProperty property,
-                                             const InstanceCoverage &inst) {
+inline std::uint64_t InstanceCoverageCount(CoverageProperty property,
+                                           const InstanceCoverage &inst) {
   switch (property) {
-    case CoverageProperty::AssertCoverage:
-      return covered_entity_count(inst.assertions);
-    case CoverageProperty::FsmStateCoverage:
-      return covered_entity_count(inst.fsm_states);
-    case CoverageProperty::StatementCoverage:
-      return covered_entity_count(inst.statements);
-    case CoverageProperty::ToggleCoverage:
-      return covered_entity_count(inst.toggles);
+    case CoverageProperty::kAssertCoverage:
+      return CoveredEntityCount(inst.assertions);
+    case CoverageProperty::kFsmStateCoverage:
+      return CoveredEntityCount(inst.fsm_states);
+    case CoverageProperty::kStatementCoverage:
+      return CoveredEntityCount(inst.statements);
+    case CoverageProperty::kToggleCoverage:
+      return CoveredEntityCount(inst.toggles);
     default:
       return 0;
   }

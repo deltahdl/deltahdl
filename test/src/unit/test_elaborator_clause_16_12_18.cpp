@@ -28,7 +28,7 @@ TEST(TypedPropertyFormal,
   EXPECT_TRUE(IsPropertyFormalTypeAllowed(PropertyFormalTypeKind::kSequence));
   EXPECT_TRUE(IsPropertyFormalTypeAllowed(PropertyFormalTypeKind::kEvent));
   EXPECT_TRUE(
-      IsPropertyFormalTypeAllowed(PropertyFormalTypeKind::kTypeAllowedIn16_6));
+      IsPropertyFormalTypeAllowed(PropertyFormalTypeKind::kTypeAllowedIn166));
 }
 
 TEST(TypedPropertyFormal, ForbiddenTypeKindRejected) {
