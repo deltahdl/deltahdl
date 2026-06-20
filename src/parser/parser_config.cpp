@@ -43,7 +43,18 @@ void Parser::ParseNamedParamAssignment(ConfigRule* rule) {
 
 void Parser::ParseUseClause(ConfigRule* rule) {
   Expect(TokenKind::kKwUse);
+
+  // Parses a comma-separated list of named_parameter_assignment, consuming the
+  // current item first and then each ', .name(...)' that follows.
+  auto parse_named_param_list = [this, rule]() {
+    do {
+      ParseNamedParamAssignment(rule);
+    } while (Match(TokenKind::kComma));
+  };
+
   if (CheckIdentifier()) {
+    // use_clause form: [ library_identifier . ] cell_identifier
+    // { , named_parameter_assignment }
     auto first = ExpectIdentifier().text;
     if (Match(TokenKind::kDot)) {
       rule->use_lib = first;
@@ -51,17 +62,13 @@ void Parser::ParseUseClause(ConfigRule* rule) {
     } else {
       rule->use_cell = first;
     }
-    // use_clause form: [ library_identifier . ] cell_identifier
-    // { , named_parameter_assignment }
     while (Match(TokenKind::kComma)) {
       ParseNamedParamAssignment(rule);
     }
   } else if (Check(TokenKind::kDot)) {
     // use_clause form: named_parameter_assignment
     // { , named_parameter_assignment }
-    do {
-      ParseNamedParamAssignment(rule);
-    } while (Match(TokenKind::kComma));
+    parse_named_param_list();
   }
 
   if (Match(TokenKind::kHash)) {
@@ -74,9 +81,7 @@ void Parser::ParseUseClause(ConfigRule* rule) {
     if (Check(TokenKind::kRParen)) {
       rule->use_param_reset_all = true;
     } else {
-      do {
-        ParseNamedParamAssignment(rule);
-      } while (Match(TokenKind::kComma));
+      parse_named_param_list();
     }
     Expect(TokenKind::kRParen);
   }
@@ -129,14 +134,34 @@ ConfigDecl* Parser::ParseConfigDecl() {
   decl->name = Expect(TokenKind::kIdentifier).text;
   Expect(TokenKind::kSemicolon);
 
-  while (Check(TokenKind::kKwLocalparam) && !AtEnd()) {
+  // Optional 'localparam <id> = <expr>;' declarations precede the design
+  // statement and rules in a config_declaration.
+  auto parse_local_params = [this, decl]() {
+    while (Check(TokenKind::kKwLocalparam) && !AtEnd()) {
+      Consume();
+      auto pname = ExpectIdentifier().text;
+      Expect(TokenKind::kEq);
+      auto* val = ParseExpr();
+      decl->local_params.emplace_back(pname, val);
+      Expect(TokenKind::kSemicolon);
+    }
+  };
+
+  // Reports and discards a duplicate 'design' statement, skipping tokens up to
+  // (and including) its terminating semicolon.
+  auto skip_duplicate_design = [this, decl]() {
+    diag_.Error(
+        CurrentLoc(),
+        std::format("duplicate 'design' statement in config '{}'", decl->name));
     Consume();
-    auto pname = ExpectIdentifier().text;
-    Expect(TokenKind::kEq);
-    auto* val = ParseExpr();
-    decl->local_params.emplace_back(pname, val);
-    Expect(TokenKind::kSemicolon);
-  }
+    while (!Check(TokenKind::kSemicolon) && !Check(TokenKind::kKwEndconfig) &&
+           !AtEnd()) {
+      Consume();
+    }
+    if (Check(TokenKind::kSemicolon)) Consume();
+  };
+
+  parse_local_params();
 
   bool has_design = false;
   if (Check(TokenKind::kKwDesign)) {
@@ -148,16 +173,7 @@ ConfigDecl* Parser::ParseConfigDecl() {
 
   while (!Check(TokenKind::kKwEndconfig) && !AtEnd()) {
     if (Check(TokenKind::kKwDesign)) {
-      diag_.Error(CurrentLoc(),
-                  std::format("duplicate 'design' statement in config '{}'",
-                              decl->name));
-
-      Consume();
-      while (!Check(TokenKind::kSemicolon) && !Check(TokenKind::kKwEndconfig) &&
-             !AtEnd()) {
-        Consume();
-      }
-      if (Check(TokenKind::kSemicolon)) Consume();
+      skip_duplicate_design();
       continue;
     }
     decl->rules.push_back(ParseConfigRule());

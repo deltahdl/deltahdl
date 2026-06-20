@@ -475,6 +475,104 @@ static bool DefineSpansMultipleLines(std::string_view line) {
          HasOpenBlockComment(body_start);
 }
 
+// How a comment-stripped active line (22.2) should be split: either it opens
+// with a directive, contains a directive after a language element, or is wholly
+// ordinary text. The directive part begins at split_pos; any leading text spans
+// [0, split_pos).
+struct ActiveLineSplit {
+  enum class Kind { kLeadingDirective, kMidLineDirective, kPlainText } kind;
+  size_t split_pos;
+};
+
+static ActiveLineSplit ClassifyActiveLine(std::string_view stripped) {
+  size_t dir_pos = FindDirectiveInStripped(stripped);
+  if (dir_pos != std::string_view::npos)
+    return {ActiveLineSplit::Kind::kLeadingDirective, dir_pos};
+  size_t mid = FindMidLineDirective(stripped);
+  if (mid != std::string_view::npos)
+    return {ActiveLineSplit::Kind::kMidLineDirective, mid};
+  return {ActiveLineSplit::Kind::kPlainText, 0};
+}
+
+// Callbacks for emitting one comment-stripped, conditional-stack-active line
+// (22.2). expand_and_emit fully expands ordinary text; emit_directive_or_text
+// runs a fragment as a directive or, failing that, expands it as text. They are
+// supplied by ProcessSource because the underlying work touches private state.
+struct ActiveLineEmit {
+  std::function<void(std::string_view)> expand_and_emit;
+  std::function<void(std::string_view)> emit_directive_or_text;
+};
+
+// Emit an already comment-stripped active line, routing it per its split kind.
+static void EmitActiveLine(std::string_view view, const ActiveLineEmit& emit,
+                           std::string& output) {
+  ActiveLineSplit split = ClassifyActiveLine(view);
+  switch (split.kind) {
+    case ActiveLineSplit::Kind::kLeadingDirective:
+      if (split.split_pos > 0) output.append(view.substr(0, split.split_pos));
+      emit.emit_directive_or_text(view.substr(split.split_pos));
+      return;
+    case ActiveLineSplit::Kind::kMidLineDirective:
+      emit.expand_and_emit(view.substr(0, split.split_pos));
+      emit.emit_directive_or_text(view.substr(split.split_pos));
+      return;
+    case ActiveLineSplit::Kind::kPlainText:
+      emit.expand_and_emit(view);
+      return;
+  }
+}
+
+// Callbacks the line loop uses to act on each physical source line. Each wraps
+// private Preprocessor work so the loop itself can live as a free function.
+struct PreprocLoopOps {
+  std::function<bool()> in_block_comment;
+  std::function<void(std::string_view)> continue_block_comment;
+  std::function<bool(std::string_view)> run_directive;
+  std::function<bool()> is_active;
+  std::function<void(std::string_view)> emit_active_line;
+  std::function<void(std::string_view)> note_ignored_line;
+};
+
+// Process one ordinary (non-block-comment) source line: a `define whose body
+// spans multiple physical lines is first joined, then the line is run as a
+// directive, emitted as active text, or (inside an ignored block) only scanned
+// so an opening block comment is tracked across lines (22.6).
+static void ProcessOrdinaryLine(std::string_view line, std::string_view src,
+                                size_t pos, size_t& eol, uint32_t& line_num,
+                                const PreprocLoopOps& ops) {
+  std::string joined;
+  if (DefineSpansMultipleLines(line)) {
+    joined = JoinDefineBody(src, pos, eol, line_num);
+    line = joined;
+  }
+  if (ops.run_directive(line)) return;
+  if (ops.is_active())
+    ops.emit_active_line(line);
+  else
+    ops.note_ignored_line(line);
+}
+
+// Drive the per-line preprocessing loop (22.x). An open block comment continues
+// with its own newline handling; every other line is processed and followed by
+// a single newline. Emitted text is appended to output.
+static void RunPreprocLoop(std::string_view src, uint32_t& line_num,
+                           const PreprocLoopOps& ops, std::string& output) {
+  size_t pos = 0;
+  while (pos < src.size()) {
+    size_t eol = src.find('\n', pos);
+    if (eol == std::string_view::npos) eol = src.size();
+    std::string_view line = src.substr(pos, eol - pos);
+    ++line_num;
+    if (ops.in_block_comment()) {
+      ops.continue_block_comment(line);
+    } else {
+      ProcessOrdinaryLine(line, src, pos, eol, line_num, ops);
+      output.push_back('\n');
+    }
+    pos = eol + 1;
+  }
+}
+
 std::string Preprocessor::ProcessSource(std::string_view src, uint32_t file_id,
                                         int depth) {
   if (depth > kMaxIncludeDepth) {
@@ -482,82 +580,51 @@ std::string Preprocessor::ProcessSource(std::string_view src, uint32_t file_id,
     return "";
   }
 
+  uint32_t line_num = 0;
   std::string output;
   output.reserve(src.size());
-  uint32_t line_num = 0;
-  size_t pos = 0;
 
   // Conditionally expand a fragment (22.5.1 inline conditionals + macros),
   // track any design element it introduces, then emit it.
-  auto expand_and_emit = [&](std::string_view fragment) {
+  ActiveLineEmit emit;
+  emit.expand_and_emit = [&](std::string_view fragment) {
     auto conditioned = ExpandInlineConditionals(std::string(fragment));
     auto expanded = ExpandInlineMacros(conditioned, file_id, line_num);
     TrackDesignElement(Trim(expanded));
     output.append(expanded);
   };
-
-  // Run a fragment through ProcessDirective; if it was not a directive, emit
-  // it as ordinary text with full expansion.
-  auto emit_directive_or_text = [&](std::string_view fragment) {
+  // Run a fragment through ProcessDirective; if it was not a directive, emit it
+  // as ordinary text with full expansion.
+  emit.emit_directive_or_text = [&](std::string_view fragment) {
     if (!ProcessDirective(fragment, file_id, line_num, depth, output))
-      expand_and_emit(fragment);
+      emit.expand_and_emit(fragment);
   };
 
-  // Handle a non-directive line while the conditional stack is active (22.2):
-  // a directive may appear at the start, mid-line after a language element, or
-  // the whole line may be ordinary text.
-  auto process_active_line = [&](std::string_view line) {
+  PreprocLoopOps ops;
+  ops.in_block_comment = [&] { return in_block_comment_; };
+  ops.is_active = [&] { return IsActive(); };
+  // An open block comment (22.6) emits or skips its text and handles its own
+  // trailing newline; a directive may still follow the comment close.
+  ops.continue_block_comment = [&](std::string_view line) {
+    if (IsActive())
+      ProcessBlockCommentLine(line, file_id, line_num, depth, output);
+    else
+      SkipBlockCommentLine(line, file_id, line_num, depth, output);
+  };
+  ops.run_directive = [&](std::string_view line) {
+    return ProcessDirective(line, file_id, line_num, depth, output);
+  };
+  ops.emit_active_line = [&](std::string_view line) {
     auto stripped = StripComments(std::string(line), in_block_comment_);
-    size_t dir_pos = FindDirectiveInStripped(stripped);
-    if (dir_pos != std::string_view::npos) {
-      if (dir_pos > 0) output.append(stripped, 0, dir_pos);
-      emit_directive_or_text(std::string_view(stripped).substr(dir_pos));
-      return;
-    }
-    size_t mid = FindMidLineDirective(stripped);
-    if (mid != std::string_view::npos) {
-      expand_and_emit(std::string_view(stripped).substr(0, mid));
-      emit_directive_or_text(std::string_view(stripped).substr(mid));
-      return;
-    }
-    expand_and_emit(stripped);
+    EmitActiveLine(stripped, emit, output);
+  };
+  // Inside an ignored block nothing is emitted, but track an opening block
+  // comment so a later in-comment directive stays hidden (22.6).
+  ops.note_ignored_line = [&](std::string_view line) {
+    StripComments(line, in_block_comment_);
   };
 
-  while (pos < src.size()) {
-    size_t eol = src.find('\n', pos);
-    if (eol == std::string_view::npos) eol = src.size();
-    std::string_view line = src.substr(pos, eol - pos);
-    ++line_num;
-
-    if (in_block_comment_) {
-      if (IsActive()) {
-        ProcessBlockCommentLine(line, file_id, line_num, depth, output);
-      } else {
-        SkipBlockCommentLine(line, file_id, line_num, depth, output);
-      }
-      pos = eol + 1;
-      continue;
-    }
-
-    std::string joined;
-    if (DefineSpansMultipleLines(line)) {
-      joined = JoinDefineBody(src, pos, eol, line_num);
-      line = joined;
-    }
-
-    bool handled = ProcessDirective(line, file_id, line_num, depth, output);
-    if (!handled && IsActive()) {
-      process_active_line(line);
-    } else if (!handled) {
-      // Inside an ignored block_of_text nothing is emitted, but a block
-      // comment may open on this line. Track that state so a directive that
-      // appears inside the comment on a following line stays hidden and does
-      // not prematurely terminate the surrounding conditional block (22.6).
-      StripComments(line, in_block_comment_);
-    }
-    output.push_back('\n');
-    pos = eol + 1;
-  }
+  RunPreprocLoop(src, line_num, ops, output);
   return output;
 }
 

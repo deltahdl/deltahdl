@@ -1,7 +1,6 @@
 #include <algorithm>
 #include <cstdint>
 #include <format>
-#include <functional>
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
@@ -281,6 +280,25 @@ void CheckRefPortsConnected(DiagEngine& diag,
   }
 }
 
+// Interface type named by `conn_name`; `found` reports whether it is known.
+std::string_view ResolveConnectedInterfaceType(const PortBindCtx& ctx,
+                                               std::string_view conn_name,
+                                               bool& found) {
+  auto iit = ctx.interface_inst_types.find(conn_name);
+  if (iit != ctx.interface_inst_types.end()) {
+    found = true;
+    return iit->second;
+  }
+  for (const auto& pp : ctx.parent_mod->ports) {
+    if (pp.name == conn_name && pp.is_interface_port) {
+      found = true;
+      return pp.interface_type_name;
+    }
+  }
+  found = false;
+  return {};
+}
+
 // Validates one interface port binding: it must be connected, name an interface
 // instance or interface port, and match the port's declared interface type.
 void CheckOneInterfacePortConnected(const PortBindCtx& ctx,
@@ -293,7 +311,6 @@ void CheckOneInterfacePortConnected(const PortBindCtx& ctx,
       break;
     }
   }
-
   if (!conn) {
     ctx.diag.Error(ctx.item->loc,
                    std::format("interface port '{}' of module '{}' cannot be "
@@ -301,7 +318,6 @@ void CheckOneInterfacePortConnected(const PortBindCtx& ctx,
                                port.name, inst.module_name));
     return;
   }
-
   std::string_view conn_name;
   if (conn->kind == ExprKind::kIdentifier) {
     conn_name = conn->text;
@@ -309,35 +325,18 @@ void CheckOneInterfacePortConnected(const PortBindCtx& ctx,
              conn->lhs->kind == ExprKind::kIdentifier && conn->rhs &&
              conn->rhs->kind == ExprKind::kIdentifier) {
     conn_name = conn->lhs->text;
-  } else {
+  }
+
+  bool found = false;
+  std::string_view conn_ifc_type =
+      conn_name.empty() ? std::string_view{}
+                        : ResolveConnectedInterfaceType(ctx, conn_name, found);
+  if (conn_name.empty() || !found) {
     ctx.diag.Error(ctx.item->loc,
                    std::format("interface port '{}' must be connected to an "
                                "interface instance or interface port",
                                port.name));
     return;
-  }
-
-  std::string_view conn_ifc_type;
-
-  auto iit = ctx.interface_inst_types.find(conn_name);
-  if (iit != ctx.interface_inst_types.end()) {
-    conn_ifc_type = iit->second;
-  } else {
-    bool is_ifc_port = false;
-    for (const auto& pp : ctx.parent_mod->ports) {
-      if (pp.name == conn_name && pp.is_interface_port) {
-        conn_ifc_type = pp.interface_type_name;
-        is_ifc_port = true;
-        break;
-      }
-    }
-    if (!is_ifc_port) {
-      ctx.diag.Error(ctx.item->loc,
-                     std::format("interface port '{}' must be connected to an "
-                                 "interface instance or interface port",
-                                 port.name));
-      return;
-    }
   }
 
   if (!port.interface_type_name.empty() && !conn_ifc_type.empty() &&
@@ -437,6 +436,17 @@ void CheckExplicitIdentifierConnection(const PortBindCtx& ctx,
                            port.is_var});
 }
 
+// True when a replication operator appears anywhere in `e`.
+bool ConnectionHasReplication(const Expr* e) {
+  if (!e) return false;
+  if (e->kind == ExprKind::kReplicate) return true;
+  if (e->kind == ExprKind::kConcatenation) {
+    for (const auto* el : e->elements)
+      if (ConnectionHasReplication(el)) return true;
+  }
+  return false;
+}
+
 }  // namespace
 
 void Elaborator::BindPorts(RtlirModuleInst& inst, const ModuleItem* item,
@@ -520,21 +530,11 @@ void Elaborator::BindPorts(RtlirModuleInst& inst, const ModuleItem* item,
                                         binding.port_name);
     }
 
-    if (conn_expr && binding.direction != Direction::kInput) {
-      std::function<bool(const Expr*)> has_rep = [&](const Expr* e) -> bool {
-        if (!e) return false;
-        if (e->kind == ExprKind::kReplicate) return true;
-        if (e->kind == ExprKind::kConcatenation) {
-          for (const auto* el : e->elements)
-            if (has_rep(el)) return true;
-        }
-        return false;
-      };
-      if (has_rep(conn_expr)) {
-        diag_.Error(conn_expr->range.start,
-                    "replication shall not appear in an output or inout "
-                    "port connection");
-      }
+    if (conn_expr && binding.direction != Direction::kInput &&
+        ConnectionHasReplication(conn_expr)) {
+      diag_.Error(conn_expr->range.start,
+                  "replication shall not appear in an output or inout "
+                  "port connection");
     }
 
     if (conn_expr) {

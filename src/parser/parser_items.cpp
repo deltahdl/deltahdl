@@ -272,6 +272,32 @@ bool Parser::TryParseDeclKeywordItem(std::vector<ModuleItem*>& items) {
 }
 
 bool Parser::TryParseMiscKeywordItem(std::vector<ModuleItem*>& items) {
+  // Parses a timeunit/timeprecision declaration with its surrounding §3.14.2
+  // snapshot/validate dance. Kept as a local lambda so its branch logic is
+  // scored separately and does not inflate this dispatcher's complexity.
+  auto parse_timeunit = [&] {
+    bool validate_pkg = !current_module_ && current_package_ != nullptr;
+    TimeScopeRefs refs =
+        CollectTimeScopeRefs(current_module_, current_package_);
+    auto loc = CurrentLoc();
+    ParseTimeunitDecl(current_module_, nullptr,
+                      validate_pkg ? current_package_ : nullptr);
+    ValidateTimeScopeAfterParse(refs, diag_, loc);
+  };
+  // Parses an `interconnect` net declaration (§6.6.8), including its optional
+  // signedness and packed dimensions, into a var-decl list.
+  auto parse_interconnect = [&] {
+    Consume();
+    DataType dtype = MakeInterconnectDataType();
+    if (Match(TokenKind::kKwSigned)) {
+      dtype.is_signed = true;
+    } else {
+      Match(TokenKind::kKwUnsigned);
+    }
+    ParsePackedDims(dtype);
+    ParseVarDeclList(items, dtype);
+  };
+
   if (Check(TokenKind::kKwAssign)) {
     ParseContinuousAssign(items);
     return true;
@@ -286,13 +312,7 @@ bool Parser::TryParseMiscKeywordItem(std::vector<ModuleItem*>& items) {
     return true;
   }
   if (Check(TokenKind::kKwTimeunit) || Check(TokenKind::kKwTimeprecision)) {
-    bool validate_pkg = !current_module_ && current_package_ != nullptr;
-    TimeScopeRefs refs =
-        CollectTimeScopeRefs(current_module_, current_package_);
-    auto loc = CurrentLoc();
-    ParseTimeunitDecl(current_module_, nullptr,
-                      validate_pkg ? current_package_ : nullptr);
-    ValidateTimeScopeAfterParse(refs, diag_, loc);
+    parse_timeunit();
     return true;
   }
   if (Check(TokenKind::kKwLet)) {
@@ -300,15 +320,7 @@ bool Parser::TryParseMiscKeywordItem(std::vector<ModuleItem*>& items) {
     return true;
   }
   if (Check(TokenKind::kKwInterconnect)) {
-    Consume();
-    DataType dtype = MakeInterconnectDataType();
-    if (Match(TokenKind::kKwSigned)) {
-      dtype.is_signed = true;
-    } else {
-      Match(TokenKind::kKwUnsigned);
-    }
-    ParsePackedDims(dtype);
-    ParseVarDeclList(items, dtype);
+    parse_interconnect();
     return true;
   }
   if (Check(TokenKind::kKwBind)) {
@@ -595,8 +607,12 @@ void Parser::ParseTypedItemOrInst(std::vector<ModuleItem*>& items,
 
 void Parser::ParseImplicitTypeOrInst(std::vector<ModuleItem*>& items) {
   auto name_tok = Consume();
-  if (Check(TokenKind::kColonColon)) {
-    Consume();
+  // Parses a `name :: type_identifier ...` form (the `::` is consumed here) as
+  // either a scoped module instantiation or a variable declaration of a
+  // package/class-scoped type. Kept as a local lambda so its nested dispatch
+  // is scored separately and does not inflate this function's complexity.
+  auto parse_scoped_name = [&] {
+    Consume();  // ::
     auto type_tok = ExpectIdentifier();
     // The built-in package name `std` is reserved (it cannot hold modules), so
     // `std :: type_identifier` is a built_in_data_type. A declarator that
@@ -617,6 +633,9 @@ void Parser::ParseImplicitTypeOrInst(std::vector<ModuleItem*>& items) {
       dtype.type_params = ParseTypeParamList();
     }
     ParseVarDeclList(items, dtype);
+  };
+  if (Check(TokenKind::kColonColon)) {
+    parse_scoped_name();
     return;
   }
   if (known_types_.count(name_tok.text) != 0) {

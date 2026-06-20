@@ -1,5 +1,7 @@
 #include <cmath>
 #include <format>
+#include <functional>
+#include <initializer_list>
 #include <optional>
 #include <unordered_map>
 #include <unordered_set>
@@ -15,118 +17,135 @@
 
 namespace delta {
 
+static void CheckModuleTimescaleOrder(const ModuleDecl* decl,
+                                      DiagEngine& diag) {
+  if (!decl->has_timeunit || !decl->has_timeprecision) return;
+  int unit_order =
+      EffectiveTimeOrder(decl->time_unit, decl->time_unit_magnitude);
+  int prec_order =
+      EffectiveTimeOrder(decl->time_prec, decl->time_prec_magnitude);
+  if (prec_order > unit_order) {
+    diag.Error(decl->range.start,
+               "time precision is less precise than the time unit");
+  }
+}
+
 void Elaborator::ValidateModuleConstraints(const ModuleDecl* decl) {
   for (const auto* item : decl->items) {
     ValidateItemConstraints(item);
   }
-  ValidatePackageImportRules(decl);
-  ValidateScopeRules(decl);
-  ValidateMixedAssignments();
-  ValidateInputPortAssignments(decl);
-  ValidateMatchesPatternIntegral(decl);
-  ValidateMatchesCaseSelectorType(decl);
-  ValidateMatchesIfPredicateType(decl);
-  ValidateDisableTargets(decl);
-  ValidateProceduralNetAssign();
-  ValidateDynamicArrayNba(decl);
-  ValidateArrayQueryOnDynamicType(decl);
-  ValidateArrayQueryOnVariableDim(decl);
-  ValidateRandomSeedType(decl);
-  ValidatePlaOutputTerms(decl);
-  ValidatePlaAscendingOrder(decl);
-  ValidateBitsCallRestrictions(decl);
-  ValidateAutomaticVarProcWrites(decl);
-  ValidateJumpStatements(decl);
-  ValidateForeachLoops(decl);
-  ValidateContAssignConstSelect(decl);
-  ValidatePartSelectBounds(decl);
-  ValidateSpecparamInParams(decl);
-  ValidateSpecparamInDeclRange(decl);
-  ValidateEnumAssignments(decl);
-  ValidateConstAssignments(decl);
-  ValidateArrayAssignments(decl);
-  ValidateAssocArraySlices(decl);
-  ValidateAssocWildcardTraversal(decl);
-  ValidateAssocTraversalArgType(decl);
-  ValidateArrayOrderingMethods(decl);
-  ValidateClassIndexSelect(decl);
-  ValidateStringIndexSelect(decl);
-  ValidateIntegralIndexSelect(decl);
-  ValidateAssocConcatTarget(decl);
-  ValidateAssocOperandInExpr(decl);
-  ValidateArrayPatternElemType(decl);
-  ValidateReplicateTargetingArray(decl);
-  ValidateArrayElementPartSelect(decl);
-  ValidateUnpackedArrayConcatNesting(decl);
-  ValidateClassHandleOps(decl);
-  ValidateChandleOps(decl);
-  ValidateVirtualInterfaceOps(decl);
-  ValidateEventOps(decl);
-  ValidateVirtualInterfaceClocking(decl);
-  ValidateInterfaceObjectAccess(decl);
-  ValidateDeferredAssertionActions(decl);
-  ValidateAggregateComparisons(decl);
-  ValidateTypeRefComparisons(decl);
-  ValidateTypeRefArgs(decl);
-  ValidateTaggedUnionMembers(decl);
-  ValidateRealOperatorRestrictions(decl);
-  ValidateAssignInExprRestrictions(decl);
-  ValidateUnsizedInConcat(decl);
-  ValidateSelectOnConcatLvalue(decl);
-  ValidateReplicateLvalue(decl);
-  ValidateStringConcatLvalue(decl);
-  ValidateReplicateMultiplier(decl);
-  ValidateStreamingConcatContext(decl);
-  ValidateBitStreamCast(decl);
-  ValidateSubroutineCallArgs(decl);
-  ValidateArrayArgTypes(decl);
-  ValidateLocalProtectedAccess(decl);
-  ValidateParameterizedScopeResolution(decl);
-  ValidateTypeParamScopeUsage(decl);
-  ValidateTypeParamScopePrefixResolvesToClass(decl);
-  ValidateStaticMethodBodies(decl);
-  ValidateClassMethodBodies(decl);
-  ValidateThisUsage(decl);
-  if (decl->has_timeunit && decl->has_timeprecision) {
-    int unit_order =
-        EffectiveTimeOrder(decl->time_unit, decl->time_unit_magnitude);
-    int prec_order =
-        EffectiveTimeOrder(decl->time_prec, decl->time_prec_magnitude);
-    if (prec_order > unit_order) {
-      diag_.Error(decl->range.start,
-                  "time precision is less precise than the time unit");
-    }
-  }
+  // The bulk of module-level validation is an ordered series of independent
+  // single-element checks; running them through a list keeps the dispatch in
+  // one place while preserving their exact execution order.
+  const std::initializer_list<std::function<void()>> checks = {
+      [&] { ValidatePackageImportRules(decl); },
+      [&] { ValidateScopeRules(decl); },
+      [&] { ValidateMixedAssignments(); },
+      [&] { ValidateInputPortAssignments(decl); },
+      [&] { ValidateMatchesPatternIntegral(decl); },
+      [&] { ValidateMatchesCaseSelectorType(decl); },
+      [&] { ValidateMatchesIfPredicateType(decl); },
+      [&] { ValidateDisableTargets(decl); },
+      [&] { ValidateProceduralNetAssign(); },
+      [&] { ValidateDynamicArrayNba(decl); },
+      [&] { ValidateArrayQueryOnDynamicType(decl); },
+      [&] { ValidateArrayQueryOnVariableDim(decl); },
+      [&] { ValidateRandomSeedType(decl); },
+      [&] { ValidatePlaOutputTerms(decl); },
+      [&] { ValidatePlaAscendingOrder(decl); },
+      [&] { ValidateBitsCallRestrictions(decl); },
+      [&] { ValidateAutomaticVarProcWrites(decl); },
+      [&] { ValidateJumpStatements(decl); },
+      [&] { ValidateForeachLoops(decl); },
+      [&] { ValidateContAssignConstSelect(decl); },
+      [&] { ValidatePartSelectBounds(decl); },
+      [&] { ValidateSpecparamInParams(decl); },
+      [&] { ValidateSpecparamInDeclRange(decl); },
+      [&] { ValidateEnumAssignments(decl); },
+      [&] { ValidateConstAssignments(decl); },
+      [&] { ValidateArrayAssignments(decl); },
+      [&] { ValidateAssocArraySlices(decl); },
+      [&] { ValidateAssocWildcardTraversal(decl); },
+      [&] { ValidateAssocTraversalArgType(decl); },
+      [&] { ValidateArrayOrderingMethods(decl); },
+      [&] { ValidateClassIndexSelect(decl); },
+      [&] { ValidateStringIndexSelect(decl); },
+      [&] { ValidateIntegralIndexSelect(decl); },
+      [&] { ValidateAssocConcatTarget(decl); },
+      [&] { ValidateAssocOperandInExpr(decl); },
+      [&] { ValidateArrayPatternElemType(decl); },
+      [&] { ValidateReplicateTargetingArray(decl); },
+      [&] { ValidateArrayElementPartSelect(decl); },
+      [&] { ValidateUnpackedArrayConcatNesting(decl); },
+      [&] { ValidateClassHandleOps(decl); },
+      [&] { ValidateChandleOps(decl); },
+      [&] { ValidateVirtualInterfaceOps(decl); },
+      [&] { ValidateEventOps(decl); },
+      [&] { ValidateVirtualInterfaceClocking(decl); },
+      [&] { ValidateInterfaceObjectAccess(decl); },
+      [&] { ValidateDeferredAssertionActions(decl); },
+      [&] { ValidateAggregateComparisons(decl); },
+      [&] { ValidateTypeRefComparisons(decl); },
+      [&] { ValidateTypeRefArgs(decl); },
+      [&] { ValidateTaggedUnionMembers(decl); },
+      [&] { ValidateRealOperatorRestrictions(decl); },
+      [&] { ValidateAssignInExprRestrictions(decl); },
+      [&] { ValidateUnsizedInConcat(decl); },
+      [&] { ValidateSelectOnConcatLvalue(decl); },
+      [&] { ValidateReplicateLvalue(decl); },
+      [&] { ValidateStringConcatLvalue(decl); },
+      [&] { ValidateReplicateMultiplier(decl); },
+      [&] { ValidateStreamingConcatContext(decl); },
+      [&] { ValidateBitStreamCast(decl); },
+      [&] { ValidateSubroutineCallArgs(decl); },
+      [&] { ValidateArrayArgTypes(decl); },
+      [&] { ValidateLocalProtectedAccess(decl); },
+      [&] { ValidateParameterizedScopeResolution(decl); },
+      [&] { ValidateTypeParamScopeUsage(decl); },
+      [&] { ValidateTypeParamScopePrefixResolvesToClass(decl); },
+      [&] { ValidateStaticMethodBodies(decl); },
+      [&] { ValidateClassMethodBodies(decl); },
+      [&] { ValidateThisUsage(decl); },
+  };
+  for (const auto& check : checks) check();
+  CheckModuleTimescaleOrder(decl, diag_);
 }
 
 namespace {
 
-void ClassifyTimescaleElement(bool el_has_unit, bool el_has_prec,
-                              bool cu_fallback_unit, bool cu_fallback_prec,
-                              SourceLoc loc, bool& any_specified,
-                              bool& any_unspecified,
-                              SourceLoc& unspecified_loc) {
-  bool has_unit = el_has_unit || cu_fallback_unit;
-  bool has_prec = el_has_prec || cu_fallback_prec;
+// State for the §3.14.2.3 timescale-consistency scan: the compilation-unit
+// fallback timescale (used when a design element omits its own) plus the
+// running record of whether any element was fully specified or unspecified.
+struct TimescaleScan {
+  bool cu_fallback_unit = false;
+  bool cu_fallback_prec = false;
+  bool any_specified = false;
+  bool any_unspecified = false;
+  SourceLoc unspecified_loc;
+};
+
+void ClassifyTimescaleElement(bool el_has_unit, bool el_has_prec, SourceLoc loc,
+                              TimescaleScan& scan) {
+  bool has_unit = el_has_unit || scan.cu_fallback_unit;
+  bool has_prec = el_has_prec || scan.cu_fallback_prec;
   if (has_unit && has_prec) {
-    any_specified = true;
+    scan.any_specified = true;
   } else {
-    if (!any_unspecified) unspecified_loc = loc;
-    any_unspecified = true;
+    if (!scan.any_unspecified) scan.unspecified_loc = loc;
+    scan.any_unspecified = true;
   }
 }
 
 }  // namespace
 
 void Elaborator::ValidateTimescaleConsistency() {
-  bool cu_unit = unit_->has_preproc_timescale || unit_->has_cu_timeunit;
-  bool cu_prec = unit_->has_preproc_timescale || unit_->has_cu_timeprecision;
-  bool any_specified = false;
-  bool any_unspecified = false;
-  SourceLoc unspecified_loc;
+  TimescaleScan scan;
+  scan.cu_fallback_unit =
+      unit_->has_preproc_timescale || unit_->has_cu_timeunit;
+  scan.cu_fallback_prec =
+      unit_->has_preproc_timescale || unit_->has_cu_timeprecision;
   auto inspect = [&](bool el_has_unit, bool el_has_prec, SourceLoc loc) {
-    ClassifyTimescaleElement(el_has_unit, el_has_prec, cu_unit, cu_prec, loc,
-                             any_specified, any_unspecified, unspecified_loc);
+    ClassifyTimescaleElement(el_has_unit, el_has_prec, loc, scan);
   };
 
   for (const auto* mod : unit_->modules)
@@ -136,8 +155,8 @@ void Elaborator::ValidateTimescaleConsistency() {
   for (const auto* prog : unit_->programs)
     inspect(prog->has_timeunit, prog->has_timeprecision, prog->range.start);
 
-  if (any_specified && any_unspecified) {
-    diag_.Error(unspecified_loc,
+  if (scan.any_specified && scan.any_unspecified) {
+    diag_.Error(scan.unspecified_loc,
                 "some design elements specify time unit and precision while "
                 "others do not");
   }
@@ -336,18 +355,70 @@ static int64_t ComputeEnumRangeCount(const EnumMember& member, SourceLoc loc,
   return count < 1 ? 1 : count;
 }
 
+// Representable range of an enum base type (§6.19, Table 6-10).
+struct EnumBaseRange {
+  bool is_signed = false;
+  uint32_t base_width = 0;
+  uint64_t max_val = 0;
+  int64_t signed_min = 0;
+};
+
+static EnumBaseRange ComputeEnumBaseRange(const DataType& dtype,
+                                          uint32_t base_width) {
+  EnumBaseRange range;
+  range.is_signed = dtype.is_signed;
+  range.base_width = base_width;
+  range.max_val =
+      dtype.is_signed
+          ? (base_width > 0 ? (1ULL << (base_width - 1)) - 1 : 0)
+          : (base_width < 64 ? (1ULL << base_width) - 1 : UINT64_MAX);
+  range.signed_min = (dtype.is_signed && base_width > 0 && base_width < 64)
+                         ? -(1LL << (base_width - 1))
+                         : INT64_MIN;
+  return range;
+}
+
+static bool EnumValueOutOfRange(int64_t v, const EnumBaseRange& range) {
+  if (range.is_signed) {
+    return v < range.signed_min || v > static_cast<int64_t>(range.max_val);
+  }
+  return v < 0 ||
+         (range.base_width < 64 && static_cast<uint64_t>(v) > range.max_val);
+}
+
+static void CheckEnumDuplicateValues(int64_t start, int64_t count,
+                                     std::unordered_set<int64_t>& seen,
+                                     SourceLoc loc, DiagEngine& diag) {
+  for (int64_t i = 0; i < count; ++i) {
+    if (!seen.insert(start + i).second) {
+      diag.Error(loc, std::format("duplicate enum member value {}", start + i));
+    }
+  }
+}
+
+// Const-evaluates an explicitly-valued enum member, reports an out-of-range
+// value, and updates the running auto-increment cursor. Called only after the
+// member's literal width/x-z checks have passed.
+static void CheckEnumMemberValueInRange(const EnumMember& member,
+                                        const EnumBaseRange& range,
+                                        int64_t& next_val, DiagEngine& diag) {
+  auto v = ConstEvalInt(member.value);
+  if (!v) return;
+  if (EnumValueOutOfRange(*v, range)) {
+    diag.Error(member.value->range.start,
+               std::format("enum member '{}' value {} is outside the "
+                           "representable range of the base type",
+                           member.name, *v));
+  }
+  next_val = *v;
+}
+
 void Elaborator::ValidateEnumDecl(const DataType& dtype, SourceLoc loc) {
   CheckEnumBaseType(dtype, loc, typedefs_, diag_);
   auto base_width = EvalTypeWidth(dtype, typedefs_);
   bool is_2state = !Is4stateType(dtype, typedefs_);
   bool prev_had_xz = false;
-  uint64_t max_val =
-      dtype.is_signed
-          ? (base_width > 0 ? (1ULL << (base_width - 1)) - 1 : 0)
-          : (base_width < 64 ? (1ULL << base_width) - 1 : UINT64_MAX);
-  int64_t signed_min = (dtype.is_signed && base_width > 0 && base_width < 64)
-                           ? -(1LL << (base_width - 1))
-                           : INT64_MIN;
+  EnumBaseRange range = ComputeEnumBaseRange(dtype, base_width);
   std::unordered_set<std::string_view> seen_names;
   std::unordered_set<int64_t> seen_values;
   int64_t next_val = 0;
@@ -365,38 +436,16 @@ void Elaborator::ValidateEnumDecl(const DataType& dtype, SourceLoc loc) {
     } else {
       prev_had_xz = ValidateEnumLiteral(member, base_width, is_2state);
       if (!prev_had_xz) {
-        auto v = ConstEvalInt(member.value);
-        if (v) {
-          bool out_of_range = false;
-          if (dtype.is_signed) {
-            out_of_range =
-                *v < signed_min || *v > static_cast<int64_t>(max_val);
-          } else {
-            out_of_range = *v < 0 || (base_width < 64 &&
-                                      static_cast<uint64_t>(*v) > max_val);
-          }
-          if (out_of_range) {
-            diag_.Error(member.value->range.start,
-                        std::format("enum member '{}' value {} is outside the "
-                                    "representable range of the base type",
-                                    member.name, *v));
-          }
-          next_val = *v;
-        }
+        CheckEnumMemberValueInRange(member, range, next_val, diag_);
       }
     }
     int64_t count = ComputeEnumRangeCount(member, loc, diag_);
     if (!prev_had_xz) {
-      for (int64_t i = 0; i < count; ++i) {
-        if (!seen_values.insert(next_val + i).second) {
-          diag_.Error(
-              loc, std::format("duplicate enum member value {}", next_val + i));
-        }
-      }
+      CheckEnumDuplicateValues(next_val, count, seen_values, loc, diag_);
     }
     next_val += count;
     if (!prev_had_xz && next_val > 0 &&
-        static_cast<uint64_t>(next_val) > max_val &&
+        static_cast<uint64_t>(next_val) > range.max_val &&
         &member != &dtype.enum_members.back()) {
       diag_.Error(loc,
                   "enum auto-increment exceeds maximum representable "
@@ -456,6 +505,34 @@ void Elaborator::CheckEnumAssignStmt(const Stmt* s) {
   diag_.Error(s->range.start, "integer assigned to enum variable without cast");
 }
 
+static bool FormalIsEnumType(const DataType& formal,
+                             const TypedefMap& typedefs) {
+  if (formal.kind == DataTypeKind::kEnum) return true;
+  if (formal.kind != DataTypeKind::kNamed) return false;
+  auto t = typedefs.find(formal.type_name);
+  return t != typedefs.end() && t->second.kind == DataTypeKind::kEnum;
+}
+
+static bool CallUsesNamedArgs(const Expr* call) {
+  // Positional binding only; a named association is left for the general
+  // argument-binding path and is not second-guessed by the strong-typing rule.
+  for (auto name : call->arg_names) {
+    if (!name.empty()) return true;
+  }
+  return false;
+}
+
+static void CheckEnumActualArg(const Expr* actual, DiagEngine& diag) {
+  if (!actual) return;
+  // Mirror the assignment rule: a bare name (an enum member or another enum
+  // of the same family) and an explicit cast are accepted; a plain integral
+  // value is rejected because it is not a member of the enumeration.
+  if (actual->kind == ExprKind::kIdentifier) return;
+  if (actual->kind == ExprKind::kCast) return;
+  diag.Error(actual->range.start,
+             "integer value passed to enum argument without cast");
+}
+
 void Elaborator::CheckEnumCallArguments(const Expr* call) {
   if (!call || call->kind != ExprKind::kCall) return;
   // Restrict to free-function calls: a member/method receiver could share a
@@ -464,30 +541,11 @@ void Elaborator::CheckEnumCallArguments(const Expr* call) {
   auto it = func_decls_.find(call->callee);
   if (it == func_decls_.end() || it->second == nullptr) return;
   const ModuleItem* fn = it->second;
-  // Positional binding only; a named association is left for the general
-  // argument-binding path and is not second-guessed by the strong-typing rule.
-  for (auto name : call->arg_names) {
-    if (!name.empty()) return;
-  }
+  if (CallUsesNamedArgs(call)) return;
   size_t count = std::min(call->args.size(), fn->func_args.size());
   for (size_t i = 0; i < count; ++i) {
-    const DataType& formal = fn->func_args[i].data_type;
-    bool formal_is_enum = formal.kind == DataTypeKind::kEnum;
-    if (!formal_is_enum && formal.kind == DataTypeKind::kNamed) {
-      auto t = typedefs_.find(formal.type_name);
-      formal_is_enum =
-          t != typedefs_.end() && t->second.kind == DataTypeKind::kEnum;
-    }
-    if (!formal_is_enum) continue;
-    const Expr* actual = call->args[i];
-    if (!actual) continue;
-    // Mirror the assignment rule: a bare name (an enum member or another enum
-    // of the same family) and an explicit cast are accepted; a plain integral
-    // value is rejected because it is not a member of the enumeration.
-    if (actual->kind == ExprKind::kIdentifier) continue;
-    if (actual->kind == ExprKind::kCast) continue;
-    diag_.Error(actual->range.start,
-                "integer value passed to enum argument without cast");
+    if (!FormalIsEnumType(fn->func_args[i].data_type, typedefs_)) continue;
+    CheckEnumActualArg(call->args[i], diag_);
   }
 }
 
@@ -506,46 +564,49 @@ void Elaborator::WalkExprForEnumCalls(const Expr* e) {
   for (auto* el : e->elements) WalkExprForEnumCalls(el);
 }
 
+// True when a data type denotes an enumeration, either directly or via a
+// typedef name.
+static bool DataTypeIsEnum(const DataType& dtype, const TypedefMap& typedefs) {
+  if (dtype.kind == DataTypeKind::kEnum) return true;
+  if (dtype.kind != DataTypeKind::kNamed) return false;
+  auto it = typedefs.find(dtype.type_name);
+  return it != typedefs.end() && it->second.kind == DataTypeKind::kEnum;
+}
+
+// An initializer/RHS that is acceptable for an enum target without a cast:
+// a bare name (enum member or sibling enum) or an explicit cast.
+static bool IsBareEnumAssignable(const Expr* e) {
+  return e && (e->kind == ExprKind::kIdentifier || e->kind == ExprKind::kCast);
+}
+
 void Elaborator::WalkStmtsForEnumAssign(const Stmt* s) {
   if (!s) return;
   WalkExprForEnumCalls(s->rhs);
   WalkExprForEnumCalls(s->expr);
   WalkExprForEnumCalls(s->condition);
-  if (s->kind == StmtKind::kVarDecl) {
-    bool is_enum = false;
-    if (s->var_decl_type.kind == DataTypeKind::kEnum) {
-      enum_var_names_.insert(s->var_name);
-      is_enum = true;
-    } else if (s->var_decl_type.kind == DataTypeKind::kNamed) {
-      auto it = typedefs_.find(s->var_decl_type.type_name);
-      if (it != typedefs_.end() && it->second.kind == DataTypeKind::kEnum) {
-        enum_var_names_.insert(s->var_name);
-        is_enum = true;
-      }
-    }
-    if (is_enum && s->var_init && s->var_init->kind != ExprKind::kIdentifier &&
-        s->var_init->kind != ExprKind::kCast) {
+  if (s->kind == StmtKind::kVarDecl &&
+      DataTypeIsEnum(s->var_decl_type, typedefs_)) {
+    enum_var_names_.insert(s->var_name);
+    if (s->var_init && !IsBareEnumAssignable(s->var_init)) {
       diag_.Error(s->range.start,
                   "integer assigned to enum variable without cast");
     }
-  }
-  if (s->kind == StmtKind::kBlockingAssign ||
-      s->kind == StmtKind::kNonblockingAssign) {
+  } else if (s->kind == StmtKind::kBlockingAssign ||
+             s->kind == StmtKind::kNonblockingAssign) {
     CheckEnumAssignStmt(s);
-  }
-  if (s->kind == StmtKind::kExprStmt && s->expr &&
-      s->expr->kind == ExprKind::kPostfixUnary) {
+  } else if (s->kind == StmtKind::kExprStmt && s->expr &&
+             s->expr->kind == ExprKind::kPostfixUnary) {
     auto name = ExprIdent(s->expr->lhs);
     if (!name.empty() && enum_var_names_.count(name) != 0) {
       diag_.Error(s->range.start,
                   "increment/decrement of enum variable without cast");
     }
   }
+  for (const Stmt* branch :
+       {s->then_branch, s->else_branch, s->body, s->for_body}) {
+    WalkStmtsForEnumAssign(branch);
+  }
   for (auto* sub : s->stmts) WalkStmtsForEnumAssign(sub);
-  WalkStmtsForEnumAssign(s->then_branch);
-  WalkStmtsForEnumAssign(s->else_branch);
-  WalkStmtsForEnumAssign(s->body);
-  WalkStmtsForEnumAssign(s->for_body);
   for (auto& ci : s->case_items) WalkStmtsForEnumAssign(ci.body);
 }
 

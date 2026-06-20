@@ -14,30 +14,30 @@ static bool LexerCheck(Lexer& lexer, TokenKind kind) {
   return cur == kind;
 }
 
-// §16.12.17 Restriction 4: capture the actual-argument shape of one property
-// instance. On entry the lexer's current token is the opening '(' of the
-// argument list; on return the matching ')' has been consumed. Nested instance
-// references found within the arguments are still recorded into
-// prop_instance_refs so the dependency digraph is unaffected.
-static void CaptureInstanceArgs(Lexer& lexer, ModuleItem* item,
-                                std::string_view callee) {
+// §16.12.17 Restriction 4: cross-token state for the actual-argument scan of
+// one property instance. `d` is the parenthesis depth; the per-argument fields
+// accumulate the identifiers and token count of the argument currently being
+// read so finalize() can classify it as a single-identifier actual.
+struct InstanceArgScan {
   PropertyInstanceArgInfo info;
-  info.callee = callee;
-  lexer.Next();  // '('
   int d = 1;
   std::vector<std::string_view> cur_idents;
   int cur_tokens = 0;
   bool arg_has_content = false;
   std::string_view prev_ident;
   bool prev_was_ident = false;
-  auto finalize_arg = [&]() {
+
+  void Finalize() {
     info.arg_idents.push_back(cur_idents);
     info.arg_is_single_ident.push_back(cur_tokens == 1 &&
                                        cur_idents.size() == 1);
     cur_idents.clear();
     cur_tokens = 0;
-  };
-  while (d > 0 && !lexer.Peek().Is(TokenKind::kEof)) {
+  }
+
+  // Consumes one token of the argument list. Returns false once the matching
+  // ')' for the opening '(' has been consumed (scan complete).
+  bool Step(Lexer& lexer, ModuleItem* item) {
     if (LexerCheck(lexer, TokenKind::kLParen)) {
       if (prev_was_ident) item->prop_instance_refs.push_back(prev_ident);
       lexer.Next();
@@ -49,14 +49,14 @@ static void CaptureInstanceArgs(Lexer& lexer, ModuleItem* item,
       lexer.Next();
       --d;
       if (d == 0) {
-        if (arg_has_content) finalize_arg();
-        break;
+        if (arg_has_content) Finalize();
+        return false;
       }
       ++cur_tokens;
       prev_was_ident = false;
     } else if (d == 1 && LexerCheck(lexer, TokenKind::kComma)) {
       lexer.Next();
-      finalize_arg();
+      Finalize();
       arg_has_content = true;
       prev_was_ident = false;
     } else if (LexerCheck(lexer, TokenKind::kIdentifier)) {
@@ -72,8 +72,24 @@ static void CaptureInstanceArgs(Lexer& lexer, ModuleItem* item,
       arg_has_content = true;
       prev_was_ident = false;
     }
+    return true;
   }
-  item->prop_instance_args.push_back(std::move(info));
+};
+
+// §16.12.17 Restriction 4: capture the actual-argument shape of one property
+// instance. On entry the lexer's current token is the opening '(' of the
+// argument list; on return the matching ')' has been consumed. Nested instance
+// references found within the arguments are still recorded into
+// prop_instance_refs so the dependency digraph is unaffected.
+static void CaptureInstanceArgs(Lexer& lexer, ModuleItem* item,
+                                std::string_view callee) {
+  InstanceArgScan scan;
+  scan.info.callee = callee;
+  lexer.Next();  // '('
+  while (scan.d > 0 && !lexer.Peek().Is(TokenKind::kEof)) {
+    if (!scan.Step(lexer, item)) break;
+  }
+  item->prop_instance_args.push_back(std::move(scan.info));
 }
 
 // §16.6/§16.10: a built-in scalar/integral/string type keyword that may head
@@ -102,13 +118,8 @@ static bool IsBuiltinTypeKwForLocalVar(TokenKind k) {
   }
 }
 
-// §16.12 named-property port list. On entry the opening '(' has already been
-// consumed; this drains the comma-separated formal list through its matching
-// ')' , recording formal names and their local-variable qualification while
-// policing the §16.12.19 direction rules. Behaviour matches the original
-// inline loop exactly.
-static void ParsePropertyPortList(Lexer& lexer, DiagEngine& diag,
-                                  ModuleItem* item) {
+// §16.12 named-property port-list scan state carried across loop iterations.
+struct PropertyPortScan {
   int depth = 1;
   bool expect_formal_name = true;
   bool saw_local = false;
@@ -118,15 +129,35 @@ static void ParsePropertyPortList(Lexer& lexer, DiagEngine& diag,
   // following `local`/`input`) begins a new, unqualified item.
   bool local_run = false;
   TokenKind prev_kind = TokenKind::kComma;
-  while (depth > 0 && !lexer.Peek().Is(TokenKind::kEof)) {
+
+  // Handles the formal-name harvest branch (§16.12 formal_port_identifier).
+  void HarvestFormalName(Lexer& lexer, ModuleItem* item) {
+    auto name_tok = lexer.Next();
+    if (!LexerCheck(lexer, TokenKind::kComma) &&
+        !LexerCheck(lexer, TokenKind::kRParen) &&
+        !LexerCheck(lexer, TokenKind::kEq)) {
+      if (LexerCheck(lexer, TokenKind::kIdentifier)) {
+        name_tok = lexer.Next();
+      }
+    }
+    item->prop_formals.push_back(name_tok.text);
+    item->prop_formal_is_local.push_back(local_run);
+    expect_formal_name = false;
+    saw_local = false;
+  }
+
+  // Consumes one token of the port list. Returns false once the matching ')'
+  // for the opening '(' has been consumed (list complete).
+  bool Step(Lexer& lexer, DiagEngine& diag, ModuleItem* item) {
     TokenKind this_kind = lexer.Peek().kind;
+    bool keep_going = true;
     if (LexerCheck(lexer, TokenKind::kLParen)) {
       lexer.Next();
       ++depth;
     } else if (LexerCheck(lexer, TokenKind::kRParen)) {
       lexer.Next();
       --depth;
-      if (depth == 0) break;
+      if (depth == 0) keep_going = false;
     } else if (depth == 1 && LexerCheck(lexer, TokenKind::kComma)) {
       lexer.Next();
       expect_formal_name = true;
@@ -168,22 +199,25 @@ static void ParsePropertyPortList(Lexer& lexer, DiagEngine& diag,
       saw_local = false;
     } else if (expect_formal_name && depth == 1 &&
                LexerCheck(lexer, TokenKind::kIdentifier)) {
-      auto name_tok = lexer.Next();
-      if (!LexerCheck(lexer, TokenKind::kComma) &&
-          !LexerCheck(lexer, TokenKind::kRParen) &&
-          !LexerCheck(lexer, TokenKind::kEq)) {
-        if (LexerCheck(lexer, TokenKind::kIdentifier)) {
-          name_tok = lexer.Next();
-        }
-      }
-      item->prop_formals.push_back(name_tok.text);
-      item->prop_formal_is_local.push_back(local_run);
-      expect_formal_name = false;
-      saw_local = false;
+      HarvestFormalName(lexer, item);
     } else {
       lexer.Next();
     }
     prev_kind = this_kind;
+    return keep_going;
+  }
+};
+
+// §16.12 named-property port list. On entry the opening '(' has already been
+// consumed; this drains the comma-separated formal list through its matching
+// ')' , recording formal names and their local-variable qualification while
+// policing the §16.12.19 direction rules. Behaviour matches the original
+// inline loop exactly.
+static void ParsePropertyPortList(Lexer& lexer, DiagEngine& diag,
+                                  ModuleItem* item) {
+  PropertyPortScan scan;
+  while (scan.depth > 0 && !lexer.Peek().Is(TokenKind::kEof)) {
+    if (!scan.Step(lexer, diag, item)) break;
   }
 }
 
@@ -200,31 +234,21 @@ struct PropertyBodyScanState {
   bool saw_time_advance = false;
 };
 
-// Processes one token of the named-property body scan that is not an assertion
-// variable declaration (those are harvested by the caller, which owns the
-// member helper). Carries the §16.12 scan state by reference so cross-iteration
-// state is preserved exactly as in the original inline loop.
-static void ScanPropertyBodyToken(Lexer& lexer, DiagEngine& diag,
-                                  ModuleItem* item,
-                                  PropertyBodyScanState& state) {
-  if (LexerCheck(lexer, TokenKind::kKwDisable)) {
-    lexer.Next();
-    if (LexerCheck(lexer, TokenKind::kKwIff)) {
-      lexer.Next();
-      ++item->prop_disable_iff_count;
-    }
-    return;
-  }
+// §16.12.16: handles the `case`/`endcase`/`default` family that maintains the
+// per-property-case default-item stack. Returns true if the current token was
+// consumed here.
+static bool ScanCaseDefaultToken(Lexer& lexer, DiagEngine& diag,
+                                 PropertyBodyScanState& state) {
   if (LexerCheck(lexer, TokenKind::kKwCase)) {
     state.case_default_counts.push_back(0);
     lexer.Next();
-    return;
+    return true;
   }
   if (LexerCheck(lexer, TokenKind::kKwEndcase)) {
     if (!state.case_default_counts.empty())
       state.case_default_counts.pop_back();
     lexer.Next();
-    return;
+    return true;
   }
   if (LexerCheck(lexer, TokenKind::kKwDefault) &&
       !state.case_default_counts.empty()) {
@@ -237,8 +261,15 @@ static void ScanPropertyBodyToken(Lexer& lexer, DiagEngine& diag,
                  "item");
     }
     lexer.Next();
-    return;
+    return true;
   }
+  return false;
+}
+
+// §16.12.17 Restrictions 1 & 3: handles the prefix-negation operators and the
+// time-advancing operators that update the scan trackers. Returns true if the
+// current token was consumed here.
+static bool ScanOperatorToken(Lexer& lexer, PropertyBodyScanState& state) {
   // §16.12.17 Restriction 1: the prefix operators not, s_nexttime,
   // s_eventually, and s_always negate/strongly bind the property expression
   // that follows. s_until and s_until_with are infix; their right operand is
@@ -254,7 +285,7 @@ static void ScanPropertyBodyToken(Lexer& lexer, DiagEngine& diag,
       state.saw_time_advance = true;
     state.expect_negated_operand = true;
     lexer.Next();
-    return;
+    return true;
   }
   // §16.12.17 Restriction 3: ##, |=> (suffix non-overlapping implication),
   // and (s_)nexttime advance time. |-> (overlapping implication) does not.
@@ -263,25 +294,53 @@ static void ScanPropertyBodyToken(Lexer& lexer, DiagEngine& diag,
       LexerCheck(lexer, TokenKind::kKwNexttime)) {
     state.saw_time_advance = true;
     lexer.Next();
+    return true;
+  }
+  return false;
+}
+
+// Handles an identifier head: a following '(' makes it a property/sequence
+// instance reference (recorded, with §16.12.17 negation/self-recursion checks
+// and argument capture); otherwise it is a bare expression operand.
+static void ScanIdentifierToken(Lexer& lexer, ModuleItem* item,
+                                PropertyBodyScanState& state) {
+  auto tok = lexer.Next();
+  if (LexerCheck(lexer, TokenKind::kLParen)) {
+    item->prop_instance_refs.push_back(tok.text);
+    if (state.expect_negated_operand) {
+      item->prop_negated_instance_refs.push_back(tok.text);
+    }
+    if (tok.text == item->name && !state.saw_time_advance) {
+      item->prop_has_untimed_self_recursion = true;
+    }
+    state.expect_negated_operand = false;
+    CaptureInstanceArgs(lexer, item, tok.text);
+  } else {
+    // A bare identifier is not a property instance; if it stood as the
+    // operand of a pending negation, that operand is a simple expression.
+    state.expect_negated_operand = false;
+  }
+}
+
+// Processes one token of the named-property body scan that is not an assertion
+// variable declaration (those are harvested by the caller, which owns the
+// member helper). Carries the §16.12 scan state by reference so cross-iteration
+// state is preserved exactly as in the original inline loop.
+static void ScanPropertyBodyToken(Lexer& lexer, DiagEngine& diag,
+                                  ModuleItem* item,
+                                  PropertyBodyScanState& state) {
+  if (LexerCheck(lexer, TokenKind::kKwDisable)) {
+    lexer.Next();
+    if (LexerCheck(lexer, TokenKind::kKwIff)) {
+      lexer.Next();
+      ++item->prop_disable_iff_count;
+    }
     return;
   }
+  if (ScanCaseDefaultToken(lexer, diag, state)) return;
+  if (ScanOperatorToken(lexer, state)) return;
   if (LexerCheck(lexer, TokenKind::kIdentifier)) {
-    auto tok = lexer.Next();
-    if (LexerCheck(lexer, TokenKind::kLParen)) {
-      item->prop_instance_refs.push_back(tok.text);
-      if (state.expect_negated_operand) {
-        item->prop_negated_instance_refs.push_back(tok.text);
-      }
-      if (tok.text == item->name && !state.saw_time_advance) {
-        item->prop_has_untimed_self_recursion = true;
-      }
-      state.expect_negated_operand = false;
-      CaptureInstanceArgs(lexer, item, tok.text);
-    } else {
-      // A bare identifier is not a property instance; if it stood as the
-      // operand of a pending negation, that operand is a simple expression.
-      state.expect_negated_operand = false;
-    }
+    ScanIdentifierToken(lexer, item, state);
     return;
   }
   // Opening parentheses are skipped so a negation can still reach an instance
@@ -478,12 +537,11 @@ void Parser::HarvestAssertionVariableDecl(ModuleItem* item) {
   if (Check(TokenKind::kSemicolon)) Consume();
 }
 
-// §16.8 sequence_port_list. On entry the opening '(' has already been consumed;
-// drains the comma-separated formal list through its matching ')', harvesting
-// formal_port_identifier names and policing the §16.8.2 local-variable rules.
-// Behaviour matches the original inline loop exactly.
-static void ParseSequencePortList(Lexer& lexer, DiagEngine& diag,
-                                  ModuleItem* item) {
+// §16.8 sequence_port_list scan state carried across loop iterations. Groups
+// the parenthesis depth, the per-port-item §16.8.2 local-variable trackers,
+// and the formal-name expectation so each iteration's handler can update them
+// in place.
+struct SequencePortScan {
   int depth = 1;
   bool expect_formal_name = true;
 
@@ -499,32 +557,31 @@ static void ParseSequencePortList(Lexer& lexer, DiagEngine& diag,
   bool item_saw_explicit_type = false;
   Direction item_dir = Direction::kInput;
   bool item_saw_eq = false;
-  SourceLoc item_start = lexer.Peek().loc;
+  SourceLoc item_start;
 
-  auto finalize_port_item = [&]() {
-    if (item_saw_local) {
-      if (item_local_explicit_here && !item_saw_explicit_type) {
-        diag.Error(item_start,
-                   "a local variable formal argument requires an explicit "
-                   "type in its own port item (§16.8.2)");
-      }
-      if (item_saw_eq &&
-          (item_dir == Direction::kInout || item_dir == Direction::kOutput)) {
-        diag.Error(item_start,
-                   "default actual argument is illegal for a local "
-                   "variable formal argument of direction inout or "
-                   "output (§16.8.2)");
-      }
-      item->prop_seq_local_lvar_directions.push_back(item_dir);
+  void FinalizePortItem(DiagEngine& diag, ModuleItem* item) {
+    if (!item_saw_local) return;
+    if (item_local_explicit_here && !item_saw_explicit_type) {
+      diag.Error(item_start,
+                 "a local variable formal argument requires an explicit "
+                 "type in its own port item (§16.8.2)");
     }
-  };
+    if (item_saw_eq &&
+        (item_dir == Direction::kInout || item_dir == Direction::kOutput)) {
+      diag.Error(item_start,
+                 "default actual argument is illegal for a local "
+                 "variable formal argument of direction inout or "
+                 "output (§16.8.2)");
+    }
+    item->prop_seq_local_lvar_directions.push_back(item_dir);
+  }
 
   // §16.8.2 carry-through: a port item that supplies only an identifier
   // inherits the `local` designation, direction, and type of the nearest
   // preceding port item that declared them explicitly. A port item that
   // begins with `local`, a direction keyword, or a built-in type keyword
   // is a fresh starter and breaks the carry.
-  auto reset_after_comma = [&]() {
+  void ResetAfterComma(Lexer& lexer) {
     bool next_is_fresh_starter = LexerCheck(lexer, TokenKind::kKwLocal) ||
                                  LexerCheck(lexer, TokenKind::kKwInput) ||
                                  LexerCheck(lexer, TokenKind::kKwOutput) ||
@@ -541,22 +598,58 @@ static void ParseSequencePortList(Lexer& lexer, DiagEngine& diag,
     item_saw_explicit_type = false;
     item_saw_eq = false;
     expect_formal_name = true;
-  };
+  }
 
-  while (depth > 0 && !lexer.Peek().Is(TokenKind::kEof)) {
+  // §16.8.2 direction keyword: records the direction and polices the
+  // requirement that a direction be preceded by `local`.
+  void HandleDirection(Lexer& lexer, DiagEngine& diag) {
+    auto dir_tok = lexer.Next();
+    if (!item_saw_local) {
+      diag.Error(dir_tok.loc,
+                 "sequence port direction requires the 'local' keyword "
+                 "(§16.8.2)");
+    }
+    if (dir_tok.kind == TokenKind::kKwInput) {
+      item_dir = Direction::kInput;
+    } else if (dir_tok.kind == TokenKind::kKwOutput) {
+      item_dir = Direction::kOutput;
+    } else {
+      item_dir = Direction::kInout;
+    }
+  }
+
+  // Harvests the formal_port_identifier (rightmost identifier of the chain).
+  void HarvestFormalName(Lexer& lexer, ModuleItem* item) {
+    auto name_tok = lexer.Next();
+    // Walk past any subsequent identifiers/type tokens until we hit the
+    // separator; the rightmost identifier is the formal_port_identifier.
+    // §16.8.2: a chain of more than one identifier means the leading
+    // identifier(s) supply a (user-defined) type alias, satisfying the
+    // explicit-type requirement.
+    while (LexerCheck(lexer, TokenKind::kIdentifier)) {
+      name_tok = lexer.Next();
+      item_saw_explicit_type = true;
+    }
+    item->prop_formals.push_back(name_tok.text);
+    expect_formal_name = false;
+  }
+
+  // Consumes one token of the port list. Returns false once the matching ')'
+  // for the opening '(' has been consumed (list complete).
+  bool Step(Lexer& lexer, DiagEngine& diag, ModuleItem* item) {
     if (LexerCheck(lexer, TokenKind::kLParen)) {
       lexer.Next();
       ++depth;
     } else if (LexerCheck(lexer, TokenKind::kRParen)) {
-      if (depth == 1) finalize_port_item();
+      if (depth == 1) FinalizePortItem(diag, item);
       lexer.Next();
       --depth;
-      if (depth == 0) break;
+      if (depth == 0) return false;
     } else if (depth == 1 && LexerCheck(lexer, TokenKind::kComma)) {
-      finalize_port_item();
+      FinalizePortItem(diag, item);
       lexer.Next();
       item_start = lexer.Peek().loc;
-      reset_after_comma();
+      ResetAfterComma(lexer);
     } else if (depth == 1 && LexerCheck(lexer, TokenKind::kKwLocal)) {
       if (!item_saw_local) item_start = lexer.Peek().loc;
       item_saw_local = true;
@@ -565,19 +658,7 @@ static void ParseSequencePortList(Lexer& lexer, DiagEngine& diag,
     } else if (depth == 1 && (LexerCheck(lexer, TokenKind::kKwInput) ||
                               LexerCheck(lexer, TokenKind::kKwOutput) ||
                               LexerCheck(lexer, TokenKind::kKwInout))) {
-      auto dir_tok = lexer.Next();
-      if (!item_saw_local) {
-        diag.Error(dir_tok.loc,
-                   "sequence port direction requires the 'local' keyword "
-                   "(§16.8.2)");
-      }
-      if (dir_tok.kind == TokenKind::kKwInput) {
-        item_dir = Direction::kInput;
-      } else if (dir_tok.kind == TokenKind::kKwOutput) {
-        item_dir = Direction::kOutput;
-      } else {
-        item_dir = Direction::kInout;
-      }
+      HandleDirection(lexer, diag);
     } else if (depth == 1 && IsBuiltinTypeKwForLocalVar(lexer.Peek().kind)) {
       lexer.Next();
       item_saw_explicit_type = true;
@@ -587,21 +668,24 @@ static void ParseSequencePortList(Lexer& lexer, DiagEngine& diag,
       expect_formal_name = false;
     } else if (depth == 1 && expect_formal_name &&
                LexerCheck(lexer, TokenKind::kIdentifier)) {
-      auto name_tok = lexer.Next();
-      // Walk past any subsequent identifiers/type tokens until we hit the
-      // separator; the rightmost identifier is the formal_port_identifier.
-      // §16.8.2: a chain of more than one identifier means the leading
-      // identifier(s) supply a (user-defined) type alias, satisfying the
-      // explicit-type requirement.
-      while (LexerCheck(lexer, TokenKind::kIdentifier)) {
-        name_tok = lexer.Next();
-        item_saw_explicit_type = true;
-      }
-      item->prop_formals.push_back(name_tok.text);
-      expect_formal_name = false;
+      HarvestFormalName(lexer, item);
     } else {
       lexer.Next();
     }
+    return true;
+  }
+};
+
+// §16.8 sequence_port_list. On entry the opening '(' has already been consumed;
+// drains the comma-separated formal list through its matching ')', harvesting
+// formal_port_identifier names and policing the §16.8.2 local-variable rules.
+// Behaviour matches the original inline loop exactly.
+static void ParseSequencePortList(Lexer& lexer, DiagEngine& diag,
+                                  ModuleItem* item) {
+  SequencePortScan scan;
+  scan.item_start = lexer.Peek().loc;
+  while (scan.depth > 0 && !lexer.Peek().Is(TokenKind::kEof)) {
+    if (!scan.Step(lexer, diag, item)) break;
   }
 }
 

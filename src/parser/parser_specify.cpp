@@ -69,38 +69,7 @@ void Parser::ParseSpecifyItem(std::vector<SpecifyItem*>& items) {
            !Check(TokenKind::kKwEndmodule)) {
       Consume();
     }
-    if (Check(TokenKind::kSemicolon)) Consume();
-  };
-
-  // Handle a system identifier: either a timing check or an erroneous system
-  // task. Returns false if the leading token is not a system identifier.
-  auto parse_system_item = [&]() {
-    if (!Check(TokenKind::kSystemIdentifier)) return false;
-    if (IsTimingCheckName(CurrentToken().text)) {
-      items.push_back(ParseTimingCheck());
-      return true;
-    }
-    diag_.Error(CurrentLoc(), "system task cannot appear in specify block");
-    skip_to_item_end();
-    return true;
-  };
-
-  // Handle an 'if' or 'ifnone' module path declaration. Returns false if the
-  // leading token is neither keyword.
-  auto parse_conditional_item = [&]() {
-    if (Check(TokenKind::kKwIfnone)) {
-      items.push_back(ParseIfnonePathDecl());
-      return true;
-    }
-    if (Check(TokenKind::kKwIf)) {
-      Consume();
-      Expect(TokenKind::kLParen);
-      auto* cond = ParseExpr();
-      Expect(TokenKind::kRParen);
-      items.push_back(ParseConditionalPathDecl(cond));
-      return true;
-    }
-    return false;
+    Match(TokenKind::kSemicolon);
   };
 
   if (Check(TokenKind::kKwPulsestyleOnevent) ||
@@ -120,9 +89,31 @@ void Parser::ParseSpecifyItem(std::vector<SpecifyItem*>& items) {
     return;
   }
 
-  if (parse_system_item()) return;
+  // A system identifier is either a timing check or an erroneous system task.
+  if (Check(TokenKind::kSystemIdentifier) &&
+      IsTimingCheckName(CurrentToken().text)) {
+    items.push_back(ParseTimingCheck());
+    return;
+  }
+  if (Check(TokenKind::kSystemIdentifier)) {
+    diag_.Error(CurrentLoc(), "system task cannot appear in specify block");
+    skip_to_item_end();
+    return;
+  }
 
-  if (parse_conditional_item()) return;
+  // An 'if'/'ifnone' module path declaration.
+  if (Check(TokenKind::kKwIfnone)) {
+    items.push_back(ParseIfnonePathDecl());
+    return;
+  }
+  if (Check(TokenKind::kKwIf)) {
+    Consume();
+    Expect(TokenKind::kLParen);
+    auto* cond = ParseExpr();
+    Expect(TokenKind::kRParen);
+    items.push_back(ParseConditionalPathDecl(cond));
+    return;
+  }
 
   if (Check(TokenKind::kLParen)) {
     items.push_back(ParseSpecifyPathDecl());
@@ -339,11 +330,12 @@ SpecifyItem* Parser::ParseSpecifyPathDecl() {
     if (item->path.polarity == SpecifyPolarity::kNone &&
         (Check(TokenKind::kPlusEq) || Check(TokenKind::kMinusEq))) {
       auto saved = lexer_.SavePos();
-      bool is_plus = Check(TokenKind::kPlusEq);
+      SpecifyPolarity prefix = Check(TokenKind::kPlusEq)
+                                   ? SpecifyPolarity::kPositive
+                                   : SpecifyPolarity::kNegative;
       Consume();
       if (Match(TokenKind::kGt)) {
-        item->path.polarity =
-            is_plus ? SpecifyPolarity::kPositive : SpecifyPolarity::kNegative;
+        item->path.polarity = prefix;
         item->path.path_kind = SpecifyPathKind::kParallel;
         return;
       }
@@ -362,15 +354,13 @@ SpecifyItem* Parser::ParseSpecifyPathDecl() {
   // Parse the destination terminal descriptor, which is parenthesized only when
   // it carries a destination polarity and data-source expression.
   auto parse_destination = [&]() {
-    if (Match(TokenKind::kLParen)) {
-      ParsePathPorts(item->path.dst_ports);
-      item->path.dst_polarity = ParseSpecifyPolarity();
-      Expect(TokenKind::kColon);
-      item->path.data_source = ParseExpr();
-      Expect(TokenKind::kRParen);
-    } else {
-      ParsePathPorts(item->path.dst_ports);
-    }
+    bool parenthesized = Match(TokenKind::kLParen);
+    ParsePathPorts(item->path.dst_ports);
+    if (!parenthesized) return;
+    item->path.dst_polarity = ParseSpecifyPolarity();
+    Expect(TokenKind::kColon);
+    item->path.data_source = ParseExpr();
+    Expect(TokenKind::kRParen);
   };
 
   Expect(TokenKind::kLParen);

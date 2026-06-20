@@ -251,28 +251,38 @@ static void CollectSliceSourceElements(const Expr* rhs, SimContext& ctx,
   }
 }
 
+// §7.4.6: destination window of an unpacked-array slice assignment, i.e. the
+// elements `base[dst_lo .. dst_lo+dst_count)` each `elem_width` bits wide.
+struct UnpackedSliceTarget {
+  std::string_view base;
+  uint32_t dst_lo;
+  uint32_t dst_count;
+  uint32_t elem_width;
+};
+
 // When no element-wise source was collected, evaluate the rhs as a single
-// packed value and split it into `dst_count` element-width slices.
-static void FillSliceSourceFromPacked(const Stmt* stmt, uint32_t elem_width,
-                                      uint32_t dst_count, SimContext& ctx,
-                                      Arena& arena,
+// packed value and split it into `dst.dst_count` element-width slices.
+static void FillSliceSourceFromPacked(const Stmt* stmt,
+                                      const UnpackedSliceTarget& dst,
+                                      SimContext& ctx, Arena& arena,
                                       std::vector<Logic4Vec>& src) {
   auto val = EvalExpr(stmt->rhs, ctx, arena);
+  uint32_t elem_width = dst.elem_width;
   uint64_t mask =
       (elem_width >= 64) ? ~uint64_t{0} : (uint64_t{1} << elem_width) - 1;
-  for (uint32_t i = 0; i < dst_count; ++i)
+  for (uint32_t i = 0; i < dst.dst_count; ++i)
     src.push_back(MakeLogic4VecVal(
         arena, elem_width, (val.ToUint64() >> (i * elem_width)) & mask));
 }
 
 // Write the collected source elements into the destination slice elements
-// `base[dst_lo .. dst_lo+dst_count)`, resizing/coercing as for a scalar write.
-static void WriteUnpackedSliceElements(std::string_view base, uint32_t dst_lo,
-                                       uint32_t dst_count,
+// `dst.base[dst.dst_lo .. dst.dst_lo+dst.dst_count)`, resizing/coercing as for
+// a scalar write.
+static void WriteUnpackedSliceElements(const UnpackedSliceTarget& dst,
                                        const std::vector<Logic4Vec>& src,
                                        SimContext& ctx, Arena& arena) {
-  for (uint32_t i = 0; i < dst_count && i < src.size(); ++i) {
-    auto n = std::string(base) + "[" + std::to_string(dst_lo + i) + "]";
+  for (uint32_t i = 0; i < dst.dst_count && i < src.size(); ++i) {
+    auto n = std::string(dst.base) + "[" + std::to_string(dst.dst_lo + i) + "]";
     auto* var = ctx.FindVariable(n);
     if (!var) continue;
     var->value = ResizeToWidth(src[i], var->value.width, arena);
@@ -289,14 +299,14 @@ static bool TryUnpackedSliceAssign(const Stmt* stmt, SimContext& ctx,
   auto* dst_info = ctx.FindArrayInfo(lhs->base->text);
   if (!dst_info) return false;
   auto [dst_lo, dst_count] = ComputeSliceRange(lhs, ctx, arena);
+  UnpackedSliceTarget dst{lhs->base->text, dst_lo, dst_count,
+                          dst_info->elem_width};
   std::vector<Logic4Vec> src;
   CollectSliceSourceElements(stmt->rhs, ctx, arena, src);
   if (src.empty()) {
-    FillSliceSourceFromPacked(stmt, dst_info->elem_width, dst_count, ctx, arena,
-                              src);
+    FillSliceSourceFromPacked(stmt, dst, ctx, arena, src);
   }
-  WriteUnpackedSliceElements(lhs->base->text, dst_lo, dst_count, src, ctx,
-                             arena);
+  WriteUnpackedSliceElements(dst, src, ctx, arena);
   return true;
 }
 
@@ -478,18 +488,27 @@ static Logic4Vec RightPadStreamToWidth(const Logic4Vec& stream,
   return widened;
 }
 
-// Repopulate `queue` from the `total_w`-bit `widened` stream, carving out
+// §11.4.14: geometry of a widened bit-stream that is unpacked MSB-first into a
+// queue: the padded stream bits plus the element count, total width, and
+// element width describing how to carve it into successive elements.
+struct WidenedStreamLayout {
+  const Logic4Vec& widened;
+  uint32_t n_elems;
+  uint32_t total_w;
+  uint32_t elem_w;
+};
+
+// Repopulate `queue` from the widened stream described by `layout`, carving out
 // `n_elems` element-width slices (MSB-first into successive elements).
 static void PopulateQueueFromWidenedStream(QueueObject* queue,
-                                           const Logic4Vec& widened,
-                                           uint32_t n_elems, uint32_t total_w,
-                                           uint32_t elem_w, Arena& arena) {
+                                           const WidenedStreamLayout& layout,
+                                           Arena& arena) {
   queue->elements.clear();
-  queue->elements.reserve(n_elems);
-  for (uint32_t i = 0; i < n_elems; ++i) {
-    uint32_t src_start = total_w - (i + 1) * elem_w;
+  queue->elements.reserve(layout.n_elems);
+  for (uint32_t i = 0; i < layout.n_elems; ++i) {
+    uint32_t src_start = layout.total_w - (i + 1) * layout.elem_w;
     queue->elements.push_back(
-        ExtractWidenedSlice(widened, src_start, elem_w, arena));
+        ExtractWidenedSlice(layout.widened, src_start, layout.elem_w, arena));
   }
   queue->AssignFreshIds();
   ++queue->generation;
@@ -518,8 +537,8 @@ static bool TryStreamingConcatToQueueTarget(const Stmt* stmt, SimContext& ctx,
   uint32_t total_w = n_elems * elem_w;
 
   Logic4Vec widened = RightPadStreamToWidth(stream, stream_w, total_w, arena);
-  PopulateQueueFromWidenedStream(queue, widened, n_elems, total_w, elem_w,
-                                 arena);
+  PopulateQueueFromWidenedStream(
+      queue, WidenedStreamLayout{widened, n_elems, total_w, elem_w}, arena);
   return true;
 }
 

@@ -19,6 +19,46 @@
 
 namespace delta {
 
+// §21.4: the invariant environment of one $readmem / $sreadmem invocation: the
+// simulation context, the arena that owns parsed words, and the radix selected
+// by the task name (hexadecimal for the *h forms, binary for the *b forms).
+// Carried as one unit because every step of a load needs all three.
+struct ReadmemEnv {
+  SimContext& ctx;
+  Arena& arena;
+  bool is_hex;
+};
+
+// §21.4.2: the destination element's declared type, which governs how a parsed
+// number is fitted to an element: its bit width, whether it is 2-state (so x/z
+// collapse to 0), and, when it is an enumerated type, the element list used to
+// range-check each loaded value.
+struct ReadmemElemType {
+  uint32_t elem_width;
+  bool two_state;
+  const EnumTypeInfo* enum_info;
+};
+
+// §21.4: the optional start_addr / finish_addr task arguments. They fix the
+// initial load cursor, the load direction, and (with no @-address in the file)
+// the expected word count. `has_start` / `has_finish` record which were given;
+// $sreadmem (§D.14) always supplies both.
+struct ReadmemWindow {
+  bool has_start;
+  bool has_finish;
+  int64_t start_arg;
+  int64_t finish_arg;
+};
+
+// §21.4 / §7.4.5: a memory_name written as a slice of an unpacked array. When
+// `is_slice` is set, [slice_lo, slice_hi] (low/high ordered) narrows the load
+// window; on a bare identifier the bounds are unused.
+struct MemSlice {
+  bool is_slice;
+  int64_t slice_lo;
+  int64_t slice_hi;
+};
+
 // §21.4: a number in the load file carries neither a length nor a base; the
 // task name fixes the radix (binary for $readmemb, hexadecimal for $readmemh).
 // The unknown value (x), the high-impedance value (z), and underscores may
@@ -201,57 +241,59 @@ static void ScanMemFile(const std::string& content, AddrFn on_addr,
 // range check. On an out-of-range enumerated value it emits the diagnostic and
 // returns false (the load must stop); otherwise it fills `out` and returns
 // true.
-static bool ParseReadmemWord(SimContext& ctx, Arena& arena, bool is_hex,
-                             const std::string& tok, uint32_t elem_width,
-                             bool two_state, const EnumTypeInfo* enum_info,
-                             Logic4Vec& out) {
-  out = ParseMemNumber(arena, tok, is_hex, elem_width);
+static bool ParseReadmemWord(const ReadmemEnv& env, const std::string& tok,
+                             const ReadmemElemType& et, Logic4Vec& out) {
+  out = ParseMemNumber(env.arena, tok, env.is_hex, et.elem_width);
   // §21.4.2: a 2-state element retains no x/z; convert them to 0.
-  if (two_state) CoerceToTwoState(out);
+  if (et.two_state) CoerceToTwoState(out);
   // §21.4.2 (shall): a value outside the range of the enumerated element type
   // is an error, and no further data is read.
-  if (enum_info && !EnumValueInRange(enum_info, out)) {
-    ctx.GetDiag().Error({}, "$readmem" + std::string(is_hex ? "h" : "b") +
+  if (et.enum_info && !EnumValueInRange(et.enum_info, out)) {
+    env.ctx.GetDiag().Error({},
+                            "$readmem" + std::string(env.is_hex ? "h" : "b") +
                                 ": value out of range for the enumerated type");
     return false;
   }
   return true;
 }
 
-// §21.4: when slice syntax names the memory, the task's start/finish addresses
-// must fall within the slice's bounds. Emits the diagnostic and returns false
-// when they do not (the load should then abort); returns true otherwise.
-static bool CheckReadmemSliceBounds(SimContext& ctx, bool is_hex, bool is_slice,
-                                    bool has_start, bool has_finish,
-                                    int64_t start_addr, int64_t finish_addr,
-                                    int64_t low_addr, int64_t high_addr) {
-  if (is_slice && has_start &&
-      (start_addr < low_addr || start_addr > high_addr ||
-       (has_finish && (finish_addr < low_addr || finish_addr > high_addr)))) {
-    ctx.GetDiag().Error({},
-                        "$readmem" + std::string(is_hex ? "h" : "b") +
-                            ": start/finish address outside the slice bounds");
+// §21.4: the addressable window of an indexed (windowed) destination — the
+// low/high address bounds the load may write, and whether the memory_name named
+// a slice (§7.4.5), which both narrows the window and triggers the slice-bounds
+// check on the task's start/finish addresses.
+struct MemWindow {
+  int64_t low_addr;
+  int64_t high_addr;
+  bool is_slice;
+};
+
+// §21.4: when slice syntax names the memory, the task's resolved start/finish
+// addresses (carried in `w`) must fall within the slice's bounds (`mw`). Emits
+// the diagnostic and returns false when they do not (the load should then
+// abort); returns true otherwise.
+static bool CheckReadmemSliceBounds(const ReadmemEnv& env, const MemWindow& mw,
+                                    const ReadmemWindow& w) {
+  auto outside = [&](int64_t a) { return a < mw.low_addr || a > mw.high_addr; };
+  if (mw.is_slice && w.has_start &&
+      (outside(w.start_arg) || (w.has_finish && outside(w.finish_arg)))) {
+    env.ctx.GetDiag().Error(
+        {}, "$readmem" + std::string(env.is_hex ? "h" : "b") +
+                ": start/finish address outside the slice bounds");
     return false;
   }
   return true;
 }
 
-// §21.4: with an explicit start-through-finish window and no addresses in the
-// file, the data-word count must match the window size, else a warning is
-// issued. Addresses not covered by the file are left unmodified by the caller.
-static void WarnReadmemWordCount(SimContext& ctx, bool is_hex, bool has_start,
-                                 bool has_finish, bool addr_in_file,
-                                 uint64_t data_words, int64_t task_lo,
-                                 int64_t task_hi) {
-  if (has_start && has_finish && !addr_in_file) {
-    auto span = static_cast<uint64_t>(task_hi - task_lo + 1);
-    if (data_words != span) {
-      ctx.GetDiag().Warning(
-          {}, "$readmem" + std::string(is_hex ? "h" : "b") +
-                  ": number of data words differs from the address range");
-    }
-  }
-}
+// §21.4: the address window the system-task arguments permit during an indexed
+// load. When the task names a start (and optionally a finish), an @-address in
+// the file must lie within [task_lo, task_hi]; the flags record which task
+// arguments were supplied.
+struct TaskAddrRange {
+  bool has_start;
+  bool has_finish;
+  int64_t task_lo;
+  int64_t task_hi;
+};
 
 // §21.4: the mutable cursor state carried through an indexed (windowed) load:
 // the running address, whether any @-address was seen, the parsed-word count,
@@ -263,16 +305,31 @@ struct IndexedLoadState {
   uint64_t data_words = 0;
 };
 
+// §21.4: with an explicit start-through-finish window and no addresses in the
+// file, the data-word count must match the window size, else a warning is
+// issued. Addresses not covered by the file are left unmodified by the caller.
+static void WarnReadmemWordCount(const ReadmemEnv& env,
+                                 const TaskAddrRange& range,
+                                 const IndexedLoadState& st) {
+  if (range.has_start && range.has_finish && !st.addr_in_file) {
+    auto span = static_cast<uint64_t>(range.task_hi - range.task_lo + 1);
+    if (st.data_words != span) {
+      env.ctx.GetDiag().Warning(
+          {}, "$readmem" + std::string(env.is_hex ? "h" : "b") +
+                  ": number of data words differs from the address range");
+    }
+  }
+}
+
 // §21.4: handles an @-address during an indexed load. A file address outside
 // the task-specified window is an error that ends the load; otherwise the
 // cursor jumps to the address. Returns false to stop the scan.
-static bool HandleIndexedAddr(SimContext& ctx, bool is_hex, bool has_start,
-                              int64_t task_lo, int64_t task_hi, int64_t addr,
-                              IndexedLoadState& st) {
+static bool HandleIndexedAddr(const ReadmemEnv& env, const TaskAddrRange& range,
+                              int64_t addr, IndexedLoadState& st) {
   st.addr_in_file = true;
-  if (has_start && (addr < task_lo || addr > task_hi)) {
-    ctx.GetDiag().Error(
-        {}, "$readmem" + std::string(is_hex ? "h" : "b") +
+  if (range.has_start && (addr < range.task_lo || addr > range.task_hi)) {
+    env.ctx.GetDiag().Error(
+        {}, "$readmem" + std::string(env.is_hex ? "h" : "b") +
                 ": file address outside the range given by the task");
     st.aborted = true;
     return false;
@@ -281,84 +338,101 @@ static bool HandleIndexedAddr(SimContext& ctx, bool is_hex, bool has_start,
   return true;
 }
 
+// §21.4: the per-load constants an indexed-word handler needs beyond the
+// environment: the destination element type and the load direction (downward
+// only when both task bounds are given and start exceeds finish).
+struct IndexedWordCtx {
+  ReadmemElemType et;
+  bool descending;
+};
+
 // §21.4: handles one data word during an indexed load: parses the token, writes
 // it through `write_word` when the cursor lies inside the load window, then
 // advances the cursor in the load direction. Returns false to stop the scan.
 template <class WriteFn>
-static bool HandleIndexedWord(SimContext& ctx, Arena& arena, bool is_hex,
-                              uint32_t elem_width, bool two_state,
-                              const EnumTypeInfo* enum_info, bool descending,
+static bool HandleIndexedWord(const ReadmemEnv& env, const IndexedWordCtx& iwc,
                               const std::string& tok, WriteFn& write_word,
                               IndexedLoadState& st) {
   Logic4Vec word;
-  if (!ParseReadmemWord(ctx, arena, is_hex, tok, elem_width, two_state,
-                        enum_info, word)) {
+  if (!ParseReadmemWord(env, tok, iwc.et, word)) {
     st.aborted = true;
     return false;
   }
   write_word(st.cursor, word);
   ++st.data_words;
-  st.cursor += descending ? -1 : 1;
+  st.cursor += iwc.descending ? -1 : 1;
   return true;
 }
 
+// §21.4 / §21.4.1: a complete indexed-load request: the destination's address
+// window (and slice flag), its declared element type, and the optional task
+// start/finish window arguments. Shared by the unpacked-array and the dynamic-
+// array / queue forms, which differ only in how they compute the window and
+// store a word.
+struct IndexedLoadReq {
+  MemWindow mw;
+  ReadmemElemType et;
+  ReadmemWindow w;
+};
+
 template <class StoreFn>
-static void EvalReadmemIndexed(SimContext& ctx, Arena& arena, bool is_hex,
-                               const std::string& content, int64_t low_addr,
-                               int64_t high_addr, bool is_slice,
-                               uint32_t elem_width, bool two_state,
-                               const EnumTypeInfo* enum_info, bool has_start,
-                               bool has_finish, int64_t start_arg,
-                               int64_t finish_arg, StoreFn store) {
+static void EvalReadmemIndexed(const ReadmemEnv& env,
+                               const std::string& content,
+                               const IndexedLoadReq& req, StoreFn store) {
+  const MemWindow& mw = req.mw;
+  const ReadmemWindow& w = req.w;
+
   // The window arguments are resolved by the caller because $readmem and
   // $sreadmem (§D.14) carry them at different argument positions; an absent
   // start/finish falls back to the memory's own bounds.
-  int64_t start_addr = has_start ? start_arg : low_addr;
-  int64_t finish_addr = has_finish ? finish_arg : high_addr;
+  int64_t start_addr = w.has_start ? w.start_arg : mw.low_addr;
+  int64_t finish_addr = w.has_finish ? w.finish_arg : mw.high_addr;
 
   // §21.4: the direction of the highest dimension's entries follows the
   // relative magnitudes of start_addr and finish_addr. Loading runs downward
   // only when both bounds are supplied and start exceeds finish; otherwise it
   // runs upward. The chosen direction persists even past an @-address.
-  bool descending = has_start && has_finish && start_addr > finish_addr;
+  bool descending = w.has_start && w.has_finish && start_addr > finish_addr;
 
   // The address window the system-task arguments permit. When the task names a
   // start (and optionally a finish), addresses appearing in the file must lie
   // within this window.
-  int64_t task_lo = has_finish ? std::min(start_addr, finish_addr) : start_addr;
-  int64_t task_hi = has_finish ? std::max(start_addr, finish_addr) : high_addr;
+  TaskAddrRange range;
+  range.has_start = w.has_start;
+  range.has_finish = w.has_finish;
+  range.task_lo = w.has_finish ? std::min(start_addr, finish_addr) : start_addr;
+  range.task_hi =
+      w.has_finish ? std::max(start_addr, finish_addr) : mw.high_addr;
 
-  // §21.4: when slice syntax names the memory, the start_addr and finish_addr
-  // arguments must fall within the slice's bounds.
-  if (!CheckReadmemSliceBounds(ctx, is_hex, is_slice, has_start, has_finish,
-                               start_addr, finish_addr, low_addr, high_addr)) {
+  // §21.4: when slice syntax names the memory, the resolved start_addr and
+  // finish_addr must fall within the slice's bounds.
+  ReadmemWindow resolved{w.has_start, w.has_finish, start_addr, finish_addr};
+  if (!CheckReadmemSliceBounds(env, mw, resolved)) {
     return;
   }
 
   auto write_word = [&](int64_t addr, const Logic4Vec& v) {
-    if (addr < low_addr || addr > high_addr) return;
+    if (addr < mw.low_addr || addr > mw.high_addr) return;
     store(addr, v);
   };
 
+  IndexedWordCtx iwc{req.et, descending};
   IndexedLoadState st;
-  st.cursor = has_start ? start_addr : low_addr;
+  st.cursor = w.has_start ? start_addr : mw.low_addr;
   ScanMemFile(
       content,
       [&](int64_t addr) -> bool {
-        return HandleIndexedAddr(ctx, is_hex, has_start, task_lo, task_hi, addr,
-                                 st);
+        return HandleIndexedAddr(env, range, addr, st);
       },
       [&](const std::string& tok) -> bool {
-        return HandleIndexedWord(ctx, arena, is_hex, elem_width, two_state,
-                                 enum_info, descending, tok, write_word, st);
+        return HandleIndexedWord(env, iwc, tok, write_word, st);
       });
 
   // §21.4: with an explicit start-through-finish window and no addresses in the
   // file, the data-word count must match the window size. Addresses not covered
   // by the file are left unmodified, which the write loop above guarantees.
   if (!st.aborted) {
-    WarnReadmemWordCount(ctx, is_hex, has_start, has_finish, st.addr_in_file,
-                         st.data_words, task_lo, task_hi);
+    WarnReadmemWordCount(env, range, st);
   }
 }
 
@@ -371,43 +445,40 @@ static void EvalReadmemIndexed(SimContext& ctx, Arena& arena, bool is_hex,
 // §21.4.1: handles one data word during an associative-array load: parses the
 // token, deposits it at the running key (creating the element if absent), then
 // advances the cursor in the load direction. Returns false to stop the scan.
-static bool HandleAssocWord(SimContext& ctx, Arena& arena, bool is_hex,
-                            AssocArrayObject* aa, bool two_state,
-                            const EnumTypeInfo* enum_info, bool descending,
-                            const std::string& tok, int64_t& cursor) {
+static bool HandleAssocWord(const ReadmemEnv& env, const IndexedWordCtx& iwc,
+                            AssocArrayObject* aa, const std::string& tok,
+                            int64_t& cursor) {
   Logic4Vec word;
-  if (!ParseReadmemWord(ctx, arena, is_hex, tok, aa->elem_width, two_state,
-                        enum_info, word)) {
+  if (!ParseReadmemWord(env, tok, iwc.et, word)) {
     return false;
   }
   // §21.4.1: loading an address creates its element if absent.
   aa->int_data[cursor] = word;
-  cursor += descending ? -1 : 1;
+  cursor += iwc.descending ? -1 : 1;
   return true;
 }
 
-static void EvalReadmemAssoc(SimContext& ctx, Arena& arena, bool is_hex,
-                             const std::string& content, AssocArrayObject* aa,
-                             bool two_state, const EnumTypeInfo* enum_info,
-                             bool has_start, bool has_finish, int64_t start_arg,
-                             int64_t finish_arg) {
+static void EvalReadmemAssoc(const ReadmemEnv& env, const std::string& content,
+                             AssocArrayObject* aa, const ReadmemElemType& et,
+                             const ReadmemWindow& w) {
   // §21.4.1: the index of an associative array loaded this way shall be of an
   // integral type. A string-keyed array has no numeric address form, so it
   // cannot be loaded.
   if (aa->is_string_key) {
-    ctx.GetDiag().Error(
-        {}, "$readmem" + std::string(is_hex ? "h" : "b") +
+    env.ctx.GetDiag().Error(
+        {}, "$readmem" + std::string(env.is_hex ? "h" : "b") +
                 ": associative array index must be of an integral type");
     return;
   }
 
   // The window arguments are resolved by the caller (their position differs
   // between $readmem and the §D.14 $sreadmem forms).
-  int64_t start_addr = has_start ? start_arg : 0;
-  int64_t finish_addr = has_finish ? finish_arg : 0;
-  bool descending = has_start && has_finish && start_addr > finish_addr;
+  int64_t start_addr = w.has_start ? w.start_arg : 0;
+  int64_t finish_addr = w.has_finish ? w.finish_arg : 0;
+  bool descending = w.has_start && w.has_finish && start_addr > finish_addr;
   int64_t cursor = start_addr;
 
+  IndexedWordCtx iwc{et, descending};
   ScanMemFile(
       content,
       [&](int64_t addr) -> bool {
@@ -415,8 +486,7 @@ static void EvalReadmemAssoc(SimContext& ctx, Arena& arena, bool is_hex,
         return true;
       },
       [&](const std::string& tok) -> bool {
-        return HandleAssocWord(ctx, arena, is_hex, aa, two_state, enum_info,
-                               descending, tok, cursor);
+        return HandleAssocWord(env, iwc, aa, tok, cursor);
       });
 }
 
@@ -430,29 +500,42 @@ static void EvalReadmemAssoc(SimContext& ctx, Arena& arena, bool is_hex,
 // repositions the load to the first subword of that word. With or without
 // addresses, when the file runs out of data the load stops and any array words
 // or subwords not yet reached are left unchanged.
+// §21.4.3: the row-major geometry of a multidimensional unpacked array load.
+// `los` / `sizes` are the per-dimension low addresses and extents (highest
+// dimension first); `ndim` is their count; `inner` is the subword count one
+// highest-dimension word encloses (the product of the lower extents); `top_lo`
+// / `top_hi` bound the highest dimension; `total` is the element count. The
+// vectors are borrowed from the destination's ArrayInfo for the load's
+// duration.
+struct MultiDimGeom {
+  const std::string& mem_name;
+  const std::vector<uint32_t>& los;
+  const std::vector<uint32_t>& sizes;
+  size_t ndim;
+  uint64_t inner;
+  int64_t top_lo;
+  int64_t top_hi;
+  uint64_t total;
+};
+
 // §21.4.3: maps a row-major global element position to its element name. A
 // sequential file fills element 0, 1, 2, ... regardless of how the dimensions
 // nest; the name carries one bracketed subscript per dimension
-// (mem[i0][i1]...), each running from its dimension's low address. `inner` is
-// the subword count enclosed by one highest-dimension word.
-static std::string MultiDimElementName(const std::string& mem_name,
-                                       const std::vector<uint32_t>& los,
-                                       const std::vector<uint32_t>& sizes,
-                                       size_t ndim, uint64_t inner,
-                                       int64_t top_lo, uint64_t global) {
-  uint64_t top = global / inner;
-  uint64_t flat = global % inner;
-  std::string nm =
-      mem_name + "[" + std::to_string(top_lo + static_cast<int64_t>(top)) + "]";
+// (mem[i0][i1]...), each running from its dimension's low address.
+static std::string MultiDimElementName(const MultiDimGeom& g, uint64_t global) {
+  uint64_t top = global / g.inner;
+  uint64_t flat = global % g.inner;
+  std::string nm = g.mem_name + "[" +
+                   std::to_string(g.top_lo + static_cast<int64_t>(top)) + "]";
   // Decompose the within-word position into per-dimension subscripts, innermost
   // first (it varies fastest), then emit them outer-to-inner.
-  std::vector<int64_t> subs(ndim - 1);
-  for (size_t d = ndim - 1; d >= 1; --d) {
-    subs[d - 1] =
-        static_cast<int64_t>(los[d]) + static_cast<int64_t>(flat % sizes[d]);
-    flat /= sizes[d];
+  std::vector<int64_t> subs(g.ndim - 1);
+  for (size_t d = g.ndim - 1; d >= 1; --d) {
+    subs[d - 1] = static_cast<int64_t>(g.los[d]) +
+                  static_cast<int64_t>(flat % g.sizes[d]);
+    flat /= g.sizes[d];
   }
-  for (size_t d = 1; d < ndim; ++d) {
+  for (size_t d = 1; d < g.ndim; ++d) {
     nm += "[" + std::to_string(subs[d - 1]) + "]";
   }
   return nm;
@@ -462,16 +545,15 @@ static std::string MultiDimElementName(const std::string& mem_name,
 // names a highest-dimension word; loading resumes at the first subword it
 // encloses. An address outside the highest dimension's range is an error.
 // Returns false to stop the scan.
-static bool HandleMultiDimAddr(SimContext& ctx, bool is_hex, int64_t top_lo,
-                               int64_t top_hi, uint64_t inner, int64_t addr,
-                               uint64_t& cursor) {
-  if (addr < top_lo || addr > top_hi) {
-    ctx.GetDiag().Error(
-        {}, "$readmem" + std::string(is_hex ? "h" : "b") +
+static bool HandleMultiDimAddr(const ReadmemEnv& env, const MultiDimGeom& g,
+                               int64_t addr, uint64_t& cursor) {
+  if (addr < g.top_lo || addr > g.top_hi) {
+    env.ctx.GetDiag().Error(
+        {}, "$readmem" + std::string(env.is_hex ? "h" : "b") +
                 ": file address outside the highest dimension's range");
     return false;
   }
-  cursor = static_cast<uint64_t>(addr - top_lo) * inner;
+  cursor = static_cast<uint64_t>(addr - g.top_lo) * g.inner;
   return true;
 }
 
@@ -479,31 +561,25 @@ static bool HandleMultiDimAddr(SimContext& ctx, bool is_hex, int64_t top_lo,
 // array is already full, otherwise parses the token, writes it to the element
 // named by the running row-major position, and advances the cursor. Returns
 // false to stop the scan.
-static bool HandleMultiDimWord(SimContext& ctx, Arena& arena, bool is_hex,
-                               const std::string& mem_name, const ArrayInfo* ai,
-                               const std::vector<uint32_t>& los,
-                               const std::vector<uint32_t>& sizes, size_t ndim,
-                               uint64_t inner, int64_t top_lo, uint64_t total,
-                               bool two_state, const EnumTypeInfo* enum_info,
+static bool HandleMultiDimWord(const ReadmemEnv& env, const MultiDimGeom& g,
+                               const ReadmemElemType& et,
                                const std::string& tok, uint64_t& cursor) {
-  if (cursor >= total) return false;  // array full; nothing more to fill
+  if (cursor >= g.total) return false;  // array full; nothing more to fill
   Logic4Vec word;
-  if (!ParseReadmemWord(ctx, arena, is_hex, tok, ai->elem_width, two_state,
-                        enum_info, word)) {
+  if (!ParseReadmemWord(env, tok, et, word)) {
     return false;
   }
-  std::string elem =
-      MultiDimElementName(mem_name, los, sizes, ndim, inner, top_lo, cursor);
-  if (auto* var = ctx.FindVariable(elem)) var->value = word;
+  std::string elem = MultiDimElementName(g, cursor);
+  if (auto* var = env.ctx.FindVariable(elem)) var->value = word;
   ++cursor;
   return true;
 }
 
-static void EvalReadmemMultiDim(SimContext& ctx, Arena& arena, bool is_hex,
+static void EvalReadmemMultiDim(const ReadmemEnv& env,
                                 const std::string& content,
                                 const std::string& mem_name,
-                                const ArrayInfo* ai, bool two_state,
-                                const EnumTypeInfo* enum_info) {
+                                const ArrayInfo* ai,
+                                const ReadmemElemType& et) {
   const std::vector<uint32_t>& los = ai->dim_los;
   const std::vector<uint32_t>& sizes = ai->dim_sizes;
   const size_t kNdim = sizes.size();
@@ -516,20 +592,18 @@ static void EvalReadmemMultiDim(SimContext& ctx, Arena& arena, bool is_hex,
 
   const auto kTopLo = static_cast<int64_t>(los[0]);
   const int64_t kTopHi = kTopLo + static_cast<int64_t>(sizes[0]) - 1;
-
   const uint64_t kTotal = static_cast<uint64_t>(sizes[0]) * inner;
+
+  MultiDimGeom geom{mem_name, los, sizes, kNdim, inner, kTopLo, kTopHi, kTotal};
   uint64_t cursor = 0;
 
   ScanMemFile(
       content,
       [&](int64_t addr) -> bool {
-        return HandleMultiDimAddr(ctx, is_hex, kTopLo, kTopHi, inner, addr,
-                                  cursor);
+        return HandleMultiDimAddr(env, geom, addr, cursor);
       },
       [&](const std::string& tok) -> bool {
-        return HandleMultiDimWord(ctx, arena, is_hex, mem_name, ai, los, sizes,
-                                  kNdim, inner, kTopLo, kTotal, two_state,
-                                  enum_info, tok, cursor);
+        return HandleMultiDimWord(env, geom, et, tok, cursor);
       });
 }
 
@@ -545,9 +619,8 @@ static void EvalReadmemMultiDim(SimContext& ctx, Arena& arena, bool is_hex,
 // identifier `is_slice` is left false; on a slice it is set and
 // slice_lo/slice_hi are evaluated (low/high ordered). Returns false for an
 // unsupported expression form, in which case the caller should do nothing.
-static bool ResolveMemName(SimContext& ctx, Arena& arena, const Expr* mn,
-                           const Expr*& base_id, bool& is_slice,
-                           int64_t& slice_lo, int64_t& slice_hi) {
+static bool ResolveMemName(const ReadmemEnv& env, const Expr* mn,
+                           const Expr*& base_id, MemSlice& slice) {
   if (mn->kind == ExprKind::kIdentifier) {
     base_id = mn;
     return true;
@@ -556,118 +629,126 @@ static bool ResolveMemName(SimContext& ctx, Arena& arena, const Expr* mn,
       !mn->is_part_select_plus && !mn->is_part_select_minus &&
       mn->base != nullptr && mn->base->kind == ExprKind::kIdentifier) {
     base_id = mn->base;
-    is_slice = true;
-    int64_t a =
-        static_cast<int64_t>(EvalExpr(mn->index, ctx, arena).ToUint64());
-    int64_t b =
-        static_cast<int64_t>(EvalExpr(mn->index_end, ctx, arena).ToUint64());
-    slice_lo = std::min(a, b);
-    slice_hi = std::max(a, b);
+    slice.is_slice = true;
+    int64_t a = static_cast<int64_t>(
+        EvalExpr(mn->index, env.ctx, env.arena).ToUint64());
+    int64_t b = static_cast<int64_t>(
+        EvalExpr(mn->index_end, env.ctx, env.arena).ToUint64());
+    slice.slice_lo = std::min(a, b);
+    slice.slice_hi = std::max(a, b);
     return true;
   }
   return false;
 }
 
+// §21.4: the user-facing inputs of a load request after the memory_name is
+// resolved: how the name was written (bare or a slice, with its bounds) and the
+// optional start/finish window arguments. Threaded together because each
+// destination form (queue, single-dimension array) consumes both.
+struct MemLoadArgs {
+  MemSlice slice;
+  ReadmemWindow w;
+};
+
+// §21.4: the resolved destination unpacked array: its name (used to build per-
+// element variable names) and its ArrayInfo (bounds and element type).
+struct DestArray {
+  const std::string& mem_name;
+  const ArrayInfo* ai;
+};
+
 // §21.4.1: loads a dynamic array or queue, whose size is fixed for the load (an
 // address beyond the last element is dropped, never resized to make room). A
 // slice narrows the address window to its own bounds, clamped to the array.
-static void LoadMemQueue(SimContext& ctx, Arena& arena, bool is_hex,
-                         const std::string& content, QueueObject* q,
-                         const EnumTypeInfo* enum_info, bool is_slice,
-                         int64_t slice_lo, int64_t slice_hi, bool has_start,
-                         bool has_finish, int64_t start_arg,
-                         int64_t finish_arg) {
+static void LoadMemQueue(const ReadmemEnv& env, const std::string& content,
+                         QueueObject* q, const EnumTypeInfo* enum_info,
+                         const MemLoadArgs& args) {
+  const MemSlice& slice = args.slice;
   int64_t low_addr = 0;
   int64_t high_addr = static_cast<int64_t>(q->elements.size()) - 1;
-  if (is_slice) {
-    low_addr = std::max(slice_lo, low_addr);
-    high_addr = std::min(slice_hi, high_addr);
+  if (slice.is_slice) {
+    low_addr = std::max(slice.slice_lo, low_addr);
+    high_addr = std::min(slice.slice_hi, high_addr);
   }
-  EvalReadmemIndexed(ctx, arena, is_hex, content, low_addr, high_addr, is_slice,
-                     q->elem_width, !q->is_4state, enum_info, has_start,
-                     has_finish, start_arg, finish_arg,
-                     [&](int64_t addr, const Logic4Vec& v) {
-                       q->elements[static_cast<size_t>(addr)] = v;
-                     });
+  IndexedLoadReq req{{low_addr, high_addr, slice.is_slice},
+                     {q->elem_width, !q->is_4state, enum_info},
+                     args.w};
+  EvalReadmemIndexed(env, content, req, [&](int64_t addr, const Logic4Vec& v) {
+    q->elements[static_cast<size_t>(addr)] = v;
+  });
 }
 
 // §21.4: loads a single-dimension unpacked array (or one lower dimension named
 // by a slice, see §7.4.5). A slice narrows the load window to its own bounds,
 // clamped to the array.
-static void LoadMemSingleDim(SimContext& ctx, Arena& arena, bool is_hex,
-                             const std::string& content,
-                             const std::string& mem_name, const ArrayInfo* ai,
-                             const EnumTypeInfo* enum_info, bool is_slice,
-                             int64_t slice_lo, int64_t slice_hi, bool has_start,
-                             bool has_finish, int64_t start_arg,
-                             int64_t finish_arg) {
+static void LoadMemSingleDim(const ReadmemEnv& env, const std::string& content,
+                             const DestArray& dest,
+                             const EnumTypeInfo* enum_info,
+                             const MemLoadArgs& args) {
+  const ArrayInfo* ai = dest.ai;
+  const MemSlice& slice = args.slice;
   int64_t arr_lo = ai->lo;
   int64_t arr_hi = ai->lo + static_cast<int64_t>(ai->size) - 1;
   // A slice narrows the load window to its own bounds (clamped to the array).
-  int64_t low_addr = is_slice ? std::max(slice_lo, arr_lo) : arr_lo;
-  int64_t high_addr = is_slice ? std::min(slice_hi, arr_hi) : arr_hi;
+  int64_t low_addr = slice.is_slice ? std::max(slice.slice_lo, arr_lo) : arr_lo;
+  int64_t high_addr =
+      slice.is_slice ? std::min(slice.slice_hi, arr_hi) : arr_hi;
 
-  EvalReadmemIndexed(
-      ctx, arena, is_hex, content, low_addr, high_addr, is_slice,
-      ai->elem_width, !ai->is_4state, enum_info, has_start, has_finish,
-      start_arg, finish_arg, [&](int64_t addr, const Logic4Vec& v) {
-        std::string elem = mem_name + "[" + std::to_string(addr) + "]";
-        if (auto* var = ctx.FindVariable(elem)) var->value = v;
-      });
+  IndexedLoadReq req{{low_addr, high_addr, slice.is_slice},
+                     {ai->elem_width, !ai->is_4state, enum_info},
+                     args.w};
+  EvalReadmemIndexed(env, content, req, [&](int64_t addr, const Logic4Vec& v) {
+    std::string elem = dest.mem_name + "[" + std::to_string(addr) + "]";
+    if (auto* var = env.ctx.FindVariable(elem)) var->value = v;
+  });
 }
 
-static void DoMemLoad(SimContext& ctx, Arena& arena, bool is_hex,
-                      const std::string& content, const Expr* mn,
-                      bool has_start, bool has_finish, int64_t start_arg,
-                      int64_t finish_arg) {
+static void DoMemLoad(const ReadmemEnv& env, const std::string& content,
+                      const Expr* mn, const ReadmemWindow& w) {
   // §21.4: memory_name is a bare unpacked array or a slice of one (the lowest
   // dimension may be written with slice syntax, see 7.4.5). The selected index
   // range is the address space the load works over.
   const Expr* base_id = nullptr;
-  bool is_slice = false;
-  int64_t slice_lo = 0;
-  int64_t slice_hi = 0;
-  if (!ResolveMemName(ctx, arena, mn, base_id, is_slice, slice_lo, slice_hi)) {
+  MemSlice slice{false, 0, 0};
+  if (!ResolveMemName(env, mn, base_id, slice)) {
     return;
   }
   std::string mem_name(base_id->text);
+  MemLoadArgs args{slice, w};
 
   // §21.4.2: when the memory's element type is enumerated, the file numbers are
   // the underlying numeric values of the type's elements and each must name a
   // valid element. A null result means the destination is not enum-typed.
-  const EnumTypeInfo* enum_info = ctx.GetVariableEnumType(mem_name);
+  const EnumTypeInfo* enum_info = env.ctx.GetVariableEnumType(mem_name);
 
   // §21.4.1: an associative array is addressed by an integral key; addresses
   // create their elements on demand rather than indexing a fixed window.
-  if (AssocArrayObject* aa = ctx.FindAssocArray(mem_name)) {
-    EvalReadmemAssoc(ctx, arena, is_hex, content, aa, !aa->is_4state, enum_info,
-                     has_start, has_finish, start_arg, finish_arg);
+  if (AssocArrayObject* aa = env.ctx.FindAssocArray(mem_name)) {
+    EvalReadmemAssoc(env, content, aa,
+                     {aa->elem_width, !aa->is_4state, enum_info}, w);
     return;
   }
 
   // §21.4.1: a dynamic array or queue loads into its existing elements.
-  if (QueueObject* q = ctx.FindQueue(mem_name)) {
-    LoadMemQueue(ctx, arena, is_hex, content, q, enum_info, is_slice, slice_lo,
-                 slice_hi, has_start, has_finish, start_arg, finish_arg);
+  if (QueueObject* q = env.ctx.FindQueue(mem_name)) {
+    LoadMemQueue(env, content, q, enum_info, args);
     return;
   }
 
-  const ArrayInfo* ai = ctx.FindArrayInfo(mem_name);
+  const ArrayInfo* ai = env.ctx.FindArrayInfo(mem_name);
   if (!ai) return;
 
   // §21.4.3: a memory with more than one unpacked dimension is filled in
   // row-major order, with @-addresses naming highest-dimension words. (A slice
   // memory_name resolves to a single lower dimension, see §7.4.5, and is
   // handled by the single-dimension path below.)
-  if (!is_slice && ai->dim_sizes.size() >= 2) {
-    EvalReadmemMultiDim(ctx, arena, is_hex, content, mem_name, ai,
-                        !ai->is_4state, enum_info);
+  if (!slice.is_slice && ai->dim_sizes.size() >= 2) {
+    EvalReadmemMultiDim(env, content, mem_name, ai,
+                        {ai->elem_width, !ai->is_4state, enum_info});
     return;
   }
 
-  LoadMemSingleDim(ctx, arena, is_hex, content, mem_name, ai, enum_info,
-                   is_slice, slice_lo, slice_hi, has_start, has_finish,
-                   start_arg, finish_arg);
+  LoadMemSingleDim(env, content, {mem_name, ai}, enum_info, args);
 }
 
 // §21.4: $readmemb / $readmemh read a text file of white space, comments, and
@@ -703,8 +784,9 @@ Logic4Vec EvalReadmem(const Expr* expr, SimContext& ctx, Arena& arena,
           ? static_cast<int64_t>(EvalExpr(expr->args[3], ctx, arena).ToUint64())
           : 0;
 
-  DoMemLoad(ctx, arena, is_hex, content, expr->args[1], has_start, has_finish,
-            start_arg, finish_arg);
+  ReadmemEnv env{ctx, arena, is_hex};
+  DoMemLoad(env, content, expr->args[1],
+            {has_start, has_finish, start_arg, finish_arg});
   return MakeLogic4VecVal(arena, 1, 0);
 }
 
@@ -730,8 +812,9 @@ Logic4Vec EvalSreadmem(const Expr* expr, SimContext& ctx, Arena& arena,
     content += EvalStringArg(expr->args[i], ctx, arena);
   }
 
-  DoMemLoad(ctx, arena, is_hex, content, expr->args[0], /*has_start=*/true,
-            /*has_finish=*/true, start_arg, finish_arg);
+  ReadmemEnv env{ctx, arena, is_hex};
+  DoMemLoad(env, content, expr->args[0],
+            {/*has_start=*/true, /*has_finish=*/true, start_arg, finish_arg});
   return MakeLogic4VecVal(arena, 1, 0);
 }
 

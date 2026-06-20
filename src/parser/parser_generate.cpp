@@ -29,37 +29,30 @@ void Parser::ParseGenerateBody(std::vector<ModuleItem*>& body,
   };
   bool has_gen_label = detect_gen_label();
 
-  // Consume the optional `: name` block name at the head of a `begin` block,
-  // diagnosing a conflict with a generate-block label.
-  auto consume_begin_name = [&]() {
-    if (has_gen_label) {
-      if (Check(TokenKind::kColon)) {
-        diag_.Error(CurrentLoc(),
-                    "cannot have both a generate block label and a block name");
-      }
-      return;
-    }
-    if (Match(TokenKind::kColon) && CheckIdentifier()) {
-      out_label = Consume().text;
-    }
-  };
+  // A bare (non-`begin`) generate body is a single module item.
+  if (!Match(TokenKind::kKwBegin)) {
+    ParseModuleItem(body);
+    return;
+  }
 
-  // Parse the body of a `begin ... end` generate block, including an
-  // optional `: name` and the matching trailing `: name`.
-  auto parse_begin_body = [&]() {
-    consume_begin_name();
-    while (!Check(TokenKind::kKwEnd) && !AtEnd()) {
-      ParseModuleItem(body);
-    }
-    Expect(TokenKind::kKwEnd);
-    if (Match(TokenKind::kColon)) Match(TokenKind::kIdentifier);
-  };
+  // Consume the optional `: name` block name at the head of the `begin` block,
+  // diagnosing a conflict with a generate-block label. A generate-block label
+  // suppresses (and conflicts with) an explicit block name, so the `Match`
+  // that would consume the name is guarded behind `!has_gen_label`.
+  if (has_gen_label && Check(TokenKind::kColon)) {
+    diag_.Error(CurrentLoc(),
+                "cannot have both a generate block label and a block name");
+  } else if (!has_gen_label && Match(TokenKind::kColon) && CheckIdentifier()) {
+    out_label = Consume().text;
+  }
 
-  if (Match(TokenKind::kKwBegin)) {
-    parse_begin_body();
-  } else {
+  // Parse the items, then the matching `end` and its optional trailing
+  // `: name`.
+  while (!Check(TokenKind::kKwEnd) && !AtEnd()) {
     ParseModuleItem(body);
   }
+  Expect(TokenKind::kKwEnd);
+  if (Match(TokenKind::kColon)) Match(TokenKind::kIdentifier);
 }
 
 void Parser::ParseGenerateRegion(std::vector<ModuleItem*>& items) {

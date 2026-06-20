@@ -34,22 +34,34 @@ static void WriteAssocMem(std::ofstream& ofs, bool is_hex,
   }
 }
 
+// §21.5: the $writememb / $writememh call under evaluation. The system-task
+// expression carries the file/memory operands plus the optional start_addr /
+// finish_addr arguments, and ctx / arena are the evaluation environment those
+// argument expressions are resolved against. These three always travel together
+// across the array-shape writers, so they ride as one entity.
+struct WritememEval {
+  const Expr* expr;
+  SimContext& ctx;
+  Arena& arena;
+};
+
 // §21.5: resolves the optional start_addr (arg 2) / finish_addr (arg 3) that
 // bound which element indices a $writemem writes. An absent argument falls back
 // to the array's own low / high bound.
-static void ResolveWritememRange(const Expr* expr, SimContext& ctx,
-                                 Arena& arena, int64_t arr_lo, int64_t arr_hi,
-                                 int64_t& start_addr, int64_t& finish_addr) {
+static void ResolveWritememRange(const WritememEval& eval, int64_t arr_lo,
+                                 int64_t arr_hi, int64_t& start_addr,
+                                 int64_t& finish_addr) {
+  const Expr* expr = eval.expr;
   bool has_start = expr->args.size() >= 3;
   bool has_finish = expr->args.size() >= 4;
   start_addr =
-      has_start
-          ? static_cast<int64_t>(EvalExpr(expr->args[2], ctx, arena).ToUint64())
-          : arr_lo;
+      has_start ? static_cast<int64_t>(
+                      EvalExpr(expr->args[2], eval.ctx, eval.arena).ToUint64())
+                : arr_lo;
   finish_addr =
-      has_finish
-          ? static_cast<int64_t>(EvalExpr(expr->args[3], ctx, arena).ToUint64())
-          : arr_hi;
+      has_finish ? static_cast<int64_t>(
+                       EvalExpr(expr->args[3], eval.ctx, eval.arena).ToUint64())
+                 : arr_hi;
 }
 
 // §21.5: writes the address range [start, finish] (descending when finish is
@@ -76,14 +88,13 @@ static void WriteMemAddressRange(int64_t start_addr, int64_t finish_addr,
 // $readmem reloads it. The optional start_addr / finish_addr bound the element
 // indices that are written.
 template <class EmitFn>
-static void WriteMemQueue(const Expr* expr, SimContext& ctx, Arena& arena,
-                          const QueueObject* q, EmitFn emit) {
+static void WriteMemQueue(const WritememEval& eval, const QueueObject* q,
+                          EmitFn emit) {
   int64_t arr_lo = 0;
   int64_t arr_hi = static_cast<int64_t>(q->elements.size()) - 1;
   int64_t start_addr = 0;
   int64_t finish_addr = 0;
-  ResolveWritememRange(expr, ctx, arena, arr_lo, arr_hi, start_addr,
-                       finish_addr);
+  ResolveWritememRange(eval, arr_lo, arr_hi, start_addr, finish_addr);
   if (arr_hi < arr_lo) return;
   WriteMemAddressRange(
       start_addr, finish_addr, arr_lo, arr_hi,
@@ -94,15 +105,14 @@ static void WriteMemQueue(const Expr* expr, SimContext& ctx, Arena& arena,
 // optional start_addr / finish_addr bound the range that is written; a finish
 // below start emits the words in descending address order.
 template <class EmitFn>
-static void WriteMemArray(const Expr* expr, SimContext& ctx, Arena& arena,
-                          const std::string& mem_name, const ArrayInfo* ai,
-                          EmitFn emit) {
+static void WriteMemArray(const WritememEval& eval, const std::string& mem_name,
+                          const ArrayInfo* ai, EmitFn emit) {
   int64_t arr_lo = ai->lo;
   int64_t arr_hi = ai->lo + static_cast<int64_t>(ai->size) - 1;
   int64_t start_addr = 0;
   int64_t finish_addr = 0;
-  ResolveWritememRange(expr, ctx, arena, arr_lo, arr_hi, start_addr,
-                       finish_addr);
+  ResolveWritememRange(eval, arr_lo, arr_hi, start_addr, finish_addr);
+  SimContext& ctx = eval.ctx;
   WriteMemAddressRange(
       start_addr, finish_addr, arr_lo, arr_hi, [&](int64_t addr) {
         std::string elem = mem_name + "[" + std::to_string(addr) + "]";
@@ -145,13 +155,15 @@ Logic4Vec EvalWritemem(const Expr* expr, SimContext& ctx, Arena& arena,
     return MakeLogic4VecVal(arena, 1, 0);
   }
 
+  WritememEval eval{expr, ctx, arena};
+
   if (const QueueObject* q = ctx.FindQueue(mem_name)) {
-    WriteMemQueue(expr, ctx, arena, q, emit);
+    WriteMemQueue(eval, q, emit);
     return MakeLogic4VecVal(arena, 1, 0);
   }
 
   if (const ArrayInfo* ai = ctx.FindArrayInfo(mem_name)) {
-    WriteMemArray(expr, ctx, arena, mem_name, ai, emit);
+    WriteMemArray(eval, mem_name, ai, emit);
     return MakeLogic4VecVal(arena, 1, 0);
   }
 

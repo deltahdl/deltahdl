@@ -118,20 +118,24 @@ void Lowerer::LowerAllImported(
     auto sub = visited;
     LowerAllImported(src, sub);
   };
-  auto handle_export = [&](const ImportItem& ex) {
-    if (ex.package_name == "*") {
-      for (std::string_view src_name : WildcardExportImportNames(pkg)) {
-        if (auto* src = FindPackage(src_name)) recurse_all(src);
-      }
-      return;
+  auto reexport_star = [&] {
+    for (std::string_view src_name : WildcardExportImportNames(pkg)) {
+      if (auto* src = FindPackage(src_name)) recurse_all(src);
     }
-    auto* src = FindPackage(ex.package_name);
-    if (!src) return;
+  };
+  auto reexport_one = [&](PackageDecl* src, const ImportItem& ex) {
     if (ex.is_wildcard) {
       recurse_all(src);
     } else {
       auto sub = visited;
       LowerImportedName(src, ex.item_name, sub);
+    }
+  };
+  auto handle_export = [&](const ImportItem& ex) {
+    if (ex.package_name == "*") {
+      reexport_star();
+    } else if (auto* src = FindPackage(ex.package_name)) {
+      reexport_one(src, ex);
     }
   };
 

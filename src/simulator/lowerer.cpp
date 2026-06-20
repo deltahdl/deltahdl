@@ -356,6 +356,47 @@ static void CommitContAssignValue(const ContAssignParams& params,
       params, drv, ContAssignDrivenValue{driven_val, effective_ds}, ctx, arena);
 }
 
+static ContAssignDriver MakeContAssignDriver(Net* net) {
+  ContAssignDriver drv;
+  drv.net = net;
+  drv.driver_idx = net ? net->drivers.size() : 0;
+  drv.first = true;
+  return drv;
+}
+
+// The loop-invariant context threaded through the inertial-delay re-evaluation
+// of a continuous assignment (IEEE 1800 §28 inertial delays): the assignment
+// parameters, the resolved delay set, and the simulation context/arena used to
+// re-evaluate the right-hand side. Bundled so the per-iteration helper stays
+// within a small parameter count.
+struct InertialLoopCtx {
+  const ContAssignParams& params;
+  const ContAssignDelays& d;
+  SimContext& ctx;
+  Arena& arena;
+};
+
+static uint64_t RemainingTicks(SimTime target, SimContext& ctx) {
+  return (target.ticks > ctx.CurrentTime().ticks)
+             ? (target.ticks - ctx.CurrentTime().ticks)
+             : 0;
+}
+
+// Re-evaluates the right-hand side after an inertial delay was interrupted and
+// decides how the pending transition continues. Returns true when the loop
+// should stop (the pending value collapsed onto the left-hand side); otherwise
+// returns false and updates `target` if the operand change rescheduled the
+// fire time.
+static bool ApplyInertialReeval(const InertialLoopCtx& loop,
+                                const PendingContAssignTransition& xition,
+                                SimTime& target) {
+  InertialReeval re = ReevalInertialContAssign(loop.params, loop.d, xition,
+                                               loop.ctx, loop.arena);
+  if (re.collapsed) return true;
+  if (re.rescheduled) target = re.target;
+  return false;
+}
+
 static SimCoroutine MakeContAssignCoroutine(ContAssignParams params,
                                             SimContext& ctx, Arena& arena) {
   if (!params.lhs || params.lhs->kind != ExprKind::kIdentifier) co_return;
@@ -364,10 +405,7 @@ static SimCoroutine MakeContAssignCoroutine(ContAssignParams params,
       CollectContAssignReadVars(params.rhs);
 
   auto* net = ctx.FindNet(params.lhs->text);
-  ContAssignDriver drv;
-  drv.net = net;
-  drv.driver_idx = net ? net->drivers.size() : 0;
-  drv.first = true;
+  ContAssignDriver drv = MakeContAssignDriver(net);
 
   while (!ctx.StopRequested()) {
     auto val = EvalExpr(params.rhs, ctx, arena, params.width);
@@ -375,22 +413,17 @@ static SimCoroutine MakeContAssignCoroutine(ContAssignParams params,
     if (params.delays.rise) {
       ContAssignDelays d = BuildContAssignDelays(params.delays, ctx, arena);
       Logic4Vec old_val = CurrentContAssignOldValue(params, net, ctx, arena);
-
       uint64_t ticks = SelectContAssignDelay(old_val, val, d, params.width);
+
       if (ticks > 0 && !read_vars.empty()) {
+        InertialLoopCtx loop{params, d, ctx, arena};
         SimTime target = ctx.CurrentTime() + SimTime{ticks};
-        while (true) {
-          uint64_t remaining = (target.ticks > ctx.CurrentTime().ticks)
-                                   ? (target.ticks - ctx.CurrentTime().ticks)
-                                   : 0;
-          if (remaining == 0) break;
-          bool expired =
-              co_await InertialDelayAwaiter{ctx, remaining, read_vars};
-          if (expired) break;
-          InertialReeval re = ReevalInertialContAssign(
-              params, d, PendingContAssignTransition{old_val, val}, ctx, arena);
-          if (re.collapsed) break;
-          if (re.rescheduled) target = re.target;
+        for (uint64_t remaining = RemainingTicks(target, ctx); remaining > 0;
+             remaining = RemainingTicks(target, ctx)) {
+          if (co_await InertialDelayAwaiter{ctx, remaining, read_vars}) break;
+          if (ApplyInertialReeval(
+                  loop, PendingContAssignTransition{old_val, val}, target))
+            break;
         }
       } else if (ticks > 0) {
         co_await DelayAwaiter{ctx, ticks};

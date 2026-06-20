@@ -127,19 +127,21 @@ RsProd Parser::ParseRsProd() {
     prod.case_expr = ParseExpr();
     Expect(TokenKind::kRParen);
     bool seen_default = false;
-    while (!Check(TokenKind::kKwEndcase) && !AtEnd()) {
+    // 18.17.3: a case production statement shall contain at most one default
+    // item; flag any additional default as illegal.
+    auto parse_one_case_item = [&]() {
       auto item_loc = CurrentLoc();
       bool is_default_here = Check(TokenKind::kKwDefault);
       prod.case_items.push_back(ParseRsCaseItem());
-      if (is_default_here) {
-        // 18.17.3: a case production statement shall contain at most one
-        // default item; flag any additional default as illegal.
-        if (seen_default) {
-          diag_.Error(item_loc,
-                      "case production shall have at most one 'default' item");
-        }
-        seen_default = true;
+      if (!is_default_here) return;
+      if (seen_default) {
+        diag_.Error(item_loc,
+                    "case production shall have at most one 'default' item");
       }
+      seen_default = true;
+    };
+    while (!Check(TokenKind::kKwEndcase) && !AtEnd()) {
+      parse_one_case_item();
     }
     Expect(TokenKind::kKwEndcase);
     return prod;
@@ -363,16 +365,23 @@ void Parser::ParseCovergroupFormalList(std::vector<std::string>& names) {
     have_pending = false;
     in_default = false;
   };
-  while (depth > 0 && !AtEnd()) {
+  auto reject_output_inout = [&]() {
+    if (!Check(TokenKind::kKwOutput) && !Check(TokenKind::kKwInout))
+      return false;
+    diag_.Error(CurrentLoc(),
+                "a covergroup formal argument cannot be declared 'output' "
+                "or 'inout'");
+    return true;
+  };
+  // Classify the current token and update the scan state for one step.
+  auto step = [&]() {
     if (Check(TokenKind::kLParen)) {
       ++depth;
     } else if (Check(TokenKind::kRParen)) {
       --depth;
       if (depth == 0) flush();
-    } else if (Check(TokenKind::kKwOutput) || Check(TokenKind::kKwInout)) {
-      diag_.Error(CurrentLoc(),
-                  "a covergroup formal argument cannot be declared 'output' "
-                  "or 'inout'");
+    } else if (reject_output_inout()) {
+      // diagnostic emitted; nothing else to record for this token.
     } else if (depth == 1 && Check(TokenKind::kComma)) {
       flush();
     } else if (depth == 1 && Check(TokenKind::kEq)) {
@@ -383,6 +392,9 @@ void Parser::ParseCovergroupFormalList(std::vector<std::string>& names) {
       pending = CurrentToken().text;
       have_pending = true;
     }
+  };
+  while (depth > 0 && !AtEnd()) {
+    step();
     if (depth > 0) Consume();
   }
   if (Check(TokenKind::kRParen)) Consume();
@@ -401,31 +413,39 @@ void Parser::ParseSampleFormalList(
   SourceLoc pending_loc{};
   bool have_pending = false;
   bool in_default = false;
+  auto reuses_covergroup_formal = [&]() {
+    for (const auto& formal : covergroup_formals) {
+      if (formal == pending) return true;
+    }
+    return false;
+  };
   auto flush = [&]() {
-    if (have_pending) {
-      for (const auto& formal : covergroup_formals) {
-        if (formal == pending) {
-          diag_.Error(pending_loc,
-                      "sample method formal argument '" + std::string(pending) +
-                          "' shares the covergroup argument scope and cannot "
-                          "reuse a covergroup formal-argument name");
-          break;
-        }
-      }
+    if (have_pending && reuses_covergroup_formal()) {
+      diag_.Error(pending_loc,
+                  "sample method formal argument '" + std::string(pending) +
+                      "' shares the covergroup argument scope and cannot "
+                      "reuse a covergroup formal-argument name");
     }
     have_pending = false;
     in_default = false;
   };
-  while (depth > 0 && !AtEnd()) {
+  auto reject_output_inout = [&]() {
+    if (!Check(TokenKind::kKwOutput) && !Check(TokenKind::kKwInout))
+      return false;
+    diag_.Error(CurrentLoc(),
+                "a sample method formal argument cannot designate an output "
+                "direction");
+    return true;
+  };
+  // Classify the current token and update the scan state for one step.
+  auto step = [&]() {
     if (Check(TokenKind::kLParen)) {
       ++depth;
     } else if (Check(TokenKind::kRParen)) {
       --depth;
       if (depth == 0) flush();
-    } else if (Check(TokenKind::kKwOutput) || Check(TokenKind::kKwInout)) {
-      diag_.Error(CurrentLoc(),
-                  "a sample method formal argument cannot designate an output "
-                  "direction");
+    } else if (reject_output_inout()) {
+      // diagnostic emitted; nothing else to record for this token.
     } else if (depth == 1 && Check(TokenKind::kComma)) {
       flush();
     } else if (depth == 1 && Check(TokenKind::kEq)) {
@@ -435,6 +455,9 @@ void Parser::ParseSampleFormalList(
       pending_loc = CurrentLoc();
       have_pending = true;
     }
+  };
+  while (depth > 0 && !AtEnd()) {
+    step();
     if (depth > 0) Consume();
   }
   if (Check(TokenKind::kRParen)) Consume();
