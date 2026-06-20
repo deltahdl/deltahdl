@@ -1,0 +1,413 @@
+#include <format>
+#include <string>
+#include <unordered_map>
+#include <unordered_set>
+#include <vector>
+
+#include "common/arena.h"
+#include "common/diagnostic.h"
+#include "common/source_loc.h"
+#include "elaborator/const_eval.h"
+#include "elaborator/elaborator.h"
+#include "elaborator/rtlir.h"
+#include "elaborator/sensitivity.h"
+#include "parser/ast.h"
+
+namespace delta {
+
+RtlirNet MakeImplicitPortNet(std::string_view name, uint32_t port_width,
+                             bool port_is_signed, NetType default_nettype) {
+  RtlirNet net;
+  net.name = name;
+  // §6.10: an implicit net assumed for a port expression takes the default net
+  // type and the vector width of the port expression declaration.
+  net.net_type = default_nettype;
+  net.width = port_width == 0 ? 1 : port_width;
+  // §23.2.2.1: nets connected to ports without an explicit net declaration are
+  // unsigned unless the port itself is declared signed.
+  net.is_signed = port_is_signed;
+  return net;
+}
+
+uint32_t LookupLhsWidth(const Expr* lhs, const RtlirModule* mod) {
+  if (!lhs || lhs->kind != ExprKind::kIdentifier) return 0;
+  for (const auto& v : mod->variables) {
+    if (v.name == lhs->text) return v.width;
+  }
+  for (const auto& n : mod->nets) {
+    if (n.name == lhs->text) return n.width;
+  }
+  for (const auto& p : mod->ports) {
+    if (p.name == lhs->text) return p.width;
+  }
+  return 0;
+}
+
+RtlirProcessKind MapAlwaysKind(AlwaysKind ak) {
+  switch (ak) {
+    case AlwaysKind::kAlways:
+      return RtlirProcessKind::kAlways;
+    case AlwaysKind::kAlwaysComb:
+      return RtlirProcessKind::kAlwaysComb;
+    case AlwaysKind::kAlwaysFF:
+      return RtlirProcessKind::kAlwaysFF;
+    case AlwaysKind::kAlwaysLatch:
+      return RtlirProcessKind::kAlwaysLatch;
+  }
+  return RtlirProcessKind::kAlwaysComb;
+}
+
+static bool StmtHasForkJoin(const Stmt* stmt) {
+  if (!stmt) return false;
+  if (stmt->kind == StmtKind::kFork) return true;
+  for (const auto* s : stmt->stmts)
+    if (StmtHasForkJoin(s)) return true;
+  if (StmtHasForkJoin(stmt->then_branch)) return true;
+  if (StmtHasForkJoin(stmt->else_branch)) return true;
+  if (StmtHasForkJoin(stmt->body)) return true;
+  if (StmtHasForkJoin(stmt->for_body)) return true;
+  for (const auto& ci : stmt->case_items)
+    if (StmtHasForkJoin(ci.body)) return true;
+  return false;
+}
+
+static bool MayInferLatch(const Stmt* stmt);
+
+static bool MayInferLatchCase(const Stmt* stmt) {
+  bool has_default = false;
+  for (const auto& ci : stmt->case_items)
+    if (ci.is_default) {
+      has_default = true;
+      break;
+    }
+  if (!has_default) return true;
+  for (const auto& ci : stmt->case_items)
+    if (MayInferLatch(ci.body)) return true;
+  return false;
+}
+
+static bool MayInferLatch(const Stmt* stmt) {
+  if (!stmt) return false;
+  switch (stmt->kind) {
+    case StmtKind::kIf:
+      if (!stmt->else_branch) return true;
+      return MayInferLatch(stmt->then_branch) ||
+             MayInferLatch(stmt->else_branch);
+    case StmtKind::kCase:
+      return MayInferLatchCase(stmt);
+    case StmtKind::kBlock:
+      for (const auto* s : stmt->stmts)
+        if (MayInferLatch(s)) return true;
+      return false;
+    default:
+      return false;
+  }
+}
+
+static bool StmtHasTimingControl(const Stmt* stmt) {
+  if (!stmt) return false;
+  switch (stmt->kind) {
+    case StmtKind::kTimingControl:
+    case StmtKind::kDelay:
+    case StmtKind::kEventControl:
+    case StmtKind::kWait:
+    case StmtKind::kWaitFork:
+      return true;
+    case StmtKind::kBlock:
+      for (const auto* s : stmt->stmts)
+        if (StmtHasTimingControl(s)) return true;
+      return false;
+    case StmtKind::kIf:
+      return StmtHasTimingControl(stmt->then_branch) ||
+             StmtHasTimingControl(stmt->else_branch);
+    case StmtKind::kFor:
+      return StmtHasTimingControl(stmt->for_body);
+    case StmtKind::kWhile:
+    case StmtKind::kDoWhile:
+    case StmtKind::kForever:
+    case StmtKind::kRepeat:
+    case StmtKind::kForeach:
+      return StmtHasTimingControl(stmt->body);
+    case StmtKind::kFork:
+      for (const auto* s : stmt->fork_stmts)
+        if (StmtHasTimingControl(s)) return true;
+      return false;
+    default:
+      return false;
+  }
+}
+
+static void ValidateCombLatchProcess(ModuleItem* item, const RtlirProcess& proc,
+                                     RtlirProcessKind kind, DiagEngine& diag) {
+  if (kind != RtlirProcessKind::kAlwaysComb &&
+      kind != RtlirProcessKind::kAlwaysLatch)
+    return;
+  if (StmtHasTimingControl(proc.body)) {
+    const char* kw = (kind == RtlirProcessKind::kAlwaysComb) ? "always_comb"
+                                                             : "always_latch";
+    diag.Error(item->loc,
+               std::format("{} shall not contain timing controls", kw));
+  }
+  if (StmtHasForkJoin(proc.body)) {
+    const char* kw = (kind == RtlirProcessKind::kAlwaysComb) ? "always_comb"
+                                                             : "always_latch";
+    diag.Error(item->loc,
+               std::format("{} shall not contain fork-join statements", kw));
+  }
+  if (kind == RtlirProcessKind::kAlwaysComb && MayInferLatch(proc.body)) {
+    diag.Warning(item->loc,
+                 "always_comb may infer latched behavior; "
+                 "ensure all paths assign all outputs");
+  }
+  if (kind == RtlirProcessKind::kAlwaysLatch && !MayInferLatch(proc.body)) {
+    diag.Warning(item->loc,
+                 "always_latch does not infer latched behavior; "
+                 "ensure incomplete assignments create intended latches");
+  }
+}
+
+static void ValidateAlwaysFFProcess(ModuleItem* item, const RtlirProcess& proc,
+                                    DiagEngine& diag) {
+  if (item->sensitivity.empty()) {
+    diag.Error(item->loc, "always_ff requires an event control");
+  }
+  if (StmtHasTimingControl(proc.body)) {
+    diag.Error(item->loc,
+               "always_ff shall not contain blocking timing controls");
+  }
+  if (StmtHasForkJoin(proc.body)) {
+    diag.Error(item->loc, "always_ff shall not contain fork-join statements");
+  }
+  bool has_edge = false;
+  for (const auto& ev : item->sensitivity) {
+    if (ev.edge == Edge::kPosedge || ev.edge == Edge::kNegedge) {
+      has_edge = true;
+      break;
+    }
+  }
+  if (!item->sensitivity.empty() && !has_edge) {
+    diag.Warning(item->loc,
+                 "always_ff has no edge-sensitive event; "
+                 "may not represent sequential logic");
+  }
+}
+
+static void ValidateFinalProcess(ModuleItem* item, const RtlirProcess& proc,
+                                 DiagEngine& diag) {
+  if (StmtHasTimingControl(proc.body)) {
+    diag.Error(item->loc, "final procedure shall not contain timing controls");
+  }
+  if (StmtHasForkJoin(proc.body)) {
+    diag.Error(item->loc,
+               "final procedure shall not contain fork-join statements");
+  }
+}
+
+void AddProcess(
+    RtlirProcessKind kind, ModuleItem* item, RtlirModule* mod, Arena& arena,
+    DiagEngine& diag,
+    const std::unordered_map<std::string_view, const ModuleItem*>* func_map) {
+  RtlirProcess proc;
+  proc.kind = kind;
+  proc.body = item->body;
+  proc.sensitivity = item->sensitivity;
+  proc.is_star_sensitivity = item->is_star_sensitivity;
+  bool needs_infer = (kind == RtlirProcessKind::kAlwaysComb ||
+                      kind == RtlirProcessKind::kAlwaysLatch);
+  if (needs_infer && proc.sensitivity.empty()) {
+    proc.sensitivity = InferSensitivity(proc.body, arena, func_map);
+  }
+  if (kind == RtlirProcessKind::kAlways && item->is_star_sensitivity &&
+      proc.sensitivity.empty()) {
+    proc.sensitivity = InferSensitivity(proc.body, arena, nullptr, false);
+  }
+
+  if (kind == RtlirProcessKind::kAlways && item->sensitivity.empty() &&
+      !item->is_star_sensitivity && !StmtHasTimingControl(proc.body)) {
+    diag.Warning(item->loc,
+                 "always block has no timing control; may cause "
+                 "a zero-delay loop");
+  }
+  ValidateCombLatchProcess(item, proc, kind, diag);
+  if (kind == RtlirProcessKind::kAlwaysFF) {
+    ValidateAlwaysFFProcess(item, proc, diag);
+  }
+  if (kind == RtlirProcessKind::kFinal) {
+    ValidateFinalProcess(item, proc, diag);
+  }
+
+  proc.attrs = ResolveAttributes(item->attrs, diag);
+  mod->processes.push_back(proc);
+}
+
+static void CollectStmtLhsPrefixes(const Stmt* stmt,
+                                   std::unordered_set<std::string>& out) {
+  if (!stmt) return;
+  if (stmt->kind == StmtKind::kBlockingAssign ||
+      stmt->kind == StmtKind::kNonblockingAssign) {
+    if (stmt->lhs) {
+      std::string prefix = LongestStaticPrefix(stmt->lhs);
+      if (!prefix.empty()) out.insert(std::move(prefix));
+    }
+  }
+  for (const auto* s : stmt->stmts) CollectStmtLhsPrefixes(s, out);
+  CollectStmtLhsPrefixes(stmt->then_branch, out);
+  CollectStmtLhsPrefixes(stmt->else_branch, out);
+  CollectStmtLhsPrefixes(stmt->body, out);
+  CollectStmtLhsPrefixes(stmt->for_body, out);
+  for (auto* fi : stmt->for_inits) CollectStmtLhsPrefixes(fi, out);
+  for (auto* fs : stmt->for_steps) CollectStmtLhsPrefixes(fs, out);
+  for (const auto& ci : stmt->case_items) CollectStmtLhsPrefixes(ci.body, out);
+  for (const auto* s : stmt->fork_stmts) CollectStmtLhsPrefixes(s, out);
+}
+
+static void CollectCallNamesExpr(const Expr* expr,
+                                 std::unordered_set<std::string_view>& out) {
+  if (!expr) return;
+  if (expr->kind == ExprKind::kCall && !expr->callee.empty())
+    out.insert(expr->callee);
+  CollectCallNamesExpr(expr->lhs, out);
+  CollectCallNamesExpr(expr->rhs, out);
+  CollectCallNamesExpr(expr->condition, out);
+  CollectCallNamesExpr(expr->true_expr, out);
+  CollectCallNamesExpr(expr->false_expr, out);
+  CollectCallNamesExpr(expr->base, out);
+  CollectCallNamesExpr(expr->index, out);
+  for (auto* arg : expr->args) CollectCallNamesExpr(arg, out);
+  for (auto* elem : expr->elements) CollectCallNamesExpr(elem, out);
+}
+
+static void CollectCallNamesStmt(const Stmt* stmt,
+                                 std::unordered_set<std::string_view>& out) {
+  if (!stmt) return;
+  CollectCallNamesExpr(stmt->expr, out);
+  CollectCallNamesExpr(stmt->rhs, out);
+  CollectCallNamesExpr(stmt->condition, out);
+  CollectCallNamesExpr(stmt->for_cond, out);
+  for (const auto* s : stmt->stmts) CollectCallNamesStmt(s, out);
+  CollectCallNamesStmt(stmt->then_branch, out);
+  CollectCallNamesStmt(stmt->else_branch, out);
+  CollectCallNamesStmt(stmt->body, out);
+  CollectCallNamesStmt(stmt->for_body, out);
+  for (auto* fi : stmt->for_inits) CollectCallNamesStmt(fi, out);
+  for (auto* fs : stmt->for_steps) CollectCallNamesStmt(fs, out);
+  for (const auto& ci : stmt->case_items) CollectCallNamesStmt(ci.body, out);
+  for (const auto* s : stmt->fork_stmts) CollectCallNamesStmt(s, out);
+}
+
+static void CollectFuncLhsPrefixes(const Stmt* body, const FuncMap& funcs,
+                                   std::unordered_set<std::string>& out) {
+  std::unordered_set<std::string_view> pending;
+  CollectCallNamesStmt(body, pending);
+  std::unordered_set<std::string_view> visited;
+  while (!pending.empty()) {
+    std::unordered_set<std::string_view> next;
+    for (auto& name : pending) {
+      if (visited.count(name)) continue;
+      visited.insert(name);
+      auto it = funcs.find(name);
+      if (it == funcs.end()) continue;
+      for (auto* s : it->second->func_body_stmts) {
+        CollectStmtLhsPrefixes(s, out);
+        CollectCallNamesStmt(s, next);
+      }
+    }
+    pending = std::move(next);
+  }
+}
+
+static bool PrefixesOverlap(const std::string& a, const std::string& b) {
+  if (a == b) return true;
+  if (a.size() < b.size())
+    return b.compare(0, a.size(), a) == 0 &&
+           (b[a.size()] == '.' || b[a.size()] == '[');
+  if (b.size() < a.size())
+    return a.compare(0, b.size(), b) == 0 &&
+           (a[b.size()] == '.' || a[b.size()] == '[');
+  return false;
+}
+
+struct ProcInfo {
+  SourceLoc loc;
+  std::unordered_set<std::string> lhs;
+  ModuleItemKind kind;
+};
+
+static const char* ProcessKindLabel(ModuleItemKind k) {
+  switch (k) {
+    case ModuleItemKind::kAlwaysFFBlock:
+      return "always_ff";
+    case ModuleItemKind::kAlwaysLatchBlock:
+      return "always_latch";
+    default:
+      return "always_comb";
+  }
+}
+
+static void CollectProcessLhsInfo(
+    const ModuleDecl* decl, std::vector<ProcInfo>& procs,
+    std::unordered_set<std::string>& cont_assign_lhs, const FuncMap* func_map) {
+  for (const auto* item : decl->items) {
+    if (item->kind == ModuleItemKind::kAlwaysCombBlock ||
+        item->kind == ModuleItemKind::kAlwaysLatchBlock ||
+        item->kind == ModuleItemKind::kAlwaysFFBlock) {
+      ProcInfo info;
+      info.loc = item->loc;
+      info.kind = item->kind;
+      CollectStmtLhsPrefixes(item->body, info.lhs);
+      if (func_map && !func_map->empty())
+        CollectFuncLhsPrefixes(item->body, *func_map, info.lhs);
+      procs.push_back(std::move(info));
+    }
+    if (item->kind == ModuleItemKind::kContAssign && item->assign_lhs) {
+      std::string prefix = LongestStaticPrefix(item->assign_lhs);
+      if (!prefix.empty()) cont_assign_lhs.insert(std::move(prefix));
+    }
+  }
+}
+
+static void CheckMultiProcDriver(const std::string& prefix, size_t i,
+                                 const std::vector<ProcInfo>& procs,
+                                 DiagEngine& diag) {
+  for (size_t j = i + 1; j < procs.size(); ++j) {
+    for (const auto& other : procs[j].lhs) {
+      if (PrefixesOverlap(prefix, other)) {
+        diag.Error(procs[j].loc,
+                   std::format("variable '{}' driven by multiple "
+                               "always_comb/always_latch/always_ff "
+                               "processes",
+                               prefix));
+        break;
+      }
+    }
+  }
+}
+
+static void CheckDriverConflicts(
+    const std::vector<ProcInfo>& procs,
+    const std::unordered_set<std::string>& cont_assign_lhs, DiagEngine& diag) {
+  for (size_t i = 0; i < procs.size(); ++i) {
+    for (const auto& var : procs[i].lhs) {
+      for (const auto& ca : cont_assign_lhs) {
+        if (PrefixesOverlap(var, ca)) {
+          diag.Error(procs[i].loc,
+                     std::format("variable '{}' driven by {} and "
+                                 "continuous assignment",
+                                 var, ProcessKindLabel(procs[i].kind)));
+          break;
+        }
+      }
+      CheckMultiProcDriver(var, i, procs, diag);
+    }
+  }
+}
+
+void Elaborator::CheckAlwaysCombMultiDriver(const ModuleDecl* decl,
+                                            RtlirModule*) {
+  std::vector<ProcInfo> procs;
+  std::unordered_set<std::string> cont_assign_lhs;
+  CollectProcessLhsInfo(decl, procs, cont_assign_lhs, &func_decls_);
+  CheckDriverConflicts(procs, cont_assign_lhs, diag_);
+}
+
+}  // namespace delta

@@ -1,0 +1,369 @@
+#include <format>
+#include <unordered_map>
+#include <unordered_set>
+
+#include "common/diagnostic.h"
+#include "elaborator/elaborator.h"
+#include "elaborator/elaborator_validate_classes_internal.h"
+#include "elaborator/rtlir.h"
+#include "elaborator/type_eval.h"
+#include "parser/ast.h"
+
+namespace delta {
+
+static bool IsLiteralExpr(ExprKind kind) {
+  return kind == ExprKind::kIntegerLiteral || kind == ExprKind::kRealLiteral ||
+         kind == ExprKind::kTimeLiteral || kind == ExprKind::kStringLiteral ||
+         kind == ExprKind::kUnbasedUnsizedLiteral;
+}
+
+// §7.8.3: an associative array declared with a class index may only be
+// indexed by an object of that class or a class derived from it; a null
+// handle is also valid. Any other index expression is a type error.
+static void CheckClassIndexSelectExpr(
+    const Expr* e,
+    const std::unordered_map<std::string_view, Elaborator::VarArrayInfo>&
+        var_array_info,
+    const std::unordered_map<std::string_view, std::string_view>&
+        class_var_types,
+    const std::unordered_set<std::string_view>& class_names,
+    const CompilationUnit* unit, DiagEngine& diag) {
+  if (!e) return;
+  if (e->kind == ExprKind::kSelect && e->base && e->index &&
+      e->base->kind == ExprKind::kIdentifier) {
+    auto it = var_array_info.find(e->base->text);
+    if (it != var_array_info.end() && it->second.is_assoc &&
+        class_names.count(it->second.assoc_index_type) > 0) {
+      const Expr* idx = e->index;
+      auto index_class = it->second.assoc_index_type;
+      bool is_null = idx->kind == ExprKind::kIdentifier && idx->text == "null";
+      bool illegal = false;
+      if (!is_null) {
+        if (IsLiteralExpr(idx->kind)) {
+          illegal = true;
+        } else if (idx->kind == ExprKind::kIdentifier) {
+          auto vt = class_var_types.find(idx->text);
+          if (vt != class_var_types.end() &&
+              !IsClassDerivedFrom(vt->second, index_class, unit)) {
+            illegal = true;
+          }
+        }
+      }
+      if (illegal) {
+        diag.Error(
+            e->range.start,
+            std::format("class-indexed associative array '{}' shall be "
+                        "indexed by an object of class '{}' or a derived class",
+                        e->base->text, index_class));
+      }
+    }
+  }
+  CheckClassIndexSelectExpr(e->lhs, var_array_info, class_var_types,
+                            class_names, unit, diag);
+  CheckClassIndexSelectExpr(e->rhs, var_array_info, class_var_types,
+                            class_names, unit, diag);
+  CheckClassIndexSelectExpr(e->base, var_array_info, class_var_types,
+                            class_names, unit, diag);
+  CheckClassIndexSelectExpr(e->index, var_array_info, class_var_types,
+                            class_names, unit, diag);
+  CheckClassIndexSelectExpr(e->condition, var_array_info, class_var_types,
+                            class_names, unit, diag);
+  CheckClassIndexSelectExpr(e->true_expr, var_array_info, class_var_types,
+                            class_names, unit, diag);
+  CheckClassIndexSelectExpr(e->false_expr, var_array_info, class_var_types,
+                            class_names, unit, diag);
+  for (const auto* elem : e->elements) {
+    CheckClassIndexSelectExpr(elem, var_array_info, class_var_types,
+                              class_names, unit, diag);
+  }
+}
+
+static void WalkStmtsForClassIndexSelect(
+    const Stmt* s,
+    const std::unordered_map<std::string_view, Elaborator::VarArrayInfo>&
+        var_array_info,
+    const std::unordered_map<std::string_view, std::string_view>&
+        class_var_types,
+    const std::unordered_set<std::string_view>& class_names,
+    const CompilationUnit* unit, DiagEngine& diag) {
+  if (!s) return;
+  CheckClassIndexSelectExpr(s->lhs, var_array_info, class_var_types,
+                            class_names, unit, diag);
+  CheckClassIndexSelectExpr(s->rhs, var_array_info, class_var_types,
+                            class_names, unit, diag);
+  CheckClassIndexSelectExpr(s->expr, var_array_info, class_var_types,
+                            class_names, unit, diag);
+  CheckClassIndexSelectExpr(s->condition, var_array_info, class_var_types,
+                            class_names, unit, diag);
+  for (auto* sub : s->stmts)
+    WalkStmtsForClassIndexSelect(sub, var_array_info, class_var_types,
+                                 class_names, unit, diag);
+  WalkStmtsForClassIndexSelect(s->then_branch, var_array_info, class_var_types,
+                               class_names, unit, diag);
+  WalkStmtsForClassIndexSelect(s->else_branch, var_array_info, class_var_types,
+                               class_names, unit, diag);
+  WalkStmtsForClassIndexSelect(s->body, var_array_info, class_var_types,
+                               class_names, unit, diag);
+  WalkStmtsForClassIndexSelect(s->for_body, var_array_info, class_var_types,
+                               class_names, unit, diag);
+  for (auto& ci : s->case_items)
+    WalkStmtsForClassIndexSelect(ci.body, var_array_info, class_var_types,
+                                 class_names, unit, diag);
+}
+
+void Elaborator::ValidateClassIndexSelect(const ModuleDecl* decl) {
+  bool has_class_index = false;
+  for (const auto& entry : var_array_info_) {
+    const auto& info = entry.second;
+    if (info.is_assoc && class_names_.count(info.assoc_index_type) > 0) {
+      has_class_index = true;
+      break;
+    }
+  }
+  if (!has_class_index) return;
+  for (const auto* item : decl->items) {
+    if (item->kind == ModuleItemKind::kContAssign) {
+      CheckClassIndexSelectExpr(item->assign_lhs, var_array_info_,
+                                class_var_types_, class_names_, unit_, diag_);
+      CheckClassIndexSelectExpr(item->assign_rhs, var_array_info_,
+                                class_var_types_, class_names_, unit_, diag_);
+    }
+    bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
+                   item->kind == ModuleItemKind::kInitialBlock;
+    if (is_proc && item->body) {
+      WalkStmtsForClassIndexSelect(item->body, var_array_info_,
+                                   class_var_types_, class_names_, unit_,
+                                   diag_);
+    }
+  }
+}
+
+// §7.8.2: an associative array declared with a string index may only be
+// indexed by a string or a string literal of any length. Any other index
+// expression type is a type check error. An empty string literal is a string
+// literal and therefore valid.
+static void CheckStringIndexSelectExpr(
+    const Expr* e,
+    const std::unordered_map<std::string_view, Elaborator::VarArrayInfo>&
+        var_array_info,
+    const TypeMap& var_types, DiagEngine& diag) {
+  if (!e) return;
+  // Plain element selects only; a slice on an associative array is reported
+  // separately, so skip it here to avoid a second diagnostic on one site.
+  if (e->kind == ExprKind::kSelect && e->base && e->index &&
+      e->base->kind == ExprKind::kIdentifier && !IsSliceSelect(e)) {
+    auto it = var_array_info.find(e->base->text);
+    if (it != var_array_info.end() && it->second.is_assoc &&
+        it->second.assoc_index_type == "string") {
+      const Expr* idx = e->index;
+      bool illegal = false;
+      if (idx->kind == ExprKind::kStringLiteral) {
+        // A string literal of any length, including "", is a valid index.
+      } else if (IsLiteralExpr(idx->kind)) {
+        // Any other literal (integer, real, time, unbased-unsized) is a
+        // different type.
+        illegal = true;
+      } else if (idx->kind == ExprKind::kIdentifier) {
+        auto vt = var_types.find(idx->text);
+        if (vt != var_types.end() && vt->second != DataTypeKind::kString) {
+          illegal = true;
+        }
+      }
+      if (illegal) {
+        diag.Error(e->range.start,
+                   std::format("string-indexed associative array '{}' shall be "
+                               "indexed by a string or string literal",
+                               e->base->text));
+      }
+    }
+  }
+  CheckStringIndexSelectExpr(e->lhs, var_array_info, var_types, diag);
+  CheckStringIndexSelectExpr(e->rhs, var_array_info, var_types, diag);
+  CheckStringIndexSelectExpr(e->base, var_array_info, var_types, diag);
+  CheckStringIndexSelectExpr(e->index, var_array_info, var_types, diag);
+  CheckStringIndexSelectExpr(e->condition, var_array_info, var_types, diag);
+  CheckStringIndexSelectExpr(e->true_expr, var_array_info, var_types, diag);
+  CheckStringIndexSelectExpr(e->false_expr, var_array_info, var_types, diag);
+  for (const auto* elem : e->elements) {
+    CheckStringIndexSelectExpr(elem, var_array_info, var_types, diag);
+  }
+}
+
+static void WalkStmtsForStringIndexSelect(
+    const Stmt* s,
+    const std::unordered_map<std::string_view, Elaborator::VarArrayInfo>&
+        var_array_info,
+    const TypeMap& var_types, DiagEngine& diag) {
+  if (!s) return;
+  CheckStringIndexSelectExpr(s->lhs, var_array_info, var_types, diag);
+  CheckStringIndexSelectExpr(s->rhs, var_array_info, var_types, diag);
+  CheckStringIndexSelectExpr(s->expr, var_array_info, var_types, diag);
+  CheckStringIndexSelectExpr(s->condition, var_array_info, var_types, diag);
+  for (auto* sub : s->stmts)
+    WalkStmtsForStringIndexSelect(sub, var_array_info, var_types, diag);
+  WalkStmtsForStringIndexSelect(s->then_branch, var_array_info, var_types,
+                                diag);
+  WalkStmtsForStringIndexSelect(s->else_branch, var_array_info, var_types,
+                                diag);
+  WalkStmtsForStringIndexSelect(s->body, var_array_info, var_types, diag);
+  WalkStmtsForStringIndexSelect(s->for_body, var_array_info, var_types, diag);
+  for (auto& ci : s->case_items)
+    WalkStmtsForStringIndexSelect(ci.body, var_array_info, var_types, diag);
+}
+
+void Elaborator::ValidateStringIndexSelect(const ModuleDecl* decl) {
+  bool has_string_index = false;
+  for (const auto& entry : var_array_info_) {
+    const auto& info = entry.second;
+    if (info.is_assoc && info.assoc_index_type == "string") {
+      has_string_index = true;
+      break;
+    }
+  }
+  if (!has_string_index) return;
+  for (const auto* item : decl->items) {
+    if (item->kind == ModuleItemKind::kContAssign) {
+      CheckStringIndexSelectExpr(item->assign_lhs, var_array_info_, var_types_,
+                                 diag_);
+      CheckStringIndexSelectExpr(item->assign_rhs, var_array_info_, var_types_,
+                                 diag_);
+    }
+    bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
+                   item->kind == ModuleItemKind::kInitialBlock;
+    if (is_proc && item->body) {
+      WalkStmtsForStringIndexSelect(item->body, var_array_info_, var_types_,
+                                    diag_);
+    }
+  }
+}
+
+// §7.8.4: indexing an integral-index associative array casts the index
+// expression to the index type, but an implicit cast from a real or shortreal
+// expression is illegal. Flag any element select on such an array whose index
+// is a nonintegral (real) expression.
+static void CheckIntegralIndexSelectExpr(
+    const Expr* e, const std::unordered_set<std::string_view>& integral_names,
+    const TypeMap& var_types, DiagEngine& diag) {
+  if (!e) return;
+  if (e->kind == ExprKind::kSelect && e->base && e->index &&
+      e->base->kind == ExprKind::kIdentifier && !IsSliceSelect(e) &&
+      integral_names.count(e->base->text) &&
+      IsNonintegralIndex(e->index, var_types)) {
+    diag.Error(e->index->range.start,
+               std::format("real or shortreal index is not allowed on "
+                           "integral-indexed associative array '{}'",
+                           e->base->text));
+  }
+  CheckIntegralIndexSelectExpr(e->lhs, integral_names, var_types, diag);
+  CheckIntegralIndexSelectExpr(e->rhs, integral_names, var_types, diag);
+  CheckIntegralIndexSelectExpr(e->base, integral_names, var_types, diag);
+  CheckIntegralIndexSelectExpr(e->index, integral_names, var_types, diag);
+  CheckIntegralIndexSelectExpr(e->condition, integral_names, var_types, diag);
+  CheckIntegralIndexSelectExpr(e->true_expr, integral_names, var_types, diag);
+  CheckIntegralIndexSelectExpr(e->false_expr, integral_names, var_types, diag);
+  for (const auto* elem : e->elements) {
+    CheckIntegralIndexSelectExpr(elem, integral_names, var_types, diag);
+  }
+}
+
+static void WalkStmtsForIntegralIndexSelect(
+    const Stmt* s, const std::unordered_set<std::string_view>& integral_names,
+    const TypeMap& var_types, DiagEngine& diag) {
+  if (!s) return;
+  CheckIntegralIndexSelectExpr(s->lhs, integral_names, var_types, diag);
+  CheckIntegralIndexSelectExpr(s->rhs, integral_names, var_types, diag);
+  CheckIntegralIndexSelectExpr(s->expr, integral_names, var_types, diag);
+  CheckIntegralIndexSelectExpr(s->condition, integral_names, var_types, diag);
+  for (auto* sub : s->stmts)
+    WalkStmtsForIntegralIndexSelect(sub, integral_names, var_types, diag);
+  WalkStmtsForIntegralIndexSelect(s->then_branch, integral_names, var_types,
+                                  diag);
+  WalkStmtsForIntegralIndexSelect(s->else_branch, integral_names, var_types,
+                                  diag);
+  WalkStmtsForIntegralIndexSelect(s->body, integral_names, var_types, diag);
+  WalkStmtsForIntegralIndexSelect(s->for_body, integral_names, var_types, diag);
+  for (auto& ci : s->case_items)
+    WalkStmtsForIntegralIndexSelect(ci.body, integral_names, var_types, diag);
+}
+
+void Elaborator::ValidateIntegralIndexSelect(const ModuleDecl* decl) {
+  auto is_builtin_integral = [](std::string_view t) {
+    return t == "int" || t == "integer" || t == "byte" || t == "shortint" ||
+           t == "longint";
+  };
+  std::unordered_set<std::string_view> integral_names;
+  for (const auto& [name, info] : var_array_info_) {
+    if (!info.is_assoc) continue;
+    auto t = info.assoc_index_type;
+    if (t == "string" || t == "*" || class_names_.count(t)) continue;
+    bool integral = is_builtin_integral(t);
+    if (!integral) {
+      auto it = typedefs_.find(t);
+      integral = it != typedefs_.end() && IsIntegralType(it->second.kind);
+    }
+    if (integral) integral_names.insert(name);
+  }
+  if (integral_names.empty()) return;
+  for (const auto* item : decl->items) {
+    if (item->kind == ModuleItemKind::kContAssign) {
+      CheckIntegralIndexSelectExpr(item->assign_lhs, integral_names, var_types_,
+                                   diag_);
+      CheckIntegralIndexSelectExpr(item->assign_rhs, integral_names, var_types_,
+                                   diag_);
+    }
+    bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
+                   item->kind == ModuleItemKind::kInitialBlock;
+    if (is_proc && item->body) {
+      WalkStmtsForIntegralIndexSelect(item->body, integral_names, var_types_,
+                                      diag_);
+    }
+  }
+}
+
+static bool ContainsRealType(const DataType& dtype, const TypedefMap& tds,
+                             int depth = 0) {
+  // Guard against a pathological recursive typedef chain; a legitimate type
+  // nests only a handful of levels deep.
+  if (depth > 16) return false;
+  if (dtype.kind == DataTypeKind::kNamed) {
+    auto it = tds.find(dtype.type_name);
+    if (it != tds.end()) return ContainsRealType(it->second, tds, depth + 1);
+    return false;
+  }
+  if (IsRealType(dtype.kind)) return true;
+  for (const auto& m : dtype.struct_members) {
+    if (IsRealType(m.type_kind)) return true;
+    // A member written through a typedef only reveals a real after the alias is
+    // resolved, so follow a named member type into the typedef table and check
+    // whatever it ultimately denotes (including a nested struct that holds
+    // one).
+    if (m.type_kind == DataTypeKind::kNamed) {
+      auto it = tds.find(m.type_name);
+      if (it != tds.end() && ContainsRealType(it->second, tds, depth + 1))
+        return true;
+    }
+  }
+  return false;
+}
+
+void Elaborator::ValidateAssocIndexType(const ModuleItem* item) {
+  if (item->unpacked_dims.empty()) return;
+  auto* dim = item->unpacked_dims[0];
+  if (!dim || dim->kind != ExprKind::kIdentifier) return;
+  auto t = dim->text;
+  if (t == "real" || t == "shortreal" || t == "realtime") {
+    diag_.Error(item->loc,
+                "real or shortreal type shall not be used as an "
+                "associative array index type");
+    return;
+  }
+
+  auto it = typedefs_.find(t);
+  if (it != typedefs_.end() && ContainsRealType(it->second, typedefs_)) {
+    diag_.Error(item->loc,
+                "real or shortreal type shall not be used as an "
+                "associative array index type");
+  }
+}
+
+}  // namespace delta

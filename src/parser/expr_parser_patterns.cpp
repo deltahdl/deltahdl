@@ -1,3 +1,4 @@
+#include "parser/expr_parser_internal.h"
 #include "parser/parser.h"
 
 namespace delta {
@@ -76,6 +77,131 @@ Expr* Parser::ParseInsideValueRange() {
   range->index_end = ParseExpr();
   Expect(TokenKind::kRBracket);
   return range;
+}
+
+static bool IsAssignmentPatternKey(TokenKind k) {
+  switch (k) {
+    case TokenKind::kIdentifier:
+    case TokenKind::kKwDefault:
+    case TokenKind::kIntLiteral:
+    case TokenKind::kKwInt:
+    case TokenKind::kKwReal:
+    case TokenKind::kKwLogic:
+    case TokenKind::kKwByte:
+    case TokenKind::kKwShortint:
+    case TokenKind::kKwLongint:
+    case TokenKind::kKwShortreal:
+    case TokenKind::kKwInteger:
+    case TokenKind::kKwBit:
+    case TokenKind::kKwReg:
+    case TokenKind::kKwTime:
+    case TokenKind::kKwRealtime:
+    case TokenKind::kKwString:
+    case TokenKind::kStringLiteral:
+      return true;
+    default:
+      return false;
+  }
+}
+
+Expr* Parser::ParsePatternReplication(Expr* count, SourceLoc loc) {
+  Consume();
+  auto* rep = arena_.Create<Expr>();
+  rep->kind = ExprKind::kReplicate;
+  rep->repeat_count = count;
+  rep->range.start = loc;
+  rep->elements.push_back(ParseExpr());
+  while (Match(TokenKind::kComma)) {
+    rep->elements.push_back(ParseExpr());
+  }
+  Expect(TokenKind::kRBrace);
+  return rep;
+}
+
+bool Parser::ParseFirstPatternElement(Expr* pat, bool& named) {
+  if (Check(TokenKind::kDot)) {
+    auto loc = CurrentLoc();
+    Consume();
+    auto name = ExpectIdentifier();
+    auto* id = arena_.Create<Expr>();
+    id->kind = ExprKind::kIdentifier;
+    id->text = name.text;
+    id->range.start = loc;
+    pat->elements.push_back(id);
+    return true;
+  }
+  auto first = CurrentToken();
+  if (!IsAssignmentPatternKey(first.kind)) {
+    pat->elements.push_back(ParseExpr());
+    return true;
+  }
+  Consume();
+  if (Check(TokenKind::kColon)) {
+    named = true;
+    pat->pattern_keys.push_back(first.text);
+    Consume();
+    pat->elements.push_back(ParseExpr());
+    return true;
+  }
+  auto* id = arena_.Create<Expr>();
+  if (first.kind == TokenKind::kIntLiteral) {
+    id->kind = ExprKind::kIntegerLiteral;
+    id->text = first.text;
+    id->int_val = ParseIntText(first.text);
+  } else {
+    id->kind = ExprKind::kIdentifier;
+    id->text = first.text;
+  }
+  id->range.start = first.loc;
+  pat->elements.push_back(ParseInfixBp(id, 0));
+  return true;
+}
+
+Expr* Parser::ParseAssignmentPattern() {
+  auto loc = CurrentLoc();
+  Expect(TokenKind::kApostropheLBrace);
+  auto* pat = arena_.Create<Expr>();
+  pat->kind = ExprKind::kAssignmentPattern;
+  pat->range.start = loc;
+
+  if (Check(TokenKind::kRBrace)) {
+    Consume();
+    return pat;
+  }
+
+  bool named = false;
+  ParseFirstPatternElement(pat, named);
+
+  if (!named && Check(TokenKind::kLBrace)) {
+    auto* count = pat->elements[0];
+    pat->elements.clear();
+    pat->elements.push_back(ParsePatternReplication(count, loc));
+    Expect(TokenKind::kRBrace);
+    return pat;
+  }
+
+  while (Match(TokenKind::kComma)) {
+    if (named) {
+      auto key_tok = Consume();
+      pat->pattern_keys.push_back(key_tok.text);
+      Expect(TokenKind::kColon);
+    }
+
+    if (Check(TokenKind::kDot)) {
+      Consume();
+      auto name = ExpectIdentifier();
+      auto* id = arena_.Create<Expr>();
+      id->kind = ExprKind::kIdentifier;
+      id->text = name.text;
+      id->range.start = name.loc;
+      pat->elements.push_back(id);
+    } else {
+      pat->elements.push_back(ParseExpr());
+    }
+  }
+
+  Expect(TokenKind::kRBrace);
+  return pat;
 }
 
 }  // namespace delta
