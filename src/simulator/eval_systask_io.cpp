@@ -236,8 +236,8 @@ static bool ScanArgHasUnknownBits(const Expr* arg, SimContext& ctx,
 
 // §21.3.4.3: pack a matched string/character field into a destination, placing
 // the leftmost character in the most significant byte.
-static Logic4Vec ScanStringToVec(Arena& arena, const std::string& str,
-                                 uint32_t width) {
+Logic4Vec ScanStringToVec(Arena& arena, const std::string& str,
+                          uint32_t width) {
   auto vec = MakeLogic4VecVal(arena, width, 0);
   for (size_t i = 0; i < str.size() && i * 8 < width; ++i) {
     auto byte_idx = static_cast<uint32_t>(str.size() - 1 - i);
@@ -253,7 +253,7 @@ static Logic4Vec ScanStringToVec(Arena& arena, const std::string& str,
 
 // §21.3.4.3: store a converted real value (its IEEE-754 bit pattern) into a
 // real destination.
-static void StoreRealField(Variable* var, Arena& arena, double d) {
+void StoreRealField(Variable* var, Arena& arena, double d) {
   if (!var) return;
   uint64_t bits = 0;
   std::memcpy(&bits, &d, sizeof(double));
@@ -266,9 +266,9 @@ static void StoreRealField(Variable* var, Arena& arena, double d) {
 // §21.3.4.3 scan engine shared in spirit with $fscanf. Interprets `fmt` against
 // `input`, assigning converted fields to the destination arguments; returns the
 // count of assigned items and reports the consumed input length.
-static uint32_t RunScanf(const std::string& input, const std::string& fmt,
-                         Expr* const* dest, size_t ndest, SimContext& ctx,
-                         Arena& arena, size_t& consumed) {
+uint32_t RunScanf(const std::string& input, const std::string& fmt,
+                  Expr* const* dest, size_t ndest, SimContext& ctx,
+                  Arena& arena, size_t& consumed) {
   size_t pos = 0;
   size_t ai = 0;
   uint32_t matched = 0;

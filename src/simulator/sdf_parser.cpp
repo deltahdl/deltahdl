@@ -93,25 +93,33 @@ static bool Expect(std::string_view& s, SdfTokKind kind) {
   return tok.kind == kind;
 }
 
+// Fills a triple (min:typ:max) into `dv` given an already-parsed leading
+// numeric token `first`. All three fields default to `first`; if a ':' follows
+// the leading value, the optional typ and max values override the defaults.
+static void ParseSdfDelayTypMax(std::string_view& s, const SdfToken& first,
+                                SdfDelayValue& dv) {
+  dv.min_val = first.num_val;
+  dv.typ_val = first.num_val;
+  dv.max_val = first.num_val;
+
+  SkipWhitespace(s);
+  if (!s.empty() && s[0] == ':') {
+    Expect(s, SdfTokKind::kColon);
+    auto typ = NextSdfToken(s);
+    if (typ.kind == SdfTokKind::kNumber) dv.typ_val = typ.num_val;
+    Expect(s, SdfTokKind::kColon);
+    auto max_tok = NextSdfToken(s);
+    if (max_tok.kind == SdfTokKind::kNumber) dv.max_val = max_tok.num_val;
+  }
+}
+
 static SdfDelayValue ParseDelayVal(std::string_view& s) {
   SdfDelayValue dv;
 
   if (!Expect(s, SdfTokKind::kLParen)) return dv;
   auto first = NextSdfToken(s);
   if (first.kind == SdfTokKind::kNumber) {
-    dv.min_val = first.num_val;
-    dv.typ_val = first.num_val;
-    dv.max_val = first.num_val;
-
-    SkipWhitespace(s);
-    if (!s.empty() && s[0] == ':') {
-      Expect(s, SdfTokKind::kColon);
-      auto typ = NextSdfToken(s);
-      if (typ.kind == SdfTokKind::kNumber) dv.typ_val = typ.num_val;
-      Expect(s, SdfTokKind::kColon);
-      auto max_tok = NextSdfToken(s);
-      if (max_tok.kind == SdfTokKind::kNumber) dv.max_val = max_tok.num_val;
-    }
+    ParseSdfDelayTypMax(s, first, dv);
   }
   Expect(s, SdfTokKind::kRParen);
   return dv;
@@ -163,19 +171,8 @@ static SdfDelayValue ParseDelayValOrEmpty(std::string_view& s, bool* present) {
   }
   auto first = NextSdfToken(s);
   if (first.kind == SdfTokKind::kNumber) {
-    dv.min_val = first.num_val;
-    dv.typ_val = first.num_val;
-    dv.max_val = first.num_val;
     *present = true;
-    SkipWhitespace(s);
-    if (!s.empty() && s[0] == ':') {
-      Expect(s, SdfTokKind::kColon);
-      auto typ = NextSdfToken(s);
-      if (typ.kind == SdfTokKind::kNumber) dv.typ_val = typ.num_val;
-      Expect(s, SdfTokKind::kColon);
-      auto max_tok = NextSdfToken(s);
-      if (max_tok.kind == SdfTokKind::kNumber) dv.max_val = max_tok.num_val;
-    }
+    ParseSdfDelayTypMax(s, first, dv);
   }
   Expect(s, SdfTokKind::kRParen);
   return dv;

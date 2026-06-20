@@ -11,6 +11,7 @@
 #include "elaborator/annex_f_local_variable_flow.h"
 #include "elaborator/annex_f_sequence_rewrite.h"
 #include "elaborator/annex_f_tight_satisfaction.h"
+#include "elaborator/annex_f_word_ops_internal.h"
 
 namespace delta {
 
@@ -83,6 +84,15 @@ void AddUnique(std::vector<LocalContext>& out, LocalContext context) {
     }
   }
   out.push_back(std::move(context));
+}
+
+// AddUnique each of `branches` into `out`. Used by the repeat rules to fold a
+// single-piece (j = 1) match into the result before peeling longer chains.
+void AppendUniqueBranches(std::vector<LocalContext>& out,
+                          std::vector<LocalContext> branches) {
+  for (LocalContext& branch : branches) {
+    AddUnique(out, std::move(branch));
+  }
 }
 
 // §F.5.5: the union L'|_D' U L''|_D'' used by the intersect rule. The remark in
@@ -255,9 +265,8 @@ std::vector<LocalContext> OutputsForSlice(const Word& word, std::size_t lo,
       // contexts chain L_0 = L_(0), ..., L_(j) = L_1 with each wi, L_(i-1),
       // L_(i) |== R. One piece covering the whole slice is the j = 1 case;
       // longer chains peel off a nonempty first piece and recurse.
-      for (LocalContext out : OutputsForSlice(word, lo, hi, *seq.lhs, input)) {
-        AddUnique(result, std::move(out));
-      }
+      AppendUniqueBranches(result,
+                           OutputsForSlice(word, lo, hi, *seq.lhs, input));
       for (std::size_t mid = lo + 1; mid < hi; ++mid) {
         for (const LocalContext& mid_ctx :
              OutputsForSlice(word, lo, mid, *seq.lhs, input)) {
@@ -276,9 +285,8 @@ std::vector<LocalContext> OutputsForSlice(const Word& word, std::size_t lo,
         result.push_back(input);
         return result;
       }
-      for (LocalContext out : OutputsForSlice(word, lo, hi, *seq.lhs, input)) {
-        AddUnique(result, std::move(out));
-      }
+      AppendUniqueBranches(result,
+                           OutputsForSlice(word, lo, hi, *seq.lhs, input));
       for (std::size_t mid = lo + 1; mid < hi; ++mid) {
         for (const LocalContext& mid_ctx :
              OutputsForSlice(word, lo, mid, *seq.lhs, input)) {
@@ -296,87 +304,6 @@ std::vector<LocalContext> OutputsForSlice(const Word& word, std::size_t lo,
       return result;
   }
   return result;
-}
-
-// Collect the atomic propositions mentioned by a sequence and count its
-// match-bearing leaves, bounding the nondegeneracy witness search.
-void CollectAtoms(const BooleanExpr& b, std::set<std::string>& out) {
-  switch (b.kind) {
-    case BooleanExpr::Kind::kTrue:
-      return;
-    case BooleanExpr::Kind::kAtom:
-      out.insert(b.atom);
-      return;
-    case BooleanExpr::Kind::kNot:
-      CollectAtoms(*b.operand_a, out);
-      return;
-    case BooleanExpr::Kind::kAnd:
-      CollectAtoms(*b.operand_a, out);
-      CollectAtoms(*b.operand_b, out);
-      return;
-  }
-}
-
-void CollectSequenceAtoms(const SequenceExpr& seq, std::set<std::string>& out,
-                          std::size_t& leaf_count) {
-  if (seq.kind == SequenceExpr::Kind::kBoolean && seq.boolean != nullptr) {
-    CollectAtoms(*seq.boolean, out);
-    ++leaf_count;
-  }
-  if (seq.kind == SequenceExpr::Kind::kClock && seq.boolean != nullptr) {
-    CollectAtoms(*seq.boolean, out);
-  }
-  if (seq.kind == SequenceExpr::Kind::kLocalVarSampling) {
-    ++leaf_count;
-  }
-  if (seq.lhs != nullptr) {
-    CollectSequenceAtoms(*seq.lhs, out, leaf_count);
-  }
-  if (seq.rhs != nullptr) {
-    CollectSequenceAtoms(*seq.rhs, out, leaf_count);
-  }
-}
-
-// The candidate alphabet for the witness search: T, _|_, and every subset of
-// the mentioned atoms. The enumeration is capped so the search stays finite.
-std::vector<Letter> CandidateAlphabet(const std::set<std::string>& atoms) {
-  std::vector<Letter> letters{LetterTop(), LetterBottom()};
-  std::vector<std::string> names(atoms.begin(), atoms.end());
-  if (names.size() > 6) {
-    return letters;
-  }
-  const std::size_t subset_count = std::size_t{1} << names.size();
-  for (std::size_t mask = 0; mask < subset_count; ++mask) {
-    std::set<std::string> subset;
-    for (std::size_t i = 0; i < names.size(); ++i) {
-      if ((mask & (std::size_t{1} << i)) != 0) {
-        subset.insert(names[i]);
-      }
-    }
-    letters.push_back(LetterAtoms(std::move(subset)));
-  }
-  return letters;
-}
-
-bool SomeWordOfLengthSatisfies(const std::vector<Letter>& alphabet,
-                               std::size_t length, const SequenceExpr& seq) {
-  const std::size_t base = alphabet.size();
-  std::size_t total = 1;
-  for (std::size_t i = 0; i < length; ++i) {
-    total *= base;
-  }
-  for (std::size_t code = 0; code < total; ++code) {
-    Word word(length);
-    std::size_t rest = code;
-    for (std::size_t pos = 0; pos < length; ++pos) {
-      word[pos] = alphabet[rest % base];
-      rest /= base;
-    }
-    if (!OutputsForSlice(word, 0, length, seq, LocalContext{}).empty()) {
-      return true;
-    }
-  }
-  return false;
 }
 
 }  // namespace
@@ -419,7 +346,12 @@ bool IsNondegenerateSequenceWithLocals(const SequenceExpr& sequence) {
   const std::vector<Letter> alphabet = CandidateAlphabet(atoms);
   const std::size_t max_length = leaf_count + 2;
   for (std::size_t length = 1; length <= max_length; ++length) {
-    if (SomeWordOfLengthSatisfies(alphabet, length, *target)) {
+    if (SomeWordOfLengthSatisfies(
+            alphabet, length, *target,
+            [](const Word& word, std::size_t length, const SequenceExpr& seq) {
+              return !OutputsForSlice(word, 0, length, seq, LocalContext{})
+                          .empty();
+            })) {
       return true;
     }
   }

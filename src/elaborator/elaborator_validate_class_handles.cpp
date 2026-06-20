@@ -158,12 +158,12 @@ static void CheckClassHandleExpr(
   }
 }
 
-static void CheckInterfaceHandleRandConstraintMode(
-    const Stmt* s,
-    const std::unordered_map<std::string_view, std::string_view>& var_types,
-    const CompilationUnit* unit, DiagEngine& diag) {
-  if (!s) return;
-
+// Extracts the call expression a statement evaluates (directly as an expression
+// statement or as the right-hand side of a blocking/nonblocking assignment),
+// unwrapping a single enclosing cast. Returns nullptr when the statement does
+// not evaluate a call.
+static const Expr* ExtractCallFromStmt(const Stmt* s) {
+  if (!s) return nullptr;
   const Expr* call = nullptr;
   if (s->kind == StmtKind::kExprStmt && s->expr) {
     call = s->expr;
@@ -172,9 +172,17 @@ static void CheckInterfaceHandleRandConstraintMode(
              s->rhs) {
     call = s->rhs;
   }
-
   if (call && call->kind == ExprKind::kCast && call->lhs) call = call->lhs;
-  if (!call || call->kind != ExprKind::kCall) return;
+  if (!call || call->kind != ExprKind::kCall) return nullptr;
+  return call;
+}
+
+static void CheckInterfaceHandleRandConstraintMode(
+    const Stmt* s,
+    const std::unordered_map<std::string_view, std::string_view>& var_types,
+    const CompilationUnit* unit, DiagEngine& diag) {
+  const Expr* call = ExtractCallFromStmt(s);
+  if (!call) return;
   const Expr* callee = call->lhs;
   if (!callee || callee->kind != ExprKind::kMemberAccess) return;
   if (!callee->lhs || callee->lhs->kind != ExprKind::kIdentifier) return;
@@ -201,18 +209,8 @@ static void CheckNamedConstraintModeExists(
     const Stmt* s,
     const std::unordered_map<std::string_view, std::string_view>& var_types,
     const CompilationUnit* unit, DiagEngine& diag) {
-  if (!s) return;
-
-  const Expr* call = nullptr;
-  if (s->kind == StmtKind::kExprStmt && s->expr) {
-    call = s->expr;
-  } else if ((s->kind == StmtKind::kBlockingAssign ||
-              s->kind == StmtKind::kNonblockingAssign) &&
-             s->rhs) {
-    call = s->rhs;
-  }
-  if (call && call->kind == ExprKind::kCast && call->lhs) call = call->lhs;
-  if (!call || call->kind != ExprKind::kCall) return;
+  const Expr* call = ExtractCallFromStmt(s);
+  if (!call) return;
 
   // callee must be <object>.<constraint_id>.constraint_mode
   const Expr* callee = call->lhs;

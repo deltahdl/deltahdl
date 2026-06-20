@@ -196,30 +196,27 @@ static void CollectExprVars(const Expr* expr, SimContext& ctx,
   for (auto* a : expr->args) CollectExprVars(a, ctx, vars);
 }
 
-StmtResult ExecForceOrAssignImpl(const Stmt* stmt, SimContext& ctx,
-                                 Arena& arena) {
-  if (!stmt->lhs) return StmtResult::kDone;
-  auto* var = ResolveLhsVariable(stmt->lhs, ctx);
-  if (!var) return StmtResult::kDone;
-
-  auto rhs_val = EvalExpr(stmt->rhs, ctx, arena);
+// Applies a procedural continuous-assignment forced value to `var` from the
+// expression `rhs`, then installs watchers on each variable appearing in `rhs`
+// so the forced value is re-evaluated whenever those variables change.
+static void InstallForcedValueWatcher(Variable* var, const Expr* rhs,
+                                      SimContext& ctx, Arena& arena) {
+  auto rhs_val = EvalExpr(rhs, ctx, arena);
   var->is_forced = true;
   var->forced_value = rhs_val;
   var->value = rhs_val;
   if (!var->is_4state) CoerceTo2State(var->value);
-  var->proc_cont_rhs = stmt->rhs;
-  if (stmt->kind == StmtKind::kAssign) var->assign_cont_rhs = stmt->rhs;
+  var->proc_cont_rhs = rhs;
   var->NotifyWatchers();
 
   std::vector<Variable*> rhs_vars;
-  CollectExprVars(stmt->rhs, ctx, rhs_vars);
+  CollectExprVars(rhs, ctx, rhs_vars);
 
   std::sort(rhs_vars.begin(), rhs_vars.end());
   rhs_vars.erase(std::unique(rhs_vars.begin(), rhs_vars.end()), rhs_vars.end());
   rhs_vars.erase(std::remove(rhs_vars.begin(), rhs_vars.end(), var),
                  rhs_vars.end());
 
-  const Expr* rhs = stmt->rhs;
   auto* ctx_ptr = &ctx;
   auto* arena_ptr = &arena;
   for (auto* rhs_var : rhs_vars) {
@@ -233,6 +230,16 @@ StmtResult ExecForceOrAssignImpl(const Stmt* stmt, SimContext& ctx,
       return false;
     });
   }
+}
+
+StmtResult ExecForceOrAssignImpl(const Stmt* stmt, SimContext& ctx,
+                                 Arena& arena) {
+  if (!stmt->lhs) return StmtResult::kDone;
+  auto* var = ResolveLhsVariable(stmt->lhs, ctx);
+  if (!var) return StmtResult::kDone;
+
+  if (stmt->kind == StmtKind::kAssign) var->assign_cont_rhs = stmt->rhs;
+  InstallForcedValueWatcher(var, stmt->rhs, ctx, arena);
 
   return StmtResult::kDone;
 }
@@ -255,35 +262,7 @@ StmtResult ExecReleaseOrDeassignImpl(const Stmt* stmt, SimContext& ctx,
   }
 
   if (var->assign_cont_rhs && stmt->kind != StmtKind::kDeassign) {
-    auto rhs_val = EvalExpr(var->assign_cont_rhs, ctx, arena);
-    var->is_forced = true;
-    var->forced_value = rhs_val;
-    var->value = rhs_val;
-    if (!var->is_4state) CoerceTo2State(var->value);
-    var->proc_cont_rhs = var->assign_cont_rhs;
-    var->NotifyWatchers();
-
-    std::vector<Variable*> rhs_vars;
-    CollectExprVars(var->assign_cont_rhs, ctx, rhs_vars);
-    std::sort(rhs_vars.begin(), rhs_vars.end());
-    rhs_vars.erase(std::unique(rhs_vars.begin(), rhs_vars.end()),
-                   rhs_vars.end());
-    rhs_vars.erase(std::remove(rhs_vars.begin(), rhs_vars.end(), var),
-                   rhs_vars.end());
-    const Expr* rhs = var->assign_cont_rhs;
-    auto* ctx_ptr = &ctx;
-    auto* arena_ptr = &arena;
-    for (auto* rhs_var : rhs_vars) {
-      rhs_var->AddWatcher([var, rhs, ctx_ptr, arena_ptr]() {
-        if (!var->is_forced || var->proc_cont_rhs != rhs) return true;
-        auto new_val = EvalExpr(rhs, *ctx_ptr, *arena_ptr);
-        var->forced_value = new_val;
-        var->value = new_val;
-        if (!var->is_4state) CoerceTo2State(var->value);
-        var->NotifyWatchers();
-        return false;
-      });
-    }
+    InstallForcedValueWatcher(var, var->assign_cont_rhs, ctx, arena);
   }
 
   return StmtResult::kDone;

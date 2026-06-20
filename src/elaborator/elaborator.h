@@ -669,6 +669,13 @@ class Elaborator {
 
   void ValidateScopeRules(const ModuleDecl* decl);
 
+  // Returns true when `name` is resolvable against any of the module-level name
+  // sets (declared signals, ports, constants, enum members, specparams,
+  // classes, tasks, functions, interface instances, or checker instances).
+  // Callers handle scope-local names (e.g. block-locals or prior arguments)
+  // before consulting this shared check.
+  bool IsNameInModuleScope(std::string_view name) const;
+
   void ValidateHierRefIntoChecker(const ModuleDecl* decl);
 
   void ValidateHierRefInstanceArray(const ModuleDecl* decl);

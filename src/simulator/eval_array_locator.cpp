@@ -41,23 +41,22 @@ struct LocatorCtx {
 static LocatorCtx MakeLocatorCtx(const std::vector<Logic4Vec>& elems,
                                  bool is_str, const Expr* expr, SimContext& ctx,
                                  Arena& arena) {
-  std::string_view iter_name = "item";
-  std::string_view index_name = "index";
-  if (!expr->args.empty() && expr->args[0] &&
-      expr->args[0]->kind == ExprKind::kIdentifier) {
-    iter_name = expr->args[0]->text;
-  }
-  if (expr->args.size() >= 2 && expr->args[1] &&
-      expr->args[1]->kind == ExprKind::kIdentifier) {
-    index_name = expr->args[1]->text;
-  }
-  std::string idx_var = std::string(iter_name) + "." + std::string(index_name);
-  return LocatorCtx{elems, is_str,    expr->with_expr,   ctx,
-                    arena, iter_name, std::move(idx_var)};
+  auto names = ExtractIterNames(expr);
+  return LocatorCtx{elems,
+                    is_str,
+                    expr->with_expr,
+                    ctx,
+                    arena,
+                    names.iter_name,
+                    std::move(names.idx_var_name)};
 }
 
-static bool EvalLocatorPredicate(const LocatorCtx& lc,
-                                 const Logic4Vec& item_val, size_t item_index) {
+// Pushes a fresh scope and binds the per-iteration locator iterators: the
+// element iterator (item_val, optionally registered as a string) and the index
+// iterator (item_index, 32-bit). The caller is responsible for evaluating the
+// with expression in this scope and calling PopScope afterwards.
+static void SetupLocatorScope(const LocatorCtx& lc, const Logic4Vec& item_val,
+                              size_t item_index) {
   lc.ctx.PushScope();
   auto* item_var = lc.ctx.CreateLocalVariable(lc.iter_name, item_val.width);
   item_var->value = item_val;
@@ -65,6 +64,11 @@ static bool EvalLocatorPredicate(const LocatorCtx& lc,
   auto* idx_var = lc.ctx.CreateLocalVariable(lc.idx_var_name, 32);
   idx_var->value =
       MakeLogic4VecVal(lc.arena, 32, static_cast<uint64_t>(item_index));
+}
+
+static bool EvalLocatorPredicate(const LocatorCtx& lc,
+                                 const Logic4Vec& item_val, size_t item_index) {
+  SetupLocatorScope(lc, item_val, item_index);
   auto result = EvalExpr(lc.with_expr, lc.ctx, lc.arena).ToUint64();
   lc.ctx.PopScope();
   return result != 0;
@@ -73,13 +77,7 @@ static bool EvalLocatorPredicate(const LocatorCtx& lc,
 static Logic4Vec EvalLocatorWithExpr(const LocatorCtx& lc,
                                      const Logic4Vec& item_val,
                                      size_t item_index) {
-  lc.ctx.PushScope();
-  auto* item_var = lc.ctx.CreateLocalVariable(lc.iter_name, item_val.width);
-  item_var->value = item_val;
-  if (lc.is_string) lc.ctx.RegisterStringVariable(lc.iter_name);
-  auto* idx_var = lc.ctx.CreateLocalVariable(lc.idx_var_name, 32);
-  idx_var->value =
-      MakeLogic4VecVal(lc.arena, 32, static_cast<uint64_t>(item_index));
+  SetupLocatorScope(lc, item_val, item_index);
   auto result = EvalExpr(lc.with_expr, lc.ctx, lc.arena);
   lc.ctx.PopScope();
   return result;
@@ -197,8 +195,11 @@ static void LocatorMinMax(std::string_view method, const LocatorCtx& lc,
   out.push_back(lc.elems[best_idx]);
 }
 
-static void LocatorUniqueWith(const LocatorCtx& lc,
-                              std::vector<Logic4Vec>& out) {
+// De-duplicates by the value of the with expression. For each first-seen
+// distinct with-value, pushes either the matching element (use_index=false) or
+// its 0-based position as a 32-bit value (use_index=true).
+static void DedupeLocatorResults(const LocatorCtx& lc, bool use_index,
+                                 std::vector<Logic4Vec>& out) {
   std::vector<uint64_t> seen;
   for (size_t i = 0; i < lc.elems.size(); ++i) {
     uint64_t v = EvalLocatorWithExpr(lc, lc.elems[i], i).ToUint64();
@@ -211,28 +212,21 @@ static void LocatorUniqueWith(const LocatorCtx& lc,
     }
     if (!dup) {
       seen.push_back(v);
-      out.push_back(lc.elems[i]);
+      out.push_back(
+          use_index ? MakeLogic4VecVal(lc.arena, 32, static_cast<uint64_t>(i))
+                    : lc.elems[i]);
     }
   }
 }
 
+static void LocatorUniqueWith(const LocatorCtx& lc,
+                              std::vector<Logic4Vec>& out) {
+  DedupeLocatorResults(lc, /*use_index=*/false, out);
+}
+
 static void LocatorUniqueIndexWith(const LocatorCtx& lc,
                                    std::vector<Logic4Vec>& out) {
-  std::vector<uint64_t> seen;
-  for (size_t i = 0; i < lc.elems.size(); ++i) {
-    uint64_t v = EvalLocatorWithExpr(lc, lc.elems[i], i).ToUint64();
-    bool dup = false;
-    for (uint64_t s : seen) {
-      if (s == v) {
-        dup = true;
-        break;
-      }
-    }
-    if (!dup) {
-      seen.push_back(v);
-      out.push_back(MakeLogic4VecVal(lc.arena, 32, static_cast<uint64_t>(i)));
-    }
-  }
+  DedupeLocatorResults(lc, /*use_index=*/true, out);
 }
 
 static bool ExtractLocatorParts(const Expr* expr, MethodCallParts& out) {

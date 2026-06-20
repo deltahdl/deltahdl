@@ -267,6 +267,59 @@ static Logic4Vec EvalCoverageControl(const Expr* expr, SimContext& ctx,
   return status_vec(ctx.GetCoverageControlState().Control(control, scope));
 }
 
+// Builds the 32-bit integer coverage result shared by the §40.3.2 query
+// functions ($coverage_get_max/$coverage_get/$coverage_merge/$coverage_save),
+// whose result is always one of the §40.3.1 status values or a positive count.
+static Logic4Vec CoverageIntResult(Arena& arena, int value) {
+  return MakeLogic4VecVal(arena, 32, static_cast<uint32_t>(value));
+}
+
+// Extracts the optional string literal argument (scope name or coverage
+// database name) at `index`. A missing or non-literal argument yields the empty
+// string, matching each §40.3.2 query function's "left empty" fallback.
+static std::string CoverageStrArg(const Expr* expr, size_t index) {
+  if (expr->args.size() > index &&
+      expr->args[index]->kind == ExprKind::kStringLiteral) {
+    return ExtractStrArg(expr->args[index]);
+  }
+  return std::string();
+}
+
+// Shared evaluator for the §40.3.2 coverage query functions. They all return
+// the §40.3.2.2 integer result pattern: `SV_COV_ERROR when the first
+// (coverage_type) argument is missing, otherwise the value produced by `query`
+// from the coverage type and the optional string argument (scope/name) at
+// `str_arg_index`.
+enum class CoverageQuery { kGetMax, kGet, kMerge, kSave };
+static Logic4Vec EvalCoverageQuery(const Expr* expr, SimContext& ctx,
+                                   Arena& arena, CoverageQuery query,
+                                   size_t str_arg_index) {
+  // The first argument selects the coverage type; without it the arguments are
+  // incorrect, reported as `SV_COV_ERROR.
+  if (expr->args.empty()) {
+    return CoverageIntResult(arena, static_cast<int>(CoverageStatus::Error));
+  }
+  int coverage_type =
+      static_cast<int>(EvalExpr(expr->args[0], ctx, arena).ToUint64());
+  std::string str_arg = CoverageStrArg(expr, str_arg_index);
+  auto& state = ctx.GetCoverageControlState();
+  switch (query) {
+    case CoverageQuery::kGetMax:
+      return CoverageIntResult(arena,
+                               state.CoverageMax(str_arg, coverage_type));
+    case CoverageQuery::kGet:
+      return CoverageIntResult(arena,
+                               state.CoverageGet(str_arg, coverage_type));
+    case CoverageQuery::kMerge:
+      return CoverageIntResult(
+          arena, static_cast<int>(state.CoverageMerge(coverage_type, str_arg)));
+    case CoverageQuery::kSave:
+      return CoverageIntResult(
+          arena, static_cast<int>(state.CoverageSave(coverage_type, str_arg)));
+  }
+  return CoverageIntResult(arena, static_cast<int>(CoverageStatus::Error));
+}
+
 // §40.3.2.2: $coverage_get_max(coverage_type, scope_def, modules_or_instance)
 // returns the value representing 100% coverage for the given coverage type over
 // the named hierarchy — the sum of all coverable items of that type. The value
@@ -274,28 +327,12 @@ static Logic4Vec EvalCoverageControl(const Expr* expr, SimContext& ctx,
 // integer result is one of the §40.3.1 status values (`SV_COV_ERROR for bad
 // arguments, `SV_COV_NOCOV when no coverage is available, `SV_COV_OVERFLOW when
 // the count is too large to represent) or a positive maximum coverage number.
+// The third argument names the module definition or instance, as the scope is
+// specified per $coverage_control() (§40.3.2.1).
 static Logic4Vec EvalCoverageGetMax(const Expr* expr, SimContext& ctx,
                                     Arena& arena) {
-  auto int_vec = [&](int value) {
-    return MakeLogic4VecVal(arena, 32, static_cast<uint32_t>(value));
-  };
-  // The first argument selects the coverage type; without it the arguments are
-  // incorrect, reported as `SV_COV_ERROR.
-  if (expr->args.empty()) {
-    return int_vec(static_cast<int>(CoverageStatus::Error));
-  }
-  int coverage_type =
-      static_cast<int>(EvalExpr(expr->args[0], ctx, arena).ToUint64());
-  // The third argument names the module definition or instance, as the scope is
-  // specified per $coverage_control() (§40.3.2.1). A string literal is used
-  // directly; otherwise the scope is left empty.
-  std::string scope;
-  if (expr->args.size() > 2 &&
-      expr->args[2]->kind == ExprKind::kStringLiteral) {
-    scope = ExtractStrArg(expr->args[2]);
-  }
-  return int_vec(
-      ctx.GetCoverageControlState().CoverageMax(scope, coverage_type));
+  return EvalCoverageQuery(expr, ctx, arena, CoverageQuery::kGetMax,
+                           /*str_arg_index=*/2);
 }
 
 // §40.3.2.3: $coverage_get(coverage_type, scope_def, modules_or_instance)
@@ -309,26 +346,8 @@ static Logic4Vec EvalCoverageGetMax(const Expr* expr, SimContext& ctx,
 // is too large to represent) or a positive current coverage number.
 static Logic4Vec EvalCoverageGet(const Expr* expr, SimContext& ctx,
                                  Arena& arena) {
-  auto int_vec = [&](int value) {
-    return MakeLogic4VecVal(arena, 32, static_cast<uint32_t>(value));
-  };
-  // The first argument selects the coverage type; without it the arguments are
-  // incorrect, reported as `SV_COV_ERROR.
-  if (expr->args.empty()) {
-    return int_vec(static_cast<int>(CoverageStatus::Error));
-  }
-  int coverage_type =
-      static_cast<int>(EvalExpr(expr->args[0], ctx, arena).ToUint64());
-  // The third argument names the module definition or instance, as the scope is
-  // specified per $coverage_control() (§40.3.2.1). A string literal is used
-  // directly; otherwise the scope is left empty.
-  std::string scope;
-  if (expr->args.size() > 2 &&
-      expr->args[2]->kind == ExprKind::kStringLiteral) {
-    scope = ExtractStrArg(expr->args[2]);
-  }
-  return int_vec(
-      ctx.GetCoverageControlState().CoverageGet(scope, coverage_type));
+  return EvalCoverageQuery(expr, ctx, arena, CoverageQuery::kGet,
+                           /*str_arg_index=*/2);
 }
 
 // §40.3.2.4: $coverage_merge(coverage_type, "name") loads and merges coverage
@@ -338,28 +357,12 @@ static Logic4Vec EvalCoverageGet(const Expr* expr, SimContext& ctx,
 // `SV_COV_OK when the data are found (for this design) and merged,
 // `SV_COV_NOCOV when the data are found but do not contain the requested
 // coverage type, and `SV_COV_ERROR when the name does not exist, the data are
-// from a different design, or another error occurs.
+// from a different design, or another error occurs. A missing or non-literal
+// name locates no database, which is the error case.
 static Logic4Vec EvalCoverageMerge(const Expr* expr, SimContext& ctx,
                                    Arena& arena) {
-  auto int_vec = [&](int value) {
-    return MakeLogic4VecVal(arena, 32, static_cast<uint32_t>(value));
-  };
-  // The first argument selects the coverage type; without it the arguments are
-  // incorrect, reported as `SV_COV_ERROR.
-  if (expr->args.empty()) {
-    return int_vec(static_cast<int>(CoverageStatus::Error));
-  }
-  int coverage_type =
-      static_cast<int>(EvalExpr(expr->args[0], ctx, arena).ToUint64());
-  // The second argument names the coverage database to load. A missing or
-  // non-literal name locates no database, which is the error case.
-  std::string name;
-  if (expr->args.size() > 1 &&
-      expr->args[1]->kind == ExprKind::kStringLiteral) {
-    name = ExtractStrArg(expr->args[1]);
-  }
-  return int_vec(static_cast<int>(
-      ctx.GetCoverageControlState().CoverageMerge(coverage_type, name)));
+  return EvalCoverageQuery(expr, ctx, arena, CoverageQuery::kMerge,
+                           /*str_arg_index=*/1);
 }
 
 // §40.3.2.5: $coverage_save(coverage_type, "name") saves the current coverage
@@ -369,28 +372,12 @@ static Logic4Vec EvalCoverageMerge(const Expr* expr, SimContext& ctx,
 // the §40.3.1 status values: `SV_COV_OK when the data are saved, `SV_COV_NOCOV
 // when no such coverage is available in this design (nothing is saved), and
 // `SV_COV_ERROR when an error occurs during the save — in which case the entry
-// for `name` is removed to preserve coverage-database integrity.
+// for `name` is removed to preserve coverage-database integrity. A missing or
+// non-literal name leaves the destination empty.
 static Logic4Vec EvalCoverageSave(const Expr* expr, SimContext& ctx,
                                   Arena& arena) {
-  auto int_vec = [&](int value) {
-    return MakeLogic4VecVal(arena, 32, static_cast<uint32_t>(value));
-  };
-  // The first argument selects the coverage type; without it the arguments are
-  // incorrect, reported as `SV_COV_ERROR.
-  if (expr->args.empty()) {
-    return int_vec(static_cast<int>(CoverageStatus::Error));
-  }
-  int coverage_type =
-      static_cast<int>(EvalExpr(expr->args[0], ctx, arena).ToUint64());
-  // The second argument names the coverage database to write. A missing or
-  // non-literal name leaves the destination empty.
-  std::string name;
-  if (expr->args.size() > 1 &&
-      expr->args[1]->kind == ExprKind::kStringLiteral) {
-    name = ExtractStrArg(expr->args[1]);
-  }
-  return int_vec(static_cast<int>(
-      ctx.GetCoverageControlState().CoverageSave(coverage_type, name)));
+  return EvalCoverageQuery(expr, ctx, arena, CoverageQuery::kSave,
+                           /*str_arg_index=*/1);
 }
 
 Logic4Vec EvalVerifSysCall(const Expr* expr, SimContext& ctx, Arena& arena,

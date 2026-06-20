@@ -9,6 +9,7 @@
 #include "elaborator/annex_f_grammar.h"
 #include "elaborator/annex_f_tight_satisfaction.h"
 #include "elaborator/annex_f_tight_satisfaction_local_variables.h"
+#include "elaborator/annex_f_word_ops_internal.h"
 
 namespace delta {
 
@@ -147,131 +148,6 @@ std::shared_ptr<const LvTopLevelProperty> LvTopLocalVarDecl(
 }
 
 namespace {
-
-// §F.5 (page 1246): w-bar interchanges T and _|_; a letter in 2^P is unchanged.
-Letter ComplementLetter(const Letter& letter) {
-  switch (letter.kind) {
-    case Letter::Kind::kTop:
-      return LetterBottom();
-    case Letter::Kind::kBottom:
-      return LetterTop();
-    case Letter::Kind::kAtomSet:
-      return letter;
-  }
-  return letter;
-}
-
-// §F.5: w-bar, the letterwise complement of the whole word.
-Word ComplementWord(const Word& word) {
-  Word out;
-  out.reserve(word.size());
-  for (const Letter& letter : word) {
-    out.push_back(ComplementLetter(letter));
-  }
-  return out;
-}
-
-// §F.5: w^{i.}, the word with its first i letters deleted (empty once i reaches
-// the length of w).
-Word Suffix(const Word& word, std::size_t i) {
-  if (i >= word.size()) {
-    return Word{};
-  }
-  return Word(word.begin() + static_cast<std::ptrdiff_t>(i), word.end());
-}
-
-// §F.5: w^{0,k}, the finite prefix w^0 w^1 ... w^k (the first k+1 letters).
-Word PrefixInclusive(const Word& word, std::size_t k) {
-  const std::size_t count = std::min(k + 1, word.size());
-  return Word(word.begin(), word.begin() + static_cast<std::ptrdiff_t>(count));
-}
-
-// §F.5: the first i letters w^{0,i-1}; the empty word when i = 0.
-Word FirstLetters(const Word& word, std::size_t i) {
-  const std::size_t count = std::min(i, word.size());
-  return Word(word.begin(), word.begin() + static_cast<std::ptrdiff_t>(count));
-}
-
-// A structural bound on how far a sequence can reach into a word, mirroring
-// §F.5.3.1: unbounded repeats are bounded by a single iteration, the shortest
-// witness on a constant T^omega tail.
-std::size_t SequenceReach(const SequenceExpr& seq) {
-  switch (seq.kind) {
-    case SequenceExpr::Kind::kBoolean:
-    case SequenceExpr::Kind::kLocalVarSampling:
-    case SequenceExpr::Kind::kNullRepeat:
-      return 1;
-    case SequenceExpr::Kind::kParen:
-    case SequenceExpr::Kind::kFirstMatch:
-    case SequenceExpr::Kind::kUnboundedRepeat:
-    case SequenceExpr::Kind::kZeroOrMoreRepeat:
-    case SequenceExpr::Kind::kLocalVarDecl:
-      return seq.lhs ? SequenceReach(*seq.lhs) : 1;
-    case SequenceExpr::Kind::kConcat:
-    case SequenceExpr::Kind::kFusion:
-      return (seq.lhs ? SequenceReach(*seq.lhs) : 0) +
-             (seq.rhs ? SequenceReach(*seq.rhs) : 0);
-    case SequenceExpr::Kind::kOr:
-    case SequenceExpr::Kind::kIntersect:
-      return std::max(seq.lhs ? SequenceReach(*seq.lhs) : 0,
-                      seq.rhs ? SequenceReach(*seq.rhs) : 0);
-    case SequenceExpr::Kind::kClock:
-      return (seq.lhs ? SequenceReach(*seq.lhs) : 1) + 1;
-  }
-  return 1;
-}
-
-// A structural bound on how far a property can reach into a word, used to size
-// the constant T^omega / _|_^omega tails for the disable iff and accept_on
-// completions, mirroring §F.5.3.1.
-std::size_t PropertyReach(const LvProperty& property) {
-  switch (property.kind) {
-    case LvProperty::Kind::kStrong:
-    case LvProperty::Kind::kWeak:
-      return property.sequence ? SequenceReach(*property.sequence) : 1;
-    case LvProperty::Kind::kParen:
-    case LvProperty::Kind::kNot:
-    case LvProperty::Kind::kLocalVarDecl:
-      return property.lhs ? PropertyReach(*property.lhs) : 1;
-    case LvProperty::Kind::kImplication:
-      return (property.sequence ? SequenceReach(*property.sequence) : 0) +
-             (property.lhs ? PropertyReach(*property.lhs) : 0);
-    case LvProperty::Kind::kOr:
-    case LvProperty::Kind::kAnd:
-      return std::max(property.lhs ? PropertyReach(*property.lhs) : 0,
-                      property.rhs ? PropertyReach(*property.rhs) : 0);
-    case LvProperty::Kind::kUntil:
-      return (property.lhs ? PropertyReach(*property.lhs) : 0) +
-             (property.rhs ? PropertyReach(*property.rhs) : 0) + 1;
-    case LvProperty::Kind::kNexttime:
-    case LvProperty::Kind::kAcceptOn:
-      return (property.lhs ? PropertyReach(*property.lhs) : 0) + 1;
-  }
-  return 1;
-}
-
-// A finite materialization of w^{0,i-1} followed by a constant tail (T^omega or
-// _|_^omega), padded past `reach` so the verdict has stabilized, mirroring
-// §F.5.3.1's bounded witness search.
-Word PrefixWithTail(const Word& prefix, const Letter& tail, std::size_t reach) {
-  Word out = prefix;
-  const std::size_t pad = reach + 2;
-  for (std::size_t i = 0; i < pad; ++i) {
-    out.push_back(tail);
-  }
-  return out;
-}
-
-// The least index at which a letter of the word satisfies b, or word.size() if
-// none does.
-std::size_t FirstSatisfyingIndex(const Word& word, const BooleanExpr& b) {
-  for (std::size_t i = 0; i < word.size(); ++i) {
-    if (LetterSatisfiesBoolean(word[i], b)) {
-      return i;
-    }
-  }
-  return word.size();
-}
 
 bool Satisfies(const Word& word, const LvProperty& property,
                const LocalContext& context);

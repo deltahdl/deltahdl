@@ -62,6 +62,33 @@ static void VpiWriteRawGroup(char* base, int ngroups, uint64_t v) {
   }
 }
 
+// §38.16/§38.35: turn a starting coordinate into the flat ordinal of the first
+// element, with the rightmost dimension varying fastest - a mixed-radix value
+// over each dimension's declared index order (dims[d] lists the declared
+// indices of unpacked dimension d, index_p[d] the requested coordinate). A
+// coordinate value that names no declared index is not a legal element
+// reference: returns false (out of range) and leaves *out_ordinal unset.
+static bool ComputeStartOrdinal(const std::vector<std::vector<int>>& dims,
+                                const int* index_p, long long* out_ordinal) {
+  long long start_ordinal = 0;
+  for (size_t d = 0; d < dims.size(); ++d) {
+    const auto& order = dims[d];
+    long long pos = -1;
+    for (size_t p = 0; p < order.size(); ++p) {
+      if (order[p] == index_p[d]) {
+        pos = static_cast<long long>(p);
+        break;
+      }
+    }
+    if (pos < 0) {
+      return false;
+    }
+    start_ordinal = start_ordinal * static_cast<long long>(order.size()) + pos;
+  }
+  *out_ordinal = start_ordinal;
+  return true;
+}
+
 void VpiContext::PutValueArray(VpiHandle obj, VpiArrayValue* arrayvalue_p,
                                int* index_p, unsigned int num) {
   if (!obj || !arrayvalue_p) return;
@@ -119,27 +146,15 @@ void VpiContext::PutValueArray(VpiHandle obj, VpiArrayValue* arrayvalue_p,
   }
 
   // §38.35: turn the starting coordinate into the flat ordinal of the first
-  // element, with the rightmost dimension varying fastest - a mixed-radix value
-  // over each dimension's declared index order. A coordinate value that names
-  // no declared index is not a legal element reference.
+  // element. A coordinate value that names no declared index is not a legal
+  // element reference.
   long long start_ordinal = 0;
-  for (size_t d = 0; d < dims.size(); ++d) {
-    const auto& order = dims[d];
-    long long pos = -1;
-    for (size_t p = 0; p < order.size(); ++p) {
-      if (order[p] == index_p[d]) {
-        pos = static_cast<long long>(p);
-        break;
-      }
-    }
-    if (pos < 0) {
-      last_error_.state = kVpiError;
-      last_error_.level = kVpiError;
-      last_error_.message =
-          "vpi_put_value_array() starting index is out of range";
-      return;
-    }
-    start_ordinal = start_ordinal * static_cast<long long>(order.size()) + pos;
+  if (!ComputeStartOrdinal(dims, index_p, &start_ordinal)) {
+    last_error_.state = kVpiError;
+    last_error_.level = kVpiError;
+    last_error_.message =
+        "vpi_put_value_array() starting index is out of range";
+    return;
   }
 
   // §38.35: elements are filled consecutively in fastest-varying-index order,
@@ -279,24 +294,12 @@ void VpiContext::GetValueArray(VpiHandle obj, VpiArrayValue* arrayvalue_p,
   }
 
   // §38.16: turn the starting coordinate into the flat ordinal of the first
-  // element, rightmost dimension varying fastest - a mixed-radix value over
-  // each dimension's declared index order. A coordinate naming no declared
-  // index is not a legal element reference.
+  // element. A coordinate naming no declared index is not a legal element
+  // reference.
   long long start_ordinal = 0;
-  for (size_t d = 0; d < dims.size(); ++d) {
-    const auto& order = dims[d];
-    long long pos = -1;
-    for (size_t p = 0; p < order.size(); ++p) {
-      if (order[p] == index_p[d]) {
-        pos = static_cast<long long>(p);
-        break;
-      }
-    }
-    if (pos < 0) {
-      fail("vpi_get_value_array() starting index is out of range");
-      return;
-    }
-    start_ordinal = start_ordinal * static_cast<long long>(order.size()) + pos;
+  if (!ComputeStartOrdinal(dims, index_p, &start_ordinal)) {
+    fail("vpi_get_value_array() starting index is out of range");
+    return;
   }
 
   // §38.16: locate the section's element children up front, in fastest-varying

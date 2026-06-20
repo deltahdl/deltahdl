@@ -29,6 +29,19 @@ static bool IsArrayPatternSpecial(const Expr* init) {
   return !init->pattern_keys.empty();
 }
 
+uint32_t ExtractLiteralWidth(std::string_view text) {
+  auto tick = text.find('\'');
+  if (tick != std::string_view::npos && tick > 0) {
+    uint32_t w = 0;
+    for (size_t i = 0; i < tick; ++i) {
+      char c = text[i];
+      if (c >= '0' && c <= '9') w = w * 10 + (c - '0');
+    }
+    if (w > 0) return w;
+  }
+  return 32;
+}
+
 std::optional<int64_t> ComputeDimSize(const Expr* dim) {
   if (dim->kind == ExprKind::kBinary && dim->op == TokenKind::kColon) {
     auto left = ConstEvalInt(dim->lhs);

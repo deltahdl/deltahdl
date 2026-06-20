@@ -438,19 +438,7 @@ void Elaborator::ValidateFunctionArgDefaultsScope(const ModuleItem* item) {
         auto name = e->text;
         if (name.empty()) continue;
         if (prior_args.count(name)) continue;
-        if (declared_names_.count(name)) continue;
-        if (ansi_port_names_.count(name)) continue;
-        if (non_ansi_complete_ports_.count(name)) continue;
-        if (non_ansi_partial_ports_.count(name)) continue;
-        if (const_names_.count(name)) continue;
-        if (enum_member_names_.count(name)) continue;
-        if (specparam_names_.count(name)) continue;
-        if (class_names_.count(name)) continue;
-        if (class_var_names_.count(name)) continue;
-        if (task_names_.count(name)) continue;
-        if (func_decls_.count(name)) continue;
-        if (interface_inst_types_.count(name)) continue;
-        if (checker_inst_names_.count(name)) continue;
+        if (IsNameInModuleScope(name)) continue;
         diag_.Error(e->range.start,
                     std::format("default value for '{}' references '{}' "
                                 "which is not declared in the subroutine's "

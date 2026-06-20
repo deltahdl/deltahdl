@@ -13,6 +13,7 @@
 #include "simulator/eval_expr_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
+#include "simulator/statement_assign_internal.h"
 
 namespace delta {
 
@@ -81,50 +82,6 @@ static void PlaceSlice(Logic4Vec& dst, uint32_t start_bit, uint64_t val,
     start_bit += put;
     bits_left -= put;
   }
-}
-
-static bool ResolveWithRange(const Expr* with_expr, SimContext& ctx,
-                             Arena& arena, uint32_t array_size,
-                             uint32_t array_lo, uint32_t& out_start,
-                             uint32_t& out_count) {
-  if (!with_expr || with_expr->kind != ExprKind::kSelect) {
-    out_start = 0;
-    out_count = array_size;
-    return true;
-  }
-  int64_t idx =
-      static_cast<int64_t>(EvalExpr(with_expr->index, ctx, arena).ToUint64());
-  if (!with_expr->index_end) {
-    int64_t rel = idx - static_cast<int64_t>(array_lo);
-    if (rel < 0 || static_cast<uint32_t>(rel) >= array_size) {
-      out_start = 0;
-      out_count = 0;
-      return false;
-    }
-    out_start = static_cast<uint32_t>(rel);
-    out_count = 1;
-    return true;
-  }
-  int64_t idx2 = static_cast<int64_t>(
-      EvalExpr(with_expr->index_end, ctx, arena).ToUint64());
-  if (with_expr->is_part_select_plus) {
-    int64_t rel = idx - static_cast<int64_t>(array_lo);
-    out_start = (rel < 0) ? 0 : static_cast<uint32_t>(rel);
-    out_count = (idx2 < 0) ? 0 : static_cast<uint32_t>(idx2);
-  } else if (with_expr->is_part_select_minus) {
-    uint32_t width = (idx2 < 0) ? 0 : static_cast<uint32_t>(idx2);
-    int64_t lo_idx = idx - static_cast<int64_t>(width) + 1;
-    int64_t rel = lo_idx - static_cast<int64_t>(array_lo);
-    out_start = (rel < 0) ? 0 : static_cast<uint32_t>(rel);
-    out_count = width;
-  } else {
-    int64_t lo = idx, hi = idx2;
-    if (lo > hi) std::swap(lo, hi);
-    int64_t rel_lo = lo - static_cast<int64_t>(array_lo);
-    out_start = (rel_lo < 0) ? 0 : static_cast<uint32_t>(rel_lo);
-    out_count = static_cast<uint32_t>(hi - lo + 1);
-  }
-  return true;
 }
 
 static void ExpandArrayElements(std::string_view name, SimContext& ctx,

@@ -28,6 +28,43 @@ static std::string_view StripStringLiteralQuotes(std::string_view text) {
   return text.substr(1, text.size() - 2);
 }
 
+// CPD-dedup: the dpi_spec_string parse/validation and the optional
+// "= c_identifier" tail are identical between DPI import and export.
+struct ParserPortHelpers {
+  static void ParseDpiSpecString(Parser& p, ModuleItem* item) {
+    auto spec_tok = p.Consume();
+    item->dpi_spec_string = StripStringLiteralQuotes(spec_tok.text);
+    if (item->dpi_spec_string == "DPI") {
+      // §35.5.4: "DPI" is deprecated; the warning text must point at the
+      // canonical replacement and warn about possible C-code changes.
+      p.diag_.Warning(
+          spec_tok.loc,
+          "\"DPI\" is deprecated and should be replaced with \"DPI-C\"; "
+          "use of the \"DPI-C\" string may require changes to the DPI "
+          "application's C code");
+    } else if (item->dpi_spec_string != "DPI-C") {
+      p.diag_.Error(spec_tok.loc,
+                    "DPI specification string must be \"DPI-C\" or \"DPI\"");
+    }
+  }
+
+  static void TryParseDpiCName(Parser& p, ModuleItem* item) {
+    if (p.Check(TokenKind::kIdentifier)) {
+      auto saved = p.lexer_.SavePos();
+      auto tok = p.Consume();
+      if (p.Match(TokenKind::kEq)) {
+        if (!IsValidCIdentifier(tok.text)) {
+          p.diag_.Error(tok.loc,
+                        "DPI c_identifier must match [a-zA-Z_][a-zA-Z0-9_]*");
+        }
+        item->dpi_c_name = tok.text;
+      } else {
+        p.lexer_.RestorePos(saved);
+      }
+    }
+  }
+};
+
 // §35.5.6: a rich but closed subset of SystemVerilog data types is permitted
 // for the formal arguments of DPI import/export subroutines. The clause states
 // these are the *only* permitted types: the C-compatible scalar types, the
@@ -206,20 +243,7 @@ ModuleItem* Parser::ParseDpiImport() {
   auto* item = arena_.Create<ModuleItem>();
   item->kind = ModuleItemKind::kDpiImport;
   item->loc = CurrentLoc();
-  auto spec_tok = Consume();
-  item->dpi_spec_string = StripStringLiteralQuotes(spec_tok.text);
-  if (item->dpi_spec_string == "DPI") {
-    // §35.5.4: "DPI" is deprecated; the warning text must point at the
-    // canonical replacement and warn about possible C-code changes.
-    diag_.Warning(
-        spec_tok.loc,
-        "\"DPI\" is deprecated and should be replaced with \"DPI-C\"; "
-        "use of the \"DPI-C\" string may require changes to the DPI "
-        "application's C code");
-  } else if (item->dpi_spec_string != "DPI-C") {
-    diag_.Error(spec_tok.loc,
-                "DPI specification string must be \"DPI-C\" or \"DPI\"");
-  }
+  ParserPortHelpers::ParseDpiSpecString(*this, item);
 
   if (Match(TokenKind::kKwPure)) {
     item->dpi_is_pure = true;
@@ -228,19 +252,7 @@ ModuleItem* Parser::ParseDpiImport() {
     item->dpi_is_context = true;
   }
 
-  if (Check(TokenKind::kIdentifier)) {
-    auto saved = lexer_.SavePos();
-    auto tok = Consume();
-    if (Match(TokenKind::kEq)) {
-      if (!IsValidCIdentifier(tok.text)) {
-        diag_.Error(tok.loc,
-                    "DPI c_identifier must match [a-zA-Z_][a-zA-Z0-9_]*");
-      }
-      item->dpi_c_name = tok.text;
-    } else {
-      lexer_.RestorePos(saved);
-    }
-  }
+  ParserPortHelpers::TryParseDpiCName(*this, item);
 
   if (Match(TokenKind::kKwTask)) {
     item->dpi_is_task = true;
@@ -313,32 +325,9 @@ ModuleItem* Parser::ParseDpiExport(SourceLoc loc) {
   auto* item = arena_.Create<ModuleItem>();
   item->kind = ModuleItemKind::kDpiExport;
   item->loc = loc;
-  auto spec_tok = Consume();
-  item->dpi_spec_string = StripStringLiteralQuotes(spec_tok.text);
-  if (item->dpi_spec_string == "DPI") {
-    diag_.Warning(
-        spec_tok.loc,
-        "\"DPI\" is deprecated and should be replaced with \"DPI-C\"; "
-        "use of the \"DPI-C\" string may require changes to the DPI "
-        "application's C code");
-  } else if (item->dpi_spec_string != "DPI-C") {
-    diag_.Error(spec_tok.loc,
-                "DPI specification string must be \"DPI-C\" or \"DPI\"");
-  }
+  ParserPortHelpers::ParseDpiSpecString(*this, item);
 
-  if (Check(TokenKind::kIdentifier)) {
-    auto saved = lexer_.SavePos();
-    auto tok = Consume();
-    if (Match(TokenKind::kEq)) {
-      if (!IsValidCIdentifier(tok.text)) {
-        diag_.Error(tok.loc,
-                    "DPI c_identifier must match [a-zA-Z_][a-zA-Z0-9_]*");
-      }
-      item->dpi_c_name = tok.text;
-    } else {
-      lexer_.RestorePos(saved);
-    }
-  }
+  ParserPortHelpers::TryParseDpiCName(*this, item);
 
   if (Match(TokenKind::kKwTask)) {
     item->dpi_is_task = true;

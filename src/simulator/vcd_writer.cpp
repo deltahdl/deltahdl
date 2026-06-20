@@ -190,6 +190,15 @@ void VcdWriter::WriteScalarChange(const VcdSignal& sig) {
   ofs_ << val << sig.ident << "\n";
 }
 
+// Maps a single 4-state logic bit, given its aval and bval components, to the
+// VCD value character: 0, 1, x, or z (§21.7.2.1).
+static char LogicBitToChar(bool aval, bool bval) {
+  if (!bval && !aval) return '0';
+  if (!bval && aval) return '1';
+  if (bval && !aval) return 'x';
+  return 'z';
+}
+
 // Table 21-8: a shortened vector value is reconstructed by left-extending it
 // according to its most significant retained digit. The values 0 and 1 extend
 // with 0, an x extends with x, and a z extends with z.
@@ -214,15 +223,7 @@ void VcdWriter::WriteVectorChange(const VcdSignal& sig) {
       a = (sig.var->value.words[word_idx].aval & mask) != 0;
       b = (sig.var->value.words[word_idx].bval & mask) != 0;
     }
-    if (!b && !a) {
-      digits.push_back('0');
-    } else if (!b && a) {
-      digits.push_back('1');
-    } else if (b && !a) {
-      digits.push_back('x');
-    } else {
-      digits.push_back('z');
-    }
+    digits.push_back(LogicBitToChar(a, b));
   }
   // §21.7.2.2: vectors are written in the shortest right-justified form. A
   // leading digit is redundant when the left-extension rule applied to the
@@ -272,16 +273,7 @@ void VcdWriter::WritePortValueChange(const VcdSignal& sig) {
       a = (sig.var->value.words[word_idx].aval & mask) != 0;
       b = (sig.var->value.words[word_idx].bval & mask) != 0;
     }
-    char c;
-    if (!b && !a) {
-      c = '0';
-    } else if (!b && a) {
-      c = '1';
-    } else if (b && !a) {
-      c = 'x';
-    } else {
-      c = 'z';
-    }
+    char c = LogicBitToChar(a, b);
     if (c != 'z') driven = true;
     ofs_ << c;
   }

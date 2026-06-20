@@ -2,6 +2,7 @@
 #include <optional>
 #include <unordered_map>
 #include <unordered_set>
+#include <utility>
 
 #include "common/diagnostic.h"
 #include "elaborator/const_eval.h"
@@ -42,6 +43,24 @@ std::string_view ResolveVifModport(const DataType& dt,
     }
   }
   return {};
+}
+
+// Extends the module-level virtual-interface type/modport maps with the
+// virtual-interface formal arguments of a task or function `item`, returning
+// the scoped maps used while walking that subroutine's body.
+std::pair<VifTypeMap, VifModportMap> BuildScopedVifMaps(
+    const ModuleItem* item, const VifTypeMap& base_vifs,
+    const VifModportMap& base_mps, const TypedefMap& typedefs) {
+  VifTypeMap scoped = base_vifs;
+  VifModportMap scoped_mps = base_mps;
+  for (const auto& a : item->func_args) {
+    auto t = ResolveVifInterfaceType(a.data_type, typedefs);
+    if (!t.empty()) {
+      scoped[a.name] = t;
+      scoped_mps[a.name] = ResolveVifModport(a.data_type, typedefs);
+    }
+  }
+  return {std::move(scoped), std::move(scoped_mps)};
 }
 
 const ModuleDecl* FindInterfaceDeclByName(const CompilationUnit* unit,
@@ -259,15 +278,8 @@ void Elaborator::ValidateVirtualInterfaceClocking(const ModuleDecl* decl) {
   for (const auto* item : decl->items) {
     if (item->kind == ModuleItemKind::kTaskDecl ||
         item->kind == ModuleItemKind::kFunctionDecl) {
-      VifTypeMap scoped = module_vifs;
-      VifModportMap scoped_mps = module_mps;
-      for (const auto& a : item->func_args) {
-        auto t = ResolveVifInterfaceType(a.data_type, typedefs_);
-        if (!t.empty()) {
-          scoped[a.name] = t;
-          scoped_mps[a.name] = ResolveVifModport(a.data_type, typedefs_);
-        }
-      }
+      auto [scoped, scoped_mps] =
+          BuildScopedVifMaps(item, module_vifs, module_mps, typedefs_);
       if (item->body) {
         WalkStmtsForVifClocking(item->body, scoped, scoped_mps, unit_, diag_);
         WalkStmtsForVirtualInterfaceClocking(item->body);
@@ -482,15 +494,8 @@ void Elaborator::ValidateInterfaceObjectAccess(const ModuleDecl* decl) {
   for (const auto* item : decl->items) {
     if (item->kind == ModuleItemKind::kTaskDecl ||
         item->kind == ModuleItemKind::kFunctionDecl) {
-      VifTypeMap scoped = module_vifs;
-      VifModportMap scoped_mps = module_mps;
-      for (const auto& a : item->func_args) {
-        auto t = ResolveVifInterfaceType(a.data_type, typedefs_);
-        if (!t.empty()) {
-          scoped[a.name] = t;
-          scoped_mps[a.name] = ResolveVifModport(a.data_type, typedefs_);
-        }
-      }
+      auto [scoped, scoped_mps] =
+          BuildScopedVifMaps(item, module_vifs, module_mps, typedefs_);
       if (item->body) {
         WalkStmtsForInterfaceObjectAccess(item->body, iface_ports, port_mps,
                                           scoped, scoped_mps, unit_, diag_);

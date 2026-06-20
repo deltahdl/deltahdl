@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <format>
+#include <functional>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -16,17 +17,19 @@
 
 namespace delta {
 
-static const ClassMember* FindBaseVirtualMethod(const ClassDecl* cls,
-                                                std::string_view method_name,
-                                                const CompilationUnit* unit) {
+// Walks the base-class chain of `cls` (excluding `cls` itself) and returns the
+// first method named `method_name` for which `accept` holds, or nullptr.
+static const ClassMember* FindBaseMethod(
+    const ClassDecl* cls, std::string_view method_name,
+    const CompilationUnit* unit,
+    const std::function<bool(const ClassMember*)>& accept) {
   if (cls->base_class.empty()) return nullptr;
   for (const auto* c = FindClassDecl(cls->base_class, unit); c;
        c = c->base_class.empty() ? nullptr
                                  : FindClassDecl(c->base_class, unit)) {
     for (const auto* m : c->members) {
       if (m->kind == ClassMemberKind::kMethod && m->method &&
-          m->method->name == method_name &&
-          (m->is_virtual || m->is_pure_virtual)) {
+          m->method->name == method_name && accept(m)) {
         return m;
       }
     }
@@ -34,21 +37,20 @@ static const ClassMember* FindBaseVirtualMethod(const ClassDecl* cls,
   return nullptr;
 }
 
+static const ClassMember* FindBaseVirtualMethod(const ClassDecl* cls,
+                                                std::string_view method_name,
+                                                const CompilationUnit* unit) {
+  return FindBaseMethod(cls, method_name, unit, [](const ClassMember* m) {
+    return m->is_virtual || m->is_pure_virtual;
+  });
+}
+
 static const ClassMember* FindBaseFinalMethod(const ClassDecl* cls,
                                               std::string_view method_name,
                                               const CompilationUnit* unit) {
-  if (cls->base_class.empty()) return nullptr;
-  for (const auto* c = FindClassDecl(cls->base_class, unit); c;
-       c = c->base_class.empty() ? nullptr
-                                 : FindClassDecl(c->base_class, unit)) {
-    for (const auto* m : c->members) {
-      if (m->kind == ClassMemberKind::kMethod && m->method &&
-          m->method->name == method_name && m->method->is_method_final) {
-        return m;
-      }
-    }
-  }
-  return nullptr;
+  return FindBaseMethod(cls, method_name, unit, [](const ClassMember* m) {
+    return m->method->is_method_final;
+  });
 }
 
 static void ValidateOverrideSignature(const ModuleItem* base_method,

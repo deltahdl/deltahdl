@@ -5,6 +5,7 @@
 #include "common/diagnostic.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
+#include "elaborator/elaborator_items_internal.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast.h"
@@ -522,35 +523,6 @@ static bool ExprContainsHierarchicalRef(const Expr* e) {
   return false;
 }
 
-static NetType DataTypeKindToNetType(DataTypeKind kind) {
-  switch (kind) {
-    case DataTypeKind::kTri:
-      return NetType::kTri;
-    case DataTypeKind::kWand:
-      return NetType::kWand;
-    case DataTypeKind::kWor:
-      return NetType::kWor;
-    case DataTypeKind::kTriand:
-      return NetType::kTriand;
-    case DataTypeKind::kTrior:
-      return NetType::kTrior;
-    case DataTypeKind::kTri0:
-      return NetType::kTri0;
-    case DataTypeKind::kTri1:
-      return NetType::kTri1;
-    case DataTypeKind::kSupply0:
-      return NetType::kSupply0;
-    case DataTypeKind::kSupply1:
-      return NetType::kSupply1;
-    case DataTypeKind::kTrireg:
-      return NetType::kTrireg;
-    case DataTypeKind::kUwire:
-      return NetType::kUwire;
-    default:
-      return NetType::kWire;
-  }
-}
-
 void Elaborator::ValidateAlias(const ModuleItem* item, RtlirModule* mod) {
   std::unordered_set<std::string_view> seen;
   for (auto* net : item->alias_nets) {
@@ -585,12 +557,12 @@ void Elaborator::ValidateAlias(const ModuleItem* item, RtlirModule* mod) {
     auto first_type_it = var_types_.find(ident_names[0]);
     NetType first_net_type = NetType::kWire;
     if (first_type_it != var_types_.end())
-      first_net_type = DataTypeKindToNetType(first_type_it->second);
+      first_net_type = DataTypeToNetType(first_type_it->second);
     for (size_t i = 1; i < ident_names.size(); ++i) {
       NetType cur_net_type = NetType::kWire;
       auto cur_type_it = var_types_.find(ident_names[i]);
       if (cur_type_it != var_types_.end())
-        cur_net_type = DataTypeKindToNetType(cur_type_it->second);
+        cur_net_type = DataTypeToNetType(cur_type_it->second);
       if (cur_net_type != first_net_type) {
         diag_.Error(
             item->loc,

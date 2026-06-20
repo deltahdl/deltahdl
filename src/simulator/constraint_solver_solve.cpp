@@ -487,6 +487,45 @@ bool ConstraintSolver::SolvePriorityLayers(
   return CheckAllConstraints(extra, include_soft);
 }
 
+// Staged solve shared by the function-argument priority pass (18.5.11) and the
+// solve...before ordered pass (18.5.9). Both passes commit the active real
+// variables first, gather the still-uncommitted active integral variables into
+// 'general', partition that set, and run the staged integral solve over the
+// partition. The only differences are the partition and staged-solve routines,
+// injected as callbacks, and which clause's wording applies (use_priority); the
+// surrounding token sequence is identical, so it is unified here.
+//
+// Returns true when the staged solve succeeds (the caller should return true),
+// false otherwise. The caller still checks guard_error_ to decide whether the
+// outer attempt loop continues or aborts, exactly as before.
+static bool RunStagedSolve(
+    std::unordered_map<std::string, RandVariable>& variables,
+    std::unordered_map<std::string, double>& real_values,
+    const std::unordered_map<std::string, int64_t>& values, bool use_priority,
+    const std::function<double(RandVariable&)>& gen_real,
+    const std::function<std::vector<std::vector<std::string>>(
+        const std::vector<std::string>&)>& partition,
+    const std::function<bool(const std::vector<std::vector<std::string>>&)>&
+        solve) {
+  (void)use_priority;
+  // Real variables are committed first (as in the flat pass), so any ordered
+  // integral group/layer is completed against them.
+  for (auto& [name, var] : variables) {
+    if (var.enabled && var.is_real) {
+      real_values[name] = gen_real(var);
+    }
+  }
+  std::vector<std::string> general;
+  for (auto& [name, var] : variables) {
+    if (!var.enabled || var.is_real) continue;
+    // randc, array-size, and inactive variables are already committed; the
+    // cyclical ones in particular are solved first, as the clause requires.
+    if (values.find(name) != values.end()) continue;
+    general.push_back(name);
+  }
+  return solve(partition(general));
+}
+
 bool ConstraintSolver::SolveIterative(const std::vector<ConstraintExpr>& extra,
                                       bool include_soft) {
   static constexpr int kMaxAttempts = 500;
@@ -548,41 +587,32 @@ bool ConstraintSolver::SolveIterative(const std::vector<ConstraintExpr>& extra,
     // space (and can fail), distinct from the solution-space-preserving
     // solve...before ordering handled below.
     if (!function_arg_priority_edges_.empty()) {
-      for (auto& [name, var] : variables_) {
-        if (var.enabled && var.is_real) {
-          real_values_[name] = GenerateRandRealValue(var);
-        }
+      if (RunStagedSolve(
+              variables_, real_values_, values_, /*use_priority=*/true,
+              [this](RandVariable& var) { return GenerateRandRealValue(var); },
+              [this](const std::vector<std::string>& general) {
+                return ComputePriorityLayers(general);
+              },
+              [&](const std::vector<std::vector<std::string>>& layers) {
+                return SolvePriorityLayers(layers, extra, include_soft);
+              })) {
+        return true;
       }
-      std::vector<std::string> general;
-      for (auto& [name, var] : variables_) {
-        if (!var.enabled || var.is_real) continue;
-        // randc, array-size, and inactive variables are already committed; the
-        // cyclical ones in particular are solved first, as the clause requires.
-        if (values_.find(name) != values_.end()) continue;
-        general.push_back(name);
-      }
-      auto layers = ComputePriorityLayers(general);
-      if (SolvePriorityLayers(layers, extra, include_soft)) return true;
       if (guard_error_) return false;
       continue;
     }
     if (!solve_before_edges_.empty()) {
-      // Real variables are committed first (as in the flat pass), so any
-      // ordered integral group is completed against them.
-      for (auto& [name, var] : variables_) {
-        if (var.enabled && var.is_real) {
-          real_values_[name] = GenerateRandRealValue(var);
-        }
+      if (RunStagedSolve(
+              variables_, real_values_, values_, /*use_priority=*/false,
+              [this](RandVariable& var) { return GenerateRandRealValue(var); },
+              [this](const std::vector<std::string>& general) {
+                return ComputeSolveGroups(general);
+              },
+              [&](const std::vector<std::vector<std::string>>& groups) {
+                return SolveOrderedGroups(groups, 0, extra, include_soft);
+              })) {
+        return true;
       }
-      std::vector<std::string> general;
-      for (auto& [name, var] : variables_) {
-        if (!var.enabled || var.is_real) continue;
-        // randc, array-size, and inactive variables are already committed.
-        if (values_.find(name) != values_.end()) continue;
-        general.push_back(name);
-      }
-      auto groups = ComputeSolveGroups(general);
-      if (SolveOrderedGroups(groups, 0, extra, include_soft)) return true;
       if (guard_error_) return false;
       continue;
     }

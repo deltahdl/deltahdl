@@ -8,6 +8,7 @@
 #include "common/diagnostic.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
+#include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast.h"
@@ -580,18 +581,8 @@ static uint32_t InferTypeRefExprWidth(const Expr* expr,
         if (v.name == expr->text) return v.width;
       }
       return 0;
-    case ExprKind::kIntegerLiteral: {
-      auto tick = expr->text.find('\'');
-      if (tick != std::string_view::npos && tick > 0) {
-        uint32_t w = 0;
-        for (size_t i = 0; i < tick; ++i) {
-          char c = expr->text[i];
-          if (c >= '0' && c <= '9') w = w * 10 + (c - '0');
-        }
-        if (w > 0) return w;
-      }
-      return 32;
-    }
+    case ExprKind::kIntegerLiteral:
+      return ExtractLiteralWidth(expr->text);
     case ExprKind::kBinary: {
       uint32_t lw = InferTypeRefExprWidth(expr->lhs, mod);
       uint32_t rw = InferTypeRefExprWidth(expr->rhs, mod);

@@ -20,6 +20,23 @@ static bool IsRealDataType(DataTypeKind kind) {
          kind == DataTypeKind::kRealtime;
 }
 
+// Builds a name->member map of the class properties visible in `cls`, walking
+// the base-class chain so that a derived declaration shadows a base one (the
+// most-derived binding is kept).
+static std::unordered_map<std::string_view, const ClassMember*>
+BuildClassPropertyMap(const ClassDecl* cls, const CompilationUnit* unit) {
+  std::unordered_map<std::string_view, const ClassMember*> properties;
+  for (const ClassDecl* c = cls; c;
+       c = c->base_class.empty() ? nullptr
+                                 : FindClassDecl(c->base_class, unit)) {
+    for (const auto* m : c->members) {
+      if (m->kind != ClassMemberKind::kProperty || m->name.empty()) continue;
+      properties.emplace(m->name, m);  // keeps the most-derived binding
+    }
+  }
+  return properties;
+}
+
 void Elaborator::ValidateOneClassRandomVariables(const ClassDecl* cls) {
   for (const auto* m : cls->members) {
     if (m->kind != ClassMemberKind::kProperty) continue;
@@ -134,15 +151,7 @@ static bool IsSimpleIntegralVectorKind(DataTypeKind k) {
 // excludes scalars (not array variables, hence outside this rule) and complex
 // types whose dimensionality is not fully visible.
 void Elaborator::ValidateOneClassForeachConstraintDims(const ClassDecl* cls) {
-  std::unordered_map<std::string_view, const ClassMember*> properties;
-  for (const ClassDecl* c = cls; c;
-       c = c->base_class.empty() ? nullptr
-                                 : FindClassDecl(c->base_class, unit_)) {
-    for (const auto* m : c->members) {
-      if (m->kind != ClassMemberKind::kProperty || m->name.empty()) continue;
-      properties.emplace(m->name, m);  // keeps the most-derived binding
-    }
-  }
+  auto properties = BuildClassPropertyMap(cls, unit_);
 
   for (const auto* m : cls->members) {
     if (m->kind != ClassMemberKind::kConstraint) continue;
@@ -200,15 +209,7 @@ bool Elaborator::IsSolveOrderableType(const DataType& dt) const {
 // resolve to a property — a hierarchical reference or an array.size() method
 // (expressly allowed as an ordering variable) is left alone.
 void Elaborator::ValidateOneClassSolveBeforeConstraints(const ClassDecl* cls) {
-  std::unordered_map<std::string_view, const ClassMember*> properties;
-  for (const ClassDecl* c = cls; c;
-       c = c->base_class.empty() ? nullptr
-                                 : FindClassDecl(c->base_class, unit_)) {
-    for (const auto* m : c->members) {
-      if (m->kind != ClassMemberKind::kProperty || m->name.empty()) continue;
-      properties.emplace(m->name, m);  // keeps the most-derived binding
-    }
-  }
+  auto properties = BuildClassPropertyMap(cls, unit_);
 
   // Aggregate every ordering edge (a variable solved before another) across the
   // class's constraint blocks so a circular dependency that spans more than one
@@ -313,15 +314,7 @@ void Elaborator::ValidateSolveBeforeConstraints() {
 // local identifiers the parser recorded are considered; a qualified reference
 // or one that does not resolve to a local property is left alone.
 void Elaborator::ValidateOneClassSoftConstraintVariables(const ClassDecl* cls) {
-  std::unordered_map<std::string_view, const ClassMember*> properties;
-  for (const ClassDecl* c = cls; c;
-       c = c->base_class.empty() ? nullptr
-                                 : FindClassDecl(c->base_class, unit_)) {
-    for (const auto* m : c->members) {
-      if (m->kind != ClassMemberKind::kProperty || m->name.empty()) continue;
-      properties.emplace(m->name, m);  // keeps the most-derived binding
-    }
-  }
+  auto properties = BuildClassPropertyMap(cls, unit_);
 
   for (const auto* m : cls->members) {
     if (m->kind != ClassMemberKind::kConstraint) continue;

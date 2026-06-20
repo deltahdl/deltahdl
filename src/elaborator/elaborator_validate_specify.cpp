@@ -14,6 +14,50 @@
 
 namespace delta {
 
+// Validates one terminal of a module path: it must name a port whose direction
+// permits the given role (kInput for path sources, kOutput for destinations;
+// inout is always allowed), it may not be a ref port, and a source must be a
+// net. `role` is the word used in diagnostics ("source"/"destination").
+static void CheckSpecifyPathTerminal(
+    const SpecifyTerminal& t, SourceLoc loc,
+    const std::unordered_map<std::string_view, const PortDecl*>& port_map,
+    const std::unordered_set<std::string_view>& local_signals,
+    Direction allowed_dir, std::string_view role, bool require_net,
+    DiagEngine& diag) {
+  std::string_view dir_phrase =
+      allowed_dir == Direction::kInput ? "input or inout" : "output or inout";
+  if (!t.interface_name.empty()) return;
+  auto it = port_map.find(t.name);
+  if (it != port_map.end()) {
+    const PortDecl* p = it->second;
+    if (p->direction == Direction::kRef) {
+      diag.Error(loc, std::format("ref port '{}' cannot be used as a "
+                                  "terminal in a specify block",
+                                  t.name));
+      return;
+    }
+    if (p->direction != allowed_dir && p->direction != Direction::kInout) {
+      diag.Error(loc, std::format("module path {} '{}' must be "
+                                  "connected to an {} port",
+                                  role, t.name, dir_phrase));
+      return;
+    }
+    if (require_net) {
+      bool is_var = !p->data_type.is_net && !p->data_type.is_interconnect;
+      if (is_var) {
+        diag.Error(
+            loc, std::format("module path source '{}' must be a net", t.name));
+      }
+    }
+    return;
+  }
+  if (local_signals.contains(t.name)) {
+    diag.Error(loc, std::format("module path {} '{}' is not connected "
+                                "to an {} port",
+                                role, t.name, dir_phrase));
+  }
+}
+
 void Elaborator::ValidateSpecifyBlocks() {
   auto check_modules = [&](const std::vector<ModuleDecl*>& modules) {
     for (auto* mod : modules) {
@@ -32,63 +76,15 @@ void Elaborator::ValidateSpecifyBlocks() {
       }
 
       auto check_source = [&](const SpecifyTerminal& t, SourceLoc loc) {
-        if (!t.interface_name.empty()) return;
-        auto it = port_map.find(t.name);
-        if (it != port_map.end()) {
-          const PortDecl* p = it->second;
-          if (p->direction == Direction::kRef) {
-            diag_.Error(loc, std::format("ref port '{}' cannot be used as a "
-                                         "terminal in a specify block",
-                                         t.name));
-            return;
-          }
-          if (p->direction != Direction::kInput &&
-              p->direction != Direction::kInout) {
-            diag_.Error(loc, std::format("module path source '{}' must be "
-                                         "connected to an input or inout port",
-                                         t.name));
-            return;
-          }
-          bool is_var = !p->data_type.is_net && !p->data_type.is_interconnect;
-          if (is_var) {
-            diag_.Error(
-                loc,
-                std::format("module path source '{}' must be a net", t.name));
-          }
-          return;
-        }
-        if (local_signals.contains(t.name)) {
-          diag_.Error(loc,
-                      std::format("module path source '{}' is not connected "
-                                  "to an input or inout port",
-                                  t.name));
-        }
+        CheckSpecifyPathTerminal(t, loc, port_map, local_signals,
+                                 Direction::kInput, "source",
+                                 /*require_net=*/true, diag_);
       };
 
       auto check_destination = [&](const SpecifyTerminal& t, SourceLoc loc) {
-        if (!t.interface_name.empty()) return;
-        auto it = port_map.find(t.name);
-        if (it != port_map.end()) {
-          const PortDecl* p = it->second;
-          if (p->direction == Direction::kRef) {
-            diag_.Error(loc, std::format("ref port '{}' cannot be used as a "
-                                         "terminal in a specify block",
-                                         t.name));
-            return;
-          }
-          if (p->direction != Direction::kOutput &&
-              p->direction != Direction::kInout) {
-            diag_.Error(loc, std::format("module path destination '{}' must be "
-                                         "connected to an output or inout port",
-                                         t.name));
-          }
-          return;
-        }
-        if (local_signals.contains(t.name)) {
-          diag_.Error(loc, std::format("module path destination '{}' is not "
-                                       "connected to an output or inout port",
-                                       t.name));
-        }
+        CheckSpecifyPathTerminal(t, loc, port_map, local_signals,
+                                 Direction::kOutput, "destination",
+                                 /*require_net=*/false, diag_);
       };
 
       auto check_timing_terminal = [&](const SpecifyTerminal& t,

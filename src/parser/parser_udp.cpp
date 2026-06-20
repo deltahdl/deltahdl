@@ -1,4 +1,5 @@
 #include "parser/parser.h"
+#include "parser/parser_instance_internal.h"
 
 namespace delta {
 
@@ -8,24 +9,8 @@ ModuleItem* Parser::ParseOneUdpInstance(const Token& udp_tok, SourceLoc loc) {
   item->loc = loc;
   item->inst_module = udp_tok.text;
 
-  if (CheckIdentifier() && !Check(TokenKind::kLParen)) {
-    item->gate_inst_name = Consume().text;
-    if (Check(TokenKind::kLBracket)) {
-      Consume();
-      item->inst_range_left = ParseExpr();
-      if (Match(TokenKind::kColon)) {
-        item->inst_range_right = ParseExpr();
-      }
-      Expect(TokenKind::kRBracket);
-    }
-  }
-
-  Expect(TokenKind::kLParen);
-  item->gate_terminals.push_back(ParseExpr());
-  while (Match(TokenKind::kComma)) {
-    item->gate_terminals.push_back(ParseExpr());
-  }
-  Expect(TokenKind::kRParen);
+  ParseGateInstanceTail(*this, item,
+                        CheckIdentifier() && !Check(TokenKind::kLParen));
   return item;
 }
 

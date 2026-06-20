@@ -334,6 +334,23 @@ static double RealVecToDouble(const Logic4Vec& v) {
   return d;
 }
 
+static Logic4Vec ConvertToRealIfNeeded(double d, uint32_t target_width,
+                                       Arena& arena) {
+  if (target_width == 32) {
+    auto f = static_cast<float>(d);
+    uint32_t fbits = 0;
+    std::memcpy(&fbits, &f, sizeof(float));
+    auto result = MakeLogic4VecVal(arena, 32, fbits);
+    result.is_real = true;
+    return result;
+  }
+  uint64_t dbits = 0;
+  std::memcpy(&dbits, &d, sizeof(double));
+  auto result = MakeLogic4VecVal(arena, 64, dbits);
+  result.is_real = true;
+  return result;
+}
+
 static Logic4Vec ConvertRealOnAssign(Logic4Vec rhs_val, const Expr* lhs,
                                      uint32_t target_width, SimContext& ctx,
                                      Arena& arena) {
@@ -352,35 +369,11 @@ static Logic4Vec ConvertRealOnAssign(Logic4Vec rhs_val, const Expr* lhs,
                        ? (rhs_val.words[0].aval & ~rhs_val.words[0].bval)
                        : 0;
     auto d = static_cast<double>(raw);
-    if (target_width == 32) {
-      auto f = static_cast<float>(d);
-      uint32_t fbits = 0;
-      std::memcpy(&fbits, &f, sizeof(float));
-      auto result = MakeLogic4VecVal(arena, 32, fbits);
-      result.is_real = true;
-      return result;
-    }
-    uint64_t dbits = 0;
-    std::memcpy(&dbits, &d, sizeof(double));
-    auto result = MakeLogic4VecVal(arena, 64, dbits);
-    result.is_real = true;
-    return result;
+    return ConvertToRealIfNeeded(d, target_width, arena);
   }
   if (rhs_val.is_real && lhs_is_real && rhs_val.width != target_width) {
     double d = RealVecToDouble(rhs_val);
-    if (target_width == 32) {
-      auto f = static_cast<float>(d);
-      uint32_t fbits = 0;
-      std::memcpy(&fbits, &f, sizeof(float));
-      auto result = MakeLogic4VecVal(arena, 32, fbits);
-      result.is_real = true;
-      return result;
-    }
-    uint64_t dbits = 0;
-    std::memcpy(&dbits, &d, sizeof(double));
-    auto result = MakeLogic4VecVal(arena, 64, dbits);
-    result.is_real = true;
-    return result;
+    return ConvertToRealIfNeeded(d, target_width, arena);
   }
   return ResizeToWidth(rhs_val, target_width, arena);
 }

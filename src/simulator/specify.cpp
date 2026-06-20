@@ -472,12 +472,21 @@ bool SpecifyManager::CheckRecoveryViolation(std::string_view ref,
   return false;
 }
 
-bool SpecifyManager::CheckRecremViolation(std::string_view ref,
-                                          uint64_t ref_time,
-                                          std::string_view data,
-                                          uint64_t data_time) const {
-  for (const auto& check : timing_checks_) {
-    if (check.kind != TimingCheckKind::kRecrem) continue;
+// Shared implementation for the two-sided timing checks (recrem / setuphold).
+// Both checks share an identical structure: filter by kind/signals, handle the
+// negative-timing-check window, then compare the elapsed time against a pair of
+// limits. The only behavioral difference is which limit applies on each side of
+// the reference time: recrem uses limit2 for the "before" side and limit for
+// the "after" side, while setuphold uses the opposite. `lower_side_limit`
+// selects which member is compared when data_time <= ref_time, and
+// `upper_side_limit` when data_time > ref_time.
+static bool CheckTimingViolation(
+    const std::vector<TimingCheckEntry>& timing_checks, TimingCheckKind kind,
+    std::string_view ref, uint64_t ref_time, std::string_view data,
+    uint64_t data_time, uint64_t TimingCheckEntry::* lower_side_limit,
+    uint64_t TimingCheckEntry::* upper_side_limit) {
+  for (const auto& check : timing_checks) {
+    if (check.kind != kind) continue;
     if (check.ref_signal != ref) continue;
     if (check.data_signal != data) continue;
     if (check.negative_timing_check_enabled) {
@@ -491,12 +500,21 @@ bool SpecifyManager::CheckRecremViolation(std::string_view ref,
 
     if (check.limit == 0 && check.limit2 == 0) continue;
     if (data_time <= ref_time) {
-      if (ref_time - data_time < check.limit2) return true;
+      if (ref_time - data_time < check.*lower_side_limit) return true;
     } else {
-      if (data_time - ref_time < check.limit) return true;
+      if (data_time - ref_time < check.*upper_side_limit) return true;
     }
   }
   return false;
+}
+
+bool SpecifyManager::CheckRecremViolation(std::string_view ref,
+                                          uint64_t ref_time,
+                                          std::string_view data,
+                                          uint64_t data_time) const {
+  return CheckTimingViolation(
+      timing_checks_, TimingCheckKind::kRecrem, ref, ref_time, data, data_time,
+      &TimingCheckEntry::limit2, &TimingCheckEntry::limit);
 }
 
 bool SpecifyManager::CheckSkewViolation(std::string_view ref, uint64_t ref_time,
@@ -798,27 +816,9 @@ bool SpecifyManager::CheckSetupholdViolation(std::string_view ref,
                                              uint64_t ref_time,
                                              std::string_view data,
                                              uint64_t data_time) const {
-  for (const auto& check : timing_checks_) {
-    if (check.kind != TimingCheckKind::kSetuphold) continue;
-    if (check.ref_signal != ref) continue;
-    if (check.data_signal != data) continue;
-    if (check.negative_timing_check_enabled) {
-      const int64_t ref_t = static_cast<int64_t>(ref_time);
-      const int64_t data_t = static_cast<int64_t>(data_time);
-      const int64_t lower = ref_t - check.signed_limit;
-      const int64_t upper = ref_t + check.signed_limit2;
-      if (data_t > lower && data_t < upper) return true;
-      continue;
-    }
-
-    if (check.limit == 0 && check.limit2 == 0) continue;
-    if (data_time <= ref_time) {
-      if (ref_time - data_time < check.limit) return true;
-    } else {
-      if (data_time - ref_time < check.limit2) return true;
-    }
-  }
-  return false;
+  return CheckTimingViolation(
+      timing_checks_, TimingCheckKind::kSetuphold, ref, ref_time, data,
+      data_time, &TimingCheckEntry::limit, &TimingCheckEntry::limit2);
 }
 
 }  // namespace delta

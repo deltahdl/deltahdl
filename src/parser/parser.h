@@ -19,6 +19,12 @@ class Parser {
   CompilationUnit* ParseLibraryText();
 
  private:
+  // Shared gate/UDP instance-tail parser (see parser_instance_internal.h).
+  friend void ParseGateInstanceTail(Parser& p, ModuleItem* item, bool has_name);
+  // File-local CPD-dedup helpers (defined static in their respective TUs).
+  friend struct ParserStmtHelpers;
+  friend struct ParserPortHelpers;
+
   void ParseTopLevel(CompilationUnit* unit);
   bool TryParsePrimaryTopLevel(CompilationUnit* unit);
   bool TryParseAnonymousProgram(CompilationUnit* unit);

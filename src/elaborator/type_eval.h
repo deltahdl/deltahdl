@@ -66,6 +66,11 @@ bool IsCastCompatible(const DataType& a, const DataType& b);
 
 bool IsTypeIncompatible(const DataType& a, const DataType& b);
 
+// Returns the bit width implied by a cast target type name (built-in keyword or
+// a leading decimal width such as "12"); returns 0 for "string" and any name
+// that has no fixed bit width. Defined once in type_eval.cpp.
+uint32_t CastTargetWidth(std::string_view type_name);
+
 uint32_t InferExprWidth(const Expr* expr, const TypedefMap& typedefs);
 
 uint32_t ContextWidth(const Expr* expr, uint32_t ctx_width,

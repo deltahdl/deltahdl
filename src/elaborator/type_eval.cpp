@@ -4,6 +4,7 @@
 #include <cstdlib>
 
 #include "elaborator/const_eval.h"
+#include "elaborator/elaborator_validate_internal.h"
 #include "lexer/token.h"
 #include "parser/ast.h"
 
@@ -527,7 +528,7 @@ static bool IsReductionOp(TokenKind op) {
          op == TokenKind::kCaretTilde;
 }
 
-static uint32_t CastTargetWidth(std::string_view type_name) {
+uint32_t CastTargetWidth(std::string_view type_name) {
   if (type_name == "byte") return 8;
   if (type_name == "shortint") return 16;
   if (type_name == "int") return 32;
@@ -538,6 +539,7 @@ static uint32_t CastTargetWidth(std::string_view type_name) {
   if (type_name == "bit") return 1;
   if (type_name == "logic") return 1;
   if (type_name == "reg") return 1;
+  if (type_name == "string") return 0;
   if (!type_name.empty() && type_name[0] >= '0' && type_name[0] <= '9') {
     uint32_t w = 0;
     for (char c : type_name) {
@@ -559,18 +561,8 @@ static bool IsShiftOp(TokenKind op) {
 uint32_t InferExprWidth(const Expr* expr, const TypedefMap& typedefs) {
   if (!expr) return 0;
   switch (expr->kind) {
-    case ExprKind::kIntegerLiteral: {
-      auto tick = expr->text.find('\'');
-      if (tick != std::string_view::npos && tick > 0) {
-        uint32_t w = 0;
-        for (size_t i = 0; i < tick; ++i) {
-          char c = expr->text[i];
-          if (c >= '0' && c <= '9') w = w * 10 + (c - '0');
-        }
-        if (w > 0) return w;
-      }
-      return 32;
-    }
+    case ExprKind::kIntegerLiteral:
+      return ExtractLiteralWidth(expr->text);
     case ExprKind::kRealLiteral:
     case ExprKind::kTimeLiteral:
       return 64;

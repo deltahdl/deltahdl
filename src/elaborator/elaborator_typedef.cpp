@@ -135,6 +135,24 @@ void Elaborator::ElaborateTypedef(ModuleItem* item, RtlirModule* mod) {
   int64_t next_val = 0;
   auto width = EvalTypeWidth(item->typedef_type, typedefs_);
   std::vector<RtlirEnumMember> members;
+  // Records one enum member (name + current value), reserving its name and
+  // emitting a backing variable, then advances the running value.
+  auto emit_member = [&](std::string_view name) {
+    enum_member_names_.insert(name);
+    members.push_back({name, next_val});
+    RtlirVariable var;
+    var.name = name;
+    var.width = width;
+    var.is_4state = false;
+    mod->variables.push_back(var);
+    ++next_val;
+  };
+  // Builds an arena-owned "<base><index>" name and emits it as a member.
+  auto emit_indexed_member = [&](std::string_view base, int64_t index) {
+    auto s = std::format("{}{}", base, index);
+    auto* p = arena_.AllocString(s.c_str(), s.size());
+    emit_member(std::string_view{p, s.size()});
+  };
   for (const auto& member : item->typedef_type.enum_members) {
     if (member.value) {
       next_val = ConstEvalInt(member.value).value_or(next_val);
@@ -146,43 +164,16 @@ void Elaborator::ElaborateTypedef(ModuleItem* item, RtlirModule* mod) {
         auto m = ConstEvalInt(member.range_end).value_or(0);
         int step = (m >= n) ? 1 : -1;
         for (auto i = n;; i += step) {
-          auto s = std::format("{}{}", member.name, i);
-          auto* p = arena_.AllocString(s.c_str(), s.size());
-          std::string_view sv{p, s.size()};
-          enum_member_names_.insert(sv);
-          members.push_back({sv, next_val});
-          RtlirVariable var;
-          var.name = sv;
-          var.width = width;
-          var.is_4state = false;
-          mod->variables.push_back(var);
-          ++next_val;
+          emit_indexed_member(member.name, i);
           if (i == m) break;
         }
       } else {
         for (int64_t i = 0; i < n; ++i) {
-          auto s = std::format("{}{}", member.name, i);
-          auto* p = arena_.AllocString(s.c_str(), s.size());
-          std::string_view sv{p, s.size()};
-          enum_member_names_.insert(sv);
-          members.push_back({sv, next_val});
-          RtlirVariable var;
-          var.name = sv;
-          var.width = width;
-          var.is_4state = false;
-          mod->variables.push_back(var);
-          ++next_val;
+          emit_indexed_member(member.name, i);
         }
       }
     } else {
-      enum_member_names_.insert(member.name);
-      members.push_back({member.name, next_val});
-      RtlirVariable var;
-      var.name = member.name;
-      var.width = width;
-      var.is_4state = false;
-      mod->variables.push_back(var);
-      ++next_val;
+      emit_member(member.name);
     }
   }
   mod->enum_types[item->name] = std::move(members);

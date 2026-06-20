@@ -22,6 +22,11 @@ namespace delta {
 using TypeMap = std::unordered_map<std::string_view, DataTypeKind>;
 using NameSet = std::unordered_set<std::string_view>;
 
+// Parses the size prefix of an integer literal's text (the digits before the
+// base tick "'"). Returns that width when present and positive, otherwise the
+// default unsized-literal width of 32. Defined in elaborator_validate.cpp.
+uint32_t ExtractLiteralWidth(std::string_view text);
+
 // Defined in elaborator_validate.cpp.
 std::optional<int64_t> ComputeDimSize(const Expr* dim);
 std::string_view LhsBaseName(const Expr* e);

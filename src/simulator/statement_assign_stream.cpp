@@ -59,10 +59,9 @@ struct StreamElemInfo {
   std::string target_name;
 };
 
-static bool ResolveWithRangeForUnpack(const Expr* with_expr, SimContext& ctx,
-                                      Arena& arena, uint32_t array_size,
-                                      uint32_t array_lo, uint32_t& out_start,
-                                      uint32_t& out_count) {
+bool ResolveWithRange(const Expr* with_expr, SimContext& ctx, Arena& arena,
+                      uint32_t array_size, uint32_t array_lo,
+                      uint32_t& out_start, uint32_t& out_count) {
   if (!with_expr || with_expr->kind != ExprKind::kSelect) {
     out_start = 0;
     out_count = array_size;
@@ -122,16 +121,16 @@ static uint32_t CollectStreamElements(const Expr* lhs, SimContext& ctx,
       if (elem->with_expr && elem->kind == ExprKind::kIdentifier) {
         if (auto* ainfo = ctx.FindArrayInfo(elem->text)) {
           uint32_t start = 0, count = 0;
-          ResolveWithRangeForUnpack(elem->with_expr, ctx, arena, ainfo->size,
-                                    ainfo->lo, start, count);
+          ResolveWithRange(elem->with_expr, ctx, arena, ainfo->size, ainfo->lo,
+                           start, count);
           if (start + count > ainfo->size)
             count = (start < ainfo->size) ? ainfo->size - start : 0;
           fixed_sum += count * ainfo->elem_width;
         } else if (auto* queue = ctx.FindQueue(elem->text)) {
           uint32_t start = 0, count = 0;
-          ResolveWithRangeForUnpack(
-              elem->with_expr, ctx, arena,
-              static_cast<uint32_t>(queue->elements.size()), 0, start, count);
+          ResolveWithRange(elem->with_expr, ctx, arena,
+                           static_cast<uint32_t>(queue->elements.size()), 0,
+                           start, count);
           fixed_sum += count * queue->elem_width;
         }
         continue;
@@ -149,8 +148,8 @@ static uint32_t CollectStreamElements(const Expr* lhs, SimContext& ctx,
     if (elem->with_expr && elem->kind == ExprKind::kIdentifier) {
       if (auto* ainfo = ctx.FindArrayInfo(elem->text)) {
         uint32_t start = 0, count = 0;
-        bool in_range = ResolveWithRangeForUnpack(
-            elem->with_expr, ctx, arena, ainfo->size, ainfo->lo, start, count);
+        bool in_range = ResolveWithRange(elem->with_expr, ctx, arena,
+                                         ainfo->size, ainfo->lo, start, count);
         if (!in_range || start + count > ainfo->size) {
           uint32_t clamped = (start < ainfo->size) ? ainfo->size - start : 0;
           ctx.GetDiag().Error(
@@ -168,9 +167,9 @@ static uint32_t CollectStreamElements(const Expr* lhs, SimContext& ctx,
       }
       if (auto* queue = ctx.FindQueue(elem->text)) {
         uint32_t start = 0, count = 0;
-        ResolveWithRangeForUnpack(elem->with_expr, ctx, arena,
-                                  static_cast<uint32_t>(queue->elements.size()),
-                                  0, start, count);
+        ResolveWithRange(elem->with_expr, ctx, arena,
+                         static_cast<uint32_t>(queue->elements.size()), 0,
+                         start, count);
         uint32_t needed = start + count;
         while (queue->elements.size() < needed) {
           queue->elements.push_back(MakeLogic4Vec(arena, queue->elem_width));
@@ -333,8 +332,8 @@ static void UnpackStreamingConcatLhsForward(const Expr* lhs,
     if (elem->with_expr && elem->kind == ExprKind::kIdentifier) {
       if (auto* ainfo = ctx.FindArrayInfo(elem->text)) {
         uint32_t start = 0, count = 0;
-        bool in_range = ResolveWithRangeForUnpack(
-            elem->with_expr, ctx, arena, ainfo->size, ainfo->lo, start, count);
+        bool in_range = ResolveWithRange(elem->with_expr, ctx, arena,
+                                         ainfo->size, ainfo->lo, start, count);
         if (!in_range || start + count > ainfo->size) {
           ctx.GetDiag().Error(
               {}, "streaming unpack with-range exceeds fixed array bounds");
@@ -356,9 +355,9 @@ static void UnpackStreamingConcatLhsForward(const Expr* lhs,
       }
       if (auto* queue = ctx.FindQueue(elem->text)) {
         uint32_t start = 0, count = 0;
-        ResolveWithRangeForUnpack(elem->with_expr, ctx, arena,
-                                  static_cast<uint32_t>(queue->elements.size()),
-                                  0, start, count);
+        ResolveWithRange(elem->with_expr, ctx, arena,
+                         static_cast<uint32_t>(queue->elements.size()), 0,
+                         start, count);
         uint32_t needed = start + count;
         while (queue->elements.size() < needed)
           queue->elements.push_back(MakeLogic4Vec(arena, queue->elem_width));

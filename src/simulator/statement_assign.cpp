@@ -13,9 +13,11 @@
 #include "parser/ast.h"
 #include "simulator/class_object.h"
 #include "simulator/eval_array.h"
+#include "simulator/eval_expr_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
+#include "simulator/statement_assign_internal.h"
 
 namespace delta {
 
@@ -33,18 +35,6 @@ void BuildLhsName(const Expr* expr, std::string& out) {
     out += ".";
     BuildLhsName(expr->rhs, out);
   }
-}
-
-static std::string StripRootPrefix(const std::string& name) {
-  constexpr std::string_view kPrefix = "$root.";
-  if (name.size() > kPrefix.size() &&
-      std::string_view(name).substr(0, kPrefix.size()) == kPrefix) {
-    auto rest = std::string_view(name).substr(kPrefix.size());
-    auto dot = rest.find('.');
-    if (dot != std::string_view::npos) return std::string(rest.substr(dot + 1));
-    return std::string(rest);
-  }
-  return name;
 }
 
 Variable* TryResolveArrayElement(const Expr* lhs, SimContext& ctx) {
@@ -314,14 +304,14 @@ static void CopyArrayElements(std::string_view dst_name, const ArrayInfo& dst,
   }
 }
 
-static bool IsTypeKeyword(std::string_view key) {
+bool IsTypeKeyword(std::string_view key) {
   return key == "int" || key == "integer" || key == "logic" || key == "reg" ||
          key == "byte" || key == "shortint" || key == "longint" ||
          key == "bit" || key == "real" || key == "shortreal" || key == "time" ||
          key == "realtime" || key == "string";
 }
 
-static bool TypeKeyMatchesKind(std::string_view key, DataTypeKind kind) {
+bool TypeKeyMatchesKind(std::string_view key, DataTypeKind kind) {
   switch (kind) {
     case DataTypeKind::kInt:
       return key == "int";

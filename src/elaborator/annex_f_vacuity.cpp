@@ -3,15 +3,22 @@
 #include <algorithm>
 #include <cstddef>
 #include <memory>
+#include <set>
+#include <string>
+#include <utility>
+#include <vector>
 
 #include "elaborator/annex_f_grammar.h"
 #include "elaborator/annex_f_neutral_satisfaction.h"
 #include "elaborator/annex_f_tight_satisfaction.h"
+#include "elaborator/annex_f_word_ops_internal.h"
 
 namespace delta {
-namespace {
 
-// §F.5 (page 1246): w-bar interchanges T and _|_; a letter in 2^P is unchanged.
+// This translation unit is the single definition site for the generic word,
+// letter, and alphabet utilities declared in annex_f_word_ops_internal.h; the
+// other Annex F satisfaction layers include that header rather than copy these.
+
 Letter ComplementLetter(const Letter& letter) {
   switch (letter.kind) {
     case Letter::Kind::kTop:
@@ -24,7 +31,6 @@ Letter ComplementLetter(const Letter& letter) {
   return letter;
 }
 
-// §F.5: w-bar, the letterwise complement of the whole word.
 Word ComplementWord(const Word& word) {
   Word out;
   out.reserve(word.size());
@@ -34,8 +40,6 @@ Word ComplementWord(const Word& word) {
   return out;
 }
 
-// §F.5: w^{i.}, the word with its first i letters deleted (empty once i reaches
-// the length of w).
 Word Suffix(const Word& word, std::size_t i) {
   if (i >= word.size()) {
     return Word{};
@@ -43,21 +47,16 @@ Word Suffix(const Word& word, std::size_t i) {
   return Word(word.begin() + static_cast<std::ptrdiff_t>(i), word.end());
 }
 
-// §F.5: w^{0,k}, the finite prefix w^0 w^1 ... w^k (the first k+1 letters).
 Word PrefixInclusive(const Word& word, std::size_t k) {
   const std::size_t count = std::min(k + 1, word.size());
   return Word(word.begin(), word.begin() + static_cast<std::ptrdiff_t>(count));
 }
 
-// §F.5: the first i letters of w; the empty word when i = 0.
 Word FirstLetters(const Word& word, std::size_t i) {
   const std::size_t count = std::min(i, word.size());
   return Word(word.begin(), word.begin() + static_cast<std::ptrdiff_t>(count));
 }
 
-// The least index at which a letter of the word satisfies b, or word.size() if
-// no letter does. With b never satisfied this equals |w|, which is exactly the
-// "for every 0 <= i < |w|, w^i |/= b" condition the abort/disable rules use.
 std::size_t FirstSatisfyingIndex(const Word& word, const BooleanExpr& b) {
   for (std::size_t i = 0; i < word.size(); ++i) {
     if (LetterSatisfiesBoolean(word[i], b)) {
@@ -67,9 +66,6 @@ std::size_t FirstSatisfyingIndex(const Word& word, const BooleanExpr& b) {
   return word.size();
 }
 
-// A structural bound on how far a sequence can reach into a word, mirroring the
-// bound §F.5.3.1 uses: enough tail letters past an explicit prefix that
-// extending a constant T^omega / _|_^omega tail cannot change a tight match.
 std::size_t SequenceReach(const SequenceExpr& seq) {
   switch (seq.kind) {
     case SequenceExpr::Kind::kBoolean:
@@ -96,38 +92,6 @@ std::size_t SequenceReach(const SequenceExpr& seq) {
   return 1;
 }
 
-// A structural bound on how far a property can reach into a word; once a word's
-// suffix lies entirely inside a constant tail this many letters past the
-// explicit prefix, extending the tail cannot change the verdict.
-std::size_t PropertyReach(const PropertyExpr& property) {
-  switch (property.kind) {
-    case PropertyExpr::Kind::kStrong:
-    case PropertyExpr::Kind::kWeak:
-      return property.sequence ? SequenceReach(*property.sequence) : 1;
-    case PropertyExpr::Kind::kParen:
-    case PropertyExpr::Kind::kNot:
-      return property.lhs ? PropertyReach(*property.lhs) : 1;
-    case PropertyExpr::Kind::kImplication:
-      return (property.sequence ? SequenceReach(*property.sequence) : 0) +
-             (property.lhs ? PropertyReach(*property.lhs) : 0);
-    case PropertyExpr::Kind::kOr:
-    case PropertyExpr::Kind::kAnd:
-      return std::max(property.lhs ? PropertyReach(*property.lhs) : 0,
-                      property.rhs ? PropertyReach(*property.rhs) : 0);
-    case PropertyExpr::Kind::kUntil:
-      return (property.lhs ? PropertyReach(*property.lhs) : 0) +
-             (property.rhs ? PropertyReach(*property.rhs) : 0) + 1;
-    case PropertyExpr::Kind::kNexttime:
-    case PropertyExpr::Kind::kAcceptOn:
-      return (property.lhs ? PropertyReach(*property.lhs) : 0) + 1;
-  }
-  return 1;
-}
-
-// A finite materialization of a prefix followed by a constant tail (T^omega or
-// _|_^omega), padded `reach` letters past the prefix plus a margin -- enough
-// for the verdict to have stabilized for the finite properties this model
-// handles, matching §F.5.3.1's PrefixWithTail.
 Word PrefixWithTail(const Word& prefix, const Letter& tail, std::size_t reach) {
   Word out = prefix;
   const std::size_t pad = reach + 2;
@@ -137,35 +101,76 @@ Word PrefixWithTail(const Word& prefix, const Letter& tail, std::size_t reach) {
   return out;
 }
 
+void CollectAtoms(const BooleanExpr& b, std::set<std::string>& out) {
+  switch (b.kind) {
+    case BooleanExpr::Kind::kTrue:
+      return;
+    case BooleanExpr::Kind::kAtom:
+      out.insert(b.atom);
+      return;
+    case BooleanExpr::Kind::kNot:
+      CollectAtoms(*b.operand_a, out);
+      return;
+    case BooleanExpr::Kind::kAnd:
+      CollectAtoms(*b.operand_a, out);
+      CollectAtoms(*b.operand_b, out);
+      return;
+  }
+}
+
+void CollectSequenceAtoms(const SequenceExpr& seq, std::set<std::string>& out,
+                          std::size_t& leaf_count) {
+  if (seq.kind == SequenceExpr::Kind::kBoolean && seq.boolean != nullptr) {
+    CollectAtoms(*seq.boolean, out);
+    ++leaf_count;
+  }
+  if (seq.kind == SequenceExpr::Kind::kClock && seq.boolean != nullptr) {
+    CollectAtoms(*seq.boolean, out);
+  }
+  if (seq.kind == SequenceExpr::Kind::kLocalVarSampling) {
+    ++leaf_count;
+  }
+  if (seq.lhs != nullptr) {
+    CollectSequenceAtoms(*seq.lhs, out, leaf_count);
+  }
+  if (seq.rhs != nullptr) {
+    CollectSequenceAtoms(*seq.rhs, out, leaf_count);
+  }
+}
+
+std::vector<Letter> CandidateAlphabet(const std::set<std::string>& atoms) {
+  std::vector<Letter> letters{LetterTop(), LetterBottom()};
+  std::vector<std::string> names(atoms.begin(), atoms.end());
+  if (names.size() > 6) {
+    return letters;
+  }
+  const std::size_t subset_count = std::size_t{1} << names.size();
+  for (std::size_t mask = 0; mask < subset_count; ++mask) {
+    std::set<std::string> subset;
+    for (std::size_t i = 0; i < names.size(); ++i) {
+      if ((mask & (std::size_t{1} << i)) != 0) {
+        subset.insert(names[i]);
+      }
+    }
+    letters.push_back(LetterAtoms(std::move(subset)));
+  }
+  return letters;
+}
+
+namespace {
+
 bool NonVacuous(const Word& word, const PropertyExpr& property);
 
-// §F.5.3.3: the abort/disable family shares one shape. w |=^non OP(b) P iff
-// w |=^non P and one of: (1) for every 0 <= i < |w|, w^i |/= b; or (2) there is
-// a prefix x of w with no letter satisfying b such that x _|_^omega |/= P or
-// x T^omega |/= P. accept_on (b) P and disable iff (b) P both use this rule.
+// §F.5.3.3 abort/disable shape, specialized for the plain (no local-variable)
+// property layer: non-vacuity and neutral satisfaction take no context.
 bool NonVacuousAbortShape(const Word& word, const BooleanExpr& boolean,
                           const PropertyExpr& operand) {
-  if (!NonVacuous(word, operand)) {
-    return false;
-  }
-  const std::size_t first_b = FirstSatisfyingIndex(word, boolean);
-  // (1) No letter of w satisfies b.
-  if (first_b == word.size()) {
-    return true;
-  }
-  // (2) Some b-free prefix x leaves P unmet under one of the constant tails.
-  // The prefixes with no b-letter are exactly those of length 0..first_b.
-  const std::size_t reach = PropertyReach(operand);
-  for (std::size_t len = 0; len <= first_b; ++len) {
-    const Word prefix = FirstLetters(word, len);
-    const Word bottom = PrefixWithTail(prefix, LetterBottom(), reach);
-    const Word top = PrefixWithTail(prefix, LetterTop(), reach);
-    if (!NeutrallySatisfies(bottom, operand) ||
-        !NeutrallySatisfies(top, operand)) {
-      return true;
-    }
-  }
-  return false;
+  return ::delta::NonVacuousAbortShape(
+      word, boolean, operand,
+      [](const Word& w, const PropertyExpr& p) { return NonVacuous(w, p); },
+      [](const Word& w, const PropertyExpr& p) {
+        return NeutrallySatisfies(w, p);
+      });
 }
 
 bool NonVacuous(const Word& word, const PropertyExpr& property) {

@@ -1,6 +1,28 @@
 #include "parser/parser.h"
+#include "parser/parser_instance_internal.h"
 
 namespace delta {
+
+void ParseGateInstanceTail(Parser& p, ModuleItem* item, bool has_name) {
+  if (has_name) {
+    item->gate_inst_name = p.Consume().text;
+    if (p.Check(TokenKind::kLBracket)) {
+      p.Consume();
+      item->inst_range_left = p.ParseExpr();
+      if (p.Match(TokenKind::kColon)) {
+        item->inst_range_right = p.ParseExpr();
+      }
+      p.Expect(TokenKind::kRBracket);
+    }
+  }
+
+  p.Expect(TokenKind::kLParen);
+  item->gate_terminals.push_back(p.ParseExpr());
+  while (p.Match(TokenKind::kComma)) {
+    item->gate_terminals.push_back(p.ParseExpr());
+  }
+  p.Expect(TokenKind::kRParen);
+}
 
 static bool GateAllowsStrength(GateKind kind) {
   switch (kind) {
@@ -342,24 +364,7 @@ ModuleItem* Parser::ParseOneGateInstance(GateKind kind, SourceLoc loc) {
   item->loc = loc;
   item->gate_kind = kind;
 
-  if (Check(TokenKind::kIdentifier)) {
-    item->gate_inst_name = Consume().text;
-    if (Check(TokenKind::kLBracket)) {
-      Consume();
-      item->inst_range_left = ParseExpr();
-      if (Match(TokenKind::kColon)) {
-        item->inst_range_right = ParseExpr();
-      }
-      Expect(TokenKind::kRBracket);
-    }
-  }
-
-  Expect(TokenKind::kLParen);
-  item->gate_terminals.push_back(ParseExpr());
-  while (Match(TokenKind::kComma)) {
-    item->gate_terminals.push_back(ParseExpr());
-  }
-  Expect(TokenKind::kRParen);
+  ParseGateInstanceTail(*this, item, Check(TokenKind::kIdentifier));
   if (!ValidGateTerminalCount(kind, item->gate_terminals.size()))
     diag_.Error(loc, "incorrect number of terminals for gate instance");
   ValidateGateTerminalLvalues(kind, item->gate_terminals, diag_, loc);

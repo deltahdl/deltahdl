@@ -684,6 +684,26 @@ void Elaborator::CheckPortCoercion(const RtlirModuleInst& inst, SourceLoc loc) {
   }
 }
 
+// Looks up a child port by name; returns nullptr when no port matches.
+static const RtlirPort* FindChildPortByName(
+    const std::vector<RtlirPort>& child_ports, std::string_view name) {
+  auto port_it =
+      std::find_if(child_ports.begin(), child_ports.end(),
+                   [&](const RtlirPort& p) { return p.name == name; });
+  if (port_it == child_ports.end()) return nullptr;
+  return &*port_it;
+}
+
+// Resolves the child port a binding connects to, skipping bindings without a
+// connection expression. Returns nullptr when the binding has no connection or
+// names no matching child port.
+static const RtlirPort* FindBoundChildPort(
+    const std::vector<RtlirPort>& child_ports,
+    const RtlirPortBinding& binding) {
+  if (!binding.connection) return nullptr;
+  return FindChildPortByName(child_ports, binding.port_name);
+}
+
 void Elaborator::CheckUwirePortMerge(const RtlirModuleInst& inst,
                                      const ModuleItem* item,
                                      RtlirModule* parent_mod) {
@@ -691,12 +711,8 @@ void Elaborator::CheckUwirePortMerge(const RtlirModuleInst& inst,
   const auto& child_ports = inst.resolved->ports;
 
   for (const auto& binding : inst.port_bindings) {
-    if (!binding.connection) continue;
-
-    auto port_it = std::find_if(
-        child_ports.begin(), child_ports.end(),
-        [&](const RtlirPort& p) { return p.name == binding.port_name; });
-    if (port_it == child_ports.end()) continue;
+    const RtlirPort* port_it = FindBoundChildPort(child_ports, binding);
+    if (!port_it) continue;
 
     NetType internal_net = PortNetType(port_it->type_kind);
     bool internal_is_uwire = (internal_net == NetType::kUwire);
@@ -729,12 +745,8 @@ void Elaborator::CheckInterconnectPortMerge(const RtlirModuleInst& inst,
   const auto& child_ports = inst.resolved->ports;
 
   for (const auto& binding : inst.port_bindings) {
-    if (!binding.connection) continue;
-
-    auto port_it = std::find_if(
-        child_ports.begin(), child_ports.end(),
-        [&](const RtlirPort& p) { return p.name == binding.port_name; });
-    if (port_it == child_ports.end()) continue;
+    const RtlirPort* port_it = FindBoundChildPort(child_ports, binding);
+    if (!port_it) continue;
 
     bool internal_is_interconnect = port_it->is_interconnect;
 
@@ -777,10 +789,9 @@ void Elaborator::ValidateUnpackedArrayPorts(const RtlirModuleInst& inst,
   const auto& child_ports = inst.resolved->ports;
 
   for (const auto& binding : inst.port_bindings) {
-    auto port_it = std::find_if(
-        child_ports.begin(), child_ports.end(),
-        [&](const RtlirPort& p) { return p.name == binding.port_name; });
-    if (port_it == child_ports.end()) continue;
+    const RtlirPort* port_it =
+        FindChildPortByName(child_ports, binding.port_name);
+    if (!port_it) continue;
     if (port_it->num_unpacked_dims == 0) continue;
 
     if (!binding.connection ||
@@ -836,12 +847,8 @@ void Elaborator::ValidateInstanceArrayPorts(
   const auto& child_ports = inst.resolved->ports;
 
   for (const auto& binding : inst.port_bindings) {
-    if (!binding.connection) continue;
-
-    auto port_it = std::find_if(
-        child_ports.begin(), child_ports.end(),
-        [&](const RtlirPort& p) { return p.name == binding.port_name; });
-    if (port_it == child_ports.end()) continue;
+    const RtlirPort* port_it = FindBoundChildPort(child_ports, binding);
+    if (!port_it) continue;
 
     bool conn_is_unpacked = false;
     uint32_t conn_num_dims = 0;

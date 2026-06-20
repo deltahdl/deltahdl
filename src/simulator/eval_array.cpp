@@ -120,10 +120,7 @@ static Logic4Vec ArrayXor(std::string_view var_name, const ArrayInfo& info,
   return MakeLogic4VecVal(arena, info.elem_width, result);
 }
 
-static Logic4Vec ReduceWithExpr(std::string_view var_name,
-                                const ArrayInfo& info, const Expr* expr,
-                                SimContext& ctx, Arena& arena) {
-  auto elems = CollectVecElements(var_name, info, ctx, arena);
+IterNames ExtractIterNames(const Expr* expr) {
   std::string_view iter_name = "item";
   std::string_view index_name = "index";
   if (!expr->args.empty() && expr->args[0] &&
@@ -136,6 +133,16 @@ static Logic4Vec ReduceWithExpr(std::string_view var_name,
   }
   std::string idx_var_name =
       std::string(iter_name) + "." + std::string(index_name);
+  return IterNames{iter_name, index_name, std::move(idx_var_name)};
+}
+
+static Logic4Vec ReduceWithExpr(std::string_view var_name,
+                                const ArrayInfo& info, const Expr* expr,
+                                SimContext& ctx, Arena& arena) {
+  auto elems = CollectVecElements(var_name, info, ctx, arena);
+  auto names = ExtractIterNames(expr);
+  std::string_view iter_name = names.iter_name;
+  const std::string& idx_var_name = names.idx_var_name;
 
   std::vector<uint64_t> vals;
   vals.reserve(elems.size());
@@ -305,18 +312,9 @@ static void ArraySortWithExpr(std::string_view var_name, const ArrayInfo& info,
                               const Expr* expr, bool ascending, SimContext& ctx,
                               Arena& arena) {
   auto vals = CollectVecElements(var_name, info, ctx, arena);
-  std::string_view iter_name = "item";
-  std::string_view index_name = "index";
-  if (!expr->args.empty() && expr->args[0] &&
-      expr->args[0]->kind == ExprKind::kIdentifier) {
-    iter_name = expr->args[0]->text;
-  }
-  if (expr->args.size() >= 2 && expr->args[1] &&
-      expr->args[1]->kind == ExprKind::kIdentifier) {
-    index_name = expr->args[1]->text;
-  }
-  std::string idx_var_name =
-      std::string(iter_name) + "." + std::string(index_name);
+  auto names = ExtractIterNames(expr);
+  std::string_view iter_name = names.iter_name;
+  const std::string& idx_var_name = names.idx_var_name;
 
   std::vector<std::pair<uint64_t, size_t>> keys(vals.size());
   for (size_t i = 0; i < vals.size(); ++i) {

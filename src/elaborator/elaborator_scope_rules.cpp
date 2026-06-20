@@ -295,21 +295,26 @@ void Elaborator::ValidateScopeRules(const ModuleDecl* decl) {
   }
   for (const auto& [name, loc] : walk.proc_lhs) {
     if (walk.local_names.count(name)) continue;
-    if (declared_names_.count(name)) continue;
-    if (ansi_port_names_.count(name)) continue;
-    if (non_ansi_complete_ports_.count(name)) continue;
-    if (non_ansi_partial_ports_.count(name)) continue;
-    if (const_names_.count(name)) continue;
-    if (enum_member_names_.count(name)) continue;
-    if (specparam_names_.count(name)) continue;
-    if (class_names_.count(name)) continue;
-    if (class_var_names_.count(name)) continue;
-    if (task_names_.count(name)) continue;
-    if (func_decls_.count(name)) continue;
-    if (interface_inst_types_.count(name)) continue;
-    if (checker_inst_names_.count(name)) continue;
+    if (IsNameInModuleScope(name)) continue;
     diag_.Error(loc, std::format("undeclared identifier '{}'", name));
   }
+}
+
+bool Elaborator::IsNameInModuleScope(std::string_view name) const {
+  if (declared_names_.count(name)) return true;
+  if (ansi_port_names_.count(name)) return true;
+  if (non_ansi_complete_ports_.count(name)) return true;
+  if (non_ansi_partial_ports_.count(name)) return true;
+  if (const_names_.count(name)) return true;
+  if (enum_member_names_.count(name)) return true;
+  if (specparam_names_.count(name)) return true;
+  if (class_names_.count(name)) return true;
+  if (class_var_names_.count(name)) return true;
+  if (task_names_.count(name)) return true;
+  if (func_decls_.count(name)) return true;
+  if (interface_inst_types_.count(name)) return true;
+  if (checker_inst_names_.count(name)) return true;
+  return false;
 }
 
 void Elaborator::ValidateForwardTypedefsInScope(const ModuleDecl* decl) {

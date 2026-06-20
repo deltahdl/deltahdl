@@ -423,6 +423,32 @@ PLI_INT32 VpiContext::Printf(std::string_view text) {
   return static_cast<PLI_INT32>(text.size());
 }
 
+// Expand a C printf()-style format string and its variable arguments into a
+// std::string, mirroring the measure-then-format idiom used by the VPI printf
+// entry points (§38.28/§38.29/§38.30/§38.41). A copy of the incoming va_list is
+// used for the sizing pass so the original remains valid for the format pass.
+// The caller retains ownership of args: this helper never calls va_end() on it,
+// matching the original per-routine behavior (the variadic callers end their
+// own list, the v-variant callers leave the caller-owned list untouched).
+// Returns false when the format expansion fails (vsnprintf < 0), leaving out
+// untouched.
+static bool FormatVaList(const char* format, va_list args, std::string& out) {
+  va_list measure;
+  va_copy(measure, args);
+  int needed = std::vsnprintf(nullptr, 0, format, measure);
+  va_end(measure);
+  if (needed < 0) {
+    return false;
+  }
+  std::string text(static_cast<std::size_t>(needed), '\0');
+  if (needed > 0) {
+    std::vsnprintf(text.data(), static_cast<std::size_t>(needed) + 1, format,
+                   args);
+  }
+  out = std::move(text);
+  return true;
+}
+
 }  // namespace delta
 
 PLI_INT32 vpi_flush() {
@@ -479,25 +505,17 @@ PLI_INT32 vpi_mcd_printf(PLI_UINT32 mcd, PLI_BYTE8* format, ...) {
   if (format == nullptr) return EOF;
 
   // §38.28: expand the format string with its variable arguments exactly as
-  // C fprintf() would. Measure the result first, then format it into a buffer
-  // of the right size.
+  // C fprintf() would (shared measure-then-format idiom in
+  // delta::FormatVaList).
   va_list args;
   va_start(args, format);
-  va_list measure;
-  va_copy(measure, args);
-  int needed = std::vsnprintf(nullptr, 0, format, measure);
-  va_end(measure);
-  if (needed < 0) {
+  std::string text;
+  bool ok = delta::FormatVaList(format, args, text);
+  va_end(args);
+  if (!ok) {
     // §38.28: the format expansion failed, so report the error with EOF.
-    va_end(args);
     return EOF;
   }
-  std::string text(static_cast<std::size_t>(needed), '\0');
-  if (needed > 0) {
-    std::vsnprintf(text.data(), static_cast<std::size_t>(needed) + 1, format,
-                   args);
-  }
-  va_end(args);
 
   // §38.28: write the expanded text to every named channel and return the
   // number of characters printed.
@@ -516,21 +534,14 @@ PLI_INT32 vpi_mcd_vprintf(PLI_UINT32 mcd, PLI_BYTE8* format, va_list ap) {
   // returning EOF (matching vpi_mcd_printf()).
   if (format == nullptr) return EOF;
 
-  // §38.29: expand the format with the caller's already-started arguments. Use
-  // a copy to measure the length, leaving the caller-owned list for the format
-  // pass; ownership of ap stays with the caller, so it is not ended here.
-  va_list measure;
-  va_copy(measure, ap);
-  int needed = std::vsnprintf(nullptr, 0, format, measure);
-  va_end(measure);
-  if (needed < 0) {
+  // §38.29: expand the format with the caller's already-started arguments
+  // (shared measure-then-format idiom in delta::FormatVaList, which copies ap
+  // for the sizing pass). Ownership of ap stays with the caller, so it is not
+  // ended here.
+  std::string text;
+  if (!delta::FormatVaList(format, ap, text)) {
     // §38.29: the format expansion failed, so report the error with EOF.
     return EOF;
-  }
-  std::string text(static_cast<std::size_t>(needed), '\0');
-  if (needed > 0) {
-    std::vsnprintf(text.data(), static_cast<std::size_t>(needed) + 1, format,
-                   ap);
   }
 
   // §38.29: write the expanded text to every named channel (reusing the §38.28
@@ -550,25 +561,16 @@ PLI_INT32 vpi_printf(PLI_BYTE8* format, ...) {
   if (format == nullptr) return EOF;
 
   // §38.30: expand the format string with its variable arguments exactly as
-  // C printf() would. Measure the result first, then format it into a buffer of
-  // the right size.
+  // C printf() would (shared measure-then-format idiom in delta::FormatVaList).
   va_list args;
   va_start(args, format);
-  va_list measure;
-  va_copy(measure, args);
-  int needed = std::vsnprintf(nullptr, 0, format, measure);
-  va_end(measure);
-  if (needed < 0) {
+  std::string text;
+  bool ok = delta::FormatVaList(format, args, text);
+  va_end(args);
+  if (!ok) {
     // §38.30: the format expansion failed, so report the error with EOF.
-    va_end(args);
     return EOF;
   }
-  std::string text(static_cast<std::size_t>(needed), '\0');
-  if (needed > 0) {
-    std::vsnprintf(text.data(), static_cast<std::size_t>(needed) + 1, format,
-                   args);
-  }
-  va_end(args);
 
   // §38.30: write the expanded text to the tool's output channel and log file
   // and return the number of characters printed.
@@ -587,21 +589,14 @@ PLI_INT32 vpi_vprintf(PLI_BYTE8* format, va_list ap) {
   // EOF (matching vpi_printf()).
   if (format == nullptr) return EOF;
 
-  // §38.41: expand the format with the caller's already-started arguments. Use
-  // a copy to measure the length, leaving the caller-owned list for the format
-  // pass; ownership of ap stays with the caller, so it is not ended here.
-  va_list measure;
-  va_copy(measure, ap);
-  int needed = std::vsnprintf(nullptr, 0, format, measure);
-  va_end(measure);
-  if (needed < 0) {
+  // §38.41: expand the format with the caller's already-started arguments
+  // (shared measure-then-format idiom in delta::FormatVaList, which copies ap
+  // for the sizing pass). Ownership of ap stays with the caller, so it is not
+  // ended here.
+  std::string text;
+  if (!delta::FormatVaList(format, ap, text)) {
     // §38.41: the format expansion failed, so report the error with EOF.
     return EOF;
-  }
-  std::string text(static_cast<std::size_t>(needed), '\0');
-  if (needed > 0) {
-    std::vsnprintf(text.data(), static_cast<std::size_t>(needed) + 1, format,
-                   ap);
   }
 
   // §38.41: write the expanded text to the tool's output channel and log file

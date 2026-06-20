@@ -9,6 +9,7 @@
 
 #include "elaborator/annex_f_grammar.h"
 #include "elaborator/annex_f_sequence_rewrite.h"
+#include "elaborator/annex_f_word_ops_internal.h"
 
 namespace delta {
 
@@ -136,86 +137,6 @@ bool TightSlice(const Word& word, std::size_t lo, std::size_t hi,
   return false;
 }
 
-void CollectAtoms(const BooleanExpr& b, std::set<std::string>& out) {
-  switch (b.kind) {
-    case BooleanExpr::Kind::kTrue:
-      return;
-    case BooleanExpr::Kind::kAtom:
-      out.insert(b.atom);
-      return;
-    case BooleanExpr::Kind::kNot:
-      CollectAtoms(*b.operand_a, out);
-      return;
-    case BooleanExpr::Kind::kAnd:
-      CollectAtoms(*b.operand_a, out);
-      CollectAtoms(*b.operand_b, out);
-      return;
-  }
-}
-
-void CollectSequenceAtoms(const SequenceExpr& seq, std::set<std::string>& out,
-                          std::size_t& leaf_count) {
-  if (seq.kind == SequenceExpr::Kind::kBoolean && seq.boolean != nullptr) {
-    CollectAtoms(*seq.boolean, out);
-    ++leaf_count;
-  }
-  if (seq.kind == SequenceExpr::Kind::kClock && seq.boolean != nullptr) {
-    CollectAtoms(*seq.boolean, out);
-  }
-  if (seq.kind == SequenceExpr::Kind::kLocalVarSampling) {
-    ++leaf_count;
-  }
-  if (seq.lhs != nullptr) {
-    CollectSequenceAtoms(*seq.lhs, out, leaf_count);
-  }
-  if (seq.rhs != nullptr) {
-    CollectSequenceAtoms(*seq.rhs, out, leaf_count);
-  }
-}
-
-// Build the candidate alphabet for the witness search: T, _|_, and every
-// subset of the mentioned atoms. The subset enumeration is capped so the
-// search stays finite; that is ample for the sequences this model evaluates.
-std::vector<Letter> CandidateAlphabet(const std::set<std::string>& atoms) {
-  std::vector<Letter> letters{LetterTop(), LetterBottom()};
-  std::vector<std::string> names(atoms.begin(), atoms.end());
-  if (names.size() > 6) {
-    return letters;
-  }
-  const std::size_t subset_count = std::size_t{1} << names.size();
-  for (std::size_t mask = 0; mask < subset_count; ++mask) {
-    std::set<std::string> subset;
-    for (std::size_t i = 0; i < names.size(); ++i) {
-      if ((mask & (std::size_t{1} << i)) != 0) {
-        subset.insert(names[i]);
-      }
-    }
-    letters.push_back(LetterAtoms(std::move(subset)));
-  }
-  return letters;
-}
-
-bool SomeWordOfLengthSatisfies(const std::vector<Letter>& alphabet,
-                               std::size_t length, const SequenceExpr& seq) {
-  const std::size_t base = alphabet.size();
-  std::size_t total = 1;
-  for (std::size_t i = 0; i < length; ++i) {
-    total *= base;
-  }
-  for (std::size_t code = 0; code < total; ++code) {
-    Word word(length);
-    std::size_t rest = code;
-    for (std::size_t pos = 0; pos < length; ++pos) {
-      word[pos] = alphabet[rest % base];
-      rest /= base;
-    }
-    if (TightSlice(word, 0, length, seq)) {
-      return true;
-    }
-  }
-  return false;
-}
-
 }  // namespace
 
 bool LetterSatisfiesBoolean(const Letter& letter, const BooleanExpr& b) {
@@ -257,7 +178,11 @@ bool IsNondegenerateSequence(const SequenceExpr& sequence) {
   const std::vector<Letter> alphabet = CandidateAlphabet(atoms);
   const std::size_t max_length = leaf_count + 2;
   for (std::size_t length = 1; length <= max_length; ++length) {
-    if (SomeWordOfLengthSatisfies(alphabet, length, *target)) {
+    if (SomeWordOfLengthSatisfies(
+            alphabet, length, *target,
+            [](const Word& word, std::size_t length, const SequenceExpr& seq) {
+              return TightSlice(word, 0, length, seq);
+            })) {
       return true;
     }
   }

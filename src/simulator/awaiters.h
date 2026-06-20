@@ -20,6 +20,36 @@
 
 namespace delta {
 
+// Resolves an event-control signal expression down to a Variable*. Handles
+// plain identifiers, clocking-block member accesses, and hierarchical names.
+// Returns nullptr when the expression is not one of these forms (e.g. a
+// compound expression) or cannot be resolved.
+inline Variable* ResolveSignalToVariable(const Expr* signal, SimContext& ctx) {
+  if (signal->kind == ExprKind::kIdentifier) {
+    return ctx.FindVariable(signal->text);
+  }
+  if (signal->kind == ExprKind::kMemberAccess) {
+    Variable* var = nullptr;
+    if (signal->lhs && signal->lhs->kind == ExprKind::kIdentifier) {
+      auto* mgr = ctx.GetClockingManager();
+      std::string_view member;
+      if (signal->rhs && signal->rhs->kind == ExprKind::kIdentifier)
+        member = signal->rhs->text;
+      else if (!signal->text.empty())
+        member = signal->text;
+      if (mgr && !member.empty())
+        var = mgr->ResolveClockingMember(signal->lhs->text, member, ctx);
+    }
+    if (!var) {
+      std::string hier_name;
+      BuildLhsName(signal, hier_name);
+      var = ctx.FindVariable(hier_name);
+    }
+    return var;
+  }
+  return nullptr;
+}
+
 struct DelayAwaiter {
   SimContext& ctx;
   uint64_t delay_ticks;
@@ -62,30 +92,12 @@ struct EventAwaiter {
     auto* proc = ctx.CurrentProcess();
     for (const auto& ev : events) {
       if (!ev.signal) continue;
-      Variable* var = nullptr;
-      if (ev.signal->kind == ExprKind::kIdentifier) {
-        var = ctx.FindVariable(ev.signal->text);
-      } else if (ev.signal->kind == ExprKind::kMemberAccess) {
-        if (ev.signal->lhs && ev.signal->lhs->kind == ExprKind::kIdentifier) {
-          auto* mgr = ctx.GetClockingManager();
-          std::string_view member;
-          if (ev.signal->rhs && ev.signal->rhs->kind == ExprKind::kIdentifier)
-            member = ev.signal->rhs->text;
-          else if (!ev.signal->text.empty())
-            member = ev.signal->text;
-          if (mgr && !member.empty())
-            var = mgr->ResolveClockingMember(ev.signal->lhs->text, member, ctx);
-        }
-
-        if (!var) {
-          std::string hier_name;
-          BuildLhsName(ev.signal, hier_name);
-          var = ctx.FindVariable(hier_name);
-        }
-      } else {
+      if (ev.signal->kind != ExprKind::kIdentifier &&
+          ev.signal->kind != ExprKind::kMemberAccess) {
         AttachCompoundWatchers(ev, h, proc);
         continue;
       }
+      Variable* var = ResolveSignalToVariable(ev.signal, ctx);
       if (!var) continue;
       if (var->is_event) {
         auto* ctx_ptr = &ctx;
@@ -125,25 +137,7 @@ struct EventAwaiter {
       return false;
     }
 
-    uint64_t pa = 0, pb = 0, ca = 0, cb = 0;
-    if (var->prev_value.nwords > 0) {
-      pa = var->prev_value.words[0].aval & 1;
-      pb = var->prev_value.words[0].bval & 1;
-    }
-    if (var->value.nwords > 0) {
-      ca = var->value.words[0].aval & 1;
-      cb = var->value.words[0].bval & 1;
-    }
-    bool prev_is_0 = (pa == 0 && pb == 0);
-    bool prev_is_1 = (pa == 1 && pb == 0);
-    bool prev_is_xz = (pb == 1);
-    bool cur_is_0 = (ca == 0 && cb == 0);
-    bool cur_is_1 = (ca == 1 && cb == 0);
-    bool pos = (prev_is_0 && !cur_is_0) || (prev_is_xz && cur_is_1);
-    bool neg = (prev_is_1 && !cur_is_1) || (prev_is_xz && cur_is_0);
-    if (edge == Edge::kPosedge) return pos;
-    if (edge == Edge::kNegedge) return neg;
-    return pos || neg;
+    return CheckEdgeOnValues(var->prev_value, var->value, edge);
   }
 
   static bool HandleEdgeEvent(std::coroutine_handle<>& h, Variable* var,
@@ -307,26 +301,7 @@ struct RepeatEventAwaiter {
     auto* ctx_ptr = &ctx;
     for (const auto& ev : events) {
       if (!ev.signal) continue;
-      Variable* var = nullptr;
-      if (ev.signal->kind == ExprKind::kIdentifier) {
-        var = ctx.FindVariable(ev.signal->text);
-      } else if (ev.signal->kind == ExprKind::kMemberAccess) {
-        if (ev.signal->lhs && ev.signal->lhs->kind == ExprKind::kIdentifier) {
-          auto* mgr = ctx.GetClockingManager();
-          std::string_view member;
-          if (ev.signal->rhs && ev.signal->rhs->kind == ExprKind::kIdentifier)
-            member = ev.signal->rhs->text;
-          else if (!ev.signal->text.empty())
-            member = ev.signal->text;
-          if (mgr && !member.empty())
-            var = mgr->ResolveClockingMember(ev.signal->lhs->text, member, ctx);
-        }
-        if (!var) {
-          std::string hier_name;
-          BuildLhsName(ev.signal, hier_name);
-          var = ctx.FindVariable(hier_name);
-        }
-      }
+      Variable* var = ResolveSignalToVariable(ev.signal, ctx);
       if (!var) continue;
 
       // Counts one occurrence and, when the target is reached, resumes the

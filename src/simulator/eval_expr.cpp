@@ -6,6 +6,7 @@
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
+#include "elaborator/type_eval.h"
 #include "lexer/token.h"
 #include "parser/ast.h"
 #include "simulator/class_object.h"
@@ -98,17 +99,26 @@ Logic4Vec EvalReplicate(const Expr* expr, SimContext& ctx, Arena& arena) {
   return result;
 }
 
+// Applies a real-valued unary increment/decrement by unpacking the IEEE-754
+// bits of old_val, adding delta (+1.0 for ++, -1.0 for --), and repacking.
+static Logic4Vec ApplyRealUnaryOp(const Logic4Vec& old_val, double delta,
+                                  Arena& arena) {
+  double d = 0.0;
+  uint64_t bits = old_val.ToUint64();
+  std::memcpy(&d, &bits, sizeof(double));
+  d += delta;
+  std::memcpy(&bits, &d, sizeof(double));
+  Logic4Vec new_val = MakeLogic4VecVal(arena, 64, bits);
+  new_val.is_real = true;
+  return new_val;
+}
+
 Logic4Vec EvalPrefixUnary(const Expr* expr, SimContext& ctx, Arena& arena) {
   auto old_val = EvalExpr(expr->lhs, ctx, arena);
   Logic4Vec new_val;
   if (old_val.is_real) {
-    double d = 0.0;
-    uint64_t bits = old_val.ToUint64();
-    std::memcpy(&d, &bits, sizeof(double));
-    d += (expr->op == TokenKind::kPlusPlus) ? 1.0 : -1.0;
-    std::memcpy(&bits, &d, sizeof(double));
-    new_val = MakeLogic4VecVal(arena, 64, bits);
-    new_val.is_real = true;
+    new_val = ApplyRealUnaryOp(
+        old_val, (expr->op == TokenKind::kPlusPlus) ? 1.0 : -1.0, arena);
   } else {
     uint64_t v = old_val.ToUint64();
     uint64_t nv = (expr->op == TokenKind::kPlusPlus) ? v + 1 : v - 1;
@@ -127,13 +137,8 @@ Logic4Vec EvalPostfixUnary(const Expr* expr, SimContext& ctx, Arena& arena) {
   auto old_val = EvalExpr(expr->lhs, ctx, arena);
   Logic4Vec new_val;
   if (old_val.is_real) {
-    double d = 0.0;
-    uint64_t bits = old_val.ToUint64();
-    std::memcpy(&d, &bits, sizeof(double));
-    d += (expr->op == TokenKind::kPlusPlus) ? 1.0 : -1.0;
-    std::memcpy(&bits, &d, sizeof(double));
-    new_val = MakeLogic4VecVal(arena, 64, bits);
-    new_val.is_real = true;
+    new_val = ApplyRealUnaryOp(
+        old_val, (expr->op == TokenKind::kPlusPlus) ? 1.0 : -1.0, arena);
   } else {
     uint64_t v = old_val.ToUint64();
     uint64_t nv = (expr->op == TokenKind::kPlusPlus) ? v + 1 : v - 1;
@@ -164,7 +169,7 @@ static void BuildMemberName(const Expr* expr, std::string& out) {
   }
 }
 
-static std::string StripRootPrefix(const std::string& name) {
+std::string StripRootPrefix(const std::string& name) {
   constexpr std::string_view kPrefix = "$root.";
   if (name.size() > kPrefix.size() &&
       std::string_view(name).substr(0, kPrefix.size()) == kPrefix) {
@@ -396,32 +401,6 @@ Logic4Vec EvalMemberAccess(const Expr* expr, SimContext& ctx, Arena& arena) {
   return ResolveMemberByType(base_name, field_name, ctx, arena);
 }
 
-static uint32_t CastWidth(std::string_view type_name) {
-  if (type_name == "byte") return 8;
-  if (type_name == "shortint") return 16;
-  if (type_name == "int") return 32;
-  if (type_name == "longint") return 64;
-  if (type_name == "integer") return 32;
-  if (type_name == "real" || type_name == "realtime") return 64;
-  if (type_name == "shortreal") return 32;
-  if (type_name == "bit") return 1;
-  if (type_name == "logic") return 1;
-  if (type_name == "reg") return 1;
-  if (type_name == "string") return 0;
-
-  if (!type_name.empty() && type_name[0] >= '0' && type_name[0] <= '9') {
-    uint32_t w = 0;
-    for (char c : type_name) {
-      if (c >= '0' && c <= '9')
-        w = w * 10 + (c - '0');
-      else
-        break;
-    }
-    if (w > 0) return w;
-  }
-  return 0;
-}
-
 static bool IsRealCastTarget(std::string_view name) {
   return name == "real" || name == "realtime" || name == "shortreal";
 }
@@ -509,7 +488,7 @@ static Logic4Vec CastRealConversion(const Logic4Vec& inner,
 }
 
 uint32_t ResolveCastWidth(std::string_view type_name, SimContext& ctx) {
-  uint32_t w = CastWidth(type_name);
+  uint32_t w = CastTargetWidth(type_name);
   if (w > 0) return w;
 
   uint32_t tw = ctx.FindTypeWidth(type_name);
