@@ -1,5 +1,6 @@
 #include "parser/library_map.h"
 
+#include <cstdint>
 #include <fstream>
 #include <sstream>
 #include <system_error>
@@ -79,7 +80,7 @@ bool GlobOne(std::string_view pat, std::string_view name) {
   return pi == pat.size();
 }
 
-enum class SpecKind : int {
+enum class SpecKind : std::uint8_t {
   kExplicitFilename = 0,
   kWildcardFilename = 1,
   kDirectory = 2,

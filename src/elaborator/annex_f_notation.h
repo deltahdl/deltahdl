@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <optional>
 #include <string_view>
 
@@ -13,7 +14,7 @@ namespace delta {
 // Annex F notation can resolve a symbol to the category it stands for.
 
 // The categories a §F.3.3 metavariable can denote.
-enum class NotationCategory {
+enum class NotationCategory : std::uint8_t {
   kBooleanExpression,           // b, c
   kType,                        // t
   kLocalVariableName,           // v

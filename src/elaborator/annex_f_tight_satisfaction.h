@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <set>
 #include <string>
 #include <vector>
@@ -13,7 +14,7 @@ namespace delta {
 // letter T (which satisfies every Boolean expression), or the bottom letter
 // _|_ (which satisfies none).
 struct Letter {
-  enum class Kind {
+  enum class Kind : std::uint8_t {
     kTop,      // T -- satisfies every Boolean expression
     kBottom,   // _|_ -- satisfies no Boolean expression
     kAtomSet,  // an element of 2^P

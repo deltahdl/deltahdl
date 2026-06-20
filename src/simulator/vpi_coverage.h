@@ -22,7 +22,7 @@ namespace delta {
 // *Coverage members are instance-level coverage types; the remaining members
 // are per-item or per-assertion status properties. The names mirror the VPI
 // constants (vpiAssertCoverage, vpiCovered, ...) without redefining them.
-enum class CoverageProperty {
+enum class CoverageProperty : std::uint8_t {
   // Instance-level coverage types.
   AssertCoverage,
   FsmStateCoverage,

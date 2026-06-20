@@ -17,7 +17,7 @@ struct Expr;
 struct ModuleItem;
 class Arena;
 
-enum class Reachability {
+enum class Reachability : std::uint8_t {
   kStronglyReachable,
   kWeaklyReachable,
   kUnreachable,
@@ -113,7 +113,7 @@ struct ClassObject {
 // written in source that names a class) or a class specialization (a concrete
 // instantiation of a parameterized class). The two forms support different
 // relations, so the kind is modeled explicitly.
-enum class ClassTypespecKind {
+enum class ClassTypespecKind : std::uint8_t {
   kLexical,
   kSpecialization,
 };

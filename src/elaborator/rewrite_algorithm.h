@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstdint>
+
 namespace delta {
 
 // §F.4.1.1 spells out the rewriting algorithm that flattens a sequence or
@@ -24,7 +26,7 @@ namespace delta {
 // flatten_sequence). A property body may instantiate sequences, but a
 // sequence never instantiates a property, so this fixed order guarantees the
 // sequence pass sees a body whose property instances are already gone.
-enum class RewriteStage {
+enum class RewriteStage : std::uint8_t {
   kProperties,  // first loop: while property instances remain
   kSequences,   // second loop: while sequence instances remain
 };
@@ -38,7 +40,7 @@ RewriteStage NextRewriteStage(RewriteStage stage);
 
 // §F.4.1.1 main-loop step 2: where a sequence instance r occurs decides how
 // its flattened form is spliced back in.
-enum class SequenceInstanceContext {
+enum class SequenceInstanceContext : std::uint8_t {
   // (a) r appears in the event expression of a clocking_event.
   kClockingEventOperand,
   // (b) r is the operand of a sequence_method_call.
@@ -56,7 +58,7 @@ bool SequenceInstanceNeedsItemWrap(SequenceInstanceContext context);
 
 // §F.4.1.1 flatten_property/flatten_sequence steps 3–6 classify each formal
 // argument of the instantiated declaration.
-enum class FormalKind {
+enum class FormalKind : std::uint8_t {
   // step 3: an untyped formal argument.
   kUntyped,
   // step 4: a typed formal, not a local variable, whose type does not match
@@ -72,7 +74,7 @@ enum class FormalKind {
 // The aspects of an actual argument that the algorithm branches on while
 // replacing a reference to its formal. Only the cases the text distinguishes
 // are modeled.
-enum class ActualNature {
+enum class ActualNature : std::uint8_t {
   // No special form: an ordinary actual-argument expression.
   kOther,
   // step 3a: the actual is `$` or a variable_lvalue.
@@ -87,7 +89,7 @@ enum class ActualNature {
 // formal argument (steps 3–5). Step 6 (local variables) is handled
 // separately by LocalVariableFlatten because it prepends declarations rather
 // than replacing references in place.
-enum class ReferenceReplacement {
+enum class ReferenceReplacement : std::uint8_t {
   // step 3a: replace the reference by the actual a_f, unchanged.
   kActualDirect,
   // step 3b: replace by item(type(a_f)'(a_f)) — cast through the actual's own
@@ -122,7 +124,7 @@ ReferenceReplacement ReplaceFormalReference(FormalKind kind,
 // value back out, an assignment appended to the sequence's match items. (In
 // flatten_property step 6 every local variable behaves like the input case:
 // a declaration "t f = a_f;" with no match-item assignment.)
-enum class LocalVarDirection {
+enum class LocalVarDirection : std::uint8_t {
   kInput,   // step 6a
   kInout,   // step 6b
   kOutput,  // step 6c

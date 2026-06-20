@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstdint>
+
 #include "elaborator/rewrite_algorithm.h"
 
 namespace delta {
@@ -28,7 +30,7 @@ namespace delta {
 // §F.4.2.1 main loop. The algorithm repeatedly selects an arbitrary checker
 // instance and replaces it by flatten_checker, until no checker instances
 // remain. There is exactly one kind of instance to drain.
-enum class CheckerRewriteStage {
+enum class CheckerRewriteStage : std::uint8_t {
   kCheckerInstances,  // while there are checker instances in π
 };
 
@@ -56,7 +58,7 @@ ReferenceReplacement ReplaceCheckerFormalReference(FormalKind kind,
                                                    ActualNature actual);
 
 // Scope across which §F.4.2.1 step 4's variable_lvalue prohibition applies.
-enum class LvalueProhibitionScope {
+enum class LvalueProhibitionScope : std::uint8_t {
   // §F.4.2.1 step 4: the whole checker. (Contrast §F.4.1.1, whose corresponding
   // prohibition is confined to the variable_lvalue of an operator_assignment or
   // inc_or_dec_expression in a sequence_match_item.)

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -113,7 +114,7 @@ struct VpiRangeDesc {
 // describe, and which of them are represented by an empty range. Fixed packed
 // and unpacked dimensions have real bounds; dynamic-array, queue, and
 // associative dimensions are empty ranges.
-enum class VpiDimensionKind {
+enum class VpiDimensionKind : std::uint8_t {
   kPacked,
   kFixedUnpacked,
   kDynamic,

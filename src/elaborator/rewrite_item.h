@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstdint>
+
 #include "parser/ast.h"
 
 namespace delta {
@@ -9,7 +11,7 @@ namespace delta {
 // operations on the underlying expression are admitted by `item(e)`,
 // keyed off the role `e` plays in the source program.
 
-enum class ItemOperandKind {
+enum class ItemOperandKind : std::uint8_t {
   // §F.4 final sentence: when e has an undefined type, item adds nothing.
   kUndefinedType,
   // §F.4: ordinary typed expression. item enables operations valid on a
@@ -29,7 +31,7 @@ enum class ItemOperandKind {
 
 // §F.4 lists three classes of operation that `item(e)` may re-admit on
 // top of e's own operations. Callers ask whether a given class is allowed.
-enum class ItemOperation {
+enum class ItemOperation : std::uint8_t {
   // Operation legal on a reference to or instance of a named item that
   // shares e's type (e.g., a part-select on a logic[0:3] reference).
   kNamedItemOfTypeOp,

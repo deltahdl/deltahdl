@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <memory>
 
 #include "elaborator/annex_f_grammar.h"
@@ -20,7 +21,7 @@ namespace delta {
 // twelve forms §F.5.1.2 rewrites, plus a Boolean-as-property leaf because the
 // nexttime and until rules emit the clock c in property position.
 struct ClockedProperty {
-  enum class Kind {
+  enum class Kind : std::uint8_t {
     kBoolean,       // b, a Boolean used as a property (e.g. the emitted !c)
     kStrong,        // strong ( R )
     kWeak,          // weak ( R )

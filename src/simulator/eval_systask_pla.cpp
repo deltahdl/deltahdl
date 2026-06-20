@@ -23,7 +23,12 @@ namespace {
 struct PlaTaskKind {
   bool valid = false;
   bool is_async = false;  // §20.16.1: asynchronous vs synchronous array
-  enum class Logic { kAnd, kOr, kNand, kNor } logic = Logic::kAnd;
+  enum class Logic : std::uint8_t {
+    kAnd,
+    kOr,
+    kNand,
+    kNor
+  } logic = Logic::kAnd;
   bool is_plane = false;  // §20.16.4 format: array vs plane
 };
 

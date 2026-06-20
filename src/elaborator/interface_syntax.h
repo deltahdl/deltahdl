@@ -1,6 +1,7 @@
 #ifndef DELTA_ELABORATOR_INTERFACE_SYNTAX_H
 #define DELTA_ELABORATOR_INTERFACE_SYNTAX_H
 
+#include <cstdint>
 #include <vector>
 
 namespace delta {
@@ -13,7 +14,7 @@ namespace delta {
 
 // §25.3: each step a hierarchical reference takes on its way to the interface
 // (or interface modport) named as an interface-port-connection actual.
-enum class InterfaceHierRefStep {
+enum class InterfaceHierRefStep : std::uint8_t {
   kInterfaceInstance,       // descends into / names an interface instance
   kArrayedInstanceElement,  // an element selected out of an instance array
   kGenerateBlock,           // a generate-block scope
@@ -31,7 +32,7 @@ bool InterfacePortHierRefIsLegal(const std::vector<InterfaceHierRefStep>& path);
 
 // §25.3: where the parameter targeted by a defparam sits relative to the
 // instance that encloses the defparam.
-enum class DefparamReach {
+enum class DefparamReach : std::uint8_t {
   kWithinInstance,   // the target lies inside the instance's own hierarchy
   kOutsideInstance,  // the target lies above or beside the instance
 };

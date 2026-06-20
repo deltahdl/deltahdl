@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <memory>
 #include <string>
 #include <vector>
@@ -21,7 +22,7 @@ namespace delta {
 // §F.5.1.1 forms !c and c & b, so the Boolean model carries negation and
 // conjunction in addition to the constant 1 and atomic propositions.
 struct BooleanExpr {
-  enum class Kind {
+  enum class Kind : std::uint8_t {
     kTrue,  // the constant 1
     kAtom,  // a named atomic proposition
     kNot,   // !operand
@@ -49,7 +50,7 @@ bool BooleanExprEqual(const BooleanExpr& lhs, const BooleanExpr& rhs);
 // [*0:$] shape produced by the §F.5.1.1 rewrite of a Boolean and is included
 // so a rewritten sequence remains representable.
 struct SequenceExpr {
-  enum class Kind {
+  enum class Kind : std::uint8_t {
     kBoolean,           // b
     kLocalVarDecl,      // ( t v [ = e ]; R )
     kLocalVarSampling,  // ( 1, v = e )
@@ -113,7 +114,7 @@ bool SequenceExprEqual(const SequenceExpr& lhs, const SequenceExpr& rhs);
 bool ContainsClock(const SequenceExpr& seq);
 
 // The seven left-hand sides of the §F.3.2 "::=" rules.
-enum class GrammarProduction {
+enum class GrammarProduction : std::uint8_t {
   kUnclockedSequence,          // R
   kClockedSequence,            // S
   kUnclockedProperty,          // P

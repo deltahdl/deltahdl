@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstdint>
+
 #include "elaborator/annex_f_grammar.h"
 #include "elaborator/annex_f_neutral_satisfaction.h"
 #include "elaborator/annex_f_tight_satisfaction.h"
@@ -32,7 +34,7 @@ bool StronglySatisfiesByFiniteWord(const Word& word,
 
 // §F.5.3.2: the four verdicts a tool checking satisfaction of A by the finite
 // word w should return.
-enum class FiniteWordVerdict {
+enum class FiniteWordVerdict : std::uint8_t {
   kHoldsStrongly,  // "Holds strongly": w |=^+ A.
   kFails,          // "Fails": not (w |=^- A).
   kHolds,    // "Holds (but does not hold strongly)": w |= A and not w |=^+ A.

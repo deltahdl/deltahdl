@@ -137,7 +137,7 @@ struct VpiSystfData {
 
 // §38.37.1: the three points in the tool's lifetime that drive the callback
 // applications named in a s_vpi_systf_data record.
-enum class VpiSystfCallback { kCompiletf, kSizetf, kCalltf };
+enum class VpiSystfCallback : std::uint8_t { kCompiletf, kSizetf, kCalltf };
 
 // §38.37.1 (tfname rule): whether a candidate system task/function name is a
 // well-formed name as it would be written in SystemVerilog source - it begins
@@ -184,7 +184,7 @@ int VpiSystfResultSizeBits(const VpiSystfData& data);
 // run for user-defined system functions and no access beyond the startup phase
 // is permitted; kFull begins once the cbEndOfCompile callbacks are called, from
 // which point until the tool finishes all functionality is available.
-enum class VpiToolPhase { kStartup, kSizetf, kFull };
+enum class VpiToolPhase : std::uint8_t { kStartup, kSizetf, kFull };
 
 // §36.10.2: whether a phase restricts VPI functionality. The startup phase and
 // the sizetf phase that follows it both restrict it (the sizetf phase permits
@@ -196,7 +196,7 @@ bool VpiPhaseRestrictsFunctionality(VpiToolPhase phase);
 // distinguishes. The two registration routines are the only ones callable while
 // the vlog_startup_routines[] array executes; the others stand in for the bulk
 // of the interface that is unavailable until the full phase.
-enum class VpiRoutine {
+enum class VpiRoutine : std::uint8_t {
   kRegisterSystf,
   kRegisterCb,
   kGetValue,

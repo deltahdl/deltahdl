@@ -18,7 +18,7 @@ namespace delta {
 // function. Value 7 ("not enough memory, cannot create queue") is defined by
 // the table but has no deterministic trigger in the model, so nothing emits
 // it.
-enum QueueStatus : uint64_t {
+enum QueueStatus : std::uint8_t {
   kQOk = 0,                 // OK
   kQFullCannotAdd = 1,      // queue full, cannot add
   kQUndefinedId = 2,        // undefined q_id
@@ -290,7 +290,7 @@ static std::string CoverageStrArg(const Expr* expr, size_t index) {
 // (coverage_type) argument is missing, otherwise the value produced by `query`
 // from the coverage type and the optional string argument (scope/name) at
 // `str_arg_index`.
-enum class CoverageQuery { kGetMax, kGet, kMerge, kSave };
+enum class CoverageQuery : std::uint8_t { kGetMax, kGet, kMerge, kSave };
 static Logic4Vec EvalCoverageQuery(const Expr* expr, SimContext& ctx,
                                    Arena& arena, CoverageQuery query,
                                    size_t str_arg_index) {

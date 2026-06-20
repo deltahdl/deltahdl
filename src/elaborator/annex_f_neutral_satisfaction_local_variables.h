@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <memory>
 #include <string>
 
@@ -41,7 +42,7 @@ namespace delta {
 // a context through. It mirrors §F.5.3.1's PropertyExpr and adds the local
 // variable declaration ( t v ; P ).
 struct LvProperty {
-  enum class Kind {
+  enum class Kind : std::uint8_t {
     kStrong,        // strong ( R )
     kWeak,          // weak ( R )
     kParen,         // ( P )
@@ -93,7 +94,7 @@ std::shared_ptr<const LvProperty> LvLocalVarDecl(
 // bare property, a disable iff guard, a parenthesized top-level property, and
 // the local variable declaration ( t v ; T ).
 struct LvTopLevelProperty {
-  enum class Kind {
+  enum class Kind : std::uint8_t {
     kProperty,      // P
     kDisableIff,    // disable iff ( b ) P
     kParen,         // ( T )

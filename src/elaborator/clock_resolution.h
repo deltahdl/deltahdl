@@ -1,6 +1,7 @@
 #ifndef DELTA_ELABORATOR_CLOCK_RESOLUTION_H
 #define DELTA_ELABORATOR_CLOCK_RESOLUTION_H
 
+#include <cstdint>
 #include <string>
 #include <string_view>
 
@@ -21,7 +22,7 @@ namespace delta {
 // The ordering of the rules establishes a precedence: an explicit event (rule
 // d) beats a contextually inferred event (rule c), which beats the default
 // clocking event (rule a); kNone means none of the three applies.
-enum class LeadingClockOrigin {
+enum class LeadingClockOrigin : std::uint8_t {
   kNone,
   kExplicit,
   kInferred,

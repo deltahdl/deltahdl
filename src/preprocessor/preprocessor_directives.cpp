@@ -1,4 +1,5 @@
 #include <cctype>
+#include <cstdint>
 #include <fstream>
 
 #include "preprocessor/preprocessor.h"
@@ -13,7 +14,7 @@ static std::string_view TrimDirective(std::string_view s) {
   return s;
 }
 
-enum class TimescaleParseStatus { kOk, kStep, kInvalid };
+enum class TimescaleParseStatus : std::uint8_t { kOk, kStep, kInvalid };
 
 static TimescaleParseStatus ParseTimescaleComponentStatus(std::string_view text,
                                                           int& magnitude,

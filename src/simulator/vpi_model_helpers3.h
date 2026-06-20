@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -309,7 +310,7 @@ bool VpiNetTerminalAccessAllowed(bool is_scalar_net_or_bit_select);
 // §37.16 details 6 and 7: the granularity a vpiPorts or vpiPortInst iteration
 // hands back for a given reference handle - either the individual port bits (or
 // scalar ports) matching the reference, or a handle to the entire port.
-enum class VpiPortGranularity {
+enum class VpiPortGranularity : std::uint8_t {
   kPortBits,    // the port bits / scalar ports the reference selects
   kEntirePort,  // a handle to the whole port
 };

@@ -420,7 +420,7 @@ inline constexpr uint32_t kDirectiveTypeDefault = 7;
 // §20.11: Table 20-6 assertion_type bit values. A $assertcontrol assertion_type
 // argument is an OR of these, selecting which assertion and report kinds the
 // task affects.
-enum class AssertionTypeBit : uint32_t {
+enum class AssertionTypeBit : std::uint8_t {
   kConcurrent = 1,
   kSimpleImmediate = 2,
   kObservedDeferredImmediate = 4,
@@ -433,7 +433,7 @@ enum class AssertionTypeBit : uint32_t {
 
 // §20.11: Table 20-7 directive_type bit values. A $assertcontrol directive_type
 // argument is an OR of these, selecting which directive kinds the task affects.
-enum class DirectiveTypeBit : uint32_t {
+enum class DirectiveTypeBit : std::uint8_t {
   kAssert = 1,
   kCover = 2,
   kAssume = 4,

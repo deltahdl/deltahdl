@@ -639,7 +639,7 @@ using VpiHandle = VpiObject*;
 // its vpiAllocScheme. Keeping this separate from the scheme return values lets
 // callers describe an allocation in intent ("this came from a frame") and have
 // the mapping to the reported scheme live in one place.
-enum class VpiAllocKind {
+enum class VpiAllocKind : std::uint8_t {
   kFrameOrThread,  // allocated with a frame or thread -> Automatic scheme
   kDynamic,        // allocated in dynamic memory (class object) -> Dynamic
   kOther,          // anything else -> the mandated Other default

@@ -1,6 +1,7 @@
 #ifndef DELTA_ELABORATOR_CLOCK_FLOW_H
 #define DELTA_ELABORATOR_CLOCK_FLOW_H
 
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -15,7 +16,7 @@ namespace delta {
 using ClockScope = std::string;
 
 // §16.13.3: an operator's flow behavior with respect to a clocking-event scope.
-enum class ClockFlowOperator {
+enum class ClockFlowOperator : std::uint8_t {
   // Linear operators carry the scope from one operand to the next, left to
   // right (repetition, concatenation, negation, implication, followed-by, and
   // the nexttime, always, and eventually operators). A clocking event written
@@ -60,7 +61,7 @@ ClockScope ClockAfterParentheses(const ClockScope& incoming,
 // §16.13.3: a method applied to an instance of a named property or sequence.
 // The clocking-event scope flows into the instance regardless of which (if any)
 // of these is applied.
-enum class InstanceMethod {
+enum class InstanceMethod : std::uint8_t {
   kNone,
   kTriggered,
   kMatched,

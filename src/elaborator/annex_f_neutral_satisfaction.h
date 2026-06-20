@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <memory>
 #include <string>
 #include <vector>
@@ -37,7 +38,7 @@ namespace delta {
 // (R |-> P) carries both a sequence antecedent and a property consequent;
 // accept_on(b) P carries a Boolean abort condition.
 struct PropertyExpr {
-  enum class Kind {
+  enum class Kind : std::uint8_t {
     kStrong,       // strong ( R )
     kWeak,         // weak ( R )
     kParen,        // ( P )
@@ -88,7 +89,7 @@ std::shared_ptr<const PropertyExpr> PropAcceptOn(
 // §F.5.3.1 evaluates: a bare property P, a disable iff (b) P guard, and a
 // parenthesized top-level property ( T ).
 struct TopLevelProperty {
-  enum class Kind {
+  enum class Kind : std::uint8_t {
     kProperty,    // P
     kDisableIff,  // disable iff ( b ) P
     kParen,       // ( T )
@@ -138,7 +139,7 @@ bool NeutrallySatisfiesClockedProperty(const Word& word,
 // evaluates: a clocked property Q, a disable iff (b) Q guard, and a
 // parenthesized clocked top-level property ( U ).
 struct ClockedTopLevelProperty {
-  enum class Kind {
+  enum class Kind : std::uint8_t {
     kProperty,    // Q
     kDisableIff,  // disable iff ( b ) Q
     kParen,       // ( U )
@@ -183,9 +184,9 @@ bool FailsTopLevelClocked(const Word& word, const ClockedTopLevelProperty& top);
 // top-level property, @( c ) T, or an intrinsically clocked top-level property
 // U.
 struct AssertionStatement {
-  enum class Activation { kAlways, kInitial };
-  enum class Role { kAssert, kAssume, kCover };
-  enum class Form {
+  enum class Activation : std::uint8_t { kAlways, kInitial };
+  enum class Role : std::uint8_t { kAssert, kAssume, kCover };
+  enum class Form : std::uint8_t {
     kExplicitClock,  // @( c ) T
     kClockedTop,     // U
   };

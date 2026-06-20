@@ -1,3 +1,4 @@
+#include <cstdint>
 #include <cstdio>
 #include <cstring>
 #include <string>
@@ -125,7 +126,7 @@ static std::string FormatDecimal(const Logic4Vec& val) {
 // §21.2.1.3: a bit-range classification used by the decimal, hexadecimal, and
 // octal renderings to decide whether unknown (x) or high-impedance (z) bits
 // force a status character in place of the ordinary digit.
-enum class XZClass { kKnown, kAllX, kAllZ, kSomeX, kSomeZ };
+enum class XZClass : std::uint8_t { kKnown, kAllX, kAllZ, kSomeX, kSomeZ };
 
 // Read the (aval, bval) pair of a single bit out of a 4-state vector. The
 // encoding matches Logic4Vec::ToString: bval clear is a known bit, bval set

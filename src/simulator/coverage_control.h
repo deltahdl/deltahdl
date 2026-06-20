@@ -24,7 +24,7 @@
 namespace delta {
 
 // §40.3.1 control-constant values accepted in the first argument.
-enum class CoverageControl : int {
+enum class CoverageControl : std::uint8_t {
   Start = 0,
   Stop = 1,
   Reset = 2,
@@ -33,7 +33,7 @@ enum class CoverageControl : int {
 
 // §40.3.1 status values returned by $coverage_control. The numeric values match
 // the `SV_COV_* `define macros.
-enum class CoverageStatus : int {
+enum class CoverageStatus : std::int8_t {
   Overflow = -2,
   Error = -1,
   NoCoverage = 0,
@@ -44,7 +44,7 @@ enum class CoverageStatus : int {
 // How much coverage a scope offers for the requested coverage type. A real
 // coverage engine derives this from the coverable items the design holds; the
 // model stores it so the control rules can be exercised without that engine.
-enum class CoverageAvailability {
+enum class CoverageAvailability : std::uint8_t {
   None,     // scope exists but offers no coverage of the requested type
   Partial,  // some, but not all, of the scope is coverable
   Full,     // the whole scope is coverable

@@ -1,6 +1,7 @@
 #ifndef DELTA_ELABORATOR_MULTICLOCK_SEQUENCE_H
 #define DELTA_ELABORATOR_MULTICLOCK_SEQUENCE_H
 
+#include <cstdint>
 #include <optional>
 #include <string>
 #include <vector>
@@ -15,7 +16,7 @@ namespace delta {
 // preceding subsequence.
 
 // The operator joining a subsequence to its predecessor.
-enum class MulticlockJoin {
+enum class MulticlockJoin : std::uint8_t {
   // The subsequence is the first; it has no preceding join.
   kLeading,
   // The subsequence follows a single-delay concatenation (`##1`).

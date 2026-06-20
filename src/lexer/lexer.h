@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <string_view>
 #include <vector>
 
@@ -26,7 +27,7 @@ class Lexer {
   // may bind an enumeration name in the same comment; the enum-only form is the
   // separate pragma written immediately after the signal's bit range.
   struct FsmStatePragma {
-    enum class Form { kStateVector, kEnumOnly };
+    enum class Form : std::uint8_t { kStateVector, kEnumOnly };
     Form form = Form::kStateVector;
     std::string_view signal_name;  // populated for kStateVector
     std::string_view enum_name;    // populated when has_enum is true

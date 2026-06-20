@@ -1,3 +1,4 @@
+#include <cstdint>
 #include <format>
 #include <unordered_map>
 #include <unordered_set>
@@ -505,7 +506,7 @@ void Elaborator::ValidateAssocWildcardTraversal(const ModuleDecl* decl) {
 // categories are not assignment compatible with each other. A narrower integral
 // argument is still assignment compatible -- the resulting truncation is
 // resolved at run time and is not flagged during elaboration.
-enum class AssocKeyCategory { kOther, kStringKey, kIntegralKey };
+enum class AssocKeyCategory : std::uint8_t { kOther, kStringKey, kIntegralKey };
 
 static AssocKeyCategory ClassifyAssocKey(std::string_view index_type,
                                          const TypedefMap& typedefs) {
