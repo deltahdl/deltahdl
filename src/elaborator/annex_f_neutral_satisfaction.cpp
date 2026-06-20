@@ -223,32 +223,38 @@ bool ImplicationHolds(const Word& word, const PropertyExpr& property) {
   return true;
 }
 
+// §F.5.3.1 (until): w^{i.} |= P1 holds for every 0 <= i < count, where count is
+// either the release index j or |w| for the "for all i" branch.
+bool UntilLhsHoldsThrough(const Word& word, const PropertyExpr& lhs,
+                          std::size_t count) {
+  for (std::size_t i = 0; i < count; ++i) {
+    if (!Satisfies(Suffix(word, i), lhs)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+// §F.5.3.1 (until): some 0 <= j < |w| has w^{j.} |= P2 with w^{i.} |= P1 for
+// all 0 <= i < j.
+bool UntilReleasedAtSomeIndex(const Word& word, const PropertyExpr& property) {
+  for (std::size_t j = 0; j < word.size(); ++j) {
+    if (Satisfies(Suffix(word, j), *property.rhs) &&
+        UntilLhsHoldsThrough(word, *property.lhs, j)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 // §F.5.3.1: w |= ( P1 until P2 ) iff some 0 <= j < |w| has w^{j.} |= P2 with
 // w^{i.} |= P1 for all 0 <= i < j, or w^{i.} |= P1 for all i.
 bool UntilHolds(const Word& word, const PropertyExpr& property) {
   if (!property.lhs || !property.rhs) {
     return false;
   }
-  for (std::size_t j = 0; j < word.size(); ++j) {
-    if (Satisfies(Suffix(word, j), *property.rhs)) {
-      bool prefix_holds = true;
-      for (std::size_t i = 0; i < j; ++i) {
-        if (!Satisfies(Suffix(word, i), *property.lhs)) {
-          prefix_holds = false;
-          break;
-        }
-      }
-      if (prefix_holds) {
-        return true;
-      }
-    }
-  }
-  for (std::size_t i = 0; i < word.size(); ++i) {
-    if (!Satisfies(Suffix(word, i), *property.lhs)) {
-      return false;
-    }
-  }
-  return true;
+  return UntilReleasedAtSomeIndex(word, property) ||
+         UntilLhsHoldsThrough(word, *property.lhs, word.size());
 }
 
 // §F.5.3.1: w |= ( accept_on (b) P ) iff w |= P, or for some 0 <= i < |w| with

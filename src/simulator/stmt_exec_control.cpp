@@ -455,6 +455,29 @@ static void TeardownForScopes(const Stmt* stmt, SimContext& ctx, bool scoped,
   if (labeled) ctx.PopStaticScope(stmt->label);
 }
 
+// How a loop should react to the StmtResult returned by its body, factored out
+// of the repeated "break / propagate / keep looping" branch shared by every
+// loop executor in this file. kPropagate means the caller must unwind its
+// scopes and co_return the body's result unchanged.
+enum class LoopAction { kKeepLooping, kBreakLoop, kPropagate };
+
+static LoopAction ClassifyLoopBodyResult(StmtResult result) {
+  if (result == StmtResult::kBreak) return LoopAction::kBreakLoop;
+  if (result != StmtResult::kDone && result != StmtResult::kContinue) {
+    return LoopAction::kPropagate;
+  }
+  return LoopAction::kKeepLooping;
+}
+
+// Evaluates a for-loop's optional continuation condition. A loop with no
+// condition runs unconditionally; otherwise it continues only while the
+// condition is truthy.
+static bool ForConditionHolds(const Stmt* stmt, SimContext& ctx, Arena& arena) {
+  if (!stmt->for_cond) return true;
+  auto cond = EvalExpr(stmt->for_cond, ctx, arena);
+  return cond.IsTruthy();
+}
+
 ExecTask ExecFor(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   bool labeled = !stmt->label.empty();
   if (labeled) ctx.PushStaticScope(stmt->label);
@@ -463,13 +486,11 @@ ExecTask ExecFor(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   CreateForInitVars(stmt, ctx);
   for (auto* init : stmt->for_inits) co_await ExecStmt(init, ctx, arena);
   while (!ctx.StopRequested()) {
-    if (stmt->for_cond) {
-      auto cond = EvalExpr(stmt->for_cond, ctx, arena);
-      if (!cond.IsTruthy()) break;
-    }
+    if (!ForConditionHolds(stmt, ctx, arena)) break;
     auto result = co_await ExecStmt(stmt->for_body, ctx, arena);
-    if (result == StmtResult::kBreak) break;
-    if (result != StmtResult::kDone && result != StmtResult::kContinue) {
+    auto action = ClassifyLoopBodyResult(result);
+    if (action == LoopAction::kBreakLoop) break;
+    if (action == LoopAction::kPropagate) {
       TeardownForScopes(stmt, ctx, scoped, labeled);
       co_return result;
     }
@@ -609,24 +630,72 @@ static uint32_t ForeachIndexForIteration(const ArrayInfo* info, uint32_t size,
   return info->is_descending ? (info->lo + size - 1 - i) : (info->lo + i);
 }
 
+// Result of the non-coroutine prologue of ExecForeach: the array name, its
+// iteration count, and whether the loop should run at all. `bail` is set when
+// the loop must terminate immediately (wildcard associative array, or a
+// zero-length iteration domain) without entering the body.
+struct ForeachSetup {
+  std::string arr_name;
+  uint32_t size = 0;
+  bool bail = false;
+};
+
+// §12.7.3: resolves the array being iterated and how many iterations it
+// implies, reporting the wildcard-associative-array error as a side effect.
+// Pure prologue computation kept out of the ExecForeach coroutine so the
+// coroutine body stays small.
+static ForeachSetup ComputeForeachSetup(const Stmt* stmt, SimContext& ctx) {
+  ForeachSetup setup;
+  setup.arr_name = GetForeachArrayName(stmt->expr);
+  if (ForeachOnWildcardAssoc(setup.arr_name, ctx)) {
+    setup.bail = true;
+    return setup;
+  }
+  setup.size = GetArraySize(stmt, ctx);
+  if (setup.size == 0) setup.bail = true;
+  return setup;
+}
+
+// Returns the foreach loop-variable name, or an empty view when the iteration
+// dimension is unnamed (a `,` placeholder in the index list).
+static std::string_view ForeachIterName(const Stmt* stmt) {
+  if (!stmt->foreach_vars.empty() && !stmt->foreach_vars[0].empty()) {
+    return stmt->foreach_vars[0];
+  }
+  return {};
+}
+
+// Assigns the loop variable for iteration `i`, mapping the zero-based counter
+// onto the array's declared index range. A no-op when the dimension is
+// unnamed (`iter_var` is null).
+static void SetForeachIterVar(Variable* iter_var, const ArrayInfo* info,
+                              uint32_t size, uint32_t i, Arena& arena) {
+  if (!iter_var) return;
+  uint32_t index = ForeachIndexForIteration(info, size, i);
+  iter_var->value = MakeLogic4VecVal(arena, 32, index);
+}
+
+// Pops the dynamic scope ExecForeach pushed for the loop body and the static
+// scope a label introduced, in the order they were pushed. Called on every
+// ExecForeach exit path that runs after the body scope is established.
+static void TeardownForeachScopes(const Stmt* stmt, SimContext& ctx,
+                                  bool labeled) {
+  ctx.PopScope();
+  if (labeled) ctx.PopStaticScope(stmt->label);
+}
+
 ExecTask ExecForeach(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   bool labeled = !stmt->label.empty();
   if (labeled) ctx.PushStaticScope(stmt->label);
-  std::string arr_name = GetForeachArrayName(stmt->expr);
-  if (ForeachOnWildcardAssoc(arr_name, ctx)) {
+  ForeachSetup setup = ComputeForeachSetup(stmt, ctx);
+  if (setup.bail) {
     if (labeled) ctx.PopStaticScope(stmt->label);
     co_return StmtResult::kDone;
   }
-  uint32_t size = GetArraySize(stmt, ctx);
-  if (size == 0) {
-    if (labeled) ctx.PopStaticScope(stmt->label);
-    co_return StmtResult::kDone;
-  }
+  const std::string& arr_name = setup.arr_name;
+  uint32_t size = setup.size;
 
-  std::string_view iter_name;
-  if (!stmt->foreach_vars.empty() && !stmt->foreach_vars[0].empty()) {
-    iter_name = stmt->foreach_vars[0];
-  }
+  std::string_view iter_name = ForeachIterName(stmt);
 
   // §12.7.3: the loop variable steps through the array's declared index range,
   // not a fixed zero base. A descending dimension counts down from its high
@@ -642,21 +711,17 @@ ExecTask ExecForeach(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   }
 
   for (uint32_t i = 0; i < size && !ctx.StopRequested(); ++i) {
-    if (iter_var) {
-      uint32_t index = ForeachIndexForIteration(info, size, i);
-      iter_var->value = MakeLogic4VecVal(arena, 32, index);
-    }
+    SetForeachIterVar(iter_var, info, size, i, arena);
     auto result = co_await ExecStmt(stmt->body, ctx, arena);
-    if (result == StmtResult::kBreak) break;
-    if (result != StmtResult::kDone && result != StmtResult::kContinue) {
-      ctx.PopScope();
-      if (labeled) ctx.PopStaticScope(stmt->label);
+    auto action = ClassifyLoopBodyResult(result);
+    if (action == LoopAction::kBreakLoop) break;
+    if (action == LoopAction::kPropagate) {
+      TeardownForeachScopes(stmt, ctx, labeled);
       co_return result;
     }
   }
 
-  ctx.PopScope();
-  if (labeled) ctx.PopStaticScope(stmt->label);
+  TeardownForeachScopes(stmt, ctx, labeled);
   co_return StmtResult::kDone;
 }
 

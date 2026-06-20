@@ -343,39 +343,35 @@ static Logic4Vec FreadIntegralVar(Variable* var, FILE* fp, Arena& arena) {
   return MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(nread));
 }
 
-// Memory variant: $fread(mem, fd [, start [, count]]), including the
-// $fread(mem, fd, , count) form whose start argument is omitted (a null arg).
-static Logic4Vec FreadMemoryArray(const Expr* expr, const ArrayInfo* ai,
-                                  FILE* fp, SimContext& ctx, Arena& arena) {
-  const Expr* dst = expr->args[0];
-  std::string mem_name(dst->text);
-  int64_t low_addr = ai->lo;
-  int64_t high_addr = ai->lo + static_cast<int64_t>(ai->size) - 1;
-  // §21.3.4.4: the data are read byte by byte; the number of bytes that fill a
-  // word is the word width rounded up to a whole number of bytes (an 8-bit word
-  // uses one byte, a 9-bit word two).
-  uint32_t elem_width = ai->elem_width;
-  uint32_t bytes_per_word = (elem_width + 7) / 8;
-  if (bytes_per_word == 0) bytes_per_word = 1;
-
-  // §21.3.4.4: start, when present, is the address of the first element loaded;
-  // otherwise the lowest-numbered location is used. The omitted-start form
-  // (`, ,`) reaches here as a null third argument and likewise defaults.
+// §21.3.4.4: start, when present, is the address of the first element loaded;
+// otherwise the lowest-numbered location is used. The omitted-start form
+// (`, ,`) reaches here as a null third argument and likewise defaults.
+static int64_t FreadStartAddr(const Expr* expr, int64_t low_addr,
+                              SimContext& ctx, Arena& arena) {
   bool has_start = expr->args.size() >= 3 && expr->args[2] != nullptr;
-  int64_t start_addr =
-      has_start
-          ? static_cast<int64_t>(EvalExpr(expr->args[2], ctx, arena).ToUint64())
-          : low_addr;
+  if (!has_start) return low_addr;
+  return static_cast<int64_t>(EvalExpr(expr->args[2], ctx, arena).ToUint64());
+}
 
-  // §21.3.4.4: count, when present, caps how many locations are loaded;
-  // otherwise the memory is filled with whatever data are available.
-  bool has_count = expr->args.size() >= 4 && expr->args[3] != nullptr;
-  uint64_t max_words =
-      has_count ? EvalExpr(expr->args[3], ctx, arena).ToUint64() : 0;
+// §21.3.4.4: count, when present, caps how many locations are loaded; otherwise
+// the memory is filled with whatever data are available. has_count reports
+// whether a cap was supplied; the returned value is the cap (0 when absent).
+static uint64_t FreadMaxWords(const Expr* expr, bool& has_count,
+                              SimContext& ctx, Arena& arena) {
+  has_count = expr->args.size() >= 4 && expr->args[3] != nullptr;
+  if (!has_count) return 0;
+  return EvalExpr(expr->args[3], ctx, arena).ToUint64();
+}
 
-  // §21.3.4.4: consecutive words are loaded toward the highest address
-  // (increasing index), regardless of the array's declared direction, until the
-  // memory is full, the count is reached, or the file is exhausted.
+// §21.3.4.4: load consecutive words toward the highest address (increasing
+// index), regardless of the array's declared direction, until the memory is
+// full, the count is reached, or the file is exhausted. Returns the total
+// number of bytes read.
+static uint64_t FreadLoadWords(const std::string& mem_name, int64_t start_addr,
+                               int64_t low_addr, int64_t high_addr,
+                               uint32_t bytes_per_word, bool has_count,
+                               uint64_t max_words, FILE* fp, SimContext& ctx,
+                               Arena& arena) {
   uint64_t total_bytes = 0;
   uint64_t words_done = 0;
   auto* buf = new uint8_t[bytes_per_word];
@@ -394,7 +390,54 @@ static Logic4Vec FreadMemoryArray(const Expr* expr, const ArrayInfo* ai,
     if (nread < bytes_per_word) break;  // file ran out mid-word
   }
   delete[] buf;
+  return total_bytes;
+}
+
+// Memory variant: $fread(mem, fd [, start [, count]]), including the
+// $fread(mem, fd, , count) form whose start argument is omitted (a null arg).
+static Logic4Vec FreadMemoryArray(const Expr* expr, const ArrayInfo* ai,
+                                  FILE* fp, SimContext& ctx, Arena& arena) {
+  const Expr* dst = expr->args[0];
+  std::string mem_name(dst->text);
+  int64_t low_addr = ai->lo;
+  int64_t high_addr = ai->lo + static_cast<int64_t>(ai->size) - 1;
+  // §21.3.4.4: the data are read byte by byte; the number of bytes that fill a
+  // word is the word width rounded up to a whole number of bytes (an 8-bit word
+  // uses one byte, a 9-bit word two).
+  uint32_t elem_width = ai->elem_width;
+  uint32_t bytes_per_word = (elem_width + 7) / 8;
+  if (bytes_per_word == 0) bytes_per_word = 1;
+
+  int64_t start_addr = FreadStartAddr(expr, low_addr, ctx, arena);
+  bool has_count = false;
+  uint64_t max_words = FreadMaxWords(expr, has_count, ctx, arena);
+
+  uint64_t total_bytes =
+      FreadLoadWords(mem_name, start_addr, low_addr, high_addr, bytes_per_word,
+                     has_count, max_words, fp, ctx, arena);
   return MakeLogic4VecVal(arena, 32, total_bytes);
+}
+
+// §21.3.4.4: the non-array destination forms. A non-packed struct/union reads
+// member by member; anything else (including a packed aggregate, which is not
+// handled by the struct form) loads the whole value at once via the
+// integral-variable form.
+static Logic4Vec FreadNonArray(const Expr* dst, FILE* fp, SimContext& ctx,
+                               Arena& arena) {
+  const StructTypeInfo* sinfo = (dst->kind == ExprKind::kIdentifier)
+                                    ? ctx.GetVariableStructType(dst->text)
+                                    : nullptr;
+  if (sinfo && !sinfo->is_packed && !sinfo->fields.empty()) {
+    Variable* var = ctx.FindVariable(dst->text);
+    if (!var) return MakeLogic4VecVal(arena, 32, 0);
+    return FreadUnpackedStruct(sinfo, var, fp, arena);
+  }
+
+  Variable* var = (dst->kind == ExprKind::kIdentifier)
+                      ? ctx.FindVariable(dst->text)
+                      : nullptr;
+  if (!var) return MakeLogic4VecVal(arena, 32, 0);
+  return FreadIntegralVar(var, fp, arena);
 }
 
 static Logic4Vec EvalFread(const Expr* expr, SimContext& ctx, Arena& arena) {
@@ -412,26 +455,7 @@ static Logic4Vec EvalFread(const Expr* expr, SimContext& ctx, Arena& arena) {
                             ? ctx.FindArrayInfo(dst->text)
                             : nullptr;
 
-  if (!ai) {
-    // §21.3.4.4: a packed aggregate is not handled by the struct form -- it
-    // falls through to the integral-variable form, which loads the whole value
-    // at once.
-    const StructTypeInfo* sinfo = (dst->kind == ExprKind::kIdentifier)
-                                      ? ctx.GetVariableStructType(dst->text)
-                                      : nullptr;
-    if (sinfo && !sinfo->is_packed && !sinfo->fields.empty()) {
-      Variable* var = ctx.FindVariable(dst->text);
-      if (!var) return MakeLogic4VecVal(arena, 32, 0);
-      return FreadUnpackedStruct(sinfo, var, fp, arena);
-    }
-
-    Variable* var = (dst->kind == ExprKind::kIdentifier)
-                        ? ctx.FindVariable(dst->text)
-                        : nullptr;
-    if (!var) return MakeLogic4VecVal(arena, 32, 0);
-    return FreadIntegralVar(var, fp, arena);
-  }
-
+  if (!ai) return FreadNonArray(dst, fp, ctx, arena);
   return FreadMemoryArray(expr, ai, fp, ctx, arena);
 }
 

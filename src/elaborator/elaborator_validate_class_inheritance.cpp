@@ -173,21 +173,24 @@ void Elaborator::ValidateAbstractClassUnimplemented(const ClassDecl* cls) {
   }
 }
 
+static void CheckPureFinalMember(const ClassMember* m, DiagEngine& diag) {
+  if (m->kind == ClassMemberKind::kMethod && m->method) {
+    if (m->is_pure_virtual && m->method->is_method_final) {
+      diag.Error(m->method->loc,
+                 "':final' shall not be specified on a pure virtual method");
+    }
+  } else if (m->kind == ClassMemberKind::kConstraint) {
+    if (m->is_pure_virtual && m->is_constraint_final) {
+      diag.Error(m->loc,
+                 "':final' shall not be specified on a pure constraint");
+    }
+  }
+}
+
 void Elaborator::ValidateAbstractClassRules() {
   for (const auto* cls : unit_->classes) {
     for (const auto* m : cls->members) {
-      if (m->kind == ClassMemberKind::kMethod && m->method) {
-        if (m->is_pure_virtual && m->method->is_method_final) {
-          diag_.Error(
-              m->method->loc,
-              "':final' shall not be specified on a pure virtual method");
-        }
-      } else if (m->kind == ClassMemberKind::kConstraint) {
-        if (m->is_pure_virtual && m->is_constraint_final) {
-          diag_.Error(m->loc,
-                      "':final' shall not be specified on a pure constraint");
-        }
-      }
+      CheckPureFinalMember(m, diag_);
     }
     ValidateAbstractClassUnimplemented(cls);
   }
@@ -232,6 +235,56 @@ static bool DefaultArgExprsEqual(const Expr* a, const Expr* b) {
   return true;
 }
 
+// Compares one prototype argument against the corresponding out-of-block
+// declaration argument (type, direction, and repeated default value per §8.24).
+static void CheckOutOfBlockArg(const FunctionArg& proto_arg,
+                               const FunctionArg& impl_arg,
+                               const ModuleItem* impl,
+                               std::string_view class_name, DiagEngine& diag) {
+  if (!TypesMatch(proto_arg.data_type, impl_arg.data_type)) {
+    diag.Error(impl->loc,
+               std::format("out-of-block declaration for '{}::{}' argument "
+                           "'{}' has mismatched type",
+                           class_name, impl->name, impl_arg.name));
+  }
+  if (proto_arg.direction != impl_arg.direction) {
+    diag.Error(impl->loc,
+               std::format("out-of-block declaration for '{}::{}' argument "
+                           "'{}' has mismatched direction",
+                           class_name, impl->name, impl_arg.name));
+  }
+  // §8.24: omitting the prototype's default value is allowed, but repeating a
+  // default value in the out-of-block declaration requires a syntactically
+  // identical default value in the prototype.
+  const Expr* impl_default = impl_arg.default_value;
+  if (impl_default != nullptr &&
+      !DefaultArgExprsEqual(proto_arg.default_value, impl_default)) {
+    diag.Error(impl->loc,
+               std::format("out-of-block declaration for '{}::{}' argument "
+                           "'{}' has a default value that is not "
+                           "syntactically identical to the prototype",
+                           class_name, impl->name, impl_arg.name));
+  }
+}
+
+static void CheckOutOfBlockReturnType(const ModuleItem* proto,
+                                      const ModuleItem* impl,
+                                      std::string_view class_name,
+                                      DiagEngine& diag) {
+  if (proto->kind != ModuleItemKind::kFunctionDecl) return;
+  auto impl_ret = impl->return_type;
+  if (impl_ret.kind == DataTypeKind::kNamed && !impl_ret.scope_name.empty() &&
+      impl_ret.scope_name == class_name) {
+    impl_ret.scope_name = {};
+  }
+  if (!TypesMatch(proto->return_type, impl_ret)) {
+    diag.Error(impl->loc,
+               std::format("out-of-block declaration for '{}::{}' has "
+                           "mismatched return type",
+                           class_name, impl->name));
+  }
+}
+
 static void ValidateOutOfBlockSignature(const ModuleItem* proto,
                                         const ModuleItem* impl,
                                         std::string_view class_name,
@@ -259,44 +312,9 @@ static void ValidateOutOfBlockSignature(const ModuleItem* proto,
     return;
   }
   for (size_t i = 0; i < proto_args.size(); ++i) {
-    if (!TypesMatch(proto_args[i].data_type, impl_args[i].data_type)) {
-      diag.Error(impl->loc,
-                 std::format("out-of-block declaration for '{}::{}' argument "
-                             "'{}' has mismatched type",
-                             class_name, impl->name, impl_args[i].name));
-    }
-    if (proto_args[i].direction != impl_args[i].direction) {
-      diag.Error(impl->loc,
-                 std::format("out-of-block declaration for '{}::{}' argument "
-                             "'{}' has mismatched direction",
-                             class_name, impl->name, impl_args[i].name));
-    }
-    // §8.24: omitting the prototype's default value is allowed, but repeating a
-    // default value in the out-of-block declaration requires a syntactically
-    // identical default value in the prototype.
-    const Expr* impl_default = impl_args[i].default_value;
-    if (impl_default != nullptr &&
-        !DefaultArgExprsEqual(proto_args[i].default_value, impl_default)) {
-      diag.Error(impl->loc,
-                 std::format("out-of-block declaration for '{}::{}' argument "
-                             "'{}' has a default value that is not "
-                             "syntactically identical to the prototype",
-                             class_name, impl->name, impl_args[i].name));
-    }
+    CheckOutOfBlockArg(proto_args[i], impl_args[i], impl, class_name, diag);
   }
-  if (proto->kind == ModuleItemKind::kFunctionDecl) {
-    auto impl_ret = impl->return_type;
-    if (impl_ret.kind == DataTypeKind::kNamed && !impl_ret.scope_name.empty() &&
-        impl_ret.scope_name == class_name) {
-      impl_ret.scope_name = {};
-    }
-    if (!TypesMatch(proto->return_type, impl_ret)) {
-      diag.Error(impl->loc,
-                 std::format("out-of-block declaration for '{}::{}' has "
-                             "mismatched return type",
-                             class_name, impl->name));
-    }
-  }
+  CheckOutOfBlockReturnType(proto, impl, class_name, diag);
 }
 
 static const ModuleDecl* FindInterfaceDecl(std::string_view name,
@@ -328,6 +346,63 @@ static bool LocPrecedes(const SourceLoc& a, const SourceLoc& b) {
   return a.column < b.column;
 }
 
+// Handles an out-of-block body whose `method_class` names an interface rather
+// than a class. Mirrors the original interface branch exactly.
+static void ValidateInterfaceOutOfBlockBody(
+    const ModuleDecl* ifc, ModuleItem* item,
+    std::unordered_set<std::string>& linked, DiagEngine& diag) {
+  const auto* proto = FindInterfaceExternPrototype(ifc, item->name);
+  if (!proto) {
+    diag.Error(item->loc,
+               std::format("no matching extern prototype for '{}.{}' in "
+                           "interface '{}'",
+                           item->method_class, item->name, item->method_class));
+    return;
+  }
+  auto key = std::string(item->method_class) + "." + std::string(item->name);
+  if (linked.count(key)) {
+    diag.Error(item->loc, std::format("duplicate hierarchical body for '{}.{}'",
+                                      item->method_class, item->name));
+    return;
+  }
+  linked.insert(key);
+  ValidateOutOfBlockSignature(proto, item, item->method_class, diag);
+}
+
+// Handles an out-of-block body whose `method_class` names a regular class.
+// Mirrors the original class branch exactly.
+static void ValidateClassOutOfBlockBody(const ClassDecl* cls, ModuleItem* item,
+                                        std::unordered_set<std::string>& linked,
+                                        DiagEngine& diag) {
+  const auto* proto = FindExternPrototype(cls, item->name);
+  if (!proto) {
+    diag.Error(item->loc,
+               std::format("no matching extern prototype for '{}::{}' in "
+                           "class '{}'",
+                           item->method_class, item->name, item->method_class));
+    return;
+  }
+  // §8.24: an out-of-block declaration shall follow the class declaration, so
+  // a body that appears ahead of its class in source order is illegal.
+  if (LocPrecedes(item->loc, cls->range.start)) {
+    diag.Error(
+        item->loc,
+        std::format("out-of-block declaration for '{}::{}' shall follow the "
+                    "declaration of class '{}'",
+                    item->method_class, item->name, item->method_class));
+    return;
+  }
+  auto key = std::string(item->method_class) + "::" + std::string(item->name);
+  if (linked.count(key)) {
+    diag.Error(item->loc,
+               std::format("duplicate out-of-block declaration for '{}::{}'",
+                           item->method_class, item->name));
+    return;
+  }
+  linked.insert(key);
+  ValidateOutOfBlockSignature(proto, item, item->method_class, diag);
+}
+
 void Elaborator::ValidateOutOfBlockDeclarations() {
   std::unordered_set<std::string> linked;
   for (auto* item : unit_->cu_items) {
@@ -339,25 +414,7 @@ void Elaborator::ValidateOutOfBlockDeclarations() {
     if (!cls) {
       const auto* ifc = FindInterfaceDecl(item->method_class, unit_);
       if (ifc) {
-        const auto* proto = FindInterfaceExternPrototype(ifc, item->name);
-        if (!proto) {
-          diag_.Error(
-              item->loc,
-              std::format("no matching extern prototype for '{}.{}' in "
-                          "interface '{}'",
-                          item->method_class, item->name, item->method_class));
-          continue;
-        }
-        auto key =
-            std::string(item->method_class) + "." + std::string(item->name);
-        if (linked.count(key)) {
-          diag_.Error(item->loc,
-                      std::format("duplicate hierarchical body for '{}.{}'",
-                                  item->method_class, item->name));
-          continue;
-        }
-        linked.insert(key);
-        ValidateOutOfBlockSignature(proto, item, item->method_class, diag_);
+        ValidateInterfaceOutOfBlockBody(ifc, item, linked, diag_);
         continue;
       }
       diag_.Error(item->loc,
@@ -365,84 +422,70 @@ void Elaborator::ValidateOutOfBlockDeclarations() {
                               item->method_class));
       continue;
     }
-    const auto* proto = FindExternPrototype(cls, item->name);
-    if (!proto) {
-      diag_.Error(
-          item->loc,
-          std::format("no matching extern prototype for '{}::{}' in "
-                      "class '{}'",
-                      item->method_class, item->name, item->method_class));
-      continue;
+    ValidateClassOutOfBlockBody(cls, item, linked, diag_);
+  }
+}
+
+// Checks the kind/legality of a single interface-class member, mirroring the
+// original dispatch chain (override specifiers + the disallowed member kinds).
+static void CheckInterfaceClassMemberKind(const ClassDecl* cls,
+                                          const ClassMember* m,
+                                          DiagEngine& diag) {
+  if (m->kind == ClassMemberKind::kMethod && m->method &&
+      (m->method->is_method_initial || m->method->is_method_extends ||
+       m->method->is_method_final)) {
+    diag.Error(m->method->loc,
+               "dynamic_override_specifiers shall not be used in "
+               "an interface class");
+  }
+  if (m->kind == ClassMemberKind::kMethod && !m->is_pure_virtual) {
+    diag.Error(m->method ? m->method->loc : cls->range.start,
+               std::format("interface class '{}' shall only contain "
+                           "pure virtual methods",
+                           cls->name));
+  } else if (m->kind == ClassMemberKind::kProperty && !m->is_const) {
+    diag.Error(cls->range.start,
+               std::format("interface class '{}' shall not contain "
+                           "data members",
+                           cls->name));
+  } else if (m->kind == ClassMemberKind::kConstraint) {
+    diag.Error(cls->range.start,
+               std::format("interface class '{}' shall not contain "
+                           "constraint blocks",
+                           cls->name));
+  } else if (m->kind == ClassMemberKind::kCovergroup) {
+    diag.Error(cls->range.start,
+               std::format("interface class '{}' shall not contain "
+                           "covergroups",
+                           cls->name));
+  } else if (m->kind == ClassMemberKind::kClassDecl) {
+    diag.Error(cls->range.start,
+               std::format("interface class '{}' shall not contain "
+                           "nested classes",
+                           cls->name));
+  }
+}
+
+// Verifies that any default argument values on an interface-class method are
+// constant expressions.
+static void CheckInterfaceClassMethodArgDefaults(const ClassMember* m,
+                                                 const ScopeMap& param_scope,
+                                                 DiagEngine& diag) {
+  if (m->kind != ClassMemberKind::kMethod || !m->method) return;
+  for (const auto& arg : m->method->func_args) {
+    if (arg.default_value && !IsConstantExpr(arg.default_value, param_scope)) {
+      diag.Error(m->method->loc,
+                 std::format("interface class method '{}' argument '{}': "
+                             "default value must be a constant expression",
+                             m->method->name, arg.name));
     }
-    // §8.24: an out-of-block declaration shall follow the class declaration, so
-    // a body that appears ahead of its class in source order is illegal.
-    if (LocPrecedes(item->loc, cls->range.start)) {
-      diag_.Error(
-          item->loc,
-          std::format("out-of-block declaration for '{}::{}' shall follow the "
-                      "declaration of class '{}'",
-                      item->method_class, item->name, item->method_class));
-      continue;
-    }
-    auto key = std::string(item->method_class) + "::" + std::string(item->name);
-    if (linked.count(key)) {
-      diag_.Error(item->loc,
-                  std::format("duplicate out-of-block declaration for '{}::{}'",
-                              item->method_class, item->name));
-      continue;
-    }
-    linked.insert(key);
-    ValidateOutOfBlockSignature(proto, item, item->method_class, diag_);
   }
 }
 
 void Elaborator::ValidateInterfaceClassMembers(const ClassDecl* cls) {
   for (const auto* m : cls->members) {
-    if (m->kind == ClassMemberKind::kMethod && m->method &&
-        (m->method->is_method_initial || m->method->is_method_extends ||
-         m->method->is_method_final)) {
-      diag_.Error(m->method->loc,
-                  "dynamic_override_specifiers shall not be used in "
-                  "an interface class");
-    }
-    if (m->kind == ClassMemberKind::kMethod && !m->is_pure_virtual) {
-      diag_.Error(m->method ? m->method->loc : cls->range.start,
-                  std::format("interface class '{}' shall only contain "
-                              "pure virtual methods",
-                              cls->name));
-    } else if (m->kind == ClassMemberKind::kProperty && !m->is_const) {
-      diag_.Error(cls->range.start,
-                  std::format("interface class '{}' shall not contain "
-                              "data members",
-                              cls->name));
-    } else if (m->kind == ClassMemberKind::kConstraint) {
-      diag_.Error(cls->range.start,
-                  std::format("interface class '{}' shall not contain "
-                              "constraint blocks",
-                              cls->name));
-    } else if (m->kind == ClassMemberKind::kCovergroup) {
-      diag_.Error(cls->range.start,
-                  std::format("interface class '{}' shall not contain "
-                              "covergroups",
-                              cls->name));
-    } else if (m->kind == ClassMemberKind::kClassDecl) {
-      diag_.Error(cls->range.start,
-                  std::format("interface class '{}' shall not contain "
-                              "nested classes",
-                              cls->name));
-    }
-
-    if (m->kind == ClassMemberKind::kMethod && m->method) {
-      for (const auto& arg : m->method->func_args) {
-        if (arg.default_value &&
-            !IsConstantExpr(arg.default_value, cu_param_scope_)) {
-          diag_.Error(m->method->loc,
-                      std::format("interface class method '{}' argument '{}': "
-                                  "default value must be a constant expression",
-                                  m->method->name, arg.name));
-        }
-      }
-    }
+    CheckInterfaceClassMemberKind(cls, m, diag_);
+    CheckInterfaceClassMethodArgDefaults(m, cu_param_scope_, diag_);
   }
 }
 
@@ -473,6 +516,46 @@ static bool IsDeclaredBefore(std::string_view name, const ClassDecl* before_cls,
   return false;
 }
 
+namespace {
+
+// Shared per-name validation for a base/extended/implemented interface name.
+// `verb` is "extend"/"implement", `noun` is "extended"/"implemented", and
+// `self_label` is "interface class"/"class" for the owning class in messages.
+// Returns true when a diagnostic was emitted that should stop further checks on
+// this name (mirrors the original `continue`/early-out control flow).
+bool ValidateInheritedInterfaceName(const ClassDecl* cls, std::string_view name,
+                                    const CompilationUnit* unit,
+                                    DiagEngine& diag, std::string_view verb,
+                                    std::string_view noun,
+                                    std::string_view self_label) {
+  if (cls->type_param_names.count(name) > 0) {
+    diag.Error(cls->range.start,
+               std::format("{} '{}' shall not {} type parameter '{}'",
+                           self_label, cls->name, verb, name));
+    return true;
+  }
+  if (IsForwardTypedefOnly(name, cls, unit)) {
+    diag.Error(cls->range.start,
+               std::format("{} '{}' shall not {} forward typedef '{}'; the "
+                           "interface class must be declared before it is {}",
+                           self_label, cls->name, verb, name, noun));
+    return true;
+  }
+  if (!IsDeclaredBefore(name, cls, unit)) {
+    const auto* target = FindClassDecl(name, unit);
+    if (target && target->is_interface) {
+      diag.Error(cls->range.start,
+                 std::format("interface class '{}' must be declared before it "
+                             "is {} by '{}'",
+                             name, noun, cls->name));
+      return true;
+    }
+  }
+  return false;
+}
+
+}  // namespace
+
 void Elaborator::ValidateInterfaceClassInheritance(const ClassDecl* cls) {
   if (!cls->implements_types.empty()) {
     diag_.Error(cls->range.start,
@@ -482,26 +565,8 @@ void Elaborator::ValidateInterfaceClassInheritance(const ClassDecl* cls) {
   }
   if (cls->base_class.empty()) return;
 
-  if (cls->type_param_names.count(cls->base_class) > 0) {
-    diag_.Error(cls->range.start,
-                std::format("interface class '{}' shall not extend type "
-                            "parameter '{}'",
-                            cls->name, cls->base_class));
-  } else if (IsForwardTypedefOnly(cls->base_class, cls, unit_)) {
-    diag_.Error(cls->range.start,
-                std::format("interface class '{}' shall not extend forward "
-                            "typedef '{}'; the interface class must be "
-                            "declared before it is extended",
-                            cls->name, cls->base_class));
-  } else if (!IsDeclaredBefore(cls->base_class, cls, unit_)) {
-    const auto* base = FindClassDecl(cls->base_class, unit_);
-    if (base && base->is_interface) {
-      diag_.Error(cls->range.start,
-                  std::format("interface class '{}' must be declared before "
-                              "it is extended by '{}'",
-                              cls->base_class, cls->name));
-    }
-  }
+  ValidateInheritedInterfaceName(cls, cls->base_class, unit_, diag_, "extend",
+                                 "extended", "interface class");
 
   const auto* base = FindClassDecl(cls->base_class, unit_);
   if (base && !base->is_interface) {
@@ -512,33 +577,9 @@ void Elaborator::ValidateInterfaceClassInheritance(const ClassDecl* cls) {
   }
   for (const auto& ref : cls->extends_interfaces) {
     auto iface_name = ref.name;
-
-    if (cls->type_param_names.count(iface_name) > 0) {
-      diag_.Error(cls->range.start,
-                  std::format("interface class '{}' shall not extend type "
-                              "parameter '{}'",
-                              cls->name, iface_name));
+    if (ValidateInheritedInterfaceName(cls, iface_name, unit_, diag_, "extend",
+                                       "extended", "interface class")) {
       continue;
-    }
-
-    if (IsForwardTypedefOnly(iface_name, cls, unit_)) {
-      diag_.Error(cls->range.start,
-                  std::format("interface class '{}' shall not extend forward "
-                              "typedef '{}'; the interface class must be "
-                              "declared before it is extended",
-                              cls->name, iface_name));
-      continue;
-    }
-
-    if (!IsDeclaredBefore(iface_name, cls, unit_)) {
-      const auto* ibase = FindClassDecl(iface_name, unit_);
-      if (ibase && ibase->is_interface) {
-        diag_.Error(cls->range.start,
-                    std::format("interface class '{}' must be declared before "
-                                "it is extended by '{}'",
-                                iface_name, cls->name));
-        continue;
-      }
     }
     const auto* ibase = FindClassDecl(iface_name, unit_);
     if (ibase && !ibase->is_interface) {
@@ -562,33 +603,9 @@ void Elaborator::ValidateRegularClassInheritance(const ClassDecl* cls) {
   }
   for (const auto& ref : cls->implements_types) {
     auto impl_name = ref.name;
-
-    if (cls->type_param_names.count(impl_name) > 0) {
-      diag_.Error(cls->range.start,
-                  std::format("class '{}' shall not implement type "
-                              "parameter '{}'",
-                              cls->name, impl_name));
+    if (ValidateInheritedInterfaceName(cls, impl_name, unit_, diag_,
+                                       "implement", "implemented", "class")) {
       continue;
-    }
-
-    if (IsForwardTypedefOnly(impl_name, cls, unit_)) {
-      diag_.Error(cls->range.start,
-                  std::format("class '{}' shall not implement forward "
-                              "typedef '{}'; the interface class must be "
-                              "declared before it is implemented",
-                              cls->name, impl_name));
-      continue;
-    }
-
-    if (!IsDeclaredBefore(impl_name, cls, unit_)) {
-      const auto* impl = FindClassDecl(impl_name, unit_);
-      if (impl && impl->is_interface) {
-        diag_.Error(cls->range.start,
-                    std::format("interface class '{}' must be declared before "
-                                "it is implemented by '{}'",
-                                impl_name, cls->name));
-        continue;
-      }
     }
     const auto* impl = FindClassDecl(impl_name, unit_);
     if (impl && !impl->is_interface) {
@@ -633,6 +650,10 @@ using IfaceMethodMap =
     std::unordered_map<std::string_view,
                        std::vector<std::pair<std::string, const ModuleItem*>>>;
 
+static void ForEachInterfaceParent(
+    const ClassDecl* cls, const CompilationUnit* unit,
+    const std::function<void(const ClassDecl*, const std::string&)>& fn);
+
 static void CollectInterfacePureVirtualMethods(
     const ClassDecl* iface, const std::string& spec_key,
     const CompilationUnit* unit, IfaceMethodMap& out,
@@ -643,21 +664,10 @@ static void CollectInterfacePureVirtualMethods(
     if (!m->method) continue;
     out[m->method->name].push_back({spec_key, m->method});
   }
-  if (!iface->base_class.empty()) {
-    const auto* base = FindClassDecl(iface->base_class, unit);
-    if (base && base->is_interface) {
-      auto base_key =
-          MakeSpecKey(iface->base_class, iface->base_class_type_params);
-      CollectInterfacePureVirtualMethods(base, base_key, unit, out, visited);
-    }
-  }
-  for (const auto& ref : iface->extends_interfaces) {
-    const auto* ext = FindClassDecl(ref.name, unit);
-    if (ext && ext->is_interface) {
-      auto ext_key = MakeSpecKey(ref.name, ref.type_params);
-      CollectInterfacePureVirtualMethods(ext, ext_key, unit, out, visited);
-    }
-  }
+  ForEachInterfaceParent(
+      iface, unit, [&](const ClassDecl* parent, const std::string& key) {
+        CollectInterfacePureVirtualMethods(parent, key, unit, out, visited);
+      });
 }
 
 static void CollectImplementedInterfaces(const ClassDecl* cls,
@@ -681,23 +691,11 @@ static void CollectInScopeInterfaceMethods(const ClassDecl* cls,
                                            IfaceMethodMap& iface_methods) {
   std::unordered_set<std::string> visited;
   if (cls->is_interface) {
-    if (!cls->base_class.empty()) {
-      const auto* base = FindClassDecl(cls->base_class, unit);
-      if (base && base->is_interface) {
-        auto base_key =
-            MakeSpecKey(cls->base_class, cls->base_class_type_params);
-        CollectInterfacePureVirtualMethods(base, base_key, unit, iface_methods,
-                                           visited);
-      }
-    }
-    for (const auto& ref : cls->extends_interfaces) {
-      const auto* ext = FindClassDecl(ref.name, unit);
-      if (ext && ext->is_interface) {
-        auto ext_key = MakeSpecKey(ref.name, ref.type_params);
-        CollectInterfacePureVirtualMethods(ext, ext_key, unit, iface_methods,
-                                           visited);
-      }
-    }
+    ForEachInterfaceParent(
+        cls, unit, [&](const ClassDecl* parent, const std::string& key) {
+          CollectInterfacePureVirtualMethods(parent, key, unit, iface_methods,
+                                             visited);
+        });
   } else {
     std::vector<InterfaceRef> all_ifaces;
     CollectImplementedInterfaces(cls, unit, all_ifaces);
@@ -737,6 +735,29 @@ static void DiagnoseInterfaceSignatureConflicts(
   }
 }
 
+// Walks the base-class chain of `cls` (excluding `cls`) and returns the first
+// virtual method named `method_name`. When `require_non_pure` is set, pure
+// virtual methods are skipped.
+static const ModuleItem* FindVirtualMethodInBaseChain(
+    const ClassDecl* cls, std::string_view method_name,
+    const CompilationUnit* unit, bool require_non_pure) {
+  for (const auto* walk = cls->base_class.empty()
+                              ? nullptr
+                              : FindClassDecl(cls->base_class, unit);
+       walk; walk = walk->base_class.empty()
+                        ? nullptr
+                        : FindClassDecl(walk->base_class, unit)) {
+    for (const auto* bm : walk->members) {
+      if (bm->kind == ClassMemberKind::kMethod && bm->method &&
+          bm->method->name == method_name && bm->is_virtual &&
+          (!require_non_pure || !bm->is_pure_virtual)) {
+        return bm->method;
+      }
+    }
+  }
+  return nullptr;
+}
+
 // Locates the concrete (virtual) implementation of `method_name` for `cls`,
 // searching the class itself first and then walking the base-class chain.
 static const ModuleItem* FindMethodNameConflictImpl(
@@ -749,20 +770,8 @@ static const ModuleItem* FindMethodNameConflictImpl(
       return cm->method;
     }
   }
-  for (const auto* walk = cls->base_class.empty()
-                              ? nullptr
-                              : FindClassDecl(cls->base_class, unit);
-       walk; walk = walk->base_class.empty()
-                        ? nullptr
-                        : FindClassDecl(walk->base_class, unit)) {
-    for (const auto* bm : walk->members) {
-      if (bm->kind == ClassMemberKind::kMethod && bm->method &&
-          bm->method->name == method_name && bm->is_virtual) {
-        return bm->method;
-      }
-    }
-  }
-  return nullptr;
+  return FindVirtualMethodInBaseChain(cls, method_name, unit,
+                                      /*require_non_pure=*/false);
 }
 
 // Checks that each implementing method matches the signature of every interface
@@ -806,20 +815,41 @@ static const ModuleItem* FindConcreteMethodInHierarchy(
       return cm->method;
     }
   }
-  const auto* walk =
-      cls->base_class.empty() ? nullptr : FindClassDecl(cls->base_class, unit);
-  while (walk) {
-    for (const auto* bm : walk->members) {
-      if (bm->kind == ClassMemberKind::kMethod && bm->method &&
-          bm->method->name == method_name && bm->is_virtual &&
-          !bm->is_pure_virtual) {
-        return bm->method;
-      }
+  return FindVirtualMethodInBaseChain(cls, method_name, unit,
+                                      /*require_non_pure=*/true);
+}
+
+// §8.26.8: an implementing method's argument defaults must mirror the interface
+// prototype's (matching presence and, where both present, the same value).
+static void CheckImplInterfaceArgDefaults(const ModuleItem* iface_method,
+                                          const ModuleItem* impl,
+                                          std::string_view iface_name,
+                                          DiagEngine& diag) {
+  const auto& iface_args = iface_method->func_args;
+  const auto& impl_args = impl->func_args;
+  size_t n = std::min(iface_args.size(), impl_args.size());
+  for (size_t i = 0; i < n; ++i) {
+    bool iface_has = iface_args[i].default_value != nullptr;
+    bool impl_has = impl_args[i].default_value != nullptr;
+    if (iface_has != impl_has) {
+      diag.Error(impl->loc,
+                 std::format("method '{}' argument '{}': default value "
+                             "presence does not match interface '{}'",
+                             impl->name, impl_args[i].name, iface_name));
+      continue;
     }
-    walk = walk->base_class.empty() ? nullptr
-                                    : FindClassDecl(walk->base_class, unit);
+    if (!iface_has) continue;
+    auto iface_val = ConstEvalInt(iface_args[i].default_value);
+    auto impl_val = ConstEvalInt(impl_args[i].default_value);
+    if (iface_val && impl_val && *iface_val != *impl_val) {
+      diag.Error(impl->loc,
+                 std::format("method '{}' argument '{}': default value "
+                             "does not match interface '{}' (expected {}, "
+                             "got {})",
+                             impl->name, impl_args[i].name, iface_name,
+                             *iface_val, *impl_val));
+    }
   }
-  return nullptr;
 }
 
 static void CheckInterfaceMethods(const ClassDecl* cls, const ClassDecl* iface,
@@ -838,36 +868,7 @@ static void CheckInterfaceMethods(const ClassDecl* cls, const ClassDecl* iface,
                              cls->name, im->method->name, iface_name));
       continue;
     }
-
-    const auto& iface_args = im->method->func_args;
-    const auto& impl_args = impl->func_args;
-    size_t n = std::min(iface_args.size(), impl_args.size());
-    for (size_t i = 0; i < n; ++i) {
-      bool iface_has = iface_args[i].default_value != nullptr;
-      bool impl_has = impl_args[i].default_value != nullptr;
-      // §8.26.8: the default argument value of an interface class method must
-      // be the same for every class that implements it. A default present on
-      // one side but absent on the other cannot yield a common value, so the
-      // implementing method's defaults must mirror the interface prototype's.
-      if (iface_has != impl_has) {
-        diag.Error(impl->loc,
-                   std::format("method '{}' argument '{}': default value "
-                               "presence does not match interface '{}'",
-                               impl->name, impl_args[i].name, iface_name));
-        continue;
-      }
-      if (!iface_has) continue;
-      auto iface_val = ConstEvalInt(iface_args[i].default_value);
-      auto impl_val = ConstEvalInt(impl_args[i].default_value);
-      if (iface_val && impl_val && *iface_val != *impl_val) {
-        diag.Error(impl->loc,
-                   std::format("method '{}' argument '{}': default value "
-                               "does not match interface '{}' (expected {}, "
-                               "got {})",
-                               impl->name, impl_args[i].name, iface_name,
-                               *iface_val, *impl_val));
-      }
-    }
+    CheckImplInterfaceArgDefaults(im->method, impl, iface_name, diag);
   }
 }
 
@@ -899,6 +900,45 @@ static void CollectOwnParamTypeNames(
   }
 }
 
+// Invokes `fn(parent, parent_key)` for every interface parent of `cls`: the
+// base class (if it is an interface) followed by each extends-interface that is
+// an interface. The spec key encodes the parent's type parameters.
+static void ForEachInterfaceParent(
+    const ClassDecl* cls, const CompilationUnit* unit,
+    const std::function<void(const ClassDecl*, const std::string&)>& fn) {
+  if (!cls->base_class.empty()) {
+    const auto* base = FindClassDecl(cls->base_class, unit);
+    if (base && base->is_interface) {
+      fn(base, MakeSpecKey(cls->base_class, cls->base_class_type_params));
+    }
+  }
+  for (const auto& ref : cls->extends_interfaces) {
+    const auto* ext = FindClassDecl(ref.name, unit);
+    if (ext && ext->is_interface) {
+      fn(ext, MakeSpecKey(ref.name, ref.type_params));
+    }
+  }
+}
+
+static void CollectEffectiveParamTypeNames(const ClassDecl* iface,
+                                           const std::string& spec_key,
+                                           const CompilationUnit* unit,
+                                           NameOriginMap& out);
+
+// Merges the effective param/type names of `parent` into `out`, skipping names
+// already owned locally (recorded in `own_names`).
+static void MergeInheritedParamTypeNames(
+    const ClassDecl* parent, const std::string& parent_key,
+    const CompilationUnit* unit,
+    const std::unordered_set<std::string_view>& own_names, NameOriginMap& out) {
+  NameOriginMap parent_map;
+  CollectEffectiveParamTypeNames(parent, parent_key, unit, parent_map);
+  for (const auto& [name, origins] : parent_map) {
+    if (own_names.count(name)) continue;
+    for (const auto& o : origins) out[name].insert(o);
+  }
+}
+
 static void CollectEffectiveParamTypeNames(const ClassDecl* iface,
                                            const std::string& spec_key,
                                            const CompilationUnit* unit,
@@ -906,29 +946,10 @@ static void CollectEffectiveParamTypeNames(const ClassDecl* iface,
   std::unordered_set<std::string_view> own_names;
   CollectOwnParamTypeNames(iface, own_names);
   for (auto n : own_names) out[n].insert(spec_key);
-  auto inherit = [&](const ClassDecl* parent, const std::string& parent_key) {
-    NameOriginMap parent_map;
-    CollectEffectiveParamTypeNames(parent, parent_key, unit, parent_map);
-    for (const auto& [name, origins] : parent_map) {
-      if (own_names.count(name)) continue;
-      for (const auto& o : origins) out[name].insert(o);
-    }
-  };
-  if (!iface->base_class.empty()) {
-    const auto* base = FindClassDecl(iface->base_class, unit);
-    if (base && base->is_interface) {
-      auto base_key =
-          MakeSpecKey(iface->base_class, iface->base_class_type_params);
-      inherit(base, base_key);
-    }
-  }
-  for (const auto& ref : iface->extends_interfaces) {
-    const auto* ext = FindClassDecl(ref.name, unit);
-    if (ext && ext->is_interface) {
-      auto ext_key = MakeSpecKey(ref.name, ref.type_params);
-      inherit(ext, ext_key);
-    }
-  }
+  ForEachInterfaceParent(
+      iface, unit, [&](const ClassDecl* parent, const std::string& parent_key) {
+        MergeInheritedParamTypeNames(parent, parent_key, unit, own_names, out);
+      });
 }
 
 static void ValidateParamTypeConflicts(const ClassDecl* cls,
@@ -938,28 +959,11 @@ static void ValidateParamTypeConflicts(const ClassDecl* cls,
   std::unordered_set<std::string_view> own_names;
   CollectOwnParamTypeNames(cls, own_names);
   NameOriginMap inherited;
-  auto process = [&](const ClassDecl* parent, const std::string& parent_key) {
-    NameOriginMap parent_map;
-    CollectEffectiveParamTypeNames(parent, parent_key, unit, parent_map);
-    for (const auto& [name, origins] : parent_map) {
-      if (own_names.count(name)) continue;
-      for (const auto& o : origins) inherited[name].insert(o);
-    }
-  };
-  if (!cls->base_class.empty()) {
-    const auto* base = FindClassDecl(cls->base_class, unit);
-    if (base && base->is_interface) {
-      auto base_key = MakeSpecKey(cls->base_class, cls->base_class_type_params);
-      process(base, base_key);
-    }
-  }
-  for (const auto& ref : cls->extends_interfaces) {
-    const auto* ext = FindClassDecl(ref.name, unit);
-    if (ext && ext->is_interface) {
-      auto ext_key = MakeSpecKey(ref.name, ref.type_params);
-      process(ext, ext_key);
-    }
-  }
+  ForEachInterfaceParent(
+      cls, unit, [&](const ClassDecl* parent, const std::string& parent_key) {
+        MergeInheritedParamTypeNames(parent, parent_key, unit, own_names,
+                                     inherited);
+      });
   for (const auto& [name, origins] : inherited) {
     if (origins.size() > 1) {
       diag.Error(

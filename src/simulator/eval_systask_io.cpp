@@ -370,6 +370,63 @@ ScanFieldResult ScanIntegerField(ScanCursor cur, int base, int width,
   }
   return ScanFieldResult::kMatched;
 }
+
+// Result of parsing one §21.3.4.3 (c) conversion specifier starting just after
+// the '%'. `stop` requests ending the scan (the specifier ran off the end of
+// the format string). On success `code` is the conversion letter and `fi` has
+// been advanced to point at that letter.
+struct ScanSpec {
+  bool stop = false;
+  bool suppress = false;
+  int width = 0;
+  char code = '\0';
+};
+
+// §21.3.4.3 (c): parse the optional assignment-suppression character and the
+// optional maximum field width, then the conversion code. `fi` enters pointing
+// at the character following '%' and exits pointing at the conversion letter.
+ScanSpec ParseScanSpec(const std::string& fmt, size_t& fi) {
+  ScanSpec spec;
+  if (fmt[fi] == '*') {
+    spec.suppress = true;
+    if (++fi >= fmt.size()) {
+      spec.stop = true;
+      return spec;
+    }
+  }
+  while (fi < fmt.size() && fmt[fi] >= '0' && fmt[fi] <= '9') {
+    spec.width = spec.width * 10 + (fmt[fi] - '0');
+    ++fi;
+  }
+  if (fi >= fmt.size()) {
+    spec.stop = true;
+    return spec;
+  }
+  spec.code = fmt[fi];
+  return spec;
+}
+
+// §21.3.4.3: dispatch a single conversion (other than the %% literal, which the
+// caller handles) to the matching field handler. Leading white space is skipped
+// for every code except %c. Returns kStop on an unsupported conversion code.
+ScanFieldResult DispatchScanField(char lc, const ScanCursor& cur, int width,
+                                  Variable* var, Arena& arena) {
+  if (lc == 'c') {
+    // §21.3.4.3: the character conversion does not skip leading white space.
+    return ScanCharField(cur, width, var, arena);
+  }
+  // §21.3.4.3: every remaining conversion ignores leading white space.
+  while (cur.pos < cur.input.size() && IsScanSpace(cur.input[cur.pos]))
+    ++cur.pos;
+
+  if (lc == 's') return ScanStringField(cur, width, var, arena);
+  if (lc == 'f' || lc == 'e' || lc == 'g' || lc == 't')
+    return ScanRealField(cur, width, var, arena);
+  if (lc == 'u') return ScanRawBinaryField(cur, var, arena);
+  int base = SpecToBase(lc);
+  if (base == 0) return ScanFieldResult::kStop;  // unsupported conversion code
+  return ScanIntegerField(cur, base, width, var, arena);
+}
 }  // namespace
 
 // §21.3.4.3 scan engine shared in spirit with $fscanf. Interprets `fmt` against
@@ -409,22 +466,11 @@ uint32_t RunScanf(const std::string& input, const std::string& fmt,
 
     if (fi + 1 >= fmt.size()) break;
     ++fi;
-    // §21.3.4.3 (c): optional assignment-suppression character.
-    bool suppress = false;
-    if (fmt[fi] == '*') {
-      suppress = true;
-      if (++fi >= fmt.size()) break;
-    }
-    // §21.3.4.3 (c): optional maximum field width.
-    int width = 0;
-    while (fi < fmt.size() && fmt[fi] >= '0' && fmt[fi] <= '9') {
-      width = width * 10 + (fmt[fi] - '0');
-      ++fi;
-    }
-    if (fi >= fmt.size()) break;
-    char code = fmt[fi];
-    char lc = (code >= 'A' && code <= 'Z') ? static_cast<char>(code - 'A' + 'a')
-                                           : code;
+    ScanSpec spec = ParseScanSpec(fmt, fi);
+    if (spec.stop) break;
+    char lc = (spec.code >= 'A' && spec.code <= 'Z')
+                  ? static_cast<char>(spec.code - 'A' + 'a')
+                  : spec.code;
 
     if (lc == '%') {
       if (pos >= input.size() || input[pos] != '%') break;
@@ -432,29 +478,11 @@ uint32_t RunScanf(const std::string& input, const std::string& fmt,
       continue;
     }
 
-    ScanFieldResult result;
-    if (lc == 'c') {
-      // §21.3.4.3: the character conversion does not skip leading white space.
-      result = ScanCharField(cur, width, field_var(suppress), arena);
-    } else {
-      // §21.3.4.3: every remaining conversion ignores leading white space.
-      while (pos < input.size() && IsScanSpace(input[pos])) ++pos;
-
-      if (lc == 's') {
-        result = ScanStringField(cur, width, field_var(suppress), arena);
-      } else if (lc == 'f' || lc == 'e' || lc == 'g' || lc == 't') {
-        result = ScanRealField(cur, width, field_var(suppress), arena);
-      } else if (lc == 'u') {
-        result = ScanRawBinaryField(cur, field_var(suppress), arena);
-      } else {
-        int base = SpecToBase(lc);
-        if (base == 0) break;  // unsupported conversion code: stop scanning
-        result = ScanIntegerField(cur, base, width, field_var(suppress), arena);
-      }
-    }
+    ScanFieldResult result =
+        DispatchScanField(lc, cur, spec.width, field_var(spec.suppress), arena);
 
     if (result == ScanFieldResult::kStop) break;
-    if (result == ScanFieldResult::kMatched && !suppress) {
+    if (result == ScanFieldResult::kMatched && !spec.suppress) {
       ++matched;
       ++ai;
     }

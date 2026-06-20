@@ -397,11 +397,9 @@ bool TryResolveConditionRelation(int type, VpiHandle ref, VpiHandle& out) {
   return false;
 }
 
-// §37.79/§37.76/§37.71/§37.69/§37.77/§37.12: the lhs/rhs of the procedural
-// continuous assignment family and alias statements, an if-else's else branch,
-// repeat-control and disable expressions, a task/func body, and a loop control
-// variable's enclosing scope.
-bool TryResolveAssignAndStmtRelation(int type, VpiHandle ref, VpiHandle& out) {
+// §37.79/§37.76: the lhs/rhs of the procedural continuous assignment family
+// (assign/force/deassign/release) and of alias statements.
+bool TryResolveAssignLhsRhsRelation(int type, VpiHandle ref, VpiHandle& out) {
   if (type == vpiLhs && (ref->type == vpiAssignStmt || ref->type == vpiForce ||
                          ref->type == vpiDeassign || ref->type == vpiRelease)) {
     out = ref->lhs;
@@ -419,6 +417,12 @@ bool TryResolveAssignAndStmtRelation(int type, VpiHandle ref, VpiHandle& out) {
     out = ref->rhs;
     return true;
   }
+  return false;
+}
+
+// §37.71/§37.69/§37.77: an if-else's else branch, the expressions of repeat
+// controls and disables, and a task/func body statement.
+bool TryResolveElseExprStmtRelation(int type, VpiHandle ref, VpiHandle& out) {
   if (type == vpiElseStmt && ref->type == vpiIfElse) {
     out = VpiIfElseStmt(ref);
     return true;
@@ -435,6 +439,14 @@ bool TryResolveAssignAndStmtRelation(int type, VpiHandle ref, VpiHandle& out) {
     out = VpiTaskFuncStmt(ref);
     return true;
   }
+  return false;
+}
+
+// §37.12: the enclosing scope of a loop control variable - the foreach
+// statement that owns it, or the for statement when it declares its own loop
+// variables.
+bool TryResolveLoopControlScopeRelation(int type, VpiHandle ref,
+                                        VpiHandle& out) {
   if (type == vpiScope && ref->parent && VpiIsLoopControlVarType(ref->type)) {
     if (ref->parent->type == vpiForeachStmt) {
       out = ref->parent;
@@ -448,27 +460,30 @@ bool TryResolveAssignAndStmtRelation(int type, VpiHandle ref, VpiHandle& out) {
   return false;
 }
 
+// §37.79/§37.76/§37.71/§37.69/§37.77/§37.12: the lhs/rhs of the procedural
+// continuous assignment family and alias statements, an if-else's else branch,
+// repeat-control and disable expressions, a task/func body, and a loop control
+// variable's enclosing scope.
+bool TryResolveAssignAndStmtRelation(int type, VpiHandle ref, VpiHandle& out) {
+  return TryResolveAssignLhsRhsRelation(type, ref, out) ||
+         TryResolveElseExprStmtRelation(type, ref, out) ||
+         TryResolveLoopControlScopeRelation(type, ref, out);
+}
+
+// §37.35/§37.9/§37.6/§37.5/§37.85: the reference object types whose vpiIndex
+// relation reaches the index expression locating them within an array - a
+// primitive, program, interface, module, or gen scope.
+bool VpiObjectHasArrayIndexRelation(int ref_type) {
+  return VpiObjectIsPrimitive(ref_type) || ref_type == vpiProgram ||
+         ref_type == vpiInterface || ref_type == kVpiModule ||
+         ref_type == vpiGenScope;
+}
+
 // §37.35/§37.9/§37.6/§37.5/§37.85: vpiIndex from a primitive, program,
 // interface, module, or gen scope reaches the index expression that locates it
 // within its array (NULL when it is not an array member).
 bool TryResolveIndexRelation(int type, VpiHandle ref, VpiHandle& out) {
-  if (type == vpiIndex && VpiObjectIsPrimitive(ref->type)) {
-    out = ref->array_member ? ref->index_expr : nullptr;
-    return true;
-  }
-  if (type == vpiIndex && ref->type == vpiProgram) {
-    out = ref->array_member ? ref->index_expr : nullptr;
-    return true;
-  }
-  if (type == vpiIndex && ref->type == vpiInterface) {
-    out = ref->array_member ? ref->index_expr : nullptr;
-    return true;
-  }
-  if (type == vpiIndex && ref->type == kVpiModule) {
-    out = ref->array_member ? ref->index_expr : nullptr;
-    return true;
-  }
-  if (type == vpiIndex && ref->type == vpiGenScope) {
+  if (type == vpiIndex && VpiObjectHasArrayIndexRelation(ref->type)) {
     out = ref->array_member ? ref->index_expr : nullptr;
     return true;
   }
@@ -504,12 +519,9 @@ bool TryResolvePrefixWithRelation(int type, VpiHandle ref, VpiHandle& out) {
   return false;
 }
 
-// §37.40/§37.45/§37.38/§37.75/§37.39/§37.23: a timing check's ref/data terms, a
-// delay device's in/out terms, a foreach constraint/statement's array variable,
-// a mod path's owning module, and a nettype declaration's alias and resolution
-// function.
-bool TryResolveTimingAndNettypeRelation(int type, VpiHandle ref,
-                                        VpiHandle& out) {
+// §37.40/§37.45/§37.39: a timing check's ref/data terms, a delay device's
+// in/out terms, and a foreach constraint/statement's array variable.
+bool TryResolveTimingTermRelation(int type, VpiHandle ref, VpiHandle& out) {
   if (type == vpiTchkRefTerm && ref->type == vpiTchk) {
     out = ref->tchk_ref_term;
     return true;
@@ -534,20 +546,25 @@ bool TryResolveTimingAndNettypeRelation(int type, VpiHandle ref,
     out = ref->foreach_array;
     return true;
   }
-  if (type == kVpiModule && ref->type == vpiModPath) {
-    out = nullptr;
-    for (VpiObject* scope = ref->parent; scope; scope = scope->parent) {
-      if (scope->type == vpiInterface) {
-        out = nullptr;
-        return true;
-      }
-      if (scope->type == kVpiModule) {
-        out = scope;
-        return true;
-      }
+  return false;
+}
+
+// §37.38: a mod path's owning module - the nearest enclosing module scope, or
+// NULL when an interface scope intervenes first.
+VpiHandle ResolveModPathOwningModule(VpiHandle ref) {
+  for (VpiObject* scope = ref->parent; scope; scope = scope->parent) {
+    if (scope->type == vpiInterface) {
+      return nullptr;
     }
-    return true;
+    if (scope->type == kVpiModule) {
+      return scope;
+    }
   }
+  return nullptr;
+}
+
+// §37.23: a nettype declaration's alias and resolution (with) function.
+bool TryResolveNettypeRelation(int type, VpiHandle ref, VpiHandle& out) {
   if (type == vpiNetTypedefAlias && ref->type == vpiNetTypedef) {
     out = ref->nettype_alias;
     return true;
@@ -557,6 +574,20 @@ bool TryResolveTimingAndNettypeRelation(int type, VpiHandle ref,
     return true;
   }
   return false;
+}
+
+// §37.40/§37.45/§37.38/§37.75/§37.39/§37.23: a timing check's ref/data terms, a
+// delay device's in/out terms, a foreach constraint/statement's array variable,
+// a mod path's owning module, and a nettype declaration's alias and resolution
+// function.
+bool TryResolveTimingAndNettypeRelation(int type, VpiHandle ref,
+                                        VpiHandle& out) {
+  if (TryResolveTimingTermRelation(type, ref, out)) return true;
+  if (type == kVpiModule && ref->type == vpiModPath) {
+    out = ResolveModPathOwningModule(ref);
+    return true;
+  }
+  return TryResolveNettypeRelation(type, ref, out);
 }
 
 // Runs the designated-pointer relation groups in their original order, stopping

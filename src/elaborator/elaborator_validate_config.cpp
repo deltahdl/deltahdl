@@ -557,16 +557,24 @@ void CollectPackageLocalNames(const PackageDecl* pkg, PackageRefContext& ctx) {
   }
 }
 
+bool PackageItemDeclaresName(const ModuleItem* pi, std::string_view name) {
+  if (pi->name == name) return true;
+  return pi->kind == ModuleItemKind::kClassDecl && pi->class_decl &&
+         pi->class_decl->name == name;
+}
+
+bool NamedPackageDeclaresName(const PackageDecl* p, std::string_view name) {
+  for (const auto* pi : p->items) {
+    if (PackageItemDeclaresName(pi, name)) return true;
+  }
+  return false;
+}
+
 bool IsProvidedByWildcard(const PackageRefContext& ctx, std::string_view name) {
   for (auto pname : ctx.wildcard_pkgs) {
     for (const auto* p : ctx.unit->packages) {
       if (p->name != pname) continue;
-      for (const auto* pi : p->items) {
-        if (pi->name == name) return true;
-        if (pi->kind == ModuleItemKind::kClassDecl && pi->class_decl &&
-            pi->class_decl->name == name)
-          return true;
-      }
+      if (NamedPackageDeclaresName(p, name)) return true;
     }
   }
   return false;
@@ -675,6 +683,38 @@ bool PackageDeclaresName(const PackageDecl* src_pkg, std::string_view name) {
 
 bool PackageProvidesName(const PackageDecl* src_pkg, std::string_view name,
                          const PkgByName& pkg_by_name,
+                         std::unordered_set<const PackageDecl*>& visited);
+
+// Handles an `export *::*` re-export: the name is provided if any package the
+// source package itself imports provides it.
+bool WildcardExportProvidesName(
+    const PackageDecl* src_pkg, std::string_view name,
+    const PkgByName& pkg_by_name,
+    const std::unordered_set<const PackageDecl*>& visited) {
+  for (const auto* imp : src_pkg->items) {
+    if (imp->kind != ModuleItemKind::kImportDecl) continue;
+    auto sit = pkg_by_name.find(imp->import_item.package_name);
+    if (sit == pkg_by_name.end()) continue;
+    auto sub = visited;
+    if (PackageProvidesName(sit->second, name, pkg_by_name, sub)) return true;
+  }
+  return false;
+}
+
+// Handles a named re-export (`export pkg::name` or `export pkg::*`): the name
+// is provided if the named source package provides it.
+bool NamedExportProvidesName(
+    const ImportItem& ex, std::string_view name, const PkgByName& pkg_by_name,
+    const std::unordered_set<const PackageDecl*>& visited) {
+  auto sit = pkg_by_name.find(ex.package_name);
+  if (sit == pkg_by_name.end()) return false;
+  if (!ex.is_wildcard && ex.item_name != name) return false;
+  auto sub = visited;
+  return PackageProvidesName(sit->second, name, pkg_by_name, sub);
+}
+
+bool PackageProvidesName(const PackageDecl* src_pkg, std::string_view name,
+                         const PkgByName& pkg_by_name,
                          std::unordered_set<const PackageDecl*>& visited) {
   if (!visited.insert(src_pkg).second) return false;
   if (PackageDeclaresName(src_pkg, name)) return true;
@@ -682,22 +722,10 @@ bool PackageProvidesName(const PackageDecl* src_pkg, std::string_view name,
     if (it->kind != ModuleItemKind::kExportDecl) continue;
     const auto& ex = it->import_item;
     if (ex.package_name == "*") {
-      for (const auto* imp : src_pkg->items) {
-        if (imp->kind != ModuleItemKind::kImportDecl) continue;
-        auto sit = pkg_by_name.find(imp->import_item.package_name);
-        if (sit == pkg_by_name.end()) continue;
-        auto sub = visited;
-        if (PackageProvidesName(sit->second, name, pkg_by_name, sub))
-          return true;
-      }
-    } else {
-      auto sit = pkg_by_name.find(ex.package_name);
-      if (sit == pkg_by_name.end()) continue;
-      if (ex.is_wildcard || ex.item_name == name) {
-        auto sub = visited;
-        if (PackageProvidesName(sit->second, name, pkg_by_name, sub))
-          return true;
-      }
+      if (WildcardExportProvidesName(src_pkg, name, pkg_by_name, visited))
+        return true;
+    } else if (NamedExportProvidesName(ex, name, pkg_by_name, visited)) {
+      return true;
     }
   }
   return false;
@@ -718,6 +746,48 @@ void CollectPackageImports(
   }
 }
 
+// Resolves the source package of a named export and confirms the source
+// package actually provides the exported name. Returns the resolved source
+// package, or nullptr after emitting the appropriate diagnostic.
+const PackageDecl* ResolveExportSource(const ModuleItem* item,
+                                       const ImportItem& ex,
+                                       const PkgByName& pkg_by_name,
+                                       DiagEngine& diag) {
+  auto src_it = pkg_by_name.find(ex.package_name);
+  if (src_it == pkg_by_name.end()) {
+    diag.Error(item->loc, std::format("export from unknown package '{}'",
+                                      ex.package_name));
+    return nullptr;
+  }
+  std::unordered_set<const PackageDecl*> visited;
+  if (!PackageProvidesName(src_it->second, ex.item_name, pkg_by_name,
+                           visited)) {
+    diag.Error(
+        item->loc,
+        std::format("'{}' is not a candidate for import from package '{}'",
+                    ex.item_name, ex.package_name));
+    return nullptr;
+  }
+  return src_it->second;
+}
+
+// §26.6: an exported name must first be imported by the exporting package,
+// either explicitly or through a wildcard import of the source package.
+void CheckExportIsImported(
+    const PackageDecl* pkg, const ModuleItem* item, const ImportItem& ex,
+    const std::unordered_set<std::string>& direct_imports,
+    const std::unordered_set<std::string_view>& wildcard_sources,
+    DiagEngine& diag) {
+  auto key = std::string(ex.package_name) + "::" + std::string(ex.item_name);
+  if (direct_imports.count(key) == 0 &&
+      wildcard_sources.count(ex.package_name) == 0) {
+    diag.Error(
+        item->loc,
+        std::format("export '{}::{}': '{}' is not imported in package '{}'",
+                    ex.package_name, ex.item_name, ex.item_name, pkg->name));
+  }
+}
+
 void ValidateOnePackageExportItem(
     const PackageDecl* pkg, const ModuleItem* item,
     const PkgByName& pkg_by_name,
@@ -728,30 +798,9 @@ void ValidateOnePackageExportItem(
 
   if (ex.package_name == "*" || ex.is_wildcard) return;
 
-  auto src_it = pkg_by_name.find(ex.package_name);
-  if (src_it == pkg_by_name.end()) {
-    diag.Error(item->loc, std::format("export from unknown package '{}'",
-                                      ex.package_name));
-    return;
-  }
-  std::unordered_set<const PackageDecl*> visited;
-  if (!PackageProvidesName(src_it->second, ex.item_name, pkg_by_name,
-                           visited)) {
-    diag.Error(
-        item->loc,
-        std::format("'{}' is not a candidate for import from package '{}'",
-                    ex.item_name, ex.package_name));
-    return;
-  }
-  auto key = std::string(ex.package_name) + "::" + std::string(ex.item_name);
+  if (ResolveExportSource(item, ex, pkg_by_name, diag) == nullptr) return;
 
-  if (direct_imports.count(key) == 0 &&
-      wildcard_sources.count(ex.package_name) == 0) {
-    diag.Error(
-        item->loc,
-        std::format("export '{}::{}': '{}' is not imported in package '{}'",
-                    ex.package_name, ex.item_name, ex.item_name, pkg->name));
-  }
+  CheckExportIsImported(pkg, item, ex, direct_imports, wildcard_sources, diag);
 }
 
 }  // namespace
@@ -810,17 +859,16 @@ void CollectModportDeclaredNames(
   }
 }
 
-void ValidateOneModportPort(
+// §25.5: a plain simple modport item (one written as a bare identifier,
+// not a `.name(expr)` modport expression, and not an imported/exported
+// subprogram or a clocking item) names an object that this interface
+// shall already declare. Naming something declared only by an enclosing
+// scope, or nowhere at all, would implicitly create a new port and is
+// illegal.
+void CheckSimpleModportItemDeclared(
     const ModuleDecl* iface, const ModportDecl* mp, const ModportPort& port,
     const std::unordered_set<std::string_view>& declared_names,
-    const std::unordered_set<std::string_view>& clocking_names,
     DiagEngine& diag) {
-  // §25.5: a plain simple modport item (one written as a bare identifier,
-  // not a `.name(expr)` modport expression, and not an imported/exported
-  // subprogram or a clocking item) names an object that this interface
-  // shall already declare. Naming something declared only by an enclosing
-  // scope, or nowhere at all, would implicitly create a new port and is
-  // illegal.
   if (!port.is_clocking && !port.is_import && !port.is_export &&
       port.expr == nullptr && !declared_names.contains(port.name)) {
     diag.Error(mp->loc,
@@ -828,6 +876,10 @@ void ValidateOneModportPort(
                            "does not declare",
                            mp->name, port.name, iface->name));
   }
+}
+
+void CheckModportConstExprDirection(const ModportDecl* mp,
+                                    const ModportPort& port, DiagEngine& diag) {
   if (IsModportLiteralExpr(port.expr) &&
       (port.direction == Direction::kOutput ||
        port.direction == Direction::kInout)) {
@@ -837,12 +889,28 @@ void ValidateOneModportPort(
                            "inout",
                            port.name, mp->name));
   }
+}
+
+void CheckModportClockingDeclared(
+    const ModuleDecl* iface, const ModportDecl* mp, const ModportPort& port,
+    const std::unordered_set<std::string_view>& clocking_names,
+    DiagEngine& diag) {
   if (port.is_clocking && !clocking_names.contains(port.name)) {
     diag.Error(mp->loc,
                std::format("clocking identifier '{}' in modport '{}' is not "
                            "declared in interface '{}'",
                            port.name, mp->name, iface->name));
   }
+}
+
+void ValidateOneModportPort(
+    const ModuleDecl* iface, const ModportDecl* mp, const ModportPort& port,
+    const std::unordered_set<std::string_view>& declared_names,
+    const std::unordered_set<std::string_view>& clocking_names,
+    DiagEngine& diag) {
+  CheckSimpleModportItemDeclared(iface, mp, port, declared_names, diag);
+  CheckModportConstExprDirection(mp, port, diag);
+  CheckModportClockingDeclared(iface, mp, port, clocking_names, diag);
 }
 
 void ValidateOneModport(

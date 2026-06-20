@@ -139,6 +139,21 @@ bool PackageDeclared(const CompilationUnit* unit, std::string_view pkg_name) {
   return false;
 }
 
+void PopulatePackageProvidedNames(const CompilationUnit* unit,
+                                  std::string_view pkg_name,
+                                  std::unordered_set<std::string_view>& names) {
+  for (const auto* pkg : unit->packages) {
+    if (pkg->name != pkg_name) continue;
+    for (const auto* pi : pkg->items) {
+      if (!pi->name.empty()) names.insert(pi->name);
+      if (pi->kind == ModuleItemKind::kClassDecl && pi->class_decl &&
+          !pi->class_decl->name.empty()) {
+        names.insert(pi->class_decl->name);
+      }
+    }
+  }
+}
+
 bool PackageProvidesName(
     const CompilationUnit* unit,
     std::unordered_map<std::string_view, std::unordered_set<std::string_view>>&
@@ -146,20 +161,171 @@ bool PackageProvidesName(
     std::string_view pkg_name, std::string_view name) {
   auto it = provided_cache.find(pkg_name);
   if (it == provided_cache.end()) {
-    auto& s = provided_cache[pkg_name];
-    for (const auto* pkg : unit->packages) {
-      if (pkg->name != pkg_name) continue;
-      for (const auto* pi : pkg->items) {
-        if (!pi->name.empty()) s.insert(pi->name);
-        if (pi->kind == ModuleItemKind::kClassDecl && pi->class_decl &&
-            !pi->class_decl->name.empty()) {
-          s.insert(pi->class_decl->name);
-        }
-      }
-    }
+    PopulatePackageProvidedNames(unit, pkg_name, provided_cache[pkg_name]);
     it = provided_cache.find(pkg_name);
   }
   return it->second.count(name) != 0;
+}
+
+// Mutable state shared across the import-rule checking helpers below. Holds
+// references to the Elaborator members and per-call locals so the phases can be
+// expressed as free functions without changing behavior.
+struct ImportRuleCtx {
+  DiagEngine& diag;
+  const CompilationUnit* unit;
+  std::unordered_map<std::string_view, std::unordered_set<std::string_view>>&
+      pkg_provided_names;
+  std::unordered_map<std::string_view, std::pair<std::string_view, SourceLoc>>&
+      explicit_imports;
+  std::vector<std::string_view>& wildcard_packages;
+  std::unordered_map<std::string_view, SourceLoc>& wildcard_claimed;
+  std::unordered_set<std::string_view>& seen_decls;
+};
+
+void TrackImportRuleDecl(ImportRuleCtx& ctx, std::string_view name,
+                         SourceLoc loc) {
+  if (name.empty()) return;
+  auto wit = ctx.wildcard_claimed.find(name);
+  if (wit != ctx.wildcard_claimed.end()) {
+    ctx.diag.Error(loc,
+                   std::format("declaration of '{}' follows a reference "
+                               "resolved through a wildcard package import",
+                               name));
+  }
+  ctx.seen_decls.insert(name);
+}
+
+void ProcessImportRuleRef(ImportRuleCtx& ctx, const Expr* e) {
+  auto name = e->text;
+  if (name.empty()) return;
+  if (ctx.seen_decls.count(name)) return;
+  std::vector<std::string_view> providers;
+  for (auto pkg : ctx.wildcard_packages) {
+    if (PackageProvidesName(ctx.unit, ctx.pkg_provided_names, pkg, name)) {
+      providers.push_back(pkg);
+    }
+  }
+  if (providers.size() > 1) {
+    ctx.diag.Error(
+        e->range.start,
+        std::format("reference to '{}' is ambiguous between wildcard "
+                    "imports of packages '{}' and '{}'",
+                    name, providers[0], providers[1]));
+    return;
+  }
+  if (providers.size() == 1) {
+    ctx.wildcard_claimed[name] = e->range.start;
+    ctx.seen_decls.insert(name);
+  }
+}
+
+void HandleExplicitImport(ImportRuleCtx& ctx, const ModuleItem* item,
+                          std::string_view pkg_name) {
+  auto name = item->import_item.item_name;
+  auto eit = ctx.explicit_imports.find(name);
+  if (eit != ctx.explicit_imports.end()) {
+    if (eit->second.first == pkg_name) return;
+    ctx.diag.Error(
+        item->loc,
+        std::format("explicit import of '{}::{}' conflicts with earlier "
+                    "explicit import from '{}'",
+                    pkg_name, name, eit->second.first));
+    return;
+  }
+  if (ctx.seen_decls.count(name)) {
+    if (ctx.wildcard_claimed.find(name) != ctx.wildcard_claimed.end()) {
+      ctx.diag.Error(
+          item->loc,
+          std::format("explicit import of '{}::{}' is illegal because "
+                      "'{}' was already referenced through a wildcard "
+                      "package import",
+                      pkg_name, name, name));
+    } else {
+      ctx.diag.Error(item->loc,
+                     std::format("explicit import of '{}::{}' collides with "
+                                 "existing declaration of '{}'",
+                                 pkg_name, name, name));
+    }
+    return;
+  }
+  ctx.explicit_imports[name] = {pkg_name, item->loc};
+  ctx.seen_decls.insert(name);
+}
+
+void HandleImportDecl(ImportRuleCtx& ctx, const ModuleItem* item) {
+  auto pkg_name = item->import_item.package_name;
+  if (!PackageDeclared(ctx.unit, pkg_name)) {
+    ctx.diag.Error(item->loc,
+                   std::format("import from unknown package '{}'; the package "
+                               "must be declared before any scope that imports "
+                               "from it",
+                               pkg_name));
+    return;
+  }
+  if (item->import_item.is_wildcard) {
+    if (std::find(ctx.wildcard_packages.begin(), ctx.wildcard_packages.end(),
+                  pkg_name) == ctx.wildcard_packages.end()) {
+      ctx.wildcard_packages.push_back(pkg_name);
+    }
+    return;
+  }
+  HandleExplicitImport(ctx, item, pkg_name);
+}
+
+void ProcessImportRuleRefs(ImportRuleCtx& ctx,
+                           const std::vector<const Expr*>& refs) {
+  for (const auto* e : refs) ProcessImportRuleRef(ctx, e);
+}
+
+void HandleImportRuleItem(ImportRuleCtx& ctx, const ModuleItem* item) {
+  switch (item->kind) {
+    case ModuleItemKind::kImportDecl:
+      HandleImportDecl(ctx, item);
+      break;
+    case ModuleItemKind::kInitialBlock:
+    case ModuleItemKind::kFinalBlock:
+    case ModuleItemKind::kAlwaysBlock:
+    case ModuleItemKind::kAlwaysCombBlock:
+    case ModuleItemKind::kAlwaysFFBlock:
+    case ModuleItemKind::kAlwaysLatchBlock: {
+      std::vector<const Expr*> refs;
+      WalkStmtIdents(item->body, refs);
+      ProcessImportRuleRefs(ctx, refs);
+      break;
+    }
+    case ModuleItemKind::kContAssign: {
+      std::vector<const Expr*> refs;
+      WalkExprIdents(item->assign_lhs, refs);
+      WalkExprIdents(item->assign_rhs, refs);
+      ProcessImportRuleRefs(ctx, refs);
+      break;
+    }
+    case ModuleItemKind::kModuleInst:
+      TrackImportRuleDecl(ctx, item->inst_name, item->loc);
+      break;
+    case ModuleItemKind::kGateInst:
+    case ModuleItemKind::kUdpInst:
+      TrackImportRuleDecl(ctx, item->gate_inst_name, item->loc);
+      break;
+    case ModuleItemKind::kClassDecl:
+      if (item->class_decl) {
+        TrackImportRuleDecl(ctx, item->class_decl->name, item->loc);
+      }
+      break;
+    default:
+      TrackImportRuleDecl(ctx, item->name, item->loc);
+      break;
+  }
+}
+
+void SeedImportRuleSeenDecls(const ModuleDecl* decl,
+                             std::unordered_set<std::string_view>& seen_decls) {
+  for (const auto& port : decl->ports) {
+    if (!port.name.empty()) seen_decls.insert(port.name);
+  }
+  for (const auto& [pname, pval] : decl->params) {
+    if (!pname.empty()) seen_decls.insert(pname);
+  }
 }
 
 }  // namespace
@@ -171,142 +337,18 @@ void Elaborator::ValidatePackageImportRules(const ModuleDecl* decl) {
 
   wildcard_packages_.push_back("std");
 
-  auto provides = [&](std::string_view pkg_name,
-                      std::string_view name) -> bool {
-    return PackageProvidesName(unit_, pkg_provided_names_, pkg_name, name);
-  };
-
   std::unordered_set<std::string_view> seen_decls;
-  for (const auto& port : decl->ports) {
-    if (!port.name.empty()) seen_decls.insert(port.name);
-  }
-  for (const auto& [pname, pval] : decl->params) {
-    if (!pname.empty()) seen_decls.insert(pname);
-  }
+  SeedImportRuleSeenDecls(decl, seen_decls);
 
-  auto track_decl = [&](std::string_view name, SourceLoc loc) {
-    if (name.empty()) return;
-    auto wit = wildcard_claimed_.find(name);
-    if (wit != wildcard_claimed_.end()) {
-      diag_.Error(loc, std::format("declaration of '{}' follows a reference "
-                                   "resolved through a wildcard package import",
-                                   name));
-    }
-    seen_decls.insert(name);
-  };
+  ImportRuleCtx ctx{diag_,
+                    unit_,
+                    pkg_provided_names_,
+                    explicit_imports_,
+                    wildcard_packages_,
+                    wildcard_claimed_,
+                    seen_decls};
 
-  auto process_ref = [&](const Expr* e) {
-    auto name = e->text;
-    if (name.empty()) return;
-    if (seen_decls.count(name)) return;
-    std::vector<std::string_view> providers;
-    for (auto pkg : wildcard_packages_) {
-      if (provides(pkg, name)) providers.push_back(pkg);
-    }
-    if (providers.size() > 1) {
-      diag_.Error(e->range.start,
-                  std::format("reference to '{}' is ambiguous between wildcard "
-                              "imports of packages '{}' and '{}'",
-                              name, providers[0], providers[1]));
-      return;
-    }
-    if (providers.size() == 1) {
-      wildcard_claimed_[name] = e->range.start;
-      seen_decls.insert(name);
-    }
-  };
-
-  auto handle_explicit_import = [&](const ModuleItem* item,
-                                    std::string_view pkg_name) {
-    auto name = item->import_item.item_name;
-    auto eit = explicit_imports_.find(name);
-    if (eit != explicit_imports_.end()) {
-      if (eit->second.first == pkg_name) return;
-      diag_.Error(
-          item->loc,
-          std::format("explicit import of '{}::{}' conflicts with earlier "
-                      "explicit import from '{}'",
-                      pkg_name, name, eit->second.first));
-      return;
-    }
-    if (seen_decls.count(name)) {
-      if (wildcard_claimed_.find(name) != wildcard_claimed_.end()) {
-        diag_.Error(
-            item->loc,
-            std::format("explicit import of '{}::{}' is illegal because "
-                        "'{}' was already referenced through a wildcard "
-                        "package import",
-                        pkg_name, name, name));
-      } else {
-        diag_.Error(item->loc,
-                    std::format("explicit import of '{}::{}' collides with "
-                                "existing declaration of '{}'",
-                                pkg_name, name, name));
-      }
-      return;
-    }
-    explicit_imports_[name] = {pkg_name, item->loc};
-    seen_decls.insert(name);
-  };
-
-  auto handle_import_decl = [&](const ModuleItem* item) {
-    auto pkg_name = item->import_item.package_name;
-    if (!PackageDeclared(unit_, pkg_name)) {
-      diag_.Error(item->loc,
-                  std::format("import from unknown package '{}'; the package "
-                              "must be declared before any scope that imports "
-                              "from it",
-                              pkg_name));
-      return;
-    }
-    if (item->import_item.is_wildcard) {
-      if (std::find(wildcard_packages_.begin(), wildcard_packages_.end(),
-                    pkg_name) == wildcard_packages_.end()) {
-        wildcard_packages_.push_back(pkg_name);
-      }
-      return;
-    }
-    handle_explicit_import(item, pkg_name);
-  };
-
-  for (const auto* item : decl->items) {
-    switch (item->kind) {
-      case ModuleItemKind::kImportDecl:
-        handle_import_decl(item);
-        break;
-      case ModuleItemKind::kInitialBlock:
-      case ModuleItemKind::kFinalBlock:
-      case ModuleItemKind::kAlwaysBlock:
-      case ModuleItemKind::kAlwaysCombBlock:
-      case ModuleItemKind::kAlwaysFFBlock:
-      case ModuleItemKind::kAlwaysLatchBlock: {
-        std::vector<const Expr*> refs;
-        WalkStmtIdents(item->body, refs);
-        for (const auto* e : refs) process_ref(e);
-        break;
-      }
-      case ModuleItemKind::kContAssign: {
-        std::vector<const Expr*> refs;
-        WalkExprIdents(item->assign_lhs, refs);
-        WalkExprIdents(item->assign_rhs, refs);
-        for (const auto* e : refs) process_ref(e);
-        break;
-      }
-      case ModuleItemKind::kModuleInst:
-        track_decl(item->inst_name, item->loc);
-        break;
-      case ModuleItemKind::kGateInst:
-      case ModuleItemKind::kUdpInst:
-        track_decl(item->gate_inst_name, item->loc);
-        break;
-      case ModuleItemKind::kClassDecl:
-        if (item->class_decl) track_decl(item->class_decl->name, item->loc);
-        break;
-      default:
-        track_decl(item->name, item->loc);
-        break;
-    }
-  }
+  for (const auto* item : decl->items) HandleImportRuleItem(ctx, item);
 }
 
 void Elaborator::ValidateScopeRules(const ModuleDecl* decl) {
@@ -531,39 +573,36 @@ bool ImportedIntoModule(const CompilationUnit* unit, const RtlirModule* m,
   return false;
 }
 
-}  // namespace
+void CheckHierRefImportedMemberAccess(
+    DiagEngine& diag, const CompilationUnit* unit,
+    const std::unordered_map<std::string_view, const RtlirModule*>& inst_type,
+    const Expr* ma) {
+  if (!ma || ma->kind != ExprKind::kMemberAccess) return;
+  if (!ma->lhs || ma->lhs->kind != ExprKind::kIdentifier) return;
+  if (!ma->rhs || ma->rhs->kind != ExprKind::kIdentifier) return;
+  auto it = inst_type.find(ma->lhs->text);
+  if (it == inst_type.end()) return;
+  if (ImportedIntoModule(unit, it->second, ma->rhs->text)) {
+    diag.Error(
+        ma->range.start,
+        std::format("hierarchical reference '{}.{}' targets a name imported "
+                    "into '{}' from a package; imported names are not "
+                    "visible through hierarchical references",
+                    ma->lhs->text, ma->rhs->text, it->second->name));
+  }
+}
 
-void Elaborator::ValidateHierRefToImportedName(const ModuleDecl* decl,
-                                               const RtlirModule* mod) {
-  if (!mod || mod->children.empty()) return;
+std::unordered_map<std::string_view, const RtlirModule*>
+CollectResolvedChildren(const RtlirModule* mod) {
   std::unordered_map<std::string_view, const RtlirModule*> inst_type;
   for (const auto& child : mod->children) {
     if (child.resolved) inst_type[child.inst_name] = child.resolved;
   }
-  if (inst_type.empty()) return;
-
-  auto check_member_access = [&](const Expr* ma) {
-    if (!ma || ma->kind != ExprKind::kMemberAccess) return;
-    if (!ma->lhs || ma->lhs->kind != ExprKind::kIdentifier) return;
-    if (!ma->rhs || ma->rhs->kind != ExprKind::kIdentifier) return;
-    auto it = inst_type.find(ma->lhs->text);
-    if (it == inst_type.end()) return;
-    if (ImportedIntoModule(unit_, it->second, ma->rhs->text)) {
-      diag_.Error(
-          ma->range.start,
-          std::format("hierarchical reference '{}.{}' targets a name imported "
-                      "into '{}' from a package; imported names are not "
-                      "visible through hierarchical references",
-                      ma->lhs->text, ma->rhs->text, it->second->name));
-    }
-  };
-
-  std::vector<const Expr*> accesses;
-  CollectModuleMemberAccesses(decl, accesses);
-  for (const auto* ma : accesses) check_member_access(ma);
+  return inst_type;
 }
 
-void Elaborator::ValidateHierRefInstanceArray(const ModuleDecl* decl) {
+std::unordered_map<std::string_view, InstanceArrayBounds>
+CollectInstanceArrayBounds(const ModuleDecl* decl) {
   std::unordered_map<std::string_view, InstanceArrayBounds> arrayed;
   for (const auto* item : decl->items) {
     if (item->kind != ModuleItemKind::kModuleInst) continue;
@@ -576,35 +615,61 @@ void Elaborator::ValidateHierRefInstanceArray(const ModuleDecl* decl) {
     b.high = std::max(*lhi, *rhi);
     arrayed[item->inst_name] = b;
   }
+  return arrayed;
+}
+
+void CheckHierRefInstanceArrayAccess(
+    DiagEngine& diag,
+    const std::unordered_map<std::string_view, InstanceArrayBounds>& arrayed,
+    const Expr* ma) {
+  std::string_view name;
+  const Expr* select_index = nullptr;
+  if (!DecodeInstanceArrayBase(ma, name, select_index)) return;
+  auto it = arrayed.find(name);
+  if (it == arrayed.end()) return;
+  if (!select_index) {
+    diag.Error(ma->range.start,
+               std::format("hierarchical reference to instance array '{}' "
+                           "requires an instance select",
+                           name));
+    return;
+  }
+  auto idx = ConstEvalInt(select_index);
+  if (!idx) return;
+  if (*idx < it->second.low || *idx > it->second.high) {
+    diag.Error(select_index->range.start,
+               std::format("instance select [{}] is out of range for "
+                           "instance array '{}' [{}:{}]",
+                           *idx, name, it->second.high, it->second.low));
+  }
+}
+
+}  // namespace
+
+void Elaborator::ValidateHierRefToImportedName(const ModuleDecl* decl,
+                                               const RtlirModule* mod) {
+  if (!mod || mod->children.empty()) return;
+  std::unordered_map<std::string_view, const RtlirModule*> inst_type =
+      CollectResolvedChildren(mod);
+  if (inst_type.empty()) return;
+
+  std::vector<const Expr*> accesses;
+  CollectModuleMemberAccesses(decl, accesses);
+  for (const auto* ma : accesses) {
+    CheckHierRefImportedMemberAccess(diag_, unit_, inst_type, ma);
+  }
+}
+
+void Elaborator::ValidateHierRefInstanceArray(const ModuleDecl* decl) {
+  std::unordered_map<std::string_view, InstanceArrayBounds> arrayed =
+      CollectInstanceArrayBounds(decl);
   if (arrayed.empty()) return;
 
   std::vector<const Expr*> accesses;
   CollectModuleMemberAccesses(decl, accesses);
-
-  auto check_array_access = [&](const Expr* ma) {
-    std::string_view name;
-    const Expr* select_index = nullptr;
-    if (!DecodeInstanceArrayBase(ma, name, select_index)) return;
-    auto it = arrayed.find(name);
-    if (it == arrayed.end()) return;
-    if (!select_index) {
-      diag_.Error(ma->range.start,
-                  std::format("hierarchical reference to instance array '{}' "
-                              "requires an instance select",
-                              name));
-      return;
-    }
-    auto idx = ConstEvalInt(select_index);
-    if (!idx) return;
-    if (*idx < it->second.low || *idx > it->second.high) {
-      diag_.Error(select_index->range.start,
-                  std::format("instance select [{}] is out of range for "
-                              "instance array '{}' [{}:{}]",
-                              *idx, name, it->second.high, it->second.low));
-    }
-  };
-
-  for (const auto* ma : accesses) check_array_access(ma);
+  for (const auto* ma : accesses) {
+    CheckHierRefInstanceArrayAccess(diag_, arrayed, ma);
+  }
 }
 
 }  // namespace delta

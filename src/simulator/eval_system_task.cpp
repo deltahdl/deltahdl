@@ -634,26 +634,36 @@ static void ExecDumpports(const Expr* expr, SimContext& ctx, VcdWriter* vcd) {
   }
 }
 
-Logic4Vec EvalVcdSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
-                         std::string_view name) {
-  auto* vcd = ctx.GetVcdWriter();
-  // §21.7.3.7: if an extended VCD control task names a file that no $dumpports
-  // call opened, the task is ignored. The match is against the files explicitly
-  // named by $dumpports; with no filename argument the default action runs
-  // against every such file. Under this single-writer model, when no $dumpports
-  // call has named a file there is nothing to mismatch, so the lone dump is the
-  // implicit target and the task proceeds.
-  if (IsDumpportsControlTask(name) && ctx.HasDumpportsFiles()) {
-    std::string file = DumpportsControlFileArg(expr);
-    if (!file.empty() && !ctx.IsDumpportsFile(file)) {
-      return MakeLogic4VecVal(arena, 1, 0);
-    }
+// §21.7.3.7: an extended VCD control task that names a file no $dumpports call
+// opened is ignored. The match is against the files explicitly named by
+// $dumpports; with no filename argument the default action runs against every
+// such file. Under this single-writer model, when no $dumpports call has named
+// a file there is nothing to mismatch, so the lone dump is the implicit target
+// and the task proceeds. Returns true when the task should be skipped.
+static bool DumpportsControlTaskTargetsUnknownFile(const Expr* expr,
+                                                   SimContext& ctx,
+                                                   std::string_view name) {
+  if (!IsDumpportsControlTask(name) || !ctx.HasDumpportsFiles()) return false;
+  std::string file = DumpportsControlFileArg(expr);
+  return !file.empty() && !ctx.IsDumpportsFile(file);
+}
+
+// §21.7.1.5 / §21.7.3.4: bound the VCD file size in bytes. The single (leading)
+// argument gives the maximum byte budget; the extended-VCD form reuses the same
+// 4-state size-limit machinery the file inherits.
+static void ExecDumpLimit(const Expr* expr, SimContext& ctx, Arena& arena,
+                          VcdWriter* vcd) {
+  if (vcd && !expr->args.empty()) {
+    uint64_t limit = EvalExpr(expr->args[0], ctx, arena).ToUint64();
+    vcd->SetSizeLimit(limit);
   }
-  if (name == "$dumpfile") {
-    ctx.SetDumpFileName(ResolveDumpFileName(expr, ctx, arena));
-  } else if (name == "$dumpvars") {
-    ExecDumpvars(expr, vcd);
-  } else if (name == "$dumpall") {
+}
+
+// §21.7.1.x: the basic four-state VCD control tasks ($dumpall/$dumpoff/$dumpon/
+// $dumpflush) act directly on the writer. Returns true when name named one of
+// them (whether or not a writer is present) so the caller stops dispatching.
+static bool ExecBasicVcdControl(std::string_view name, VcdWriter* vcd) {
+  if (name == "$dumpall") {
     // Emit a checkpoint of every selected variable's current value (§21.7.1.4).
     if (vcd) vcd->DumpAll();
   } else if (name == "$dumpoff") {
@@ -662,19 +672,25 @@ Logic4Vec EvalVcdSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
   } else if (name == "$dumpon") {
     // Resume dumping with a checkpoint of current values (§21.7.1.3).
     if (vcd) vcd->DumpOn();
-  } else if (name == "$dumplimit") {
-    // §21.7.1.5: the single argument bounds the VCD file size in bytes.
-    if (vcd && !expr->args.empty()) {
-      uint64_t limit = EvalExpr(expr->args[0], ctx, arena).ToUint64();
-      vcd->SetSizeLimit(limit);
-    }
   } else if (name == "$dumpflush") {
     // §21.7.1.6: flush buffered output to the dump file, then continue dumping
     // as before so no value changes are lost.
     if (vcd) vcd->Flush();
-  } else if (name == "$dumpports") {
-    ExecDumpports(expr, ctx, vcd);
-  } else if (name == "$dumpportsoff") {
+  } else {
+    return false;
+  }
+  return true;
+}
+
+// §21.7.3.x: the extended-VCD ($dumpports) port control tasks. Each reuses the
+// 4-state machinery the extended VCD file inherits and treats its optional
+// trailing filename as selecting this single-file writer (already validated by
+// DumpportsControlTaskTargetsUnknownFile). Returns true when name named one of
+// these tasks so the caller stops dispatching.
+static bool ExecDumpportsControl(const Expr* expr, SimContext& ctx,
+                                 Arena& arena, VcdWriter* vcd,
+                                 std::string_view name) {
+  if (name == "$dumpportsoff") {
     // §21.7.3.2: suspend the extended VCD port dump. A checkpoint marking every
     // selected port as x is written and recording stops from this simulation
     // time forward. The optional filename argument denotes the $dumpports
@@ -711,10 +727,7 @@ Logic4Vec EvalVcdSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
     // so the optional filename is parsed but does not change which dump is
     // limited. The byte budget reuses the 4-state size-limit machinery the
     // extended VCD file inherits (§21.7.1.5).
-    if (vcd && !expr->args.empty()) {
-      uint64_t limit = EvalExpr(expr->args[0], ctx, arena).ToUint64();
-      vcd->SetSizeLimit(limit);
-    }
+    ExecDumpLimit(expr, ctx, arena, vcd);
   } else if (name == "$dumpportsflush") {
     // §21.7.3.5: push the buffered extended-VCD port values out to the dump
     // file, clearing the simulator's VCD buffer so a reader sees everything
@@ -727,6 +740,29 @@ Logic4Vec EvalVcdSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
     // file inherits (§21.7.1.6): no VCD command is written and the dump state
     // is left untouched so dumping continues exactly as before.
     if (vcd) vcd->Flush();
+  } else {
+    return false;
+  }
+  return true;
+}
+
+Logic4Vec EvalVcdSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
+                         std::string_view name) {
+  auto* vcd = ctx.GetVcdWriter();
+  if (DumpportsControlTaskTargetsUnknownFile(expr, ctx, name)) {
+    return MakeLogic4VecVal(arena, 1, 0);
+  }
+  if (name == "$dumpfile") {
+    ctx.SetDumpFileName(ResolveDumpFileName(expr, ctx, arena));
+  } else if (name == "$dumpvars") {
+    ExecDumpvars(expr, vcd);
+  } else if (name == "$dumplimit") {
+    // §21.7.1.5: the single argument bounds the VCD file size in bytes.
+    ExecDumpLimit(expr, ctx, arena, vcd);
+  } else if (name == "$dumpports") {
+    ExecDumpports(expr, ctx, vcd);
+  } else if (!ExecBasicVcdControl(name, vcd)) {
+    ExecDumpportsControl(expr, ctx, arena, vcd, name);
   }
   return MakeLogic4VecVal(arena, 1, 0);
 }

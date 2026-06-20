@@ -236,6 +236,27 @@ double VpiReadDelayValue(const VpiTime& slot, int time_type) {
   return 0.0;
 }
 
+// §38.10 (Table 38-2): emit the min:typ:max triple of one stored delay field
+// into da[k..k+2], advancing k past the run.
+void VpiWriteMtmTriple(VpiDelay* delay_p, int& k, int time_type, double min_v,
+                       double typ_v, double max_v) {
+  VpiWriteDelayValue(&delay_p->da[k++], time_type, min_v);
+  VpiWriteDelayValue(&delay_p->da[k++], time_type, typ_v);
+  VpiWriteDelayValue(&delay_p->da[k++], time_type, max_v);
+}
+
+// §38.10 (Table 38-2): the both-flags arm - nine entries, min:typ:max of delay,
+// then reject, then error.
+void VpiWriteDelayRunBoth(VpiDelay* delay_p, int& k, int time_type,
+                          const VpiDelayInfo& d) {
+  VpiWriteMtmTriple(delay_p, k, time_type, d.min_delay, d.typ_delay,
+                    d.max_delay);
+  VpiWriteMtmTriple(delay_p, k, time_type, d.min_reject, d.typ_reject,
+                    d.max_reject);
+  VpiWriteMtmTriple(delay_p, k, time_type, d.min_error, d.typ_error,
+                    d.max_error);
+}
+
 // §38.10 (Table 38-2): emit one delay's run of da entries, selected by
 // mtm_flag and pulsere_flag, starting at da[k] and advancing k past the run.
 // The branch arms mirror Table 38-2 exactly: neither flag is one plain delay;
@@ -248,9 +269,8 @@ void VpiWriteDelayRun(VpiDelay* delay_p, int& k, bool mtm, bool pulsere,
     VpiWriteDelayValue(&delay_p->da[k++], time_type, d.delay);
   } else if (mtm && !pulsere) {
     // min:typ:max only: three entries, min then typ then max delay.
-    VpiWriteDelayValue(&delay_p->da[k++], time_type, d.min_delay);
-    VpiWriteDelayValue(&delay_p->da[k++], time_type, d.typ_delay);
-    VpiWriteDelayValue(&delay_p->da[k++], time_type, d.max_delay);
+    VpiWriteMtmTriple(delay_p, k, time_type, d.min_delay, d.typ_delay,
+                      d.max_delay);
   } else if (!mtm && pulsere) {
     // Pulse limits only: delay, reject limit, error limit.
     VpiWriteDelayValue(&delay_p->da[k++], time_type, d.delay);
@@ -259,16 +279,29 @@ void VpiWriteDelayRun(VpiDelay* delay_p, int& k, bool mtm, bool pulsere,
   } else {
     // Both flags: nine entries - min:typ:max of delay, then reject, then
     // error.
-    VpiWriteDelayValue(&delay_p->da[k++], time_type, d.min_delay);
-    VpiWriteDelayValue(&delay_p->da[k++], time_type, d.typ_delay);
-    VpiWriteDelayValue(&delay_p->da[k++], time_type, d.max_delay);
-    VpiWriteDelayValue(&delay_p->da[k++], time_type, d.min_reject);
-    VpiWriteDelayValue(&delay_p->da[k++], time_type, d.typ_reject);
-    VpiWriteDelayValue(&delay_p->da[k++], time_type, d.max_reject);
-    VpiWriteDelayValue(&delay_p->da[k++], time_type, d.min_error);
-    VpiWriteDelayValue(&delay_p->da[k++], time_type, d.typ_error);
-    VpiWriteDelayValue(&delay_p->da[k++], time_type, d.max_error);
+    VpiWriteDelayRunBoth(delay_p, k, time_type, d);
   }
+}
+
+// §38.32 (Table 38-4): read a min:typ:max triple from da[k..k+2] into the three
+// referenced stored-delay fields, advancing k past the run.
+void VpiReadMtmTriple(VpiDelay* delay_p, int& k, int time_type, double& min_v,
+                      double& typ_v, double& max_v) {
+  min_v = VpiReadDelayValue(delay_p->da[k++], time_type);
+  typ_v = VpiReadDelayValue(delay_p->da[k++], time_type);
+  max_v = VpiReadDelayValue(delay_p->da[k++], time_type);
+}
+
+// §38.32 (Table 38-4): the both-flags arm - nine entries, min:typ:max of delay,
+// then reject, then error.
+void VpiReadDelayRunBoth(VpiDelay* delay_p, int& k, int time_type,
+                         VpiDelayInfo& d) {
+  VpiReadMtmTriple(delay_p, k, time_type, d.min_delay, d.typ_delay,
+                   d.max_delay);
+  VpiReadMtmTriple(delay_p, k, time_type, d.min_reject, d.typ_reject,
+                   d.max_reject);
+  VpiReadMtmTriple(delay_p, k, time_type, d.min_error, d.typ_error,
+                   d.max_error);
 }
 
 // §38.32 (Table 38-4, the inverse of VpiWriteDelayRun): read one delay's run
@@ -283,9 +316,8 @@ void VpiReadDelayRun(VpiDelay* delay_p, int& k, bool mtm, bool pulsere,
     d.delay = VpiReadDelayValue(delay_p->da[k++], time_type);
   } else if (mtm && !pulsere) {
     // min:typ:max only: three entries, min then typ then max delay.
-    d.min_delay = VpiReadDelayValue(delay_p->da[k++], time_type);
-    d.typ_delay = VpiReadDelayValue(delay_p->da[k++], time_type);
-    d.max_delay = VpiReadDelayValue(delay_p->da[k++], time_type);
+    VpiReadMtmTriple(delay_p, k, time_type, d.min_delay, d.typ_delay,
+                     d.max_delay);
   } else if (!mtm && pulsere) {
     // Pulse limits only: delay, reject limit, error limit.
     d.delay = VpiReadDelayValue(delay_p->da[k++], time_type);
@@ -294,15 +326,7 @@ void VpiReadDelayRun(VpiDelay* delay_p, int& k, bool mtm, bool pulsere,
   } else {
     // Both flags: nine entries - min:typ:max of delay, then reject, then
     // error.
-    d.min_delay = VpiReadDelayValue(delay_p->da[k++], time_type);
-    d.typ_delay = VpiReadDelayValue(delay_p->da[k++], time_type);
-    d.max_delay = VpiReadDelayValue(delay_p->da[k++], time_type);
-    d.min_reject = VpiReadDelayValue(delay_p->da[k++], time_type);
-    d.typ_reject = VpiReadDelayValue(delay_p->da[k++], time_type);
-    d.max_reject = VpiReadDelayValue(delay_p->da[k++], time_type);
-    d.min_error = VpiReadDelayValue(delay_p->da[k++], time_type);
-    d.typ_error = VpiReadDelayValue(delay_p->da[k++], time_type);
-    d.max_error = VpiReadDelayValue(delay_p->da[k++], time_type);
+    VpiReadDelayRunBoth(delay_p, k, time_type, d);
   }
 }
 

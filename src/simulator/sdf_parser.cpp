@@ -529,6 +529,59 @@ static void ParseCondElseDelayEntry(std::string_view& s, SdfCell& cell,
   if (!s.empty() && s[0] == ')') Expect(s, SdfTokKind::kRParen);
 }
 
+// Handles a (PATHPULSE ...) / (PATHPULSEPERCENT ...) delay-section entry:
+// parses the pulse limit, records the percent flag, and appends it to the cell.
+static void ParsePulseLimitDelayEntry(std::string_view& s, SdfCell& cell,
+                                      bool is_percent) {
+  auto pl = ParsePulseLimit(s);
+  pl.is_percent = is_percent;
+  cell.pulse_limits.push_back(pl);
+  RecordDelayEntry(cell, SdfDelayEntryKind::kPulseLimit,
+                   cell.pulse_limits.size() - 1);
+}
+
+// Handles a (INTERCONNECT ...) delay-section entry.
+static void ParseInterconnectDelayEntry(std::string_view& s, SdfCell& cell,
+                                        bool increment) {
+  auto ic = ParseInterconnectEntry(s);
+  ic.is_increment = increment;
+  AddInterconnectToCell(cell, std::move(ic));
+}
+
+// Handles a (IOPATH ...) delay-section entry.
+static void ParseIopathDelayEntry(std::string_view& s, SdfCell& cell,
+                                  bool increment) {
+  auto io = ParseIopath(s);
+  io.is_increment = increment;
+  AddIopathToCell(cell, io);
+}
+
+// Dispatches a single already-opened delay-section entry (the leading '(' and
+// keyword have been consumed) to the handler for its keyword.
+static void HandleDelayEntry(std::string_view& s, SdfCell& cell, SdfFile& file,
+                             const SdfToken& kw, bool increment) {
+  if (kw.text == "PATHPULSE" || kw.text == "PATHPULSEPERCENT") {
+    ParsePulseLimitDelayEntry(s, cell, kw.text == "PATHPULSEPERCENT");
+  } else if (kw.text == "INTERCONNECT") {
+    ParseInterconnectDelayEntry(s, cell, increment);
+  } else if (kw.text == "PORT") {
+    ParseAndAddLoadOnlyInterconnect(s, cell, SdfInterconnectKind::kPort,
+                                    increment);
+  } else if (kw.text == "NETDELAY") {
+    ParseAndAddLoadOnlyInterconnect(s, cell, SdfInterconnectKind::kNetdelay,
+                                    increment);
+  } else if (kw.text == "IOPATH") {
+    ParseIopathDelayEntry(s, cell, increment);
+  } else if (kw.text == "COND") {
+    ParseCondDelayEntry(s, cell, file, increment);
+  } else if (kw.text == "CONDELSE") {
+    ParseCondElseDelayEntry(s, cell, file, increment);
+  } else {
+    file.unannotatable.emplace_back(kw.text);
+    SkipSdfParen(s);
+  }
+}
+
 static void ParseDelaySection(std::string_view& s, SdfCell& cell, SdfFile& file,
                               bool increment) {
   while (true) {
@@ -536,43 +589,7 @@ static void ParseDelaySection(std::string_view& s, SdfCell& cell, SdfFile& file,
     if (s.empty() || s[0] == ')') break;
     Expect(s, SdfTokKind::kLParen);
     auto kw = NextSdfToken(s);
-    if (kw.text == "PATHPULSE" || kw.text == "PATHPULSEPERCENT") {
-      auto pl = ParsePulseLimit(s);
-      pl.is_percent = (kw.text == "PATHPULSEPERCENT");
-      cell.pulse_limits.push_back(pl);
-      RecordDelayEntry(cell, SdfDelayEntryKind::kPulseLimit,
-                       cell.pulse_limits.size() - 1);
-      continue;
-    }
-
-    if (kw.text == "INTERCONNECT") {
-      auto ic = ParseInterconnectEntry(s);
-      ic.is_increment = increment;
-      AddInterconnectToCell(cell, std::move(ic));
-      continue;
-    }
-    if (kw.text == "PORT") {
-      ParseAndAddLoadOnlyInterconnect(s, cell, SdfInterconnectKind::kPort,
-                                      increment);
-      continue;
-    }
-    if (kw.text == "NETDELAY") {
-      ParseAndAddLoadOnlyInterconnect(s, cell, SdfInterconnectKind::kNetdelay,
-                                      increment);
-      continue;
-    }
-    if (kw.text == "IOPATH") {
-      auto io = ParseIopath(s);
-      io.is_increment = increment;
-      AddIopathToCell(cell, io);
-    } else if (kw.text == "COND") {
-      ParseCondDelayEntry(s, cell, file, increment);
-    } else if (kw.text == "CONDELSE") {
-      ParseCondElseDelayEntry(s, cell, file, increment);
-    } else {
-      file.unannotatable.emplace_back(kw.text);
-      SkipSdfParen(s);
-    }
+    HandleDelayEntry(s, cell, file, kw, increment);
   }
   Expect(s, SdfTokKind::kRParen);
 }

@@ -278,29 +278,47 @@ static bool ScanDecimalForDontCare(const std::string& buf, size_t start,
   return false;
 }
 
+// True if char c marks a don't-care digit under the given case kind. Under
+// casez only z/?/Z is don't-care; otherwise x/X is don't-care too.
+static bool IsDontCareDigit(char c, TokenKind case_kind) {
+  bool is_z = (c == 'z' || c == 'Z' || c == '?');
+  bool is_x = (c == 'x' || c == 'X');
+  return (case_kind == TokenKind::kKwCasez) ? is_z : (is_z || is_x);
+}
+
+// Numeric value of a single binary/octal/hex digit character.
+static uint64_t DigitCharValue(char c) {
+  if (c >= '0' && c <= '9') return c - '0';
+  if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+  if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+  return 0;
+}
+
+// Mark all bits contributed by one don't-care digit at bit_pos in the mask.
+static void MarkDontCareBits(uint32_t bit_pos, int bits_per_digit,
+                             PatternBits& result) {
+  for (int b = 0; b < bits_per_digit && bit_pos + b < 64; ++b)
+    result.dc_mask |= uint64_t{1} << (bit_pos + b);
+}
+
+// OR one decoded digit value (dv) into aval starting at bit_pos.
+static void SetDigitValueBits(uint64_t dv, uint32_t bit_pos, int bits_per_digit,
+                              PatternBits& result) {
+  for (int b = 0; b < bits_per_digit && bit_pos + b < 64; ++b) {
+    if ((dv >> b) & 1u) result.aval |= uint64_t{1} << (bit_pos + b);
+  }
+}
+
 static void DecodePatternDigits(const std::string& buf, size_t i,
                                 int bits_per_digit, TokenKind case_kind,
                                 PatternBits& result) {
   uint32_t bit_pos = 0;
   for (size_t j = buf.size(); j > i; --j) {
     char c = buf[j - 1];
-    bool is_z = (c == 'z' || c == 'Z' || c == '?');
-    bool is_x = (c == 'x' || c == 'X');
-    bool is_dc = (case_kind == TokenKind::kKwCasez) ? is_z : (is_z || is_x);
-    if (is_dc) {
-      for (int b = 0; b < bits_per_digit && bit_pos + b < 64; ++b)
-        result.dc_mask |= uint64_t{1} << (bit_pos + b);
+    if (IsDontCareDigit(c, case_kind)) {
+      MarkDontCareBits(bit_pos, bits_per_digit, result);
     } else {
-      uint64_t dv = 0;
-      if (c >= '0' && c <= '9')
-        dv = c - '0';
-      else if (c >= 'a' && c <= 'f')
-        dv = c - 'a' + 10;
-      else if (c >= 'A' && c <= 'F')
-        dv = c - 'A' + 10;
-      for (int b = 0; b < bits_per_digit && bit_pos + b < 64; ++b) {
-        if ((dv >> b) & 1u) result.aval |= uint64_t{1} << (bit_pos + b);
-      }
+      SetDigitValueBits(DigitCharValue(c), bit_pos, bits_per_digit, result);
     }
     bit_pos += bits_per_digit;
   }

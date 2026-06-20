@@ -3,6 +3,7 @@
 #include <cmath>
 #include <cstdint>
 #include <cstring>
+#include <functional>
 #include <iostream>
 #include <string>
 #include <string_view>
@@ -336,12 +337,11 @@ static void RegisterForkChildScopes(const Stmt* s, Process* p,
   for (auto scope : ctx.ActiveNamedScopes()) ctx.RegisterNamedScope(scope, p);
 }
 
-// Creates and schedules one fork child process for the statement s, wiring it
-// into the shared join state and the spawning process's wait-fork tally.
-static void SpawnForkChild(const Stmt* s, SimContext& ctx, Arena& arena,
-                           ForkJoinState* state, Process* spawning_proc,
-                           WaitForkState* parent_wfs, Process* parent_proc) {
-  if (parent_wfs) parent_wfs->remaining++;
+// Allocates the child Process and copies the spawning process's execution
+// context (region/reactivity/program-block) and a freshly drawn per-child RNG
+// seed onto it, then links it into the spawning process's child list.
+static Process* CreateForkChildProcess(SimContext& ctx, Arena& arena,
+                                       Process* spawning_proc) {
   auto* p = arena.Create<Process>();
   if (spawning_proc) spawning_proc->children.push_back(p);
   p->kind = ProcessKind::kInitial;
@@ -355,29 +355,58 @@ static void SpawnForkChild(const Stmt* s, SimContext& ctx, Arena& arena,
   // unique seed determined solely by the parent, and the per-child seed
   // material is settled in fork order rather than execution order.
   p->rng_seed = ctx.DrawSeedForChild();
-  p->coro = ForkChildCoroutine(s, ctx, arena, state, parent_wfs, parent_proc)
-                .Release();
+  return p;
+}
 
-  RegisterForkChildScopes(s, p, ctx);
-  auto* event = ctx.GetScheduler().GetEventPool().Acquire();
-  event->callback = [p, &ctx, state, parent_wfs, parent_proc]() {
+// Handles a fork child whose scheduled start event fired after the child was
+// already cancelled (e.g. by disable fork): drains its join/wait-fork tallies
+// and resumes the join site and/or wait-fork waiter when their conditions are
+// met, exactly as a normally completing child would.
+static void RetireCancelledForkChild(SimContext& ctx, ForkJoinState* state,
+                                     WaitForkState* parent_wfs,
+                                     Process* parent_proc) {
+  state->remaining--;
+  bool should_resume =
+      state->join_any ? !state->resumed : (state->remaining == 0);
+  if (should_resume && state->parent) {
+    state->resumed = true;
+    state->parent.resume();
+  }
+  if (parent_wfs && --parent_wfs->remaining == 0 && parent_wfs->waiter) {
+    ctx.SetCurrentProcess(parent_proc);
+    parent_wfs->waiter.resume();
+  }
+}
+
+// Builds the scheduler callback that starts (or retires, if cancelled) one fork
+// child process when its start event fires.
+static std::function<void()> MakeForkChildStartCallback(
+    Process* p, SimContext& ctx, ForkJoinState* state,
+    WaitForkState* parent_wfs, Process* parent_proc) {
+  return [p, &ctx, state, parent_wfs, parent_proc]() {
     if (!p->active) {
-      state->remaining--;
-      bool should_resume =
-          state->join_any ? !state->resumed : (state->remaining == 0);
-      if (should_resume && state->parent) {
-        state->resumed = true;
-        state->parent.resume();
-      }
-      if (parent_wfs && --parent_wfs->remaining == 0 && parent_wfs->waiter) {
-        ctx.SetCurrentProcess(parent_proc);
-        parent_wfs->waiter.resume();
-      }
+      RetireCancelledForkChild(ctx, state, parent_wfs, parent_proc);
       return;
     }
     ctx.SetCurrentProcess(p);
     p->Resume();
   };
+}
+
+// Creates and schedules one fork child process for the statement s, wiring it
+// into the shared join state and the spawning process's wait-fork tally.
+static void SpawnForkChild(const Stmt* s, SimContext& ctx, Arena& arena,
+                           ForkJoinState* state, Process* spawning_proc,
+                           WaitForkState* parent_wfs, Process* parent_proc) {
+  if (parent_wfs) parent_wfs->remaining++;
+  auto* p = CreateForkChildProcess(ctx, arena, spawning_proc);
+  p->coro = ForkChildCoroutine(s, ctx, arena, state, parent_wfs, parent_proc)
+                .Release();
+
+  RegisterForkChildScopes(s, p, ctx);
+  auto* event = ctx.GetScheduler().GetEventPool().Acquire();
+  event->callback =
+      MakeForkChildStartCallback(p, ctx, state, parent_wfs, parent_proc);
   auto fork_region = (spawning_proc && spawning_proc->is_reactive)
                          ? Region::kReactive
                          : Region::kActive;

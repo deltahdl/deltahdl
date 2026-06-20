@@ -417,6 +417,27 @@ static UniqueIfScan ScanUniqueIfChain(const Stmt* stmt, SimContext& ctx,
   return scan;
 }
 
+// Runs the branch selected by a unique-if scan: the first matching arm, else
+// the trailing unconditional else, reporting a no-match violation for a plain
+// `unique` chain that has no final else.
+static bool ExecFuncUniqueIfBranch(const Stmt* stmt, const UniqueIfScan& scan,
+                                   CaseQualifier qual, Variable* ret_var,
+                                   std::string_view func_name, SimContext& ctx,
+                                   Arena& arena) {
+  if (scan.first_match) {
+    return ExecFuncStmt(scan.first_match->then_branch, ret_var, func_name, ctx,
+                        arena);
+  }
+  if (scan.has_final_else) {
+    const Stmt* final_else = FuncFindFinalElse(stmt);
+    if (final_else)
+      return ExecFuncStmt(final_else, ret_var, func_name, ctx, arena);
+  } else if (qual == CaseQualifier::kUnique) {
+    ctx.AddPendingViolation("unique if: no condition matched");
+  }
+  return false;
+}
+
 // A unique/unique0/priority if encountered while running a function or task
 // body performs the same violation checks as one in a process body (§12.4.2).
 // Because the report queue is keyed on the calling process (§12.4.2.2), routing
@@ -427,24 +448,11 @@ static bool ExecFuncUniqueIf(const Stmt* stmt, CaseQualifier qual,
                              Variable* ret_var, std::string_view func_name,
                              SimContext& ctx, Arena& arena) {
   UniqueIfScan scan = ScanUniqueIfChain(stmt, ctx, arena);
-  int match_count = scan.match_count;
-  const Stmt* first_match = scan.first_match;
-  bool has_final_else = scan.has_final_else;
-  if (match_count > 1) {
+  if (scan.match_count > 1) {
     ctx.AddPendingViolation("unique if: multiple conditions matched");
   }
-  if (first_match) {
-    return ExecFuncStmt(first_match->then_branch, ret_var, func_name, ctx,
-                        arena);
-  }
-  if (has_final_else) {
-    const Stmt* final_else = FuncFindFinalElse(stmt);
-    if (final_else)
-      return ExecFuncStmt(final_else, ret_var, func_name, ctx, arena);
-  } else if (qual == CaseQualifier::kUnique) {
-    ctx.AddPendingViolation("unique if: no condition matched");
-  }
-  return false;
+  return ExecFuncUniqueIfBranch(stmt, scan, qual, ret_var, func_name, ctx,
+                                arena);
 }
 
 static bool ExecFuncPriorityIf(const Stmt* stmt, Variable* ret_var,
@@ -541,6 +549,22 @@ static void ExecFuncForInits(const Stmt* stmt, Variable* ret_var,
   }
 }
 
+// Runs the condition/body/step iterations of a for-loop. Returns true when the
+// body executed a return (so the caller should propagate it).
+static bool ExecFuncForLoop(const Stmt* stmt, Variable* ret_var,
+                            std::string_view func_name, SimContext& ctx,
+                            Arena& arena) {
+  while (stmt->for_cond && EvalExpr(stmt->for_cond, ctx, arena).IsTruthy()) {
+    if (stmt->for_body &&
+        ExecFuncStmt(stmt->for_body, ret_var, func_name, ctx, arena)) {
+      return true;
+    }
+    for (auto* step : stmt->for_steps)
+      ExecFuncStmt(step, ret_var, func_name, ctx, arena);
+  }
+  return false;
+}
+
 static bool ExecFuncFor(const Stmt* stmt, Variable* ret_var,
                         std::string_view func_name, SimContext& ctx,
                         Arena& arena) {
@@ -549,19 +573,10 @@ static bool ExecFuncFor(const Stmt* stmt, Variable* ret_var,
   bool scoped = ForInitNeedsScope(stmt);
   if (scoped) ctx.PushScope();
   ExecFuncForInits(stmt, ret_var, func_name, ctx, arena);
-  while (stmt->for_cond && EvalExpr(stmt->for_cond, ctx, arena).IsTruthy()) {
-    if (stmt->for_body &&
-        ExecFuncStmt(stmt->for_body, ret_var, func_name, ctx, arena)) {
-      if (scoped) ctx.PopScope();
-      if (labeled) ctx.PopStaticScope(stmt->label);
-      return true;
-    }
-    for (auto* step : stmt->for_steps)
-      ExecFuncStmt(step, ret_var, func_name, ctx, arena);
-  }
+  bool returned = ExecFuncForLoop(stmt, ret_var, func_name, ctx, arena);
   if (scoped) ctx.PopScope();
   if (labeled) ctx.PopStaticScope(stmt->label);
-  return false;
+  return returned;
 }
 
 static Variable* CreateFuncLocalVar(std::string_view name, const DataType& type,
@@ -675,22 +690,12 @@ static uint32_t ResolveForeachSize(std::string_view name, SimContext& ctx) {
   return var ? var->value.width : 0;
 }
 
-static bool ExecFuncForeach(const Stmt* stmt, Variable* ret_var,
-                            std::string_view func_name, SimContext& ctx,
-                            Arena& arena) {
-  bool labeled = !stmt->label.empty();
-  if (labeled) ctx.PushStaticScope(stmt->label);
-  std::string name = GetForeachArrayName(stmt->expr);
-  if (name.empty()) {
-    if (labeled) ctx.PopStaticScope(stmt->label);
-    return false;
-  }
-  uint32_t size = ResolveForeachSize(name, ctx);
-  if (size == 0) {
-    if (labeled) ctx.PopStaticScope(stmt->label);
-    return false;
-  }
-
+// Runs the iteration loop of a foreach over an array of `size` elements,
+// pushing a scope that holds the (optional) loop index variable. Returns true
+// when the body executed a return.
+static bool ExecFuncForeachLoop(const Stmt* stmt, uint32_t size,
+                                Variable* ret_var, std::string_view func_name,
+                                SimContext& ctx, Arena& arena) {
   std::string_view iter_name;
   if (!stmt->foreach_vars.empty() && !stmt->foreach_vars[0].empty()) {
     iter_name = stmt->foreach_vars[0];
@@ -709,14 +714,27 @@ static bool ExecFuncForeach(const Stmt* stmt, Variable* ret_var,
     if (stmt->body &&
         ExecFuncStmt(stmt->body, ret_var, func_name, ctx, arena)) {
       ctx.PopScope();
-      if (labeled) ctx.PopStaticScope(stmt->label);
       return true;
     }
   }
 
   ctx.PopScope();
-  if (labeled) ctx.PopStaticScope(stmt->label);
   return false;
+}
+
+static bool ExecFuncForeach(const Stmt* stmt, Variable* ret_var,
+                            std::string_view func_name, SimContext& ctx,
+                            Arena& arena) {
+  bool labeled = !stmt->label.empty();
+  if (labeled) ctx.PushStaticScope(stmt->label);
+  std::string name = GetForeachArrayName(stmt->expr);
+  uint32_t size = name.empty() ? 0 : ResolveForeachSize(name, ctx);
+  bool returned = false;
+  if (size != 0) {
+    returned = ExecFuncForeachLoop(stmt, size, ret_var, func_name, ctx, arena);
+  }
+  if (labeled) ctx.PopStaticScope(stmt->label);
+  return returned;
 }
 
 static bool ExecFuncStmt(const Stmt* stmt, Variable* ret_var,

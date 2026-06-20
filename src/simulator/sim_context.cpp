@@ -15,6 +15,35 @@ SimContext::SimContext(Scheduler& sched, Arena& arena, DiagEngine& diag,
 
 namespace {
 
+// Shrinks `p` to the next-shorter dotted instance prefix (dropping the final
+// path segment, keeping the trailing dot), clearing it when no segment remains.
+void ShrinkInstancePrefix(std::string& p) {
+  size_t last =
+      (p.size() >= 2) ? p.find_last_of('.', p.size() - 2) : std::string::npos;
+  if (last == std::string::npos) {
+    p.clear();
+  } else {
+    p = p.substr(0, last + 1);
+  }
+}
+
+// When the instance at `p` has type `head`, looks up `rest` under that prefix.
+// Returns the matching variable or nullptr.
+Variable* LookupRestUnderMatchingInstance(
+    const std::string& p, std::string_view head, std::string_view rest,
+    const std::unordered_map<std::string, std::string>& instance_types,
+    const std::unordered_map<std::string_view, Variable*>& variables) {
+  std::string prefix_no_dot = p;
+  if (!prefix_no_dot.empty() && prefix_no_dot.back() == '.')
+    prefix_no_dot.pop_back();
+  auto type_it = instance_types.find(prefix_no_dot);
+  if (type_it == instance_types.end() || type_it->second != head)
+    return nullptr;
+  std::string cand = p + std::string(rest);
+  auto cit = variables.find(cand);
+  return (cit != variables.end()) ? cit->second : nullptr;
+}
+
 // Walks progressively shorter instance prefixes searching for `name` (or its
 // rest under a matching instance head) in the variable table. Extracted from
 // FindVariable so the lookup body stays a single cohesive step.
@@ -25,22 +54,10 @@ Variable* FindVariableByPrefixWalk(
     const std::unordered_map<std::string_view, Variable*>& variables) {
   std::string p = prefix;
   while (!p.empty()) {
-    size_t last =
-        (p.size() >= 2) ? p.find_last_of('.', p.size() - 2) : std::string::npos;
-    if (last == std::string::npos) {
-      p.clear();
-    } else {
-      p = p.substr(0, last + 1);
-    }
-    std::string prefix_no_dot = p;
-    if (!prefix_no_dot.empty() && prefix_no_dot.back() == '.')
-      prefix_no_dot.pop_back();
-    auto type_it = instance_types.find(prefix_no_dot);
-    if (type_it != instance_types.end() && type_it->second == head) {
-      std::string cand = p + std::string(rest);
-      auto cit = variables.find(cand);
-      if (cit != variables.end()) return cit->second;
-    }
+    ShrinkInstancePrefix(p);
+    Variable* under_inst = LookupRestUnderMatchingInstance(
+        p, head, rest, instance_types, variables);
+    if (under_inst) return under_inst;
     std::string cand = p + std::string(name);
     auto cit = variables.find(cand);
     if (cit != variables.end()) return cit->second;
@@ -124,6 +141,19 @@ void InitNetDefaultValue(Variable* var, NetType type, bool is_user_nettype) {
   }
 }
 
+// Populates a freshly created Net's fields from the CreateNet arguments.
+void PopulateNetFields(Net* net, Variable* var, NetType type,
+                       Strength charge_strength, uint64_t decay_ticks,
+                       bool is_user_nettype, std::string_view resolve_func) {
+  net->type = type;
+  net->resolved = var;
+  net->charge_strength = charge_strength;
+  net->base_charge_strength = charge_strength;
+  net->decay_ticks = decay_ticks;
+  net->is_user_nettype = is_user_nettype;
+  net->resolve_func = resolve_func;
+}
+
 }  // namespace
 
 Net* SimContext::CreateNet(std::string_view name, NetType type, uint32_t width,
@@ -134,13 +164,8 @@ Net* SimContext::CreateNet(std::string_view name, NetType type, uint32_t width,
   if (is_signed) var->is_signed = true;
   InitNetDefaultValue(var, type, is_user_nettype);
   auto* net = arena_.Create<Net>();
-  net->type = type;
-  net->resolved = var;
-  net->charge_strength = charge_strength;
-  net->base_charge_strength = charge_strength;
-  net->decay_ticks = decay_ticks;
-  net->is_user_nettype = is_user_nettype;
-  net->resolve_func = resolve_func;
+  PopulateNetFields(net, var, type, charge_strength, decay_ticks,
+                    is_user_nettype, resolve_func);
   nets_[name] = net;
   return net;
 }
@@ -683,6 +708,24 @@ uint32_t AssocArrayObject::Size() const {
                                              : int_data.size());
 }
 
+namespace {
+
+// Populates a freshly created AssocArrayObject's fields from the
+// CreateAssocArray arguments.
+void PopulateAssocArrayFields(AssocArrayObject* aa, uint32_t elem_width,
+                              bool is_string_key, uint32_t index_width,
+                              bool is_wildcard, bool is_4state,
+                              bool is_index_signed) {
+  aa->elem_width = elem_width;
+  aa->is_string_key = is_string_key;
+  aa->is_wildcard = is_wildcard;
+  aa->index_width = index_width;
+  aa->is_4state = is_4state;
+  aa->is_index_signed = is_index_signed;
+}
+
+}  // namespace
+
 AssocArrayObject* SimContext::CreateAssocArray(std::string_view name,
                                                uint32_t elem_width,
                                                bool is_string_key,
@@ -690,12 +733,8 @@ AssocArrayObject* SimContext::CreateAssocArray(std::string_view name,
                                                bool is_wildcard, bool is_4state,
                                                bool is_index_signed) {
   auto* aa = arena_.Create<AssocArrayObject>();
-  aa->elem_width = elem_width;
-  aa->is_string_key = is_string_key;
-  aa->is_wildcard = is_wildcard;
-  aa->index_width = index_width;
-  aa->is_4state = is_4state;
-  aa->is_index_signed = is_index_signed;
+  PopulateAssocArrayFields(aa, elem_width, is_string_key, index_width,
+                           is_wildcard, is_4state, is_index_signed);
   assoc_arrays_[name] = aa;
   return aa;
 }

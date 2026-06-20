@@ -158,42 +158,65 @@ void ApplyClassParamOverrides(std::string_view var_name, uint64_t handle,
   }
 }
 
+static int ResolveDpiActualIndex(const DpiFunction* import, const Expr* expr,
+                                 size_t i, size_t positional_count) {
+  if (i < positional_count) {
+    return static_cast<int>(i);
+  }
+  for (size_t j = 0; j < expr->arg_names.size(); ++j) {
+    if (expr->arg_names[j] == import->args[i].name) {
+      return static_cast<int>(positional_count + j);
+    }
+  }
+  return -1;
+}
+
+static uint64_t EvalDpiActualForFormal(const DpiFunction* import,
+                                       const Expr* expr, size_t i,
+                                       size_t positional_count, SimContext& ctx,
+                                       Arena& arena) {
+  int ai = ResolveDpiActualIndex(import, expr, i, positional_count);
+  if (ai >= 0 && expr->args[static_cast<size_t>(ai)] != nullptr) {
+    return EvalExpr(expr->args[static_cast<size_t>(ai)], ctx, arena).ToUint64();
+  }
+  if (import->args[i].default_value) {
+    return EvalExpr(import->args[i].default_value, ctx, arena).ToUint64();
+  }
+  return 0;
+}
+
+static std::vector<uint64_t> BindDpiActualsFromImport(const DpiFunction* import,
+                                                      const Expr* expr,
+                                                      SimContext& ctx,
+                                                      Arena& arena) {
+  size_t positional_count = expr->args.size() - expr->arg_names.size();
+  std::vector<uint64_t> args;
+  args.reserve(import->args.size());
+  for (size_t i = 0; i < import->args.size(); ++i) {
+    args.push_back(
+        EvalDpiActualForFormal(import, expr, i, positional_count, ctx, arena));
+  }
+  return args;
+}
+
+static std::vector<uint64_t> BindDpiActualsPositional(const Expr* expr,
+                                                      SimContext& ctx,
+                                                      Arena& arena) {
+  std::vector<uint64_t> args;
+  args.reserve(expr->args.size());
+  for (auto* arg : expr->args) {
+    args.push_back(EvalExpr(arg, ctx, arena).ToUint64());
+  }
+  return args;
+}
+
 static std::vector<uint64_t> BindDpiCallActuals(const DpiFunction* import,
                                                 const Expr* expr,
                                                 SimContext& ctx, Arena& arena) {
-  std::vector<uint64_t> args;
   if (import && !import->args.empty()) {
-    size_t positional_count = expr->args.size() - expr->arg_names.size();
-    args.reserve(import->args.size());
-    for (size_t i = 0; i < import->args.size(); ++i) {
-      int ai = -1;
-      if (i < positional_count) {
-        ai = static_cast<int>(i);
-      } else {
-        for (size_t j = 0; j < expr->arg_names.size(); ++j) {
-          if (expr->arg_names[j] == import->args[i].name) {
-            ai = static_cast<int>(positional_count + j);
-            break;
-          }
-        }
-      }
-      if (ai >= 0 && expr->args[static_cast<size_t>(ai)] != nullptr) {
-        args.push_back(EvalExpr(expr->args[static_cast<size_t>(ai)], ctx, arena)
-                           .ToUint64());
-      } else if (import->args[i].default_value) {
-        args.push_back(
-            EvalExpr(import->args[i].default_value, ctx, arena).ToUint64());
-      } else {
-        args.push_back(0);
-      }
-    }
-  } else {
-    args.reserve(expr->args.size());
-    for (auto* arg : expr->args) {
-      args.push_back(EvalExpr(arg, ctx, arena).ToUint64());
-    }
+    return BindDpiActualsFromImport(import, expr, ctx, arena);
   }
-  return args;
+  return BindDpiActualsPositional(expr, ctx, arena);
 }
 
 static Logic4Vec EvalDpiCall(const Expr* expr, SimContext& ctx, Arena& arena) {
@@ -433,6 +456,24 @@ static bool IsRestrictedTarget(const Process* proc) {
          proc->kind == ProcessKind::kContAssign;
 }
 
+static bool IsProcessKillable(const Process* proc) {
+  return proc && proc->sv_state != ProcessState::kFinished &&
+         proc->sv_state != ProcessState::kKilled;
+}
+
+static void KillProcessDescendants(Process* proc) {
+  std::vector<Process*> stack(proc->children.begin(), proc->children.end());
+  while (!stack.empty()) {
+    auto* child = stack.back();
+    stack.pop_back();
+    if (IsProcessKillable(child)) {
+      child->active = false;
+      child->sv_state = ProcessState::kKilled;
+      for (auto* gc : child->children) stack.push_back(gc);
+    }
+  }
+}
+
 static void EvalProcessKill(Process* proc, SimContext& ctx, Arena& arena,
                             Logic4Vec& out) {
   if (IsRestrictedTarget(proc)) {
@@ -443,23 +484,10 @@ static void EvalProcessKill(Process* proc, SimContext& ctx, Arena& arena,
     out = MakeLogic4VecVal(arena, 1, 0);
     return;
   }
-  if (proc && proc->sv_state != ProcessState::kFinished &&
-      proc->sv_state != ProcessState::kKilled) {
+  if (IsProcessKillable(proc)) {
     proc->active = false;
     proc->sv_state = ProcessState::kKilled;
-
-    std::vector<Process*> stack(proc->children.begin(), proc->children.end());
-    while (!stack.empty()) {
-      auto* child = stack.back();
-      stack.pop_back();
-      if (child->sv_state != ProcessState::kFinished &&
-          child->sv_state != ProcessState::kKilled) {
-        child->active = false;
-        child->sv_state = ProcessState::kKilled;
-        for (auto* gc : child->children) stack.push_back(gc);
-      }
-    }
-
+    KillProcessDescendants(proc);
     for (auto& w : proc->await_waiters) {
       if (w) w.resume();
     }
@@ -584,6 +612,16 @@ static bool TryBuiltinMethodCall(const Expr* expr, SimContext& ctx,
 
 static thread_local std::unordered_set<std::string_view> expanding_lets;
 
+static int FindLetNamedActualIndex(const FunctionArg& formal, const Expr* call,
+                                   size_t positional_count) {
+  for (size_t j = 0; j < call->arg_names.size(); ++j) {
+    if (call->arg_names[j] == formal.name) {
+      return static_cast<int>(positional_count + j);
+    }
+  }
+  return -1;
+}
+
 static Logic4Vec EvalLetActualForFormal(const FunctionArg& formal,
                                         const Expr* call, size_t i,
                                         size_t positional_count,
@@ -591,13 +629,7 @@ static Logic4Vec EvalLetActualForFormal(const FunctionArg& formal,
   if (i < positional_count) {
     return EvalExpr(call->args[i], ctx, arena);
   }
-  int found = -1;
-  for (size_t j = 0; j < call->arg_names.size(); ++j) {
-    if (call->arg_names[j] == formal.name) {
-      found = static_cast<int>(positional_count + j);
-      break;
-    }
-  }
+  int found = FindLetNamedActualIndex(formal, call, positional_count);
   if (found >= 0 && call->args[static_cast<size_t>(found)]) {
     return EvalExpr(call->args[static_cast<size_t>(found)], ctx, arena);
   }

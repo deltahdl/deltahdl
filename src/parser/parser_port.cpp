@@ -148,30 +148,44 @@ struct ParserPortHelpers {
     }
   }
 
+  // After `iface_name.modport_name` has been recognized (both identifier
+  // tokens consumed), fill in the named-interface-port fields and parse the
+  // remaining `port_name [dims] [= default]` tail.
+  static void FinishAnsiModportPort(Parser& p, PortDecl& port,
+                                    std::string_view iface_name,
+                                    std::string_view modport_name) {
+    port.data_type.kind = DataTypeKind::kNamed;
+    port.data_type.type_name = iface_name;
+    port.data_type.modport_name = modport_name;
+    port.name = p.ExpectIdentifier().text;
+    p.ParseUnpackedDims(port.unpacked_dims);
+    if (p.Match(TokenKind::kEq)) {
+      port.default_value = p.ParseExpr();
+    }
+  }
+
+  // Attempt to match `iface_name.modport_name port_name` from the current
+  // position, consuming tokens as it goes. Returns true and fully parses the
+  // port when the modport form is matched; returns false without restoring the
+  // lexer (the caller is responsible for restoring the saved position).
+  static bool TryMatchAnsiModportPort(Parser& p, PortDecl& port) {
+    auto id_tok = p.Consume();
+    if (!p.Check(TokenKind::kDot)) return false;
+    p.Consume();
+    if (!p.CheckIdentifier()) return false;
+    auto modport_tok = p.Consume();
+    if (!p.CheckIdentifier()) return false;
+    FinishAnsiModportPort(p, port, id_tok.text, modport_tok.text);
+    return true;
+  }
+
   // Disambiguate `iface_name.modport_name port_name` (a named interface port
   // with an explicit modport) from an ordinary typed port. Returns true and
   // fully parses the port when the modport form is matched; otherwise restores
   // the lexer position and returns false so the caller parses a data type.
   static bool TryParseAnsiModportPort(Parser& p, PortDecl& port) {
     auto saved = p.lexer_.SavePos();
-    auto id_tok = p.Consume();
-    if (p.Check(TokenKind::kDot)) {
-      p.Consume();
-      if (p.CheckIdentifier()) {
-        auto modport_tok = p.Consume();
-        if (p.CheckIdentifier()) {
-          port.data_type.kind = DataTypeKind::kNamed;
-          port.data_type.type_name = id_tok.text;
-          port.data_type.modport_name = modport_tok.text;
-          port.name = p.ExpectIdentifier().text;
-          p.ParseUnpackedDims(port.unpacked_dims);
-          if (p.Match(TokenKind::kEq)) {
-            port.default_value = p.ParseExpr();
-          }
-          return true;
-        }
-      }
-    }
+    if (TryMatchAnsiModportPort(p, port)) return true;
     p.lexer_.RestorePos(saved);
     return false;
   }

@@ -23,19 +23,26 @@ static void AddOrUpdateVTableEntry(ClassTypeInfo* info,
   }
 }
 
+static bool VTableHasMethodName(const ClassTypeInfo* info,
+                                std::string_view method_name) {
+  for (const auto& existing : info->vtable) {
+    if (existing.method_name == method_name) return true;
+  }
+  return false;
+}
+
+static void MergeInterfaceVTableEntries(ClassTypeInfo* info,
+                                        const ClassTypeInfo* iface) {
+  for (const auto& entry : iface->vtable) {
+    if (!VTableHasMethodName(info, entry.method_name))
+      info->vtable.push_back(entry);
+  }
+}
+
 static void MergeInterfaceVTables(ClassTypeInfo* info) {
   for (const auto* iface : info->extended_interfaces) {
     if (!iface) continue;
-    for (const auto& entry : iface->vtable) {
-      bool found = false;
-      for (const auto& existing : info->vtable) {
-        if (existing.method_name == entry.method_name) {
-          found = true;
-          break;
-        }
-      }
-      if (!found) info->vtable.push_back(entry);
-    }
+    MergeInterfaceVTableEntries(info, iface);
   }
 }
 

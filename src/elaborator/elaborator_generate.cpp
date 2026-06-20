@@ -330,6 +330,22 @@ static std::optional<std::string_view> ValidateGenerateForHeader(
   return genvar_name;
 }
 
+// §27.4: compute the next genvar value for a ++/-- step expression. Returns
+// nullopt unless the step is a unary increment/decrement on an identifier that
+// is bound in the loop scope.
+static std::optional<int64_t> ComputeIncDecNextValue(
+    const Expr* e, const ScopeMap& loop_scope) {
+  if (e->kind != ExprKind::kUnary && e->kind != ExprKind::kPostfixUnary) {
+    return std::nullopt;
+  }
+  if (!e->lhs || e->lhs->kind != ExprKind::kIdentifier) return std::nullopt;
+  auto it = loop_scope.find(e->lhs->text);
+  if (it == loop_scope.end()) return std::nullopt;
+  if (e->op == TokenKind::kPlusPlus) return it->second + 1;
+  if (e->op == TokenKind::kMinusMinus) return it->second - 1;
+  return std::nullopt;
+}
+
 // §27.4: compute the genvar value for the next iteration of a generate-for
 // loop. Supports a right-hand-side step expression as well as ++/-- on the
 // genvar. Returns nullopt when no valid next value can be determined, which
@@ -340,17 +356,62 @@ static std::optional<int64_t> ComputeGenerateForNextValue(
     return ConstEvalInt(item->gen_step->rhs, loop_scope);
   }
   if (item->gen_step->expr) {
-    auto* e = item->gen_step->expr;
-    if ((e->kind == ExprKind::kUnary || e->kind == ExprKind::kPostfixUnary) &&
-        e->lhs && e->lhs->kind == ExprKind::kIdentifier) {
-      auto it = loop_scope.find(e->lhs->text);
-      if (it != loop_scope.end()) {
-        if (e->op == TokenKind::kPlusPlus) return it->second + 1;
-        if (e->op == TokenKind::kMinusMinus) return it->second - 1;
-      }
-    }
+    return ComputeIncDecNextValue(item->gen_step->expr, loop_scope);
   }
   return std::nullopt;
+}
+
+// §27.4: a named loop generate block declares an array of generate block
+// instances, and it shall be an error if that array's name collides with any
+// other declaration in the enclosing scope, including another generate block
+// instance array. The array counts as declared even when the loop yields no
+// instances, so this check runs before the iteration count is known. Loop
+// generate arrays are an error on conflict (unlike conditional generate
+// blocks, whose naming rules differ), so the loop path enforces it directly
+// rather than through the shared label collector. Returns false (and reports
+// the diagnostic) when the array name conflicts; true otherwise.
+static bool RegisterGenerateForArrayName(
+    DiagEngine& diag, const ModuleItem* item, const RtlirModule* mod,
+    std::unordered_set<std::string_view>& declared_names) {
+  if (item->name.empty()) return true;
+  if (IsNameDeclared(item->name, mod) ||
+      !declared_names.insert(item->name).second) {
+    diag.Error(item->loc,
+               std::format("generate block array '{}' conflicts with an "
+                           "existing declaration in the same scope",
+                           item->name));
+    return false;
+  }
+  return true;
+}
+
+// §27.4: the x/z prohibition holds as the loop advances; a step that drives the
+// genvar to an x or z bit is an error, not a silent stop.
+static bool GenerateForStepHasXZLiteral(const ModuleItem* item) {
+  return ExprHasXZLiteral(item->gen_step->rhs) ||
+         ExprHasXZLiteral(item->gen_step->expr);
+}
+
+// §27.4: evaluate the generate-for loop condition in the current loop scope.
+// Returns true while the loop should keep iterating: the condition must be a
+// constant that evaluates to a nonzero value.
+static bool GenerateForConditionHolds(const ModuleItem* item,
+                                      const ScopeMap& loop_scope) {
+  auto cond = ConstEvalInt(item->gen_cond, loop_scope);
+  return cond.has_value() && *cond != 0;
+}
+
+// §27.4: per-iteration genvar validity check, run before elaborating the body
+// of one generate-for iteration. Returns true (and reports the diagnostic) when
+// the genvar value repeats during evaluation, which must abort the loop. The
+// current value is recorded in seen_values so a later repeat can be detected.
+static bool GenerateForGenvarRepeats(DiagEngine& diag, const ModuleItem* item,
+                                     int64_t genvar_value,
+                                     std::unordered_set<int64_t>& seen_values) {
+  if (seen_values.insert(genvar_value).second) return false;
+  diag.Error(item->loc,
+             "generate-for genvar value is repeated during evaluation");
+  return true;
 }
 
 void Elaborator::ElaborateGenerateFor(ModuleItem* item, RtlirModule* mod,
@@ -359,24 +420,7 @@ void Elaborator::ElaborateGenerateFor(ModuleItem* item, RtlirModule* mod,
   if (!genvar_name_opt) return;
   auto genvar_name = *genvar_name_opt;
 
-  // §27.4: a named loop generate block declares an array of generate block
-  // instances, and it shall be an error if that array's name collides with any
-  // other declaration in the enclosing scope, including another generate block
-  // instance array. The array counts as declared even when the loop yields no
-  // instances, so this check runs before the iteration count is known. Loop
-  // generate arrays are an error on conflict (unlike conditional generate
-  // blocks, whose naming rules differ), so the loop path enforces it directly
-  // rather than through the shared label collector.
-  if (!item->name.empty()) {
-    if (IsNameDeclared(item->name, mod) ||
-        !declared_names_.insert(item->name).second) {
-      diag_.Error(item->loc,
-                  std::format("generate block array '{}' conflicts with an "
-                              "existing declaration in the same scope",
-                              item->name));
-      return;
-    }
-  }
+  if (!RegisterGenerateForArrayName(diag_, item, mod, declared_names_)) return;
 
   auto init_val = ConstEvalInt(item->gen_init->rhs, scope);
   if (!init_val) {
@@ -392,12 +436,10 @@ void Elaborator::ElaborateGenerateFor(ModuleItem* item, RtlirModule* mod,
 
   int64_t iter = 0;
   for (; iter < kMaxGenerateIterations; ++iter) {
-    auto cond = ConstEvalInt(item->gen_cond, loop_scope);
-    if (!cond || !*cond) break;
+    if (!GenerateForConditionHolds(item, loop_scope)) break;
 
-    if (!seen_values.insert(loop_scope[genvar_name]).second) {
-      diag_.Error(item->loc,
-                  "generate-for genvar value is repeated during evaluation");
+    if (GenerateForGenvarRepeats(diag_, item, loop_scope[genvar_name],
+                                 seen_values)) {
       gen_prefix_ = saved_prefix;
       return;
     }
@@ -406,10 +448,7 @@ void Elaborator::ElaborateGenerateFor(ModuleItem* item, RtlirModule* mod,
                               loop_scope[genvar_name]);
     ElaborateGenerateItems(item->gen_body, mod, loop_scope);
 
-    // §27.4: the x/z prohibition holds as the loop advances; a step that
-    // drives the genvar to an x or z bit is an error, not a silent stop.
-    if (ExprHasXZLiteral(item->gen_step->rhs) ||
-        ExprHasXZLiteral(item->gen_step->expr)) {
+    if (GenerateForStepHasXZLiteral(item)) {
       diag_.Error(item->loc,
                   "generate-for genvar shall not have any bit set to x or z "
                   "during evaluation");

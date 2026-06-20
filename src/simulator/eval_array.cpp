@@ -136,6 +136,21 @@ IterNames ExtractIterNames(const Expr* expr) {
   return IterNames{iter_name, index_name, std::move(idx_var_name)};
 }
 
+static Logic4Vec EvalWithExprForElement(const Expr* with_expr,
+                                        std::string_view iter_name,
+                                        const std::string& idx_var_name,
+                                        const Logic4Vec& elem, size_t index,
+                                        SimContext& ctx, Arena& arena) {
+  ctx.PushScope();
+  auto* item_var = ctx.CreateLocalVariable(iter_name, elem.width);
+  item_var->value = elem;
+  auto* idx_var = ctx.CreateLocalVariable(idx_var_name, 32);
+  idx_var->value = MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(index));
+  Logic4Vec ev = EvalExpr(with_expr, ctx, arena);
+  ctx.PopScope();
+  return ev;
+}
+
 static std::vector<uint64_t> EvalReduceWithValues(
     const std::vector<Logic4Vec>& elems, const Expr* expr,
     std::string_view iter_name, const std::string& idx_var_name,
@@ -144,36 +159,52 @@ static std::vector<uint64_t> EvalReduceWithValues(
   vals.reserve(elems.size());
   result_width = 0;
   for (size_t i = 0; i < elems.size(); ++i) {
-    ctx.PushScope();
-    auto* item_var = ctx.CreateLocalVariable(iter_name, elems[i].width);
-    item_var->value = elems[i];
-    auto* idx_var = ctx.CreateLocalVariable(idx_var_name, 32);
-    idx_var->value = MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(i));
-    Logic4Vec ev = EvalExpr(expr->with_expr, ctx, arena);
-    ctx.PopScope();
+    Logic4Vec ev = EvalWithExprForElement(
+        expr->with_expr, iter_name, idx_var_name, elems[i], i, ctx, arena);
     vals.push_back(ev.ToUint64());
     if (i == 0) result_width = ev.width;
   }
   return vals;
 }
 
+static uint64_t ReduceSumVals(const std::vector<uint64_t>& vals) {
+  uint64_t result = 0;
+  for (auto v : vals) result += v;
+  return result;
+}
+
+static uint64_t ReduceProductVals(const std::vector<uint64_t>& vals) {
+  uint64_t result = 1;
+  for (auto v : vals) result *= v;
+  return result;
+}
+
+static uint64_t ReduceAndVals(const std::vector<uint64_t>& vals) {
+  uint64_t result = vals.empty() ? 0 : vals[0];
+  for (size_t i = 1; i < vals.size(); ++i) result &= vals[i];
+  return result;
+}
+
+static uint64_t ReduceOrVals(const std::vector<uint64_t>& vals) {
+  uint64_t result = 0;
+  for (auto v : vals) result |= v;
+  return result;
+}
+
+static uint64_t ReduceXorVals(const std::vector<uint64_t>& vals) {
+  uint64_t result = 0;
+  for (auto v : vals) result ^= v;
+  return result;
+}
+
 static uint64_t ApplyReduction(std::string_view method,
                                const std::vector<uint64_t>& vals) {
-  uint64_t result = 0;
-  if (method == "sum") {
-    for (auto v : vals) result += v;
-  } else if (method == "product") {
-    result = 1;
-    for (auto v : vals) result *= v;
-  } else if (method == "and") {
-    result = vals.empty() ? 0 : vals[0];
-    for (size_t i = 1; i < vals.size(); ++i) result &= vals[i];
-  } else if (method == "or") {
-    for (auto v : vals) result |= v;
-  } else if (method == "xor") {
-    for (auto v : vals) result ^= v;
-  }
-  return result;
+  if (method == "sum") return ReduceSumVals(vals);
+  if (method == "product") return ReduceProductVals(vals);
+  if (method == "and") return ReduceAndVals(vals);
+  if (method == "or") return ReduceOrVals(vals);
+  if (method == "xor") return ReduceXorVals(vals);
+  return 0;
 }
 
 static Logic4Vec ReduceWithExpr(std::string_view var_name,
@@ -313,14 +344,40 @@ static uint64_t EvalSortKey(const Expr* with_expr, std::string_view iter_name,
                             const std::string& idx_var_name,
                             const Logic4Vec& elem, size_t index,
                             SimContext& ctx, Arena& arena) {
-  ctx.PushScope();
-  auto* item_var = ctx.CreateLocalVariable(iter_name, elem.width);
-  item_var->value = elem;
-  auto* idx_var = ctx.CreateLocalVariable(idx_var_name, 32);
-  idx_var->value = MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(index));
-  uint64_t key = EvalExpr(with_expr, ctx, arena).ToUint64();
-  ctx.PopScope();
-  return key;
+  return EvalWithExprForElement(with_expr, iter_name, idx_var_name, elem, index,
+                                ctx, arena)
+      .ToUint64();
+}
+
+static std::vector<std::pair<uint64_t, size_t>> BuildSortKeys(
+    const std::vector<Logic4Vec>& vals, const Expr* expr,
+    std::string_view iter_name, const std::string& idx_var_name,
+    SimContext& ctx, Arena& arena) {
+  std::vector<std::pair<uint64_t, size_t>> keys(vals.size());
+  for (size_t i = 0; i < vals.size(); ++i) {
+    keys[i] = {EvalSortKey(expr->with_expr, iter_name, idx_var_name, vals[i], i,
+                           ctx, arena),
+               i};
+  }
+  return keys;
+}
+
+static void SortKeysByValue(std::vector<std::pair<uint64_t, size_t>>& keys,
+                            bool ascending) {
+  if (ascending) {
+    std::sort(keys.begin(), keys.end());
+  } else {
+    std::sort(keys.begin(), keys.end(),
+              [](const auto& a, const auto& b) { return a.first > b.first; });
+  }
+}
+
+static std::vector<Logic4Vec> ReorderByKeys(
+    const std::vector<Logic4Vec>& vals,
+    const std::vector<std::pair<uint64_t, size_t>>& keys) {
+  std::vector<Logic4Vec> sorted(vals.size());
+  for (size_t i = 0; i < keys.size(); ++i) sorted[i] = vals[keys[i].second];
+  return sorted;
 }
 
 static void ArraySortWithExpr(std::string_view var_name, const ArrayInfo& info,
@@ -328,23 +385,10 @@ static void ArraySortWithExpr(std::string_view var_name, const ArrayInfo& info,
                               Arena& arena) {
   auto vals = CollectVecElements(var_name, info, ctx, arena);
   auto names = ExtractIterNames(expr);
-  std::string_view iter_name = names.iter_name;
-  const std::string& idx_var_name = names.idx_var_name;
-
-  std::vector<std::pair<uint64_t, size_t>> keys(vals.size());
-  for (size_t i = 0; i < vals.size(); ++i) {
-    keys[i] = {EvalSortKey(expr->with_expr, iter_name, idx_var_name, vals[i], i,
-                           ctx, arena),
-               i};
-  }
-  if (ascending) {
-    std::sort(keys.begin(), keys.end());
-  } else {
-    std::sort(keys.begin(), keys.end(),
-              [](const auto& a, const auto& b) { return a.first > b.first; });
-  }
-  std::vector<Logic4Vec> sorted(vals.size());
-  for (size_t i = 0; i < keys.size(); ++i) sorted[i] = vals[keys[i].second];
+  auto keys = BuildSortKeys(vals, expr, names.iter_name, names.idx_var_name,
+                            ctx, arena);
+  SortKeysByValue(keys, ascending);
+  std::vector<Logic4Vec> sorted = ReorderByKeys(vals, keys);
   WriteVecElements(var_name, info, sorted, ctx);
 }
 

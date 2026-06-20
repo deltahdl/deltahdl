@@ -203,9 +203,8 @@ static void ValidateFinalProcess(ModuleItem* item, const RtlirProcess& proc,
   }
 }
 
-void AddProcess(
-    RtlirProcessKind kind, ModuleItem* item, RtlirModule* mod, Arena& arena,
-    DiagEngine& diag,
+static RtlirProcess BuildProcessWithSensitivity(
+    RtlirProcessKind kind, ModuleItem* item, Arena& arena,
     const std::unordered_map<std::string_view, const ModuleItem*>* func_map) {
   RtlirProcess proc;
   proc.kind = kind;
@@ -221,7 +220,11 @@ void AddProcess(
       proc.sensitivity.empty()) {
     proc.sensitivity = InferSensitivity(proc.body, arena, nullptr, false);
   }
+  return proc;
+}
 
+static void ValidateProcess(RtlirProcessKind kind, ModuleItem* item,
+                            const RtlirProcess& proc, DiagEngine& diag) {
   if (kind == RtlirProcessKind::kAlways && item->sensitivity.empty() &&
       !item->is_star_sensitivity && !StmtHasTimingControl(proc.body)) {
     diag.Warning(item->loc,
@@ -235,7 +238,14 @@ void AddProcess(
   if (kind == RtlirProcessKind::kFinal) {
     ValidateFinalProcess(item, proc, diag);
   }
+}
 
+void AddProcess(
+    RtlirProcessKind kind, ModuleItem* item, RtlirModule* mod, Arena& arena,
+    DiagEngine& diag,
+    const std::unordered_map<std::string_view, const ModuleItem*>* func_map) {
+  RtlirProcess proc = BuildProcessWithSensitivity(kind, item, arena, func_map);
+  ValidateProcess(kind, item, proc, diag);
   proc.attrs = ResolveAttributes(item->attrs, diag);
   mod->processes.push_back(proc);
 }

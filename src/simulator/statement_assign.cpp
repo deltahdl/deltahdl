@@ -163,43 +163,60 @@ static bool WriteClassObjectField(Variable* base_var,
   return true;
 }
 
-bool WriteStructField(const Expr* lhs, const Logic4Vec& rhs_val,
-                      SimContext& ctx, Arena& arena) {
-  std::string name;
-  BuildLhsName(lhs, name);
-  auto dot = name.find('.');
-  if (dot == std::string::npos) return false;
-  auto base_name = std::string_view(name).substr(0, dot);
-  auto field_name = std::string_view(name).substr(dot + 1);
+// Writes field_name into the current `this` object. *handled is set true when
+// base_name names `this`; in that case the returned value is the write result.
+static bool WriteThisField(std::string_view base_name,
+                           std::string_view field_name,
+                           const Logic4Vec& rhs_val, SimContext& ctx,
+                           bool* handled) {
+  *handled = false;
+  if (base_name != "this") return false;
+  *handled = true;
+  auto* self = ctx.CurrentThis();
+  if (!self) return false;
+  self->SetProperty(std::string(field_name), rhs_val);
+  return true;
+}
 
-  if (base_name == "this") {
-    auto* self = ctx.CurrentThis();
-    if (self) {
-      self->SetProperty(std::string(field_name), rhs_val);
-      return true;
-    }
-    return false;
-  }
+// Writes field_name into the parent slice of the current `this` object via
+// `super`. *handled is set true when base_name names `super`.
+static bool WriteSuperField(std::string_view base_name,
+                            std::string_view field_name,
+                            const Logic4Vec& rhs_val, SimContext& ctx,
+                            bool* handled) {
+  *handled = false;
+  if (base_name != "super") return false;
+  *handled = true;
+  auto* self = ctx.CurrentThis();
+  if (!(self && self->type && self->type->parent)) return false;
+  self->SetPropertyForType(std::string(field_name), self->type->parent,
+                           rhs_val);
+  return true;
+}
 
-  if (base_name == "super") {
-    auto* self = ctx.CurrentThis();
-    if (self && self->type && self->type->parent) {
-      self->SetPropertyForType(std::string(field_name), self->type->parent,
-                               rhs_val);
-      return true;
-    }
-    return false;
-  }
-
+// Writes field_name as a static property of the class named base_name.
+// *handled is set true when base_name names a known class type.
+static bool WriteStaticClassField(std::string_view base_name,
+                                  std::string_view field_name,
+                                  const Logic4Vec& rhs_val, SimContext& ctx,
+                                  bool* handled) {
+  *handled = false;
   auto* cls_type = ctx.FindClassType(base_name);
-  if (cls_type) {
-    auto sit = cls_type->static_properties.find(std::string(field_name));
-    if (sit != cls_type->static_properties.end()) {
-      sit->second = rhs_val;
-      return true;
-    }
-    return false;
-  }
+  if (!cls_type) return false;
+  *handled = true;
+  auto sit = cls_type->static_properties.find(std::string(field_name));
+  if (sit == cls_type->static_properties.end()) return false;
+  sit->second = rhs_val;
+  return true;
+}
+
+// Writes field_name into the variable named base_name, which may be a packed
+// struct/union or a class-object handle. The caller has confirmed base_name is
+// neither this/super nor a class type.
+static bool WriteVariableField(std::string_view base_name,
+                               std::string_view field_name,
+                               const Logic4Vec& rhs_val, SimContext& ctx,
+                               Arena& arena) {
   auto* base_var = ctx.FindVariable(base_name);
   if (!base_var) return false;
   auto* info = ctx.GetVariableStructType(base_name);
@@ -211,6 +228,25 @@ bool WriteStructField(const Expr* lhs, const Logic4Vec& rhs_val,
       return true;
   }
   return WriteClassObjectField(base_var, base_name, field_name, rhs_val, ctx);
+}
+
+bool WriteStructField(const Expr* lhs, const Logic4Vec& rhs_val,
+                      SimContext& ctx, Arena& arena) {
+  std::string name;
+  BuildLhsName(lhs, name);
+  auto dot = name.find('.');
+  if (dot == std::string::npos) return false;
+  auto base_name = std::string_view(name).substr(0, dot);
+  auto field_name = std::string_view(name).substr(dot + 1);
+
+  bool handled = false;
+  bool result = WriteThisField(base_name, field_name, rhs_val, ctx, &handled);
+  if (handled) return result;
+  result = WriteSuperField(base_name, field_name, rhs_val, ctx, &handled);
+  if (handled) return result;
+  result = WriteStaticClassField(base_name, field_name, rhs_val, ctx, &handled);
+  if (handled) return result;
+  return WriteVariableField(base_name, field_name, rhs_val, ctx, arena);
 }
 
 static void WritePartSelect(Variable* var, uint32_t lo, uint32_t width,

@@ -495,6 +495,18 @@ bool CoverageDB::SingletonValueParticipates(BinValueResolution resolution) {
   return resolution == BinValueResolution::kOk;
 }
 
+// Enumerates every integer in [lo, hi] inclusive. The loop terminates on the
+// high value rather than on an exhausted increment so it stays safe when
+// hi == INT64_MAX (LRM 19.5.7, second and third range bullets).
+static std::vector<int64_t> EnumerateInclusiveRange(int64_t lo, int64_t hi) {
+  std::vector<int64_t> out;
+  for (int64_t v = lo;; ++v) {
+    out.push_back(v);
+    if (v == hi) break;
+  }
+  return out;
+}
+
 std::vector<int64_t> CoverageDB::ResolveBinRange(int64_t low, int64_t high,
                                                  bool low_has_xz,
                                                  bool high_has_xz,
@@ -512,12 +524,7 @@ std::vector<int64_t> CoverageDB::ResolveBinRange(int64_t low, int64_t high,
   int64_t lo = std::max(low, EffectiveTypeMin(eff));
   int64_t hi = std::min(high, EffectiveTypeMax(eff));
   if (lo > hi) return {};
-  std::vector<int64_t> out;
-  for (int64_t v = lo;; ++v) {
-    out.push_back(v);
-    if (v == hi) break;  // terminate here to stay safe when hi == INT64_MAX
-  }
-  return out;
+  return EnumerateInclusiveRange(lo, hi);
 }
 
 }  // namespace delta

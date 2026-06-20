@@ -149,6 +149,20 @@ static void ApplyConstSizedUnpackedDim(const Expr* dim, RtlirVariable& var,
   }
 }
 
+// §7.8: an identifier first dimension naming a typedef or class type makes the
+// array associative with that user-defined index type. Returns true when the
+// dimension was a user-defined associative index.
+static bool TryParseUserDefinedAssocDim(
+    const Expr* dim, RtlirVariable& var, const TypedefMap& typedefs,
+    const std::unordered_set<std::string_view>& class_names) {
+  if (dim->kind != ExprKind::kIdentifier ||
+      !IsUserDefinedType(dim->text, typedefs, class_names)) {
+    return false;
+  }
+  ApplyUserDefinedAssocDim(dim, var, typedefs, class_names);
+  return true;
+}
+
 static void ComputeUnpackedDims(
     const std::vector<Expr*>& dims, RtlirVariable& var,
     const TypedefMap& typedefs,
@@ -158,12 +172,7 @@ static void ComputeUnpackedDims(
   auto* dim = dims[0];
   if (TryParseQueueDim(dim, var, diag, loc)) return;
   if (TryParseAssocDim(dim, var)) return;
-
-  if (dim->kind == ExprKind::kIdentifier &&
-      IsUserDefinedType(dim->text, typedefs, class_names)) {
-    ApplyUserDefinedAssocDim(dim, var, typedefs, class_names);
-    return;
-  }
+  if (TryParseUserDefinedAssocDim(dim, var, typedefs, class_names)) return;
   if (TryParseRangeDim(dim, var)) return;
 
   ApplyConstSizedUnpackedDim(dim, var, diag, loc);
@@ -194,12 +203,11 @@ struct DeclNameTables {
   std::unordered_set<std::string_view>& declared_names;
 };
 
-// §23.2.2.1: diagnose redeclaration of a declared name and width mismatches
-// against an earlier partial (direction-only) port declaration. `kind_word`
-// selects "net" or "variable" in the vector-range message.
-static void CheckDeclRedeclaration(
-    const ModuleItem* item, const DataType& dtype, const TypedefMap& typedefs,
-    DeclNameTables tables, std::string_view kind_word, DiagEngine& diag) {
+// §23.2.2.1: diagnose redeclaration of a declared name against the ANSI and
+// complete non-ANSI port name tables.
+static void CheckPortNameRedeclaration(const ModuleItem* item,
+                                       const DeclNameTables& tables,
+                                       DiagEngine& diag) {
   if (tables.ansi_port_names.count(item->name)) {
     diag.Error(item->loc,
                std::format("redeclaration of ANSI port '{}'", item->name));
@@ -211,6 +219,16 @@ static void CheckDeclRedeclaration(
                     "declaration",
                     item->name));
   }
+}
+
+// §23.2.2.1: reconcile a declaration against an earlier partial
+// (direction-only) port declaration — width mismatch is an error — or, when
+// there is no partial port, record the name and diagnose any plain
+// redeclaration. `kind_word` selects "net" or "variable" in the vector-range
+// message.
+static void CheckPartialPortOrNameRedeclaration(
+    const ModuleItem* item, const DataType& dtype, const TypedefMap& typedefs,
+    DeclNameTables tables, std::string_view kind_word, DiagEngine& diag) {
   auto it = tables.non_ansi_partial_ports.find(item->name);
   if (it != tables.non_ansi_partial_ports.end()) {
     uint32_t decl_width = EvalTypeWidth(dtype, typedefs);
@@ -223,6 +241,17 @@ static void CheckDeclRedeclaration(
   } else if (!tables.declared_names.insert(item->name).second) {
     diag.Error(item->loc, std::format("redeclaration of '{}'", item->name));
   }
+}
+
+// §23.2.2.1: diagnose redeclaration of a declared name and width mismatches
+// against an earlier partial (direction-only) port declaration. `kind_word`
+// selects "net" or "variable" in the vector-range message.
+static void CheckDeclRedeclaration(
+    const ModuleItem* item, const DataType& dtype, const TypedefMap& typedefs,
+    DeclNameTables tables, std::string_view kind_word, DiagEngine& diag) {
+  CheckPortNameRedeclaration(item, tables, diag);
+  CheckPartialPortOrNameRedeclaration(item, dtype, typedefs, tables, kind_word,
+                                      diag);
 }
 
 // §6.7.1 / §23.2.2.1: a net declared with a vector type that cannot carry a
@@ -263,6 +292,28 @@ static void ValidateNetDriveStrength(const DataType& dtype, const RtlirNet& net,
   }
 }
 
+// §6.10: build the continuous assignment that lowers a net declaration
+// assignment — an identifier LHS naming the net driven by the initializer, with
+// the net's width and the declaration's drive strengths and delays.
+static RtlirContAssign BuildNetDeclContAssign(const ModuleItem* item,
+                                              const RtlirNet& net,
+                                              Arena& arena) {
+  auto* lhs = arena.Create<Expr>();
+  lhs->kind = ExprKind::kIdentifier;
+  lhs->text = item->name;
+  lhs->range = item->init_expr->range;
+  RtlirContAssign ca;
+  ca.lhs = lhs;
+  ca.rhs = item->init_expr;
+  ca.width = net.width;
+  ca.drive_strength0 = item->data_type.drive_strength0;
+  ca.drive_strength1 = item->data_type.drive_strength1;
+  ca.delay = item->net_delay;
+  ca.delay_fall = item->net_delay_fall;
+  ca.delay_decay = item->net_delay_decay;
+  return ca;
+}
+
 // §6.10: a net declaration assignment lowers to a continuous assignment of the
 // initializer to the net (illegal on interconnect nets).
 static void LowerNetDeclAssignment(
@@ -275,21 +326,8 @@ static void LowerNetDeclAssignment(
                "interconnect net shall not have a net declaration assignment");
     return;
   }
-  auto* lhs = arena.Create<Expr>();
-  lhs->kind = ExprKind::kIdentifier;
-  lhs->text = item->name;
-  lhs->range = item->init_expr->range;
   cont_assign_targets.emplace(item->name, item->loc);
-  RtlirContAssign ca;
-  ca.lhs = lhs;
-  ca.rhs = item->init_expr;
-  ca.width = net.width;
-  ca.drive_strength0 = item->data_type.drive_strength0;
-  ca.drive_strength1 = item->data_type.drive_strength1;
-  ca.delay = item->net_delay;
-  ca.delay_fall = item->net_delay_fall;
-  ca.delay_decay = item->net_delay_decay;
-  mod->assigns.push_back(ca);
+  mod->assigns.push_back(BuildNetDeclContAssign(item, net, arena));
 }
 
 // §6.10 / §28.16: apply the compilation unit's default trireg charge strength
@@ -564,22 +602,34 @@ bool ExprRefsOutsideInterface(
   return false;
 }
 
-// §25.9: collect the names declared within an interface body (ports,
-// parameters, modports, items and instance names) that count as "local".
-std::unordered_set<std::string_view> CollectInterfaceLocalNames(
-    const ModuleDecl* iface) {
-  std::unordered_set<std::string_view> local;
+// §25.9: collect the port, parameter and modport names of an interface body.
+void CollectInterfaceHeaderNames(const ModuleDecl* iface,
+                                 std::unordered_set<std::string_view>& local) {
   for (const auto& p : iface->ports)
     if (!p.name.empty()) local.insert(p.name);
   for (const auto& param : iface->params)
     if (!param.first.empty()) local.insert(param.first);
   for (const auto* mp : iface->modports)
     if (mp && !mp->name.empty()) local.insert(mp->name);
+}
+
+// §25.9: collect the declared names and instance names of an interface's items.
+void CollectInterfaceItemNames(const ModuleDecl* iface,
+                               std::unordered_set<std::string_view>& local) {
   for (const auto* it : iface->items) {
     if (it == nullptr) continue;
     if (!it->name.empty()) local.insert(it->name);
     if (!it->inst_name.empty()) local.insert(it->inst_name);
   }
+}
+
+// §25.9: collect the names declared within an interface body (ports,
+// parameters, modports, items and instance names) that count as "local".
+std::unordered_set<std::string_view> CollectInterfaceLocalNames(
+    const ModuleDecl* iface) {
+  std::unordered_set<std::string_view> local;
+  CollectInterfaceHeaderNames(iface, local);
+  CollectInterfaceItemNames(iface, local);
   return local;
 }
 
@@ -694,6 +744,66 @@ void ValidateVirtualInterfaceTarget(const ModuleItem* item,
 
 }  // namespace
 
+// §6.11 / §6.20 / §23.2.2.1: bundle of name-table state updated while
+// registering a variable declaration's name (const-ness, kind, shape, named
+// type).
+struct VarDeclNameTables {
+  std::unordered_set<std::string_view>& const_names;
+  std::unordered_map<std::string_view, DataTypeKind>& var_types;
+  std::unordered_set<std::string_view>& scalar_var_names;
+  std::unordered_set<std::string_view>& packed_array_vars;
+  std::unordered_map<std::string_view, std::string_view>& var_named_types;
+};
+
+// §6.11 / §6.20: record the bookkeeping name tables for a variable declaration
+// (const-ness, type kind, scalar/packed-array shape, named type) before the
+// RtlirVariable is built.
+static void RegisterVarDeclNames(const ModuleItem* item,
+                                 VarDeclNameTables tables, DiagEngine& diag) {
+  if (item->data_type.is_const) {
+    if (!item->init_expr) {
+      diag.Error(
+          item->loc,
+          std::format("const variable '{}' must be initialized", item->name));
+    }
+    tables.const_names.insert(item->name);
+  }
+  tables.var_types[item->name] = item->data_type.kind;
+  if (!item->data_type.packed_dim_left)
+    tables.scalar_var_names.insert(item->name);
+  else if (item->unpacked_dims.empty())
+    tables.packed_array_vars.insert(item->name);
+  if (item->data_type.kind == DataTypeKind::kNamed)
+    tables.var_named_types[item->name] = item->data_type.type_name;
+}
+
+// §25.9: bundle of virtual-interface name-table state updated while registering
+// a virtual interface variable declaration.
+struct VirtualInterfaceVarTables {
+  std::unordered_map<std::string_view, std::string_view>&
+      vi_var_interface_types;
+  std::unordered_map<std::string_view, std::string_view>& vi_var_modports;
+  std::unordered_map<std::string_view, std::vector<int64_t>>&
+      vi_var_param_values;
+};
+
+// §25.9: register a virtual interface variable's interface/modport bindings and
+// validate the named interface target (`iface_decl` is the resolved interface,
+// or null when unknown).
+static void RegisterVirtualInterfaceVarDecl(const ModuleItem* item,
+                                            const ModuleDecl* iface_decl,
+                                            VirtualInterfaceVarTables tables,
+                                            DiagEngine& diag) {
+  if (item->data_type.kind != DataTypeKind::kVirtualInterface) return;
+  auto iface_name = item->data_type.type_name;
+  auto modport_name = item->data_type.modport_name;
+  tables.vi_var_interface_types[item->name] = iface_name;
+  tables.vi_var_modports[item->name] = modport_name;
+  RecordViParamOverrides(item, tables.vi_var_param_values);
+  ValidateVirtualInterfaceTarget(item, iface_decl, iface_name, modport_name,
+                                 diag);
+}
+
 void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
   ResolveTypeRef(item, mod);
 
@@ -718,30 +828,18 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
                           non_ansi_partial_ports_, declared_names_},
                          "variable", diag_);
 
-  if (item->data_type.is_const) {
-    if (!item->init_expr) {
-      diag_.Error(
-          item->loc,
-          std::format("const variable '{}' must be initialized", item->name));
-    }
-    const_names_.insert(item->name);
-  }
-  var_types_[item->name] = item->data_type.kind;
-  if (!item->data_type.packed_dim_left)
-    scalar_var_names_.insert(item->name);
-  else if (item->unpacked_dims.empty())
-    packed_array_vars_.insert(item->name);
-  if (item->data_type.kind == DataTypeKind::kNamed)
-    var_named_types_[item->name] = item->data_type.type_name;
-  if (item->data_type.kind == DataTypeKind::kVirtualInterface) {
-    auto iface_name = item->data_type.type_name;
-    auto modport_name = item->data_type.modport_name;
-    vi_var_interface_types_[item->name] = iface_name;
-    vi_var_modports_[item->name] = modport_name;
-    RecordViParamOverrides(item, vi_var_param_values_);
-    ValidateVirtualInterfaceTarget(item, FindModule(iface_name), iface_name,
-                                   modport_name, diag_);
-  }
+  RegisterVarDeclNames(item,
+                       {const_names_, var_types_, scalar_var_names_,
+                        packed_array_vars_, var_named_types_},
+                       diag_);
+  const ModuleDecl* vi_iface_decl =
+      item->data_type.kind == DataTypeKind::kVirtualInterface
+          ? FindModule(item->data_type.type_name)
+          : nullptr;
+  RegisterVirtualInterfaceVarDecl(
+      item, vi_iface_decl,
+      {vi_var_interface_types_, vi_var_modports_, vi_var_param_values_}, diag_);
+
   RtlirVariable var;
   var.name = ScopedName(item->name);
   var.width = EvalTypeWidth(item->data_type, typedefs_);

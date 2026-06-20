@@ -499,43 +499,56 @@ void Parser::ParseExtendedTimingCheckArgs(TimingCheckDecl& tc) {
   ParseSetupholdExtendedArgs(tc);
 }
 
-static void ValidateTimingCheckDecl(DiagEngine& diag, SourceLoc loc,
-                                    const TimingCheckDecl& tc) {
-  if (tc.check_kind == TimingCheckKind::kSetuphold && tc.limits.size() < 2) {
+// Checks that timing checks requiring two timing_check_limit arguments
+// ($setuphold, $recrem, $fullskew) actually received them.
+static void ValidateTimingCheckLimitCount(DiagEngine& diag, SourceLoc loc,
+                                          const TimingCheckDecl& tc) {
+  if (tc.limits.size() >= 2) return;
+
+  if (tc.check_kind == TimingCheckKind::kSetuphold) {
     diag.Error(loc, "$setuphold requires two timing_check_limit arguments");
-  }
-
-  if (tc.check_kind == TimingCheckKind::kRecrem && tc.limits.size() < 2) {
+  } else if (tc.check_kind == TimingCheckKind::kRecrem) {
     diag.Error(loc, "$recrem requires two timing_check_limit arguments");
-  }
-
-  if (tc.check_kind == TimingCheckKind::kFullskew && tc.limits.size() < 2) {
+  } else if (tc.check_kind == TimingCheckKind::kFullskew) {
     diag.Error(loc, "$fullskew requires two timing_check_limit arguments");
   }
+}
 
-  if (tc.check_kind == TimingCheckKind::kWidth &&
-      tc.ref_edge == SpecifyEdge::kNone) {
+// Checks that $width and $period reference events carry an edge specification.
+static void ValidateTimingCheckEdgeRequired(DiagEngine& diag, SourceLoc loc,
+                                            const TimingCheckDecl& tc) {
+  if (tc.ref_edge != SpecifyEdge::kNone) return;
+
+  if (tc.check_kind == TimingCheckKind::kWidth) {
     diag.Error(loc, "$width reference_event must be an edge specification");
-  }
-
-  if (tc.check_kind == TimingCheckKind::kPeriod &&
-      tc.ref_edge == SpecifyEdge::kNone) {
+  } else if (tc.check_kind == TimingCheckKind::kPeriod) {
     diag.Error(loc, "$period reference_event must be an edge specification");
   }
+}
 
-  if (tc.check_kind == TimingCheckKind::kNochange) {
-    if (tc.limits.size() < 2) {
-      diag.Error(loc,
-                 "$nochange requires both start_edge_offset and "
-                 "end_edge_offset arguments");
-    }
-    if (tc.ref_edge != SpecifyEdge::kPosedge &&
-        tc.ref_edge != SpecifyEdge::kNegedge) {
-      diag.Error(loc,
-                 "$nochange reference_event must use posedge or negedge "
-                 "(edge-control specifiers are not allowed)");
-    }
+// Checks the $nochange-specific argument-count and edge-kind requirements.
+static void ValidateNochangeTimingCheck(DiagEngine& diag, SourceLoc loc,
+                                        const TimingCheckDecl& tc) {
+  if (tc.check_kind != TimingCheckKind::kNochange) return;
+
+  if (tc.limits.size() < 2) {
+    diag.Error(loc,
+               "$nochange requires both start_edge_offset and "
+               "end_edge_offset arguments");
   }
+  if (tc.ref_edge != SpecifyEdge::kPosedge &&
+      tc.ref_edge != SpecifyEdge::kNegedge) {
+    diag.Error(loc,
+               "$nochange reference_event must use posedge or negedge "
+               "(edge-control specifiers are not allowed)");
+  }
+}
+
+static void ValidateTimingCheckDecl(DiagEngine& diag, SourceLoc loc,
+                                    const TimingCheckDecl& tc) {
+  ValidateTimingCheckLimitCount(diag, loc, tc);
+  ValidateTimingCheckEdgeRequired(diag, loc, tc);
+  ValidateNochangeTimingCheck(diag, loc, tc);
 }
 
 SpecifyItem* Parser::ParseTimingCheck() {

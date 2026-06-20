@@ -334,6 +334,43 @@ static std::optional<ConstVal> ConstEvalUnaryFull(const Expr* expr,
   return ConstVal{*result, operand->width, operand->is_signed};
 }
 
+// Normalizes the binary operands to their effective signed/unsigned values:
+// signed operands are sign-extended from their declared width, unsigned
+// operands are truncated to their declared width.
+static void NormalizeBinaryOperands(const ConstVal& lhs, const ConstVal& rhs,
+                                    bool is_signed, int64_t& lv, int64_t& rv) {
+  if (is_signed) {
+    lv = SignExtendFromWidth(lhs.value, lhs.width);
+    rv = SignExtendFromWidth(rhs.value, rhs.width);
+  } else {
+    lv = TruncateToWidth(lhs.value, lhs.width);
+    rv = TruncateToWidth(rhs.value, rhs.width);
+  }
+}
+
+// Handles unsigned division and modulo, which require unsigned arithmetic on
+// the operands. Returns std::nullopt for non-div/mod operators (signaling the
+// caller to fall through to the generic signed evaluator) and on
+// divide-by-zero. The has_result output distinguishes "not a div/mod op" from a
+// real failure.
+static std::optional<ConstVal> EvalUnsignedDivMod(TokenKind op, int64_t lv,
+                                                  int64_t rv, uint32_t width,
+                                                  bool& handled) {
+  handled = true;
+  auto ul = static_cast<uint64_t>(lv);
+  auto ur = static_cast<uint64_t>(rv);
+  if (op == TokenKind::kSlash || op == TokenKind::kSlashEq) {
+    if (ur == 0) return std::nullopt;
+    return ConstVal{static_cast<int64_t>(ul / ur), width, false};
+  }
+  if (op == TokenKind::kPercent || op == TokenKind::kPercentEq) {
+    if (ur == 0) return std::nullopt;
+    return ConstVal{static_cast<int64_t>(ul % ur), width, false};
+  }
+  handled = false;
+  return std::nullopt;
+}
+
 static std::optional<ConstVal> ConstEvalBinaryFull(const Expr* expr,
                                                    const ScopeMap& scope) {
   auto lhs = ConstEvalFull(expr->lhs, scope);
@@ -342,26 +379,11 @@ static std::optional<ConstVal> ConstEvalBinaryFull(const Expr* expr,
   uint32_t w = std::max(lhs->width, rhs->width);
   bool s = lhs->is_signed && rhs->is_signed;
   int64_t lv = 0, rv = 0;
-  if (s) {
-    lv = SignExtendFromWidth(lhs->value, lhs->width);
-    rv = SignExtendFromWidth(rhs->value, rhs->width);
-  } else {
-    lv = TruncateToWidth(lhs->value, lhs->width);
-    rv = TruncateToWidth(rhs->value, rhs->width);
-  }
-  if (!s &&
-      (expr->op == TokenKind::kSlash || expr->op == TokenKind::kSlashEq)) {
-    auto ul = static_cast<uint64_t>(lv);
-    auto ur = static_cast<uint64_t>(rv);
-    if (ur == 0) return std::nullopt;
-    return ConstVal{static_cast<int64_t>(ul / ur), w, false};
-  }
-  if (!s &&
-      (expr->op == TokenKind::kPercent || expr->op == TokenKind::kPercentEq)) {
-    auto ul = static_cast<uint64_t>(lv);
-    auto ur = static_cast<uint64_t>(rv);
-    if (ur == 0) return std::nullopt;
-    return ConstVal{static_cast<int64_t>(ul % ur), w, false};
+  NormalizeBinaryOperands(*lhs, *rhs, s, lv, rv);
+  if (!s) {
+    bool handled = false;
+    auto div_result = EvalUnsignedDivMod(expr->op, lv, rv, w, handled);
+    if (handled) return div_result;
   }
   auto result = EvalBinary(expr->op, lv, rv);
   if (!result) return std::nullopt;

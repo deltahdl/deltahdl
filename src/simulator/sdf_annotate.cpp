@@ -56,21 +56,33 @@ static void ExpandSdfDelaysThree(std::vector<uint64_t>& out, uint64_t v1,
   out[11] = std::min(v1, v2);
 }
 
-static void ExpandSdfDelaysSix(std::vector<uint64_t>& out, uint64_t v1,
-                               uint64_t v2, uint64_t v3, uint64_t v4,
-                               uint64_t v5, uint64_t v6) {
+static void ExpandSdfDelaysSixDirect(std::vector<uint64_t>& out, uint64_t v1,
+                                     uint64_t v2, uint64_t v3, uint64_t v4,
+                                     uint64_t v5, uint64_t v6) {
   out[0] = v1;
   out[1] = v2;
   out[2] = v3;
   out[3] = v4;
   out[4] = v5;
   out[5] = v6;
+}
+
+static void ExpandSdfDelaysSixDerived(std::vector<uint64_t>& out, uint64_t v1,
+                                      uint64_t v2, uint64_t v3, uint64_t v4,
+                                      uint64_t v5, uint64_t v6) {
   out[6] = std::min(v1, v3);
   out[7] = std::max(v1, v4);
   out[8] = std::min(v2, v5);
   out[9] = std::max(v2, v6);
   out[10] = std::max(v3, v5);
   out[11] = std::min(v4, v6);
+}
+
+static void ExpandSdfDelaysSix(std::vector<uint64_t>& out, uint64_t v1,
+                               uint64_t v2, uint64_t v3, uint64_t v4,
+                               uint64_t v5, uint64_t v6) {
+  ExpandSdfDelaysSixDirect(out, v1, v2, v3, v4, v5, v6);
+  ExpandSdfDelaysSixDerived(out, v1, v2, v3, v4, v5, v6);
 }
 
 std::vector<uint64_t> ExpandSdfDelays(const std::vector<SdfDelayValue>& vals,
@@ -335,40 +347,31 @@ std::vector<SdfDelayEntryRef> BuildDerivedSdfDelayOrder(const SdfCell& cell) {
   return derived;
 }
 
-void AnnotateSdfIopathEntry(const SdfIopath& io, SpecifyManager& mgr,
-                            SdfMtm mtm) {
-  PathDelay pd;
-  pd.src_port = io.src_port;
-  pd.dst_port = io.dst_port;
+// Fills the 12 path-delay slots of `pd` from the iopath's rise/fall/turnoff
+// delay values.
+void FillSdfIopathDelays(PathDelay& pd, const SdfIopath& io, SdfMtm mtm) {
+  const auto kExpanded = ExpandSdfDelays({io.rise, io.fall, io.turnoff}, mtm);
+  pd.delay_count = 12;
+  for (int i = 0; i < 12; ++i) pd.delays[i] = kExpanded[i];
+}
 
-  pd.condition = io.condition;
-  pd.is_ifnone = io.is_ifnone;
-
-  {
-    const auto kExpanded = ExpandSdfDelays({io.rise, io.fall, io.turnoff}, mtm);
-    pd.delay_count = 12;
-    for (int i = 0; i < 12; ++i) pd.delays[i] = kExpanded[i];
-  }
-  if (!io.extended_form) {
-    if (io.is_increment) {
-      mgr.IncrementPathDelay(pd);
-      return;
-    }
-
-    ApplyGlobalPulseLimits(pd, mgr.RejectPulseLimitPercent(),
-                           mgr.ErrorPulseLimitPercent());
-    mgr.AddPathDelay(pd);
+// Handles the non-extended (legacy) iopath form: increment in place, or apply
+// the global pulse limits and add. Returns once the entry is committed.
+void AnnotateSdfIopathSimple(PathDelay& pd, const SdfIopath& io,
+                             SpecifyManager& mgr) {
+  if (io.is_increment) {
+    mgr.IncrementPathDelay(pd);
     return;
   }
+  ApplyGlobalPulseLimits(pd, mgr.RejectPulseLimitPercent(),
+                         mgr.ErrorPulseLimitPercent());
+  mgr.AddPathDelay(pd);
+}
 
-  const bool kAnyPulseSupplied =
-      io.rise_reject_present || io.rise_error_present ||
-      io.fall_reject_present || io.fall_error_present;
-  if (!kAnyPulseSupplied) {
-    mgr.AddPathDelay(pd, true);
-    return;
-  }
-
+// Applies the explicit reject/error pulse limits supplied with an extended-form
+// iopath onto the already-built path delay.
+void ApplySdfIopathPulseLimits(PathDelay& pd, const SdfIopath& io,
+                               SpecifyManager& mgr, SdfMtm mtm) {
   ApplyGlobalPulseLimits(pd, mgr.RejectPulseLimitPercent(),
                          mgr.ErrorPulseLimitPercent());
   if (io.rise_reject_present || io.fall_reject_present) {
@@ -383,7 +386,38 @@ void AnnotateSdfIopathEntry(const SdfIopath& io, SpecifyManager& mgr,
     const uint64_t kErr = SelectMtm(src_dv, mtm);
     for (int i = 0; i < 12; ++i) pd.error_limit[i] = kErr;
   }
+}
+
+// Handles the extended iopath form: with no supplied pulse limits it is added
+// as-is, otherwise the explicit limits are applied first.
+void AnnotateSdfIopathExtended(PathDelay& pd, const SdfIopath& io,
+                               SpecifyManager& mgr, SdfMtm mtm) {
+  const bool kAnyPulseSupplied =
+      io.rise_reject_present || io.rise_error_present ||
+      io.fall_reject_present || io.fall_error_present;
+  if (!kAnyPulseSupplied) {
+    mgr.AddPathDelay(pd, true);
+    return;
+  }
+  ApplySdfIopathPulseLimits(pd, io, mgr, mtm);
   mgr.AddPathDelay(pd);
+}
+
+void AnnotateSdfIopathEntry(const SdfIopath& io, SpecifyManager& mgr,
+                            SdfMtm mtm) {
+  PathDelay pd;
+  pd.src_port = io.src_port;
+  pd.dst_port = io.dst_port;
+
+  pd.condition = io.condition;
+  pd.is_ifnone = io.is_ifnone;
+
+  FillSdfIopathDelays(pd, io, mtm);
+  if (!io.extended_form) {
+    AnnotateSdfIopathSimple(pd, io, mgr);
+    return;
+  }
+  AnnotateSdfIopathExtended(pd, io, mgr, mtm);
 }
 
 void AnnotateSdfInterconnectEntry(const SdfInterconnect& ic,

@@ -352,24 +352,32 @@ static bool ApplyTimeformatRangeField(const Expr* arg, SimContext& ctx,
   return true;
 }
 
-static Logic4Vec EvalTimeformatTask(const Expr* expr, SimContext& ctx,
-                                    Arena& arena) {
-  // Bare $timeformat with no parens block leaves the configured state alone.
-  if (expr->args.empty()) return MakeLogic4VecVal(arena, 1, 0);
-
-  TimeFormatSpec spec = ctx.GetTimeFormat();
+// Apply the two range-checked integer fields (units_number, precision_number)
+// of a $timeformat call onto `spec`. Returns false when either field is out of
+// the Table 20-2 range, in which case the diagnostic has been emitted and the
+// caller must abort without committing the spec.
+static bool ApplyTimeformatRangeFields(const Expr* expr, SimContext& ctx,
+                                       Arena& arena, TimeFormatSpec& spec) {
   if (expr->args.size() >= 1 && expr->args[0]) {
     if (!ApplyTimeformatRangeField(expr->args[0], ctx, arena, "units_number",
                                    spec.units_number)) {
-      return MakeLogic4VecVal(arena, 1, 0);
+      return false;
     }
   }
   if (expr->args.size() >= 2 && expr->args[1]) {
     if (!ApplyTimeformatRangeField(expr->args[1], ctx, arena,
                                    "precision_number", spec.precision_number)) {
-      return MakeLogic4VecVal(arena, 1, 0);
+      return false;
     }
   }
+  return true;
+}
+
+// Apply the optional suffix_string (arg 2) and minimum_field_width (arg 3) of a
+// $timeformat call onto `spec`. A string literal suffix is taken verbatim; any
+// other expression is evaluated and formatted as a string.
+static void ApplyTimeformatTextFields(const Expr* expr, SimContext& ctx,
+                                      Arena& arena, TimeFormatSpec& spec) {
   if (expr->args.size() >= 3 && expr->args[2]) {
     if (expr->args[2]->kind == ExprKind::kStringLiteral) {
       spec.suffix_string = ExtractStringArg(expr->args[2]);
@@ -383,6 +391,18 @@ static Logic4Vec EvalTimeformatTask(const Expr* expr, SimContext& ctx,
         static_cast<int64_t>(EvalExpr(expr->args[3], ctx, arena).ToUint64());
     spec.minimum_field_width = static_cast<int>(v);
   }
+}
+
+static Logic4Vec EvalTimeformatTask(const Expr* expr, SimContext& ctx,
+                                    Arena& arena) {
+  // Bare $timeformat with no parens block leaves the configured state alone.
+  if (expr->args.empty()) return MakeLogic4VecVal(arena, 1, 0);
+
+  TimeFormatSpec spec = ctx.GetTimeFormat();
+  if (!ApplyTimeformatRangeFields(expr, ctx, arena, spec)) {
+    return MakeLogic4VecVal(arena, 1, 0);
+  }
+  ApplyTimeformatTextFields(expr, ctx, arena, spec);
   ctx.SetTimeFormat(spec);
   return MakeLogic4VecVal(arena, 1, 0);
 }
@@ -619,6 +639,96 @@ static Logic4Vec EvalCountDrivers(const Expr* expr, SimContext& ctx,
   return MakeLogic4VecVal(arena, 1, kN01x > 1 ? 1 : 0);
 }
 
+// Optional $reset family (Annex D.8). $reset tallies a reset of the tool and
+// captures its reset_value argument (the second argument, after stop_value)
+// so that the value can be communicated to after the reset; the other
+// arguments are accepted but carry no observable state here.
+static Logic4Vec EvalAnnexDReset(const Expr* expr, SimContext& ctx,
+                                 Arena& arena) {
+  int64_t reset_value = 0;
+  if (expr->args.size() > 1 && expr->args[1]) {
+    reset_value =
+        static_cast<int64_t>(EvalExpr(expr->args[1], ctx, arena).ToUint64());
+  }
+  ctx.RecordReset(reset_value);
+  return MakeLogic4VecVal(arena, 1, 0);
+}
+
+// Optional $scope system task (Annex D.11). It selects a level of hierarchy
+// as the interactive scope used to identify objects. Its single argument is
+// the complete hierarchical name of a module, task, function, or named block;
+// record that name as the new interactive scope.
+static Logic4Vec EvalAnnexDScope(const Expr* expr, SimContext& ctx,
+                                 Arena& arena) {
+  if (!expr->args.empty() && expr->args[0]) {
+    ctx.SetInteractiveScope(HierarchicalScopeName(expr->args[0]));
+  }
+  return MakeLogic4VecVal(arena, 1, 0);
+}
+
+// Optional $list system task (Annex D.6). It produces a listing of a module,
+// task, function, or named block. With no argument the object listed is the
+// current scope setting (the interactive scope established by $scope); with
+// an argument, the argument is the complete hierarchical name of the specific
+// scope to list. Resolve which scope is selected and record it.
+static Logic4Vec EvalAnnexDList(const Expr* expr, SimContext& ctx,
+                                Arena& arena) {
+  std::string target = (!expr->args.empty() && expr->args[0])
+                           ? HierarchicalScopeName(expr->args[0])
+                           : ctx.InteractiveScope();
+  ctx.RecordListing(target);
+  return MakeLogic4VecVal(arena, 1, 0);
+}
+
+// Optional $showscopes system task (Annex D.12). It produces a complete list
+// of the modules, tasks, functions, and named blocks defined at the current
+// scope level (the interactive scope established by $scope). An optional
+// integer argument widens the listing: a nonzero value lists every such
+// object in or below the current hierarchical scope, while no argument or a
+// zero value lists only the objects at the current scope level itself.
+// Evaluate the optional argument to decide the depth and record the request.
+static Logic4Vec EvalAnnexDShowScopes(const Expr* expr, SimContext& ctx,
+                                      Arena& arena) {
+  bool recursive = false;
+  if (!expr->args.empty() && expr->args[0]) {
+    recursive = EvalExpr(expr->args[0], ctx, arena).ToUint64() != 0;
+  }
+  ctx.RecordShowScopes(ctx.InteractiveScope(), recursive);
+  return MakeLogic4VecVal(arena, 1, 0);
+}
+
+// Optional $showvars system task (Annex D.13). It produces status information
+// for the reg and net variables, scalar and vector, in the current scope (the
+// interactive scope established by $scope). With no argument every variable
+// in that scope is reported; with a list of variables only the named ones
+// are. A bit-select or part-select of a vector reports the status of all bits
+// of that vector, so such a selection is reduced to the name of its
+// underlying vector. Collect the requested variable names and record the
+// request against the current scope.
+static Logic4Vec EvalAnnexDShowVars(const Expr* expr, SimContext& ctx,
+                                    Arena& arena) {
+  std::vector<std::string> vars;
+  for (const Expr* arg : expr->args) {
+    if (arg) vars.push_back(ShowVarsVariableName(arg));
+  }
+  ctx.RecordShowVars(ctx.InteractiveScope(), std::move(vars));
+  return MakeLogic4VecVal(arena, 1, 0);
+}
+
+// Optional $log system task (Annex D.7). The log file holds a copy of
+// everything printed to standard output. An optional filename argument closes
+// the current log file and starts a new one, directing subsequent output
+// there; with no argument logging is simply reenabled.
+static Logic4Vec EvalAnnexDLog(const Expr* expr, SimContext& ctx,
+                               Arena& arena) {
+  if (!expr->args.empty() && expr->args[0]) {
+    ctx.SetLogFile(ExtractStringArg(expr->args[0]));
+  } else {
+    ctx.EnableLogging();
+  }
+  return MakeLogic4VecVal(arena, 1, 0);
+}
+
 // Dispatch the optional Annex-D interactive/diagnostic tasks ($reset family,
 // $scope, $list, $showscopes, $showvars, $nolog, $log). Returns true and writes
 // the call's value to `out` when `name` is one of them; returns false otherwise
@@ -627,18 +737,8 @@ static Logic4Vec EvalCountDrivers(const Expr* expr, SimContext& ctx,
 static bool TryEvalAnnexDInteractiveTask(const Expr* expr, SimContext& ctx,
                                          Arena& arena, std::string_view name,
                                          Logic4Vec& out) {
-  // Optional $reset family (Annex D.8). $reset tallies a reset of the tool and
-  // captures its reset_value argument (the second argument, after stop_value)
-  // so that the value can be communicated to after the reset; the other
-  // arguments are accepted but carry no observable state here.
   if (name == "$reset") {
-    int64_t reset_value = 0;
-    if (expr->args.size() > 1 && expr->args[1]) {
-      reset_value =
-          static_cast<int64_t>(EvalExpr(expr->args[1], ctx, arena).ToUint64());
-    }
-    ctx.RecordReset(reset_value);
-    out = MakeLogic4VecVal(arena, 1, 0);
+    out = EvalAnnexDReset(expr, ctx, arena);
     return true;
   }
   // $reset_count reports how many times the tool has been reset.
@@ -651,79 +751,30 @@ static bool TryEvalAnnexDInteractiveTask(const Expr* expr, SimContext& ctx,
     out = MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(ctx.ResetValue()));
     return true;
   }
-  // Optional $scope system task (Annex D.11). It selects a level of hierarchy
-  // as the interactive scope used to identify objects. Its single argument is
-  // the complete hierarchical name of a module, task, function, or named block;
-  // record that name as the new interactive scope.
   if (name == "$scope") {
-    if (!expr->args.empty() && expr->args[0]) {
-      ctx.SetInteractiveScope(HierarchicalScopeName(expr->args[0]));
-    }
-    out = MakeLogic4VecVal(arena, 1, 0);
+    out = EvalAnnexDScope(expr, ctx, arena);
     return true;
   }
-  // Optional $list system task (Annex D.6). It produces a listing of a module,
-  // task, function, or named block. With no argument the object listed is the
-  // current scope setting (the interactive scope established by $scope); with
-  // an argument, the argument is the complete hierarchical name of the specific
-  // scope to list. Resolve which scope is selected and record it.
   if (name == "$list") {
-    std::string target = (!expr->args.empty() && expr->args[0])
-                             ? HierarchicalScopeName(expr->args[0])
-                             : ctx.InteractiveScope();
-    ctx.RecordListing(target);
-    out = MakeLogic4VecVal(arena, 1, 0);
+    out = EvalAnnexDList(expr, ctx, arena);
     return true;
   }
-  // Optional $showscopes system task (Annex D.12). It produces a complete list
-  // of the modules, tasks, functions, and named blocks defined at the current
-  // scope level (the interactive scope established by $scope). An optional
-  // integer argument widens the listing: a nonzero value lists every such
-  // object in or below the current hierarchical scope, while no argument or a
-  // zero value lists only the objects at the current scope level itself.
-  // Evaluate the optional argument to decide the depth and record the request.
   if (name == "$showscopes") {
-    bool recursive = false;
-    if (!expr->args.empty() && expr->args[0]) {
-      recursive = EvalExpr(expr->args[0], ctx, arena).ToUint64() != 0;
-    }
-    ctx.RecordShowScopes(ctx.InteractiveScope(), recursive);
-    out = MakeLogic4VecVal(arena, 1, 0);
+    out = EvalAnnexDShowScopes(expr, ctx, arena);
     return true;
   }
-  // Optional $showvars system task (Annex D.13). It produces status information
-  // for the reg and net variables, scalar and vector, in the current scope (the
-  // interactive scope established by $scope). With no argument every variable
-  // in that scope is reported; with a list of variables only the named ones
-  // are. A bit-select or part-select of a vector reports the status of all bits
-  // of that vector, so such a selection is reduced to the name of its
-  // underlying vector. Collect the requested variable names and record the
-  // request against the current scope.
   if (name == "$showvars") {
-    std::vector<std::string> vars;
-    for (const Expr* arg : expr->args) {
-      if (arg) vars.push_back(ShowVarsVariableName(arg));
-    }
-    ctx.RecordShowVars(ctx.InteractiveScope(), std::move(vars));
-    out = MakeLogic4VecVal(arena, 1, 0);
+    out = EvalAnnexDShowVars(expr, ctx, arena);
     return true;
   }
-  // Optional $nolog and $log system tasks (Annex D.7). The log file holds a
-  // copy of everything printed to standard output. $nolog disables that copy;
-  // $log reenables it. An optional filename argument to $log closes the current
-  // log file and starts a new one, directing subsequent output there.
+  // Optional $nolog system task (Annex D.7): disables the standard-output copy.
   if (name == "$nolog") {
     ctx.DisableLogging();
     out = MakeLogic4VecVal(arena, 1, 0);
     return true;
   }
   if (name == "$log") {
-    if (!expr->args.empty() && expr->args[0]) {
-      ctx.SetLogFile(ExtractStringArg(expr->args[0]));
-    } else {
-      ctx.EnableLogging();
-    }
-    out = MakeLogic4VecVal(arena, 1, 0);
+    out = EvalAnnexDLog(expr, ctx, arena);
     return true;
   }
   return false;

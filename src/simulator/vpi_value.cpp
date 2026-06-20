@@ -457,6 +457,86 @@ static void PutValueWriteWord(VpiHandle obj, const VpiValue* value) {
   }
 }
 
+// §38.34: resolves whether the target carries a writable variable before any
+// value is stored. Returns true when PutValue must stop here (no var and no
+// net, the net-only write attempt, or the named-event trigger all finish in
+// this phase, and the caller returns nullptr); returns false to continue to the
+// value-store path.
+static bool PutValueResolveWritableTarget(VpiHandle obj, Scheduler* scheduler) {
+  if (!obj->var && !obj->net) return true;
+
+  if (!obj->var) {
+    if (scheduler) scheduler->NoteWriteAttempt();
+    return true;
+  }
+
+  // §38.34: putting to a vpiNamedEvent toggles (triggers) the named event. Such
+  // an object needs no value, so value_p may be NULL and is not consulted.
+  if (obj->var->is_event) {
+    if (scheduler) obj->var->triggered_ticks = scheduler->CurrentTime().ticks;
+    return true;
+  }
+  return false;
+}
+
+// §38.34: notes the write attempt, stores the supplied value into the target,
+// and, for vpiForceFlag, latches it as the held forced value. This is the
+// committed-write phase reached once every legality check has passed.
+static void PutValueApplyWriteAndForce(VpiHandle obj, const VpiValue* value,
+                                       int mode, Scheduler* scheduler) {
+  if (scheduler) scheduler->NoteWriteAttempt();
+
+  PutValueWriteWord(obj, value);
+
+  // §38.34: vpiForceFlag performs a procedural force (§10.6.2): the supplied
+  // value takes effect now and is held as the forced value.
+  if (mode == vpiForceFlag) {
+    obj->var->is_forced = true;
+    obj->var->forced_value = obj->var->value;
+  }
+}
+
+// §38.34: vpiNoDelay, vpiForceFlag, and vpiReleaseFlag all act immediately and
+// ignore time_p; every other mode takes its delay from time_p, where a delay is
+// present when a nonzero time is supplied.
+static bool PutValueHasDelay(int mode, const VpiTime* time) {
+  bool immediate =
+      (mode == vpiNoDelay || mode == vpiForceFlag || mode == vpiReleaseFlag);
+  return !immediate && time &&
+         (time->low != 0 || time->high != 0 || time->real != 0.0);
+}
+
+// Applies the §38.34/§37.43 delay-mode restrictions (sequential UDP must be
+// written with vpiNoDelay; no delayed put on an automatic variable). Returns
+// true (with error recorded) when the put must be refused.
+static bool PutValueDelayModeIsRejected(VpiHandle obj, int mode, bool has_delay,
+                                        VpiErrorInfo& error) {
+  // §38.34: a sequential UDP is always set with no delay, no matter what delay
+  // the primitive instance carries, so a value may be put to it only with the
+  // vpiNoDelay flag. Supplying one of the scheduled delay modes instead is an
+  // error, and the put is rejected.
+  if (obj->type == vpiSeqPrim &&
+      (mode == vpiInertialDelay || mode == vpiTransportDelay ||
+       mode == vpiPureTransportDelay)) {
+    RecordVpiError(error,
+                   "vpi_put_value(): a sequential UDP must be written with the "
+                   "vpiNoDelay flag");
+    return true;
+  }
+
+  // §37.43 detail 3: it is illegal to put a value with a delay on an automatic
+  // variable. A delay would schedule the update for a future time, but the
+  // automatic object's storage may no longer exist by then. Reject the put
+  // rather than applying it.
+  if (obj->automatic && has_delay) {
+    RecordVpiError(error,
+                   "vpi_put_value(): a value with a delay may not be put on an "
+                   "automatic variable");
+    return true;
+  }
+  return false;
+}
+
 VpiHandle VpiContext::PutValue(VpiHandle obj, VpiValue* value, VpiTime* time,
                                int flags) {
   if (!obj) return nullptr;
@@ -478,51 +558,13 @@ VpiHandle VpiContext::PutValue(VpiHandle obj, VpiValue* value, VpiTime* time,
     return nullptr;
   }
 
-  // §38.34: vpiNoDelay, vpiForceFlag, and vpiReleaseFlag all act immediately
-  // and ignore time_p; every other mode takes its delay from time_p, where a
-  // delay is present when a nonzero time is supplied.
-  bool immediate =
-      (mode == vpiNoDelay || mode == vpiForceFlag || mode == vpiReleaseFlag);
-  bool has_delay = !immediate && time &&
-                   (time->low != 0 || time->high != 0 || time->real != 0.0);
+  bool has_delay = PutValueHasDelay(mode, time);
 
-  // §38.34: a sequential UDP is always set with no delay, no matter what delay
-  // the primitive instance carries, so a value may be put to it only with the
-  // vpiNoDelay flag. Supplying one of the scheduled delay modes instead is an
-  // error, and the put is rejected.
-  if (obj->type == vpiSeqPrim &&
-      (mode == vpiInertialDelay || mode == vpiTransportDelay ||
-       mode == vpiPureTransportDelay)) {
-    RecordVpiError(last_error_,
-                   "vpi_put_value(): a sequential UDP must be written with the "
-                   "vpiNoDelay flag");
+  if (PutValueDelayModeIsRejected(obj, mode, has_delay, last_error_)) {
     return nullptr;
   }
 
-  // §37.43 detail 3: it is illegal to put a value with a delay on an automatic
-  // variable. A delay would schedule the update for a future time, but the
-  // automatic object's storage may no longer exist by then. Reject the put
-  // rather than applying it.
-  if (obj->automatic && has_delay) {
-    RecordVpiError(last_error_,
-                   "vpi_put_value(): a value with a delay may not be put on an "
-                   "automatic variable");
-    return nullptr;
-  }
-
-  if (!obj->var && !obj->net) return nullptr;
-
-  if (!obj->var) {
-    if (scheduler_) scheduler_->NoteWriteAttempt();
-    return nullptr;
-  }
-
-  // §38.34: putting to a vpiNamedEvent toggles (triggers) the named event. Such
-  // an object needs no value, so value_p may be NULL and is not consulted.
-  if (obj->var->is_event) {
-    if (scheduler_) obj->var->triggered_ticks = scheduler_->CurrentTime().ticks;
-    return nullptr;
-  }
+  if (PutValueResolveWritableTarget(obj, scheduler_)) return nullptr;
 
   if (!value) return nullptr;
 
@@ -537,16 +579,7 @@ VpiHandle VpiContext::PutValue(VpiHandle obj, VpiValue* value, VpiTime* time,
     return nullptr;
   }
 
-  if (scheduler_) scheduler_->NoteWriteAttempt();
-
-  PutValueWriteWord(obj, value);
-
-  // §38.34: vpiForceFlag performs a procedural force (§10.6.2): the supplied
-  // value takes effect now and is held as the forced value.
-  if (mode == vpiForceFlag) {
-    obj->var->is_forced = true;
-    obj->var->forced_value = obj->var->value;
-  }
+  PutValueApplyWriteAndForce(obj, value, mode, scheduler_);
 
   // §38.34: a handle to the scheduled event is returned only when
   // vpiReturnEvent was requested and a delay actually scheduled an event; in

@@ -77,6 +77,70 @@ const ModuleDecl* FindInterfaceDeclByName(const CompilationUnit* unit,
   return nullptr;
 }
 
+// Extracts the clocking-block name addressed by member-access expression `e`
+// of the form `vif.block.signal` (the middle segment).
+std::string_view ResolveVifClockingBlockName(const Expr* e) {
+  if (e->lhs->rhs && e->lhs->rhs->kind == ExprKind::kIdentifier) {
+    return e->lhs->rhs->text;
+  }
+  if (!e->lhs->text.empty()) return e->lhs->text;
+  return {};
+}
+
+// Extracts the signal name addressed by member-access expression `e` of the
+// form `vif.block.signal` (the trailing segment).
+std::string_view ResolveVifClockingSignalName(const Expr* e) {
+  if (e->rhs && e->rhs->kind == ExprKind::kIdentifier) return e->rhs->text;
+  if (!e->text.empty()) return e->text;
+  return {};
+}
+
+// Finds the named modport on `iface`, or nullptr when `modport_name` is empty
+// or no matching modport exists.
+const ModportDecl* FindVifModportDecl(const ModuleDecl* iface,
+                                      std::string_view modport_name) {
+  if (modport_name.empty()) return nullptr;
+  for (const auto* mp : iface->modports) {
+    if (mp && mp->name == modport_name) return mp;
+  }
+  return nullptr;
+}
+
+// Locates the clocking-block item named `block_name` on `iface`, setting
+// `member_exists` when a var/net member of that name is found instead.
+const ModuleItem* FindVifClockingBlockItem(const ModuleDecl* iface,
+                                           std::string_view block_name,
+                                           bool& member_exists) {
+  member_exists = false;
+  for (const auto* it : iface->items) {
+    if (it->kind == ModuleItemKind::kClockingBlock && it->name == block_name) {
+      return it;
+    }
+    if ((it->kind == ModuleItemKind::kVarDecl ||
+         it->kind == ModuleItemKind::kNetDecl) &&
+        it->name == block_name) {
+      member_exists = true;
+    }
+  }
+  return nullptr;
+}
+
+bool ModportExposesClockingBlock(const ModportDecl* modport,
+                                 std::string_view block_name) {
+  for (const auto& p : modport->ports) {
+    if (p.is_clocking && p.name == block_name) return true;
+  }
+  return false;
+}
+
+bool ClockingBlockHasSignal(const ModuleItem* cb_item,
+                            std::string_view sig_name) {
+  for (const auto& sig : cb_item->clocking_signals) {
+    if (sig.name == sig_name) return true;
+  }
+  return false;
+}
+
 // Diagnoses a virtual-interface clocking-block access of the form
 // `vif.block.signal` for one resolved member-access expression `e`, where
 // `vif_it` is the entry that resolved the base identifier to its interface
@@ -86,65 +150,27 @@ void CheckResolvedVifClockingAccess(const Expr* e,
                                     const VifModportMap& vif_mps,
                                     const CompilationUnit* unit,
                                     DiagEngine& diag) {
-  std::string_view block_name;
-  if (e->lhs->rhs && e->lhs->rhs->kind == ExprKind::kIdentifier) {
-    block_name = e->lhs->rhs->text;
-  } else if (!e->lhs->text.empty()) {
-    block_name = e->lhs->text;
-  }
-  std::string_view sig_name;
-  if (e->rhs && e->rhs->kind == ExprKind::kIdentifier) {
-    sig_name = e->rhs->text;
-  } else if (!e->text.empty()) {
-    sig_name = e->text;
-  }
+  std::string_view block_name = ResolveVifClockingBlockName(e);
+  std::string_view sig_name = ResolveVifClockingSignalName(e);
   const auto* iface = FindInterfaceDeclByName(unit, vif_it->second);
   if (!iface || block_name.empty()) return;
 
   std::string_view modport_name;
   auto mp_it = vif_mps.find(e->lhs->lhs->text);
   if (mp_it != vif_mps.end()) modport_name = mp_it->second;
+  const ModportDecl* modport = FindVifModportDecl(iface, modport_name);
 
-  const ModportDecl* modport = nullptr;
-  if (!modport_name.empty()) {
-    for (const auto* mp : iface->modports) {
-      if (mp && mp->name == modport_name) {
-        modport = mp;
-        break;
-      }
-    }
-  }
-
-  const ModuleItem* cb_item = nullptr;
   bool member_exists = false;
-  for (const auto* it : iface->items) {
-    if (it->kind == ModuleItemKind::kClockingBlock && it->name == block_name) {
-      cb_item = it;
-      break;
-    }
-    if ((it->kind == ModuleItemKind::kVarDecl ||
-         it->kind == ModuleItemKind::kNetDecl) &&
-        it->name == block_name) {
-      member_exists = true;
-    }
-  }
+  const ModuleItem* cb_item =
+      FindVifClockingBlockItem(iface, block_name, member_exists);
 
-  if (cb_item && modport) {
-    bool clocking_in_modport = false;
-    for (const auto& p : modport->ports) {
-      if (p.is_clocking && p.name == block_name) {
-        clocking_in_modport = true;
-        break;
-      }
-    }
-    if (!clocking_in_modport) {
-      diag.Error(
-          e->range.start,
-          std::format("clocking block '{}' is not accessible through modport "
-                      "'{}' of interface '{}'",
-                      block_name, modport_name, vif_it->second));
-      cb_item = nullptr;
-    }
+  if (cb_item && modport && !ModportExposesClockingBlock(modport, block_name)) {
+    diag.Error(
+        e->range.start,
+        std::format("clocking block '{}' is not accessible through modport "
+                    "'{}' of interface '{}'",
+                    block_name, modport_name, vif_it->second));
+    cb_item = nullptr;
   }
 
   if (!cb_item && !member_exists) {
@@ -152,20 +178,12 @@ void CheckResolvedVifClockingAccess(const Expr* e,
                std::format("'{}' is not a clocking block or member of "
                            "interface '{}'",
                            block_name, vif_it->second));
-  } else if (cb_item && !sig_name.empty()) {
-    bool signal_found = false;
-    for (const auto& sig : cb_item->clocking_signals) {
-      if (sig.name == sig_name) {
-        signal_found = true;
-        break;
-      }
-    }
-    if (!signal_found) {
-      diag.Error(e->range.start,
-                 std::format("'{}' is not a signal of clocking block '{}' in "
-                             "interface '{}'",
-                             sig_name, block_name, vif_it->second));
-    }
+  } else if (cb_item && !sig_name.empty() &&
+             !ClockingBlockHasSignal(cb_item, sig_name)) {
+    diag.Error(e->range.start,
+               std::format("'{}' is not a signal of clocking block '{}' in "
+                           "interface '{}'",
+                           sig_name, block_name, vif_it->second));
   }
 }
 

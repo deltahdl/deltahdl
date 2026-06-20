@@ -14,6 +14,29 @@ namespace delta {
 
 namespace {
 
+// True when both tracked arrays are fixed-size, equally ranked, and have more
+// than one unpacked dimension -- the precondition for a faster-varying
+// dimension size comparison.
+bool BothFixedMultiDim(const Elaborator::VarArrayInfo& l,
+                       const Elaborator::VarArrayInfo& r) {
+  return !l.is_dynamic && !r.is_dynamic && !l.is_assoc && !r.is_assoc &&
+         l.dim_sizes.size() == r.dim_sizes.size() && l.dim_sizes.size() > 1;
+}
+
+// Emits the faster-varying dimension size-mismatch diagnostic for dimension
+// `i` of the two tracked arrays.
+void ReportFasterVaryingDimMismatchAt(const Elaborator::VarArrayInfo& l,
+                                      const Elaborator::VarArrayInfo& r,
+                                      const Expr* lhs, const Expr* rhs,
+                                      size_t i, SourceLoc loc,
+                                      DiagEngine& diag) {
+  diag.Error(
+      loc,
+      std::format("faster-varying array dimension size mismatch in "
+                  "assignment ('{}' dim {} is {}, '{}' dim {} is {})",
+                  lhs->text, i, l.dim_sizes[i], rhs->text, i, r.dim_sizes[i]));
+}
+
 // Reports the first faster-varying (non-leftmost) unpacked dimension whose
 // size differs between the two fixed-size arrays. Returns true (with a
 // diagnostic emitted) when a mismatch is found, mirroring the early return of
@@ -22,19 +45,80 @@ bool ReportFasterVaryingDimMismatch(const Elaborator::VarArrayInfo& l,
                                     const Elaborator::VarArrayInfo& r,
                                     const Expr* lhs, const Expr* rhs,
                                     SourceLoc loc, DiagEngine& diag) {
-  if (l.is_dynamic || r.is_dynamic || l.is_assoc || r.is_assoc ||
-      l.dim_sizes.size() != r.dim_sizes.size() || l.dim_sizes.size() <= 1) {
-    return false;
-  }
+  if (!BothFixedMultiDim(l, r)) return false;
   for (size_t i = 1; i < l.dim_sizes.size(); ++i) {
     if (l.dim_sizes[i] != r.dim_sizes[i]) {
-      diag.Error(
-          loc, std::format("faster-varying array dimension size mismatch in "
-                           "assignment ('{}' dim {} is {}, '{}' dim {} is {})",
-                           lhs->text, i, l.dim_sizes[i], rhs->text, i,
-                           r.dim_sizes[i]));
+      ReportFasterVaryingDimMismatchAt(l, r, lhs, rhs, i, loc, diag);
       return true;
     }
+  }
+  return false;
+}
+
+// Reports an associativity / associative-index-type mismatch between two
+// tracked arrays. Returns true (with a diagnostic emitted) when found.
+bool ReportAssocKindMismatch(const Elaborator::VarArrayInfo& l,
+                             const Elaborator::VarArrayInfo& r, SourceLoc loc,
+                             DiagEngine& diag) {
+  if (l.is_assoc != r.is_assoc) {
+    diag.Error(loc,
+               "associative array cannot be assigned to or from a "
+               "non-associative array");
+    return true;
+  }
+  if (l.is_assoc && r.is_assoc && l.assoc_index_type != r.assoc_index_type) {
+    diag.Error(loc, "associative array index type mismatch in assignment");
+    return true;
+  }
+  return false;
+}
+
+// Reports a mismatch in the number of unpacked dimensions between two tracked
+// arrays. Returns true (with a diagnostic emitted) when found.
+bool ReportUnpackedDimCountMismatch(const Elaborator::VarArrayInfo& l,
+                                    const Elaborator::VarArrayInfo& r,
+                                    const Expr* lhs, const Expr* rhs,
+                                    SourceLoc loc, DiagEngine& diag) {
+  if (l.num_unpacked_dims != r.num_unpacked_dims) {
+    diag.Error(loc,
+               std::format("array assignment requires the same number of "
+                           "unpacked dimensions ('{}' has {}, '{}' has {})",
+                           lhs->text, l.num_unpacked_dims, rhs->text,
+                           r.num_unpacked_dims));
+    return true;
+  }
+  return false;
+}
+
+// Reports an element-type mismatch between two tracked arrays. Returns true
+// (with a diagnostic emitted) when found.
+bool ReportElementTypeMismatch(const Elaborator::VarArrayInfo& l,
+                               const Elaborator::VarArrayInfo& r,
+                               const Expr* lhs, const Expr* rhs, SourceLoc loc,
+                               DiagEngine& diag) {
+  if (!ElementTypesEquivalent(l.elem_type, l.elem_width, l.elem_is_signed,
+                              l.elem_is_4state, r.elem_type, r.elem_width,
+                              r.elem_is_signed, r.elem_is_4state)) {
+    diag.Error(loc, std::format("array element type mismatch in assignment "
+                                "('{}' vs '{}')",
+                                lhs->text, rhs->text));
+    return true;
+  }
+  return false;
+}
+
+// Reports a fixed-size element-count mismatch between two tracked arrays.
+// Returns true (with a diagnostic emitted) when found.
+bool ReportFixedSizeMismatch(const Elaborator::VarArrayInfo& l,
+                             const Elaborator::VarArrayInfo& r, const Expr* lhs,
+                             const Expr* rhs, SourceLoc loc, DiagEngine& diag) {
+  if (l.unpacked_size > 0 && !l.is_dynamic && r.unpacked_size > 0 &&
+      !r.is_dynamic && l.unpacked_size != r.unpacked_size) {
+    diag.Error(loc, std::format("array size mismatch: '{}' has {} elements but "
+                                "'{}' has {}",
+                                lhs->text, l.unpacked_size, rhs->text,
+                                r.unpacked_size));
+    return true;
   }
   return false;
 }
@@ -47,42 +131,10 @@ bool ReportArrayShapeMismatch(const Elaborator::VarArrayInfo& l,
                               const Elaborator::VarArrayInfo& r,
                               const Expr* lhs, const Expr* rhs, SourceLoc loc,
                               DiagEngine& diag) {
-  if (l.is_assoc != r.is_assoc) {
-    diag.Error(loc,
-               "associative array cannot be assigned to or from a "
-               "non-associative array");
-    return true;
-  }
-  if (l.is_assoc && r.is_assoc && l.assoc_index_type != r.assoc_index_type) {
-    diag.Error(loc, "associative array index type mismatch in assignment");
-    return true;
-  }
-
-  if (l.num_unpacked_dims != r.num_unpacked_dims) {
-    diag.Error(loc,
-               std::format("array assignment requires the same number of "
-                           "unpacked dimensions ('{}' has {}, '{}' has {})",
-                           lhs->text, l.num_unpacked_dims, rhs->text,
-                           r.num_unpacked_dims));
-    return true;
-  }
-
-  if (!ElementTypesEquivalent(l.elem_type, l.elem_width, l.elem_is_signed,
-                              l.elem_is_4state, r.elem_type, r.elem_width,
-                              r.elem_is_signed, r.elem_is_4state)) {
-    diag.Error(loc, std::format("array element type mismatch in assignment "
-                                "('{}' vs '{}')",
-                                lhs->text, rhs->text));
-    return true;
-  }
-  if (l.unpacked_size > 0 && !l.is_dynamic && r.unpacked_size > 0 &&
-      !r.is_dynamic && l.unpacked_size != r.unpacked_size) {
-    diag.Error(loc, std::format("array size mismatch: '{}' has {} elements but "
-                                "'{}' has {}",
-                                lhs->text, l.unpacked_size, rhs->text,
-                                r.unpacked_size));
-    return true;
-  }
+  if (ReportAssocKindMismatch(l, r, loc, diag)) return true;
+  if (ReportUnpackedDimCountMismatch(l, r, lhs, rhs, loc, diag)) return true;
+  if (ReportElementTypeMismatch(l, r, lhs, rhs, loc, diag)) return true;
+  if (ReportFixedSizeMismatch(l, r, lhs, rhs, loc, diag)) return true;
   return false;
 }
 
@@ -231,6 +283,30 @@ static void CheckArrayArgCompat(const Expr* actual,
   }
 }
 
+// Checks the single formal at position `formal_index` of `func` against the
+// actual that binds to it in the call `expr`, reporting any associative-array
+// incompatibility. Array-typed formals with no bound identifier actual are
+// silently skipped, mirroring the caller's per-formal continues.
+static void CheckOneArrayFormalArg(
+    const Expr* expr, const ModuleItem* func, size_t formal_index,
+    size_t positional_count,
+    const std::unordered_map<std::string_view, Elaborator::VarArrayInfo>&
+        var_array_info,
+    const std::unordered_set<std::string_view>& class_names,
+    const TypedefMap& typedefs, DiagEngine& diag) {
+  const auto& formal = func->func_args[formal_index];
+  if (formal.unpacked_dims.empty()) return;
+  auto formal_info = FormalArrayInfo(formal, class_names, typedefs);
+  int ai =
+      ResolveActualArgIndex(expr, formal_index, formal.name, positional_count);
+  if (ai < 0) return;
+  auto* actual = expr->args[static_cast<size_t>(ai)];
+  if (!actual || actual->kind != ExprKind::kIdentifier) return;
+  auto ait = var_array_info.find(actual->text);
+  if (ait == var_array_info.end()) return;
+  CheckArrayArgCompat(actual, ait->second, formal_info, diag);
+}
+
 static void CheckArrayArgTypes(
     const Expr* expr,
     const std::unordered_map<std::string_view, const ModuleItem*>& func_decls,
@@ -244,18 +320,8 @@ static void CheckArrayArgTypes(
   const auto* func = it->second;
   size_t positional_count = expr->args.size() - expr->arg_names.size();
   for (size_t i = 0; i < func->func_args.size(); ++i) {
-    const auto& formal = func->func_args[i];
-    auto formal_info = FormalArrayInfo(formal, class_names, typedefs);
-
-    if (formal.unpacked_dims.empty()) continue;
-
-    int ai = ResolveActualArgIndex(expr, i, formal.name, positional_count);
-    if (ai < 0) continue;
-    auto* actual = expr->args[static_cast<size_t>(ai)];
-    if (!actual || actual->kind != ExprKind::kIdentifier) continue;
-    auto ait = var_array_info.find(actual->text);
-    if (ait == var_array_info.end()) continue;
-    CheckArrayArgCompat(actual, ait->second, formal_info, diag);
+    CheckOneArrayFormalArg(expr, func, i, positional_count, var_array_info,
+                           class_names, typedefs, diag);
   }
 }
 

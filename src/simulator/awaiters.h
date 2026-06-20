@@ -163,20 +163,32 @@ struct EventAwaiter {
     return CheckEdgeOnValues(var->prev_value, var->value, edge);
   }
 
+  // Evaluates the edge gate for an edge-sensitive variable watcher. On a
+  // qualifying edge returns true; otherwise resyncs prev_value and returns
+  // false so the watcher stays armed without resuming.
+  static bool EdgeGatePasses(Variable* var, Edge edge) {
+    if (CheckEdge(var, edge)) return true;
+    var->prev_value = var->value;
+    return false;
+  }
+
+  // Evaluates the optional iff condition for an edge-sensitive variable
+  // watcher. Returns true when there is no condition or it is non-zero;
+  // otherwise resyncs prev_value and returns false.
+  static bool IffGatePasses(Variable* var, const Expr* iff_cond,
+                            SimContext& ctx) {
+    if (!iff_cond) return true;
+    auto val = EvalExpr(iff_cond, ctx, ctx.GetArena());
+    if (val.ToUint64() != 0) return true;
+    var->prev_value = var->value;
+    return false;
+  }
+
   static bool HandleEdgeEvent(std::coroutine_handle<>& h, Variable* var,
                               Edge edge, const Expr* iff_cond, SimContext& ctx,
                               Process* proc) {
-    if (!CheckEdge(var, edge)) {
-      var->prev_value = var->value;
-      return false;
-    }
-    if (iff_cond) {
-      auto val = EvalExpr(iff_cond, ctx, ctx.GetArena());
-      if (val.ToUint64() == 0) {
-        var->prev_value = var->value;
-        return false;
-      }
-    }
+    if (!EdgeGatePasses(var, edge)) return false;
+    if (!IffGatePasses(var, iff_cond, ctx)) return false;
     ResumeMaybeReactive(h, proc, ctx);
     return true;
   }
@@ -238,28 +250,48 @@ struct EventAwaiter {
   // previous value, and on a genuine triggering change marks the shared guard
   // consumed and resumes the process once. Returns the AddWatcher convention
   // (true removes the watcher, false keeps it armed).
+  // Result of a compound-watcher trigger evaluation. `removed` carries the
+  // AddWatcher return value to use when the watcher is not resuming;
+  // `resume` is set only when every gate passed and the process should run.
+  struct CompoundTrigger {
+    bool removed;
+    bool resume;
+  };
+
+  // Applies the change/edge/iff gates for a compound-expression operand
+  // watcher against the shared previous value, updating *prev in place. The
+  // shared `consumed` guard ensures the resume happens at most once across all
+  // sibling watchers. Does not perform the resume itself.
+  static CompoundTrigger EvalCompoundTrigger(
+      const std::shared_ptr<Logic4Vec>& prev,
+      const std::shared_ptr<bool>& consumed, const Expr* signal, Edge edge,
+      const Expr* iff_cond, SimContext& ctx, Process* proc) {
+    if (*consumed) return {true, false};
+    if (proc && !proc->active) return {true, false};
+    auto cur = EvalExpr(signal, ctx, ctx.GetArena());
+    if (Logic4VecBitsEqual(cur, *prev)) return {false, false};
+    if (edge != Edge::kNone && !CheckEdgeOnValues(*prev, cur, edge)) {
+      *prev = cur;
+      return {false, false};
+    }
+    *prev = cur;
+    if (iff_cond) {
+      auto val = EvalExpr(iff_cond, ctx, ctx.GetArena());
+      if (val.ToUint64() == 0) return {false, false};
+    }
+    *consumed = true;
+    return {true, true};
+  }
+
   static bool EvalCompoundWatcher(std::coroutine_handle<> h,
                                   const std::shared_ptr<Logic4Vec>& prev,
                                   const std::shared_ptr<bool>& consumed,
                                   const Expr* signal, Edge edge,
                                   const Expr* iff_cond, SimContext& ctx,
                                   Process* proc) {
-    if (*consumed) return true;
-    if (proc && !proc->active) return true;
-    auto cur = EvalExpr(signal, ctx, ctx.GetArena());
-    if (Logic4VecBitsEqual(cur, *prev)) {
-      return false;
-    }
-    if (edge != Edge::kNone && !CheckEdgeOnValues(*prev, cur, edge)) {
-      *prev = cur;
-      return false;
-    }
-    *prev = cur;
-    if (iff_cond) {
-      auto val = EvalExpr(iff_cond, ctx, ctx.GetArena());
-      if (val.ToUint64() == 0) return false;
-    }
-    *consumed = true;
+    auto trigger =
+        EvalCompoundTrigger(prev, consumed, signal, edge, iff_cond, ctx, proc);
+    if (!trigger.resume) return trigger.removed;
     ResumeMaybeReactive(h, proc, ctx);
     return true;
   }
@@ -347,6 +379,40 @@ struct RepeatEventAwaiter {
 
   // Arms a persistent edge-sensitive watcher on a value-carrying operand,
   // forwarding qualifying edges (after the iff gate) to tally.
+  // Edge-watcher gate result. `passed` is true when a qualifying edge (and the
+  // iff condition) was seen and the occurrence should be tallied; otherwise
+  // `keep_armed_return` carries the AddWatcher value to return.
+  struct EdgeOperandGate {
+    bool passed;
+    bool keep_armed_return;
+  };
+
+  // Applies the active/suspended/edge/iff gates for a repeat edge operand
+  // watcher, resyncing var->prev_value on each non-tally exit. Returns whether
+  // the occurrence should be tallied along with the watcher return value to use
+  // when it should not.
+  static EdgeOperandGate EvalEdgeOperandGate(Variable* var, Edge edge,
+                                             const Expr* iff_cond,
+                                             const std::shared_ptr<bool>& done,
+                                             SimContext& ctx, Process* proc) {
+    if (*done) return {false, true};
+    if (proc && !proc->active) return {false, true};
+    if (proc && proc->is_suspended) return {false, false};
+    if (!EventAwaiter::CheckEdge(var, edge)) {
+      var->prev_value = var->value;
+      return {false, false};
+    }
+    if (iff_cond) {
+      auto val = EvalExpr(iff_cond, ctx, ctx.GetArena());
+      if (val.ToUint64() == 0) {
+        var->prev_value = var->value;
+        return {false, false};
+      }
+    }
+    var->prev_value = var->value;
+    return {true, false};
+  }
+
   template <typename TallyFn>
   static void ArmEdgeOperand(Variable* var, const EventExpr& ev,
                              std::shared_ptr<bool> done, SimContext& ctx,
@@ -357,21 +423,9 @@ struct RepeatEventAwaiter {
     auto* ctx_ptr = &ctx;
     var->AddWatcher(
         [var, edge, iff_cond, ctx_ptr, proc, done, tally]() mutable {
-          if (*done) return true;
-          if (proc && !proc->active) return true;
-          if (proc && proc->is_suspended) return false;
-          if (!EventAwaiter::CheckEdge(var, edge)) {
-            var->prev_value = var->value;
-            return false;
-          }
-          if (iff_cond) {
-            auto val = EvalExpr(iff_cond, *ctx_ptr, ctx_ptr->GetArena());
-            if (val.ToUint64() == 0) {
-              var->prev_value = var->value;
-              return false;
-            }
-          }
-          var->prev_value = var->value;
+          auto gate =
+              EvalEdgeOperandGate(var, edge, iff_cond, done, *ctx_ptr, proc);
+          if (!gate.passed) return gate.keep_armed_return;
           return tally();
         });
   }

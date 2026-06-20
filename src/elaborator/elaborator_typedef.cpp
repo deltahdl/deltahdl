@@ -82,6 +82,32 @@ bool IsAssocFirstDimTypedef(
   return is_assoc;
 }
 
+// True when an identifier dimension names a dynamic/queue/associative form
+// (so the enclosing typedef has no fixed bit width).
+bool IsDynamicDimIdentifier(const Expr* dim) {
+  if (dim->kind != ExprKind::kIdentifier) return false;
+  auto t = dim->text;
+  return t == "$" || t == "*" || t == "string" || t == "int" ||
+         t == "integer" || t == "byte" || t == "shortint" || t == "longint";
+}
+
+// Computes the fixed element count contributed by a single unpacked dimension.
+// Returns the count when the dimension is a fixed range or size, otherwise
+// nullopt (dynamic, non-constant, or non-positive dimension).
+std::optional<uint64_t> FixedDimCount(const Expr* dim) {
+  if (!dim || IsDynamicDimIdentifier(dim)) return std::nullopt;
+  if (dim->kind == ExprKind::kBinary && dim->op == TokenKind::kColon) {
+    auto lv = ConstEvalInt(dim->lhs);
+    auto rv = ConstEvalInt(dim->rhs);
+    if (!lv || !rv) return std::nullopt;
+    int64_t span = std::abs(*lv - *rv) + 1;
+    return static_cast<uint64_t>(span);
+  }
+  auto sv = ConstEvalInt(dim);
+  if (!sv || *sv <= 0) return std::nullopt;
+  return static_cast<uint64_t>(*sv);
+}
+
 // §6.24.3: when every unpacked dimension is a fixed integer size (no dynamic,
 // queue, or associative dim), the typedef has a known total bit width.
 // Returns the total width when fixed and representable, otherwise nullopt.
@@ -91,35 +117,12 @@ std::optional<uint32_t> ComputeFixedUnpackedWidth(ModuleItem* item,
   uint64_t total = elem_width;
   bool all_fixed = (elem_width > 0);
   for (auto* dim : item->unpacked_dims) {
-    if (!dim) {
+    auto count = FixedDimCount(dim);
+    if (!count) {
       all_fixed = false;
       break;
     }
-    if (dim->kind == ExprKind::kIdentifier) {
-      auto t = dim->text;
-      if (t == "$" || t == "*" || t == "string" || t == "int" ||
-          t == "integer" || t == "byte" || t == "shortint" || t == "longint") {
-        all_fixed = false;
-        break;
-      }
-    }
-    if (dim->kind == ExprKind::kBinary && dim->op == TokenKind::kColon) {
-      auto lv = ConstEvalInt(dim->lhs);
-      auto rv = ConstEvalInt(dim->rhs);
-      if (!lv || !rv) {
-        all_fixed = false;
-        break;
-      }
-      int64_t span = std::abs(*lv - *rv) + 1;
-      total *= static_cast<uint64_t>(span);
-    } else {
-      auto sv = ConstEvalInt(dim);
-      if (!sv || *sv <= 0) {
-        all_fixed = false;
-        break;
-      }
-      total *= static_cast<uint64_t>(*sv);
-    }
+    total *= *count;
   }
   if (all_fixed && total > 0 && total < uint64_t{1} << 32) {
     return static_cast<uint32_t>(total);
@@ -153,28 +156,34 @@ std::vector<RtlirEnumMember> BuildEnumMembers(
     auto* p = arena.AllocString(s.c_str(), s.size());
     emit_member(std::string_view{p, s.size()});
   };
+  // Expands a `name[range_start:range_end]` member into one indexed member per
+  // step from range_start toward range_end (inclusive).
+  auto emit_inclusive_range = [&](std::string_view name, int64_t n, int64_t m) {
+    int step = (m >= n) ? 1 : -1;
+    for (auto i = n;; i += step) {
+      emit_indexed_member(name, i);
+      if (i == m) break;
+    }
+  };
+  // Emits one declared enum member entry, expanding any `[range]` suffix.
+  auto emit_declared_member = [&](const EnumMember& member) {
+    if (!member.range_start) {
+      emit_member(member.name);
+      return;
+    }
+    auto n = ConstEvalInt(member.range_start).value_or(0);
+    if (member.range_end) {
+      emit_inclusive_range(member.name, n,
+                           ConstEvalInt(member.range_end).value_or(0));
+    } else {
+      for (int64_t i = 0; i < n; ++i) emit_indexed_member(member.name, i);
+    }
+  };
   for (const auto& member : item->typedef_type.enum_members) {
     if (member.value) {
       next_val = ConstEvalInt(member.value).value_or(next_val);
     }
-
-    if (member.range_start) {
-      auto n = ConstEvalInt(member.range_start).value_or(0);
-      if (member.range_end) {
-        auto m = ConstEvalInt(member.range_end).value_or(0);
-        int step = (m >= n) ? 1 : -1;
-        for (auto i = n;; i += step) {
-          emit_indexed_member(member.name, i);
-          if (i == m) break;
-        }
-      } else {
-        for (int64_t i = 0; i < n; ++i) {
-          emit_indexed_member(member.name, i);
-        }
-      }
-    } else {
-      emit_member(member.name);
-    }
+    emit_declared_member(member);
   }
   return members;
 }

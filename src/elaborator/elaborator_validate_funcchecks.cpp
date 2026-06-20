@@ -733,6 +733,36 @@ static bool ValidateConstFuncBodyContent(const ModuleItem* func, SourceLoc loc,
   return true;
 }
 
+// §13.4.3 — collects the set of names local to a constant function body: each
+// named argument, the function's own name (its implicit result variable), and
+// every variable declared inside the body.
+static std::unordered_set<std::string_view> CollectConstFuncLocalNames(
+    const ModuleItem* func) {
+  std::unordered_set<std::string_view> local_names;
+  for (const auto& arg : func->func_args)
+    if (!arg.name.empty()) local_names.insert(arg.name);
+  if (!func->name.empty()) local_names.insert(func->name);
+  for (auto* s : func->func_body_stmts) CollectLocalDeclNames(s, local_names);
+  return local_names;
+}
+
+// §13.4.3 — walks the body of a constant function, applying the
+// identifier-scope, hierarchical-reference, system-call, and nested-call rules.
+// Returns false (the body failed) once any §13.4.3 violation is reported.
+static bool CheckConstFuncBody(
+    const ModuleItem* func, SourceLoc loc,
+    const std::unordered_set<std::string_view>& param_names,
+    const std::unordered_set<std::string_view>& function_names,
+    const std::unordered_set<std::string_view>& local_names,
+    const std::unordered_map<std::string_view, const ModuleItem*>* func_decls,
+    std::unordered_set<std::string_view>* visited, DiagEngine& diag) {
+  ConstFuncBodyCheck chk{func->name,  param_names, function_names,
+                         local_names, func_decls,  visited,
+                         diag,        loc,         /*failed=*/false};
+  for (auto* s : func->func_body_stmts) WalkConstFuncStmt(s, chk);
+  return !chk.failed;
+}
+
 static bool ValidateConstantFunction(
     const ModuleItem* func, SourceLoc loc,
     const std::unordered_set<std::string_view>& param_names,
@@ -745,17 +775,10 @@ static bool ValidateConstantFunction(
   if (!ValidateConstFuncArgs(func, loc, diag)) return false;
   if (!ValidateConstFuncBodyContent(func, loc, diag)) return false;
 
-  std::unordered_set<std::string_view> local_names;
-  for (const auto& arg : func->func_args)
-    if (!arg.name.empty()) local_names.insert(arg.name);
-  if (!func->name.empty()) local_names.insert(func->name);
-  for (auto* s : func->func_body_stmts) CollectLocalDeclNames(s, local_names);
-
-  ConstFuncBodyCheck chk{func->name,  param_names, function_names,
-                         local_names, func_decls,  visited,
-                         diag,        loc,         /*failed=*/false};
-  for (auto* s : func->func_body_stmts) WalkConstFuncStmt(s, chk);
-  return !chk.failed;
+  std::unordered_set<std::string_view> local_names =
+      CollectConstFuncLocalNames(func);
+  return CheckConstFuncBody(func, loc, param_names, function_names, local_names,
+                            func_decls, visited, diag);
 }
 
 struct ConstFuncCallCtx {

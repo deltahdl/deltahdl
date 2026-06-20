@@ -160,6 +160,75 @@ bool ValidatePutValueArrayRequest(VpiHandle obj, VpiArrayValue* arrayvalue_p,
   return true;
 }
 
+// §38.35: decode one supplied source value from a scalar arm (the integer,
+// short-int, long-int, real, or short-real format) into a 64-bit aval. Each
+// scalar arm holds one C value per source position; the value is widened (and,
+// for the signed/narrow integer arms, sign- or zero-handled by the same casts
+// the standard's per-format descriptions imply) into the element's low word.
+uint64_t DecodePutScalarAval(const VpiArrayValue* arrayvalue_p,
+                             unsigned int src, int fmt) {
+  switch (fmt) {
+    case kVpiShortIntVal:
+      return static_cast<uint64_t>(
+          static_cast<uint16_t>(arrayvalue_p->value.shortints[src]));
+    case kVpiLongIntVal:
+      return static_cast<uint64_t>(arrayvalue_p->value.longints[src]);
+    case kVpiRealVal:
+      return static_cast<uint64_t>(arrayvalue_p->value.reals[src]);
+    case kVpiShortRealVal:
+      return static_cast<uint64_t>(arrayvalue_p->value.shortreals[src]);
+    case kVpiIntVal:
+    default:
+      return static_cast<uint64_t>(
+          static_cast<uint32_t>(arrayvalue_p->value.integers[src]));
+  }
+}
+
+// §38.35: decode one supplied source value from the vpiTimeVal arm into a
+// 64-bit aval, combining the high and low halves of the VpiTime into one word.
+uint64_t DecodePutTimeAval(const VpiArrayValue* arrayvalue_p,
+                           unsigned int src) {
+  const VpiTime& t = arrayvalue_p->value.times[src];
+  return (static_cast<uint64_t>(t.high) << 32) | t.low;
+}
+
+// §38.35: decode one supplied source value from the vpiVectorVal arm into the
+// element's aval/bval words. A 2-state element ignores the supplied bval bits.
+void DecodePutVectorValue(const VpiArrayValue* arrayvalue_p, unsigned int src,
+                          bool elem_4state, uint64_t* out_aval,
+                          uint64_t* out_bval) {
+  const VpiVectorVal& vv = arrayvalue_p->value.vectors[src];
+  *out_aval = vv.aval;
+  *out_bval = elem_4state ? vv.bval : 0;
+}
+
+// §38.35: decode one supplied source value from the vpiRawFourStateVal arm into
+// the element's aval/bval words. Each element occupies ngroups*2 bytes - an
+// aval group followed by a bval group - read least-significant byte first. When
+// this 4-state format is used for a 2-state array, the bvalbits group is
+// ignored.
+void DecodePutRawFourState(const VpiArrayValue* arrayvalue_p, unsigned int src,
+                           uint32_t width, bool elem_4state, uint64_t* out_aval,
+                           uint64_t* out_bval) {
+  int ngroups = (static_cast<int>(width) + 7) / 8;
+  const char* abase =
+      arrayvalue_p->value.rawvals + static_cast<size_t>(src) * ngroups * 2;
+  *out_aval = VpiReadRawGroup(abase, ngroups);
+  *out_bval = elem_4state ? VpiReadRawGroup(abase + ngroups, ngroups) : 0;
+}
+
+// §38.35: decode one supplied source value from the vpiRawTwoStateVal arm into
+// a 64-bit aval. This 2-state format carries no bvalbits group, so each element
+// occupies just ngroups bytes; for a 4-state array the bval bits are taken to
+// be 0 (handled by the caller's zero default).
+uint64_t DecodePutRawTwoState(const VpiArrayValue* arrayvalue_p,
+                              unsigned int src, uint32_t width) {
+  int ngroups = (static_cast<int>(width) + 7) / 8;
+  const char* abase =
+      arrayvalue_p->value.rawvals + static_cast<size_t>(src) * ngroups;
+  return VpiReadRawGroup(abase, ngroups);
+}
+
 // §38.35: decode one supplied source value (at source position src in the
 // arrayvalue arm the format selects) into the element's aval/bval words. width
 // is the destination element's bit width; elem_4state says whether the element
@@ -170,55 +239,28 @@ void DecodePutSourceValue(const VpiArrayValue* arrayvalue_p, unsigned int src,
                           uint64_t* out_bval) {
   uint64_t aval = 0;
   uint64_t bval = 0;
-  switch (static_cast<int>(arrayvalue_p->format)) {
+  int fmt = static_cast<int>(arrayvalue_p->format);
+  switch (fmt) {
+    case kVpiTimeVal:
+      aval = DecodePutTimeAval(arrayvalue_p, src);
+      break;
+    case kVpiVectorVal:
+      DecodePutVectorValue(arrayvalue_p, src, elem_4state, &aval, &bval);
+      break;
+    case kVpiRawFourStateVal:
+      DecodePutRawFourState(arrayvalue_p, src, width, elem_4state, &aval,
+                            &bval);
+      break;
+    case kVpiRawTwoStateVal:
+      aval = DecodePutRawTwoState(arrayvalue_p, src, width);
+      break;
     case kVpiIntVal:
-      aval = static_cast<uint64_t>(
-          static_cast<uint32_t>(arrayvalue_p->value.integers[src]));
-      break;
     case kVpiShortIntVal:
-      aval = static_cast<uint64_t>(
-          static_cast<uint16_t>(arrayvalue_p->value.shortints[src]));
-      break;
     case kVpiLongIntVal:
-      aval = static_cast<uint64_t>(arrayvalue_p->value.longints[src]);
-      break;
     case kVpiRealVal:
-      aval = static_cast<uint64_t>(arrayvalue_p->value.reals[src]);
-      break;
     case kVpiShortRealVal:
-      aval = static_cast<uint64_t>(arrayvalue_p->value.shortreals[src]);
+      aval = DecodePutScalarAval(arrayvalue_p, src, fmt);
       break;
-    case kVpiTimeVal: {
-      const VpiTime& t = arrayvalue_p->value.times[src];
-      aval = (static_cast<uint64_t>(t.high) << 32) | t.low;
-      break;
-    }
-    case kVpiVectorVal: {
-      const VpiVectorVal& vv = arrayvalue_p->value.vectors[src];
-      aval = vv.aval;
-      bval = elem_4state ? vv.bval : 0;
-      break;
-    }
-    case kVpiRawFourStateVal: {
-      int ngroups = (static_cast<int>(width) + 7) / 8;
-      const char* abase =
-          arrayvalue_p->value.rawvals + static_cast<size_t>(src) * ngroups * 2;
-      aval = VpiReadRawGroup(abase, ngroups);
-      // §38.35: when this 4-state format is used for a 2-state array, the
-      // bvalbits group is ignored.
-      bval = elem_4state ? VpiReadRawGroup(abase + ngroups, ngroups) : 0;
-      break;
-    }
-    case kVpiRawTwoStateVal: {
-      int ngroups = (static_cast<int>(width) + 7) / 8;
-      const char* abase =
-          arrayvalue_p->value.rawvals + static_cast<size_t>(src) * ngroups;
-      aval = VpiReadRawGroup(abase, ngroups);
-      // §38.35: this 2-state format carries no bvalbits; for a 4-state array
-      // its bval bits are taken to be 0.
-      bval = 0;
-      break;
-    }
     default:
       break;
   }
@@ -382,17 +424,12 @@ void ReadGetElementValue(VpiObject* element, uint64_t* out_aval,
   }
 }
 
-// §38.16: encode one element's current value (aval/bval words, elem_4state)
-// into position k of the arm the format selects. The raw and vector formats lay
-// the element bits out per their byte/word group descriptions; the scalar arms
-// widen the element value into one C scalar.
-void EncodeGetElementValue(VpiArrayValue* arrayvalue_p, unsigned int k, int fmt,
-                           int ngroups, uint64_t aval, uint64_t bval,
-                           bool elem_4state) {
+// §38.16: encode one element's value into position k of a scalar arm (the
+// integer, short-int, long-int, real, or short-real format), widening or
+// narrowing the element's aval into the arm's C scalar type.
+void EncodeGetScalarValue(VpiArrayValue* arrayvalue_p, unsigned int k, int fmt,
+                          uint64_t aval) {
   switch (fmt) {
-    case kVpiIntVal:
-      arrayvalue_p->value.integers[k] = static_cast<int32_t>(aval);
-      break;
     case kVpiShortIntVal:
       arrayvalue_p->value.shortints[k] = static_cast<int16_t>(aval);
       break;
@@ -405,35 +442,79 @@ void EncodeGetElementValue(VpiArrayValue* arrayvalue_p, unsigned int k, int fmt,
     case kVpiShortRealVal:
       arrayvalue_p->value.shortreals[k] = static_cast<float>(aval);
       break;
+    case kVpiIntVal:
+    default:
+      arrayvalue_p->value.integers[k] = static_cast<int32_t>(aval);
+      break;
+  }
+}
+
+// §38.16: encode one element's value into position k of the vpiTimeVal arm,
+// splitting the 64-bit aval into the VpiTime high and low halves.
+void EncodeGetTimeValue(VpiArrayValue* arrayvalue_p, unsigned int k,
+                        uint64_t aval) {
+  arrayvalue_p->value.times[k].high = static_cast<uint32_t>(aval >> 32);
+  arrayvalue_p->value.times[k].low = static_cast<uint32_t>(aval & 0xFFFFFFFFu);
+}
+
+// §38.16: encode one element's value into position k of the vpiVectorVal arm.
+// bvalbits carry the unknown/high-impedance state for a 4-state element; a
+// 2-state element reports a known (bval 0) value.
+void EncodeGetVectorValue(VpiArrayValue* arrayvalue_p, unsigned int k,
+                          uint64_t aval, uint64_t bval, bool elem_4state) {
+  arrayvalue_p->value.vectors[k].aval = static_cast<uint32_t>(aval);
+  arrayvalue_p->value.vectors[k].bval =
+      elem_4state ? static_cast<uint32_t>(bval) : 0;
+}
+
+// §38.16: encode one element's value into position k of the vpiRawFourStateVal
+// arm. Each element occupies ngroups*2 bytes - an aval group followed by a bval
+// group - loaded least-significant byte first.
+void EncodeGetRawFourState(VpiArrayValue* arrayvalue_p, unsigned int k,
+                           int ngroups, uint64_t aval, uint64_t bval,
+                           bool elem_4state) {
+  char* abase =
+      arrayvalue_p->value.rawvals + static_cast<size_t>(k) * ngroups * 2;
+  VpiWriteRawGroup(abase, ngroups, aval);
+  VpiWriteRawGroup(abase + ngroups, ngroups, elem_4state ? bval : 0);
+}
+
+// §38.16: encode one element's value into position k of the vpiRawTwoStateVal
+// arm. The 2-state raw format omits the bval group, so each element occupies
+// just ngroups bytes.
+void EncodeGetRawTwoState(VpiArrayValue* arrayvalue_p, unsigned int k,
+                          int ngroups, uint64_t aval) {
+  char* abase = arrayvalue_p->value.rawvals + static_cast<size_t>(k) * ngroups;
+  VpiWriteRawGroup(abase, ngroups, aval);
+}
+
+// §38.16: encode one element's current value (aval/bval words, elem_4state)
+// into position k of the arm the format selects. The raw and vector formats lay
+// the element bits out per their byte/word group descriptions; the scalar arms
+// widen the element value into one C scalar.
+void EncodeGetElementValue(VpiArrayValue* arrayvalue_p, unsigned int k, int fmt,
+                           int ngroups, uint64_t aval, uint64_t bval,
+                           bool elem_4state) {
+  switch (fmt) {
     case kVpiTimeVal:
-      arrayvalue_p->value.times[k].high = static_cast<uint32_t>(aval >> 32);
-      arrayvalue_p->value.times[k].low =
-          static_cast<uint32_t>(aval & 0xFFFFFFFFu);
+      EncodeGetTimeValue(arrayvalue_p, k, aval);
       break;
     case kVpiVectorVal:
-      arrayvalue_p->value.vectors[k].aval = static_cast<uint32_t>(aval);
-      // §38.16: bvalbits carry the unknown/high-impedance state for a 4-state
-      // element; a 2-state element reports a known (bval 0) value.
-      arrayvalue_p->value.vectors[k].bval =
-          elem_4state ? static_cast<uint32_t>(bval) : 0;
+      EncodeGetVectorValue(arrayvalue_p, k, aval, bval, elem_4state);
       break;
-    case kVpiRawFourStateVal: {
-      // §38.16: each element occupies ngroups*2 bytes - an aval group
-      // followed by a bval group - loaded least-significant byte first.
-      char* abase =
-          arrayvalue_p->value.rawvals + static_cast<size_t>(k) * ngroups * 2;
-      VpiWriteRawGroup(abase, ngroups, aval);
-      VpiWriteRawGroup(abase + ngroups, ngroups, elem_4state ? bval : 0);
+    case kVpiRawFourStateVal:
+      EncodeGetRawFourState(arrayvalue_p, k, ngroups, aval, bval, elem_4state);
       break;
-    }
-    case kVpiRawTwoStateVal: {
-      // §38.16: the 2-state raw format omits the bval group, so each element
-      // occupies just ngroups bytes.
-      char* abase =
-          arrayvalue_p->value.rawvals + static_cast<size_t>(k) * ngroups;
-      VpiWriteRawGroup(abase, ngroups, aval);
+    case kVpiRawTwoStateVal:
+      EncodeGetRawTwoState(arrayvalue_p, k, ngroups, aval);
       break;
-    }
+    case kVpiIntVal:
+    case kVpiShortIntVal:
+    case kVpiLongIntVal:
+    case kVpiRealVal:
+    case kVpiShortRealVal:
+      EncodeGetScalarValue(arrayvalue_p, k, fmt, aval);
+      break;
     default:
       break;
   }

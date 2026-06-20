@@ -64,7 +64,6 @@ void Elaborator::ValidateModuleConstraints(const ModuleDecl* decl) {
   ValidateEventOps(decl);
   ValidateVirtualInterfaceClocking(decl);
   ValidateInterfaceObjectAccess(decl);
-
   ValidateDeferredAssertionActions(decl);
   ValidateAggregateComparisons(decl);
   ValidateTypeRefComparisons(decl);
@@ -88,7 +87,6 @@ void Elaborator::ValidateModuleConstraints(const ModuleDecl* decl) {
   ValidateStaticMethodBodies(decl);
   ValidateClassMethodBodies(decl);
   ValidateThisUsage(decl);
-
   if (decl->has_timeunit && decl->has_timeprecision) {
     int unit_order =
         EffectiveTimeOrder(decl->time_unit, decl->time_unit_magnitude);
@@ -254,34 +252,95 @@ bool Elaborator::ValidateEnumLiteral(const EnumMember& member,
   return has_xz;
 }
 
-void Elaborator::ValidateEnumDecl(const DataType& dtype, SourceLoc loc) {
-  if (!dtype.enum_base_name.empty()) {
-    auto it = typedefs_.find(dtype.enum_base_name);
-    if (it != typedefs_.end()) {
-      auto k = it->second.kind;
-      bool integer_atom =
-          k == DataTypeKind::kByte || k == DataTypeKind::kShortint ||
-          k == DataTypeKind::kInt || k == DataTypeKind::kLongint ||
-          k == DataTypeKind::kInteger || k == DataTypeKind::kTime;
-      bool integer_vector = k == DataTypeKind::kLogic ||
-                            k == DataTypeKind::kReg || k == DataTypeKind::kBit;
-      if (!integer_atom && !integer_vector) {
-        diag_.Error(loc, std::format("enum base type '{}' is not an "
-                                     "integer_atom_type or integer_vector_type",
-                                     dtype.enum_base_name));
-      } else if (integer_atom && dtype.packed_dim_left != nullptr) {
-        diag_.Error(loc,
-                    std::format("packed dimension not permitted on enum base "
+static void CheckEnumBaseType(const DataType& dtype, SourceLoc loc,
+                              const TypedefMap& typedefs, DiagEngine& diag) {
+  if (dtype.enum_base_name.empty()) return;
+  auto it = typedefs.find(dtype.enum_base_name);
+  if (it == typedefs.end()) return;
+  auto k = it->second.kind;
+  bool integer_atom = k == DataTypeKind::kByte ||
+                      k == DataTypeKind::kShortint || k == DataTypeKind::kInt ||
+                      k == DataTypeKind::kLongint ||
+                      k == DataTypeKind::kInteger || k == DataTypeKind::kTime;
+  bool integer_vector = k == DataTypeKind::kLogic || k == DataTypeKind::kReg ||
+                        k == DataTypeKind::kBit;
+  if (!integer_atom && !integer_vector) {
+    diag.Error(loc, std::format("enum base type '{}' is not an "
+                                "integer_atom_type or integer_vector_type",
+                                dtype.enum_base_name));
+  } else if (integer_atom && dtype.packed_dim_left != nullptr) {
+    diag.Error(loc, std::format("packed dimension not permitted on enum base "
                                 "type '{}' that denotes an integer_atom_type",
                                 dtype.enum_base_name));
-      }
-    }
   }
+}
 
+static void CheckEnumMemberName(
+    const EnumMember& member, SourceLoc loc,
+    std::unordered_set<std::string_view>& seen_names,
+    const std::unordered_set<std::string_view>& declared, DiagEngine& diag) {
+  if (member.range_start) return;
+  if (!seen_names.insert(member.name).second) {
+    diag.Error(loc,
+               std::format("duplicate enum member name '{}'", member.name));
+  } else if (declared.count(member.name)) {
+    diag.Error(loc, std::format("enum member name '{}' is already declared "
+                                "in this scope",
+                                member.name));
+  }
+}
+
+static void CheckEnumMemberValueRefs(
+    const EnumMember& member,
+    const std::unordered_set<std::string_view>& const_names, DiagEngine& diag) {
+  if (!member.value) return;
+  if (ExprContainsHierarchicalRef(member.value)) {
+    diag.Error(member.value->range.start,
+               "hierarchical name not allowed in enum named constant "
+               "value");
+  }
+  auto const_name = FindConstVarRef(member.value, const_names);
+  if (!const_name.empty()) {
+    diag.Error(member.value->range.start,
+               std::format("const variable '{}' not allowed in enum named "
+                           "constant value",
+                           const_name));
+  }
+}
+
+static int64_t ComputeEnumRangeCount(const EnumMember& member, SourceLoc loc,
+                                     DiagEngine& diag) {
+  if (!member.range_start) return 1;
+  auto n = ConstEvalInt(member.range_start).value_or(0);
+  int64_t count = 1;
+  if (member.range_end) {
+    auto m = ConstEvalInt(member.range_end).value_or(0);
+    // Table 6-10: for the name[N:M] form, both bounds shall be
+    // non-negative integral numbers.
+    if (n < 0 || m < 0) {
+      diag.Error(loc, std::format("enum range bounds of '{}' shall be "
+                                  "non-negative integral numbers",
+                                  member.name));
+    }
+    count = (m >= n) ? (m - n + 1) : (n - m + 1);
+  } else {
+    // Table 6-10: for the name[N] form, N shall be a positive integral
+    // number.
+    if (n < 1) {
+      diag.Error(loc, std::format("enum range count of '{}' shall be a "
+                                  "positive integral number",
+                                  member.name));
+    }
+    count = n;
+  }
+  return count < 1 ? 1 : count;
+}
+
+void Elaborator::ValidateEnumDecl(const DataType& dtype, SourceLoc loc) {
+  CheckEnumBaseType(dtype, loc, typedefs_, diag_);
   auto base_width = EvalTypeWidth(dtype, typedefs_);
   bool is_2state = !Is4stateType(dtype, typedefs_);
   bool prev_had_xz = false;
-
   uint64_t max_val =
       dtype.is_signed
           ? (base_width > 0 ? (1ULL << (base_width - 1)) - 1 : 0)
@@ -289,39 +348,12 @@ void Elaborator::ValidateEnumDecl(const DataType& dtype, SourceLoc loc) {
   int64_t signed_min = (dtype.is_signed && base_width > 0 && base_width < 64)
                            ? -(1LL << (base_width - 1))
                            : INT64_MIN;
-
   std::unordered_set<std::string_view> seen_names;
   std::unordered_set<int64_t> seen_values;
   int64_t next_val = 0;
-
   for (const auto& member : dtype.enum_members) {
-    if (!member.range_start) {
-      if (!seen_names.insert(member.name).second) {
-        diag_.Error(
-            loc, std::format("duplicate enum member name '{}'", member.name));
-      } else if (enum_member_names_.count(member.name)) {
-        diag_.Error(loc,
-                    std::format("enum member name '{}' is already declared "
-                                "in this scope",
-                                member.name));
-      }
-    }
-
-    if (member.value) {
-      if (ExprContainsHierarchicalRef(member.value)) {
-        diag_.Error(member.value->range.start,
-                    "hierarchical name not allowed in enum named constant "
-                    "value");
-      }
-      auto const_name = FindConstVarRef(member.value, const_names_);
-      if (!const_name.empty()) {
-        diag_.Error(member.value->range.start,
-                    std::format("const variable '{}' not allowed in enum named "
-                                "constant value",
-                                const_name));
-      }
-    }
-
+    CheckEnumMemberName(member, loc, seen_names, enum_member_names_, diag_);
+    CheckEnumMemberValueRefs(member, const_names_, diag_);
     if (!member.value) {
       if (prev_had_xz) {
         diag_.Error(loc,
@@ -353,33 +385,7 @@ void Elaborator::ValidateEnumDecl(const DataType& dtype, SourceLoc loc) {
         }
       }
     }
-
-    int64_t count = 1;
-    if (member.range_start) {
-      auto n = ConstEvalInt(member.range_start).value_or(0);
-      if (member.range_end) {
-        auto m = ConstEvalInt(member.range_end).value_or(0);
-        // Table 6-10: for the name[N:M] form, both bounds shall be
-        // non-negative integral numbers.
-        if (n < 0 || m < 0) {
-          diag_.Error(loc, std::format("enum range bounds of '{}' shall be "
-                                       "non-negative integral numbers",
-                                       member.name));
-        }
-        count = (m >= n) ? (m - n + 1) : (n - m + 1);
-      } else {
-        // Table 6-10: for the name[N] form, N shall be a positive integral
-        // number.
-        if (n < 1) {
-          diag_.Error(loc, std::format("enum range count of '{}' shall be a "
-                                       "positive integral number",
-                                       member.name));
-        }
-        count = n;
-      }
-      if (count < 1) count = 1;
-    }
-
+    int64_t count = ComputeEnumRangeCount(member, loc, diag_);
     if (!prev_had_xz) {
       for (int64_t i = 0; i < count; ++i) {
         if (!seen_values.insert(next_val + i).second) {
@@ -388,7 +394,6 @@ void Elaborator::ValidateEnumDecl(const DataType& dtype, SourceLoc loc) {
         }
       }
     }
-
     next_val += count;
     if (!prev_had_xz && next_val > 0 &&
         static_cast<uint64_t>(next_val) > max_val &&
@@ -668,12 +673,10 @@ void Elaborator::ResolveTypeRef(ModuleItem* item, const RtlirModule* mod) {
     item->data_type.type_ref_expr = nullptr;
     return;
   }
-
   for (const auto& v : mod->variables) {
     if (v.name != ref->text) continue;
     item->data_type.kind = var_types_[ref->text];
     item->data_type.is_signed = v.is_signed;
-
     if (v.width > 1 && (item->data_type.kind == DataTypeKind::kLogic ||
                         item->data_type.kind == DataTypeKind::kBit ||
                         item->data_type.kind == DataTypeKind::kReg)) {
@@ -718,7 +721,6 @@ bool Elaborator::ResolveParameterizedType(DataType& dtype) {
   if (dtype.scope_name.empty() || dtype.type_params.empty()) return false;
   const auto* cls = FindClassDecl(dtype.scope_name, unit_);
   if (!cls) return false;
-
   std::unordered_map<std::string_view, const DataType*> subst;
   for (size_t i = 0; i < cls->params.size() && i < dtype.type_params.size();
        ++i) {
@@ -735,7 +737,6 @@ bool Elaborator::ResolveParameterizedType(DataType& dtype) {
     if (!td) return false;
     param_name = td->typedef_type.type_name;
   }
-
   auto it = subst.find(param_name);
   if (it == subst.end()) return false;
   const DataType& resolved = *it->second;
@@ -784,9 +785,7 @@ void Elaborator::ValidateUnpackedStructWithUnionDefaults(const DataType& dtype,
 void Elaborator::ValidateStructMemberDefaultsConstant(const DataType& dtype,
                                                       SourceLoc loc) {
   if (dtype.kind != DataTypeKind::kStruct) return;
-
   if (dtype.is_packed) return;
-
   for (const auto& m : dtype.struct_members) {
     if (m.type_kind == DataTypeKind::kUnion) return;
   }
@@ -905,7 +904,6 @@ void Elaborator::ValidatePackedUnion(const DataType& dtype, SourceLoc loc) {
   if (dtype.kind != DataTypeKind::kUnion) return;
   if (!dtype.is_packed && !dtype.is_soft) return;
   if (dtype.struct_members.empty()) return;
-
   if (!dtype.is_soft && !dtype.is_tagged) {
     uint32_t first_w = EvalStructMemberWidth(dtype.struct_members[0]);
     for (size_t i = 1; i < dtype.struct_members.size(); ++i) {

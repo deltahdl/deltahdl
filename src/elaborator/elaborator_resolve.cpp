@@ -133,55 +133,86 @@ ModuleDecl* FindNonModuleDesign(std::string_view name, CompilationUnit* unit) {
   return nullptr;
 }
 
+// Records a single package value parameter in the compilation-unit parameter
+// scope under its fully qualified "package.name" key (§26.3), if it is a value
+// parameter with a constant-evaluable initializer.
+void RegisterOnePackageParam(std::string_view pkg_name, ModuleItem* item,
+                             ScopeMap& cu_param_scope, Arena& arena) {
+  if (item->kind != ModuleItemKind::kParamDecl || !item->init_expr) return;
+  auto val = ConstEvalInt(item->init_expr, cu_param_scope);
+  if (!val) return;
+  auto* qname = arena.Create<std::string>(std::string(pkg_name) + "." +
+                                          std::string(item->name));
+  cu_param_scope[*qname] = *val;
+}
+
 // Records each package's value parameters in the compilation-unit parameter
 // scope under their fully qualified "package.name" key (§26.3).
 void RegisterPackageParams(CompilationUnit* unit, ScopeMap& cu_param_scope,
                            Arena& arena) {
   for (auto* pkg : unit->packages) {
     for (auto* item : pkg->items) {
-      if (item->kind == ModuleItemKind::kParamDecl && item->init_expr) {
-        auto val = ConstEvalInt(item->init_expr, cu_param_scope);
-        if (val) {
-          auto* qname = arena.Create<std::string>(std::string(pkg->name) + "." +
-                                                  std::string(item->name));
-          cu_param_scope[*qname] = *val;
-        }
-      }
+      RegisterOnePackageParam(pkg->name, item, cu_param_scope, arena);
     }
+  }
+}
+
+// Inserts the built-in class names that always live in the compilation-unit
+// scope (§6.14, §15.x predefined process/semaphore/mailbox classes).
+void RegisterBuiltinClassNames(
+    std::unordered_set<std::string_view>& class_names) {
+  class_names.insert("semaphore");
+  class_names.insert("mailbox");
+  class_names.insert("weak_reference");
+  class_names.insert("process");
+}
+
+// Classifies one compilation-unit item, recording it in the appropriate
+// elaborator scope structures (names, typedefs, class/parameterized-class sets,
+// or the constant parameter scope).
+void ClassifyCuScopeItem(
+    ModuleItem* item, std::unordered_set<std::string_view>& cu_scope_names,
+    TypedefMap& typedefs, std::unordered_set<std::string_view>& class_names,
+    std::unordered_set<std::string_view>& parameterized_classes,
+    ScopeMap& cu_param_scope) {
+  if (!item->name.empty()) cu_scope_names.insert(item->name);
+  if (item->kind == ModuleItemKind::kTypedef) {
+    typedefs[item->name] = item->typedef_type;
+  } else if (item->kind == ModuleItemKind::kClassDecl && item->class_decl) {
+    class_names.insert(item->class_decl->name);
+    if (!item->class_decl->params.empty())
+      parameterized_classes.insert(item->class_decl->name);
+  } else if (item->kind == ModuleItemKind::kParamDecl && item->init_expr) {
+    auto val = ConstEvalInt(item->init_expr, cu_param_scope);
+    if (val) {
+      cu_param_scope[item->name] = *val;
+    }
+  }
+}
+
+// Records each compilation-unit class declaration in the class-name and scope
+// sets, flagging parameterized classes (§8.25).
+void RegisterCuClasses(
+    CompilationUnit* unit, std::unordered_set<std::string_view>& class_names,
+    std::unordered_set<std::string_view>& cu_scope_names,
+    std::unordered_set<std::string_view>& parameterized_classes) {
+  for (auto* cls : unit->classes) {
+    class_names.insert(cls->name);
+    cu_scope_names.insert(cls->name);
+    if (!cls->params.empty()) parameterized_classes.insert(cls->name);
   }
 }
 
 }  // namespace
 
 void Elaborator::RegisterCuScopeItems() {
-  class_names_.insert("semaphore");
-
-  class_names_.insert("mailbox");
-
-  class_names_.insert("weak_reference");
-
-  class_names_.insert("process");
+  RegisterBuiltinClassNames(class_names_);
   for (auto* item : unit_->cu_items) {
-    if (!item->name.empty()) cu_scope_names_.insert(item->name);
-    if (item->kind == ModuleItemKind::kTypedef) {
-      typedefs_[item->name] = item->typedef_type;
-    } else if (item->kind == ModuleItemKind::kClassDecl && item->class_decl) {
-      class_names_.insert(item->class_decl->name);
-      if (!item->class_decl->params.empty())
-        parameterized_class_names_.insert(item->class_decl->name);
-    } else if (item->kind == ModuleItemKind::kParamDecl && item->init_expr) {
-      auto val = ConstEvalInt(item->init_expr, cu_param_scope_);
-      if (val) {
-        cu_param_scope_[item->name] = *val;
-      }
-    }
+    ClassifyCuScopeItem(item, cu_scope_names_, typedefs_, class_names_,
+                        parameterized_class_names_, cu_param_scope_);
   }
-  for (auto* cls : unit_->classes) {
-    class_names_.insert(cls->name);
-    cu_scope_names_.insert(cls->name);
-    if (!cls->params.empty()) parameterized_class_names_.insert(cls->name);
-  }
-
+  RegisterCuClasses(unit_, class_names_, cu_scope_names_,
+                    parameterized_class_names_);
   RegisterPackageParams(unit_, cu_param_scope_, arena_);
 }
 

@@ -217,6 +217,77 @@ static void ExpandClassProperties(ClassObject* obj,
   }
 }
 
+// Expands an unpacked-array identifier into its constituent element parts,
+// honoring an optional `with` slice range.
+static void ExpandArrayAggregate(const Expr* elem, const ArrayInfo* ainfo,
+                                 SimContext& ctx, Arena& arena,
+                                 std::vector<Logic4Vec>& parts,
+                                 uint32_t& total_width) {
+  if (elem->with_expr) {
+    uint32_t start = 0, count = 0;
+    ResolveWithRange(elem->with_expr, ctx, arena, ainfo->size, ainfo->lo, start,
+                     count);
+    ExpandArrayElementsSliced(elem->text, ctx, parts, total_width,
+                              {start, count});
+  } else {
+    ExpandArrayElements(elem->text, ctx, parts, total_width);
+  }
+}
+
+// Expands a queue identifier into its constituent element parts, honoring an
+// optional `with` slice range.
+static void ExpandQueueAggregate(const Expr* elem, QueueObject* queue,
+                                 SimContext& ctx, Arena& arena,
+                                 std::vector<Logic4Vec>& parts,
+                                 uint32_t& total_width) {
+  if (elem->with_expr) {
+    uint32_t start = 0, count = 0;
+    ResolveWithRange(elem->with_expr, ctx, arena,
+                     static_cast<uint32_t>(queue->elements.size()), 0, start,
+                     count);
+    ExpandQueueElementsSliced(queue, parts, total_width, arena, {start, count});
+  } else {
+    ExpandQueueElements(queue, parts, total_width, arena);
+  }
+}
+
+// Expands a struct/union variable identifier into its constituent field parts.
+// Returns true if the named struct variable existed and was expanded.
+static bool TryExpandStructAggregate(const Expr* elem,
+                                     const StructTypeInfo* sinfo,
+                                     SimContext& ctx, Arena& arena,
+                                     std::vector<Logic4Vec>& parts,
+                                     uint32_t& total_width) {
+  auto* var = ctx.FindVariable(elem->text);
+  if (!var) return false;
+  if (sinfo->is_union) {
+    ExpandUnionFirstMember(var, sinfo, parts, total_width, arena);
+  } else {
+    ExpandStructFields(var, sinfo, parts, total_width, arena);
+  }
+  return true;
+}
+
+// Expands a class-handle variable identifier into its non-static property
+// parts. Returns true if the named class variable existed (a null handle
+// contributes zero parts but is still considered handled).
+static bool TryExpandClassAggregate(const Expr* elem, SimContext& ctx,
+                                    Arena& arena, std::vector<Logic4Vec>& parts,
+                                    uint32_t& total_width) {
+  auto* var = ctx.FindVariable(elem->text);
+  if (!var) return false;
+  uint64_t handle = var->value.ToUint64();
+  if (handle == kNullClassHandle) {
+    return true;
+  }
+  auto* obj = ctx.GetClassObject(handle);
+  if (obj) {
+    ExpandClassProperties(obj, parts, total_width, arena);
+    return true;
+  }
+  return false;
+}
+
 // Tries to expand an unpacked aggregate identifier (array/queue/assoc/struct/
 // class) into its constituent parts. Returns true if the identifier named such
 // an aggregate (and was handled, possibly contributing zero parts); false if
@@ -226,29 +297,12 @@ static bool TryExpandAggregateElement(const Expr* elem, SimContext& ctx,
                                       std::vector<Logic4Vec>& parts,
                                       uint32_t& total_width) {
   if (auto* ainfo = ctx.FindArrayInfo(elem->text)) {
-    if (elem->with_expr) {
-      uint32_t start = 0, count = 0;
-      ResolveWithRange(elem->with_expr, ctx, arena, ainfo->size, ainfo->lo,
-                       start, count);
-      ExpandArrayElementsSliced(elem->text, ctx, parts, total_width,
-                                {start, count});
-    } else {
-      ExpandArrayElements(elem->text, ctx, parts, total_width);
-    }
+    ExpandArrayAggregate(elem, ainfo, ctx, arena, parts, total_width);
     return true;
   }
 
   if (auto* queue = ctx.FindQueue(elem->text)) {
-    if (elem->with_expr) {
-      uint32_t start = 0, count = 0;
-      ResolveWithRange(elem->with_expr, ctx, arena,
-                       static_cast<uint32_t>(queue->elements.size()), 0, start,
-                       count);
-      ExpandQueueElementsSliced(queue, parts, total_width, arena,
-                                {start, count});
-    } else {
-      ExpandQueueElements(queue, parts, total_width, arena);
-    }
+    ExpandQueueAggregate(elem, queue, ctx, arena, parts, total_width);
     return true;
   }
 
@@ -258,30 +312,15 @@ static bool TryExpandAggregateElement(const Expr* elem, SimContext& ctx,
   }
 
   if (auto* sinfo = ctx.GetVariableStructType(elem->text)) {
-    auto* var = ctx.FindVariable(elem->text);
-    if (var) {
-      if (sinfo->is_union) {
-        ExpandUnionFirstMember(var, sinfo, parts, total_width, arena);
-      } else {
-        ExpandStructFields(var, sinfo, parts, total_width, arena);
-      }
+    if (TryExpandStructAggregate(elem, sinfo, ctx, arena, parts, total_width)) {
       return true;
     }
   }
 
   if (auto class_type = ctx.GetVariableClassType(elem->text);
       !class_type.empty()) {
-    auto* var = ctx.FindVariable(elem->text);
-    if (var) {
-      uint64_t handle = var->value.ToUint64();
-      if (handle == kNullClassHandle) {
-        return true;
-      }
-      auto* obj = ctx.GetClassObject(handle);
-      if (obj) {
-        ExpandClassProperties(obj, parts, total_width, arena);
-        return true;
-      }
+    if (TryExpandClassAggregate(elem, ctx, arena, parts, total_width)) {
+      return true;
     }
   }
 

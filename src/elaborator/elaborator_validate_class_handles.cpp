@@ -246,6 +246,33 @@ static bool ClassHierarchyHasConstraint(const ClassDecl* cls,
   return false;
 }
 
+// Matches the named form obj.constraint_id.constraint_mode(...) of a call
+// statement. On success returns the prefix member access (whose left side is
+// the object handle identifier and whose right side is the constraint name),
+// and nullptr otherwise.
+static const Expr* MatchNamedConstraintModePrefix(const Stmt* s) {
+  const Expr* call = ExtractCallFromStmt(s);
+  if (!call) return nullptr;
+
+  // callee must be <object>.<constraint_id>.constraint_mode
+  const Expr* callee = call->lhs;
+  if (!callee || callee->kind != ExprKind::kMemberAccess) return nullptr;
+  if (!callee->rhs || callee->rhs->kind != ExprKind::kIdentifier)
+    return nullptr;
+  if (callee->rhs->text != "constraint_mode") return nullptr;
+
+  // The named form prefixes the method with object.constraint_id, so the
+  // receiver of constraint_mode is itself a member access whose left side is a
+  // plain object handle and whose right side is the constraint name.
+  const Expr* prefix = callee->lhs;
+  if (!prefix || prefix->kind != ExprKind::kMemberAccess) return nullptr;
+  if (!prefix->lhs || prefix->lhs->kind != ExprKind::kIdentifier)
+    return nullptr;
+  if (!prefix->rhs || prefix->rhs->kind != ExprKind::kIdentifier)
+    return nullptr;
+  return prefix;
+}
+
 // 18.9: the constraint named in a constraint_mode() call shall be a constraint
 // block that exists in the object's class hierarchy; naming one that does not
 // exist is a compile-time error. This applies only to the named form
@@ -256,22 +283,8 @@ static void CheckNamedConstraintModeExists(
     const Stmt* s,
     const std::unordered_map<std::string_view, std::string_view>& var_types,
     const CompilationUnit* unit, DiagEngine& diag) {
-  const Expr* call = ExtractCallFromStmt(s);
-  if (!call) return;
-
-  // callee must be <object>.<constraint_id>.constraint_mode
-  const Expr* callee = call->lhs;
-  if (!callee || callee->kind != ExprKind::kMemberAccess) return;
-  if (!callee->rhs || callee->rhs->kind != ExprKind::kIdentifier) return;
-  if (callee->rhs->text != "constraint_mode") return;
-
-  // The named form prefixes the method with object.constraint_id, so the
-  // receiver of constraint_mode is itself a member access whose left side is a
-  // plain object handle and whose right side is the constraint name.
-  const Expr* prefix = callee->lhs;
-  if (!prefix || prefix->kind != ExprKind::kMemberAccess) return;
-  if (!prefix->lhs || prefix->lhs->kind != ExprKind::kIdentifier) return;
-  if (!prefix->rhs || prefix->rhs->kind != ExprKind::kIdentifier) return;
+  const Expr* prefix = MatchNamedConstraintModePrefix(s);
+  if (!prefix) return;
 
   auto obj_name = prefix->lhs->text;
   auto constraint_name = prefix->rhs->text;
@@ -364,6 +377,23 @@ static bool IsNonClassLiteral(const Expr* e) {
                e->kind == ExprKind::kUnbasedUnsizedLiteral);
 }
 
+// Reject a compound assignment (e.g. +=, |=) whose target is a class handle.
+static void CheckCompoundAssignOnClassHandle(const Stmt* s, DiagEngine& diag) {
+  if (s->rhs && s->rhs->kind == ExprKind::kBinary &&
+      IsCompoundAssignOp(s->rhs->op)) {
+    diag.Error(s->range.start,
+               "operator is not allowed on class object handles");
+  }
+}
+
+// Reject assigning a literal (non-class) value to a class object handle.
+static void CheckNonClassLiteralAssign(const Stmt* s, DiagEngine& diag) {
+  if (IsNonClassLiteral(s->rhs)) {
+    diag.Error(s->range.start,
+               "cannot assign non-class value to class object handle");
+  }
+}
+
 // Runs every assignment-target check that applies when a blocking/nonblocking
 // assignment writes a class-handle variable.
 static void CheckClassHandleAssignTarget(
@@ -372,22 +402,13 @@ static void CheckClassHandleAssignTarget(
     const std::unordered_map<std::string_view, std::string_view>&
         class_var_types,
     const CompilationUnit* unit, DiagEngine& diag) {
-  if (s->rhs && s->rhs->kind == ExprKind::kBinary &&
-      IsCompoundAssignOp(s->rhs->op)) {
-    diag.Error(s->range.start,
-               "operator is not allowed on class object handles");
-  }
-
+  CheckCompoundAssignOnClassHandle(s, diag);
   CheckNewOnUnconstructibleHandle(s, class_var_types, unit, diag);
   CheckTypedConstructorCompatibility(s, class_names, class_var_types, unit,
                                      diag);
   CheckClassHandleAssignCompatibility(s, class_var_names, class_var_types, unit,
                                       diag);
-
-  if (IsNonClassLiteral(s->rhs)) {
-    diag.Error(s->range.start,
-               "cannot assign non-class value to class object handle");
-  }
+  CheckNonClassLiteralAssign(s, diag);
 }
 
 void Elaborator::WalkStmtsForClassHandleOps(const Stmt* s) {

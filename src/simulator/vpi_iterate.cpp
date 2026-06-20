@@ -231,205 +231,125 @@ struct VpiIterateModes {
   bool callback_object = false;
 };
 
-// Classify a (type, ref) iteration into its special modes. The detailed §37.x
-// reasoning for each mode lives at the assignment below; collecting them here
-// keeps VpiContext::Iterate focused on dispatch.
-VpiIterateModes ComputeVpiIterateModes(int type, VpiHandle ref) {
-  VpiIterateModes m;
-
-  // §37.42: a tf call's arguments are reached through vpiArgument. The
-  // arguments are the call's argument-kind children (an expr, interface expr,
-  // scope, primitive, or named event(-array)), not children whose own type is
-  // vpiArgument, so this iteration is recognized specially below.
+// §37.42 / §37.27: classify the tf-call argument and named-event special
+// modes. A tf call's arguments are reached through vpiArgument (argument-kind
+// children, not vpiArgument-typed children); a named event's
+// vpiWaitingProcesses reaches the waiting threads and its vpiIndex reaches the
+// locating index expressions.
+void ComputeTfAndEventModes(int type, VpiHandle ref, VpiIterateModes& m) {
   m.tf_argument = ref && VpiIsTfCallType(ref->type) && type == vpiArgument;
-
-  // §37.27 detail 1: vpiWaitingProcesses on a named event reaches the threads
-  // of every process - static or dynamic - currently waiting on that event. The
-  // relation is named for the processes but the objects it reaches are threads,
-  // so it is recognized specially rather than matched against the relation
-  // name.
   m.named_event_waiting =
       ref && ref->type == vpiNamedEvent && type == vpiWaitingProcesses;
-
-  // §37.27 detail 2: vpiIndex on a named event reaches the index expressions
-  // that locate it within an array, starting with the index for the named event
-  // and working outward. A named event that is not an array element has no such
-  // indices, so the iteration finds none and reports NULL. The relation reaches
-  // exprs, not children whose own type is vpiIndex, so it too is special.
   m.named_event_index = ref && ref->type == vpiNamedEvent && type == vpiIndex;
+}
 
-  // §37.18 detail 3: vpiElement on a packed array variable reaches its
-  // subelements - struct var, union var, enum var, or (for a multidimensioned
-  // packed array) another packed array var - one dimension level at a time. The
-  // relation reaches those variable kinds, not children whose own type is
-  // literally vpiElement, so it is recognized specially below.
+// §37.18 details 3 and 6: classify the packed-array-variable special modes.
+// vpiElement reaches the subelement variables one dimension at a time;
+// vpiIndex reaches the index expressions locating a subelement within its
+// parent. Both reach objects whose own type is not the relation type.
+void ComputePackedArrayModes(int type, VpiHandle ref, VpiIterateModes& m) {
   m.packed_array_var_element =
       ref && ref->type == vpiPackedArrayVar && type == vpiElement;
-
-  // §37.18 detail 6: vpiIndex on a packed array variable reaches the index
-  // expressions that locate a subelement within its vpiParent, beginning with
-  // the subelement's own index and working outward (the right-to-left textual
-  // order). Like the named-event case it reaches exprs, not children whose own
-  // type is vpiIndex.
   m.packed_array_var_index =
       ref && ref->type == vpiPackedArrayVar && type == vpiIndex;
+}
 
-  // §37.24 detail 2: vpiElement on an interconnect array reaches its
-  // subelements one dimension level at a time - each is itself an interconnect
-  // array (a further dimension) or a leaf interconnect net - rather than
-  // children whose own type is literally vpiElement.
+// §37.24 details 1 and 2: classify the interconnect special modes. An
+// interconnect array's vpiElement reaches its nested arrays/leaf nets; an
+// interconnect net's vpiElement and vpiMember reach array elements or struct
+// members only when its connected typespec has the matching array/struct data
+// type.
+void ComputeInterconnectModes(int type, VpiHandle ref, VpiIterateModes& m) {
   m.interconnect_array_element =
       ref && ref->type == vpiInterconnectArray && type == vpiElement;
-
-  // §37.24 detail 1: vpiElement on an interconnect net reaches the net's array
-  // elements, but only when the typespec it connects to has a packed or
-  // unpacked array data type; a net connected to a non-array type has no such
-  // elements.
   m.interconnect_net_element =
       ref && ref->type == vpiInterconnectNet && type == vpiElement &&
       VpiIsInterconnectArrayDataTypespec(VpiInterconnectNetTypespecType(ref));
-
-  // §37.24 detail 1: vpiMember on an interconnect net reaches the net's struct
-  // members, but only when the typespec it connects to has a packed or unpacked
-  // struct (or union) data type.
   m.interconnect_net_member =
       ref && ref->type == vpiInterconnectNet && type == vpiMember &&
       VpiIsInterconnectStructDataTypespec(VpiInterconnectNetTypespecType(ref));
+}
 
-  // §37.20 detail 1: vpiMemoryWord is a backwards-compatibility relation. A
-  // memory has been generalized to a reg array (vpiRegArray) and its words to
-  // reg objects (vpiReg). Iterating vpiMemoryWord over a reg array therefore
-  // reaches its reg word objects - children whose own kind is vpiReg, not
-  // children typed literally vpiMemoryWord - so the relation is recognized
-  // specially. The variable and variable-array definitions these objects reuse
-  // belong to §37.17.
+// §37.20 detail 1 / §37.46 (figure) / §37.21 (figure): classify the
+// memory-word and net/variable driver/load special modes. vpiMemoryWord on a
+// reg array reaches its reg word objects; vpiDriver/vpiLoad reach a net's or a
+// variable's driver/load objects (the net case differs from the variable case
+// per §37.46), rather than children whose own type is the relation type.
+void ComputeDriverLoadModes(int type, VpiHandle ref, VpiIterateModes& m) {
   m.memory_word = ref && VpiIsArrayVarType(ref->type) && type == vpiMemoryWord;
-
-  // §37.46 (figure): vpiDriver on a net reaches the net's driver objects - a
-  // port, a force, a delay terminal, a continuous assignment (whole or single
-  // bit), or a primitive terminal - and vpiLoad reaches its load objects. The
-  // net case differs from the variable case below: an assignment statement
-  // loads but does not drive a net, and a port loads a net only through the
-  // complex-expression rule (detail 1), so the net relations are collected by
-  // net-specific machinery rather than reused from §37.21.
   m.net_driver = ref && (ref->type == vpiNet || ref->type == vpiNetBit) &&
                  type == vpiDriver;
   m.net_load =
       ref && (ref->type == vpiNet || ref->type == vpiNetBit) && type == vpiLoad;
-
-  // §37.21 (figure): vpiDriver on a variable reaches the variable's driver
-  // objects - a port, a force, a continuous assignment (whole or single bit),
-  // or a procedural assignment statement - rather than children whose own type
-  // is literally vpiDriver. Likewise vpiLoad reaches the variable's load
-  // objects. A net reference is handled by §37.46 above, not here.
   m.variable_driver = ref && type == vpiDriver && !m.net_driver;
   m.variable_load = ref && type == vpiLoad && !m.net_load;
+}
 
-  // §37.5 detail 1: the top-level modules are accessed by iterating vpiModule
-  // with a NULL reference object. Only top-level modules answer that iteration;
-  // a module nested inside another scope is also a vpiModule object but is
-  // reached through its parent's internal scope, so it is excluded here.
-  m.top_module = !ref && type == kVpiModule;
-
-  // §37.31 detail 1 and §37.33 detail 6: vpiMethods on a class defn or a class
-  // object reaches its methods, which are task and function objects (the "task
-  // func" node) rather than children whose own type is literally vpiMethods, so
-  // this iteration is matched specially and filtered to drop implicit built-in
-  // methods (those carrying no explicit declaration) below.
+// §37.31 details 1/3/5/6 + §37.33 details 3/4/6: classify the class special
+// modes. vpiMethods reaches a class's task/function objects;
+// vpiWaitingProcesses and vpiMessages on a class object reach waiting threads
+// and held message expressions; vpiConstraint and vpiDerivedClasses reach a
+// class defn's constraints and derived class defns; and an extends object's
+// vpiArgument reaches the constructor-chaining expressions.
+void ComputeClassModes(int type, VpiHandle ref, VpiIterateModes& m) {
   m.class_methods = ref &&
                     (ref->type == vpiClassDefn || ref->type == vpiClassObj) &&
                     type == vpiMethods;
-
-  // §37.33 detail 3: vpiWaitingProcesses on a class object - a mailbox or a
-  // semaphore - reaches the threads of the processes waiting on it, like the
-  // named-event case (§37.27). The relation reaches thread objects, not
-  // children whose own type is literally vpiWaitingProcesses, so it is matched
-  // specially.
   m.class_obj_waiting =
       ref && ref->type == vpiClassObj && type == vpiWaitingProcesses;
-
-  // §37.33 detail 4: vpiMessages on a class object - a mailbox - reaches the
-  // messages it holds, which are expression objects rather than children whose
-  // own type is literally vpiMessages, so it too is matched specially.
   m.class_obj_messages = ref && ref->type == vpiClassObj && type == vpiMessages;
-
-  // §37.31 detail 3: vpiConstraint on a class defn reaches the class's
-  // constraint children directly (a generic type match), but the iteration must
-  // return only normal constraints, so inline constraints are dropped below.
   m.class_constraint =
       ref && ref->type == vpiClassDefn && type == vpiConstraint;
-
-  // §37.31 detail 5: vpiDerivedClasses on a class defn reaches the class defns
-  // derived from it - again class-defn objects, not children whose own type is
-  // vpiDerivedClasses - so the relation is recognized specially.
   m.class_derived =
       ref && ref->type == vpiClassDefn && type == vpiDerivedClasses;
-
-  // §37.31 detail 6: the vpiArgument iteration from an extends object yields
-  // the expressions used for constructor chaining (8.17). The arguments are
-  // expression children, not children whose own type is vpiArgument, so this is
-  // matched specially like a tf call's argument iteration.
   m.extends_argument = ref && ref->type == vpiExtends && type == vpiArgument;
+}
 
-  // §37.12 detail 7: a scope's vpiVirtualInterfaceVar iteration reaches the
-  // virtual interface vars it declares (§37.29). When the scope declares an
-  // array of virtual interfaces, the iteration yields each element of the array
-  // separately, so the array var child is expanded rather than returned whole.
+// §37.12 details 4/7: classify the scope special modes. A scope's
+// vpiVirtualInterfaceVar iteration reaches the virtual interface vars it
+// declares (expanding an array into its elements); vpiVariables reports such an
+// array whole alongside ordinary variables; vpiImport reaches the objects
+// actually imported into the scope.
+void ComputeScopeModes(int type, VpiHandle ref, VpiIterateModes& m) {
   m.vif = ref && type == vpiVirtualInterfaceVar;
-
-  // §37.12 detail 7: a scope's vpiVariables iteration reports an array of
-  // virtual interfaces as the single array var that declares it (not its
-  // elements), alongside the scope's ordinary variables.
   m.variables = ref && type == vpiVariables;
-
-  // §37.12 detail 4: a scope's vpiImport iteration reaches the objects actually
-  // imported into it through import declarations - the items genuinely
-  // referenced across the import (marked imported), rather than children whose
-  // own type is literally vpiImport or items merely made visible by the import.
   m.import = ref && type == vpiImport;
+}
 
-  // §37.40 detail 2: a timing check's vpiExpr iteration reaches its arguments.
-  // The reference, controlled-reference, and data events are returned as tchk
-  // term objects (vpiTchkTerm); every other argument keeps the type of its
-  // expression. The relation therefore reaches those terms and expressions, not
-  // children whose own type is literally vpiExpr, so it is matched specially.
+// §37.40 detail 2 / §37.38 details 2/3 / §37.75 detail 2 / §37.80 (figure):
+// classify the timing-check, constraint, foreach-loop-var, and callback special
+// modes. A timing check's vpiExpr reaches its term/expr arguments; a foreach
+// constraint's or statement's vpiLoopVars reaches its index variables; a
+// constraint-expression container's vpiConstraintExpr reaches its body
+// expressions; and a vpiCallback iteration is matched by the object a callback
+// was registered on.
+void ComputeConstraintAndCallbackModes(int type, VpiHandle ref,
+                                       VpiIterateModes& m) {
   m.tchk_expr = ref && ref->type == vpiTchk && type == vpiExpr;
-
-  // §37.38 detail 2: vpiLoopVars on a foreach constraint walks the constraint's
-  // index variables in left-to-right order. The objects reached are the index
-  // variables (and null-op placeholders for skipped positions), not children
-  // whose own type is literally vpiLoopVars, so the iteration is built from the
-  // constraint's dedicated loop-var list rather than matched by type.
   m.constr_foreach_loopvars =
       ref && ref->type == vpiConstrForEach && type == vpiLoopVars;
-
-  // §37.75 detail 2: vpiLoopVars on a foreach statement walks the loop's index
-  // variables in left-to-right order. As with the foreach constraint above, the
-  // objects reached are the index variables (and null-op placeholders for
-  // skipped positions), not children whose own type is literally vpiLoopVars,
-  // so the iteration is built from the statement's dedicated loop-var list
-  // rather than matched by type.
   m.foreach_stmt_loopvars =
       ref && ref->type == vpiForeachStmt && type == vpiLoopVars;
-
-  // §37.38 detail 3: vpiConstraintExpr on a constraint-expression container -
-  // an implication, constraint if, constraint if-else, or foreach constraint -
-  // walks the body expressions it holds in source order. They are reached from
-  // a dedicated body list, not matched as children whose own type is
-  // vpiConstraintExpr, so this iteration is recognized specially.
   m.constraint_expr = ref && type == vpiConstraintExpr &&
                       VpiIsConstraintExprContainerType(ref->type);
-
-  // §37.80 (figure): the callback objects placed on a prim term, an expr, a
-  // time queue, or a stmt are reached from that object by iterating vpiCallback
-  // with the object as the reference. A callback is matched by the object it
-  // was registered on (its s_cb_data obj field), since the callback object is
-  // not a child of that object. (A NULL reference instead reaches the callbacks
-  // not related to such an object - detail 2 - handled by the general walk
-  // below, where a callback whose obj field is null answers the null
-  // reference.)
   m.callback_object = ref && type == vpiCallback;
+}
 
+// Classify a (type, ref) iteration into its special modes. The detailed §37.x
+// reasoning for each mode lives in the per-group helpers above; collecting them
+// here keeps VpiContext::Iterate focused on dispatch. §37.5 detail 1: the
+// top-level modules are accessed by iterating vpiModule with a NULL reference;
+// a nested module is reached through its parent's internal scope instead.
+VpiIterateModes ComputeVpiIterateModes(int type, VpiHandle ref) {
+  VpiIterateModes m;
+  ComputeTfAndEventModes(type, ref, m);
+  ComputePackedArrayModes(type, ref, m);
+  ComputeInterconnectModes(type, ref, m);
+  ComputeDriverLoadModes(type, ref, m);
+  ComputeClassModes(type, ref, m);
+  ComputeScopeModes(type, ref, m);
+  ComputeConstraintAndCallbackModes(type, ref, m);
+  m.top_module = !ref && type == kVpiModule;
   return m;
 }
 
@@ -438,83 +358,96 @@ VpiIterateModes ComputeVpiIterateModes(int type, VpiHandle ref) {
 // the generic child/object walk consults; each special mode that reaches
 // objects whose own type is not the relation type is handled before the default
 // exact-type comparison.
-bool VpiIterateMatches(int obj_type, int type, VpiHandle ref,
-                       const VpiIterateModes& modes) {
-  // §37.20 detail 1: a reg array's vpiMemoryWord iteration collects its
-  // reg word objects (vpiReg), the backwards-compatible form of the
-  // legacy memory words, rather than children whose own type is literally
-  // vpiMemoryWord.
-  if (modes.memory_word) return obj_type == kVpiReg;
-  if (type == vpiAssertion) return VpiIsAssertionType(obj_type);
-  // §37.31 detail 1 / §37.33 detail 6: a class defn's or class object's
-  // vpiMethods iteration collects its method objects - the tasks and
-  // functions declared as class items - rather than children whose own
-  // type is literally vpiMethods.
-  if (modes.class_methods) return VpiIsClassMethodType(obj_type);
-  // §37.31 detail 5: a class defn's vpiDerivedClasses iteration collects
-  // the class defns derived from it.
-  if (modes.class_derived) return obj_type == vpiClassDefn;
-  // §37.31 detail 6: an extends object's vpiArgument iteration collects
-  // the expressions supplied for constructor chaining.
-  if (modes.extends_argument) return VpiIsExprType(obj_type);
-  // §37.27 detail 1: a named event's vpiWaitingProcesses iteration
-  // collects the thread objects of the waiting processes, not children
-  // typed vpiWaitingProcesses.
-  if (modes.named_event_waiting) return obj_type == vpiThread;
-  // §37.33 detail 3: a class object's vpiWaitingProcesses iteration
-  // likewise collects the thread objects of the processes waiting on it.
-  if (modes.class_obj_waiting) return obj_type == vpiThread;
-  // §37.33 detail 4: a class object's vpiMessages iteration collects the
-  // message objects it holds - expressions - not children typed
-  // vpiMessages.
-  if (modes.class_obj_messages) return VpiIsExprType(obj_type);
-  // §37.27 detail 2: a named event's vpiIndex iteration collects the
-  // index expressions locating it within its array.
-  if (modes.named_event_index) return VpiIsExprType(obj_type);
-  // §37.18 detail 3: a packed array variable's vpiElement iteration
-  // collects its subelement variables (struct/union/enum/packed-array
-  // vars), not children whose own type is vpiElement.
-  if (modes.packed_array_var_element) {
-    return VpiIsPackedArrayVarElementType(obj_type);
+// §37.20/§37.31/§37.33/§37.18 (selected): resolve the special modes whose
+// match reduces to a fixed object kind or a kind predicate - the reg-array
+// memory word (vpiReg), the class method/derived/extends-argument relations,
+// the named-event/class-object waiting threads, the class-object messages, the
+// named-event index, and the packed-array subelement/index relations. Returns
+// true if one of these modes applied and writes its verdict into *matched, so
+// the caller can preserve the original precedence by consulting these first.
+bool VpiIterateMatchesKindMode(int obj_type, const VpiIterateModes& modes,
+                               bool* matched) {
+  if (modes.memory_word) {
+    *matched = obj_type == kVpiReg;
+    return true;
   }
-  // §37.18 detail 6: a packed array variable's vpiIndex iteration
-  // collects the index expressions locating a subelement within its
-  // parent.
-  if (modes.packed_array_var_index) return VpiIsExprType(obj_type);
-  // §37.24 details 1 and 2: an interconnect array's vpiElement, an
-  // interconnect net's vpiElement, and an interconnect net's vpiMember
-  // each collect the interconnect subobjects they reach - a nested
-  // interconnect array or a leaf interconnect net - not children whose
-  // own type is literally vpiElement or vpiMember.
+  if (modes.class_methods) {
+    *matched = VpiIsClassMethodType(obj_type);
+    return true;
+  }
+  if (modes.class_derived) {
+    *matched = obj_type == vpiClassDefn;
+    return true;
+  }
+  if (modes.extends_argument) {
+    *matched = VpiIsExprType(obj_type);
+    return true;
+  }
+  if (modes.named_event_waiting || modes.class_obj_waiting) {
+    *matched = obj_type == vpiThread;
+    return true;
+  }
+  if (modes.class_obj_messages || modes.named_event_index) {
+    *matched = VpiIsExprType(obj_type);
+    return true;
+  }
+  if (modes.packed_array_var_element) {
+    *matched = VpiIsPackedArrayVarElementType(obj_type);
+    return true;
+  }
+  if (modes.packed_array_var_index) {
+    *matched = VpiIsExprType(obj_type);
+    return true;
+  }
+  return false;
+}
+
+// §37.24/§37.40/§37.72/§37.42/§37.34 (selected): resolve the remaining special
+// modes that reach edge-specific objects - the interconnect subelements, a
+// timing check's term/expr arguments, a case item's match conditions, a tf
+// call's arguments, and a constraint's constraint items. Returns true if one of
+// these applied and writes its verdict into *matched. These are checked after
+// the kind-mode group so the original precedence is preserved.
+bool VpiIterateMatchesEdgeMode(int obj_type, int type, VpiHandle ref,
+                               const VpiIterateModes& modes, bool* matched) {
   if (modes.interconnect_array_element || modes.interconnect_net_element ||
       modes.interconnect_net_member) {
-    return VpiIsInterconnectSubelementType(obj_type);
+    *matched = VpiIsInterconnectSubelementType(obj_type);
+    return true;
   }
-  // §37.40 detail 2: a timing check's vpiExpr iteration collects its
-  // argument objects - the reference/controlled-reference and data event
-  // terms (each a vpiTchkTerm) together with the check's other argument
-  // expressions - rather than children whose own type is literally
-  // vpiExpr.
   if (modes.tchk_expr) {
-    return obj_type == vpiTchkTerm || VpiIsExprType(obj_type);
+    *matched = obj_type == vpiTchkTerm || VpiIsExprType(obj_type);
+    return true;
   }
-  // §37.72 detail 1: a case item's match expressions are reached through
-  // the vpiExpr edge, which spans both patterns and plain expressions, so
-  // the iteration collects every condition the item groups - not only
-  // children whose own type happens to be vpiExpr.
   if (ref && ref->type == vpiCaseItem && type == vpiExpr) {
-    return VpiIsCaseItemConditionType(obj_type);
+    *matched = VpiIsCaseItemConditionType(obj_type);
+    return true;
   }
-  // §37.42: a tf call's vpiArgument iteration collects its argument
-  // objects - the exprs, interface exprs, scope, primitive, and
-  // named-event(-array) the relation reaches - rather than children whose
-  // own type is vpiArgument.
-  if (modes.tf_argument) return VpiIsTfCallArgumentType(obj_type);
-  // §37.34 detail 5: a constraint's vpiConstraintItem iteration collects
-  // every constraint item it groups - the constraint orderings and
-  // constraint expressions - in the order they occur, rather than
-  // children whose own type is literally vpiConstraintItem.
-  if (type == vpiConstraintItem) return VpiIsConstraintItemType(obj_type);
+  if (modes.tf_argument) {
+    *matched = VpiIsTfCallArgumentType(obj_type);
+    return true;
+  }
+  if (type == vpiConstraintItem) {
+    *matched = VpiIsConstraintItemType(obj_type);
+    return true;
+  }
+  return false;
+}
+
+bool VpiIterateMatches(int obj_type, int type, VpiHandle ref,
+                       const VpiIterateModes& modes) {
+  bool matched = false;
+  // §37.20 detail 1: a reg array's vpiMemoryWord iteration collects reg word
+  // objects, etc. - the fixed-kind special modes resolved first to preserve
+  // precedence.
+  if (VpiIterateMatchesKindMode(obj_type, modes, &matched)) return matched;
+  // §37.x: the vpiAssertion relation reaches every assertion kind, checked
+  // between the two grouped mode blocks exactly as in the original order.
+  if (type == vpiAssertion) return VpiIsAssertionType(obj_type);
+  // §37.24/§37.40/§37.72/§37.42/§37.34: the edge-specific special modes.
+  if (VpiIterateMatchesEdgeMode(obj_type, type, ref, modes, &matched)) {
+    return matched;
+  }
   return obj_type == type;
 }
 
@@ -523,17 +456,23 @@ bool VpiIterateMatches(int obj_type, int type, VpiHandle ref,
 // virtual interfaces into its individual elements. The iteration is supported
 // only in an elaborated context; within a lexical context such as a class defn
 // (§37.31) it is not supported and yields nothing.
+// §37.12 detail 7: expand a declared array of virtual interfaces into its
+// individual virtual interface var elements, appending each to the iterator.
+void CollectVirtualInterfaceArrayElems(VpiObject* array_var, VpiObject* iter) {
+  for (auto* elem : array_var->children) {
+    if (elem->type == vpiVirtualInterfaceVar) {
+      iter->children.push_back(elem);
+    }
+  }
+}
+
 void CollectVirtualInterfaceVars(VpiObject* ref, VpiObject* iter) {
   if (ref->type == vpiClassDefn) return;
   for (auto* child : ref->children) {
     if (child->type == vpiVirtualInterfaceVar) {
       iter->children.push_back(child);
     } else if (VpiIsVirtualInterfaceArray(child)) {
-      for (auto* elem : child->children) {
-        if (elem->type == vpiVirtualInterfaceVar) {
-          iter->children.push_back(elem);
-        }
-      }
+      CollectVirtualInterfaceArrayElems(child, iter);
     }
   }
 }
@@ -673,34 +612,95 @@ void CollectMatchingObjects(int type, VpiHandle ref,
 // special modes need are passed by reference. Detail 2 of §37.81 - an empty
 // time queue yields NULL rather than an empty iterator - is left to the shared
 // empty-children check by the caller.
+// §37.12 details 4/7: route the scope special modes - virtual interface vars,
+// variables, and imports - to their collectors. Returns true if one of these
+// modes applied.
+bool DispatchScopeMode(int type, VpiHandle ref, const VpiIterateModes& modes,
+                       VpiObject* iter) {
+  (void)type;
+  if (modes.vif) {
+    CollectVirtualInterfaceVars(ref, iter);
+    return true;
+  }
+  if (modes.variables) {
+    CollectScopeVariables(ref, iter);
+    return true;
+  }
+  if (modes.import) {
+    CollectImportedObjects(ref, iter);
+    return true;
+  }
+  return false;
+}
+
+// §37.42 detail 6 / §37.81: route the null-reference registry modes - the
+// user-defined system tf objects and the surviving simulation-time-queue slots.
+// Returns true if one of these modes applied.
+bool DispatchRegistryMode(int type, VpiHandle ref,
+                          std::vector<VpiObject*>& all_objects,
+                          const std::vector<VpiTimeQueueSlot>& time_queue_slots,
+                          VpiObject* iter) {
+  if (!ref && type == vpiUserSystf) {
+    CollectUserSystf(all_objects, iter);
+    return true;
+  }
+  if (!ref && type == vpiTimeQueue) {
+    CollectTimeQueueSlots(time_queue_slots, all_objects, iter);
+    return true;
+  }
+  return false;
+}
+
+// §37.46/§37.21/§37.38/§37.75/§37.80: route the reference-object special modes
+// computed from a non-null reference - net/variable drivers and loads, foreach
+// loop variables, constraint-expression bodies, and registered callback
+// objects. Returns true if one of these modes applied.
+bool DispatchRefSpecialMode(int type, VpiHandle ref,
+                            const VpiIterateModes& modes,
+                            std::vector<VpiObject*>& all_objects,
+                            const std::vector<VpiHandle>& cb_handles,
+                            const std::vector<VpiCbData>& callbacks,
+                            VpiObject* iter) {
+  (void)type;
+  if (modes.net_driver || modes.net_load) {
+    CollectNetDriversOrLoads(ref, modes.net_driver, iter);
+    return true;
+  }
+  if (modes.variable_driver || modes.variable_load) {
+    CollectVariableDriversOrLoads(ref, modes.variable_driver,
+                                  VpiIsStructUnionOrClassVar(ref->type), iter);
+    return true;
+  }
+  if (modes.constr_foreach_loopvars || modes.foreach_stmt_loopvars) {
+    CollectForeachLoopVars(ref, all_objects, iter);
+    return true;
+  }
+  if (modes.constraint_expr) {
+    CollectConstraintExprs(ref, iter);
+    return true;
+  }
+  if (modes.callback_object) {
+    CollectCallbackObjects(ref, cb_handles, callbacks, iter);
+    return true;
+  }
+  return false;
+}
+
 void DispatchVpiIterate(int type, VpiHandle ref, const VpiIterateModes& modes,
                         std::vector<VpiObject*>& all_objects,
                         const std::vector<VpiTimeQueueSlot>& time_queue_slots,
                         const std::vector<VpiHandle>& cb_handles,
                         const std::vector<VpiCbData>& callbacks,
                         VpiObject* iter) {
-  if (modes.vif) {
-    CollectVirtualInterfaceVars(ref, iter);
-  } else if (modes.variables) {
-    CollectScopeVariables(ref, iter);
-  } else if (modes.import) {
-    CollectImportedObjects(ref, iter);
-  } else if (!ref && type == vpiUserSystf) {
-    CollectUserSystf(all_objects, iter);
-  } else if (!ref && type == vpiTimeQueue) {
-    CollectTimeQueueSlots(time_queue_slots, all_objects, iter);
-  } else if (modes.net_driver || modes.net_load) {
-    CollectNetDriversOrLoads(ref, modes.net_driver, iter);
-  } else if (modes.variable_driver || modes.variable_load) {
-    CollectVariableDriversOrLoads(ref, modes.variable_driver,
-                                  VpiIsStructUnionOrClassVar(ref->type), iter);
-  } else if (modes.constr_foreach_loopvars || modes.foreach_stmt_loopvars) {
-    CollectForeachLoopVars(ref, all_objects, iter);
-  } else if (modes.constraint_expr) {
-    CollectConstraintExprs(ref, iter);
-  } else if (modes.callback_object) {
-    CollectCallbackObjects(ref, cb_handles, callbacks, iter);
-  } else if (ref) {
+  if (DispatchScopeMode(type, ref, modes, iter)) return;
+  if (DispatchRegistryMode(type, ref, all_objects, time_queue_slots, iter)) {
+    return;
+  }
+  if (DispatchRefSpecialMode(type, ref, modes, all_objects, cb_handles,
+                             callbacks, iter)) {
+    return;
+  }
+  if (ref) {
     CollectMatchingChildren(type, ref, modes, iter);
   } else {
     CollectMatchingObjects(type, ref, modes, all_objects, iter);

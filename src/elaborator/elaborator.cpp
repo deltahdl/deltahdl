@@ -52,6 +52,41 @@ const ConfigDecl* FindDelegatedConfig(const std::vector<ConfigDecl*>& configs,
   return nullptr;
 }
 
+// True when an inner instance path lies at or beneath the inner config's top
+// cell, so it can be rewritten onto the outer hierarchy (§33.4.1).
+bool InnerPathUnderTop(std::string_view ipath, std::string_view inner_top) {
+  return ipath == inner_top ||
+         (ipath.size() > inner_top.size() && ipath.starts_with(inner_top) &&
+          ipath[inner_top.size()] == '.');
+}
+
+// Records a delegated inner default rule (§33.4.1) as a liblist override rooted
+// at outer_path. No-op when the rule carries no library list.
+void CollectInnerConfigDefaultOverride(
+    const ConfigRule* irule, const std::string& outer_path,
+    std::vector<std::pair<std::string, std::vector<std::string>>>& overrides) {
+  if (irule->liblist.empty()) return;
+  overrides.emplace_back(outer_path, LiblistToStrings(irule->liblist));
+}
+
+// Translates a delegated inner instance rule (§33.4.1) whose path lies under
+// inner_top into a liblist override rooted at outer_path. No-op when the rule
+// carries no library list or its path is outside the inner top cell.
+void CollectInnerConfigInstanceOverride(
+    const ConfigRule* irule, const std::string& outer_path,
+    std::string_view inner_top,
+    std::vector<std::pair<std::string, std::vector<std::string>>>& overrides) {
+  if (irule->liblist.empty()) return;
+  std::string_view ipath = irule->inst_path;
+  if (!InnerPathUnderTop(ipath, inner_top)) return;
+  std::string translated = outer_path;
+  if (ipath.size() > inner_top.size()) {
+    translated.append(ipath.substr(inner_top.size()));
+  }
+  overrides.emplace_back(std::move(translated),
+                         LiblistToStrings(irule->liblist));
+}
+
 // Translates the default/instance liblist rules of a delegated inner config
 // (§33.4.1) into instance liblist overrides rooted at outer_path, appending
 // them to overrides. inner_top names the inner config's top cell, used to
@@ -62,22 +97,10 @@ void CollectInnerConfigLiblistOverrides(
     std::vector<std::pair<std::string, std::vector<std::string>>>& overrides) {
   for (auto* irule : inner->rules) {
     if (irule->kind == ConfigRuleKind::kDefault) {
-      if (irule->liblist.empty()) continue;
-      overrides.emplace_back(outer_path, LiblistToStrings(irule->liblist));
+      CollectInnerConfigDefaultOverride(irule, outer_path, overrides);
     } else if (irule->kind == ConfigRuleKind::kInstance) {
-      if (irule->liblist.empty()) continue;
-      std::string_view ipath = irule->inst_path;
-      bool path_matches =
-          ipath == inner_top ||
-          (ipath.size() > inner_top.size() && ipath.starts_with(inner_top) &&
-           ipath[inner_top.size()] == '.');
-      if (!path_matches) continue;
-      std::string translated = outer_path;
-      if (ipath.size() > inner_top.size()) {
-        translated.append(ipath.substr(inner_top.size()));
-      }
-      overrides.emplace_back(std::move(translated),
-                             LiblistToStrings(irule->liblist));
+      CollectInnerConfigInstanceOverride(irule, outer_path, inner_top,
+                                         overrides);
     }
   }
 }
@@ -178,6 +201,39 @@ void CollectConfigDelegationOverrides(
     CollectInnerConfigLiblistOverrides(inner, outer_path, inner_top,
                                        liblist_overrides);
   }
+}
+
+// Bundles the most recent elaboration-severity details (§20.10.1) plus the
+// simulation-blocked flag for transfer onto the elaborated design.
+struct DesignMetadata {
+  bool simulation_blocked = false;
+  std::string last_severity;
+  std::string last_severity_msg;
+  std::string last_severity_scope;
+  SourceLoc last_severity_loc;
+};
+
+// Returns the set of top-level module names, used to anchor the §23.10.4.2
+// early-resolution ambiguity check.
+std::unordered_set<std::string_view> BuildTopModuleNameSet(
+    const RtlirDesign* design) {
+  std::unordered_set<std::string_view> top_names;
+  for (auto* top : design->top_modules) top_names.insert(top->name);
+  return top_names;
+}
+
+// Copies the compilation unit's packages and class declarations together with
+// the captured elaboration metadata onto the finished design.
+void CopyDesignMetadata(RtlirDesign* design, const CompilationUnit* unit,
+                        const DesignMetadata& meta) {
+  design->packages = unit->packages;
+  design->cu_class_decls.insert(design->cu_class_decls.end(),
+                                unit->classes.begin(), unit->classes.end());
+  design->simulation_blocked = meta.simulation_blocked;
+  design->last_elab_severity = meta.last_severity;
+  design->last_elab_severity_msg = meta.last_severity_msg;
+  design->last_elab_severity_scope = meta.last_severity_scope;
+  design->last_elab_severity_loc = meta.last_severity_loc;
 }
 
 }  // namespace
@@ -313,8 +369,8 @@ RtlirDesign* Elaborator::ElaborateTops(
   // instantiated module once, so each module's defparams are checked a single
   // time regardless of how many instances exist.
   {
-    std::unordered_set<std::string_view> top_names;
-    for (auto* top : design->top_modules) top_names.insert(top->name);
+    std::unordered_set<std::string_view> top_names =
+        BuildTopModuleNameSet(design);
     for (const auto& entry : design->all_modules)
       CheckEarlyResolutionAmbiguity(entry.second, top_names);
   }
@@ -327,15 +383,11 @@ RtlirDesign* Elaborator::ElaborateTops(
 
   PopulateTypeWidths(typedefs_, design->type_widths);
 
-  design->packages = unit_->packages;
-
-  design->cu_class_decls.insert(design->cu_class_decls.end(),
-                                unit_->classes.begin(), unit_->classes.end());
-  design->simulation_blocked = elab_simulation_blocked_;
-  design->last_elab_severity = elab_last_severity_;
-  design->last_elab_severity_msg = elab_last_severity_msg_;
-  design->last_elab_severity_scope = elab_last_severity_scope_;
-  design->last_elab_severity_loc = elab_last_severity_loc_;
+  CopyDesignMetadata(
+      design, unit_,
+      DesignMetadata{elab_simulation_blocked_, elab_last_severity_,
+                     elab_last_severity_msg_, elab_last_severity_scope_,
+                     elab_last_severity_loc_});
   return design;
 }
 

@@ -451,6 +451,14 @@ static void ValidateGateStrength(GateKind gate_kind, SourceLoc loc,
                "strength0 and a strength1 keyword");
 }
 
+static void ValidateGateDelay(GateKind gate_kind, SourceLoc loc, Expr* delay,
+                              Expr* delay_decay, DiagEngine& diag) {
+  if (delay && !GateAllowsDelay(gate_kind))
+    diag.Error(loc, "delay not allowed on this gate type");
+  if (delay_decay && !GateUsesDelay3(gate_kind))
+    diag.Error(loc, "this gate type allows at most 2 delay values");
+}
+
 void Parser::ParseGateInst(std::vector<ModuleItem*>& items) {
   auto loc = CurrentLoc();
   auto gate_kind = TokenToGateKind(CurrentToken().kind);
@@ -483,10 +491,7 @@ void Parser::ParseGateInst(std::vector<ModuleItem*>& items) {
   Expr* delay_fall = nullptr;
   Expr* delay_decay = nullptr;
   ParseGateDelay(delay, delay_fall, delay_decay);
-  if (delay && !GateAllowsDelay(gate_kind))
-    diag_.Error(loc, "delay not allowed on this gate type");
-  if (delay_decay && !GateUsesDelay3(gate_kind))
-    diag_.Error(loc, "this gate type allows at most 2 delay values");
+  ValidateGateDelay(gate_kind, loc, delay, delay_decay, diag_);
 
   std::vector<std::string_view> array_names;
   auto parse_instance = [&]() -> ModuleItem* {

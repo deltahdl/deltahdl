@@ -21,6 +21,27 @@ static bool IsDpiOpenArrayOutputFormal(const FunctionArg& formal) {
   return is_open && is_output;
 }
 
+// §7.7: true when every name in `arg_names` is empty, i.e. the call uses pure
+// positional binding (named association suppresses this analysis).
+static bool AllPositionalArgs(const Expr* call) {
+  for (auto name : call->arg_names) {
+    if (!name.empty()) return false;
+  }
+  return true;
+}
+
+// §7.7: true when the i-th positional actual of `call` is an identifier naming
+// a dynamic array or queue, given the per-variable array info map.
+static bool ActualIsDynamicOrQueue(
+    const Expr* actual,
+    const std::unordered_map<std::string_view, Elaborator::VarArrayInfo>&
+        var_array_info) {
+  if (!actual || actual->kind != ExprKind::kIdentifier) return false;
+  auto vit = var_array_info.find(actual->text);
+  if (vit == var_array_info.end()) return false;
+  return vit->second.is_dynamic || vit->second.is_queue;
+}
+
 // §7.7: at a DPI import call, an open-array (unsized) formal with an output
 // direction may not receive a dynamic array or queue actual. The unsized
 // dimension means the C side has no agreed-upon element count to write back
@@ -31,23 +52,16 @@ void Elaborator::CheckDpiOpenArrayCall(const Expr* call) {
   if (it == dpi_import_decls_.end() || it->second == nullptr) return;
   const ModuleItem* imp = it->second;
   // Only positional binding is analyzed; named association is left untouched.
-  for (auto name : call->arg_names) {
-    if (!name.empty()) return;
-  }
+  if (!AllPositionalArgs(call)) return;
   size_t count = std::min(call->args.size(), imp->func_args.size());
   for (size_t i = 0; i < count; ++i) {
     if (!IsDpiOpenArrayOutputFormal(imp->func_args[i])) continue;
     const Expr* actual = call->args[i];
-    if (!actual || actual->kind != ExprKind::kIdentifier) continue;
-    auto vit = var_array_info_.find(actual->text);
-    if (vit == var_array_info_.end()) continue;
-    if (vit->second.is_dynamic || vit->second.is_queue) {
-      diag_.Error(
-          actual->range.start,
-          std::format("a dynamic array or queue cannot be passed to the "
-                      "open-array output argument of DPI import '{}'",
-                      call->callee));
-    }
+    if (!ActualIsDynamicOrQueue(actual, var_array_info_)) continue;
+    diag_.Error(actual->range.start,
+                std::format("a dynamic array or queue cannot be passed to the "
+                            "open-array output argument of DPI import '{}'",
+                            call->callee));
   }
 }
 
@@ -107,23 +121,35 @@ static bool StmtNodeSpawnsBackgroundProcess(const Stmt* s) {
 
 static bool StmtSpawnsBackgroundProcess(const Stmt* s);
 
-// §13.4.4: true when any substatement of `s` spawns a background process.
-static bool ChildStmtSpawnsBackgroundProcess(const Stmt* s) {
+// §13.4.4: true when any statement in one of `s`'s child statement-list slots
+// spawns a background process.
+static bool ChildStmtListSpawnsBackgroundProcess(const Stmt* s) {
   for (auto* sub : s->stmts)
     if (StmtSpawnsBackgroundProcess(sub)) return true;
   for (auto* sub : s->fork_stmts)
     if (StmtSpawnsBackgroundProcess(sub)) return true;
-  if (StmtSpawnsBackgroundProcess(s->then_branch)) return true;
-  if (StmtSpawnsBackgroundProcess(s->else_branch)) return true;
-  if (StmtSpawnsBackgroundProcess(s->body)) return true;
-  if (StmtSpawnsBackgroundProcess(s->for_body)) return true;
-  if (StmtSpawnsBackgroundProcess(s->assert_pass_stmt)) return true;
-  if (StmtSpawnsBackgroundProcess(s->assert_fail_stmt)) return true;
   for (auto& ci : s->case_items)
     if (StmtSpawnsBackgroundProcess(ci.body)) return true;
   for (auto& ri : s->randcase_items)
     if (StmtSpawnsBackgroundProcess(ri.second)) return true;
   return false;
+}
+
+// §13.4.4: true when one of `s`'s single-statement child slots spawns a
+// background process.
+static bool ChildStmtSlotSpawnsBackgroundProcess(const Stmt* s) {
+  return StmtSpawnsBackgroundProcess(s->then_branch) ||
+         StmtSpawnsBackgroundProcess(s->else_branch) ||
+         StmtSpawnsBackgroundProcess(s->body) ||
+         StmtSpawnsBackgroundProcess(s->for_body) ||
+         StmtSpawnsBackgroundProcess(s->assert_pass_stmt) ||
+         StmtSpawnsBackgroundProcess(s->assert_fail_stmt);
+}
+
+// §13.4.4: true when any substatement of `s` spawns a background process.
+static bool ChildStmtSpawnsBackgroundProcess(const Stmt* s) {
+  return ChildStmtListSpawnsBackgroundProcess(s) ||
+         ChildStmtSlotSpawnsBackgroundProcess(s);
 }
 
 // §13.4.4
@@ -775,6 +801,27 @@ static std::unordered_set<std::string_view> CollectNonSingularFuncs(
   return non_singular_funcs;
 }
 
+// Validates one sensitivity-list event expression (the `signal` and
+// `iff_condition` of a single entry): call legality, no task calls, and
+// singular-value requirements.
+static void ValidateSensitivityEntry(
+    const Expr* signal, const Expr* iff_condition,
+    const std::unordered_map<std::string_view, const ModuleItem*>& all_decls,
+    const std::unordered_set<std::string_view>& non_singular_vars,
+    const std::unordered_set<std::string_view>& non_singular_funcs,
+    DiagEngine& diag) {
+  CheckCallNoOutInoutRefInExpr(signal, all_decls, diag, "an event expression");
+  CheckCallNoOutInoutRefInExpr(iff_condition, all_decls, diag,
+                               "an event expression");
+
+  CheckNoTaskCallInExpr(signal, all_decls, diag);
+  CheckNoTaskCallInExpr(iff_condition, all_decls, diag);
+
+  CheckEventExprSingular(signal, non_singular_vars, non_singular_funcs, diag);
+  CheckEventExprSingular(iff_condition, non_singular_vars, non_singular_funcs,
+                         diag);
+}
+
 // Validates the event expressions in a procedural block's body and sensitivity
 // list: call legality, no task calls, and singular-value requirements.
 static void ValidateProcBlockEvents(
@@ -790,19 +837,30 @@ static void ValidateProcBlockEvents(
                            diag);
 
   for (const auto& ev : item->sensitivity) {
-    CheckCallNoOutInoutRefInExpr(ev.signal, all_decls, diag,
-                                 "an event expression");
-    CheckCallNoOutInoutRefInExpr(ev.iff_condition, all_decls, diag,
-                                 "an event expression");
-
-    CheckNoTaskCallInExpr(ev.signal, all_decls, diag);
-    CheckNoTaskCallInExpr(ev.iff_condition, all_decls, diag);
-
-    CheckEventExprSingular(ev.signal, non_singular_vars, non_singular_funcs,
-                           diag);
-    CheckEventExprSingular(ev.iff_condition, non_singular_vars,
-                           non_singular_funcs, diag);
+    ValidateSensitivityEntry(ev.signal, ev.iff_condition, all_decls,
+                             non_singular_vars, non_singular_funcs, diag);
   }
+}
+
+// Validates the subroutine-call rules in a function or task body.
+static void ValidateSubroutineBodyCallArgs(
+    const ModuleItem* item,
+    const std::unordered_map<std::string_view, const ModuleItem*>& all_decls,
+    const std::unordered_set<std::string_view>& net_names, DiagEngine& diag) {
+  for (auto* s : item->func_body_stmts) {
+    WalkStmtForCallArgs(s, all_decls, net_names, diag);
+  }
+}
+
+// Validates the subroutine-call rules in a continuous assignment's RHS.
+static void ValidateContAssignCallArgs(
+    const ModuleItem* item,
+    const std::unordered_map<std::string_view, const ModuleItem*>& all_decls,
+    DiagEngine& diag) {
+  CheckVoidCallInExpr(item->assign_rhs, all_decls, diag);
+
+  CheckCallNoOutInoutRefInExpr(item->assign_rhs, all_decls, diag,
+                               "a continuous assignment");
 }
 
 // Validates the subroutine-call rules in one top-level item.
@@ -820,15 +878,10 @@ static void ValidateCallArgsInItem(
 
   if (item->kind == ModuleItemKind::kFunctionDecl ||
       item->kind == ModuleItemKind::kTaskDecl) {
-    for (auto* s : item->func_body_stmts) {
-      WalkStmtForCallArgs(s, all_decls, net_names, diag);
-    }
+    ValidateSubroutineBodyCallArgs(item, all_decls, net_names, diag);
   }
   if (item->kind == ModuleItemKind::kContAssign) {
-    CheckVoidCallInExpr(item->assign_rhs, all_decls, diag);
-
-    CheckCallNoOutInoutRefInExpr(item->assign_rhs, all_decls, diag,
-                                 "a continuous assignment");
+    ValidateContAssignCallArgs(item, all_decls, diag);
   }
 }
 

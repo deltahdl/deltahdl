@@ -153,6 +153,21 @@ static std::string ScanMemFileToken(const std::string& content, size_t n,
   return content.substr(begin, pos - begin);
 }
 
+// §21.4: dispatches one scanned token to the address or word callback. Returns
+// false (to stop the scan) only when the chosen callback asks to abort.
+template <class AddrFn, class WordFn>
+static bool DispatchMemFileToken(const std::string& tok, AddrFn& on_addr,
+                                 WordFn& on_word) {
+  if (tok[0] == '@') {
+    // §21.4: an @-address is a hexadecimal index that repositions the load
+    // cursor; no white space separates the '@' from its digits.
+    auto addr =
+        static_cast<int64_t>(std::strtoull(tok.c_str() + 1, nullptr, 16));
+    return on_addr(addr);
+  }
+  return on_word(tok);
+}
+
 template <class AddrFn, class WordFn>
 static void ScanMemFile(const std::string& content, AddrFn on_addr,
                         WordFn on_word) {
@@ -171,15 +186,7 @@ static void ScanMemFile(const std::string& content, AddrFn on_addr,
     std::string tok = ScanMemFileToken(content, n, pos);
     if (tok.empty()) continue;
 
-    if (tok[0] == '@') {
-      // §21.4: an @-address is a hexadecimal index that repositions the load
-      // cursor; no white space separates the '@' from its digits.
-      auto addr =
-          static_cast<int64_t>(std::strtoull(tok.c_str() + 1, nullptr, 16));
-      if (!on_addr(addr)) return;
-    } else {
-      if (!on_word(tok)) return;
-    }
+    if (!DispatchMemFileToken(tok, on_addr, on_word)) return;
   }
 }
 
@@ -246,6 +253,55 @@ static void WarnReadmemWordCount(SimContext& ctx, bool is_hex, bool has_start,
   }
 }
 
+// §21.4: the mutable cursor state carried through an indexed (windowed) load:
+// the running address, whether any @-address was seen, the parsed-word count,
+// and an abort flag set when a callback ends the scan early.
+struct IndexedLoadState {
+  int64_t cursor = 0;
+  bool addr_in_file = false;
+  bool aborted = false;
+  uint64_t data_words = 0;
+};
+
+// §21.4: handles an @-address during an indexed load. A file address outside
+// the task-specified window is an error that ends the load; otherwise the
+// cursor jumps to the address. Returns false to stop the scan.
+static bool HandleIndexedAddr(SimContext& ctx, bool is_hex, bool has_start,
+                              int64_t task_lo, int64_t task_hi, int64_t addr,
+                              IndexedLoadState& st) {
+  st.addr_in_file = true;
+  if (has_start && (addr < task_lo || addr > task_hi)) {
+    ctx.GetDiag().Error(
+        {}, "$readmem" + std::string(is_hex ? "h" : "b") +
+                ": file address outside the range given by the task");
+    st.aborted = true;
+    return false;
+  }
+  st.cursor = addr;
+  return true;
+}
+
+// §21.4: handles one data word during an indexed load: parses the token, writes
+// it through `write_word` when the cursor lies inside the load window, then
+// advances the cursor in the load direction. Returns false to stop the scan.
+template <class WriteFn>
+static bool HandleIndexedWord(SimContext& ctx, Arena& arena, bool is_hex,
+                              uint32_t elem_width, bool two_state,
+                              const EnumTypeInfo* enum_info, bool descending,
+                              const std::string& tok, WriteFn& write_word,
+                              IndexedLoadState& st) {
+  Logic4Vec word;
+  if (!ParseReadmemWord(ctx, arena, is_hex, tok, elem_width, two_state,
+                        enum_info, word)) {
+    st.aborted = true;
+    return false;
+  }
+  write_word(st.cursor, word);
+  ++st.data_words;
+  st.cursor += descending ? -1 : 1;
+  return true;
+}
+
 template <class StoreFn>
 static void EvalReadmemIndexed(SimContext& ctx, Arena& arena, bool is_hex,
                                const std::string& content, int64_t low_addr,
@@ -265,7 +321,6 @@ static void EvalReadmemIndexed(SimContext& ctx, Arena& arena, bool is_hex,
   // only when both bounds are supplied and start exceeds finish; otherwise it
   // runs upward. The chosen direction persists even past an @-address.
   bool descending = has_start && has_finish && start_addr > finish_addr;
-  int64_t cursor = has_start ? start_addr : low_addr;
 
   // The address window the system-task arguments permit. When the task names a
   // start (and optionally a finish), addresses appearing in the file must lie
@@ -285,44 +340,25 @@ static void EvalReadmemIndexed(SimContext& ctx, Arena& arena, bool is_hex,
     store(addr, v);
   };
 
-  bool addr_in_file = false;
-  bool aborted = false;
-  uint64_t data_words = 0;
+  IndexedLoadState st;
+  st.cursor = has_start ? start_addr : low_addr;
   ScanMemFile(
       content,
       [&](int64_t addr) -> bool {
-        addr_in_file = true;
-        if (has_start && (addr < task_lo || addr > task_hi)) {
-          // §21.4: a file address outside the task-specified window is an error
-          // and ends the load.
-          ctx.GetDiag().Error(
-              {}, "$readmem" + std::string(is_hex ? "h" : "b") +
-                      ": file address outside the range given by the task");
-          aborted = true;
-          return false;
-        }
-        cursor = addr;
-        return true;
+        return HandleIndexedAddr(ctx, is_hex, has_start, task_lo, task_hi, addr,
+                                 st);
       },
       [&](const std::string& tok) -> bool {
-        Logic4Vec word;
-        if (!ParseReadmemWord(ctx, arena, is_hex, tok, elem_width, two_state,
-                              enum_info, word)) {
-          aborted = true;
-          return false;
-        }
-        write_word(cursor, word);
-        ++data_words;
-        cursor += descending ? -1 : 1;
-        return true;
+        return HandleIndexedWord(ctx, arena, is_hex, elem_width, two_state,
+                                 enum_info, descending, tok, write_word, st);
       });
 
   // §21.4: with an explicit start-through-finish window and no addresses in the
   // file, the data-word count must match the window size. Addresses not covered
   // by the file are left unmodified, which the write loop above guarantees.
-  if (!aborted) {
-    WarnReadmemWordCount(ctx, is_hex, has_start, has_finish, addr_in_file,
-                         data_words, task_lo, task_hi);
+  if (!st.aborted) {
+    WarnReadmemWordCount(ctx, is_hex, has_start, has_finish, st.addr_in_file,
+                         st.data_words, task_lo, task_hi);
   }
 }
 
@@ -332,6 +368,24 @@ static void EvalReadmemIndexed(SimContext& ctx, Arena& arena, bool is_hex,
 // exist. The pattern file addresses elements numerically; when the index is an
 // enumerated type, that number is the underlying numeric value of the
 // enumeration element (see 6.19).
+// §21.4.1: handles one data word during an associative-array load: parses the
+// token, deposits it at the running key (creating the element if absent), then
+// advances the cursor in the load direction. Returns false to stop the scan.
+static bool HandleAssocWord(SimContext& ctx, Arena& arena, bool is_hex,
+                            AssocArrayObject* aa, bool two_state,
+                            const EnumTypeInfo* enum_info, bool descending,
+                            const std::string& tok, int64_t& cursor) {
+  Logic4Vec word;
+  if (!ParseReadmemWord(ctx, arena, is_hex, tok, aa->elem_width, two_state,
+                        enum_info, word)) {
+    return false;
+  }
+  // §21.4.1: loading an address creates its element if absent.
+  aa->int_data[cursor] = word;
+  cursor += descending ? -1 : 1;
+  return true;
+}
+
 static void EvalReadmemAssoc(SimContext& ctx, Arena& arena, bool is_hex,
                              const std::string& content, AssocArrayObject* aa,
                              bool two_state, const EnumTypeInfo* enum_info,
@@ -361,15 +415,8 @@ static void EvalReadmemAssoc(SimContext& ctx, Arena& arena, bool is_hex,
         return true;
       },
       [&](const std::string& tok) -> bool {
-        Logic4Vec word;
-        if (!ParseReadmemWord(ctx, arena, is_hex, tok, aa->elem_width,
-                              two_state, enum_info, word)) {
-          return false;
-        }
-        // §21.4.1: loading an address creates its element if absent.
-        aa->int_data[cursor] = word;
-        cursor += descending ? -1 : 1;
-        return true;
+        return HandleAssocWord(ctx, arena, is_hex, aa, two_state, enum_info,
+                               descending, tok, cursor);
       });
 }
 
@@ -411,6 +458,47 @@ static std::string MultiDimElementName(const std::string& mem_name,
   return nm;
 }
 
+// §21.4.3: handles an @-address during a multidimensional load. The address
+// names a highest-dimension word; loading resumes at the first subword it
+// encloses. An address outside the highest dimension's range is an error.
+// Returns false to stop the scan.
+static bool HandleMultiDimAddr(SimContext& ctx, bool is_hex, int64_t top_lo,
+                               int64_t top_hi, uint64_t inner, int64_t addr,
+                               uint64_t& cursor) {
+  if (addr < top_lo || addr > top_hi) {
+    ctx.GetDiag().Error(
+        {}, "$readmem" + std::string(is_hex ? "h" : "b") +
+                ": file address outside the highest dimension's range");
+    return false;
+  }
+  cursor = static_cast<uint64_t>(addr - top_lo) * inner;
+  return true;
+}
+
+// §21.4.3: handles one data word during a multidimensional load: stops when the
+// array is already full, otherwise parses the token, writes it to the element
+// named by the running row-major position, and advances the cursor. Returns
+// false to stop the scan.
+static bool HandleMultiDimWord(SimContext& ctx, Arena& arena, bool is_hex,
+                               const std::string& mem_name, const ArrayInfo* ai,
+                               const std::vector<uint32_t>& los,
+                               const std::vector<uint32_t>& sizes, size_t ndim,
+                               uint64_t inner, int64_t top_lo, uint64_t total,
+                               bool two_state, const EnumTypeInfo* enum_info,
+                               const std::string& tok, uint64_t& cursor) {
+  if (cursor >= total) return false;  // array full; nothing more to fill
+  Logic4Vec word;
+  if (!ParseReadmemWord(ctx, arena, is_hex, tok, ai->elem_width, two_state,
+                        enum_info, word)) {
+    return false;
+  }
+  std::string elem =
+      MultiDimElementName(mem_name, los, sizes, ndim, inner, top_lo, cursor);
+  if (auto* var = ctx.FindVariable(elem)) var->value = word;
+  ++cursor;
+  return true;
+}
+
 static void EvalReadmemMultiDim(SimContext& ctx, Arena& arena, bool is_hex,
                                 const std::string& content,
                                 const std::string& mem_name,
@@ -435,29 +523,13 @@ static void EvalReadmemMultiDim(SimContext& ctx, Arena& arena, bool is_hex,
   ScanMemFile(
       content,
       [&](int64_t addr) -> bool {
-        // §21.4.3: an address entry names a highest-dimension word. Loading
-        // resumes at the first subword enclosed by that word.
-        if (addr < kTopLo || addr > kTopHi) {
-          ctx.GetDiag().Error(
-              {}, "$readmem" + std::string(is_hex ? "h" : "b") +
-                      ": file address outside the highest dimension's range");
-          return false;
-        }
-        cursor = static_cast<uint64_t>(addr - kTopLo) * inner;
-        return true;
+        return HandleMultiDimAddr(ctx, is_hex, kTopLo, kTopHi, inner, addr,
+                                  cursor);
       },
       [&](const std::string& tok) -> bool {
-        if (cursor >= kTotal) return false;  // array full; nothing more to fill
-        Logic4Vec word;
-        if (!ParseReadmemWord(ctx, arena, is_hex, tok, ai->elem_width,
-                              two_state, enum_info, word)) {
-          return false;
-        }
-        std::string elem = MultiDimElementName(mem_name, los, sizes, kNdim,
-                                               inner, kTopLo, cursor);
-        if (auto* var = ctx.FindVariable(elem)) var->value = word;
-        ++cursor;
-        return true;
+        return HandleMultiDimWord(ctx, arena, is_hex, mem_name, ai, los, sizes,
+                                  kNdim, inner, kTopLo, kTotal, two_state,
+                                  enum_info, tok, cursor);
       });
 }
 
@@ -496,6 +568,54 @@ static bool ResolveMemName(SimContext& ctx, Arena& arena, const Expr* mn,
   return false;
 }
 
+// §21.4.1: loads a dynamic array or queue, whose size is fixed for the load (an
+// address beyond the last element is dropped, never resized to make room). A
+// slice narrows the address window to its own bounds, clamped to the array.
+static void LoadMemQueue(SimContext& ctx, Arena& arena, bool is_hex,
+                         const std::string& content, QueueObject* q,
+                         const EnumTypeInfo* enum_info, bool is_slice,
+                         int64_t slice_lo, int64_t slice_hi, bool has_start,
+                         bool has_finish, int64_t start_arg,
+                         int64_t finish_arg) {
+  int64_t low_addr = 0;
+  int64_t high_addr = static_cast<int64_t>(q->elements.size()) - 1;
+  if (is_slice) {
+    low_addr = std::max(slice_lo, low_addr);
+    high_addr = std::min(slice_hi, high_addr);
+  }
+  EvalReadmemIndexed(ctx, arena, is_hex, content, low_addr, high_addr, is_slice,
+                     q->elem_width, !q->is_4state, enum_info, has_start,
+                     has_finish, start_arg, finish_arg,
+                     [&](int64_t addr, const Logic4Vec& v) {
+                       q->elements[static_cast<size_t>(addr)] = v;
+                     });
+}
+
+// §21.4: loads a single-dimension unpacked array (or one lower dimension named
+// by a slice, see §7.4.5). A slice narrows the load window to its own bounds,
+// clamped to the array.
+static void LoadMemSingleDim(SimContext& ctx, Arena& arena, bool is_hex,
+                             const std::string& content,
+                             const std::string& mem_name, const ArrayInfo* ai,
+                             const EnumTypeInfo* enum_info, bool is_slice,
+                             int64_t slice_lo, int64_t slice_hi, bool has_start,
+                             bool has_finish, int64_t start_arg,
+                             int64_t finish_arg) {
+  int64_t arr_lo = ai->lo;
+  int64_t arr_hi = ai->lo + static_cast<int64_t>(ai->size) - 1;
+  // A slice narrows the load window to its own bounds (clamped to the array).
+  int64_t low_addr = is_slice ? std::max(slice_lo, arr_lo) : arr_lo;
+  int64_t high_addr = is_slice ? std::min(slice_hi, arr_hi) : arr_hi;
+
+  EvalReadmemIndexed(
+      ctx, arena, is_hex, content, low_addr, high_addr, is_slice,
+      ai->elem_width, !ai->is_4state, enum_info, has_start, has_finish,
+      start_arg, finish_arg, [&](int64_t addr, const Logic4Vec& v) {
+        std::string elem = mem_name + "[" + std::to_string(addr) + "]";
+        if (auto* var = ctx.FindVariable(elem)) var->value = v;
+      });
+}
+
 static void DoMemLoad(SimContext& ctx, Arena& arena, bool is_hex,
                       const std::string& content, const Expr* mn,
                       bool has_start, bool has_finish, int64_t start_arg,
@@ -525,22 +645,10 @@ static void DoMemLoad(SimContext& ctx, Arena& arena, bool is_hex,
     return;
   }
 
-  // §21.4.1: a dynamic array or queue loads into its existing elements. The
-  // current size is fixed for the load, so an address beyond the last element
-  // is simply dropped — the array is never resized to make room.
+  // §21.4.1: a dynamic array or queue loads into its existing elements.
   if (QueueObject* q = ctx.FindQueue(mem_name)) {
-    int64_t low_addr = 0;
-    int64_t high_addr = static_cast<int64_t>(q->elements.size()) - 1;
-    if (is_slice) {
-      low_addr = std::max(slice_lo, low_addr);
-      high_addr = std::min(slice_hi, high_addr);
-    }
-    EvalReadmemIndexed(ctx, arena, is_hex, content, low_addr, high_addr,
-                       is_slice, q->elem_width, !q->is_4state, enum_info,
-                       has_start, has_finish, start_arg, finish_arg,
-                       [&](int64_t addr, const Logic4Vec& v) {
-                         q->elements[static_cast<size_t>(addr)] = v;
-                       });
+    LoadMemQueue(ctx, arena, is_hex, content, q, enum_info, is_slice, slice_lo,
+                 slice_hi, has_start, has_finish, start_arg, finish_arg);
     return;
   }
 
@@ -557,19 +665,9 @@ static void DoMemLoad(SimContext& ctx, Arena& arena, bool is_hex,
     return;
   }
 
-  int64_t arr_lo = ai->lo;
-  int64_t arr_hi = ai->lo + static_cast<int64_t>(ai->size) - 1;
-  // A slice narrows the load window to its own bounds (clamped to the array).
-  int64_t low_addr = is_slice ? std::max(slice_lo, arr_lo) : arr_lo;
-  int64_t high_addr = is_slice ? std::min(slice_hi, arr_hi) : arr_hi;
-
-  EvalReadmemIndexed(
-      ctx, arena, is_hex, content, low_addr, high_addr, is_slice,
-      ai->elem_width, !ai->is_4state, enum_info, has_start, has_finish,
-      start_arg, finish_arg, [&](int64_t addr, const Logic4Vec& v) {
-        std::string elem = mem_name + "[" + std::to_string(addr) + "]";
-        if (auto* var = ctx.FindVariable(elem)) var->value = v;
-      });
+  LoadMemSingleDim(ctx, arena, is_hex, content, mem_name, ai, enum_info,
+                   is_slice, slice_lo, slice_hi, has_start, has_finish,
+                   start_arg, finish_arg);
 }
 
 // §21.4: $readmemb / $readmemh read a text file of white space, comments, and
@@ -689,6 +787,47 @@ static void WriteMemAddressRange(int64_t start_addr, int64_t finish_addr,
 // §21.5.3 fixes whether @-address specifiers accompany the words: an unpacked
 // or dynamic array is written as a bare sequence (a sequential read reloads
 // it), while an associative array prefixes every entry with its @-address.
+// §21.5.3: writes a dynamic array or queue as a bare sequence of words with no
+// @-address specifiers, exactly like a fixed unpacked array, so a sequential
+// $readmem reloads it. The optional start_addr / finish_addr bound the element
+// indices that are written.
+template <class EmitFn>
+static void WriteMemQueue(const Expr* expr, SimContext& ctx, Arena& arena,
+                          const QueueObject* q, EmitFn emit) {
+  int64_t arr_lo = 0;
+  int64_t arr_hi = static_cast<int64_t>(q->elements.size()) - 1;
+  int64_t start_addr = 0;
+  int64_t finish_addr = 0;
+  ResolveWritememRange(expr, ctx, arena, arr_lo, arr_hi, start_addr,
+                       finish_addr);
+  if (arr_hi < arr_lo) return;
+  WriteMemAddressRange(
+      start_addr, finish_addr, arr_lo, arr_hi,
+      [&](int64_t addr) { emit(q->elements[static_cast<size_t>(addr)]); });
+}
+
+// §21.5: writes a fixed unpacked array as a bare sequence of words. The
+// optional start_addr / finish_addr bound the range that is written; a finish
+// below start emits the words in descending address order.
+template <class EmitFn>
+static void WriteMemArray(const Expr* expr, SimContext& ctx, Arena& arena,
+                          const std::string& mem_name, const ArrayInfo* ai,
+                          EmitFn emit) {
+  int64_t arr_lo = ai->lo;
+  int64_t arr_hi = ai->lo + static_cast<int64_t>(ai->size) - 1;
+  int64_t start_addr = 0;
+  int64_t finish_addr = 0;
+  ResolveWritememRange(expr, ctx, arena, arr_lo, arr_hi, start_addr,
+                       finish_addr);
+  WriteMemAddressRange(
+      start_addr, finish_addr, arr_lo, arr_hi, [&](int64_t addr) {
+        std::string elem = mem_name + "[" + std::to_string(addr) + "]";
+        if (auto* var = ctx.FindVariable(elem)) {
+          emit(var->value);
+        }
+      });
+}
+
 Logic4Vec EvalWritemem(const Expr* expr, SimContext& ctx, Arena& arena,
                        bool is_hex) {
   if (expr->args.size() < 2) return MakeLogic4VecVal(arena, 1, 0);
@@ -722,40 +861,13 @@ Logic4Vec EvalWritemem(const Expr* expr, SimContext& ctx, Arena& arena,
     return MakeLogic4VecVal(arena, 1, 0);
   }
 
-  // §21.5.3: a dynamic array or queue is written as a bare sequence of words
-  // with no @-address specifiers, exactly like a fixed unpacked array, so a
-  // sequential $readmem reloads it. The optional start_addr / finish_addr
-  // bound the element indices that are written.
   if (const QueueObject* q = ctx.FindQueue(mem_name)) {
-    int64_t arr_lo = 0;
-    int64_t arr_hi = static_cast<int64_t>(q->elements.size()) - 1;
-    int64_t start_addr = 0;
-    int64_t finish_addr = 0;
-    ResolveWritememRange(expr, ctx, arena, arr_lo, arr_hi, start_addr,
-                         finish_addr);
-    if (arr_hi < arr_lo) return MakeLogic4VecVal(arena, 1, 0);
-    WriteMemAddressRange(
-        start_addr, finish_addr, arr_lo, arr_hi,
-        [&](int64_t addr) { emit(q->elements[static_cast<size_t>(addr)]); });
+    WriteMemQueue(expr, ctx, arena, q, emit);
     return MakeLogic4VecVal(arena, 1, 0);
   }
 
   if (const ArrayInfo* ai = ctx.FindArrayInfo(mem_name)) {
-    int64_t arr_lo = ai->lo;
-    int64_t arr_hi = ai->lo + static_cast<int64_t>(ai->size) - 1;
-    // The optional start_addr / finish_addr bound the range that is written;
-    // a finish below start emits the words in descending address order.
-    int64_t start_addr = 0;
-    int64_t finish_addr = 0;
-    ResolveWritememRange(expr, ctx, arena, arr_lo, arr_hi, start_addr,
-                         finish_addr);
-    WriteMemAddressRange(
-        start_addr, finish_addr, arr_lo, arr_hi, [&](int64_t addr) {
-          std::string elem = mem_name + "[" + std::to_string(addr) + "]";
-          if (auto* var = ctx.FindVariable(elem)) {
-            emit(var->value);
-          }
-        });
+    WriteMemArray(expr, ctx, arena, mem_name, ai, emit);
     return MakeLogic4VecVal(arena, 1, 0);
   }
 

@@ -201,6 +201,30 @@ bool ImplicationHolds(const Word& word, const LvProperty& property,
   return true;
 }
 
+// §F.5.6.1 helper: w^{i.}, L_0 |= P1 holds for every 0 <= i < limit.
+bool UntilLhsHoldsThroughLimit(const Word& word, const LvProperty& lhs,
+                               const LocalContext& context, std::size_t limit) {
+  for (std::size_t i = 0; i < limit; ++i) {
+    if (!Satisfies(Suffix(word, i), lhs, context)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+// §F.5.6.1 helper: some 0 <= j < |w| has w^{j.}, L_0 |= P2 while
+// w^{i.}, L_0 |= P1 for all 0 <= i < j.
+bool UntilHasReleasingIndex(const Word& word, const LvProperty& property,
+                            const LocalContext& context) {
+  for (std::size_t j = 0; j < word.size(); ++j) {
+    if (Satisfies(Suffix(word, j), *property.rhs, context) &&
+        UntilLhsHoldsThroughLimit(word, *property.lhs, context, j)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 // §F.5.6.1: w, L_0 |= ( P1 until P2 ) iff some 0 <= j < |w| has
 // w^{j.}, L_0 |= P2 with w^{i.}, L_0 |= P1 for all 0 <= i < j, or
 // w^{i.}, L_0 |= P1 for all i.
@@ -209,26 +233,10 @@ bool UntilHolds(const Word& word, const LvProperty& property,
   if (!property.lhs || !property.rhs) {
     return false;
   }
-  for (std::size_t j = 0; j < word.size(); ++j) {
-    if (Satisfies(Suffix(word, j), *property.rhs, context)) {
-      bool prefix_holds = true;
-      for (std::size_t i = 0; i < j; ++i) {
-        if (!Satisfies(Suffix(word, i), *property.lhs, context)) {
-          prefix_holds = false;
-          break;
-        }
-      }
-      if (prefix_holds) {
-        return true;
-      }
-    }
+  if (UntilHasReleasingIndex(word, property, context)) {
+    return true;
   }
-  for (std::size_t i = 0; i < word.size(); ++i) {
-    if (!Satisfies(Suffix(word, i), *property.lhs, context)) {
-      return false;
-    }
-  }
-  return true;
+  return UntilLhsHoldsThroughLimit(word, *property.lhs, context, word.size());
 }
 
 // §F.5.6.1: w, L_0 |= ( accept_on (b) P ) iff w, L_0 |= P, or for some

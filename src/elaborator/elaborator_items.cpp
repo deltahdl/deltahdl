@@ -270,6 +270,80 @@ void CheckGateInstanceArrayTerminalWidths(
   }
 }
 
+// Emits the redeclaration and dynamic-override-specifier diagnostics for a
+// function or task declaration item. Records the name in `declared_names`.
+void CheckFunctionDeclDiagnostics(
+    const ModuleItem* item,
+    std::unordered_set<std::string_view>& declared_names, DiagEngine& diag) {
+  if (!item->name.empty() && !declared_names.insert(item->name).second) {
+    diag.Error(item->loc, std::format("redeclaration of '{}'", item->name));
+  }
+  if (item->method_class.empty() &&
+      (item->is_method_initial || item->is_method_extends ||
+       item->is_method_final)) {
+    diag.Error(item->loc,
+               "dynamic_override_specifiers shall only be legal on "
+               "method declarations inside a non-interface class scope");
+  }
+}
+
+// Emits the gate-instance name-conflict and redeclaration diagnostics. Records
+// the instance name in `declared_names`.
+void CheckGateInstNameDiagnostics(
+    const ModuleItem* item,
+    std::unordered_set<std::string_view>& declared_names, DiagEngine& diag) {
+  if (!item->gate_inst_name.empty() && !item->gate_terminals.empty() &&
+      item->gate_terminals[0] &&
+      item->gate_terminals[0]->kind == ExprKind::kIdentifier &&
+      item->gate_terminals[0]->text == item->gate_inst_name) {
+    diag.Error(item->loc,
+               std::format("gate instance name '{}' conflicts with its "
+                           "output net",
+                           item->gate_inst_name));
+  }
+  if (!item->gate_inst_name.empty() &&
+      !declared_names.insert(item->gate_inst_name).second) {
+    diag.Error(item->loc,
+               std::format("redeclaration of '{}'", item->gate_inst_name));
+  }
+}
+
+// Emits the UDP-instance redeclaration diagnostic and records the instance
+// name.
+void CheckUdpInstNameDiagnostics(
+    const ModuleItem* item,
+    std::unordered_set<std::string_view>& declared_names, DiagEngine& diag) {
+  if (!item->gate_inst_name.empty() &&
+      !declared_names.insert(item->gate_inst_name).second) {
+    diag.Error(item->loc,
+               std::format("redeclaration of '{}'", item->gate_inst_name));
+  }
+}
+
+// Builds an RTLIR import record from an import-declaration item and appends it
+// to the module's import list.
+void RecordImportDecl(const ModuleItem* item, RtlirModule* mod) {
+  RtlirImport imp;
+  imp.package_name = item->import_item.package_name;
+  imp.item_name = item->import_item.item_name;
+  imp.is_wildcard = item->import_item.is_wildcard;
+  mod->imports.push_back(imp);
+}
+
+// Records a class declaration's name (and parameterized status) and pushes the
+// class decl onto the module per §8.
+void RecordClassDecl(
+    const ModuleItem* item, RtlirModule* mod,
+    std::unordered_set<std::string_view>& class_names,
+    std::unordered_set<std::string_view>& parameterized_class_names) {
+  if (!item->class_decl) return;
+  class_names.insert(item->class_decl->name);
+  if (!item->class_decl->params.empty()) {
+    parameterized_class_names.insert(item->class_decl->name);
+  }
+  mod->class_decls.push_back(item->class_decl);
+}
+
 }  // namespace
 
 void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
@@ -315,41 +389,13 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
       break;
     case ModuleItemKind::kFunctionDecl:
     case ModuleItemKind::kTaskDecl:
-
-      if (!item->name.empty() && !declared_names_.insert(item->name).second) {
-        diag_.Error(item->loc,
-                    std::format("redeclaration of '{}'", item->name));
-      }
-
-      if (item->method_class.empty() &&
-          (item->is_method_initial || item->is_method_extends ||
-           item->is_method_final)) {
-        diag_.Error(item->loc,
-                    "dynamic_override_specifiers shall only be legal on "
-                    "method declarations inside a non-interface class scope");
-      }
+      CheckFunctionDeclDiagnostics(item, declared_names_, diag_);
       ValidateFunctionBody(item);
       ValidateFunctionArgDefaultsScope(item);
       mod->function_decls.push_back(item);
       break;
     case ModuleItemKind::kGateInst:
-
-      if (!item->gate_inst_name.empty() && !item->gate_terminals.empty() &&
-          item->gate_terminals[0] &&
-          item->gate_terminals[0]->kind == ExprKind::kIdentifier &&
-          item->gate_terminals[0]->text == item->gate_inst_name) {
-        diag_.Error(item->loc,
-                    std::format("gate instance name '{}' conflicts with its "
-                                "output net",
-                                item->gate_inst_name));
-      }
-
-      if (!item->gate_inst_name.empty() &&
-          !declared_names_.insert(item->gate_inst_name).second) {
-        diag_.Error(item->loc,
-                    std::format("redeclaration of '{}'", item->gate_inst_name));
-      }
-
+      CheckGateInstNameDiagnostics(item, declared_names_, diag_);
       // §6.10: an undeclared identifier used in a primitive instance's
       // terminal list is assumed to be an implicit scalar net of the default
       // net type, the same assumption made for a module instance's port
@@ -370,12 +416,7 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
       ResolveInterconnectPrimitiveTerminals(item->gate_terminals, mod);
       break;
     case ModuleItemKind::kUdpInst:
-
-      if (!item->gate_inst_name.empty() &&
-          !declared_names_.insert(item->gate_inst_name).second) {
-        diag_.Error(item->loc,
-                    std::format("redeclaration of '{}'", item->gate_inst_name));
-      }
+      CheckUdpInstNameDiagnostics(item, declared_names_, diag_);
       // §6.10: undeclared identifiers in a UDP instance's terminal list also
       // become implicit scalar nets of the default net type.
       for (auto* term : item->gate_terminals) {
@@ -420,14 +461,9 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
       break;
     case ModuleItemKind::kDefparam:
       break;
-    case ModuleItemKind::kImportDecl: {
-      RtlirImport imp;
-      imp.package_name = item->import_item.package_name;
-      imp.item_name = item->import_item.item_name;
-      imp.is_wildcard = item->import_item.is_wildcard;
-      mod->imports.push_back(imp);
+    case ModuleItemKind::kImportDecl:
+      RecordImportDecl(item, mod);
       break;
-    }
     case ModuleItemKind::kExportDecl:
 
       break;
@@ -491,12 +527,7 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
     case ModuleItemKind::kNestedModuleDecl:
       break;
     case ModuleItemKind::kClassDecl:
-      if (item->class_decl) {
-        class_names_.insert(item->class_decl->name);
-        if (!item->class_decl->params.empty())
-          parameterized_class_names_.insert(item->class_decl->name);
-        mod->class_decls.push_back(item->class_decl);
-      }
+      RecordClassDecl(item, mod, class_names_, parameterized_class_names_);
       break;
   }
 }
@@ -545,6 +576,177 @@ std::optional<std::vector<int64_t>> TryConstEvalInstParams(
   return values;
 }
 
+// §25.9: records a module-instance whose resolved child is an interface,
+// checker, or program into the corresponding lookup table so later passes can
+// validate references against the instantiated kind.
+void ClassifyInstantiatedChild(
+    const ModuleItem* item, const ModuleDecl* child,
+    std::unordered_map<std::string_view, std::string_view>&
+        interface_inst_types,
+    std::unordered_map<std::string_view, std::vector<int64_t>>&
+        interface_inst_param_values,
+    std::unordered_set<std::string_view>& checker_inst_names,
+    std::unordered_set<std::string_view>& program_inst_names) {
+  if (child->decl_kind == ModuleDeclKind::kInterface) {
+    interface_inst_types[item->inst_name] = item->inst_module;
+    if (auto values = TryConstEvalInstParams(item)) {
+      interface_inst_param_values[item->inst_name] = std::move(*values);
+    }
+  }
+  if (child->decl_kind == ModuleDeclKind::kChecker) {
+    checker_inst_names.insert(item->inst_name);
+  }
+  if (child->decl_kind == ModuleDeclKind::kProgram) {
+    program_inst_names.insert(item->inst_name);
+  }
+}
+
+// Emits the parent-scope legality diagnostics for a module-instance item whose
+// resolved child is `child`: an interface may not instantiate a module, and a
+// program or checker may only instantiate checkers.
+void CheckModuleInstParentRules(const ModuleItem* item, const ModuleDecl* decl,
+                                const ModuleDecl* child, bool parent_is_program,
+                                bool parent_is_checker,
+                                std::string_view parent_kind_word,
+                                DiagEngine& diag) {
+  if (decl->decl_kind == ModuleDeclKind::kInterface &&
+      child->decl_kind == ModuleDeclKind::kModule) {
+    diag.Error(item->loc,
+               std::format("module '{}' cannot be instantiated inside "
+                           "interface '{}'",
+                           item->inst_module, decl->name));
+  }
+  if ((parent_is_program || parent_is_checker) &&
+      child->decl_kind != ModuleDeclKind::kChecker) {
+    diag.Error(item->loc,
+               std::format("only checkers can be instantiated inside "
+                           "{} '{}'",
+                           parent_kind_word, decl->name));
+  }
+}
+
+// Emits the per-item legality diagnostics that depend only on the parent decl
+// kind (no instance resolution): forbidden primitives/nets/always/nested decls
+// inside programs/checkers/interfaces, and records port-less nested programs.
+void CheckProgramCheckerItemRules(
+    const ModuleItem* item, const ModuleDecl* decl, bool parent_is_program,
+    bool parent_is_checker, std::string_view parent_kind_word,
+    std::unordered_set<std::string_view>& program_inst_names,
+    DiagEngine& diag) {
+  if ((parent_is_program || parent_is_checker) &&
+      item->kind == ModuleItemKind::kUdpInst) {
+    diag.Error(item->loc, std::format("primitive cannot be instantiated inside "
+                                      "{} '{}'",
+                                      parent_kind_word, decl->name));
+  }
+  // §17.7: a checker body may define variables but not nets.
+  if (parent_is_checker && item->kind == ModuleItemKind::kNetDecl) {
+    diag.Error(item->loc,
+               std::format("a net cannot be declared inside checker '{}'; "
+                           "only variables may be defined in a checker body",
+                           decl->name));
+  }
+  // Annex C.2.7: a general 'always' procedure is removed for checkers.
+  if (parent_is_checker && item->kind == ModuleItemKind::kAlwaysBlock) {
+    diag.Error(item->loc,
+               std::format("a general 'always' procedure cannot be used "
+                           "inside checker '{}'; use always_comb, "
+                           "always_latch, or always_ff instead",
+                           decl->name));
+  }
+  // §17.2: only further checkers may be declared inside a checker.
+  if (parent_is_checker && item->kind == ModuleItemKind::kNestedModuleDecl &&
+      item->nested_module_decl &&
+      item->nested_module_decl->decl_kind != ModuleDeclKind::kChecker) {
+    diag.Error(item->loc,
+               std::format("a module, interface, or program cannot be "
+                           "declared inside checker '{}'",
+                           decl->name));
+  }
+  if (item->kind == ModuleItemKind::kNestedModuleDecl &&
+      item->nested_module_decl &&
+      item->nested_module_decl->decl_kind == ModuleDeclKind::kProgram &&
+      item->nested_module_decl->ports.empty()) {
+    program_inst_names.insert(item->nested_module_decl->name);
+  }
+  if (decl->decl_kind == ModuleDeclKind::kInterface &&
+      item->kind == ModuleItemKind::kNestedModuleDecl &&
+      item->nested_module_decl &&
+      item->nested_module_decl->decl_kind == ModuleDeclKind::kModule) {
+    diag.Error(item->loc,
+               std::format("module '{}' cannot be declared inside "
+                           "interface '{}'",
+                           item->nested_module_decl->name, decl->name));
+  }
+}
+
+// Returns true if a child instance named `name` already exists on the module,
+// i.e. the nested module was explicitly instantiated by the source.
+bool ModuleExplicitlyInstantiated(const RtlirModule* mod,
+                                  std::string_view name) {
+  for (const auto& child : mod->children) {
+    if (child.module_name == name) return true;
+  }
+  return false;
+}
+
+// Indexes the nested module/interface/program declarations of `decl` by name
+// and rejects a virtual-interface variable declared directly inside an
+// interface body.
+void CollectNestedModulesAndCheckVif(
+    const ModuleDecl* decl,
+    std::unordered_map<std::string_view, ModuleDecl*>& nested_module_decls,
+    DiagEngine& diag) {
+  for (const auto* item : decl->items) {
+    if (item->kind == ModuleItemKind::kNestedModuleDecl &&
+        item->nested_module_decl) {
+      nested_module_decls[item->nested_module_decl->name] =
+          item->nested_module_decl;
+    }
+    if (decl->decl_kind == ModuleDeclKind::kInterface &&
+        item->kind == ModuleItemKind::kVarDecl &&
+        item->data_type.kind == DataTypeKind::kVirtualInterface) {
+      diag.Error(item->loc,
+                 "virtual interface cannot be declared inside an interface");
+    }
+  }
+}
+
+// Records task and function declaration names, defaults their lifetime from the
+// enclosing decl (§6.21), and collects the automatic ones. Mutates the three
+// member tables passed by reference.
+void ClassifyTaskFuncDecls(
+    const ModuleDecl* decl, std::unordered_set<std::string_view>& task_names,
+    std::unordered_map<std::string_view, const ModuleItem*>& func_decls,
+    std::unordered_set<std::string_view>& auto_task_func_names) {
+  for (const auto* item : decl->items) {
+    if (item->kind == ModuleItemKind::kTaskDecl) {
+      task_names.insert(item->name);
+    }
+    if (item->kind == ModuleItemKind::kFunctionDecl) {
+      func_decls[item->name] = item;
+    }
+  }
+  for (auto* item : decl->items) {
+    if ((item->kind == ModuleItemKind::kFunctionDecl ||
+         item->kind == ModuleItemKind::kTaskDecl) &&
+        !item->is_automatic && !item->is_static) {
+      if (decl->is_automatic) {
+        item->is_automatic = true;
+      } else {
+        item->is_static = true;
+      }
+    }
+  }
+  for (const auto* item : decl->items) {
+    if ((item->kind == ModuleItemKind::kTaskDecl ||
+         item->kind == ModuleItemKind::kFunctionDecl) &&
+        item->is_automatic) {
+      auto_task_func_names.insert(item->name);
+    }
+  }
+}
+
 }  // namespace
 
 void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
@@ -586,20 +788,7 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
   task_names_.clear();
   sequence_names_.clear();
   func_decls_.clear();
-  for (const auto* item : decl->items) {
-    if (item->kind == ModuleItemKind::kNestedModuleDecl &&
-        item->nested_module_decl) {
-      nested_module_decls_[item->nested_module_decl->name] =
-          item->nested_module_decl;
-    }
-
-    if (decl->decl_kind == ModuleDeclKind::kInterface &&
-        item->kind == ModuleItemKind::kVarDecl &&
-        item->data_type.kind == DataTypeKind::kVirtualInterface) {
-      diag_.Error(item->loc,
-                  "virtual interface cannot be declared inside an interface");
-    }
-  }
+  CollectNestedModulesAndCheckVif(decl, nested_module_decls_, diag_);
   const bool kParentIsProgram = decl->decl_kind == ModuleDeclKind::kProgram;
   const bool kParentIsChecker = decl->decl_kind == ModuleDeclKind::kChecker;
   const std::string_view kParentKindWord = kParentIsProgram
@@ -609,127 +798,23 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
   for (const auto* item : decl->items) {
     if (item->kind == ModuleItemKind::kModuleInst) {
       auto* child = FindModuleInScope(item->inst_module);
-      if (child && child->decl_kind == ModuleDeclKind::kInterface) {
-        interface_inst_types_[item->inst_name] = item->inst_module;
-        // §25.9: record explicit parameter overrides (when they evaluate to
-        // constants) so a later virtual-interface assignment can confirm the
-        // actual parameter values match.
-        if (auto values = TryConstEvalInstParams(item)) {
-          interface_inst_param_values_[item->inst_name] = std::move(*values);
-        }
-      }
-      if (child && child->decl_kind == ModuleDeclKind::kChecker) {
-        checker_inst_names_.insert(item->inst_name);
-      }
-      if (child && child->decl_kind == ModuleDeclKind::kProgram) {
-        program_inst_names_.insert(item->inst_name);
-      }
-      if (decl->decl_kind == ModuleDeclKind::kInterface && child &&
-          child->decl_kind == ModuleDeclKind::kModule) {
-        diag_.Error(item->loc,
-                    std::format("module '{}' cannot be instantiated inside "
-                                "interface '{}'",
-                                item->inst_module, decl->name));
-      }
-      if ((kParentIsProgram || kParentIsChecker) && child &&
-          child->decl_kind != ModuleDeclKind::kChecker) {
-        diag_.Error(item->loc,
-                    std::format("only checkers can be instantiated inside "
-                                "{} '{}'",
-                                kParentKindWord, decl->name));
+      if (child) {
+        ClassifyInstantiatedChild(item, child, interface_inst_types_,
+                                  interface_inst_param_values_,
+                                  checker_inst_names_, program_inst_names_);
+        CheckModuleInstParentRules(item, decl, child, kParentIsProgram,
+                                   kParentIsChecker, kParentKindWord, diag_);
       }
     }
-    if ((kParentIsProgram || kParentIsChecker) &&
-        item->kind == ModuleItemKind::kUdpInst) {
-      diag_.Error(item->loc,
-                  std::format("primitive cannot be instantiated inside "
-                              "{} '{}'",
-                              kParentKindWord, decl->name));
-    }
-
-    // §17.7: a checker body may define variables (the checker variables of
-    // §17.2's checker_or_generate_item_declaration), but defining nets in the
-    // checker body is illegal.
-    if (kParentIsChecker && item->kind == ModuleItemKind::kNetDecl) {
-      diag_.Error(item->loc,
-                  std::format("a net cannot be declared inside checker '{}'; "
-                              "only variables may be defined in a checker body",
-                              decl->name));
-    }
-
-    // Annex C.2.7: the general-purpose always procedure in checkers is
-    // deprecated and removed in this version of the standard. The specialized
-    // always_comb, always_latch, and always_ff procedures have been added for
-    // checkers and cover every case a general always could express, so a plain
-    // always inside a checker body is rejected.
-    if (kParentIsChecker && item->kind == ModuleItemKind::kAlwaysBlock) {
-      diag_.Error(item->loc,
-                  std::format("a general 'always' procedure cannot be used "
-                              "inside checker '{}'; use always_comb, "
-                              "always_latch, or always_ff instead",
-                              decl->name));
-    }
-
-    // §17.2: modules, interfaces, and programs shall not be declared inside a
-    // checker. Only further checker declarations are permitted here.
-    if (kParentIsChecker && item->kind == ModuleItemKind::kNestedModuleDecl &&
-        item->nested_module_decl &&
-        item->nested_module_decl->decl_kind != ModuleDeclKind::kChecker) {
-      diag_.Error(item->loc,
-                  std::format("a module, interface, or program cannot be "
-                              "declared inside checker '{}'",
-                              decl->name));
-    }
-
-    if (item->kind == ModuleItemKind::kNestedModuleDecl &&
-        item->nested_module_decl &&
-        item->nested_module_decl->decl_kind == ModuleDeclKind::kProgram &&
-        item->nested_module_decl->ports.empty()) {
-      program_inst_names_.insert(item->nested_module_decl->name);
-    }
-    if (decl->decl_kind == ModuleDeclKind::kInterface &&
-        item->kind == ModuleItemKind::kNestedModuleDecl &&
-        item->nested_module_decl &&
-        item->nested_module_decl->decl_kind == ModuleDeclKind::kModule) {
-      diag_.Error(item->loc,
-                  std::format("module '{}' cannot be declared inside "
-                              "interface '{}'",
-                              item->nested_module_decl->name, decl->name));
-    }
+    CheckProgramCheckerItemRules(item, decl, kParentIsProgram, kParentIsChecker,
+                                 kParentKindWord, program_inst_names_, diag_);
   }
 
   for (const auto& [pname, pval] : decl->params) {
     const_names_.insert(pname);
   }
 
-  for (const auto* item : decl->items) {
-    if (item->kind == ModuleItemKind::kTaskDecl) {
-      task_names_.insert(item->name);
-    }
-    if (item->kind == ModuleItemKind::kFunctionDecl) {
-      func_decls_[item->name] = item;
-    }
-  }
-
-  for (auto* item : decl->items) {
-    if ((item->kind == ModuleItemKind::kFunctionDecl ||
-         item->kind == ModuleItemKind::kTaskDecl) &&
-        !item->is_automatic && !item->is_static) {
-      if (decl->is_automatic) {
-        item->is_automatic = true;
-      } else {
-        item->is_static = true;
-      }
-    }
-  }
-
-  for (const auto* item : decl->items) {
-    if ((item->kind == ModuleItemKind::kTaskDecl ||
-         item->kind == ModuleItemKind::kFunctionDecl) &&
-        item->is_automatic) {
-      auto_task_func_names_.insert(item->name);
-    }
-  }
+  ClassifyTaskFuncDecls(decl, task_names_, func_decls_, auto_task_func_names_);
 
   std::vector<std::pair<std::string_view, ModuleDecl*>> local_nested_modules(
       nested_module_decls_.begin(), nested_module_decls_.end());
@@ -754,14 +839,7 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
     if (nested_decl->decl_kind == ModuleDeclKind::kInterface) continue;
 
     if (HasParamPortWithoutDefault(nested_decl)) continue;
-    bool explicitly_instantiated = false;
-    for (const auto& child : mod->children) {
-      if (child.module_name == name) {
-        explicitly_instantiated = true;
-        break;
-      }
-    }
-    if (explicitly_instantiated) continue;
+    if (ModuleExplicitlyInstantiated(mod, name)) continue;
     RtlirModuleInst inst;
     inst.module_name = name;
     inst.inst_name = name;

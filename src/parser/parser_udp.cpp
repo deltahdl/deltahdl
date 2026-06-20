@@ -218,9 +218,8 @@ static bool UdpRowContainsZ(const UdpTableRow& row) {
   return UdpSymbolIsZ(row.current_state) || UdpSymbolIsZ(row.output);
 }
 
-static void ValidateUdpRowInputTransitions(DiagEngine& diag,
-                                           const UdpTableRow& row,
-                                           SourceLoc row_loc) {
+static void ValidateUdpRowEdgeCount(DiagEngine& diag, const UdpTableRow& row,
+                                    SourceLoc row_loc) {
   int edge_count = 0;
   for (char c : row.inputs) {
     if (UdpInputIsEdge(c)) ++edge_count;
@@ -229,27 +228,40 @@ static void ValidateUdpRowInputTransitions(DiagEngine& diag,
     diag.Error(row_loc,
                "UDP table row shall contain at most one input transition");
   }
+}
 
-  if (!row.inputs.empty()) {
-    bool all_x = true;
-    for (char c : row.inputs) {
-      if (c != 'x' && c != 'X') {
-        all_x = false;
-        break;
-      }
-    }
-    if (all_x && row.output != 'x' && row.output != 'X') {
-      diag.Error(row_loc,
-                 "UDP table row with all-x inputs shall specify x output");
+static void ValidateUdpRowAllXInputs(DiagEngine& diag, const UdpTableRow& row,
+                                     SourceLoc row_loc) {
+  if (row.inputs.empty()) return;
+  bool all_x = true;
+  for (char c : row.inputs) {
+    if (c != 'x' && c != 'X') {
+      all_x = false;
+      break;
     }
   }
+  if (all_x && row.output != 'x' && row.output != 'X') {
+    diag.Error(row_loc,
+               "UDP table row with all-x inputs shall specify x output");
+  }
+}
 
+static void ValidateUdpRowNoDashInput(DiagEngine& diag, const UdpTableRow& row,
+                                      SourceLoc row_loc) {
   for (char c : row.inputs) {
     if (c == '-') {
       diag.Error(row_loc, "- shall not appear in a UDP input field");
       break;
     }
   }
+}
+
+static void ValidateUdpRowInputTransitions(DiagEngine& diag,
+                                           const UdpTableRow& row,
+                                           SourceLoc row_loc) {
+  ValidateUdpRowEdgeCount(diag, row, row_loc);
+  ValidateUdpRowAllXInputs(diag, row, row_loc);
+  ValidateUdpRowNoDashInput(diag, row, row_loc);
 }
 
 static void ValidateUdpRowStateAndOutput(DiagEngine& diag, UdpDecl* udp,
@@ -369,6 +381,27 @@ static void ReconcileUdpNonAnsiPortList(
   }
 }
 
+// Emits the diagnostics for a UDP initial statement header (the begin/delay
+// form errors and the output-target mismatch) given the positions captured at
+// the matching points in the token stream. Pure-diagnostic; no parsing.
+static void ValidateUdpInitialHeader(DiagEngine& diag, const UdpDecl* udp,
+                                     bool saw_begin, SourceLoc begin_loc,
+                                     bool saw_hash, SourceLoc hash_loc,
+                                     const Token& id_tok) {
+  if (saw_begin) {
+    diag.Error(begin_loc,
+               "UDP initial statement shall be a single procedural assignment");
+  }
+  if (saw_hash) {
+    diag.Error(hash_loc,
+               "UDP initial statement shall not contain delay control");
+  }
+  if (!udp->output_name.empty() && id_tok.text != udp->output_name) {
+    diag.Error(id_tok.loc,
+               "UDP initial statement shall target the output port");
+  }
+}
+
 UdpDecl* Parser::ParseUdpDecl() {
   auto* udp = arena_.Create<UdpDecl>();
   udp->range.start = CurrentLoc();
@@ -429,22 +462,13 @@ UdpDecl* Parser::ParseUdpDecl() {
   if (Match(TokenKind::kKwInitial)) {
     udp->has_initial = true;
 
-    if (Check(TokenKind::kKwBegin)) {
-      diag_.Error(
-          CurrentLoc(),
-          "UDP initial statement shall be a single procedural assignment");
-    }
-
-    if (Check(TokenKind::kHash)) {
-      diag_.Error(CurrentLoc(),
-                  "UDP initial statement shall not contain delay control");
-    }
+    bool saw_begin = Check(TokenKind::kKwBegin);
+    SourceLoc begin_loc = CurrentLoc();
+    bool saw_hash = Check(TokenKind::kHash);
+    SourceLoc hash_loc = CurrentLoc();
     auto id_tok = Expect(TokenKind::kIdentifier);
-
-    if (!udp->output_name.empty() && id_tok.text != udp->output_name) {
-      diag_.Error(id_tok.loc,
-                  "UDP initial statement shall target the output port");
-    }
+    ValidateUdpInitialHeader(diag_, udp, saw_begin, begin_loc, saw_hash,
+                             hash_loc, id_tok);
     Expect(TokenKind::kEq);
 
     auto rhs_tok = CurrentToken();

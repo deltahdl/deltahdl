@@ -646,55 +646,92 @@ static void ApplyCompoundAssignOp(const Stmt* stmt, SimContext& ctx,
   }
 }
 
-StmtResult ExecBlockingAssignImpl(const Stmt* stmt, SimContext& ctx,
-                                  Arena& arena) {
-  if (!stmt->lhs) return StmtResult::kDone;
-
-  if (TryVirtualInterfaceAssign(stmt, ctx)) return StmtResult::kDone;
-  if (TryClassNewAssign(stmt, ctx, arena)) return StmtResult::kDone;
-  if (TryTypedClassNewAssign(stmt, ctx, arena)) return StmtResult::kDone;
-  if (TryAssocCopyAssign(stmt, ctx)) return StmtResult::kDone;
-  if (TryAssocLiteralAssign(stmt, ctx, arena)) return StmtResult::kDone;
-  if (TryStreamingConcatToQueueTarget(stmt, ctx, arena))
-    return StmtResult::kDone;
-  if (TryQueueBlockingAssign(stmt, ctx, arena)) return StmtResult::kDone;
-
-  if (TryEventVarAssign(stmt, ctx)) return StmtResult::kDone;
-
-  if (TryUnpackedSliceAssign(stmt, ctx, arena)) return StmtResult::kDone;
-
-  if (TrySubarrayAssign(stmt, ctx, arena)) return StmtResult::kDone;
-
+// Run the chain of special-case blocking-assignment handlers that do not need
+// the generic rhs value (virtual interfaces, class `new`, associative-array
+// copy/literal, streaming-to-queue, queue/event/slice/subarray, and compound
+// operators). Returns true when one of them fully handled the assignment.
+static bool TryDispatchSpecialBlockingAssign(const Stmt* stmt, SimContext& ctx,
+                                             Arena& arena) {
+  if (TryVirtualInterfaceAssign(stmt, ctx)) return true;
+  if (TryClassNewAssign(stmt, ctx, arena)) return true;
+  if (TryTypedClassNewAssign(stmt, ctx, arena)) return true;
+  if (TryAssocCopyAssign(stmt, ctx)) return true;
+  if (TryAssocLiteralAssign(stmt, ctx, arena)) return true;
+  if (TryStreamingConcatToQueueTarget(stmt, ctx, arena)) return true;
+  if (TryQueueBlockingAssign(stmt, ctx, arena)) return true;
+  if (TryEventVarAssign(stmt, ctx)) return true;
+  if (TryUnpackedSliceAssign(stmt, ctx, arena)) return true;
+  if (TrySubarrayAssign(stmt, ctx, arena)) return true;
   if (stmt->rhs && stmt->rhs->kind == ExprKind::kBinary &&
       IsCompoundAssignOp(stmt->rhs->op)) {
     ApplyCompoundAssignOp(stmt, ctx, arena);
-    return StmtResult::kDone;
+    return true;
   }
+  return false;
+}
 
-  auto rhs_val = EvalRhsWithStructContext(stmt, ctx, arena);
-
+// Apply the generic blocking assignment of `rhs_val` once the special-case
+// handlers have declined. Covers concatenation/pattern unpack, streaming
+// unpack, bit/part-select writes, array writes, and the scalar fallback.
+static void ApplyGenericBlockingAssign(const Stmt* stmt, Logic4Vec rhs_val,
+                                       SimContext& ctx, Arena& arena) {
   if (stmt->lhs->kind == ExprKind::kConcatenation ||
       stmt->lhs->kind == ExprKind::kAssignmentPattern) {
     UnpackConcatLhs(stmt->lhs, rhs_val, ctx, arena);
-    return StmtResult::kDone;
+    return;
   }
-
   if (stmt->lhs->kind == ExprKind::kStreamingConcat) {
     UnpackStreamingConcatLhs(stmt->lhs, rhs_val, ctx, arena);
-    return StmtResult::kDone;
+    return;
   }
-
   rhs_val = ApplyStreamPackToTargetWidening(stmt, rhs_val, ctx, arena);
-
   if (stmt->lhs->kind == ExprKind::kSelect) {
     TrySelectBlockingAssign(stmt->lhs, rhs_val, ctx, arena);
-    return StmtResult::kDone;
+    return;
   }
-
-  if (TryArrayBlockingAssign(stmt, ctx, arena)) return StmtResult::kDone;
-
+  if (TryArrayBlockingAssign(stmt, ctx, arena)) return;
   AssignToScalarLhs(stmt, rhs_val, ctx, arena);
+}
+
+StmtResult ExecBlockingAssignImpl(const Stmt* stmt, SimContext& ctx,
+                                  Arena& arena) {
+  if (!stmt->lhs) return StmtResult::kDone;
+  if (TryDispatchSpecialBlockingAssign(stmt, ctx, arena))
+    return StmtResult::kDone;
+  auto rhs_val = EvalRhsWithStructContext(stmt, ctx, arena);
+  ApplyGenericBlockingAssign(stmt, rhs_val, ctx, arena);
   return StmtResult::kDone;
+}
+
+// Append the elements of array `info` named `base` (in declared order) to
+// `elems`. Missing element variables are skipped, matching a sparse store.
+static void AppendArrayElements(std::string_view base, const ArrayInfo* info,
+                                SimContext& ctx,
+                                std::vector<Logic4Vec>& elems) {
+  for (uint32_t i = 0; i < info->size; ++i) {
+    uint32_t idx =
+        info->is_descending ? (info->lo + info->size - 1 - i) : (info->lo + i);
+    auto name = std::string(base) + "[" + std::to_string(idx) + "]";
+    auto* v = ctx.FindVariable(name);
+    if (v) elems.push_back(v->value);
+  }
+}
+
+// Expand a single identifier `item` of an array-concatenation rhs: array
+// identifiers contribute their elements, queue identifiers splice their
+// elements. Returns false when `item` is not an array/queue identifier.
+static bool TryAppendConcatIdentifier(const Expr* item, SimContext& ctx,
+                                      std::vector<Logic4Vec>& elems) {
+  if (item->kind != ExprKind::kIdentifier) return false;
+  if (auto* src_arr = ctx.FindArrayInfo(item->text)) {
+    AppendArrayElements(item->text, src_arr, ctx, elems);
+    return true;
+  }
+  if (auto* src_q = ctx.FindQueue(item->text)) {
+    elems.insert(elems.end(), src_q->elements.begin(), src_q->elements.end());
+    return true;
+  }
+  return false;
 }
 
 // Flatten the elements of an unpacked-array concatenation rhs into `elems`:
@@ -704,26 +741,7 @@ static void CollectArrayConcatElements(const Expr* rhs, SimContext& ctx,
                                        Arena& arena,
                                        std::vector<Logic4Vec>& elems) {
   for (auto* item : rhs->elements) {
-    if (item->kind == ExprKind::kIdentifier) {
-      auto* src_arr = ctx.FindArrayInfo(item->text);
-      if (src_arr) {
-        for (uint32_t i = 0; i < src_arr->size; ++i) {
-          uint32_t idx = src_arr->is_descending
-                             ? (src_arr->lo + src_arr->size - 1 - i)
-                             : (src_arr->lo + i);
-          auto name = std::string(item->text) + "[" + std::to_string(idx) + "]";
-          auto* v = ctx.FindVariable(name);
-          if (v) elems.push_back(v->value);
-        }
-        continue;
-      }
-      auto* src_q = ctx.FindQueue(item->text);
-      if (src_q) {
-        elems.insert(elems.end(), src_q->elements.begin(),
-                     src_q->elements.end());
-        continue;
-      }
-    }
+    if (TryAppendConcatIdentifier(item, ctx, elems)) continue;
     elems.push_back(EvalExpr(item, ctx, arena));
   }
 }
@@ -869,6 +887,56 @@ static void ScheduleStreamingConcatNba(const Stmt* stmt,
   ctx.GetScheduler().ScheduleEvent(stream_time, stream_region, stream_event);
 }
 
+// Install the deferred update callback for a single-bit NBA write of `idx`.
+static void SetupBitSelectNbaCallback(Event* event, Variable* var, uint32_t idx,
+                                      const Logic4Vec& rhs_val, Arena& arena) {
+  event->callback = [var, idx, rhs_val, &arena]() {
+    if (idx >= var->value.width) return;
+    uint64_t old_val = var->value.ToUint64();
+    uint64_t bit = rhs_val.ToUint64() & 1;
+    uint64_t cleared = old_val & ~(uint64_t{1} << idx);
+    var->value =
+        MakeLogic4VecVal(arena, var->value.width, cleared | (bit << idx));
+    var->NotifyWatchers();
+  };
+}
+
+// Install the deferred update callback for a `w`-bit part-select NBA write
+// starting at bit `lo`.
+static void SetupPartSelectNbaCallback(Event* event, Variable* var, uint32_t lo,
+                                       uint32_t w, const Logic4Vec& rhs_val,
+                                       Arena& arena) {
+  event->callback = [var, lo, w, rhs_val, &arena]() {
+    uint64_t mask = (w >= 64) ? ~uint64_t{0} : (uint64_t{1} << w) - 1;
+    uint64_t old_val = var->value.ToUint64();
+    uint64_t new_bits = (rhs_val.ToUint64() & mask) << lo;
+    uint64_t cleared = old_val & ~(mask << lo);
+    var->value = MakeLogic4VecVal(arena, var->value.width, cleared | new_bits);
+    var->NotifyWatchers();
+  };
+}
+
+// Resolve the [lo, w) part-select range for `lhs` given base index `idx` and
+// `end_val`, mirroring the plus/minus/ranged select forms. Returns false when
+// the select has zero width or lies entirely outside `var_width`; otherwise
+// clamps the range to the variable width.
+static bool ResolvePartSelectNbaRange(const Expr* lhs, uint32_t idx,
+                                      uint32_t end_val, uint32_t var_width,
+                                      uint32_t& lo, uint32_t& w) {
+  lo = idx;
+  w = end_val;
+  if (lhs->is_part_select_plus) {
+  } else if (lhs->is_part_select_minus) {
+    lo = (idx >= w - 1) ? idx - w + 1 : 0;
+  } else {
+    lo = std::min(idx, end_val);
+    w = std::max(idx, end_val) - lo + 1;
+  }
+  if (w == 0 || lo >= var_width) return false;
+  if (lo + w > var_width) w = var_width - lo;
+  return true;
+}
+
 // Configure the deferred update callback for an NBA whose target is an
 // unresolved bit-select or part-select of `var`. Returns false (without
 // setting a callback) when the assignment must be dropped: an unknown index,
@@ -881,39 +949,17 @@ static bool SetupSelectNbaCallback(Event* event, Variable* var, const Expr* lhs,
   auto idx = static_cast<uint32_t>(idx_val.ToUint64());
 
   if (!lhs->index_end) {
-    event->callback = [var, idx, rhs_val, &arena]() {
-      if (idx >= var->value.width) return;
-      uint64_t old_val = var->value.ToUint64();
-      uint64_t bit = rhs_val.ToUint64() & 1;
-      uint64_t cleared = old_val & ~(uint64_t{1} << idx);
-      var->value =
-          MakeLogic4VecVal(arena, var->value.width, cleared | (bit << idx));
-      var->NotifyWatchers();
-    };
+    SetupBitSelectNbaCallback(event, var, idx, rhs_val, arena);
     return true;
   }
 
   uint32_t end_val =
       static_cast<uint32_t>(EvalExpr(lhs->index_end, ctx, arena).ToUint64());
-  uint32_t lo = idx;
-  uint32_t w = end_val;
-  if (lhs->is_part_select_plus) {
-  } else if (lhs->is_part_select_minus) {
-    lo = (idx >= w - 1) ? idx - w + 1 : 0;
-  } else {
-    lo = std::min(idx, end_val);
-    w = std::max(idx, end_val) - lo + 1;
-  }
-  if (w == 0 || lo >= var->value.width) return false;
-  if (lo + w > var->value.width) w = var->value.width - lo;
-  event->callback = [var, lo, w, rhs_val, &arena]() {
-    uint64_t mask = (w >= 64) ? ~uint64_t{0} : (uint64_t{1} << w) - 1;
-    uint64_t old_val = var->value.ToUint64();
-    uint64_t new_bits = (rhs_val.ToUint64() & mask) << lo;
-    uint64_t cleared = old_val & ~(mask << lo);
-    var->value = MakeLogic4VecVal(arena, var->value.width, cleared | new_bits);
-    var->NotifyWatchers();
-  };
+  uint32_t lo = 0;
+  uint32_t w = 0;
+  if (!ResolvePartSelectNbaRange(lhs, idx, end_val, var->value.width, lo, w))
+    return false;
+  SetupPartSelectNbaCallback(event, var, lo, w, rhs_val, arena);
   return true;
 }
 

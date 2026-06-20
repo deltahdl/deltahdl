@@ -138,6 +138,71 @@ uint32_t ComputeInstDimSizes(const ModuleItem* item,
   return total_instances;
 }
 
+// Returns true when the instantiation supplied at least one positional
+// (unnamed) parameter override (#(v0, v1, ...)).
+bool InstUsesPositionalParams(const ModuleItem* item) {
+  for (const auto& [pname, pexpr] : item->inst_params) {
+    if (pname.empty() && pexpr) return true;
+  }
+  return false;
+}
+
+// Reports a diagnostic for an instantiation of an unknown module, qualifying
+// the name with its scope when one was specified.
+void ReportUnknownModule(const ModuleItem* item, DiagEngine& diag) {
+  if (item->inst_scope.empty())
+    diag.Error(item->loc,
+               std::format("unknown module '{}'", item->inst_module));
+  else
+    diag.Error(item->loc, std::format("unknown module '{}::{}'",
+                                      item->inst_scope, item->inst_module));
+}
+
+// Resolves the instantiation's own parameter overrides into child_params,
+// dispatching on whether they were written positionally or by name.
+void ResolveInstParams(const ModuleItem* item, const ModuleDecl* child_decl,
+                       const ScopeMap& parent_scope,
+                       Elaborator::ParamList& child_params, DiagEngine& diag) {
+  if (InstUsesPositionalParams(item)) {
+    ResolvePositionalInstParams(item, child_decl, parent_scope, child_params,
+                                diag);
+  } else {
+    ResolveNamedInstParams(item, child_decl, parent_scope, child_params, diag);
+  }
+}
+
+// Builds the scope used to evaluate configuration parameter-override
+// expressions: the instance's parent scope augmented with the configuration's
+// own localparams (§33.4.3).
+ScopeMap BuildConfigOverrideScope(const ScopeMap& parent_scope,
+                                  const ScopeMap& config_localparam_scope) {
+  ScopeMap scope = parent_scope;
+  for (const auto& [name, val] : config_localparam_scope) {
+    scope[name] = val;
+  }
+  return scope;
+}
+
+// Applies one configuration override's explicit per-parameter values onto
+// child_params, recording each touched parameter in `locked`. A present
+// expression sets a new value, a null one ("(.p())") leaves the parameter at
+// its module default; either way the configuration now owns the parameter
+// (§33.4.3).
+void ApplyConfigOverrideParams(
+    const std::vector<std::pair<std::string_view, Expr*>>& override_params,
+    Elaborator::ParamList& child_params, const ScopeMap& scope,
+    std::vector<std::string_view>& locked) {
+  for (const auto& [pname, pexpr] : override_params) {
+    DropParamOverride(child_params, pname);
+    if (pexpr) {
+      if (auto val = ConstEvalInt(pexpr, scope)) {
+        child_params.push_back({pname, *val});
+      }
+    }
+    locked.push_back(pname);
+  }
+}
+
 }  // namespace
 
 void Elaborator::ApplyConfigParamOverrides(
@@ -147,10 +212,8 @@ void Elaborator::ApplyConfigParamOverrides(
 
   // Parameter identifiers resolve in the instance's parent scope, augmented
   // with the configuration's own localparams (§33.4.3).
-  ScopeMap scope = parent_scope;
-  for (const auto& [name, val] : config_localparam_scope_) {
-    scope[name] = val;
-  }
+  ScopeMap scope =
+      BuildConfigOverrideScope(parent_scope, config_localparam_scope_);
 
   for (const auto& ov : instance_param_overrides_) {
     if (ov.inst_path != current_inst_path_) continue;
@@ -158,19 +221,7 @@ void Elaborator::ApplyConfigParamOverrides(
     if (ov.reset_all) {
       ResetAllConfigParams(child_decl, child_params, locked);
     }
-
-    for (const auto& [pname, pexpr] : ov.params) {
-      // Replace any value the instantiation supplied; a present expression sets
-      // a new value while a null one ("(.p())") leaves the parameter at its
-      // module default. Either way the configuration now owns the parameter.
-      DropParamOverride(child_params, pname);
-      if (pexpr) {
-        if (auto val = ConstEvalInt(pexpr, scope)) {
-          child_params.push_back({pname, *val});
-        }
-      }
-      locked.push_back(pname);
-    }
+    ApplyConfigOverrideParams(ov.params, child_params, scope, locked);
   }
 }
 
@@ -190,12 +241,7 @@ void Elaborator::ElaborateModuleInst(ModuleItem* item, RtlirModule* mod) {
 
   auto* child_decl = FindModuleInScope(item->inst_module);
   if (!child_decl) {
-    if (item->inst_scope.empty())
-      diag_.Error(item->loc,
-                  std::format("unknown module '{}'", item->inst_module));
-    else
-      diag_.Error(item->loc, std::format("unknown module '{}::{}'",
-                                         item->inst_scope, item->inst_module));
+    ReportUnknownModule(item, diag_);
     mod->children.push_back(inst);
     current_inst_path_ = std::move(saved_inst_path);
     return;
@@ -205,20 +251,7 @@ void Elaborator::ElaborateModuleInst(ModuleItem* item, RtlirModule* mod) {
   Elaborator::ParamList child_params;
   auto parent_scope = BuildParamScope(mod);
 
-  bool is_positional = false;
-  for (const auto& [pname, pexpr] : item->inst_params) {
-    if (pname.empty() && pexpr) {
-      is_positional = true;
-      break;
-    }
-  }
-
-  if (is_positional) {
-    ResolvePositionalInstParams(item, child_decl, parent_scope, child_params,
-                                diag_);
-  } else {
-    ResolveNamedInstParams(item, child_decl, parent_scope, child_params, diag_);
-  }
+  ResolveInstParams(item, child_decl, parent_scope, child_params, diag_);
 
   // A configuration may override (or reset) this instance's parameters on top
   // of whatever the instantiation specified (§33.4.3).

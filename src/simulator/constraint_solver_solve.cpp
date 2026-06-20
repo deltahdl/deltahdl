@@ -85,6 +85,24 @@ bool SoftDirectlyReferences(const ConstraintExpr& soft,
   return false;
 }
 
+// One relaxation sweep over every priority edge: a successor's rank is pushed
+// to at least one past its predecessor's. Returns true when some rank changed,
+// so the caller can stop once the ranks reach their fixpoint.
+bool RelaxPriorityRanks(
+    const std::unordered_map<std::string, std::vector<std::string>>& succ,
+    std::unordered_map<std::string, int>& prank) {
+  bool changed = false;
+  for (const auto& [h, ls] : succ) {
+    for (const auto& l : ls) {
+      if (prank[l] < prank[h] + 1) {
+        prank[l] = prank[h] + 1;
+        changed = true;
+      }
+    }
+  }
+  return changed;
+}
+
 // prank(v) = how many variables must be solved before v, i.e. its distance from
 // a source of the priority digraph (higher -> lower successor edges). A
 // variable with nothing ordered before it has rank 0; each successor sits at
@@ -97,16 +115,7 @@ std::unordered_map<std::string, int> ComputePriorityRanks(
   std::unordered_map<std::string, int> prank;
   for (const auto& v : vars) prank[v] = 0;
   for (size_t pass = 0; pass < vars.size(); ++pass) {
-    bool changed = false;
-    for (const auto& [h, ls] : succ) {
-      for (const auto& l : ls) {
-        if (prank[l] < prank[h] + 1) {
-          prank[l] = prank[h] + 1;
-          changed = true;
-        }
-      }
-    }
-    if (!changed) break;
+    if (!RelaxPriorityRanks(succ, prank)) break;
   }
   return prank;
 }
@@ -362,6 +371,27 @@ void ConstraintSolver::CommitStaticSharedValues() {
   }
 }
 
+namespace {
+
+// Process one constraint in declaration order for the 'disable soft'
+// resolution. A soft constraint is recorded as seen (so a later directive can
+// discard it); a 'disable soft' directive discards each already-seen soft
+// constraint — exactly the lower-priority ones — that directly references its
+// variable.
+void VisitDisableSoftConstraint(
+    const ConstraintExpr& c, std::vector<const ConstraintExpr*>& seen_soft,
+    std::unordered_set<const ConstraintExpr*>& disabled_soft) {
+  if (c.kind == ConstraintKind::kSoft) {
+    seen_soft.push_back(&c);
+  } else if (c.kind == ConstraintKind::kDisableSoft) {
+    for (const auto* s : seen_soft) {
+      if (SoftDirectlyReferences(*s, c.var_name)) disabled_soft.insert(s);
+    }
+  }
+}
+
+}  // namespace
+
 void ConstraintSolver::ComputeDisabledSoft(
     const std::vector<ConstraintExpr>& extra) {
   disabled_soft_.clear();
@@ -372,20 +402,15 @@ void ConstraintSolver::ComputeDisabledSoft(
   // seen before it, which are exactly the ones of lower priority, that directly
   // reference the directive's variable.
   std::vector<const ConstraintExpr*> seen_soft;
-  auto visit = [&](const ConstraintExpr& c) {
-    if (c.kind == ConstraintKind::kSoft) {
-      seen_soft.push_back(&c);
-    } else if (c.kind == ConstraintKind::kDisableSoft) {
-      for (const auto* s : seen_soft) {
-        if (SoftDirectlyReferences(*s, c.var_name)) disabled_soft_.insert(s);
-      }
-    }
-  };
   for (const auto& block : blocks_) {
     if (!block.enabled) continue;
-    for (const auto& c : block.constraints) visit(c);
+    for (const auto& c : block.constraints) {
+      VisitDisableSoftConstraint(c, seen_soft, disabled_soft_);
+    }
   }
-  for (const auto& c : extra) visit(c);
+  for (const auto& c : extra) {
+    VisitDisableSoftConstraint(c, seen_soft, disabled_soft_);
+  }
 }
 
 bool ConstraintSolver::SolveBySoftPriority(
@@ -548,59 +573,111 @@ std::vector<std::vector<std::string>> ConstraintSolver::ComputePriorityLayers(
   return out;
 }
 
+namespace {
+
+// Every hard constraint that has become checkable under 'committed' must hold;
+// constraints whose referenced variables are not all committed yet are skipped
+// (they are evaluated once more variables are fixed). 'eval' evaluates one
+// constraint against the current value set.
+bool AllCommittedHardConstraintsHold(
+    const std::vector<const ConstraintExpr*>& hard,
+    const std::unordered_set<std::string>& committed,
+    const std::function<bool(const ConstraintExpr&)>& eval) {
+  for (const auto* c : hard) {
+    if (!ConstraintReady(*c, committed)) continue;
+    if (!eval(*c)) return false;
+  }
+  return true;
+}
+
+// Each checkable soft constraint's inner expression_or_dist must hold under
+// 'committed'; not-yet-checkable ones are skipped, as for hard constraints.
+bool AllCommittedSoftConstraintsHold(
+    const std::vector<const ConstraintExpr*>& soft,
+    const std::unordered_set<std::string>& committed,
+    const std::function<bool(const ConstraintExpr&)>& eval) {
+  for (const auto* c : soft) {
+    if (!ConstraintReady(*c, committed)) continue;
+    const ConstraintExpr* inner = c->inner ? c->inner : nullptr;
+    if (inner && !eval(*inner)) return false;
+  }
+  return true;
+}
+
+}  // namespace
+
 bool ConstraintSolver::CheckCommittedConstraints(
     const std::vector<ConstraintExpr>& extra, bool include_soft,
     const std::unordered_set<std::string>& committed) const {
   std::vector<const ConstraintExpr*> hard;
   std::vector<const ConstraintExpr*> soft;
   CollectConstraints(blocks_, extra, hard, soft);
-  for (const auto* c : hard) {
-    if (!ConstraintReady(*c, committed)) continue;
-    if (!EvalConstraint(*c)) return false;
-  }
-  if (include_soft) {
-    for (const auto* c : soft) {
-      if (!ConstraintReady(*c, committed)) continue;
-      const ConstraintExpr* inner = c->inner ? c->inner : nullptr;
-      if (inner && !EvalConstraint(*inner)) return false;
-    }
+  auto eval = [this](const ConstraintExpr& c) { return EvalConstraint(c); };
+  if (!AllCommittedHardConstraintsHold(hard, committed, eval)) return false;
+  if (include_soft && !AllCommittedSoftConstraintsHold(soft, committed, eval)) {
+    return false;
   }
   return true;
 }
+
+namespace {
+
+// committed starts from every variable already fixed before the general pass —
+// the inactive (state) variables, the randc draws, the array sizes, and the
+// real variables — all of which are present in values_/real_values_ by now.
+std::unordered_set<std::string> CommittedFromValues(
+    const std::unordered_map<std::string, int64_t>& values,
+    const std::unordered_map<std::string, double>& real_values) {
+  std::unordered_set<std::string> committed;
+  for (const auto& kv : values) committed.insert(kv.first);
+  for (const auto& kv : real_values) committed.insert(kv.first);
+  return committed;
+}
+
+// Draw one priority layer up to 'attempts' times, returning true as soon as a
+// draw leaves the now-checkable constraints satisfied against 'committed' plus
+// this layer. 'draw_layer' redraws every variable in the layer; 'check' tests
+// the constraints against a committed set.
+bool DrawAndCheckPriorityLayer(
+    const std::vector<std::string>& layer,
+    const std::unordered_set<std::string>& committed, int attempts,
+    const std::function<void(const std::vector<std::string>&)>& draw_layer,
+    const std::function<bool(const std::unordered_set<std::string>&)>& check) {
+  for (int attempt = 0; attempt < attempts; ++attempt) {
+    draw_layer(layer);
+    std::unordered_set<std::string> with_layer = committed;
+    for (const auto& name : layer) with_layer.insert(name);
+    if (check(with_layer)) return true;
+  }
+  return false;
+}
+
+}  // namespace
 
 bool ConstraintSolver::SolvePriorityLayers(
     const std::vector<std::vector<std::string>>& layers,
     const std::vector<ConstraintExpr>& extra, bool include_soft) {
   static constexpr int kLayerAttempts = 200;
-  // committed starts from every variable already fixed before the general pass
-  // — the inactive (state) variables, the randc draws, the array sizes, and the
-  // real variables — all of which are present in values_/real_values_ by now.
-  std::unordered_set<std::string> committed;
-  for (const auto& kv : values_) committed.insert(kv.first);
-  for (const auto& kv : real_values_) committed.insert(kv.first);
-  // Draw one layer up to kLayerAttempts times, returning true as soon as a draw
-  // leaves the now-checkable constraints satisfied against 'committed' plus
-  // this layer.
-  auto solve_one_layer = [&](const std::vector<std::string>& layer) {
-    for (int attempt = 0; attempt < kLayerAttempts; ++attempt) {
-      for (const auto& name : layer) {
-        auto it = variables_.find(name);
-        if (it == variables_.end()) continue;
-        values_[name] = GenerateRandValue(it->second);
-      }
-      std::unordered_set<std::string> with_layer = committed;
-      for (const auto& name : layer) with_layer.insert(name);
-      if (CheckCommittedConstraints(extra, include_soft, with_layer)) {
-        return true;
-      }
+  std::unordered_set<std::string> committed =
+      CommittedFromValues(values_, real_values_);
+  auto draw_layer = [this](const std::vector<std::string>& layer) {
+    for (const auto& name : layer) {
+      auto it = variables_.find(name);
+      if (it == variables_.end()) continue;
+      values_[name] = GenerateRandValue(it->second);
     }
-    return false;
+  };
+  auto check = [&](const std::unordered_set<std::string>& with_layer) {
+    return CheckCommittedConstraints(extra, include_soft, with_layer);
   };
   for (const auto& layer : layers) {
     // 18.5.11: an earlier, higher-priority layer is never reconsidered. If no
     // draw of this layer satisfies the constraints that have become checkable,
     // the overall solve fails — the subdivision can make the set unsolvable.
-    if (!solve_one_layer(layer)) return false;
+    if (!DrawAndCheckPriorityLayer(layer, committed, kLayerAttempts, draw_layer,
+                                   check)) {
+      return false;
+    }
     for (const auto& name : layer) committed.insert(name);
   }
   // Every layer committed: accept only if the complete assignment satisfies all
@@ -619,6 +696,35 @@ bool ConstraintSolver::SolvePriorityLayers(
 // Returns true when the staged solve succeeds (the caller should return true),
 // false otherwise. The caller still checks guard_error_ to decide whether the
 // outer attempt loop continues or aborts, exactly as before.
+// Real variables are committed first (as in the flat pass), so any ordered
+// integral group/layer is completed against them.
+static void CommitStagedRealVariables(
+    std::unordered_map<std::string, RandVariable>& variables,
+    std::unordered_map<std::string, double>& real_values,
+    const std::function<double(RandVariable&)>& gen_real) {
+  for (auto& [name, var] : variables) {
+    if (var.enabled && var.is_real) {
+      real_values[name] = gen_real(var);
+    }
+  }
+}
+
+// Gather the still-uncommitted active integral variables — the set the staged
+// pass partitions and solves. randc, array-size, and inactive variables are
+// already committed; the cyclical ones in particular are solved first, as the
+// clause requires.
+static std::vector<std::string> CollectStagedGeneralVariables(
+    const std::unordered_map<std::string, RandVariable>& variables,
+    const std::unordered_map<std::string, int64_t>& values) {
+  std::vector<std::string> general;
+  for (const auto& [name, var] : variables) {
+    if (!var.enabled || var.is_real) continue;
+    if (values.find(name) != values.end()) continue;
+    general.push_back(name);
+  }
+  return general;
+}
+
 static bool RunStagedSolve(
     std::unordered_map<std::string, RandVariable>& variables,
     std::unordered_map<std::string, double>& real_values,
@@ -629,23 +735,48 @@ static bool RunStagedSolve(
     const std::function<bool(const std::vector<std::vector<std::string>>&)>&
         solve) {
   (void)use_priority;
-  // Real variables are committed first (as in the flat pass), so any ordered
-  // integral group/layer is completed against them.
-  for (auto& [name, var] : variables) {
-    if (var.enabled && var.is_real) {
-      real_values[name] = gen_real(var);
-    }
-  }
-  std::vector<std::string> general;
-  for (auto& [name, var] : variables) {
-    if (!var.enabled || var.is_real) continue;
-    // randc, array-size, and inactive variables are already committed; the
-    // cyclical ones in particular are solved first, as the clause requires.
-    if (values.find(name) != values.end()) continue;
-    general.push_back(name);
-  }
+  CommitStagedRealVariables(variables, real_values, gen_real);
+  std::vector<std::string> general =
+      CollectStagedGeneralVariables(variables, values);
   return solve(partition(general));
 }
+
+namespace {
+
+// The outcome of one staged or flat attempt within SolveIterative's retry loop.
+enum class AttemptOutcome {
+  kSolved,  // a complete satisfying assignment was found; return true
+  kAbort,   // a guard ERROR was hit; randomize() fails outright (return false)
+  kRetry,   // no solution this attempt; the loop should try again
+};
+
+// Collapse the shared "solved? / guard error? / retry" decision used after a
+// pass runs. 'pass' runs the staged or flat solve (and may set the guard flag);
+// 'guard_error' is read afterward to distinguish an outright failure from an
+// ordinary retry.
+AttemptOutcome ResolveAttempt(const std::function<bool()>& pass,
+                              const bool& guard_error) {
+  if (pass()) return AttemptOutcome::kSolved;
+  if (guard_error) return AttemptOutcome::kAbort;
+  return AttemptOutcome::kRetry;
+}
+
+// Select and run the one pass that applies for this attempt — the
+// priority-layer staged pass (18.5.11), the solve...before ordered staged pass
+// (18.5.9), or the default flat pass — and resolve its outcome. Exactly one of
+// 'priority_pass', 'ordered_pass', 'flat_pass' runs, chosen by which ordering
+// edges exist, just as the original inline branch chain did.
+AttemptOutcome RunAttemptPass(bool has_priority_edges, bool has_before_edges,
+                              const std::function<bool()>& priority_pass,
+                              const std::function<bool()>& ordered_pass,
+                              const std::function<bool()>& flat_pass,
+                              const bool& guard_error) {
+  if (has_priority_edges) return ResolveAttempt(priority_pass, guard_error);
+  if (has_before_edges) return ResolveAttempt(ordered_pass, guard_error);
+  return ResolveAttempt(flat_pass, guard_error);
+}
+
+}  // namespace
 
 bool ConstraintSolver::SolveIterative(const std::vector<ConstraintExpr>& extra,
                                       bool include_soft) {
@@ -655,6 +786,41 @@ bool ConstraintSolver::SolveIterative(const std::vector<ConstraintExpr>& extra,
   auto gen_real = [this](RandVariable& var) {
     return GenerateRandRealValue(var);
   };
+  // 18.5.11: when random variables are used as function arguments, the implied
+  // priority is solved in layers — the higher-priority variables first, each
+  // layer committed as state variables to the next without backtracking. This
+  // subdivides the solution space (and can fail), distinct from the
+  // solution-space-preserving solve...before ordering.
+  auto priority_pass = [&] {
+    return RunStagedSolve(
+        variables_, real_values_, values_, /*use_priority=*/true, gen_real,
+        [this](const std::vector<std::string>& general) {
+          return ComputePriorityLayers(general);
+        },
+        [&](const std::vector<std::vector<std::string>>& layers) {
+          return SolvePriorityLayers(layers, extra, include_soft);
+        });
+  };
+  // 18.5.9: a solve...before ordering solves the active integral rand variables
+  // in ordered groups; an earlier group is committed before the later groups
+  // are solved against it, shifting the probability distribution to match the
+  // ordering while leaving the set of legal solutions unchanged.
+  auto ordered_pass = [&] {
+    return RunStagedSolve(
+        variables_, real_values_, values_, /*use_priority=*/false, gen_real,
+        [this](const std::vector<std::string>& general) {
+          return ComputeSolveGroups(general);
+        },
+        [&](const std::vector<std::vector<std::string>>& groups) {
+          return SolveOrderedGroups(groups, 0, extra, include_soft);
+        });
+  };
+  // With no ordering the default single pass is used unchanged; it already
+  // draws each legal value combination with uniform probability.
+  auto flat_pass = [&] {
+    DrawGeneralPass(variables_, values_, real_values_, gen, gen_real);
+    return CheckAllConstraints(extra, include_soft);
+  };
   for (int attempt = 0; attempt < kMaxAttempts; ++attempt) {
     values_.clear();
     real_values_.clear();
@@ -663,52 +829,12 @@ bool ConstraintSolver::SolveIterative(const std::vector<ConstraintExpr>& extra,
     ApplyDirectConstraints(extra, include_soft);
     DrawRandcVariables(variables_, values_, gen);
     DrawArraySizeVariables(variables_, values_, gen);
-    // 18.5.9: when a solve...before ordering applies, solve the active integral
-    // rand variables in ordered groups rather than in one flat pass. An earlier
-    // group is committed before the later groups are solved against it, which
-    // shifts the probability distribution to match the ordering while leaving
-    // the set of legal solutions unchanged. With no ordering the default single
-    // pass below is used unchanged, and it already draws each legal value
-    // combination with uniform probability. 18.5.11: when random variables are
-    // used as function arguments, the implied priority is solved in layers —
-    // the higher-priority variables first, each layer committed as state
-    // variables to the next without backtracking. This subdivides the solution
-    // space (and can fail), distinct from the solution-space-preserving
-    // solve...before ordering handled below.
-    if (!function_arg_priority_edges_.empty()) {
-      if (RunStagedSolve(
-              variables_, real_values_, values_, /*use_priority=*/true,
-              gen_real,
-              [this](const std::vector<std::string>& general) {
-                return ComputePriorityLayers(general);
-              },
-              [&](const std::vector<std::vector<std::string>>& layers) {
-                return SolvePriorityLayers(layers, extra, include_soft);
-              })) {
-        return true;
-      }
-      if (guard_error_) return false;
-      continue;
-    }
-    if (!solve_before_edges_.empty()) {
-      if (RunStagedSolve(
-              variables_, real_values_, values_, /*use_priority=*/false,
-              gen_real,
-              [this](const std::vector<std::string>& general) {
-                return ComputeSolveGroups(general);
-              },
-              [&](const std::vector<std::vector<std::string>>& groups) {
-                return SolveOrderedGroups(groups, 0, extra, include_soft);
-              })) {
-        return true;
-      }
-      if (guard_error_) return false;
-      continue;
-    }
-    DrawGeneralPass(variables_, values_, real_values_, gen, gen_real);
-    if (CheckAllConstraints(extra, include_soft)) return true;
+    AttemptOutcome outcome = RunAttemptPass(
+        !function_arg_priority_edges_.empty(), !solve_before_edges_.empty(),
+        priority_pass, ordered_pass, flat_pass, guard_error_);
+    if (outcome == AttemptOutcome::kSolved) return true;
     // 18.5.12: an ERROR guard fails randomize() outright; do not retry it.
-    if (guard_error_) return false;
+    if (outcome == AttemptOutcome::kAbort) return false;
   }
   return false;
 }

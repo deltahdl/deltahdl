@@ -731,6 +731,31 @@ static bool CollectUnpackedSetMembers(const Expr* elem, SimContext& ctx,
   return false;
 }
 
+// Tests `lhs` against each singular value collected from an unpacked-array set
+// member. Returns 1 on the first match, 2 if any comparison was ambiguous (and
+// none matched), and 0 otherwise.
+static int MatchUnpackedSetMembers(const Logic4Vec& lhs,
+                                   const std::vector<Logic4Vec>& members) {
+  int result = 0;
+  for (const auto& member : members) {
+    int mr = CompareInsideValue(lhs, member);
+    if (mr == 1) return 1;
+    if (mr == 2) result = 2;
+  }
+  return result;
+}
+
+// When `elem` (in a non-range position) names an unpacked array, traverses it
+// to singular values per §11.4.13 and reports the membership result through
+// `out`/the return value. Returns true when `elem` was such an array.
+static bool TryMatchUnpackedSetMember(const Logic4Vec& lhs, const Expr* elem,
+                                      SimContext& ctx, int& out) {
+  std::vector<Logic4Vec> members;
+  if (!CollectUnpackedSetMembers(elem, ctx, members)) return false;
+  out = MatchUnpackedSetMembers(lhs, members);
+  return true;
+}
+
 // Evaluates `lhs inside { elem }` for one set member. Returns 1 on a match, 0
 // on a definite mismatch, and 2 when the comparison was ambiguous (x). Handles
 // ranges, unpacked-array members (traversed to singular values per §11.4.13),
@@ -740,15 +765,9 @@ static int EvalInsideElement(const Logic4Vec& lhs, const Expr* elem,
   bool is_range =
       elem->kind == ExprKind::kSelect && elem->index && elem->index_end;
   if (!is_range) {
-    std::vector<Logic4Vec> members;
-    if (CollectUnpackedSetMembers(elem, ctx, members)) {
-      int result = 0;
-      for (const auto& member : members) {
-        int mr = CompareInsideValue(lhs, member);
-        if (mr == 1) return 1;
-        if (mr == 2) result = 2;
-      }
-      return result;
+    int unpacked_result = 0;
+    if (TryMatchUnpackedSetMember(lhs, elem, ctx, unpacked_result)) {
+      return unpacked_result;
     }
   }
   return is_range ? InsideMatchRange(lhs, elem, ctx, arena)

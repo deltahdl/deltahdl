@@ -238,6 +238,38 @@ void CheckExportSignatureEquivalence(
   }
 }
 
+// §35.4: multiple export declarations with the same c_identifier in one scope
+// are forbidden. Records the linkage name in the per-scope set and reports a
+// repeat.
+void CheckExportDuplicateLinkName(
+    const ModuleItem* item, std::string_view link_name,
+    std::unordered_set<std::string_view>& export_link_in_scope,
+    DiagEngine& diag) {
+  auto [_, inserted] = export_link_in_scope.insert(link_name);
+  if (!inserted) {
+    diag.Error(item->loc,
+               std::format("DPI export linkage name '{}' already declared in "
+                           "this scope",
+                           link_name));
+  }
+}
+
+// §35.7: at most one export per SystemVerilog function in a scope. Records the
+// SV function name in the per-scope set and reports a repeat.
+void CheckExportDuplicateSvFunc(
+    const ModuleItem* item,
+    std::unordered_set<std::string_view>& exported_sv_func_in_scope,
+    DiagEngine& diag) {
+  auto [_func, func_inserted] = exported_sv_func_in_scope.insert(item->name);
+  if (!func_inserted) {
+    diag.Error(item->loc,
+               std::format("SystemVerilog function '{}' is already exported in "
+                           "this scope; only one export declaration per "
+                           "function is permitted (§35.7)",
+                           item->name));
+  }
+}
+
 // §35.4/§35.7: run the full battery of export-declaration checks for one export
 // item, given the SystemVerilog callables indexed for its enclosing scope and
 // the per-scope / cross-scope bookkeeping sets.
@@ -248,23 +280,8 @@ void ValidateExportDeclaration(
     std::unordered_set<std::string_view>& exported_sv_func_in_scope,
     std::unordered_map<std::string_view, DpiExportSignature>& export_signatures,
     DiagEngine& diag) {
-  auto [_, inserted] = export_link_in_scope.insert(link_name);
-  if (!inserted) {
-    diag.Error(item->loc,
-               std::format("DPI export linkage name '{}' already declared in "
-                           "this scope",
-                           link_name));
-  }
-
-  // §35.7: at most one export per SystemVerilog function in a scope.
-  auto [_func, func_inserted] = exported_sv_func_in_scope.insert(item->name);
-  if (!func_inserted) {
-    diag.Error(item->loc,
-               std::format("SystemVerilog function '{}' is already exported in "
-                           "this scope; only one export declaration per "
-                           "function is permitted (§35.7)",
-                           item->name));
-  }
+  CheckExportDuplicateLinkName(item, link_name, export_link_in_scope, diag);
+  CheckExportDuplicateSvFunc(item, exported_sv_func_in_scope, diag);
 
   auto callable_it = sv_callables.find(item->name);
   if (callable_it == sv_callables.end()) {
@@ -315,6 +332,45 @@ void CheckImportSignatureAgreement(
   }
 }
 
+// §35.4: index a module's SystemVerilog function and task declarations by name
+// so each export can look up the routine it names and obtain its signature for
+// the cross-scope equivalence check.
+std::unordered_map<std::string_view, const ModuleItem*> IndexSvCallables(
+    const ModuleDecl* mod) {
+  std::unordered_map<std::string_view, const ModuleItem*> sv_callables;
+  for (const auto* item : mod->items) {
+    if (item == nullptr) continue;
+    if (item->kind == ModuleItemKind::kFunctionDecl ||
+        item->kind == ModuleItemKind::kTaskDecl) {
+      sv_callables.emplace(item->name, item);
+    }
+  }
+  return sv_callables;
+}
+
+// §35.4: track the DPI version string ("DPI-C" or the deprecated "DPI")
+// associated with each linkage identifier the first time it is seen. Any later
+// declaration sharing that linkage identifier must agree on the version string,
+// for imports and exports alike.
+void CheckDpiVersionStringAgreement(
+    const ModuleItem* item, std::string_view link_name,
+    std::unordered_map<std::string_view, std::string_view>& link_version,
+    DiagEngine& diag) {
+  auto found = link_version.find(link_name);
+  if (found == link_version.end()) {
+    link_version.emplace(link_name, item->dpi_spec_string);
+    return;
+  }
+  if (found->second != item->dpi_spec_string) {
+    diag.Error(
+        item->loc,
+        std::format("DPI linkage name '{}' was previously declared with "
+                    "version string \"{}\"; all declarations sharing one "
+                    "linkage name must use the same version string",
+                    link_name, found->second));
+  }
+}
+
 }  // namespace
 
 void Elaborator::ValidateDpiDeclarations() {
@@ -360,14 +416,8 @@ void Elaborator::ValidateDpiGlobalNameSpace() {
     // Index this module's SystemVerilog function and task declarations by
     // name so each export can look up the routine it names and obtain its
     // signature for the cross-scope equivalence check.
-    std::unordered_map<std::string_view, const ModuleItem*> sv_callables;
-    for (const auto* item : mod->items) {
-      if (item == nullptr) continue;
-      if (item->kind == ModuleItemKind::kFunctionDecl ||
-          item->kind == ModuleItemKind::kTaskDecl) {
-        sv_callables.emplace(item->name, item);
-      }
-    }
+    std::unordered_map<std::string_view, const ModuleItem*> sv_callables =
+        IndexSvCallables(mod);
 
     // §35.4: multiple export declarations with the same c_identifier in the
     // same scope are forbidden. Each module declaration is one scope, so we
@@ -396,19 +446,7 @@ void Elaborator::ValidateDpiGlobalNameSpace() {
             exported_sv_func_in_scope, export_signatures, diag_);
       }
 
-      auto found = link_version.find(link_name);
-      if (found == link_version.end()) {
-        link_version.emplace(link_name, item->dpi_spec_string);
-        continue;
-      }
-      if (found->second != item->dpi_spec_string) {
-        diag_.Error(
-            item->loc,
-            std::format("DPI linkage name '{}' was previously declared with "
-                        "version string \"{}\"; all declarations sharing one "
-                        "linkage name must use the same version string",
-                        link_name, found->second));
-      }
+      CheckDpiVersionStringAgreement(item, link_name, link_version, diag_);
     }
   }
 }

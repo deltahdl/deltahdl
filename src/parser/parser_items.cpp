@@ -26,6 +26,139 @@ static std::optional<AlwaysKind> TokenToAlwaysKind(TokenKind tk) {
   }
 }
 
+namespace {
+
+// Mutable pointers into the time-scope fields of the module or package that
+// owns the timeunit/timeprecision declaration currently being parsed, plus a
+// snapshot of the prior state captured before parsing so the post-parse
+// validation can detect mismatches.
+struct TimeScopeRefs {
+  bool active = false;
+  bool* has_unit = nullptr;
+  bool* has_prec = nullptr;
+  TimeUnit* unit = nullptr;
+  TimeUnit* prec = nullptr;
+  int* unit_mag = nullptr;
+  int* prec_mag = nullptr;
+  bool has_other_items = false;
+  bool was_unit_set = false;
+  bool was_prec_set = false;
+  TimeUnit old_unit{};
+  int old_unit_mag = 0;
+  TimeUnit old_prec{};
+  int old_prec_mag = 0;
+};
+
+// Binds the time-scope pointers to whichever of the module/package owns the
+// declaration and snapshots the prior values for later mismatch checks.
+TimeScopeRefs CollectTimeScopeRefs(ModuleDecl* mod, PackageDecl* pkg) {
+  TimeScopeRefs refs;
+  bool validate_mod = mod && (mod->decl_kind == ModuleDeclKind::kModule ||
+                              mod->decl_kind == ModuleDeclKind::kInterface ||
+                              mod->decl_kind == ModuleDeclKind::kProgram);
+  bool validate_pkg = !mod && pkg != nullptr;
+  if (validate_mod) {
+    refs.active = true;
+    refs.has_unit = &mod->has_timeunit;
+    refs.has_prec = &mod->has_timeprecision;
+    refs.unit = &mod->time_unit;
+    refs.prec = &mod->time_prec;
+    refs.unit_mag = &mod->time_unit_magnitude;
+    refs.prec_mag = &mod->time_prec_magnitude;
+    refs.has_other_items = !mod->items.empty();
+  } else if (validate_pkg) {
+    refs.active = true;
+    refs.has_unit = &pkg->has_timeunit;
+    refs.has_prec = &pkg->has_timeprecision;
+    refs.unit = &pkg->time_unit;
+    refs.prec = &pkg->time_prec;
+    refs.unit_mag = &pkg->time_unit_magnitude;
+    refs.prec_mag = &pkg->time_prec_magnitude;
+    refs.has_other_items = !pkg->items.empty();
+  }
+  refs.was_unit_set = refs.has_unit && *refs.has_unit;
+  refs.was_prec_set = refs.has_prec && *refs.has_prec;
+  refs.old_unit = refs.was_unit_set ? *refs.unit : TimeUnit{};
+  refs.old_unit_mag = refs.was_unit_set ? *refs.unit_mag : 0;
+  refs.old_prec = refs.was_prec_set ? *refs.prec : TimeUnit{};
+  refs.old_prec_mag = refs.was_prec_set ? *refs.prec_mag : 0;
+  return refs;
+}
+
+// Emits the §3.14.2 diagnostics comparing the just-parsed timeunit/
+// timeprecision against the snapshot captured in CollectTimeScopeRefs.
+void ValidateTimeScopeAfterParse(const TimeScopeRefs& refs, DiagEngine& diag,
+                                 SourceLoc loc) {
+  if (!refs.active) return;
+  if (*refs.has_unit && !refs.was_unit_set && refs.has_other_items)
+    diag.Error(loc,
+               "timeunit as a later item requires a matching prior "
+               "declaration in the same time scope");
+  else if (refs.was_unit_set &&
+           (*refs.unit != refs.old_unit || *refs.unit_mag != refs.old_unit_mag))
+    diag.Error(loc, "timeunit does not match prior declaration");
+  if (*refs.has_prec && !refs.was_prec_set && refs.has_other_items)
+    diag.Error(loc,
+               "timeprecision as a later item requires a matching prior "
+               "declaration in the same time scope");
+  else if (refs.was_prec_set &&
+           (*refs.prec != refs.old_prec || *refs.prec_mag != refs.old_prec_mag))
+    diag.Error(loc, "timeprecision does not match prior declaration");
+}
+
+// Builds the fixed (keyword-independent) part of an `interconnect` net's
+// data type; the optional signedness is filled in by the caller.
+DataType MakeInterconnectDataType() {
+  DataType dtype;
+  dtype.kind = DataTypeKind::kWire;
+  dtype.is_net = true;
+  dtype.is_interconnect = true;
+  return dtype;
+}
+
+// Builds a named data type carrying an optional package/class scope name.
+// The caller fills in any parameterized type arguments after the `#`.
+DataType MakeScopedNamedType(std::string_view scope_name,
+                             std::string_view type_name) {
+  DataType dtype;
+  dtype.kind = DataTypeKind::kNamed;
+  dtype.scope_name = scope_name;
+  dtype.type_name = type_name;
+  return dtype;
+}
+
+// Builds an unscoped named (type_identifier) data type.
+DataType MakeNamedType(std::string_view type_name) {
+  DataType dtype;
+  dtype.kind = DataTypeKind::kNamed;
+  dtype.type_name = type_name;
+  return dtype;
+}
+
+// Stamps the resolved package/class scope name onto each instantiation item
+// produced for a `scope :: module #(...) inst(...)` form.
+void StampInstScope(std::vector<ModuleItem*>& items, size_t start,
+                    std::string_view scope_name) {
+  for (size_t i = start; i < items.size(); ++i)
+    items[i]->inst_scope = scope_name;
+}
+
+// Propagates a deferred-immediate / concurrent assertion item's optional
+// block_identifier label onto each item produced for it (§16.14), filling the
+// item name and its statement body label only where still unset.
+void ApplyAssertionLabel(std::vector<ModuleItem*>& items, size_t before,
+                         std::string_view label) {
+  if (label.empty()) return;
+  for (size_t i = before; i < items.size(); ++i) {
+    if (items[i]->name.empty()) items[i]->name = label;
+    if (items[i]->body && items[i]->body->label.empty()) {
+      items[i]->body->label = label;
+    }
+  }
+}
+
+}  // namespace
+
 bool Parser::TryParseClockingOrVerification(std::vector<ModuleItem*>& items) {
   if (Check(TokenKind::kKwSpecify)) {
     if (InGenerateBlock()) {
@@ -153,61 +286,13 @@ bool Parser::TryParseMiscKeywordItem(std::vector<ModuleItem*>& items) {
     return true;
   }
   if (Check(TokenKind::kKwTimeunit) || Check(TokenKind::kKwTimeprecision)) {
-    bool validate_mod =
-        current_module_ &&
-        (current_module_->decl_kind == ModuleDeclKind::kModule ||
-         current_module_->decl_kind == ModuleDeclKind::kInterface ||
-         current_module_->decl_kind == ModuleDeclKind::kProgram);
     bool validate_pkg = !current_module_ && current_package_ != nullptr;
-    bool* p_has_unit = nullptr;
-    bool* p_has_prec = nullptr;
-    TimeUnit* p_unit = nullptr;
-    TimeUnit* p_prec = nullptr;
-    int* p_unit_mag = nullptr;
-    int* p_prec_mag = nullptr;
-    bool has_other_items = false;
-    if (validate_mod) {
-      p_has_unit = &current_module_->has_timeunit;
-      p_has_prec = &current_module_->has_timeprecision;
-      p_unit = &current_module_->time_unit;
-      p_prec = &current_module_->time_prec;
-      p_unit_mag = &current_module_->time_unit_magnitude;
-      p_prec_mag = &current_module_->time_prec_magnitude;
-      has_other_items = !current_module_->items.empty();
-    } else if (validate_pkg) {
-      p_has_unit = &current_package_->has_timeunit;
-      p_has_prec = &current_package_->has_timeprecision;
-      p_unit = &current_package_->time_unit;
-      p_prec = &current_package_->time_prec;
-      p_unit_mag = &current_package_->time_unit_magnitude;
-      p_prec_mag = &current_package_->time_prec_magnitude;
-      has_other_items = !current_package_->items.empty();
-    }
-    bool was_unit_set = p_has_unit && *p_has_unit;
-    bool was_prec_set = p_has_prec && *p_has_prec;
-    TimeUnit old_unit = was_unit_set ? *p_unit : TimeUnit{};
-    int old_unit_mag = was_unit_set ? *p_unit_mag : 0;
-    TimeUnit old_prec = was_prec_set ? *p_prec : TimeUnit{};
-    int old_prec_mag = was_prec_set ? *p_prec_mag : 0;
+    TimeScopeRefs refs =
+        CollectTimeScopeRefs(current_module_, current_package_);
     auto loc = CurrentLoc();
     ParseTimeunitDecl(current_module_, nullptr,
                       validate_pkg ? current_package_ : nullptr);
-    if (validate_mod || validate_pkg) {
-      if (*p_has_unit && !was_unit_set && has_other_items)
-        diag_.Error(loc,
-                    "timeunit as a later item requires a matching prior "
-                    "declaration in the same time scope");
-      else if (was_unit_set &&
-               (*p_unit != old_unit || *p_unit_mag != old_unit_mag))
-        diag_.Error(loc, "timeunit does not match prior declaration");
-      if (*p_has_prec && !was_prec_set && has_other_items)
-        diag_.Error(loc,
-                    "timeprecision as a later item requires a matching prior "
-                    "declaration in the same time scope");
-      else if (was_prec_set &&
-               (*p_prec != old_prec || *p_prec_mag != old_prec_mag))
-        diag_.Error(loc, "timeprecision does not match prior declaration");
-    }
+    ValidateTimeScopeAfterParse(refs, diag_, loc);
     return true;
   }
   if (Check(TokenKind::kKwLet)) {
@@ -216,10 +301,7 @@ bool Parser::TryParseMiscKeywordItem(std::vector<ModuleItem*>& items) {
   }
   if (Check(TokenKind::kKwInterconnect)) {
     Consume();
-    DataType dtype;
-    dtype.kind = DataTypeKind::kWire;
-    dtype.is_net = true;
-    dtype.is_interconnect = true;
+    DataType dtype = MakeInterconnectDataType();
     if (Match(TokenKind::kKwSigned)) {
       dtype.is_signed = true;
     } else {
@@ -384,58 +466,31 @@ void Parser::ParseModuleItem(std::vector<ModuleItem*>& items) {
     return;
   }
 
+  // Each branch parses one module_or_generate_item form; the shared
+  // AttachAttrs is applied once after the dispatch. The data-declaration
+  // fallback attaches its own attributes, so it returns early.
   if (TryParseKeywordItem(items)) {
-    if (!assertion_label.empty()) {
-      for (size_t i = before; i < items.size(); ++i) {
-        if (items[i]->name.empty()) items[i]->name = assertion_label;
-        if (items[i]->body && items[i]->body->label.empty()) {
-          items[i]->body->label = assertion_label;
-        }
-      }
-    }
-    AttachAttrs(items, before, attrs);
-    return;
-  }
-  if (Check(TokenKind::kKwParameter) || Check(TokenKind::kKwLocalparam)) {
+    ApplyAssertionLabel(items, before, assertion_label);
+  } else if (Check(TokenKind::kKwParameter) ||
+             Check(TokenKind::kKwLocalparam)) {
     ParseParamDecl(items);
-    AttachAttrs(items, before, attrs);
-    return;
-  }
-  if (Check(TokenKind::kKwDefparam)) {
+  } else if (Check(TokenKind::kKwDefparam)) {
     items.push_back(ParseDefparam());
-    AttachAttrs(items, before, attrs);
-    return;
-  }
-  if (Check(TokenKind::kKwImport)) {
+  } else if (Check(TokenKind::kKwImport)) {
     ParseImportDecl(items);
-    AttachAttrs(items, before, attrs);
-    return;
-  }
-  if (Check(TokenKind::kKwExport)) {
+  } else if (Check(TokenKind::kKwExport)) {
     ParseExportDecl(items);
-    AttachAttrs(items, before, attrs);
-    return;
-  }
-  if (Check(TokenKind::kKwGenerate)) {
+  } else if (Check(TokenKind::kKwGenerate)) {
     ParseGenerateRegion(items);
-    AttachAttrs(items, before, attrs);
-    return;
-  }
-  if (Check(TokenKind::kKwFor)) {
+  } else if (Check(TokenKind::kKwFor)) {
     items.push_back(ParseGenerateFor());
-    AttachAttrs(items, before, attrs);
-    return;
-  }
-  if (Check(TokenKind::kKwIf)) {
+  } else if (Check(TokenKind::kKwIf)) {
     items.push_back(ParseGenerateIf());
-    AttachAttrs(items, before, attrs);
+  } else if (!TryParseNonPortItem(items)) {
+    ParseDataDeclItem(items, before, attrs);
     return;
   }
-  if (TryParseNonPortItem(items)) {
-    AttachAttrs(items, before, attrs);
-    return;
-  }
-  ParseDataDeclItem(items, before, attrs);
+  AttachAttrs(items, before, attrs);
 }
 
 void Parser::ParseDataDeclItem(std::vector<ModuleItem*>& items, size_t before,
@@ -553,14 +608,10 @@ void Parser::ParseImplicitTypeOrInst(std::vector<ModuleItem*>& items) {
         diag_.Error(name_tok.loc, "instantiations not allowed in programs");
       auto start = items.size();
       ParseModuleInstList(type_tok, &items);
-      for (auto i = start; i < items.size(); ++i)
-        items[i]->inst_scope = name_tok.text;
+      StampInstScope(items, start, name_tok.text);
       return;
     }
-    DataType dtype;
-    dtype.kind = DataTypeKind::kNamed;
-    dtype.scope_name = name_tok.text;
-    dtype.type_name = type_tok.text;
+    DataType dtype = MakeScopedNamedType(name_tok.text, type_tok.text);
     if (Check(TokenKind::kHash)) {
       Consume();
       dtype.type_params = ParseTypeParamList();
@@ -569,10 +620,7 @@ void Parser::ParseImplicitTypeOrInst(std::vector<ModuleItem*>& items) {
     return;
   }
   if (known_types_.count(name_tok.text) != 0) {
-    DataType dtype;
-    dtype.kind = DataTypeKind::kNamed;
-    dtype.type_name = name_tok.text;
-    ParseVarDeclList(items, dtype);
+    ParseVarDeclList(items, MakeNamedType(name_tok.text));
     return;
   }
   if (known_udps_.count(name_tok.text) != 0) {

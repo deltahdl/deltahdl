@@ -99,6 +99,37 @@ static uint32_t VcdDataTypeSize(VcdDataType type, uint32_t width) {
   return width;
 }
 
+// Copy the descriptive registration arguments (everything except the counter
+// state) into a fresh VcdSignal. No writer state is consulted or mutated.
+static VcdSignal MakeVcdSignalFields(std::string_view name, uint32_t width,
+                                     Variable* var, NetType net_type,
+                                     int32_t msb, int32_t lsb,
+                                     VcdDataType data_type) {
+  VcdSignal sig;
+  sig.name = name;
+  sig.width = width;
+  sig.var = var;
+  sig.net_type = net_type;
+  sig.data_type = data_type;
+  sig.msb = msb;
+  sig.lsb = lsb;
+  return sig;
+}
+
+// Assign the per-signal identifier and port codes, advancing the writer's
+// counters as §21.7.4.2 requires (the port identifier code ascends one unit
+// per registration, in module-declaration order; the printable-ASCII
+// identifier wraps back to '!' once it passes '~').
+static void AssignVcdSignalCodes(VcdSignal& sig, char& next_ident,
+                                 uint32_t& next_port_id) {
+  sig.ident = next_ident++;
+  // §21.7.4.2: the identifier code of a port is an integer that ascends in
+  // one-unit increments for each port, in the order found in the module
+  // declaration. Each registration is one such port.
+  sig.port_id = next_port_id++;
+  if (next_ident > '~') next_ident = '!';
+}
+
 // Populate a VcdSignal from the registration arguments, advancing the writer's
 // identifier and port counters as §21.7.4.2 requires (the port identifier code
 // ascends one unit per registration, in module-declaration order).
@@ -106,21 +137,9 @@ static VcdSignal MakeVcdSignal(std::string_view name, uint32_t width,
                                Variable* var, NetType net_type, int32_t msb,
                                int32_t lsb, VcdDataType data_type,
                                char& next_ident, uint32_t& next_port_id) {
-  VcdSignal sig;
-  sig.name = name;
-  sig.width = width;
-  sig.var = var;
-  sig.ident = next_ident++;
-  sig.net_type = net_type;
-  sig.data_type = data_type;
-  sig.msb = msb;
-  sig.lsb = lsb;
-  // §21.7.4.2: the identifier code of a port is an integer that ascends in
-  // one-unit increments for each port, in the order found in the module
-  // declaration. Each registration is one such port.
-  sig.port_id = next_port_id++;
-
-  if (next_ident > '~') next_ident = '!';
+  VcdSignal sig =
+      MakeVcdSignalFields(name, width, var, net_type, msb, lsb, data_type);
+  AssignVcdSignalCodes(sig, next_ident, next_port_id);
   return sig;
 }
 
@@ -152,6 +171,19 @@ static void WriteVarDecl(std::ofstream& ofs, const VcdSignal& sig,
       << " $end\n";
 }
 
+// Emit the $var declaration for a freshly registered signal, choosing the
+// extended-VCD port form (§21.7.4.2) when the writer is recording $dumpports
+// nodes and the standard data-type form (§21.7.5) otherwise.
+static void WriteSignalVarDecl(std::ofstream& ofs, const VcdSignal& sig,
+                               std::string_view name, uint32_t width,
+                               bool port_nodes) {
+  if (port_nodes) {
+    WritePortVarDecl(ofs, sig, name);
+    return;
+  }
+  WriteVarDecl(ofs, sig, name, width);
+}
+
 void VcdWriter::RegisterSignal(std::string_view name, uint32_t width,
                                Variable* var, NetType net_type, int32_t msb,
                                int32_t lsb, VcdDataType data_type) {
@@ -159,11 +191,7 @@ void VcdWriter::RegisterSignal(std::string_view name, uint32_t width,
                                 next_ident_, next_port_id_);
   signals_.push_back(sig);
   if (!ofs_.is_open()) return;
-  if (port_nodes_) {
-    WritePortVarDecl(ofs_, sig, name);
-    return;
-  }
-  WriteVarDecl(ofs_, sig, name, width);
+  WriteSignalVarDecl(ofs_, sig, name, width, port_nodes_);
 }
 
 void VcdWriter::EndDefinitions() {

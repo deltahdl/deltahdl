@@ -192,6 +192,30 @@ static std::unordered_set<std::string_view> ResolveCalledFunctions(
   return visited;
 }
 
+static void MergeOneCalledFunctionReads(
+    const ModuleItem* func, std::unordered_set<std::string>& reads) {
+  for (auto* s : func->func_body_stmts) {
+    CollectStmtReads(s, reads);
+  }
+}
+
+static void MergeOneCalledFunctionLocals(
+    const ModuleItem* func, std::unordered_set<std::string>& locals) {
+  for (const auto& arg : func->func_args) {
+    if (!arg.name.empty()) locals.insert(std::string(arg.name));
+  }
+  for (auto* s : func->func_body_stmts) {
+    CollectBlockLocalNames(s, locals);
+  }
+}
+
+static void MergeOneCalledFunctionWritten(
+    const ModuleItem* func, std::unordered_set<std::string>& written) {
+  for (auto* s : func->func_body_stmts) {
+    CollectWrittenNames(s, written);
+  }
+}
+
 static void MergeCalledFunctionSignals(
     const Stmt* body, const FuncMap& funcs, bool exclude_written,
     std::unordered_set<std::string>& reads,
@@ -202,19 +226,10 @@ static void MergeCalledFunctionSignals(
     auto it = funcs.find(fname);
     if (it == funcs.end()) continue;
     const auto* func = it->second;
-    for (auto* s : func->func_body_stmts) {
-      CollectStmtReads(s, reads);
-    }
-    for (const auto& arg : func->func_args) {
-      if (!arg.name.empty()) locals.insert(std::string(arg.name));
-    }
-    for (auto* s : func->func_body_stmts) {
-      CollectBlockLocalNames(s, locals);
-    }
+    MergeOneCalledFunctionReads(func, reads);
+    MergeOneCalledFunctionLocals(func, locals);
     if (exclude_written) {
-      for (auto* s : func->func_body_stmts) {
-        CollectWrittenNames(s, written);
-      }
+      MergeOneCalledFunctionWritten(func, written);
     }
   }
 }

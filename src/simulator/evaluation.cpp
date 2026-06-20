@@ -271,60 +271,97 @@ static Logic4Vec EvalLogicalEquiv(const Expr* expr, SimContext& ctx,
   bool rv = r.ToUint64() != 0;
   return MakeLogic4VecVal(arena, 1, (lv == rv) ? 1 : 0);
 }
+// Operands of an identity-equality comparison, after resolving each side's
+// identifier node, bound variable, and null/event classification.
+struct IdentityEqualityOperands {
+  const Expr* lhs_id;
+  const Expr* rhs_id;
+  Variable* lv;
+  Variable* rv;
+  bool lhs_is_event;
+  bool rhs_is_event;
+  bool lhs_is_null;
+  bool rhs_is_null;
+  bool is_eq_op;
+};
+
+// Returns true when the operator is one of the four equality operators
+// (==, !=, ===, !==) and fills `ops` with the resolved operand information.
+static bool ResolveIdentityEqualityOperands(const Expr* expr, SimContext& ctx,
+                                            IdentityEqualityOperands& ops) {
+  if (expr->op != TokenKind::kEqEq && expr->op != TokenKind::kBangEq &&
+      expr->op != TokenKind::kEqEqEq && expr->op != TokenKind::kBangEqEq) {
+    return false;
+  }
+  ops.lhs_id = (expr->lhs && expr->lhs->kind == ExprKind::kIdentifier)
+                   ? expr->lhs
+                   : nullptr;
+  ops.rhs_id = (expr->rhs && expr->rhs->kind == ExprKind::kIdentifier)
+                   ? expr->rhs
+                   : nullptr;
+  ops.lv = ops.lhs_id ? ctx.FindVariable(ops.lhs_id->text) : nullptr;
+  ops.rv = ops.rhs_id ? ctx.FindVariable(ops.rhs_id->text) : nullptr;
+  ops.lhs_is_event = ops.lv && ops.lv->is_event;
+  ops.rhs_is_event = ops.rv && ops.rv->is_event;
+  ops.lhs_is_null = ops.lhs_id && ops.lhs_id->text == "null" && !ops.lv;
+  ops.rhs_is_null = ops.rhs_id && ops.rhs_id->text == "null" && !ops.rv;
+  ops.is_eq_op =
+      (expr->op == TokenKind::kEqEq || expr->op == TokenKind::kEqEqEq);
+  return true;
+}
+
+// Compares two event operands by object identity (a null event compares equal
+// to an unbound/null event), producing the boolean comparison result.
+static Logic4Vec EvalEventIdentityEquality(const IdentityEqualityOperands& ops,
+                                           Arena& arena) {
+  bool equal = false;
+  if (ops.lhs_is_event && ops.rhs_is_event) {
+    equal = (ops.lv == ops.rv);
+  } else if (ops.lhs_is_event && ops.rhs_is_null) {
+    equal = ops.lv->is_null_event;
+  } else if (ops.rhs_is_event && ops.lhs_is_null) {
+    equal = ops.rv->is_null_event;
+  }
+  return MakeLogic4VecVal(arena, 1, (ops.is_eq_op == equal) ? 1u : 0u);
+}
+
+// §25.9: equality of a virtual interface against another virtual interface,
+// an interface instance, or null compares the interface instance each side
+// refers to (an unbound virtual interface and null compare equal).
+static Logic4Vec EvalVirtualInterfaceEquality(
+    const IdentityEqualityOperands& ops, SimContext& ctx, bool lhs_is_vi,
+    bool rhs_is_vi, Arena& arena) {
+  auto operand_scope = [&](Variable* v, const Expr* id, bool is_vi,
+                           bool is_null) -> std::string {
+    if (is_vi) return std::string(ctx.VirtualInterfaceBinding(v));
+    if (is_null) return std::string();
+    if (id) return ctx.ResolveInstanceScope(id->text);
+    return std::string();
+  };
+  std::string ls =
+      operand_scope(ops.lv, ops.lhs_id, lhs_is_vi, ops.lhs_is_null);
+  std::string rs =
+      operand_scope(ops.rv, ops.rhs_id, rhs_is_vi, ops.rhs_is_null);
+  bool equal = (ls == rs);
+  return MakeLogic4VecVal(arena, 1, (ops.is_eq_op == equal) ? 1u : 0u);
+}
+
 // Handles equality comparisons (==, !=, ===, !==) whose operands are event
 // variables or virtual interfaces, per the special object-identity semantics.
 // Returns true and sets `out` when the special handling applies; otherwise
 // returns false so the caller falls through to the generic binary operator.
 static bool TryEvalIdentityEquality(const Expr* expr, SimContext& ctx,
                                     Arena& arena, Logic4Vec& out) {
-  if (expr->op != TokenKind::kEqEq && expr->op != TokenKind::kBangEq &&
-      expr->op != TokenKind::kEqEqEq && expr->op != TokenKind::kBangEqEq) {
-    return false;
-  }
-  auto* lhs_id = (expr->lhs && expr->lhs->kind == ExprKind::kIdentifier)
-                     ? expr->lhs
-                     : nullptr;
-  auto* rhs_id = (expr->rhs && expr->rhs->kind == ExprKind::kIdentifier)
-                     ? expr->rhs
-                     : nullptr;
-  Variable* lv = lhs_id ? ctx.FindVariable(lhs_id->text) : nullptr;
-  Variable* rv = rhs_id ? ctx.FindVariable(rhs_id->text) : nullptr;
-  bool lhs_is_event = lv && lv->is_event;
-  bool rhs_is_event = rv && rv->is_event;
-  bool lhs_is_null = lhs_id && lhs_id->text == "null" && !lv;
-  bool rhs_is_null = rhs_id && rhs_id->text == "null" && !rv;
-  bool is_eq_op =
-      (expr->op == TokenKind::kEqEq || expr->op == TokenKind::kEqEqEq);
-  if (lhs_is_event || rhs_is_event) {
-    bool equal = false;
-    if (lhs_is_event && rhs_is_event) {
-      equal = (lv == rv);
-    } else if (lhs_is_event && rhs_is_null) {
-      equal = lv->is_null_event;
-    } else if (rhs_is_event && lhs_is_null) {
-      equal = rv->is_null_event;
-    }
-    out = MakeLogic4VecVal(arena, 1, (is_eq_op == equal) ? 1u : 0u);
+  IdentityEqualityOperands ops;
+  if (!ResolveIdentityEqualityOperands(expr, ctx, ops)) return false;
+  if (ops.lhs_is_event || ops.rhs_is_event) {
+    out = EvalEventIdentityEquality(ops, arena);
     return true;
   }
-
-  // §25.9: equality of a virtual interface against another virtual interface,
-  // an interface instance, or null compares the interface instance each side
-  // refers to (an unbound virtual interface and null compare equal).
-  bool lhs_is_vi = ctx.IsVirtualInterfaceVar(lv);
-  bool rhs_is_vi = ctx.IsVirtualInterfaceVar(rv);
+  bool lhs_is_vi = ctx.IsVirtualInterfaceVar(ops.lv);
+  bool rhs_is_vi = ctx.IsVirtualInterfaceVar(ops.rv);
   if (lhs_is_vi || rhs_is_vi) {
-    auto operand_scope = [&](Variable* v, const Expr* id, bool is_vi,
-                             bool is_null) -> std::string {
-      if (is_vi) return std::string(ctx.VirtualInterfaceBinding(v));
-      if (is_null) return std::string();
-      if (id) return ctx.ResolveInstanceScope(id->text);
-      return std::string();
-    };
-    std::string ls = operand_scope(lv, lhs_id, lhs_is_vi, lhs_is_null);
-    std::string rs = operand_scope(rv, rhs_id, rhs_is_vi, rhs_is_null);
-    bool equal = (ls == rs);
-    out = MakeLogic4VecVal(arena, 1, (is_eq_op == equal) ? 1u : 0u);
+    out = EvalVirtualInterfaceEquality(ops, ctx, lhs_is_vi, rhs_is_vi, arena);
     return true;
   }
   return false;

@@ -353,6 +353,42 @@ bool IsBitsCall(const Expr* e) {
          e->args.size() == 1 && e->args[0];
 }
 
+// §20.6.2 (NC12, NC13): a bare identifier argument names either a dynamically
+// sized typedef or an interface-class object; flag whichever applies.
+void CheckBitsCallIdentArg(
+    const Expr* call, const Expr* a,
+    const std::unordered_set<std::string_view>& dyn_types,
+    const std::unordered_set<std::string_view>& iface_vars, DiagEngine& diag) {
+  if (dyn_types.count(a->text) != 0) {
+    diag.Error(call->range.start,
+               std::format("'$bits' cannot be applied directly to "
+                           "dynamically sized type '{}'",
+                           a->text));
+  }
+  if (iface_vars.count(a->text) != 0) {
+    diag.Error(call->range.start,
+               std::format("'$bits' shall not be applied to interface "
+                           "class object '{}'",
+                           a->text));
+  }
+}
+
+// §20.6.2 (NC9): a call argument that names a function with a dynamically sized
+// return type has no defined bit-stream size.
+void CheckBitsCallFuncArg(const Expr* call, const Expr* a,
+                          const std::unordered_set<std::string_view>& dyn_funcs,
+                          DiagEngine& diag) {
+  std::string_view name = a->callee;
+  if (name.empty() && a->lhs && a->lhs->kind == ExprKind::kIdentifier)
+    name = a->lhs->text;
+  if (!name.empty() && dyn_funcs.count(name) != 0) {
+    diag.Error(call->range.start,
+               std::format("'$bits' shall not enclose function '{}' "
+                           "whose return type is dynamically sized",
+                           name));
+  }
+}
+
 // §20.6.2: report the restricted forms of a confirmed $bits call: a bare
 // identifier naming a dynamically sized typedef (NC12) or an interface-class
 // object (NC13), or a call to a function with a dynamically sized return type
@@ -363,28 +399,9 @@ void CheckBitsCallArg(const Expr* call, const Expr* a,
                       const std::unordered_set<std::string_view>& iface_vars,
                       DiagEngine& diag) {
   if (a->kind == ExprKind::kIdentifier) {
-    if (dyn_types.count(a->text) != 0) {
-      diag.Error(call->range.start,
-                 std::format("'$bits' cannot be applied directly to "
-                             "dynamically sized type '{}'",
-                             a->text));
-    }
-    if (iface_vars.count(a->text) != 0) {
-      diag.Error(call->range.start,
-                 std::format("'$bits' shall not be applied to interface "
-                             "class object '{}'",
-                             a->text));
-    }
+    CheckBitsCallIdentArg(call, a, dyn_types, iface_vars, diag);
   } else if (a->kind == ExprKind::kCall) {
-    std::string_view name = a->callee;
-    if (name.empty() && a->lhs && a->lhs->kind == ExprKind::kIdentifier)
-      name = a->lhs->text;
-    if (!name.empty() && dyn_funcs.count(name) != 0) {
-      diag.Error(call->range.start,
-                 std::format("'$bits' shall not enclose function '{}' "
-                             "whose return type is dynamically sized",
-                             name));
-    }
+    CheckBitsCallFuncArg(call, a, dyn_funcs, diag);
   }
 }
 

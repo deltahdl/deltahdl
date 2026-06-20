@@ -399,6 +399,57 @@ Expr* Parser::ParseThisOrSuperExpr() {
   return ParseWithClause(result);
 }
 
+namespace {
+
+// Builds a width/type cast whose target type is carried by an AST node
+// (cast->rhs) and whose value is carried by cast->lhs. The cast inherits the
+// type node's start location. Pure node construction; the caller has already
+// parsed both operands.
+Expr* MakeNodeCast(Arena& arena, Expr* type_node, Expr* value) {
+  auto* cast = arena.Create<Expr>();
+  cast->kind = ExprKind::kCast;
+  cast->range.start = type_node->range.start;
+  cast->rhs = type_node;
+  cast->lhs = value;
+  return cast;
+}
+
+// Builds a cast whose target type is carried by a name string (cast->text) and
+// whose value is carried by cast->lhs, starting at the given location. Pure
+// node construction.
+Expr* MakeTextCast(Arena& arena, std::string_view type_text, SourceLoc start,
+                   Expr* value) {
+  auto* cast = arena.Create<Expr>();
+  cast->kind = ExprKind::kCast;
+  cast->text = type_text;
+  cast->range.start = start;
+  cast->lhs = value;
+  return cast;
+}
+
+// Builds a bare identifier node carrying the given name text and location.
+// Pure node construction.
+Expr* MakeIdentifierNode(Arena& arena, std::string_view text, SourceLoc loc) {
+  auto* id = arena.Create<Expr>();
+  id->kind = ExprKind::kIdentifier;
+  id->text = text;
+  id->range.start = loc;
+  return id;
+}
+
+// Builds a postfix increment/decrement node wrapping an already-parsed operand,
+// using the already-consumed operator's kind. Pure node construction.
+Expr* MakePostfixUnary(Arena& arena, TokenKind op, Expr* operand) {
+  auto* post = arena.Create<Expr>();
+  post->kind = ExprKind::kPostfixUnary;
+  post->op = op;
+  post->lhs = operand;
+  post->range.start = operand->range.start;
+  return post;
+}
+
+}  // namespace
+
 Expr* Parser::ParsePrimaryExpr() {
   auto tok = CurrentToken();
 
@@ -412,11 +463,8 @@ Expr* Parser::ParsePrimaryExpr() {
         Consume();
         if (Check(TokenKind::kLParen)) {
           Consume();
-          auto* cast = arena_.Create<Expr>();
-          cast->kind = ExprKind::kCast;
-          cast->range.start = lit->range.start;
-          cast->rhs = lit;
-          cast->lhs = ParseExpr();
+          auto* value = ParseExpr();
+          auto* cast = MakeNodeCast(arena_, lit, value);
           Expect(TokenKind::kRParen);
           return cast;
         }
@@ -448,12 +496,7 @@ Expr* Parser::ParsePrimaryExpr() {
 
       if (Check(TokenKind::kApostropheLBrace)) {
         auto* pat = ParseAssignmentPattern();
-        auto* typed = arena_.Create<Expr>();
-        typed->kind = ExprKind::kCast;
-        typed->range.start = ref->range.start;
-        typed->rhs = ref;
-        typed->lhs = pat;
-        return typed;
+        return MakeNodeCast(arena_, ref, pat);
       }
       return ref;
     }
@@ -469,21 +512,14 @@ Expr* Parser::ParsePrimaryExpr() {
       return ParseNewExpr();
 
     case TokenKind::kDotStar: {
-      auto* pat = arena_.Create<Expr>();
-      pat->kind = ExprKind::kIdentifier;
-      pat->text = ".*";
-      pat->range.start = Consume().loc;
-      return pat;
+      auto loc = Consume().loc;
+      return MakeIdentifierNode(arena_, ".*", loc);
     }
 
     case TokenKind::kDot: {
       auto loc = Consume().loc;
       auto name = ExpectIdentifier();
-      auto* pat = arena_.Create<Expr>();
-      pat->kind = ExprKind::kIdentifier;
-      pat->text = name.text;
-      pat->range.start = loc;
-      return pat;
+      return MakeIdentifierNode(arena_, name.text, loc);
     }
     default:
       break;
@@ -505,12 +541,7 @@ Expr* Parser::ParseCastOrTypedPattern() {
 
   if (Check(TokenKind::kApostropheLBrace)) {
     auto* pat = ParseAssignmentPattern();
-    auto* typed = arena_.Create<Expr>();
-    typed->kind = ExprKind::kCast;
-    typed->text = type_tok.text;
-    typed->range.start = type_tok.loc;
-    typed->lhs = pat;
-    return typed;
+    return MakeTextCast(arena_, type_tok.text, type_tok.loc, pat);
   }
 
   if (Check(TokenKind::kApostrophe)) {
@@ -592,12 +623,7 @@ Expr* Parser::TryParseUserTypeCast(const Token& tok) {
 
   if (Check(TokenKind::kApostropheLBrace)) {
     auto* pat = ParseAssignmentPattern();
-    auto* typed = arena_.Create<Expr>();
-    typed->kind = ExprKind::kCast;
-    typed->text = tok.text;
-    typed->range.start = tok.loc;
-    typed->lhs = pat;
-    return typed;
+    return MakeTextCast(arena_, tok.text, tok.loc, pat);
   }
   if (!Check(TokenKind::kApostrophe)) return nullptr;
   auto saved = lexer_.SavePos();
@@ -607,11 +633,8 @@ Expr* Parser::TryParseUserTypeCast(const Token& tok) {
     return nullptr;
   }
   Consume();
-  auto* cast = arena_.Create<Expr>();
-  cast->kind = ExprKind::kCast;
-  cast->text = tok.text;
-  cast->range.start = tok.loc;
-  cast->lhs = ParseExpr();
+  auto* value = ParseExpr();
+  auto* cast = MakeTextCast(arena_, tok.text, tok.loc, value);
   Expect(TokenKind::kRParen);
   return cast;
 }
@@ -629,23 +652,15 @@ Expr* Parser::ParseIdentifierExpr() {
 
   if (Check(TokenKind::kApostropheLBrace)) {
     auto* pat = ParseAssignmentPattern();
-    auto* typed = arena_.Create<Expr>();
-    typed->kind = ExprKind::kCast;
-    typed->range.start = result->range.start;
-    typed->lhs = pat;
-    typed->rhs = result;
-    return typed;
+    return MakeNodeCast(arena_, result, pat);
   }
   if (Check(TokenKind::kApostrophe)) {
     auto saved = lexer_.SavePos();
     Consume();
     if (Check(TokenKind::kLParen)) {
       Consume();
-      auto* cast = arena_.Create<Expr>();
-      cast->kind = ExprKind::kCast;
-      cast->range.start = result->range.start;
-      cast->lhs = ParseExpr();
-      cast->rhs = result;
+      auto* value = ParseExpr();
+      auto* cast = MakeNodeCast(arena_, result, value);
       Expect(TokenKind::kRParen);
       return cast;
     }
@@ -670,12 +685,7 @@ Expr* Parser::ParseIdentifierExpr() {
 
   if (Check(TokenKind::kPlusPlus) || Check(TokenKind::kMinusMinus)) {
     auto op_tok = Consume();
-    auto* post = arena_.Create<Expr>();
-    post->kind = ExprKind::kPostfixUnary;
-    post->op = op_tok.kind;
-    post->lhs = result;
-    post->range.start = result->range.start;
-    return post;
+    return MakePostfixUnary(arena_, op_tok.kind, result);
   }
 
   result = ParseWithClause(result);

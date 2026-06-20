@@ -3,6 +3,7 @@
 #include <cstdlib>
 #include <format>
 #include <optional>
+#include <unordered_map>
 #include <unordered_set>
 
 #include "common/arena.h"
@@ -100,33 +101,50 @@ static void RegisterHeaderImportItem(const ModuleItem* pi,
   }
 }
 
+// Locate a package declaration by name within the compilation unit, or nullptr.
+static const PackageDecl* FindPackageByName(const CompilationUnit* unit,
+                                            std::string_view pkg_name) {
+  for (const auto* p : unit->packages) {
+    if (p->name == pkg_name) return p;
+  }
+  return nullptr;
+}
+
+// Register every named item of a wildcard-imported package.
+static void RegisterWildcardHeaderImport(const PackageDecl* pkg,
+                                         TypedefMap& typedefs,
+                                         ScopeMap& cu_param_scope) {
+  for (const auto* pi : pkg->items) {
+    if (!pi->name.empty())
+      RegisterHeaderImportItem(pi, pi->name, typedefs, cu_param_scope);
+  }
+}
+
+// Register a single named item of an explicitly-named package import.
+static void RegisterNamedHeaderImport(const PackageDecl* pkg,
+                                      std::string_view target,
+                                      TypedefMap& typedefs,
+                                      ScopeMap& cu_param_scope) {
+  for (const auto* pi : pkg->items) {
+    if (pi->name == target) {
+      RegisterHeaderImportItem(pi, target, typedefs, cu_param_scope);
+      break;
+    }
+  }
+}
+
 // Apply one header (package) import directive, resolving the named package and
 // registering either all of its items (wildcard) or a single named item.
 static void ApplyHeaderImport(const ImportItem& import_item,
                               const CompilationUnit* unit, TypedefMap& typedefs,
                               ScopeMap& cu_param_scope) {
-  auto pkg_name = import_item.package_name;
-  const PackageDecl* pkg = nullptr;
-  for (const auto* p : unit->packages) {
-    if (p->name == pkg_name) {
-      pkg = p;
-      break;
-    }
-  }
+  const PackageDecl* pkg = FindPackageByName(unit, import_item.package_name);
   if (!pkg) return;
   if (import_item.is_wildcard) {
-    for (const auto* pi : pkg->items) {
-      if (!pi->name.empty())
-        RegisterHeaderImportItem(pi, pi->name, typedefs, cu_param_scope);
-    }
+    RegisterWildcardHeaderImport(pkg, typedefs, cu_param_scope);
   } else {
-    auto target = import_item.item_name;
-    for (const auto* pi : pkg->items) {
-      if (pi->name == target) {
-        RegisterHeaderImportItem(pi, target, typedefs, cu_param_scope);
-        break;
-      }
-    }
+    RegisterNamedHeaderImport(pkg, import_item.item_name, typedefs,
+                              cu_param_scope);
   }
 }
 
@@ -199,28 +217,31 @@ static void ResolveExplicitPortTypes(const ModuleDecl* decl, RtlirModule* mod) {
 // contains_dollar are precomputed by the caller because they require Elaborator
 // member helpers; has_param_type / param_type describe the optional declared
 // data type.
-static void ResolveUnresolvedParamValue(
-    RtlirParamDecl& pd, const Expr* pval, std::string_view pname,
-    const ScopeMap& scope, bool refers_to_unbounded, bool contains_dollar,
-    bool has_param_type, const DataType* param_type, DiagEngine& diag) {
+// §6.20.7: an unbounded ($) parameter value, or a reference to another
+// unbounded parameter, makes this parameter unbounded too. Returns true when
+// the value was recognized as unbounded (and pd updated), so the caller can
+// stop.
+static bool TryResolveUnboundedParamValue(RtlirParamDecl& pd, const Expr* pval,
+                                          bool refers_to_unbounded) {
   if (pval->kind == ExprKind::kIdentifier && pval->text == "$") {
     pd.is_unbounded = true;
-    return;
+    return true;
   }
   if (pval->kind == ExprKind::kIdentifier && refers_to_unbounded) {
     // §6.20.7: assigning a $ (unbounded) parameter to another parameter is
     // legal; the assigned-to parameter is itself unbounded.
     pd.is_unbounded = true;
-    return;
+    return true;
   }
-  if (contains_dollar) {
-    // §6.20.7: $ must be the entire, self-contained parameter value; it
-    // may not be combined with operators or selects in this context.
-    diag.Error(pval->range.start,
-               std::format("'$' may only be assigned to parameter '{}' "
-                           "as a complete, self-contained expression",
-                           pname));
-  }
+  return false;
+}
+
+// Fold a parameter's default expression into a concrete value: prefer an
+// integer constant, then (for integer-typed parameters) a real constant rounded
+// per §6.12.1.
+static void FoldParamConstantValue(RtlirParamDecl& pd, const Expr* pval,
+                                   const ScopeMap& scope, bool has_param_type,
+                                   const DataType* param_type) {
   auto val = ConstEvalInt(pval, scope);
   if (val) {
     pd.resolved_value = *val;
@@ -235,6 +256,24 @@ static void ResolveUnresolvedParamValue(
       pd.is_resolved = true;
     }
   }
+}
+
+static void ResolveUnresolvedParamValue(
+    RtlirParamDecl& pd, const Expr* pval, std::string_view pname,
+    const ScopeMap& scope, bool refers_to_unbounded, bool contains_dollar,
+    bool has_param_type, const DataType* param_type, DiagEngine& diag) {
+  if (TryResolveUnboundedParamValue(pd, pval, refers_to_unbounded)) {
+    return;
+  }
+  if (contains_dollar) {
+    // §6.20.7: $ must be the entire, self-contained parameter value; it
+    // may not be combined with operators or selects in this context.
+    diag.Error(pval->range.start,
+               std::format("'$' may only be assigned to parameter '{}' "
+                           "as a complete, self-contained expression",
+                           pname));
+  }
+  FoldParamConstantValue(pd, pval, scope, has_param_type, param_type);
 }
 
 // §6.20: report every value parameter that ends up with neither a default
@@ -252,12 +291,61 @@ static void ReportParamsMissingValue(const ModuleDecl* decl,
   }
 }
 
+// Apply an instantiation override (if any) to a parameter, coercing the value
+// to the declared width per §6.20.2. Returns true when an override was applied.
+static bool ApplyParamOverride(RtlirParamDecl& pd,
+                               const Elaborator::ParamList& params,
+                               std::string_view pname) {
+  auto override_val = FindParamOverride(params, pname);
+  if (!override_val) return false;
+  pd.resolved_value = ConvertOverrideValue(*override_val, pd);
+  pd.is_resolved = true;
+  pd.from_override = true;
+  return true;
+}
+
+// Initialize the standalone (non-port, non-item) header fields of a freshly
+// created RtlirModule from its declaration.
+static void InitRtlirModuleHeader(RtlirModule* mod, const ModuleDecl* decl,
+                                  const CompilationUnit* unit,
+                                  DiagEngine& diag) {
+  mod->name = decl->name;
+  mod->library = decl->library;
+  mod->has_param_port_list = decl->has_param_port_list;
+  mod->is_program = (decl->decl_kind == ModuleDeclKind::kProgram);
+  mod->delay_mode = unit->delay_mode_directive;
+  mod->attrs = ResolveAttributes(decl->attrs, diag);
+
+  RtlirImport std_import;
+  std_import.package_name = "std";
+  std_import.is_wildcard = true;
+  mod->imports.push_back(std_import);
+}
+
+// Build the non-value identity/type fields of a parameter declaration (name,
+// localparam/type-param flags, declared-type info). Value resolution is handled
+// separately because it requires Elaborator member helpers.
+static RtlirParamDecl BuildParamDeclShell(const ModuleDecl* decl, size_t i,
+                                          const TypedefMap& typedefs,
+                                          const ScopeMap& scope,
+                                          bool has_param_type) {
+  const auto& [pname, pval] = decl->params[i];
+  RtlirParamDecl pd;
+  pd.name = pname;
+  pd.default_value = pval;
+  pd.is_resolved = false;
+  pd.is_type_param = decl->type_param_names.count(pname) > 0;
+  pd.is_localparam = decl->localparam_port_names.count(pname) > 0;
+  if (has_param_type) {
+    PopulateParamTypeInfo(pd, decl->param_types[i], typedefs, scope);
+  }
+  return pd;
+}
+
 RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
                                          const ParamList& params) {
   auto* mod = arena_.Create<RtlirModule>();
-  mod->name = decl->name;
-
-  mod->library = decl->library;
+  InitRtlirModuleHeader(mod, decl, unit_, diag_);
 
   // While this cell is elaborated it is the parent of any instances it
   // contains; record its library so child binding can fall back to it
@@ -265,43 +353,18 @@ RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
   // previous value is restored before returning.
   std::string saved_library = std::move(current_library_);
   current_library_.assign(decl->library.data(), decl->library.size());
-  mod->has_param_port_list = decl->has_param_port_list;
-  mod->is_program = (decl->decl_kind == ModuleDeclKind::kProgram);
-
-  mod->delay_mode = unit_->delay_mode_directive;
-
-  mod->attrs = ResolveAttributes(decl->attrs, diag_);
-
-  RtlirImport std_import;
-  std_import.package_name = "std";
-  std_import.is_wildcard = true;
-  mod->imports.push_back(std_import);
 
   ApplyHeaderImports(decl);
 
   for (size_t i = 0; i < decl->params.size(); ++i) {
     const auto& [pname, pval] = decl->params[i];
-    RtlirParamDecl pd;
-    pd.name = pname;
-    pd.default_value = pval;
-    pd.is_resolved = false;
-    pd.is_type_param = decl->type_param_names.count(pname) > 0;
-    pd.is_localparam = decl->localparam_port_names.count(pname) > 0;
-
     auto scope = BuildParamScope(mod);
-
-    if (!pd.is_type_param && i < decl->param_types.size()) {
-      PopulateParamTypeInfo(pd, decl->param_types[i], typedefs_, scope);
-    }
-
-    auto override_val = FindParamOverride(params, pname);
-    if (override_val) {
-      pd.resolved_value = ConvertOverrideValue(*override_val, pd);
-      pd.is_resolved = true;
-      pd.from_override = true;
-    }
+    bool has_param_type = i < decl->param_types.size() &&
+                          decl->type_param_names.count(pname) == 0;
+    RtlirParamDecl pd =
+        BuildParamDeclShell(decl, i, typedefs_, scope, has_param_type);
+    ApplyParamOverride(pd, params, pname);
     if (!pd.is_resolved && pval) {
-      bool has_param_type = !pd.is_type_param && i < decl->param_types.size();
       const DataType* param_type =
           has_param_type ? &decl->param_types[i] : nullptr;
       bool refers_to_unbounded = pval->kind == ExprKind::kIdentifier &&
@@ -311,7 +374,6 @@ RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
                                   contains_dollar, has_param_type, param_type,
                                   diag_);
     }
-
     mod->params.push_back(pd);
   }
 
@@ -327,6 +389,36 @@ RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
   return mod;
 }
 
+// Diagnose repeated explicitly-named (.name) ports within a single non-ANSI
+// header.
+static void CheckDuplicateExplicitPortNames(const ModuleDecl* decl,
+                                            DiagEngine& diag) {
+  std::unordered_set<std::string_view> explicit_names;
+  for (const auto& port : decl->ports) {
+    if (port.is_explicit_named && !port.name.empty()) {
+      if (!explicit_names.insert(port.name).second) {
+        diag.Error(port.loc,
+                   std::format("duplicate port name '.{}'", port.name));
+      }
+    }
+  }
+}
+
+// Diagnose repeated ordinary port names in an ANSI header, tracked across the
+// run via ansi_port_names.
+static void CheckDuplicateAnsiPortNames(
+    const ModuleDecl* decl,
+    std::unordered_set<std::string_view>& ansi_port_names, DiagEngine& diag) {
+  for (const auto& port : decl->ports) {
+    if (!port.name.empty()) {
+      if (!ansi_port_names.insert(port.name).second) {
+        diag.Error(port.loc,
+                   std::format("duplicate port name '{}'", port.name));
+      }
+    }
+  }
+}
+
 // Diagnose repeated port names: explicitly named (.name) ports in a non-ANSI
 // header, and ordinary port names in an ANSI header (tracked across the run via
 // ansi_port_names).
@@ -334,26 +426,9 @@ static void CheckDuplicatePortNames(
     const ModuleDecl* decl,
     std::unordered_set<std::string_view>& ansi_port_names, DiagEngine& diag) {
   if (decl->is_non_ansi_ports) {
-    std::unordered_set<std::string_view> explicit_names;
-    for (const auto& port : decl->ports) {
-      if (port.is_explicit_named && !port.name.empty()) {
-        if (!explicit_names.insert(port.name).second) {
-          diag.Error(port.loc,
-                     std::format("duplicate port name '.{}'", port.name));
-        }
-      }
-    }
-  }
-
-  if (!decl->is_non_ansi_ports) {
-    for (const auto& port : decl->ports) {
-      if (!port.name.empty()) {
-        if (!ansi_port_names.insert(port.name).second) {
-          diag.Error(port.loc,
-                     std::format("duplicate port name '{}'", port.name));
-        }
-      }
-    }
+    CheckDuplicateExplicitPortNames(decl, diag);
+  } else {
+    CheckDuplicateAnsiPortNames(decl, ansi_port_names, diag);
   }
 }
 
@@ -408,77 +483,142 @@ static void ComputePortUnpackedDimSizes(const PortDecl& port, RtlirPort& rp) {
   rp.num_unpacked_dims = static_cast<uint32_t>(rp.unpacked_dim_sizes.size());
 }
 
+// Reject port types that may never appear on a port (chandle, virtual
+// interface). Emits the diagnostic and returns true when the port must be
+// skipped.
+static bool RejectIllegalPortType(const PortDecl& port, DiagEngine& diag) {
+  if (port.data_type.kind == DataTypeKind::kChandle) {
+    diag.Error(port.loc, "chandle cannot be used as a port type");
+    return true;
+  }
+  if (port.data_type.kind == DataTypeKind::kVirtualInterface) {
+    diag.Error(port.loc, "virtual interface cannot be used as a port type");
+    return true;
+  }
+  return false;
+}
+
+// §23.2.2: diagnose a non-ANSI port that appears in the header but never gets a
+// direction declaration in the module body.
+static void DiagnoseMissingNonAnsiPortDirection(const PortDecl& port,
+                                                bool is_non_ansi,
+                                                DiagEngine& diag) {
+  if (is_non_ansi && !port.name.empty() && !port.is_explicit_named &&
+      port.direction == Direction::kNone) {
+    diag.Error(port.loc,
+               std::format("port '{}' has no direction declaration in the "
+                           "module body",
+                           port.name));
+  }
+}
+
+// §23.2.2.1: validate the per-port type constraints that do not block building
+// the RtlirPort: interconnect ports may not be signed, and inout ports may not
+// carry a variable data type.
+static void DiagnosePortTypeConstraints(const PortDecl& port, bool port_is_var,
+                                        DiagEngine& diag) {
+  // Interconnect is an untyped generic connection, so it carries no signedness
+  // of its own.
+  if (port.data_type.is_interconnect && port.data_type.is_signed) {
+    diag.Error(port.loc,
+               std::format("interconnect port '{}' shall not be declared "
+                           "signed",
+                           port.name));
+  }
+  if (port.direction == Direction::kInout && port_is_var) {
+    diag.Error(port.loc, std::format("variable data type is not permitted on "
+                                     "inout port '{}'",
+                                     port.name));
+  }
+}
+
+// Record the type information of a directioned non-ANSI port so the matching
+// body net/variable declaration can be reconciled later (§23.2.2.1).
+static void TrackNonAnsiPortType(
+    const ModuleDecl* decl, const PortDecl& port, const TypedefMap& typedefs,
+    const ScopeMap& param_scope,
+    std::unordered_set<std::string_view>& complete_ports,
+    std::unordered_map<std::string_view, uint32_t>& partial_ports,
+    std::unordered_set<std::string_view>& signed_ports) {
+  if (!decl->is_non_ansi_ports || port.name.empty() ||
+      port.direction == Direction::kNone) {
+    return;
+  }
+  if (port.data_type.kind != DataTypeKind::kImplicit) {
+    complete_ports.insert(port.name);
+  } else {
+    partial_ports[port.name] =
+        EvalTypeWidth(port.data_type, typedefs, param_scope);
+    // §23.2.2.1: remember a `signed` port direction declaration so the
+    // matching net/variable declaration can be considered signed too.
+    if (port.data_type.is_signed) signed_ports.insert(port.name);
+  }
+}
+
+// Fill the base (non-interface) fields of an RtlirPort from its declaration,
+// including the folded unpacked-dimension sizes.
+static RtlirPort BuildRtlirPortBase(const PortDecl& port, bool port_is_var,
+                                    uint32_t width) {
+  RtlirPort rp;
+  rp.name = port.name;
+  rp.direction = port.direction;
+  rp.type_kind = port.data_type.kind;
+  rp.width = width;
+  rp.is_signed = port.data_type.is_signed;
+  rp.is_var = port_is_var;
+  rp.is_interconnect = port.data_type.is_interconnect;
+  rp.default_value = port.default_value;
+  ComputePortUnpackedDimSizes(port, rp);
+  return rp;
+}
+
+// State threaded into ElaborateOnePort that would otherwise be Elaborator
+// members; grouped so the helper can stay a free function (no header change).
+struct PortElabContext {
+  const TypedefMap& typedefs;
+  const ScopeMap& param_scope;
+  std::unordered_set<std::string_view>& complete_ports;
+  std::unordered_map<std::string_view, uint32_t>& partial_ports;
+  std::unordered_set<std::string_view>& signed_ports;
+  DiagEngine& diag;
+};
+
+// Elaborate one port declaration into its RtlirPort: run the per-port
+// diagnostics, track non-ANSI type info, and build the base fields. The
+// interface-port flag is resolved by the caller because it needs FindModule.
+static RtlirPort ElaborateOnePort(const ModuleDecl* decl, const PortDecl& port,
+                                  PortElabContext& ctx) {
+  DiagnoseMissingNonAnsiPortDirection(port, decl->is_non_ansi_ports, ctx.diag);
+  TrackNonAnsiPortType(decl, port, ctx.typedefs, ctx.param_scope,
+                       ctx.complete_ports, ctx.partial_ports, ctx.signed_ports);
+
+  if (port.default_value) {
+    ValidatePortDefaultValue(port, decl->is_non_ansi_ports, ctx.diag);
+  }
+
+  bool port_is_var = !port.data_type.is_net && !port.data_type.is_interconnect;
+  DiagnosePortTypeConstraints(port, port_is_var, ctx.diag);
+
+  uint32_t width = EvalTypeWidth(port.data_type, ctx.typedefs, ctx.param_scope);
+  return BuildRtlirPortBase(port, port_is_var, width);
+}
+
 void Elaborator::ElaboratePorts(const ModuleDecl* decl, RtlirModule* mod) {
   auto param_scope = BuildParamScope(mod);
 
   CheckDuplicatePortNames(decl, ansi_port_names_, diag_);
 
+  PortElabContext ctx{typedefs_,
+                      param_scope,
+                      non_ansi_complete_ports_,
+                      non_ansi_partial_ports_,
+                      non_ansi_signed_ports_,
+                      diag_};
+
   for (const auto& port : decl->ports) {
-    if (port.data_type.kind == DataTypeKind::kChandle) {
-      diag_.Error(port.loc, "chandle cannot be used as a port type");
-      continue;
-    }
-    if (port.data_type.kind == DataTypeKind::kVirtualInterface) {
-      diag_.Error(port.loc, "virtual interface cannot be used as a port type");
-      continue;
-    }
+    if (RejectIllegalPortType(port, diag_)) continue;
 
-    if (decl->is_non_ansi_ports && !port.name.empty() &&
-        !port.is_explicit_named && port.direction == Direction::kNone) {
-      diag_.Error(port.loc,
-                  std::format("port '{}' has no direction declaration in the "
-                              "module body",
-                              port.name));
-    }
-
-    if (decl->is_non_ansi_ports && !port.name.empty() &&
-        port.direction != Direction::kNone) {
-      if (port.data_type.kind != DataTypeKind::kImplicit) {
-        non_ansi_complete_ports_.insert(port.name);
-      } else {
-        non_ansi_partial_ports_[port.name] =
-            EvalTypeWidth(port.data_type, typedefs_, param_scope);
-        // §23.2.2.1: remember a `signed` port direction declaration so the
-        // matching net/variable declaration can be considered signed too.
-        if (port.data_type.is_signed) non_ansi_signed_ports_.insert(port.name);
-      }
-    }
-
-    if (port.default_value) {
-      ValidatePortDefaultValue(port, decl->is_non_ansi_ports, diag_);
-    }
-
-    // §23.2.2.1: it is illegal to specify `signed` for a port declared as an
-    // interconnect port. Interconnect is an untyped generic connection, so it
-    // carries no signedness of its own.
-    if (port.data_type.is_interconnect && port.data_type.is_signed) {
-      diag_.Error(port.loc,
-                  std::format("interconnect port '{}' shall not be declared "
-                              "signed",
-                              port.name));
-    }
-
-    bool port_is_var =
-        !port.data_type.is_net && !port.data_type.is_interconnect;
-
-    if (port.direction == Direction::kInout && port_is_var) {
-      diag_.Error(port.loc,
-                  std::format("variable data type is not permitted on "
-                              "inout port '{}'",
-                              port.name));
-    }
-
-    RtlirPort rp;
-    rp.name = port.name;
-    rp.direction = port.direction;
-    rp.type_kind = port.data_type.kind;
-    rp.width = EvalTypeWidth(port.data_type, typedefs_, param_scope);
-    rp.is_signed = port.data_type.is_signed;
-    rp.is_var = port_is_var;
-    rp.is_interconnect = port.data_type.is_interconnect;
-    rp.default_value = port.default_value;
-
-    ComputePortUnpackedDimSizes(port, rp);
+    RtlirPort rp = ElaborateOnePort(decl, port, ctx);
 
     if (port.is_interface_port) {
       rp.is_interface_port = true;

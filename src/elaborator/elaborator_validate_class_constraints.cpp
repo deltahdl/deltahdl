@@ -241,6 +241,26 @@ static void AddSolveBeforeEdges(
   }
 }
 
+// Depth-first visit of one node in a solve...before ordering graph, used by
+// SolveBeforeGraphHasCycle. Colors: 0 white, 1 gray (on stack), 2 black.
+// Returns true as soon as a gray successor is reached, which closes a cycle.
+static bool SolveBeforeVisit(
+    std::string_view v,
+    const std::unordered_map<std::string_view, std::vector<std::string_view>>&
+        succ,
+    std::unordered_map<std::string_view, int>& color) {
+  color[v] = 1;
+  auto sit = succ.find(v);
+  if (sit != succ.end()) {
+    for (std::string_view w : sit->second) {
+      if (color[w] == 1) return true;
+      if (color[w] == 0 && SolveBeforeVisit(w, succ, color)) return true;
+    }
+  }
+  color[v] = 2;
+  return false;
+}
+
 // Depth-first cycle detection over a solve...before ordering graph. A gray
 // (on-stack) successor closes a cycle, such as 'solve a before b' combined with
 // 'solve b before a' (or a degenerate 'solve a before a').
@@ -249,31 +269,40 @@ static bool SolveBeforeGraphHasCycle(
         succ,
     const std::unordered_set<std::string_view>& nodes) {
   std::unordered_map<std::string_view, int> color;  // 0 white, 1 gray, 2 black
-  bool has_cycle = false;
-  std::function<void(std::string_view)> dfs = [&](std::string_view v) {
-    color[v] = 1;
-    auto sit = succ.find(v);
-    if (sit != succ.end()) {
-      for (std::string_view w : sit->second) {
-        if (color[w] == 1) {
-          has_cycle = true;
-          return;
-        }
-        if (color[w] == 0) {
-          dfs(w);
-          if (has_cycle) return;
-        }
-      }
-    }
-    color[v] = 2;
-  };
   for (std::string_view v : nodes) {
-    if (color[v] == 0) {
-      dfs(v);
-      if (has_cycle) break;
-    }
+    if (color[v] == 0 && SolveBeforeVisit(v, succ, color)) return true;
   }
-  return has_cycle;
+  return false;
+}
+
+// 18.5.9: resolve one solve...before entry to the local property it names and
+// emit the rand/randc diagnostics. Returns the resolved property when 'e' is a
+// simple local rand variable still needing the integral/real-type check, or
+// nullptr when there is nothing further to check (not simple, not a local
+// property, or already reported as randc/non-rand).
+static const ClassMember* ResolveSolveBeforeEntry(
+    const ConstraintSolveBeforeEntry& e, const SourceLoc& loc,
+    const std::unordered_map<std::string_view, const ClassMember*>& properties,
+    DiagEngine& diag) {
+  if (!e.is_simple)
+    return nullptr;  // hierarchical ref or array.size(): allowed
+  auto it = properties.find(e.name);
+  if (it == properties.end()) return nullptr;  // not a local property
+  const ClassMember* prop = it->second;
+  if (prop->is_randc) {
+    diag.Error(loc, std::format("randc variable '{}' is not allowed in a "
+                                "solve...before ordering constraint",
+                                e.name));
+    return nullptr;
+  }
+  if (!prop->is_rand) {
+    diag.Error(loc, std::format("'{}' is not a random variable and cannot "
+                                "appear in a solve...before ordering "
+                                "constraint",
+                                e.name));
+    return nullptr;
+  }
+  return prop;
 }
 
 void Elaborator::ValidateOneClassSolveBeforeConstraints(const ClassDecl* cls) {
@@ -289,24 +318,9 @@ void Elaborator::ValidateOneClassSolveBeforeConstraints(const ClassDecl* cls) {
 
   auto check_entry = [&](const ConstraintSolveBeforeEntry& e,
                          const SourceLoc& loc) {
-    if (!e.is_simple) return;  // hierarchical ref or array.size(): allowed
-    auto it = properties.find(e.name);
-    if (it == properties.end()) return;  // not a local property: leave alone
-    const ClassMember* prop = it->second;
-    if (prop->is_randc) {
-      diag_.Error(loc, std::format("randc variable '{}' is not allowed in a "
-                                   "solve...before ordering constraint",
-                                   e.name));
-      return;
-    }
-    if (!prop->is_rand) {
-      diag_.Error(loc, std::format("'{}' is not a random variable and cannot "
-                                   "appear in a solve...before ordering "
-                                   "constraint",
-                                   e.name));
-      return;
-    }
-    if (!IsSolveOrderableType(prop->data_type)) {
+    const ClassMember* prop =
+        ResolveSolveBeforeEntry(e, loc, properties, diag_);
+    if (prop && !IsSolveOrderableType(prop->data_type)) {
       diag_.Error(loc,
                   std::format("solve...before ordering variable '{}' shall be "
                               "of integral or real type",
@@ -400,24 +414,33 @@ static bool IsModeMethodCall(const Expr* e) {
 
 static bool ExprCallsModeMethod(const Expr* e);
 
-// Recurse into every sub-expression of 'e', returning true if any contains a
+// True if any single-expression operand field of 'e' contains a
 // rand_mode()/constraint_mode() call.
-static bool AnyChildExprCallsModeMethod(const Expr* e) {
-  if (ExprCallsModeMethod(e->lhs)) return true;
-  if (ExprCallsModeMethod(e->rhs)) return true;
-  if (ExprCallsModeMethod(e->base)) return true;
-  if (ExprCallsModeMethod(e->index)) return true;
-  if (ExprCallsModeMethod(e->index_end)) return true;
-  if (ExprCallsModeMethod(e->condition)) return true;
-  if (ExprCallsModeMethod(e->true_expr)) return true;
-  if (ExprCallsModeMethod(e->false_expr)) return true;
-  if (ExprCallsModeMethod(e->repeat_count)) return true;
-  if (ExprCallsModeMethod(e->with_expr)) return true;
+static bool ScalarExprFieldsCallModeMethod(const Expr* e) {
+  return ExprCallsModeMethod(e->lhs) || ExprCallsModeMethod(e->rhs) ||
+         ExprCallsModeMethod(e->base) || ExprCallsModeMethod(e->index) ||
+         ExprCallsModeMethod(e->index_end) ||
+         ExprCallsModeMethod(e->condition) ||
+         ExprCallsModeMethod(e->true_expr) ||
+         ExprCallsModeMethod(e->false_expr) ||
+         ExprCallsModeMethod(e->repeat_count) ||
+         ExprCallsModeMethod(e->with_expr);
+}
+
+// True if any element of the list-valued operand fields of 'e' (call arguments
+// or aggregate elements) contains a rand_mode()/constraint_mode() call.
+static bool ListExprFieldsCallModeMethod(const Expr* e) {
   for (const auto* a : e->args)
     if (ExprCallsModeMethod(a)) return true;
   for (const auto* el : e->elements)
     if (ExprCallsModeMethod(el)) return true;
   return false;
+}
+
+// Recurse into every sub-expression of 'e', returning true if any contains a
+// rand_mode()/constraint_mode() call.
+static bool AnyChildExprCallsModeMethod(const Expr* e) {
+  return ScalarExprFieldsCallModeMethod(e) || ListExprFieldsCallModeMethod(e);
 }
 
 // 18.5.11: a function called in a constraint cannot modify the constraints, for
@@ -443,10 +466,9 @@ static bool StmtExprFieldsCallModeMethod(const Stmt* s) {
   return false;
 }
 
-// 18.5.11: recurse into every substatement (and the expressions guarding case
-// and randcase arms) of 's', returning true on a rand_mode()/constraint_mode()
-// call.
-static bool StmtChildrenCallModeMethod(const Stmt* s) {
+// 18.5.11: true if any case or randcase arm of 's' (its guard expressions or
+// its arm body) contains a rand_mode()/constraint_mode() call.
+static bool CaseArmsCallModeMethod(const Stmt* s) {
   for (const auto& ci : s->case_items) {
     for (const auto* p : ci.patterns)
       if (ExprCallsModeMethod(p)) return true;
@@ -456,19 +478,38 @@ static bool StmtChildrenCallModeMethod(const Stmt* s) {
     if (ExprCallsModeMethod(w)) return true;
     if (StmtCallsModeMethod(body)) return true;
   }
+  return false;
+}
+
+// 18.5.11: true if any list-valued substatement field of 's' (block/fork
+// bodies, for-loop inits and steps) contains a rand_mode()/constraint_mode()
+// call.
+static bool StmtListChildrenCallModeMethod(const Stmt* s) {
   for (const auto* sub : s->stmts)
     if (StmtCallsModeMethod(sub)) return true;
   for (const auto* sub : s->fork_stmts)
     if (StmtCallsModeMethod(sub)) return true;
-  if (StmtCallsModeMethod(s->then_branch)) return true;
-  if (StmtCallsModeMethod(s->else_branch)) return true;
-  if (StmtCallsModeMethod(s->body)) return true;
-  if (StmtCallsModeMethod(s->for_body)) return true;
   for (const auto* fi : s->for_inits)
     if (StmtCallsModeMethod(fi)) return true;
   for (const auto* fs : s->for_steps)
     if (StmtCallsModeMethod(fs)) return true;
   return false;
+}
+
+// 18.5.11: true if any single-substatement field of 's' (branch arms, loop and
+// generic bodies) contains a rand_mode()/constraint_mode() call.
+static bool ScalarStmtChildrenCallModeMethod(const Stmt* s) {
+  return StmtCallsModeMethod(s->then_branch) ||
+         StmtCallsModeMethod(s->else_branch) || StmtCallsModeMethod(s->body) ||
+         StmtCallsModeMethod(s->for_body);
+}
+
+// 18.5.11: recurse into every substatement (and the expressions guarding case
+// and randcase arms) of 's', returning true on a rand_mode()/constraint_mode()
+// call.
+static bool StmtChildrenCallModeMethod(const Stmt* s) {
+  return CaseArmsCallModeMethod(s) || ScalarStmtChildrenCallModeMethod(s) ||
+         StmtListChildrenCallModeMethod(s);
 }
 
 // 18.5.11: recursively search a statement (and its substatements and

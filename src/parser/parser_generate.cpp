@@ -19,12 +19,12 @@ void Parser::ParseGenerateBody(std::vector<ModuleItem*>& body,
     if (!CheckIdentifier()) return false;
     auto saved = lexer_.SavePos();
     auto ident = Consume();
-    if (!Check(TokenKind::kColon)) {
-      lexer_.RestorePos(saved);
-      return false;
+    bool committed = Check(TokenKind::kColon);
+    if (committed) {
+      Consume();
+      committed = Check(TokenKind::kKwBegin);
     }
-    Consume();
-    if (!Check(TokenKind::kKwBegin)) {
+    if (!committed) {
       lexer_.RestorePos(saved);
       return false;
     }
@@ -33,18 +33,23 @@ void Parser::ParseGenerateBody(std::vector<ModuleItem*>& body,
   };
   bool has_gen_label = detect_gen_label();
 
-  // Parse the body of a `begin ... end` generate block, including an
-  // optional `: name` and the matching trailing `: name`.
-  auto parse_begin_body = [&]() {
+  // Consume the optional `: name` block name at the head of a `begin` block,
+  // diagnosing a conflict with a generate-block label.
+  auto consume_begin_name = [&]() {
     if (!has_gen_label && Match(TokenKind::kColon)) {
-      if (CheckIdentifier()) {
-        out_label = Consume().text;
-      }
+      if (CheckIdentifier()) out_label = Consume().text;
+      return;
     }
     if (has_gen_label && Check(TokenKind::kColon)) {
       diag_.Error(CurrentLoc(),
                   "cannot have both a generate block label and a block name");
     }
+  };
+
+  // Parse the body of a `begin ... end` generate block, including an
+  // optional `: name` and the matching trailing `: name`.
+  auto parse_begin_body = [&]() {
+    consume_begin_name();
     while (!Check(TokenKind::kKwEnd) && !AtEnd()) {
       ParseModuleItem(body);
     }

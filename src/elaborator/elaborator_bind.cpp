@@ -103,6 +103,15 @@ static bool BindAppliesToModule(const BindDirective* bd, const RtlirModule* mod,
   return hier_path == bd->target;
 }
 
+// Build the dotted hierarchical path of a child instance from its parent path.
+static std::string BindChildPath(const std::string& hier_path,
+                                 std::string_view inst_name) {
+  std::string child_path = hier_path;
+  child_path.push_back('.');
+  child_path.append(inst_name.data(), inst_name.size());
+  return child_path;
+}
+
 void Elaborator::WalkForBind(RtlirModule* mod, const std::string& hier_path,
                              const std::vector<BindDirective*>& binds,
                              bool under_bind,
@@ -124,16 +133,11 @@ void Elaborator::WalkForBind(RtlirModule* mod, const std::string& hier_path,
     ApplyBindInstance(bd, mod);
   }
 
-  size_t n = mod->children.size();
-  for (size_t i = 0; i < n; ++i) {
-    auto& c = mod->children[i];
+  for (auto& c : mod->children) {
     if (!c.resolved) continue;
     bool child_under_bind = under_bind || c.is_bound;
-    std::string child_path = hier_path;
-    child_path.push_back('.');
-    child_path.append(c.inst_name.data(), c.inst_name.size());
-    WalkForBind(c.resolved, child_path, binds, child_under_bind, visited,
-                applied);
+    WalkForBind(c.resolved, BindChildPath(hier_path, c.inst_name), binds,
+                child_under_bind, visited, applied);
   }
 }
 
@@ -363,6 +367,33 @@ bool DecodeInterfaceConnection(const Expr* conn,
   return false;
 }
 
+// Record one matched export (modport port `pp` satisfied by `body`) into the
+// per-export-key buckets, reporting a prototype mismatch where one applies.
+void RecordExportSite(const ModportPort& pp, const ModuleItem* body,
+                      const RtlirModuleInst& child,
+                      std::string_view iface_inst_name,
+                      std::string_view modport_name,
+                      std::unordered_map<ExportKey, std::vector<ExportSite>,
+                                         ExportKeyHash>& buckets,
+                      DiagEngine& diag) {
+  // §25.7: an export written as a full prototype pins the signature
+  // the defining module must provide; a definition that does not
+  // match it exactly is an elaboration error.
+  if (pp.prototype && !ExportPrototypeMatchesBody(pp.prototype, body)) {
+    diag.Error(
+        body->loc,
+        std::format("definition of exported subroutine '{}' in module '{}' "
+                    "does not match the prototype declared in the modport",
+                    pp.name, child.module_name));
+  }
+  ExportKey key{iface_inst_name, modport_name, pp.name};
+  ExportSite site;
+  site.child_inst = child.inst_name;
+  site.is_task = body->kind == ModuleItemKind::kTaskDecl;
+  site.loc = body->loc;
+  buckets[key].push_back(site);
+}
+
 void CollectModportExportSites(
     const std::vector<ModportPort>& mp_ports, const ModuleDecl* child_decl,
     const RtlirModuleInst& child, const RtlirPortBinding& binding,
@@ -376,22 +407,48 @@ void CollectModportExportSites(
     const auto* body =
         FindOutOfBlockBodyInChild(child_decl, binding.port_name, pp.name);
     if (!body) continue;
-    // §25.7: an export written as a full prototype pins the signature
-    // the defining module must provide; a definition that does not
-    // match it exactly is an elaboration error.
-    if (pp.prototype && !ExportPrototypeMatchesBody(pp.prototype, body)) {
-      diag.Error(
-          body->loc,
-          std::format("definition of exported subroutine '{}' in module '{}' "
-                      "does not match the prototype declared in the modport",
-                      pp.name, child.module_name));
-    }
-    ExportKey key{iface_inst_name, modport_name, pp.name};
-    ExportSite site;
-    site.child_inst = child.inst_name;
-    site.is_task = body->kind == ModuleItemKind::kTaskDecl;
-    site.loc = body->loc;
-    buckets[key].push_back(site);
+    RecordExportSite(pp, body, child, iface_inst_name, modport_name, buckets,
+                     diag);
+  }
+}
+
+// Resolve the interface declaration a port binding connects to, decoding the
+// interface instance and (optional) modport names. Returns null when the
+// binding does not connect to a known interface instance.
+const ModuleDecl* ResolveBoundInterface(
+    const RtlirPortBinding& binding,
+    const std::unordered_map<std::string_view, std::string_view>&
+        iface_inst_to_type,
+    const FindModuleFn& find_module, std::string_view& iface_inst_name,
+    std::string_view& modport_name) {
+  if (!binding.connection) return nullptr;
+  if (!DecodeInterfaceConnection(binding.connection, iface_inst_name,
+                                 modport_name))
+    return nullptr;
+  auto it = iface_inst_to_type.find(iface_inst_name);
+  if (it == iface_inst_to_type.end()) return nullptr;
+  return find_module(it->second);
+}
+
+// Collect export sites for one port binding, dispatching to the named modport
+// or, when no modport is named, to every modport of the connected interface.
+void CollectBindingExportSites(
+    const RtlirModuleInst& child, const ModuleDecl* child_decl,
+    const RtlirPortBinding& binding, const ModuleDecl* iface_decl,
+    std::string_view iface_inst_name, std::string_view modport_name,
+    std::unordered_map<ExportKey, std::vector<ExportSite>, ExportKeyHash>&
+        buckets,
+    DiagEngine& diag) {
+  if (!modport_name.empty()) {
+    const auto* mp = FindModportInInterface(iface_decl, modport_name);
+    if (!mp) return;
+    CollectModportExportSites(mp->ports, child_decl, child, binding,
+                              iface_inst_name, modport_name, buckets, diag);
+    return;
+  }
+  for (const auto* mp : iface_decl->modports) {
+    CollectModportExportSites(mp->ports, child_decl, child, binding,
+                              iface_inst_name, modport_name, buckets, diag);
   }
 }
 
@@ -406,31 +463,14 @@ void CollectChildExportSites(
         buckets,
     DiagEngine& diag) {
   for (const auto& binding : child.port_bindings) {
-    if (!binding.connection) continue;
-    const auto* conn = binding.connection;
-
     std::string_view iface_inst_name;
     std::string_view modport_name;
-    if (!DecodeInterfaceConnection(conn, iface_inst_name, modport_name))
-      continue;
-
-    auto it = iface_inst_to_type.find(iface_inst_name);
-    if (it == iface_inst_to_type.end()) continue;
-
-    auto* iface_decl = find_module(it->second);
+    const auto* iface_decl =
+        ResolveBoundInterface(binding, iface_inst_to_type, find_module,
+                              iface_inst_name, modport_name);
     if (!iface_decl) continue;
-
-    if (!modport_name.empty()) {
-      const auto* mp = FindModportInInterface(iface_decl, modport_name);
-      if (!mp) continue;
-      CollectModportExportSites(mp->ports, child_decl, child, binding,
-                                iface_inst_name, modport_name, buckets, diag);
-    } else {
-      for (const auto* mp : iface_decl->modports) {
-        CollectModportExportSites(mp->ports, child_decl, child, binding,
-                                  iface_inst_name, modport_name, buckets, diag);
-      }
-    }
+    CollectBindingExportSites(child, child_decl, binding, iface_decl,
+                              iface_inst_name, modport_name, buckets, diag);
   }
 }
 

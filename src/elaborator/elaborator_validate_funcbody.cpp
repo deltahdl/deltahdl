@@ -135,6 +135,33 @@ static void CheckRefArgsInForkBlocks(
     CheckRefArgsInForkBlocks(ri.second, ref_names, diag);
 }
 
+static void CheckFuncBodyTimeControl(const Stmt* s, DiagEngine& diag) {
+  if (s->kind == StmtKind::kDelay || s->kind == StmtKind::kCycleDelay ||
+      s->kind == StmtKind::kEventControl ||
+      s->kind == StmtKind::kTimingControl || s->kind == StmtKind::kWait ||
+      s->kind == StmtKind::kWaitFork || s->kind == StmtKind::kWaitOrder ||
+      s->kind == StmtKind::kExpect) {
+    diag.Error(s->range.start,
+               "time-controlling statement is not allowed inside a function");
+  }
+}
+
+static void CheckFuncBodyVarDecl(const Stmt* s, std::string_view func_name,
+                                 DiagEngine& diag) {
+  if (s->kind != StmtKind::kVarDecl) return;
+  if (!func_name.empty() && s->var_name == func_name) {
+    diag.Error(s->range.start,
+               std::format("declaration of '{}' conflicts with function name",
+                           func_name));
+  }
+  if (s->var_is_static && s->var_init && !IsConstantExpr(s->var_init)) {
+    diag.Error(s->range.start,
+               std::format("static variable '{}' initializer must be a "
+                           "constant expression",
+                           s->var_name));
+  }
+}
+
 static void CheckFuncBodyStmtSelf(
     const Stmt* s, bool is_void,
     const std::unordered_set<std::string_view>& task_names,
@@ -147,14 +174,7 @@ static void CheckFuncBodyStmtSelf(
                "only fork/join_none is permitted inside a function");
   }
 
-  if (s->kind == StmtKind::kDelay || s->kind == StmtKind::kCycleDelay ||
-      s->kind == StmtKind::kEventControl ||
-      s->kind == StmtKind::kTimingControl || s->kind == StmtKind::kWait ||
-      s->kind == StmtKind::kWaitFork || s->kind == StmtKind::kWaitOrder ||
-      s->kind == StmtKind::kExpect) {
-    diag.Error(s->range.start,
-               "time-controlling statement is not allowed inside a function");
-  }
+  CheckFuncBodyTimeControl(s, diag);
 
   if (s->kind == StmtKind::kExprStmt && s->expr &&
       s->expr->kind == ExprKind::kCall &&
@@ -162,21 +182,8 @@ static void CheckFuncBodyStmtSelf(
     diag.Error(s->range.start, "function cannot enable a task");
   }
 
-  if (s->kind == StmtKind::kVarDecl && !func_name.empty() &&
-      s->var_name == func_name) {
-    diag.Error(s->range.start,
-               std::format("declaration of '{}' conflicts with function name",
-                           func_name));
-  }
+  CheckFuncBodyVarDecl(s, func_name, diag);
 
-  if (s->kind == StmtKind::kVarDecl && s->var_is_static && s->var_init) {
-    if (!IsConstantExpr(s->var_init)) {
-      diag.Error(s->range.start,
-                 std::format("static variable '{}' initializer must be a "
-                             "constant expression",
-                             s->var_name));
-    }
-  }
   if (s->kind == StmtKind::kAssign && s->lhs &&
       s->lhs->kind == ExprKind::kSelect) {
     diag.Error(s->range.start,
@@ -271,40 +278,42 @@ static void CheckNbaEventControlForAutoVar(
   }
 }
 
-static void CheckTaskBodyStmtSelf(
+static void CheckTaskBodyNbaForAutoVar(
     const Stmt* s, const std::unordered_set<std::string_view>& auto_vars,
     DiagEngine& diag) {
-  if (s->kind == StmtKind::kReturn && s->expr) {
-    diag.Error(s->range.start, "task returns a value");
-  }
-
-  if (s->kind == StmtKind::kNonblockingAssign && s->lhs) {
+  if (s->kind != StmtKind::kNonblockingAssign) return;
+  if (s->lhs) {
     auto target = NbaAutoTargetRoot(s->lhs);
     if (!target.empty() && auto_vars.count(target) != 0) {
       diag.Error(s->range.start,
                  "automatic task variable in nonblocking assignment");
     }
   }
+  CheckNbaEventControlForAutoVar(s, auto_vars, diag);
+}
 
-  if (s->kind == StmtKind::kNonblockingAssign) {
-    CheckNbaEventControlForAutoVar(s, auto_vars, diag);
-  }
-
-  // §13.3.2: an automatic task variable shall not be traced by continuous
-  // monitoring system tasks such as $monitor and $dumpvars, whose tracing
-  // outlives the invocation.
-  if (s->kind == StmtKind::kExprStmt && s->expr &&
-      s->expr->kind == ExprKind::kSystemCall &&
-      (s->expr->callee == "$monitor" || s->expr->callee == "$dumpvars")) {
-    for (auto* a : s->expr->args) {
-      if (ExprRefsAutoVar(a, auto_vars)) {
-        diag.Error(s->range.start,
-                   "automatic task variable traced by system task");
-        break;
-      }
+// §13.3.2: an automatic task variable shall not be traced by continuous
+// monitoring system tasks such as $monitor and $dumpvars, whose tracing
+// outlives the invocation.
+static void CheckTaskBodyMonitorTrace(
+    const Stmt* s, const std::unordered_set<std::string_view>& auto_vars,
+    DiagEngine& diag) {
+  if (!(s->kind == StmtKind::kExprStmt && s->expr &&
+        s->expr->kind == ExprKind::kSystemCall &&
+        (s->expr->callee == "$monitor" || s->expr->callee == "$dumpvars")))
+    return;
+  for (auto* a : s->expr->args) {
+    if (ExprRefsAutoVar(a, auto_vars)) {
+      diag.Error(s->range.start,
+                 "automatic task variable traced by system task");
+      break;
     }
   }
+}
 
+static void CheckTaskBodyContAssign(
+    const Stmt* s, const std::unordered_set<std::string_view>& auto_vars,
+    DiagEngine& diag) {
   if (s->kind == StmtKind::kForce || s->kind == StmtKind::kAssign) {
     auto name = ExprIdent(s->lhs);
     if (!name.empty() && auto_vars.count(name) != 0) {
@@ -317,6 +326,18 @@ static void CheckTaskBodyStmtSelf(
     diag.Error(s->range.start,
                "bit-select or part-select in procedural assign LHS");
   }
+}
+
+static void CheckTaskBodyStmtSelf(
+    const Stmt* s, const std::unordered_set<std::string_view>& auto_vars,
+    DiagEngine& diag) {
+  if (s->kind == StmtKind::kReturn && s->expr) {
+    diag.Error(s->range.start, "task returns a value");
+  }
+
+  CheckTaskBodyNbaForAutoVar(s, auto_vars, diag);
+  CheckTaskBodyMonitorTrace(s, auto_vars, diag);
+  CheckTaskBodyContAssign(s, auto_vars, diag);
 
   if (s->kind == StmtKind::kFork) {
     for (auto* sub : s->fork_stmts) CheckNoReturnInFork(sub, diag);
@@ -463,28 +484,41 @@ void CollectIdentLeaves(const Expr* e, std::vector<const Expr*>& out) {
   for (auto* el : e->elements) CollectIdentLeaves(el, out);
 }
 
+// Reports each identifier leaf of a default-value expression that is neither a
+// previously declared argument nor visible in the subroutine's declaring scope.
+template <typename InModuleScopeFn>
+void CheckOneArgDefaultScope(
+    const FunctionArg& arg,
+    const std::unordered_set<std::string_view>& prior_args,
+    const InModuleScopeFn& in_module_scope, DiagEngine& diag) {
+  std::vector<const Expr*> idents;
+  CollectIdentLeaves(arg.default_value, idents);
+  for (const auto* e : idents) {
+    auto name = e->text;
+    if (name.empty()) continue;
+    if (prior_args.count(name)) continue;
+    if (in_module_scope(name)) continue;
+    diag.Error(e->range.start,
+               std::format("default value for '{}' references '{}' "
+                           "which is not declared in the subroutine's "
+                           "declaring scope",
+                           arg.name, name));
+  }
+}
+
 }  // namespace
 
 void Elaborator::ValidateFunctionArgDefaultsScope(const ModuleItem* item) {
   if (!item) return;
   if (!item->is_ansi_ports) return;
   if (!item->method_class.empty()) return;
+  auto in_module_scope = [this](std::string_view name) {
+    return IsNameInModuleScope(name);
+  };
   std::unordered_set<std::string_view> prior_args;
   for (const auto& arg : item->func_args) {
     if (arg.default_value) {
-      std::vector<const Expr*> idents;
-      CollectIdentLeaves(arg.default_value, idents);
-      for (const auto* e : idents) {
-        auto name = e->text;
-        if (name.empty()) continue;
-        if (prior_args.count(name)) continue;
-        if (IsNameInModuleScope(name)) continue;
-        diag_.Error(e->range.start,
-                    std::format("default value for '{}' references '{}' "
-                                "which is not declared in the subroutine's "
-                                "declaring scope",
-                                arg.name, name));
-      }
+      CheckOneArgDefaultScope(arg, prior_args, in_module_scope, diag_);
     }
     if (!arg.name.empty()) prior_args.insert(arg.name);
   }

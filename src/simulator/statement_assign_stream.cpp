@@ -144,6 +144,28 @@ static bool LhsHasGreedyDynamicElement(const Expr* lhs, SimContext& ctx) {
   return false;
 }
 
+// Bit width contributed by a with-range identifier element (fixed array or
+// queue) when computing the fixed-target sum.
+static uint32_t FixedWithRangeElementWidth(const Expr* elem, SimContext& ctx,
+                                           Arena& arena) {
+  if (auto* ainfo = ctx.FindArrayInfo(elem->text)) {
+    uint32_t start = 0, count = 0;
+    ResolveWithRange(elem->with_expr, ctx, arena, ainfo->size, ainfo->lo, start,
+                     count);
+    if (start + count > ainfo->size)
+      count = (start < ainfo->size) ? ainfo->size - start : 0;
+    return count * ainfo->elem_width;
+  }
+  if (auto* queue = ctx.FindQueue(elem->text)) {
+    uint32_t start = 0, count = 0;
+    ResolveWithRange(elem->with_expr, ctx, arena,
+                     static_cast<uint32_t>(queue->elements.size()), 0, start,
+                     count);
+    return count * queue->elem_width;
+  }
+  return 0;
+}
+
 // Sum of bit widths of all non-greedy (fixed) targets, used to compute how
 // many bits remain for the single greedy dynamic queue.
 static uint32_t SumFixedElementWidths(const Expr* lhs, SimContext& ctx,
@@ -151,20 +173,7 @@ static uint32_t SumFixedElementWidths(const Expr* lhs, SimContext& ctx,
   uint32_t fixed_sum = 0;
   for (auto* elem : lhs->elements) {
     if (elem->with_expr && elem->kind == ExprKind::kIdentifier) {
-      if (auto* ainfo = ctx.FindArrayInfo(elem->text)) {
-        uint32_t start = 0, count = 0;
-        ResolveWithRange(elem->with_expr, ctx, arena, ainfo->size, ainfo->lo,
-                         start, count);
-        if (start + count > ainfo->size)
-          count = (start < ainfo->size) ? ainfo->size - start : 0;
-        fixed_sum += count * ainfo->elem_width;
-      } else if (auto* queue = ctx.FindQueue(elem->text)) {
-        uint32_t start = 0, count = 0;
-        ResolveWithRange(elem->with_expr, ctx, arena,
-                         static_cast<uint32_t>(queue->elements.size()), 0,
-                         start, count);
-        fixed_sum += count * queue->elem_width;
-      }
+      fixed_sum += FixedWithRangeElementWidth(elem, ctx, arena);
       continue;
     }
     if (elem->kind == ExprKind::kIdentifier && ctx.FindQueue(elem->text))
@@ -243,6 +252,46 @@ static uint32_t CollectGreedyQueueElements(const Expr* elem, QueueObject* queue,
   return added;
 }
 
+// Try to collect a with-range element (fixed array or queue). Returns true and
+// sets `added` if the element was a with-range identifier handled here.
+static bool TryCollectWithRangeElement(const Expr* elem, SimContext& ctx,
+                                       Arena& arena,
+                                       std::vector<StreamElemInfo>& elems,
+                                       uint32_t& added) {
+  if (!elem->with_expr || elem->kind != ExprKind::kIdentifier) return false;
+  if (auto* ainfo = ctx.FindArrayInfo(elem->text)) {
+    added = CollectArrayWithRangeElements(elem, ainfo, ctx, arena, elems);
+    return true;
+  }
+  if (auto* queue = ctx.FindQueue(elem->text)) {
+    added = CollectQueueWithRangeElements(elem, queue, ctx, arena, elems);
+    return true;
+  }
+  return false;
+}
+
+// Try to collect a bare dynamic-queue element under greedy sizing. Returns true
+// if the element was such a queue (the first one is sized greedily; subsequent
+// ones are cleared). Sets `added` for the greedy queue.
+static bool TryCollectGreedyDynamicElement(const Expr* elem, SimContext& ctx,
+                                           Arena& arena, uint32_t rhs_width,
+                                           uint32_t fixed_sum,
+                                           bool& first_dynamic_consumed,
+                                           std::vector<StreamElemInfo>& elems,
+                                           uint32_t& added) {
+  if (elem->with_expr || elem->kind != ExprKind::kIdentifier) return false;
+  auto* queue = ctx.FindQueue(elem->text);
+  if (!queue) return false;
+  if (!first_dynamic_consumed) {
+    first_dynamic_consumed = true;
+    added = CollectGreedyQueueElements(elem, queue, rhs_width, fixed_sum, arena,
+                                       elems);
+  } else {
+    queue->elements.clear();
+  }
+  return true;
+}
+
 static uint32_t CollectStreamElements(const Expr* lhs, SimContext& ctx,
                                       Arena& arena,
                                       std::vector<StreamElemInfo>& elems,
@@ -254,32 +303,16 @@ static uint32_t CollectStreamElements(const Expr* lhs, SimContext& ctx,
   uint32_t total_width = 0;
   bool first_dynamic_consumed = false;
   for (auto* elem : lhs->elements) {
-    if (elem->with_expr && elem->kind == ExprKind::kIdentifier) {
-      if (auto* ainfo = ctx.FindArrayInfo(elem->text)) {
-        total_width +=
-            CollectArrayWithRangeElements(elem, ainfo, ctx, arena, elems);
-        continue;
-      }
-      if (auto* queue = ctx.FindQueue(elem->text)) {
-        total_width +=
-            CollectQueueWithRangeElements(elem, queue, ctx, arena, elems);
-        continue;
-      }
+    uint32_t added = 0;
+    if (TryCollectWithRangeElement(elem, ctx, arena, elems, added)) {
+      total_width += added;
+      continue;
     }
-
-    if (has_dynamic && !elem->with_expr &&
-        elem->kind == ExprKind::kIdentifier) {
-      auto* queue = ctx.FindQueue(elem->text);
-      if (queue) {
-        if (!first_dynamic_consumed) {
-          first_dynamic_consumed = true;
-          total_width += CollectGreedyQueueElements(elem, queue, rhs_width,
-                                                    fixed_sum, arena, elems);
-        } else {
-          queue->elements.clear();
-        }
-        continue;
-      }
+    if (has_dynamic &&
+        TryCollectGreedyDynamicElement(elem, ctx, arena, rhs_width, fixed_sum,
+                                       first_dynamic_consumed, elems, added)) {
+      total_width += added;
+      continue;
     }
     auto* var = ResolveLhsVariable(elem, ctx);
     if (!var) continue;
@@ -289,23 +322,26 @@ static uint32_t CollectStreamElements(const Expr* lhs, SimContext& ctx,
   return total_width;
 }
 
+// Copy a single bit position `sbit` of `src` into bit position `dbit` of `dst`.
+// Out-of-range source words contribute nothing.
+static void CopyOneStreamBit(const Logic4Vec& src, Logic4Vec& dst,
+                             uint32_t sbit, uint32_t dbit) {
+  uint32_t sw = sbit / 64, sb = sbit % 64;
+  uint32_t dw = dbit / 64, db = dbit % 64;
+  if (sw >= src.nwords) return;
+  if ((src.words[sw].aval >> sb) & 1) dst.words[dw].aval |= uint64_t{1} << db;
+  if ((src.words[sw].bval >> sb) & 1) dst.words[dw].bval |= uint64_t{1} << db;
+}
+
 // Copy `bits_to_copy` bits from `stream`[src_start..] into `dst`[dst_start..],
 // stopping at total_width.
 static void CopyStreamSliceBits(const Logic4Vec& stream, Logic4Vec& dst,
                                 uint32_t src_start, uint32_t dst_start,
                                 uint32_t bits_to_copy, uint32_t total_width) {
   for (uint32_t b = 0; b < bits_to_copy; ++b) {
-    uint32_t sbit = src_start + b;
     uint32_t dbit = dst_start + b;
     if (dbit >= total_width) break;
-    uint32_t sw = sbit / 64, sb = sbit % 64;
-    uint32_t dw = dbit / 64, db = dbit % 64;
-    if (sw < stream.nwords) {
-      if ((stream.words[sw].aval >> sb) & 1)
-        dst.words[dw].aval |= uint64_t{1} << db;
-      if ((stream.words[sw].bval >> sb) & 1)
-        dst.words[dw].bval |= uint64_t{1} << db;
-    }
+    CopyOneStreamBit(stream, dst, src_start + b, dbit);
   }
 }
 
@@ -334,14 +370,7 @@ static Logic4Vec ExtractStreamBits(const Logic4Vec& stream, uint32_t bit_offset,
   for (uint32_t b = 0; b < width; ++b) {
     uint32_t sbit = bit_offset + b;
     if (sbit >= total_width) break;
-    uint32_t sw = sbit / 64, sb = sbit % 64;
-    uint32_t dw = b / 64, db = b % 64;
-    if (sw < stream.nwords) {
-      if ((stream.words[sw].aval >> sb) & 1)
-        result.words[dw].aval |= uint64_t{1} << db;
-      if ((stream.words[sw].bval >> sb) & 1)
-        result.words[dw].bval |= uint64_t{1} << db;
-    }
+    CopyOneStreamBit(stream, result, sbit, b);
   }
   return result;
 }
@@ -446,6 +475,37 @@ static void ForwardUnpackQueueWithRange(const Expr* elem, QueueObject* queue,
   }
 }
 
+// Forward-unpack arm for a plain scalar/lvalue element: write the target from
+// the next `width` stream bits, advancing `cursor`.
+static void ForwardUnpackScalar(const Expr* elem, SimContext& ctx,
+                                const StreamTaker& take, uint32_t& cursor) {
+  auto* var = ResolveLhsVariable(elem, ctx);
+  if (!var) return;
+  uint32_t w = var->value.width;
+  var->value = take(w);
+  if (!var->is_4state) CoerceTo2State(var->value);
+  var->NotifyWatchers();
+  cursor += w;
+}
+
+// Forward-unpack dispatch for one element (with-range array, with-range queue,
+// or plain scalar/lvalue).
+static void ForwardUnpackOneElement(const Expr* elem, SimContext& ctx,
+                                    Arena& arena, const StreamTaker& take,
+                                    uint32_t& cursor) {
+  if (elem->with_expr && elem->kind == ExprKind::kIdentifier) {
+    if (auto* ainfo = ctx.FindArrayInfo(elem->text)) {
+      ForwardUnpackArrayWithRange(elem, ainfo, ctx, arena, take, cursor);
+      return;
+    }
+    if (auto* queue = ctx.FindQueue(elem->text)) {
+      ForwardUnpackQueueWithRange(elem, queue, ctx, arena, take, cursor);
+      return;
+    }
+  }
+  ForwardUnpackScalar(elem, ctx, take, cursor);
+}
+
 // Forward unpack for the right-shift form: walk elements in stream order and
 // write each target before resolving the next element's with-range, consuming
 // bits from the most-significant end of the stream as we go. This makes an
@@ -461,23 +521,7 @@ static void UnpackStreamingConcatLhsForward(const Expr* lhs,
     return MakeLogic4Vec(arena, w);
   };
   for (auto* elem : lhs->elements) {
-    if (elem->with_expr && elem->kind == ExprKind::kIdentifier) {
-      if (auto* ainfo = ctx.FindArrayInfo(elem->text)) {
-        ForwardUnpackArrayWithRange(elem, ainfo, ctx, arena, take, cursor);
-        continue;
-      }
-      if (auto* queue = ctx.FindQueue(elem->text)) {
-        ForwardUnpackQueueWithRange(elem, queue, ctx, arena, take, cursor);
-        continue;
-      }
-    }
-    auto* var = ResolveLhsVariable(elem, ctx);
-    if (!var) continue;
-    uint32_t w = var->value.width;
-    var->value = take(w);
-    if (!var->is_4state) CoerceTo2State(var->value);
-    var->NotifyWatchers();
-    cursor += w;
+    ForwardUnpackOneElement(elem, ctx, arena, take, cursor);
   }
   if (cursor > total)
     ctx.GetDiag().Error({}, "too few bits in stream for streaming unpack");
@@ -491,17 +535,46 @@ static Logic4Vec BuildLeftAlignedStream(const Logic4Vec& rhs_val,
   uint32_t shift = rhs_val.width - total_width;
   Logic4Vec stream = MakeLogic4Vec(arena, total_width);
   for (uint32_t b = 0; b < total_width; ++b) {
-    uint32_t sbit = shift + b;
-    uint32_t sw = sbit / 64, sb = sbit % 64;
-    uint32_t dw = b / 64, db = b % 64;
-    if (sw < rhs_val.nwords) {
-      if ((rhs_val.words[sw].aval >> sb) & 1)
-        stream.words[dw].aval |= uint64_t{1} << db;
-      if ((rhs_val.words[sw].bval >> sb) & 1)
-        stream.words[dw].bval |= uint64_t{1} << db;
-    }
+    CopyOneStreamBit(rhs_val, stream, shift + b, b);
   }
   return stream;
+}
+
+// Write `value` into `var`, coercing to 2-state if needed and notifying.
+static void StoreStreamValueToVar(Variable* var, Logic4Vec value) {
+  var->value = std::move(value);
+  if (!var->is_4state) CoerceTo2State(var->value);
+  var->NotifyWatchers();
+}
+
+// Write a collected element targeting a synthetic queue slot
+// ("<name>__q__<idx>") at `qpos`, the position of "__q__" in the name.
+static void WriteStreamQueueElement(const StreamElemInfo& ei, size_t qpos,
+                                    const Logic4Vec& stream,
+                                    uint32_t bit_offset, uint32_t total_width,
+                                    SimContext& ctx, Arena& arena) {
+  auto qname = std::string_view(ei.target_name).substr(0, qpos);
+  auto idx_str = ei.target_name.substr(qpos + 5);
+  auto idx = static_cast<uint32_t>(std::stoul(idx_str));
+  auto* queue = ctx.FindQueue(qname);
+  if (queue && idx < queue->elements.size()) {
+    queue->elements[idx] =
+        ExtractStreamBits(stream, bit_offset, ei.width, total_width, arena);
+  }
+}
+
+// Write a collected element targeting a named variable, creating it on demand.
+static void WriteStreamNamedVar(const StreamElemInfo& ei,
+                                const Logic4Vec& stream, uint32_t bit_offset,
+                                uint32_t total_width, SimContext& ctx,
+                                Arena& arena) {
+  auto* var = ctx.FindVariable(ei.target_name);
+  if (!var) {
+    var = ctx.CreateVariable(*arena.Create<std::string>(ei.target_name),
+                             ei.width);
+  }
+  StoreStreamValueToVar(
+      var, ExtractStreamBits(stream, bit_offset, ei.width, total_width, arena));
 }
 
 // Write one collected stream element's bits to its target (queue slot, named
@@ -513,33 +586,17 @@ static void WriteStreamElement(const StreamElemInfo& ei,
   if (!ei.target_name.empty()) {
     auto qpos = ei.target_name.find("__q__");
     if (qpos != std::string::npos) {
-      auto qname = std::string_view(ei.target_name).substr(0, qpos);
-      auto idx_str = ei.target_name.substr(qpos + 5);
-      auto idx = static_cast<uint32_t>(std::stoul(idx_str));
-      auto* queue = ctx.FindQueue(qname);
-      if (queue && idx < queue->elements.size()) {
-        queue->elements[idx] =
-            ExtractStreamBits(stream, bit_offset, ei.width, total_width, arena);
-      }
+      WriteStreamQueueElement(ei, qpos, stream, bit_offset, total_width, ctx,
+                              arena);
     } else {
-      auto* var = ctx.FindVariable(ei.target_name);
-      if (!var) {
-        var = ctx.CreateVariable(*arena.Create<std::string>(ei.target_name),
-                                 ei.width);
-      }
-      var->value =
-          ExtractStreamBits(stream, bit_offset, ei.width, total_width, arena);
-      if (!var->is_4state) CoerceTo2State(var->value);
-      var->NotifyWatchers();
+      WriteStreamNamedVar(ei, stream, bit_offset, total_width, ctx, arena);
     }
-  } else {
-    auto* var = ResolveLhsVariable(ei.expr, ctx);
-    if (!var) return;
-    var->value =
-        ExtractStreamBits(stream, bit_offset, ei.width, total_width, arena);
-    if (!var->is_4state) CoerceTo2State(var->value);
-    var->NotifyWatchers();
+    return;
   }
+  auto* var = ResolveLhsVariable(ei.expr, ctx);
+  if (!var) return;
+  StoreStreamValueToVar(
+      var, ExtractStreamBits(stream, bit_offset, ei.width, total_width, arena));
 }
 
 void UnpackStreamingConcatLhs(const Expr* lhs, const Logic4Vec& rhs_val,

@@ -229,36 +229,113 @@ static DriverStrength ComputeEffectiveDriverStrength(
   return effective_ds;
 }
 
+static void ApplyContAssignToNet(Net* net, size_t driver_idx, bool first,
+                                 const Logic4Vec& driven_val,
+                                 DriverStrength effective_ds, Arena& arena) {
+  if (first) {
+    net->drivers.push_back(driven_val);
+    net->driver_strengths.push_back(effective_ds);
+  } else {
+    net->drivers[driver_idx] = driven_val;
+    net->driver_strengths[driver_idx] = effective_ds;
+  }
+  net->Resolve(arena);
+}
+
+static void ApplyContAssignToVariable(const ContAssignParams& params,
+                                      const Logic4Vec& driven_val,
+                                      SimContext& ctx, Arena& arena) {
+  auto* var = ctx.FindVariable(params.lhs->text);
+  if (var && !var->is_forced) {
+    var->value = ResizeToWidth(driven_val, var->value.width, arena);
+    var->NotifyWatchers();
+  }
+}
+
 static void ApplyContAssignResult(const ContAssignParams& params, Net* net,
                                   size_t driver_idx, bool first,
                                   const Logic4Vec& driven_val,
                                   DriverStrength effective_ds, SimContext& ctx,
                                   Arena& arena) {
   if (net) {
-    if (first) {
-      net->drivers.push_back(driven_val);
-      net->driver_strengths.push_back(effective_ds);
-    } else {
-      net->drivers[driver_idx] = driven_val;
-      net->driver_strengths[driver_idx] = effective_ds;
-    }
-    net->Resolve(arena);
+    ApplyContAssignToNet(net, driver_idx, first, driven_val, effective_ds,
+                         arena);
   } else {
-    auto* var = ctx.FindVariable(params.lhs->text);
-    if (var && !var->is_forced) {
-      var->value = ResizeToWidth(driven_val, var->value.width, arena);
-      var->NotifyWatchers();
-    }
+    ApplyContAssignToVariable(params, driven_val, ctx, arena);
   }
+}
+
+static std::vector<std::string_view> CollectContAssignReadVars(
+    const Expr* rhs) {
+  std::unordered_set<std::string> read_strs;
+  CollectExprReads(rhs, read_strs);
+  return std::vector<std::string_view>(read_strs.begin(), read_strs.end());
+}
+
+static Logic4Vec CurrentContAssignOldValue(const ContAssignParams& params,
+                                           const Net* net, SimContext& ctx,
+                                           Arena& arena) {
+  Logic4Vec old_val = MakeLogic4VecVal(arena, 1, 0);
+  auto* var = ctx.FindVariable(params.lhs->text);
+  if (var)
+    old_val = var->value;
+  else if (net && net->resolved)
+    old_val = net->resolved->value;
+  return old_val;
+}
+
+// Tracks the result of re-evaluating the right-hand side after an inertial
+// delay is interrupted by an operand change. `collapsed` requests that the
+// pending transition be dropped because the new value already equals the
+// left-hand side. `rescheduled` is true only when the operand changed and a new
+// fire time was computed into `target`; otherwise the caller keeps its existing
+// target unchanged.
+struct InertialReeval {
+  bool collapsed = false;
+  bool rescheduled = false;
+  SimTime target;
+};
+
+static InertialReeval ReevalInertialContAssign(const ContAssignParams& params,
+                                               const ContAssignDelays& d,
+                                               const Logic4Vec& old_val,
+                                               Logic4Vec& val, SimContext& ctx,
+                                               Arena& arena) {
+  InertialReeval result;
+  auto new_val = EvalExpr(params.rhs, ctx, arena, params.width);
+  if (Logic4VecEqual(new_val, val)) return result;
+  // The operand changed again before the pending value could propagate, so the
+  // previously scheduled event is dropped.
+  val = new_val;
+  if (Logic4VecEqual(new_val, old_val)) {
+    // The re-evaluated right-hand side now matches the value already present on
+    // the left-hand side, so no replacement event is scheduled and the pending
+    // transition collapses immediately.
+    result.collapsed = true;
+    return result;
+  }
+  uint64_t ticks = SelectContAssignDelay(old_val, val, d, params.width);
+  result.rescheduled = true;
+  result.target = ctx.CurrentTime() + SimTime{ticks};
+  return result;
+}
+
+static void CommitContAssignValue(const ContAssignParams& params, Net* net,
+                                  size_t driver_idx, bool first,
+                                  const Logic4Vec& val, SimContext& ctx,
+                                  Arena& arena) {
+  DriverStrength effective_ds = ComputeEffectiveDriverStrength(params, ctx);
+  auto driven_val = ApplyHighzStrengthsToValue(val, effective_ds, arena);
+  ApplyContAssignResult(params, net, driver_idx, first, driven_val,
+                        effective_ds, ctx, arena);
 }
 
 static SimCoroutine MakeContAssignCoroutine(ContAssignParams params,
                                             SimContext& ctx, Arena& arena) {
   if (!params.lhs || params.lhs->kind != ExprKind::kIdentifier) co_return;
 
-  std::unordered_set<std::string> read_strs;
-  CollectExprReads(params.rhs, read_strs);
-  std::vector<std::string_view> read_vars(read_strs.begin(), read_strs.end());
+  std::vector<std::string_view> read_vars =
+      CollectContAssignReadVars(params.rhs);
 
   auto* net = ctx.FindNet(params.lhs->text);
   size_t driver_idx = net ? net->drivers.size() : 0;
@@ -269,13 +346,7 @@ static SimCoroutine MakeContAssignCoroutine(ContAssignParams params,
 
     if (params.delays.rise) {
       ContAssignDelays d = BuildContAssignDelays(params.delays, ctx, arena);
-
-      Logic4Vec old_val = MakeLogic4VecVal(arena, 1, 0);
-      auto* var = ctx.FindVariable(params.lhs->text);
-      if (var)
-        old_val = var->value;
-      else if (net && net->resolved)
-        old_val = net->resolved->value;
+      Logic4Vec old_val = CurrentContAssignOldValue(params, net, ctx, arena);
 
       uint64_t ticks = SelectContAssignDelay(old_val, val, d, params.width);
       if (ticks > 0 && !read_vars.empty()) {
@@ -288,33 +359,17 @@ static SimCoroutine MakeContAssignCoroutine(ContAssignParams params,
           bool expired =
               co_await InertialDelayAwaiter{ctx, remaining, read_vars};
           if (expired) break;
-          auto new_val = EvalExpr(params.rhs, ctx, arena, params.width);
-          if (!Logic4VecEqual(new_val, val)) {
-            // The operand changed again before the pending value could
-            // propagate, so the previously scheduled event is dropped.
-            val = new_val;
-            if (Logic4VecEqual(new_val, old_val)) {
-              // The re-evaluated right-hand side now matches the value already
-              // present on the left-hand side, so no replacement event is
-              // scheduled and the pending transition collapses immediately.
-              break;
-            }
-            ticks = SelectContAssignDelay(old_val, val, d, params.width);
-            target = ctx.CurrentTime() + SimTime{ticks};
-          }
+          InertialReeval re =
+              ReevalInertialContAssign(params, d, old_val, val, ctx, arena);
+          if (re.collapsed) break;
+          if (re.rescheduled) target = re.target;
         }
       } else if (ticks > 0) {
         co_await DelayAwaiter{ctx, ticks};
       }
     }
 
-    DriverStrength effective_ds = ComputeEffectiveDriverStrength(params, ctx);
-
-    auto driven_val = ApplyHighzStrengthsToValue(val, effective_ds, arena);
-
-    ApplyContAssignResult(params, net, driver_idx, first, driven_val,
-                          effective_ds, ctx, arena);
-
+    CommitContAssignValue(params, net, driver_idx, first, val, ctx, arena);
     first = false;
 
     if (read_vars.empty()) break;
@@ -617,22 +672,24 @@ void Lowerer::LowerImportedName(
     return;
   }
 
+  auto recurse = [&](std::string_view pkg_name) {
+    auto* src = FindPackage(pkg_name);
+    if (!src) return;
+    auto sub = visited;
+    LowerImportedName(src, name, sub);
+  };
+  auto handle_export = [&](const ImportItem& ex) {
+    if (ex.package_name == "*") {
+      for (std::string_view src_name : WildcardExportImportNames(pkg))
+        recurse(src_name);
+    } else if (ex.is_wildcard || ex.item_name == name) {
+      recurse(ex.package_name);
+    }
+  };
+
   for (auto* item : pkg->items) {
     if (item->kind != ModuleItemKind::kExportDecl) continue;
-    const auto& ex = item->import_item;
-    if (ex.package_name == "*") {
-      for (std::string_view src_name : WildcardExportImportNames(pkg)) {
-        auto* src = FindPackage(src_name);
-        if (!src) continue;
-        auto sub = visited;
-        LowerImportedName(src, name, sub);
-      }
-    } else if (ex.is_wildcard || ex.item_name == name) {
-      auto* src = FindPackage(ex.package_name);
-      if (!src) continue;
-      auto sub = visited;
-      LowerImportedName(src, name, sub);
-    }
+    handle_export(item->import_item);
   }
 }
 
@@ -644,27 +701,30 @@ void Lowerer::LowerAllImported(
     LowerPackageItem(item);
   }
 
-  for (auto* item : pkg->items) {
-    if (item->kind != ModuleItemKind::kExportDecl) continue;
-    const auto& ex = item->import_item;
+  auto recurse_all = [&](PackageDecl* src) {
+    auto sub = visited;
+    LowerAllImported(src, sub);
+  };
+  auto handle_export = [&](const ImportItem& ex) {
     if (ex.package_name == "*") {
       for (std::string_view src_name : WildcardExportImportNames(pkg)) {
-        auto* src = FindPackage(src_name);
-        if (!src) continue;
-        auto sub = visited;
-        LowerAllImported(src, sub);
+        if (auto* src = FindPackage(src_name)) recurse_all(src);
       }
-    } else {
-      auto* src = FindPackage(ex.package_name);
-      if (!src) continue;
-      if (ex.is_wildcard) {
-        auto sub = visited;
-        LowerAllImported(src, sub);
-      } else {
-        auto sub = visited;
-        LowerImportedName(src, ex.item_name, sub);
-      }
+      return;
     }
+    auto* src = FindPackage(ex.package_name);
+    if (!src) return;
+    if (ex.is_wildcard) {
+      recurse_all(src);
+    } else {
+      auto sub = visited;
+      LowerImportedName(src, ex.item_name, sub);
+    }
+  };
+
+  for (auto* item : pkg->items) {
+    if (item->kind != ModuleItemKind::kExportDecl) continue;
+    handle_export(item->import_item);
   }
 }
 
@@ -678,6 +738,18 @@ static void AliasPackageDataItem(const PackageDecl* pkg, const ModuleItem* item,
   ctx.AliasVariable(item->name, qname);
 }
 
+static void AliasAllPackageDataItems(const PackageDecl* pkg, SimContext& ctx) {
+  for (const auto* item : pkg->items) AliasPackageDataItem(pkg, item, ctx);
+}
+
+static void AliasNamedPackageDataItem(const PackageDecl* pkg,
+                                      std::string_view item_name,
+                                      SimContext& ctx) {
+  for (const auto* item : pkg->items) {
+    if (item->name == item_name) AliasPackageDataItem(pkg, item, ctx);
+  }
+}
+
 void Lowerer::LowerImports(const RtlirModule* mod) {
   auto apply_import = [&](const RtlirImport& imp) {
     auto* pkg = FindPackage(imp.package_name);
@@ -685,12 +757,10 @@ void Lowerer::LowerImports(const RtlirModule* mod) {
     std::unordered_set<const PackageDecl*> visited;
     if (imp.is_wildcard) {
       LowerAllImported(pkg, visited);
-      for (const auto* item : pkg->items) AliasPackageDataItem(pkg, item, ctx_);
+      AliasAllPackageDataItems(pkg, ctx_);
     } else {
       LowerImportedName(pkg, imp.item_name, visited);
-      for (const auto* item : pkg->items) {
-        if (item->name == imp.item_name) AliasPackageDataItem(pkg, item, ctx_);
-      }
+      AliasNamedPackageDataItem(pkg, imp.item_name, ctx_);
     }
   };
 

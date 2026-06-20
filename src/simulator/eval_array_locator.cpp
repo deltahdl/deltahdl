@@ -275,47 +275,61 @@ struct AssocLocatorState {
   }
 };
 
+// Forward scan over every entry, pushing the projection of each matching entry.
+// Used by the "find all" (no break) and "find first" (break) arms; the latter
+// passes stop_after_first=true.
+static void AssocScanForward(const AssocLocatorState& st, bool stop_after_first,
+                             Logic4Vec (*project)(const AssocLocatorState&,
+                                                  size_t),
+                             std::vector<Logic4Vec>& out) {
+  for (size_t i = 0; i < st.vals.size(); ++i)
+    if (st.Matches(i)) {
+      out.push_back(project(st, i));
+      if (stop_after_first) break;
+    }
+}
+
+// Reverse scan, pushing the projection of the last matching entry only.
+static void AssocScanLast(const AssocLocatorState& st,
+                          Logic4Vec (*project)(const AssocLocatorState&,
+                                               size_t),
+                          std::vector<Logic4Vec>& out) {
+  for (size_t i = st.vals.size(); i > 0; --i)
+    if (st.Matches(i - 1)) {
+      out.push_back(project(st, i - 1));
+      break;
+    }
+}
+
+static Logic4Vec ProjectVal(const AssocLocatorState& st, size_t i) {
+  return st.vals[i];
+}
+
+static Logic4Vec ProjectKey(const AssocLocatorState& st, size_t i) {
+  return st.KeyVec(i);
+}
+
 static void AssocLocatorFind(std::string_view method,
                              const AssocLocatorState& st,
                              std::vector<Logic4Vec>& out) {
-  const auto& vals = st.vals;
   if (method == "find") {
-    for (size_t i = 0; i < vals.size(); ++i)
-      if (st.Matches(i)) out.push_back(vals[i]);
+    AssocScanForward(st, /*stop_after_first=*/false, ProjectVal, out);
   } else if (method == "find_first") {
-    for (size_t i = 0; i < vals.size(); ++i)
-      if (st.Matches(i)) {
-        out.push_back(vals[i]);
-        break;
-      }
+    AssocScanForward(st, /*stop_after_first=*/true, ProjectVal, out);
   } else {  // find_last
-    for (size_t i = vals.size(); i > 0; --i)
-      if (st.Matches(i - 1)) {
-        out.push_back(vals[i - 1]);
-        break;
-      }
+    AssocScanLast(st, ProjectVal, out);
   }
 }
 
 static void AssocLocatorFindIndex(std::string_view method,
                                   const AssocLocatorState& st,
                                   std::vector<Logic4Vec>& out) {
-  const auto& vals = st.vals;
   if (method == "find_index") {
-    for (size_t i = 0; i < vals.size(); ++i)
-      if (st.Matches(i)) out.push_back(st.KeyVec(i));
+    AssocScanForward(st, /*stop_after_first=*/false, ProjectKey, out);
   } else if (method == "find_first_index") {
-    for (size_t i = 0; i < vals.size(); ++i)
-      if (st.Matches(i)) {
-        out.push_back(st.KeyVec(i));
-        break;
-      }
+    AssocScanForward(st, /*stop_after_first=*/true, ProjectKey, out);
   } else {  // find_last_index
-    for (size_t i = vals.size(); i > 0; --i)
-      if (st.Matches(i - 1)) {
-        out.push_back(st.KeyVec(i - 1));
-        break;
-      }
+    AssocScanLast(st, ProjectKey, out);
   }
 }
 
@@ -385,14 +399,11 @@ static bool DispatchAssocLocator(std::string_view method,
 // std::map gives for free by visiting keys in ascending order. Only integer
 // keys are representable through this value vector — string-keyed and wildcard
 // arrays are left for the caller to handle.
-static bool TryCollectAssocLocatorResult(const Expr* expr,
-                                         const MethodCallParts& parts,
-                                         AssocArrayObject& aa, SimContext& ctx,
-                                         Arena& arena,
-                                         std::vector<Logic4Vec>& out) {
-  std::string_view method = parts.method_name;
-  if (method == "map") return false;  // not a 7.12.1 locator method
-
+// Emits the mandatory-with-clause diagnostic for the associative-array find*
+// locators. Returns false (with an error raised) when a with clause is required
+// but absent; true otherwise.
+static bool CheckAssocWithClauseRequired(std::string_view method,
+                                         const Expr* expr, SimContext& ctx) {
   const bool kNeedsWith = method == "find" || method == "find_index" ||
                           method == "find_first" ||
                           method == "find_first_index" ||
@@ -402,14 +413,34 @@ static bool TryCollectAssocLocatorResult(const Expr* expr,
                                 "' requires a 'with' clause");
     return false;
   }
-  if (aa.is_string_key) return false;  // index type not representable here
+  return true;
+}
 
-  std::vector<int64_t> keys;
-  std::vector<Logic4Vec> vals;
+// Flattens the integer-keyed associative array into parallel key/value vectors
+// in std::map ascending-key order (the first()/last() ordering of §7.9).
+static void CollectAssocKeyVals(const AssocArrayObject& aa,
+                                std::vector<int64_t>& keys,
+                                std::vector<Logic4Vec>& vals) {
   for (const auto& [k, v] : aa.int_data) {
     keys.push_back(k);
     vals.push_back(v);
   }
+}
+
+static bool TryCollectAssocLocatorResult(const Expr* expr,
+                                         const MethodCallParts& parts,
+                                         AssocArrayObject& aa, SimContext& ctx,
+                                         Arena& arena,
+                                         std::vector<Logic4Vec>& out) {
+  std::string_view method = parts.method_name;
+  if (method == "map") return false;  // not a 7.12.1 locator method
+
+  if (!CheckAssocWithClauseRequired(method, expr, ctx)) return false;
+  if (aa.is_string_key) return false;  // index type not representable here
+
+  std::vector<int64_t> keys;
+  std::vector<Logic4Vec> vals;
+  CollectAssocKeyVals(aa, keys, vals);
 
   LocatorCtx lc = MakeLocatorCtx(vals, /*is_str=*/false, expr, ctx, arena);
   AssocLocatorState st{keys, vals, lc, aa.index_width, ctx, arena};
@@ -420,32 +451,56 @@ static bool TryCollectAssocLocatorResult(const Expr* expr,
 // unique_index, min, max): builds the iterator context only when a with clause
 // is present and routes to the matching helper. Sets *handled when the method
 // is one of these and returns the result the caller should propagate.
+// unique: dedupe by with-value when a with clause is present, otherwise by the
+// element value itself.
+static void RunIndexedUnique(const Expr* expr,
+                             const std::vector<Logic4Vec>& elems, bool is_str,
+                             SimContext& ctx, Arena& arena,
+                             std::vector<Logic4Vec>& out) {
+  if (expr->with_expr) {
+    LocatorCtx lc = MakeLocatorCtx(elems, is_str, expr, ctx, arena);
+    LocatorUniqueWith(lc, out);
+  } else {
+    LocatorUnique(elems, arena, out);
+  }
+}
+
+// unique_index: same dedupe rule as unique, but emits 0-based positions.
+static void RunIndexedUniqueIndex(const Expr* expr,
+                                  const std::vector<Logic4Vec>& elems,
+                                  bool is_str, SimContext& ctx, Arena& arena,
+                                  std::vector<Logic4Vec>& out) {
+  if (expr->with_expr) {
+    LocatorCtx lc = MakeLocatorCtx(elems, is_str, expr, ctx, arena);
+    LocatorUniqueIndexWith(lc, out);
+  } else {
+    LocatorUniqueIndex(elems, arena, out);
+  }
+}
+
+static void RunIndexedMinMax(std::string_view method, const Expr* expr,
+                             const std::vector<Logic4Vec>& elems, bool is_str,
+                             SimContext& ctx, Arena& arena,
+                             std::vector<Logic4Vec>& out) {
+  LocatorCtx lc = MakeLocatorCtx(elems, is_str, expr, ctx, arena);
+  LocatorMinMax(method, lc, out);
+}
+
 static bool TryIndexedOptionalWithLocator(
     std::string_view method, const Expr* expr,
     const std::vector<Logic4Vec>& elems, bool is_str, SimContext& ctx,
     Arena& arena, std::vector<Logic4Vec>& out, bool& handled) {
   handled = true;
   if (method == "unique") {
-    if (expr->with_expr) {
-      LocatorCtx lc = MakeLocatorCtx(elems, is_str, expr, ctx, arena);
-      LocatorUniqueWith(lc, out);
-    } else {
-      LocatorUnique(elems, arena, out);
-    }
+    RunIndexedUnique(expr, elems, is_str, ctx, arena, out);
     return true;
   }
   if (method == "unique_index") {
-    if (expr->with_expr) {
-      LocatorCtx lc = MakeLocatorCtx(elems, is_str, expr, ctx, arena);
-      LocatorUniqueIndexWith(lc, out);
-    } else {
-      LocatorUniqueIndex(elems, arena, out);
-    }
+    RunIndexedUniqueIndex(expr, elems, is_str, ctx, arena, out);
     return true;
   }
   if (method == "min" || method == "max") {
-    LocatorCtx lc = MakeLocatorCtx(elems, is_str, expr, ctx, arena);
-    LocatorMinMax(method, lc, out);
+    RunIndexedMinMax(method, expr, elems, is_str, ctx, arena, out);
     return true;
   }
   handled = false;

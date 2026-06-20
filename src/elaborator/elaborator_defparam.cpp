@@ -1,3 +1,4 @@
+#include <optional>
 #include <set>
 #include <string_view>
 #include <tuple>
@@ -147,6 +148,29 @@ static bool DefparamOverrideAllowed(DiagEngine& diag,
   return true;
 }
 
+// Validates one already-resolved defparam target and, if the override may
+// proceed, evaluates its right-hand side. On any rejection (illegal override or
+// non-constant value) the assignment `key` is recorded in `applied` and an
+// empty optional is returned; the caller then skips it. On success the
+// converted override value is returned.
+static std::optional<int64_t> EvalDefparamOverride(
+    DiagEngine& diag, const RtlirParamDecl* param, const Expr* val_expr,
+    const ScopeMap& scope, SourceLoc loc,
+    std::set<std::tuple<RtlirModule*, const ModuleItem*, size_t>>& applied,
+    const std::tuple<RtlirModule*, const ModuleItem*, size_t>& key) {
+  if (!DefparamOverrideAllowed(diag, param, val_expr, loc)) {
+    applied.insert(key);
+    return std::nullopt;
+  }
+  auto val = ConstEvalInt(val_expr, scope);
+  if (!val) {
+    diag.Warning(loc, "defparam value is not constant");
+    applied.insert(key);
+    return std::nullopt;
+  }
+  return ConvertOverrideValue(*val, *param);
+}
+
 void Elaborator::ApplyDefparams(RtlirModule* mod, const ModuleDecl* decl) {
   ScopeMap scope = BuildParamScope(mod);
   for (const auto* item : decl->items) {
@@ -158,18 +182,11 @@ void Elaborator::ApplyDefparams(RtlirModule* mod, const ModuleDecl* decl) {
       RtlirModule* target_mod = nullptr;
       auto* param = ResolveDefparamPath(mod, path_expr, &target_mod);
       if (!param) continue;
-      if (!DefparamOverrideAllowed(diag_, param, val_expr, item->loc)) {
-        applied_defparams_.insert(key);
-        continue;
-      }
-      auto val = ConstEvalInt(val_expr, scope);
-      if (!val) {
-        diag_.Warning(item->loc, "defparam value is not constant");
-        applied_defparams_.insert(key);
-        continue;
-      }
+      auto value = EvalDefparamOverride(diag_, param, val_expr, scope,
+                                        item->loc, applied_defparams_, key);
+      if (!value) continue;
 
-      param->resolved_value = ConvertOverrideValue(*val, *param);
+      param->resolved_value = *value;
       param->is_resolved = true;
       param->from_override = true;
 
