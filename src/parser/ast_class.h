@@ -95,6 +95,11 @@ struct ClassMember {
   bool is_randc = false;
   bool is_const = false;
   bool is_pure_virtual = false;
+  // §6.20/§8.25: this member is a parameter or localparam declaration (carried
+  // with kind kProperty). Distinguished from a data property so that, e.g.,
+  // §8.26 interface-class validation does not flag a parameter as a data
+  // member.
+  bool is_param = false;
 
   bool is_constraint_initial = false;
   bool is_constraint_extends = false;

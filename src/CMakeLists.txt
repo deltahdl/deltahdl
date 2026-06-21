@@ -182,6 +182,7 @@ add_library(deltahdl_lib STATIC
     elaborator/elaborator_validate_class_handles.cpp
     elaborator/elaborator_validate_class_inheritance.cpp
     elaborator/elaborator_validate_class_members.cpp
+    elaborator/elaborator_validate_class_outofblock.cpp
     elaborator/elaborator_validate_clocking.cpp
     elaborator/elaborator_validate_config.cpp
     elaborator/elaborator_validate_datatype_ops.cpp

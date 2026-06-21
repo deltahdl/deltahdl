@@ -439,6 +439,7 @@ bool Parser::TryParseKeywordClassMember(std::vector<ClassMember*>& members,
     for (size_t i = 0; i < param_items.size(); ++i) {
       auto* m = (i == 0) ? member : arena_.Create<ClassMember>();
       m->kind = ClassMemberKind::kProperty;
+      m->is_param = true;
       m->name = param_items[i]->name;
       members.push_back(m);
     }
