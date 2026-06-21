@@ -68,13 +68,18 @@ Figure 1: Compilation pipeline for simulation and synthesis modes.
 
 ### Preprocessor
 
-The preprocessor handles macro definitions (`+define+`), file inclusion
-(`` `include ``), and conditional compilation (`` `ifdef ``/`` `ifndef ``). It
-operates on raw source text before tokenization and produces a single
-concatenated string for the lexer. Include directories are specified with
-`+incdir+`. It also tracks `` `timescale `` directives and
-`` `default_nettype `` declarations, propagating them to the parser through
-the preprocessed result.
+The preprocessor handles macro definitions (`+define+`, `` `define ``/`` `undef ``),
+file inclusion (`` `include ``), and conditional compilation
+(`` `ifdef ``/`` `ifndef ``/`` `elsif ``/`` `else ``). It operates on raw source
+text before tokenization and produces a single concatenated string for the
+lexer. Include directories are specified with `+incdir+`. It also processes the
+remaining standard compiler directives — `` `line ``,
+`` `celldefine ``/`` `endcelldefine ``, `` `unconnected_drive ``,
+`` `default_decay_time ``, `` `default_trireg_strength ``, the `` `delay_mode_* ``
+family, and `` `begin_keywords ``/`` `end_keywords `` — and tracks the resulting
+state (`` `timescale ``, `` `default_nettype ``, unconnected-drive net type,
+decay time, trireg strength, and delay mode), propagating it to the parser
+through the preprocessed result.
 
 The macro table supports both object-like and function-like macros with
 default argument values. Predefined macros such as `__FILE__` and `__LINE__`
@@ -88,22 +93,29 @@ identifiers. The keyword table supports version-aware recognition so that
 keywords introduced in later revisions of the standard can be selectively
 enabled or disabled. The lexer attaches source locations to every token so that
 downstream diagnostics can point back to the original file and line. String
-literal escape sequences are handled during tokenization.
+literal escape sequences are handled during tokenization. A keyword-version
+stack supports nested `` `begin_keywords ``/`` `end_keywords `` blocks, and FSM
+tool pragmas embedded in block comments are extracted during tokenization for
+use by functional-coverage reporting.
 
 ### Parser
 
 A recursive-descent parser consumes the token stream and builds an abstract
 syntax tree (AST). Expressions use a Pratt parser for correct precedence and
 associativity. The parser is split across several translation units organized
-by grammar domain: top-level declarations (modules, interfaces, programs,
-classes, checkers), type and variable declarations, statements, module
-instantiation, port lists, assertions, specify blocks, clocking blocks,
-generate constructs, verification constructs (randcase, randsequence), and
-configuration declarations. A separate unit handles time-literal resolution.
+by grammar domain: top-level declarations (modules, packages, interfaces,
+programs, classes, checkers, user-defined primitives), type and variable
+declarations, statements, module instantiation, port lists, assertions,
+sequence and property declarations, specify blocks, clocking blocks, generate
+constructs, verification constructs (randcase, randsequence), `let` and `bind`
+declarations, DPI import/export, and configuration declarations. A separate
+unit handles time-literal resolution.
 
 The AST is allocated in an arena so that the entire tree can be freed in one
-shot after elaboration. The top-level AST node is a `CompilationUnit`
-containing modules, packages, interfaces, programs, and classes.
+shot after elaboration. The top-level AST node is a `CompilationUnit`. Besides
+modules, packages, interfaces, programs, and classes, it holds user-defined
+primitives, checkers, configurations, library declarations, bind directives,
+external constraint blocks, and compilation-unit-scope items.
 
 ### Elaborator
 
@@ -131,12 +143,22 @@ resolves `defparam` overrides after the module hierarchy has been constructed.
 A validation pass checks constraints such as assignment to constants and
 enum type compatibility.
 
+Beyond core RTL, the elaborator carries out the semantic analysis and
+validation needed by the advanced and verification feature set: concurrent
+assertions, properties and sequences (including the Annex F temporal
+semantics), checkers, covergroups and crosses, clocking blocks, interfaces,
+class inheritance and member resolution, and DPI import/export. These checks
+are spread across many translation units but feed the same RTLIR.
+
 The RTLIR consists of `RtlirModule` nodes containing ports, nets, variables,
 continuous assignments, net aliases, processes, parameter declarations,
-module instances, function declarations, class declarations, and enum type
-maps. Each process carries its sensitivity list and a pointer to its AST body
-statement. An `RtlirDesign` collects the top-level modules and a lookup map
-of all elaborated modules.
+child module instances, function declarations, `let` declarations, sequence
+declarations, package imports, class declarations, module attributes, and enum
+type maps. Each process carries its sensitivity list and a pointer to its AST
+body statement. An `RtlirDesign` collects the top-level modules and a lookup
+map of all elaborated modules, along with packages, compilation-unit-scope
+function, `let`, and class declarations, a type-width table, and elaboration
+diagnostic state (including a simulation-blocked flag set by `$fatal`/`$error`).
 
 ## Back End
 
@@ -177,14 +199,16 @@ RTLIR process it creates either a coroutine `Process` or a
 Continuous assignments are lowered into processes scheduled in the Active
 region.
 
-The resulting `SimContext` owns the full simulation state: variables, nets,
-the scheduler, the diagnostic engine, and auxiliary managers for VPI, DPI,
-clocking, assertions, SVA, coverage, constraint solving, specify blocks, and
-SDF annotations. It provides variable lookup by name, scope management for
-function and task calls, and value read/write operations. It also holds type
-information for structs, enums, and classes so that the expression evaluator
-can perform field access and method dispatch at runtime, and it manages
-dynamic arrays, associative arrays, and queues.
+The resulting `SimContext` holds the core simulation state: variables, nets,
+the scheduler, and the diagnostic engine. It also references the auxiliary
+managers it coordinates with — the DPI context, clocking manager, and coverage
+database — while the remaining verification subsystems (VPI, which uses a global
+context, plus the assertion, SVA, constraint-solving, and specify managers) are
+owned alongside it rather than embedded in it. It provides variable lookup by
+name, scope management for function and task calls, and value read/write
+operations. It also holds type information for structs, enums, and classes so
+that the expression evaluator can perform field access and method dispatch at
+runtime, and it manages dynamic arrays, associative arrays, and queues.
 
 All values created during lowering use dual-rail aval/bval encoding per the
 VPI convention. Values are packed into 64-bit words. A `Logic4Word` holds
@@ -198,7 +222,7 @@ two-state counterpart where the bval rail is absent, used in contexts where
 x and z cannot occur. Signals also carry strength information per IEEE
 1800-2023: the `Strength` enum covers eight levels from highz through
 supply, and a `StrengthVal` packs the drive-zero strength, drive-one
-strength, and logic value into a single byte for strength-aware resolution
+strength, and logic value into a compact bitfield for strength-aware resolution
 when multiple drivers contend on a net.
 
 With this value system in place, a `Variable` stores a `Logic4Vec` value, a
@@ -260,12 +284,15 @@ setup and hold violations given signal transition times.
 
 The evaluator interprets AST expression and statement nodes at runtime when
 the scheduler dispatches a process. Expression evaluation is split across
-several translation units by domain: general expressions, array method
-dispatch (size, insert, delete, push, pop), enum method dispatch (name,
-first, last, next, prev), string method dispatch (substr, toupper, tolower,
-len), math system calls, file I/O system calls ($fopen, $fclose, $fwrite,
-$fscanf), format string processing for $display and $sformatf, and
-function/task call evaluation with scope management. Statement execution
+several translation units by domain: general expressions, bit and part
+select, streaming operators (pack/unpack), array method dispatch (size,
+insert, delete, push, pop), enum method dispatch (name, first, last, next,
+prev), string method dispatch (substr, toupper, tolower, len), math system
+calls, format string processing for $display and $sformatf, and function/task
+call evaluation with scope management. System tasks are themselves split by
+group: general I/O and file I/O ($fopen, $fclose, $fwrite, $fscanf), array
+query, memory load/store ($readmem/$writemem), PLA modeling, and
+stochastic/verification tasks. Statement execution
 handles blocking, non-blocking, continuous, and force/release assignment
 semantics, with a `StmtResult` signaling the control flow outcome of each
 statement (normal, break, continue, return, disable).
@@ -306,8 +333,9 @@ set-membership, implication, distribution, and soft constraints through BFS
 domain reduction with backtracking.
 
 Additional runtime support includes the UDP evaluator for user-defined
-primitive tables, `ClassObject` for SystemVerilog class instance storage
-with virtual method dispatch via `SvCallable`, and `SyncObjects` for
+primitive tables, a switch network that resolves bidirectional switch
+(tran/tranif) connections, `ClassObject` for SystemVerilog class instance
+storage with virtual method dispatch via `SvCallable`, and `SyncObjects` for
 simulation-level semaphores and events. A two-state fast-path detector
 identifies variables that have never held x or z values for simplified
 evaluation, and an event coalescer merges multiple pending updates to the
@@ -348,11 +376,13 @@ Figure 3: Synthesizer processing stages from RTLIR to netlist.
 The synthesis lowerer converts an `RtlirModule` into an And-Inverter Graph
 (AIG). It first validates synthesizability, rejecting constructs that have
 no hardware equivalent such as system task calls and timing controls. A
-memory inference pass then analyzes `always_ff` blocks for array access
-patterns and replaces them with dedicated memory primitives, recording each
-memory's depth, data width, and read/write port configuration.
+standalone memory inference pass exists that analyzes `always_ff` blocks for
+array access patterns and describes dedicated memory primitives — recording
+each memory's depth, data width, and read/write port configuration — but it is
+not yet integrated into `SynthLower::Lower`; it is currently exercised only by
+unit tests, and the main flow lowers `always_ff` blocks to latches.
 
-With memories extracted, the remaining design is lowered into the AIG. Input
+The design is lowered into the AIG as follows. Input
 and output ports become AIG primary inputs and outputs. Continuous
 assignments and combinational process bodies are lowered expression by
 expression, bit by bit, into AND and NOT nodes. `always_ff` blocks produce
@@ -371,12 +401,15 @@ already been allocated.
 
 #### Optimizer
 
-Five optimization passes operate on the AIG. Constant propagation replaces
-outputs that are provably constant. Balancing restructures AND trees to
-minimize critical-path depth. Rewriting applies local subgraph replacement
-using cut enumeration to reduce node count. Refactoring performs
-larger-scope restructuring for area reduction. Redundancy removal identifies
-and eliminates stuck-at-fault redundant nodes.
+Optimization on the AIG is built on two core transforms — constant
+propagation, which replaces nodes that are provably constant, and balancing,
+which restructures AND trees to minimize critical-path depth. Three further
+entry points are layered on top: rewriting (local subgraph replacement using
+cut enumeration to reduce node count), refactoring (larger-scope restructuring
+for area reduction), and redundancy removal (eliminating stuck-at-fault
+redundant nodes). In the current implementation these higher-level passes
+delegate substantially to the constant-propagation and balancing core rather
+than implementing fully independent algorithms.
 
 #### Mapper
 
@@ -391,8 +424,9 @@ including pin names, directions, Boolean functions, timing arcs, and area
 values, and the `CellMapper` produces a `CellMapping` of `CellInstance`
 entries naming a library cell and its input and output net connections.
 Advanced passes provide delay-oriented LUT mapping that minimizes
-critical-path depth, iterative area-delay tradeoff optimization, and
-register retiming in both forward and backward directions.
+critical-path depth, iterative area-delay tradeoff optimization, and forward
+register retiming. (Backward retiming is present as a placeholder but does not
+yet move registers.)
 
 #### Writer
 
@@ -442,11 +476,13 @@ parser, AIG optimizer, and technology mapper are implemented from scratch.
 | DPI | Direct Programming Interface |
 | DPI-C | Direct Programming Interface for C |
 | EDIF | Electronic Design Interchange Format |
+| FSM | Finite State Machine |
 | IEEE | Institute of Electrical and Electronics Engineers |
 | JSON | JavaScript Object Notation |
 | LUT | Look-Up Table |
 | MUX | Multiplexer |
 | NBA | Non-Blocking Assignment |
+| PLA | Programmable Logic Array |
 | RAII | Resource Acquisition Is Initialization |
 | RTLIR | Register-Transfer Level Intermediate Representation |
 | SDF | Standard Delay Format |
@@ -670,6 +706,12 @@ structural hashing
 
 > A deduplication technique that ensures identical AIG nodes
 > are shared rather than duplicated.
+
+switch network
+
+> The set of bidirectional switch primitives (`tran`,
+> `tranif0`, `tranif1`) whose terminals are resolved together
+> as a connected node during simulation.
 
 technology mapping
 
