@@ -155,7 +155,9 @@ TEST(NetAndVariableTypeElaboration, TypeReferenceElaborates) {
   auto* design = ElaborateSrc(
       "module m;\n"
       "  int x;\n"
-      "  type(x) y;\n"
+      // §6.23: a type_reference used in a variable declaration shall be
+      // preceded by the 'var' keyword.
+      "  var type(x) y;\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
