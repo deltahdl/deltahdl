@@ -43,7 +43,10 @@ TEST(CheckerProcedures, CheckerWithMultipleItemsElaborates) {
       "checker chk;\n"
       "  logic flag;\n"
       "  initial flag = 0;\n"
-      "  always @(flag) flag <= ~flag;\n"
+      // §17.5: a general 'always' procedure is not among the always forms
+      // permitted in a checker (only always_comb/always_latch/always_ff);
+      // a general always in a checker was removed in IEEE 1800-2023.
+      "  always_ff @(posedge flag) flag <= ~flag;\n"
       "  final $display(\"done\");\n"
       "endchecker\n",
       f, "chk");

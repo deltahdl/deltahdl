@@ -10,14 +10,35 @@
 
 namespace delta {
 
+namespace {
+// §7.2.1: the bit width contributed by a member's packed dimensions — the
+// leading [l:r] times every trailing dimension. Returns 1 when the member has
+// no packed dimension, and 0 when any bound is not a foldable constant.
+uint32_t PackedDimProduct(const StructMember& m) {
+  if (!m.packed_dim_left || !m.packed_dim_right) return 1;
+  auto left = ConstEvalInt(m.packed_dim_left);
+  auto right = ConstEvalInt(m.packed_dim_right);
+  if (!left || !right) return 0;
+  uint32_t w = static_cast<uint32_t>(std::abs(*left - *right) + 1);
+  for (const auto& [l, r] : m.extra_packed_dims) {
+    auto lv = ConstEvalInt(l);
+    auto rv = ConstEvalInt(r);
+    if (!lv || !rv) return 0;
+    w *= static_cast<uint32_t>(std::abs(*lv - *rv) + 1);
+  }
+  return w;
+}
+}  // namespace
+
 uint32_t EvalStructMemberWidth(const StructMember& m) {
+  // §7.2.1: an inline aggregate (struct/union) or enum member's width comes
+  // from its full type, which already folds in its own packed dimensions and
+  // (for aggregates) the widths of its nested members.
+  if (m.nested_type) return EvalTypeWidth(*m.nested_type);
+
   if (m.packed_dim_left && m.packed_dim_right) {
-    auto left = ConstEvalInt(m.packed_dim_left);
-    auto right = ConstEvalInt(m.packed_dim_right);
-    if (left && right) {
-      auto w = std::abs(*left - *right) + 1;
-      return static_cast<uint32_t>(w);
-    }
+    uint32_t w = PackedDimProduct(m);
+    if (w > 0) return w;
   }
 
   switch (m.type_kind) {
@@ -45,13 +66,10 @@ static uint32_t TagBitWidth(uint32_t num_members) {
 
 uint32_t EvalStructMemberWidth(const StructMember& m,
                                const TypedefMap& typedefs) {
+  if (m.nested_type) return EvalTypeWidth(*m.nested_type, typedefs);
   if (m.packed_dim_left && m.packed_dim_right) {
-    auto left = ConstEvalInt(m.packed_dim_left);
-    auto right = ConstEvalInt(m.packed_dim_right);
-    if (left && right) {
-      auto w = std::abs(*left - *right) + 1;
-      return static_cast<uint32_t>(w);
-    }
+    uint32_t w = PackedDimProduct(m);
+    if (w > 0) return w;
   }
   if (m.type_kind == DataTypeKind::kNamed && !m.type_name.empty()) {
     auto it = typedefs.find(m.type_name);

@@ -238,6 +238,14 @@ void Parser::ParseStructMemberList(DataType& dtype, const DataType& member_type,
   do {
     StructMember member;
     ApplyMemberType(member, member_type);
+    // §7.2.1: retain the full type for inline aggregate/enum members so a
+    // nested member's bit width can be recovered during width evaluation
+    // (ApplyMemberType keeps only the member's own kind and packed dims).
+    if (member_type.kind == DataTypeKind::kStruct ||
+        member_type.kind == DataTypeKind::kUnion ||
+        member_type.kind == DataTypeKind::kEnum) {
+      member.nested_type = arena_.Create<DataType>(member_type);
+    }
     member.is_rand = is_rand;
     member.is_randc = is_randc;
     member.attrs = member_attrs;

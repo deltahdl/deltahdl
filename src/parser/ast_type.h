@@ -61,6 +61,8 @@ struct EnumMember {
   Expr* range_end = nullptr;
 };
 
+struct DataType;
+
 struct StructMember {
   DataTypeKind type_kind = DataTypeKind::kImplicit;
   bool is_signed = false;
@@ -74,6 +76,10 @@ struct StructMember {
   Expr* init_expr = nullptr;
   std::vector<Expr*> unpacked_dims;
   std::vector<Attribute> attrs;
+  // §7.2.1: for an inline aggregate (struct/union) or enum member type, the
+  // full parsed type, retained so member widths can be computed by recursing
+  // into nested members / enum base. Null for scalar and named-type members.
+  const DataType* nested_type = nullptr;
 };
 
 struct DataType {

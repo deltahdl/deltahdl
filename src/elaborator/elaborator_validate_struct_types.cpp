@@ -326,9 +326,10 @@ void Elaborator::ValidatePackedUnion(const DataType& dtype, SourceLoc loc) {
   if (!dtype.is_packed && !dtype.is_soft) return;
   if (dtype.struct_members.empty()) return;
   if (!dtype.is_soft && !dtype.is_tagged) {
-    uint32_t first_w = EvalStructMemberWidth(dtype.struct_members[0]);
+    uint32_t first_w =
+        EvalStructMemberWidth(dtype.struct_members[0], typedefs_);
     for (size_t i = 1; i < dtype.struct_members.size(); ++i) {
-      uint32_t w = EvalStructMemberWidth(dtype.struct_members[i]);
+      uint32_t w = EvalStructMemberWidth(dtype.struct_members[i], typedefs_);
       if (w != first_w) {
         diag_.Error(loc,
                     std::format("packed union member '{}' has width {} but "

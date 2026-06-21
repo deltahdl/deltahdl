@@ -70,7 +70,13 @@ void CheckClockingOutputBinding(const ClockingSignalDecl& sig,
 
 void Elaborator::ValidateClockingBlock(ModuleItem* item,
                                        const RtlirModule* mod) {
-  if (item->name.empty() && !item->is_default_clocking) {
+  // §14.3: only an actual clocking_declaration is subject to the naming rule;
+  // an inline clocking event in a property/sequence/assert item is not a
+  // clocking block and is reached here only because it shares the item carrier.
+  // §14.3/§14.13: a clocking block must be named unless it is the default
+  // clocking or a global clocking, both of which may be anonymous.
+  if (item->kind == ModuleItemKind::kClockingBlock && item->name.empty() &&
+      !item->is_default_clocking && !item->is_global_clocking) {
     diag_.Error(item->loc, "non-default clocking block must have a name");
   }
 

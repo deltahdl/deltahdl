@@ -795,10 +795,17 @@ static void RegisterVarDeclNames(const ModuleItem* item,
     tables.const_names.insert(item->name);
   }
   tables.var_types[item->name] = item->data_type.kind;
-  if (!item->data_type.packed_dim_left)
-    tables.scalar_var_names.insert(item->name);
-  else if (item->unpacked_dims.empty())
-    tables.packed_array_vars.insert(item->name);
+  // §7.4/§7.8: a variable carrying an unpacked dimension (fixed, dynamic,
+  // queue, or associative array) is neither a scalar nor a packed-array
+  // variable for select-legality purposes; indexing it is a legal array
+  // select, not a bit-select of a scalar. Only dimensionless variables are
+  // classified here.
+  if (item->unpacked_dims.empty()) {
+    if (!item->data_type.packed_dim_left)
+      tables.scalar_var_names.insert(item->name);
+    else
+      tables.packed_array_vars.insert(item->name);
+  }
   if (item->data_type.kind == DataTypeKind::kNamed)
     tables.var_named_types[item->name] = item->data_type.type_name;
 }
