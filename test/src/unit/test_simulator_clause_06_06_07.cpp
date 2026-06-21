@@ -11,7 +11,7 @@
 
 using namespace delta;
 
-// NettypeDataKind, ModelUserNettype, and the resolution helpers exercised below
+// NettypeDataKind, UserNettype, and the resolution helpers exercised below
 // are production declarations from simulator/net.h (§6.6.7).
 
 static Variable* MakeVar(Arena& arena, uint32_t width) {
@@ -77,7 +77,7 @@ TEST(UserDefinedNettype, ResolutionFunctionCalledWithDriverValues) {
   Net net = MakeMultiDriverNet(arena, var, {1, 0});
 
   bool called = false;
-  ModelUserNettype nt;
+  UserNettype nt;
   nt.resolution = [&](Arena& a,
                       const std::vector<Logic4Vec>& drivers) -> Logic4Vec {
     called = true;
@@ -95,7 +95,7 @@ TEST(UserDefinedNettype, DriverChangeTriggerResolution) {
   Net net = MakeDrivenNet(arena, var, 0);
 
   int call_count = 0;
-  ModelUserNettype nt;
+  UserNettype nt;
   nt.resolution = [&](Arena& a,
                       const std::vector<Logic4Vec>& drivers) -> Logic4Vec {
     ++call_count;
@@ -115,7 +115,7 @@ TEST(UserDefinedNettype, UnresolvedNettypeMultipleDriversIsError) {
   auto* var = MakeVar(arena, 1);
   Net net = MakeMultiDriverNet(arena, var, {1, 0});
 
-  ModelUserNettype nt;
+  UserNettype nt;
   nt.resolution = nullptr;
   EXPECT_TRUE(CheckUnresolvedMultipleDrivers(net, nt));
 }
@@ -125,7 +125,7 @@ TEST(UserDefinedNettype, UnresolvedNettypeSingleDriverOk) {
   auto* var = MakeVar(arena, 1);
   Net net = MakeDrivenNet(arena, var, 1);
 
-  ModelUserNettype nt;
+  UserNettype nt;
   nt.resolution = nullptr;
   EXPECT_FALSE(CheckUnresolvedMultipleDrivers(net, nt));
 }
@@ -135,7 +135,7 @@ TEST(UserDefinedNettype, SameDataTypeDifferentResolution) {
   auto* var_a = MakeVar(arena, 1);
   auto* var_b = MakeVar(arena, 1);
 
-  ModelUserNettype nt_or;
+  UserNettype nt_or;
   nt_or.resolution = [](Arena& a,
                         const std::vector<Logic4Vec>& drivers) -> Logic4Vec {
     uint64_t r = 0;
@@ -143,7 +143,7 @@ TEST(UserDefinedNettype, SameDataTypeDifferentResolution) {
     return MakeLogic4VecVal(a, 1, r);
   };
 
-  ModelUserNettype nt_and;
+  UserNettype nt_and;
   nt_and.resolution = [](Arena& a,
                          const std::vector<Logic4Vec>& drivers) -> Logic4Vec {
     uint64_t r = 1;
@@ -172,7 +172,7 @@ TEST(UserDefinedNettype, AtomicNetResolvedAsWhole) {
   net.drivers.push_back(MakeLogic4VecVal(arena, 8, 0x55));
 
   bool received_both = false;
-  ModelUserNettype nt;
+  UserNettype nt;
   nt.bit_width = 8;
   nt.resolution = [&](Arena& a,
                       const std::vector<Logic4Vec>& drivers) -> Logic4Vec {
@@ -233,7 +233,7 @@ TEST(UserDefinedNettype, UnresolvedNettypeNoResolutionFunction) {
   net.type = NetType::kWire;
   net.resolved = var;
 
-  ModelUserNettype nt;
+  UserNettype nt;
 
   ResolveUserDefinedNet(net, nt, arena);
 
@@ -247,7 +247,7 @@ TEST(UserDefinedNettype, UnresolvedNettypeZeroDriversOk) {
   net.type = NetType::kWire;
   net.resolved = var;
 
-  ModelUserNettype nt;
+  UserNettype nt;
   nt.resolution = nullptr;
   EXPECT_FALSE(CheckUnresolvedMultipleDrivers(net, nt));
 }
@@ -264,7 +264,7 @@ TEST(UserDefinedNettype, ResolutionWithThreeDrivers) {
   net.drivers.push_back(MakeLogic4VecVal(arena, 1, 1));
 
   size_t driver_count = 0;
-  ModelUserNettype nt;
+  UserNettype nt;
   nt.resolution = [&](Arena& a,
                       const std::vector<Logic4Vec>& drivers) -> Logic4Vec {
     driver_count = drivers.size();
