@@ -112,6 +112,13 @@ void ValidateNameSpaceCompilationUnit(const CompilationUnit* unit,
         item->kind == ModuleItemKind::kExportDecl)
       continue;
     if (item->from_anonymous_program) continue;
+    // §6.18: a forward typedef (e.g. `typedef interface class IC;`, carried as
+    // a kTypedef with an implicit aliased type) is a forward declaration, not a
+    // definition; it does not redeclare the eventual class or typedef of the
+    // same name. An unresolved forward typedef is reported separately.
+    if (item->kind == ModuleItemKind::kTypedef &&
+        item->typedef_type.kind == DataTypeKind::kImplicit)
+      continue;
     check_cu(item->name, item->loc);
   }
   for (auto* cls : unit->classes) check_cu(cls->name, cls->range.start);
