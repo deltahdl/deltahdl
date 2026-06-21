@@ -28,8 +28,8 @@ SpecifyManager SeedManagerWithPathDelay(unsigned delay0) {
 // and returns it so the caller can make its distinct delay/pulse assertions.
 // Shared by the §32.5 PATHPULSE+IOPATH ordered-process tests whose
 // parse/annotate tail is otherwise identical.
-const PathDelay& AnnotateBufDelayBody(const std::string& delay_body,
-                                      SpecifyManager& mgr) {
+PathDelay AnnotateBufDelayBody(const std::string& delay_body,
+                               SpecifyManager& mgr) {
   SdfFile file;
   std::string sdf =
       R"(
@@ -51,10 +51,10 @@ const PathDelay& AnnotateBufDelayBody(const std::string& delay_body,
 TEST(SdfMultipleAnnotations, IopathAfterPathpulseOverwritesPulseLimits) {
   SpecifyManager mgr = SeedManagerWithPathDelay(1);
 
-  const PathDelay pd = AnnotateBufDelayBody(R"((DELAY (ABSOLUTE
+  const auto& pd = AnnotateBufDelayBody(R"((DELAY (ABSOLUTE
           (PATHPULSE A Z (10) (20))
           (IOPATH A Z (35) (61)))))",
-                                            mgr);
+                                        mgr);
 
   EXPECT_EQ(pd.delays[0], 35u);
   EXPECT_EQ(pd.delays[1], 61u);
@@ -217,10 +217,10 @@ TEST(SdfMultipleAnnotations,
      ExtendedIopathWithEmptyPulseSlotsPreservesPriorPathpulse) {
   SpecifyManager mgr = SeedManagerWithPathDelay(20);
 
-  const PathDelay pd = AnnotateBufDelayBody(R"((DELAY (ABSOLUTE
+  const auto& pd = AnnotateBufDelayBody(R"((DELAY (ABSOLUTE
           (PATHPULSE A Z (10) (20))
           (IOPATH A Z ((35) () ()) ((61) () ())))))",
-                                            mgr);
+                                        mgr);
 
   EXPECT_EQ(pd.delays[0], 35u);
   EXPECT_EQ(pd.delays[1], 61u);
