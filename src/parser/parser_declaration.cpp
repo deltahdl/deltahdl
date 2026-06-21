@@ -425,8 +425,7 @@ Direction Parser::ParseArgDirection(FunctionArg& arg, Direction sticky_dir,
                                     bool* was_explicit) {
   if (was_explicit) *was_explicit = true;
   auto reject_extra_direction = [&](Direction first) {
-    while (Check(TokenKind::kKwRef) || Check(TokenKind::kKwInput) ||
-           Check(TokenKind::kKwOutput) || Check(TokenKind::kKwInout)) {
+    while (IsDirectionQualifierKw(CurrentToken().kind)) {
       bool involves_ref = first == Direction::kRef || Check(TokenKind::kKwRef);
       if (!involves_ref) break;
       diag_.Error(CurrentLoc(),
