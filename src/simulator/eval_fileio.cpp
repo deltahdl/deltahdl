@@ -200,19 +200,6 @@ static Logic4Vec EvalUngetc(const Expr* expr, SimContext& ctx, Arena& arena) {
   return MakeLogic4VecVal(arena, 32, 0);
 }
 
-// §21.3.4.3: the integer conversion codes are case-insensitive (%d or %D, and
-// so on). Returns the numeric base for an integer code, or 0 for a code this
-// reader does not treat as an integer field.
-static int SpecToBase(char spec) {
-  char c =
-      (spec >= 'A' && spec <= 'Z') ? static_cast<char>(spec - 'A' + 'a') : spec;
-  if (c == 'd') return 10;
-  if (c == 'h' || c == 'x') return 16;
-  if (c == 'b') return 2;
-  if (c == 'o') return 8;
-  return 0;
-}
-
 static std::string ReadFileContent(FILE* fp) {
   std::string content;
   int c = 0;

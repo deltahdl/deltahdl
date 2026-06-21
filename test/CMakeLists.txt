@@ -1,8 +1,15 @@
 include(FetchContent)
 FetchContent_Declare(
     googletest
-    URL https://github.com/google/googletest/archive/refs/tags/v1.15.2.tar.gz
-    URL_HASH SHA256=7b42b4d6ed48810c5362c265a17faebe90dc2373c885e5216439d37927f02926
+    URL https://github.com/google/googletest/archive/refs/tags/v1.17.0.tar.gz
+    URL_HASH SHA256=65fab701d9829d38cb77c14acdc431d2108bfdbf8979e40eb8ae567edf10b27c
+    # Apply the upstream fix for googletest issue #4762: gtest-printers.h converts
+    # char8_t/char16_t to char32_t implicitly, which the newer clang rejects under
+    # -Wcharacter-conversion. main makes the cast explicit (static_cast); v1.17.0
+    # does not yet carry it, so apply that exact change to the fetched header.
+    PATCH_COMMAND sed -i.bak
+        -e "s/ImplicitCast_<char32_t>(c)/static_cast<char32_t>(c)/"
+        googletest/include/gtest/gtest-printers.h
 )
 FetchContent_MakeAvailable(googletest)
 
