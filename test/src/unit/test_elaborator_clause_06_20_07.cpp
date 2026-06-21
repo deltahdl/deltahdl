@@ -75,7 +75,9 @@ TEST(DollarConstantElaboration, DollarParameterAssignedToAnotherIsUnbounded) {
   auto* mod = design->top_modules[0];
   bool found_p = false;
   for (auto& p : mod->params) {
-    if (p.name == "Q") EXPECT_TRUE(p.is_unbounded);
+    if (p.name == "Q") {
+      EXPECT_TRUE(p.is_unbounded);
+    }
     if (p.name == "P") {
       found_p = true;
       EXPECT_TRUE(p.is_unbounded);
@@ -118,7 +120,9 @@ TEST(DollarConstantElaboration, ParameterAssignedBoundedParameterNotUnbounded) {
   EXPECT_FALSE(f.has_errors);
   auto* mod = design->top_modules[0];
   for (auto& p : mod->params) {
-    if (p.name == "P") EXPECT_FALSE(p.is_unbounded);
+    if (p.name == "P") {
+      EXPECT_FALSE(p.is_unbounded);
+    }
   }
 }
 

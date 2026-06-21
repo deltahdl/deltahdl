@@ -103,8 +103,7 @@ TEST(NormalizedLinearizedRanges, RowMajorIterationIsContiguousOneDimensional) {
 // words exactly as the packed-array canonical representation of H.7.7
 // prescribes.
 TEST(NormalizedLinearizedRanges, LinearizedIndexCrossesCanonicalWordBoundary) {
-  const int kI = 2, kJ = 2,
-            kK = 20;  // 80-bit packed array, three canonical words.
+  const int kJ = 2, kK = 20;  // 80-bit packed array, three canonical words.
   auto linear = [&](int l, int m, int n) { return n + m * kK + l * kJ * kK; };
 
   svBitVecVal vec[3] = {0u, 0u, 0u};
@@ -186,7 +185,9 @@ TEST(NormalizedLinearizedRanges,
   for (int b = 0; b < kI * kJ * kK; ++b) {
     const bool kWritten = b == linear(0, 0, 0) || b == linear(0, 1, 2) ||
                           b == linear(1, 0, 1) || b == linear(1, 1, 2);
-    if (!kWritten) EXPECT_EQ(svGetBitselLogic(&vec, b), sv_0);
+    if (!kWritten) {
+      EXPECT_EQ(svGetBitselLogic(&vec, b), sv_0);
+    }
   }
 }
 

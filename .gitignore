@@ -14,3 +14,5 @@ compile_commands.json
 Testing/
 Thumbs.db
 build-check/
+
+.claude/

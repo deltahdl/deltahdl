@@ -72,7 +72,7 @@ TEST(AssignmentPatternElaboration, LhsPositionalPatternElaborates) {
 
 TEST(AssignmentPatternElaboration, ErrorPatternExpressionInPort) {
   ElabFixture f;
-  auto* design = ElaborateSrc(
+  ElaborateSrc(
       "module sub(input int a);\n"
       "endmodule\n"
       "module top;\n"
@@ -84,7 +84,7 @@ TEST(AssignmentPatternElaboration, ErrorPatternExpressionInPort) {
 
 TEST(AssignmentPatternElaboration, ErrorLhsNamedKeys) {
   ElabFixture f;
-  auto* design = ElaborateSrc(
+  ElaborateSrc(
       "module m;\n"
       "  typedef struct packed { logic [7:0] a; logic [7:0] b; } pair_t;\n"
       "  pair_t p;\n"
@@ -97,7 +97,7 @@ TEST(AssignmentPatternElaboration, ErrorLhsNamedKeys) {
 
 TEST(AssignmentPatternElaboration, ErrorNonConstantInConstantPattern) {
   ElabFixture f;
-  auto* design = ElaborateSrc(
+  ElaborateSrc(
       "module m;\n"
       "  int x;\n"
       "  localparam int arr [3] = '{x, 2, 3};\n"
@@ -120,7 +120,7 @@ TEST(AssignmentPatternElaboration, ExpressionUsableOutsideAssignmentSide) {
 
 TEST(AssignmentPatternElaboration, ErrorTypedLhsPatternNamedKeys) {
   ElabFixture f;
-  auto* design = ElaborateSrc(
+  ElaborateSrc(
       "module m;\n"
       "  typedef struct packed { logic [7:0] a; logic [7:0] b; } pair_t;\n"
       "  pair_t p;\n"
@@ -133,7 +133,7 @@ TEST(AssignmentPatternElaboration, ErrorTypedLhsPatternNamedKeys) {
 
 TEST(AssignmentPatternElaboration, ErrorLhsPatternBitCountMismatch) {
   ElabFixture f;
-  auto* design = ElaborateSrc(
+  ElaborateSrc(
       "module m;\n"
       "  logic [7:0] a, b;\n"
       "  initial '{a, b} = 32'hDEADBEEF;\n"
