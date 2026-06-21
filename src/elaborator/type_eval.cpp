@@ -19,7 +19,7 @@ uint32_t PackedDimProduct(const StructMember& m) {
   auto left = ConstEvalInt(m.packed_dim_left);
   auto right = ConstEvalInt(m.packed_dim_right);
   if (!left || !right) return 0;
-  uint32_t w = static_cast<uint32_t>(std::abs(*left - *right) + 1);
+  auto w = static_cast<uint32_t>(std::abs(*left - *right) + 1);
   for (const auto& [l, r] : m.extra_packed_dims) {
     auto lv = ConstEvalInt(l);
     auto rv = ConstEvalInt(r);
