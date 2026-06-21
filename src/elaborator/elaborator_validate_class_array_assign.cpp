@@ -579,7 +579,12 @@ void Elaborator::ValidateAssocWildcardTraversal(const ModuleDecl* decl) {
 // categories are not assignment compatible with each other. A narrower integral
 // argument is still assignment compatible -- the resulting truncation is
 // resolved at run time and is not flagged during elaboration.
-enum class AssocKeyCategory : std::uint8_t { kOther, kStringKey, kIntegralKey };
+enum class AssocKeyCategory : std::uint8_t {
+  kOther,
+  kStringKey,
+  kIntegralKey,
+  kWildcard
+};
 
 static AssocKeyCategory ClassifyAssocKey(std::string_view index_type,
                                          const TypedefMap& typedefs) {
@@ -615,13 +620,31 @@ static void CheckTraversalCallSite(
     const Expr* e,
     const std::unordered_map<std::string_view, AssocKeyCategory>& assoc_keys,
     const TypeMap& var_types, DiagEngine& diag) {
-  if (e->kind != ExprKind::kCall || !e->base ||
-      e->base->kind != ExprKind::kIdentifier || !IsTraversalMethod(e->callee) ||
-      e->args.empty()) {
+  // `arr.first(x)` parses as a kCall whose lhs is the member access `arr.first`
+  // and whose args hold the traversal argument.
+  if (e->kind != ExprKind::kCall || !e->lhs ||
+      e->lhs->kind != ExprKind::kMemberAccess || e->args.empty()) {
     return;
   }
-  auto it = assoc_keys.find(e->base->text);
+  const Expr* access = e->lhs;
+  if (!access->lhs || access->lhs->kind != ExprKind::kIdentifier ||
+      !access->rhs || access->rhs->kind != ExprKind::kIdentifier ||
+      !IsTraversalMethod(access->rhs->text)) {
+    return;
+  }
+  auto array_name = access->lhs->text;
+  auto method = access->rhs->text;
+  auto it = assoc_keys.find(array_name);
   if (it == assoc_keys.end()) return;
+  // §7.9.4-7.9.7: first/last/next/prev shall not be used on a wildcard-indexed
+  // associative array.
+  if (it->second == AssocKeyCategory::kWildcard) {
+    diag.Error(e->range.start,
+               std::format("traversal method '{}' shall not be used on the "
+                           "wildcard-indexed associative array '{}'",
+                           method, array_name));
+    return;
+  }
   const Expr* arg = e->args[0];
   bool wrong = (it->second == AssocKeyCategory::kStringKey &&
                 TraversalArgIsIntegral(arg, var_types)) ||
@@ -632,7 +655,7 @@ static void CheckTraversalCallSite(
                std::format("traversal method '{}' argument is not "
                            "assignment compatible with the index type of "
                            "associative array '{}'",
-                           e->callee, e->base->text));
+                           method, array_name));
   }
 }
 
@@ -678,7 +701,11 @@ static void WalkStmtsForTraversalArgType(
 void Elaborator::ValidateAssocTraversalArgType(const ModuleDecl* decl) {
   std::unordered_map<std::string_view, AssocKeyCategory> assoc_keys;
   for (const auto& [name, info] : var_array_info_) {
-    if (!info.is_assoc || info.assoc_index_type == "*") continue;
+    if (!info.is_assoc) continue;
+    if (info.assoc_index_type == "*") {
+      assoc_keys[name] = AssocKeyCategory::kWildcard;
+      continue;
+    }
     auto cat = ClassifyAssocKey(info.assoc_index_type, typedefs_);
     if (cat != AssocKeyCategory::kOther) assoc_keys[name] = cat;
   }
