@@ -487,7 +487,7 @@ size_t CheckFatalFinishNumber(const Expr* expr, bool is_fatal,
     auto* first_arg = expr->args[0];
     if (first_arg->kind == ExprKind::kIntegerLiteral) {
       auto val = first_arg->int_val;
-      if (val < 0 || val > 2) {
+      if (val > 2) {
         diag.Error(first_arg->range.start, "finish_number must be 0, 1, or 2");
       }
       return 1;

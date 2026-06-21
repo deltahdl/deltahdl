@@ -139,7 +139,7 @@ struct EnumMemberBuilder {
   RtlirModule* mod;
   std::unordered_set<std::string_view>& enum_member_names;
   int64_t next_val = 0;
-  std::vector<RtlirEnumMember> members;
+  std::vector<RtlirEnumMember> members = {};
 
   // Records one enum member (name + current value), reserving its name and
   // emitting a backing variable, then advances the running value.
