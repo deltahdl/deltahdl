@@ -95,8 +95,16 @@ TEST(PackedArrayCanonicalRepresentation, UnusedBitsAreMaskedByConsumer) {
   EXPECT_EQ(SV_GET_UNSIGNED_BITS(elem, 5), 0x09u);  // upper unused bits masked
 
   // Sign extension replicates the value's high bit across the unused bits.
-  EXPECT_EQ(SV_GET_SIGNED_BITS(0x1Fu, 4), 0xFFFFFFFFu);  // high bit set -> -1
-  EXPECT_EQ(SV_GET_SIGNED_BITS(0x0Fu, 4), 0x0Fu);        // high bit clear
+  // The operands are runtime locals (like `elem` above) rather than literals so
+  // the width-4 utility is exercised dynamically; with literal operands the
+  // mask is constant-folded into an ineffective bitwise-and.
+  svBitVecVal high_bit_set = 0x1Fu;
+  svBitVecVal high_bit_clear = 0x0Fu;
+  int narrow_width = 4;
+  EXPECT_EQ(SV_GET_SIGNED_BITS(high_bit_set, narrow_width),
+            0xFFFFFFFFu);  // high bit set -> -1
+  EXPECT_EQ(SV_GET_SIGNED_BITS(high_bit_clear, narrow_width),
+            0x0Fu);  // high bit clear
 }
 
 // C4 edge case: a part-select whose window straddles the 32-bit element
@@ -116,8 +124,13 @@ TEST(PackedArrayCanonicalRepresentation, PartSelectStraddlesElementBoundary) {
 // sign-extension utilities pass the element through unchanged (the width-32
 // branch).
 TEST(PackedArrayCanonicalRepresentation, FullWidthElementHasNoUnusedBits) {
-  EXPECT_EQ(SV_GET_UNSIGNED_BITS(0xDEADBEEFu, 32), 0xDEADBEEFu);
-  EXPECT_EQ(SV_GET_SIGNED_BITS(0xDEADBEEFu, 32), 0xDEADBEEFu);
+  // Runtime locals (not literals) so the width-32 branch is selected
+  // dynamically; with a literal width the macro's unused width-N branch
+  // constant-folds into an ineffective bitwise-and.
+  svBitVecVal full_elem = 0xDEADBEEFu;
+  int full_width = 32;
+  EXPECT_EQ(SV_GET_UNSIGNED_BITS(full_elem, full_width), 0xDEADBEEFu);
+  EXPECT_EQ(SV_GET_SIGNED_BITS(full_elem, full_width), 0xDEADBEEFu);
 }
 
 }  // namespace

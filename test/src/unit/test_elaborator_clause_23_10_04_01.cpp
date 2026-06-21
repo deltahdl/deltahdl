@@ -4,15 +4,24 @@ using namespace delta;
 
 namespace {
 
+RtlirParamDecl* FindParamInModule(RtlirModule* mod,
+                                  std::string_view param_name) {
+  for (auto& q : mod->params) {
+    if (q.name == param_name) {
+      return &q;
+    }
+  }
+  return nullptr;
+}
+
 RtlirParamDecl* FindParamUnderChild(RtlirModule* parent,
                                     std::string_view inst_name,
                                     std::string_view param_name) {
   for (auto& child : parent->children) {
     if (child.inst_name == inst_name && child.resolved) {
-      for (auto& q : child.resolved->params) {
-        if (q.name == param_name) {
-          return &q;
-        }
+      RtlirParamDecl* p = FindParamInModule(child.resolved, param_name);
+      if (p != nullptr) {
+        return p;
       }
     }
   }

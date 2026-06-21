@@ -110,30 +110,37 @@ TEST(AbstractGrammar, AssertionProductionForms) {
 TEST(AbstractGrammar, ProductionCategoriesMatchNotation) {
   const auto kRCategory = ClassifyAnnexFNotation("R");
   ASSERT_TRUE(kRCategory.has_value());
+  if (!kRCategory.has_value()) return;
   EXPECT_EQ(CategoryOfProduction(GrammarProduction::kUnclockedSequence),
             *kRCategory);
   const auto kSCategory = ClassifyAnnexFNotation("S");
   ASSERT_TRUE(kSCategory.has_value());
+  if (!kSCategory.has_value()) return;
   EXPECT_EQ(CategoryOfProduction(GrammarProduction::kClockedSequence),
             *kSCategory);
   const auto kPCategory = ClassifyAnnexFNotation("P");
   ASSERT_TRUE(kPCategory.has_value());
+  if (!kPCategory.has_value()) return;
   EXPECT_EQ(CategoryOfProduction(GrammarProduction::kUnclockedProperty),
             *kPCategory);
   const auto kQCategory = ClassifyAnnexFNotation("Q");
   ASSERT_TRUE(kQCategory.has_value());
+  if (!kQCategory.has_value()) return;
   EXPECT_EQ(CategoryOfProduction(GrammarProduction::kClockedProperty),
             *kQCategory);
   const auto kTCategory = ClassifyAnnexFNotation("T");
   ASSERT_TRUE(kTCategory.has_value());
+  if (!kTCategory.has_value()) return;
   EXPECT_EQ(CategoryOfProduction(GrammarProduction::kUnclockedTopLevelProperty),
             *kTCategory);
   const auto kUCategory = ClassifyAnnexFNotation("U");
   ASSERT_TRUE(kUCategory.has_value());
+  if (!kUCategory.has_value()) return;
   EXPECT_EQ(CategoryOfProduction(GrammarProduction::kClockedTopLevelProperty),
             *kUCategory);
   const auto kACategory = ClassifyAnnexFNotation("A");
   ASSERT_TRUE(kACategory.has_value());
+  if (!kACategory.has_value()) return;
   EXPECT_EQ(CategoryOfProduction(GrammarProduction::kAssertion), *kACategory);
 }
 

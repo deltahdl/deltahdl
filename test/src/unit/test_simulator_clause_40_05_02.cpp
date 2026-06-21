@@ -172,6 +172,7 @@ TEST(CoverageInformationQueries,
   // 10 - (3 + 1 + 1 + 1 + 2) = 2 still in progress.
   const std::optional<std::uint64_t> kInProgress = AssertInProgress(c);
   ASSERT_TRUE(kInProgress.has_value());
+  if (!kInProgress.has_value()) return;
   EXPECT_EQ(kInProgress.value(), 2U);
 
   AssertionCoverageCounters all_concluded;
@@ -179,6 +180,7 @@ TEST(CoverageInformationQueries,
   all_concluded.successes = 4;
   const std::optional<std::uint64_t> kNone = AssertInProgress(all_concluded);
   ASSERT_TRUE(kNone.has_value());
+  if (!kNone.has_value()) return;
   EXPECT_EQ(kNone.value(), 0U);
 }
 
@@ -192,6 +194,7 @@ TEST(CoverageInformationQueries, InProgressClampsWhenOutcomesExceedAttempts) {
   c.failures = 2;
   const std::optional<std::uint64_t> kInProgress = AssertInProgress(c);
   ASSERT_TRUE(kInProgress.has_value());
+  if (!kInProgress.has_value()) return;
   EXPECT_EQ(kInProgress.value(), 0U);
 }
 

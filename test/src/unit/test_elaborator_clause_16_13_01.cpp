@@ -38,6 +38,7 @@ TEST(MulticlockSequenceLegality, EmptyMatchingTrailingSubsequenceIsIllegal) {
   const std::optional<std::string> kError =
       CheckMulticlockSequenceLegality(kSubsequences);
   ASSERT_TRUE(kError.has_value());
+  if (!kError.has_value()) return;
   const std::string& error = *kError;
   EXPECT_FALSE(error.empty());
 }
@@ -73,6 +74,7 @@ TEST(MulticlockSequenceLegality, DifferentlyClockedOtherJoinIsIllegal) {
   const std::optional<std::string> kError =
       CheckMulticlockSequenceLegality(kSubsequences);
   ASSERT_TRUE(kError.has_value());
+  if (!kError.has_value()) return;
   const std::string& error = *kError;
   EXPECT_FALSE(error.empty());
 }
@@ -111,6 +113,7 @@ TEST(MulticlockSequenceLegality, EmptyMatchingInteriorSubsequenceIsIllegal) {
   const std::optional<std::string> kError =
       CheckMulticlockSequenceLegality(kSubsequences);
   ASSERT_TRUE(kError.has_value());
+  if (!kError.has_value()) return;
   const std::string& error = *kError;
   EXPECT_FALSE(error.empty());
 }
@@ -140,6 +143,7 @@ TEST(MulticlockSequenceLegality, CrossClockOtherJoinInInteriorIsIllegal) {
   const std::optional<std::string> kError =
       CheckMulticlockSequenceLegality(kSubsequences);
   ASSERT_TRUE(kError.has_value());
+  if (!kError.has_value()) return;
   const std::string& error = *kError;
   EXPECT_FALSE(error.empty());
 }

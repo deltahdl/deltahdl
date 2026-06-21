@@ -66,12 +66,22 @@ void MarkArrayElementsEnum(SimFixture& f, const char* name, const char* tname,
 // Registers an enum type `tname` with members carrying explicit ordinal values,
 // and marks each element of array `name` as that enum type, so the array is a
 // genuine unpacked array of an enumerated type.
-void SetupEnumMem(SimFixture& f, const char* name, const char* tname,
-                  const std::vector<std::pair<const char*, uint64_t>>& members,
-                  int lo, int size, uint32_t width) {
-  RegisterEnum(f, tname, members);
-  SetupMem(f, name, lo, size, width, /*four_state=*/false);
-  MarkArrayElementsEnum(f, name, tname, lo, size);
+// §21.5.2 enumerated-array memory setup inputs: the array/type names, the enum
+// members (name -> ordinal value), and the array geometry (low index, element
+// count, element width).
+struct EnumMemSpec {
+  const char* name;
+  const char* tname;
+  std::vector<std::pair<const char*, uint64_t>> members;
+  int lo;
+  int size;
+  uint32_t width;
+};
+
+void SetupEnumMem(SimFixture& f, const EnumMemSpec& spec) {
+  RegisterEnum(f, spec.tname, spec.members);
+  SetupMem(f, spec.name, spec.lo, spec.size, spec.width, /*four_state=*/false);
+  MarkArrayElementsEnum(f, spec.name, spec.tname, spec.lo, spec.size);
 }
 
 // §21.5.2: for an enumerated array, the file holds each element's ordinal value
@@ -81,8 +91,12 @@ void SetupEnumMem(SimFixture& f, const char* name, const char* tname,
 TEST(IoSystemTaskTest, EnumeratedArrayWritesOrdinalValues) {
   SimFixture f;
   std::string path = "/tmp/deltahdl_test_21_05_02_enum.txt";
-  SetupEnumMem(f, "states", "state_e", {{"RED", 2}, {"GREEN", 5}, {"BLUE", 9}},
-               0, 3, 8);
+  SetupEnumMem(f, EnumMemSpec{"states",
+                              "state_e",
+                              {{"RED", 2}, {"GREEN", 5}, {"BLUE", 9}},
+                              0,
+                              3,
+                              8});
   // Element values are the members' ordinal (underlying) values.
   Cell(f, "states", 0)->value = MakeLogic4VecVal(f.arena, 8, 2);  // RED
   Cell(f, "states", 1)->value = MakeLogic4VecVal(f.arena, 8, 5);  // GREEN

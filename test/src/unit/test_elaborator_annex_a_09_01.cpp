@@ -20,9 +20,10 @@ TEST(AttributeInstanceElaboration, SingleAttrNoValueResolves) {
   auto& m = *design->top_modules[0];
   ASSERT_GE(m.attrs.size(), 1u);
   EXPECT_EQ(m.attrs[0].name, "synthesis");
-  const auto resolved_value = m.attrs[0].resolved_value;
-  ASSERT_TRUE(resolved_value.has_value());
-  EXPECT_EQ(*resolved_value, 1);
+  const auto kResolvedValue = m.attrs[0].resolved_value;
+  ASSERT_TRUE(kResolvedValue.has_value());
+  if (!kResolvedValue.has_value()) return;
+  EXPECT_EQ(*kResolvedValue, 1);
 }
 
 TEST(AttributeInstanceElaboration, AttrSpecConstantExpressionFolds) {
@@ -38,9 +39,10 @@ TEST(AttributeInstanceElaboration, AttrSpecConstantExpressionFolds) {
   auto& m = *design->top_modules[0];
   ASSERT_GE(m.attrs.size(), 1u);
   EXPECT_EQ(m.attrs[0].name, "depth");
-  const auto resolved_value = m.attrs[0].resolved_value;
-  ASSERT_TRUE(resolved_value.has_value());
-  EXPECT_EQ(*resolved_value, 5);
+  const auto kResolvedValue = m.attrs[0].resolved_value;
+  ASSERT_TRUE(kResolvedValue.has_value());
+  if (!kResolvedValue.has_value()) return;
+  EXPECT_EQ(*kResolvedValue, 5);
 }
 
 TEST(AttributeInstanceElaboration, MultipleAttrSpecsResolveInOrder) {
@@ -77,9 +79,10 @@ TEST(AttributeInstanceElaboration, AttrValueConstantExpressionCrossLink) {
     for (auto& a : v.attrs) {
       if (a.name == "weight") {
         found = true;
-        const auto resolved_value = a.resolved_value;
-        ASSERT_TRUE(resolved_value.has_value());
-        EXPECT_EQ(*resolved_value, 8);
+        const auto kResolvedValue = a.resolved_value;
+        ASSERT_TRUE(kResolvedValue.has_value());
+        if (!kResolvedValue.has_value()) return;
+        EXPECT_EQ(*kResolvedValue, 8);
       }
     }
   }
@@ -115,9 +118,10 @@ TEST(AttributeInstanceElaboration, AttrSpecWithoutValueDefaultsToOne) {
   auto& m = *design->top_modules[0];
   ASSERT_GE(m.attrs.size(), 1u);
   EXPECT_EQ(m.attrs[0].name, "mark_debug");
-  const auto resolved_value = m.attrs[0].resolved_value;
-  ASSERT_TRUE(resolved_value.has_value());
-  EXPECT_EQ(*resolved_value, 1);
+  const auto kResolvedValue = m.attrs[0].resolved_value;
+  ASSERT_TRUE(kResolvedValue.has_value());
+  if (!kResolvedValue.has_value()) return;
+  EXPECT_EQ(*kResolvedValue, 1);
 }
 
 TEST(AttributeInstanceElaboration, AttrInstanceListPreservesOrder) {
@@ -135,15 +139,18 @@ TEST(AttributeInstanceElaboration, AttrInstanceListPreservesOrder) {
   EXPECT_EQ(m.attrs[0].name, "a");
   EXPECT_EQ(m.attrs[1].name, "b");
   EXPECT_EQ(m.attrs[2].name, "c");
-  const auto resolved_value0 = m.attrs[0].resolved_value;
-  const auto resolved_value1 = m.attrs[1].resolved_value;
-  const auto resolved_value2 = m.attrs[2].resolved_value;
-  ASSERT_TRUE(resolved_value0.has_value());
-  ASSERT_TRUE(resolved_value1.has_value());
-  ASSERT_TRUE(resolved_value2.has_value());
-  EXPECT_EQ(*resolved_value0, 1);
-  EXPECT_EQ(*resolved_value1, 2);
-  EXPECT_EQ(*resolved_value2, 3);
+  const auto kResolvedValue0 = m.attrs[0].resolved_value;
+  const auto kResolvedValue1 = m.attrs[1].resolved_value;
+  const auto kResolvedValue2 = m.attrs[2].resolved_value;
+  ASSERT_TRUE(kResolvedValue0.has_value());
+  if (!kResolvedValue0.has_value()) return;
+  ASSERT_TRUE(kResolvedValue1.has_value());
+  if (!kResolvedValue1.has_value()) return;
+  ASSERT_TRUE(kResolvedValue2.has_value());
+  if (!kResolvedValue2.has_value()) return;
+  EXPECT_EQ(*kResolvedValue0, 1);
+  EXPECT_EQ(*kResolvedValue1, 2);
+  EXPECT_EQ(*kResolvedValue2, 3);
 }
 
 }  // namespace

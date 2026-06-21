@@ -49,13 +49,8 @@ CompilationUnit* ParseTwoLeafTop(SourceManager& mgr, Arena& arena,
 // cells and a `top` that instantiates one `leaf`, assigning the three modules
 // the given libraries, and returns the cell bound to top.u (or nullptr).
 RtlirModule* BindLeafUnderTop(SourceManager& mgr, Arena& arena,
-                              DiagEngine& diag, const std::string& config_body,
-                              std::string_view lib_leaf0,
-                              std::string_view lib_leaf1,
-                              std::string_view lib_top) {
-  auto* cu = ParseTwoLeafTop(
-      mgr, arena, diag,
-      BindLeafParams{config_body, lib_leaf0, lib_leaf1, lib_top});
+                              DiagEngine& diag, const BindLeafParams& params) {
+  auto* cu = ParseTwoLeafTop(mgr, arena, diag, params);
   Elaborator elab(arena, diag, cu);
   auto* design = elab.Elaborate(cu->configs[0]);
   if (design == nullptr || design->top_modules.empty()) return nullptr;
@@ -72,8 +67,9 @@ TEST(ConfigLiblistClause, UnselectedLiblistFallsBackToParentLibrary) {
   Arena arena;
   DiagEngine diag(mgr);
   auto* bound =
-      BindLeafUnderTop(mgr, arena, diag, "config c; design top; endconfig\n",
-                       "libX", "libY", "libY");
+      BindLeafUnderTop(mgr, arena, diag,
+                       BindLeafParams{"config c; design top; endconfig\n",
+                                      "libX", "libY", "libY"});
   ASSERT_NE(bound, nullptr);
   EXPECT_EQ(bound->library, "libY");
 }
@@ -85,8 +81,9 @@ TEST(ConfigLiblistClause, ParentLibraryFallbackTracksParent) {
   Arena arena;
   DiagEngine diag(mgr);
   auto* bound =
-      BindLeafUnderTop(mgr, arena, diag, "config c; design top; endconfig\n",
-                       "libX", "libY", "libX");
+      BindLeafUnderTop(mgr, arena, diag,
+                       BindLeafParams{"config c; design top; endconfig\n",
+                                      "libX", "libY", "libX"});
   ASSERT_NE(bound, nullptr);
   EXPECT_EQ(bound->library, "libX");
 }
@@ -98,8 +95,9 @@ TEST(ConfigLiblistClause, EmptyDefaultLiblistFallsBackToParentLibrary) {
   Arena arena;
   DiagEngine diag(mgr);
   auto* bound = BindLeafUnderTop(
-      mgr, arena, diag, "config c; design top; default liblist; endconfig\n",
-      "libX", "libY", "libY");
+      mgr, arena, diag,
+      BindLeafParams{"config c; design top; default liblist; endconfig\n",
+                     "libX", "libY", "libY"});
   ASSERT_NE(bound, nullptr);
   EXPECT_EQ(bound->library, "libY");
 }
@@ -111,8 +109,9 @@ TEST(ConfigLiblistClause, ParentFallbackSkippedWhenParentLacksCell) {
   Arena arena;
   DiagEngine diag(mgr);
   auto* bound =
-      BindLeafUnderTop(mgr, arena, diag, "config c; design top; endconfig\n",
-                       "libA", "libB", "libZ");
+      BindLeafUnderTop(mgr, arena, diag,
+                       BindLeafParams{"config c; design top; endconfig\n",
+                                      "libA", "libB", "libZ"});
   ASSERT_NE(bound, nullptr);
   EXPECT_EQ(bound->name, "leaf");
   EXPECT_EQ(bound->library, "libA");
@@ -125,8 +124,9 @@ TEST(ConfigLiblistClause, NoParentLibraryContextSkipsFallback) {
   Arena arena;
   DiagEngine diag(mgr);
   auto* bound =
-      BindLeafUnderTop(mgr, arena, diag, "config c; design top; endconfig\n",
-                       "libA", "libB", std::string_view{});
+      BindLeafUnderTop(mgr, arena, diag,
+                       BindLeafParams{"config c; design top; endconfig\n",
+                                      "libA", "libB", std::string_view{}});
   ASSERT_NE(bound, nullptr);
   EXPECT_EQ(bound->name, "leaf");
 }
@@ -139,8 +139,9 @@ TEST(ConfigLiblistClause, CellClauseSelectsLibraryListForCell) {
   DiagEngine diag(mgr);
   auto* bound = BindLeafUnderTop(
       mgr, arena, diag,
-      "config c; design top; cell leaf liblist libB; endconfig\n", "libA",
-      "libB", "libC");
+      BindLeafParams{
+          "config c; design top; cell leaf liblist libB; endconfig\n", "libA",
+          "libB", "libC"});
   ASSERT_NE(bound, nullptr);
   EXPECT_EQ(bound->library, "libB");
 }
@@ -154,8 +155,9 @@ TEST(ConfigLiblistClause, SelectedListSearchedInOrderFirstWins) {
   DiagEngine diag(mgr);
   auto* bound = BindLeafUnderTop(
       mgr, arena, diag,
-      "config c; design top; cell leaf liblist libA libB; endconfig\n", "libA",
-      "libB", "libC");
+      BindLeafParams{
+          "config c; design top; cell leaf liblist libA libB; endconfig\n",
+          "libA", "libB", "libC"});
   ASSERT_NE(bound, nullptr);
   EXPECT_EQ(bound->library, "libA");
 }
@@ -168,8 +170,9 @@ TEST(ConfigLiblistClause, SelectedListOrderDrivesPrecedence) {
   DiagEngine diag(mgr);
   auto* bound = BindLeafUnderTop(
       mgr, arena, diag,
-      "config c; design top; cell leaf liblist libB libA; endconfig\n", "libA",
-      "libB", "libC");
+      BindLeafParams{
+          "config c; design top; cell leaf liblist libB libA; endconfig\n",
+          "libA", "libB", "libC"});
   ASSERT_NE(bound, nullptr);
   EXPECT_EQ(bound->library, "libB");
 }
@@ -184,8 +187,9 @@ TEST(ConfigLiblistClause, SelectedListSkipsLibraryWithoutCell) {
   DiagEngine diag(mgr);
   auto* bound = BindLeafUnderTop(
       mgr, arena, diag,
-      "config c; design top; cell leaf liblist libX libB; endconfig\n", "libA",
-      "libB", "libC");
+      BindLeafParams{
+          "config c; design top; cell leaf liblist libX libB; endconfig\n",
+          "libA", "libB", "libC"});
   ASSERT_NE(bound, nullptr);
   EXPECT_EQ(bound->library, "libB");
 }
