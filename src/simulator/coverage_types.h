@@ -86,7 +86,7 @@ struct CoverPoint {
   bool is_real = false;
   // Trailing window of recently sampled values, used to recognize value
   // transition sequences for transition bins.
-  std::vector<int64_t> sample_history;
+  std::vector<int64_t> sample_history = {};
   // Weight Wi of this coverpoint within the covergroup coverage average (LRM
   // 19.11). The value originates from option.weight (LRM 19.7); a coverpoint
   // carries it so the covergroup average can weight each item.
@@ -215,7 +215,7 @@ struct CoverGroup {
   // Whether the instance is currently collecting coverage. start() and stop()
   // toggle this; while stopped a triggered sample() records nothing (LRM 19.8).
   bool collecting = true;
-  CoverGroupTypeOption type_option;
+  CoverGroupTypeOption type_option = {};
 };
 
 // Identifies a covergroup type option for the Table 19-4 placement queries
