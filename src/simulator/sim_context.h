@@ -153,7 +153,7 @@ struct StochasticQueue {
   int64_t q_type = 0;
   int64_t max_length = 0;
   uint64_t count = 0;
-  std::deque<StochasticQueueEntry> entries;
+  std::deque<StochasticQueueEntry> entries = {};
 
   uint64_t max_count = 0;
   uint64_t arrivals = 0;
