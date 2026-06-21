@@ -856,6 +856,7 @@ void Elaborator::ResetItemElaborationState() {
   enum_var_names_.clear();
   enum_member_names_.clear();
   const_names_.clear();
+  const_var_names_.clear();
   class_var_names_.clear();
   class_var_types_.clear();
   var_init_names_.clear();

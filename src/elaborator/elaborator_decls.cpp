@@ -775,6 +775,7 @@ void ValidateVirtualInterfaceTarget(const ModuleItem* item,
 // type).
 struct VarDeclNameTables {
   std::unordered_set<std::string_view>& const_names;
+  std::unordered_set<std::string_view>& const_var_names;
   std::unordered_map<std::string_view, DataTypeKind>& var_types;
   std::unordered_set<std::string_view>& scalar_var_names;
   std::unordered_set<std::string_view>& packed_array_vars;
@@ -793,6 +794,7 @@ static void RegisterVarDeclNames(const ModuleItem* item,
           std::format("const variable '{}' must be initialized", item->name));
     }
     tables.const_names.insert(item->name);
+    tables.const_var_names.insert(item->name);
   }
   tables.var_types[item->name] = item->data_type.kind;
   // §7.4/§7.8: a variable carrying an unpacked dimension (fixed, dynamic,
@@ -861,10 +863,11 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
                           non_ansi_partial_ports_, declared_names_},
                          "variable", diag_);
 
-  RegisterVarDeclNames(item,
-                       {const_names_, var_types_, scalar_var_names_,
-                        packed_array_vars_, var_named_types_},
-                       diag_);
+  RegisterVarDeclNames(
+      item,
+      {const_names_, const_var_names_, var_types_, scalar_var_names_,
+       packed_array_vars_, var_named_types_},
+      diag_);
   const ModuleDecl* vi_iface_decl =
       item->data_type.kind == DataTypeKind::kVirtualInterface
           ? FindModule(item->data_type.type_name)

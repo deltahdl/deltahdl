@@ -442,7 +442,7 @@ void Elaborator::ValidateEnumDecl(const DataType& dtype, SourceLoc loc) {
   int64_t next_val = 0;
   for (const auto& member : dtype.enum_members) {
     CheckEnumMemberName(member, loc, seen_names, enum_member_names_, diag_);
-    CheckEnumMemberValueRefs(member, const_names_, diag_);
+    CheckEnumMemberValueRefs(member, const_var_names_, diag_);
     if (!member.value) {
       if (prev_had_xz) {
         diag_.Error(loc,

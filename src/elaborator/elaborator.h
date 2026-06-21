@@ -900,6 +900,9 @@ class Elaborator {
   std::unordered_set<std::string_view> enum_var_names_;
   std::unordered_set<std::string_view> enum_member_names_;
   std::unordered_set<std::string_view> const_names_;
+  // §6.19: const *variables* only (not parameters/specparams), which unlike
+  // elaboration-time constants may not appear in an enum named-constant value.
+  std::unordered_set<std::string_view> const_var_names_;
 
   std::unordered_map<std::string_view, DataTypeKind> forward_typedef_kinds_;
   std::unordered_set<std::string_view> class_names_;
