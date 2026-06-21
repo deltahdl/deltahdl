@@ -133,14 +133,39 @@ static void WalkStmtsForVisibility(
     WalkStmtsForVisibility(ci.body, var_types, unit, diag);
 }
 
+// §8.18: collect class-typed handle variables declared inside a procedural
+// block. These block-local handles are not recorded in class_var_types_ (which
+// is seeded only from module-scope handles), yet member accesses through them
+// are still subject to the local/protected visibility rules.
+static void CollectBlockClassVarDecls(
+    const Stmt* s, const std::unordered_set<std::string_view>& class_names,
+    std::unordered_map<std::string_view, std::string_view>& var_types) {
+  if (!s) return;
+  if (s->kind == StmtKind::kVarDecl &&
+      s->var_decl_type.kind == DataTypeKind::kNamed &&
+      class_names.count(s->var_decl_type.type_name)) {
+    var_types[s->var_name] = s->var_decl_type.type_name;
+  }
+  for (auto* sub : s->stmts)
+    CollectBlockClassVarDecls(sub, class_names, var_types);
+  CollectBlockClassVarDecls(s->then_branch, class_names, var_types);
+  CollectBlockClassVarDecls(s->else_branch, class_names, var_types);
+  CollectBlockClassVarDecls(s->body, class_names, var_types);
+  CollectBlockClassVarDecls(s->for_body, class_names, var_types);
+  for (auto& ci : s->case_items)
+    CollectBlockClassVarDecls(ci.body, class_names, var_types);
+}
+
 void Elaborator::ValidateLocalProtectedAccess(const ModuleDecl* decl) {
-  if (class_var_types_.empty()) return;
+  if (class_names_.empty()) return;
   for (const auto* item : decl->items) {
     bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
                    item->kind == ModuleItemKind::kInitialBlock;
-    if (is_proc && item->body) {
-      WalkStmtsForVisibility(item->body, class_var_types_, unit_, diag_);
-    }
+    if (!is_proc || !item->body) continue;
+    // Combine module-scope handles with any declared inside this block.
+    auto var_types = class_var_types_;
+    CollectBlockClassVarDecls(item->body, class_names_, var_types);
+    WalkStmtsForVisibility(item->body, var_types, unit_, diag_);
   }
 }
 
@@ -205,10 +230,15 @@ void Elaborator::ValidateConstClassProperties() {
     if (global_consts.empty() && instance_consts.empty()) continue;
     for (const auto* m : cls->members) {
       if (m->kind != ClassMemberKind::kMethod || !m->method) continue;
-      if (!m->method->body) continue;
       bool is_ctor = m->method->name == "new";
-      WalkStmtsForConstClassProp(m->method->body, global_consts,
-                                 instance_consts, is_ctor, diag_);
+      // A class subroutine body is stored in func_body_stmts, not the single
+      // `body` statement used by module procedural blocks; walk each statement
+      // so const-property assignments inside methods/tasks are actually
+      // checked.
+      for (const auto* s : m->method->func_body_stmts) {
+        WalkStmtsForConstClassProp(s, global_consts, instance_consts, is_ctor,
+                                   diag_);
+      }
     }
   }
 }
