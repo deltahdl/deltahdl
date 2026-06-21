@@ -31,7 +31,7 @@ TEST(DumpfileSysTask, RecordsNameFromStringExpression) {
 // valid filename source.
 TEST(DumpfileSysTask, RecordsNameFromIntegralValue) {
   SysTaskFixture f;
-  auto* var = MakeVar(f, "code", 32, 0x77617665);  // ASCII "wave"
+  MakeVar(f, "code", 32, 0x77617665);  // ASCII "wave"
   auto* expr = MkSysCall(f.arena, "$dumpfile", {MkId(f.arena, "code")});
   EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(f.ctx.GetDumpFileName(), "wave");

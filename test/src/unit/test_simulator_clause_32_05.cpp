@@ -51,10 +51,10 @@ const PathDelay& AnnotateBufDelayBody(const std::string& delay_body,
 TEST(SdfMultipleAnnotations, IopathAfterPathpulseOverwritesPulseLimits) {
   SpecifyManager mgr = SeedManagerWithPathDelay(1);
 
-  const PathDelay& pd = AnnotateBufDelayBody(R"((DELAY (ABSOLUTE
+  const PathDelay pd = AnnotateBufDelayBody(R"((DELAY (ABSOLUTE
           (PATHPULSE A Z (10) (20))
           (IOPATH A Z (35) (61)))))",
-                                             mgr);
+                                            mgr);
 
   EXPECT_EQ(pd.delays[0], 35u);
   EXPECT_EQ(pd.delays[1], 61u);
@@ -217,10 +217,10 @@ TEST(SdfMultipleAnnotations,
      ExtendedIopathWithEmptyPulseSlotsPreservesPriorPathpulse) {
   SpecifyManager mgr = SeedManagerWithPathDelay(20);
 
-  const PathDelay& pd = AnnotateBufDelayBody(R"((DELAY (ABSOLUTE
+  const PathDelay pd = AnnotateBufDelayBody(R"((DELAY (ABSOLUTE
           (PATHPULSE A Z (10) (20))
           (IOPATH A Z ((35) () ()) ((61) () ())))))",
-                                             mgr);
+                                            mgr);
 
   EXPECT_EQ(pd.delays[0], 35u);
   EXPECT_EQ(pd.delays[1], 61u);

@@ -51,7 +51,7 @@ TEST_F(VpiGetCbInfoSim, ReportsRegisteredCallbackInfo) {
 // §38.8: the routine reports the callback's trigger object as well, so a handle
 // stored at registration round-trips back through vpi_get_cb_info().
 TEST_F(VpiGetCbInfoSim, ReportsTriggerObject) {
-  auto* var = sim_ctx_.CreateVariable("sig", 8);
+  sim_ctx_.CreateVariable("sig", 8);
   vpi_ctx_.Attach(sim_ctx_);
   vpiHandle obj = vpi_handle_by_name("sig", nullptr);
   ASSERT_NE(obj, nullptr);

@@ -49,7 +49,7 @@ TEST(BoundedQueue, PushBackOnFullPreservesContents) {
 
 TEST(BoundedQueue, PushBackWarnsOnDiscard) {
   SimFixture f;
-  auto* q = MakeBoundedQueue(f, 2, {10, 20});
+  MakeBoundedQueue(f, 2, {10, 20});
 
   auto before = f.diag.WarningCount();
   auto* call =
@@ -82,7 +82,7 @@ TEST(BoundedQueue, PushFrontDiscardsLastElement) {
 
 TEST(BoundedQueue, PushFrontWarnsOnDiscard) {
   SimFixture f;
-  auto* q = MakeBoundedQueue(f, 2, {10, 20});
+  MakeBoundedQueue(f, 2, {10, 20});
 
   auto before = f.diag.WarningCount();
   auto* call =
@@ -106,7 +106,7 @@ TEST(BoundedQueue, InsertOnFullDiscardsLastElement) {
 
 TEST(BoundedQueue, InsertWarnsOnDiscard) {
   SimFixture f;
-  auto* q = MakeBoundedQueue(f, 2, {10, 20});
+  MakeBoundedQueue(f, 2, {10, 20});
 
   auto before = f.diag.WarningCount();
   auto* call = MakeMethodCall(f.arena, "q", "insert",
@@ -133,7 +133,7 @@ TEST(BoundedQueue, IndexedWriteDollarPlusOneOnFullIsNoop) {
 
 TEST(BoundedQueue, IndexedWriteWarnsOnDiscard) {
   SimFixture f;
-  auto* q = MakeBoundedQueue(f, 2, {10, 20});
+  MakeBoundedQueue(f, 2, {10, 20});
 
   auto before = f.diag.WarningCount();
   auto* dollar = MakeId(f.arena, "$");
