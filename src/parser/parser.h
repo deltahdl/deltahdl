@@ -450,6 +450,11 @@ class Parser {
   bool AtEnd();
   SourceLoc CurrentLoc();
   void Synchronize();
+  // Synchronize() that guarantees forward progress: a body parse loop that only
+  // terminates on its own end keyword would otherwise spin forever when
+  // Synchronize() halts on a foreign block-closing keyword without consuming
+  // it.
+  void SynchronizeWithProgress();
 
   Lexer& lexer_;
   Arena& arena_;

@@ -137,6 +137,12 @@ Token Parser::Expect(TokenKind kind) {
   return tok;
 }
 
+void Parser::SynchronizeWithProgress() {
+  auto before = lexer_.SavePos().pos;
+  Synchronize();
+  if (!AtEnd() && lexer_.SavePos().pos == before) Consume();
+}
+
 void Parser::Synchronize() {
   while (!AtEnd()) {
     if (Check(TokenKind::kSemicolon)) {
