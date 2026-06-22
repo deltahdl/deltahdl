@@ -180,7 +180,12 @@ ConfigDecl* Parser::ParseConfigDecl() {
       skip_duplicate_design();
       continue;
     }
+    auto before = lexer_.SavePos().pos;
     decl->rules.push_back(ParseConfigRule());
+    // A token that starts no config_rule (e.g. the 'use' of an illegal
+    // 'default use ...', already diagnosed) leaves the cursor unmoved. Stop so
+    // the Expect(kKwEndconfig) below reports it instead of spinning.
+    if (lexer_.SavePos().pos == before) break;
   }
 
   if (!has_design) {

@@ -312,7 +312,12 @@ Stmt* Parser::ParseRandsequenceStmt() {
   Expect(TokenKind::kRParen);
 
   while (!Check(TokenKind::kKwEndsequence) && !AtEnd()) {
+    auto before = lexer_.SavePos().pos;
     stmt->rs_productions.push_back(ParseRsProduction());
+    // Missing endsequence: a token that cannot start a production (e.g. the
+    // enclosing end/endmodule) reaches here and ParseRsProduction consumes
+    // nothing. Stop and let the Expect below report the missing endsequence.
+    if (lexer_.SavePos().pos == before) break;
   }
 
   Expect(TokenKind::kKwEndsequence);

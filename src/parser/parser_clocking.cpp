@@ -121,7 +121,13 @@ ModuleItem* Parser::ParseClockingDecl() {
 
   if (!item->is_global_clocking) {
     while (!Check(TokenKind::kKwEndclocking) && !AtEnd()) {
+      auto before = lexer_.SavePos().pos;
       ParseClockingItem(item);
+      // Guard against a non-clocking_item token (e.g. a missing endclocking, so
+      // the enclosing endmodule lands here): ParseClockingItem consumes
+      // nothing, so stop and let the Expect below report the missing
+      // endclocking.
+      if (lexer_.SavePos().pos == before) break;
     }
   }
 

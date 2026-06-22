@@ -16,7 +16,12 @@ ModuleItem* Parser::ParseSpecifyBlock() {
   Expect(TokenKind::kKwSpecify);
 
   while (!Check(TokenKind::kKwEndspecify) && !AtEnd()) {
+    auto before = lexer_.SavePos().pos;
     ParseSpecifyItem(item->specify_items);
+    // Missing endspecify: the enclosing endmodule reaches here and
+    // ParseSpecifyItem's recovery consumes nothing. Stop and let the Expect
+    // below report the missing endspecify rather than spinning.
+    if (lexer_.SavePos().pos == before) break;
   }
   Expect(TokenKind::kKwEndspecify);
   return item;

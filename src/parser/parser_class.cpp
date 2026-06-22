@@ -98,6 +98,7 @@ void Parser::ParseModportItem(ModportDecl* mp) {
 
   int tf_mode = 0;
   while (!Check(TokenKind::kRParen) && !AtEnd()) {
+    auto before = lexer_.SavePos().pos;
     ParseAttributes();
     if (Check(TokenKind::kKwClocking)) {
       tf_mode = 0;
@@ -121,6 +122,10 @@ void Parser::ParseModportItem(ModportDecl* mp) {
       mp->ports.push_back(ParseModportSimplePort(cur_dir));
     }
     if (!Check(TokenKind::kRParen)) Expect(TokenKind::kComma);
+    // Missing ')': a token that is neither a port nor a comma (e.g. the
+    // terminating ';') leaves the cursor unmoved. Stop so the caller's
+    // Expect(kRParen) reports the error instead of spinning.
+    if (lexer_.SavePos().pos == before) break;
   }
 }
 
