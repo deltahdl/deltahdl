@@ -648,7 +648,7 @@ jobs:
       ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
       UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
     if: ${{ !failure() && !cancelled() }}
-    needs: cache-sv-tests
+    needs: [cache-sv-tests, unit-test-asan-ubsan]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
@@ -698,7 +698,7 @@ jobs:
           retention-days: 1
   integration-test-macos-26-arm64-clang:
     if: ${{ !failure() && !cancelled() }}
-    needs: cache-sv-tests
+    needs: [cache-sv-tests, unit-test-macos-26-arm64-clang]
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v5
@@ -721,7 +721,7 @@ jobs:
     env:
       TSAN_OPTIONS: halt_on_error=1:second_deadlock_stack=1
     if: ${{ !failure() && !cancelled() }}
-    needs: cache-sv-tests
+    needs: [cache-sv-tests, unit-test-tsan]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
@@ -742,7 +742,7 @@ jobs:
         run: PYTHONPATH=.:scripts python3 -m run_sv_tests
   integration-test-ubuntu-24-04-x86-64-clang:
     if: ${{ !failure() && !cancelled() }}
-    needs: cache-sv-tests
+    needs: [cache-sv-tests, unit-test-ubuntu-24-04-x86-64-clang]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
@@ -763,7 +763,7 @@ jobs:
         run: PYTHONPATH=.:scripts python3 -m run_sv_tests
   integration-test-ubuntu-24-04-x86-64-gcc:
     if: ${{ !failure() && !cancelled() }}
-    needs: cache-sv-tests
+    needs: [cache-sv-tests, unit-test-ubuntu-24-04-x86-64-gcc]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
@@ -787,7 +787,6 @@ jobs:
       github.ref_name == 'main'
       && github.event_name == 'push'
     needs:
-      - assert-coverage
       - e2e-test-macos-26-arm64-clang
       - e2e-test-asan-ubsan
       - e2e-test-tsan
