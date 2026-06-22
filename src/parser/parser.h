@@ -88,6 +88,7 @@ class Parser {
   ModuleDecl* ParseProgramDecl();
   void ParseModportDecl(std::vector<ModportDecl*>& out);
   void ParseModportItem(ModportDecl* mp);
+  void ParseModportPortEntry(ModportDecl* mp, Direction& cur_dir, int& tf_mode);
   ModportPort ParseModportTfPort(bool is_import);
   ModportPort ParseModportSimplePort(Direction dir);
   bool IsAtClassDecl();
@@ -354,6 +355,7 @@ class Parser {
                           const std::vector<Attribute>& attrs);
 
   ModuleItem* ParseClockingDecl();
+  void ParseClockingItemList(ModuleItem* item);
   void ParseClockingItem(ModuleItem* item);
   void ParseClockingSkew(Edge& edge, Expr*& delay);
   Direction ParseClockingDirection(Edge& in_edge, Expr*& in_delay,

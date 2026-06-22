@@ -93,34 +93,38 @@ static Direction TokenToDirection(TokenKind tk) {
   }
 }
 
+void Parser::ParseModportPortEntry(ModportDecl* mp, Direction& cur_dir,
+                                   int& tf_mode) {
+  ParseAttributes();
+  if (Check(TokenKind::kKwClocking)) {
+    tf_mode = 0;
+    Consume();
+    ModportPort port;
+    port.is_clocking = true;
+    port.name = Expect(TokenKind::kIdentifier).text;
+    mp->ports.push_back(port);
+  } else if (Check(TokenKind::kKwImport) || Check(TokenKind::kKwExport)) {
+    tf_mode = Check(TokenKind::kKwImport) ? 1 : 2;
+    Consume();
+    mp->ports.push_back(ParseModportTfPort(tf_mode == 1));
+  } else if (IsPortDirection(CurrentToken().kind)) {
+    tf_mode = 0;
+    cur_dir = TokenToDirection(CurrentToken().kind);
+    Consume();
+    mp->ports.push_back(ParseModportSimplePort(cur_dir));
+  } else if (tf_mode != 0) {
+    mp->ports.push_back(ParseModportTfPort(tf_mode == 1));
+  } else {
+    mp->ports.push_back(ParseModportSimplePort(cur_dir));
+  }
+}
+
 void Parser::ParseModportItem(ModportDecl* mp) {
   Direction cur_dir = Direction::kNone;
-
   int tf_mode = 0;
   while (!Check(TokenKind::kRParen) && !AtEnd()) {
     auto before = lexer_.SavePos().pos;
-    ParseAttributes();
-    if (Check(TokenKind::kKwClocking)) {
-      tf_mode = 0;
-      Consume();
-      ModportPort port;
-      port.is_clocking = true;
-      port.name = Expect(TokenKind::kIdentifier).text;
-      mp->ports.push_back(port);
-    } else if (Check(TokenKind::kKwImport) || Check(TokenKind::kKwExport)) {
-      tf_mode = Check(TokenKind::kKwImport) ? 1 : 2;
-      Consume();
-      mp->ports.push_back(ParseModportTfPort(tf_mode == 1));
-    } else if (IsPortDirection(CurrentToken().kind)) {
-      tf_mode = 0;
-      cur_dir = TokenToDirection(CurrentToken().kind);
-      Consume();
-      mp->ports.push_back(ParseModportSimplePort(cur_dir));
-    } else if (tf_mode != 0) {
-      mp->ports.push_back(ParseModportTfPort(tf_mode == 1));
-    } else {
-      mp->ports.push_back(ParseModportSimplePort(cur_dir));
-    }
+    ParseModportPortEntry(mp, cur_dir, tf_mode);
     if (!Check(TokenKind::kRParen)) Expect(TokenKind::kComma);
     // Missing ')': a token that is neither a port nor a comma (e.g. the
     // terminating ';') leaves the cursor unmoved. Stop so the caller's
