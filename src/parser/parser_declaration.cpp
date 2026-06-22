@@ -577,6 +577,20 @@ DataType Parser::ParseFunctionReturnType() {
     ParsePackedDims(dt);
     return dt;
   }
+  // ParseDataType() does not handle the struct/union/enum keywords, so dispatch
+  // them here as every other data-type caller does. Without this, an inline
+  // aggregate return type (e.g. `function struct {...} f;`) left the cursor on
+  // the keyword and the function-body loop spun forever.
+  if (Check(TokenKind::kKwEnum)) {
+    DataType dt = ParseEnumType();
+    ParsePackedDims(dt);
+    return dt;
+  }
+  if (Check(TokenKind::kKwStruct) || Check(TokenKind::kKwUnion)) {
+    DataType dt = ParseStructOrUnionType();
+    ParsePackedDims(dt);
+    return dt;
+  }
   return ParseDataType();
 }
 

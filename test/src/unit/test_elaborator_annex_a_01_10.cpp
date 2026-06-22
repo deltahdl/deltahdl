@@ -46,7 +46,10 @@ TEST(ConstraintElaboration, ClassWithConstraintPrototype) {
 }
 
 TEST(ConstraintElaboration, ClassWithExternConstraintPrototype) {
-  EXPECT_TRUE(
+  // §18.5.2: with the explicit form of constraint prototype (the extern
+  // keyword), it shall be an error if no corresponding external constraint
+  // block is provided.
+  EXPECT_FALSE(
       ElabOk("class C;\n"
              "  rand int x;\n"
              "  extern constraint c;\n"
@@ -56,7 +59,9 @@ TEST(ConstraintElaboration, ClassWithExternConstraintPrototype) {
 }
 
 TEST(ConstraintElaboration, ClassWithPureConstraintPrototype) {
-  EXPECT_TRUE(
+  // §18.5: it shall be an error to declare a pure constraint in a non-abstract
+  // class (C here is not virtual).
+  EXPECT_FALSE(
       ElabOk("class C;\n"
              "  rand int x;\n"
              "  pure constraint c;\n"

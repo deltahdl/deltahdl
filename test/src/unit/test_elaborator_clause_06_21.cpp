@@ -103,10 +103,15 @@ TEST(ScopeAndLifetimeElaboration, LifetimeStaticElaborates) {
 }
 
 TEST(ScopeAndLifetimeElaboration, LifetimeAutomaticElaborates) {
+  // §6.21: a variable may be explicitly declared automatic within a procedural
+  // block. (Module-level automatic is illegal and is covered separately by
+  // VarDecl.AutomaticInModuleScopeError.)
   ElabFixture f;
   auto* design = Elaborate(
       "module m;\n"
-      "  automatic int y = 0;\n"
+      "  initial begin\n"
+      "    automatic int y = 0;\n"
+      "  end\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
