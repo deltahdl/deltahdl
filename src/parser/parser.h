@@ -466,6 +466,7 @@ class Parser {
   std::unordered_set<std::string_view> known_udps_;
   ModuleDecl* current_module_ = nullptr;
   PackageDecl* current_package_ = nullptr;
+  CompilationUnit* current_compilation_unit_ = nullptr;
   bool InProgramBlock() const {
     return current_module_ &&
            current_module_->decl_kind == ModuleDeclKind::kProgram;

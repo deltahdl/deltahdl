@@ -35,18 +35,20 @@ void RunFixedArray3(SimFixture& f, const char* op,
   info.elem_width = 32;
   info.is_dynamic = false;
   f.ctx.RegisterArray("arr", info);
+  // SimContext::variables_ is keyed by std::string_view, so the name backing
+  // each element variable must outlive the context use below. Keep the three
+  // element names in a stable container rather than recreating transient
+  // std::strings (whose freed buffers would leave the map keys dangling).
+  std::array<std::string, 3> names{"arr[0]", "arr[1]", "arr[2]"};
   for (uint32_t i = 0; i < 3; ++i) {
-    auto name = "arr[" + std::to_string(i) + "]";
-    MakeVar(f, name, 32, 0);
+    MakeVar(f, names[i], 32, 0);
   }
   for (uint32_t i = 0; i < 3; ++i) {
-    auto name = "arr[" + std::to_string(i) + "]";
-    f.ctx.FindVariable(name)->value = MakeLogic4VecVal(f.arena, 32, in[i]);
+    f.ctx.FindVariable(names[i])->value = MakeLogic4VecVal(f.arena, 32, in[i]);
   }
   TryExecArrayPropertyStmt("arr", op, f.ctx, f.arena);
   for (uint32_t i = 0; i < 3; ++i) {
-    auto name = "arr[" + std::to_string(i) + "]";
-    EXPECT_EQ(f.ctx.FindVariable(name)->value.ToUint64(), expected[i]);
+    EXPECT_EQ(f.ctx.FindVariable(names[i])->value.ToUint64(), expected[i]);
   }
 }
 

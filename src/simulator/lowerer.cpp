@@ -646,8 +646,15 @@ void Lowerer::LowerProcess(const RtlirProcess& proc, bool from_program,
       RegisterSensitivity(proc, p, ctx_);
       break;
     case RtlirProcessKind::kAlwaysFF:
+      // §9.2.2.4: an always_ff is driven by its explicit edge event control
+      // (stored in proc.sensitivity), so it must wait on that event each
+      // iteration like a sensitized always. Using the always_comb re-trigger
+      // loop instead made it re-fire on its own nonblocking-assign updates and
+      // spin forever.
       p->kind = ProcessKind::kAlwaysFF;
-      p->coro = MakeAlwaysCombCoroutine(proc.body, ctx_, arena_).Release();
+      p->coro =
+          MakeAlwaysSensCoroutine(proc.body, proc.sensitivity, ctx_, arena_)
+              .Release();
       break;
     case RtlirProcessKind::kFinal:
       p->kind = ProcessKind::kFinal;

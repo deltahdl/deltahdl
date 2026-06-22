@@ -361,9 +361,11 @@ void Parser::ParseOutOfBlockConstraint(CompilationUnit* unit) {
       Consume();
     }
   }
-  unit->external_constraints.push_back({class_name, constraint_name, loc,
-                                        is_initial, is_extends, is_final,
-                                        is_static});
+  if (unit) {
+    unit->external_constraints.push_back({class_name, constraint_name, loc,
+                                          is_initial, is_extends, is_final,
+                                          is_static});
+  }
 }
 
 bool Parser::TryParseSecondaryTopLevel(CompilationUnit* unit) {
@@ -450,6 +452,7 @@ bool Parser::TryParsePrimaryTopLevel(CompilationUnit* unit) {
 }
 
 void Parser::ParseTopLevel(CompilationUnit* unit) {
+  current_compilation_unit_ = unit;
   if (Match(TokenKind::kSemicolon)) return;
   auto top_attrs = ParseAttributes();
   auto udp_count = unit->udps.size();
@@ -648,7 +651,7 @@ bool Parser::TryParsePackageBodyItem(std::vector<ModuleItem*>& items) {
   }
 
   if (Check(TokenKind::kKwConstraint)) {
-    ParseOutOfBlockConstraint(nullptr);
+    ParseOutOfBlockConstraint(current_compilation_unit_);
     return true;
   }
   if (Check(TokenKind::kKwStatic)) {
@@ -656,7 +659,7 @@ bool Parser::TryParsePackageBodyItem(std::vector<ModuleItem*>& items) {
     Consume();
     if (Check(TokenKind::kKwConstraint)) {
       lexer_.RestorePos(saved);
-      ParseOutOfBlockConstraint(nullptr);
+      ParseOutOfBlockConstraint(current_compilation_unit_);
       return true;
     }
     lexer_.RestorePos(saved);
