@@ -19,7 +19,12 @@ inline RtlirDesign* ElaborateSrc(const std::string& src, ElabFixture& f,
   Parser parser(lexer, f.arena, f.diag);
   auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
-  auto name = top.empty() ? cu->modules.back()->name : top;
+  // With no explicit top and no top-level module (empty/whitespace/comment-only
+  // or package/class-only source), pass an empty name; the elaborator validates
+  // and elaborates the compilation unit as-is rather than dereferencing an
+  // empty module list (which was undefined behavior, crashing on arm64).
+  std::string_view name = top;
+  if (name.empty() && !cu->modules.empty()) name = cu->modules.back()->name;
   auto* design = elab.Elaborate(name);
   f.has_errors = f.diag.HasErrors();
   return design;
@@ -73,7 +78,10 @@ inline RtlirDesign* ElaborateWithPreprocessor(const std::string& src,
   }
   PropagateDecayAndDelayToCu(cu, preproc);
   Elaborator elab(f.arena, f.diag, cu);
-  auto name = top.empty() ? cu->modules.back()->name : top;
+  // See ElaborateSrc: with no explicit top and no top-level module, pass an
+  // empty name instead of dereferencing an empty module list.
+  std::string_view name = top;
+  if (name.empty() && !cu->modules.empty()) name = cu->modules.back()->name;
   auto* design = elab.Elaborate(name);
   f.has_errors = f.diag.HasErrors();
   return design;

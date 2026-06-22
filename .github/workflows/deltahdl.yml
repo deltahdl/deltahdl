@@ -151,6 +151,15 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
+      # The coverage build emits heavily instrumented objects that exhausted the
+      # runner disk (final link: "No space left on device"). Reclaim the ~20+ GB
+      # of preinstalled toolchains we do not use before building.
+      - name: Free disk space
+        uses: jlumbroso/free-disk-space@main
+        with:
+          tool-cache: false
+          large-packages: false
+          swap-storage: false
       - name: Install tools
         run: |
           sudo apt-get update
@@ -991,7 +1000,7 @@ jobs:
       - name: Unit tests
         run: >-
           ctest --test-dir build --output-on-failure
-          --label-exclude e2e
+          --label-exclude e2e --timeout 60
           --exclude-regex '_NOT_BUILT'
     strategy:
       fail-fast: false
@@ -1017,7 +1026,7 @@ jobs:
       - name: Unit tests
         run: >-
           ctest --test-dir build --output-on-failure
-          --label-exclude e2e
+          --label-exclude e2e --timeout 60
           --exclude-regex '_NOT_BUILT'
       - name: Upload profraw
         uses: actions/upload-artifact@v4
@@ -1044,7 +1053,7 @@ jobs:
           find build/test -maxdepth 1 -type f -name 'test_*'
           -exec chmod +x {} +
       - name: Unit tests
-        run: ctest --test-dir build --output-on-failure --label-exclude e2e
+        run: ctest --test-dir build --output-on-failure --label-exclude e2e --timeout 60
   unit-test-tsan:
     env:
       TSAN_OPTIONS: halt_on_error=1:second_deadlock_stack=1
@@ -1065,7 +1074,7 @@ jobs:
       - name: Unit tests
         run: >-
           ctest --test-dir build --output-on-failure
-          --label-exclude e2e
+          --label-exclude e2e --timeout 60
           --exclude-regex '_NOT_BUILT'
     strategy:
       fail-fast: false
@@ -1096,7 +1105,7 @@ jobs:
           find build/test -maxdepth 1 -type f -name 'test_*'
           -exec chmod +x {} +
       - name: Unit tests
-        run: ctest --test-dir build --output-on-failure --label-exclude e2e
+        run: ctest --test-dir build --output-on-failure --label-exclude e2e --timeout 60
   unit-test-ubuntu-24-04-x86-64-gcc:
     needs: build-ubuntu-24-04-x86-64-gcc
     runs-on: ubuntu-24.04
@@ -1127,7 +1136,7 @@ jobs:
           find build/test -maxdepth 1 -type f -name 'test_*'
           -exec chmod +x {} +
       - name: Unit tests
-        run: ctest --test-dir build --output-on-failure --label-exclude e2e
+        run: ctest --test-dir build --output-on-failure --label-exclude e2e --timeout 60
 name: DeltaHDL
 on:
   pull_request:

@@ -603,7 +603,13 @@ void Parser::ParseTypedItemOrInst(std::vector<ModuleItem*>& items,
   }
   if (!CheckIdentifier()) {
     diag_.Error(CurrentLoc(), "unexpected token in module body");
+    // Synchronize() halts at a block-closing keyword (e.g. endpackage,
+    // endclass) without consuming it. When that keyword does not close the
+    // enclosing module/interface/program body, the body parse loop would spin
+    // forever re-reporting the same token, so force forward progress here.
+    auto before = lexer_.SavePos().pos;
     Synchronize();
+    if (!AtEnd() && lexer_.SavePos().pos == before) Consume();
     return;
   }
   ParseImplicitTypeOrInst(items);

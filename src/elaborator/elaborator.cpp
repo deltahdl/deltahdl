@@ -410,6 +410,17 @@ RtlirDesign* Elaborator::ElaborateTops(
 }
 
 RtlirDesign* Elaborator::Elaborate(std::string_view top_module_name) {
+  // No explicit top module: a package-only or class-only compilation unit has
+  // nothing to instantiate, but its package/class items still need validation.
+  // A genuinely empty unit (e.g. empty/comment-only source) yields no design.
+  if (top_module_name.empty()) {
+    if (unit_->modules.empty() && unit_->packages.empty() &&
+        unit_->cu_items.empty())
+      return nullptr;
+    RunPreElaborationValidations();
+    return ElaborateTops({});
+  }
+
   RunPreElaborationValidations();
 
   auto* mod_decl = FindModule(top_module_name);
