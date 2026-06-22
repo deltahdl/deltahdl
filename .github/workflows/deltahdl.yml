@@ -157,9 +157,9 @@ jobs:
       - name: Free disk space
         uses: jlumbroso/free-disk-space@main
         with:
-          tool-cache: false
           large-packages: false
           swap-storage: false
+          tool-cache: false
       - name: Install tools
         run: |
           sudo apt-get update
