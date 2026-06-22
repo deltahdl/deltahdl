@@ -16,26 +16,12 @@ jobs:
         with:
           name: build-coverage-shard-0
           path: build/
-      - name: Download unit profraw shard 0
+      - name: Download unit profraw
         uses: actions/download-artifact@v4
         with:
-          name: profraw-unit-shard-0
+          pattern: profraw-unit-shard-*
           path: profraw/unit/
-      - name: Download unit profraw shard 1
-        uses: actions/download-artifact@v4
-        with:
-          name: profraw-unit-shard-1
-          path: profraw/unit/
-      - name: Download unit profraw shard 2
-        uses: actions/download-artifact@v4
-        with:
-          name: profraw-unit-shard-2
-          path: profraw/unit/
-      - name: Download unit profraw shard 3
-        uses: actions/download-artifact@v4
-        with:
-          name: profraw-unit-shard-3
-          path: profraw/unit/
+          merge-multiple: true
       - name: Download e2e profraw
         uses: actions/download-artifact@v4
         with:
@@ -97,7 +83,7 @@ jobs:
       CCACHE_DIR: ${{ github.workspace }}/.ccache
       CCACHE_MAXSIZE: 200M
     name: build-asan-ubsan-shard-${{ matrix.shard }}
-    needs: [clang-tidy-src, clang-tidy-test]
+    needs: [assert-coverage]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
@@ -130,7 +116,7 @@ jobs:
           cmake --build build --parallel 4 --target deltahdl
           targets=$(grep -oP 'add_unit_test\(\K[^)]+' \
             test/CMakeLists.txt \
-            | awk "(NR-1) % 4 == ${{ matrix.shard }}")
+            | awk "(NR-1) % 5 == ${{ matrix.shard }}")
           cmake --build build --parallel 4 --target $targets
       - name: Upload build
         uses: actions/upload-artifact@v4
@@ -141,7 +127,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [0, 1, 2, 3]
+        shard: [0, 1, 2, 3, 4]
   build-coverage:
     env:
       CCACHE_DIR: ${{ github.workspace }}/.ccache
@@ -189,7 +175,7 @@ jobs:
           cmake --build build --parallel 4 --target deltahdl
           targets=$(grep -oP 'add_unit_test\(\K[^)]+' \
             test/CMakeLists.txt \
-            | awk "(NR-1) % 4 == ${{ matrix.shard }}")
+            | awk "(NR-1) % 20 == ${{ matrix.shard }}")
           cmake --build build --parallel 4 --target $targets
       - name: Upload build
         uses: actions/upload-artifact@v4
@@ -200,12 +186,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [0, 1, 2, 3]
+        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
   build-macos-26-arm64-clang:
     env:
       CCACHE_DIR: ${{ github.workspace }}/.ccache
       CCACHE_MAXSIZE: 200M
-    needs: [clang-tidy-src, clang-tidy-test]
+    needs: [assert-coverage]
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v5
@@ -242,7 +228,7 @@ jobs:
       CCACHE_DIR: ${{ github.workspace }}/.ccache
       CCACHE_MAXSIZE: 200M
     name: build-tsan-shard-${{ matrix.shard }}
-    needs: [clang-tidy-src, clang-tidy-test]
+    needs: [assert-coverage]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
@@ -275,7 +261,7 @@ jobs:
           cmake --build build --parallel 4 --target deltahdl
           targets=$(grep -oP 'add_unit_test\(\K[^)]+' \
             test/CMakeLists.txt \
-            | awk "(NR-1) % 4 == ${{ matrix.shard }}")
+            | awk "(NR-1) % 5 == ${{ matrix.shard }}")
           cmake --build build --parallel 4 --target $targets
       - name: Upload build
         uses: actions/upload-artifact@v4
@@ -286,13 +272,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [0, 1, 2, 3]
+        shard: [0, 1, 2, 3, 4]
   build-ubuntu-24-04-x86-64-clang:
     env:
       CCACHE_DIR: ${{ github.workspace }}/.ccache
       CCACHE_MAXSIZE: 200M
     name: build-ubuntu-24-04-x86-64-clang-shard-${{ matrix.shard }}
-    needs: [clang-tidy-src, clang-tidy-test]
+    needs: [assert-coverage]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
@@ -324,7 +310,7 @@ jobs:
           cmake --build build --parallel 4 --target deltahdl
           targets=$(grep -oP 'add_unit_test\(\K[^)]+' \
             test/CMakeLists.txt \
-            | awk "(NR-1) % 3 == ${{ matrix.shard }}")
+            | awk "(NR-1) % 4 == ${{ matrix.shard }}")
           cmake --build build --parallel 4 --target $targets
       - name: Upload build
         uses: actions/upload-artifact@v4
@@ -335,13 +321,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [0, 1, 2]
+        shard: [0, 1, 2, 3]
   build-ubuntu-24-04-x86-64-gcc:
     env:
       CCACHE_DIR: ${{ github.workspace }}/.ccache
       CCACHE_MAXSIZE: 200M
     name: build-ubuntu-24-04-x86-64-gcc-shard-${{ matrix.shard }}
-    needs: [clang-tidy-src, clang-tidy-test]
+    needs: [assert-coverage]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
@@ -373,7 +359,7 @@ jobs:
           cmake --build build --parallel 4 --target deltahdl
           targets=$(grep -oP 'add_unit_test\(\K[^)]+' \
             test/CMakeLists.txt \
-            | awk "(NR-1) % 4 == ${{ matrix.shard }}")
+            | awk "(NR-1) % 5 == ${{ matrix.shard }}")
           cmake --build build --parallel 4 --target $targets
       - name: Upload build
         uses: actions/upload-artifact@v4
@@ -384,7 +370,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [0, 1, 2, 3]
+        shard: [0, 1, 2, 3, 4]
   # Ensures sv-tests is cached for integration-test jobs. Compares
   # the latest remote SHA against the SV_TESTS_SHA repo variable to
   # decide if a clone is needed. On warm cache (same SHA) this is a
@@ -393,11 +379,6 @@ jobs:
   cache-sv-tests:
     needs:
       - unit-test-coverage
-      - unit-test-macos-26-arm64-clang
-      - unit-test-asan-ubsan
-      - unit-test-tsan
-      - unit-test-ubuntu-24-04-x86-64-clang
-      - unit-test-ubuntu-24-04-x86-64-gcc
     outputs:
       sv-tests-sha: ${{ steps.sv-tests-ref.outputs.sha }}
     runs-on: ubuntu-24.04
@@ -1005,7 +986,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [0, 1, 2, 3]
+        shard: [0, 1, 2, 3, 4]
   unit-test-coverage:
     env:
       LLVM_PROFILE_FILE: ${{ github.workspace }}/profraw/%p.profraw
@@ -1037,7 +1018,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [0, 1, 2, 3]
+        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
   unit-test-macos-26-arm64-clang:
     needs: build-macos-26-arm64-clang
     runs-on: macos-26
@@ -1079,64 +1060,55 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [0, 1, 2, 3]
+        shard: [0, 1, 2, 3, 4]
   unit-test-ubuntu-24-04-x86-64-clang:
+    name: unit-test-ubuntu-24-04-x86-64-clang-shard-${{ matrix.shard }}
     needs: build-ubuntu-24-04-x86-64-clang
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
-      - name: Download build shard 0
+      - name: Download build
         uses: actions/download-artifact@v4
         with:
-          name: build-ubuntu-24-04-x86-64-clang-shard-0
-          path: build/
-      - name: Download build shard 1
-        uses: actions/download-artifact@v4
-        with:
-          name: build-ubuntu-24-04-x86-64-clang-shard-1
-          path: build/
-      - name: Download build shard 2
-        uses: actions/download-artifact@v4
-        with:
-          name: build-ubuntu-24-04-x86-64-clang-shard-2
+          name: build-ubuntu-24-04-x86-64-clang-shard-${{ matrix.shard }}
           path: build/
       - name: Fix permissions
         run: >-
           find build/test -maxdepth 1 -type f -name 'test_*'
           -exec chmod +x {} +
       - name: Unit tests
-        run: ctest --test-dir build --output-on-failure --label-exclude e2e --timeout 60
+        run: >-
+          ctest --test-dir build --output-on-failure
+          --label-exclude e2e --timeout 60
+          --exclude-regex '_NOT_BUILT'
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
   unit-test-ubuntu-24-04-x86-64-gcc:
+    name: unit-test-ubuntu-24-04-x86-64-gcc-shard-${{ matrix.shard }}
     needs: build-ubuntu-24-04-x86-64-gcc
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
-      - name: Download build shard 0
+      - name: Download build
         uses: actions/download-artifact@v4
         with:
-          name: build-ubuntu-24-04-x86-64-gcc-shard-0
-          path: build/
-      - name: Download build shard 1
-        uses: actions/download-artifact@v4
-        with:
-          name: build-ubuntu-24-04-x86-64-gcc-shard-1
-          path: build/
-      - name: Download build shard 2
-        uses: actions/download-artifact@v4
-        with:
-          name: build-ubuntu-24-04-x86-64-gcc-shard-2
-          path: build/
-      - name: Download build shard 3
-        uses: actions/download-artifact@v4
-        with:
-          name: build-ubuntu-24-04-x86-64-gcc-shard-3
+          name: build-ubuntu-24-04-x86-64-gcc-shard-${{ matrix.shard }}
           path: build/
       - name: Fix permissions
         run: >-
           find build/test -maxdepth 1 -type f -name 'test_*'
           -exec chmod +x {} +
       - name: Unit tests
-        run: ctest --test-dir build --output-on-failure --label-exclude e2e --timeout 60
+        run: >-
+          ctest --test-dir build --output-on-failure
+          --label-exclude e2e --timeout 60
+          --exclude-regex '_NOT_BUILT'
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3, 4]
 name: DeltaHDL
 on:
   pull_request:
