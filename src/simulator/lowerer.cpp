@@ -63,21 +63,26 @@ static SimCoroutine MakeAlwaysSensCoroutine(const Stmt* body,
 // pure outputs are excluded. Callee formals come from the runtime subroutine
 // registry, which is populated (RegisterModuleSubroutines) before processes are
 // lowered.
+// Records the base identifiers of any output actuals of a single call node.
+static void CollectOutputActualsOfCall(const Expr* call, SimContext& ctx,
+                                       std::unordered_set<std::string>& out) {
+  const ModuleItem* fn = ctx.FindFunction(call->callee);
+  if (!fn) return;
+  size_t n = std::min(call->args.size(), fn->func_args.size());
+  for (size_t i = 0; i < n; ++i) {
+    if (fn->func_args[i].direction != Direction::kOutput) continue;
+    const Expr* a = call->args[i];
+    while (a && a->kind == ExprKind::kSelect && a->base) a = a->base;
+    if (a && a->kind == ExprKind::kIdentifier && !a->text.empty())
+      out.insert(std::string(a->text));
+  }
+}
+
 static void CollectCallOutputActuals(const Expr* expr, SimContext& ctx,
                                      std::unordered_set<std::string>& out) {
   if (!expr) return;
-  if (expr->kind == ExprKind::kCall && !expr->callee.empty()) {
-    if (const ModuleItem* fn = ctx.FindFunction(expr->callee)) {
-      size_t n = std::min(expr->args.size(), fn->func_args.size());
-      for (size_t i = 0; i < n; ++i) {
-        if (fn->func_args[i].direction != Direction::kOutput) continue;
-        const Expr* a = expr->args[i];
-        while (a && a->kind == ExprKind::kSelect && a->base) a = a->base;
-        if (a && a->kind == ExprKind::kIdentifier && !a->text.empty())
-          out.insert(std::string(a->text));
-      }
-    }
-  }
+  if (expr->kind == ExprKind::kCall && !expr->callee.empty())
+    CollectOutputActualsOfCall(expr, ctx, out);
   CollectCallOutputActuals(expr->lhs, ctx, out);
   CollectCallOutputActuals(expr->rhs, ctx, out);
   CollectCallOutputActuals(expr->condition, ctx, out);
