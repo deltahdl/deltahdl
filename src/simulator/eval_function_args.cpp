@@ -333,6 +333,24 @@ static bool IsMemberAccessOn(const Expr* lhs, std::string_view base_name) {
          lhs->rhs->kind == ExprKind::kIdentifier;
 }
 
+// §8.15/§8.18: an unqualified (or `this`-qualified) member write inside a
+// method resolves the member in the lexically enclosing class's scope. Routing
+// through SetPropertyForType keyed by the current method's class updates the
+// scoped storage slot that a later qualified read (`obj.name`, `super.name`, or
+// access through a base-typed handle) consults -- so a base constructor that
+// runs as part of a chain populates the inherited slot, not just the unscoped
+// alias. With no enclosing-class context active, the plain unscoped write is
+// preserved, leaving non-method writes unchanged.
+static void WriteSelfProperty(ClassObject* self, std::string_view name,
+                              const Logic4Vec& val, SimContext& ctx) {
+  const ClassTypeInfo* enclosing = ctx.CurrentMethodClass();
+  if (enclosing) {
+    self->SetPropertyForType(name, enclosing, val);
+  } else {
+    self->SetProperty(std::string(name), val);
+  }
+}
+
 // Assigns to a plain identifier lhs: writes the local variable when present,
 // otherwise falls back to a property on the current `this` object.
 static void ExecFuncIdentifierAssign(const Expr* lhs, const Logic4Vec& val,
@@ -343,7 +361,7 @@ static void ExecFuncIdentifierAssign(const Expr* lhs, const Logic4Vec& val,
     return;
   }
   auto* self = ctx.CurrentThis();
-  if (self) self->SetProperty(std::string(lhs->text), val);
+  if (self) WriteSelfProperty(self, lhs->text, val, ctx);
 }
 
 static void ExecFuncBlockingAssign(const Stmt* stmt, SimContext& ctx,
@@ -361,7 +379,7 @@ static void ExecFuncBlockingAssign(const Stmt* stmt, SimContext& ctx,
 
   if (IsMemberAccessOn(stmt->lhs, "this")) {
     auto* self = ctx.CurrentThis();
-    if (self) self->SetProperty(std::string(stmt->lhs->rhs->text), val);
+    if (self) WriteSelfProperty(self, stmt->lhs->rhs->text, val, ctx);
     return;
   }
 
