@@ -98,8 +98,13 @@ struct ClassObject {
 
   ModuleItem* ResolveMethod(std::string_view name) const;
 
-  ModuleItem* ResolveMethodForType(std::string_view name,
-                                   const ClassTypeInfo* from_type) const;
+  // Resolves `name` starting at `from_type` and walking up the inheritance
+  // chain. When `defining_type_out` is non-null, it receives the class in which
+  // the method was found (its lexically enclosing class), so callers can track
+  // the scope for a subsequent `super` resolution.
+  ModuleItem* ResolveMethodForType(
+      std::string_view name, const ClassTypeInfo* from_type,
+      const ClassTypeInfo** defining_type_out = nullptr) const;
 
   Logic4Vec GetPropertyForType(std::string_view name,
                                const ClassTypeInfo* declared_type,

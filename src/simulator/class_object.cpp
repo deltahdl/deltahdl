@@ -63,10 +63,14 @@ ModuleItem* ClassObject::ResolveMethod(std::string_view name) const {
 }
 
 ModuleItem* ClassObject::ResolveMethodForType(
-    std::string_view name, const ClassTypeInfo* from_type) const {
+    std::string_view name, const ClassTypeInfo* from_type,
+    const ClassTypeInfo** defining_type_out) const {
   for (const auto* t = from_type; t != nullptr; t = t->parent) {
     auto it = t->methods.find(std::string(name));
-    if (it != t->methods.end()) return it->second;
+    if (it != t->methods.end()) {
+      if (defining_type_out) *defining_type_out = t;
+      return it->second;
+    }
   }
   return nullptr;
 }

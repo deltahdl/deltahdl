@@ -680,6 +680,20 @@ class SimContext {
   void PopThis();
   ClassObject* CurrentThis() const;
 
+  // §8.15/§8.17: the class whose method body is currently executing (the
+  // lexically enclosing class), so `super` resolves relative to that class
+  // rather than the dynamic type of `this`. Without this, super.new() in a
+  // mid-hierarchy constructor would re-resolve to the same level and recurse.
+  void PushMethodClass(const ClassTypeInfo* cls) {
+    method_class_stack_.push_back(cls);
+  }
+  void PopMethodClass() {
+    if (!method_class_stack_.empty()) method_class_stack_.pop_back();
+  }
+  const ClassTypeInfo* CurrentMethodClass() const {
+    return method_class_stack_.empty() ? nullptr : method_class_stack_.back();
+  }
+
   void IncrementAssertionFailCount() { ++assertion_fail_count_; }
   int AssertionFailCount() const { return assertion_fail_count_; }
 
@@ -869,6 +883,7 @@ class SimContext {
   int function_depth_ = 0;
 
   std::vector<ClassObject*> this_stack_;
+  std::vector<const ClassTypeInfo*> method_class_stack_;
 
   std::vector<std::vector<QueueRefBinding>> queue_ref_stack_;
   std::vector<std::vector<AssocRefBinding>> assoc_ref_stack_;

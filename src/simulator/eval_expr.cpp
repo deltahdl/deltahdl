@@ -321,8 +321,15 @@ static bool TryThisSuperMember(std::string_view base_name,
   }
   if (base_name == "super") {
     auto* self = ctx.CurrentThis();
-    if (self && self->type && self->type->parent) {
-      out = self->GetPropertyForType(field_name, self->type->parent, arena);
+    // §8.15: super resolves against the parent of the lexically enclosing class
+    // (tracked during method execution); fall back to the dynamic type's parent
+    // when no enclosing-class context is active.
+    const ClassTypeInfo* enclosing = ctx.CurrentMethodClass();
+    const ClassTypeInfo* super_type =
+        enclosing ? enclosing->parent
+                  : (self && self->type ? self->type->parent : nullptr);
+    if (self && super_type) {
+      out = self->GetPropertyForType(field_name, super_type, arena);
     } else {
       out = MakeLogic4Vec(arena, 1);
     }

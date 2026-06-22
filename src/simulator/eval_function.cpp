@@ -49,9 +49,13 @@ static void RunConstructorForLevel(const ClassTypeInfo* info, ClassObject*,
   auto it = info->methods.find("new");
   if (it == info->methods.end() || !it->second) return;
   ctx.PushScope();
+  // §8.15/§8.17: while this constructor body runs, `super` resolves relative to
+  // `info` (the lexically enclosing class), not the dynamic type of the object.
+  ctx.PushMethodClass(info);
   if (args_expr) BindFunctionArgs(it->second, args_expr, ctx, arena);
   Variable dummy;
   ExecFunctionBody(it->second, &dummy, ctx, arena);
+  ctx.PopMethodClass();
   ctx.PopScope();
 }
 
@@ -306,11 +310,23 @@ static bool TryEvalSuperMethodCall(const Expr* expr, SimContext& ctx,
   if (!ExtractMethodCallParts(expr, parts)) return false;
   if (parts.var_name != "super") return false;
   auto* self = ctx.CurrentThis();
-  if (!self || !self->type || !self->type->parent) return false;
+  if (!self || !self->type) return false;
+  // §8.15: `super` refers to the parent of the lexically enclosing class. Using
+  // the dynamic type of `this` here made super.new() in a mid-hierarchy
+  // constructor resolve back to the same level and recurse forever.
+  const ClassTypeInfo* enclosing = ctx.CurrentMethodClass();
+  const ClassTypeInfo* super_type =
+      enclosing ? enclosing->parent : self->type->parent;
+  if (!super_type) return false;
+  const ClassTypeInfo* defining = nullptr;
   auto* method =
-      self->ResolveMethodForType(parts.method_name, self->type->parent);
+      self->ResolveMethodForType(parts.method_name, super_type, &defining);
   if (!method) return false;
+  // Run the resolved method with its own defining class as the enclosing scope
+  // so a nested super call walks one level further up, not back to here.
+  ctx.PushMethodClass(defining);
   out = ExecInstanceMethodCall(method, self, expr, ctx, arena);
+  ctx.PopMethodClass();
   return true;
 }
 
