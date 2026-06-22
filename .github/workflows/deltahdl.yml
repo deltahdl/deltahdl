@@ -19,9 +19,9 @@ jobs:
       - name: Download unit profraw
         uses: actions/download-artifact@v4
         with:
-          pattern: profraw-unit-shard-*
-          path: profraw/unit/
           merge-multiple: true
+          path: profraw/unit/
+          pattern: profraw-unit-shard-*
       - name: Download e2e profraw
         uses: actions/download-artifact@v4
         with:
