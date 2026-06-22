@@ -98,7 +98,7 @@ static uint64_t EvalRepeatCount(const Expr* count_expr, SimContext& ctx,
 static void SpawnNbaEventProcess(SimCoroutine coro, SimContext& ctx,
                                  Arena& arena);
 static SimCoroutine NbEventTriggerEventCoroutine(const Stmt* stmt,
-                                                 const NbEventTrigger& trigger,
+                                                 NbEventTrigger trigger,
                                                  SimContext& ctx, Arena& arena);
 
 static StmtResult ExecNbEventTriggerImpl(const Stmt* stmt, SimContext& ctx,
@@ -322,9 +322,11 @@ static void DrainForkChild(SimContext& ctx, const ForkRendezvous& rdv,
   }
 }
 
+// rdv is by value, not by reference: this coroutine uses rdv after the co_await
+// below, but the ForkRendezvous passed in is a temporary; a reference would
+// dangle in the frame, a by-value copy lives for the coroutine's duration.
 static SimCoroutine ForkChildCoroutine(const Stmt* body, SimContext& ctx,
-                                       Arena& arena,
-                                       const ForkRendezvous& rdv) {
+                                       Arena& arena, ForkRendezvous rdv) {
   co_await ExecStmt(body, ctx, arena);
 
   FinalizeForkChildProcess(ctx);
@@ -822,8 +824,11 @@ static StmtResult ExecNbaWithEvent(const Stmt* stmt, SimContext& ctx,
 // Detached waiter for the event-control form of ->>: blocks (off the issuing
 // process) until the event control has occurred the required number of times,
 // then creates the nonblocking-region update event that fires the named event.
+// trigger is by value, not by reference: it is used after the co_await
+// suspensions below, but the NbEventTrigger passed in is a temporary; a
+// by-value copy lives in the coroutine frame, a reference would dangle.
 static SimCoroutine NbEventTriggerEventCoroutine(const Stmt* stmt,
-                                                 const NbEventTrigger& trigger,
+                                                 NbEventTrigger trigger,
                                                  SimContext& ctx,
                                                  Arena& arena) {
   for (uint64_t i = 0; i < trigger.count; ++i) {
