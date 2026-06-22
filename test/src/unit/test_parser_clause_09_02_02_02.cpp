@@ -24,11 +24,18 @@ TEST(AlwaysCombParsing, NestedIfElseAndCase) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstAlwaysCombStmt(r);
+  // The always_comb body here is a begin/end block, so its first statement is
+  // the if; step through the block to reach it (cf.
+  // AlwaysCombNestedIfElseInBlock).
+  auto* block = FirstAlwaysCombStmt(r);
+  ASSERT_NE(block, nullptr);
+  ASSERT_EQ(block->kind, StmtKind::kBlock);
+  ASSERT_GE(block->stmts.size(), 1u);
+  auto* stmt = block->stmts[0];
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kIf);
-  EXPECT_NE(stmt->then_branch, nullptr);
-  EXPECT_NE(stmt->else_branch, nullptr);
+  ASSERT_NE(stmt->then_branch, nullptr);
+  ASSERT_NE(stmt->else_branch, nullptr);
 
   ASSERT_EQ(stmt->then_branch->kind, StmtKind::kBlock);
   ASSERT_GE(stmt->then_branch->stmts.size(), 1u);

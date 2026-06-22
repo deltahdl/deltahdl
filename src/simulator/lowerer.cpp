@@ -56,10 +56,69 @@ static SimCoroutine MakeAlwaysSensCoroutine(const Stmt* body,
   }
 }
 
+// §9.2.2.2: a variable passed to an output formal of a called task/function is
+// written by the call, not read. It must stay out of an always_comb's implicit
+// sensitivity list; otherwise the block re-triggers on its own write and spins
+// in a zero-delay loop. An inout actual is read as well as written, so only
+// pure outputs are excluded. Callee formals come from the runtime subroutine
+// registry, which is populated (RegisterModuleSubroutines) before processes are
+// lowered.
+static void CollectCallOutputActuals(const Expr* expr, SimContext& ctx,
+                                     std::unordered_set<std::string>& out) {
+  if (!expr) return;
+  if (expr->kind == ExprKind::kCall && !expr->callee.empty()) {
+    if (const ModuleItem* fn = ctx.FindFunction(expr->callee)) {
+      size_t n = std::min(expr->args.size(), fn->func_args.size());
+      for (size_t i = 0; i < n; ++i) {
+        if (fn->func_args[i].direction != Direction::kOutput) continue;
+        const Expr* a = expr->args[i];
+        while (a && a->kind == ExprKind::kSelect && a->base) a = a->base;
+        if (a && a->kind == ExprKind::kIdentifier && !a->text.empty())
+          out.insert(std::string(a->text));
+      }
+    }
+  }
+  CollectCallOutputActuals(expr->lhs, ctx, out);
+  CollectCallOutputActuals(expr->rhs, ctx, out);
+  CollectCallOutputActuals(expr->condition, ctx, out);
+  CollectCallOutputActuals(expr->true_expr, ctx, out);
+  CollectCallOutputActuals(expr->false_expr, ctx, out);
+  CollectCallOutputActuals(expr->base, ctx, out);
+  CollectCallOutputActuals(expr->index, ctx, out);
+  for (auto* arg : expr->args) CollectCallOutputActuals(arg, ctx, out);
+  for (auto* elem : expr->elements) CollectCallOutputActuals(elem, ctx, out);
+}
+
+static void CollectCallOutputActuals(const Stmt* stmt, SimContext& ctx,
+                                     std::unordered_set<std::string>& out) {
+  if (!stmt) return;
+  CollectCallOutputActuals(stmt->condition, ctx, out);
+  CollectCallOutputActuals(stmt->rhs, ctx, out);
+  CollectCallOutputActuals(stmt->expr, ctx, out);
+  CollectCallOutputActuals(stmt->for_cond, ctx, out);
+  CollectCallOutputActuals(stmt->assert_expr, ctx, out);
+  for (auto* s : stmt->stmts) CollectCallOutputActuals(s, ctx, out);
+  CollectCallOutputActuals(stmt->then_branch, ctx, out);
+  CollectCallOutputActuals(stmt->else_branch, ctx, out);
+  CollectCallOutputActuals(stmt->for_body, ctx, out);
+  for (auto* fi : stmt->for_inits) CollectCallOutputActuals(fi, ctx, out);
+  for (auto* fs : stmt->for_steps) CollectCallOutputActuals(fs, ctx, out);
+  CollectCallOutputActuals(stmt->body, ctx, out);
+  for (auto* s : stmt->fork_stmts) CollectCallOutputActuals(s, ctx, out);
+  for (const auto& ci : stmt->case_items)
+    CollectCallOutputActuals(ci.body, ctx, out);
+}
+
 static SimCoroutine MakeAlwaysCombCoroutine(const Stmt* body, SimContext& ctx,
                                             Arena& arena) {
   auto read_strs = CollectReadSignals(body);
-  std::vector<std::string_view> read_vars(read_strs.begin(), read_strs.end());
+  std::unordered_set<std::string> call_outputs;
+  CollectCallOutputActuals(body, ctx, call_outputs);
+  std::vector<std::string_view> read_vars;
+  read_vars.reserve(read_strs.size());
+  for (const auto& s : read_strs) {
+    if (call_outputs.count(s) == 0) read_vars.push_back(s);
+  }
   while (!ctx.StopRequested()) {
     co_await ExecStmt(body, ctx, arena);
     if (read_vars.empty()) break;

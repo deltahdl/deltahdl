@@ -563,6 +563,13 @@ struct AnyChangeAwaiter {
       if (!var) continue;
       var->prev_value = var->value;
       var->AddWatcher([h, proc, ctx_ptr]() mutable {
+        // A wait/@* re-suspension arms a fresh watcher on every awaited signal,
+        // but watchers are cleared only from the signal that actually fired.
+        // Watchers stranded on the other signals accumulate; once one of them
+        // resumes the coroutine to completion, the rest would resume an
+        // already-finished frame (undefined behavior -> SEGFAULT). Drop any
+        // watcher whose coroutine has finished.
+        if (h.done()) return true;
         if (proc && !proc->active) return true;
         EventAwaiter::ResumeMaybeReactive(h, proc, *ctx_ptr);
         return true;
