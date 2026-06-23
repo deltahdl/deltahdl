@@ -25,11 +25,42 @@ static std::string_view AggregateOperandName(const Expr* e) {
   return {};
 }
 
+static bool IsFixedUnpackedArray(const Elaborator::VarArrayInfo& a) {
+  return !a.is_dynamic && !a.is_assoc && !a.is_queue;
+}
+
+static bool ArrayTypesEquivalent(const Elaborator::VarArrayInfo& a,
+                                 const Elaborator::VarArrayInfo& b) {
+  return a.dim_sizes == b.dim_sizes && a.elem_width == b.elem_width &&
+         a.elem_type == b.elem_type && a.elem_is_signed == b.elem_is_signed &&
+         a.elem_is_4state == b.elem_is_4state;
+}
+
 void Elaborator::CheckAggregateCompareOp(const Expr* expr) {
   if (!expr->lhs || !expr->rhs) return;
   auto l_name = AggregateOperandName(expr->lhs);
   auto r_name = AggregateOperandName(expr->rhs);
   if (l_name.empty() || r_name.empty()) return;
+
+  // Whole unpacked-array operands are not recorded as named types; compare
+  // their tracked shapes directly. Equivalence requires equal element type and
+  // equal dimension sizes (§6.22.2), so flag any mismatch.
+  if (expr->lhs->kind == ExprKind::kIdentifier &&
+      expr->rhs->kind == ExprKind::kIdentifier) {
+    auto lai = var_array_info_.find(l_name);
+    auto rai = var_array_info_.find(r_name);
+    bool both_fixed =
+        lai != var_array_info_.end() && rai != var_array_info_.end() &&
+        IsFixedUnpackedArray(lai->second) && IsFixedUnpackedArray(rai->second);
+    if (both_fixed) {
+      if (!ArrayTypesEquivalent(lai->second, rai->second)) {
+        diag_.Error(expr->range.start,
+                    "comparison of non-equivalent aggregate array types");
+      }
+      return;
+    }
+  }
+
   auto lit = var_named_types_.find(l_name);
   auto rit = var_named_types_.find(r_name);
   if (lit == var_named_types_.end() || rit == var_named_types_.end()) return;
