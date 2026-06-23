@@ -89,9 +89,9 @@ ExecTask ExecWait(const Stmt* stmt, SimContext& ctx, Arena& arena) {
 
   SubstituteSequenceEndpoints(reads, ctx);
   std::vector<std::string_view> read_vars(reads.begin(), reads.end());
-  // Shared with every watcher armed below: set true once the condition is met
-  // and this coroutine resumes for good, so any watcher still stranded on a
-  // sibling signal removes itself instead of resuming the (by then freed) frame.
+  // Shared with every watcher armed below: set true once the condition holds
+  // and this coroutine resumes for good, so a watcher still stranded on a
+  // sibling signal removes itself instead of resuming the (freed) frame.
   auto finished = std::make_shared<bool>(false);
   bool suspended = false;
   while (!ctx.StopRequested()) {
