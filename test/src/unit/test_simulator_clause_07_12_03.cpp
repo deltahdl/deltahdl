@@ -14,8 +14,13 @@ namespace {
 void MakeFixedArray(SimFixture& f, std::string_view name,
                     const std::vector<uint64_t>& vals, uint32_t elem_width) {
   for (size_t i = 0; i < vals.size(); ++i) {
+    // SimContext keys variables by std::string_view, so the element-name
+    // backing storage must outlive the map entry; persist it in the arena the
+    // way the lowerer does (lowerer_var.cpp) rather than passing a local
+    // std::string that dangles once the loop iteration ends.
     auto ename = std::string(name) + "[" + std::to_string(i) + "]";
-    auto* var = f.ctx.CreateVariable(ename, elem_width);
+    auto* stored = f.arena.Create<std::string>(std::move(ename));
+    auto* var = f.ctx.CreateVariable(*stored, elem_width);
     var->value = MakeLogic4VecVal(f.arena, elem_width, vals[i]);
   }
   ArrayInfo info;
