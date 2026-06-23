@@ -67,7 +67,13 @@ static bool IsReductionOp(TokenKind op) {
 static Logic4Vec EvalUnaryNot(Logic4Vec operand, Arena& arena) {
   auto result = MakeLogic4Vec(arena, operand.width);
   for (uint32_t i = 0; i < result.nwords; ++i) {
-    result.words[i] = Logic4Not(operand.words[i]);
+    // ~0->1, ~1->0, ~x->x, ~z->x. An unknown input bit (bval=1, i.e. x or z)
+    // yields x, whose canonical encoding is (aval=1, bval=1) -- matching
+    // MakeAllX and the 1'bx literal. Force aval high on unknown bits so ~z
+    // does not collapse to the z encoding (0,1). (Done here rather than in the
+    // shared Logic4Not so reduction/XNOR keep their existing encoding.)
+    Logic4Word w = operand.words[i];
+    result.words[i] = {(~w.aval & ~w.bval) | w.bval, w.bval};
   }
 
   uint32_t bit_pos = operand.width % 64;

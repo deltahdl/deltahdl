@@ -31,14 +31,7 @@ Logic4Word Logic4Xor(Logic4Word a, Logic4Word b) {
   return {result_aval & ~unknown, unknown};
 }
 
-Logic4Word Logic4Not(Logic4Word a) {
-  // Bitwise negation: ~0->1, ~1->0, ~x->x, ~z->x. An unknown input bit
-  // (bval=1, i.e. x or z) yields x, whose canonical 4-state encoding is
-  // (aval=1, bval=1) -- matching MakeAllX. Forcing aval high on unknown bits
-  // (rather than leaving the inverted level) keeps ~z from collapsing to the
-  // z encoding (0,1).
-  return {(~a.aval & ~a.bval) | a.bval, a.bval};
-}
+Logic4Word Logic4Not(Logic4Word a) { return {~a.aval & ~a.bval, a.bval}; }
 
 bool Logic4Vec::IsKnown() const {
   for (uint32_t i = 0; i < nwords; ++i) {
