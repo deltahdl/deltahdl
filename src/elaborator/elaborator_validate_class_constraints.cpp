@@ -622,18 +622,19 @@ static void ValidatePrePostRandomizePrototype(const ClassMember* m,
                                               DiagEngine& diag) {
   const ModuleItem* fn = m->method;
   if (!fn) return;
+  std::string_view name = fn->name;
   if (fn->kind != ModuleItemKind::kFunctionDecl) {
     diag.Error(m->loc, std::format("'{}' shall be a void function taking no "
                                    "arguments, not a task",
-                                   m->name));
+                                   name));
     return;
   }
   if (fn->return_type.kind != DataTypeKind::kVoid) {
     diag.Error(m->loc,
-               std::format("'{}' shall have a void return type", m->name));
+               std::format("'{}' shall have a void return type", name));
   }
   if (!fn->func_args.empty()) {
-    diag.Error(m->loc, std::format("'{}' shall take no arguments", m->name));
+    diag.Error(m->loc, std::format("'{}' shall take no arguments", name));
   }
 }
 
@@ -641,13 +642,16 @@ static void ValidatePrePostRandomizePrototype(const ClassMember* m,
 void Elaborator::ValidateOneClassBuiltinMethods(const ClassDecl* cls) {
   for (const auto* m : cls->members) {
     if (m->kind != ClassMemberKind::kMethod) continue;
-    if (m->name == "rand_mode") {
+    // A method member carries its name on the underlying function/task item,
+    // not on the ClassMember (which the parser leaves empty for methods).
+    std::string_view name = m->method ? m->method->name : m->name;
+    if (name == "rand_mode") {
       diag_.Error(m->loc,
                   "'rand_mode' is a built-in method and cannot be overridden");
     }
     // 18.9: constraint_mode() is likewise a built-in method that a class may
     // not redefine.
-    if (m->name == "constraint_mode") {
+    if (name == "constraint_mode") {
       diag_.Error(
           m->loc,
           "'constraint_mode' is a built-in method and cannot be overridden");
@@ -656,11 +660,11 @@ void Elaborator::ValidateOneClassBuiltinMethods(const ClassDecl* cls) {
     // user class shall not declare a method named randomize. (pre_randomize and
     // post_randomize are different: 18.6.2 permits overriding those, subject to
     // the prototype check below.)
-    if (m->name == "randomize") {
+    if (name == "randomize") {
       diag_.Error(m->loc,
                   "'randomize' is a built-in method and cannot be overridden");
     }
-    if (m->name == "pre_randomize" || m->name == "post_randomize") {
+    if (name == "pre_randomize" || name == "post_randomize") {
       ValidatePrePostRandomizePrototype(m, diag_);
     }
   }
