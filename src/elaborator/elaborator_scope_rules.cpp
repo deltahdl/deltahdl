@@ -21,7 +21,31 @@ struct ScopeWalk {
   std::vector<std::pair<std::string_view, SourceLoc>> block_labels;
   std::unordered_set<std::string_view> local_names;
   std::vector<std::pair<std::string_view, SourceLoc>> proc_lhs;
+  // §12.7.1: control variables declared in a for-loop header are local to the
+  // loop's implicit block. This stack holds the names currently in scope while
+  // walking a loop's sub-statements, so assignments to them are not mistaken
+  // for writes to an undeclared identifier and the names never leak outward.
+  std::vector<std::string_view> active_loop_vars;
 };
+
+// §12.7.1: a for loop whose header declares its control variables (e.g.
+// `for (int i = 0; ...)`) creates an implicit block; those variables are local
+// to the loop and visible only in its condition, step, and body. Pushes each
+// such name onto the active-loop-var stack and returns how many were pushed so
+// the caller can pop them once the loop's sub-statements have been walked.
+size_t PushTypedForInitVars(const Stmt* s, ScopeWalk& out) {
+  size_t pushed = 0;
+  for (size_t k = 0; k < s->for_inits.size(); ++k) {
+    if (k >= s->for_init_types.size()) break;
+    if (s->for_init_types[k].kind == DataTypeKind::kImplicit) continue;
+    const Stmt* init = s->for_inits[k];
+    if (init && init->lhs && init->lhs->kind == ExprKind::kIdentifier) {
+      out.active_loop_vars.push_back(init->lhs->text);
+      ++pushed;
+    }
+  }
+  return pushed;
+}
 
 void CollectScopeWalk(const Stmt* s, ScopeWalk& out) {
   if (!s) return;
@@ -33,7 +57,9 @@ void CollectScopeWalk(const Stmt* s, ScopeWalk& out) {
   }
   if ((s->kind == StmtKind::kBlockingAssign ||
        s->kind == StmtKind::kNonblockingAssign) &&
-      s->lhs && s->lhs->kind == ExprKind::kIdentifier) {
+      s->lhs && s->lhs->kind == ExprKind::kIdentifier &&
+      std::find(out.active_loop_vars.begin(), out.active_loop_vars.end(),
+                s->lhs->text) == out.active_loop_vars.end()) {
     out.proc_lhs.emplace_back(s->lhs->text, s->range.start);
   }
   for (const auto* sub : s->stmts) CollectScopeWalk(sub, out);
@@ -41,10 +67,15 @@ void CollectScopeWalk(const Stmt* s, ScopeWalk& out) {
   CollectScopeWalk(s->then_branch, out);
   CollectScopeWalk(s->else_branch, out);
   CollectScopeWalk(s->body, out);
-  CollectScopeWalk(s->for_body, out);
+  for (const auto& ci : s->case_items) CollectScopeWalk(ci.body, out);
+
+  // §12.7.1: walk the for-loop's init, step, and body with the locally declared
+  // control variables in scope, then drop them so they do not leak outward.
+  size_t pushed = PushTypedForInitVars(s, out);
   for (const auto* fi : s->for_inits) CollectScopeWalk(fi, out);
   for (const auto* fs : s->for_steps) CollectScopeWalk(fs, out);
-  for (const auto& ci : s->case_items) CollectScopeWalk(ci.body, out);
+  CollectScopeWalk(s->for_body, out);
+  out.active_loop_vars.resize(out.active_loop_vars.size() - pushed);
 }
 
 bool IsProcBodyItem(ModuleItemKind k) {

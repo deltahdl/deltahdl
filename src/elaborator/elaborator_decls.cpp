@@ -782,6 +782,25 @@ struct VarDeclNameTables {
   std::unordered_map<std::string_view, std::string_view>& var_named_types;
 };
 
+// §6.11.1 / Table 6-8: the integer atom types (byte, shortint, int, longint,
+// integer, time) are multi-bit vector types with a fixed implicit width, not
+// scalars. Per §11.5.1 a bit-select or part-select of a scalar is illegal, but
+// these vector types are freely bit/part-selectable, so they must not be
+// classified as scalars even though they carry no explicit packed dimension.
+static bool IsIntegerAtomKind(DataTypeKind kind) {
+  switch (kind) {
+    case DataTypeKind::kByte:
+    case DataTypeKind::kShortint:
+    case DataTypeKind::kInt:
+    case DataTypeKind::kInteger:
+    case DataTypeKind::kLongint:
+    case DataTypeKind::kTime:
+      return true;
+    default:
+      return false;
+  }
+}
+
 // §6.11 / §6.20: record the bookkeeping name tables for a variable declaration
 // (const-ness, type kind, scalar/packed-array shape, named type) before the
 // RtlirVariable is built.
@@ -803,10 +822,10 @@ static void RegisterVarDeclNames(const ModuleItem* item,
   // select, not a bit-select of a scalar. Only dimensionless variables are
   // classified here.
   if (item->unpacked_dims.empty()) {
-    if (!item->data_type.packed_dim_left)
-      tables.scalar_var_names.insert(item->name);
-    else
+    if (item->data_type.packed_dim_left)
       tables.packed_array_vars.insert(item->name);
+    else if (!IsIntegerAtomKind(item->data_type.kind))
+      tables.scalar_var_names.insert(item->name);
   }
   if (item->data_type.kind == DataTypeKind::kNamed)
     tables.var_named_types[item->name] = item->data_type.type_name;
