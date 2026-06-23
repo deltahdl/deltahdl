@@ -22,6 +22,7 @@ void EventPool::Release(Event* event) {
   event->kind = EventKind::kEvaluation;
   event->target = nullptr;
   event->callback = nullptr;
+  event->superseded = nullptr;
   event->next = free_list_;
   free_list_ = event;
   ++free_count_;
@@ -118,9 +119,28 @@ void Scheduler::ScheduleEvent(SimTime time, Region region, Event* event) {
   event_calendar_[time].regions[idx].Push(event);
 }
 
+static bool SlotHasLiveEvent(const TimeSlot& slot) {
+  for (const auto& queue : slot.regions) {
+    for (const Event* e = queue.head; e; e = e->next) {
+      if (!e->superseded || !*e->superseded) return true;
+    }
+  }
+  return false;
+}
+
 void Scheduler::Run() {
   while (!event_calendar_.empty() && !stop_requested_) {
     auto it = event_calendar_.begin();
+    if (!SlotHasLiveEvent(it->second)) {
+      // Every event here is a superseded inertial-delay timeout that an earlier
+      // operand change cancelled (IEEE 1800 §28). They do no work, so drop them
+      // without advancing simulation time past the last real activity.
+      for (auto& queue : it->second.regions) {
+        while (!queue.empty()) pool_.Release(queue.Pop());
+      }
+      event_calendar_.erase(it);
+      continue;
+    }
     current_time_ = it->first;
     ExecuteTimeSlot(it->second);
     event_calendar_.erase(it);

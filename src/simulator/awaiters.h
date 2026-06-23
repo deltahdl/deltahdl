@@ -613,6 +613,12 @@ struct InertialDelayAwaiter {
     auto* event = ctx.GetScheduler().GetEventPool().Acquire();
     auto f = fired;
     auto e = expired;
+    // If an operand change wins the `fired` race first, this timeout becomes a
+    // no-op. Tag it with the same guard so the scheduler can drop the orphaned
+    // event without advancing time to it (IEEE 1800 §28 inertial delays). When
+    // this timeout fires legitimately, `fired` is still false as the scheduler
+    // reaches the slot (the callback below sets it), so the event stays live.
+    event->superseded = f;
     event->callback = [h, proc, f, e, &ctx = ctx]() mutable {
       if (*f) return;
       *f = true;

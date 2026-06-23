@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <functional>
 #include <map>
+#include <memory>
 
 #include "common/types.h"
 
@@ -20,6 +21,11 @@ struct Event {
   void* target = nullptr;
   std::function<void()> callback;
   Event* next = nullptr;
+  // When set and pointing at a true value, this event has been superseded and
+  // does no work (an inertial-delay timeout an operand change cancelled, IEEE
+  // 1800 §28). Such an event must not advance simulation time. Null for every
+  // ordinary event, which is always live.
+  std::shared_ptr<bool> superseded = nullptr;
 };
 
 struct EventQueue {
