@@ -34,15 +34,14 @@ using WidthMap = std::unordered_map<std::string_view, uint32_t>;
 // width as the shape key: differing widths are necessarily non-equivalent.
 // Returns true when both operands are unpacked-array typedef variables, i.e.
 // the comparison was fully handled here.
-static bool CheckArrayCompareOp(const Expr* expr, std::string_view l_name,
-                                std::string_view r_name, const NameMap& types,
+static bool CheckArrayCompareOp(const Expr* expr, const NameMap& types,
                                 const WidthMap& widths, DiagEngine& diag) {
   if (expr->lhs->kind != ExprKind::kIdentifier ||
       expr->rhs->kind != ExprKind::kIdentifier) {
     return false;
   }
-  auto lt = types.find(l_name);
-  auto rt = types.find(r_name);
+  auto lt = types.find(AggregateOperandName(expr->lhs));
+  auto rt = types.find(AggregateOperandName(expr->rhs));
   if (lt == types.end() || rt == types.end()) return false;
   auto lw = widths.find(lt->second);
   auto rw = widths.find(rt->second);
@@ -59,7 +58,7 @@ void Elaborator::CheckAggregateCompareOp(const Expr* expr) {
   auto l_name = AggregateOperandName(expr->lhs);
   auto r_name = AggregateOperandName(expr->rhs);
   if (l_name.empty() || r_name.empty()) return;
-  if (CheckArrayCompareOp(expr, l_name, r_name, var_named_types_,
+  if (CheckArrayCompareOp(expr, var_named_types_,
                           fixed_unpacked_typedef_widths_, diag_)) {
     return;
   }
