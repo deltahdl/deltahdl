@@ -887,6 +887,8 @@ class Elaborator {
   };
 
  private:
+  friend struct ItemElaborationStateSaver;  // per-module state save/restore
+
   std::unordered_set<std::string_view> declared_names_;
   std::unordered_set<std::string_view> net_names_;
   std::unordered_map<std::string_view, SourceLoc> cont_assign_targets_;

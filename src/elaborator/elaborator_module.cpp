@@ -357,10 +357,149 @@ static RtlirParamDecl BuildParamDeclShell(const ModuleDecl* decl, size_t i,
   return pd;
 }
 
+// Holds a snapshot of the per-module item-elaboration state. The constructor
+// moves the state out of the elaborator (resetting it for the nested module
+// about to be elaborated); Restore moves it back. The field set mirrors
+// Elaborator::ResetItemElaborationState exactly; decltype is used so the field
+// types track the members without naming the elaborator's private nested types.
+struct ItemElaborationStateSaver {
+  decltype(Elaborator::forward_typedef_kinds_) forward_typedef_kinds;
+  decltype(Elaborator::declared_names_) declared_names;
+  decltype(Elaborator::net_names_) net_names;
+  decltype(Elaborator::cont_assign_targets_) cont_assign_targets;
+  decltype(Elaborator::proc_assign_targets_) proc_assign_targets;
+  decltype(Elaborator::var_types_) var_types;
+  decltype(Elaborator::var_array_info_) var_array_info;
+  decltype(Elaborator::specparam_names_) specparam_names;
+  decltype(Elaborator::enum_var_names_) enum_var_names;
+  decltype(Elaborator::enum_member_names_) enum_member_names;
+  decltype(Elaborator::const_names_) const_names;
+  decltype(Elaborator::const_var_names_) const_var_names;
+  decltype(Elaborator::class_var_names_) class_var_names;
+  decltype(Elaborator::class_var_types_) class_var_types;
+  decltype(Elaborator::var_init_names_) var_init_names;
+  decltype(Elaborator::output_port_targets_) output_port_targets;
+  decltype(Elaborator::nettype_net_names_) nettype_net_names;
+  decltype(Elaborator::interconnect_names_) interconnect_names;
+  decltype(Elaborator::scalar_var_names_) scalar_var_names;
+  decltype(Elaborator::var_named_types_) var_named_types;
+  decltype(Elaborator::alias_pairs_) alias_pairs;
+  decltype(Elaborator::non_ansi_complete_ports_) non_ansi_complete_ports;
+  decltype(Elaborator::non_ansi_partial_ports_) non_ansi_partial_ports;
+  decltype(Elaborator::ansi_port_names_) ansi_port_names;
+  decltype(Elaborator::clocking_signals_) clocking_signals;
+  decltype(Elaborator::interface_inst_types_) interface_inst_types;
+  decltype(Elaborator::vi_var_interface_types_) vi_var_interface_types;
+  decltype(Elaborator::vi_var_modports_) vi_var_modports;
+  decltype(Elaborator::vi_var_param_values_) vi_var_param_values;
+  decltype(Elaborator::interface_inst_param_values_) interface_inst_param_vals;
+  decltype(Elaborator::checker_inst_names_) checker_inst_names;
+  decltype(Elaborator::program_inst_names_) program_inst_names;
+  decltype(Elaborator::auto_task_func_names_) auto_task_func_names;
+  decltype(Elaborator::nested_module_decls_) nested_module_decls;
+  decltype(Elaborator::task_names_) task_names;
+  decltype(Elaborator::sequence_names_) sequence_names;
+  decltype(Elaborator::func_decls_) func_decls;
+
+  explicit ItemElaborationStateSaver(Elaborator& e) {
+    forward_typedef_kinds = std::move(e.forward_typedef_kinds_);
+    declared_names = std::move(e.declared_names_);
+    net_names = std::move(e.net_names_);
+    cont_assign_targets = std::move(e.cont_assign_targets_);
+    proc_assign_targets = std::move(e.proc_assign_targets_);
+    var_types = std::move(e.var_types_);
+    var_array_info = std::move(e.var_array_info_);
+    specparam_names = std::move(e.specparam_names_);
+    enum_var_names = std::move(e.enum_var_names_);
+    enum_member_names = std::move(e.enum_member_names_);
+    const_names = std::move(e.const_names_);
+    const_var_names = std::move(e.const_var_names_);
+    class_var_names = std::move(e.class_var_names_);
+    class_var_types = std::move(e.class_var_types_);
+    var_init_names = std::move(e.var_init_names_);
+    output_port_targets = std::move(e.output_port_targets_);
+    nettype_net_names = std::move(e.nettype_net_names_);
+    interconnect_names = std::move(e.interconnect_names_);
+    scalar_var_names = std::move(e.scalar_var_names_);
+    var_named_types = std::move(e.var_named_types_);
+    alias_pairs = std::move(e.alias_pairs_);
+    non_ansi_complete_ports = std::move(e.non_ansi_complete_ports_);
+    non_ansi_partial_ports = std::move(e.non_ansi_partial_ports_);
+    ansi_port_names = std::move(e.ansi_port_names_);
+    clocking_signals = std::move(e.clocking_signals_);
+    interface_inst_types = std::move(e.interface_inst_types_);
+    vi_var_interface_types = std::move(e.vi_var_interface_types_);
+    vi_var_modports = std::move(e.vi_var_modports_);
+    vi_var_param_values = std::move(e.vi_var_param_values_);
+    interface_inst_param_vals = std::move(e.interface_inst_param_values_);
+    checker_inst_names = std::move(e.checker_inst_names_);
+    program_inst_names = std::move(e.program_inst_names_);
+    auto_task_func_names = std::move(e.auto_task_func_names_);
+    nested_module_decls = std::move(e.nested_module_decls_);
+    task_names = std::move(e.task_names_);
+    sequence_names = std::move(e.sequence_names_);
+    func_decls = std::move(e.func_decls_);
+    e.ResetItemElaborationState();
+  }
+
+  void Restore(Elaborator& e) {
+    e.forward_typedef_kinds_ = std::move(forward_typedef_kinds);
+    e.declared_names_ = std::move(declared_names);
+    e.net_names_ = std::move(net_names);
+    e.cont_assign_targets_ = std::move(cont_assign_targets);
+    e.proc_assign_targets_ = std::move(proc_assign_targets);
+    e.var_types_ = std::move(var_types);
+    e.var_array_info_ = std::move(var_array_info);
+    e.specparam_names_ = std::move(specparam_names);
+    e.enum_var_names_ = std::move(enum_var_names);
+    e.enum_member_names_ = std::move(enum_member_names);
+    e.const_names_ = std::move(const_names);
+    e.const_var_names_ = std::move(const_var_names);
+    e.class_var_names_ = std::move(class_var_names);
+    e.class_var_types_ = std::move(class_var_types);
+    e.var_init_names_ = std::move(var_init_names);
+    e.output_port_targets_ = std::move(output_port_targets);
+    e.nettype_net_names_ = std::move(nettype_net_names);
+    e.interconnect_names_ = std::move(interconnect_names);
+    e.scalar_var_names_ = std::move(scalar_var_names);
+    e.var_named_types_ = std::move(var_named_types);
+    e.alias_pairs_ = std::move(alias_pairs);
+    e.non_ansi_complete_ports_ = std::move(non_ansi_complete_ports);
+    e.non_ansi_partial_ports_ = std::move(non_ansi_partial_ports);
+    e.ansi_port_names_ = std::move(ansi_port_names);
+    e.clocking_signals_ = std::move(clocking_signals);
+    e.interface_inst_types_ = std::move(interface_inst_types);
+    e.vi_var_interface_types_ = std::move(vi_var_interface_types);
+    e.vi_var_modports_ = std::move(vi_var_modports);
+    e.vi_var_param_values_ = std::move(vi_var_param_values);
+    e.interface_inst_param_values_ = std::move(interface_inst_param_vals);
+    e.checker_inst_names_ = std::move(checker_inst_names);
+    e.program_inst_names_ = std::move(program_inst_names);
+    e.auto_task_func_names_ = std::move(auto_task_func_names);
+    e.nested_module_decls_ = std::move(nested_module_decls);
+    e.task_names_ = std::move(task_names);
+    e.sequence_names_ = std::move(sequence_names);
+    e.func_decls_ = std::move(func_decls);
+  }
+};
+
 RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
                                          const ParamList& params) {
   auto* mod = arena_.Create<RtlirModule>();
   InitRtlirModuleHeader(mod, decl, unit_, diag_);
+
+  // The per-module item-elaboration state (the members reset by
+  // ResetItemElaborationState) is accumulated as this module's items are
+  // elaborated and is read by the deferred post-item validations. Elaborating a
+  // child instance recurses back into ElaborateModule, which resets and
+  // repopulates those members for the child; without restoring them the
+  // parent's validations would run against the child's leftover state -- for
+  // example a child's continuous assign to a port named like a parent signal
+  // would be misread as a multiple-driver conflict (§23.3.3). Snapshot the
+  // state here and restore it before returning so each ElaborateModule call is
+  // transparent to its caller. (nested_module_decls_ already had a narrower
+  // per-call save at the instance site; this generalizes it to the full set.)
+  ItemElaborationStateSaver saved_item_state(*this);
 
   // While this cell is elaborated it is the parent of any instances it
   // contains; record its library so child binding can fall back to it
@@ -402,6 +541,7 @@ RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
   ElaborateItems(decl, mod);
   ResolveExplicitPortTypes(decl, mod);
   current_library_ = std::move(saved_library);
+  saved_item_state.Restore(*this);
   return mod;
 }
 
