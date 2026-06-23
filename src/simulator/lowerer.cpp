@@ -347,26 +347,6 @@ static void ApplyContAssignResult(const ContAssignParams& params,
   }
 }
 
-static std::vector<std::string_view> CollectContAssignReadVars(
-    const Expr* rhs, Arena& arena) {
-  std::unordered_set<std::string> read_strs;
-  CollectExprReads(rhs, read_strs);
-  // The change-watchers and SimContext key by std::string_view, so the backing
-  // storage must outlive the assignment coroutine. The local set above dies on
-  // return, so intern each name in the arena (which lives for the whole
-  // simulation) instead of handing back views into freed memory -- otherwise a
-  // delayed assignment that arms its AnyChangeAwaiter only after the delay
-  // reads a reused buffer, FindVariable misses, and the assignment stops
-  // reacting to later operand changes (IEEE 1800 §28 gate/net delays).
-  std::vector<std::string_view> read_vars;
-  read_vars.reserve(read_strs.size());
-  for (const auto& name : read_strs) {
-    auto* stored = arena.Create<std::string>(name);
-    read_vars.push_back(*stored);
-  }
-  return read_vars;
-}
-
 static Logic4Vec CurrentContAssignOldValue(const ContAssignParams& params,
                                            const Net* net, SimContext& ctx,
                                            Arena& arena) {
@@ -499,8 +479,16 @@ static SimCoroutine MakeContAssignCoroutine(ContAssignParams params,
                                             SimContext& ctx, Arena& arena) {
   if (!params.lhs || params.lhs->kind != ExprKind::kIdentifier) co_return;
 
-  std::vector<std::string_view> read_vars =
-      CollectContAssignReadVars(params.rhs, arena);
+  // The change-watchers and SimContext key by std::string_view, so the strings
+  // backing read_vars must outlive every co_await below. Keep the owning set in
+  // the coroutine frame (as MakeAlwaysCombCoroutine does) rather than returning
+  // views into a helper's local set that dies on return -- otherwise a delayed
+  // assignment, which arms its AnyChangeAwaiter only after the delay, reads a
+  // reused buffer, FindVariable misses, and the assignment stops reacting to
+  // later operand changes (IEEE 1800 §28 gate/net delays).
+  std::unordered_set<std::string> read_strs;
+  CollectExprReads(params.rhs, read_strs);
+  std::vector<std::string_view> read_vars(read_strs.begin(), read_strs.end());
 
   auto* net = ctx.FindNet(params.lhs->text);
   ContAssignDriver drv = MakeContAssignDriver(net);
