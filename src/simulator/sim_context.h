@@ -563,6 +563,9 @@ class SimContext {
   void SetVariableEnumType(std::string_view var_name,
                            std::string_view type_name);
   const EnumTypeInfo* GetVariableEnumType(std::string_view var_name) const;
+  // Resolves an unqualified enum element name to its numeric value across all
+  // registered enum types (§6.19.4). Returns true and fills `value` on a hit.
+  bool FindEnumMemberValue(std::string_view name, uint64_t& value) const;
 
   void RegisterStructType(std::string_view name, const StructTypeInfo& info);
   const StructTypeInfo* FindStructType(std::string_view name) const;

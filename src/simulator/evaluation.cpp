@@ -31,6 +31,15 @@ static Logic4Vec EvalIdentifier(const Expr* expr, SimContext& ctx,
     val.is_signed = var->is_signed;
     return val;
   }
+  // An unqualified enum element name is not a variable; it contributes its
+  // numeric value, cast to the enum base type (§6.19.4). The default base is
+  // int, so a 32-bit signed value is the conservative carrier.
+  uint64_t enum_value = 0;
+  if (ctx.FindEnumMemberValue(expr->text, enum_value)) {
+    auto val = MakeLogic4VecVal(arena, 32, enum_value);
+    val.is_signed = true;
+    return val;
+  }
   return MakeLogic4Vec(arena, 1);
 }
 bool HasUnknownBits(const Logic4Vec& v) {
