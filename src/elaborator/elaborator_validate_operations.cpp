@@ -25,40 +25,29 @@ static std::string_view AggregateOperandName(const Expr* e) {
   return {};
 }
 
-static bool IsFixedUnpackedArray(const Elaborator::VarArrayInfo& a) {
-  return !a.is_dynamic && !a.is_assoc && !a.is_queue;
-}
+using NameMap = std::unordered_map<std::string_view, std::string_view>;
+using WidthMap = std::unordered_map<std::string_view, uint32_t>;
 
-static bool ArrayTypesEquivalent(const Elaborator::VarArrayInfo& a,
-                                 const Elaborator::VarArrayInfo& b) {
-  return a.dim_sizes == b.dim_sizes && a.elem_width == b.elem_width &&
-         a.elem_type == b.elem_type && a.elem_is_signed == b.elem_is_signed &&
-         a.elem_is_4state == b.elem_is_4state;
-}
-
-using ArrayInfoMap =
-    std::unordered_map<std::string_view, Elaborator::VarArrayInfo>;
-
-// Whole unpacked-array operands are not recorded as named types; compare their
-// tracked shapes directly. Equivalence requires equal element type and equal
-// dimension sizes (§6.22.2), so flag any mismatch. Returns true when both
-// operands are whole fixed-size unpacked arrays (i.e. the comparison was fully
-// handled here).
+// Two whole unpacked-array operands compare legally only when their element
+// type and dimension sizes match (§6.22.2). A typedef array's dimensions are
+// not recorded on the variable, so use the typedef's cached fixed unpacked
+// width as the shape key: differing widths are necessarily non-equivalent.
+// Returns true when both operands are unpacked-array typedef variables, i.e.
+// the comparison was fully handled here.
 static bool CheckArrayCompareOp(const Expr* expr, std::string_view l_name,
-                                std::string_view r_name,
-                                const ArrayInfoMap& info, DiagEngine& diag) {
+                                std::string_view r_name, const NameMap& types,
+                                const WidthMap& widths, DiagEngine& diag) {
   if (expr->lhs->kind != ExprKind::kIdentifier ||
       expr->rhs->kind != ExprKind::kIdentifier) {
     return false;
   }
-  auto lai = info.find(l_name);
-  auto rai = info.find(r_name);
-  if (lai == info.end() || rai == info.end()) return false;
-  if (!IsFixedUnpackedArray(lai->second) ||
-      !IsFixedUnpackedArray(rai->second)) {
-    return false;
-  }
-  if (!ArrayTypesEquivalent(lai->second, rai->second)) {
+  auto lt = types.find(l_name);
+  auto rt = types.find(r_name);
+  if (lt == types.end() || rt == types.end()) return false;
+  auto lw = widths.find(lt->second);
+  auto rw = widths.find(rt->second);
+  if (lw == widths.end() || rw == widths.end()) return false;
+  if (lw->second != rw->second) {
     diag.Error(expr->range.start,
                "comparison of non-equivalent aggregate array types");
   }
@@ -70,7 +59,10 @@ void Elaborator::CheckAggregateCompareOp(const Expr* expr) {
   auto l_name = AggregateOperandName(expr->lhs);
   auto r_name = AggregateOperandName(expr->rhs);
   if (l_name.empty() || r_name.empty()) return;
-  if (CheckArrayCompareOp(expr, l_name, r_name, var_array_info_, diag_)) return;
+  if (CheckArrayCompareOp(expr, l_name, r_name, var_named_types_,
+                          fixed_unpacked_typedef_widths_, diag_)) {
+    return;
+  }
 
   auto lit = var_named_types_.find(l_name);
   auto rit = var_named_types_.find(r_name);
