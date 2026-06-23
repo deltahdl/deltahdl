@@ -386,6 +386,7 @@ struct ItemElaborationStateSaver {
   decltype(Elaborator::alias_pairs_) alias_pairs;
   decltype(Elaborator::non_ansi_complete_ports_) non_ansi_complete_ports;
   decltype(Elaborator::non_ansi_partial_ports_) non_ansi_partial_ports;
+  decltype(Elaborator::non_ansi_signed_ports_) non_ansi_signed_ports;
   decltype(Elaborator::ansi_port_names_) ansi_port_names;
   decltype(Elaborator::clocking_signals_) clocking_signals;
   decltype(Elaborator::interface_inst_types_) interface_inst_types;
@@ -425,6 +426,7 @@ struct ItemElaborationStateSaver {
     alias_pairs = std::move(e.alias_pairs_);
     non_ansi_complete_ports = std::move(e.non_ansi_complete_ports_);
     non_ansi_partial_ports = std::move(e.non_ansi_partial_ports_);
+    non_ansi_signed_ports = std::move(e.non_ansi_signed_ports_);
     ansi_port_names = std::move(e.ansi_port_names_);
     clocking_signals = std::move(e.clocking_signals_);
     interface_inst_types = std::move(e.interface_inst_types_);
@@ -466,6 +468,7 @@ struct ItemElaborationStateSaver {
     e.alias_pairs_ = std::move(alias_pairs);
     e.non_ansi_complete_ports_ = std::move(non_ansi_complete_ports);
     e.non_ansi_partial_ports_ = std::move(non_ansi_partial_ports);
+    e.non_ansi_signed_ports_ = std::move(non_ansi_signed_ports);
     e.ansi_port_names_ = std::move(ansi_port_names);
     e.clocking_signals_ = std::move(clocking_signals);
     e.interface_inst_types_ = std::move(interface_inst_types);

@@ -868,6 +868,7 @@ void Elaborator::ResetItemElaborationState() {
   alias_pairs_.clear();
   non_ansi_complete_ports_.clear();
   non_ansi_partial_ports_.clear();
+  non_ansi_signed_ports_.clear();
   ansi_port_names_.clear();
   clocking_signals_.clear();
   interface_inst_types_.clear();
@@ -916,7 +917,13 @@ void Elaborator::RunPostItemValidations(const ModuleDecl* decl,
 
 void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
   ReclassifyForwardUdpInstances(decl);
-  ResetItemElaborationState();
+  // §23.2.2.1: do NOT reset the per-module item-elaboration state here.
+  // ElaborateModule already reset it via the ItemElaborationStateSaver before
+  // ElaboratePorts ran, and ElaboratePorts populated the ANSI/non-ANSI
+  // port-name tables (complete/partial/signed ports) that the body net and
+  // variable declarations below reconcile against. Re-running the reset would
+  // wipe those tables before reconciliation, silently dropping the
+  // redeclaration, range-mismatch, and signedness checks.
   CollectNestedModulesAndCheckVif(decl, nested_module_decls_, diag_);
   const bool kParentIsProgram = decl->decl_kind == ModuleDeclKind::kProgram;
   const bool kParentIsChecker = decl->decl_kind == ModuleDeclKind::kChecker;
