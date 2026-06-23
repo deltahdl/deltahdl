@@ -575,19 +575,6 @@ const EnumTypeInfo* SimContext::GetVariableEnumType(
   return FindEnumType(it->second);
 }
 
-bool SimContext::FindEnumMemberValue(std::string_view name,
-                                     uint64_t& value) const {
-  for (const auto& entry : enum_types_) {
-    for (const auto& member : entry.second.members) {
-      if (member.name == name) {
-        value = member.value;
-        return true;
-      }
-    }
-  }
-  return false;
-}
-
 void SimContext::RegisterStructType(std::string_view name,
                                     const StructTypeInfo& info) {
   struct_types_[name] = info;

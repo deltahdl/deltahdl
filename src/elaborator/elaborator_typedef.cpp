@@ -150,6 +150,12 @@ struct EnumMemberBuilder {
     var.name = name;
     var.width = width;
     var.is_4state = false;
+    // An enum element contributes its numeric value when read (§6.19.4); seed
+    // the backing variable with that value rather than the default zero.
+    auto* init = arena.Create<Expr>();
+    init->kind = ExprKind::kIntegerLiteral;
+    init->int_val = static_cast<uint64_t>(next_val);
+    var.init_expr = init;
     mod->variables.push_back(var);
     ++next_val;
   }
