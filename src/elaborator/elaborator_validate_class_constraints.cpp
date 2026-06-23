@@ -427,8 +427,11 @@ static const ModuleItem* FindClassFunction(const ClassDecl* cls,
                                        ? nullptr
                                        : FindClassDecl(c->base_class, unit)) {
     for (const auto* m : c->members) {
-      if (m->kind == ClassMemberKind::kMethod && m->name == name && m->method &&
-          m->method->kind == ModuleItemKind::kFunctionDecl) {
+      // A method member carries its name on m->method->name; the parser leaves
+      // ClassMember::name empty for methods (TryParseMethodOrConstraint).
+      if (m->kind == ClassMemberKind::kMethod && m->method &&
+          m->method->kind == ModuleItemKind::kFunctionDecl &&
+          m->method->name == name) {
         return m->method;
       }
     }
