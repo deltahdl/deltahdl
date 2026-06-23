@@ -630,8 +630,7 @@ static void ValidatePrePostRandomizePrototype(const ClassMember* m,
     return;
   }
   if (fn->return_type.kind != DataTypeKind::kVoid) {
-    diag.Error(m->loc,
-               std::format("'{}' shall have a void return type", name));
+    diag.Error(m->loc, std::format("'{}' shall have a void return type", name));
   }
   if (!fn->func_args.empty()) {
     diag.Error(m->loc, std::format("'{}' shall take no arguments", name));
