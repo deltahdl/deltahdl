@@ -8,7 +8,7 @@ jobs:
     permissions:
       id-token: write
       pages: write
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
       - name: Download build
@@ -32,18 +32,16 @@ jobs:
         with:
           name: profraw-integration
           path: profraw/integration/
-      - name: Install tools
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y llvm-18
+      - name: Install LLVM
+        uses: ./.github/actions/install-llvm
       - name: Generate coverage report
         run: |
-          llvm-profdata-18 merge -sparse \
+          llvm-profdata merge -sparse \
             profraw/unit/*.profraw \
             profraw/e2e/*.profraw \
             profraw/integration/*.profraw \
             -o merged.profdata
-          llvm-cov-18 show build/src/deltahdl \
+          llvm-cov show build/src/deltahdl \
             -instr-profile=merged.profdata \
             --ignore-filename-regex='test/|third_party/' \
             --format=html \
@@ -52,10 +50,10 @@ jobs:
       # lowering it hides bugs and lets regressions slip through silently.
       - name: Enforce 100% coverage
         run: |
-          llvm-cov-18 report build/src/deltahdl \
+          llvm-cov report build/src/deltahdl \
             -instr-profile=merged.profdata \
             --ignore-filename-regex='test/|third_party/'
-          llvm-cov-18 export build/src/deltahdl \
+          llvm-cov export build/src/deltahdl \
             -instr-profile=merged.profdata \
             --ignore-filename-regex='test/|third_party/' \
             --summary-only \
@@ -84,13 +82,13 @@ jobs:
       CCACHE_MAXSIZE: 200M
     name: build-asan-ubsan-shard-${{ matrix.shard }}
     needs: [assert-coverage]
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - name: Install tools
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y ccache clang-18
+      - name: Install LLVM
+        uses: ./.github/actions/install-llvm
+      - name: Install ccache
+        run: sudo apt-get install -y ccache
       - name: Restore ccache
         uses: actions/cache@v5
         with:
@@ -107,9 +105,9 @@ jobs:
       - name: Build
         run: |
           cmake -B build \
-            -DCMAKE_CXX_COMPILER=clang++-18 \
+            -DCMAKE_CXX_COMPILER=clang++ \
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
-            -DCMAKE_C_COMPILER=clang-18 \
+            -DCMAKE_C_COMPILER=clang \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_BUILD_TYPE=Debug \
             -DDELTAHDL_SANITIZERS=ON
@@ -134,7 +132,7 @@ jobs:
       CCACHE_MAXSIZE: 200M
     name: build-coverage-shard-${{ matrix.shard }}
     needs: [clang-tidy-src, clang-tidy-test]
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
       # The coverage build emits heavily instrumented objects that exhausted the
@@ -146,10 +144,10 @@ jobs:
           large-packages: false
           swap-storage: false
           tool-cache: false
-      - name: Install tools
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y ccache clang-18
+      - name: Install LLVM
+        uses: ./.github/actions/install-llvm
+      - name: Install ccache
+        run: sudo apt-get install -y ccache
       - name: Restore ccache
         uses: actions/cache@v5
         with:
@@ -166,9 +164,9 @@ jobs:
       - name: Build
         run: |
           cmake -B build \
-            -DCMAKE_CXX_COMPILER=clang++-18 \
+            -DCMAKE_CXX_COMPILER=clang++ \
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
-            -DCMAKE_C_COMPILER=clang-18 \
+            -DCMAKE_C_COMPILER=clang \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_BUILD_TYPE=Debug \
             -DDELTAHDL_COVERAGE=ON
@@ -193,7 +191,7 @@ jobs:
       CCACHE_DIR: ${{ github.workspace }}/.ccache
       CCACHE_MAXSIZE: 200M
     needs: [assert-coverage]
-    runs-on: macos-26
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v5
       - name: Install tools
@@ -230,13 +228,13 @@ jobs:
       CCACHE_MAXSIZE: 200M
     name: build-tsan-shard-${{ matrix.shard }}
     needs: [assert-coverage]
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - name: Install tools
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y ccache clang-18
+      - name: Install LLVM
+        uses: ./.github/actions/install-llvm
+      - name: Install ccache
+        run: sudo apt-get install -y ccache
       - name: Restore ccache
         uses: actions/cache@v5
         with:
@@ -253,9 +251,9 @@ jobs:
       - name: Build
         run: |
           cmake -B build \
-            -DCMAKE_CXX_COMPILER=clang++-18 \
+            -DCMAKE_CXX_COMPILER=clang++ \
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
-            -DCMAKE_C_COMPILER=clang-18 \
+            -DCMAKE_C_COMPILER=clang \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_BUILD_TYPE=Debug \
             -DDELTAHDL_TSAN=ON
@@ -280,13 +278,13 @@ jobs:
       CCACHE_MAXSIZE: 200M
     name: build-ubuntu-24-04-x86-64-clang-shard-${{ matrix.shard }}
     needs: [assert-coverage]
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - name: Install tools
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y ccache clang-18
+      - name: Install LLVM
+        uses: ./.github/actions/install-llvm
+      - name: Install ccache
+        run: sudo apt-get install -y ccache
       - name: Restore ccache
         uses: actions/cache@v5
         with:
@@ -303,9 +301,9 @@ jobs:
       - name: Build
         run: |
           cmake -B build \
-            -DCMAKE_CXX_COMPILER=clang++-18 \
+            -DCMAKE_CXX_COMPILER=clang++ \
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
-            -DCMAKE_C_COMPILER=clang-18 \
+            -DCMAKE_C_COMPILER=clang \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_BUILD_TYPE=Release
           cmake --build build --parallel 4 --target deltahdl
@@ -329,13 +327,13 @@ jobs:
       CCACHE_MAXSIZE: 200M
     name: build-ubuntu-24-04-x86-64-gcc-shard-${{ matrix.shard }}
     needs: [assert-coverage]
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - name: Install tools
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y ccache g++-14
+      - name: Install GCC
+        uses: ./.github/actions/install-gcc
+      - name: Install ccache
+        run: sudo apt-get install -y ccache
       - name: Restore ccache
         uses: actions/cache@v5
         with:
@@ -352,9 +350,9 @@ jobs:
       - name: Build
         run: |
           cmake -B build \
-            -DCMAKE_CXX_COMPILER=g++-14 \
+            -DCMAKE_CXX_COMPILER=g++ \
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
-            -DCMAKE_C_COMPILER=gcc-14 \
+            -DCMAKE_C_COMPILER=gcc \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_BUILD_TYPE=Release
           cmake --build build --parallel 4 --target deltahdl
@@ -382,7 +380,7 @@ jobs:
       - unit-test-coverage
     outputs:
       sv-tests-sha: ${{ steps.sv-tests-ref.outputs.sha }}
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
       - id: sv-tests-ref
         name: Get latest sv-tests commit
@@ -422,19 +420,18 @@ jobs:
       CTCACHE_DIR: ${{ github.workspace }}/.ctcache
     name: clang-tidy-src-shard-${{ matrix.shard }}
     needs: static-analysis
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - name: Install tools
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y clang-18 clang-tidy-18
-          pip install git+https://github.com/matus-chochlik/ctcache.git
+      - name: Install LLVM
+        uses: ./.github/actions/install-llvm
+      - name: Install ctcache
+        run: pip install git+https://github.com/matus-chochlik/ctcache.git
       - name: Create clang-tidy wrapper
         run: |
           sudo tee /usr/local/bin/clang-tidy-cached << 'WRAPPER'
           #!/bin/bash
-          exec clang-tidy-cache /usr/bin/clang-tidy-18 "${@}"
+          exec clang-tidy-cache /usr/bin/clang-tidy "${@}"
           WRAPPER
           sudo chmod +x /usr/local/bin/clang-tidy-cached
       - name: Restore ctcache
@@ -450,7 +447,7 @@ jobs:
       - name: Generate compile_commands.json
         run: |
           cmake -B build \
-            -DCMAKE_CXX_COMPILER=clang++-18 \
+            -DCMAKE_CXX_COMPILER=clang++ \
             -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
       - name: Run clang-tidy (src, shard ${{ matrix.shard }}/2)
         run: |
@@ -463,7 +460,7 @@ jobs:
             | sed 's/\./\\./g' \
             | sed 's|^|/|' \
             | paste -sd'|')
-          run-clang-tidy-18 -p build \
+          run-clang-tidy -p build \
             -j "$(nproc)" \
             -clang-tidy-binary /usr/local/bin/clang-tidy-cached \
             -config-file=etc/clang_tidy/src.yml \
@@ -480,19 +477,18 @@ jobs:
       CTCACHE_DIR: ${{ github.workspace }}/.ctcache
     name: clang-tidy-test-shard-${{ matrix.shard }}
     needs: static-analysis
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - name: Install tools
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y clang-18 clang-tidy-18
-          pip install git+https://github.com/matus-chochlik/ctcache.git
+      - name: Install LLVM
+        uses: ./.github/actions/install-llvm
+      - name: Install ctcache
+        run: pip install git+https://github.com/matus-chochlik/ctcache.git
       - name: Create clang-tidy wrapper
         run: |
           sudo tee /usr/local/bin/clang-tidy-cached << 'WRAPPER'
           #!/bin/bash
-          exec clang-tidy-cache /usr/bin/clang-tidy-18 "${@}"
+          exec clang-tidy-cache /usr/bin/clang-tidy "${@}"
           WRAPPER
           sudo chmod +x /usr/local/bin/clang-tidy-cached
       - name: Restore ctcache
@@ -508,7 +504,7 @@ jobs:
       - name: Generate compile_commands.json
         run: |
           cmake -B build \
-            -DCMAKE_CXX_COMPILER=clang++-18 \
+            -DCMAKE_CXX_COMPILER=clang++ \
             -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
       - name: Run clang-tidy (test, shard ${{ matrix.shard }}/18)
         run: |
@@ -520,7 +516,7 @@ jobs:
             | sed 's/\./\\./g' \
             | sed 's|^|/|' \
             | paste -sd'|')
-          run-clang-tidy-18 -p build \
+          run-clang-tidy -p build \
             -j "$(nproc)" \
             -clang-tidy-binary /usr/local/bin/clang-tidy-cached \
             -config-file=etc/clang_tidy/test_src_unit.yml \
@@ -540,7 +536,7 @@ jobs:
       UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
     if: ${{ !failure() && !cancelled() }}
     needs: integration-test-asan-ubsan
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
       - name: Download build
@@ -557,7 +553,7 @@ jobs:
       LLVM_PROFILE_FILE: ${{ github.workspace }}/profraw/%p.profraw
     if: ${{ !failure() && !cancelled() }}
     needs: integration-test-coverage
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
       - name: Download build
@@ -578,7 +574,7 @@ jobs:
   e2e-test-macos-26-arm64-clang:
     if: ${{ !failure() && !cancelled() }}
     needs: integration-test-macos-26-arm64-clang
-    runs-on: macos-26
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v5
       - name: Download build
@@ -595,7 +591,7 @@ jobs:
       TSAN_OPTIONS: halt_on_error=1:second_deadlock_stack=1
     if: ${{ !failure() && !cancelled() }}
     needs: integration-test-tsan
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
       - name: Download build
@@ -610,7 +606,7 @@ jobs:
   e2e-test-ubuntu-24-04-x86-64-clang:
     if: ${{ !failure() && !cancelled() }}
     needs: integration-test-ubuntu-24-04-x86-64-clang
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
       - name: Download build
@@ -625,7 +621,7 @@ jobs:
   e2e-test-ubuntu-24-04-x86-64-gcc:
     if: ${{ !failure() && !cancelled() }}
     needs: integration-test-ubuntu-24-04-x86-64-gcc
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
       - name: Download build
@@ -650,7 +646,7 @@ jobs:
       UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
     if: ${{ !failure() && !cancelled() }}
     needs: [cache-sv-tests, unit-test-asan-ubsan]
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
       - name: Restore sv-tests cache
@@ -673,7 +669,7 @@ jobs:
       LLVM_PROFILE_FILE: ${{ github.workspace }}/profraw/%p.profraw
     if: ${{ !failure() && !cancelled() }}
     needs: cache-sv-tests
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
       - name: Restore sv-tests cache
@@ -700,7 +696,7 @@ jobs:
   integration-test-macos-26-arm64-clang:
     if: ${{ !failure() && !cancelled() }}
     needs: [cache-sv-tests, unit-test-macos-26-arm64-clang]
-    runs-on: macos-26
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v5
       - name: Restore sv-tests cache
@@ -723,7 +719,7 @@ jobs:
       TSAN_OPTIONS: halt_on_error=1:second_deadlock_stack=1
     if: ${{ !failure() && !cancelled() }}
     needs: [cache-sv-tests, unit-test-tsan]
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
       - name: Restore sv-tests cache
@@ -744,7 +740,7 @@ jobs:
   integration-test-ubuntu-24-04-x86-64-clang:
     if: ${{ !failure() && !cancelled() }}
     needs: [cache-sv-tests, unit-test-ubuntu-24-04-x86-64-clang]
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
       - name: Restore sv-tests cache
@@ -765,7 +761,7 @@ jobs:
   integration-test-ubuntu-24-04-x86-64-gcc:
     if: ${{ !failure() && !cancelled() }}
     needs: [cache-sv-tests, unit-test-ubuntu-24-04-x86-64-gcc]
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
       - name: Restore sv-tests cache
@@ -795,7 +791,7 @@ jobs:
       - e2e-test-ubuntu-24-04-x86-64-gcc
     permissions:
       contents: write
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
         with:
@@ -841,7 +837,7 @@ jobs:
           git tag -f latest
           git push origin latest --force
   static-analysis:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
         with:
@@ -877,26 +873,33 @@ jobs:
           path: ~/.cache/pip
           restore-keys: |
             pip-${{ github.job }}-
+      - id: pmd
+        name: Resolve latest PMD release
+        run: >-
+          echo "ver=$(curl -fsSL
+          https://api.github.com/repos/pmd/pmd/releases/latest
+          | jq -r .tag_name | sed 's#pmd_releases/##')" >> "$GITHUB_OUTPUT"
       - name: Restore PMD cache
         uses: actions/cache@v5
         with:
-          key: pmd-7.21.0
-          path: pmd-bin-7.21.0
-      - name: Install tools
+          key: pmd-${{ steps.pmd.outputs.ver }}
+          path: pmd-bin-${{ steps.pmd.outputs.ver }}
+      - name: Install LLVM
+        uses: ./.github/actions/install-llvm
+      - name: Install lint tools and PMD
         run: |
-          sudo apt-get update
-          sudo apt-get install -y clang-format-19
           pip install \
             assert-no-inline-directives \
             assert-no-linter-config-files \
             yamllint
-          if [ ! -d pmd-bin-7.21.0 ]; then
-            PMD=pmd-dist-7.21.0-bin.zip
-            PMD_URL=https://github.com/pmd/pmd/releases
-            wget -q "$PMD_URL/download/pmd_releases%2F7.21.0/$PMD"
+          PMD_VER="${{ steps.pmd.outputs.ver }}"
+          if [ ! -d "pmd-bin-$PMD_VER" ]; then
+            PMD="pmd-dist-$PMD_VER-bin.zip"
+            URL=https://github.com/pmd/pmd/releases
+            wget -q "$URL/download/pmd_releases%2F$PMD_VER/$PMD"
             unzip -q "$PMD"
           fi
-          echo "$PWD/pmd-bin-7.21.0/bin" >> "$GITHUB_PATH"
+          echo "$PWD/pmd-bin-$PMD_VER/bin" >> "$GITHUB_PATH"
       # ── YAML lint (conditional) ──
       - if: steps.detect.outputs.yaml_changed == 'true'
         name: Lint YAML
@@ -932,7 +935,7 @@ jobs:
       - name: Check formatting
         run: |
           find src test -name '*.cpp' -o -name '*.h' | \
-            xargs clang-format-19 \
+            xargs clang-format \
             --dry-run --Werror --style=google
       - name: Check file line limits
         run: |
@@ -966,7 +969,7 @@ jobs:
       UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
     name: unit-test-asan-ubsan-shard-${{ matrix.shard }}
     needs: build-asan-ubsan
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
       - name: Download build
@@ -992,7 +995,7 @@ jobs:
       LLVM_PROFILE_FILE: ${{ github.workspace }}/profraw/%p.profraw
     name: unit-test-coverage-shard-${{ matrix.shard }}
     needs: build-coverage
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
       - name: Download build
@@ -1022,7 +1025,7 @@ jobs:
                 '10', '11', '12', '13', '14', '15', '16', '17', '18', '19']
   unit-test-macos-26-arm64-clang:
     needs: build-macos-26-arm64-clang
-    runs-on: macos-26
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v5
       - name: Download build
@@ -1041,7 +1044,7 @@ jobs:
       TSAN_OPTIONS: halt_on_error=1:second_deadlock_stack=1
     name: unit-test-tsan-shard-${{ matrix.shard }}
     needs: build-tsan
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
       - name: Download build
@@ -1065,7 +1068,7 @@ jobs:
   unit-test-ubuntu-24-04-x86-64-clang:
     name: unit-test-ubuntu-24-04-x86-64-clang-shard-${{ matrix.shard }}
     needs: build-ubuntu-24-04-x86-64-clang
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
       - name: Download build
@@ -1089,7 +1092,7 @@ jobs:
   unit-test-ubuntu-24-04-x86-64-gcc:
     name: unit-test-ubuntu-24-04-x86-64-gcc-shard-${{ matrix.shard }}
     needs: build-ubuntu-24-04-x86-64-gcc
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
       - name: Download build
@@ -1114,6 +1117,7 @@ name: DeltaHDL
 on:
   pull_request:
     paths:
+      - .github/actions/**
       - .github/workflows/deltahdl.yml
       - CMakeLists.txt
       - etc/**
@@ -1130,6 +1134,7 @@ on:
   push:
     branches: [main]
     paths:
+      - .github/actions/**
       - .github/workflows/deltahdl.yml
       - CMakeLists.txt
       - etc/**

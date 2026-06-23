@@ -1,0 +1,34 @@
+---
+description: >-
+  Install the newest Clang/LLVM toolchain published for this Ubuntu release on
+  apt.llvm.org and symlink unversioned binary names so callers never name a
+  version. Nothing is pinned: the highest clang-N major available wins.
+name: Install LLVM
+runs:
+  steps:
+    - name: Install newest LLVM/Clang from apt.llvm.org
+      run: |
+        . /etc/os-release
+        wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key |
+          sudo tee /etc/apt/trusted.gpg.d/apt.llvm.org.asc >/dev/null
+        echo "deb http://apt.llvm.org/${VERSION_CODENAME}/ llvm-toolchain-${VERSION_CODENAME} main" |
+          sudo tee /etc/apt/sources.list.d/llvm.list >/dev/null
+        sudo apt-get update
+        ver=$(apt-cache search --names-only '^clang-[0-9]+$' |
+          grep -oE 'clang-[0-9]+' | grep -oE '[0-9]+$' | sort -n | tail -1)
+        if [ -z "${ver}" ]; then
+          echo "::error::no versioned clang package found on apt.llvm.org"
+          exit 1
+        fi
+        echo "Installing newest LLVM/Clang toolchain: ${ver}"
+        sudo apt-get install -y \
+          "clang-${ver}" "clang-tidy-${ver}" "clang-format-${ver}" \
+          "lld-${ver}" "llvm-${ver}"
+        for tool in clang clang++ clang-cpp clang-tidy clang-format \
+          clang-apply-replacements run-clang-tidy llvm-cov llvm-profdata; do
+          if [ -x "/usr/bin/${tool}-${ver}" ]; then
+            sudo ln -sf "/usr/bin/${tool}-${ver}" "/usr/bin/${tool}"
+          fi
+        done
+      shell: bash
+  using: composite

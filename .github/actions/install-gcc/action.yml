@@ -1,0 +1,27 @@
+---
+description: >-
+  Install the newest g++/gcc reachable from this runner (adding the
+  ubuntu-toolchain-r test PPA so the newest release is available even when the
+  base image's default lags) and symlink unversioned names. Nothing is pinned:
+  the highest g++-N major available wins.
+name: Install GCC
+runs:
+  steps:
+    - name: Install newest GCC
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y software-properties-common
+        sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
+        sudo apt-get update
+        ver=$(apt-cache search --names-only '^g\+\+-[0-9]+$' |
+          grep -oE 'g\+\+-[0-9]+' | grep -oE '[0-9]+$' | sort -n | tail -1)
+        if [ -z "${ver}" ]; then
+          echo "::error::no versioned g++ package found"
+          exit 1
+        fi
+        echo "Installing newest GCC: ${ver}"
+        sudo apt-get install -y "g++-${ver}" "gcc-${ver}"
+        sudo ln -sf "/usr/bin/g++-${ver}" /usr/bin/g++
+        sudo ln -sf "/usr/bin/gcc-${ver}" /usr/bin/gcc
+      shell: bash
+  using: composite
