@@ -319,6 +319,7 @@ struct ParserPortHelpers {
   static void ParseValueParamPortDecl(Parser& p, ParamPortList& out,
                                       bool is_localparam_group) {
     DataType dtype = p.ParseDataType();
+    p.ParseImplicitParamRange(dtype);
     auto name = p.Expect(TokenKind::kIdentifier);
     Expr* default_val = nullptr;
     if (p.Match(TokenKind::kEq)) {

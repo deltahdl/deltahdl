@@ -526,15 +526,7 @@ void Parser::ParseParamDecl(std::vector<ModuleItem*>& items) {
     return;
   }
   DataType dtype = ParseDataType();
-
-  if (dtype.kind == DataTypeKind::kImplicit && Check(TokenKind::kLBracket)) {
-    dtype.kind = DataTypeKind::kLogic;
-    Consume();
-    dtype.packed_dim_left = ParseExpr();
-    Expect(TokenKind::kColon);
-    dtype.packed_dim_right = ParseExpr();
-    Expect(TokenKind::kRBracket);
-  }
+  ParseImplicitParamRange(dtype);
 
   do {
     auto* item = arena_.Create<ModuleItem>();
@@ -550,6 +542,21 @@ void Parser::ParseParamDecl(std::vector<ModuleItem*>& items) {
     items.push_back(item);
   } while (Match(TokenKind::kComma));
   Expect(TokenKind::kSemicolon);
+}
+
+// §6.20.2 / §A.2.1.1: a value parameter may carry a packed range with no
+// explicit data type (e.g. `parameter [7:0] P`). ParseDataType does not consume
+// a bare leading range, so do it here. The type stays implicit -- it is not an
+// explicit `logic` -- and its width comes from the range.
+void Parser::ParseImplicitParamRange(DataType& dtype) {
+  if (dtype.kind != DataTypeKind::kImplicit || !Check(TokenKind::kLBracket)) {
+    return;
+  }
+  Consume();
+  dtype.packed_dim_left = ParseExpr();
+  Expect(TokenKind::kColon);
+  dtype.packed_dim_right = ParseExpr();
+  Expect(TokenKind::kRBracket);
 }
 
 bool Parser::TryParseTypeRef(std::vector<ModuleItem*>& items) {
