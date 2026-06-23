@@ -78,43 +78,43 @@ struct InstanceCoverage {
 };
 
 // vpiAssertAttemptCovered: the number of attempts of the assertion.
-inline std::uint64_t AssertAttemptCovered(const AssertionCoverageCounters &c) {
+inline std::uint64_t AssertAttemptCovered(const AssertionCoverageCounters& c) {
   return c.attempts;
 }
 
 // vpiAssertSuccessCovered: the number of nonvacuous successes of the assertion,
 // or, for a cover sequence handle, the number of sequence matches. Both are
 // recorded in the same field, so the value is reported uniformly.
-inline std::uint64_t AssertSuccessCovered(const AssertionCoverageCounters &c) {
+inline std::uint64_t AssertSuccessCovered(const AssertionCoverageCounters& c) {
   return c.successes;
 }
 
 // vpiAssertVacuousSuccessCovered: the number of vacuous successes.
 inline std::uint64_t AssertVacuousSuccessCovered(
-    const AssertionCoverageCounters &c) {
+    const AssertionCoverageCounters& c) {
   return c.vacuous_successes;
 }
 
 // vpiAssertDisableCovered: the number of times the assertion reached the
 // disabled state.
-inline std::uint64_t AssertDisableCovered(const AssertionCoverageCounters &c) {
+inline std::uint64_t AssertDisableCovered(const AssertionCoverageCounters& c) {
   return c.disabled;
 }
 
 // vpiAssertKillCovered: the number of times the assertion was killed.
-inline std::uint64_t AssertKillCovered(const AssertionCoverageCounters &c) {
+inline std::uint64_t AssertKillCovered(const AssertionCoverageCounters& c) {
   return c.killed;
 }
 
 // vpiAssertFailureCovered: the number of failures of the assertion.
-inline std::uint64_t AssertFailureCovered(const AssertionCoverageCounters &c) {
+inline std::uint64_t AssertFailureCovered(const AssertionCoverageCounters& c) {
   return c.failures;
 }
 
 // vpiCovered for an assertion handle: the assertion counts as covered only once
 // it has been attempted, has produced at least one nonvacuous success, and has
 // never failed.
-inline bool AssertionCovered(const AssertionCoverageCounters &c) {
+inline bool AssertionCovered(const AssertionCoverageCounters& c) {
   return c.attempts > 0 && c.successes > 0 && c.failures == 0;
 }
 
@@ -124,7 +124,7 @@ inline bool AssertionCovered(const AssertionCoverageCounters &c) {
 // single attempt may match many times, so the result is absent for one. Should
 // the recorded outcomes ever exceed the attempts the count is clamped to zero.
 inline std::optional<std::uint64_t> AssertInProgress(
-    const AssertionCoverageCounters &c) {
+    const AssertionCoverageCounters& c) {
   if (c.is_cover_sequence) {
     return std::nullopt;
   }
@@ -139,7 +139,7 @@ inline std::optional<std::uint64_t> AssertInProgress(
 // Dispatches an assertion-status property to the matching tally. Properties
 // that are not per-assertion status counts contribute nothing.
 inline std::uint64_t AssertionStatusQuery(CoverageProperty property,
-                                          const AssertionCoverageCounters &c) {
+                                          const AssertionCoverageCounters& c) {
   switch (property) {
     case CoverageProperty::kAssertAttemptCovered:
       return AssertAttemptCovered(c);
@@ -160,12 +160,12 @@ inline std::uint64_t AssertionStatusQuery(CoverageProperty property,
 
 // vpiCovered for a handle that holds several coverable entities: how many of
 // those entities are covered (covered statements, FSM states, or signal bits).
-inline std::uint64_t CoveredEntityCount(const EntityCoverage &e) {
+inline std::uint64_t CoveredEntityCount(const EntityCoverage& e) {
   return e.covered;
 }
 
 // vpiCoveredCount: how many times the item has been covered.
-inline std::uint64_t CoveredCount(const EntityCoverage &e) {
+inline std::uint64_t CoveredCount(const EntityCoverage& e) {
   return e.hit_count;
 }
 
@@ -173,7 +173,7 @@ inline std::uint64_t CoveredCount(const EntityCoverage &e) {
 // requested coverage type within the instance. A property that is not one of
 // the four coverage types selects nothing.
 inline std::uint64_t InstanceCoverageCount(CoverageProperty property,
-                                           const InstanceCoverage &inst) {
+                                           const InstanceCoverage& inst) {
   switch (property) {
     case CoverageProperty::kAssertCoverage:
       return CoveredEntityCount(inst.assertions);
