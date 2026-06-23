@@ -344,7 +344,13 @@ void CheckExplicitIdentifierConnection(const PortBindCtx& ctx,
                                        const RtlirPort& port,
                                        std::string_view binding_port_name) {
   DataTypeKind port_kind = NormalizeForCompatibility(port.type_kind);
-  if (port_kind != DataTypeKind::kImplicit) {
+  // §23.3.3.7/§6.6.7: a user-defined nettype net carries its own net-type
+  // semantics; its compatibility with a port is governed by the dissimilar
+  // net-type rules (which warn for an explicit connection), not by data-type
+  // assignment compatibility. Its var_types_ entry is the meaningless kNamed
+  // nettype reference, so skip the kind-based check for such a connection.
+  if (port_kind != DataTypeKind::kImplicit &&
+      ctx.nettype_net_names.count(conn_expr->text) == 0) {
     DataTypeKind sig_kind = DataTypeKind::kImplicit;
     auto vt = ctx.var_types.find(conn_expr->text);
     if (vt != ctx.var_types.end()) {

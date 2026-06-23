@@ -67,7 +67,10 @@ TEST(OrderedPortElaboration, OrderedPortDirectionMatchesChildPort) {
       "  assign b = a;\n"
       "endmodule\n"
       "module top;\n"
-      "  logic x, y, z;\n"
+      // §23.3.3 requires a net for the inout connection; a variable connected
+      // to an inout port is illegal, so z is a wire (x/y may stay variables).
+      "  logic x, y;\n"
+      "  wire z;\n"
       "  child u(x, y, z);\n"
       "endmodule\n",
       f);

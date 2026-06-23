@@ -349,9 +349,13 @@ bool ExportPrototypeMatchesBody(const ModuleItem* proto,
   if (proto->kind != body->kind) return false;
   if (proto->func_args.size() != body->func_args.size()) return false;
   for (size_t i = 0; i < proto->func_args.size(); ++i) {
-    if (!TypesMatch(proto->func_args[i].data_type,
-                    body->func_args[i].data_type))
-      return false;
+    const DataType& pa = proto->func_args[i].data_type;
+    const DataType& ba = body->func_args[i].data_type;
+    if (!TypesMatch(pa, ba)) return false;
+    // §25.7 requires an exact match: TypesMatch treats same-canonical-kind
+    // vectors as matching regardless of width, so compare widths too to reject
+    // arguments such as logic [7:0] against logic [3:0].
+    if (EvalTypeWidth(pa) != EvalTypeWidth(ba)) return false;
     if (proto->func_args[i].direction != body->func_args[i].direction)
       return false;
   }
