@@ -466,9 +466,16 @@ void Parser::ParseTimingCheckTrailingArgs(TimingCheckDecl& tc) {
   while (Match(TokenKind::kComma)) {
     if (Check(TokenKind::kRParen)) break;
 
-    bool width_needs_threshold =
-        tc.check_kind == TimingCheckKind::kWidth && tc.limits.size() < 2;
-    if (!width_needs_threshold && Check(TokenKind::kIdentifier) &&
+    // Some checks still expect a second timing_check_limit at this position
+    // ($width's optional threshold; the mandatory pair of $setuphold/$recrem/
+    // $fullskew). A bare identifier there is that limit, not the notifier.
+    bool needs_second_limit =
+        tc.limits.size() < 2 &&
+        (tc.check_kind == TimingCheckKind::kWidth ||
+         tc.check_kind == TimingCheckKind::kSetuphold ||
+         tc.check_kind == TimingCheckKind::kRecrem ||
+         tc.check_kind == TimingCheckKind::kFullskew);
+    if (!needs_second_limit && Check(TokenKind::kIdentifier) &&
         CheckNextIsCommaOrRParen()) {
       tc.notifier = Consume().text;
       ParseExtendedTimingCheckArgs(tc);
