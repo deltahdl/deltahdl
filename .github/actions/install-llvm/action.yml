@@ -1,33 +1,35 @@
 ---
 description: >-
-  Install the newest Clang/LLVM toolchain published for this Ubuntu release on
-  apt.llvm.org and symlink unversioned binary names so callers never name a
-  version. Nothing is pinned: the highest clang-N major available wins.
+  Install the newest STABLE Clang/LLVM toolchain (clang, clang-tidy,
+  clang-format, llvm-cov, llvm-profdata) from apt.llvm.org and symlink
+  unversioned binary names so callers never name a version. Nothing is pinned:
+  the latest LLVM stable release is discovered at run time and auto-followed.
 name: Install LLVM
 runs:
   steps:
-    - name: Install newest LLVM/Clang from apt.llvm.org
+    - name: Install newest stable LLVM/Clang from apt.llvm.org
       run: |
         . /etc/os-release
-        wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key |
-          sudo tee /etc/apt/trusted.gpg.d/apt.llvm.org.asc >/dev/null
-        echo "deb http://apt.llvm.org/${VERSION_CODENAME}/ llvm-toolchain-${VERSION_CODENAME} main" |
-          sudo tee /etc/apt/sources.list.d/llvm.list >/dev/null
-        sudo apt-get update
-        ver=$(apt-cache search --names-only '^clang-[0-9]+$' |
-          grep -oE 'clang-[0-9]+' | grep -oE '[0-9]+$' | sort -n | tail -1)
-        if [ -z "${ver}" ]; then
-          echo "::error::no versioned clang package found on apt.llvm.org"
+        major=$(curl -fsSL \
+          https://api.github.com/repos/llvm/llvm-project/releases/latest |
+          jq -r .tag_name | sed -E 's/^llvmorg-([0-9]+).*/\1/')
+        if ! echo "${major}" | grep -qE '^[0-9]+$'; then
+          echo "::error::could not resolve latest LLVM stable major"
           exit 1
         fi
-        echo "Installing newest LLVM/Clang toolchain: ${ver}"
+        echo "Installing newest stable LLVM/Clang: ${major}"
+        wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key |
+          sudo tee /etc/apt/trusted.gpg.d/apt.llvm.org.asc >/dev/null
+        echo "deb http://apt.llvm.org/${VERSION_CODENAME}/ llvm-toolchain-${VERSION_CODENAME}-${major} main" |
+          sudo tee /etc/apt/sources.list.d/llvm.list >/dev/null
+        sudo apt-get update
         sudo apt-get install -y \
-          "clang-${ver}" "clang-tidy-${ver}" "clang-format-${ver}" \
-          "lld-${ver}" "llvm-${ver}"
+          "clang-${major}" "clang-tidy-${major}" "clang-format-${major}" \
+          "llvm-${major}"
         for tool in clang clang++ clang-cpp clang-tidy clang-format \
           clang-apply-replacements run-clang-tidy llvm-cov llvm-profdata; do
-          if [ -x "/usr/bin/${tool}-${ver}" ]; then
-            sudo ln -sf "/usr/bin/${tool}-${ver}" "/usr/bin/${tool}"
+          if [ -x "/usr/bin/${tool}-${major}" ]; then
+            sudo ln -sf "/usr/bin/${tool}-${major}" "/usr/bin/${tool}"
           fi
         done
       shell: bash
