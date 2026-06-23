@@ -36,30 +36,41 @@ static bool ArrayTypesEquivalent(const Elaborator::VarArrayInfo& a,
          a.elem_is_4state == b.elem_is_4state;
 }
 
+using ArrayInfoMap =
+    std::unordered_map<std::string_view, Elaborator::VarArrayInfo>;
+
+// Whole unpacked-array operands are not recorded as named types; compare their
+// tracked shapes directly. Equivalence requires equal element type and equal
+// dimension sizes (§6.22.2), so flag any mismatch. Returns true when both
+// operands are whole fixed-size unpacked arrays (i.e. the comparison was fully
+// handled here).
+static bool CheckArrayCompareOp(const Expr* expr, std::string_view l_name,
+                                std::string_view r_name,
+                                const ArrayInfoMap& info, DiagEngine& diag) {
+  if (expr->lhs->kind != ExprKind::kIdentifier ||
+      expr->rhs->kind != ExprKind::kIdentifier) {
+    return false;
+  }
+  auto lai = info.find(l_name);
+  auto rai = info.find(r_name);
+  if (lai == info.end() || rai == info.end()) return false;
+  if (!IsFixedUnpackedArray(lai->second) ||
+      !IsFixedUnpackedArray(rai->second)) {
+    return false;
+  }
+  if (!ArrayTypesEquivalent(lai->second, rai->second)) {
+    diag.Error(expr->range.start,
+               "comparison of non-equivalent aggregate array types");
+  }
+  return true;
+}
+
 void Elaborator::CheckAggregateCompareOp(const Expr* expr) {
   if (!expr->lhs || !expr->rhs) return;
   auto l_name = AggregateOperandName(expr->lhs);
   auto r_name = AggregateOperandName(expr->rhs);
   if (l_name.empty() || r_name.empty()) return;
-
-  // Whole unpacked-array operands are not recorded as named types; compare
-  // their tracked shapes directly. Equivalence requires equal element type and
-  // equal dimension sizes (§6.22.2), so flag any mismatch.
-  if (expr->lhs->kind == ExprKind::kIdentifier &&
-      expr->rhs->kind == ExprKind::kIdentifier) {
-    auto lai = var_array_info_.find(l_name);
-    auto rai = var_array_info_.find(r_name);
-    bool both_fixed =
-        lai != var_array_info_.end() && rai != var_array_info_.end() &&
-        IsFixedUnpackedArray(lai->second) && IsFixedUnpackedArray(rai->second);
-    if (both_fixed) {
-      if (!ArrayTypesEquivalent(lai->second, rai->second)) {
-        diag_.Error(expr->range.start,
-                    "comparison of non-equivalent aggregate array types");
-      }
-      return;
-    }
-  }
+  if (CheckArrayCompareOp(expr, l_name, r_name, var_array_info_, diag_)) return;
 
   auto lit = var_named_types_.find(l_name);
   auto rit = var_named_types_.find(r_name);
