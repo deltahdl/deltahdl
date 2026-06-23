@@ -720,8 +720,17 @@ Expr* Parser::ParseIdentifierExpr() {
 
   Expr* result = ParseMemberAccessChain(tok);
 
-  if (Check(TokenKind::kHash) && known_types_.count(tok.text) != 0) {
-    result = ParseParameterizedScope(result);
+  // §8.25.1: a parameterized class scope ("C#(5)::f()") is class_type with a
+  // parameter_value_assignment, i.e. a name followed by "#(...)". The name need
+  // not be a previously declared type for this to be grammatical, so recognize
+  // it by the "#(" lookahead rather than by type knowledge (which fails for
+  // forward-referenced parameterized classes).
+  if (Check(TokenKind::kHash)) {
+    auto saved = lexer_.SavePos();
+    Consume();
+    bool is_param_value = Check(TokenKind::kLParen);
+    lexer_.RestorePos(saved);
+    if (is_param_value) result = ParseParameterizedScope(result);
   }
 
   bool cast_handled = false;
