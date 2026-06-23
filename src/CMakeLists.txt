@@ -228,6 +228,7 @@ add_library(deltahdl_lib STATIC
     simulator/statement_assign_stream.cpp
     simulator/stmt_exec_control.cpp
     simulator/stmt_exec_randsequence.cpp
+    simulator/stmt_exec_wait.cpp
     simulator/sva_engine_properties.cpp
     simulator/sva_engine_sampling.cpp
     simulator/sva_engine_sequences.cpp

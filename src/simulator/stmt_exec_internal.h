@@ -16,6 +16,10 @@ class Arena;
 ExecTask ExecRandcase(const Stmt* stmt, SimContext& ctx, Arena& arena);
 ExecTask ExecRandsequence(const Stmt* stmt, SimContext& ctx, Arena& arena);
 
+// Defined in stmt_exec_wait.cpp.
+ExecTask ExecWait(const Stmt* stmt, SimContext& ctx, Arena& arena);
+ExecTask ExecWaitOrder(const Stmt* stmt, SimContext& ctx, Arena& arena);
+
 // Defined in stmt_exec_control.cpp.
 ExecTask ExecBlock(const Stmt* stmt, SimContext& ctx, Arena& arena);
 ExecTask ExecIf(const Stmt* stmt, SimContext& ctx, Arena& arena);

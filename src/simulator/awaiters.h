@@ -552,24 +552,40 @@ struct SequenceEventAwaiter {
 struct AnyChangeAwaiter {
   SimContext& ctx;
   const std::vector<std::string_view>& var_names;
+  // Optional guard shared with the awaiting coroutine, true once that coroutine
+  // has resumed for good. An ExecTask-based waiter (the wait statement) has its
+  // coroutine frame destroyed the instant it resumes to completion, by the
+  // awaiting temporary's destructor as control unwinds — so a stranded sibling
+  // watcher cannot even call h.done() safely (that would read a freed frame).
+  // Such waiters pass `finished`; every stranded watcher then removes itself by
+  // value without touching the handle. SimCoroutine waiters (always_comb /
+  // continuous assigns) keep their frame alive at final_suspend, so they leave
+  // this null and rely on the h.done() check below.
+  std::shared_ptr<bool> finished = nullptr;
 
   bool await_ready() const noexcept { return false; }
 
   void await_suspend(std::coroutine_handle<> h) {
     auto* proc = ctx.CurrentProcess();
     auto* ctx_ptr = &ctx;
+    auto fin = finished;
     for (auto name : var_names) {
       auto* var = ctx.FindVariable(name);
       if (!var) continue;
       var->prev_value = var->value;
-      var->AddWatcher([h, proc, ctx_ptr]() mutable {
+      var->AddWatcher([h, proc, ctx_ptr, fin]() mutable {
         // A wait/@* re-suspension arms a fresh watcher on every awaited signal,
         // but watchers are cleared only from the signal that actually fired.
         // Watchers stranded on the other signals accumulate; once one of them
         // resumes the coroutine to completion, the rest would resume an
-        // already-finished frame (undefined behavior -> SEGFAULT). Drop any
-        // watcher whose coroutine has finished.
-        if (h.done()) return true;
+        // already-finished (or freed) frame -> undefined behavior / SEGFAULT.
+        // Drop any such watcher: by the shared guard when present (frame may
+        // already be freed), otherwise by the still-alive frame's done() flag.
+        if (fin) {
+          if (*fin) return true;
+        } else if (h.done()) {
+          return true;
+        }
         if (proc && !proc->active) return true;
         EventAwaiter::ResumeMaybeReactive(h, proc, *ctx_ptr);
         return true;
