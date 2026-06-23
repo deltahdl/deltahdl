@@ -344,15 +344,19 @@ inline SpecifyItem* GetSolePathItem(T& r) {
   return spec->specify_items[0];
 }
 
-// Get the sole timing check declaration from a parse result.
+// Get the sole timing check declaration from a parse result. A specify block
+// may legally contain other items (e.g. a specparam declaring a limit value),
+// so scan for the timing-check item rather than assuming it appears first.
 template <typename T>
 inline TimingCheckDecl* GetSoleTimingCheck(T& r) {
   if (!r.cu || r.cu->modules.empty()) return nullptr;
   auto* spec = FindSpecifyBlock(r.cu->modules[0]->items);
-  if (!spec || spec->specify_items.empty()) return nullptr;
-  if (spec->specify_items[0]->kind != SpecifyItemKind::kTimingCheck)
-    return nullptr;
-  return &spec->specify_items[0]->timing_check;
+  if (!spec) return nullptr;
+  for (auto* item : spec->specify_items) {
+    if (item->kind == SpecifyItemKind::kTimingCheck)
+      return &item->timing_check;
+  }
+  return nullptr;
 }
 
 // Result of parsing a module with a single specify item.
