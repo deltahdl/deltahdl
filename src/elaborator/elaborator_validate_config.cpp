@@ -70,7 +70,12 @@ void ValidateNameSpaceDefinitions(const CompilationUnit* unit,
                  std::format("duplicate definition of '{}'", name));
     }
   };
-  for (auto* m : unit->modules) check_def(m->library, m->name, m->range);
+  // §23.5: an extern module declaration declares a module's ports without
+  // defining the module itself, so it is a prototype rather than a definition
+  // and does not participate in the duplicate-definition check. The prototype
+  // is matched against its actual definition in elaborator_resolve.
+  for (auto* m : unit->modules)
+    if (!m->is_extern) check_def(m->library, m->name, m->range);
   for (auto* p : unit->programs) check_def(p->library, p->name, p->range);
   for (auto* i : unit->interfaces) check_def(i->library, i->name, i->range);
   for (auto* u : unit->udps) check_def(u->library, u->name, u->range);
