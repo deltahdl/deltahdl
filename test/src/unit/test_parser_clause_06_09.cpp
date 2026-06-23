@@ -16,7 +16,10 @@ static const ModuleItem* CollectTypedefsAndVar(ParseResult& r,
   const ModuleItem* var = nullptr;
   for (auto* it : items) {
     if (it->kind == ModuleItemKind::kTypedef) {
-      typedefs.emplace(it->name, it->data_type);
+      // A typedef's aliased type is parsed into typedef_type (data_type is
+      // left empty for typedef items), matching how the elaborator builds its
+      // TypedefMap. Keying off data_type made every typedef look scalar.
+      typedefs.emplace(it->name, it->typedef_type);
     } else if (it->kind == ModuleItemKind::kVarDecl) {
       var = it;
     }
