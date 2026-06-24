@@ -229,6 +229,7 @@ void Elaborator::ElaborateTypedef(ModuleItem* item, RtlirModule* mod) {
   if (!item->unpacked_dims.empty() && !first_dim_assoc) {
     if (auto width = ComputeFixedUnpackedWidth(item, typedefs_)) {
       fixed_unpacked_typedef_widths_[item->name] = *width;
+      td_array_dims_[item->name] = item->unpacked_dims;
     }
   }
   if (item->typedef_type.kind == DataTypeKind::kStruct ||

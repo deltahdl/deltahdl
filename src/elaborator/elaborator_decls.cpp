@@ -858,10 +858,33 @@ static void RegisterVirtualInterfaceVarDecl(const ModuleItem* item,
                                  diag);
 }
 
+// §6.18 / §7.4: when a variable's named type is a fixed unpacked-array typedef
+// and it declares no unpacked dimensions of its own, rewrite it to the
+// typedef's element base type (keeping its own const-ness) plus the typedef's
+// unpacked dimensions, so it elaborates and lowers identically to an inline
+// unpacked-array declaration.
+static void AdoptTypedefArrayDims(
+    ModuleItem* item, const TypedefMap& typedefs,
+    const std::unordered_map<std::string_view, std::vector<Expr*>>&
+        td_array_dims) {
+  if (!item->unpacked_dims.empty()) return;
+  if (item->data_type.kind != DataTypeKind::kNamed) return;
+  auto dims_it = td_array_dims.find(item->data_type.type_name);
+  if (dims_it == td_array_dims.end()) return;
+  auto base_it = typedefs.find(item->data_type.type_name);
+  if (base_it == typedefs.end()) return;
+  bool was_const = item->data_type.is_const;
+  item->data_type = base_it->second;
+  item->data_type.is_const = was_const;
+  item->unpacked_dims = dims_it->second;
+}
+
 void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
   ResolveTypeRef(item, mod);
 
   ResolveParameterizedType(item->data_type);
+
+  AdoptTypedefArrayDims(item, typedefs_, td_array_dims_);
 
   if (item->data_type.kind == DataTypeKind::kNamed &&
       nettype_names_.count(item->data_type.type_name)) {

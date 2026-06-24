@@ -866,6 +866,7 @@ class Elaborator {
   // fixed-size mismatch when the destination of a bit-stream cast is an
   // unpacked-array typedef.
   std::unordered_map<std::string_view, uint32_t> fixed_unpacked_typedef_widths_;
+  std::unordered_map<std::string_view, std::vector<Expr*>> td_array_dims_;
   std::unordered_set<std::string_view> cu_scope_names_;
   ScopeMap cu_param_scope_;
 

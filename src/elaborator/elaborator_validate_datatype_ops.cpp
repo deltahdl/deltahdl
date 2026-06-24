@@ -96,7 +96,17 @@ void Elaborator::WalkStmtsForChandleOps(const Stmt* s) {
       s->lhs && s->rhs) {
     bool lhs_ch = IsChandleVar(s->lhs, var_types_);
     bool rhs_ch = IsChandleVar(s->rhs, var_types_);
-    if (lhs_ch && !rhs_ch && !IsNullLiteral(s->rhs)) {
+    // §10.10: a concatenation assigned to a chandle array or queue is an
+    // unpacked array concatenation, not a scalar chandle assignment; its
+    // per-element null legality is checked in CheckNullItemInArrayConcatAssign,
+    // so the scalar "= another chandle or null" rule does not apply here.
+    bool unpacked_concat_target =
+        s->lhs->kind == ExprKind::kIdentifier &&
+        var_array_info_.count(s->lhs->text) > 0 &&
+        (s->rhs->kind == ExprKind::kConcatenation ||
+         s->rhs->kind == ExprKind::kAssignmentPattern);
+    if (lhs_ch && !rhs_ch && !IsNullLiteral(s->rhs) &&
+        !unpacked_concat_target) {
       diag_.Error(s->range.start,
                   "chandle can only be assigned from another chandle or null");
     }
