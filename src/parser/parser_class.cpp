@@ -360,6 +360,14 @@ bool Parser::VirtualIsClassQualifier() {
   return is_qualifier;
 }
 
+bool Parser::TryConsumeVirtualQualifier(ClassMember* m) {
+  if (!Check(TokenKind::kKwVirtual) || !VirtualIsClassQualifier()) return false;
+  if (m->is_virtual) diag_.Error(CurrentLoc(), "duplicate 'virtual' qualifier");
+  m->is_virtual = true;
+  Consume();
+  return true;
+}
+
 bool Parser::ParseClassQualifiers(ClassMember* m) {
   bool proto = false;
   while (true) {
@@ -368,13 +376,7 @@ bool Parser::ParseClassQualifiers(ClassMember* m) {
                                  &ClassMember::is_static,
                                  "duplicate 'static' qualifier"))
       continue;
-    if (Check(TokenKind::kKwVirtual) && VirtualIsClassQualifier()) {
-      if (m->is_virtual)
-        diag_.Error(CurrentLoc(), "duplicate 'virtual' qualifier");
-      m->is_virtual = true;
-      Consume();
-      continue;
-    }
+    if (TryConsumeVirtualQualifier(m)) continue;
     if (Match(TokenKind::kKwPure)) {
       m->is_pure_virtual = true;
       proto = true;

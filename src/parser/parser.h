@@ -106,6 +106,7 @@ class Parser {
   bool TryConsumeClassQualifier(ClassMember* m, TokenKind kw,
                                 bool ClassMember::* flag, const char* dup_msg);
   bool TryConsumeAccessQualifier(ClassMember* m);
+  bool TryConsumeVirtualQualifier(ClassMember* m);
   bool TryConsumeRandQualifier(ClassMember* m);
   void ValidateClassMethod(ClassMember* member);
   void ParseExtraPropertyDecls(std::vector<ClassMember*>& members,
