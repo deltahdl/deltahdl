@@ -979,7 +979,7 @@ void Elaborator::ValidateExternalConstraints() {
       }
     }
     if (target == nullptr) continue;
-    if (!LocStrictlyBefore(target->range.end, ext.loc)) {
+    if (LocStrictlyBefore(ext.loc, target->range.end)) {
       diag_.Error(
           ext.loc,
           std::format("external constraint block '{}::{}' shall appear "
