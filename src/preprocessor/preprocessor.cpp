@@ -857,12 +857,13 @@ bool Preprocessor::ProcessMiscStateDirective(std::string_view line,
 }
 
 bool Preprocessor::ProcessStateDirective(std::string_view line, SourceLoc loc,
-                                         uint32_t file_id, uint32_t line_num,
                                          int depth, std::string& output) {
+  // loc already carries file_id/line, so they are not separate parameters here
+  // (keeping the arity <= 5 for readability-function-size).
   if (ProcessSimpleStateDirective(line, loc, depth, output)) return true;
-  if (ProcessExpandedStateDirective(line, loc, file_id, line_num, output))
+  if (ProcessExpandedStateDirective(line, loc, loc.file_id, loc.line, output))
     return true;
-  return ProcessMiscStateDirective(line, loc, file_id, line_num, output);
+  return ProcessMiscStateDirective(line, loc, loc.file_id, loc.line, output);
 }
 
 static size_t FindUndefNameEnd(std::string_view text) {
@@ -919,8 +920,7 @@ bool Preprocessor::ProcessActiveOnlyDirective(std::string_view line,
   }
   if (ProcessKeywordsDirective(line, loc, file_id, line_num, output))
     return true;
-  if (ProcessStateDirective(line, loc, file_id, line_num, depth, output))
-    return true;
+  if (ProcessStateDirective(line, loc, depth, output)) return true;
   auto trimmed = Trim(line);
   return TryExpandMacro(trimmed, output, file_id, line_num, depth);
 }
