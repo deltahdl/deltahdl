@@ -551,7 +551,9 @@ void Parser::ParseOneFunctionArg(std::vector<FunctionArg>& args,
 
   InheritRefQualifiers(args, arg, dir_explicit);
   Match(TokenKind::kKwVar);
-  arg.data_type = ParseDataType();
+  if (!TryParseInlineAggregateType(arg.data_type)) {
+    arg.data_type = ParseDataType();
+  }
   ResolveImplicitArgDataType(arg, scan.prev_data_type, dir_explicit,
                              scan.first_arg, scan.prev_was_default);
 
@@ -593,21 +595,29 @@ DataType Parser::ParseFunctionReturnType() {
     ParsePackedDims(dt);
     return dt;
   }
-  // ParseDataType() does not handle the struct/union/enum keywords, so dispatch
-  // them here as every other data-type caller does. Without this, an inline
-  // aggregate return type (e.g. `function struct {...} f;`) left the cursor on
-  // the keyword and the function-body loop spun forever.
-  if (Check(TokenKind::kKwEnum)) {
-    DataType dt = ParseEnumType();
-    ParsePackedDims(dt);
-    return dt;
-  }
-  if (Check(TokenKind::kKwStruct) || Check(TokenKind::kKwUnion)) {
-    DataType dt = ParseStructOrUnionType();
-    ParsePackedDims(dt);
+  DataType dt;
+  if (TryParseInlineAggregateType(dt)) {
     return dt;
   }
   return ParseDataType();
+}
+
+bool Parser::TryParseInlineAggregateType(DataType& dt) {
+  // ParseDataType() does not handle the struct/union/enum keywords, so dispatch
+  // them here as every data-type caller must. Without this, an inline aggregate
+  // type (e.g. a `struct {...}` DPI import argument or function return type)
+  // left the cursor on the keyword, derailing the surrounding parse.
+  if (Check(TokenKind::kKwEnum)) {
+    dt = ParseEnumType();
+    ParsePackedDims(dt);
+    return true;
+  }
+  if (Check(TokenKind::kKwStruct) || Check(TokenKind::kKwUnion)) {
+    dt = ParseStructOrUnionType();
+    ParsePackedDims(dt);
+    return true;
+  }
+  return false;
 }
 
 void Parser::ParseOneOverrideSpecifier(ModuleItem* item) {

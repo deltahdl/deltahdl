@@ -114,6 +114,12 @@ bool Parser::Match(TokenKind kind) {
   return true;
 }
 
+std::string_view Parser::ArenaCopy(std::string_view text) {
+  auto* buf = static_cast<char*>(arena_.Allocate(text.size(), 1));
+  std::copy_n(text.data(), text.size(), buf);
+  return {buf, text.size()};
+}
+
 std::string_view Parser::ParseDottedPath() {
   auto first = ExpectIdentifier().text;
   std::string path(first);
@@ -122,9 +128,7 @@ std::string_view Parser::ParseDottedPath() {
     auto next = ExpectIdentifier().text;
     path.append(next.data(), next.size());
   }
-  auto* buf = static_cast<char*>(arena_.Allocate(path.size(), 1));
-  std::copy_n(path.data(), path.size(), buf);
-  return {buf, path.size()};
+  return ArenaCopy(path);
 }
 
 Token Parser::Expect(TokenKind kind) {
@@ -236,16 +240,16 @@ std::string_view Parser::ParseFilePathSpec() {
     diag_.Error(CurrentLoc(), "expected file path specification");
     return {};
   }
-  auto* buf = static_cast<char*>(arena_.Allocate(tok.text.size(), 1));
-  std::copy_n(tok.text.data(), tok.text.size(), buf);
-  return {buf, tok.text.size()};
+  return ArenaCopy(tok.text);
 }
 
 LibraryDecl* Parser::ParseLibraryDecl() {
   auto* decl = arena_.Create<LibraryDecl>();
   decl->range.start = CurrentLoc();
   Expect(TokenKind::kKwLibrary);
-  decl->name = Expect(TokenKind::kIdentifier).text;
+  // The library name view must outlive the throwaway SourceManager used to
+  // parse this map file, so copy it into the long-lived parser arena.
+  decl->name = ArenaCopy(Expect(TokenKind::kIdentifier).text);
 
   auto path = ParseFilePathSpec();
   if (path.empty()) {

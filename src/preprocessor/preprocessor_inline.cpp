@@ -306,6 +306,10 @@ static size_t FindInlineConditional(std::string_view line) {
   return std::string_view::npos;
 }
 
+bool Preprocessor::HasInlineConditional(std::string_view line) const {
+  return FindInlineConditional(line) != std::string_view::npos;
+}
+
 static size_t SkipWhitespace(const std::string& s, size_t pos) {
   while (pos < s.size() && std::isspace(static_cast<unsigned char>(s[pos])))
     ++pos;

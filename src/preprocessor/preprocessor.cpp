@@ -213,9 +213,28 @@ static bool DefineNeedsContinuation(std::string_view line_text,
   return false;
 }
 
+// Returns the text up to an unquoted one-line comment (//), or the whole text
+// if there is none.
+static std::string_view StripTrailingLineComment(std::string_view text) {
+  bool in_string = false;
+  for (size_t i = 0; i < text.size(); ++i) {
+    char c = text[i];
+    if (c == '"' && (i == 0 || text[i - 1] != '\\')) {
+      in_string = !in_string;
+    } else if (!in_string && c == '/' && i + 1 < text.size() &&
+               text[i + 1] == '/') {
+      return text.substr(0, i);
+    }
+  }
+  return text;
+}
+
 static void AppendDefineLine(std::string_view line, std::string& joined) {
   if (EndsWithBackslash(line)) {
-    joined.append(line.substr(0, line.size() - 1));
+    // §22.5.1: a one-line comment ends at the backslash continuation, so drop
+    // the comment before joining — otherwise it would swallow the body that
+    // continues on the next line.
+    joined.append(StripTrailingLineComment(line.substr(0, line.size() - 1)));
   } else {
     joined.append(line);
   }
@@ -635,6 +654,14 @@ std::string Preprocessor::ProcessSource(std::string_view src, uint32_t file_id,
   };
   ops.emit_active_line = [&](std::string_view line) {
     auto stripped = StripComments(std::string(line), in_block_comment_);
+    // An inline `ifdef…`endif resolved on this line (22.6) must go through the
+    // inline conditional expander; the mid-line directive dispatch would
+    // instead push it onto the multi-line conditional stack and drop the
+    // trailing text.
+    if (HasInlineConditional(stripped)) {
+      emit.expand_and_emit(stripped);
+      return;
+    }
     EmitActiveLine(stripped, emit, output);
   };
   // Inside an ignored block nothing is emitted, but track an opening block
@@ -668,6 +695,19 @@ void Preprocessor::OutputRemainder(std::string_view line,
                                    std::string_view directive, uint32_t file_id,
                                    uint32_t line_num, std::string& output) {
   OutputText(AfterDirective(line, directive), file_id, line_num, output);
+}
+
+void Preprocessor::ProcessDirectiveRemainder(std::string_view line,
+                                             std::string_view directive,
+                                             SourceLoc loc, int depth,
+                                             std::string& output) {
+  auto rest = AfterDirective(line, directive);
+  auto trimmed = Trim(rest);
+  if (!trimmed.empty() && trimmed.front() == '`' &&
+      ProcessDirective(rest, loc.file_id, loc.line, depth, output)) {
+    return;
+  }
+  OutputText(rest, loc.file_id, loc.line, output);
 }
 
 bool Preprocessor::RejectInsideDesignElement(std::string_view directive_name,
@@ -720,17 +760,16 @@ bool Preprocessor::ProcessDelayModeDirective(std::string_view line,
 }
 
 bool Preprocessor::ProcessSimpleStateDirective(std::string_view line,
-                                               SourceLoc loc, uint32_t file_id,
-                                               uint32_t line_num,
+                                               SourceLoc loc, int depth,
                                                std::string& output) {
   if (StartsWithDirective(line, "endcelldefine")) {
     in_celldefine_ = false;
-    OutputRemainder(line, "endcelldefine", file_id, line_num, output);
+    ProcessDirectiveRemainder(line, "endcelldefine", loc, depth, output);
     return true;
   }
   if (StartsWithDirective(line, "celldefine")) {
     in_celldefine_ = true;
-    OutputRemainder(line, "celldefine", file_id, line_num, output);
+    ProcessDirectiveRemainder(line, "celldefine", loc, depth, output);
     return true;
   }
   if (StartsWithDirective(line, "pragma")) {
@@ -795,9 +834,8 @@ bool Preprocessor::ProcessExpandedStateDirective(std::string_view line,
 
 bool Preprocessor::ProcessStateDirective(std::string_view line, SourceLoc loc,
                                          uint32_t file_id, uint32_t line_num,
-                                         std::string& output) {
-  if (ProcessSimpleStateDirective(line, loc, file_id, line_num, output))
-    return true;
+                                         int depth, std::string& output) {
+  if (ProcessSimpleStateDirective(line, loc, depth, output)) return true;
   if (ProcessExpandedStateDirective(line, loc, file_id, line_num, output))
     return true;
   if (StartsWithDirective(line, "resetall")) {
@@ -875,7 +913,8 @@ bool Preprocessor::ProcessActiveOnlyDirective(std::string_view line,
   }
   if (ProcessKeywordsDirective(line, loc, file_id, line_num, output))
     return true;
-  if (ProcessStateDirective(line, loc, file_id, line_num, output)) return true;
+  if (ProcessStateDirective(line, loc, file_id, line_num, depth, output))
+    return true;
   auto trimmed = Trim(line);
   return TryExpandMacro(trimmed, output, file_id, line_num, depth);
 }

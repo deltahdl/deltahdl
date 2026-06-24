@@ -219,6 +219,10 @@ class Parser {
   LibraryDecl* ParseLibraryDecl();
   IncludeStmt* ParseLibraryIncludeStmt();
   std::string_view ParseFilePathSpec();
+  // Copies text into the parser arena so the resulting view outlives the
+  // SourceManager that produced the token (needed for library-map loading,
+  // which parses each map file with a throwaway local SourceManager).
+  std::string_view ArenaCopy(std::string_view text);
 
   BindDirective* ParseBindDirective();
 
@@ -248,6 +252,10 @@ class Parser {
                              const std::vector<Attribute>& member_attrs,
                              bool is_rand, bool is_randc);
   DataType ParseFunctionReturnType();
+  // Dispatches an inline enum/struct/union type (which ParseDataType does not
+  // handle) into the appropriate parser, applying any trailing packed dims.
+  // Returns true and fills dt when an aggregate keyword was consumed.
+  bool TryParseInlineAggregateType(DataType& dt);
   void ParseDynamicOverrideSpecifiers(ModuleItem* item);
   void ParseOneOverrideSpecifier(ModuleItem* item);
   Direction ParseArgDirection(FunctionArg& arg, Direction sticky_dir,

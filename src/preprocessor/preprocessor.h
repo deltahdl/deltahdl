@@ -40,11 +40,19 @@ class Preprocessor {
   bool ProcessConditionalDirective(std::string_view line, uint32_t file_id,
                                    uint32_t line_num, std::string& output);
   bool ProcessStateDirective(std::string_view line, SourceLoc loc,
-                             uint32_t file_id, uint32_t line_num,
+                             uint32_t file_id, uint32_t line_num, int depth,
                              std::string& output);
   void OutputRemainder(std::string_view line, std::string_view directive,
                        uint32_t file_id, uint32_t line_num,
                        std::string& output);
+  // Emits the text after a directive that has no newline-terminated end (22.2),
+  // first dispatching it as a directive so a same-line trailing directive (e.g.
+  // `celldefine `timescale ...) is still acted on.
+  void ProcessDirectiveRemainder(std::string_view line,
+                                 std::string_view directive, SourceLoc loc,
+                                 int depth, std::string& output);
+  // True when an inline `ifdef…`endif resolves entirely on this line (22.6).
+  bool HasInlineConditional(std::string_view line) const;
   void OutputText(std::string_view text, uint32_t file_id, uint32_t line_num,
                   std::string& output);
   void OutputPreExpanded(std::string_view text, std::string& output);
@@ -115,8 +123,7 @@ class Preprocessor {
   void ResetDirectiveState();
   bool ProcessDelayModeDirective(std::string_view line, SourceLoc loc);
   bool ProcessSimpleStateDirective(std::string_view line, SourceLoc loc,
-                                   uint32_t file_id, uint32_t line_num,
-                                   std::string& output);
+                                   int depth, std::string& output);
   bool ProcessExpandedStateDirective(std::string_view line, SourceLoc loc,
                                      uint32_t file_id, uint32_t line_num,
                                      std::string& output);
