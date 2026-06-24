@@ -21,7 +21,6 @@ struct AssocArrayObject;
 struct ClassDecl;
 struct Expr;
 struct RtlirModuleInst;
-struct RtlirPortBinding;
 struct RtlirVariable;
 struct Variable;
 
@@ -59,11 +58,7 @@ class Lowerer {
   void RegisterEnumTypes(const RtlirModule* mod);
   void LowerChildModules(const RtlirModule* mod);
 
-  void LowerPortBindings(const RtlirModuleInst& inst, bool from_program,
-                         const std::string& parent_prefix,
-                         const std::string& child_prefix);
-  void LowerOnePortBinding(const RtlirPortBinding& binding, bool from_program,
-                           const std::string& child_prefix);
+  void LowerPortBindings(const RtlirModuleInst& inst, bool from_program);
 
   SimContext& ctx_;
   Arena& arena_;
