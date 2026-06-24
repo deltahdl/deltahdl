@@ -858,25 +858,29 @@ static void RegisterVirtualInterfaceVarDecl(const ModuleItem* item,
                                  diag);
 }
 
-// §6.18 / §7.4: when a variable's named type is a fixed unpacked-array typedef
-// and it declares no unpacked dimensions of its own, rewrite it to the
-// typedef's element base type (keeping its own const-ness) plus the typedef's
-// unpacked dimensions, so it elaborates and lowers identically to an inline
-// unpacked-array declaration.
-static void AdoptTypedefArrayDims(
+// §6.18 / §7.4 / §10.10.1: when a variable's named type is a fixed unpacked-
+// array typedef and it declares no unpacked dimensions of its own, rewrite it
+// to the typedef's element base type (keeping its own const-ness) plus the
+// typedef's unpacked dimensions, so it elaborates and lowers identically to an
+// inline unpacked-array declaration. Returns the adopted typedef name (empty
+// when no rewrite happened) so the caller can keep the variable's named-type
+// association, which the rewrite to a non-named base type would otherwise drop.
+static std::string_view AdoptTypedefArrayDims(
     ModuleItem* item, const TypedefMap& typedefs,
     const std::unordered_map<std::string_view, std::vector<Expr*>>&
         td_array_dims) {
-  if (!item->unpacked_dims.empty()) return;
-  if (item->data_type.kind != DataTypeKind::kNamed) return;
+  if (!item->unpacked_dims.empty()) return {};
+  if (item->data_type.kind != DataTypeKind::kNamed) return {};
   auto dims_it = td_array_dims.find(item->data_type.type_name);
-  if (dims_it == td_array_dims.end()) return;
+  if (dims_it == td_array_dims.end()) return {};
   auto base_it = typedefs.find(item->data_type.type_name);
-  if (base_it == typedefs.end()) return;
+  if (base_it == typedefs.end()) return {};
+  std::string_view typedef_name = item->data_type.type_name;
   bool was_const = item->data_type.is_const;
   item->data_type = base_it->second;
   item->data_type.is_const = was_const;
   item->unpacked_dims = dims_it->second;
+  return typedef_name;
 }
 
 void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
@@ -884,7 +888,8 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
 
   ResolveParameterizedType(item->data_type);
 
-  AdoptTypedefArrayDims(item, typedefs_, td_array_dims_);
+  std::string_view adopted_array_typedef =
+      AdoptTypedefArrayDims(item, typedefs_, td_array_dims_);
 
   if (item->data_type.kind == DataTypeKind::kNamed &&
       nettype_names_.count(item->data_type.type_name)) {
@@ -910,6 +915,13 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
       {const_names_, const_var_names_, var_types_, scalar_var_names_,
        packed_array_vars_, var_named_types_},
       diag_);
+  // §10.10.1 / §11.2.2: keep the named-type association for a variable that
+  // adopted a typedef array's dimensions above; rewriting it to a non-named
+  // base type kept RegisterVarDeclNames from recording it, but aggregate
+  // type-equivalence checks still need to know its declared array typedef.
+  if (!adopted_array_typedef.empty()) {
+    var_named_types_[item->name] = adopted_array_typedef;
+  }
   const ModuleDecl* vi_iface_decl =
       item->data_type.kind == DataTypeKind::kVirtualInterface
           ? FindModule(item->data_type.type_name)
