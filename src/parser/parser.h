@@ -233,6 +233,7 @@ class Parser {
   bool TryForwardAggregateTypedef(ModuleItem* item);
   bool TryForwardBareTypedef(ModuleItem* item);
   void SkipBracketedDims();
+  void SkipBalancedParens();
   bool TryInterfacePortTypedef(ModuleItem* item);
   ModuleItem* ParseNettypeDecl();
   DataType ParseEnumType();
@@ -302,6 +303,7 @@ class Parser {
   void RejectInstInProgram(SourceLoc loc, const char* msg);
   void ParseScopedTypeOrInst(const Token& name_tok,
                              std::vector<ModuleItem*>& items);
+  bool LooksLikeScopedInstTail();
   void ParsePlainVarDecl(const Token& name_tok,
                          std::vector<ModuleItem*>& items);
   ModuleItem* ParseModuleInst(const Token& module_tok);

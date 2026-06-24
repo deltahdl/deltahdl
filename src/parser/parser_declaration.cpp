@@ -339,6 +339,22 @@ bool Parser::TryForwardBareTypedef(ModuleItem* item) {
 
 // Skip a (possibly nested) run of bracketed unpacked-dimension tokens while
 // probing for the interface-port '.'-form.
+// Consumes a balanced `( ... )` group when the cursor is on the opening paren;
+// a no-op otherwise. Used for lookahead past a parameter value list.
+void Parser::SkipBalancedParens() {
+  if (!Check(TokenKind::kLParen)) return;
+  Consume();
+  int depth = 1;
+  while (depth > 0 && !Check(TokenKind::kEof)) {
+    if (CurrentToken().kind == TokenKind::kLParen)
+      depth++;
+    else if (CurrentToken().kind == TokenKind::kRParen)
+      depth--;
+    if (depth > 0) Consume();
+  }
+  if (Check(TokenKind::kRParen)) Consume();
+}
+
 void Parser::SkipBracketedDims() {
   while (Check(TokenKind::kLBracket)) {
     Consume();

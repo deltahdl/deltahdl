@@ -618,6 +618,29 @@ void Parser::RejectInstInProgram(SourceLoc loc, const char* msg) {
   if (InProgramBlock()) diag_.Error(loc, msg);
 }
 
+// Looks past the current position (the candidate instance name of a scoped
+// `name :: id ...` form) to decide whether the tail is a hierarchical_instance
+// rather than a variable declarator. Per A.4.1.1, a module/interface/checker
+// instantiation is `[ #(params) ] instance_name [dims] ( port_list )`, so the
+// parenthesized port-connection list is mandatory; a bare declarator followed
+// by `;`, `=`, `,`, or `[` is a data_declaration of the scoped type. The lexer
+// position is restored before returning.
+bool Parser::LooksLikeScopedInstTail() {
+  auto saved = lexer_.SavePos();
+  if (Check(TokenKind::kHash)) {
+    Consume();
+    SkipBalancedParens();
+  }
+  bool has_name = CheckIdentifier();
+  if (has_name) {
+    Consume();  // instance name
+    SkipBracketedDims();
+  }
+  bool is_inst = has_name && Check(TokenKind::kLParen);
+  lexer_.RestorePos(saved);
+  return is_inst;
+}
+
 // Parses a `name :: type_identifier ...` form (the `::` is consumed here) as
 // either a scoped module instantiation or a variable declaration of a
 // package/class-scoped type.
@@ -630,8 +653,7 @@ void Parser::ParseScopedTypeOrInst(const Token& name_tok,
   // is a variable declaration of that scoped type rather than a scoped module
   // instantiation.
   bool is_builtin_pkg = name_tok.text == "std";
-  bool is_scoped_inst =
-      !is_builtin_pkg && (CheckIdentifier() || Check(TokenKind::kHash));
+  bool is_scoped_inst = !is_builtin_pkg && LooksLikeScopedInstTail();
   if (is_scoped_inst) {
     RejectInstInProgram(name_tok.loc, "instantiations not allowed in programs");
     auto start = items.size();
