@@ -347,17 +347,20 @@ bool Parser::TryConsumeRandQualifier(ClassMember* m) {
   return false;
 }
 
-// §25.9: 'virtual' is overloaded inside a class body. It is a member qualifier
-// only for a virtual method (virtual function/task) or a nested virtual class;
-// when followed by an interface name it begins a virtual interface property
-// type and must be left for ParseDataType. Peeks one token past 'virtual'.
+// §25.9: 'virtual' is overloaded inside a class body. It begins a virtual
+// interface property type only when followed by an interface name ('virtual Bus
+// b;') or the explicit 'interface' keyword ('virtual interface Bus b;'); that
+// case must be left for ParseDataType. In every other position it is a member
+// qualifier (virtual function/task, a nested virtual class, or ahead of further
+// method qualifiers such as 'pure virtual protected function'). Peeks one token
+// past 'virtual'.
 bool Parser::VirtualIsClassQualifier() {
   auto saved = lexer_.SavePos();
   Consume();
-  bool is_qualifier = Check(TokenKind::kKwFunction) ||
-                      Check(TokenKind::kKwTask) || Check(TokenKind::kKwClass);
+  bool is_interface_type =
+      Check(TokenKind::kIdentifier) || Check(TokenKind::kKwInterface);
   lexer_.RestorePos(saved);
-  return is_qualifier;
+  return !is_interface_type;
 }
 
 bool Parser::TryConsumeVirtualQualifier(ClassMember* m) {
