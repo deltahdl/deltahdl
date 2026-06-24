@@ -456,6 +456,24 @@ RtlirDesign* Elaborator::Elaborate(const ConfigDecl* cfg) {
     instance_param_overrides_.push_back(std::move(ov));
   }
 
+  // §33.4.1.1, §33.4.1.5: the top-level design cell is named by the design
+  // statement (its library defaults to the config's library when omitted); the
+  // default clause selects instances, not the top cell, so resolve the top cell
+  // before the default library list is installed -- otherwise a top whose
+  // library is absent from the default liblist would be filtered away and the
+  // design would fail to elaborate.
+  std::vector<ModuleDecl*> top_decls;
+  top_decls.reserve(cfg->design_cells.size());
+  for (const auto& [lib, cell] : cfg->design_cells) {
+    auto* md = FindModule(cell);
+    if (!md) {
+      diag_.Error({}, std::format("config '{}' design cell '{}' not found",
+                                  cfg->name, cell));
+      return nullptr;
+    }
+    top_decls.push_back(md);
+  }
+
   ApplyConfigDefaultLiblist(cfg, library_order_, library_order_strict_);
 
   for (auto* rule : cfg->rules) {
@@ -482,17 +500,6 @@ RtlirDesign* Elaborator::Elaborate(const ConfigDecl* cfg) {
                                    instance_use_overrides_,
                                    instance_liblist_overrides_);
 
-  std::vector<ModuleDecl*> top_decls;
-  top_decls.reserve(cfg->design_cells.size());
-  for (const auto& [lib, cell] : cfg->design_cells) {
-    auto* md = FindModule(cell);
-    if (!md) {
-      diag_.Error({}, std::format("config '{}' design cell '{}' not found",
-                                  cfg->name, cell));
-      return nullptr;
-    }
-    top_decls.push_back(md);
-  }
   return ElaborateTops(top_decls);
 }
 
