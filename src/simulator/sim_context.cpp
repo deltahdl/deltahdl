@@ -76,7 +76,12 @@ Variable* FindVariableByPrefixWalk(const NameLookup& lookup,
     auto cit = tables.variables.find(cand);
     if (cit != tables.variables.end()) return cit->second;
   }
-  return nullptr;
+  // §23.6: a hierarchical name rooted at the top module (e.g. "top.sig") strips
+  // its leading segment against the top instance, which is keyed under the
+  // empty prefix. The walk above skips that iteration when it starts from an
+  // empty prefix (a top-level process or a test-time lookup), so try it
+  // explicitly.
+  return LookupRestUnderMatchingInstance("", lookup.head, lookup.rest, tables);
 }
 
 }  // namespace
