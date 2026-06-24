@@ -613,16 +613,35 @@ Expr* Parser::ParseMemberAccessChain(Token tok) {
   return result;
 }
 
+// §6.20 / Syntax 8-2: a parameter_value_assignment may be ordered (a bare
+// expression) or named (".name(value)"). Captures one element of either form,
+// recording the name in arg_names (empty for the ordered form) and the value in
+// elements.
+void Parser::ParseParamValueAssignment(Expr* base) {
+  if (Check(TokenKind::kDot)) {
+    Consume();
+    auto name_tok = Expect(TokenKind::kIdentifier);
+    Expect(TokenKind::kLParen);
+    Expr* value = Check(TokenKind::kRParen) ? nullptr : ParseExpr();
+    Expect(TokenKind::kRParen);
+    base->arg_names.push_back(name_tok.text);
+    base->elements.push_back(value);
+    return;
+  }
+  base->arg_names.push_back({});
+  base->elements.push_back(ParseExpr());
+}
+
 Expr* Parser::ParseParameterizedScope(Expr* base) {
   Consume();
   if (!Check(TokenKind::kLParen)) return base;
   base->has_param_spec = true;
   Consume();
   if (!Check(TokenKind::kRParen)) {
-    base->elements.push_back(ParseExpr());
+    ParseParamValueAssignment(base);
     while (Check(TokenKind::kComma)) {
       Consume();
-      base->elements.push_back(ParseExpr());
+      ParseParamValueAssignment(base);
     }
   }
   Expect(TokenKind::kRParen);

@@ -102,6 +102,7 @@ class Parser {
   bool TryParseKeywordClassMember(std::vector<ClassMember*>& members,
                                   ClassMember* member, bool proto);
   bool ParseClassQualifiers(ClassMember* member);
+  bool VirtualIsClassQualifier();
   bool TryConsumeClassQualifier(ClassMember* m, TokenKind kw,
                                 bool ClassMember::* flag, const char* dup_msg);
   bool TryConsumeAccessQualifier(ClassMember* m);
@@ -402,6 +403,7 @@ class Parser {
   void ParseTrailingNamedArgs(Expr* call);
   Expr* ParseMemberAccessChain(Token tok);
   Expr* MakeMemberAccess(Expr* base);
+  void ParseParamValueAssignment(Expr* base);
   Expr* ParseParameterizedScope(Expr* base);
   Expr* TryParseUserTypeCast(const Token& tok);
   Expr* ParseIdentifierExpr();

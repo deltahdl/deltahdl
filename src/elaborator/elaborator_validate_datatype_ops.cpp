@@ -211,8 +211,31 @@ static bool IsAllowedVirtualInterfaceBinaryOp(TokenKind op) {
          op == TokenKind::kEqEqEq || op == TokenKind::kBangEqEq;
 }
 
-static void CheckVirtualInterfaceExpr(const Expr* e, const TypeMap& types,
-                                      DiagEngine& diag) {
+// §25.9: == / != between two virtual interfaces is legal only when they have
+// the same interface type. Reports when both operands are vif variables whose
+// recorded interface types differ.
+static void CheckViEqualitySameType(
+    const Expr* e, const TypeMap& types,
+    const std::unordered_map<std::string_view, std::string_view>& vi_iface,
+    DiagEngine& diag) {
+  if (e->kind != ExprKind::kBinary || !e->lhs || !e->rhs) return;
+  if (!IsAllowedVirtualInterfaceBinaryOp(e->op)) return;
+  if (!IsVirtualInterfaceVar(e->lhs, types) ||
+      !IsVirtualInterfaceVar(e->rhs, types))
+    return;
+  auto lit = vi_iface.find(ExprIdent(e->lhs));
+  auto rit = vi_iface.find(ExprIdent(e->rhs));
+  if (lit != vi_iface.end() && rit != vi_iface.end() &&
+      lit->second != rit->second) {
+    diag.Error(e->range.start,
+               "comparison between virtual interfaces of different types");
+  }
+}
+
+static void CheckVirtualInterfaceExpr(
+    const Expr* e, const TypeMap& types,
+    const std::unordered_map<std::string_view, std::string_view>& vi_iface,
+    DiagEngine& diag) {
   if (!e) return;
   if (e->kind == ExprKind::kBinary) {
     bool lhs_vi = e->lhs && IsVirtualInterfaceVar(e->lhs, types);
@@ -221,6 +244,7 @@ static void CheckVirtualInterfaceExpr(const Expr* e, const TypeMap& types,
       diag.Error(e->range.start,
                  "operator is not allowed on virtual interface");
     }
+    CheckViEqualitySameType(e, types, vi_iface, diag);
   }
   if (e->kind == ExprKind::kUnary && IsVirtualInterfaceVar(e->lhs, types)) {
     diag.Error(e->range.start, "operator is not allowed on virtual interface");
@@ -233,15 +257,15 @@ static void CheckVirtualInterfaceExpr(const Expr* e, const TypeMap& types,
       IsVirtualInterfaceVar(e->base, types)) {
     diag.Error(e->range.start, "bit-select on virtual interface is illegal");
   }
-  CheckVirtualInterfaceExpr(e->lhs, types, diag);
-  CheckVirtualInterfaceExpr(e->rhs, types, diag);
-  CheckVirtualInterfaceExpr(e->base, types, diag);
-  CheckVirtualInterfaceExpr(e->index, types, diag);
-  CheckVirtualInterfaceExpr(e->condition, types, diag);
-  CheckVirtualInterfaceExpr(e->true_expr, types, diag);
-  CheckVirtualInterfaceExpr(e->false_expr, types, diag);
+  CheckVirtualInterfaceExpr(e->lhs, types, vi_iface, diag);
+  CheckVirtualInterfaceExpr(e->rhs, types, vi_iface, diag);
+  CheckVirtualInterfaceExpr(e->base, types, vi_iface, diag);
+  CheckVirtualInterfaceExpr(e->index, types, vi_iface, diag);
+  CheckVirtualInterfaceExpr(e->condition, types, vi_iface, diag);
+  CheckVirtualInterfaceExpr(e->true_expr, types, vi_iface, diag);
+  CheckVirtualInterfaceExpr(e->false_expr, types, vi_iface, diag);
   for (const auto* elem : e->elements) {
-    CheckVirtualInterfaceExpr(elem, types, diag);
+    CheckVirtualInterfaceExpr(elem, types, vi_iface, diag);
   }
 }
 
@@ -429,9 +453,11 @@ void Elaborator::WalkStmtsForVirtualInterfaceOps(const Stmt* s) {
                                vi_external_defparam_insts_};
     CheckVirtualInterfaceAssignStmt(s, kCtx, diag_);
   }
-  CheckVirtualInterfaceExpr(s->rhs, var_types_, diag_);
-  CheckVirtualInterfaceExpr(s->expr, var_types_, diag_);
-  CheckVirtualInterfaceExpr(s->condition, var_types_, diag_);
+  CheckVirtualInterfaceExpr(s->rhs, var_types_, vi_var_interface_types_, diag_);
+  CheckVirtualInterfaceExpr(s->expr, var_types_, vi_var_interface_types_,
+                            diag_);
+  CheckVirtualInterfaceExpr(s->condition, var_types_, vi_var_interface_types_,
+                            diag_);
   for (auto* sub : s->stmts) WalkStmtsForVirtualInterfaceOps(sub);
   WalkStmtsForVirtualInterfaceOps(s->then_branch);
   WalkStmtsForVirtualInterfaceOps(s->else_branch);

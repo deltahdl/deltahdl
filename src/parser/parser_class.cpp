@@ -347,6 +347,19 @@ bool Parser::TryConsumeRandQualifier(ClassMember* m) {
   return false;
 }
 
+// §25.9: 'virtual' is overloaded inside a class body. It is a member qualifier
+// only for a virtual method (virtual function/task) or a nested virtual class;
+// when followed by an interface name it begins a virtual interface property
+// type and must be left for ParseDataType. Peeks one token past 'virtual'.
+bool Parser::VirtualIsClassQualifier() {
+  auto saved = lexer_.SavePos();
+  Consume();
+  bool is_qualifier = Check(TokenKind::kKwFunction) ||
+                      Check(TokenKind::kKwTask) || Check(TokenKind::kKwClass);
+  lexer_.RestorePos(saved);
+  return is_qualifier;
+}
+
 bool Parser::ParseClassQualifiers(ClassMember* m) {
   bool proto = false;
   while (true) {
@@ -355,10 +368,13 @@ bool Parser::ParseClassQualifiers(ClassMember* m) {
                                  &ClassMember::is_static,
                                  "duplicate 'static' qualifier"))
       continue;
-    if (TryConsumeClassQualifier(m, TokenKind::kKwVirtual,
-                                 &ClassMember::is_virtual,
-                                 "duplicate 'virtual' qualifier"))
+    if (Check(TokenKind::kKwVirtual) && VirtualIsClassQualifier()) {
+      if (m->is_virtual)
+        diag_.Error(CurrentLoc(), "duplicate 'virtual' qualifier");
+      m->is_virtual = true;
+      Consume();
       continue;
+    }
     if (Match(TokenKind::kKwPure)) {
       m->is_pure_virtual = true;
       proto = true;
