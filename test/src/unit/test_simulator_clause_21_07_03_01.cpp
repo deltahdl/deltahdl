@@ -16,8 +16,8 @@ class DumpportsSysTask : public VcdTestBase {};
 // Standard two-port VCD setup shared by the $dumpports scope/file tests:
 // creates 1-bit ports "a" (value 1) and "b" (value 0), registers them with the
 // writer (idents '!' and '"'), finishes the header, writes the initial
-// timestamp and installs the writer on the context. The caller owns `vcd` so
-// its destructor flushes into the test scope before ReadVcd.
+// timestamp and installs the writer on the context. The caller owns `vcd`;
+// call vcd.Flush() before ReadVcd so buffered output reaches the file.
 static void SetupAbDump(SimFixture& f, VcdWriter& vcd) {
   auto* a = MakeVar(f, "a", 1, 1);
   auto* b = MakeVar(f, "b", 1, 0);
@@ -62,6 +62,7 @@ TEST_F(DumpportsSysTask, IncludesRegisteredPortsWhenScopeOmitted) {
       MkSysCall(f.arena, "$dumpports", {nullptr, MkStr(f.arena, "ports.vcd")}),
       f.ctx, f.arena);
 
+  vcd.Flush();
   auto content = ReadVcd();
   EXPECT_NE(content.find("1!"), std::string::npos);   // a dumped
   EXPECT_NE(content.find("0\""), std::string::npos);  // b dumped
@@ -88,6 +89,7 @@ TEST_F(DumpportsSysTask, DumpsMultipleNamedScopes) {
                       MkStr(f.arena, "ports.vcd")}),
            f.ctx, f.arena);
 
+  vcd.Flush();
   auto content = ReadVcd();
   EXPECT_NE(content.find("1!"), std::string::npos);   // a dumped
   EXPECT_NE(content.find("1\""), std::string::npos);  // b dumped
@@ -112,6 +114,7 @@ TEST_F(DumpportsSysTask, ResolvesHierarchicalScopeName) {
                      {MkId(f.arena, "top.sig"), MkStr(f.arena, "ports.vcd")}),
            f.ctx, f.arena);
 
+  vcd.Flush();
   auto content = ReadVcd();
   EXPECT_NE(content.find("1!"), std::string::npos);   // top.sig -> sig dumped
   EXPECT_EQ(content.find("0\""), std::string::npos);  // other not dumped
@@ -134,6 +137,7 @@ TEST_F(DumpportsSysTask, ScopeWithoutFilenameDefaultsName) {
            f.arena);
 
   EXPECT_EQ(f.ctx.GetDumpFileName(), "dumpports.vcd");
+  vcd.Flush();
   EXPECT_NE(ReadVcd().find("1!"), std::string::npos);  // sig dumped
 }
 
