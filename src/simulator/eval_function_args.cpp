@@ -343,7 +343,14 @@ static bool IsMemberAccessOn(const Expr* lhs, std::string_view base_name) {
 // preserved, leaving non-method writes unchanged.
 static void WriteSelfProperty(ClassObject* self, std::string_view name,
                               const Logic4Vec& val, SimContext& ctx) {
+  // §8.11: a `this.x` write updates the invoking instance. Properties are kept
+  // under both an unscoped key and a `Type::name` scoped key, and reads consult
+  // the scoped key first. In a plain instance method (no enclosing-class
+  // context, unlike a constructor) fall back to the object's own type so both
+  // copies stay in sync; otherwise the write lands only on the unscoped key and
+  // the next read returns the stale scoped value.
   const ClassTypeInfo* enclosing = ctx.CurrentMethodClass();
+  if (!enclosing) enclosing = self->type;
   if (enclosing) {
     self->SetPropertyForType(name, enclosing, val);
   } else {

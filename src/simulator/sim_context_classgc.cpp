@@ -137,15 +137,17 @@ void ClearDeadWeakReferences(
   }
 }
 
-// Erases every class object that is neither live nor pinned by an active
-// `this` pointer, zeroing its ref count before removal.
+// Erases every class object that is neither live, pinned by an active `this`
+// pointer, nor strongly reachable through an outstanding reference count
+// (§8.30.1: an object is eligible for collection only once it is no longer
+// strongly reachable).
 void SweepDeadObjects(
     const std::unordered_set<uint64_t>& live,
     const std::unordered_set<ClassObject*>& this_live,
     std::unordered_map<uint64_t, ClassObject*>& class_objects) {
   for (auto it = class_objects.begin(); it != class_objects.end();) {
-    if (!live.count(it->first) && !this_live.count(it->second)) {
-      it->second->ref_count = 0;
+    if (!live.count(it->first) && !this_live.count(it->second) &&
+        it->second->ref_count == 0) {
       it = class_objects.erase(it);
     } else {
       ++it;
