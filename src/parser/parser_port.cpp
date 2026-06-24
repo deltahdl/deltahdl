@@ -222,6 +222,13 @@ struct ParserPortHelpers {
     return true;
   }
 
+  // Tries the two no-direction ANSI port forms that begin with a non-keyword
+  // identifier: an interface modport port, then a plain named-type port.
+  static bool TryParseAnsiModportOrNamedTypePort(Parser& p, PortDecl& port) {
+    return TryParseAnsiModportPort(p, port) ||
+           TryParseAnsiNamedTypePort(p, port);
+  }
+
   // Parse the data type of an ANSI port, handling the explicit `var`, packed
   // struct/union, `interconnect`, and ordinary data-type forms.
   static void ParseAnsiPortDataType(Parser& p, PortDecl& port) {
@@ -875,10 +882,7 @@ PortDecl Parser::ParsePortDecl() {
 
   if (dir == Direction::kNone && CheckIdentifier() &&
       known_types_.count(CurrentToken().text) == 0) {
-    if (ParserPortHelpers::TryParseAnsiModportPort(*this, port)) {
-      return port;
-    }
-    if (ParserPortHelpers::TryParseAnsiNamedTypePort(*this, port)) {
+    if (ParserPortHelpers::TryParseAnsiModportOrNamedTypePort(*this, port)) {
       return port;
     }
   }
