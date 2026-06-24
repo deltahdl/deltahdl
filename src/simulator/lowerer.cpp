@@ -765,45 +765,58 @@ static bool IsConnectablePortBinding(const RtlirPortBinding& binding) {
          binding.direction == Direction::kInout;
 }
 
-static Expr* MakeLocalPortId(std::string_view port_name, Arena& arena) {
-  auto* name_str = arena.Create<std::string>(std::string(port_name));
+static Expr* MakeLocalPortId(std::string_view qualified_name, Arena& arena) {
+  auto* name_str = arena.Create<std::string>(std::string(qualified_name));
   auto* local_id = arena.Create<Expr>();
   local_id->kind = ExprKind::kIdentifier;
   local_id->text = *name_str;
   return local_id;
 }
 
-void Lowerer::LowerPortBindings(const RtlirModuleInst& inst,
-                                bool from_program) {
-  for (const auto& binding : inst.port_bindings) {
-    if (!IsConnectablePortBinding(binding)) continue;
+// Lowers one port binding into a continuous assignment (or alias for inout).
+// The connection expression lives in the parent scope while the port lives in
+// the child scope; the caller has set inst_prefix_ to the parent prefix so the
+// connection resolves there, and the child-side port id is fully qualified with
+// child_prefix so it resolves regardless of the active process prefix. A bare
+// port name would otherwise shadow a same-named parent signal (the .* case).
+void Lowerer::LowerOnePortBinding(const RtlirPortBinding& binding,
+                                  bool from_program,
+                                  const std::string& child_prefix) {
+  std::string local_qualified = child_prefix + std::string(binding.port_name);
 
-    auto* local_id = MakeLocalPortId(binding.port_name, arena_);
+  if (binding.direction == Direction::kInout) {
+    if (binding.connection->kind != ExprKind::kIdentifier) return;
+    ctx_.AliasVariable(local_qualified, binding.connection->text);
+    return;
+  }
 
-    if (binding.direction == Direction::kInout) {
-      if (binding.connection->kind != ExprKind::kIdentifier) continue;
-      std::string local_qualified =
-          inst_prefix_ + std::string(binding.port_name);
-      ctx_.AliasVariable(local_qualified, binding.connection->text);
-      continue;
-    }
-
-    if (binding.direction == Direction::kInput) {
-      RtlirContAssign ca;
-      ca.lhs = local_id;
-      ca.rhs = binding.connection;
-      ca.width = binding.width;
-      LowerContAssign(ca, from_program);
-      continue;
-    }
-
-    if (binding.connection->kind != ExprKind::kIdentifier) continue;
-    RtlirContAssign ca;
+  auto* local_id = MakeLocalPortId(local_qualified, arena_);
+  RtlirContAssign ca;
+  ca.width = binding.width;
+  if (binding.direction == Direction::kInput) {
+    ca.lhs = local_id;
+    ca.rhs = binding.connection;
+  } else {
+    if (binding.connection->kind != ExprKind::kIdentifier) return;
     ca.lhs = binding.connection;
     ca.rhs = local_id;
-    ca.width = binding.width;
-    LowerContAssign(ca, from_program);
   }
+  LowerContAssign(ca, from_program);
+}
+
+void Lowerer::LowerPortBindings(const RtlirModuleInst& inst, bool from_program,
+                                const std::string& parent_prefix,
+                                const std::string& child_prefix) {
+  // Continuous assignments built here must resolve the parent-scope connection
+  // expression, so temporarily run with the parent prefix while the child-side
+  // port id carries child_prefix as an absolute name.
+  auto saved_prefix = inst_prefix_;
+  inst_prefix_ = parent_prefix;
+  for (const auto& binding : inst.port_bindings) {
+    if (!IsConnectablePortBinding(binding)) continue;
+    LowerOnePortBinding(binding, from_program, child_prefix);
+  }
+  inst_prefix_ = saved_prefix;
 }
 
 static void CreateChildModuleVariables(const std::string& inst_prefix,
@@ -847,7 +860,8 @@ void Lowerer::LowerChildModules(const RtlirModule* mod) {
     CreateChildModuleVariables(inst_prefix_, child.resolved, ctx_, arena_);
     CreateChildModulePorts(inst_prefix_, child.resolved, ctx_, arena_);
 
-    LowerPortBindings(child, child.resolved->is_program);
+    LowerPortBindings(child, child.resolved->is_program, saved_prefix,
+                      inst_prefix_);
 
     uint32_t child_block_id =
         child.resolved->is_program ? next_program_block_id_++ : 0;
