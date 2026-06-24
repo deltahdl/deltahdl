@@ -450,6 +450,11 @@ bool Parser::TryParseKeywordClassMember(std::vector<ClassMember*>& members,
       m->kind = ClassMemberKind::kProperty;
       m->is_param = true;
       m->name = param_items[i]->name;
+      // §6.20/§8.25: carry the parameter's type and default value so the
+      // lowerer can evaluate it into the class type's static-property store
+      // (a class parameter is a compile-time constant of the class).
+      m->data_type = param_items[i]->data_type;
+      m->init_expr = param_items[i]->init_expr;
       members.push_back(m);
     }
     return true;

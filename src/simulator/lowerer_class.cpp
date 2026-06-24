@@ -99,16 +99,31 @@ static void CollectClassMembers(ClassTypeInfo* info, const ClassDecl* cls) {
   }
 }
 
+static void StoreClassParam(ClassTypeInfo* info, std::string_view pname,
+                            const Logic4Vec& value) {
+  info->static_properties[std::string(pname)] = value;
+}
+
 static void InitClassParams(ClassTypeInfo* info, const ClassDecl* cls,
                             SimContext& ctx, Arena& arena) {
+  // §6.20: parameters supplied through the class's parameter port list.
   for (const auto& [pname, pexpr] : cls->params) {
     info->properties.push_back({pname, 32, false});
-    if (pexpr) {
-      info->static_properties[std::string(pname)] = EvalExpr(pexpr, ctx, arena);
-    } else {
-      info->static_properties[std::string(pname)] =
-          MakeLogic4VecVal(arena, 32, 0);
-    }
+    StoreClassParam(
+        info, pname,
+        pexpr ? EvalExpr(pexpr, ctx, arena) : MakeLogic4VecVal(arena, 32, 0));
+  }
+  // §8.25/§8.26.3: parameters declared in the class body (carried as kProperty
+  // members with is_param) become static compile-time constants of the class,
+  // readable via the class name with the scope resolution operator.
+  for (const auto* member : cls->members) {
+    if (member->kind != ClassMemberKind::kProperty || !member->is_param)
+      continue;
+    uint32_t w = EvalTypeWidth(member->data_type, {});
+    if (w == 0) w = 32;
+    StoreClassParam(info, member->name,
+                    member->init_expr ? EvalExpr(member->init_expr, ctx, arena)
+                                      : MakeLogic4VecVal(arena, w, 0));
   }
 }
 
