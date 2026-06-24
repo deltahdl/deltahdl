@@ -201,34 +201,6 @@ struct ParserPortHelpers {
     return false;
   }
 
-  // §25.3.2: an ANSI interface port written with a plain interface name (or
-  // any user-named type) as `type_name port_name [dims] [= default]`. The
-  // leading identifier is not a known type keyword, so ParseDataType would
-  // otherwise return an implicit type and consume the type name as the port
-  // name. Returns true and fully parses the port when this two-identifier form
-  // is matched; otherwise restores the lexer position and returns false.
-  static bool TryParseAnsiNamedTypePort(Parser& p, PortDecl& port) {
-    auto saved = p.lexer_.SavePos();
-    auto type_tok = p.Consume();
-    if (!p.CheckIdentifier()) {
-      p.lexer_.RestorePos(saved);
-      return false;
-    }
-    port.data_type.kind = DataTypeKind::kNamed;
-    port.data_type.type_name = type_tok.text;
-    port.name = p.ExpectIdentifier().text;
-    p.ParseUnpackedDims(port.unpacked_dims);
-    if (p.Match(TokenKind::kEq)) port.default_value = p.ParseExpr();
-    return true;
-  }
-
-  // Tries the two no-direction ANSI port forms that begin with a non-keyword
-  // identifier: an interface modport port, then a plain named-type port.
-  static bool TryParseAnsiModportOrNamedTypePort(Parser& p, PortDecl& port) {
-    return TryParseAnsiModportPort(p, port) ||
-           TryParseAnsiNamedTypePort(p, port);
-  }
-
   // Parse the data type of an ANSI port, handling the explicit `var`, packed
   // struct/union, `interconnect`, and ordinary data-type forms.
   static void ParseAnsiPortDataType(Parser& p, PortDecl& port) {
@@ -882,7 +854,7 @@ PortDecl Parser::ParsePortDecl() {
 
   if (dir == Direction::kNone && CheckIdentifier() &&
       known_types_.count(CurrentToken().text) == 0) {
-    if (ParserPortHelpers::TryParseAnsiModportOrNamedTypePort(*this, port)) {
+    if (ParserPortHelpers::TryParseAnsiModportPort(*this, port)) {
       return port;
     }
   }
