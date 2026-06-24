@@ -70,10 +70,20 @@ CheckOptions:
   # IEEE 1800-2023 Annex I/K/L/M: VPI/DPI C-API typedefs and struct tags
   readability-identifier-naming.TypedefIgnoredRegexp: 's_vpi_.*|s_cb_data|sv[A-Z].*|t_vpi_.*|p_vpi_.*|vpi_assertion_callback_func'
   readability-identifier-naming.VariableCase: lower_case
+# Disabled checks (only valid exceptions, see header rule 4):
+# - bugprone-random-generator-seed: IEEE 1800-2023 18.13/18.14 require
+#   randomization to be reproducible (same seed -> same sequence;
+#   srandom/get_randstate/set_randstate). The check demands an unpredictable
+#   seed, which would break that guarantee.
+# - bugprone-command-processor: IEEE 1800-2023 20.17.1 defines $system as
+#   passing its argument to the C system() command processor; the check forbids
+#   the one call the task is specified to make.
 Checks: >-
   -*,
   bugprone-*,
   -bugprone-easily-swappable-parameters,
+  -bugprone-random-generator-seed,
+  -bugprone-command-processor,
   cppcoreguidelines-avoid-goto,
   cppcoreguidelines-init-variables,
   cppcoreguidelines-slicing,

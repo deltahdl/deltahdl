@@ -397,7 +397,7 @@ struct RepeatEventAwaiter {
   // forwarded to tally once the active/suspended gates pass.
   template <typename TallyFn>
   static void ArmEventOperand(Variable* var, const std::shared_ptr<bool>& done,
-                              Process* proc, TallyFn tally) {
+                              Process* proc, const TallyFn& tally) {
     var->AddWatcher([proc, done, tally]() mutable {
       if (*done) return true;
       if (proc && !proc->active) return true;
@@ -445,7 +445,7 @@ struct RepeatEventAwaiter {
   template <typename TallyFn>
   static void ArmEdgeOperand(Variable* var, const EventExpr& ev,
                              const std::shared_ptr<bool>& done,
-                             ResumeTarget target, TallyFn tally) {
+                             ResumeTarget target, const TallyFn& tally) {
     var->prev_value = var->value;
     Edge edge = ev.edge;
     const Expr* iff_cond = ev.iff_condition;

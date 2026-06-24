@@ -510,11 +510,13 @@ bool IsOneShotPliCallback(int reason) {
 }
 
 static VpiContext* g_vpi_context = nullptr;
-static VpiContext g_default_context;
 
 VpiContext& GetGlobalVpiContext() {
+  // Function-local static: the default context is constructed lazily on first
+  // use (catchable) rather than during static init before main.
+  static VpiContext default_context;
   if (g_vpi_context) return *g_vpi_context;
-  return g_default_context;
+  return default_context;
 }
 
 void SetGlobalVpiContext(VpiContext* ctx) { g_vpi_context = ctx; }

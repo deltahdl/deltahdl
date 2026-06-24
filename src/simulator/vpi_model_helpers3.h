@@ -245,8 +245,8 @@ bool VpiPortIndexAndNameApply(int type);
 // explicitly named port returns its explicit name; otherwise, if an inferred
 // name exists, that name is returned; otherwise NULL. An empty C string counts
 // as "no name".
-const char* VpiPortName(bool explicitly_named, const char* explicit_name,
-                        const char* inferred_name);
+const char* VpiPortName(bool explicitly_named, std::string_view explicit_name,
+                        std::string_view inferred_name);
 
 // §37.14 detail 11: vpiSize for a port. A null port reports 0; any other port
 // reports its bit width.

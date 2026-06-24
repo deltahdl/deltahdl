@@ -681,7 +681,7 @@ static const char* VpiNameStr(VpiHandle obj) {
   // then any inferred name, else NULL. The model stores one name, so an
   // unnamed (null) port yields NULL while a named port yields its name.
   if (obj->type == vpiPort) {
-    return VpiPortName(obj->explicit_name, obj->name.data(), obj->name.data());
+    return VpiPortName(obj->explicit_name, obj->name, obj->name);
   }
   // §37.60 detail 1: an atomic statement's vpiName is its label when one
   // was written, and NULL otherwise - never an empty string for an

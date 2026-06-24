@@ -63,10 +63,14 @@ CheckOptions:
   # IEEE 1800-2023 Annex I/K/L/M: VPI/DPI C-API typedefs and struct tags
   readability-identifier-naming.TypedefIgnoredRegexp: 's_vpi_.*|s_cb_data|sv[A-Z].*|t_vpi_.*|p_vpi_.*|vpi_assertion_callback_func'
   readability-identifier-naming.VariableCase: lower_case
+# bugprone-random-generator-seed disabled: IEEE 1800-2023 18.13/18.14
+# randomization tests use fixed seeds on purpose to assert reproducible
+# sequences; the check demands an unpredictable seed, which would defeat them.
 Checks: >-
   -*,
   bugprone-*,
   -bugprone-easily-swappable-parameters,
+  -bugprone-random-generator-seed,
   cppcoreguidelines-avoid-goto,
   cppcoreguidelines-init-variables,
   cppcoreguidelines-slicing,

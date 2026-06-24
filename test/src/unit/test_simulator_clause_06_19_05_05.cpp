@@ -32,6 +32,7 @@ TEST(EnumMethods, NumSingleMember) {
 TEST(EnumMethods, NumLargeEnum) {
   EnumFixture f;
   std::vector<std::pair<std::string, uint64_t>> members;
+  members.reserve(256);
   for (uint64_t i = 0; i < 256; ++i) {
     members.push_back({"E" + std::to_string(i), i});
   }

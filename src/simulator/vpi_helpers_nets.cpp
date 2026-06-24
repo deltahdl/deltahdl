@@ -285,14 +285,16 @@ bool VpiPortIndexAndNameApply(int type) {
   return type != vpiPortBit;
 }
 
-const char* VpiPortName(bool explicitly_named, const char* explicit_name,
-                        const char* inferred_name) {
+const char* VpiPortName(bool explicitly_named, std::string_view explicit_name,
+                        std::string_view inferred_name) {
   // §37.14 detail 8: an explicitly named port returns its explicit name;
   // failing that, an inferred name is returned if one exists; otherwise NULL.
-  if (explicitly_named && explicit_name && explicit_name[0] != '\0') {
-    return explicit_name;
+  // Names are interned null-terminated, so returning data() yields a valid C
+  // string for the VPI caller.
+  if (explicitly_named && !explicit_name.empty()) {
+    return explicit_name.data();
   }
-  if (inferred_name && inferred_name[0] != '\0') return inferred_name;
+  if (!inferred_name.empty()) return inferred_name.data();
   return nullptr;
 }
 
