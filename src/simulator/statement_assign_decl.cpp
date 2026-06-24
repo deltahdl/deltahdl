@@ -117,8 +117,18 @@ static bool TryExecClassVarDecl(const Stmt* stmt, SimContext& ctx,
   SetClassParamExprs(stmt->var_name, stmt->var_decl_type.type_params, ctx);
 
   if (!stmt->var_init) return true;
-  if (stmt->var_init->kind != ExprKind::kCall) return true;
-  if (stmt->var_init->text != "new") return true;
+
+  // A class-handle initializer that is not a `new` call (e.g. a copy from
+  // another handle or a static call such as `process::self()`) is evaluated
+  // and stored like an ordinary assignment; only `new` needs the
+  // construction/shallow-copy handling below.
+  if (stmt->var_init->kind != ExprKind::kCall ||
+      stmt->var_init->text != "new") {
+    auto val = EvalExpr(stmt->var_init, ctx, arena);
+    auto* var = ctx.FindVariable(stmt->var_name);
+    if (var) var->value = val;
+    return true;
+  }
 
   if (TryExecClassShallowCopy(stmt->var_name, stmt->var_init, ctx, arena)) {
     return true;

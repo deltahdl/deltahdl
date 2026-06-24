@@ -407,6 +407,7 @@ void SimContext::ExitProgramBlock(uint32_t program_block_id) {
 void SimContext::RunFinalBlocks() {
   stop_requested_ = false;
   for (auto* proc : final_processes_) {
+    SetCurrentProcess(proc);
     proc->Resume();
     if (stop_requested_) break;
   }
