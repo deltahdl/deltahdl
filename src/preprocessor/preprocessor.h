@@ -124,6 +124,9 @@ class Preprocessor {
   bool ProcessDelayModeDirective(std::string_view line, SourceLoc loc);
   bool ProcessSimpleStateDirective(std::string_view line, SourceLoc loc,
                                    int depth, std::string& output);
+  bool ProcessMiscStateDirective(std::string_view line, SourceLoc loc,
+                                 uint32_t file_id, uint32_t line_num,
+                                 std::string& output);
   bool ProcessExpandedStateDirective(std::string_view line, SourceLoc loc,
                                      uint32_t file_id, uint32_t line_num,
                                      std::string& output);

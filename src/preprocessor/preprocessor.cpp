@@ -832,12 +832,10 @@ bool Preprocessor::ProcessExpandedStateDirective(std::string_view line,
   return false;
 }
 
-bool Preprocessor::ProcessStateDirective(std::string_view line, SourceLoc loc,
-                                         uint32_t file_id, uint32_t line_num,
-                                         int depth, std::string& output) {
-  if (ProcessSimpleStateDirective(line, loc, depth, output)) return true;
-  if (ProcessExpandedStateDirective(line, loc, file_id, line_num, output))
-    return true;
+bool Preprocessor::ProcessMiscStateDirective(std::string_view line,
+                                             SourceLoc loc, uint32_t file_id,
+                                             uint32_t line_num,
+                                             std::string& output) {
   if (StartsWithDirective(line, "resetall")) {
     if (RejectInsideDesignElement("resetall", loc)) return true;
     ResetDirectiveState();
@@ -855,8 +853,16 @@ bool Preprocessor::ProcessStateDirective(std::string_view line, SourceLoc loc,
                                 loc);
     return true;
   }
-  if (ProcessDelayModeDirective(line, loc)) return true;
-  return false;
+  return ProcessDelayModeDirective(line, loc);
+}
+
+bool Preprocessor::ProcessStateDirective(std::string_view line, SourceLoc loc,
+                                         uint32_t file_id, uint32_t line_num,
+                                         int depth, std::string& output) {
+  if (ProcessSimpleStateDirective(line, loc, depth, output)) return true;
+  if (ProcessExpandedStateDirective(line, loc, file_id, line_num, output))
+    return true;
+  return ProcessMiscStateDirective(line, loc, file_id, line_num, output);
 }
 
 static size_t FindUndefNameEnd(std::string_view text) {

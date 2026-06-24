@@ -214,6 +214,41 @@ static void SubstituteToken(std::string_view token,
   result.append(token);
 }
 
+// Handles the macro-quote escape sequences (`\`", `", and ``) at body[i],
+// appending their literal expansion to result. Returns the number of source
+// characters consumed, or 0 if no macro-quote begins at body[i].
+static size_t AppendMacroQuote(std::string_view body, size_t i,
+                               std::string& result) {
+  if (i + 3 < body.size() && body[i] == '`' && body[i + 1] == '\\' &&
+      body[i + 2] == '`' && body[i + 3] == '"') {
+    result += "\\\"";
+    return 4;
+  }
+  if (i + 1 < body.size() && body[i] == '`' && body[i + 1] == '"') {
+    result += '"';
+    return 2;
+  }
+  if (i + 1 < body.size() && body[i] == '`' && body[i + 1] == '`') {
+    return 2;
+  }
+  return 0;
+}
+
+// §22.5.1: macro and argument substitution shall not occur within string
+// literals. Copies one literal character (honoring escapes) at body[i] into
+// result, clearing in_string at the closing quote. Returns chars consumed.
+static size_t CopyStringChar(std::string_view body, size_t i, bool& in_string,
+                             std::string& result) {
+  if (body[i] == '\\' && i + 1 < body.size()) {
+    result += body[i];
+    result += body[i + 1];
+    return 2;
+  }
+  if (body[i] == '"') in_string = false;
+  result += body[i];
+  return 1;
+}
+
 std::string Preprocessor::SubstituteParams(
     std::string_view body, const std::vector<std::string>& params,
     const std::vector<std::string_view>& args) {
@@ -223,35 +258,13 @@ std::string Preprocessor::SubstituteParams(
   bool in_string = false;
   while (i < body.size()) {
     if (in_string) {
-      // §22.5.1: macro and argument substitution shall not occur within string
-      // literals. Copy verbatim until the closing quote, honoring escapes. The
-      // `" macro-quote is handled below and deliberately does not start such a
-      // suppression region, since its contents are meant to be substituted.
-      if (body[i] == '\\' && i + 1 < body.size()) {
-        result += body[i];
-        result += body[i + 1];
-        i += 2;
-        continue;
-      }
-      if (body[i] == '"') in_string = false;
-      result += body[i++];
+      i += CopyStringChar(body, i, in_string, result);
       continue;
     }
-    if (i + 3 < body.size() && body[i] == '`' && body[i + 1] == '\\' &&
-        body[i + 2] == '`' && body[i + 3] == '"') {
-      result += "\\\"";
-      i += 4;
-      continue;
-    }
-
-    if (i + 1 < body.size() && body[i] == '`' && body[i + 1] == '"') {
-      result += '"';
-      i += 2;
-      continue;
-    }
-
-    if (i + 1 < body.size() && body[i] == '`' && body[i + 1] == '`') {
-      i += 2;
+    // The `" macro-quote does not start a suppression region: its contents are
+    // meant to be substituted, unlike a plain " string literal.
+    if (size_t consumed = AppendMacroQuote(body, i, result)) {
+      i += consumed;
       continue;
     }
     if (!IsIdentChar(body[i])) {
