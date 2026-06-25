@@ -257,7 +257,8 @@ static Logic4Vec EvalDpiCall(const Expr* expr, SimContext& ctx, Arena& arena) {
 }
 
 static void ExecClassMethod(ModuleItem* method, const Expr* expr,
-                            SimContext& ctx, Arena& arena, Logic4Vec& out);
+                            SimContext& ctx, Arena& arena, Logic4Vec& out,
+                            const ClassTypeInfo* param_cls = nullptr);
 
 struct InstanceMethodInfo {
   ClassObject* obj = nullptr;
@@ -389,12 +390,34 @@ static bool ResolveClassScope(const Expr* expr, SimContext& ctx,
 }
 
 static void ExecClassMethod(ModuleItem* method, const Expr* expr,
-                            SimContext& ctx, Arena& arena, Logic4Vec& out) {
+                            SimContext& ctx, Arena& arena, Logic4Vec& out,
+                            const ClassTypeInfo* param_cls) {
   bool is_void = (method->return_type.kind == DataTypeKind::kVoid);
   BindFunctionArgs(method, expr, ctx, arena);
   Variable dummy_ret;
   Variable* ret_var = &dummy_ret;
-  if (!is_void) ret_var = ctx.CreateLocalVariable(method->name, 32);
+  if (!is_void) {
+    uint32_t ret_width = 32;  // default
+
+    if (param_cls && param_cls->decl) {
+      // Build a ScopeMap from bound parameters
+      ScopeMap scope;
+      for (const auto& [pname, pexpr] : param_cls->decl->params) {
+        auto* var = ctx.FindVariable(pname);
+        if (var) {
+          scope[pname] = static_cast<int64_t>(var->value.ToUint64());
+        }
+      }
+      // Evaluate type width with parameter values in scope
+      ret_width = EvalTypeWidth(method->return_type, {}, scope);
+      if (ret_width == 0) ret_width = 32;
+    } else {
+      ret_width = EvalTypeWidth(method->return_type);
+      if (ret_width == 0) ret_width = 32;
+    }
+
+    ret_var = ctx.CreateLocalVariable(method->name, ret_width);
+  }
   ExecFunctionBody(method, ret_var, ctx, arena);
   out = is_void ? MakeLogic4VecVal(arena, 1, 0) : ret_var->value;
 }
@@ -428,7 +451,7 @@ static bool TryEvalParameterizedScopeCall(const Expr* expr, SimContext& ctx,
     ctx.PopScope();
     return true;
   }
-  ExecClassMethod(info.method, expr, ctx, arena, out);
+  ExecClassMethod(info.method, expr, ctx, arena, out, info.cls);
   ctx.PopScope();
   return true;
 }
