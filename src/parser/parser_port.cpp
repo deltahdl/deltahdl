@@ -201,6 +201,27 @@ struct ParserPortHelpers {
     return false;
   }
 
+  // Parse the simple interface-port form `iface_type port_name` (25.3.2): no
+  // direction, an unknown (non-data) type name, and not a modport form. Returns
+  // true and fully parses the port when matched; otherwise restores the lexer
+  // position and returns false so the caller parses an ordinary data type.
+  static bool TryParseSimpleInterfacePort(Parser& p, PortDecl& port) {
+    auto saved = p.lexer_.SavePos();
+    auto type_tok = p.Consume();
+    if (!p.CheckIdentifier()) {
+      p.lexer_.RestorePos(saved);
+      return false;
+    }
+    port.data_type.kind = DataTypeKind::kNamed;
+    port.data_type.type_name = type_tok.text;
+    port.name = p.ExpectIdentifier().text;
+    p.ParseUnpackedDims(port.unpacked_dims);
+    if (p.Match(TokenKind::kEq)) {
+      port.default_value = p.ParseExpr();
+    }
+    return true;
+  }
+
   // Parse the data type of an ANSI port, handling the explicit `var`, packed
   // struct/union, `interconnect`, and ordinary data-type forms.
   static void ParseAnsiPortDataType(Parser& p, PortDecl& port) {
@@ -857,23 +878,9 @@ PortDecl Parser::ParsePortDecl() {
     if (ParserPortHelpers::TryParseAnsiModportPort(*this, port)) {
       return port;
     }
-    // Check for simple interface port form: `interface_type port_name`
-    // when no direction is specified and the identifier is not a known type.
-    auto saved = lexer_.SavePos();
-    auto type_tok = Consume();
-    if (CheckIdentifier()) {
-      // This looks like `unknown_id identifier`, treat it as an interface port.
-      port.data_type.kind = DataTypeKind::kNamed;
-      port.data_type.type_name = type_tok.text;
-      port.name = ExpectIdentifier().text;
-      ParseUnpackedDims(port.unpacked_dims);
-      if (Match(TokenKind::kEq)) {
-        port.default_value = ParseExpr();
-      }
+    if (ParserPortHelpers::TryParseSimpleInterfacePort(*this, port)) {
       return port;
     }
-    // Not an interface port, restore and parse as a normal data type.
-    lexer_.RestorePos(saved);
   }
 
   ParserPortHelpers::ParseAnsiPortDataType(*this, port);
