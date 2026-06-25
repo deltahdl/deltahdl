@@ -538,6 +538,10 @@ void Parser::ParseParamDecl(std::vector<ModuleItem*>& items) {
     ParseUnpackedDims(item->unpacked_dims);
     if (Match(TokenKind::kEq)) {
       item->init_expr = ParseExpr();
+    } else {
+      // §6.20.1 fn22: omitting the value is legal only in a
+      // parameter_port_list (a separate parse path), not here.
+      diag_.Error(item->loc, "parameter declaration requires a default value");
     }
     items.push_back(item);
   } while (Match(TokenKind::kComma));
