@@ -780,6 +780,11 @@ void Elaborator::ElaboratePorts(const ModuleDecl* decl, RtlirModule* mod) {
 
     if (port.is_interface_port) {
       rp.is_interface_port = true;
+      // §23.3.3.4: a named interface-type port (`bus_if p` / `bus_if.mp p`)
+      // records its required interface type so the connection check can reject
+      // an instance of a different type. A generic `interface p` port leaves
+      // type_name empty, so it keeps accepting any interface instance.
+      rp.interface_type_name = port.data_type.type_name;
     } else if (port.direction == Direction::kNone &&
                port.data_type.kind == DataTypeKind::kNamed &&
                !port.data_type.type_name.empty()) {
