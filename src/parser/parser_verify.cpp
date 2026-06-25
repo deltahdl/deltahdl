@@ -336,6 +336,19 @@ void Parser::ParseCoverpointBody() {
   Expect(TokenKind::kRBrace);
 }
 
+void Parser::SkipBinsSelectBrackets() {
+  while (Check(TokenKind::kLBracket)) {
+    Consume();
+    int depth = 1;
+    while (depth > 0 && !AtEnd()) {
+      if (Check(TokenKind::kLBracket)) depth++;
+      if (Check(TokenKind::kRBracket)) depth--;
+      if (depth > 0) Consume();
+    }
+    Expect(TokenKind::kRBracket);
+  }
+}
+
 void Parser::ParseCoverpointItem() {
   Match(TokenKind::kKwWildcard);
 
@@ -343,16 +356,7 @@ void Parser::ParseCoverpointItem() {
       Check(TokenKind::kKwIgnoreBins)) {
     Consume();
     ExpectIdentifier();
-    while (Check(TokenKind::kLBracket)) {
-      Consume();
-      int depth = 1;
-      while (depth > 0 && !AtEnd()) {
-        if (Check(TokenKind::kLBracket)) depth++;
-        if (Check(TokenKind::kRBracket)) depth--;
-        if (depth > 0) Consume();
-      }
-      Expect(TokenKind::kRBracket);
-    }
+    SkipBinsSelectBrackets();
     Expect(TokenKind::kEq);
     ParseCovergroupItemRhs();
   } else {

@@ -191,6 +191,7 @@ class Parser {
   void SkipCovergroupItem();
   void ParseCoverpointBody();
   void ParseCoverpointItem();
+  void SkipBinsSelectBrackets();
   void ParseCovergroupItemRhs();
 
   ModuleItem* ParseSpecifyBlock();
