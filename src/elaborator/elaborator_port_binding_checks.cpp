@@ -62,6 +62,30 @@ static const RtlirPort* FindBoundChildPort(
   return FindChildPortByName(child_ports, binding.port_name);
 }
 
+// True when this child port carries no user-supplied connection in the
+// instantiation, i.e. its binding was synthesized for an unconnected input
+// port. §23.3.3.6: an unconnected uwire port has no second source to merge, so
+// the single-source warning shall not fire for it. Explicit connections (named
+// or positional, including non-identifier expressions) remain user-supplied.
+static bool PortLeftUnconnected(const std::vector<RtlirPort>& child_ports,
+                                const ModuleItem* item,
+                                std::string_view port_name) {
+  bool is_ordered =
+      !item->inst_ports.empty() && item->inst_ports[0].first.empty();
+  if (is_ordered) {
+    size_t idx = 0;
+    for (; idx < child_ports.size(); ++idx) {
+      if (child_ports[idx].name == port_name) break;
+    }
+    return idx >= item->inst_ports.size();
+  }
+  for (const auto& [pname, conn] : item->inst_ports) {
+    (void)conn;
+    if (pname == port_name) return false;
+  }
+  return true;
+}
+
 void Elaborator::CheckUwirePortMerge(const RtlirModuleInst& inst,
                                      const ModuleItem* item,
                                      RtlirModule* parent_mod) {
@@ -71,6 +95,7 @@ void Elaborator::CheckUwirePortMerge(const RtlirModuleInst& inst,
   for (const auto& binding : inst.port_bindings) {
     const RtlirPort* port_it = FindBoundChildPort(child_ports, binding);
     if (!port_it) continue;
+    if (PortLeftUnconnected(child_ports, item, binding.port_name)) continue;
 
     NetType internal_net = PortNetType(port_it->type_kind);
     bool internal_is_uwire = (internal_net == NetType::kUwire);
