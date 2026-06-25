@@ -123,6 +123,32 @@ static Logic4Vec CombineBranches(Logic4Vec tv, Logic4Vec fv, Arena& arena) {
   if (tv.is_real || fv.is_real) result.is_real = true;
   return result;
 }
+// §11.4.11: the unselected conditional operand shall not be evaluated. An
+// operand that could mutate state (an embedded assignment, ++/--, or a call)
+// is detected here so the determinate-condition path can skip it; a pure
+// operand is still evaluated to recover its result-type metadata.
+static bool ExprMayHaveSideEffect(const Expr* e) {
+  if (e == nullptr) return false;
+  if (e->kind == ExprKind::kCall || e->kind == ExprKind::kSystemCall)
+    return true;
+  if (e->kind == ExprKind::kBinary &&
+      (e->op == TokenKind::kEq || IsCompoundAssignOp(e->op)))
+    return true;
+  if ((e->kind == ExprKind::kUnary || e->kind == ExprKind::kPostfixUnary) &&
+      (e->op == TokenKind::kPlusPlus || e->op == TokenKind::kMinusMinus))
+    return true;
+  if (ExprMayHaveSideEffect(e->lhs) || ExprMayHaveSideEffect(e->rhs) ||
+      ExprMayHaveSideEffect(e->condition) ||
+      ExprMayHaveSideEffect(e->true_expr) ||
+      ExprMayHaveSideEffect(e->false_expr) || ExprMayHaveSideEffect(e->base) ||
+      ExprMayHaveSideEffect(e->index) || ExprMayHaveSideEffect(e->index_end))
+    return true;
+  for (const auto* a : e->args)
+    if (ExprMayHaveSideEffect(a)) return true;
+  for (const auto* el : e->elements)
+    if (ExprMayHaveSideEffect(el)) return true;
+  return false;
+}
 static Logic4Vec EvalTernaryUnknownCond(const Expr* expr, SimContext& ctx,
                                         Arena& arena, uint32_t context_width) {
   auto tv = EvalExpr(expr->true_expr, ctx, arena, context_width);
@@ -153,12 +179,23 @@ static Logic4Vec EvalTernary(const Expr* expr, SimContext& ctx, Arena& arena,
   if (HasUnknownBits(cond)) {
     return EvalTernaryUnknownCond(expr, ctx, arena, context_width);
   }
-  auto tv = EvalExpr(expr->true_expr, ctx, arena, context_width);
-  auto fv = EvalExpr(expr->false_expr, ctx, arena, context_width);
-  bool result_signed = tv.is_signed && fv.is_signed;
-  uint32_t width = (tv.width > fv.width) ? tv.width : fv.width;
+  // §11.4.11: a determinate condition selects exactly one expression; the
+  // other shall not be evaluated. A side-effect-free unselected expression is
+  // still evaluated so its width/signedness/realness contribute to the result
+  // type, but one that could mutate state is skipped.
+  bool cond_true = cond.ToUint64() != 0;
+  const Expr* other_expr = cond_true ? expr->false_expr : expr->true_expr;
+  auto chosen = EvalExpr(cond_true ? expr->true_expr : expr->false_expr, ctx,
+                         arena, context_width);
+  bool result_signed = chosen.is_signed;
+  uint32_t width = chosen.width;
+  if (!ExprMayHaveSideEffect(other_expr)) {
+    auto other = EvalExpr(other_expr, ctx, arena, context_width);
+    result_signed = chosen.is_signed && other.is_signed;
+    if (other.width > width) width = other.width;
+    if (other.is_real) chosen.is_real = true;
+  }
   if (context_width > width) width = context_width;
-  auto& chosen = (cond.ToUint64() != 0) ? tv : fv;
   Logic4Vec result;
   if (chosen.width < width) {
     result = ExtendVec(chosen, width, result_signed, arena);
