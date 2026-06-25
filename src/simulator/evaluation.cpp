@@ -132,12 +132,18 @@ static Logic4Vec EvalTernaryUnknownCond(const Expr* expr, SimContext& ctx,
   if (context_width > width) width = context_width;
   if (tv.width < width) tv = ExtendVec(tv, width, result_signed, arena);
   if (fv.width < width) fv = ExtendVec(fv, width, result_signed, arena);
+  Logic4Vec result;
   if (EvalCaseEquality(tv, fv)) {
     tv.is_signed = result_signed;
-    return tv;
+    result = tv;
+  } else {
+    result = CombineBranches(tv, fv, arena);
+    result.is_signed = result_signed;
   }
-  auto result = CombineBranches(tv, fv, arena);
-  result.is_signed = result_signed;
+  // Apply assignment-like context truncation (§10.8 conditional operands)
+  if (context_width > 0 && result.width > context_width) {
+    result = ResizeToWidth(result, context_width, arena);
+  }
   return result;
 }
 static Logic4Vec EvalTernary(const Expr* expr, SimContext& ctx, Arena& arena,
@@ -153,13 +159,19 @@ static Logic4Vec EvalTernary(const Expr* expr, SimContext& ctx, Arena& arena,
   uint32_t width = (tv.width > fv.width) ? tv.width : fv.width;
   if (context_width > width) width = context_width;
   auto& chosen = (cond.ToUint64() != 0) ? tv : fv;
+  Logic4Vec result;
   if (chosen.width < width) {
-    auto extended = ExtendVec(chosen, width, result_signed, arena);
-    extended.is_signed = result_signed;
-    return extended;
+    result = ExtendVec(chosen, width, result_signed, arena);
+    result.is_signed = result_signed;
+  } else {
+    result = chosen;
+    result.is_signed = result_signed;
   }
-  chosen.is_signed = result_signed;
-  return chosen;
+  // Apply assignment-like context truncation (§10.8 conditional operands)
+  if (context_width > 0 && result.width > context_width) {
+    result = ResizeToWidth(result, context_width, arena);
+  }
+  return result;
 }
 
 static uint32_t AssignExprLhsWidth(const Expr* lhs, SimContext& ctx) {
@@ -441,11 +453,18 @@ static Logic4Vec EvalBinaryDispatch(const Expr* expr, SimContext& ctx,
 static Logic4Vec EvalMinTypMax(const Expr* expr, SimContext& ctx, Arena& arena,
                                uint32_t context_width) {
   DelayMode mode = ctx.GetDelayMode();
+  Logic4Vec result;
   if (mode == DelayMode::kMin)
-    return EvalExpr(expr->lhs, ctx, arena, context_width);
-  if (mode == DelayMode::kMax)
-    return EvalExpr(expr->rhs, ctx, arena, context_width);
-  return EvalExpr(expr->condition, ctx, arena, context_width);
+    result = EvalExpr(expr->lhs, ctx, arena, context_width);
+  else if (mode == DelayMode::kMax)
+    result = EvalExpr(expr->rhs, ctx, arena, context_width);
+  else
+    result = EvalExpr(expr->condition, ctx, arena, context_width);
+  // Apply assignment-like context truncation (§10.8 mintymax expressions)
+  if (context_width > 0 && result.width > context_width) {
+    result = ResizeToWidth(result, context_width, arena);
+  }
+  return result;
 }
 
 Logic4Vec EvalExpr(const Expr* expr, SimContext& ctx, Arena& arena,

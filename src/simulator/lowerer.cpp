@@ -550,9 +550,12 @@ void Lowerer::LowerParams(const RtlirModule* mod) {
       continue;
     }
     if (!p.is_resolved) continue;
-    auto* var = ctx_.CreateVariable(p.name, 32);
-    var->value =
-        MakeLogic4VecVal(arena_, 32, static_cast<uint64_t>(p.resolved_value));
+    // Use declared width if parameter has explicit type, else 32 (§10.8
+    // context)
+    uint32_t width = (p.decl_width > 0) ? p.decl_width : 32;
+    auto* var = ctx_.CreateVariable(p.name, width);
+    var->value = MakeLogic4VecVal(arena_, width,
+                                  static_cast<uint64_t>(p.resolved_value));
   }
 }
 
