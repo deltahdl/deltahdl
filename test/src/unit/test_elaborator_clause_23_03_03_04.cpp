@@ -180,4 +180,44 @@ TEST(InterfacePortConnectionRulesElaboration, ZzzProbeDifferentType) {
   }
 }
 
+// TEMP PROBE 2: parse-level dump of the child PortDecl + cu->interfaces.
+// kNamed=15, kNone=0. Remove after diagnosis.
+TEST(InterfacePortConnectionRulesElaboration, ZzzProbeParseLevel) {
+  SourceManager mgr;
+  Arena arena;
+  DiagEngine diag(mgr);
+  std::string src =
+      "interface bus_if;\n"
+      "  logic data;\n"
+      "endinterface\n"
+      "interface other_if;\n"
+      "  logic data;\n"
+      "endinterface\n"
+      "module child(bus_if port_a);\n"
+      "endmodule\n"
+      "module top;\n"
+      "  other_if inst();\n"
+      "  child u(.port_a(inst));\n"
+      "endmodule\n";
+  auto fid = mgr.AddFile("<test>", src);
+  Lexer lexer(mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, arena, diag);
+  auto* cu = parser.Parse();
+  ADD_FAILURE() << "PROBE2 ninterfaces=" << cu->interfaces.size()
+                << " nmodules=" << cu->modules.size();
+  for (auto* i : cu->interfaces) {
+    ADD_FAILURE() << "PROBE2 interface=" << i->name;
+  }
+  for (auto* m : cu->modules) {
+    ADD_FAILURE() << "PROBE2 module=" << m->name
+                  << " nports=" << m->ports.size();
+    for (const auto& p : m->ports) {
+      ADD_FAILURE() << "PROBE2  port=" << p.name
+                    << " dir=" << static_cast<int>(p.direction)
+                    << " kind=" << static_cast<int>(p.data_type.kind)
+                    << " tn=" << p.data_type.type_name;
+    }
+  }
+}
+
 }  // namespace
