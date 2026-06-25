@@ -325,82 +325,17 @@ Stmt* Parser::ParseRandsequenceStmt() {
   return stmt;
 }
 
-void Parser::ParseCoverpointBody() {
-  if (Match(TokenKind::kSemicolon)) {
-    return;
+static void SkipCoverpointBody(Lexer& lexer) {
+  while (!lexer.Peek().Is(TokenKind::kSemicolon) &&
+         !lexer.Peek().Is(TokenKind::kLBrace) &&
+         !lexer.Peek().Is(TokenKind::kEof)) {
+    lexer.Next();
   }
-  Expect(TokenKind::kLBrace);
-  while (!Check(TokenKind::kRBrace) && !AtEnd()) {
-    ParseCoverpointItem();
+  if (lexer.Peek().Is(TokenKind::kLBrace)) {
+    lexer.Next();
+    SkipBraceBlock(lexer);
   }
-  Expect(TokenKind::kRBrace);
-}
-
-void Parser::SkipBinsSelectBrackets() {
-  while (Check(TokenKind::kLBracket)) {
-    Consume();
-    int depth = 1;
-    while (depth > 0 && !AtEnd()) {
-      if (Check(TokenKind::kLBracket)) depth++;
-      if (Check(TokenKind::kRBracket)) depth--;
-      if (depth > 0) Consume();
-    }
-    Expect(TokenKind::kRBracket);
-  }
-}
-
-void Parser::ParseCoverpointItem() {
-  Match(TokenKind::kKwWildcard);
-
-  if (Check(TokenKind::kKwBins) || Check(TokenKind::kKwIllegalBins) ||
-      Check(TokenKind::kKwIgnoreBins)) {
-    Consume();
-    ExpectIdentifier();
-    SkipBinsSelectBrackets();
-    Expect(TokenKind::kEq);
-    ParseCovergroupItemRhs();
-  } else {
-    while (!Check(TokenKind::kSemicolon) && !AtEnd()) {
-      Consume();
-    }
-  }
-  Expect(TokenKind::kSemicolon);
-}
-
-// Returns true when the covergroup-item RHS scan should stop at the current
-// token: a top-level ';' or an unmatched closing brace/paren.
-bool Parser::CovergroupRhsAtTerminator(int brace_depth, int paren_depth) {
-  if (Check(TokenKind::kRBrace)) return brace_depth == 0;
-  if (Check(TokenKind::kRParen)) return paren_depth == 0;
-  if (Check(TokenKind::kSemicolon)) return paren_depth == 0 && brace_depth == 0;
-  return false;
-}
-
-void Parser::ParseCovergroupItemRhs() {
-  int brace_depth = 0;
-  int paren_depth = 0;
-
-  while (!AtEnd()) {
-    if (CovergroupRhsAtTerminator(brace_depth, paren_depth)) break;
-    if (Check(TokenKind::kLBrace)) {
-      brace_depth++;
-    } else if (Check(TokenKind::kRBrace)) {
-      brace_depth--;
-    } else if (Check(TokenKind::kLParen)) {
-      paren_depth++;
-    } else if (Check(TokenKind::kRParen)) {
-      paren_depth--;
-    } else if (Check(TokenKind::kKwWith)) {
-      Consume();
-      SkipBalancedParens();
-      continue;
-    } else if (Check(TokenKind::kKwIff)) {
-      Consume();
-      SkipBalancedParens();
-      break;
-    }
-    Consume();
-  }
+  if (lexer.Peek().Is(TokenKind::kSemicolon)) lexer.Next();
 }
 
 void Parser::ParseBlockEventExpression() {
@@ -607,7 +542,7 @@ void Parser::SkipCovergroupItem() {
 
   if (IsCoverpointOrCross(CurrentToken().kind)) {
     Consume();
-    ParseCoverpointBody();
+    SkipCoverpointBody(lexer_);
     return;
   }
 
@@ -616,7 +551,7 @@ void Parser::SkipCovergroupItem() {
     if (Match(TokenKind::kColon) && IsCoverpointOrCross(CurrentToken().kind)) {
       Consume();
     }
-    ParseCoverpointBody();
+    SkipCoverpointBody(lexer_);
     return;
   }
 

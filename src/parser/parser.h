@@ -189,11 +189,6 @@ class Parser {
       const std::vector<std::string>& covergroup_formals);
   void ParseBlockEventExpression();
   void SkipCovergroupItem();
-  void ParseCoverpointBody();
-  void ParseCoverpointItem();
-  void SkipBinsSelectBrackets();
-  void ParseCovergroupItemRhs();
-  bool CovergroupRhsAtTerminator(int brace_depth, int paren_depth);
 
   ModuleItem* ParseSpecifyBlock();
   void ParseSpecparamDecl(std::vector<ModuleItem*>& items);

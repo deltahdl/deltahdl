@@ -78,9 +78,13 @@ static void SetDigitBits(Logic4Vec& vec, uint32_t& bit_pos, int bit_count,
   for (int b = 0; b < bit_count && bit_pos < width; ++b, ++bit_pos) {
     uint32_t word = bit_pos / 64;
     uint64_t mask = uint64_t{1} << (bit_pos % 64);
-    if (is_x || is_z) {
-      // Both x and z literal digits use the (aval=1, bval=1) encoding here.
+    if (is_x) {
+      // An x literal digit uses the (aval=1, bval=1) encoding.
       vec.words[word].aval |= mask;
+      vec.words[word].bval |= mask;
+    } else if (is_z) {
+      // A z literal digit uses the (aval=0, bval=1) encoding, matching FillXZ
+      // and the raw-bit consumers (see net.cpp GetBitVal).
       vec.words[word].bval |= mask;
     } else if (dval >= 0 && (dval & (1 << b))) {
       vec.words[word].aval |= mask;

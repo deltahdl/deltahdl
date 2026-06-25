@@ -493,8 +493,9 @@ bool Elaborator::ResolveExplicitTarget(const PortBindScope& scope, size_t index,
 }
 
 // Validates an identifier port connection: a non-interface port goes through
-// the net-type compatibility check, while an interface port requires the
-// connected identifier to name a declared interface instance.
+// the net-type compatibility check. An interface port may be connected either
+// to a declared interface instance or to a higher-level interface port (a
+// hierarchical pass-down), so no instance-name check is enforced here.
 static void CheckExplicitIdentifierOrInterfacePort(const PortBindCtx& ctx,
                                                    const Expr* conn_expr,
                                                    const RtlirPort* port,
@@ -502,12 +503,6 @@ static void CheckExplicitIdentifierOrInterfacePort(const PortBindCtx& ctx,
   if (!conn_expr || conn_expr->kind != ExprKind::kIdentifier || !port) return;
   if (!port->is_interface_port) {
     CheckExplicitIdentifierConnection(ctx, conn_expr, *port, port_name);
-  } else if (!ctx.interface_inst_types.count(conn_expr->text)) {
-    ctx.diag.Error(ctx.item->loc,
-                   std::format("interface port '{}' requires a declared "
-                               "interface instance but '{}' is not an "
-                               "interface instance",
-                               port_name, conn_expr->text));
   }
 }
 
