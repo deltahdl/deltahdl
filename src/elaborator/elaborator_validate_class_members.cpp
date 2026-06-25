@@ -297,6 +297,40 @@ static bool IsSuperNewCall(const Stmt* s) {
   return lhs_is_super && rhs_is_new;
 }
 
+// §8.17: returns whether a statement subtree contains a super.new() call.
+static bool StmtSubtreeHasSuperNew(const Stmt* s) {
+  if (!s) return false;
+  if (IsSuperNewCall(s)) return true;
+  for (const auto* sub : s->stmts)
+    if (StmtSubtreeHasSuperNew(sub)) return true;
+  if (StmtSubtreeHasSuperNew(s->then_branch)) return true;
+  if (StmtSubtreeHasSuperNew(s->else_branch)) return true;
+  if (StmtSubtreeHasSuperNew(s->body)) return true;
+  if (StmtSubtreeHasSuperNew(s->for_body)) return true;
+  for (const auto& ci : s->case_items)
+    if (StmtSubtreeHasSuperNew(ci.body)) return true;
+  return false;
+}
+
+// §8.17: returns whether a super.new() call appears in a control-flow position
+// (the then/else branch of an if, a loop body, or a case-item body), where it
+// can never be the unconditional first executable statement. Sequential
+// statements (top-level or inside a begin/end block) are not flagged here; a
+// non-first sequential super.new() is handled by the index check.
+static bool ConstructorHasGuardedSuperNew(const Stmt* s) {
+  if (!s) return false;
+  if (StmtSubtreeHasSuperNew(s->then_branch) ||
+      StmtSubtreeHasSuperNew(s->else_branch) ||
+      StmtSubtreeHasSuperNew(s->body) || StmtSubtreeHasSuperNew(s->for_body)) {
+    return true;
+  }
+  for (const auto& ci : s->case_items)
+    if (StmtSubtreeHasSuperNew(ci.body)) return true;
+  for (const auto* sub : s->stmts)
+    if (ConstructorHasGuardedSuperNew(sub)) return true;
+  return false;
+}
+
 void Elaborator::ValidateOneClassChainingCtor(const ClassDecl* cls) {
   if (cls->base_class.empty()) return;
   const ClassMember* ctor = nullptr;
@@ -319,6 +353,16 @@ void Elaborator::ValidateOneClassChainingCtor(const ClassDecl* cls) {
                   "in the constructor");
     }
     break;
+  }
+  if (!has_super_new) {
+    for (const auto* s : stmts) {
+      if (ConstructorHasGuardedSuperNew(s)) {
+        diag_.Error(s->range.start,
+                    "super.new() shall be the first executable statement "
+                    "in the constructor");
+        break;
+      }
+    }
   }
   if (has_super_new &&
       (!cls->extends_args.empty() || cls->extends_has_default)) {

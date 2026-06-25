@@ -291,6 +291,8 @@ void Elaborator::RunPreElaborationValidations() {
 
   ValidateChainingConstructors();
 
+  ValidateSuperInNonDerivedClass();
+
   ValidateEmbeddedCovergroupAssign();
 
   ValidateDerivedCovergroupBase();

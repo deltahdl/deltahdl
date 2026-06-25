@@ -507,6 +507,24 @@ static bool IsCompoundAssignOp(TokenKind op) {
   }
 }
 
+// §6.19.5/§6.19.6: the first, last, next, and prev enumeration methods return a
+// value of the same enumeration type, so assigning their result to an enum
+// variable requires no cast. Recognizes both the no-parens member access
+// (c.next) and the explicit call form (c.next()). The num/name methods return
+// int/string and are intentionally excluded.
+static bool IsEnumTypedMethodResult(const Expr* e) {
+  if (!e) return false;
+  const Expr* member = e;
+  if (e->kind == ExprKind::kCall && e->lhs &&
+      e->lhs->kind == ExprKind::kMemberAccess) {
+    member = e->lhs;
+  }
+  if (member->kind != ExprKind::kMemberAccess) return false;
+  if (!member->rhs || member->rhs->kind != ExprKind::kIdentifier) return false;
+  std::string_view m = member->rhs->text;
+  return m == "first" || m == "last" || m == "next" || m == "prev";
+}
+
 void Elaborator::CheckEnumAssignStmt(const Stmt* s) {
   auto name = ExprIdent(s->lhs);
   if (name.empty()) return;
@@ -520,6 +538,7 @@ void Elaborator::CheckEnumAssignStmt(const Stmt* s) {
   if (!s->rhs) return;
   if (s->rhs->kind == ExprKind::kIdentifier) return;
   if (s->rhs->kind == ExprKind::kCast) return;
+  if (IsEnumTypedMethodResult(s->rhs)) return;
   diag_.Error(s->range.start, "integer assigned to enum variable without cast");
 }
 
