@@ -222,6 +222,21 @@ struct ParserPortHelpers {
     return true;
   }
 
+  // Parses a `.name(port_expr)` explicit-named ANSI port. Returns true and
+  // fills `port` when the current token begins such a port; false otherwise.
+  static bool TryParseExplicitNamedPort(Parser& p, PortDecl& port) {
+    if (!p.Check(TokenKind::kDot)) return false;
+    port.is_explicit_named = true;
+    p.Consume();
+    port.name = p.ExpectIdentifier().text;
+    p.Expect(TokenKind::kLParen);
+    if (!p.Check(TokenKind::kRParen)) {
+      port.port_expr = p.ParseExpr();
+    }
+    p.Expect(TokenKind::kRParen);
+    return true;
+  }
+
   // Parse the data type of an ANSI port, handling the explicit `var`, packed
   // struct/union, `interconnect`, and ordinary data-type forms.
   static void ParseAnsiPortDataType(Parser& p, PortDecl& port) {
@@ -856,15 +871,7 @@ PortDecl Parser::ParsePortDecl() {
     Consume();
   }
 
-  if (Check(TokenKind::kDot)) {
-    port.is_explicit_named = true;
-    Consume();
-    port.name = ExpectIdentifier().text;
-    Expect(TokenKind::kLParen);
-    if (!Check(TokenKind::kRParen)) {
-      port.port_expr = ParseExpr();
-    }
-    Expect(TokenKind::kRParen);
+  if (ParserPortHelpers::TryParseExplicitNamedPort(*this, port)) {
     return port;
   }
 

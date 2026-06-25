@@ -492,6 +492,25 @@ bool Elaborator::ResolveExplicitTarget(const PortBindScope& scope, size_t index,
   return true;
 }
 
+// Validates an identifier port connection: a non-interface port goes through
+// the net-type compatibility check, while an interface port requires the
+// connected identifier to name a declared interface instance.
+static void CheckExplicitIdentifierOrInterfacePort(const PortBindCtx& ctx,
+                                                   const Expr* conn_expr,
+                                                   const RtlirPort* port,
+                                                   std::string_view port_name) {
+  if (!(conn_expr && conn_expr->kind == ExprKind::kIdentifier && port)) return;
+  if (!port->is_interface_port) {
+    CheckExplicitIdentifierConnection(ctx, conn_expr, *port, port_name);
+  } else if (!ctx.interface_inst_types.count(conn_expr->text)) {
+    ctx.diag.Error(ctx.item->loc,
+                   std::format("interface port '{}' requires a declared "
+                               "interface instance but '{}' is not an "
+                               "interface instance",
+                               port_name, conn_expr->text));
+  }
+}
+
 void Elaborator::CheckExplicitConnLegality(const PortBindScope& scope,
                                            const ExplicitPortBind& bind) {
   const Expr* conn_expr = bind.conn_expr;
@@ -502,18 +521,8 @@ void Elaborator::CheckExplicitConnLegality(const PortBindScope& scope,
       diag_,      scope.item, scope.parent_mod,    nettype_net_names_,
       var_types_, net_names_, interconnect_names_, interface_inst_types_};
 
-  if (conn_expr && conn_expr->kind == ExprKind::kIdentifier && port) {
-    if (!port->is_interface_port) {
-      CheckExplicitIdentifierConnection(kPortCtx, conn_expr, *port,
-                                        binding.port_name);
-    } else if (!interface_inst_types_.count(conn_expr->text)) {
-      diag_.Error(scope.item->loc,
-                  std::format("interface port '{}' requires a declared "
-                              "interface instance but '{}' is not an "
-                              "interface instance",
-                              binding.port_name, conn_expr->text));
-    }
-  }
+  CheckExplicitIdentifierOrInterfacePort(kPortCtx, conn_expr, port,
+                                         binding.port_name);
 
   if (conn_expr && binding.direction != Direction::kInput &&
       ConnectionHasReplication(conn_expr)) {

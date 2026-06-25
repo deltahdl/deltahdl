@@ -60,6 +60,16 @@ std::optional<ModuleDecl*> FindInstanceUseOverride(
   return std::nullopt;
 }
 
+// Appends every declaration in `decls` whose name matches `name` to
+// `candidates`.
+template <typename Decls>
+static void AppendNamedDecls(const Decls& decls, std::string_view name,
+                             std::vector<ModuleDecl*>& candidates) {
+  for (auto* d : decls) {
+    if (d->name == name) candidates.push_back(d);
+  }
+}
+
 // Partitions modules named `name` into the non-extern candidates and the first
 // extern declaration encountered.
 void CollectModuleCandidates(std::string_view name, CompilationUnit* unit,
@@ -73,18 +83,9 @@ void CollectModuleCandidates(std::string_view name, CompilationUnit* unit,
       candidates.push_back(mod);
     }
   }
-  for (auto* iface : unit->interfaces) {
-    if (iface->name != name) continue;
-    candidates.push_back(iface);
-  }
-  for (auto* prog : unit->programs) {
-    if (prog->name != name) continue;
-    candidates.push_back(prog);
-  }
-  for (auto* checker : unit->checkers) {
-    if (checker->name != name) continue;
-    candidates.push_back(checker);
-  }
+  AppendNamedDecls(unit->interfaces, name, candidates);
+  AppendNamedDecls(unit->programs, name, candidates);
+  AppendNamedDecls(unit->checkers, name, candidates);
 }
 
 // Returns the candidates whose library appears in `liblist`, preserving order.

@@ -367,60 +367,39 @@ void Parser::ParseCoverpointItem() {
   Expect(TokenKind::kSemicolon);
 }
 
+// Returns true when the covergroup-item RHS scan should stop at the current
+// token: a top-level ';' or an unmatched closing brace/paren.
+bool Parser::CovergroupRhsAtTerminator(int brace_depth, int paren_depth) {
+  if (Check(TokenKind::kRBrace)) return brace_depth == 0;
+  if (Check(TokenKind::kRParen)) return paren_depth == 0;
+  if (Check(TokenKind::kSemicolon)) return paren_depth == 0 && brace_depth == 0;
+  return false;
+}
+
 void Parser::ParseCovergroupItemRhs() {
   int brace_depth = 0;
   int paren_depth = 0;
 
   while (!AtEnd()) {
+    if (CovergroupRhsAtTerminator(brace_depth, paren_depth)) break;
     if (Check(TokenKind::kLBrace)) {
       brace_depth++;
-      Consume();
     } else if (Check(TokenKind::kRBrace)) {
-      if (brace_depth > 0) {
-        brace_depth--;
-        Consume();
-      } else {
-        break;
-      }
+      brace_depth--;
     } else if (Check(TokenKind::kLParen)) {
       paren_depth++;
-      Consume();
     } else if (Check(TokenKind::kRParen)) {
-      if (paren_depth > 0) {
-        paren_depth--;
-        Consume();
-      } else {
-        break;
-      }
-    } else if (Check(TokenKind::kSemicolon)) {
-      if (paren_depth == 0 && brace_depth == 0) {
-        break;
-      }
-      Consume();
+      paren_depth--;
     } else if (Check(TokenKind::kKwWith)) {
       Consume();
-      Expect(TokenKind::kLParen);
-      int depth = 1;
-      while (depth > 0 && !AtEnd()) {
-        if (Check(TokenKind::kLParen)) depth++;
-        if (Check(TokenKind::kRParen)) depth--;
-        if (depth > 0) Consume();
-      }
-      Expect(TokenKind::kRParen);
+      SkipBalancedParens();
+      continue;
     } else if (Check(TokenKind::kKwIff)) {
       Consume();
-      Expect(TokenKind::kLParen);
-      int depth = 1;
-      while (depth > 0 && !AtEnd()) {
-        if (Check(TokenKind::kLParen)) depth++;
-        if (Check(TokenKind::kRParen)) depth--;
-        if (depth > 0) Consume();
-      }
-      Expect(TokenKind::kRParen);
+      SkipBalancedParens();
       break;
-    } else {
-      Consume();
     }
+    Consume();
   }
 }
 

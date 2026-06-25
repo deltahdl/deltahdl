@@ -193,6 +193,7 @@ class Parser {
   void ParseCoverpointItem();
   void SkipBinsSelectBrackets();
   void ParseCovergroupItemRhs();
+  bool CovergroupRhsAtTerminator(int brace_depth, int paren_depth);
 
   ModuleItem* ParseSpecifyBlock();
   void ParseSpecparamDecl(std::vector<ModuleItem*>& items);
