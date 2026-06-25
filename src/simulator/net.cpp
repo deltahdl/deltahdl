@@ -645,6 +645,11 @@ bool ResolveUserDefinedNet(Net& net, const UserNettype& nettype, Arena& arena) {
   if (nettype.resolution) {
     Logic4Vec result = nettype.resolution(arena, net.drivers);
     net.resolved->value = result;
+  } else if (net.drivers.empty() && net.resolved) {
+    // §6.6.7/§6.7.3: a logic net of an unresolved user-defined nettype with no
+    // drivers takes the data type's default value, which for a 4-state type is
+    // x (not z and not 0).
+    SetAllX(net.resolved->value);
   }
   return true;
 }
