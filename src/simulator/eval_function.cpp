@@ -256,9 +256,13 @@ static Logic4Vec EvalDpiCall(const Expr* expr, SimContext& ctx, Arena& arena) {
   return MakeLogic4VecVal(arena, 32, result);
 }
 
-static void ExecClassMethod(ModuleItem* method, const Expr* expr,
-                            SimContext& ctx, Arena& arena, Logic4Vec& out,
-                            const ClassTypeInfo* param_cls = nullptr);
+struct ClassMethodTarget {
+  ModuleItem* method = nullptr;
+  const ClassTypeInfo* param_cls = nullptr;
+};
+
+static void ExecClassMethod(ClassMethodTarget target, const Expr* expr,
+                            SimContext& ctx, Arena& arena, Logic4Vec& out);
 
 struct InstanceMethodInfo {
   ClassObject* obj = nullptr;
@@ -299,7 +303,7 @@ static Logic4Vec ExecInstanceMethodCall(ModuleItem* method, ClassObject* obj,
   ctx.PushThis(obj);
   ctx.PushQueueRefFrame();
   ctx.PushAssocRefFrame();
-  ExecClassMethod(method, expr, ctx, arena, out);
+  ExecClassMethod({method}, expr, ctx, arena, out);
   WritebackOutputArgs(method, expr, ctx, arena);
   WritebackQueueRefs(ctx);
   WritebackAssocRefs(ctx);
@@ -405,16 +409,16 @@ static uint32_t ComputeMethodReturnWidth(ModuleItem* method, SimContext& ctx,
   return width == 0 ? 32 : width;
 }
 
-static void ExecClassMethod(ModuleItem* method, const Expr* expr,
-                            SimContext& ctx, Arena& arena, Logic4Vec& out,
-                            const ClassTypeInfo* param_cls) {
+static void ExecClassMethod(ClassMethodTarget target, const Expr* expr,
+                            SimContext& ctx, Arena& arena, Logic4Vec& out) {
+  ModuleItem* method = target.method;
   bool is_void = (method->return_type.kind == DataTypeKind::kVoid);
   BindFunctionArgs(method, expr, ctx, arena);
   Variable dummy_ret;
   Variable* ret_var = &dummy_ret;
   if (!is_void) {
     ret_var = ctx.CreateLocalVariable(
-        method->name, ComputeMethodReturnWidth(method, ctx, param_cls));
+        method->name, ComputeMethodReturnWidth(method, ctx, target.param_cls));
   }
   ExecFunctionBody(method, ret_var, ctx, arena);
   out = is_void ? MakeLogic4VecVal(arena, 1, 0) : ret_var->value;
@@ -431,7 +435,7 @@ static bool TryEvalClassScopeCall(const Expr* expr, SimContext& ctx,
     return true;
   }
   ctx.PushScope();
-  ExecClassMethod(info.method, expr, ctx, arena, out);
+  ExecClassMethod({info.method}, expr, ctx, arena, out);
   ctx.PopScope();
   return true;
 }
@@ -449,7 +453,7 @@ static bool TryEvalParameterizedScopeCall(const Expr* expr, SimContext& ctx,
     ctx.PopScope();
     return true;
   }
-  ExecClassMethod(info.method, expr, ctx, arena, out, info.cls);
+  ExecClassMethod({info.method, info.cls}, expr, ctx, arena, out);
   ctx.PopScope();
   return true;
 }

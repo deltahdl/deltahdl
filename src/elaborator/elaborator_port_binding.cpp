@@ -499,7 +499,7 @@ static void CheckExplicitIdentifierOrInterfacePort(const PortBindCtx& ctx,
                                                    const Expr* conn_expr,
                                                    const RtlirPort* port,
                                                    std::string_view port_name) {
-  if (!(conn_expr && conn_expr->kind == ExprKind::kIdentifier && port)) return;
+  if (!conn_expr || conn_expr->kind != ExprKind::kIdentifier || !port) return;
   if (!port->is_interface_port) {
     CheckExplicitIdentifierConnection(ctx, conn_expr, *port, port_name);
   } else if (!ctx.interface_inst_types.count(conn_expr->text)) {
