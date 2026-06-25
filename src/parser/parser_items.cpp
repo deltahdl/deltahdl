@@ -692,7 +692,13 @@ void Parser::ParseImplicitTypeOrInst(std::vector<ModuleItem*>& items) {
     return;
   }
   if (known_types_.count(name_tok.text) != 0) {
-    ParseVarDeclList(items, MakeNamedType(name_tok.text));
+    DataType dtype = MakeNamedType(name_tok.text);
+    // Parse type parameters if present (e.g., C#(1, real) v2;)
+    if (Check(TokenKind::kHash)) {
+      Consume();
+      dtype.type_params = ParseTypeParamList();
+    }
+    ParseVarDeclList(items, dtype);
     return;
   }
   if (known_udps_.count(name_tok.text) != 0) {
