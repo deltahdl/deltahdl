@@ -213,13 +213,18 @@ TEST(DefaultClockingElab, ReferenceFormElaborates) {
 }
 
 TEST(DefaultClockingElab, DefaultClockingInInterfaceElaborates) {
-  EXPECT_TRUE(
-      ElabOk("interface my_if (input clk);\n"
-             "  logic [7:0] data;\n"
-             "  default clocking cb @(posedge clk);\n"
-             "    input data;\n"
-             "  endclocking\n"
-             "endinterface\n"));
+  // Top-level interface (no module): name it as the explicit top so it is
+  // elaborated rather than skipped by ElabOk's module default.
+  ElabFixture f;
+  ElaborateSrc(
+      "interface my_if (input clk);\n"
+      "  logic [7:0] data;\n"
+      "  default clocking cb @(posedge clk);\n"
+      "    input data;\n"
+      "  endclocking\n"
+      "endinterface\n",
+      f, "my_if");
+  EXPECT_FALSE(f.has_errors);
 }
 
 TEST(GlobalClockingElab, BasicGlobalClockingElaborates) {
@@ -245,10 +250,13 @@ TEST(GlobalClockingElab, CompoundEventElaborates) {
 }
 
 TEST(GlobalClockingElab, GlobalClockingInInterfaceElaborates) {
-  EXPECT_TRUE(
-      ElabOk("interface my_if (input clk);\n"
-             "  global clocking gc @(posedge clk); endclocking\n"
-             "endinterface\n"));
+  ElabFixture f;
+  ElaborateSrc(
+      "interface my_if (input clk);\n"
+      "  global clocking gc @(posedge clk); endclocking\n"
+      "endinterface\n",
+      f, "my_if");
+  EXPECT_FALSE(f.has_errors);
 }
 
 TEST(GlobalClockingElab, GlobalAndDefaultCoexist) {
@@ -305,12 +313,15 @@ TEST(SyncDriveElab, MultipleDrivesToSameOutputElaborates) {
 }
 
 TEST(ClockingBlockElab, ClockingBlockInProgramElaborates) {
-  EXPECT_TRUE(
-      ElabOk("program test(input logic clk);\n"
-             "  clocking cb @(posedge clk);\n"
-             "    input data;\n"
-             "  endclocking\n"
-             "endprogram\n"));
+  ElabFixture f;
+  ElaborateSrc(
+      "program test(input logic clk);\n"
+      "  clocking cb @(posedge clk);\n"
+      "    input data;\n"
+      "  endclocking\n"
+      "endprogram\n",
+      f, "test");
+  EXPECT_FALSE(f.has_errors);
 }
 
 TEST(ClockingBlockElab, SequenceDeclInBlockElaborates) {
@@ -326,19 +337,25 @@ TEST(ClockingBlockElab, SequenceDeclInBlockElaborates) {
 }
 
 TEST(DefaultClockingElab, DefaultClockingInProgramElaborates) {
-  EXPECT_TRUE(
-      ElabOk("program test(input logic clk);\n"
-             "  default clocking cb @(posedge clk);\n"
-             "    input data;\n"
-             "  endclocking\n"
-             "endprogram\n"));
+  ElabFixture f;
+  ElaborateSrc(
+      "program test(input logic clk);\n"
+      "  default clocking cb @(posedge clk);\n"
+      "    input data;\n"
+      "  endclocking\n"
+      "endprogram\n",
+      f, "test");
+  EXPECT_FALSE(f.has_errors);
 }
 
 TEST(GlobalClockingElab, GlobalClockingInProgramElaborates) {
-  EXPECT_TRUE(
-      ElabOk("program test(input logic clk);\n"
-             "  global clocking gc @(posedge clk); endclocking\n"
-             "endprogram\n"));
+  ElabFixture f;
+  ElaborateSrc(
+      "program test(input logic clk);\n"
+      "  global clocking gc @(posedge clk); endclocking\n"
+      "endprogram\n",
+      f, "test");
+  EXPECT_FALSE(f.has_errors);
 }
 
 TEST(CycleDelayElab, CycleDelayIdentifierWithDefaultClocking) {

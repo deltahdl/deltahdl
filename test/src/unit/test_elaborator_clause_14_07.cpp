@@ -14,30 +14,41 @@ TEST(ClockingScopeElab, ClockingInModuleElaborates) {
 }
 
 TEST(ClockingScopeElab, ClockingInProgramElaborates) {
-  EXPECT_TRUE(
-      ElabOk("program p(input clk);\n"
-             "  clocking cb @(posedge clk);\n"
-             "    input data;\n"
-             "  endclocking\n"
-             "endprogram\n"));
+  // A top-level program (no enclosing module) is named as the explicit top so
+  // it is actually elaborated; §14.7 permits a clocking block in a program.
+  ElabFixture f;
+  ElaborateSrc(
+      "program p(input clk);\n"
+      "  clocking cb @(posedge clk);\n"
+      "    input data;\n"
+      "  endclocking\n"
+      "endprogram\n",
+      f, "p");
+  EXPECT_FALSE(f.has_errors);
 }
 
 TEST(ClockingScopeElab, ClockingInCheckerElaborates) {
-  EXPECT_TRUE(
-      ElabOk("checker chk(input clk, input data);\n"
-             "  clocking cb @(posedge clk);\n"
-             "    input data;\n"
-             "  endclocking\n"
-             "endchecker\n"));
+  ElabFixture f;
+  ElaborateSrc(
+      "checker chk(input clk, input data);\n"
+      "  clocking cb @(posedge clk);\n"
+      "    input data;\n"
+      "  endclocking\n"
+      "endchecker\n",
+      f, "chk");
+  EXPECT_FALSE(f.has_errors);
 }
 
 TEST(ClockingScopeElab, ClockingInInterfaceElaborates) {
-  EXPECT_TRUE(
-      ElabOk("interface intf(input clk, input data);\n"
-             "  clocking cb @(posedge clk);\n"
-             "    input data;\n"
-             "  endclocking\n"
-             "endinterface\n"));
+  ElabFixture f;
+  ElaborateSrc(
+      "interface intf(input clk, input data);\n"
+      "  clocking cb @(posedge clk);\n"
+      "    input data;\n"
+      "  endclocking\n"
+      "endinterface\n",
+      f, "intf");
+  EXPECT_FALSE(f.has_errors);
 }
 
 TEST(ClockingScopeElab, DotAccessToClockvarElaborates) {
