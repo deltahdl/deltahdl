@@ -325,17 +325,99 @@ Stmt* Parser::ParseRandsequenceStmt() {
   return stmt;
 }
 
-static void SkipCoverpointBody(Lexer& lexer) {
-  while (!lexer.Peek().Is(TokenKind::kSemicolon) &&
-         !lexer.Peek().Is(TokenKind::kLBrace) &&
-         !lexer.Peek().Is(TokenKind::kEof)) {
-    lexer.Next();
+void Parser::ParseCoverpointBody() {
+  if (Match(TokenKind::kSemicolon)) {
+    return;
   }
-  if (lexer.Peek().Is(TokenKind::kLBrace)) {
-    lexer.Next();
-    SkipBraceBlock(lexer);
+  Expect(TokenKind::kLBrace);
+  while (!Check(TokenKind::kRBrace) && !AtEnd()) {
+    ParseCoverpointItem();
   }
-  if (lexer.Peek().Is(TokenKind::kSemicolon)) lexer.Next();
+  Expect(TokenKind::kRBrace);
+}
+
+void Parser::ParseCoverpointItem() {
+  Match(TokenKind::kKwWildcard);
+
+  if (Check(TokenKind::kKwBins) || Check(TokenKind::kKwIllegalBins) ||
+      Check(TokenKind::kKwIgnoreBins)) {
+    Consume();
+    ExpectIdentifier();
+    while (Check(TokenKind::kLBracket)) {
+      Consume();
+      int depth = 1;
+      while (depth > 0 && !AtEnd()) {
+        if (Check(TokenKind::kLBracket)) depth++;
+        if (Check(TokenKind::kRBracket)) depth--;
+        if (depth > 0) Consume();
+      }
+      Expect(TokenKind::kRBracket);
+    }
+    Expect(TokenKind::kEq);
+    ParseCovergroupItemRhs();
+  } else {
+    while (!Check(TokenKind::kSemicolon) && !AtEnd()) {
+      Consume();
+    }
+  }
+  Expect(TokenKind::kSemicolon);
+}
+
+void Parser::ParseCovergroupItemRhs() {
+  int brace_depth = 0;
+  int paren_depth = 0;
+
+  while (!AtEnd()) {
+    if (Check(TokenKind::kLBrace)) {
+      brace_depth++;
+      Consume();
+    } else if (Check(TokenKind::kRBrace)) {
+      if (brace_depth > 0) {
+        brace_depth--;
+        Consume();
+      } else {
+        break;
+      }
+    } else if (Check(TokenKind::kLParen)) {
+      paren_depth++;
+      Consume();
+    } else if (Check(TokenKind::kRParen)) {
+      if (paren_depth > 0) {
+        paren_depth--;
+        Consume();
+      } else {
+        break;
+      }
+    } else if (Check(TokenKind::kSemicolon)) {
+      if (paren_depth == 0 && brace_depth == 0) {
+        break;
+      }
+      Consume();
+    } else if (Check(TokenKind::kKwWith)) {
+      Consume();
+      Expect(TokenKind::kLParen);
+      int depth = 1;
+      while (depth > 0 && !AtEnd()) {
+        if (Check(TokenKind::kLParen)) depth++;
+        if (Check(TokenKind::kRParen)) depth--;
+        if (depth > 0) Consume();
+      }
+      Expect(TokenKind::kRParen);
+    } else if (Check(TokenKind::kKwIff)) {
+      Consume();
+      Expect(TokenKind::kLParen);
+      int depth = 1;
+      while (depth > 0 && !AtEnd()) {
+        if (Check(TokenKind::kLParen)) depth++;
+        if (Check(TokenKind::kRParen)) depth--;
+        if (depth > 0) Consume();
+      }
+      Expect(TokenKind::kRParen);
+      break;
+    } else {
+      Consume();
+    }
+  }
 }
 
 void Parser::ParseBlockEventExpression() {
@@ -542,7 +624,7 @@ void Parser::SkipCovergroupItem() {
 
   if (IsCoverpointOrCross(CurrentToken().kind)) {
     Consume();
-    SkipCoverpointBody(lexer_);
+    ParseCoverpointBody();
     return;
   }
 
@@ -551,7 +633,7 @@ void Parser::SkipCovergroupItem() {
     if (Match(TokenKind::kColon) && IsCoverpointOrCross(CurrentToken().kind)) {
       Consume();
     }
-    SkipCoverpointBody(lexer_);
+    ParseCoverpointBody();
     return;
   }
 
