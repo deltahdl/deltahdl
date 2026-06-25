@@ -743,6 +743,34 @@ static bool PortAlreadyFlagged(const RtlirModuleInst& inst,
   return false;
 }
 
+// Errors when one named interface-type port is connected to an interface
+// instance of a different type than the port's declared interface type.
+static void CheckOneNamedInterfacePort(const PortBindCtx& ctx,
+                                       const PortDecl& port,
+                                       const RtlirModuleInst& inst) {
+  const Expr* conn = nullptr;
+  for (const auto& binding : inst.port_bindings) {
+    if (binding.port_name == port.name) {
+      conn = binding.connection;
+      break;
+    }
+  }
+  std::string_view conn_name = ConnectionInterfaceName(conn);
+  if (conn_name.empty()) return;
+
+  bool found = false;
+  std::string_view conn_ifc_type =
+      ResolveConnectedInterfaceType(ctx, conn_name, found);
+  if (found && !conn_ifc_type.empty() &&
+      conn_ifc_type != port.data_type.type_name) {
+    ctx.diag.Error(
+        ctx.item->loc,
+        std::format("interface port '{}' requires interface type '{}' "
+                    "but is connected to instance of type '{}'",
+                    port.name, port.data_type.type_name, conn_ifc_type));
+  }
+}
+
 // §23.3.3.4/§25.3.2: a named interface-type port (`bus_if p`) must connect to
 // an interface instance of the identical type. The required type is taken from
 // the child declaration, so the rule holds even when the elaborated port's
@@ -758,28 +786,7 @@ static void CheckNamedInterfaceTypePorts(const PortBindCtx& ctx,
     if (port.data_type.kind != DataTypeKind::kNamed) continue;
     if (!NameIsInterface(port.data_type.type_name, unit)) continue;
     if (PortAlreadyFlagged(inst, port.name)) continue;
-
-    const Expr* conn = nullptr;
-    for (const auto& binding : inst.port_bindings) {
-      if (binding.port_name == port.name) {
-        conn = binding.connection;
-        break;
-      }
-    }
-    std::string_view conn_name = ConnectionInterfaceName(conn);
-    if (conn_name.empty()) continue;
-
-    bool found = false;
-    std::string_view conn_ifc_type =
-        ResolveConnectedInterfaceType(ctx, conn_name, found);
-    if (found && !conn_ifc_type.empty() &&
-        conn_ifc_type != port.data_type.type_name) {
-      ctx.diag.Error(
-          ctx.item->loc,
-          std::format("interface port '{}' requires interface type '{}' "
-                      "but is connected to instance of type '{}'",
-                      port.name, port.data_type.type_name, conn_ifc_type));
-    }
+    CheckOneNamedInterfacePort(ctx, port, inst);
   }
 }
 
