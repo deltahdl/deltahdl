@@ -782,7 +782,9 @@ static void CheckNamedInterfaceTypePorts(const PortBindCtx& ctx,
   if (!child_decl) return;
 
   for (const auto& port : child_decl->ports) {
-    if (port.direction != Direction::kNone) continue;
+    // An interface-type port carries no meaningful direction (the parser may
+    // leave the ANSI default in place), so the rule keys off the named type
+    // being an interface rather than the direction.
     if (port.data_type.kind != DataTypeKind::kNamed) continue;
     if (!NameIsInterface(port.data_type.type_name, unit)) continue;
     if (PortAlreadyFlagged(inst, port.name)) continue;
