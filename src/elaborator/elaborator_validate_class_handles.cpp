@@ -469,7 +469,13 @@ void Elaborator::WalkStmtsForClassHandleOps(const Stmt* s) {
 }
 
 void Elaborator::ValidateClassHandleOps(const ModuleDecl* decl) {
-  if (class_var_names_.empty()) return;
+  // Block-local class handles are not seeded into class_var_names_ (only
+  // module-scope handles are); they are collected during the walk itself
+  // (WalkStmtsForClassHandleOps records each kVarDecl in source order before
+  // reaching later assignments). Guarding on class_var_names_ would skip the
+  // walk entirely when every handle is declared inside a procedural block, so
+  // guard on class_names_ instead, mirroring ValidateLocalProtectedAccess.
+  if (class_names_.empty()) return;
   for (const auto* item : decl->items) {
     bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
                    item->kind == ModuleItemKind::kInitialBlock;
