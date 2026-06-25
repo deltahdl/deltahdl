@@ -502,10 +502,17 @@ void Elaborator::CheckExplicitConnLegality(const PortBindScope& scope,
       diag_,      scope.item, scope.parent_mod,    nettype_net_names_,
       var_types_, net_names_, interconnect_names_, interface_inst_types_};
 
-  if (conn_expr && conn_expr->kind == ExprKind::kIdentifier && port &&
-      !port->is_interface_port) {
-    CheckExplicitIdentifierConnection(kPortCtx, conn_expr, *port,
-                                      binding.port_name);
+  if (conn_expr && conn_expr->kind == ExprKind::kIdentifier && port) {
+    if (!port->is_interface_port) {
+      CheckExplicitIdentifierConnection(kPortCtx, conn_expr, *port,
+                                        binding.port_name);
+    } else if (!interface_inst_types_.count(conn_expr->text)) {
+      diag_.Error(scope.item->loc,
+                  std::format("interface port '{}' requires a declared "
+                              "interface instance but '{}' is not an "
+                              "interface instance",
+                              binding.port_name, conn_expr->text));
+    }
   }
 
   if (conn_expr && binding.direction != Direction::kInput &&
