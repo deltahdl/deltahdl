@@ -15,6 +15,10 @@ static const ClassMember* FindMemberInClass(const ClassDecl* cls,
   for (const auto* c = cls; c;) {
     for (const auto* m : c->members) {
       if (m->name == name) return m;
+      // §8.18: a method member carries its name on the method item, not on the
+      // ClassMember, so match that too — the local/protected qualifiers live on
+      // the ClassMember and must govern method calls just as for data members.
+      if (m->method != nullptr && m->method->name == name) return m;
     }
     if (c->base_class.empty()) break;
     c = FindClassDecl(c->base_class, unit);
