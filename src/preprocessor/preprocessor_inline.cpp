@@ -425,9 +425,19 @@ std::string Preprocessor::ExpandInlineMacros(std::string_view line,
   std::string result;
   result.reserve(line.size());
   size_t copied = 0;
-  in_string = false;
 
   while (true) {
+    // Recalculate in_string based on quote characters from the start of the
+    // line to the current copied position. This ensures we correctly track
+    // whether we are inside a string literal before searching for the next
+    // backtick.
+    in_string = false;
+    for (size_t i = 0; i < copied && i < line.size(); ++i) {
+      if (line[i] == '"' && (i == 0 || line[i - 1] != '\\')) {
+        in_string = !in_string;
+      }
+    }
+
     size_t bt = FindNextBacktick(line, copied, in_string);
     if (bt == std::string_view::npos) break;
     result.append(line.substr(copied, bt - copied));
