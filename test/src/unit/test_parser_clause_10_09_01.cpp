@@ -85,7 +85,7 @@ TEST(ArrayLiteralParsing, IndexKeyWithDefault) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
+  auto* item = FirstItem(r, ModuleItemKind::kVarDecl);
   ASSERT_NE(item, nullptr);
   ASSERT_NE(item->init_expr, nullptr);
   EXPECT_EQ(item->init_expr->kind, ExprKind::kAssignmentPattern);

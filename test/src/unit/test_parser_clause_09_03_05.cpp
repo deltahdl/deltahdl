@@ -393,7 +393,7 @@ TEST(StatementLabelParsing, PrefixLabelMatchesEndLabelOnBegin) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
+  auto* stmt = InitialBody(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kBlock);
   EXPECT_EQ(stmt->label, "name");

@@ -113,6 +113,7 @@ TEST(ExpressionLexing, BitwiseAndShiftOperators) {
       case TokenKind::kPipe:
       case TokenKind::kCaret:
       case TokenKind::kCaretTilde:
+      case TokenKind::kTildeCaret:
       case TokenKind::kTilde:
       case TokenKind::kLtLt:
       case TokenKind::kGtGt:

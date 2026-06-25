@@ -180,7 +180,11 @@ TEST(TaskAndFunctionParsing, RefArgOnFunction) {
   EXPECT_EQ(fn->func_args[1].direction, Direction::kRef);
 }
 
-TEST(PassByRefParsing, RefDoesNotStickyToNextArg) {
+TEST(PassByRefParsing, RefStickiesToNextArg) {
+  // §13.4 (Syntax 13-2 prose): once a direction is given, subsequent formals
+  // default to the same direction, and the const/static qualifiers on the ref
+  // direction are included in this default. So the second bare argument here
+  // inherits ref, not input.
   auto r = Parse(
       "module m;\n"
       "  function automatic void f(ref int x, int y);\n"
@@ -192,7 +196,7 @@ TEST(PassByRefParsing, RefDoesNotStickyToNextArg) {
   ASSERT_NE(fn, nullptr);
   ASSERT_EQ(fn->func_args.size(), 2u);
   EXPECT_EQ(fn->func_args[0].direction, Direction::kRef);
-  EXPECT_EQ(fn->func_args[1].direction, Direction::kInput);
+  EXPECT_EQ(fn->func_args[1].direction, Direction::kRef);
 }
 
 TEST(FunctionDeclParsing, RefOldStyleDeclOnFunction) {

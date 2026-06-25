@@ -31,8 +31,11 @@ TEST(LoopSyntaxParsing, ForeachLoopInAlwaysComb) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstAlwaysCombStmt(r);
-  ASSERT_NE(stmt, nullptr);
+  auto* block = FirstAlwaysCombStmt(r);
+  ASSERT_NE(block, nullptr);
+  ASSERT_EQ(block->kind, StmtKind::kBlock);
+  ASSERT_GE(block->stmts.size(), 1u);
+  auto* stmt = block->stmts[0];
   EXPECT_EQ(stmt->kind, StmtKind::kForeach);
   ASSERT_FALSE(stmt->foreach_vars.empty());
 }

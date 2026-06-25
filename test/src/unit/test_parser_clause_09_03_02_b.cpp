@@ -133,9 +133,9 @@ TEST(ParallelBlockParsing, ForkAsDirectInitialBody) {
   auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kFork);
-  ASSERT_GE(stmt->stmts.size(), 2u);
-  EXPECT_EQ(stmt->stmts[0]->kind, StmtKind::kBlockingAssign);
-  EXPECT_EQ(stmt->stmts[1]->kind, StmtKind::kBlockingAssign);
+  ASSERT_GE(stmt->fork_stmts.size(), 2u);
+  EXPECT_EQ(stmt->fork_stmts[0]->kind, StmtKind::kBlockingAssign);
+  EXPECT_EQ(stmt->fork_stmts[1]->kind, StmtKind::kBlockingAssign);
 }
 
 TEST(ParallelBlockParsing, LocalparamInForkJoin) {

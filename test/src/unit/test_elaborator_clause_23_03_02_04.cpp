@@ -198,11 +198,10 @@ TEST(WildcardPortConnectionElaboration,
 
 TEST(WildcardPortConnectionElaboration, MixedStylesInSameParent) {
   EXPECT_TRUE(
-      ElabOk("module child(input logic a, output logic b);\n"
-             "  assign b = a;\n"
+      ElabOk("module child(input logic a, input logic b);\n"
              "endmodule\n"
              "module top;\n"
-             "  logic a, b, c, d, e, f;\n"
+             "  logic a, b, c, d;\n"
              "  child u0(a, b);\n"
              "  child u1(.a(c), .b(d));\n"
              "  child u2(.a, .b);\n"

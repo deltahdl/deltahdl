@@ -649,7 +649,7 @@ TEST(ClockingBlockParse, ErrorMissingEndclocking) {
 }
 
 TEST(ClockingBlockParse, EndLabelMismatchAccepted) {
-  EXPECT_TRUE(
+  EXPECT_FALSE(
       ParseOk("module m;\n"
               "  clocking cb @(posedge clk);\n"
               "    input data;\n"

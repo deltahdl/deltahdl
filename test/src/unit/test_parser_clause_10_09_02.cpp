@@ -65,10 +65,10 @@ TEST(StructPatternParsing, AssignmentPatternInForLoop) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  typedef struct { int idx; int val; } entry_t;\n"
-              "  entry_t table[4];\n"
+              "  entry_t tbl[4];\n"
               "  initial begin\n"
               "    for (int i = 0; i < 4; i = i + 1) begin\n"
-              "      table[i] = '{i, i * 10};\n"
+              "      tbl[i] = '{i, i * 10};\n"
               "    end\n"
               "  end\n"
               "endmodule\n"));

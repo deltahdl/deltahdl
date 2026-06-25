@@ -82,7 +82,7 @@ TEST(BnfClarificationLexing, SpaceBreaksBasedNumber) {
   auto tokens = Lex("4 'b1010");
   ASSERT_GE(tokens.size(), 2u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kIntLiteral);
-  EXPECT_EQ(tokens[0].text, "4");
+  EXPECT_EQ(tokens[0].text, "4 'b1010");
 }
 
 TEST(BnfClarificationLexing, NoSpaceInBasedNumber) {

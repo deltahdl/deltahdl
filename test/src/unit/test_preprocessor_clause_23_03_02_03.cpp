@@ -17,7 +17,9 @@ TEST(ImplicitNamedPortConnectionPreprocessing,
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* inst = FindItemByKind(r, ModuleItemKind::kModuleInst);
+  ASSERT_GE(r.cu->modules.size(), 2u);
+  auto* inst =
+      FindItemByKind(r.cu->modules[1]->items, ModuleItemKind::kModuleInst);
   ASSERT_NE(inst, nullptr);
   ASSERT_EQ(inst->inst_ports.size(), 2u);
   EXPECT_EQ(inst->inst_ports[0].first, "a");

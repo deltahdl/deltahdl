@@ -37,9 +37,8 @@ TEST(ProceduralAssignmentParsing, BlockingAssignInTaskBody) {
   EXPECT_FALSE(r.has_errors);
   auto* task = FindItemByKind(r, ModuleItemKind::kTaskDecl);
   ASSERT_NE(task, nullptr);
-  ASSERT_NE(task->body, nullptr);
-  ASSERT_GE(task->body->stmts.size(), 1u);
-  auto* assign = task->body->stmts.back();
+  ASSERT_GE(task->func_body_stmts.size(), 1u);
+  auto* assign = task->func_body_stmts.back();
   EXPECT_EQ(assign->kind, StmtKind::kBlockingAssign);
 }
 
@@ -56,8 +55,8 @@ TEST(ProceduralAssignmentParsing, BlockingAssignInFunctionBody) {
   EXPECT_FALSE(r.has_errors);
   auto* func = FirstFunctionDecl(r);
   ASSERT_NE(func, nullptr);
-  ASSERT_NE(func->body, nullptr);
-  auto* assign = FindStmtByKind(func->body->stmts, StmtKind::kBlockingAssign);
+  auto* assign =
+      FindStmtByKind(func->func_body_stmts, StmtKind::kBlockingAssign);
   ASSERT_NE(assign, nullptr);
   EXPECT_EQ(assign->lhs->text, "tmp");
 }

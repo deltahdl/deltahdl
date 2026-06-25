@@ -15,12 +15,13 @@ TEST(WildcardPortConnectionLexing, WildcardTokenSequence) {
 
 TEST(WildcardPortConnectionLexing, WildcardMixedWithNamed) {
   auto tokens = Lex("sub u0(.a(x), .*)");
-  ASSERT_GE(tokens.size(), 10u);
+  ASSERT_GE(tokens.size(), 11u);
   EXPECT_EQ(tokens[2].kind, TokenKind::kLParen);
   EXPECT_EQ(tokens[3].kind, TokenKind::kDot);
   EXPECT_EQ(tokens[4].text, "a");
-  EXPECT_EQ(tokens[8].kind, TokenKind::kDotStar);
-  EXPECT_EQ(tokens[9].kind, TokenKind::kRParen);
+  EXPECT_EQ(tokens[8].kind, TokenKind::kComma);
+  EXPECT_EQ(tokens[9].kind, TokenKind::kDotStar);
+  EXPECT_EQ(tokens[10].kind, TokenKind::kRParen);
 }
 
 }  // namespace

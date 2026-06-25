@@ -16,7 +16,9 @@ TEST(WildcardPortConnectionPreprocessing, WildcardSurvivesPreprocessing) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* inst = FindItemByKind(r, ModuleItemKind::kModuleInst);
+  ASSERT_GE(r.cu->modules.size(), 2u);
+  auto* inst =
+      FindItemByKind(r.cu->modules[1]->items, ModuleItemKind::kModuleInst);
   ASSERT_NE(inst, nullptr);
   EXPECT_TRUE(inst->inst_wildcard);
   EXPECT_TRUE(inst->inst_ports.empty());

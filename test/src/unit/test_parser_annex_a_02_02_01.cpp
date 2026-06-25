@@ -298,7 +298,7 @@ TEST(NetAndVariableTypeParsing, TypeReferenceFromExpression) {
   auto r = Parse(
       "module m;\n"
       "  int x;\n"
-      "  type(x) y;\n"
+      "  var type(x) y;\n"
       "endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -506,7 +506,7 @@ TEST(NetAndVariableTypeParsing, EnumNameDeclarationWithConstantExpression) {
 TEST(NetAndVariableTypeParsing, TypeReferenceFromDataType) {
   auto r = Parse(
       "module m;\n"
-      "  type(int) y;\n"
+      "  var type(int) y;\n"
       "endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);

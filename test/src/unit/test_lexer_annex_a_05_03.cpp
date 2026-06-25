@@ -64,11 +64,10 @@ TEST(UdpBodyLexing, InitialStatementTokenSequence) {
 
 TEST(UdpBodyLexing, ParenthesizedEdgeTokenSequence) {
   auto tokens = Lex("(01)");
-  ASSERT_GE(tokens.size(), 4u);
+  ASSERT_GE(tokens.size(), 3u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kLParen);
   EXPECT_EQ(tokens[1].kind, TokenKind::kIntLiteral);
-  EXPECT_EQ(tokens[2].kind, TokenKind::kIntLiteral);
-  EXPECT_EQ(tokens[3].kind, TokenKind::kRParen);
+  EXPECT_EQ(tokens[2].kind, TokenKind::kRParen);
 }
 
 TEST(UdpBodyLexing, DashAsMinusToken) {

@@ -106,13 +106,18 @@ TEST(FunctionReturnElaboration, VoidFunctionBareReturnOk) {
              "endmodule\n"));
 }
 
-TEST(FunctionReturnElaboration, NonVoidFunctionBareReturnOk) {
-  EXPECT_TRUE(
-      ElabOk("module m;\n"
-             "  function int f();\n"
-             "    return;\n"
-             "  endfunction\n"
-             "endmodule\n"));
+TEST(FunctionReturnElaboration, NonVoidFunctionBareReturnError) {
+  // §13.4: when the return statement is used, nonvoid functions shall specify
+  // an expression with the return; a bare `return;` here is an error.
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  function int f();\n"
+      "    return;\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
 }
 
 TEST(FunctionReturnElaboration, VoidReturnWithValueInNestedBlockError) {

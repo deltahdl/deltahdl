@@ -127,11 +127,13 @@ TEST(WildcardPortConnectionParsing, MixedStylesInSameParent) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto& items = r.cu->modules[1]->items;
-  ASSERT_GE(items.size(), 4u);
-  EXPECT_FALSE(items[0]->inst_wildcard);
-  EXPECT_FALSE(items[1]->inst_wildcard);
-  EXPECT_FALSE(items[2]->inst_wildcard);
-  EXPECT_TRUE(items[3]->inst_wildcard);
+  // `logic a, b, c, d;` yields four separate var-decl items before the four
+  // instantiations, so the instances are items[4..7].
+  ASSERT_GE(items.size(), 8u);
+  EXPECT_FALSE(items[4]->inst_wildcard);
+  EXPECT_FALSE(items[5]->inst_wildcard);
+  EXPECT_FALSE(items[6]->inst_wildcard);
+  EXPECT_TRUE(items[7]->inst_wildcard);
 }
 
 }  // namespace
