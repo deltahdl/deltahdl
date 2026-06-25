@@ -82,6 +82,7 @@ static void SetDigitBits(Logic4Vec& vec, uint32_t& bit_pos, int bit_count,
       vec.words[word].aval |= mask;
       vec.words[word].bval |= mask;
     } else if (is_z) {
+      vec.words[word].aval |= mask;
       vec.words[word].bval |= mask;
     } else if (dval >= 0 && (dval & (1 << b))) {
       vec.words[word].aval |= mask;
