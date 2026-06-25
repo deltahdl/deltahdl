@@ -201,7 +201,11 @@ uint32_t Lexer::SkipLineComment() {
   while (!AtEnd() && Current() != '\n') {
     Advance();
   }
-  return pos_;
+  uint32_t body_end = pos_;
+  if (!AtEnd() && Current() == '\n') {
+    Advance();
+  }
+  return body_end;
 }
 
 uint32_t Lexer::SkipBlockComment(SourceLoc start_loc) {
