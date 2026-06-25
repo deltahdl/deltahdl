@@ -857,6 +857,23 @@ PortDecl Parser::ParsePortDecl() {
     if (ParserPortHelpers::TryParseAnsiModportPort(*this, port)) {
       return port;
     }
+    // Check for simple interface port form: `interface_type port_name`
+    // when no direction is specified and the identifier is not a known type.
+    auto saved = lexer_.SavePos();
+    auto type_tok = Consume();
+    if (CheckIdentifier()) {
+      // This looks like `unknown_id identifier`, treat it as an interface port.
+      port.data_type.kind = DataTypeKind::kNamed;
+      port.data_type.type_name = type_tok.text;
+      port.name = ExpectIdentifier().text;
+      ParseUnpackedDims(port.unpacked_dims);
+      if (Match(TokenKind::kEq)) {
+        port.default_value = ParseExpr();
+      }
+      return port;
+    }
+    // Not an interface port, restore and parse as a normal data type.
+    lexer_.RestorePos(saved);
   }
 
   ParserPortHelpers::ParseAnsiPortDataType(*this, port);
