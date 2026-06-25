@@ -121,11 +121,15 @@ bool Preprocessor::ExpandUserDefinedMacro(std::string_view name,
   }
 
   expansion_stack_.emplace_back(name);
+  auto exp_trimmed = Trim(std::string_view(expanded));
+  bool starts_directive = !exp_trimmed.empty() && exp_trimmed[0] == '`';
+  if (!starts_directive) {
+    expanded = ExpandInlineMacros(expanded, loc.file_id, loc.line);
+  }
   if (!rest.empty()) {
     expanded += ExpandInlineMacros(rest, loc.file_id, loc.line);
   }
-  auto exp_trimmed = Trim(std::string_view(expanded));
-  if (!exp_trimmed.empty() && exp_trimmed[0] == '`') {
+  if (starts_directive) {
     ProcessDirective(expanded, loc.file_id, loc.line, depth, output);
   } else {
     output.append(expanded);
@@ -215,7 +219,8 @@ size_t Preprocessor::ExpandInlineFunctionMacro(const MacroDef& def,
       name_end +
       static_cast<size_t>(balanced.data() + balanced.size() - rest.data());
   expansion_stack_.emplace_back(def.name);
-  result += ExpandMacro(def, args_text);
+  std::string body = ExpandMacro(def, args_text);
+  result += ExpandInlineMacros(body, loc.file_id, loc.line);
   expansion_stack_.pop_back();
   return advance;
 }
@@ -256,7 +261,8 @@ size_t Preprocessor::ExpandSingleInlineMacro(std::string_view line, size_t pos,
   }
 
   expansion_stack_.emplace_back(name);
-  result += ExpandMacro(*def, {});
+  std::string body = ExpandMacro(*def, {});
+  result += ExpandInlineMacros(body, file_id, line_num);
   expansion_stack_.pop_back();
   return i;
 }
