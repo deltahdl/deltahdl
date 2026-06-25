@@ -319,6 +319,11 @@ static void SignExtendWideResult(const Logic4Vec& val, uint32_t target_width,
   uint32_t fill_bit = val.width % 64;
   if (fill_bit != 0) {
     uint64_t fill_mask = ~((uint64_t{1} << fill_bit) - 1);
+    uint32_t target_bits_in_word = target_width % 64;
+    if (target_bits_in_word > fill_bit) {
+      uint64_t upper_limit = (uint64_t{1} << target_bits_in_word) - 1;
+      fill_mask &= upper_limit;
+    }
     result.words[val.width / 64].aval |= a_fill & fill_mask;
     result.words[val.width / 64].bval |= b_fill & fill_mask;
   }
