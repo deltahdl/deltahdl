@@ -127,22 +127,22 @@ static Logic4Vec CombineBranches(Logic4Vec tv, Logic4Vec fv, Arena& arena) {
 // operand that could mutate state (an embedded assignment, ++/--, or a call)
 // is detected here so the determinate-condition path can skip it; a pure
 // operand is still evaluated to recover its result-type metadata.
-static bool ExprMayHaveSideEffect(const Expr* e) {
-  if (e == nullptr) return false;
+static bool ExprNodeIsSideEffect(const Expr* e) {
   if (e->kind == ExprKind::kCall || e->kind == ExprKind::kSystemCall)
     return true;
   if (e->kind == ExprKind::kBinary &&
       (e->op == TokenKind::kEq || IsCompoundAssignOp(e->op)))
     return true;
-  if ((e->kind == ExprKind::kUnary || e->kind == ExprKind::kPostfixUnary) &&
-      (e->op == TokenKind::kPlusPlus || e->op == TokenKind::kMinusMinus))
-    return true;
-  if (ExprMayHaveSideEffect(e->lhs) || ExprMayHaveSideEffect(e->rhs) ||
-      ExprMayHaveSideEffect(e->condition) ||
-      ExprMayHaveSideEffect(e->true_expr) ||
-      ExprMayHaveSideEffect(e->false_expr) || ExprMayHaveSideEffect(e->base) ||
-      ExprMayHaveSideEffect(e->index) || ExprMayHaveSideEffect(e->index_end))
-    return true;
+  return (e->kind == ExprKind::kUnary || e->kind == ExprKind::kPostfixUnary) &&
+         (e->op == TokenKind::kPlusPlus || e->op == TokenKind::kMinusMinus);
+}
+static bool ExprMayHaveSideEffect(const Expr* e) {
+  if (e == nullptr) return false;
+  if (ExprNodeIsSideEffect(e)) return true;
+  const Expr* children[] = {e->lhs,  e->rhs,   e->condition,  e->true_expr,
+                            e->base, e->index, e->false_expr, e->index_end};
+  for (const auto* c : children)
+    if (ExprMayHaveSideEffect(c)) return true;
   for (const auto* a : e->args)
     if (ExprMayHaveSideEffect(a)) return true;
   for (const auto* el : e->elements)

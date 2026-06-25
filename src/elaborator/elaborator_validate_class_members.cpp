@@ -331,39 +331,54 @@ static bool ConstructorHasGuardedSuperNew(const Stmt* s) {
   return false;
 }
 
-void Elaborator::ValidateOneClassChainingCtor(const ClassDecl* cls) {
-  if (cls->base_class.empty()) return;
-  const ClassMember* ctor = nullptr;
+// Returns the new() constructor member of a class, or nullptr if absent.
+static const ClassMember* FindClassConstructor(const ClassDecl* cls) {
   for (const auto* m : cls->members) {
     if (m->kind == ClassMemberKind::kMethod && m->method &&
         m->method->name == "new") {
-      ctor = m;
-      break;
+      return m;
     }
   }
-  if (!ctor || !ctor->method) return;
-  bool has_super_new = false;
-  const auto& stmts = ctor->method->func_body_stmts;
+  return nullptr;
+}
+
+// §8.17: scans the top-level sequential statements of a constructor for a
+// super.new() call. Emits an error if one is present but is not the first
+// executable statement. Returns whether such a sequential call was found.
+static bool ReportSequentialSuperNew(const ModuleItem* method,
+                                     DiagEngine& diag) {
+  const auto& stmts = method->func_body_stmts;
   for (size_t i = 0; i < stmts.size(); ++i) {
     if (!IsSuperNewCall(stmts[i])) continue;
-    has_super_new = true;
     if (i != 0) {
-      diag_.Error(stmts[i]->range.start,
-                  "super.new() shall be the first executable statement "
-                  "in the constructor");
+      diag.Error(stmts[i]->range.start,
+                 "super.new() shall be the first executable statement "
+                 "in the constructor");
     }
-    break;
+    return true;
   }
-  if (!has_super_new) {
-    for (const auto* s : stmts) {
-      if (ConstructorHasGuardedSuperNew(s)) {
-        diag_.Error(s->range.start,
-                    "super.new() shall be the first executable statement "
-                    "in the constructor");
-        break;
-      }
+  return false;
+}
+
+// §8.17: emits an error if a super.new() call appears in a control-flow
+// position of the constructor (where it can never be the first statement).
+static void ReportGuardedSuperNew(const ModuleItem* method, DiagEngine& diag) {
+  for (const auto* s : method->func_body_stmts) {
+    if (ConstructorHasGuardedSuperNew(s)) {
+      diag.Error(s->range.start,
+                 "super.new() shall be the first executable statement "
+                 "in the constructor");
+      return;
     }
   }
+}
+
+void Elaborator::ValidateOneClassChainingCtor(const ClassDecl* cls) {
+  if (cls->base_class.empty()) return;
+  const ClassMember* ctor = FindClassConstructor(cls);
+  if (!ctor || !ctor->method) return;
+  bool has_super_new = ReportSequentialSuperNew(ctor->method, diag_);
+  if (!has_super_new) ReportGuardedSuperNew(ctor->method, diag_);
   if (has_super_new &&
       (!cls->extends_args.empty() || cls->extends_has_default)) {
     diag_.Error(ctor->method->loc,
