@@ -92,14 +92,20 @@ TEST(PackageImportInHeader, InterfaceHeaderImportVisibleInBody) {
 // imported type names an interface port; resolving that port type proves the
 // header import reached the port list, not just the body.
 TEST(PackageImportInHeader, InterfaceHeaderImportVisibleInPortType) {
-  EXPECT_TRUE(
-      ElabOk("package pkg;\n"
-             "  typedef logic [7:0] byte_t;\n"
-             "endpackage\n"
-             "interface ifc import pkg::byte_t; (input byte_t a);\n"
-             "  byte_t shadow;\n"
-             "  assign shadow = a;\n"
-             "endinterface\n"));
+  // A top-level interface (no enclosing module) must still be elaborable, so
+  // the test names it as the explicit top rather than relying on ElabOk's
+  // module default (§26.4 names the interface among the three header kinds).
+  ElabFixture f;
+  ElaborateSrc(
+      "package pkg;\n"
+      "  typedef logic [7:0] byte_t;\n"
+      "endpackage\n"
+      "interface ifc import pkg::byte_t; (input byte_t a);\n"
+      "  byte_t shadow;\n"
+      "  assign shadow = a;\n"
+      "endinterface\n",
+      f, "ifc");
+  EXPECT_FALSE(f.has_errors);
 }
 
 // Mirrors the §26.4 example: a single header mixes an explicit import with a
@@ -124,24 +130,30 @@ TEST(PackageImportInHeader, MixedExplicitAndWildcardHeaderImports) {
 // imported type names the port and a body variable; if header import did not
 // make it visible, elaboration would fail to resolve the type.
 TEST(PackageImportInHeader, ProgramHeaderImportVisibleInPortAndBody) {
-  EXPECT_TRUE(
-      ElabOk("package pkg;\n"
-             "  typedef logic [7:0] byte_t;\n"
-             "endpackage\n"
-             "program p import pkg::byte_t; (input byte_t a);\n"
-             "  byte_t local_b;\n"
-             "  initial local_b = a;\n"
-             "endprogram\n"));
+  ElabFixture f;
+  ElaborateSrc(
+      "package pkg;\n"
+      "  typedef logic [7:0] byte_t;\n"
+      "endpackage\n"
+      "program p import pkg::byte_t; (input byte_t a);\n"
+      "  byte_t local_b;\n"
+      "  initial local_b = a;\n"
+      "endprogram\n",
+      f, "p");
+  EXPECT_FALSE(f.has_errors);
 }
 
 TEST(PackageImportInHeader, WildcardProgramHeaderImportVisibleInPort) {
-  EXPECT_TRUE(
-      ElabOk("package pkg;\n"
-             "  typedef logic [15:0] word_t;\n"
-             "endpackage\n"
-             "program p import pkg::*; (input word_t a, output word_t b);\n"
-             "  initial b = a;\n"
-             "endprogram\n"));
+  ElabFixture f;
+  ElaborateSrc(
+      "package pkg;\n"
+      "  typedef logic [15:0] word_t;\n"
+      "endpackage\n"
+      "program p import pkg::*; (input word_t a, output word_t b);\n"
+      "  initial b = a;\n"
+      "endprogram\n",
+      f, "p");
+  EXPECT_FALSE(f.has_errors);
 }
 
 }  // namespace
