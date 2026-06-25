@@ -64,7 +64,7 @@ static Logic4Vec EvalFgets(const Expr* expr, SimContext& ctx, Arena& arena) {
 static Logic4Vec EvalFgetc(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (expr->args.empty()) return MakeLogic4VecVal(arena, 32, 0xFFFFFFFF);
   uint32_t fd = FdFromArg(expr->args[0], ctx, arena);
-  FILE* fp = ReadableHandle(fd, ctx);
+  FILE* fp = ctx.GetFileHandle(fd);
   if (!fp) return MakeLogic4VecVal(arena, 32, 0xFFFFFFFF);
 
   int ch = std::fgetc(fp);
@@ -136,11 +136,11 @@ static long SignedOffset(const Logic4Vec& vec) {
 }
 
 static Logic4Vec EvalFseek(const Expr* expr, SimContext& ctx, Arena& arena) {
-  if (expr->args.size() < 3) return MakeLogic4VecVal(arena, 32, 0);
+  if (expr->args.size() < 3) return MakeLogic4VecVal(arena, 64, 0);
   uint32_t fd = FdFromArg(expr->args[0], ctx, arena);
   FILE* fp = ctx.GetFileHandle(fd);
   // §21.3.5: a failed reposition reports the error code -1.
-  if (!fp) return MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(-1));
+  if (!fp) return MakeLogic4VecVal(arena, 64, static_cast<uint64_t>(-1));
 
   long offset = SignedOffset(EvalExpr(expr->args[1], ctx, arena));
 
@@ -156,13 +156,13 @@ static Logic4Vec EvalFseek(const Expr* expr, SimContext& ctx, Arena& arena) {
   } else if (operation == 2) {
     whence = SEEK_END;
   } else if (operation != 0) {
-    return MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(-1));
+    return MakeLogic4VecVal(arena, 64, static_cast<uint64_t>(-1));
   }
 
   // §21.3.5: a successful $fseek cancels any $ungetc push-back; the host's
   // std::fseek discards pushed-back characters for the stream as required.
   int result = std::fseek(fp, offset, whence);
-  return MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(result));
+  return MakeLogic4VecVal(arena, 64, static_cast<uint64_t>(result));
 }
 
 static Logic4Vec EvalFtell(const Expr* expr, SimContext& ctx, Arena& arena) {
@@ -175,15 +175,15 @@ static Logic4Vec EvalFtell(const Expr* expr, SimContext& ctx, Arena& arena) {
 }
 
 static Logic4Vec EvalRewind(const Expr* expr, SimContext& ctx, Arena& arena) {
-  if (expr->args.empty()) return MakeLogic4VecVal(arena, 32, 0);
+  if (expr->args.empty()) return MakeLogic4VecVal(arena, 64, 0);
   uint32_t fd = FdFromArg(expr->args[0], ctx, arena);
   FILE* fp = ctx.GetFileHandle(fd);
   // §21.3.5: $rewind is equivalent to $fseek(fd, 0, 0) and, like $fseek,
   // reports -1 when the reposition fails. The host reposition also discards
   // any $ungetc push-back, satisfying the cancellation requirement.
-  if (!fp) return MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(-1));
+  if (!fp) return MakeLogic4VecVal(arena, 64, static_cast<uint64_t>(-1));
   int result = std::fseek(fp, 0, SEEK_SET);
-  return MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(result));
+  return MakeLogic4VecVal(arena, 64, static_cast<uint64_t>(result));
 }
 
 static Logic4Vec EvalUngetc(const Expr* expr, SimContext& ctx, Arena& arena) {
