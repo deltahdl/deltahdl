@@ -31,6 +31,13 @@ static Logic4Vec EvalIdentifier(const Expr* expr, SimContext& ctx,
     val.is_signed = var->is_signed;
     return val;
   }
+  // §8.6: when reading an unqualified identifier within a method body, if the
+  // identifier is not found as a local variable, try to resolve it as a
+  // property of the current object (this).
+  auto* self = ctx.CurrentThis();
+  if (self) {
+    return self->GetProperty(expr->text, arena);
+  }
   return MakeLogic4Vec(arena, 1);
 }
 bool HasUnknownBits(const Logic4Vec& v) {
