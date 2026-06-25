@@ -277,7 +277,12 @@ static bool ResolveInstanceMethod(const MethodCallParts& parts, SimContext& ctx,
   info.method = info.obj->ResolveVirtualMethod(parts.method_name);
   if (!info.method) {
     auto* declared_type = ctx.FindClassType(class_type);
-    if (declared_type) {
+    // §8.26.9: when the declared type is an interface class, method resolution
+    // uses the object's dynamic type (the implementing class), not the
+    // interface.
+    if (declared_type && declared_type->is_interface) {
+      info.method = info.obj->ResolveMethod(parts.method_name);
+    } else if (declared_type) {
       info.method =
           info.obj->ResolveMethodForType(parts.method_name, declared_type);
     } else {
