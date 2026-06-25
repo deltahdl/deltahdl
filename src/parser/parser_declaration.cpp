@@ -430,6 +430,14 @@ ModuleItem* Parser::ParseNettypeDecl() {
   item->typedef_type = ParseDataType();
   item->name = Expect(TokenKind::kIdentifier).text;
 
+  // §6.6.7 / A.2.1.3: a nettype declaration requires an explicit data type
+  // (or a source nettype). A lone `nettype name;` is not well formed.
+  if (item->typedef_type.kind == DataTypeKind::kImplicit &&
+      item->typedef_type.type_name.empty()) {
+    diag_.Error(item->loc,
+                "nettype declaration requires an explicit data type");
+  }
+
   if (Check(TokenKind::kKwWith)) {
     Consume();
     auto func_name = Expect(TokenKind::kIdentifier).text;
@@ -597,6 +605,14 @@ DataType Parser::ParseFunctionReturnType() {
   }
   DataType dt;
   if (TryParseInlineAggregateType(dt)) {
+    return dt;
+  }
+  // §6.23: a type_reference (e.g. `type(this)`) is a valid return type.
+  if (Check(TokenKind::kKwType)) {
+    Consume();
+    Expect(TokenKind::kLParen);
+    dt.type_ref_expr = ParseExpr();
+    Expect(TokenKind::kRParen);
     return dt;
   }
   return ParseDataType();

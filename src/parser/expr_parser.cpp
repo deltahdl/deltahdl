@@ -579,6 +579,7 @@ static bool IsMethodKeyword(TokenKind kind) {
     case TokenKind::kKwAnd:
     case TokenKind::kKwOr:
     case TokenKind::kKwXor:
+    case TokenKind::kKwSuper:
       return true;
     default:
       return false;

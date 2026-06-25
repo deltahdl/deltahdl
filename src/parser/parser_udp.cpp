@@ -230,22 +230,6 @@ static void ValidateUdpRowEdgeCount(DiagEngine& diag, const UdpTableRow& row,
   }
 }
 
-static void ValidateUdpRowAllXInputs(DiagEngine& diag, const UdpTableRow& row,
-                                     SourceLoc row_loc) {
-  if (row.inputs.empty()) return;
-  bool all_x = true;
-  for (char c : row.inputs) {
-    if (c != 'x' && c != 'X') {
-      all_x = false;
-      break;
-    }
-  }
-  if (all_x && row.output != 'x' && row.output != 'X') {
-    diag.Error(row_loc,
-               "UDP table row with all-x inputs shall specify x output");
-  }
-}
-
 static void ValidateUdpRowNoDashInput(DiagEngine& diag, const UdpTableRow& row,
                                       SourceLoc row_loc) {
   for (char c : row.inputs) {
@@ -260,7 +244,6 @@ static void ValidateUdpRowInputTransitions(DiagEngine& diag,
                                            const UdpTableRow& row,
                                            SourceLoc row_loc) {
   ValidateUdpRowEdgeCount(diag, row, row_loc);
-  ValidateUdpRowAllXInputs(diag, row, row_loc);
   ValidateUdpRowNoDashInput(diag, row, row_loc);
 }
 
@@ -348,6 +331,9 @@ void Parser::ParseUdpTable(UdpDecl* udp) {
   Expect(TokenKind::kKwTable);
   while (!Check(TokenKind::kKwEndtable) && !AtEnd()) {
     ParseUdpTableRow(udp);
+  }
+  if (udp->table.empty()) {
+    diag_.Error(CurrentLoc(), "UDP table shall contain at least one entry");
   }
   Expect(TokenKind::kKwEndtable);
 }

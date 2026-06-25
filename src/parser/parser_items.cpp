@@ -693,8 +693,10 @@ void Parser::ParseImplicitTypeOrInst(std::vector<ModuleItem*>& items) {
   }
   if (known_types_.count(name_tok.text) != 0) {
     DataType dtype = MakeNamedType(name_tok.text);
-    // Parse type parameters if present (e.g., C#(1, real) v2;)
-    if (Check(TokenKind::kHash)) {
+    // Parse type parameters if present (e.g., C#(1, real) v2;). A nettype
+    // identifier instead takes a delay_control here (e.g. `mynet #5 x;`),
+    // which ParseVarDeclList handles, so skip type params for nettypes.
+    if (Check(TokenKind::kHash) && known_nettypes_.count(name_tok.text) == 0) {
       Consume();
       dtype.type_params = ParseTypeParamList();
     }

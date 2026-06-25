@@ -507,6 +507,11 @@ bool Parser::TryParseCuScopeItem(CompilationUnit* unit) {
     return true;
   }
 
+  if (Check(TokenKind::kKwLet)) {
+    unit->cu_items.push_back(ParseLetDecl());
+    return true;
+  }
+
   if (TryParseCuScopeDataDecl(unit)) return true;
 
   if (Check(TokenKind::kKwTimeunit) || Check(TokenKind::kKwTimeprecision)) {
