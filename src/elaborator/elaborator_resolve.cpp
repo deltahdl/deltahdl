@@ -73,6 +73,18 @@ void CollectModuleCandidates(std::string_view name, CompilationUnit* unit,
       candidates.push_back(mod);
     }
   }
+  for (auto* iface : unit->interfaces) {
+    if (iface->name != name) continue;
+    candidates.push_back(iface);
+  }
+  for (auto* prog : unit->programs) {
+    if (prog->name != name) continue;
+    candidates.push_back(prog);
+  }
+  for (auto* checker : unit->checkers) {
+    if (checker->name != name) continue;
+    candidates.push_back(checker);
+  }
 }
 
 // Returns the candidates whose library appears in `liblist`, preserving order.
