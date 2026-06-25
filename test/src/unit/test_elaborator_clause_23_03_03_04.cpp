@@ -130,4 +130,54 @@ TEST(InterfacePortConnectionRulesElaboration,
   EXPECT_TRUE(f.has_errors);
 }
 
+// TEMP PROBE: dump runtime port state for the DifferentType scenario so CI logs
+// reveal which guard suppresses the §23.3.3.4 check. Remove after diagnosis.
+TEST(InterfacePortConnectionRulesElaboration, ZzzProbeDifferentType) {
+  ElabFixture f;
+  auto* d = ElaborateSrc(
+      "interface bus_if;\n"
+      "  logic data;\n"
+      "endinterface\n"
+      "interface other_if;\n"
+      "  logic data;\n"
+      "endinterface\n"
+      "module child(bus_if port_a);\n"
+      "endmodule\n"
+      "module top;\n"
+      "  other_if inst();\n"
+      "  child u(.port_a(inst));\n"
+      "endmodule\n",
+      f);
+  ADD_FAILURE() << "PROBE has_errors=" << f.has_errors
+                << " design=" << (d != nullptr);
+  if (!d) return;
+  auto it = d->all_modules.find("top");
+  ADD_FAILURE() << "PROBE top_found=" << (it != d->all_modules.end())
+                << " nmodules=" << d->all_modules.size();
+  if (it == d->all_modules.end()) return;
+  auto* top = it->second;
+  ADD_FAILURE() << "PROBE top_children=" << top->children.size();
+  for (const auto& ch : top->children) {
+    ADD_FAILURE() << "PROBE child inst_name=" << ch.inst_name
+                  << " module_name=" << ch.module_name
+                  << " resolved=" << (ch.resolved != nullptr)
+                  << " nbindings=" << ch.port_bindings.size();
+    if (ch.resolved) {
+      for (const auto& p : ch.resolved->ports) {
+        ADD_FAILURE() << "PROBE   port name=" << p.name
+                      << " is_ifc=" << p.is_interface_port
+                      << " ifc_type=" << p.interface_type_name;
+      }
+    }
+    for (const auto& b : ch.port_bindings) {
+      ADD_FAILURE() << "PROBE   binding port=" << b.port_name
+                    << " conn=" << (b.connection != nullptr) << " kind="
+                    << (b.connection ? static_cast<int>(b.connection->kind)
+                                     : -1)
+                    << " text="
+                    << (b.connection ? b.connection->text : std::string_view{});
+    }
+  }
+}
+
 }  // namespace
