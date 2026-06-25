@@ -710,6 +710,79 @@ void Elaborator::BindTrailingInputPorts(const PortBindScope& scope) {
   }
 }
 
+// Returns the identifier naming the connected interface instance/port for a
+// binding connection, or an empty view for a non-identifier expression.
+static std::string_view ConnectionInterfaceName(const Expr* conn) {
+  if (!conn) return {};
+  if (conn->kind == ExprKind::kIdentifier) return conn->text;
+  if (conn->kind == ExprKind::kMemberAccess && conn->lhs &&
+      conn->lhs->kind == ExprKind::kIdentifier) {
+    return conn->lhs->text;
+  }
+  return {};
+}
+
+// True when `name` is declared as an interface in the compilation unit.
+static bool NameIsInterface(std::string_view name,
+                            const CompilationUnit* unit) {
+  for (const auto* i : unit->interfaces) {
+    if (i->name == name) return true;
+  }
+  return false;
+}
+
+// True when the elaborated module's port of this name already carries the
+// interface-port flag, in which case CheckInterfacePortsConnected enforces it
+// and re-checking here would duplicate the diagnostic.
+static bool PortAlreadyFlagged(const RtlirModuleInst& inst,
+                               std::string_view name) {
+  if (!inst.resolved) return false;
+  for (const auto& rp : inst.resolved->ports) {
+    if (rp.name == name && rp.is_interface_port) return true;
+  }
+  return false;
+}
+
+// §23.3.3.4/§25.3.2: a named interface-type port (`bus_if p`) must connect to
+// an interface instance of the identical type. The required type is taken from
+// the child declaration, so the rule holds even when the elaborated port's
+// is_interface_port flag was not set during nested port elaboration.
+static void CheckNamedInterfaceTypePorts(const PortBindCtx& ctx,
+                                         const ModuleDecl* child_decl,
+                                         const RtlirModuleInst& inst,
+                                         const CompilationUnit* unit) {
+  if (!child_decl) return;
+
+  for (const auto& port : child_decl->ports) {
+    if (port.direction != Direction::kNone) continue;
+    if (port.data_type.kind != DataTypeKind::kNamed) continue;
+    if (!NameIsInterface(port.data_type.type_name, unit)) continue;
+    if (PortAlreadyFlagged(inst, port.name)) continue;
+
+    const Expr* conn = nullptr;
+    for (const auto& binding : inst.port_bindings) {
+      if (binding.port_name == port.name) {
+        conn = binding.connection;
+        break;
+      }
+    }
+    std::string_view conn_name = ConnectionInterfaceName(conn);
+    if (conn_name.empty()) continue;
+
+    bool found = false;
+    std::string_view conn_ifc_type =
+        ResolveConnectedInterfaceType(ctx, conn_name, found);
+    if (found && !conn_ifc_type.empty() &&
+        conn_ifc_type != port.data_type.type_name) {
+      ctx.diag.Error(
+          ctx.item->loc,
+          std::format("interface port '{}' requires interface type '{}' "
+                      "but is connected to instance of type '{}'",
+                      port.name, port.data_type.type_name, conn_ifc_type));
+    }
+  }
+}
+
 void Elaborator::BindPorts(RtlirModuleInst& inst, const ModuleItem* item,
                            RtlirModule* parent_mod) {
   if (!inst.resolved) return;
@@ -735,6 +808,8 @@ void Elaborator::BindPorts(RtlirModuleInst& inst, const ModuleItem* item,
       var_types_, net_names_, interconnect_names_, interface_inst_types_};
   CheckRefPortsConnected(diag_, child_ports, inst, item);
   CheckInterfacePortsConnected(kPortCtx, child_ports, inst);
+  CheckNamedInterfaceTypePorts(kPortCtx, FindModule(inst.module_name), inst,
+                               unit_);
 }
 
 }  // namespace delta
