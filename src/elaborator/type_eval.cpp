@@ -486,7 +486,13 @@ bool ElementTypesEquivalent(const ElementTypeInfo& a,
 bool IsAssignmentCompatible(const DataType& a, const DataType& b) {
   if (TypesEquivalent(a, b)) return true;
 
-  if (IsIntegralType(a.kind) && IsIntegralType(b.kind)) return true;
+  // §6.22.3/§6.22.4: assignment compatibility for integral types is symmetric
+  // EXCEPT when the target (b) is an enum -- an integral value requires an
+  // explicit cast to be assigned to an enum, so an enum target is excluded here
+  // and only the legal enum-source direction is accepted by the rule below.
+  if (IsIntegralType(a.kind) && IsIntegralType(b.kind) &&
+      b.kind != DataTypeKind::kEnum)
+    return true;
 
   if (a.kind == DataTypeKind::kEnum && IsIntegralType(b.kind)) return true;
 
