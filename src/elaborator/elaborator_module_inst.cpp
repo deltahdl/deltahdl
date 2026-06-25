@@ -263,7 +263,7 @@ void Elaborator::ElaborateModuleInst(ModuleItem* item, RtlirModule* mod) {
   nested_module_decls_ = std::move(saved_nested);
 
   MarkConfigLockedParams(inst, config_locked);
-  BindPorts(inst, item, mod);
+  BindPorts(inst, item, mod, child_decl);
 
   std::vector<uint32_t> inst_dim_sizes;
   uint32_t total_instances = ComputeInstDimSizes(item, inst_dim_sizes);

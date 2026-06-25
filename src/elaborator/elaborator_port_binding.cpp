@@ -791,7 +791,8 @@ static void CheckNamedInterfaceTypePorts(const PortBindCtx& ctx,
 }
 
 void Elaborator::BindPorts(RtlirModuleInst& inst, const ModuleItem* item,
-                           RtlirModule* parent_mod) {
+                           RtlirModule* parent_mod,
+                           const ModuleDecl* child_decl) {
   if (!inst.resolved) return;
   const auto& child_ports = inst.resolved->ports;
 
@@ -815,8 +816,7 @@ void Elaborator::BindPorts(RtlirModuleInst& inst, const ModuleItem* item,
       var_types_, net_names_, interconnect_names_, interface_inst_types_};
   CheckRefPortsConnected(diag_, child_ports, inst, item);
   CheckInterfacePortsConnected(kPortCtx, child_ports, inst);
-  CheckNamedInterfaceTypePorts(kPortCtx, FindModule(inst.module_name), inst,
-                               unit_);
+  CheckNamedInterfaceTypePorts(kPortCtx, child_decl, inst, unit_);
 }
 
 }  // namespace delta

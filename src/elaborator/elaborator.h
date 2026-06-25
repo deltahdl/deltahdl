@@ -155,7 +155,7 @@ class Elaborator {
   Expr* MakeHighZExpr();
 
   void BindPorts(RtlirModuleInst& inst, const ModuleItem* item,
-                 RtlirModule* parent_mod);
+                 RtlirModule* parent_mod, const ModuleDecl* child_decl);
 
   // §23.3.3 per-instance binding scope shared by the BindPorts helpers.
   struct PortBindScope {
