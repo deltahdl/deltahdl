@@ -39,7 +39,10 @@ inline std::vector<Token> Lex(const std::string& src) {
 }
 
 inline LexAllResult LexWithDiag(const std::string& src) {
-  SourceManager mgr;
+  // Keep the SourceManager alive for the whole test process (as Lex() does):
+  // Token::text is a string_view into the manager's file buffer, so a local
+  // manager would leave every returned token dangling once this call returns.
+  static SourceManager mgr;
   DiagEngine diag(mgr);
   auto fid = mgr.AddFile("<test>", src);
   Lexer lexer(mgr.FileContent(fid), fid, diag);
