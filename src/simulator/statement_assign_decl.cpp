@@ -263,21 +263,25 @@ static void RecomputeRhsInto(Variable* var, const Expr* rhs, SimContext& ctx,
   var->NotifyWatchers();
 }
 
+// Behavior of the watchers InstallRhsWatchers installs: `still_valid` gates the
+// watcher (returning true to detach once its backing force/assign is no longer
+// in effect); `forced` selects whether the recomputed value also refreshes
+// var->forced_value.
+struct RhsWatcherSpec {
+  std::function<bool()> still_valid;
+  bool forced;
+};
+
 // Installs, on each variable referenced by `rhs` (other than `var`), a watcher
-// that re-evaluates `rhs` into `var` whenever a source changes. `still_valid`
-// gates the watcher (returning true to detach once its backing force/assign is
-// no longer in effect); `forced` selects whether the recomputed value also
-// refreshes var->forced_value.
+// that re-evaluates `rhs` into `var` whenever a source changes.
 static void InstallRhsWatchers(Variable* var, const Expr* rhs, SimContext& ctx,
-                               Arena& arena,
-                               const std::function<bool()>& still_valid,
-                               bool forced) {
+                               Arena& arena, const RhsWatcherSpec& spec) {
   auto* ctx_ptr = &ctx;
   auto* arena_ptr = &arena;
   for (auto* rhs_var : CollectDistinctRhsVars(rhs, ctx, var)) {
-    rhs_var->AddWatcher([var, rhs, ctx_ptr, arena_ptr, still_valid, forced]() {
-      if (!still_valid()) return true;
-      RecomputeRhsInto(var, rhs, *ctx_ptr, *arena_ptr, forced);
+    rhs_var->AddWatcher([var, rhs, ctx_ptr, arena_ptr, spec]() {
+      if (!spec.still_valid()) return true;
+      RecomputeRhsInto(var, rhs, *ctx_ptr, *arena_ptr, spec.forced);
       return false;
     });
   }
@@ -298,8 +302,8 @@ static void InstallForcedValueWatcher(Variable* var, const Expr* rhs,
 
   InstallRhsWatchers(
       var, rhs, ctx, arena,
-      [var, rhs]() { return var->is_forced && var->proc_cont_rhs == rhs; },
-      /*forced=*/true);
+      {[var, rhs]() { return var->is_forced && var->proc_cont_rhs == rhs; },
+       /*forced=*/true});
 }
 
 // Reestablishes a continuous assignment on `var` from expression `rhs` after
@@ -313,12 +317,12 @@ static void ReestablishContinuousAssignment(Variable* var, const Expr* rhs,
   if (!var->is_4state) CoerceTo2State(var->value);
   var->NotifyWatchers();
 
-  InstallRhsWatchers(
-      var, rhs, ctx, arena,
-      [var, rhs]() {
-        return var->assign_cont_rhs && var->assign_cont_rhs == rhs;
-      },
-      /*forced=*/false);
+  InstallRhsWatchers(var, rhs, ctx, arena,
+                     {[var, rhs]() {
+                        return var->assign_cont_rhs &&
+                               var->assign_cont_rhs == rhs;
+                      },
+                      /*forced=*/false});
 }
 
 StmtResult ExecForceOrAssignImpl(const Stmt* stmt, SimContext& ctx,
