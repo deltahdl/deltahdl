@@ -332,6 +332,7 @@ static std::optional<ConstVal> ConstEvalUnaryFull(const Expr* expr,
   auto result = EvalUnary(expr->op, operand->value);
   if (!result) return std::nullopt;
   int64_t v = TruncateToWidth(*result, operand->width);
+  if (operand->is_signed) v = SignExtendFromWidth(v, operand->width);
   return ConstVal{v, operand->width, operand->is_signed};
 }
 
@@ -389,6 +390,7 @@ static std::optional<ConstVal> ConstEvalBinaryFull(const Expr* expr,
   auto result = EvalBinary(expr->op, lv, rv);
   if (!result) return std::nullopt;
   int64_t v = TruncateToWidth(*result, w);
+  if (s) v = SignExtendFromWidth(v, w);
   return ConstVal{v, w, s};
 }
 
