@@ -120,7 +120,7 @@ TEST(ContAssignDelayParsing, NetDeclTwoDelayWithInit) {
 TEST(ContAssignDelayParsing, VectorNetDeclWithDelay) {
   auto r = Parse(
       "module t;\n"
-      "  wire #(5, 10) [7:0] w = 8'hFF;\n"
+      "  wire [7:0] #(5, 10) w = 8'hFF;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);

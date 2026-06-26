@@ -526,6 +526,17 @@ bool Parser::TryParseCuScopeItem(CompilationUnit* unit) {
     ParseOutOfBlockConstraint(unit);
     return true;
   }
+
+  if (Check(TokenKind::kKwSequence)) {
+    unit->cu_items.push_back(ParseSequenceDecl());
+    return true;
+  }
+
+  if (Check(TokenKind::kKwProperty)) {
+    unit->cu_items.push_back(ParsePropertyDecl());
+    return true;
+  }
+
   return false;
 }
 
