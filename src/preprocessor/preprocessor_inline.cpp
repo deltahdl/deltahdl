@@ -219,7 +219,11 @@ size_t Preprocessor::ExpandInlineFunctionMacro(const MacroDef& def,
       name_end +
       static_cast<size_t>(balanced.data() + balanced.size() - rest.data());
   expansion_stack_.emplace_back(def.name);
-  std::string body = ExpandMacro(def, args_text);
+  // §22.5.1: actual macro arguments are themselves subject to macro expansion
+  // before being substituted for the formal arguments in the macro text.
+  std::string expanded_args =
+      ExpandInlineMacros(args_text, loc.file_id, loc.line);
+  std::string body = ExpandMacro(def, expanded_args);
   result += ExpandInlineMacros(body, loc.file_id, loc.line);
   expansion_stack_.pop_back();
   return advance;
