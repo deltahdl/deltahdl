@@ -658,6 +658,13 @@ void Parser::ParseDynamicOverrideSpecifiers(ModuleItem* item) {
 }
 
 void Parser::ParseFuncName(ModuleItem* item) {
+  if (Check(TokenKind::kKwNew)) {
+    item->name = "new";
+    Consume();
+    item->return_type = DataType{};
+    return;
+  }
+
   item->return_type = ParseFunctionReturnType();
 
   if (item->return_type.kind == DataTypeKind::kNamed &&
