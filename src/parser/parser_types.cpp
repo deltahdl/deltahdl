@@ -414,20 +414,35 @@ void Parser::ParseUnpackedDims(std::vector<Expr*>& dims) {
 
 void Parser::ParseVarDeclList(std::vector<ModuleItem*>& items,
                               const DataType& dtype) {
+  DataType actual_dtype = dtype;
+
+  // Handle "const var type" case: if we have const with implicit type,
+  // the actual type follows the var keyword.
+  if (actual_dtype.kind == DataTypeKind::kImplicit && actual_dtype.is_const &&
+      Check(TokenKind::kKwVar)) {
+    Consume();  // consume "var"
+    actual_dtype = ParseDataType();
+    actual_dtype.is_const = true;  // preserve const flag
+    if (actual_dtype.kind == DataTypeKind::kImplicit &&
+        Check(TokenKind::kLBracket)) {
+      ParsePackedDims(actual_dtype);
+    }
+  }
+
   Expr* nd1 = nullptr;
   Expr* nd2 = nullptr;
   Expr* nd3 = nullptr;
-  bool nettype_named = dtype.kind == DataTypeKind::kNamed &&
-                       known_nettypes_.count(dtype.type_name) != 0;
-  if (dtype.is_net || nettype_named) ParseGateDelay(nd1, nd2, nd3);
+  bool nettype_named = actual_dtype.kind == DataTypeKind::kNamed &&
+                       known_nettypes_.count(actual_dtype.type_name) != 0;
+  if (actual_dtype.is_net || nettype_named) ParseGateDelay(nd1, nd2, nd3);
   do {
     auto* item = arena_.Create<ModuleItem>();
-    item->kind =
-        dtype.is_net ? ModuleItemKind::kNetDecl : ModuleItemKind::kVarDecl;
+    item->kind = actual_dtype.is_net ? ModuleItemKind::kNetDecl
+                                     : ModuleItemKind::kVarDecl;
     item->loc = CurrentLoc();
-    item->data_type = dtype;
-    item->drive_strength0 = dtype.drive_strength0;
-    item->drive_strength1 = dtype.drive_strength1;
+    item->data_type = actual_dtype;
+    item->drive_strength0 = actual_dtype.drive_strength0;
+    item->drive_strength1 = actual_dtype.drive_strength1;
     item->net_delay = nd1;
     item->net_delay_fall = nd2;
     item->net_delay_decay = nd3;

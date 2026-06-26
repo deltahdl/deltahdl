@@ -83,12 +83,16 @@ Expr* Parser::ParseSystemCall() {
   call->kind = ExprKind::kSystemCall;
   call->callee = tok.text;
   call->range.start = tok.loc;
-  if (!Match(TokenKind::kLParen)) return call;
+  if (!Match(TokenKind::kLParen)) {
+    if (Check(TokenKind::kLBracket)) return ParseSelectExpr(call);
+    return call;
+  }
 
   if (!Check(TokenKind::kRParen)) {
     ParseSysCallArgs(call);
   }
   Expect(TokenKind::kRParen);
+  if (Check(TokenKind::kLBracket)) return ParseSelectExpr(call);
   return call;
 }
 

@@ -127,11 +127,14 @@ void SimContext::AliasVariable(std::string_view alias_name,
 }
 
 void SimContext::NullifyEventVariable(std::string_view name) {
-  auto* var = arena_.Create<Variable>();
-  var->value = MakeLogic4Vec(arena_, 1);
-  var->is_event = true;
+  auto* var = FindVariable(name);
+  if (var == nullptr) {
+    var = arena_.Create<Variable>();
+    var->value = MakeLogic4Vec(arena_, 1);
+    var->is_event = true;
+    variables_[name] = var;
+  }
   var->is_null_event = true;
-  variables_[name] = var;
 }
 
 Net* SimContext::FindNet(std::string_view name) {
