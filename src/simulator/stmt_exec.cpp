@@ -618,6 +618,17 @@ static uint64_t EvalRepeatCount(const Expr* count_expr, SimContext& ctx,
   auto val = EvalExpr(count_expr, ctx, arena);
   if (!val.IsKnown()) return 0;
   uint64_t count = val.ToUint64();
+  // §9.4.5: a repeat count <= 0 behaves as if there were no repeat construct.
+  // A negative signed value narrower than 64 bits arrives zero-extended from
+  // ToUint64(), so sign-extend it before the signed comparison or e.g. a 32-bit
+  // -3 would read as a large positive count instead of bypassing the repeat.
+  if (val.is_signed && val.width > 0 && val.width < 64) {
+    uint64_t sign_bit = uint64_t{1} << (val.width - 1);
+    if (count & sign_bit) {
+      uint64_t mask = (uint64_t{1} << val.width) - 1;
+      count = count | ~mask;
+    }
+  }
   if (val.is_signed && static_cast<int64_t>(count) <= 0) return 0;
   return count;
 }
