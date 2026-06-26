@@ -31,6 +31,16 @@ static Logic4Vec EvalIdentifier(const Expr* expr, SimContext& ctx,
     val.is_signed = var->is_signed;
     return val;
   }
+  // §8.10: a static method can directly access static properties of the same
+  // class by unqualified reference. With no `this`, resolve against the
+  // enclosing class's static properties before falling through.
+  const ClassTypeInfo* method_cls = ctx.CurrentMethodClass();
+  if (method_cls) {
+    auto it = method_cls->static_properties.find(std::string(expr->text));
+    if (it != method_cls->static_properties.end()) {
+      return it->second;
+    }
+  }
   // §8.6: when reading an unqualified identifier within a method body, if the
   // identifier is not found as a local variable, try to resolve it as a
   // property of the current object (this).
