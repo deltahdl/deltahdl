@@ -331,7 +331,8 @@ static std::optional<ConstVal> ConstEvalUnaryFull(const Expr* expr,
   }
   auto result = EvalUnary(expr->op, operand->value);
   if (!result) return std::nullopt;
-  return ConstVal{*result, operand->width, operand->is_signed};
+  int64_t v = TruncateToWidth(*result, operand->width);
+  return ConstVal{v, operand->width, operand->is_signed};
 }
 
 // Normalizes the binary operands to their effective signed/unsigned values:
@@ -387,7 +388,8 @@ static std::optional<ConstVal> ConstEvalBinaryFull(const Expr* expr,
   }
   auto result = EvalBinary(expr->op, lv, rv);
   if (!result) return std::nullopt;
-  return ConstVal{*result, w, s};
+  int64_t v = TruncateToWidth(*result, w);
+  return ConstVal{v, w, s};
 }
 
 static std::optional<ConstVal> ConstEvalSelectFull(const Expr* expr,
