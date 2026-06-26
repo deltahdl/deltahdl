@@ -390,7 +390,13 @@ static std::optional<ConstVal> ConstEvalBinaryFull(const Expr* expr,
   auto result = EvalBinary(expr->op, lv, rv);
   if (!result) return std::nullopt;
   int64_t v = TruncateToWidth(*result, w);
-  if (s) v = SignExtendFromWidth(v, w);
+  // §11.4.10: the logical right shift (>>) zero-fills vacated high bits, so its
+  // result is never sign-extended even when the operand type is signed. Only
+  // arithmetic results (incl. the arithmetic right shift >>>) propagate the
+  // sign bit.
+  bool is_logical_rshift =
+      expr->op == TokenKind::kGtGt || expr->op == TokenKind::kGtGtEq;
+  if (s && !is_logical_rshift) v = SignExtendFromWidth(v, w);
   return ConstVal{v, w, s};
 }
 
