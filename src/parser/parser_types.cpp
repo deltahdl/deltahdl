@@ -292,6 +292,11 @@ bool Parser::TryParseNetDataType(DataType& dtype, bool has_intervening) {
 
   auto inner_kind = TokenToTypeKind(CurrentToken().kind);
   if (inner_kind && !IsNetTypeToken(CurrentToken().kind)) {
+    // §6.3.2: trireg is a charge-storage net whose net-type kind carries
+    // distinct semantics, so keep kTrireg over the inner data type. Other nets
+    // adopt the inner data type kind so the §6.7.1 4-state check can inspect it
+    // (e.g. reject `wire bit` / `wire real`).
+    if (dtype.kind != DataTypeKind::kTrireg) dtype.kind = *inner_kind;
     dtype.is_signed = IsDefaultSigned(*inner_kind);
     Consume();
   }
