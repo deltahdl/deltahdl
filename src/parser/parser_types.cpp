@@ -310,7 +310,9 @@ DataType Parser::ParseDataType() {
     return ParseVirtualInterfaceType();
   }
 
-  if (Check(TokenKind::kIdentifier)) {
+  bool is_named = Check(TokenKind::kIdentifier) &&
+                  known_types_.count(CurrentToken().text) != 0;
+  if (is_named) {
     auto named = ParseNamedType();
     named.is_const = dtype.is_const;
     ParsePackedDims(named);
