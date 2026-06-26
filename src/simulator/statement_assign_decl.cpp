@@ -253,24 +253,31 @@ static std::vector<Variable*> CollectDistinctRhsVars(const Expr* rhs,
   return rhs_vars;
 }
 
+// Recomputes `rhs` into `var`, also refreshing var->forced_value when `forced`.
+static void RecomputeRhsInto(Variable* var, const Expr* rhs, SimContext& ctx,
+                             Arena& arena, bool forced) {
+  auto new_val = EvalExpr(rhs, ctx, arena);
+  if (forced) var->forced_value = new_val;
+  var->value = new_val;
+  if (!var->is_4state) CoerceTo2State(var->value);
+  var->NotifyWatchers();
+}
+
 // Installs, on each variable referenced by `rhs` (other than `var`), a watcher
 // that re-evaluates `rhs` into `var` whenever a source changes. `still_valid`
 // gates the watcher (returning true to detach once its backing force/assign is
 // no longer in effect); `forced` selects whether the recomputed value also
 // refreshes var->forced_value.
 static void InstallRhsWatchers(Variable* var, const Expr* rhs, SimContext& ctx,
-                               Arena& arena, std::function<bool()> still_valid,
+                               Arena& arena,
+                               const std::function<bool()>& still_valid,
                                bool forced) {
   auto* ctx_ptr = &ctx;
   auto* arena_ptr = &arena;
   for (auto* rhs_var : CollectDistinctRhsVars(rhs, ctx, var)) {
     rhs_var->AddWatcher([var, rhs, ctx_ptr, arena_ptr, still_valid, forced]() {
       if (!still_valid()) return true;
-      auto new_val = EvalExpr(rhs, *ctx_ptr, *arena_ptr);
-      if (forced) var->forced_value = new_val;
-      var->value = new_val;
-      if (!var->is_4state) CoerceTo2State(var->value);
-      var->NotifyWatchers();
+      RecomputeRhsInto(var, rhs, *ctx_ptr, *arena_ptr, forced);
       return false;
     });
   }

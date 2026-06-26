@@ -809,23 +809,29 @@ void Lowerer::LowerPortBindings(const RtlirModuleInst& inst,
   }
 }
 
+static void CreateChildModuleVariable(const std::string& inst_prefix,
+                                      const RtlirVariable& var, SimContext& ctx,
+                                      Arena& arena) {
+  auto* name = arena.Create<std::string>(inst_prefix + std::string(var.name));
+  uint32_t width = var.class_type_name.empty() ? var.width : 64;
+  if (var.is_real && width < 64) width = 64;
+  auto* v = ctx.CreateVariable(*name, width);
+  if (!var.is_4state && !var.is_event && !var.is_string && !var.is_chandle)
+    v->value = MakeLogic4VecVal(arena, width, 0);
+  if (var.is_chandle) v->value = MakeLogic4VecVal(arena, width, 0);
+  v->is_4state = var.is_4state;
+  if (var.is_event) v->is_event = true;
+  if (var.is_signed) v->is_signed = true;
+  if (var.init_expr) {
+    v->value = EvalExpr(var.init_expr, ctx, arena);
+  }
+}
+
 static void CreateChildModuleVariables(const std::string& inst_prefix,
                                        const RtlirModule* resolved,
                                        SimContext& ctx, Arena& arena) {
   for (const auto& var : resolved->variables) {
-    auto* name = arena.Create<std::string>(inst_prefix + std::string(var.name));
-    uint32_t width = var.class_type_name.empty() ? var.width : 64;
-    if (var.is_real && width < 64) width = 64;
-    auto* v = ctx.CreateVariable(*name, width);
-    if (!var.is_4state && !var.is_event && !var.is_string && !var.is_chandle)
-      v->value = MakeLogic4VecVal(arena, width, 0);
-    if (var.is_chandle) v->value = MakeLogic4VecVal(arena, width, 0);
-    v->is_4state = var.is_4state;
-    if (var.is_event) v->is_event = true;
-    if (var.is_signed) v->is_signed = true;
-    if (var.init_expr) {
-      v->value = EvalExpr(var.init_expr, ctx, arena);
-    }
+    CreateChildModuleVariable(inst_prefix, var, ctx, arena);
   }
 }
 
