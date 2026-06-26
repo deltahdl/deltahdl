@@ -310,8 +310,7 @@ bool Is4stateType(const DataType& dtype, const TypedefMap& typedefs) {
 
 bool IsSignedType(const DataType& dtype, const TypedefMap& typedefs) {
   const auto* resolved = ResolveNamed(dtype, typedefs);
-  return resolved ? IsSignedType(*resolved, typedefs)
-                  : (dtype.is_signed || IsImplicitlySigned(dtype.kind));
+  return resolved ? IsSignedType(*resolved, typedefs) : dtype.is_signed;
 }
 
 bool IsVector(const DataType& dtype) {
