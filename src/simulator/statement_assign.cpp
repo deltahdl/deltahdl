@@ -536,6 +536,12 @@ static std::vector<Logic4Vec> CollectConcatElements(const Expr* rhs,
         continue;
       }
     }
+    if (item->kind == ExprKind::kAssignmentPattern) {
+      for (auto* elem : item->elements) {
+        elems.push_back(EvalExpr(elem, ctx, arena));
+      }
+      continue;
+    }
     elems.push_back(EvalExpr(item, ctx, arena));
   }
   return elems;
