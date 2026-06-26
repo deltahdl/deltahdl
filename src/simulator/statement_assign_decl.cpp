@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <functional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -239,6 +240,42 @@ static void CollectExprVars(const Expr* expr, SimContext& ctx,
   for (auto* a : expr->args) CollectExprVars(a, ctx, vars);
 }
 
+// Returns the distinct variables referenced by `rhs`, excluding `self`.
+static std::vector<Variable*> CollectDistinctRhsVars(const Expr* rhs,
+                                                     SimContext& ctx,
+                                                     Variable* self) {
+  std::vector<Variable*> rhs_vars;
+  CollectExprVars(rhs, ctx, rhs_vars);
+  std::sort(rhs_vars.begin(), rhs_vars.end());
+  rhs_vars.erase(std::unique(rhs_vars.begin(), rhs_vars.end()), rhs_vars.end());
+  rhs_vars.erase(std::remove(rhs_vars.begin(), rhs_vars.end(), self),
+                 rhs_vars.end());
+  return rhs_vars;
+}
+
+// Installs, on each variable referenced by `rhs` (other than `var`), a watcher
+// that re-evaluates `rhs` into `var` whenever a source changes. `still_valid`
+// gates the watcher (returning true to detach once its backing force/assign is
+// no longer in effect); `forced` selects whether the recomputed value also
+// refreshes var->forced_value.
+static void InstallRhsWatchers(Variable* var, const Expr* rhs, SimContext& ctx,
+                               Arena& arena, std::function<bool()> still_valid,
+                               bool forced) {
+  auto* ctx_ptr = &ctx;
+  auto* arena_ptr = &arena;
+  for (auto* rhs_var : CollectDistinctRhsVars(rhs, ctx, var)) {
+    rhs_var->AddWatcher([var, rhs, ctx_ptr, arena_ptr, still_valid, forced]() {
+      if (!still_valid()) return true;
+      auto new_val = EvalExpr(rhs, *ctx_ptr, *arena_ptr);
+      if (forced) var->forced_value = new_val;
+      var->value = new_val;
+      if (!var->is_4state) CoerceTo2State(var->value);
+      var->NotifyWatchers();
+      return false;
+    });
+  }
+}
+
 // Applies a procedural continuous-assignment forced value to `var` from the
 // expression `rhs`, then installs watchers on each variable appearing in `rhs`
 // so the forced value is re-evaluated whenever those variables change.
@@ -252,27 +289,10 @@ static void InstallForcedValueWatcher(Variable* var, const Expr* rhs,
   var->proc_cont_rhs = rhs;
   var->NotifyWatchers();
 
-  std::vector<Variable*> rhs_vars;
-  CollectExprVars(rhs, ctx, rhs_vars);
-
-  std::sort(rhs_vars.begin(), rhs_vars.end());
-  rhs_vars.erase(std::unique(rhs_vars.begin(), rhs_vars.end()), rhs_vars.end());
-  rhs_vars.erase(std::remove(rhs_vars.begin(), rhs_vars.end(), var),
-                 rhs_vars.end());
-
-  auto* ctx_ptr = &ctx;
-  auto* arena_ptr = &arena;
-  for (auto* rhs_var : rhs_vars) {
-    rhs_var->AddWatcher([var, rhs, ctx_ptr, arena_ptr]() {
-      if (!var->is_forced || var->proc_cont_rhs != rhs) return true;
-      auto new_val = EvalExpr(rhs, *ctx_ptr, *arena_ptr);
-      var->forced_value = new_val;
-      var->value = new_val;
-      if (!var->is_4state) CoerceTo2State(var->value);
-      var->NotifyWatchers();
-      return false;
-    });
-  }
+  InstallRhsWatchers(
+      var, rhs, ctx, arena,
+      [var, rhs]() { return var->is_forced && var->proc_cont_rhs == rhs; },
+      /*forced=*/true);
 }
 
 // Reestablishes a continuous assignment on `var` from expression `rhs` after
@@ -286,26 +306,12 @@ static void ReestablishContinuousAssignment(Variable* var, const Expr* rhs,
   if (!var->is_4state) CoerceTo2State(var->value);
   var->NotifyWatchers();
 
-  std::vector<Variable*> rhs_vars;
-  CollectExprVars(rhs, ctx, rhs_vars);
-
-  std::sort(rhs_vars.begin(), rhs_vars.end());
-  rhs_vars.erase(std::unique(rhs_vars.begin(), rhs_vars.end()), rhs_vars.end());
-  rhs_vars.erase(std::remove(rhs_vars.begin(), rhs_vars.end(), var),
-                 rhs_vars.end());
-
-  auto* ctx_ptr = &ctx;
-  auto* arena_ptr = &arena;
-  for (auto* rhs_var : rhs_vars) {
-    rhs_var->AddWatcher([var, rhs, ctx_ptr, arena_ptr]() {
-      if (!var->assign_cont_rhs || var->assign_cont_rhs != rhs) return true;
-      auto new_val = EvalExpr(rhs, *ctx_ptr, *arena_ptr);
-      var->value = new_val;
-      if (!var->is_4state) CoerceTo2State(var->value);
-      var->NotifyWatchers();
-      return false;
-    });
-  }
+  InstallRhsWatchers(
+      var, rhs, ctx, arena,
+      [var, rhs]() {
+        return var->assign_cont_rhs && var->assign_cont_rhs == rhs;
+      },
+      /*forced=*/false);
 }
 
 StmtResult ExecForceOrAssignImpl(const Stmt* stmt, SimContext& ctx,
