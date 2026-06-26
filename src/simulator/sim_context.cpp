@@ -133,6 +133,23 @@ void SimContext::NullifyEventVariable(std::string_view name) {
     var->value = MakeLogic4Vec(arena_, 1);
     var->is_event = true;
     variables_[name] = var;
+    var->is_null_event = true;
+    return;
+  }
+  // §6.18: nullifying one event handle must not disturb other handles that
+  // alias the same underlying event. If this name shares its Variable with
+  // another handle, rebind it to a fresh nulled event so the aliases diverge.
+  int shared = 0;
+  for (const auto& [key, value] : variables_) {
+    if (value == var && ++shared > 1) break;
+  }
+  if (shared > 1) {
+    auto* fresh = arena_.Create<Variable>();
+    fresh->value = MakeLogic4Vec(arena_, 1);
+    fresh->is_event = true;
+    fresh->is_null_event = true;
+    variables_[name] = fresh;
+    return;
   }
   var->is_null_event = true;
 }
