@@ -74,14 +74,13 @@ static bool DecodeMemNumberChar(char c, bool is_hex, uint8_t& aval,
                                 uint8_t& bval) {
   aval = 0;
   bval = 0;
-  // 4-state encoding: x is aval=0/bval=1, z is aval=1/bval=1.
   if (c == 'x' || c == 'X') {
-    bval = is_hex ? 0xF : 0x1;
+    aval = is_hex ? 0xF : 0x1;
+    bval = aval;
     return true;
   }
   if (c == 'z' || c == 'Z' || c == '?') {
     bval = is_hex ? 0xF : 0x1;
-    aval = bval;
     return true;
   }
   int digit = -1;
@@ -122,10 +121,10 @@ static Logic4Vec ParseMemNumber(Arena& arena, const std::string& tok,
 // §21.4.2: a 2-state destination — such as an int or bit vector, or an
 // enumerated type with a 2-state base — cannot hold x or z, so any unknown or
 // high-impedance bit read from the load file is turned into 0. In the 4-state
-// encoding an x bit is aval=0/bval=1 and a z bit is aval=1/bval=1; clearing
-// every bit whose bval is set and then dropping bval reduces both to a plain 0,
-// while 0 and 1 bits are left unchanged. Reading otherwise proceeds exactly as
-// for a 4-state element type.
+// encoding an x bit is aval=bval=1 and a z bit is aval=0/bval=1; clearing every
+// bit whose bval is set and then dropping bval reduces both to a plain 0, while
+// 0 and 1 bits are left unchanged. Reading otherwise proceeds exactly as for a
+// 4-state element type.
 static void CoerceToTwoState(Logic4Vec& v) {
   for (uint32_t i = 0; i < v.nwords; ++i) {
     v.words[i].aval &= ~v.words[i].bval;

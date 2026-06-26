@@ -33,10 +33,8 @@ Logic4Vec EvalUnbasedUnsized(const Expr* expr, Arena& arena) {
     if (c == '1') return MakeLogic4VecVal(arena, 64, ~uint64_t{0});
     if (c == '0') return MakeLogic4VecVal(arena, 64, 0);
     auto vec = MakeLogic4Vec(arena, 64);
-    // 4-state encoding: x is aval=0/bval=1, z is aval=1/bval=1.
-    if (c == 'x' || c == 'X') vec.words[0] = {0, ~uint64_t{0}};
-    if (c == 'z' || c == 'Z' || c == '?')
-      vec.words[0] = {~uint64_t{0}, ~uint64_t{0}};
+    if (c == 'x' || c == 'X') vec.words[0] = {~uint64_t{0}, ~uint64_t{0}};
+    if (c == 'z' || c == 'Z' || c == '?') vec.words[0] = {0, ~uint64_t{0}};
     return vec;
   }
   return MakeLogic4VecVal(arena, 64, expr->int_val);
@@ -81,12 +79,12 @@ static void SetDigitBits(Logic4Vec& vec, uint32_t& bit_pos, int bit_count,
     uint32_t word = bit_pos / 64;
     uint64_t mask = uint64_t{1} << (bit_pos % 64);
     if (is_x) {
-      // An x literal digit uses the (aval=0, bval=1) encoding.
+      // An x literal digit uses the (aval=1, bval=1) encoding.
+      vec.words[word].aval |= mask;
       vec.words[word].bval |= mask;
     } else if (is_z) {
-      // A z literal digit uses the (aval=1, bval=1) encoding, matching FillXZ
+      // A z literal digit uses the (aval=0, bval=1) encoding, matching FillXZ
       // and the raw-bit consumers (see net.cpp GetBitVal).
-      vec.words[word].aval |= mask;
       vec.words[word].bval |= mask;
     } else if (dval >= 0 && (dval & (1 << b))) {
       vec.words[word].aval |= mask;
@@ -97,8 +95,7 @@ static void FillXZ(Logic4Vec& vec, uint32_t start, uint32_t end, bool is_x) {
   for (uint32_t b = start; b < end; ++b) {
     uint32_t word = b / 64;
     uint64_t mask = uint64_t{1} << (b % 64);
-    // x is aval=0/bval=1, z is aval=1/bval=1: set aval for z, never for x.
-    if (!is_x) vec.words[word].aval |= mask;
+    if (is_x) vec.words[word].aval |= mask;
     vec.words[word].bval |= mask;
   }
 }

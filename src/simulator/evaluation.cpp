@@ -59,8 +59,7 @@ bool HasUnknownBits(const Logic4Vec& v) {
 Logic4Vec MakeAllX(Arena& arena, uint32_t width) {
   auto vec = MakeLogic4Vec(arena, width);
   for (uint32_t i = 0; i < vec.nwords; ++i) {
-    // 4-state encoding: x is aval=0/bval=1 (z is aval=1/bval=1). Set bval only.
-    vec.words[i] = {0, ~uint64_t{0}};
+    vec.words[i] = {~uint64_t{0}, ~uint64_t{0}};
   }
   return vec;
 }

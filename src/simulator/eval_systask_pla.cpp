@@ -126,7 +126,7 @@ void PlaSetBit(Logic4Vec& v, uint32_t pos, Logic4Word bit) {
 // participates: 0 takes the complemented input, 1 takes the true input, a
 // don't-care (z, and the equivalent ?) drops the input from the reduction, and
 // x takes the worst case by contributing an unknown. In the 4-state encoding a
-// personality bit holds 0 as {0,0}, 1 as {1,0}, x as {0,1} and z/? as {1,1}.
+// personality bit holds 0 as {0,0}, 1 as {1,0}, x as {1,1} and z/? as {0,1}.
 // §20.16.4: map one personality code and its input bit to the term that the
 // input contributes to the reduction. Sets `participates` to false when the
 // personality code drops the input from the reduction (array format != 1, or
@@ -141,8 +141,8 @@ Logic4Word PlaInputTerm(const PlaTaskKind& k, Logic4Word code,
       // 1 takes the true input value, 0 takes the complemented input value.
       return code.aval == 1 ? in_bit : Logic4Not(in_bit);
     }
-    if (code.aval == 0) {
-      // x (aval=0/bval=1): worst case of the input value - contribute unknown.
+    if (code.aval == 1) {
+      // x: take the worst case of the input value - contribute an unknown.
       return Logic4Word{0, 1};
     }
     // z (and the equivalent ?): do-not-care, the input does not participate.
