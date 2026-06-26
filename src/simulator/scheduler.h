@@ -72,10 +72,15 @@ class Scheduler {
 
   // The time of the earliest event still scheduled - the next future event.
   // When nothing remains queued there is no future event, so the current time
-  // is reported instead.
+  // is reported instead. Events at or before current_time_ are skipped: while
+  // the current time slot is being drained its entry is still present, and a
+  // query for the next event (e.g. §38.13 time-queue) must report only future
+  // work.
   SimTime NextEventTime() const {
-    return event_calendar_.empty() ? current_time_
-                                   : event_calendar_.begin()->first;
+    if (event_calendar_.empty()) return current_time_;
+    auto it = event_calendar_.upper_bound(current_time_);
+    if (it == event_calendar_.end()) return current_time_;
+    return it->first;
   }
 
   Region CurrentRegion() const { return current_region_; }
