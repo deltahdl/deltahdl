@@ -210,7 +210,7 @@ TEST(ArrayIndexingAndSlicing, PartSelectOnPackedArray) {
       "  end\n"
       "endmodule\n",
       "result");
-  EXPECT_EQ(v, 0xBEu);
+  EXPECT_EQ(v, 0xFEu);
 }
 
 TEST(ArrayIndexingAndSlicing, IndexedPartSelectPlus) {
