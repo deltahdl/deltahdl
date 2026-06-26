@@ -275,6 +275,39 @@ static void InstallForcedValueWatcher(Variable* var, const Expr* rhs,
   }
 }
 
+// Reestablishes a continuous assignment on `var` from expression `rhs` after
+// a release statement. Similar to InstallForcedValueWatcher but for
+// assignments: does not set is_forced, and watchers check assign_cont_rhs
+// instead of is_forced to remain valid after release.
+static void ReestablishContinuousAssignment(Variable* var, const Expr* rhs,
+                                            SimContext& ctx, Arena& arena) {
+  auto rhs_val = EvalExpr(rhs, ctx, arena);
+  var->value = rhs_val;
+  if (!var->is_4state) CoerceTo2State(var->value);
+  var->NotifyWatchers();
+
+  std::vector<Variable*> rhs_vars;
+  CollectExprVars(rhs, ctx, rhs_vars);
+
+  std::sort(rhs_vars.begin(), rhs_vars.end());
+  rhs_vars.erase(std::unique(rhs_vars.begin(), rhs_vars.end()), rhs_vars.end());
+  rhs_vars.erase(std::remove(rhs_vars.begin(), rhs_vars.end(), var),
+                 rhs_vars.end());
+
+  auto* ctx_ptr = &ctx;
+  auto* arena_ptr = &arena;
+  for (auto* rhs_var : rhs_vars) {
+    rhs_var->AddWatcher([var, rhs, ctx_ptr, arena_ptr]() {
+      if (!var->assign_cont_rhs || var->assign_cont_rhs != rhs) return true;
+      auto new_val = EvalExpr(rhs, *ctx_ptr, *arena_ptr);
+      var->value = new_val;
+      if (!var->is_4state) CoerceTo2State(var->value);
+      var->NotifyWatchers();
+      return false;
+    });
+  }
+}
+
 StmtResult ExecForceOrAssignImpl(const Stmt* stmt, SimContext& ctx,
                                  Arena& arena) {
   if (!stmt->lhs) return StmtResult::kDone;
@@ -305,7 +338,7 @@ StmtResult ExecReleaseOrDeassignImpl(const Stmt* stmt, SimContext& ctx,
   }
 
   if (var->assign_cont_rhs && stmt->kind != StmtKind::kDeassign) {
-    InstallForcedValueWatcher(var, var->assign_cont_rhs, ctx, arena);
+    ReestablishContinuousAssignment(var, var->assign_cont_rhs, ctx, arena);
   }
 
   return StmtResult::kDone;
