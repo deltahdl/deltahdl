@@ -49,10 +49,14 @@ void ResetAllConfigParams(const ModuleDecl* child_decl,
                           std::vector<std::string_view>& locked) {
   child_params.clear();
   for (const auto& [dname, dexpr] : child_decl->params) {
-    (void)dexpr;
     if (child_decl->localparam_port_names.count(dname) > 0) continue;
     if (child_decl->type_param_names.count(dname) > 0) continue;
     locked.push_back(dname);
+    if (dexpr) {
+      if (auto val = ConstEvalInt(dexpr)) {
+        child_params.push_back({dname, *val});
+      }
+    }
   }
 }
 
