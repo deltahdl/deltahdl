@@ -14,13 +14,16 @@ TEST(ProceduralBlockSim, InitialConstructRuns) {
 }
 
 TEST(ProceduralBlockSim, FinalConstructLowersWithoutDisturbingInitial) {
+  // §9.2.3: final procedures are enabled at the end of simulation and execute
+  // only once. The initial block sets a = 1, then the final block runs at end
+  // of simulation and overwrites it with 99, so the observed end value is 99.
   EXPECT_EQ(RunAndGet("module t;\n"
                       "  logic [7:0] a;\n"
                       "  initial a = 8'd1;\n"
                       "  final a = 8'd99;\n"
                       "endmodule\n",
                       "a"),
-            1u);
+            99u);
 }
 
 TEST(ProceduralBlockSim, BlockingAssignmentSimple) {
