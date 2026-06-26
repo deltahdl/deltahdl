@@ -153,6 +153,7 @@ bool Parser::ParseFirstPatternElement(Expr* pat, bool& named) {
     id->text = first.text;
   }
   id->range.start = first.loc;
+  id = ParseIdentifierPostfixChain(id);
   pat->elements.push_back(ParseInfixBp(id, 0));
   return true;
 }
