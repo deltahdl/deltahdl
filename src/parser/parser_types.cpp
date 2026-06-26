@@ -292,8 +292,7 @@ bool Parser::TryParseNetDataType(DataType& dtype, bool has_intervening) {
 
   auto inner_kind = TokenToTypeKind(CurrentToken().kind);
   if (inner_kind && !IsNetTypeToken(CurrentToken().kind)) {
-    dtype.kind = *inner_kind;
-    dtype.is_signed = IsDefaultSigned(dtype.kind);
+    dtype.is_signed = IsDefaultSigned(*inner_kind);
     Consume();
   }
   return false;
