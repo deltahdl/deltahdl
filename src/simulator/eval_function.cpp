@@ -435,7 +435,16 @@ static bool TryEvalClassScopeCall(const Expr* expr, SimContext& ctx,
     return true;
   }
   ctx.PushScope();
+  // §8.10: a static method can directly call static methods and access static
+  // properties of the same class, so the class scope must be in effect while
+  // the method body executes for unqualified same-class references to resolve.
+  if (info.method->is_static) {
+    ctx.PushMethodClass(info.cls);
+  }
   ExecClassMethod({info.method}, expr, ctx, arena, out);
+  if (info.method->is_static) {
+    ctx.PopMethodClass();
+  }
   ctx.PopScope();
   return true;
 }
