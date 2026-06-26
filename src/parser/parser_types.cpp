@@ -329,7 +329,7 @@ DataType Parser::ParseDataType() {
   if (!kind) return dtype;
   dtype.kind = *kind;
   dtype.is_net = IsNetTypeToken(tok_kind);
-
+  dtype.type_name = CurrentToken().text;
   dtype.is_signed = IsDefaultSigned(dtype.kind);
   Consume();
 
