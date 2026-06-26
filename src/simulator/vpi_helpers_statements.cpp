@@ -179,7 +179,7 @@ VpiHandle VpiLoopConditionExpr(VpiHandle loop) {
   // is an expression kind (an operation, a reference, a constant, ...) rather
   // than the vpiCondition relation tag, so it is found by scanning for the
   // first expression child. Null when none is attached.
-  if (!loop) return nullptr;
+  if (!loop || !VpiIsWhileOrRepeatType(loop->type)) return nullptr;
   for (auto* child : loop->children) {
     if (VpiIsExprType(child->type)) return child;
   }
