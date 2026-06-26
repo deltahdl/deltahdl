@@ -99,7 +99,8 @@ namespace {
 void CheckTypeParamNotSetToValue(const ModuleItem* item, DiagEngine& diag) {
   if (item->data_type.kind == DataTypeKind::kVoid &&
       item->typedef_type.kind == DataTypeKind::kImplicit &&
-      item->init_expr != nullptr) {
+      item->init_expr != nullptr &&
+      item->init_expr->kind != ExprKind::kTypeRef) {
     diag.Error(item->loc,
                std::format("type parameter '{}' can only be set to a data "
                            "type, not a value expression",
