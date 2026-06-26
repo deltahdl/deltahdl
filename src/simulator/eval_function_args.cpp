@@ -269,6 +269,10 @@ static void BindValueArg(const FunctionArg& param, const Expr* expr,
   }
   auto* var = ctx.CreateLocalVariable(param.name, val.width);
   var->value = val;
+  // §7.2.2: register a struct-typed parameter's type so member access works.
+  if (dt.kind == DataTypeKind::kStruct && !dt.type_name.empty()) {
+    ctx.SetVariableStructType(param.name, dt.type_name);
+  }
 }
 
 void BindFunctionArgs(const ModuleItem* func, const Expr* expr, SimContext& ctx,
