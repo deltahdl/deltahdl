@@ -823,6 +823,9 @@ static void CreateChildModuleVariables(const std::string& inst_prefix,
     v->is_4state = var.is_4state;
     if (var.is_event) v->is_event = true;
     if (var.is_signed) v->is_signed = true;
+    if (var.init_expr) {
+      v->value = EvalExpr(var.init_expr, ctx, arena);
+    }
   }
 }
 
