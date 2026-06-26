@@ -162,7 +162,11 @@ static bool Logic4VecEqual(const Logic4Vec& a, const Logic4Vec& b) {
 
 static bool IsAllHighZ(const Logic4Vec& v) {
   for (uint32_t i = 0; i < v.nwords; ++i) {
-    if (v.words[i].aval != 0 || v.words[i].bval == 0) return false;
+    // 4-state encoding: x is aval=0/bval=1, z is aval=1/bval=1. A bit is 0 or z
+    // exactly when aval == bval; a set bval marks the z bits. The value is all
+    // high-impedance when every bit is 0 or z and at least one bit is z.
+    if (v.words[i].aval != v.words[i].bval || v.words[i].bval == 0)
+      return false;
   }
   return v.nwords > 0;
 }

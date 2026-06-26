@@ -816,7 +816,8 @@ Logic4Vec EvalInside(const Expr* expr, SimContext& ctx, Arena& arena) {
   }
   if (ambiguous) {
     auto x = MakeLogic4Vec(arena, 1);
-    x.words[0] = {~uint64_t{0}, ~uint64_t{0}};
+    // x is aval=0/bval=1 (z is aval=1/bval=1).
+    x.words[0] = {0, 1};
     return x;
   }
   return MakeLogic4VecVal(arena, 1, 0);

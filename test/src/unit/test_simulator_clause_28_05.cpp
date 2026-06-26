@@ -105,7 +105,8 @@ TEST(BufNotSimulation, ProductionBufDrivesUnknownForUnknownInput) {
   ASSERT_NE(design, nullptr);
   LowerAndRun(design, f);
   auto b = ReadResolvedBit(f, "y");
-  EXPECT_EQ(b.aval, 1u);
+  // x is encoded aval=0/bval=1.
+  EXPECT_EQ(b.aval, 0u);
   EXPECT_EQ(b.bval, 1u);
 }
 
@@ -135,7 +136,8 @@ TEST(BufNotSimulation, ProductionNotDrivesUnknownForUnknownInput) {
   ASSERT_NE(design, nullptr);
   LowerAndRun(design, f);
   auto b = ReadResolvedBit(f, "y");
-  EXPECT_EQ(b.aval, 1u);
+  // x is encoded aval=0/bval=1.
+  EXPECT_EQ(b.aval, 0u);
   EXPECT_EQ(b.bval, 1u);
 }
 
@@ -147,7 +149,8 @@ TEST(BufNotSimulation, ProductionNotDrivesUnknownForHighImpedanceInput) {
   ASSERT_NE(design, nullptr);
   LowerAndRun(design, f);
   auto b = ReadResolvedBit(f, "y");
-  EXPECT_EQ(b.aval, 1u);
+  // x is encoded aval=0/bval=1.
+  EXPECT_EQ(b.aval, 0u);
   EXPECT_EQ(b.bval, 1u);
 }
 
