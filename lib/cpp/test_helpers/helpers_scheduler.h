@@ -20,6 +20,7 @@ inline uint64_t RunAndGet(const std::string& src, const char* var_name) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
+  f.ctx.RunFinalBlocks();
   auto* var = f.ctx.FindVariable(var_name);
   EXPECT_NE(var, nullptr);
   if (!var) return 0;
@@ -34,6 +35,7 @@ inline double RunAndGetReal(const std::string& src, const char* var_name) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
+  f.ctx.RunFinalBlocks();
   auto* var = f.ctx.FindVariable(var_name);
   EXPECT_NE(var, nullptr);
   if (!var) return 0.0;
@@ -51,6 +53,7 @@ inline void LowerRunAndCheck(
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
+  f.ctx.RunFinalBlocks();
   for (auto& [name, expected] : checks) {
     auto* var = f.ctx.FindVariable(name);
     ASSERT_NE(var, nullptr) << "Variable not found: " << name;
