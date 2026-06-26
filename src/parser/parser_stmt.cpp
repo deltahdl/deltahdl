@@ -807,7 +807,7 @@ void Parser::ParseIntraAssignTiming(Stmt* stmt) {
     stmt->events = ParseEventList();
     Expect(TokenKind::kRParen);
   }
-  stmt->rhs = ParseExpr();
+  stmt->rhs = ParseMinTypMaxExpr();
 }
 
 Stmt* Parser::ParseAssignmentOrExprNoSemi() {
