@@ -151,7 +151,7 @@ static std::unordered_set<std::string_view> CollectNonStaticMemberNames(
     const ClassDecl* cls) {
   std::unordered_set<std::string_view> non_static;
   for (const auto* member : cls->members) {
-    if (member->is_static) continue;
+    if (member->is_static || member->is_param) continue;
     if (member->kind == ClassMemberKind::kProperty && !member->name.empty()) {
       non_static.insert(member->name);
     } else if (member->kind == ClassMemberKind::kMethod && member->method &&
