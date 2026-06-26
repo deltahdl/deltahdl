@@ -214,6 +214,7 @@ struct ParserPortHelpers {
     }
     port.data_type.kind = DataTypeKind::kNamed;
     port.data_type.type_name = type_tok.text;
+    port.is_interface_port = true;
     port.name = p.ExpectIdentifier().text;
     p.ParseUnpackedDims(port.unpacked_dims);
     if (p.Match(TokenKind::kEq)) {
