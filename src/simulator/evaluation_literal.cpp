@@ -172,6 +172,22 @@ Logic4Vec EvalIntLiteral(const Expr* expr, Arena& arena) {
     }
     return vec;
   }
+  // §5.7.1: a sized literal's value is formed from all its digits. A based
+  // hex/octal/binary literal wider than 64 bits cannot be carried by the
+  // single 64-bit expr->int_val the parser computes (its high words are lost
+  // and its low word is corrupted by the parser's overflow), so parse the
+  // digit string directly into a multi-word vector. ParseBasedXZLiteral
+  // handles plain numeric digits in addition to x/z (none present here).
+  if (width > 64) {
+    std::string buf;
+    int bpd = 0;
+    ParseLiteralBase(expr->text, buf, bpd);
+    if (bpd != 0) {
+      auto vec = ParseBasedXZLiteral(expr->text, width, arena);
+      vec.is_signed = is_signed;
+      return vec;
+    }
+  }
   auto vec = MakeLogic4VecVal(arena, width, expr->int_val);
   vec.is_signed = is_signed;
   return vec;
