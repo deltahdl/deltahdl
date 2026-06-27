@@ -176,7 +176,7 @@ TEST(WireTriResolution, ResolveMultipleDriversConflictWire) {
 
   net.Resolve(arena);
 
-  EXPECT_EQ(var->value.words[0].aval, 0u);
+  EXPECT_EQ(var->value.words[0].aval & 0xFF, 0xFFu);  // all bits x = (1, 1)
   EXPECT_EQ(var->value.words[0].bval & 0xFF, 0xFFu);
 }
 
@@ -219,7 +219,7 @@ TEST(WireTriResolution, TriConflictProducesX) {
 
   net.Resolve(arena);
 
-  EXPECT_EQ(var->value.words[0].aval, 0u);
+  EXPECT_EQ(var->value.words[0].aval & 0xFF, 0xFFu);  // all bits x = (1, 1)
   EXPECT_EQ(var->value.words[0].bval & 0xFF, 0xFFu);
 }
 
@@ -255,10 +255,11 @@ TEST(WireTriResolution, ThreeDriverWireResolution) {
   EXPECT_TRUE((w.aval & 1u) != 0);
   EXPECT_TRUE((w.bval & 1u) == 0);
 
-  EXPECT_TRUE((w.aval & 2u) == 0);
+  // bit1 and bit2 resolve to x; Convention A sets aval on an x bit.
+  EXPECT_TRUE((w.aval & 2u) != 0);
   EXPECT_TRUE((w.bval & 2u) != 0);
 
-  EXPECT_TRUE((w.aval & 4u) == 0);
+  EXPECT_TRUE((w.aval & 4u) != 0);
   EXPECT_TRUE((w.bval & 4u) != 0);
 
   EXPECT_TRUE((w.aval & 8u) == 0);
@@ -275,7 +276,7 @@ TEST(WireTriResolution, WireZDriverPassesThrough) {
 
   net.drivers.push_back(MakeLogic4VecVal(arena, 8, 42));
   auto z_drv = MakeLogic4Vec(arena, 8);
-  z_drv.words[0].aval = 0xFF;
+  z_drv.words[0].aval = 0x00;  // z = (aval=0, bval=1) per Convention A
   z_drv.words[0].bval = 0xFF;
   net.drivers.push_back(z_drv);
 
@@ -293,7 +294,7 @@ TEST(WireTriResolution, TriZDriverPassesThrough) {
 
   net.drivers.push_back(MakeLogic4VecVal(arena, 8, 42));
   auto z_drv = MakeLogic4Vec(arena, 8);
-  z_drv.words[0].aval = 0xFF;
+  z_drv.words[0].aval = 0x00;  // z = (aval=0, bval=1) per Convention A
   z_drv.words[0].bval = 0xFF;
   net.drivers.push_back(z_drv);
 

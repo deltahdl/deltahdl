@@ -36,9 +36,9 @@ StrengthNet ResolveWidth1(Arena& arena,
 }
 
 // Asserts the four resolved strength bounds of a width-1 net and that bit 0 of
-// its backing variable holds an x (aval bit 0, bval bit 1). Centralizes the
-// six-line assertion block shared by the ambiguous-result StrengthResolution
-// tests.
+// its backing variable holds an x. Canonical Convention A encodes x as
+// (aval=1, bval=1). Centralizes the six-line assertion block shared by the
+// ambiguous-result StrengthResolution tests.
 void ExpectResolvedStrengthsAndX(const StrengthNet& sn, Strength s0_hi,
                                  Strength s0_lo, Strength s1_hi,
                                  Strength s1_lo) {
@@ -47,7 +47,7 @@ void ExpectResolvedStrengthsAndX(const StrengthNet& sn, Strength s0_hi,
   EXPECT_EQ(net.resolved_strength.s0_lo, s0_lo);
   EXPECT_EQ(net.resolved_strength.s1_hi, s1_hi);
   EXPECT_EQ(net.resolved_strength.s1_lo, s1_lo);
-  EXPECT_EQ(sn.var->value.words[0].aval & 1u, 0u);
+  EXPECT_EQ(sn.var->value.words[0].aval & 1u, 1u);
   EXPECT_EQ(sn.var->value.words[0].bval & 1u, 1u);
 }
 

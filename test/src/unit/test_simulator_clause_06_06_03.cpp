@@ -261,11 +261,12 @@ TEST(WiredNetResolution, TriorUsesWorResolution) {
   EXPECT_EQ(var->value.ToUint64(), 0xFFu);
 }
 
-// Builds an all-z value of the given width (every bit aval=bval=1).
+// Builds an all-z value of the given width. Canonical Convention A encodes z as
+// (aval=0, bval=1) per bit.
 Logic4Vec MakeZVec(Arena& arena, uint32_t width) {
   auto v = MakeLogic4Vec(arena, width);
   uint64_t mask = (width >= 64) ? ~uint64_t{0} : ((uint64_t{1} << width) - 1);
-  v.words[0].aval = mask;
+  v.words[0].aval = 0;
   v.words[0].bval = mask;
   return v;
 }

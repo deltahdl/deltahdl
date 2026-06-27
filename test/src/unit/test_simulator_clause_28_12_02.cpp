@@ -20,7 +20,7 @@ TEST(StrengthResolution, EqualStrengthConflictProducesX) {
   AddDriver(arena, net, 1, 1, Strength::kStrong);
   net.Resolve(arena);
 
-  EXPECT_EQ(sn.var->value.words[0].aval & 1u, 0u);
+  EXPECT_EQ(sn.var->value.words[0].aval & 1u, 1u);  // x = (aval=1, bval=1)
   EXPECT_EQ(sn.var->value.words[0].bval & 1u, 1u);
 }
 
@@ -53,7 +53,7 @@ TEST(StrengthResolution, EqualSupplyConflictProducesX) {
   AddDriver(arena, net, 1, 1, Strength::kSupply);
   net.Resolve(arena);
 
-  EXPECT_EQ(sn.var->value.words[0].aval & 1u, 0u);
+  EXPECT_EQ(sn.var->value.words[0].aval & 1u, 1u);  // x = (aval=1, bval=1)
   EXPECT_EQ(sn.var->value.words[0].bval & 1u, 1u);
 }
 
@@ -66,7 +66,7 @@ TEST(StrengthResolution, EqualStrengthConflictPerBit) {
   AddDriver(arena, net, 8, 0x0F, Strength::kStrong);
   net.Resolve(arena);
 
-  EXPECT_EQ(sn.var->value.words[0].aval & 0xFFu, 0u);
+  EXPECT_EQ(sn.var->value.words[0].aval & 0xFFu, 0xFFu);  // all bits x
   EXPECT_EQ(sn.var->value.words[0].bval & 0xFFu, 0xFFu);
 }
 
@@ -117,7 +117,9 @@ TEST(StrengthResolution, EqualStrengthPartialConflictPerBit) {
   AddDriver(arena, net, 4, 0b1010, Strength::kStrong);
   net.Resolve(arena);
 
-  EXPECT_EQ(sn.var->value.words[0].aval & 0xFu, 0b1000u);
+  // bit3=1, bit2=x, bit1=x, bit0=0. Under Convention A an x bit sets aval, so
+  // aval = 0b1110 (the known 1 at bit3 plus the two x bits), bval = 0b0110.
+  EXPECT_EQ(sn.var->value.words[0].aval & 0xFu, 0b1110u);
   EXPECT_EQ(sn.var->value.words[0].bval & 0xFu, 0b0110u);
 }
 
@@ -185,7 +187,7 @@ TEST(StrengthResolution,
   AddDriver(arena, net, 1, 1, Strength::kMedium);
   net.Resolve(arena);
 
-  EXPECT_EQ(sn.var->value.words[0].aval & 1u, 0u);
+  EXPECT_EQ(sn.var->value.words[0].aval & 1u, 1u);  // x = (aval=1, bval=1)
   EXPECT_EQ(sn.var->value.words[0].bval & 1u, 1u);
   EXPECT_EQ(net.resolved_strength.s0_hi, Strength::kMedium);
   EXPECT_EQ(net.resolved_strength.s1_hi, Strength::kMedium);
@@ -201,7 +203,7 @@ TEST(StrengthResolution, EqualStrengthConflictOnTriNetPopulatesAmbiguous) {
   AddDriver(arena, net, 1, 1, Strength::kStrong);
   net.Resolve(arena);
 
-  EXPECT_EQ(sn.var->value.words[0].aval & 1u, 0u);
+  EXPECT_EQ(sn.var->value.words[0].aval & 1u, 1u);  // x = (aval=1, bval=1)
   EXPECT_EQ(sn.var->value.words[0].bval & 1u, 1u);
   EXPECT_EQ(net.resolved_strength.s0_hi, Strength::kStrong);
   EXPECT_EQ(net.resolved_strength.s1_hi, Strength::kStrong);

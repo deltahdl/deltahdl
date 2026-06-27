@@ -12,8 +12,9 @@ namespace {
 // design is elaborated, lowered, and run, then the resolved net value is read
 // back from the SimContext.
 
-// 4-state value of bit 0, encoded as (bval << 1) | aval.
-//   0 -> 0, 1 -> 1, x -> 2, z -> 3
+// 4-state value of bit 0, encoded as (bval << 1) | aval. Canonical Convention
+// A: x = (aval=1, bval=1), z = (aval=0, bval=1).
+//   0 -> 0, 1 -> 1, z -> 2, x -> 3
 uint8_t Bit0(const Variable& v) {
   uint8_t a = v.value.words[0].aval & 1;
   uint8_t b = v.value.words[0].bval & 1;
@@ -21,8 +22,8 @@ uint8_t Bit0(const Variable& v) {
 }
 
 constexpr uint8_t kVal1 = 1;
-constexpr uint8_t kValX = 2;
-constexpr uint8_t kValZ = 3;
+constexpr uint8_t kValZ = 2;
+constexpr uint8_t kValX = 3;
 
 // §6.7.1: the default initialization value for a net shall be z.
 TEST(NetDefaultValue, UndrivenWireDefaultsToZ) {
@@ -48,7 +49,7 @@ TEST(NetDefaultValue, DrivenNetAssumesDriverValue) {
 }
 
 // §6.7.1: the default applies to every bit of a vector net, not just bit 0.
-// All four bits of an undriven vector wire come up z (aval=1, bval=1 per bit).
+// All four bits of an undriven vector wire come up z (aval=0, bval=1 per bit).
 TEST(NetDefaultValue, UndrivenVectorWireAllBitsZ) {
   LowerFixture f;
   auto* design = ElaborateSrc("module t; wire [3:0] w; endmodule\n", f);
@@ -56,7 +57,7 @@ TEST(NetDefaultValue, UndrivenVectorWireAllBitsZ) {
   LowerAndRun(design, f);
   auto* var = f.ctx.FindVariable("w");
   ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.words[0].aval & 0xF, 0xFu);
+  EXPECT_EQ(var->value.words[0].aval & 0xF, 0x0u);
   EXPECT_EQ(var->value.words[0].bval & 0xF, 0xFu);
 }
 
@@ -72,7 +73,7 @@ TEST(NetDefaultValue, UndrivenTriregDefaultsToX) {
 }
 
 // §6.7.1: the trireg x default also applies across every bit of a vector trireg
-// (x is aval=0, bval=1 per bit).
+// (x is aval=1, bval=1 per bit).
 TEST(NetDefaultValue, UndrivenVectorTriregAllBitsX) {
   LowerFixture f;
   auto* design = ElaborateSrc("module t; trireg [3:0] r; endmodule\n", f);
@@ -80,7 +81,7 @@ TEST(NetDefaultValue, UndrivenVectorTriregAllBitsX) {
   LowerAndRun(design, f);
   auto* var = f.ctx.FindVariable("r");
   ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.words[0].aval & 0xF, 0x0u);
+  EXPECT_EQ(var->value.words[0].aval & 0xF, 0xFu);
   EXPECT_EQ(var->value.words[0].bval & 0xF, 0xFu);
 }
 
