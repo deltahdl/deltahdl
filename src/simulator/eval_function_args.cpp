@@ -281,7 +281,7 @@ static uint32_t EvalFormalArgWidth(const DataType& dt, SimContext& ctx,
 // `input s_t arg` -- cannot find its layout by the type name `s_t` (a type name
 // is never a registered struct key). Resolve the layout from the actual
 // argument's registered struct type and re-register it under the parameter
-// name; fall back to the bare type-name mapping otherwise.
+// name. No-op when the actual argument is not a resolvable struct identifier.
 static void RegisterValueArgStructType(const FunctionArg& param,
                                        const Expr* expr, int arg_index,
                                        SimContext& ctx) {
@@ -297,7 +297,10 @@ static void RegisterValueArgStructType(const FunctionArg& param,
       return;
     }
   }
-  if (!param.data_type.type_name.empty())
+  // Legacy fallback for an inline struct-typed formal whose actual is not a
+  // resolvable struct identifier.
+  if (param.data_type.kind == DataTypeKind::kStruct &&
+      !param.data_type.type_name.empty())
     ctx.SetVariableStructType(param.name, param.data_type.type_name);
 }
 
@@ -312,9 +315,10 @@ static void BindValueArg(const FunctionArg& param, const Expr* expr,
   }
   auto* var = ctx.CreateLocalVariable(param.name, val.width);
   var->value = val;
-  if (dt.kind == DataTypeKind::kStruct) {
-    RegisterValueArgStructType(param, expr, arg_index, ctx);
-  }
+  // A named-type struct formal (input s_t arg) has kind kNamed, not kStruct, so
+  // resolve from the actual argument unconditionally; the resolver is a no-op
+  // for non-struct actuals.
+  RegisterValueArgStructType(param, expr, arg_index, ctx);
 }
 
 void BindFunctionArgs(const ModuleItem* func, const Expr* expr, SimContext& ctx,
