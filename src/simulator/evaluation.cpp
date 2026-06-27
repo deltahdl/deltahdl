@@ -528,6 +528,26 @@ static Logic4Vec EvalMinTypMax(const Expr* expr, SimContext& ctx, Arena& arena,
   return result;
 }
 
+// §5.7.1: widen an unbased unsized literal to `width`, replicating its single
+// bit (0/1/x/z) across every bit of the context-sized result.
+static Logic4Vec FillUnbasedUnsized(const Logic4Vec& v, uint32_t width,
+                                    Arena& arena) {
+  uint64_t af = (v.nwords > 0 && (v.words[0].aval & 1)) ? ~uint64_t{0} : 0;
+  uint64_t bf = (v.nwords > 0 && (v.words[0].bval & 1)) ? ~uint64_t{0} : 0;
+  auto out = MakeLogic4Vec(arena, width);
+  for (uint32_t w = 0; w < out.nwords; ++w) {
+    out.words[w].aval = af;
+    out.words[w].bval = bf;
+  }
+  uint32_t rem = width % 64;
+  if (rem != 0 && out.nwords > 0) {
+    uint64_t mask = (uint64_t{1} << rem) - 1;
+    out.words[out.nwords - 1].aval &= mask;
+    out.words[out.nwords - 1].bval &= mask;
+  }
+  return out;
+}
+
 Logic4Vec EvalExpr(const Expr* expr, SimContext& ctx, Arena& arena,
                    uint32_t context_width) {
   if (!expr) return MakeLogic4Vec(arena, 1);
@@ -538,8 +558,14 @@ Logic4Vec EvalExpr(const Expr* expr, SimContext& ctx, Arena& arena,
   switch (expr->kind) {
     case ExprKind::kIntegerLiteral:
       return EvalIntLiteral(expr, arena);
-    case ExprKind::kUnbasedUnsizedLiteral:
-      return EvalUnbasedUnsized(expr, arena);
+    case ExprKind::kUnbasedUnsizedLiteral: {
+      auto v = EvalUnbasedUnsized(expr, arena);
+      // §5.7.1: an unbased unsized literal takes the size of the context it
+      // appears in, filling every bit with its single-bit value. Context-free
+      // calls (context_width == 0) keep the self-determined carrier.
+      if (context_width == 0 || context_width == v.width) return v;
+      return FillUnbasedUnsized(v, context_width, arena);
+    }
     case ExprKind::kStringLiteral:
       return EvalStringLiteral(expr, arena);
     case ExprKind::kRealLiteral:
