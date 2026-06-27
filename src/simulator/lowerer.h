@@ -42,6 +42,7 @@ class Lowerer {
   void LowerProcess(const RtlirProcess& proc, bool from_program,
                     uint32_t program_block_id);
   void LowerContAssign(const RtlirContAssign& ca, bool from_program);
+  void LowerSequenceMonitors(const RtlirModule* mod);
   void LowerClassDecl(const ClassDecl* cls);
   void LowerImports(const RtlirModule* mod);
   void LowerPackageItem(ModuleItem* item);

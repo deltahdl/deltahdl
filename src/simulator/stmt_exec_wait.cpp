@@ -30,7 +30,10 @@ void SubstituteSequenceEndpoints(std::unordered_set<std::string>& reads,
       std::string ep_name = "__seq_" + name;
       auto* ep_var = ctx.FindVariable(ep_name);
       if (!ep_var) {
-        ep_var = ctx.CreateVariable(ep_name, 1);
+        // variables_ keys by string_view, so intern the name in the arena;
+        // a local std::string key would dangle once this function returns.
+        auto* stored = ctx.GetArena().Create<std::string>(ep_name);
+        ep_var = ctx.CreateVariable(*stored, 1);
         ep_var->is_event = true;
       }
       seq_adds.insert(ep_name);
