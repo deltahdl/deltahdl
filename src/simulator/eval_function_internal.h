@@ -34,8 +34,23 @@ Logic4Vec EvalVcdSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
 // eval_function_args.cpp; the call-dispatch entry points in eval_function.cpp
 // invoke them.
 struct Variable;
+struct ClassObject;
 void BindFunctionArgs(const ModuleItem* func, const Expr* expr, SimContext& ctx,
                       Arena& arena);
+
+// Runs a resolved class method on a concrete object (sets `this`, binds args,
+// writes back). Defined in eval_function.cpp; reused by eval_randomize.cpp to
+// invoke pre_randomize()/post_randomize() on the randomized object.
+Logic4Vec ExecInstanceMethodCall(ModuleItem* method, ClassObject* obj,
+                                 const Expr* expr, SimContext& ctx,
+                                 Arena& arena);
+
+// 18.6/8.26.9: handle a built-in randomize() method call on a class handle
+// (including an interface-class handle). Returns false when the call is not a
+// randomize() on a resolvable class object, so normal method dispatch proceeds.
+// Defined in eval_randomize.cpp.
+bool TryEvalRandomizeMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
+                                Logic4Vec& out);
 void WritebackOutputArgs(const ModuleItem* func, const Expr* expr,
                          SimContext& ctx, Arena& arena);
 void ExecFunctionBody(const ModuleItem* func, Variable* ret_var,

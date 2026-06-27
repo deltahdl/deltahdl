@@ -295,9 +295,9 @@ static bool ResolveInstanceMethod(const MethodCallParts& parts, SimContext& ctx,
   return info.method != nullptr;
 }
 
-static Logic4Vec ExecInstanceMethodCall(ModuleItem* method, ClassObject* obj,
-                                        const Expr* expr, SimContext& ctx,
-                                        Arena& arena) {
+Logic4Vec ExecInstanceMethodCall(ModuleItem* method, ClassObject* obj,
+                                 const Expr* expr, SimContext& ctx,
+                                 Arena& arena) {
   Logic4Vec out;
   ctx.PushScope();
   ctx.PushThis(obj);
@@ -769,6 +769,9 @@ static bool TryDispatchMethodOrLet(const Expr* expr, SimContext& ctx,
                                    Arena& arena, Logic4Vec& out) {
   if (TryBuiltinMethodCall(expr, ctx, arena, out)) return true;
   if (TryEvalSuperMethodCall(expr, ctx, arena, out)) return true;
+  // 18.6.3: randomize() is built-in and cannot be overridden, so a user class
+  // never declares it; handle it before the user-method dispatch below.
+  if (TryEvalRandomizeMethodCall(expr, ctx, arena, out)) return true;
   if (TryEvalClassMethodCall(expr, ctx, arena, out)) return true;
   if (TryEvalWeakRefStaticCall(expr, ctx, arena, out)) return true;
   if (TryEvalProcessStaticCall(expr, ctx, arena, out)) return true;
