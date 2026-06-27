@@ -325,7 +325,116 @@ Stmt* Parser::ParseRandsequenceStmt() {
   return stmt;
 }
 
-static void SkipCoverpointBody(Lexer& lexer) {
+static bool IsBinsKeyword(TokenKind k) {
+  return k == TokenKind::kKwBins || k == TokenKind::kKwIllegalBins ||
+         k == TokenKind::kKwIgnoreBins;
+}
+
+// §19.5: a bins selection is `bins_keyword name [array] = ...`. Consume the
+// keyword, name, and optional array dimension already known to lead the item,
+// then require the '=' that every bins form has.
+static void ScanBinsSelectionHeader(Lexer& lexer, DiagEngine& diag) {
+  lexer.Next();  // bins keyword
+  if (lexer.Peek().Is(TokenKind::kIdentifier)) lexer.Next();
+  if (lexer.Peek().Is(TokenKind::kLBracket)) {
+    int bd = 0;
+    do {
+      if (lexer.Peek().Is(TokenKind::kLBracket))
+        ++bd;
+      else if (lexer.Peek().Is(TokenKind::kRBracket))
+        --bd;
+      lexer.Next();
+    } while (bd > 0 && !lexer.Peek().Is(TokenKind::kEof));
+  }
+  if (!lexer.Peek().Is(TokenKind::kEq)) {
+    diag.Error(lexer.Peek().loc, "expected '=' in bins declaration");
+  }
+}
+
+enum class CovBodyStep { kNotHandled, kContinue, kReturn };
+
+// Handle a token seen at item level (body brace depth 1, no open parens),
+// reporting the missing ';' / '=' diagnostics. Returns kNotHandled when the
+// token is ordinary value content for the caller's nesting scan to consume.
+static CovBodyStep ScanCoverpointItemToken(Lexer& lexer, DiagEngine& diag,
+                                           bool& item_active) {
+  Token t = lexer.Peek();
+  if (t.Is(TokenKind::kRBrace)) {
+    if (item_active) diag.Error(t.loc, "missing ';' in covergroup item");
+    lexer.Next();
+    return CovBodyStep::kReturn;
+  }
+  if (t.Is(TokenKind::kSemicolon)) {
+    item_active = false;
+    lexer.Next();
+    return CovBodyStep::kContinue;
+  }
+  // 'wildcard' is a prefix of the following bins selection; consume it without
+  // starting a fresh item so the bins keyword sees the prior termination state.
+  if (t.Is(TokenKind::kKwWildcard)) {
+    lexer.Next();
+    return CovBodyStep::kContinue;
+  }
+  if (IsBinsKeyword(t.kind)) {
+    if (item_active) diag.Error(t.loc, "missing ';' in covergroup item");
+    item_active = true;
+    ScanBinsSelectionHeader(lexer, diag);
+    return CovBodyStep::kContinue;
+  }
+  return CovBodyStep::kNotHandled;
+}
+
+// Consume one ordinary token, tracking brace/paren nesting. Returns kReturn
+// once the body's closing brace is consumed (reporting an unbalanced paren).
+static CovBodyStep ScanCoverpointNesting(Lexer& lexer, DiagEngine& diag,
+                                         int& brace, int& paren,
+                                         bool& item_active) {
+  Token t = lexer.Peek();
+  if (t.Is(TokenKind::kLBrace)) {
+    ++brace;
+  } else if (t.Is(TokenKind::kRBrace)) {
+    --brace;
+    if (brace == 0) {
+      if (paren > 0) diag.Error(t.loc, "missing ')' in covergroup item");
+      lexer.Next();
+      return CovBodyStep::kReturn;
+    }
+  } else if (t.Is(TokenKind::kLParen)) {
+    ++paren;
+  } else if (t.Is(TokenKind::kRParen)) {
+    if (paren > 0) --paren;
+  } else if (brace == 1 && paren == 0) {
+    item_active = true;
+  }
+  lexer.Next();
+  return CovBodyStep::kContinue;
+}
+
+// §19.5/§19.6: validate the brace-delimited body of a coverpoint or cross. The
+// opening '{' has already been consumed (body brace depth starts at 1). Beyond
+// balancing braces, this enforces the bin-syntax points exercised by the
+// malformed-bins tests: a bins selection needs '=' after its (optionally
+// indexed) name, each item ends with ';', and parentheses (e.g. binsof(...))
+// must balance before the item terminates. Everything else is tolerated so the
+// many legal bin forms continue to parse.
+static void ScanCoverpointBraceBody(Lexer& lexer, DiagEngine& diag) {
+  int brace = 1;  // the coverpoint/cross body itself
+  int paren = 0;
+  bool item_active = false;
+  while (!lexer.Peek().Is(TokenKind::kEof)) {
+    if (brace == 1 && paren == 0) {
+      CovBodyStep step = ScanCoverpointItemToken(lexer, diag, item_active);
+      if (step == CovBodyStep::kReturn) return;
+      if (step == CovBodyStep::kContinue) continue;
+    }
+    if (ScanCoverpointNesting(lexer, diag, brace, paren, item_active) ==
+        CovBodyStep::kReturn) {
+      return;
+    }
+  }
+}
+
+static void SkipCoverpointBody(Lexer& lexer, DiagEngine& diag) {
   while (!lexer.Peek().Is(TokenKind::kSemicolon) &&
          !lexer.Peek().Is(TokenKind::kLBrace) &&
          !lexer.Peek().Is(TokenKind::kEof)) {
@@ -333,7 +442,7 @@ static void SkipCoverpointBody(Lexer& lexer) {
   }
   if (lexer.Peek().Is(TokenKind::kLBrace)) {
     lexer.Next();
-    SkipBraceBlock(lexer);
+    ScanCoverpointBraceBody(lexer, diag);
   }
   if (lexer.Peek().Is(TokenKind::kSemicolon)) lexer.Next();
 }
@@ -542,7 +651,7 @@ void Parser::SkipCovergroupItem() {
 
   if (IsCoverpointOrCross(CurrentToken().kind)) {
     Consume();
-    SkipCoverpointBody(lexer_);
+    SkipCoverpointBody(lexer_, diag_);
     return;
   }
 
@@ -551,7 +660,7 @@ void Parser::SkipCovergroupItem() {
     if (Match(TokenKind::kColon) && IsCoverpointOrCross(CurrentToken().kind)) {
       Consume();
     }
-    SkipCoverpointBody(lexer_);
+    SkipCoverpointBody(lexer_, diag_);
     return;
   }
 
