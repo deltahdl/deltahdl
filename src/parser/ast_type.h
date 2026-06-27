@@ -110,6 +110,11 @@ struct DataType {
   std::vector<EnumMember> enum_members;
   std::vector<StructMember> struct_members;
   std::vector<DataType> type_params;
+
+  // §6.20 / Syntax 8-2: when this DataType is an element of an enclosing type's
+  // parameter_value_assignment given in the named form ".name(value)", this
+  // holds the formal parameter name it binds to. Empty for the ordered form.
+  std::string_view param_arg_name;
 };
 
 struct FunctionArg {

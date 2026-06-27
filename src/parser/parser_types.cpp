@@ -177,22 +177,33 @@ void Parser::ParsePackedDims(DataType& dtype) {
   }
 }
 
+// Parses one element of a parameter_value_assignment list. An ordered element
+// is a bare data type or expression; a named element is ".name(value)", whose
+// formal name is recorded on the value's DataType (§6.20 / Syntax 8-2).
+DataType Parser::ParseOneTypeParam() {
+  if (Match(TokenKind::kDot)) {
+    std::string_view arg_name = Expect(TokenKind::kIdentifier).text;
+    Expect(TokenKind::kLParen);
+    DataType dt;
+    if (!Check(TokenKind::kRParen)) {
+      dt = ParseDataType();
+      if (dt.kind == DataTypeKind::kImplicit) dt.type_ref_expr = ParseExpr();
+    }
+    Expect(TokenKind::kRParen);
+    dt.param_arg_name = arg_name;
+    return dt;
+  }
+  DataType dt = ParseDataType();
+  if (dt.kind == DataTypeKind::kImplicit) dt.type_ref_expr = ParseExpr();
+  return dt;
+}
+
 std::vector<DataType> Parser::ParseTypeParamList() {
   std::vector<DataType> result;
   Expect(TokenKind::kLParen);
   if (!Check(TokenKind::kRParen)) {
-    auto dt = ParseDataType();
-    if (dt.kind == DataTypeKind::kImplicit) {
-      dt.type_ref_expr = ParseExpr();
-    }
-    result.push_back(dt);
-    while (Match(TokenKind::kComma)) {
-      dt = ParseDataType();
-      if (dt.kind == DataTypeKind::kImplicit) {
-        dt.type_ref_expr = ParseExpr();
-      }
-      result.push_back(dt);
-    }
+    result.push_back(ParseOneTypeParam());
+    while (Match(TokenKind::kComma)) result.push_back(ParseOneTypeParam());
   }
   Expect(TokenKind::kRParen);
   return result;

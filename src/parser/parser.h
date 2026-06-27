@@ -330,6 +330,7 @@ class Parser {
   void ParseUnpackedDims(std::vector<Expr*>& dims);
   void ParseParenList(std::vector<Expr*>& out);
   std::vector<DataType> ParseTypeParamList();
+  DataType ParseOneTypeParam();
   DataType ParseNamedType();
 
   Stmt* ParseStmt();
