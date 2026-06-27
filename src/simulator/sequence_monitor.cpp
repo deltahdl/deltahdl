@@ -64,11 +64,14 @@ SimCoroutine MakeSequenceMonitorCoroutine(const ModuleItem* seq,
   std::vector<size_t> active;
   while (!ctx.StopRequested()) {
     co_await EventAwaiter{ctx, seq->seq_clock, arena};
-    // TEMP DIAGNOSTIC: write the value WaitBlocks expects (42) directly to
-    // `result` on each clock tick, bypassing __seq_/wait, so the test PASSES
-    // iff the monitor spawns and clocks (isolates spawn+clk). Revert after.
+    // TEMP DIAGNOSTIC: at the posedge, write 42 (WaitBlocks' expected value)
+    // iff the endpoint event already has watchers (i.e. the wait armed on
+    // __seq_<name>), else 7. PASS => armed (bug is the wake); FAIL => the wait
+    // never armed (runtime substitution/registration). Revert after.
+    auto* ep = ctx.FindVariable(ep_name);
+    size_t wc = ep ? ep->watchers.size() : 0;
     if (auto* rv = ctx.FindVariable("result")) {
-      rv->value = MakeLogic4VecVal(arena, 8, 42);
+      rv->value = MakeLogic4VecVal(arena, 8, wc > 0 ? 42 : 7);
     }
     active.push_back(0);
     AdvanceLinearAttempts(operands, active, ctx, arena);
