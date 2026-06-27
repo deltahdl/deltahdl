@@ -383,6 +383,19 @@ struct EventAwaiter {
                                        event);
       return;
     }
+    // §9.4: the coroutine being resumed belongs to `proc`. A synchronous resume
+    // runs inside whatever process is currently executing (e.g. the one that
+    // drove the awaited signal in NotifyWatchers), so set the current process
+    // to `proc` for the duration of the resume and restore it afterward; this
+    // keeps per-process state (FlushPendingViolations, name lookup) correct
+    // without disturbing the caller's NotifyWatchers loop.
+    if (proc) {
+      auto* saved = ctx.CurrentProcess();
+      ctx.SetCurrentProcess(proc);
+      h.resume();
+      ctx.SetCurrentProcess(saved);
+      return;
+    }
     h.resume();
   }
 };
@@ -513,8 +526,17 @@ struct NamedEventAwaiter {
   void await_suspend(std::coroutine_handle<> h) {
     auto* var = ctx.FindVariable(event_name);
     if (!var) return;
-    var->AddWatcher([h]() mutable {
+    auto* proc = ctx.CurrentProcess();
+    auto* ctx_ptr = &ctx;
+    var->AddWatcher([h, proc, ctx_ptr]() mutable {
+      // The watcher fires synchronously inside the triggering process's
+      // NotifyWatchers; set the current process to the waiter's own for the
+      // resume (so the post-resume flush point sees the right process) and
+      // restore it afterward (§9.4 / §12.4.2.1).
+      auto* saved = ctx_ptr->CurrentProcess();
+      if (proc) ctx_ptr->SetCurrentProcess(proc);
       h.resume();
+      ctx_ptr->SetCurrentProcess(saved);
       return true;
     });
   }
