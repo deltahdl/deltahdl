@@ -546,16 +546,22 @@ void Lowerer::LowerProcesses(const std::vector<RtlirProcess>& procs,
 
 void Lowerer::LowerParams(const RtlirModule* mod) {
   for (const auto& p : mod->params) {
+    // §23.10/§6.20: a parameter is an instance-specific runtime value, so its
+    // variable is scoped by the instance prefix (empty for a top module). This
+    // makes a child instance's parameters — including any defparam override —
+    // visible to that instance's processes. The name is arena-persisted because
+    // SimContext keys variables by string_view.
+    auto* full = arena_.Create<std::string>(inst_prefix_ + std::string(p.name));
     if (p.is_unbounded) {
-      ctx_.RegisterUnboundedParam(p.name);
-      ctx_.CreateVariable(p.name, 32);
+      ctx_.RegisterUnboundedParam(*full);
+      ctx_.CreateVariable(*full, 32);
       continue;
     }
     if (!p.is_resolved) continue;
     // Use declared width if parameter has explicit type, else 32 (§10.8
     // context)
     uint32_t width = (p.decl_width > 0) ? p.decl_width : 32;
-    auto* var = ctx_.CreateVariable(p.name, width);
+    auto* var = ctx_.CreateVariable(*full, width);
     var->value = MakeLogic4VecVal(arena_, width,
                                   static_cast<uint64_t>(p.resolved_value));
   }
@@ -881,6 +887,7 @@ void Lowerer::LowerChildModules(const RtlirModule* mod) {
 
     RegisterInstanceKeyBinding(inst_prefix_, child.resolved->library,
                                child.resolved->name, ctx_);
+    LowerParams(child.resolved);
     CreateChildModuleVariables(inst_prefix_, child.resolved, ctx_, arena_);
     CreateChildModulePorts(inst_prefix_, child.resolved, ctx_, arena_);
 
