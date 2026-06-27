@@ -23,6 +23,9 @@ static uint32_t InferTypeRefExprWidth(const Expr* expr,
       for (const auto& v : mod->variables) {
         if (v.name == expr->text) return v.width;
       }
+      for (const auto& n : mod->nets) {
+        if (n.name == expr->text) return n.width;
+      }
       return 0;
     case ExprKind::kIntegerLiteral:
       return ExtractLiteralWidth(expr->text);
@@ -57,6 +60,9 @@ static bool InferTypeRefExprSigned(const Expr* expr, const RtlirModule* mod) {
       for (const auto& v : mod->variables) {
         if (v.name == expr->text) return v.is_signed;
       }
+      for (const auto& n : mod->nets) {
+        if (n.name == expr->text) return n.is_signed;
+      }
       return false;
     case ExprKind::kBinary:
       return InferTypeRefExprSigned(expr->lhs, mod) &&
@@ -73,23 +79,28 @@ static bool InferTypeRefExprSigned(const Expr* expr, const RtlirModule* mod) {
   }
 }
 
+// §6.23: build the packed dimension [width-1:0] of a type_reference resolved to
+// a known scalar/vector width (no dimension is added for a 1-bit scalar).
+static void SetTypeRefPackedDims(DataType& dt, uint32_t width, Arena& arena) {
+  if (width <= 1) return;
+  auto* left = arena.Create<Expr>();
+  left->kind = ExprKind::kIntegerLiteral;
+  left->int_val = static_cast<int64_t>(width - 1);
+  auto* right = arena.Create<Expr>();
+  right->kind = ExprKind::kIntegerLiteral;
+  right->int_val = 0;
+  dt.packed_dim_left = left;
+  dt.packed_dim_right = right;
+}
+
 void Elaborator::ResolveTypeRef(ModuleItem* item, const RtlirModule* mod) {
   if (!item->data_type.type_ref_expr) return;
   auto* ref = item->data_type.type_ref_expr;
   CheckTypeRefArgInner(ref, item->loc);
   if (ref->kind != ExprKind::kIdentifier) {
-    uint32_t w = InferTypeRefExprWidth(ref, mod);
     item->data_type.kind = DataTypeKind::kLogic;
-    if (w > 1) {
-      auto* left = arena_.Create<Expr>();
-      left->kind = ExprKind::kIntegerLiteral;
-      left->int_val = static_cast<int64_t>(w - 1);
-      auto* right = arena_.Create<Expr>();
-      right->kind = ExprKind::kIntegerLiteral;
-      right->int_val = 0;
-      item->data_type.packed_dim_left = left;
-      item->data_type.packed_dim_right = right;
-    }
+    SetTypeRefPackedDims(item->data_type, InferTypeRefExprWidth(ref, mod),
+                         arena_);
     item->data_type.is_signed = InferTypeRefExprSigned(ref, mod);
     item->data_type.type_ref_expr = nullptr;
     return;
@@ -98,18 +109,22 @@ void Elaborator::ResolveTypeRef(ModuleItem* item, const RtlirModule* mod) {
     if (v.name != ref->text) continue;
     item->data_type.kind = var_types_[ref->text];
     item->data_type.is_signed = v.is_signed;
-    if (v.width > 1 && (item->data_type.kind == DataTypeKind::kLogic ||
-                        item->data_type.kind == DataTypeKind::kBit ||
-                        item->data_type.kind == DataTypeKind::kReg)) {
-      auto* left = arena_.Create<Expr>();
-      left->kind = ExprKind::kIntegerLiteral;
-      left->int_val = static_cast<int64_t>(v.width - 1);
-      auto* right = arena_.Create<Expr>();
-      right->kind = ExprKind::kIntegerLiteral;
-      right->int_val = 0;
-      item->data_type.packed_dim_left = left;
-      item->data_type.packed_dim_right = right;
+    if (item->data_type.kind == DataTypeKind::kLogic ||
+        item->data_type.kind == DataTypeKind::kBit ||
+        item->data_type.kind == DataTypeKind::kReg) {
+      SetTypeRefPackedDims(item->data_type, v.width, arena_);
     }
+    item->data_type.type_ref_expr = nullptr;
+    return;
+  }
+  // §6.23: type(net) yields the net's underlying data type (a logic vector of
+  // the net's width); the net-ness of the declared object comes separately from
+  // its own net keyword, not from the type_reference.
+  for (const auto& n : mod->nets) {
+    if (n.name != ref->text) continue;
+    item->data_type.kind = DataTypeKind::kLogic;
+    item->data_type.is_signed = n.is_signed;
+    SetTypeRefPackedDims(item->data_type, n.width, arena_);
     item->data_type.type_ref_expr = nullptr;
     return;
   }

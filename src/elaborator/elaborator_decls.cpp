@@ -375,6 +375,10 @@ static void ApplyTriregNetDefaults(const ModuleItem* item, RtlirNet& net,
 }
 
 void Elaborator::ElaborateNetDecl(ModuleItem* item, RtlirModule* mod) {
+  // §6.23: a net declared with a type_reference data type (e.g. `wire type(x)
+  // y`) resolves the referenced object's width/signedness before the net is
+  // built.
+  ResolveTypeRef(item, mod);
   CheckDeclRedeclaration(item, {item->data_type, typedefs_},
                          {ansi_port_names_, non_ansi_complete_ports_,
                           non_ansi_partial_ports_, declared_names_},
