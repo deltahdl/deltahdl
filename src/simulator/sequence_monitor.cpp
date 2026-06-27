@@ -62,16 +62,20 @@ SimCoroutine MakeSequenceMonitorCoroutine(const ModuleItem* seq,
   std::string ep_name = "__seq_" + std::string(seq->name);
   const std::vector<Expr*>& operands = seq->seq_linear_operands;
   std::vector<size_t> active;
+  // TEMP DIAGNOSTIC (non-confounded): at the FIRST posedge only, write 42 iff
+  // the endpoint event already has watchers (the wait armed on __seq_<name>),
+  // else 7; never fire, never overwrite. PASS => armed (bug is the wake);
+  // FAIL => the wait never armed (substitution/registration). Revert after.
+  bool reported = false;
   while (!ctx.StopRequested()) {
     co_await EventAwaiter{ctx, seq->seq_clock, arena};
-    // TEMP DIAGNOSTIC: at the posedge, write 42 (WaitBlocks' expected value)
-    // iff the endpoint event already has watchers (i.e. the wait armed on
-    // __seq_<name>), else 7. PASS => armed (bug is the wake); FAIL => the wait
-    // never armed (runtime substitution/registration). Revert after.
-    auto* ep = ctx.FindVariable(ep_name);
-    size_t wc = ep ? ep->watchers.size() : 0;
-    if (auto* rv = ctx.FindVariable("result")) {
-      rv->value = MakeLogic4VecVal(arena, 8, wc > 0 ? 42 : 7);
+    if (!reported) {
+      reported = true;
+      auto* ep = ctx.FindVariable(ep_name);
+      size_t wc = ep ? ep->watchers.size() : 0;
+      if (auto* rv = ctx.FindVariable("result")) {
+        rv->value = MakeLogic4VecVal(arena, 8, wc > 0 ? 42 : 7);
+      }
     }
     active.push_back(0);
     AdvanceLinearAttempts(operands, active, ctx, arena);
