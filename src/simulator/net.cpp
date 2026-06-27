@@ -292,10 +292,13 @@ static uint8_t DriverBit0Val(const Logic4Vec& drv) {
   uint64_t mask = 1;
   bool a = (drv.words[0].aval & mask) != 0;
   bool b = (drv.words[0].bval & mask) != 0;
+  // Canonical Convention A, matching GetBitVal and the val-code consumers
+  // (WiredAnd/WiredOr/EffectiveStrength): x = (aval=1, bval=1) -> 2, which
+  // carries drive strength; z = (aval=0, bval=1) -> 3, which is high impedance.
   if (!b && !a) return 0;
   if (!b && a) return 1;
-  if (b && !a) return 2;
-  return 3;
+  if (b && a) return 2;  // x
+  return 3;              // z
 }
 
 static bool FindWeakerUnambig(const std::vector<Logic4Vec>& drivers,
