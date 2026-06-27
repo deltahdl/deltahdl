@@ -6,6 +6,15 @@ using namespace delta;
 namespace {
 
 TEST(ConcatenationParsing, ModulePathConcatenation) {
+  // A concatenation is NOT a legal specify path terminal. Per Annex A.7.2/A.7.3
+  // a parallel path is
+  //   ( specify_input_terminal_descriptor => specify_output_terminal_descriptor
+  //   )
+  // and specify_input_terminal_descriptor ::= input_identifier
+  // [ [ constant_range_expression ] ] — module_path_concatenation appears only
+  // in module_path_primary (A.8.4), never as a path terminal. §30.4.5 also
+  // states a parallel '=>' connection joins one source to one destination. So
+  // this must be rejected.
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -13,7 +22,7 @@ TEST(ConcatenationParsing, ModulePathConcatenation) {
       "  endspecify\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
+  EXPECT_TRUE(r.has_errors);
 }
 
 TEST(ConcatenationParsing, ConcatenationBasic) {
@@ -214,7 +223,10 @@ TEST(ConcatenationParsing, StreamExpressionWithIndexedMinusRange) {
 }
 
 TEST(ConcatenationParsing, ModulePathMultipleConcatenation) {
-  EXPECT_TRUE(
+  // A multiple concatenation is likewise not a legal specify path terminal
+  // (Annex A.7.2/A.7.3; §30.4.5). The parallel '=>' source must be a single
+  // specify_input_terminal_descriptor, so this is rejected.
+  EXPECT_FALSE(
       ParseOk("module m(input a, input b, output c);\n"
               "  specify\n"
               "    ({2{a, b}} => c) = 5;\n"
