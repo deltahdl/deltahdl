@@ -276,6 +276,31 @@ static uint32_t EvalFormalArgWidth(const DataType& dt, SimContext& ctx,
   return width;
 }
 
+// §7.2.2/§13.5.1: make member access (arg.field) work on a by-value struct
+// copy. struct_types_ is keyed by variable name, so a named-type formal -- e.g.
+// `input s_t arg` -- cannot find its layout by the type name `s_t` (a type name
+// is never a registered struct key). Resolve the layout from the actual
+// argument's registered struct type and re-register it under the parameter
+// name; fall back to the bare type-name mapping otherwise.
+static void RegisterValueArgStructType(const FunctionArg& param,
+                                       const Expr* expr, int arg_index,
+                                       SimContext& ctx) {
+  const Expr* actual =
+      (arg_index >= 0) ? expr->args[static_cast<size_t>(arg_index)] : nullptr;
+  if (actual && actual->kind == ExprKind::kIdentifier) {
+    if (const auto* sinfo = ctx.GetVariableStructType(actual->text)) {
+      // Copy before re-inserting: registering into struct_types_ may rehash and
+      // invalidate the reference returned for the source variable.
+      StructTypeInfo copy = *sinfo;
+      ctx.RegisterStructType(param.name, copy);
+      ctx.SetVariableStructType(param.name, param.name);
+      return;
+    }
+  }
+  if (!param.data_type.type_name.empty())
+    ctx.SetVariableStructType(param.name, param.data_type.type_name);
+}
+
 static void BindValueArg(const FunctionArg& param, const Expr* expr,
                          int arg_index, SimContext& ctx, Arena& arena) {
   auto val = ResolveArgValue(param, expr, arg_index, ctx, arena);
@@ -287,9 +312,8 @@ static void BindValueArg(const FunctionArg& param, const Expr* expr,
   }
   auto* var = ctx.CreateLocalVariable(param.name, val.width);
   var->value = val;
-  // §7.2.2: register a struct-typed parameter's type so member access works.
-  if (dt.kind == DataTypeKind::kStruct && !dt.type_name.empty()) {
-    ctx.SetVariableStructType(param.name, dt.type_name);
+  if (dt.kind == DataTypeKind::kStruct) {
+    RegisterValueArgStructType(param, expr, arg_index, ctx);
   }
 }
 
