@@ -57,12 +57,15 @@ inline Expr* MakeAssocSelectIdent(Arena& arena, std::string_view base_name,
   return sel;
 }
 
-// Create a local variable holding an x/z-tainted index key. The value's low
-// word has its b-plane bit set so the key is partially unknown.
+// Create a variable holding an x/z-tainted index key. The value's low word has
+// its b-plane bit set so the key is partially unknown. It is registered as a
+// module-scope variable (not a block-local one) so it is resolvable by
+// EvalExpr without an active process scope, as these unit tests call the
+// assoc-array read/write paths directly.
 inline Variable* MakeXTaintedKeyVar(SimFixture& f,
                                     std::string_view name = "__xkey",
                                     uint64_t base_val = 5) {
-  auto* var = f.ctx.CreateLocalVariable(name, 32);
+  auto* var = f.ctx.CreateVariable(name, 32);
   var->value = MakeLogic4VecVal(f.arena, 32, base_val);
   var->value.words[0].bval = 0x1;
   return var;
