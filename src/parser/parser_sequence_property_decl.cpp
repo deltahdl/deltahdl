@@ -744,7 +744,8 @@ static void ParseSequencePortList(Lexer& lexer, DiagEngine& diag,
 // sequence body. Returns false on any non-unit cycle delay or parse failure;
 // only `##1` between Boolean operands is supported by the linear monitor.
 bool Parser::ParseLinearSeqOperands(std::vector<Expr*>& operands) {
-  while (!Check(TokenKind::kKwEndsequence) && !AtEnd()) {
+  while (!Check(TokenKind::kKwEndsequence) && !Check(TokenKind::kSemicolon) &&
+         !AtEnd()) {
     Expr* op = ParseExpr();
     if (!op) return false;
     operands.push_back(op);
@@ -776,6 +777,8 @@ void Parser::CaptureLinearSequenceBody(ModuleItem* item) {
   }
   std::vector<Expr*> operands;
   if (ok) ok = ParseLinearSeqOperands(operands);
+  // The sequence_expr is terminated by ';' before `endsequence`.
+  if (ok) Match(TokenKind::kSemicolon);
   ok = ok && Check(TokenKind::kKwEndsequence) && !operands.empty();
   diag_.PopSuppress();
   lexer_.RestorePos(saved);
