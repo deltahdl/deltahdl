@@ -125,9 +125,22 @@ static bool TryCompoundArraySelect(const Expr* expr, SimContext& ctx,
     return TryCompoundDefaultElem(expr, ctx, arena, out);
   }
   auto* elem = ctx.FindVariable(compound);
-  if (!elem) return TryCompoundDefaultElem(expr, ctx, arena, out);
-  out = elem->value;
-  return true;
+  if (elem) {
+    out = elem->value;
+    return true;
+  }
+  // The full compound name is not a variable. If the base (all indices but the
+  // last) names a real packed element, the trailing index is a bit-select of
+  // that element per §11.5.2, not a further array dimension: return false so
+  // EvalSelect falls through to the bit-select path. Only when the addressed
+  // array element itself is absent is this a genuine out-of-bounds read that
+  // defaults to x/0.
+  std::string parent;
+  if (BuildCompoundName(expr->base, ctx, arena, parent) &&
+      ctx.FindVariable(parent)) {
+    return false;
+  }
+  return TryCompoundDefaultElem(expr, ctx, arena, out);
 }
 
 static bool TryArraySliceSelect(const Expr* expr, SimContext& ctx, Arena& arena,

@@ -60,8 +60,11 @@ static ReplicateInner EvalReplicateInner(const Expr* expr, SimContext& ctx,
   }
   uint32_t bit_pos = 0;
   for (auto it = parts.rbegin(); it != parts.rend(); ++it) {
-    inner.aval |= it->ToUint64() << bit_pos;
+    // Replication copies the operand's bits verbatim, so preserve the raw
+    // 4-state encoding; ToUint64() would project unknown bits to 0.
+    uint64_t av = (it->nwords > 0) ? it->words[0].aval : 0;
     uint64_t bv = (it->nwords > 0) ? it->words[0].bval : 0;
+    inner.aval |= av << bit_pos;
     inner.bval |= bv << bit_pos;
     bit_pos += it->width;
   }

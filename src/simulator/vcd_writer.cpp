@@ -214,9 +214,12 @@ void VcdWriter::WriteTimestamp(uint64_t time) {
 
 void VcdWriter::WriteScalarChange(const VcdSignal& sig) {
   if (!sig.var) return;
-  uint64_t aval = sig.var->value.ToUint64() & 1;
+  // The raw aval bit is needed to tell x=(1,1) from z=(0,1); ToUint64() would
+  // project both unknown states to 0 and misreport x as z.
+  uint64_t aval = 0;
   uint64_t bval = 0;
   if (sig.var->value.nwords > 0) {
+    aval = sig.var->value.words[0].aval & 1;
     bval = sig.var->value.words[0].bval & 1;
   }
   char val = '0';

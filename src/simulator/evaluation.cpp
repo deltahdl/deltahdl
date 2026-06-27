@@ -69,7 +69,10 @@ Logic4Vec AssembleConcatParts(const std::vector<Logic4Vec>& parts,
   auto result = MakeLogic4Vec(arena, total_width);
   uint32_t bit_pos = 0;
   for (auto it = parts.rbegin(); it != parts.rend(); ++it) {
-    uint64_t aval = it->ToUint64();
+    // Concatenation places each operand's bits verbatim, so the raw 4-state
+    // encoding must be preserved: read aval/bval directly rather than via
+    // ToUint64(), which projects unknown bits to 0 for numeric contexts.
+    uint64_t aval = (it->nwords > 0) ? it->words[0].aval : 0;
     uint64_t bval = (it->nwords > 0) ? it->words[0].bval : 0;
     uint32_t w = it->width;
     if (w > 64) w = 64;
