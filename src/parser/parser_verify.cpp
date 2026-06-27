@@ -351,7 +351,7 @@ static void ScanBinsSelectionHeader(Lexer& lexer, DiagEngine& diag) {
   }
 }
 
-enum class CovBodyStep { kNotHandled, kContinue, kReturn };
+enum class CovBodyStep : uint8_t { kNotHandled, kContinue, kReturn };
 
 // Handle a token seen at item level (body brace depth 1, no open parens),
 // reporting the missing ';' / '=' diagnostics. Returns kNotHandled when the
