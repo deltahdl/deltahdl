@@ -66,9 +66,10 @@ SimCoroutine MakeSequenceMonitorCoroutine(const ModuleItem* seq,
     co_await EventAwaiter{ctx, seq->seq_clock, arena};
     // §16.14.5: a new evaluation attempt begins at every clock tick.
     active.push_back(0);
-    if (AdvanceLinearAttempts(operands, active, ctx, arena)) {
-      FireSequenceEndpoint(ctx, ep_name);
-    }
+    AdvanceLinearAttempts(operands, active, ctx, arena);
+    // TEMP DIAGNOSTIC: fire unconditionally each clock tick to localize whether
+    // the spawn/clock-await/fire/wait-wake pipeline works (revert after).
+    FireSequenceEndpoint(ctx, ep_name);
   }
 }
 
