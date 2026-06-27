@@ -258,12 +258,30 @@ static bool TryBindRefDirectionArg(const Expr* expr, int arg_index,
 
 // Performs the default by-value bind: resolves the argument value, widens it to
 // the formal's declared width when applicable, and creates the local variable.
+// Computes a value parameter's declared width using the live simulation scope,
+// so a width that references in-scope (class/specialization) parameters -- e.g.
+// `logic [W-1:0]` -- resolves to the bound parameter value instead of
+// collapsing to 1 bit. Types without packed dimensions use the static
+// evaluator.
+static uint32_t EvalFormalArgWidth(const DataType& dt, SimContext& ctx,
+                                   Arena& arena) {
+  if (!dt.packed_dim_left || !dt.packed_dim_right) return EvalTypeWidth(dt);
+  auto span = [&](const Expr* l, const Expr* r) -> uint32_t {
+    int64_t lv = static_cast<int64_t>(EvalExpr(l, ctx, arena).ToUint64());
+    int64_t rv = static_cast<int64_t>(EvalExpr(r, ctx, arena).ToUint64());
+    return static_cast<uint32_t>((lv >= rv ? lv - rv : rv - lv) + 1);
+  };
+  uint32_t width = span(dt.packed_dim_left, dt.packed_dim_right);
+  for (const auto& [l, r] : dt.extra_packed_dims) width *= span(l, r);
+  return width;
+}
+
 static void BindValueArg(const FunctionArg& param, const Expr* expr,
                          int arg_index, SimContext& ctx, Arena& arena) {
   auto val = ResolveArgValue(param, expr, arg_index, ctx, arena);
   const auto& dt = param.data_type;
   if (dt.kind != DataTypeKind::kImplicit) {
-    uint32_t formal_width = EvalTypeWidth(dt);
+    uint32_t formal_width = EvalFormalArgWidth(dt, ctx, arena);
     if (formal_width > 0 && formal_width != val.width)
       val = ResizeToWidth(val, formal_width, arena);
   }
