@@ -16,7 +16,9 @@ TEST(OrderedPortPreprocessor, OrderedPortConnectionSurvivesPreprocessing) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* inst = FindItemByKind(r, ModuleItemKind::kModuleInst);
+  ASSERT_GE(r.cu->modules.size(), 2u);
+  auto* inst =
+      FindItemByKind(r.cu->modules[1]->items, ModuleItemKind::kModuleInst);
   ASSERT_NE(inst, nullptr);
   EXPECT_EQ(inst->inst_module, "child");
   ASSERT_EQ(inst->inst_ports.size(), 2u);
@@ -34,7 +36,9 @@ TEST(OrderedPortPreprocessor, BlankOrderedPortSurvivesPreprocessing) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* inst = FindItemByKind(r, ModuleItemKind::kModuleInst);
+  ASSERT_GE(r.cu->modules.size(), 2u);
+  auto* inst =
+      FindItemByKind(r.cu->modules[1]->items, ModuleItemKind::kModuleInst);
   ASSERT_NE(inst, nullptr);
   ASSERT_EQ(inst->inst_ports.size(), 3u);
   EXPECT_NE(inst->inst_ports[0].second, nullptr);
@@ -52,7 +56,9 @@ TEST(OrderedPortPreprocessor, MacroExpandedInOrderedPortExpression) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* inst = FindItemByKind(r, ModuleItemKind::kModuleInst);
+  ASSERT_GE(r.cu->modules.size(), 2u);
+  auto* inst =
+      FindItemByKind(r.cu->modules[1]->items, ModuleItemKind::kModuleInst);
   ASSERT_NE(inst, nullptr);
   ASSERT_EQ(inst->inst_ports.size(), 1u);
   EXPECT_TRUE(inst->inst_ports[0].first.empty());
