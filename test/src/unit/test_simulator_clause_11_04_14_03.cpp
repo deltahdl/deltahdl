@@ -42,8 +42,11 @@ TEST(StreamingUnpack, StreamingUnpackRightShiftBasic) {
   auto* lhs = MakeStreamConcat(
       f.arena, TokenKind::kGtGt,
       {MakeId(f.arena, "a"), MakeId(f.arena, "b"), MakeId(f.arena, "c")});
+  // §5.7.1: a sized literal's value comes from its digits, so the 96-bit source
+  // must spell the intended value 1 in its text (the >64-bit value cannot be
+  // carried by the 64-bit int_val alone).
   auto* rhs = MakeInt(f.arena, 1);
-  rhs->text = "96'h0";
+  rhs->text = "96'h1";
   auto* stmt = MakeStreamUnpackAssign(f.arena, lhs, rhs);
   ExecBlockingAssignImpl(stmt, f.ctx, f.arena);
 
