@@ -35,6 +35,15 @@ class DiagEngine {
 
   void SetWarningsAsErrors(bool val) { warnings_as_errors_ = val; }
 
+  // Temporarily suppress every diagnostic (and its count) while a speculative
+  // parse runs, so a trial parse whose result is discarded never reports
+  // errors. Calls nest; diagnostics resume once the outermost suppression is
+  // released.
+  void PushSuppress() { ++suppress_depth_; }
+  void PopSuppress() {
+    if (suppress_depth_ > 0) --suppress_depth_;
+  }
+
  private:
   void Emit(DiagSeverity sev, SourceLoc loc, std::string msg);
 
@@ -43,6 +52,7 @@ class DiagEngine {
   uint32_t error_count_ = 0;
   uint32_t warning_count_ = 0;
   bool warnings_as_errors_ = false;
+  uint32_t suppress_depth_ = 0;
 };
 
 }  // namespace delta

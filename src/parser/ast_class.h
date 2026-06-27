@@ -130,6 +130,12 @@ struct ClassMember {
   // on a randc variable.
   std::vector<ConstraintSoftVarRef> constraint_soft_refs;
 
+  // 18.5: the top-level constraint relation expressions of this constraint
+  // block, in source order (empty for non-constraint members). The parser
+  // captures these so the simulator can translate them into the constraint
+  // solver's inputs for a runtime randomize() call.
+  std::vector<Expr*> constraint_exprs;
+
   DataType data_type;
   std::string_view name;
   std::vector<Expr*> unpacked_dims;

@@ -32,6 +32,7 @@ void DiagEngine::Error(SourceLoc loc, std::string msg) {
 }
 
 void DiagEngine::Emit(DiagSeverity sev, SourceLoc loc, std::string msg) {
+  if (suppress_depth_ > 0) return;
   if (sev == DiagSeverity::kError || sev == DiagSeverity::kFatal) {
     ++error_count_;
   } else if (sev == DiagSeverity::kWarning) {

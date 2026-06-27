@@ -717,6 +717,27 @@ bool Parser::ScanConstraintBodyToken(ClassMember* member, int& depth,
   return LeafClosesQualifier(t);
 }
 
+// 18.5: speculatively parse one top-level constraint relation as an Expr* and
+// record it for the simulator's randomize() translation. The trial parse
+// suppresses diagnostics and rewinds the lexer, so it neither consumes input
+// nor changes what the token scan reports; special forms/braces are left to it.
+void Parser::CaptureConstraintRelation(ClassMember* member) {
+  TokenKind k = CurrentToken().kind;
+  if (k == TokenKind::kKwForeach || k == TokenKind::kKwSolve ||
+      k == TokenKind::kKwSoft || k == TokenKind::kKwDist ||
+      k == TokenKind::kLBrace || k == TokenKind::kRBrace ||
+      k == TokenKind::kSemicolon) {
+    return;
+  }
+  auto saved = lexer_.SavePos();
+  diag_.PushSuppress();
+  Expr* rel = ParseExpr();
+  bool ok = rel != nullptr && Check(TokenKind::kSemicolon);
+  diag_.PopSuppress();
+  lexer_.RestorePos(saved);
+  if (ok && member) member->constraint_exprs.push_back(rel);
+}
+
 ClassMember* Parser::ParseConstraintStub(ClassMember* member) {
   member->kind = ClassMemberKind::kConstraint;
   Consume();
@@ -733,13 +754,22 @@ ClassMember* Parser::ParseConstraintStub(ClassMember* member) {
   // in that span are recorded so the elaborator can reject a soft constraint
   // specified on a randc variable.
   bool in_soft = false;
+  // 18.5: a new top-level relation begins right after the opening '{' and after
+  // each ';'. Capture the relation expression at each such point (see above).
+  bool at_relation_start = true;
   while (depth > 0 && !AtEnd()) {
-    // Every structural token re-enters the loop with the qualifier flag
-    // cleared, so remember its carried-in value for the leaf-token tail (which
-    // alone consults the previous leaf's qualifier) and reset it.
+    if (at_relation_start && depth == 1 && !in_soft) {
+      CaptureConstraintRelation(member);
+    }
+    bool starts_with_semicolon = Check(TokenKind::kSemicolon);
+    // Carry the previous leaf's '.'/'::' qualifier state for the leaf-token
+    // tail (which alone consults it), then reset for this iteration's
+    // structural pass.
     bool carried_qualifier = prev_was_qualifier;
     prev_was_qualifier =
         ScanConstraintBodyToken(member, depth, in_soft, carried_qualifier);
+    // The next iteration starts a fresh relation only after a ';' was consumed.
+    at_relation_start = starts_with_semicolon;
   }
   return member;
 }

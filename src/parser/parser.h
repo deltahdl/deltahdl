@@ -115,6 +115,7 @@ class Parser {
   bool ParseConstraintHeader(ClassMember* member);
   bool ScanConstraintBodyToken(ClassMember* member, int& depth, bool& in_soft,
                                bool carried_qualifier);
+  void CaptureConstraintRelation(ClassMember* member);
   void CheckConstraintExprToken(const Token& tok);
   void CheckForeachConstraintHeader(ClassMember* member);
   void CheckSolveBeforeConstraint(ClassMember* member);
