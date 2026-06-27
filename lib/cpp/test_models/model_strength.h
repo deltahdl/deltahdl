@@ -208,67 +208,54 @@ inline StrengthSignal CombineAmbiguous(StrengthSignal a, StrengthSignal b) {
 // surviving ranges are merged with that contribution into [lo, hi] form.
 inline StrengthSignal CombineAmbiguousWithUnambiguous(StrengthSignal unambig,
                                                       StrengthSignal ambig) {
-  StrengthLevel s_u = (unambig.value == Val4::kV0) ? unambig.strength0_hi
-                                                   : unambig.strength1_hi;
+  bool vu_is_0 = unambig.value == Val4::kV0;
+  StrengthLevel s_u = vu_is_0 ? unambig.strength0_hi : unambig.strength1_hi;
   uint8_t s_u_idx = static_cast<uint8_t>(s_u);
 
+  // Split the ambiguous signal into its component on the unambiguous value side
+  // (Vu) and the opposite value side (!Vu).
+  StrengthLevel amb_vu_lo = vu_is_0 ? ambig.strength0_lo : ambig.strength1_lo;
+  StrengthLevel amb_vu_hi = vu_is_0 ? ambig.strength0_hi : ambig.strength1_hi;
+  StrengthLevel amb_op_lo = vu_is_0 ? ambig.strength1_lo : ambig.strength0_lo;
+  StrengthLevel amb_op_hi = vu_is_0 ? ambig.strength1_hi : ambig.strength0_hi;
+
+  // Vu side (§28.12.3 rules a/b, same value): the unambiguous level Su is
+  // always driven, and two drivers of the same value resolve to the stronger
+  // one, so the result spans [max(Su, ambig_lo), max(Su, ambig_hi)]. Rule c
+  // never fills a same-value gap, which is exactly why the lower bound is
+  // clamped up to Su rather than extended down to it.
+  StrengthLevel vu_lo = static_cast<StrengthLevel>(
+      std::max<uint8_t>(s_u_idx, static_cast<uint8_t>(amb_vu_lo)));
+  StrengthLevel vu_hi = static_cast<StrengthLevel>(
+      std::max<uint8_t>(s_u_idx, static_cast<uint8_t>(amb_vu_hi)));
+
+  // Opposite side (§28.12.3 rules a/b/c, opposite value): only ambiguous levels
+  // strictly greater than Su survive (rules a/b); when any survive, the signals
+  // are of opposite value so rule c fills the gap down to Su+1.
+  StrengthLevel op_lo = StrengthLevel::kHighz;
+  StrengthLevel op_hi = StrengthLevel::kHighz;
+  if (static_cast<uint8_t>(amb_op_hi) > s_u_idx) {
+    op_hi = amb_op_hi;
+    op_lo = static_cast<StrengthLevel>(s_u_idx + 1);
+  }
+
   StrengthSignal result;
-
-  auto apply_rule_ab = [&](StrengthLevel a_lo, StrengthLevel a_hi,
-                           StrengthLevel& r_lo, StrengthLevel& r_hi) {
-    if (static_cast<uint8_t>(a_hi) > s_u_idx) {
-      uint8_t lo_idx =
-          std::max<uint8_t>(static_cast<uint8_t>(a_lo), s_u_idx + 1);
-      r_lo = static_cast<StrengthLevel>(lo_idx);
-      r_hi = a_hi;
-    }
-  };
-
-  apply_rule_ab(ambig.strength0_lo, ambig.strength0_hi, result.strength0_lo,
-                result.strength0_hi);
-  apply_rule_ab(ambig.strength1_lo, ambig.strength1_hi, result.strength1_lo,
-                result.strength1_hi);
-
-  // Merge the unambig's single level Su onto its value side. The merge always
-  // extends the lo down to s_u (a same-side surviving lo is at least s_u+1).
-  if (unambig.value == Val4::kV0) {
-    if (result.strength0_hi == StrengthLevel::kHighz) {
-      result.strength0_hi = s_u;
-    }
-    result.strength0_lo = s_u;
+  if (vu_is_0) {
+    result.strength0_lo = vu_lo;
+    result.strength0_hi = vu_hi;
+    result.strength1_lo = op_lo;
+    result.strength1_hi = op_hi;
   } else {
-    if (result.strength1_hi == StrengthLevel::kHighz) {
-      result.strength1_hi = s_u;
-    }
-    result.strength1_lo = s_u;
+    result.strength1_lo = vu_lo;
+    result.strength1_hi = vu_hi;
+    result.strength0_lo = op_lo;
+    result.strength0_hi = op_hi;
   }
 
-  // Rule c: opposite-side surviving range with lo > Su+1 leaves a gap; fill
-  // it by lowering the !Vu-side lo to Su+1.
-  StrengthLevel su_plus_1 = static_cast<StrengthLevel>(s_u_idx + 1);
-  if (unambig.value == Val4::kV0) {
-    if (result.strength1_hi != StrengthLevel::kHighz &&
-        static_cast<uint8_t>(result.strength1_lo) >
-            static_cast<uint8_t>(su_plus_1)) {
-      result.strength1_lo = su_plus_1;
-    }
-  } else {
-    if (result.strength0_hi != StrengthLevel::kHighz &&
-        static_cast<uint8_t>(result.strength0_lo) >
-            static_cast<uint8_t>(su_plus_1)) {
-      result.strength0_lo = su_plus_1;
-    }
-  }
-
-  bool has_side0 = result.strength0_hi != StrengthLevel::kHighz;
-  bool has_side1 = result.strength1_hi != StrengthLevel::kHighz;
-  if (has_side0 && has_side1) {
-    result.value = Val4::kX;
-  } else if (has_side0) {
-    result.value = Val4::kV0;
-  } else {
-    result.value = Val4::kV1;
-  }
+  // The unambiguous signal always anchors its known value, so the result keeps
+  // that value unless opposite-value levels survive, in which case it is
+  // ambiguous (x).
+  result.value = (op_hi != StrengthLevel::kHighz) ? Val4::kX : unambig.value;
   return result;
 }
 
