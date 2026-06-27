@@ -71,22 +71,27 @@ Logic4Vec AssembleConcatParts(const std::vector<Logic4Vec>& parts,
   for (auto it = parts.rbegin(); it != parts.rend(); ++it) {
     // Concatenation places each operand's bits verbatim, so the raw 4-state
     // encoding must be preserved: read aval/bval directly rather than via
-    // ToUint64(), which projects unknown bits to 0 for numeric contexts.
-    uint64_t aval = (it->nwords > 0) ? it->words[0].aval : 0;
-    uint64_t bval = (it->nwords > 0) ? it->words[0].bval : 0;
-    uint32_t w = it->width;
-    if (w > 64) w = 64;
-    uint32_t word = bit_pos / 64;
-    uint32_t bit = bit_pos % 64;
-    if (word < result.nwords) {
-      result.words[word].aval |= aval << bit;
-      result.words[word].bval |= bval << bit;
-      if (bit + w > 64 && word + 1 < result.nwords) {
-        result.words[word + 1].aval |= aval >> (64 - bit);
-        result.words[word + 1].bval |= bval >> (64 - bit);
+    // ToUint64(), which projects unknown bits to 0 for numeric contexts. Copy
+    // every word of the part, not just the first, so operands wider than 64
+    // bits (e.g. multi-character strings) are not truncated.
+    uint32_t remaining = it->width;
+    for (uint32_t pw = 0; pw < it->nwords && remaining > 0; ++pw) {
+      uint64_t aval = it->words[pw].aval;
+      uint64_t bval = it->words[pw].bval;
+      uint32_t w = (remaining > 64) ? 64 : remaining;
+      uint32_t word = bit_pos / 64;
+      uint32_t bit = bit_pos % 64;
+      if (word < result.nwords) {
+        result.words[word].aval |= aval << bit;
+        result.words[word].bval |= bval << bit;
+        if (bit + w > 64 && word + 1 < result.nwords) {
+          result.words[word + 1].aval |= aval >> (64 - bit);
+          result.words[word + 1].bval |= bval >> (64 - bit);
+        }
       }
+      bit_pos += w;
+      remaining -= w;
     }
-    bit_pos += it->width;
   }
   return result;
 }
