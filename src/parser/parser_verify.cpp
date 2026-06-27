@@ -387,8 +387,7 @@ static CovBodyStep ScanCoverpointItemToken(Lexer& lexer, DiagEngine& diag,
 // Consume one ordinary token, tracking brace/paren nesting. Returns kReturn
 // once the body's closing brace is consumed (reporting an unbalanced paren).
 static CovBodyStep ScanCoverpointNesting(Lexer& lexer, DiagEngine& diag,
-                                         int& brace, int& paren,
-                                         bool& item_active) {
+                                         int& brace, int& paren) {
   Token t = lexer.Peek();
   if (t.Is(TokenKind::kLBrace)) {
     ++brace;
@@ -403,8 +402,6 @@ static CovBodyStep ScanCoverpointNesting(Lexer& lexer, DiagEngine& diag,
     ++paren;
   } else if (t.Is(TokenKind::kRParen)) {
     if (paren > 0) --paren;
-  } else if (brace == 1 && paren == 0) {
-    item_active = true;
   }
   lexer.Next();
   return CovBodyStep::kContinue;
@@ -427,7 +424,7 @@ static void ScanCoverpointBraceBody(Lexer& lexer, DiagEngine& diag) {
       if (step == CovBodyStep::kReturn) return;
       if (step == CovBodyStep::kContinue) continue;
     }
-    if (ScanCoverpointNesting(lexer, diag, brace, paren, item_active) ==
+    if (ScanCoverpointNesting(lexer, diag, brace, paren) ==
         CovBodyStep::kReturn) {
       return;
     }
