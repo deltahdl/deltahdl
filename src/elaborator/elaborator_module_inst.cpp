@@ -12,9 +12,143 @@
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
+#include "elaborator/type_eval.h"
 #include "parser/ast.h"
 
 namespace delta {
+
+// §6.20.3: convert a type-parameter override argument (which the expression
+// parser produces as a plain identifier, e.g. `shortint` or a class name `C`)
+// into a DataType. Built-in scalar type names map to their kind; any other name
+// is carried as a named type so it resolves against class/typedef tables later.
+static DataType TypeParamOverrideToDataType(const Expr* expr) {
+  DataType dt;
+  if (!expr || expr->kind != ExprKind::kIdentifier) return dt;
+  static const std::pair<std::string_view, DataTypeKind> kBuiltins[] = {
+      {"logic", DataTypeKind::kLogic},
+      {"bit", DataTypeKind::kBit},
+      {"reg", DataTypeKind::kReg},
+      {"byte", DataTypeKind::kByte},
+      {"shortint", DataTypeKind::kShortint},
+      {"int", DataTypeKind::kInt},
+      {"longint", DataTypeKind::kLongint},
+      {"integer", DataTypeKind::kInteger},
+      {"time", DataTypeKind::kTime},
+      {"real", DataTypeKind::kReal},
+      {"shortreal", DataTypeKind::kShortreal},
+      {"realtime", DataTypeKind::kRealtime},
+      {"string", DataTypeKind::kString},
+      {"chandle", DataTypeKind::kChandle},
+  };
+  for (const auto& [name, kind] : kBuiltins) {
+    if (expr->text == name) {
+      dt.kind = kind;
+      return dt;
+    }
+  }
+  dt.kind = DataTypeKind::kNamed;
+  dt.type_name = expr->text;
+  return dt;
+}
+
+static bool InstParamsArePositional(const ModuleItem* item) {
+  for (const auto& [n, e] : item->inst_params)
+    if (n.empty() && e) return true;
+  return false;
+}
+
+static const Expr* NamedTypeParamOverride(const ModuleItem* item,
+                                          std::string_view pname) {
+  for (const auto& [n, e] : item->inst_params)
+    if (n == pname) return e;
+  return nullptr;
+}
+
+// A positional override maps to the index of `pname` among the overridable
+// (non-localparam) parameters, mirroring ResolvePositionalInstParams.
+static const Expr* PositionalTypeParamOverride(const ModuleItem* item,
+                                               const ModuleDecl* child_decl,
+                                               std::string_view pname) {
+  size_t idx = 0;
+  for (const auto& [dname, dexpr] : child_decl->params) {
+    if (child_decl->localparam_port_names.count(dname) > 0) continue;
+    if (dname == pname)
+      return idx < item->inst_params.size() ? item->inst_params[idx].second
+                                            : nullptr;
+    ++idx;
+  }
+  return nullptr;
+}
+
+// Locate the instantiation override expression for the type parameter `pname`,
+// honoring both the named (.T(x)) and positional (#(x, ...)) forms (the two are
+// never mixed -- the parser rejects that).
+static const Expr* FindTypeParamOverrideExpr(const ModuleItem* item,
+                                             const ModuleDecl* child_decl,
+                                             std::string_view pname) {
+  if (InstParamsArePositional(item))
+    return PositionalTypeParamOverride(item, child_decl, pname);
+  return NamedTypeParamOverride(item, pname);
+}
+
+// A saved typedef-map entry, so a type-parameter substitution made for one
+// child elaboration can be undone afterwards (the map is shared across
+// modules).
+struct SavedTypedef {
+  std::string_view name;
+  bool existed = false;
+  DataType prev;
+};
+
+// §6.20.3/§23.10: resolve each of the child's type parameters to a concrete
+// type (an instantiation override if present, otherwise the declared default)
+// and publish it in `typedefs` so the child's dependent declarations elaborate
+// against the chosen type. A type parameter with neither a default nor an
+// override is an error. Returns the prior entries so the caller can restore the
+// shared map after the child is elaborated.
+static std::vector<SavedTypedef> ApplyChildTypeParams(
+    const ModuleItem* item, const ModuleDecl* child_decl, TypedefMap& typedefs,
+    DiagEngine& diag) {
+  std::vector<SavedTypedef> saved;
+  for (size_t i = 0; i < child_decl->params.size(); ++i) {
+    std::string_view pname = child_decl->params[i].first;
+    if (child_decl->type_param_names.count(pname) == 0) continue;
+    const Expr* ov = FindTypeParamOverrideExpr(item, child_decl, pname);
+    bool has_default =
+        i < child_decl->param_types.size() &&
+        child_decl->param_types[i].kind != DataTypeKind::kImplicit;
+    DataType resolved;
+    if (ov && ov->kind == ExprKind::kIdentifier) {
+      resolved = TypeParamOverrideToDataType(ov);
+    } else if (has_default) {
+      resolved = child_decl->param_types[i];
+    } else {
+      diag.Error(item->loc,
+                 std::format("type parameter '{}' of '{}' has no default type "
+                             "and no override at instantiation",
+                             pname, child_decl->name));
+      continue;
+    }
+    SavedTypedef s;
+    s.name = pname;
+    auto it = typedefs.find(pname);
+    s.existed = it != typedefs.end();
+    if (s.existed) s.prev = it->second;
+    saved.push_back(s);
+    typedefs[pname] = resolved;
+  }
+  return saved;
+}
+
+static void RestoreChildTypeParams(TypedefMap& typedefs,
+                                   const std::vector<SavedTypedef>& saved) {
+  for (const auto& s : saved) {
+    if (s.existed)
+      typedefs[s.name] = s.prev;
+    else
+      typedefs.erase(s.name);
+  }
+}
 
 static uint32_t EvalInstDimSize(const Expr* left, const Expr* right) {
   if (left && right) {
@@ -263,7 +397,13 @@ void Elaborator::ElaborateModuleInst(ModuleItem* item, RtlirModule* mod) {
   ApplyConfigParamOverrides(child_decl, child_params, parent_scope,
                             config_locked);
 
+  // §6.20.3/§23.10: publish the child's type-parameter substitutions into the
+  // shared typedef map so its dependent declarations resolve against the chosen
+  // types, then restore the map once the child has been elaborated.
+  auto saved_type_params =
+      ApplyChildTypeParams(item, child_decl, typedefs_, diag_);
   inst.resolved = ElaborateModule(child_decl, child_params);
+  RestoreChildTypeParams(typedefs_, saved_type_params);
   nested_module_decls_ = std::move(saved_nested);
 
   MarkConfigLockedParams(inst, config_locked);

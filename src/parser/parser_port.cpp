@@ -330,12 +330,13 @@ struct ParserPortHelpers {
     }
     auto name = p.Expect(TokenKind::kIdentifier);
     bool has_default = false;
+    DataType def_type;
     if (p.Match(TokenKind::kEq)) {
       has_default = true;
       if (p.Check(TokenKind::kKwType)) {
         p.ParseExpr();
       } else {
-        p.ParseDataType();
+        def_type = p.ParseDataType();
       }
     }
 
@@ -346,7 +347,8 @@ struct ParserPortHelpers {
                                 name.text));
     }
     out.params.push_back({name.text, nullptr});
-    if (out.param_types) out.param_types->push_back(DataType{});
+    // §6.20.3: retain the default type (empty/kImplicit means no default).
+    if (out.param_types) out.param_types->push_back(def_type);
     out.type_param_names.insert(name.text);
     if (is_localparam_group) out.localparam_port_names.insert(name.text);
     p.known_types_.insert(name.text);

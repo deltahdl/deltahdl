@@ -26,6 +26,50 @@ static std::optional<int64_t> FindParamOverride(
   return std::nullopt;
 }
 
+// §6.20.3: follow typedef and type-parameter substitutions to decide whether a
+// declared type ultimately names a class type.
+static bool ParamTypeResolvesToClass(
+    const DataType& dtype, const TypedefMap& typedefs,
+    const std::unordered_set<std::string_view>& class_names) {
+  const DataType* cur = &dtype;
+  for (int depth = 0; depth < 32 && cur->kind == DataTypeKind::kNamed;
+       ++depth) {
+    if (class_names.count(cur->type_name) > 0) return true;
+    auto it = typedefs.find(cur->type_name);
+    if (it == typedefs.end()) break;
+    cur = &it->second;
+  }
+  return false;
+}
+
+// The elaborator state needed to validate a type-parameter-typed value
+// parameter's assigned value, bundled to stay within the argument-count limit.
+struct TypeParamValueCtx {
+  const TypedefMap& typedefs;
+  const std::unordered_set<std::string_view>& class_names;
+  DiagEngine& diag;
+};
+
+// §6.20.3: a value parameter whose declared type is one of this module's type
+// parameters, and which (after the instance override or default) resolved to a
+// class type, cannot be assigned an integral constant value.
+static void CheckTypeParamValueAssignable(const ModuleDecl* decl, size_t i,
+                                          const Expr* pval,
+                                          const ScopeMap& scope,
+                                          const TypeParamValueCtx& ctx) {
+  if (i >= decl->param_types.size()) return;
+  const DataType& dt = decl->param_types[i];
+  if (dt.kind != DataTypeKind::kNamed) return;
+  if (decl->type_param_names.count(dt.type_name) == 0) return;
+  if (!pval || !ConstEvalInt(pval, scope)) return;
+  if (!ParamTypeResolvesToClass(dt, ctx.typedefs, ctx.class_names)) return;
+  ctx.diag.Error(pval->range.start,
+                 std::format("cannot assign an integral value to parameter "
+                             "whose type parameter '{}' resolved to a class "
+                             "type",
+                             dt.type_name));
+}
+
 bool Elaborator::HasParamPortWithoutDefault(const ModuleDecl* decl) {
   for (const auto& [name, expr] : decl->params) {
     if (decl->localparam_port_names.count(name)) continue;
@@ -513,6 +557,7 @@ RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
 
   ApplyHeaderImports(decl);
 
+  TypeParamValueCtx tp_ctx{typedefs_, class_names_, diag_};
   for (size_t i = 0; i < decl->params.size(); ++i) {
     const auto& [pname, pval] = decl->params[i];
     auto scope = BuildParamScope(mod);
@@ -532,6 +577,7 @@ RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
           has_param_type, param_type};
       ResolveUnresolvedParamValue(pd, val, scope, diag_);
     }
+    CheckTypeParamValueAssignable(decl, i, pval, scope, tp_ctx);
     mod->params.push_back(pd);
   }
 
