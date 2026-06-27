@@ -62,17 +62,15 @@ SimCoroutine MakeSequenceMonitorCoroutine(const ModuleItem* seq,
   std::string ep_name = "__seq_" + std::string(seq->name);
   const std::vector<Expr*>& operands = seq->seq_linear_operands;
   std::vector<size_t> active;
-  // TEMP DIAGNOSTIC: fire once at spawn (before any clock await) to test
-  // whether the monitor is spawned at all (isolates capture/spawn from
-  // clock-await).
-  FireSequenceEndpoint(ctx, ep_name);
   while (!ctx.StopRequested()) {
     co_await EventAwaiter{ctx, seq->seq_clock, arena};
-    // §16.14.5: a new evaluation attempt begins at every clock tick.
+    // TEMP DIAGNOSTIC: write directly to `result` on each clock tick, bypassing
+    // __seq_/wait, to test spawn+clock-await in isolation (revert after).
+    if (auto* rv = ctx.FindVariable("result")) {
+      rv->value = MakeLogic4VecVal(arena, 8, 99);
+    }
     active.push_back(0);
     AdvanceLinearAttempts(operands, active, ctx, arena);
-    // TEMP DIAGNOSTIC: fire unconditionally each clock tick to localize whether
-    // the spawn/clock-await/fire/wait-wake pipeline works (revert after).
     FireSequenceEndpoint(ctx, ep_name);
   }
 }
