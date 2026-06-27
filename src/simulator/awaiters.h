@@ -147,15 +147,25 @@ struct EventAwaiter {
   static void AttachEdgeVarWatcher(Variable* var, const EventExpr& ev,
                                    std::coroutine_handle<> h, SimContext& ctx,
                                    Process* proc) {
-    var->prev_value = var->value;
     auto* ctx_ptr = &ctx;
-    var->AddWatcher([h, var, edge = ev.edge, iff_cond = ev.iff_condition,
+    // Per-watcher snapshot of the value as of arming. The single shared
+    // var->prev_value is clobbered when one of several coroutines waiting on
+    // the same signal's edge resumes and re-arms synchronously mid-notify,
+    // which starves every later watcher in that drain (e.g. only the first of
+    // two `always @(posedge clk)` blocks would ever fire). Each watcher keeps
+    // its own baseline and restores it before delegating to the shared edge
+    // logic, so the detections stay independent.
+    Logic4Vec prev = var->value;
+    var->AddWatcher([h, var, prev, edge = ev.edge, iff_cond = ev.iff_condition,
                      ctx_ptr, proc]() mutable {
       if (proc && !proc->active) return true;
 
       if (proc && proc->is_suspended) return false;
-      return HandleEdgeEvent(h, var, EdgeSpec{edge, iff_cond},
-                             ResumeTarget{*ctx_ptr, proc});
+      var->prev_value = prev;
+      bool fired = HandleEdgeEvent(h, var, EdgeSpec{edge, iff_cond},
+                                   ResumeTarget{*ctx_ptr, proc});
+      prev = var->value;
+      return fired;
     });
   }
 
