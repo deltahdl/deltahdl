@@ -62,7 +62,10 @@ uint64_t Logic4Vec::ToUint64() const {
   if (nwords == 0) {
     return 0;
   }
-  return words[0].aval;
+  // 4-state -> integer projection: unknown bits (x, z) read as 0, matching the
+  // SystemVerilog 4-state-to-2-state cast. A known bit has bval=0, so masking
+  // by ~bval leaves defined values unchanged while collapsing x/z to 0.
+  return words[0].aval & ~words[0].bval;
 }
 
 std::string Logic4Vec::ToString() const {
