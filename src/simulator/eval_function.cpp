@@ -342,9 +342,11 @@ static bool TryEvalClassMethodCall(const Expr* expr, SimContext& ctx,
   if (!ResolveInstanceMethod(parts, ctx, info)) return false;
   // §8.10/§8.9: a static method invoked through an instance handle shares the
   // class's single static storage; dispatch it in class scope (no `this`).
-  if (info.method->is_static)
-    return TryEvalStaticMethodThroughInstance(info.method, info.obj, expr, ctx,
-                                              arena, out);
+  if (info.method->is_static) {
+    RunStaticMethodInClassScope({info.method, info.obj->type}, expr, ctx, arena,
+                                out);
+    return true;
+  }
   out = ExecInstanceMethodCall(info.method, info.obj, expr, ctx, arena);
   return true;
 }

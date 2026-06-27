@@ -58,16 +58,16 @@ struct ClassMethodTarget {
 void ExecClassMethod(ClassMethodTarget target, const Expr* expr,
                      SimContext& ctx, Arena& arena, Logic4Vec& out);
 
-// 8.10/8.9: dispatch a static-method call that has no `this` -- either an
-// unqualified call inside another static method (resolved against the enclosing
-// class) or an instance-handle call `obj.static_fn()`. Both run in class scope
-// so unqualified static-property access targets the single shared slot. Defined
-// in eval_static_method.cpp.
+// 8.10/8.9: a static-method call has no `this`, so it runs in class scope
+// (target.param_cls is the scope class) and unqualified static-member access
+// targets the single shared slot. Defined in eval_static_method.cpp.
+// RunStaticMethodInClassScope is the shared runner (instance-handle path);
+// TryEvalEnclosingStaticCall handles an unqualified call inside a static
+// method.
+void RunStaticMethodInClassScope(ClassMethodTarget target, const Expr* expr,
+                                 SimContext& ctx, Arena& arena, Logic4Vec& out);
 bool TryEvalEnclosingStaticCall(const Expr* expr, SimContext& ctx, Arena& arena,
                                 Logic4Vec& out);
-bool TryEvalStaticMethodThroughInstance(ModuleItem* method, ClassObject* obj,
-                                        const Expr* expr, SimContext& ctx,
-                                        Arena& arena, Logic4Vec& out);
 
 // 18.6/8.26.9: handle a built-in randomize() method call on a class handle
 // (including an interface-class handle). Returns false when the call is not a
