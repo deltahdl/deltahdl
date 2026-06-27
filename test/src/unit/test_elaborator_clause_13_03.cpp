@@ -72,9 +72,11 @@ TEST(TaskElaboration, TaskEnablesTaskElaborates) {
 
 TEST(TaskElaboration, TaskWithRefArgElaborates) {
   ElabFixture f;
+  // §13.5.2: pass-by-reference is illegal in a static-lifetime subroutine, so a
+  // ref argument requires an automatic (or ref static) subroutine.
   auto* design = Elaborate(
       "module m;\n"
-      "  task inc(ref int v);\n"
+      "  task automatic inc(ref int v);\n"
       "    v = v + 1;\n"
       "  endtask\n"
       "endmodule\n",

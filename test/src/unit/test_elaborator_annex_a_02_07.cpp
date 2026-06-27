@@ -71,9 +71,11 @@ TEST(TaskDeclElaboration, TaskPortDefaultValueElaborates) {
 }
 
 TEST(TaskDeclElaboration, TaskConstRefPortElaborates) {
+  // §13.5.2: pass-by-reference is illegal in a static-lifetime subroutine, so a
+  // ref/const ref port requires an automatic (or ref static) subroutine.
   EXPECT_TRUE(
       ElabOk("module m;\n"
-             "  task my_task(const ref int x);\n"
+             "  task automatic my_task(const ref int x);\n"
              "  endtask\n"
              "endmodule\n"));
 }
