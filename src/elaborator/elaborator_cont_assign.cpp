@@ -144,22 +144,32 @@ Expr* MakeRhsPartSelect(Expr* rhs, uint32_t hi, uint32_t lo, Arena& arena) {
   return sel;
 }
 
+// Recursion-invariant context for splitting a concatenation continuous-assign
+// lvalue (bundled to keep the helper within the parameter-count threshold).
+struct ConcatContAssignCtx {
+  ModuleItem* item;
+  RtlirModule* mod;
+  Arena& arena;
+  DiagEngine& diag;
+};
+
 // §11.4.1: a continuous assignment to a concatenation drives each element from
 // its own slice of the right-hand side; the leftmost element takes the most
 // significant bits. Emit one assignment per (recursively flattened) element so
 // each whole-identifier target registers its own net driver.
-void EmitConcatContAssigns(ModuleItem* item, Expr* lhs, Expr* rhs,
-                           RtlirModule* mod, Arena& arena, DiagEngine& diag) {
-  uint32_t hi = ConcatLhsWidth(lhs, mod);
+void EmitConcatContAssigns(const ConcatContAssignCtx& cx, Expr* lhs,
+                           Expr* rhs) {
+  uint32_t hi = ConcatLhsWidth(lhs, cx.mod);
   for (auto* el : lhs->elements) {
-    uint32_t w = ConcatLhsWidth(el, mod);
+    uint32_t w = ConcatLhsWidth(el, cx.mod);
     if (w == 0) continue;
-    Expr* elem_rhs = MakeRhsPartSelect(rhs, hi - 1, hi - w, arena);
+    Expr* elem_rhs = MakeRhsPartSelect(rhs, hi - 1, hi - w, cx.arena);
     hi -= w;
     if (el->kind == ExprKind::kConcatenation) {
-      EmitConcatContAssigns(item, el, elem_rhs, mod, arena, diag);
+      EmitConcatContAssigns(cx, el, elem_rhs);
     } else {
-      mod->assigns.push_back(BuildContAssignFor(item, el, elem_rhs, w, diag));
+      cx.mod->assigns.push_back(
+          BuildContAssignFor(cx.item, el, elem_rhs, w, cx.diag));
     }
   }
 }
@@ -183,8 +193,8 @@ void Elaborator::ElaborateContAssign(ModuleItem* item, RtlirModule* mod) {
     ValidateContAssignDriveStrength(item, mod);
   }
   if (item->assign_lhs && item->assign_lhs->kind == ExprKind::kConcatenation) {
-    EmitConcatContAssigns(item, item->assign_lhs, item->assign_rhs, mod, arena_,
-                          diag_);
+    ConcatContAssignCtx cx{item, mod, arena_, diag_};
+    EmitConcatContAssigns(cx, item->assign_lhs, item->assign_rhs);
     return;
   }
   mod->assigns.push_back(BuildContAssign(item, mod, diag_));
