@@ -113,7 +113,11 @@ TEST(BlockNameParsing, MismatchedEndLabelForkJoinErrors) {
   EXPECT_TRUE(r.has_errors);
 }
 
-TEST(BlockNameParsing, EndLabelWithoutStartLabelOk) {
+TEST(BlockNameParsing, EndLabelWithoutStartLabelErrors) {
+  // §9.3.4 (printed p.229): "It shall be an error if the name at the end is
+  // different from the block name at the beginning." A block with no name at
+  // begin but a name after end has a name "different from" (none at) the
+  // beginning, so an end label without a matching start label is illegal.
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -121,7 +125,7 @@ TEST(BlockNameParsing, EndLabelWithoutStartLabelOk) {
       "  end : unnamed_end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
+  EXPECT_TRUE(r.has_errors);
 }
 
 TEST(BlockStatementSyntaxParsing, SequentialBlockNamedWithDecls) {
