@@ -186,7 +186,14 @@ static Logic4Vec ExtractStructField(Variable* base_var,
                                     std::string_view field, Arena& arena) {
   for (const auto& f : info->fields) {
     if (f.name != field) continue;
-    uint64_t val = base_var->value.ToUint64() >> f.bit_offset;
+    // §7.2: a field at bit_offset >= 64 lives in a later word; ToUint64() only
+    // exposes word[0], so read the field's own word directly.
+    uint32_t start_word = f.bit_offset / 64;
+    uint32_t start_offset = f.bit_offset % 64;
+    uint64_t val = 0;
+    if (start_word < base_var->value.nwords) {
+      val = base_var->value.words[start_word].aval >> start_offset;
+    }
     uint64_t mask =
         (f.width >= 64) ? ~uint64_t{0} : (uint64_t{1} << f.width) - 1;
     return MakeLogic4VecVal(arena, f.width, val & mask);
