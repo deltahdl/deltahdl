@@ -159,7 +159,7 @@ bool TryComparisonConstraint(const Expr* rel, std::vector<RandInfo>& rands,
   }
   if (!var_side) return false;
   if (mirror) ComparisonKind(MirrorComparison(rel->op), kind);
-  int64_t c =
+  auto c =
       static_cast<int64_t>(EvalExpr(const_side, rc.ctx, rc.arena).ToUint64());
   out.kind = kind;
   out.var_name = std::string(var_side->text);
@@ -298,7 +298,7 @@ bool TryEvalRandomizeMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
 
   // 18.6.3: seed from the object's own RNG so randomize() draws a fresh result
   // each call while staying reproducible from the object's starting state.
-  uint32_t seed = static_cast<uint32_t>(ctx.ObjectRng(obj)());
+  auto seed = static_cast<uint32_t>(ctx.ObjectRng(obj)());
   ConstraintSolver solver(seed);
   RandomizeCtx rc{obj, ctx, arena};
 
