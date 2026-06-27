@@ -285,17 +285,6 @@ struct ModuleItem {
   std::vector<std::string_view> prop_seq_assert_vars;
 
   std::vector<EventExpr> clocking_event;
-
-  // §16.13.6/§9.4.4: for a named sequence whose body is the simple clocked
-  // linear form `@(edge clk) b0 ##1 b1 ##1 ... bn` (each bi a Boolean), the
-  // clocking event and the operand expressions in order. Captured by the parser
-  // so the simulator can run a monitor that fires the sequence's endpoint event
-  // on a match and make `sequence.triggered` work. A dedicated field (not
-  // clocking_event, which marks a clocking block) so clocking-block validation
-  // is unaffected. Both empty for any other sequence shape.
-  std::vector<EventExpr> seq_clock;
-  std::vector<Expr*> seq_linear_operands;
-
   std::vector<ClockingSignalDecl> clocking_signals;
   bool is_default_clocking = false;
   bool is_global_clocking = false;

@@ -740,54 +740,6 @@ static void ParseSequencePortList(Lexer& lexer, DiagEngine& diag,
   }
 }
 
-// §16.13.6: parse the operand chain `b0 ##1 b1 ##1 ... bn` of a simple linear
-// sequence body. Returns false on any non-unit cycle delay or parse failure;
-// only `##1` between Boolean operands is supported by the linear monitor.
-bool Parser::ParseLinearSeqOperands(std::vector<Expr*>& operands) {
-  while (!Check(TokenKind::kKwEndsequence) && !Check(TokenKind::kSemicolon) &&
-         !AtEnd()) {
-    Expr* op = ParseExpr();
-    if (!op) return false;
-    operands.push_back(op);
-    if (!Check(TokenKind::kHashHash)) break;
-    Consume();  // '##'
-    if (!Check(TokenKind::kIntLiteral) || CurrentToken().text != "1")
-      return false;
-    Consume();  // '1'
-  }
-  return true;
-}
-
-// §16.13.6/§9.4.4: trial-parse the simple clocked linear body
-// `@(edge clk) b0 ##1 b1 ##1 ... bn` and record the clock + operands so the
-// simulator can fire the sequence endpoint on a match. Diagnostics are
-// suppressed and the lexer is rewound, so the harvest scan in ParseSequenceDecl
-// re-reads the same tokens unchanged; any other body shape leaves the fields
-// empty and no monitor is created.
-void Parser::CaptureLinearSequenceBody(ModuleItem* item) {
-  if (!Check(TokenKind::kAt)) return;
-  auto saved = lexer_.SavePos();
-  diag_.PushSuppress();
-  Consume();  // '@'
-  std::vector<EventExpr> clock;
-  bool ok = Match(TokenKind::kLParen);
-  if (ok) {
-    clock = ParseEventList();
-    ok = Match(TokenKind::kRParen);
-  }
-  std::vector<Expr*> operands;
-  if (ok) ok = ParseLinearSeqOperands(operands);
-  // The sequence_expr is terminated by ';' before `endsequence`.
-  if (ok) Match(TokenKind::kSemicolon);
-  ok = ok && Check(TokenKind::kKwEndsequence) && !operands.empty();
-  diag_.PopSuppress();
-  lexer_.RestorePos(saved);
-  if (ok) {
-    item->seq_clock = std::move(clock);
-    item->seq_linear_operands = std::move(operands);
-  }
-}
-
 ModuleItem* Parser::ParseSequenceDecl() {
   auto* item = arena_.Create<ModuleItem>();
   item->kind = ModuleItemKind::kSequenceDecl;
@@ -812,12 +764,6 @@ ModuleItem* Parser::ParseSequenceDecl() {
   }
 
   Expect(TokenKind::kSemicolon);
-
-  // §16.13.6: capture the simple clocked linear body for the simulator's
-  // sequence.triggered monitor. This is a trial parse that suppresses
-  // diagnostics and rewinds, so the harvest scan below runs over the same
-  // tokens unchanged.
-  CaptureLinearSequenceBody(item);
 
   // §16.10: assertion_variable_declarations precede the sequence_expr in the
   // body. We harvest them while still at the head of the body; once we see a
