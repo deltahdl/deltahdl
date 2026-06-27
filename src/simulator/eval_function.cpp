@@ -442,6 +442,10 @@ static bool TryEvalClassScopeCall(const Expr* expr, SimContext& ctx,
     ctx.PushMethodClass(info.cls);
   }
   ExecClassMethod({info.method}, expr, ctx, arena, out);
+  // §13.5.2: output and inout arguments are copied back to the caller on
+  // return. The instance-method path does this; the class-scope static path
+  // must too, or `Cls::task(out_arg)` silently drops its results.
+  WritebackOutputArgs(info.method, expr, ctx, arena);
   if (info.method->is_static) {
     ctx.PopMethodClass();
   }
@@ -463,6 +467,9 @@ static bool TryEvalParameterizedScopeCall(const Expr* expr, SimContext& ctx,
     return true;
   }
   ExecClassMethod({info.method, info.cls}, expr, ctx, arena, out);
+  // §13.5.2: copy output/inout arguments back to the caller on return (the
+  // parameterized class-scope path, e.g. `Cls#(N)::task(out_arg)`).
+  WritebackOutputArgs(info.method, expr, ctx, arena);
   ctx.PopScope();
   return true;
 }
