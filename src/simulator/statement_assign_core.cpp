@@ -344,19 +344,41 @@ static bool TrySubarrayAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   return true;
 }
 
+// §11.4.1/§11.5.1: width of a concatenation lvalue element -- a nested
+// concatenation/assignment pattern sums its own elements; any other form
+// reduces to the width of the resolved target variable (0 when unresolved).
+static uint32_t ConcatLhsElemWidth(const Expr* e, SimContext& ctx) {
+  if (e->kind == ExprKind::kConcatenation ||
+      e->kind == ExprKind::kAssignmentPattern) {
+    uint32_t total = 0;
+    for (const auto* sub : e->elements) total += ConcatLhsElemWidth(sub, ctx);
+    return total;
+  }
+  auto* var = ResolveLhsVariable(e, ctx);
+  return var ? var->value.width : 0;
+}
+
 static void UnpackConcatLhs(const Expr* lhs, const Logic4Vec& rhs_val,
                             SimContext& ctx, Arena& arena) {
   uint64_t rhs_raw = rhs_val.ToUint64();
   uint32_t bit_offset = 0;
   for (auto it = lhs->elements.rbegin(); it != lhs->elements.rend(); ++it) {
-    auto* var = ResolveLhsVariable(*it, ctx);
-    if (!var) continue;
-    uint32_t w = var->value.width;
+    const Expr* el = *it;
+    uint32_t w = ConcatLhsElemWidth(el, ctx);
+    if (w == 0) continue;
     uint64_t mask = (w >= 64) ? ~uint64_t{0} : (uint64_t{1} << w) - 1;
     uint64_t slice = (rhs_raw >> bit_offset) & mask;
+    bit_offset += w;
+    // §11.4.1: a nested concatenation lvalue distributes its slice recursively.
+    if (el->kind == ExprKind::kConcatenation ||
+        el->kind == ExprKind::kAssignmentPattern) {
+      UnpackConcatLhs(el, MakeLogic4VecVal(arena, w, slice), ctx, arena);
+      continue;
+    }
+    auto* var = ResolveLhsVariable(el, ctx);
+    if (!var) continue;
     var->value = MakeLogic4VecVal(arena, w, slice);
     var->NotifyWatchers();
-    bit_offset += w;
   }
 }
 
