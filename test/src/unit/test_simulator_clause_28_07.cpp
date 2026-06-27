@@ -300,7 +300,12 @@ TEST(MosSwitchSimulation, NmosControlUnknownDoesNotPassDefiniteValue) {
       f);
   ASSERT_NE(design, nullptr);
   LowerAndRun(design, f);
-  EXPECT_TRUE(SettledToHighZ(f, "y"));
+  // Ambiguous control: the switch passes "1 or z", which collapses in the
+  // ternary (§11.4.11) to x = (aval=1, bval=1), not a definite value.
+  auto* v = f.ctx.FindVariable("y");
+  ASSERT_NE(v, nullptr);
+  EXPECT_EQ(v->value.words[0].aval & 1u, 1u);
+  EXPECT_EQ(v->value.words[0].bval & 1u, 1u);
 }
 
 TEST(MosSwitchSimulation, NmosControlHighZDoesNotPassDefiniteValue) {
@@ -315,7 +320,12 @@ TEST(MosSwitchSimulation, NmosControlHighZDoesNotPassDefiniteValue) {
       f);
   ASSERT_NE(design, nullptr);
   LowerAndRun(design, f);
-  EXPECT_TRUE(SettledToHighZ(f, "y"));
+  // Floating (z) control behaves like x control: passes "1 or z", which
+  // collapses in the ternary (§11.4.11) to x = (aval=1, bval=1).
+  auto* v = f.ctx.FindVariable("y");
+  ASSERT_NE(v, nullptr);
+  EXPECT_EQ(v->value.words[0].aval & 1u, 1u);
+  EXPECT_EQ(v->value.words[0].bval & 1u, 1u);
 }
 
 }  // namespace

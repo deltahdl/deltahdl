@@ -40,7 +40,7 @@ TEST(ConditionalAmbiguousCondition, ZConditionCombinesBranchesBitwise) {
   ternary->false_expr = MakeId(f.arena, "zf");
   auto result = EvalExpr(ternary, f.ctx, f.arena);
 
-  EXPECT_EQ(result.words[0].aval, 0b1000u);
+  EXPECT_EQ(result.words[0].aval, 0b1110u);  // differing bits -> x = (1, 1)
   EXPECT_EQ(result.words[0].bval, 0b0110u);
 }
 
@@ -74,7 +74,7 @@ TEST(ConditionalAmbiguousCondition,
   ternary->false_expr = MakeId(f.arena, "tf");
   auto result = EvalExpr(ternary, f.ctx, f.arena);
 
-  EXPECT_EQ(result.words[0].aval, 0b1000u);
+  EXPECT_EQ(result.words[0].aval, 0b1110u);  // differing bits -> x = (1, 1)
   EXPECT_EQ(result.words[0].bval, 0b0110u);
 }
 
@@ -920,7 +920,7 @@ TEST(ConditionalAmbiguousCondition, MultiBitPartialXTriggersAmbiguous) {
                            MakeId(f.arena, "t"), MakeId(f.arena, "e")),
                f.ctx, f.arena);
 
-  EXPECT_EQ(result.words[0].aval, 0b1000u);
+  EXPECT_EQ(result.words[0].aval, 0b1110u);  // differing bits -> x = (1, 1)
   EXPECT_EQ(result.words[0].bval, 0b0110u);
 }
 

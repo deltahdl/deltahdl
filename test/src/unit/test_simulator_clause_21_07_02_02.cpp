@@ -59,8 +59,8 @@ TEST_F(VcdValueFormatSim, ShortensRedundantLeadingZeros) {
 // the zero fill rule — collapsing both x bits to b10 would misrepresent the
 // value.
 TEST_F(VcdValueFormatSim, ShortensRedundantLeadingX) {
-  // bit3=x, bit2=x, bit1=1, bit0=0 -> aval=0b0010, bval=0b1100.
-  auto content = DumpOne(4, MakeVec(arena_, 4, 0b0010, 0b1100));
+  // bit3=x, bit2=x, bit1=1, bit0=0 -> aval=0b1110, bval=0b1100 (x=(1,1)).
+  auto content = DumpOne(4, MakeVec(arena_, 4, 0b1110, 0b1100));
   EXPECT_NE(content.find("bx10 !"), std::string::npos);
   EXPECT_EQ(content.find("bxx10"), std::string::npos);
 }
@@ -69,7 +69,7 @@ TEST_F(VcdValueFormatSim, ShortensRedundantLeadingX) {
 // z, exercising the z fill rule and the guarantee that at least one digit is
 // always retained.
 TEST_F(VcdValueFormatSim, ShortensRedundantLeadingZ) {
-  auto content = DumpOne(4, MakeVec(arena_, 4, 0b1111, 0b1111));
+  auto content = DumpOne(4, MakeVec(arena_, 4, 0b0000, 0b1111));  // z=(0,1)
   EXPECT_NE(content.find("bz !"), std::string::npos);
   EXPECT_EQ(content.find("bzz"), std::string::npos);
 }

@@ -9,7 +9,8 @@ namespace {
 
 // Build a 4-state vector from an MSB-first string of 0/1/x/z characters, so a
 // test reads in the same bit order the LRM writes its literals. The encoding
-// matches Logic4Vec::ToString: x is (aval 0, bval 1) and z is (aval 1, bval 1).
+// matches Logic4Vec::ToString (canonical, Figure 38-8): x is (aval 1, bval 1)
+// and z is (aval 0, bval 1).
 Logic4Vec MakeVec(Arena& arena, const std::string& bits) {
   auto v = MakeLogic4Vec(arena, static_cast<uint32_t>(bits.size()));
   for (size_t k = 0; k < bits.size(); ++k) {
@@ -21,10 +22,10 @@ Logic4Vec MakeVec(Arena& arena, const std::string& bits) {
         w.aval |= mask;
         break;
       case 'x':
+        w.aval |= mask;
         w.bval |= mask;
         break;
       case 'z':
-        w.aval |= mask;
         w.bval |= mask;
         break;
       default:

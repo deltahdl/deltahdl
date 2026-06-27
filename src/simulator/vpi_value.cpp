@@ -60,7 +60,9 @@ static void GetValueHexStr(VpiHandle obj, VpiValue* value,
     uint8_t a_nibble = (aval >> (i * 4)) & 0xF;
     uint8_t b_nibble = (bval >> (i * 4)) & 0xF;
     if (b_nibble != 0) {
-      result += (b_nibble == 0xF && a_nibble == 0xF) ? 'x' : 'z';
+      // §21.2.1.3 / Figure 38-8: a group whose unknown bits are all z (a=0,
+      // b=0xF) prints z; any other group containing an unknown bit prints x.
+      result += (b_nibble == 0xF && a_nibble == 0) ? 'z' : 'x';
     } else {
       result += HexDigitFromBits(a_nibble);
     }
@@ -81,10 +83,10 @@ static void GetValueOctStr(VpiHandle obj, VpiValue* value,
     uint8_t a_bits = (aval >> (i * 3)) & 0x7;
     uint8_t b_bits = (bval >> (i * 3)) & 0x7;
     if (b_bits != 0) {
-      // §38.15, Table 38-3 (octal row): a digit covering any unknown bit is
-      // reported as x only when the whole group is x, otherwise as z. Under the
-      // canonical encoding (Figure 38-8) x=(1,1), so an all-x group is a=0x7.
-      result += (b_bits == 0x7 && a_bits == 0x7) ? 'x' : 'z';
+      // §38.15, Table 38-3 (octal row) / §21.2.1.3: a group prints z only when
+      // its unknown bits are all z (a=0, b=0x7); any other group containing an
+      // unknown bit prints x (canonical encoding x=(1,1), z=(0,1)).
+      result += (b_bits == 0x7 && a_bits == 0) ? 'z' : 'x';
     } else {
       result += static_cast<char>('0' + a_bits);
     }

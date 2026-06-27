@@ -21,21 +21,21 @@ TEST(WireTriResolution, Wire_0_1) {
   Logic4Word a{0, 0};
   Logic4Word b{1, 0};
   auto r = ResolveWireWord(a, b);
-  EXPECT_EQ(r.aval, 0u);
+  EXPECT_EQ(r.aval, 1u);
   EXPECT_EQ(r.bval, 1u);
 }
 
 TEST(WireTriResolution, Wire_0_x) {
   Logic4Word zero{0, 0};
-  Logic4Word x{0, 1};
+  Logic4Word x{1, 1};
   auto r = ResolveWireWord(zero, x);
-  EXPECT_EQ(r.aval, 0u);
+  EXPECT_EQ(r.aval, 1u);
   EXPECT_EQ(r.bval, 1u);
 }
 
 TEST(WireTriResolution, Wire_0_z) {
   Logic4Word zero{0, 0};
-  Logic4Word z{1, 1};
+  Logic4Word z{0, 1};
   auto r = ResolveWireWord(zero, z);
   EXPECT_EQ(r.aval, 0u);
   EXPECT_EQ(r.bval, 0u);
@@ -45,7 +45,7 @@ TEST(WireTriResolution, Wire_1_0) {
   Logic4Word one{1, 0};
   Logic4Word zero{0, 0};
   auto r = ResolveWireWord(one, zero);
-  EXPECT_EQ(r.aval, 0u);
+  EXPECT_EQ(r.aval, 1u);
   EXPECT_EQ(r.bval, 1u);
 }
 
@@ -59,53 +59,53 @@ TEST(WireTriResolution, Wire_1_1) {
 
 TEST(WireTriResolution, Wire_1_x) {
   Logic4Word one{1, 0};
-  Logic4Word x{0, 1};
+  Logic4Word x{1, 1};
   auto r = ResolveWireWord(one, x);
-  EXPECT_EQ(r.aval, 0u);
+  EXPECT_EQ(r.aval, 1u);
   EXPECT_EQ(r.bval, 1u);
 }
 
 TEST(WireTriResolution, Wire_1_z) {
   Logic4Word one{1, 0};
-  Logic4Word z{1, 1};
+  Logic4Word z{0, 1};
   auto r = ResolveWireWord(one, z);
   EXPECT_EQ(r.aval, 1u);
   EXPECT_EQ(r.bval, 0u);
 }
 
 TEST(WireTriResolution, Wire_x_0) {
-  Logic4Word x{0, 1};
+  Logic4Word x{1, 1};
   Logic4Word zero{0, 0};
   auto r = ResolveWireWord(x, zero);
-  EXPECT_EQ(r.aval, 0u);
+  EXPECT_EQ(r.aval, 1u);
   EXPECT_EQ(r.bval, 1u);
 }
 
 TEST(WireTriResolution, Wire_x_1) {
-  Logic4Word x{0, 1};
+  Logic4Word x{1, 1};
   Logic4Word one{1, 0};
   auto r = ResolveWireWord(x, one);
-  EXPECT_EQ(r.aval, 0u);
+  EXPECT_EQ(r.aval, 1u);
   EXPECT_EQ(r.bval, 1u);
 }
 
 TEST(WireTriResolution, Wire_x_x) {
-  Logic4Word x{0, 1};
+  Logic4Word x{1, 1};
   auto r = ResolveWireWord(x, x);
-  EXPECT_EQ(r.aval, 0u);
+  EXPECT_EQ(r.aval, 1u);
   EXPECT_EQ(r.bval, 1u);
 }
 
 TEST(WireTriResolution, Wire_x_z) {
-  Logic4Word x{0, 1};
-  Logic4Word z{1, 1};
+  Logic4Word x{1, 1};
+  Logic4Word z{0, 1};
   auto r = ResolveWireWord(x, z);
-  EXPECT_EQ(r.aval, 0u);
+  EXPECT_EQ(r.aval, 1u);
   EXPECT_EQ(r.bval, 1u);
 }
 
 TEST(WireTriResolution, Wire_z_0) {
-  Logic4Word z{1, 1};
+  Logic4Word z{0, 1};
   Logic4Word zero{0, 0};
   auto r = ResolveWireWord(z, zero);
   EXPECT_EQ(r.aval, 0u);
@@ -113,7 +113,7 @@ TEST(WireTriResolution, Wire_z_0) {
 }
 
 TEST(WireTriResolution, Wire_z_1) {
-  Logic4Word z{1, 1};
+  Logic4Word z{0, 1};
   Logic4Word one{1, 0};
   auto r = ResolveWireWord(z, one);
   EXPECT_EQ(r.aval, 1u);
@@ -121,17 +121,17 @@ TEST(WireTriResolution, Wire_z_1) {
 }
 
 TEST(WireTriResolution, Wire_z_x) {
-  Logic4Word z{1, 1};
-  Logic4Word x{0, 1};
+  Logic4Word z{0, 1};
+  Logic4Word x{1, 1};
   auto r = ResolveWireWord(z, x);
-  EXPECT_EQ(r.aval, 0u);
+  EXPECT_EQ(r.aval, 1u);
   EXPECT_EQ(r.bval, 1u);
 }
 
 TEST(WireTriResolution, Wire_z_z) {
-  Logic4Word z{1, 1};
+  Logic4Word z{0, 1};
   auto r = ResolveWireWord(z, z);
-  EXPECT_EQ(r.aval, 1u);
+  EXPECT_EQ(r.aval, 0u);
   EXPECT_EQ(r.bval, 1u);
 }
 

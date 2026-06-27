@@ -33,12 +33,14 @@ void RunAndCheckResolvedWord(const std::string& initial_line,
 
 TEST(HighzStrengthOutput, Highz1ProducesZWhenGateComputesOne) {
   RunAndCheckResolvedWord("  initial begin a = 1'b1; b = 1'b1; end\n",
-                          "  and (strong0, highz1) g1(y, a, b);\n", 1u, 1u);
+                          "  and (strong0, highz1) g1(y, a, b);\n", 0u,
+                          1u);  // z = (aval=0, bval=1)
 }
 
 TEST(HighzStrengthOutput, Highz0ProducesZWhenGateComputesZero) {
   RunAndCheckResolvedWord("  initial begin a = 1'b0; b = 1'b1; end\n",
-                          "  and (highz0, strong1) g1(y, a, b);\n", 1u, 1u);
+                          "  and (highz0, strong1) g1(y, a, b);\n", 0u,
+                          1u);  // z = (aval=0, bval=1)
 }
 
 TEST(HighzStrengthOutput, Highz1DoesNotAffectZeroOutput) {

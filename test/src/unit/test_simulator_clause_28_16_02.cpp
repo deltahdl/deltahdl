@@ -18,7 +18,7 @@ TEST(TriregResolution, TriregRetainsPrevValue) {
   net.resolved = var;
 
   auto z_drv = MakeLogic4Vec(arena, 8);
-  z_drv.words[0].aval = ~uint64_t{0};
+  z_drv.words[0].aval = uint64_t{0};  // z = (aval=0, bval=1)
   z_drv.words[0].bval = ~uint64_t{0};
   net.drivers.push_back(z_drv);
   net.Resolve(arena);
@@ -34,7 +34,7 @@ TEST(TriregResolution, InCapacitiveStateWhenAllDriversZ) {
   net.resolved = var;
 
   auto z_drv = MakeLogic4Vec(arena, 8);
-  z_drv.words[0].aval = ~uint64_t{0};
+  z_drv.words[0].aval = uint64_t{0};  // z = (aval=0, bval=1)
   z_drv.words[0].bval = ~uint64_t{0};
   net.drivers.push_back(z_drv);
   EXPECT_TRUE(net.InCapacitiveState());
@@ -61,7 +61,7 @@ TEST(TriregResolution, NotInCapacitiveStateForNonTrireg) {
   net.resolved = var;
 
   auto z_drv = MakeLogic4Vec(arena, 8);
-  z_drv.words[0].aval = ~uint64_t{0};
+  z_drv.words[0].aval = uint64_t{0};  // z = (aval=0, bval=1)
   z_drv.words[0].bval = ~uint64_t{0};
   net.drivers.push_back(z_drv);
   EXPECT_FALSE(net.InCapacitiveState());
@@ -76,7 +76,7 @@ TEST(TriregResolution, MixedZAndDrivenResolvesToDriven) {
   net.resolved = var;
 
   auto z_drv = MakeLogic4Vec(arena, 8);
-  z_drv.words[0].aval = ~uint64_t{0};
+  z_drv.words[0].aval = uint64_t{0};  // z = (aval=0, bval=1)
   z_drv.words[0].bval = ~uint64_t{0};
   net.drivers.push_back(z_drv);
   net.drivers.push_back(MakeLogic4VecVal(arena, 8, 99));
@@ -93,7 +93,7 @@ TEST(TriregResolution, NotInCapacitiveStateWhenAnyDriverNonZ) {
   net.resolved = var;
 
   auto z_drv = MakeLogic4Vec(arena, 8);
-  z_drv.words[0].aval = ~uint64_t{0};
+  z_drv.words[0].aval = uint64_t{0};  // z = (aval=0, bval=1)
   z_drv.words[0].bval = ~uint64_t{0};
   net.drivers.push_back(z_drv);
   net.drivers.push_back(MakeLogic4VecVal(arena, 8, 1));
@@ -104,19 +104,19 @@ TEST(TriregResolution, RetainsXStateWhenDriversTurnOff) {
   Arena arena;
   auto* var = arena.Create<Variable>();
   var->value = MakeLogic4Vec(arena, 8);
-  var->value.words[0].aval = 0;
+  var->value.words[0].aval = 0xFF;  // held x = (aval=1, bval=1)
   var->value.words[0].bval = 0xFF;
   Net net;
   net.type = NetType::kTrireg;
   net.resolved = var;
 
   auto z_drv = MakeLogic4Vec(arena, 8);
-  z_drv.words[0].aval = ~uint64_t{0};
+  z_drv.words[0].aval = uint64_t{0};  // z = (aval=0, bval=1)
   z_drv.words[0].bval = ~uint64_t{0};
   net.drivers.push_back(z_drv);
   net.Resolve(arena);
 
-  EXPECT_EQ(var->value.words[0].aval & 0xFF, 0u);
+  EXPECT_EQ(var->value.words[0].aval & 0xFF, 0xFFu);  // retained x
   EXPECT_EQ(var->value.words[0].bval & 0xFF, 0xFFu);
 }
 
@@ -132,10 +132,10 @@ TEST(TriregResolution, RetainsPrevValueWhenAllOfMultipleDriversTurnOff) {
   net.resolved = var;
 
   auto z_drv_a = MakeLogic4Vec(arena, 8);
-  z_drv_a.words[0].aval = ~uint64_t{0};
+  z_drv_a.words[0].aval = uint64_t{0};  // z = (aval=0, bval=1)
   z_drv_a.words[0].bval = ~uint64_t{0};
   auto z_drv_b = MakeLogic4Vec(arena, 8);
-  z_drv_b.words[0].aval = ~uint64_t{0};
+  z_drv_b.words[0].aval = uint64_t{0};  // z = (aval=0, bval=1)
   z_drv_b.words[0].bval = ~uint64_t{0};
   net.drivers.push_back(z_drv_a);
   net.drivers.push_back(z_drv_b);
@@ -151,7 +151,7 @@ TEST(TriregResolution, HoldsZWhenForcedEvenWithActiveDriver) {
   Arena arena;
   auto* var = arena.Create<Variable>();
   auto z_val = MakeLogic4Vec(arena, 8);
-  z_val.words[0].aval = ~uint64_t{0};
+  z_val.words[0].aval = uint64_t{0};  // z = (aval=0, bval=1)
   z_val.words[0].bval = ~uint64_t{0};
   var->value = z_val;
   var->is_forced = true;
@@ -161,7 +161,7 @@ TEST(TriregResolution, HoldsZWhenForcedEvenWithActiveDriver) {
 
   net.drivers.push_back(MakeLogic4VecVal(arena, 8, 1));
   net.Resolve(arena);
-  EXPECT_EQ(var->value.words[0].aval & 0xFF, 0xFFu);
+  EXPECT_EQ(var->value.words[0].aval & 0xFF, 0u);  // held z = (aval=0, bval=1)
   EXPECT_EQ(var->value.words[0].bval & 0xFF, 0xFFu);
 }
 
@@ -172,7 +172,7 @@ TEST(TriregResolution, HoldsInitialZStateWhenUndriven) {
   Arena arena;
   auto* var = arena.Create<Variable>();
   auto z_val = MakeLogic4Vec(arena, 8);
-  z_val.words[0].aval = ~uint64_t{0};
+  z_val.words[0].aval = uint64_t{0};  // z = (aval=0, bval=1)
   z_val.words[0].bval = ~uint64_t{0};
   var->value = z_val;
   Net net;
@@ -180,7 +180,7 @@ TEST(TriregResolution, HoldsInitialZStateWhenUndriven) {
   net.resolved = var;
   // No drivers added: the trireg is undriven from elaboration onward.
   net.Resolve(arena);
-  EXPECT_EQ(var->value.words[0].aval & 0xFF, 0xFFu);
+  EXPECT_EQ(var->value.words[0].aval & 0xFF, 0u);  // held z = (aval=0, bval=1)
   EXPECT_EQ(var->value.words[0].bval & 0xFF, 0xFFu);
 }
 
@@ -193,11 +193,11 @@ TEST(TriregResolution, XDriverResolvesLikeWire) {
   net.resolved = var;
 
   auto x_drv = MakeLogic4Vec(arena, 8);
-  x_drv.words[0].aval = 0;
+  x_drv.words[0].aval = 0xFF;  // x = (aval=1, bval=1)
   x_drv.words[0].bval = 0xFF;
   net.drivers.push_back(x_drv);
   net.Resolve(arena);
-  EXPECT_EQ(var->value.words[0].aval & 0xFF, 0u);
+  EXPECT_EQ(var->value.words[0].aval & 0xFF, 0xFFu);  // x driver passes through
   EXPECT_EQ(var->value.words[0].bval & 0xFF, 0xFFu);
 }
 

@@ -54,12 +54,12 @@ TEST(IoSystemTaskTest, PackedFourStateBitsWrittenInReadmemForm) {
   SimFixture f;
   std::string path = "/tmp/deltahdl_test_21_05_01_xz.txt";
   SetupMem(f, "src", 0, 1, 8);
-  // Build the 8-bit word 1 0 x z 1 0 0 1. In the four-state encoding a known
-  // bit has bval clear, an x bit is bval set with aval clear, and a z bit is
-  // bval set with aval set; bits 5 (x) and 4 (z) carry the unknown/high-Z
-  // values.
+  // Build the 8-bit word 1 0 x z 1 0 0 1. In the canonical four-state encoding
+  // (Figure 38-8) a known bit has bval clear, an x bit is bval set with aval
+  // set, and a z bit is bval set with aval clear; bits 5 (x) and 4 (z) carry
+  // the unknown/high-Z values.
   Logic4Vec v = MakeLogic4VecVal(f.arena, 8, 0);
-  v.words[0].aval = 0b10011001u;  // the 1 bits, plus the z bit's set aval
+  v.words[0].aval = 0b10101001u;  // the 1 bits, plus the x bit's set aval
   v.words[0].bval = 0b00110000u;  // bits 5 and 4 are the x and z positions
   Cell(f, "src", 0)->value = v;
 

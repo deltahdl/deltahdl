@@ -33,7 +33,7 @@ uint64_t RunZInItemDontCare(StmtFixture& f, TokenKind case_kind) {
 
   auto* pat_var = f.ctx.CreateVariable("pat_z", 4);
   pat_var->value = MakeLogic4Vec(f.arena, 4);
-  pat_var->value.words[0].aval = 0x03;
+  pat_var->value.words[0].aval = 0x02;  // bit0 = z = (aval=0, bval=1)
   pat_var->value.words[0].bval = 0x01;
 
   CaseItem item1;
@@ -324,7 +324,7 @@ TEST(CasezStatementSim, CasezWithZInSelector) {
 
   auto* sel_var = f.ctx.CreateVariable("sel_z", 8);
   sel_var->value = MakeLogic4Vec(f.arena, 8);
-  sel_var->value.words[0].aval = 0x03;
+  sel_var->value.words[0].aval = 0x02;  // bit0 = z = (aval=0, bval=1)
   sel_var->value.words[0].bval = 0x01;
 
   auto* stmt = f.arena.Create<Stmt>();

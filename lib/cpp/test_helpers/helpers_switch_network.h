@@ -40,7 +40,8 @@ inline bool SwitchControlIsUnknown(SwitchKind kind, Logic4Word control) {
 }
 
 inline bool IsZ(const Logic4Word& w) {
-  return (w.aval & 1) != 0 && (w.bval & 1) != 0;
+  // Canonical Convention A: z = (aval=0, bval=1).
+  return (w.aval & 1) == 0 && (w.bval & 1) != 0;
 }
 
 inline void ResolveSwitchNetwork(std::vector<SwitchInst>& switches,
@@ -72,22 +73,24 @@ inline Net MakeUndrivenNet(Arena& arena, Variable* var) {
   net.type = NetType::kWire;
   net.resolved = var;
   auto z = MakeLogic4Vec(arena, 1);
-  z.words[0].aval = 1;
+  z.words[0].aval = 0;  // canonical Convention A: z = (aval=0, bval=1)
   z.words[0].bval = 1;
   net.drivers.push_back(z);
   return net;
-}
-
-inline uint8_t ValOf(const Variable& v) {
-  uint8_t a = v.value.words[0].aval & 1;
-  uint8_t b = v.value.words[0].bval & 1;
-  return static_cast<uint8_t>((b << 1) | a);
 }
 
 static constexpr uint8_t kVal0 = 0;
 static constexpr uint8_t kVal1 = 1;
 static constexpr uint8_t kValX = 2;
 static constexpr uint8_t kValZ = 3;
+
+// Canonical Convention A: x=(aval=1,bval=1), z=(aval=0,bval=1).
+inline uint8_t ValOf(const Variable& v) {
+  uint8_t a = v.value.words[0].aval & 1;
+  uint8_t b = v.value.words[0].bval & 1;
+  if (b == 0) return a;  // kVal0 / kVal1
+  return a ? kValX : kValZ;
+}
 
 struct NetPair {
   Arena arena;

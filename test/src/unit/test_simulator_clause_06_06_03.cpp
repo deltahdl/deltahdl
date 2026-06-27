@@ -22,13 +22,13 @@ TEST(WiredNetResolution, Wand_0_1) {
 }
 
 TEST(WiredNetResolution, Wand_0_x) {
-  auto r = ResolveWandWord({0, 0}, {0, 1});
+  auto r = ResolveWandWord({0, 0}, {1, 1});
   EXPECT_EQ(r.aval, 0u);
   EXPECT_EQ(r.bval, 0u);
 }
 
 TEST(WiredNetResolution, Wand_0_z) {
-  auto r = ResolveWandWord({0, 0}, {1, 1});
+  auto r = ResolveWandWord({0, 0}, {0, 1});
   EXPECT_EQ(r.aval, 0u);
   EXPECT_EQ(r.bval, 0u);
 }
@@ -46,62 +46,62 @@ TEST(WiredNetResolution, Wand_1_1) {
 }
 
 TEST(WiredNetResolution, Wand_1_x) {
-  auto r = ResolveWandWord({1, 0}, {0, 1});
-  EXPECT_EQ(r.aval, 0u);
+  auto r = ResolveWandWord({1, 0}, {1, 1});
+  EXPECT_EQ(r.aval, 1u);
   EXPECT_EQ(r.bval, 1u);
 }
 
 TEST(WiredNetResolution, Wand_1_z) {
-  auto r = ResolveWandWord({1, 0}, {1, 1});
+  auto r = ResolveWandWord({1, 0}, {0, 1});
   EXPECT_EQ(r.aval, 1u);
   EXPECT_EQ(r.bval, 0u);
 }
 
 TEST(WiredNetResolution, Wand_x_0) {
-  auto r = ResolveWandWord({0, 1}, {0, 0});
-  EXPECT_EQ(r.aval, 0u);
-  EXPECT_EQ(r.bval, 0u);
-}
-
-TEST(WiredNetResolution, Wand_x_1) {
-  auto r = ResolveWandWord({0, 1}, {1, 0});
-  EXPECT_EQ(r.aval, 0u);
-  EXPECT_EQ(r.bval, 1u);
-}
-
-TEST(WiredNetResolution, Wand_x_x) {
-  auto r = ResolveWandWord({0, 1}, {0, 1});
-  EXPECT_EQ(r.aval, 0u);
-  EXPECT_EQ(r.bval, 1u);
-}
-
-TEST(WiredNetResolution, Wand_x_z) {
-  auto r = ResolveWandWord({0, 1}, {1, 1});
-  EXPECT_EQ(r.aval, 0u);
-  EXPECT_EQ(r.bval, 1u);
-}
-
-TEST(WiredNetResolution, Wand_z_0) {
   auto r = ResolveWandWord({1, 1}, {0, 0});
   EXPECT_EQ(r.aval, 0u);
   EXPECT_EQ(r.bval, 0u);
 }
 
-TEST(WiredNetResolution, Wand_z_1) {
+TEST(WiredNetResolution, Wand_x_1) {
   auto r = ResolveWandWord({1, 1}, {1, 0});
+  EXPECT_EQ(r.aval, 1u);
+  EXPECT_EQ(r.bval, 1u);
+}
+
+TEST(WiredNetResolution, Wand_x_x) {
+  auto r = ResolveWandWord({1, 1}, {1, 1});
+  EXPECT_EQ(r.aval, 1u);
+  EXPECT_EQ(r.bval, 1u);
+}
+
+TEST(WiredNetResolution, Wand_x_z) {
+  auto r = ResolveWandWord({1, 1}, {0, 1});
+  EXPECT_EQ(r.aval, 1u);
+  EXPECT_EQ(r.bval, 1u);
+}
+
+TEST(WiredNetResolution, Wand_z_0) {
+  auto r = ResolveWandWord({0, 1}, {0, 0});
+  EXPECT_EQ(r.aval, 0u);
+  EXPECT_EQ(r.bval, 0u);
+}
+
+TEST(WiredNetResolution, Wand_z_1) {
+  auto r = ResolveWandWord({0, 1}, {1, 0});
   EXPECT_EQ(r.aval, 1u);
   EXPECT_EQ(r.bval, 0u);
 }
 
 TEST(WiredNetResolution, Wand_z_x) {
-  auto r = ResolveWandWord({1, 1}, {0, 1});
-  EXPECT_EQ(r.aval, 0u);
+  auto r = ResolveWandWord({0, 1}, {1, 1});
+  EXPECT_EQ(r.aval, 1u);
   EXPECT_EQ(r.bval, 1u);
 }
 
 TEST(WiredNetResolution, Wand_z_z) {
-  auto r = ResolveWandWord({1, 1}, {1, 1});
-  EXPECT_EQ(r.aval, 1u);
+  auto r = ResolveWandWord({0, 1}, {0, 1});
+  EXPECT_EQ(r.aval, 0u);
   EXPECT_EQ(r.bval, 1u);
 }
 
@@ -118,13 +118,13 @@ TEST(WiredNetResolution, Wor_0_1) {
 }
 
 TEST(WiredNetResolution, Wor_0_x) {
-  auto r = ResolveWorWord({0, 0}, {0, 1});
-  EXPECT_EQ(r.aval, 0u);
+  auto r = ResolveWorWord({0, 0}, {1, 1});
+  EXPECT_EQ(r.aval, 1u);
   EXPECT_EQ(r.bval, 1u);
 }
 
 TEST(WiredNetResolution, Wor_0_z) {
-  auto r = ResolveWorWord({0, 0}, {1, 1});
+  auto r = ResolveWorWord({0, 0}, {0, 1});
   EXPECT_EQ(r.aval, 0u);
   EXPECT_EQ(r.bval, 0u);
 }
@@ -142,62 +142,62 @@ TEST(WiredNetResolution, Wor_1_1) {
 }
 
 TEST(WiredNetResolution, Wor_1_x) {
-  auto r = ResolveWorWord({1, 0}, {0, 1});
-  EXPECT_EQ(r.aval, 1u);
-  EXPECT_EQ(r.bval, 0u);
-}
-
-TEST(WiredNetResolution, Wor_1_z) {
   auto r = ResolveWorWord({1, 0}, {1, 1});
   EXPECT_EQ(r.aval, 1u);
   EXPECT_EQ(r.bval, 0u);
 }
 
-TEST(WiredNetResolution, Wor_x_0) {
-  auto r = ResolveWorWord({0, 1}, {0, 0});
-  EXPECT_EQ(r.aval, 0u);
-  EXPECT_EQ(r.bval, 1u);
-}
-
-TEST(WiredNetResolution, Wor_x_1) {
-  auto r = ResolveWorWord({0, 1}, {1, 0});
+TEST(WiredNetResolution, Wor_1_z) {
+  auto r = ResolveWorWord({1, 0}, {0, 1});
   EXPECT_EQ(r.aval, 1u);
   EXPECT_EQ(r.bval, 0u);
 }
 
-TEST(WiredNetResolution, Wor_x_x) {
-  auto r = ResolveWorWord({0, 1}, {0, 1});
-  EXPECT_EQ(r.aval, 0u);
-  EXPECT_EQ(r.bval, 1u);
-}
-
-TEST(WiredNetResolution, Wor_x_z) {
-  auto r = ResolveWorWord({0, 1}, {1, 1});
-  EXPECT_EQ(r.aval, 0u);
-  EXPECT_EQ(r.bval, 1u);
-}
-
-TEST(WiredNetResolution, Wor_z_0) {
+TEST(WiredNetResolution, Wor_x_0) {
   auto r = ResolveWorWord({1, 1}, {0, 0});
-  EXPECT_EQ(r.aval, 0u);
-  EXPECT_EQ(r.bval, 0u);
+  EXPECT_EQ(r.aval, 1u);
+  EXPECT_EQ(r.bval, 1u);
 }
 
-TEST(WiredNetResolution, Wor_z_1) {
+TEST(WiredNetResolution, Wor_x_1) {
   auto r = ResolveWorWord({1, 1}, {1, 0});
   EXPECT_EQ(r.aval, 1u);
   EXPECT_EQ(r.bval, 0u);
 }
 
-TEST(WiredNetResolution, Wor_z_x) {
+TEST(WiredNetResolution, Wor_x_x) {
+  auto r = ResolveWorWord({1, 1}, {1, 1});
+  EXPECT_EQ(r.aval, 1u);
+  EXPECT_EQ(r.bval, 1u);
+}
+
+TEST(WiredNetResolution, Wor_x_z) {
   auto r = ResolveWorWord({1, 1}, {0, 1});
+  EXPECT_EQ(r.aval, 1u);
+  EXPECT_EQ(r.bval, 1u);
+}
+
+TEST(WiredNetResolution, Wor_z_0) {
+  auto r = ResolveWorWord({0, 1}, {0, 0});
   EXPECT_EQ(r.aval, 0u);
+  EXPECT_EQ(r.bval, 0u);
+}
+
+TEST(WiredNetResolution, Wor_z_1) {
+  auto r = ResolveWorWord({0, 1}, {1, 0});
+  EXPECT_EQ(r.aval, 1u);
+  EXPECT_EQ(r.bval, 0u);
+}
+
+TEST(WiredNetResolution, Wor_z_x) {
+  auto r = ResolveWorWord({0, 1}, {1, 1});
+  EXPECT_EQ(r.aval, 1u);
   EXPECT_EQ(r.bval, 1u);
 }
 
 TEST(WiredNetResolution, Wor_z_z) {
-  auto r = ResolveWorWord({1, 1}, {1, 1});
-  EXPECT_EQ(r.aval, 1u);
+  auto r = ResolveWorWord({0, 1}, {0, 1});
+  EXPECT_EQ(r.aval, 0u);
   EXPECT_EQ(r.bval, 1u);
 }
 

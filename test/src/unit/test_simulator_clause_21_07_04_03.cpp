@@ -59,10 +59,10 @@ TEST_F(ExtendedVcdValueChangeSim, ScalarPortValueChangesUseExtendedForm) {
     p1->value = MakeScalar(arena_, 1, 0);  // 1, port_id 1
     vcd.RegisterSignal("p1", 1, p1);
     auto* px = arena_.Create<Variable>();
-    px->value = MakeScalar(arena_, 0, 1);  // x, port_id 2
+    px->value = MakeScalar(arena_, 1, 1);  // x = (aval=1, bval=1), port_id 2
     vcd.RegisterSignal("px", 1, px);
     auto* pz = arena_.Create<Variable>();
-    pz->value = MakeScalar(arena_, 1, 1);  // z, port_id 3
+    pz->value = MakeScalar(arena_, 0, 1);  // z = (aval=0, bval=1), port_id 3
     vcd.RegisterSignal("pz", 1, pz);
     vcd.EndDefinitions();
     vcd.WriteTimestamp(0);

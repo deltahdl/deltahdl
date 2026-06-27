@@ -9,7 +9,8 @@ using namespace delta;
 static Logic4Vec MakeAllZ(Arena& arena, uint32_t width) {
   auto vec = MakeLogic4Vec(arena, width);
   for (uint32_t w = 0; w < vec.nwords; ++w) {
-    vec.words[w].aval = ~uint64_t{0};
+    vec.words[w].aval =
+        uint64_t{0};  // canonical Convention A: z = (aval=0, bval=1)
     vec.words[w].bval = ~uint64_t{0};
   }
   return vec;
@@ -63,9 +64,10 @@ TEST(CapacitiveNetwork, EqualStrengthDifferentValuesToX) {
 
   PropagateCharge(a, b);
 
-  EXPECT_EQ(var_a->value.words[0].aval & 0xFF, 0u);
+  EXPECT_EQ(var_a->value.words[0].aval & 0xFF,
+            0xFFu);  // conflict -> x = (1, 1)
   EXPECT_EQ(var_a->value.words[0].bval & 0xFF, 0xFFu);
-  EXPECT_EQ(var_b->value.words[0].aval & 0xFF, 0u);
+  EXPECT_EQ(var_b->value.words[0].aval & 0xFF, 0xFFu);
   EXPECT_EQ(var_b->value.words[0].bval & 0xFF, 0xFFu);
 }
 

@@ -14,7 +14,7 @@ namespace {
 static Logic4Vec MakeXVec(Arena& arena, uint32_t width) {
   auto v = MakeLogic4Vec(arena, width);
   for (uint32_t w = 0; w < v.nwords; ++w) {
-    v.words[w].aval = 0;
+    v.words[w].aval = ~uint64_t{0};  // canonical Convention A: x = (1, 1)
     v.words[w].bval = ~uint64_t{0};
   }
   return v;
@@ -64,7 +64,7 @@ TEST(TriregResolution, UnknownDriverPutsNetInDrivenState) {
   net.Resolve(arena);
 
   EXPECT_FALSE(net.InCapacitiveState());
-  EXPECT_EQ(var->value.words[0].aval & 0xFFu, 0u);
+  EXPECT_EQ(var->value.words[0].aval & 0xFFu, 0xFFu);  // x = (aval=1, bval=1)
   EXPECT_EQ(var->value.words[0].bval & 0xFFu, 0xFFu);
 }
 

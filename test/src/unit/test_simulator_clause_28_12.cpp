@@ -45,7 +45,8 @@ TEST(UserNettypeStrength, UserNettypeIgnoresStrengthPerBit) {
   AddDriver(arena, net, 4, 0b1010, Strength::kWeak);
   net.Resolve(arena);
 
-  EXPECT_EQ(sn.var->value.words[0].aval & 0xFu, 0b1000u);
+  // Bits 1,2 conflict -> x = (aval=1, bval=1); bit3=1, bit0=0 (Convention A).
+  EXPECT_EQ(sn.var->value.words[0].aval & 0xFu, 0b1110u);
   EXPECT_EQ(sn.var->value.words[0].bval & 0xFu, 0b0110u);
 }
 
@@ -76,7 +77,7 @@ TEST(UserNettypeStrength, UserNettypeIgnoresStrengthWithThreeDrivers) {
   AddDriver(arena, net, 1, 0, Strength::kWeak);
   net.Resolve(arena);
 
-  EXPECT_EQ(sn.var->value.words[0].aval & 1u, 0u);
+  EXPECT_EQ(sn.var->value.words[0].aval & 1u, 1u);  // x = (aval=1, bval=1)
   EXPECT_EQ(sn.var->value.words[0].bval & 1u, 1u);
 }
 
@@ -95,7 +96,7 @@ TEST(UserNettypeStrength, UserNettypeConflictKeepsNoStrengthLevels) {
   net.Resolve(arena);
 
   // Value resolves to x, the strengths having played no part in the outcome.
-  EXPECT_EQ(sn.var->value.words[0].aval & 1u, 0u);
+  EXPECT_EQ(sn.var->value.words[0].aval & 1u, 1u);  // x = (aval=1, bval=1)
   EXPECT_EQ(sn.var->value.words[0].bval & 1u, 1u);
 
   // No strength levels appear on either side of the scale.

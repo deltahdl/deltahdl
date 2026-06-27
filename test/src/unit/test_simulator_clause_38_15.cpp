@@ -85,8 +85,8 @@ TEST_F(VpiGetValueSim, GetValueScalarFormatOne) {
 // (a=0,b=1) or vpiZ (a=1,b=1), alongside the vpi0/vpi1 cases above.
 TEST_F(VpiGetValueSim, GetValueScalarFormatX) {
   auto* var = sim_ctx_.CreateVariable("sx", 1);
-  var->value = MakeLogic4VecVal(arena_, 1, 0);
-  var->value.words[0].bval = 1;  // a=0,b=1 -> x
+  var->value = MakeLogic4VecVal(arena_, 1, 1);
+  var->value.words[0].bval = 1;  // a=1,b=1 -> x
   vpi_ctx_.Attach(sim_ctx_);
 
   vpiHandle h = vpi_handle_by_name("sx", nullptr);
@@ -100,8 +100,8 @@ TEST_F(VpiGetValueSim, GetValueScalarFormatX) {
 
 TEST_F(VpiGetValueSim, GetValueScalarFormatZ) {
   auto* var = sim_ctx_.CreateVariable("sz", 1);
-  var->value = MakeLogic4VecVal(arena_, 1, 1);
-  var->value.words[0].bval = 1;  // a=1,b=1 -> z
+  var->value = MakeLogic4VecVal(arena_, 1, 0);
+  var->value.words[0].bval = 1;  // a=0,b=1 -> z
   vpi_ctx_.Attach(sim_ctx_);
 
   vpiHandle h = vpi_handle_by_name("sz", nullptr);
@@ -129,10 +129,10 @@ TEST_F(VpiGetValueSim, GetValueBinStrFormat) {
 }
 
 // §38.15, Table 38-3 (binary row): the returned string uses the characters
-// 1, 0, x, and z. Bit 2 is x (a=0,b=1) and bit 1 is z (a=1,b=1).
+// 1, 0, x, and z. Bit 2 is x (a=1,b=1) and bit 1 is z (a=0,b=1).
 TEST_F(VpiGetValueSim, GetValueBinStrFormatUnknownBits) {
   auto* var = sim_ctx_.CreateVariable("bxz", 4);
-  var->value = MakeLogic4VecVal(arena_, 4, 0b1010);
+  var->value = MakeLogic4VecVal(arena_, 4, 0b1100);
   var->value.words[0].bval = 0b0110;
   vpi_ctx_.Attach(sim_ctx_);
 
@@ -162,11 +162,11 @@ TEST_F(VpiGetValueSim, GetValueHexStrFormat) {
 }
 
 // §38.15, Table 38-3 (hex row): a hex digit covering an unknown bit is reported
-// as x, or as z when the whole nibble is z. High nibble is all z (a=F,b=F),
+// as x, or as z when the whole nibble is z. High nibble is all z (a=0,b=F),
 // low nibble carries a single unknown bit and so reports x.
 TEST_F(VpiGetValueSim, GetValueHexStrFormatUnknownBits) {
   auto* var = sim_ctx_.CreateVariable("hxz", 8);
-  var->value = MakeLogic4VecVal(arena_, 8, 0xF0);
+  var->value = MakeLogic4VecVal(arena_, 8, 0x00);
   var->value.words[0].bval = 0xF1;
   vpi_ctx_.Attach(sim_ctx_);
 
@@ -200,8 +200,8 @@ TEST_F(VpiGetValueSim, GetValueOctStrFormat) {
 // low group is driven all-z (a=1,b=1), so it must render as 'z'.
 TEST_F(VpiGetValueSim, GetValueOctStrFormatUnknownBits) {
   auto* var = sim_ctx_.CreateVariable("ocz", 6);
-  var->value = MakeLogic4VecVal(arena_, 6, 0b111111);
-  var->value.words[0].bval = 0b000111;  // low octal digit is all z (a=1,b=1)
+  var->value = MakeLogic4VecVal(arena_, 6, 0b111000);
+  var->value.words[0].bval = 0b000111;  // low octal digit is all z (a=0,b=1)
   vpi_ctx_.Attach(sim_ctx_);
 
   vpiHandle h = vpi_handle_by_name("ocz", nullptr);
@@ -321,13 +321,13 @@ TEST_F(VpiGetValueSim, GetValueVectorFormatSingleWordBoundary) {
   EXPECT_EQ(val.value.vector[0].bval, 0u);
 }
 
-// §38.15, Table 38-3 (vpiVectorVal row): unknown bits use the ab encoding
-// 11=X, 01=Z, which is not the same bit pattern as the internal four-state
-// word. A z bit (internal a=1,b=1) must encode as vecval a=0,b=1.
+// §38.15, Table 38-3 (vpiVectorVal row) / Figure 38-8: unknown bits use the ab
+// encoding 11=X, 01=Z, which now matches the internal four-state word, so the
+// returned value is a direct copy. A z bit is internal a=0,b=1.
 TEST_F(VpiGetValueSim, GetValueVectorFormatEncodesUnknownBits) {
   auto* var = sim_ctx_.CreateVariable("vz", 4);
-  var->value = MakeLogic4VecVal(arena_, 4, 0b1111);
-  var->value.words[0].bval = 0b0100;  // bit 2 is z (a=1,b=1)
+  var->value = MakeLogic4VecVal(arena_, 4, 0b1011);
+  var->value.words[0].bval = 0b0100;  // bit 2 is z (a=0,b=1)
   vpi_ctx_.Attach(sim_ctx_);
 
   vpiHandle h = vpi_handle_by_name("vz", nullptr);

@@ -19,7 +19,7 @@ Net MakeChargedTrireg(Arena& arena, uint64_t held, uint32_t width) {
   net.resolved = var;
   auto z = MakeLogic4Vec(arena, width);
   for (uint32_t w = 0; w < z.nwords; ++w) {
-    z.words[w] = {~uint64_t{0}, ~uint64_t{0}};
+    z.words[w] = {uint64_t{0}, ~uint64_t{0}};  // z = (aval=0, bval=1)
   }
   net.drivers.push_back(z);
   return net;
@@ -55,13 +55,14 @@ TEST(TriregChargeStrength, UnknownHeldValueDrivesBothSidesAtChargeStrength) {
   Arena arena;
   auto* var = arena.Create<Variable>();
   var->value = MakeLogic4Vec(arena, 1);
-  var->value.words[0] = {0, 1};  // x on the low bit: aval clear, bval set
+  var->value.words[0] = {1, 1};  // x on the low bit: aval set, bval set
   Net net;
   net.type = NetType::kTrireg;
   net.charge_strength = Strength::kLarge;
   net.resolved = var;
   auto z = MakeLogic4Vec(arena, 1);
-  z.words[0] = {~uint64_t{0}, ~uint64_t{0}};  // sole driver at high impedance
+  z.words[0] = {uint64_t{0},
+                ~uint64_t{0}};  // sole driver at high impedance (z)
   net.drivers.push_back(z);
   net.Resolve(arena);
   EXPECT_EQ(net.resolved_strength.s0_hi, Strength::kLarge);

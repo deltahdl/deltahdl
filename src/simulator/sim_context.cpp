@@ -113,7 +113,10 @@ Variable* SimContext::CreateVariable(std::string_view name, uint32_t width) {
   auto* var = arena_.Create<Variable>();
   var->value = MakeLogic4Vec(arena_, width);
 
+  // §6.4: an uninitialized 4-state variable defaults to x. Canonical
+  // Convention A encodes x as (aval=1, bval=1) per bit.
   for (uint32_t i = 0; i < var->value.nwords; ++i) {
+    var->value.words[i].aval = ~uint64_t{0};
     var->value.words[i].bval = ~uint64_t{0};
   }
   variables_[name] = var;
@@ -167,15 +170,15 @@ namespace {
 void InitNetDefaultValue(Variable* var, NetType type, bool is_user_nettype) {
   if (is_user_nettype) {
   } else if (type == NetType::kTrireg) {
-    // Encode x as aval=0, bval=1 per bit.
+    // Canonical Convention A: x = (aval=1, bval=1) per bit.
     for (uint32_t i = 0; i < var->value.nwords; ++i) {
-      var->value.words[i].aval = uint64_t{0};
+      var->value.words[i].aval = ~uint64_t{0};
       var->value.words[i].bval = ~uint64_t{0};
     }
   } else {
-    // z (high impedance) until driven.
+    // z (high impedance) until driven; Convention A z = (aval=0, bval=1).
     for (uint32_t i = 0; i < var->value.nwords; ++i) {
-      var->value.words[i].aval = ~uint64_t{0};
+      var->value.words[i].aval = uint64_t{0};
       var->value.words[i].bval = ~uint64_t{0};
     }
   }

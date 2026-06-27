@@ -14,7 +14,7 @@ namespace {
 Logic4Vec MakeAllZ(Arena& arena, uint32_t width) {
   auto vec = MakeLogic4Vec(arena, width);
   for (uint32_t w = 0; w < vec.nwords; ++w) {
-    vec.words[w].aval = ~uint64_t{0};
+    vec.words[w].aval = 0;  // canonical Convention A: z = (aval=0, bval=1)
     vec.words[w].bval = ~uint64_t{0};
   }
   return vec;
@@ -23,7 +23,7 @@ Logic4Vec MakeAllZ(Arena& arena, uint32_t width) {
 Logic4Vec MakeAllX(Arena& arena, uint32_t width) {
   auto vec = MakeLogic4Vec(arena, width);
   for (uint32_t w = 0; w < vec.nwords; ++w) {
-    vec.words[w].aval = 0;
+    vec.words[w].aval = ~uint64_t{0};  // canonical Convention A: x = (1, 1)
     vec.words[w].bval = ~uint64_t{0};
   }
   return vec;
@@ -31,7 +31,7 @@ Logic4Vec MakeAllX(Arena& arena, uint32_t width) {
 
 bool AllBitsX(const Logic4Vec& v) {
   for (uint32_t w = 0; w < v.nwords; ++w) {
-    if (v.words[w].aval != 0) return false;
+    if (v.words[w].aval != ~uint64_t{0}) return false;  // x = (aval=1, bval=1)
     if (v.words[w].bval != ~uint64_t{0}) return false;
   }
   return true;
@@ -67,7 +67,7 @@ TEST(ChargeDecayProcess, StoredOneTransitionsToXAfterDelay) {
   ASSERT_TRUE(sched.HasEvents());
   sched.Run();
 
-  EXPECT_EQ(var->value.words[0].aval & 0xFF, 0u);
+  EXPECT_EQ(var->value.words[0].aval & 0xFF, 0xFFu);  // decayed to x = (1, 1)
   EXPECT_EQ(var->value.words[0].bval & 0xFF, 0xFFu);
 }
 
@@ -112,7 +112,7 @@ TEST(ChargeDecayProcess, DecayFiresOnlyAfterChargeDecayTimeElapses) {
   sched.Run();
 
   // Only once the delay has elapsed do the known bits decay to x.
-  EXPECT_EQ(var->value.words[0].aval & 0xFF, 0u);
+  EXPECT_EQ(var->value.words[0].aval & 0xFF, 0xFFu);  // decayed to x = (1, 1)
   EXPECT_EQ(var->value.words[0].bval & 0xFF, 0xFFu);
 }
 
@@ -230,7 +230,8 @@ TEST(ChargeDecayProcess, OnlyKnownBitsTransitionToX) {
   ASSERT_TRUE(sched.HasEvents());
   sched.Run();
 
-  EXPECT_EQ(var->value.words[0].aval & 0xFF, 0b01000100u);
+  // Known bits decay to x = (aval=1, bval=1); unknown bits keep their aval.
+  EXPECT_EQ(var->value.words[0].aval & 0xFF, 0b01110111u);
   EXPECT_EQ(var->value.words[0].bval & 0xFF, 0xFFu);
 }
 

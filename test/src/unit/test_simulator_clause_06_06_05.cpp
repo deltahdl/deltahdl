@@ -36,20 +36,20 @@ TEST(Tri0Tri1Resolution, Tri0_0_0) {
 TEST(Tri0Tri1Resolution, Tri0_0_1) {
   Arena arena;
   auto r = ResolveTwoBit(arena, NetType::kTri0, {0, 0}, {1, 0});
-  EXPECT_EQ(r.aval, 0u);
+  EXPECT_EQ(r.aval, 1u);
   EXPECT_EQ(r.bval, 1u);
 }
 
 TEST(Tri0Tri1Resolution, Tri0_0_x) {
   Arena arena;
-  auto r = ResolveTwoBit(arena, NetType::kTri0, {0, 0}, {0, 1});
-  EXPECT_EQ(r.aval, 0u);
+  auto r = ResolveTwoBit(arena, NetType::kTri0, {0, 0}, {1, 1});
+  EXPECT_EQ(r.aval, 1u);
   EXPECT_EQ(r.bval, 1u);
 }
 
 TEST(Tri0Tri1Resolution, Tri0_0_z) {
   Arena arena;
-  auto r = ResolveTwoBit(arena, NetType::kTri0, {0, 0}, {1, 1});
+  auto r = ResolveTwoBit(arena, NetType::kTri0, {0, 0}, {0, 1});
   EXPECT_EQ(r.aval, 0u);
   EXPECT_EQ(r.bval, 0u);
 }
@@ -57,7 +57,7 @@ TEST(Tri0Tri1Resolution, Tri0_0_z) {
 TEST(Tri0Tri1Resolution, Tri0_1_0) {
   Arena arena;
   auto r = ResolveTwoBit(arena, NetType::kTri0, {1, 0}, {0, 0});
-  EXPECT_EQ(r.aval, 0u);
+  EXPECT_EQ(r.aval, 1u);
   EXPECT_EQ(r.bval, 1u);
 }
 
@@ -70,70 +70,70 @@ TEST(Tri0Tri1Resolution, Tri0_1_1) {
 
 TEST(Tri0Tri1Resolution, Tri0_1_x) {
   Arena arena;
-  auto r = ResolveTwoBit(arena, NetType::kTri0, {1, 0}, {0, 1});
-  EXPECT_EQ(r.aval, 0u);
+  auto r = ResolveTwoBit(arena, NetType::kTri0, {1, 0}, {1, 1});
+  EXPECT_EQ(r.aval, 1u);
   EXPECT_EQ(r.bval, 1u);
 }
 
 TEST(Tri0Tri1Resolution, Tri0_1_z) {
   Arena arena;
-  auto r = ResolveTwoBit(arena, NetType::kTri0, {1, 0}, {1, 1});
+  auto r = ResolveTwoBit(arena, NetType::kTri0, {1, 0}, {0, 1});
   EXPECT_EQ(r.aval, 1u);
   EXPECT_EQ(r.bval, 0u);
 }
 
 TEST(Tri0Tri1Resolution, Tri0_x_0) {
   Arena arena;
-  auto r = ResolveTwoBit(arena, NetType::kTri0, {0, 1}, {0, 0});
-  EXPECT_EQ(r.aval, 0u);
+  auto r = ResolveTwoBit(arena, NetType::kTri0, {1, 1}, {0, 0});
+  EXPECT_EQ(r.aval, 1u);
   EXPECT_EQ(r.bval, 1u);
 }
 
 TEST(Tri0Tri1Resolution, Tri0_x_1) {
   Arena arena;
-  auto r = ResolveTwoBit(arena, NetType::kTri0, {0, 1}, {1, 0});
-  EXPECT_EQ(r.aval, 0u);
+  auto r = ResolveTwoBit(arena, NetType::kTri0, {1, 1}, {1, 0});
+  EXPECT_EQ(r.aval, 1u);
   EXPECT_EQ(r.bval, 1u);
 }
 
 TEST(Tri0Tri1Resolution, Tri0_x_x) {
   Arena arena;
-  auto r = ResolveTwoBit(arena, NetType::kTri0, {0, 1}, {0, 1});
-  EXPECT_EQ(r.aval, 0u);
+  auto r = ResolveTwoBit(arena, NetType::kTri0, {1, 1}, {1, 1});
+  EXPECT_EQ(r.aval, 1u);
   EXPECT_EQ(r.bval, 1u);
 }
 
 TEST(Tri0Tri1Resolution, Tri0_x_z) {
   Arena arena;
-  auto r = ResolveTwoBit(arena, NetType::kTri0, {0, 1}, {1, 1});
-  EXPECT_EQ(r.aval, 0u);
+  auto r = ResolveTwoBit(arena, NetType::kTri0, {1, 1}, {0, 1});
+  EXPECT_EQ(r.aval, 1u);
   EXPECT_EQ(r.bval, 1u);
 }
 
 TEST(Tri0Tri1Resolution, Tri0_z_0) {
   Arena arena;
-  auto r = ResolveTwoBit(arena, NetType::kTri0, {1, 1}, {0, 0});
+  auto r = ResolveTwoBit(arena, NetType::kTri0, {0, 1}, {0, 0});
   EXPECT_EQ(r.aval, 0u);
   EXPECT_EQ(r.bval, 0u);
 }
 
 TEST(Tri0Tri1Resolution, Tri0_z_1) {
   Arena arena;
-  auto r = ResolveTwoBit(arena, NetType::kTri0, {1, 1}, {1, 0});
+  auto r = ResolveTwoBit(arena, NetType::kTri0, {0, 1}, {1, 0});
   EXPECT_EQ(r.aval, 1u);
   EXPECT_EQ(r.bval, 0u);
 }
 
 TEST(Tri0Tri1Resolution, Tri0_z_x) {
   Arena arena;
-  auto r = ResolveTwoBit(arena, NetType::kTri0, {1, 1}, {0, 1});
-  EXPECT_EQ(r.aval, 0u);
+  auto r = ResolveTwoBit(arena, NetType::kTri0, {0, 1}, {1, 1});
+  EXPECT_EQ(r.aval, 1u);
   EXPECT_EQ(r.bval, 1u);
 }
 
 TEST(Tri0Tri1Resolution, Tri0_z_z) {
   Arena arena;
-  auto r = ResolveTwoBit(arena, NetType::kTri0, {1, 1}, {1, 1});
+  auto r = ResolveTwoBit(arena, NetType::kTri0, {0, 1}, {0, 1});
   EXPECT_EQ(r.aval, 0u);
   EXPECT_EQ(r.bval, 0u);
 }
@@ -148,20 +148,20 @@ TEST(Tri0Tri1Resolution, Tri1_0_0) {
 TEST(Tri0Tri1Resolution, Tri1_0_1) {
   Arena arena;
   auto r = ResolveTwoBit(arena, NetType::kTri1, {0, 0}, {1, 0});
-  EXPECT_EQ(r.aval, 0u);
+  EXPECT_EQ(r.aval, 1u);
   EXPECT_EQ(r.bval, 1u);
 }
 
 TEST(Tri0Tri1Resolution, Tri1_0_x) {
   Arena arena;
-  auto r = ResolveTwoBit(arena, NetType::kTri1, {0, 0}, {0, 1});
-  EXPECT_EQ(r.aval, 0u);
+  auto r = ResolveTwoBit(arena, NetType::kTri1, {0, 0}, {1, 1});
+  EXPECT_EQ(r.aval, 1u);
   EXPECT_EQ(r.bval, 1u);
 }
 
 TEST(Tri0Tri1Resolution, Tri1_0_z) {
   Arena arena;
-  auto r = ResolveTwoBit(arena, NetType::kTri1, {0, 0}, {1, 1});
+  auto r = ResolveTwoBit(arena, NetType::kTri1, {0, 0}, {0, 1});
   EXPECT_EQ(r.aval, 0u);
   EXPECT_EQ(r.bval, 0u);
 }
@@ -169,7 +169,7 @@ TEST(Tri0Tri1Resolution, Tri1_0_z) {
 TEST(Tri0Tri1Resolution, Tri1_1_0) {
   Arena arena;
   auto r = ResolveTwoBit(arena, NetType::kTri1, {1, 0}, {0, 0});
-  EXPECT_EQ(r.aval, 0u);
+  EXPECT_EQ(r.aval, 1u);
   EXPECT_EQ(r.bval, 1u);
 }
 
@@ -182,70 +182,70 @@ TEST(Tri0Tri1Resolution, Tri1_1_1) {
 
 TEST(Tri0Tri1Resolution, Tri1_1_x) {
   Arena arena;
-  auto r = ResolveTwoBit(arena, NetType::kTri1, {1, 0}, {0, 1});
-  EXPECT_EQ(r.aval, 0u);
+  auto r = ResolveTwoBit(arena, NetType::kTri1, {1, 0}, {1, 1});
+  EXPECT_EQ(r.aval, 1u);
   EXPECT_EQ(r.bval, 1u);
 }
 
 TEST(Tri0Tri1Resolution, Tri1_1_z) {
   Arena arena;
-  auto r = ResolveTwoBit(arena, NetType::kTri1, {1, 0}, {1, 1});
+  auto r = ResolveTwoBit(arena, NetType::kTri1, {1, 0}, {0, 1});
   EXPECT_EQ(r.aval, 1u);
   EXPECT_EQ(r.bval, 0u);
 }
 
 TEST(Tri0Tri1Resolution, Tri1_x_0) {
   Arena arena;
-  auto r = ResolveTwoBit(arena, NetType::kTri1, {0, 1}, {0, 0});
-  EXPECT_EQ(r.aval, 0u);
+  auto r = ResolveTwoBit(arena, NetType::kTri1, {1, 1}, {0, 0});
+  EXPECT_EQ(r.aval, 1u);
   EXPECT_EQ(r.bval, 1u);
 }
 
 TEST(Tri0Tri1Resolution, Tri1_x_1) {
   Arena arena;
-  auto r = ResolveTwoBit(arena, NetType::kTri1, {0, 1}, {1, 0});
-  EXPECT_EQ(r.aval, 0u);
+  auto r = ResolveTwoBit(arena, NetType::kTri1, {1, 1}, {1, 0});
+  EXPECT_EQ(r.aval, 1u);
   EXPECT_EQ(r.bval, 1u);
 }
 
 TEST(Tri0Tri1Resolution, Tri1_x_x) {
   Arena arena;
-  auto r = ResolveTwoBit(arena, NetType::kTri1, {0, 1}, {0, 1});
-  EXPECT_EQ(r.aval, 0u);
+  auto r = ResolveTwoBit(arena, NetType::kTri1, {1, 1}, {1, 1});
+  EXPECT_EQ(r.aval, 1u);
   EXPECT_EQ(r.bval, 1u);
 }
 
 TEST(Tri0Tri1Resolution, Tri1_x_z) {
   Arena arena;
-  auto r = ResolveTwoBit(arena, NetType::kTri1, {0, 1}, {1, 1});
-  EXPECT_EQ(r.aval, 0u);
+  auto r = ResolveTwoBit(arena, NetType::kTri1, {1, 1}, {0, 1});
+  EXPECT_EQ(r.aval, 1u);
   EXPECT_EQ(r.bval, 1u);
 }
 
 TEST(Tri0Tri1Resolution, Tri1_z_0) {
   Arena arena;
-  auto r = ResolveTwoBit(arena, NetType::kTri1, {1, 1}, {0, 0});
+  auto r = ResolveTwoBit(arena, NetType::kTri1, {0, 1}, {0, 0});
   EXPECT_EQ(r.aval, 0u);
   EXPECT_EQ(r.bval, 0u);
 }
 
 TEST(Tri0Tri1Resolution, Tri1_z_1) {
   Arena arena;
-  auto r = ResolveTwoBit(arena, NetType::kTri1, {1, 1}, {1, 0});
+  auto r = ResolveTwoBit(arena, NetType::kTri1, {0, 1}, {1, 0});
   EXPECT_EQ(r.aval, 1u);
   EXPECT_EQ(r.bval, 0u);
 }
 
 TEST(Tri0Tri1Resolution, Tri1_z_x) {
   Arena arena;
-  auto r = ResolveTwoBit(arena, NetType::kTri1, {1, 1}, {0, 1});
-  EXPECT_EQ(r.aval, 0u);
+  auto r = ResolveTwoBit(arena, NetType::kTri1, {0, 1}, {1, 1});
+  EXPECT_EQ(r.aval, 1u);
   EXPECT_EQ(r.bval, 1u);
 }
 
 TEST(Tri0Tri1Resolution, Tri1_z_z) {
   Arena arena;
-  auto r = ResolveTwoBit(arena, NetType::kTri1, {1, 1}, {1, 1});
+  auto r = ResolveTwoBit(arena, NetType::kTri1, {0, 1}, {0, 1});
   EXPECT_EQ(r.aval, 1u);
   EXPECT_EQ(r.bval, 0u);
 }
@@ -322,7 +322,8 @@ TEST(Tri0Tri1Resolution, Tri0PullsOnlyResidualZBitsLowAcrossVector) {
   net.resolved = var;
   // Bits 0-3 drive 1,0,1,0; bits 4-7 are z (aval&bval both set).
   auto drv = MakeLogic4Vec(arena, 8);
-  drv.words[0] = {0xF5, 0xF0};
+  drv.words[0] = {0x05,
+                  0xF0};  // low nibble driven; high nibble z=(aval0,bval1)
   net.drivers.push_back(drv);
   net.Resolve(arena);
   // Driven bits pass through unchanged; floating bits pull down to 0.
@@ -341,7 +342,8 @@ TEST(Tri0Tri1Resolution, Tri1PullsOnlyResidualZBitsHighAcrossVector) {
   net.resolved = var;
   // Bits 0-3 drive 1,0,1,0; bits 4-7 are z.
   auto drv = MakeLogic4Vec(arena, 8);
-  drv.words[0] = {0xF5, 0xF0};
+  drv.words[0] = {0x05,
+                  0xF0};  // low nibble driven; high nibble z=(aval0,bval1)
   net.drivers.push_back(drv);
   net.Resolve(arena);
   // Driven bits pass through unchanged; floating bits pull up to 1.

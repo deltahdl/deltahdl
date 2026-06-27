@@ -10,7 +10,8 @@ using namespace delta;
 static Logic4Vec MakeAllZ(Arena& arena, uint32_t width) {
   auto vec = MakeLogic4Vec(arena, width);
   for (uint32_t w = 0; w < vec.nwords; ++w) {
-    vec.words[w].aval = ~uint64_t{0};
+    vec.words[w].aval =
+        uint64_t{0};  // canonical Convention A: z = (aval=0, bval=1)
     vec.words[w].bval = ~uint64_t{0};
   }
   return vec;
@@ -56,8 +57,8 @@ TEST(ChargeDecay, IdealStatePreservesUnknownBits) {
   Arena arena;
   Scheduler sched(arena);
   auto* var = arena.Create<Variable>();
-  // Low nibble encodes, from bit 0 up: 0, 1, x, z (a mix of known and
-  // unknown bits); the high nibble is all known zeros.
+  // Low nibble encodes, from bit 0 up: 0, 1, z, x (a mix of known and
+  // unknown bits, Convention A); the high nibble is all known zeros.
   auto val = MakeLogic4Vec(arena, 8);
   val.words[0].aval = 0b1010;
   val.words[0].bval = 0b1100;

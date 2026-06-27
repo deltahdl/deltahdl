@@ -31,7 +31,7 @@ void PushDriver(Arena& arena, Net& net, uint64_t val, Strength strength,
 // Pushes a 1-bit X-valued driver with a uniform strength on both rails.
 void PushXDriver(Arena& arena, Net& net, Strength strength) {
   auto x_val = MakeLogic4Vec(arena, 1);
-  x_val.words[0].aval = 0;
+  x_val.words[0].aval = 1;  // canonical Convention A: x = (aval=1, bval=1)
   x_val.words[0].bval = 1;
   net.drivers.push_back(x_val);
   net.driver_strengths.push_back({strength, strength});
@@ -202,7 +202,7 @@ TEST(StrengthResolution, WandOneAndXResolvesToX) {
   PushXDriver(arena, net, Strength::kStrong);
   net.Resolve(arena);
 
-  EXPECT_EQ(var->value.words[0].aval, 0u);
+  EXPECT_EQ(var->value.words[0].aval, 1u);  // x = (aval=1, bval=1)
   EXPECT_EQ(var->value.words[0].bval, 1u);
 }
 
@@ -215,7 +215,7 @@ TEST(StrengthResolution, WorZeroOrXResolvesToX) {
   PushXDriver(arena, net, Strength::kStrong);
   net.Resolve(arena);
 
-  EXPECT_EQ(var->value.words[0].aval, 0u);
+  EXPECT_EQ(var->value.words[0].aval, 1u);  // x = (aval=1, bval=1)
   EXPECT_EQ(var->value.words[0].bval, 1u);
 }
 

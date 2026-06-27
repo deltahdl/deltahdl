@@ -113,7 +113,7 @@ TEST(BitwiseEval, BinaryXnorWithX) {
 
   auto* a = f.ctx.CreateVariable("za", 4);
   a->value = MakeLogic4Vec(f.arena, 4);
-  a->value.words[0].aval = 0b1000;
+  a->value.words[0].aval = 0b1100;  // bit2 = x = (aval=1, bval=1)
   a->value.words[0].bval = 0b0100;
 
   auto* b = f.ctx.CreateVariable("zb", 4);
@@ -123,7 +123,7 @@ TEST(BitwiseEval, BinaryXnorWithX) {
                           MakeId(f.arena, "za"), MakeId(f.arena, "zb"));
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.width, 4u);
-  EXPECT_EQ(result.words[0].aval, 0b1001u);
+  EXPECT_EQ(result.words[0].aval, 0b1101u);  // bit2 = x = (aval=1, bval=1)
   EXPECT_EQ(result.words[0].bval, 0b0100u);
 }
 
@@ -438,7 +438,7 @@ constexpr Logic4Word kFour[4] = {
 };
 constexpr Logic4Word kOut0 = {0, 0};
 constexpr Logic4Word kOut1 = {1, 0};
-constexpr Logic4Word kOutX = {0, 1};
+constexpr Logic4Word kOutX = {1, 1};  // canonical Convention A: x = (1, 1)
 
 TEST(BitwiseTruthTable, BinaryAndAllCells) {
   const Logic4Word kExpected[4][4] = {

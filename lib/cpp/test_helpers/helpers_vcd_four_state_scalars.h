@@ -13,7 +13,7 @@ using namespace delta;
 
 // Registers four 1-bit signals on `vcd`, one per logic state, in the order that
 // assigns identifier codes '!', '"', '#', '$':
-//   z0=(0,0)->0, o1=(1,0)->1, ux=(0,1)->x, hz=(1,1)->z.
+//   z0=(0,0)->0, o1=(1,0)->1, ux=(1,1)->x, hz=(0,1)->z (canonical, Fig 38-8).
 // Callers invoke this between WriteHeader and EndDefinitions, then dump values
 // and assert each state maps to its binary value character.
 inline void RegisterFourStateScalars(VcdWriter& vcd, Arena& arena) {
@@ -24,11 +24,11 @@ inline void RegisterFourStateScalars(VcdWriter& vcd, Arena& arena) {
   one->value = MakeScalar(arena, 1, 0);
   vcd.RegisterSignal("o1", 1, one);  // ident '"'
   auto* unknown = arena.Create<Variable>();
-  unknown->value = MakeScalar(arena, 0, 1);
-  vcd.RegisterSignal("ux", 1, unknown);  // ident '#'
+  unknown->value = MakeScalar(arena, 1, 1);  // x = (aval=1, bval=1)
+  vcd.RegisterSignal("ux", 1, unknown);      // ident '#'
   auto* highz = arena.Create<Variable>();
-  highz->value = MakeScalar(arena, 1, 1);
-  vcd.RegisterSignal("hz", 1, highz);  // ident '$'
+  highz->value = MakeScalar(arena, 0, 1);  // z = (aval=0, bval=1)
+  vcd.RegisterSignal("hz", 1, highz);      // ident '$'
 }
 
 // Writes the header, registers the four-state scalars, ends definitions, and

@@ -82,7 +82,7 @@ TEST(NettypeInitialization, MultiBitDefaultIsAllX) {
   nt.data_kind = NettypeDataKind::k4StateIntegral;
   InitializeUserDefinedNet(net, nt, arena);
 
-  EXPECT_EQ(var->value.words[0].aval & 0xFF, 0x00u);
+  EXPECT_EQ(var->value.words[0].aval & 0xFF, 0xFFu);  // x = (aval=1, bval=1)
   EXPECT_EQ(var->value.words[0].bval & 0xFF, 0xFFu);
 }
 
@@ -201,8 +201,8 @@ TEST(NettypeInitialization, StructMemberInitializersApplied) {
   // Initialized member: known value 0b1010.
   EXPECT_EQ(v.words[0].aval & 0xF, 0xAu);
   EXPECT_EQ(v.words[0].bval & 0xF, 0x0u);
-  // Uninitialized member: all x (aval 0, bval 1) across its bits.
-  EXPECT_EQ((v.words[0].aval >> 4) & 0xF, 0x0u);
+  // Uninitialized member: all x (aval 1, bval 1) across its bits.
+  EXPECT_EQ((v.words[0].aval >> 4) & 0xF, 0xFu);
   EXPECT_EQ((v.words[0].bval >> 4) & 0xF, 0xFu);
 }
 
@@ -261,8 +261,8 @@ TEST(NettypeInitialization, StructMemberInitAtNonZeroOffset) {
 
   Logic4Vec v = InitialStructNetValue(arena, 8, members);
 
-  // Lower member untouched: all x.
-  EXPECT_EQ(v.words[0].aval & 0xF, 0x0u);
+  // Lower member untouched: all x = (aval=1, bval=1).
+  EXPECT_EQ(v.words[0].aval & 0xF, 0xFu);
   EXPECT_EQ(v.words[0].bval & 0xF, 0xFu);
   // Upper member: known value 0b0101 placed at offset 4.
   EXPECT_EQ((v.words[0].aval >> 4) & 0xF, 0x5u);

@@ -79,7 +79,8 @@ TEST(BidirectionalSwitchNetwork, AllSixSourceElementsAreBidirectional) {
 TEST(BidirectionalSwitchNetwork, BuiltinNetXControlAmbiguousGivesX) {
   auto np = MakeNetPair(1);
   std::vector<BidirSwitchInst> sw;
-  sw.push_back({&np.a, &np.b, BidirSwitchKind::kTranif1, {0, 1}, false});
+  sw.push_back(
+      {&np.a, &np.b, BidirSwitchKind::kTranif1, {1, 1}, false});  // x ctrl
   ResolveBidirSwitchNetwork(sw, np.arena);
   EXPECT_EQ(ValOf(*np.vb), kValX);
 }
@@ -87,7 +88,8 @@ TEST(BidirectionalSwitchNetwork, BuiltinNetXControlAmbiguousGivesX) {
 TEST(BidirectionalSwitchNetwork, BuiltinNetZControlAmbiguousGivesX) {
   auto np = MakeNetPair(0);
   std::vector<BidirSwitchInst> sw;
-  sw.push_back({&np.a, &np.b, BidirSwitchKind::kTranif1, {1, 1}, false});
+  sw.push_back(
+      {&np.a, &np.b, BidirSwitchKind::kTranif1, {0, 1}, false});  // z ctrl
   ResolveBidirSwitchNetwork(sw, np.arena);
   EXPECT_EQ(ValOf(*np.vb), kValX);
 }
@@ -132,7 +134,8 @@ TEST(BidirectionalSwitchNetwork,
 TEST(BidirectionalSwitchNetwork, UserDefinedNetXControlIsOff) {
   auto np = MakeNetPair(1);
   std::vector<BidirSwitchInst> sw;
-  sw.push_back({&np.a, &np.b, BidirSwitchKind::kTranif1, {0, 1}, true});
+  sw.push_back(
+      {&np.a, &np.b, BidirSwitchKind::kTranif1, {1, 1}, true});  // x ctrl
   ResolveBidirSwitchNetwork(sw, np.arena);
   EXPECT_EQ(ValOf(*np.vb), kValZ);
 }
@@ -140,7 +143,8 @@ TEST(BidirectionalSwitchNetwork, UserDefinedNetXControlIsOff) {
 TEST(BidirectionalSwitchNetwork, UserDefinedNetZControlIsOff) {
   auto np = MakeNetPair(1);
   std::vector<BidirSwitchInst> sw;
-  sw.push_back({&np.a, &np.b, BidirSwitchKind::kTranif1, {1, 1}, true});
+  sw.push_back(
+      {&np.a, &np.b, BidirSwitchKind::kTranif1, {0, 1}, true});  // z ctrl
   ResolveBidirSwitchNetwork(sw, np.arena);
   EXPECT_EQ(ValOf(*np.vb), kValZ);
 }

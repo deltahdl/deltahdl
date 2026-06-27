@@ -25,7 +25,8 @@ Net MakeUndrivenNet(Arena& arena, NetType type, uint32_t width) {
 Logic4Vec MakeAllZ(Arena& arena, uint32_t width) {
   auto v = MakeLogic4Vec(arena, width);
   for (uint32_t w = 0; w < v.nwords; ++w) {
-    v.words[w].aval = ~uint64_t{0};
+    v.words[w].aval =
+        uint64_t{0};  // canonical Convention A: z = (aval=0, bval=1)
     v.words[w].bval = ~uint64_t{0};
   }
   return v;
@@ -99,8 +100,9 @@ TEST(Tri0Tri1NetStrengths, Tri0DrivenBitsOverridePulldownOnUndrivenBits) {
   Arena arena;
   Net net = MakeUndrivenNet(arena, NetType::kTri0, 8);
   auto driver = MakeLogic4Vec(arena, 8);
-  // Low nibble driven to 1 (aval set, bval clear); high nibble z (both set).
-  driver.words[0].aval = 0xFF;
+  // Low nibble driven to 1 (aval set, bval clear); high nibble z (aval clear,
+  // bval set) per Convention A.
+  driver.words[0].aval = 0x0F;
   driver.words[0].bval = 0xF0;
   net.drivers.push_back(driver);
   net.Resolve(arena);
@@ -113,8 +115,9 @@ TEST(Tri0Tri1NetStrengths, Tri1DrivenBitsOverridePullupOnUndrivenBits) {
   Arena arena;
   Net net = MakeUndrivenNet(arena, NetType::kTri1, 8);
   auto driver = MakeLogic4Vec(arena, 8);
-  // Low nibble driven to 0 (both clear); high nibble z (both set).
-  driver.words[0].aval = 0xF0;
+  // Low nibble driven to 0 (both clear); high nibble z (aval clear, bval set)
+  // per Convention A.
+  driver.words[0].aval = 0x00;
   driver.words[0].bval = 0xF0;
   net.drivers.push_back(driver);
   net.Resolve(arena);
