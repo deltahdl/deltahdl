@@ -129,8 +129,8 @@ static std::string FormatDecimal(const Logic4Vec& val) {
 enum class XZClass : std::uint8_t { kKnown, kAllX, kAllZ, kSomeX, kSomeZ };
 
 // Read the (aval, bval) pair of a single bit out of a 4-state vector. The
-// encoding matches Logic4Vec::ToString: bval clear is a known bit, bval set
-// with aval clear is x, and bval set with aval set is z.
+// encoding matches Logic4Vec::ToString (canonical, Figure 38-8): bval clear is
+// a known bit, bval set with aval set is x, and bval set with aval clear is z.
 static void ReadBit(const Logic4Vec& val, uint32_t i, bool& a, bool& b) {
   uint32_t w = i / 64;
   uint64_t mask = uint64_t{1} << (i % 64);
@@ -150,7 +150,7 @@ static XZClass ClassifyBits(const Logic4Vec& val, uint32_t lo, uint32_t hi) {
     ReadBit(val, i, a, b);
     if (!b)
       has_known = true;
-    else if (!a)
+    else if (a)
       has_x = true;
     else
       has_z = true;

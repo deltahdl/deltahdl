@@ -36,7 +36,7 @@ static void GetValueBinStr(VpiHandle obj, VpiValue* value,
     if (!b_bit) {
       result += (a_bit ? '1' : '0');
     } else {
-      result += (a_bit ? 'z' : 'x');
+      result += (a_bit ? 'x' : 'z');  // x=(1,1), z=(0,1)
     }
   }
   pool.push_back(std::move(result));
@@ -60,7 +60,7 @@ static void GetValueHexStr(VpiHandle obj, VpiValue* value,
     uint8_t a_nibble = (aval >> (i * 4)) & 0xF;
     uint8_t b_nibble = (bval >> (i * 4)) & 0xF;
     if (b_nibble != 0) {
-      result += (b_nibble == 0xF && a_nibble == 0xF) ? 'z' : 'x';
+      result += (b_nibble == 0xF && a_nibble == 0xF) ? 'x' : 'z';
     } else {
       result += HexDigitFromBits(a_nibble);
     }
@@ -82,8 +82,9 @@ static void GetValueOctStr(VpiHandle obj, VpiValue* value,
     uint8_t b_bits = (bval >> (i * 3)) & 0x7;
     if (b_bits != 0) {
       // §38.15, Table 38-3 (octal row): a digit covering any unknown bit is
-      // reported as z only when the whole group is z, otherwise as x.
-      result += (b_bits == 0x7 && a_bits == 0x7) ? 'z' : 'x';
+      // reported as x only when the whole group is x, otherwise as z. Under the
+      // canonical encoding (Figure 38-8) x=(1,1), so an all-x group is a=0x7.
+      result += (b_bits == 0x7 && a_bits == 0x7) ? 'x' : 'z';
     } else {
       result += static_cast<char>('0' + a_bits);
     }
@@ -94,7 +95,7 @@ static void GetValueOctStr(VpiHandle obj, VpiValue* value,
 
 static int ScalarFromBits(uint64_t aval, uint64_t bval) {
   if (!bval) return aval ? kVpi1 : kVpi0;
-  return aval ? kVpiZ : kVpiX;
+  return aval ? kVpiX : kVpiZ;  // x=(1,1), z=(0,1)
 }
 
 static void GetValueVector(VpiHandle obj, VpiValue* value,
@@ -118,10 +119,9 @@ static void GetValueVector(VpiHandle obj, VpiValue* value,
     auto a32 = static_cast<uint32_t>((aval >> shift) & 0xFFFFFFFFu);
     auto b32 = static_cast<uint32_t>((bval >> shift) & 0xFFFFFFFFu);
     // §38.15 / Figure 38-8: the returned encoding is ab 00=0, 10=1, 11=X,
-    // 01=Z. That assigns the aval bit of an unknown the opposite sense from
-    // the internal word (X is a=0/b=1, Z is a=1/b=1), so flip the aval bit of
-    // every unknown position by xoring in the bval bits.
-    vec[static_cast<size_t>(i)].aval = a32 ^ b32;
+    // 01=Z. The internal word now uses this same canonical encoding (X=a1/b1,
+    // Z=a0/b1), so the boundary value is a direct copy with no conversion.
+    vec[static_cast<size_t>(i)].aval = a32;
     vec[static_cast<size_t>(i)].bval = b32;
   }
   pool.push_back(std::move(vec));
@@ -452,7 +452,8 @@ static void PutValueWriteWord(VpiHandle obj, const VpiValue* value) {
     obj->var->value.words[0].bval = 0;
   } else if (value->format == kVpiScalarVal) {
     int s = value->value.scalar;
-    obj->var->value.words[0].aval = (s == kVpi1 || s == kVpiZ) ? 1 : 0;
+    // Canonical encoding: x=(aval=1,bval=1), z=(aval=0,bval=1).
+    obj->var->value.words[0].aval = (s == kVpi1 || s == kVpiX) ? 1 : 0;
     obj->var->value.words[0].bval = (s == kVpiX || s == kVpiZ) ? 1 : 0;
   }
 }

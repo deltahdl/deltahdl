@@ -8,10 +8,12 @@ using namespace delta;
 namespace {
 
 TEST(LogicValuesSim, FourBasicValuesEncodeDistinctly) {
+  // §6.3.1 canonical encoding (LRM Figure 38-8): 0=(0,0), 1=(1,0),
+  // x=(aval=1,bval=1), z=(aval=0,bval=1).
   Logic4Word v0{0, 0};
   Logic4Word v1{1, 0};
-  Logic4Word vx{0, 1};
-  Logic4Word vz{1, 1};
+  Logic4Word vx{1, 1};
+  Logic4Word vz{0, 1};
   EXPECT_TRUE(v0.IsZero());
   EXPECT_TRUE(v1.IsOne());
   EXPECT_TRUE(v0.IsKnown());
@@ -36,10 +38,10 @@ TEST(LogicValuesSim, UnknownAndHighZAreNeitherKnownNorTrue) {
   // a definite 0 or 1, so each is unknown and does not yield a true condition.
   Arena arena;
   auto vx = MakeLogic4Vec(arena, 1);
-  vx.words[0].bval = 1;  // x encodes as aval=0, bval=1
+  vx.words[0].aval = 1;
+  vx.words[0].bval = 1;  // x encodes as aval=1, bval=1
   auto vz = MakeLogic4Vec(arena, 1);
-  vz.words[0].aval = 1;
-  vz.words[0].bval = 1;  // z encodes as aval=1, bval=1
+  vz.words[0].bval = 1;  // z encodes as aval=0, bval=1
   EXPECT_FALSE(vx.IsKnown());
   EXPECT_FALSE(vz.IsKnown());
   EXPECT_FALSE(vx.IsTruthy());
@@ -61,8 +63,8 @@ TEST(LogicValuesSim, OneComplementsToZero) {
 }
 
 TEST(LogicValuesSim, ZBehavesLikeXUnderBitwiseNot) {
-  Logic4Word vz{1, 1};
-  Logic4Word vx{0, 1};
+  Logic4Word vz{0, 1};
+  Logic4Word vx{1, 1};
   auto rz = Logic4Not(vz);
   auto rx = Logic4Not(vx);
   EXPECT_EQ(rz.aval, rx.aval);
@@ -71,8 +73,8 @@ TEST(LogicValuesSim, ZBehavesLikeXUnderBitwiseNot) {
 
 TEST(LogicValuesSim, ZBehavesLikeXUnderBitwiseAndWithOne) {
   Logic4Word v1{1, 0};
-  Logic4Word vz{1, 1};
-  Logic4Word vx{0, 1};
+  Logic4Word vz{0, 1};
+  Logic4Word vx{1, 1};
   auto rz = Logic4And(vz, v1);
   auto rx = Logic4And(vx, v1);
   EXPECT_EQ(rz.aval & 1u, rx.aval & 1u);
@@ -82,7 +84,7 @@ TEST(LogicValuesSim, ZBehavesLikeXUnderBitwiseAndWithOne) {
 
 TEST(LogicValuesSim, ZAndZeroCollapsesToZero) {
   Logic4Word v0{0, 0};
-  Logic4Word vz{1, 1};
+  Logic4Word vz{0, 1};
   auto r = Logic4And(vz, v0);
   EXPECT_EQ(r.aval & 1u, 0u);
   EXPECT_EQ(r.bval & 1u, 0u);
@@ -90,8 +92,8 @@ TEST(LogicValuesSim, ZAndZeroCollapsesToZero) {
 
 TEST(LogicValuesSim, ZBehavesLikeXUnderBitwiseOrWithZero) {
   Logic4Word v0{0, 0};
-  Logic4Word vz{1, 1};
-  Logic4Word vx{0, 1};
+  Logic4Word vz{0, 1};
+  Logic4Word vx{1, 1};
   auto rz = Logic4Or(vz, v0);
   auto rx = Logic4Or(vx, v0);
   EXPECT_EQ(rz.aval & 1u, rx.aval & 1u);
@@ -101,7 +103,7 @@ TEST(LogicValuesSim, ZBehavesLikeXUnderBitwiseOrWithZero) {
 
 TEST(LogicValuesSim, ZOrOneCollapsesToOne) {
   Logic4Word v1{1, 0};
-  Logic4Word vz{1, 1};
+  Logic4Word vz{0, 1};
   auto r = Logic4Or(vz, v1);
   EXPECT_EQ(r.aval & 1u, 1u);
   EXPECT_EQ(r.bval & 1u, 0u);
@@ -109,8 +111,8 @@ TEST(LogicValuesSim, ZOrOneCollapsesToOne) {
 
 TEST(LogicValuesSim, ZBehavesLikeXUnderBitwiseXor) {
   Logic4Word v1{1, 0};
-  Logic4Word vz{1, 1};
-  Logic4Word vx{0, 1};
+  Logic4Word vz{0, 1};
+  Logic4Word vx{1, 1};
   auto rz = Logic4Xor(vz, v1);
   auto rx = Logic4Xor(vx, v1);
   EXPECT_EQ(rz.aval & 1u, rx.aval & 1u);
@@ -128,7 +130,9 @@ TEST(LogicValuesSim, FourStateVectorBitsAreIndependentlySettable) {
 
   vec.words[0].aval |= (uint64_t{1} << 3);
   vec.words[0].bval |= (uint64_t{1} << 3);
-  EXPECT_EQ(vec.ToString(), "zx10");
+  // bit3=(1,1)=x, bit2=(0,1)=z, bit1=(1,0)=1, bit0=(0,0)=0 (canonical
+  // encoding).
+  EXPECT_EQ(vec.ToString(), "xz10");
 }
 
 }  // namespace

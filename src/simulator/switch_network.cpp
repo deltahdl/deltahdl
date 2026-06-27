@@ -10,7 +10,7 @@ namespace delta {
 namespace {
 
 bool IsZWord(const Logic4Word& w) {
-  return (w.aval & 1) != 0 && (w.bval & 1) != 0;
+  return (w.aval & 1) == 0 && (w.bval & 1) != 0;  // z = (aval=0, bval=1)
 }
 
 Logic4Vec PrimaryDriver(const Net& net, const Variable& var) {
@@ -30,10 +30,11 @@ void ResolveAmbiguousTerminal(Variable& terminal_var, const Logic4Vec& term_drv,
   uint8_t o_b = other_drv.words[0].bval & 1;
   uint8_t on_a = term_is_driven ? t_a : (other_is_driven ? o_a : t_a);
   uint8_t on_b = term_is_driven ? t_b : (other_is_driven ? o_b : t_b);
-  uint8_t off_a = term_is_driven ? t_a : 1;
+  // Undriven "off" state is high-impedance z = (aval=0, bval=1).
+  uint8_t off_a = term_is_driven ? t_a : 0;
   uint8_t off_b = term_is_driven ? t_b : 1;
   if ((on_a != off_a || on_b != off_b) && !term_is_driven) {
-    terminal_var.value.words[0].aval = 0;
+    terminal_var.value.words[0].aval = 1;  // ambiguous -> x = (aval=1, bval=1)
     terminal_var.value.words[0].bval = 1;
   }
 }

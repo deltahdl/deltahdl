@@ -222,10 +222,10 @@ void VcdWriter::WriteScalarChange(const VcdSignal& sig) {
   char val = '0';
   if (!bval && aval) {
     val = '1';
-  } else if (bval && !aval) {
-    val = 'x';
   } else if (bval && aval) {
-    val = 'z';
+    val = 'x';  // x = (aval=1, bval=1)
+  } else if (bval && !aval) {
+    val = 'z';  // z = (aval=0, bval=1)
   }
   ofs_ << val << sig.ident << "\n";
 }
@@ -235,8 +235,8 @@ void VcdWriter::WriteScalarChange(const VcdSignal& sig) {
 static char LogicBitToChar(bool aval, bool bval) {
   if (!bval && !aval) return '0';
   if (!bval && aval) return '1';
-  if (bval && !aval) return 'x';
-  return 'z';
+  if (bval && aval) return 'x';  // x = (aval=1, bval=1)
+  return 'z';                    // z = (aval=0, bval=1)
 }
 
 // Table 21-8: a shortened vector value is reconstructed by left-extending it

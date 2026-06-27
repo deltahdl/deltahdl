@@ -175,7 +175,7 @@ static bool BitIsZ(const Logic4Vec& v, uint32_t bit) {
   if (wi >= v.nwords) return false;
   bool a = (v.words[wi].aval >> bi) & 1;
   bool b = (v.words[wi].bval >> bi) & 1;
-  return a && b;
+  return !a && b;  // z = (aval=0, bval=1)
 }
 
 static bool BitIsXZ(const Logic4Vec& v, uint32_t bit) {

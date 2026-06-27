@@ -103,29 +103,33 @@ NetStrength CombineWiredLogicAmbiguous(NetStrength a, NetStrength b,
   return r;
 }
 
+// Net resolution under the canonical 4-state encoding (LRM Figure 38-8):
+// z=(aval=0,bval=1), x=(aval=1,bval=1). A z bit is detected as ~aval & bval and
+// an x bit as aval & bval. A z result contributes only to res_bval (its aval is
+// 0); an x result sets both res_aval and res_bval.
 Logic4Word ResolveWireWord(Logic4Word a, Logic4Word b) {
-  uint64_t a_z = a.aval & a.bval;
-  uint64_t b_z = b.aval & b.bval;
+  uint64_t a_z = ~a.aval & a.bval;
+  uint64_t b_z = ~b.aval & b.bval;
   uint64_t both_z = a_z & b_z;
   uint64_t a_only_z = a_z & ~b_z;
   uint64_t b_only_z = b_z & ~a_z;
   uint64_t neither_z = ~a_z & ~b_z;
 
-  uint64_t a_x = ~a.aval & a.bval;
-  uint64_t b_x = ~b.aval & b.bval;
+  uint64_t a_x = a.aval & a.bval;
+  uint64_t b_x = b.aval & b.bval;
   uint64_t conflict = ~a.bval & ~b.bval & (a.aval ^ b.aval);
   uint64_t unknown = (a_x | b_x | conflict) & neither_z;
 
-  uint64_t res_aval = both_z | (b.aval & a_only_z) | (a.aval & b_only_z) |
-                      (a.aval & neither_z & ~unknown);
+  uint64_t res_aval = (b.aval & a_only_z) | (a.aval & b_only_z) |
+                      (a.aval & neither_z & ~unknown) | unknown;
   uint64_t res_bval =
       both_z | (b.bval & a_only_z) | (a.bval & b_only_z) | unknown;
   return {res_aval, res_bval};
 }
 
 Logic4Word ResolveWandWord(Logic4Word a, Logic4Word b) {
-  uint64_t a_z = a.aval & a.bval;
-  uint64_t b_z = b.aval & b.bval;
+  uint64_t a_z = ~a.aval & a.bval;
+  uint64_t b_z = ~b.aval & b.bval;
   uint64_t both_z = a_z & b_z;
   uint64_t a_only_z = a_z & ~b_z;
   uint64_t b_only_z = b_z & ~a_z;
@@ -134,21 +138,21 @@ Logic4Word ResolveWandWord(Logic4Word a, Logic4Word b) {
   uint64_t a_0 = ~a.aval & ~a.bval;
   uint64_t b_0 = ~b.aval & ~b.bval;
   uint64_t either_0 = (a_0 | b_0) & neither_z;
-  uint64_t a_x = ~a.aval & a.bval;
-  uint64_t b_x = ~b.aval & b.bval;
+  uint64_t a_x = a.aval & a.bval;
+  uint64_t b_x = b.aval & b.bval;
   uint64_t either_x = (a_x | b_x) & neither_z & ~either_0;
   uint64_t both_1 = a.aval & ~a.bval & b.aval & ~b.bval & neither_z;
 
   uint64_t res_aval =
-      both_z | (b.aval & a_only_z) | (a.aval & b_only_z) | both_1;
+      (b.aval & a_only_z) | (a.aval & b_only_z) | both_1 | either_x;
   uint64_t res_bval =
       both_z | (b.bval & a_only_z) | (a.bval & b_only_z) | either_x;
   return {res_aval, res_bval};
 }
 
 Logic4Word ResolveWorWord(Logic4Word a, Logic4Word b) {
-  uint64_t a_z = a.aval & a.bval;
-  uint64_t b_z = b.aval & b.bval;
+  uint64_t a_z = ~a.aval & a.bval;
+  uint64_t b_z = ~b.aval & b.bval;
   uint64_t both_z = a_z & b_z;
   uint64_t a_only_z = a_z & ~b_z;
   uint64_t b_only_z = b_z & ~a_z;
@@ -157,12 +161,12 @@ Logic4Word ResolveWorWord(Logic4Word a, Logic4Word b) {
   uint64_t a_1 = a.aval & ~a.bval;
   uint64_t b_1 = b.aval & ~b.bval;
   uint64_t either_1 = (a_1 | b_1) & neither_z;
-  uint64_t a_x = ~a.aval & a.bval;
-  uint64_t b_x = ~b.aval & b.bval;
+  uint64_t a_x = a.aval & a.bval;
+  uint64_t b_x = b.aval & b.bval;
   uint64_t either_x = (a_x | b_x) & neither_z & ~either_1;
 
   uint64_t res_aval =
-      both_z | (b.aval & a_only_z) | (a.aval & b_only_z) | either_1;
+      (b.aval & a_only_z) | (a.aval & b_only_z) | either_1 | either_x;
   uint64_t res_bval =
       both_z | (b.bval & a_only_z) | (a.bval & b_only_z) | either_x;
   return {res_aval, res_bval};
@@ -184,7 +188,7 @@ static Logic4Word ResolveWord(Logic4Word a, Logic4Word b, NetType type) {
 static void FixupTriPull(Logic4Vec& result, NetType type) {
   if (type != NetType::kTri0 && type != NetType::kTri1) return;
   for (uint32_t w = 0; w < result.nwords; ++w) {
-    uint64_t z_bits = result.words[w].aval & result.words[w].bval;
+    uint64_t z_bits = ~result.words[w].aval & result.words[w].bval;
     if (z_bits == 0) continue;
     result.words[w].bval &= ~z_bits;
     if (type == NetType::kTri1) {
@@ -207,8 +211,8 @@ static BitVal GetBitVal(const Logic4Vec& vec, uint32_t bit) {
   bool b = (vec.words[word].bval & mask) != 0;
   if (!b && !a) return {0};
   if (!b && a) return {1};
-  if (b && !a) return {2};
-  return {3};
+  if (b && a) return {2};  // x = (aval=1, bval=1)
+  return {3};              // z = (aval=0, bval=1)
 }
 
 static void SetBit(Logic4Vec& vec, uint32_t bit, uint8_t val) {
@@ -221,11 +225,11 @@ static void SetBit(Logic4Vec& vec, uint32_t bit, uint8_t val) {
   } else if (val == 1) {
     vec.words[word].aval |= mask;
     vec.words[word].bval &= ~mask;
-  } else if (val == 2) {
-    vec.words[word].aval &= ~mask;
-    vec.words[word].bval |= mask;
-  } else {
+  } else if (val == 2) {  // x = (aval=1, bval=1)
     vec.words[word].aval |= mask;
+    vec.words[word].bval |= mask;
+  } else {  // z = (aval=0, bval=1)
+    vec.words[word].aval &= ~mask;
     vec.words[word].bval |= mask;
   }
 }
@@ -400,10 +404,11 @@ static void ResolveStrengthBit(const std::vector<Logic4Vec>& drivers,
 }
 
 static bool AllDriversZ(const std::vector<Logic4Vec>& drivers) {
+  // z = (aval=0, bval=1): a word is all-z iff every bval bit is set and every
+  // aval bit is clear.
   for (const auto& drv : drivers) {
     for (uint32_t w = 0; w < drv.nwords; ++w) {
-      if (drv.words[w].bval != ~uint64_t{0} ||
-          drv.words[w].aval != ~uint64_t{0}) {
+      if (drv.words[w].bval != ~uint64_t{0} || drv.words[w].aval != 0) {
         return false;
       }
     }
@@ -413,14 +418,14 @@ static bool AllDriversZ(const std::vector<Logic4Vec>& drivers) {
 
 static void SetAllX(Logic4Vec& val) {
   for (uint32_t w = 0; w < val.nwords; ++w) {
-    val.words[w] = {0, ~uint64_t{0}};
+    val.words[w] = {~uint64_t{0}, ~uint64_t{0}};  // x = (aval=1, bval=1)
   }
 }
 
 static void DecayKnownBitsToX(Logic4Vec& val) {
   for (uint32_t w = 0; w < val.nwords; ++w) {
     uint64_t known = ~val.words[w].bval;
-    val.words[w].aval &= ~known;
+    val.words[w].aval |= known;  // decayed bit becomes x = (aval=1, bval=1)
     val.words[w].bval |= known;
   }
 }

@@ -7,13 +7,18 @@
 
 namespace delta {
 
+// 4-state encoding (LRM Figure 38-8 / §H.7.7, canonical): a known bit is
+// bval=0; an unknown bit is bval=1 with aval distinguishing x=(aval=1,bval=1)
+// from z=(aval=0,bval=1). Per §11.4.x, logic operators treat z as x, so every
+// unknown result bit is normalized to x by forcing its aval set (|
+// result_bval).
 Logic4Word Logic4And(Logic4Word a, Logic4Word b) {
   uint64_t a_known_0 = ~a.aval & ~a.bval;
   uint64_t b_known_0 = ~b.aval & ~b.bval;
   uint64_t result_aval = a.aval & b.aval;
   uint64_t any_known_0 = a_known_0 | b_known_0;
   uint64_t result_bval = (a.bval | b.bval) & ~any_known_0;
-  return {result_aval & ~result_bval, result_bval};
+  return {result_aval | result_bval, result_bval};
 }
 
 Logic4Word Logic4Or(Logic4Word a, Logic4Word b) {
@@ -22,16 +27,18 @@ Logic4Word Logic4Or(Logic4Word a, Logic4Word b) {
   uint64_t result_aval = a.aval | b.aval;
   uint64_t any_known_1 = a_known_1 | b_known_1;
   uint64_t result_bval = (a.bval | b.bval) & ~any_known_1;
-  return {result_aval & ~result_bval, result_bval};
+  return {result_aval | result_bval, result_bval};
 }
 
 Logic4Word Logic4Xor(Logic4Word a, Logic4Word b) {
   uint64_t unknown = a.bval | b.bval;
   uint64_t result_aval = a.aval ^ b.aval;
-  return {result_aval & ~unknown, unknown};
+  return {result_aval | unknown, unknown};
 }
 
-Logic4Word Logic4Not(Logic4Word a) { return {~a.aval & ~a.bval, a.bval}; }
+Logic4Word Logic4Not(Logic4Word a) {
+  return {(~a.aval & ~a.bval) | a.bval, a.bval};
+}
 
 bool Logic4Vec::IsKnown() const {
   for (uint32_t i = 0; i < nwords; ++i) {
@@ -71,7 +78,7 @@ std::string Logic4Vec::ToString() const {
       result += '0';
     } else if (!b && a) {
       result += '1';
-    } else if (b && !a) {
+    } else if (b && a) {
       result += 'x';
     } else {
       result += 'z';

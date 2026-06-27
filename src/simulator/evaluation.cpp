@@ -127,8 +127,11 @@ static Logic4Vec CombineBranches(Logic4Vec tv, Logic4Vec fv, Arena& arena) {
   for (uint32_t i = 0; i < result.nwords; ++i) {
     auto tw = (i < tv.nwords) ? tv.words[i] : Logic4Word{};
     auto fw = (i < fv.nwords) ? fv.words[i] : Logic4Word{};
-    result.words[i].aval = tw.aval & fw.aval;
+    // §11.4.11 Table 11-22: result is 0 iff both 0, 1 iff both 1, else x. Under
+    // the canonical encoding x=(aval=1,bval=1), so every unknown result bit
+    // sets aval as well as bval.
     result.words[i].bval = tw.bval | fw.bval | (tw.aval ^ fw.aval);
+    result.words[i].aval = (tw.aval & fw.aval) | result.words[i].bval;
   }
   if (tv.is_real || fv.is_real) result.is_real = true;
   return result;

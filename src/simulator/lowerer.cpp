@@ -186,7 +186,8 @@ static Logic4Vec ApplyHighzStrengthsToValue(const Logic4Vec& val,
     uint64_t to_z = 0;
     if (s0_is_z) to_z |= (~a & ~b) & mask;
     if (s1_is_z) to_z |= (a & ~b) & mask;
-    out.words[w].aval = a | to_z;
+    // A high-impedance bit is z = (aval=0, bval=1).
+    out.words[w].aval = a & ~to_z;
     out.words[w].bval = b | to_z;
   }
   return out;
