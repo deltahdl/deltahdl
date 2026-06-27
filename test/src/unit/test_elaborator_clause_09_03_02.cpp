@@ -103,6 +103,7 @@ TEST(ParallelBlockElaboration, ForkWithLocalparamElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
+      "  int a;\n"
       "  initial begin\n"
       "    fork\n"
       "      localparam int N = 4;\n"
@@ -119,6 +120,7 @@ TEST(ParallelBlockElaboration, ForkWithParameterElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
+      "  int a;\n"
       "  initial begin\n"
       "    fork\n"
       "      parameter int W = 8;\n"
