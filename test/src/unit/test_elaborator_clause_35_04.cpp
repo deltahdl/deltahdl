@@ -27,14 +27,21 @@ TEST(DpiGlobalNameElab, DuplicateDefaultExportLinkageInSameScopeIsError) {
 
 // §35.4: "Multiple export declarations are allowed with the same
 // c_identifier, explicit or implicit, as long as they are in different
-// scopes ..." — exporting the same name from two distinct modules is OK.
+// scopes ..." — exporting the same name from two distinct modules is OK,
+// provided the routines have equivalent type signatures. §35.7 additionally
+// requires each export to occur in the scope where the function is defined, so
+// both functions are defined here (with matching signatures).
 TEST(DpiGlobalNameElab, SameExportLinkageAcrossDifferentScopesIsOk) {
   ElabFixture f;
   Elaborate(R"(
     module m;
+      function int sv_a(input int x);
+      endfunction
       export "DPI-C" link = function sv_a;
     endmodule
     module n;
+      function int sv_b(input int x);
+      endfunction
       export "DPI-C" link = function sv_b;
     endmodule
   )",
@@ -105,7 +112,9 @@ TEST(DpiGlobalNameElab, ExportsSharingLinkageWithMatchingTaskSignaturesIsOk) {
 }
 
 // §35.4: matching version strings on import + export sharing a c_identifier
-// is the well-formed case. The elaborator must accept it.
+// is the well-formed case. The elaborator must accept it. Per §35.7 the
+// exported function is defined in its scope, with a signature equivalent to the
+// import sharing the linkage name.
 TEST(DpiGlobalNameElab, ImportExportSameLinkageSameVersionStringIsOk) {
   ElabFixture f;
   Elaborate(R"(
@@ -113,6 +122,8 @@ TEST(DpiGlobalNameElab, ImportExportSameLinkageSameVersionStringIsOk) {
       import "DPI-C" link = function int f(input int x);
     endmodule
     module n;
+      function int sv_g(input int x);
+      endfunction
       export "DPI-C" link = function sv_g;
     endmodule
   )",
