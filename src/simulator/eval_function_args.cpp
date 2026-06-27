@@ -389,6 +389,17 @@ static void ExecFuncIdentifierAssign(const Expr* lhs, const Logic4Vec& val,
     var->value = val;
     return;
   }
+  // §8.10: a static method writes a static property of the enclosing class by
+  // unqualified reference (mirrors the read path in EvalIdentifier). Static
+  // storage takes precedence over an instance property of the same name.
+  const ClassTypeInfo* method_cls = ctx.CurrentMethodClass();
+  if (method_cls) {
+    auto it = method_cls->static_properties.find(std::string(lhs->text));
+    if (it != method_cls->static_properties.end()) {
+      it->second = val;
+      return;
+    }
+  }
   auto* self = ctx.CurrentThis();
   if (self) WriteSelfProperty(self, lhs->text, val, ctx);
 }

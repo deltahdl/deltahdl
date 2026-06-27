@@ -256,13 +256,9 @@ static Logic4Vec EvalDpiCall(const Expr* expr, SimContext& ctx, Arena& arena) {
   return MakeLogic4VecVal(arena, 32, result);
 }
 
-struct ClassMethodTarget {
-  ModuleItem* method = nullptr;
-  const ClassTypeInfo* param_cls = nullptr;
-};
-
-static void ExecClassMethod(ClassMethodTarget target, const Expr* expr,
-                            SimContext& ctx, Arena& arena, Logic4Vec& out);
+// ClassMethodTarget and the ExecClassMethod prototype live in
+// eval_function_internal.h (so eval_static_method.cpp can run a method body
+// without a `this`); the definition is below.
 
 struct InstanceMethodInfo {
   ClassObject* obj = nullptr;
@@ -344,6 +340,11 @@ static bool TryEvalClassMethodCall(const Expr* expr, SimContext& ctx,
   if (!ExtractMethodCallParts(expr, parts)) return false;
   InstanceMethodInfo info;
   if (!ResolveInstanceMethod(parts, ctx, info)) return false;
+  // §8.10/§8.9: a static method invoked through an instance handle shares the
+  // class's single static storage; dispatch it in class scope (no `this`).
+  if (info.method->is_static)
+    return TryEvalStaticMethodThroughInstance(info.method, info.obj, expr, ctx,
+                                              arena, out);
   out = ExecInstanceMethodCall(info.method, info.obj, expr, ctx, arena);
   return true;
 }
@@ -409,8 +410,8 @@ static uint32_t ComputeMethodReturnWidth(ModuleItem* method, SimContext& ctx,
   return width == 0 ? 32 : width;
 }
 
-static void ExecClassMethod(ClassMethodTarget target, const Expr* expr,
-                            SimContext& ctx, Arena& arena, Logic4Vec& out) {
+void ExecClassMethod(ClassMethodTarget target, const Expr* expr,
+                     SimContext& ctx, Arena& arena, Logic4Vec& out) {
   ModuleItem* method = target.method;
   bool is_void = (method->return_type.kind == DataTypeKind::kVoid);
   BindFunctionArgs(method, expr, ctx, arena);
@@ -784,6 +785,9 @@ static bool TryDispatchMethodOrLet(const Expr* expr, SimContext& ctx,
   if (TryEvalProcessStaticCall(expr, ctx, arena, out)) return true;
   if (TryEvalClassScopeCall(expr, ctx, arena, out)) return true;
   if (TryEvalParameterizedScopeCall(expr, ctx, arena, out)) return true;
+  // §8.10: an unqualified call inside a static method resolves against the
+  // enclosing class's static methods before module-level functions.
+  if (TryEvalEnclosingStaticCall(expr, ctx, arena, out)) return true;
   auto* let_decl = ctx.FindLetDecl(expr->callee);
   if (let_decl) {
     out = EvalLetExpansion(let_decl, expr, ctx, arena);
