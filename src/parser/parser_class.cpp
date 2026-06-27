@@ -429,19 +429,15 @@ void Parser::ValidateConstructorQualifiers(ClassMember* member) {
 
 bool Parser::TryParseMethodOrConstraint(std::vector<ClassMember*>& members,
                                         ClassMember* member, bool proto) {
-  if (Check(TokenKind::kKwFunction)) {
+  bool is_func = Check(TokenKind::kKwFunction);
+  if (is_func || Check(TokenKind::kKwTask)) {
     member->kind = ClassMemberKind::kMethod;
-    member->method = ParseFunctionDecl(proto);
+    member->method = is_func ? ParseFunctionDecl(proto) : ParseTaskDecl(proto);
+    // Mirror the method name onto the ClassMember, like every other member kind
+    // (typedef/property/nested class); the name itself lives on member->method.
+    member->name = member->method->name;
     ValidateClassMethod(member);
-    ValidateConstructorQualifiers(member);
-    if (proto && !member->is_pure_virtual) member->method->is_extern = true;
-    members.push_back(member);
-    return true;
-  }
-  if (Check(TokenKind::kKwTask)) {
-    member->kind = ClassMemberKind::kMethod;
-    member->method = ParseTaskDecl(proto);
-    ValidateClassMethod(member);
+    if (is_func) ValidateConstructorQualifiers(member);
     if (proto && !member->is_pure_virtual) member->method->is_extern = true;
     members.push_back(member);
     return true;
