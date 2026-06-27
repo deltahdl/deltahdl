@@ -360,7 +360,18 @@ void Elaborator::WalkExprForUnsizedInConcat(const Expr* expr) {
   WalkExprForUnsizedInConcat(expr->condition);
   WalkExprForUnsizedInConcat(expr->true_expr);
   WalkExprForUnsizedInConcat(expr->false_expr);
-  for (auto* elem : expr->elements) WalkExprForUnsizedInConcat(elem);
+  for (auto* elem : expr->elements) {
+    // §11.4.12.1: the unsized-constant restriction is a packed-concatenation
+    // rule. A concatenation that is an item of an assignment pattern '{...} is
+    // an unpacked array concatenation (§10.10), where unsized constants are
+    // legal, so descend into it without applying the element check to it.
+    if (expr->kind == ExprKind::kAssignmentPattern &&
+        elem->kind == ExprKind::kConcatenation) {
+      for (auto* sub : elem->elements) WalkExprForUnsizedInConcat(sub);
+      continue;
+    }
+    WalkExprForUnsizedInConcat(elem);
+  }
   for (auto* arg : expr->args) WalkExprForUnsizedInConcat(arg);
 }
 
