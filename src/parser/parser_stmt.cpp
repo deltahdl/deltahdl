@@ -312,6 +312,8 @@ bool Parser::IsBlockVarDeclStart() {
   return result;
 }
 
+static bool IsCompoundAssignOp(TokenKind kind);
+
 bool Parser::IsBlockVarDeclStartCore() {
   auto tk = CurrentToken().kind;
   if (tk == TokenKind::kKwAutomatic || tk == TokenKind::kKwStatic) {
@@ -344,8 +346,31 @@ bool Parser::IsBlockVarDeclStartCore() {
     lexer_.RestorePos(saved);
     return is_decl;
   }
-  return Check(TokenKind::kIdentifier) &&
-         known_types_.count(CurrentToken().text) != 0;
+  if (!Check(TokenKind::kIdentifier) ||
+      known_types_.count(CurrentToken().text) == 0) {
+    return false;
+  }
+  // A leading known type name usually begins a declaration (`Type v;`,
+  // `pkg::Type v;`), but a scoped call or assignment is a statement, not a
+  // declaration (§8.10/§8.23).
+  return !IsScopedCallOrAssignStmt();
+}
+
+bool Parser::IsScopedCallOrAssignStmt() {
+  auto saved = lexer_.SavePos();
+  Consume();  // the known type name
+  bool is_stmt = false;
+  if (Match(TokenKind::kColonColon)) {
+    while (CheckIdentifier()) {
+      Consume();
+      if (!Match(TokenKind::kColonColon)) break;
+    }
+    is_stmt = Check(TokenKind::kLParen) || Check(TokenKind::kEq) ||
+              Check(TokenKind::kLtEq) ||
+              IsCompoundAssignOp(CurrentToken().kind);
+  }
+  lexer_.RestorePos(saved);
+  return is_stmt;
 }
 
 void Parser::ParseBlockDataDecl(std::vector<Stmt*>& stmts,
