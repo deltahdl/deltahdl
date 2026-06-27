@@ -16,6 +16,7 @@
 #include "simulator/evaluation.h"
 #include "simulator/net.h"
 #include "simulator/process.h"
+#include "simulator/sequence_monitor.h"
 #include "simulator/sim_context.h"
 #include "simulator/statement_assign.h"
 #include "simulator/stmt_exec.h"
@@ -647,6 +648,7 @@ void Lowerer::LowerModule(const RtlirModule* mod) {
   RegisterModulePorts(mod, ctx_);
   RegisterModuleSubroutines(mod, ctx_);
   RegisterModuleSequenceDecls(mod, ctx_);
+  LowerSequenceMonitors(mod);
   for (auto* cls : mod->class_decls) {
     LowerClassDecl(cls);
   }
@@ -733,6 +735,24 @@ void Lowerer::LowerProcess(const RtlirProcess& proc, bool from_program,
   }
 
   ScheduleProcess(p, ctx_);
+}
+
+// §16.13.6/§9.4.4: spawn a monitor process for each named sequence whose simple
+// clocked linear body the parser captured, so its endpoint event fires on a
+// match and procedural `sequence.triggered`/`wait` observe it. Additive: no
+// other code fires these endpoint events.
+void Lowerer::LowerSequenceMonitors(const RtlirModule* mod) {
+  for (auto* seq : mod->sequence_decls) {
+    if (seq->seq_clock.empty() || seq->seq_linear_operands.empty()) continue;
+    auto* p = arena_.Create<Process>();
+    p->kind = ProcessKind::kAlways;
+    p->id = next_id_++;
+    p->home_region = Region::kActive;
+    p->inst_prefix = inst_prefix_;
+    p->rng_seed = ctx_.DrawSeedForChild();
+    p->coro = MakeSequenceMonitorCoroutine(seq, ctx_, arena_).Release();
+    ScheduleProcess(p, ctx_);
+  }
 }
 
 void Lowerer::LowerContAssign(const RtlirContAssign& ca, bool from_program) {
