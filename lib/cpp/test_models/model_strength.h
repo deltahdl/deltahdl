@@ -214,9 +214,10 @@ inline StrengthSignal CombineAmbiguousWithUnambiguous(StrengthSignal unambig,
 
   // Split the ambiguous signal into its component on the unambiguous value side
   // (Vu) and the opposite value side (!Vu).
+  // The opposite-side lower bound is not needed: rule c always fills the gap
+  // down to Su+1 whenever any opposite-value level survives.
   StrengthLevel amb_vu_lo = vu_is_0 ? ambig.strength0_lo : ambig.strength1_lo;
   StrengthLevel amb_vu_hi = vu_is_0 ? ambig.strength0_hi : ambig.strength1_hi;
-  StrengthLevel amb_op_lo = vu_is_0 ? ambig.strength1_lo : ambig.strength0_lo;
   StrengthLevel amb_op_hi = vu_is_0 ? ambig.strength1_hi : ambig.strength0_hi;
 
   // Vu side (§28.12.3 rules a/b, same value): the unambiguous level Su is
