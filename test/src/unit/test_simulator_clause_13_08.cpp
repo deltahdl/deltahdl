@@ -33,18 +33,7 @@ TEST(ParameterizedSubroutineSim, ParameterizedStaticFunctionReturnsValue) {
       "  initial result = Doubler#(8)::double_val(8'd21);\n"
       "endmodule\n",
       f);
-  // PROBE (temporary, reverted next cycle): the width path reads correct
-  // statically yet resolves to 1 bit at runtime; surface the runtime facts.
-  ASSERT_NE(design, nullptr);
-  Lowerer probe_lowerer(f.ctx, f.arena, f.diag);
-  probe_lowerer.Lower(design);
-  ADD_FAILURE() << "PROBE find_doubler="
-                << (f.ctx.FindClassType("Doubler") != nullptr);
-  f.scheduler.Run();
-  auto* rv = f.ctx.FindVariable("result");
-  ADD_FAILURE() << "PROBE result="
-                << (rv ? static_cast<long>(rv->value.ToUint64()) : -1)
-                << " width=" << (rv ? rv->value.width : 0);
+  LowerRunAndCheck(f, design, {{"result", 42u}});
 }
 
 TEST(ParameterizedSubroutineSim, VirtualClassIsAbstract) {
