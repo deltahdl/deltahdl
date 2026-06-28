@@ -42,6 +42,18 @@ runs:
           sleep $(( attempt * 5 ))
         done
         if ! echo "${major}" | grep -qE '^[0-9]+$'; then
+          # Fallback: the GitHub releases API had a bad window. Derive the
+          # newest stable major straight from the apt.llvm.org repo we install
+          # from. The numbered llvm-toolchain-<codename>-<N> dists are stable;
+          # the unversioned trunk dist has no numeric suffix and is excluded by
+          # the regex, so this still floats to newest STABLE (never trunk).
+          echo "::warning::releases API discovery failed; falling back to" \
+            "apt.llvm.org repo listing"
+          major=$(curl -fsSL "http://apt.llvm.org/${VERSION_CODENAME}/dists/" |
+            grep -oE "llvm-toolchain-${VERSION_CODENAME}-[0-9]+" |
+            sed -E 's/.*-([0-9]+)$/\1/' | sort -n | tail -1)
+        fi
+        if ! echo "${major}" | grep -qE '^[0-9]+$'; then
           echo "::error::could not resolve latest LLVM stable major"
           exit 1
         fi
