@@ -60,6 +60,24 @@ int WriteInterleavedCb(VpiCbData* cb) {
   return 0;
 }
 
+// Two successive vpi_put_data() calls for the same id within one save routine.
+struct DoubleWrite {
+  int id = 0;
+  const char* first = nullptr;
+  int first_len = 0;
+  const char* second = nullptr;
+  int second_len = 0;
+  int ret1 = -1;
+  int ret2 = -1;
+};
+
+int WriteTwiceCb(VpiCbData* cb) {
+  auto* p = static_cast<DoubleWrite*>(cb->user_data);
+  p->ret1 = vpi_put_data(p->id, const_cast<char*>(p->first), p->first_len);
+  p->ret2 = vpi_put_data(p->id, const_cast<char*>(p->second), p->second_len);
+  return 0;
+}
+
 using VpiPutDataSim = VpiSaveRestoreSim;
 
 // §38.31 C1+C2: from a cbStartOfSave routine the call shall place numOfBytes of
@@ -208,16 +226,19 @@ TEST_F(VpiPutDataSim, RepeatedAndInterleavedWritesAreUnrestricted) {
 TEST_F(VpiPutDataSim, MultipleWritesReadBackInDifferentChunkSizes) {
   const char kFirst[] = {'A', 'B', 'C'};
   const char kSecond[] = {'D', 'E', 'F'};
-  SingleWrite w1;
-  w1.id = 3;
-  w1.data = kFirst;
-  w1.len = 3;
-  DispatchWith(cbStartOfSave, WriteOnceCb, &w1);
-  SingleWrite w2;
-  w2.id = 3;
-  w2.data = kSecond;
-  w2.len = 3;
-  DispatchWith(cbStartOfSave, WriteOnceCb, &w2);
+  // Both writes happen in a single save routine: a cbStartOfSave callback is
+  // persistent (§38.36.3), so dispatching the reason a second time would
+  // re-fire the first write as well. One dispatch with both vpi_put_data()
+  // calls writes exactly the six intended bytes.
+  DoubleWrite w;
+  w.id = 3;
+  w.first = kFirst;
+  w.first_len = 3;
+  w.second = kSecond;
+  w.second_len = 3;
+  DispatchWith(cbStartOfSave, WriteTwiceCb, &w);
+  EXPECT_EQ(w.ret1, 3);
+  EXPECT_EQ(w.ret2, 3);
 
   DoubleRead r;
   r.id = 3;
