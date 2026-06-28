@@ -417,7 +417,7 @@ RtlirDesign* Elaborator::Elaborate(std::string_view top_module_name) {
   // A genuinely empty unit (e.g. empty/comment-only source) yields no design.
   if (top_module_name.empty()) {
     if (unit_->modules.empty() && unit_->packages.empty() &&
-        unit_->cu_items.empty())
+        unit_->cu_items.empty() && unit_->classes.empty())
       return nullptr;
     RunPreElaborationValidations();
     return ElaborateTops({});
