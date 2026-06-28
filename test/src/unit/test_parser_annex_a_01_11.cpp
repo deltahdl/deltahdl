@@ -214,6 +214,9 @@ TEST(PackageItemsParsing, PackageExportDeclaration) {
 TEST(PackageItemsParsing, AllPackageItemAlternatives) {
   auto r = Parse(
       "package pkg;\n"
+      // §3.14.2.2: timeunit/timeprecision shall precede any other items in the
+      // time scope, so it leads the package body.
+      "  timeunit 1ns;\n"
       "  wire w;\n"
       "  int x;\n"
       "  task t(); endtask\n"
@@ -229,7 +232,6 @@ TEST(PackageItemsParsing, AllPackageItemAlternatives) {
       "  covergroup cg; endgroup\n"
       "  property p; 1; endproperty\n"
       "  ;\n"
-      "  timeunit 1ns;\n"
       "  export other_pkg::*;\n"
       "  program;\n"
       "    task inner_t(); endtask\n"
