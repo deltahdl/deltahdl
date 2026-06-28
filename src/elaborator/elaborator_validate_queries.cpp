@@ -754,19 +754,43 @@ void Elaborator::ValidateSpecparamInDeclRange(const ModuleDecl* decl) {
   }
 }
 
-static bool ExprContainsHierRef(const Expr* e) {
+// §11.2.1/§23.8: a hierarchical reference whose target is a parameter is a
+// legal constant-expression operand. `base.member` is such a reference when a
+// module named `base` declares `member` as a parameter (an upward or
+// named-module reference to a constant). References to nets/variables (e.g. a
+// child instance's signal, `s.x`) are not constants and remain forbidden.
+static bool MemberAccessRefersToModuleParam(const CompilationUnit* unit,
+                                            const Expr* e) {
+  if (unit == nullptr || e->is_scope_resolution) return false;
+  if (!e->lhs || e->lhs->kind != ExprKind::kIdentifier) return false;
+  if (!e->rhs || e->rhs->kind != ExprKind::kIdentifier) return false;
+  for (const auto* m : unit->modules) {
+    if (m->name != e->lhs->text) continue;
+    for (const auto* item : m->items) {
+      if (item->kind == ModuleItemKind::kParamDecl &&
+          item->name == e->rhs->text) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+static bool ExprContainsHierRef(const Expr* e, const CompilationUnit* unit) {
   if (!e) return false;
-  if (e->kind == ExprKind::kMemberAccess) return true;
-  if (ExprContainsHierRef(e->lhs)) return true;
-  if (ExprContainsHierRef(e->rhs)) return true;
-  if (ExprContainsHierRef(e->condition)) return true;
-  if (ExprContainsHierRef(e->true_expr)) return true;
-  if (ExprContainsHierRef(e->false_expr)) return true;
+  if (e->kind == ExprKind::kMemberAccess) {
+    return !MemberAccessRefersToModuleParam(unit, e);
+  }
+  if (ExprContainsHierRef(e->lhs, unit)) return true;
+  if (ExprContainsHierRef(e->rhs, unit)) return true;
+  if (ExprContainsHierRef(e->condition, unit)) return true;
+  if (ExprContainsHierRef(e->true_expr, unit)) return true;
+  if (ExprContainsHierRef(e->false_expr, unit)) return true;
   for (auto* elem : e->elements) {
-    if (ExprContainsHierRef(elem)) return true;
+    if (ExprContainsHierRef(elem, unit)) return true;
   }
   for (auto* arg : e->args) {
-    if (ExprContainsHierRef(arg)) return true;
+    if (ExprContainsHierRef(arg, unit)) return true;
   }
   return false;
 }
@@ -775,10 +799,11 @@ namespace {
 
 // Flag the elaborated parameter overrides in decl->params whose value contains
 // a hierarchical reference.
-void CheckParamMapHierRefs(const ModuleDecl* decl, DiagEngine& diag) {
+void CheckParamMapHierRefs(const ModuleDecl* decl, const CompilationUnit* unit,
+                           DiagEngine& diag) {
   for (const auto& [pname, pval] : decl->params) {
     if (!pval) continue;
-    if (ExprContainsHierRef(pval)) {
+    if (ExprContainsHierRef(pval, unit)) {
       diag.Error(pval->range.start,
                  std::format("parameter '{}' value contains a hierarchical "
                              "reference",
@@ -791,7 +816,7 @@ void CheckParamMapHierRefs(const ModuleDecl* decl, DiagEngine& diag) {
 // value may not contain a hierarchical reference, and a localparam initialized
 // with an assignment pattern must be a constant expression in param_scope.
 void ValidateOneValueParam(const ModuleItem* item, const ScopeMap& param_scope,
-                           DiagEngine& diag) {
+                           const CompilationUnit* unit, DiagEngine& diag) {
   if (item->data_type.kind == DataTypeKind::kVoid &&
       item->typedef_type.kind != DataTypeKind::kImplicit)
     return;
@@ -802,7 +827,7 @@ void ValidateOneValueParam(const ModuleItem* item, const ScopeMap& param_scope,
     return;
   }
 
-  if (ExprContainsHierRef(item->init_expr)) {
+  if (ExprContainsHierRef(item->init_expr, unit)) {
     diag.Error(item->loc,
                std::format("parameter '{}' value contains a hierarchical "
                            "reference",
@@ -826,10 +851,10 @@ void Elaborator::ValidateValueParams(const ModuleDecl* decl,
   ScopeMap param_scope = BuildParamScope(mod);
   for (const auto* item : decl->items) {
     if (item->kind != ModuleItemKind::kParamDecl) continue;
-    ValidateOneValueParam(item, param_scope, diag_);
+    ValidateOneValueParam(item, param_scope, unit_, diag_);
   }
 
-  CheckParamMapHierRefs(decl, diag_);
+  CheckParamMapHierRefs(decl, unit_, diag_);
 }
 
 }  // namespace delta
