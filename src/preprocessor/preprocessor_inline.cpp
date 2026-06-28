@@ -85,7 +85,13 @@ bool Preprocessor::ExpandFunctionLikeMacro(const MacroDef& def,
   if (balanced.empty()) return false;
   auto args_text = balanced.substr(1, balanced.size() - 2);
   if (!ValidateMacroArgCount(def, args_text, loc, name)) return false;
-  expanded = ExpandMacro(def, args_text);
+  // §22.5.1: macro arguments are expanded before parameter substitution. This
+  // runs before the caller pushes def onto the expansion stack, so an argument
+  // that calls the same macro -- `TOP(`TOP(b,1), `TOP(42,a)) -- is expanded in
+  // the caller's context and is not mistaken for a recursive expansion.
+  std::string expanded_args =
+      ExpandInlineMacros(args_text, loc.file_id, loc.line);
+  expanded = ExpandMacro(def, expanded_args);
   auto end_pos = static_cast<size_t>(balanced.data() + balanced.size() -
                                      after_name.data());
   rest = after_name.substr(end_pos);
