@@ -727,6 +727,23 @@ void ReportUnknownScopeBases(const ModuleDecl* decl, Pred known,
   }
 }
 
+// True when `n` names a known scope-resolution base: a compilation-unit scope
+// name (package/class/interface), a module-local class or typedef, or a
+// declared package (§26.3).
+bool IsKnownScopeBase(std::string_view n,
+                      const std::unordered_set<std::string_view>& cu_scope,
+                      const std::unordered_set<std::string_view>& classes,
+                      const TypedefMap& typedefs, const CompilationUnit* unit) {
+  if (cu_scope.count(n) != 0 || classes.count(n) != 0 ||
+      typedefs.count(n) != 0) {
+    return true;
+  }
+  for (const auto* pkg : unit->packages) {
+    if (pkg->name == n) return true;
+  }
+  return false;
+}
+
 }  // namespace
 
 bool Elaborator::IsDeclaredNameForRhs(std::string_view name) const {
@@ -779,14 +796,8 @@ void Elaborator::ValidateUnresolvedReferences(const ModuleDecl* decl,
   ReportUnknownScopeBases(
       decl,
       [this](std::string_view n) {
-        if (cu_scope_names_.count(n) != 0 || class_names_.count(n) != 0 ||
-            typedefs_.count(n) != 0) {
-          return true;
-        }
-        for (const auto* pkg : unit_->packages) {
-          if (pkg->name == n) return true;
-        }
-        return false;
+        return IsKnownScopeBase(n, cu_scope_names_, class_names_, typedefs_,
+                                unit_);
       },
       diag_);
 }
