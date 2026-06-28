@@ -54,14 +54,17 @@ TEST(FunctionsInConstraintsParsing, NoCallRecordsNothing) {
 // function call — only the receiver-free form is the function-in-constraint the
 // clause governs.
 TEST(FunctionsInConstraintsParsing, MemberQualifiedCallNotRecorded) {
+  // Class D must be declared so `D d;` is a property of a known type; C is then
+  // the last class, and its constraint references d.f() through the handle d.
   auto r = Parse(
+      "class D; endclass\n"
       "class C;\n"
       "  rand int x;\n"
       "  D d;\n"
       "  constraint c1 { x == d.f(); }\n"
       "endclass\n");
   ASSERT_FALSE(r.has_errors);
-  const auto* m = FindConstraint(r.cu->classes.front(), "c1");
+  const auto* m = FindConstraint(r.cu->classes.back(), "c1");
   ASSERT_NE(m, nullptr);
   EXPECT_FALSE(RefersTo(m, "f"));
 }
