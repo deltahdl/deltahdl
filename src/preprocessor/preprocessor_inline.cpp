@@ -218,12 +218,15 @@ size_t Preprocessor::ExpandInlineFunctionMacro(const MacroDef& def,
   size_t advance =
       name_end +
       static_cast<size_t>(balanced.data() + balanced.size() - rest.data());
-  expansion_stack_.emplace_back(def.name);
   // §22.5.1: actual macro arguments are themselves subject to macro expansion
-  // before being substituted for the formal arguments in the macro text.
+  // before being substituted for the formal arguments in the macro text. The
+  // arguments are expanded in the caller's context, so the macro is not yet on
+  // the expansion stack: a call to the same macro inside an argument (e.g.
+  // `TOP(`TOP(b,1), ...)) is not a recursive expansion. Only guard the body.
   std::string expanded_args =
       ExpandInlineMacros(args_text, loc.file_id, loc.line);
   std::string body = ExpandMacro(def, expanded_args);
+  expansion_stack_.emplace_back(def.name);
   result += ExpandInlineMacros(body, loc.file_id, loc.line);
   expansion_stack_.pop_back();
   return advance;
