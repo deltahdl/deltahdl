@@ -536,24 +536,24 @@ void Elaborator::ValidateVarDeclTypes(ModuleItem* item) {
 }
 
 static void CollectUnpackedDimSizes(const std::vector<Expr*>& dims,
+                                    std::vector<uint32_t>& dim_los,
                                     std::vector<uint32_t>& dim_sizes) {
   for (auto* dim : dims) {
     if (!dim) continue;
     if (dim->kind == ExprKind::kBinary && dim->op == TokenKind::kColon) {
       auto lv = ConstEvalInt(dim->lhs);
       auto rv = ConstEvalInt(dim->rhs);
-      if (lv && rv) {
-        dim_sizes.push_back(static_cast<uint32_t>(std::abs(*lv - *rv) + 1));
-      }
-    } else {
-      auto sv = ConstEvalInt(dim);
-      if (sv && *sv > 0) dim_sizes.push_back(static_cast<uint32_t>(*sv));
+      if (!lv || !rv) continue;
+      dim_los.push_back(static_cast<uint32_t>(std::min(*lv, *rv)));
+      dim_sizes.push_back(static_cast<uint32_t>(std::abs(*lv - *rv) + 1));
+    } else if (auto sv = ConstEvalInt(dim); sv && *sv > 0) {
+      dim_los.push_back(0);
+      dim_sizes.push_back(static_cast<uint32_t>(*sv));
     }
   }
 }
 
-void Elaborator::TrackVarArrayInfo(const ModuleItem* item,
-                                   const RtlirVariable& var) {
+void Elaborator::TrackVarArrayInfo(const ModuleItem* item, RtlirVariable& var) {
   if (item->unpacked_dims.empty()) return;
   VarArrayInfo info{item->data_type.kind,
                     var.unpacked_size,
@@ -570,8 +570,18 @@ void Elaborator::TrackVarArrayInfo(const ModuleItem* item,
       item->unpacked_dims[0]->kind == ExprKind::kIdentifier) {
     info.assoc_index_type = item->unpacked_dims[0]->text;
   }
-  CollectUnpackedDimSizes(item->unpacked_dims, info.dim_sizes);
+  std::vector<uint32_t> dim_los;
+  CollectUnpackedDimSizes(item->unpacked_dims, dim_los, info.dim_sizes);
   var_array_info_[item->name] = info;
+  // §7.4.2: carry full per-dimension extents to the simulator only when every
+  // dimension is a fixed const size — queue/dynamic/assoc dims fall short of
+  // the declared count, so the single-dimension unpacked_size/lo stays in
+  // force.
+  if (info.dim_sizes.size() >= 2 &&
+      info.dim_sizes.size() == item->unpacked_dims.size()) {
+    var.unpacked_dim_los = std::move(dim_los);
+    var.unpacked_dim_sizes = info.dim_sizes;
+  }
 }
 
 namespace {

@@ -475,9 +475,86 @@ static Logic4Vec FindArrayKeyedValue(const Expr* rhs,
   return MakeLogic4VecVal(arena, slot.width, 0);
 }
 
+namespace {
+// §7.4.2: bundle for distributing a (possibly nested) assignment pattern into a
+// fixed multidimensional unpacked array, keeping the recursive walk within the
+// parameter-count limit.
+struct PatternDist {
+  const ArrayInfo& info;
+  SimContext& ctx;
+  Arena& arena;
+};
+}  // namespace
+
+// §10.9.1: the pattern element that fills one dimension's element at index
+// `idx` (position `pos`): a positional element, an index-keyed element, or the
+// default-keyed element. Null when the pattern supplies none for this element.
+static const Expr* SelectDimElement(const Expr* pat, uint32_t idx,
+                                    uint32_t pos) {
+  if (pat->pattern_keys.empty())
+    return pos < pat->elements.size() ? pat->elements[pos] : nullptr;
+  size_t m = FindIndexKeyedElement(pat, idx);
+  if (m >= pat->elements.size()) m = FindDefaultKeyedElement(pat);
+  return m < pat->elements.size() ? pat->elements[m] : nullptr;
+}
+
+// Writes one scalar leaf element (resizing/defaulting to the element width).
+static void WriteLeaf(const PatternDist& pd, const std::string& name,
+                      const Expr* sub) {
+  auto* elem = pd.ctx.FindVariable(name);
+  if (!elem) return;
+  Logic4Vec val = sub ? EvalExpr(sub, pd.ctx, pd.arena)
+                      : MakeLogic4VecVal(pd.arena, pd.info.elem_width, 0);
+  elem->value = ResizeToWidth(val, pd.info.elem_width, pd.arena);
+  elem->NotifyWatchers();
+}
+
+// §10.9.1: broadcasts one scalar `sub` to every leaf at and below dimension `d`
+// of the subtree rooted at `prefix` (an inner default that is not itself a
+// nested pattern fills the whole sub-array).
+static void WriteScalarSubtree(const PatternDist& pd, const std::string& prefix,
+                               size_t d, const Expr* sub) {
+  uint32_t lo = pd.info.dim_los[d];
+  bool last = (d + 1 == pd.info.dim_sizes.size());
+  for (uint32_t i = 0; i < pd.info.dim_sizes[d]; ++i) {
+    std::string child = prefix + "[" + std::to_string(lo + i) + "]";
+    if (last)
+      WriteLeaf(pd, child, sub);
+    else
+      WriteScalarSubtree(pd, child, d + 1, sub);
+  }
+}
+
+// §7.4.2/§10.9.1: distribute the assignment pattern `pat` across dimension `d`
+// of the subtree rooted at `prefix`. A nested pattern recurses into the next
+// dimension; a scalar at a non-last dimension broadcasts to the sub-array.
+static void DistributeDimPattern(const PatternDist& pd,
+                                 const std::string& prefix, size_t d,
+                                 const Expr* pat) {
+  uint32_t lo = pd.info.dim_los[d];
+  bool last = (d + 1 == pd.info.dim_sizes.size());
+  for (uint32_t i = 0; i < pd.info.dim_sizes[d]; ++i) {
+    std::string child = prefix + "[" + std::to_string(lo + i) + "]";
+    const Expr* sub = SelectDimElement(pat, lo + i, i);
+    bool is_pattern = sub && (sub->kind == ExprKind::kAssignmentPattern ||
+                              sub->kind == ExprKind::kConcatenation);
+    if (last)
+      WriteLeaf(pd, child, sub);
+    else if (is_pattern)
+      DistributeDimPattern(pd, child, d + 1, sub);
+    else
+      WriteScalarSubtree(pd, child, d + 1, sub);
+  }
+}
+
 static void DistributePatternToArray(std::string_view arr_name,
                                      const ArrayInfo& info, const Expr* rhs,
                                      SimContext& ctx, Arena& arena) {
+  if (info.dim_sizes.size() > 1) {
+    DistributeDimPattern(PatternDist{info, ctx, arena}, std::string(arr_name),
+                         0, rhs);
+    return;
+  }
   bool named = !rhs->pattern_keys.empty();
   bool replicate = rhs->elements.size() == 1 &&
                    rhs->elements[0]->kind == ExprKind::kReplicate;

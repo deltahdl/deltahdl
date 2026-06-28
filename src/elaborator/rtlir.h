@@ -92,6 +92,15 @@ struct RtlirVariable {
   uint32_t unpacked_size = 0;
   uint32_t unpacked_lo = 0;
   bool is_descending = false;
+  // §7.4.2: full per-dimension extents of a fixed multidimensional unpacked
+  // array, outermost first, so the simulator can materialize one leaf variable
+  // per element (arr[i0][i1]...) and distribute a nested assignment pattern
+  // into it. Populated only when every unpacked dimension is a fixed
+  // range/const dimension; left empty for single-dimension, queue, dynamic, or
+  // associative arrays (which keep the single-dimension
+  // unpacked_size/unpacked_lo above).
+  std::vector<uint32_t> unpacked_dim_sizes;
+  std::vector<uint32_t> unpacked_dim_los;
   bool is_dynamic = false;
   bool is_queue = false;
   int32_t queue_max_size = -1;

@@ -367,7 +367,7 @@ class Elaborator {
 
   void ValidateAssocIndexType(const ModuleItem* item);
 
-  void TrackVarArrayInfo(const ModuleItem* item, const RtlirVariable& var);
+  void TrackVarArrayInfo(const ModuleItem* item, RtlirVariable& var);
 
   void ValidateVarDeclTypes(ModuleItem* item);
 

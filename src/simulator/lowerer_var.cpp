@@ -135,9 +135,65 @@ static void InitArrayFromNamed(const RtlirVariable& var, uint32_t idx,
   elem->value = MakeLogic4VecVal(arena, var.width, 0);
 }
 
+namespace {
+// §7.4.2: bundle for materializing the leaves of a fixed multidimensional
+// unpacked array, keeping the recursive walk within the parameter-count limit.
+struct MultiDimArray {
+  const RtlirVariable& var;
+  SimContext& ctx;
+  Arena& arena;
+};
+}  // namespace
+
+// §7.4.2: recursively create one leaf variable per element of a fixed
+// multidimensional unpacked array, named arr[i0][i1]... in row-major order so a
+// compound select (eval_select.cpp) and a nested assignment pattern resolve to
+// it. An untouched 2-state leaf defaults to 0; a 4-state leaf keeps the x that
+// CreateVariable seeds (§6.4).
+static void CreateMultiDimLeaves(const MultiDimArray& m,
+                                 const std::string& prefix, size_t d) {
+  const auto& sizes = m.var.unpacked_dim_sizes;
+  if (d == sizes.size()) {
+    auto* stored = m.arena.Create<std::string>(prefix);
+    auto* elem = m.ctx.CreateVariable(*stored, m.var.width);
+    elem->is_4state = m.var.is_4state;
+    elem->is_signed = m.var.is_signed;
+    if (!m.var.is_4state)
+      elem->value = MakeLogic4VecVal(m.arena, m.var.width, 0);
+    return;
+  }
+  uint32_t lo = m.var.unpacked_dim_los[d];
+  for (uint32_t i = 0; i < sizes[d]; ++i) {
+    CreateMultiDimLeaves(m, prefix + "[" + std::to_string(lo + i) + "]", d + 1);
+  }
+}
+
+// §7.4.2: register a fixed multidimensional unpacked array and create its
+// leaves. The single-dimension lo/size keep describing the outermost dimension
+// (so existing whole-array and outer-index paths still work), while dim_los /
+// dim_sizes carry every dimension. Returns false for a single-dimension array.
+static bool TryCreateMultiDimArray(const RtlirVariable& var, SimContext& ctx,
+                                   Arena& arena) {
+  if (var.unpacked_dim_sizes.size() < 2) return false;
+  ArrayInfo info;
+  info.lo = var.unpacked_lo;
+  info.size = var.unpacked_size;
+  info.elem_width = var.width;
+  info.is_descending = var.is_descending;
+  info.is_4state = var.is_4state;
+  info.elem_type_kind = var.elem_type_kind;
+  info.dim_los = var.unpacked_dim_los;
+  info.dim_sizes = var.unpacked_dim_sizes;
+  ctx.RegisterArray(var.name, info);
+  CreateMultiDimLeaves(MultiDimArray{var, ctx, arena}, std::string(var.name),
+                       0);
+  return true;
+}
+
 static void CreateArrayElements(const RtlirVariable& var, SimContext& ctx,
                                 Arena& arena) {
   if (var.unpacked_size == 0) return;
+  if (TryCreateMultiDimArray(var, ctx, arena)) return;
   ArrayInfo info;
   info.lo = var.unpacked_lo;
   info.size = var.unpacked_size;
