@@ -40,13 +40,16 @@ TEST(TimeformatSysTask, DefaultUnitsFollowsGlobalPrecision) {
 }
 
 // Invoking $timeformat shall install the supplied units number, precision
-// number, suffix string, and minimum field width.
+// number, suffix string, and minimum field width. Per §20.4.3 the precision
+// number, like the units number, "shall be ... in the range from 2 to -15"
+// (Table 20-2), so a precision of 2 -- distinct from the default 0 -- exercises
+// installation while staying within the legal range.
 TEST(TimeformatSysTask, InvocationInstallsAllFourArguments) {
   SysTaskFixture f;
-  EvalExpr(MkTimeformatCall(f.arena, -9, 3, " ns", 12), f.ctx, f.arena);
+  EvalExpr(MkTimeformatCall(f.arena, -9, 2, " ns", 12), f.ctx, f.arena);
   const auto& spec = f.ctx.GetTimeFormat();
   EXPECT_EQ(spec.units_number, -9);
-  EXPECT_EQ(spec.precision_number, 3);
+  EXPECT_EQ(spec.precision_number, 2);
   EXPECT_EQ(spec.suffix_string, " ns");
   EXPECT_EQ(spec.minimum_field_width, 12);
 }
