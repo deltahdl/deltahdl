@@ -178,6 +178,7 @@ add_library(deltahdl_lib STATIC
     elaborator/elaborator_process.cpp
     elaborator/elaborator_resolve.cpp
     elaborator/elaborator_scope_rules.cpp
+    elaborator/elaborator_scope_rules_hier.cpp
     elaborator/elaborator_typedef.cpp
     elaborator/elaborator_validate_class_array_assign.cpp
     elaborator/elaborator_validate_class_array_index.cpp
