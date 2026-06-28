@@ -49,7 +49,9 @@ TEST_F(DumpallSysTask, EnabledDumpRecordsOnlyChangedVariables) {
     vcd.DumpChangedValues(0);
   }
   auto content = ReadVcd();
-  EXPECT_NE(content.find("b00111100 !"), std::string::npos);   // changed dumped
+  // §21.7.2.2: vectors use the shortest right-justified form, so 8'h3C
+  // (00111100) drops its redundant leading zeros to b111100.
+  EXPECT_NE(content.find("b111100 !"), std::string::npos);     // changed dumped
   EXPECT_EQ(content.find("b10100101 \""), std::string::npos);  // steady skipped
 }
 

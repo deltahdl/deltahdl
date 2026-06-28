@@ -76,7 +76,8 @@ TEST_F(DumpportsOffOnSysTask, DumpportsonResumesWithCurrentValues) {
     vcd.WriteTimestamp(400);  // recording is live again
   }
   auto content = ReadVcd();
-  EXPECT_NE(content.find("b00111100 !"), std::string::npos);  // 0x3C resumed
+  // §21.7.2.2: shortest right-justified form drops 8'h3C's leading zeros.
+  EXPECT_NE(content.find("b111100 !"), std::string::npos);  // 0x3C resumed
   EXPECT_NE(content.find("#400"), std::string::npos);
 }
 

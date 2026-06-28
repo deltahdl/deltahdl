@@ -51,7 +51,8 @@ TEST_F(DumpflushSysTask, ResumesDumpingWithoutLoss) {
     vcd.DumpChangedValues(0);
   }
   auto content = ReadVcd();
-  EXPECT_NE(content.find("b00111100 !"), std::string::npos);  // change recorded
+  // §21.7.2.2: shortest right-justified form drops 8'h3C's leading zeros.
+  EXPECT_NE(content.find("b111100 !"), std::string::npos);  // change recorded
   EXPECT_EQ(content.find("$dumpflush"),
             std::string::npos);  // no command emitted
 }

@@ -74,7 +74,8 @@ TEST_F(DumpOffOnSysTask, DumpOnResumesWithCurrentValues) {
   }
   auto content = ReadVcd();
   EXPECT_NE(content.find("$dumpon"), std::string::npos);
-  EXPECT_NE(content.find("b00111100 !"),
+  // §21.7.2.2: shortest right-justified form drops 8'h3C's leading zeros.
+  EXPECT_NE(content.find("b111100 !"),
             std::string::npos);  // 0x3C current value
   EXPECT_NE(content.find("#400"), std::string::npos);
 }
