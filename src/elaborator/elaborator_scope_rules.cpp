@@ -770,6 +770,74 @@ CollectResolvedChildren(const RtlirModule* mod) {
   return inst_type;
 }
 
+// True when any element of `range` projects (via `proj`) to `name`.
+template <typename Range, typename Proj>
+bool RangeHasName(const Range& range, Proj proj, std::string_view name) {
+  for (const auto& e : range) {
+    if (proj(e) == name) return true;
+  }
+  return false;
+}
+
+bool EnumTypesDeclare(const RtlirModule* m, std::string_view name) {
+  for (const auto& entry : m->enum_types) {
+    if (RangeHasName(
+            entry.second, [](const RtlirEnumMember& e) { return e.name; },
+            name)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// True when `name` is declared at the top level of module `m` and so may be the
+// target of a hierarchical reference `inst.name`. Covers every flat namespace
+// an instance member access can reach.
+bool ModuleDeclaresMember(const RtlirModule* m, std::string_view name) {
+  auto ptr_name = [](const auto* d) {
+    return d ? d->name : std::string_view{};
+  };
+  return RangeHasName(
+             m->ports, [](const RtlirPort& p) { return p.name; }, name) ||
+         RangeHasName(
+             m->nets, [](const RtlirNet& n) { return n.name; }, name) ||
+         RangeHasName(
+             m->variables, [](const RtlirVariable& v) { return v.name; },
+             name) ||
+         RangeHasName(
+             m->params, [](const RtlirParamDecl& p) { return p.name; }, name) ||
+         RangeHasName(m->function_decls, ptr_name, name) ||
+         RangeHasName(m->let_decls, ptr_name, name) ||
+         RangeHasName(m->sequence_decls, ptr_name, name) ||
+         RangeHasName(m->class_decls, ptr_name, name) ||
+         RangeHasName(
+             m->children, [](const RtlirModuleInst& c) { return c.inst_name; },
+             name) ||
+         EnumTypesDeclare(m, name);
+}
+
+// Gate for the undeclared-member check: only a plain module whose top-level
+// namespace is fully enumerable by ModuleDeclaresMember may be checked.
+// Interfaces and programs expose modports/clocking-block members; a generate
+// construct introduces named scopes; and a procedural block can declare named
+// blocks (`begin : label`) reachable hierarchically — none of which appear in
+// the flat RtlirModule lists. For any of those the check is suppressed so it
+// never produces a false positive.
+bool ChildDeclAllowsMemberCheck(const ModuleDecl* child) {
+  if (!child) return false;
+  if (child->decl_kind != ModuleDeclKind::kModule) return false;
+  if (!child->modports.empty()) return false;
+  for (const auto* item : child->items) {
+    if (IsProcBodyItem(item->kind)) return false;
+    if (item->kind == ModuleItemKind::kGenerateFor ||
+        item->kind == ModuleItemKind::kGenerateIf ||
+        item->kind == ModuleItemKind::kGenerateCase) {
+      return false;
+    }
+  }
+  return true;
+}
+
 std::unordered_map<std::string_view, InstanceArrayBounds>
 CollectInstanceArrayBounds(const ModuleDecl* decl) {
   std::unordered_map<std::string_view, InstanceArrayBounds> arrayed;
@@ -838,6 +906,36 @@ void Elaborator::ValidateHierRefInstanceArray(const ModuleDecl* decl) {
   CollectModuleMemberAccesses(decl, accesses);
   for (const auto* ma : accesses) {
     CheckHierRefInstanceArrayAccess(diag_, arrayed, ma);
+  }
+}
+
+// §23.6: a hierarchical reference `inst.name` shall resolve to a name declared
+// in the instantiated module. When the left operand is a resolved child
+// instance of a plain module (see ChildDeclAllowsMemberCheck) and the right
+// operand is a simple identifier that the child does not declare, the reference
+// is unresolved.
+void Elaborator::ValidateHierRefUndeclaredMember(const ModuleDecl* decl,
+                                                 const RtlirModule* mod) {
+  if (!mod || mod->children.empty()) return;
+  std::unordered_map<std::string_view, const RtlirModule*> inst_type =
+      CollectResolvedChildren(mod);
+  if (inst_type.empty()) return;
+
+  std::vector<const Expr*> accesses;
+  CollectModuleMemberAccesses(decl, accesses);
+  for (const auto* ma : accesses) {
+    if (!ma->lhs || ma->lhs->kind != ExprKind::kIdentifier) continue;
+    if (!ma->rhs || ma->rhs->kind != ExprKind::kIdentifier) continue;
+    auto it = inst_type.find(ma->lhs->text);
+    if (it == inst_type.end()) continue;
+    if (!ChildDeclAllowsMemberCheck(FindModule(it->second->name))) continue;
+    if (ModuleDeclaresMember(it->second, ma->rhs->text)) continue;
+    diag_.Error(
+        ma->range.start,
+        std::format("hierarchical reference '{}.{}' is unresolved: '{}' is not "
+                    "declared in module '{}'",
+                    ma->lhs->text, ma->rhs->text, ma->rhs->text,
+                    it->second->name));
   }
 }
 

@@ -753,6 +753,10 @@ class Elaborator {
 
   void ValidateHierRefInstanceArray(const ModuleDecl* decl);
 
+  // §23.6: flags `inst.name` where the child module does not declare `name`.
+  void ValidateHierRefUndeclaredMember(const ModuleDecl* decl,
+                                       const RtlirModule* mod);
+
   void ValidateHierRefToAutomatic(const ModuleDecl* decl);
 
   void ValidateHierRefIntoProgram(const ModuleDecl* decl);
