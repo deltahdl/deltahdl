@@ -58,12 +58,27 @@ runs:
           exit 1
         fi
         echo "Installing newest stable LLVM/Clang: ${major}"
-        wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key |
-          sudo tee /etc/apt/trusted.gpg.d/apt.llvm.org.asc >/dev/null
+        # Each network step is retried so a single transient blip (apt.llvm.org
+        # or the apt mirrors had a bad moment) does not hard-fail the whole
+        # matrix under `set -e -o pipefail`.
+        retry() {
+          local n
+          for n in 1 2 3 4 5; do
+            "$@" && return 0
+            echo "::warning::'$*' failed (attempt ${n}); retrying in $((n * 5))s"
+            sleep $((n * 5))
+          done
+          echo "::error::'$*' failed after 5 attempts"
+          return 1
+        }
+        retry wget -qO /tmp/llvm-snapshot.gpg.key \
+          https://apt.llvm.org/llvm-snapshot.gpg.key
+        sudo tee /etc/apt/trusted.gpg.d/apt.llvm.org.asc \
+          </tmp/llvm-snapshot.gpg.key >/dev/null
         echo "deb http://apt.llvm.org/${VERSION_CODENAME}/ llvm-toolchain-${VERSION_CODENAME}-${major} main" |
           sudo tee /etc/apt/sources.list.d/llvm.list >/dev/null
-        sudo apt-get update
-        sudo apt-get install -y \
+        retry sudo apt-get update
+        retry sudo apt-get install -y \
           "clang-${major}" "clang-tidy-${major}" "clang-format-${major}" \
           "llvm-${major}"
         for tool in clang clang++ clang-cpp clang-tidy clang-format \
