@@ -11,6 +11,7 @@
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
+#include "elaborator/type_eval.h"
 #include "parser/ast.h"
 
 namespace delta {
@@ -508,6 +509,54 @@ bool ModuleSkipsUnresolvedCheck(const ModuleDecl* decl,
   return false;
 }
 
+// §6.16/§6.22.5: a string and an integral or real type are type-incompatible —
+// no implicit or explicit cast bridges them — so a direct procedural assignment
+// between a string variable and a numeric variable is an error. The check is
+// restricted to the string<->numeric pair: it is the residual §6.22.5 case that
+// carries no width/signedness nuance, so flagging it stays free of the false
+// positives that a general residual check would raise on integral/real
+// conversions (which are assignment-compatible).
+void CheckStringNumericAssigns(
+    const Stmt* s,
+    const std::unordered_map<std::string_view, DataTypeKind>& var_types,
+    DiagEngine& diag) {
+  if (!s) return;
+  if ((s->kind == StmtKind::kBlockingAssign ||
+       s->kind == StmtKind::kNonblockingAssign) &&
+      s->lhs && s->lhs->kind == ExprKind::kIdentifier && s->rhs &&
+      s->rhs->kind == ExprKind::kIdentifier) {
+    auto lit = var_types.find(s->lhs->text);
+    auto rit = var_types.find(s->rhs->text);
+    if (lit != var_types.end() && rit != var_types.end()) {
+      auto numeric = [](DataTypeKind k) {
+        return IsIntegralType(k) || k == DataTypeKind::kReal ||
+               k == DataTypeKind::kShortreal || k == DataTypeKind::kRealtime;
+      };
+      bool l_str = lit->second == DataTypeKind::kString;
+      bool r_str = rit->second == DataTypeKind::kString;
+      if ((l_str && numeric(rit->second)) || (r_str && numeric(lit->second))) {
+        diag.Error(s->range.start,
+                   "type-incompatible assignment between string and numeric "
+                   "type");
+      }
+    }
+  }
+  for (const auto* sub : s->stmts)
+    CheckStringNumericAssigns(sub, var_types, diag);
+  for (const auto* sub : s->fork_stmts)
+    CheckStringNumericAssigns(sub, var_types, diag);
+  CheckStringNumericAssigns(s->then_branch, var_types, diag);
+  CheckStringNumericAssigns(s->else_branch, var_types, diag);
+  CheckStringNumericAssigns(s->body, var_types, diag);
+  CheckStringNumericAssigns(s->for_body, var_types, diag);
+  for (const auto* fi : s->for_inits)
+    CheckStringNumericAssigns(fi, var_types, diag);
+  for (const auto* fs : s->for_steps)
+    CheckStringNumericAssigns(fs, var_types, diag);
+  for (const auto& ci : s->case_items)
+    CheckStringNumericAssigns(ci.body, var_types, diag);
+}
+
 }  // namespace
 
 bool Elaborator::IsDeclaredNameForRhs(std::string_view name) const {
@@ -524,6 +573,17 @@ bool Elaborator::IsDeclaredNameForRhs(std::string_view name) const {
 void Elaborator::ValidateUnresolvedReferences(const ModuleDecl* decl,
                                               const RtlirModule* mod) {
   if (!mod) return;
+
+  // §6.16/§6.22.5: string<->numeric procedural assignments are
+  // type-incompatible independent of any package imports, so check them before
+  // the import-aware bare-name gate below (which skips modules with non-std
+  // imports).
+  for (const auto* item : decl->items) {
+    if (IsProcBodyItem(item->kind)) {
+      CheckStringNumericAssigns(item->body, var_types_, diag_);
+    }
+  }
+
   if (ModuleSkipsUnresolvedCheck(decl, mod)) return;
 
   for (const auto* item : decl->items) {
