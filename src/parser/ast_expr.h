@@ -73,6 +73,10 @@ struct Expr {
   bool is_part_select_plus = false;
   bool is_part_select_minus = false;
   bool has_param_spec = false;
+  // kMemberAccess only: true when the operator was `::` (scope resolution),
+  // false when it was `.` (member access). Lets the elaborator distinguish
+  // `pkg::x` from `obj.x` (§26.3 / §23.7.1).
+  bool is_scope_resolution = false;
 
   Expr* with_expr = nullptr;
   bool with_has_parens = false;

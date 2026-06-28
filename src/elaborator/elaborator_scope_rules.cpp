@@ -658,6 +658,75 @@ void ReportProcUnresolved(const ModuleDecl* decl, Pred declared,
   }
 }
 
+// Collects the base identifier of every scope-resolution member access
+// (`base::member`, marked is_scope_resolution by the parser) whose base is a
+// plain identifier, recursing through the whole expression tree so nested forms
+// (`a::b::c`, scope refs inside calls/concats) are reached. System scopes
+// (`$unit::`, `$root.`) carry their prefix in scope_prefix and are skipped
+// here.
+void CollectScopeBases(const Expr* e, std::vector<const Expr*>& out) {
+  if (!e) return;
+  if (e->kind == ExprKind::kMemberAccess && e->is_scope_resolution && e->lhs &&
+      e->lhs->kind == ExprKind::kIdentifier && e->lhs->scope_prefix.empty() &&
+      !e->lhs->text.starts_with("$")) {
+    out.push_back(e->lhs);
+  }
+  CollectScopeBases(e->lhs, out);
+  CollectScopeBases(e->rhs, out);
+  CollectScopeBases(e->base, out);
+  CollectScopeBases(e->index, out);
+  CollectScopeBases(e->index_end, out);
+  CollectScopeBases(e->condition, out);
+  CollectScopeBases(e->true_expr, out);
+  CollectScopeBases(e->false_expr, out);
+  CollectScopeBases(e->repeat_count, out);
+  CollectScopeBases(e->with_expr, out);
+  for (const auto* a : e->args) CollectScopeBases(a, out);
+  for (const auto* el : e->elements) CollectScopeBases(el, out);
+}
+
+// Walks a procedural block, collecting scope-resolution bases from the RHS of
+// every blocking/nonblocking assignment.
+void CollectProcScopeBases(const Stmt* s, std::vector<const Expr*>& out) {
+  if (!s) return;
+  if (s->kind == StmtKind::kBlockingAssign ||
+      s->kind == StmtKind::kNonblockingAssign) {
+    CollectScopeBases(s->rhs, out);
+  }
+  for (const auto* sub : s->stmts) CollectProcScopeBases(sub, out);
+  for (const auto* sub : s->fork_stmts) CollectProcScopeBases(sub, out);
+  CollectProcScopeBases(s->then_branch, out);
+  CollectProcScopeBases(s->else_branch, out);
+  CollectProcScopeBases(s->body, out);
+  CollectProcScopeBases(s->for_body, out);
+  for (const auto* fi : s->for_inits) CollectProcScopeBases(fi, out);
+  for (const auto* fs : s->for_steps) CollectProcScopeBases(fs, out);
+  for (const auto& ci : s->case_items) CollectProcScopeBases(ci.body, out);
+}
+
+// §26.3: a scope-resolution prefix `base::` shall name a package (or a class /
+// type, for static-member and type-scope access). `known` accepts those base
+// names; "std" is the always-available built-in package. Any other base is an
+// unresolved package or scope.
+template <typename Pred>
+void ReportUnknownScopeBases(const ModuleDecl* decl, Pred known,
+                             DiagEngine& diag) {
+  std::vector<const Expr*> bases;
+  for (const auto* item : decl->items) {
+    if (item->kind == ModuleItemKind::kContAssign) {
+      CollectScopeBases(item->assign_rhs, bases);
+    } else if (IsProcBodyItem(item->kind)) {
+      CollectProcScopeBases(item->body, bases);
+    }
+  }
+  for (const auto* b : bases) {
+    if (b->text == "std" || b->text == "local" || known(b->text)) continue;
+    diag.Error(
+        b->range.start,
+        std::format("reference to unresolved package or scope '{}'", b->text));
+  }
+}
+
 }  // namespace
 
 bool Elaborator::IsDeclaredNameForRhs(std::string_view name) const {
@@ -701,6 +770,18 @@ void Elaborator::ValidateUnresolvedReferences(const ModuleDecl* decl,
 
   ReportProcUnresolved(
       decl, [this](std::string_view n) { return IsDeclaredNameForRhs(n); },
+      diag_);
+
+  // §26.3: a `pkg::x` scope prefix must name a known package (or a class/type
+  // for static-member / type-scope access). cu_scope_names_ holds packages,
+  // classes, and interfaces; class_names_ and typedefs_ cover module-local
+  // classes and type names.
+  ReportUnknownScopeBases(
+      decl,
+      [this](std::string_view n) {
+        return cu_scope_names_.count(n) != 0 || class_names_.count(n) != 0 ||
+               typedefs_.count(n) != 0;
+      },
       diag_);
 }
 
