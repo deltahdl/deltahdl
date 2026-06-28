@@ -436,6 +436,83 @@ void Elaborator::ValidateScopeRules(const ModuleDecl* decl) {
   }
 }
 
+namespace {
+
+// Collects standalone identifier operands of `e`, deliberately NOT descending
+// into member-access subtrees (so the base of `a.b`, `s.field`, `$root.x`, or
+// `pkg::x` is never collected) and skipping scope-prefixed identifiers. Only
+// the plain `kIdentifier` reads that must resolve to a local declaration
+// survive.
+void CollectBareIdents(const Expr* e, std::vector<const Expr*>& out) {
+  if (!e) return;
+  if (e->kind == ExprKind::kMemberAccess) return;
+  if (e->kind == ExprKind::kIdentifier) {
+    if (e->scope_prefix.empty()) out.push_back(e);
+    return;
+  }
+  CollectBareIdents(e->lhs, out);
+  CollectBareIdents(e->rhs, out);
+  CollectBareIdents(e->base, out);
+  CollectBareIdents(e->index, out);
+  CollectBareIdents(e->index_end, out);
+  CollectBareIdents(e->condition, out);
+  CollectBareIdents(e->true_expr, out);
+  CollectBareIdents(e->false_expr, out);
+  CollectBareIdents(e->repeat_count, out);
+  CollectBareIdents(e->with_expr, out);
+  for (const auto* a : e->args) CollectBareIdents(a, out);
+  for (const auto* el : e->elements) CollectBareIdents(el, out);
+}
+
+// True when the module imports any name or contains a generate construct, in
+// which case a bare identifier may legally resolve to an imported name or a
+// generated/genvar name the elaborated module's symbol table does not list.
+// Skipping such modules keeps the unresolved-reference check free of false
+// positives.
+bool ModuleSkipsUnresolvedCheck(const ModuleDecl* decl,
+                                const RtlirModule* mod) {
+  if (!mod->imports.empty()) return true;
+  for (const auto* item : decl->items) {
+    if (item->kind == ModuleItemKind::kGenerateFor ||
+        item->kind == ModuleItemKind::kGenerateIf ||
+        item->kind == ModuleItemKind::kGenerateCase) {
+      return true;
+    }
+  }
+  return false;
+}
+
+}  // namespace
+
+bool Elaborator::IsDeclaredNameForRhs(std::string_view name) const {
+  // var_types_ records the bare name of every elaborated net and variable; the
+  // remaining sets cover names that are not signals (typedefs, nettypes,
+  // sequences, compilation-unit names) but may still be read by name.
+  return var_types_.count(name) != 0 || IsNameInModuleScope(name) ||
+         typedefs_.count(name) != 0 || nettype_names_.count(name) != 0 ||
+         sequence_names_.count(name) != 0 ||
+         assoc_typedef_names_.count(name) != 0 ||
+         cu_scope_names_.count(name) != 0;
+}
+
+void Elaborator::ValidateUnresolvedReferences(const ModuleDecl* decl,
+                                              const RtlirModule* mod) {
+  if (!mod) return;
+  if (ModuleSkipsUnresolvedCheck(decl, mod)) return;
+
+  for (const auto* item : decl->items) {
+    if (item->kind != ModuleItemKind::kContAssign) continue;
+    std::vector<const Expr*> refs;
+    CollectBareIdents(item->assign_rhs, refs);
+    for (const auto* e : refs) {
+      if (IsDeclaredNameForRhs(e->text)) continue;
+      diag_.Error(
+          e->range.start,
+          std::format("reference to unresolved identifier '{}'", e->text));
+    }
+  }
+}
+
 bool Elaborator::IsNameInModuleScope(std::string_view name) const {
   if (declared_names_.count(name)) return true;
   if (ansi_port_names_.count(name)) return true;

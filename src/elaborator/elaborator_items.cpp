@@ -928,6 +928,7 @@ void Elaborator::RunPostItemValidations(const ModuleDecl* decl,
   ValidateProgramSubroutineCall(decl);
   ValidateHierRefToAutomatic(decl);
   ValidateHierRefToImportedName(decl, mod);
+  ValidateUnresolvedReferences(decl, mod);
   ValidateHierRefInstanceArray(decl);
   ValidateForwardTypedefsInScope(decl);
   ValidateForwardTypedefScopePrefix(decl);

@@ -742,11 +742,11 @@ class Elaborator {
 
   void ValidateScopeRules(const ModuleDecl* decl);
 
-  // Returns true when `name` is resolvable against any of the module-level name
-  // sets (declared signals, ports, constants, enum members, specparams,
-  // classes, tasks, functions, interface instances, or checker instances).
-  // Callers handle scope-local names (e.g. block-locals or prior arguments)
-  // before consulting this shared check.
+  // §5.6/§6.5: flags an unresolved bare identifier read on a cont-assign RHS.
+  void ValidateUnresolvedReferences(const ModuleDecl* decl,
+                                    const RtlirModule* mod);
+  bool IsDeclaredNameForRhs(std::string_view name) const;
+  // True when `name` resolves against any module-level name set (see .cpp).
   bool IsNameInModuleScope(std::string_view name) const;
 
   void ValidateHierRefIntoChecker(const ModuleDecl* decl);
