@@ -93,13 +93,19 @@ TEST_F(VpiGetPropertySim, TimePropertyWithNullObjectReportsSimulationTimeUnit) {
 }
 
 // §38.6: querying a protected object is an error, and on an error vpi_get()
-// returns vpiUndefined.
+// returns vpiUndefined. Per §37.3.6 (printed p.1003) the vpiType and
+// vpiIsProtected properties are explicitly "permitted for all objects", so the
+// refusal must be observed through some other property -- here vpiSize, which a
+// module (a non-expression object) does not exempt from the protection rule.
 TEST_F(VpiGetPropertySim, ProtectedObjectQueryReturnsVpiUndefined) {
   auto* mod = vpi_ctx_.CreateModule("locked", "locked");
   mod->is_protected = true;
 
-  // C8: an error makes vpi_get() yield vpiUndefined.
-  EXPECT_EQ(vpi_get(vpiType, mod), vpiUndefined);
+  // §37.3.6: vpiType stays accessible on a protected object.
+  EXPECT_EQ(vpi_get(vpiType, mod), vpiModule);
+
+  // C8: a refused (non-exempt) query makes vpi_get() yield vpiUndefined.
+  EXPECT_EQ(vpi_get(vpiSize, mod), vpiUndefined);
 
   // C7: the protected-object query is recorded as an error.
   SVpiErrorInfo info = {};
