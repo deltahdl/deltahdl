@@ -32,9 +32,10 @@ TEST_F(VpiPutValueArraySim, MultiDimensionFillFollowsFastestVaryingIndex) {
   EXPECT_EQ(elems_[6]->value.words[0].aval, 13u);  // a[0][3]
   EXPECT_EQ(elems_[7]->value.words[0].aval, 14u);  // a[0][4]
   EXPECT_EQ(elems_[8]->value.words[0].aval, 15u);  // a[0][5]
-  // The earlier ordinals were never in the section.
-  EXPECT_EQ(elems_[0]->value.words[0].bval, ~uint64_t{0});
-  EXPECT_EQ(elems_[3]->value.words[0].bval, ~uint64_t{0});
+  // The earlier ordinals were never in the section. The elements are 8 bits
+  // wide, so their untouched initial-x value is masked to that width.
+  EXPECT_EQ(elems_[0]->value.words[0].bval, 0xFFu);
+  EXPECT_EQ(elems_[3]->value.words[0].bval, 0xFFu);
 }
 
 // §38.35: in vpiRawFourStateVal format each element occupies ngroups*2 bytes -
@@ -146,7 +147,8 @@ TEST_F(VpiPutValueArraySim, UnsupportedFormatIsError) {
 
   SVpiErrorInfo info = {};
   EXPECT_EQ(vpi_chk_error(&info), vpiError);
-  EXPECT_EQ(elems_[0]->value.words[0].bval, ~uint64_t{0});  // unchanged
+  EXPECT_EQ(elems_[0]->value.words[0].bval,
+            0xFFFFFFFFu);  // unchanged (initial x masked to 32-bit width)
 }
 
 // §38.35: only vpiOneValue, vpiPropagateOff, and vpiNoDelay (the default) are
@@ -164,7 +166,8 @@ TEST_F(VpiPutValueArraySim, IllegalFlagIsError) {
 
   SVpiErrorInfo info = {};
   EXPECT_EQ(vpi_chk_error(&info), vpiError);
-  EXPECT_EQ(elems_[0]->value.words[0].bval, ~uint64_t{0});  // unchanged
+  EXPECT_EQ(elems_[0]->value.words[0].bval,
+            0xFFFFFFFFu);  // unchanged (initial x masked to 32-bit width)
 }
 
 // §38.35: the routine modifies only static unpacked arrays (vpiArrayType
@@ -181,7 +184,8 @@ TEST_F(VpiPutValueArraySim, NonStaticArrayIsError) {
 
   SVpiErrorInfo info = {};
   EXPECT_EQ(vpi_chk_error(&info), vpiError);
-  EXPECT_EQ(elems_[0]->value.words[0].bval, ~uint64_t{0});  // unchanged
+  EXPECT_EQ(elems_[0]->value.words[0].bval,
+            0xFFFFFFFFu);  // unchanged (initial x masked to 32-bit width)
 }
 
 // §38.35: in the raw formats an element occupies ngroups = (elemBits + 7)/8
@@ -225,7 +229,8 @@ TEST_F(VpiPutValueArraySim, NetArrayTargetOverridesElementValues) {
   EXPECT_EQ(vpi_chk_error(&info), 0);
   EXPECT_EQ(elems_[1]->value.words[0].aval, 44u);
   EXPECT_EQ(elems_[2]->value.words[0].aval, 55u);
-  EXPECT_EQ(elems_[0]->value.words[0].bval, ~uint64_t{0});  // outside section
+  EXPECT_EQ(elems_[0]->value.words[0].bval,
+            0xFFFFFFFFu);  // outside section (initial x masked to 32-bit width)
 }
 
 // §38.35: the vpiShortIntVal format supplies one short per element through the
