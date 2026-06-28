@@ -327,21 +327,28 @@ static bool TryLowerClassNewVarInit(const RtlirVariable& var, Variable* v,
   return true;
 }
 
+// §6.17/§15: an event variable initialized to `null` is a null event; one
+// initialized to another event identifier aliases that event. Returns true when
+// it handled an event initializer.
+static bool TryLowerEventVarInit(const RtlirVariable& var, Variable* v,
+                                 SimContext& ctx) {
+  if (!var.is_event || var.init_expr->kind != ExprKind::kIdentifier)
+    return false;
+  if (var.init_expr->text == "null") {
+    v->is_null_event = true;
+    return true;
+  }
+  auto* target = ctx.FindVariable(var.init_expr->text);
+  if (target && target->is_event) {
+    ctx.AliasVariable(var.name, var.init_expr->text);
+    return true;
+  }
+  return false;
+}
+
 void Lowerer::LowerVarInit(const RtlirVariable& var, Variable* v,
                            uint32_t width) {
-  if (var.is_event && var.init_expr->kind == ExprKind::kIdentifier &&
-      var.init_expr->text == "null") {
-    v->is_null_event = true;
-    return;
-  }
-
-  if (var.is_event && var.init_expr->kind == ExprKind::kIdentifier) {
-    auto* target = ctx_.FindVariable(var.init_expr->text);
-    if (target && target->is_event) {
-      ctx_.AliasVariable(var.name, var.init_expr->text);
-      return;
-    }
-  }
+  if (TryLowerEventVarInit(var, v, ctx_)) return;
   if (TryLowerClassNewVarInit(var, v, ctx_, arena_)) return;
 
   auto* sinfo = ctx_.GetVariableStructType(var.name);
