@@ -67,6 +67,17 @@ bool TimeSlot::AnyNonemptyIn(Region first, Region last) const {
   return false;
 }
 
+Region TimeSlot::FirstNonemptyIn(Region first, Region last) const {
+  auto lo = static_cast<size_t>(first);
+  auto hi = static_cast<size_t>(last);
+  for (size_t i = lo; i <= hi; ++i) {
+    if (!regions[i].empty()) {
+      return static_cast<Region>(i);
+    }
+  }
+  return Region::kCOUNT;
+}
+
 bool TimeSlot::AnyIterativeNonempty() const {
   for (size_t i = 0; i < kRegionCount; ++i) {
     if (IsIterativeRegion(static_cast<Region>(i)) && !regions[i].empty()) {
@@ -153,17 +164,8 @@ void Scheduler::ExecuteTimeSlot(TimeSlot& slot) {
   ExecuteRegion(slot, Region::kPreActive);
 
   while (slot.AnyIterativeNonempty()) {
-    // §4.4.2 (Figure 4-1): drive the active region set (Active/Inactive/NBA) to
-    // a fixpoint *before* the Observed regions run, so a Pre-Observed or
-    // Observed event samples fully stabilized active-set state even when an
-    // Inactive or NBA event has scheduled a fresh Active event during the
-    // iteration.
     while (IterateActiveSet(slot)) {
     }
-    ExecuteRegion(slot, Region::kPreObserved);
-    ExecuteRegion(slot, Region::kObserved);
-    ExecuteRegion(slot, Region::kPostObserved);
-
     while (IterateReactiveSet(slot)) {
     }
 
@@ -179,41 +181,33 @@ void Scheduler::ExecuteTimeSlot(TimeSlot& slot) {
 }
 
 bool Scheduler::IterateActiveSet(TimeSlot& slot) {
-  if (!slot.AnyNonemptyIn(Region::kActive, Region::kPostNBA)) {
+  if (!slot.AnyNonemptyIn(Region::kActive, Region::kPostObserved)) {
     return false;
   }
-  while (slot.AnyNonemptyIn(Region::kActive, Region::kPostNBA)) {
-    ExecuteActiveRegions(slot);
+  // §4.5 reference algorithm: drain the active region set together with the
+  // Observed regions, always taking the *earliest* nonempty region next. An
+  // event scheduled into an earlier region while a later one runs (e.g. an NBA
+  // created during the Observed region) is therefore processed before the
+  // reactive set, and the Pre-Observed/Observed regions sample only once every
+  // earlier active-set region — including Inactive→Active re-entries — settles.
+  while (slot.AnyNonemptyIn(Region::kActive, Region::kPostObserved)) {
+    ExecuteRegion(slot,
+                  slot.FirstNonemptyIn(Region::kActive, Region::kPostObserved));
   }
   return true;
-}
-
-void Scheduler::ExecuteActiveRegions(TimeSlot& slot) {
-  for (size_t i = 0; i < kRegionCount; ++i) {
-    auto r = static_cast<Region>(i);
-    if (IsActiveRegionSet(r)) {
-      ExecuteRegion(slot, r);
-    }
-  }
 }
 
 bool Scheduler::IterateReactiveSet(TimeSlot& slot) {
   if (!slot.AnyNonemptyIn(Region::kReactive, Region::kPostReNBA)) {
     return false;
   }
+  // §4.5 reference algorithm: same earliest-nonempty-first drain across the
+  // reactive region set (Reactive..Post-Re-NBA).
   while (slot.AnyNonemptyIn(Region::kReactive, Region::kPostReNBA)) {
-    ExecuteReactiveRegions(slot);
+    ExecuteRegion(slot,
+                  slot.FirstNonemptyIn(Region::kReactive, Region::kPostReNBA));
   }
   return true;
-}
-
-void Scheduler::ExecuteReactiveRegions(TimeSlot& slot) {
-  for (size_t i = 0; i < kRegionCount; ++i) {
-    auto r = static_cast<Region>(i);
-    if (IsReactiveRegionSet(r)) {
-      ExecuteRegion(slot, r);
-    }
-  }
 }
 
 void Scheduler::ExecuteRegion(TimeSlot& slot, Region region) {

@@ -43,6 +43,10 @@ struct TimeSlot {
 
   bool AnyNonemptyIn(Region first, Region last) const;
 
+  // Lowest-ordinal region in [first, last] holding an event, or kCOUNT when the
+  // whole range is empty. Drives the §4.5 earliest-nonempty-first iteration.
+  Region FirstNonemptyIn(Region first, Region last) const;
+
   bool AnyIterativeNonempty() const;
 };
 
@@ -172,8 +176,6 @@ class Scheduler {
 
  private:
   void ExecuteTimeSlot(TimeSlot& slot);
-  void ExecuteActiveRegions(TimeSlot& slot);
-  void ExecuteReactiveRegions(TimeSlot& slot);
   void ExecuteRegion(TimeSlot& slot, Region region);
   void DrainQueue(EventQueue& queue);
 
