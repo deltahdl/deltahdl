@@ -259,6 +259,10 @@ static void ApplyStructMemberDefaults(const RtlirVariable& var, Variable* v,
 void Lowerer::LowerVarAggregate(const RtlirVariable& var) {
   if (var.is_queue) {
     ctx_.CreateQueue(var.name, var.width, var.queue_max_size, var.is_4state);
+    // §7.10.1: a queue may be initialized from an assignment-pattern literal
+    // (e.g. int q[$] = '{10, 20, 30}). Populate its elements like a dynamic
+    // array; LowerDynArrayInit is a no-op when there is no initializer.
+    LowerDynArrayInit(var);
   } else if (var.is_dynamic) {
     ctx_.CreateQueue(var.name, var.width);
     LowerDynArrayInit(var);
