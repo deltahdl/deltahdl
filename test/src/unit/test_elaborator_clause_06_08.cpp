@@ -80,9 +80,14 @@ TEST(VarDecl, MultipleVarsInOneStatement) {
   EXPECT_FALSE(f.has_errors);
   auto* mod = design->top_modules[0];
   ASSERT_GE(mod->variables.size(), 3u);
-  EXPECT_EQ(mod->variables[0].name, "t.a");
-  EXPECT_EQ(mod->variables[1].name, "t.b");
-  EXPECT_EQ(mod->variables[2].name, "t.c");
+  // §6.8: each variable_decl_assignment names a simple variable_identifier, so
+  // a single declaration of "a, b, c" elaborates to three variables whose
+  // stored names are the bare identifiers. The "t.a" hierarchical path name
+  // (§23.6) is a separate concept from the declared name and is not what is
+  // recorded here.
+  EXPECT_EQ(mod->variables[0].name, "a");
+  EXPECT_EQ(mod->variables[1].name, "b");
+  EXPECT_EQ(mod->variables[2].name, "c");
 }
 
 TEST(VarDecl, VarImplicitElaboratesAsLogic) {
