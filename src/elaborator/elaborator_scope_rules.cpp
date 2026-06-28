@@ -471,7 +471,14 @@ void CollectBareIdents(const Expr* e, std::vector<const Expr*>& out) {
 // positives.
 bool ModuleSkipsUnresolvedCheck(const ModuleDecl* decl,
                                 const RtlirModule* mod) {
-  if (!mod->imports.empty()) return true;
+  // Every module carries an auto-injected `import std::*` (see
+  // elaborator_module.cpp); that implicit wildcard brings in only the small,
+  // known std package and must not disable the check. Any *other* import means
+  // a bare name may legally resolve to an imported package member the module
+  // symbol table does not list, so skip such modules to avoid false positives.
+  for (const auto& imp : mod->imports) {
+    if (imp.package_name != "std" || !imp.is_wildcard) return true;
+  }
   for (const auto* item : decl->items) {
     if (item->kind == ModuleItemKind::kGenerateFor ||
         item->kind == ModuleItemKind::kGenerateIf ||
