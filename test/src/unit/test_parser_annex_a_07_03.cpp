@@ -186,10 +186,12 @@ TEST(SpecifyTerminalParsing, TerminalWithEdgeSensitivePath) {
 }
 
 TEST(SpecifyTerminalParsing, ListOfPathInputsMultiple) {
+  // A.7.4: a list_of_path_inputs is only valid with the full connection '*>';
+  // the parallel '=>' connects a single source to a single destination.
   auto r = Parse(
       "module m;\n"
       "  specify\n"
-      "    (a, b, c => d) = 5;\n"
+      "    (a, b, c *> d) = 5;\n"
       "  endspecify\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
