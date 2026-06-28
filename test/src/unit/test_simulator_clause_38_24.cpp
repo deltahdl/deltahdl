@@ -121,7 +121,13 @@ TEST_F(VpiMcdCloseSim, ClosesDescriptorOpenedByFopen) {
   EXPECT_EQ(vpi_mcd_close(fopen_mcd), 0u);
   EXPECT_FALSE(vpi_ctx_.IsMcdFileOpen("from_fopen.log"));
 
-  // The freed channel can be reused by a fresh open.
+  // §38.27: the channel freed by the close is available to a fresh open again.
+  // The LRM does not fix which channel an open returns -- it draws an unused
+  // one
+  // -- so to observe channel 3 (bit 2) being reclaimed, first consume the lower
+  // channel 2 (bit 1); the reclaimed channel 3 is then the one handed back.
+  char filler[] = "filler.log";
+  EXPECT_EQ(vpi_mcd_open(filler), 0x00000002u);
   char fresh[] = "fresh.log";
   EXPECT_EQ(vpi_mcd_open(fresh), fopen_mcd);
 }
