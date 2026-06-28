@@ -863,48 +863,6 @@ bool IsImplicitNestedInstantiationCandidate(std::string_view name,
 
 }  // namespace
 
-void Elaborator::ResetItemElaborationState() {
-  forward_typedef_kinds_.clear();
-  declared_names_.clear();
-  net_names_.clear();
-  cont_assign_targets_.clear();
-  proc_assign_targets_.clear();
-  var_types_.clear();
-  var_array_info_.clear();
-  specparam_names_.clear();
-  enum_var_names_.clear();
-  enum_member_names_.clear();
-  const_names_.clear();
-  const_var_names_.clear();
-  class_var_names_.clear();
-  class_var_types_.clear();
-  var_init_names_.clear();
-  output_port_targets_.clear();
-  nettype_net_names_.clear();
-  interconnect_names_.clear();
-  scalar_var_names_.clear();
-  var_named_types_.clear();
-  alias_pairs_.clear();
-  non_ansi_complete_ports_.clear();
-  non_ansi_partial_ports_.clear();
-  non_ansi_signed_ports_.clear();
-  ansi_port_names_.clear();
-  clocking_signals_.clear();
-  interface_inst_types_.clear();
-  vi_var_interface_types_.clear();
-  vi_var_modports_.clear();
-  vi_var_param_values_.clear();
-  interface_inst_param_values_.clear();
-  checker_inst_names_.clear();
-  program_inst_names_.clear();
-  auto_task_func_names_.clear();
-  nested_module_decls_.clear();
-  task_names_.clear();
-  let_names_.clear();
-  sequence_names_.clear();
-  func_decls_.clear();
-}
-
 void Elaborator::RunPostItemValidations(const ModuleDecl* decl,
                                         RtlirModule* mod) {
   CheckAlwaysCombMultiDriver(decl, mod);

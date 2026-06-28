@@ -12,6 +12,7 @@
 
 #include "common/source_loc.h"
 #include "elaborator/const_eval.h"
+#include "elaborator/elaborator_bind_scope.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/property_rewrite.h"
 #include "elaborator/rtlir.h"
@@ -157,22 +158,6 @@ class Elaborator {
   void BindPorts(RtlirModuleInst& inst, const ModuleItem* item,
                  RtlirModule* parent_mod, const ModuleDecl* child_decl);
 
-  // §23.3.3 per-instance binding scope shared by the BindPorts helpers.
-  struct PortBindScope {
-    RtlirModuleInst& inst;
-    const ModuleItem* item;
-    RtlirModule* parent_mod;
-    bool has_pull;
-    bool is_ordered;
-  };
-  // Mutable per-connection state threaded through the BindExplicitPort helpers.
-  struct ExplicitPortBind {
-    RtlirPortBinding& binding;
-    const Expr* conn_expr;
-    std::string_view port_name;
-    const RtlirPort* child_port;  // nullptr when no port matches
-    bool is_implicit;
-  };
   // Binds the explicit port connection at `index`; returns false to stop the
   // loop (too many ordered connections for the instantiated module).
   bool BindExplicitPort(const PortBindScope& scope, size_t index);
