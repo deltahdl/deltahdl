@@ -244,6 +244,17 @@ static void MergeCalledFunctionSignals(const Stmt* body, const FuncMap& funcs,
   }
 }
 
+// §9.2.2.2.1: the inferred sensitivity watches whole signals, so reduce a
+// read's longest static prefix (e.g. "state[0]", "s.f") to the base identifier.
+// The event signal is then a plain identifier that the simulator resolves to
+// the declared net/variable (it keys watchers by the base name via
+// FindVariable); an indexed/membered text would never match and the process
+// would not wake.
+static std::string_view BaseSignalName(std::string_view name) {
+  auto pos = name.find_first_of("[.");
+  return pos == std::string_view::npos ? name : name.substr(0, pos);
+}
+
 static std::vector<EventExpr> BuildSensitivityEvents(
     const std::unordered_set<std::string>& reads,
     const std::unordered_set<std::string>& locals,
@@ -251,13 +262,19 @@ static std::vector<EventExpr> BuildSensitivityEvents(
     Arena& arena) {
   std::vector<EventExpr> events;
   events.reserve(reads.size());
+  // The read names retain their longest static prefix for the locals/written
+  // exclusion checks (§9.2.2.2.1), but several selects of one signal collapse
+  // to a single base-name event, so dedupe the emitted identifiers.
+  std::unordered_set<std::string_view> emitted;
   for (const auto& name : reads) {
     if (locals.count(name)) continue;
     if (exclude_written && written.count(name)) continue;
+    std::string_view base = BaseSignalName(name);
+    if (base.empty() || !emitted.insert(base).second) continue;
     auto* expr = arena.Create<Expr>();
     expr->kind = ExprKind::kIdentifier;
-    expr->text = std::string_view(arena.AllocString(name.data(), name.size()),
-                                  name.size());
+    expr->text = std::string_view(arena.AllocString(base.data(), base.size()),
+                                  base.size());
     events.push_back({Edge::kNone, expr});
   }
   return events;
