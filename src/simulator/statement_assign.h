@@ -39,7 +39,7 @@ Variable* TryResolveCompoundElement(const Expr* lhs, SimContext& ctx,
                                     Arena& arena);
 Variable* ResolveLhsVariable(const Expr* lhs, SimContext& ctx);
 bool WriteStructField(const Expr* lhs, const Logic4Vec& rhs_val,
-                      SimContext& ctx, Arena& arena);
+                      SimContext& ctx);
 void WriteBitSelect(Variable* var, const Expr* lhs, const Logic4Vec& rhs_val,
                     SimContext& ctx, Arena& arena);
 Logic4Vec ResizeToWidth(Logic4Vec val, uint32_t target_width, Arena& arena);

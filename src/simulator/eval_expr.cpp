@@ -186,10 +186,7 @@ static Logic4Vec ExtractStructField(Variable* base_var,
                                     std::string_view field, Arena& arena) {
   for (const auto& f : info->fields) {
     if (f.name != field) continue;
-    uint64_t val = base_var->value.ToUint64() >> f.bit_offset;
-    uint64_t mask =
-        (f.width >= 64) ? ~uint64_t{0} : (uint64_t{1} << f.width) - 1;
-    return MakeLogic4VecVal(arena, f.width, val & mask);
+    return ExtractBitField(arena, base_var->value, f.bit_offset, f.width);
   }
   return MakeLogic4Vec(arena, 1);
 }

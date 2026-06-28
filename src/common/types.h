@@ -38,6 +38,19 @@ struct Logic4Vec {
 Logic4Vec MakeLogic4Vec(class Arena& arena, uint32_t width);
 Logic4Vec MakeLogic4VecVal(class Arena& arena, uint32_t width, uint64_t val);
 
+// Extract `width` bits starting at `start_bit` from `src` into a fresh vector
+// of that width, preserving 4-state encoding. Bits at or beyond src.width read
+// as 0. Multi-word safe (unlike a ToUint64()-based slice, which loses bits >=
+// 64).
+Logic4Vec ExtractBitField(class Arena& arena, const Logic4Vec& src,
+                          uint32_t start_bit, uint32_t width);
+
+// Deposit the low `width` bits of `src` into `dst` starting at `start_bit`,
+// preserving every other bit of `dst` (4-state encoding kept on both sides).
+// Multi-word safe: writes the correct word/bit even when start_bit >= 64.
+void DepositBitField(Logic4Vec& dst, uint32_t start_bit, const Logic4Vec& src,
+                     uint32_t width);
+
 struct Logic2Vec {
   uint32_t width = 0;
   uint32_t nwords = 0;

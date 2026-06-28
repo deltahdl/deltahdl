@@ -123,16 +123,10 @@ static bool TaggedUnionTagMismatch(std::string_view base_name,
 // of info's fields. Returns true when the field was found and written.
 static bool WriteStructFieldBits(Variable* base_var, const StructTypeInfo* info,
                                  std::string_view field_name,
-                                 const Logic4Vec& rhs_val, Arena& arena) {
+                                 const Logic4Vec& rhs_val) {
   for (const auto& f : info->fields) {
     if (f.name != field_name) continue;
-    uint64_t old_val = base_var->value.ToUint64();
-    uint64_t mask =
-        (f.width >= 64) ? ~uint64_t{0} : (uint64_t{1} << f.width) - 1;
-    uint64_t new_bits = (rhs_val.ToUint64() & mask) << f.bit_offset;
-    uint64_t cleared = old_val & ~(mask << f.bit_offset);
-    base_var->value =
-        MakeLogic4VecVal(arena, base_var->value.width, cleared | new_bits);
+    DepositBitField(base_var->value, f.bit_offset, rhs_val, f.width);
     base_var->NotifyWatchers();
     return true;
   }
@@ -215,8 +209,7 @@ static bool WriteStaticClassField(std::string_view base_name,
 // neither this/super nor a class type.
 static bool WriteVariableField(std::string_view base_name,
                                std::string_view field_name,
-                               const Logic4Vec& rhs_val, SimContext& ctx,
-                               Arena& arena) {
+                               const Logic4Vec& rhs_val, SimContext& ctx) {
   auto* base_var = ctx.FindVariable(base_name);
   if (!base_var) return false;
   auto* info = ctx.GetVariableStructType(base_name);
@@ -224,14 +217,13 @@ static bool WriteVariableField(std::string_view base_name,
     if (info->is_union && TaggedUnionTagMismatch(base_name, field_name, ctx)) {
       return true;
     }
-    if (WriteStructFieldBits(base_var, info, field_name, rhs_val, arena))
-      return true;
+    if (WriteStructFieldBits(base_var, info, field_name, rhs_val)) return true;
   }
   return WriteClassObjectField(base_var, base_name, field_name, rhs_val, ctx);
 }
 
 bool WriteStructField(const Expr* lhs, const Logic4Vec& rhs_val,
-                      SimContext& ctx, Arena& arena) {
+                      SimContext& ctx) {
   std::string name;
   BuildLhsName(lhs, name);
   auto dot = name.find('.');
@@ -246,7 +238,7 @@ bool WriteStructField(const Expr* lhs, const Logic4Vec& rhs_val,
   if (handled) return result;
   result = WriteStaticClassField(base_name, field_name, rhs_val, ctx, &handled);
   if (handled) return result;
-  return WriteVariableField(base_name, field_name, rhs_val, ctx, arena);
+  return WriteVariableField(base_name, field_name, rhs_val, ctx);
 }
 
 static void WritePartSelect(Variable* var, uint32_t lo, uint32_t width,

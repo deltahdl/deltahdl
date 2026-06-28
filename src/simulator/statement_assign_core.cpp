@@ -460,7 +460,7 @@ static void AssignToScalarLhs(const Stmt* stmt, Logic4Vec rhs_val,
     if (stmt->rhs && stmt->rhs->kind == ExprKind::kTagged && stmt->rhs->rhs)
       ctx.SetVariableTag(stmt->lhs->text, stmt->rhs->rhs->text);
   } else if (stmt->lhs->kind == ExprKind::kMemberAccess) {
-    WriteStructField(stmt->lhs, rhs_val, ctx, arena);
+    WriteStructField(stmt->lhs, rhs_val, ctx);
   }
 }
 
@@ -675,7 +675,7 @@ static void ApplyCompoundAssignOp(const Stmt* stmt, SimContext& ctx,
   } else if (stmt->lhs->kind == ExprKind::kMemberAccess) {
     auto lhs_val = EvalExpr(stmt->lhs, ctx, arena);
     auto result = EvalBinaryOp(base_op, lhs_val, actual_rhs, arena);
-    WriteStructField(stmt->lhs, result, ctx, arena);
+    WriteStructField(stmt->lhs, result, ctx);
   } else {
     auto result = EvalExpr(stmt->rhs, ctx, arena);
     AssignToScalarLhs(stmt, result, ctx, arena);
@@ -766,7 +766,7 @@ void PerformBlockingAssign(const Expr* lhs, const Logic4Vec& rhs_val,
     if (!var->is_4state) CoerceTo2State(var->value);
     var->NotifyWatchers();
   } else if (lhs->kind == ExprKind::kMemberAccess) {
-    WriteStructField(lhs, rhs_val, ctx, arena);
+    WriteStructField(lhs, rhs_val, ctx);
   }
 }
 

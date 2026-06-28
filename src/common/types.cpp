@@ -105,6 +105,37 @@ Logic4Vec MakeLogic4VecVal(Arena& arena, uint32_t width, uint64_t val) {
   return vec;
 }
 
+Logic4Vec ExtractBitField(Arena& arena, const Logic4Vec& src,
+                          uint32_t start_bit, uint32_t width) {
+  Logic4Vec out = MakeLogic4Vec(arena, width);
+  for (uint32_t i = 0; i < width; ++i) {
+    uint32_t s = start_bit + i;
+    if (s >= src.width) continue;
+    uint64_t a = (src.words[s / 64].aval >> (s % 64)) & 1;
+    uint64_t b = (src.words[s / 64].bval >> (s % 64)) & 1;
+    out.words[i / 64].aval |= a << (i % 64);
+    out.words[i / 64].bval |= b << (i % 64);
+  }
+  return out;
+}
+
+void DepositBitField(Logic4Vec& dst, uint32_t start_bit, const Logic4Vec& src,
+                     uint32_t width) {
+  for (uint32_t i = 0; i < width; ++i) {
+    uint32_t d = start_bit + i;
+    if (d >= dst.width) break;
+    uint64_t a = 0;
+    uint64_t b = 0;
+    if (i < src.width) {
+      a = (src.words[i / 64].aval >> (i % 64)) & 1;
+      b = (src.words[i / 64].bval >> (i % 64)) & 1;
+    }
+    uint64_t bit = uint64_t{1} << (d % 64);
+    dst.words[d / 64].aval = (dst.words[d / 64].aval & ~bit) | (a << (d % 64));
+    dst.words[d / 64].bval = (dst.words[d / 64].bval & ~bit) | (b << (d % 64));
+  }
+}
+
 uint64_t Logic2Vec::ToUint64() const {
   if (nwords == 0) {
     return 0;

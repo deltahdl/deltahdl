@@ -215,7 +215,7 @@ TEST(TaggedUnionEval, MatchingMemberWriteUpdatesValue) {
   lhs->rhs = MakeId(f.arena, "a");
   auto rhs_val = MakeLogic4VecVal(f.arena, 8, 0x5A);
 
-  WriteStructField(lhs, rhs_val, f.ctx, f.arena);
+  WriteStructField(lhs, rhs_val, f.ctx);
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_EQ(var->value.ToUint64(), 0x5Au);
 }
@@ -245,7 +245,7 @@ TEST(TaggedUnionEval, MismatchedWriteEmitsDiagnosticAndKeepsValue) {
   auto rhs_val = MakeLogic4VecVal(f.arena, 8, 0x77);
 
   EXPECT_FALSE(f.diag.HasErrors());
-  WriteStructField(lhs, rhs_val, f.ctx, f.arena);
+  WriteStructField(lhs, rhs_val, f.ctx);
   EXPECT_TRUE(f.diag.HasErrors());
   EXPECT_EQ(var->value.ToUint64(), 0x33u);
 }
