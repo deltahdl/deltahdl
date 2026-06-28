@@ -277,7 +277,7 @@ TEST(ConfigParamApply, EmptyOverrideResetsParameterToDefault) {
   auto* a1 = ConfigElabFirstChild(
       f,
       "module adder #(parameter W = 8) (); endmodule\n"
-      "module top; adder a1 #(.W(16)) (); endmodule\n"
+      "module top; adder #(.W(16)) a1 (); endmodule\n"
       "config c; design top; instance top.a1 use #(.W()); endconfig\n");
   ASSERT_NE(a1, nullptr);
   EXPECT_FALSE(f.has_errors);
@@ -291,7 +291,7 @@ TEST(ConfigParamApply, EmptyListResetsAllParametersToDefault) {
   auto* a1 = ConfigElabFirstChild(
       f,
       "module adder #(parameter W = 8, parameter D = 4) (); endmodule\n"
-      "module top; adder a1 #(.W(16), .D(2)) (); endmodule\n"
+      "module top; adder #(.W(16), .D(2)) a1 (); endmodule\n"
       "config c; design top; instance top.a1 use #(); endconfig\n");
   ASSERT_NE(a1, nullptr);
   EXPECT_FALSE(f.has_errors);
