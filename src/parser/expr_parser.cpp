@@ -587,7 +587,7 @@ static bool IsMethodKeyword(TokenKind kind) {
 }
 
 Expr* Parser::MakeMemberAccess(Expr* base) {
-  const bool is_scope = CurrentToken().kind == TokenKind::kColonColon;
+  bool is_scope = CurrentToken().kind == TokenKind::kColonColon;
   Consume();
   auto member_tok =
       IsMethodKeyword(CurrentToken().kind) ? Consume() : ExpectIdentifier();
