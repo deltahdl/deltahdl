@@ -86,17 +86,19 @@ TEST_F(WhileRepeat, ConditionIsNullWhenAbsentOrHandleNull) {
 
 // vpiCondition edge is scoped to the loop statements: asking a non-loop
 // statement for vpiCondition does not pick up an expression child through this
-// path. Here an ordinary wait (§37.67 draws its own vpiCondition) with an
-// expression child yields no condition from the while/repeat dispatch.
+// path. The negative control must be a genuinely condition-less statement -- a
+// forever loop (§37.70 draws no controlling-condition edge), not a wait (§37.67
+// draws its own vpiCondition, served publicly). A forever with an expression
+// child yields no condition from the while/repeat dispatch.
 TEST_F(WhileRepeat, VpiConditionIsScopedToLoopStatements) {
   VpiObject condition;
   condition.type = vpiOperation;
 
-  VpiObject wait_stmt;
-  wait_stmt.type = vpiWait;
-  wait_stmt.children = {&condition};
+  VpiObject forever_stmt;
+  forever_stmt.type = vpiForever;
+  forever_stmt.children = {&condition};
 
-  EXPECT_EQ(vpi_handle(vpiCondition, &wait_stmt), nullptr);
+  EXPECT_EQ(vpi_handle(vpiCondition, &forever_stmt), nullptr);
 }
 
 // Body edge (the diagram's unlabeled arrow to a statement): a while statement
