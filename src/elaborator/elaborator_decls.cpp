@@ -209,6 +209,10 @@ struct DeclNameTables {
   const std::unordered_set<std::string_view>& non_ansi_complete_ports;
   const std::unordered_map<std::string_view, uint32_t>& non_ansi_partial_ports;
   std::unordered_set<std::string_view>& declared_names;
+  // §27.4: the declaration's generate-prefixed name, used as the redeclaration
+  // key so distinct loop-iteration instances do not collide. Equals the bare
+  // name for an unprefixed top-level declaration.
+  std::string_view scoped_name;
 };
 
 // §23.2.2.1: diagnose redeclaration of a declared name against the ANSI and
@@ -256,7 +260,11 @@ static void CheckPartialPortOrNameRedeclaration(const ModuleItem* item,
                              "declaration",
                              kind_word, item->name));
     }
-  } else if (!tables.declared_names.insert(item->name).second) {
+  } else if (!tables.declared_names.insert(tables.scoped_name).second) {
+    // §27.4: each generate-loop iteration is a distinct block instance, so the
+    // name is tracked under its generate-prefixed (scoped) form; an unprefixed
+    // top-level declaration scopes to its bare name, leaving that case
+    // unchanged. Only a true same-scope clash collides.
     diag.Error(item->loc, std::format("redeclaration of '{}'", item->name));
   }
 }
@@ -379,10 +387,11 @@ void Elaborator::ElaborateNetDecl(ModuleItem* item, RtlirModule* mod) {
   // y`) resolves the referenced object's width/signedness before the net is
   // built.
   ResolveTypeRef(item, mod);
-  CheckDeclRedeclaration(item, {item->data_type, typedefs_},
-                         {ansi_port_names_, non_ansi_complete_ports_,
-                          non_ansi_partial_ports_, declared_names_},
-                         "net", diag_);
+  CheckDeclRedeclaration(
+      item, {item->data_type, typedefs_},
+      {ansi_port_names_, non_ansi_complete_ports_, non_ansi_partial_ports_,
+       declared_names_, ScopedName(item->name)},
+      "net", diag_);
   net_names_.insert(item->name);
   var_types_[item->name] = item->data_type.kind;
   if (!item->data_type.packed_dim_left)
@@ -909,10 +918,11 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
     diag_.Error(item->loc,
                 "automatic lifetime is not allowed on module-level variables");
   }
-  CheckDeclRedeclaration(item, {item->data_type, typedefs_},
-                         {ansi_port_names_, non_ansi_complete_ports_,
-                          non_ansi_partial_ports_, declared_names_},
-                         "variable", diag_);
+  CheckDeclRedeclaration(
+      item, {item->data_type, typedefs_},
+      {ansi_port_names_, non_ansi_complete_ports_, non_ansi_partial_ports_,
+       declared_names_, ScopedName(item->name)},
+      "variable", diag_);
 
   RegisterVarDeclNames(
       item,
