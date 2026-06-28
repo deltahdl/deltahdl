@@ -921,9 +921,9 @@ class Elaborator {
   std::unordered_set<std::string_view> interconnect_names_;
   std::unordered_set<std::string_view> scalar_var_names_;
   std::unordered_set<std::string_view> task_names_;
+  std::unordered_set<std::string_view> let_names_;  // §11.12 let decl names
   std::unordered_set<std::string_view> sequence_names_;
-  // §16.12 / §F.4.1: registry of property and sequence declarations used
-  // to flatten an instance's body for legality checks.
+  // §16.12/§F.4.1: property+sequence registry to flatten an instance body.
   PropertyRegistry property_registry_;
 
   std::unordered_map<std::string_view, const ModuleItem*> func_decls_;

@@ -570,6 +570,94 @@ void CheckStringNumericAssigns(
     CheckStringNumericAssigns(ci.body, var_types, diag);
 }
 
+// Over-approximated set of names that are local to a procedural block: block
+// (begin/end) variable declarations, for-loop control variables, and foreach
+// index variables. Collected flat across the whole block tree without tracking
+// scope boundaries — that can only ever SUPPRESS a diagnostic, never raise one,
+// so a missed boundary is always safe.
+void CollectProcLocalNames(const Stmt* s,
+                           std::unordered_set<std::string_view>& names) {
+  if (!s) return;
+  if (s->kind == StmtKind::kVarDecl && !s->var_name.empty()) {
+    names.insert(s->var_name);
+  }
+  for (auto v : s->foreach_vars) names.insert(v);
+  for (const auto* sub : s->stmts) CollectProcLocalNames(sub, names);
+  for (const auto* sub : s->fork_stmts) CollectProcLocalNames(sub, names);
+  CollectProcLocalNames(s->then_branch, names);
+  CollectProcLocalNames(s->else_branch, names);
+  CollectProcLocalNames(s->body, names);
+  CollectProcLocalNames(s->for_body, names);
+  for (const auto* fi : s->for_inits) {
+    if (fi && fi->lhs && fi->lhs->kind == ExprKind::kIdentifier) {
+      names.insert(fi->lhs->text);
+    }
+    CollectProcLocalNames(fi, names);
+  }
+  for (const auto* fs : s->for_steps) CollectProcLocalNames(fs, names);
+  for (const auto& ci : s->case_items) CollectProcLocalNames(ci.body, names);
+}
+
+// Collects the RHS Expr of every procedural blocking/nonblocking assignment
+// whose ENTIRE rhs is a single bare identifier that is not a literal (null/$),
+// a builtin type keyword, or a block-local name. The caller then rejects any
+// that resolve to no declaration. Restricting to a single-identifier rhs is
+// what keeps this free of false positives: every other identifier-shaped rhs
+// primary that is NOT a value read (a call/tag/stream-size operand, a
+// member/scoped reference) only ever appears INSIDE a larger expression, so it
+// is never the whole rhs.
+void CollectProcSingleIdentRhs(
+    const Stmt* s, const std::unordered_set<std::string_view>& locals,
+    std::vector<const Expr*>& out) {
+  if (!s) return;
+  if (s->kind == StmtKind::kBlockingAssign ||
+      s->kind == StmtKind::kNonblockingAssign) {
+    const Expr* r = s->rhs;
+    if (r && r->kind == ExprKind::kIdentifier && r->scope_prefix.empty() &&
+        r->text != "null" && r->text != "$" && !IsBuiltinTypeKeyword(r->text) &&
+        locals.count(r->text) == 0) {
+      out.push_back(r);
+    }
+  }
+  for (const auto* sub : s->stmts) CollectProcSingleIdentRhs(sub, locals, out);
+  for (const auto* sub : s->fork_stmts)
+    CollectProcSingleIdentRhs(sub, locals, out);
+  CollectProcSingleIdentRhs(s->then_branch, locals, out);
+  CollectProcSingleIdentRhs(s->else_branch, locals, out);
+  CollectProcSingleIdentRhs(s->body, locals, out);
+  CollectProcSingleIdentRhs(s->for_body, locals, out);
+  for (const auto* fi : s->for_inits)
+    CollectProcSingleIdentRhs(fi, locals, out);
+  for (const auto* fs : s->for_steps)
+    CollectProcSingleIdentRhs(fs, locals, out);
+  for (const auto& ci : s->case_items)
+    CollectProcSingleIdentRhs(ci.body, locals, out);
+}
+
+// §6.5/§23.6: rejects an unresolved bare identifier read on a procedural
+// assignment RHS. Block-local names are gathered first so the single-identifier
+// check never flags a block-scoped declaration; `declared` resolves a name
+// against the module/CU scope.
+template <typename Pred>
+void ReportProcUnresolved(const ModuleDecl* decl, Pred declared,
+                          DiagEngine& diag) {
+  std::unordered_set<std::string_view> locals;
+  for (const auto* item : decl->items) {
+    if (IsProcBodyItem(item->kind)) CollectProcLocalNames(item->body, locals);
+  }
+  std::vector<const Expr*> refs;
+  for (const auto* item : decl->items) {
+    if (IsProcBodyItem(item->kind)) {
+      CollectProcSingleIdentRhs(item->body, locals, refs);
+    }
+  }
+  for (const auto* e : refs) {
+    if (declared(e->text)) continue;
+    diag.Error(e->range.start,
+               std::format("reference to unresolved identifier '{}'", e->text));
+  }
+}
+
 }  // namespace
 
 bool Elaborator::IsDeclaredNameForRhs(std::string_view name) const {
@@ -610,6 +698,10 @@ void Elaborator::ValidateUnresolvedReferences(const ModuleDecl* decl,
           std::format("reference to unresolved identifier '{}'", e->text));
     }
   }
+
+  ReportProcUnresolved(
+      decl, [this](std::string_view n) { return IsDeclaredNameForRhs(n); },
+      diag_);
 }
 
 bool Elaborator::IsNameInModuleScope(std::string_view name) const {
@@ -623,6 +715,7 @@ bool Elaborator::IsNameInModuleScope(std::string_view name) const {
   if (class_names_.count(name)) return true;
   if (class_var_names_.count(name)) return true;
   if (task_names_.count(name)) return true;
+  if (let_names_.count(name)) return true;
   if (func_decls_.count(name)) return true;
   if (interface_inst_types_.count(name)) return true;
   if (checker_inst_names_.count(name)) return true;

@@ -498,6 +498,7 @@ bool Elaborator::ElaborateBehavioralItem(ModuleItem* item, RtlirModule* mod) {
       return true;
     case ModuleItemKind::kLetDecl:
       ValidateLetDecl(item);
+      let_names_.insert(item->name);
       mod->let_decls.push_back(item);
       return true;
     case ModuleItemKind::kSpecifyBlock:
@@ -899,6 +900,7 @@ void Elaborator::ResetItemElaborationState() {
   auto_task_func_names_.clear();
   nested_module_decls_.clear();
   task_names_.clear();
+  let_names_.clear();
   sequence_names_.clear();
   func_decls_.clear();
 }

@@ -443,6 +443,7 @@ struct ItemElaborationStateSaver {
   decltype(Elaborator::auto_task_func_names_) auto_task_func_names;
   decltype(Elaborator::nested_module_decls_) nested_module_decls;
   decltype(Elaborator::task_names_) task_names;
+  decltype(Elaborator::let_names_) let_names;
   decltype(Elaborator::sequence_names_) sequence_names;
   decltype(Elaborator::func_decls_) func_decls;
 
@@ -483,6 +484,7 @@ struct ItemElaborationStateSaver {
     auto_task_func_names = std::move(e.auto_task_func_names_);
     nested_module_decls = std::move(e.nested_module_decls_);
     task_names = std::move(e.task_names_);
+    let_names = std::move(e.let_names_);
     sequence_names = std::move(e.sequence_names_);
     func_decls = std::move(e.func_decls_);
     e.ResetItemElaborationState();
@@ -525,6 +527,7 @@ struct ItemElaborationStateSaver {
     e.auto_task_func_names_ = std::move(auto_task_func_names);
     e.nested_module_decls_ = std::move(nested_module_decls);
     e.task_names_ = std::move(task_names);
+    e.let_names_ = std::move(let_names);
     e.sequence_names_ = std::move(sequence_names);
     e.func_decls_ = std::move(func_decls);
   }
