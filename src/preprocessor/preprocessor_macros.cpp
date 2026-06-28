@@ -89,7 +89,8 @@ bool Preprocessor::EvalIfdefUnary(std::string_view& expr) {
 }
 
 std::string Preprocessor::ExpandMacro(const MacroDef& macro,
-                                      std::string_view args_text) {
+                                      std::string_view args_text,
+                                      SourceLoc loc) {
   if (!macro.is_function_like) return macro.body;
   auto args = SplitMacroArgs(args_text);
 
@@ -101,7 +102,14 @@ std::string Preprocessor::ExpandMacro(const MacroDef& macro,
         macro.param_defaults[i] != "\x01") {
       resolved.emplace_back(macro.param_defaults[i]);
     } else {
-      resolved.emplace_back(arg);
+      // §22.5.1: an actual argument is macro-expanded before being substituted
+      // for the formal argument. Splitting happens first, on the raw text, so
+      // the argument count and default selection are decided before expansion
+      // (an argument expanding to empty, e.g. `EMPTY, is a provided-but-empty
+      // argument, not an omitted one). Expanding here -- before the caller
+      // pushes this macro onto the expansion stack -- also means an argument
+      // that calls the same macro is not mistaken for a recursive expansion.
+      resolved.emplace_back(ExpandInlineMacros(arg, loc.file_id, loc.line));
     }
   }
   std::vector<std::string_view> resolved_views;

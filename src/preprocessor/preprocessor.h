@@ -103,7 +103,8 @@ class Preprocessor {
                                    std::string& result);
   void ResolveAndReadInclude(std::string_view fn, SourceLoc loc, int depth,
                              std::string& output, bool angle_bracket);
-  std::string ExpandMacro(const MacroDef& macro, std::string_view args_text);
+  std::string ExpandMacro(const MacroDef& macro, std::string_view args_text,
+                          SourceLoc loc);
   bool ValidateMacroArgCount(const MacroDef& def, std::string_view args_text,
                              SourceLoc loc, std::string_view name);
   std::string ResolveInclude(std::string_view filename,
