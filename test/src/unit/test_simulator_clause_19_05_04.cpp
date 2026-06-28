@@ -10,6 +10,10 @@ using namespace delta;
 
 namespace {
 
+// §19.5.6: a transition bin "0 => 1" is hit only by a completed value
+// transition -- the coverpoint must be sampled at 0 and then at 1 on the next
+// sample. A lone scalar sample of either endpoint value does not complete the
+// sequence, so the transition bin is not matched.
 TEST(Coverage, TransitionBinNotMatchedByScalar) {
   CoverageDB db;
   auto* g = db.CreateGroup("cg");
@@ -20,7 +24,8 @@ TEST(Coverage, TransitionBinNotMatchedByScalar) {
   tbin.transitions = {{0, 1}};
   CoverageDB::AddBin(cp, tbin);
 
-  db.Sample(g, {{"sig", 0}});
+  // A single scalar sample equal to the transition's destination does not, on
+  // its own, complete the 0 => 1 sequence.
   db.Sample(g, {{"sig", 1}});
   EXPECT_EQ(g->coverpoints[0].bins[0].hit_count, 0u);
 }

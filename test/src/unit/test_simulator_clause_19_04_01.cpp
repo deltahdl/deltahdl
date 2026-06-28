@@ -21,12 +21,14 @@ TEST(Coverage, DerivedOverridesBaseCoverpoint) {
   CoverPoint* a = CoverageDB::AddCoverPoint(base, "a");
   CoverBin a_bin;
   a_bin.name = "a0";
+  a_bin.values = {0};   // §19.5: a coverpoint bin holds a value set
   a_bin.hit_count = 0;  // uncovered
   CoverageDB::AddBin(a, a_bin);
 
   CoverPoint* b = CoverageDB::AddCoverPoint(base, "b");
   CoverBin b_bin;
   b_bin.name = "b0";
+  b_bin.values = {1};   // §19.5: a coverpoint bin holds a value set
   b_bin.hit_count = 1;  // covered
   CoverageDB::AddBin(b, b_bin);
 
