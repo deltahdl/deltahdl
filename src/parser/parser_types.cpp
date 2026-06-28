@@ -230,7 +230,11 @@ DataType Parser::ParseNamedType() {
   dtype.kind = DataTypeKind::kNamed;
   dtype.type_name = Consume().text;
 
-  if (Check(TokenKind::kHash)) {
+  // §6.7.2 / A.2.1.3: a user-defined nettype name takes a delay control here
+  // (e.g. `mynet #5 x;`), not a parameter value assignment. Leave the `#` for
+  // the net-delay parse in ParseVarDeclList; only a non-nettype named type
+  // (e.g. a parameterized class `C#(...)`) consumes `#(` as type parameters.
+  if (Check(TokenKind::kHash) && known_nettypes_.count(dtype.type_name) == 0) {
     Consume();
     dtype.type_params = ParseTypeParamList();
   }
