@@ -413,6 +413,23 @@ void Elaborator::ValidatePackageImportRules(const ModuleDecl* decl) {
                     wildcard_claimed_,
                     seen_decls};
 
+  // §26.3: a wildcard import makes its names candidates throughout the entire
+  // scope, including for references that textually precede the import. Gather
+  // every (declared) wildcard package up front so such references resolve --
+  // and, when two wildcard imports supply the same name, are reported as
+  // ambiguous. Only the package list is pre-seeded here; claim/decl ordering
+  // is still driven by the textual pass below.
+  for (const auto* item : decl->items) {
+    if (item->kind != ModuleItemKind::kImportDecl) continue;
+    if (!item->import_item.is_wildcard) continue;
+    auto pkg = item->import_item.package_name;
+    if (!PackageDeclared(unit_, pkg)) continue;
+    if (std::find(wildcard_packages_.begin(), wildcard_packages_.end(), pkg) ==
+        wildcard_packages_.end()) {
+      wildcard_packages_.push_back(pkg);
+    }
+  }
+
   for (const auto* item : decl->items) HandleImportRuleItem(ctx, item);
 }
 
