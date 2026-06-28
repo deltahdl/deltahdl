@@ -28,9 +28,13 @@ TEST(GateStrengthValidity, StrengthSpecAllowedForNOutputGates) {
 }
 
 TEST(PullGateStrength, StrengthWrongType) {
+  // A.3.2: pullup_strength is (strength0, strength1) | (strength1, strength0) |
+  // (strength1); a lone strength is permitted only as a strength1. A single
+  // strength0 on a pullup is therefore the wrong strength type. (The two-value
+  // (strong0, strong1) form is legal, so it is not the error case.)
   auto r = Parse(
       "module m;\n"
-      "  pullup (strong0, strong1) (net1);\n"
+      "  pullup (strong0) (net1);\n"
       "endmodule\n");
   EXPECT_TRUE(r.has_errors);
 }
