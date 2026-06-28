@@ -187,10 +187,13 @@ TEST(DeferredAssertionElaboration, ClassMemberToRefFormalRejected) {
 
 TEST(DeferredAssertionElaboration, StaticVarToRefFormalAccepted) {
   ElabFixture f;
+  // §13.5.2: pass-by-reference is illegal for a subroutine with static
+  // lifetime, so the task must be automatic for the ref formal to be legal; a
+  // static variable is then accepted as the ref actual.
   auto* design = Elaborate(
       "module m;\n"
       "  int s;\n"
-      "  task by_ref(ref int r); endtask\n"
+      "  task automatic by_ref(ref int r); endtask\n"
       "  initial assert #0 (1) by_ref(s);\n"
       "endmodule\n",
       f);
