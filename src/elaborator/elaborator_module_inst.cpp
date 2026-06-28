@@ -19,36 +19,10 @@ namespace delta {
 
 // §6.20.3: convert a type-parameter override argument (which the expression
 // parser produces as a plain identifier, e.g. `shortint` or a class name `C`)
-// into a DataType. Built-in scalar type names map to their kind; any other name
-// is carried as a named type so it resolves against class/typedef tables later.
+// into a DataType, via the shared name->type mapping.
 static DataType TypeParamOverrideToDataType(const Expr* expr) {
-  DataType dt;
-  if (!expr || expr->kind != ExprKind::kIdentifier) return dt;
-  static const std::pair<std::string_view, DataTypeKind> kBuiltins[] = {
-      {"logic", DataTypeKind::kLogic},
-      {"bit", DataTypeKind::kBit},
-      {"reg", DataTypeKind::kReg},
-      {"byte", DataTypeKind::kByte},
-      {"shortint", DataTypeKind::kShortint},
-      {"int", DataTypeKind::kInt},
-      {"longint", DataTypeKind::kLongint},
-      {"integer", DataTypeKind::kInteger},
-      {"time", DataTypeKind::kTime},
-      {"real", DataTypeKind::kReal},
-      {"shortreal", DataTypeKind::kShortreal},
-      {"realtime", DataTypeKind::kRealtime},
-      {"string", DataTypeKind::kString},
-      {"chandle", DataTypeKind::kChandle},
-  };
-  for (const auto& [name, kind] : kBuiltins) {
-    if (expr->text == name) {
-      dt.kind = kind;
-      return dt;
-    }
-  }
-  dt.kind = DataTypeKind::kNamed;
-  dt.type_name = expr->text;
-  return dt;
+  if (!expr || expr->kind != ExprKind::kIdentifier) return DataType{};
+  return TypeNameToDataType(expr->text);
 }
 
 static bool InstParamsArePositional(const ModuleItem* item) {

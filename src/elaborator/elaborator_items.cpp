@@ -185,6 +185,20 @@ void Elaborator::ElaborateParamDecl(ModuleItem* item, RtlirModule* mod) {
   bool is_type = item->data_type.kind == DataTypeKind::kVoid &&
                  item->typedef_type.kind != DataTypeKind::kImplicit;
 
+  // §6.23/§6.20.3: a type-parameter default written with the type operator,
+  // e.g. `localparam type T = type(int)`, arrives as a kTypeRef init expression
+  // (its text is the inner type name) rather than a typedef_type. Resolve it to
+  // a concrete type so dependent declarations elaborate against the chosen
+  // type, carrying the built-in's implicit signedness (so `T x` is signed for
+  // int).
+  if (!is_type && item->data_type.kind == DataTypeKind::kVoid &&
+      item->typedef_type.kind == DataTypeKind::kImplicit && item->init_expr &&
+      item->init_expr->kind == ExprKind::kTypeRef &&
+      !item->init_expr->text.empty()) {
+    item->typedef_type = TypeNameToDataType(item->init_expr->text);
+    is_type = item->typedef_type.kind != DataTypeKind::kImplicit;
+  }
+
   CheckTypeParamNotSetToValue(item, diag_);
   CheckTypeParamConformsToForwardKind(item, is_type, typedefs_, diag_);
 

@@ -231,6 +231,36 @@ bool IsImplicitlySigned(DataTypeKind kind) {
   }
 }
 
+DataType TypeNameToDataType(std::string_view name) {
+  static const std::pair<std::string_view, DataTypeKind> kBuiltins[] = {
+      {"logic", DataTypeKind::kLogic},
+      {"bit", DataTypeKind::kBit},
+      {"reg", DataTypeKind::kReg},
+      {"byte", DataTypeKind::kByte},
+      {"shortint", DataTypeKind::kShortint},
+      {"int", DataTypeKind::kInt},
+      {"longint", DataTypeKind::kLongint},
+      {"integer", DataTypeKind::kInteger},
+      {"time", DataTypeKind::kTime},
+      {"real", DataTypeKind::kReal},
+      {"shortreal", DataTypeKind::kShortreal},
+      {"realtime", DataTypeKind::kRealtime},
+      {"string", DataTypeKind::kString},
+      {"chandle", DataTypeKind::kChandle},
+  };
+  DataType dt;
+  for (const auto& [n, kind] : kBuiltins) {
+    if (name == n) {
+      dt.kind = kind;
+      dt.is_signed = IsImplicitlySigned(kind);
+      return dt;
+    }
+  }
+  dt.kind = DataTypeKind::kNamed;
+  dt.type_name = name;
+  return dt;
+}
+
 static const DataType* ResolveNamed(const DataType& dtype,
                                     const TypedefMap& typedefs) {
   if (dtype.kind != DataTypeKind::kNamed) return nullptr;

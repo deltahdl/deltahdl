@@ -32,6 +32,12 @@ bool Is4stateType(DataTypeKind kind);
 
 bool IsImplicitlySigned(DataTypeKind kind);
 
+// §6.20.3/§6.23: map a type name (a built-in keyword like `int`/`shortint` or a
+// user type/class name) to a DataType. Built-in scalar types map to their kind
+// with the kind's implicit signedness; any other name becomes a kNamed type
+// that resolves against the class/typedef tables later.
+DataType TypeNameToDataType(std::string_view name);
+
 bool Is4stateType(const DataType& dtype, const TypedefMap& typedefs);
 
 bool IsSignedType(const DataType& dtype, const TypedefMap& typedefs);
