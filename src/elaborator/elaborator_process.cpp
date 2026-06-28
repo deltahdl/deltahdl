@@ -142,15 +142,20 @@ static void ValidateCombLatchProcess(ModuleItem* item, const RtlirProcess& proc,
   if (kind != RtlirProcessKind::kAlwaysComb &&
       kind != RtlirProcessKind::kAlwaysLatch)
     return;
+  const char* kw =
+      (kind == RtlirProcessKind::kAlwaysComb) ? "always_comb" : "always_latch";
+  // §9.2.2.2.2 / §9.2.2.3: an always_comb (and, by reference, always_latch)
+  // infers its own sensitivity and shall not carry an explicit event control;
+  // the parser stores such a control in the block's sensitivity list.
+  if (!item->sensitivity.empty() || item->is_star_sensitivity) {
+    diag.Error(item->loc,
+               std::format("{} shall not have an explicit event control", kw));
+  }
   if (StmtHasTimingControl(proc.body)) {
-    const char* kw = (kind == RtlirProcessKind::kAlwaysComb) ? "always_comb"
-                                                             : "always_latch";
     diag.Error(item->loc,
                std::format("{} shall not contain timing controls", kw));
   }
   if (StmtHasForkJoin(proc.body)) {
-    const char* kw = (kind == RtlirProcessKind::kAlwaysComb) ? "always_comb"
-                                                             : "always_latch";
     diag.Error(item->loc,
                std::format("{} shall not contain fork-join statements", kw));
   }
