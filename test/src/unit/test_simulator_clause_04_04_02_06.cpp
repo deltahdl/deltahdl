@@ -132,9 +132,15 @@ TEST(ReactiveRegionSim, ReactiveBlockingAssignAndActionHomeIsReactive) {
 }
 
 TEST(ReactiveRegionSim, ReactiveIsReactiveSetDualOfActive) {
+  // §4.4.2.6/§4.4.2.7/§4.4.2.8: the reactive region set mirrors the active set
+  // — Reactive is the dual of Active, Re-Inactive of Inactive, and Re-NBA of
+  // NBA. A region that is not itself an active-set member (e.g. Reactive) has
+  // no dual.
   EXPECT_EQ(Scheduler::ReactiveSetDualOf(Region::kActive), Region::kReactive);
+  EXPECT_EQ(Scheduler::ReactiveSetDualOf(Region::kInactive),
+            Region::kReInactive);
+  EXPECT_EQ(Scheduler::ReactiveSetDualOf(Region::kNBA), Region::kReNBA);
   EXPECT_EQ(Scheduler::ReactiveSetDualOf(Region::kReactive), Region::kCOUNT);
-  EXPECT_EQ(Scheduler::ReactiveSetDualOf(Region::kNBA), Region::kCOUNT);
 
   EXPECT_TRUE(IsActiveRegionSet(Region::kActive));
   EXPECT_TRUE(IsReactiveRegionSet(Region::kReactive));

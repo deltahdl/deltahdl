@@ -153,8 +153,17 @@ void Scheduler::ExecuteTimeSlot(TimeSlot& slot) {
   ExecuteRegion(slot, Region::kPreActive);
 
   while (slot.AnyIterativeNonempty()) {
+    // §4.4.2 (Figure 4-1): drive the active region set (Active/Inactive/NBA) to
+    // a fixpoint *before* the Observed regions run, so a Pre-Observed or
+    // Observed event samples fully stabilized active-set state even when an
+    // Inactive or NBA event has scheduled a fresh Active event during the
+    // iteration.
     while (IterateActiveSet(slot)) {
     }
+    ExecuteRegion(slot, Region::kPreObserved);
+    ExecuteRegion(slot, Region::kObserved);
+    ExecuteRegion(slot, Region::kPostObserved);
+
     while (IterateReactiveSet(slot)) {
     }
 
@@ -170,10 +179,10 @@ void Scheduler::ExecuteTimeSlot(TimeSlot& slot) {
 }
 
 bool Scheduler::IterateActiveSet(TimeSlot& slot) {
-  if (!slot.AnyNonemptyIn(Region::kActive, Region::kPostObserved)) {
+  if (!slot.AnyNonemptyIn(Region::kActive, Region::kPostNBA)) {
     return false;
   }
-  while (slot.AnyNonemptyIn(Region::kActive, Region::kPostObserved)) {
+  while (slot.AnyNonemptyIn(Region::kActive, Region::kPostNBA)) {
     ExecuteActiveRegions(slot);
   }
   return true;
@@ -182,8 +191,7 @@ bool Scheduler::IterateActiveSet(TimeSlot& slot) {
 void Scheduler::ExecuteActiveRegions(TimeSlot& slot) {
   for (size_t i = 0; i < kRegionCount; ++i) {
     auto r = static_cast<Region>(i);
-    if (IsActiveRegionSet(r) || r == Region::kPreObserved ||
-        r == Region::kObserved || r == Region::kPostObserved) {
+    if (IsActiveRegionSet(r)) {
       ExecuteRegion(slot, r);
     }
   }
