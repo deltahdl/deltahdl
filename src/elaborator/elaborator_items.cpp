@@ -500,8 +500,11 @@ bool Elaborator::ElaborateBehavioralItem(ModuleItem* item, RtlirModule* mod) {
       ValidateLetDecl(item);
       mod->let_decls.push_back(item);
       return true;
-    case ModuleItemKind::kCovergroupDecl:
     case ModuleItemKind::kSpecifyBlock:
+      RegisterSpecifyBlockSpecparams(item, mod, specparam_names_, const_names_);
+      mod->let_decls.push_back(item);
+      return true;
+    case ModuleItemKind::kCovergroupDecl:
     case ModuleItemKind::kDpiExport:
       mod->let_decls.push_back(item);
       return true;

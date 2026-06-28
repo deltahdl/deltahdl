@@ -8,11 +8,29 @@
 #include "common/source_loc.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
+#include "elaborator/elaborator_items_internal.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast.h"
 
 namespace delta {
+
+void RegisterSpecifyBlockSpecparams(
+    const ModuleItem* item, RtlirModule* mod,
+    std::unordered_set<std::string_view>& specparam_names,
+    std::unordered_set<std::string_view>& const_names) {
+  for (const auto* sp : item->specify_items) {
+    if (!sp || sp->kind != SpecifyItemKind::kSpecparam) continue;
+    if (sp->is_pathpulse || sp->param_name.starts_with("PATHPULSE$")) continue;
+    specparam_names.insert(sp->param_name);
+    const_names.insert(sp->param_name);
+    RtlirVariable var;
+    var.name = sp->param_name;
+    var.width = 32;
+    var.init_expr = sp->param_value;
+    mod->variables.push_back(var);
+  }
+}
 
 namespace {
 

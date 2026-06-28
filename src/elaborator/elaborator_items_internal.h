@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string_view>
+#include <unordered_set>
 
 #include "elaborator/rtlir.h"
 #include "parser/ast.h"
@@ -19,5 +20,19 @@ NetType DataTypeToNetType(DataTypeKind kind);
 // recorded on the module. Defined once in elaborator_items.cpp; used there and
 // by the module-instantiation/port-binding and generate translation units.
 bool IsNameDeclared(std::string_view name, const RtlirModule* mod);
+
+// §6.20.5: specify parameters declared inside a specify block are named
+// constants of the enclosing module, exactly like specparams in the main module
+// body. Registers each ordinary specparam of the given specify-block item as a
+// module constant (recorded as a 32-bit variable carrying its value
+// expression), and notes its name in the specparam and constant name sets so it
+// resolves and rejects illegal assignment like a body specparam. PATHPULSE$
+// entries are path-pulse limits rather than named constants and are skipped. A
+// specify block cannot appear in a generate scope, so the bare name is used.
+// Defined in elaborator_validate_specify.cpp.
+void RegisterSpecifyBlockSpecparams(
+    const ModuleItem* item, RtlirModule* mod,
+    std::unordered_set<std::string_view>& specparam_names,
+    std::unordered_set<std::string_view>& const_names);
 
 }  // namespace delta
