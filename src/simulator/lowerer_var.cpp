@@ -312,6 +312,21 @@ void Lowerer::LowerVar(const RtlirVariable& var) {
   LowerVarAggregate(var);
 }
 
+// §8.7/§6.8: a class-handle declaration initialized with `new` constructs the
+// object as part of static initialization (before any initial/always block),
+// the same as a runtime `handle = new(args)` assignment. Generic EvalExpr
+// cannot do this because a bare `new` call carries no target class type; the
+// declared handle type supplies it. Returns true when it handled a class-new
+// initializer.
+static bool TryLowerClassNewVarInit(const RtlirVariable& var, Variable* v,
+                                    SimContext& ctx, Arena& arena) {
+  if (var.class_type_name.empty() || var.init_expr->kind != ExprKind::kCall ||
+      var.init_expr->text != "new")
+    return false;
+  v->value = EvalClassNew(var.class_type_name, var.init_expr, ctx, arena);
+  return true;
+}
+
 void Lowerer::LowerVarInit(const RtlirVariable& var, Variable* v,
                            uint32_t width) {
   if (var.is_event && var.init_expr->kind == ExprKind::kIdentifier &&
@@ -327,16 +342,7 @@ void Lowerer::LowerVarInit(const RtlirVariable& var, Variable* v,
       return;
     }
   }
-  // §8.7/§6.8: a class-handle declaration initialized with `new` constructs the
-  // object as part of static initialization (before any initial/always block),
-  // the same as a runtime `handle = new(args)` assignment. Generic EvalExpr
-  // cannot do this because a bare `new` call carries no target class type; the
-  // declared handle type supplies it.
-  if (!var.class_type_name.empty() && var.init_expr->kind == ExprKind::kCall &&
-      var.init_expr->text == "new") {
-    v->value = EvalClassNew(var.class_type_name, var.init_expr, ctx_, arena_);
-    return;
-  }
+  if (TryLowerClassNewVarInit(var, v, ctx_, arena_)) return;
 
   auto* sinfo = ctx_.GetVariableStructType(var.name);
 
