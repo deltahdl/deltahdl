@@ -883,6 +883,28 @@ void CheckHierRefInstanceArrayAccess(
 
 }  // namespace
 
+// §23.6: a hierarchical reference `inst.name` into a resolved child of a plain
+// module (see ChildDeclAllowsMemberCheck) is unresolved when the child does not
+// declare `name`. The imported-name case is reported by the imported-member
+// check above, so it is skipped here to avoid a duplicate diagnostic.
+void Elaborator::CheckHierRefUndeclaredMember(
+    const std::unordered_map<std::string_view, const RtlirModule*>& inst_type,
+    const Expr* ma) {
+  if (!ma->lhs || ma->lhs->kind != ExprKind::kIdentifier) return;
+  if (!ma->rhs || ma->rhs->kind != ExprKind::kIdentifier) return;
+  auto it = inst_type.find(ma->lhs->text);
+  if (it == inst_type.end()) return;
+  if (!ChildDeclAllowsMemberCheck(FindModule(it->second->name))) return;
+  if (ModuleDeclaresMember(it->second, ma->rhs->text)) return;
+  if (ImportedIntoModule(unit_, it->second, ma->rhs->text)) return;
+  diag_.Error(
+      ma->range.start,
+      std::format("hierarchical reference '{}.{}' is unresolved: '{}' is not "
+                  "declared in module '{}'",
+                  ma->lhs->text, ma->rhs->text, ma->rhs->text,
+                  it->second->name));
+}
+
 void Elaborator::ValidateHierRefToImportedName(const ModuleDecl* decl,
                                                const RtlirModule* mod) {
   if (!mod || mod->children.empty()) return;
@@ -894,6 +916,7 @@ void Elaborator::ValidateHierRefToImportedName(const ModuleDecl* decl,
   CollectModuleMemberAccesses(decl, accesses);
   for (const auto* ma : accesses) {
     CheckHierRefImportedMemberAccess(diag_, unit_, inst_type, ma);
+    CheckHierRefUndeclaredMember(inst_type, ma);
   }
 }
 
@@ -906,36 +929,6 @@ void Elaborator::ValidateHierRefInstanceArray(const ModuleDecl* decl) {
   CollectModuleMemberAccesses(decl, accesses);
   for (const auto* ma : accesses) {
     CheckHierRefInstanceArrayAccess(diag_, arrayed, ma);
-  }
-}
-
-// §23.6: a hierarchical reference `inst.name` shall resolve to a name declared
-// in the instantiated module. When the left operand is a resolved child
-// instance of a plain module (see ChildDeclAllowsMemberCheck) and the right
-// operand is a simple identifier that the child does not declare, the reference
-// is unresolved.
-void Elaborator::ValidateHierRefUndeclaredMember(const ModuleDecl* decl,
-                                                 const RtlirModule* mod) {
-  if (!mod || mod->children.empty()) return;
-  std::unordered_map<std::string_view, const RtlirModule*> inst_type =
-      CollectResolvedChildren(mod);
-  if (inst_type.empty()) return;
-
-  std::vector<const Expr*> accesses;
-  CollectModuleMemberAccesses(decl, accesses);
-  for (const auto* ma : accesses) {
-    if (!ma->lhs || ma->lhs->kind != ExprKind::kIdentifier) continue;
-    if (!ma->rhs || ma->rhs->kind != ExprKind::kIdentifier) continue;
-    auto it = inst_type.find(ma->lhs->text);
-    if (it == inst_type.end()) continue;
-    if (!ChildDeclAllowsMemberCheck(FindModule(it->second->name))) continue;
-    if (ModuleDeclaresMember(it->second, ma->rhs->text)) continue;
-    diag_.Error(
-        ma->range.start,
-        std::format("hierarchical reference '{}.{}' is unresolved: '{}' is not "
-                    "declared in module '{}'",
-                    ma->lhs->text, ma->rhs->text, ma->rhs->text,
-                    it->second->name));
   }
 }
 

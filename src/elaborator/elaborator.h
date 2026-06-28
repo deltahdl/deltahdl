@@ -750,15 +750,11 @@ class Elaborator {
   bool IsNameInModuleScope(std::string_view name) const;
 
   void ValidateHierRefIntoChecker(const ModuleDecl* decl);
-
   void ValidateHierRefInstanceArray(const ModuleDecl* decl);
-
-  // §23.6: flags `inst.name` where the child module does not declare `name`.
-  void ValidateHierRefUndeclaredMember(const ModuleDecl* decl,
-                                       const RtlirModule* mod);
-
+  void CheckHierRefUndeclaredMember(
+      const std::unordered_map<std::string_view, const RtlirModule*>& inst_type,
+      const Expr* ma);
   void ValidateHierRefToAutomatic(const ModuleDecl* decl);
-
   void ValidateHierRefIntoProgram(const ModuleDecl* decl);
 
   void ValidateProgramSubroutineCall(const ModuleDecl* decl);
