@@ -438,6 +438,23 @@ void Elaborator::ValidateScopeRules(const ModuleDecl* decl) {
 
 namespace {
 
+// A built-in data-type keyword (logic, bit, int, ...) parsed in expression
+// position — e.g. the type argument of `$bits(logic [7:0])` — is materialized
+// as a `kIdentifier` node carrying the keyword text (see
+// ParseCastOrTypedPattern). Such a node is a type reference, not a value read,
+// so it must never be checked against the value namespace. Mirrors
+// IsCastTypeToken in the expression parser.
+bool IsBuiltinTypeKeyword(std::string_view name) {
+  static constexpr std::string_view kTypeKeywords[] = {
+      "logic",   "bit",      "byte",   "int",       "shortint", "longint",
+      "integer", "reg",      "real",   "shortreal", "realtime", "time",
+      "signed",  "unsigned", "string", "const",     "void"};
+  for (auto kw : kTypeKeywords) {
+    if (name == kw) return true;
+  }
+  return false;
+}
+
 // Collects standalone identifier operands of `e`, deliberately NOT descending
 // into member-access subtrees (so the base of `a.b`, `s.field`, `$root.x`, or
 // `pkg::x` is never collected) and skipping scope-prefixed identifiers. Only
@@ -447,7 +464,9 @@ void CollectBareIdents(const Expr* e, std::vector<const Expr*>& out) {
   if (!e) return;
   if (e->kind == ExprKind::kMemberAccess) return;
   if (e->kind == ExprKind::kIdentifier) {
-    if (e->scope_prefix.empty()) out.push_back(e);
+    if (e->scope_prefix.empty() && !IsBuiltinTypeKeyword(e->text)) {
+      out.push_back(e);
+    }
     return;
   }
   CollectBareIdents(e->lhs, out);
