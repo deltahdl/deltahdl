@@ -70,11 +70,11 @@ TEST(ModuleDefinition, ModuleWithParamsPortsAndBody) {
       "q);\n"
       "  typedef logic [W-1:0] data_t;\n"
       "  wire [W-1:0] net;\n"
-      "  logic [W-1:0] var;\n"
+      "  logic [W-1:0] dat;\n"
       "  localparam int HALF = W / 2;\n"
       "  function automatic data_t invert(data_t d); return ~d; endfunction\n"
-      "  assign net = var;\n"
-      "  always_comb var = invert(q);\n"
+      "  assign net = dat;\n"
+      "  always_comb dat = invert(q);\n"
       "  always_ff @(posedge clk) q <= net;\n"
       "endmodule\n"));
 }
