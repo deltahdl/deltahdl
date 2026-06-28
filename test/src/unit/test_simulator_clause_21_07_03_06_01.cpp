@@ -19,15 +19,21 @@ class VcdcloseKeyword : public VcdTestBase {};
 TEST_F(VcdcloseKeyword, ExtendedVcdRecordsFinalSimulationTime) {
   SimFixture f;
   auto* data = MakeVar(f, "data", 8, 0xA5);
-  VcdWriter vcd(tmp_path_);
-  vcd.SetExtended();
-  vcd.WriteHeader("1ns");
-  vcd.RegisterSignal("data", 8, data);
-  vcd.EndDefinitions();
-  vcd.WriteTimestamp(500);
-  vcd.DumpAllValues();
+  // The writer buffers into its std::ofstream; the final $vcdclose line stays
+  // in that buffer until the stream is flushed on close. Scope the writer so
+  // its destructor closes (and flushes) the file before ReadVcd reads it back,
+  // mirroring the close-then-read ordering a real consumer sees.
+  {
+    VcdWriter vcd(tmp_path_);
+    vcd.SetExtended();
+    vcd.WriteHeader("1ns");
+    vcd.RegisterSignal("data", 8, data);
+    vcd.EndDefinitions();
+    vcd.WriteTimestamp(500);
+    vcd.DumpAllValues();
 
-  vcd.WriteVcdClose(13000);
+    vcd.WriteVcdClose(13000);
+  }
 
   auto content = ReadVcd();
   EXPECT_NE(content.find("$vcdclose #13000 $end"), std::string::npos);
