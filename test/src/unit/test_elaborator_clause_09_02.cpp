@@ -56,8 +56,12 @@ TEST(StructuredProcedureElaboration, AllSixProcedureTypesElaborate) {
 
 TEST(StructuredProcedureElaboration, MultipleProcessesElaborate) {
   ElabFixture f;
+  // §6.10: implicit declarations apply only to nets in specific contexts; an
+  // undeclared name on a procedural assignment LHS is an error, so the
+  // variables these processes drive must be declared explicitly.
   auto* design = ElaborateSrc(
       "module m;\n"
+      "  logic a, b, c;\n"
       "  initial a = 0;\n"
       "  initial b = 0;\n"
       "  initial c = 0;\n"
