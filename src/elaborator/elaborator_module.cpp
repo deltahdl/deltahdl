@@ -551,6 +551,22 @@ RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
   // per-call save at the instance site; this generalizes it to the full set.)
   ItemElaborationStateSaver saved_item_state(*this);
 
+  // §23.9/§24.3: the enclosing-scope chain follows lexical nesting, not the
+  // instance tree. A lexically nested declaration (set up by the nested-decl
+  // elaboration site, which records the enclosing scope in
+  // pending_enclosing_scope_) extends the caller's chain by one entry; any
+  // other call (a separately-instantiated child, a bind, or the top cell)
+  // starts from an empty chain so the prior caller's scope does not leak in.
+  std::vector<std::unordered_set<std::string_view>> saved_enclosing =
+      std::move(enclosing_scope_names_);
+  enclosing_scope_names_.clear();
+  if (has_pending_enclosing_scope_) {
+    enclosing_scope_names_ = saved_enclosing;
+    enclosing_scope_names_.push_back(std::move(pending_enclosing_scope_));
+    pending_enclosing_scope_.clear();
+    has_pending_enclosing_scope_ = false;
+  }
+
   // While this cell is elaborated it is the parent of any instances it
   // contains; record its library so child binding can fall back to it
   // (§33.4.1.5) or inherit it for a library-less use clause (§33.4.1.6). The
@@ -593,6 +609,7 @@ RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
   ElaborateItems(decl, mod);
   ResolveExplicitPortTypes(decl, mod);
   current_library_ = std::move(saved_library);
+  enclosing_scope_names_ = std::move(saved_enclosing);
   saved_item_state.Restore(*this);
   return mod;
 }

@@ -834,7 +834,35 @@ bool Elaborator::IsNameInModuleScope(std::string_view name) const {
   if (func_decls_.count(name)) return true;
   if (interface_inst_types_.count(name)) return true;
   if (checker_inst_names_.count(name)) return true;
+  // §23.9/§24.3: a lexically nested module/program/interface also sees names
+  // declared in the scopes that textually enclose it.
+  for (const auto& scope : enclosing_scope_names_) {
+    if (scope.count(name)) return true;
+  }
   return false;
+}
+
+std::unordered_set<std::string_view> Elaborator::CaptureCurrentScopeNames()
+    const {
+  std::unordered_set<std::string_view> scope;
+  scope.insert(declared_names_.begin(), declared_names_.end());
+  scope.insert(const_names_.begin(), const_names_.end());
+  scope.insert(enum_member_names_.begin(), enum_member_names_.end());
+  scope.insert(specparam_names_.begin(), specparam_names_.end());
+  scope.insert(class_names_.begin(), class_names_.end());
+  scope.insert(class_var_names_.begin(), class_var_names_.end());
+  scope.insert(task_names_.begin(), task_names_.end());
+  scope.insert(let_names_.begin(), let_names_.end());
+  scope.insert(ansi_port_names_.begin(), ansi_port_names_.end());
+  scope.insert(non_ansi_complete_ports_.begin(),
+               non_ansi_complete_ports_.end());
+  scope.insert(checker_inst_names_.begin(), checker_inst_names_.end());
+  for (const auto& [name, kind] : var_types_) scope.insert(name);
+  for (const auto& [name, item] : func_decls_) scope.insert(name);
+  for (const auto& [name, width] : non_ansi_partial_ports_) scope.insert(name);
+  for (const auto& [name, type] : interface_inst_types_) scope.insert(name);
+  for (const auto& [name, type] : typedefs_) scope.insert(name);
+  return scope;
 }
 
 namespace {

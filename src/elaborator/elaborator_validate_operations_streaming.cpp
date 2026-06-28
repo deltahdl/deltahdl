@@ -588,6 +588,14 @@ void Elaborator::ValidateAnonymousProgramHierRefs() {
   for (const auto* item : unit_->cu_items) {
     if (!item->from_anonymous_program) continue;
     if (item->body) WalkStmtsForProgramRef(item->body, program_names, diag_);
+    // §24.3: a hierarchical reference to a program from an anonymous program is
+    // illegal wherever it appears, including inside a task or function the
+    // anonymous program declares (whose body is in func_body_stmts, not body).
+    if (item->kind == ModuleItemKind::kTaskDecl ||
+        item->kind == ModuleItemKind::kFunctionDecl) {
+      for (const auto* s : item->func_body_stmts)
+        WalkStmtsForProgramRef(s, program_names, diag_);
+    }
   }
 }
 

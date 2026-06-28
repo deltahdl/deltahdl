@@ -749,6 +749,11 @@ class Elaborator {
   // True when `name` resolves against any module-level name set (see .cpp).
   bool IsNameInModuleScope(std::string_view name) const;
 
+  // §23.9/§24.3: snapshot of the names declared in the scope currently being
+  // elaborated, captured when descending into a lexically-nested declaration so
+  // the nested scope can resolve enclosing-scope identifiers.
+  std::unordered_set<std::string_view> CaptureCurrentScopeNames() const;
+
   void ValidateHierRefIntoChecker(const ModuleDecl* decl);
   void ValidateHierRefInstanceArray(const ModuleDecl* decl);
   void CheckHierRefUndeclaredMember(
@@ -889,6 +894,15 @@ class Elaborator {
 
  private:
   friend struct ItemElaborationStateSaver;  // per-module state save/restore
+
+  // §23.9/§24.3: stack of enclosing lexical scopes' visible names. A lexically
+  // nested module/program/interface sees names declared in the modules that
+  // textually enclose it; ElaborateModule pushes one entry per enclosing scope
+  // around a nested declaration's elaboration. A separately-instantiated module
+  // breaks the lexical chain, so its elaboration starts from an empty stack.
+  std::vector<std::unordered_set<std::string_view>> enclosing_scope_names_;
+  std::unordered_set<std::string_view> pending_enclosing_scope_;
+  bool has_pending_enclosing_scope_ = false;
 
   std::unordered_set<std::string_view> declared_names_;
   std::unordered_set<std::string_view> net_names_;

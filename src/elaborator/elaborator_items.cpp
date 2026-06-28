@@ -987,6 +987,10 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
     std::string saved_inst_path = current_inst_path_;
     if (!current_inst_path_.empty()) current_inst_path_.push_back('.');
     current_inst_path_.append(name.data(), name.size());
+    // §23.9/§24.3: a nested module/program/interface resolves names declared in
+    // this enclosing scope, so hand its visible names to ElaborateModule.
+    pending_enclosing_scope_ = CaptureCurrentScopeNames();
+    has_pending_enclosing_scope_ = true;
     inst.resolved = ElaborateModule(nested_decl, empty_params);
     current_inst_path_ = std::move(saved_inst_path);
     mod->children.push_back(inst);
