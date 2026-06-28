@@ -245,12 +245,10 @@ static void ApplyStructMemberDefaults(const RtlirVariable& var, Variable* v,
   for (const auto& f : sinfo->fields) {
     for (const auto& m : var.dtype->struct_members) {
       if (m.name != f.name || !m.init_expr) continue;
-      auto val = EvalExpr(m.init_expr, ctx, arena).ToUint64();
-      uint64_t mask =
-          (f.width >= 64) ? ~uint64_t{0} : (uint64_t{1} << f.width) - 1;
-      uint64_t old_val = v->value.ToUint64();
-      old_val |= (val & mask) << f.bit_offset;
-      v->value = MakeLogic4VecVal(arena, v->value.width, old_val);
+      // Multi-word safe: a field at bit offset >= 64 cannot be reached through
+      // ToUint64() (which keeps only the low 64 bits).
+      Logic4Vec val = EvalExpr(m.init_expr, ctx, arena);
+      DepositBitField(v->value, f.bit_offset, val, f.width);
       break;
     }
   }
