@@ -779,8 +779,14 @@ void Elaborator::ValidateUnresolvedReferences(const ModuleDecl* decl,
   ReportUnknownScopeBases(
       decl,
       [this](std::string_view n) {
-        return cu_scope_names_.count(n) != 0 || class_names_.count(n) != 0 ||
-               typedefs_.count(n) != 0;
+        if (cu_scope_names_.count(n) != 0 || class_names_.count(n) != 0 ||
+            typedefs_.count(n) != 0) {
+          return true;
+        }
+        for (const auto* pkg : unit_->packages) {
+          if (pkg->name == n) return true;
+        }
+        return false;
       },
       diag_);
 }
