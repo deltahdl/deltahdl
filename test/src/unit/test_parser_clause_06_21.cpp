@@ -483,12 +483,12 @@ TEST(ScopeAndLifetimeParsing, LifetimeStaticOnModuleItem) {
 }
 
 TEST(ScopeAndLifetimeParsing, LifetimeAutomaticOnModuleItem) {
+  // §6.21: variables declared in a module outside a task, process, or function
+  // have a static lifetime; the `automatic` lifetime is permitted only inside a
+  // task, function, or block (a procedural context). A module-level `automatic`
+  // data declaration is therefore illegal and is rejected.
   auto r = Parse("module m; automatic int y = 0; endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
-  EXPECT_TRUE(item->is_automatic);
+  EXPECT_TRUE(r.has_errors);
 }
 
 TEST(ScopeAndLifetimeParsing, FunctionDeclLifetimeAutomatic) {
