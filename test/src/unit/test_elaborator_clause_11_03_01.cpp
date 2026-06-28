@@ -378,10 +378,16 @@ TEST(RealOps, PowerOnRealIsLegal) {
 
 TEST(RealOps, IllegalOpOnRealInContAssign) {
   ElabFixture f;
+  // §6.7.1: a built-in net's data type shall be a 4-state integral type (or an
+  // unpacked aggregate of such), so `wire real` is illegal independent of the
+  // expression; a real-valued continuous-assignment target must be a variable
+  // (§6.5/§10.3) or a user-defined nettype (§6.7.2). Using a real variable here
+  // isolates the operator: the error must come from `&` applied to real
+  // operands (§11.3.1), not from an illegal net declaration.
   ElaborateSrc(
       "module m;\n"
       "  real a, b;\n"
-      "  wire real c;\n"
+      "  real c;\n"
       "  assign c = a & b;\n"
       "endmodule\n",
       f);
@@ -390,10 +396,13 @@ TEST(RealOps, IllegalOpOnRealInContAssign) {
 
 TEST(RealOps, LegalOpOnRealInContAssign) {
   ElabFixture f;
+  // §6.5/§10.3: a continuous assignment may drive a variable, and a real
+  // variable is a valid target (§6.7.1 forbids a real built-in net). The `+`
+  // operator is legal on real operands (§11.3.1), so this elaborates cleanly.
   ElaborateSrc(
       "module m;\n"
       "  real a, b;\n"
-      "  wire real c;\n"
+      "  real c;\n"
       "  assign c = a + b;\n"
       "endmodule\n",
       f);
