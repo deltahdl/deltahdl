@@ -654,14 +654,17 @@ void Lowerer::LowerModule(const RtlirModule* mod) {
   LowerParams(mod);
   RegisterModuleNets(mod, ctx_);
   RegisterEnumTypes(mod);
+  // §8.7/§6.8: class types must be registered before module variables so a
+  // class-handle declaration with a `new` static initializer (e.g.
+  // `C h = new(42);`) can construct its object during static initialization.
+  for (auto* cls : mod->class_decls) {
+    LowerClassDecl(cls);
+  }
   for (const auto& var : mod->variables) LowerVar(var);
   RegisterModulePorts(mod, ctx_);
   RegisterModuleSubroutines(mod, ctx_);
   RegisterModuleSequenceDecls(mod, ctx_);
   LowerSequenceMonitors(mod);
-  for (auto* cls : mod->class_decls) {
-    LowerClassDecl(cls);
-  }
 
   LowerImports(mod);
   RegisterProcessClassType(ctx_, arena_);
