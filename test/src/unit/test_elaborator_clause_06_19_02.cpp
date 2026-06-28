@@ -183,11 +183,12 @@ TEST(Elaboration, EnumRangeNOneProducesSingle) {
 
 TEST(Elaboration, EnumRangeNMZeroBoundsAllowed) {
   // Zero is a legal bound for the name[N:M] form, since both bounds need only
-  // be non-negative.
+  // be non-negative. The label uses `register` (not `reg`, a reserved keyword)
+  // matching the §6.19 example name[N:M] form.
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module top;\n"
-      "  typedef enum {reg[0:2]} E1;\n"
+      "  typedef enum {register[0:2]} E1;\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
@@ -196,11 +197,11 @@ TEST(Elaboration, EnumRangeNMZeroBoundsAllowed) {
   auto it = mod->enum_types.find("E1");
   ASSERT_NE(it, mod->enum_types.end());
   ASSERT_EQ(it->second.size(), 3u);
-  EXPECT_EQ(it->second[0].name, "reg0");
+  EXPECT_EQ(it->second[0].name, "register0");
   EXPECT_EQ(it->second[0].value, 0);
-  EXPECT_EQ(it->second[1].name, "reg1");
+  EXPECT_EQ(it->second[1].name, "register1");
   EXPECT_EQ(it->second[1].value, 1);
-  EXPECT_EQ(it->second[2].name, "reg2");
+  EXPECT_EQ(it->second[2].name, "register2");
   EXPECT_EQ(it->second[2].value, 2);
 }
 

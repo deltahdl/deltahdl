@@ -199,7 +199,14 @@ static bool LiteralHasXZ(std::string_view txt) {
 
 static bool ExprContainsXZ(const Expr* e) {
   if (!e) return false;
-  if (e->kind == ExprKind::kIntegerLiteral && LiteralHasXZ(e->text)) {
+  // §6.19: a 4-state enum value may be x/z. The unbased unsized form ('x, 'z)
+  // lexes as its own kind, not kIntegerLiteral, so it must be matched here too;
+  // otherwise it is mistaken for an ordinary integer and folded into the
+  // auto-increment/duplicate-value machinery (e.g. {XX = 'x} colliding with a
+  // later explicit value).
+  if ((e->kind == ExprKind::kIntegerLiteral ||
+       e->kind == ExprKind::kUnbasedUnsizedLiteral) &&
+      LiteralHasXZ(e->text)) {
     return true;
   }
   if (ExprContainsXZ(e->lhs)) return true;
