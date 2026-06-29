@@ -426,6 +426,7 @@ void Elaborator::ResetItemElaborationState() {
   scalar_var_names_.clear();
   var_named_types_.clear();
   alias_pairs_.clear();
+  alias_bit_pairs_.clear();
   non_ansi_complete_ports_.clear();
   non_ansi_partial_ports_.clear();
   non_ansi_signed_ports_.clear();
@@ -473,6 +474,7 @@ struct ItemElaborationStateSaver {
   decltype(Elaborator::scalar_var_names_) scalar_var_names;
   decltype(Elaborator::var_named_types_) var_named_types;
   decltype(Elaborator::alias_pairs_) alias_pairs;
+  decltype(Elaborator::alias_bit_pairs_) alias_bit_pairs;
   decltype(Elaborator::non_ansi_complete_ports_) non_ansi_complete_ports;
   decltype(Elaborator::non_ansi_partial_ports_) non_ansi_partial_ports;
   decltype(Elaborator::non_ansi_signed_ports_) non_ansi_signed_ports;
@@ -514,6 +516,7 @@ struct ItemElaborationStateSaver {
     scalar_var_names = std::move(e.scalar_var_names_);
     var_named_types = std::move(e.var_named_types_);
     alias_pairs = std::move(e.alias_pairs_);
+    alias_bit_pairs = std::move(e.alias_bit_pairs_);
     non_ansi_complete_ports = std::move(e.non_ansi_complete_ports_);
     non_ansi_partial_ports = std::move(e.non_ansi_partial_ports_);
     non_ansi_signed_ports = std::move(e.non_ansi_signed_ports_);
@@ -557,6 +560,7 @@ struct ItemElaborationStateSaver {
     e.scalar_var_names_ = std::move(scalar_var_names);
     e.var_named_types_ = std::move(var_named_types);
     e.alias_pairs_ = std::move(alias_pairs);
+    e.alias_bit_pairs_ = std::move(alias_bit_pairs);
     e.non_ansi_complete_ports_ = std::move(non_ansi_complete_ports);
     e.non_ansi_partial_ports_ = std::move(non_ansi_partial_ports);
     e.non_ansi_signed_ports_ = std::move(non_ansi_signed_ports);

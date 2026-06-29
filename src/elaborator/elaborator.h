@@ -928,6 +928,12 @@ class Elaborator {
   std::unordered_map<std::string_view, const ModuleItem*> func_decls_;
   std::unordered_map<std::string_view, std::string_view> var_named_types_;
   std::set<std::pair<std::string_view, std::string_view>> alias_pairs_;
+  // §10.11 bit-level alias correspondences seen in this module, to flag a given
+  // alias specified more than once across statements (keyed by raw net name +
+  // bit index pairs). Reset/saved alongside alias_pairs_.
+  std::set<std::pair<std::pair<std::string_view, uint32_t>,
+                     std::pair<std::string_view, uint32_t>>>
+      alias_bit_pairs_;
 
   std::unordered_set<std::string_view> non_ansi_complete_ports_;
   std::unordered_map<std::string_view, uint32_t> non_ansi_partial_ports_;

@@ -1,6 +1,9 @@
 #include <charconv>
 #include <format>
+#include <optional>
+#include <set>
 #include <unordered_set>
+#include <vector>
 
 #include "common/diagnostic.h"
 #include "elaborator/const_eval.h"
@@ -664,6 +667,128 @@ void CheckAliasNetWidthCompat(const ModuleItem* item, DiagEngine& diag,
   }
 }
 
+// §10.11: one constituent bit of an alias operand -- the (raw, same-scope) net
+// name and the bit index within it. Raw names are used (not scoped) so the
+// reference stays valid for the module-lifetime duplicate set and so that two
+// statements naming the same net in the same scope compare equal.
+using AliasBitRef = std::pair<std::string_view, uint32_t>;
+
+// MSB-first bits of a plain net identifier, or nullopt for an unknown net.
+template <typename WidthFn>
+std::optional<std::vector<AliasBitRef>> FlattenAliasIdentBits(
+    const Expr* e, WidthFn net_width) {
+  uint32_t w = net_width(e->text);
+  if (w == 0) return std::nullopt;
+  std::vector<AliasBitRef> bits;
+  for (uint32_t i = w; i-- > 0;) bits.emplace_back(e->text, i);
+  return bits;
+}
+
+// MSB-first bits of a constant bit-select or part-select over a known net, or
+// nullopt for a non-constant index, an indexed (+:/-:) select, or unknown net.
+template <typename WidthFn>
+std::optional<std::vector<AliasBitRef>> FlattenAliasSelectBits(
+    const Expr* e, WidthFn net_width) {
+  bool indexed = e->is_part_select_plus || e->is_part_select_minus;
+  if (!e->base || e->base->kind != ExprKind::kIdentifier || indexed)
+    return std::nullopt;
+  if (net_width(e->base->text) == 0) return std::nullopt;
+  auto hi = ConstEvalInt(e->index);
+  if (!hi) return std::nullopt;
+  std::vector<AliasBitRef> bits;
+  if (!e->index_end) {
+    bits.emplace_back(e->base->text, static_cast<uint32_t>(*hi));
+    return bits;
+  }
+  auto lo = ConstEvalInt(e->index_end);
+  if (!lo) return std::nullopt;
+  int64_t a = *hi;
+  int64_t b = *lo;
+  if (a < b) std::swap(a, b);
+  for (int64_t i = a; i >= b; --i)
+    bits.emplace_back(e->base->text, static_cast<uint32_t>(i));
+  return bits;
+}
+
+// Flatten an alias operand (identifier, constant bit/part-select, or
+// concatenation of these) into its MSB-first list of constituent net bits.
+// Returns nullopt if any part is not a constant select over a known net, so the
+// caller skips the bit-level analysis rather than mis-reporting.
+template <typename WidthFn>
+std::optional<std::vector<AliasBitRef>> FlattenAliasOperandBits(
+    const Expr* e, WidthFn net_width) {
+  if (!e) return std::nullopt;
+  if (e->kind == ExprKind::kIdentifier)
+    return FlattenAliasIdentBits(e, net_width);
+  if (e->kind == ExprKind::kSelect) return FlattenAliasSelectBits(e, net_width);
+  if (e->kind != ExprKind::kConcatenation || e->repeat_count)
+    return std::nullopt;
+  std::vector<AliasBitRef> bits;
+  for (auto* el : e->elements) {
+    auto sub = FlattenAliasOperandBits(el, net_width);
+    if (!sub) return std::nullopt;
+    bits.insert(bits.end(), sub->begin(), sub->end());
+  }
+  return bits;
+}
+
+// Scans every pair of operands position-by-position, inserting each canonical
+// bit correspondence into the module-lifetime set; returns true on the first
+// correspondence already present (i.e. specified more than once, §10.11).
+bool AliasOperandsHaveDuplicateBit(
+    const std::vector<std::vector<AliasBitRef>>& operands, size_t width,
+    std::set<std::pair<AliasBitRef, AliasBitRef>>& seen) {
+  for (size_t i = 0; i < operands.size(); ++i) {
+    for (size_t j = i + 1; j < operands.size(); ++j) {
+      for (size_t p = 0; p < width; ++p) {
+        AliasBitRef a = operands[i][p];
+        AliasBitRef b = operands[j][p];
+        auto pair = (a <= b) ? std::make_pair(a, b) : std::make_pair(b, a);
+        if (!seen.insert(pair).second) return true;
+      }
+    }
+  }
+  return false;
+}
+
+// §10.11: "it is not allowed to ... specify a given alias more than once." When
+// an alias statement uses selects or concatenations, expand it to bit-level
+// correspondences and flag a correspondence that was already established by an
+// earlier alias statement. Whole-net identifier pairs are handled by
+// CheckAliasDuplicatePairs, so this only engages structured operands.
+template <typename ScopeFn>
+void CheckAliasBitDuplicates(
+    const ModuleItem* item, DiagEngine& diag,
+    std::set<std::pair<AliasBitRef, AliasBitRef>>& seen, RtlirModule* mod,
+    ScopeFn scope) {
+  bool has_structured = false;
+  for (auto* net : item->alias_nets)
+    if (net && net->kind != ExprKind::kIdentifier) has_structured = true;
+  if (!has_structured) return;
+
+  auto net_width = [&](std::string_view raw) -> uint32_t {
+    auto scoped = scope(raw);
+    for (const auto& n : mod->nets)
+      if (n.name == scoped) return n.width;
+    return 0;
+  };
+
+  std::vector<std::vector<AliasBitRef>> operands;
+  for (auto* net : item->alias_nets) {
+    auto flat = FlattenAliasOperandBits(net, net_width);
+    if (!flat) return;
+    operands.push_back(std::move(*flat));
+  }
+  if (operands.size() < 2) return;
+  size_t width = operands[0].size();
+  for (const auto& op : operands)
+    if (op.size() != width) return;
+
+  if (AliasOperandsHaveDuplicateBit(operands, width, seen)) {
+    diag.Error(item->loc, "alias bit correspondence specified more than once");
+  }
+}
+
 void CheckAliasDuplicatePairs(
     const ModuleItem* item, DiagEngine& diag,
     std::set<std::pair<std::string_view, std::string_view>>& alias_pairs,
@@ -694,6 +819,8 @@ void Elaborator::ValidateAlias(const ModuleItem* item, RtlirModule* mod) {
       item, diag_, mod, ident_names,
       [this](std::string_view n) { return ScopedName(n); });
   CheckAliasDuplicatePairs(item, diag_, alias_pairs_, ident_names);
+  CheckAliasBitDuplicates(item, diag_, alias_bit_pairs_, mod,
+                          [this](std::string_view n) { return ScopedName(n); });
 }
 
 void Elaborator::CheckAssocConcatTargetInAssign(const Stmt* s) {
