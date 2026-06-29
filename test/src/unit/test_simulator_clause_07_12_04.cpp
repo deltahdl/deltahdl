@@ -118,7 +118,12 @@ TEST(ArrayIteratorIndex, DefaultIndexInFindLastIndex) {
 TEST(ArrayIteratorIndex, IndexEqualToItemValue) {
   SimFixture f;
 
-  MakeDynArray(f, "arr", {2, 1, 2, 3});
+  // §7.12.1 — find() returns every element whose with predicate is true. Here
+  // the predicate compares each element to ITS OWN index, so the duplicate 2
+  // matches only at index 2 (not index 0). The trailing element must not equal
+  // its index (3 at index 3 would spuriously match), so it is a non-matching
+  // sentinel; the surviving matches are the elements 1 (index 1) and 2.
+  MakeDynArray(f, "arr", {2, 1, 2, 9});
 
   auto* pred = MakeBinary(f.arena, TokenKind::kEqEq, MakeId(f.arena, "item"),
                           MakeId(f.arena, "item.index"));
