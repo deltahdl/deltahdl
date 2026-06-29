@@ -604,6 +604,18 @@ static void CollectFixedArrayElements(std::string_view name,
                                       const ArrayInfo& ai, SimContext& ctx,
                                       std::vector<Logic4Vec>& out);
 
+// §10.10: an element of an unpacked array concatenation may itself be an
+// assignment pattern that contributes its elements (not a single value),
+// either bare ('{...}) or typed (AI3'{5, 6, 7}). The typed form parses as a
+// cast wrapping the pattern, so unwrap it here.
+static const Expr* AsArrayConcatPattern(const Expr* item) {
+  if (item->kind == ExprKind::kAssignmentPattern) return item;
+  if (item->kind == ExprKind::kCast && item->lhs &&
+      item->lhs->kind == ExprKind::kAssignmentPattern)
+    return item->lhs;
+  return nullptr;
+}
+
 static std::vector<Logic4Vec> CollectConcatElements(const Expr* rhs,
                                                     SimContext& ctx,
                                                     Arena& arena) {
@@ -621,8 +633,8 @@ static std::vector<Logic4Vec> CollectConcatElements(const Expr* rhs,
         continue;
       }
     }
-    if (item->kind == ExprKind::kAssignmentPattern) {
-      for (auto* elem : item->elements) {
+    if (const Expr* pat = AsArrayConcatPattern(item)) {
+      for (auto* elem : pat->elements) {
         elems.push_back(EvalExpr(elem, ctx, arena));
       }
       continue;
