@@ -71,8 +71,12 @@ TEST(ConstraintSolving, EmptyConstraintBlock) {
 }
 
 TEST(ConstraintSolving, ImplicationTrueCondition) {
+  // 18.5.5: the implication's short-form antecedent is the equality
+  // cond_var == cond_value (here x == 10). To make the antecedent TRUE so the
+  // consequent y < 20 is enforced, fix x to that same value 10; a different
+  // fixed value (e.g. 50) makes x == 10 false and leaves y unconstrained.
   ConstraintSolver solver(42);
-  SetupImplicationSolver(solver, 50);
+  SetupImplicationSolver(solver, 10);
 
   ASSERT_TRUE(solver.Solve());
   EXPECT_LT(solver.GetValue("y"), 20);
