@@ -457,7 +457,12 @@ TEST(Preprocessor, DirectiveInRemainderOfAnotherDirective) {
                            "`endcelldefine\n");
   pp.Preprocess(fid);
   EXPECT_FALSE(f.diag.HasErrors());
-  EXPECT_TRUE(pp.InCelldefine());
+  // §22.10: `endcelldefine (the standalone directive on the last line) closes
+  // the celldefine region, so InCelldefine() is correctly false at
+  // end-of-preprocess. The remainder-directive feature under test is proven by
+  // HasTimescale() below: the `timescale in the remainder of `celldefine was
+  // still acted on.
+  EXPECT_FALSE(pp.InCelldefine());
   EXPECT_TRUE(pp.HasTimescale());
 }
 
