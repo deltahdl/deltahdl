@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <string_view>
 
@@ -309,25 +310,23 @@ static Logic4Vec EvalStringByteSelect(const Logic4Vec& base_val, uint64_t idx,
 
 // §7.4.1: a single-index select of a packed multidimensional array selects an
 // outermost element (the inner-dimension width) as an unsigned vector, not a
-// single bit. Returns true and fills `out` when `expr` names such an array.
-static bool TryPackedElementSelect(const Expr* expr, uint64_t idx,
-                                   const Logic4Vec& base_val, SimContext& ctx,
-                                   Arena& arena, Logic4Vec& out) {
+// single bit. Returns the element value when `expr` names such an array.
+static std::optional<Logic4Vec> TryPackedElementSelect(
+    const Expr* expr, uint64_t idx, const Logic4Vec& base_val, SimContext& ctx,
+    Arena& arena) {
   if (expr->index_end || !expr->base ||
       expr->base->kind != ExprKind::kIdentifier)
-    return false;
+    return std::nullopt;
   auto* var = ctx.FindVariable(expr->base->text);
-  if (!var || var->packed_elem_width <= 1) return false;
+  if (!var || var->packed_elem_width <= 1) return std::nullopt;
   uint32_t w = var->packed_elem_width;
   uint64_t off = (idx >= var->packed_outer_lo)
                      ? (idx - var->packed_outer_lo) * uint64_t{w}
                      : 0;
   if (off >= base_val.width)
-    out = SelectBaseIs4State(expr, ctx) ? MakeAllX(arena, w)
-                                        : MakeLogic4VecVal(arena, w, 0);
-  else
-    out = ExtractBitField(arena, base_val, static_cast<uint32_t>(off), w);
-  return true;
+    return SelectBaseIs4State(expr, ctx) ? MakeAllX(arena, w)
+                                         : MakeLogic4VecVal(arena, w, 0);
+  return ExtractBitField(arena, base_val, static_cast<uint32_t>(off), w);
 }
 
 Logic4Vec EvalSelect(const Expr* expr, SimContext& ctx, Arena& arena) {
@@ -346,8 +345,8 @@ Logic4Vec EvalSelect(const Expr* expr, SimContext& ctx, Arena& arena) {
     return EvalStringByteSelect(base_val, idx, arena);
   if (expr->index_end)
     return EvalPackedPartSelect(expr, base_val, idx, ctx, arena);
-  if (TryPackedElementSelect(expr, idx, base_val, ctx, arena, result))
-    return result;
+  if (auto elem = TryPackedElementSelect(expr, idx, base_val, ctx, arena))
+    return *elem;
   if (idx >= base_val.width)
     return SelectBaseIs4State(expr, ctx) ? MakeAllX(arena, 1)
                                          : MakeLogic4VecVal(arena, 1, 0);

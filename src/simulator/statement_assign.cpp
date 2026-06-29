@@ -250,23 +250,28 @@ static void WritePartSelect(Variable* var, uint32_t lo, uint32_t width,
   var->value = MakeLogic4VecVal(arena, var->value.width, cleared | new_bits);
 }
 
+// §7.4.1: writes a single-index target on a packed multidimensional array as an
+// outermost element (the inner-dimension width), not a single bit. Returns true
+// when `var` is such an array and the write was handled.
+static bool TryWritePackedElement(Variable* var, uint32_t idx,
+                                  const Logic4Vec& rhs_val, Arena& arena) {
+  if (var->packed_elem_width <= 1) return false;
+  uint32_t w = var->packed_elem_width;
+  uint64_t off = (idx >= var->packed_outer_lo)
+                     ? (idx - var->packed_outer_lo) * uint64_t{w}
+                     : 0;
+  if (off < var->value.width)
+    WritePartSelect(var, static_cast<uint32_t>(off), w, rhs_val, arena);
+  return true;
+}
+
 void WriteBitSelect(Variable* var, const Expr* lhs, const Logic4Vec& rhs_val,
                     SimContext& ctx, Arena& arena) {
   auto idx_val = EvalExpr(lhs->index, ctx, arena);
   if (HasUnknownBits(idx_val)) return;
   auto idx = static_cast<uint32_t>(idx_val.ToUint64());
   if (!lhs->index_end) {
-    // §7.4.1: a single-index target on a packed multidimensional array writes
-    // an outermost element (the inner-dimension width), not a single bit.
-    if (var->packed_elem_width > 1) {
-      uint32_t w = var->packed_elem_width;
-      uint64_t off = (idx >= var->packed_outer_lo)
-                         ? (idx - var->packed_outer_lo) * uint64_t{w}
-                         : 0;
-      if (off >= var->value.width) return;
-      WritePartSelect(var, static_cast<uint32_t>(off), w, rhs_val, arena);
-      return;
-    }
+    if (TryWritePackedElement(var, idx, rhs_val, arena)) return;
     if (idx >= var->value.width) return;
     uint64_t old_val = var->value.ToUint64();
     uint64_t bit = rhs_val.ToUint64() & 1;
