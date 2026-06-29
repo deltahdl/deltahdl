@@ -819,6 +819,16 @@ void Elaborator::ValidateUnresolvedReferences(const ModuleDecl* decl,
       diag_);
 }
 
+// §23.9/§24.3: true when a lexically enclosing scope declares `name`.
+static bool NameInEnclosingScope(
+    const std::vector<std::unordered_set<std::string_view>>& scopes,
+    std::string_view name) {
+  for (const auto& scope : scopes) {
+    if (scope.count(name)) return true;
+  }
+  return false;
+}
+
 bool Elaborator::IsNameInModuleScope(std::string_view name) const {
   if (declared_names_.count(name)) return true;
   if (ansi_port_names_.count(name)) return true;
@@ -836,9 +846,7 @@ bool Elaborator::IsNameInModuleScope(std::string_view name) const {
   if (checker_inst_names_.count(name)) return true;
   // §23.9/§24.3: a lexically nested module/program/interface also sees names
   // declared in the scopes that textually enclose it.
-  for (const auto& scope : enclosing_scope_names_) {
-    if (scope.count(name)) return true;
-  }
+  if (NameInEnclosingScope(enclosing_scope_names_, name)) return true;
   return false;
 }
 
