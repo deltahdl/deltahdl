@@ -445,6 +445,23 @@ void Elaborator::SetStructTypeInfo(const ModuleItem* item, RtlirVariable& var) {
   var.dtype = arena_.Create<DataType>(td->second);
 }
 
+// Records the declared-type information a variable carries beyond its raw
+// width: struct/union layout, a class handle's type name, an enum's type, and —
+// for a packed multidimensional array (§7.4.1, e.g. `logic [1:0][7:0]`) — the
+// type itself so the lowerer can compute the outermost-element stride and a
+// single-index select slices a whole element rather than one bit.
+void Elaborator::SetVariableTypeInfo(const ModuleItem* item,
+                                     RtlirVariable& var) {
+  SetStructTypeInfo(item, var);
+  if (item->data_type.kind == DataTypeKind::kNamed &&
+      class_names_.count(item->data_type.type_name)) {
+    var.class_type_name = item->data_type.type_name;
+  }
+  SetEnumTypeInfo(item, var, typedefs_, arena_);
+  if (!var.dtype && !item->data_type.extra_packed_dims.empty())
+    var.dtype = &item->data_type;
+}
+
 static void ValidateParameterizedClassDefaults(const ModuleItem* item,
                                                const CompilationUnit* unit,
                                                DiagEngine& diag) {
@@ -942,21 +959,7 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
     var_init_names_.insert(item->name);
   }
 
-  SetStructTypeInfo(item, var);
-
-  if (item->data_type.kind == DataTypeKind::kNamed &&
-      class_names_.count(item->data_type.type_name)) {
-    var.class_type_name = item->data_type.type_name;
-  }
-
-  SetEnumTypeInfo(item, var, typedefs_, arena_);
-
-  // §7.4.1: record the declared type for a packed multidimensional array (e.g.
-  // `logic [1:0][7:0]`) so the lowerer can compute its outermost-element
-  // stride; a single-index select then slices a whole element, not one bit.
-  // Struct/enum types already set var.dtype above.
-  if (!var.dtype && !item->data_type.extra_packed_dims.empty())
-    var.dtype = &item->data_type;
+  SetVariableTypeInfo(item, var);
 
   ComputeUnpackedDims(item->unpacked_dims, var, {typedefs_, class_names_},
                       diag_, item->loc);
