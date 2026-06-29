@@ -420,7 +420,11 @@ TEST(CasezStatementSim, CasezZInSelectorIsDontCare) {
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
 
-  EXPECT_EQ(var->value.ToUint64(), 99u);
+  // §12.5.1: z in the case_expression is a do-not-care for casez, so bits 3 and
+  // 1 of sel=4'bz1z0 drop out and the surviving known bits (bit2=1, bit0=0)
+  // match the first item 4'b0100 -> x = 10. (z-in-selector IS a don't-care, per
+  // the test name; expecting the default 99 would mean z were significant.)
+  EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
 TEST(CasezStatementSim, CasezDontCareInPatternOnly) {
