@@ -34,6 +34,44 @@ static bool IsNonSynthStmt(StmtKind kind) {
          kind == StmtKind::kDisableFork || kind == StmtKind::kWaitFork;
 }
 
+// §9.4.2: a named event (event-typed variable) appearing in an event control
+// is not a synthesizable trigger — there is no hardware net to sense.
+static bool SensitivityHasNamedEvent(const RtlirProcess& proc,
+                                     const RtlirModule* mod) {
+  for (const auto& ev : proc.sensitivity) {
+    const Expr* sig = ev.signal;
+    if (!sig || sig->kind != ExprKind::kIdentifier) continue;
+    for (const auto& var : mod->variables) {
+      if (var.name == sig->text) {
+        if (var.is_event) return true;
+        break;
+      }
+    }
+  }
+  return false;
+}
+
+// True if any event-control term carries an edge qualifier (posedge/negedge/
+// edge) — i.e. the block is edge-sensitive (sequential) rather than level.
+static bool SensitivityHasEdge(const RtlirProcess& proc) {
+  for (const auto& ev : proc.sensitivity) {
+    if (ev.edge == Edge::kPosedge || ev.edge == Edge::kNegedge ||
+        ev.edge == Edge::kEdge)
+      return true;
+  }
+  return false;
+}
+
+// True if any event-control term carries an `iff` qualifier (§9.4.2.3). A
+// level-sensitive `always` whose trigger is gated by `iff` only updates when
+// the guard holds, which synthesizes to a latch.
+static bool SensitivityHasIff(const RtlirProcess& proc) {
+  for (const auto& ev : proc.sensitivity) {
+    if (ev.iff_condition) return true;
+  }
+  return false;
+}
+
 bool SynthLower::CheckStmtSynthesizable(const Stmt* stmt) {
   if (!stmt) return true;
   if (IsNonSynthStmt(stmt->kind)) {
@@ -90,6 +128,11 @@ bool SynthLower::CheckSynthesizable(const RtlirModule* mod) {
       continue;
     }
     has_synth_content = true;
+    if (SensitivityHasNamedEvent(proc, mod)) {
+      diag_.Error(SourceLoc{},
+                  "named event in event control is not synthesizable");
+      return false;
+    }
     if (!CheckStmtSynthesizable(proc.body)) return false;
   }
   // §9.2.1/§9.2.3: initial and final procedural blocks are not synthesizable.
@@ -560,6 +603,9 @@ AigGraph* SynthLower::Lower(const RtlirModule* mod) {
       case RtlirProcessKind::kAlways:
         if (proc.is_star_sensitivity) {
           LowerAlwaysComb(proc, *aig);
+        } else if (!SensitivityHasEdge(proc) && SensitivityHasIff(proc)) {
+          // §9.4.2.3: level-sensitive event control gated by `iff` → latch.
+          LowerAlwaysLatch(proc, *aig);
         }
         break;
       case RtlirProcessKind::kAlwaysFF:
