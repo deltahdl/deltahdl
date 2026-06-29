@@ -131,9 +131,9 @@ static SimCoroutine MakeAlwaysCombCoroutine(const Stmt* body,
   std::vector<std::string_view> read_vars;
   read_vars.reserve(sens.size());
   for (const auto& ev : sens) {
-    if (!ev.expr || ev.expr->text.empty()) continue;
-    if (call_outputs.count(std::string(ev.expr->text)) != 0) continue;
-    read_vars.push_back(ev.expr->text);
+    if (!ev.signal || ev.signal->text.empty()) continue;
+    if (call_outputs.count(std::string(ev.signal->text)) != 0) continue;
+    read_vars.push_back(ev.signal->text);
   }
   while (!ctx.StopRequested()) {
     co_await ExecStmt(body, ctx, arena);
