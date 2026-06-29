@@ -44,9 +44,17 @@ static uint32_t StreamSliceSize(const Expr* size_expr, SimContext& ctx,
   return static_cast<uint32_t>(val);
 }
 
-static uint64_t ExtractSlice(const Logic4Vec& src, uint32_t start_bit,
-                             uint32_t slice_size) {
-  uint64_t result = 0;
+// §11.4.14: a stream carries 4-state values, so a slice must move both the
+// value (aval) and the unknown (bval) plane; carrying aval alone silently
+// flattens x/z to a known 0 through the pack.
+struct SliceBits {
+  uint64_t aval = 0;
+  uint64_t bval = 0;
+};
+
+static SliceBits ExtractSlice(const Logic4Vec& src, uint32_t start_bit,
+                              uint32_t slice_size) {
+  SliceBits result;
   uint32_t bits_left = slice_size;
   uint32_t dst_bit = 0;
   while (bits_left > 0 && start_bit < src.width) {
@@ -56,7 +64,8 @@ static uint64_t ExtractSlice(const Logic4Vec& src, uint32_t start_bit,
     uint32_t take = (bits_left < avail) ? bits_left : avail;
     if (word < src.nwords) {
       uint64_t mask = (take >= 64) ? ~uint64_t{0} : (uint64_t{1} << take) - 1;
-      result |= ((src.words[word].aval >> bit) & mask) << dst_bit;
+      result.aval |= ((src.words[word].aval >> bit) & mask) << dst_bit;
+      result.bval |= ((src.words[word].bval >> bit) & mask) << dst_bit;
     }
     dst_bit += take;
     start_bit += take;
@@ -65,7 +74,7 @@ static uint64_t ExtractSlice(const Logic4Vec& src, uint32_t start_bit,
   return result;
 }
 
-static void PlaceSlice(Logic4Vec& dst, uint32_t start_bit, uint64_t val,
+static void PlaceSlice(Logic4Vec& dst, uint32_t start_bit, SliceBits val,
                        uint32_t slice_size) {
   uint32_t bits_left = slice_size;
   uint32_t src_bit = 0;
@@ -76,7 +85,8 @@ static void PlaceSlice(Logic4Vec& dst, uint32_t start_bit, uint64_t val,
     uint32_t put = (bits_left < avail) ? bits_left : avail;
     if (word < dst.nwords) {
       uint64_t mask = (put >= 64) ? ~uint64_t{0} : (uint64_t{1} << put) - 1;
-      dst.words[word].aval |= ((val >> src_bit) & mask) << bit;
+      dst.words[word].aval |= ((val.aval >> src_bit) & mask) << bit;
+      dst.words[word].bval |= ((val.bval >> src_bit) & mask) << bit;
     }
     src_bit += put;
     start_bit += put;
@@ -343,7 +353,7 @@ static Logic4Vec StreamReorderSlices(const Logic4Vec& concat,
     uint32_t dst_start = total_width > (i + 1) * slice_size
                              ? total_width - (i + 1) * slice_size
                              : 0;
-    uint64_t slice = ExtractSlice(concat, src_start, slice_size);
+    SliceBits slice = ExtractSlice(concat, src_start, slice_size);
     PlaceSlice(result, dst_start, slice, slice_size);
   }
   return result;
@@ -365,7 +375,7 @@ Logic4Vec EvalStreamingConcat(const Expr* expr, SimContext& ctx, Arena& arena) {
   auto concat = MakeLogic4Vec(arena, total_width);
   uint32_t bit_pos = 0;
   for (auto it = parts.rbegin(); it != parts.rend(); ++it) {
-    PlaceSlice(concat, bit_pos, it->ToUint64(), it->width);
+    PlaceSlice(concat, bit_pos, ExtractSlice(*it, 0, it->width), it->width);
     bit_pos += it->width;
   }
 
