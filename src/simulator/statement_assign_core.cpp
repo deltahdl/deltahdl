@@ -204,6 +204,15 @@ static const Expr* UnwrapTypedPattern(const Expr* expr) {
 
 static uint32_t LhsContextWidth(const Expr* lhs, SimContext& ctx) {
   if (!lhs) return 0;
+  // 11.3.6 / 11.6.1: a concatenation target's width is the sum of its operand
+  // widths, and that width is the assignment context the right-hand side is
+  // evaluated in (so `{carry, acc} = rega + regb` adds at the full LHS width
+  // and keeps the carry-out bit).
+  if (lhs->kind == ExprKind::kConcatenation) {
+    uint32_t total = 0;
+    for (auto* elem : lhs->elements) total += LhsContextWidth(elem, ctx);
+    return total;
+  }
   auto* var = ResolveLhsVariable(lhs, ctx);
   return var ? var->value.width : 0;
 }
