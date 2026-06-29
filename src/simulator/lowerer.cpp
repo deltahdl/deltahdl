@@ -115,15 +115,25 @@ static void CollectCallOutputActuals(const Stmt* stmt, SimContext& ctx,
     CollectCallOutputActuals(ci.body, ctx, out);
 }
 
-static SimCoroutine MakeAlwaysCombCoroutine(const Stmt* body, SimContext& ctx,
-                                            Arena& arena) {
-  auto read_strs = CollectReadSignals(body);
+static SimCoroutine MakeAlwaysCombCoroutine(const Stmt* body,
+                                            const std::vector<EventExpr>& sens,
+                                            SimContext& ctx, Arena& arena) {
+  // §9.2.2.2.1: always_comb/always_latch watch the inferred sensitivity list,
+  // which (unlike a raw read scan of the body) descends into called functions
+  // and reduces each read to its base signal name -- so a variable read only
+  // inside a called function still re-triggers the block, and a bit-select read
+  // watches the whole vector. proc.sensitivity already excludes block-locals
+  // and self-written signals; additionally drop any variable passed to a called
+  // subroutine's output formal -- it is written by the call, not read, and
+  // would otherwise re-trigger the block on its own update (a zero-delay spin).
   std::unordered_set<std::string> call_outputs;
   CollectCallOutputActuals(body, ctx, call_outputs);
   std::vector<std::string_view> read_vars;
-  read_vars.reserve(read_strs.size());
-  for (const auto& s : read_strs) {
-    if (call_outputs.count(s) == 0) read_vars.push_back(s);
+  read_vars.reserve(sens.size());
+  for (const auto& ev : sens) {
+    if (!ev.expr || ev.expr->text.empty()) continue;
+    if (call_outputs.count(std::string(ev.expr->text)) != 0) continue;
+    read_vars.push_back(ev.expr->text);
   }
   while (!ctx.StopRequested()) {
     co_await ExecStmt(body, ctx, arena);
@@ -726,7 +736,9 @@ void Lowerer::LowerProcess(const RtlirProcess& proc, bool from_program,
     case RtlirProcessKind::kAlwaysComb:
     case RtlirProcessKind::kAlwaysLatch:
       p->kind = ProcessKind::kAlwaysComb;
-      p->coro = MakeAlwaysCombCoroutine(proc.body, ctx_, arena_).Release();
+      p->coro =
+          MakeAlwaysCombCoroutine(proc.body, proc.sensitivity, ctx_, arena_)
+              .Release();
       RegisterSensitivity(proc, p, ctx_);
       break;
     case RtlirProcessKind::kAlwaysFF:
