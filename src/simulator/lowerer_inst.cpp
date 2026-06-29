@@ -32,7 +32,7 @@ void Lowerer::LowerPortBindings(const RtlirModuleInst& inst,
   // stays bare and resolves in the parent. Otherwise an implicit/wildcard
   // connection (.a == .a(a)) resolves to the child's own same-named port and
   // self-assigns instead of propagating.
-  const std::string inst_seg = std::string(inst.inst_name) + ".";
+  std::string inst_seg = std::string(inst.inst_name) + ".";
   for (const auto& binding : inst.port_bindings) {
     if (!IsConnectablePortBinding(binding)) continue;
 
