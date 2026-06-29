@@ -124,13 +124,14 @@ static bool TaggedUnionTagMismatch(std::string_view base_name,
 static bool WriteStructFieldBits(Variable* base_var, const StructTypeInfo* info,
                                  std::string_view field_name,
                                  const Logic4Vec& rhs_val) {
-  for (const auto& f : info->fields) {
-    if (f.name != field_name) continue;
-    DepositBitField(base_var->value, f.bit_offset, rhs_val, f.width);
-    base_var->NotifyWatchers();
-    return true;
+  uint32_t bit_offset = 0;
+  uint32_t width = 0;
+  if (!ResolveStructFieldPath(info, field_name, &bit_offset, &width)) {
+    return false;
   }
-  return false;
+  DepositBitField(base_var->value, bit_offset, rhs_val, width);
+  base_var->NotifyWatchers();
+  return true;
 }
 
 // Writes field_name into the class object referenced by base_var. Returns true

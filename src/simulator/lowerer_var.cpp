@@ -17,26 +17,43 @@
 
 namespace delta {
 
-static void RegisterStructInfo(const RtlirVariable& var, SimContext& ctx) {
-  if (!var.dtype || var.dtype->struct_members.empty()) return;
-  StructTypeInfo info;
-  info.type_name = var.name;
-  info.is_packed = var.dtype->is_packed;
-  info.is_union = (var.dtype->kind == DataTypeKind::kUnion);
-  info.is_soft = var.dtype->is_soft;
-  info.total_width = var.width;
+// Builds the layout of a struct/union DataType: each field's bit offset (within
+// its own width frame) and width, recursing into aggregate members so a nested
+// member is reachable by its dotted path (§7.2.1). The result is arena-owned so
+// the registered top-level copy's nested pointers stay valid.
+static StructTypeInfo* BuildStructTypeInfo(const DataType* dtype,
+                                           uint32_t total_width,
+                                           std::string_view type_name,
+                                           Arena& arena) {
+  auto* info = arena.Create<StructTypeInfo>();
+  info->type_name = type_name;
+  info->is_packed = dtype->is_packed;
+  info->is_union = (dtype->kind == DataTypeKind::kUnion);
+  info->is_soft = dtype->is_soft;
+  info->total_width = total_width;
 
-  uint32_t offset = var.width;
-  for (const auto& m : var.dtype->struct_members) {
+  uint32_t offset = total_width;
+  for (const auto& m : dtype->struct_members) {
     uint32_t fw = EvalStructMemberWidth(m);
-    if (info.is_union) {
-      info.fields.push_back({m.name, 0, fw, m.type_kind});
-    } else {
+    uint32_t field_off = 0;
+    if (!info->is_union) {
       offset -= fw;
-      info.fields.push_back({m.name, offset, fw, m.type_kind});
+      field_off = offset;
     }
+    StructFieldInfo fi{m.name, field_off, fw, m.type_kind};
+    if (m.nested_type && !m.nested_type->struct_members.empty()) {
+      fi.nested = BuildStructTypeInfo(m.nested_type, fw, m.type_name, arena);
+    }
+    info->fields.push_back(fi);
   }
-  ctx.RegisterStructType(var.name, info);
+  return info;
+}
+
+static void RegisterStructInfo(const RtlirVariable& var, SimContext& ctx,
+                               Arena& arena) {
+  if (!var.dtype || var.dtype->struct_members.empty()) return;
+  auto* info = BuildStructTypeInfo(var.dtype, var.width, var.name, arena);
+  ctx.RegisterStructType(var.name, *info);
   ctx.SetVariableStructType(var.name, var.name);
 }
 
@@ -382,7 +399,7 @@ void Lowerer::LowerVar(const RtlirVariable& var) {
   if (var.is_signed) v->is_signed = true;
   if (var.is_string) ctx_.RegisterStringVariable(var.name);
   if (var.is_real) ctx_.RegisterRealVariable(var.name);
-  RegisterStructInfo(var, ctx_);
+  RegisterStructInfo(var, ctx_, arena_);
   if (var.init_expr) {
     LowerVarInit(var, v, width);
   }

@@ -10,8 +10,17 @@ namespace delta {
 
 struct DataType;
 enum class DataTypeKind : uint8_t;
+class Arena;
 
 using TypedefMap = std::unordered_map<std::string_view, DataType>;
+
+// §7.2.1 / §23.6: fill in `nested_type` for every struct/union member of `dt`
+// whose declared type is a named typedef resolving to a struct or union, so the
+// aggregate's layout is fully self-describing (the simulator can size and reach
+// a nested member by its dotted path without a typedef table). Recurses into
+// the resolved members; arena-copies each resolved type so `dt` owns it.
+void ResolveNestedAggregateTypes(DataType& dt, const TypedefMap& typedefs,
+                                 Arena& arena);
 
 uint32_t EvalTypeWidth(const DataType& dtype);
 

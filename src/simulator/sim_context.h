@@ -40,11 +40,17 @@ struct EnumTypeInfo {
   std::vector<EnumMemberInfo> members;
 };
 
+struct StructTypeInfo;
+
 struct StructFieldInfo {
   std::string_view name;
   uint32_t bit_offset = 0;
   uint32_t width = 0;
   DataTypeKind type_kind = DataTypeKind::kLogic;
+  // §7.2.1: the layout of this field's own type when it is itself a struct or
+  // union, so a nested member is reachable by its dotted path. Null for
+  // scalars.
+  const StructTypeInfo* nested = nullptr;
 };
 
 struct StructTypeInfo {
@@ -55,6 +61,12 @@ struct StructTypeInfo {
   bool is_union = false;
   bool is_soft = false;
 };
+
+// §7.2.1 / §23.6: resolve a (possibly dotted) member path within `info` to the
+// absolute bit offset and width within the base variable, descending through
+// nested struct/union fields. Returns false if any path segment is not a field.
+bool ResolveStructFieldPath(const StructTypeInfo* info, std::string_view path,
+                            uint32_t* bit_offset, uint32_t* width);
 
 struct QueueObject {
   std::vector<Logic4Vec> elements;

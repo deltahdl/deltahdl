@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cstdlib>
 
+#include "common/arena.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "lexer/token.h"
@@ -266,6 +267,33 @@ static const DataType* ResolveNamed(const DataType& dtype,
   if (dtype.kind != DataTypeKind::kNamed) return nullptr;
   auto it = typedefs.find(dtype.type_name);
   return (it != typedefs.end()) ? &it->second : nullptr;
+}
+
+// The struct/union DataType a member's declared type denotes: an inline
+// aggregate keeps its parsed type directly; a named member resolves through the
+// typedef table. Returns null for scalar members and unresolved names.
+static const DataType* NestedAggregateSource(const StructMember& m,
+                                             const TypedefMap& typedefs) {
+  if (m.nested_type) return m.nested_type;
+  if (m.type_kind != DataTypeKind::kNamed) return nullptr;
+  auto it = typedefs.find(m.type_name);
+  if (it == typedefs.end()) return nullptr;
+  if (it->second.kind != DataTypeKind::kStruct &&
+      it->second.kind != DataTypeKind::kUnion) {
+    return nullptr;
+  }
+  return &it->second;
+}
+
+void ResolveNestedAggregateTypes(DataType& dt, const TypedefMap& typedefs,
+                                 Arena& arena) {
+  for (auto& m : dt.struct_members) {
+    const DataType* src = NestedAggregateSource(m, typedefs);
+    if (!src) continue;
+    auto* copy = arena.Create<DataType>(*src);
+    ResolveNestedAggregateTypes(*copy, typedefs, arena);
+    m.nested_type = copy;
+  }
 }
 
 uint32_t EvalTypeWidth(const DataType& dtype, const TypedefMap& typedefs) {

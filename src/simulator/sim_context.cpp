@@ -618,6 +618,34 @@ const EnumTypeInfo* SimContext::GetVariableEnumType(
   return FindEnumType(it->second);
 }
 
+static const StructFieldInfo* FindStructField(const StructTypeInfo* info,
+                                              std::string_view name) {
+  for (const auto& f : info->fields) {
+    if (f.name == name) return &f;
+  }
+  return nullptr;
+}
+
+bool ResolveStructFieldPath(const StructTypeInfo* info, std::string_view path,
+                            uint32_t* bit_offset, uint32_t* width) {
+  uint32_t acc = 0;
+  while (info) {
+    auto dot = path.find('.');
+    auto seg = dot == std::string_view::npos ? path : path.substr(0, dot);
+    const StructFieldInfo* f = FindStructField(info, seg);
+    if (!f) return false;
+    acc += f->bit_offset;
+    if (dot == std::string_view::npos) {
+      *bit_offset = acc;
+      *width = f->width;
+      return true;
+    }
+    info = f->nested;
+    path = path.substr(dot + 1);
+  }
+  return false;
+}
+
 void SimContext::RegisterStructType(std::string_view name,
                                     const StructTypeInfo& info) {
   struct_types_[name] = info;

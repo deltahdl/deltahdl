@@ -184,9 +184,10 @@ std::string StripRootPrefix(const std::string& name) {
 static Logic4Vec ExtractStructField(Variable* base_var,
                                     const StructTypeInfo* info,
                                     std::string_view field, Arena& arena) {
-  for (const auto& f : info->fields) {
-    if (f.name != field) continue;
-    return ExtractBitField(arena, base_var->value, f.bit_offset, f.width);
+  uint32_t bit_offset = 0;
+  uint32_t width = 0;
+  if (ResolveStructFieldPath(info, field, &bit_offset, &width)) {
+    return ExtractBitField(arena, base_var->value, bit_offset, width);
   }
   return MakeLogic4Vec(arena, 1);
 }

@@ -432,7 +432,9 @@ static void SetStructTypeInfo(const ModuleItem* item, RtlirVariable& var,
                               const TypedefMap& typedefs, Arena& arena) {
   if (item->data_type.kind == DataTypeKind::kStruct ||
       item->data_type.kind == DataTypeKind::kUnion) {
-    var.dtype = &item->data_type;
+    auto* copy = arena.Create<DataType>(item->data_type);
+    ResolveNestedAggregateTypes(*copy, typedefs, arena);
+    var.dtype = copy;
     return;
   }
   if (item->data_type.kind != DataTypeKind::kNamed) return;
@@ -443,7 +445,9 @@ static void SetStructTypeInfo(const ModuleItem* item, RtlirVariable& var,
     return;
   }
 
-  var.dtype = arena.Create<DataType>(td->second);
+  auto* copy = arena.Create<DataType>(td->second);
+  ResolveNestedAggregateTypes(*copy, typedefs, arena);
+  var.dtype = copy;
 }
 
 // Records the declared-type information a variable carries beyond its raw
