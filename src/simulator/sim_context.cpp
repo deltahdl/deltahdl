@@ -137,6 +137,12 @@ void SimContext::AliasVariable(std::string_view alias_name,
   if (target) variables_[alias_name] = target;
 }
 
+void SimContext::AliasNet(std::string_view alias_name,
+                          std::string_view target_name) {
+  auto* target = FindNet(target_name);
+  if (target) nets_[alias_name] = target;
+}
+
 void SimContext::NullifyEventVariable(std::string_view name) {
   auto* var = FindVariable(name);
   if (var == nullptr) {

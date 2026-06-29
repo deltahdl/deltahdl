@@ -21,6 +21,7 @@ struct AssocArrayObject;
 struct ClassDecl;
 struct Expr;
 struct RtlirModuleInst;
+struct RtlirPortBinding;
 struct RtlirVariable;
 struct Variable;
 
@@ -60,6 +61,8 @@ class Lowerer {
   void LowerChildModules(const RtlirModule* mod);
 
   void LowerPortBindings(const RtlirModuleInst& inst, bool from_program);
+  bool TryAliasInterfacePort(const RtlirModuleInst& inst,
+                             const RtlirPortBinding& binding);
 
   SimContext& ctx_;
   Arena& arena_;

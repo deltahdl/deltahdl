@@ -213,6 +213,11 @@ class SimContext {
   Net* CreateNet(std::string_view name, NetType type, uint32_t width,
                  const NetSpec& spec = {});
 
+  // Binds alias_name to the same Net as target_name (no-op if target is
+  // unknown). Used to share an interface port's nets with the connected
+  // interface instance (§25.3.2). alias_name must outlive the context.
+  void AliasNet(std::string_view alias_name, std::string_view target_name);
+
   Scheduler& GetScheduler() { return scheduler_; }
   Arena& GetArena() { return arena_; }
   DiagEngine& GetDiag() { return diag_; }
