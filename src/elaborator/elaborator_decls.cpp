@@ -18,35 +18,6 @@
 
 namespace delta {
 
-NetType DataTypeToNetType(DataTypeKind kind) {
-  switch (kind) {
-    case DataTypeKind::kTri:
-      return NetType::kTri;
-    case DataTypeKind::kWand:
-      return NetType::kWand;
-    case DataTypeKind::kWor:
-      return NetType::kWor;
-    case DataTypeKind::kTriand:
-      return NetType::kTriand;
-    case DataTypeKind::kTrior:
-      return NetType::kTrior;
-    case DataTypeKind::kTri0:
-      return NetType::kTri0;
-    case DataTypeKind::kTri1:
-      return NetType::kTri1;
-    case DataTypeKind::kSupply0:
-      return NetType::kSupply0;
-    case DataTypeKind::kSupply1:
-      return NetType::kSupply1;
-    case DataTypeKind::kTrireg:
-      return NetType::kTrireg;
-    case DataTypeKind::kUwire:
-      return NetType::kUwire;
-    default:
-      return NetType::kWire;
-  }
-}
-
 static void InferDynArraySize(const std::vector<Expr*>& dims, const Expr* init,
                               RtlirVariable& var) {
   if (dims.empty() || dims[0] != nullptr) return;
@@ -979,6 +950,13 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
   }
 
   SetEnumTypeInfo(item, var, typedefs_, arena_);
+
+  // §7.4.1: record the declared type for a packed multidimensional array (e.g.
+  // `logic [1:0][7:0]`) so the lowerer can compute its outermost-element
+  // stride; a single-index select then slices a whole element, not one bit.
+  // Struct/enum types already set var.dtype above.
+  if (!var.dtype && !item->data_type.extra_packed_dims.empty())
+    var.dtype = &item->data_type;
 
   ComputeUnpackedDims(item->unpacked_dims, var, {typedefs_, class_names_},
                       diag_, item->loc);

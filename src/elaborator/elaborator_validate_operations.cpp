@@ -17,6 +17,35 @@ namespace delta {
 
 using TypeMap = std::unordered_map<std::string_view, DataTypeKind>;
 
+NetType DataTypeToNetType(DataTypeKind kind) {
+  switch (kind) {
+    case DataTypeKind::kTri:
+      return NetType::kTri;
+    case DataTypeKind::kWand:
+      return NetType::kWand;
+    case DataTypeKind::kWor:
+      return NetType::kWor;
+    case DataTypeKind::kTriand:
+      return NetType::kTriand;
+    case DataTypeKind::kTrior:
+      return NetType::kTrior;
+    case DataTypeKind::kTri0:
+      return NetType::kTri0;
+    case DataTypeKind::kTri1:
+      return NetType::kTri1;
+    case DataTypeKind::kSupply0:
+      return NetType::kSupply0;
+    case DataTypeKind::kSupply1:
+      return NetType::kSupply1;
+    case DataTypeKind::kTrireg:
+      return NetType::kTrireg;
+    case DataTypeKind::kUwire:
+      return NetType::kUwire;
+    default:
+      return NetType::kWire;
+  }
+}
+
 static std::string_view AggregateOperandName(const Expr* e) {
   if (!e) return {};
   if (e->kind == ExprKind::kIdentifier) return e->text;
