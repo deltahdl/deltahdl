@@ -945,7 +945,9 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
 
   RtlirVariable var;
   var.name = ScopedName(item->name);
-  var.width = EvalTypeWidth(item->data_type, typedefs_);
+  // A packed dimension may reference a parameter (e.g. `logic [W-1:0]`), so the
+  // width must be evaluated in the module's parameter scope (10.3.3 / A.2.2.1).
+  var.width = EvalTypeWidth(item->data_type, typedefs_, BuildParamScope(mod));
   ValidatePackedDimRange(item->data_type, item->loc);
   SetVariableKindFlags(item, var, typedefs_);
   var.is_signed = IsSignedType(item->data_type, typedefs_);

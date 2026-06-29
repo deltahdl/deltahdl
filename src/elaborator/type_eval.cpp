@@ -298,6 +298,13 @@ uint32_t EvalTypeWidth(const DataType& dtype, const TypedefMap& typedefs,
     }
     if (w > 0) return w;
   }
+  // Mirror the 2-arg overload: a struct/union with no resolvable packed
+  // outer dimension still sizes from its members (using typedefs), not the
+  // 1-bit base-type fallback.
+  if (dtype.kind == DataTypeKind::kStruct ||
+      dtype.kind == DataTypeKind::kUnion) {
+    return EvalStructOrUnionWidth(dtype, typedefs);
+  }
   return EvalTypeWidth(dtype);
 }
 
