@@ -30,7 +30,8 @@ static bool IsNonSynthStmt(StmtKind kind) {
   return kind == StmtKind::kDelay || kind == StmtKind::kTimingControl ||
          kind == StmtKind::kWait || kind == StmtKind::kForever ||
          kind == StmtKind::kFork || kind == StmtKind::kDisable ||
-         kind == StmtKind::kEventTrigger;
+         kind == StmtKind::kEventTrigger || kind == StmtKind::kEventControl ||
+         kind == StmtKind::kDisableFork || kind == StmtKind::kWaitFork;
 }
 
 bool SynthLower::CheckStmtSynthesizable(const Stmt* stmt) {
@@ -80,11 +81,25 @@ bool SynthLower::CheckCaseSynth(const Stmt* stmt) {
 }
 
 bool SynthLower::CheckSynthesizable(const RtlirModule* mod) {
+  bool has_initial_final = false;
+  bool has_synth_content = !mod->assigns.empty();
   for (const auto& proc : mod->processes) {
     if (proc.kind == RtlirProcessKind::kInitial ||
-        proc.kind == RtlirProcessKind::kFinal)
+        proc.kind == RtlirProcessKind::kFinal) {
+      has_initial_final = true;
       continue;
+    }
+    has_synth_content = true;
     if (!CheckStmtSynthesizable(proc.body)) return false;
+  }
+  // §9.2.1/§9.2.3: initial and final procedural blocks are not synthesizable.
+  // They are tolerated (bypassed) when the module also describes synthesizable
+  // logic, but a module whose only content is initial/final has nothing to
+  // synthesize and is rejected.
+  if (has_initial_final && !has_synth_content) {
+    diag_.Error(SourceLoc{},
+                "initial/final procedural block is not synthesizable");
+    return false;
   }
   return true;
 }
