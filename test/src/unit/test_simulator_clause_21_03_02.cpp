@@ -199,7 +199,10 @@ TEST(IoSystemTaskTest, FstrobeAndFmonitorAcceptMcd) {
 
 // §21.3.2: every b/h/o suffix variant of $fdisplay, $fstrobe, and $fmonitor
 // must dispatch through the same suffix-aware path as $fwrite*, producing the
-// expected radix when no format string is given.
+// expected radix when no format string is given. Per §21.2.1.2 a non-decimal
+// radix without an explicit %0 field width always shows leading zeros padded to
+// the operand's bit width; the unsized integer literal arguments here are
+// 32-bit (§5.7.1), so hex pads to 8 digits, octal to 11, and binary to 32.
 TEST(IoSystemTaskTest, DisplayStrobeMonitorRadixSuffixesAllDispatch) {
   SimFixture f;
   struct Case {
@@ -208,11 +211,15 @@ TEST(IoSystemTaskTest, DisplayStrobeMonitorRadixSuffixesAllDispatch) {
     const char* expected;
   };
   const Case kCases[] = {
-      {"$fdisplayh", 0xab, "ab\n"}, {"$fdisplayo", 8, "10\n"},
-      {"$fdisplayb", 5, "101\n"},   {"$fstrobeh", 0xcd, "cd\n"},
-      {"$fstrobeo", 9, "11\n"},     {"$fstrobeb", 6, "110\n"},
-      {"$fmonitorh", 0xef, "ef\n"}, {"$fmonitoro", 7, "7\n"},
-      {"$fmonitorb", 3, "11\n"},
+      {"$fdisplayh", 0xab, "000000ab\n"},
+      {"$fdisplayo", 8, "00000000010\n"},
+      {"$fdisplayb", 5, "00000000000000000000000000000101\n"},
+      {"$fstrobeh", 0xcd, "000000cd\n"},
+      {"$fstrobeo", 9, "00000000011\n"},
+      {"$fstrobeb", 6, "00000000000000000000000000000110\n"},
+      {"$fmonitorh", 0xef, "000000ef\n"},
+      {"$fmonitoro", 7, "00000000007\n"},
+      {"$fmonitorb", 3, "00000000000000000000000000000011\n"},
   };
   for (const auto& c : kCases) {
     std::string path =

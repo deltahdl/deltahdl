@@ -45,7 +45,10 @@ TEST(StringFormatTaskTest, SwriteWritesToOutputVariable) {
 
 // §21.3.3 N5 (cross-ref to §21.3.2): $swriteb / $swriteh / $swriteo derive
 // their default radix from the task-name suffix when no format string is
-// supplied, exactly as $fwriteb / $fwriteh / $fwriteo do.
+// supplied, exactly as $fwriteb / $fwriteh / $fwriteo do. Per §21.2.1.2 a
+// non-decimal radix without an explicit %0 field width keeps its leading zeros
+// padded to the operand width; the unsized integer literals are 32-bit
+// (§5.7.1), so hex pads to 8 digits, octal to 11, and binary to 32.
 TEST(StringFormatTaskTest, SwriteSuffixesUseRadix) {
   SimFixture f;
   struct Case {
@@ -54,9 +57,9 @@ TEST(StringFormatTaskTest, SwriteSuffixesUseRadix) {
     const char* expected;
   };
   const Case kCases[] = {
-      {"$swriteh", 0xab, "ab"},
-      {"$swriteo", 8, "10"},
-      {"$swriteb", 5, "101"},
+      {"$swriteh", 0xab, "000000ab"},
+      {"$swriteo", 8, "00000000010"},
+      {"$swriteb", 5, "00000000000000000000000000000101"},
   };
   for (const auto& c : kCases) {
     std::string name = std::string("v_") + c.task;
