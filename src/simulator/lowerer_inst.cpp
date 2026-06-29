@@ -14,7 +14,8 @@ static bool IsConnectablePortBinding(const RtlirPortBinding& binding) {
   if (binding.width == 0) return false;
   return binding.direction == Direction::kInput ||
          binding.direction == Direction::kOutput ||
-         binding.direction == Direction::kInout;
+         binding.direction == Direction::kInout ||
+         binding.direction == Direction::kRef;
 }
 
 static Expr* MakeLocalPortId(std::string_view port_name, Arena& arena) {
@@ -39,7 +40,11 @@ void Lowerer::LowerPortBindings(const RtlirModuleInst& inst,
     auto* local_id =
         MakeLocalPortId(inst_seg + std::string(binding.port_name), arena_);
 
-    if (binding.direction == Direction::kInout) {
+    // §23.3.3 ref ports and §23.3.3.4 inout ports both share storage with the
+    // connected parent signal, so alias the child port onto it rather than
+    // lowering a one-way continuous assignment.
+    if (binding.direction == Direction::kInout ||
+        binding.direction == Direction::kRef) {
       if (binding.connection->kind != ExprKind::kIdentifier) continue;
       std::string local_qualified =
           inst_prefix_ + inst_seg + std::string(binding.port_name);
