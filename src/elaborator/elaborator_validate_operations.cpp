@@ -751,20 +751,19 @@ bool AliasOperandsHaveDuplicateBit(
   return false;
 }
 
-// §10.11: "it is not allowed to ... specify a given alias more than once." When
-// an alias statement uses selects or concatenations, expand it to bit-level
-// correspondences and flag a correspondence that was already established by an
-// earlier alias statement. Whole-net identifier pairs are handled by
-// CheckAliasDuplicatePairs, so this only engages structured operands.
-template <typename ScopeFn>
-void CheckAliasBitDuplicates(
-    const ModuleItem* item, DiagEngine& diag,
-    std::set<std::pair<AliasBitRef, AliasBitRef>>& seen, RtlirModule* mod,
-    ScopeFn scope) {
-  bool has_structured = false;
+bool AliasHasStructuredOperand(const ModuleItem* item) {
   for (auto* net : item->alias_nets)
-    if (net && net->kind != ExprKind::kIdentifier) has_structured = true;
-  if (!has_structured) return;
+    if (net && net->kind != ExprKind::kIdentifier) return true;
+  return false;
+}
+
+// Expand an alias statement's operands to equal-length bit-level vectors, or
+// nullopt when it has no structured operand, a width is unknown, or the
+// operands disagree on width (the latter is reported elsewhere).
+template <typename ScopeFn>
+std::optional<std::vector<std::vector<AliasBitRef>>> BuildAliasOperandBits(
+    const ModuleItem* item, RtlirModule* mod, ScopeFn scope) {
+  if (!AliasHasStructuredOperand(item)) return std::nullopt;
 
   auto net_width = [&](std::string_view raw) -> uint32_t {
     auto scoped = scope(raw);
@@ -776,15 +775,29 @@ void CheckAliasBitDuplicates(
   std::vector<std::vector<AliasBitRef>> operands;
   for (auto* net : item->alias_nets) {
     auto flat = FlattenAliasOperandBits(net, net_width);
-    if (!flat) return;
+    if (!flat) return std::nullopt;
     operands.push_back(std::move(*flat));
   }
-  if (operands.size() < 2) return;
+  if (operands.size() < 2) return std::nullopt;
   size_t width = operands[0].size();
   for (const auto& op : operands)
-    if (op.size() != width) return;
+    if (op.size() != width) return std::nullopt;
+  return operands;
+}
 
-  if (AliasOperandsHaveDuplicateBit(operands, width, seen)) {
+// §10.11: "it is not allowed to ... specify a given alias more than once." When
+// an alias statement uses selects or concatenations, expand it to bit-level
+// correspondences and flag a correspondence that was already established by an
+// earlier alias statement. Whole-net identifier pairs are handled by
+// CheckAliasDuplicatePairs, so this only engages structured operands.
+template <typename ScopeFn>
+void CheckAliasBitDuplicates(
+    const ModuleItem* item, DiagEngine& diag,
+    std::set<std::pair<AliasBitRef, AliasBitRef>>& seen, RtlirModule* mod,
+    ScopeFn scope) {
+  auto operands = BuildAliasOperandBits(item, mod, scope);
+  if (!operands) return;
+  if (AliasOperandsHaveDuplicateBit(*operands, (*operands)[0].size(), seen)) {
     diag.Error(item->loc, "alias bit correspondence specified more than once");
   }
 }
