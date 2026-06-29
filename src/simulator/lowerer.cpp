@@ -794,55 +794,6 @@ void Lowerer::LowerContAssign(const RtlirContAssign& ca, bool from_program) {
   ScheduleProcess(p, ctx_);
 }
 
-static bool IsConnectablePortBinding(const RtlirPortBinding& binding) {
-  if (!binding.connection) return false;
-  if (binding.width == 0) return false;
-  return binding.direction == Direction::kInput ||
-         binding.direction == Direction::kOutput ||
-         binding.direction == Direction::kInout;
-}
-
-static Expr* MakeLocalPortId(std::string_view port_name, Arena& arena) {
-  auto* name_str = arena.Create<std::string>(std::string(port_name));
-  auto* local_id = arena.Create<Expr>();
-  local_id->kind = ExprKind::kIdentifier;
-  local_id->text = *name_str;
-  return local_id;
-}
-
-void Lowerer::LowerPortBindings(const RtlirModuleInst& inst,
-                                bool from_program) {
-  for (const auto& binding : inst.port_bindings) {
-    if (!IsConnectablePortBinding(binding)) continue;
-
-    auto* local_id = MakeLocalPortId(binding.port_name, arena_);
-
-    if (binding.direction == Direction::kInout) {
-      if (binding.connection->kind != ExprKind::kIdentifier) continue;
-      std::string local_qualified =
-          inst_prefix_ + std::string(binding.port_name);
-      ctx_.AliasVariable(local_qualified, binding.connection->text);
-      continue;
-    }
-
-    if (binding.direction == Direction::kInput) {
-      RtlirContAssign ca;
-      ca.lhs = local_id;
-      ca.rhs = binding.connection;
-      ca.width = binding.width;
-      LowerContAssign(ca, from_program);
-      continue;
-    }
-
-    if (binding.connection->kind != ExprKind::kIdentifier) continue;
-    RtlirContAssign ca;
-    ca.lhs = binding.connection;
-    ca.rhs = local_id;
-    ca.width = binding.width;
-    LowerContAssign(ca, from_program);
-  }
-}
-
 static void CreateChildModuleVariable(const std::string& inst_prefix,
                                       const RtlirVariable& var, SimContext& ctx,
                                       Arena& arena) {
@@ -886,7 +837,8 @@ void Lowerer::LowerChildModules(const RtlirModule* mod) {
   for (const auto& child : mod->children) {
     if (!child.resolved) continue;
     auto saved_prefix = inst_prefix_;
-    inst_prefix_ = inst_prefix_ + std::string(child.inst_name) + ".";
+    auto child_prefix = inst_prefix_ + std::string(child.inst_name) + ".";
+    inst_prefix_ = child_prefix;
 
     RegisterInstanceKeyBinding(inst_prefix_, child.resolved->library,
                                child.resolved->name, ctx_);
@@ -894,7 +846,11 @@ void Lowerer::LowerChildModules(const RtlirModule* mod) {
     CreateChildModuleVariables(inst_prefix_, child.resolved, ctx_, arena_);
     CreateChildModulePorts(inst_prefix_, child.resolved, ctx_, arena_);
 
+    // Port connections resolve in the parent scope (see LowerPortBindings),
+    // then restore the child prefix for the child's own body.
+    inst_prefix_ = saved_prefix;
     LowerPortBindings(child, child.resolved->is_program);
+    inst_prefix_ = child_prefix;
 
     uint32_t child_block_id =
         child.resolved->is_program ? next_program_block_id_++ : 0;
