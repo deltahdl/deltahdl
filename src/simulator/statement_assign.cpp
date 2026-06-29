@@ -256,6 +256,17 @@ void WriteBitSelect(Variable* var, const Expr* lhs, const Logic4Vec& rhs_val,
   if (HasUnknownBits(idx_val)) return;
   auto idx = static_cast<uint32_t>(idx_val.ToUint64());
   if (!lhs->index_end) {
+    // §7.4.1: a single-index target on a packed multidimensional array writes
+    // an outermost element (the inner-dimension width), not a single bit.
+    if (var->packed_elem_width > 1) {
+      uint32_t w = var->packed_elem_width;
+      uint64_t off = (idx >= var->packed_outer_lo)
+                         ? (idx - var->packed_outer_lo) * uint64_t{w}
+                         : 0;
+      if (off >= var->value.width) return;
+      WritePartSelect(var, static_cast<uint32_t>(off), w, rhs_val, arena);
+      return;
+    }
     if (idx >= var->value.width) return;
     uint64_t old_val = var->value.ToUint64();
     uint64_t bit = rhs_val.ToUint64() & 1;

@@ -336,9 +336,35 @@ void Lowerer::LowerVarAggregate(const RtlirVariable& var) {
   }
 }
 
+// §7.4.1: when a variable is a packed multidimensional array (more than one
+// packed dimension, stored as a single flat vector), record the outermost
+// element width and low bound so a single-index select `x[i]` slices that many
+// bits rather than one bit. No-op for ordinary vectors and packed structs.
+void Lowerer::RecordPackedArrayStride(const RtlirVariable& var, Variable* v) {
+  const DataType* dt = var.dtype;
+  if (!dt || dt->extra_packed_dims.empty() || !dt->packed_dim_left ||
+      !dt->packed_dim_right)
+    return;
+  auto span = [&](const Expr* l, const Expr* r) -> uint32_t {
+    int64_t lv = static_cast<int64_t>(EvalExpr(l, ctx_, arena_).ToUint64());
+    int64_t rv = static_cast<int64_t>(EvalExpr(r, ctx_, arena_).ToUint64());
+    return static_cast<uint32_t>((lv >= rv ? lv - rv : rv - lv) + 1);
+  };
+  uint32_t stride = 1;
+  for (const auto& [l, r] : dt->extra_packed_dims) stride *= span(l, r);
+  if (stride <= 1) return;
+  int64_t lv = static_cast<int64_t>(
+      EvalExpr(dt->packed_dim_left, ctx_, arena_).ToUint64());
+  int64_t rv = static_cast<int64_t>(
+      EvalExpr(dt->packed_dim_right, ctx_, arena_).ToUint64());
+  v->packed_elem_width = stride;
+  v->packed_outer_lo = static_cast<uint32_t>(std::min(lv, rv));
+}
+
 void Lowerer::LowerVar(const RtlirVariable& var) {
   uint32_t width = var.class_type_name.empty() ? var.width : 64;
   auto* v = ctx_.CreateVariable(var.name, width);
+  RecordPackedArrayStride(var, v);
 
   // §25.9: track virtual interface variables so assignments bind them to an
   // interface instance and component access redirects through that binding.

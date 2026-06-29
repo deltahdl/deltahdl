@@ -36,6 +36,7 @@ class Lowerer {
   void LowerParams(const RtlirModule* mod);
   void LowerAliases(const RtlirModule* mod);
   void LowerVar(const RtlirVariable& var);
+  void RecordPackedArrayStride(const RtlirVariable& var, Variable* v);
   void LowerVarInit(const RtlirVariable& var, Variable* v, uint32_t width);
   void LowerVarAggregate(const RtlirVariable& var);
   void LowerProcesses(const std::vector<RtlirProcess>& procs, bool from_program,
