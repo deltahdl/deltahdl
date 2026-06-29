@@ -700,12 +700,10 @@ static bool IsDollarExpr(const Expr* e) {
 
 static int InsideMatchRange(Logic4Vec lhs, const Expr* elem, SimContext& ctx,
                             Arena& arena) {
-  if (!lhs.IsKnown()) return 2;
-  uint64_t lv = lhs.ToUint64();
-
   if (elem->op == TokenKind::kPlusSlashMinus ||
       elem->op == TokenKind::kPlusPercentMinus) {
-    return InsideMatchTolerance(lv, elem, ctx, arena);
+    if (!lhs.IsKnown()) return 2;
+    return InsideMatchTolerance(lhs.ToUint64(), elem, ctx, arena);
   }
 
   uint64_t lo = IsDollarExpr(elem->index)
@@ -715,7 +713,19 @@ static int InsideMatchRange(Logic4Vec lhs, const Expr* elem, SimContext& ctx,
                     ? ResolveDollarBound(lhs.width, false)
                     : EvalExpr(elem->index_end, ctx, arena).ToUint64();
   if (lo > hi) return 0;
-  return (lv >= lo && lv <= hi) ? 1 : 0;
+
+  // §11.4.13: with x/z bits in the left operand the comparison ranges over
+  // every concretization of the unknown bits. ToUint64() projects those bits to
+  // 0 (the minimum); setting them to 1 gives the maximum. If the whole span
+  // lies inside [lo, hi] the membership is a definite 1; if it lies entirely
+  // outside, a definite 0; otherwise the comparison is ambiguous (x) and
+  // OR-reduces with the other set members.
+  uint64_t unknown = lhs.nwords > 0 ? lhs.words[0].bval : 0;
+  uint64_t lv_min = lhs.ToUint64();
+  uint64_t lv_max = lv_min | unknown;
+  if (lv_min >= lo && lv_max <= hi) return 1;
+  if (lv_max < lo || lv_min > hi) return 0;
+  return 2;
 }
 
 // Compares the left-hand expression against one singular set member, returning
