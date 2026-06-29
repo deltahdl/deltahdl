@@ -131,12 +131,16 @@ struct EventAwaiter {
   // Arms a watcher on a named-event variable that resumes the suspended
   // coroutine (respecting active/suspended process state) once when triggered.
   static void AttachEventVarWatcher(Variable* var, std::coroutine_handle<> h,
-                                    SimContext& ctx, Process* proc) {
+                                    SimContext& ctx, Process* proc,
+                                    const std::shared_ptr<bool>& consumed) {
     auto* ctx_ptr = &ctx;
-    var->AddWatcher([h, proc, ctx_ptr]() mutable {
+    var->AddWatcher([h, proc, ctx_ptr, consumed]() mutable {
       if (proc && !proc->active) return true;
-
+      // A sibling operand of the same event control already resumed this
+      // await; the coroutine has moved on, so retire this stale watcher.
+      if (*consumed) return true;
       if (proc && proc->is_suspended) return false;
+      *consumed = true;
       ResumeMaybeReactive(h, proc, *ctx_ptr);
       return true;
     });
@@ -145,9 +149,11 @@ struct EventAwaiter {
   // Arms an edge-sensitive watcher on a value-carrying variable, delegating
   // the edge/iff evaluation and resume decision to HandleEdgeEvent.
   static void AttachEdgeVarWatcher(Variable* var, const EventExpr& ev,
-                                   std::coroutine_handle<> h, SimContext& ctx,
-                                   Process* proc) {
-    auto* ctx_ptr = &ctx;
+                                   std::coroutine_handle<> h,
+                                   ResumeTarget target,
+                                   const std::shared_ptr<bool>& consumed) {
+    auto* ctx_ptr = &target.ctx;
+    auto* proc = target.proc;
     // Per-watcher snapshot of the value as of arming. The single shared
     // var->prev_value is clobbered when one of several coroutines waiting on
     // the same signal's edge resumes and re-arms synchronously mid-notify,
@@ -157,34 +163,42 @@ struct EventAwaiter {
     // logic, so the detections stay independent.
     Logic4Vec prev = var->value;
     var->AddWatcher([h, var, prev, edge = ev.edge, iff_cond = ev.iff_condition,
-                     ctx_ptr, proc]() mutable {
+                     ctx_ptr, proc, consumed]() mutable {
       if (proc && !proc->active) return true;
-
+      // Another operand of the same `@(a or b)` event control already resumed
+      // this await; retire this stale sibling so it cannot re-fire the handle.
+      if (*consumed) return true;
       if (proc && proc->is_suspended) return false;
       var->prev_value = prev;
       bool fired = HandleEdgeEvent(h, var, EdgeSpec{edge, iff_cond},
                                    ResumeTarget{*ctx_ptr, proc});
       prev = var->value;
+      if (fired) *consumed = true;
       return fired;
     });
   }
 
   void await_suspend(std::coroutine_handle<> h) {
     auto* proc = ctx.CurrentProcess();
+    // §9.4.2: an `@(a or b ...)` event control resumes its process at most once
+    // per trigger. All operand watchers armed by this await share one guard so
+    // that the first to fire retires the rest, even when several operands name
+    // the same signal (e.g. `posedge clk or negedge clk`).
+    auto consumed = std::make_shared<bool>(false);
     for (const auto& ev : events) {
       if (!ev.signal) continue;
       if (ev.signal->kind != ExprKind::kIdentifier &&
           ev.signal->kind != ExprKind::kMemberAccess) {
-        AttachCompoundWatchers(ev, h, proc);
+        AttachCompoundWatchers(ev, h, proc, consumed);
         continue;
       }
       Variable* var = ResolveSignalToVariable(ev.signal, ctx);
       if (!var) continue;
       if (var->is_event) {
-        AttachEventVarWatcher(var, h, ctx, proc);
+        AttachEventVarWatcher(var, h, ctx, proc, consumed);
         continue;
       }
-      AttachEdgeVarWatcher(var, ev, h, ctx, proc);
+      AttachEdgeVarWatcher(var, ev, h, ResumeTarget{ctx, proc}, consumed);
     }
   }
 
@@ -335,13 +349,13 @@ struct EventAwaiter {
   }
 
   void AttachCompoundWatchers(const EventExpr& ev, std::coroutine_handle<> h,
-                              Process* proc) {
+                              Process* proc,
+                              const std::shared_ptr<bool>& consumed) {
     std::vector<std::string_view> names;
     CollectExprIdentifiers(ev.signal, names);
     if (names.empty()) return;
     auto prev =
         std::make_shared<Logic4Vec>(EvalExpr(ev.signal, ctx, ctx.GetArena()));
-    auto consumed = std::make_shared<bool>(false);
     auto* ctx_ptr = &ctx;
     const Expr* signal = ev.signal;
     const Expr* iff_cond = ev.iff_condition;
