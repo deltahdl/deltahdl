@@ -428,21 +428,22 @@ static void SetEnumTypeInfo(const ModuleItem* item, RtlirVariable& var,
   }
 }
 
-void Elaborator::SetStructTypeInfo(const ModuleItem* item, RtlirVariable& var) {
+static void SetStructTypeInfo(const ModuleItem* item, RtlirVariable& var,
+                              const TypedefMap& typedefs, Arena& arena) {
   if (item->data_type.kind == DataTypeKind::kStruct ||
       item->data_type.kind == DataTypeKind::kUnion) {
     var.dtype = &item->data_type;
     return;
   }
   if (item->data_type.kind != DataTypeKind::kNamed) return;
-  auto td = typedefs_.find(item->data_type.type_name);
-  if (td == typedefs_.end()) return;
+  auto td = typedefs.find(item->data_type.type_name);
+  if (td == typedefs.end()) return;
   if (td->second.kind != DataTypeKind::kStruct &&
       td->second.kind != DataTypeKind::kUnion) {
     return;
   }
 
-  var.dtype = arena_.Create<DataType>(td->second);
+  var.dtype = arena.Create<DataType>(td->second);
 }
 
 // Records the declared-type information a variable carries beyond its raw
@@ -452,7 +453,7 @@ void Elaborator::SetStructTypeInfo(const ModuleItem* item, RtlirVariable& var) {
 // single-index select slices a whole element rather than one bit.
 void Elaborator::SetVariableTypeInfo(const ModuleItem* item,
                                      RtlirVariable& var) {
-  SetStructTypeInfo(item, var);
+  SetStructTypeInfo(item, var, typedefs_, arena_);
   if (item->data_type.kind == DataTypeKind::kNamed &&
       class_names_.count(item->data_type.type_name)) {
     var.class_type_name = item->data_type.type_name;

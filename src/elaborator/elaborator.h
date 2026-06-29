@@ -129,7 +129,6 @@ class Elaborator {
   // Returns the reconciled signedness for the net/variable declaration.
   bool ReconcilePartialPortSignedness(std::string_view name, bool decl_signed,
                                       RtlirModule* mod);
-  void SetStructTypeInfo(const ModuleItem* item, RtlirVariable& var);
   void SetVariableTypeInfo(const ModuleItem* item, RtlirVariable& var);
   void ElaborateContAssign(ModuleItem* item, RtlirModule* mod);
   void ValidateContAssignIdentLhs(ModuleItem* item, RtlirModule* mod);
