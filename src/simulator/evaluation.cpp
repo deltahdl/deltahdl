@@ -447,6 +447,112 @@ static bool TryEvalIdentityEquality(const Expr* expr, SimContext& ctx,
   return false;
 }
 
+// §11.6.1 Table 11-21: arithmetic and bitwise operators whose result width is
+// the maximum width of the two operands; both operands are context-determined.
+static bool IsMaxWidthBinaryOp(TokenKind op) {
+  switch (op) {
+    case TokenKind::kPlus:
+    case TokenKind::kMinus:
+    case TokenKind::kStar:
+    case TokenKind::kSlash:
+    case TokenKind::kPercent:
+    case TokenKind::kAmp:
+    case TokenKind::kPipe:
+    case TokenKind::kCaret:
+    case TokenKind::kTildeCaret:
+    case TokenKind::kCaretTilde:
+      return true;
+    default:
+      return false;
+  }
+}
+
+// §11.6.1: shift and power operators whose result width is the left operand's
+// width; the left operand is context-determined, the right self-determined.
+static bool IsLeftWidthBinaryOp(TokenKind op) {
+  switch (op) {
+    case TokenKind::kPower:
+    case TokenKind::kLtLt:
+    case TokenKind::kGtGt:
+    case TokenKind::kLtLtLt:
+    case TokenKind::kGtGtGt:
+      return true;
+    default:
+      return false;
+  }
+}
+
+static bool IsUnaryReductionOp(TokenKind op) {
+  switch (op) {
+    case TokenKind::kAmp:
+    case TokenKind::kPipe:
+    case TokenKind::kCaret:
+    case TokenKind::kTildeAmp:
+    case TokenKind::kTildePipe:
+    case TokenKind::kTildeCaret:
+    case TokenKind::kCaretTilde:
+      return true;
+    default:
+      return false;
+  }
+}
+
+// §11.6.1: the self-determined bit length of an expression, resolving variable
+// widths through the simulation context. Returns 0 ("indeterminate") for node
+// kinds whose width cannot be derived structurally (selects, member access,
+// calls, casts, ...); callers treat 0 as "do not force-widen", so such an
+// operand keeps its own evaluated width and the result is left unchanged.
+static uint32_t SimSelfWidth(const Expr* expr, SimContext& ctx) {
+  if (!expr) return 0;
+  switch (expr->kind) {
+    case ExprKind::kIntegerLiteral:
+      return LiteralWidth(expr->text, expr->int_val);
+    case ExprKind::kIdentifier: {
+      auto* var = ctx.FindVariable(expr->text);
+      return var ? var->value.width : 0;
+    }
+    case ExprKind::kUnary:
+      if (expr->op == TokenKind::kBang || IsUnaryReductionOp(expr->op))
+        return 1;
+      return SimSelfWidth(expr->lhs, ctx);
+    case ExprKind::kBinary:
+      if (IsMaxWidthBinaryOp(expr->op))
+        return std::max(SimSelfWidth(expr->lhs, ctx),
+                        SimSelfWidth(expr->rhs, ctx));
+      if (IsLeftWidthBinaryOp(expr->op)) return SimSelfWidth(expr->lhs, ctx);
+      return 1;  // comparison / equality / logical -> one-bit result
+    case ExprKind::kTernary:
+      return std::max(SimSelfWidth(expr->true_expr, ctx),
+                      SimSelfWidth(expr->false_expr, ctx));
+    default:
+      return 0;
+  }
+}
+
+// §11.6.1: evaluate a binary operator's context-determined operands at the
+// context width before combining them, so a wide sibling (or assignment
+// context) keeps a narrow operand from truncating an intermediate carry --
+// e.g. in `(a + b + 0) >> 1` the 32-bit literal 0 widens the addition's
+// context to 32 bits, preserving a+b's carry into bit 16.
+static Logic4Vec EvalContextDeterminedBinary(const Expr* expr, SimContext& ctx,
+                                             Arena& arena,
+                                             uint32_t context_width) {
+  if (IsMaxWidthBinaryOp(expr->op)) {
+    uint32_t w = std::max({context_width, SimSelfWidth(expr->lhs, ctx),
+                           SimSelfWidth(expr->rhs, ctx)});
+    return EvalBinaryOp(expr->op, EvalExpr(expr->lhs, ctx, arena, w),
+                        EvalExpr(expr->rhs, ctx, arena, w), arena,
+                        context_width);
+  }
+  if (IsLeftWidthBinaryOp(expr->op)) {
+    uint32_t w = std::max(context_width, SimSelfWidth(expr->lhs, ctx));
+    return EvalBinaryOp(expr->op, EvalExpr(expr->lhs, ctx, arena, w),
+                        EvalExpr(expr->rhs, ctx, arena), arena, context_width);
+  }
+  return EvalBinaryOp(expr->op, EvalExpr(expr->lhs, ctx, arena),
+                      EvalExpr(expr->rhs, ctx, arena), arena, context_width);
+}
+
 static Logic4Vec EvalBinaryExpr(const Expr* expr, SimContext& ctx, Arena& arena,
                                 uint32_t context_width = 0) {
   if (expr->op == TokenKind::kEq) return EvalAssignInExpr(expr, ctx, arena);
@@ -472,8 +578,7 @@ static Logic4Vec EvalBinaryExpr(const Expr* expr, SimContext& ctx, Arena& arena,
     if (TryEvalIdentityEquality(expr, ctx, arena, identity_result))
       return identity_result;
   }
-  return EvalBinaryOp(expr->op, EvalExpr(expr->lhs, ctx, arena),
-                      EvalExpr(expr->rhs, ctx, arena), arena, context_width);
+  return EvalContextDeterminedBinary(expr, ctx, arena, context_width);
 }
 
 static Logic4Vec EvalTaggedExpr(const Expr* expr, SimContext& ctx, Arena& arena,

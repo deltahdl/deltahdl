@@ -21,6 +21,11 @@ class Arena;
 Logic4Vec EvalExpr(const Expr* expr, SimContext& ctx, Arena& arena,
                    uint32_t context_width = 0);
 
+// §5.7.1/§11.6.1 — the self-determined bit length of an integer literal from
+// its text (sized literals carry an explicit width; an unsized decimal literal
+// is at least 32 bits, 64 when its value exceeds 32 bits).
+uint32_t LiteralWidth(std::string_view text, uint64_t val);
+
 bool HasUnknownBits(const Logic4Vec& v);
 Logic4Vec MakeAllX(Arena& arena, uint32_t width);
 int64_t SignExtend(uint64_t val, uint32_t width);

@@ -15,7 +15,7 @@ namespace delta {
 static bool IsXChar(char c) { return c == 'x' || c == 'X'; }
 static bool IsZChar(char c) { return c == 'z' || c == 'Z' || c == '?'; }
 
-static uint32_t LiteralWidth(std::string_view text, uint64_t val) {
+uint32_t LiteralWidth(std::string_view text, uint64_t val) {
   auto tick = text.find('\'');
   if (tick != std::string_view::npos && tick > 0) {
     uint32_t w = 0;
