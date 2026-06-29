@@ -928,12 +928,10 @@ class Elaborator {
   std::unordered_map<std::string_view, const ModuleItem*> func_decls_;
   std::unordered_map<std::string_view, std::string_view> var_named_types_;
   std::set<std::pair<std::string_view, std::string_view>> alias_pairs_;
-  // §10.11 bit-level alias correspondences seen in this module, to flag a given
-  // alias specified more than once across statements (keyed by raw net name +
-  // bit index pairs). Reset/saved alongside alias_pairs_.
-  std::set<std::pair<std::pair<std::string_view, uint32_t>,
-                     std::pair<std::string_view, uint32_t>>>
-      alias_bit_pairs_;
+  // §10.11: flag a bit-level alias correspondence specified more than once
+  // across statements. AliasBitRef = (raw net name, bit index).
+  using AliasBitRef = std::pair<std::string_view, uint32_t>;
+  std::set<std::pair<AliasBitRef, AliasBitRef>> alias_bit_pairs_;
 
   std::unordered_set<std::string_view> non_ansi_complete_ports_;
   std::unordered_map<std::string_view, uint32_t> non_ansi_partial_ports_;
@@ -943,10 +941,8 @@ class Elaborator {
   std::unordered_set<std::string_view> ansi_port_names_;
 
   std::unordered_map<std::string_view, std::string_view> interface_inst_types_;
-
   std::unordered_map<std::string_view, std::string_view>
       vi_var_interface_types_;
-
   std::unordered_map<std::string_view, std::string_view> vi_var_modports_;
 
   // §25.9: explicit parameter value overrides, evaluated to constants, for
@@ -957,7 +953,6 @@ class Elaborator {
       vi_var_param_values_;
   std::unordered_map<std::string_view, std::vector<int64_t>>
       interface_inst_param_values_;
-
   // §25.9: interface instances targeted by a defparam declared outside the
   // interface; such an instance shall not be assigned to a virtual interface.
   std::unordered_set<std::string_view> vi_external_defparam_insts_;
