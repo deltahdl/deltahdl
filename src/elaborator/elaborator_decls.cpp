@@ -987,7 +987,7 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
 
   TrackVarArrayInfo(item, var);
 
-  var.attrs = ResolveAttributes(item->attrs, diag_);
+  var.attrs = ResolveAttributes(item->attrs, diag_, BuildParamScope(mod));
   mod->variables.push_back(var);
   ValidateArrayInitPattern(item);
   ValidateStructInitPattern(item);

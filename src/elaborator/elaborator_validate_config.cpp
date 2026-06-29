@@ -17,7 +17,8 @@
 
 namespace delta {
 
-static ResolvedAttribute EvalAttribute(const Attribute& attr) {
+static ResolvedAttribute EvalAttribute(const Attribute& attr,
+                                       const ScopeMap& scope) {
   ResolvedAttribute ra;
   ra.name = attr.name;
   if (!attr.value) {
@@ -32,16 +33,19 @@ static ResolvedAttribute EvalAttribute(const Attribute& attr) {
       ra.string_value = txt;
     }
   } else {
-    ra.resolved_value = ConstEvalInt(attr.value);
+    // §A.9.1/§5.12: an attribute value is a constant expression that may
+    // reference module parameters, so evaluate it against the param scope.
+    ra.resolved_value = ConstEvalInt(attr.value, scope);
   }
   return ra;
 }
 
 std::vector<ResolvedAttribute> ResolveAttributes(
-    const std::vector<Attribute>& attrs, DiagEngine& diag) {
+    const std::vector<Attribute>& attrs, DiagEngine& diag,
+    const ScopeMap& scope) {
   std::vector<ResolvedAttribute> result;
   for (const auto& attr : attrs) {
-    auto ra = EvalAttribute(attr);
+    auto ra = EvalAttribute(attr, scope);
     auto it = std::find_if(result.begin(), result.end(),
                            [&](const auto& e) { return e.name == ra.name; });
     if (it != result.end()) {

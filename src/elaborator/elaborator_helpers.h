@@ -6,6 +6,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "elaborator/const_eval.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast.h"
@@ -21,7 +22,8 @@ struct ResolvedAttribute;
 enum class RtlirProcessKind : uint8_t;
 
 std::vector<ResolvedAttribute> ResolveAttributes(
-    const std::vector<Attribute>& attrs, DiagEngine& diag);
+    const std::vector<Attribute>& attrs, DiagEngine& diag,
+    const ScopeMap& scope = {});
 uint32_t LookupLhsWidth(const Expr* lhs, const RtlirModule* mod);
 RtlirProcessKind MapAlwaysKind(AlwaysKind ak);
 
