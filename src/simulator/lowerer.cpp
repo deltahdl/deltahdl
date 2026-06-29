@@ -586,7 +586,13 @@ void Lowerer::LowerAliases(const RtlirModule* mod) {
       if (primary.empty()) {
         primary = net->text;
       } else {
+        // §10.11: aliased nets denote the same physical net, so they share one
+        // resolved storage. Redirect both the variable map (used for reads) and
+        // the net map (used by continuous-assign driver resolution); otherwise
+        // a driver on the non-primary net writes a Variable the alias never
+        // sees.
         ctx_.AliasVariable(net->text, primary);
+        ctx_.AliasNet(net->text, primary);
       }
     }
   }
