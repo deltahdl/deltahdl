@@ -298,6 +298,17 @@ struct ParserPortHelpers {
     return type_then_name;
   }
 
+  // Parses the data type of an ANSI port, treating a forward-referenced
+  // user-defined type (a two-identifier `type name` head) as a named type and
+  // otherwise deferring to the general port data-type parse.
+  static void ParsePortType(Parser& p, PortDecl& port, Direction dir) {
+    if (LooksLikeForwardNamedType(p, dir)) {
+      port.data_type = p.ParseNamedType();
+    } else {
+      ParseAnsiPortDataType(p, port);
+    }
+  }
+
   // After a comma in an ANSI port list, a bare identifier (with no preceding
   // type) continues the previous port's type/direction. Returns true and
   // appends the port when this form is matched; otherwise leaves the lexer
@@ -782,11 +793,7 @@ PortDecl Parser::ParsePortDecl() {
     }
   }
 
-  if (ParserPortHelpers::LooksLikeForwardNamedType(*this, dir)) {
-    port.data_type = ParseNamedType();
-  } else {
-    ParserPortHelpers::ParseAnsiPortDataType(*this, port);
-  }
+  ParserPortHelpers::ParsePortType(*this, port, dir);
 
   if (port.data_type.kind == DataTypeKind::kNamed && Check(TokenKind::kDot)) {
     Consume();
