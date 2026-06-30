@@ -527,7 +527,11 @@ void Parser::ParseClassMembers(std::vector<ClassMember*>& members) {
 
   if (TryParseKeywordClassMember(members, member, proto)) return;
 
-  DataType dtype = ParseDataType();
+  // (6.19/7.2) a class property may use an inline enum/struct/union data type,
+  // which ParseDataType() does not consume; dispatch those here first, as every
+  // other data-type caller must.
+  DataType dtype;
+  if (!TryParseInlineAggregateType(dtype)) dtype = ParseDataType();
   member->kind = ClassMemberKind::kProperty;
   member->data_type = dtype;
   member->name = Expect(TokenKind::kIdentifier).text;
