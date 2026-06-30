@@ -7,11 +7,15 @@ namespace {
 TEST(FullAndParallelConnectionElaboration, VectorAndScalarEndpointsElaborate) {
   ElabFixture f;
   auto* design = ElaborateSrc(
-      "module m(input sel, input [7:0] in1, in2, output [7:0] q);\n"
+      // 30.3.1: a module path destination shall be connected to an output or
+      // inout port; the scalar endpoint path drives the scalar output qs (the
+      // input sel would be an illegal destination).
+      "module m(input sel, input [7:0] in1, in2, output [7:0] q,\n"
+      "         output qs);\n"
       "  specify\n"
       "    (in1 => q) = 3;\n"
       "    (sel *> q) = 2;\n"
-      "    (sel => sel) = 1;\n"
+      "    (sel => qs) = 1;\n"
       "  endspecify\n"
       "endmodule\n",
       f);
