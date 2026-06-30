@@ -58,36 +58,52 @@ static void WalkStmtsForSequenceEvents(
     WalkStmtsForSequenceEvents(ci.body, seq_names, in_automatic, diag);
 }
 
+static bool IsProcessBlockItem(ModuleItemKind kind) {
+  switch (kind) {
+    case ModuleItemKind::kInitialBlock:
+    case ModuleItemKind::kAlwaysBlock:
+    case ModuleItemKind::kAlwaysCombBlock:
+    case ModuleItemKind::kAlwaysFFBlock:
+    case ModuleItemKind::kAlwaysLatchBlock:
+    case ModuleItemKind::kFinalBlock:
+      return true;
+    default:
+      return false;
+  }
+}
+
+// Walk one module item's statements for sequence-event arguments. A process
+// block's statements live in item->body; a task body's statements live in
+// func_body_stmts (item->body is the module-process body form), so both are
+// walked for a task so an event control such as @(s(a, b)) inside an automatic
+// task is reached. §9.4.2.4: arguments to a sequence used in an event control
+// shall be static, so an automatic task local passed as a sequence argument is
+// an error (in_automatic is false for a process block and a non-automatic
+// task, so static sequence arguments stay legal there).
+static void WalkItemForSequenceEvents(
+    const ModuleItem* item,
+    const std::unordered_set<std::string_view>& seq_names, DiagEngine& diag) {
+  if (IsProcessBlockItem(item->kind)) {
+    if (item->body) {
+      WalkStmtsForSequenceEvents(const_cast<Stmt*>(item->body), seq_names,
+                                 false, diag);
+    }
+    return;
+  }
+  if (item->kind != ModuleItemKind::kTaskDecl) return;
+  if (item->body) {
+    WalkStmtsForSequenceEvents(const_cast<Stmt*>(item->body), seq_names,
+                               item->is_automatic, diag);
+  }
+  for (auto* s : item->func_body_stmts) {
+    WalkStmtsForSequenceEvents(s, seq_names, item->is_automatic, diag);
+  }
+}
+
 void Elaborator::ValidateSequenceEventArgs(const ModuleDecl* decl) {
   if (sequence_names_.empty()) return;
   for (const auto* item : decl->items) {
-    if (item->kind == ModuleItemKind::kInitialBlock ||
-        item->kind == ModuleItemKind::kAlwaysBlock ||
-        item->kind == ModuleItemKind::kAlwaysCombBlock ||
-        item->kind == ModuleItemKind::kAlwaysFFBlock ||
-        item->kind == ModuleItemKind::kAlwaysLatchBlock ||
-        item->kind == ModuleItemKind::kFinalBlock) {
-      if (item->body) {
-        WalkStmtsForSequenceEvents(const_cast<Stmt*>(item->body),
-                                   sequence_names_, false, diag_);
-      }
-    }
-
-    if (item->kind == ModuleItemKind::kTaskDecl) {
-      // A task body's statements live in func_body_stmts (item->body is the
-      // module-process body form); walk them so an event control such as
-      // @(s(a, b)) inside an automatic task is reached. §9.4.2.4: arguments to
-      // a sequence used in an event control shall be static, so an automatic
-      // task local passed as a sequence argument is an error.
-      if (item->body) {
-        WalkStmtsForSequenceEvents(const_cast<Stmt*>(item->body),
-                                   sequence_names_, item->is_automatic, diag_);
-      }
-      for (auto* s : item->func_body_stmts) {
-        WalkStmtsForSequenceEvents(s, sequence_names_, item->is_automatic,
-                                   diag_);
-      }
-    }
+    WalkItemForSequenceEvents(item, sequence_names_, diag_);
   }
 }
 
