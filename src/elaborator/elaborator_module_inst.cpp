@@ -438,6 +438,26 @@ void PushInstanceArray(const InstArrayDistribCtx& ctx, RtlirModule* mod,
   }
 }
 
+// Appends `inst` to `mod`, expanding a single-dimension instance array into one
+// distributed instance per index (§23.3.3.5). Other forms append a single
+// instance unchanged.
+void AppendModuleInstOrArray(const InstArrayDistribCtx& ctx, RtlirModule* mod,
+                             const RtlirModuleInst& inst,
+                             const ModuleItem* item) {
+  std::optional<int64_t> arr_left;
+  std::optional<int64_t> arr_right;
+  if (item->inst_dims.size() == 1) {
+    if (item->inst_range_left) arr_left = ConstEvalInt(item->inst_range_left);
+    if (item->inst_range_right)
+      arr_right = ConstEvalInt(item->inst_range_right);
+  }
+  if (arr_left && arr_right) {
+    PushInstanceArray(ctx, mod, inst, *arr_left, *arr_right);
+  } else {
+    mod->children.push_back(inst);
+  }
+}
+
 }  // namespace
 
 void Elaborator::ApplyConfigParamOverrides(
@@ -521,29 +541,9 @@ void Elaborator::ElaborateModuleInst(ModuleItem* item, RtlirModule* mod) {
   CheckInterconnectPortMerge(inst, item, mod);
 
   inst.attrs = ResolveAttributes(item->attrs, diag_);
-  AppendModuleInstOrArray(inst, item, mod);
+  InstArrayDistribCtx dctx{arena_, mod, var_array_info_};
+  AppendModuleInstOrArray(dctx, mod, inst, item);
   current_inst_path_ = std::move(saved_inst_path);
-}
-
-void Elaborator::AppendModuleInstOrArray(const RtlirModuleInst& inst,
-                                         const ModuleItem* item,
-                                         RtlirModule* mod) {
-  // §23.3.3.5: a single-dimension instance array expands into one instance per
-  // index, with each port connection distributed (replicate / part-select /
-  // unpacked element). Other forms keep the existing single-instance lowering.
-  std::optional<int64_t> arr_left;
-  std::optional<int64_t> arr_right;
-  if (item->inst_dims.size() == 1) {
-    if (item->inst_range_left) arr_left = ConstEvalInt(item->inst_range_left);
-    if (item->inst_range_right)
-      arr_right = ConstEvalInt(item->inst_range_right);
-  }
-  if (arr_left && arr_right) {
-    InstArrayDistribCtx dctx{arena_, mod, var_array_info_};
-    PushInstanceArray(dctx, mod, inst, *arr_left, *arr_right);
-  } else {
-    mod->children.push_back(inst);
-  }
 }
 
 }  // namespace delta

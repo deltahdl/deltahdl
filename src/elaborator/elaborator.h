@@ -147,10 +147,6 @@ class Elaborator {
   void RunPostItemValidations(const ModuleDecl* decl, RtlirModule* mod);
 
   void ElaborateModuleInst(ModuleItem* item, RtlirModule* mod);
-  // Appends `inst` to `mod`, expanding a single-dimension instance array into
-  // one distributed instance per index (§23.3.3.5).
-  void AppendModuleInstOrArray(const RtlirModuleInst& inst,
-                               const ModuleItem* item, RtlirModule* mod);
 
   UdpDecl* FindUdpByName(std::string_view name) const;
 
