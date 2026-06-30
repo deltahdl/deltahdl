@@ -112,6 +112,12 @@ std::string BuildPrinttimescaleReport(const Expr* expr, SimContext& ctx);
 std::string BuildStackTraceReport(const SimContext& ctx);
 Logic4Vec EvalFunctionCall(const Expr* expr, SimContext& ctx, Arena& arena);
 
+// §11.12 — expand a let into its body expression. `call` supplies the actual
+// arguments (it may be a bare identifier reference for a no-argument let, in
+// which case no actuals are bound).
+Logic4Vec EvalLetExpansion(ModuleItem* decl, const Expr* call, SimContext& ctx,
+                           Arena& arena);
+
 void EmitSeverityHeader(SimContext& ctx, std::string_view prefix,
                         std::string_view msg, std::ostream& os);
 

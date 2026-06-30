@@ -766,8 +766,8 @@ static void BindLetArgs(ModuleItem* decl, const std::vector<Logic4Vec>& vals,
   }
 }
 
-static Logic4Vec EvalLetExpansion(ModuleItem* decl, const Expr* call,
-                                  SimContext& ctx, Arena& arena) {
+Logic4Vec EvalLetExpansion(ModuleItem* decl, const Expr* call, SimContext& ctx,
+                           Arena& arena) {
   if (expanding_lets.count(decl->name)) return MakeAllX(arena, 32);
   expanding_lets.insert(decl->name);
 
