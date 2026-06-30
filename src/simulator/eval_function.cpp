@@ -263,6 +263,10 @@ static Logic4Vec EvalDpiCall(const Expr* expr, SimContext& ctx, Arena& arena) {
 struct InstanceMethodInfo {
   ClassObject* obj = nullptr;
   ModuleItem* method = nullptr;
+  // The class in which `method` is defined, so its body resolves unqualified
+  // members against that level (§8.15 member shadowing across a base/derived
+  // hierarchy).
+  const ClassTypeInfo* owner = nullptr;
 };
 
 static bool ResolveInstanceMethod(const MethodCallParts& parts, SimContext& ctx,
@@ -275,18 +279,17 @@ static bool ResolveInstanceMethod(const MethodCallParts& parts, SimContext& ctx,
   if (handle == kNullClassHandle) return false;
   info.obj = ctx.GetClassObject(handle);
   if (!info.obj) return false;
-  info.method = info.obj->ResolveVirtualMethod(parts.method_name);
+  info.method = info.obj->ResolveVirtualMethod(parts.method_name, &info.owner);
   if (!info.method) {
     auto* declared_type = ctx.FindClassType(class_type);
     // §8.26.9: a non-interface declared type resolves against that type; an
     // interface-class declared type (or no declared type at all) resolves via
     // the object's dynamic type (the implementing class).
-    if (declared_type && !declared_type->is_interface) {
-      info.method =
-          info.obj->ResolveMethodForType(parts.method_name, declared_type);
-    } else {
-      info.method = info.obj->ResolveMethod(parts.method_name);
-    }
+    const ClassTypeInfo* from = (declared_type && !declared_type->is_interface)
+                                    ? declared_type
+                                    : info.obj->type;
+    info.method =
+        info.obj->ResolveMethodForType(parts.method_name, from, &info.owner);
   }
   return info.method != nullptr;
 }
@@ -347,7 +350,12 @@ static bool TryEvalClassMethodCall(const Expr* expr, SimContext& ctx,
                                 out);
     return true;
   }
+  // Run the body with its defining class as the enclosing scope so an
+  // unqualified member resolves to that level even when a derived class
+  // shadows the name (§8.15).
+  ctx.PushMethodClass(info.owner);
   out = ExecInstanceMethodCall(info.method, info.obj, expr, ctx, arena);
+  ctx.PopMethodClass();
   return true;
 }
 

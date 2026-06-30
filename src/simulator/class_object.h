@@ -94,7 +94,8 @@ struct ClassObject {
 
   void SetProperty(std::string_view name, const Logic4Vec& val);
 
-  ModuleItem* ResolveVirtualMethod(std::string_view name) const;
+  ModuleItem* ResolveVirtualMethod(
+      std::string_view name, const ClassTypeInfo** owner_out = nullptr) const;
 
   ModuleItem* ResolveMethod(std::string_view name) const;
 

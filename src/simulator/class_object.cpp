@@ -47,10 +47,15 @@ void ClassObject::SetProperty(std::string_view name, const Logic4Vec& val) {
   properties[key] = val;
 }
 
-ModuleItem* ClassObject::ResolveVirtualMethod(std::string_view name) const {
+ModuleItem* ClassObject::ResolveVirtualMethod(
+    std::string_view name, const ClassTypeInfo** owner_out) const {
   if (!type) return nullptr;
   int idx = type->FindVTableIndex(name);
-  if (idx >= 0) return type->vtable[static_cast<size_t>(idx)].method;
+  if (idx >= 0) {
+    const auto& entry = type->vtable[static_cast<size_t>(idx)];
+    if (owner_out) *owner_out = entry.owner;
+    return entry.method;
+  }
   return nullptr;
 }
 

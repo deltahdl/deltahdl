@@ -43,9 +43,13 @@ static Logic4Vec EvalIdentifier(const Expr* expr, SimContext& ctx,
   }
   // §8.6: when reading an unqualified identifier within a method body, if the
   // identifier is not found as a local variable, try to resolve it as a
-  // property of the current object (this).
+  // property of the current object (this). §8.15: resolve against the class in
+  // which the running method is defined so a base method reads the base field
+  // even when a derived class shadows the name.
   auto* self = ctx.CurrentThis();
   if (self) {
+    if (method_cls)
+      return self->GetPropertyForType(expr->text, method_cls, arena);
     return self->GetProperty(expr->text, arena);
   }
   return MakeLogic4Vec(arena, 1);
