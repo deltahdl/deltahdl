@@ -3,12 +3,32 @@
 #include <string_view>
 #include <unordered_set>
 
+#include "common/arena.h"
 #include "elaborator/rtlir.h"
+#include "elaborator/type_eval.h"
 #include "parser/ast.h"
 
 namespace delta {
 
 struct RtlirModule;
+
+// State threaded into RegisterImportedEnumLiterals: the compilation unit (to
+// find imported packages), the arena and enum-member name set used to emit
+// backing variables, and the typedef map used to size each enum.
+struct ImportedEnumCtx {
+  const CompilationUnit* unit;
+  Arena& arena;
+  TypedefMap& typedefs;
+  std::unordered_set<std::string_view>& enum_member_names;
+};
+
+// §6.19/§26.6: a wildcard package import makes the package's enumeration
+// literals visible by their unqualified names. Emit a backing variable per such
+// literal into `mod` (the same representation used for a locally declared enum)
+// so a bare reference like `COLOR_GREEN` resolves to its value. Covers both
+// header and body wildcard imports. Defined in elaborator_typedef.cpp.
+void RegisterImportedEnumLiterals(const ModuleDecl* decl, RtlirModule* mod,
+                                  const ImportedEnumCtx& ctx);
 
 // Maps a net data-type kind to its RTLIR net type, defaulting to kWire for any
 // kind that is not a net type. Defined once in elaborator_decls.cpp and shared

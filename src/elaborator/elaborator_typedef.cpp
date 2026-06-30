@@ -12,6 +12,7 @@
 #include "common/diagnostic.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
+#include "elaborator/elaborator_items_internal.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast.h"
@@ -290,6 +291,30 @@ bool NettypesMatch(std::string_view a, std::string_view b,
   std::string_view ca = (ait != nettype_canonical.end()) ? ait->second : a;
   std::string_view cb = (bit != nettype_canonical.end()) ? bit->second : b;
   return ca == cb;
+}
+
+void RegisterImportedEnumLiterals(const ModuleDecl* decl, RtlirModule* mod,
+                                  const ImportedEnumCtx& ctx) {
+  for (const auto* item : decl->items) {
+    if (item->kind != ModuleItemKind::kImportDecl) continue;
+    if (!item->import_item.is_wildcard) continue;
+    const PackageDecl* pkg = nullptr;
+    for (const auto* p : ctx.unit->packages) {
+      if (p->name == item->import_item.package_name) {
+        pkg = p;
+        break;
+      }
+    }
+    if (!pkg) continue;
+    for (auto* pi : pkg->items) {
+      if (pi->kind != ModuleItemKind::kTypedef) continue;
+      if (pi->typedef_type.kind != DataTypeKind::kEnum) continue;
+      if (mod->enum_types.count(pi->name) != 0) continue;
+      uint32_t width = EvalTypeWidth(pi->typedef_type, ctx.typedefs);
+      mod->enum_types[pi->name] =
+          BuildEnumMembers(pi, width, ctx.arena, mod, ctx.enum_member_names);
+    }
+  }
 }
 
 }  // namespace delta

@@ -10,6 +10,7 @@
 #include "common/diagnostic.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
+#include "elaborator/elaborator_items_internal.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast.h"
@@ -624,6 +625,8 @@ RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
   current_library_.assign(decl->library.data(), decl->library.size());
 
   ApplyHeaderImports(decl);
+  ImportedEnumCtx enum_ctx{unit_, arena_, typedefs_, enum_member_names_};
+  RegisterImportedEnumLiterals(decl, mod, enum_ctx);
 
   TypeParamValueCtx tp_ctx{typedefs_, class_names_, diag_};
   for (size_t i = 0; i < decl->params.size(); ++i) {
