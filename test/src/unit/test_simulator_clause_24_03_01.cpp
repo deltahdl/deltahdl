@@ -135,6 +135,16 @@ TEST(ProgramSchedulingSim, ProgramNbaCommitsAfterDesignNba) {
   EXPECT_EQ(b->value.ToUint64(), 10u);
 }
 
+// A program initial's event control on a design signal resumes in the Reactive
+// region (24.3.1): when trig transitions, the program statement is scheduled
+// into the Reactive region, after the design's NBA region has committed v<=10,
+// so the program-driven v=99 wins. The design drives trig one time step later
+// (#1) because a program initial executes in the Reactive region (24.3.1),
+// strictly after the Active region of the same time slot; were trig driven at
+// time 0 the program's @(trig) would not yet be armed when the design's Active
+// write occurred, a clocking-block-less program/design race (24.3.2). Delaying
+// the design write lets the program arm @(trig) first, so the resume is
+// deterministic and exercises the Reactive-region scheduling under test.
 TEST(ProgramSchedulingSim, ProgramEventWaitResumesInReactive) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -145,7 +155,7 @@ TEST(ProgramSchedulingSim, ProgramEventWaitResumesInReactive) {
       "    initial @(trig) v = 8'd99;\n"
       "  endprogram\n"
       "  initial begin\n"
-      "    trig = 1'b1;\n"
+      "    #1 trig = 1'b1;\n"
       "    v <= 8'd10;\n"
       "  end\n"
       "endmodule\n",

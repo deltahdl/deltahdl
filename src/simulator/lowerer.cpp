@@ -505,7 +505,17 @@ static SimCoroutine MakeContAssignCoroutine(ContAssignParams params,
   auto* net = ctx.FindNet(params.lhs->text);
   ContAssignDriver drv = MakeContAssignDriver(net);
 
-  while (!ctx.StopRequested()) {
+  // A continuous assignment must drive its left-hand side at least once when it
+  // is activated, even if a simulation stop was already requested for the
+  // region in which it first runs. A program's `assign` is reactive (§24.3.1),
+  // so it first executes in the Reactive region alongside the program's initial
+  // procedures; if such an initial completes first it sets the stop request
+  // (the program block finished, §24.7) before this coroutine's first
+  // evaluation. Guarding the very first evaluation behind StopRequested would
+  // then drop the assignment entirely, leaving the target at its reset value.
+  bool evaluated_once = false;
+  while (!evaluated_once || !ctx.StopRequested()) {
+    evaluated_once = true;
     auto val = EvalExpr(params.rhs, ctx, arena, params.width);
 
     if (params.delays.rise) {
