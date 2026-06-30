@@ -8,9 +8,11 @@
 #include <utility>
 #include <vector>
 
+#include "common/arena.h"
 #include "common/diagnostic.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
+#include "elaborator/elaborator_port_binding_internal.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast.h"
@@ -315,6 +317,127 @@ void ApplyConfigOverrideParams(
   }
 }
 
+using VarArrayInfoMap =
+    std::unordered_map<std::string_view, Elaborator::VarArrayInfo>;
+
+// Shared context for §23.3.3.5 instance-array expansion: the arena for
+// synthesizing per-instance connection expressions, the parent module (for
+// signal widths), and the parent's unpacked-array shapes.
+struct InstArrayDistribCtx {
+  Arena& arena;
+  const RtlirModule* parent_mod;
+  const VarArrayInfoMap& var_array_info;
+};
+
+Expr* MakeIntLitExpr(Arena& arena, uint64_t v) {
+  auto* e = arena.Create<Expr>();
+  e->kind = ExprKind::kIntegerLiteral;
+  e->int_val = v;
+  return e;
+}
+
+// `base[idx]` (single element/bit select).
+Expr* MakeElementSelectExpr(Arena& arena, Expr* base, uint32_t idx) {
+  auto* e = arena.Create<Expr>();
+  e->kind = ExprKind::kSelect;
+  e->base = base;
+  e->index = MakeIntLitExpr(arena, idx);
+  return e;
+}
+
+// `base[lo +: width]` (ascending indexed part-select).
+Expr* MakePartSelectPlusExpr(Arena& arena, Expr* base, uint32_t lo,
+                             uint32_t width) {
+  auto* e = arena.Create<Expr>();
+  e->kind = ExprKind::kSelect;
+  e->base = base;
+  e->index = MakeIntLitExpr(arena, lo);
+  e->index_end = MakeIntLitExpr(arena, width);
+  e->is_part_select_plus = true;
+  return e;
+}
+
+// Total width of a concatenation whose elements are all named signals, or 0 if
+// any element is not a simple identifier.
+uint32_t ConcatConnWidth(const Expr* conn, const RtlirModule* mod) {
+  uint32_t w = 0;
+  for (const Expr* el : conn->elements) {
+    if (!el || el->kind != ExprKind::kIdentifier) return 0;
+    w += FindSignalWidth(el->text, mod);
+  }
+  return w;
+}
+
+// True when a concatenation has exactly `total` elements and each is a named
+// signal of width `port_width`, so position `p` maps cleanly to one element.
+bool ConcatElementsUniform(const Expr* conn, uint32_t total,
+                           uint32_t port_width, const RtlirModule* mod) {
+  if (conn->elements.size() != total) return false;
+  for (const Expr* el : conn->elements) {
+    if (!el || el->kind != ExprKind::kIdentifier) return false;
+    if (FindSignalWidth(el->text, mod) != port_width) return false;
+  }
+  return true;
+}
+
+// §23.3.3.5: rewrite one port connection for the instance at array position
+// `position` (0 = least-significant / right index). An unpacked-array
+// connection maps element-by-position; a packed connection whose width is
+// port_width*total is part-selected (rightmost instance to the LSB); an
+// equal-width connection is replicated to every instance.
+Expr* DistributeInstanceConnection(const InstArrayDistribCtx& ctx,
+                                   const RtlirPortBinding& binding,
+                                   uint32_t position, uint32_t total) {
+  Expr* conn = binding.connection;
+  uint32_t port_width = binding.width;
+  if (!conn || port_width == 0 || total < 2) return conn;
+
+  if (conn->kind == ExprKind::kIdentifier) {
+    auto it = ctx.var_array_info.find(conn->text);
+    if (it != ctx.var_array_info.end() && it->second.num_unpacked_dims > 0) {
+      return MakeElementSelectExpr(ctx.arena, conn, position);
+    }
+    if (FindSignalWidth(conn->text, ctx.parent_mod) == port_width * total) {
+      return MakePartSelectPlusExpr(ctx.arena, conn, position * port_width,
+                                    port_width);
+    }
+    return conn;
+  }
+
+  if (conn->kind == ExprKind::kConcatenation &&
+      ConcatConnWidth(conn, ctx.parent_mod) == port_width * total) {
+    if (ConcatElementsUniform(conn, total, port_width, ctx.parent_mod)) {
+      // Concatenation elements are stored most-significant first.
+      return conn->elements[total - 1 - position];
+    }
+    return MakePartSelectPlusExpr(ctx.arena, conn, position * port_width,
+                                  port_width);
+  }
+  return conn;
+}
+
+// Materializes a single-dimension instance array `c[left:right]` as `total`
+// separate instances, each named `c[idx]` and carrying its distributed port
+// connections (§23.3.3.5). The resolved child module is shared across copies;
+// per-instance variable storage is created later under each instance's prefix.
+void PushInstanceArray(const InstArrayDistribCtx& ctx, RtlirModule* mod,
+                       const RtlirModuleInst& base, int64_t left,
+                       int64_t right) {
+  uint32_t total = static_cast<uint32_t>(std::abs(left - right) + 1);
+  int64_t step = (right <= left) ? 1 : -1;
+  for (uint32_t p = 0; p < total; ++p) {
+    int64_t idx = right + step * static_cast<int64_t>(p);
+    RtlirModuleInst copy = base;
+    std::string name = std::format("{}[{}]", base.inst_name, idx);
+    auto* buf = ctx.arena.AllocString(name.c_str(), name.size());
+    copy.inst_name = std::string_view(buf, name.size());
+    for (auto& b : copy.port_bindings) {
+      b.connection = DistributeInstanceConnection(ctx, b, p, total);
+    }
+    mod->children.push_back(std::move(copy));
+  }
+}
+
 }  // namespace
 
 void Elaborator::ApplyConfigParamOverrides(
@@ -398,7 +521,23 @@ void Elaborator::ElaborateModuleInst(ModuleItem* item, RtlirModule* mod) {
   CheckInterconnectPortMerge(inst, item, mod);
 
   inst.attrs = ResolveAttributes(item->attrs, diag_);
-  mod->children.push_back(inst);
+
+  // §23.3.3.5: a single-dimension instance array expands into one instance per
+  // index, with each port connection distributed (replicate / part-select /
+  // unpacked element). Other forms keep the existing single-instance lowering.
+  std::optional<int64_t> arr_left;
+  std::optional<int64_t> arr_right;
+  if (item->inst_dims.size() == 1) {
+    if (item->inst_range_left) arr_left = ConstEvalInt(item->inst_range_left);
+    if (item->inst_range_right)
+      arr_right = ConstEvalInt(item->inst_range_right);
+  }
+  if (arr_left && arr_right) {
+    InstArrayDistribCtx dctx{arena_, mod, var_array_info_};
+    PushInstanceArray(dctx, mod, inst, *arr_left, *arr_right);
+  } else {
+    mod->children.push_back(inst);
+  }
   current_inst_path_ = std::move(saved_inst_path);
 }
 

@@ -338,9 +338,27 @@ static void ApplyContAssignToNet(const ContAssignDriver& drv,
   drv.net->Resolve(arena);
 }
 
+// True for the left-hand-side forms a continuous assignment can drive beyond a
+// bare identifier: a part-select/element select, a concatenation, an assignment
+// pattern, a streaming concatenation, or a member access. These reuse the
+// procedural lvalue writer (PerformBlockingAssign) below.
+static bool ContAssignSupportsStructuredLhs(ExprKind k) {
+  return k == ExprKind::kSelect || k == ExprKind::kConcatenation ||
+         k == ExprKind::kAssignmentPattern || k == ExprKind::kStreamingConcat ||
+         k == ExprKind::kMemberAccess;
+}
+
 static void ApplyContAssignToVariable(const ContAssignParams& params,
                                       const Logic4Vec& driven_val,
                                       SimContext& ctx, Arena& arena) {
+  if (params.lhs->kind != ExprKind::kIdentifier) {
+    // A concatenation, part-select, member, or streaming-concat target reuses
+    // the procedural lvalue writer, which decomposes the lvalue and notifies
+    // each affected variable's watchers (§11.4.1; §23.3.3.5 output
+    // distribution drives instance outputs into part-selects of a parent net).
+    PerformBlockingAssign(params.lhs, driven_val, ctx, arena);
+    return;
+  }
   auto* var = ctx.FindVariable(params.lhs->text);
   if (var && !var->is_forced) {
     var->value = ResizeToWidth(driven_val, var->value.width, arena);
@@ -363,7 +381,9 @@ static Logic4Vec CurrentContAssignOldValue(const ContAssignParams& params,
                                            const Net* net, SimContext& ctx,
                                            Arena& arena) {
   Logic4Vec old_val = MakeLogic4VecVal(arena, 1, 0);
-  auto* var = ctx.FindVariable(params.lhs->text);
+  auto* var = params.lhs->kind == ExprKind::kIdentifier
+                  ? ctx.FindVariable(params.lhs->text)
+                  : nullptr;
   if (var)
     old_val = var->value;
   else if (net && net->resolved)
@@ -489,7 +509,11 @@ static ExecTask RunInertialContAssignDelay(
 
 static SimCoroutine MakeContAssignCoroutine(ContAssignParams params,
                                             SimContext& ctx, Arena& arena) {
-  if (!params.lhs || params.lhs->kind != ExprKind::kIdentifier) co_return;
+  if (!params.lhs) co_return;
+  const bool lhs_is_name = params.lhs->kind == ExprKind::kIdentifier;
+  if (!lhs_is_name && !ContAssignSupportsStructuredLhs(params.lhs->kind)) {
+    co_return;
+  }
 
   // The change-watchers and SimContext key by std::string_view, so the strings
   // backing read_vars must outlive every co_await below. Keep the owning set in
@@ -502,7 +526,7 @@ static SimCoroutine MakeContAssignCoroutine(ContAssignParams params,
   CollectExprReads(params.rhs, read_strs);
   std::vector<std::string_view> read_vars(read_strs.begin(), read_strs.end());
 
-  auto* net = ctx.FindNet(params.lhs->text);
+  auto* net = lhs_is_name ? ctx.FindNet(params.lhs->text) : nullptr;
   ContAssignDriver drv = MakeContAssignDriver(net);
 
   // A continuous assignment must drive its left-hand side at least once when it

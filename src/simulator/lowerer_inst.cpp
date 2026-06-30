@@ -109,7 +109,16 @@ void Lowerer::LowerPortBindings(const RtlirModuleInst& inst,
       continue;
     }
 
-    if (binding.connection->kind != ExprKind::kIdentifier) continue;
+    // The output drives its connection; besides a bare net this may be a
+    // part-select, element select, or concatenation produced by §23.3.3.5
+    // instance-array distribution, all of which the continuous-assignment
+    // lvalue writer now handles.
+    ExprKind ck = binding.connection->kind;
+    if (ck != ExprKind::kIdentifier && ck != ExprKind::kSelect &&
+        ck != ExprKind::kConcatenation && ck != ExprKind::kAssignmentPattern &&
+        ck != ExprKind::kStreamingConcat && ck != ExprKind::kMemberAccess) {
+      continue;
+    }
     RtlirContAssign ca;
     ca.lhs = binding.connection;
     ca.rhs = local_id;
