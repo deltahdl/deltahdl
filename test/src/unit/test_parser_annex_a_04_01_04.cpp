@@ -174,7 +174,6 @@ TEST(CheckerInstantiationGrammar, PackageScopedCheckerInst) {
       "  endchecker\n"
       "endpackage\n"
       "module m;\n"
-      "  logic clk;\n"
       "  pkg::my_chk u0(.clk(clk));\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
