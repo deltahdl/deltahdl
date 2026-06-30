@@ -510,7 +510,7 @@ static ExecTask RunInertialContAssignDelay(
 static SimCoroutine MakeContAssignCoroutine(ContAssignParams params,
                                             SimContext& ctx, Arena& arena) {
   if (!params.lhs) co_return;
-  const bool lhs_is_name = params.lhs->kind == ExprKind::kIdentifier;
+  bool lhs_is_name = params.lhs->kind == ExprKind::kIdentifier;
   if (!lhs_is_name && !ContAssignSupportsStructuredLhs(params.lhs->kind)) {
     co_return;
   }

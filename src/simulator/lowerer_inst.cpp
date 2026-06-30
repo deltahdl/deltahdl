@@ -9,6 +9,15 @@
 
 namespace delta {
 
+// An output port connection the continuous-assignment lvalue writer can drive:
+// a bare net, or a part-select / element select / concatenation / member /
+// streaming concatenation produced by §23.3.3.5 instance-array distribution.
+static bool IsDrivableOutputConnection(ExprKind k) {
+  return k == ExprKind::kIdentifier || k == ExprKind::kSelect ||
+         k == ExprKind::kConcatenation || k == ExprKind::kAssignmentPattern ||
+         k == ExprKind::kStreamingConcat || k == ExprKind::kMemberAccess;
+}
+
 static bool IsConnectablePortBinding(const RtlirPortBinding& binding) {
   if (!binding.connection) return false;
   if (binding.width == 0) return false;
@@ -113,12 +122,7 @@ void Lowerer::LowerPortBindings(const RtlirModuleInst& inst,
     // part-select, element select, or concatenation produced by §23.3.3.5
     // instance-array distribution, all of which the continuous-assignment
     // lvalue writer now handles.
-    ExprKind ck = binding.connection->kind;
-    if (ck != ExprKind::kIdentifier && ck != ExprKind::kSelect &&
-        ck != ExprKind::kConcatenation && ck != ExprKind::kAssignmentPattern &&
-        ck != ExprKind::kStreamingConcat && ck != ExprKind::kMemberAccess) {
-      continue;
-    }
+    if (!IsDrivableOutputConnection(binding.connection->kind)) continue;
     RtlirContAssign ca;
     ca.lhs = binding.connection;
     ca.rhs = local_id;

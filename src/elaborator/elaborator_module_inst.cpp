@@ -423,7 +423,7 @@ Expr* DistributeInstanceConnection(const InstArrayDistribCtx& ctx,
 void PushInstanceArray(const InstArrayDistribCtx& ctx, RtlirModule* mod,
                        const RtlirModuleInst& base, int64_t left,
                        int64_t right) {
-  uint32_t total = static_cast<uint32_t>(std::abs(left - right) + 1);
+  auto total = static_cast<uint32_t>(std::abs(left - right) + 1);
   int64_t step = (right <= left) ? 1 : -1;
   for (uint32_t p = 0; p < total; ++p) {
     int64_t idx = right + step * static_cast<int64_t>(p);
@@ -521,7 +521,13 @@ void Elaborator::ElaborateModuleInst(ModuleItem* item, RtlirModule* mod) {
   CheckInterconnectPortMerge(inst, item, mod);
 
   inst.attrs = ResolveAttributes(item->attrs, diag_);
+  AppendModuleInstOrArray(inst, item, mod);
+  current_inst_path_ = std::move(saved_inst_path);
+}
 
+void Elaborator::AppendModuleInstOrArray(const RtlirModuleInst& inst,
+                                         const ModuleItem* item,
+                                         RtlirModule* mod) {
   // §23.3.3.5: a single-dimension instance array expands into one instance per
   // index, with each port connection distributed (replicate / part-select /
   // unpacked element). Other forms keep the existing single-instance lowering.
@@ -538,7 +544,6 @@ void Elaborator::ElaborateModuleInst(ModuleItem* item, RtlirModule* mod) {
   } else {
     mod->children.push_back(inst);
   }
-  current_inst_path_ = std::move(saved_inst_path);
 }
 
 }  // namespace delta
