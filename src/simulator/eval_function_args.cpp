@@ -665,9 +665,15 @@ static bool ExecFuncFor(const Stmt* stmt, const FuncExecCtx& exec) {
 static Variable* CreateFuncLocalVar(std::string_view name, const DataType& type,
                                     const Expr* init, SimContext& ctx,
                                     Arena& arena) {
-  uint32_t w = EvalTypeWidth(type);
+  // A class-typed local (user class, or the built-in `process`/handle types)
+  // holds a 64-bit handle and must record its class type so later method calls
+  // such as `p.suspend()` dispatch -- module-scope decls do this via
+  // TryExecClassVarDecl, but function-body locals take this path instead.
+  bool is_class = !type.type_name.empty() && ctx.FindClassType(type.type_name);
+  uint32_t w = is_class ? 64 : EvalTypeWidth(type);
   if (w == 0) w = 32;
   auto* v = ctx.CreateLocalVariable(name, w);
+  if (is_class) ctx.SetVariableClassType(name, type.type_name);
   if (init) v->value = EvalExpr(init, ctx, arena);
   return v;
 }
