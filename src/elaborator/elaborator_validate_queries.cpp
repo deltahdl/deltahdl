@@ -139,6 +139,13 @@ void CheckPlaArgAscending(const Expr* arg, const PlaRangeMap& ranges,
                           bool check_unpacked, const char* message,
                           DiagEngine& diag) {
   if (!arg) return;
+  // A single bit-select (e.g. b[0]) names exactly one term, so there is no
+  // term ordering to violate -- the declared range direction of the base
+  // vector is irrelevant. Only a whole-vector term carries an order here.
+  if (arg->kind == ExprKind::kSelect && arg->index && !arg->index_end &&
+      !arg->is_part_select_plus && !arg->is_part_select_minus) {
+    return;
+  }
   auto base = LhsBaseName(arg);
   if (base.empty()) return;
   auto it = ranges.find(base);
