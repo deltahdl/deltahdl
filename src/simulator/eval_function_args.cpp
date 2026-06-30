@@ -811,6 +811,13 @@ static bool ExecFuncStmt(const Stmt* stmt, const FuncExecCtx& exec) {
     case StmtKind::kBlockingAssign:
       ExecFuncBlockingAssign(stmt, exec.ctx, exec.arena);
       return false;
+    case StmtKind::kNonblockingAssign:
+      // §13.4.4: a nonblocking assignment is legal in a function body; it
+      // schedules into the NBA region just as it does in a process, rather
+      // than being dropped. The enclosing call runs inside a process, so the
+      // scheduler is active to drain the update.
+      ExecNonblockingAssignImpl(stmt, exec.ctx, exec.arena);
+      return false;
     case StmtKind::kExprStmt:
       EvalExpr(stmt->expr, exec.ctx, exec.arena);
       return false;
