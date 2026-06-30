@@ -5,6 +5,7 @@
 
 #include "common/types.h"
 #include "parser/parser.h"
+#include "parser/parser_dpi_validate.h"
 
 namespace delta {
 
@@ -281,6 +282,22 @@ struct ParserPortHelpers {
     return is_non_ansi;
   }
 
+  // §6.18 / §23.2.2.1: an ANSI port type may be a user-defined type declared
+  // later in the same module body (a forward type reference), so it is not yet
+  // in known_types_ when the port list is parsed. With an explicit direction an
+  // interface port is impossible, so two consecutive identifiers (`input pair_t
+  // p`) unambiguously name a type followed by the port name; report that so the
+  // first identifier is parsed as a named type rather than the port name.
+  static bool LooksLikeForwardNamedType(Parser& p, Direction dir) {
+    if (dir == Direction::kNone || !p.CheckIdentifier()) return false;
+    if (p.known_types_.count(p.CurrentToken().text) != 0) return false;
+    auto saved = p.lexer_.SavePos();
+    p.Consume();
+    bool type_then_name = p.CheckIdentifier();
+    p.lexer_.RestorePos(saved);
+    return type_then_name;
+  }
+
   // After a comma in an ANSI port list, a bare identifier (with no preceding
   // type) continues the previous port's type/direction. Returns true and
   // appends the port when this form is matched; otherwise leaves the lexer
@@ -405,134 +422,6 @@ struct ParserPortHelpers {
     return false;
   }
 };
-
-// §35.5.6: a rich but closed subset of SystemVerilog data types is permitted
-// for the formal arguments of DPI import/export subroutines. The clause states
-// these are the *only* permitted types: the C-compatible scalar types, the
-// scalar 2-/4-state bit types, packed arrays/structs/unions of bit and logic,
-// enumerations (interpreted as their base type), and user-defined types
-// (typedef/named) built from the above. Anything outside that set -- notably
-// event types, virtual interfaces, and net types -- is not a permitted formal
-// argument type. Named/typedef forms are accepted here because their underlying
-// type is only known after elaboration, and typedef is itself a permitted
-// construct per the clause.
-static bool IsPermittedDpiFormalType(DataTypeKind kind) {
-  switch (kind) {
-    case DataTypeKind::kImplicit:
-    case DataTypeKind::kLogic:
-    case DataTypeKind::kReg:
-    case DataTypeKind::kBit:
-    case DataTypeKind::kByte:
-    case DataTypeKind::kShortint:
-    case DataTypeKind::kInt:
-    case DataTypeKind::kLongint:
-    case DataTypeKind::kInteger:
-    case DataTypeKind::kReal:
-    case DataTypeKind::kShortreal:
-    case DataTypeKind::kRealtime:
-    case DataTypeKind::kTime:
-    case DataTypeKind::kString:
-    case DataTypeKind::kVoid:
-    case DataTypeKind::kChandle:
-    case DataTypeKind::kNamed:
-    case DataTypeKind::kEnum:
-    case DataTypeKind::kStruct:
-    case DataTypeKind::kUnion:
-      return true;
-    default:
-      return false;
-  }
-}
-
-// §35.5.5: the result type of an imported function is restricted to "small
-// values" -- a tighter set than the §35.5.6 formal-argument types. The
-// permitted results are void, the C-compatible scalar integer and real types,
-// chandle, string, and *scalar* (single-bit, unpacked) bit/logic. Packed
-// bit/logic vectors, the wide 4-state vector types (integer, time), and
-// aggregates (struct/union/enum) are not small values and are rejected here.
-// Named/typedef results are accepted and deferred to elaboration, since the
-// underlying type is not resolved during parsing. The implicit (omitted) kind
-// is handled separately, since §35.5.5 also requires the result type to be
-// stated explicitly.
-static bool IsPermittedDpiResultType(const DataType& type) {
-  switch (type.kind) {
-    case DataTypeKind::kVoid:
-    case DataTypeKind::kByte:
-    case DataTypeKind::kShortint:
-    case DataTypeKind::kInt:
-    case DataTypeKind::kLongint:
-    case DataTypeKind::kReal:
-    case DataTypeKind::kShortreal:
-    case DataTypeKind::kRealtime:
-    case DataTypeKind::kChandle:
-    case DataTypeKind::kString:
-    case DataTypeKind::kNamed:
-      return true;
-    case DataTypeKind::kBit:
-    case DataTypeKind::kLogic:
-    case DataTypeKind::kReg:
-      // Only the scalar form qualifies; any packed dimension makes it a vector.
-      return type.packed_dim_left == nullptr && type.extra_packed_dims.empty();
-    default:
-      return false;
-  }
-}
-
-// §35.5.5: validate the (already-parsed) result type of a DPI imported
-// function. The type must be stated explicitly and restricted to small values.
-static void ValidateDpiResultType(DiagEngine& diag, const ModuleItem* item) {
-  if (item->return_type.kind == DataTypeKind::kImplicit) {
-    // §35.5.5: an imported function declaration shall explicitly specify a data
-    // type or void for its result. Unlike a native function declaration, an
-    // omitted (implicit) return type is not allowed.
-    diag.Error(item->loc,
-               "an imported function must explicitly specify a data type or "
-               "void for its result");
-  } else if (!IsPermittedDpiResultType(item->return_type)) {
-    // §35.5.5: function results are restricted to small values; the type is
-    // outside the permitted set.
-    diag.Error(item->loc,
-               "result type is not permitted for a DPI imported function; "
-               "function results are restricted to small values");
-  }
-}
-
-// §35.5.4: the ref qualifier is forbidden on the formal arguments of a DPI
-// import declaration.
-static void ValidateDpiImportNoRefArgs(DiagEngine& diag,
-                                       const ModuleItem* item) {
-  for (const auto& arg : item->func_args) {
-    if (arg.direction == Direction::kRef) {
-      diag.Error(item->loc,
-                 "ref qualifier cannot be used in a DPI import declaration");
-      break;
-    }
-  }
-}
-
-// §35.5.6: the listed types are the only permitted types for formal arguments
-// of imported subroutines; a union argument must additionally be packed.
-static void ValidateDpiImportFormalTypes(DiagEngine& diag,
-                                         const ModuleItem* item) {
-  for (const auto& arg : item->func_args) {
-    if (!IsPermittedDpiFormalType(arg.data_type.kind)) {
-      diag.Error(item->loc,
-                 std::format("type of formal argument '{}' is not permitted "
-                             "for a DPI imported subroutine",
-                             arg.name));
-    } else if (arg.data_type.kind == DataTypeKind::kUnion &&
-               !arg.data_type.is_packed) {
-      // §35.5.6: among the type-constructing forms in the permitted set, a
-      // union is allowed in its packed form only. An unpacked union is
-      // therefore not a permitted formal-argument type.
-      diag.Error(item->loc,
-                 std::format("unpacked union formal argument '{}' is not "
-                             "permitted for a DPI imported subroutine; only "
-                             "the packed form of a union is allowed",
-                             arg.name));
-    }
-  }
-}
 
 static Direction TokenToDirection(TokenKind kind) {
   switch (kind) {
@@ -893,7 +782,11 @@ PortDecl Parser::ParsePortDecl() {
     }
   }
 
-  ParserPortHelpers::ParseAnsiPortDataType(*this, port);
+  if (ParserPortHelpers::LooksLikeForwardNamedType(*this, dir)) {
+    port.data_type = ParseNamedType();
+  } else {
+    ParserPortHelpers::ParseAnsiPortDataType(*this, port);
+  }
 
   if (port.data_type.kind == DataTypeKind::kNamed && Check(TokenKind::kDot)) {
     Consume();

@@ -358,7 +358,14 @@ void CheckExplicitIdentifierConnection(const PortBindCtx& ctx,
     } else if (ctx.net_names.count(conn_expr->text)) {
       sig_kind = DataTypeKind::kLogic;
     }
-    if (sig_kind != DataTypeKind::kImplicit) {
+    // §6.22.2: a user-defined (typedef) type's assignment compatibility turns
+    // on its resolved structure, which the single DataTypeKind does not carry.
+    // When either side is still a named type the kind comparison is unreliable
+    // (e.g. an unpacked-array typedef port stays kNamed while its connection
+    // resolves to the element kind), so defer rather than raise a false
+    // incompatibility -- equivalent named aggregates pass on both sides.
+    if (sig_kind != DataTypeKind::kImplicit &&
+        port_kind != DataTypeKind::kNamed && sig_kind != DataTypeKind::kNamed) {
       DataType port_dt{};
       port_dt.kind = port_kind;
       DataType sig_dt{};
