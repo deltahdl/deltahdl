@@ -359,16 +359,21 @@ bool Parser::IsBlockVarDeclStartCore() {
 bool Parser::IsScopedCallOrAssignStmt() {
   auto saved = lexer_.SavePos();
   Consume();  // the known type name
-  bool is_stmt = false;
   if (Match(TokenKind::kColonColon)) {
     while (CheckIdentifier()) {
       Consume();
       if (!Match(TokenKind::kColonColon)) break;
     }
-    is_stmt = Check(TokenKind::kLParen) || Check(TokenKind::kEq) ||
-              Check(TokenKind::kLtEq) ||
-              IsCompoundAssignOp(CurrentToken().kind);
   }
+  // A known type name reached here either bare or after a `::` scope path. If
+  // it is immediately followed by a call `(` or an assignment operator, it is a
+  // statement rather than a declaration. The bare-assignment case covers an
+  // embedded covergroup (§19.4): `covergroup cg ... endgroup` implicitly
+  // declares both the type `cg` and a variable `cg`, so `cg = new;` is an
+  // assignment to that variable, not the start of a `cg <name>` declaration.
+  bool is_stmt = Check(TokenKind::kLParen) || Check(TokenKind::kEq) ||
+                 Check(TokenKind::kLtEq) ||
+                 IsCompoundAssignOp(CurrentToken().kind);
   lexer_.RestorePos(saved);
   return is_stmt;
 }
