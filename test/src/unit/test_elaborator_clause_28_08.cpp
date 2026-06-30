@@ -201,16 +201,19 @@ TEST(BidirectionalSwitchTerminals, Rtranif1RejectsUdnt) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(BidirectionalSwitchTerminals, TranAcceptsWholeVector) {
+// §4.9.6 / §28.8: a primitive output or inout terminal shall connect to a
+// 1-bit net (a scalar net or a bit-select of a vector net); tran/tranif1/
+// tranif0 may additionally connect to a user-defined net type, but not to a
+// whole multibit vector. Connecting a 4-bit vector is therefore an error.
+TEST(BidirectionalSwitchTerminals, TranRejectsWholeVector) {
   ElabFixture f;
-  auto* design = Elaborate(
+  Elaborate(
       "module m;\n"
       "  wire [3:0] a, b;\n"
       "  tran t1(a, b);\n"
       "endmodule\n",
       f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
+  EXPECT_TRUE(f.has_errors);
 }
 
 TEST(BidirectionalSwitchUdnt, TranAcceptsSameUdntOnBothSides) {
