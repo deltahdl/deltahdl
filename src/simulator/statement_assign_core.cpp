@@ -140,7 +140,10 @@ static bool TryClassCopyNewAssign(const Stmt* stmt, SimContext& ctx,
   auto* copy = src_obj->ShallowCopy(arena);
   auto copy_handle = ctx.AllocateClassObject(copy);
   auto* var = ctx.FindVariable(stmt->lhs->text);
-  if (var) var->value = MakeLogic4VecVal(arena, 64, copy_handle);
+  if (var) {
+    var->value = MakeLogic4VecVal(arena, 64, copy_handle);
+    var->NotifyWatchers();
+  }
   return true;
 }
 
@@ -155,7 +158,10 @@ static void AssignWeakReferenceNew(const Stmt* stmt, SimContext& ctx,
   }
   auto wr_handle = ctx.AllocateWeakReference(referent, arena);
   auto* var = ctx.FindVariable(stmt->lhs->text);
-  if (var) var->value = MakeLogic4VecVal(arena, 64, wr_handle);
+  if (var) {
+    var->value = MakeLogic4VecVal(arena, 64, wr_handle);
+    var->NotifyWatchers();
+  }
 }
 
 static bool TryClassNewAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
@@ -174,7 +180,10 @@ static bool TryClassNewAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
 
   auto handle = EvalClassNew(type_name, stmt->rhs, ctx, arena);
   auto* var = ctx.FindVariable(stmt->lhs->text);
-  if (var) var->value = handle;
+  if (var) {
+    var->value = handle;
+    var->NotifyWatchers();
+  }
   ApplyClassParamOverrides(stmt->lhs->text, handle.ToUint64(), ctx, arena);
   return true;
 }
@@ -191,7 +200,10 @@ static bool TryTypedClassNewAssign(const Stmt* stmt, SimContext& ctx,
   if (!ctx.FindClassType(stmt->rhs->lhs->text)) return false;
   auto handle = EvalClassNew(stmt->rhs->lhs->text, nullptr, ctx, arena);
   auto* var = ctx.FindVariable(stmt->lhs->text);
-  if (var) var->value = handle;
+  if (var) {
+    var->value = handle;
+    var->NotifyWatchers();
+  }
   return true;
 }
 
