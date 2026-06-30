@@ -452,8 +452,12 @@ static Logic4Vec ResolveMemberByType(std::string_view base_name,
     return out;
   }
 
-  if (TryClassPropertyAccess(ma, out)) return out;
+  // §8.26: a class-scoped enum literal accessed through an instance handle
+  // (p.ERR_OVERFLOW) resolves to its enum value. This is tried before the
+  // general property read, which would otherwise claim the (unknown) name and
+  // return 0; a name that is not an enum member falls through to it.
   if (TryClassEnumAccess(base_var, field_name, ctx, arena, out)) return out;
+  if (TryClassPropertyAccess(ma, out)) return out;
   if (TryCollectionAccess(base_name, field_name, ctx, arena, out)) return out;
   if (TryEvalEnumProperty(base_name, field_name, ctx, arena, out)) return out;
   if (TryStaticMemberAccess(base_name, field_name, ctx, arena, out)) return out;
