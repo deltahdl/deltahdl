@@ -33,6 +33,8 @@ TEST(ClassParsing, WeakRefNewWithNull) {
 }
 
 TEST(ClassParsing, WeakRefTwoInstancesSameReferent) {
+  // NOTE: weak0/weak1/strong0/strong1 are reserved drive-strength keywords
+  // (Annex B / Table B.1), so they cannot name variables here.
   EXPECT_TRUE(
       ParseOk("class obj;\n"
               "  int x;\n"
@@ -40,10 +42,10 @@ TEST(ClassParsing, WeakRefTwoInstancesSameReferent) {
               "module m;\n"
               "  initial begin\n"
               "    obj strong_obj;\n"
-              "    weak_reference #(obj) weak1, weak2;\n"
+              "    weak_reference #(obj) wref1, wref2;\n"
               "    strong_obj = new();\n"
-              "    weak1 = new(strong_obj);\n"
-              "    weak2 = new(strong_obj);\n"
+              "    wref1 = new(strong_obj);\n"
+              "    wref2 = new(strong_obj);\n"
               "  end\n"
               "endmodule\n"));
 }
