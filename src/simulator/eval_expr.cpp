@@ -225,24 +225,52 @@ struct MemberAccess {
   Arena& arena;
 };
 
+// Reads field `field` from class object `obj`, honoring declared-type scoping
+// (§8.15) when `declared_type` is known so a base method reads a shadowed base
+// field rather than the derived one.
+static Logic4Vec ReadClassField(ClassObject* obj,
+                                const ClassTypeInfo* declared_type,
+                                std::string_view field, Arena& arena) {
+  if (declared_type)
+    return obj->GetPropertyForType(field, declared_type, arena);
+  return obj->GetProperty(field, arena);
+}
+
+// Resolves a (possibly chained) field path against class object `obj`. A single
+// field is read directly. A chained path `first.rest` (e.g. `a.next.data` for a
+// forward-typedef linked list, §6.18) fetches `first` as a class handle and
+// recurses into the referenced object; the inner fields carry no declared-type
+// shadowing context, so they are read by bare name. When `first` does not name
+// a live class handle, the chain falls back to reading the whole dotted path as
+// a single flattened key on `obj` (the legacy nested-handle storage scheme).
+static Logic4Vec ResolveClassFieldChain(ClassObject* obj,
+                                        const ClassTypeInfo* declared_type,
+                                        std::string_view field_path,
+                                        SimContext& ctx, Arena& arena) {
+  auto dot = field_path.find('.');
+  if (dot == std::string_view::npos) {
+    return ReadClassField(obj, declared_type, field_path, arena);
+  }
+  auto first = field_path.substr(0, dot);
+  auto rest = field_path.substr(dot + 1);
+  Logic4Vec handle_val = ReadClassField(obj, declared_type, first, arena);
+  auto* next_obj = ctx.GetClassObject(handle_val.ToUint64());
+  if (!next_obj) {
+    return ReadClassField(obj, declared_type, field_path, arena);
+  }
+  return ResolveClassFieldChain(next_obj, nullptr, rest, ctx, arena);
+}
+
 static bool TryClassPropertyAccess(const MemberAccess& ma, Logic4Vec& out) {
   Variable* base_var = ma.base_var;
   if (!base_var) return false;
-  SimContext& ctx = ma.ctx;
-  Arena& arena = ma.arena;
-  std::string_view field_name = ma.field_name;
-  auto handle = base_var->value.ToUint64();
-  auto* obj = ctx.GetClassObject(handle);
+  auto* obj = ma.ctx.GetClassObject(base_var->value.ToUint64());
   if (!obj) return false;
-  auto declared = ctx.GetVariableClassType(ma.base_name);
-  if (!declared.empty()) {
-    auto* declared_type = ctx.FindClassType(declared);
-    if (declared_type) {
-      out = obj->GetPropertyForType(field_name, declared_type, arena);
-      return true;
-    }
-  }
-  out = obj->GetProperty(field_name, arena);
+  const ClassTypeInfo* declared_type = nullptr;
+  auto declared = ma.ctx.GetVariableClassType(ma.base_name);
+  if (!declared.empty()) declared_type = ma.ctx.FindClassType(declared);
+  out = ResolveClassFieldChain(obj, declared_type, ma.field_name, ma.ctx,
+                               ma.arena);
   return true;
 }
 
