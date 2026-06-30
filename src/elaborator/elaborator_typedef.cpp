@@ -293,27 +293,41 @@ bool NettypesMatch(std::string_view a, std::string_view b,
   return ca == cb;
 }
 
+namespace {
+
+// Locates a package by name within the compilation unit, or nullptr.
+const PackageDecl* FindUnitPackage(const CompilationUnit* unit,
+                                   std::string_view name) {
+  for (const auto* p : unit->packages) {
+    if (p->name == name) return p;
+  }
+  return nullptr;
+}
+
+// Emits enum-literal backing variables for every enum typedef in `pkg` that the
+// importing module does not already define.
+void EmitPackageEnumLiterals(const PackageDecl* pkg, RtlirModule* mod,
+                             const ImportedEnumCtx& ctx) {
+  for (auto* pi : pkg->items) {
+    if (pi->kind != ModuleItemKind::kTypedef) continue;
+    if (pi->typedef_type.kind != DataTypeKind::kEnum) continue;
+    if (mod->enum_types.count(pi->name) != 0) continue;
+    uint32_t width = EvalTypeWidth(pi->typedef_type, ctx.typedefs);
+    mod->enum_types[pi->name] =
+        BuildEnumMembers(pi, width, ctx.arena, mod, ctx.enum_member_names);
+  }
+}
+
+}  // namespace
+
 void RegisterImportedEnumLiterals(const ModuleDecl* decl, RtlirModule* mod,
                                   const ImportedEnumCtx& ctx) {
   for (const auto* item : decl->items) {
     if (item->kind != ModuleItemKind::kImportDecl) continue;
     if (!item->import_item.is_wildcard) continue;
-    const PackageDecl* pkg = nullptr;
-    for (const auto* p : ctx.unit->packages) {
-      if (p->name == item->import_item.package_name) {
-        pkg = p;
-        break;
-      }
-    }
-    if (!pkg) continue;
-    for (auto* pi : pkg->items) {
-      if (pi->kind != ModuleItemKind::kTypedef) continue;
-      if (pi->typedef_type.kind != DataTypeKind::kEnum) continue;
-      if (mod->enum_types.count(pi->name) != 0) continue;
-      uint32_t width = EvalTypeWidth(pi->typedef_type, ctx.typedefs);
-      mod->enum_types[pi->name] =
-          BuildEnumMembers(pi, width, ctx.arena, mod, ctx.enum_member_names);
-    }
+    const PackageDecl* pkg =
+        FindUnitPackage(ctx.unit, item->import_item.package_name);
+    if (pkg) EmitPackageEnumLiterals(pkg, mod, ctx);
   }
 }
 
