@@ -156,8 +156,10 @@ TEST(StaticDeferredAssertion,
 }
 
 // A concurrent property assertion at module level is NOT a deferred assertion,
-// so it is not turned into an always_comb process — confirming the rule keys
-// strictly on the deferred form.
+// so it is not turned into an always_comb process — confirming the deferred
+// rule keys strictly on the deferred form. Per §16.14.5 a static concurrent
+// assertion uses `always` semantics, so the simple clocked boolean form is
+// modeled as a clocked (always_ff) process rather than an always_comb one.
 TEST(StaticDeferredAssertion, ConcurrentAssertNotWrappedInAlwaysComb) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -168,7 +170,8 @@ TEST(StaticDeferredAssertion, ConcurrentAssertNotWrappedInAlwaysComb) {
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
   auto* mod = design->top_modules[0];
-  EXPECT_EQ(mod->processes.size(), 0u);
+  ASSERT_EQ(mod->processes.size(), 1u);
+  EXPECT_EQ(mod->processes[0].kind, RtlirProcessKind::kAlwaysFF);
 }
 
 }  // namespace

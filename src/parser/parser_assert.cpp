@@ -181,6 +181,77 @@ ModuleItem* Parser::ParseDeferredImmediateItem(SourceLoc loc, StmtKind kind) {
   return WrapStmtAsItem(arena_, stmt, loc);
 }
 
+// §16.14.5: a concurrent assertion used outside procedural code has `always`
+// semantics. This captures the simple, non-temporal clocked form
+// `@(event) boolean_expression` so the elaborator can model it as a clocked
+// process: the leading clock is recorded in item->sensitivity and the boolean
+// is wrapped as an immediate-assert body in item->body, which evaluates and
+// reports at each clock edge. Any spec this cannot handle (no leading clock, or
+// a temporal/sequence property) restores the lexer and returns false, leaving
+// the caller to skip the spec as before. The trial parse is run with
+// diagnostics suppressed so a discarded attempt never reports errors.
+// Scan the property body (from the token after the leading clock to the
+// matching close parenthesis) for an operator that makes it a temporal/sequence
+// property rather than a sampled boolean. ParseExpr already stops before
+// sequence delays (##), repetition, and property keywords, but it *would*
+// consume the implication operators |-> and |=>, so they must be detected here.
+// The lexer position is left unchanged.
+bool Parser::BodyHasTemporalOperator() {
+  auto scan = lexer_.SavePos();
+  int depth = 0;
+  bool found = false;
+  while (!Check(TokenKind::kEof)) {
+    TokenKind k = CurrentToken().kind;
+    if (k == TokenKind::kLParen) {
+      ++depth;
+    } else if (k == TokenKind::kRParen) {
+      if (depth == 0) break;  // the property's own closing parenthesis
+      --depth;
+    } else if (k == TokenKind::kPipeDashGt || k == TokenKind::kPipeEqGt ||
+               k == TokenKind::kHashHash) {
+      found = true;
+      break;
+    }
+    Consume();
+  }
+  lexer_.RestorePos(scan);
+  return found;
+}
+
+bool Parser::TryParseSimpleConcurrentProperty(ModuleItem* item) {
+  if (!Check(TokenKind::kAt)) return false;
+  auto saved = lexer_.SavePos();
+  diag_.PushSuppress();
+  Consume();  // '@'
+  std::vector<EventExpr> events;
+  bool ok = true;
+  if (Match(TokenKind::kLParen)) {
+    events = ParseEventList();
+    if (!Match(TokenKind::kRParen)) ok = false;
+  } else {
+    events.push_back(ParseSingleEvent());
+  }
+  bool temporal = ok && BodyHasTemporalOperator();
+  Expr* prop = (ok && !temporal) ? ParseExpr() : nullptr;
+  // Accept only the simple form: a non-temporal boolean that consumes the whole
+  // spec, so the next token is the property's closing parenthesis. Anything
+  // else restores the lexer and the caller skips the spec as before.
+  if (!ok || temporal || !Check(TokenKind::kRParen)) {
+    diag_.PopSuppress();
+    lexer_.RestorePos(saved);
+    return false;
+  }
+  diag_.PopSuppress();
+  item->sensitivity = std::move(events);
+  item->assert_expr = prop;
+  auto* stmt = arena_.Create<Stmt>();
+  stmt->kind = StmtKind::kAssertImmediate;
+  stmt->range.start = item->loc;
+  stmt->assert_expr = prop;
+  item->body = stmt;
+  return true;
+}
+
 ModuleItem* Parser::ParsePropertyAssertLike(ModuleItemKind kind,
                                             TokenKind keyword) {
   auto* item = arena_.Create<ModuleItem>();
@@ -197,7 +268,11 @@ ModuleItem* Parser::ParsePropertyAssertLike(ModuleItemKind kind,
 
   Expect(TokenKind::kKwProperty);
   Expect(TokenKind::kLParen);
-  item->assert_expr = SkipPropertySpec(arena_, lexer_, CurrentLoc());
+  bool simple_concurrent = kind == ModuleItemKind::kAssertProperty &&
+                           TryParseSimpleConcurrentProperty(item);
+  if (!simple_concurrent) {
+    item->assert_expr = SkipPropertySpec(arena_, lexer_, CurrentLoc());
+  }
   Expect(TokenKind::kRParen);
 
   if (!Check(TokenKind::kSemicolon) && !Check(TokenKind::kKwElse)) {
@@ -208,6 +283,13 @@ ModuleItem* Parser::ParsePropertyAssertLike(ModuleItemKind kind,
   }
   if (!item->assert_pass_stmt && !item->assert_fail_stmt) {
     Expect(TokenKind::kSemicolon);
+  }
+  // For the clocked simple form the action block belongs to the synthesized
+  // assert body that the elaborator lowers (item->assert_* is otherwise unread
+  // for a concurrent assert property).
+  if (simple_concurrent) {
+    item->body->assert_pass_stmt = item->assert_pass_stmt;
+    item->body->assert_fail_stmt = item->assert_fail_stmt;
   }
   return item;
 }

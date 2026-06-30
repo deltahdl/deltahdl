@@ -554,6 +554,15 @@ bool Elaborator::ElaborateAssertionItem(ModuleItem* item, RtlirModule* mod) {
         AddProcess(RtlirProcessKind::kAlwaysComb, item, mod, kEnv);
         return true;
       }
+      // §16.14.5: a static concurrent assertion outside procedural code uses
+      // `always` semantics. The parser captures the simple clocked boolean form
+      // as a leading clock in item->sensitivity plus an immediate-assert body
+      // in item->body; model it as a clocked process so the property is checked
+      // at each leading clock edge.
+      if (item->body != nullptr && !item->sensitivity.empty()) {
+        AddProcess(RtlirProcessKind::kAlwaysFF, item, mod, kEnv);
+        return true;
+      }
       ValidateClockingBlock(item, mod);
       return true;
     case ModuleItemKind::kAssumeProperty:
