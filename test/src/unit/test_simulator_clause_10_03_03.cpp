@@ -213,9 +213,12 @@ TEST(AssignmentDelaySim, NetDeclSingleDelayApplied) {
 
 TEST(AssignmentDelaySim, VectorNetDeclDelayWholeVector) {
   SimFixture f;
+  // A.2.1.3 net_declaration: the packed range is part of data_type_or_implicit,
+  // and delay3 follows it -- the legal order is `wire [7:0] #5 w`, not
+  // `wire #5 [7:0] w`.
   auto* design = ElaborateSrc(
       "module t;\n"
-      "  wire #5 [7:0] w = 8'hAB;\n"
+      "  wire [7:0] #5 w = 8'hAB;\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
