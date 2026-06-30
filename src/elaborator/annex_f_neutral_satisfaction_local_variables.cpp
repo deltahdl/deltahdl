@@ -275,9 +275,11 @@ bool Satisfies(const Word& word, const LvProperty& property,
       // §F.5.6.1: w, L_0 |= ( P ) iff w, L_0 |= P.
       return property.lhs && Satisfies(word, *property.lhs, context);
     case LvProperty::Kind::kNot:
-      // §F.5.6.1: w, L_0 |= not P iff w-bar, L_0 |/= P.
+      // §F.5.6.1: w, L_0 |= not P iff w-bar, L_0 |= P. Negation is by word
+      // complementation, matching the plain neutral-satisfaction rule (the
+      // result is not logically negated).
       return property.lhs &&
-             !Satisfies(ComplementWord(word), *property.lhs, context);
+             Satisfies(ComplementWord(word), *property.lhs, context);
     case LvProperty::Kind::kStrong:
       // §F.5.6.1: strong(R) over the four-way tight-satisfaction relation.
       return property.sequence &&
