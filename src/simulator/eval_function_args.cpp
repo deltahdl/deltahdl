@@ -435,6 +435,13 @@ static void ExecFuncIdentifierAssign(const Expr* lhs, const Logic4Vec& val,
 static void ExecFuncBlockingAssign(const Stmt* stmt, SimContext& ctx,
                                    Arena& arena) {
   if (!stmt->lhs) return;
+  // §7.10/§13.4: an assignment to a queue from a function body uses the queue
+  // assignment path -- it rebuilds the element list, allocates fresh element
+  // ids, and bumps the generation so prior references are outdated -- rather
+  // than a flat scalar write that ignores the queue object.
+  // TryQueueBlockingAssign guards on an identifier queue target and declines
+  // otherwise.
+  if (TryQueueBlockingAssign(stmt, ctx, arena)) return;
   auto val = EvalExpr(stmt->rhs, ctx, arena);
   if (stmt->lhs->kind == ExprKind::kIdentifier) {
     ExecFuncIdentifierAssign(stmt->lhs, val, ctx);
