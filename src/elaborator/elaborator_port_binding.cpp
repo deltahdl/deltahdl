@@ -499,6 +499,26 @@ bool Elaborator::ResolveExplicitTarget(const PortBindScope& scope, size_t index,
   return true;
 }
 
+// §10.8/§10.9.1: an assignment pattern is permitted in a port connection only
+// as a bare pattern on an input port whose formal is a pattern-compatible
+// aggregate (a struct/union or an unpacked array), where the pattern takes its
+// type from the port. It is illegal on an output/inout port (the actual must be
+// an lvalue), as a typed/cast pattern, and for a non-aggregate formal such as
+// `int`, which an assignment pattern cannot target.
+static bool IllegalPatternPortConnection(const Expr* conn_expr,
+                                         Direction direction,
+                                         const RtlirPort* port) {
+  bool bare_pattern = conn_expr->kind == ExprKind::kAssignmentPattern;
+  bool cast_pattern = conn_expr->kind == ExprKind::kCast && conn_expr->lhs &&
+                      conn_expr->lhs->kind == ExprKind::kAssignmentPattern;
+  if (!bare_pattern && !cast_pattern) return false;
+  bool aggregate_input =
+      bare_pattern && direction == Direction::kInput && port != nullptr &&
+      (port->type_kind == DataTypeKind::kStruct ||
+       port->type_kind == DataTypeKind::kUnion || port->num_unpacked_dims > 0);
+  return !aggregate_input;
+}
+
 // Validates an identifier port connection: a non-interface port goes through
 // the net-type compatibility check. An interface port may be connected either
 // to a declared interface instance or to a higher-level interface port (a
@@ -533,15 +553,11 @@ void Elaborator::CheckExplicitConnLegality(const PortBindScope& scope,
                 "port connection");
   }
 
-  if (conn_expr) {
-    bool is_pattern = conn_expr->kind == ExprKind::kAssignmentPattern ||
-                      (conn_expr->kind == ExprKind::kCast && conn_expr->lhs &&
-                       conn_expr->lhs->kind == ExprKind::kAssignmentPattern);
-    if (is_pattern) {
-      diag_.Error(conn_expr->range.start,
-                  "assignment pattern expression shall not be used in a "
-                  "port expression");
-    }
+  if (conn_expr &&
+      IllegalPatternPortConnection(conn_expr, binding.direction, port)) {
+    diag_.Error(conn_expr->range.start,
+                "assignment pattern expression shall not be used in a "
+                "port expression");
   }
 
   if (conn_expr && conn_expr->kind == ExprKind::kIdentifier &&
