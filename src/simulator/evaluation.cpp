@@ -15,44 +15,41 @@
 #include "simulator/statement_assign.h"
 
 namespace delta {
-static Logic4Vec EvalIdentifier(const Expr* expr, SimContext& ctx,
-                                Arena& arena) {
-  auto* var = ctx.FindVariable(expr->text);
-  if (var) {
-    if (var->is_event)
-      return MakeLogic4VecVal(arena, 1, var->is_null_event ? 0u : 1u);
-    auto val = var->value;
-    if (ctx.IsRealVariable(expr->text)) val.is_real = true;
-    if (ctx.IsStringVariable(expr->text)) val.is_string = true;
-    // An object's signedness is fixed by its own declaration; it is never
-    // inherited from a value that flowed in from elsewhere (e.g. across a
-    // module port). Derive the read value's signedness from the declaration
-    // so a signed value stored into an unsigned object reads back unsigned.
-    val.is_signed = var->is_signed;
-    return val;
-  }
-  // §8.10: a static method can directly access static properties of the same
-  // class by unqualified reference. With no `this`, resolve against the
-  // enclosing class's static properties before falling through.
+// Resolves an unqualified identifier that is not a local variable against the
+// running method's class scope. §8.10: a static method can directly access
+// static properties of the same class by unqualified reference. §8.6/§8.15: an
+// instance method reads it as a property of `this`, resolved against the class
+// in which the running method is defined so a base method reads the base field
+// even when a derived class shadows the name.
+static Logic4Vec EvalIdentifierClassScope(const Expr* expr, SimContext& ctx,
+                                          Arena& arena) {
   const ClassTypeInfo* method_cls = ctx.CurrentMethodClass();
   if (method_cls) {
     auto it = method_cls->static_properties.find(std::string(expr->text));
-    if (it != method_cls->static_properties.end()) {
-      return it->second;
-    }
+    if (it != method_cls->static_properties.end()) return it->second;
   }
-  // §8.6: when reading an unqualified identifier within a method body, if the
-  // identifier is not found as a local variable, try to resolve it as a
-  // property of the current object (this). §8.15: resolve against the class in
-  // which the running method is defined so a base method reads the base field
-  // even when a derived class shadows the name.
   auto* self = ctx.CurrentThis();
-  if (self) {
-    if (method_cls)
-      return self->GetPropertyForType(expr->text, method_cls, arena);
-    return self->GetProperty(expr->text, arena);
-  }
-  return MakeLogic4Vec(arena, 1);
+  if (!self) return MakeLogic4Vec(arena, 1);
+  if (method_cls)
+    return self->GetPropertyForType(expr->text, method_cls, arena);
+  return self->GetProperty(expr->text, arena);
+}
+
+static Logic4Vec EvalIdentifier(const Expr* expr, SimContext& ctx,
+                                Arena& arena) {
+  auto* var = ctx.FindVariable(expr->text);
+  if (!var) return EvalIdentifierClassScope(expr, ctx, arena);
+  if (var->is_event)
+    return MakeLogic4VecVal(arena, 1, var->is_null_event ? 0u : 1u);
+  auto val = var->value;
+  if (ctx.IsRealVariable(expr->text)) val.is_real = true;
+  if (ctx.IsStringVariable(expr->text)) val.is_string = true;
+  // An object's signedness is fixed by its own declaration; it is never
+  // inherited from a value that flowed in from elsewhere (e.g. across a
+  // module port). Derive the read value's signedness from the declaration
+  // so a signed value stored into an unsigned object reads back unsigned.
+  val.is_signed = var->is_signed;
+  return val;
 }
 bool HasUnknownBits(const Logic4Vec& v) {
   for (uint32_t i = 0; i < v.nwords; ++i) {
