@@ -73,9 +73,20 @@ void Elaborator::ValidateSequenceEventArgs(const ModuleDecl* decl) {
       }
     }
 
-    if (item->kind == ModuleItemKind::kTaskDecl && item->body) {
-      WalkStmtsForSequenceEvents(const_cast<Stmt*>(item->body), sequence_names_,
-                                 item->is_automatic, diag_);
+    if (item->kind == ModuleItemKind::kTaskDecl) {
+      // A task body's statements live in func_body_stmts (item->body is the
+      // module-process body form); walk them so an event control such as
+      // @(s(a, b)) inside an automatic task is reached. §9.4.2.4: arguments to
+      // a sequence used in an event control shall be static, so an automatic
+      // task local passed as a sequence argument is an error.
+      if (item->body) {
+        WalkStmtsForSequenceEvents(const_cast<Stmt*>(item->body),
+                                   sequence_names_, item->is_automatic, diag_);
+      }
+      for (auto* s : item->func_body_stmts) {
+        WalkStmtsForSequenceEvents(s, sequence_names_, item->is_automatic,
+                                   diag_);
+      }
     }
   }
 }
