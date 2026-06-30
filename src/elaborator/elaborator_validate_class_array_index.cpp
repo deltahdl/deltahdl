@@ -17,6 +17,48 @@ static bool IsLiteralExpr(ExprKind kind) {
          kind == ExprKind::kUnbasedUnsizedLiteral;
 }
 
+// §7.8.3: resolving a class-indexed select requires the elaboration context
+// that describes the visible class-indexed associative arrays and class types
+// of the enclosing scope. These values always travel together as one unit, so
+// they are bundled into a single context object passed through the recursive
+// walk. local_classes maps the names of classes declared inside the enclosing
+// module to their declarations, which are not visible through unit->classes.
+struct ClassIndexCtx {
+  const std::unordered_map<std::string_view, Elaborator::VarArrayInfo>&
+      var_array_info;
+  const std::unordered_map<std::string_view, std::string_view>& class_var_types;
+  const std::unordered_set<std::string_view>& class_names;
+  const std::unordered_map<std::string_view, const ClassDecl*>& local_classes;
+  const CompilationUnit* unit;
+  DiagEngine& diag;
+};
+
+// Resolves a class name to its declaration, preferring a class declared inside
+// the enclosing module (which FindClassDecl does not see, as those live in the
+// module rather than in unit->classes) before falling back to compilation-unit
+// scope.
+static const ClassDecl* FindClassDeclScoped(std::string_view name,
+                                            const ClassIndexCtx& ctx) {
+  auto it = ctx.local_classes.find(name);
+  if (it != ctx.local_classes.end()) return it->second;
+  return FindClassDecl(name, ctx.unit);
+}
+
+// §7.8.3: true when class *a* is *b* or is derived (directly or transitively)
+// from *b*. Walks the base-class chain consulting both module-local and
+// compilation-unit class scopes so a class declared inside the module resolves.
+static bool IsClassDerivedFromScoped(std::string_view a, std::string_view b,
+                                     const ClassIndexCtx& ctx) {
+  if (a == b) return true;
+  for (const auto* cls = FindClassDeclScoped(a, ctx); cls;
+       cls = cls->base_class.empty()
+                 ? nullptr
+                 : FindClassDeclScoped(cls->base_class, ctx)) {
+    if (cls->base_class == b) return true;
+  }
+  return false;
+}
+
 // §7.8.3: an associative array declared with a class index may only be
 // indexed by an object of that class or a class derived from it; a null
 // handle is also valid. Any other index expression is a type error.
@@ -24,37 +66,20 @@ static bool IsLiteralExpr(ExprKind kind) {
 // Returns true when the index expression of a class-indexed associative array
 // select is an illegal index (a literal, or an identifier whose class type is
 // not the index class or a class derived from it).
-static bool IsIllegalClassIndex(
-    const Expr* idx, std::string_view index_class,
-    const std::unordered_map<std::string_view, std::string_view>&
-        class_var_types,
-    const CompilationUnit* unit) {
+static bool IsIllegalClassIndex(const Expr* idx, std::string_view index_class,
+                                const ClassIndexCtx& ctx) {
   bool is_null = idx->kind == ExprKind::kIdentifier && idx->text == "null";
   if (is_null) return false;
   if (IsLiteralExpr(idx->kind)) return true;
   if (idx->kind == ExprKind::kIdentifier) {
-    auto vt = class_var_types.find(idx->text);
-    if (vt != class_var_types.end() &&
-        !IsClassDerivedFrom(vt->second, index_class, unit)) {
+    auto vt = ctx.class_var_types.find(idx->text);
+    if (vt != ctx.class_var_types.end() &&
+        !IsClassDerivedFromScoped(vt->second, index_class, ctx)) {
       return true;
     }
   }
   return false;
 }
-
-// §7.8.3: resolving a class-indexed select requires the elaboration context
-// that describes the visible class-indexed associative arrays and class types
-// of the enclosing scope. These five values always travel together as one
-// unit, so they are bundled into a single context object passed through the
-// recursive walk.
-struct ClassIndexCtx {
-  const std::unordered_map<std::string_view, Elaborator::VarArrayInfo>&
-      var_array_info;
-  const std::unordered_map<std::string_view, std::string_view>& class_var_types;
-  const std::unordered_set<std::string_view>& class_names;
-  const CompilationUnit* unit;
-  DiagEngine& diag;
-};
 
 // Validates a single select node against the class-index rule, emitting a
 // diagnostic when its index expression is illegal. Non-select nodes are
@@ -70,8 +95,7 @@ static void CheckClassIndexSelectNode(const Expr* e, const ClassIndexCtx& ctx) {
     return;
   }
   auto index_class = it->second.assoc_index_type;
-  if (IsIllegalClassIndex(e->index, index_class, ctx.class_var_types,
-                          ctx.unit)) {
+  if (IsIllegalClassIndex(e->index, index_class, ctx)) {
     ctx.diag.Error(
         e->range.start,
         std::format("class-indexed associative array '{}' shall be "
@@ -117,6 +141,20 @@ static void WalkStmtsForClassIndexSelect(const Stmt* s,
   for (auto& ci : s->case_items) WalkStmtsForClassIndexSelect(ci.body, ctx);
 }
 
+// Collects the classes declared directly inside a module, keyed by name. These
+// module-local classes are not reachable through unit->classes, so the §7.8.3
+// derivation walk needs them gathered separately to resolve a base class.
+static std::unordered_map<std::string_view, const ClassDecl*>
+CollectModuleLocalClasses(const ModuleDecl* decl) {
+  std::unordered_map<std::string_view, const ClassDecl*> local_classes;
+  for (const auto* item : decl->items) {
+    if (item->kind == ModuleItemKind::kClassDecl && item->class_decl) {
+      local_classes[item->class_decl->name] = item->class_decl;
+    }
+  }
+  return local_classes;
+}
+
 void Elaborator::ValidateClassIndexSelect(const ModuleDecl* decl) {
   bool has_class_index = false;
   for (const auto& entry : var_array_info_) {
@@ -127,8 +165,10 @@ void Elaborator::ValidateClassIndexSelect(const ModuleDecl* decl) {
     }
   }
   if (!has_class_index) return;
-  ClassIndexCtx ctx{var_array_info_, class_var_types_, class_names_, unit_,
-                    diag_};
+  auto local_classes = CollectModuleLocalClasses(decl);
+  ClassIndexCtx ctx{var_array_info_, class_var_types_,
+                    class_names_,    local_classes,
+                    unit_,           diag_};
   for (const auto* item : decl->items) {
     if (item->kind == ModuleItemKind::kContAssign) {
       CheckClassIndexSelectExpr(item->assign_lhs, ctx);
