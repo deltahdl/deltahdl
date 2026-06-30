@@ -327,7 +327,13 @@ TEST(PassByRef, SwapViaRef) {
       {Direction::kRef, false, false, false, {}, "x", nullptr, {}},
       {Direction::kRef, false, false, false, {}, "y", nullptr, {}},
   };
+  // §13.4: a variable used in a function body must be declared; there is no
+  // implicit creation for procedural locals. Declare the temporary explicitly.
+  auto* tmp_decl = f.arena.Create<Stmt>();
+  tmp_decl->kind = StmtKind::kVarDecl;
+  tmp_decl->var_name = "tmp";
   func->func_body_stmts = {
+      tmp_decl,
       MakeAssign(f.arena, "tmp", MakeId(f.arena, "x")),
       MakeAssign(f.arena, "x", MakeId(f.arena, "y")),
       MakeAssign(f.arena, "y", MakeId(f.arena, "tmp")),
