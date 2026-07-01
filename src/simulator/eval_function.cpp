@@ -359,8 +359,8 @@ static bool TryEvalClassMethodCall(const Expr* expr, SimContext& ctx,
   return true;
 }
 
-static void BindClassParams(const ClassTypeInfo* cls, const Expr* base_id,
-                            SimContext& ctx, Arena& arena) {
+void BindClassParams(const ClassTypeInfo* cls, const Expr* base_id,
+                     SimContext& ctx, Arena& arena) {
   if (!cls->decl) return;
   const auto& params = cls->decl->params;
   const auto& values = base_id->elements;

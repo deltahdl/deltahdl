@@ -197,8 +197,19 @@ static bool TryTypedClassNewAssign(const Stmt* stmt, SimContext& ctx,
   if (!stmt->rhs->rhs || stmt->rhs->rhs->kind != ExprKind::kIdentifier)
     return false;
   if (stmt->rhs->rhs->text != "new") return false;
-  if (!ctx.FindClassType(stmt->rhs->lhs->text)) return false;
+  auto* cls = ctx.FindClassType(stmt->rhs->lhs->text);
+  if (!cls) return false;
+  // §8.25: a parameterized class scope (E#(.N(77))::new) carries its
+  // specialization overrides in the base identifier's elements. Bind them as
+  // locals in a fresh scope before constructing so the constructor body reads
+  // the overridden parameter values, mirroring the class-scope method path.
+  bool parameterized = !stmt->rhs->lhs->elements.empty();
+  if (parameterized) {
+    ctx.PushScope();
+    BindClassParams(cls, stmt->rhs->lhs, ctx, arena);
+  }
   auto handle = EvalClassNew(stmt->rhs->lhs->text, nullptr, ctx, arena);
+  if (parameterized) ctx.PopScope();
   auto* var = ctx.FindVariable(stmt->lhs->text);
   if (var) {
     var->value = handle;

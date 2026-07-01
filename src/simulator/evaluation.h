@@ -129,6 +129,14 @@ void TeardownTaskCall(const ModuleItem* func, const Expr* expr, SimContext& ctx,
 Logic4Vec EvalClassNew(std::string_view class_type, const Expr* new_expr,
                        SimContext& ctx, Arena& arena);
 
+// Bind the specialization parameters of a parameterized class scope (e.g. the
+// N in E#(.N(77))) as local variables so the constructor/method body sees the
+// overridden values. base_id is the identifier carrying the #(...) overrides in
+// its elements.
+struct ClassTypeInfo;
+void BindClassParams(const ClassTypeInfo* cls, const Expr* base_id,
+                     SimContext& ctx, Arena& arena);
+
 void ApplyClassParamOverrides(std::string_view var_name, uint64_t handle,
                               SimContext& ctx, Arena& arena);
 
