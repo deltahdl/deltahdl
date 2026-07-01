@@ -252,7 +252,7 @@ struct EventAwaiter {
                               const EdgeSpec& spec, ResumeTarget target) {
     if (!EdgeGatePasses(var, spec.edge)) return false;
     if (!IffGatePasses(var, spec.iff_cond, target.ctx)) return false;
-    ResumeMaybeReactive(h, target.proc, target.ctx);
+    ResumeMaybeReactive(h, target.proc, target.ctx, spec.edge == Edge::kNone);
     return true;
   }
 
@@ -351,7 +351,7 @@ struct EventAwaiter {
                                   const EdgeSpec& spec, ResumeTarget target) {
     auto trigger = EvalCompoundTrigger(op, spec, target);
     if (!trigger.resume) return trigger.removed;
-    ResumeMaybeReactive(h, target.proc, target.ctx);
+    ResumeMaybeReactive(h, target.proc, target.ctx, spec.edge == Edge::kNone);
     return true;
   }
 
@@ -380,7 +380,25 @@ struct EventAwaiter {
   }
 
   static void ResumeMaybeReactive(std::coroutine_handle<> h, Process* proc,
-                                  SimContext& ctx) {
+                                  SimContext& ctx, bool defer = false) {
+    // §9.2.2.2 / §4: a level-sensitive (non-edge) process triggered by another
+    // process's blocking write must observe *settled* inputs, so its evaluation
+    // is scheduled into the Active region rather than resumed synchronously in
+    // the middle of the writer's NotifyWatchers loop. Otherwise an always @*
+    // reading two signals that the writer sets in sequence (a=..; b=..) would
+    // fire on the first write and read the second signal before it is updated.
+    // Edge-sensitive (posedge/negedge) resumes stay synchronous.
+    if (defer && proc && !proc->is_reactive && !ctx.IsReactiveContext()) {
+      auto* event = ctx.GetScheduler().GetEventPool().Acquire();
+      event->callback = [h, proc, &ctx]() mutable {
+        if (!proc->active) return;
+        ctx.SetCurrentProcess(proc);
+        h.resume();
+      };
+      ctx.GetScheduler().ScheduleEvent(ctx.CurrentTime(), Region::kActive,
+                                       event);
+      return;
+    }
     if (proc && proc->is_reactive) {
       auto* event = ctx.GetScheduler().GetEventPool().Acquire();
       event->callback = [h, proc, &ctx]() mutable {
