@@ -158,24 +158,26 @@ TEST(RandseqValuePassingSim, ArgumentInThenValueOut) {
 // left-to-right availability rule deterministically.
 TEST(RandseqValuePassingSim, OnlyAlreadyGeneratedValuesAreAvailable) {
   SimFixture f;
-  auto [before, after] =
+  // NB: `before` is a reserved keyword (Table B.1, e.g. solve..before), so it
+  // cannot name a variable; use `pre` for the value captured ahead of `a`.
+  auto [pre, after] =
       RunModuleTwoVars(f,
                        "module t;\n"
                        "  int a;\n"
-                       "  int before;\n"
+                       "  int pre;\n"
                        "  int after;\n"
                        "  initial begin\n"
-                       "    a = 99; before = 0; after = 0;\n"
+                       "    a = 99; pre = 0; after = 0;\n"
                        "    randsequence(main)\n"
-                       "      void main : { before = a; } a { after = a; } ;\n"
+                       "      void main : { pre = a; } a { after = a; } ;\n"
                        "      int a : { return 7; } ;\n"
                        "    endsequence\n"
                        "  end\n"
                        "endmodule\n",
-                       "before", "after");
+                       "pre", "after");
   // 'a' not yet generated -> outer variable; 'a' already generated -> its
   // value.
-  EXPECT_EQ(before, 99u);
+  EXPECT_EQ(pre, 99u);
   EXPECT_EQ(after, 7u);
 }
 
