@@ -150,7 +150,7 @@ void Scheduler::Run() {
   // soft stop so the event calendar still drains and a program's own pending
   // nonblocking assign in a later slot takes effect.
   while (!event_calendar_.empty() && !stop_requested_ &&
-         !(ctx_ != nullptr && ctx_->FinishRequested())) {
+         (ctx_ == nullptr || !ctx_->FinishRequested())) {
     auto it = event_calendar_.begin();
     if (!SlotHasLiveEvent(it->second)) {
       // Every event here is a superseded inertial-delay timeout that an earlier
