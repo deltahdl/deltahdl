@@ -175,8 +175,8 @@ def chapter_from_path(path: str) -> str:
 
 def _aggregate_chapters(
     results: list[dict[str, Any]],
-) -> list[tuple[str, str, str, str]]:
-    """Aggregate results into sorted (name, passed, total, pct) row tuples."""
+) -> list[tuple[str, str, str, str, str]]:
+    """Aggregate into sorted (clause, total, passed, failed, pct) row tuples."""
     chapters: defaultdict[str, dict[str, int]] = defaultdict(
         lambda: {"passed": 0, "failed": 0},
     )
@@ -186,20 +186,22 @@ def _aggregate_chapters(
             bucket["passed"] += 1
         else:
             bucket["failed"] += 1
-    rows: list[tuple[str, str, str, str]] = []
+    rows: list[tuple[str, str, str, str, str]] = []
     for name in sorted(chapters, key=_natural_sort_key):
         c = chapters[name]
         total = c["passed"] + c["failed"]
         pct = 100.0 * c["passed"] / total if total else 0.0
         display = name.removeprefix("chapter-")
-        rows.append((display, str(c["passed"]), str(total), f"{pct:.1f}%"))
+        rows.append(
+            (display, str(total), str(c["passed"]), str(c["failed"]), f"{pct:.1f}%"),
+        )
     return rows
 
 
 def print_chapter_breakdown(results: list[dict[str, Any]]) -> None:
     """Print per-chapter pass/fail summary as a box-drawing table."""
     rows = _aggregate_chapters(results)
-    headers = ("Chapter", "Passed", "Sub-Total", "Percentage")
+    headers = ("Clause", "# of tests", "Passed", "Failed", "Percentage")
     widths = [
         max(len(h), max((len(row[i]) for row in rows), default=0))
         for i, h in enumerate(headers)
@@ -219,11 +221,11 @@ def print_chapter_breakdown(results: list[dict[str, Any]]) -> None:
 
     print("\nPer-chapter breakdown:")
     print(_border("┌", "┬", "┐"))
-    print(_row(headers, ["<"] * 4))
+    print(_row(headers, ["<"] * 5))
     print(_border("├", "┼", "┤"))
     for row in rows:
-        color = GREEN if row[3] == "100.0%" else RED
-        print(_row(row, ["<", ">", ">", ">"], color))
+        color = GREEN if row[4] == "100.0%" else RED
+        print(_row(row, ["<", ">", ">", ">", ">"], color))
     print(_border("└", "┴", "┘"))
 
 
