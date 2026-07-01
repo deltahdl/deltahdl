@@ -247,6 +247,15 @@ size_t Preprocessor::ExpandSingleInlineMacro(std::string_view line, size_t pos,
 
   const auto* def = macros_.Lookup(name);
   if (def == nullptr) {
+    // §22.5.1: a text-macro usage naming an undefined macro is an error. A
+    // compiler directive (e.g. `timescale) that reaches the inline expander is
+    // handled elsewhere and is not a macro reference, so it is left verbatim
+    // without diagnosis. This branch also catches line-leading undefined
+    // macros, which fall through to the inline expander as ordinary text.
+    if (!IsCompilerDirective(name)) {
+      diag_.Error({file_id, line_num, 1},
+                  "undefined macro '" + std::string(name) + "'");
+    }
     result.append(line.substr(pos, i - pos));
     return i;
   }
