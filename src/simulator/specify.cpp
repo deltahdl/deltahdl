@@ -297,30 +297,20 @@ void ApplySdfAnnotationFields(TimingCheckEntry& check,
   if (a.set_end_edge_offset) check.end_edge_offset = a.end_edge_offset;
 }
 
-TimingCheckEntry BuildTimingCheckFromAnnotation(const SdfTcAnnotation& a) {
-  TimingCheckEntry e;
-  e.kind = a.kind;
-  e.ref_signal = a.ref_signal;
-  e.ref_edge = a.ref_edge;
-  e.data_signal = a.data_signal;
-  e.data_edge = a.data_edge;
-  e.condition = a.condition;
-  ApplySdfAnnotationFields(e, a);
-  return e;
-}
-
 }  // namespace
 
 void SpecifyManager::AnnotateSdfTimingCheck(const SdfTcAnnotation& a) {
-  bool matched = false;
+  // §32.1: SDF back-annotates the timing checks a design already declares in
+  // its specify blocks; it never introduces a new check. A single SDF check
+  // (e.g. SETUPHOLD) expands into several candidate annotations (setup, hold,
+  // setuphold) so it can update whichever representation the specify block
+  // uses; candidates that match nothing are simply dropped, not appended.
+  // Appending them would fabricate checks the RTL never declared (turning one
+  // SETUPHOLD into three entries).
   for (auto& existing : timing_checks_) {
     if (!SdfAnnotationMatchesCheck(existing, a)) continue;
     ApplySdfAnnotationFields(existing, a);
-    matched = true;
   }
-  if (matched) return;
-
-  timing_checks_.push_back(BuildTimingCheckFromAnnotation(a));
 }
 
 void SpecifyManager::AnnotateSdf(SdfAnnotation annotation) {
