@@ -560,8 +560,13 @@ void Elaborator::CheckExplicitConnLegality(const PortBindScope& scope,
                 "port expression");
   }
 
+  // §25.3: an interface port is a by-reference connection to an interface
+  // instance, not an output driver. The same interface instance is routinely
+  // shared across the interface ports of several modules (the whole point of a
+  // bus interface), so it must not trip the multiple-output-driver check.
   if (conn_expr && conn_expr->kind == ExprKind::kIdentifier &&
       binding.direction != Direction::kInput &&
+      (!port || !port->is_interface_port) &&
       net_names_.count(conn_expr->text) == 0) {
     auto name = conn_expr->text;
     if (!output_port_targets_.emplace(name, scope.item->loc).second) {
