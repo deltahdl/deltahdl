@@ -104,7 +104,14 @@ struct DelayAwaiter {
     event->callback = [h, proc, &ctx = ctx]() mutable {
       if (proc && !proc->active) return;
 
-      if (proc && proc->is_suspended) return;
+      // §9.7: this delay has elapsed, but the process is suspended. The wake is
+      // one-shot, so dropping it would strand the coroutine's continuation (h
+      // is the inner parked frame; Process::coro is an outer frame). Stash h so
+      // resume() can replay it, then return.
+      if (proc && proc->is_suspended) {
+        proc->pending_wake = h;
+        return;
+      }
       if (proc) ctx.SetCurrentProcess(proc);
       h.resume();
     };

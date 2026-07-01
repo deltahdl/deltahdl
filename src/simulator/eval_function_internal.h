@@ -82,4 +82,14 @@ void ExecFunctionBody(const ModuleItem* func, Variable* ret_var,
 void WritebackQueueRefs(SimContext& ctx);
 void WritebackAssocRefs(SimContext& ctx);
 
+// §9.7 built-in process control. The handlers live in eval_process_methods.cpp;
+// the call dispatch in eval_function.cpp routes to them.
+// TryEvalProcessStaticCall handles `process::self()`; TryEvalProcessMethodCall
+// handles p.status()/kill()/ suspend()/resume()/srandom(). Each returns false
+// when the call is not the matching process form, so normal dispatch proceeds.
+bool TryEvalProcessStaticCall(const Expr* expr, SimContext& ctx, Arena& arena,
+                              Logic4Vec& out);
+bool TryEvalProcessMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
+                              Logic4Vec& out);
+
 }  // namespace delta

@@ -114,6 +114,13 @@ struct Process {
 
   ProcessState sv_state = ProcessState::kRunning;
   bool is_suspended = false;
+  // §9.7: when a process is suspended, a one-shot delay wake that elapses
+  // during the suspension cannot simply be dropped -- it holds the only handle
+  // to the coroutine's parked continuation (which is nested below
+  // Process::coro, so resuming coro would resume the wrong frame). Stash that
+  // inner handle here and replay it on resume(). Empty when no elapsed wake is
+  // pending.
+  std::coroutine_handle<> pending_wake;
   std::vector<std::coroutine_handle<>> await_waiters;
 
   uint32_t rng_seed = 0;

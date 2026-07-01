@@ -120,6 +120,7 @@ add_library(deltahdl_lib STATIC
     simulator/evaluation.cpp
     simulator/evaluation_literal.cpp
     simulator/eval_function.cpp
+    simulator/eval_process_methods.cpp
     simulator/eval_randomize.cpp
     simulator/eval_static_method.cpp
     simulator/sequence_monitor.cpp
