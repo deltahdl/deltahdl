@@ -212,7 +212,12 @@ struct AssocArraySpec {
 class SimContext {
  public:
   SimContext(Scheduler& sched, Arena& arena, DiagEngine& diag,
-             uint32_t seed = 0);
+             uint32_t seed = 0)
+      : scheduler_(sched), arena_(arena), diag_(diag), rng_(seed) {
+    // Wire the scheduler's back-reference so it can clear the executing process
+    // when it goes idle (see Scheduler::Run).
+    scheduler_.SetContext(this);
+  }
 
   Variable* FindVariable(std::string_view name);
   Variable* CreateVariable(std::string_view name, uint32_t width);

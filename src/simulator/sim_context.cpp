@@ -9,10 +9,6 @@
 
 namespace delta {
 
-SimContext::SimContext(Scheduler& sched, Arena& arena, DiagEngine& diag,
-                       uint32_t seed)
-    : scheduler_(sched), arena_(arena), diag_(diag), rng_(seed) {}
-
 namespace {
 
 // The two symbol tables consulted during a hierarchical name lookup: the map

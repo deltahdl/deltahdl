@@ -4,6 +4,7 @@
 #include <cstdlib>
 
 #include "common/arena.h"
+#include "simulator/sim_context.h"
 
 namespace delta {
 
@@ -156,6 +157,13 @@ void Scheduler::Run() {
     ExecuteTimeSlot(it->second);
     event_calendar_.erase(it);
   }
+  // The scheduler is now idle: no process is executing. An event callback that
+  // resumed a process left it installed as the context's current process (that
+  // is how a bare-name lookup during the process picks up its instance prefix).
+  // Clear it so a post-run hierarchical lookup - e.g. a testbench or PLI query
+  // after Run() returns - resolves in the top scope instead of inheriting the
+  // last-run instance's prefix and finding a same-named variable it shadows.
+  if (ctx_) ctx_->SetCurrentProcess(nullptr);
 }
 
 void Scheduler::ExecuteTimeSlot(TimeSlot& slot) {

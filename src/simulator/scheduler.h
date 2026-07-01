@@ -10,6 +10,8 @@
 
 namespace delta {
 
+class SimContext;
+
 enum class EventKind : uint8_t {
   kUpdate,
   kEvaluation,
@@ -89,6 +91,10 @@ class Scheduler {
 
   Region CurrentRegion() const { return current_region_; }
   bool HasEvents() const { return !event_calendar_.empty(); }
+
+  // Back-reference to the owning context, set once at construction. Used only
+  // to clear the executing process when the scheduler goes idle (see Run()).
+  void SetContext(SimContext* ctx) { ctx_ = ctx; }
 
   void ScheduleEvent(SimTime time, Region region, Event* event);
   void Run();
@@ -183,6 +189,7 @@ class Scheduler {
   bool IterateReactiveSet(TimeSlot& slot);
 
   EventPool pool_;
+  SimContext* ctx_ = nullptr;
   std::map<SimTime, TimeSlot> event_calendar_;
   std::function<void()> post_timestep_cb_;
   SimTime current_time_{0};
