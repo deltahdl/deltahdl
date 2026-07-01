@@ -194,38 +194,65 @@ TEST(ConfigLiblistClause, SelectedListSkipsLibraryWithoutCell) {
   EXPECT_EQ(bound->library, "libB");
 }
 
-// §33.4.1.5: a liblist clause is inherited hierarchically downward, so it
-// governs cells bound anywhere below the instance it names.
+// §33.6.4: a liblist clause on an instance clause governs that instance's own
+// cell binding and is inherited by its whole subhierarchy ("all of the
+// descendants ... inherit its liblist from the instance selection clause"),
+// while a sibling instance with no such clause falls back to the default
+// liblist. Here `top` instantiates two `mid` cells and `mid`/`leaf` each exist
+// in both libB and libR. With `default liblist libR` and `instance top.m1
+// liblist libB`, the m1 subtree (mid and its leaf) binds entirely from libB and
+// the m2 subtree binds entirely from libR. The earlier form of this test forced
+// `instance top.m liblist libB` while placing `mid` only in a third library, so
+// the instance's own cell could not bind at all -- which is correct behavior,
+// not the inheritance the test meant to check.
 TEST(ConfigLiblistClause, LiblistInheritedBySubhierarchy) {
   SourceManager mgr;
   Arena arena;
   DiagEngine diag(mgr);
-  auto fid = mgr.AddFile(
-      "<test>",
-      "module leaf; endmodule\n"
-      "module leaf; endmodule\n"
-      "module mid; leaf u(); endmodule\n"
-      "module top; mid m(); endmodule\n"
-      "config c; design top; instance top.m liblist libB; endconfig\n");
+  auto fid = mgr.AddFile("<test>",
+                         "module leaf; endmodule\n"
+                         "module leaf; endmodule\n"
+                         "module mid; leaf u(); endmodule\n"
+                         "module mid; leaf u(); endmodule\n"
+                         "module top; mid m1(); mid m2(); endmodule\n"
+                         "config c; design top; default liblist libR; "
+                         "instance top.m1 liblist libB; endconfig\n");
   Lexer lex(mgr.FileContent(fid), fid, diag);
   Parser parser(lex, arena, diag);
   auto* cu = parser.Parse();
   ASSERT_FALSE(diag.HasErrors());
-  ASSERT_EQ(cu->modules.size(), 4u);
-  cu->modules[0]->library = "libA";
-  cu->modules[1]->library = "libB";
-  cu->modules[2]->library = "libC";
-  cu->modules[3]->library = "libC";
+  ASSERT_EQ(cu->modules.size(), 5u);
+  cu->modules[0]->library = "libB";  // leaf
+  cu->modules[1]->library = "libR";  // leaf
+  cu->modules[2]->library = "libB";  // mid
+  cu->modules[3]->library = "libR";  // mid
+  cu->modules[4]->library = "libR";  // top
 
   Elaborator elab(arena, diag, cu);
   auto* design = elab.Elaborate(cu->configs[0]);
   ASSERT_NE(design, nullptr);
-  auto* mid = design->top_modules[0]->children[0].resolved;
-  ASSERT_NE(mid, nullptr);
-  ASSERT_EQ(mid->children.size(), 1u);
-  auto* leaf = mid->children[0].resolved;
-  ASSERT_NE(leaf, nullptr);
-  EXPECT_EQ(leaf->library, "libB");
+  ASSERT_FALSE(design->top_modules.empty());
+  auto* top = design->top_modules[0];
+  ASSERT_EQ(top->children.size(), 2u);
+
+  // top.m1: the instance liblist libB governs m1 and is inherited by its leaf.
+  auto* mid1 = top->children[0].resolved;
+  ASSERT_NE(mid1, nullptr);
+  EXPECT_EQ(mid1->library, "libB");
+  ASSERT_EQ(mid1->children.size(), 1u);
+  auto* leaf1 = mid1->children[0].resolved;
+  ASSERT_NE(leaf1, nullptr);
+  EXPECT_EQ(leaf1->library, "libB");
+
+  // top.m2: no instance clause, so the default liblist libR governs the
+  // subtree.
+  auto* mid2 = top->children[1].resolved;
+  ASSERT_NE(mid2, nullptr);
+  EXPECT_EQ(mid2->library, "libR");
+  ASSERT_EQ(mid2->children.size(), 1u);
+  auto* leaf2 = mid2->children[0].resolved;
+  ASSERT_NE(leaf2, nullptr);
+  EXPECT_EQ(leaf2->library, "libR");
 }
 
 }  // namespace
