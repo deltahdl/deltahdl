@@ -379,6 +379,21 @@ struct EventAwaiter {
     }
   }
 
+  // Schedule `h` to resume in `region` at the current time, bound to `proc`.
+  // Used by the deferred/reactive branches of ResumeMaybeReactive so the
+  // coroutine runs in its own scheduling slot rather than synchronously inside
+  // the caller's NotifyWatchers loop.
+  static void ScheduleResume(std::coroutine_handle<> h, Process* proc,
+                             SimContext& ctx, Region region) {
+    auto* event = ctx.GetScheduler().GetEventPool().Acquire();
+    event->callback = [h, proc, &ctx]() mutable {
+      if (!proc->active) return;
+      ctx.SetCurrentProcess(proc);
+      h.resume();
+    };
+    ctx.GetScheduler().ScheduleEvent(ctx.CurrentTime(), region, event);
+  }
+
   static void ResumeMaybeReactive(std::coroutine_handle<> h, Process* proc,
                                   SimContext& ctx, bool defer = false) {
     // §9.2.2.2 / §4: a level-sensitive (non-edge) process triggered by another
@@ -389,37 +404,16 @@ struct EventAwaiter {
     // fire on the first write and read the second signal before it is updated.
     // Edge-sensitive (posedge/negedge) resumes stay synchronous.
     if (defer && proc && !proc->is_reactive && !ctx.IsReactiveContext()) {
-      auto* event = ctx.GetScheduler().GetEventPool().Acquire();
-      event->callback = [h, proc, &ctx]() mutable {
-        if (!proc->active) return;
-        ctx.SetCurrentProcess(proc);
-        h.resume();
-      };
-      ctx.GetScheduler().ScheduleEvent(ctx.CurrentTime(), Region::kActive,
-                                       event);
+      ScheduleResume(h, proc, ctx, Region::kActive);
       return;
     }
     if (proc && proc->is_reactive) {
-      auto* event = ctx.GetScheduler().GetEventPool().Acquire();
-      event->callback = [h, proc, &ctx]() mutable {
-        if (!proc->active) return;
-        ctx.SetCurrentProcess(proc);
-        h.resume();
-      };
-      ctx.GetScheduler().ScheduleEvent(ctx.CurrentTime(), Region::kReactive,
-                                       event);
+      ScheduleResume(h, proc, ctx, Region::kReactive);
       return;
     }
 
     if (proc && ctx.IsReactiveContext()) {
-      auto* event = ctx.GetScheduler().GetEventPool().Acquire();
-      event->callback = [h, proc, &ctx]() mutable {
-        if (!proc->active) return;
-        ctx.SetCurrentProcess(proc);
-        h.resume();
-      };
-      ctx.GetScheduler().ScheduleEvent(ctx.CurrentTime(), Region::kActive,
-                                       event);
+      ScheduleResume(h, proc, ctx, Region::kActive);
       return;
     }
     // §9.4: the coroutine being resumed belongs to `proc`. A synchronous resume
