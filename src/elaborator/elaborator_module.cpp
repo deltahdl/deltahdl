@@ -879,6 +879,27 @@ static RtlirPort ElaborateOnePort(const ModuleDecl* decl, const PortDecl& port,
   return BuildRtlirPortBase(port, port_is_var, width);
 }
 
+// 23.2.2.4: a default input-port value is a constant expression evaluated in
+// the scope of the module where the port is defined, not in the scope of the
+// instantiating module. Fold it against this module's parameter scope (which
+// already includes the compilation-unit scope and any per-instance parameter
+// overrides) and capture the resolved constant as a literal, so it is not
+// re-resolved in the instantiating scope when later used as a port connection.
+static void FoldPortDefaultValue(Arena& arena, const ScopeMap& scope,
+                                 RtlirPort& rp) {
+  if (rp.default_value == nullptr) return;
+  // A literal default is already scope-independent, so leave it untouched; this
+  // also avoids truncating a wide (>64-bit) literal through the 64-bit fold.
+  // Only name-bearing expressions need to be pinned to the defining scope.
+  if (rp.default_value->kind == ExprKind::kIntegerLiteral) return;
+  auto v = ConstEvalInt(rp.default_value, scope);
+  if (!v) return;
+  auto* lit = arena.Create<Expr>();
+  lit->kind = ExprKind::kIntegerLiteral;
+  lit->int_val = static_cast<uint64_t>(*v);
+  rp.default_value = lit;
+}
+
 void Elaborator::ElaboratePorts(const ModuleDecl* decl, RtlirModule* mod) {
   auto param_scope = BuildParamScope(mod);
 
@@ -895,6 +916,7 @@ void Elaborator::ElaboratePorts(const ModuleDecl* decl, RtlirModule* mod) {
     if (RejectIllegalPortType(port, diag_)) continue;
 
     RtlirPort rp = ElaborateOnePort(decl, port, ctx);
+    FoldPortDefaultValue(arena_, param_scope, rp);
 
     if (port.is_interface_port) {
       rp.is_interface_port = true;
