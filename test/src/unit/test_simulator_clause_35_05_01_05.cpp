@@ -201,8 +201,14 @@ TEST(DpiReentrancy, ImportedTaskCallWithoutTimingControlDoesNotSuspend) {
     rt.LeaveImportCall();
     result_val = result.AsInt();
     time_after = sched.CurrentTime().ticks;
-    // No timing control ran, so nothing was deferred to a future slot.
-    pending_after = sched.HasEvents();
+    // No timing control ran, so nothing was deferred to a *future* slot. The
+    // discriminating query is NextEventTime(), not HasEvents(): the event
+    // calendar still holds the current in-progress slot (Run() erases it only
+    // after the slot finishes executing), so HasEvents() is trivially true
+    // inside any callback. NextEventTime() reports only future work
+    // (upper_bound(current_time_), scheduler.h), which is what "deferred to a
+    // future slot" means and what the suspending sibling test observes advance.
+    pending_after = sched.NextEventTime().ticks > sched.CurrentTime().ticks;
   };
   sched.ScheduleEvent({kCallTime}, Region::kActive, ev);
   sched.Run();
