@@ -243,6 +243,20 @@ class SimContext {
   void RequestStop() { stop_requested_ = true; }
   bool StopRequested() const { return stop_requested_; }
 
+  // §20.2: an explicit $finish/$stop/$fatal ends the run and drops any events
+  // already scheduled in a later time slot. This is distinct from the "soft"
+  // stop that program completion (§24) raises through RequestStop(): that only
+  // tells running processes to stop starting new work and lets the event
+  // calendar drain naturally, so a program's own pending nonblocking assign
+  // still takes effect. RequestFinish() raises both so process loops that guard
+  // on StopRequested() still unwind, while the scheduler halts on
+  // FinishRequested().
+  void RequestFinish() {
+    finish_requested_ = true;
+    stop_requested_ = true;
+  }
+  bool FinishRequested() const { return finish_requested_; }
+
   // Optional $reset family (Annex D.8). RecordReset tallies one reset of the
   // tool and remembers the reset_value argument so that the $reset_value
   // system function can hand that value back after the reset. $reset_count
@@ -819,6 +833,7 @@ class SimContext {
   DpiContext* dpi_context_ = nullptr;
   Process* current_process_ = nullptr;
   bool stop_requested_ = false;
+  bool finish_requested_ = false;
   uint32_t reset_count_ = 0;
   int64_t reset_value_ = 0;
   std::string interactive_scope_;

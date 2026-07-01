@@ -141,7 +141,16 @@ static bool SlotHasLiveEvent(const TimeSlot& slot) {
 }
 
 void Scheduler::Run() {
-  while (!event_calendar_.empty() && !stop_requested_) {
+  // §20.2: an explicit $finish/$stop/$fatal requests a hard halt through the
+  // SimContext. Honor it between time slots so no later-time events run once
+  // the halt is pending -- a process suspended on a delay must not resume in a
+  // time step past the finish (e.g. `forever #10` with `#45 $finish` performs
+  // its t=40 iteration but not the t=50 one). This checks FinishRequested(),
+  // not the broader StopRequested(): program completion (§24) raises only the
+  // soft stop so the event calendar still drains and a program's own pending
+  // nonblocking assign in a later slot takes effect.
+  while (!event_calendar_.empty() && !stop_requested_ &&
+         !(ctx_ != nullptr && ctx_->FinishRequested())) {
     auto it = event_calendar_.begin();
     if (!SlotHasLiveEvent(it->second)) {
       // Every event here is a superseded inertial-delay timeout that an earlier

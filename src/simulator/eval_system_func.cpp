@@ -457,7 +457,7 @@ static Logic4Vec EvalSeveritySysCall(const Expr* expr, SimContext& ctx,
                                      Arena& arena, std::string_view name) {
   if (name == "$fatal") {
     ExecSeverityTask(expr, ctx, arena, "FATAL", std::cerr);
-    ctx.RequestStop();
+    ctx.RequestFinish();
   } else if (name == "$error") {
     ExecSeverityTask(expr, ctx, arena, "ERROR", std::cerr);
   } else if (name == "$warning") {
@@ -797,7 +797,7 @@ Logic4Vec EvalSystemCall(const Expr* expr, SimContext& ctx, Arena& arena) {
   // host; both honor the Table 20-1 diagnostic level before halting.
   if (name == "$finish" || name == "$stop") {
     EmitSimControlDiagnostic(expr, ctx, arena, name, std::cout);
-    ctx.RequestStop();
+    ctx.RequestFinish();
     return MakeLogic4VecVal(arena, 1, 0);
   }
   // Optional $countdrivers function (Annex D.2).
