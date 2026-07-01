@@ -104,7 +104,20 @@ jobs:
             ccache-build-asan-ubsan-shard-${{
               matrix.shard }}-
             ccache-build-asan-ubsan-
-      - name: Build
+      - id: buildout
+        name: Restore build output
+        uses: actions/cache/restore@v5
+        with:
+          key: >-
+            buildout-asan-ubsan-shard-${{ matrix.shard }}-${{
+            hashFiles('src/**', 'lib/cpp/**', 'test/src/**',
+            'CMakeLists.txt', 'test/CMakeLists.txt',
+            '.github/workflows/deltahdl.yml',
+            '.github/actions/install-llvm/**',
+            '.github/actions/install-gcc/**') }}
+          path: build
+      - if: steps.buildout.outputs.cache-hit != 'true'
+        name: Build
         run: |
           cmake -B build \
             -DCMAKE_CXX_COMPILER=clang++ \
@@ -118,12 +131,27 @@ jobs:
             test/CMakeLists.txt \
             | awk "(NR-1) % 5 == ${{ matrix.shard }}")
           cmake --build build --parallel 4 --target $targets
+      - if: steps.buildout.outputs.cache-hit != 'true'
+        name: Slim build output
+        run: find build -name '*.o' -delete
       - name: Upload build
         uses: actions/upload-artifact@v4
         with:
           name: build-asan-ubsan-shard-${{ matrix.shard }}
           path: build/
           retention-days: 1
+      - if: steps.buildout.outputs.cache-hit != 'true'
+        name: Save build output
+        uses: actions/cache/save@v5
+        with:
+          key: >-
+            buildout-asan-ubsan-shard-${{ matrix.shard }}-${{
+            hashFiles('src/**', 'lib/cpp/**', 'test/src/**',
+            'CMakeLists.txt', 'test/CMakeLists.txt',
+            '.github/workflows/deltahdl.yml',
+            '.github/actions/install-llvm/**',
+            '.github/actions/install-gcc/**') }}
+          path: build
     strategy:
       fail-fast: false
       matrix:
@@ -165,7 +193,20 @@ jobs:
             ccache-build-coverage-shard-${{
               matrix.shard }}-
             ccache-build-coverage-
-      - name: Build
+      - id: buildout
+        name: Restore build output
+        uses: actions/cache/restore@v5
+        with:
+          key: >-
+            buildout-coverage-shard-${{ matrix.shard }}-${{
+            hashFiles('src/**', 'lib/cpp/**', 'test/src/**',
+            'CMakeLists.txt', 'test/CMakeLists.txt',
+            '.github/workflows/deltahdl.yml',
+            '.github/actions/install-llvm/**',
+            '.github/actions/install-gcc/**') }}
+          path: build
+      - if: steps.buildout.outputs.cache-hit != 'true'
+        name: Build
         run: |
           cmake -B build \
             -DCMAKE_CXX_COMPILER=clang++ \
@@ -179,12 +220,27 @@ jobs:
             test/CMakeLists.txt \
             | awk "(NR-1) % 20 == ${{ matrix.shard }}")
           cmake --build build --parallel 4 --target $targets
+      - if: steps.buildout.outputs.cache-hit != 'true'
+        name: Slim build output
+        run: find build -name '*.o' -delete
       - name: Upload build
         uses: actions/upload-artifact@v4
         with:
           name: build-coverage-shard-${{ matrix.shard }}
           path: build/
           retention-days: 1
+      - if: steps.buildout.outputs.cache-hit != 'true'
+        name: Save build output
+        uses: actions/cache/save@v5
+        with:
+          key: >-
+            buildout-coverage-shard-${{ matrix.shard }}-${{
+            hashFiles('src/**', 'lib/cpp/**', 'test/src/**',
+            'CMakeLists.txt', 'test/CMakeLists.txt',
+            '.github/workflows/deltahdl.yml',
+            '.github/actions/install-llvm/**',
+            '.github/actions/install-gcc/**') }}
+          path: build
     strategy:
       fail-fast: false
       matrix:
@@ -211,7 +267,20 @@ jobs:
           restore-keys: |
             ccache-build-macos-arm64-${{ hashFiles('**/CMakeLists.txt') }}-
             ccache-build-macos-arm64-
-      - name: Build
+      - id: buildout
+        name: Restore build output
+        uses: actions/cache/restore@v5
+        with:
+          key: >-
+            buildout-macos-26-arm64-clang-${{
+            hashFiles('src/**', 'lib/cpp/**', 'test/src/**',
+            'CMakeLists.txt', 'test/CMakeLists.txt',
+            '.github/workflows/deltahdl.yml',
+            '.github/actions/install-llvm/**',
+            '.github/actions/install-gcc/**') }}
+          path: build
+      - if: steps.buildout.outputs.cache-hit != 'true'
+        name: Build
         run: |
           cmake -B build \
             -DCMAKE_CXX_COMPILER=clang++ \
@@ -220,12 +289,27 @@ jobs:
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_BUILD_TYPE=Release
           cmake --build build --parallel 2
+      - if: steps.buildout.outputs.cache-hit != 'true'
+        name: Slim build output
+        run: find build -name '*.o' -delete
       - name: Upload build
         uses: actions/upload-artifact@v4
         with:
           name: build-macos-26-arm64-clang
           path: build/
           retention-days: 1
+      - if: steps.buildout.outputs.cache-hit != 'true'
+        name: Save build output
+        uses: actions/cache/save@v5
+        with:
+          key: >-
+            buildout-macos-26-arm64-clang-${{
+            hashFiles('src/**', 'lib/cpp/**', 'test/src/**',
+            'CMakeLists.txt', 'test/CMakeLists.txt',
+            '.github/workflows/deltahdl.yml',
+            '.github/actions/install-llvm/**',
+            '.github/actions/install-gcc/**') }}
+          path: build
   build-tsan:
     env:
       CCACHE_DIR: ${{ github.workspace }}/.ccache
@@ -254,7 +338,20 @@ jobs:
             ccache-build-tsan-shard-${{
               matrix.shard }}-
             ccache-build-tsan-
-      - name: Build
+      - id: buildout
+        name: Restore build output
+        uses: actions/cache/restore@v5
+        with:
+          key: >-
+            buildout-tsan-shard-${{ matrix.shard }}-${{
+            hashFiles('src/**', 'lib/cpp/**', 'test/src/**',
+            'CMakeLists.txt', 'test/CMakeLists.txt',
+            '.github/workflows/deltahdl.yml',
+            '.github/actions/install-llvm/**',
+            '.github/actions/install-gcc/**') }}
+          path: build
+      - if: steps.buildout.outputs.cache-hit != 'true'
+        name: Build
         run: |
           cmake -B build \
             -DCMAKE_CXX_COMPILER=clang++ \
@@ -268,12 +365,27 @@ jobs:
             test/CMakeLists.txt \
             | awk "(NR-1) % 5 == ${{ matrix.shard }}")
           cmake --build build --parallel 4 --target $targets
+      - if: steps.buildout.outputs.cache-hit != 'true'
+        name: Slim build output
+        run: find build -name '*.o' -delete
       - name: Upload build
         uses: actions/upload-artifact@v4
         with:
           name: build-tsan-shard-${{ matrix.shard }}
           path: build/
           retention-days: 1
+      - if: steps.buildout.outputs.cache-hit != 'true'
+        name: Save build output
+        uses: actions/cache/save@v5
+        with:
+          key: >-
+            buildout-tsan-shard-${{ matrix.shard }}-${{
+            hashFiles('src/**', 'lib/cpp/**', 'test/src/**',
+            'CMakeLists.txt', 'test/CMakeLists.txt',
+            '.github/workflows/deltahdl.yml',
+            '.github/actions/install-llvm/**',
+            '.github/actions/install-gcc/**') }}
+          path: build
     strategy:
       fail-fast: false
       matrix:
@@ -306,7 +418,20 @@ jobs:
             ccache-build-clang-release-shard-${{
               matrix.shard }}-
             ccache-build-clang-release-
-      - name: Build
+      - id: buildout
+        name: Restore build output
+        uses: actions/cache/restore@v5
+        with:
+          key: >-
+            buildout-ubuntu-24-04-x86-64-clang-shard-${{ matrix.shard }}-${{
+            hashFiles('src/**', 'lib/cpp/**', 'test/src/**',
+            'CMakeLists.txt', 'test/CMakeLists.txt',
+            '.github/workflows/deltahdl.yml',
+            '.github/actions/install-llvm/**',
+            '.github/actions/install-gcc/**') }}
+          path: build
+      - if: steps.buildout.outputs.cache-hit != 'true'
+        name: Build
         run: |
           cmake -B build \
             -DCMAKE_CXX_COMPILER=clang++ \
@@ -319,12 +444,27 @@ jobs:
             test/CMakeLists.txt \
             | awk "(NR-1) % 4 == ${{ matrix.shard }}")
           cmake --build build --parallel 4 --target $targets
+      - if: steps.buildout.outputs.cache-hit != 'true'
+        name: Slim build output
+        run: find build -name '*.o' -delete
       - name: Upload build
         uses: actions/upload-artifact@v4
         with:
           name: build-ubuntu-24-04-x86-64-clang-shard-${{ matrix.shard }}
           path: build/
           retention-days: 1
+      - if: steps.buildout.outputs.cache-hit != 'true'
+        name: Save build output
+        uses: actions/cache/save@v5
+        with:
+          key: >-
+            buildout-ubuntu-24-04-x86-64-clang-shard-${{ matrix.shard }}-${{
+            hashFiles('src/**', 'lib/cpp/**', 'test/src/**',
+            'CMakeLists.txt', 'test/CMakeLists.txt',
+            '.github/workflows/deltahdl.yml',
+            '.github/actions/install-llvm/**',
+            '.github/actions/install-gcc/**') }}
+          path: build
     strategy:
       fail-fast: false
       matrix:
@@ -355,7 +495,20 @@ jobs:
             ccache-build-gcc-release-shard-${{
               matrix.shard }}-
             ccache-build-gcc-release-
-      - name: Build
+      - id: buildout
+        name: Restore build output
+        uses: actions/cache/restore@v5
+        with:
+          key: >-
+            buildout-ubuntu-24-04-x86-64-gcc-shard-${{ matrix.shard }}-${{
+            hashFiles('src/**', 'lib/cpp/**', 'test/src/**',
+            'CMakeLists.txt', 'test/CMakeLists.txt',
+            '.github/workflows/deltahdl.yml',
+            '.github/actions/install-llvm/**',
+            '.github/actions/install-gcc/**') }}
+          path: build
+      - if: steps.buildout.outputs.cache-hit != 'true'
+        name: Build
         run: |
           cmake -B build \
             -DCMAKE_CXX_COMPILER=g++ \
@@ -368,12 +521,27 @@ jobs:
             test/CMakeLists.txt \
             | awk "(NR-1) % 5 == ${{ matrix.shard }}")
           cmake --build build --parallel 4 --target $targets
+      - if: steps.buildout.outputs.cache-hit != 'true'
+        name: Slim build output
+        run: find build -name '*.o' -delete
       - name: Upload build
         uses: actions/upload-artifact@v4
         with:
           name: build-ubuntu-24-04-x86-64-gcc-shard-${{ matrix.shard }}
           path: build/
           retention-days: 1
+      - if: steps.buildout.outputs.cache-hit != 'true'
+        name: Save build output
+        uses: actions/cache/save@v5
+        with:
+          key: >-
+            buildout-ubuntu-24-04-x86-64-gcc-shard-${{ matrix.shard }}-${{
+            hashFiles('src/**', 'lib/cpp/**', 'test/src/**',
+            'CMakeLists.txt', 'test/CMakeLists.txt',
+            '.github/workflows/deltahdl.yml',
+            '.github/actions/install-llvm/**',
+            '.github/actions/install-gcc/**') }}
+          path: build
     strategy:
       fail-fast: false
       matrix:
@@ -1133,15 +1301,9 @@ on:
       - .github/workflows/deltahdl.yml
       - CMakeLists.txt
       - etc/**
-      - lib/python/run_tests_common/**
       - lib/cpp/**
-      - scripts/run_sim_tests/**
-      - scripts/run_sv_tests/**
       - src/**
       - test/CMakeLists.txt
-      - test/lib/python/run_tests_common/**
-      - test/scripts/run_sim_tests/**
-      - test/scripts/run_sv_tests/**
       - test/src/**
   push:
     branches: [main]
@@ -1150,14 +1312,8 @@ on:
       - .github/workflows/deltahdl.yml
       - CMakeLists.txt
       - etc/**
-      - lib/python/run_tests_common/**
       - lib/cpp/**
-      - scripts/run_sim_tests/**
-      - scripts/run_sv_tests/**
       - src/**
       - test/CMakeLists.txt
-      - test/lib/python/run_tests_common/**
-      - test/scripts/run_sim_tests/**
-      - test/scripts/run_sv_tests/**
       - test/src/**
   workflow_dispatch:
