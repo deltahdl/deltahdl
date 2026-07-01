@@ -481,6 +481,12 @@ SvOpenArrayHandle DpiRuntime::MakeOpenArrayFromActual(void* actual_data,
 
 void DpiRuntime::EnterContextImportCall(std::string_view sv_name,
                                         DpiScope decl_scope, bool is_task) {
+  // §35.9: the disabled state is a per-thread property of an in-progress
+  // disable episode. Opening a fresh top-level import chain means no disable is
+  // active, so clear the thread-local state; otherwise a disable left set by an
+  // earlier chain (thread-local, not held per DpiRuntime) would leak into this
+  // call.
+  if (call_chain_.empty()) DpiSetCurrentDisabledState(false);
   // §35.5.3: the chain's context is the import declaration's instantiated
   // scope when SystemVerilog calls a context import.
   PushScope(std::move(decl_scope));
@@ -489,6 +495,9 @@ void DpiRuntime::EnterContextImportCall(std::string_view sv_name,
 
 void DpiRuntime::EnterNoncontextImportCall(std::string_view sv_name,
                                            bool is_task) {
+  // See EnterContextImportCall: a fresh top-level chain starts with no active
+  // disable episode (§35.9).
+  if (call_chain_.empty()) DpiSetCurrentDisabledState(false);
   call_chain_.push_back({sv_name, false, is_task});
 }
 
