@@ -236,6 +236,11 @@ TEST(InputSamplingSim, SampledBeforeBlockEventFires) {
 
 TEST(InputSamplingSim, ClockvarMemberAccessResolvesToSampledValue) {
   SimFixture f;
+  // The clock must exist before SetupClockingBlock runs: Attach registers the
+  // sampling watcher by looking up the block's clock signal, so a clock created
+  // afterward would never be watched and nothing would ever sample.
+  auto* clk = f.ctx.CreateVariable("clk", 1);
+  clk->value = MakeLogic4VecVal(f.arena, 1, 0);
   auto* data = f.ctx.CreateVariable("data", 8);
   data->value = MakeLogic4VecVal(f.arena, 8, 0xA5);
 
@@ -244,8 +249,6 @@ TEST(InputSamplingSim, ClockvarMemberAccessResolvesToSampledValue) {
       f, cmgr, {"cb", Edge::kPosedge, {0}, {0}, "data", ClockingDir::kInput});
   f.ctx.SetClockingManager(&cmgr);
 
-  auto* clk = f.ctx.CreateVariable("clk", 1);
-  clk->value = MakeLogic4VecVal(f.arena, 1, 0);
   SchedulePosedge(f, clk, 10);
   f.scheduler.Run();
 
