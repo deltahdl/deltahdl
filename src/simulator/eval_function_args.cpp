@@ -313,6 +313,13 @@ static void BindValueArg(const FunctionArg& param, const Expr* expr,
     if (formal_width > 0 && formal_width != val.width)
       val = ResizeToWidth(val, formal_width, arena);
   }
+  // 13.3.2/13.5.1: an output formal is not passed a value from the caller; only
+  // input and inout formals receive the actual's value. The actual is evaluated
+  // above solely to size the formal - reset the bits to the default so a
+  // read-before-write (and, for an automatic task, each fresh entry) observes
+  // the default value rather than the caller's current value.
+  if (param.direction == Direction::kOutput)
+    val = MakeLogic4VecVal(arena, val.width, 0);
   auto* var = ctx.CreateLocalVariable(param.name, val.width);
   var->value = val;
   // A named-type struct formal (input s_t arg) has kind kNamed, not kStruct, so

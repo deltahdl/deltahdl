@@ -27,15 +27,17 @@ TEST(TaskMemorySim, StaticTaskVarDefaultInitThenRetains) {
   EXPECT_EQ(val, 10u);
 }
 
-// §13.3.2: variables of an automatic task, including output type arguments, are
-// replicated and reinitialized to the default value whenever execution enters
-// their scope. Each call sees the output arg freshly zeroed, so the result is 1
-// regardless of how many times the task ran before.
+// §13.3.2 + §13.5.1: an output argument of an automatic task is not passed the
+// caller's value; it is replicated and reinitialized to the default value
+// whenever execution enters its scope. Using a 2-state type (default 0), each
+// call computes 0 + 1 = 1 and copies it out, so the result is 1 regardless of
+// how many times the task ran before. (If the output were wrongly seeded from
+// the caller, the second call would read the retained 1 and produce 2.)
 TEST(TaskMemorySim, AutomaticTaskOutputArgDefaultInitEachEntry) {
   auto val = RunAndGet(
       "module t;\n"
       "  logic [31:0] result;\n"
-      "  task automatic bump(output logic [31:0] v);\n"
+      "  task automatic bump(output int v);\n"
       "    v = v + 1;\n"
       "  endtask\n"
       "  initial begin\n"
