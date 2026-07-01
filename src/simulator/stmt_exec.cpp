@@ -332,6 +332,38 @@ static ExecTask ExecFork(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   co_return StmtResult::kDone;
 }
 
+// §13.4.4: a function body must not block, so it may spawn background processes
+// only through fork...join_none. This performs the same child-process spawning
+// as ExecFork's join_none path, but as a plain call with no coroutine await, so
+// the synchronous function-body executor (ExecFuncStmt) can run it. A fork with
+// any other join kind inside a function is illegal (it would block) and is left
+// untouched here.
+void SpawnForkJoinNone(const Stmt* stmt, SimContext& ctx, Arena& arena) {
+  if (!stmt || stmt->join_kind != TokenKind::kKwJoinNone) return;
+  bool labeled = !stmt->label.empty();
+  if (labeled) ctx.PushStaticScope(stmt->label);
+
+  uint32_t process_count = 0;
+  for (auto* s : stmt->fork_stmts) {
+    if (!IsForkBlockItemDecl(s)) process_count++;
+  }
+  if (process_count == 0) {
+    if (labeled) ctx.PopStaticScope(stmt->label);
+    return;
+  }
+
+  auto* state = arena.Create<ForkJoinState>();
+  state->remaining = process_count;
+  state->join_any = false;
+  auto* spawning_proc = ctx.CurrentProcess();
+  state->parent_proc = spawning_proc;
+  WaitForkState* parent_wfs =
+      spawning_proc ? &spawning_proc->wait_fork_state : nullptr;
+  SpawnForkChildren(stmt, ctx, arena, spawning_proc,
+                    {state, parent_wfs, spawning_proc});
+  if (labeled) ctx.PopStaticScope(stmt->label);
+}
+
 static ExecTask ExecWaitFork(SimContext& ctx) {
   auto* proc = ctx.CurrentProcess();
   if (!proc) co_return StmtResult::kDone;

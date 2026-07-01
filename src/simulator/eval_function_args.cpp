@@ -11,6 +11,7 @@
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
 #include "simulator/statement_assign.h"
+#include "simulator/stmt_exec.h"
 
 namespace delta {
 
@@ -858,6 +859,12 @@ static bool ExecFuncStmt(const Stmt* stmt, const FuncExecCtx& exec) {
       return ExecFuncDoWhile(stmt, exec);
     case StmtKind::kForever:
       return ExecFuncForever(stmt, exec);
+    case StmtKind::kFork:
+      // §13.4.4: a function may fork off background processes with join_none
+      // (join/join_any would block and are illegal here). Spawn the children
+      // and continue; the function itself does not wait.
+      SpawnForkJoinNone(stmt, exec.ctx, exec.arena);
+      return false;
     default:
       return false;
   }
