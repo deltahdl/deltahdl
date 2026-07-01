@@ -218,6 +218,47 @@ static bool TryTypedClassNewAssign(const Stmt* stmt, SimContext& ctx,
   return true;
 }
 
+// §8.12: the declared class-type name of property `field` on `type`, searching
+// base classes along the parent chain. Empty when no such property exists or it
+// is not class-typed.
+static std::string_view MemberClassTypeName(const ClassTypeInfo* type,
+                                            std::string_view field) {
+  for (const auto* t = type; t != nullptr; t = t->parent) {
+    if (t->decl == nullptr) continue;
+    for (const auto* m : t->decl->members) {
+      if (m->kind == ClassMemberKind::kProperty && m->name == field)
+        return m->data_type.type_name;
+    }
+  }
+  return {};
+}
+
+// §8.4 / §8.12: `obj.field = new` where field is a class handle. The bare `new`
+// carries no type context, so resolve field's declared class type from the AST,
+// construct the object, and store the resulting handle through the member chain
+// (WriteStructField reaches the real nested handle, so a later shallow copy
+// shares it rather than falling back to a flat "field.x" key).
+static bool TryMemberClassNewAssign(const Stmt* stmt, SimContext& ctx,
+                                    Arena& arena) {
+  if (!stmt->rhs || stmt->rhs->kind != ExprKind::kCall) return false;
+  if (stmt->rhs->text != "new") return false;
+  if (!stmt->lhs || stmt->lhs->kind != ExprKind::kMemberAccess) return false;
+  if (!stmt->lhs->lhs || stmt->lhs->lhs->kind != ExprKind::kIdentifier)
+    return false;
+  if (!stmt->lhs->rhs || stmt->lhs->rhs->kind != ExprKind::kIdentifier)
+    return false;
+  auto base_type = ctx.GetVariableClassType(stmt->lhs->lhs->text);
+  if (base_type.empty()) return false;
+  const auto* cls = ctx.FindClassType(base_type);
+  if (cls == nullptr) return false;
+  auto field_type = MemberClassTypeName(cls, stmt->lhs->rhs->text);
+  if (field_type.empty() || ctx.FindClassType(field_type) == nullptr)
+    return false;
+  auto handle = EvalClassNew(field_type, stmt->rhs, ctx, arena);
+  WriteStructField(stmt->lhs, handle, ctx);
+  return true;
+}
+
 static const Expr* UnwrapTypedPattern(const Expr* expr) {
   if (expr->kind == ExprKind::kCast && expr->lhs &&
       expr->lhs->kind == ExprKind::kAssignmentPattern)
@@ -723,6 +764,7 @@ static bool TryDispatchSpecialBlockingAssign(const Stmt* stmt, SimContext& ctx,
   if (TryVirtualInterfaceAssign(stmt, ctx)) return true;
   if (TryClassNewAssign(stmt, ctx, arena)) return true;
   if (TryTypedClassNewAssign(stmt, ctx, arena)) return true;
+  if (TryMemberClassNewAssign(stmt, ctx, arena)) return true;
   if (TryAssocCopyAssign(stmt, ctx)) return true;
   if (TryAssocLiteralAssign(stmt, ctx, arena)) return true;
   if (TryStreamingConcatToQueueTarget(stmt, ctx, arena)) return true;
