@@ -40,7 +40,7 @@ TEST(Elaborator, DelayModePath_AppliesToAllFollowingModules) {
       "endmodule\n"
       "module b;\n"
       "endmodule\n",
-      f);
+      f, /*top=*/"", /*auto_top=*/true);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
   ASSERT_EQ(design->top_modules.size(), 2u);

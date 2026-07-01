@@ -32,6 +32,50 @@ static void CollectAllModules(
 
 namespace {
 
+void CollectInstantiatedNames(const std::vector<ModuleItem*>& items,
+                              std::unordered_set<std::string_view>& names);
+
+// §23.3.1: record the name of every module instantiated by `item`, descending
+// through generate constructs (whose alternatives live in gen_body / gen_else /
+// gen_case_items) and nested module declarations. Non-instantiating items carry
+// empty gen_* fields, so the recursion is a no-op for them.
+void CollectItemInstantiations(const ModuleItem* item,
+                               std::unordered_set<std::string_view>& names) {
+  if (item->kind == ModuleItemKind::kModuleInst) {
+    if (!item->inst_module.empty()) names.insert(item->inst_module);
+    return;
+  }
+  if (item->kind == ModuleItemKind::kNestedModuleDecl) {
+    if (item->nested_module_decl != nullptr)
+      CollectInstantiatedNames(item->nested_module_decl->items, names);
+    return;
+  }
+  CollectInstantiatedNames(item->gen_body, names);
+  if (item->gen_else != nullptr)
+    CollectItemInstantiations(item->gen_else, names);
+  for (const auto& ci : item->gen_case_items)
+    CollectInstantiatedNames(ci.body, names);
+}
+
+void CollectInstantiatedNames(const std::vector<ModuleItem*>& items,
+                              std::unordered_set<std::string_view>& names) {
+  for (const auto* item : items) CollectItemInstantiations(item, names);
+}
+
+// §23.3.1: the top-level modules of a compilation unit are the modules present
+// in the source but not instantiated by any other module. Returns them in
+// source order; used when no explicit top module is named.
+std::vector<ModuleDecl*> CollectAutoTopModules(const CompilationUnit* unit) {
+  std::unordered_set<std::string_view> instantiated;
+  for (const auto* mod : unit->modules)
+    CollectInstantiatedNames(mod->items, instantiated);
+
+  std::vector<ModuleDecl*> tops;
+  for (auto* mod : unit->modules)
+    if (!instantiated.contains(mod->name)) tops.push_back(mod);
+  return tops;
+}
+
 // Copies an AST liblist (string_views into the source) into owning strings.
 std::vector<std::string> LiblistToStrings(
     const std::vector<std::string_view>& liblist) {
@@ -412,15 +456,17 @@ RtlirDesign* Elaborator::ElaborateTops(
 }
 
 RtlirDesign* Elaborator::Elaborate(std::string_view top_module_name) {
-  // No explicit top module: a package-only or class-only compilation unit has
-  // nothing to instantiate, but its package/class items still need validation.
-  // A genuinely empty unit (e.g. empty/comment-only source) yields no design.
+  // No explicit top module: root every uninstantiated module as a top per
+  // §23.3.1. A package-only or class-only compilation unit has nothing to
+  // instantiate but its package/class items still need validation, so it
+  // proceeds with an empty top set. A genuinely empty unit (e.g. empty or
+  // comment-only source) yields no design.
   if (top_module_name.empty()) {
     if (unit_->modules.empty() && unit_->packages.empty() &&
         unit_->cu_items.empty() && unit_->classes.empty())
       return nullptr;
     RunPreElaborationValidations();
-    return ElaborateTops({});
+    return ElaborateTops(CollectAutoTopModules(unit_));
   }
 
   RunPreElaborationValidations();

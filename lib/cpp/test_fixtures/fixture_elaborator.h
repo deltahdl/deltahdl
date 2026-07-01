@@ -59,9 +59,13 @@ inline void PropagateDecayAndDelayToCu(CompilationUnit* cu,
   cu->delay_mode_directive = preproc.DelayModeDirective();
 }
 
+// When `auto_top` is set, no top module is named and the elaborator roots every
+// uninstantiated module as a top (§23.3.1) rather than the single last module;
+// used by tests that check multi-top designs.
 inline RtlirDesign* ElaborateWithPreprocessor(const std::string& src,
                                               ElabFixture& f,
-                                              std::string_view top = "") {
+                                              std::string_view top = "",
+                                              bool auto_top = false) {
   auto fid = f.mgr.AddFile("<test>", src);
   Preprocessor preproc(f.mgr, f.diag, {});
   auto* cu = PreprocessAndParseCu(f, fid, preproc);
@@ -81,7 +85,8 @@ inline RtlirDesign* ElaborateWithPreprocessor(const std::string& src,
   // See ElaborateSrc: with no explicit top and no top-level module, pass an
   // empty name instead of dereferencing an empty module list.
   std::string_view name = top;
-  if (name.empty() && !cu->modules.empty()) name = cu->modules.back()->name;
+  if (!auto_top && name.empty() && !cu->modules.empty())
+    name = cu->modules.back()->name;
   auto* design = elab.Elaborate(name);
   f.has_errors = f.diag.HasErrors();
   return design;
