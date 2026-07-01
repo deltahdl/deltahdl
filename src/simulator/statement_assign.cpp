@@ -156,13 +156,13 @@ static void SetClassField(ClassObject* obj, const ClassTypeInfo* declared_type,
 static void WriteClassFieldChain(ClassObject* obj,
                                  const ClassTypeInfo* declared_type,
                                  std::string_view field_path,
-                                 const Logic4Vec& rhs_val, SimContext& ctx,
-                                 Arena& arena) {
+                                 const Logic4Vec& rhs_val, SimContext& ctx) {
   auto dot = field_path.find('.');
   if (dot == std::string_view::npos) {
     SetClassField(obj, declared_type, field_path, rhs_val);
     return;
   }
+  auto& arena = ctx.GetArena();
   auto first = field_path.substr(0, dot);
   auto rest = field_path.substr(dot + 1);
   Logic4Vec handle_val =
@@ -173,7 +173,7 @@ static void WriteClassFieldChain(ClassObject* obj,
     SetClassField(obj, declared_type, field_path, rhs_val);
     return;
   }
-  WriteClassFieldChain(next_obj, nullptr, rest, rhs_val, ctx, arena);
+  WriteClassFieldChain(next_obj, nullptr, rest, rhs_val, ctx);
 }
 
 // Writes field_name into the class object referenced by base_var. Returns true
@@ -189,8 +189,7 @@ static bool WriteClassObjectField(Variable* base_var,
   const ClassTypeInfo* declared_type = nullptr;
   auto declared = ctx.GetVariableClassType(base_name);
   if (!declared.empty()) declared_type = ctx.FindClassType(declared);
-  WriteClassFieldChain(obj, declared_type, field_name, rhs_val, ctx,
-                       ctx.GetArena());
+  WriteClassFieldChain(obj, declared_type, field_name, rhs_val, ctx);
   base_var->NotifyWatchers();
   return true;
 }
