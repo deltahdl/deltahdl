@@ -136,6 +136,7 @@ add_library(deltahdl_lib STATIC
     simulator/statement_assign_core.cpp
     simulator/statement_assign_nonblocking.cpp
     simulator/lowerer.cpp
+    simulator/lowerer_child.cpp
     simulator/lowerer_inst.cpp
     simulator/lowerer_import.cpp
     simulator/vcd_writer.cpp

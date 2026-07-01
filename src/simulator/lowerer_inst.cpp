@@ -76,7 +76,13 @@ bool Lowerer::TryAliasInterfacePort(const RtlirModuleInst& inst,
   for (const auto& net : ifc->nets) {
     auto* alias =
         arena_.Create<std::string>(port_prefix + std::string(net.name));
-    ctx_.AliasNet(*alias, conn_prefix + std::string(net.name));
+    std::string target = conn_prefix + std::string(net.name);
+    // A net shares one storage between its net-map entry (driver resolution)
+    // and its variable-map entry (value reads). Alias both, like LowerAliases,
+    // so a continuous assign driven through the port reaches the shared net and
+    // the value is observable on the connected interface instance.
+    ctx_.AliasNet(*alias, target);
+    ctx_.AliasVariable(*alias, target);
   }
   return true;
 }

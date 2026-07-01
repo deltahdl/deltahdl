@@ -373,6 +373,7 @@ static void InitRtlirModuleHeader(RtlirModule* mod, const ModuleDecl* decl,
   mod->library = decl->library;
   mod->has_param_port_list = decl->has_param_port_list;
   mod->is_program = (decl->decl_kind == ModuleDeclKind::kProgram);
+  mod->is_interface = (decl->decl_kind == ModuleDeclKind::kInterface);
   mod->delay_mode = unit->delay_mode_directive;
   mod->attrs = ResolveAttributes(decl->attrs, diag);
 

@@ -14,6 +14,7 @@
 #include "simulator/awaiters.h"
 #include "simulator/class_object.h"
 #include "simulator/evaluation.h"
+#include "simulator/lowerer_child.h"
 #include "simulator/net.h"
 #include "simulator/process.h"
 #include "simulator/sequence_monitor.h"
@@ -632,9 +633,9 @@ void Lowerer::LowerAliases(const RtlirModule* mod) {
   }
 }
 
-static void RegisterInstanceKeyBinding(const std::string& inst_prefix,
-                                       std::string_view library,
-                                       std::string_view name, SimContext& ctx) {
+void RegisterInstanceKeyBinding(const std::string& inst_prefix,
+                                std::string_view library, std::string_view name,
+                                SimContext& ctx) {
   std::string key = inst_prefix;
   if (!key.empty() && key.back() == '.') key.pop_back();
   ctx.RegisterInstanceType(key, name);
@@ -662,7 +663,7 @@ static void RegisterModulePorts(const RtlirModule* mod, SimContext& ctx) {
   }
 }
 
-static void RegisterModuleSubroutines(const RtlirModule* mod, SimContext& ctx) {
+void RegisterModuleSubroutines(const RtlirModule* mod, SimContext& ctx) {
   for (auto* func : mod->function_decls) {
     ctx.RegisterFunction(func->name, func);
   }
@@ -844,78 +845,6 @@ void Lowerer::LowerContAssign(const RtlirContAssign& ca, bool from_program) {
   p->coro = MakeContAssignCoroutine(cap, ctx_, arena_).Release();
 
   ScheduleProcess(p, ctx_);
-}
-
-static void CreateChildModuleVariable(const std::string& inst_prefix,
-                                      const RtlirVariable& var, SimContext& ctx,
-                                      Arena& arena) {
-  auto* name = arena.Create<std::string>(inst_prefix + std::string(var.name));
-  uint32_t width = var.class_type_name.empty() ? var.width : 64;
-  if (var.is_real && width < 64) width = 64;
-  auto* v = ctx.CreateVariable(*name, width);
-  if (!var.is_4state && !var.is_event && !var.is_string && !var.is_chandle)
-    v->value = MakeLogic4VecVal(arena, width, 0);
-  if (var.is_chandle) v->value = MakeLogic4VecVal(arena, width, 0);
-  v->is_4state = var.is_4state;
-  if (var.is_event) v->is_event = true;
-  if (var.is_signed) v->is_signed = true;
-  if (var.init_expr) {
-    v->value = EvalExpr(var.init_expr, ctx, arena);
-  }
-}
-
-static void CreateChildModuleVariables(const std::string& inst_prefix,
-                                       const RtlirModule* resolved,
-                                       SimContext& ctx, Arena& arena) {
-  for (const auto& var : resolved->variables) {
-    CreateChildModuleVariable(inst_prefix, var, ctx, arena);
-  }
-}
-
-static void CreateChildModulePorts(const std::string& inst_prefix,
-                                   const RtlirModule* resolved, SimContext& ctx,
-                                   Arena& arena) {
-  for (const auto& port : resolved->ports) {
-    auto* name =
-        arena.Create<std::string>(inst_prefix + std::string(port.name));
-    if (!ctx.FindVariable(*name)) {
-      auto* v = ctx.CreateVariable(*name, port.width);
-      if (port.is_signed) v->is_signed = true;
-    }
-  }
-}
-
-void Lowerer::LowerChildModules(const RtlirModule* mod) {
-  for (const auto& child : mod->children) {
-    if (!child.resolved) continue;
-    auto saved_prefix = inst_prefix_;
-    auto child_prefix = inst_prefix_ + std::string(child.inst_name) + ".";
-    inst_prefix_ = child_prefix;
-
-    RegisterInstanceKeyBinding(inst_prefix_, child.resolved->library,
-                               child.resolved->name, ctx_);
-    LowerParams(child.resolved);
-    CreateChildModuleVariables(inst_prefix_, child.resolved, ctx_, arena_);
-    CreateChildModulePorts(inst_prefix_, child.resolved, ctx_, arena_);
-
-    // Port connections resolve in the parent scope (see LowerPortBindings),
-    // then restore the child prefix for the child's own body.
-    inst_prefix_ = saved_prefix;
-    LowerPortBindings(child, child.resolved->is_program);
-    inst_prefix_ = child_prefix;
-
-    uint32_t child_block_id =
-        child.resolved->is_program ? next_program_block_id_++ : 0;
-    LowerProcesses(child.resolved->processes, child.resolved->is_program,
-                   child_block_id);
-    for (const auto& ca : child.resolved->assigns) {
-      LowerContAssign(ca, child.resolved->is_program);
-    }
-
-    LowerChildModules(child.resolved);
-
-    inst_prefix_ = saved_prefix;
-  }
 }
 
 static void RegisterDesignTypeWidths(const RtlirDesign* design,

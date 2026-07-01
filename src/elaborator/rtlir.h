@@ -207,6 +207,7 @@ struct RtlirModule {
   std::string_view library;
   bool has_param_port_list = false;
   bool is_program = false;
+  bool is_interface = false;
   std::vector<ResolvedAttribute> attrs;
   DelayModeDirective delay_mode = DelayModeDirective::kNone;
 
