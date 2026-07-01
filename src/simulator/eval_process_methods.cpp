@@ -98,6 +98,28 @@ static void EvalProcessSuspend(Process* proc, SimContext& ctx, Arena& arena,
   out = MakeLogic4VecVal(arena, 1, 0);
 }
 
+// §9.7: drive a just-resumed process. Replay a delay wake that elapsed while it
+// was suspended (its handle was stashed by the DelayAwaiter), resuming the
+// exact parked continuation; if none is pending, the process was suspended
+// while not waiting on an elapsed delay, so drive it through its own coro
+// handle.
+static void DriveResumedProcess(Process* target, SimContext& ctx) {
+  if (!target->active) return;
+  if (target->pending_wake) {
+    auto h = target->pending_wake;
+    target->pending_wake = {};
+    if (!h.done()) {
+      ctx.SetCurrentProcess(target);
+      h.resume();
+    }
+    return;
+  }
+  if (!target->Done()) {
+    ctx.SetCurrentProcess(target);
+    target->Resume();
+  }
+}
+
 static void EvalProcessResume(Process* proc, SimContext& ctx, Arena& arena,
                               Logic4Vec& out) {
   if (IsRestrictedTarget(proc)) {
@@ -116,26 +138,7 @@ static void EvalProcessResume(Process* proc, SimContext& ctx, Arena& arena,
 
     auto* event = ctx.GetScheduler().GetEventPool().Acquire();
     Process* target = proc;
-    event->callback = [target, &ctx]() {
-      if (!target->active) return;
-      // §9.7: replay a delay wake that elapsed while suspended (its handle was
-      // stashed by the DelayAwaiter). This resumes the exact parked
-      // continuation. If none is pending the process was suspended while not
-      // waiting on an elapsed delay, so drive it through its own coro handle.
-      if (target->pending_wake) {
-        auto h = target->pending_wake;
-        target->pending_wake = {};
-        if (!h.done()) {
-          ctx.SetCurrentProcess(target);
-          h.resume();
-        }
-        return;
-      }
-      if (!target->Done()) {
-        ctx.SetCurrentProcess(target);
-        target->Resume();
-      }
-    };
+    event->callback = [target, &ctx]() { DriveResumedProcess(target, ctx); };
     ctx.GetScheduler().ScheduleEvent(ctx.CurrentTime(), Region::kActive, event);
   }
   out = MakeLogic4VecVal(arena, 1, 0);
