@@ -884,6 +884,14 @@ static void AttachCuMethodsToClasses(const RtlirDesign* design,
     auto* cls = ctx.FindClassType(item->method_class);
     if (!cls) continue;
     std::string name(item->name);
+    // 8.24: the out-of-block definition repeats neither the lifetime nor the
+    // static qualifier, so the body item parses with is_static false. Carry the
+    // static-ness forward from the in-class prototype before the body replaces
+    // it, so a class-scoped call (C#()::f()) still resolves it as static.
+    auto existing = cls->methods.find(name);
+    if (existing != cls->methods.end() && existing->second->is_static) {
+      item->is_static = true;
+    }
     cls->methods[name] = item;
   }
 }
