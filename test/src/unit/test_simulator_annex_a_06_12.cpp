@@ -28,6 +28,11 @@ TEST(RandsequenceSim, IfTrueBranchExecutes) {
 
 TEST(RandsequenceSim, ReturnTerminatesProduction) {
   SimFixture f;
+  // 18.17.6: a return aborts the generation of the *current* production only;
+  // the code after it in that production's block does not run, but sequence
+  // generation continues with the next production in the enclosing list. Here
+  // `first`'s `x = 8'd55` is skipped by the return (so x stays 10), yet
+  // `second` is still generated and adds 5, leaving x == 15.
   auto* var = RunRandseqAndFindVar(f,
                                    "module t;\n"
                                    "  logic [7:0] x;\n"
@@ -35,14 +40,15 @@ TEST(RandsequenceSim, ReturnTerminatesProduction) {
                                    "    x = 8'd0;\n"
                                    "    randsequence(main)\n"
                                    "      main : first second;\n"
-                                   "      first : { x = 8'd10; return; };\n"
-                                   "      second : { x = 8'd99; };\n"
+                                   "      first : { x = 8'd10; return; "
+                                   "x = 8'd55; };\n"
+                                   "      second : { x = x + 8'd5; };\n"
                                    "    endsequence\n"
                                    "  end\n"
                                    "endmodule\n",
                                    "x");
   ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 10u);
+  EXPECT_EQ(var->value.ToUint64(), 15u);
 }
 
 TEST(RandsequenceSim, CaseDefaultExecutes) {
