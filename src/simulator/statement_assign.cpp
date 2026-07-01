@@ -134,6 +134,48 @@ static bool WriteStructFieldBits(Variable* base_var, const StructTypeInfo* info,
   return true;
 }
 
+// Writes `field` onto class object `obj`, honoring declared-type scoping
+// (§8.15) when the type is known so a base field is written rather than a
+// shadowing derived one.
+static void SetClassField(ClassObject* obj, const ClassTypeInfo* declared_type,
+                          std::string_view field, const Logic4Vec& rhs_val) {
+  if (declared_type)
+    obj->SetPropertyForType(field, declared_type, rhs_val);
+  else
+    obj->SetProperty(std::string(field), rhs_val);
+}
+
+// Writes a (possibly chained) field path into class object `obj`. A chained
+// path `first.rest` (e.g. `a.val`) fetches `first` as a class handle and
+// recurses into the referenced object, so `o2.a.val = 88` reaches the same
+// Inner object shared by a shallow copy (§8.12) rather than creating a flat
+// "a.val" key on the outer object. Mirrors ResolveClassFieldChain on the read
+// side; the inner fields carry no declared-type shadowing context. When `first`
+// is not a live handle, the whole dotted path falls back to a flattened key
+// (the legacy nested-handle storage scheme).
+static void WriteClassFieldChain(ClassObject* obj,
+                                 const ClassTypeInfo* declared_type,
+                                 std::string_view field_path,
+                                 const Logic4Vec& rhs_val, SimContext& ctx,
+                                 Arena& arena) {
+  auto dot = field_path.find('.');
+  if (dot == std::string_view::npos) {
+    SetClassField(obj, declared_type, field_path, rhs_val);
+    return;
+  }
+  auto first = field_path.substr(0, dot);
+  auto rest = field_path.substr(dot + 1);
+  Logic4Vec handle_val =
+      declared_type ? obj->GetPropertyForType(first, declared_type, arena)
+                    : obj->GetProperty(first, arena);
+  auto* next_obj = ctx.GetClassObject(handle_val.ToUint64());
+  if (!next_obj) {
+    SetClassField(obj, declared_type, field_path, rhs_val);
+    return;
+  }
+  WriteClassFieldChain(next_obj, nullptr, rest, rhs_val, ctx, arena);
+}
+
 // Writes field_name into the class object referenced by base_var. Returns true
 // when base_var refers to a live class object (the write is always performed in
 // that case).
@@ -144,16 +186,11 @@ static bool WriteClassObjectField(Variable* base_var,
   auto handle = base_var->value.ToUint64();
   auto* obj = ctx.GetClassObject(handle);
   if (!obj) return false;
+  const ClassTypeInfo* declared_type = nullptr;
   auto declared = ctx.GetVariableClassType(base_name);
-  if (!declared.empty()) {
-    auto* declared_type = ctx.FindClassType(declared);
-    if (declared_type) {
-      obj->SetPropertyForType(field_name, declared_type, rhs_val);
-      base_var->NotifyWatchers();
-      return true;
-    }
-  }
-  obj->SetProperty(std::string(field_name), rhs_val);
+  if (!declared.empty()) declared_type = ctx.FindClassType(declared);
+  WriteClassFieldChain(obj, declared_type, field_name, rhs_val, ctx,
+                       ctx.GetArena());
   base_var->NotifyWatchers();
   return true;
 }
