@@ -10,6 +10,7 @@
 #include "lexer/token.h"
 #include "parser/ast.h"
 #include "simulator/class_object.h"
+#include "simulator/clocking.h"
 #include "simulator/eval_array.h"
 #include "simulator/eval_expr_internal.h"
 #include "simulator/eval_string.h"
@@ -430,6 +431,24 @@ static bool TryEventSequenceMethod(const MemberAccess& ma, Logic4Vec& out) {
   return false;
 }
 
+// §14.13: reading a clockvar (cb.data) yields the value sampled at the clocking
+// block's most recent input event, not the signal's live value.
+// ResolveClockingMember confirms `base_name` names a clocking block carrying
+// signal `field_name` and yields the underlying variable for its width. Returns
+// true and fills `out` when the access resolved to a clockvar.
+static bool TryClockvarMemberAccess(std::string_view base_name,
+                                    std::string_view field_name,
+                                    SimContext& ctx, Arena& arena,
+                                    Logic4Vec& out) {
+  auto* mgr = ctx.GetClockingManager();
+  if (!mgr) return false;
+  auto* sig_var = mgr->ResolveClockingMember(base_name, field_name, ctx);
+  if (!sig_var) return false;
+  uint64_t sampled = mgr->GetSampledValue(base_name, field_name);
+  out = MakeLogic4VecVal(arena, sig_var->value.width, sampled);
+  return true;
+}
+
 static Logic4Vec ResolveMemberByType(std::string_view base_name,
                                      std::string_view field_name,
                                      SimContext& ctx, Arena& arena) {
@@ -461,6 +480,8 @@ static Logic4Vec ResolveMemberByType(std::string_view base_name,
   if (TryCollectionAccess(base_name, field_name, ctx, arena, out)) return out;
   if (TryEvalEnumProperty(base_name, field_name, ctx, arena, out)) return out;
   if (TryStaticMemberAccess(base_name, field_name, ctx, arena, out)) return out;
+  if (TryClockvarMemberAccess(base_name, field_name, ctx, arena, out))
+    return out;
   return MakeLogic4Vec(arena, 1);
 }
 
