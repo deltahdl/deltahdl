@@ -469,6 +469,13 @@ void Lowerer::LowerVarInit(const RtlirVariable& var, Variable* v,
     val = MakeLogic4VecVal(arena_, width, val.ToUint64());
 
   if (var.is_string) val = StripStringZeros(val, arena_);
+  // §6.11.2: assigning a 4-state initializer to a 2-state variable is an
+  // automatic conversion, so unknown/high-impedance bits become zero. The
+  // width-mismatch branch above already drops them via the numeric
+  // projection; this also covers the matching-width case.
+  if (!var.is_4state && !var.is_string && !var.is_real && !var.is_event &&
+      !var.is_chandle)
+    CoerceTo2State(val);
   v->value = val;
 }
 

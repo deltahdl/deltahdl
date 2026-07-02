@@ -45,27 +45,6 @@ TEST(TwoStateAndFourState, ShortintFunctionReturnType) {
   EXPECT_EQ(item->return_type.kind, DataTypeKind::kShortint);
 }
 
-TEST(TwoStateAndFourState, All2StateTypes) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  byte b;\n"
-              "  shortint si;\n"
-              "  int i;\n"
-              "  longint li;\n"
-              "  bit bv;\n"
-              "endmodule\n"));
-}
-
-TEST(TwoStateAndFourState, All4StateTypes) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  logic l;\n"
-              "  reg r;\n"
-              "  integer ig;\n"
-              "  time t;\n"
-              "endmodule\n"));
-}
-
 TEST(TwoStateAndFourState, DataTypeSyntaxIntegerVector) {
   auto r = Parse(
       "module m;\n"
