@@ -60,6 +60,58 @@ TEST(UnpackedArrayConcatElaboration, ArrayItemExpansion) {
   EXPECT_EQ(c3->value.ToUint64(), 40u);
 }
 
+// §10.10: a `{...}` concatenation initializing an unpacked/dynamic/queue array
+// *declaration* is an unpacked array concatenation, where unsized integer
+// literals are legal (unlike a packed §11.4.12 concatenation). The declaration-
+// initializer path is distinct from the procedural-assignment path above, and
+// previously applied the packed unsized-constant check, rejecting these.
+TEST(UnpackedArrayConcatElaboration, DynamicArrayDeclInitUnsizedLiterals) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  byte b[] = { 1, 2, 3, 4 };\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(UnpackedArrayConcatElaboration, QueueDeclInitUnsizedLiterals) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  int q[$] = { 10, 20, 30 };\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(UnpackedArrayConcatElaboration, FixedArrayDeclInitUnsizedLiterals) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  int a[3] = { 4, 5, 6 };\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// Negative guard: a `{...}` initializing a plain packed vector (not an array)
+// is a genuine §11.4.12 packed concatenation, where unsized constants remain
+// illegal. The declaration-initializer exception must not swallow this.
+TEST(UnpackedArrayConcatElaboration, PackedVectorDeclInitUnsizedStillErrors) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] x = { 1, 2 };\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_TRUE(f.has_errors);
+}
+
 TEST(UnpackedArrayConcatElaboration, AssociativeArrayTargetError) {
   ElabFixture f;
   auto* design = ElaborateSrc(

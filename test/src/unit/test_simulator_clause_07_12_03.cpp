@@ -357,6 +357,28 @@ TEST(ArrayReduction, SumIntegration) {
   EXPECT_EQ(f.ctx.FindVariable("total")->value.ToUint64(), 60u);
 }
 
+// §10.10/§7.12.3 end-to-end: a dynamic array initialized with an unsized-
+// literal `{...}` concatenation (as opposed to a fixed array with an `'{...}`
+// assignment pattern) must elaborate, lower into a populated queue, and reduce
+// correctly. This is the exact full-pipeline seam the isolated reduction tests
+// (hand-built SimContext) and the fixed-array `'{...}` Integration tests miss.
+TEST(ArrayReduction, DynamicArrayConcatInitSumIntegration) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  byte b[] = { 1, 2, 3, 4 };\n"
+      "  int y;\n"
+      "  initial y = b.sum;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_EQ(f.ctx.FindVariable("y")->value.ToUint64(), 10u);
+}
+
 TEST(ArrayReduction, ProductIntegration) {
   SimFixture f;
   auto* design = ElaborateSrc(
