@@ -307,4 +307,46 @@ TEST(PackedArrayValidation, PackedDimOnPackedStruct_Allowed) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
+TEST(PackedArrayValidation, PackedDimParameterBoundWidth) {
+  // Each packed-dimension bound is a constant expression that may be any
+  // integer value; a parameter is such a constant. `logic [W-1:0]` with W==8
+  // must elaborate to an 8-bit vector, i.e. the parameter bound is evaluated
+  // rather than ignored. (The literal-bound form is PackedDimElaboratesWidth.)
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  parameter integer W = 8;\n"
+      "  logic [W-1:0] x;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+  auto* mod = design->top_modules[0];
+  const RtlirVariable* x = nullptr;
+  for (const auto& v : mod->variables)
+    if (v.name == "x") x = &v;
+  ASSERT_NE(x, nullptr);
+  EXPECT_EQ(x->width, 8u);
+}
+
+TEST(PackedArrayValidation, PackedDimLocalparamBoundWidth) {
+  // A localparam bound is likewise a constant expression and takes the
+  // localparam evaluation path rather than the parameter one.
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  localparam integer W = 8;\n"
+      "  logic [W-1:0] x;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+  auto* mod = design->top_modules[0];
+  const RtlirVariable* x = nullptr;
+  for (const auto& v : mod->variables)
+    if (v.name == "x") x = &v;
+  ASSERT_NE(x, nullptr);
+  EXPECT_EQ(x->width, 8u);
+}
+
 }  // namespace

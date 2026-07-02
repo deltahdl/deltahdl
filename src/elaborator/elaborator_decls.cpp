@@ -888,11 +888,31 @@ static bool IsIntegerAtomKind(DataTypeKind kind) {
   }
 }
 
+// §11.5.1 / §7.4.1: a packed structure or packed union presents as a single
+// contiguous vector, and §11.5.1 lists a packed structure among the operands a
+// bit-select or part-select may address. A variable of packed aggregate type is
+// therefore freely bit/part-selectable and must not be treated as a scalar,
+// even though it carries no explicit packed dimension of its own. Named types
+// are followed through the typedef map to the underlying aggregate.
+static bool IsPackedAggregateVar(const DataType& dtype,
+                                 const TypedefMap& typedefs) {
+  const DataType* d = &dtype;
+  for (int hops = 0; hops < 16 && d->kind == DataTypeKind::kNamed; ++hops) {
+    auto it = typedefs.find(d->type_name);
+    if (it == typedefs.end()) return false;
+    d = &it->second;
+  }
+  return (d->kind == DataTypeKind::kStruct ||
+          d->kind == DataTypeKind::kUnion) &&
+         (d->is_packed || d->is_soft);
+}
+
 // §6.11 / §6.20: record the bookkeeping name tables for a variable declaration
 // (const-ness, type kind, scalar/packed-array shape, named type) before the
 // RtlirVariable is built.
 static void RegisterVarDeclNames(const ModuleItem* item,
-                                 VarDeclNameTables tables, DiagEngine& diag) {
+                                 VarDeclNameTables tables,
+                                 const TypedefMap& typedefs, DiagEngine& diag) {
   if (item->data_type.is_const) {
     if (!item->init_expr) {
       diag.Error(
@@ -911,7 +931,8 @@ static void RegisterVarDeclNames(const ModuleItem* item,
   if (item->unpacked_dims.empty()) {
     if (item->data_type.packed_dim_left)
       tables.packed_array_vars.insert(item->name);
-    else if (!IsIntegerAtomKind(item->data_type.kind))
+    else if (!IsIntegerAtomKind(item->data_type.kind) &&
+             !IsPackedAggregateVar(item->data_type, typedefs))
       tables.scalar_var_names.insert(item->name);
   }
   if (item->data_type.kind == DataTypeKind::kNamed)
@@ -1002,7 +1023,7 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
       item,
       {const_names_, const_var_names_, var_types_, scalar_var_names_,
        packed_array_vars_, var_named_types_},
-      diag_);
+      typedefs_, diag_);
   // §10.10.1 / §11.2.2: keep the named-type association for a variable that
   // adopted a typedef array's dimensions above; rewriting it to a non-named
   // base type kept RegisterVarDeclNames from recording it, but aggregate

@@ -218,3 +218,141 @@ TEST(SelectElaboration, RealParameterSelectError) {
       f);
   EXPECT_TRUE(f.diag.HasErrors());
 }
+
+// §11.5.1 lists a packed structure among the operands a bit-select may
+// address. A packed struct presents as a single contiguous vector, so a
+// bit-select of it must elaborate without the "select of a scalar" error.
+TEST(SelectElaboration, PackedStructBitSelectIsLegal) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  struct packed { logic [3:0] hi; logic [3:0] lo; } s;\n"
+      "  logic b;\n"
+      "  initial b = s[0];\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+// §11.5.1: the same operand rule admits a part-select of a packed structure.
+TEST(SelectElaboration, PackedStructPartSelectIsLegal) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  struct packed { logic [3:0] hi; logic [3:0] lo; } s;\n"
+      "  logic [3:0] y;\n"
+      "  initial y = s[7:4];\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+// §11.5.1/§7.4.1: the packed-structure select base is reached through a
+// typedef as well -- a named packed struct type is still a single vector and
+// remains part-selectable.
+TEST(SelectElaboration, NamedPackedStructPartSelectIsLegal) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  typedef struct packed { logic [3:0] hi; logic [3:0] lo; } s_t;\n"
+      "  s_t s;\n"
+      "  logic [3:0] y;\n"
+      "  initial y = s[7:4];\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+// §11.5.1: a packed union likewise collapses to a single vector, so a
+// part-select of a packed union is a legal select base.
+TEST(SelectElaboration, PackedUnionPartSelectIsLegal) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  union packed { logic [7:0] a; logic [7:0] b; } u;\n"
+      "  logic [3:0] y;\n"
+      "  initial y = u[7:4];\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+// §11.5.1 negative: an unpacked structure is not a single vector, so a
+// bit-select of it stays illegal. Confirms the packed-aggregate allowance is
+// narrow and does not leak to unpacked aggregates.
+TEST(SelectElaboration, UnpackedStructBitSelectIsIllegal) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  struct { logic [3:0] hi; logic [3:0] lo; } s;\n"
+      "  logic b;\n"
+      "  initial b = s[0];\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+// §11.5.1/§11.2.1: the indexed part-select width is a constant expression,
+// which a localparam satisfies just as a parameter does. It must resolve in the
+// module's constant scope rather than be rejected as non-constant (the
+// parameter form is covered separately by
+// IndexedPartSelectWidthParameterAccepted).
+TEST(SelectElaboration, IndexedPartSelectWidthLocalparamAccepted) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  localparam integer c = 3;\n"
+      "  logic [15:0] data;\n"
+      "  logic [7:0] y;\n"
+      "  initial y = data[1+:c];\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §11.5.1: a bit-select of a real-typed variable is illegal, and the rule
+// covers the whole real family -- shortreal is a real type just as `real` is.
+TEST(SelectElaboration, ShortrealVariableBitSelectError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  shortreal r;\n"
+      "  logic y;\n"
+      "  assign y = r[0];\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+// §11.5.1: realtime is likewise a real type, so selecting from it is illegal.
+TEST(SelectElaboration, RealtimeVariableBitSelectError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  realtime r;\n"
+      "  logic y;\n"
+      "  assign y = r[0];\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+// §11.5.1: for an ascending [0:15] declaration the smaller index names the more
+// significant bit, so data[7:0] reverses the required ordering and is illegal
+// (the descending-declaration form is covered by PartSelectReversedOrderError).
+TEST(SelectElaboration, AscendingDeclReversedPartSelectError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  logic [0:15] data;\n"
+      "  logic [7:0] y;\n"
+      "  assign y = data[7:0];\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
