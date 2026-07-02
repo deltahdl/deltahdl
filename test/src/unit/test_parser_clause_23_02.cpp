@@ -30,6 +30,14 @@ TEST(ModuleDeclarations, ModuleKeywordWithoutNameIsRejected) {
   EXPECT_TRUE(r.has_errors);
 }
 
+TEST(ModuleDeclarations, MacromoduleKeywordWithoutNameIsRejected) {
+  // The name requirement applies equally on the interchangeable `macromodule`
+  // path: with no identifier after the keyword the definition must be
+  // diagnosed rather than accepted with an empty name.
+  auto r = Parse("macromodule ; endmodule");
+  EXPECT_TRUE(r.has_errors);
+}
+
 TEST(ModuleDefinitions, ModuleWithoutEndmoduleIsRejected) {
   // The closing keyword is mandatory: a definition that opens with `module`
   // but is never terminated must be diagnosed rather than silently accepted.
