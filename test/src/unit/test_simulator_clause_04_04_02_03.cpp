@@ -181,17 +181,25 @@ TEST(InactiveRegionSim, InactiveRegionHoldsMultipleEvents) {
   EXPECT_EQ(count, 5);
 }
 
-TEST(InactiveRegionSim, ZeroDelaySuspendsProcessAndResumesViaInactive) {
+// §4.4.2.3: an explicit #0 suspends the running process into the Inactive
+// region so that every other Active event of the current time slot drains
+// before it resumes in the next Inactive->Active iteration. The reader initial
+// is declared first, so it activates first (declaration-order FIFO in the
+// Active region); its #0 must let the later writer initial run before the read
+// is observed. A no-op #0 would read the pre-write value instead, so `seen`
+// distinguishes the two.
+TEST(InactiveRegionSim, ZeroDelayYieldsToOtherActiveProcessesBeforeResuming) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
-      "  logic [7:0] b, snap;\n"
+      "  logic [7:0] shared, seen;\n"
       "  initial begin\n"
-      "    b = 8'd0;\n"
-      "    snap = 8'd0;\n"
-      "    b <= 8'd9;\n"
+      "    seen = 8'd0;\n"
       "    #0;\n"
-      "    snap = b;\n"
+      "    seen = shared;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    shared = 8'd42;\n"
       "  end\n"
       "endmodule\n",
       f);
@@ -199,7 +207,34 @@ TEST(InactiveRegionSim, ZeroDelaySuspendsProcessAndResumesViaInactive) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  EXPECT_EQ(f.ctx.FindVariable("snap")->value.ToUint64(), 0u);
-  EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 9u);
+  EXPECT_EQ(f.ctx.FindVariable("seen")->value.ToUint64(), 42u);
   EXPECT_EQ(f.scheduler.CurrentTime().ticks, 0u);
+}
+
+// §4.4.2.3 negative/discriminating form: the Inactive-region resume is specific
+// to an *explicit #0*. The closest input that must be handled differently is a
+// nonzero delay, which suspends the process to a *later* time slot rather than
+// the current slot's Inactive region. Here #1 must advance simulation time, so
+// the post-delay write lands at time 1 -- an implementation that funneled every
+// delay into the current-slot Inactive region (mistreating #1 as #0) would
+// leave the clock at 0. Observing ticks==1 proves the rule keys on zero
+// specifically.
+TEST(InactiveRegionSim, NonzeroDelayAdvancesTimeInsteadOfInactiveResume) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] snap;\n"
+      "  initial begin\n"
+      "    snap = 8'd0;\n"
+      "    #1;\n"
+      "    snap = 8'd7;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_EQ(f.ctx.FindVariable("snap")->value.ToUint64(), 7u);
+  EXPECT_EQ(f.scheduler.CurrentTime().ticks, 1u);
 }
