@@ -13,33 +13,11 @@
 
 using namespace delta;
 
-TEST(ReNbaRegionSim, ReNBAExecutesAfterReInactive) {
-  VerifyTwoRegionOrder({Region::kReInactive, "reinactive"},
-                       {Region::kReNBA, "renba"});
-}
-
-TEST(ReNbaRegionSim, AllReInactiveEventsCompleteBeforeReNBA) {
-  Arena arena;
-  Scheduler sched(arena);
-  std::vector<std::string> order;
-
-  for (int i = 0; i < 3; ++i) {
-    auto* ev = sched.GetEventPool().Acquire();
-    ev->callback = [&order, i]() {
-      order.push_back("reinactive" + std::to_string(i));
-    };
-    sched.ScheduleEvent({0}, Region::kReInactive, ev);
-  }
-
-  auto* renba = sched.GetEventPool().Acquire();
-  renba->callback = [&]() { order.push_back("renba"); };
-  sched.ScheduleEvent({0}, Region::kReNBA, renba);
-
-  sched.Run();
-  ASSERT_EQ(order.size(), 4u);
-
-  EXPECT_EQ(order[3], "renba");
-}
+// D1 (Re-NBA drains after all Re-Inactive) is covered by the stronger
+// four-region order test below and by the mid-drain test, which asserts the
+// same reinactive<renba relation over both statically and dynamically
+// scheduled Re-Inactive events; standalone pairwise/batch variants were
+// redundant and were removed (mirrors the §4.4.2.4 NBA suite dedup).
 
 TEST(ReNbaRegionSim, ReNBAToReactiveIteration) {
   VerifyIterationChain(Region::kReactive, "reactive", Region::kReNBA, "renba");
@@ -135,6 +113,65 @@ TEST(ReNbaRegionSim,
   f.scheduler.Run();
   EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 99u);
   EXPECT_EQ(f.scheduler.CurrentTime().ticks, 5u);
+}
+
+// D2, array-concatenation nonblocking-assign form: an unpacked-array target
+// assigned a concatenation from within a reactive-set process (program block)
+// still defers its per-element updates to the Re-NBA region. Exercises the
+// distinct array-concat routing site in production. Discriminates deferral: a
+// blocking write to mem[0] after the nonblocking assign is overwritten by the
+// deferred Re-NBA update (mem[0] ends at 10, not the later blocking 7).
+TEST(ReNbaRegionSim,
+     ArrayConcatNonblockingAssignFromReactiveSetSchedulesReNBA) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  logic [7:0] mem [0:1];\n"
+      "  program p;\n"
+      "    initial begin\n"
+      "      mem[0] = 8'd1;\n"
+      "      mem[1] = 8'd2;\n"
+      "      mem <= {8'd10, 8'd20};\n"
+      "      mem[0] = 8'd7;\n"
+      "    end\n"
+      "  endprogram\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_EQ(f.ctx.FindVariable("mem[0]")->value.ToUint64(), 10u);
+  EXPECT_EQ(f.ctx.FindVariable("mem[1]")->value.ToUint64(), 20u);
+}
+
+// D2, streaming-concatenation nonblocking-assign form (§11.4.14.3): a streaming
+// target of a nonblocking assign executed in a reactive-set process defers its
+// reverse (unpack) writes to the Re-NBA region. Exercises the distinct
+// streaming routing site in production. Discriminates deferral: the later
+// blocking write to `a` is overwritten by the deferred Re-NBA unpack, so `a`
+// ends at the unpacked 0xAB rather than the blocking 9.
+TEST(ReNbaRegionSim,
+     StreamingConcatNonblockingAssignFromReactiveSetSchedulesReNBA) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  logic [7:0] a, b;\n"
+      "  program p;\n"
+      "    initial begin\n"
+      "      a = 8'd1;\n"
+      "      {>> {a, b}} <= 16'hABCD;\n"
+      "      a = 8'd9;\n"
+      "    end\n"
+      "  endprogram\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_EQ(f.ctx.FindVariable("a")->value.ToUint64(), 0xABu);
+  EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 0xCDu);
 }
 
 TEST(ReNbaRegionSim, ReNBAIsReactiveSetDualOfNBA) {
