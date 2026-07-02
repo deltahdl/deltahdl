@@ -134,4 +134,25 @@ TEST(ScopeAndLifetimeSimulation, DefaultLifetimeInAutoModuleIsAutomatic) {
   EXPECT_EQ(val, 1u);
 }
 
+TEST(ScopeAndLifetimeSimulation, UnnamedBlockVarVisibleToNestedBlock) {
+  // §6.21: a variable declared in an unnamed block is visible both to that
+  // block and to any nested block below it. Here `outer` is declared in the
+  // initial block and then read and written from an inner unnamed block; the
+  // write must land on that same variable, so the enclosing block observes 15
+  // (5 + 10), not the original 5.
+  auto val = RunAndGet(
+      "module t;\n"
+      "  int observed;\n"
+      "  initial begin\n"
+      "    int outer = 5;\n"
+      "    begin\n"
+      "      outer = outer + 10;\n"
+      "    end\n"
+      "    observed = outer;\n"
+      "  end\n"
+      "endmodule\n",
+      "observed");
+  EXPECT_EQ(val, 15u);
+}
+
 }  // namespace

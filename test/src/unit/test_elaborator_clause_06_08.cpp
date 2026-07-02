@@ -192,6 +192,33 @@ TEST(VarDecl, TypeRefInVarDeclWithVarOk) {
              "endmodule\n"));
 }
 
+TEST(VarDecl, IntegerAtomTypesAreSignedByDefault) {
+  // §6.8: only signed types retain the significance of the sign; byte,
+  // shortint, int, integer, and longint are signed by default, while vector
+  // types (bit/logic/reg) are unsigned unless explicitly declared signed.
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  byte a;\n"
+      "  shortint b;\n"
+      "  int c;\n"
+      "  integer d;\n"
+      "  longint e;\n"
+      "  bit [7:0] u;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_GE(mod->variables.size(), 6u);
+  EXPECT_TRUE(mod->variables[0].is_signed);   // byte
+  EXPECT_TRUE(mod->variables[1].is_signed);   // shortint
+  EXPECT_TRUE(mod->variables[2].is_signed);   // int
+  EXPECT_TRUE(mod->variables[3].is_signed);   // integer
+  EXPECT_TRUE(mod->variables[4].is_signed);   // longint
+  EXPECT_FALSE(mod->variables[5].is_signed);  // bit -> unsigned by default
+}
+
 TEST(VarDecl, VarBytePrefixEquivalentToBareByte) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -207,6 +234,26 @@ TEST(VarDecl, VarBytePrefixEquivalentToBareByte) {
   EXPECT_EQ(mod->variables[0].width, mod->variables[1].width);
   EXPECT_EQ(mod->variables[0].is_signed, mod->variables[1].is_signed);
   EXPECT_EQ(mod->variables[0].is_4state, mod->variables[1].is_4state);
+}
+
+TEST(VarDecl, VarSigningOnlyElaboratesAsSignedLogic) {
+  // §6.8: with the var keyword and only signing/range specified, the data type
+  // is implicitly logic. `var signed [7:0]` therefore elaborates to a 4-state
+  // (logic) 8-bit variable that also carries the signed qualifier -- the range-
+  // only form (VarRangeOnlyEquivalentToVarLogic) stays unsigned by contrast.
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  var signed [7:0] v;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_FALSE(mod->variables.empty());
+  EXPECT_TRUE(mod->variables[0].is_4state);
+  EXPECT_TRUE(mod->variables[0].is_signed);
+  EXPECT_EQ(mod->variables[0].width, 8u);
 }
 
 TEST(VarDecl, VarRangeOnlyEquivalentToVarLogic) {

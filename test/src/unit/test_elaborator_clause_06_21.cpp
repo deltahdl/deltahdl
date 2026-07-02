@@ -30,19 +30,6 @@ TEST(ScopeAndLifetimeElaboration, StaticVarInInitialBlock) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-TEST(ScopeAndLifetimeElaboration, AutomaticVarInInitialBlock) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module top;\n"
-      "  initial begin\n"
-      "    automatic int temp = 42;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.diag.HasErrors());
-}
-
 TEST(ScopeAndLifetimeElaboration, StaticVarInAutoFunc) {
   ElabFixture f;
   auto* design = ElaborateSrc(

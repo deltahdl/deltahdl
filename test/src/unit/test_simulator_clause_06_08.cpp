@@ -234,6 +234,74 @@ TEST(VariableDeclaration, StaticInitializerWithClassNew) {
   EXPECT_EQ(val, 42u);
 }
 
+TEST(VariableDeclaration,
+     EnumImplicitBaseDefaultsToBaseTypeZeroNotFirstMember) {
+  // Table 6-7: an enumeration's default initial value is its base type's
+  // default value, NOT its first enumerator. With no explicit base the base
+  // type is int (2-state), whose default is 0 -- even though the first
+  // enumerator here is 5. Observing 0 (rather than 5) exercises exactly this
+  // rule.
+  LowerFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  enum { A = 5, B } e;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+
+  auto* var = f.ctx.FindVariable("e");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.words[0].aval, 0u);
+  EXPECT_EQ(var->value.words[0].bval, 0u);
+}
+
+TEST(VariableDeclaration, Enum4StateBaseDefaultsToX) {
+  // Table 6-7: an enumeration inherits its base type's default. A 4-state base
+  // (logic) makes the default x, distinguishing it from a 2-state-base enum
+  // whose default is 0. x is Convention A (aval=bval=1) per bit.
+  LowerFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  enum logic [1:0] { A, B } e;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+
+  auto* var = f.ctx.FindVariable("e");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.words[0].bval & 0x3u, 0x3u);
+}
+
+TEST(VariableDeclaration, ClassHandleDefaultIsNull) {
+  // Table 6-7: a class-handle variable with no initializer defaults to null,
+  // encoded as an all-zero handle (aval=bval=0) -- the same null encoding used
+  // for chandle.
+  LowerFixture f;
+  auto* design = ElaborateSrc(
+      "class C;\n"
+      "  int v;\n"
+      "endclass\n"
+      "module t;\n"
+      "  C h;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+
+  auto* var = f.ctx.FindVariable("h");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.words[0].aval, 0u);
+  EXPECT_EQ(var->value.words[0].bval, 0u);
+}
+
 TEST(VariableDeclaration, VariableStoresValueBetweenAssignmentAndRead) {
   auto val = RunAndGet(
       "module t;\n"

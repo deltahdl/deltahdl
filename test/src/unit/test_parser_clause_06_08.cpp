@@ -285,6 +285,25 @@ TEST(DataTypeParsing, VarImplicitLogicWithRange) {
   EXPECT_EQ(item->data_type.packed_dim_left->int_val, 15u);
 }
 
+TEST(DataTypeParsing, VarSignedRangeImplicitType) {
+  // §6.8: after the var keyword the data type is optional; specifying only a
+  // range and/or signing leaves the type implicit (resolved to logic during
+  // elaboration) while the signed qualifier is captured on the declaration.
+  auto r = Parse(
+      "module t;\n"
+      "  var signed [7:0] v;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kImplicit);
+  EXPECT_TRUE(item->data_type.is_signed);
+  ASSERT_NE(item->data_type.packed_dim_left, nullptr);
+  EXPECT_EQ(item->name, "v");
+}
+
 TEST(DataTypeParsing, MixedScalarAndArrayDecl) {
   auto r = Parse(
       "module t;\n"
