@@ -336,6 +336,30 @@ TEST(FunctionElaboration, FunctionWithForkJoinAnyError) {
   EXPECT_TRUE(f.has_errors);
 }
 
+// §13.4 rule a) enumerates fork-join and fork-join_any (alongside #, ##, @,
+// wait, wait fork, wait_order, and expect) as the time-controlling statements a
+// function shall not contain. fork-join_none is deliberately absent from that
+// list: it spawns background processes without suspending the enclosing
+// function, so it stays legal. This is the same restriction §9.3.2 refers to
+// when it notes that a parallel block has restricted usage inside function
+// calls (see 13.4). This positive case makes the negative fork-join and
+// fork-join_any tests above discriminating on the join keyword rather than on
+// the mere presence of a fork.
+TEST(FunctionElaboration, FunctionWithForkJoinNoneIsOk) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  function void f();\n"
+      "    fork\n"
+      "      ;\n"
+      "    join_none\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 TEST(FunctionElaboration, FunctionMayCallProcessKill) {
   ElabFixture f;
   auto* design = ElaborateSrc(

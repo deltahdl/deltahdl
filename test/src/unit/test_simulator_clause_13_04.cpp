@@ -59,6 +59,29 @@ TEST(FunctionSim, FunctionEmptyBody) {
   EXPECT_EQ(val, 6u);
 }
 
+// §13.4 p.341 argument-direction table: an inout formal copies the actual's
+// value in at the start of the call and copies the formal's value back out at
+// the end. Reading the incoming value (41) and writing an updated value back
+// exercises both halves — a missing copy-in would start from the default and a
+// missing copy-out would leave x at 41, so x==42 discriminates both. Input
+// (copy-in) and output (copy-out) are already observed by FunctionWithLocalVars
+// and FunctionMultipleStatements; this closes the remaining inout input form.
+TEST(FunctionSim, FunctionInoutArgCopiesInAndOut) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  function void bump(inout logic [7:0] v);\n"
+      "    v = v + 8'd1;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    x = 8'd41;\n"
+      "    bump(x);\n"
+      "  end\n"
+      "endmodule\n",
+      "x");
+  EXPECT_EQ(val, 42u);
+}
+
 TEST(FunctionSim, FunctionMultipleStatements) {
   auto val = RunAndGet(
       "module t;\n"
