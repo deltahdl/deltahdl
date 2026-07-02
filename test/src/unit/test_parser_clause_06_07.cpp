@@ -4,16 +4,6 @@ using namespace delta;
 
 namespace {
 
-TEST(NetDeclarationSyntax, BuiltinNetTypeAlternative) {
-  auto r = Parse("module m; wire w; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto& items = r.cu->modules[0]->items;
-  ASSERT_EQ(items.size(), 1u);
-  EXPECT_EQ(items[0]->kind, ModuleItemKind::kNetDecl);
-  EXPECT_TRUE(items[0]->data_type.is_net);
-}
-
 TEST(NetDeclarationSyntax, EachNetTypeKeywordRecognized) {
   auto r = Parse(
       "module m;\n"
