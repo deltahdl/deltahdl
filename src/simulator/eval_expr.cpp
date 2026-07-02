@@ -511,6 +511,10 @@ static bool TryVirtualInterfaceMember(const Expr* expr, SimContext& ctx,
 }
 
 Logic4Vec EvalMemberAccess(const Expr* expr, SimContext& ctx, Arena& arena) {
+  Logic4Vec reduce_out;
+  if (TryEvalArrayReductionWithClause(expr, ctx, arena, reduce_out))
+    return reduce_out;
+
   Logic4Vec vif_out;
   if (TryVirtualInterfaceMember(expr, ctx, arena, vif_out)) return vif_out;
 

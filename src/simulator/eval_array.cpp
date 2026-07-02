@@ -223,9 +223,15 @@ static uint64_t ApplyReduction(std::string_view method,
   return 0;
 }
 
+// Reduces the values produced by the with-clause expression of `expr` for each
+// element of the named array (§7.12.3). `method` selects the fold and is passed
+// explicitly so this serves both the parenthesized call form (method name on
+// expr->lhs->rhs) and the bare member-access form `arr.sum with (e)` (method
+// name on expr->rhs). The result takes the width of the with expression.
 static Logic4Vec ReduceWithExpr(std::string_view var_name,
                                 const ArrayInfo& info, const Expr* expr,
-                                SimContext& ctx, Arena& arena) {
+                                std::string_view method, SimContext& ctx,
+                                Arena& arena) {
   auto elems = CollectVecElements(var_name, info, ctx, arena);
   auto names = ExtractIterNames(expr);
   WithIterEnv env{names.iter_name, names.idx_var_name, ctx, arena};
@@ -234,7 +240,6 @@ static Logic4Vec ReduceWithExpr(std::string_view var_name,
   auto vals = EvalReduceWithValues(elems, expr, env, result_width);
   if (result_width == 0) result_width = info.elem_width;
 
-  std::string_view method = expr->lhs->rhs->text;
   uint64_t result = ApplyReduction(method, vals);
   return MakeLogic4VecVal(arena, result_width, result);
 }
@@ -276,6 +281,67 @@ static bool IsReductionMethod(std::string_view method) {
          method == "or" || method == "xor";
 }
 
+// Resolves the ArrayInfo a reduction should read. Registered fixed and dynamic
+// arrays return their own info. A queue ([$]) is not registered as ArrayInfo,
+// but §7.12.3 reduction methods apply to any unpacked integral array; when a
+// reduction is requested on a queue, present a dynamic-array view backed by the
+// queue's elements so the shared reduction path reads them. `scratch` provides
+// storage for that synthesized view. Non-reduction methods on a queue return
+// nullptr so they fall through to the dedicated queue dispatch.
+static const ArrayInfo* ArrayInfoForReduction(std::string_view var_name,
+                                              std::string_view method,
+                                              SimContext& ctx,
+                                              ArrayInfo& scratch) {
+  if (auto* info = ctx.FindArrayInfo(var_name)) return info;
+  if (!IsReductionMethod(method)) return nullptr;
+  if (auto* q = ctx.FindQueue(var_name)) {
+    scratch.is_dynamic = true;
+    scratch.elem_width = q->elem_width;
+    scratch.size = static_cast<uint32_t>(q->elements.size());
+    return &scratch;
+  }
+  return nullptr;
+}
+
+// §7.12.3: an associative array is an unpacked array of integral values, so the
+// reduction methods apply to its stored elements. Collect them in key order
+// (int- or string-keyed); the supported operators are commutative, so the
+// unspecified iteration order does not affect the result.
+static std::vector<Logic4Vec> CollectAssocElements(const AssocArrayObject* aa) {
+  std::vector<Logic4Vec> vals;
+  if (aa->is_string_key) {
+    for (const auto& [key, val] : aa->str_data) vals.push_back(val);
+  } else {
+    for (const auto& [key, val] : aa->int_data) vals.push_back(val);
+  }
+  return vals;
+}
+
+// Folds an associative array's elements with the named reduction, optionally
+// transforming each through the with clause carried by `expr` (null for the
+// bare property form). Returns false for non-reduction methods so the caller
+// keeps handling its own methods (size, exists, traversal, …).
+static bool TryAssocReduction(AssocArrayObject* aa, std::string_view method,
+                              const Expr* expr, SimContext& ctx, Arena& arena,
+                              Logic4Vec& out) {
+  if (!IsReductionMethod(method)) return false;
+  auto elems = CollectAssocElements(aa);
+  if (expr != nullptr && expr->with_expr != nullptr) {
+    auto names = ExtractIterNames(expr);
+    WithIterEnv env{names.iter_name, names.idx_var_name, ctx, arena};
+    uint32_t result_width = 0;
+    auto vals = EvalReduceWithValues(elems, expr, env, result_width);
+    if (result_width == 0) result_width = aa->elem_width;
+    out = MakeLogic4VecVal(arena, result_width, ApplyReduction(method, vals));
+    return true;
+  }
+  std::vector<uint64_t> vals;
+  vals.reserve(elems.size());
+  for (const auto& e : elems) vals.push_back(e.ToUint64());
+  out = MakeLogic4VecVal(arena, aa->elem_width, ApplyReduction(method, vals));
+  return true;
+}
+
 static bool DispatchReduction(std::string_view method, const ArrayCtx& ac,
                               Logic4Vec& out) {
   if (method == "sum") {
@@ -305,7 +371,7 @@ static bool DispatchReductionExpr(std::string_view method, const ArrayCtx& ac,
                                   const Expr* expr, Logic4Vec& out) {
   if (!IsReductionMethod(method)) return false;
   if (expr->with_expr) {
-    out = ReduceWithExpr(ac.var_name, ac.info, expr, ac.ctx, ac.arena);
+    out = ReduceWithExpr(ac.var_name, ac.info, expr, method, ac.ctx, ac.arena);
   } else if (method == "sum") {
     out = ArraySum(ac.var_name, ac.info, ac.ctx, ac.arena);
   } else if (method == "product") {
@@ -341,7 +407,9 @@ bool TryEvalArrayMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
                             Logic4Vec& out) {
   MethodCallParts parts;
   if (!ExtractMethodCallParts(expr, parts)) return false;
-  auto* info = ctx.FindArrayInfo(parts.var_name);
+  ArrayInfo scratch;
+  const auto* info =
+      ArrayInfoForReduction(parts.var_name, parts.method_name, ctx, scratch);
   if (!info) return false;
   ArrayCtx ac{parts.var_name, *info, ctx, arena};
   if (DispatchReductionExpr(parts.method_name, ac, expr, out)) return true;
@@ -351,6 +419,30 @@ bool TryEvalArrayMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
     out = MakeLogic4VecVal(arena, 1, 0);
     return true;
   }
+  return false;
+}
+
+// §7.12.3: a reduction method written without parentheses carries its with
+// clause on the member-access node itself (arr.sum with (e), the form used
+// throughout the LRM). EvalMemberAccess routes such a node here so the with
+// clause is applied instead of silently dropped. Only reduction methods on an
+// unpacked integral array (or queue) are handled; everything else, including
+// the no-clause property read, falls through to the ordinary member path.
+bool TryEvalArrayReductionWithClause(const Expr* expr, SimContext& ctx,
+                                     Arena& arena, Logic4Vec& out) {
+  if (expr->kind != ExprKind::kMemberAccess || !expr->with_expr) return false;
+  if (!expr->lhs || expr->lhs->kind != ExprKind::kIdentifier) return false;
+  if (!expr->rhs || expr->rhs->kind != ExprKind::kIdentifier) return false;
+  std::string_view method = expr->rhs->text;
+  if (!IsReductionMethod(method)) return false;
+  std::string_view var_name = expr->lhs->text;
+  ArrayInfo scratch;
+  if (const auto* info = ArrayInfoForReduction(var_name, method, ctx, scratch)) {
+    out = ReduceWithExpr(var_name, *info, expr, method, ctx, arena);
+    return true;
+  }
+  if (auto* aa = ctx.FindAssocArray(var_name))
+    return TryAssocReduction(aa, method, expr, ctx, arena, out);
   return false;
 }
 
@@ -523,7 +615,8 @@ bool TryExecArrayMethodStmt(const Expr* expr, SimContext& ctx, Arena& arena) {
 
 bool TryEvalArrayProperty(std::string_view var_name, std::string_view prop,
                           SimContext& ctx, Arena& arena, Logic4Vec& out) {
-  auto* info = ctx.FindArrayInfo(var_name);
+  ArrayInfo scratch;
+  const auto* info = ArrayInfoForReduction(var_name, prop, ctx, scratch);
   if (!info) return false;
   ArrayCtx ac{var_name, *info, ctx, arena};
   if (DispatchReduction(prop, ac, out)) return true;
@@ -750,7 +843,7 @@ bool TryEvalAssocMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
     }
     return AssocTraversal(aa, parts.method_name, ref_var, arena, out);
   }
-  return false;
+  return TryAssocReduction(aa, parts.method_name, expr, ctx, arena, out);
 }
 
 static bool ExecAssocDelete(AssocArrayObject* aa, const Expr* expr,
@@ -788,7 +881,7 @@ bool TryEvalAssocProperty(std::string_view var_name, std::string_view prop,
     out = MakeLogic4VecVal(arena, 32, aa->Size());
     return true;
   }
-  return false;
+  return TryAssocReduction(aa, prop, nullptr, ctx, arena, out);
 }
 
 bool TryExecAssocPropertyStmt(std::string_view var_name, std::string_view prop,

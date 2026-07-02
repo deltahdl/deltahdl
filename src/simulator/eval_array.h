@@ -14,6 +14,13 @@ class Arena;
 bool TryEvalArrayMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
                             Logic4Vec& out);
 
+// Applies a §7.12.3 reduction whose with clause is attached to a bare
+// member-access node (arr.sum with (e), the parenthesis-free LRM form). Returns
+// false for anything that is not such a reduction so the caller continues with
+// ordinary member resolution.
+bool TryEvalArrayReductionWithClause(const Expr* expr, SimContext& ctx,
+                                     Arena& arena, Logic4Vec& out);
+
 bool TryExecArrayMethodStmt(const Expr* expr, SimContext& ctx, Arena& arena);
 
 bool TryEvalArrayProperty(std::string_view var_name, std::string_view prop,
