@@ -499,7 +499,7 @@ static void ValidateWeakReferenceTypeParam(
   }
 }
 
-void Elaborator::ValidateVarDeclTypes(ModuleItem* item) {
+void Elaborator::ValidateVarDeclTypes(ModuleItem* item, const ScopeMap& scope) {
   if (item->data_type.kind == DataTypeKind::kNamed &&
       class_names_.count(item->data_type.type_name)) {
     class_var_names_.insert(item->name);
@@ -514,7 +514,7 @@ void Elaborator::ValidateVarDeclTypes(ModuleItem* item) {
       item->data_type.kind == DataTypeKind::kUnion) {
     ValidatePackedStructDefaults(item->data_type, item->loc);
     ValidateUnpackedStructWithUnionDefaults(item->data_type, item->loc);
-    ValidateStructMemberDefaultsConstant(item->data_type, item->loc);
+    ValidateStructMemberDefaultsConstant(item->data_type, item->loc, scope);
     ValidateVoidMembers(item->data_type, item->loc);
     ValidateRandQualifiers(item->data_type, item->loc);
     ValidatePackedDimRequiresPackedKeyword(item->data_type, item->loc);
@@ -980,7 +980,7 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
   ValidateArrayInitPattern(item);
   ValidateStructInitPattern(item);
 
-  ValidateVarDeclTypes(item);
+  ValidateVarDeclTypes(item, BuildParamScope(mod));
   TrackEnumVariable(item);
 }
 

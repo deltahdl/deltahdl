@@ -219,14 +219,18 @@ void Elaborator::ValidateUnpackedStructWithUnionDefaults(const DataType& dtype,
 }
 
 void Elaborator::ValidateStructMemberDefaultsConstant(const DataType& dtype,
-                                                      SourceLoc loc) {
+                                                      SourceLoc loc,
+                                                      const ScopeMap& scope) {
   if (dtype.kind != DataTypeKind::kStruct) return;
   if (dtype.is_packed) return;
   for (const auto& m : dtype.struct_members) {
     if (m.type_kind == DataTypeKind::kUnion) return;
   }
   for (const auto& m : dtype.struct_members) {
-    if (m.init_expr && !IsConstantExpr(m.init_expr, cu_param_scope_)) {
+    // §7.2.2: a member default is a constant expression, which per §11.2.1 may
+    // reference a parameter. Use the module parameter scope (a superset of the
+    // compilation-unit scope) so `int m = P;` resolves.
+    if (m.init_expr && !IsConstantExpr(m.init_expr, scope)) {
       diag_.Error(loc,
                   "struct member default value must be a constant expression");
       return;

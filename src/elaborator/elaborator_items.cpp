@@ -875,7 +875,7 @@ bool IsImplicitNestedInstantiationCandidate(std::string_view name,
 void Elaborator::RunPostItemValidations(const ModuleDecl* decl,
                                         RtlirModule* mod) {
   CheckAlwaysCombMultiDriver(decl, mod);
-  ValidateModuleConstraints(decl);
+  ValidateModuleConstraints(decl, mod);
   ValidateValueParams(decl, mod);
   ValidateLhsPatternWidths(decl, mod);
   ValidateClockvarAccess(decl);

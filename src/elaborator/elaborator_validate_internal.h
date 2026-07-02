@@ -14,6 +14,7 @@
 #include <vector>
 
 #include "common/diagnostic.h"
+#include "elaborator/const_eval.h"
 #include "elaborator/rtlir.h"
 #include "parser/ast.h"
 
@@ -49,10 +50,12 @@ void CheckForceLhs(
     DiagEngine& diag);
 void CheckRealSelect(const Expr* e, const TypeMap& types, DiagEngine& diag);
 void CheckScalarSelect(const Expr* e, const NameSet& scalars, DiagEngine& diag);
-void CheckIndexedPartSelectWidth(const Expr* e, DiagEngine& diag);
+void CheckIndexedPartSelectWidth(const Expr* e, const ScopeMap& scope,
+                                 DiagEngine& diag);
 void CheckScalarSelectStmt(const Stmt* s, const NameSet& scalars,
                            DiagEngine& diag);
-void CheckIndexedPartSelectWidthStmt(const Stmt* s, DiagEngine& diag);
+void CheckIndexedPartSelectWidthStmt(const Stmt* s, const ScopeMap& scope,
+                                     DiagEngine& diag);
 
 // Defined in elaborator_validate_matches.cpp.
 bool IsArrayQueryFunc(std::string_view callee);

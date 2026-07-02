@@ -270,19 +270,18 @@ class Elaborator {
   void ValidateArrayInitPattern(const ModuleItem* item);
   void ValidateStructInitPattern(const ModuleItem* item);
 
-  void ValidateModuleConstraints(const ModuleDecl* decl);
+  void ValidateModuleConstraints(const ModuleDecl* decl, RtlirModule* mod);
 
   void ValidateTimescaleConsistency();
 
   void ValidateEnumDecl(const DataType& dtype, SourceLoc loc);
 
   void ValidatePackedStructDefaults(const DataType& dtype, SourceLoc loc);
-
   void ValidateUnpackedStructWithUnionDefaults(const DataType& dtype,
                                                SourceLoc loc);
-
   void ValidateStructMemberDefaultsConstant(const DataType& dtype,
-                                            SourceLoc loc);
+                                            SourceLoc loc,
+                                            const ScopeMap& scope);
 
   void ValidateVoidMembers(const DataType& dtype, SourceLoc loc);
 
@@ -354,14 +353,14 @@ class Elaborator {
 
   void TrackVarArrayInfo(const ModuleItem* item, RtlirVariable& var);
 
-  void ValidateVarDeclTypes(ModuleItem* item);
+  void ValidateVarDeclTypes(ModuleItem* item, const ScopeMap& scope);
 
   bool ValidateEnumLiteral(const EnumMember& member, uint32_t base_width,
                            bool is_2state);
 
   void ValidateEdgeOnReal(const ModuleItem* item);
 
-  void ValidateItemConstraints(const ModuleItem* item);
+  void ValidateItemConstraints(const ModuleItem* item, const ScopeMap& scope);
 
   void ValidateDeferredAssertionActions(const ModuleDecl* decl);
   void WalkStmtsForDeferredActions(const Stmt* s);

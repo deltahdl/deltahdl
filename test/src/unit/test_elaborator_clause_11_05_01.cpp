@@ -111,6 +111,24 @@ TEST(SelectElaboration, IndexedPartSelectWidthMustBeConstant) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
+// §11.5.1/§11.2.1: the indexed part-select width is a constant expression,
+// which may be a parameter reference. It must be evaluated in the module's
+// parameter scope, not rejected as non-constant (contrast the `integer w`
+// variable case above, which is genuinely non-constant and still errors).
+TEST(SelectElaboration, IndexedPartSelectWidthParameterAccepted) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  parameter integer c = 3;\n"
+      "  logic [15:0] data;\n"
+      "  logic [7:0] y;\n"
+      "  initial y = data[1+:c];\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 TEST(SelectElaboration, IndexedPartSelectWidthMustBePositive) {
   ElabFixture f;
   ElaborateSrc(

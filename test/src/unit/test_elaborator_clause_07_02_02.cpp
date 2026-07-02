@@ -117,6 +117,26 @@ TEST(StructAssignmentValidation, NonConstantMemberDefault_Rejected) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
+// §7.2.2/§11.2.1: a member default is a constant expression, which may be a
+// parameter reference. It must be evaluated in the module's parameter scope,
+// so a parameter default is accepted (contrast the `int n` variable case
+// above, which is genuinely non-constant and still errors). Uses an anonymous
+// inline struct, as in the sv-tests default-value case.
+TEST(StructAssignmentValidation, ParameterMemberDefault_Allowed) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  parameter c = 4'h5;\n"
+      "  struct {\n"
+      "    bit [3:0] lo = c;\n"
+      "    bit [3:0] hi;\n"
+      "  } p1;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 TEST(StructAssignmentValidation,
      UnpackedStructWithUnionMemberDefault_OnUnionMember_Rejected) {
   ElabFixture f;

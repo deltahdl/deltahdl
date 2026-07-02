@@ -30,9 +30,14 @@ static void CheckModuleTimescaleOrder(const ModuleDecl* decl,
   }
 }
 
-void Elaborator::ValidateModuleConstraints(const ModuleDecl* decl) {
+void Elaborator::ValidateModuleConstraints(const ModuleDecl* decl,
+                                           RtlirModule* mod) {
+  // §11.2.1: constant-expression checks below (indexed part-select width, etc.)
+  // may reference module parameters, so evaluate them in the module's parameter
+  // scope rather than an empty one.
+  ScopeMap scope = mod ? BuildParamScope(mod) : ScopeMap{};
   for (const auto* item : decl->items) {
-    ValidateItemConstraints(item);
+    ValidateItemConstraints(item, scope);
   }
   // The bulk of module-level validation is an ordered series of independent
   // single-element checks. Two of them inspect elaborator-wide state rather

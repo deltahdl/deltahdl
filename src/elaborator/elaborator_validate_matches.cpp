@@ -104,7 +104,8 @@ void Elaborator::ValidateLhsPatternWidths(const ModuleDecl* decl,
   }
 }
 
-void Elaborator::ValidateItemConstraints(const ModuleItem* item) {
+void Elaborator::ValidateItemConstraints(const ModuleItem* item,
+                                         const ScopeMap& scope) {
   bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
                  item->kind == ModuleItemKind::kInitialBlock;
   if (is_proc && item->body) {
@@ -143,12 +144,12 @@ void Elaborator::ValidateItemConstraints(const ModuleItem* item) {
     CheckRealSelect(item->assign_rhs, var_types_, diag_);
     CheckScalarSelect(item->assign_rhs, scalar_var_names_, diag_);
     CheckScalarSelect(item->assign_lhs, scalar_var_names_, diag_);
-    CheckIndexedPartSelectWidth(item->assign_rhs, diag_);
-    CheckIndexedPartSelectWidth(item->assign_lhs, diag_);
+    CheckIndexedPartSelectWidth(item->assign_rhs, scope, diag_);
+    CheckIndexedPartSelectWidth(item->assign_lhs, scope, diag_);
   }
   if (is_proc && item->body) {
     CheckScalarSelectStmt(item->body, scalar_var_names_, diag_);
-    CheckIndexedPartSelectWidthStmt(item->body, diag_);
+    CheckIndexedPartSelectWidthStmt(item->body, scope, diag_);
   }
 }
 

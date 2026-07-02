@@ -426,10 +426,15 @@ void CheckScalarSelect(const Expr* e, const NameSet& scalars,
   CheckScalarSelect(e->index, scalars, diag);
 }
 
-static void CheckIndexedPartSelectWidthNode(const Expr* e, DiagEngine& diag) {
+static void CheckIndexedPartSelectWidthNode(const Expr* e,
+                                            const ScopeMap& scope,
+                                            DiagEngine& diag) {
   if (!e->index_end) return;
   if (!e->is_part_select_plus && !e->is_part_select_minus) return;
-  auto width = ConstEvalInt(e->index_end);
+  // §11.5.1: the width is a constant expression, which per §11.2.1 may be a
+  // parameter/localparam reference. Evaluate it in the module's parameter scope
+  // so `x[i +: WIDTH]` resolves rather than being rejected as non-constant.
+  auto width = ConstEvalInt(e->index_end, scope);
   if (!width.has_value()) {
     diag.Error(e->range.start,
                "indexed part-select width must be a constant expression");
@@ -441,14 +446,15 @@ static void CheckIndexedPartSelectWidthNode(const Expr* e, DiagEngine& diag) {
                "indexed part-select width must be a positive constant");
 }
 
-void CheckIndexedPartSelectWidth(const Expr* e, DiagEngine& diag) {
+void CheckIndexedPartSelectWidth(const Expr* e, const ScopeMap& scope,
+                                 DiagEngine& diag) {
   if (!e) return;
   if (e->kind == ExprKind::kSelect && e->base)
-    CheckIndexedPartSelectWidthNode(e, diag);
-  CheckIndexedPartSelectWidth(e->lhs, diag);
-  CheckIndexedPartSelectWidth(e->rhs, diag);
-  CheckIndexedPartSelectWidth(e->base, diag);
-  CheckIndexedPartSelectWidth(e->index, diag);
+    CheckIndexedPartSelectWidthNode(e, scope, diag);
+  CheckIndexedPartSelectWidth(e->lhs, scope, diag);
+  CheckIndexedPartSelectWidth(e->rhs, scope, diag);
+  CheckIndexedPartSelectWidth(e->base, scope, diag);
+  CheckIndexedPartSelectWidth(e->index, scope, diag);
 }
 
 void CheckScalarSelectStmt(const Stmt* s, const NameSet& scalars,
@@ -471,23 +477,28 @@ void CheckScalarSelectStmt(const Stmt* s, const NameSet& scalars,
   for (auto* fs : s->fork_stmts) CheckScalarSelectStmt(fs, scalars, diag);
 }
 
-void CheckIndexedPartSelectWidthStmt(const Stmt* s, DiagEngine& diag) {
+void CheckIndexedPartSelectWidthStmt(const Stmt* s, const ScopeMap& scope,
+                                     DiagEngine& diag) {
   if (!s) return;
-  CheckIndexedPartSelectWidth(s->lhs, diag);
-  CheckIndexedPartSelectWidth(s->rhs, diag);
-  CheckIndexedPartSelectWidth(s->expr, diag);
-  CheckIndexedPartSelectWidth(s->condition, diag);
-  for (auto* child : s->stmts) CheckIndexedPartSelectWidthStmt(child, diag);
-  CheckIndexedPartSelectWidthStmt(s->then_branch, diag);
-  CheckIndexedPartSelectWidthStmt(s->else_branch, diag);
-  CheckIndexedPartSelectWidthStmt(s->body, diag);
-  for (auto* fi : s->for_inits) CheckIndexedPartSelectWidthStmt(fi, diag);
-  CheckIndexedPartSelectWidthStmt(s->for_body, diag);
-  for (auto* fs : s->for_steps) CheckIndexedPartSelectWidthStmt(fs, diag);
-  CheckIndexedPartSelectWidth(s->for_cond, diag);
+  CheckIndexedPartSelectWidth(s->lhs, scope, diag);
+  CheckIndexedPartSelectWidth(s->rhs, scope, diag);
+  CheckIndexedPartSelectWidth(s->expr, scope, diag);
+  CheckIndexedPartSelectWidth(s->condition, scope, diag);
+  for (auto* child : s->stmts)
+    CheckIndexedPartSelectWidthStmt(child, scope, diag);
+  CheckIndexedPartSelectWidthStmt(s->then_branch, scope, diag);
+  CheckIndexedPartSelectWidthStmt(s->else_branch, scope, diag);
+  CheckIndexedPartSelectWidthStmt(s->body, scope, diag);
+  for (auto* fi : s->for_inits)
+    CheckIndexedPartSelectWidthStmt(fi, scope, diag);
+  CheckIndexedPartSelectWidthStmt(s->for_body, scope, diag);
+  for (auto* fs : s->for_steps)
+    CheckIndexedPartSelectWidthStmt(fs, scope, diag);
+  CheckIndexedPartSelectWidth(s->for_cond, scope, diag);
   for (const auto& ci : s->case_items)
-    CheckIndexedPartSelectWidthStmt(ci.body, diag);
-  for (auto* fs : s->fork_stmts) CheckIndexedPartSelectWidthStmt(fs, diag);
+    CheckIndexedPartSelectWidthStmt(ci.body, scope, diag);
+  for (auto* fs : s->fork_stmts)
+    CheckIndexedPartSelectWidthStmt(fs, scope, diag);
 }
 
 bool ExprContainsIdent(const Expr* e, std::string_view name) {
