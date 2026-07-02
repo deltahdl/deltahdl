@@ -157,4 +157,32 @@ TEST(ConstExprElab, NoDefaultParamBlocksTopElaboration) {
   EXPECT_TRUE(f.has_errors);
 }
 
+// §6.20.1: in a list of parameter constants a parameter may depend on an
+// earlier one, and the list may interleave value and type parameters (the
+// clause's own example: N, then M depending on N, then a type parameter T, then
+// a value parameter x of that type). Driven through elaboration: M resolves to
+// N*16 even with a type parameter following it, and the type-parameter-typed
+// value parameter x resolves to its default.
+TEST(ConstExprElab, PortListMixedValueAndTypeDependencies) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module mc #(int N = 5, M = N * 16, type T = int, T x = 0)();\n"
+      "endmodule\n",
+      f, "mc");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const RtlirParamDecl* m = nullptr;
+  const RtlirParamDecl* x = nullptr;
+  for (const auto& p : design->top_modules[0]->params) {
+    if (p.name == "M") m = &p;
+    if (p.name == "x") x = &p;
+  }
+  ASSERT_NE(m, nullptr);
+  EXPECT_TRUE(m->is_resolved);
+  EXPECT_EQ(m->resolved_value, 80);
+  ASSERT_NE(x, nullptr);
+  EXPECT_TRUE(x->is_resolved);
+  EXPECT_EQ(x->resolved_value, 0);
+}
+
 }  // namespace

@@ -109,6 +109,58 @@ TEST(ParameterOverride, SignedUnrangedAdoptsOverrideRange) {
   EXPECT_EQ(u0->params[0].resolved_value, -5);
 }
 
+// §23.10: the two kinds of overridable parameter constants are value parameters
+// and type parameters. A type parameter is overridden by an ordered instance
+// parameter value assignment; the child's body variable, declared with the type
+// parameter's type, adopts the width of the override type (int = 32) rather
+// than the declared default (byte = 8).
+TEST(ParameterOverride, TypeParameterOverriddenByOrderedInstanceAssignment) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module child #(parameter type T = byte)();\n"
+      "  T data;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  child #(int) u0();\n"
+      "endmodule\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* u0 = design->top_modules[0]->children[0].resolved;
+  ASSERT_NE(u0, nullptr);
+  const RtlirVariable* data = nullptr;
+  for (const auto& v : u0->variables) {
+    if (v.name == "data") data = &v;
+  }
+  ASSERT_NE(data, nullptr);
+  EXPECT_EQ(data->width, 32u);
+}
+
+// §23.10: the same type-parameter override reached by a named instance
+// parameter value assignment. Without the override the variable would be 16
+// bits wide (shortint), so observing 32 bits confirms the override is applied.
+TEST(ParameterOverride, TypeParameterOverriddenByNamedInstanceAssignment) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module child #(parameter type T = shortint)();\n"
+      "  T data;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  child #(.T(int)) u0();\n"
+      "endmodule\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* u0 = design->top_modules[0]->children[0].resolved;
+  ASSERT_NE(u0, nullptr);
+  const RtlirVariable* data = nullptr;
+  for (const auto& v : u0->variables) {
+    if (v.name == "data") data = &v;
+  }
+  ASSERT_NE(data, nullptr);
+  EXPECT_EQ(data->width, 32u);
+}
+
 TEST(ParameterOverride, SignedRangedKeepsDeclarationRangeAndSignedness) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -120,6 +172,46 @@ TEST(ParameterOverride, SignedRangedKeepsDeclarationRangeAndSignedness) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
+  auto* u0 = design->top_modules[0]->children[0].resolved;
+  ASSERT_NE(u0, nullptr);
+  EXPECT_EQ(u0->params[0].resolved_value, 1);
+}
+
+// §23.10: the value-parameter type/range override rules apply to a module
+// instance parameter value assignment, not only to a defparam. This exercises
+// the instantiation-override code path (which coerces the value to the declared
+// width) via an ordered assignment on a ranged, untyped parameter: 13 is
+// truncated to the declared 3-bit range, giving 5.
+TEST(ParameterOverride, RangedUntypedTruncatesOrderedInstanceOverride) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module child #(parameter [2:0] P = 0)();\n"
+      "endmodule\n"
+      "module top;\n"
+      "  child #(13) u0();\n"
+      "endmodule\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* u0 = design->top_modules[0]->children[0].resolved;
+  ASSERT_NE(u0, nullptr);
+  EXPECT_EQ(u0->params[0].resolved_value, 5);
+}
+
+// §23.10: the same override rules reached by a named instance parameter value
+// assignment on a typed, unranged parameter. The 33-bit override is converted
+// to the parameter's declared 32-bit int type, so only the low bit survives.
+TEST(ParameterOverride, TypedUnrangedConvertsNamedInstanceOverride) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module child #(parameter int P = 0)();\n"
+      "endmodule\n"
+      "module top;\n"
+      "  child #(.P(64'h1_0000_0001)) u0();\n"
+      "endmodule\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
   auto* u0 = design->top_modules[0]->children[0].resolved;
   ASSERT_NE(u0, nullptr);
   EXPECT_EQ(u0->params[0].resolved_value, 1);

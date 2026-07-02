@@ -1,14 +1,8 @@
 #include "fixture_elaborator.h"
-#include "helpers_localparam_resolution.h"
 
 using namespace delta;
 
 namespace {
-
-TEST(LocalparamElaboration, LocalparamResolvesValue) {
-  ElabFixture f;
-  ExpectLocalparamDepth32ResolvesAsLocal(f);
-}
 
 TEST(LocalparamElaboration, ParameterAndLocalparamCoexist) {
   ElabFixture f;
@@ -155,6 +149,55 @@ TEST(LocalparamElaboration, LocalparamFollowsOverriddenParameter) {
     }
   }
   EXPECT_TRUE(found);
+}
+
+// §6.20.4: the parameter a localparam is derived from may be modified by a
+// defparam statement (not only by an instance parameter value assignment); the
+// localparam follows the defparam'd value. Distinct from the instance-override
+// path: W is changed by defparam and the dependent localparam W2 is recomputed.
+TEST(LocalparamElaboration, LocalparamFollowsDefparamModifiedParameter) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module child #(parameter int W = 8);\n"
+      "  localparam int W2 = W * 2;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  child u0();\n"
+      "  defparam u0.W = 16;\n"
+      "endmodule\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* child = design->top_modules[0]->children[0].resolved;
+  ASSERT_NE(child, nullptr);
+  bool found = false;
+  for (const auto& p : child->params) {
+    if (p.name == "W2") {
+      found = true;
+      EXPECT_TRUE(p.is_localparam);
+      EXPECT_TRUE(p.is_resolved);
+      EXPECT_EQ(p.resolved_value, 32);
+    }
+  }
+  EXPECT_TRUE(found);
+}
+
+// §6.20.4: in a parameter_port_list a declaration with no keyword inherits the
+// preceding localparam group, so it is a local parameter and therefore not
+// overridable. Here C follows a localparam B, so a named instance override of C
+// is rejected — observing the sticky-grouping classification through the full
+// elaboration path.
+TEST(LocalparamElaboration, StickyLocalparamPortRejectsInstanceOverride) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module child #(parameter int A = 1, localparam int B = 2, int C = "
+      "3)();\n"
+      "endmodule\n"
+      "module top;\n"
+      "  child #(.C(9)) u0();\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_TRUE(f.has_errors);
 }
 
 }  // namespace
