@@ -351,8 +351,11 @@ def test_audit_src_names_constant_expression_forms() -> None:
     """Step 1 names the 11.2.1 constant forms so parameter widths get covered."""
     steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
     prompt = steps[0][1]
-    assert "11.2.1" in prompt
-    assert "a parameter" in prompt and "a localparam" in prompt
+    assert (
+        "11.2.1" in prompt
+        and "a parameter" in prompt
+        and "a localparam" in prompt
+    )
 
 
 def test_audit_src_enumerates_consumed_dependencies() -> None:
@@ -378,8 +381,10 @@ def test_writing_tests_covers_each_input_form() -> None:
     """The writing-missing-tests step requires one test per enumerated input form."""
     steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
     prompt = steps[7][1]
-    assert "per enumerated INPUT FORM" in prompt
-    assert "a literal AND a parameter" in prompt
+    assert (
+        "per enumerated INPUT FORM" in prompt
+        and "a literal AND a parameter" in prompt
+    )
 
 
 def test_writing_tests_covers_negative_form() -> None:
@@ -394,5 +399,4 @@ def test_writing_tests_requires_dependency_composed_end_to_end() -> None:
         ["7.12.3"], "~/LRM.pdf", satisfied_dependencies=["7.5", "10.10"],
     )
     prompt = steps[7][1]
-    assert "END-TO-END test" in prompt
-    assert "full pipeline" in prompt
+    assert "END-TO-END test" in prompt and "full pipeline" in prompt
