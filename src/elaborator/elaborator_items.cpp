@@ -108,19 +108,29 @@ void CheckTypeParamNotSetToValue(const ModuleItem* item, DiagEngine& diag) {
   }
 }
 
-// §6.20.3: a type parameter declared with a leading enum, struct, or union
-// keyword restricts its valid types; assigning a type that does not conform
-// to that basic data type is an error. Resolve the assigned type through any
-// typedef chain and flag only a definite kind mismatch, leaving an
-// unresolved named type alone.
+// §6.20.3: a type parameter declared with a leading basic-data-type keyword
+// (enum, struct, union, class, or interface class) restricts its valid types;
+// assigning a type that does not conform to that keyword is an error. The
+// assigned type is resolved through any typedef chain first, and only a
+// definite mismatch is flagged -- a still-named type is left alone, since it
+// may resolve to a conforming type declared elsewhere.
+//
+// On a type-parameter item the restriction keyword is carried in
+// forward_type_kind as: kEnum/kStruct/kUnion for those aggregate keywords,
+// kNamed for a `class` restriction, and kVoid for `interface class` (see
+// Parser::ParseTypeParamDecl).
 void CheckTypeParamConformsToForwardKind(const ModuleItem* item, bool is_type,
                                          const TypedefMap& typedefs,
                                          DiagEngine& diag) {
-  if (!is_type || (item->forward_type_kind != DataTypeKind::kEnum &&
-                   item->forward_type_kind != DataTypeKind::kStruct &&
-                   item->forward_type_kind != DataTypeKind::kUnion)) {
-    return;
-  }
+  if (!is_type) return;
+  const DataTypeKind fwd = item->forward_type_kind;
+  const bool aggregate_restriction = fwd == DataTypeKind::kEnum ||
+                                     fwd == DataTypeKind::kStruct ||
+                                     fwd == DataTypeKind::kUnion;
+  const bool class_restriction =
+      fwd == DataTypeKind::kNamed || fwd == DataTypeKind::kVoid;
+  if (!aggregate_restriction && !class_restriction) return;
+
   const DataType* resolved = &item->typedef_type;
   for (int hops = 0; hops < 8 && resolved->kind == DataTypeKind::kNamed;
        ++hops) {
@@ -128,8 +138,24 @@ void CheckTypeParamConformsToForwardKind(const ModuleItem* item, bool is_type,
     if (td == typedefs.end()) break;
     resolved = &td->second;
   }
-  if (resolved->kind != DataTypeKind::kNamed &&
-      resolved->kind != item->forward_type_kind) {
+
+  if (class_restriction) {
+    // A class (or interface class) type is always referenced by name, so a
+    // resolved concrete type -- a built-in scalar/vector, enum, struct, or
+    // union -- cannot be a class and does not conform. A type still named after
+    // resolution is left alone (it may be a class declared elsewhere).
+    if (resolved->kind != DataTypeKind::kNamed) {
+      diag.Error(item->loc,
+                 std::format(
+                     "type parameter '{}' is restricted to a {} type but is "
+                     "assigned a type that is not a class",
+                     item->name,
+                     fwd == DataTypeKind::kVoid ? "interface class" : "class"));
+    }
+    return;
+  }
+
+  if (resolved->kind != DataTypeKind::kNamed && resolved->kind != fwd) {
     static const auto kBasicName = [](DataTypeKind k) -> std::string_view {
       switch (k) {
         case DataTypeKind::kEnum:
@@ -145,7 +171,7 @@ void CheckTypeParamConformsToForwardKind(const ModuleItem* item, bool is_type,
     diag.Error(item->loc,
                std::format("type parameter '{}' is assigned a type that does "
                            "not conform to the required {} kind",
-                           item->name, kBasicName(item->forward_type_kind)));
+                           item->name, kBasicName(fwd)));
   }
 }
 

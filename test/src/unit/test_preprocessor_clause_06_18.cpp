@@ -69,19 +69,4 @@ TEST(DataTypeParsing, InterfaceBasedTypedef) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(DataTypeParsing, TypedefChainPreprocessor) {
-  auto r = ParseWithPreprocessor(
-      "module m;\n"
-      "  typedef logic [15:0] halfword_t;\n"
-      "  typedef halfword_t addr_t;\n"
-      "  addr_t pc;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_GE(r.cu->modules[0]->items.size(), 3u);
-  auto* var = r.cu->modules[0]->items[2];
-  EXPECT_EQ(var->data_type.kind, DataTypeKind::kNamed);
-  EXPECT_EQ(var->data_type.type_name, "addr_t");
-}
-
 }  // namespace

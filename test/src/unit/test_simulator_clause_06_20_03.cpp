@@ -50,6 +50,31 @@ TEST(TypeParameterSim, LocalparamTypeResolvesWidth) {
   EXPECT_EQ(var->value.ToUint64(), 0xABu);
 }
 
+// §6.20.3: a type parameter whose type is a packed vector sets the width of a
+// dependent variable, observable at run time when an over-wide value assigned
+// to it is truncated to that width.
+TEST(TypeParameterSim, VectorTypeParamResolvesWidth) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  parameter type T = logic [7:0];\n"
+      "  T x;\n"
+      "  initial x = 16'hABCD;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+
+  EXPECT_EQ(var->value.width, 8u);
+  EXPECT_EQ(var->value.ToUint64(), 0xCDu);
+}
+
 TEST(TypeParameterSim, MultipleTypeParamsResolveCorrectly) {
   SimFixture f;
   auto* design = ElaborateSrc(

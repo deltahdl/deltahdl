@@ -292,6 +292,11 @@ bool Parser::TryForwardClassTypedef(ModuleItem* item) {
   Consume();
   if (Check(TokenKind::kKwClass)) Consume();
   item->name = Expect(TokenKind::kIdentifier).text;
+  // §6.18: record that this forward declaration specified the class (or
+  // interface class) basic type, so the elaborator can reject a later
+  // definition of the same name that does not resolve to a class. A class type
+  // is always referenced by name, so kNamed is the recorded forward kind.
+  item->forward_type_kind = DataTypeKind::kNamed;
   known_types_.insert(item->name);
   Expect(TokenKind::kSemicolon);
   return true;

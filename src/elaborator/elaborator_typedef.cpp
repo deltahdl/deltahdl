@@ -30,6 +30,9 @@ std::string_view TypedefKindName(DataTypeKind k) {
       return "struct";
     case DataTypeKind::kUnion:
       return "union";
+    case DataTypeKind::kNamed:
+      // §6.18: a forward class (or interface class) typedef records kNamed.
+      return "class";
     default:
       return "type";
   }

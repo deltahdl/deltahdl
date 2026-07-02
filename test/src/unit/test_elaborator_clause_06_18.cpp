@@ -89,6 +89,28 @@ TEST(UserDefinedTypeElaboration, TypedefStructWidth) {
   }
 }
 
+TEST(UserDefinedTypeElaboration, TypedefUnionWidth) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  typedef union packed { logic [7:0] a; logic [7:0] b; } val_t;\n"
+      "  val_t u;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+  auto* mod = design->top_modules[0];
+  bool found = false;
+  for (const auto& v : mod->variables) {
+    if (v.name == "u") {
+      // A packed union sizes to its widest member; both members are 8 bits.
+      EXPECT_EQ(v.width, 8u);
+      found = true;
+    }
+  }
+  EXPECT_TRUE(found);
+}
+
 TEST(UserDefinedTypeElaboration, ForwardTypedefThenDefinition) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -184,6 +206,34 @@ TEST(UserDefinedTypeElaboration, ForwardUnionWithEnumDefinition_Error) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
+// §6.18: a forward typedef that specified the class basic type does not conform
+// to a later definition of the same name that resolves to a non-class type, so
+// redefining the name as a data typedef is an error.
+TEST(UserDefinedTypeElaboration, ForwardClassTypedefWithDataDefinition_Error) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  typedef class C;\n"
+      "  typedef int C;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+// §6.18: the same conformance rule applies to a forward interface-class
+// typedef; a later data typedef of the same name does not conform.
+TEST(UserDefinedTypeElaboration,
+     ForwardInterfaceClassTypedefWithDataDefinition_Error) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  typedef interface class IC;\n"
+      "  typedef int IC;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
 TEST(UserDefinedTypeElaboration, MultipleForwardEnumDeclarations) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -218,6 +268,30 @@ TEST(UserDefinedTypeElaboration, ForwardTypedefAfterFinalDefinition) {
     }
   }
   EXPECT_TRUE(found);
+}
+
+// §6.18: the actual data type definition of a forward typedef shall be
+// resolved within the same local scope OR generate block. Here a forward enum
+// typedef, its final definition, and a variable using it all live inside a
+// generate block; the definition resolves the forward declaration, so the
+// variable's type is known and elaboration reports no error (an unresolved
+// forward typedef would be an error, as UnresolvedForwardTypedefInModule_Error
+// shows).
+TEST(UserDefinedTypeElaboration, ForwardTypedefResolvedInGenerateBlock) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  generate\n"
+      "    for (i = 0; i < 1; i = i + 1) begin : g\n"
+      "      typedef enum color_e;\n"
+      "      typedef enum {RED, GREEN, BLUE} color_e;\n"
+      "      color_e c;\n"
+      "    end\n"
+      "  endgenerate\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
 }
 
 TEST(UserDefinedTypeElaboration, UnresolvedForwardTypedefInModule_Error) {

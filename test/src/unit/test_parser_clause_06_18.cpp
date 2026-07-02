@@ -79,6 +79,19 @@ TEST(TypeDeclParsing, TypedefStruct) {
   EXPECT_EQ(item->typedef_type.kind, DataTypeKind::kStruct);
 }
 
+TEST(TypeDeclParsing, TypedefUnionBody) {
+  auto r = Parse(
+      "module m;\n"
+      "  typedef union { int i; logic [7:0] b; } val_t;\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kTypedef);
+  EXPECT_EQ(item->name, "val_t");
+  EXPECT_EQ(item->typedef_type.kind, DataTypeKind::kUnion);
+}
+
 TEST(TypeDeclParsing, TypedefWithDims) {
   auto r = Parse("module m; typedef int arr_t [4]; endmodule");
   ASSERT_NE(r.cu, nullptr);
