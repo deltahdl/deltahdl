@@ -416,24 +416,27 @@ void Elaborator::ValidateUnsizedInConcat(const ModuleDecl* decl) {
       WalkExprForUnsizedInConcat(item->assign_lhs);
       WalkExprForUnsizedInConcat(item->assign_rhs);
     }
-    if (item->init_expr) {
-      // §10.10: when the initializer of an array variable is a `{...}`
-      // concatenation, it is an unpacked array concatenation where unsized
-      // integer literals are legal — unlike a packed §11.4.12 concatenation.
-      // Descend into the elements without applying the top-level unsized-
-      // constant check, mirroring the procedural array-concat assignment path.
-      if (item->init_expr->kind == ExprKind::kConcatenation &&
-          var_array_info_.count(item->name)) {
-        for (auto* elem : item->init_expr->elements)
-          WalkExprForUnsizedInConcat(elem);
-      } else {
-        WalkExprForUnsizedInConcat(item->init_expr);
-      }
-    }
+    CheckVarInitUnsizedInConcat(item);
   }
   for (const auto& p : decl->params) {
     WalkExprForUnsizedInConcat(p.second);
   }
+}
+
+void Elaborator::CheckVarInitUnsizedInConcat(const ModuleItem* item) {
+  if (!item->init_expr) return;
+  // §10.10: when the initializer of an array variable is a `{...}`
+  // concatenation, it is an unpacked array concatenation where unsized integer
+  // literals are legal — unlike a packed §11.4.12 concatenation. Descend into
+  // the elements without applying the top-level unsized-constant check,
+  // mirroring the procedural array-concat assignment path.
+  if (item->init_expr->kind == ExprKind::kConcatenation &&
+      var_array_info_.count(item->name)) {
+    for (auto* elem : item->init_expr->elements)
+      WalkExprForUnsizedInConcat(elem);
+    return;
+  }
+  WalkExprForUnsizedInConcat(item->init_expr);
 }
 
 static bool IsSelectOnConcat(const Expr* expr) {

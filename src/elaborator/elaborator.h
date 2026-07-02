@@ -691,6 +691,7 @@ class Elaborator {
   void WalkStmtsForAssignInExpr(const Stmt* s);
 
   void ValidateUnsizedInConcat(const ModuleDecl* decl);
+  void CheckVarInitUnsizedInConcat(const ModuleItem* item);
   void WalkExprForUnsizedInConcat(const Expr* expr);
   void WalkStmtsForUnsizedInConcat(const Stmt* s);
 
