@@ -107,58 +107,6 @@ TEST(EventControlSim, SequentialPosedgeThenNegedge) {
   EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 2u);
 }
 
-enum class Logic4 : uint8_t {
-  kVal0 = 0,
-  kVal1 = 1,
-  kX = 2,
-  kZ = 3,
-};
-
-enum class EdgeKind : uint8_t {
-  kNone,
-  kPosedge,
-  kNegedge,
-};
-
-EdgeKind DetectEdge(Logic4 from, Logic4 to) {
-  if (from == to) return EdgeKind::kNone;
-  if (from == Logic4::kVal0 &&
-      (to == Logic4::kVal1 || to == Logic4::kX || to == Logic4::kZ))
-    return EdgeKind::kPosedge;
-  if ((from == Logic4::kX || from == Logic4::kZ) && to == Logic4::kVal1)
-    return EdgeKind::kPosedge;
-  if (from == Logic4::kVal1 &&
-      (to == Logic4::kVal0 || to == Logic4::kX || to == Logic4::kZ))
-    return EdgeKind::kNegedge;
-  if ((from == Logic4::kX || from == Logic4::kZ) && to == Logic4::kVal0)
-    return EdgeKind::kNegedge;
-  return EdgeKind::kNone;
-}
-
-TEST(EdgeDetection, NoEdge0To0) {
-  EXPECT_EQ(DetectEdge(Logic4::kVal0, Logic4::kVal0), EdgeKind::kNone);
-}
-
-TEST(EdgeDetection, NoEdge1To1) {
-  EXPECT_EQ(DetectEdge(Logic4::kVal1, Logic4::kVal1), EdgeKind::kNone);
-}
-
-TEST(EdgeDetection, NoEdgeXToX) {
-  EXPECT_EQ(DetectEdge(Logic4::kX, Logic4::kX), EdgeKind::kNone);
-}
-
-TEST(EdgeDetection, NoEdgeXToZ) {
-  EXPECT_EQ(DetectEdge(Logic4::kX, Logic4::kZ), EdgeKind::kNone);
-}
-
-TEST(EdgeDetection, NoEdgeZToX) {
-  EXPECT_EQ(DetectEdge(Logic4::kZ, Logic4::kX), EdgeKind::kNone);
-}
-
-TEST(EdgeDetection, NoEdgeZToZ) {
-  EXPECT_EQ(DetectEdge(Logic4::kZ, Logic4::kZ), EdgeKind::kNone);
-}
-
 TEST(EventControlSim, EdgeEventFiresOnPosedge) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -205,31 +153,6 @@ TEST(EventControlSim, EdgeEventFiresOnNegedge) {
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 20u);
-}
-
-TEST(EventControlSim, PosedgeDetectsOnlyLsb) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] wide;\n"
-      "  logic [7:0] x;\n"
-      "  initial begin\n"
-      "    wide = 8'd0;\n"
-      "    #5 wide = 8'd2;\n"
-      "    #5 wide = 8'd3;\n"
-      "  end\n"
-      "  initial begin\n"
-      "    @(posedge wide) x = 8'd42;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
 TEST(EventControlSim, NoEventOnSameValueWrite) {
@@ -448,56 +371,6 @@ TEST(EventControlSim, NegedgeFiresOnXToZero) {
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 44u);
-}
-
-TEST(EventControlSim, NegedgeDetectsOnlyLsb) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] wide;\n"
-      "  logic [7:0] x;\n"
-      "  initial begin\n"
-      "    wide = 8'd3;\n"
-      "    #5 wide = 8'd1;\n"
-      "    #5 wide = 8'd0;\n"
-      "  end\n"
-      "  initial begin\n"
-      "    @(negedge wide) x = 8'd55;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 55u);
-}
-
-TEST(EventControlSim, EdgeDetectsOnlyLsb) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] wide;\n"
-      "  logic [7:0] x;\n"
-      "  initial begin\n"
-      "    wide = 8'd0;\n"
-      "    #5 wide = 8'd2;\n"
-      "    #5 wide = 8'd3;\n"
-      "  end\n"
-      "  initial begin\n"
-      "    @(edge wide) x = 8'd66;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 66u);
 }
 
 TEST(EventControlSim, NoPosedgeOnXToZ) {
@@ -866,6 +739,81 @@ TEST(EventControlSim, ClockingBlockInputResolvesThroughClockingManager) {
   coro.Resume();
 
   EXPECT_EQ(data->watchers.size(), 1u);
+}
+
+// The "edge event ... only on the LSB" rule discriminated: an upper bit
+// toggles while the LSB is held constant, so a posedge must NOT fire. A
+// broken any-bit implementation would resume and write x.
+TEST(EventControlSim, PosedgeIgnoresUpperBitChangeWhenLsbHeld) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] wide;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    wide = 8'd1;\n"
+      "    x = 8'd0;\n"
+      "    #5 wide = 8'd3;\n"
+      "    #5 $finish;\n"
+      "  end\n"
+      "  initial @(posedge wide) x = 8'd42;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0u);
+}
+
+TEST(EventControlSim, NegedgeIgnoresUpperBitChangeWhenLsbHeld) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] wide;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    wide = 8'd3;\n"
+      "    x = 8'd0;\n"
+      "    #5 wide = 8'd1;\n"
+      "    #5 $finish;\n"
+      "  end\n"
+      "  initial @(negedge wide) x = 8'd55;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0u);
+}
+
+TEST(EventControlSim, EdgeIgnoresUpperBitChangeWhenLsbHeld) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] wide;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    wide = 8'd0;\n"
+      "    x = 8'd0;\n"
+      "    #5 wide = 8'd2;\n"
+      "    #5 $finish;\n"
+      "  end\n"
+      "  initial @(edge wide) x = 8'd66;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
 TEST(EventControlSim, NamedEventTriggerReleasesWaiter) {

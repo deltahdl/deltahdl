@@ -429,8 +429,16 @@ static void CheckEventExprSingular(
                              expr->callee));
     }
   }
-  CheckEventExprSingular(expr->lhs, non_singular_vars, non_singular_funcs,
-                         diag);
+  // §9.4.2: an aggregate may appear in an event expression as long as the
+  // expression reduces to a singular value. A member select such as `s.a`
+  // yields a singular result, so the aggregate object on the left of the `.`
+  // need not itself be singular — do not flag it. (Element selects like
+  // `arr[0]` carry their operand in the base/index fields, which are already
+  // not walked here.)
+  if (expr->kind != ExprKind::kMemberAccess) {
+    CheckEventExprSingular(expr->lhs, non_singular_vars, non_singular_funcs,
+                           diag);
+  }
   CheckEventExprSingular(expr->rhs, non_singular_vars, non_singular_funcs,
                          diag);
   CheckEventExprSingular(expr->condition, non_singular_vars, non_singular_funcs,

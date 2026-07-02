@@ -145,6 +145,22 @@ TEST(EventControlElaboration, PackedStructEventExpressionAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §9.4.2: an aggregate object may appear in an event expression when the
+// expression reduces to a singular value. Selecting a singular member of an
+// otherwise non-singular unpacked struct is accepted (contrast @(s), which is
+// rejected because the whole struct is non-singular).
+TEST(EventControlElaboration, UnpackedStructMemberEventExpressionAccepted) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  struct { int a; int b; } s;\n"
+      "  initial @(s.a) ;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 TEST(EventControlElaboration, FunctionCallInEventExpressionAccepted) {
   ElabFixture f;
   auto* design = ElaborateSrc(
