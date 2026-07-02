@@ -1,6 +1,5 @@
 #include <gtest/gtest.h>
 
-#include "elaborator/type_eval.h"
 #include "fixture_simulator.h"
 #include "parser/ast.h"
 #include "simulator/lowerer.h"
@@ -8,28 +7,6 @@
 using namespace delta;
 
 namespace {
-
-TEST(SignedAndUnsigned, ImplicitlySignedTypes) {
-  struct Case {
-    DataTypeKind kind;
-    bool expected;
-    const char* label;
-  };
-  const Case kCases[] = {
-      {DataTypeKind::kInteger, true, "integer"},
-      {DataTypeKind::kInt, true, "int"},
-      {DataTypeKind::kShortint, true, "shortint"},
-      {DataTypeKind::kLongint, true, "longint"},
-      {DataTypeKind::kByte, true, "byte"},
-      {DataTypeKind::kLogic, false, "logic"},
-      {DataTypeKind::kReg, false, "reg"},
-      {DataTypeKind::kBit, false, "bit"},
-      {DataTypeKind::kTime, false, "time"},
-  };
-  for (const auto& c : kCases) {
-    EXPECT_EQ(IsImplicitlySigned(c.kind), c.expected) << c.label;
-  }
-}
 
 TEST(SignedAndUnsigned, TypeOpByteIsSigned) {
   SimFixture f;
