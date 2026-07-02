@@ -330,3 +330,69 @@ def test_build_steps_constraints_call_out_lrm_copyright() -> None:
     steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
     for _description, prompt in steps[2:]:
         assert "copyrighted" in prompt
+
+
+# --- input-form + interaction coverage (blind-spot fix) ---------------------
+
+
+def test_audit_src_enumerates_input_forms() -> None:
+    """Step 1 asks Claude to enumerate each claim's distinct INPUT FORMS."""
+    steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
+    assert "INPUT FORMS" in steps[0][1]
+
+
+def test_audit_src_enumerates_negative_form() -> None:
+    """Step 1 asks for each rule's NEGATIVE (must-reject) form too."""
+    steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
+    assert "NEGATIVE form" in steps[0][1]
+
+
+def test_audit_src_names_constant_expression_forms() -> None:
+    """Step 1 names the 11.2.1 constant forms so parameter widths get covered."""
+    steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
+    prompt = steps[0][1]
+    assert "11.2.1" in prompt
+    assert "a parameter" in prompt and "a localparam" in prompt
+
+
+def test_audit_src_enumerates_consumed_dependencies() -> None:
+    """Step 1 asks which dependency subclauses' constructs the rule consumes."""
+    steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
+    assert "CONSUMES" in steps[0][1]
+
+
+def test_constraints_require_full_pipeline_when_input_produced() -> None:
+    """The constraints require a full-pipeline test when input production matters."""
+    steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
+    # constraints ride on every action step; check the writing-functionality one
+    assert "full pipeline" in steps[8][1]
+
+
+def test_constraints_allow_dependency_syntax_without_scope_violation() -> None:
+    """Building input from a dependency's real syntax is declared scope-legal."""
+    steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
+    assert "does NOT violate the scoping rule" in steps[8][1]
+
+
+def test_writing_tests_covers_each_input_form() -> None:
+    """The writing-missing-tests step requires one test per enumerated input form."""
+    steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
+    prompt = steps[7][1]
+    assert "per enumerated INPUT FORM" in prompt
+    assert "a literal AND a parameter" in prompt
+
+
+def test_writing_tests_covers_negative_form() -> None:
+    """The writing-missing-tests step requires the negative (rejected-input) test."""
+    steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
+    assert "NEGATIVE form" in steps[7][1]
+
+
+def test_writing_tests_requires_dependency_composed_end_to_end() -> None:
+    """The writing-missing-tests step requires an end-to-end test per consumed dependency."""
+    steps = build_steps(
+        ["7.12.3"], "~/LRM.pdf", satisfied_dependencies=["7.5", "10.10"],
+    )
+    prompt = steps[7][1]
+    assert "END-TO-END test" in prompt
+    assert "full pipeline" in prompt
