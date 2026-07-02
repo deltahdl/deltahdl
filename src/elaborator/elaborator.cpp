@@ -466,7 +466,17 @@ RtlirDesign* Elaborator::Elaborate(std::string_view top_module_name) {
         unit_->cu_items.empty() && unit_->classes.empty())
       return nullptr;
     RunPreElaborationValidations();
-    return ElaborateTops(CollectAutoTopModules(unit_));
+    auto tops = CollectAutoTopModules(unit_);
+    // §23.3.1: a design shall contain at least one top-level module. If the
+    // unit declares modules but every one is instantiated by another (e.g. a
+    // mutual instantiation cycle), no module roots the hierarchy and there is
+    // nothing to elaborate. A package- or class-only unit legitimately has no
+    // modules, so the check is gated on a non-empty module set.
+    if (tops.empty() && !unit_->modules.empty()) {
+      diag_.Error({}, "design contains no top-level module");
+      return nullptr;
+    }
+    return ElaborateTops(tops);
   }
 
   RunPreElaborationValidations();

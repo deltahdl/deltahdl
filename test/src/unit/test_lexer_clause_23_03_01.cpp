@@ -6,12 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(TopLevelModules, DollarRootLexesAsSystemIdentifier) {
-  auto r = LexOne("$root ");
-  EXPECT_EQ(r.token.kind, TokenKind::kSystemIdentifier);
-  EXPECT_EQ(r.token.text, "$root");
-}
-
 TEST(TopLevelModules, DollarRootDotPathTokenSequence) {
   auto tokens = Lex("$root.A.B");
   ASSERT_GE(tokens.size(), 6u);

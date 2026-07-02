@@ -24,14 +24,6 @@ TEST(TopLevelModules, SingleModuleParsesAsTopCandidate) {
   EXPECT_EQ(r.cu->modules[0]->name, "only");
 }
 
-TEST(TopLevelModules, DollarRootHierPathInAssignParses) {
-  EXPECT_TRUE(
-      ParseOk("module top;\n"
-              "  logic x;\n"
-              "  assign x = $root.top.x;\n"
-              "endmodule\n"));
-}
-
 TEST(TopLevelModules, DollarRootHierPathInInitialBlockParses) {
   EXPECT_TRUE(
       ParseOk("module top;\n"

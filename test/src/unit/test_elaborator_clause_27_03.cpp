@@ -31,6 +31,25 @@ TEST(GenerateConstructSyntax, ConstantConditionFromEnclosingScopeElaborates) {
   EXPECT_EQ(CountVariablesNamed(r.design->top_modules[0], 'a'), 1);
 }
 
+// §27.3: a generate-scheme expression is a constant expression, which admits a
+// localparam operand as well as a parameter. localparam resolution runs through
+// a different declaration path than parameter, so a generate-if gated on a
+// localparam is exercised on its own: the selected block's declaration reaches
+// the module.
+TEST(GenerateConstructSyntax, ConstantConditionFromLocalparamElaborates) {
+  auto r = RunGenerateElaboration(
+      "module top;\n"
+      "  localparam Q = 1;\n"
+      "  if (Q == 1) begin\n"
+      "    logic a;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.design, nullptr);
+  EXPECT_FALSE(r.f.has_errors);
+  ASSERT_EQ(r.design->top_modules.size(), 1u);
+  EXPECT_EQ(CountVariablesNamed(r.design->top_modules[0], 'a'), 1);
+}
+
 // §27.3: all expressions in generate schemes shall be constant expressions,
 // deterministic at elaboration time. A condition that depends on a runtime
 // variable is not constant, and the elaborator flags it.
