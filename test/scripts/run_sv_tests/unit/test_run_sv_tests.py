@@ -288,7 +288,7 @@ def test_print_chapter_breakdown_has_box_drawing_table(
     assert all(
         s in captured
         for s in ("┌", "┐", "├", "┤", "└", "┘", "│",
-                   "Clause", "# of tests", "Passed", "Failed", "Percentage")
+                   "Clause", "# of tests", "Failed", "Percentage")
     )
 
 
@@ -303,13 +303,13 @@ def test_print_chapter_breakdown_shows_correct_values(
     ]
     rst.print_chapter_breakdown(results)
     captured = re.sub(r"\033\[[0-9;]*m", "", capsys.readouterr().out)
-    # Column order: Clause │ # of tests │ Passed │ Failed │ Percentage.
+    # Column order: Clause │ # of tests │ Failed │ Percentage.
     row5 = next(ln for ln in captured.splitlines() if ln.startswith("│ 5"))
     row6 = next(ln for ln in captured.splitlines() if ln.startswith("│ 6"))
     cells5 = [c.strip() for c in row5.strip("│").split("│")]
     cells6 = [c.strip() for c in row6.strip("│").split("│")]
-    assert cells5 == ["5", "2", "1", "1", "50.0%"] and cells6 == [
-        "6", "1", "1", "0", "100.0%",
+    assert cells5 == ["5", "2", "1", "50.0%"] and cells6 == [
+        "6", "1", "0", "100.0%",
     ]
 
 
