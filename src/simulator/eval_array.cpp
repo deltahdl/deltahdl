@@ -437,7 +437,8 @@ bool TryEvalArrayReductionWithClause(const Expr* expr, SimContext& ctx,
   if (!IsReductionMethod(method)) return false;
   std::string_view var_name = expr->lhs->text;
   ArrayInfo scratch;
-  if (const auto* info = ArrayInfoForReduction(var_name, method, ctx, scratch)) {
+  if (const auto* info =
+          ArrayInfoForReduction(var_name, method, ctx, scratch)) {
     out = ReduceWithExpr(var_name, *info, expr, method, ctx, arena);
     return true;
   }

@@ -552,10 +552,11 @@ TEST(ArrayReduction, QueueReductionWithClauseIntegration) {
   EXPECT_EQ(f.ctx.FindVariable("y")->value.ToUint64(), 36u);
 }
 
-// §7.12.3 end-to-end: the with clause also applies when the reduction is written
-// as a parenthesized method call (arr.sum() with (e)), a distinct parse from the
-// bare member-access form above. Both route to the same value-reducing fold;
-// over {1,2,3,4} the expression item+10 yields {11,12,13,14}, summing to 50.
+// §7.12.3 end-to-end: the with clause also applies when the reduction is
+// written as a parenthesized method call (arr.sum() with (e)), a distinct parse
+// from the bare member-access form above. Both route to the same value-reducing
+// fold; over {1,2,3,4} the expression item+10 yields {11,12,13,14}, summing
+// to 50.
 TEST(ArrayReduction, CallFormWithClauseSumIntegration) {
   SimFixture f;
   auto* design = ElaborateSrc(
