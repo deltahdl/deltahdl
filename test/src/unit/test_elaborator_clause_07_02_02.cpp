@@ -78,16 +78,6 @@ TEST(StructAssignmentValidation, UnpackedStructAssignment) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(StructAssignmentValidation, PackedStructAllMembersDefaulted_Rejected) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module top;\n"
-      "  struct packed { bit [3:0] a = 1; bit [3:0] b = 2; } s;\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(f.diag.HasErrors());
-}
-
 TEST(StructAssignmentValidation, PackedStructTypedefMemberDefault_Rejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -131,6 +121,68 @@ TEST(StructAssignmentValidation, ParameterMemberDefault_Allowed) {
       "    bit [3:0] lo = c;\n"
       "    bit [3:0] hi;\n"
       "  } p1;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+// §7.2.2/§11.2.1: a member default is a constant expression, one form of which
+// is a localparam reference. Like the parameter case, it must resolve in the
+// module's parameter scope, so a localparam-valued default is accepted.
+TEST(StructAssignmentValidation, LocalparamMemberDefault_Allowed) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  localparam c = 4'h5;\n"
+      "  struct {\n"
+      "    bit [3:0] lo = c;\n"
+      "    bit [3:0] hi;\n"
+      "  } p1;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+// §7.2.2/§11.2.1: a constant function call is another form of constant
+// expression admitted as a member default. With constant arguments the call is
+// accepted, a distinct code path from a plain identifier (parameter/localparam)
+// reference.
+TEST(StructAssignmentValidation, ConstantFunctionCallMemberDefault_Allowed) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  function int inc;\n"
+      "    input int x;\n"
+      "    inc = x + 1;\n"
+      "  endfunction\n"
+      "  struct {\n"
+      "    int a = inc(2);\n"
+      "    int b;\n"
+      "  } s;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+// §7.2.2 (final sentence, see §6.7.1): the initial assignment expression within
+// a data type is ignored when the type is used to declare a net without a
+// user-defined nettype. The member default is legal on the (unpacked) struct
+// type, and using that type as a net is accepted -- the default is not applied
+// as an (illegal) net declaration assignment. The same type used as a variable
+// is accepted too, confirming the type itself is well-formed.
+TEST(StructAssignmentValidation, StructMemberDefaultIgnoredForNet) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  typedef struct {\n"
+      "    logic [7:0] a = 8'hFF;\n"
+      "    logic [7:0] b;\n"
+      "  } t;\n"
+      "  t v;\n"
+      "  wire t w;\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);

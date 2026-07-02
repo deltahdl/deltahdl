@@ -252,14 +252,77 @@ static void CheckDeclRedeclaration(const ModuleItem* item,
   CheckPartialPortOrNameRedeclaration(item, decl_type, tables, kind_word, diag);
 }
 
+// §6.7.1 item a / §6.11.1: a packed structure or union is an integral type,
+// but per §7.2.1 it is treated as a 2-state vector when every one of its
+// members is 2-state. Report such an aggregate as conclusively 2-state. A
+// member of any other kind (a 4-state integer, an enum, or a named/nested
+// aggregate that could resolve to a 4-state type) leaves the result 4-state,
+// so the aggregate is not rejected.
+static bool PackedAggregateIsAll2State(const DataType& dtype) {
+  if (dtype.struct_members.empty()) return false;
+  for (const auto& m : dtype.struct_members) {
+    switch (m.type_kind) {
+      case DataTypeKind::kBit:
+      case DataTypeKind::kByte:
+      case DataTypeKind::kShortint:
+      case DataTypeKind::kInt:
+      case DataTypeKind::kLongint:
+        break;
+      default:
+        return false;
+    }
+  }
+  return true;
+}
+
+// §6.7.1 item b: a member of one of these types can never itself be a net
+// (they are neither integral nor an aggregate of nets), so an unpacked
+// struct/union containing such a member is not a valid net data type.
+static bool MemberKindCannotBeNet(DataTypeKind kind) {
+  switch (kind) {
+    case DataTypeKind::kReal:
+    case DataTypeKind::kShortreal:
+    case DataTypeKind::kRealtime:
+    case DataTypeKind::kString:
+    case DataTypeKind::kChandle:
+    case DataTypeKind::kEvent:
+    case DataTypeKind::kVoid:
+      return true;
+    default:
+      return false;
+  }
+}
+
 // §6.7.1 / §23.2.2.1: a net declared with a vector type that cannot carry a
-// 4-state value is rejected.
+// 4-state value is rejected. Item a of §6.7.1 requires a 4-state integral type
+// (see §6.11.1); a plain 2-state integer net type, or a packed struct/union
+// whose members are all 2-state, is not legal. Item b allows a fixed-size
+// unpacked struct/union, but only when each member is itself a valid net type.
 static void ValidateNetDataTypeIs4State(const DataType& dtype, DiagEngine& diag,
                                         SourceLoc loc) {
   if (dtype.is_interconnect) return;
   DataTypeKind k = dtype.kind;
-  if (k != DataTypeKind::kStruct && k != DataTypeKind::kUnion &&
-      k != DataTypeKind::kEnum && k != DataTypeKind::kNamed &&
+  if (k == DataTypeKind::kStruct || k == DataTypeKind::kUnion) {
+    if (dtype.is_packed || dtype.is_soft) {
+      if (PackedAggregateIsAll2State(dtype)) {
+        diag.Error(loc, "net data type must be 4-state");
+      }
+      return;
+    }
+    // §6.7.1 item b: an unpacked struct/union net's members must each be valid
+    // net types. A directly non-net member kind (real, string, chandle, ...)
+    // makes the whole aggregate an invalid net data type.
+    for (const auto& m : dtype.struct_members) {
+      if (MemberKindCannotBeNet(m.type_kind)) {
+        diag.Error(loc,
+                   "unpacked struct/union net member must be a valid net "
+                   "data type");
+        return;
+      }
+    }
+    return;
+  }
+  if (k != DataTypeKind::kEnum && k != DataTypeKind::kNamed &&
       DataTypeToNetType(k) == NetType::kWire && k != DataTypeKind::kWire &&
       !Is4stateType(k)) {
     diag.Error(loc, "net data type must be 4-state");
@@ -387,6 +450,14 @@ void Elaborator::ElaborateNetDecl(ModuleItem* item, RtlirModule* mod) {
   ValidatePackedDimRange(item->data_type, item->loc);
 
   ValidateNetDataTypeIs4State(item->data_type, diag_, item->loc);
+
+  // §6.7.1: an interconnect net shall specify at most one delay value. A single
+  // delay (net_delay) is permitted; a second or third delay term is not.
+  if (item->data_type.is_interconnect &&
+      (item->net_delay_fall != nullptr || item->net_delay_decay != nullptr)) {
+    diag_.Error(item->loc,
+                "interconnect net shall specify at most one delay value");
+  }
 
   if (item->data_type.charge_strength != 0 &&
       net.net_type != NetType::kTrireg) {

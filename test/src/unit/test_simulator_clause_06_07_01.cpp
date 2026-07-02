@@ -36,6 +36,18 @@ TEST(NetDefaultValue, UndrivenWireDefaultsToZ) {
   EXPECT_EQ(Bit0(*var), kValZ);
 }
 
+// §6.7.1: the default-z rule applies to every non-trireg net type, not just
+// `wire`. An undriven `tri` net comes up z as well.
+TEST(NetDefaultValue, UndrivenTriDefaultsToZ) {
+  LowerFixture f;
+  auto* design = ElaborateSrc("module t; tri w; endmodule\n", f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* var = f.ctx.FindVariable("w");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(Bit0(*var), kValZ);
+}
+
 // §6.7.1: nets with drivers shall assume the output value of their drivers.
 TEST(NetDefaultValue, DrivenNetAssumesDriverValue) {
   LowerFixture f;
