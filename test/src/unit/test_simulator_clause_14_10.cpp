@@ -40,6 +40,16 @@ void WatchFlag(Variable* ev, bool* flag) {
   });
 }
 
+// Add a watcher to `ev` that appends `label` to *order when fired, so the
+// firing can be ordered relative to events placed in other scheduler regions.
+void WatchOrder(Variable* ev, std::vector<std::string>* order,
+                const char* label) {
+  ev->AddWatcher([order, label]() {
+    order->push_back(label);
+    return true;
+  });
+}
+
 // Standard single-block event setup: create clk (initial `clk_init`), register
 // a "cb" block on "clk" with the given edge, create+bind its "__cb_event", and
 // attach. Returns clk; fills *out_event with the bound event variable.
@@ -79,36 +89,6 @@ void SetupTwoBlockEvents(ClockingSimFixture& f, ClockingManager& cmgr,
 
   WatchFlag(ev1, spec.fired1);
   WatchFlag(ev2, spec.fired2);
-}
-
-// Region-ordering check: schedule an event tagged `pre_label` in `pre_region`
-// at t=10, register an "observed"-region edge callback on a posedge "cb" block,
-// then verify the pre-region event fires before the clocking edge callback.
-void RunRegionOrderingTest(ClockingSimFixture& f, Region pre_region,
-                           const char* pre_label) {
-  auto* clk = f.ctx.CreateVariable("clk", 1);
-  clk->value = MakeLogic4VecVal(f.arena, 1, 0);
-
-  ClockingManager cmgr;
-  RegisterClockBlock(cmgr, "cb", "clk", Edge::kPosedge);
-
-  std::vector<std::string> order;
-
-  auto* pre_ev = f.scheduler.GetEventPool().Acquire();
-  pre_ev->callback = [&order, pre_label]() { order.push_back(pre_label); };
-  f.scheduler.ScheduleEvent(SimTime{10}, pre_region, pre_ev);
-
-  cmgr.RegisterEdgeCallback("cb", f.ctx, f.scheduler,
-                            [&order]() { order.push_back("observed"); });
-
-  cmgr.Attach(f.ctx, f.scheduler);
-
-  SchedulePosedge(f, clk, 10);
-  f.scheduler.Run();
-
-  ASSERT_GE(order.size(), 2u);
-  EXPECT_EQ(order[0], pre_label);
-  EXPECT_EQ(order[1], "observed");
 }
 
 TEST(ClockingBlockEventSim, EventVarTriggeredOnClockEdge) {
@@ -161,11 +141,6 @@ TEST(ClockingBlockEventSim, EventNotTriggeredOnWrongEdge) {
   EXPECT_FALSE(triggered);
 }
 
-TEST(ClockingBlockEventSim, EventFiresInObservedRegion) {
-  ClockingSimFixture f;
-  RunRegionOrderingTest(f, Region::kActive, "active");
-}
-
 TEST(ClockingBlockEventSim, NegedgeBlockTriggersOnNegedge) {
   ClockingSimFixture f;
   ClockingManager cmgr;
@@ -179,6 +154,30 @@ TEST(ClockingBlockEventSim, NegedgeBlockTriggersOnNegedge) {
   f.scheduler.Run();
 
   EXPECT_TRUE(triggered);
+}
+
+// §14.10: a clocking block triggers its named event upon its specified clocking
+// event. A block declared with the any-edge form (Edge::kEdge) takes either
+// transition as its clocking event, so both a rising and a falling edge trigger
+// the block event, unlike the posedge/negedge blocks that react to a single
+// direction.
+TEST(ClockingBlockEventSim, AnyEdgeBlockTriggersOnBothEdges) {
+  ClockingSimFixture f;
+  ClockingManager cmgr;
+  Variable* cb_event = nullptr;
+  auto* clk = SetupSingleBlockEvent(f, cmgr, Edge::kEdge, 0, &cb_event);
+
+  uint32_t fire_count = 0;
+  cb_event->AddWatcher([&fire_count]() {
+    ++fire_count;
+    return true;
+  });
+
+  SchedulePosedge(f, clk, 10);
+  ScheduleNegedge(f, clk, 20);
+  f.scheduler.Run();
+
+  EXPECT_EQ(fire_count, 2u);
 }
 
 TEST(ClockingBlockEventSim, MultipleBlocksTriggerIndependentEvents) {
@@ -201,9 +200,38 @@ TEST(ClockingBlockEventSim, MultipleBlocksTriggerIndependentEvents) {
   EXPECT_FALSE(ev2_fired);
 }
 
-TEST(ClockingBlockEventSim, EventFiresAfterNBARegion) {
+// §14.10: the event *associated with the clocking block name* (the clocking
+// block event) shall be triggered in the Observed region. This test watches the
+// bound event variable itself (the object §14.10 names) and confirms its notify
+// lands in Observed by ordering it against competing Active- and NBA-region
+// events in the same time step. If the block-event notify were scheduled into
+// the active region set instead of Observed it would fire before the NBA event,
+// so the strict "block_event last" ordering discriminates the Observed
+// placement.
+TEST(ClockingBlockEventSim, NamedEventFiresInObservedRegionAfterActiveAndNBA) {
   ClockingSimFixture f;
-  RunRegionOrderingTest(f, Region::kNBA, "nba");
+  ClockingManager cmgr;
+  Variable* cb_event = nullptr;
+  auto* clk = SetupSingleBlockEvent(f, cmgr, Edge::kPosedge, 0, &cb_event);
+
+  std::vector<std::string> order;
+  WatchOrder(cb_event, &order, "block_event");
+
+  auto* active_ev = f.scheduler.GetEventPool().Acquire();
+  active_ev->callback = [&order]() { order.push_back("active"); };
+  f.scheduler.ScheduleEvent(SimTime{10}, Region::kActive, active_ev);
+
+  auto* nba_ev = f.scheduler.GetEventPool().Acquire();
+  nba_ev->callback = [&order]() { order.push_back("nba"); };
+  f.scheduler.ScheduleEvent(SimTime{10}, Region::kNBA, nba_ev);
+
+  SchedulePosedge(f, clk, 10);
+  f.scheduler.Run();
+
+  ASSERT_EQ(order.size(), 3u);
+  EXPECT_EQ(order[0], "active");
+  EXPECT_EQ(order[1], "nba");
+  EXPECT_EQ(order[2], "block_event");
 }
 
 TEST(ClockingBlockEventSim, MultipleWatchersAllFireOnEdge) {
