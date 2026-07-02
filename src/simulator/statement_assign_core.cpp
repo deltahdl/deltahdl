@@ -485,12 +485,10 @@ static Logic4Vec ConvertToRealIfNeeded(double d, uint32_t target_width,
   return result;
 }
 
-Logic4Vec ConvertRealOnAssign(Logic4Vec rhs_val, const Expr* lhs,
-                              uint32_t target_width, SimContext& ctx,
-                              Arena& arena) {
-  auto name = LhsIdentName(lhs);
-  if (name.empty()) return ResizeToWidth(rhs_val, target_width, arena);
-  bool lhs_is_real = ctx.IsRealVariable(name);
+Logic4Vec ConvertRealForKnownLhs(Logic4Vec rhs_val, bool lhs_is_real,
+                                 uint32_t target_width, Arena& arena) {
+  // §6.12.1: a real assigned to an integer converts by rounding to the nearest
+  // integer with ties away from zero (std::llround), never a raw bit copy.
   if (rhs_val.is_real && !lhs_is_real) {
     double d = RealVecToDouble(rhs_val);
     auto ival = static_cast<uint64_t>(static_cast<int64_t>(std::llround(d)));
@@ -498,6 +496,8 @@ Logic4Vec ConvertRealOnAssign(Logic4Vec rhs_val, const Expr* lhs,
     result.is_signed = true;
     return result;
   }
+  // §6.12.1: an expression assigned to a real converts numerically; x/z bits of
+  // the source read as zero (ToUint64's aval & ~bval projection).
   if (!rhs_val.is_real && lhs_is_real) {
     uint64_t raw = rhs_val.nwords > 0
                        ? (rhs_val.words[0].aval & ~rhs_val.words[0].bval)
@@ -510,6 +510,15 @@ Logic4Vec ConvertRealOnAssign(Logic4Vec rhs_val, const Expr* lhs,
     return ConvertToRealIfNeeded(d, target_width, arena);
   }
   return ResizeToWidth(rhs_val, target_width, arena);
+}
+
+Logic4Vec ConvertRealOnAssign(Logic4Vec rhs_val, const Expr* lhs,
+                              uint32_t target_width, SimContext& ctx,
+                              Arena& arena) {
+  auto name = LhsIdentName(lhs);
+  if (name.empty()) return ResizeToWidth(rhs_val, target_width, arena);
+  bool lhs_is_real = ctx.IsRealVariable(name);
+  return ConvertRealForKnownLhs(rhs_val, lhs_is_real, target_width, arena);
 }
 
 static void AssignToScalarLhs(const Stmt* stmt, Logic4Vec rhs_val,

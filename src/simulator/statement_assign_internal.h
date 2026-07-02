@@ -27,6 +27,13 @@ Logic4Vec ConvertRealOnAssign(Logic4Vec rhs_val, const Expr* lhs,
                               uint32_t target_width, SimContext& ctx,
                               Arena& arena);
 
+// Defined in statement_assign_core.cpp; also used by lowerer_var.cpp for the
+// declaration-initializer form of the §6.12.1 conversion. Same rule as
+// ConvertRealOnAssign but with the lhs real-ness supplied directly, for callers
+// that have no lhs Expr (e.g. a variable declared with an initializer).
+Logic4Vec ConvertRealForKnownLhs(Logic4Vec rhs_val, bool lhs_is_real,
+                                 uint32_t target_width, Arena& arena);
+
 // Defined in statement_assign_core.cpp; also used by the §11.4.2 nonblocking
 // path in statement_assign_nonblocking.cpp. Evaluate the rhs with the lhs as
 // the assignment context (width and, for named patterns, struct type).

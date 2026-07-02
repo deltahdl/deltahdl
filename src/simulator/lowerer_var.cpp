@@ -465,6 +465,13 @@ void Lowerer::LowerVarInit(const RtlirVariable& var, Variable* v,
     return;
   }
   auto val = EvalExpr(var.init_expr, ctx_, arena_);
+  // §6.12.1: a declaration initializer is an assignment, so an initializer that
+  // crosses the real/integer boundary undergoes the same implicit conversion as
+  // a procedural assign (round-to-nearest ties-away one way; x/z->0 numeric
+  // conversion the other), never a raw bit reinterpretation of the operand.
+  if (val.is_real != var.is_real && !var.is_string && !val.is_string &&
+      !var.is_event && !var.is_chandle)
+    val = ConvertRealForKnownLhs(val, var.is_real, width, arena_);
   if (val.width != width && !var.is_real && !var.is_string)
     val = MakeLogic4VecVal(arena_, width, val.ToUint64());
 
