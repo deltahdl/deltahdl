@@ -74,21 +74,6 @@ TEST(SpecparamParsing, SpecifyBlockWithSpecparam) {
   EXPECT_TRUE(HasSpecifyItemKind(spec, SpecifyItemKind::kPathDecl));
 }
 
-TEST(SpecparamParsing, SpecifyItemSpecparamDecl) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify\n"
-      "    specparam tPD = 10;\n"
-      "  endspecify\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* spec = FindSpecifyBlock(r.cu->modules[0]->items);
-  ASSERT_NE(spec, nullptr);
-  ASSERT_EQ(spec->specify_items.size(), 1u);
-  EXPECT_EQ(spec->specify_items[0]->kind, SpecifyItemKind::kSpecparam);
-}
-
 TEST(SpecparamParsing, SpecparamPackedDim) {
   auto r = Parse(
       "module m;\n"

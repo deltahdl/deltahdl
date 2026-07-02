@@ -28,6 +28,14 @@ void Elaborator::ElaborateSpecparam(ModuleItem* item, RtlirModule* mod) {
   if (item->data_type.packed_dim_left && item->data_type.packed_dim_right) {
     var.width = EvalTypeWidth(item->data_type);
     if (var.width == 0) var.width = 32;
+  } else if (item->init_expr &&
+             item->init_expr->kind == ExprKind::kIntegerLiteral) {
+    // §6.20.5: a specify parameter with no range specification takes the range
+    // of its final value. A sized integer literal carries that width directly
+    // (a 4'd5 value is 4 bits); an unsized literal is 32 bits. Non-literal or
+    // non-integer initializers keep the 32-bit default.
+    uint32_t w = InferExprWidth(item->init_expr, typedefs_);
+    var.width = w == 0 ? 32 : w;
   } else {
     var.width = 32;
   }
