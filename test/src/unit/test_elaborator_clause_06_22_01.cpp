@@ -99,4 +99,32 @@ TEST(MatchingTypesElaboration, SimpleTypedefMatchesUnderlyingBuiltin) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
+// §6.22.1(c): an anonymous enum type matches itself among data objects
+// declared in the same declaration statement, so x and y are assignable.
+TEST(MatchingTypesElaboration, AnonymousEnumSameDeclAssignmentElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  enum {A, B} x, y;\n"
+      "  initial x = y;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+// §6.22.1(c): an anonymous union type likewise matches itself among data
+// objects of the same declaration statement.
+TEST(MatchingTypesElaboration, AnonymousUnionSameDeclAssignmentElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  union packed { logic [7:0] a; logic [7:0] b; } x, y;\n"
+      "  initial x = y;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace

@@ -90,4 +90,51 @@ TEST(EquivalentTypesElaboration, UnpackedFixedSizeArraySameSizeEquivalent) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
+// §6.22.2(d): unpacked fixed-size arrays are equivalent when their element
+// types are equivalent and the sizes are equal -- the actual range bounds may
+// differ ([0:5] vs [1:6]).
+TEST(EquivalentTypesElaboration,
+     UnpackedFixedSizeArrayDifferentRangesEquivalent) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  bit [7:0] a [0:5];\n"
+      "  bit [7:0] b [1:6];\n"
+      "  initial a = b;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+// §6.22.2(e): dynamic arrays are equivalent when they are the same kind of
+// array with equivalent element types.
+TEST(EquivalentTypesElaboration, DynamicArraysSameElementTypeEquivalent) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  int a [];\n"
+      "  int b [];\n"
+      "  initial a = b;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+// §6.22.2(e): queues are equivalent when they are the same kind of array with
+// equivalent element types.
+TEST(EquivalentTypesElaboration, QueuesSameElementTypeEquivalent) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  int a [$];\n"
+      "  int b [$];\n"
+      "  initial a = b;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace

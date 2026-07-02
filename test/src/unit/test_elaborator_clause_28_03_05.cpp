@@ -115,4 +115,63 @@ TEST(GateArrayElaboration, ParameterTypedRangeBoundIsAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §28.3.5: a [lhi:rhi] range on a module instance name yields abs(lhi-rhi)+1
+// distinct instances, the same array-of-instances rule that governs gates.
+TEST(ModuleInstanceArrayElaboration, RangeExpandsToInstanceCount) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module child; endmodule\n"
+      "module top;\n"
+      "  child c0 [3:0] ();\n"
+      "endmodule\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(design->top_modules[0]->children.size(), 4u);
+}
+
+// §28.3.5: one instance identifier may be associated with only one range;
+// reusing `u` for a second array is an illegal redeclaration.
+TEST(ModuleInstanceArrayElaboration, ReusedArrayInstanceNameRejected) {
+  ElabFixture f;
+  Elaborate(
+      "module child; endmodule\n"
+      "module top;\n"
+      "  child u [0:3] ();\n"
+      "  child u [4:7] ();\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_TRUE(f.has_errors);
+}
+
+// §28.3.5: the range bounds are constant expressions (§11.2.1). End-to-end: a
+// parameter bound [N:0] with N=3 yields abs(N-0)+1 = 4 instances.
+TEST(ModuleInstanceArrayElaboration, ParameterBoundExpandsToInstanceCount) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module child; endmodule\n"
+      "module top;\n"
+      "  parameter int N = 3;\n"
+      "  child c0 [N:0] ();\n"
+      "endmodule\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(design->top_modules[0]->children.size(), 4u);
+}
+
+// §28.3.5 (negative): a range bound that is not a constant expression (a
+// variable) is rejected.
+TEST(ModuleInstanceArrayElaboration, NonConstantRangeBoundRejected) {
+  ElabFixture f;
+  Elaborate(
+      "module child; endmodule\n"
+      "module top;\n"
+      "  reg [3:0] r;\n"
+      "  child c0 [r:0] ();\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_TRUE(f.has_errors);
+}
+
 }  // namespace

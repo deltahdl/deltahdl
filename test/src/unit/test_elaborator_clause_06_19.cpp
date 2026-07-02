@@ -250,4 +250,18 @@ TEST(EnumerationElaboration, EnumVectorTypedefBaseWithPackedDimAllowed) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
+// §6.19: an enum named-constant value is an elaboration-time constant
+// expression (§6.20) and may reference a localparam, not only a parameter.
+TEST(EnumerationElaboration, EnumLocalparamInitializer_Ok) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  localparam int X = 4;\n"
+      "  enum integer {A = X, B} v;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace

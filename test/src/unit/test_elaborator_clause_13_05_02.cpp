@@ -324,4 +324,19 @@ TEST(PassByRefValidation, NonRefArgsInStaticFuncAccepted) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
+// §13.5.2: an element of an unpacked array is one of the constructs that may
+// legally be passed by reference (unlike a net).
+TEST(PassByRefValidation, UnpackedArrayElementPassedByRefAccepted) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  logic v [0:3];\n"
+      "  function automatic void take(ref logic x);\n"
+      "  endfunction\n"
+      "  initial take(v[2]);\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace

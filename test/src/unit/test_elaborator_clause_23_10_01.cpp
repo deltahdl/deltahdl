@@ -208,4 +208,20 @@ TEST(DefparamElaboration, DefparamCannotTargetOtherArrayInstance) {
   EXPECT_LE(count_77, 1);
 }
 
+// §23.10.1: defparam overrides value parameters; a localparam is local and
+// cannot be redefined by a defparam statement.
+TEST(DefparamElaboration, CannotOverrideLocalparam) {
+  ElabFixture f;
+  Elaborate(
+      "module child ();\n"
+      "  localparam int L = 1;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  child u();\n"
+      "  defparam u.L = 5;\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
 }  // namespace

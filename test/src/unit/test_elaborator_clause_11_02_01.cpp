@@ -191,4 +191,28 @@ TEST(ConstantExpressionElaboration, ConstantBuiltinMethodTypeQueryElaborates) {
   EXPECT_TRUE(IsConstantExpr(e));
 }
 
+// §11.2.1: a localparam is an admitted constant-expression operand, resolved on
+// a different production path than a parameter.
+TEST(ConstantExpressionElaboration, LocalparamOperandInConstantExpr) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  localparam int L = 4;\n"
+             "  parameter int P = L * 2;\n"
+             "endmodule\n"));
+}
+
+// §11.2.1: a genvar is an admitted constant-expression operand within a
+// generate loop.
+TEST(ConstantExpressionElaboration, GenvarOperandInConstantExpr) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  genvar g;\n"
+             "  generate\n"
+             "    for (g = 0; g < 2; g = g + 1) begin : blk\n"
+             "      localparam int L = g + 1;\n"
+             "    end\n"
+             "  endgenerate\n"
+             "endmodule\n"));
+}
+
 }  // namespace

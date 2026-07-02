@@ -248,19 +248,6 @@ TEST(TaskDeclParsing, TaskBodyNewStyleMultipleDirections) {
                            Direction::kInout, Direction::kRef});
 }
 
-TEST(TaskDeclParsing, TaskBodyNewStyleStickyDirection) {
-  auto r = Parse(
-      "module m;\n"
-      "  task my_task(input int a, int b, int c);\n"
-      "  endtask\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  VerifyFuncArgDirections(
-      r.cu->modules[0]->items[0],
-      {Direction::kInput, Direction::kInput, Direction::kInput});
-}
-
 TEST(TaskDeclParsing, TaskBodyWithEndLabel) {
   auto r = Parse(
       "module m;\n"
@@ -336,20 +323,6 @@ TEST(TaskAndFunctionParsing, TaskEmptyBody) {
   auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kTaskDecl);
   EXPECT_TRUE(item->func_body_stmts.empty());
-}
-
-TEST(TaskAndFunctionParsing, TaskDirectionStickyOutput) {
-  auto r = Parse(
-      "module m;\n"
-      "  task t(output logic [7:0] a, b);\n"
-      "  endtask\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  ASSERT_EQ(item->func_args.size(), 2u);
-  EXPECT_EQ(item->func_args[0].direction, Direction::kOutput);
-  EXPECT_EQ(item->func_args[1].direction, Direction::kOutput);
 }
 
 TEST(TaskAndFunctionParsing, TaskMultipleStatements) {

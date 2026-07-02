@@ -541,6 +541,15 @@ void Elaborator::ElaborateModuleInst(ModuleItem* item, RtlirModule* mod) {
   CheckInterconnectPortMerge(inst, item, mod);
 
   inst.attrs = ResolveAttributes(item->attrs, diag_);
+  // §28.3.5: an instance-array range shall be given by two constant
+  // expressions; a non-constant bound in a [lhi:rhi] range is an error, the
+  // same rule the gate/switch-array path enforces.
+  if (item->inst_range_left && item->inst_range_right &&
+      (!ConstEvalInt(item->inst_range_left) ||
+       !ConstEvalInt(item->inst_range_right))) {
+    diag_.Error(item->loc,
+                "instance array range bound must be a constant expression");
+  }
   InstArrayDistribCtx dctx{arena_, mod, var_array_info_};
   AppendModuleInstOrArray(dctx, mod, inst, item);
   current_inst_path_ = std::move(saved_inst_path);

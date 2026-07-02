@@ -64,4 +64,29 @@ TEST(ModuleInstantiationParser, PortlessInstanceWithoutParensRejected) {
   EXPECT_TRUE(r.has_errors);
 }
 
+// §23.3.2: positional and named connections cannot be mixed, but the three
+// named forms may be mixed -- here an explicit .a(a) with a wildcard .*.
+TEST(ModuleInstantiationParser,
+     WildcardMixedWithExplicitNamedConnectionsParses) {
+  auto r = Parse(
+      "module top;\n"
+      "  logic a, b;\n"
+      "  child u0(.a(a), .*);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+// §23.3.2: a named_parameter_assignment list must not name the same parameter
+// twice.
+TEST(ModuleInstantiationParser, DuplicateNamedParameterAssignmentRejected) {
+  auto r = Parse(
+      "module child #(parameter int W = 1) ();\n"
+      "endmodule\n"
+      "module top;\n"
+      "  child #(.W(1), .W(2)) u0();\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
 }  // namespace
