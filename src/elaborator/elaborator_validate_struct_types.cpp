@@ -305,6 +305,15 @@ void Elaborator::ValidatePackedStructMemberTypes(const DataType& dtype,
     if (!IsLegalPackedMemberType(m.type_kind)) {
       diag_.Error(loc, std::format("type of member '{}' is not allowed in a {}",
                                    m.name, container));
+      continue;
+    }
+    // §7.2.1: only packed data types are permitted as members. A member that
+    // carries unpacked dimensions is an unpacked array, which is not a packed
+    // type, so it cannot appear in a packed structure or union.
+    if (!m.unpacked_dims.empty()) {
+      diag_.Error(
+          loc, std::format("unpacked array member '{}' is not allowed in a {}",
+                           m.name, container));
     }
   }
 }

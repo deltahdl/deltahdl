@@ -192,6 +192,14 @@ DataType Parser::ParseStructOrUnionType() {
     } else {
       Match(TokenKind::kKwUnsigned);
     }
+  } else if (Check(TokenKind::kKwSigned) || Check(TokenKind::kKwUnsigned)) {
+    // §7.2.1 (Syntax 7-1): 'signing' may appear only after 'packed'. An
+    // unpacked structure or union cannot carry a signedness specifier, so
+    // reject a stray signed/unsigned here and drop it to recover cleanly
+    // before the member list.
+    diag_.Error(CurrentLoc(),
+                "signing is not allowed on an unpacked structure or union");
+    Consume();
   }
 
   if (CheckIdentifier() && !Check(TokenKind::kLBrace)) {

@@ -156,6 +156,67 @@ TEST(PackedStructSimulation, BitMemberInFourStateStruct_ReadsAsTwoState) {
   EXPECT_EQ(v, 0u);
 }
 
+// §7.2.1: a packed structure used as a whole behaves per its signedness. A
+// 'packed signed' struct read as a single vector sign-extends when widened, so
+// an all-ones 8-bit value fills the upper byte with ones.
+TEST(PackedStructSimulation, SignedPackedStructWholeReadSignExtends) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  typedef struct packed signed { logic [7:0] a; } b_t;\n"
+      "  b_t s;\n"
+      "  logic [15:0] r;\n"
+      "  initial begin s = 8'hFF; r = s; end\n"
+      "endmodule\n",
+      "r");
+  EXPECT_EQ(v, 0xFFFFu);
+}
+
+// §7.2.1: unsigned is the default signedness of a packed structure, so the
+// same whole-vector read zero-extends when widened. This discriminates the
+// default from the explicit 'signed' case above.
+TEST(PackedStructSimulation, UnsignedDefaultPackedStructWholeReadZeroExtends) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  typedef struct packed { logic [7:0] a; } b_t;\n"
+      "  b_t s;\n"
+      "  logic [15:0] r;\n"
+      "  initial begin s = 8'hFF; r = s; end\n"
+      "endmodule\n",
+      "r");
+  EXPECT_EQ(v, 0x00FFu);
+}
+
+// §7.2.1 built from §6.11 integer data types: a packed structure whose members
+// are declared with real Table 6-8 types (int, byte) packs them without gaps in
+// most-significant-first order. Driven end-to-end (parse/elaborate/run), the
+// first member occupies the high bits of the whole vector.
+TEST(PackedStructSimulation, IntegerTypeMembersPackMsbFirst) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  typedef struct packed { int a; byte b; } m_t;\n"
+      "  m_t m;\n"
+      "  logic [31:0] ra;\n"
+      "  initial begin m = 40'h1122334455; ra = m.a; end\n"
+      "endmodule\n",
+      "ra");
+  EXPECT_EQ(v, 0x11223344u);
+}
+
+// §7.2.1: bits of a packed structure may be selected as if it were a packed
+// array [n-1:0]. This exercises the indexed part-select form ([base+:width]),
+// distinct from the fixed [msb:lsb] and single-bit select forms.
+TEST(PackedStructSimulation, IndexedPartSelectOnPackedStruct) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  typedef struct packed { logic [7:0] hi; logic [7:0] lo; } w_t;\n"
+      "  w_t w;\n"
+      "  logic [7:0] top_byte;\n"
+      "  initial begin w = 16'hABCD; top_byte = w[8+:8]; end\n"
+      "endmodule\n",
+      "top_byte");
+  EXPECT_EQ(v, 0xABu);
+}
+
 TEST(PackedStructSimulation, MemberWriteUpdatesWholeVector) {
   auto v = RunAndGet(
       "module t;\n"

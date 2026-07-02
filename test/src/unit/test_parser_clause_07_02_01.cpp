@@ -330,29 +330,6 @@ TEST(PackedStructParsing, PackedStructWithPackedUnion) {
               "endmodule\n"));
 }
 
-TEST(PackedStructParsing, PackedStructAssignToLogicVector) {
-  auto r = Parse(
-      "module t;\n"
-      "  typedef struct packed {\n"
-      "    logic [3:0] upper;\n"
-      "    logic [3:0] lower;\n"
-      "  } nibbles_t;\n"
-      "  nibbles_t n;\n"
-      "  logic [7:0] result;\n"
-      "  initial begin\n"
-      "    n = 8'b1010_0101;\n"
-      "    result = n;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* s0 = NthInitialStmt(r, 0);
-  ASSERT_NE(s0, nullptr);
-  EXPECT_EQ(s0->kind, StmtKind::kBlockingAssign);
-  ASSERT_NE(s0->rhs, nullptr);
-  EXPECT_EQ(s0->rhs->kind, ExprKind::kIntegerLiteral);
-}
-
 TEST(PackedStructParsing, PackedWithEnumMember) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -515,24 +492,6 @@ TEST(PackedStructParsing, PackedStructFromInteger) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kIntegerLiteral);
 }
 
-TEST(PackedStructParsing, PackedSignedAllTwoStateMembers) {
-  auto r = Parse(
-      "module t;\n"
-      "  struct packed signed {\n"
-      "    int a;\n"
-      "    shortint b;\n"
-      "    byte c;\n"
-      "    bit [7:0] d;\n"
-      "  } pack1;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_TRUE(item->data_type.is_packed);
-  EXPECT_TRUE(item->data_type.is_signed);
-  EXPECT_EQ(item->data_type.struct_members.size(), 4u);
-}
-
 TEST(PackedStructParsing, PackedStructDefaultUnsigned) {
   auto r = Parse(
       "module t;\n"
@@ -569,6 +528,13 @@ TEST(PackedStructParsing, UnpackedSignedStruct_Rejected) {
       "  typedef struct signed { int f1; logic f2; } bad_t;\n"
       "endmodule\n");
   EXPECT_TRUE(r.has_errors);
+  // The targeted signing diagnostic drops the stray 'signed' and still parses
+  // the member list, so the (illegal) body is recovered with both members
+  // rather than desyncing on a generic brace error.
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_FALSE(item->typedef_type.is_signed);
+  EXPECT_EQ(item->typedef_type.struct_members.size(), 2u);
 }
 
 TEST(PackedStructParsing, UnpackedUnsignedStruct_Rejected) {
@@ -577,6 +543,9 @@ TEST(PackedStructParsing, UnpackedUnsignedStruct_Rejected) {
       "  typedef struct unsigned { int f1; logic f2; } bad_t;\n"
       "endmodule\n");
   EXPECT_TRUE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->typedef_type.struct_members.size(), 2u);
 }
 
 }  // namespace

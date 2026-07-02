@@ -124,6 +124,16 @@ TEST(PackedStructValidation, PackedStructEventMember_Rejected) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
+TEST(PackedStructValidation, PackedStructUnpackedArrayMember_Rejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  struct packed { logic [7:0] mem [4]; logic [7:0] a; } s;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
 TEST(PackedStructValidation, PackedStructRegMember_Allowed) {
   ElabFixture f;
   ElaborateSrc(
@@ -150,6 +160,20 @@ TEST(PackedStructValidation, NestedPackedStruct_Allowed) {
              "    logic [7:0] color;\n"
              "  } pixel_t;\n"
              "  pixel_t p;\n"
+             "endmodule\n"));
+}
+
+// §7.2.1: a packed data type is legal as a packed-struct member. A packed union
+// is a packed data type, so it is accepted alongside the integral members
+// (distinct admitted form from the nested packed struct case above).
+TEST(PackedStructValidation, PackedStructPackedUnionMember_Allowed) {
+  EXPECT_TRUE(
+      ElabOk("module top;\n"
+             "  typedef struct packed {\n"
+             "    logic [7:0] tag;\n"
+             "    union packed { logic [7:0] a; logic [7:0] b; } u;\n"
+             "  } msg_t;\n"
+             "  msg_t m;\n"
              "endmodule\n"));
 }
 
