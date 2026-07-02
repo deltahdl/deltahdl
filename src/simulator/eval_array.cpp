@@ -1,6 +1,7 @@
 #include "simulator/eval_array.h"
 
 #include <algorithm>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -223,25 +224,30 @@ static uint64_t ApplyReduction(std::string_view method,
   return 0;
 }
 
+struct ArrayCtx {
+  std::string_view var_name;
+  const ArrayInfo& info;
+  SimContext& ctx;
+  Arena& arena;
+};
+
 // Reduces the values produced by the with-clause expression of `expr` for each
 // element of the named array (§7.12.3). `method` selects the fold and is passed
 // explicitly so this serves both the parenthesized call form (method name on
 // expr->lhs->rhs) and the bare member-access form `arr.sum with (e)` (method
 // name on expr->rhs). The result takes the width of the with expression.
-static Logic4Vec ReduceWithExpr(std::string_view var_name,
-                                const ArrayInfo& info, const Expr* expr,
-                                std::string_view method, SimContext& ctx,
-                                Arena& arena) {
-  auto elems = CollectVecElements(var_name, info, ctx, arena);
+static Logic4Vec ReduceWithExpr(const ArrayCtx& ac, const Expr* expr,
+                                std::string_view method) {
+  auto elems = CollectVecElements(ac.var_name, ac.info, ac.ctx, ac.arena);
   auto names = ExtractIterNames(expr);
-  WithIterEnv env{names.iter_name, names.idx_var_name, ctx, arena};
+  WithIterEnv env{names.iter_name, names.idx_var_name, ac.ctx, ac.arena};
 
   uint32_t result_width = 0;
   auto vals = EvalReduceWithValues(elems, expr, env, result_width);
-  if (result_width == 0) result_width = info.elem_width;
+  if (result_width == 0) result_width = ac.info.elem_width;
 
   uint64_t result = ApplyReduction(method, vals);
-  return MakeLogic4VecVal(arena, result_width, result);
+  return MakeLogic4VecVal(ac.arena, result_width, result);
 }
 
 static Logic4Vec ArraySize(std::string_view var_name, const ArrayInfo& info,
@@ -268,13 +274,6 @@ static Logic4Vec ArrayMax(std::string_view var_name, const ArrayInfo& info,
   uint64_t result = *std::max_element(vals.begin(), vals.end());
   return MakeLogic4VecVal(arena, info.elem_width, result);
 }
-
-struct ArrayCtx {
-  std::string_view var_name;
-  const ArrayInfo& info;
-  SimContext& ctx;
-  Arena& arena;
-};
 
 static bool IsReductionMethod(std::string_view method) {
   return method == "sum" || method == "product" || method == "and" ||
@@ -319,12 +318,14 @@ static std::vector<Logic4Vec> CollectAssocElements(const AssocArrayObject* aa) {
 
 // Folds an associative array's elements with the named reduction, optionally
 // transforming each through the with clause carried by `expr` (null for the
-// bare property form). Returns false for non-reduction methods so the caller
+// bare property form). Returns nullopt for non-reduction methods so the caller
 // keeps handling its own methods (size, exists, traversal, …).
-static bool TryAssocReduction(AssocArrayObject* aa, std::string_view method,
-                              const Expr* expr, SimContext& ctx, Arena& arena,
-                              Logic4Vec& out) {
-  if (!IsReductionMethod(method)) return false;
+static std::optional<Logic4Vec> TryAssocReduction(AssocArrayObject* aa,
+                                                  std::string_view method,
+                                                  const Expr* expr,
+                                                  SimContext& ctx,
+                                                  Arena& arena) {
+  if (!IsReductionMethod(method)) return std::nullopt;
   auto elems = CollectAssocElements(aa);
   if (expr != nullptr && expr->with_expr != nullptr) {
     auto names = ExtractIterNames(expr);
@@ -332,14 +333,12 @@ static bool TryAssocReduction(AssocArrayObject* aa, std::string_view method,
     uint32_t result_width = 0;
     auto vals = EvalReduceWithValues(elems, expr, env, result_width);
     if (result_width == 0) result_width = aa->elem_width;
-    out = MakeLogic4VecVal(arena, result_width, ApplyReduction(method, vals));
-    return true;
+    return MakeLogic4VecVal(arena, result_width, ApplyReduction(method, vals));
   }
   std::vector<uint64_t> vals;
   vals.reserve(elems.size());
   for (const auto& e : elems) vals.push_back(e.ToUint64());
-  out = MakeLogic4VecVal(arena, aa->elem_width, ApplyReduction(method, vals));
-  return true;
+  return MakeLogic4VecVal(arena, aa->elem_width, ApplyReduction(method, vals));
 }
 
 static bool DispatchReduction(std::string_view method, const ArrayCtx& ac,
@@ -371,7 +370,7 @@ static bool DispatchReductionExpr(std::string_view method, const ArrayCtx& ac,
                                   const Expr* expr, Logic4Vec& out) {
   if (!IsReductionMethod(method)) return false;
   if (expr->with_expr) {
-    out = ReduceWithExpr(ac.var_name, ac.info, expr, method, ac.ctx, ac.arena);
+    out = ReduceWithExpr(ac, expr, method);
   } else if (method == "sum") {
     out = ArraySum(ac.var_name, ac.info, ac.ctx, ac.arena);
   } else if (method == "product") {
@@ -439,11 +438,16 @@ bool TryEvalArrayReductionWithClause(const Expr* expr, SimContext& ctx,
   ArrayInfo scratch;
   if (const auto* info =
           ArrayInfoForReduction(var_name, method, ctx, scratch)) {
-    out = ReduceWithExpr(var_name, *info, expr, method, ctx, arena);
+    ArrayCtx ac{var_name, *info, ctx, arena};
+    out = ReduceWithExpr(ac, expr, method);
     return true;
   }
-  if (auto* aa = ctx.FindAssocArray(var_name))
-    return TryAssocReduction(aa, method, expr, ctx, arena, out);
+  if (auto* aa = ctx.FindAssocArray(var_name)) {
+    if (auto reduced = TryAssocReduction(aa, method, expr, ctx, arena)) {
+      out = *reduced;
+      return true;
+    }
+  }
   return false;
 }
 
@@ -844,7 +848,12 @@ bool TryEvalAssocMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
     }
     return AssocTraversal(aa, parts.method_name, ref_var, arena, out);
   }
-  return TryAssocReduction(aa, parts.method_name, expr, ctx, arena, out);
+  if (auto reduced =
+          TryAssocReduction(aa, parts.method_name, expr, ctx, arena)) {
+    out = *reduced;
+    return true;
+  }
+  return false;
 }
 
 static bool ExecAssocDelete(AssocArrayObject* aa, const Expr* expr,
@@ -882,7 +891,11 @@ bool TryEvalAssocProperty(std::string_view var_name, std::string_view prop,
     out = MakeLogic4VecVal(arena, 32, aa->Size());
     return true;
   }
-  return TryAssocReduction(aa, prop, nullptr, ctx, arena, out);
+  if (auto reduced = TryAssocReduction(aa, prop, nullptr, ctx, arena)) {
+    out = *reduced;
+    return true;
+  }
+  return false;
 }
 
 bool TryExecAssocPropertyStmt(std::string_view var_name, std::string_view prop,

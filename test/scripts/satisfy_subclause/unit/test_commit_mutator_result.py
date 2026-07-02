@@ -45,6 +45,23 @@ def _patched_body(value: str = "") -> Any:
     )
 
 
+@pytest.fixture(autouse=True)
+def _stub_clang_format() -> Any:
+    """Stop commit_mutator_result from shelling out to clang-format."""
+    with patch("satisfy_subclause.mutators.clang_format_changed") as mock:
+        yield mock
+
+
+def test_commit_mutator_result_formats_changed_before_commit(
+    _stub_clang_format: Any,
+) -> None:
+    """The changed C++ files are clang-formatted before the commit lands."""
+    with _patched_porcelain((["foo.cpp"], ["bar.h"], [])), \
+            _patched_commit(), _patched_close(), _patched_body():
+        commit_mutator_result(["6.3"], [42], model="opus")
+    assert _stub_clang_format.call_args[0][0] == ["foo.cpp", "bar.h"]
+
+
 @pytest.mark.parametrize(
     "porcelain", [([], [], []), (["{a,"], [], [])],
     ids=["clean", "only-garbage"],

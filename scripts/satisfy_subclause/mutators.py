@@ -317,6 +317,28 @@ def _close_satisfied_issue(subclause: str, issue: int) -> None:
     )
 
 
+_CLANG_FORMAT_EXTENSIONS = (".cpp", ".h")
+
+
+def clang_format_changed(changed: list[str]) -> None:
+    """Run ``clang-format -i --style=google`` on changed C++ sources.
+
+    The CI static-analysis gate rejects any file that is not
+    google-formatted (``clang-format --dry-run --Werror --style=google``),
+    and the resumed mutator session is not guaranteed to have formatted
+    the code it wrote. Formatting here — immediately before the commit —
+    keeps every landed commit past that gate. Non-C++ paths (``.py``,
+    ``CMakeLists.txt``) are left untouched; clang-format does not apply
+    to them.
+    """
+    cpp = [p for p in changed if p.endswith(_CLANG_FORMAT_EXTENSIONS)]
+    if not cpp:
+        return
+    subprocess.run(
+        ["clang-format", "-i", "--style=google", *cpp], check=True,
+    )
+
+
 def commit_mutator_result(
     subclauses: list[str], issues: list[int], *, model: str,
 ) -> bool:
@@ -342,6 +364,7 @@ def commit_mutator_result(
         for subclause, issue in zip(subclauses, issues, strict=True):
             _close_satisfied_issue(subclause, issue)
         return False
+    clang_format_changed(changed)
     summary = generate_commit_body(
         subclauses, added, modified, deleted, model=model,
     ).strip()
