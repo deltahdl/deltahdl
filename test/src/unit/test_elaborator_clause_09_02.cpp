@@ -143,4 +143,22 @@ TEST(StructuredProcedureElaboration,
   EXPECT_TRUE(f.has_errors);
 }
 
+// Footnote 25 accepting path: the override specifier IS legal when the method
+// is declared inside a non-interface class scope. This anchors the three
+// module-level rejections above -- without it, a rule that flagged any override
+// specifier regardless of scope would still pass those negatives.
+TEST(StructuredProcedureElaboration,
+     DynamicOverrideAcceptedOnNonInterfaceClassMethod) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "class C;\n"
+      "  virtual function :initial void foo();\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m; endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace
