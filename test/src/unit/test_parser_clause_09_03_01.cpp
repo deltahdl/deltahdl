@@ -218,6 +218,26 @@ TEST(SequentialBlockParsing, EmptySeqBlock) {
   EXPECT_EQ(stmt->stmts.size(), 0u);
 }
 
+// Syntax 9-2 gives seq_block an optional [ : block_identifier ] after begin.
+// Exercise that BNF element: a named begin-end block parses and the block
+// identifier is recorded on the block statement.
+TEST(SequentialBlockParsing, NamedSequentialBlockRecordsBlockIdentifier) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    begin : blk\n"
+      "      a = 1;\n"
+      "    end : blk\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kBlock);
+  EXPECT_EQ(stmt->label, "blk");
+}
+
 TEST(SequentialBlockParsing, NullStatementInSeqBlock) {
   auto r = Parse(
       "module m;\n"

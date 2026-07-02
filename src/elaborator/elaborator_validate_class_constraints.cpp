@@ -37,33 +37,51 @@ BuildClassPropertyMap(const ClassDecl* cls, const CompilationUnit* unit) {
   return properties;
 }
 
-// 18.4: validate the union-rand restrictions on a single rand/randc property.
-// Resolves the declared type through any typedef chain so that a union hidden
-// behind a named type is still examined, then rejects the non-randomizable
-// union flavors (unpacked, or packed tagged).
-static void ValidateRandUnionMember(const ClassMember* m,
-                                    const TypedefMap& typedefs,
-                                    DiagEngine& diag) {
-  // Resolve the declared type through any typedef chain so that a union
-  // hidden behind a named type is still examined.
-  const DataType* resolved = &m->data_type;
-  for (int hops = 0; hops < 8 && resolved->kind == DataTypeKind::kNamed;
-       ++hops) {
-    auto it = typedefs.find(resolved->type_name);
+// Resolve a declared type through any typedef chain (bounded) so an aggregate
+// hidden behind a named type is still examined.
+static const DataType* ResolveThroughTypedefs(const DataType* dt,
+                                              const TypedefMap& typedefs) {
+  for (int hops = 0; hops < 8 && dt->kind == DataTypeKind::kNamed; ++hops) {
+    auto it = typedefs.find(dt->type_name);
     if (it == typedefs.end()) break;
-    resolved = &it->second;
+    dt = &it->second;
   }
+  return dt;
+}
+
+// 18.4: validate the aggregate-rand restrictions on a single rand/randc
+// property. Resolves the declared type through any typedef chain so that a
+// union or structure hidden behind a named type is still examined, then rejects
+// the non-randomizable flavors.
+static void ValidateRandAggregateMember(const ClassMember* m,
+                                        const TypedefMap& typedefs,
+                                        DiagEngine& diag) {
+  const DataType* resolved = ResolveThroughTypedefs(&m->data_type, typedefs);
   // Only a packed untagged union may be randomized: it is treated as an
   // integral value. An unpacked union has no single integral image, and a
   // packed tagged union carries a tag that randomization cannot honor.
-  if (resolved->kind != DataTypeKind::kUnion) return;
-  if (!resolved->is_packed) {
-    diag.Error(m->loc, std::format("unpacked union '{}' shall not be declared "
-                                   "rand or randc",
-                                   m->name));
-  } else if (resolved->is_tagged) {
-    diag.Error(m->loc, std::format("packed tagged union '{}' shall not be "
-                                   "declared rand or randc",
+  if (resolved->kind == DataTypeKind::kUnion) {
+    if (!resolved->is_packed) {
+      diag.Error(m->loc,
+                 std::format("unpacked union '{}' shall not be declared "
+                             "rand or randc",
+                             m->name));
+    } else if (resolved->is_tagged) {
+      diag.Error(m->loc, std::format("packed tagged union '{}' shall not be "
+                                     "declared rand or randc",
+                                     m->name));
+    }
+    return;
+  }
+  // An unpacked structure may be declared rand (its random members are solved
+  // concurrently), but shall not be declared randc: randc cycles over a single
+  // integral declared range, which an unpacked aggregate does not present. A
+  // packed structure is treated as an integral value, so randc is allowed there
+  // and is not rejected here.
+  if (m->is_randc && resolved->kind == DataTypeKind::kStruct &&
+      !resolved->is_packed) {
+    diag.Error(m->loc, std::format("unpacked structure '{}' shall not be "
+                                   "declared randc",
                                    m->name));
   }
 }
@@ -90,7 +108,8 @@ void Elaborator::ValidateOneClassRandomVariables(const ClassDecl* cls) {
                               m->name));
     }
 
-    if (m->is_rand || m->is_randc) ValidateRandUnionMember(m, typedefs_, diag_);
+    if (m->is_rand || m->is_randc)
+      ValidateRandAggregateMember(m, typedefs_, diag_);
   }
 }
 

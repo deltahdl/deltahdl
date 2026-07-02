@@ -129,4 +129,82 @@ TEST(BlockingAssignSim, IntraAssignmentDelayEvaluatesLvalueAfterDelay) {
   EXPECT_EQ(arr3->value.ToUint64(), 99u);
 }
 
+// The intra-assignment delay of a blocking assignment (§10.4.1) is a §9.4.1
+// delay control, so a negative delay must be reinterpreted as a
+// two's-complement unsigned integer the width of a time variable, exactly as a
+// standalone delay does. A 32-bit -1 delay therefore advances time by the full
+// 64-bit all-ones value, not by the raw zero-extended 0xFFFFFFFF. This
+// discriminates against taking the delay's raw bits.
+TEST(BlockingAssignSim,
+     NegativeIntraAssignmentDelayReinterpretedAsTimeVariable) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int d;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    d = -1;\n"
+      "    x = #d 8'd42;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 42u);
+  EXPECT_EQ(f.ctx.CurrentTime().ticks, ~uint64_t{0});
+}
+
+// An intra-assignment delay whose value has any unknown bits (§9.4.1) must be
+// treated as a zero delay, even when the known bits are nonzero. Here the delay
+// 4'b10xx has known high bits worth 8, but the unknown low bits force a zero
+// delay, so the assignment completes at time 0. This discriminates against a
+// raw-bits reading that would advance time by 8.
+TEST(BlockingAssignSim, MultibitUnknownIntraAssignmentDelayTreatedAsZero) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    x = 8'd1;\n"
+      "    x = #(4'b10xx) 8'd2;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 2u);
+  EXPECT_EQ(f.ctx.CurrentTime().ticks, 0u);
+}
+
+// §10.4.1 permits a variable of any of the assignment-compatible LHS forms; a
+// struct member select (§7.2) is one such form and reaches production through
+// the kMemberAccess lvalue-resolution path (ResolveLhsVariable/BuildLhsName),
+// distinct from the plain-identifier and select forms already exercised. Each
+// member write lands at its own field offset within the packed struct, so
+// writing both members from scratch and reading back the whole struct verifies
+// the full pipeline resolves and composes member-LHS blocking assignments. The
+// existing §7.2.1 coverage overwrites a single member of a pre-initialized
+// struct; this drives two distinct member LHS targets and observes the result.
+TEST(BlockingAssignSim, StructMemberLhsWritesComposeFullStruct) {
+  auto result = RunAndGet(
+      "module t;\n"
+      "  typedef struct packed { logic [7:0] hi; logic [7:0] lo; } w_t;\n"
+      "  w_t s;\n"
+      "  initial begin\n"
+      "    s.hi = 8'hAB;\n"
+      "    s.lo = 8'hCD;\n"
+      "  end\n"
+      "endmodule\n",
+      "s");
+  EXPECT_EQ(result, 0xABCDu);
+}
+
 }  // namespace

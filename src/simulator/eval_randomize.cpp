@@ -58,14 +58,27 @@ void AddRandMember(const ClassMember* m, const ClassTypeInfo* level,
   out.push_back(std::move(info));
 }
 
+// 18.4: a rand class-handle member names an object; randomize() solves that
+// object's own random members and shall never modify the handle itself. The
+// handle is therefore not built as a solver variable — doing so would draw an
+// integer and overwrite the handle on writeback. (The recursive solve of the
+// referenced object is a separate concern; the head-level obligation observed
+// here is simply that the handle value is left unchanged.)
+bool IsClassHandleMember(const ClassMember* m, SimContext& ctx) {
+  return m->data_type.kind == DataTypeKind::kNamed &&
+         ctx.FindClassType(m->data_type.type_name) != nullptr;
+}
+
 // 18.4: gather every rand/randc data member visible on the object, walking the
-// inheritance chain so inherited random variables are included.
-void CollectRandVariables(const ClassTypeInfo* type,
+// inheritance chain so inherited random variables are included. Class-handle
+// members are skipped so the handle they hold is never overwritten.
+void CollectRandVariables(const ClassTypeInfo* type, SimContext& ctx,
                           std::vector<RandInfo>& out) {
   for (const auto* lvl = type; lvl != nullptr; lvl = lvl->parent) {
     if (!lvl->decl) continue;
     for (const ClassMember* m : lvl->decl->members) {
-      if (m->kind == ClassMemberKind::kProperty && (m->is_rand || m->is_randc))
+      if (m->kind == ClassMemberKind::kProperty &&
+          (m->is_rand || m->is_randc) && !IsClassHandleMember(m, ctx))
         AddRandMember(m, lvl, out);
     }
   }
@@ -303,7 +316,7 @@ bool TryEvalRandomizeMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
   RandomizeCtx rc{obj, ctx, arena};
 
   std::vector<RandInfo> rands;
-  CollectRandVariables(obj->type, rands);
+  CollectRandVariables(obj->type, ctx, rands);
   CollectConstraintBlocks(obj->type, rands, rc, solver);
   for (auto& ri : rands) {
     if (ri.var.min_val > ri.var.max_val) ri.var.max_val = ri.var.min_val;

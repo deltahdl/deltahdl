@@ -7,6 +7,8 @@
 #include <unordered_set>
 #include <vector>
 
+#include "fixture_simulator.h"
+#include "helpers_scheduler.h"
 #include "simulator/constraint_solver.h"
 
 using namespace delta;
@@ -129,6 +131,36 @@ TEST(Constraint, RandcCycleResets) {
     cycle2.insert(solver.GetValue("y"));
   }
   EXPECT_EQ(cycle2.size(), 2u);
+}
+
+// 18.4: a class-handle member may be declared rand, but randomize() solves the
+// referenced object's members and shall not modify the handle itself. Here the
+// handle 'child' is left at its default null while a sibling rand int is
+// solved. A correct implementation never draws a value for the handle, so it
+// stays null; an implementation that treated the handle as an integral rand
+// variable would overwrite it with the solved (near-certainly nonzero) draw.
+// The randomize() call succeeds (so the write-back path runs), making this
+// discriminating.
+TEST(RandomVariableTypes, RandomizeLeavesObjectHandleUnmodified) {
+  const char* src =
+      "class Inner;\n"
+      "endclass\n"
+      "class Outer;\n"
+      "  rand Inner child;\n"
+      "  rand int a;\n"
+      "  constraint c { a > 0; a < 10; }\n"
+      "endclass\n"
+      "module t;\n"
+      "  int ok;\n"
+      "  int seen;\n"
+      "  initial begin\n"
+      "    Outer o = new;\n"
+      "    ok = o.randomize();\n"
+      "    seen = (o.child == null) ? 1 : 0;\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "ok"), 1u);
+  EXPECT_EQ(RunAndGet(src, "seen"), 1u);
 }
 
 }  // namespace

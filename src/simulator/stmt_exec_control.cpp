@@ -740,7 +740,7 @@ ExecTask ExecCycleDelay(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   co_return StmtResult::kDone;
 }
 
-static uint64_t DelayTicksFromValue(const Logic4Vec& val) {
+uint64_t DelayTicksFromValue(const Logic4Vec& val) {
   if (!val.IsKnown()) return 0;
   uint64_t raw = val.ToUint64();
   if (val.is_signed && val.width > 0 && val.width < 64) {

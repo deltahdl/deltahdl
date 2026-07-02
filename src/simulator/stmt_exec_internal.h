@@ -1,12 +1,23 @@
 #pragma once
 
+#include <cstdint>
+
 #include "simulator/exec_task.h"
 
 namespace delta {
 
 struct Stmt;
+struct Logic4Vec;
 class SimContext;
 class Arena;
+
+// Defined in stmt_exec_control.cpp. Applies the §9.4.1 delay-control value
+// rules (unknown/high-impedance delay reads as zero; a negative delay is
+// reinterpreted as a two's-complement unsigned integer the width of a time
+// variable) to a delay expression's evaluated value. Shared so the
+// intra-assignment delay of a blocking assignment (§10.4.1) normalizes its
+// delay the same way a standalone delay-control statement does.
+uint64_t DelayTicksFromValue(const Logic4Vec& val);
 
 // Statement executors split out of stmt_exec.cpp into sibling translation
 // units. The dispatcher in stmt_exec.cpp calls these by name, so they have
