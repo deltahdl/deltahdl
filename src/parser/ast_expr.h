@@ -86,6 +86,13 @@ struct Expr {
   std::vector<std::string_view> pattern_keys;
 
   bool is_parenthesized = false;
+
+  // §12.6: set on a kIdentifier produced from the `. variable_identifier`
+  // pattern form, distinguishing a pattern identifier that binds a new variable
+  // from a bare identifier used as a constant expression pattern. Parsing drops
+  // the leading dot, so this flag is the only record that the identifier came
+  // from a binding position.
+  bool is_pattern_binding = false;
 };
 
 // §11.5: an operand is "simple" iff it is not parenthesized AND is a primary

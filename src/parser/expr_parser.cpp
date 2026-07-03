@@ -536,7 +536,12 @@ Expr* Parser::ParsePrimaryExpr() {
     case TokenKind::kDot: {
       auto loc = Consume().loc;
       auto name = ExpectIdentifier();
-      return MakeIdentifierNode(arena_, name.text, loc);
+      auto* id = MakeIdentifierNode(arena_, name.text, loc);
+      // §12.6: `. variable_identifier` is a pattern that binds a new
+      // identifier; record that so the elaborator can enforce binding-name
+      // uniqueness.
+      id->is_pattern_binding = true;
+      return id;
     }
     default:
       break;

@@ -127,6 +127,9 @@ bool Parser::ParseFirstPatternElement(Expr* pat, bool& named) {
     id->kind = ExprKind::kIdentifier;
     id->text = name.text;
     id->range.start = loc;
+    // §12.6: `. variable_identifier` inside a `'{...}` structure pattern binds
+    // a new pattern identifier; mark it for the elaborator's uniqueness check.
+    id->is_pattern_binding = true;
     pat->elements.push_back(id);
     return true;
   }
@@ -195,6 +198,9 @@ Expr* Parser::ParseAssignmentPattern() {
       id->kind = ExprKind::kIdentifier;
       id->text = name.text;
       id->range.start = name.loc;
+      // §12.6: subsequent `. variable_identifier` structure-pattern bindings
+      // are marked the same way for the elaborator's uniqueness check.
+      id->is_pattern_binding = true;
       pat->elements.push_back(id);
     } else {
       pat->elements.push_back(ParseExpr());

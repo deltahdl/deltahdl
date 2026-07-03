@@ -2,6 +2,7 @@
 
 #include "fixture_simulator.h"
 #include "helpers_eval_op.h"
+#include "helpers_lower_run.h"
 #include "parser/ast.h"
 #include "simulator/evaluation.h"
 #include "simulator/lowerer.h"
@@ -34,6 +35,44 @@ TEST(Matches, VariableMatch) {
   auto* expr = ParseExprFrom("sig matches 8'hAB", f);
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 1u);
+}
+
+// §12.6: a constant expression pattern (11.2.1) succeeds when the value equals
+// its value. The constant here is a localparam, not a literal, so it exercises
+// the parameter-resolution code path end-to-end (elaborate + lower + run).
+TEST(Matches, ConstantLocalparamPatternMatchesRuntime) {
+  SimFixture f;
+  uint64_t y = RunModule(f,
+                         "module t;\n"
+                         "  localparam int P = 5;\n"
+                         "  logic [7:0] x;\n"
+                         "  logic y;\n"
+                         "  initial begin\n"
+                         "    x = 8'd5;\n"
+                         "    y = x matches P;\n"
+                         "  end\n"
+                         "endmodule\n",
+                         "y");
+  EXPECT_EQ(y, 1u);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §12.6: same constant expression pattern rule, but the constant is a module
+// parameter and the value differs from it, so the match fails (result 0).
+TEST(Matches, ConstantParameterPatternNoMatchRuntime) {
+  SimFixture f;
+  uint64_t y = RunModule(f,
+                         "module t #(parameter int Q = 6);\n"
+                         "  logic [7:0] x;\n"
+                         "  logic y;\n"
+                         "  initial begin\n"
+                         "    x = 8'd3;\n"
+                         "    y = x matches Q;\n"
+                         "  end\n"
+                         "endmodule\n",
+                         "y");
+  EXPECT_EQ(y, 0u);
+  EXPECT_FALSE(f.has_errors);
 }
 
 TEST(Matches, WildcardXInPattern) {
@@ -95,6 +134,19 @@ TEST(Matches, ResultDeterminedWhenValueAndPatternHaveXZ) {
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_TRUE(result.IsKnown());
   EXPECT_EQ(result.width, 1u);
+}
+
+// §12.6: the 1-bit result is 0 (fail) — never x or z — even when the value
+// being matched carries x/z bits and the pattern cannot match it.
+TEST(Matches, ResultDeterminedFalseWithValueXZ) {
+  SimFixture f;
+  // aval 0b1010 with bval 0b0101 makes two of the value's bits x/z.
+  MakeVar4(f, "fv", 4, 0b1010, 0b0101);
+  auto* expr = ParseExprFrom("fv matches 4'b0101", f);
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_TRUE(result.IsKnown());
+  EXPECT_EQ(result.width, 1u);
+  EXPECT_EQ(result.ToUint64(), 0u);
 }
 
 TEST(Matches, TripleAmpTrue) {
