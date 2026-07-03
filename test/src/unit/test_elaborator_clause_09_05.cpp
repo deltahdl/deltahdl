@@ -94,23 +94,6 @@ TEST(ProcessExecutionThreadElaboration, AlwaysFFCreatesProcess) {
             RtlirProcessKind::kAlwaysFF);
 }
 
-TEST(ProcessExecutionThreadElaboration,
-     MultipleProceduresCreateMultipleProcesses) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  logic clk, a, b, c;\n"
-      "  initial a = 0;\n"
-      "  always @(posedge clk) b = ~b;\n"
-      "  always_comb c = a;\n"
-      "  final a = 1;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  EXPECT_EQ(design->top_modules[0]->processes.size(), 4u);
-}
-
 TEST(ProcessExecutionThreadElaboration, ContAssignSeparateFromProcesses) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -124,42 +107,6 @@ TEST(ProcessExecutionThreadElaboration, ContAssignSeparateFromProcesses) {
   EXPECT_FALSE(f.has_errors);
   EXPECT_EQ(design->top_modules[0]->processes.size(), 1u);
   EXPECT_GE(design->top_modules[0]->assigns.size(), 1u);
-}
-
-TEST(ProcessExecutionThreadElaboration, MultipleProcessKindsInOneModule) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  logic clk, a, b, c;\n"
-      "  initial a = 0;\n"
-      "  always_comb b = a;\n"
-      "  always_ff @(posedge clk) c <= b;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* mod = design->top_modules[0];
-  ASSERT_EQ(mod->processes.size(), 3u);
-  EXPECT_EQ(mod->processes[0].kind, RtlirProcessKind::kInitial);
-  EXPECT_EQ(mod->processes[1].kind, RtlirProcessKind::kAlwaysComb);
-  EXPECT_EQ(mod->processes[2].kind, RtlirProcessKind::kAlwaysFF);
-}
-
-TEST(ProcessExecutionThreadElaboration, InitialAndFinalCoexist) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  logic x;\n"
-      "  initial x = 1;\n"
-      "  final $display(\"done\");\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* mod = design->top_modules[0];
-  ASSERT_EQ(mod->processes.size(), 2u);
-  EXPECT_EQ(mod->processes[0].kind, RtlirProcessKind::kInitial);
-  EXPECT_EQ(mod->processes[1].kind, RtlirProcessKind::kFinal);
 }
 
 TEST(ProcessExecutionThreadElaboration, AllSixProcessKindsInOneModule) {
