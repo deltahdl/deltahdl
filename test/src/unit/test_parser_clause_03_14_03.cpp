@@ -182,4 +182,76 @@ TEST(DesignBuildingBlockParsing, StepRejectedInCuScopeTimeunit) {
   EXPECT_TRUE(r.has_errors);
 }
 
+// The precision-argument source (ii) must be picked up from a timeunit slash
+// form living in an interface, not only in a module. Distinct production path
+// from InterfacesAndProgramsContribute, which supplies a standalone
+// timeprecision statement.
+TEST(DesignBuildingBlockParsing, InterfaceTimeunitPrecArgContributes) {
+  auto r = ParseTimescale31402(
+      "interface i;\n"
+      "  timeunit 1us / 1fs;\n"
+      "endinterface\n"
+      "module m;\n"
+      "  timeprecision 1ns;\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto gp = ComputeGlobalTimePrecision(r.cu, r.has_preproc_timescale,
+                                       r.preproc_global_precision);
+  EXPECT_EQ(gp, TimeUnit::kFs);
+}
+
+// Source (ii) contributed from the compilation-unit scope: a timeunit slash
+// form outside all design elements sets the CU-scope precision, which the
+// design-wide minimum must include. Distinct from CUScopeTimeprecisionIncluded,
+// which uses a standalone timeprecision statement.
+TEST(DesignBuildingBlockParsing, CuScopeTimeunitPrecArgContributes) {
+  auto r = ParseTimescale31402(
+      "timeunit 1us / 1fs;\n"
+      "module m;\n"
+      "  timeprecision 1ns;\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto gp = ComputeGlobalTimePrecision(r.cu, r.has_preproc_timescale,
+                                       r.preproc_global_precision);
+  EXPECT_EQ(gp, TimeUnit::kFs);
+}
+
+// Source (i), a timeprecision statement, must be gathered from a module nested
+// inside another module, exercising the recursive descent in the collector.
+// The finer inner precision wins the design-wide minimum.
+TEST(DesignBuildingBlockParsing, NestedModuleTimeprecisionContributes) {
+  auto r = ParseTimescale31402(
+      "module outer;\n"
+      "  timeprecision 1ns;\n"
+      "  module inner;\n"
+      "    timeprecision 1ps;\n"
+      "  endmodule\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto gp = ComputeGlobalTimePrecision(r.cu, r.has_preproc_timescale,
+                                       r.preproc_global_precision);
+  EXPECT_EQ(gp, TimeUnit::kPs);
+}
+
+// Source (ii) contributed from a program's timeunit slash form, with the
+// program supplying the unique design-wide minimum. Exercises the program
+// syntactic position and the dedicated program collection loop, which no other
+// test drives to the winning value (elsewhere an interface or module wins).
+TEST(DesignBuildingBlockParsing, ProgramTimeunitPrecArgIsMinimum) {
+  auto r = ParseTimescale31402(
+      "interface i;\n"
+      "  timeprecision 1ns;\n"
+      "endinterface\n"
+      "program p;\n"
+      "  timeunit 1us / 1ps;\n"
+      "endprogram\n"
+      "module m;\n"
+      "  timeprecision 1us;\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto gp = ComputeGlobalTimePrecision(r.cu, r.has_preproc_timescale,
+                                       r.preproc_global_precision);
+  EXPECT_EQ(gp, TimeUnit::kPs);
+}
+
 }  // namespace

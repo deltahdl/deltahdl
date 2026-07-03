@@ -17,19 +17,14 @@ TEST(DesignBuildingBlockParsing, ThreeMagnitudes) {
   EXPECT_EQ(DelayToTicks(1, ts100, TimeUnit::kPs), 100000u);
 }
 
-TEST(DesignBuildingBlockSimulation, StepTimeUnitEqualsGlobalPrecision) {
-  SimFixture f;
-  f.ctx.SetGlobalPrecision(TimeUnit::kFs);
-  EXPECT_EQ(f.ctx.GlobalPrecision(), TimeUnit::kFs);
-  EXPECT_EQ(f.ctx.StepTimeUnit(), TimeUnit::kFs);
-}
-
 TEST(DesignBuildingBlockSimulation, StepTimeUnitTracksLatestGlobalPrecision) {
   SimFixture f;
   f.ctx.SetGlobalPrecision(TimeUnit::kNs);
   ASSERT_EQ(f.ctx.StepTimeUnit(), TimeUnit::kNs);
+  EXPECT_EQ(f.ctx.StepTimeUnit(), f.ctx.GlobalPrecision());
   f.ctx.SetGlobalPrecision(TimeUnit::kFs);
   EXPECT_EQ(f.ctx.StepTimeUnit(), TimeUnit::kFs);
+  EXPECT_EQ(f.ctx.StepTimeUnit(), f.ctx.GlobalPrecision());
 }
 
 }  // namespace
