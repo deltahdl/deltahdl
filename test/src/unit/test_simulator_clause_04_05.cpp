@@ -316,6 +316,62 @@ TEST(SimulationAlgorithmSim,
   EXPECT_EQ(order[3], "pre_postponed");
 }
 
+// End-to-end observation of execute_time_slot's region order built from real
+// source syntax (the §4.4 region structure this pass depends on): the whole
+// Active region must fully drain before the NBA region runs. A blocking write
+// lands in the Active region, a nonblocking write is deferred to NBA, so a
+// later blocking read in the same block still sees the pre-NBA value.
+TEST(SimulationAlgorithmSim,
+     RegionOrderDefersNonblockingUpdateUntilActiveDrains) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a, b;\n"
+      "  initial begin\n"
+      "    a = 8'd1;\n"
+      "    a <= 8'd2;\n"
+      "    b = a;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  // NBA update applied only after the Active region drained.
+  EXPECT_EQ(f.ctx.FindVariable("a")->value.ToUint64(), 2u);
+  // The blocking read observed a before the NBA update took effect.
+  EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 1u);
+}
+
+// End-to-end observation of execute_region's update-event branch through a
+// distinct input form of "a process sensitive to the object" (the §4.3
+// construct): a process armed with an explicit level-sensitive event control.
+// When the driven variable is updated at a later time slot, the update event
+// schedules evaluation of the sensitive process, which recomputes its target.
+TEST(SimulationAlgorithmSim, UpdatePropagatesThroughExplicitSensitivityList) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] src, dst;\n"
+      "  initial begin\n"
+      "    dst = 8'd0;\n"
+      "    #1 src = 8'd5;\n"
+      "  end\n"
+      "  always @(src) dst = src + 8'd1;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  EXPECT_EQ(f.ctx.FindVariable("src")->value.ToUint64(), 5u);
+  // The sensitive always block re-evaluated after src's update event.
+  EXPECT_EQ(f.ctx.FindVariable("dst")->value.ToUint64(), 6u);
+}
+
 TEST(SimulationAlgorithmSim, FutureTimeSlotCreatedDuringExecutionIsAdvancedTo) {
   Arena arena;
   Scheduler sched(arena);
