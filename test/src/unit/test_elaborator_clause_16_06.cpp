@@ -1,10 +1,58 @@
 #include <gtest/gtest.h>
 
 #include "elaborator/concurrent_assertion_expr.h"
+#include "fixture_elaborator.h"
 
 using namespace delta;
 
 namespace {
+
+// §16.6: an expression in a concurrent assertion shall not reference a chandle
+// variable. Built from real source (a chandle declared with the chandle
+// keyword, referenced in the property of a concurrent assert) and driven
+// through elaboration so the rejection is observed end-to-end, not via a
+// helper.
+TEST(ConcurrentAssertionBooleanExpr, ChandleInAssertPropertyRejectedEndToEnd) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  logic clk;\n"
+      "  chandle h;\n"
+      "  assert property (@(posedge clk) h != null);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// §16.6 negative sibling: the same concurrent assert with an ordinary
+// (non-chandle) variable in the chandle's place elaborates without error, so
+// the rejection keys on the chandle type rather than the assertion context.
+TEST(ConcurrentAssertionBooleanExpr, OrdinaryVariableInAssertPropertyAccepted) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module m;\n"
+      "  logic clk, a;\n"
+      "  assert property (@(posedge clk) a);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §16.6 negative sibling: a chandle declared in the module but never named in
+// the concurrent assertion does not trip the rule.
+TEST(ConcurrentAssertionBooleanExpr, UnreferencedChandleDoesNotTripAssertRule) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module m;\n"
+      "  logic clk, a;\n"
+      "  chandle h;\n"
+      "  assert property (@(posedge clk) a);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
 
 TEST(ConcurrentAssertionBooleanExpr,
      OverallResultMustBeCastCompatibleWithIntegral) {

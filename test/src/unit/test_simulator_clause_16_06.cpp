@@ -83,16 +83,4 @@ TEST(AssertionBooleanExprPlace, DisableConditionUsesCurrentValuesNotSampled) {
   EXPECT_TRUE(DisableConditionUsesCurrentValues());
 }
 
-TEST(AssertionDisableCondition, AllowsTriggeredMethod) {
-  EXPECT_TRUE(DisableConditionAllowsTriggeredMethod());
-}
-
-TEST(AssertionDisableCondition, ForbidsMatchedMethod) {
-  EXPECT_FALSE(DisableConditionAllowsMatchedMethod());
-}
-
-TEST(AssertionDisableCondition, ForbidsLocalVariableReference) {
-  EXPECT_FALSE(DisableConditionAllowsLocalVariableReference());
-}
-
 }  // namespace

@@ -1,6 +1,52 @@
 #include "elaborator/concurrent_assertion_expr.h"
 
+#include "elaborator/rtlir.h"
+#include "parser/ast.h"
+
 namespace delta {
+
+namespace {
+
+// True when `name` is declared as a chandle variable of the module.
+bool NamesChandleVariable(std::string_view name, const RtlirModule* mod) {
+  if (name.empty() || mod == nullptr) return false;
+  for (const auto& v : mod->variables) {
+    if (v.name == name) return v.is_chandle;
+  }
+  return false;
+}
+
+// Recursively searches an assertion expression for a reference to a chandle
+// variable. Returns the first such variable's name, or an empty view.
+std::string_view FindChandleRef(const Expr* e, const RtlirModule* mod) {
+  if (e == nullptr) return {};
+  if (e->kind == ExprKind::kIdentifier && NamesChandleVariable(e->text, mod)) {
+    return e->text;
+  }
+  const Expr* children[] = {
+      e->lhs,       e->rhs,       e->base,       e->index,        e->index_end,
+      e->condition, e->true_expr, e->false_expr, e->repeat_count, e->with_expr};
+  for (const Expr* c : children) {
+    auto hit = FindChandleRef(c, mod);
+    if (!hit.empty()) return hit;
+  }
+  for (const Expr* a : e->args) {
+    auto hit = FindChandleRef(a, mod);
+    if (!hit.empty()) return hit;
+  }
+  for (const Expr* el : e->elements) {
+    auto hit = FindChandleRef(el, mod);
+    if (!hit.empty()) return hit;
+  }
+  return {};
+}
+
+}  // namespace
+
+std::string_view ConcurrentAssertionExprReferencedChandle(
+    const Expr* body, const RtlirModule* mod) {
+  return FindChandleRef(body, mod);
+}
 
 bool ConcurrentAssertionExprTypeIsAcceptable(bool overall_result_castable) {
   return overall_result_castable;

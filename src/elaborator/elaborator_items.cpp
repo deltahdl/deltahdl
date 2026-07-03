@@ -12,6 +12,7 @@
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
+#include "elaborator/concurrent_assertion_expr.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_items_internal.h"
@@ -562,6 +563,26 @@ bool Elaborator::ElaborateBehavioralItem(ModuleItem* item, RtlirModule* mod) {
 
 bool Elaborator::ElaborateAssertionItem(ModuleItem* item, RtlirModule* mod) {
   const ProcessBuildEnv kEnv{arena_, diag_, &func_decls_};
+  // §16.6: an expression appearing in a concurrent assertion shall not
+  // reference a variable of chandle type. A concurrent assertion statement
+  // (assert/assume/cover/restrict property) keeps its property_spec expression
+  // in assert_expr, or, for the simple clocked boolean form, in the immediate
+  // body statement's assert_expr. Report the first chandle reference once.
+  auto check_no_chandle = [&]() {
+    const Expr* bodies[] = {item->assert_expr, item->body != nullptr
+                                                   ? item->body->assert_expr
+                                                   : nullptr};
+    for (const Expr* b : bodies) {
+      std::string_view ch = ConcurrentAssertionExprReferencedChandle(b, mod);
+      if (!ch.empty()) {
+        diag_.Error(item->loc,
+                    "concurrent assertion expression references chandle "
+                    "variable \"" +
+                        std::string(ch) + "\" (§16.6)");
+        return;
+      }
+    }
+  };
   switch (item->kind) {
     case ModuleItemKind::kSequenceDecl:
       sequence_names_.insert(item->name);
@@ -594,6 +615,7 @@ bool Elaborator::ElaborateAssertionItem(ModuleItem* item, RtlirModule* mod) {
       return true;
     }
     case ModuleItemKind::kAssertProperty:
+      check_no_chandle();
       // §16.4.3: a module-item deferred immediate assertion is a static
       // deferred assertion, modeled as an implicit always_comb procedure.
       if (IsStaticDeferredAssertion(item)) {

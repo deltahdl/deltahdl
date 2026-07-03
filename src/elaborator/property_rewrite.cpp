@@ -33,6 +33,22 @@ bool SequenceCycleDfs(const SequenceByName& by_name, const ModuleItem* node,
 
 }  // namespace
 
+bool DisableConditionSampledValueRequiresExplicitClock(
+    SampledValueFunction fn) {
+  // §16.12 head: $sampled is the sole sampled value function that carries no
+  // clocking event of its own, so it alone may omit the explicit clock; every
+  // other sampled value function must name its clock in the disable condition.
+  return fn != SampledValueFunction::kSampled;
+}
+
+bool DisableConditionSampledValueClockIsWellFormed(
+    SampledValueFunction fn, bool clock_explicitly_specified) {
+  if (DisableConditionSampledValueRequiresExplicitClock(fn)) {
+    return clock_explicitly_specified;
+  }
+  return true;
+}
+
 void PropertyRegistry::Register(const ModuleItem* decl) {
   if (decl == nullptr) return;
   if (decl->kind != ModuleItemKind::kPropertyDecl &&

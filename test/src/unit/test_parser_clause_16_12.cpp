@@ -117,6 +117,25 @@ TEST(AssertionSemanticsParsing, PropertyDeclInGenerateBlock) {
               "endmodule\n"));
 }
 
+// §16.12: a named property may be declared in a checker. The checker body
+// routes through the same module-item parse path, so the property_declaration
+// is captured among the checker's items.
+TEST(AssertionSemanticsParsing, PropertyDeclInChecker) {
+  auto r = Parse(
+      "checker chk;\n"
+      "  property p_chk;\n"
+      "    @(posedge clk) a |-> b;\n"
+      "  endproperty\n"
+      "endchecker\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->checkers.size(), 1u);
+  auto* item =
+      FindItemByKind(r.cu->checkers[0]->items, ModuleItemKind::kPropertyDecl);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->name, "p_chk");
+}
+
 // §16.12 Syntax 16-16: endproperty may carry a matching identifier label.
 TEST(AssertionSemanticsParsing, PropertyDeclMatchingEndLabel) {
   auto r = Parse(
@@ -130,6 +149,58 @@ TEST(AssertionSemanticsParsing, PropertyDeclMatchingEndLabel) {
   auto* item = FindItemByKind(r, ModuleItemKind::kPropertyDecl);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->name, "p_lbl");
+}
+
+// §16.12 Syntax 16-16: a property_port_item may carry a default actual
+// argument (`= property_actual_arg`). The formal binds to that default when an
+// instance omits the argument.
+TEST(AssertionSemanticsParsing, PropertyDeclWithDefaultActualArg) {
+  auto r = Parse(
+      "module m;\n"
+      "  property p(a = 1);\n"
+      "    @(posedge clk) a |-> a;\n"
+      "  endproperty\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FindItemByKind(r, ModuleItemKind::kPropertyDecl);
+  ASSERT_NE(item, nullptr);
+  ASSERT_EQ(item->prop_formals.size(), 1u);
+  EXPECT_EQ(item->prop_formals[0], "a");
+}
+
+// §16.12: beyond the positions listed in §16.8, a formal argument of a named
+// property may be referenced in place of a property_expr. Here the formal `pa`
+// stands as the whole body property_expr.
+TEST(AssertionSemanticsParsing, PropertyFormalReferencedAsPropertyExpr) {
+  auto r = Parse(
+      "module m;\n"
+      "  property outer(pa);\n"
+      "    @(posedge clk) pa;\n"
+      "  endproperty\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FindItemByKind(r, ModuleItemKind::kPropertyDecl);
+  ASSERT_NE(item, nullptr);
+  ASSERT_EQ(item->prop_formals.size(), 1u);
+  EXPECT_EQ(item->prop_formals[0], "pa");
+}
+
+// §16.12: the disable iff clause guards on an expression_or_dist, so the
+// condition may carry a distribution (`dist`), not only a plain expression.
+TEST(AssertionSemanticsParsing, PropertyDisableConditionAcceptsExprOrDist) {
+  auto r = Parse(
+      "module m;\n"
+      "  property p;\n"
+      "    disable iff (r dist {0 := 1, 1 := 1}) a |-> b;\n"
+      "  endproperty\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FindItemByKind(r, ModuleItemKind::kPropertyDecl);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->prop_disable_iff_count, 1);
 }
 
 // §16.12: a named property may be instantiated prior to its declaration.

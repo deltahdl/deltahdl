@@ -5,9 +5,22 @@
 #include <unordered_map>
 #include <vector>
 
+#include "elaborator/sampled_value.h"
 #include "parser/ast.h"
 
 namespace delta {
+
+// §16.12 head: the disable condition of a `disable iff` clause may use sampled
+// value functions (see §16.9.3). When a sampled value function other than
+// $sampled appears there, its clock argument shall be specified explicitly in
+// its actual argument list. This reports when the explicit clock is required.
+bool DisableConditionSampledValueRequiresExplicitClock(SampledValueFunction fn);
+
+// §16.12 head: legality of a sampled value function used inside a `disable iff`
+// disable condition, given whether its clock argument was explicitly supplied.
+// Only $sampled is well-formed without an explicit clock argument.
+bool DisableConditionSampledValueClockIsWellFormed(
+    SampledValueFunction fn, bool clock_explicitly_specified);
 
 // §16.12 anchors property semantics on the flattened form produced by the
 // §F.4.1 rewriting algorithm. Both subclauses share one legality rule: a

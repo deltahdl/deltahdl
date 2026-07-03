@@ -1,8 +1,12 @@
 #pragma once
 
 #include <cstdint>
+#include <string_view>
 
 namespace delta {
+
+struct Expr;
+struct RtlirModule;
 
 // §16.6: contexts where a Boolean expression appears inside a concurrent
 // assertion. The same expression-content rules apply across all places; the
@@ -31,6 +35,13 @@ bool NonStaticClassMemberReferenceAllowed();
 
 // §16.6: expressions shall not reference variables of chandle type.
 bool ChandleVariableReferenceAllowed();
+
+// §16.6: applies the chandle prohibition to a real concurrent-assertion body.
+// Walks `body` and, if any referenced identifier names a chandle-typed variable
+// of `mod`, returns that variable's name; returns an empty view when the body
+// references no chandle variable. The elaboration driver reports the error.
+std::string_view ConcurrentAssertionExprReferencedChandle(
+    const Expr* body, const RtlirModule* mod);
 
 // §16.6: a sequence_match_item with a local variable as the variable_lvalue
 // may use C assignment / increment / decrement. Outside that one exception,
