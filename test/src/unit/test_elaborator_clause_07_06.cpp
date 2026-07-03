@@ -35,6 +35,22 @@ TEST(ArrayAssignmentValidation, ArrayAssignTypeMismatch) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
+// §7.6: element types of source and target shall be equivalent. Two packed
+// vector elements of the same 4-state kind but different widths are not
+// equivalent, so the array assignment is rejected (a width-based negative,
+// distinct from the signedness/state mismatch above).
+TEST(ArrayAssignmentValidation, ElementWidthMismatchRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0]  a[4];\n"
+      "  logic [15:0] b[4];\n"
+      "  initial a = b;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
 TEST(ArrayAssignmentValidation, WireToVarArrayAssign) {
   EXPECT_TRUE(
       ElabOk("module t;\n"
@@ -130,6 +146,30 @@ TEST(ArrayAssignmentValidation, FasterVaryingDimSizeMatchAccepted) {
       ElabOk("module t;\n"
              "  int a[2][3];\n"
              "  int b[2][3];\n"
+             "  initial a = b;\n"
+             "endmodule\n"));
+}
+
+// §7.6: only the slowest-varying dimension gets the weaker (kind-flexible)
+// treatment; a faster-varying fixed dimension must still be equivalent even
+// when the leftmost dimension is dynamic (and therefore run-time sized).
+TEST(ArrayAssignmentValidation, FasterVaryingDimMismatchDynamicOuterRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  int a[][3];\n"
+      "  int b[][4];\n"
+      "  initial a = b;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+TEST(ArrayAssignmentValidation, FasterVaryingDimMatchDynamicOuterAccepted) {
+  EXPECT_TRUE(
+      ElabOk("module t;\n"
+             "  int a[][3];\n"
+             "  int b[][3];\n"
              "  initial a = b;\n"
              "endmodule\n"));
 }

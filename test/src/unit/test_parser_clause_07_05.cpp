@@ -57,4 +57,21 @@ TEST(DynamicArrayParsing, LeftmostDynamicWithInnerFixed) {
   EXPECT_NE(item->unpacked_dims[1], nullptr);
 }
 
+// §7.5: any unpacked dimension may be a dynamic array dimension, including the
+// element position — a dynamic array whose element is itself a dynamic array
+// parses to two unsized (null) unpacked dimensions.
+TEST(DynamicArrayParsing, ArrayElementDynamicBothDimsUnsized) {
+  auto r = Parse(
+      "module t;\n"
+      "  int d[][];\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  ASSERT_EQ(item->unpacked_dims.size(), 2u);
+  EXPECT_EQ(item->unpacked_dims[0], nullptr);
+  EXPECT_EQ(item->unpacked_dims[1], nullptr);
+}
+
 }  // namespace

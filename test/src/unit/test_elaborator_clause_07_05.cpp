@@ -58,4 +58,23 @@ TEST(DynamicArrayValidation, DynamicArrayOfArraysElaborates) {
              "endmodule\n"));
 }
 
+// §7.5: a dynamic array supports any variable data type as its element type.
+// A real element is a distinct data-type input form from the packed-vector and
+// array element forms already covered.
+TEST(DynamicArrayValidation, RealElementDynamicElaborates) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  real d[];\n"
+             "endmodule\n"));
+}
+
+// §7.5: a string element is another distinct variable data type admitted as a
+// dynamic array element.
+TEST(DynamicArrayValidation, StringElementDynamicElaborates) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  string d[];\n"
+             "endmodule\n"));
+}
+
 }  // namespace

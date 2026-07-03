@@ -63,6 +63,40 @@ bool ReportFasterVaryingDimMismatch(const ArrayAssignPair& p,
   return false;
 }
 
+// §7.6 — the slowest-varying (leftmost) dimension of a dynamic array or queue
+// may differ in kind and its size is not known until run time, but every
+// faster-varying dimension shall still meet the §6.22.2 equivalence
+// requirement, which for a fixed dimension means an identical declared size.
+// The leftmost dynamic/queue dimension contributes no entry to `dim_sizes`, so
+// when both arrays have a dynamic/queue leftmost dimension backed by a full
+// complement of fixed faster dimensions, `dim_sizes` holds exactly those faster
+// dimensions and comparing the two vectors element-wise enforces the rule for
+// that declaration shape. The both-fixed shape is handled separately, and the
+// leftmost dimension is intentionally left uncompared here.
+bool ReportFasterVaryingDimMismatchVarOuter(const ArrayAssignPair& p,
+                                            DiagEngine& diag) {
+  const Elaborator::VarArrayInfo& l = p.l;
+  const Elaborator::VarArrayInfo& r = p.r;
+  bool l_var_outer = (l.is_dynamic || l.is_queue) && !l.is_assoc;
+  bool r_var_outer = (r.is_dynamic || r.is_queue) && !r.is_assoc;
+  if (!l_var_outer || !r_var_outer) return false;
+  if (l.num_unpacked_dims != r.num_unpacked_dims) return false;
+  if (l.num_unpacked_dims < 2) return false;
+  if (l.dim_sizes.size() != l.num_unpacked_dims - 1) return false;
+  if (r.dim_sizes.size() != r.num_unpacked_dims - 1) return false;
+  for (size_t i = 0; i < l.dim_sizes.size(); ++i) {
+    if (l.dim_sizes[i] != r.dim_sizes[i]) {
+      diag.Error(p.loc, std::format(
+                            "faster-varying array dimension size mismatch in "
+                            "assignment ('{}' dim {} is {}, '{}' dim {} is {})",
+                            p.lhs->text, i + 1, l.dim_sizes[i], p.rhs->text,
+                            i + 1, r.dim_sizes[i]));
+      return true;
+    }
+  }
+  return false;
+}
+
 // Reports an associativity / associative-index-type mismatch between two
 // tracked arrays. Returns true (with a diagnostic emitted) when found.
 bool ReportAssocKindMismatch(const Elaborator::VarArrayInfo& l,
@@ -161,6 +195,7 @@ void Elaborator::CheckArrayAssignExprs(const Expr* lhs, const Expr* rhs,
 
   if (ReportArrayShapeMismatch(kPair, diag_)) return;
   if (ReportFasterVaryingDimMismatch(kPair, diag_)) return;
+  if (ReportFasterVaryingDimMismatchVarOuter(kPair, diag_)) return;
 }
 
 void Elaborator::ValidateOneArrayAssignment(const ModuleItem* item) {
