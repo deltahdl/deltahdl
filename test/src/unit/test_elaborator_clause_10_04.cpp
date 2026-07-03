@@ -4,6 +4,22 @@ using namespace delta;
 
 namespace {
 
+// §10.4: the left-hand side of a procedural assignment shall be a variable.
+// Positive anchor — a variable LHS is accepted, confirming the net-target check
+// does not reject legitimate variable targets.
+TEST(ProceduralAssignmentElaboration, VariableLhsIsAccepted) {
+  SimFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  logic v;\n"
+      "  initial begin\n"
+      "    v = 1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+}
+
 TEST(ProceduralAssignmentElaboration, ProceduralAssignToNetIsError) {
   SimFixture f;
   ElaborateSrc(
