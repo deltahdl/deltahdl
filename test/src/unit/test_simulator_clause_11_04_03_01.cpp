@@ -1,4 +1,5 @@
 #include "builders_ast.h"
+#include "fixture_real.h"
 #include "fixture_simulator.h"
 #include "helpers_eval_op.h"
 #include "parser/ast.h"
@@ -246,17 +247,6 @@ TEST(SignedUnsignedArithmetic, UnsignedAdditionProducesUnsignedResult) {
   EXPECT_FALSE(result.is_signed);
 }
 
-TEST(SignedUnsignedArithmetic, RealArithmeticUsesFloatingPoint) {
-  SimFixture f;
-  MakeRealVar(f, "ra", 7.5);
-  MakeRealVar(f, "rb", 2.0);
-  auto* expr = MakeBinary(f.arena, TokenKind::kSlash, MakeId(f.arena, "ra"),
-                          MakeId(f.arena, "rb"));
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_TRUE(result.is_real);
-  EXPECT_DOUBLE_EQ(ToDouble(result), 3.75);
-}
-
 TEST(SignedUnsignedArithmetic, EndToEndSignedDivision) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -431,6 +421,138 @@ TEST(SignedUnsignedArithmetic, EndToEndUnsignedToSignedConversionKeepsBits) {
   EXPECT_EQ(var->value.ToUint64(),
             static_cast<uint64_t>(static_cast<uint32_t>(-1)));
   EXPECT_TRUE(var->is_signed);
+}
+
+// §11.4.3.1: the operand data types govern the arithmetic, and the target then
+// reinterprets the result. A signed int divided by a signed (unsized decimal)
+// literal is a signed, two's-complement division yielding a negative quotient;
+// assigning that quotient to an unsigned vector keeps the bit pattern, so the
+// destination reads the wrapped large positive value. This is the LRM's
+// "U = intS / 3" row (result 65532), not covered by a signed-into-signed or an
+// all-unsigned division elsewhere in this file.
+TEST(SignedUnsignedArithmetic, SignedDivisionQuotientIntoUnsignedTargetWraps) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int intS;\n"
+      "  logic [15:0] u;\n"
+      "  initial begin\n"
+      "    intS = -12;\n"
+      "    u = intS / 3;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* var = f.ctx.FindVariable("u");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64() & 0xFFFFu, 65532u);
+  EXPECT_FALSE(var->is_signed);
+}
+
+// §11.4.3.1 / Table 11-7: an unsigned variable operand forces the whole
+// division to be evaluated as an unsigned operation even when the other operand
+// is a signed literal. The pattern 16'hFFF4 would be -12 if it were signed, but
+// as an unsigned value it is 65524, so the quotient is a large positive number
+// that survives unchanged into a signed target. This is the LRM's
+// "intS = U / 3" row (result 21841); a signed interpretation would give -4.
+TEST(SignedUnsignedArithmetic, UnsignedVariableDivisionEvaluatedUnsigned) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [15:0] u;\n"
+      "  int intS;\n"
+      "  initial begin\n"
+      "    u = 16'hFFF4;\n"
+      "    intS = u / 3;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* var = f.ctx.FindVariable("intS");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64() & 0xFFFFFFFFu, 21841u);
+  EXPECT_TRUE(var->is_signed);
+}
+
+// §11.4.3.1 / Table 11-7: a real variable is interpreted with a floating-point
+// representation, so dividing two real operands keeps the fractional part
+// rather than truncating toward zero the way integer division would. Driven
+// from a real declaration through the full pipeline, 15.0/2.0 yields 7.5; an
+// integer division of the same magnitudes would give 7. This complements the
+// synthetic real-arithmetic checks with an end-to-end observation built from
+// real source syntax.
+TEST(SignedUnsignedArithmetic, RealDivisionKeepsFractionEndToEnd) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  real a, b, r;\n"
+      "  initial begin\n"
+      "    a = 15.0;\n"
+      "    b = 2.0;\n"
+      "    r = a / b;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* var = f.ctx.FindVariable("r");
+  ASSERT_NE(var, nullptr);
+  EXPECT_DOUBLE_EQ(VecToDouble(var->value), 7.5);
+}
+
+// §11.4.3.1 / Table 11-7 (signed net row): a signed net operand is interpreted
+// as a signed, two's-complement value by an arithmetic operator, just like a
+// signed variable. The net is built from real `wire signed` syntax, driven by a
+// continuous assignment, and divided by a signed literal; both operands are
+// signed so the division is signed and -12/3 yields -4. Were the net treated as
+// unsigned, 0xF4 would be 244 and the quotient would be 81.
+TEST(SignedUnsignedArithmetic, SignedNetOperandUsesSignedArithmetic) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  wire signed [7:0] a;\n"
+      "  logic signed [7:0] q;\n"
+      "  assign a = -8'sd12;\n"
+      "  initial begin\n"
+      "    #1;\n"
+      "    q = a / 8'sd3;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* var = f.ctx.FindVariable("q");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64() & 0xFFu, 0xFCu);
+  EXPECT_TRUE(var->is_signed);
+}
+
+// §11.4.3.1 / Table 11-7 (unsigned net row): an unsigned net operand forces the
+// operator to interpret the whole expression as unsigned even when the other
+// operand is a signed literal. The net is built from real `wire` syntax and
+// driven by a continuous assignment; 0xF0 is 240 unsigned, so 240/2 yields 120.
+// Were the net treated as signed, 0xF0 would be -16 and the quotient -8.
+TEST(SignedUnsignedArithmetic, UnsignedNetOperandUsesUnsignedArithmetic) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  wire [7:0] a;\n"
+      "  logic [7:0] q;\n"
+      "  assign a = 8'hF0;\n"
+      "  initial begin\n"
+      "    #1;\n"
+      "    q = a / 8'sd2;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* var = f.ctx.FindVariable("q");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64() & 0xFFu, 120u);
+  EXPECT_FALSE(var->is_signed);
 }
 
 }  // namespace
