@@ -71,6 +71,47 @@ TEST(PrimitiveInstantiationParsing, GateInst_AllDeclarationComponents) {
   EXPECT_EQ(g->gate_terminals.size(), 3u);  // terminal connection list
 }
 
+// §28.3 head states its declaration structure applies to a gate OR a switch
+// instance. The AllDeclarationComponents test above uses a gate; this exercises
+// the switch input form: an nmos switch declaration carrying an optional delay,
+// an instance identifier, an array range, and the terminal connection list.
+// (A switch cannot take a drive strength — that is §28.3.2's restriction — so
+// the strength component is absent here.)
+TEST(PrimitiveInstantiationParsing, SwitchInstanceDeclarationComponents) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire o, i, c;\n"
+      "  nmos #3 s[1:0](o, i, c);\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto gates = FindAllGates(r.cu->modules[0]->items);
+  ASSERT_EQ(gates.size(), 1u);
+  auto* g = gates[0];
+  EXPECT_EQ(g->gate_kind, GateKind::kNmos);  // switch keyword
+  EXPECT_NE(g->gate_delay, nullptr);         // propagation delay
+  EXPECT_EQ(g->gate_inst_name, "s");         // instance identifier
+  EXPECT_NE(g->inst_range_left, nullptr);    // array range
+  EXPECT_NE(g->inst_range_right, nullptr);
+  EXPECT_EQ(g->gate_terminals.size(), 3u);  // terminal connection list
+}
+
+// §28.3 head: a comma-separated list of switch instances shares one delay
+// specification, exactly as for gates.
+TEST(PrimitiveInstantiationParsing, SwitchListSharesOneDelay) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire o1, o2, i1, i2, c1, c2;\n"
+      "  nmos #4 s1(o1, i1, c1), s2(o2, i2, c2);\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto gates = FindAllGates(r.cu->modules[0]->items);
+  ASSERT_EQ(gates.size(), 2u);
+  for (auto* g : gates) {
+    ASSERT_NE(g->gate_delay, nullptr);
+    EXPECT_EQ(g->gate_delay->int_val, 4u);
+  }
+}
+
 TEST(GateDelayParsing, MultipleInstancesWithRiseFallDelay) {
   auto r = Parse(
       "module m;\n"

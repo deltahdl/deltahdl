@@ -264,6 +264,142 @@ TEST(LogicGates, ProductionXnorGateInvertsParity) {
   EXPECT_EQ(w.bval & 1u, 0u);
 }
 
+// §28.4 Table 28-3, x/z rows, observed on the production gate rather than the
+// evaluation model: an AND gate whose second input is an undriven wire (z)
+// still resolves to 0 when the other input holds the controlling value 0.
+TEST(LogicGates, ProductionAndGateControllingZeroDominatesHighZInput) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  reg a;\n"
+      "  wire b;\n"  // undriven -> high impedance (z)
+      "  wire y;\n"
+      "  and g(y, a, b);\n"
+      "  initial a = 1'b0;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* net = f.ctx.FindNet("y");
+  ASSERT_NE(net, nullptr);
+  ASSERT_NE(net->resolved, nullptr);
+  const auto& w = net->resolved->value.words[0];
+  EXPECT_EQ(w.aval & 1u, 0u);  // logic 0
+  EXPECT_EQ(w.bval & 1u, 0u);
+}
+
+// §28.4 Table 28-3: a non-controlling input paired with z drives the AND output
+// to x (the gate normalizes z to x, then 1 & x = x).
+TEST(LogicGates, ProductionAndGateHighZInputYieldsUnknown) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  reg a;\n"
+      "  wire b;\n"  // undriven -> z
+      "  wire y;\n"
+      "  and g(y, a, b);\n"
+      "  initial a = 1'b1;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* net = f.ctx.FindNet("y");
+  ASSERT_NE(net, nullptr);
+  ASSERT_NE(net->resolved, nullptr);
+  const auto& w = net->resolved->value.words[0];
+  EXPECT_EQ(w.aval & 1u, 1u);  // x = (aval=1, bval=1)
+  EXPECT_EQ(w.bval & 1u, 1u);
+}
+
+// §28.4 Table 28-3, or column: the OR gate's controlling value 1 dominates a z
+// input on the production gate.
+TEST(LogicGates, ProductionOrGateControllingOneDominatesHighZInput) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  reg a;\n"
+      "  wire b;\n"  // undriven -> z
+      "  wire y;\n"
+      "  or g(y, a, b);\n"
+      "  initial a = 1'b1;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* net = f.ctx.FindNet("y");
+  ASSERT_NE(net, nullptr);
+  ASSERT_NE(net->resolved, nullptr);
+  const auto& w = net->resolved->value.words[0];
+  EXPECT_EQ(w.aval & 1u, 1u);  // logic 1
+  EXPECT_EQ(w.bval & 1u, 0u);
+}
+
+// §28.4 Table 28-3, xor column: unlike AND/OR there is no controlling value —
+// any x or z on an input forces the XOR output to x. Observed on the production
+// gate with an undriven (z) second input.
+TEST(LogicGates, ProductionXorGateHighZInputYieldsUnknown) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  reg a;\n"
+      "  wire b;\n"  // undriven -> z
+      "  wire y;\n"
+      "  xor g(y, a, b);\n"
+      "  initial a = 1'b1;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* net = f.ctx.FindNet("y");
+  ASSERT_NE(net, nullptr);
+  ASSERT_NE(net->resolved, nullptr);
+  const auto& w = net->resolved->value.words[0];
+  EXPECT_EQ(w.aval & 1u, 1u);  // x = (aval=1, bval=1)
+  EXPECT_EQ(w.bval & 1u, 1u);
+}
+
+// §28.4: with two delays the second value governs the output fall delay. A
+// two-input AND holding 1 falls to 0 when an input drops; the falling edge
+// scheduled at t=3 completes at 3 + fall(9) = 12 on the production scheduler.
+TEST(NInputGateDelay, ProductionTwoDelayAndGateFallTransitionUsesSecondSlot) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  reg a, b;\n"
+      "  wire y;\n"
+      "  and #(4, 9) g(y, a, b);\n"
+      "  initial begin a = 1'b1; b = 1'b1; #3 a = 1'b0; end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  EXPECT_EQ(f.scheduler.CurrentTime().ticks, 12u);
+}
+
+// §28.4: the smaller of the two delays applies to output transitions to x. The
+// AND output at 1 goes to x when an input becomes x at t=3; the transition
+// completes at 3 + min(4, 9) = 7, and the output settles to x.
+TEST(NInputGateDelay, ProductionTwoDelayAndGateTransitionToXUsesSmallerSlot) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  reg a, b;\n"
+      "  wire y;\n"
+      "  and #(4, 9) g(y, a, b);\n"
+      "  initial begin a = 1'b1; b = 1'b1; #3 b = 1'bx; end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  EXPECT_EQ(f.scheduler.CurrentTime().ticks, 7u);
+  auto* net = f.ctx.FindNet("y");
+  ASSERT_NE(net, nullptr);
+  ASSERT_NE(net->resolved, nullptr);
+  const auto& w = net->resolved->value.words[0];
+  EXPECT_EQ(w.aval & 1u, 1u);  // x = (aval=1, bval=1)
+  EXPECT_EQ(w.bval & 1u, 1u);
+}
+
 TEST(NInputGateDelay, ProductionTwoDelayAndGateSchedulerEndsAtInputPlusRise) {
   // The two-delay form on a multi-input AND gate: a 0->1 input transition
   // routes through the first slot, observable through scheduler.CurrentTime.
