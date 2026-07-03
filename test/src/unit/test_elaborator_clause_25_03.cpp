@@ -94,6 +94,38 @@ TEST(InterfaceInstantiationGrammar, ElaborationMultipleInstances) {
   EXPECT_NE(top->children[1].resolved, nullptr);
 }
 
+// §25.3: an interface is instantiated hierarchically like a module -- it may
+// carry a parameter override and be instantiated as an array. Mirrors the
+// clause's own example (`myinterface #(100) scalar1(), vector[9:0]();`): one
+// named instance plus a 10-element array yields 11 interface instances, each
+// resolved to the interface with the overridden parameter applied.
+TEST(InterfaceInstantiationGrammar, ParameterOverrideAndInstanceArray) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "interface myinterface #(parameter int P = 8);\n"
+      "  logic [P-1:0] data;\n"
+      "endinterface\n"
+      "module top;\n"
+      "  myinterface #(100) scalar1(), vector[9:0]();\n"
+      "endmodule\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  ASSERT_FALSE(f.has_errors);
+  auto* top = design->top_modules[0];
+  ASSERT_EQ(top->children.size(), 11u);
+  for (const auto& child : top->children) {
+    EXPECT_EQ(child.module_name, "myinterface");
+    ASSERT_NE(child.resolved, nullptr);
+    EXPECT_TRUE(child.resolved->is_interface);
+    const RtlirParamDecl* p = nullptr;
+    for (const auto& pd : child.resolved->params)
+      if (pd.name == "P") p = &pd;
+    ASSERT_NE(p, nullptr);
+    EXPECT_TRUE(p->is_resolved);
+    EXPECT_EQ(p->resolved_value, 100);
+  }
+}
+
 TEST(InterfaceInstantiationGrammar, ElaborationUnresolvedInterface) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -166,6 +198,71 @@ TEST(InterfaceDefinitions, NestedInterfaceNotImplicitlyInstantiated) {
   auto* outer = top->children[0].resolved;
   ASSERT_NE(outer, nullptr);
   EXPECT_TRUE(outer->children.empty());
+}
+
+// §25.3: interfaces are never implicitly instantiated. When no top module is
+// named and the elaborator roots every uninstantiated design element (§23.3.1),
+// an uninstantiated module becomes a top but an uninstantiated interface does
+// not -- the interface is left out of the auto-top set. Drives the auto-top
+// path directly (auto_top=true), which the explicitly-named-top tests bypass.
+TEST(InterfaceDefinitions, InterfaceExcludedFromAutoTopModules) {
+  ElabFixture f;
+  auto* design = ElaborateWithPreprocessor(
+      "interface lone_if;\n"
+      "  logic x;\n"
+      "endinterface\n"
+      "module top;\n"
+      "endmodule\n",
+      f, "", /*auto_top=*/true);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  ASSERT_EQ(design->top_modules.size(), 1u);
+  EXPECT_EQ(design->top_modules[0]->name, "top");
+}
+
+// §25.3: the actual of an interface port connection shall refer to an interface
+// instance. Built from real interface-port syntax (a module with an interface
+// port) and driven through the full pipeline: when the actual names an actual
+// interface instance the elaborator resolves it and roots both children with no
+// diagnostic. Observes the production port-binding check, not the model helper.
+TEST(InterfacePortActual, InterfaceInstanceActualElaborates) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "interface ib;\n"
+      "  logic x;\n"
+      "endinterface\n"
+      "module sub(ib p);\n"
+      "endmodule\n"
+      "module top;\n"
+      "  ib bus();\n"
+      "  sub s(.p(bus));\n"
+      "endmodule\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  ASSERT_EQ(design->top_modules.size(), 1u);
+  // top roots the interface instance `bus` and the module instance `s`.
+  EXPECT_GE(design->top_modules[0]->children.size(), 2u);
+}
+
+// §25.3: the negative form -- an interface-port actual that does not name an
+// interface instance (here a plain variable) is rejected by the elaborator's
+// port-binding check. Full-pipeline counterpart of the synthetic
+// InterfacePortHierRef/NonInterfaceTargetIsIllegal model below.
+TEST(InterfacePortActual, NonInterfaceActualIsError) {
+  ElabFixture f;
+  Elaborate(
+      "interface ib;\n"
+      "  logic x;\n"
+      "endinterface\n"
+      "module sub(ib p);\n"
+      "endmodule\n"
+      "module top;\n"
+      "  logic not_an_iface;\n"
+      "  sub s(.p(not_an_iface));\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_TRUE(f.has_errors);
 }
 
 // §25.3: an interface-port-connection actual that is a hierarchical reference

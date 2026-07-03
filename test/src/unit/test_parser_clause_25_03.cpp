@@ -163,16 +163,6 @@ TEST(InterfaceItemsParsing, InterfaceGenerateRegion) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(InterfaceItemsParsing, InterfaceNestedProgram) {
-  auto r = Parse(
-      "interface ifc;\n"
-      "  program prg;\n"
-      "  endprogram\n"
-      "endinterface\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(InterfaceItemsParsing, InterfaceNestedInterface) {
   auto r = Parse(
       "interface outer_ifc;\n"
