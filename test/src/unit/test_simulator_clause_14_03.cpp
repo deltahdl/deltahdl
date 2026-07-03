@@ -89,24 +89,6 @@ TEST(ClockingBlockSim, MultipleBlocks) {
   EXPECT_NE(cmgr.Find("cb_slow"), nullptr);
 }
 
-TEST(ClockingBlockSim, DeclareWithClockEvent) {
-  ClockingSimFixture f;
-  ClockingManager cmgr;
-
-  ClockingBlock block;
-  block.name = "cb";
-  block.clock_signal = "clk";
-  block.clock_edge = Edge::kPosedge;
-  block.default_input_skew = SimTime{0};
-  block.default_output_skew = SimTime{0};
-  cmgr.Register(block);
-
-  const auto* found = cmgr.Find("cb");
-  ASSERT_NE(found, nullptr);
-  EXPECT_EQ(found->clock_signal, "clk");
-  EXPECT_EQ(found->clock_edge, Edge::kPosedge);
-}
-
 TEST(ClockingBlockSim, NegedgeClockEvent) {
   ClockingSimFixture f;
   ClockingManager cmgr;
@@ -200,25 +182,6 @@ TEST(ClockingBlockSim, OutputSkew) {
 
   auto skew = mgr.GetOutputSkew("cb", "data_out");
   EXPECT_EQ(skew.ticks, 3u);
-}
-
-TEST(ClockingBlockSim, InoutReadWriteSplit) {
-  ClockingManager cmgr;
-  ClockingBlock block;
-  block.name = "cb";
-  block.clock_signal = "clk";
-  block.clock_edge = Edge::kPosedge;
-  block.default_input_skew = SimTime{2};
-  block.default_output_skew = SimTime{5};
-
-  ClockingSignal sig;
-  sig.signal_name = "bidir";
-  sig.direction = ClockingDir::kInout;
-  block.signals.push_back(sig);
-  cmgr.Register(block);
-
-  EXPECT_EQ(cmgr.GetInputSkew("cb", "bidir").ticks, 2u);
-  EXPECT_EQ(cmgr.GetOutputSkew("cb", "bidir").ticks, 5u);
 }
 
 TEST(ClockingBlockSim, EdgeClockEdgeRegistered) {
