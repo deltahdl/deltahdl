@@ -1,9 +1,6 @@
 #include <string_view>
 
-#include "builders_ast.h"
-#include "common/types.h"
 #include "fixture_simulator.h"
-#include "helpers_stmt_exec.h"
 #include "parser/ast.h"
 #include "simulator/lowerer.h"
 #include "simulator/stmt_exec.h"
@@ -13,59 +10,30 @@ using namespace delta;
 
 namespace {
 
-TEST(CaseStatementSim, CaseExactMatchBaseline) {
-  StmtFixture f;
-  auto* result_var = f.ctx.CreateVariable("ce", 32);
-  result_var->value = MakeLogic4VecVal(f.arena, 32, 0);
-
-  auto* stmt = f.arena.Create<Stmt>();
-  stmt->kind = StmtKind::kCase;
-  stmt->case_kind = TokenKind::kKwCase;
-  stmt->condition = MakeInt(f.arena, 3);
-
-  CaseItem item1;
-  item1.patterns.push_back(MakeInt(f.arena, 1));
-  item1.body = MakeBlockAssign(f.arena, "ce", 10);
-  stmt->case_items.push_back(item1);
-
-  CaseItem item2;
-  item2.patterns.push_back(MakeInt(f.arena, 3));
-  item2.body = MakeBlockAssign(f.arena, "ce", 30);
-  stmt->case_items.push_back(item2);
-
-  CaseItem def;
-  def.is_default = true;
-  def.body = MakeBlockAssign(f.arena, "ce", 99);
-  stmt->case_items.push_back(def);
-
-  RunStmt(stmt, f.ctx, f.arena);
-  EXPECT_EQ(result_var->value.ToUint64(), 30u);
-}
-
-TEST(CaseStatementSim, CaseMultiplePatterns) {
-  StmtFixture f;
-  auto* result_var = f.ctx.CreateVariable("cmp", 32);
-  result_var->value = MakeLogic4VecVal(f.arena, 32, 0);
-
-  auto* stmt = f.arena.Create<Stmt>();
-  stmt->kind = StmtKind::kCase;
-  stmt->case_kind = TokenKind::kKwCase;
-  stmt->condition = MakeInt(f.arena, 5);
-
-  CaseItem item1;
-  item1.patterns.push_back(MakeInt(f.arena, 3));
-  item1.patterns.push_back(MakeInt(f.arena, 5));
-  item1.patterns.push_back(MakeInt(f.arena, 7));
-  item1.body = MakeBlockAssign(f.arena, "cmp", 111);
-  stmt->case_items.push_back(item1);
-
-  CaseItem def;
-  def.is_default = true;
-  def.body = MakeBlockAssign(f.arena, "cmp", 0);
-  stmt->case_items.push_back(def);
-
-  RunStmt(stmt, f.ctx, f.arena);
-  EXPECT_EQ(result_var->value.ToUint64(), 111u);
+// §12.5: a case item may list several expressions separated by commas; the
+// selector matches the item when it equals any one of them. Here the middle
+// expression of the list is the matching one, driven end to end from source.
+TEST(CaseStatementSim, CaseMultiExpressionItemMatchesAnyExpr) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] sel, x;\n"
+      "  initial begin\n"
+      "    sel = 8'd5;\n"
+      "    case (sel)\n"
+      "      8'd3, 8'd5, 8'd7: x = 8'd42;\n"
+      "      default: x = 8'd0;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
 TEST(CaseStatementSim, CaseFirstMatch) {
@@ -600,6 +568,93 @@ TEST(CaseStatementSim, CaseDefaultInMiddlePosition) {
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
+// §12.5: all case expressions are made equal to the length of the longest, and
+// when every expression is signed the shorter ones are sign-extended. A 4-bit
+// signed selector holding -1 must therefore match the 8-bit signed pattern that
+// also denotes -1, not the 8-bit pattern whose low nibble happens to agree.
+TEST(CaseStatementSim, CaseAllSignedSignExtendsToLongest) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic signed [3:0] sel;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    sel = -1;\n"
+      "    case (sel)\n"
+      "      8'sh0F: x = 8'd1;\n"
+      "      8'shFF: x = 8'd2;\n"
+      "      default: x = 8'd9;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 2u);
+}
+
+// §12.5: if any of the case expressions is unsigned, all of them are treated as
+// unsigned. So even though the selector is declared signed, the presence of
+// unsigned item expressions forces a zero-extended comparison: -1 in 4 bits
+// widens to 0x0F, matching the unsigned 8'h0F pattern rather than 8'hFF.
+TEST(CaseStatementSim, CaseUnsignedItemForcesZeroExtend) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic signed [3:0] sel;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    sel = -1;\n"
+      "    case (sel)\n"
+      "      8'hFF: x = 8'd1;\n"
+      "      8'h0F: x = 8'd2;\n"
+      "      default: x = 8'd9;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 2u);
+}
+
+// §12.5: the length equalization also governs a plain unsigned comparison. A
+// 4-bit selector holding 0xF is widened to the 8-bit item length, so it matches
+// 8'h0F and does not match 8'hFF -- a comparison that only looked at the low
+// nibble would wrongly match 8'hFF.
+TEST(CaseStatementSim, CaseUnsignedWidthEqualizeToLongest) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [3:0] sel;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    sel = 4'hF;\n"
+      "    case (sel)\n"
+      "      8'hFF: x = 8'd1;\n"
+      "      8'h0F: x = 8'd2;\n"
+      "      default: x = 8'd9;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 2u);
+}
+
 TEST(CaseStatementSim, CaseNullBodyItemMatch) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -621,6 +676,157 @@ TEST(CaseStatementSim, CaseNullBodyItemMatch) {
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 42u);
+}
+
+// §12.5: the case expression is evaluated exactly once, before any of the item
+// expressions. A function whose side effect counts its own invocations is used
+// as the case expression; after the statement runs the counter must read 1 (an
+// implementation that re-evaluated the expression per item comparison would
+// leave it at the number of items scanned).
+TEST(CaseStatementSim, CaseExpressionEvaluatedExactlyOnce) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  int calls;\n"
+      "  function logic [7:0] pick();\n"
+      "    calls = calls + 1;\n"
+      "    return 8'd2;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    calls = 0;\n"
+      "    case (pick())\n"
+      "      8'd0: x = 8'd10;\n"
+      "      8'd1: x = 8'd20;\n"
+      "      8'd2: x = 8'd30;\n"
+      "      default: x = 8'd99;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* calls = f.ctx.FindVariable("calls");
+  auto* x = f.ctx.FindVariable("x");
+  ASSERT_NE(calls, nullptr);
+  ASSERT_NE(x, nullptr);
+  EXPECT_EQ(calls->value.ToUint64(), 1u);
+  EXPECT_EQ(x->value.ToUint64(), 30u);
+}
+
+// §12.5: a default item is ignored during the linear search. Here the default
+// sits ahead of a matching item in the list, yet the search must skip it and
+// execute the later matching item, not the default.
+TEST(CaseStatementSim, CaseDefaultIgnoredDuringSearch) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] sel, x;\n"
+      "  initial begin\n"
+      "    sel = 8'd1;\n"
+      "    case (sel)\n"
+      "      8'd0: x = 8'd10;\n"
+      "      default: x = 8'd99;\n"
+      "      8'd1: x = 8'd20;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 20u);
+}
+
+// §12.5: a plain-case comparison is exact for every bit with respect to 0, 1,
+// x, and z. This drives a heterogeneous selector that mixes all four values and
+// requires the matching item to agree in every position; a pattern that differs
+// only in a single z-versus-x bit must not match.
+TEST(CaseStatementSim, CaseExactMatchMixedFourState) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] sel, x;\n"
+      "  initial begin\n"
+      "    sel = 8'b1x0z_1x0z;\n"
+      "    case (sel)\n"
+      "      8'b1x0z_1x0x: x = 8'd1;\n"
+      "      8'b1x0z_1x0z: x = 8'd2;\n"
+      "      default: x = 8'd9;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 2u);
+}
+
+// §12.5 (width equalization, consuming the §11.6.1 concatenation width): a case
+// item may be any expression, including a concatenation whose length is fixed
+// by the bit-length rules. The 4-bit concatenation is widened to the 8-bit
+// selector length, so 0xB matches 0x0B and does not match 0xFB.
+TEST(CaseStatementSim, CaseConcatItemWidthEqualizesToSelector) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] sel, x;\n"
+      "  initial begin\n"
+      "    sel = 8'h0B;\n"
+      "    case (sel)\n"
+      "      8'hFB: x = 8'd1;\n"
+      "      {2'b10, 2'b11}: x = 8'd2;\n"
+      "      default: x = 8'd9;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 2u);
+}
+
+// §12.5 (sign treatment, consuming §11.8.1 signedness): signedness can come
+// from the operand's type, not just an explicit `signed` keyword. A `byte`
+// selector is signed, and with all-signed item expressions the shorter selector
+// is sign-extended to the 16-bit item length, so -1 matches 16'shFFFF rather
+// than the same low byte 16'sh00FF.
+TEST(CaseStatementSim, CaseTypeDerivedSignedSelectorSignExtends) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  byte sel;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    sel = -1;\n"
+      "    case (sel)\n"
+      "      16'shFFFF: x = 8'd1;\n"
+      "      16'sh00FF: x = 8'd2;\n"
+      "      default: x = 8'd9;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
 }  // namespace

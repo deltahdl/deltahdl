@@ -289,13 +289,37 @@ static bool CaseInsidePatternMatch(const Logic4Vec& sel, const Expr* pat,
   return CaseInsideValueMatch(sel, pat_val);
 }
 
+// §12.5: a plain `case` comparison succeeds only when every bit matches
+// exactly with respect to 0/1/x/z. To make that bitwise comparison meaningful,
+// the selector and the item expression are first made equal in length to the
+// longer of the two. The bits added by that extension are sign-filled only when
+// both operands are signed; if either is unsigned the whole comparison is
+// unsigned, so the added bits are zero. This mirrors the width/sign resolution
+// the simulator already applies to the equality operators (see 11.6.1, 11.8.1).
 static bool CaseExactMatch(const Logic4Vec& sel, const Logic4Vec& pat) {
-  uint32_t nw = (sel.nwords > pat.nwords) ? sel.nwords : pat.nwords;
-  for (uint32_t i = 0; i < nw; ++i) {
-    uint64_t sa = (i < sel.nwords) ? sel.words[i].aval : 0;
-    uint64_t sb = (i < sel.nwords) ? sel.words[i].bval : 0;
-    uint64_t pa = (i < pat.nwords) ? pat.words[i].aval : 0;
-    uint64_t pb = (i < pat.nwords) ? pat.words[i].bval : 0;
+  uint32_t width = (sel.width > pat.width) ? sel.width : pat.width;
+  bool sign_ext = sel.is_signed && pat.is_signed;
+  // Returns the (aval,bval) bit pair of `v` at position `i`, extending past the
+  // operand's own width with either its replicated sign bit or zero.
+  auto bit_at = [sign_ext](const Logic4Vec& v, uint32_t i, uint64_t& a,
+                           uint64_t& b) {
+    uint32_t src = i;
+    if (i >= v.width) {
+      if (!(sign_ext && v.width > 0)) {
+        a = 0;
+        b = 0;
+        return;
+      }
+      src = v.width - 1;
+    }
+    uint32_t wi = src / 64, bi = src % 64;
+    a = (wi < v.nwords) ? ((v.words[wi].aval >> bi) & 1) : 0;
+    b = (wi < v.nwords) ? ((v.words[wi].bval >> bi) & 1) : 0;
+  };
+  for (uint32_t i = 0; i < width; ++i) {
+    uint64_t sa, sb, pa, pb;
+    bit_at(sel, i, sa, sb);
+    bit_at(pat, i, pa, pb);
     if (sa != pa || sb != pb) return false;
   }
   return true;
