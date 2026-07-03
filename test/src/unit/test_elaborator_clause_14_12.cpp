@@ -101,4 +101,25 @@ TEST(DefaultClockingElab, DuplicateDefaultClockingViaAssignmentErrors) {
   EXPECT_TRUE(f.has_errors);
 }
 
+// §14.12 (claim E, mixed forms): the "only one default clocking per scope" rule
+// spans both spellings of a default. An inline default clocking declaration and
+// a later "default clocking <id>;" assignment together specify the default
+// twice in the same module and shall be a compiler error, even though the
+// assignment's identifier does name a real clocking block.
+TEST(DefaultClockingElab, DuplicateDefaultViaMixedInlineAndAssignmentErrors) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic clk;\n"
+      "  logic a;\n"
+      "  default clocking cb @(posedge clk);\n"
+      "    input a;\n"
+      "  endclocking\n"
+      "  default clocking cb;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_TRUE(f.has_errors);
+}
+
 }  // namespace
