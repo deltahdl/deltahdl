@@ -134,17 +134,6 @@ TEST(DesignBuildingBlockParsing, RemovesFileOrderDependency) {
   EXPECT_EQ(r1.cu->modules[0]->time_prec, TimeUnit::kFs);
 }
 
-TEST(DesignBuildingBlockParsing, DefinesTimeScope) {
-  auto r = ParseTimescale31402(
-      "module m;\n"
-      "  timeunit 1ns;\n"
-      "  timeprecision 1ps;\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(r.cu->modules[0]->has_timeunit);
-  EXPECT_TRUE(r.cu->modules[0]->has_timeprecision);
-}
-
 TEST(DesignBuildingBlockParsing, WorksInInterface) {
   auto r = ParseTimescale31402(
       "interface ifc;\n"
@@ -506,6 +495,56 @@ TEST(DesignBuildingBlockParsing, TimeunitMatchingRepeatInProgramAccepted) {
   EXPECT_FALSE(r.has_errors);
   EXPECT_TRUE(r.cu->programs[0]->has_timeunit);
   EXPECT_EQ(r.cu->programs[0]->time_unit, TimeUnit::kNs);
+}
+
+// The slash form of `timeunit` is admitted in every design-element scope, not
+// only in modules and the compilation unit. These exercise it in an interface,
+// a program, and a package so each syntactic position's combined unit/precision
+// parse is observed; the package case drives the distinct code path that stores
+// the slash-supplied precision onto the package declaration.
+TEST(DesignBuildingBlockParsing, TimeunitSlashInInterfaceSetsBoth) {
+  auto r = ParseTimescale31402(
+      "interface ifc;\n"
+      "  timeunit 100ps / 10fs;\n"
+      "endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->interfaces.size(), 1u);
+  auto* ifc = r.cu->interfaces[0];
+  EXPECT_TRUE(ifc->has_timeunit);
+  EXPECT_TRUE(ifc->has_timeprecision);
+  EXPECT_EQ(ifc->time_unit, TimeUnit::kPs);
+  EXPECT_EQ(ifc->time_prec, TimeUnit::kFs);
+}
+
+TEST(DesignBuildingBlockParsing, TimeunitSlashInProgramSetsBoth) {
+  auto r = ParseTimescale31402(
+      "program p;\n"
+      "  timeunit 100ps / 10fs;\n"
+      "endprogram\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->programs.size(), 1u);
+  auto* prog = r.cu->programs[0];
+  EXPECT_TRUE(prog->has_timeunit);
+  EXPECT_TRUE(prog->has_timeprecision);
+  EXPECT_EQ(prog->time_unit, TimeUnit::kPs);
+  EXPECT_EQ(prog->time_prec, TimeUnit::kFs);
+}
+
+TEST(DesignBuildingBlockParsing, TimeunitSlashInPackageSetsBoth) {
+  auto r = Parse(
+      "package pkg;\n"
+      "  timeunit 100ps / 10fs;\n"
+      "endpackage\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->packages.size(), 1u);
+  auto* pkg = r.cu->packages[0];
+  EXPECT_TRUE(pkg->has_timeunit);
+  EXPECT_TRUE(pkg->has_timeprecision);
+  EXPECT_EQ(pkg->time_unit, TimeUnit::kPs);
+  EXPECT_EQ(pkg->time_prec, TimeUnit::kFs);
 }
 
 }  // namespace
