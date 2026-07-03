@@ -310,6 +310,46 @@ TEST(IntraAssignTimingSimulation, NbaRepeatEventDoesNotBlock) {
   LowerRunAndCheck(f, design, {{"a", 40}, {"c", 55}});
 }
 
+// --- repeat over a bare-signal event: any transition is counted ------------
+
+TEST(IntraAssignTimingSimulation, BlockingRepeatBareSignalCountsTransitions) {
+  SimFixture f;
+  // §9.4.5's `repeat(num) @(clk)` example: with no posedge/negedge qualifier
+  // the event control fires on any transition of clk, and the repeat tallies
+  // each one until the count is reached. The count comes from a runtime
+  // variable, exactly as in the LRM example. Four transitions (two rising, two
+  // falling) are supplied; a posedge-only interpretation would see only two and
+  // never reach the count, so observing the write proves any transition counts.
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic clk;\n"
+      "  logic [7:0] a, b;\n"
+      "  int num;\n"
+      "  initial begin\n"
+      "    clk = 0;\n"
+      "    a = 8'd0;\n"
+      "    num = 4;\n"
+      "    b = 8'd55;\n"
+      "    a = repeat(num) @(clk) b;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    #5 clk = 1;\n"  // transition 1
+      "    #5 clk = 0;\n"  // transition 2
+      "    #5 clk = 1;\n"  // transition 3
+      "    #5 clk = 0;\n"  // transition 4 => count reached, a <- 55
+      "    #5 clk = 1;\n"  // extra transition, no effect
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* a = f.ctx.FindVariable("a");
+  ASSERT_NE(a, nullptr);
+  EXPECT_EQ(a->value.ToUint64(), 55u);
+}
+
 // --- repeat count evaluated once, before scheduling ------------------------
 
 TEST(IntraAssignTimingSimulation, RepeatCountEvaluatedOnce) {
@@ -389,6 +429,44 @@ TEST(IntraAssignTimingSimulation, RepeatCountNegativeBypasses) {
   auto* a = f.ctx.FindVariable("a");
   ASSERT_NE(a, nullptr);
   EXPECT_EQ(a->value.ToUint64(), 80u);
+}
+
+TEST(IntraAssignTimingSimulation,
+     RepeatCountUnsignedNegativeBitPatternDoesNotBypass) {
+  SimFixture f;
+  // §9.4.5: whether a negative-looking count bypasses the repeat depends on the
+  // signedness of the count expression. The same bit pattern that reads as -3
+  // in a signed variable reads as a large positive count in an unsigned one, so
+  // the repeat must wait rather than assigning at once. Here `u` is an unsigned
+  // 8-bit logic holding 253; only a couple of clock edges are supplied, far
+  // fewer than the count, so the assignment never completes and `a` keeps its
+  // initial value. If the count were (wrongly) treated as signed, it would be
+  // <= 0 and the write of b would occur immediately.
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic clk;\n"
+      "  logic [7:0] a, b, u;\n"
+      "  initial begin\n"
+      "    clk = 0;\n"
+      "    a = 8'd0;\n"
+      "    u = -3;\n"  // unsigned: bit pattern 8'hFD == 253
+      "    b = 8'd80;\n"
+      "    a = repeat(u) @(posedge clk) b;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    #5 clk = 1; #5 clk = 0;\n"
+      "    #5 clk = 1; #5 clk = 0;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* a = f.ctx.FindVariable("a");
+  ASSERT_NE(a, nullptr);
+  // Still waiting for the 253rd edge; the assignment has not happened.
+  EXPECT_EQ(a->value.ToUint64(), 0u);
 }
 
 TEST(IntraAssignTimingSimulation, RepeatCountUnknownBypasses) {
