@@ -510,6 +510,8 @@ class Elaborator {
 
   void ApplyClassMethodAutomaticDefault();
 
+  void DefaultPackageTaskFuncLifetimes();
+
   void ValidateChainingConstructors();
   void ValidateOneClassChainingCtor(const ClassDecl* cls);
   void ValidateOneClassDefaultKeyword(const ClassDecl* cls);

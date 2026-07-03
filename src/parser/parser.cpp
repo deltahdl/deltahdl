@@ -692,7 +692,11 @@ PackageDecl* Parser::ParsePackageDecl() {
   pkg->range.start = CurrentLoc();
   Expect(TokenKind::kKwPackage);
 
-  Match(TokenKind::kKwAutomatic) || Match(TokenKind::kKwStatic);
+  if (Match(TokenKind::kKwAutomatic)) {
+    pkg->is_automatic = true;
+  } else {
+    Match(TokenKind::kKwStatic);
+  }
 
   pkg->name = Expect(TokenKind::kIdentifier).text;
   Expect(TokenKind::kSemicolon);

@@ -820,20 +820,26 @@ void RecordTaskFuncNames(
   }
 }
 
-// §6.21: a task/function with no explicit lifetime inherits the enclosing
-// decl's lifetime (automatic if the decl is automatic, otherwise static).
-void DefaultTaskFuncLifetimes(const ModuleDecl* decl) {
-  for (auto* item : decl->items) {
+// §6.21/§13.3.1: a task/function with no explicit lifetime inherits the
+// enclosing scope's lifetime (automatic if the scope is automatic, otherwise
+// static).
+void DefaultSubroutineLifetimes(const std::vector<ModuleItem*>& items,
+                                bool scope_is_automatic) {
+  for (auto* item : items) {
     if ((item->kind == ModuleItemKind::kFunctionDecl ||
          item->kind == ModuleItemKind::kTaskDecl) &&
         !item->is_automatic && !item->is_static) {
-      if (decl->is_automatic) {
+      if (scope_is_automatic) {
         item->is_automatic = true;
       } else {
         item->is_static = true;
       }
     }
   }
+}
+
+void DefaultTaskFuncLifetimes(const ModuleDecl* decl) {
+  DefaultSubroutineLifetimes(decl->items, decl->is_automatic);
 }
 
 // Collects the names of the automatic-lifetime tasks and functions.
@@ -905,6 +911,15 @@ bool IsImplicitNestedInstantiationCandidate(std::string_view name,
 }
 
 }  // namespace
+
+// §13.3.1: subroutines declared in a package take their default lifetime from
+// the package. Packages are not elaborated through ElaborateItems (they are not
+// modules), so their task/function default lifetimes are resolved here.
+void Elaborator::DefaultPackageTaskFuncLifetimes() {
+  for (auto* pkg : unit_->packages) {
+    DefaultSubroutineLifetimes(pkg->items, pkg->is_automatic);
+  }
+}
 
 void Elaborator::RunPostItemValidations(const ModuleDecl* decl,
                                         RtlirModule* mod) {

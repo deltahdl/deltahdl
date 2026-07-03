@@ -88,6 +88,55 @@ TEST(TaskDeclSim, DefaultTaskInAutomaticModuleIsAutomatic) {
   EXPECT_EQ(val, 1u);
 }
 
+// §13.3.1: a task defined in an ordinary package has no explicit lifetime and
+// so defaults to static. Its local therefore persists across the two calls made
+// from the importing module's initial block, yielding 2. This is the package
+// input form of the default-static rule (contrast DefaultTaskIsStatic, module).
+TEST(TaskDeclSim, DefaultTaskInPackageIsStatic) {
+  auto val = RunAndGet(
+      "package pk;\n"
+      "  task counter(output logic [31:0] v);\n"
+      "    int cnt;\n"
+      "    cnt = cnt + 1;\n"
+      "    v = cnt;\n"
+      "  endtask\n"
+      "endpackage\n"
+      "module t;\n"
+      "  import pk::*;\n"
+      "  logic [31:0] result;\n"
+      "  initial begin\n"
+      "    counter(result);\n"
+      "    counter(result);\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(val, 2u);
+}
+
+// §13.3.1: a task with no explicit lifetime defined in a package marked
+// `automatic` is implicitly automatic, so its local is reallocated on each call
+// and the counter resets to 1. Contrast DefaultTaskInPackageIsStatic above.
+TEST(TaskDeclSim, DefaultTaskInAutomaticPackageIsAutomatic) {
+  auto val = RunAndGet(
+      "package automatic pk;\n"
+      "  task counter(output logic [31:0] v);\n"
+      "    int cnt;\n"
+      "    cnt = cnt + 1;\n"
+      "    v = cnt;\n"
+      "  endtask\n"
+      "endpackage\n"
+      "module t;\n"
+      "  import pk::*;\n"
+      "  logic [31:0] result;\n"
+      "  initial begin\n"
+      "    counter(result);\n"
+      "    counter(result);\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(val, 1u);
+}
+
 TEST(TaskDeclSim, StaticVarInAutoTaskPersists) {
   auto val = RunAndGet(
       "module t;\n"
@@ -124,6 +173,35 @@ TEST(TaskDeclSim, AutoVarInStaticTaskFresh) {
       "endmodule\n",
       "result");
   EXPECT_EQ(val, 1u);
+}
+
+// §13.3.1: a task defined inside a class is always automatic, even with no
+// explicit lifetime keyword. Its locals are therefore reallocated on every
+// invocation, so the counter resets to 1 each call. Contrast
+// DefaultTaskIsStatic above, where the same no-lifetime task at module level
+// keeps its locals.
+TEST(TaskDeclSim, ClassTaskIsAlwaysAutomatic) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "class C;\n"
+      "  task step(output int r);\n"
+      "    int cnt;\n"
+      "    cnt = cnt + 1;\n"
+      "    r = cnt;\n"
+      "  endtask\n"
+      "endclass\n"
+      "module t;\n"
+      "  int a, b, c;\n"
+      "  initial begin\n"
+      "    C obj;\n"
+      "    obj = new;\n"
+      "    obj.step(a);\n"
+      "    obj.step(b);\n"
+      "    obj.step(c);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"a", 1u}, {"b", 1u}, {"c", 1u}});
 }
 
 TEST(TaskDeclSim, SetupReturnsTaskItem) {

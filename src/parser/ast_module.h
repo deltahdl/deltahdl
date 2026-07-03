@@ -389,6 +389,10 @@ struct PackageDecl {
   int time_prec_magnitude = 1;
   bool has_timeunit = false;
   bool has_timeprecision = false;
+  // §13.3.1: a package declared `automatic` makes its subroutines default to
+  // automatic lifetime; otherwise their default lifetime is static. Kept last
+  // so adding it does not shift the offsets of the fields above.
+  bool is_automatic = false;
 };
 
 }  // namespace delta

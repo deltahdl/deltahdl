@@ -329,6 +329,8 @@ void Elaborator::RunPreElaborationValidations() {
 
   ApplyClassMethodAutomaticDefault();
 
+  DefaultPackageTaskFuncLifetimes();
+
   ValidateFinalClassExtension();
 
   ValidateWeakReferenceMembers();
