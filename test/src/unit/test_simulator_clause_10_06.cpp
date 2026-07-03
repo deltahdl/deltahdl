@@ -52,6 +52,39 @@ TEST(ProceduralContinuousAssignSim, ForceRhsReevaluatesOnVariableChange) {
   EXPECT_EQ(a->value.ToUint64(), 52u);
 }
 
+// The head's rule treats the assign/force RHS as a continuous assignment,
+// reevaluating it whenever *any* RHS variable changes. The LRM's own example
+// is `force a = b + f(c)`, where a variable (c) appears only as a function-call
+// argument -- it must still be a reevaluation source.
+TEST(ProceduralContinuousAssignSim,
+     ForceReevaluatesOnFunctionCallArgumentChange) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] b, c, a;\n"
+      "  function logic [7:0] dbl(input logic [7:0] x);\n"
+      "    return x + x;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    b = 8'd1;\n"
+      "    c = 8'd2;\n"
+      "    force a = b + dbl(c);\n"
+      "    #1;\n"
+      "    c = 8'd10;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* a = f.ctx.FindVariable("a");
+  ASSERT_NE(a, nullptr);
+  // b + dbl(c) = 1 + (10+10) = 21; unchanged (5) if the func-call argument
+  // were not collected as a reevaluation source.
+  EXPECT_EQ(a->value.ToUint64(), 21u);
+}
+
 TEST(ProceduralContinuousAssignSim, ForceReevaluatesForEachRhsVariableChange) {
   SimFixture f;
   auto* design = ElaborateSrc(
