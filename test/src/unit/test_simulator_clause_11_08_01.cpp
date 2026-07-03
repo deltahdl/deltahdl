@@ -167,18 +167,6 @@ TEST(ExprType, RealTimesIntIsReal) {
   EXPECT_DOUBLE_EQ(ToDouble(result), 7.5);
 }
 
-TEST(ExprType, IntTimesRealIsReal) {
-  SimFixture f;
-  auto* vi = f.ctx.CreateVariable("i", 32);
-  vi->value = MakeLogic4VecVal(f.arena, 32, 4);
-  MakeRealVar(f, "r", 0.25);
-  auto result = EvalExpr(MakeBinary(f.arena, TokenKind::kStar,
-                                    MakeId(f.arena, "i"), MakeId(f.arena, "r")),
-                         f.ctx, f.arena);
-  EXPECT_TRUE(result.is_real);
-  EXPECT_DOUBLE_EQ(ToDouble(result), 1.0);
-}
-
 TEST(ExprType, RealMinusRealIsReal) {
   SimFixture f;
   MakeRealVar(f, "a", 5.0);
@@ -380,18 +368,6 @@ TEST(ExprType, TypeNotDeterminedByLhs) {
   EXPECT_EQ(val, 44u);
 }
 
-TEST(ExprType, TypeNotDeterminedByLhsSignedTarget) {
-  SimFixture f;
-  MakeSignedVarAdv(f, "target", 16, 0);
-  MakeVar(f, "u1", 8, 200);
-  MakeVar(f, "u2", 8, 100);
-  auto result =
-      EvalExpr(MakeBinary(f.arena, TokenKind::kPlus, MakeId(f.arena, "u1"),
-                          MakeId(f.arena, "u2")),
-               f.ctx, f.arena);
-  EXPECT_FALSE(result.is_signed);
-}
-
 TEST(ExprType, SelfDeterminedReductionInsideLargerExpr) {
   SimFixture f;
   MakeSignedVarAdv(f, "a", 8, 0xFF);
@@ -523,6 +499,130 @@ TEST(ExprType, PartSelectAssignedToWiderVarIsZeroExtended) {
       "endmodule\n",
       "a");
   EXPECT_EQ(val, 0x00FFu);
+}
+
+// A based number (no 's') is unsigned, so when it is the source of an
+// assignment to a wider signed target it is zero-extended, not sign-extended,
+// even though its own high bit is set. Drives the §5.7.1 literal syntax through
+// the full pipeline so the classification is observed via real assignment
+// extension rather than an inspected flag.
+TEST(ExprType, BasedLiteralUnsignedZeroExtendedFullPipeline) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  logic signed [15:0] w;\n"
+      "  initial w = 8'h80;\n"
+      "endmodule\n",
+      "w");
+  EXPECT_EQ(val, 0x0080u);
+}
+
+// The 's' notation flips the same literal to signed, so the identical value is
+// now sign-extended into the wider target. This is the discriminating negative
+// of the rule above and exercises the "except where s notation is used" branch.
+TEST(ExprType, SignedBasedLiteralSignExtendedFullPipeline) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  logic signed [15:0] w;\n"
+      "  initial w = 8'sh80;\n"
+      "endmodule\n",
+      "w");
+  EXPECT_EQ(val, 0xFF80u);
+}
+
+// A bit-select result is unsigned regardless of the operand's signedness. The
+// single selected bit of a signed vector, assigned to a wider signed target, is
+// therefore zero-extended (result 0x0001); a signed 1-bit '1' would instead
+// sign-extend to all ones. Built from §11.5.1 bit-select syntax end-to-end.
+TEST(ExprType, BitSelectOfSignedIsUnsignedFullPipeline) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  logic signed [7:0] sv;\n"
+      "  logic signed [15:0] w;\n"
+      "  initial begin\n"
+      "    sv = 8'shFF;\n"
+      "    w = sv[7];\n"
+      "  end\n"
+      "endmodule\n",
+      "w");
+  EXPECT_EQ(val, 0x0001u);
+}
+
+// A concatenation result is unsigned regardless of its operands' signedness.
+// Concatenating two signed nibbles yields an unsigned byte, so assignment to a
+// wider signed target zero-extends (0x00FF); a signed byte would sign-extend to
+// 0xFFFF. Built from §11.4.12 concatenation syntax end-to-end.
+TEST(ExprType, ConcatOfSignedIsUnsignedFullPipeline) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  logic signed [3:0] a, b;\n"
+      "  logic signed [15:0] w;\n"
+      "  initial begin\n"
+      "    a = 4'shF;\n"
+      "    b = 4'shF;\n"
+      "    w = {a, b};\n"
+      "  end\n"
+      "endmodule\n",
+      "w");
+  EXPECT_EQ(val, 0x00FFu);
+}
+
+// When all operands are signed the result is signed, so a signed sum that is
+// narrower than its target sign-extends on assignment. Two signed bytes summing
+// to -1 give 0xFFFF in a wider signed target; an unsigned result would instead
+// zero-extend to 0x00FF. Operand signedness is taken from the `logic signed`
+// declarations, driven end-to-end. Complements the unsigned-operand case in
+// TypeNotDeterminedByLhs.
+TEST(ExprType, AllSignedOperandsYieldSignedResultFullPipeline) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  logic signed [7:0] a, b;\n"
+      "  logic signed [15:0] w;\n"
+      "  initial begin\n"
+      "    a = 8'shFE;\n"
+      "    b = 8'sh01;\n"
+      "    w = a + b;\n"
+      "  end\n"
+      "endmodule\n",
+      "w");
+  EXPECT_EQ(val, 0xFFFFu);
+}
+
+// If any operand is real the whole expression is real, so an integer multiplied
+// by a real fraction keeps its fractional part instead of truncating to an
+// integer. The int operand comes from a real declaration and the real result is
+// read back through a real target, driven end-to-end.
+TEST(ExprType, AnyRealOperandYieldsRealResultFullPipeline) {
+  auto val = RunAndGetReal(
+      "module t;\n"
+      "  int i;\n"
+      "  real w;\n"
+      "  initial begin\n"
+      "    i = 3;\n"
+      "    w = i * 0.5;\n"
+      "  end\n"
+      "endmodule\n",
+      "w");
+  EXPECT_DOUBLE_EQ(val, 1.5);
+}
+
+// An unbased decimal literal is signed, so when it is the sole literal operand
+// alongside a signed variable the whole addition stays signed and its narrower
+// result sign-extends into the wider target. -2 + 1 gives -1 -> 0xFFFF; had the
+// decimal literal been unsigned the mixed expression would be unsigned and
+// yield 0x00FF. This observes the decimal-is-signed rule through a real literal
+// operand end-to-end, distinct from the flag-only DecimalLiteralIsSigned.
+TEST(ExprType, DecimalLiteralOperandIsSignedFullPipeline) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  logic signed [7:0] s;\n"
+      "  logic signed [15:0] w;\n"
+      "  initial begin\n"
+      "    s = 8'shFE;\n"
+      "    w = s + 1;\n"
+      "  end\n"
+      "endmodule\n",
+      "w");
+  EXPECT_EQ(val, 0xFFFFu);
 }
 
 }  // namespace
