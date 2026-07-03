@@ -104,6 +104,14 @@ TEST(DesignBuildingBlockParsing, ErrorInvalidMagnitude) {
   EXPECT_TRUE(r.has_errors);
 }
 
+// §3.14.2.1 syntax requires a time_unit operand before the '/'. The separator
+// is present but the unit operand is absent, a path distinct from a missing '/'
+// or an empty precision after the '/'.
+TEST(DesignBuildingBlockParsing, ErrorEmptyUnitBeforeSlash) {
+  auto r = PreprocessTimescale("`timescale / 1ps\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
 TEST(DesignBuildingBlockParsing, WhitespaceAroundSlash) {
   auto r1 = PreprocessTimescale("`timescale 1ns/1ps\n");
   EXPECT_FALSE(r1.has_errors);
@@ -114,6 +122,30 @@ TEST(DesignBuildingBlockParsing, WhitespaceAroundSlash) {
   EXPECT_FALSE(r2.has_errors);
   EXPECT_EQ(r2.timescale.unit, TimeUnit::kNs);
   EXPECT_EQ(r2.timescale.precision, TimeUnit::kPs);
+}
+
+// §3.14.2.1: a directive stays in effect from where it appears until the next
+// directive is read. An intervening design element does not reset it, so with
+// no replacing directive the originally captured value must survive unchanged.
+TEST(DesignBuildingBlockParsing, PersistsThroughInterveningModule) {
+  auto r = PreprocessTimescale(
+      "`timescale 1us / 1ns\n"
+      "module m;\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_TRUE(r.has_timescale);
+  EXPECT_EQ(r.timescale.unit, TimeUnit::kUs);
+  EXPECT_EQ(r.timescale.magnitude, 1);
+  EXPECT_EQ(r.timescale.precision, TimeUnit::kNs);
+  EXPECT_EQ(r.timescale.prec_magnitude, 1);
+}
+
+// §3.14.2.1 syntax `timescale time_unit / time_precision requires both
+// operands. The separator is present here but the precision operand is absent,
+// a path distinct from a wholly missing '/'.
+TEST(DesignBuildingBlockParsing, ErrorEmptyPrecisionAfterSlash) {
+  auto r = PreprocessTimescale("`timescale 1ns /\n");
+  EXPECT_TRUE(r.has_errors);
 }
 
 TEST(DesignBuildingBlockParsing, LrmExampleThreeModules) {
