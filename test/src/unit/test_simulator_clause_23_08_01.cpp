@@ -165,4 +165,75 @@ TEST(TaskAndFunctionNameResolutionSimulation,
   EXPECT_EQ(v->value.ToUint64(), 16u);
 }
 
+TEST(TaskAndFunctionNameResolutionSimulation,
+     ForwardDefinedCompilationUnitFunctionResolvesAndExecutes) {
+  SimFixture f;
+  // §23.8.1's compilation-unit lookup resolves a bare call to a function even
+  // when that function is defined textually after the calling module. The
+  // resolution is order-independent, so the call runs and yields the sum.
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  integer x;\n"
+      "  initial x = later_add(4, 5);\n"
+      "endmodule\n"
+      "function int later_add(int a, int b);\n"
+      "  return a + b;\n"
+      "endfunction\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* v = f.ctx.FindVariable("x");
+  ASSERT_NE(v, nullptr);
+  EXPECT_EQ(v->value.ToUint64(), 9u);
+}
+
+TEST(TaskAndFunctionNameResolutionSimulation,
+     ForwardDefinedCompilationUnitTaskResolvesAndExecutes) {
+  SimFixture f;
+  // The compilation-unit lookup is order-independent for tasks as well as
+  // functions: a bare task call in the calling module resolves to a task whose
+  // definition appears later in the compilation unit, and the task runs and
+  // writes its output argument.
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  int x;\n"
+      "  initial later_set(x);\n"
+      "endmodule\n"
+      "task later_set(output int v);\n"
+      "  v = 42;\n"
+      "endtask\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* v = f.ctx.FindVariable("x");
+  ASSERT_NE(v, nullptr);
+  EXPECT_EQ(v->value.ToUint64(), 42u);
+}
+
+TEST(TaskAndFunctionNameResolutionSimulation,
+     CompilationUnitFunctionBodyCallsForwardDefinedCompilationUnitFunction) {
+  SimFixture f;
+  // Mirrors LRM Example 1: a compilation-unit subroutine (caller) makes a bare
+  // reference to another compilation-unit function (f) that is defined later.
+  // The unit lookup resolves the forward reference from inside the subroutine
+  // body, so calling caller from a module returns f(10) + 100 == 111.
+  auto* design = ElaborateSrc(
+      "function int caller(int a);\n"
+      "  return f(a) + 100;\n"
+      "endfunction\n"
+      "module m;\n"
+      "  integer x;\n"
+      "  initial x = caller(10);\n"
+      "endmodule\n"
+      "function int f(int y);\n"
+      "  return y + 1;\n"
+      "endfunction\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* v = f.ctx.FindVariable("x");
+  ASSERT_NE(v, nullptr);
+  EXPECT_EQ(v->value.ToUint64(), 111u);
+}
+
 }  // namespace

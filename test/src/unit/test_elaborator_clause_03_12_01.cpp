@@ -64,14 +64,6 @@ TEST(CompilationUnitElaboration, CuScopeLocalparamElaborates) {
              "endmodule\n"));
 }
 
-TEST(CompilationUnitElaboration, DollarUnitScopeExprElaborates) {
-  EXPECT_TRUE(
-      ElabOk("bit b;\n"
-             "module m;\n"
-             "  logic sig;\n"
-             "endmodule\n"));
-}
-
 TEST(CompilationUnitElaboration, CuScopeClassVisibleInModule) {
   EXPECT_TRUE(
       ElabOk("class my_class;\n"
@@ -149,6 +141,83 @@ TEST(CompilationUnitElaboration, CuScopeVarDeclElaborates) {
              "module m;\n"
              "  logic sig;\n"
              "endmodule\n"));
+}
+
+TEST(CompilationUnitElaboration,
+     DollarUnitPrefixResolvesToCompilationUnitScopeDespiteLocalShadow) {
+  ElabFixture f;
+  // §3.12.1: the whole purpose of the $unit:: prefix is unambiguous access to
+  // the outermost (compilation-unit-scope) declaration. Here a module-local
+  // localparam K shadows a compilation-unit localparam K of a different value.
+  // The bare reference must see the local (width 3) while the $unit::K
+  // reference must reach past the shadow to the compilation-unit value
+  // (width 8).
+  auto* design = Elaborate(
+      "localparam int K = 8;\n"
+      "module m;\n"
+      "  localparam int K = 3;\n"
+      "  logic [$unit::K-1:0] wide;\n"
+      "  logic [K-1:0] narrow;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  ASSERT_EQ(design->top_modules.size(), 1u);
+  auto* mod = design->top_modules[0];
+  ASSERT_EQ(mod->variables.size(), 2u);
+  EXPECT_EQ(mod->variables[0].name, "wide");
+  EXPECT_EQ(mod->variables[0].width, 8u);
+  EXPECT_EQ(mod->variables[1].name, "narrow");
+  EXPECT_EQ(mod->variables[1].width, 3u);
+}
+
+TEST(CompilationUnitElaboration,
+     DollarUnitPrefixResolvesCompilationUnitParameterPastLocalShadow) {
+  ElabFixture f;
+  // §3.12.1: the outermost declaration reached by $unit:: may be declared with
+  // the `parameter` keyword rather than `localparam`. At compilation-unit scope
+  // both name a constant, so a $unit:: reference must still bypass a same-named
+  // module-local parameter (here local 3) and resolve to the outermost value 8.
+  auto* design = Elaborate(
+      "parameter int K = 8;\n"
+      "module m;\n"
+      "  localparam int K = 3;\n"
+      "  logic [$unit::K-1:0] wide;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  ASSERT_EQ(design->top_modules.size(), 1u);
+  auto* mod = design->top_modules[0];
+  ASSERT_EQ(mod->variables.size(), 1u);
+  EXPECT_EQ(mod->variables[0].name, "wide");
+  EXPECT_EQ(mod->variables[0].width, 8u);
+}
+
+TEST(CompilationUnitElaboration,
+     DollarUnitPrefixResolvesToCompilationUnitScopeInParameterInitializer) {
+  ElabFixture f;
+  // §3.12.1: the $unit:: disambiguation applies wherever a constant expression
+  // is evaluated, not only in a packed dimension. Here a module-local
+  // localparam M is initialized from $unit::K while a same-named local K
+  // shadows the compilation-unit K. M must be computed from the outermost K
+  // (8 + 1 == 9), giving a 9-bit vector, not from the local K (which would be
+  // 4 bits).
+  auto* design = Elaborate(
+      "localparam int K = 8;\n"
+      "module m;\n"
+      "  localparam int K = 3;\n"
+      "  localparam int M = $unit::K + 1;\n"
+      "  logic [M-1:0] wide;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  ASSERT_EQ(design->top_modules.size(), 1u);
+  auto* mod = design->top_modules[0];
+  ASSERT_EQ(mod->variables.size(), 1u);
+  EXPECT_EQ(mod->variables[0].name, "wide");
+  EXPECT_EQ(mod->variables[0].width, 9u);
 }
 
 TEST(CompilationUnitElaboration, ForwardReferenceToCuScopeFunctionAccepted) {

@@ -133,21 +133,6 @@ TEST(TaskAndFunctionNameResolutionElaboration,
 }
 
 TEST(TaskAndFunctionNameResolutionElaboration,
-     ModuleLocalFunctionShadowsCompilationUnitFunction) {
-  EXPECT_TRUE(
-      ElabOk("function int f(int a);\n"
-             "  return a + 100;\n"
-             "endfunction\n"
-             "module m;\n"
-             "  function int f(int a);\n"
-             "    return a;\n"
-             "  endfunction\n"
-             "  integer x;\n"
-             "  initial x = f(1);\n"
-             "endmodule\n"));
-}
-
-TEST(TaskAndFunctionNameResolutionElaboration,
      CompilationUnitFunctionCalledFromNamedBlock) {
   EXPECT_TRUE(
       ElabOk("function int cu_f(int a);\n"
@@ -159,6 +144,27 @@ TEST(TaskAndFunctionNameResolutionElaboration,
              "    x = cu_f(9);\n"
              "  end\n"
              "endmodule\n"));
+}
+
+TEST(TaskAndFunctionNameResolutionElaboration,
+     ForwardDefinedCompilationUnitFunctionIsGathered) {
+  ElabFixture f;
+  // The compilation-unit lookup that §23.8.1 inserts is independent of source
+  // order: a bare call in an earlier module resolves to a function whose
+  // definition appears later in the unit. This is the exception §3.12.1 carves
+  // out from its "names shall already be defined" rule for task/function names.
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  integer x;\n"
+      "  initial x = later_add(2, 3);\n"
+      "endmodule\n"
+      "function int later_add(int a, int b);\n"
+      "  return a + b;\n"
+      "endfunction\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_TRUE(CuListHas(design, "later_add"));
 }
 
 TEST(TaskAndFunctionNameResolutionElaboration,

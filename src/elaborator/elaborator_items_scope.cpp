@@ -11,6 +11,17 @@ namespace delta {
 
 ScopeMap Elaborator::BuildParamScope(const RtlirModule* mod) const {
   ScopeMap scope = cu_param_scope_;
+  // §3.12.1: an explicit $unit:: prefix names the compilation-unit-scope
+  // declaration and exists precisely so a same-named module-local declaration
+  // cannot shadow it. Expose each compilation-unit-scope parameter a second
+  // time under a "$unit::"-qualified key, which the local-parameter overlay
+  // below never overwrites, so a $unit:: reference keeps resolving to the
+  // outermost value.
+  for (const auto& [name, val] : cu_param_scope_) {
+    if (name.find('.') != std::string_view::npos) continue;
+    auto* key = arena_.Create<std::string>("$unit::" + std::string(name));
+    scope[*key] = val;
+  }
   for (const auto& p : mod->params) {
     if (p.is_resolved) {
       scope[p.name] = p.resolved_value;

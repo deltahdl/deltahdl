@@ -452,6 +452,18 @@ static std::optional<ConstVal> ConstEvalFull(const Expr* expr,
     case ExprKind::kIntegerLiteral:
       return ConstEvalLiteral(expr);
     case ExprKind::kIdentifier: {
+      // §3.12.1: a $unit:: prefix forces resolution to the compilation-unit
+      // scope, bypassing any same-named local that would otherwise shadow it.
+      // Those values are aliased under a "$unit::"-qualified key by
+      // BuildParamScope, so a match there is the outermost declaration and a
+      // miss must not silently fall back to the shadowing local.
+      if (expr->scope_prefix == "$unit") {
+        std::string key = "$unit::";
+        key += expr->text;
+        auto uit = scope.find(key);
+        if (uit != scope.end()) return ConstVal{uit->second, 32, true};
+        return std::nullopt;
+      }
       auto it = scope.find(expr->text);
       if (it != scope.end()) return ConstVal{it->second, 32, true};
       return std::nullopt;

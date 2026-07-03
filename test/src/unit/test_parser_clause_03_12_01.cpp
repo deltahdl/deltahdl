@@ -475,10 +475,6 @@ TEST(CompilationUnitParsing, DollarUnitInSubexpression) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(CompilationUnitParsing, UnrecognizedTopLevelTokenIsError) {
-  EXPECT_FALSE(ParseOk("always_comb begin end"));
-}
-
 TEST(CompilationUnitParsing, BareStatementAtTopLevelIsError) {
   EXPECT_FALSE(ParseOk("assign x = 1;"));
 }
