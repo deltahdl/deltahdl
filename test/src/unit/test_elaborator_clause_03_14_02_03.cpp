@@ -102,4 +102,54 @@ TEST(TimescalePrecedenceElaboration, MixedAcrossModuleAndInterfaceErrors) {
   EXPECT_TRUE(f.has_errors);
 }
 
+// A program is one of the design-element kinds the consistency rule ranges
+// over: a fully specified program alongside an unspecified module must be
+// diagnosed just as a mixed pair of modules would be.
+TEST(TimescalePrecedenceElaboration, MixedAcrossProgramAndModuleErrors) {
+  ElabFixture f;
+  ElaborateWithPreprocAndCu(
+      "program p;\n"
+      "  timeunit 1ns;\n"
+      "  timeprecision 1ps;\n"
+      "endprogram\n"
+      "module a;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// "Specified" means both a time unit and a time precision are in effect. An
+// element carrying only a timeunit is still unspecified, so pairing it with a
+// fully specified element trips the same error as pairing with a bare element.
+TEST(TimescalePrecedenceElaboration, PartialSpecificationIsUnspecified) {
+  ElabFixture f;
+  ElaborateWithPreprocAndCu(
+      "module a;\n"
+      "  timeunit 1ns;\n"
+      "  timeprecision 1ps;\n"
+      "endmodule\n"
+      "module b;\n"
+      "  timeunit 1ns;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// The other half of the same partial-specification form: an element that names
+// only a time precision (and no time unit) is likewise not fully specified, so
+// mixing it with a fully specified element is an error too.
+TEST(TimescalePrecedenceElaboration, PrecisionOnlyIsUnspecified) {
+  ElabFixture f;
+  ElaborateWithPreprocAndCu(
+      "module a;\n"
+      "  timeunit 1ns;\n"
+      "  timeprecision 1ps;\n"
+      "endmodule\n"
+      "module b;\n"
+      "  timeprecision 1ps;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
 }  // namespace
