@@ -143,6 +143,32 @@ TEST(ProgramBlockParsing, ProgramRejectsAlwaysProcedure) {
   EXPECT_TRUE(r.has_errors);
 }
 
+// The prohibition on "always procedures" covers every always variant, not just
+// the general-purpose always. Each keyword is a distinct token that the same
+// in-program guard must reject.
+TEST(ProgramBlockParsing, ProgramRejectsAlwaysCombProcedure) {
+  auto r = Parse("program p; always_comb begin end endprogram\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(ProgramBlockParsing, ProgramRejectsAlwaysFfProcedure) {
+  auto r = Parse(
+      "program p;\n"
+      "  logic clk, q;\n"
+      "  always_ff @(posedge clk) q <= 1'b1;\n"
+      "endprogram\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(ProgramBlockParsing, ProgramRejectsAlwaysLatchProcedure) {
+  auto r = Parse(
+      "program p;\n"
+      "  logic en, d, q;\n"
+      "  always_latch if (en) q = d;\n"
+      "endprogram\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
 TEST(ProgramBlockParsing, ProgramRejectsGatePrimitiveInstance) {
   auto r = Parse(
       "program p;\n"
