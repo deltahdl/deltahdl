@@ -150,6 +150,18 @@ TEST(HierarchicalNameElaboration, NamedBeginEndBlockCreatesBranch) {
              "endmodule\n"));
 }
 
+// §23.6: a named fork-join block defines a new hierarchy branch, just like a
+// named begin-end block. This is the fork-join input form of the branch rule
+// (the begin-end form is covered separately).
+TEST(HierarchicalNameElaboration, NamedForkJoinBlockCreatesBranch) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  initial fork : blk\n"
+             "    logic [7:0] x;\n"
+             "  join\n"
+             "endmodule\n"));
+}
+
 TEST(HierarchicalNameElaboration, NestedNamedBlocksCreateNestedBranches) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
@@ -227,6 +239,55 @@ TEST(HierarchicalNameElaboration, InstanceSelectInRangeElaboratesOk) {
              "  child c [3:0] ();\n"
              "  logic x;\n"
              "  assign x = c[2].sig;\n"
+             "endmodule\n"));
+}
+
+// §23.6: the instance select is a constant expression, not just a literal. A
+// parameter is one of the constant forms of 11.2.1, so a parameter-valued
+// select that lands inside the array bounds is accepted.
+TEST(HierarchicalNameElaboration, InstanceSelectViaParameterInRangeOk) {
+  EXPECT_TRUE(
+      ElabOk("module child;\n"
+             "  logic sig;\n"
+             "endmodule\n"
+             "module top;\n"
+             "  parameter P = 2;\n"
+             "  child c [3:0] ();\n"
+             "  logic x;\n"
+             "  assign x = c[P].sig;\n"
+             "endmodule\n"));
+}
+
+// §23.6: the constant expression shall evaluate to a legal index value. The
+// out-of-range check applies to a parameter-valued select exactly as it does to
+// a literal one -- the select is resolved against the module's parameter scope.
+TEST(HierarchicalNameElaboration, InstanceSelectViaParameterOutOfRangeError) {
+  EXPECT_FALSE(
+      ElabOk("module child;\n"
+             "  logic sig;\n"
+             "endmodule\n"
+             "module top;\n"
+             "  parameter P = 5;\n"
+             "  child c [3:0] ();\n"
+             "  logic x;\n"
+             "  assign x = c[P].sig;\n"
+             "endmodule\n"));
+}
+
+// §23.6: the select is a constant expression, not just a single literal token.
+// A folded arithmetic expression that lands outside the array bounds is
+// likewise rejected -- exercising the expression-evaluation path rather than a
+// bare literal read.
+TEST(HierarchicalNameElaboration,
+     InstanceSelectViaConstantExpressionOutOfRangeError) {
+  EXPECT_FALSE(
+      ElabOk("module child;\n"
+             "  logic sig;\n"
+             "endmodule\n"
+             "module top;\n"
+             "  child c [3:0] ();\n"
+             "  logic x;\n"
+             "  assign x = c[2 + 3].sig;\n"
              "endmodule\n"));
 }
 

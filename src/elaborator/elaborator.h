@@ -740,7 +740,8 @@ class Elaborator {
   std::unordered_set<std::string_view> CaptureCurrentScopeNames() const;
 
   void ValidateHierRefIntoChecker(const ModuleDecl* decl);
-  void ValidateHierRefInstanceArray(const ModuleDecl* decl);
+  void ValidateHierRefInstanceArray(const ModuleDecl* decl,
+                                    const RtlirModule* mod);
   void CheckHierRefUndeclaredMember(
       const std::unordered_map<std::string_view, const RtlirModule*>& inst_type,
       const Expr* ma);

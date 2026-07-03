@@ -258,7 +258,7 @@ CollectInstanceArrayBounds(const ModuleDecl* decl) {
 void CheckHierRefInstanceArrayAccess(
     DiagEngine& diag,
     const std::unordered_map<std::string_view, InstanceArrayBounds>& arrayed,
-    const Expr* ma) {
+    const Expr* ma, const ScopeMap& scope) {
   std::string_view name;
   const Expr* select_index = nullptr;
   if (!DecodeInstanceArrayBase(ma, name, select_index)) return;
@@ -271,7 +271,11 @@ void CheckHierRefInstanceArrayAccess(
                            name));
     return;
   }
-  auto idx = ConstEvalInt(select_index);
+  // §23.6: the instance select is a constant expression, so it may be any of
+  // the constant forms of 11.2.1 -- a literal, but equally a parameter or
+  // localparam. Evaluate it against the enclosing module's parameter scope so a
+  // parameter-valued select is range-checked, not just a bare literal.
+  auto idx = ConstEvalInt(select_index, scope);
   if (!idx) return;
   if (*idx < it->second.low || *idx > it->second.high) {
     diag.Error(select_index->range.start,
@@ -320,15 +324,17 @@ void Elaborator::ValidateHierRefToImportedName(const ModuleDecl* decl,
   }
 }
 
-void Elaborator::ValidateHierRefInstanceArray(const ModuleDecl* decl) {
+void Elaborator::ValidateHierRefInstanceArray(const ModuleDecl* decl,
+                                              const RtlirModule* mod) {
   std::unordered_map<std::string_view, InstanceArrayBounds> arrayed =
       CollectInstanceArrayBounds(decl);
   if (arrayed.empty()) return;
 
+  ScopeMap scope = mod ? BuildParamScope(mod) : ScopeMap{};
   std::vector<const Expr*> accesses;
   CollectModuleMemberAccesses(decl, accesses);
   for (const auto* ma : accesses) {
-    CheckHierRefInstanceArrayAccess(diag_, arrayed, ma);
+    CheckHierRefInstanceArrayAccess(diag_, arrayed, ma, scope);
   }
 }
 
