@@ -172,6 +172,90 @@ TEST(Preprocessor, Timescale_IllegalInsideDesignElement) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
+// The "illegal within a design element" rule is not module-specific: the
+// directive is equally forbidden inside every design-element kind. Exercise a
+// distinct enclosing position (an interface) to confirm the same rejection.
+TEST(Preprocessor, Timescale_IllegalInsideInterface) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  PreprocessWithPP("interface ifc;\n`timescale 1ns / 1ps\nendinterface\n", f,
+                   pp);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+// A package is another design-element position the same prohibition covers.
+TEST(Preprocessor, Timescale_IllegalInsidePackage) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  PreprocessWithPP("package pkg;\n`timescale 1ns / 1ps\nendpackage\n", f, pp);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+// The accepting side of the same rule: once a design element closes, the
+// directive is back at compilation-unit scope and is legal again.
+TEST(Preprocessor, Timescale_LegalAfterDesignElementCloses) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  PreprocessWithPP("module foo;\nendmodule\n`timescale 1ns / 1ps\n", f, pp);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_TRUE(pp.HasTimescale());
+  EXPECT_EQ(pp.CurrentTimescale().unit, TimeUnit::kNs);
+  EXPECT_EQ(pp.CurrentTimescale().precision, TimeUnit::kPs);
+}
+
+// A program is another design-element position the prohibition covers.
+TEST(Preprocessor, Timescale_IllegalInsideProgram) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  PreprocessWithPP("program prg;\n`timescale 1ns / 1ps\nendprogram\n", f, pp);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+// A checker is likewise a design element, so the directive is illegal inside
+// it.
+TEST(Preprocessor, Timescale_IllegalInsideChecker) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  PreprocessWithPP("checker chk;\n`timescale 1ns / 1ps\nendchecker\n", f, pp);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+// A primitive is a design element as well; the same rejection applies.
+TEST(Preprocessor, Timescale_IllegalInsidePrimitive) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  PreprocessWithPP("primitive prim;\n`timescale 1ns / 1ps\nendprimitive\n", f,
+                   pp);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+// A configuration is the final design-element kind this prohibition spans.
+TEST(Preprocessor, Timescale_IllegalInsideConfig) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  PreprocessWithPP("config cfg;\n`timescale 1ns / 1ps\nendconfig\n", f, pp);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+// The magnitude-set {1,10,100} constraint governs the precision argument in its
+// own right: a value outside the set is rejected in that position too.
+TEST(Preprocessor, Timescale_InvalidPrecisionMagnitude) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  PreprocessWithPP("`timescale 1ns / 5ps\n", f, pp);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+// The largest legal magnitude, 100, is accepted in the precision argument.
+TEST(Preprocessor, Timescale_PrecisionMagnitude100) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  PreprocessWithPP("`timescale 1us / 100ns\n", f, pp);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(pp.CurrentTimescale().prec_magnitude, 100);
+  EXPECT_EQ(pp.CurrentTimescale().precision, TimeUnit::kNs);
+}
+
 TEST(Preprocessor, Timescale_MissingSlash) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
