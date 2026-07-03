@@ -5,16 +5,6 @@ using namespace delta;
 
 namespace {
 
-TEST(UnpackedArrayParsing, VarDeclAssignmentWithDims) {
-  auto r = Parse("module m; int arr [3:0]; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
-  EXPECT_EQ(item->name, "arr");
-  EXPECT_GE(item->unpacked_dims.size(), 1u);
-}
-
 TEST(UnpackedArrayParsing, UnpackedDimConstantRange) {
   auto r = Parse("module m; logic x [7:0]; endmodule\n");
   ASSERT_NE(r.cu, nullptr);

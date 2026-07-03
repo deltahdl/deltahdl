@@ -45,11 +45,15 @@ static bool TryParseQueueDim(const Expr* dim, RtlirVariable& var,
   return true;
 }
 
-static bool TryParseRangeDim(const Expr* dim, RtlirVariable& var) {
+static bool TryParseRangeDim(const Expr* dim, RtlirVariable& var,
+                             const ScopeMap& scope) {
   if (dim->kind != ExprKind::kBinary || dim->op != TokenKind::kColon)
     return false;
-  auto lval = ConstEvalInt(dim->lhs);
-  auto rval = ConstEvalInt(dim->rhs);
+  // §7.4.2: each bound is a constant_expression, which per §11.2.1 may name a
+  // parameter or localparam. Evaluate in the module's parameter scope so a
+  // dimension such as `[N-1:0]` resolves just as a packed dimension does.
+  auto lval = ConstEvalInt(dim->lhs, scope);
+  auto rval = ConstEvalInt(dim->rhs, scope);
   if (!lval || !rval) return false;
   auto lo = std::min(*lval, *rval);
   auto hi = std::max(*lval, *rval);
@@ -110,8 +114,12 @@ static void ApplyUserDefinedAssocDim(
 }
 
 static void ApplyConstSizedUnpackedDim(const Expr* dim, RtlirVariable& var,
-                                       DiagEngine& diag, SourceLoc loc) {
-  auto size_val = ConstEvalInt(dim);
+                                       DiagEngine& diag, SourceLoc loc,
+                                       const ScopeMap& scope) {
+  // §7.4.2 / §11.2.1: the single-number `[size]` form is a constant integer
+  // expression and may be a parameter or localparam, so it is evaluated in the
+  // module's parameter scope.
+  auto size_val = ConstEvalInt(dim, scope);
   if (!size_val) return;
   if (*size_val <= 0) {
     diag.Error(loc, "unpacked dimension size shall be a positive integer");
@@ -145,16 +153,16 @@ struct TypeNameContext {
 static void ComputeUnpackedDims(const std::vector<Expr*>& dims,
                                 RtlirVariable& var,
                                 const TypeNameContext& types, DiagEngine& diag,
-                                SourceLoc loc) {
+                                SourceLoc loc, const ScopeMap& scope) {
   if (dims.empty() || !dims[0]) return;
   auto* dim = dims[0];
   if (TryParseQueueDim(dim, var, diag, loc)) return;
   if (TryParseAssocDim(dim, var)) return;
   if (TryParseUserDefinedAssocDim(dim, var, types.typedefs, types.class_names))
     return;
-  if (TryParseRangeDim(dim, var)) return;
+  if (TryParseRangeDim(dim, var, scope)) return;
 
-  ApplyConstSizedUnpackedDim(dim, var, diag, loc);
+  ApplyConstSizedUnpackedDim(dim, var, diag, loc, scope);
 }
 
 bool Elaborator::ReconcilePartialPortSignedness(std::string_view name,
@@ -601,23 +609,28 @@ void Elaborator::ValidateVarDeclTypes(ModuleItem* item, const ScopeMap& scope) {
 
 static void CollectUnpackedDimSizes(const std::vector<Expr*>& dims,
                                     std::vector<uint32_t>& dim_los,
-                                    std::vector<uint32_t>& dim_sizes) {
+                                    std::vector<uint32_t>& dim_sizes,
+                                    const ScopeMap& scope) {
   for (auto* dim : dims) {
     if (!dim) continue;
     if (dim->kind == ExprKind::kBinary && dim->op == TokenKind::kColon) {
-      auto lv = ConstEvalInt(dim->lhs);
-      auto rv = ConstEvalInt(dim->rhs);
+      // §7.4.2 / §11.2.1: bounds may name parameters, so evaluate every
+      // dimension in the module's parameter scope (mirrors
+      // ComputeUnpackedDims).
+      auto lv = ConstEvalInt(dim->lhs, scope);
+      auto rv = ConstEvalInt(dim->rhs, scope);
       if (!lv || !rv) continue;
       dim_los.push_back(static_cast<uint32_t>(std::min(*lv, *rv)));
       dim_sizes.push_back(static_cast<uint32_t>(std::abs(*lv - *rv) + 1));
-    } else if (auto sv = ConstEvalInt(dim); sv && *sv > 0) {
+    } else if (auto sv = ConstEvalInt(dim, scope); sv && *sv > 0) {
       dim_los.push_back(0);
       dim_sizes.push_back(static_cast<uint32_t>(*sv));
     }
   }
 }
 
-void Elaborator::TrackVarArrayInfo(const ModuleItem* item, RtlirVariable& var) {
+void Elaborator::TrackVarArrayInfo(const ModuleItem* item, RtlirVariable& var,
+                                   const ScopeMap& scope) {
   if (item->unpacked_dims.empty()) return;
   VarArrayInfo info{item->data_type.kind,
                     var.unpacked_size,
@@ -635,7 +648,7 @@ void Elaborator::TrackVarArrayInfo(const ModuleItem* item, RtlirVariable& var) {
     info.assoc_index_type = item->unpacked_dims[0]->text;
   }
   std::vector<uint32_t> dim_los;
-  CollectUnpackedDimSizes(item->unpacked_dims, dim_los, info.dim_sizes);
+  CollectUnpackedDimSizes(item->unpacked_dims, dim_los, info.dim_sizes, scope);
   var_array_info_[item->name] = info;
   // §7.4.2: carry full per-dimension extents to the simulator only when every
   // dimension is a fixed const size — queue/dynamic/assoc dims fall short of
@@ -1061,11 +1074,11 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
   SetVariableTypeInfo(item, var);
 
   ComputeUnpackedDims(item->unpacked_dims, var, {typedefs_, class_names_},
-                      diag_, item->loc);
+                      diag_, item->loc, BuildParamScope(mod));
   ValidateUnpackedDimRange(item->unpacked_dims, item->loc);
   InferDynArraySize(item->unpacked_dims, item->init_expr, var);
 
-  TrackVarArrayInfo(item, var);
+  TrackVarArrayInfo(item, var, BuildParamScope(mod));
 
   var.attrs = ResolveAttributes(item->attrs, diag_, BuildParamScope(mod));
   mod->variables.push_back(var);

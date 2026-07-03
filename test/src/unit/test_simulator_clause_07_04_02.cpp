@@ -33,4 +33,23 @@ TEST(UnpackedArraySimulation, RangeFormElementAccess) {
   EXPECT_EQ(v, 0x42u);
 }
 
+// §7.4.2 / §11.2.1: the size of a fixed-size unpacked array may be given by a
+// parameter. End-to-end, the top element is only addressable when that bound
+// resolves in the parameter scope; a mis-resolved (zero) size would make this
+// access fall outside the array.
+TEST(UnpackedArraySimulation, ParameterSizedArrayElementAccess) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  parameter int N = 4;\n"
+      "  logic [7:0] arr [N];\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    arr[3] = 8'h55;\n"
+      "    result = arr[3];\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 0x55u);
+}
+
 }  // namespace
