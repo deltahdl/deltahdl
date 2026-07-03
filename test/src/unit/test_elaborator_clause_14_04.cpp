@@ -42,6 +42,53 @@ TEST(ClockingSkewConstExpr, ConstantArithmeticSkewElaborates) {
              "endmodule\n"));
 }
 
+// §14.4: a localparam is a constant-expression form (§11.2.1) and, like a
+// parameter, is an acceptable skew. Confirms the constant-expression check
+// resolves the localparam through the module's constant scope.
+TEST(ClockingSkewConstExpr, LocalparamSkewElaborates) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  localparam SK = 4;\n"
+             "  logic clk, data;\n"
+             "  clocking cb @(posedge clk);\n"
+             "    output #SK data;\n"
+             "  endclocking\n"
+             "endmodule\n"));
+}
+
+// §14.4: a constant function call (§11.2.1) is a constant expression, hence a
+// legal skew. The call cannot always be folded to an integer at this check, so
+// the rule must accept it as constant rather than rejecting it as non-constant.
+TEST(ClockingSkewConstExpr, ConstantFunctionCallSkewElaborates) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  function automatic int getskew();\n"
+             "    return 3;\n"
+             "  endfunction\n"
+             "  logic clk, data;\n"
+             "  clocking cb @(posedge clk);\n"
+             "    input #getskew() data;\n"
+             "  endclocking\n"
+             "endmodule\n"));
+}
+
+// §14.4: the constant-expression requirement also governs the block-wide
+// default skews (the `default input/output` item), which the elaborator checks
+// at a separate site from the per-signal skews. Constant default skews on both
+// directions must elaborate cleanly.
+TEST(ClockingSkewConstExpr, DefaultBlockSkewElaborates) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  parameter IN_SK = 2;\n"
+             "  localparam OUT_SK = 3;\n"
+             "  logic clk, data;\n"
+             "  clocking cb @(posedge clk);\n"
+             "    default input #IN_SK output #OUT_SK;\n"
+             "    input data;\n"
+             "  endclocking\n"
+             "endmodule\n"));
+}
+
 // §14.4: the 1step skew is a valid constant skew form; the constant-expression
 // check must accept it rather than flagging it as non-constant.
 TEST(ClockingSkewConstExpr, OneStepSkewElaborates) {

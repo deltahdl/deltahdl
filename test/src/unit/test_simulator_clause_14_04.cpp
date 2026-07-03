@@ -80,12 +80,6 @@ TEST(ClockingSkewSim, InputSkewSamplesBeforeClockEdge) {
   EXPECT_EQ(sampled, 0xABu);
 }
 
-TEST(ClockingSkewSim, OutputSkewDrivesAfterClockEdge) {
-  ClockingSimFixture f;
-  ClockingManager cmgr;
-  TestOutputSkewDrive(f, cmgr, 0x55u);
-}
-
 TEST(ClockingSkewSim, OutputSkewDelaysDriveBySkewAmount) {
   // §14.4: an output is driven skew time units *after* the clock event. With an
   // output skew of 5, a drive requested at t=10 must not appear at t=12 and
