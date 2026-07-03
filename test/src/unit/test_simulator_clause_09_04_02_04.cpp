@@ -77,4 +77,41 @@ TEST(SequenceEventSim, MultipleWaitersOnSequenceEndpoint) {
   EXPECT_EQ(v2->value.ToUint64(), 20u);
 }
 
+TEST(SequenceEventSim, ProcessStaysBlockedWhenSequenceNeverMatches) {
+  // §9.4.2.4: the process executing the event control shall block until the
+  // sequence reaches its end point. This is the blocking half of the rule:
+  // the sequence `a ##1 b ##1 c` never completes because c is held low, so
+  // the endpoint never fires and the waiting process never runs its action.
+  // result must keep its initial value.
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic clk, a, b, c;\n"
+      "  logic [7:0] result;\n"
+      "  sequence abc;\n"
+      "    @(posedge clk) a ##1 b ##1 c;\n"
+      "  endsequence\n"
+      "  initial begin\n"
+      "    clk = 0; a = 0; b = 0; c = 0; result = 0;\n"
+      "    #1 a = 1; clk = 1; #1 clk = 0;\n"
+      "    #1 b = 1; clk = 1; #1 clk = 0;\n"
+      "    #1 clk = 1; #1 clk = 0;\n"  // c stays 0 -> no full match
+      "    #10 $finish;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    @(abc) result = 8'd42;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* var = f.ctx.FindVariable("result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0u);
+}
+
 }  // namespace

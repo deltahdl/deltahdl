@@ -659,6 +659,9 @@ struct SequencePortScan {
       item_saw_explicit_type = true;
     }
     item->prop_formals.push_back(name_tok.text);
+    // §16.8: the formal starts out with no default; a following `= actual`
+    // (handled in DispatchTopLevel) flips this entry to true.
+    item->prop_formal_has_default.push_back(false);
     expect_formal_name = false;
   }
 
@@ -696,6 +699,11 @@ struct SequencePortScan {
       item_saw_explicit_type = true;
     } else if (LexerCheck(lexer, TokenKind::kEq)) {
       item_saw_eq = true;
+      // §16.8: `formal = default_expression` gives the most recently harvested
+      // formal a default actual argument.
+      if (!item->prop_formal_has_default.empty()) {
+        item->prop_formal_has_default.back() = true;
+      }
       lexer.Next();
       expect_formal_name = false;
     } else if (expect_formal_name &&

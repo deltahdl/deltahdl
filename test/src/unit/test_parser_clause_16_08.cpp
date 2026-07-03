@@ -96,6 +96,45 @@ TEST(SequenceDeclarationParsing, SequenceDeclWithTrailingLabelParses) {
   EXPECT_TRUE(found);
 }
 
+TEST(SequenceDeclarationParsing, SequenceTypedFormalParses) {
+  // §16.8 Syntax 16-5, sequence_formal_type ::= data_type_or_implicit
+  // | sequence | untyped. The `sequence` alternative (a formal that is itself
+  // a sequence) must parse and its formal_port_identifier must be captured.
+  auto r = Parse(
+      "module m;\n"
+      "  sequence s(sequence x);\n"
+      "    @(posedge clk) x;\n"
+      "  endsequence\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  ModuleItem* seq = nullptr;
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kSequenceDecl && item->name == "s") {
+      seq = item;
+    }
+  }
+  ASSERT_NE(seq, nullptr);
+  ASSERT_EQ(seq->prop_formals.size(), 1u);
+  EXPECT_EQ(seq->prop_formals[0], "x");
+}
+
+TEST(SequenceDeclarationParsing, SequenceDeclEndLabelMismatchIsError) {
+  // §16.8 sequence_declaration: `endsequence [ : sequence_identifier ]`. When
+  // the trailing label is present it must match the declared sequence name;
+  // a mismatched label is rejected. This is the negative of the accepting
+  // SequenceDeclWithTrailingLabelParses case.
+  auto r = Parse(
+      "module m;\n"
+      "  sequence s;\n"
+      "    @(posedge clk) a ##1 b;\n"
+      "  endsequence : wrong\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_TRUE(r.has_errors);
+}
+
 TEST(SequenceDeclarationParsing, DollarAsSequenceActualParses) {
   // §16.8: the terminal `$` may appear as an actual argument in a sequence
   // instance (here as the upper bound of a cycle_delay_const_range).
@@ -175,6 +214,126 @@ TEST(SequenceDeclarationParsing, SequenceDeclaredInInterfaceParses) {
   ASSERT_EQ(r.cu->interfaces.size(), 1u);
   bool found = false;
   for (auto* item : r.cu->interfaces[0]->items) {
+    if (item->kind == ModuleItemKind::kSequenceDecl && item->name == "s") {
+      found = true;
+    }
+  }
+  EXPECT_TRUE(found);
+}
+
+TEST(SequenceDeclarationParsing, SequenceBodyLocalVariableDeclIsCaptured) {
+  // §16.8 Syntax 16-5: a sequence_declaration admits an optional run of
+  // assertion_variable_declarations between the header and the sequence_expr
+  // ({ assertion_variable_declaration } sequence_expr). The parser harvests
+  // each declared local name so later stages can bind it; observe that a
+  // body-local variable is recorded on the declaration.
+  auto r = Parse(
+      "module m;\n"
+      "  sequence s;\n"
+      "    int cnt;\n"
+      "    @(posedge clk) a ##1 b;\n"
+      "  endsequence\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  ModuleItem* seq = nullptr;
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kSequenceDecl && item->name == "s") {
+      seq = item;
+    }
+  }
+  ASSERT_NE(seq, nullptr);
+  bool found_cnt = false;
+  for (auto v : seq->prop_seq_assert_vars) {
+    if (v == "cnt") found_cnt = true;
+  }
+  EXPECT_TRUE(found_cnt);
+}
+
+TEST(SequenceDeclarationParsing, SequenceDeclaredInProgramParses) {
+  // §16.8 scope list: a named sequence may be declared in a program. The
+  // program body reaches the sequence parser through ParseModuleItem, a
+  // distinct container from a module or package.
+  auto r = Parse(
+      "program p;\n"
+      "  sequence s;\n"
+      "    @(posedge clk) a ##1 b;\n"
+      "  endsequence\n"
+      "endprogram\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->programs.size(), 1u);
+  bool found = false;
+  for (auto* item : r.cu->programs[0]->items) {
+    if (item->kind == ModuleItemKind::kSequenceDecl && item->name == "s") {
+      found = true;
+    }
+  }
+  EXPECT_TRUE(found);
+}
+
+TEST(SequenceDeclarationParsing, SequenceDeclaredInCompilationUnitScopeParses) {
+  // §16.8 scope list: a named sequence may be declared in compilation-unit
+  // scope, i.e. outside any design element. It lands in the unit's cu_items.
+  auto r = Parse(
+      "sequence s;\n"
+      "  @(posedge clk) a ##1 b;\n"
+      "endsequence\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  bool found = false;
+  for (auto* item : r.cu->cu_items) {
+    if (item->kind == ModuleItemKind::kSequenceDecl && item->name == "s") {
+      found = true;
+    }
+  }
+  EXPECT_TRUE(found);
+}
+
+TEST(SequenceDeclarationParsing, SequenceDeclaredInCheckerParses) {
+  // §16.8 scope list: a named sequence may be declared in a checker.
+  auto r = Parse(
+      "checker chk;\n"
+      "  sequence s;\n"
+      "    @(posedge clk) a ##1 b;\n"
+      "  endsequence\n"
+      "endchecker\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->checkers.size(), 1u);
+  bool found = false;
+  for (auto* item : r.cu->checkers[0]->items) {
+    if (item->kind == ModuleItemKind::kSequenceDecl && item->name == "s") {
+      found = true;
+    }
+  }
+  EXPECT_TRUE(found);
+}
+
+TEST(SequenceDeclarationParsing, SequenceDeclaredInGenerateBlockParses) {
+  // §16.8 scope list: a named sequence may be declared in a generate block.
+  // Here the sequence lives inside a generate-for block's body, a scope
+  // distinct from a bare module item.
+  auto r = Parse(
+      "module m;\n"
+      "  genvar i;\n"
+      "  for (i = 0; i < 2; i = i + 1) begin : g\n"
+      "    sequence s;\n"
+      "      @(posedge clk) a ##1 b;\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  ModuleItem* gen = nullptr;
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kGenerateFor) gen = item;
+  }
+  ASSERT_NE(gen, nullptr);
+  bool found = false;
+  for (auto* item : gen->gen_body) {
     if (item->kind == ModuleItemKind::kSequenceDecl && item->name == "s") {
       found = true;
     }

@@ -13,12 +13,48 @@
 
 namespace delta {
 
-// Mark a single event-control event that names a known sequence, and flag the
-// automatic-variable argument restriction (`s` supplies the location).
+using SequenceDeclMap = std::unordered_map<std::string_view, const ModuleItem*>;
+
+// §16.8: an instance of a named sequence shall provide an actual argument for
+// each formal argument that does not have a default actual argument declared.
+// This checks the positional-binding form of an instance used in an event
+// control; named or partially-omitted binding is left to the general
+// argument-binding machinery.
+static void CheckSequenceActualArgCount(Stmt* s, const Expr* call,
+                                        const ModuleItem* decl,
+                                        DiagEngine& diag) {
+  // Only the purely-positional, fully-supplied form is validated here: a named
+  // binding populates arg_names, and an omitted actual leaves a null arg.
+  if (!call->arg_names.empty()) return;
+  for (const auto* a : call->args) {
+    if (!a) return;
+  }
+  size_t actuals = call->args.size();
+  size_t total = decl->prop_formals.size();
+  size_t required = 0;
+  for (size_t i = 0; i < total; ++i) {
+    bool has_default = i < decl->prop_formal_has_default.size() &&
+                       decl->prop_formal_has_default[i];
+    if (!has_default) ++required;
+  }
+  if (actuals < required) {
+    diag.Error(s->range.start,
+               "sequence instance omits an actual argument for a formal that "
+               "has no default (§16.8)");
+  } else if (actuals > total) {
+    diag.Error(s->range.start,
+               "sequence instance provides more actual arguments than the "
+               "sequence has formal arguments (§16.8)");
+  }
+}
+
+// Mark a single event-control event that names a known sequence, flag the
+// §9.4.2.4 automatic-variable argument restriction, and enforce the §16.8
+// actual-argument count rule (`s` supplies the location).
 static void MarkSequenceEvent(
     Stmt* s, EventExpr& ev,
-    const std::unordered_set<std::string_view>& seq_names, bool in_automatic,
-    DiagEngine& diag) {
+    const std::unordered_set<std::string_view>& seq_names,
+    const SequenceDeclMap& seq_decls, bool in_automatic, DiagEngine& diag) {
   if (!ev.signal) return;
   std::string_view name;
   bool has_args = false;
@@ -36,26 +72,36 @@ static void MarkSequenceEvent(
                  "sequence event arguments shall not reference "
                  "automatic variables");
     }
+    if (ev.signal->kind == ExprKind::kCall) {
+      auto it = seq_decls.find(name);
+      if (it != seq_decls.end()) {
+        CheckSequenceActualArgCount(s, ev.signal, it->second, diag);
+      }
+    }
   }
 }
 
 static void WalkStmtsForSequenceEvents(
     Stmt* s, const std::unordered_set<std::string_view>& seq_names,
-    bool in_automatic, DiagEngine& diag) {
+    const SequenceDeclMap& seq_decls, bool in_automatic, DiagEngine& diag) {
   if (!s) return;
   if (s->kind == StmtKind::kEventControl) {
     for (auto& ev : s->events) {
-      MarkSequenceEvent(s, ev, seq_names, in_automatic, diag);
+      MarkSequenceEvent(s, ev, seq_names, seq_decls, in_automatic, diag);
     }
   }
   for (auto* sub : s->stmts)
-    WalkStmtsForSequenceEvents(sub, seq_names, in_automatic, diag);
-  WalkStmtsForSequenceEvents(s->then_branch, seq_names, in_automatic, diag);
-  WalkStmtsForSequenceEvents(s->else_branch, seq_names, in_automatic, diag);
-  WalkStmtsForSequenceEvents(s->body, seq_names, in_automatic, diag);
-  WalkStmtsForSequenceEvents(s->for_body, seq_names, in_automatic, diag);
+    WalkStmtsForSequenceEvents(sub, seq_names, seq_decls, in_automatic, diag);
+  WalkStmtsForSequenceEvents(s->then_branch, seq_names, seq_decls, in_automatic,
+                             diag);
+  WalkStmtsForSequenceEvents(s->else_branch, seq_names, seq_decls, in_automatic,
+                             diag);
+  WalkStmtsForSequenceEvents(s->body, seq_names, seq_decls, in_automatic, diag);
+  WalkStmtsForSequenceEvents(s->for_body, seq_names, seq_decls, in_automatic,
+                             diag);
   for (auto& ci : s->case_items)
-    WalkStmtsForSequenceEvents(ci.body, seq_names, in_automatic, diag);
+    WalkStmtsForSequenceEvents(ci.body, seq_names, seq_decls, in_automatic,
+                               diag);
 }
 
 static bool IsProcessBlockItem(ModuleItemKind kind) {
@@ -82,28 +128,39 @@ static bool IsProcessBlockItem(ModuleItemKind kind) {
 // task, so static sequence arguments stay legal there).
 static void WalkItemForSequenceEvents(
     const ModuleItem* item,
-    const std::unordered_set<std::string_view>& seq_names, DiagEngine& diag) {
+    const std::unordered_set<std::string_view>& seq_names,
+    const SequenceDeclMap& seq_decls, DiagEngine& diag) {
   if (IsProcessBlockItem(item->kind)) {
     if (item->body) {
       WalkStmtsForSequenceEvents(const_cast<Stmt*>(item->body), seq_names,
-                                 false, diag);
+                                 seq_decls, false, diag);
     }
     return;
   }
   if (item->kind != ModuleItemKind::kTaskDecl) return;
   if (item->body) {
     WalkStmtsForSequenceEvents(const_cast<Stmt*>(item->body), seq_names,
-                               item->is_automatic, diag);
+                               seq_decls, item->is_automatic, diag);
   }
   for (auto* s : item->func_body_stmts) {
-    WalkStmtsForSequenceEvents(s, seq_names, item->is_automatic, diag);
+    WalkStmtsForSequenceEvents(s, seq_names, seq_decls, item->is_automatic,
+                               diag);
   }
 }
 
 void Elaborator::ValidateSequenceEventArgs(const ModuleDecl* decl) {
   if (sequence_names_.empty()) return;
+  // §16.8 actual-argument checks need each named sequence's formals, so map the
+  // sequences declared in this scope by name. A sequence instantiated across a
+  // scope boundary is absent here, and its count check is simply skipped.
+  SequenceDeclMap seq_decls;
   for (const auto* item : decl->items) {
-    WalkItemForSequenceEvents(item, sequence_names_, diag_);
+    if (item->kind == ModuleItemKind::kSequenceDecl) {
+      seq_decls[item->name] = item;
+    }
+  }
+  for (const auto* item : decl->items) {
+    WalkItemForSequenceEvents(item, sequence_names_, seq_decls, diag_);
   }
 }
 

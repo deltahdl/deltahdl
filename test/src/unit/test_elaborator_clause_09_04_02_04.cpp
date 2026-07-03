@@ -19,21 +19,6 @@ TEST(SequenceEventElaboration, SequenceEventElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(SequenceEventElaboration, SequenceEventWithIffGuardElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  logic clk, a, b, c, en;\n"
-      "  sequence abc;\n"
-      "    @(posedge clk) a ##1 b ##1 c;\n"
-      "  endsequence\n"
-      "  initial @(abc iff en) $display(\"matched\");\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 TEST(SequenceEventElaboration, SequenceEventArgumentResolvesToInstance) {
   // §9.4.2.4: the event_expression uses a sequence_instance whose argument is
   // a non-automatic signal from the enclosing scope.

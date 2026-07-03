@@ -278,6 +278,11 @@ struct ModuleItem {
   // declaration order; non-local formals are not represented here.
   std::vector<Direction> prop_seq_local_lvar_directions;
 
+  // §16.8: parallel to prop_formals; true when the formal has a default actual
+  // argument declared (`formal = default_expression`). Used by the elaborator
+  // to decide which formals an instance must supply an actual for.
+  std::vector<bool> prop_formal_has_default;
+
   // §16.10: identifiers introduced by assertion_variable_declaration items in
   // the body of a sequence or property declaration. Each entry is one local
   // variable declared in the body (a single declaration with N comma-
