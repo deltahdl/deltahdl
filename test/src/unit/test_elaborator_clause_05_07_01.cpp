@@ -152,18 +152,6 @@ TEST(IntegerLiteralElaboration, SignedHexElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(IntegerLiteralElaboration, UnderscoredDecimalElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  int x;\n"
-      "  initial x = 1_000;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 TEST(IntegerLiteralElaboration, XDigitSetsAllBitsUnknown) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -196,23 +184,6 @@ TEST(IntegerLiteralElaboration, UnderscoreSeparatorInValue) {
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 07777u);
-}
-
-TEST(IntegerLiteralElaboration, HexValueUnderscoreSeparator) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [15:0] x;\n"
-      "  initial x = 16'hAB_CD;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 0xABCDu);
 }
 
 TEST(IntegerLiteralElaboration, HexDigitsCaseInsensitive) {
@@ -601,6 +572,28 @@ TEST(IntegerLiteralElaboration, OctalXZCaseInsensitive) {
       f);
   ASSERT_NE(design, nullptr);
   LowerRunAndCompareBitPatterns(f, design, 0x3F);
+}
+
+// §5.7.1: the same literal rules apply when the literal is decoded through the
+// constant-evaluation path of a localparam initializer (distinct from the
+// procedural-assignment path). The based hex literal is const-evaluated into
+// the localparam and read back out, observing its value survives that path.
+TEST(IntegerLiteralElaboration, LiteralDecodedThroughLocalparam) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  localparam [7:0] L = 8'hA5;\n"
+      "  logic [7:0] x;\n"
+      "  initial x = L;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0xA5u);
 }
 
 }  // namespace

@@ -15,6 +15,8 @@ namespace delta {
 static bool IsXChar(char c) { return c == 'x' || c == 'X'; }
 static bool IsZChar(char c) { return c == 'z' || c == 'Z' || c == '?'; }
 
+static bool IsSignedLiteral(std::string_view text);
+
 uint32_t LiteralWidth(std::string_view text, uint64_t val) {
   auto tick = text.find('\'');
   if (tick != std::string_view::npos && tick > 0) {
@@ -24,7 +26,13 @@ uint32_t LiteralWidth(std::string_view text, uint64_t val) {
     }
     if (w > 0) return w;
   }
-  return (val > UINT32_MAX) ? 64 : 32;
+  // An unsized number is at least 32 bits, widened to the minimum width that
+  // holds its value. §5.7.1 additionally requires a signed unsized number to
+  // keep a sign bit, so a value whose most significant magnitude bit would
+  // land on the sign position needs one extra bit to stay non-negative.
+  if (val > UINT32_MAX) return 64;
+  if (IsSignedLiteral(text) && val > uint64_t{0x7FFFFFFF}) return 33;
+  return 32;
 }
 Logic4Vec EvalUnbasedUnsized(const Expr* expr, Arena& arena) {
   auto text = expr->text;

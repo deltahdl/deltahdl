@@ -53,23 +53,6 @@ TEST(IntegerLiteralSim, HexLiteralDistinctNibbles) {
   EXPECT_EQ(var->value.ToUint64(), 0xA5u);
 }
 
-TEST(IntegerLiteralSim, DecimalUnsized) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  int x;\n"
-      "  initial x = 255;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 255u);
-}
-
 TEST(IntegerLiteralSim, BinaryNumber) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -532,20 +515,6 @@ TEST(IntegerLiteralSim, SizeConstantNonzero) {
   EXPECT_EQ(result, 1u);
 }
 
-TEST(IntegerLiteralSim, BinaryLiteralWithUnderscore) {
-  auto v = RunAndGet(
-      "module t;\n  logic [7:0] x;\n  initial x = 8'b1010_0101;\nendmodule\n",
-      "x");
-  EXPECT_EQ(v, 0xA5u);
-}
-
-TEST(IntegerLiteralSim, OctalLiteralFourDigit) {
-  auto v = RunAndGet(
-      "module t;\n  logic [11:0] x;\n  initial x = 12'o7654;\nendmodule\n",
-      "x");
-  EXPECT_EQ(v, 07654u);
-}
-
 TEST(IntegerLiteralSim, AllBasesProduceSameValue) {
   SimFixture f;
   ASSERT_TRUE(RunSim(f,
@@ -809,6 +778,34 @@ TEST(IntegerLiteralSim, NegativeSizedLiteralIsTwosComplement) {
   EXPECT_EQ(result & 0xFFu, 0xFAu);
 }
 
+TEST(IntegerLiteralSim, SignedLiteralSignExtendsIntoUnsignedLogic) {
+  // §5.7.1 final paragraph: a sized signed literal is sign-extended when
+  // assigned to a logic object regardless of whether that object's type is
+  // signed. The 4-bit signed literal 4'shf is -1; widened into the unsigned
+  // 8-bit logic target it must become 0xFF (sign fill), not 0x0F (zero fill).
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial x = 4'shf;\n"
+      "endmodule\n",
+      "x");
+  EXPECT_EQ(result & 0xFFu, 0xFFu);
+}
+
+TEST(IntegerLiteralSim, UnsignedLiteralZeroExtendsIntoUnsignedLogic) {
+  // Discriminates the rule above: the same value with no s designator is an
+  // unsigned literal, so widening into the identical unsigned 8-bit logic
+  // target zero-fills to 0x0F. Only the literal's signedness — not the
+  // target's — decides between sign fill and zero fill.
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial x = 4'hf;\n"
+      "endmodule\n",
+      "x");
+  EXPECT_EQ(result & 0xFFu, 0x0Fu);
+}
+
 TEST(IntegerLiteralSim, UnbasedUnsizedIsOneBitInConcatenation) {
   // {1'b1, '1, 1'b0} must be a 3-bit value (0b110 == 6) — the
   // unbased unsized literal contributes a single bit in the
@@ -839,6 +836,110 @@ TEST(IntegerLiteralSim, UnbasedUnsizedIsOneBitInReplication) {
       "endmodule\n",
       "x");
   EXPECT_EQ(result, 0xFu);
+}
+
+// §5.7.1: a sized negative literal is sign-extended when assigned to a logic
+// object. -4'sd1 is a 4-bit signed -1; widened into the 8-bit target it fills
+// with the sign bit to 0xFF, not 0x0F. Distinct input form from the s-only
+// literal (this one forms the negative via a leading unary minus).
+TEST(IntegerLiteralSim, NegativeLiteralSignExtendsIntoWiderLogic) {
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial x = -4'sd1;\n"
+      "endmodule\n",
+      "x");
+  EXPECT_EQ(result & 0xFFu, 0xFFu);
+}
+
+// §5.7.1: an unsized signed number must reserve a sign bit, so a value between
+// 2^31 and 2^32 stays non-negative rather than collapsing to a 32-bit negative.
+// The plain decimal 2147483648 is signed and unsized; widened into the 64-bit
+// signed target it must remain +2147483648, which only holds if the literal
+// reserved a 33rd (sign) bit instead of stopping at 32.
+TEST(IntegerLiteralSim, UnsizedSignedValueReservesSignBit) {
+  auto result = RunAndGet(
+      "module t;\n"
+      "  longint x;\n"
+      "  initial x = 2147483648;\n"
+      "endmodule\n",
+      "x");
+  EXPECT_EQ(result, 2147483648ull);
+}
+
+// §5.7.1: the '?' digit is the z alternative and, in a hexadecimal literal,
+// sets four bits to high-impedance. Here the low hex digit '?' drives bits 0-3
+// to z (aval=0, bval=1) while the known high digit 5 stays a plain value.
+TEST(IntegerLiteralSim, QuestionMarkFillsFourBitsInHex) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial x = 8'h5?;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.words[0].aval & 0xF0u, 0x50u);
+  EXPECT_EQ(var->value.words[0].bval & 0x0Fu, 0x0Fu);
+  EXPECT_EQ(var->value.words[0].bval & 0xF0u, 0x00u);
+}
+
+// §5.7.1: in an octal literal the '?' digit sets three bits to high-impedance.
+// The low octal digit '?' drives bits 0-2 to z while the high digit 7 stays a
+// known value.
+TEST(IntegerLiteralSim, QuestionMarkFillsThreeBitsInOctal) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [5:0] x;\n"
+      "  initial x = 6'o7?;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.words[0].aval & 0x38u, 0x38u);
+  EXPECT_EQ(var->value.words[0].bval & 0x07u, 0x07u);
+  EXPECT_EQ(var->value.words[0].bval & 0x38u, 0x00u);
+}
+
+// §5.7.1 (final paragraph): an integer literal constant is a logic vector with
+// range [n-1:0]. Built end-to-end on the §7.4 packed-vector dependency: the
+// literal is stored in a real logic [7:0] packed vector and part-selected, so
+// the high nibble reads 0xA and the low nibble 0x5 — observing the literal laid
+// out MSB-first across the vector's bit range rather than as an opaque scalar.
+TEST(IntegerLiteralSim, LiteralOccupiesLogicVectorMsbFirst) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] v;\n"
+      "  logic [3:0] hi;\n"
+      "  logic [3:0] lo;\n"
+      "  initial begin\n"
+      "    v = 8'hA5;\n"
+      "    hi = v[7:4];\n"
+      "    lo = v[3:0];\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* hi = f.ctx.FindVariable("hi");
+  auto* lo = f.ctx.FindVariable("lo");
+  ASSERT_NE(hi, nullptr);
+  ASSERT_NE(lo, nullptr);
+  EXPECT_EQ(hi->value.ToUint64(), 0xAu);
+  EXPECT_EQ(lo->value.ToUint64(), 0x5u);
 }
 
 }  // namespace

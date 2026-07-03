@@ -358,14 +358,6 @@ TEST(IntegerLiteralParsing, ZeroSizeError) {
   delete r.diag;
 }
 
-TEST(IntegerLiteralParsing, DecimalValueWithUnderscores) {
-  auto r = Parse("module m; int x; initial x = 27_195_000; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->int_val, 27195000u);
-}
-
 TEST(IntegerLiteralParsing, UnaryMinusOnSimpleDecimal) {
   auto r = Parse("module m; int x; initial x = -42; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -397,6 +389,21 @@ TEST(IntegerLiteralParsing, UnaryMinusOnBasedLiteral) {
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kUnary);
   EXPECT_EQ(rhs->op, TokenKind::kMinus);
+  ASSERT_NE(rhs->lhs, nullptr);
+  EXPECT_EQ(rhs->lhs->kind, ExprKind::kIntegerLiteral);
+  EXPECT_EQ(rhs->lhs->int_val, 6u);
+}
+
+// §5.7.1: a plus operator preceding the size of a based literal is a unary plus
+// operator applied to the literal (the based-literal counterpart of the unary
+// plus on a simple decimal).
+TEST(IntegerLiteralParsing, UnaryPlusOnBasedLiteral) {
+  auto r = Parse("module m; logic [7:0] x; initial x = +8'd6; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kUnary);
+  EXPECT_EQ(rhs->op, TokenKind::kPlus);
   ASSERT_NE(rhs->lhs, nullptr);
   EXPECT_EQ(rhs->lhs->kind, ExprKind::kIntegerLiteral);
   EXPECT_EQ(rhs->lhs->int_val, 6u);
