@@ -169,4 +169,80 @@ TEST(SyncDriveElab, IntraAssignDelayOnBitSelectDriveErrors) {
              "endmodule\n"));
 }
 
+// §14.16 intro: the drivable clocking block outputs are those declared `output`
+// *or* `inout`. A synchronous drive to an inout clockvar is the legal way to
+// write it, so it must elaborate cleanly -- the direction check rejects only a
+// write to an `input` clockvar, never a drive to an inout one.
+TEST(SyncDriveElab, SyncDriveToInoutClockvarOk) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  logic clk;\n"
+             "  logic [7:0] data, r;\n"
+             "  clocking cb @(posedge clk);\n"
+             "    inout data;\n"
+             "  endclocking\n"
+             "  initial cb.data <= r;\n"
+             "endmodule\n"));
+}
+
+// §14.16: the write-to-a-clockvar prohibition applies to inout clockvars as
+// well as output ones. A continuous assignment to the signal tied to an inout
+// clockvar is illegal exactly as it is for an output clockvar.
+TEST(SyncDriveElab, ContinuousAssignToInoutClockvarErrors) {
+  EXPECT_FALSE(
+      ElabOk("module m;\n"
+             "  logic clk;\n"
+             "  logic [7:0] data;\n"
+             "  clocking cb @(posedge clk);\n"
+             "    inout data;\n"
+             "  endclocking\n"
+             "  assign data = 8'h00;\n"
+             "endmodule\n"));
+}
+
+// §14.16: likewise, a procedural continuous assignment (force) to an inout
+// clockvar is illegal -- only the synchronous drive syntax may write it.
+TEST(SyncDriveElab, ForceToInoutClockvarErrors) {
+  EXPECT_FALSE(
+      ElabOk("module m;\n"
+             "  logic clk;\n"
+             "  logic [7:0] data, r;\n"
+             "  clocking cb @(posedge clk);\n"
+             "    inout data;\n"
+             "  endclocking\n"
+             "  initial force cb.data = r;\n"
+             "endmodule\n"));
+}
+
+// §14.16: the write-to-a-clockvar prohibition covers the `assign` form of a
+// procedural continuous assignment for an inout clockvar as well, completing
+// the {assign, force} x {output, inout} matrix of illegal write forms.
+TEST(SyncDriveElab, ProceduralAssignToInoutClockvarErrors) {
+  EXPECT_FALSE(
+      ElabOk("module m;\n"
+             "  logic clk;\n"
+             "  logic [7:0] data, r;\n"
+             "  clocking cb @(posedge clk);\n"
+             "    inout data;\n"
+             "  endclocking\n"
+             "  initial assign cb.data = r;\n"
+             "endmodule\n"));
+}
+
+// §14.16: the right-hand side of a synchronous drive may be any valid
+// expression that is assignment compatible with the driven signal -- not just
+// a bare identifier or literal. An operator expression as the drive value
+// elaborates cleanly.
+TEST(SyncDriveElab, DriveExpressionMayBeArbitraryExpression) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  logic clk;\n"
+             "  logic [7:0] data, a, b;\n"
+             "  clocking cb @(posedge clk);\n"
+             "    output data;\n"
+             "  endclocking\n"
+             "  initial cb.data <= (a & b) | 8'h0F;\n"
+             "endmodule\n"));
+}
+
 }  // namespace
