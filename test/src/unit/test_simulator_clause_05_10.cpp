@@ -186,4 +186,24 @@ TEST(StructLiteralSim, NestedBracesArrayOfStructs) {
   EXPECT_EQ(vr1->value.ToUint64(), 0x3344u);
 }
 
+// §5.10 requires a bare (prefixless) structure literal to acquire its type
+// from an assignment-like context (§10.8). Here the only source of a type is
+// the function's return type — a §10.8 assignment-like context that is neither
+// a plain LHS assignment nor a declaration initializer. Building the literal
+// from that dependency's real syntax and running it end-to-end confirms the
+// literal is typed and packed into the return value (0xDEAD).
+TEST(StructLiteralSim, TypedByFunctionReturnContext) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  typedef struct packed { logic [7:0] a; logic [7:0] b; } ab_t;\n"
+      "  function ab_t make();\n"
+      "    return '{8'hDE, 8'hAD};\n"
+      "  endfunction\n"
+      "  logic [15:0] r;\n"
+      "  initial r = make();\n"
+      "endmodule\n",
+      "r");
+  EXPECT_EQ(v, 0xDEADu);
+}
+
 }  // namespace

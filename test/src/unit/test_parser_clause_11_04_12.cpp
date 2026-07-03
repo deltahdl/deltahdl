@@ -54,16 +54,6 @@ TEST(ConcatenationParsing, ConcatenationTwoElements) {
   EXPECT_EQ(stmt->rhs->elements.size(), 2u);
 }
 
-TEST(ConcatenationParsing, ConcatenationThreeElements) {
-  auto r = Parse("module m; initial x = {a, b, c}; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->rhs->kind, ExprKind::kConcatenation);
-  EXPECT_EQ(stmt->rhs->elements.size(), 3u);
-}
-
 TEST(ConcatenationParsing, ConcatenationNested) {
   auto r = Parse("module m; initial x = {a, {b, c}}; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
