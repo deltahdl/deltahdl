@@ -10,86 +10,130 @@ using namespace delta;
 
 namespace {
 
-TEST(EqualityWithUnknownBits, LogicalEqualityReturnsXWithUnknownOperand) {
+// §11.4.5: for the logical equality (==) and inequality (!=) operators, if an
+// unknown (x) or high-impedance (z) bit makes the relation ambiguous, the
+// result shall be 1'bx. The x bit is produced by a 4-state literal stored into
+// a declared variable and read back as an operand, so the whole path from
+// source through elaboration and simulation is exercised.
+TEST(EqualityOperatorSim, LogicalEqualityAmbiguousXOperandYieldsX) {
   SimFixture f;
-
-  MakeVar4(f, "el", 4, 0b1000, 0b0100);
-  auto* b = f.ctx.CreateVariable("er", 4);
-  b->value = MakeLogic4VecVal(f.arena, 4, 0b1100);
-  auto* expr = MakeBinary(f.arena, TokenKind::kEqEq, MakeId(f.arena, "el"),
-                          MakeId(f.arena, "er"));
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_NE(result.words[0].bval, 0u);
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [3:0] a, b;\n"
+      "  logic r;\n"
+      "  initial begin\n"
+      "    a = 4'b1x00;\n"
+      "    b = 4'b1000;\n"
+      "    r = (a == b);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* r = f.ctx.FindVariable("r");
+  ASSERT_NE(r, nullptr);
+  EXPECT_EQ(r->value.width, 1u);
+  // An x result is flagged by its unknown (bval) bit being set.
+  EXPECT_NE(r->value.words[0].bval & 1u, 0u);
 }
 
-TEST(EqualityWithUnknownBits, LogicalInequalityReturnsXWithUnknownOperand) {
+TEST(EqualityOperatorSim, LogicalInequalityAmbiguousZOperandYieldsX) {
   SimFixture f;
-
-  MakeVar4(f, "nl", 4, 0b1000, 0b0100);
-  auto* b = f.ctx.CreateVariable("nr", 4);
-  b->value = MakeLogic4VecVal(f.arena, 4, 0b1100);
-  auto* expr = MakeBinary(f.arena, TokenKind::kBangEq, MakeId(f.arena, "nl"),
-                          MakeId(f.arena, "nr"));
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_NE(result.words[0].bval, 0u);
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [3:0] a, b;\n"
+      "  logic r;\n"
+      "  initial begin\n"
+      "    a = 4'b1000;\n"
+      "    b = 4'b10z0;\n"
+      "    r = (a != b);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* r = f.ctx.FindVariable("r");
+  ASSERT_NE(r, nullptr);
+  EXPECT_EQ(r->value.width, 1u);
+  EXPECT_NE(r->value.words[0].bval & 1u, 0u);
 }
 
-TEST(EqualityWithUnknownBits, CaseEqualityAlwaysReturnsKnownValue) {
+// §11.4.5: for case equality (===) and case inequality (!==), the x and z bits
+// participate in the comparison and must match for the operands to be equal;
+// the result is always a known 1'b1 or 1'b0, never x. Both operands here carry
+// identical x and z bits, so === reports a known match.
+TEST(EqualityOperatorSim, CaseEqualityMatchesXZFromSource) {
   SimFixture f;
-
-  auto* expr = MakeBinary(f.arena, TokenKind::kEqEqEq, MakeInt(f.arena, 5),
-                          MakeInt(f.arena, 5));
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 1u);
-  EXPECT_EQ(result.words[0].bval, 0u);
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [3:0] a, b;\n"
+      "  logic r;\n"
+      "  initial begin\n"
+      "    a = 4'b1x0z;\n"
+      "    b = 4'b1x0z;\n"
+      "    r = (a === b);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* r = f.ctx.FindVariable("r");
+  ASSERT_NE(r, nullptr);
+  EXPECT_EQ(r->value.ToUint64(), 1u);
+  // The result is a known value: no unknown bit is set.
+  EXPECT_EQ(r->value.words[0].bval & 1u, 0u);
 }
 
-TEST(EqualityWithUnknownBits, CaseEqualityMatchesXZPatterns) {
+TEST(EqualityOperatorSim, CaseEqualityXZMismatchIsKnownFalse) {
   SimFixture f;
-
-  MakeVar4(f, "a", 4, 0b1010, 0b0100);
-  MakeVar4(f, "b", 4, 0b1010, 0b0100);
-  auto* expr = MakeBinary(f.arena, TokenKind::kEqEqEq, MakeId(f.arena, "a"),
-                          MakeId(f.arena, "b"));
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 1u);
-  EXPECT_EQ(result.words[0].bval, 0u);
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [3:0] a, b;\n"
+      "  logic r;\n"
+      "  initial begin\n"
+      "    a = 4'b1x0z;\n"
+      "    b = 4'b1x00;\n"
+      "    r = (a === b);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* r = f.ctx.FindVariable("r");
+  ASSERT_NE(r, nullptr);
+  EXPECT_EQ(r->value.ToUint64(), 0u);
+  EXPECT_EQ(r->value.words[0].bval & 1u, 0u);
 }
 
-TEST(EqualityWithUnknownBits, CaseEqualityMismatchesXZPatterns) {
+TEST(EqualityOperatorSim, CaseInequalityXZMismatchIsKnownTrue) {
   SimFixture f;
-
-  MakeVar4(f, "a", 4, 0b1010, 0b0100);
-  MakeVar4(f, "b", 4, 0b1010, 0b1000);
-  auto* expr = MakeBinary(f.arena, TokenKind::kEqEqEq, MakeId(f.arena, "a"),
-                          MakeId(f.arena, "b"));
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 0u);
-  EXPECT_EQ(result.words[0].bval, 0u);
-}
-
-TEST(EqualityWithUnknownBits, CaseInequalityMatchesXZPatterns) {
-  SimFixture f;
-
-  MakeVar4(f, "a", 4, 0b1010, 0b0100);
-  MakeVar4(f, "b", 4, 0b1010, 0b0100);
-  auto* expr = MakeBinary(f.arena, TokenKind::kBangEqEq, MakeId(f.arena, "a"),
-                          MakeId(f.arena, "b"));
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 0u);
-  EXPECT_EQ(result.words[0].bval, 0u);
-}
-
-TEST(EqualityWithUnknownBits, CaseInequalityMismatchesXZPatterns) {
-  SimFixture f;
-
-  MakeVar4(f, "a", 4, 0b1010, 0b0100);
-  MakeVar4(f, "b", 4, 0b1010, 0b1000);
-  auto* expr = MakeBinary(f.arena, TokenKind::kBangEqEq, MakeId(f.arena, "a"),
-                          MakeId(f.arena, "b"));
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 1u);
-  EXPECT_EQ(result.words[0].bval, 0u);
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [3:0] a, b;\n"
+      "  logic r;\n"
+      "  initial begin\n"
+      "    a = 4'b1x0z;\n"
+      "    b = 4'b1x00;\n"
+      "    r = (a !== b);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* r = f.ctx.FindVariable("r");
+  ASSERT_NE(r, nullptr);
+  EXPECT_EQ(r->value.ToUint64(), 1u);
+  EXPECT_EQ(r->value.words[0].bval & 1u, 0u);
 }
 
 TEST(ExpressionSim, EqualityFalse) {
@@ -287,14 +331,61 @@ TEST(EqualityOperatorEval, PackedStructInequality) {
   EXPECT_EQ(result.ToUint64(), 1u);
 }
 
-TEST(EqualityOperatorEval, SignedEqualityNegativeValues) {
+// §11.4.5: when both operands are signed, the comparison is a signed one and
+// the narrower operand is sign-extended to the wider width. Here a is 4-bit
+// signed -1 (1111); extended to 8 bits it becomes 0xFF, which equals the 8-bit
+// signed -1. A zero-extension would give 0x0F and mismatch, so a result of 1
+// confirms the sign-extending path. Both operands are declared signed so the
+// signedness is produced by real source, not asserted synthetically.
+TEST(EqualityOperatorSim, BothSignedSignExtendsNarrowerOperand) {
   SimFixture f;
-  MakeSignedVarAdv(f, "sa", 8, 0xFF);
-  MakeSignedVarAdv(f, "sb", 8, 0xFF);
-  auto* expr = MakeBinary(f.arena, TokenKind::kEqEq, MakeId(f.arena, "sa"),
-                          MakeId(f.arena, "sb"));
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 1u);
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic signed [3:0] a;\n"
+      "  logic signed [7:0] b;\n"
+      "  logic y;\n"
+      "  initial begin\n"
+      "    a = -1;\n"
+      "    b = -1;\n"
+      "    y = (a == b);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* y = f.ctx.FindVariable("y");
+  ASSERT_NE(y, nullptr);
+  EXPECT_EQ(y->value.ToUint64(), 1u);
+}
+
+// §11.4.5: the signed comparison distinguishes a sign-extended negative from a
+// same-low-bits positive. a is 4-bit signed -1 -> 0xFF; b is 8-bit signed 15 ->
+// 0x0F. As signed values -1 != 15, so the result is 0. Were a zero-extended, it
+// would read 0x0F and spuriously match, so 0 confirms the signed
+// interpretation.
+TEST(EqualityOperatorSim, BothSignedNegativeDiffersFromPositive) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic signed [3:0] a;\n"
+      "  logic signed [7:0] b;\n"
+      "  logic y;\n"
+      "  initial begin\n"
+      "    a = -1;\n"
+      "    b = 15;\n"
+      "    y = (a == b);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* y = f.ctx.FindVariable("y");
+  ASSERT_NE(y, nullptr);
+  EXPECT_EQ(y->value.ToUint64(), 0u);
 }
 
 TEST(RealOperandResult, RealEqualityComparison) {
@@ -357,48 +448,6 @@ TEST(RealOperandResult, MixedRealIntInequalityComparison) {
       "endmodule\n",
       "r");
   EXPECT_EQ(v, 1u);
-}
-
-TEST(EqualityOperatorEval, LogicalEqualityFalse) {
-  SimFixture f;
-
-  MakeVar(f, "a", 8, 5);
-  MakeVar(f, "b", 8, 3);
-  auto* expr = MakeBinary(f.arena, TokenKind::kEqEq, MakeId(f.arena, "a"),
-                          MakeId(f.arena, "b"));
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 0u);
-}
-
-TEST(EqualityOperatorEval, LogicalInequalityFalse) {
-  SimFixture f;
-
-  MakeVar(f, "a", 8, 5);
-  MakeVar(f, "b", 8, 5);
-  auto* expr = MakeBinary(f.arena, TokenKind::kBangEq, MakeId(f.arena, "a"),
-                          MakeId(f.arena, "b"));
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 0u);
-}
-
-TEST(EqualityOperatorEval, CaseEqualityFalseOnDifferentValues) {
-  SimFixture f;
-
-  auto* expr = MakeBinary(f.arena, TokenKind::kEqEqEq, MakeInt(f.arena, 5),
-                          MakeInt(f.arena, 3));
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 0u);
-  EXPECT_EQ(result.words[0].bval, 0u);
-}
-
-TEST(EqualityOperatorEval, CaseInequalityFalseOnSameValues) {
-  SimFixture f;
-
-  auto* expr = MakeBinary(f.arena, TokenKind::kBangEqEq, MakeInt(f.arena, 5),
-                          MakeInt(f.arena, 5));
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 0u);
-  EXPECT_EQ(result.words[0].bval, 0u);
 }
 
 TEST(EqualityOperatorEval, AllEqualityOperatorsReturnOneBit) {
@@ -468,6 +517,77 @@ TEST(EqualityOperatorSim, UnsignedNarrowMismatchesWiderTopBits) {
   auto* y = f.ctx.FindVariable("y");
   ASSERT_NE(y, nullptr);
   EXPECT_EQ(y->value.ToUint64(), 0u);
+}
+
+// §11.4.5: when one operand is unsigned, the whole comparison is unsigned and
+// the narrower operand is zero-extended (never sign-extended). a is 4-bit
+// signed -1 (0xF); mixed with the unsigned 8-bit b it is zero-extended to
+// 0x0F (15), which equals b. A both-signed reading would sign-extend a to 0xFF
+// and mismatch, so a result of 1 confirms the unsigned interpretation forced by
+// the single unsigned operand.
+TEST(EqualityOperatorSim, MixedSignedUnsignedComparesUnsigned) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  logic signed [3:0] a;\n"
+      "  logic [7:0] b;\n"
+      "  logic y;\n"
+      "  initial begin\n"
+      "    a = -1;\n"
+      "    b = 8'h0F;\n"
+      "    y = (a == b);\n"
+      "  end\n"
+      "endmodule\n",
+      "y");
+  EXPECT_EQ(v, 1u);
+}
+
+// §11.4.5: signedness that comes from a default-signed integer type (rather
+// than an explicit 'signed' keyword) still drives a signed comparison that
+// sign-extends the narrower operand. byte -1 (0xFF) sign-extends to 32 bits
+// (0xFFFFFFFF) and equals int -1. Were byte treated as unsigned it would read
+// 0x000000FF and mismatch, so 1 confirms the signed interpretation taken from
+// the type default.
+TEST(EqualityOperatorSim, DefaultSignedTypesSignExtend) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  byte a;\n"
+      "  int b;\n"
+      "  logic y;\n"
+      "  initial begin\n"
+      "    a = -1;\n"
+      "    b = -1;\n"
+      "    y = (a == b);\n"
+      "  end\n"
+      "endmodule\n",
+      "y");
+  EXPECT_EQ(v, 1u);
+}
+
+// §11.4.5: case inequality (!==) on two operands that carry identical x and z
+// bits reports a known 1'b0 -- they match bit for bit, including the unknowns.
+// Completes the !== input form alongside the === match and === /!== mismatch
+// cases; the result is always known, never x.
+TEST(EqualityOperatorSim, CaseInequalityMatchesXZIsKnownFalse) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [3:0] a, b;\n"
+      "  logic r;\n"
+      "  initial begin\n"
+      "    a = 4'b1x0z;\n"
+      "    b = 4'b1x0z;\n"
+      "    r = (a !== b);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* r = f.ctx.FindVariable("r");
+  ASSERT_NE(r, nullptr);
+  EXPECT_EQ(r->value.ToUint64(), 0u);
+  EXPECT_EQ(r->value.words[0].bval & 1u, 0u);
 }
 
 }  // namespace

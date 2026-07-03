@@ -150,4 +150,96 @@ TEST(OperatorElaboration, ChandleInequalityWithNullElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §11.4.5: comparing a class handle with the literal null using the logical
+// equality operator is a legal operation, so elaboration reports no error.
+TEST(OperatorElaboration, ClassHandleEqualityWithNullElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "class C; endclass\n"
+      "module m;\n"
+      "  C c;\n"
+      "  logic r;\n"
+      "  initial r = (c == null);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §11.4.5: the rule permits a class-handle comparison when one operand is
+// assignment compatible with the other. A base handle and a handle of a class
+// derived from it satisfy that requirement, and case equality (===) is one of
+// the permitted operators, so this comparison elaborates cleanly.
+TEST(OperatorElaboration, ClassHandleCaseEqualityCompatibleElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "class Base; endclass\n"
+      "class Derived extends Base; endclass\n"
+      "module m;\n"
+      "  Base b;\n"
+      "  Derived d;\n"
+      "  logic r;\n"
+      "  initial r = (b === d);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §11.4.5: the class-handle comparison is legal only when one operand is
+// assignment compatible with the other. Two handles of unrelated classes are
+// not, so the equality comparison is rejected. This is the discriminating
+// negative for the compatibility requirement above.
+TEST(OperatorElaboration, ClassHandleEqualityIncompatibleRejected) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "class A; endclass\n"
+      "class B; endclass\n"
+      "module m;\n"
+      "  A a;\n"
+      "  B b;\n"
+      "  logic r;\n"
+      "  initial r = (a == b);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// §11.4.5: case equality (===) is one of the operators the rule permits between
+// a chandle and the literal null, so this comparison elaborates without error.
+// Complements the ==/!= chandle-null cases with the case-equality operator
+// form.
+TEST(OperatorElaboration, ChandleCaseEqualityWithNullElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  chandle h;\n"
+      "  logic r;\n"
+      "  initial r = (h === null);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §11.4.5: two handles of the same class type are trivially assignment
+// compatible, so a logical-equality (==) comparison between them is a legal
+// operation and elaborates cleanly. Covers the == operator on two class handles
+// (the base/derived case above uses ===).
+TEST(OperatorElaboration, ClassHandleEqualitySameTypeElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "class C; endclass\n"
+      "module m;\n"
+      "  C a;\n"
+      "  C b;\n"
+      "  logic r;\n"
+      "  initial r = (a == b);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace
