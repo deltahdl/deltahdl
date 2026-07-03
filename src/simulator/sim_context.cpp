@@ -247,6 +247,25 @@ ModuleItem* SimContext::FindSequenceDecl(std::string_view name) {
   return (it != sequence_decls_.end()) ? it->second : nullptr;
 }
 
+void SimContext::SetCurrentProcess(Process* proc) {
+  if (proc == current_process_) return;
+  // §13.3.2: SetCurrentProcess is the thread-switch primitive -- every process
+  // resume is preceded by a call here. Hand the scope stack off between threads
+  // so automatic-task (and block) locals stay private to each activation: park
+  // the outgoing process's stack and bring in the incoming process's. Static
+  // storage is unaffected -- it lives in static_frames_, shared across
+  // activations of the same instance.
+  if (current_process_) {
+    current_process_->saved_scope_stack = std::move(scope_stack_);
+  }
+  if (proc) {
+    scope_stack_ = std::move(proc->saved_scope_stack);
+  } else {
+    scope_stack_.clear();
+  }
+  current_process_ = proc;
+}
+
 void SimContext::PushScope() { scope_stack_.emplace_back(); }
 
 void SimContext::PopScope() {

@@ -306,7 +306,8 @@ static void RegisterValueArgStructType(const FunctionArg& param,
 }
 
 static void BindValueArg(const FunctionArg& param, const Expr* expr,
-                         int arg_index, SimContext& ctx, Arena& arena) {
+                         int arg_index, const ModuleItem* func, SimContext& ctx,
+                         Arena& arena) {
   auto val = ResolveArgValue(param, expr, arg_index, ctx, arena);
   const auto& dt = param.data_type;
   if (dt.kind != DataTypeKind::kImplicit) {
@@ -321,8 +322,29 @@ static void BindValueArg(const FunctionArg& param, const Expr* expr,
   // the default value rather than the caller's current value.
   if (param.direction == Direction::kOutput)
     val = MakeLogic4VecVal(arena, val.width, 0);
+
+  // §13.3.2: the arguments of a static task/function are static storage that
+  // retains its value between invocations. On a later call the formal already
+  // exists in the static-frame store, so reuse that cell instead of a fresh
+  // default-initialized one: an input/inout formal is refreshed with the value
+  // just passed, while an output formal keeps whatever it retained from the
+  // last call (a read-before-write sees the retained value, not the default).
+  // An automatic task takes the fresh-each-entry path below, per §13.3.2 /
+  // Claim E.
+  bool is_static_sub = func && func->is_static && !func->is_automatic;
+  if (is_static_sub) {
+    auto* existing = ctx.FindStaticFuncVar(func->name, param.name);
+    if (existing) {
+      ctx.AliasLocalVariable(param.name, existing);
+      if (param.direction != Direction::kOutput) existing->value = val;
+      RegisterValueArgStructType(param, expr, arg_index, ctx);
+      return;
+    }
+  }
+
   auto* var = ctx.CreateLocalVariable(param.name, val.width);
   var->value = val;
+  if (is_static_sub) ctx.SaveStaticFuncVar(func->name, param.name, var);
   // A named-type struct formal (input s_t arg) has kind kNamed, not kStruct, so
   // resolve from the actual argument unconditionally; the resolver is a no-op
   // for non-struct actuals.
@@ -342,7 +364,7 @@ void BindFunctionArgs(const ModuleItem* func, const Expr* expr, SimContext& ctx,
                                    ctx, arena)) {
       continue;
     }
-    BindValueArg(param, expr, ai, ctx, arena);
+    BindValueArg(param, expr, ai, func, ctx, arena);
   }
 }
 

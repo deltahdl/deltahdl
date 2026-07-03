@@ -5,11 +5,15 @@
 #include <exception>
 #include <random>
 #include <string>
+#include <string_view>
+#include <unordered_map>
 #include <vector>
 
 #include "common/types.h"
 
 namespace delta {
+
+struct Variable;
 
 struct SimCoroutine {
   struct promise_type {
@@ -135,6 +139,17 @@ struct Process {
   std::vector<std::string> pending_violations;
 
   std::string inst_prefix;
+
+  // §13.3.2: a task may be enabled more than once concurrently, and every
+  // variable of an automatic task (and, more generally, every block-scoped
+  // local) must be private to each activation. Automatic/block locals live on
+  // the context's single scope stack while this process runs; when the process
+  // suspends and another runs, its scope stack is parked here and swapped back
+  // in on resume by SimContext::SetCurrentProcess, so concurrent activations
+  // never see each other's locals. Kept last so adding it does not shift the
+  // offsets of the fields above.
+  std::vector<std::unordered_map<std::string_view, Variable*>>
+      saved_scope_stack;
 
   ~Process() {
     if (coro) coro.destroy();

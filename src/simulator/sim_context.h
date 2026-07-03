@@ -497,7 +497,7 @@ class SimContext {
   void SetDpiContext(DpiContext* dpi) { dpi_context_ = dpi; }
   DpiContext* GetDpiContext() { return dpi_context_; }
 
-  void SetCurrentProcess(Process* proc) { current_process_ = proc; }
+  void SetCurrentProcess(Process* proc);
   Process* CurrentProcess() const { return current_process_; }
   bool IsReactiveContext() const;
 

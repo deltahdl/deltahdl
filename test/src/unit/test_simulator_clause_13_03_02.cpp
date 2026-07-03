@@ -27,6 +27,28 @@ TEST(TaskMemorySim, StaticTaskVarDefaultInitThenRetains) {
   EXPECT_EQ(val, 10u);
 }
 
+// §13.3.2: the arguments of a static task -- including output arguments -- are
+// static storage that retains its value between invocations. An output argument
+// is never passed a value from the caller, so a read-before-write on the second
+// call observes the value left behind by the first. The task increments its own
+// output before copying it back, so retention yields 1 then 2; if the output
+// were (wrongly) re-defaulted each call, both calls would produce 1.
+TEST(TaskMemorySim, StaticTaskOutputArgRetainsBetweenInvocations) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  logic [31:0] result;\n"
+      "  task static acc(output int v);\n"
+      "    v = v + 1;\n"
+      "  endtask\n"
+      "  initial begin\n"
+      "    acc(result);\n"
+      "    acc(result);\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(val, 2u);
+}
+
 // §13.3.2 + §13.5.1: an output argument of an automatic task is not passed the
 // caller's value; it is replicated and reinitialized to the default value
 // whenever execution enters its scope. Using a 2-state type (default 0), each
@@ -130,6 +152,58 @@ TEST(TaskMemorySim, StaticTaskStorageIsPerInstance) {
       "endmodule\n",
       f);
   LowerRunAndCheck(f, design, {{"a.r", 2u}, {"b.r", 2u}});
+}
+
+// §13.3.2: a task may be enabled more than once concurrently; every variable of
+// an automatic task is replicated per concurrent invocation so each activation
+// keeps its own state. Two branches of a fork enter the same automatic task and
+// each stashes its own seed into the task local before the shared delay; after
+// the delay each reads back its own copy. Separate storage yields 11 and 22;
+// shared storage would let the second activation's write clobber the first.
+TEST(TaskMemorySim, AutomaticTaskConcurrentInvocationsHaveSeparateStorage) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] r1, r2;\n"
+      "  task automatic tk(input int seed, output logic [31:0] o);\n"
+      "    int x;\n"
+      "    x = seed;\n"
+      "    #10;\n"
+      "    o = x;\n"
+      "  endtask\n"
+      "  initial fork\n"
+      "    tk(11, r1);\n"
+      "    tk(22, r2);\n"
+      "  join\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"r1", 11u}, {"r2", 22u}});
+}
+
+// §13.3.2: all variables of a static task are static -- a single variable per
+// declared local in the module instance, regardless of how many activations are
+// concurrent. The same fork enters a static task twice; both activations share
+// the one storage cell, so the second activation's write is what both read back
+// after the delay. Shared storage yields 22 and 22; per-invocation storage
+// would (wrongly) preserve the first activation's 11.
+TEST(TaskMemorySim, StaticTaskConcurrentInvocationsShareStorage) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] r1, r2;\n"
+      "  task static tk(input int seed, output logic [31:0] o);\n"
+      "    int x;\n"
+      "    x = seed;\n"
+      "    #10;\n"
+      "    o = x;\n"
+      "  endtask\n"
+      "  initial fork\n"
+      "    tk(11, r1);\n"
+      "    tk(22, r2);\n"
+      "  join\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"r1", 22u}, {"r2", 22u}});
 }
 
 }  // namespace

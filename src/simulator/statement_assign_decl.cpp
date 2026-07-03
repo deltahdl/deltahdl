@@ -162,13 +162,31 @@ static void CreateDeclVariable(const Stmt* stmt, uint32_t width, bool is_real,
   }
 }
 
+// §13.3.2: all variables of a static task are static. A local with no explicit
+// lifetime keyword inherits its enclosing subroutine's lifetime, so a plain
+// local declared inside a static-lifetime task/function is itself static and
+// must be a single cell shared across every activation -- including concurrent
+// ones. Such a local therefore has to resolve against the shared static-frame
+// store rather than the per-activation scope stack (which, since automatic and
+// block locals are now private to each process, would otherwise give each
+// concurrent activation its own copy). An explicit `automatic` local never
+// becomes static.
+static bool IsEffectivelyStaticLocal(const Stmt* stmt,
+                                     std::string_view func_name,
+                                     SimContext& ctx) {
+  if (stmt->var_is_static) return true;
+  if (stmt->var_is_automatic || func_name.empty()) return false;
+  auto* f = ctx.FindFunction(func_name);
+  return f && f->is_static && !f->is_automatic;
+}
+
 // Returns true if the declaration resolves to an already-existing variable
 // (a static-func var to alias, or a local already present) and so needs no
 // fresh creation.
 static bool TryReuseExistingDeclVar(const Stmt* stmt,
                                     std::string_view func_name,
                                     SimContext& ctx) {
-  if (stmt->var_is_static && !func_name.empty()) {
+  if (IsEffectivelyStaticLocal(stmt, func_name, ctx) && !func_name.empty()) {
     auto* existing = ctx.FindStaticFuncVar(func_name, stmt->var_name);
     if (existing) {
       ctx.AliasLocalVariable(stmt->var_name, existing);
@@ -194,7 +212,7 @@ static void InitializeDeclVariable(const Stmt* stmt, Variable* var,
     if (!var->is_4state) CoerceTo2State(var->value);
   }
 
-  if (stmt->var_is_static && !func_name.empty()) {
+  if (IsEffectivelyStaticLocal(stmt, func_name, ctx) && !func_name.empty()) {
     ctx.SaveStaticFuncVar(func_name, stmt->var_name, var);
   }
 }
