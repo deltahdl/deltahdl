@@ -58,8 +58,11 @@ static bool IsAllowedChandleBinaryOp(TokenKind op) {
          op == TokenKind::kEqEqQuestion || op == TokenKind::kBangEqQuestion;
 }
 
-static void CheckChandleExpr(const Expr* e, const TypeMap& types,
-                             DiagEngine& diag) {
+static void CheckChandleExpr(
+    const Expr* e, const TypeMap& types,
+    const std::unordered_map<std::string_view, Elaborator::VarArrayInfo>&
+        arrays,
+    DiagEngine& diag) {
   if (!e) return;
   if (e->kind == ExprKind::kBinary) {
     bool lhs_ch = e->lhs && IsChandleVar(e->lhs, types);
@@ -75,17 +78,23 @@ static void CheckChandleExpr(const Expr* e, const TypeMap& types,
     diag.Error(e->range.start, "operator is not allowed on chandle");
   }
   if (e->kind == ExprKind::kSelect && e->base && IsChandleVar(e->base, types)) {
-    diag.Error(e->range.start, "bit-select on chandle is illegal");
+    // §6.14: a scalar chandle cannot be bit-selected, but indexing a chandle
+    // associative array, queue, or unpacked array selects a whole element and
+    // is a legal use (a chandle may be inserted into an associative array).
+    // Only flag the select when its base is a scalar chandle, not an array.
+    if (arrays.find(ExprIdent(e->base)) == arrays.end()) {
+      diag.Error(e->range.start, "bit-select on chandle is illegal");
+    }
   }
-  CheckChandleExpr(e->lhs, types, diag);
-  CheckChandleExpr(e->rhs, types, diag);
-  CheckChandleExpr(e->base, types, diag);
-  CheckChandleExpr(e->index, types, diag);
-  CheckChandleExpr(e->condition, types, diag);
-  CheckChandleExpr(e->true_expr, types, diag);
-  CheckChandleExpr(e->false_expr, types, diag);
+  CheckChandleExpr(e->lhs, types, arrays, diag);
+  CheckChandleExpr(e->rhs, types, arrays, diag);
+  CheckChandleExpr(e->base, types, arrays, diag);
+  CheckChandleExpr(e->index, types, arrays, diag);
+  CheckChandleExpr(e->condition, types, arrays, diag);
+  CheckChandleExpr(e->true_expr, types, arrays, diag);
+  CheckChandleExpr(e->false_expr, types, arrays, diag);
   for (const auto* elem : e->elements) {
-    CheckChandleExpr(elem, types, diag);
+    CheckChandleExpr(elem, types, arrays, diag);
   }
 }
 
@@ -115,9 +124,9 @@ void Elaborator::WalkStmtsForChandleOps(const Stmt* s) {
                   "chandle cannot be assigned to a non-chandle variable");
     }
   }
-  CheckChandleExpr(s->rhs, var_types_, diag_);
-  CheckChandleExpr(s->expr, var_types_, diag_);
-  CheckChandleExpr(s->condition, var_types_, diag_);
+  CheckChandleExpr(s->rhs, var_types_, var_array_info_, diag_);
+  CheckChandleExpr(s->expr, var_types_, var_array_info_, diag_);
+  CheckChandleExpr(s->condition, var_types_, var_array_info_, diag_);
   for (auto* sub : s->stmts) WalkStmtsForChandleOps(sub);
   WalkStmtsForChandleOps(s->then_branch);
   WalkStmtsForChandleOps(s->else_branch);

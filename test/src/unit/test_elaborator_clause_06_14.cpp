@@ -128,6 +128,56 @@ TEST(ChandleDataType, ChandleInTaggedUnion_Ok) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
+TEST(ChandleDataType, ChandleInsertedIntoAssociativeArray_Ok) {
+  // §6.14: a chandle may be inserted into an associative array. Declaring a
+  // chandle-valued associative array and inserting a null handle at a key must
+  // elaborate without error -- the chandle usage restrictions (ports, packed
+  // types, untagged unions, ...) do not extend to associative-array elements.
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  chandle aa[int];\n"
+      "  initial aa[3] = null;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(ChandleDataType, ChandleAssociativeArrayElementRead_Ok) {
+  // §6.14: a chandle may be inserted into an associative array, and reading an
+  // element back with an index is a legal element access -- not a bit-select of
+  // a scalar chandle. Reading aa[key] into another chandle must not be
+  // rejected.
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  chandle aa[int];\n"
+      "  chandle x;\n"
+      "  initial x = aa[3];\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(ChandleDataType, ChandleScalarBitSelect_Error) {
+  // §6.14: a chandle is not a vector, so bit-selecting a scalar chandle is
+  // still illegal. This is the negative counterpart to the associative-array
+  // element access above -- the array base is what makes the index legal, not
+  // chandle. The lvalue is a chandle so the only applicable rule is the
+  // bit-select prohibition, isolating it from the assign-to-other-type rule.
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  chandle h;\n"
+      "  chandle x;\n"
+      "  initial x = h[0];\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
 TEST(ChandleDataType, ChandleInPackedStruct_Error) {
   ElabFixture f;
   ElaborateSrc(

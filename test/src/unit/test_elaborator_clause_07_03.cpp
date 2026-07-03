@@ -147,6 +147,31 @@ TEST(UnionDeclarationValidation, StringInTaggedUnion_OK) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
+TEST(UnionDeclarationValidation, EventInUntaggedUnion_Rejected) {
+  // §7.3: an event is a handle-like dynamic type, so like chandle and string it
+  // may only appear as a member of a tagged union. In an untagged union it must
+  // be rejected -- without a tag a sibling member could reinterpret its bits.
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  union { event e; int a; } u;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+TEST(UnionDeclarationValidation, EventInTaggedUnion_OK) {
+  // §7.3: the same event member is permitted once the union is tagged, since
+  // the tag makes a type-safe read of the dynamic handle possible.
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  union tagged { event e; int a; } u;\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 TEST(UnionDeclarationValidation, PackedDimOnPackedOnlyUnion_Allowed) {
   ElabFixture f;
   ElaborateSrc(
