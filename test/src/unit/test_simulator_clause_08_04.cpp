@@ -87,36 +87,6 @@ TEST(ClassSim, HandleNullAssignment) {
   EXPECT_EQ(f.ctx.GetClassObject(null_handle), nullptr);
 }
 
-TEST(ClassSim, HandleEqualitySameHandleReturnsOne) {
-  SimFixture f;
-  auto h = MakeLogic4VecVal(f.arena, 64, 5);
-  auto result = EvalBinaryOp(TokenKind::kEqEq, h, h, f.arena);
-  EXPECT_EQ(result.ToUint64(), 1u);
-}
-
-TEST(ClassSim, HandleEqualityDifferentHandlesReturnsZero) {
-  SimFixture f;
-  auto h1 = MakeLogic4VecVal(f.arena, 64, 5);
-  auto h2 = MakeLogic4VecVal(f.arena, 64, 6);
-  auto result = EvalBinaryOp(TokenKind::kEqEq, h1, h2, f.arena);
-  EXPECT_EQ(result.ToUint64(), 0u);
-}
-
-TEST(ClassSim, HandleInequalityDifferentHandlesReturnsOne) {
-  SimFixture f;
-  auto h1 = MakeLogic4VecVal(f.arena, 64, 5);
-  auto h2 = MakeLogic4VecVal(f.arena, 64, 6);
-  auto result = EvalBinaryOp(TokenKind::kBangEq, h1, h2, f.arena);
-  EXPECT_EQ(result.ToUint64(), 1u);
-}
-
-TEST(ClassSim, HandleCaseEqualitySameHandleReturnsOne) {
-  SimFixture f;
-  auto h = MakeLogic4VecVal(f.arena, 64, 5);
-  auto result = EvalBinaryOp(TokenKind::kEqEqEq, h, h, f.arena);
-  EXPECT_EQ(result.ToUint64(), 1u);
-}
-
 TEST(ClassSim, HandleCaseInequalityDifferentHandlesReturnsOne) {
   SimFixture f;
   auto h1 = MakeLogic4VecVal(f.arena, 64, 5);
@@ -177,6 +147,151 @@ TEST(ClassSim, IsAReturnsFalseForUnrelatedType) {
   auto* b = MakeClassType(f, "B", {"y"});
   EXPECT_FALSE(a->IsA(b));
   EXPECT_FALSE(b->IsA(a));
+}
+
+// §8.4: assignment of a class object copies the handle, so two variables that
+// were assigned from the same allocated object refer to that one object and
+// compare equal. Exercised end to end (elaborate/lower/run) rather than from a
+// hand-built handle value: 'new' produces the object, the assignment aliases
+// the second handle, and the listed '==' / '===' operators observe the alias.
+TEST(ClassSim, AssignedHandlesAliasSameObjectCompareEqual) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "class C; endclass\n"
+      "module m;\n"
+      "  logic eq;\n"
+      "  logic ceq;\n"
+      "  initial begin\n"
+      "    C a, b;\n"
+      "    a = new;\n"
+      "    b = a;\n"
+      "    eq = (a == b);\n"
+      "    ceq = (a === b);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* eq = f.ctx.FindVariable("eq");
+  auto* ceq = f.ctx.FindVariable("ceq");
+  ASSERT_NE(eq, nullptr);
+  ASSERT_NE(ceq, nullptr);
+  EXPECT_EQ(eq->value.ToUint64(), 1u);
+  EXPECT_EQ(ceq->value.ToUint64(), 1u);
+}
+
+// §8.4: distinct objects created by separate 'new' calls have distinct handles,
+// so handles pointing at different objects compare unequal. Built from real
+// source syntax and run through the full pipeline so the '==' / '!=' operators
+// act on handles the allocator actually produced.
+TEST(ClassSim, DistinctObjectsCompareUnequal) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "class C; endclass\n"
+      "module m;\n"
+      "  logic eq;\n"
+      "  logic neq;\n"
+      "  initial begin\n"
+      "    C a, b;\n"
+      "    a = new;\n"
+      "    b = new;\n"
+      "    eq = (a == b);\n"
+      "    neq = (a != b);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* eq = f.ctx.FindVariable("eq");
+  auto* neq = f.ctx.FindVariable("neq");
+  ASSERT_NE(eq, nullptr);
+  ASSERT_NE(neq, nullptr);
+  EXPECT_EQ(eq->value.ToUint64(), 0u);
+  EXPECT_EQ(neq->value.ToUint64(), 1u);
+}
+
+// §8.4: the conditional operator is one of the operators valid on object
+// handles. Built end to end from 11.4.11's real ternary syntax -- two distinct
+// objects are allocated and each branch is selected in turn, so the result
+// handle aliases the object the condition chose, observed with '=='.
+TEST(ClassSim, ConditionalOperatorSelectsHandleAtRuntime) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "class C; endclass\n"
+      "module m;\n"
+      "  logic picks_a;\n"
+      "  logic picks_b;\n"
+      "  initial begin\n"
+      "    C a, b, ta, tb;\n"
+      "    a = new;\n"
+      "    b = new;\n"
+      "    ta = 1'b1 ? a : b;\n"
+      "    tb = 1'b0 ? a : b;\n"
+      "    picks_a = (ta == a);\n"
+      "    picks_b = (tb == b);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* pa = f.ctx.FindVariable("picks_a");
+  auto* pb = f.ctx.FindVariable("picks_b");
+  ASSERT_NE(pa, nullptr);
+  ASSERT_NE(pb, nullptr);
+  EXPECT_EQ(pa->value.ToUint64(), 1u);
+  EXPECT_EQ(pb->value.ToUint64(), 1u);
+}
+
+// §8.4: assignment of a class object whose type is assignment compatible with
+// the target is valid. The compatible source is a derived-class handle built
+// from 6.22.3's real 'extends' inheritance; after assigning it into a base
+// handle the two handles alias the one object, observed with '=='.
+TEST(ClassSim, CompatibleDerivedHandleAssignmentAliasesAtRuntime) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "class Base; endclass\n"
+      "class Child extends Base; endclass\n"
+      "module m;\n"
+      "  logic aliased;\n"
+      "  initial begin\n"
+      "    Base bh;\n"
+      "    Child ch;\n"
+      "    ch = new;\n"
+      "    bh = ch;\n"
+      "    aliased = (bh == ch);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* aliased = f.ctx.FindVariable("aliased");
+  ASSERT_NE(aliased, nullptr);
+  EXPECT_EQ(aliased->value.ToUint64(), 1u);
+}
+
+// §8.4: assignment of null is a valid operation on an object handle. After an
+// object is allocated and null is then assigned over it, comparing the handle
+// with null yields true -- observed end to end rather than from a hand-set
+// handle value.
+TEST(ClassSim, NullAssignmentClearsHandleAtRuntime) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "class C; endclass\n"
+      "module m;\n"
+      "  logic is_null;\n"
+      "  initial begin\n"
+      "    C h;\n"
+      "    h = new;\n"
+      "    h = null;\n"
+      "    is_null = (h == null);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* v = f.ctx.FindVariable("is_null");
+  ASSERT_NE(v, nullptr);
+  EXPECT_EQ(v->value.ToUint64(), 1u);
 }
 
 TEST(ClassSim, UninitializedHandleDetectableAsNull) {

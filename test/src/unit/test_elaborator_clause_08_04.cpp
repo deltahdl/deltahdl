@@ -224,16 +224,6 @@ TEST(ClassObjectElaboration, ClassVariableElaboratesOk) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-TEST(ClassObjectElaboration, ClassVariableDeclarationOk) {
-  EXPECT_TRUE(
-      ElabOk("class Packet;\n"
-             "  int data;\n"
-             "endclass\n"
-             "module m;\n"
-             "  Packet p1;\n"
-             "endmodule\n"));
-}
-
 TEST(ClassObjectElaboration, ClassHandleAssignmentOk) {
   EXPECT_TRUE(
       ElabOk("class Packet;\n"
@@ -335,6 +325,40 @@ TEST(ClassObjectElaboration, ClassHandleAssignIncompatibleError) {
       "  A a;\n"
       "  B b;\n"
       "  initial a = b;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// Table 8-1 lists casting of a SystemVerilog object handle as "Limited" (in
+// contrast to the unrestricted casting of a C pointer). One consequence of that
+// limit is that a handle cannot be reinterpreted as an unrelated non-class
+// value: casting it to a plain integral type is rejected.
+TEST(ClassObjectElaboration, ClassHandleCastToNonClassTypeError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class C; endclass\n"
+      "module m;\n"
+      "  C a;\n"
+      "  initial begin\n"
+      "    automatic int r;\n"
+      "    r = int'(a);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// The dual of the previous check: the limited casting of Table 8-1 also forbids
+// producing a class handle out of an ordinary (non-class, non-null) value, so
+// casting an integer literal to a class type is rejected.
+TEST(ClassObjectElaboration, NonClassValueCastToClassTypeError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class C; endclass\n"
+      "module m;\n"
+      "  C a;\n"
+      "  initial a = C'(5);\n"
       "endmodule\n",
       f);
   EXPECT_TRUE(f.has_errors);
