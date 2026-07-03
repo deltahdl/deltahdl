@@ -148,6 +148,131 @@ TEST(UpwardNameReferenceSimulation,
   EXPECT_EQ(r->value.ToUint64(), 77u);
 }
 
+TEST(UpwardNameReferenceSimulation, UpwardReferenceByEnclosingInstanceName) {
+  // §23.8: a variable in an enclosing module can be referenced when that
+  // module's instance name is known, not only when its module type name is
+  // used. Here leaf reads m1.v, where m1 is the instance name of the enclosing
+  // mid instance (leaf lives inside m1). The leading scope_name m1 is not found
+  // in leaf's own scope, so the search climbs to the enclosing scopes until it
+  // reaches top, where the instance m1 exists, and the item v is then resolved
+  // downward from that instance -- distinct from a sibling-instance reference,
+  // whose scope_name is found already in the immediate parent.
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module leaf;\n"
+      "  integer r;\n"
+      "  initial begin\n"
+      "    #1;\n"
+      "    r = m1.v;\n"
+      "  end\n"
+      "endmodule\n"
+      "module mid;\n"
+      "  integer v;\n"
+      "  leaf l1();\n"
+      "  initial v = 33;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  mid m1();\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* r = f.ctx.FindVariable("m1.l1.r");
+  ASSERT_NE(r, nullptr);
+  EXPECT_EQ(r->value.ToUint64(), 33u);
+}
+
+TEST(UpwardNameReferenceSimulation, UpwardNetReferenceReadsDrivenValue) {
+  // Syntax 23-8 admits net_identifier as an item_name of an upward reference.
+  // Here child reads parent.n, a net in the enclosing module driven by a
+  // continuous assignment. The upward-resolution walk must reach the net's
+  // driven value just as it does for a variable, so the read observes the
+  // settled 0xA5 rather than the net's default.
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module child;\n"
+      "  integer r;\n"
+      "  initial begin\n"
+      "    #1;\n"
+      "    r = parent.n;\n"
+      "  end\n"
+      "endmodule\n"
+      "module parent;\n"
+      "  wire [7:0] n;\n"
+      "  assign n = 8'hA5;\n"
+      "  child c1();\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* r = f.ctx.FindVariable("c1.r");
+  ASSERT_NE(r, nullptr);
+  EXPECT_EQ(r->value.ToUint64(), 0xA5u);
+}
+
+TEST(UpwardNameReferenceSimulation, UpwardParameterReferenceReadsValue) {
+  // Syntax 23-8 admits parameter_identifier as an item_name. child reads
+  // parent.P, a parameter of the enclosing module referenced by that module's
+  // type name; the upward reference must resolve to the parameter's value (8),
+  // observed end-to-end rather than merely elaborating without error.
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module child;\n"
+      "  integer r;\n"
+      "  initial begin\n"
+      "    #1;\n"
+      "    r = parent.P;\n"
+      "  end\n"
+      "endmodule\n"
+      "module parent;\n"
+      "  parameter int P = 8;\n"
+      "  child c1();\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* r = f.ctx.FindVariable("c1.r");
+  ASSERT_NE(r, nullptr);
+  EXPECT_EQ(r->value.ToUint64(), 8u);
+}
+
+TEST(UpwardNameReferenceSimulation, UpwardPortReferenceReadsDrivenValue) {
+  // Syntax 23-8 admits port_identifier as an item_name. child reads parent.p,
+  // an input port of the enclosing parent instance that an outer module drives
+  // with 0x3C. The upward reference resolves through the enclosing instance to
+  // the port's driven value.
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module child;\n"
+      "  integer r;\n"
+      "  initial begin\n"
+      "    #1;\n"
+      "    r = parent.p;\n"
+      "  end\n"
+      "endmodule\n"
+      "module parent(input logic [7:0] p);\n"
+      "  child c1();\n"
+      "endmodule\n"
+      "module top;\n"
+      "  wire [7:0] s = 8'h3C;\n"
+      "  parent pi(.p(s));\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* r = f.ctx.FindVariable("pi.c1.r");
+  ASSERT_NE(r, nullptr);
+  EXPECT_EQ(r->value.ToUint64(), 0x3Cu);
+}
+
 TEST(UpwardNameReferenceSimulation, UpwardSearchUsesEnclosingModuleNotSibling) {
   // The upward search visits enclosing module scopes only; it must not reach
   // sideways into a sibling instance. Here child's reference parent.v resolves

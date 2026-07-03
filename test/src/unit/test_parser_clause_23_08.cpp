@@ -92,33 +92,6 @@ TEST(UpwardNameReferenceParsing, UpwardReferenceProducesMemberAccessNode) {
   EXPECT_EQ(stmt->rhs->rhs->text, "v");
 }
 
-TEST(UpwardNameReferenceParsing, ScopeNameSubroutineFormParses) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  initial begin\n"
-              "    x = my_task.local_v;\n"
-              "  end\n"
-              "endmodule\n"));
-}
-
-TEST(UpwardNameReferenceParsing, ScopeNameInstanceFormParses) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  initial begin\n"
-              "    x = inst1.sig;\n"
-              "  end\n"
-              "endmodule\n"));
-}
-
-TEST(UpwardNameReferenceParsing, ScopeNameGenerateBlockFormParses) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  initial begin\n"
-              "    x = gen_blk.v;\n"
-              "  end\n"
-              "endmodule\n"));
-}
-
 TEST(UpwardNameReferenceParsing, MultiComponentUpwardPathParses) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
