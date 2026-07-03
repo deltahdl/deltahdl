@@ -493,6 +493,22 @@ TEST(RealOps, RealArrayElementAccessIsLegal) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §11.3.1 lists a union member alongside a structure member as a position where
+// a real operand may appear. Reading a real member of an unpacked union into a
+// real expression elaborates without error.
+TEST(RealOps, UnionMemberRealAccessIsLegal) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  typedef union { real realval; longint bits; } U;\n"
+      "  U u;\n"
+      "  real v;\n"
+      "  initial v = u.realval;\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+}
+
 // The XNOR bitwise operator also spells as ^~, which is integral-only just like
 // its ~^ form, so applying it to real operands must be rejected.
 TEST(RealOps, BitwiseXnorCaretTildeOnRealIsIllegal) {

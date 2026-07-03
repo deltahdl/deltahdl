@@ -140,6 +140,49 @@ TEST(RealDataType, ShortrealBitSelectError) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
+// §6.12: edge event controls are prohibited on every real-variable type, not
+// only real. A posedge on a shortreal is rejected the same way.
+TEST(RealDataType, ShortrealEdgeControlError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  shortreal a;\n"
+      "  always @(posedge a)\n"
+      "    $display(\"posedge\");\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+// §6.12: bit-select references of real variables are prohibited for every
+// real-variable type, so a bit-select of a realtime is rejected.
+TEST(RealDataType, RealtimeBitSelectError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  realtime a;\n"
+      "  wire b;\n"
+      "  assign b = a[0];\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+// §6.12: a real index expression is prohibited in a part-select of a vector,
+// just as in a bit-select. Here the real drives an indexed part-select (+:).
+TEST(RealDataType, RealIndexInPartSelectError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  real a = 1.0;\n"
+      "  wire [7:0] b;\n"
+      "  wire [1:0] c;\n"
+      "  assign c = b[a +: 2];\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
 TEST(RealDataType, RealAndRealtimeInterchangeable) {
   ElabFixture f;
   ElaborateSrc(

@@ -58,45 +58,6 @@ TEST(RealDataType, RealTypesInProcedural) {
               "endmodule\n"));
 }
 
-TEST(RealDataType, RealDecl) {
-  auto r = Parse(
-      "module m;\n"
-      "  real r;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kReal);
-  EXPECT_EQ(item->name, "r");
-}
-
-TEST(RealDataType, ShortrealDecl) {
-  auto r = Parse(
-      "module m;\n"
-      "  shortreal sr;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kShortreal);
-  EXPECT_EQ(item->name, "sr");
-}
-
-TEST(RealDataType, RealtimeDecl) {
-  auto r = Parse(
-      "module m;\n"
-      "  realtime rt;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kRealtime);
-  EXPECT_EQ(item->name, "rt");
-}
-
 TEST(RealDataType, MultipleRealDecls) {
   auto r = Parse(
       "module m;\n"

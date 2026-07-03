@@ -11,27 +11,6 @@ using namespace delta;
 
 namespace {
 
-// Builds a real-valued variable carried at shortreal (32-bit) precision. The
-// shared MakeRealVar helper only produces 64-bit reals, so the shortreal result
-// rule in §11.3.1 needs a narrower operand built locally.
-Variable* MakeShortrealVar(SimFixture& f, std::string_view name, float val) {
-  auto* var = f.ctx.CreateVariable(name, 32);
-  uint32_t bits = 0;
-  std::memcpy(&bits, &val, sizeof(float));
-  var->value = MakeLogic4VecVal(f.arena, 32, bits);
-  var->value.is_real = true;
-  f.ctx.RegisterRealVariable(name);
-  return var;
-}
-
-// Reinterprets the low 32 bits of a shortreal result as a float.
-float ShortrealResult(const Logic4Vec& v) {
-  auto bits = static_cast<uint32_t>(v.ToUint64());
-  float val = 0.0f;
-  std::memcpy(&val, &bits, sizeof(float));
-  return val;
-}
-
 // Builds a conditional (a ? b : c) expression; no shared builder exists for it.
 Expr* MakeTernary(Arena& arena, Expr* cond, Expr* t, Expr* f) {
   auto* e = arena.Create<Expr>();
@@ -252,33 +231,6 @@ TEST(RealOperandResult, E2eMixedRealIntArithResultIsReal) {
   EXPECT_DOUBLE_EQ(v, 3.5);
 }
 
-// §11.3.1: for operators other than the single-bit ones, when no operand is
-// real but an operand is shortreal, the result is shortreal (32-bit).
-TEST(RealOperandResult, ShortrealArithResultIsShortreal) {
-  SimFixture f;
-  MakeShortrealVar(f, "a", 1.5f);
-  MakeShortrealVar(f, "b", 2.25f);
-  auto result = EvalExpr(MakeBinary(f.arena, TokenKind::kPlus,
-                                    MakeId(f.arena, "a"), MakeId(f.arena, "b")),
-                         f.ctx, f.arena);
-  EXPECT_TRUE(result.is_real);
-  EXPECT_EQ(result.width, 32u);
-  EXPECT_FLOAT_EQ(ShortrealResult(result), 3.75f);
-}
-
-// §11.3.1: a real operand outranks a shortreal operand, so the result is real
-// (64-bit) even when the other operand is only shortreal.
-TEST(RealOperandResult, RealOperandWinsOverShortreal) {
-  SimFixture f;
-  MakeRealVar(f, "a", 1.5);
-  MakeShortrealVar(f, "b", 2.25f);
-  auto result = EvalExpr(MakeBinary(f.arena, TokenKind::kStar,
-                                    MakeId(f.arena, "a"), MakeId(f.arena, "b")),
-                         f.ctx, f.arena);
-  EXPECT_TRUE(result.is_real);
-  EXPECT_EQ(result.width, 64u);
-}
-
 // §11.3.1: for the conditional operator a real selected branch makes the result
 // real, so a chosen real arm produces a real result.
 TEST(RealOperandResult, ConditionalWithRealBranchResultIsReal) {
@@ -304,6 +256,115 @@ TEST(RealOperandResult, ConditionalConditionRealDoesNotForceRealResult) {
                            MakeId(f.arena, "y")),
                f.ctx, f.arena);
   EXPECT_FALSE(result.is_real);
+}
+
+// §11.3.1: for operators other than the single-bit ones, when an operand is
+// shortreal and none is real, the result is shortreal. Observed end-to-end from
+// a real shortreal declaration so the sum itself is computed at shortreal
+// (single) precision, not merely truncated on assignment. 2^24 and 1.0 are each
+// representable in a C float, but their sum 2^24+1 is not, so a shortreal sum
+// rounds to 2^24 while the same sum in reals stays exact. Comparing the widened
+// shortreal sum against the real sum makes the shortreal result type visible.
+TEST(RealOperandResult, E2eShortrealArithResultIsShortreal) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  shortreal a, b;\n"
+      "  real w, wr;\n"
+      "  logic rounded;\n"
+      "  initial begin\n"
+      "    a = 16777216.0;\n"
+      "    b = 1.0;\n"
+      "    w = a + b;\n"
+      "    wr = 16777216.0 + 1.0;\n"
+      "    rounded = (w != wr);\n"
+      "  end\n"
+      "endmodule\n",
+      "rounded");
+  EXPECT_EQ(v, 1u);
+}
+
+// §11.3.1: when one operand is real and another is shortreal, the real operand
+// wins and the result is real (double), not shortreal. Driven end-to-end from a
+// real and a shortreal declaration. 2^24+1 is exact in a C double but not a C
+// float, so a real result preserves it whereas a shortreal result would round
+// it to 2^24; observing 2^24+1 survives proves the result was real.
+TEST(RealOperandResult, E2eRealOperandWinsOverShortreal) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  real a, c;\n"
+      "  shortreal b;\n"
+      "  logic real_result;\n"
+      "  initial begin\n"
+      "    a = 16777216.0;\n"
+      "    b = 1.0;\n"
+      "    c = a + b;\n"
+      "    real_result = (c == 16777217.0);\n"
+      "  end\n"
+      "endmodule\n",
+      "real_result");
+  EXPECT_EQ(v, 1u);
+}
+
+// §11.3.1: a real array element (the LRM's realarray[intval] form) is a valid
+// real operand. Read end-to-end from a real unpacked array indexed by an int
+// variable and used in a real arithmetic expression, the element carries its
+// stored real value into the result.
+TEST(RealOperandResult, E2eRealArrayElementIsRealOperand) {
+  auto v = RunAndGetReal(
+      "module t;\n"
+      "  real arr[4];\n"
+      "  real m;\n"
+      "  int i;\n"
+      "  initial begin\n"
+      "    i = 1;\n"
+      "    arr[i] = 4.0;\n"
+      "    m = arr[i] * 2.0;\n"
+      "  end\n"
+      "endmodule\n",
+      "m");
+  EXPECT_DOUBLE_EQ(v, 8.0);
+}
+
+// §11.3.1: the single-bit result rule for relational operators applies to every
+// real-variable type, including shortreal operands (not just real). Driven
+// end-to-end from shortreal declarations so the comparison operates on 32-bit
+// real values produced by the shortreal decl path.
+TEST(RealOperandResult, E2eRelationalOnShortrealIsSingleBit) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  shortreal a, b;\n"
+      "  logic r;\n"
+      "  initial begin\n"
+      "    a = 3.5;\n"
+      "    b = 2.5;\n"
+      "    r = a > b;\n"
+      "  end\n"
+      "endmodule\n",
+      "r");
+  EXPECT_EQ(v, 1u);
+}
+
+// §11.3.1: when one operand is shortreal and the other is a (non-real) integer,
+// no operand is real, so the result is shortreal. Driven end-to-end from a
+// shortreal declaration and an integer literal operand. 2^24+1 is exact in a C
+// double but not a C float, so a shortreal result rounds the sum to 2^24 while
+// the reference real sum stays exact; the mismatch proves the mixed
+// shortreal/integer result took shortreal (single) precision.
+TEST(RealOperandResult, E2eShortrealIntArithResultIsShortreal) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  shortreal a;\n"
+      "  real w, wr;\n"
+      "  logic rounded;\n"
+      "  initial begin\n"
+      "    a = 16777216.0;\n"
+      "    w = a + 1;\n"
+      "    wr = 16777216.0 + 1.0;\n"
+      "    rounded = (w != wr);\n"
+      "  end\n"
+      "endmodule\n",
+      "rounded");
+  EXPECT_EQ(v, 1u);
 }
 
 }  // namespace
