@@ -389,32 +389,50 @@ void Elaborator::ValidateCycleDelayDefaultClocking(const ModuleDecl* decl) {
 }
 
 // §14.11: locate an assignment that carries a cycle-delay intra-assignment
-// timing control. A synchronous drive (§14.16) reaches a clocking-block
-// variable through a member access (e.g. cb.sig or vif.cb.sig), so a target
-// that is a simple name can only be the illegal intra-assignment form. The walk
-// returns the offending statement so its source location can be reported.
-static const Stmt* FindIntraAssignCycleDelay(const Stmt* s) {
+// timing control. A leading cycle delay is legal only on a synchronous drive
+// (§14.16), which targets a writable clocking-block variable reached through a
+// member access such as cb.sig, optionally wrapped in a bit-select or slice
+// (cb.sig[2]). Every other assignment target -- a simple name, a bit-/part-
+// select of an ordinary variable, a concatenation, or a member of a
+// non-clocking object -- makes the ## an illegal intra-assignment delay.
+// Discriminating on the clockvar predicate rather than on the bare-name shape
+// catches those select and concatenation forms too. The walk returns the
+// offending statement so its source location can be reported.
+static const Stmt* FindIntraAssignCycleDelay(
+    const Stmt* s, const ClockvarPredicate& targets_writable) {
   if (!s) return nullptr;
   if ((s->kind == StmtKind::kBlockingAssign ||
        s->kind == StmtKind::kNonblockingAssign) &&
       s->cycle_delay != nullptr && s->lhs != nullptr &&
-      s->lhs->kind == ExprKind::kIdentifier) {
+      !targets_writable(s->lhs)) {
     return s;
   }
   for (auto* sub : s->stmts) {
-    if (const auto* hit = FindIntraAssignCycleDelay(sub)) return hit;
+    if (const auto* hit = FindIntraAssignCycleDelay(sub, targets_writable))
+      return hit;
   }
-  if (const auto* hit = FindIntraAssignCycleDelay(s->then_branch)) return hit;
-  if (const auto* hit = FindIntraAssignCycleDelay(s->else_branch)) return hit;
-  if (const auto* hit = FindIntraAssignCycleDelay(s->body)) return hit;
-  if (const auto* hit = FindIntraAssignCycleDelay(s->for_body)) return hit;
+  if (const auto* hit =
+          FindIntraAssignCycleDelay(s->then_branch, targets_writable))
+    return hit;
+  if (const auto* hit =
+          FindIntraAssignCycleDelay(s->else_branch, targets_writable))
+    return hit;
+  if (const auto* hit = FindIntraAssignCycleDelay(s->body, targets_writable))
+    return hit;
+  if (const auto* hit =
+          FindIntraAssignCycleDelay(s->for_body, targets_writable))
+    return hit;
   for (auto& ci : s->case_items) {
-    if (const auto* hit = FindIntraAssignCycleDelay(ci.body)) return hit;
+    if (const auto* hit = FindIntraAssignCycleDelay(ci.body, targets_writable))
+      return hit;
   }
   return nullptr;
 }
 
 void Elaborator::ValidateIntraAssignCycleDelay(const ModuleDecl* decl) {
+  const ClockvarPredicate kTargetsWritable = [this](const Expr* e) {
+    return ExprTargetsWritableClockvar(e);
+  };
   for (const auto* item : decl->items) {
     bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
                    item->kind == ModuleItemKind::kAlwaysCombBlock ||
@@ -423,7 +441,8 @@ void Elaborator::ValidateIntraAssignCycleDelay(const ModuleDecl* decl) {
                    item->kind == ModuleItemKind::kInitialBlock ||
                    item->kind == ModuleItemKind::kFinalBlock;
     if (is_proc && item->body) {
-      if (const Stmt* hit = FindIntraAssignCycleDelay(item->body)) {
+      if (const Stmt* hit =
+              FindIntraAssignCycleDelay(item->body, kTargetsWritable)) {
         diag_.Error(hit->range.start,
                     "cycle delay (##) is not a legal intra-assignment delay "
                     "in a blocking or nonblocking assignment");
