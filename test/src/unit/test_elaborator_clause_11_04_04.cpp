@@ -44,6 +44,47 @@ TEST(ConstEval, RelationalFalseResults) {
   }
 }
 
+// Constant-expression operand form: relational operands that are module
+// parameters are folded by the elaborator's constant evaluator to fix a
+// localparam's value; reading it at run time observes the result.
+TEST(ConstEval, RelationalOverParameters) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  parameter int P = 3;\n"
+      "  parameter int Q = 5;\n"
+      "  localparam bit LT = (P < Q);\n"
+      "  logic r;\n"
+      "  initial r = LT;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* var = f.ctx.FindVariable("r");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 1u);
+}
+
+// Same rule with localparam operands, a distinct constant form that reaches the
+// constant evaluator through a different declaration path.
+TEST(ConstEval, RelationalOverLocalparams) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  localparam int P = 7;\n"
+      "  localparam int Q = 2;\n"
+      "  localparam bit GT = (P > Q);\n"
+      "  logic r;\n"
+      "  initial r = GT;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* var = f.ctx.FindVariable("r");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 1u);
+}
+
 TEST(AlwaysCombBasicSim, AlwaysCombComparison) {
   SimFixture f;
   auto* design = ElaborateSrc(
