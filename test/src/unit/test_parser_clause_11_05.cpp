@@ -37,21 +37,6 @@ TEST(OperatorAndExpressionParsing, FunctionCallExpression) {
   EXPECT_EQ(rhs->args.size(), 2u);
 }
 
-TEST(OperatorAndExpressionParsing, ParameterReferenceAsOperand) {
-  auto r = Parse(
-      "module t;\n"
-      "  parameter int P = 42;\n"
-      "  int x;\n"
-      "  initial x = P;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kIdentifier);
-  EXPECT_EQ(rhs->text, "P");
-}
-
 TEST(OperatorAndExpressionParsing, BitSelectAsOperand) {
   auto r = Parse(
       "module t;\n"
@@ -290,37 +275,6 @@ TEST(OperatorAndExpressionParsing,
   EXPECT_EQ(rhs->rhs->kind, ExprKind::kBinary);
   EXPECT_TRUE(rhs->rhs->is_parenthesized);
   EXPECT_FALSE(IsSimpleOperand(rhs->rhs));
-}
-
-TEST(OperatorAndExpressionParsing, NetReferenceAsOperand) {
-  auto r = Parse(
-      "module t;\n"
-      "  wire [7:0] w;\n"
-      "  initial x = w;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kIdentifier);
-  EXPECT_EQ(rhs->text, "w");
-}
-
-TEST(OperatorAndExpressionParsing, BitSelectOfNetAsOperand) {
-  auto r = Parse(
-      "module t;\n"
-      "  wire [7:0] w;\n"
-      "  initial b = w[3];\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kSelect);
-  ASSERT_NE(rhs->base, nullptr);
-  EXPECT_EQ(rhs->base->text, "w");
-  EXPECT_NE(rhs->index, nullptr);
-  EXPECT_EQ(rhs->index_end, nullptr);
 }
 
 TEST(OperatorAndExpressionParsing, PartSelectOfPackedArrayAsOperand) {

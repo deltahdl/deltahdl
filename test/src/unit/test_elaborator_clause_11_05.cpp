@@ -106,4 +106,55 @@ TEST(OperandElaboration, BitSelectOfNetElaborates) {
              "endmodule\n"));
 }
 
+// §11.5 para 2 lists a packed structure among the base types that admit a
+// bit-select operand. Elaboration must accept selecting a bit of a packed
+// struct rather than rejecting it as a bit-select of a scalar: a packed
+// aggregate is excluded from the scalar-select check, unlike a plain `logic b`.
+TEST(OperandElaboration, PackedStructBitSelectOperandElaborates) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  struct packed { logic [3:0] hi; logic [3:0] lo; } s;\n"
+             "  logic b;\n"
+             "  initial b = s[3];\n"
+             "endmodule\n"));
+}
+
+// §11.5 para 2 likewise lists a packed structure as a base type for a
+// part-select operand.
+TEST(OperandElaboration, PackedStructPartSelectOperandElaborates) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  struct packed { logic [3:0] hi; logic [3:0] lo; } s;\n"
+             "  logic [3:0] b;\n"
+             "  initial b = s[7:4];\n"
+             "endmodule\n"));
+}
+
+// §11.5 para 2 lists a packed array among the base types that admit bit-select
+// and part-select operands. A packed-array variable is registered on the
+// packed-array path (not the scalar path), so selecting from it must elaborate;
+// §7.4.1 supplies the multi-dimensional packed declaration.
+TEST(OperandElaboration, PackedArraySelectOperandElaborates) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  logic [1:0][7:0] arr;\n"
+             "  logic b;\n"
+             "  logic [3:0] nib;\n"
+             "  initial begin b = arr[1][0]; nib = arr[1][7:4]; end\n"
+             "endmodule\n"));
+}
+
+// §11.5 para 2 lists a parameter among the base types that admit bit-select and
+// part-select operands (a parameter is a constant operand, §11.2.1). Both forms
+// over a vector parameter must elaborate cleanly.
+TEST(OperandElaboration, ParameterBitAndPartSelectOperandElaborates) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  parameter [15:0] P = 16'hABCD;\n"
+             "  logic b;\n"
+             "  logic [7:0] hi;\n"
+             "  initial begin b = P[0]; hi = P[15:8]; end\n"
+             "endmodule\n"));
+}
+
 }  // namespace

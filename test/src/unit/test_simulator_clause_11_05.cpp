@@ -8,57 +8,57 @@ using namespace delta;
 
 namespace {
 
+// §11.5 para 1: a complete-form reference to a variable uses all of the
+// variable's bits as the operand. Built from a real §6.8 declaration and driven
+// end-to-end so the whole 32-bit value flows through to the target.
 TEST(Eval, VariableReferenceUsesAllBits) {
-  ExprFixture f;
-  auto* var = f.ctx.CreateVariable("wide", 32);
-  var->value = MakeLogic4VecVal(f.arena, 32, 0xDEADBEEF);
-
-  auto result = EvalExpr(MakeId(f.arena, "wide"), f.ctx, f.arena);
-  EXPECT_EQ(result.width, 32u);
-  EXPECT_EQ(result.ToUint64(), 0xDEADBEEFu);
+  auto v = RunAndGet(
+      "module t;\n"
+      "  logic [31:0] a;\n"
+      "  logic [31:0] y;\n"
+      "  initial begin a = 32'hDEADBEEF; y = a; end\n"
+      "endmodule\n",
+      "y");
+  EXPECT_EQ(v, 0xDEADBEEFu);
 }
 
+// §11.5 para 1: for a scalar variable the operand is its whole (single-bit)
+// value.
 TEST(Eval, SingleBitVariableUsesAllBits) {
-  ExprFixture f;
-  auto* var = f.ctx.CreateVariable("flag", 1);
-  var->value = MakeLogic4VecVal(f.arena, 1, 1);
-
-  auto result = EvalExpr(MakeId(f.arena, "flag"), f.ctx, f.arena);
-  EXPECT_EQ(result.width, 1u);
-  EXPECT_EQ(result.ToUint64(), 1u);
+  auto v = RunAndGet(
+      "module t;\n"
+      "  logic a;\n"
+      "  logic y;\n"
+      "  initial begin a = 1'b1; y = a; end\n"
+      "endmodule\n",
+      "y");
+  EXPECT_EQ(v, 1u);
 }
 
+// §11.5 para 4: a concatenation (§11.4.12) is an operand whose bits are the
+// ordered bits of its elements. Elements come from real §6.8 declarations and
+// the concatenation is evaluated through the full pipeline.
 TEST(Eval, ConcatenationAsOperand) {
-  ExprFixture f;
-  auto* concat = MakeConcatOfTwoVars(f, "hi", 4, 0xA, "lo", 4, 0x5);
-
-  auto result = EvalExpr(concat, f.ctx, f.arena);
-  EXPECT_EQ(result.width, 8u);
-  EXPECT_EQ(result.ToUint64(), 0xA5u);
+  auto v = RunAndGet(
+      "module t;\n"
+      "  logic [3:0] hi, lo;\n"
+      "  logic [7:0] y;\n"
+      "  initial begin hi = 4'hA; lo = 4'h5; y = {hi, lo}; end\n"
+      "endmodule\n",
+      "y");
+  EXPECT_EQ(v, 0xA5u);
 }
 
+// §11.5 para 4: a nested concatenation is likewise an operand.
 TEST(Eval, NestedConcatenationAsOperand) {
-  ExprFixture f;
-  auto* va = f.ctx.CreateVariable("a", 4);
-  va->value = MakeLogic4VecVal(f.arena, 4, 0x1);
-  auto* vb = f.ctx.CreateVariable("b", 4);
-  vb->value = MakeLogic4VecVal(f.arena, 4, 0x2);
-  auto* vc = f.ctx.CreateVariable("c", 4);
-  vc->value = MakeLogic4VecVal(f.arena, 4, 0x3);
-
-  auto* inner = f.arena.Create<Expr>();
-  inner->kind = ExprKind::kConcatenation;
-  inner->elements.push_back(MakeId(f.arena, "b"));
-  inner->elements.push_back(MakeId(f.arena, "c"));
-
-  auto* outer = f.arena.Create<Expr>();
-  outer->kind = ExprKind::kConcatenation;
-  outer->elements.push_back(MakeId(f.arena, "a"));
-  outer->elements.push_back(inner);
-
-  auto result = EvalExpr(outer, f.ctx, f.arena);
-  EXPECT_EQ(result.width, 12u);
-  EXPECT_EQ(result.ToUint64(), 0x123u);
+  auto v = RunAndGet(
+      "module t;\n"
+      "  logic [3:0] a, b, c;\n"
+      "  logic [11:0] y;\n"
+      "  initial begin a = 4'h1; b = 4'h2; c = 4'h3; y = {a, {b, c}}; end\n"
+      "endmodule\n",
+      "y");
+  EXPECT_EQ(v, 0x123u);
 }
 
 TEST(Eval, FunctionCallAsOperand) {
