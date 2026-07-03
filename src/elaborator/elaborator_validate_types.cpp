@@ -17,17 +17,27 @@
 
 namespace delta {
 
+// §3.14: a design element's time precision shall be at least as precise as its
+// time unit. When the two are written as separate timeunit/timeprecision
+// statements (rather than the "unit / precision" slash form the parser already
+// checks), the comparison can only happen once both have been collected, so it
+// lands here. The rule is stated once and applies to every design element, so
+// the per-element field comparison is shared.
+static void CheckTimescaleOrder(bool has_unit, bool has_prec, TimeUnit unit,
+                                int unit_mag, TimeUnit prec, int prec_mag,
+                                SourceLoc loc, DiagEngine& diag) {
+  if (!has_unit || !has_prec) return;
+  if (EffectiveTimeOrder(prec, prec_mag) > EffectiveTimeOrder(unit, unit_mag)) {
+    diag.Error(loc, "time precision is less precise than the time unit");
+  }
+}
+
 static void CheckModuleTimescaleOrder(const ModuleDecl* decl,
                                       DiagEngine& diag) {
-  if (!decl->has_timeunit || !decl->has_timeprecision) return;
-  int unit_order =
-      EffectiveTimeOrder(decl->time_unit, decl->time_unit_magnitude);
-  int prec_order =
-      EffectiveTimeOrder(decl->time_prec, decl->time_prec_magnitude);
-  if (prec_order > unit_order) {
-    diag.Error(decl->range.start,
-               "time precision is less precise than the time unit");
-  }
+  CheckTimescaleOrder(decl->has_timeunit, decl->has_timeprecision,
+                      decl->time_unit, decl->time_unit_magnitude,
+                      decl->time_prec, decl->time_prec_magnitude,
+                      decl->range.start, diag);
 }
 
 void Elaborator::ValidateModuleConstraints(const ModuleDecl* decl,
@@ -182,6 +192,28 @@ void Elaborator::ValidateTimescaleConsistency() {
     diag_.Error(scan.unspecified_loc,
                 "some design elements specify time unit and precision while "
                 "others do not");
+  }
+}
+
+// §3.14: enforce the precision-no-coarser-than-unit rule for the design
+// elements that are not necessarily reached through module item elaboration.
+// A package is never elaborated that way, and an interface or program that is
+// declared but never instantiated is likewise skipped, so the
+// separate-statement form of the check that CheckModuleTimescaleOrder performs
+// for modules would otherwise never run for them. Scanning the declarations
+// directly (as the consistency check in ValidateTimescaleConsistency already
+// does) covers every such element exactly once.
+void Elaborator::ValidateStandaloneTimescaleOrder() {
+  auto check = [&](const ModuleDecl* decl) {
+    CheckModuleTimescaleOrder(decl, diag_);
+  };
+  for (const auto* iface : unit_->interfaces) check(iface);
+  for (const auto* prog : unit_->programs) check(prog);
+  for (const auto* pkg : unit_->packages) {
+    CheckTimescaleOrder(pkg->has_timeunit, pkg->has_timeprecision,
+                        pkg->time_unit, pkg->time_unit_magnitude,
+                        pkg->time_prec, pkg->time_prec_magnitude,
+                        pkg->range.start, diag_);
   }
 }
 

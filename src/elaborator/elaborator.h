@@ -274,6 +274,8 @@ class Elaborator {
 
   void ValidateTimescaleConsistency();
 
+  void ValidateStandaloneTimescaleOrder();
+
   void ValidateEnumDecl(const DataType& dtype, SourceLoc loc);
 
   void ValidatePackedStructDefaults(const DataType& dtype, SourceLoc loc);

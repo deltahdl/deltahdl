@@ -375,6 +375,8 @@ void Elaborator::RunPreElaborationValidations() {
 
   ValidateTimescaleConsistency();
 
+  ValidateStandaloneTimescaleOrder();
+
   ValidateDpiDeclarations();
 
   ValidateDpiGlobalNameSpace();

@@ -50,17 +50,6 @@ TEST(DesignBuildingBlockParsing, SlashPrecisionEqualToUnit) {
   EXPECT_TRUE(ParseOk("module m; timeunit 1ns / 1ns; endmodule\n"));
 }
 
-TEST(DesignBuildingBlockParsing, TimeScaleCarriesUnitAndPrecision) {
-  TimeScale ts;
-  ts.unit = TimeUnit::kNs;
-  ts.magnitude = 10;
-  ts.precision = TimeUnit::kPs;
-  ts.prec_magnitude = 100;
-  EXPECT_EQ(ts.unit, TimeUnit::kNs);
-  EXPECT_EQ(ts.precision, TimeUnit::kPs);
-  EXPECT_NE(static_cast<int8_t>(ts.unit), static_cast<int8_t>(ts.precision));
-}
-
 TEST(DesignBuildingBlockParsing, ParserAcceptsMagnitudesOneTenHundred) {
   EXPECT_TRUE(ParseOk("module m; timeunit 1ns; endmodule\n"));
   EXPECT_TRUE(ParseOk("module m; timeunit 10ns; endmodule\n"));

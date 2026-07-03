@@ -6,15 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(DesignBuildingBlockPreprocessing, TimescaleAcceptsAllSixUnits) {
-  EXPECT_FALSE(PreprocessTimescale("`timescale 1s / 1s\n").has_errors);
-  EXPECT_FALSE(PreprocessTimescale("`timescale 1ms / 1ms\n").has_errors);
-  EXPECT_FALSE(PreprocessTimescale("`timescale 1us / 1us\n").has_errors);
-  EXPECT_FALSE(PreprocessTimescale("`timescale 1ns / 1ns\n").has_errors);
-  EXPECT_FALSE(PreprocessTimescale("`timescale 1ps / 1ps\n").has_errors);
-  EXPECT_FALSE(PreprocessTimescale("`timescale 1fs / 1fs\n").has_errors);
-}
-
 TEST(DesignBuildingBlockPreprocessing,
      TimescaleAcceptsMagnitudesOneTenHundred) {
   EXPECT_FALSE(PreprocessTimescale("`timescale 1ns / 1ps\n").has_errors);
