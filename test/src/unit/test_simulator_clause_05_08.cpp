@@ -57,6 +57,16 @@ TEST(TimeLiteralSimulation, ScaledToExplicitTimeunitPs) {
   EXPECT_DOUBLE_EQ(v, 40.0);
 }
 
+// §5.8: the scaling to the current time unit applies to a fixed-point literal
+// just as to an integer one. Under the default ns unit, 2.5us scales up by 1000
+// to 2500.0 - exercising the fixed-point input form through a non-unit scale
+// factor (the plain FixedPointNs case is ns->ns, i.e. unscaled).
+TEST(TimeLiteralSimulation, FixedPointScaledToDefaultUnit) {
+  auto v = RunAndGetReal(
+      "module t;\n  realtime r;\n  initial r = 2.5us;\nendmodule\n", "r");
+  EXPECT_DOUBLE_EQ(v, 2500.0);
+}
+
 TEST(TimeLiteralSimulation, ScaledToExplicitTimeunitUs) {
   auto v = RunAndGetReal(
       "module t;\n"

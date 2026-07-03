@@ -545,6 +545,11 @@ std::optional<double> ConstEvalReal(const Expr* expr, const ScopeMap& scope) {
 
   switch (expr->kind) {
     case ExprKind::kRealLiteral:
+    // §5.8: a time literal is interpreted as a realtime (real) value already
+    // scaled to the current time unit; the parser folds that scaling into
+    // real_val, so in a constant real context it evaluates exactly like any
+    // other real literal.
+    case ExprKind::kTimeLiteral:
       return expr->real_val;
     case ExprKind::kIntegerLiteral:
       return static_cast<double>(expr->int_val);
