@@ -464,7 +464,18 @@ void Lowerer::LowerVarInit(const RtlirVariable& var, Variable* v,
     v->value = EvalStructPattern(init, sinfo, ctx_, arena_);
     return;
   }
-  auto val = EvalExpr(var.init_expr, ctx_, arena_);
+  // §11.6: a declaration initializer is an assignment, so its target width is
+  // the context the initializer expression is evaluated in, exactly as for a
+  // procedural assign. For a plain integral scalar target this lets an
+  // arithmetic initializer such as `logic [16:0] s = a + b;` keep the carry-out
+  // that a self-determined evaluation at the operands' own width would drop.
+  // Aggregate, real, string, event, and chandle initializers keep their
+  // dedicated sizing and stay self-determined.
+  uint32_t init_ctx = 0;
+  if (!sinfo && !var.is_real && !var.is_string && !var.is_event &&
+      !var.is_chandle && init->kind != ExprKind::kAssignmentPattern)
+    init_ctx = width;
+  auto val = EvalExpr(var.init_expr, ctx_, arena_, init_ctx);
   // §6.12.1: a declaration initializer is an assignment, so an initializer that
   // crosses the real/integer boundary undergoes the same implicit conversion as
   // a procedural assign (round-to-nearest ties-away one way; x/z->0 numeric
