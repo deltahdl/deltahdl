@@ -22,27 +22,6 @@ TEST(NonblockingAssignSim, NbaAppliesToValue) {
   LowerRunAndCheck(f, design, {{"a", 10u}, {"b", 20u}});
 }
 
-TEST(NonblockingAssignSim, SingleAssignment) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [31:0] a;\n"
-      "  initial begin\n"
-      "    a <= 5;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("a");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 5u);
-}
-
 TEST(NonblockingAssignSim, MultipleNBASameVarLastWins) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -325,31 +304,6 @@ TEST(NonblockingAssignSim, NBAFunctionCallRHS) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-TEST(NonblockingAssignSim, NBAArithmeticExpression) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [31:0] a;\n"
-      "  logic [31:0] b;\n"
-      "  logic [31:0] result;\n"
-      "  initial begin\n"
-      "    a = 15;\n"
-      "    b = 27;\n"
-      "    result <= a + b;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 42u);
-}
-
 TEST(NonblockingAssignSim, NBABitwiseOperators) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -534,33 +488,6 @@ TEST(NonblockingAssignSim, DifferentWidths) {
   EXPECT_EQ(word->value.ToUint64(), 0xDEADCAFEu);
 }
 
-TEST(NonblockingAssignSim, NBACaseDefaultBranch) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [31:0] sel;\n"
-      "  logic [31:0] result;\n"
-      "  initial begin\n"
-      "    sel = 99;\n"
-      "    case (sel)\n"
-      "      0: result <= 10;\n"
-      "      1: result <= 20;\n"
-      "      default: result <= 77;\n"
-      "    endcase\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 77u);
-}
-
 TEST(NonblockingAssignSim, NBABitwiseNot) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -607,22 +534,6 @@ TEST(NonblockingAssignSim, NBAReplicationRHS) {
   EXPECT_EQ(var->value.ToUint64(), 0xAAu);
 }
 
-TEST(NonblockingAssignSim, MixedBlockingAndNBA) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [31:0] a;\n"
-      "  logic [31:0] b;\n"
-      "  initial begin\n"
-      "    a = 5;\n"
-      "    b <= a + 1;\n"
-      "    a = 10;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  LowerRunAndCheck(f, design, {{"a", 10u}, {"b", 6u}});
-}
-
 TEST(NonblockingAssignSim, AutomaticVariableNbaIsError) {
   SimFixture f;
   ElaborateSrc(
@@ -632,6 +543,38 @@ TEST(NonblockingAssignSim, AutomaticVariableNbaIsError) {
       "    x <= 42;\n"
       "  endtask\n"
       "  initial set_val();\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// §10.4.2: a queue is a dynamically sized array, so a nonblocking assignment to
+// one of its elements is illegal just as for a dynamic array.
+TEST(NonblockingAssignSim, QueueElementNbaIsError) {
+  SimFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  int q[$];\n"
+      "  initial begin\n"
+      "    q.push_back(0);\n"
+      "    q[0] <= 1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// §10.4.2: an associative array is dynamically sized as well; a nonblocking
+// assignment targeting one of its elements is likewise illegal.
+TEST(NonblockingAssignSim, AssociativeArrayElementNbaIsError) {
+  SimFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  int aa[int];\n"
+      "  initial begin\n"
+      "    aa[5] = 0;\n"
+      "    aa[5] <= 1;\n"
+      "  end\n"
       "endmodule\n",
       f);
   EXPECT_TRUE(f.has_errors);

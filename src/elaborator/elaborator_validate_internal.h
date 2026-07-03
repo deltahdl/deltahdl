@@ -36,6 +36,7 @@ bool ExprUsesInterconnect(const Expr* e,
                           const std::unordered_set<std::string_view>& names);
 void CheckNbaDynamicArrayTarget(
     const Stmt* s, const std::unordered_set<std::string_view>& dyn_names,
+    const std::unordered_set<std::string_view>& dynsized_names,
     DiagEngine& diag);
 void CollectProcTargets(const Stmt* s,
                         std::unordered_map<std::string_view, SourceLoc>& out);

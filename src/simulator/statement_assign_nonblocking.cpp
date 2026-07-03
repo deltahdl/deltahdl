@@ -164,17 +164,23 @@ StmtResult ExecNonblockingAssignImpl(const Stmt* stmt, SimContext& ctx,
 static void SetupWholeVarNbaCallback(Event* event, Variable* var,
                                      const Logic4Vec& rhs_val) {
   event->kind = EventKind::kUpdate;
+  // Record the most recently scheduled pending value so the class garbage
+  // collector can keep a handle awaiting an NBA update reachable (see the
+  // pending_nba scan in the class GC).
   var->pending_nba = rhs_val;
   var->has_pending_nba = true;
-  event->callback = [var]() {
-    if (var->has_pending_nba) {
-      if (!var->is_forced) {
-        var->value = var->pending_nba;
-        if (!var->is_4state) CoerceTo2State(var->value);
-        var->NotifyWatchers();
-      }
-      var->has_pending_nba = false;
+  // §10.4.2: each scheduled nonblocking update carries its own sampled
+  // right-hand value and applies it at its own scheduled time. When several
+  // intra-assignment-delayed NBAs target the same variable at distinct future
+  // times (Example 7), they must not cancel one another, so the update value
+  // is captured here rather than read from the single shared pending_nba slot.
+  event->callback = [var, rhs_val]() {
+    if (!var->is_forced) {
+      var->value = rhs_val;
+      if (!var->is_4state) CoerceTo2State(var->value);
+      var->NotifyWatchers();
     }
+    var->has_pending_nba = false;
   };
 }
 

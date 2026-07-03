@@ -211,32 +211,41 @@ std::string_view LhsBaseName(const Expr* e) {
   return {};
 }
 
+// §10.4.2 forbids a nonblocking assignment to an element of a dynamically sized
+// array variable -- dynamic arrays, queues, and associative arrays all qualify
+// because an element's storage can move as the collection is resized between
+// the schedule and update steps. `dynsized_names` therefore carries all three
+// kinds and gates the nonblocking branch, while `dyn_names` (dynamic arrays
+// only) preserves the existing procedural-continuous-assignment diagnostic.
 void CheckNbaDynamicArrayTarget(
     const Stmt* s, const std::unordered_set<std::string_view>& dyn_names,
+    const std::unordered_set<std::string_view>& dynsized_names,
     DiagEngine& diag) {
   if (!s) return;
   if (s->lhs && s->lhs->kind == ExprKind::kSelect) {
     auto name = LhsBaseName(s->lhs);
-    if (!name.empty() && dyn_names.count(name) != 0) {
-      if (s->kind == StmtKind::kNonblockingAssign) {
-        diag.Error(s->range.start,
-                   "nonblocking assignment to element of dynamic array");
-      } else if (s->kind == StmtKind::kForce || s->kind == StmtKind::kAssign) {
-        diag.Error(s->range.start,
-                   "procedural continuous assignment to element of "
-                   "dynamic array");
-      }
+    if (!name.empty() && s->kind == StmtKind::kNonblockingAssign &&
+        dynsized_names.count(name) != 0) {
+      diag.Error(
+          s->range.start,
+          "nonblocking assignment to element of dynamically sized array");
+    } else if (!name.empty() && dyn_names.count(name) != 0 &&
+               (s->kind == StmtKind::kForce || s->kind == StmtKind::kAssign)) {
+      diag.Error(s->range.start,
+                 "procedural continuous assignment to element of "
+                 "dynamic array");
     }
   }
-  for (auto* sub : s->stmts) CheckNbaDynamicArrayTarget(sub, dyn_names, diag);
+  for (auto* sub : s->stmts)
+    CheckNbaDynamicArrayTarget(sub, dyn_names, dynsized_names, diag);
   for (auto* sub : s->fork_stmts)
-    CheckNbaDynamicArrayTarget(sub, dyn_names, diag);
-  CheckNbaDynamicArrayTarget(s->then_branch, dyn_names, diag);
-  CheckNbaDynamicArrayTarget(s->else_branch, dyn_names, diag);
-  CheckNbaDynamicArrayTarget(s->body, dyn_names, diag);
-  CheckNbaDynamicArrayTarget(s->for_body, dyn_names, diag);
+    CheckNbaDynamicArrayTarget(sub, dyn_names, dynsized_names, diag);
+  CheckNbaDynamicArrayTarget(s->then_branch, dyn_names, dynsized_names, diag);
+  CheckNbaDynamicArrayTarget(s->else_branch, dyn_names, dynsized_names, diag);
+  CheckNbaDynamicArrayTarget(s->body, dyn_names, dynsized_names, diag);
+  CheckNbaDynamicArrayTarget(s->for_body, dyn_names, dynsized_names, diag);
   for (auto& ci : s->case_items)
-    CheckNbaDynamicArrayTarget(ci.body, dyn_names, diag);
+    CheckNbaDynamicArrayTarget(ci.body, dyn_names, dynsized_names, diag);
 }
 
 static void CollectLhsBaseNames(

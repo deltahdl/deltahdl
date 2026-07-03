@@ -482,14 +482,20 @@ void Elaborator::ValidateProceduralNetAssign() {
 
 void Elaborator::ValidateDynamicArrayNba(const ModuleDecl* decl) {
   std::unordered_set<std::string_view> dyn_names;
+  std::unordered_set<std::string_view> dynsized_names;
   for (const auto& [name, info] : var_array_info_) {
     if (info.is_dynamic) dyn_names.insert(name);
+    // §10.4.2: dynamic arrays, queues, and associative arrays are all
+    // dynamically sized and are illegal nonblocking-assignment element targets.
+    if (info.is_dynamic || info.is_queue || info.is_assoc)
+      dynsized_names.insert(name);
   }
-  if (dyn_names.empty()) return;
+  if (dynsized_names.empty()) return;
   for (const auto* item : decl->items) {
-    if (item->body) CheckNbaDynamicArrayTarget(item->body, dyn_names, diag_);
+    if (item->body)
+      CheckNbaDynamicArrayTarget(item->body, dyn_names, dynsized_names, diag_);
     for (auto* s : item->func_body_stmts)
-      CheckNbaDynamicArrayTarget(s, dyn_names, diag_);
+      CheckNbaDynamicArrayTarget(s, dyn_names, dynsized_names, diag_);
   }
 }
 

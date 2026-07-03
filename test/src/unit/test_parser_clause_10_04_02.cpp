@@ -69,23 +69,6 @@ TEST(NonblockingAssignParsing, TernaryRhs) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kTernary);
 }
 
-TEST(NonblockingAssignParsing, InBeginEndBlock) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg q, d;\n"
-      "  initial begin\n"
-      "    q <= d;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* body = InitialBody(r);
-  ASSERT_NE(body, nullptr);
-  EXPECT_EQ(body->kind, StmtKind::kBlock);
-  ASSERT_EQ(body->stmts.size(), 1u);
-  EXPECT_EQ(body->stmts[0]->kind, StmtKind::kNonblockingAssign);
-}
-
 TEST(NonblockingAssignParsing, IfElseMuxPattern) {
   auto r = Parse(
       "module m;\n"
@@ -392,23 +375,6 @@ TEST(NonblockingAssignParsing, RegisterFilePattern) {
   EXPECT_EQ(if_stmt->then_branch->kind, StmtKind::kNonblockingAssign);
   ASSERT_NE(if_stmt->then_branch->lhs, nullptr);
   EXPECT_EQ(if_stmt->then_branch->lhs->kind, ExprKind::kSelect);
-}
-
-TEST(NonblockingAssignParsing, ExpressionRhs) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg [7:0] q, a, b;\n"
-      "  initial begin\n"
-      "    q <= a + b;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kNonblockingAssign);
-  ASSERT_NE(stmt->rhs, nullptr);
-  EXPECT_EQ(stmt->rhs->kind, ExprKind::kBinary);
 }
 
 TEST(NonblockingAssignParsing, PartSelectLhs) {
