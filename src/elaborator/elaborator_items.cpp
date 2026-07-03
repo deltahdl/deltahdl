@@ -540,6 +540,18 @@ bool Elaborator::ElaborateBehavioralItem(ModuleItem* item, RtlirModule* mod) {
       mod->let_decls.push_back(item);
       return true;
     case ModuleItemKind::kCovergroupDecl:
+      // §19.3 (footnote 29): the extends form of a covergroup is legal only
+      // within a class. The grammar accepts `covergroup extends base ;` in any
+      // scope, so the restriction is a semantic one applied here. A covergroup
+      // declaration handled as a module item belongs to a module, interface,
+      // checker, or program — class covergroups are elaborated as class
+      // members and never reach this path — so an inherited base is illegal.
+      if (!item->covergroup_extends_base.empty()) {
+        diag_.Error(item->loc,
+                    "a covergroup may only use 'extends' inside a class");
+      }
+      mod->let_decls.push_back(item);
+      return true;
     case ModuleItemKind::kDpiExport:
       mod->let_decls.push_back(item);
       return true;

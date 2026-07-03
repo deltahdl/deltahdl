@@ -5,17 +5,6 @@ using namespace delta;
 
 namespace {
 
-TEST(CovergroupParsing, CovergroupWithCoverpoint) {
-  EXPECT_TRUE(ParseOk(R"(
-    module m;
-      logic [2:0] addr;
-      covergroup cg @(addr);
-        coverpoint addr;
-      endgroup
-    endmodule
-  )"));
-}
-
 TEST_F(VerifyParseTest, BasicCovergroup) {
   auto* unit = Parse(R"(
     module m;
@@ -162,6 +151,110 @@ TEST(CovergroupParsing, InoutFormalArgumentRejected) {
     module m;
       covergroup cg (inout int x) @(posedge clk);
         coverpoint x;
+      endgroup
+    endmodule
+  )"));
+}
+
+// LRM 19.3: a covergroup can be defined in an interface.
+TEST(CovergroupParsing, CovergroupInInterface) {
+  EXPECT_TRUE(ParseOk(R"(
+    interface intf;
+      logic [2:0] addr;
+      covergroup cg @(addr);
+        coverpoint addr;
+      endgroup
+    endinterface
+  )"));
+}
+
+// LRM 19.3: a covergroup can be defined in a checker.
+TEST(CovergroupParsing, CovergroupInChecker) {
+  EXPECT_TRUE(ParseOk(R"(
+    checker chk;
+      covergroup cg @(posedge clk);
+        coverpoint x;
+      endgroup
+    endchecker
+  )"));
+}
+
+// LRM 19.3: coverage_option has a second alternative,
+// "type_option . member = constant_expression", distinct from the
+// "option . member = expression" form.
+TEST(CovergroupParsing, CovergroupWithTypeOption) {
+  EXPECT_TRUE(ParseOk(R"(
+    module m;
+      covergroup cg @(posedge clk);
+        type_option.merge_instances = 1;
+        coverpoint x;
+      endgroup
+    endmodule
+  )"));
+}
+
+// LRM 19.3: coverage_spec has two alternatives, cover_point and cover_cross.
+// This exercises the cover_cross alternative, matching the shape of the g2
+// example (two coverage points crossed under a label).
+TEST(CovergroupParsing, CovergroupWithCrossCoverage) {
+  EXPECT_TRUE(ParseOk(R"(
+    module m;
+      covergroup cg @(posedge clk);
+        cp_a: coverpoint a;
+        cp_b: coverpoint b;
+        axb: cross cp_a, cp_b;
+      endgroup
+    endmodule
+  )"));
+}
+
+// LRM 19.3: block_event_expression is recursively defined so that two block
+// events may be combined with "or"; the coverage sample is then triggered by
+// either event.
+TEST(CovergroupParsing, CovergroupWithOredBlockEvents) {
+  EXPECT_TRUE(ParseOk(R"(
+    module m;
+      covergroup cg @@(begin top.worker or end top.worker);
+        coverpoint x;
+      endgroup
+    endmodule
+  )"));
+}
+
+// LRM 19.3: a block event expression has two keyword forms, "begin" and "end".
+// The "end" form triggers the sample after the named block finishes; this
+// exercises that alternative on its own.
+TEST(CovergroupParsing, CovergroupWithEndBlockEvent) {
+  EXPECT_TRUE(ParseOk(R"(
+    module m;
+      covergroup cg @@(end top.worker);
+        coverpoint x;
+      endgroup
+    endmodule
+  )"));
+}
+
+// LRM 19.3 (negative form of the block event grammar): a block event
+// expression must open with either "begin" or "end"; a bare hierarchical name
+// with no keyword is illegal.
+TEST(CovergroupParsing, CovergroupBlockEventMissingBeginEndRejected) {
+  EXPECT_FALSE(ParseOk(R"(
+    module m;
+      covergroup cg @@(top.worker);
+        coverpoint x;
+      endgroup
+    endmodule
+  )"));
+}
+
+// LRM 19.3 (negative form of the with-function coverage_event): the customized
+// sampling method introduced by "with function" must name the sample method;
+// any other function name is illegal.
+TEST(CovergroupParsing, CovergroupWithFunctionNonSampleRejected) {
+  EXPECT_FALSE(ParseOk(R"(
+    module m;
+      covergroup cg with function collect(int v);
+        coverpoint v;
       endgroup
     endmodule
   )"));
