@@ -197,14 +197,6 @@ TEST(ClassParsing, ParameterizedClassDefaultInstantiation) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
-TEST(ParameterizedClassParsing, ClassWithParams) {
-  auto r = Parse("class C #(type T = int); endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->classes.size(), 1u);
-  EXPECT_EQ(r.cu->classes[0]->params.size(), 1u);
-}
-
 TEST(ParameterizedClassParsing, TypedefSpecialization) {
   EXPECT_TRUE(
       ParseOk("class vector #(int size = 1);\n"

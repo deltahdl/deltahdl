@@ -9,54 +9,12 @@ using namespace delta;
 
 namespace {
 
-TEST(ObjectPropertySim, PropertySetAndGet) {
-  SimFixture f;
-  auto* type = MakeClassType(f, "Packet", {"data"});
-  auto [handle, obj] = MakeObj(f, type);
-
-  obj->SetProperty("data", MakeLogic4VecVal(f.arena, 32, 42));
-  EXPECT_EQ(obj->GetProperty("data", f.arena).ToUint64(), 42u);
-}
-
-TEST(ObjectPropertySim, MultipleProperties) {
-  SimFixture f;
-  auto* type = MakeClassType(f, "Packet", {"header", "payload", "crc"});
-  auto [handle, obj] = MakeObj(f, type);
-
-  obj->SetProperty("header", MakeLogic4VecVal(f.arena, 32, 1));
-  obj->SetProperty("payload", MakeLogic4VecVal(f.arena, 32, 2));
-  obj->SetProperty("crc", MakeLogic4VecVal(f.arena, 32, 3));
-
-  EXPECT_EQ(obj->GetProperty("header", f.arena).ToUint64(), 1u);
-  EXPECT_EQ(obj->GetProperty("payload", f.arena).ToUint64(), 2u);
-  EXPECT_EQ(obj->GetProperty("crc", f.arena).ToUint64(), 3u);
-}
-
 TEST(ObjectPropertySim, UndefinedPropertyReturnsZero) {
   SimFixture f;
   auto* type = MakeClassType(f, "Empty", {});
   auto [handle, obj] = MakeObj(f, type);
 
   EXPECT_EQ(obj->GetProperty("nonexistent", f.arena).ToUint64(), 0u);
-}
-
-TEST(ObjectPropertySim, ParameterAccessAsProperty) {
-  SimFixture f;
-  auto* info = f.arena.Create<ClassTypeInfo>();
-  info->name = "vector";
-  info->properties.push_back({"data", 8, false});
-
-  info->properties.push_back({"width", 32, false});
-  f.ctx.RegisterClassType("vector", info);
-
-  auto* obj = f.arena.Create<ClassObject>();
-  obj->type = info;
-  obj->properties["data"] = MakeLogic4VecVal(f.arena, 8, 0);
-  obj->properties["width"] = MakeLogic4VecVal(f.arena, 32, 7);
-  uint64_t handle = f.ctx.AllocateClassObject(obj);
-  (void)handle;
-
-  EXPECT_EQ(obj->GetProperty("width", f.arena).ToUint64(), 7u);
 }
 
 TEST(ObjectPropertySim, PropertyOverwrite) {
@@ -178,6 +136,105 @@ TEST(ObjectPropertySim, NoRestrictionOnPropertyDataType) {
                       "endmodule\n",
                       "result"),
             5u);
+}
+
+// §8.5: a class property may have any data type. Exercising the non-integral
+// data-type forms end to end - a real property survives an instance-qualified
+// write and read.
+TEST(ObjectPropertySim, RealPropertyValueRoundTrips) {
+  EXPECT_DOUBLE_EQ(RunAndGetReal("class C;\n"
+                                 "  real r;\n"
+                                 "endclass\n"
+                                 "module t;\n"
+                                 "  real out;\n"
+                                 "  initial begin\n"
+                                 "    C c;\n"
+                                 "    c = new;\n"
+                                 "    c.r = 3.5;\n"
+                                 "    out = c.r;\n"
+                                 "  end\n"
+                                 "endmodule\n",
+                                 "out"),
+                   3.5);
+}
+
+// §8.5: a string-typed class property holds and returns its value.
+TEST(ObjectPropertySim, StringPropertyValueRoundTrips) {
+  EXPECT_EQ(RunAndGet("class C;\n"
+                      "  string s;\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int out;\n"
+                      "  initial begin\n"
+                      "    C c;\n"
+                      "    c = new;\n"
+                      "    c.s = \"hi\";\n"
+                      "    out = (c.s == \"hi\") ? 100 : 0;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "out"),
+            100u);
+}
+
+// §8.5: a class property may be an aggregate (packed struct) type; the nested
+// member is reachable through the instance.
+TEST(ObjectPropertySim, StructPropertyValueRoundTrips) {
+  EXPECT_EQ(RunAndGet("typedef struct packed { int x; } pt;\n"
+                      "class C;\n"
+                      "  pt p;\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int out;\n"
+                      "  initial begin\n"
+                      "    C c;\n"
+                      "    c = new;\n"
+                      "    c.p.x = 9;\n"
+                      "    out = c.p.x;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "out"),
+            9u);
+}
+
+// §8.5: a class property may itself be a class handle; the nested object's
+// property is reachable through the outer instance.
+TEST(ObjectPropertySim, ClassHandlePropertyValueRoundTrips) {
+  EXPECT_EQ(RunAndGet("class Inner;\n"
+                      "  int v;\n"
+                      "endclass\n"
+                      "class Outer;\n"
+                      "  Inner in;\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int out;\n"
+                      "  initial begin\n"
+                      "    Outer o;\n"
+                      "    o = new;\n"
+                      "    o.in = new;\n"
+                      "    o.in.v = 7;\n"
+                      "    out = o.in.v;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "out"),
+            7u);
+}
+
+// §8.5: a local value parameter (localparam) of a class can be read by
+// qualifying its name with an instance handle, just like a value parameter.
+TEST(ObjectPropertySim, LocalParameterAccessedViaInstance) {
+  EXPECT_EQ(RunAndGet("class C;\n"
+                      "  localparam int L = 42;\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int out;\n"
+                      "  initial begin\n"
+                      "    C c;\n"
+                      "    c = new;\n"
+                      "    out = c.L;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "out"),
+            42u);
 }
 
 }  // namespace

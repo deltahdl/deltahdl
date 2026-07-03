@@ -15,19 +15,6 @@ TEST(ObjectPropertyElaboration, ClassWithPropertiesElaborates) {
              "endmodule\n"));
 }
 
-TEST(ObjectPropertyElaboration, PropertyAccessElaborates) {
-  EXPECT_TRUE(
-      ElabOk("class Packet;\n"
-             "  int command;\n"
-             "endclass\n"
-             "module m;\n"
-             "  Packet p;\n"
-             "  initial begin\n"
-             "    p.command = 1;\n"
-             "  end\n"
-             "endmodule\n"));
-}
-
 TEST(ObjectPropertyElaboration, VariousPropertyTypes) {
   EXPECT_TRUE(
       ElabOk("class C;\n"
@@ -152,6 +139,20 @@ TEST(ObjectPropertyElaboration, ConstantPartSelectWidthOk) {
              "  logic [3:0] slice;\n"
              "  initial begin\n"
              "    slice = bus[0 +: 4];\n"
+             "  end\n"
+             "endmodule\n"));
+}
+
+// §8.5: accessing a data type through a class handle is illegal, but naming a
+// type through the class scope resolution operator on a specialization is legal
+// typecasting - the accepting counterpart to TypeParamAccessViaHandleIsIllegal.
+TEST(ObjectPropertyElaboration, TypeAccessViaScopeResolutionIsLegal) {
+  EXPECT_TRUE(
+      ElabOk("class vector #(parameter width = 7, type T = int);\n"
+             "endclass\n"
+             "module m;\n"
+             "  initial begin\n"
+             "    $display(vector#(3)::T'(3));\n"
              "  end\n"
              "endmodule\n"));
 }

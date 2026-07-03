@@ -1,5 +1,6 @@
 #include "fixture_simulator.h"
 #include "helpers_class_object.h"
+#include "helpers_scheduler.h"
 #include "parser/ast.h"
 #include "simulator/class_object.h"
 #include "simulator/evaluation.h"
@@ -8,27 +9,6 @@
 using namespace delta;
 
 namespace {
-
-TEST(ClassSim, ParameterizedClassDifferentWidths) {
-  SimFixture f;
-
-  auto* type8 = f.arena.Create<ClassTypeInfo>();
-  type8->name = "Stack_8";
-  type8->properties.push_back({"data", 8, false});
-  f.ctx.RegisterClassType("Stack_8", type8);
-
-  auto* type32 = f.arena.Create<ClassTypeInfo>();
-  type32->name = "Stack_32";
-  type32->properties.push_back({"data", 32, false});
-  f.ctx.RegisterClassType("Stack_32", type32);
-
-  auto* t8 = f.ctx.FindClassType("Stack_8");
-  auto* t32 = f.ctx.FindClassType("Stack_32");
-  ASSERT_NE(t8, nullptr);
-  ASSERT_NE(t32, nullptr);
-  EXPECT_EQ(t8->properties[0].width, 8u);
-  EXPECT_EQ(t32->properties[0].width, 32u);
-}
 
 TEST(ClassSim, ParameterizedClassInstantiation) {
   SimFixture f;
@@ -44,25 +24,6 @@ TEST(ClassSim, ParameterizedClassInstantiation) {
   obj->SetProperty("second", MakeLogic4VecVal(f.arena, 32, 20));
   EXPECT_EQ(obj->GetProperty("first", f.arena).ToUint64(), 10u);
   EXPECT_EQ(obj->GetProperty("second", f.arena).ToUint64(), 20u);
-}
-
-TEST(ClassSim, ParameterizedClassDeclParams) {
-  SimFixture f;
-
-  auto* decl = f.arena.Create<ClassDecl>();
-  decl->name = "C";
-  decl->params.push_back({"p", nullptr});
-
-  auto* type = f.arena.Create<ClassTypeInfo>();
-  type->name = "C";
-  type->decl = decl;
-  f.ctx.RegisterClassType("C", type);
-
-  auto* found = f.ctx.FindClassType("C");
-  ASSERT_NE(found, nullptr);
-  ASSERT_NE(found->decl, nullptr);
-  ASSERT_EQ(found->decl->params.size(), 1u);
-  EXPECT_EQ(found->decl->params[0].first, "p");
 }
 
 TEST(ClassSim, ParameterizedClassStaticMethod) {
@@ -114,49 +75,6 @@ TEST(ClassSim, SpecializationsHaveIndependentStaticMembers) {
   EXPECT_EQ(type_b->static_properties["count"].ToUint64(), 0u);
 }
 
-TEST(ClassSim, MultipleParamsPreserved) {
-  SimFixture f;
-
-  auto* decl = f.arena.Create<ClassDecl>();
-  decl->name = "C";
-  decl->params.push_back({"A", nullptr});
-  decl->params.push_back({"B", nullptr});
-  decl->params.push_back({"C_PARAM", nullptr});
-
-  auto* type = f.arena.Create<ClassTypeInfo>();
-  type->name = "C";
-  type->decl = decl;
-  f.ctx.RegisterClassType("C", type);
-
-  auto* found = f.ctx.FindClassType("C");
-  ASSERT_NE(found, nullptr);
-  ASSERT_NE(found->decl, nullptr);
-  ASSERT_EQ(found->decl->params.size(), 3u);
-  EXPECT_EQ(found->decl->params[0].first, "A");
-  EXPECT_EQ(found->decl->params[1].first, "B");
-  EXPECT_EQ(found->decl->params[2].first, "C_PARAM");
-}
-
-TEST(ClassSim, TypeParamNamesTracked) {
-  SimFixture f;
-
-  auto* decl = f.arena.Create<ClassDecl>();
-  decl->name = "C";
-  decl->params.push_back({"T", nullptr});
-  decl->params.push_back({"N", nullptr});
-  decl->type_param_names.insert("T");
-
-  auto* type = f.arena.Create<ClassTypeInfo>();
-  type->name = "C";
-  type->decl = decl;
-  f.ctx.RegisterClassType("C", type);
-
-  auto* found = f.ctx.FindClassType("C");
-  ASSERT_NE(found, nullptr);
-  EXPECT_TRUE(found->decl->type_param_names.count("T"));
-  EXPECT_FALSE(found->decl->type_param_names.count("N"));
-}
-
 TEST(ClassSim, LoweredDefaultParamValues) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -199,6 +117,59 @@ TEST(ClassSim, LoweredMixedParams) {
   EXPECT_FALSE(info->decl->type_param_names.count("N"));
 }
 
+// §8.25: a specialization is a generic class combined with a specific set of
+// actual parameter values, and instances are declared with the same override
+// rules as modules. Two distinct value-parameter specializations of the same
+// generic class coexist and each object carries its own parameter value, read
+// back here through the full pipeline via instance-qualified access.
+TEST(ClassSim, ValueParameterDistinctPerSpecialization) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "class vector #(parameter width = 7);\n"
+      "  bit [width:0] a;\n"
+      "endclass\n"
+      "module t;\n"
+      "  int w8, w16;\n"
+      "  initial begin\n"
+      "    vector #(8) v8;\n"
+      "    vector #(16) v16;\n"
+      "    v8 = new;\n"
+      "    v16 = new;\n"
+      "    w8 = v8.width;\n"
+      "    w16 = v16.width;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"w8", 8u}, {"w16", 16u}});
+}
+
+// §8.25: all matching specializations of a generic class shall represent the
+// same type. Two variables independently declared with the identical value-
+// parameter specialization hold assignment-compatible handles: assigning one to
+// the other aliases the same object, so a property written through the first is
+// read back through the second. A mismatched type would make the handle
+// assignment illegal.
+TEST(ClassSim, MatchingSpecializationsAreSameType) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "class vector #(parameter width = 7);\n"
+      "  int data;\n"
+      "endclass\n"
+      "module t;\n"
+      "  int r;\n"
+      "  initial begin\n"
+      "    vector #(4) a;\n"
+      "    vector #(4) b;\n"
+      "    a = new;\n"
+      "    a.data = 55;\n"
+      "    b = a;\n"
+      "    r = b.data;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"r", 55u}});
+}
+
 TEST(ClassSim, LoweredParamClassExtendsBase) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -221,6 +192,45 @@ TEST(ClassSim, LoweredParamClassExtendsBase) {
   EXPECT_EQ(info->parent->name, "Base");
   ASSERT_NE(info->decl, nullptr);
   EXPECT_EQ(info->decl->params.size(), 1u);
+}
+
+// §8.25: instances use the same override rules as modules, which include named
+// parameter overrides. A named override supplies the value the instance reads
+// back (the positional form is covered by
+// ValueParameterDistinctPerSpecialization).
+TEST(ClassSim, NamedParameterOverrideApplied) {
+  EXPECT_EQ(RunAndGet("class vector #(parameter width = 7);\n"
+                      "  int data;\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int out;\n"
+                      "  initial begin\n"
+                      "    vector #(.width(2)) v;\n"
+                      "    v = new;\n"
+                      "    out = v.width;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "out"),
+            2u);
+}
+
+// §8.25: a type parameter (here its default, int) determines the type of a
+// class property, which is then usable at run time.
+TEST(ClassSim, TypeParameterDefaultYieldsUsableProperty) {
+  EXPECT_EQ(RunAndGet("class C #(type T = int);\n"
+                      "  T data;\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int out;\n"
+                      "  initial begin\n"
+                      "    C c;\n"
+                      "    c = new;\n"
+                      "    c.data = 42;\n"
+                      "    out = c.data;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "out"),
+            42u);
 }
 
 }  // namespace

@@ -9,15 +9,6 @@
 
 using namespace delta;
 
-static Expr* MkBin(Arena& a, TokenKind op, Expr* l, Expr* r) {
-  auto* e = a.Create<Expr>();
-  e->kind = ExprKind::kBinary;
-  e->op = op;
-  e->lhs = l;
-  e->rhs = r;
-  return e;
-}
-
 namespace {
 
 TEST(ObjectMethodSim, SimpleMethodCall) {
@@ -37,26 +28,6 @@ TEST(ObjectMethodSim, SimpleMethodCall) {
   auto* resolved = obj->ResolveMethod("get_count");
   EXPECT_NE(resolved, nullptr);
   EXPECT_EQ(resolved->name, "get_count");
-}
-
-TEST(ObjectMethodSim, MethodWithArgs) {
-  SimFixture f;
-  auto* type = MakeClassType(f, "Adder", {"total"});
-
-  auto* method = f.arena.Create<ModuleItem>();
-  method->kind = ModuleItemKind::kFunctionDecl;
-  method->name = "add";
-  method->return_type.kind = DataTypeKind::kVoid;
-  method->func_args = {
-      {Direction::kInput, false, false, false, {}, "v", nullptr, {}}};
-  auto* rhs = MkBin(f.arena, TokenKind::kPlus, MkId(f.arena, "total"),
-                    MkId(f.arena, "v"));
-  method->func_body_stmts.push_back(MakeAssign(f.arena, "total", rhs));
-  type->methods["add"] = method;
-
-  auto [handle, obj] = MakeObj(f, type);
-  auto* resolved = obj->ResolveMethod("add");
-  EXPECT_NE(resolved, nullptr);
 }
 
 TEST(ObjectMethodSim, MethodNotFound) {
@@ -121,6 +92,36 @@ TEST(ObjectMethodSim, MethodCallModifiesProperty) {
   LowerRunAndCheck(f, design, {{"result", 17u}});
 }
 
+// §8.6: the lifetime of a class method shall be automatic. A method's local
+// variable therefore gets fresh storage on every call and does not carry a
+// value over from one invocation to the next. Each call to step() reads its
+// local as its default and returns 1; a static lifetime would instead
+// accumulate (1, 2, 3), so all-ones discriminates the required automatic
+// lifetime being applied at run time.
+TEST(ObjectMethodSim, ClassMethodLifetimeIsAutomatic) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "class C;\n"
+      "  function int step();\n"
+      "    int x;\n"
+      "    x = x + 1;\n"
+      "    return x;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  int a, b, c;\n"
+      "  initial begin\n"
+      "    C obj;\n"
+      "    obj = new;\n"
+      "    a = obj.step();\n"
+      "    b = obj.step();\n"
+      "    c = obj.step();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"a", 1u}, {"b", 1u}, {"c", 1u}});
+}
+
 TEST(ObjectMethodSim, MultipleMethodsSameObject) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -149,6 +150,38 @@ TEST(ObjectMethodSim, MultipleMethodsSameObject) {
       "endmodule\n",
       f);
   LowerRunAndCheck(f, design, {{"rx", 3u}, {"ry", 4u}});
+}
+
+// §8.6: the automatic-lifetime rule applies to class tasks as well as
+// functions. A task local variable is re-created per call and does not persist,
+// so repeated calls each observe the fresh default (a static lifetime would
+// instead accumulate 1, 2, 3).
+TEST(ObjectMethodSim, TaskMethodLifetimeIsAutomatic) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "class C;\n"
+      "  int acc;\n"
+      "  task step();\n"
+      "    int x;\n"
+      "    x = x + 1;\n"
+      "    acc = x;\n"
+      "  endtask\n"
+      "endclass\n"
+      "module t;\n"
+      "  int a, b, c;\n"
+      "  initial begin\n"
+      "    C o;\n"
+      "    o = new;\n"
+      "    o.step();\n"
+      "    a = o.acc;\n"
+      "    o.step();\n"
+      "    b = o.acc;\n"
+      "    o.step();\n"
+      "    c = o.acc;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"a", 1u}, {"b", 1u}, {"c", 1u}});
 }
 
 }  // namespace

@@ -34,16 +34,6 @@ TEST(ParameterizedClassElaboration, MultipleParamsOk) {
       "endmodule\n"));
 }
 
-TEST(ParameterizedClassElaboration, ExplicitSpecializationOk) {
-  EXPECT_TRUE(
-      ElabOk("class vector #(int size = 1);\n"
-             "  bit [size-1:0] a;\n"
-             "endclass\n"
-             "module m;\n"
-             "  vector #(10) vten;\n"
-             "endmodule\n"));
-}
-
 TEST(ParameterizedClassElaboration, ParamClassExtendsBaseOk) {
   EXPECT_TRUE(
       ElabOk("class Base;\n"
@@ -234,6 +224,20 @@ TEST(ParameterizedClassElaboration, ExplicitOverrideForNoDefaultClassOk) {
              "endclass\n"
              "module m;\n"
              "  D #(4) obj;\n"
+             "endmodule\n"));
+}
+
+// §8.25: when only some parameters have defaults, a specialization must supply
+// values for the ones without defaults. Overriding the defaultless parameter
+// while letting the rest default is legal (contrast
+// NoDefaultSpecializationUnadornedIsError, which omits the required override).
+TEST(ParameterizedClassElaboration, MixedDefaultPartialOverrideOk) {
+  EXPECT_TRUE(
+      ElabOk("class C #(int a, int b = 2);\n"
+             "  int data;\n"
+             "endclass\n"
+             "module m;\n"
+             "  C #(5) c;\n"
              "endmodule\n"));
 }
 

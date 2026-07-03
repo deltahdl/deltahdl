@@ -21,34 +21,6 @@ TEST(InheritanceParsing, ClassExtends) {
   EXPECT_EQ(cls->base_class, "parent");
 }
 
-TEST(InheritanceParsing, ClassExtendsBase) {
-  auto r = Parse(
-      "class Base;\n"
-      "  int x;\n"
-      "endclass\n"
-      "class Derived extends Base;\n"
-      "  int y;\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->classes.size(), 2u);
-  EXPECT_EQ(r.cu->classes[0]->name, "Base");
-  EXPECT_TRUE(r.cu->classes[0]->base_class.empty());
-}
-
-TEST(InheritanceParsing, ClassExtendsDerived) {
-  auto r = Parse(
-      "class Base;\n"
-      "  int x;\n"
-      "endclass\n"
-      "class Derived extends Base;\n"
-      "  int y;\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->classes.size(), 2u);
-  EXPECT_EQ(r.cu->classes[1]->name, "Derived");
-  EXPECT_EQ(r.cu->classes[1]->base_class, "Base");
-}
-
 TEST(InheritanceParsing, SubclassInheritsAndAddsMembers) {
   auto r = Parse(
       "class Packet;\n"
@@ -108,22 +80,6 @@ TEST(InheritanceParsing, FinalClassWithExtends) {
   ASSERT_EQ(r.cu->classes.size(), 2u);
   EXPECT_TRUE(r.cu->classes[1]->is_final);
   EXPECT_EQ(r.cu->classes[1]->base_class, "Base");
-}
-
-TEST(InheritanceParsing, SubclassAdditionalMembers) {
-  auto r = Parse(
-      "class Base;\n"
-      "  int x;\n"
-      "endclass\n"
-      "class Derived extends Base;\n"
-      "  int y;\n"
-      "  int z;\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* derived = r.cu->classes[1];
-  EXPECT_EQ(derived->base_class, "Base");
-  EXPECT_GE(derived->members.size(), 2u);
 }
 
 TEST(InheritanceParsing, NonFinalDerivedClassIsFinalFalse) {

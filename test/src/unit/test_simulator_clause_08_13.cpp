@@ -2,6 +2,7 @@
 #include "builders_systask.h"
 #include "fixture_simulator.h"
 #include "helpers_class_object.h"
+#include "helpers_scheduler.h"
 #include "parser/ast.h"
 #include "simulator/class_object.h"
 #include "simulator/evaluation.h"
@@ -18,26 +19,6 @@ TEST(InheritanceSimulation, InheritanceParentLink) {
 
   EXPECT_EQ(derived->parent, base);
   EXPECT_EQ(derived->parent->name, "Base");
-}
-
-TEST(InheritanceSimulation, InheritedMethodResolution) {
-  SimFixture f;
-  auto* base = MakeClassType(f, "Base", {"x"});
-
-  auto* method = f.arena.Create<ModuleItem>();
-  method->kind = ModuleItemKind::kFunctionDecl;
-  method->name = "get_x";
-  method->func_body_stmts.push_back(MakeReturn(f.arena, MkId(f.arena, "x")));
-  base->methods["get_x"] = method;
-
-  auto* derived = MakeClassType(f, "Derived", {"y"});
-  derived->parent = base;
-
-  auto [handle, obj] = MakeObj(f, derived);
-
-  auto* resolved = obj->ResolveMethod("get_x");
-  EXPECT_NE(resolved, nullptr);
-  EXPECT_EQ(resolved->name, "get_x");
 }
 
 TEST(InheritanceSimulation, InheritanceChainPropertyAccess) {
@@ -105,26 +86,6 @@ TEST(InheritanceSimulation, IsAMultiLevel) {
   EXPECT_FALSE(a->IsA(c));
 }
 
-TEST(InheritanceSimulation, DerivedMethodOverridesBase) {
-  SimFixture f;
-  auto* base = MakeClassType(f, "Base", {});
-  auto* base_method = f.arena.Create<ModuleItem>();
-  base_method->kind = ModuleItemKind::kFunctionDecl;
-  base_method->name = "get";
-  base->methods["get"] = base_method;
-
-  auto* derived = MakeClassType(f, "Derived", {});
-  derived->parent = base;
-  auto* derived_method = f.arena.Create<ModuleItem>();
-  derived_method->kind = ModuleItemKind::kFunctionDecl;
-  derived_method->name = "get";
-  derived->methods["get"] = derived_method;
-
-  auto [handle, obj] = MakeObj(f, derived);
-  auto* resolved = obj->ResolveMethod("get");
-  EXPECT_EQ(resolved, derived_method);
-}
-
 TEST(InheritanceSimulation, IsAUnrelatedTypes) {
   SimFixture f;
   auto* a = MakeClassType(f, "A", {});
@@ -132,6 +93,66 @@ TEST(InheritanceSimulation, IsAUnrelatedTypes) {
 
   EXPECT_FALSE(a->IsA(b));
   EXPECT_FALSE(b->IsA(a));
+}
+
+// §8.13: once a subclass extends a base class, all of the base class's
+// properties and methods become part of the subclass. Built from real `extends`
+// source and driven through the full pipeline, an object of the derived class
+// both reads a property declared only in the base and calls a method declared
+// only in the base.
+TEST(InheritanceSimulation, DerivedInheritsBasePropertyAndMethod) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "class Base;\n"
+      "  int bval;\n"
+      "  function int base_get();\n"
+      "    return 7;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "class Derived extends Base;\n"
+      "  int dval;\n"
+      "endclass\n"
+      "module t;\n"
+      "  int p, m;\n"
+      "  initial begin\n"
+      "    Derived d;\n"
+      "    d = new;\n"
+      "    d.bval = 42;\n"
+      "    p = d.bval;\n"
+      "    m = d.base_get();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"p", 42u}, {"m", 7u}});
+}
+
+// §8.13: the methods of the base class can be overridden to change their
+// definitions. A call on a derived-class handle to a name the derived class
+// redefines resolves to the derived definition (1 from the base would show no
+// override took effect).
+TEST(InheritanceSimulation, DerivedMethodOverridesBaseFullPipeline) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "class Base;\n"
+      "  function int who();\n"
+      "    return 1;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "class Derived extends Base;\n"
+      "  function int who();\n"
+      "    return 2;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  int r;\n"
+      "  initial begin\n"
+      "    Derived d;\n"
+      "    d = new;\n"
+      "    r = d.who();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"r", 2u}});
 }
 
 TEST(InheritanceSimulation, MethodNotFoundReturnsNull) {
@@ -142,6 +163,63 @@ TEST(InheritanceSimulation, MethodNotFoundReturnsNull) {
 
   auto [handle, obj] = MakeObj(f, derived);
   EXPECT_EQ(obj->ResolveMethod("nonexistent"), nullptr);
+}
+
+// §8.13: inheritance carries over methods of every kind, not just functions. A
+// task declared only in the base is callable on a derived object and operates
+// on the inherited property.
+TEST(InheritanceSimulation, DerivedInheritsBaseTask) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "class Base;\n"
+      "  int v;\n"
+      "  task setit();\n"
+      "    v = 33;\n"
+      "  endtask\n"
+      "endclass\n"
+      "class Derived extends Base;\n"
+      "endclass\n"
+      "module t;\n"
+      "  int out;\n"
+      "  initial begin\n"
+      "    Derived d;\n"
+      "    d = new;\n"
+      "    d.setit();\n"
+      "    out = d.v;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"out", 33u}});
+}
+
+// §8.13: a base task can also be overridden by the derived class; a call on a
+// derived handle runs the derived definition (1 would mean the base version
+// ran).
+TEST(InheritanceSimulation, DerivedOverridesBaseTask) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "class Base;\n"
+      "  int v;\n"
+      "  task setit();\n"
+      "    v = 1;\n"
+      "  endtask\n"
+      "endclass\n"
+      "class Derived extends Base;\n"
+      "  task setit();\n"
+      "    v = 2;\n"
+      "  endtask\n"
+      "endclass\n"
+      "module t;\n"
+      "  int out;\n"
+      "  initial begin\n"
+      "    Derived d;\n"
+      "    d = new;\n"
+      "    d.setit();\n"
+      "    out = d.v;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"out", 2u}});
 }
 
 }  // namespace
