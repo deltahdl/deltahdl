@@ -207,6 +207,18 @@ void Elaborator::ValidateBackgroundFuncCallContext(const ModuleDecl* decl) {
 
 static bool IsValidOutputArg(const Expr* e) {
   if (!e) return false;
+  // §13.5: an output/inout actual is restricted to an expression that is valid
+  // on the left-hand side of a procedural assignment (§10.4). A concatenation
+  // is such an lvalue only when every element is itself a valid lvalue, so a
+  // concatenation containing a non-assignable element (e.g. a literal) is
+  // rejected just like a bare literal actual would be.
+  if (e->kind == ExprKind::kConcatenation) {
+    if (e->elements.empty()) return false;
+    for (const auto* el : e->elements) {
+      if (!IsValidOutputArg(el)) return false;
+    }
+    return true;
+  }
   return e->kind == ExprKind::kIdentifier || e->kind == ExprKind::kSelect ||
          e->kind == ExprKind::kMemberAccess;
 }

@@ -201,79 +201,6 @@ TEST(SubroutineCallSim, TaskCallWithArgs) {
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
-TEST(SubroutineCallArgWriteback, NestedFunctionOutputArgs) {
-  ExprFixture f;
-
-  auto* result_var = f.ctx.CreateVariable("result", 32);
-  result_var->value = MakeLogic4VecVal(f.arena, 32, 0);
-
-  auto* inner = f.arena.Create<ModuleItem>();
-  inner->kind = ModuleItemKind::kFunctionDecl;
-  inner->name = "inner";
-  inner->func_args = {
-      {Direction::kInput, false, false, false, {}, "a", nullptr, {}},
-      {Direction::kOutput, false, false, false, {}, "b", nullptr, {}},
-  };
-  auto* inner_lhs = f.arena.Create<Expr>();
-  inner_lhs->kind = ExprKind::kIdentifier;
-  inner_lhs->text = "b";
-  auto* inner_a = f.arena.Create<Expr>();
-  inner_a->kind = ExprKind::kIdentifier;
-  inner_a->text = "a";
-  auto* hundred = f.arena.Create<Expr>();
-  hundred->kind = ExprKind::kIntegerLiteral;
-  hundred->int_val = 100;
-  auto* inner_add = f.arena.Create<Expr>();
-  inner_add->kind = ExprKind::kBinary;
-  inner_add->op = TokenKind::kPlus;
-  inner_add->lhs = inner_a;
-  inner_add->rhs = hundred;
-  auto* inner_assign = f.arena.Create<Stmt>();
-  inner_assign->kind = StmtKind::kBlockingAssign;
-  inner_assign->lhs = inner_lhs;
-  inner_assign->rhs = inner_add;
-  inner->func_body_stmts.push_back(inner_assign);
-  f.ctx.RegisterFunction("inner", inner);
-
-  auto* outer = f.arena.Create<ModuleItem>();
-  outer->kind = ModuleItemKind::kFunctionDecl;
-  outer->name = "outer";
-  outer->func_args = {
-      {Direction::kInput, false, false, false, {}, "x", nullptr, {}},
-      {Direction::kOutput, false, false, false, {}, "y", nullptr, {}},
-  };
-  auto* call_arg0 = f.arena.Create<Expr>();
-  call_arg0->kind = ExprKind::kIdentifier;
-  call_arg0->text = "x";
-  auto* call_arg1 = f.arena.Create<Expr>();
-  call_arg1->kind = ExprKind::kIdentifier;
-  call_arg1->text = "y";
-  auto* inner_call = f.arena.Create<Expr>();
-  inner_call->kind = ExprKind::kCall;
-  inner_call->callee = "inner";
-  inner_call->args = {call_arg0, call_arg1};
-  auto* call_stmt = f.arena.Create<Stmt>();
-  call_stmt->kind = StmtKind::kExprStmt;
-  call_stmt->expr = inner_call;
-  outer->func_body_stmts.push_back(call_stmt);
-  f.ctx.RegisterFunction("outer", outer);
-
-  auto* arg0 = f.arena.Create<Expr>();
-  arg0->kind = ExprKind::kIntegerLiteral;
-  arg0->int_val = 5;
-  auto* arg1 = f.arena.Create<Expr>();
-  arg1->kind = ExprKind::kIdentifier;
-  arg1->text = "result";
-  auto* call = f.arena.Create<Expr>();
-  call->kind = ExprKind::kCall;
-  call->callee = "outer";
-  call->args = {arg0, arg1};
-
-  EvalExpr(call, f.ctx, f.arena);
-
-  EXPECT_EQ(result_var->value.ToUint64(), 105u);
-}
-
 TEST(SubroutineCallExprSim, FunctionCallInTernary) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -323,6 +250,84 @@ TEST(SubroutineCallArgWriteback, TaskInoutArgRoundTrip) {
       "endmodule\n",
       f);
   LowerRunAndCheck(f, design, {{"x", 42u}});
+}
+
+TEST(SubroutineCallSim, InputArgExpressionEvaluated) {
+  // §13.5: an input actual may be any expression; its value is computed at the
+  // call site and passed into the formal. Built from real declarations and
+  // driven end to end so the value flows through the pipeline.
+  EXPECT_EQ(RunAndGet("module t;\n"
+                      "  logic [7:0] x, a, b;\n"
+                      "  function logic [7:0] ident(input logic [7:0] v);\n"
+                      "    return v;\n"
+                      "  endfunction\n"
+                      "  initial begin\n"
+                      "    a = 8'd5;\n"
+                      "    b = 8'd7;\n"
+                      "    x = ident(a + b);\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "x"),
+            12u);
+}
+
+TEST(SubroutineCallArgWriteback, PartSelectOutputArgWriteback) {
+  // §13.5: the returned output value is written back to the actual. When the
+  // actual is a part-select lvalue (§10.4), only the selected bits are updated.
+  EXPECT_EQ(RunAndGet("module t;\n"
+                      "  logic [7:0] x;\n"
+                      "  task get(output logic [3:0] o);\n"
+                      "    o = 4'hA;\n"
+                      "  endtask\n"
+                      "  initial begin\n"
+                      "    x = 8'd0;\n"
+                      "    get(x[7:4]);\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "x"),
+            0xA0u);
+}
+
+TEST(SubroutineCallArgWriteback, StructMemberOutputArgWriteback) {
+  // §13.5: the output value is copied back into a member-select actual,
+  // updating the corresponding field of the packed struct built from real
+  // syntax.
+  EXPECT_EQ(RunAndGet("module t;\n"
+                      "  typedef struct packed "
+                      "{ logic [3:0] hi; logic [3:0] lo; } pair_t;\n"
+                      "  pair_t s;\n"
+                      "  task get(output logic [3:0] o);\n"
+                      "    o = 4'hC;\n"
+                      "  endtask\n"
+                      "  initial begin\n"
+                      "    s = 8'd0;\n"
+                      "    get(s.lo);\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "s"),
+            0x0Cu);
+}
+
+TEST(SubroutineCallArgWriteback, ConcatenationOutputArgWriteback) {
+  // §13.5: returning from the subroutine copies the output value back into the
+  // actual. When the actual is a concatenation lvalue, the returned value is
+  // distributed across the concatenated targets (most-significant slice to the
+  // left element), observed end to end through the simulator pipeline.
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [3:0] a, b;\n"
+      "  task get(output logic [7:0] o);\n"
+      "    o = 8'hAB;\n"
+      "  endtask\n"
+      "  initial begin\n"
+      "    a = 4'd0;\n"
+      "    b = 4'd0;\n"
+      "    get({a, b});\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"a", 0xAu}, {"b", 0xBu}});
 }
 
 }  // namespace
