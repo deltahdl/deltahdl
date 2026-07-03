@@ -61,6 +61,13 @@ bool IsSingularType(const DataType& dtype);
 
 bool IsAggregateType(const DataType& dtype);
 
+// §6.4: overloads that resolve a named type through the typedef table before
+// classifying it, so an unpacked structure/union reached via a typedef name is
+// still recognized as aggregate rather than mistaken for a singular named type.
+bool IsSingularType(const DataType& dtype, const TypedefMap& typedefs);
+
+bool IsAggregateType(const DataType& dtype, const TypedefMap& typedefs);
+
 bool IsIntegralType(DataTypeKind kind);
 
 bool IsSimpleBitVectorType(DataTypeKind kind);

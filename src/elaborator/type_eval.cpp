@@ -405,6 +405,16 @@ bool IsAggregateType(const DataType& dtype) {
 
 bool IsSingularType(const DataType& dtype) { return !IsAggregateType(dtype); }
 
+bool IsAggregateType(const DataType& dtype, const TypedefMap& typedefs) {
+  const auto* resolved = ResolveNamed(dtype, typedefs);
+  return resolved ? IsAggregateType(*resolved, typedefs)
+                  : IsAggregateType(dtype);
+}
+
+bool IsSingularType(const DataType& dtype, const TypedefMap& typedefs) {
+  return !IsAggregateType(dtype, typedefs);
+}
+
 bool IsIntegralType(DataTypeKind kind) {
   switch (kind) {
     case DataTypeKind::kBit:

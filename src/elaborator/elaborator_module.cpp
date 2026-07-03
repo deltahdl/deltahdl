@@ -714,6 +714,7 @@ static void CheckDuplicatePortNames(
 // input ports only, ANSI-style declarations only, and singular non-interconnect
 // types only.
 static void ValidatePortDefaultValue(const PortDecl& port, bool is_non_ansi,
+                                     const TypedefMap& typedefs,
                                      DiagEngine& diag) {
   if (port.direction != Direction::kInput) {
     diag.Error(port.loc,
@@ -734,7 +735,8 @@ static void ValidatePortDefaultValue(const PortDecl& port, bool is_non_ansi,
     diag.Error(port.loc, std::format("default value on interconnect port '{}'",
                                      port.name));
   }
-  if (!port.unpacked_dims.empty() || !IsSingularType(port.data_type)) {
+  if (!port.unpacked_dims.empty() ||
+      !IsSingularType(port.data_type, typedefs)) {
     diag.Error(port.loc, std::format("default value on non-singular port '{}'",
                                      port.name));
   }
@@ -870,7 +872,8 @@ static RtlirPort ElaborateOnePort(const ModuleDecl* decl, const PortDecl& port,
   TrackNonAnsiPortType(decl, port, ctx);
 
   if (port.default_value) {
-    ValidatePortDefaultValue(port, decl->is_non_ansi_ports, ctx.diag);
+    ValidatePortDefaultValue(port, decl->is_non_ansi_ports, ctx.typedefs,
+                             ctx.diag);
   }
 
   bool port_is_var = !port.data_type.is_net && !port.data_type.is_interconnect;
