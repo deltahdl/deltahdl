@@ -692,6 +692,18 @@ bool Parser::ScanConstraintBodyToken(ClassMember* member, int& depth,
   if (kind == TokenKind::kKwDist) {
     Consume();
     CheckDistSet();
+    // 18.5: a dist expression forms a complete expression_or_dist and may not
+    // appear within another expression. Once the dist_list has been consumed,
+    // the only token that may legally follow is the ';' terminating the
+    // constraint_expression; an operator, ')', or any other continuation means
+    // the dist was used as an operand of a surrounding expression. A bare '}'
+    // (a missing terminator, or the constraint block's own close) is left to
+    // the ordinary terminator handling so this rule does not fire on it.
+    if (!AtEnd() && !Check(TokenKind::kSemicolon) &&
+        !Check(TokenKind::kRBrace)) {
+      diag_.Error(CurrentLoc(),
+                  "a dist expression may not appear within another expression");
+    }
     return false;
   }
   // 18.5.13.1/structural: 'soft' opens a soft constraint and a brace adjusts
