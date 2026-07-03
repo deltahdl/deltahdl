@@ -150,6 +150,25 @@ TEST(ProgramConstruct, ReferencingProgramSignalFromOutsideIsError) {
   EXPECT_TRUE(f.has_errors);
 }
 
+// §24.3: nets declared in a program are program signals, exactly as program
+// variables are, so a hierarchical reference to a program net from outside the
+// program is an error too. The sibling test above uses a program variable; this
+// covers the net input form, read through a continuous assignment in the
+// enclosing module.
+TEST(ProgramConstruct, ReferencingProgramNetFromOutsideIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  wire w;\n"
+      "  program p;\n"
+      "    wire pnet;\n"
+      "  endprogram\n"
+      "  assign w = p.pnet;\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_TRUE(f.has_errors);
+}
+
 TEST(ProgramConstruct, ImplicitlyInstantiatedNestedProgramReusesDeclName) {
   ProgramElabFixture f;
   auto* design = ElaborateSource(
@@ -162,14 +181,18 @@ TEST(ProgramConstruct, ImplicitlyInstantiatedNestedProgramReusesDeclName) {
   ASSERT_NE(design, nullptr);
   ASSERT_FALSE(design->top_modules.empty());
   const auto* top = design->top_modules[0];
-  bool found = false;
+  // §24.3: a portless nested program that is not explicitly instantiated is
+  // implicitly instantiated exactly once, and the implicit instance reuses the
+  // declaration name. Counting the matching children observes the "once" part
+  // of the rule, not just that some instance exists.
+  int instances = 0;
   for (const auto& child : top->children) {
     if (child.module_name == "p") {
       EXPECT_EQ(child.inst_name, child.module_name);
-      found = true;
+      ++instances;
     }
   }
-  EXPECT_TRUE(found);
+  EXPECT_EQ(instances, 1);
 }
 
 TEST(ProgramConstruct, HierRefBetweenProgramsIsLegal) {

@@ -60,17 +60,25 @@ TEST(ProgramConstructSim, NoImplicitFinishWithoutProgramInitial) {
   EXPECT_FALSE(f.ctx.StopRequested());
 }
 
-TEST(ProgramConstructSim, ImplicitFinishWaitsForAllProgramInitials) {
+// §24.3: the implicit $finish fires "immediately after all the threads ...
+// within all programs have ended" -- not when the first one ends. Two program
+// blocks whose initials complete at different times (t=20 and t=60) must both
+// run to completion before the run stops. If the stop fired when the earlier
+// initial (p1) ended at t=20, p2's #60 delay would be cut off and b would keep
+// its reset value; observing b==2 shows the run waited for the latest-ending
+// program initial across both blocks.
+TEST(ProgramConstructSim,
+     ImplicitFinishWaitsForLatestProgramInitialAcrossBlocks) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module top;\n"
       "  logic [7:0] a;\n"
       "  logic [7:0] b;\n"
       "  program p1;\n"
-      "    initial a = 8'd1;\n"
+      "    initial begin #20 a = 8'd1; end\n"
       "  endprogram\n"
       "  program p2;\n"
-      "    initial b = 8'd2;\n"
+      "    initial begin #60 b = 8'd2; end\n"
       "  endprogram\n"
       "endmodule\n",
       f);

@@ -142,4 +142,27 @@ TEST(SimControlSim, StopLevelZeroStillRequestsStop) {
   EXPECT_TRUE(f.ctx.StopRequested());
 }
 
+// §20.2: the diagnostic-level argument is an expression, not only a literal. A
+// localparam is a constant expression that resolves during elaboration and
+// takes a different path from a literal operand, so this drives the level from
+// a localparam end to end -- real source, elaboration, and the run -- rather
+// than hand-building the argument node. A value of 2 selects the level-2
+// diagnostic, so the memory/CPU statistics line appears and the run halts.
+TEST(SimControlSim, FinishLevelFromLocalparamSelectsStatistics) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  localparam int LVL = 2;\n"
+      "  initial $finish(LVL);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  std::ostringstream captured;
+  std::streambuf* old_buf = std::cout.rdbuf(captured.rdbuf());
+  LowerAndRun(design, f);
+  std::cout.rdbuf(old_buf);
+  EXPECT_TRUE(f.ctx.StopRequested());
+  EXPECT_NE(captured.str().find("statistics"), std::string::npos);
+}
+
 }  // namespace
