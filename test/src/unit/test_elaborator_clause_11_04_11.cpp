@@ -333,4 +333,74 @@ TEST(ConditionalElaboration, TernaryWithOneNullBranchElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §11.4.11: the conditional operator is usable inside a constant expression,
+// where its branch selection is resolved by the elaborator's constant-eval
+// path (a different code path from the runtime evaluator). The condition here
+// is a real parameter and the whole expression initializes a localparam, so the
+// constant-expression path is reached the way a design reaches it — not by
+// stubbing a scope map. A true parameter selects the first branch.
+TEST(ConstEval, ParameterConditionSelectsFirstBranchInConstExpr) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  parameter SEL = 1;\n"
+      "  localparam int R = SEL ? 7 : 9;\n"
+      "  int result;\n"
+      "  initial result = R;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 7u);
+}
+
+// §11.4.11 constant-expression path, false parameter condition selects second.
+TEST(ConstEval, ParameterConditionSelectsSecondBranchInConstExpr) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  parameter SEL = 0;\n"
+      "  localparam int R = SEL ? 7 : 9;\n"
+      "  int result;\n"
+      "  initial result = R;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 9u);
+}
+
+// §11.4.11 constant-expression path with the branch operands themselves being
+// parameters: the selected operand's symbol is resolved by constant-eval.
+TEST(ConstEval, ParameterOperandsInConstantTernary) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  parameter A = 5;\n"
+      "  parameter B = 6;\n"
+      "  localparam int R = 1 ? A : B;\n"
+      "  int result;\n"
+      "  initial result = R;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 5u);
+}
+
 }  // namespace

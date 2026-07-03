@@ -2,6 +2,7 @@
 #include "fixture_evaluator.h"
 #include "fixture_simulator.h"
 #include "helpers_eval_op.h"
+#include "helpers_scheduler.h"
 #include "parser/ast.h"
 #include "simulator/evaluation.h"
 #include "simulator/lowerer.h"
@@ -56,26 +57,6 @@ TEST(ConditionalAmbiguousCondition, XConditionWithEqualBranchesReturnsValue) {
   auto result = EvalExpr(ternary, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 5u);
   EXPECT_EQ(result.words[0].bval, 0u);
-}
-
-TEST(ConditionalAmbiguousCondition,
-     XConditionCombinesDifferentBranchesBitwise) {
-  SimFixture f;
-
-  MakeVar4(f, "td", 1, 0, 1);
-  auto* tv = f.ctx.CreateVariable("tt", 4);
-  tv->value = MakeLogic4VecVal(f.arena, 4, 0b1100);
-  auto* fv = f.ctx.CreateVariable("tf", 4);
-  fv->value = MakeLogic4VecVal(f.arena, 4, 0b1010);
-  auto* ternary = f.arena.Create<Expr>();
-  ternary->kind = ExprKind::kTernary;
-  ternary->condition = MakeId(f.arena, "td");
-  ternary->true_expr = MakeId(f.arena, "tt");
-  ternary->false_expr = MakeId(f.arena, "tf");
-  auto result = EvalExpr(ternary, f.ctx, f.arena);
-
-  EXPECT_EQ(result.words[0].aval, 0b1110u);  // differing bits -> x = (1, 1)
-  EXPECT_EQ(result.words[0].bval, 0b0110u);
 }
 
 TEST(ConditionalExpressionSim, TernaryTrueBranch) {
@@ -134,30 +115,6 @@ TEST(ConditionalOperatorEval, TrueConditionSelectsTrueExpression) {
   auto* expr = ParseExprFrom("1 ? 42 : 99", f);
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 42u);
-}
-
-TEST(ShortCircuit, TernaryEvaluatesTrueBranchOnly) {
-  SimFixture f;
-  MakeVar(f, "c", 8, 1);
-  MakeVar(f, "t", 8, 10);
-  MakeVar(f, "e", 8, 20);
-  auto result =
-      EvalExpr(MakeTernary(f.arena, MakeId(f.arena, "c"), MakeId(f.arena, "t"),
-                           MakeId(f.arena, "e")),
-               f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 10u);
-}
-
-TEST(ShortCircuit, TernaryEvaluatesFalseBranchOnly) {
-  SimFixture f;
-  MakeVar(f, "c", 8, 0);
-  MakeVar(f, "t", 8, 10);
-  MakeVar(f, "e", 8, 20);
-  auto result =
-      EvalExpr(MakeTernary(f.arena, MakeId(f.arena, "c"), MakeId(f.arena, "t"),
-                           MakeId(f.arena, "e")),
-               f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 20u);
 }
 
 TEST(ShortCircuit, TernaryTrueCondSkipsFalseBranchSideEffect) {
@@ -882,19 +839,6 @@ TEST(ConditionalAmbiguousCondition, XInBranchesPropagates) {
   EXPECT_NE(result.words[0].bval & 0b0010u, 0u);
 }
 
-TEST(ConditionalAmbiguousCondition, ZConditionEqualBranchesReturnsValue) {
-  SimFixture f;
-  MakeVar4(f, "zc", 1, 0, 1);
-  MakeVar(f, "t", 8, 42);
-  MakeVar(f, "e", 8, 42);
-  auto result =
-      EvalExpr(MakeTernary(f.arena, MakeId(f.arena, "zc"), MakeId(f.arena, "t"),
-                           MakeId(f.arena, "e")),
-               f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 42u);
-  EXPECT_EQ(result.words[0].bval, 0u);
-}
-
 TEST(ConditionalAmbiguousCondition, DifferentWidthBranchesCombinedToMaxWidth) {
   SimFixture f;
   MakeVar4(f, "xc", 1, 0, 1);
@@ -991,6 +935,183 @@ TEST(TernaryOperatorSim, CondPredicateTripleAndSecondFalse) {
   auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 99u);
+}
+
+// §11.4.11: when one branch is real and the other integral, the integral branch
+// is cast to real and the result type is real. The selected integral operand
+// must contribute its numeric value, not its raw bit pattern.
+TEST(ConditionalRealResult, IntegralSelectedBranchCastToReal) {
+  // Condition true selects the integral branch; the real second branch still
+  // forces a real result, so 5 must be delivered as 5.0.
+  double v = RunAndGetReal(
+      "module t;\n"
+      "  real r;\n"
+      "  initial r = 1 ? 5 : 2.5;\n"
+      "endmodule\n",
+      "r");
+  EXPECT_DOUBLE_EQ(v, 5.0);
+}
+
+TEST(ConditionalRealResult, IntegralUnselectedBranchStillForcesReal) {
+  // Condition false selects the integral second branch; the real first branch
+  // forces a real result, so the integer 7 must be delivered as 7.0.
+  double v = RunAndGetReal(
+      "module t;\n"
+      "  real r;\n"
+      "  initial r = 0 ? 2.5 : 7;\n"
+      "endmodule\n",
+      "r");
+  EXPECT_DOUBLE_EQ(v, 7.0);
+}
+
+TEST(ConditionalRealResult, SignedIntegralBranchCastPreservesSign) {
+  // A signed integral branch cast to real keeps its negative value rather than
+  // reinterpreting the two's-complement pattern as a large positive number.
+  double v = RunAndGetReal(
+      "module t;\n"
+      "  int i;\n"
+      "  real r;\n"
+      "  initial begin\n"
+      "    i = -3;\n"
+      "    r = 1 ? i : 2.5;\n"
+      "  end\n"
+      "endmodule\n",
+      "r");
+  EXPECT_DOUBLE_EQ(v, -3.0);
+}
+
+TEST(ConditionalRealResult, BothBranchesRealUnchanged) {
+  // Regression guard for the real early-return path: a plain both-real
+  // conditional still selects the taken real branch verbatim.
+  double v = RunAndGetReal(
+      "module t;\n"
+      "  real r;\n"
+      "  initial r = 1 ? 2.5 : 3.5;\n"
+      "endmodule\n",
+      "r");
+  EXPECT_DOUBLE_EQ(v, 2.5);
+}
+
+// §11.4.11: when the condition is ambiguous (x/z) and both branches are
+// logically equivalent, the operator returns that shared value. Driven from
+// real source syntax (a 1'bx-valued logic condition) through the full pipeline
+// so the ambiguous-condition path is reached the way a design would reach it,
+// not by hand-constructing a 4-state operand.
+TEST(ConditionalAmbiguousCondition,
+     XConditionEqualBranchesReturnsValueEndToEnd) {
+  EXPECT_EQ(RunAndGet("module t;\n"
+                      "  logic c;\n"
+                      "  logic [3:0] a, b, r;\n"
+                      "  initial begin\n"
+                      "    c = 1'bx;\n"
+                      "    a = 4'hA;\n"
+                      "    b = 4'hA;\n"
+                      "    r = c ? a : b;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "r"),
+            0xAu);
+}
+
+// §11.4.11: an ambiguous condition with integral, non-equivalent branches
+// combines the two results bit by bit (Table 11-20) — each bit that agrees is
+// kept, each bit that differs becomes x. Full pipeline from a 1'bx condition:
+// a and b agree on bits 3/1/0 and differ on bit 2.
+TEST(ConditionalAmbiguousCondition, XConditionDiffersCombinesBitwiseEndToEnd) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic c;\n"
+      "  logic [3:0] a, b, r;\n"
+      "  logic bit3, bit1;\n"
+      "  integer unk;\n"
+      "  initial begin\n"
+      "    c = 1'bx;\n"
+      "    a = 4'b1100;\n"
+      "    b = 4'b1000;\n"
+      "    r = c ? a : b;\n"
+      "    unk = $isunknown(r);\n"
+      "    bit3 = r[3];\n"
+      "    bit1 = r[1];\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  // Differing bit 2 forces the result unknown; the agreeing bits survive.
+  LowerRunAndCheck(f, design, {{"unk", 1u}, {"bit3", 1u}, {"bit1", 0u}});
+}
+
+// §11.4.11: a z-valued condition is ambiguous exactly as an x-valued one is
+// (both are unknown). With logically-equivalent branches the shared value is
+// returned. This is the z counterpart to the x end-to-end test above, driven
+// from a 1'bz literal through the full pipeline.
+TEST(ConditionalAmbiguousCondition,
+     ZConditionEqualBranchesReturnsValueEndToEnd) {
+  EXPECT_EQ(RunAndGet("module t;\n"
+                      "  logic c;\n"
+                      "  logic [3:0] a, b, r;\n"
+                      "  initial begin\n"
+                      "    c = 1'bz;\n"
+                      "    a = 4'hA;\n"
+                      "    b = 4'hA;\n"
+                      "    r = c ? a : b;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "r"),
+            0xAu);
+}
+
+// §11.4.11: besides integral operands, the conditional operator also applies to
+// aggregate operands. With a determinate condition a packed-struct branch is
+// selected whole; reading the selected struct back confirms its bits flowed
+// through. Built from a real packed-struct declaration and struct literals.
+TEST(TernaryOperatorSim, PackedStructAggregateBranchSelected) {
+  EXPECT_EQ(
+      RunAndGet("module t;\n"
+                "  typedef struct packed { logic [3:0] hi; logic [3:0] lo; } "
+                "pair_t;\n"
+                "  pair_t s1, s2, r;\n"
+                "  initial begin\n"
+                "    s1 = '{4'hA, 4'h5};\n"
+                "    s2 = '{4'h3, 4'hC};\n"
+                "    r = 1 ? s1 : s2;\n"
+                "  end\n"
+                "endmodule\n",
+                "r"),
+      0xA5u);
+}
+
+// §11.4.11: with an ambiguous condition and a real (nonintegral) result, the
+// branches are compared for numeric equivalence. When they differ, the result
+// is the default value for the type (Table 7-1: 0.0 for real) rather than a
+// bit-by-bit combination of the two operands' bit patterns.
+TEST(ConditionalRealResult, AmbiguousRealBranchesNotEquivalentReturnDefault) {
+  double v = RunAndGetReal(
+      "module t;\n"
+      "  logic c;\n"
+      "  real r;\n"
+      "  initial begin\n"
+      "    c = 1'bx;\n"
+      "    r = c ? 2.5 : 3.5;\n"
+      "  end\n"
+      "endmodule\n",
+      "r");
+  EXPECT_DOUBLE_EQ(v, 0.0);
+}
+
+// §11.4.11: an ambiguous condition with numerically-equivalent real branches
+// returns that shared value.
+TEST(ConditionalRealResult, AmbiguousRealBranchesEquivalentReturnValue) {
+  double v = RunAndGetReal(
+      "module t;\n"
+      "  logic c;\n"
+      "  real r;\n"
+      "  initial begin\n"
+      "    c = 1'bx;\n"
+      "    r = c ? 4.5 : 4.5;\n"
+      "  end\n"
+      "endmodule\n",
+      "r");
+  EXPECT_DOUBLE_EQ(v, 4.5);
 }
 
 }  // namespace

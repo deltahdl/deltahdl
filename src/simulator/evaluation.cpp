@@ -183,10 +183,52 @@ static bool ExprMayHaveSideEffect(const Expr* e) {
     if (ExprMayHaveSideEffect(el)) return true;
   return false;
 }
+// Read a conditional operand as a floating-point value: a real vector holds a
+// double (or float, when 32-bit) bit pattern; an integral vector contributes
+// its numeric value, sign-extended when signed.
+static double TernaryOperandToDouble(const Logic4Vec& v) {
+  if (v.is_real) {
+    if (v.width == 32) {
+      float f = 0.0f;
+      auto bits = static_cast<uint32_t>(v.ToUint64());
+      std::memcpy(&f, &bits, sizeof(float));
+      return static_cast<double>(f);
+    }
+    double d = 0.0;
+    uint64_t bits = v.ToUint64();
+    std::memcpy(&d, &bits, sizeof(double));
+    return d;
+  }
+  if (v.is_signed && v.width > 0 && v.width < 64) {
+    uint64_t raw = v.ToUint64();
+    if ((raw >> (v.width - 1)) & 1u) raw |= ~((uint64_t{1} << v.width) - 1);
+    return static_cast<double>(static_cast<int64_t>(raw));
+  }
+  if (v.is_signed)
+    return static_cast<double>(static_cast<int64_t>(v.ToUint64()));
+  return static_cast<double>(v.ToUint64());
+}
+static Logic4Vec MakeRealVec(Arena& arena, double d) {
+  uint64_t bits = 0;
+  std::memcpy(&bits, &d, sizeof(double));
+  auto r = MakeLogic4VecVal(arena, 64, bits);
+  r.is_real = true;
+  return r;
+}
 static Logic4Vec EvalTernaryUnknownCond(const Expr* expr, SimContext& ctx,
                                         Arena& arena, uint32_t context_width) {
   auto tv = EvalExpr(expr->true_expr, ctx, arena, context_width);
   auto fv = EvalExpr(expr->false_expr, ctx, arena, context_width);
+  // §11.4.11: for a real (nonintegral) result under an ambiguous condition, the
+  // branches are compared for logical (numeric) equivalence. When equal the
+  // shared value is returned; otherwise the result is the default value for the
+  // resulting type (Table 7-1 gives 0.0 for real), not a bit-by-bit
+  // combination.
+  if (tv.is_real || fv.is_real) {
+    double td = TernaryOperandToDouble(tv);
+    double fd = TernaryOperandToDouble(fv);
+    return MakeRealVec(arena, td == fd ? td : 0.0);
+  }
   bool result_signed = tv.is_signed && fv.is_signed;
   uint32_t width = (tv.width > fv.width) ? tv.width : fv.width;
   if (context_width > width) width = context_width;
@@ -206,6 +248,27 @@ static Logic4Vec EvalTernaryUnknownCond(const Expr* expr, SimContext& ctx,
   }
   return result;
 }
+// §11.4.11: when one conditional branch is real and the other is integral, the
+// integral branch is cast to real. The result must carry the numeric VALUE of
+// the integral operand encoded as a real bit pattern, not the raw integer bits
+// (which a later ToDouble would misread as an already-real value).
+static Logic4Vec IntegralToReal(const Logic4Vec& v, Arena& arena) {
+  double d;
+  if (v.is_signed && v.width > 0 && v.width < 64) {
+    uint64_t raw = v.ToUint64();
+    if ((raw >> (v.width - 1)) & 1u) raw |= ~((uint64_t{1} << v.width) - 1);
+    d = static_cast<double>(static_cast<int64_t>(raw));
+  } else if (v.is_signed) {
+    d = static_cast<double>(static_cast<int64_t>(v.ToUint64()));
+  } else {
+    d = static_cast<double>(v.ToUint64());
+  }
+  uint64_t bits = 0;
+  std::memcpy(&bits, &d, sizeof(double));
+  auto r = MakeLogic4VecVal(arena, 64, bits);
+  r.is_real = true;
+  return r;
+}
 static Logic4Vec EvalTernary(const Expr* expr, SimContext& ctx, Arena& arena,
                              uint32_t context_width = 0) {
   auto cond = EvalExpr(expr->condition, ctx, arena);
@@ -222,12 +285,19 @@ static Logic4Vec EvalTernary(const Expr* expr, SimContext& ctx, Arena& arena,
   auto chosen = EvalExpr(cond_true ? expr->true_expr : expr->false_expr, ctx,
                          arena, context_width);
   bool result_signed = chosen.is_signed;
+  bool result_real = chosen.is_real;
   uint32_t width = chosen.width;
   if (!ExprMayHaveSideEffect(other_expr)) {
     auto other = EvalExpr(other_expr, ctx, arena, context_width);
     result_signed = chosen.is_signed && other.is_signed;
     if (other.width > width) width = other.width;
-    if (other.is_real) chosen.is_real = true;
+    if (other.is_real) result_real = true;
+  }
+  // §11.4.11: a real branch forces a real result type; an integral chosen
+  // branch is converted to its real value before being returned.
+  if (result_real) {
+    if (!chosen.is_real) chosen = IntegralToReal(chosen, arena);
+    return chosen;
   }
   if (context_width > width) width = context_width;
   Logic4Vec result;
