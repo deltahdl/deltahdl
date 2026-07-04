@@ -133,6 +133,28 @@ TEST(SuperElaboration, SuperNewFirstStatementOk) {
              "endmodule\n"));
 }
 
+// §8.15 requires super.new to be the first statement *executed*. A super.new
+// call nested inside a conditional can never satisfy that: the branch condition
+// executes before it. This covers the control-flow input form of the rule,
+// which travels a different validation path than a merely out-of-order
+// sequential call, so it is rejected at elaboration.
+TEST(SuperElaboration, SuperNewInsideConditionalError) {
+  EXPECT_FALSE(
+      ElabOk("class Base;\n"
+             "  function new();\n"
+             "  endfunction\n"
+             "endclass\n"
+             "class Derived extends Base;\n"
+             "  int y;\n"
+             "  function new();\n"
+             "    if (y == 0) super.new();\n"
+             "  endfunction\n"
+             "endclass\n"
+             "module m;\n"
+             "  Derived d;\n"
+             "endmodule\n"));
+}
+
 // §8.15 states that an expression reaching a base class value parameter
 // through super is not a constant expression. A static variable initializer
 // requires a constant expression, so initializing one from super.P (where P
@@ -146,6 +168,29 @@ TEST(SuperElaboration, SuperValueParamNotConstantError) {
              "class Derived extends Base;\n"
              "  function int f();\n"
              "    static int s = super.P;\n"
+             "    return s;\n"
+             "  endfunction\n"
+             "endclass\n"
+             "module m;\n"
+             "  Derived d;\n"
+             "endmodule\n"));
+}
+
+// §8.15 names both a value parameter and a local value parameter as the kinds
+// of parameter whose super-qualified access is non-constant. The test above
+// exercises the value-parameter form; this one covers the local value
+// parameter (a localparam declared in the base class, per §6.20.4). Reaching it
+// through super in a static-variable initializer, which requires a constant
+// expression, must therefore also be rejected at elaboration. The super access
+// itself is legal because f is a non-static method of a derived class.
+TEST(SuperElaboration, SuperLocalValueParamNotConstantError) {
+  EXPECT_FALSE(
+      ElabOk("class Base;\n"
+             "  localparam int LP = 4;\n"
+             "endclass\n"
+             "class Derived extends Base;\n"
+             "  function int f();\n"
+             "    static int s = super.LP;\n"
              "    return s;\n"
              "  endfunction\n"
              "endclass\n"
