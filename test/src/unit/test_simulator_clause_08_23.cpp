@@ -33,16 +33,6 @@ TEST(ClassScopeResolutionSim, ScopeResolutionMethodLookup) {
   EXPECT_EQ(it->second->name, "compute");
 }
 
-TEST(ClassScopeResolutionSim, ScopeResolutionMultipleStaticProps) {
-  SimFixture f;
-  auto* type = MakeClassType(f, "Config", {});
-  type->static_properties["WIDTH"] = MakeLogic4VecVal(f.arena, 32, 8);
-  type->static_properties["DEPTH"] = MakeLogic4VecVal(f.arena, 32, 16);
-
-  EXPECT_EQ(type->static_properties["WIDTH"].ToUint64(), 8u);
-  EXPECT_EQ(type->static_properties["DEPTH"].ToUint64(), 16u);
-}
-
 TEST(ClassScopeResolutionSim, ScopeResolutionMissingProperty) {
   SimFixture f;
   auto* type = MakeClassType(f, "Empty", {});
@@ -154,18 +144,6 @@ TEST(ClassScopeResolutionSim, StaticVoidMethodCall) {
             77u);
 }
 
-TEST(ClassScopeResolutionSim, EnumMemberReadViaScope) {
-  SimFixture f;
-  auto* type = MakeClassType(f, "Base", {});
-  type->enum_members["bin"] = 0;
-  type->enum_members["oct"] = 1;
-  type->enum_members["dec"] = 2;
-  type->enum_members["hex"] = 3;
-
-  EXPECT_EQ(type->enum_members["bin"], 0u);
-  EXPECT_EQ(type->enum_members["hex"], 3u);
-}
-
 TEST(ClassScopeResolutionSim, DisambiguatesClassScopeFromLocal) {
   EXPECT_EQ(RunAndGet("class Base;\n"
                       "  static int val = 42;\n"
@@ -238,6 +216,36 @@ TEST(ClassScopeResolutionSim, SuperclassStaticAccessFromDerived) {
                       "endmodule\n",
                       "result"),
             55u);
+}
+
+TEST(ClassScopeResolutionSim, StaticPropertyWrittenViaScope) {
+  // C8: class-scope-resolved static property written in an assignment, then
+  // read back through the same `::` access -- full pipeline.
+  EXPECT_EQ(RunAndGet("class C;\n"
+                      "  static int count;\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    C::count = 5;\n"
+                      "    result = C::count;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            5u);
+}
+
+TEST(ClassScopeResolutionSim, EnumNamedConstantViaScope) {
+  // C8: enumeration named constant reachable via `::` -- full pipeline.
+  EXPECT_EQ(RunAndGet("class C;\n"
+                      "  typedef enum { RED, GREEN = 3, BLUE } color_e;\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial result = C::GREEN;\n"
+                      "endmodule\n",
+                      "result"),
+            3u);
 }
 
 }  // namespace

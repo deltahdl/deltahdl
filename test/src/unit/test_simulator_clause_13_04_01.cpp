@@ -279,4 +279,23 @@ TEST(FunctionReturnSim, SystemFunctionAsImplicitVariableInExpression) {
   EXPECT_EQ(var->value.ToUint64(), 43u);
 }
 
+// §13.4.1: unless otherwise specified, all nonvoid function calls -- including
+// built-in methods -- may be used as an implicit variable within an expression.
+// Here the built-in queue method size() is a nonvoid call embedded in an
+// arithmetic expression, and the whole expression evaluates end to end.
+TEST(FunctionReturnSim, BuiltinMethodCallAsImplicitVariableInExpression) {
+  uint64_t r = RunAndGet(
+      "module t;\n"
+      "  int q[$];\n"
+      "  int r;\n"
+      "  initial begin\n"
+      "    q.push_back(10);\n"
+      "    q.push_back(20);\n"
+      "    r = q.size() + 5;\n"
+      "  end\n"
+      "endmodule\n",
+      "r");
+  EXPECT_EQ(r, 7u);
+}
+
 }  // namespace

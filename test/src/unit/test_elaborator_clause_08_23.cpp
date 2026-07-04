@@ -185,4 +185,43 @@ TEST(ClassScopeResolutionElaboration, ClassNamePrefixInExpressionOk) {
              "endmodule\n"));
 }
 
+// §8.23: a class-scoped parameter is a constant expression. Referencing it via
+// `Class::PARAM` in a constant context must fold to the parameter's value at
+// elaboration, not merely elaborate without error. Cfg::WIDTH resolves to 8.
+TEST(ClassScopeResolutionElaboration, ClassParameterFoldsAsConstant) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "class Cfg;\n"
+      "  parameter int WIDTH = 8;\n"
+      "endclass\n"
+      "module m;\n"
+      "  localparam int W = Cfg::WIDTH;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  ASSERT_GE(design->top_modules[0]->params.size(), 1u);
+  EXPECT_EQ(design->top_modules[0]->params[0].name, "W");
+  EXPECT_EQ(design->top_modules[0]->params[0].resolved_value, 8);
+}
+
+// §8.23: a class-scoped local parameter is likewise a constant expression
+// reachable through `::`. Cfg::DEPTH resolves to 16.
+TEST(ClassScopeResolutionElaboration, ClassLocalparamFoldsAsConstant) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "class Cfg;\n"
+      "  localparam int DEPTH = 16;\n"
+      "endclass\n"
+      "module m;\n"
+      "  localparam int D = Cfg::DEPTH;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  ASSERT_GE(design->top_modules[0]->params.size(), 1u);
+  EXPECT_EQ(design->top_modules[0]->params[0].name, "D");
+  EXPECT_EQ(design->top_modules[0]->params[0].resolved_value, 16);
+}
+
 }  // namespace

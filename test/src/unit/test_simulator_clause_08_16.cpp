@@ -248,4 +248,32 @@ TEST(ClassSim, E2eCastFailsIncompatibleTypesEvenIfNull) {
             0u);
 }
 
+// §8.16 success case 2: the source expression's declared type is an interface
+// class (§8.26) that the destination concrete class implements, and the
+// run-time object is assignment compatible. Here an interface-class-typed
+// handle ih refers to a C object; the run-time-checked $cast back to the
+// concrete C succeeds (returns 1). This is distinct from the superclass-source
+// case: the static source type is an interface class, not a base class.
+TEST(ClassSim, E2eCastFromInterfaceClassSourceSucceeds) {
+  EXPECT_EQ(RunAndGet("interface class IntfC;\n"
+                      "  pure virtual function int get();\n"
+                      "endclass\n"
+                      "class C implements IntfC;\n"
+                      "  virtual function int get(); return 7; endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    IntfC ih;\n"
+                      "    C c;\n"
+                      "    C c2;\n"
+                      "    c = new;\n"
+                      "    ih = c;\n"
+                      "    result = $cast(c2, ih);\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            1u);
+}
+
 }  // namespace

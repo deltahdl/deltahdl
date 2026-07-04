@@ -2,11 +2,65 @@
 #include "builders_systask.h"
 #include "fixture_simulator.h"
 #include "helpers_class_object.h"
+#include "helpers_scheduler.h"
 #include "simulator/class_object.h"
 
 using namespace delta;
 
 namespace {
+
+// §8.24 full-pipeline: a method whose body is declared out of the class block
+// (an `extern` prototype inside the class, the full definition qualified with
+// `ClassName::` after the class) must actually EXECUTE end-to-end and return
+// the value its out-of-block body computes. The elaborator links the qualified
+// definition back onto the class type (AttachCuMethodsToClasses); this drives
+// real source through parse+elaborate+lower+run to prove the linked body runs.
+TEST(ClassSim, E2eOutOfBlockFunctionBodyExecutes) {
+  EXPECT_EQ(RunAndGet("class C;\n"
+                      "  extern function int foo(input int a);\n"
+                      "endclass\n"
+                      "function int C::foo(input int a);\n"
+                      "  return a + 1;\n"
+                      "endfunction\n"
+                      "module t;\n"
+                      "  int r;\n"
+                      "  initial begin\n"
+                      "    C c;\n"
+                      "    c = new;\n"
+                      "    r = c.foo(41);\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "r"),
+            42u);
+}
+
+// §8.24: the same out-of-block linkage for a TASK. The extern task prototype
+// lives in the class; the out-of-block body (`task C::set(...)`) assigns a
+// class property. An in-block getter reads that property back so the effect of
+// the out-of-block task body is observable at module scope.
+TEST(ClassSim, E2eOutOfBlockTaskBodyExecutes) {
+  EXPECT_EQ(RunAndGet("class C;\n"
+                      "  int val;\n"
+                      "  extern task set(input int a);\n"
+                      "  function int get();\n"
+                      "    return val;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "task C::set(input int a);\n"
+                      "  val = a;\n"
+                      "endtask\n"
+                      "module t;\n"
+                      "  int r;\n"
+                      "  initial begin\n"
+                      "    C c;\n"
+                      "    c = new;\n"
+                      "    c.set(7);\n"
+                      "    r = c.get();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "r"),
+            7u);
+}
 
 TEST(ClassSim, ExternMethodRegisteredSeparately) {
   SimFixture f;

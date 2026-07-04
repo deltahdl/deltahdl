@@ -201,4 +201,73 @@ TEST(InterfaceClassImplements, SubclassInheritsInterfaceImplementation) {
              "endmodule\n"));
 }
 
+// §8.26 C9: an interface-class-typed handle may reference an instance of a
+// class that declares (via 'implements') that it implements the interface.
+TEST(InterfaceClassHandleAssign, ImplementingClassAssignableToInterfaceHandle) {
+  EXPECT_TRUE(
+      ElabOk("interface class IC;\n"
+             "  pure virtual function void f();\n"
+             "endclass\n"
+             "class C implements IC;\n"
+             "  virtual function void f();\n"
+             "  endfunction\n"
+             "endclass\n"
+             "module m;\n"
+             "  initial begin\n"
+             "    IC ih;\n"
+             "    C c;\n"
+             "    ih = c;\n"
+             "  end\n"
+             "endmodule\n"));
+}
+
+// §8.26 C9: merely defining every pure-virtual method is not sufficient; a
+// class that does not declare 'implements' cannot be assigned to an
+// interface-class handle.
+TEST(InterfaceClassHandleAssign,
+     NonImplementingClassNotAssignableToInterfaceHandle) {
+  EXPECT_FALSE(
+      ElabOk("interface class IC;\n"
+             "  pure virtual function void f();\n"
+             "endclass\n"
+             "class D;\n"
+             "  virtual function void f();\n"
+             "  endfunction\n"
+             "endclass\n"
+             "module m;\n"
+             "  initial begin\n"
+             "    IC ih;\n"
+             "    D d;\n"
+             "    ih = d;\n"
+             "  end\n"
+             "endmodule\n"));
+}
+
+// §8.26 C5: an interface class may inherit from another interface class via
+// 'extends'.
+TEST(InterfaceClassInheritance, InterfaceClassExtendsInterfaceClassOk) {
+  EXPECT_TRUE(
+      ElabOk("interface class IB;\n"
+             "  pure virtual function void g();\n"
+             "endclass\n"
+             "interface class IC extends IB;\n"
+             "  pure virtual function void f();\n"
+             "endclass\n"
+             "module m;\n"
+             "endmodule\n"));
+}
+
+// §8.26 C5: an interface class shall not extend an ordinary (non-interface)
+// class.
+TEST(InterfaceClassInheritance, InterfaceClassExtendsRegularClassError) {
+  EXPECT_FALSE(
+      ElabOk("class SomeRegularClass;\n"
+             "endclass\n"
+             "interface class IC extends SomeRegularClass;\n"
+             "  pure virtual function void f();\n"
+             "endclass\n"
+             "module m;\n"
+             "endmodule\n"));
+}
+
 }  // namespace

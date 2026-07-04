@@ -1,6 +1,7 @@
 #include "elaborator/const_eval.h"
 
 #include <cmath>
+#include <cstring>
 #include <unordered_set>
 
 #include "lexer/token.h"
@@ -265,6 +266,27 @@ static std::optional<int64_t> EvalConstSysCall(const Expr* expr,
                                                const ScopeMap& scope) {
   if (expr->callee == "$bits") return EvalConstBits(expr);
   if (expr->callee == "$countbits") return EvalConstCountbits(expr, scope);
+  // §20.5: the integer-returning conversion functions take a real argument, so
+  // they fold from the constant real value rather than an integral first arg.
+  if (expr->callee == "$rtoi" || expr->callee == "$realtobits" ||
+      expr->callee == "$shortrealtobits") {
+    if (expr->args.empty()) return std::nullopt;
+    auto rv = ConstEvalReal(expr->args[0], scope);
+    if (!rv) return std::nullopt;
+    if (expr->callee == "$rtoi")
+      return static_cast<int64_t>(*rv);  // truncates toward zero
+    if (expr->callee == "$realtobits") {
+      double d = *rv;
+      uint64_t bits = 0;
+      std::memcpy(&bits, &d, sizeof(d));
+      return static_cast<int64_t>(bits);
+    }
+    // $shortrealtobits: narrow to single precision, reinterpret the 32 bits.
+    float fv = static_cast<float>(*rv);
+    uint32_t bits = 0;
+    std::memcpy(&bits, &fv, sizeof(fv));
+    return static_cast<int64_t>(bits);
+  }
   auto arg = EvalFirstArg(expr, scope);
   if (!arg) return std::nullopt;
   if (expr->callee == "$clog2") return Clog2(*arg);
@@ -573,6 +595,36 @@ std::optional<double> ConstEvalReal(const Expr* expr, const ScopeMap& scope) {
       auto cond = ConstEvalInt(expr->condition, scope);
       if (!cond) return std::nullopt;
       return ConstEvalReal(*cond ? expr->true_expr : expr->false_expr, scope);
+    }
+    case ExprKind::kSystemCall:
+    case ExprKind::kCall: {
+      // §20.5: the real-returning conversion functions may appear in a constant
+      // real context. Each folds from the constant integral value of its arg.
+      if (expr->callee == "$itor") {
+        if (expr->args.empty()) return std::nullopt;
+        auto iv = ConstEvalInt(expr->args[0], scope);
+        if (!iv) return std::nullopt;
+        return static_cast<double>(*iv);
+      }
+      if (expr->callee == "$bitstoreal") {
+        if (expr->args.empty()) return std::nullopt;
+        auto iv = ConstEvalInt(expr->args[0], scope);
+        if (!iv) return std::nullopt;
+        uint64_t bits = static_cast<uint64_t>(*iv);
+        double d = 0.0;
+        std::memcpy(&d, &bits, sizeof(d));
+        return d;
+      }
+      if (expr->callee == "$bitstoshortreal") {
+        if (expr->args.empty()) return std::nullopt;
+        auto iv = ConstEvalInt(expr->args[0], scope);
+        if (!iv) return std::nullopt;
+        uint32_t bits = static_cast<uint32_t>(*iv);
+        float fv = 0.0f;
+        std::memcpy(&fv, &bits, sizeof(fv));
+        return static_cast<double>(fv);
+      }
+      return std::nullopt;
     }
     default:
       return std::nullopt;

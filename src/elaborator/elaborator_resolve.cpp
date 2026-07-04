@@ -170,6 +170,38 @@ void RegisterPackageParams(CompilationUnit* unit, ScopeMap& cu_param_scope,
   }
 }
 
+// §8.23: a class value parameter or local parameter is a public element and a
+// constant expression, reachable from outside the class via the class scope
+// resolution operator (Class::PARAM). Record each such parameter under its
+// "Class.name" key so a constant expression referring to it -- which parses as
+// a member access whose compound key is "Class.name" -- folds at elaboration.
+// Type parameters carry no value and are skipped.
+void RegisterClassParams(CompilationUnit* unit, ScopeMap& cu_param_scope,
+                         Arena& arena) {
+  for (auto* cls : unit->classes) {
+    auto record = [&](std::string_view pname, const Expr* pexpr) {
+      if (!pexpr) return;
+      auto val = ConstEvalInt(pexpr, cu_param_scope);
+      if (!val) return;
+      auto* qname = arena.Create<std::string>(std::string(cls->name) + "." +
+                                              std::string(pname));
+      cu_param_scope[*qname] = *val;
+    };
+    // Body parameter/localparam declarations are class members flagged
+    // is_param (parser_class.cpp records them as kProperty members).
+    for (const auto* m : cls->members) {
+      if (m->kind == ClassMemberKind::kProperty && m->is_param)
+        record(m->name, m->init_expr);
+    }
+    // The #() parameter ports live in cls->params; type parameters carry no
+    // value and are skipped.
+    for (const auto& [pname, pexpr] : cls->params) {
+      if (cls->type_param_names.count(pname)) continue;
+      record(pname, pexpr);
+    }
+  }
+}
+
 // Inserts the built-in class names that always live in the compilation-unit
 // scope (§6.14, §15.x predefined process/semaphore/mailbox classes).
 void RegisterBuiltinClassNames(
@@ -237,6 +269,7 @@ void Elaborator::RegisterCuScopeItems() {
   RegisterCuClasses(unit_, class_names_, cu_scope_names_,
                     parameterized_class_names_);
   RegisterPackageParams(unit_, cu_param_scope_, arena_);
+  RegisterClassParams(unit_, cu_param_scope_, arena_);
 }
 
 ModuleItem* Elaborator::FindCuScopeItem(std::string_view name) const {

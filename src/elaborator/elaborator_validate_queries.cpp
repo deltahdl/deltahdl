@@ -783,10 +783,37 @@ static bool MemberAccessRefersToModuleParam(const CompilationUnit* unit,
   return false;
 }
 
+// §8.23: a class scope resolution `Class::PARAM` whose target is a class value
+// parameter or local parameter is a legal constant-expression operand, not a
+// hierarchical reference. (A class parameter is a public constant of the
+// class.)
+static bool ScopeResolutionRefersToClassParam(const CompilationUnit* unit,
+                                              const Expr* e) {
+  if (unit == nullptr || !e->is_scope_resolution) return false;
+  if (!e->lhs || e->lhs->kind != ExprKind::kIdentifier) return false;
+  if (!e->rhs || e->rhs->kind != ExprKind::kIdentifier) return false;
+  for (const auto* cls : unit->classes) {
+    if (cls->name != e->lhs->text) continue;
+    for (const auto* m : cls->members) {
+      if (m->kind == ClassMemberKind::kProperty && m->is_param &&
+          m->name == e->rhs->text) {
+        return true;
+      }
+    }
+    for (const auto& [pname, pexpr] : cls->params) {
+      (void)pexpr;
+      if (pname == e->rhs->text) return true;
+    }
+  }
+  return false;
+}
+
 static bool ExprContainsHierRef(const Expr* e, const CompilationUnit* unit) {
   if (!e) return false;
   if (e->kind == ExprKind::kMemberAccess) {
-    return !MemberAccessRefersToModuleParam(unit, e);
+    if (MemberAccessRefersToModuleParam(unit, e)) return false;
+    if (ScopeResolutionRefersToClassParam(unit, e)) return false;
+    return true;
   }
   if (ExprContainsHierRef(e->lhs, unit)) return true;
   if (ExprContainsHierRef(e->rhs, unit)) return true;

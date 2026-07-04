@@ -647,7 +647,9 @@ void Parser::SkipCovergroupItem() {
   }
 
   if (IsCoverpointOrCross(CurrentToken().kind)) {
+    bool is_cross = Check(TokenKind::kKwCross);
     Consume();
+    if (is_cross) ValidateCrossItemList();
     SkipCoverpointBody(lexer_, diag_);
     return;
   }
@@ -655,13 +657,58 @@ void Parser::SkipCovergroupItem() {
   if (Check(TokenKind::kIdentifier)) {
     Consume();
     if (Match(TokenKind::kColon) && IsCoverpointOrCross(CurrentToken().kind)) {
+      bool is_cross = Check(TokenKind::kKwCross);
       Consume();
+      if (is_cross) ValidateCrossItemList();
     }
     SkipCoverpointBody(lexer_, diag_);
     return;
   }
 
   SkipToSemiOrEnd(lexer_, TokenKind::kKwEndgroup);
+}
+
+void Parser::ValidateCrossItemList() {
+  // §19.6 / Syntax 19-4: list_of_cross_items ::= cross_item , cross_item
+  // { , cross_item }, where cross_item ::= cover_point_identifier |
+  // variable_identifier. The list ends at the optional `iff` guard, the cross
+  // body `{`, or the terminating `;`. A cross must name at least two items and
+  // each item must be a bare identifier -- expressions may not appear directly
+  // in a cross (a coverage point must be defined first).
+  SourceLoc start = CurrentLoc();
+  int item_count = 0;
+  bool expr_item = false;
+  bool expect_item = true;
+  while (!AtEnd()) {
+    TokenKind k = CurrentToken().kind;
+    if (k == TokenKind::kKwIff || k == TokenKind::kLBrace ||
+        k == TokenKind::kSemicolon || k == TokenKind::kKwEndgroup) {
+      break;
+    }
+    if (k == TokenKind::kComma) {
+      Consume();
+      expect_item = true;
+      continue;
+    }
+    if (k == TokenKind::kIdentifier && expect_item) {
+      ++item_count;
+      Consume();
+      expect_item = false;
+      continue;
+    }
+    // Anything else between items (an operator, a select, a second identifier
+    // with no separating comma) means a cross item is a compound expression.
+    expr_item = true;
+    Consume();
+  }
+  if (expr_item) {
+    diag_.Error(
+        start,
+        "a cross item shall be a coverage point or variable identifier; "
+        "an expression cannot be used directly in a cross");
+  } else if (item_count < 2) {
+    diag_.Error(start, "a cross shall list at least two coverage points");
+  }
 }
 
 }  // namespace delta

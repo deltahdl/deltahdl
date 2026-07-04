@@ -192,6 +192,10 @@ class Parser {
       const std::vector<std::string>& covergroup_formals);
   void ParseBlockEventExpression();
   void SkipCovergroupItem();
+  // §19.6: consume a cross's list_of_cross_items (positioned just after the
+  // `cross` keyword) up to the optional `iff`/body, enforcing that it names at
+  // least two bare cover_point/variable identifiers and no direct expressions.
+  void ValidateCrossItemList();
 
   ModuleItem* ParseSpecifyBlock();
   void ParseSpecparamDecl(std::vector<ModuleItem*>& items);
