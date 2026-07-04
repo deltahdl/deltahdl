@@ -1,62 +1,9 @@
 #include "fixture_simulator.h"
-#include "helpers_class_object.h"
 #include "helpers_scheduler.h"
-#include "simulator/class_object.h"
 
 using namespace delta;
 
 namespace {
-
-TEST(ClassSim, CastSuperclassToSubclassIllegal) {
-  SimFixture f;
-  auto* base = MakeClassType(f, "Base", {});
-  auto* derived = MakeClassType(f, "Derived", {});
-  derived->parent = base;
-
-  auto [handle, obj] = MakeObj(f, base);
-  EXPECT_FALSE(obj->type->IsA(derived));
-}
-
-TEST(ClassSim, CastSucceedsWhenObjectIsDerived) {
-  SimFixture f;
-  auto* base = MakeClassType(f, "Base", {"x"});
-  auto* derived = MakeClassType(f, "Derived", {"y"});
-  derived->parent = base;
-
-  auto [handle, obj] = MakeObj(f, derived);
-  EXPECT_TRUE(obj->type->IsA(derived));
-  EXPECT_TRUE(obj->type->IsA(base));
-}
-
-TEST(ClassSim, CastFailsUnrelatedTypes) {
-  SimFixture f;
-  auto* type_a = MakeClassType(f, "TypeA", {});
-  auto* type_b = MakeClassType(f, "TypeB", {});
-
-  auto [handle, obj] = MakeObj(f, type_a);
-  EXPECT_FALSE(obj->type->IsA(type_b));
-}
-
-TEST(ClassSim, CastNullHandleIsZero) {
-  SimFixture f;
-  EXPECT_EQ(f.ctx.GetClassObject(kNullClassHandle), nullptr);
-}
-
-TEST(ClassSim, CastDeepHierarchySucceeds) {
-  SimFixture f;
-  auto* grand = MakeClassType(f, "Grand", {});
-  auto* mid = MakeClassType(f, "Mid", {});
-  mid->parent = grand;
-  auto* leaf = MakeClassType(f, "Leaf", {});
-  leaf->parent = mid;
-
-  auto [handle, obj] = MakeObj(f, leaf);
-  EXPECT_TRUE(obj->type->IsA(grand));
-  EXPECT_TRUE(obj->type->IsA(mid));
-
-  auto [h2, obj2] = MakeObj(f, grand);
-  EXPECT_FALSE(obj2->type->IsA(leaf));
-}
 
 TEST(ClassSim, E2eCastFunctionReturnsOneOnSuccess) {
   EXPECT_EQ(RunAndGet("class Base; int x; endclass\n"
@@ -89,6 +36,25 @@ TEST(ClassSim, E2eCastAssignmentCompatibleDirectionSucceeds) {
                       "    Derived d;\n"
                       "    d = new;\n"
                       "    result = $cast(b, d);\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            1u);
+}
+
+TEST(ClassSim, E2eCastSameTypeSucceeds) {
+  // Success case 1, the "same type" sub-form: the destination and source are
+  // the identical class type — the most direct assignment-compatible cast — so
+  // $cast succeeds and returns 1. (The superclass-of-source sub-form is covered
+  // separately by E2eCastAssignmentCompatibleDirectionSucceeds.)
+  EXPECT_EQ(RunAndGet("class Base; int x; endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    Base a;\n"
+                      "    Base b;\n"
+                      "    a = new;\n"
+                      "    result = $cast(b, a);\n"
                       "  end\n"
                       "endmodule\n",
                       "result"),
@@ -129,6 +95,32 @@ TEST(ClassSim, E2eCastTaskFormFailsWithError) {
   EXPECT_FALSE(f.has_errors);
   LowerAndRun(design, f);
   EXPECT_TRUE(f.diag.HasErrors());
+}
+
+// §8.16 / §6.24.2 interweave: the task form of a class-handle downcast that
+// succeeds performs the assignment and, the assignment being valid, raises no
+// run-time error. This is the positive counterpart to the task form that fails:
+// only an invalid cast triggers the diagnostic.
+TEST(ClassSim, E2eCastTaskFormSucceedsNoError) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "class Base; endclass\n"
+      "class Derived extends Base; endclass\n"
+      "module t;\n"
+      "  initial begin\n"
+      "    Base b;\n"
+      "    Derived d;\n"
+      "    Derived d2;\n"
+      "    d = new;\n"
+      "    b = d;\n"
+      "    $cast(d2, b);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  LowerAndRun(design, f);
+  EXPECT_FALSE(f.diag.HasErrors());
 }
 
 TEST(ClassSim, E2eCastNullSucceeds) {

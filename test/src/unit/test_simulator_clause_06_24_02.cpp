@@ -236,6 +236,81 @@ TEST(DynamicCastSim, FunctionFormIntegralCastSucceeds) {
   EXPECT_EQ(d->value.ToUint64(), 5u);
 }
 
+// §6.24.2: the source_expression admits any constant form of 11.2.1. A
+// parameter whose value names a valid enum member drives the singular cast
+// rule: the function form assigns the destination and returns 1. Building the
+// operand from real parameter syntax exercises an input form the literal-only
+// tests above do not.
+TEST(DynamicCastSim, FunctionFormParameterSourceSucceeds) {
+  SimFixture f;
+  auto* design =
+      ElaborateLowerRun(f,
+                        "module t;\n"
+                        "  parameter int P = 2;\n"
+                        "  typedef enum {RED, GREEN, BLUE} color_t;\n"
+                        "  color_t c;\n"
+                        "  int ok;\n"
+                        "  initial ok = $cast(c, P);\n"
+                        "endmodule\n");
+  ASSERT_NE(design, nullptr);
+
+  auto* ok = f.ctx.FindVariable("ok");
+  ASSERT_NE(ok, nullptr);
+  EXPECT_EQ(ok->value.ToUint64(), 1u);
+  auto* c = f.ctx.FindVariable("c");
+  ASSERT_NE(c, nullptr);
+  EXPECT_EQ(c->value.ToUint64(), 2u);
+}
+
+// §6.24.2 negative: the source is a parameter constant whose value is not a
+// valid member of the enum destination. The function form makes no assignment
+// and returns 0, leaving the previously assigned destination unchanged.
+TEST(DynamicCastSim, FunctionFormParameterSourceOutOfRangeFails) {
+  SimFixture f;
+  auto* design =
+      ElaborateLowerRun(f,
+                        "module t;\n"
+                        "  parameter int P = 9;\n"
+                        "  typedef enum {RED, GREEN, BLUE} color_t;\n"
+                        "  color_t c;\n"
+                        "  int ok;\n"
+                        "  initial begin\n"
+                        "    c = GREEN;\n"
+                        "    ok = $cast(c, P);\n"
+                        "  end\n"
+                        "endmodule\n");
+  ASSERT_NE(design, nullptr);
+
+  auto* ok = f.ctx.FindVariable("ok");
+  ASSERT_NE(ok, nullptr);
+  EXPECT_EQ(ok->value.ToUint64(), 0u);
+  auto* c = f.ctx.FindVariable("c");
+  ASSERT_NE(c, nullptr);
+  EXPECT_EQ(c->value.ToUint64(), 1u);  // still GREEN, no assignment made
+}
+
+// §6.24.2: the source_expression may also be a localparam constant, a distinct
+// constant declaration from a parameter. Driven through the task form, a
+// localparam whose value names a valid enum member assigns the destination and
+// raises no run-time error.
+TEST(DynamicCastSim, TaskFormLocalparamSourceAssigns) {
+  SimFixture f;
+  auto* design =
+      ElaborateLowerRun(f,
+                        "module t;\n"
+                        "  localparam int LP = 1;\n"
+                        "  typedef enum {RED, GREEN, BLUE} color_t;\n"
+                        "  color_t c;\n"
+                        "  initial $cast(c, LP);\n"
+                        "endmodule\n");
+  ASSERT_NE(design, nullptr);
+
+  auto* c = f.ctx.FindVariable("c");
+  ASSERT_NE(c, nullptr);
+  EXPECT_EQ(c->value.ToUint64(), 1u);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 // §6.24.2: the task form of a valid integral cast assigns the destination and,
 // because the assignment is valid, raises no run-time error.
 TEST(DynamicCastSim, TaskFormIntegralCastAssignsNoError) {
