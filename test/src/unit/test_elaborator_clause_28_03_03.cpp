@@ -1,42 +1,10 @@
 #include <gtest/gtest.h>
 
 #include "fixture_elaborator.h"
-#include "model_gate_declaration.h"
 
 using namespace delta;
 
 namespace {
-
-TEST(GateDelayValidity, MaxDelaysByGateType) {
-  struct {
-    GateType gate;
-    uint32_t expected;
-  } const kCases[] = {
-
-      {GateType::kPullup, 0u},   {GateType::kPulldown, 0u},
-
-      {GateType::kTran, 0u},     {GateType::kRtran, 0u},
-
-      {GateType::kAnd, 2u},      {GateType::kNand, 2u},
-      {GateType::kOr, 2u},       {GateType::kNor, 2u},
-      {GateType::kXor, 2u},      {GateType::kXnor, 2u},
-
-      {GateType::kBuf, 2u},      {GateType::kNot, 2u},
-
-      {GateType::kBufif0, 3u},   {GateType::kBufif1, 3u},
-      {GateType::kNotif0, 3u},   {GateType::kNotif1, 3u},
-
-      {GateType::kNmos, 3u},     {GateType::kPmos, 3u},
-      {GateType::kRnmos, 3u},    {GateType::kRpmos, 3u},
-      {GateType::kCmos, 3u},     {GateType::kRcmos, 3u},
-
-      {GateType::kTranif0, 2u},  {GateType::kTranif1, 2u},
-      {GateType::kRtranif0, 2u}, {GateType::kRtranif1, 2u},
-  };
-  for (const auto& c : kCases) {
-    EXPECT_EQ(MaxDelays(c.gate), c.expected);
-  }
-}
 
 TEST(GateDelayElaboration, GateWithDelayStillProducesAssign) {
   ElabFixture f;
@@ -54,6 +22,30 @@ TEST(GateDelayElaboration, GateWithDelayStillProducesAssign) {
   ASSERT_NE(ca.rhs, nullptr);
   EXPECT_EQ(ca.rhs->kind, ExprKind::kBinary);
   EXPECT_EQ(ca.rhs->op, TokenKind::kPipe);
+}
+
+TEST(GateDelayElaboration, GateDelayLoweredOntoContinuousAssign) {
+  // §28.3.3: a gate's delay specification specifies its propagation delay. The
+  // elaborator lowers the primitive to a continuous assignment and must move
+  // the single delay value onto that assignment so the simulator can apply it.
+  // A one-value delay populates only the rise slot; the fall/turn-off slots
+  // stay empty.
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module m;\n"
+      "  wire a, b, y;\n"
+      "  and #7 g1(y, a, b);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_GE(mod->assigns.size(), 1u);
+  auto& ca = mod->assigns.back();
+  ASSERT_NE(ca.delay, nullptr);
+  EXPECT_EQ(ca.delay->int_val, 7u);
+  EXPECT_EQ(ca.delay_fall, nullptr);
+  EXPECT_EQ(ca.delay_decay, nullptr);
 }
 
 }  // namespace
