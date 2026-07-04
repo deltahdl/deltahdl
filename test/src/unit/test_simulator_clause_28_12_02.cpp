@@ -1,8 +1,8 @@
 #include <gtest/gtest.h>
 
 #include "common/arena.h"
+#include "fixture_simulator.h"
 #include "helpers_net_strength.h"
-#include "model_strength.h"
 #include "simulator/net.h"
 #include "simulator/scheduler.h"
 #include "simulator/variable.h"
@@ -10,52 +10,6 @@
 using namespace delta;
 
 namespace {
-
-TEST(StrengthResolution, EqualStrengthConflictProducesX) {
-  Arena arena;
-  StrengthNet sn = MakeStrengthNet(arena, 1);
-  Net& net = sn.net;
-
-  AddDriver(arena, net, 1, 0, Strength::kStrong);
-  AddDriver(arena, net, 1, 1, Strength::kStrong);
-  net.Resolve(arena);
-
-  EXPECT_EQ(sn.var->value.words[0].aval & 1u, 1u);  // x = (aval=1, bval=1)
-  EXPECT_EQ(sn.var->value.words[0].bval & 1u, 1u);
-}
-
-TEST(StrengthCombine, EqualWeakOppositeValueProducesX) {
-  StrengthSignal weak_one{Val4::kV1, StrengthLevel::kHighz,
-                          StrengthLevel::kWeak};
-  StrengthSignal weak_zero{Val4::kV0, StrengthLevel::kWeak,
-                           StrengthLevel::kHighz};
-  auto result = CombineUnambiguous(weak_one, weak_zero);
-  EXPECT_EQ(result.value, Val4::kX);
-}
-
-TEST(StrengthCombine, EqualStrengthConflictCarriesStrengthRange) {
-  StrengthSignal pull_one{Val4::kV1, StrengthLevel::kHighz,
-                          StrengthLevel::kPull};
-  StrengthSignal pull_zero{Val4::kV0, StrengthLevel::kPull,
-                           StrengthLevel::kHighz};
-  auto result = CombineUnambiguous(pull_one, pull_zero);
-  EXPECT_EQ(result.value, Val4::kX);
-  EXPECT_EQ(result.strength0_hi, StrengthLevel::kPull);
-  EXPECT_EQ(result.strength1_hi, StrengthLevel::kPull);
-}
-
-TEST(StrengthResolution, EqualSupplyConflictProducesX) {
-  Arena arena;
-  StrengthNet sn = MakeStrengthNet(arena, 1);
-  Net& net = sn.net;
-
-  AddDriver(arena, net, 1, 0, Strength::kSupply);
-  AddDriver(arena, net, 1, 1, Strength::kSupply);
-  net.Resolve(arena);
-
-  EXPECT_EQ(sn.var->value.words[0].aval & 1u, 1u);  // x = (aval=1, bval=1)
-  EXPECT_EQ(sn.var->value.words[0].bval & 1u, 1u);
-}
 
 TEST(StrengthResolution, EqualStrengthConflictPerBit) {
   Arena arena;
@@ -68,44 +22,6 @@ TEST(StrengthResolution, EqualStrengthConflictPerBit) {
 
   EXPECT_EQ(sn.var->value.words[0].aval & 0xFFu, 0xFFu);  // all bits x
   EXPECT_EQ(sn.var->value.words[0].bval & 0xFFu, 0xFFu);
-}
-
-TEST(StrengthCombine, AmbiguousSameRangePreserved) {
-  StrengthSignal a{Val4::kX, StrengthLevel::kWeak, StrengthLevel::kWeak};
-  StrengthSignal b{Val4::kX, StrengthLevel::kWeak, StrengthLevel::kWeak};
-  auto result = CombineAmbiguous(a, b);
-  EXPECT_EQ(result.value, Val4::kX);
-  EXPECT_EQ(result.strength0_hi, StrengthLevel::kWeak);
-  EXPECT_EQ(result.strength1_hi, StrengthLevel::kWeak);
-}
-
-TEST(StrengthCombine, AmbiguousWidensToMaxPerSide) {
-  StrengthSignal weak_x{Val4::kX, StrengthLevel::kWeak, StrengthLevel::kWeak};
-  StrengthSignal pull_x{Val4::kX, StrengthLevel::kPull, StrengthLevel::kPull};
-  auto result = CombineAmbiguous(weak_x, pull_x);
-  EXPECT_EQ(result.value, Val4::kX);
-  EXPECT_EQ(result.strength0_hi, StrengthLevel::kPull);
-  EXPECT_EQ(result.strength1_hi, StrengthLevel::kPull);
-}
-
-TEST(StrengthCombine, AmbiguousOppositeSidesUnion) {
-  StrengthSignal pull_h{Val4::kX, StrengthLevel::kHighz, StrengthLevel::kPull};
-  StrengthSignal weak_l{Val4::kX, StrengthLevel::kWeak, StrengthLevel::kHighz};
-  auto result = CombineAmbiguous(pull_h, weak_l);
-  EXPECT_EQ(result.value, Val4::kX);
-  EXPECT_EQ(result.strength0_hi, StrengthLevel::kWeak);
-  EXPECT_EQ(result.strength1_hi, StrengthLevel::kPull);
-}
-
-TEST(StrengthCombine, AmbiguousSupplyDominatesStrongPerSide) {
-  StrengthSignal strong_x{Val4::kX, StrengthLevel::kStrong,
-                          StrengthLevel::kStrong};
-  StrengthSignal supply_x{Val4::kX, StrengthLevel::kSupply,
-                          StrengthLevel::kSupply};
-  auto result = CombineAmbiguous(strong_x, supply_x);
-  EXPECT_EQ(result.value, Val4::kX);
-  EXPECT_EQ(result.strength0_hi, StrengthLevel::kSupply);
-  EXPECT_EQ(result.strength1_hi, StrengthLevel::kSupply);
 }
 
 TEST(StrengthResolution, EqualStrengthPartialConflictPerBit) {
@@ -121,77 +37,6 @@ TEST(StrengthResolution, EqualStrengthPartialConflictPerBit) {
   // aval = 0b1110 (the known 1 at bit3 plus the two x bits), bval = 0b0110.
   EXPECT_EQ(sn.var->value.words[0].aval & 0xFu, 0b1110u);
   EXPECT_EQ(sn.var->value.words[0].bval & 0xFu, 0b0110u);
-}
-
-TEST(StrengthResolution,
-     EqualStrengthConflictPopulatesAmbiguousResolvedStrength) {
-  Arena arena;
-  StrengthNet sn = MakeStrengthNet(arena, 1);
-  Net& net = sn.net;
-
-  AddDriver(arena, net, 1, 0, Strength::kPull);
-  AddDriver(arena, net, 1, 1, Strength::kPull);
-  net.Resolve(arena);
-
-  EXPECT_EQ(net.resolved_strength.s0_hi, Strength::kPull);
-  EXPECT_EQ(net.resolved_strength.s1_hi, Strength::kPull);
-  EXPECT_TRUE(net.resolved_strength.IsAmbiguous());
-}
-
-TEST(StrengthResolution,
-     EqualSupplyConflictPopulatesAmbiguousResolvedStrength) {
-  Arena arena;
-  StrengthNet sn = MakeStrengthNet(arena, 1);
-  Net& net = sn.net;
-
-  AddDriver(arena, net, 1, 0, Strength::kSupply);
-  AddDriver(arena, net, 1, 1, Strength::kSupply);
-  net.Resolve(arena);
-
-  EXPECT_EQ(net.resolved_strength.s0_hi, Strength::kSupply);
-  EXPECT_EQ(net.resolved_strength.s1_hi, Strength::kSupply);
-  EXPECT_TRUE(net.resolved_strength.IsAmbiguous());
-}
-
-TEST(StrengthResolution, EqualStrengthConflictLeavesLoAtHighz) {
-  Arena arena;
-  StrengthNet sn = MakeStrengthNet(arena, 1);
-  Net& net = sn.net;
-
-  AddDriver(arena, net, 1, 0, Strength::kStrong);
-  AddDriver(arena, net, 1, 1, Strength::kStrong);
-  net.Resolve(arena);
-
-  EXPECT_EQ(net.resolved_strength.s0_lo, Strength::kHighz);
-  EXPECT_EQ(net.resolved_strength.s1_lo, Strength::kHighz);
-}
-
-TEST(StrengthCombine, AmbiguousThreeSignalsFoldPreservesRange) {
-  StrengthSignal weak_x{Val4::kX, StrengthLevel::kWeak, StrengthLevel::kWeak};
-  StrengthSignal pull_x{Val4::kX, StrengthLevel::kPull, StrengthLevel::kPull};
-  StrengthSignal strong_x{Val4::kX, StrengthLevel::kStrong,
-                          StrengthLevel::kStrong};
-  auto result = CombineAmbiguous(CombineAmbiguous(weak_x, pull_x), strong_x);
-  EXPECT_EQ(result.value, Val4::kX);
-  EXPECT_EQ(result.strength0_hi, StrengthLevel::kStrong);
-  EXPECT_EQ(result.strength1_hi, StrengthLevel::kStrong);
-}
-
-TEST(StrengthResolution,
-     EqualMediumConflictPopulatesAmbiguousResolvedStrength) {
-  Arena arena;
-  StrengthNet sn = MakeStrengthNet(arena, 1);
-  Net& net = sn.net;
-
-  AddDriver(arena, net, 1, 0, Strength::kMedium);
-  AddDriver(arena, net, 1, 1, Strength::kMedium);
-  net.Resolve(arena);
-
-  EXPECT_EQ(sn.var->value.words[0].aval & 1u, 1u);  // x = (aval=1, bval=1)
-  EXPECT_EQ(sn.var->value.words[0].bval & 1u, 1u);
-  EXPECT_EQ(net.resolved_strength.s0_hi, Strength::kMedium);
-  EXPECT_EQ(net.resolved_strength.s1_hi, Strength::kMedium);
-  EXPECT_TRUE(net.resolved_strength.IsAmbiguous());
 }
 
 TEST(StrengthResolution, EqualStrengthConflictOnTriNetPopulatesAmbiguous) {
@@ -354,6 +199,143 @@ TEST(AmbiguousNetStrengthCombine, CombiningWithDefaultStretchesLoToHighz) {
   EXPECT_EQ(r.s1_lo, Strength::kHighz);
   EXPECT_EQ(r.s0_hi, Strength::kHighz);
   EXPECT_EQ(r.s0_lo, Strength::kHighz);
+}
+
+// --- Full-pipeline observation of §28.12.2 Claim 1 --------------------------
+// When two signals of equal strength and opposite value combine, the result is
+// value x carrying the strength levels of both signals plus all the smaller
+// strength levels (Figure 28-4 / Figure 28-5). §28.12.1 explicitly delegates
+// this unlike-value/same-strength case here. The competing drivers are produced
+// from real drive-strength source (the machinery of §28.11), elaborated,
+// lowered, and run, so the resolved value and the ambiguous resolved strength
+// are observed exactly as the production resolver computes them -- rather than
+// from a hand-assembled Net or a test-model combiner.
+
+// Elaborates, lowers, and runs `src`, then returns the settled net named "w".
+static Net* RunAndFindNetW(SimFixture& f, const char* src) {
+  auto* design = ElaborateSrc(src, f);
+  if (design == nullptr) return nullptr;
+  LowerAndRun(design, f);
+  return f.ctx.FindNet("w");
+}
+
+// Figure 28-4 exactly: a weak 1 and a weak 0 driving one wire settle to a weak
+// x. The resolved strength is ambiguous, its high bound the shared weak level
+// on both sides and its low bound HiZ -- i.e. weak plus every smaller level.
+TEST(StrengthResolutionPipeline, EqualWeakOppositeValueYieldsWeakX) {
+  SimFixture f;
+  Net* net = RunAndFindNetW(f,
+                            "module t;\n"
+                            "  wire w;\n"
+                            "  assign (weak0, weak1) w = 1'b1;\n"
+                            "  assign (weak0, weak1) w = 1'b0;\n"
+                            "endmodule\n");
+  ASSERT_NE(net, nullptr);
+  auto* var = f.ctx.FindVariable("w");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.words[0].aval & 1u, 1u);  // x = (aval=1, bval=1)
+  EXPECT_EQ(var->value.words[0].bval & 1u, 1u);
+  EXPECT_EQ(net->resolved_strength.s0_hi, Strength::kWeak);
+  EXPECT_EQ(net->resolved_strength.s1_hi, Strength::kWeak);
+  EXPECT_EQ(net->resolved_strength.s0_lo, Strength::kHighz);
+  EXPECT_EQ(net->resolved_strength.s1_lo, Strength::kHighz);
+  EXPECT_TRUE(net->resolved_strength.IsAmbiguous());
+}
+
+// The "all the smaller strength levels" clause made explicit at strong: a
+// strong 1 opposing a strong 0 yields x whose range spans strong down to HiZ
+// on both sides of the scale, not just the strong endpoint.
+TEST(StrengthResolutionPipeline,
+     EqualStrongOppositeValueSpansAllSmallerLevels) {
+  SimFixture f;
+  Net* net = RunAndFindNetW(f,
+                            "module t;\n"
+                            "  wire w;\n"
+                            "  assign (strong0, strong1) w = 1'b1;\n"
+                            "  assign (strong0, strong1) w = 1'b0;\n"
+                            "endmodule\n");
+  ASSERT_NE(net, nullptr);
+  auto* var = f.ctx.FindVariable("w");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.words[0].aval & 1u, 1u);
+  EXPECT_EQ(var->value.words[0].bval & 1u, 1u);
+  EXPECT_EQ(net->resolved_strength.s0_hi, Strength::kStrong);
+  EXPECT_EQ(net->resolved_strength.s1_hi, Strength::kStrong);
+  EXPECT_EQ(net->resolved_strength.s0_lo, Strength::kHighz);
+  EXPECT_EQ(net->resolved_strength.s1_lo, Strength::kHighz);
+  EXPECT_TRUE(net->resolved_strength.IsAmbiguous());
+}
+
+// Input-form coverage: the equal-strength opposite-value drivers originate from
+// gate primitive outputs (§28.4 gate syntax) rather than continuous
+// assignments. §28.12.2's rule resolves the drivers regardless of how they are
+// produced, so the same weak x results.
+TEST(StrengthResolutionPipeline, EqualStrengthConflictFromGateOutputs) {
+  SimFixture f;
+  Net* net = RunAndFindNetW(
+      f,
+      "module t;\n"
+      "  wire w;\n"
+      "  wire a = 1'b1, b = 1'b1;\n"         // and -> 1
+      "  wire c = 1'b0, d = 1'b1;\n"         // and -> 0
+      "  and (weak0, weak1) g0(w, a, b);\n"  // weak-strength 1 driver
+      "  and (weak0, weak1) g1(w, c, d);\n"  // weak-strength 0 driver
+      "endmodule\n");
+  ASSERT_NE(net, nullptr);
+  auto* var = f.ctx.FindVariable("w");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.words[0].aval & 1u, 1u);  // x
+  EXPECT_EQ(var->value.words[0].bval & 1u, 1u);
+  EXPECT_EQ(net->resolved_strength.s0_hi, Strength::kWeak);
+  EXPECT_EQ(net->resolved_strength.s1_hi, Strength::kWeak);
+  EXPECT_TRUE(net->resolved_strength.IsAmbiguous());
+}
+
+// Input-form coverage: one of the conflicting drivers is produced by a
+// net-declaration assignment (§6.10 / §28.11) -- a continuous driver in a
+// different syntactic position than a standalone `assign`. It competes with an
+// opposite-value cont-assign driver of equal strength, and §28.12.2's rule
+// resolves the two into a strong x with a range down to HiZ.
+TEST(StrengthResolutionPipeline, EqualStrengthConflictFromNetDeclInitializer) {
+  SimFixture f;
+  Net* net =
+      RunAndFindNetW(f,
+                     "module t;\n"
+                     "  wire (strong0, strong1) w = 1'b1;\n"    // net-decl 1
+                     "  assign (strong0, strong1) w = 1'b0;\n"  // 0 driver
+                     "endmodule\n");
+  ASSERT_NE(net, nullptr);
+  auto* var = f.ctx.FindVariable("w");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.words[0].aval & 1u, 1u);  // x
+  EXPECT_EQ(var->value.words[0].bval & 1u, 1u);
+  EXPECT_EQ(net->resolved_strength.s0_hi, Strength::kStrong);
+  EXPECT_EQ(net->resolved_strength.s1_hi, Strength::kStrong);
+  EXPECT_EQ(net->resolved_strength.s0_lo, Strength::kHighz);
+  EXPECT_EQ(net->resolved_strength.s1_lo, Strength::kHighz);
+  EXPECT_TRUE(net->resolved_strength.IsAmbiguous());
+}
+
+// Input-form coverage: a vector operand driven end to end. §28.12.2's rule is
+// applied independently per bit, so on a multi-bit net each bit is resolved on
+// its own -- conflicting bits become x while agreeing bits keep their value.
+// The competing vector drivers come from real drive-strength cont-assign source
+// rather than a hand-built Net.
+TEST(StrengthResolutionPipeline, EqualStrengthConflictVectorResolvesPerBit) {
+  SimFixture f;
+  Net* net = RunAndFindNetW(f,
+                            "module t;\n"
+                            "  wire [3:0] w;\n"
+                            "  assign (strong0, strong1) w = 4'b1100;\n"
+                            "  assign (strong0, strong1) w = 4'b1010;\n"
+                            "endmodule\n");
+  ASSERT_NE(net, nullptr);
+  auto* var = f.ctx.FindVariable("w");
+  ASSERT_NE(var, nullptr);
+  // bit3: 1 vs 1 -> 1; bit2: 1 vs 0 -> x; bit1: 0 vs 1 -> x; bit0: 0 vs 0 -> 0.
+  // Convention A: an x bit sets aval, so aval = 0b1110, bval = 0b0110.
+  EXPECT_EQ(var->value.words[0].aval & 0xFu, 0b1110u);
+  EXPECT_EQ(var->value.words[0].bval & 0xFu, 0b0110u);
 }
 
 }  // namespace
