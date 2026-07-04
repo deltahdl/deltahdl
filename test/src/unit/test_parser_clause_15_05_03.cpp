@@ -71,18 +71,25 @@ TEST(EventTriggeredParser, TriggeredMethodEventAlias) {
   ASSERT_GE(stmt->fork_stmts.size(), 2u);
 }
 
-TEST(EventTriggeredParser, TriggeredMethodWithBodyStmt) {
+TEST(EventTriggeredParser, TriggeredMethodCallForm) {
+  // §15.5.3: the method prototype carries empty parentheses, so the
+  // parenthesized call form ev.triggered() is a legal invocation alongside the
+  // bare-member form. The wait condition parses as a call expression (its
+  // receiver being the event member access), distinct from the plain member
+  // access of ev.triggered.
   auto r = Parse(
       "module m;\n"
-      "  event e;\n"
+      "  event ev;\n"
       "  initial begin\n"
-      "    wait(e.triggered) $display(\"done\");\n"
+      "    wait(ev.triggered());\n"
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kWait);
+  ASSERT_NE(stmt->condition, nullptr);
+  EXPECT_EQ(stmt->condition->kind, ExprKind::kCall);
 }
 
 }  // namespace

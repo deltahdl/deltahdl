@@ -92,4 +92,12 @@ bool TryEvalProcessStaticCall(const Expr* expr, SimContext& ctx, Arena& arena,
 bool TryEvalProcessMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
                               Logic4Vec& out);
 
+// §15.5.3: routes the parenthesized call form of the named-event triggered
+// method (ev.triggered()) to the same triggered-state evaluation used for the
+// bare-member form. Returns false when the call is not a triggered() invocation
+// on a named event, so normal method dispatch proceeds. Defined in
+// eval_expr.cpp alongside the member-access triggered handler.
+bool TryEvalEventTriggeredCall(const Expr* expr, SimContext& ctx, Arena& arena,
+                               Logic4Vec& out);
+
 }  // namespace delta

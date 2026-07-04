@@ -526,6 +526,7 @@ static bool TryEvalWeakRefStaticCall(const Expr* expr, SimContext& ctx,
 static bool TryBuiltinMethodCall(const Expr* expr, SimContext& ctx,
                                  Arena& arena, Logic4Vec& out) {
   if (TryEvalProcessMethodCall(expr, ctx, arena, out)) return true;
+  if (TryEvalEventTriggeredCall(expr, ctx, arena, out)) return true;
   if (TryEvalWeakRefMethodCall(expr, ctx, arena, out)) return true;
   if (TryEvalEnumMethodCall(expr, ctx, arena, out)) return true;
   if (TryEvalStringMethodCall(expr, ctx, arena, out)) return true;

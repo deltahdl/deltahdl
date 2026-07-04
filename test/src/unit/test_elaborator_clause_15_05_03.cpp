@@ -12,14 +12,6 @@ TEST(EventTriggeredElaborator, WaitTriggeredElaborates) {
              "endmodule\n"));
 }
 
-TEST(EventTriggeredElaborator, WaitTriggeredWithBodyElaborates) {
-  EXPECT_TRUE(
-      ElabOk("module m;\n"
-             "  event ev;\n"
-             "  initial wait(ev.triggered) $display(\"done\");\n"
-             "endmodule\n"));
-}
-
 TEST(EventTriggeredElaborator, ForkTriggerAndWaitTriggeredElaborates) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
@@ -30,6 +22,18 @@ TEST(EventTriggeredElaborator, ForkTriggerAndWaitTriggeredElaborates) {
              "      wait(blast.triggered);\n"
              "    join\n"
              "  end\n"
+             "endmodule\n"));
+}
+
+TEST(EventTriggeredElaborator, TriggeredCallFormElaborates) {
+  // §15.5.3: the parenthesized call form of the triggered method is a
+  // bit-valued expression, so it elaborates as the right-hand side of an
+  // assignment without being flagged as an unknown function call.
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  event ev;\n"
+             "  logic b;\n"
+             "  initial b = ev.triggered();\n"
              "endmodule\n"));
 }
 

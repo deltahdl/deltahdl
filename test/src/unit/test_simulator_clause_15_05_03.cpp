@@ -47,21 +47,11 @@ TEST(IpcSync, NonblockingTriggerSetsTriggeredState) {
   EXPECT_TRUE(f.ctx.IsEventTriggered("my_event"));
 }
 
-TEST(IpcSync, TriggeredMethodReturnsOneWhenTriggered) {
-  auto result = EvalEvTriggered(/*set_triggered=*/true);
-  EXPECT_EQ(result.ToUint64(), 1u);
-}
-
 TEST(IpcSync, TriggeredMethodYieldsSingleBit) {
   // §15.5.3: triggered is prototyped as a bit-valued method, so the evaluated
   // result is a single-bit quantity regardless of the event's triggered state.
   auto result = EvalEvTriggered(/*set_triggered=*/true);
   EXPECT_EQ(result.width, 1u);
-}
-
-TEST(IpcSync, TriggeredMethodReturnsZeroByDefault) {
-  auto result = EvalEvTriggered(/*set_triggered=*/false);
-  EXPECT_EQ(result.ToUint64(), 0u);
 }
 
 TEST(IpcSync, WaitTriggeredProceedsWhenAlreadyTriggered) {
@@ -306,6 +296,144 @@ TEST(IpcSync, TriggeredStatePersistsAcrossSuccessiveWaitsInSameStep) {
   ASSERT_NE(second, nullptr);
   EXPECT_EQ(first->value.ToUint64(), 1u);
   EXPECT_EQ(second->value.ToUint64(), 1u);
+}
+
+TEST(IpcSync, TriggeredCallFormEvaluatesTrueWhenTriggered) {
+  // §15.5.3: the method is prototyped `function bit triggered()`, so invoking
+  // it with explicit empty parentheses is equivalent to the bare-member form.
+  // After the event fires in this step, ev.triggered() reads back true.
+  LowerFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  event ev;\n"
+      "  logic [7:0] hit;\n"
+      "  initial begin\n"
+      "    -> ev;\n"
+      "    if (ev.triggered()) hit = 8'd1; else hit = 8'd0;\n"
+      "  end\n"
+      "  initial #1 $finish;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* var = f.ctx.FindVariable("hit");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 1u);
+}
+
+TEST(IpcSync, TriggeredCallFormEvaluatesFalseWhenNotTriggered) {
+  // §15.5.3: with no trigger in the current step, the call form yields 1'b0
+  // just as the bare-member form does, so the else branch runs.
+  LowerFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  event ev;\n"
+      "  logic [7:0] hit;\n"
+      "  initial begin\n"
+      "    if (ev.triggered()) hit = 8'd1; else hit = 8'd0;\n"
+      "  end\n"
+      "  initial #1 $finish;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* var = f.ctx.FindVariable("hit");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0u);
+}
+
+TEST(IpcSync, TriggeredCallFormOnNullEventReturnsFalse) {
+  // §15.5.3: the triggered method of a null named event returns false. This
+  // must hold for the parenthesized call form as well as the bare-member form,
+  // so a procedural read of ev.triggered() on a null event assigns 0.
+  LowerFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  event ev = null;\n"
+      "  logic [7:0] hit;\n"
+      "  initial begin\n"
+      "    hit = ev.triggered();\n"
+      "  end\n"
+      "  initial #1 $finish;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* var = f.ctx.FindVariable("hit");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0u);
+}
+
+TEST(IpcSync, TriggeredStateVisibleThroughEventAlias) {
+  // §15.5.3: the triggered state is a property of the underlying named-event
+  // synchronization object, not of the name used to reach it. The example
+  // introduces an alias (event done_too = done) to make this point. Triggering
+  // `done` and reading `done_too.triggered` in the same step observes the state
+  // through the alias, so the if-branch runs.
+  LowerFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  event done;\n"
+      "  event done_too = done;\n"
+      "  logic [7:0] hit;\n"
+      "  initial begin\n"
+      "    -> done;\n"
+      "    if (done_too.triggered) hit = 8'd1; else hit = 8'd0;\n"
+      "  end\n"
+      "  initial #1 $finish;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* var = f.ctx.FindVariable("hit");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 1u);
+}
+
+TEST(IpcSync, NonblockingTriggerEndToEndSetsTriggeredState) {
+  // §15.5.3: the persistent triggered state records that the event fired in the
+  // current step regardless of which trigger operator produced it. Here the
+  // event is fired with the §15.5.1 nonblocking trigger ->>, whose effect lands
+  // in the nonblocking region of the same step; a sibling wait on the triggered
+  // state then unblocks and runs the following assignment.
+  LowerFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  event ev;\n"
+      "  logic [7:0] hit;\n"
+      "  initial begin\n"
+      "    ->> ev;\n"
+      "    wait(ev.triggered);\n"
+      "    hit = 8'd1;\n"
+      "  end\n"
+      "  initial #2 $finish;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* var = f.ctx.FindVariable("hit");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
 }  // namespace

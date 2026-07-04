@@ -431,6 +431,27 @@ static bool TryEventSequenceMethod(const MemberAccess& ma, Logic4Vec& out) {
   return false;
 }
 
+// §15.5.3: the triggered method is prototyped as `function bit triggered()`, so
+// a program may invoke it with explicit empty parentheses (ev.triggered()) as
+// well as omitting them (ev.triggered). The bare-member form is handled by
+// TryEventSequenceMethod during member-access evaluation; this routine covers
+// the call form, which arrives as a kCall whose receiver is the named event.
+// It yields the same single-bit result: the event's triggered state for the
+// current time step, or 1'b0 when the named event is null.
+bool TryEvalEventTriggeredCall(const Expr* expr, SimContext& ctx, Arena& arena,
+                               Logic4Vec& out) {
+  MethodCallParts parts;
+  if (!ExtractMethodCallParts(expr, parts)) return false;
+  if (parts.method_name != "triggered") return false;
+  auto* var = ctx.FindVariable(parts.var_name);
+  if (!var || !var->is_event) return false;
+  out = var->is_null_event
+            ? MakeLogic4VecVal(arena, 1, 0u)
+            : MakeLogic4VecVal(arena, 1,
+                               ctx.IsEventTriggered(parts.var_name) ? 1u : 0u);
+  return true;
+}
+
 // §14.13: reading a clockvar (cb.data) yields the value sampled at the clocking
 // block's most recent input event, not the signal's live value.
 // ResolveClockingMember confirms `base_name` names a clocking block carrying
