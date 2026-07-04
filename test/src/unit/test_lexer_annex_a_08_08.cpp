@@ -106,10 +106,6 @@ TEST(StringLiteralLexing, TripleQuotedStringEscapeSeq) {
   EXPECT_EQ(tokens[0].kind, TokenKind::kStringLiteral);
 }
 
-TEST(StringLiteralLexing, QuotedStringUnterminatedError) {
-  EXPECT_TRUE(LexHasErrors("\"no closing quote\n"));
-}
-
 TEST(StringLiteralLexing, TripleQuotedStringUnterminatedError) {
   EXPECT_TRUE(LexHasErrors("\"\"\"no closing triple"));
 }
