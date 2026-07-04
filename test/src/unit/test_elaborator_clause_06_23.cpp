@@ -1,10 +1,22 @@
 #include "fixture_simulator.h"
+#include "helpers_generate_elab.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
 
 using namespace delta;
 
 namespace {
+
+// Counts variables in `mod` whose name ends in `last`. A declaration inside an
+// (unnamed) generate block reaches the module's variable list under a scoped
+// name, so the trailing character identifies which alternative was taken.
+int CountVarsEndingWith(const RtlirModule* mod, char last) {
+  int count = 0;
+  for (const auto& var : mod->variables) {
+    if (!var.name.empty() && var.name.back() == last) ++count;
+  }
+  return count;
+}
 
 TEST(TypeOperatorSim, TypeOpInt) {
   SimFixture f;
@@ -667,6 +679,37 @@ TEST(TypeOperatorSim, TypeOpBitTypeUnsigned) {
   EXPECT_EQ(var->value.ToUint64(), 0xABu);
 }
 
+// §6.23 — the type operator applied to an expression yields that expression's
+// self-determined type. Here the operand's type is produced by a user-defined
+// typedef (§6.18) built from real source syntax: `bus_t` names a 24-bit logic
+// vector, so `type(x)` derives a 24-bit unsigned type for the dependent
+// declaration. Driven through the full pipeline and observed at runtime.
+TEST(TypeOperatorSim, TypeOpTypedefVectorType) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  typedef logic [23:0] bus_t;\n"
+      "  bus_t x;\n"
+      "  var type(x) y;\n"
+      "  initial begin\n"
+      "    x = 24'h123456;\n"
+      "    y = 24'hABCDEF;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* var = f.ctx.FindVariable("y");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.width, 24u);
+  EXPECT_FALSE(var->is_signed);
+  EXPECT_EQ(var->value.ToUint64(), 0xABCDEFu);
+}
+
 TEST(TypeOperatorElab, TypeOfThisInClassMethodAccepted) {
   EXPECT_TRUE(
       ElabOk("class C;\n"
@@ -783,6 +826,161 @@ TEST(TypeOperatorElab, AssocArrayElementInTypeArgRejected) {
              "  int a[string];\n"
              "  var type(a[\"k\"]) v;\n"
              "endmodule\n"));
+}
+
+// §6.23 — a queue is a variable-size (dynamic) object as well, so selecting one
+// of its elements inside type(...) is rejected, just like a dynamic or
+// associative array element. This exercises the queue input form of the
+// dynamic-object prohibition.
+TEST(TypeOperatorElab, QueueElementInTypeArgRejected) {
+  EXPECT_FALSE(
+      ElabOk("module m;\n"
+             "  int q[$];\n"
+             "  var type(q[0]) v;\n"
+             "endmodule\n"));
+}
+
+// §6.23 — a comparison of two type references is a constant expression, and the
+// two references compare equal exactly when the referenced types match
+// (§6.22.1) This is the accepting path for the `==` form: with `T` bound to
+// `int`, the generate-if condition is true, so the then-block's declaration
+// reaches the module and the else-block's does not. Observing which declaration
+// survives shows the elaborator actually folding the comparison to true via
+// type matching, not merely accepting the syntax.
+TEST(TypeOperatorGenerate, EqualMatchingTypesSelectsThenBranch) {
+  auto r = RunGenerateElaboration(
+      "module top;\n"
+      "  parameter type T = int;\n"
+      "  if (type(T) == type(int)) begin\n"
+      "    logic a;\n"
+      "  end else begin\n"
+      "    logic b;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.design, nullptr);
+  EXPECT_FALSE(r.f.has_errors);
+  ASSERT_EQ(r.design->top_modules.size(), 1u);
+  EXPECT_EQ(CountVarsEndingWith(r.design->top_modules[0], 'a'), 1);
+  EXPECT_EQ(CountVarsEndingWith(r.design->top_modules[0], 'b'), 0);
+}
+
+// §6.23 — the rejecting path for `==`: `int` and `real` are nonmatching types,
+// so the condition folds to false and the else-block is the one instantiated.
+TEST(TypeOperatorGenerate, EqualNonMatchingTypesSelectsElseBranch) {
+  auto r = RunGenerateElaboration(
+      "module top;\n"
+      "  parameter type T = int;\n"
+      "  if (type(T) == type(real)) begin\n"
+      "    logic a;\n"
+      "  end else begin\n"
+      "    logic b;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.design, nullptr);
+  EXPECT_FALSE(r.f.has_errors);
+  ASSERT_EQ(r.design->top_modules.size(), 1u);
+  EXPECT_EQ(CountVarsEndingWith(r.design->top_modules[0], 'a'), 0);
+  EXPECT_EQ(CountVarsEndingWith(r.design->top_modules[0], 'b'), 1);
+}
+
+// §6.23 — the inequality form negates the match result: nonmatching types make
+// `!=` true, selecting the then-block.
+TEST(TypeOperatorGenerate, NotEqualNonMatchingTypesSelectsThenBranch) {
+  auto r = RunGenerateElaboration(
+      "module top;\n"
+      "  parameter type T = int;\n"
+      "  if (type(T) != type(real)) begin\n"
+      "    logic a;\n"
+      "  end else begin\n"
+      "    logic b;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.design, nullptr);
+  EXPECT_FALSE(r.f.has_errors);
+  ASSERT_EQ(r.design->top_modules.size(), 1u);
+  EXPECT_EQ(CountVarsEndingWith(r.design->top_modules[0], 'a'), 1);
+  EXPECT_EQ(CountVarsEndingWith(r.design->top_modules[0], 'b'), 0);
+}
+
+// §6.23 — the case-equality operator behaves the same as equality for type
+// references: matching types fold `===` to true, selecting the then-block.
+TEST(TypeOperatorGenerate, CaseEqualMatchingTypesSelectsThenBranch) {
+  auto r = RunGenerateElaboration(
+      "module top;\n"
+      "  parameter type T = int;\n"
+      "  if (type(T) === type(int)) begin\n"
+      "    logic a;\n"
+      "  end else begin\n"
+      "    logic b;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.design, nullptr);
+  EXPECT_FALSE(r.f.has_errors);
+  ASSERT_EQ(r.design->top_modules.size(), 1u);
+  EXPECT_EQ(CountVarsEndingWith(r.design->top_modules[0], 'a'), 1);
+  EXPECT_EQ(CountVarsEndingWith(r.design->top_modules[0], 'b'), 0);
+}
+
+// §6.23 — the case-inequality operator negates the match, so matching types
+// fold `!==` to false and the else-block is instantiated.
+TEST(TypeOperatorGenerate, CaseNotEqualMatchingTypesSelectsElseBranch) {
+  auto r = RunGenerateElaboration(
+      "module top;\n"
+      "  parameter type T = int;\n"
+      "  if (type(T) !== type(int)) begin\n"
+      "    logic a;\n"
+      "  end else begin\n"
+      "    logic b;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.design, nullptr);
+  EXPECT_FALSE(r.f.has_errors);
+  ASSERT_EQ(r.design->top_modules.size(), 1u);
+  EXPECT_EQ(CountVarsEndingWith(r.design->top_modules[0], 'a'), 0);
+  EXPECT_EQ(CountVarsEndingWith(r.design->top_modules[0], 'b'), 1);
+}
+
+// §6.23 — both operands may be built-in data-type references rather than type
+// parameters. `int` (signed) and `bit` (unsigned) are nonmatching, so the
+// condition folds to false; the else-block is taken. This exercises the
+// data-type (text) operand form of the fold, distinct from the type-parameter
+// (identifier) form above.
+TEST(TypeOperatorGenerate, BuiltinDataTypeReferencesFoldByMatching) {
+  auto r = RunGenerateElaboration(
+      "module top;\n"
+      "  if (type(int) == type(bit)) begin\n"
+      "    logic a;\n"
+      "  end else begin\n"
+      "    logic b;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.design, nullptr);
+  EXPECT_FALSE(r.f.has_errors);
+  ASSERT_EQ(r.design->top_modules.size(), 1u);
+  EXPECT_EQ(CountVarsEndingWith(r.design->top_modules[0], 'a'), 0);
+  EXPECT_EQ(CountVarsEndingWith(r.design->top_modules[0], 'b'), 1);
+}
+
+// §6.23 — the comparison being a constant expression must hold for each kind of
+// constant type operand, which take different resolution paths. The parameter
+// form is covered above; here the operand is a `localparam type`, and the
+// generate-if still folds by type matching (localparam T bound to `int` matches
+// `type(int)`), selecting the then-block.
+TEST(TypeOperatorGenerate, LocalparamTypeOperandFoldsByMatching) {
+  auto r = RunGenerateElaboration(
+      "module top;\n"
+      "  localparam type T = int;\n"
+      "  if (type(T) == type(int)) begin\n"
+      "    logic a;\n"
+      "  end else begin\n"
+      "    logic b;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.design, nullptr);
+  EXPECT_FALSE(r.f.has_errors);
+  ASSERT_EQ(r.design->top_modules.size(), 1u);
+  EXPECT_EQ(CountVarsEndingWith(r.design->top_modules[0], 'a'), 1);
+  EXPECT_EQ(CountVarsEndingWith(r.design->top_modules[0], 'b'), 0);
 }
 
 }  // namespace

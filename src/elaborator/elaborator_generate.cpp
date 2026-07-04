@@ -57,7 +57,12 @@ void Elaborator::ElaborateGenerateItems(const std::vector<ModuleItem*>& items,
 
 void Elaborator::ElaborateGenerateIf(ModuleItem* item, RtlirModule* mod,
                                      const ScopeMap& scope) {
-  auto cond = ConstEvalInt(item->gen_cond, scope);
+  // §6.23: a comparison of two type references is a constant expression, so it
+  // may gate a generate-if. Fold it here (via §6.22.1 type matching) before the
+  // ordinary integer const-eval, which does not understand type-reference
+  // operands.
+  auto cond = EvalConstTypeRefCompare(item->gen_cond);
+  if (!cond) cond = ConstEvalInt(item->gen_cond, scope);
   if (!cond) {
     diag_.Warning(item->loc, "generate-if condition is not constant");
     return;

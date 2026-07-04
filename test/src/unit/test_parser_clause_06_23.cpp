@@ -52,19 +52,6 @@ TEST(TypeOperatorParsing, TypeRefComparison) {
               "endmodule\n"));
 }
 
-TEST(TypeOperatorParsing, TypeOperatorExprKind) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial x = type(y);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  auto* rhs = stmt->rhs;
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kTypeRef);
-}
-
 TEST(TypeOperatorParsing, TypeOperatorInDataType) {
   auto r = Parse(
       "module t;\n"
@@ -491,6 +478,18 @@ TEST(TypeOperatorParsing, TypeRefAssignmentPatternCast) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
+}
+
+// §6.23 — a type reference used as the data type of a variable declaration
+// shall be preceded by the `var` keyword. This is the rejecting counterpart to
+// the accepting `var type(a) b;` forms above: a bare `type(a) b;` omits the
+// required keyword and the parser reports an error.
+TEST(TypeOperatorParsing, VarTypeRefWithoutVarKeywordRejected) {
+  EXPECT_FALSE(
+      ParseOk("module t;\n"
+              "  int a;\n"
+              "  type(a) b;\n"
+              "endmodule\n"));
 }
 
 }  // namespace

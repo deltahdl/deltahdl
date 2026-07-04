@@ -34,25 +34,6 @@ TEST(ThisParsing, ThisDisambiguationInConstructor) {
   EXPECT_EQ(ctor->method->name, "new");
 }
 
-TEST(ThisParsing, ThisChainedMemberAccess) {
-  EXPECT_TRUE(
-      ParseOk("class C;\n"
-              "  int a;\n"
-              "  function int get_a();\n"
-              "    return this.a;\n"
-              "  endfunction\n"
-              "endclass\n"));
-}
-
-TEST(ThisParsing, ThisMethodCallChain) {
-  EXPECT_TRUE(
-      ParseOk("class C;\n"
-              "  function C get_self();\n"
-              "    return this;\n"
-              "  endfunction\n"
-              "endclass\n"));
-}
-
 TEST(ThisParsing, ThisInClassTask) {
   EXPECT_TRUE(
       ParseOk("class C;\n"

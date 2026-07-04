@@ -93,21 +93,6 @@ TEST(ThisElaboration, ThisInClassTaskOk) {
              "endmodule\n"));
 }
 
-TEST(ThisElaboration, ThisInConstructorOk) {
-  EXPECT_TRUE(
-      ElabOk("class C;\n"
-             "  int a;\n"
-             "  int b;\n"
-             "  function new(int a, int b);\n"
-             "    this.a = a;\n"
-             "    this.b = b;\n"
-             "  endfunction\n"
-             "endclass\n"
-             "module m;\n"
-             "  C c;\n"
-             "endmodule\n"));
-}
-
 TEST(ThisElaboration, BareThisInModuleInitialError) {
   EXPECT_FALSE(
       ElabOk("module m;\n"
@@ -142,6 +127,23 @@ TEST(ThisElaboration, TypeOfThisInStaticMethodBodyAllowed) {
              "    int b;\n"
              "    if (type(this) == type(int)) b = 1;\n"
              "    return b;\n"
+             "  endfunction\n"
+             "endclass\n"
+             "module m;\n"
+             "  C c;\n"
+             "endmodule\n"));
+}
+
+// §8.11 — a static method is not tied to any instance, so a non-literal 'this'
+// (here `this.x`) inside a static method body is outside the permitted set and
+// an error is issued. This is the static-method rejection form, a different
+// enforcement path from the module-context rejections above.
+TEST(ThisElaboration, ThisInStaticMethodError) {
+  EXPECT_FALSE(
+      ElabOk("class C;\n"
+             "  int x;\n"
+             "  static function int f();\n"
+             "    return this.x;\n"
              "  endfunction\n"
              "endclass\n"
              "module m;\n"

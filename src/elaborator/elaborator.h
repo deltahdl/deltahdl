@@ -678,6 +678,16 @@ class Elaborator {
   void CheckTypeRefCompareOp(const Expr* expr);
   void WalkStmtsForTypeRefCompare(const Stmt* s);
 
+  // §6.23: resolve one type-reference operand of a comparison to the concrete
+  // data type it denotes, following the typedef/type-parameter tables. Returns
+  // nullopt when the operand is not a type reference or names a type this pass
+  // cannot resolve (e.g. a plain variable), so the caller leaves it unfolded.
+  std::optional<DataType> ResolveTypeRefOperandType(const Expr* op) const;
+  // §6.23: fold a type-reference equality/inequality/case-equality comparison
+  // to a constant 0/1 using §6.22.1 type matching. Returns nullopt when `expr`
+  // is not such a comparison or an operand cannot be resolved.
+  std::optional<int64_t> EvalConstTypeRefCompare(const Expr* expr) const;
+
   void ValidateTypeRefArgs(const ModuleDecl* decl);
   void WalkExprForTypeRefArg(const Expr* expr);
   void WalkStmtsForTypeRefArg(const Stmt* s);

@@ -633,9 +633,74 @@ static Logic4Vec EvalContextDeterminedBinary(const Expr* expr, SimContext& ctx,
                       EvalExpr(expr->rhs, ctx, arena), arena, context_width);
 }
 
+// §6.23 — the concrete type a single type_reference operand denotes at run
+// time. A user class name (or `type(this)`, which stands for the class whose
+// method is executing, §8.11) resolves to that class; any other name or the
+// data-type form resolves to a plain type name. `resolved` is false when the
+// operand is not a type reference or names a class-less `this`.
+struct TypeRefRuntimeId {
+  std::string_view name;
+  bool is_class = false;
+  bool resolved = false;
+};
+
+static TypeRefRuntimeId ResolveTypeRefRuntimeId(const Expr* op,
+                                                SimContext& ctx) {
+  TypeRefRuntimeId id;
+  if (!op || op->kind != ExprKind::kTypeRef) return id;
+  if (op->lhs && op->lhs->kind == ExprKind::kIdentifier) {
+    std::string_view name = op->lhs->text;
+    if (name == "this") {
+      // §6.23/§8.11: type(this) is the lexically enclosing class of the running
+      // method, not the dynamic type of any handle.
+      const ClassTypeInfo* cls = ctx.CurrentMethodClass();
+      if (!cls) return id;
+      id.name = cls->name;
+      id.is_class = true;
+      id.resolved = true;
+      return id;
+    }
+    id.name = name;
+    id.is_class = ctx.FindClassType(name) != nullptr;
+    id.resolved = true;
+    return id;
+  }
+  if (!op->text.empty()) {
+    id.name = op->text;
+    id.resolved = true;
+  }
+  return id;
+}
+
+// §6.23 — evaluate a comparison of two type references to a one-bit result:
+// true exactly when the referenced types match (equality forms) or do not
+// (inequality forms). Returns false, leaving `out` untouched, when `expr` is
+// not an equality/inequality of two resolvable type references.
+static bool TryTypeRefComparison(const Expr* expr, SimContext& ctx,
+                                 Arena& arena, Logic4Vec& out) {
+  bool is_eq = expr->op == TokenKind::kEqEq || expr->op == TokenKind::kEqEqEq;
+  bool is_neq =
+      expr->op == TokenKind::kBangEq || expr->op == TokenKind::kBangEqEq;
+  if (!is_eq && !is_neq) return false;
+  if (!expr->lhs || expr->lhs->kind != ExprKind::kTypeRef) return false;
+  if (!expr->rhs || expr->rhs->kind != ExprKind::kTypeRef) return false;
+  TypeRefRuntimeId a = ResolveTypeRefRuntimeId(expr->lhs, ctx);
+  TypeRefRuntimeId b = ResolveTypeRefRuntimeId(expr->rhs, ctx);
+  if (!a.resolved || !b.resolved) return false;
+  bool matched = a.is_class == b.is_class && a.name == b.name;
+  bool result = is_eq ? matched : !matched;
+  out = MakeLogic4VecVal(arena, 1, result ? 1 : 0);
+  return true;
+}
+
 static Logic4Vec EvalBinaryExpr(const Expr* expr, SimContext& ctx, Arena& arena,
                                 uint32_t context_width = 0) {
   if (expr->op == TokenKind::kEq) return EvalAssignInExpr(expr, ctx, arena);
+  {
+    Logic4Vec type_ref_result;
+    if (TryTypeRefComparison(expr, ctx, arena, type_ref_result))
+      return type_ref_result;
+  }
   {
     Logic4Vec arr_result;
     if (TryArrayEqualityOp(expr, ctx, arena, arr_result)) return arr_result;

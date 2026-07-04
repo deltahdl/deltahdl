@@ -172,6 +172,63 @@ void Elaborator::CheckTypeRefCompareOp(const Expr* expr) {
               "reference");
 }
 
+// §6.23 — a type_reference used in a comparison denotes a data type. Its inner
+// operand parses either as a data type (a built-in keyword, kept in `text`) or,
+// for a user name, as an identifier expression (kept in `lhs`). Map that to the
+// concrete DataType, following the typedef/type-parameter tables so that a type
+// parameter such as `parameter type T = int` compares as its bound type. A name
+// that never resolves to a built-in or a table entry (for instance a plain
+// variable used as `type(v)`) is left unresolved so the caller does not fold
+// it.
+std::optional<DataType> Elaborator::ResolveTypeRefOperandType(
+    const Expr* op) const {
+  if (!op || op->kind != ExprKind::kTypeRef) return std::nullopt;
+  DataType dt;
+  if (!op->text.empty()) {
+    dt = TypeNameToDataType(op->text);
+  } else if (op->lhs && op->lhs->kind == ExprKind::kIdentifier) {
+    dt = TypeNameToDataType(op->lhs->text);
+  } else {
+    return std::nullopt;
+  }
+  for (int depth = 0; depth < 16 && dt.kind == DataTypeKind::kNamed; ++depth) {
+    DataType builtin = TypeNameToDataType(dt.type_name);
+    if (builtin.kind != DataTypeKind::kNamed) {
+      dt = builtin;
+      break;
+    }
+    auto it = typedefs_.find(dt.type_name);
+    if (it == typedefs_.end()) break;
+    dt = it->second;
+  }
+  if (dt.kind == DataTypeKind::kNamed) return std::nullopt;
+  return dt;
+}
+
+// §6.23 — a comparison of two type references is a constant expression whose
+// result is true exactly when the referenced types match per §6.22.1 (equality
+// forms yield that truth value; inequality forms its negation). Fold such a
+// comparison to 0/1 so it can drive an elaboration-time selection (e.g. a
+// generate-if). Returns nullopt when this is not a two-type-reference
+// comparison or either operand's type cannot be resolved.
+std::optional<int64_t> Elaborator::EvalConstTypeRefCompare(
+    const Expr* expr) const {
+  if (!expr || expr->kind != ExprKind::kBinary) return std::nullopt;
+  bool is_equality =
+      expr->op == TokenKind::kEqEq || expr->op == TokenKind::kBangEq ||
+      expr->op == TokenKind::kEqEqEq || expr->op == TokenKind::kBangEqEq;
+  if (!is_equality) return std::nullopt;
+  if (!expr->lhs || expr->lhs->kind != ExprKind::kTypeRef) return std::nullopt;
+  if (!expr->rhs || expr->rhs->kind != ExprKind::kTypeRef) return std::nullopt;
+  auto lhs_type = ResolveTypeRefOperandType(expr->lhs);
+  auto rhs_type = ResolveTypeRefOperandType(expr->rhs);
+  if (!lhs_type || !rhs_type) return std::nullopt;
+  bool matched = TypesMatch(*lhs_type, *rhs_type);
+  bool is_negated =
+      expr->op == TokenKind::kBangEq || expr->op == TokenKind::kBangEqEq;
+  return (matched != is_negated) ? 1 : 0;
+}
+
 void Elaborator::WalkExprForTypeRefCompare(const Expr* expr) {
   if (!expr) return;
   if (expr->kind == ExprKind::kBinary) {
@@ -252,8 +309,10 @@ static bool TypeRefArgHasMemberAccess(const Expr* e) {
   return false;
 }
 
-// True when this node is itself a select on a dynamic/associative array; the
-// recursive descent into children is handled separately by the caller.
+// True when this node is itself a select on a dynamic object; the recursive
+// descent into children is handled separately by the caller. Dynamic arrays,
+// queues, and associative arrays are all variable-size (dynamic) objects, so a
+// select into any of them is a reference to an element of a dynamic object.
 static bool TypeRefArgSelectsDynamicElement(
     const Expr* e,
     const std::unordered_map<std::string_view, Elaborator::VarArrayInfo>&
@@ -264,7 +323,7 @@ static bool TypeRefArgSelectsDynamicElement(
   }
   auto it = array_info.find(e->base->text);
   return it != array_info.end() &&
-         (it->second.is_dynamic || it->second.is_assoc);
+         (it->second.is_dynamic || it->second.is_assoc || it->second.is_queue);
 }
 
 bool Elaborator::TypeRefArgUsesDynamicElement(const Expr* e) const {
