@@ -206,10 +206,41 @@ TEST(EnableGates, MultipleInstancesMixed) {
   EXPECT_TRUE(gates[1]->gate_inst_name.empty());
 }
 
+// §28.3.4: when instances are declared as an array, the identifier that names
+// the array is what makes the declaration legal. Accepting path — the name is
+// present and is captured against the array range (§28.3.5 supplies the range
+// syntax the identifier attaches to).
+TEST(PrimitiveInstantiationParsing, ArrayInstanceWithIdentifierIsNamed) {
+  auto r = Parse(
+      "module m;\n"
+      "  and a1[0:3] (out, a, b);\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kAnd);
+  ASSERT_NE(g, nullptr);
+  EXPECT_EQ(g->gate_inst_name, "a1");
+  ASSERT_NE(g->inst_range_left, nullptr);
+  EXPECT_NE(g->inst_range_right, nullptr);
+}
+
+// §28.3.4: rejecting path — an array range with no naming identifier is
+// illegal.
 TEST(PrimitiveInstantiationParsing, ArrayInstanceWithoutIdentifierIsRejected) {
   auto r = Parse(
       "module m;\n"
       "  and [0:3] (out, a, b);\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+// §28.3.4: the array-needs-a-name rule holds in every instance position, not
+// only the first. A later instance in a comma-separated list that carries a
+// range but no identifier is equally illegal.
+TEST(PrimitiveInstantiationParsing,
+     ArrayWithoutIdentifierInCommaListIsRejected) {
+  auto r = Parse(
+      "module m;\n"
+      "  and a1[0:3] (o1, a, b), [4:7] (o2, c, d);\n"
       "endmodule\n");
   EXPECT_TRUE(r.has_errors);
 }
