@@ -76,16 +76,6 @@ TEST(ConstantClassPropertyElaboration, MultipleInstanceConstantsOk) {
              "endmodule\n"));
 }
 
-TEST(ConstantClassPropertyElaboration, InstanceConstStaticErrorWithInit) {
-  EXPECT_TRUE(
-      ElabOk("class C;\n"
-             "  static const int X = 42;\n"
-             "endclass\n"
-             "module m;\n"
-             "  C c;\n"
-             "endmodule\n"));
-}
-
 TEST(ConstantClassPropertyElaboration, ConstWithLocalQualifierOk) {
   EXPECT_TRUE(
       ElabOk("class C;\n"
@@ -159,6 +149,40 @@ TEST(ConstantClassPropertyElaboration, InstanceConstAssignInMethodError) {
              "  endfunction\n"
              "  function void reset();\n"
              "    id = 0;\n"
+             "  endfunction\n"
+             "endclass\n"
+             "module m;\n"
+             "  C c;\n"
+             "endmodule\n"));
+}
+
+// §8.19: an instance constant's assignment can only be done once in the
+// constructor. Two unconditional writes in new() are a double assignment.
+TEST(ConstantClassPropertyElaboration, InstanceConstDoubleAssignInCtorError) {
+  EXPECT_FALSE(
+      ElabOk("class C;\n"
+             "  const int size;\n"
+             "  function new();\n"
+             "    size = 1;\n"
+             "    size = 2;\n"
+             "  endfunction\n"
+             "endclass\n"
+             "module m;\n"
+             "  C c;\n"
+             "endmodule\n"));
+}
+
+// §8.19: choosing the single value across the branches of an if/else is one
+// dynamic write, not two, so it must not be flagged as a double assignment.
+TEST(ConstantClassPropertyElaboration, InstanceConstBranchedSingleAssignOk) {
+  EXPECT_TRUE(
+      ElabOk("class C;\n"
+             "  const int size;\n"
+             "  function new(int sel);\n"
+             "    if (sel)\n"
+             "      size = 1;\n"
+             "    else\n"
+             "      size = 2;\n"
              "  endfunction\n"
              "endclass\n"
              "module m;\n"

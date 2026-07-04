@@ -153,6 +153,25 @@ TEST(ConstConstantElaboration, ConstWithHierarchicalNameInitializerSucceeds) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
+// §6.20.6: a static const may be set to a genvar. Inside a generate-for the
+// loop index is a constant, so a const declared in the loop body may be
+// initialized from it; the declaration elaborates without a non-constant
+// diagnostic. The genvar is built from real generate-loop syntax so the const
+// initializer observes an actual loop index, not a stand-in value.
+TEST(ConstConstantElaboration, ConstInitializedFromGenvarSucceeds) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  genvar i;\n"
+      "  for (i = 0; i < 2; i = i + 1) begin : g\n"
+      "    const int x = i;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 // §6.20.6: an automatic const (one declared in an automatic scope, such as an
 // automatic subroutine) may be set to any expression that would be legal
 // without the const keyword, unlike a static const which must be set at

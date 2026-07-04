@@ -226,6 +226,32 @@ static void CollectConstClassProperties(
   }
 }
 
+// §8.19: an instance constant may be assigned in the constructor, but the
+// assignment can only be done once. Two unconditional writes at the top level
+// of new() are an unambiguous double assignment. Only top-level statements are
+// counted so a value chosen across the branches of an if/else (a single
+// dynamic write) is not mistaken for two writes.
+static void CheckInstanceConstSingleAssign(
+    const ModuleItem* ctor,
+    const std::unordered_set<std::string_view>& instance_consts,
+    DiagEngine& diag) {
+  std::unordered_map<std::string_view, int> counts;
+  for (const auto* s : ctor->func_body_stmts) {
+    if (!s) continue;
+    if (s->kind != StmtKind::kBlockingAssign &&
+        s->kind != StmtKind::kNonblockingAssign)
+      continue;
+    if (!s->lhs || s->lhs->kind != ExprKind::kIdentifier) continue;
+    if (!instance_consts.count(s->lhs->text)) continue;
+    if (++counts[s->lhs->text] == 2) {
+      diag.Error(s->range.start,
+                 std::format("instance constant '{}' is assigned more than "
+                             "once in the constructor",
+                             s->lhs->text));
+    }
+  }
+}
+
 void Elaborator::ValidateConstClassProperties() {
   for (const auto* cls : unit_->classes) {
     std::unordered_set<std::string_view> global_consts;
@@ -243,6 +269,8 @@ void Elaborator::ValidateConstClassProperties() {
         WalkStmtsForConstClassProp(s, global_consts, instance_consts, is_ctor,
                                    diag_);
       }
+      if (is_ctor)
+        CheckInstanceConstSingleAssign(m->method, instance_consts, diag_);
     }
   }
 }
