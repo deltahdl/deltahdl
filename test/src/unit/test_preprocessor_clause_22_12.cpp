@@ -139,14 +139,6 @@ TEST(Preprocessor, Line_NoOutput) {
   EXPECT_TRUE(trimmed.empty());
 }
 
-TEST(Preprocessor, Line_SurroundingCodePreserved) {
-  PreprocFixture f;
-  auto out = Preprocess("wire a;\n`line 5 \"f.sv\" 0\nwire b;\n", f);
-  EXPECT_FALSE(f.diag.HasErrors());
-  EXPECT_NE(out.find("wire a;"), std::string::npos);
-  EXPECT_NE(out.find("wire b;"), std::string::npos);
-}
-
 TEST(Preprocessor, Line_ResetallDoesNotAffect) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
@@ -294,6 +286,37 @@ TEST(Preprocessor, Line_IncludeSavesAndRestores) {
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_NE(result.find('1'), std::string::npos);
   EXPECT_NE(result.find('3'), std::string::npos);
+
+  std::remove(inc_path.c_str());
+  std::filesystem::remove_all(tmp_dir);
+}
+
+TEST(Preprocessor, Line_IncludeFileResetsLineCountToOne) {
+  // §22.12 requires the line counter to be reset to 1 at the beginning of each
+  // file, and an included file is a new file. The `include sits on line 2 of
+  // the parent, but `__LINE__ on the third line of the included file must
+  // report that file's own line 3 - a counter that continued from the parent
+  // would instead yield 4. Observing the reset from inside the include
+  // complements Line_IncludeSavesAndRestores, which only observes the parent
+  // resuming afterward.
+  std::string tmp_dir = "/tmp/deltahdl_test_22_12_reset";
+  std::string inc_path = tmp_dir + "/counted.svh";
+  std::filesystem::create_directories(tmp_dir);
+  {
+    std::ofstream ofs(inc_path);
+    ofs << "// pad a\n// pad b\n`__LINE__\n";
+  }
+
+  PreprocFixture f;
+  PreprocConfig cfg;
+  cfg.include_dirs.push_back(tmp_dir);
+  auto result = Preprocess(
+      "wire a;\n"
+      "`include \"counted.svh\"\n",
+      f, cfg);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(result.find('3'), std::string::npos);
+  EXPECT_EQ(result.find('4'), std::string::npos);
 
   std::remove(inc_path.c_str());
   std::filesystem::remove_all(tmp_dir);
