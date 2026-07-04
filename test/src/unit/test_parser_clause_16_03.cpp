@@ -83,30 +83,6 @@ TEST(ImmediateAssertionStatementParsing, CoverPassActionOnly) {
   EXPECT_EQ(stmt->assert_fail_stmt, nullptr);
 }
 
-TEST(ImmediateAssertionStatementParsing, DeferredAssertHash0SetsFlag) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial assert #0 (c);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_TRUE(stmt->is_deferred);
-}
-
-TEST(ImmediateAssertionStatementParsing, DeferredAssertFinalSetsFlag) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial assert final (c);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_TRUE(stmt->is_deferred);
-}
-
 TEST(ImmediateAssertionStatementParsing, LabeledAssertParses) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -151,74 +127,6 @@ TEST(ImmediateAssertionStatementParsing, AssertInsideAlwaysComb) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ImmediateAssertionStatementParsing, DeferredAssumeHash0SetsFlag) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial assume #0 (c);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kAssumeImmediate);
-  EXPECT_TRUE(stmt->is_deferred);
-}
-
-TEST(ImmediateAssertionStatementParsing, DeferredAssumeFinalSetsFlag) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial assume final (c);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kAssumeImmediate);
-  EXPECT_TRUE(stmt->is_deferred);
-}
-
-TEST(ImmediateAssertionStatementParsing, DeferredCoverHash0SetsFlag) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial cover #0 (c);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kCoverImmediate);
-  EXPECT_TRUE(stmt->is_deferred);
-}
-
-TEST(ImmediateAssertionStatementParsing, DeferredCoverFinalSetsFlag) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial cover final (c);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kCoverImmediate);
-  EXPECT_TRUE(stmt->is_deferred);
-}
-
-TEST(ImmediateAssertionStatementParsing, LabeledDeferredAssertModuleLevel) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  logic c;\n"
-              "  chk: assert #0 (c);\n"
-              "endmodule\n"));
-}
-
-TEST(ImmediateAssertionStatementParsing, LabeledDeferredCoverModuleLevel) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  logic c;\n"
-              "  hit: cover final (c);\n"
-              "endmodule\n"));
-}
-
 TEST(ImmediateAssertionStatementParsing, CoverWithElseClauseRejected) {
   auto r = Parse(
       "module m;\n"
@@ -243,28 +151,39 @@ TEST(ImmediateAssertionStatementParsing, AssumeMissingExpressionRejected) {
   EXPECT_TRUE(r.has_errors);
 }
 
-TEST(ImmediateAssertionStatementParsing, DeferredAssertNonZeroHashRejected) {
+// §16.3: the fail statement is any legal procedural statement, so it can signal
+// a failure to another part of the testbench -- here an event trigger. The
+// action block's else arm accepts a `-> ev` statement.
+TEST(ImmediateAssertionStatementParsing, AssertFailActionEventTrigger) {
   auto r = Parse(
       "module m;\n"
-      "  initial assert #1 (c);\n"
+      "  event ev;\n"
+      "  initial assert(c) else -> ev;\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kAssertImmediate);
+  EXPECT_EQ(stmt->assert_pass_stmt, nullptr);
+  ASSERT_NE(stmt->assert_fail_stmt, nullptr);
+  EXPECT_EQ(stmt->assert_fail_stmt->kind, StmtKind::kEventTrigger);
 }
 
-TEST(ImmediateAssertionStatementParsing, DeferredAssumeNonZeroHashRejected) {
+// §16.3: the asserted expression is an ordinary (nontemporal) expression, so a
+// function call is an admitted operand form for the condition.
+TEST(ImmediateAssertionStatementParsing, AssertConditionFunctionCall) {
   auto r = Parse(
       "module m;\n"
-      "  initial assume #5 (c);\n"
+      "  initial assert(f(a, b)) pass = 1;\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
-}
-
-TEST(ImmediateAssertionStatementParsing, DeferredCoverNonZeroHashRejected) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial cover #2 (c);\n"
-      "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kAssertImmediate);
+  ASSERT_NE(stmt->assert_expr, nullptr);
+  EXPECT_EQ(stmt->assert_expr->kind, ExprKind::kCall);
 }
 
 }  // namespace

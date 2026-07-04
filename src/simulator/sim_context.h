@@ -738,6 +738,42 @@ class SimContext {
   int CoverEvalCount() const { return cover_eval_count_; }
   int CoverSuccessCount() const { return cover_success_count_; }
 
+  // §20.11: whole-design assertion control applied by an assertion control
+  // system task ($assertcontrol/$asserton/$assertoff/$assertkill and the action
+  // control tasks) that names no scope list. Two independent controls are held:
+  // On/Off/Kill toggle whether an immediate assertion is checked at all, while
+  // FailOn/FailOff toggle its default fail action ($error, §16.3). Each stores
+  // the assertion_type (Table 20-6) and directive_type (Table 20-7) masks the
+  // controlling task carried, so an assertion is affected only when its own
+  // type and directive bits are both set in the stored masks. The masks are
+  // expressed as plain integers here to keep this header free of the SVA
+  // engine's enum definitions.
+  void SetGlobalAssertCheckingOff(uint32_t assertion_type,
+                                  uint32_t directive_type) {
+    assert_checking_off_ = true;
+    assert_checking_off_atype_ = assertion_type;
+    assert_checking_off_dtype_ = directive_type;
+  }
+  void SetGlobalAssertCheckingOn() { assert_checking_off_ = false; }
+  bool AssertCheckingEnabled(uint32_t type_bit, uint32_t directive_bit) const {
+    if (!assert_checking_off_) return true;
+    return (assert_checking_off_atype_ & type_bit) == 0 ||
+           (assert_checking_off_dtype_ & directive_bit) == 0;
+  }
+  void SetGlobalAssertFailActionOff(uint32_t assertion_type,
+                                    uint32_t directive_type) {
+    assert_fail_off_ = true;
+    assert_fail_off_atype_ = assertion_type;
+    assert_fail_off_dtype_ = directive_type;
+  }
+  void SetGlobalAssertFailActionOn() { assert_fail_off_ = false; }
+  bool AssertFailActionEnabled(uint32_t type_bit,
+                               uint32_t directive_bit) const {
+    if (!assert_fail_off_) return true;
+    return (assert_fail_off_atype_ & type_bit) == 0 ||
+           (assert_fail_off_dtype_ & directive_bit) == 0;
+  }
+
   // §20.10: record the last severity system task's tool-specific message parts
   // so a harness can confirm the required call-site information was reported --
   // the severity label, the user message, the simulation time, the hierarchical
@@ -952,6 +988,14 @@ class SimContext {
 
   int cover_eval_count_ = 0;
   int cover_success_count_ = 0;
+
+  // §20.11: whole-design assertion control state (see the accessor comment).
+  bool assert_checking_off_ = false;
+  uint32_t assert_checking_off_atype_ = 0;
+  uint32_t assert_checking_off_dtype_ = 0;
+  bool assert_fail_off_ = false;
+  uint32_t assert_fail_off_atype_ = 0;
+  uint32_t assert_fail_off_dtype_ = 0;
 
   std::string last_severity_;
   std::string last_severity_msg_;

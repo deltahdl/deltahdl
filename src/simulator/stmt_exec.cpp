@@ -22,6 +22,7 @@
 #include "simulator/sim_context.h"
 #include "simulator/statement_assign.h"
 #include "simulator/stmt_exec_internal.h"
+#include "simulator/sva_engine.h"
 
 namespace delta {
 
@@ -453,8 +454,46 @@ static void RecordCoverImmediateSample(const Stmt* stmt, bool is_true,
   if (is_true) ctx.IncrementCoverSuccessCount();
 }
 
+// §20.11: the Table 20-6 assertion_type bit that identifies an immediate
+// assertion statement -- simple immediate, observed deferred, or final deferred
+// -- so a $assertcontrol assertion_type mask can select whether it is checked.
+static uint32_t ImmediateAssertionTypeBit(const Stmt* stmt) {
+  if (!stmt->is_deferred) {
+    return static_cast<uint32_t>(AssertionTypeBit::kSimpleImmediate);
+  }
+  return stmt->is_final_deferred
+             ? static_cast<uint32_t>(AssertionTypeBit::kFinalDeferredImmediate)
+             : static_cast<uint32_t>(
+                   AssertionTypeBit::kObservedDeferredImmediate);
+}
+
+// §20.11: the Table 20-7 directive_type bit for an immediate assertion -- an
+// assert, cover, or assume directive -- used the same way against a
+// $assertcontrol directive_type mask.
+static uint32_t ImmediateDirectiveTypeBit(const Stmt* stmt) {
+  switch (stmt->kind) {
+    case StmtKind::kCoverImmediate:
+      return static_cast<uint32_t>(DirectiveTypeBit::kCover);
+    case StmtKind::kAssumeImmediate:
+      return static_cast<uint32_t>(DirectiveTypeBit::kAssume);
+    default:
+      return static_cast<uint32_t>(DirectiveTypeBit::kAssert);
+  }
+}
+
 static ExecTask ExecImmediateAssert(const Stmt* stmt, SimContext& ctx,
                                     Arena& arena) {
+  // §16.3 / §20.11: the execution of immediate assertions can be controlled by
+  // the assertion control system tasks. When $assertcontrol Off/Kill (or
+  // $assertoff/$assertkill) has stopped checking for this assertion's type and
+  // directive, the assertion is not evaluated, records nothing, and runs no
+  // action on this activation.
+  uint32_t type_bit = ImmediateAssertionTypeBit(stmt);
+  uint32_t directive_bit = ImmediateDirectiveTypeBit(stmt);
+  if (!ctx.AssertCheckingEnabled(type_bit, directive_bit)) {
+    co_return StmtResult::kDone;
+  }
+
   auto cond = EvalExpr(stmt->assert_expr, ctx, arena);
 
   bool is_true = cond.IsTruthy();
@@ -475,8 +514,15 @@ static ExecTask ExecImmediateAssert(const Stmt* stmt, SimContext& ctx,
       }
       co_return co_await ExecStmt(stmt->assert_fail_stmt, ctx, arena);
     } else if (stmt->kind != StmtKind::kCoverImmediate) {
+      // §20.11: the fail-action controls do not affect the statistics counters,
+      // so the failure is still counted even when its report is suppressed.
       ctx.IncrementAssertionFailCount();
-      EmitSeverityHeader(ctx, "ERROR", "Assertion failed.", std::cerr);
+      // §16.3 / §20.11: with no else clause the tool reports the violation via
+      // $error, unless $assertcontrol FailOff ($assertfailoff) has suppressed
+      // the fail action for this assertion's type and directive.
+      if (ctx.AssertFailActionEnabled(type_bit, directive_bit)) {
+        EmitSeverityHeader(ctx, "ERROR", "Assertion failed.", std::cerr);
+      }
     }
   }
   co_return StmtResult::kDone;

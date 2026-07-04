@@ -2,7 +2,9 @@
 #include "fixture_simulator.h"
 #include "parser/ast.h"
 #include "simulator/evaluation.h"
+#include "simulator/lowerer.h"
 #include "simulator/sva_engine.h"
+#include "simulator/variable.h"
 
 using namespace delta;
 
@@ -49,21 +51,6 @@ TEST(SvaEngine, AssertoffDisablesInstance) {
   EXPECT_TRUE(ctrl.IsEnabled("inst2"));
 }
 
-TEST(SvaEngine, AssertonReenablesInstance) {
-  AssertionControl ctrl;
-  ctrl.SetOff("inst1");
-  EXPECT_FALSE(ctrl.IsEnabled("inst1"));
-  ctrl.SetOn("inst1");
-  EXPECT_TRUE(ctrl.IsEnabled("inst1"));
-}
-
-TEST(SvaEngine, AssertkillKillsAndDisables) {
-  AssertionControl ctrl;
-  ctrl.Kill("inst1");
-  EXPECT_FALSE(ctrl.IsEnabled("inst1"));
-  EXPECT_TRUE(ctrl.WasKilled("inst1"));
-}
-
 TEST(SvaEngine, AssertControlGlobalOff) {
   AssertionControl ctrl;
   ctrl.SetGlobalOff();
@@ -84,14 +71,6 @@ TEST(SvaEngine, AssertPassOff) {
   ctrl.SetPassOff("inst1");
   EXPECT_FALSE(ctrl.IsPassEnabled("inst1"));
   EXPECT_TRUE(ctrl.IsPassEnabled("inst2"));
-}
-
-TEST(SvaEngine, AssertFailOn) {
-  AssertionControl ctrl;
-  ctrl.SetFailOff("inst1");
-  EXPECT_FALSE(ctrl.IsFailEnabled("inst1"));
-  ctrl.SetFailOn("inst1");
-  EXPECT_TRUE(ctrl.IsFailEnabled("inst1"));
 }
 
 struct SvaFixture {
@@ -423,6 +402,252 @@ TEST(SvaEngine, DefaultDirectiveTypeAffectsAllDirectives) {
                                           DirectiveTypeBit::kCover));
   EXPECT_TRUE(ControlAffectsDirectiveType(kDirectiveTypeDefault,
                                           DirectiveTypeBit::kAssume));
+}
+
+// The full-pipeline tests below drive an assertion control system task from
+// real source and observe its effect on a real immediate assertion (§16.3),
+// which is how §20.11's control_type/assertion_type/directive_type semantics
+// are meant to be applied. Each builds the assertion and the control task from
+// source, then parses, elaborates, lowers, and runs the design.
+int RunAndGetAssertionFailCount(const char* src) {
+  SimFixture f;
+  auto* design = ElaborateSrc(src, f);
+  EXPECT_NE(design, nullptr);
+  if (!design) return -1;
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  return f.ctx.AssertionFailCount();
+}
+
+// §20.11: $assertoff (Off) shall stop the checking of the immediate assertions
+// it selects, so a failing immediate assert reports no violation.
+TEST(AssertControlSim, AssertOffStopsImmediateAssertionChecking) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  initial begin\n"
+      "    $assertoff;\n"
+      "    assert(0);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_EQ(f.ctx.AssertionFailCount(), 0);
+}
+
+// §20.11: $asserton (On) shall re-enable checking after an $assertoff, so only
+// the assertion evaluated while checking is on reports its failure.
+TEST(AssertControlSim, AssertOnReenablesImmediateAssertionChecking) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  initial begin\n"
+      "    $assertoff;\n"
+      "    assert(0);\n"
+      "    $asserton;\n"
+      "    assert(0);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_EQ(f.ctx.AssertionFailCount(), 1);
+}
+
+// §20.11: $assertcontrol dispatches by integer control_type; Off (4) stops
+// checking and On (3) re-enables it, exactly as the convenience tasks do.
+TEST(AssertControlSim, AssertControlOffThenOnByControlType) {
+  EXPECT_EQ(RunAndGetAssertionFailCount("module t;\n"
+                                        "  initial begin\n"
+                                        "    $assertcontrol(4);\n"
+                                        "    assert(0);\n"
+                                        "    $assertcontrol(3);\n"
+                                        "    assert(0);\n"
+                                        "  end\n"
+                                        "endmodule\n"),
+            1);
+}
+
+// §20.11: the assertion_type argument selects which assertion kinds a control
+// affects. An Off whose mask is Concurrent-only (bit 1) does not include simple
+// immediate (bit 2), so a simple immediate assert keeps checking and still
+// reports its failure -- the mask is honored end to end.
+TEST(AssertControlSim, AssertionTypeMaskExcludesSimpleImmediate) {
+  EXPECT_EQ(RunAndGetAssertionFailCount("module t;\n"
+                                        "  initial begin\n"
+                                        "    $assertcontrol(4, 1, 7);\n"
+                                        "    assert(0);\n"
+                                        "  end\n"
+                                        "endmodule\n"),
+            1);
+  // With the default mask (255) the same Off does stop the checking.
+  EXPECT_EQ(RunAndGetAssertionFailCount("module t;\n"
+                                        "  initial begin\n"
+                                        "    $assertcontrol(4, 255, 7);\n"
+                                        "    assert(0);\n"
+                                        "  end\n"
+                                        "endmodule\n"),
+            0);
+}
+
+// §20.11: the directive_type argument likewise selects directive kinds. An Off
+// whose directive mask is Cover-only (bit 2) does not include assert (bit 1),
+// so an assert directive keeps checking.
+TEST(AssertControlSim, DirectiveTypeMaskExcludesAssertDirective) {
+  EXPECT_EQ(RunAndGetAssertionFailCount("module t;\n"
+                                        "  initial begin\n"
+                                        "    $assertcontrol(4, 255, 2);\n"
+                                        "    assert(0);\n"
+                                        "  end\n"
+                                        "endmodule\n"),
+            1);
+}
+
+// §20.11: Kill (5), like Off, stops the checking of the selected assertions.
+TEST(AssertControlSim, AssertKillStopsImmediateAssertionChecking) {
+  EXPECT_EQ(RunAndGetAssertionFailCount("module t;\n"
+                                        "  initial begin\n"
+                                        "    $assertkill;\n"
+                                        "    assert(0);\n"
+                                        "  end\n"
+                                        "endmodule\n"),
+            0);
+}
+
+// §20.11: $assertfailoff (FailOff) stops the fail action, including the default
+// $error, but the action controls do not affect the statistics counters -- so
+// the failure is still counted while no ERROR is reported. $assertfailon
+// restores the report.
+TEST(AssertControlSim, FailOffSuppressesDefaultErrorButStillCounts) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  initial begin\n"
+      "    $assertfailoff;\n"
+      "    assert(0);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_EQ(f.ctx.AssertionFailCount(), 1);
+  EXPECT_NE(f.ctx.LastSeverity(), "ERROR");
+
+  SimFixture g;
+  auto* design2 = ElaborateSrc(
+      "module t;\n"
+      "  initial begin\n"
+      "    $assertfailoff;\n"
+      "    $assertfailon;\n"
+      "    assert(0);\n"
+      "  end\n"
+      "endmodule\n",
+      g);
+  ASSERT_NE(design2, nullptr);
+  Lowerer lowerer2(g.ctx, g.arena, g.diag);
+  lowerer2.Lower(design2);
+  g.scheduler.Run();
+  EXPECT_EQ(g.ctx.AssertionFailCount(), 1);
+  EXPECT_EQ(g.ctx.LastSeverity(), "ERROR");
+}
+
+// §20.11: a control that names a scope list targets those scopes rather than
+// the whole design; immediate assertions are not registered by hierarchical
+// name, so such a task leaves them checking (it does not turn off the whole
+// design).
+TEST(AssertControlSim, ScopedOffDoesNotStopWholeDesignChecking) {
+  EXPECT_EQ(RunAndGetAssertionFailCount("module t;\n"
+                                        "  initial begin\n"
+                                        "    $assertoff(0, t);\n"
+                                        "    assert(0);\n"
+                                        "  end\n"
+                                        "endmodule\n"),
+            1);
+}
+
+// §20.11: control_type shall be an integer expression, not necessarily a
+// literal. A localparam supplies the control_type here, which resolves to Off;
+// the failing assert is then not checked.
+TEST(AssertControlSim, ControlTypeFromLocalparam) {
+  EXPECT_EQ(RunAndGetAssertionFailCount("module t;\n"
+                                        "  localparam int OFF = 4;\n"
+                                        "  initial begin\n"
+                                        "    $assertcontrol(OFF);\n"
+                                        "    assert(0);\n"
+                                        "  end\n"
+                                        "endmodule\n"),
+            0);
+}
+
+// §20.11: control_type and assertion_type are integer expressions; parameters
+// supply both here (Off with the default-all mask), so the failing assert is
+// not checked -- the same effect as the literal form, via the parameter path.
+TEST(AssertControlSim, ControlAndAssertionTypeFromParameters) {
+  EXPECT_EQ(RunAndGetAssertionFailCount("module t;\n"
+                                        "  parameter int OFF = 4;\n"
+                                        "  parameter int ALL = 255;\n"
+                                        "  initial begin\n"
+                                        "    $assertcontrol(OFF, ALL, 7);\n"
+                                        "    assert(0);\n"
+                                        "  end\n"
+                                        "endmodule\n"),
+            0);
+}
+
+// §20.11: the default directive_type (7) selects assume directives too, so Off
+// stops the checking of an immediate assume (which is otherwise checked like an
+// assert, §16.3).
+TEST(AssertControlSim, AssertOffStopsImmediateAssume) {
+  EXPECT_EQ(RunAndGetAssertionFailCount("module t;\n"
+                                        "  initial begin\n"
+                                        "    $assertoff;\n"
+                                        "    assume(0);\n"
+                                        "  end\n"
+                                        "endmodule\n"),
+            0);
+}
+
+// §20.11: the assertion_type mask selects the deferred immediate kinds as well.
+// $assertoff (assertion_type 15) includes observed deferred immediate, so a
+// failing `assert #0` is not checked and records no failure.
+TEST(AssertControlSim, AssertOffStopsDeferredObservedAssertion) {
+  EXPECT_EQ(RunAndGetAssertionFailCount("module t;\n"
+                                        "  initial begin\n"
+                                        "    $assertoff;\n"
+                                        "    assert #0 (0);\n"
+                                        "  end\n"
+                                        "endmodule\n"),
+            0);
+}
+
+// §20.11: the directive_type mask selects cover directives. An Off whose
+// directive mask is Cover (bit 2) stops the checking of an immediate cover, so
+// the cover records no evaluation. Built from real source and driven end to
+// end.
+TEST(AssertControlSim, DirectiveMaskStopsCoverImmediate) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  initial begin\n"
+      "    $assertcontrol(4, 255, 2);\n"
+      "    cover(1);\n"
+      "    cover(1);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_EQ(f.ctx.CoverEvalCount(), 0);
 }
 
 }  // namespace

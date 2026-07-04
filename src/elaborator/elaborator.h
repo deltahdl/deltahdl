@@ -366,7 +366,8 @@ class Elaborator {
   void ValidateItemConstraints(const ModuleItem* item, const ScopeMap& scope);
 
   void ValidateDeferredAssertionActions(const ModuleDecl* decl);
-  void WalkStmtsForDeferredActions(const Stmt* s);
+  void WalkStmtsForDeferredActions(
+      const Stmt* s, const std::unordered_set<std::string_view>& auto_vars);
   std::unordered_map<std::string_view, const ModuleItem*>
       deferred_subroutine_map_;
 

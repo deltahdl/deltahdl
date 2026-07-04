@@ -256,6 +256,39 @@ TEST(AssertionStatementSim, DeferredCallArgEvaluatedAtScheduleTime) {
   EXPECT_EQ(var->value.ToUint64(), 5u);
 }
 
+// §16.4: an actual argument passed to a deferred assertion action subroutine is
+// fully evaluated -- including any function call in the argument expression --
+// at the instant the deferred assertion's expression is evaluated, not when the
+// deferred call later runs. The argument is dbl(s); although s is overwritten
+// after the assertion is processed, the captured value reflects dbl of the
+// value s held at processing time.
+TEST(AssertionStatementSim, DeferredFunctionCallArgEvaluatedAtScheduleTime) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] s;\n"
+      "  logic [7:0] result;\n"
+      "  function logic [7:0] dbl(input logic [7:0] v);\n"
+      "    dbl = v << 1;\n"
+      "  endfunction\n"
+      "  task capture(input logic [7:0] v); result = v; endtask\n"
+      "  initial begin\n"
+      "    s = 8'd5;\n"
+      "    result = 8'd0;\n"
+      "    assert #0 (1) capture(dbl(s));\n"
+      "    s = 8'd99;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 10u);  // dbl(5), captured at processing time
+}
+
 TEST(AssertionStatementSim, ObservedDeferredAssumeActionDeferred) {
   SimFixture f;
   auto* design = ElaborateSrc(

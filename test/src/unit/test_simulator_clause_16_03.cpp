@@ -488,6 +488,52 @@ TEST(ImmediateAssertSim, FailureTimeRecordableInActionBlock) {
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
+// §16.3: the execution of immediate assertions can be controlled by using the
+// assertion control system tasks (§20.11). With $assertoff in effect the
+// assertion is not checked, so neither its pass nor its fail (else) action
+// runs; $asserton restores checking and the fail action runs. Built from real
+// source and driven through the full pipeline.
+TEST(ImmediateAssertSim, ControlledByAssertionControlSystemTask) {
+  SimFixture off;
+  auto* design_off = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    x = 8'd0;\n"
+      "    $assertoff;\n"
+      "    assert(0) else x = 8'd99;\n"
+      "  end\n"
+      "endmodule\n",
+      off);
+  ASSERT_NE(design_off, nullptr);
+  Lowerer lowerer_off(off.ctx, off.arena, off.diag);
+  lowerer_off.Lower(design_off);
+  off.scheduler.Run();
+  auto* xo = off.ctx.FindVariable("x");
+  ASSERT_NE(xo, nullptr);
+  EXPECT_EQ(xo->value.ToUint64(), 0u);  // fail action suppressed while off
+
+  SimFixture on;
+  auto* design_on = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    x = 8'd0;\n"
+      "    $assertoff;\n"
+      "    $asserton;\n"
+      "    assert(0) else x = 8'd99;\n"
+      "  end\n"
+      "endmodule\n",
+      on);
+  ASSERT_NE(design_on, nullptr);
+  Lowerer lowerer_on(on.ctx, on.arena, on.diag);
+  lowerer_on.Lower(design_on);
+  on.scheduler.Run();
+  auto* xn = on.ctx.FindVariable("x");
+  ASSERT_NE(xn, nullptr);
+  EXPECT_EQ(xn->value.ToUint64(), 99u);  // fail action runs once re-enabled
+}
+
 TEST(ImmediateAssertSim, MultipleSeverityTasksInActionBlockBothRun) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -513,6 +559,61 @@ TEST(ImmediateAssertSim, MultipleSeverityTasksInActionBlockBothRun) {
   EXPECT_EQ(var->value.ToUint64(), 55u);
   EXPECT_EQ(f.ctx.LastSeverity(), "WARNING");
   EXPECT_EQ(f.ctx.LastSeverityMsg(), "second");
+}
+
+// §16.3: the fail statement, being any legal procedural statement, can signal a
+// failure to another part of the testbench. Here a failing assert triggers an
+// event that a separate process is waiting on, and that process then runs.
+// Built from real source and driven end to end.
+TEST(ImmediateAssertSim, FailActionTriggersEventUnblockingProcess) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  event ev;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    x = 8'd0;\n"
+      "    #1 assert(0) else -> ev;\n"
+      "  end\n"
+      "  always @(ev) x = 8'd42;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 42u);
+}
+
+// §16.3: the asserted expression is interpreted like an if condition, and it
+// may be any nontemporal expression -- including a function call. Here the
+// condition is a user function returning false, so the assertion fails and the
+// else arm runs. Built from real source and driven end to end.
+TEST(ImmediateAssertSim, AssertConditionFromFunctionCall) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  logic [7:0] flag;\n"
+      "  function logic is_hi(input logic [7:0] v);\n"
+      "    is_hi = (v > 8'd4);\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    x = 8'd3;\n"
+      "    flag = 8'd0;\n"
+      "    assert(is_hi(x)) flag = 8'd1; else flag = 8'd2;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("flag");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 2u);  // is_hi(3) is false -> else arm
 }
 
 }  // namespace

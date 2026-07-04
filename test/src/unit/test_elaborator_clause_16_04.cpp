@@ -29,6 +29,24 @@ TEST(DeferredAssertionElaboration, UserTaskCallPassActionAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §16.4: a deferred assertion action block may contain a single subroutine
+// call; a void function call is one of the permitted call forms (alongside a
+// task, task method, void function method, and system task), so it is accepted
+// with no single-call diagnostic, just like the task and system-task forms.
+TEST(DeferredAssertionElaboration, VoidFunctionCallActionAccepted) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module m;\n"
+      "  function void note; endfunction\n"
+      "  logic c;\n"
+      "  initial assert #0 (c) note();\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(f.diag.WarningCount(), 0u);
+}
+
 TEST(DeferredAssertionElaboration, OmittedActionsAccepted) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -195,6 +213,62 @@ TEST(DeferredAssertionElaboration, StaticVarToRefFormalAccepted) {
       "  int s;\n"
       "  task automatic by_ref(ref int r); endtask\n"
       "  initial assert #0 (1) by_ref(s);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §16.4: it shall be an error to pass a dynamic variable as the actual for a
+// const ref formal too, not only a plain ref formal -- the restriction is on
+// the pass-by-reference direction regardless of constness. A class property
+// (dynamic storage) passed to a `const ref` formal is rejected.
+TEST(DeferredAssertionElaboration, ClassMemberToConstRefFormalRejected) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module m;\n"
+      "  class C; int v; endclass\n"
+      "  C h = new();\n"
+      "  task by_cref(const ref int r); endtask\n"
+      "  initial assert #0 (1) by_cref(h.v);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// §16.4: it shall be an error to pass an automatic variable as the actual for a
+// ref formal of a deferred-assertion action call. A local of an automatic task
+// has automatic storage, so passing it by reference is rejected.
+TEST(DeferredAssertionElaboration, AutomaticLocalToRefFormalRejected) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module m;\n"
+      "  task automatic upd(ref int r); endtask\n"
+      "  task automatic caller;\n"
+      "    int loc;\n"
+      "    assert #0 (1) upd(loc);\n"
+      "  endtask\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// §16.4: the automatic-variable restriction is on the variable's storage, not
+// on the enclosing subroutine's lifetime. A module-level static variable passed
+// by reference is accepted even from inside an automatic task, so the check
+// does not over-reject.
+TEST(DeferredAssertionElaboration,
+     StaticVarFromAutomaticTaskToRefFormalAccepted) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module m;\n"
+      "  int s;\n"
+      "  task automatic use_static(ref int r); endtask\n"
+      "  task automatic caller;\n"
+      "    assert #0 (1) use_static(s);\n"
+      "  endtask\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);

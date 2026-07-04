@@ -235,9 +235,9 @@ static void CheckFinalDeferredCallee(const Stmt* action,
   }
 }
 
-static void CheckDeferredCallRefArgs(const Stmt* action,
-                                     const DeferredSubroutineMap& subs,
-                                     DiagEngine& diag) {
+static void CheckDeferredCallRefArgs(
+    const Stmt* action, const DeferredSubroutineMap& subs,
+    const std::unordered_set<std::string_view>& auto_vars, DiagEngine& diag) {
   if (!IsSingleSubroutineCall(action)) return;
   if (!action || action->kind != StmtKind::kExprStmt || !action->expr) return;
   if (action->expr->kind != ExprKind::kCall) return;
@@ -250,19 +250,35 @@ static void CheckDeferredCallRefArgs(const Stmt* action,
     if (formals[i].direction != Direction::kRef) continue;
     const Expr* a = actuals[i];
     if (!a) continue;
+    // §16.4: a dynamic variable (e.g. a class property, reached through a
+    // member access) cannot be the actual for a pass-by-reference formal.
     if (a->kind == ExprKind::kMemberAccess) {
       diag.Error(
           a->range.start,
           std::format("§16.4: cannot pass dynamic variable as actual for "
                       "ref{} formal '{}' in deferred-assertion call",
                       formals[i].is_const ? " const" : "", formals[i].name));
+      continue;
+    }
+    // §16.4: an automatic variable is likewise disallowed as the actual for a
+    // pass-by-reference formal, because its storage may no longer exist when
+    // the deferred action runs. A bare identifier naming an automatic variable
+    // in scope -- a formal or local of the enclosing automatic subroutine -- is
+    // an error.
+    if (a->kind == ExprKind::kIdentifier &&
+        auto_vars.find(a->text) != auto_vars.end()) {
+      diag.Error(
+          a->range.start,
+          std::format("§16.4: cannot pass automatic variable as actual for "
+                      "ref{} formal '{}' in deferred-assertion call",
+                      formals[i].is_const ? " const" : "", formals[i].name));
     }
   }
 }
 
-static void CheckDeferredActionStmt(const Stmt* s,
-                                    const DeferredSubroutineMap& subs,
-                                    DiagEngine& diag) {
+static void CheckDeferredActionStmt(
+    const Stmt* s, const DeferredSubroutineMap& subs,
+    const std::unordered_set<std::string_view>& auto_vars, DiagEngine& diag) {
   if (!s->is_deferred) return;
   if (s->kind != StmtKind::kAssertImmediate &&
       s->kind != StmtKind::kAssumeImmediate &&
@@ -285,21 +301,47 @@ static void CheckDeferredActionStmt(const Stmt* s,
     CheckFinalDeferredCallee(s->assert_fail_stmt, subs, diag);
   }
 
-  CheckDeferredCallRefArgs(s->assert_pass_stmt, subs, diag);
-  CheckDeferredCallRefArgs(s->assert_fail_stmt, subs, diag);
+  CheckDeferredCallRefArgs(s->assert_pass_stmt, subs, auto_vars, diag);
+  CheckDeferredCallRefArgs(s->assert_fail_stmt, subs, auto_vars, diag);
 }
 
-void Elaborator::WalkStmtsForDeferredActions(const Stmt* s) {
+// §16.4: gather the names of automatic variables visible to deferred assertions
+// in a subroutine body. When the enclosing task or function has automatic
+// lifetime, every local variable is automatic; an explicitly-automatic local is
+// automatic even inside a static routine.
+static void CollectAutomaticVarNames(
+    const Stmt* s, bool routine_is_automatic,
+    std::unordered_set<std::string_view>& out) {
   if (!s) return;
-  CheckDeferredActionStmt(s, deferred_subroutine_map_, diag_);
-  for (auto* sub : s->stmts) WalkStmtsForDeferredActions(sub);
-  WalkStmtsForDeferredActions(s->then_branch);
-  WalkStmtsForDeferredActions(s->else_branch);
-  WalkStmtsForDeferredActions(s->body);
-  WalkStmtsForDeferredActions(s->for_body);
-  WalkStmtsForDeferredActions(s->assert_pass_stmt);
-  WalkStmtsForDeferredActions(s->assert_fail_stmt);
-  for (const auto& ci : s->case_items) WalkStmtsForDeferredActions(ci.body);
+  if (s->kind == StmtKind::kVarDecl &&
+      (routine_is_automatic || s->var_is_automatic)) {
+    out.insert(s->var_name);
+  }
+  for (auto* sub : s->stmts)
+    CollectAutomaticVarNames(sub, routine_is_automatic, out);
+  CollectAutomaticVarNames(s->then_branch, routine_is_automatic, out);
+  CollectAutomaticVarNames(s->else_branch, routine_is_automatic, out);
+  CollectAutomaticVarNames(s->body, routine_is_automatic, out);
+  CollectAutomaticVarNames(s->for_body, routine_is_automatic, out);
+  CollectAutomaticVarNames(s->assert_pass_stmt, routine_is_automatic, out);
+  CollectAutomaticVarNames(s->assert_fail_stmt, routine_is_automatic, out);
+  for (const auto& ci : s->case_items)
+    CollectAutomaticVarNames(ci.body, routine_is_automatic, out);
+}
+
+void Elaborator::WalkStmtsForDeferredActions(
+    const Stmt* s, const std::unordered_set<std::string_view>& auto_vars) {
+  if (!s) return;
+  CheckDeferredActionStmt(s, deferred_subroutine_map_, auto_vars, diag_);
+  for (auto* sub : s->stmts) WalkStmtsForDeferredActions(sub, auto_vars);
+  WalkStmtsForDeferredActions(s->then_branch, auto_vars);
+  WalkStmtsForDeferredActions(s->else_branch, auto_vars);
+  WalkStmtsForDeferredActions(s->body, auto_vars);
+  WalkStmtsForDeferredActions(s->for_body, auto_vars);
+  WalkStmtsForDeferredActions(s->assert_pass_stmt, auto_vars);
+  WalkStmtsForDeferredActions(s->assert_fail_stmt, auto_vars);
+  for (const auto& ci : s->case_items)
+    WalkStmtsForDeferredActions(ci.body, auto_vars);
 }
 
 void Elaborator::ValidateDeferredAssertionActions(const ModuleDecl* decl) {
@@ -311,8 +353,26 @@ void Elaborator::ValidateDeferredAssertionActions(const ModuleDecl* decl) {
     }
   }
   for (const auto* item : decl->items) {
-    if (item->body) {
-      WalkStmtsForDeferredActions(item->body);
+    // A task or function keeps its body in func_body_stmts; procedural blocks
+    // (initial/always) keep theirs in body. Validate whichever this item uses.
+    if (!item->body && item->func_body_stmts.empty()) continue;
+    // §16.4: collect the automatic-variable names in scope for this item so a
+    // deferred action call passing one of them by reference can be rejected. An
+    // automatic task or function makes its formals and locals automatic.
+    bool routine_is_automatic = (item->kind == ModuleItemKind::kTaskDecl ||
+                                 item->kind == ModuleItemKind::kFunctionDecl) &&
+                                item->is_automatic;
+    std::unordered_set<std::string_view> auto_vars;
+    if (routine_is_automatic) {
+      for (const auto& fa : item->func_args) auto_vars.insert(fa.name);
+    }
+    CollectAutomaticVarNames(item->body, routine_is_automatic, auto_vars);
+    for (const auto* st : item->func_body_stmts) {
+      CollectAutomaticVarNames(st, routine_is_automatic, auto_vars);
+    }
+    WalkStmtsForDeferredActions(item->body, auto_vars);
+    for (const auto* st : item->func_body_stmts) {
+      WalkStmtsForDeferredActions(st, auto_vars);
     }
   }
 }

@@ -7,11 +7,13 @@
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
+#include "parser/assertion_control_task.h"
 #include "parser/ast.h"
 #include "simulator/coverage_control.h"
 #include "simulator/eval_systask_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
+#include "simulator/sva_engine.h"
 #include "simulator/variable.h"
 
 namespace delta {
@@ -408,6 +410,71 @@ static Logic4Vec EvalCoverageSave(const Expr* expr, SimContext& ctx,
                            /*str_arg_index=*/1);
 }
 
+// §20.11: apply an assertion control system task that names no scope list, so
+// it affects the whole design (the LRM's own examples note that whole-design
+// tasks name no modules). Only this whole-design form is modeled against
+// immediate assertions, which are not registered by hierarchical name; a task
+// that names specific scopes leaves them unaffected. On/Off/Kill toggle
+// checking and FailOn/FailOff toggle the default fail action, each carrying the
+// Table 20-6 assertion_type and Table 20-7 directive_type masks that select
+// which assertions are affected.
+static void ApplyGlobalAssertionControlTask(const Expr* expr, SimContext& ctx,
+                                            Arena& arena,
+                                            std::string_view name) {
+  AssertControlInvocation inv;
+  bool has_scope_list = false;
+  if (name == "$assertcontrol") {
+    // Argument order: control_type, assertion_type, directive_type, levels,
+    // then the scope list. control_type is required; the type masks default to
+    // 255 and 7 when omitted.
+    if (expr->args.empty() || !expr->args[0]) return;
+    inv.control_type =
+        static_cast<uint32_t>(EvalExpr(expr->args[0], ctx, arena).ToUint64());
+    inv.assertion_type =
+        (expr->args.size() > 1 && expr->args[1])
+            ? static_cast<uint32_t>(
+                  EvalExpr(expr->args[1], ctx, arena).ToUint64())
+            : kAssertionTypeDefault;
+    inv.directive_type =
+        (expr->args.size() > 2 && expr->args[2])
+            ? static_cast<uint32_t>(
+                  EvalExpr(expr->args[2], ctx, arena).ToUint64())
+            : kDirectiveTypeDefault;
+    has_scope_list = expr->args.size() > 4;  // levels at [3], scopes at [4..]
+  } else {
+    // A convenience/backward-compatibility task expands to a fixed
+    // $assertcontrol invocation; its own arguments are (levels, scope...).
+    if (!EquivalentAssertControlForTask(name, inv)) return;
+    has_scope_list = expr->args.size() > 1;
+  }
+  if (has_scope_list) return;
+
+  switch (static_cast<AssertControlType>(inv.control_type)) {
+    case AssertControlType::kOn:
+      // §20.11: On re-enables checking and violation reporting.
+      ctx.SetGlobalAssertCheckingOn();
+      ctx.SetGlobalAssertFailActionOn();
+      break;
+    case AssertControlType::kOff:
+    case AssertControlType::kKill:
+      // §20.11: Off/Kill stop the checking of the selected assertions.
+      ctx.SetGlobalAssertCheckingOff(inv.assertion_type, inv.directive_type);
+      break;
+    case AssertControlType::kFailOn:
+      ctx.SetGlobalAssertFailActionOn();
+      break;
+    case AssertControlType::kFailOff:
+      // §20.11: FailOff stops the fail action, including the default $error.
+      ctx.SetGlobalAssertFailActionOff(inv.assertion_type, inv.directive_type);
+      break;
+    default:
+      // Lock/Unlock and the pass/vacuity action controls do not change
+      // whole-design checking or the default fail action of immediate
+      // assertions; their semantics are exercised on AssertionControl directly.
+      break;
+  }
+}
+
 // §16.9/§16.13: the sampled-value functions and immediate-assertion-control
 // queries. Returns the result when `name` selects one of these, or nullopt so
 // the caller can fall through to the other system-call families.
@@ -441,7 +508,14 @@ static std::optional<Logic4Vec> EvalSampledValueOrAssert(
     return MakeLogic4VecVal(arena, 1, 0);
   }
 
-  if (name.starts_with("$assert")) return MakeLogic4VecVal(arena, 1, 0);
+  if (name.starts_with("$assert")) {
+    // §20.11: an assertion control system task takes effect when executed; the
+    // call itself yields no meaningful value.
+    if (IsAssertionControlTaskName(name)) {
+      ApplyGlobalAssertionControlTask(expr, ctx, arena, name);
+    }
+    return MakeLogic4VecVal(arena, 1, 0);
+  }
 
   return std::nullopt;
 }

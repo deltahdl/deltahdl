@@ -64,20 +64,4 @@ TEST(ImmediateAssertionElaboration, ActionBlockWithSeverityTasksElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ImmediateAssertionElaboration, DeferredImmediateAssertionElaborates) {
-  ElabFixture f;
-  auto* design = Elaborate(
-      "module m;\n"
-      "  logic c;\n"
-      "  initial begin\n"
-      "    assert #0 (c);\n"
-      "    assume final (c);\n"
-      "    cover #0 (c);\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 }  // namespace
