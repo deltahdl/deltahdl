@@ -25,6 +25,61 @@ TEST(ConcurrentAssertionSampling, AutomaticVariableSamplesCurrentValue) {
   EXPECT_EQ(sv.mode, SampleMode::kCurrent);
 }
 
+// §16.5.1 / §16.10: a local variable is one of the exceptions to the Preponed
+// sampling rule. Like an automatic variable, its sampled value is its current
+// value, not a value read from the Preponed region. §16.10 states the same rule
+// ("the sampled value of a local variable is the current value") and refers
+// back to §16.5.1; SampleLocalVariable is the production carrier for that
+// weave.
+TEST(ConcurrentAssertionSampling, LocalVariableSamplesCurrentValue) {
+  SampledValue sv = SampleLocalVariable(0x2468);
+  EXPECT_EQ(sv.value, 0x2468u);
+  EXPECT_EQ(sv.mode, SampleMode::kCurrent);
+}
+
+// §16.5.1: the default sampled value of a static variable is the value assigned
+// in its declaration, which is distinct from the plain uninitialized type
+// default that any other variable/net gets. At time 0 the static variable
+// therefore samples that declaration-assigned value (in kDefault mode) rather
+// than its live/Preponed running value. The third argument models the value
+// assigned in the declaration.
+TEST(ConcurrentAssertionSampling,
+     StaticVariableDefaultIsDeclarationAssignedValue) {
+  SampledValue sv = SampleStaticVariable(0xDEAD, SimTime{0}, 7);
+  EXPECT_EQ(sv.value, 7u);
+  EXPECT_EQ(sv.mode, SampleMode::kDefault);
+}
+
+// §16.5.1: active free checker variables are the third kind, alongside
+// automatic and local variables, that is excepted from Preponed sampling — its
+// sampled value is its current value.
+TEST(ConcurrentAssertionSampling,
+     ActiveFreeCheckerVariableSamplesCurrentValue) {
+  SampledValue sv = SampleActiveFreeCheckerVariable(0x1357);
+  EXPECT_EQ(sv.value, 0x1357u);
+  EXPECT_EQ(sv.mode, SampleMode::kCurrent);
+}
+
+// §16.5.1: the current-value rule for a free checker variable has an exception
+// — when a sampled value function ($past/$future) asks for a past or future
+// value of an active free checker variable, that value comes from the Postponed
+// region instead.
+TEST(ConcurrentAssertionSampling, FreeCheckerPastFutureSamplesPostponedRegion) {
+  SampledValue sv = SampleActiveFreeCheckerVarPastFuture(0x99);
+  EXPECT_EQ(sv.value, 0x99u);
+  EXPECT_EQ(sv.mode, SampleMode::kPostponed);
+}
+
+// §16.5.1: the complementary exception for automatic variables — a sampled
+// value function's request for a past or future value of an automatic variable
+// collapses to the automatic variable's current value rather than reaching into
+// another clock tick.
+TEST(ConcurrentAssertionSampling, AutomaticPastFutureCollapsesToCurrentValue) {
+  SampledValue sv = SampleAutomaticVarPastFuture(0x42);
+  EXPECT_EQ(sv.value, 0x42u);
+  EXPECT_EQ(sv.mode, SampleMode::kCurrent);
+}
+
 TEST(ConcurrentAssertionSampling, DefaultSampledValueOfTriggeredIsZero) {
   SampledValue t = DefaultSampledValueOfTriggered();
   EXPECT_EQ(t.value, 0u);

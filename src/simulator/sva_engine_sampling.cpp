@@ -57,6 +57,31 @@ SampledValue SampleAutomaticVariable(uint64_t current_value) {
   return SampledValue{current_value, SampleMode::kCurrent};
 }
 
+SampledValue SampleLocalVariable(uint64_t current_value) {
+  // §16.5.1 / §16.10: a local variable is sampled at its current value, not at
+  // its Preponed value, so its sampled value carries kCurrent just as an
+  // automatic variable's does.
+  return SampledValue{current_value, SampleMode::kCurrent};
+}
+
+SampledValue SampleActiveFreeCheckerVariable(uint64_t current_value) {
+  // §16.5.1: an active free checker variable, like an automatic or local
+  // variable, is sampled at its current value.
+  return SampledValue{current_value, SampleMode::kCurrent};
+}
+
+SampledValue SampleActiveFreeCheckerVarPastFuture(uint64_t postponed_value) {
+  // §16.5.1: a past/future value of an active free checker variable requested
+  // by a sampled value function is read from the Postponed region.
+  return SampledValue{postponed_value, SampleMode::kPostponed};
+}
+
+SampledValue SampleAutomaticVarPastFuture(uint64_t current_value) {
+  // §16.5.1: a past/future value of an automatic variable requested by a
+  // sampled value function collapses to the automatic variable's current value.
+  return SampledValue{current_value, SampleMode::kCurrent};
+}
+
 SampledValue DefaultSampledValueOfTriggered() {
   return SampledValue{0, SampleMode::kDefault};
 }

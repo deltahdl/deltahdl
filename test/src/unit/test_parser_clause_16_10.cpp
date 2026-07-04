@@ -123,6 +123,81 @@ TEST(LocalVariableParsing, AssertionVariableDeclWithPackedDimension) {
   EXPECT_EQ(item->prop_seq_assert_vars[0], "q");
 }
 
+// §16.10: a local variable declared in a sequence body may not be used in the
+// body's clocking event expression. Here the body local `x` is named as the
+// clock signal `@(posedge x)`, which the parser must reject.
+TEST(LocalVariableParsing, LocalVariableInClockingEventIsError) {
+  auto r = Parse(
+      "module m;\n"
+      "  sequence s;\n"
+      "    logic x;\n"
+      "    @(posedge x) (a, x = data) ##1 b;\n"
+      "  endsequence\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_TRUE(r.has_errors);
+}
+
+// §16.10: the companion accepting case — a body local variable that is only
+// assigned/read in the sequence body (not named in the clocking event) is
+// legal, so clocking on an ordinary signal must not trip the check.
+TEST(LocalVariableParsing, LocalVariableNotInClockingEventParses) {
+  auto r = Parse(
+      "module m;\n"
+      "  sequence s;\n"
+      "    logic x;\n"
+      "    @(posedge clk) (a, x = data) ##1 b;\n"
+      "  endsequence\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FindItemByKind(r, ModuleItemKind::kSequenceDecl);
+  ASSERT_NE(item, nullptr);
+  ASSERT_EQ(item->prop_seq_assert_vars.size(), 1u);
+  EXPECT_EQ(item->prop_seq_assert_vars[0], "x");
+}
+
+// §16.10 Syntax 16-13 / §16.6: the var_data_type of an
+// assertion_variable_declaration may carry a signing keyword (signed/unsigned)
+// after the type keyword. The parser advances past that signing token while
+// consuming the type prefix, so the declared name is still harvested.
+TEST(LocalVariableParsing, AssertionVariableDeclWithSigning) {
+  auto r = Parse(
+      "module m;\n"
+      "  sequence s;\n"
+      "    logic signed x;\n"
+      "    @(posedge clk) (a, x = data) ##1 b;\n"
+      "  endsequence\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FindItemByKind(r, ModuleItemKind::kSequenceDecl);
+  ASSERT_NE(item, nullptr);
+  ASSERT_EQ(item->prop_seq_assert_vars.size(), 1u);
+  EXPECT_EQ(item->prop_seq_assert_vars[0], "x");
+}
+
+// §16.10: a declaration assignment defines the local variable's initial value.
+// The initializer need not be constant, but a constant literal is an equally
+// valid initializer form; the parser skips whatever initializer expression
+// follows the '=' and still records the declared name. This is the
+// accumulating-local shape `int x = 0;` from §16.10's own examples.
+TEST(LocalVariableParsing, AssertionVariableDeclWithConstantInitializer) {
+  auto r = Parse(
+      "module m;\n"
+      "  sequence s;\n"
+      "    int x = 0;\n"
+      "    @(posedge clk) (a, x = data) ##1 b;\n"
+      "  endsequence\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FindItemByKind(r, ModuleItemKind::kSequenceDecl);
+  ASSERT_NE(item, nullptr);
+  ASSERT_EQ(item->prop_seq_assert_vars.size(), 1u);
+  EXPECT_EQ(item->prop_seq_assert_vars[0], "x");
+}
+
 // §16.10: several assertion_variable_declaration items may appear in sequence
 // at the head of a body. Each decl line contributes its own names to the
 // harvested local-variable list in source order.

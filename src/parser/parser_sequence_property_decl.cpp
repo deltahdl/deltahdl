@@ -839,6 +839,40 @@ ModuleItem* Parser::ParseSequenceDecl() {
     }
     in_decl_prefix = false;
 
+    // §16.10: a local variable declared in the sequence body cannot be used in
+    // the body's clocking event expression. The assertion_variable_declarations
+    // are harvested before this point, so any identifier inside a `@( ... )`
+    // event group (an edge signal or an iff guard) that matches a body local is
+    // rejected here. The whole parenthesized event group is consumed so its
+    // names are not also recorded as sequence instance references.
+    if (Check(TokenKind::kAt)) {
+      Consume();  // '@'
+      if (Check(TokenKind::kLParen)) {
+        Consume();  // '('
+        int depth = 1;
+        while (depth > 0 && !AtEnd()) {
+          if (Check(TokenKind::kLParen)) {
+            ++depth;
+          } else if (Check(TokenKind::kRParen)) {
+            --depth;
+          } else if (Check(TokenKind::kIdentifier)) {
+            auto name = CurrentToken().text;
+            for (auto local : item->prop_seq_assert_vars) {
+              if (local == name) {
+                diag_.Error(CurrentLoc(),
+                            "local variable \"" + std::string(name) +
+                                "\" may not be used in a clocking event "
+                                "expression (§16.10)");
+                break;
+              }
+            }
+          }
+          Consume();
+        }
+      }
+      continue;
+    }
+
     if (Check(TokenKind::kHashHash)) {
       auto delay_loc = CurrentLoc();
       Consume();

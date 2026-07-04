@@ -59,6 +59,10 @@ enum class SampleMode : uint8_t {
   kPreponed = 0,
   kCurrent = 1,
   kDefault = 2,
+  // §16.5.1: a past or future value of an active free checker variable that is
+  // referenced by a sampled value function is taken from the Postponed region
+  // rather than the Preponed region.
+  kPostponed = 3,
 };
 
 struct SampledValue {
@@ -70,6 +74,31 @@ SampledValue SampleStaticVariable(uint64_t preponed_value, SimTime t,
                                   uint64_t type_default);
 
 SampledValue SampleAutomaticVariable(uint64_t current_value);
+
+// §16.5.1: local variables (see §16.10) are one of the exceptions to the
+// preponed-sample rule — like automatic and active free checker variables,
+// their sampled value is their current value rather than a value read from the
+// Preponed region. §16.10 restates this directly ("the sampled value of a local
+// variable is the current value, see 16.5.1"). Modeling local-variable sampling
+// with its own entry point keeps that weave explicit at the point production
+// code consults a local variable's sampled value.
+SampledValue SampleLocalVariable(uint64_t current_value);
+
+// §16.5.1: active free checker variables are the third kind (with automatic and
+// local variables) whose sampled value is their current value rather than a
+// Preponed value.
+SampledValue SampleActiveFreeCheckerVariable(uint64_t current_value);
+
+// §16.5.1: exception to the current-value rule above. When a past or future
+// value of an active free checker variable is referenced by a sampled value
+// function (e.g. $past/$future), that value is sampled in the Postponed region.
+SampledValue SampleActiveFreeCheckerVarPastFuture(uint64_t postponed_value);
+
+// §16.5.1: complementary exception for automatic variables. When a past or
+// future value of an automatic variable is referenced by a sampled value
+// function, the current value of the automatic variable is taken instead of a
+// value from a past or future clock tick.
+SampledValue SampleAutomaticVarPastFuture(uint64_t current_value);
 
 SampledValue DefaultSampledValueOfTriggered();
 SampledValue DefaultSampledValueOfMatched();
