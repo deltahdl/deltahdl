@@ -88,6 +88,38 @@ TEST(LexicalConventionLexing, MixedWhitespaceAsTokenSeparators) {
   EXPECT_EQ(tokens[1].text, "b");
 }
 
+// Negative form of the free-format separator rule: whitespace between two
+// word tokens is significant precisely because removing it fuses them into a
+// single token. "foo bar" is two identifiers; "foobar" is one.
+TEST(LexicalConventionLexing, AdjacentWordTokensRequireSeparator) {
+  auto separated = Lex("foo bar");
+  ASSERT_EQ(separated.size(), 3u);  // ident, ident, EOF
+  EXPECT_EQ(separated[0].kind, TokenKind::kIdentifier);
+  EXPECT_EQ(separated[0].text, "foo");
+  EXPECT_EQ(separated[1].kind, TokenKind::kIdentifier);
+  EXPECT_EQ(separated[1].text, "bar");
+
+  auto merged = Lex("foobar");
+  ASSERT_EQ(merged.size(), 2u);  // one ident, EOF
+  EXPECT_EQ(merged[0].kind, TokenKind::kIdentifier);
+  EXPECT_EQ(merged[0].text, "foobar");
+}
+
+// Sharper negative: dropping the separator changes meaning, not just count --
+// a keyword run together with a following letter is no longer the keyword but
+// a single ordinary identifier.
+TEST(LexicalConventionLexing, MissingSeparatorMergesKeywordIntoIdentifier) {
+  auto spaced = Lex("module m");
+  ASSERT_EQ(spaced.size(), 3u);
+  EXPECT_EQ(spaced[0].kind, TokenKind::kKwModule);
+  EXPECT_EQ(spaced[1].kind, TokenKind::kIdentifier);
+
+  auto merged = Lex("modulem");
+  ASSERT_EQ(merged.size(), 2u);
+  EXPECT_EQ(merged[0].kind, TokenKind::kIdentifier);  // NOT the keyword
+  EXPECT_EQ(merged[0].text, "modulem");
+}
+
 TEST(LexicalConventionLexing, CommentCategory) {
   auto tokens = Lex("a // line comment\nb");
   ASSERT_EQ(tokens.size(), 3u);
@@ -200,6 +232,40 @@ TEST(LexicalConventionLexing, FreeFormatIdentifierSplitByBlockComment) {
   ASSERT_EQ(with_comment.size(), 3u);
   EXPECT_EQ(with_comment[0].text, "a");
   EXPECT_EQ(with_comment[1].text, "bc");
+}
+
+// The free-format rule of 5.2 says whitespace is not syntactically
+// significant beyond separating tokens -- except for escaped identifiers
+// (see 5.6.1). These two tests exercise that carve-out using 5.6.1's real
+// escaped-identifier syntax (leading backslash). Inside an escaped
+// identifier, operator characters are NOT split into their own tokens; the
+// run continues until whitespace, which is what actually terminates it.
+TEST(LexicalConventionLexing, EscapedIdentifierSuspendsFreeFormatSeparation) {
+  // Without the escape, '+' separates three tokens.
+  auto plain = Lex("cpu+alu");
+  ASSERT_EQ(plain.size(), 4u);
+  EXPECT_EQ(plain[0].kind, TokenKind::kIdentifier);
+  EXPECT_EQ(plain[1].kind, TokenKind::kPlus);
+  EXPECT_EQ(plain[2].kind, TokenKind::kIdentifier);
+
+  // With the escape, the whole run is one identifier -- the '+' is absorbed.
+  auto escaped = Lex("\\cpu+alu ");
+  ASSERT_EQ(escaped.size(), 2u);
+  EXPECT_EQ(escaped[0].kind, TokenKind::kEscapedIdentifier);
+  EXPECT_EQ(escaped[0].text, "cpu+alu");
+  EXPECT_EQ(escaped[1].kind, TokenKind::kEof);
+}
+
+TEST(LexicalConventionLexing, WhitespaceIsSignificantAsEscapedIdentifierEnd) {
+  // The space is significant here: it delimits the escaped identifier's
+  // extent rather than being an ignorable separator between two idents.
+  auto tokens = Lex("\\a+b c");
+  ASSERT_EQ(tokens.size(), 3u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kEscapedIdentifier);
+  EXPECT_EQ(tokens[0].text, "a+b");
+  EXPECT_EQ(tokens[1].kind, TokenKind::kIdentifier);
+  EXPECT_EQ(tokens[1].text, "c");
+  EXPECT_EQ(tokens[2].kind, TokenKind::kEof);
 }
 
 TEST(LexicalConventionLexing, EmptyInputProducesEofOnly) {

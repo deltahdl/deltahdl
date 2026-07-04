@@ -118,6 +118,22 @@ TEST(LexicalTokenSim, LexicalTokenCrlfLineEndings) {
   EXPECT_EQ(result, 55u);
 }
 
+// End-to-end exercise of 5.2's free-format carve-out for escaped identifiers
+// (see 5.6.1). The signal name embeds a '+', which outside an escaped
+// identifier would lex as an operator token, and the space that follows it is
+// the significant terminator. Built from real escaped-identifier source
+// syntax and run through parse -> elaborate -> simulate; reading the value
+// back confirms the whole pipeline treated "net+name" as one signal.
+TEST(LexicalTokenSim, EscapedIdentifierNameDrivenEndToEnd) {
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic [7:0] \\net+name ;\n"
+      "  initial \\net+name = 8'd42;\n"
+      "endmodule\n",
+      "net+name");
+  EXPECT_EQ(result, 42u);
+}
+
 TEST(LexicalTokenSim, LexicalTokenStringLiteralCategoryInSimulation) {
   auto result = RunAndGet(
       "module t;\n"
