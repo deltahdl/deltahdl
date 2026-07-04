@@ -426,6 +426,7 @@ class Parser {
   Expr* ParseParameterizedScope(Expr* base);
   Expr* TryParseUserTypeCast(const Token& tok);
   Expr* ParseIdentifierExpr();
+  Expr* ParseLocalScopeExpr();
   Expr* TryParseIdentifierCast(Expr* base, bool* handled);
   Expr* ParseIdentifierPostfixChain(Expr* result);
   Expr* ParseWithClauseTail(Expr* result);

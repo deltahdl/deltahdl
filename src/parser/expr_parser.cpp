@@ -523,6 +523,8 @@ Expr* Parser::ParsePrimaryExpr() {
     case TokenKind::kKwThis:
     case TokenKind::kKwSuper:
       return ParseThisOrSuperExpr();
+    case TokenKind::kKwLocal:
+      return ParseLocalScopeExpr();
     case TokenKind::kKwTagged:
       return ParseTaggedExpr();
     case TokenKind::kKwNew:
@@ -738,6 +740,26 @@ Expr* Parser::ParseWithClauseTail(Expr* result) {
     if (Check(TokenKind::kLParen)) result = ParseCallExpr(result);
   }
   return result;
+}
+
+// §A.9.3 ps_type_identifier admits a "local ::" scope prefix (footnote 48),
+// used inside an inline randomize()...with constraint to bind a name in the
+// calling scope rather than the randomized object (see 18.7.1); the same
+// prefix also opens §A.8.4 class_qualifier. Parse it as a scope-resolution
+// chain so a trailing type identifier can still form a cast
+// ("local::T'(expr)"). A bare "local" without "::" is not an expression, so
+// this keeps that error path intact rather than treating "local" as a name.
+Expr* Parser::ParseLocalScopeExpr() {
+  auto tok = Consume();  // 'local'
+  if (!Check(TokenKind::kColonColon)) {
+    diag_.Error(tok.loc, "'local' may only appear here as a 'local::' prefix");
+    return MakeErrorExpr(arena_, tok.loc);
+  }
+  Expr* result = ParseMemberAccessChain(tok);
+  bool cast_handled = false;
+  Expr* cast = TryParseIdentifierCast(result, &cast_handled);
+  if (cast_handled) return cast;
+  return ParseIdentifierPostfixChain(result);
 }
 
 Expr* Parser::ParseIdentifierExpr() {

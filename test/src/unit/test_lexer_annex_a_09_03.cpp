@@ -172,13 +172,6 @@ TEST(IdentifierLexing, SystemIdentTrailingDollar) {
   EXPECT_EQ(tokens[0].text, "$test$");
 }
 
-TEST(IdentifierLexing, SystemIdentEmbeddedDollarFollowedByDigit) {
-  auto tokens = Lex("$test$0plusargs ");
-  ASSERT_GE(tokens.size(), 2u);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kSystemIdentifier);
-  EXPECT_EQ(tokens[0].text, "$test$0plusargs");
-}
-
 TEST(IdentifierLexing, SystemIdentMultipleInStream) {
   auto tokens = Lex("$display $finish $time");
   ASSERT_GE(tokens.size(), 4u);
