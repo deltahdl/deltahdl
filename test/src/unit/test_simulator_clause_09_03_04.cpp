@@ -51,6 +51,26 @@ TEST(BlockNameSimulation, NestedNamedBlocksSimulate) {
   EXPECT_EQ(val, 8u);
 }
 
+// A named parallel block (par_block from §9.3.2) closed with a matching join
+// label runs end-to-end: the block name is accepted and all forked children
+// complete before control passes the join, so their combined effect is visible.
+TEST(BlockNameSimulation, NamedForkBlockSimulates) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  int result;\n"
+      "  int a, b;\n"
+      "  initial begin\n"
+      "    fork : workers\n"
+      "      a = 30;\n"
+      "      b = 12;\n"
+      "    join : workers\n"
+      "    result = a + b;\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(val, 42u);
+}
+
 TEST(BlockNameSimulation, NamedBlockVarsAreStatic) {
   auto val = RunAndGet(
       "module t;\n"
