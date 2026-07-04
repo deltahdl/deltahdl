@@ -585,7 +585,13 @@ Stmt* Parser::ParseForStmt() {
   if (Check(TokenKind::kSemicolon)) {
     Consume();
   } else if (Check(TokenKind::kKwVar) ||
-             IsDataTypeKeyword(CurrentToken().kind)) {
+             IsDataTypeKeyword(CurrentToken().kind) ||
+             (Check(TokenKind::kIdentifier) &&
+              known_types_.count(CurrentToken().text) != 0)) {
+    // for_variable_declaration ::= [ var ] data_type variable_identifier = ...
+    // (Syntax 12-5). data_type may be a user-defined (named) type, so a leading
+    // identifier that names a known type begins a local declaration rather than
+    // a plain assignment.
     ParserStmtHelpers::ParseForLocalDeclInits(*this, stmt);
   } else {
     ParserStmtHelpers::ParseForPlainInits(*this, stmt);
