@@ -69,12 +69,6 @@ TEST(ConditionalStatementSim, ExecuteIfElse) {
   EXPECT_EQ(out->value.ToUint64(), 0u);
 }
 
-bool EvaluateWaitCondition(uint64_t value) { return value != 0; }
-
-TEST(TimingControl, WaitConditionNonzeroIsTrue) {
-  EXPECT_TRUE(EvaluateWaitCondition(42));
-}
-
 TEST(ConditionalStatementSim, IfTrueTakesThenBranch) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -464,6 +458,107 @@ TEST(ConditionalStatementSim, BothBranchesNullNoEffect) {
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
+// End-to-end coverage of §12.4's true->then / false->else rule when the
+// cond_predicate is built from the §12.6 dependency's `&&&` conjunction. The
+// input is written as real source and driven through the full pipeline; the
+// observed value confirms the branch §12.4 selects for the predicate's result.
+// Here both operands are true, so the predicate is true and the then branch
+// runs.
+TEST(ConditionalStatementSim, TripleAndPredicateTrueTakesThenBranch) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  logic a, b;\n"
+      "  initial begin\n"
+      "    a = 1; b = 1; x = 8'd0;\n"
+      "    if (a &&& b) x = 8'd42;\n"
+      "    else x = 8'd99;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 42u);
+}
+
+// Companion to the previous test: with one operand false the `&&&` predicate is
+// false, so §12.4 routes execution to the else branch. The differing value
+// discriminates the false path from the true path.
+TEST(ConditionalStatementSim, TripleAndPredicateFalseTakesElseBranch) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  logic a, b;\n"
+      "  initial begin\n"
+      "    a = 1; b = 0; x = 8'd0;\n"
+      "    if (a &&& b) x = 8'd42;\n"
+      "    else x = 8'd99;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 99u);
+}
+
+// End-to-end coverage of §12.4's true->then rule when the cond_predicate is a
+// §12.6 cond_pattern (`expression matches pattern`). The operand equals the
+// constant pattern, so the match yields true and the then branch runs.
+TEST(ConditionalStatementSim, MatchesPredicateTrueTakesThenBranch) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x, y;\n"
+      "  initial begin\n"
+      "    x = 8'd7; y = 8'd0;\n"
+      "    if (x matches 8'd7) y = 8'd42;\n"
+      "    else y = 8'd99;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("y");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 42u);
+}
+
+// Companion to the previous test: the operand does not equal the constant
+// pattern, so the `matches` predicate is false and §12.4 executes the else
+// branch. The differing value discriminates the false path from the true path.
+TEST(ConditionalStatementSim, MatchesPredicateFalseTakesElseBranch) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x, y;\n"
+      "  initial begin\n"
+      "    x = 8'd7; y = 8'd0;\n"
+      "    if (x matches 8'd3) y = 8'd42;\n"
+      "    else y = 8'd99;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("y");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 99u);
+}
+
 TEST(ConditionalStatementSim, CompiledIfXSkipsThenBranch) {
   CompiledSimFixture f;
   auto* sel = f.ctx.CreateVariable("sel", 1);
@@ -488,6 +583,89 @@ TEST(ConditionalStatementSim, CompiledIfXSkipsThenBranch) {
   auto compiled = ProcessCompiler::Compile(1, block);
   compiled.Execute(f.ctx);
   EXPECT_EQ(out->value.ToUint64(), 99u);
+}
+
+// A bare (block-free) dangling else must bind to the closest preceding if that
+// lacks an else, i.e. the inner if here. With the outer condition true and the
+// inner condition false, the else associated with the inner if runs. Were the
+// else instead bound to the outer if, the outer-then (the inner if, which has
+// no else once the else is stolen away) would run and leave x untouched.
+TEST(ConditionalStatementSim, DanglingElseBindsInnerIfAtRuntime) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  logic a, b;\n"
+      "  initial begin\n"
+      "    a = 1; b = 0; x = 8'd9;\n"
+      "    if (a)\n"
+      "      if (b) x = 8'd1;\n"
+      "      else x = 8'd2;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 2u);
+}
+
+// Because the dangling else belongs to the inner if, a false outer condition
+// leaves the whole construct inert: the outer if has no else of its own, so
+// nothing executes and x keeps its prior value. A mistaken outer binding would
+// instead run the else and set x to 2.
+TEST(ConditionalStatementSim, DanglingElseInnerBindingLeavesOuterElseless) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  logic a, b;\n"
+      "  initial begin\n"
+      "    a = 0; b = 1; x = 8'd9;\n"
+      "    if (a)\n"
+      "      if (b) x = 8'd1;\n"
+      "      else x = 8'd2;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 9u);
+}
+
+// A begin-end block around the inner if forces the else to associate with the
+// outer if instead. With the outer condition false, that outer-bound else runs.
+// Without the block the else would belong to the inner if and a false outer
+// condition would execute nothing, leaving x at its prior value.
+TEST(ConditionalStatementSim, BeginEndForcesElseOntoOuterIfAtRuntime) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  logic a, b;\n"
+      "  initial begin\n"
+      "    a = 0; b = 1; x = 8'd9;\n"
+      "    if (a) begin\n"
+      "      if (b) x = 8'd1;\n"
+      "    end\n"
+      "    else x = 8'd2;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 2u);
 }
 
 TEST(ConditionalStatementSim, CompiledIfZRunsElseBranch) {
