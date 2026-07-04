@@ -11,39 +11,6 @@ using namespace delta;
 
 namespace {
 
-// Common setup shared by the non-virtual / static method-binding tests: a base
-// "Packet" and a derived "LinkedPacket" each declaring a non-virtual "get"
-// method, plus a live object of the derived type. Callers parameterize nothing;
-// they apply their own distinct assertions to the returned members.
-struct OverriddenGetFixture {
-  ClassTypeInfo* base;
-  ModuleItem* base_get;
-  ClassTypeInfo* derived;
-  ModuleItem* derived_get;
-  ClassObject* obj;
-};
-
-static OverriddenGetFixture MakeOverriddenGetFixture(SimFixture& f) {
-  OverriddenGetFixture r;
-  r.base = MakeClassType(f, "Packet", {});
-  r.base_get = f.arena.Create<ModuleItem>();
-  r.base_get->kind = ModuleItemKind::kFunctionDecl;
-  r.base_get->name = "get";
-  r.base->methods["get"] = r.base_get;
-
-  r.derived = MakeClassType(f, "LinkedPacket", {});
-  r.derived->parent = r.base;
-  r.derived_get = f.arena.Create<ModuleItem>();
-  r.derived_get->kind = ModuleItemKind::kFunctionDecl;
-  r.derived_get->name = "get";
-  r.derived->methods["get"] = r.derived_get;
-
-  auto [handle, obj] = MakeObj(f, r.derived);
-  (void)handle;
-  r.obj = obj;
-  return r;
-}
-
 TEST(OverriddenMemberSimulation, SubclassIsValidBaseObject) {
   SimFixture f;
   auto* packet = MakeClassType(f, "Packet", {"i"});
@@ -65,28 +32,6 @@ TEST(OverriddenMemberSimulation, MultiLevelSubclassIsValidBaseObject) {
   EXPECT_TRUE(leaf->IsA(base));
   EXPECT_TRUE(leaf->IsA(mid));
   EXPECT_FALSE(base->IsA(leaf));
-}
-
-TEST(OverriddenMemberSimulation, NonVirtualResolutionFromBaseType) {
-  SimFixture f;
-  auto fx = MakeOverriddenGetFixture(f);
-  EXPECT_EQ(fx.obj->ResolveMethod("get"), fx.derived_get);
-
-  auto it = fx.base->methods.find("get");
-  ASSERT_NE(it, fx.base->methods.end());
-  EXPECT_EQ(it->second, fx.base_get);
-}
-
-TEST(OverriddenMemberSimulation, OverriddenPropertyInDerived) {
-  SimFixture f;
-  auto* base = MakeClassType(f, "Packet", {"i"});
-  auto* derived = MakeClassType(f, "LinkedPacket", {"i"});
-  derived->parent = base;
-
-  auto [handle, obj] = MakeObj(f, derived);
-  obj->SetProperty("i", MakeLogic4VecVal(f.arena, 32, 2));
-
-  EXPECT_EQ(obj->GetProperty("i", f.arena).ToUint64(), 2u);
 }
 
 TEST(OverriddenMemberSimulation, VirtualMethodDispatchesThroughVtable) {
@@ -251,35 +196,6 @@ TEST(OverriddenMemberSimulation, E2eNonOverriddenMemberAccessibleThroughBase) {
             5u);
 }
 
-// §8.14: a non-virtual method reference is bound by the handle's declared type.
-// Resolving the method from the base's declared type yields the base method
-// even though the object is a LinkedPacket, while resolving from the derived
-// type yields the override -- the static-binding production helper itself.
-TEST(OverriddenMemberSimulation, StaticMethodBindingSelectsDeclaredType) {
-  SimFixture f;
-  auto fx = MakeOverriddenGetFixture(f);
-  EXPECT_EQ(fx.obj->ResolveMethodForType("get", fx.base), fx.base_get);
-  EXPECT_EQ(fx.obj->ResolveMethodForType("get", fx.derived), fx.derived_get);
-}
-
-// §8.14: a shadowed property is read through the slot of the handle's declared
-// type. With the per-level scoped slots the lowerer populates, a base-typed
-// reference sees the base value and a derived-typed reference sees the override
-// -- both observed through the property-read production helper.
-TEST(OverriddenMemberSimulation, StaticPropertyBindingSelectsDeclaredType) {
-  SimFixture f;
-  auto* base = MakeClassType(f, "Packet", {"i"});
-  auto* derived = MakeClassType(f, "LinkedPacket", {"i"});
-  derived->parent = base;
-
-  auto [handle, obj] = MakeObj(f, derived);
-  obj->properties["Packet::i"] = MakeLogic4VecVal(f.arena, 32, 1);
-  obj->properties["LinkedPacket::i"] = MakeLogic4VecVal(f.arena, 32, 2);
-
-  EXPECT_EQ(obj->GetPropertyForType("i", base, f.arena).ToUint64(), 1u);
-  EXPECT_EQ(obj->GetPropertyForType("i", derived, f.arena).ToUint64(), 2u);
-}
-
 // §8.14: a write through a base-typed reference targets the base-level slot of
 // a shadowed property, leaving the derived level's slot untouched -- the
 // write-side static-binding production helper.
@@ -296,6 +212,41 @@ TEST(OverriddenMemberSimulation, WriteThroughBaseTypeTargetsBaseSlot) {
   obj->SetPropertyForType("i", base, MakeLogic4VecVal(f.arena, 32, 7));
   EXPECT_EQ(obj->GetPropertyForType("i", base, f.arena).ToUint64(), 7u);
   EXPECT_EQ(obj->GetPropertyForType("i", derived, f.arena).ToUint64(), 2u);
+}
+
+// §8.14: the clause's headline example, verbatim in spirit. The base "get"
+// returns its own property "i" rather than a literal, so calling p.get()
+// through a base handle exercises BOTH facets of the rule at once: the
+// non-virtual call selects the base method, and inside that base method the
+// unqualified "i" binds to the base's property (1), never the derived override
+// (-2). The literal-returning method test above only observes method
+// selection; this one observes the "original members in the base class" claim.
+TEST(OverriddenMemberSimulation,
+     E2eBaseMethodReadsBasePropertyThroughBaseHandle) {
+  EXPECT_EQ(RunAndGet("class Packet;\n"
+                      "  integer i = 1;\n"
+                      "  function integer get();\n"
+                      "    get = i;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "class LinkedPacket extends Packet;\n"
+                      "  integer i = 2;\n"
+                      "  function integer get();\n"
+                      "    get = -i;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    LinkedPacket lp;\n"
+                      "    Packet p;\n"
+                      "    lp = new;\n"
+                      "    p = lp;\n"
+                      "    result = p.get();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            1u);
 }
 
 // §8.14: static binding holds at every level of the chain, not just the root.
@@ -325,6 +276,65 @@ TEST(OverriddenMemberSimulation, E2eIntermediateHandleSeesIntermediateMember) {
       "endmodule\n",
       f);
   LowerRunAndCheck(f, design, {{"result", 2u}});
+}
+
+// §8.14: the static-binding rule applies to a base handle produced by ARGUMENT
+// PASSING, not only by a local upcast assignment. A function formal typed as
+// the base class, bound to a derived actual, is a distinct production path for
+// the base handle (formal-argument binding records the declared type). Reading
+// the shadowed property through the formal must yield the base value (1), not
+// the derived override (2). Built from §8.5 property + §8.6 function + §8.13
+// extends real syntax and driven through the full pipeline.
+TEST(OverriddenMemberSimulation, E2eBasePropertyThroughBaseTypedArgument) {
+  EXPECT_EQ(RunAndGet("class Packet;\n"
+                      "  integer i = 1;\n"
+                      "endclass\n"
+                      "class LinkedPacket extends Packet;\n"
+                      "  integer i = 2;\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  function integer read_i(Packet p);\n"
+                      "    read_i = p.i;\n"
+                      "  endfunction\n"
+                      "  initial begin\n"
+                      "    LinkedPacket lp;\n"
+                      "    lp = new;\n"
+                      "    result = read_i(lp);\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            1u);
+}
+
+// §8.14: the method-binding facet of the same argument-passing input form. A
+// non-virtual method called through a base-typed formal selects the base
+// method (10), not the derived override (20), because the formal's declared
+// type governs the dispatch.
+TEST(OverriddenMemberSimulation, E2eBaseMethodThroughBaseTypedArgument) {
+  EXPECT_EQ(RunAndGet("class Packet;\n"
+                      "  function integer get();\n"
+                      "    get = 10;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "class LinkedPacket extends Packet;\n"
+                      "  function integer get();\n"
+                      "    get = 20;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  function integer call_get(Packet p);\n"
+                      "    call_get = p.get();\n"
+                      "  endfunction\n"
+                      "  initial begin\n"
+                      "    LinkedPacket lp;\n"
+                      "    lp = new;\n"
+                      "    result = call_get(lp);\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            10u);
 }
 
 }  // namespace

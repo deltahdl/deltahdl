@@ -305,6 +305,19 @@ static void RegisterValueArgStructType(const FunctionArg& param,
     ctx.SetVariableStructType(param.name, param.data_type.type_name);
 }
 
+// §8.14: a class-typed formal holds a handle whose DECLARED type governs
+// non-virtual member and property resolution. Record it just as a local class
+// variable does (see CreateFuncLocalVar); otherwise a base-typed formal bound
+// to a derived actual would have no declared type on file and member lookup
+// would fall back to the runtime object's type, wrongly reaching the derived
+// override instead of the hidden base member.
+static void RegisterValueArgClassType(const FunctionArg& param,
+                                      SimContext& ctx) {
+  const auto& dt = param.data_type;
+  if (!dt.type_name.empty() && ctx.FindClassType(dt.type_name))
+    ctx.SetVariableClassType(param.name, dt.type_name);
+}
+
 static void BindValueArg(const FunctionArg& param, const Expr* expr,
                          int arg_index, const ModuleItem* func, SimContext& ctx,
                          Arena& arena) {
@@ -338,6 +351,7 @@ static void BindValueArg(const FunctionArg& param, const Expr* expr,
       ctx.AliasLocalVariable(param.name, existing);
       if (param.direction != Direction::kOutput) existing->value = val;
       RegisterValueArgStructType(param, expr, arg_index, ctx);
+      RegisterValueArgClassType(param, ctx);
       return;
     }
   }
@@ -349,6 +363,7 @@ static void BindValueArg(const FunctionArg& param, const Expr* expr,
   // resolve from the actual argument unconditionally; the resolver is a no-op
   // for non-struct actuals.
   RegisterValueArgStructType(param, expr, arg_index, ctx);
+  RegisterValueArgClassType(param, ctx);
 }
 
 void BindFunctionArgs(const ModuleItem* func, const Expr* expr, SimContext& ctx,
