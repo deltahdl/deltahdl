@@ -738,14 +738,23 @@ class SimContext {
   int CoverEvalCount() const { return cover_eval_count_; }
   int CoverSuccessCount() const { return cover_success_count_; }
 
-  void SetLastSeverity(std::string_view sev, std::string_view msg, SimTime t) {
+  // §20.10: record the last severity system task's tool-specific message parts
+  // so a harness can confirm the required call-site information was reported --
+  // the severity label, the user message, the simulation time, the hierarchical
+  // scope of the call, and its source line (the `__LINE__ equivalent).
+  void SetLastSeverity(std::string_view sev, std::string_view msg, SimTime t,
+                       std::string_view scope = {}, uint32_t line = 0) {
     last_severity_ = std::string(sev);
     last_severity_msg_ = std::string(msg);
     last_severity_time_ = t;
+    last_severity_scope_ = std::string(scope);
+    last_severity_line_ = line;
   }
   std::string_view LastSeverity() const { return last_severity_; }
   std::string_view LastSeverityMsg() const { return last_severity_msg_; }
   SimTime LastSeverityTime() const { return last_severity_time_; }
+  std::string_view LastSeverityScope() const { return last_severity_scope_; }
+  uint32_t LastSeverityLine() const { return last_severity_line_; }
 
   void SetClockingManager(class ClockingManager* mgr) { clocking_mgr_ = mgr; }
   class ClockingManager* GetClockingManager() { return clocking_mgr_; }
@@ -947,6 +956,8 @@ class SimContext {
   std::string last_severity_;
   std::string last_severity_msg_;
   SimTime last_severity_time_{};
+  std::string last_severity_scope_;
+  uint32_t last_severity_line_ = 0;
 
   class ClockingManager* clocking_mgr_ = nullptr;
 

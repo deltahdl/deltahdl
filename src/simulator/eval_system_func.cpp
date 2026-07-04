@@ -453,10 +453,35 @@ static Logic4Vec EvalMiscSysCall(const Expr* expr, SimContext& ctx,
   return EvalClassifiedSysCall(expr, ctx, arena, name);
 }
 
+// §20.2 / Table 20-1: emit the banner that $finish and $stop print before
+// halting, at the reporting level given by their first argument. Level 0 emits
+// nothing, level 1 reports the current time, and level 2 additionally reports
+// resource statistics.
+static void EmitFinishDiagnostic(SimContext& ctx, std::string_view task,
+                                 int64_t level, std::ostream& os) {
+  if (level <= 0) return;
+  os << task << " at time " << ctx.CurrentTime().ticks << "\n";
+  if (level >= 2) {
+    os << task << ": memory and CPU time statistics unavailable\n";
+  }
+}
+
 static Logic4Vec EvalSeveritySysCall(const Expr* expr, SimContext& ctx,
                                      Arena& arena, std::string_view name) {
   if (name == "$fatal") {
     ExecSeverityTask(expr, ctx, arena, "FATAL", std::cerr);
+    // §20.10: calling $fatal produces an implicit $finish. Its optional first
+    // argument is a finish_number consistent with $finish's argument (§20.2),
+    // which selects how much diagnostic information the tool reports before it
+    // halts. A leading string argument means no finish_number was supplied, so
+    // the default reporting level of 1 applies.
+    int64_t level = 1;
+    if (!expr->args.empty() && expr->args[0] &&
+        expr->args[0]->kind != ExprKind::kStringLiteral) {
+      level =
+          static_cast<int64_t>(EvalExpr(expr->args[0], ctx, arena).ToUint64());
+    }
+    EmitFinishDiagnostic(ctx, "$finish", level, std::cout);
     ctx.RequestFinish();
   } else if (name == "$error") {
     ExecSeverityTask(expr, ctx, arena, "ERROR", std::cerr);
@@ -558,11 +583,7 @@ static void EmitSimControlDiagnostic(const Expr* expr, SimContext& ctx,
     level =
         static_cast<int64_t>(EvalExpr(expr->args[0], ctx, arena).ToUint64());
   }
-  if (level <= 0) return;
-  os << task << " at time " << ctx.CurrentTime().ticks << "\n";
-  if (level >= 2) {
-    os << task << ": memory and CPU time statistics unavailable\n";
-  }
+  EmitFinishDiagnostic(ctx, task, level, os);
 }
 
 // Optional $countdrivers system function (Annex D.2). It counts the drivers on

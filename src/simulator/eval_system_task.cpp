@@ -11,6 +11,7 @@
 #include "parser/ast.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"
+#include "simulator/process.h"
 #include "simulator/sim_context.h"
 #include "simulator/statement_assign.h"
 #include "simulator/vcd_writer.h"
@@ -312,12 +313,40 @@ void ExecDisplayWrite(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (expr->callee.starts_with("$display")) std::cout << "\n";
 }
 
+// §20.10: the hierarchical name of the scope in which a severity system task is
+// called -- the same walk %m performs (§21.2.1.5): the top instance name, then
+// the running process's instance chain, then the active subroutine / named
+// block / labeled statement scopes in lexical order.
+static std::string SeverityScopeName(SimContext& ctx) {
+  std::string name(ctx.FindInstanceType(""));
+  if (Process* proc = ctx.CurrentProcess()) {
+    std::string prefix = proc->inst_prefix;
+    if (!prefix.empty() && prefix.back() == '.') prefix.pop_back();
+    if (!prefix.empty()) {
+      if (!name.empty()) name += '.';
+      name += prefix;
+    }
+  }
+  for (std::string_view scope : ctx.ActiveNamedScopes()) {
+    if (!name.empty()) name += '.';
+    name += std::string(scope);
+  }
+  return name;
+}
+
 void EmitSeverityHeader(SimContext& ctx, std::string_view prefix,
-                        std::string_view msg, std::ostream& os) {
+                        std::string_view msg, std::ostream& os, uint32_t line) {
+  // §20.10: the tool-specific message reports the severity plus the required
+  // call-site information -- the simulation time, the hierarchical scope of the
+  // call, and its source line (the `__LINE__ equivalent, see §22.13). A line of
+  // 0 marks a call site with no recorded source location.
+  std::string scope = SeverityScopeName(ctx);
   os << "[" << ctx.CurrentTime().ticks << "] " << prefix;
+  if (!scope.empty()) os << " " << scope;
+  if (line != 0) os << " (line " << line << ")";
   if (!msg.empty()) os << ": " << msg;
   os << "\n";
-  ctx.SetLastSeverity(prefix, msg, ctx.CurrentTime());
+  ctx.SetLastSeverity(prefix, msg, ctx.CurrentTime(), scope, line);
 }
 
 void ExecSeverityTask(const Expr* expr, SimContext& ctx, Arena& arena,
@@ -343,7 +372,9 @@ void ExecSeverityTask(const Expr* expr, SimContext& ctx, Arena& arena,
   }
   std::string msg =
       fmt.empty() ? "" : FormatDisplay(fmt, arg_vals, {.ctx = &ctx});
-  EmitSeverityHeader(ctx, prefix, msg, os);
+  // §20.10: report the source line of the call, matching the `__LINE__ the
+  // preprocessor would produce here (§22.13).
+  EmitSeverityHeader(ctx, prefix, msg, os, expr->range.start.line);
 }
 
 Logic4Vec EvalDeferredPrint(const Expr* expr, SimContext& ctx, Arena& arena) {

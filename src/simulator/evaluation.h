@@ -119,7 +119,8 @@ Logic4Vec EvalLetExpansion(ModuleItem* decl, const Expr* call, SimContext& ctx,
                            Arena& arena);
 
 void EmitSeverityHeader(SimContext& ctx, std::string_view prefix,
-                        std::string_view msg, std::ostream& os);
+                        std::string_view msg, std::ostream& os,
+                        uint32_t line = 0);
 
 const ModuleItem* SetupTaskCall(const Expr* expr, SimContext& ctx,
                                 Arena& arena);
