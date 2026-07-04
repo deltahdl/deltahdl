@@ -52,6 +52,21 @@ TEST(GateElaboration, HighzBothStrengthsRejected) {
   EXPECT_TRUE(f.has_errors);
 }
 
+// §28.3.2 names both (highz0, highz1) and (highz1, highz0) as invalid. Since
+// the strength0/strength1 specifications may appear in either order, exercise
+// the reversed (strength1-first) form to confirm the illegal-pair rule fires
+// regardless of the order the keywords are written.
+TEST(GateElaboration, HighzBothStrengthsRejectedReversedOrder) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  wire a, b, y;\n"
+      "  and (highz1, highz0) g1(y, a, b);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
 TEST(GateElaboration, DriveStrengthPropagatedToContAssign) {
   ElabFixture f;
   auto* design = Elaborate(

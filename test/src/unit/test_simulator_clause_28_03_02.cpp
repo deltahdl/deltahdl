@@ -48,6 +48,13 @@ TEST(HighzStrengthOutput, Highz1DoesNotAffectZeroOutput) {
                           "  and (strong0, highz1) g1(y, a, b);\n", 0u, 0u);
 }
 
+// Symmetric negative form: highz0 rewrites only logic-0 outputs, so a gate that
+// computes a 1 must keep its 1 (aval=1, bval=0) even when strength0 is highz0.
+TEST(HighzStrengthOutput, Highz0DoesNotAffectOneOutput) {
+  RunAndCheckResolvedWord("  initial begin a = 1'b1; b = 1'b1; end\n",
+                          "  and (highz0, strong1) g1(y, a, b);\n", 1u, 0u);
+}
+
 TEST(Strength01Semantics, Strength0AndStrength1ReachNetDriver) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -65,6 +72,28 @@ TEST(Strength01Semantics, Strength0AndStrength1ReachNetDriver) {
   ASSERT_FALSE(net->driver_strengths.empty());
   EXPECT_EQ(net->driver_strengths[0].s0, Strength::kPull);
   EXPECT_EQ(net->driver_strengths[0].s1, Strength::kSupply);
+}
+
+// A second point in the strength0/strength1 keyword-to-level mapping: weak0 and
+// strong1 must reach the driver as the weak and strong runtime strengths,
+// exercising a different code path than the pull/supply case above.
+TEST(Strength01Semantics, WeakAndStrongStrengthsReachNetDriver) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  logic a, b;\n"
+      "  wire y;\n"
+      "  initial begin a = 1'b1; b = 1'b1; end\n"
+      "  and (weak0, strong1) g1(y, a, b);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* net = f.ctx.FindNet("y");
+  ASSERT_NE(net, nullptr);
+  ASSERT_FALSE(net->driver_strengths.empty());
+  EXPECT_EQ(net->driver_strengths[0].s0, Strength::kWeak);
+  EXPECT_EQ(net->driver_strengths[0].s1, Strength::kStrong);
 }
 
 }  // namespace

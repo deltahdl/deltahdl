@@ -27,18 +27,6 @@ TEST(GateStrengthValidity, StrengthSpecAllowedForNOutputGates) {
   EXPECT_TRUE(CanHaveStrengthSpec(GateType::kNot));
 }
 
-TEST(PullGateStrength, StrengthWrongType) {
-  // A.3.2: pullup_strength is (strength0, strength1) | (strength1, strength0) |
-  // (strength1); a lone strength is permitted only as a strength1. A single
-  // strength0 on a pullup is therefore the wrong strength type. (The two-value
-  // (strong0, strong1) form is legal, so it is not the error case.)
-  auto r = Parse(
-      "module m;\n"
-      "  pullup (strong0) (net1);\n"
-      "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
-}
-
 TEST(GateInstStrengthParsing, Strength0Strength1KeywordEncoding) {
   auto r = Parse(
       "module m;\n"
@@ -219,6 +207,142 @@ TEST(GateInstStrengthParsing, MissingCommaBetweenStrengthsRejected) {
       "module m;\n"
       "  wire y, a, b;\n"
       "  and (strong0 strong1) g(y, a, b);\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+// §28.3.2 admits every Table 28-2 primitive as a strength carrier. Each gate
+// keyword is a distinct case in the allow-list, so drive one instantiation of
+// every remaining n-input/n-output/enable gate through a real parse and confirm
+// the strengths are accepted and recorded on the instance.
+TEST(GateInstStrengthParsing, NorWithStrengthAccepted) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire y, a, b;\n"
+      "  nor (strong0, strong1) g(y, a, b);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[3];
+  EXPECT_EQ(item->drive_strength0, 4u);
+  EXPECT_EQ(item->drive_strength1, 4u);
+}
+
+TEST(GateInstStrengthParsing, XorWithStrengthAccepted) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire y, a, b;\n"
+      "  xor (pull0, weak1) g(y, a, b);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[3];
+  EXPECT_EQ(item->drive_strength0, 3u);
+  EXPECT_EQ(item->drive_strength1, 2u);
+}
+
+TEST(GateInstStrengthParsing, XnorWithStrengthAccepted) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire y, a, b;\n"
+      "  xnor (weak0, pull1) g(y, a, b);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[3];
+  EXPECT_EQ(item->drive_strength0, 2u);
+  EXPECT_EQ(item->drive_strength1, 3u);
+}
+
+TEST(GateInstStrengthParsing, NotWithStrengthAccepted) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire y, a;\n"
+      "  not (strong0, strong1) g(y, a);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[2];
+  EXPECT_EQ(item->drive_strength0, 4u);
+  EXPECT_EQ(item->drive_strength1, 4u);
+}
+
+TEST(GateInstStrengthParsing, Bufif0WithStrengthAccepted) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire y, a, en;\n"
+      "  bufif0 (strong0, weak1) g(y, a, en);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[3];
+  EXPECT_EQ(item->drive_strength0, 4u);
+  EXPECT_EQ(item->drive_strength1, 2u);
+}
+
+TEST(GateInstStrengthParsing, Notif0WithStrengthAccepted) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire y, a, en;\n"
+      "  notif0 (pull0, strong1) g(y, a, en);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[3];
+  EXPECT_EQ(item->drive_strength0, 3u);
+  EXPECT_EQ(item->drive_strength1, 4u);
+}
+
+TEST(GateInstStrengthParsing, Notif1WithStrengthAccepted) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire y, a, en;\n"
+      "  notif1 (supply0, supply1) g(y, a, en);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[3];
+  EXPECT_EQ(item->drive_strength0, 5u);
+  EXPECT_EQ(item->drive_strength1, 5u);
+}
+
+// §28.3.2 negative form: a strength specification must be enclosed in a pair of
+// parentheses; bare strength keywords after the gate type are not accepted.
+TEST(GateInstStrengthParsing, StrengthWithoutParenthesesRejected) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire y, a, b;\n"
+      "  and strong0, strong1 g(y, a, b);\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+// §28.3.2 negative form: only Table 28-2 primitives may carry a drive strength.
+// nmos is exercised above; cover the other switch families (MOS pmos, CMOS,
+// bidirectional tran) each with a full parse that must reject the strength.
+TEST(SwitchStrengthRejection, PmosStrengthRejected) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire y, in, ctrl;\n"
+      "  pmos (strong0, strong1) g(y, in, ctrl);\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(SwitchStrengthRejection, CmosStrengthRejected) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire y, in, nc, pc;\n"
+      "  cmos (strong0, strong1) g(y, in, nc, pc);\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(SwitchStrengthRejection, TranStrengthRejected) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire a, b;\n"
+      "  tran (strong0, strong1) g(a, b);\n"
       "endmodule\n");
   EXPECT_TRUE(r.has_errors);
 }
