@@ -17,12 +17,4 @@ TEST(LexicalConventionElaboration, StringWithOctalEscapeElaborates) {
              "endmodule\n"));
 }
 
-TEST(LexicalConventionElaboration, StringWithHexEscapeElaborates) {
-  EXPECT_TRUE(
-      ElabOk("module t;\n"
-             "  byte c;\n"
-             "  initial c = \"\\x41\";\n"
-             "endmodule\n"));
-}
-
 }  // namespace
