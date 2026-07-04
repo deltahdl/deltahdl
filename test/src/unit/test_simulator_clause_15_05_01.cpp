@@ -10,33 +10,6 @@
 
 namespace {
 
-TEST(EventTriggerSimulator, BlockingTriggerUnblocksWaiter) {
-  LowerFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  event ev;\n"
-      "  logic [31:0] result;\n"
-      "  initial begin\n"
-      "    @(ev);\n"
-      "    result = 42;\n"
-      "  end\n"
-      "  initial begin\n"
-      "    #5 ->ev;\n"
-      "    #1 $finish;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 42u);
-}
-
 TEST(EventTriggerSimulator, NonblockingTriggerUnblocksWaiter) {
   LowerFixture f;
   auto* design = ElaborateSrc(
@@ -120,6 +93,145 @@ TEST(EventTriggerSimulator, NonblockingTriggerDefersToNbaRegion) {
   auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 99u);
+}
+
+// §15.5.1: a named event triggered via -> behaves like a one shot -- the
+// trigger state itself is not observable, only its effect on processes already
+// waiting. Here the -> fires before any process is blocked on ev, so it is
+// lost; the subsequent @(ev) in the same process then blocks forever and the
+// assignment past it never runs. Contrast NonblockingTriggerDefersToNbaRegion,
+// where ->> reaches a same-time-step waiter registered after the statement.
+TEST(EventTriggerSimulator, BlockingTriggerIsOneShotAndLost) {
+  LowerFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  event ev;\n"
+      "  logic [31:0] result;\n"
+      "  initial begin\n"
+      "    result = 7;\n"
+      "    -> ev;\n"
+      "    @(ev);\n"
+      "    result = 42;\n"
+      "  end\n"
+      "  initial #100 $finish;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* var = f.ctx.FindVariable("result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 7u);
+}
+
+// §15.5.1: the trigger target is a hierarchical_event_identifier, so a blocking
+// -> may name an event inside a child instance through a dotted path. The child
+// process waits on its own event; triggering it from the parent as `s.ev`
+// resolves to that same instance-qualified event and unblocks the waiter
+// (result becomes 9). Built from real hierarchical syntax, full pipeline.
+TEST(EventTriggerSimulator, BlockingTriggerHierarchicalTarget) {
+  LowerFixture f;
+  auto* design = ElaborateSrc(
+      "module sub;\n"
+      "  event ev;\n"
+      "  logic [31:0] result;\n"
+      "  initial begin\n"
+      "    result = 0;\n"
+      "    @(ev);\n"
+      "    result = 9;\n"
+      "  end\n"
+      "endmodule\n"
+      "module t;\n"
+      "  sub s();\n"
+      "  initial begin\n"
+      "    #5 -> s.ev;\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* var = f.ctx.FindVariable("s.result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 9u);
+}
+
+// The nonblocking ->> form likewise accepts a hierarchical target: the deferred
+// NBA-region update event fires the child instance's event, unblocking its
+// waiter (result becomes 9).
+TEST(EventTriggerSimulator, NonblockingTriggerHierarchicalTarget) {
+  LowerFixture f;
+  auto* design = ElaborateSrc(
+      "module sub;\n"
+      "  event ev;\n"
+      "  logic [31:0] result;\n"
+      "  initial begin\n"
+      "    result = 0;\n"
+      "    @(ev);\n"
+      "    result = 9;\n"
+      "  end\n"
+      "endmodule\n"
+      "module t;\n"
+      "  sub s();\n"
+      "  initial begin\n"
+      "    #5 ->> s.ev;\n"
+      "    #2 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* var = f.ctx.FindVariable("s.result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 9u);
+}
+
+// §15.5.1 states that ->> creates a *nonblocking assign* update event that
+// fires in the nonblocking assignment region -- the same region a §10.4.2
+// nonblocking procedural assignment (<=) uses. Built from real <= syntax: the
+// assignment `x <= 5` and the `->> ev` trigger both land in that region this
+// time step, so the process unblocked by ev observes the already-committed
+// nonblocking write (result == 5). An active-region trigger firing before the
+// NBA update would leave result == 0.
+TEST(EventTriggerSimulator, NonblockingTriggerCoexistsWithNonblockingAssign) {
+  LowerFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  event ev;\n"
+      "  logic [31:0] x, result;\n"
+      "  initial begin\n"
+      "    x = 0;\n"
+      "    result = 0;\n"
+      "    @(ev);\n"
+      "    result = x;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    x <= 5;\n"
+      "    ->> ev;\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* var = f.ctx.FindVariable("result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 5u);
 }
 
 TEST(EventTriggerSimulator, TriggerUnblocksMultipleWaiters) {

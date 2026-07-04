@@ -42,18 +42,56 @@ struct NbEventTrigger {
   uint64_t count;
   bool reactive;
 };
+
+// Flattens a named-event trigger target into a dotted name. §15.5.1's target is
+// a hierarchical_event_identifier, so a member-access path (e.g. `sub.ev`) is
+// joined with dots down to the same instance-qualified name the waiting process
+// registered on. A leading scope prefix on a component is preserved. Returns
+// false for any other target form (e.g. an array select).
+bool BuildEventTargetName(const Expr* expr, std::string& out) {
+  if (!expr) return false;
+  if (expr->kind == ExprKind::kIdentifier) {
+    if (!expr->scope_prefix.empty()) {
+      out += expr->scope_prefix;
+      out += '.';
+    }
+    out += expr->text;
+    return true;
+  }
+  if (expr->kind == ExprKind::kMemberAccess) {
+    if (!BuildEventTargetName(expr->lhs, out)) return false;
+    out += '.';
+    return BuildEventTargetName(expr->rhs, out);
+  }
+  return false;
+}
+
+// Resolves the trigger target to the stable name used to look up its event
+// variable. A bare identifier is returned verbatim -- exactly the token the
+// scope-aware FindVariable already resolves -- so this preserves the original
+// resolution for every non-hierarchical case. Only a member-access path is
+// flattened (and interned in the arena so the view stays valid for the deferred
+// ->> scheduling and the triggered() map, both of which key by string_view).
+std::string_view ResolveEventTargetName(const Expr* expr, SimContext& ctx) {
+  if (!expr) return {};
+  if (expr->kind == ExprKind::kIdentifier) return expr->text;
+  if (expr->kind != ExprKind::kMemberAccess) return {};
+  std::string name;
+  if (!BuildEventTargetName(expr, name)) return {};
+  auto* stored = ctx.GetArena().Create<std::string>(std::move(name));
+  return *stored;
+}
 }  // namespace
 
 static StmtResult ExecEventTriggerImpl(const Stmt* stmt, SimContext& ctx) {
-  if (!stmt->expr || stmt->expr->kind != ExprKind::kIdentifier) {
-    return StmtResult::kDone;
-  }
-  auto* var = ctx.FindVariable(stmt->expr->text);
+  auto event_name = ResolveEventTargetName(stmt->expr, ctx);
+  if (event_name.empty()) return StmtResult::kDone;
+  auto* var = ctx.FindVariable(event_name);
   if (!var) return StmtResult::kDone;
 
   if (var->is_null_event) return StmtResult::kDone;
 
-  ctx.SetEventTriggered(stmt->expr->text);
+  ctx.SetEventTriggered(event_name);
 
   auto pending = std::move(var->watchers);
   var->watchers.clear();
@@ -104,15 +142,13 @@ static SimCoroutine NbEventTriggerEventCoroutine(const Stmt* stmt,
 
 static StmtResult ExecNbEventTriggerImpl(const Stmt* stmt, SimContext& ctx,
                                          Arena& arena) {
-  if (!stmt->expr || stmt->expr->kind != ExprKind::kIdentifier) {
-    return StmtResult::kDone;
-  }
-  auto* var = ctx.FindVariable(stmt->expr->text);
+  auto event_name = ResolveEventTargetName(stmt->expr, ctx);
+  if (event_name.empty()) return StmtResult::kDone;
+  auto* var = ctx.FindVariable(event_name);
   if (!var) return StmtResult::kDone;
 
   if (var->is_null_event) return StmtResult::kDone;
 
-  auto event_name = stmt->expr->text;
   bool reactive = ctx.IsReactiveContext();
 
   // Event-control form: ->> @(...) ev  or  ->> repeat(n) @(...) ev. The update
