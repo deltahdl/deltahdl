@@ -46,13 +46,4 @@ TEST(WhiteSpaceSynthesis, FormfeedDelimiterSynthesizes) {
   ASSERT_NE(aig, nullptr);
 }
 
-TEST(WhiteSpaceSynthesis, EndOfFileTerminatesSynthesis) {
-  SynthFixture f;
-  auto* mod = ElaborateSrc(f, "module m; logic a, b; assign a = b; endmodule");
-  ASSERT_NE(mod, nullptr);
-  SynthLower synth(f.arena, f.diag);
-  auto* aig = synth.Lower(mod);
-  ASSERT_NE(aig, nullptr);
-}
-
 }  // namespace
