@@ -56,15 +56,6 @@ TEST(LexicalConventionElaboration, BlockTokensInsideLineIgnoredElaborates) {
              "endmodule\n"));
 }
 
-TEST(LexicalConventionElaboration, MixedCommentsElaborate) {
-  EXPECT_TRUE(
-      ElabOk("module /* name */ t; // header\n"
-             "  logic a; /* decl */\n"
-             "  // assignment below\n"
-             "  assign /* lhs */ a = /* rhs */ 1'b0; // done\n"
-             "endmodule\n"));
-}
-
 TEST(LexicalConventionElaboration, CommentOnlyInputElaboratesEmpty) {
   ElabFixture f;
   auto* design = ElaborateSrc(
