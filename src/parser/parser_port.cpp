@@ -676,6 +676,22 @@ static void InferImplicitNetForPort(PortDecl& port) {
   }
 }
 
+// §17.2: the type of a checker output argument shall not be untyped (the
+// sequence and property type forms are already rejected while the port type is
+// parsed). `type_omitted` records whether the port had no explicit data type
+// before defaults were applied; an output whose type was omitted is untyped and
+// therefore illegal.
+static void DiagnoseUntypedCheckerOutput(const PortDecl& port,
+                                         bool type_omitted, bool is_checker,
+                                         DiagEngine& diag) {
+  if (is_checker && type_omitted && port.direction == Direction::kOutput) {
+    diag.Error(port.loc,
+               std::format("checker output formal '{}' shall have a type; an "
+                           "output argument cannot be untyped",
+                           port.name));
+  }
+}
+
 static void ResolvePortDefaults(PortDecl& port, const PortDecl* prev,
                                 bool is_checker) {
   if (port.is_interface_port) return;
@@ -729,7 +745,11 @@ void Parser::ParsePortList(ModuleDecl& mod) {
 
   const bool kIsChecker = mod.decl_kind == ModuleDeclKind::kChecker;
   mod.ports.push_back(ParsePortDecl());
+  bool type_omitted =
+      mod.ports.back().data_type.kind == DataTypeKind::kImplicit;
   ResolvePortDefaults(mod.ports.back(), nullptr, kIsChecker);
+  DiagnoseUntypedCheckerOutput(mod.ports.back(), type_omitted, kIsChecker,
+                               diag_);
   while (Match(TokenKind::kComma)) {
     PortDecl prev = mod.ports.back();
 
@@ -738,7 +758,10 @@ void Parser::ParsePortList(ModuleDecl& mod) {
       continue;
     }
     mod.ports.push_back(ParsePortDecl());
+    type_omitted = mod.ports.back().data_type.kind == DataTypeKind::kImplicit;
     ResolvePortDefaults(mod.ports.back(), &prev, kIsChecker);
+    DiagnoseUntypedCheckerOutput(mod.ports.back(), type_omitted, kIsChecker,
+                                 diag_);
   }
   Expect(TokenKind::kRParen);
 }

@@ -39,4 +39,30 @@ TEST(CheckerVariables, RandFreeVariableInCheckerBodyIsLegal) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §17.7: a free checker variable declaration may additionally carry a const
+// qualifier, producing a constant free variable. Such a declaration elaborates
+// cleanly as a checker variable.
+TEST(CheckerVariables, ConstFreeVariableInCheckerBodyIsLegal) {
+  ElabFixture f;
+  ElaborateSrc(
+      "checker chk(bit valid);\n"
+      "  rand const bit [5:0] idx;\n"
+      "endchecker\n",
+      f, "chk");
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §17.7: a constant free checker variable may be initialized in its
+// declaration, retaining that value; the initializer elaborates as a checker
+// variable initialization.
+TEST(CheckerVariables, ConstFreeVariableWithInitializerIsLegal) {
+  ElabFixture f;
+  ElaborateSrc(
+      "checker chk(bit valid);\n"
+      "  rand const bit [3:0] k = 4'd7;\n"
+      "endchecker\n",
+      f, "chk");
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace

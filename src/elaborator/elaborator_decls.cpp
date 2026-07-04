@@ -927,7 +927,11 @@ static void RegisterVarDeclNames(const ModuleItem* item,
                                  VarDeclNameTables tables,
                                  const TypedefMap& typedefs, DiagEngine& diag) {
   if (item->data_type.is_const) {
-    if (!item->init_expr) {
+    // §17.7: a constant free checker variable (rand const) need not be
+    // initialized; an uninitialized one simply takes a nondeterministic
+    // constant value that never changes. The general requirement that a const
+    // variable be initialized therefore does not apply to a free variable.
+    if (!item->init_expr && !item->is_rand) {
       diag.Error(
           item->loc,
           std::format("const variable '{}' must be initialized", item->name));

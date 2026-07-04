@@ -440,6 +440,7 @@ void Elaborator::ValidateMixedAssignments() {
 }
 
 void Elaborator::ValidateInputPortAssignments(const ModuleDecl* decl) {
+  const bool is_checker = decl->decl_kind == ModuleDeclKind::kChecker;
   for (const auto& port : decl->ports) {
     if (port.direction != Direction::kInput) continue;
     // §23.3.3.2 frames this rule in terms of a variable input port; a net input
@@ -447,21 +448,27 @@ void Elaborator::ValidateInputPortAssignments(const ModuleDecl* decl) {
     // instead, so only the variable case is rejected here.
     bool port_is_var =
         !port.data_type.is_net && !port.data_type.is_interconnect;
-    if (!port_is_var) continue;
+    // §17.2: a checker shall not modify any of its input formal arguments, and
+    // a checker input formal is net-typed, so the variable-only exception above
+    // does not apply inside a checker body.
+    if (!port_is_var && !is_checker) continue;
 
+    std::string msg =
+        is_checker ? std::format(
+                         "input formal argument '{}' cannot be modified "
+                         "inside checker '{}'",
+                         port.name, decl->name)
+                   : std::format(
+                         "variable '{}' is declared as an input port and "
+                         "cannot be the target of an assignment",
+                         port.name);
     auto ca = cont_assign_targets_.find(port.name);
     if (ca != cont_assign_targets_.end()) {
-      diag_.Error(ca->second,
-                  std::format("variable '{}' is declared as an input port and "
-                              "cannot be the target of an assignment",
-                              port.name));
+      diag_.Error(ca->second, msg);
     }
     auto pa = proc_assign_targets_.find(port.name);
     if (pa != proc_assign_targets_.end()) {
-      diag_.Error(pa->second,
-                  std::format("variable '{}' is declared as an input port and "
-                              "cannot be the target of an assignment",
-                              port.name));
+      diag_.Error(pa->second, msg);
     }
   }
 }

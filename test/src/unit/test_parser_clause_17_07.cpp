@@ -45,4 +45,15 @@ TEST(CheckerVariables, ConstFreeVariableParses) {
               "endchecker\n"));
 }
 
+// §17.7: a variable defined in a checker body shall have a static lifetime, so
+// an explicit automatic lifetime on a checker variable is rejected.
+TEST(CheckerVariables, AutomaticCheckerVariableIsIllegal) {
+  auto r = Parse(
+      "checker chk;\n"
+      "  automatic bit flag;\n"
+      "endchecker\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_TRUE(r.has_errors);
+}
+
 }  // namespace
