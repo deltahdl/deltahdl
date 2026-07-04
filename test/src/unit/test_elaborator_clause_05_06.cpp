@@ -76,4 +76,38 @@ TEST(IdentifierElaboration, IdentifierExceedingMaxLengthReportsError) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
+// The §5.6 length limit governs every identifier, escaped ones included. Here
+// the name is written with escaped-identifier syntax (a leading backslash and a
+// terminating space, the §5.6.1 dependency) and driven end-to-end through parse
+// and elaborate; a 1024-character escaped name stays within the limit and
+// elaborates cleanly.
+TEST(IdentifierElaboration, EscapedIdentifierMaxLengthElaborates) {
+  std::string long_id(1024, 'a');
+  EXPECT_TRUE(
+      ElabOk("module t;\n"
+             "  logic \\" +
+             long_id +
+             " ;\n"
+             "  assign \\" +
+             long_id +
+             " = 1'b0;\n"
+             "endmodule\n"));
+}
+
+// Negative form of the length rule on the escaped-identifier input path: an
+// escaped name of 1025 characters exceeds the limit and is rejected during the
+// lexing performed by elaboration, exactly like an over-length simple name.
+TEST(IdentifierElaboration, EscapedIdentifierExceedingMaxLengthReportsError) {
+  ElabFixture f;
+  std::string long_id(1025, 'a');
+  ElaborateSrc(
+      "module m;\n"
+      "  logic \\" +
+          long_id +
+          " ;\n"
+          "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
 }  // namespace
