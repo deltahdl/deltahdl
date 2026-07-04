@@ -692,6 +692,13 @@ class Elaborator {
   void WalkExprForRealOps(const Expr* expr);
   void WalkStmtsForRealOps(const Stmt* s);
 
+  // §6.24.1: size-cast width and size/signing-cast integral-operand rules.
+  void ValidateCastOperations(const ModuleDecl* decl);
+  void WalkExprForCast(const Expr* expr);
+  void WalkStmtsForCast(const Stmt* s);
+  void CheckCastExpr(const Expr* expr);
+  bool CastOperandIsReal(const Expr* operand) const;
+
   void ValidateAssignInExprRestrictions(const ModuleDecl* decl);
   void WalkExprForAssignInExpr(const Expr* expr, bool in_event_or_cont);
   void WalkStmtsForAssignInExpr(const Stmt* s);

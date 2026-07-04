@@ -134,6 +134,23 @@ TEST(EnumNumericalExpr, EnumCastOutOfRange_Ok) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
+// 6.19.4: the auto-cast-to-base-type rule covers an enum whose base type is
+// declared explicitly, not only the int default. An explicit-base enum member
+// used in arithmetic and assigned to an integer elaborates without a cast,
+// because the member auto-casts to its (explicit) base type.
+TEST(EnumNumericalExpr, EnumExplicitBaseAutocast_Ok) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top();\n"
+      "  typedef enum bit [3:0] {lo = 1, hi} e;\n"
+      "  int a;\n"
+      "  initial a = hi * 2;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 TEST(EnumNumericalExpr, EnumIncrementNoCast_Error) {
   ElabFixture f;
   ElaborateSrc(

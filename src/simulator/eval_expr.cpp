@@ -680,6 +680,54 @@ static bool TryArrayBitStreamCast(const Expr* expr, SimContext& ctx,
   return true;
 }
 
+// §6.24.1: a numeric size cast (a constant_primary casting type) records its
+// target width in an expression node rather than a type-name string: the parser
+// leaves `text` empty and carries the width expression in `rhs` and the operand
+// in `lhs`. Evaluate that width and pad/truncate the operand to it, letting the
+// operand's own signedness pass through unchanged. Returns true and fills `out`
+// when `expr` is such a cast. A cast that names a type (nonempty `text`), an
+// assignment-pattern cast (`lhs` is an assignment pattern), or a type-reference
+// cast (`rhs` is a type reference) is not a size cast and is left to the
+// caller.
+static bool TrySizeCast(const Expr* expr, SimContext& ctx, Arena& arena,
+                        Logic4Vec& out) {
+  if (!expr->text.empty() || expr->rhs == nullptr || expr->lhs == nullptr)
+    return false;
+  if (expr->lhs->kind == ExprKind::kAssignmentPattern ||
+      expr->rhs->kind == ExprKind::kTypeRef)
+    return false;
+  auto width_v = EvalExpr(expr->rhs, ctx, arena);
+  if (!width_v.IsKnown()) return false;
+  uint64_t w64 = width_v.ToUint64();
+  if (w64 == 0 || w64 > 0xFFFF) return false;
+  uint32_t tw = static_cast<uint32_t>(w64);
+
+  auto inner = EvalExpr(expr->lhs, ctx, arena);
+  auto result = MakeLogic4Vec(arena, tw);
+  uint64_t mask = tw >= 64 ? ~uint64_t{0} : (uint64_t{1} << tw) - 1;
+  if (result.nwords > 0 && inner.nwords > 0) {
+    uint64_t aval = inner.words[0].aval;
+    uint64_t bval = inner.words[0].bval;
+    // §6.24.1: the result is the value a packed [tw-1:0] vector would hold
+    // after being assigned the operand, and the operand's own (self-determined)
+    // signedness passes through unchanged. Widening a signed operand therefore
+    // replicates its sign bit -- in both the value and the x/z plane -- across
+    // the new high bits, exactly as an assignment of a signed source does; a
+    // narrowing cast or an unsigned operand simply masks to the target width.
+    if (inner.is_signed && inner.width > 0 && inner.width < tw &&
+        inner.width < 64) {
+      uint64_t high_bits = mask & ~((uint64_t{1} << inner.width) - 1);
+      if ((aval >> (inner.width - 1)) & 1) aval |= high_bits;
+      if ((bval >> (inner.width - 1)) & 1) bval |= high_bits;
+    }
+    result.words[0].aval = aval & mask;
+    result.words[0].bval = bval & mask;
+  }
+  result.is_signed = inner.is_signed;
+  out = result;
+  return true;
+}
+
 // Handles the signedness/const/void cast keywords that simply re-tag or empty
 // the inner value. Returns true and fills `out` when `type_name` was one of
 // those keywords. `inner` may be mutated in place for the signedness cases.
@@ -709,6 +757,9 @@ static bool TryKeywordCast(std::string_view type_name, Logic4Vec& inner,
 Logic4Vec EvalCast(const Expr* expr, SimContext& ctx, Arena& arena) {
   Logic4Vec stream_out;
   if (TryArrayBitStreamCast(expr, ctx, arena, stream_out)) return stream_out;
+
+  Logic4Vec size_out;
+  if (TrySizeCast(expr, ctx, arena, size_out)) return size_out;
 
   auto inner = EvalExpr(expr->lhs, ctx, arena);
   std::string_view type_name = expr->text;

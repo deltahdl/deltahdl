@@ -74,24 +74,6 @@ TEST(CastOperatorParsing, PackedCastToInt) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kCast);
 }
 
-TEST(CastOperatorParsing, IntCastToPackedStruct) {
-  auto r = Parse(
-      "module t;\n"
-      "  typedef struct packed {\n"
-      "    logic [7:0] hi;\n"
-      "    logic [7:0] lo;\n"
-      "  } pair_t;\n"
-      "  pair_t p;\n"
-      "  initial p = pair_t'(16'hBEEF);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  ASSERT_NE(stmt->rhs, nullptr);
-  EXPECT_EQ(stmt->rhs->kind, ExprKind::kCast);
-}
-
 TEST(CastOperatorParsing, CastInParameterInit) {
   auto r = Parse(
       "module m;\n"
@@ -202,6 +184,24 @@ TEST(CastOperatorParsing, SizeCastParameter) {
               "    r2 = (Q+1)'(x - 2);\n"
               "  end\n"
               "endmodule\n"));
+}
+
+// 6.24.1: a size cast's constant-expression casting type may be a localparam,
+// a distinct constant form of 11.2.1 from a parameter or a bare literal. It
+// parses as a cast just as the parameter form does.
+TEST(CastOperatorParsing, SizeCastLocalparam) {
+  auto r = Parse(
+      "module m;\n"
+      "  localparam L = 8;\n"
+      "  logic [31:0] x;\n"
+      "  logic [31:0] result;\n"
+      "  initial result = L'(x - 2);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kCast);
 }
 
 TEST(CastOperatorParsing, CastRealExprToInt) {

@@ -505,6 +505,115 @@ void Elaborator::ValidateRealOperatorRestrictions(const ModuleDecl* decl) {
   }
 }
 
+namespace {
+
+// §6.24.1: a numeric size cast writes its target width as a constant_primary --
+// an integer literal, a constant parameter, or a constant expression -- rather
+// than a named type. The parser records these in the "node cast" form: the
+// width expression is carried in rhs and the value being cast in lhs, leaving
+// the type-name text empty. A cast that names a type (int', signed', or a
+// user-defined type) sets the text field, and a cast whose operand is an
+// assignment pattern (type'{...}) or whose casting type is a type reference is
+// not a size cast either. Membership here is provisional: only a rhs that
+// actually evaluates to a constant integer is treated as a size.
+bool IsSizeCastForm(const Expr* cast) {
+  return cast->text.empty() && cast->rhs != nullptr && cast->lhs != nullptr &&
+         cast->lhs->kind != ExprKind::kAssignmentPattern &&
+         cast->rhs->kind != ExprKind::kTypeRef;
+}
+
+// §6.24.1: signed'() and unsigned'() change only the signedness of the operand.
+bool IsSigningCast(const Expr* cast) {
+  return cast->text == "signed" || cast->text == "unsigned";
+}
+
+}  // namespace
+
+// §6.24.1: a real value has no bit representation of its own, so the two casts
+// that reinterpret an operand as a packed vector -- the size cast and the
+// signing cast -- require an integral operand. A real variable or a real
+// literal used directly as such an operand is rejected here at elaboration.
+bool Elaborator::CastOperandIsReal(const Expr* operand) const {
+  if (!operand) return false;
+  if (operand->kind == ExprKind::kRealLiteral) return true;
+  return IsRealVar(operand, var_types_);
+}
+
+void Elaborator::CheckCastExpr(const Expr* expr) {
+  if (!expr || expr->kind != ExprKind::kCast) return;
+
+  if (IsSizeCastForm(expr)) {
+    // A confirmed numeric size cast: the casting type evaluates to a constant
+    // integer. If it does not evaluate here, the rhs may name a type or an
+    // unresolved parameter, so no size rule is applied.
+    auto size = ConstEvalInt(expr->rhs);
+    if (size) {
+      // §6.24.1: the size specified by a constant-expression casting type shall
+      // be positive; a zero or negative size is an error.
+      if (*size <= 0) {
+        diag_.Error(expr->range.start,
+                    "size cast target width must be a positive constant");
+      } else if (CastOperandIsReal(expr->lhs)) {
+        // §6.24.1: the expression inside a size cast shall be integral.
+        diag_.Error(expr->range.start,
+                    "expression inside a size cast shall be an integral value");
+      }
+    }
+  } else if (IsSigningCast(expr) && CastOperandIsReal(expr->lhs)) {
+    // §6.24.1: the expression inside a signing cast shall be integral.
+    diag_.Error(expr->range.start,
+                "expression inside a signing cast shall be an integral value");
+  }
+}
+
+void Elaborator::WalkExprForCast(const Expr* expr) {
+  if (!expr) return;
+  CheckCastExpr(expr);
+  WalkExprForCast(expr->lhs);
+  WalkExprForCast(expr->rhs);
+  WalkExprForCast(expr->base);
+  WalkExprForCast(expr->index);
+  WalkExprForCast(expr->index_end);
+  WalkExprForCast(expr->condition);
+  WalkExprForCast(expr->true_expr);
+  WalkExprForCast(expr->false_expr);
+  for (auto* elem : expr->elements) WalkExprForCast(elem);
+  for (auto* arg : expr->args) WalkExprForCast(arg);
+}
+
+void Elaborator::WalkStmtsForCast(const Stmt* s) {
+  if (!s) return;
+  WalkExprForCast(s->rhs);
+  WalkExprForCast(s->lhs);
+  WalkExprForCast(s->expr);
+  WalkExprForCast(s->condition);
+  WalkExprForCast(s->assert_expr);
+  for (auto* sub : s->stmts) WalkStmtsForCast(sub);
+  WalkStmtsForCast(s->then_branch);
+  WalkStmtsForCast(s->else_branch);
+  WalkStmtsForCast(s->body);
+  WalkStmtsForCast(s->for_body);
+  for (auto& ci : s->case_items) WalkStmtsForCast(ci.body);
+}
+
+void Elaborator::ValidateCastOperations(const ModuleDecl* decl) {
+  for (const auto* item : decl->items) {
+    bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
+                   item->kind == ModuleItemKind::kAlwaysCombBlock ||
+                   item->kind == ModuleItemKind::kAlwaysFFBlock ||
+                   item->kind == ModuleItemKind::kAlwaysLatchBlock ||
+                   item->kind == ModuleItemKind::kInitialBlock ||
+                   item->kind == ModuleItemKind::kFinalBlock;
+    if (is_proc && item->body) {
+      WalkStmtsForCast(item->body);
+    }
+    if (item->kind == ModuleItemKind::kContAssign) {
+      WalkExprForCast(item->assign_lhs);
+      WalkExprForCast(item->assign_rhs);
+    }
+  }
+}
+
 static bool IsAssignOp(TokenKind op) {
   switch (op) {
     case TokenKind::kEq:
