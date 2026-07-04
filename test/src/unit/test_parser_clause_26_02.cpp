@@ -240,6 +240,52 @@ TEST(PackageDeclaration, PackageExportDeclarationAsPackageItem) {
   EXPECT_TRUE(found_export);
 }
 
+// The package_declaration production opens with { attribute_instance }: an
+// attribute prefix on the package header is legal and must not disturb parsing.
+TEST(PackageDeclaration, AttributeInstanceBeforePackageAccepted) {
+  auto r = Parse(
+      "(* keep *) package pkg;\n"
+      "  parameter int W = 4;\n"
+      "endpackage\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->packages.size(), 1u);
+  EXPECT_EQ(r.cu->packages[0]->name, "pkg");
+  EXPECT_EQ(r.cu->packages[0]->items.size(), 1u);
+}
+
+// Each package_item may itself carry a leading { attribute_instance }; the
+// attribute is consumed and the item still lands in the package body.
+TEST(PackageDeclaration, AttributeInstanceBeforePackageItemAccepted) {
+  auto r = Parse(
+      "package pkg;\n"
+      "  (* my_attr = 1 *) int v;\n"
+      "endpackage\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->packages.size(), 1u);
+  ASSERT_FALSE(r.cu->packages[0]->items.empty());
+  EXPECT_EQ(r.cu->packages[0]->items[0]->kind, ModuleItemKind::kVarDecl);
+}
+
+// package_or_generate_item_declaration lists extern_constraint_declaration; a
+// package body accepts an out-of-block constraint via its dedicated dispatch
+// and records it on the compilation unit for later prototype pairing.
+TEST(PackageDeclaration, ExternConstraintDeclarationAsPackageItem) {
+  auto r = Parse(
+      "package pkg;\n"
+      "  class C;\n"
+      "    rand int x;\n"
+      "    constraint c;\n"
+      "  endclass\n"
+      "  constraint C::c { x > 0; }\n"
+      "endpackage\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->packages.size(), 1u);
+  EXPECT_EQ(r.cu->external_constraints.size(), 1u);
+}
+
 TEST(PackageDeclaration, TimeunitsDeclarationAsPackageItem) {
   auto r = Parse(
       "package pkg;\n"

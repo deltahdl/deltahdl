@@ -46,6 +46,57 @@ TEST(PackageDeclarationElaboration, FinalBlockInPackageRejected) {
              "endmodule\n"));
 }
 
+// §26.2: because a package may hold processes only inside checkers, a
+// combinational always procedure sitting directly in the package body is
+// rejected, like the general always/initial/final cases above.
+TEST(PackageDeclarationElaboration, AlwaysCombBlockInPackageRejected) {
+  EXPECT_FALSE(
+      ElabOk("package pkg;\n"
+             "  int x;\n"
+             "  always_comb x = 1;\n"
+             "endpackage\n"
+             "module m;\n"
+             "  import pkg::*;\n"
+             "endmodule\n"));
+}
+
+TEST(PackageDeclarationElaboration, AlwaysFfBlockInPackageRejected) {
+  EXPECT_FALSE(
+      ElabOk("package pkg;\n"
+             "  int x;\n"
+             "  logic clk;\n"
+             "  always_ff @(posedge clk) x <= 1;\n"
+             "endpackage\n"
+             "module m;\n"
+             "  import pkg::*;\n"
+             "endmodule\n"));
+}
+
+TEST(PackageDeclarationElaboration, AlwaysLatchBlockInPackageRejected) {
+  EXPECT_FALSE(
+      ElabOk("package pkg;\n"
+             "  int x;\n"
+             "  logic en;\n"
+             "  always_latch if (en) x = 1;\n"
+             "endpackage\n"
+             "module m;\n"
+             "  import pkg::*;\n"
+             "endmodule\n"));
+}
+
+// §26.2 explicitly permits populating a package with nets; only a net carrying
+// an implicit continuous assignment is barred. A bare net declaration therefore
+// elaborates cleanly — the accepting boundary of the rule negated above.
+TEST(PackageDeclarationElaboration, NetWithoutContinuousAssignmentAccepted) {
+  EXPECT_TRUE(
+      ElabOk("package pkg;\n"
+             "  wire w;\n"
+             "endpackage\n"
+             "module m;\n"
+             "  import pkg::*;\n"
+             "endmodule\n"));
+}
+
 TEST(PackageDeclarationElaboration, HierarchicalReferenceFromPackageRejected) {
   EXPECT_FALSE(
       ElabOk("module other;\n"
