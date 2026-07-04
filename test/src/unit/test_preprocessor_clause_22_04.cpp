@@ -489,6 +489,50 @@ TEST(Preprocessor, Include_AbsolutePath_Missing_DoesNotFallBack) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
+// §22.4: for the angle-bracket form, a relative filename is resolved relative
+// to the searched (implementation-dependent) location. Exercise a subdirectory
+// relative path so the resolver joins the include dir with a multi-segment path
+// rather than a bare filename.
+TEST(Preprocessor,
+     Include_AngleBracket_RelativeSubdirResolvedUnderSearchLocation) {
+  IncludeTestDir tmp;
+  auto root = tmp.dir / "std_root";
+  fs::create_directories(root / "parts");
+  tmp.WriteFile("std_root/parts/count.v", "wire angle_count;\n");
+
+  PreprocFixture f;
+  PreprocConfig cfg;
+  cfg.include_dirs.push_back(root.string());
+  auto fid = f.mgr.AddFile((tmp.dir / "top.sv").string(),
+                           "`include <parts/count.v>\n");
+  Preprocessor pp(f.mgr, f.diag, std::move(cfg));
+  auto result = pp.Preprocess(fid);
+
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(result.find("wire angle_count;"), std::string::npos);
+}
+
+// §22.4: whether the double-quote or angle-bracket search rule applies is
+// decided from the macro-expanded filename text. A macro expanding to the
+// angle-bracket form must therefore take the angle-bracket search path, which
+// does not consult the source file's directory. The included name exists only
+// beside the top file, so a correct angle-bracket resolution fails to find it.
+TEST(Preprocessor,
+     Include_MacroExpandsToAngleBracketForm_DoesNotSearchSourceDir) {
+  IncludeTestDir tmp;
+  tmp.WriteFile("sys.svh", "wire from_source_dir;\n");
+
+  PreprocFixture f;
+  auto fid = f.mgr.AddFile((tmp.dir / "top.sv").string(),
+                           "`define SYSHDR <sys.svh>\n"
+                           "`include `SYSHDR\n");
+  Preprocessor pp(f.mgr, f.diag, {});
+  auto result = pp.Preprocess(fid);
+
+  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_EQ(result.find("wire from_source_dir;"), std::string::npos);
+}
+
 TEST(Preprocessor, Include_BothFormsInSameFile) {
   IncludeTestDir tmp;
   auto lib = tmp.dir / "lib";
