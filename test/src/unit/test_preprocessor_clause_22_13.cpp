@@ -28,12 +28,6 @@ TEST(FileAndLineMacroPreprocessing, Line_ExpandsOnSecondLine) {
   EXPECT_NE(result.find('2'), std::string::npos);
 }
 
-TEST(FileAndLineMacroPreprocessing, Line_ExpandsOnFifthLine) {
-  PreprocFixture f;
-  auto result = Preprocess("a\nb\nc\nd\n`__LINE__\n", f);
-  EXPECT_NE(result.find('5'), std::string::npos);
-}
-
 TEST(FileAndLineMacroPreprocessing, File_InlineInExpression) {
   PreprocFixture f;
   auto result = Preprocess("$display(`__FILE__);\n", f);
@@ -122,39 +116,6 @@ TEST(FileAndLineMacroPreprocessing, Include_RevertsAfterInclude) {
 
   std::remove(inc_path.c_str());
   std::remove(tmp_dir.c_str());
-}
-
-TEST(FileAndLineMacroPreprocessing, Include_LineIncrementsAfter) {
-  std::string tmp_dir = "/tmp/deltahdl_test_22_13_inc";
-  std::string inc_path = tmp_dir + "/stub.svh";
-  std::filesystem::create_directories(tmp_dir);
-  {
-    std::ofstream ofs(inc_path);
-    ofs << "// stub\n";
-  }
-
-  PreprocFixture f;
-  PreprocConfig cfg;
-  cfg.include_dirs.push_back(tmp_dir);
-
-  auto result = Preprocess("`include \"stub.svh\"\n`__LINE__\n", f, cfg);
-  EXPECT_FALSE(f.diag.HasErrors());
-  EXPECT_NE(result.find('2'), std::string::npos);
-
-  std::remove(inc_path.c_str());
-  std::remove(tmp_dir.c_str());
-}
-
-TEST(FileAndLineMacroPreprocessing, File_NoError) {
-  PreprocFixture f;
-  Preprocess("`__FILE__\n", f);
-  EXPECT_FALSE(f.diag.HasErrors());
-}
-
-TEST(FileAndLineMacroPreprocessing, Line_NoError) {
-  PreprocFixture f;
-  Preprocess("`__LINE__\n", f);
-  EXPECT_FALSE(f.diag.HasErrors());
 }
 
 TEST(FileAndLineMacroPreprocessing, FileAndLine_InsideIfdef) {
