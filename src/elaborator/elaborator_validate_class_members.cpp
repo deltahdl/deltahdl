@@ -387,6 +387,29 @@ void Elaborator::ValidateOneClassChainingCtor(const ClassDecl* cls) {
   }
 }
 
+// §19.4: identifies the embedded covergroup targeted by an assignment's
+// left-hand side, or an empty view when the target is not a covergroup. The
+// covergroup instance variable can be named either bare (`cg = new`) or through
+// an explicit object handle inside the class (`this.cg = new`); both forms name
+// the same variable and both are subject to the assignment restriction.
+static std::string_view AssignedCovergroupName(
+    const Expr* lhs, const std::unordered_set<std::string_view>& cg_names) {
+  if (lhs == nullptr) return {};
+  if (lhs->kind == ExprKind::kIdentifier && cg_names.count(lhs->text)) {
+    return lhs->text;
+  }
+  // `this.cg` is a member access with the `.` operator (not `::`) whose base is
+  // `this` and whose member names an embedded covergroup of this class.
+  if (lhs->kind == ExprKind::kMemberAccess && !lhs->is_scope_resolution &&
+      lhs->lhs != nullptr && lhs->lhs->kind == ExprKind::kIdentifier &&
+      lhs->lhs->text == "this" && lhs->rhs != nullptr &&
+      lhs->rhs->kind == ExprKind::kIdentifier &&
+      cg_names.count(lhs->rhs->text)) {
+    return lhs->rhs->text;
+  }
+  return {};
+}
+
 // §19.4: a covergroup declared inside a class is an embedded covergroup whose
 // identifier names an implicitly declared instance variable. That variable is
 // instantiated by assigning the result of new() to it inside the enclosing
@@ -397,14 +420,15 @@ static void CheckCovergroupAssignStmt(
     const Stmt* s, const std::unordered_set<std::string_view>& cg_names,
     DiagEngine& diag) {
   if (!s) return;
-  if ((s->kind == StmtKind::kBlockingAssign ||
-       s->kind == StmtKind::kNonblockingAssign) &&
-      s->lhs && s->lhs->kind == ExprKind::kIdentifier &&
-      cg_names.count(s->lhs->text)) {
-    diag.Error(s->range.start,
-               std::format("embedded covergroup '{}' shall only be assigned "
-                           "inside the new() method of its class",
-                           s->lhs->text));
+  if (s->kind == StmtKind::kBlockingAssign ||
+      s->kind == StmtKind::kNonblockingAssign) {
+    std::string_view cg = AssignedCovergroupName(s->lhs, cg_names);
+    if (!cg.empty()) {
+      diag.Error(s->range.start,
+                 std::format("embedded covergroup '{}' shall only be assigned "
+                             "inside the new() method of its class",
+                             cg));
+    }
   }
   for (const auto* sub : s->stmts) {
     CheckCovergroupAssignStmt(sub, cg_names, diag);

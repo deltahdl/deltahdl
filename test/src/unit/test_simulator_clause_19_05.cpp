@@ -117,6 +117,27 @@ TEST(Coverage, TransitionBinDoesNotCountWithoutSequence) {
   EXPECT_EQ(g->coverpoints[0].bins[0].hit_count, 0u);
 }
 
+// LRM 19.5: a transition bin counts only once the coverage point matches its
+// entire sequence of value transitions, including a sequence of more than two
+// states. The count advances on the sample that completes the full run.
+TEST(Coverage, TransitionBinCountsOnMultiStepSequence) {
+  CoverageDB db;
+  auto* g = db.CreateGroup("cg");
+  auto* cp = CoverageDB::AddCoverPoint(g, "x");
+
+  CoverBin t;
+  t.name = "t012";
+  t.kind = CoverBinKind::kTransition;
+  t.transitions = {{0, 1, 2}};
+  CoverageDB::AddBin(cp, t);
+
+  db.Sample(g, {{"x", 0}});
+  db.Sample(g, {{"x", 1}});
+  EXPECT_EQ(g->coverpoints[0].bins[0].hit_count, 0u);
+  db.Sample(g, {{"x", 2}});
+  EXPECT_EQ(g->coverpoints[0].bins[0].hit_count, 1u);
+}
+
 // LRM 19.5: a default bin catches values that do not lie within any of the
 // defined bins.
 TEST(Coverage, DefaultBinCatchesUnmatchedValue) {
@@ -180,6 +201,22 @@ TEST(Coverage, AutoBinsAreMarkedAuto) {
 
   CoverageDB::AutoCreateBins(cp, 0, 15);
   EXPECT_EQ(cp->bins[0].kind, CoverBinKind::kAuto);
+}
+
+// LRM 19.5: automatic bins shall not be created for a coverpoint over a real
+// expression; such a coverpoint must instead specify at least one explicit bins
+// construct. Asking the engine to auto-create bins for a real coverpoint yields
+// none, complementing the integral auto_bin_max case above.
+TEST(Coverage, NoAutoBinsForRealCoverpoint) {
+  CoverageDB db;
+  auto* g = db.CreateGroup("cg");
+  g->options.auto_bin_max = 8;
+  auto* cp = CoverageDB::AddCoverPoint(g, "r");
+  cp->is_real = true;
+
+  EXPECT_FALSE(CoverageDB::AutoBinsAllowed(cp));
+  CoverageDB::AutoCreateBins(cp, 0, 15);
+  EXPECT_TRUE(cp->bins.empty());
 }
 
 // LRM 19.5: coverage calculation shall not take into account the coverage

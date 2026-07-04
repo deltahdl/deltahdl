@@ -44,4 +44,31 @@ TEST(SourceText, MultipleCovergroupsInClass) {
   EXPECT_EQ(cg_names[1], "cv2");
 }
 
+// §19.4: arguments can be passed in to an embedded covergroup. A covergroup
+// declared with a formal-argument list (as in the C1 example, where the
+// argument later initializes a coverage option) is still recognized as a
+// covergroup class member named by its identifier.
+TEST(SourceText, ParameterizedCovergroupInClass) {
+  auto r = Parse(
+      "class C1;\n"
+      "  bit [7:0] x;\n"
+      "  bit clk;\n"
+      "  covergroup cv (int arg) @(posedge clk);\n"
+      "    coverpoint x;\n"
+      "  endgroup\n"
+      "endclass\n");
+  ASSERT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  std::string_view cg_name;
+  unsigned cg_count = 0;
+  for (auto* m : r.cu->classes[0]->members) {
+    if (m->kind == ClassMemberKind::kCovergroup) {
+      cg_name = m->name;
+      ++cg_count;
+    }
+  }
+  ASSERT_EQ(cg_count, 1u);
+  EXPECT_EQ(cg_name, "cv");
+}
+
 }  // namespace

@@ -86,4 +86,63 @@ TEST(CoverPointParsing, LabeledCoverpoint) {
   )"));
 }
 
+// LRM 19.5 (Syntax 19-2, covergroup_value_range): a value range may be
+// open-ended using $ for the low or high bound.
+TEST(CoverPointParsing, CoverpointWithOpenEndedRangeBins) {
+  EXPECT_TRUE(ParseOk(R"(
+    module m;
+      covergroup cg @(posedge clk);
+        coverpoint addr {
+          bins lo = {[$:15]};
+          bins hi = {[240:$]};
+        }
+      endgroup
+    endmodule
+  )"));
+}
+
+// LRM 19.5 (Syntax 19-2, covergroup_value_range): a value range may be written
+// as a center with a +/- or +%- tolerance.
+TEST(CoverPointParsing, CoverpointWithToleranceRangeBins) {
+  EXPECT_TRUE(ParseOk(R"(
+    module m;
+      covergroup cg @(posedge clk);
+        coverpoint addr {
+          bins near = {[100 +/- 4]};
+          bins pct  = {[100 +%- 10]};
+        }
+      endgroup
+    endmodule
+  )"));
+}
+
+// LRM 19.5 (Syntax 19-2, bins_or_options): the default sequence form catches
+// transitions that do not lie within any defined transition bin.
+TEST(CoverPointParsing, CoverpointWithDefaultSequenceBin) {
+  EXPECT_TRUE(ParseOk(R"(
+    module m;
+      covergroup cg @(posedge clk);
+        coverpoint addr {
+          bins t = (0 => 1);
+          bins others = default sequence;
+        }
+      endgroup
+    endmodule
+  )"));
+}
+
+// LRM 19.5 (Syntax 19-2, bins_or_options): a bin may be assigned a trans_list
+// describing one or more value-transition sequences.
+TEST(CoverPointParsing, CoverpointWithTransitionListBins) {
+  EXPECT_TRUE(ParseOk(R"(
+    module m;
+      covergroup cg @(posedge clk);
+        coverpoint addr {
+          bins seq = (0 => 1 => 2);
+        }
+      endgroup
+    endmodule
+  )"));
+}
+
 }  // namespace
