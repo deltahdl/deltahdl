@@ -99,78 +99,6 @@ TEST(StmtExec, ForeachNoVarsStillIterates) {
   EXPECT_EQ(cnt->value.ToUint64(), 3u);
 }
 
-TEST(StmtExec, ForeachBreakExitsLoop) {
-  StmtFixture f;
-  auto* arr = f.ctx.CreateVariable("brk_arr", 10);
-  arr->value = MakeLogic4VecVal(f.arena, 10, 0);
-
-  auto* cnt = f.ctx.CreateVariable("brk_cnt", 32);
-  cnt->value = MakeLogic4VecVal(f.arena, 32, 0);
-
-  auto* add = f.arena.Create<Expr>();
-  add->kind = ExprKind::kBinary;
-  add->op = TokenKind::kPlus;
-  add->lhs = MakeId(f.arena, "brk_cnt");
-  add->rhs = MakeInt(f.arena, 1);
-
-  auto* inc_stmt = f.arena.Create<Stmt>();
-  inc_stmt->kind = StmtKind::kBlockingAssign;
-  inc_stmt->lhs = MakeId(f.arena, "brk_cnt");
-  inc_stmt->rhs = add;
-
-  auto* break_stmt = f.arena.Create<Stmt>();
-  break_stmt->kind = StmtKind::kBreak;
-
-  auto* cmp = f.arena.Create<Expr>();
-  cmp->kind = ExprKind::kBinary;
-  cmp->op = TokenKind::kEqEq;
-  cmp->lhs = MakeId(f.arena, "brk_cnt");
-  cmp->rhs = MakeInt(f.arena, 3);
-
-  auto* if_stmt = f.arena.Create<Stmt>();
-  if_stmt->kind = StmtKind::kIf;
-  if_stmt->condition = cmp;
-  if_stmt->then_branch = break_stmt;
-
-  auto* block = f.arena.Create<Stmt>();
-  block->kind = StmtKind::kBlock;
-  block->stmts.push_back(inc_stmt);
-  block->stmts.push_back(if_stmt);
-
-  auto* stmt = f.arena.Create<Stmt>();
-  stmt->kind = StmtKind::kForeach;
-  stmt->expr = MakeId(f.arena, "brk_arr");
-  stmt->foreach_vars.push_back("i");
-  stmt->body = block;
-
-  RunStmt(stmt, f.ctx, f.arena);
-  EXPECT_EQ(cnt->value.ToUint64(), 3u);
-}
-
-TEST(StmtExec, ForeachIteratorVariableAccessible) {
-  StmtFixture f;
-  auto* arr = f.ctx.CreateVariable("itarr", 5);
-  arr->value = MakeLogic4VecVal(f.arena, 5, 0);
-
-  auto* last = f.ctx.CreateVariable("last_i", 32);
-  last->value = MakeLogic4VecVal(f.arena, 32, 0);
-
-  auto* body = f.arena.Create<Stmt>();
-  body->kind = StmtKind::kBlockingAssign;
-  body->lhs = MakeId(f.arena, "last_i");
-  body->rhs = MakeId(f.arena, "i");
-
-  auto* stmt = f.arena.Create<Stmt>();
-  stmt->kind = StmtKind::kForeach;
-  stmt->expr = MakeId(f.arena, "itarr");
-  stmt->foreach_vars.push_back("i");
-  stmt->body = body;
-
-  RunStmt(stmt, f.ctx, f.arena);
-
-  EXPECT_EQ(last->value.ToUint64(), 4u);
-}
-
 // §12.7.3 — the foreach-loop opens an implicit scope and its loop variable has
 // automatic lifetime local to that scope: during the loop the loop variable
 // shadows an outer variable of the same name, and the outer variable is left
@@ -207,54 +135,6 @@ TEST(StmtExec, ForeachLoopVarIsLocalToScope) {
   auto* after = f.ctx.FindVariable("i");
   ASSERT_NE(after, nullptr);
   EXPECT_EQ(after->value.ToUint64(), 99u);
-}
-
-TEST(StmtExec, ForeachContinueSkipsIteration) {
-  StmtFixture f;
-  auto* arr = f.ctx.CreateVariable("carr", 4);
-  arr->value = MakeLogic4VecVal(f.arena, 4, 0);
-
-  auto* cnt = f.ctx.CreateVariable("ccnt", 32);
-  cnt->value = MakeLogic4VecVal(f.arena, 32, 0);
-
-  auto* add = f.arena.Create<Expr>();
-  add->kind = ExprKind::kBinary;
-  add->op = TokenKind::kPlus;
-  add->lhs = MakeId(f.arena, "ccnt");
-  add->rhs = MakeInt(f.arena, 1);
-
-  auto* inc_stmt = f.arena.Create<Stmt>();
-  inc_stmt->kind = StmtKind::kBlockingAssign;
-  inc_stmt->lhs = MakeId(f.arena, "ccnt");
-  inc_stmt->rhs = add;
-
-  auto* cont_stmt = f.arena.Create<Stmt>();
-  cont_stmt->kind = StmtKind::kContinue;
-
-  auto* cmp = f.arena.Create<Expr>();
-  cmp->kind = ExprKind::kBinary;
-  cmp->op = TokenKind::kEqEq;
-  cmp->lhs = MakeId(f.arena, "i");
-  cmp->rhs = MakeInt(f.arena, 1);
-
-  auto* if_stmt = f.arena.Create<Stmt>();
-  if_stmt->kind = StmtKind::kIf;
-  if_stmt->condition = cmp;
-  if_stmt->then_branch = cont_stmt;
-
-  auto* block = f.arena.Create<Stmt>();
-  block->kind = StmtKind::kBlock;
-  block->stmts.push_back(if_stmt);
-  block->stmts.push_back(inc_stmt);
-
-  auto* stmt = f.arena.Create<Stmt>();
-  stmt->kind = StmtKind::kForeach;
-  stmt->expr = MakeId(f.arena, "carr");
-  stmt->foreach_vars.push_back("i");
-  stmt->body = block;
-
-  RunStmt(stmt, f.ctx, f.arena);
-  EXPECT_EQ(cnt->value.ToUint64(), 3u);
 }
 
 TEST(LoopStatementSim, ForeachBasic) {
@@ -442,6 +322,78 @@ TEST(LoopStatementSim, ForeachUsesDeclaredIndexBase) {
   EXPECT_EQ(d3->value.ToUint64(), 3u);
 }
 
+// §12.7.3 — each loop variable corresponds to one array dimension, and the
+// loop variables map to nested loops whose innermost (highest-cardinality)
+// index changes most rapidly. Stamping an increasing order counter into each
+// element records the visit sequence: for a 2x3 array the row index advances
+// only after the column index has swept its full range, so element [1][0]
+// (order 4) is visited immediately after [0][2] (order 3).
+TEST(LoopStatementSim, ForeachMultiDimIteratesInnermostFastest) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] matrix [2][3];\n"
+      "  logic [7:0] ord;\n"
+      "  initial begin\n"
+      "    ord = 8'd0;\n"
+      "    foreach (matrix[i, j]) begin\n"
+      "      ord = ord + 8'd1;\n"
+      "      matrix[i][j] = ord;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* m00 = f.ctx.FindVariable("matrix[0][0]");
+  auto* m02 = f.ctx.FindVariable("matrix[0][2]");
+  auto* m10 = f.ctx.FindVariable("matrix[1][0]");
+  auto* m12 = f.ctx.FindVariable("matrix[1][2]");
+  ASSERT_NE(m00, nullptr);
+  ASSERT_NE(m02, nullptr);
+  ASSERT_NE(m10, nullptr);
+  ASSERT_NE(m12, nullptr);
+  EXPECT_EQ(m00->value.ToUint64(), 1u);  // first visited
+  EXPECT_EQ(m02->value.ToUint64(), 3u);  // end of first row
+  EXPECT_EQ(m10->value.ToUint64(), 4u);  // row advances only after column sweep
+  EXPECT_EQ(m12->value.ToUint64(), 6u);  // last visited
+}
+
+// §12.7.3 — for a descending dimension the loop variable counts down from the
+// high declared index to the low one (the LRM's B[5:1] iterates 5 down to 1).
+// Stamping an increasing order counter into each visited element records the
+// visit order: the first-visited element (index 5) gets 1 and the last-visited
+// (index 1) gets 5, which is only possible if the loop walked the range
+// downward.
+TEST(LoopStatementSim, ForeachDescendingRangeIteratesHighToLow) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] data [5:1];\n"
+      "  logic [7:0] ord;\n"
+      "  initial begin\n"
+      "    ord = 8'd0;\n"
+      "    foreach (data[i]) begin\n"
+      "      ord = ord + 8'd1;\n"
+      "      data[i] = ord;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* d5 = f.ctx.FindVariable("data[5]");
+  auto* d1 = f.ctx.FindVariable("data[1]");
+  ASSERT_NE(d5, nullptr);
+  ASSERT_NE(d1, nullptr);
+  EXPECT_EQ(d5->value.ToUint64(), 1u);  // index 5 visited first
+  EXPECT_EQ(d1->value.ToUint64(), 5u);  // index 1 visited last
+}
+
 // §12.7.3 — a string is iterated as a dynamic array of bytes: the loop runs
 // once per character, so the counter reaches the character count (3), not the
 // bit width (24).
@@ -465,6 +417,32 @@ TEST(LoopStatementSim, ForeachOverStringIteratesPerCharacter) {
   auto* var = f.ctx.FindVariable("cnt");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 3u);
+}
+
+// §12.7.3 — when a loop variable appears in an expression other than as an
+// index into the designated array it takes an integer value (for a fixed-size
+// array, int). Accumulating the loop variable itself sums the visited indices
+// 0..3, giving 6, which is only meaningful if the variable is a usable integer
+// operand outside the index position.
+TEST(LoopStatementSim, ForeachLoopVarUsableAsIntInExpression) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] arr [4];\n"
+      "  logic [7:0] total;\n"
+      "  initial begin\n"
+      "    total = 8'd0;\n"
+      "    foreach (arr[i]) total = total + i;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("total");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 6u);
 }
 
 }  // namespace

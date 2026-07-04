@@ -220,4 +220,17 @@ TEST(LoopSyntaxParsing, ErrorForeachMissingCloseBracket) {
   EXPECT_TRUE(r.has_errors);
 }
 
+// §12.7.3 — a loop-variable slot implicitly declares an index variable, so it
+// admits only an identifier; a function call in that position (its closest
+// rejected form) is not a valid implicit declaration and is an error.
+TEST(LoopSyntaxParsing, ErrorForeachFunctionCallAsLoopVar) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    foreach (arr[f()]) x = 0;\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
 }  // namespace

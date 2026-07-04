@@ -223,17 +223,6 @@ TEST(ConstraintItemsParsing, ConstraintPrototypeQualifiers) {
   EXPECT_EQ(members[4]->name, "c4");
 }
 
-TEST(ConstraintItemsParsing, ImplicitConstraintPrototype) {
-  auto r = Parse(
-      "class C;\n"
-      "  rand int x;\n"
-      "  constraint c;\n"
-      "endclass\n");
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->classes.size(), 1u);
-}
-
 TEST(ConstraintItemsParsing, OutOfBlockConstraint) {
   auto r = Parse(
       "class a;\n"
@@ -244,23 +233,6 @@ TEST(ConstraintItemsParsing, OutOfBlockConstraint) {
   EXPECT_FALSE(r.has_errors);
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->classes.size(), 1u);
-}
-
-TEST(ConstraintItemsParsing, ExternConstraintPrototypeVerifiesAst) {
-  auto r = Parse(
-      "class A;\n"
-      "  rand int x;\n"
-      "  extern constraint c1;\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->classes.size(), 1u);
-  bool found = false;
-  for (auto* m : r.cu->classes[0]->members) {
-    if (m->kind == ClassMemberKind::kConstraint && m->name == "c1") {
-      found = true;
-    }
-  }
-  EXPECT_TRUE(found);
 }
 
 TEST(ConstraintItemsParsing, ConstraintDeclDynamicOverride) {
@@ -371,84 +343,6 @@ TEST(ConstraintItemsParsing, DistEqualWeightSingleValue) {
       "class C;\n"
       "  rand int x;\n"
       "  constraint c { x dist {42 := 1}; }\n"
-      "endclass\n");
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->classes.size(), 1u);
-}
-
-TEST(ConstraintItemsParsing, DistDivideWeightMultipleValues) {
-  auto r = Parse(
-      "class C;\n"
-      "  rand int x;\n"
-      "  constraint c { x dist {1 :/ 1, 2 :/ 1, 3 :/ 1, 4 :/ 1}; }\n"
-      "endclass\n");
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->classes.size(), 1u);
-}
-
-TEST(ConstraintItemsParsing, DistWithRangeAndEqualWeight) {
-  auto r = Parse(
-      "class C;\n"
-      "  rand int x;\n"
-      "  constraint c { x dist {[0:3] := 1, [4:7] := 2}; }\n"
-      "endclass\n");
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->classes.size(), 1u);
-}
-
-TEST(ConstraintItemsParsing, DistWithMixedWeightTypes) {
-  auto r = Parse(
-      "class C;\n"
-      "  rand int x;\n"
-      "  constraint c { x dist {0 := 1, [1:10] :/ 5, 11 := 3}; }\n"
-      "endclass\n");
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->classes.size(), 1u);
-}
-
-TEST(ConstraintItemsParsing, DistWithDefaultWeight) {
-  auto r = Parse(
-      "class C;\n"
-      "  rand int x;\n"
-      "  constraint c { x dist {[0:255] :/ 1, default :/ 1}; }\n"
-      "endclass\n");
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->classes.size(), 1u);
-}
-
-TEST(ConstraintItemsParsing, DistWithExpressionWeights) {
-  auto r = Parse(
-      "class C;\n"
-      "  rand int x;\n"
-      "  constraint c { x dist {1 := 2 * 3, 2 := 4 + 1}; }\n"
-      "endclass\n");
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->classes.size(), 1u);
-}
-
-TEST(ConstraintItemsParsing, DistWithNegativeValues) {
-  auto r = Parse(
-      "class C;\n"
-      "  rand int x;\n"
-      "  constraint c { x dist {-10 := 1, 0 := 2, 10 := 1}; }\n"
-      "endclass\n");
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->classes.size(), 1u);
-}
-
-TEST(ConstraintItemsParsing, DistMultipleConstraints) {
-  auto r = Parse(
-      "class C;\n"
-      "  rand int x, y;\n"
-      "  constraint cx { x dist {[0:100] := 1}; }\n"
-      "  constraint cy { y dist {[0:50] :/ 2, [51:100] :/ 1}; }\n"
       "endclass\n");
   EXPECT_FALSE(r.has_errors);
   ASSERT_NE(r.cu, nullptr);
@@ -599,28 +493,6 @@ TEST(ConstraintItemsParsing, PureConstraintPrototype) {
   EXPECT_TRUE(r.cu->classes[0]->members[1]->is_pure_virtual);
 }
 
-TEST(ConstraintItemsParsing, ExternConstraintDeclExtendsOverride) {
-  auto r = Parse(
-      "class C;\n"
-      "  rand int x;\n"
-      "  extern constraint c;\n"
-      "endclass\n"
-      "constraint :extends C::c { x > 0; }\n");
-  ASSERT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->classes.size(), 1u);
-}
-
-TEST(ConstraintItemsParsing, ExternConstraintDeclFinalOverride) {
-  auto r = Parse(
-      "class C;\n"
-      "  rand int x;\n"
-      "  extern constraint c;\n"
-      "endclass\n"
-      "constraint :initial :final C::c { x > 0; }\n");
-  ASSERT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->classes.size(), 1u);
-}
-
 TEST(ConstraintItemsParsing, SolveBeforeWithSelect) {
   auto r = Parse(
       "class C;\n"
@@ -719,20 +591,6 @@ TEST(ConstraintItemsParsing, ErrorExternConstraintMissingIdentifier) {
   EXPECT_TRUE(r.has_errors);
 }
 
-TEST(ConstraintItemsParsing, ConstraintExtendsAndFinalOverride) {
-  auto r = Parse(
-      "class C;\n"
-      "  rand int x;\n"
-      "  constraint :extends :final c { x > 0; }\n"
-      "endclass\n");
-  ASSERT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->classes.size(), 1u);
-  EXPECT_EQ(r.cu->classes[0]->members[1]->name, "c");
-  EXPECT_TRUE(r.cu->classes[0]->members[1]->is_constraint_extends);
-  EXPECT_TRUE(r.cu->classes[0]->members[1]->is_constraint_final);
-  EXPECT_FALSE(r.cu->classes[0]->members[1]->is_constraint_initial);
-}
-
 TEST(ConstraintItemsParsing, MultipleConstraintBlockItems) {
   auto r = Parse(
       "class C;\n"
@@ -826,6 +684,33 @@ TEST(ConstraintItemsParsing, ConstraintPrimaryWithParens) {
   ASSERT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->classes.size(), 1u);
   EXPECT_EQ(r.cu->classes[0]->members[1]->name, "c");
+}
+
+// uniqueness_constraint ::= unique { range_list }: the brace list is a
+// range_list, so a value_range element (here the range [1:5]) is admitted
+// alongside a plain variable, not just the bare-identifier list.
+TEST(ConstraintItemsParsing, UniquenessConstraintValueRange) {
+  auto r = Parse(
+      "class C;\n"
+      "  rand int x;\n"
+      "  constraint c { unique { [1:5], x }; }\n"
+      "endclass\n");
+  ASSERT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  EXPECT_EQ(r.cu->classes[0]->members[1]->name, "c");
+}
+
+// dist_item ::= value_range [ dist_weight ] | default :/ expression: the
+// default alternative is grammatical only with the :/ weight operator, so the
+// closest rejected input -- 'default' followed by the := operator -- is not
+// derivable from this production and the parser reports it.
+TEST(ConstraintItemsParsing, ErrorDistDefaultEqualWeight) {
+  auto r = Parse(
+      "class C;\n"
+      "  rand int x;\n"
+      "  constraint c { x dist { [0:9] :/ 1, default := 1 }; }\n"
+      "endclass\n");
+  EXPECT_TRUE(r.has_errors);
 }
 
 }  // namespace

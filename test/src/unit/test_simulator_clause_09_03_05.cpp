@@ -152,6 +152,56 @@ TEST(StatementLabelSimulation, LabeledBeginBlockWithLocalVar) {
   EXPECT_EQ(val, 21u);
 }
 
+// §9.3.5 — a statement label on a for loop that declares its loop variable
+// names the implicit block the loop creates (weave 12.7.3), and a labeled
+// statement can be disabled with the same behavior as disabling a named block
+// (weave 9.6.2). Disabling the loop by its own label therefore terminates the
+// whole loop — acting like a break — and execution resumes at the statement
+// following it.
+TEST(StatementLabelSimulation, DisableLabeledForLoopActsLikeBreak) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] count, after;\n"
+      "  initial begin\n"
+      "    count = 8'd0;\n"
+      "    after = 8'd0;\n"
+      "    run: for (int i = 0; i < 8; i = i + 1) begin\n"
+      "      if (i == 3) disable run;\n"
+      "      count = count + 8'd1;\n"
+      "    end\n"
+      "    after = 8'd1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  // count reaches 3 (iterations i=0,1,2), then i=3 disables the loop before the
+  // increment; `after` proves execution resumed past the loop.
+  LowerRunAndCheck(f, design, {{"count", 3u}, {"after", 1u}});
+}
+
+// §9.3.5 — the same rule for a foreach loop: its label names the loop's
+// implicit block, so disabling that label ends the entire foreach and resumes
+// after it.
+TEST(StatementLabelSimulation, DisableLabeledForeachActsLikeBreak) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] arr [8];\n"
+      "  logic [7:0] visited, after;\n"
+      "  initial begin\n"
+      "    visited = 8'd0;\n"
+      "    after = 8'd0;\n"
+      "    scan: foreach (arr[i]) begin\n"
+      "      if (i == 3) disable scan;\n"
+      "      visited = visited + 8'd1;\n"
+      "    end\n"
+      "    after = 8'd1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"visited", 3u}, {"after", 1u}});
+}
+
 TEST(StatementLabelSimulation, LabeledForkJoinExecutes) {
   // Labeling a fork-join block creates its named scope without disturbing
   // execution: the parent blocks on join and the spawned assignment lands.

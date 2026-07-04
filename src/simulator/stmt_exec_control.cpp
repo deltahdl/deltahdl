@@ -1,6 +1,7 @@
 #include <cstdint>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
@@ -473,10 +474,31 @@ static bool HasTypedForInit(const Stmt* stmt) {
 // Pops the dynamic scope a typed for-init introduced and the static scope a
 // label introduced, in the order ExecFor pushed them. Called on every ExecFor
 // exit path to keep the scope stack balanced.
+// §9.3.5: a statement label on a foreach loop, or a for loop that declares its
+// loop variable, names the implicit begin-end block the loop creates. Pushing
+// the static scope alone (for hierarchical name resolution) is not enough for a
+// `disable <label>` to find the loop; registering the label as a named scope of
+// the running process — exactly as ExecBlock does for a named begin-end block —
+// lets the disable resolve so the loop can consume it. Paired 1:1 with
+// ExitLoopLabelScope so the scope stack stays balanced on every exit path.
+static void EnterLoopLabelScope(const Stmt* stmt, SimContext& ctx,
+                                bool labeled) {
+  if (!labeled) return;
+  ctx.PushStaticScope(stmt->label);
+  ctx.RegisterNamedScope(stmt->label, ctx.CurrentProcess());
+}
+
+static void ExitLoopLabelScope(const Stmt* stmt, SimContext& ctx,
+                               bool labeled) {
+  if (!labeled) return;
+  ctx.UnregisterNamedScope(stmt->label, ctx.CurrentProcess());
+  ctx.PopStaticScope(stmt->label);
+}
+
 static void TeardownForScopes(const Stmt* stmt, SimContext& ctx, bool scoped,
                               bool labeled) {
   if (scoped) ctx.PopScope();
-  if (labeled) ctx.PopStaticScope(stmt->label);
+  ExitLoopLabelScope(stmt, ctx, labeled);
 }
 
 // How a loop should react to the StmtResult returned by its body, factored out
@@ -493,6 +515,21 @@ static LoopAction ClassifyLoopBodyResult(StmtResult result) {
   return LoopAction::kKeepLooping;
 }
 
+// §9.3.5: a statement label on a foreach loop, or on a for loop that declares
+// its loop variable, names the implicit begin-end block the loop creates. Per
+// §9.6.2, disabling a named block terminates it and resumes execution at the
+// following statement. So when the loop body bubbles up a kDisable that targets
+// the loop's own label, the disable is consumed here and turned into a normal
+// loop exit rather than propagating further up the process. Returns true when
+// the loop should stop.
+static bool LoopDisableTargetsOwnLabel(const Stmt* stmt, StmtResult result,
+                                       bool labeled, SimContext& ctx) {
+  if (result != StmtResult::kDisable || !labeled) return false;
+  if (ctx.GetDisableTarget() != stmt->label) return false;
+  ctx.ClearDisableTarget();
+  return true;
+}
+
 // Evaluates a for-loop's optional continuation condition. A loop with no
 // condition runs unconditionally; otherwise it continues only while the
 // condition is truthy.
@@ -504,7 +541,7 @@ static bool ForConditionHolds(const Stmt* stmt, SimContext& ctx, Arena& arena) {
 
 ExecTask ExecFor(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   bool labeled = !stmt->label.empty();
-  if (labeled) ctx.PushStaticScope(stmt->label);
+  EnterLoopLabelScope(stmt, ctx, labeled);
   bool scoped = HasTypedForInit(stmt);
   if (scoped) ctx.PushScope();
   CreateForInitVars(stmt, ctx);
@@ -515,6 +552,7 @@ ExecTask ExecFor(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     auto action = ClassifyLoopBodyResult(result);
     if (action == LoopAction::kBreakLoop) break;
     if (action == LoopAction::kPropagate) {
+      if (LoopDisableTargetsOwnLabel(stmt, result, labeled, ctx)) break;
       TeardownForScopes(stmt, ctx, scoped, labeled);
       co_return result;
     }
@@ -705,15 +743,80 @@ static void SetForeachIterVar(Variable* iter_var, const ArrayInfo* info,
 static void TeardownForeachScopes(const Stmt* stmt, SimContext& ctx,
                                   bool labeled) {
   ctx.PopScope();
-  if (labeled) ctx.PopStaticScope(stmt->label);
+  ExitLoopLabelScope(stmt, ctx, labeled);
+}
+
+// §12.7.3: for a multidimensional (unpacked) array each loop variable
+// corresponds to one dimension. Collects, in declaration order, the loop
+// variable name plus its dimension's low index and size for every dimension
+// that has a named loop variable, so ExecForeach can iterate them as nested
+// loops. A dimension whose variable slot is omitted (an empty name) is not
+// iterated and contributes no entry.
+struct ForeachDimIter {
+  std::string_view name;
+  uint32_t lo;
+  uint32_t size;
+};
+
+static std::vector<ForeachDimIter> CollectForeachDims(const Stmt* stmt,
+                                                      const ArrayInfo* info) {
+  std::vector<ForeachDimIter> dims;
+  size_t ndims = info->dim_sizes.size();
+  size_t nvars = stmt->foreach_vars.size();
+  for (size_t k = 0; k < nvars && k < ndims; ++k) {
+    if (stmt->foreach_vars[k].empty()) continue;
+    uint32_t lo = (k < info->dim_los.size()) ? info->dim_los[k] : 0;
+    dims.push_back({stmt->foreach_vars[k], lo, info->dim_sizes[k]});
+  }
+  return dims;
+}
+
+// §12.7.3: drives a multidimensional foreach as nested loops. A flat odometer
+// over the product of the iterated dimension sizes yields the same nesting the
+// LRM prescribes: the last (highest-cardinality, innermost) dimension changes
+// most rapidly, the first (lowest-cardinality, outermost) most slowly. Each
+// step maps the counter back to per-dimension index values before running the
+// body once, so `continue` advances to the next combination and `break` (or a
+// disable of the loop's own label) leaves the whole loop.
+static ExecTask ExecForeachMultiDim(const Stmt* stmt, SimContext& ctx,
+                                    Arena& arena, const ArrayInfo* info,
+                                    bool labeled) {
+  std::vector<ForeachDimIter> dims = CollectForeachDims(stmt, info);
+  ctx.PushScope();
+  std::vector<Variable*> vars;
+  uint64_t total = 1;
+  for (const auto& d : dims) {
+    vars.push_back(ctx.CreateLocalVariable(d.name, 32));
+    total *= d.size;
+  }
+  for (uint64_t n = 0; n < total && !ctx.StopRequested(); ++n) {
+    uint64_t rem = n;
+    for (size_t d = dims.size(); d-- > 0;) {
+      uint32_t idx = static_cast<uint32_t>(rem % dims[d].size);
+      rem /= dims[d].size;
+      if (vars[d]) {
+        vars[d]->value = MakeLogic4VecVal(arena, 32, dims[d].lo + idx);
+      }
+    }
+    auto result = co_await ExecStmt(stmt->body, ctx, arena);
+    auto action = ClassifyLoopBodyResult(result);
+    if (action == LoopAction::kBreakLoop) break;
+    if (action == LoopAction::kPropagate) {
+      if (LoopDisableTargetsOwnLabel(stmt, result, labeled, ctx)) break;
+      TeardownForeachScopes(stmt, ctx, labeled);
+      co_return result;
+    }
+  }
+  TeardownForeachScopes(stmt, ctx, labeled);
+  co_return StmtResult::kDone;
 }
 
 ExecTask ExecForeach(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   bool labeled = !stmt->label.empty();
-  if (labeled) ctx.PushStaticScope(stmt->label);
+  EnterLoopLabelScope(stmt, ctx, labeled);
   ForeachSetup setup = ComputeForeachSetup(stmt, ctx);
   if (setup.bail) {
-    if (labeled) ctx.PopStaticScope(stmt->label);
+    ExitLoopLabelScope(stmt, ctx, labeled);
     co_return StmtResult::kDone;
   }
   const std::string& arr_name = setup.arr_name;
@@ -728,6 +831,13 @@ ExecTask ExecForeach(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   const ArrayInfo* info =
       arr_name.empty() ? nullptr : ctx.FindArrayInfo(arr_name);
 
+  // §12.7.3: a multidimensional unpacked array binds one loop variable per
+  // dimension; iterate every dimension as nested loops rather than only the
+  // outermost.
+  if (info && info->dim_sizes.size() >= 2 && stmt->foreach_vars.size() >= 2) {
+    co_return co_await ExecForeachMultiDim(stmt, ctx, arena, info, labeled);
+  }
+
   ctx.PushScope();
   Variable* iter_var = nullptr;
   if (!iter_name.empty()) {
@@ -740,6 +850,7 @@ ExecTask ExecForeach(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     auto action = ClassifyLoopBodyResult(result);
     if (action == LoopAction::kBreakLoop) break;
     if (action == LoopAction::kPropagate) {
+      if (LoopDisableTargetsOwnLabel(stmt, result, labeled, ctx)) break;
       TeardownForeachScopes(stmt, ctx, labeled);
       co_return result;
     }
