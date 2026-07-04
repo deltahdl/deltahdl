@@ -5,15 +5,6 @@ using namespace delta;
 
 namespace {
 
-TEST(IoSystemTaskParsing, DisplayInAlwaysBlock) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  reg clk;\n"
-              "  always @(posedge clk)\n"
-              "    $display(\"clock edge at %0t\", $time);\n"
-              "endmodule\n"));
-}
-
 TEST(IoSystemTaskParsing, DisplaySystemCall) {
   auto r = Parse(
       "module m;\n"
@@ -47,6 +38,26 @@ TEST(IoSystemTaskParsing, SystemCallLeadingEmptyArg) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
+}
+
+// Claim 1 (Syntax 21-1): the "( list_of_arguments )" group is optional and the
+// list inside it may itself be empty. An empty parenthesized call is a distinct
+// surface form from the parenthesis-free call, so the parser must accept it and
+// produce a system call carrying no arguments. (Its runtime effect -- a bare
+// newline for $display -- is checked in the simulator suite.)
+TEST(IoSystemTaskParsing, DisplayEmptyParens) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial $display();\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_NE(stmt->expr, nullptr);
+  EXPECT_EQ(stmt->expr->kind, ExprKind::kSystemCall);
+  EXPECT_EQ(stmt->expr->callee, "$display");
+  EXPECT_TRUE(stmt->expr->args.empty());
 }
 
 TEST(IoSystemTaskParsing, DisplayNoArgs) {

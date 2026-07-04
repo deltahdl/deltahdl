@@ -401,14 +401,70 @@ static std::string FormatArgWidth(const Logic4Vec& val, char spec,
   return std::string(width - core.size(), pad) + core;
 }
 
+static int FormatHexDigitVal(char c) {
+  if (c >= '0' && c <= '9') return c - '0';
+  if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+  if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+  return -1;
+}
+
+// §21.2.1: inside a $display/$write string-literal argument the special
+// character '\' introduces an escape whose meaning is that of Table 5-1 in
+// 5.9.1. Decode a single such sequence in place -- named escapes, octal '\ddd'
+// and hex '\xhh' -- and emit the resulting byte as a literal. Decoding here,
+// one character at a time, keeps an escaped byte (e.g. octal '\045') out of the
+// '%' format-specifier machinery even when it decodes to a '%'. Any other
+// escaped character stands for itself, matching the string-literal decoder.
 static void AppendLiteralChar(const std::string& fmt, size_t& i,
                               std::string& out) {
-  if (fmt[i] == '\\' && i + 1 < fmt.size()) {
-    out += (fmt[i + 1] == 'n') ? '\n' : fmt[i + 1];
-    ++i;
-  } else {
+  if (fmt[i] != '\\' || i + 1 >= fmt.size()) {
     out += fmt[i];
+    return;
   }
+  char c = fmt[++i];
+  switch (c) {
+    case 'n':
+      out += '\n';
+      return;
+    case 't':
+      out += '\t';
+      return;
+    case '\\':
+      out += '\\';
+      return;
+    case '"':
+      out += '"';
+      return;
+    case 'v':
+      out += '\v';
+      return;
+    case 'f':
+      out += '\f';
+      return;
+    case 'a':
+      out += '\a';
+      return;
+    default:
+      break;
+  }
+  if (c == 'x') {
+    int val = 0;
+    for (int j = 0;
+         j < 2 && i + 1 < fmt.size() && FormatHexDigitVal(fmt[i + 1]) >= 0; ++j)
+      val = val * 16 + FormatHexDigitVal(fmt[++i]);
+    out += static_cast<char>(val);
+    return;
+  }
+  if (c >= '0' && c <= '7') {
+    int val = c - '0';
+    for (int j = 0;
+         j < 2 && i + 1 < fmt.size() && fmt[i + 1] >= '0' && fmt[i + 1] <= '7';
+         ++j)
+      val = val * 8 + (fmt[++i] - '0');
+    out += static_cast<char>(val);
+    return;
+  }
+  out += c;
 }
 
 // §21.2.1.2: parse the optional field width that may sit between the '%' and

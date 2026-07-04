@@ -225,4 +225,101 @@ TEST(IoDisplayWriteSim, LibrarySpecifierConsumesNoArgument) {
   EXPECT_EQ(out.find('%'), std::string::npos);
 }
 
+// N3a: a '\' escape inside a string-literal argument is interpreted per
+// Table 5-1 of 5.9.1. The tab escape must render as an actual tab byte, not the
+// literal letter 't' -- so the decoder is more than a bare "\n handler".
+TEST(IoDisplayWriteSim, TabEscapeRendersTab) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  initial $write(\"a\\tb\");\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "a\tb");
+}
+
+// N3a: an octal '\ddd' escape (from 5.9.1's Table 5-1) selects the byte with
+// that octal code. \123 is octal 0123 == 'S'.
+TEST(IoDisplayWriteSim, OctalEscapeRendersByte) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  initial $write(\"\\123\");\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "S");
+}
+
+// N3a: a hex '\xhh' escape selects the byte with that hex code. \x41 == 'A'.
+TEST(IoDisplayWriteSim, HexEscapeRendersByte) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  initial $write(\"\\x41\");\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "A");
+}
+
+// N3a: an octal escape that resolves to '%' (octal 045) must reach the output
+// as a literal percent sign -- the byte is decoded as literal text and is not
+// re-interpreted as the start of a format specification.
+TEST(IoDisplayWriteSim, OctalEscapedPercentIsLiteral) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  initial $write(\"\\045d\");\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "%d");
+}
+
+// N3a/N4c: the worked example from 21.2.1, combining the '\' escape (backslash,
+// tab, newline, escaped quote and octal \123 == 'S') with the '%%' literal
+// percent. $display terminates the whole thing with a trailing newline.
+TEST(IoDisplayWriteSim, CombinedBackslashAndPercentEscapes) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  initial $display(\"\\\\\\t\\\\\\n\\\"%%\\123\");\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "\\\t\\\n\"%S\n");
+}
+
+// N1/B2: $displayb is a display-family name; like every $display* task it
+// terminates its output with a newline. Its radix suffix affects only the
+// default radix of unformatted expression arguments, never the newline.
+TEST(IoDisplayWriteSim, DisplaybAppendsNewline) {
+  SimFixture f;
+  std::string out =
+      RunCapture("module t;\n  initial $displayb(\"hi\");\nendmodule\n", f);
+  EXPECT_EQ(out, "hi\n");
+}
+
+// N1/B2: $displayo is likewise a display-family name and appends a newline.
+TEST(IoDisplayWriteSim, DisplayoAppendsNewline) {
+  SimFixture f;
+  std::string out =
+      RunCapture("module t;\n  initial $displayo(\"hi\");\nendmodule\n", f);
+  EXPECT_EQ(out, "hi\n");
+}
+
+// N1/B2: $writeo is a write-family name and emits no trailing newline.
+TEST(IoDisplayWriteSim, WriteoOmitsNewline) {
+  SimFixture f;
+  std::string out =
+      RunCapture("module t;\n  initial $writeo(\"hi\");\nendmodule\n", f);
+  EXPECT_EQ(out, "hi");
+}
+
+// N1/B2: $writeh completes the eight-name enumeration at the runtime stage; as
+// a write-family name it too omits the trailing newline.
+TEST(IoDisplayWriteSim, WritehOmitsNewline) {
+  SimFixture f;
+  std::string out =
+      RunCapture("module t;\n  initial $writeh(\"hi\");\nendmodule\n", f);
+  EXPECT_EQ(out, "hi");
+}
+
 }  // namespace
