@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <cstdint>
 #include <string_view>
 #include <vector>
@@ -35,24 +36,18 @@ TEST(SvaEngine, SequenceOperatorOr) {
 
 // §16.9.7: the match set of `a or b` is the union of the two operands' match
 // sets, with each composite match ending where its originating operand match
-// ends. This mirrors Figure 16-11: the first operand matches at ticks 9..12 and
-// the second matches at tick 12, so the composite matches at 9, 10, 11, and 13
-// once and at 12 twice — operand matches are not merged.
+// ends. This reproduces Figure 16-11 for `(te1 ##[1:5] te2) or (te3 ##2 te4 ##2
+// te5)`: the first operand matches at ticks 9, 10, 11, 12, and 13, and the
+// second matches at tick 12. The composite therefore has one match at each of
+// ticks 9, 10, 11, and 13 and two matches at tick 12 — operand matches are not
+// merged, so the coincident tick appears twice.
 TEST(SvaEngine, SequenceOrIsUnionOfOperandMatches) {
-  auto u = EvalSequenceOrMatches({9, 10, 11, 13}, {12});
+  auto u = EvalSequenceOrMatches({9, 10, 11, 12, 13}, {12});
   EXPECT_TRUE(u.matched);
-  std::vector<uint32_t> expected{9, 10, 11, 13, 12};
+  std::vector<uint32_t> expected{9, 10, 11, 12, 13, 12};
   EXPECT_EQ(u.end_times, expected);
-}
-
-// §16.9.7: when both operands match on the same clock tick, each contributes a
-// distinct composite match — there are two matches ending on that tick.
-TEST(SvaEngine, SequenceOrKeepsCoincidentMatchesSeparate) {
-  auto u = EvalSequenceOrMatches({12}, {12});
-  EXPECT_TRUE(u.matched);
-  EXPECT_EQ(u.end_times.size(), 2u);
-  EXPECT_EQ(u.end_times[0], 12u);
-  EXPECT_EQ(u.end_times[1], 12u);
+  // The defining feature of the figure: tick 12 carries two composite matches.
+  EXPECT_EQ(std::count(u.end_times.begin(), u.end_times.end(), 12u), 2);
 }
 
 // §16.9.7: a match of either operand alone is a match of the composite, ending
@@ -65,16 +60,6 @@ TEST(SvaEngine, SequenceOrMatchesWhenOnlyOneOperandMatches) {
   auto only_b = EvalSequenceOrMatches({}, {4});
   EXPECT_TRUE(only_b.matched);
   EXPECT_EQ(only_b.end_times, std::vector<uint32_t>{4});
-}
-
-// §16.9.7: the union draws matches from both operands at once. When each
-// operand contributes several matches — including a tick where both match — the
-// composite carries every one of them, with the coincident tick kept twice.
-TEST(SvaEngine, SequenceOrUnionDrawsFromBothOperands) {
-  auto u = EvalSequenceOrMatches({2, 5}, {3, 5});
-  EXPECT_TRUE(u.matched);
-  std::vector<uint32_t> expected{2, 5, 3, 5};
-  EXPECT_EQ(u.end_times, expected);
 }
 
 // §16.9.7: with neither operand matching, the composite has no match.

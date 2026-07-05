@@ -38,4 +38,33 @@ TEST(AssertionSemanticsParsing, OrOfBooleanExpressions) {
   EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kAssertProperty));
 }
 
+// §16.9.7: the `or` of two sequences is a sequence_expr, so it is accepted in
+// every position that admits one. A cover-property spec is a distinct syntactic
+// position (parsed by a separate item path from an assert), so the operator is
+// exercised there too.
+TEST(AssertionSemanticsParsing, OrInCoverProperty) {
+  auto r = Parse(
+      "module m;\n"
+      "  cover property (@(posedge clk) (a ##2 b) or (c ##2 d ##2 e));\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kCoverProperty));
+}
+
+// §16.9.7: a named sequence declaration is another syntactic position for the
+// `or` operator — its body is a sequence_expr. The declaration parses as a
+// sequence item with the operator in its body.
+TEST(AssertionSemanticsParsing, OrInSequenceDeclaration) {
+  auto r = Parse(
+      "module m;\n"
+      "  sequence s;\n"
+      "    (a ##2 b) or (c ##2 d ##2 e);\n"
+      "  endsequence\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kSequenceDecl));
+}
+
 }  // namespace
