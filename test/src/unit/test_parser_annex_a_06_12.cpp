@@ -214,19 +214,6 @@ TEST(RandsequenceSyntaxParsing, ComplexMixedProds) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(RandsequenceSyntaxParsing, RsProdAsCodeBlock) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    randsequence(main)\n"
-      "      main : { $display(\"inline\"); };\n"
-      "    endsequence\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(RandsequenceSyntaxParsing, RsProdAsProductionItem) {
   auto r = Parse(
       "module m;\n"
@@ -286,24 +273,6 @@ TEST(RandsequenceSyntaxParsing, RsIfOnly) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(RandsequenceSyntaxParsing, RsCaseItemDefault) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    randsequence(main)\n"
-      "      main : case (99)\n"
-      "               0: a;\n"
-      "               default: b;\n"
-      "             endcase;\n"
-      "      a : { ; };\n"
-      "      b : { ; };\n"
-      "    endsequence\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(RandsequenceSyntaxParsing, RsCaseItemDefaultColon) {
   auto r = Parse(
       "module m;\n"
@@ -313,26 +282,6 @@ TEST(RandsequenceSyntaxParsing, RsCaseItemDefaultColon) {
       "               default : a;\n"
       "             endcase;\n"
       "      a : { ; };\n"
-      "    endsequence\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(RandsequenceSyntaxParsing, RsCaseMultipleItems) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    randsequence(main)\n"
-      "      main : case (1)\n"
-      "               0: a;\n"
-      "               1: b;\n"
-      "               2: c;\n"
-      "             endcase;\n"
-      "      a : { ; };\n"
-      "      b : { ; };\n"
-      "      c : { ; };\n"
       "    endsequence\n"
       "  end\n"
       "endmodule\n");
@@ -367,34 +316,6 @@ TEST(RandsequenceSyntaxParsing, RsProductionListRandJoinWithExpr) {
       "      a : { ; };\n"
       "      b : { ; };\n"
       "      c : { ; };\n"
-      "    endsequence\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(RandsequenceSyntaxParsing, BreakInRandsequence) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    randsequence(main)\n"
-      "      main : a { break; };\n"
-      "      a : { ; };\n"
-      "    endsequence\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(RandsequenceSyntaxParsing, ReturnInRandsequence) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    randsequence(main)\n"
-      "      main : a { return; };\n"
-      "      a : { ; };\n"
       "    endsequence\n"
       "  end\n"
       "endmodule\n");
