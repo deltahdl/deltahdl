@@ -96,6 +96,21 @@ TEST(OperatorElaboration, UnaryReductionXnorAltElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// Negative form: a reduction operator requires a bit-vector operand, so
+// applying one to a real variable is illegal and must be reported at
+// elaboration.
+TEST(OperatorElaboration, UnaryReductionOnRealOperandRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  real r;\n"
+      "  logic x;\n"
+      "  initial x = &r;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
 TEST(AlwaysCombBasicSim, AlwaysCombReductionAnd) {
   SimFixture f;
   auto* design = ElaborateSrc(

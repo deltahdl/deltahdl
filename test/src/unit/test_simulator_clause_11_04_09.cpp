@@ -191,95 +191,6 @@ TEST(OperatorSim, UnaryReductionXnorAlt) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-TEST(EvalOp, ReductionAndAllOnes) {
-  SimFixture f;
-
-  auto* expr =
-      MakeUnary(f.arena, TokenKind::kAmp, MakeInt(f.arena, 0xFFFFFFFF));
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 1u);
-}
-
-TEST(EvalOp, ReductionAndNotAllOnes) {
-  SimFixture f;
-
-  auto* expr = MakeUnary(f.arena, TokenKind::kAmp, MakeInt(f.arena, 5));
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 0u);
-}
-
-TEST(EvalOp, ReductionOrNonZero) {
-  SimFixture f;
-
-  auto* expr = MakeUnary(f.arena, TokenKind::kPipe, MakeInt(f.arena, 4));
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 1u);
-}
-
-TEST(EvalOp, ReductionOrZero) {
-  SimFixture f;
-
-  auto* expr = MakeUnary(f.arena, TokenKind::kPipe, MakeInt(f.arena, 0));
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 0u);
-}
-
-TEST(EvalOp, ReductionXorEvenOnes) {
-  SimFixture f;
-
-  auto* expr = MakeUnary(f.arena, TokenKind::kCaret, MakeInt(f.arena, 3));
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 0u);
-}
-
-TEST(EvalOp, ReductionXorOddOnes) {
-  SimFixture f;
-
-  auto* expr = MakeUnary(f.arena, TokenKind::kCaret, MakeInt(f.arena, 7));
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 1u);
-}
-
-TEST(EvalOp, ReductionNand) {
-  SimFixture f;
-
-  auto* expr = MakeUnary(f.arena, TokenKind::kTildeAmp, MakeInt(f.arena, 5));
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 1u);
-}
-
-TEST(EvalOp, ReductionNor) {
-  SimFixture f;
-
-  auto* expr = MakeUnary(f.arena, TokenKind::kTildePipe, MakeInt(f.arena, 0));
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 1u);
-}
-
-TEST(EvalOp, ReductionXnorTildeCaret) {
-  SimFixture f;
-
-  auto* expr = MakeUnary(f.arena, TokenKind::kTildeCaret, MakeInt(f.arena, 3));
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 1u);
-}
-
-TEST(EvalOp, ReductionXnorCaretTilde) {
-  SimFixture f;
-
-  auto* expr = MakeUnary(f.arena, TokenKind::kCaretTilde, MakeInt(f.arena, 7));
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 0u);
-}
-
-TEST(EvalOp, ReductionAndZero) {
-  SimFixture f;
-
-  auto* expr = MakeUnary(f.arena, TokenKind::kAmp, MakeInt(f.arena, 0));
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 0u);
-}
-
 TEST(EvalOpXZ, ReductionAndWithZKnown0) {
   SimFixture f;
 
@@ -530,6 +441,239 @@ TEST(EvalOp, ReductionFirstStepWidthTwo) {
   EXPECT_EQ(EvalReduceToU64(f, TokenKind::kTildeAmp), 1u);
   EXPECT_EQ(EvalReduceToU64(f, TokenKind::kTildePipe), 0u);
   EXPECT_EQ(EvalReduceToU64(f, TokenKind::kTildeCaret), 0u);
+}
+
+// The following tests drive an operand that genuinely carries an x bit through
+// real source syntax (a 4-state based literal assigned into a logic vector),
+// then observe the reduction result end-to-end after lowering and running.
+// This exercises the Table 11-16/11-17/11-18 truth-table rules on unknown
+// operands through the production evaluation path, rather than hand-seeding a
+// 4-state variable state.
+
+// Reduction AND over 1..1x has no known 0 to force the result, so the unknown
+// bit propagates and the single-bit result is x (Table 11-16).
+TEST(OperatorSim, ReductionAndXOperandFullPipeline) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [3:0] v;\n"
+      "  logic r;\n"
+      "  initial begin\n"
+      "    v = 4'b111x;\n"
+      "    r = &v;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* r = f.ctx.FindVariable("r");
+  ASSERT_NE(r, nullptr);
+  EXPECT_FALSE(r->value.IsKnown());
+}
+
+// Reduction OR over 1..1x is pinned to 1 by the known 1 bit: the unknown is
+// absorbed and the result is a definite 1 (Table 11-17).
+TEST(OperatorSim, ReductionOrKnownOneAbsorbsXFullPipeline) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [3:0] v;\n"
+      "  logic r;\n"
+      "  initial begin\n"
+      "    v = 4'b100x;\n"
+      "    r = |v;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* r = f.ctx.FindVariable("r");
+  ASSERT_NE(r, nullptr);
+  EXPECT_TRUE(r->value.IsKnown());
+  EXPECT_EQ(r->value.ToUint64(), 1u);
+}
+
+// Reduction XOR sees any unknown bit and yields x regardless of the other bits
+// (Table 11-18).
+TEST(OperatorSim, ReductionXorXOperandFullPipeline) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [3:0] v;\n"
+      "  logic r;\n"
+      "  initial begin\n"
+      "    v = 4'b10x0;\n"
+      "    r = ^v;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* r = f.ctx.FindVariable("r");
+  ASSERT_NE(r, nullptr);
+  EXPECT_FALSE(r->value.IsKnown());
+}
+
+// Inverting an unknown reduction-AND result leaves it unknown: reduction NAND
+// of 1..1x stays x, confirming the invert step preserves x.
+TEST(OperatorSim, ReductionNandXOperandStaysXFullPipeline) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [3:0] v;\n"
+      "  logic r;\n"
+      "  initial begin\n"
+      "    v = 4'b111x;\n"
+      "    r = ~&v;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* r = f.ctx.FindVariable("r");
+  ASSERT_NE(r, nullptr);
+  EXPECT_FALSE(r->value.IsKnown());
+}
+
+// Reduction OR over an all-z operand yields x: z is treated as x by the logic
+// table, so with no known 1 the single-bit result is unknown.
+TEST(OperatorSim, ReductionOrZOperandFullPipeline) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [3:0] v;\n"
+      "  logic r;\n"
+      "  initial begin\n"
+      "    v = 4'bzzzz;\n"
+      "    r = |v;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* r = f.ctx.FindVariable("r");
+  ASSERT_NE(r, nullptr);
+  EXPECT_FALSE(r->value.IsKnown());
+}
+
+// Input form: an operand wider than one machine word (100 bits) forces the fold
+// to keep applying the operator across word boundaries. All 100 bits are 1, so
+// reduction AND is 1 and reduction XOR is 0 (an even number of set bits).
+TEST(OperatorSim, ReductionOverWideMultiWordOperand) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [99:0] v;\n"
+      "  logic r_and;\n"
+      "  logic r_xor;\n"
+      "  initial begin\n"
+      "    v = '1;\n"
+      "    r_and = &v;\n"
+      "    r_xor = ^v;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* r_and = f.ctx.FindVariable("r_and");
+  auto* r_xor = f.ctx.FindVariable("r_xor");
+  ASSERT_NE(r_and, nullptr);
+  ASSERT_NE(r_xor, nullptr);
+  EXPECT_EQ(r_and->value.ToUint64(), 1u);
+  EXPECT_EQ(r_xor->value.ToUint64(), 0u);
+}
+
+// Input form: a 2-state operand type (bit) can never carry x/z, so the result
+// is always a definite 0/1. AND of 4'b1011 is 0 (a bit is clear); XOR is 1
+// (an odd number of set bits).
+TEST(OperatorSim, ReductionOverTwoStateOperand) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  bit [3:0] v;\n"
+      "  logic r_and;\n"
+      "  logic r_xor;\n"
+      "  initial begin\n"
+      "    v = 4'b1011;\n"
+      "    r_and = &v;\n"
+      "    r_xor = ^v;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* r_and = f.ctx.FindVariable("r_and");
+  auto* r_xor = f.ctx.FindVariable("r_xor");
+  ASSERT_NE(r_and, nullptr);
+  ASSERT_NE(r_xor, nullptr);
+  EXPECT_TRUE(r_and->value.IsKnown());
+  EXPECT_EQ(r_and->value.ToUint64(), 0u);
+  EXPECT_TRUE(r_xor->value.IsKnown());
+  EXPECT_EQ(r_xor->value.ToUint64(), 1u);
+}
+
+// Input form: a single-bit operand. With only one bit there are no fold steps,
+// so every reduction just yields that bit's value (single operand -> single-bit
+// result). All three of AND/OR/XOR over 1'b1 are 1.
+TEST(OperatorSim, ReductionOverSingleBitOperand) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic v;\n"
+      "  logic r_and;\n"
+      "  logic r_or;\n"
+      "  logic r_xor;\n"
+      "  initial begin\n"
+      "    v = 1'b1;\n"
+      "    r_and = &v;\n"
+      "    r_or = |v;\n"
+      "    r_xor = ^v;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  EXPECT_EQ(f.ctx.FindVariable("r_and")->value.ToUint64(), 1u);
+  EXPECT_EQ(f.ctx.FindVariable("r_or")->value.ToUint64(), 1u);
+  EXPECT_EQ(f.ctx.FindVariable("r_xor")->value.ToUint64(), 1u);
+}
+
+// Syntactic position: the reduction drives a continuous assignment rather than
+// a procedural one. AND of an all-ones vector resolves the net to 1.
+TEST(OperatorSim, ReductionInContinuousAssign) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [3:0] a;\n"
+      "  logic y;\n"
+      "  assign y = &a;\n"
+      "  initial a = 4'b1111;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* y = f.ctx.FindVariable("y");
+  ASSERT_NE(y, nullptr);
+  EXPECT_EQ(y->value.ToUint64(), 1u);
+}
+
+// Dependency (value parameter, §6.20.2): the reduced operand is produced by a
+// real parameter declaration, driven end-to-end. XOR of 4'b1110 is 1 (an odd
+// number of set bits).
+TEST(OperatorSim, ReductionOverParameterOperand) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  parameter [3:0] P = 4'b1110;\n"
+      "  logic r;\n"
+      "  initial r = ^P;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* r = f.ctx.FindVariable("r");
+  ASSERT_NE(r, nullptr);
+  EXPECT_EQ(r->value.ToUint64(), 1u);
 }
 
 }  // namespace
