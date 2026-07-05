@@ -179,4 +179,48 @@ TEST(IntegralIndexAssocArrayElaboration, IntegerIndexExprLegal) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §7.8.4: the illegal-implicit-cast rule covers a real *literal* index, not
+// only a real-typed variable — a distinct input form that reaches the check by
+// literal kind rather than by variable type.
+TEST(IntegralIndexAssocArrayElaboration, RealLiteralIndexIllegal) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  int map[int];\n"
+      "  initial map[3.7] = 1;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// §7.8.4: the prohibition applies wherever the array is indexed, including a
+// read (an index select on the right-hand side), not just a write target.
+TEST(IntegralIndexAssocArrayElaboration, RealIndexInReadPositionIllegal) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  int map[int];\n"
+      "  real r;\n"
+      "  int x;\n"
+      "  initial x = map[r];\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// §7.8.4: only the *implicit* cast from real is illegal. An explicit cast of a
+// real value to an integral type (§6.24.1) yields an integral index and is
+// legal, so wrapping the real operand in int'(...) defeats the prohibition.
+TEST(IntegralIndexAssocArrayElaboration, ExplicitRealCastIndexLegal) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  int map[int];\n"
+      "  real r;\n"
+      "  initial map[int'(r)] = 1;\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace
