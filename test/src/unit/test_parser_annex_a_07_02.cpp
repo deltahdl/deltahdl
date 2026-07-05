@@ -158,6 +158,91 @@ TEST_F(SpecifyTest, FullPathDescriptionInputOutputLists) {
   EXPECT_EQ(p->dst_ports.size(), 2u);
 }
 
+// --- Terminal-descriptor input forms consumed by the path descriptions.
+// parallel_path_description / full_path_description reference
+// specify_input/output_terminal_descriptor (§A.7.3); each descriptor may be a
+// plain identifier, a bit-/part-select, or an interface.port reference. Build
+// each from real source syntax and confirm the §A.7.2 path production accepts
+// and records it. ---
+
+// A parallel path whose input and output terminals are bit-selects.
+TEST_F(SpecifyTest, ParallelPathBitSelectTerminals) {
+  auto* cu = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (a[2] => b[2]) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_FALSE(diag_.HasErrors());
+  const auto* p = FirstPathDecl(FirstSpecifyBlock(cu));
+  ASSERT_NE(p, nullptr);
+  EXPECT_EQ(p->path_kind, SpecifyPathKind::kParallel);
+  ASSERT_EQ(p->src_ports.size(), 1u);
+  ASSERT_EQ(p->dst_ports.size(), 1u);
+  EXPECT_EQ(p->src_ports[0].name, "a");
+  EXPECT_EQ(p->src_ports[0].range_kind, SpecifyRangeKind::kBitSelect);
+  EXPECT_EQ(p->dst_ports[0].range_kind, SpecifyRangeKind::kBitSelect);
+}
+
+// A full path whose terminals are part-selects.
+TEST_F(SpecifyTest, FullPathPartSelectTerminals) {
+  auto* cu = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (a[3:0] *> b[3:0]) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_FALSE(diag_.HasErrors());
+  const auto* p = FirstPathDecl(FirstSpecifyBlock(cu));
+  ASSERT_NE(p, nullptr);
+  EXPECT_EQ(p->path_kind, SpecifyPathKind::kFull);
+  ASSERT_EQ(p->src_ports.size(), 1u);
+  ASSERT_EQ(p->dst_ports.size(), 1u);
+  EXPECT_EQ(p->src_ports[0].range_kind, SpecifyRangeKind::kPartSelect);
+  EXPECT_EQ(p->dst_ports[0].range_kind, SpecifyRangeKind::kPartSelect);
+}
+
+// A path whose terminals are interface.port references (the
+// interface_identifier '.' port_identifier form of input/output_identifier).
+TEST_F(SpecifyTest, PathInterfacePortTerminals) {
+  auto* cu = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (bus.d => bus.q) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_FALSE(diag_.HasErrors());
+  const auto* p = FirstPathDecl(FirstSpecifyBlock(cu));
+  ASSERT_NE(p, nullptr);
+  EXPECT_EQ(p->path_kind, SpecifyPathKind::kParallel);
+  ASSERT_EQ(p->src_ports.size(), 1u);
+  ASSERT_EQ(p->dst_ports.size(), 1u);
+  EXPECT_EQ(p->src_ports[0].interface_name, "bus");
+  EXPECT_EQ(p->src_ports[0].name, "d");
+  EXPECT_EQ(p->dst_ports[0].interface_name, "bus");
+  EXPECT_EQ(p->dst_ports[0].name, "q");
+}
+
+// --- '= path_delay_value' input forms. A simple_path_declaration binds a
+// path_delay_value (§A.7.4), which may be a single expression or a
+// parenthesized list of expressions. The single-value form is covered above;
+// here the parenthesized multi-value list is built from real syntax and each
+// delay expression is recorded. ---
+
+TEST_F(SpecifyTest, SimplePathMultiValueDelay) {
+  auto* cu = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (a => b) = (3, 4, 5);\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_FALSE(diag_.HasErrors());
+  const auto* p = FirstPathDecl(FirstSpecifyBlock(cu));
+  ASSERT_NE(p, nullptr);
+  EXPECT_EQ(p->path_kind, SpecifyPathKind::kParallel);
+  EXPECT_EQ(p->delays.size(), 3u);
+}
+
 // --- polarity_operator ::= + | - (optional before '=>'/'*>'). ---
 
 TEST_F(SpecifyTest, PolarityOperatorPositiveParallel) {
