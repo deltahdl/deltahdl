@@ -213,44 +213,6 @@ TEST(StringDataType, IntegralCastToStringZeroPadsThenStripsZeros) {
   EXPECT_EQ(VecToStr(s2->value), "\nA");
 }
 
-TEST(StringDataType, StringConcatenationProducesStringResult) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  string a, b, c;\n"
-      "  initial begin\n"
-      "    a = \"foo\";\n"
-      "    b = \"bar\";\n"
-      "    c = {a, b};\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* c = f.ctx.FindVariable("c");
-  ASSERT_NE(c, nullptr);
-  EXPECT_EQ(VecToStr(c->value), "foobar");
-}
-
-TEST(StringDataType, StringReplicationOperator) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  string s;\n"
-      "  initial s = {3{\"ab\"}};\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* s = f.ctx.FindVariable("s");
-  ASSERT_NE(s, nullptr);
-  EXPECT_EQ(VecToStr(s->value), "ababab");
-}
-
 TEST(StringDataType, DefaultStringVariableIndexingReturnsZero) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -550,6 +512,75 @@ TEST(StringDataType, StringIndexLeftmostAndRightmostFromSource) {
   ASSERT_NE(last, nullptr);
   EXPECT_EQ(first->value.ToUint64() & 0xFFu, 0x68u);
   EXPECT_EQ(last->value.ToUint64() & 0xFFu, 0x6Fu);
+}
+
+// §6.16: a string variable declared without an initializer is initialized to
+// the empty string "", which has zero length. Observed end to end by comparing
+// the freshly declared (uninitialized) variable against the empty-string
+// literal with the Table 6-9 equality operator; a default of "" yields 1.
+TEST(StringDataType, UninitializedStringDefaultsToEmpty) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  string s;\n"
+      "  logic r;\n"
+      "  initial r = (s == \"\");\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* r = f.ctx.FindVariable("r");
+  ASSERT_NE(r, nullptr);
+  EXPECT_EQ(r->value.ToUint64(), 1u);
+}
+
+// §6.16: a string variable's declaration initializer may be a string data type
+// expression, not only a bare string literal or "". Here the initializer is a
+// concatenation of string literals in the declaration position (a distinct code
+// path from a procedural assignment); assigned to the string target it is
+// implicitly converted and the variable is initialized to the joined value.
+TEST(StringDataType, StringExpressionInitializer) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  string s = {\"foo\", \"bar\"};\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* s = f.ctx.FindVariable("s");
+  ASSERT_NE(s, nullptr);
+  EXPECT_EQ(VecToStr(s->value), "foobar");
+}
+
+// §6.16, Table 6-9 (comparison row): a relational operator admits a string-type
+// operand on one side and a string literal on the other, with the literal
+// implicitly converted to string for the comparison. This covers the mixed
+// string-variable/string-literal input form for a relational operator (the
+// equality operator's mixed form is covered separately); "abc" < "abd" is true.
+TEST(StringDataType, RelationalLessThanWithStringLiteralOperand) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  string a;\n"
+      "  logic r;\n"
+      "  initial begin\n"
+      "    a = \"abc\";\n"
+      "    r = (a < \"abd\");\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* r = f.ctx.FindVariable("r");
+  ASSERT_NE(r, nullptr);
+  EXPECT_EQ(r->value.ToUint64(), 1u);
 }
 
 }  // namespace

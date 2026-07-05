@@ -13,29 +13,6 @@ using namespace delta;
 
 namespace {
 
-TEST(StringConcatAndReplication, StringConcatValue) {
-  SimFixture f;
-  MakeStringVar(f, "s1", "hello");
-  MakeStringVar(f, "s2", " world");
-  auto* concat = f.arena.Create<Expr>();
-  concat->kind = ExprKind::kConcatenation;
-  concat->elements.push_back(MakeId(f.arena, "s1"));
-  concat->elements.push_back(MakeId(f.arena, "s2"));
-  auto result = EvalExpr(concat, f.ctx, f.arena);
-  EXPECT_EQ(VecToStr(result), "hello world");
-}
-
-TEST(StringConcatAndReplication, StringReplicateValue) {
-  SimFixture f;
-  MakeStringVar(f, "sr", "ab");
-  auto* repl = f.arena.Create<Expr>();
-  repl->kind = ExprKind::kReplicate;
-  repl->repeat_count = MakeInt(f.arena, 3);
-  repl->elements.push_back(MakeId(f.arena, "sr"));
-  auto result = EvalExpr(repl, f.ctx, f.arena);
-  EXPECT_EQ(VecToStr(result), "ababab");
-}
-
 TEST(StringConcatAndReplication, StringConcatSetsIsString) {
   SimFixture f;
   MakeStringVar(f, "sa", "hi");
@@ -206,6 +183,57 @@ TEST(StringConcatAndReplication, EndToEndNonConstantMultiplier) {
   auto* var = f.ctx.FindVariable("s");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(VecToStr(var->value), "boo boo boo ");
+}
+
+// §11.4.12.2: when any operand of a concatenation is of type string, every
+// other operand is implicitly converted to the string data type (per §6.16).
+// Here a genuine integral (byte) variable is concatenated onto a string
+// variable through the full pipeline, so the CONVERSION of the non-string
+// operand is observed by value ("hi" + byte 'X' -> "hiX"), not merely the
+// string-typing of the result.
+TEST(StringConcatAndReplication, EndToEndIntegralOperandConvertedToString) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  string s;\n"
+      "  byte b;\n"
+      "  initial begin\n"
+      "    s = \"hi\";\n"
+      "    b = \"X\";\n"
+      "    s = {s, b};\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("s");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(VecToStr(var->value), "hiX");
+}
+
+// §11.4.12.2: a string replication accepts a non-constant multiplier, but a
+// constant multiplier is equally valid and takes a different code path than a
+// runtime variable — the count is folded from a parameter during elaboration
+// rather than read at run time. Here the multiplier is a module parameter, the
+// constant-expression form distinct from the literal and int-variable forms.
+TEST(StringConcatAndReplication, EndToEndParameterMultiplierReplication) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  parameter P = 3;\n"
+      "  string s;\n"
+      "  initial s = {P{\"ab\"}};\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("s");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(VecToStr(var->value), "ababab");
 }
 
 TEST(StringConcatAndReplication, EndToEndThreeStringConcat) {
