@@ -81,21 +81,6 @@ TEST(ClockingBlockParse, NegedgeClockEvent) {
   EXPECT_EQ(item->clocking_event[0].edge, Edge::kNegedge);
 }
 
-TEST(ClockingBlockParse, SingleSignalDecl) {
-  auto r = Parse(
-      "module m;\n"
-      "  clocking cb @(posedge clk);\n"
-      "    input data;\n"
-      "  endclocking\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FindClockingBlockByIndex(r);
-  ASSERT_NE(item, nullptr);
-  ASSERT_EQ(item->clocking_signals.size(), 1u);
-  EXPECT_EQ(item->clocking_signals[0].name, "data");
-}
-
 TEST(ClockingBlockParse, BusExampleFullDecl) {
   auto r = Parse(
       "module t;\n"
@@ -126,23 +111,6 @@ TEST(ClockingBlockParse, BusExampleFullDecl) {
   EXPECT_EQ(item->clocking_signals[4].direction, Direction::kInput);
 }
 
-TEST(ClockingBlockParse, MultipleSignalDeclCommaSeparated) {
-  auto r = Parse(
-      "module m;\n"
-      "  clocking cb @(posedge clk);\n"
-      "    input a, b, c;\n"
-      "  endclocking\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FindClockingBlockByIndex(r);
-  ASSERT_NE(item, nullptr);
-  ASSERT_EQ(item->clocking_signals.size(), 3u);
-  EXPECT_EQ(item->clocking_signals[0].name, "a");
-  EXPECT_EQ(item->clocking_signals[1].name, "b");
-  EXPECT_EQ(item->clocking_signals[2].name, "c");
-}
-
 TEST(ClockingBlockParse, BareSignalNoHierExpr) {
   auto r = Parse(
       "module m;\n"
@@ -157,20 +125,6 @@ TEST(ClockingBlockParse, BareSignalNoHierExpr) {
   ASSERT_EQ(item->clocking_signals.size(), 1u);
   EXPECT_EQ(item->clocking_signals[0].name, "data");
   EXPECT_EQ(item->clocking_signals[0].hier_expr, nullptr);
-}
-
-TEST(ClockingBlockParse, InoutSignalParsed) {
-  auto r = Parse(
-      "module m;\n"
-      "  clocking cb @(posedge clk);\n"
-      "    inout data;\n"
-      "  endclocking\n"
-      "endmodule\n");
-  ModuleItem* item = nullptr;
-  ASSERT_NO_FATAL_FAILURE(GetClockingBlockChecked(r, item));
-  ASSERT_EQ(item->clocking_signals.size(), 1u);
-  EXPECT_EQ(item->clocking_signals[0].direction, Direction::kInout);
-  EXPECT_EQ(item->clocking_signals[0].name, "data");
 }
 
 TEST(ClockingBlockParse, BasicDeclWithInputOutput) {
@@ -229,25 +183,6 @@ TEST(ClockingBlockParse, BareIdentifierEvent) {
   EXPECT_EQ(item->clocking_event[0].edge, Edge::kNone);
 }
 
-TEST(ClockingBlockParse, AllThreeDirections) {
-  auto r = Parse(
-      "module t;\n"
-      "  clocking cb @(posedge clk);\n"
-      "    input data_in;\n"
-      "    output data_out;\n"
-      "    inout bidir;\n"
-      "  endclocking\n"
-      "endmodule\n");
-  ModuleItem* item = nullptr;
-  ASSERT_NO_FATAL_FAILURE(GetClockingBlockChecked(r, item));
-
-  VerifyClockingSignalDirections(item, {
-                                           {Direction::kInput, "data_in"},
-                                           {Direction::kOutput, "data_out"},
-                                           {Direction::kInout, "bidir"},
-                                       });
-}
-
 TEST(ClockingBlockParse, MultipleSignalsSameDirectionList) {
   auto r = Parse(
       "module t;\n"
@@ -282,23 +217,6 @@ TEST(ClockingBlockParse, PropertyDeclInsideBlock) {
   auto* item = FindClockingBlockByIndex(r);
   ASSERT_NE(item, nullptr);
   ASSERT_EQ(item->clocking_signals.size(), 1u);
-}
-
-TEST(ClockingBlockParse, PlainNamedDecl) {
-  auto r = Parse(
-      "module m;\n"
-      "  clocking cb @(posedge clk);\n"
-      "    input data;\n"
-      "  endclocking\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FindClockingBlockByIndex(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kClockingBlock);
-  EXPECT_EQ(item->name, "cb");
-  EXPECT_FALSE(item->is_default_clocking);
-  EXPECT_FALSE(item->is_global_clocking);
 }
 
 TEST(ClockingBlockParse, EndLabelMatches) {
@@ -343,22 +261,6 @@ TEST(ClockingBlockParse, EventParenthesizedPosedge) {
   ASSERT_NE(item, nullptr);
   ASSERT_EQ(item->clocking_event.size(), 1u);
   EXPECT_EQ(item->clocking_event[0].edge, Edge::kPosedge);
-}
-
-TEST(ClockingBlockParse, InputDirection) {
-  auto r = Parse(
-      "module m;\n"
-      "  clocking cb @(posedge clk);\n"
-      "    input data;\n"
-      "  endclocking\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FindClockingBlockByIndex(r);
-  ASSERT_NE(item, nullptr);
-  ASSERT_EQ(item->clocking_signals.size(), 1u);
-  EXPECT_EQ(item->clocking_signals[0].direction, Direction::kInput);
-  EXPECT_EQ(item->clocking_signals[0].name, "data");
 }
 
 TEST(ClockingBlockParse, MultipleBlocksInModule) {
@@ -432,24 +334,6 @@ TEST(ClockingBlockParse, BlockAmongOtherModuleItems) {
   ASSERT_GE(r.cu->modules[0]->items.size(), 4u);
 }
 
-TEST(ClockingBlockParse, MinimalSingleInput) {
-  auto r = Parse(
-      "module m;\n"
-      "  clocking bus @(posedge clk);\n"
-      "    input addr;\n"
-      "  endclocking\n"
-      "endmodule\n");
-  ModuleItem* item = nullptr;
-  ASSERT_NO_FATAL_FAILURE(GetClockingBlockChecked(r, item));
-  EXPECT_EQ(item->kind, ModuleItemKind::kClockingBlock);
-  EXPECT_EQ(item->name, "bus");
-  ASSERT_EQ(item->clocking_event.size(), 1u);
-  EXPECT_EQ(item->clocking_event[0].edge, Edge::kPosedge);
-  ASSERT_EQ(item->clocking_signals.size(), 1u);
-  EXPECT_EQ(item->clocking_signals[0].direction, Direction::kInput);
-  EXPECT_EQ(item->clocking_signals[0].name, "addr");
-}
-
 TEST(ClockingBlockParse, EdgeKeywordAsSkewEdge) {
   auto r = Parse(
       "module m;\n"
@@ -483,21 +367,6 @@ TEST(ClockingBlockParse, EmptyBodyAccepted) {
               "  clocking cb @(posedge clk);\n"
               "  endclocking\n"
               "endmodule\n"));
-}
-
-TEST(ClockingBlockParse, InputOutputCombinedDirection) {
-  auto r = Parse(
-      "module m;\n"
-      "  clocking cb @(posedge clk);\n"
-      "    input #2 output #4 data;\n"
-      "  endclocking\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FindClockingBlockByIndex(r);
-  ASSERT_NE(item, nullptr);
-  ASSERT_EQ(item->clocking_signals.size(), 1u);
-  EXPECT_EQ(item->clocking_signals[0].direction, Direction::kInout);
 }
 
 TEST(ClockingSkewParse, CombinedInputOutputSkewDelays) {
@@ -534,27 +403,6 @@ TEST(ClockingSkewParse, InputAndOutputNumericSkews) {
   ASSERT_NE(item->clocking_signals[0].skew_delay, nullptr);
   EXPECT_EQ(item->clocking_signals[1].direction, Direction::kOutput);
   ASSERT_NE(item->clocking_signals[1].skew_delay, nullptr);
-}
-
-TEST(ClockingSkewParse, OneStepInClockingBlock) {
-  auto r = Parse(
-      "module m;\n"
-      "  clocking cb @(posedge clk);\n"
-      "    input #1step a;\n"
-      "  endclocking\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-  auto* mod = r.cu->modules[0];
-
-  ModuleItem* clk_item = nullptr;
-  for (auto* item : mod->items) {
-    if (item->kind == ModuleItemKind::kClockingBlock) {
-      clk_item = item;
-      break;
-    }
-  }
-  ASSERT_NE(clk_item, nullptr);
 }
 
 TEST(ClockingSkewParse, OutputNegedgeWithDelay) {
@@ -610,23 +458,6 @@ TEST(ClockingSkewParse, DelayOnlyNoEdge) {
   EXPECT_EQ(sig.skew_delay->kind, ExprKind::kIntegerLiteral);
 }
 
-TEST(ClockingSkewParse, EdgeAndDelayTogether) {
-  auto r = Parse(
-      "module m;\n"
-      "  clocking cb @(posedge clk);\n"
-      "    output negedge #1 ack;\n"
-      "  endclocking\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FindClockingBlockByIndex(r);
-  ASSERT_NE(item, nullptr);
-  ASSERT_EQ(item->clocking_signals.size(), 1u);
-  auto& sig = item->clocking_signals[0];
-  EXPECT_EQ(sig.skew_edge, Edge::kNegedge);
-  ASSERT_NE(sig.skew_delay, nullptr);
-}
-
 TEST(ClockingSkewParse, OneStepDelayText) {
   auto r = Parse(
       "module m;\n"
@@ -642,23 +473,6 @@ TEST(ClockingSkewParse, OneStepDelayText) {
   auto& sig = item->clocking_signals[0];
   ASSERT_NE(sig.skew_delay, nullptr);
   EXPECT_EQ(sig.skew_delay->text, "1step");
-}
-
-TEST(ClockingSkewParse, NonzeroInputSkew) {
-  auto r = Parse(
-      "module m;\n"
-      "  clocking cb @(posedge clk);\n"
-      "    input #3 addr;\n"
-      "  endclocking\n"
-      "endmodule\n");
-  ModuleItem* item = nullptr;
-  ASSERT_NO_FATAL_FAILURE(GetClockingBlockChecked(r, item));
-  ASSERT_EQ(item->clocking_signals.size(), 1u);
-  auto& sig = item->clocking_signals[0];
-  EXPECT_EQ(sig.direction, Direction::kInput);
-  EXPECT_EQ(sig.name, "addr");
-  ASSERT_NE(sig.skew_delay, nullptr);
-  EXPECT_EQ(sig.skew_delay->kind, ExprKind::kIntegerLiteral);
 }
 
 TEST(ClockingSkewParse, InputEdgeAndDelayNoOutput) {
@@ -712,33 +526,6 @@ TEST(ClockingSkewParse, OutputNegedgeEdgeOnly) {
   EXPECT_EQ(sig.skew_edge, Edge::kNegedge);
 }
 
-TEST(ClockingSkewParse, CombinedInputOutputVerified) {
-  auto r = Parse(
-      "module t;\n"
-      "  clocking cb @(posedge clk);\n"
-      "    input #2 output #4 cmd;\n"
-      "  endclocking\n"
-      "endmodule\n");
-  ModuleItem* item = nullptr;
-  ASSERT_NO_FATAL_FAILURE(GetClockingBlockChecked(r, item));
-  ASSERT_EQ(item->clocking_signals.size(), 1u);
-  auto& sig = item->clocking_signals[0];
-  EXPECT_EQ(sig.direction, Direction::kInout);
-  EXPECT_EQ(sig.name, "cmd");
-  EXPECT_NE(sig.skew_delay, nullptr);
-  EXPECT_NE(sig.out_skew_delay, nullptr);
-}
-
-TEST(ClockingSkewParse, TimeUnitSuffix) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  clocking dram @(clk);\n"
-              "    input #1ps address;\n"
-              "    input #5 output #6 data;\n"
-              "  endclocking\n"
-              "endmodule\n"));
-}
-
 TEST(ClockingSkewParse, OneStepWithHierExpr) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -765,32 +552,6 @@ TEST(ClockingSkewParse, MixedTimeUnitSuffix) {
               "    input enable;\n"
               "  endclocking\n"
               "endmodule\n"));
-}
-
-TEST(ClockingSkewParse, InputSkewDelayFields) {
-  auto r = Parse(
-      "module m;\n"
-      "  clocking cb @(posedge clk);\n"
-      "    input #2 data;\n"
-      "  endclocking\n"
-      "endmodule\n");
-  ModuleItem* item = nullptr;
-  ASSERT_NO_FATAL_FAILURE(GetClockingBlockChecked(r, item));
-  ASSERT_EQ(item->clocking_signals.size(), 1u);
-  auto& sig = item->clocking_signals[0];
-  ASSERT_NE(sig.skew_delay, nullptr);
-
-  struct {
-    bool ok;
-    const char* label;
-  } const kChecks[] = {
-      {sig.direction == Direction::kInput, "direction"},
-      {sig.name == "data", "name"},
-      {sig.skew_delay->kind == ExprKind::kIntegerLiteral, "skew_delay_kind"},
-  };
-  for (const auto& c : kChecks) {
-    EXPECT_TRUE(c.ok) << c.label;
-  }
 }
 
 TEST(ClockingSkewParse, ExplicitZeroOutputSkew) {
@@ -826,21 +587,6 @@ TEST(ClockingSkewParse, DramExampleFromSpec) {
   EXPECT_EQ(item->clocking_signals[0].direction, Direction::kInput);
   EXPECT_EQ(item->clocking_signals[1].name, "data");
   EXPECT_EQ(item->clocking_signals[1].direction, Direction::kInout);
-}
-
-TEST(ClockingSkewParse, OneStepDelayStructure) {
-  auto r = Parse(
-      "module m;\n"
-      "  clocking cb @(posedge clk);\n"
-      "    input #1step data;\n"
-      "  endclocking\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FindClockingBlockByIndex(r);
-  ASSERT_NE(item, nullptr);
-  ASSERT_EQ(item->clocking_signals.size(), 1u);
-  EXPECT_NE(item->clocking_signals[0].skew_delay, nullptr);
 }
 
 TEST(ClockingSkewParse, InputSkewMultipleSignals) {
@@ -890,6 +636,253 @@ TEST(ClockingSkewParse, DefaultOutputSkew) {
   ASSERT_NE(item, nullptr);
   ASSERT_GE(item->clocking_signals.size(), 1u);
   EXPECT_EQ(item->clocking_signals[0].name, "ack");
+}
+
+// clocking_declaration second alternative: `global clocking [id] event ;
+// endclocking`. The global form carries no clocking_item body, so no signals
+// are recorded and the global flag is set.
+TEST(ClockingBlockParse, GlobalClockingDeclaration) {
+  auto r = Parse(
+      "module m;\n"
+      "  global clocking gclk @(posedge clk);\n"
+      "  endclocking\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FindClockingBlockByIndex(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_TRUE(item->is_global_clocking);
+  EXPECT_FALSE(item->is_default_clocking);
+  EXPECT_EQ(item->name, "gclk");
+  EXPECT_EQ(item->clocking_signals.size(), 0u);
+}
+
+// clocking_declaration first alternative with the optional `default` prefix and
+// a clocking_event: `default clocking [id] event ; { clocking_item }
+// endclocking`. Distinct from the bodyless `default clocking id ;` form.
+TEST(ClockingBlockParse, DefaultClockingWithEvent) {
+  auto r = Parse(
+      "module m;\n"
+      "  default clocking cb @(posedge clk);\n"
+      "    input data;\n"
+      "  endclocking\n"
+      "endmodule\n");
+  ModuleItem* item = nullptr;
+  ASSERT_NO_FATAL_FAILURE(GetClockingBlockChecked(r, item));
+  EXPECT_TRUE(item->is_default_clocking);
+  EXPECT_FALSE(item->is_global_clocking);
+  EXPECT_EQ(item->name, "cb");
+  ASSERT_EQ(item->clocking_signals.size(), 1u);
+  EXPECT_EQ(item->clocking_signals[0].name, "data");
+}
+
+// Negative: clocking_declaration requires a clocking_event after the (optional)
+// identifier for a non-default block. A bare `clocking id ;` has no event and
+// must be rejected.
+TEST(ClockingBlockParse, MissingClockingEventRejected) {
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb;\n"
+      "    input data;\n"
+      "  endclocking\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+// clocking_drive ::= clockvar_expression <= [ cycle_delay ] expression.
+// Without a cycle_delay the drive is a nonblocking assignment whose lvalue is a
+// clockvar_expression (`cb.data`, a member access), with no cycle delay set.
+TEST(ClockingDriveParse, DriveWithoutCycleDelay) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial cb.data <= 8'hFF;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* s = FirstInitialStmt(r);
+  ASSERT_NE(s, nullptr);
+  EXPECT_EQ(s->kind, StmtKind::kNonblockingAssign);
+  ASSERT_NE(s->lhs, nullptr);
+  EXPECT_EQ(s->lhs->kind, ExprKind::kMemberAccess);
+  EXPECT_EQ(s->cycle_delay, nullptr);
+}
+
+// cycle_delay ::= ## integral_number. The `##2` before the expression records
+// an integer-literal cycle delay on the drive.
+TEST(ClockingDriveParse, DriveWithCycleDelayInteger) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial cb.data <= ##2 8'hFF;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* s = FirstInitialStmt(r);
+  ASSERT_NE(s, nullptr);
+  EXPECT_EQ(s->kind, StmtKind::kNonblockingAssign);
+  ASSERT_NE(s->cycle_delay, nullptr);
+  EXPECT_EQ(s->cycle_delay->kind, ExprKind::kIntegerLiteral);
+}
+
+// cycle_delay ::= ## identifier. The delay may name a constant instead of a
+// literal, e.g. `##n`.
+TEST(ClockingDriveParse, DriveWithCycleDelayIdentifier) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial cb.data <= ##n 8'hFF;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* s = FirstInitialStmt(r);
+  ASSERT_NE(s, nullptr);
+  ASSERT_NE(s->cycle_delay, nullptr);
+  EXPECT_EQ(s->cycle_delay->kind, ExprKind::kIdentifier);
+}
+
+// cycle_delay ::= ## ( expression ). A parenthesized expression delay, e.g.
+// `##(a + 1)`, parses to the enclosed expression tree.
+TEST(ClockingDriveParse, DriveWithCycleDelayParenExpr) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial cb.data <= ##(a + 1) 8'hFF;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* s = FirstInitialStmt(r);
+  ASSERT_NE(s, nullptr);
+  ASSERT_NE(s->cycle_delay, nullptr);
+  EXPECT_EQ(s->cycle_delay->kind, ExprKind::kBinary);
+}
+
+// clockvar_expression ::= clockvar select. A bit-select applied to the clockvar
+// (`cb.data[3]`) makes the drive lvalue a select over the member access.
+TEST(ClockingDriveParse, ClockvarExpressionWithSelect) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial cb.data[3] <= 1'b1;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* s = FirstInitialStmt(r);
+  ASSERT_NE(s, nullptr);
+  EXPECT_EQ(s->kind, StmtKind::kNonblockingAssign);
+  ASSERT_NE(s->lhs, nullptr);
+  EXPECT_EQ(s->lhs->kind, ExprKind::kSelect);
+}
+
+// clocking_declaration: the clocking_identifier is optional. An anonymous
+// clocking block (no name before the event) is accepted and records an empty
+// name.
+TEST(ClockingBlockParse, AnonymousClockingBlock) {
+  auto r = Parse(
+      "module m;\n"
+      "  clocking @(posedge clk);\n"
+      "    input data;\n"
+      "  endclocking\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FindClockingBlockByIndex(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_TRUE(item->name.empty());
+  EXPECT_FALSE(item->is_global_clocking);
+  ASSERT_EQ(item->clocking_signals.size(), 1u);
+  EXPECT_EQ(item->clocking_signals[0].name, "data");
+}
+
+// clocking_declaration second alternative: the clocking_identifier is likewise
+// optional for `global clocking`.
+TEST(ClockingBlockParse, AnonymousGlobalClocking) {
+  auto r = Parse(
+      "module m;\n"
+      "  global clocking @(posedge clk);\n"
+      "  endclocking\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FindClockingBlockByIndex(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_TRUE(item->is_global_clocking);
+  EXPECT_TRUE(item->name.empty());
+}
+
+// clocking_item third alternative admits an assertion_item_declaration; a
+// sequence declaration is one such input form.
+TEST(ClockingBlockParse, SequenceDeclInsideBlock) {
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    input a, b;\n"
+      "    sequence s;\n"
+      "      a ##1 b;\n"
+      "    endsequence\n"
+      "  endclocking\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FindClockingBlockByIndex(r);
+  ASSERT_NE(item, nullptr);
+  ASSERT_EQ(item->clocking_signals.size(), 2u);
+}
+
+// clocking_item third alternative: a let declaration is also a valid
+// assertion_item_declaration inside a clocking block.
+TEST(ClockingBlockParse, LetDeclInsideBlock) {
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    input data;\n"
+      "    let val = 42;\n"
+      "  endclocking\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FindClockingBlockByIndex(r);
+  ASSERT_NE(item, nullptr);
+  ASSERT_EQ(item->clocking_signals.size(), 1u);
+}
+
+// clocking_item third alternative: the assertion_item_declaration may be
+// preceded by attribute_instance(s).
+TEST(ClockingBlockParse, AttributedAssertionItemInBlock) {
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    input data;\n"
+      "    (* foo *) property p;\n"
+      "      data;\n"
+      "    endproperty\n"
+      "  endclocking\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FindClockingBlockByIndex(r);
+  ASSERT_NE(item, nullptr);
+  ASSERT_EQ(item->clocking_signals.size(), 1u);
+}
+
+// Negative: {attribute_instance} is grammatical only before the
+// assertion_item_declaration alternative of clocking_item, not before a
+// clocking_direction, so an attributed signal direction is rejected.
+TEST(ClockingBlockParse, AttributeBeforeDirectionRejected) {
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    (* foo *) input data;\n"
+      "  endclocking\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+// Negative: the inout alternative of clocking_direction admits no
+// clocking_skew, so a skew before an inout signal is rejected.
+TEST(ClockingBlockParse, InoutWithSkewRejected) {
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    inout #1 data;\n"
+      "  endclocking\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
 }
 
 }  // namespace
