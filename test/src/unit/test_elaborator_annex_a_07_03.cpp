@@ -117,6 +117,24 @@ TEST(SpecifyTerminalElaboration, RefPortRejectedAsOutputIdentifier) {
   EXPECT_TRUE(f.has_errors);
 }
 
+// The first alternative of each production — input_identifier ::=
+// input_port_identifier and output_identifier ::= output_port_identifier — must
+// be *accepted*. Prior tests only exercised the inout alternative and the
+// direction negatives; this observes a clean pass where a plain input port is
+// taken as a path source and a plain output port as a path destination.
+TEST(SpecifyTerminalElaboration, PlainInputAndOutputPortsAcceptedAsTerminals) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m(input i, output o);\n"
+      "  specify\n"
+      "    (i => o) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 TEST(SpecifyTerminalElaboration, InterfacePortFormElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(

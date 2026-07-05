@@ -371,6 +371,100 @@ TEST(SpecifyTerminalParsing, OutputIdentifierInterfaceForm) {
   EXPECT_EQ(si->path.dst_ports[0].name, "x");
 }
 
+// specify_input_terminal_descriptor ::= input_identifier [[
+// constant_range_expression ]] admits the interface_identifier.port_identifier
+// alternative of input_identifier *combined with* a range. The interface-form
+// and range sub-forms were only ever exercised separately; this checks the
+// descriptor captures both at once.
+TEST(SpecifyTerminalParsing, InputIdentifierInterfaceFormWithPartSelect) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (bus.a[3:0] => b) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* si = GetSolePathItem(r);
+  ASSERT_NE(si, nullptr);
+  ASSERT_EQ(si->path.src_ports.size(), 1u);
+  EXPECT_EQ(si->path.src_ports[0].interface_name, "bus");
+  EXPECT_EQ(si->path.src_ports[0].name, "a");
+  EXPECT_EQ(si->path.src_ports[0].range_kind, SpecifyRangeKind::kPartSelect);
+  EXPECT_NE(si->path.src_ports[0].range_left, nullptr);
+  EXPECT_NE(si->path.src_ports[0].range_right, nullptr);
+}
+
+// specify_output_terminal_descriptor ::= output_identifier [[
+// constant_range_expression ]] admits the interface_identifier.port_identifier
+// form combined with a bit-select.
+TEST(SpecifyTerminalParsing, OutputIdentifierInterfaceFormWithBitSelect) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (a => bus.x[2]) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* si = GetSolePathItem(r);
+  ASSERT_NE(si, nullptr);
+  ASSERT_EQ(si->path.dst_ports.size(), 1u);
+  EXPECT_EQ(si->path.dst_ports[0].interface_name, "bus");
+  EXPECT_EQ(si->path.dst_ports[0].name, "x");
+  EXPECT_EQ(si->path.dst_ports[0].range_kind, SpecifyRangeKind::kBitSelect);
+  EXPECT_NE(si->path.dst_ports[0].range_left, nullptr);
+  EXPECT_EQ(si->path.dst_ports[0].range_right, nullptr);
+}
+
+// specify_input_terminal_descriptor ::= input_identifier [[
+// constant_range_expression ]]. The range bounds are constant *expressions*,
+// not just literals — a parameter reference embedded in an expression bound
+// takes the identifier branch of the expression parser, distinct from the
+// numeric-literal branch the other range tests cover. Input built from a real
+// parameter declaration.
+TEST(SpecifyTerminalParsing, InputTerminalPartSelectWithParameterBound) {
+  auto r = Parse(
+      "module m;\n"
+      "  parameter W = 8;\n"
+      "  specify\n"
+      "    (a[W-1:0] => b) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* si = GetSolePathItem(r);
+  ASSERT_NE(si, nullptr);
+  ASSERT_EQ(si->path.src_ports.size(), 1u);
+  EXPECT_EQ(si->path.src_ports[0].name, "a");
+  EXPECT_EQ(si->path.src_ports[0].range_kind, SpecifyRangeKind::kPartSelect);
+  EXPECT_NE(si->path.src_ports[0].range_left, nullptr);
+  EXPECT_NE(si->path.src_ports[0].range_right, nullptr);
+}
+
+// specify_output_terminal_descriptor ::= output_identifier [[
+// constant_range_expression ]]. A bare localparam identifier as a bit-select
+// bound — another constant form of §11.2.1 admitted by the range expression.
+// Input built from a real localparam.
+TEST(SpecifyTerminalParsing, OutputTerminalBitSelectWithLocalparamBound) {
+  auto r = Parse(
+      "module m;\n"
+      "  localparam IDX = 3;\n"
+      "  specify\n"
+      "    (a => b[IDX]) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* si = GetSolePathItem(r);
+  ASSERT_NE(si, nullptr);
+  ASSERT_EQ(si->path.dst_ports.size(), 1u);
+  EXPECT_EQ(si->path.dst_ports[0].name, "b");
+  EXPECT_EQ(si->path.dst_ports[0].range_kind, SpecifyRangeKind::kBitSelect);
+  EXPECT_NE(si->path.dst_ports[0].range_left, nullptr);
+  EXPECT_EQ(si->path.dst_ports[0].range_right, nullptr);
+}
+
 TEST(TimingCheckEventDefParsing, TerminalBitSelect) {
   auto r = Parse(
       "module m;\n"
