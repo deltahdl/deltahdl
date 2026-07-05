@@ -108,6 +108,21 @@ TEST(ConfigCellClause, UnqualifiedCellClauseAppliesToNamedCell) {
   EXPECT_EQ(bound->library, "gateLib");
 }
 
+// §33.4.1.4: a cell clause applies only to the cell it names; an instance of a
+// different cell is untouched even when the named cell exists. Here top.u is an
+// adder, but the clause names 'alt', so the instance binds to adder unchanged.
+TEST(ConfigCellClause, CellClauseDoesNotApplyToUnnamedCell) {
+  SourceManager mgr;
+  Arena arena;
+  DiagEngine diag(mgr);
+  auto* bound = BindAdderChild(
+      {mgr, arena, diag,
+       "config c; design top; cell alt use gateLib.alt; endconfig\n", "rtlLib",
+       "gateLib", "rtlLib"});
+  ASSERT_NE(bound, nullptr);
+  EXPECT_EQ(bound->name, "adder");
+}
+
 // §33.4.1.4: the qualifying library scopes the clause; when that library does
 // not define the named cell, the clause matches nothing and the cell binds
 // normally.
