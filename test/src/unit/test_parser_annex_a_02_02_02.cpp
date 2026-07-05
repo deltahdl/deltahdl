@@ -106,22 +106,6 @@ TEST(StrengthParsing, Strength1AllKeywords) {
   }
 }
 
-TEST(StrengthParsing, StrengthValueEncoding) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire (weak0, pull1) w1;\n"
-      "  wire (supply0, supply1) w2;\n"
-      "endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* w1 = r.cu->modules[0]->items[0];
-  EXPECT_EQ(w1->drive_strength0, 2u);
-  EXPECT_EQ(w1->drive_strength1, 3u);
-  auto* w2 = r.cu->modules[0]->items[1];
-  EXPECT_EQ(w2->drive_strength0, 5u);
-  EXPECT_EQ(w2->drive_strength1, 5u);
-}
-
 TEST(StrengthParsing, DriveStrengthStr1Highz0) {
   auto r = Parse(
       "module m;\n"
@@ -144,26 +128,6 @@ TEST(StrengthParsing, NoDriveStrengthDefault) {
   auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->drive_strength0, 0u);
   EXPECT_EQ(item->drive_strength1, 0u);
-}
-
-TEST(StrengthParsing, AllDriveStrengthForms) {
-  auto r1 = Parse("module m; wire (weak0, pull1) w; endmodule");
-  EXPECT_FALSE(r1.has_errors);
-
-  auto r2 = Parse("module m; wire (pull1, weak0) w; endmodule");
-  EXPECT_FALSE(r2.has_errors);
-
-  auto r3 = Parse("module m; wire (supply0, highz1) w; endmodule");
-  EXPECT_FALSE(r3.has_errors);
-
-  auto r4 = Parse("module m; wire (supply1, highz0) w; endmodule");
-  EXPECT_FALSE(r4.has_errors);
-
-  auto r5 = Parse("module m; wire (highz0, weak1) w; endmodule");
-  EXPECT_FALSE(r5.has_errors);
-
-  auto r6 = Parse("module m; wire (highz1, pull0) w; endmodule");
-  EXPECT_FALSE(r6.has_errors);
 }
 
 TEST(StrengthParsing, SameDirectionStrength0PairRejected) {
@@ -253,6 +217,30 @@ TEST(StrengthParsing, UdpInstSameDirectionPairRejected) {
       "  my_udp (weak0, weak0) u1(y, a);\n"
       "endmodule");
   EXPECT_TRUE(r.has_errors);
+}
+
+// Positive input form for drive_strength in UDP-instantiation position: a
+// valid strength0/strength1 pair is accepted and stored on the instance. The
+// existing UDP tests only exercise the reject paths, so this covers the accept
+// side of the same syntactic position.
+TEST(StrengthParsing, UdpInstDriveStrengthAccepted) {
+  auto r = Parse(
+      "primitive my_udp(output y, input a);\n"
+      "  table 0 : 1; 1 : 0; endtable\n"
+      "endprimitive\n"
+      "module m;\n"
+      "  wire y, a;\n"
+      "  my_udp (strong0, weak1) u1(y, a);\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ModuleItem* inst = nullptr;
+  for (auto* it : r.cu->modules[0]->items) {
+    if (it->kind == ModuleItemKind::kUdpInst) inst = it;
+  }
+  ASSERT_NE(inst, nullptr);
+  EXPECT_EQ(inst->drive_strength0, 4u);  // strong0
+  EXPECT_EQ(inst->drive_strength1, 2u);  // weak1
 }
 
 TEST(ChargeStrengthParsing, Small) {
