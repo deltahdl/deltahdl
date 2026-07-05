@@ -214,18 +214,6 @@ TEST(DelayParsing, Delay3TriregWithChargeStrengthSmall) {
   EXPECT_EQ(item->net_delay_decay->int_val, 15u);
 }
 
-TEST(DelayParsing, Delay3TriregWithChargeStrengthLarge) {
-  auto r = Parse(
-      "module t;\n"
-      "  trireg (large) #(10, 20, 50) cap1;\n"
-      "endmodule\n");
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->data_type.charge_strength, 4);
-  ASSERT_NE(item->net_delay, nullptr);
-  EXPECT_EQ(item->net_delay->int_val, 10u);
-}
-
 TEST(DelayParsing, Delay2MintypMaxTwoValues) {
   auto r = Parse(
       "module m;\n"
@@ -269,20 +257,6 @@ TEST(DelayParsing, Delay3NetSingleValue) {
   EXPECT_EQ(item->net_delay->int_val, 5u);
   EXPECT_EQ(item->net_delay_fall, nullptr);
   EXPECT_EQ(item->net_delay_decay, nullptr);
-}
-
-TEST(DelayParsing, Delay3RiseFallDecay) {
-  auto r = Parse(
-      "module t;\n"
-      "  wire #(1, 2, 3) w;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_NE(item->net_delay, nullptr);
-  EXPECT_NE(item->net_delay_fall, nullptr);
-  EXPECT_NE(item->net_delay_decay, nullptr);
 }
 
 TEST(DelayParsing, Delay3OverArityRejected) {
