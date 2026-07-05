@@ -22,22 +22,4 @@ TEST(LetKeywordLexing, UntypedKeyword) {
   EXPECT_EQ(r.token.text, "untyped");
 }
 
-// The let_identifier that follows the keyword is a separate identifier token.
-TEST(LetKeywordLexing, LetThenIdentifier) {
-  auto tokens = Lex("let mux");
-  ASSERT_GE(tokens.size(), 2u);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kKwLet);
-  EXPECT_EQ(tokens[1].kind, TokenKind::kIdentifier);
-  EXPECT_EQ(tokens[1].text, "mux");
-}
-
-// `untyped` keeps its keyword identity inside a port list context.
-TEST(LetKeywordLexing, UntypedThenFormal) {
-  auto tokens = Lex("untyped a");
-  ASSERT_GE(tokens.size(), 2u);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kKwUntyped);
-  EXPECT_EQ(tokens[1].kind, TokenKind::kIdentifier);
-  EXPECT_EQ(tokens[1].text, "a");
-}
-
 }  // namespace

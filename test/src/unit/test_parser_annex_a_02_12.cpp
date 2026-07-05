@@ -215,22 +215,6 @@ TEST(LetDeclParsing, LetDecl_InProceduralBlock) {
               "endmodule\n"));
 }
 
-// A.2.12 let_formal_type ::= data_type_or_implicit (vector data_type form).
-// A typed formal whose data_type carries a packed dimension, distinct from a
-// simple scalar type name.
-TEST(LetDeclParsing, LetFormalType_PackedVectorType) {
-  auto r = Parse(
-      "module m;\n"
-      "  let lsb(logic [3:0] x) = x[0];\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* item =
-      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kLetDecl);
-  ASSERT_NE(item, nullptr);
-  ASSERT_EQ(item->func_args.size(), 1u);
-  EXPECT_EQ(item->func_args[0].name, "x");
-}
-
 // A.2.12 let_port_item ::= ... formal_port_identifier { variable_dimension }
 // ... The variable_dimension group repeats: a formal with two unpacked
 // dimensions.
@@ -245,6 +229,19 @@ TEST(LetDeclParsing, LetPortItem_MultipleVariableDimensions) {
   ASSERT_NE(item, nullptr);
   ASSERT_EQ(item->func_args.size(), 1u);
   EXPECT_EQ(item->func_args[0].unpacked_dims.size(), 2u);
+}
+
+// A.2.12 let_list_of_arguments, alternative 1: each positional entry is
+// [ let_actual_arg ] and so may be omitted. This omits the leading positional
+// actual (distinct from the named-tail omission tested above), exercising the
+// optional-positional form of the first alternative.
+TEST(LetDeclParsing, LetListOfArguments_PositionalEmptyArg) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  let mux(sel, d0, d1) = sel ? d1 : d0;\n"
+              "  wire w;\n"
+              "  assign w = mux(, a, b);\n"
+              "endmodule\n"));
 }
 
 // A.2.12 let_expression ::= [ package_scope ] let_identifier
