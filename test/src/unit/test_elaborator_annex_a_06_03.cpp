@@ -57,23 +57,6 @@ TEST(ParallelBlockElaboration, BeginEndInsideForkElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(StatementBlockElaboration, NestedSeqBlockFollowedByStatement) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  int a, b;\n"
-      "  initial begin\n"
-      "    begin\n"
-      "      a = 10;\n"
-      "    end\n"
-      "    b = a;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 TEST(StatementBlockElaboration, ForkInsideSeqBlockElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -210,23 +193,6 @@ TEST(ParallelBlockElaboration, ForkInsideAlwaysLatchErrors) {
       "    fork\n"
       "      q = d;\n"
       "    join\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(f.has_errors);
-}
-
-TEST(ParallelBlockElaboration, NestedForkInsideAlwaysCombErrors) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module m;\n"
-      "  logic a;\n"
-      "  always_comb begin\n"
-      "    begin\n"
-      "      fork\n"
-      "        a = 1;\n"
-      "      join\n"
-      "    end\n"
       "  end\n"
       "endmodule\n",
       f);

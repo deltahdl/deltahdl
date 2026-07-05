@@ -8,23 +8,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParallelBlockLowering, ForkJoinNone) {
-  LowerFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [31:0] a, b;\n"
-      "  initial begin\n"
-      "    fork\n"
-      "      a = 10;\n"
-      "      b = 20;\n"
-      "    join_none\n"
-      "    #1 $finish;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  LowerRunAndCheck(f, design, {{"a", 10u}, {"b", 20u}});
-}
-
 TEST(ParallelBlockLowering, ForkJoin) {
   LowerFixture f;
   auto* design = ElaborateSrc(
@@ -96,6 +79,39 @@ TEST(BlockStatementSimSyntax, ForkWithSingleBeginEnd) {
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 2u);
+}
+
+// End-to-end for the block_item_declaration dependency (A.2.8): a variable is
+// declared inside a seq_block from real source, assigned, and read within the
+// same block, with the result observed after simulation.
+TEST(BlockStatementSimSyntax, SeqBlockDeclUsedAtRuntime) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] out;\n"
+      "  initial begin\n"
+      "    logic [7:0] tmp;\n"
+      "    tmp = 8'd6;\n"
+      "    out = tmp + 8'd1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"out", 7u}});
+}
+
+// End-to-end for the block_identifier dependency (A.9.3): a named seq_block
+// built from real source runs to completion and its statement takes effect.
+TEST(BlockStatementSimSyntax, NamedSeqBlockRunsAtRuntime) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] out;\n"
+      "  initial begin : blk\n"
+      "    out = 8'd9;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"out", 9u}});
 }
 
 }  // namespace

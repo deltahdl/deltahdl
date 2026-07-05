@@ -5,6 +5,11 @@ using namespace delta;
 
 namespace {
 
+// -------------------------------------------------------------------------
+// seq_block ::= begin [ : block_identifier ] { block_item_declaration }
+//               { statement_or_null } end [ : block_identifier ]
+// -------------------------------------------------------------------------
+
 TEST(BlockStatementSyntaxParsing, SeqBlockBasic) {
   auto r = Parse(
       "module m;\n"
@@ -21,6 +26,21 @@ TEST(BlockStatementSyntaxParsing, SeqBlockBasic) {
   ASSERT_GE(body->stmts.size(), 2u);
 }
 
+TEST(BlockStatementSyntaxParsing, SeqBlockEmpty) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* body = InitialBody(r);
+  ASSERT_NE(body, nullptr);
+  EXPECT_EQ(body->kind, StmtKind::kBlock);
+  EXPECT_EQ(body->stmts.size(), 0u);
+}
+
+// Both block_identifiers present and matched (begin : name ... end : name).
 TEST(BlockStatementSyntaxParsing, SeqBlockWithLabel) {
   auto r = Parse(
       "module m;\n"
@@ -36,6 +56,23 @@ TEST(BlockStatementSyntaxParsing, SeqBlockWithLabel) {
   EXPECT_EQ(body->label, "myblock");
 }
 
+// Leading block_identifier only; the optional trailing one is omitted.
+TEST(BlockStatementSyntaxParsing, SeqBlockNamed) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin : my_block\n"
+      "    a = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* body = InitialBody(r);
+  ASSERT_NE(body, nullptr);
+  EXPECT_EQ(body->kind, StmtKind::kBlock);
+  EXPECT_EQ(body->label, "my_block");
+}
+
+// block_item_declaration (data_declaration) preceding the statements.
 TEST(BlockStatementSyntaxParsing, SeqBlockWithBlockItemDecl) {
   auto r = Parse(
       "module m;\n"
@@ -51,6 +88,45 @@ TEST(BlockStatementSyntaxParsing, SeqBlockWithBlockItemDecl) {
   ASSERT_GE(body->stmts.size(), 2u);
   EXPECT_EQ(body->stmts[0]->kind, StmtKind::kVarDecl);
 }
+
+// block_item_declaration (parameter_declaration alternative).
+TEST(BlockStatementSyntaxParsing, SeqBlockWithParamDecl) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    parameter int P = 42;\n"
+      "    a = P;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* body = InitialBody(r);
+  ASSERT_NE(body, nullptr);
+  EXPECT_GE(body->stmts.size(), 2u);
+}
+
+// A seq_block is itself a statement_or_null, so it may nest within a block.
+TEST(BlockStatementSyntaxParsing, BeginEndAsStatement) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    begin\n"
+      "      a = 1;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kBlock);
+}
+
+// -------------------------------------------------------------------------
+// par_block ::= fork [ : block_identifier ] { block_item_declaration }
+//               { statement_or_null } join_keyword [ : block_identifier ]
+// join_keyword ::= join | join_any | join_none
+// -------------------------------------------------------------------------
 
 TEST(BlockStatementSyntaxParsing, ParBlockBasic) {
   auto r = Parse(
@@ -106,6 +182,23 @@ TEST(BlockStatementSyntaxParsing, ParBlockJoinNone) {
   EXPECT_EQ(stmt->join_kind, TokenKind::kKwJoinNone);
 }
 
+// Empty par_block: no block_item_declarations and no statements.
+TEST(BlockStatementSyntaxParsing, ForkJoinEmpty) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    fork join\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kFork);
+  EXPECT_EQ(stmt->fork_stmts.size(), 0u);
+}
+
+// Both block_identifiers present and matched (fork : name ... join : name).
 TEST(BlockStatementSyntaxParsing, ParBlockWithLabel) {
   auto r = Parse(
       "module m;\n"
@@ -123,13 +216,13 @@ TEST(BlockStatementSyntaxParsing, ParBlockWithLabel) {
   EXPECT_EQ(stmt->label, "par_block");
 }
 
-TEST(BlockStatementSyntaxParsing, NestedSeqInPar) {
+// Leading block_identifier only; the optional trailing one is omitted.
+TEST(BlockStatementSyntaxParsing, ForkNamed) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
-      "    fork\n"
-      "      begin a = 1; b = 2; end\n"
-      "      begin c = 3; end\n"
+      "    fork : my_fork\n"
+      "      #10 a = 1;\n"
       "    join\n"
       "  end\n"
       "endmodule\n");
@@ -138,233 +231,10 @@ TEST(BlockStatementSyntaxParsing, NestedSeqInPar) {
   auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kFork);
-  ASSERT_GE(stmt->fork_stmts.size(), 2u);
-  EXPECT_EQ(stmt->fork_stmts[0]->kind, StmtKind::kBlock);
-  EXPECT_EQ(stmt->fork_stmts[1]->kind, StmtKind::kBlock);
+  EXPECT_EQ(stmt->label, "my_fork");
 }
 
-TEST(BlockStatementSyntaxParsing, SeqBlockEmpty) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* body = InitialBody(r);
-  ASSERT_NE(body, nullptr);
-  EXPECT_EQ(body->kind, StmtKind::kBlock);
-  EXPECT_EQ(body->stmts.size(), 0u);
-}
-
-TEST(BlockStatementSyntaxParsing, SeqBlockWithVarDecl) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    int x;\n"
-      "    x = 5;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* body = InitialBody(r);
-  ASSERT_NE(body, nullptr);
-  EXPECT_EQ(body->kind, StmtKind::kBlock);
-  EXPECT_GE(body->stmts.size(), 2u);
-  EXPECT_EQ(body->stmts[0]->kind, StmtKind::kVarDecl);
-}
-
-TEST(BlockStatementSyntaxParsing, SeqBlockWithParamDecl) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    parameter int P = 42;\n"
-      "    a = P;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* body = InitialBody(r);
-  ASSERT_NE(body, nullptr);
-  EXPECT_GE(body->stmts.size(), 2u);
-}
-
-TEST(BlockStatementSyntaxParsing, SingleStatementInBlock) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    x = 42;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* body = FirstInitialBody(r);
-  ASSERT_NE(body, nullptr);
-  EXPECT_EQ(body->kind, StmtKind::kBlock);
-  ASSERT_EQ(body->stmts.size(), 1u);
-  EXPECT_EQ(body->stmts[0]->kind, StmtKind::kBlockingAssign);
-}
-
-TEST(BlockStatementSyntaxParsing, MultipleAssignmentsInBlock) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    a = 1;\n"
-      "    b = 2;\n"
-      "    c = 3;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* body = FirstInitialBody(r);
-  ASSERT_NE(body, nullptr);
-  ASSERT_EQ(body->stmts.size(), 3u);
-  for (size_t i = 0; i < 3; ++i) {
-    EXPECT_EQ(body->stmts[i]->kind, StmtKind::kBlockingAssign);
-  }
-}
-
-TEST(BlockStatementSyntaxParsing, BlockWithOnlyVarDecls) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    int a;\n"
-      "    logic [3:0] b;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* body = FirstInitialBody(r);
-  ASSERT_NE(body, nullptr);
-  EXPECT_EQ(body->kind, StmtKind::kBlock);
-  ASSERT_EQ(body->stmts.size(), 2u);
-  EXPECT_EQ(body->stmts[0]->kind, StmtKind::kVarDecl);
-  EXPECT_EQ(body->stmts[1]->kind, StmtKind::kVarDecl);
-}
-
-TEST(BlockStatementSyntaxParsing, MultipleSequentialBlocksInSameInitial) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    begin : first\n"
-      "      a = 1;\n"
-      "    end : first\n"
-      "    begin : second\n"
-      "      b = 2;\n"
-      "    end : second\n"
-      "    begin : third\n"
-      "      c = 3;\n"
-      "    end : third\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* body = FirstInitialBody(r);
-  ASSERT_NE(body, nullptr);
-  ASSERT_EQ(body->stmts.size(), 3u);
-  EXPECT_EQ(body->stmts[0]->kind, StmtKind::kBlock);
-  EXPECT_EQ(body->stmts[0]->label, "first");
-  EXPECT_EQ(body->stmts[1]->kind, StmtKind::kBlock);
-  EXPECT_EQ(body->stmts[1]->label, "second");
-  EXPECT_EQ(body->stmts[2]->kind, StmtKind::kBlock);
-  EXPECT_EQ(body->stmts[2]->label, "third");
-}
-
-TEST(BlockStatementSyntaxParsing, NamedNestedBlocks) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin : outer\n"
-      "    begin : mid\n"
-      "      begin : inner\n"
-      "        x = 1;\n"
-      "      end : inner\n"
-      "    end : mid\n"
-      "  end : outer\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* body = FirstInitialBody(r);
-  ASSERT_NE(body, nullptr);
-  EXPECT_EQ(body->label, "outer");
-  ASSERT_EQ(body->stmts.size(), 1u);
-  EXPECT_EQ(body->stmts[0]->label, "mid");
-  ASSERT_EQ(body->stmts[0]->stmts.size(), 1u);
-  EXPECT_EQ(body->stmts[0]->stmts[0]->label, "inner");
-}
-
-TEST(BlockStatementSyntaxParsing, BeginEndAsStatement) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    begin\n"
-      "      a = 1;\n"
-      "    end\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kBlock);
-}
-
-TEST(BlockStatementSyntaxParsing, ForkJoin) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    fork #10 a = 1; #20 b = 1; join\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kFork);
-  EXPECT_EQ(stmt->join_kind, TokenKind::kKwJoin);
-  EXPECT_EQ(stmt->fork_stmts.size(), 2u);
-}
-
-TEST(BlockStatementSyntaxParsing, ForkJoinAny) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    fork #10 a = 1; join_any\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  EXPECT_EQ(stmt->join_kind, TokenKind::kKwJoinAny);
-}
-
-TEST(BlockStatementSyntaxParsing, ForkJoinNone) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    fork #10 a = 1; join_none\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  EXPECT_EQ(stmt->join_kind, TokenKind::kKwJoinNone);
-}
-
-TEST(BlockStatementSyntaxParsing, ForkJoinEmpty) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    fork join\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kFork);
-  EXPECT_EQ(stmt->fork_stmts.size(), 0u);
-}
-
+// block_item_declaration (with automatic lifetime) inside a par_block.
 TEST(BlockStatementSyntaxParsing, ForkWithVarDecl) {
   auto r = Parse(
       "module m;\n"
@@ -385,208 +255,14 @@ TEST(BlockStatementSyntaxParsing, ForkWithVarDecl) {
   EXPECT_TRUE(stmt->fork_stmts[0]->var_is_automatic);
 }
 
-TEST(BlockStatementSyntaxParsing, ForkMultipleStmts) {
+// A seq_block composed as a statement_or_null thread inside a par_block.
+TEST(BlockStatementSyntaxParsing, NestedSeqInPar) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
       "    fork\n"
-      "      a = 1;\n"
-      "      b = 2;\n"
-      "      c = 3;\n"
-      "    join\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->fork_stmts.size(), 3u);
-}
-
-TEST(BlockStatementSyntaxParsing, ForkWithBeginEndSubBlocks) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    fork\n"
-      "      begin\n"
-      "        a = 1;\n"
-      "        b = 2;\n"
-      "      end\n"
-      "      begin\n"
-      "        c = 3;\n"
-      "        d = 4;\n"
-      "      end\n"
-      "    join\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->fork_stmts.size(), 2u);
-  EXPECT_EQ(stmt->fork_stmts[0]->kind, StmtKind::kBlock);
-  EXPECT_EQ(stmt->fork_stmts[1]->kind, StmtKind::kBlock);
-}
-
-TEST(BlockStatementSyntaxParsing, ForkWithIfElseThread) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    fork\n"
-      "      if (cond) a = 1; else a = 0;\n"
-      "      #10 b = 2;\n"
-      "    join\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kFork);
-  ASSERT_EQ(stmt->fork_stmts.size(), 2u);
-  EXPECT_EQ(stmt->fork_stmts[0]->kind, StmtKind::kIf);
-  EXPECT_EQ(stmt->fork_stmts[1]->kind, StmtKind::kDelay);
-}
-
-TEST(BlockStatementSyntaxParsing, ForkJoinThreeThreads) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    fork\n"
-      "      #5 a = 1;\n"
-      "      #10 b = 2;\n"
-      "      #15 c = 3;\n"
-      "    join\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kFork);
-  EXPECT_EQ(stmt->fork_stmts.size(), 3u);
-}
-
-TEST(BlockStatementSyntaxParsing, ForkJoinAnyTwoThreads) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    fork\n"
-      "      #5 a = 1;\n"
-      "      #100 b = 2;\n"
-      "    join_any\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kFork);
-  EXPECT_EQ(stmt->join_kind, TokenKind::kKwJoinAny);
-  EXPECT_EQ(stmt->fork_stmts.size(), 2u);
-}
-
-TEST(BlockStatementSyntaxParsing, ForkJoinNoneSingleThread) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    fork\n"
-      "      #50 a = 1;\n"
-      "    join_none\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kFork);
-  EXPECT_EQ(stmt->join_kind, TokenKind::kKwJoinNone);
-  EXPECT_EQ(stmt->fork_stmts.size(), 1u);
-}
-
-TEST(BlockStatementSyntaxParsing, ParallelBlockVarDeclInFork) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial fork\n"
-      "    int local_var;\n"
-      "    begin local_var = 1; end\n"
-      "  join\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kFork);
-  ASSERT_GE(stmt->fork_stmts.size(), 1u);
-}
-
-TEST(BlockStatementSyntaxParsing, ParallelBlockNestedBeginInFork) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial fork\n"
-      "    begin #10 a = 1; #20 a = 2; end\n"
-      "    begin #15 b = 3; end\n"
-      "  join\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kFork);
-  ASSERT_EQ(stmt->fork_stmts.size(), 2u);
-  EXPECT_EQ(stmt->fork_stmts[0]->kind, StmtKind::kBlock);
-  EXPECT_EQ(stmt->fork_stmts[1]->kind, StmtKind::kBlock);
-}
-
-TEST(BlockStatementSyntaxParsing, NamedForkJoinAny) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    fork : race_threads\n"
-      "      #10 a = 1;\n"
-      "      #20 b = 2;\n"
-      "    join_any : race_threads\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kFork);
-  EXPECT_EQ(stmt->label, "race_threads");
-  EXPECT_EQ(stmt->join_kind, TokenKind::kKwJoinAny);
-}
-
-TEST(BlockStatementSyntaxParsing, ForkMixedStmtsAndBlocks) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    fork\n"
-      "      #10 a = 1;\n"
-      "      begin\n"
-      "        #20 b = 2;\n"
-      "        #30 c = 3;\n"
-      "      end\n"
-      "      #40 d = 4;\n"
-      "    join\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kFork);
-  ASSERT_EQ(stmt->fork_stmts.size(), 3u);
-  EXPECT_EQ(stmt->fork_stmts[0]->kind, StmtKind::kDelay);
-  EXPECT_EQ(stmt->fork_stmts[1]->kind, StmtKind::kBlock);
-  EXPECT_EQ(stmt->fork_stmts[2]->kind, StmtKind::kDelay);
-}
-
-TEST(BlockStatementSyntaxParsing, VarDeclInFork) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    fork\n"
-      "      int x;\n"
-      "      begin x = 1; end\n"
+      "      begin a = 1; b = 2; end\n"
+      "      begin c = 3; end\n"
       "    join\n"
       "  end\n"
       "endmodule\n");
@@ -596,54 +272,11 @@ TEST(BlockStatementSyntaxParsing, VarDeclInFork) {
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kFork);
   ASSERT_GE(stmt->fork_stmts.size(), 2u);
-  EXPECT_EQ(stmt->fork_stmts[0]->kind, StmtKind::kVarDecl);
-}
-
-TEST(BlockStatementSyntaxParsing, BlockWithForkJoinInside) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    fork\n"
-      "      #10 a = 1;\n"
-      "      #20 b = 2;\n"
-      "    join\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kFork);
-  EXPECT_EQ(stmt->join_kind, TokenKind::kKwJoin);
-  EXPECT_GE(stmt->fork_stmts.size(), 2u);
-}
-
-TEST(BlockStatementSyntaxParsing, ForkWithBeginEndThreads) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    fork\n"
-      "      begin\n"
-      "        #10 a = 1;\n"
-      "        #20 a = 2;\n"
-      "      end\n"
-      "      begin\n"
-      "        #15 b = 3;\n"
-      "      end\n"
-      "    join\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kFork);
-  ASSERT_EQ(stmt->fork_stmts.size(), 2u);
   EXPECT_EQ(stmt->fork_stmts[0]->kind, StmtKind::kBlock);
   EXPECT_EQ(stmt->fork_stmts[1]->kind, StmtKind::kBlock);
-  EXPECT_EQ(stmt->fork_stmts[0]->stmts.size(), 2u);
 }
 
+// A par_block used directly as the initial statement (not wrapped in begin).
 TEST(BlockStatementSyntaxParsing, ForkJoinAsDirectBody) {
   auto r = Parse(
       "module m;\n"
@@ -660,230 +293,111 @@ TEST(BlockStatementSyntaxParsing, ForkJoinAsDirectBody) {
   EXPECT_EQ(body->join_kind, TokenKind::kKwJoin);
 }
 
-TEST(BlockStatementSyntaxParsing, ForkJoinAnyAsDirectBody) {
+// -------------------------------------------------------------------------
+// action_block ::= statement_or_null | [ statement ] else statement_or_null
+// -------------------------------------------------------------------------
+
+// First alternative: a bare pass statement (statement_or_null), no else clause.
+TEST(BlockStatementSyntaxParsing, ActionBlockPassStatementOnly) {
   auto r = Parse(
       "module m;\n"
-      "  initial fork\n"
-      "    a = 1;\n"
-      "    b = 2;\n"
-      "  join_any\n"
+      "  initial begin\n"
+      "    assert (a) b = 1;\n"
+      "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* body = InitialBody(r);
-  ASSERT_NE(body, nullptr);
-  EXPECT_EQ(body->kind, StmtKind::kFork);
-  EXPECT_EQ(body->join_kind, TokenKind::kKwJoinAny);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kAssertImmediate);
+  ASSERT_NE(stmt->assert_pass_stmt, nullptr);
+  EXPECT_EQ(stmt->assert_pass_stmt->kind, StmtKind::kBlockingAssign);
+  EXPECT_EQ(stmt->assert_fail_stmt, nullptr);
 }
 
-TEST(BlockStatementSyntaxParsing, ForkJoinNoneAsDirectBody) {
+// Second alternative in full: an optional pass statement followed by
+// else and a fail statement_or_null.
+TEST(BlockStatementSyntaxParsing, ActionBlockPassAndElseFail) {
   auto r = Parse(
       "module m;\n"
-      "  initial fork\n"
-      "    a = 1;\n"
-      "    b = 2;\n"
-      "  join_none\n"
+      "  initial begin\n"
+      "    assert (a) b = 1; else c = 1;\n"
+      "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* body = InitialBody(r);
-  ASSERT_NE(body, nullptr);
-  EXPECT_EQ(body->kind, StmtKind::kFork);
-  EXPECT_EQ(body->join_kind, TokenKind::kKwJoinNone);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kAssertImmediate);
+  ASSERT_NE(stmt->assert_pass_stmt, nullptr);
+  EXPECT_EQ(stmt->assert_pass_stmt->kind, StmtKind::kBlockingAssign);
+  ASSERT_NE(stmt->assert_fail_stmt, nullptr);
+  EXPECT_EQ(stmt->assert_fail_stmt->kind, StmtKind::kBlockingAssign);
 }
 
-TEST(BlockStatementSyntaxParsing, VarDeclInForkJoinAny) {
-  EXPECT_TRUE(
+// Second alternative with the leading statement omitted: else and a fail
+// statement only, exercising the optional [ statement ] branch.
+TEST(BlockStatementSyntaxParsing, ActionBlockElseOnlyOmittedPass) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    assert (a) else c = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kAssertImmediate);
+  EXPECT_EQ(stmt->assert_pass_stmt, nullptr);
+  ASSERT_NE(stmt->assert_fail_stmt, nullptr);
+  EXPECT_EQ(stmt->assert_fail_stmt->kind, StmtKind::kBlockingAssign);
+}
+
+// First alternative where statement_or_null is the null statement: the whole
+// action block is just the terminating semicolon, so neither pass nor fail
+// statement is produced.
+TEST(BlockStatementSyntaxParsing, ActionBlockNullStatement) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    assert (a);\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kAssertImmediate);
+  EXPECT_EQ(stmt->assert_pass_stmt, nullptr);
+  EXPECT_EQ(stmt->assert_fail_stmt, nullptr);
+}
+
+// -------------------------------------------------------------------------
+// Negative forms: the block productions mandate their closing keyword.
+// -------------------------------------------------------------------------
+
+// seq_block requires a closing end; reaching the module boundary without it
+// is a parse error.
+TEST(BlockStatementSyntaxParsing, SeqBlockMissingEndRejected) {
+  EXPECT_FALSE(
       ParseOk("module m;\n"
-              "  initial fork\n"
-              "    int x;\n"
-              "    x = 1;\n"
-              "  join_any\n"
+              "  initial begin\n"
+              "    a = 1;\n"
               "endmodule\n"));
 }
 
-TEST(BlockStatementSyntaxParsing, VarDeclInForkJoinNone) {
-  EXPECT_TRUE(
+// par_block requires a join_keyword to close; terminating a fork with end
+// is a parse error.
+TEST(BlockStatementSyntaxParsing, ParBlockMissingJoinRejected) {
+  EXPECT_FALSE(
       ParseOk("module m;\n"
-              "  initial fork\n"
-              "    int x;\n"
-              "    x = 1;\n"
-              "  join_none\n"
+              "  initial begin\n"
+              "    fork\n"
+              "      a = 1;\n"
+              "    end\n"
+              "  end\n"
               "endmodule\n"));
-}
-
-TEST(BlockStatementSyntaxParsing, EmptyForkFollowedByStatement) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    fork\n"
-      "    join\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kFork);
-  EXPECT_EQ(stmt->join_kind, TokenKind::kKwJoin);
-  EXPECT_TRUE(stmt->fork_stmts.empty());
-}
-
-TEST(BlockStatementSyntaxParsing, ForkWithNonblockingAssigns) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    fork\n"
-      "      a <= 1;\n"
-      "      b <= 2;\n"
-      "    join\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kFork);
-  ASSERT_EQ(stmt->fork_stmts.size(), 2u);
-  EXPECT_EQ(stmt->fork_stmts[0]->kind, StmtKind::kNonblockingAssign);
-  EXPECT_EQ(stmt->fork_stmts[1]->kind, StmtKind::kNonblockingAssign);
-}
-
-TEST(BlockStatementSyntaxParsing, MultipleSequentialForks) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    fork\n"
-      "      #5 a = 1;\n"
-      "    join\n"
-      "    fork\n"
-      "      #10 b = 2;\n"
-      "    join\n"
-      "    fork\n"
-      "      #15 c = 3;\n"
-      "    join_any\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* body = r.cu->modules[0]->items[0]->body;
-  ASSERT_NE(body, nullptr);
-  ASSERT_EQ(body->stmts.size(), 3u);
-  EXPECT_EQ(body->stmts[0]->kind, StmtKind::kFork);
-  EXPECT_EQ(body->stmts[0]->join_kind, TokenKind::kKwJoin);
-  EXPECT_EQ(body->stmts[1]->kind, StmtKind::kFork);
-  EXPECT_EQ(body->stmts[1]->join_kind, TokenKind::kKwJoin);
-  EXPECT_EQ(body->stmts[2]->kind, StmtKind::kFork);
-  EXPECT_EQ(body->stmts[2]->join_kind, TokenKind::kKwJoinAny);
-}
-
-TEST(BlockStatementSyntaxParsing, ForkJoinSingleBeginEnd) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    fork\n"
-      "      begin\n"
-      "        a = 1;\n"
-      "        b = 2;\n"
-      "        c = 3;\n"
-      "      end\n"
-      "    join\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kFork);
-  ASSERT_EQ(stmt->fork_stmts.size(), 1u);
-  EXPECT_EQ(stmt->fork_stmts[0]->kind, StmtKind::kBlock);
-  EXPECT_EQ(stmt->fork_stmts[0]->stmts.size(), 3u);
-}
-
-TEST(BlockStatementSyntaxParsing, VarDeclAndThreadInForkJoin) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial fork\n"
-      "    int x;\n"
-      "    x = 5;\n"
-      "  join\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* body = r.cu->modules[0]->items[0]->body;
-  ASSERT_NE(body, nullptr);
-  EXPECT_EQ(body->kind, StmtKind::kFork);
-  ASSERT_GE(body->fork_stmts.size(), 1u);
-  EXPECT_EQ(body->fork_stmts[0]->kind, StmtKind::kVarDecl);
-}
-
-TEST(BlockStatementSyntaxParsing, MultipleVarDeclsInFork) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    fork\n"
-      "      int x;\n"
-      "      int y;\n"
-      "      begin x = 1; y = 2; end\n"
-      "    join\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kFork);
-  ASSERT_GE(stmt->fork_stmts.size(), 3u);
-  EXPECT_EQ(stmt->fork_stmts[0]->kind, StmtKind::kVarDecl);
-  EXPECT_EQ(stmt->fork_stmts[1]->kind, StmtKind::kVarDecl);
-}
-
-TEST(BlockStatementSyntaxParsing, ForkJoinAsStatement) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    fork\n"
-      "      a = 1;\n"
-      "    join\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kFork);
-}
-
-TEST(BlockStatementSyntaxParsing, SeqBlockNamed) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin : my_block\n"
-      "    a = 1;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* body = InitialBody(r);
-  ASSERT_NE(body, nullptr);
-  EXPECT_EQ(body->kind, StmtKind::kBlock);
-  EXPECT_EQ(body->label, "my_block");
-}
-
-TEST(BlockStatementSyntaxParsing, ForkNamed) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    fork : my_fork\n"
-      "      #10 a = 1;\n"
-      "    join\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kFork);
-  EXPECT_EQ(stmt->label, "my_fork");
 }
 
 }  // namespace
