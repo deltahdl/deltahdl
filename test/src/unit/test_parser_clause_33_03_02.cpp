@@ -143,6 +143,42 @@ TEST(LibraryMapInclude, NestedRelativeIncludeAnchorsToImmediateContainingFile) {
   EXPECT_EQ(m.LibraryForFile((sub_dir / "x.dv").string()), "deep");
 }
 
+// A lib.map's permitted content is limited to library specifications, include
+// statements, and standard SystemVerilog comment syntax. Here line and block
+// comments are interleaved with a library declaration and an include; the
+// loader must consume them via the ordinary lexer and still resolve both the
+// local and the included library, confirming comments are an accepted form.
+TEST(LibraryMapInclude, StandardCommentSyntaxIsAcceptedInMapFile) {
+  TempLibMapDir tmp;
+  tmp.Write("sub.map",
+            "// leading line comment in the included map\n"
+            "library subLib *.sv;\n");
+  auto top = tmp.Write("top.map",
+                       "// top-level line comment\n"
+                       "library topLib *.v; /* trailing block comment */\n"
+                       "/* multi-line block\n"
+                       "   comment before the include */\n"
+                       "include sub.map;\n");
+  LibraryMap m;
+  ASSERT_TRUE(m.LoadMapFile(top));
+  EXPECT_EQ(m.LibraryForFile((tmp.dir / "x.v").string()), "topLib");
+  EXPECT_EQ(m.LibraryForFile((tmp.dir / "y.sv").string()), "subLib");
+}
+
+// The permitted content of a lib.map is limited to library specifications,
+// include statements, and comments. A construct outside that set -- here an
+// ordinary module declaration -- is therefore not accepted and the load fails
+// with a diagnostic, confirming the "limited to" constraint is enforced rather
+// than silently tolerated.
+TEST(LibraryMapInclude, NonPermittedConstructInMapFileIsRejected) {
+  TempLibMapDir tmp;
+  auto top = tmp.Write("top.map", "module m; endmodule\n");
+  LibraryMap m;
+  std::vector<std::string> errors;
+  EXPECT_FALSE(m.LoadMapFile(top, &errors));
+  EXPECT_FALSE(errors.empty());
+}
+
 // An absolute include path is honored as given; the containing-file anchoring
 // rule applies only to relative paths.
 TEST(LibraryMapInclude, AbsoluteIncludePathIsHonoredAsGiven) {
