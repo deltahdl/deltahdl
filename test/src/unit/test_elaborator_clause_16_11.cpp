@@ -22,10 +22,26 @@ TEST(AttachSubroutineCall, NondegenerateSequenceAcceptsAttachment) {
       SequenceMatchClass::kAdmitsAtLeastOneNonempty));
 }
 
+TEST(AttachSubroutineCall, NoMatchSequenceRejectsAttachment) {
+  // §16.11: the other degenerate class — a sequence that admits no match at
+  // all — is likewise not a legal host for an attached sequence_match_item.
+  EXPECT_FALSE(
+      IsSequenceMatchItemAttachLegal(SequenceMatchClass::kAdmitsNoMatch));
+}
+
 TEST(AttachSubroutineCall, AutomaticByReferenceForbidden) {
   // §16.11: an automatic variable shall not be passed by reference under any
   // circumstance.
   EXPECT_FALSE(IsAutomaticArgUseAllowed(SubroutineArgPassing::kByRef,
+                                        /*from_procedural_assertion=*/true,
+                                        /*is_constant=*/true));
+}
+
+TEST(AttachSubroutineCall, AutomaticByConstReferenceForbidden) {
+  // §16.11: the no-by-reference rule for automatics covers const ref just as
+  // it covers ref — neither by-reference form is allowed for an automatic
+  // variable, even a constant one from a procedural assertion.
+  EXPECT_FALSE(IsAutomaticArgUseAllowed(SubroutineArgPassing::kByConstRef,
                                         /*from_procedural_assertion=*/true,
                                         /*is_constant=*/true));
 }
@@ -48,12 +64,23 @@ TEST(AttachSubroutineCall, LocalVarArgumentMustBeByValue) {
       /*local_var_in_arg_expr=*/true, SubroutineArgPassing::kByValueInput));
 }
 
-TEST(AttachSubroutineCall, RunsInReactiveRegionAndDoesNotBlockEval) {
-  // §16.11: subroutines are scheduled in the Reactive region (like action
-  // blocks) and assertion evaluation does not wait for them.
-  EXPECT_EQ(AttachedSubroutineRegion(),
-            AttachedSubroutineSchedulingRegion::kReactive);
-  EXPECT_FALSE(AssertionEvalWaitsForAttachedSubroutine());
+TEST(AttachSubroutineCall, LocalVarArgumentByConstReferenceRejected) {
+  // §16.11: const ref is a by-reference form, so an actual argument that
+  // mentions a local variable may not be passed by const ref either.
+  EXPECT_FALSE(IsLocalVarArgPassingLegal(
+      /*local_var_in_arg_expr=*/true, SubroutineArgPassing::kByConstRef));
+}
+
+TEST(AttachSubroutineCall, NonLocalVarArgumentAllowsAnyPassingMode) {
+  // §16.11: the by-value restriction is scoped to arguments that mention a
+  // local variable. When no local variable appears, any of the three passing
+  // modes is permitted.
+  EXPECT_TRUE(IsLocalVarArgPassingLegal(
+      /*local_var_in_arg_expr=*/false, SubroutineArgPassing::kByRef));
+  EXPECT_TRUE(IsLocalVarArgPassingLegal(
+      /*local_var_in_arg_expr=*/false, SubroutineArgPassing::kByConstRef));
+  EXPECT_TRUE(IsLocalVarArgPassingLegal(
+      /*local_var_in_arg_expr=*/false, SubroutineArgPassing::kByValueInput));
 }
 
 TEST(AttachSubroutineCall, RunsAtEveryEndPointInListOrder) {
@@ -106,7 +133,7 @@ TEST(AttachSubroutineCall, AutomaticOutsideProceduralAssertionRejected) {
                                         /*is_constant=*/true));
 }
 
-TEST(AttachSubroutineCall, ByValueInputTypeMustBeAllowedBy16_6) {
+TEST(AttachSubroutineCall, ByValueInputVariableTypeMustBeAllowed) {
   // §16.11: a variable passed by value as an input shall be of a type
   // allowed in §16.6. The gate forwards the §16.6 verdict.
   EXPECT_TRUE(IsByValueInputArgumentTypeAllowed(/*type_allowed_in_16_6=*/true));

@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <vector>
+
 #include "simulator/sva_engine.h"
 
 using namespace delta;
@@ -46,32 +49,43 @@ TEST(SequenceProperty, WeakFailsOnlyWhenAPrefixWitnessesInability) {
       PropertyResult::kFail);
 }
 
+// A spread of operand match sets, each given as the set of clock ticks on which
+// a match of the underlying sequence_expr ends. The empty set is the no-match
+// case; the others cover a single match, several distinct end ticks, and ties
+// on the earliest end tick — the shapes §16.9.8 first_match reduces.
+const std::vector<std::vector<uint32_t>> kOperandMatchSets = {
+    {}, {7}, {5, 3, 4, 2}, {4, 4, 6}, {3, 3, 3},
+};
+
 // §16.12.2: strong(sequence_expr) is equivalent to
 // strong(first_match(sequence_expr)) because a nonempty match of the sequence
-// exists exactly when one exists for its first_match. The strong evaluator
-// depends only on that preserved observation, so it returns the same verdict
-// whether or not first_match wraps the sequence.
+// exists exactly when one exists for its first_match. Rather than assert this
+// by an identity, drive the operand match set through the real §16.9.8
+// first_match reduction (EvalFirstMatch) and confirm the strong verdict is
+// unchanged: strong holds iff the operand had any match, and first_match
+// preserves that existence.
 TEST(SequenceProperty, StrongEqualsStrongOfFirstMatch) {
-  // first_match preserves whether a nonempty match exists.
-  auto nonempty_match_of_first_match = [](bool of_seq) { return of_seq; };
-  for (bool has_match : {false, true}) {
-    EXPECT_EQ(
-        EvalStrongSequenceProperty(has_match),
-        EvalStrongSequenceProperty(nonempty_match_of_first_match(has_match)));
+  for (const auto& match_set : kOperandMatchSets) {
+    bool seq_has_match = !match_set.empty();
+    bool first_match_has_match = EvalFirstMatch(match_set).matched;
+    EXPECT_EQ(EvalStrongSequenceProperty(seq_has_match),
+              EvalStrongSequenceProperty(first_match_has_match));
   }
 }
 
 // §16.12.2: weak(sequence_expr) is equivalent to
 // weak(first_match(sequence_expr)) because a finite prefix witnesses inability
-// to match the sequence exactly when it does for its first_match. The weak
-// evaluator depends only on that preserved observation.
+// to match the sequence exactly when it does for its first_match. Model the
+// witness as the absence of any match over the observed word, and derive the
+// first_match side through the real EvalFirstMatch reduction: because
+// first_match keeps a match exactly when the operand had one, the two inability
+// observations agree and the weak verdict is the same.
 TEST(SequenceProperty, WeakEqualsWeakOfFirstMatch) {
-  // A prefix witnesses inability for the sequence iff for its first_match.
-  auto prefix_inability_of_first_match = [](bool of_seq) { return of_seq; };
-  for (bool witnessed : {false, true}) {
-    EXPECT_EQ(
-        EvalWeakSequenceProperty(witnessed),
-        EvalWeakSequenceProperty(prefix_inability_of_first_match(witnessed)));
+  for (const auto& match_set : kOperandMatchSets) {
+    bool seq_prefix_inability = match_set.empty();
+    bool first_match_prefix_inability = !EvalFirstMatch(match_set).matched;
+    EXPECT_EQ(EvalWeakSequenceProperty(seq_prefix_inability),
+              EvalWeakSequenceProperty(first_match_prefix_inability));
   }
 }
 

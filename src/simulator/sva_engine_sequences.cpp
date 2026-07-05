@@ -38,7 +38,10 @@ bool MatchRepetition(const SvaSequence& seq,
       break;
     }
   }
-  return consecutive >= seq.rep_min && consecutive <= seq.rep_max;
+  // §16.9.2: a `$` maximum leaves the upper bound unbounded, so only the
+  // minimum iteration count constrains the match.
+  return consecutive >= seq.rep_min &&
+         (seq.rep_max_is_dollar || consecutive <= seq.rep_max);
 }
 
 bool MatchGotoRepetition(const SvaSequence& seq,
@@ -53,7 +56,7 @@ bool MatchGotoRepetition(const SvaSequence& seq,
 
   bool last_matches = seq.expr_check && seq.expr_check(vals.back());
   return last_matches && match_count >= seq.rep_min &&
-         match_count <= seq.rep_max;
+         (seq.rep_max_is_dollar || match_count <= seq.rep_max);
 }
 
 bool MatchNonConsecutiveRepetition(const SvaSequence& seq,
@@ -64,7 +67,8 @@ bool MatchNonConsecutiveRepetition(const SvaSequence& seq,
       ++match_count;
     }
   }
-  return match_count >= seq.rep_min && match_count <= seq.rep_max;
+  return match_count >= seq.rep_min &&
+         (seq.rep_max_is_dollar || match_count <= seq.rep_max);
 }
 
 bool MatchDelaySequence(const SvaSequence& seq,

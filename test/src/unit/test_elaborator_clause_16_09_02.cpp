@@ -69,6 +69,19 @@ TEST(RepetitionContext, GotoAndNonconsecutiveRequireBareBoolean) {
                                      /*boolean_has_attached_match_item=*/true));
 }
 
+TEST(RepetitionContext, NonconsecutiveRequiresBareBoolean) {
+  // §16.9.2: the Boolean-only restriction applies to nonconsecutive
+  // repetition exactly as it does to goto repetition. A non-Boolean operand
+  // is rejected; a bare Boolean operand is accepted.
+  EXPECT_FALSE(
+      IsRepetitionAllowedOn(RepetitionKind::kNonconsecutive,
+                            /*operand_is_boolean_expr=*/false,
+                            /*boolean_has_attached_match_item=*/false));
+  EXPECT_TRUE(IsRepetitionAllowedOn(RepetitionKind::kNonconsecutive,
+                                    /*operand_is_boolean_expr=*/true,
+                                    /*boolean_has_attached_match_item=*/false));
+}
+
 TEST(RepetitionZero, OnlyConsecutivePermitsZeroIterations) {
   // §16.9.2 (and the anchor for §16.9.2.1): only consecutive repetition
   // has a defined zero-iteration semantics. Goto/nonconsecutive require a

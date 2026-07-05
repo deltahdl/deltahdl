@@ -47,6 +47,11 @@ struct SvaSequence {
   uint32_t delay_cycles = 0;
   uint32_t rep_min = 0;
   uint32_t rep_max = 0;
+  // §16.9.2: the repetition maximum may be `$` — a finite but unbounded upper
+  // bound. When set, rep_max is ignored and only the rep_min lower bound
+  // constrains the iteration count. [*] is [*0:$] and [+] is [*1:$], both of
+  // which set this flag.
+  bool rep_max_is_dollar = false;
   std::function<bool(uint64_t)> expr_check;
 };
 
