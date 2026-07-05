@@ -318,17 +318,6 @@ TEST(AssignmentPatternLvalueParsing, NetLvalueInContinuousAssign) {
   EXPECT_EQ(assign_item->assign_lhs->kind, ExprKind::kAssignmentPattern);
 }
 
-TEST(PatternParsing, PatternParenthesizedConstant) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    if (v matches (5)) x = 1;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(PatternParsing, PatternTaggedMissingMember) {
   auto r = Parse(
       "module m;\n"
@@ -396,6 +385,116 @@ TEST(AssignmentPatternLvalueParsing, VariableLvalueInProceduralAssign) {
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
   ASSERT_NE(stmt->lhs, nullptr);
   EXPECT_EQ(stmt->lhs->kind, ExprKind::kAssignmentPattern);
+}
+
+// §A.6.7.1 constant_assignment_pattern_expression ::=
+// assignment_pattern_expression. The same '{...} assignment pattern must be
+// accepted in a constant-expression position — here a localparam initializer —
+// not only in the procedural and continuous-assign positions the other tests
+// cover. The parser reaches the same ParseAssignmentPattern code, so the
+// resulting node is a plain kAssignmentPattern.
+TEST(ConstantAssignmentPatternExpressionParsing, PositionalInLocalparam) {
+  auto r = Parse(
+      "module m;\n"
+      "  localparam int LP[3] = '{1, 2, 3};\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* param = FindItemByKind(r, ModuleItemKind::kParamDecl);
+  ASSERT_NE(param, nullptr);
+  ASSERT_NE(param->init_expr, nullptr);
+  EXPECT_EQ(param->init_expr->kind, ExprKind::kAssignmentPattern);
+  EXPECT_EQ(param->init_expr->elements.size(), 3u);
+}
+
+// §A.6.7.1: a member-keyed structure pattern is equally valid as a
+// constant_assignment_pattern_expression; drive it through a value parameter's
+// default (a constant-expression position) built from a real struct typedef.
+TEST(ConstantAssignmentPatternExpressionParsing, StructureKeyedInParameter) {
+  auto r = Parse(
+      "module m;\n"
+      "  typedef struct { int x; int y; } pt_t;\n"
+      "  parameter pt_t P = '{x: 1, y: 2};\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* param = FindItemByKind(r, ModuleItemKind::kParamDecl);
+  ASSERT_NE(param, nullptr);
+  ASSERT_NE(param->init_expr, nullptr);
+  EXPECT_EQ(param->init_expr->kind, ExprKind::kAssignmentPattern);
+  ASSERT_EQ(param->init_expr->pattern_keys.size(), 2u);
+  EXPECT_EQ(param->init_expr->pattern_keys[0], "x");
+  EXPECT_EQ(param->init_expr->pattern_keys[1], "y");
+}
+
+// §A.6.7.1 assignment_pattern ::= '{ constant_expression { expression {, ...} }
+// }. The replication count is a constant_expression; exercise the parameter
+// form (a §11.2.1 constant other than an integer literal, unlike the
+// Replication test above). The count node is the referenced identifier, not a
+// literal.
+TEST(AssignmentPatternParsing, ReplicationCountFromParameter) {
+  auto r = Parse(
+      "module m;\n"
+      "  parameter N = 3;\n"
+      "  int a[6];\n"
+      "  initial a = '{N{0, 1}};\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_NE(stmt->rhs, nullptr);
+  EXPECT_EQ(stmt->rhs->kind, ExprKind::kAssignmentPattern);
+  ASSERT_EQ(stmt->rhs->elements.size(), 1u);
+  auto* rep = stmt->rhs->elements[0];
+  EXPECT_EQ(rep->kind, ExprKind::kReplicate);
+  ASSERT_NE(rep->repeat_count, nullptr);
+  EXPECT_EQ(rep->repeat_count->kind, ExprKind::kIdentifier);
+}
+
+// §A.6.7.1 pattern ::= constant_expression. The PatternConstantExpr test covers
+// the integer-literal constant form; a named constant (a localparam) is the
+// other §11.2.1 constant form and reaches the pattern through the identifier
+// branch of primary-expression parsing rather than the literal branch.
+// Complements the literal case so both constant-expression parse paths are
+// observed.
+TEST(PatternParsing, PatternConstantExprParameter) {
+  auto r = Parse(
+      "module m;\n"
+      "  localparam P = 5;\n"
+      "  initial begin\n"
+      "    case(x) matches\n"
+      "      P: y = 8'd1;\n"
+      "      default: y = 8'd0;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+// §A.6.7.1 negative: the keyed assignment-pattern form
+// '{ structure_pattern_key : expression } requires an expression after the
+// colon. Omitting it must be rejected at parse time.
+TEST(AssignmentPatternParsing, KeyedMissingValue) {
+  auto r = Parse(
+      "module m;\n"
+      "  int a;\n"
+      "  initial a = '{x:};\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+// §A.6.7.1 negative: pattern ::= . variable_identifier requires an identifier
+// after the dot; a dot with no following identifier must be rejected.
+TEST(PatternParsing, PatternDotMissingIdentifier) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    if (v matches .) x = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
 }
 
 }  // namespace
