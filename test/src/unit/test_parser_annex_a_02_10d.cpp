@@ -105,6 +105,19 @@ TEST(AssertionDeclParsing, SequencePortItem_DefaultValue) {
               "endmodule\n"));
 }
 
+TEST(AssertionDeclParsing, SequencePortItem_VariableDimension) {
+  // sequence_port_item admits {variable_dimension} after the
+  // formal_port_identifier: `sequence_formal_type formal_id
+  // {variable_dimension}
+  // [= sequence_actual_arg]`. Observe that a dimensioned formal is accepted.
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  sequence s(int x [3:0]);\n"
+              "    x[0] ##1 x[1];\n"
+              "  endsequence\n"
+              "endmodule\n"));
+}
+
 TEST(AssertionDeclParsing, SequencePortItem_LocalInout) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
