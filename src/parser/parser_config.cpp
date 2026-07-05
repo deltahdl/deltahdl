@@ -7,7 +7,12 @@ namespace delta {
 void Parser::ParseDesignStatement(ConfigDecl* decl) {
   Expect(TokenKind::kKwDesign);
   while (!Check(TokenKind::kSemicolon) && !AtEnd()) {
+    auto before = lexer_.SavePos().pos;
     auto first = ExpectIdentifier().text;
+    // A token that is not a cell_identifier (e.g. the 'endconfig' keyword after
+    // a design_statement whose terminating ';' is missing) leaves the cursor
+    // unmoved. Stop so the Expect(';') below reports it instead of spinning.
+    if (lexer_.SavePos().pos == before) break;
     std::string_view lib;
     std::string_view cell = first;
     if (Match(TokenKind::kDot)) {
@@ -62,8 +67,16 @@ void Parser::ParseUseClause(ConfigRule* rule) {
     } else {
       rule->use_cell = first;
     }
-    while (Match(TokenKind::kComma)) {
-      ParseNamedParamAssignment(rule);
+    // use_clause form 3: a named_parameter_assignment may directly follow the
+    // cell_identifier with no separating comma ('use lib.cell .p(v), .q(w)'),
+    // any further assignments being comma-separated. A leading comma
+    // ('use lib.cell , .p(v)') is also tolerated as a lenient continuation.
+    if (Check(TokenKind::kDot)) {
+      parse_named_param_list();
+    } else {
+      while (Match(TokenKind::kComma)) {
+        ParseNamedParamAssignment(rule);
+      }
     }
   } else if (Check(TokenKind::kDot)) {
     // use_clause form: named_parameter_assignment
@@ -102,10 +115,16 @@ ConfigRule* Parser::ParseConfigRule() {
     Consume();
     rule->kind = ConfigRuleKind::kInstance;
     rule->inst_path = ParseDottedPath();
+    // Every config_rule_statement pairs a selection clause with an expansion
+    // clause: an inst_clause is legal only when followed by a liblist_clause or
+    // a use_clause. A bare 'instance <path>;' matches no grammar alternative.
     if (Check(TokenKind::kKwLiblist)) {
       ParseLiblistClause(rule);
     } else if (Check(TokenKind::kKwUse)) {
       ParseUseClause(rule);
+    } else {
+      diag_.Error(CurrentLoc(),
+                  "instance selection requires a 'liblist' or 'use' clause");
     }
   } else if (Check(TokenKind::kKwCell)) {
     Consume();
@@ -117,10 +136,16 @@ ConfigRule* Parser::ParseConfigRule() {
     } else {
       rule->cell_name = first;
     }
+    // As with an inst_clause, a cell_clause is legal only when followed by a
+    // liblist_clause or a use_clause; a bare 'cell <name>;' is not a
+    // config_rule_statement.
     if (Check(TokenKind::kKwLiblist)) {
       ParseLiblistClause(rule);
     } else if (Check(TokenKind::kKwUse)) {
       ParseUseClause(rule);
+    } else {
+      diag_.Error(CurrentLoc(),
+                  "cell selection requires a 'liblist' or 'use' clause");
     }
   }
   Expect(TokenKind::kSemicolon);

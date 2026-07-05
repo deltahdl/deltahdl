@@ -86,6 +86,17 @@ TEST(ConfigDesignStatementParsing, CollectsQualifiedAndBareCells) {
   EXPECT_EQ(cells[1].second, "other");
 }
 
+// design_statement ends with a required ';' terminal. Omitting it (so the
+// 'endconfig' keyword appears where a cell_identifier or ';' is expected) is
+// rejected rather than silently accepted.
+TEST(ConfigDesignStatementParsing, MissingTerminatingSemicolonRejected) {
+  auto r = Parse(
+      "config c;\n"
+      "  design top\n"
+      "endconfig\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
 // design_statement's cell list is a { } repetition, so an empty list still
 // forms a well-formed statement at the grammar level.
 TEST(ConfigDesignStatementParsing, EmptyCellListParses) {
@@ -114,6 +125,30 @@ TEST(ConfigRuleStatementParsing, AllFiveAlternativesParse) {
   ASSERT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->configs.size(), 1u);
   EXPECT_EQ(r.cu->configs[0]->rules.size(), 5u);
+}
+
+// config_rule_statement has no bare 'inst_clause ;' alternative: an inst_clause
+// must be paired with a liblist_clause or a use_clause. A selection with no
+// expansion clause is rejected.
+TEST(ConfigRuleStatementParsing,
+     InstanceSelectionWithoutExpansionClauseRejected) {
+  auto r = Parse(
+      "config c;\n"
+      "  design top;\n"
+      "  instance top.a;\n"
+      "endconfig\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+// Likewise there is no bare 'cell_clause ;' alternative; a cell selection with
+// no liblist/use expansion clause is rejected.
+TEST(ConfigRuleStatementParsing, CellSelectionWithoutExpansionClauseRejected) {
+  auto r = Parse(
+      "config c;\n"
+      "  design top;\n"
+      "  cell adder;\n"
+      "endconfig\n");
+  EXPECT_TRUE(r.has_errors);
 }
 
 // default_clause ::= default
@@ -209,6 +244,23 @@ TEST(ConfigUseClauseParsing, CellWithLibraryAndConfigSuffix) {
   EXPECT_TRUE(rule->use_config);
 }
 
+// use_clause ::= use [ library_identifier . ] cell_identifier [ : config ]
+// Form 1 with the optional '[ library_identifier . ]' omitted and no ': config'
+// suffix: a plain unqualified cell_identifier binding.
+TEST(ConfigUseClauseParsing, BareCellFormOne) {
+  auto r = Parse(
+      "config c;\n"
+      "  design top;\n"
+      "  instance top.a use adder;\n"
+      "endconfig\n");
+  ASSERT_FALSE(r.has_errors);
+  auto* rule = r.cu->configs[0]->rules[0];
+  EXPECT_EQ(rule->use_lib, "");
+  EXPECT_EQ(rule->use_cell, "adder");
+  EXPECT_FALSE(rule->use_config);
+  EXPECT_TRUE(rule->use_params.empty());
+}
+
 // use_clause ::= use named_parameter_assignment
 //   { , named_parameter_assignment } [ : config ]
 TEST(ConfigUseClauseParsing, BareNamedParameterAssignmentList) {
@@ -242,6 +294,42 @@ TEST(ConfigUseClauseParsing, CellFollowedByNamedParameterAssignments) {
   EXPECT_TRUE(rule->use_config);
 }
 
+// use_clause ::= use [ library_identifier . ] cell_identifier
+//   named_parameter_assignment { , named_parameter_assignment } [ : config ]
+// Grammar form 3: the first named_parameter_assignment directly follows the
+// cell_identifier with no separating comma.
+TEST(ConfigUseClauseParsing, CellDirectlyFollowedByNamedParameterAssignments) {
+  auto r = Parse(
+      "config c;\n"
+      "  design top;\n"
+      "  instance top.a use gateLib.adder .W(8), .D(16) : config;\n"
+      "endconfig\n");
+  ASSERT_FALSE(r.has_errors);
+  auto* rule = r.cu->configs[0]->rules[0];
+  EXPECT_EQ(rule->use_lib, "gateLib");
+  EXPECT_EQ(rule->use_cell, "adder");
+  ASSERT_EQ(rule->use_params.size(), 2u);
+  EXPECT_EQ(rule->use_params[0].first, "W");
+  EXPECT_EQ(rule->use_params[1].first, "D");
+  EXPECT_TRUE(rule->use_config);
+}
+
+// The same form is valid for a bare (unqualified) cell_identifier.
+TEST(ConfigUseClauseParsing,
+     BareCellDirectlyFollowedByNamedParameterAssignment) {
+  auto r = Parse(
+      "config c;\n"
+      "  design top;\n"
+      "  instance top.a use adder .W(8);\n"
+      "endconfig\n");
+  ASSERT_FALSE(r.has_errors);
+  auto* rule = r.cu->configs[0]->rules[0];
+  EXPECT_EQ(rule->use_lib, "");
+  EXPECT_EQ(rule->use_cell, "adder");
+  ASSERT_EQ(rule->use_params.size(), 1u);
+  EXPECT_EQ(rule->use_params[0].first, "W");
+}
+
 // The bare named_parameter_assignment form also accepts the ': config' suffix.
 TEST(ConfigUseClauseParsing, BareNamedParametersWithConfigSuffix) {
   auto r = Parse(
@@ -268,6 +356,29 @@ TEST(ConfigUseClauseParsing, EmptyParameterExpressionAccepted) {
   ASSERT_EQ(rule->use_params.size(), 1u);
   EXPECT_EQ(rule->use_params[0].first, "W");
   EXPECT_EQ(rule->use_params[0].second, nullptr);
+}
+
+// A named_parameter_assignment value is a param_expression, so besides a
+// literal it may be a reference to a parameter -- here a localparam declared by
+// the config itself via a real local_parameter_declaration. This drives the
+// dependency's own syntax through the parser and observes the use_clause
+// capturing the (non-null) reference expression as the override value.
+TEST(ConfigUseClauseParsing, ParameterOverrideValueReferencesConfigLocalparam) {
+  auto r = Parse(
+      "config c;\n"
+      "  localparam W = 8;\n"
+      "  design top;\n"
+      "  instance top.a use adder .P(W);\n"
+      "endconfig\n");
+  ASSERT_FALSE(r.has_errors);
+  auto* cfg = r.cu->configs[0];
+  ASSERT_EQ(cfg->local_params.size(), 1u);
+  EXPECT_EQ(cfg->local_params[0].first, "W");
+  auto* rule = cfg->rules[0];
+  EXPECT_EQ(rule->use_cell, "adder");
+  ASSERT_EQ(rule->use_params.size(), 1u);
+  EXPECT_EQ(rule->use_params[0].first, "P");
+  EXPECT_NE(rule->use_params[0].second, nullptr);
 }
 
 }  // namespace
