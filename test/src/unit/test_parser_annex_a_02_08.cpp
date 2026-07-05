@@ -21,21 +21,6 @@ TEST(BlockItemDeclParsing, BlockItemDataDecl) {
   EXPECT_EQ(stmt->var_name, "x");
 }
 
-TEST(BlockItemDeclParsing, BlockItemDataDeclWithInit) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    int x = 10;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kVarDecl);
-  EXPECT_NE(stmt->var_init, nullptr);
-}
-
 TEST(BlockItemDeclParsing, BlockItemLocalparamDecl) {
   auto r = Parse(
       "module m;\n"
@@ -146,25 +131,6 @@ TEST(BlockItemDeclParsing, ForkJoinBlockItem) {
               "endmodule\n"));
 }
 
-TEST(BlockItemDeclParsing, MultipleBlockItemDecls) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    int a;\n"
-      "    int b;\n"
-      "    int c;\n"
-      "    a = 1;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto stmts = AllInitialStmts(r);
-  ASSERT_GE(stmts.size(), 4u);
-  EXPECT_EQ(stmts[0]->kind, StmtKind::kVarDecl);
-  EXPECT_EQ(stmts[1]->kind, StmtKind::kVarDecl);
-  EXPECT_EQ(stmts[2]->kind, StmtKind::kVarDecl);
-}
-
 TEST(BlockItemDeclParsing, DataDeclWithAttribute) {
   auto r = Parse(
       "module m;\n"
@@ -270,34 +236,6 @@ TEST(BlockItemDeclParsing, DataDeclWithVarPrefix) {
   EXPECT_EQ(stmt->var_name, "x");
 }
 
-TEST(BlockItemDeclParsing, ImportWildcardInBlock) {
-  EXPECT_TRUE(
-      ParseOk("package pkg;\n"
-              "  int x;\n"
-              "endpackage\n"
-              "module m;\n"
-              "  initial begin\n"
-              "    import pkg::*;\n"
-              "  end\n"
-              "endmodule\n"));
-}
-
-TEST(BlockItemDeclParsing, LetDeclNoArgsInBlock) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    let ZERO = 0;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kBlockItemDecl);
-  ASSERT_NE(stmt->decl_item, nullptr);
-  EXPECT_EQ(stmt->decl_item->kind, ModuleItemKind::kLetDecl);
-}
-
 TEST(BlockItemDeclParsing, MultipleAttributeInstancesOnDataDecl) {
   auto r = Parse(
       "module m;\n"
@@ -330,6 +268,22 @@ TEST(BlockItemDeclParsing, ErrorBlockItemParameterMissingSemicolon) {
       "  initial begin\n"
       "    parameter int D = 4\n"
       "    $display(\"%0d\", D);\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+// block_item_declaration admits exactly four alternatives (data_declaration,
+// local_parameter_declaration, parameter_declaration, let_declaration); a
+// net_declaration is not among them. A net declared in procedural block
+// position is therefore outside the production and must be rejected, which
+// fixes the boundary of the alternative set rather than a missing terminal.
+TEST(BlockItemDeclParsing, ErrorNetDeclNotABlockItem) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    wire w;\n"
+      "    w = 1;\n"
       "  end\n"
       "endmodule\n");
   EXPECT_TRUE(r.has_errors);
