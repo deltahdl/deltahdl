@@ -95,28 +95,6 @@ TEST(WildcardAssocArraySimulation, OverwriteKey) {
   EXPECT_EQ(v, 999u);
 }
 
-// §7.8.1 — wildcard indexing expressions are self-determined and treated as
-// unsigned: a value with its high bit set must key on its unsigned magnitude,
-// not a sign-extended negative.
-TEST(WildcardAssocArraySimulation, IndexTreatedAsUnsigned) {
-  SimFixture f;
-  auto* aa = f.ctx.CreateAssocArray(
-      "aa", 32, /*is_string_key=*/false,
-      AssocArraySpec{/*index_width=*/32, /*is_wildcard=*/true});
-
-  auto* sel = MakeAssocSelect(f.arena, 0xFFFFFFFF);
-  auto* stmt = f.arena.Create<Stmt>();
-  stmt->kind = StmtKind::kBlockingAssign;
-  stmt->lhs = sel;
-  stmt->rhs = f.arena.Create<Expr>();
-  stmt->rhs->kind = ExprKind::kIntegerLiteral;
-  stmt->rhs->int_val = 5;
-  ExecBlockingAssignImpl(stmt, f.ctx, f.arena);
-
-  EXPECT_EQ(aa->int_data.count(4294967295), 1u);
-  EXPECT_EQ(aa->int_data.count(-1), 0u);
-}
-
 // §7.8.1 — the same numeric value carried by indices of differing widths
 // collapses to a single entry (leading zeros dropped, minimal value used).
 TEST(WildcardAssocArraySimulation, EquivalentWidthsCollapse) {
@@ -131,36 +109,6 @@ TEST(WildcardAssocArraySimulation, EquivalentWidthsCollapse) {
       "endmodule\n",
       "result");
   EXPECT_EQ(v, 77u);
-}
-
-// §7.8.1 — a 4-state index value containing x or z is invalid, so the write is
-// rejected and no entry is created.
-TEST(WildcardAssocArraySimulation, UnknownIndexNotStored) {
-  SimFixture f;
-  auto* aa = f.ctx.CreateAssocArray(
-      "aa", 32, /*is_string_key=*/false,
-      AssocArraySpec{/*index_width=*/32, /*is_wildcard=*/true});
-
-  auto* sel = f.arena.Create<Expr>();
-  sel->kind = ExprKind::kSelect;
-  auto* base = f.arena.Create<Expr>();
-  base->kind = ExprKind::kIdentifier;
-  base->text = "aa";
-  sel->base = base;
-  auto* idx = f.arena.Create<Expr>();
-  idx->kind = ExprKind::kIntegerLiteral;
-  idx->text = "8'bx";
-  sel->index = idx;
-
-  auto* stmt = f.arena.Create<Stmt>();
-  stmt->kind = StmtKind::kBlockingAssign;
-  stmt->lhs = sel;
-  stmt->rhs = f.arena.Create<Expr>();
-  stmt->rhs->kind = ExprKind::kIntegerLiteral;
-  stmt->rhs->int_val = 9;
-  ExecBlockingAssignImpl(stmt, f.ctx, f.arena);
-
-  EXPECT_EQ(aa->Size(), 0u);
 }
 
 // §7.8.1 — a string literal index is cast to a bit vector of equivalent size,
@@ -195,29 +143,53 @@ TEST(WildcardAssocArraySimulation, SingleCharStringLiteralIndex) {
   EXPECT_EQ(v, 9u);
 }
 
-// §7.8.1 — an x/z index is also invalid when reading: it cannot match any
-// stored entry, so the read yields the array default rather than a stored
-// value. Exercises the read path (distinct from the rejected write).
-TEST(WildcardAssocArraySimulation, UnknownIndexReadReturnsDefault) {
-  SimFixture f;
-  auto* aa = f.ctx.CreateAssocArray(
-      "aa", 32, /*is_string_key=*/false,
-      AssocArraySpec{/*index_width=*/32, /*is_wildcard=*/true});
-  aa->int_data[5] = MakeLogic4VecVal(f.arena, 32, 77);
+// §7.8.1 — driven through the full pipeline: an x/z index is also invalid when
+// reading. A z-bearing index cannot match the stored key 5, so the read yields
+// the array default (0) rather than the stored 77. Exercises the read path,
+// distinct from the rejected write.
+TEST(WildcardAssocArraySimulation, UnknownIndexReadReturnsDefaultEndToEnd) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  int aa[*];\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    aa[5] = 77;\n"
+      "    result = aa[8'bz];\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 0u);
+}
 
-  auto* rd = f.arena.Create<Expr>();
-  rd->kind = ExprKind::kSelect;
-  auto* base = f.arena.Create<Expr>();
-  base->kind = ExprKind::kIdentifier;
-  base->text = "aa";
-  rd->base = base;
-  auto* idx = f.arena.Create<Expr>();
-  idx->kind = ExprKind::kIntegerLiteral;
-  idx->text = "8'bz";
-  rd->index = idx;
+// §7.8.1 — driven through the full pipeline: an index carrying x/z is invalid
+// at run time, so a write through it stores nothing. Observed with num(), which
+// returns a count (permitted on a wildcard array, unlike an index-returning
+// locator). The valid integral write on the same array is retained, isolating
+// the x/z rejection from ordinary storage.
+TEST(WildcardAssocArraySimulation, UnknownIndexNotStoredEndToEnd) {
+  auto rejected = RunAndGet(
+      "module t;\n"
+      "  int aa[*];\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    aa[8'bxx] = 9;\n"
+      "    result = aa.num();\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(rejected, 0u);
 
-  auto result = EvalExpr(rd, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 0u);
+  auto stored = RunAndGet(
+      "module t;\n"
+      "  int aa[*];\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    aa[3] = 9;\n"
+      "    result = aa.num();\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(stored, 1u);
 }
 
 // §7.8.1 — because indices are treated as unsigned, a key with its top bit set
@@ -245,6 +217,28 @@ TEST(WildcardAssocArraySimulation, UnsignedKeyOrdering) {
   EXPECT_EQ(it->first, 1);
   ++it;
   EXPECT_EQ(it->first, 4294967295);
+}
+
+// §7.8.1 — driven through the full pipeline: an index expression is
+// self-determined and treated as unsigned. A signed 32-bit variable holding -1
+// keys on its unsigned bit pattern (0xFFFFFFFF == 4294967295), so it addresses
+// the same entry as the plain unsigned literal 32'hFFFFFFFF. Were the index
+// sign-extended instead, the two writes/reads would land on different keys and
+// the read would miss.
+TEST(WildcardAssocArraySimulation, SignedVarIndexTreatedAsUnsignedEndToEnd) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  int aa[*];\n"
+      "  int s;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    s = -1;\n"
+      "    aa[s] = 55;\n"
+      "    result = aa[32'hFFFFFFFF];\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 55u);
 }
 
 }  // namespace

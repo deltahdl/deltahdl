@@ -126,6 +126,48 @@ TEST(WildcardIndexType, RealVariableIndexIsError) {
   EXPECT_TRUE(f.has_errors);
 }
 
+// §7.8.1 — the nonintegral prohibition covers every real-valued type. A
+// shortreal-typed variable used as the index is rejected.
+TEST(WildcardIndexType, ShortrealVariableIndexIsError) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  int aa[*];\n"
+      "  shortreal sr;\n"
+      "  initial aa[sr] = 0;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// §7.8.1 — likewise a realtime-typed variable is nonintegral and rejected as a
+// wildcard index.
+TEST(WildcardIndexType, RealtimeVariableIndexIsError) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  int aa[*];\n"
+      "  realtime rt;\n"
+      "  initial aa[rt] = 0;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// §7.8.1 — unique_index returns an array of index values, so like the other
+// index-returning locators it is not allowed on a wildcard associative array.
+TEST(WildcardIndexType, UniqueIndexOnWildcardIsError) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  int aa[*];\n"
+      "  int idx[$];\n"
+      "  initial idx = aa.unique_index with (item > 0);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
 // Contrast: an integral index on the same wildcard array elaborates cleanly.
 TEST(WildcardIndexType, IntegralIndexIsAllowed) {
   ElabFixture f;

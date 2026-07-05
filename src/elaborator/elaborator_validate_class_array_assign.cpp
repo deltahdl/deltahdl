@@ -486,10 +486,11 @@ static bool IsTraversalMethod(std::string_view name) {
 
 // §7.8.1 — array manipulation methods (§7.12) that yield an index value or an
 // array of index values. A wildcard-indexed associative array may not be used
-// with these, since its keys have no stable index domain to return.
+// with these, since its keys have no stable index domain to return. This
+// includes unique_index, which returns an array of the qualifying indices.
 static bool IsIndexReturningMethod(std::string_view name) {
   return name == "find_index" || name == "find_first_index" ||
-         name == "find_last_index";
+         name == "find_last_index" || name == "unique_index";
 }
 
 // §7.8.1 — true when `idx` is a nonintegral index expression for a wildcard
