@@ -143,8 +143,12 @@ std::vector<GrammarForm> ProductionForms(GrammarProduction production);
 // §F.3.2: in the strong/weak "sequence" forms of P, "each instance of R ...
 // shall be a nondegenerate unclocked sequence" and "R shall not be tightly
 // satisfied by the empty word"; the Q production states the same for its
-// clocked sequence S. This check enforces both clauses for such an operand by
-// deferring to §F.5.2's nondegeneracy and tight-satisfaction definitions.
+// clocked sequence S. §F.3.2 points at both §F.5.2 and §F.5.5 for the
+// definitions of nondegeneracy and tight satisfaction: §F.5.2 defines them for
+// sequences without local variables, §F.5.5 for sequences with local variables.
+// This check enforces both clauses by deferring to §F.5.2 for a plain operand
+// and to §F.5.5, which §F.5.2 does not subsume, once the operand carries a
+// local variable.
 bool SequenceOperandSatisfiesNondegeneracyRequirement(const SequenceExpr& seq);
 
 }  // namespace delta

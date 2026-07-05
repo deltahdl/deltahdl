@@ -7,6 +7,7 @@
 
 #include "elaborator/annex_f_notation.h"
 #include "elaborator/annex_f_tight_satisfaction.h"
+#include "elaborator/annex_f_tight_satisfaction_local_variables.h"
 
 namespace delta {
 
@@ -306,10 +307,43 @@ std::vector<GrammarForm> ProductionForms(GrammarProduction production) {
   return {};
 }
 
+namespace {
+
+// Whether a local-variable form -- ( t v; R ) or ( 1, v = e ) -- appears
+// anywhere in the sequence. §F.5.2's tight-satisfaction model does not cover
+// these forms (its slice rules reject them), so when one is present the §F.5.5
+// definitions, which do model local variables, are the applicable ones.
+bool SequenceUsesLocalVariables(const SequenceExpr& seq) {
+  if (seq.kind == SequenceExpr::Kind::kLocalVarDecl ||
+      seq.kind == SequenceExpr::Kind::kLocalVarSampling) {
+    return true;
+  }
+  if (seq.lhs != nullptr && SequenceUsesLocalVariables(*seq.lhs)) {
+    return true;
+  }
+  if (seq.rhs != nullptr && SequenceUsesLocalVariables(*seq.rhs)) {
+    return true;
+  }
+  return false;
+}
+
+}  // namespace
+
 bool SequenceOperandSatisfiesNondegeneracyRequirement(const SequenceExpr& seq) {
   // §F.3.2 imposes two conditions on the sequence operand of a strong/weak
   // sequence property: it shall be nondegenerate, and it shall not be tightly
-  // satisfied by the empty word. Both definitions live in §F.5.2.
+  // satisfied by the empty word. §F.3.2 cites both §F.5.2 (the definitions
+  // without local variables) and §F.5.5 (the definitions with local variables)
+  // for these terms. When the operand carries a local variable, §F.5.2 cannot
+  // evaluate it, so the §F.5.5 definitions -- which generalize §F.5.2 -- apply:
+  // nondegeneracy is IsNondegenerateSequenceWithLocals, and "tightly satisfied
+  // by the empty word" is the empty word yielding some output context from the
+  // empty input context.
+  if (SequenceUsesLocalVariables(seq)) {
+    const bool kEmptyWordMatches =
+        !TightSatisfactionOutputs(Word{}, seq, LocalContext{}).empty();
+    return IsNondegenerateSequenceWithLocals(seq) && !kEmptyWordMatches;
+  }
   return IsNondegenerateSequence(seq) && !TightlySatisfiedByEmptyWord(seq);
 }
 

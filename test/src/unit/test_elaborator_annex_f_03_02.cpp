@@ -78,6 +78,21 @@ TEST(AbstractGrammar, ClockedPropertyProductionForms) {
                 "and", "implication", "nexttime", "until", "abort"}));
 }
 
+// §F.3.2: the implication form of Q is ( S |-> Q ) -- unlike P's ( R |-> P ),
+// its antecedent is a clocked sequence S and its consequent a clocked property
+// Q. This pins the clocked counterpart of the unclocked implication operands.
+TEST(AbstractGrammar, ClockedPropertyImplicationOperands) {
+  const auto kForms = ProductionForms(GrammarProduction::kClockedProperty);
+  bool found = false;
+  for (const auto& form : kForms) {
+    if (form.label == "implication") {
+      found = true;
+      EXPECT_EQ(form.operands, (std::vector<std::string>{"S", "Q"}));
+    }
+  }
+  EXPECT_TRUE(found);
+}
+
 // §F.3.2: the unclocked top-level property T is a plain property, a
 // disable-iff guarded property, a declaration, or a parenthesized form.
 TEST(AbstractGrammar, UnclockedTopLevelPropertyProductionForms) {
@@ -102,6 +117,21 @@ TEST(AbstractGrammar, AssertionProductionForms) {
   EXPECT_EQ(Labels(GrammarProduction::kAssertion),
             (std::vector<std::string>{"always", "always with clock", "initial",
                                       "initial with clock"}));
+}
+
+// §F.3.2: the assertion operands encode the clocked/unclocked split of the
+// bodies. The unclocked always/initial forms take a clocked top-level property
+// U; the "with clock" forms take a Boolean clock b over an unclocked top-level
+// property T. This observes the RHS operand shapes, not just the form labels.
+TEST(AbstractGrammar, AssertionFormOperandsDistinguishClockedBodies) {
+  const auto kForms = ProductionForms(GrammarProduction::kAssertion);
+  ASSERT_EQ(kForms.size(), 4u);
+  EXPECT_EQ(kForms[0].operands, (std::vector<std::string>{"U"}));  // always
+  EXPECT_EQ(kForms[1].operands,
+            (std::vector<std::string>{"b", "T"}));  // always with clock
+  EXPECT_EQ(kForms[2].operands, (std::vector<std::string>{"U"}));  // initial
+  EXPECT_EQ(kForms[3].operands,
+            (std::vector<std::string>{"b", "T"}));  // initial with clock
 }
 
 // §F.3.2's productions are named by the §F.3.3 metavariable conventions: each
@@ -220,6 +250,40 @@ TEST(AbstractGrammar, DegenerateClockedSequenceOperandIsRejected) {
   auto clocked =
       SeqClock(BoolAtom("clk"), SeqNullRepeat(SeqBoolean(BoolAtom("a"))));
   EXPECT_FALSE(SequenceOperandSatisfiesNondegeneracyRequirement(*clocked));
+}
+
+// §F.3.2 cites §F.5.5 as well as §F.5.2 for the definitions of nondegeneracy
+// and tight satisfaction. A sequence operand that samples a local variable,
+// ( 1, v = e ), admits a one-letter match and never the empty word, so it is a
+// nondegenerate operand. §F.5.2 does not model the sampling form, so only the
+// §F.5.5 definition classifies it correctly -- and the requirement check must
+// consult that definition to accept the operand.
+TEST(AbstractGrammar, NondegenerateLocalVariableSamplingOperandIsAccepted) {
+  auto sampling = SeqLocalVarSampling("v");
+  EXPECT_TRUE(SequenceOperandSatisfiesNondegeneracyRequirement(*sampling));
+}
+
+// §F.3.2 (via §F.5.5): a local-variable operand that admits only the empty
+// match is still degenerate. ( t v; a[*0] ) declares v over a null repetition,
+// whose body matches only the empty word, so no nonempty word satisfies it and
+// it is rejected.
+TEST(AbstractGrammar, DegenerateLocalVariableOperandIsRejected) {
+  auto empty_only =
+      SeqLocalVarDecl("int", "v", SeqNullRepeat(SeqBoolean(BoolAtom("a"))));
+  EXPECT_FALSE(SequenceOperandSatisfiesNondegeneracyRequirement(*empty_only));
+}
+
+// §F.3.2 (via §F.5.5): even a nondegenerate local-variable operand is rejected
+// when it can also be tightly satisfied by the empty word. ( a[*0] or (1, v=e)
+// ) admits a one-letter match through the sampling branch yet also matches the
+// empty word through the null-repetition branch, so the empty-word clause
+// rejects it -- and only the §F.5.5 tight-satisfaction relation, which models
+// the sampling branch, evaluates this operand.
+TEST(AbstractGrammar, LocalVariableOperandMatchingEmptyWordIsRejected) {
+  auto admits_empty_too =
+      SeqOr(SeqNullRepeat(SeqBoolean(BoolAtom("a"))), SeqLocalVarSampling("v"));
+  EXPECT_FALSE(
+      SequenceOperandSatisfiesNondegeneracyRequirement(*admits_empty_too));
 }
 
 }  // namespace
