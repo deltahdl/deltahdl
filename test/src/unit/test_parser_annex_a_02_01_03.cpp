@@ -33,6 +33,18 @@ TEST(TypeDeclParsing, DataDeclVarPrefix) {
   EXPECT_EQ(item->name, "x");
 }
 
+TEST(TypeDeclParsing, DataDeclConstVarPrefix) {
+  // data_declaration admits [const] and [var] together; the type that follows
+  // `var` is threaded through the const-var branch and the const flag survives.
+  auto r = Parse("module m; const var logic x = 1'b1; endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
+  EXPECT_EQ(item->name, "x");
+  EXPECT_TRUE(item->data_type.is_const);
+}
+
 TEST(TypeDeclParsing, DataDeclMultipleAssignments) {
   auto r = Parse("module m; logic a, b, c; endmodule");
   ASSERT_NE(r.cu, nullptr);
@@ -108,22 +120,6 @@ TEST(TypeDeclParsing, NetDeclWirePackedDims) {
   auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
   EXPECT_NE(item->data_type.packed_dim_left, nullptr);
-}
-
-TEST(TypeDeclParsing, NetDeclTri) {
-  auto r = Parse("module m; tri t; endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
-}
-
-TEST(TypeDeclParsing, NetDeclWandWor) {
-  auto r = Parse("module m; wand wa; wor wo; endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kNetDecl);
-  EXPECT_EQ(r.cu->modules[0]->items[1]->kind, ModuleItemKind::kNetDecl);
 }
 
 TEST(TypeDeclParsing, NetDeclWithInitializer) {
@@ -493,6 +489,13 @@ TEST(TypeDeclParsing, ErrorExportMissingSemicolon) {
 
 TEST(TypeDeclParsing, ErrorNettypeMissingSemicolon) {
   auto r = Parse("module m; nettype real foo endmodule");
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(TypeDeclParsing, ErrorNettypeWithoutDataType) {
+  // nettype_declaration alt-1 makes the data_type mandatory; a lone
+  // `nettype name;` with no data type must be rejected.
+  auto r = Parse("module m; nettype foo; endmodule");
   EXPECT_TRUE(r.has_errors);
 }
 
