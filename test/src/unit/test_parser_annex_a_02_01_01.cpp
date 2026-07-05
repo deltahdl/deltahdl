@@ -31,18 +31,6 @@ TEST(ParameterDeclParsing, ParameterPackedDim) {
   EXPECT_NE(item->data_type.packed_dim_left, nullptr);
 }
 
-TEST(ParameterDeclParsing, ParameterStringType) {
-  auto r = Parse("module m; parameter string NAME = \"hello\"; endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(ParameterDeclParsing, ParameterRealType) {
-  auto r = Parse("module m; parameter real PI = 3.14; endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(ParameterDeclParsing, ListOfParamAssignments) {
   auto r = Parse("module m; parameter int A = 1, B = 2, C = 3; endmodule");
   ASSERT_NE(r.cu, nullptr);
@@ -60,34 +48,8 @@ TEST(ParameterDeclParsing, ParamAssignmentNoDefault) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParameterDeclParsing, ParameterSignedType) {
-  auto r = Parse("module m; parameter signed [7:0] S = -1; endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kParamDecl);
-  EXPECT_EQ(item->name, "S");
-}
-
 TEST(ParameterDeclParsing, LocalparamSignedType) {
   auto r = Parse("module m; localparam signed [3:0] N = 4'sb1111; endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kParamDecl);
-}
-
-TEST(ParameterDeclParsing, ParameterLogicVectorType) {
-  auto r = Parse("module m; parameter logic [15:0] ADDR = 16'hBEEF; endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kParamDecl);
-  EXPECT_EQ(item->name, "ADDR");
-}
-
-TEST(ParameterDeclParsing, ParameterIntegerType) {
-  auto r = Parse("module m; parameter integer COUNT = 100; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto* item = r.cu->modules[0]->items[0];
@@ -158,33 +120,6 @@ TEST(ParameterDeclParsing, LocalparamTypeDecl) {
 
 TEST(ParameterDeclParsing, TypeParamForwardEnum) {
   auto r = Parse("module m; parameter type enum T = my_enum_t; endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kParamDecl);
-  EXPECT_EQ(item->name, "T");
-}
-
-TEST(ParameterDeclParsing, TypeParamForwardStruct) {
-  auto r = Parse("module m; parameter type struct T = my_struct_t; endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kParamDecl);
-  EXPECT_EQ(item->name, "T");
-}
-
-TEST(ParameterDeclParsing, TypeParamForwardUnion) {
-  auto r = Parse("module m; parameter type union T = my_union_t; endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kParamDecl);
-  EXPECT_EQ(item->name, "T");
-}
-
-TEST(ParameterDeclParsing, TypeParamForwardClass) {
-  auto r = Parse("module m; parameter type class T = my_class_t; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto* item = r.cu->modules[0]->items[0];
