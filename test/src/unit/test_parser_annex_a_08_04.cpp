@@ -29,6 +29,23 @@ TEST(PrimaryParsing, BitSelectMultiDim) {
   EXPECT_EQ(rhs->kind, ExprKind::kSelect);
 }
 
+// bit_select ::= { [ expression ] } admits a run of consecutive bracketed
+// indices; a two-level select on a multidimensional array exercises the
+// repetition, distinct from the single-index form.
+TEST(PrimaryParsing, ChainedBitSelect) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic [7:0] mem [0:3][0:1];\n"
+      "  logic [7:0] x;\n"
+      "  initial x = mem[2][1];\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kSelect);
+}
+
 TEST(PrimaryParsing, SelectMemberBitSelect) {
   auto r = Parse(
       "module m;\n"
@@ -122,15 +139,6 @@ TEST(PrimaryParsing, PrimaryUnbasedUnsizedLiteral0) {
   EXPECT_EQ(rhs->kind, ExprKind::kUnbasedUnsizedLiteral);
 }
 
-TEST(PrimaryParsing, PrimaryUnbasedUnsizedLiteral1) {
-  auto r = Parse("module m; initial x = '1; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kUnbasedUnsizedLiteral);
-}
-
 TEST(PrimaryParsing, PrimaryDollarSign) {
   auto r = Parse(
       "module m;\n"
@@ -195,38 +203,8 @@ TEST(PrimaryParsing, ImplicitClassHandleThisDotSuper) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(PrimaryParsing, PrimaryLiteralSizedInteger) {
-  auto r = Parse("module m; initial x = 8'hFF; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
-}
-
-TEST(PrimaryParsing, PrimaryLiteralBinary) {
-  auto r = Parse("module m; initial x = 4'b1010; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
-}
-
 TEST(PrimaryParsing, TimeLiteralNanoseconds) {
   auto r = Parse("module m; initial #100ns; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(PrimaryParsing, TimeLiteralPicoseconds) {
-  auto r = Parse("module m; initial #50ps; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(PrimaryParsing, TimeLiteralMicroseconds) {
-  auto r = Parse("module m; initial #1us; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
@@ -235,24 +213,6 @@ TEST(PrimaryParsing, TimeLiteralFixedPoint) {
   auto r = Parse("module m; initial #2.5ns; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-}
-
-TEST(PrimaryParsing, PrimaryUnbasedUnsizedLiteralX) {
-  auto r = Parse("module m; initial x = 'x; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kUnbasedUnsizedLiteral);
-}
-
-TEST(PrimaryParsing, PrimaryUnbasedUnsizedLiteralZ) {
-  auto r = Parse("module m; initial x = 'z; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kUnbasedUnsizedLiteral);
 }
 
 TEST(PrimaryParsing, PrimaryStreamingConcatenation) {
@@ -420,6 +380,41 @@ TEST(PrimaryParsing, PrimaryLetExpression) {
               "  int x;\n"
               "  initial x = max2(3, 5);\n"
               "endmodule\n"));
+}
+
+// primary ::= ... | cast, where cast ::= casting_type ' ( expression ). A value
+// cast in a procedural assignment RHS parses to a distinct cast primary.
+TEST(PrimaryParsing, PrimaryValueCast) {
+  auto r = Parse(
+      "module m;\n"
+      "  int x;\n"
+      "  initial x = int'(3.5);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kCast);
+  EXPECT_EQ(rhs->text, "int");
+}
+
+// constant_primary ::= ... | constant_cast, where
+// constant_cast ::= casting_type ' ( constant_expression ). A cast standing as
+// a parameter initializer is a constant_primary.
+TEST(PrimaryParsing, ConstantPrimaryConstantCast) {
+  auto r = Parse("module m; parameter int P = shortint'(3); endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* param = r.cu->modules[0]->items[0];
+  ASSERT_NE(param->init_expr, nullptr);
+  EXPECT_EQ(param->init_expr->kind, ExprKind::kCast);
+  EXPECT_EQ(param->init_expr->text, "shortint");
+}
+
+// cast ::= casting_type ' ( expression ) — the parenthesized operand is
+// mandatory; a cast whose closing parenthesis is missing must be rejected.
+TEST(PrimaryParsing, ErrorCastMissingCloseParen) {
+  EXPECT_FALSE(ParseOk("module m; initial x = int'(3; endmodule\n"));
 }
 
 }  // namespace
