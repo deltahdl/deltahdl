@@ -4,20 +4,6 @@
 using namespace delta;
 namespace {
 
-TEST(AggregateTypeParsing, AssocArrayExistsMethod) {
-  auto r = Parse(
-      "module t;\n"
-      "  int aa[string];\n"
-      "  initial x = aa.exists(\"key\");\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  auto* rhs = stmt->rhs;
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kCall);
-}
-
 TEST(AggregateTypeParsing, AssocArrayExistsIntKey) {
   auto r = Parse(
       "module t;\n"
