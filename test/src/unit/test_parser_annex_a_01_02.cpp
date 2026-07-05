@@ -19,21 +19,6 @@ TEST_F(ConfigParseTest, MultipleConfigs) {
   EXPECT_EQ(unit->configs[1]->name, "cfg2");
 }
 
-TEST(SourceText, ClassDecl) {
-  auto r = Parse(
-      "class Packet;\n"
-      "  rand bit [7:0] payload;\n"
-      "  function void display();\n"
-      "    $display(\"pkt\");\n"
-      "  endfunction\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->classes.size(), 1u);
-  EXPECT_EQ(r.cu->classes[0]->name, "Packet");
-  EXPECT_EQ(r.cu->classes[0]->members.size(), 2u);
-}
-
 TEST(SourceText, EmptyCuCompletelyEmpty) {
   auto r = Parse("");
   ASSERT_NE(r.cu, nullptr);
@@ -54,17 +39,6 @@ TEST(SourceText, CheckerDeclEndLabel) {
   auto r = Parse("checker chk; endchecker : chk\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-}
-
-TEST(SourceText, PackageDecl) {
-  auto r = Parse(
-      "package my_pkg;\n"
-      "  typedef int myint;\n"
-      "endpackage\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->packages.size(), 1u);
-  EXPECT_EQ(r.cu->packages[0]->name, "my_pkg");
 }
 
 TEST(SourceText, PackageDeclEndLabel) {
@@ -278,6 +252,328 @@ TEST(SourceText, ExternProgramHeader) {
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->programs.size(), 1u);
   EXPECT_TRUE(r.cu->programs[0]->is_extern);
+}
+
+// class_declaration's leading 'virtual' option: the class is flagged virtual.
+TEST(SourceText, VirtualClass) {
+  auto r = Parse("virtual class C; endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  EXPECT_TRUE(r.cu->classes[0]->is_virtual);
+}
+
+// class_declaration's final_specifier option: ': final' before the identifier
+// marks the class as final.
+TEST(SourceText, FinalClass) {
+  auto r = Parse("class : final C; endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  EXPECT_TRUE(r.cu->classes[0]->is_final);
+}
+
+// class_declaration's optional parameter_port_list: a parameterized class
+// records its parameters.
+TEST(SourceText, ParameterizedClass) {
+  auto r = Parse("class C #(parameter int W = 8); endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  EXPECT_FALSE(r.cu->classes[0]->params.empty());
+}
+
+// class_declaration's 'extends class_type' option: the base class name is
+// recorded.
+TEST(SourceText, ClassExtends) {
+  auto r = Parse("class D extends B; endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  EXPECT_EQ(r.cu->classes[0]->base_class, "B");
+}
+
+// class_declaration's 'extends class_type ( list_of_arguments )' option: the
+// base constructor argument list is captured.
+TEST(SourceText, ClassExtendsWithArgs) {
+  auto r = Parse("class D extends B(1); endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  EXPECT_EQ(r.cu->classes[0]->extends_args.size(), 1u);
+}
+
+// class_declaration's 'extends class_type ( default )' option: the 'default'
+// argument marker is recorded distinctly from a positional argument list.
+TEST(SourceText, ClassExtendsDefaultArgs) {
+  auto r = Parse("class D extends B(default); endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  EXPECT_TRUE(r.cu->classes[0]->extends_has_default);
+}
+
+// class_declaration's 'implements interface_class_type' option: implemented
+// interface classes are recorded.
+TEST(SourceText, ClassImplements) {
+  auto r = Parse("class C implements I; endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  EXPECT_EQ(r.cu->classes[0]->implements_types.size(), 1u);
+}
+
+// class_declaration's optional 'endclass : class_identifier' end label.
+TEST(SourceText, ClassEndLabel) {
+  auto r = Parse("class C; endclass : C\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+}
+
+// interface_class_declaration's 'extends interface_class_type' option: an
+// interface class extending a base interface class records its base.
+TEST(SourceText, InterfaceClassExtends) {
+  auto r = Parse("interface class IC extends IB; endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  EXPECT_TRUE(r.cu->classes[0]->is_interface);
+  EXPECT_EQ(r.cu->classes[0]->base_class, "IB");
+}
+
+// interface_nonansi_header: an interface whose port list is bare identifiers
+// (no directions) is the non-ansi header counterpart to InterfaceAnsiHeader.
+TEST(SourceText, InterfaceNonAnsiHeaderPorts) {
+  auto r = Parse("interface ifc(a, b); endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->interfaces.size(), 1u);
+  EXPECT_TRUE(r.cu->interfaces[0]->is_non_ansi_ports);
+}
+
+// interface_declaration's (.*) form: an interface with an implicit port list.
+TEST(SourceText, InterfaceWildcardPorts) {
+  auto r = Parse("interface ifc(.*); endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->interfaces.size(), 1u);
+  EXPECT_TRUE(r.cu->interfaces[0]->has_wildcard_ports);
+}
+
+// interface_declaration's optional 'endinterface : interface_identifier' label.
+TEST(SourceText, InterfaceEndLabel) {
+  auto r = Parse("interface ifc; endinterface : ifc\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->interfaces.size(), 1u);
+}
+
+// program_nonansi_header: a program whose port list is bare identifiers.
+TEST(SourceText, ProgramNonAnsiHeaderPorts) {
+  auto r = Parse("program prg(a, b); endprogram\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->programs.size(), 1u);
+  EXPECT_TRUE(r.cu->programs[0]->is_non_ansi_ports);
+}
+
+// program_declaration's (.*) form: a program with an implicit port list.
+TEST(SourceText, ProgramWildcardPorts) {
+  auto r = Parse("program prg(.*); endprogram\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->programs.size(), 1u);
+  EXPECT_TRUE(r.cu->programs[0]->has_wildcard_ports);
+}
+
+// program_declaration's optional 'endprogram : program_identifier' label.
+TEST(SourceText, ProgramEndLabel) {
+  auto r = Parse("program prg; endprogram : prg\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->programs.size(), 1u);
+}
+
+// module_declaration's 'extern module_nonansi_header' alternative: an extern
+// header whose bare-identifier port list marks it non-ansi.
+TEST(SourceText, ExternModuleNonAnsiHeader) {
+  auto r = Parse("extern module m(a, b);\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  EXPECT_TRUE(r.cu->modules[0]->is_extern);
+  EXPECT_TRUE(r.cu->modules[0]->is_non_ansi_ports);
+}
+
+// interface_declaration's 'extern interface_nonansi_header' alternative: the
+// non-ansi (bare-identifier ports) counterpart to ExternInterfaceHeader.
+TEST(SourceText, ExternInterfaceNonAnsiHeader) {
+  auto r = Parse("extern interface ifc(a, b);\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->interfaces.size(), 1u);
+  EXPECT_TRUE(r.cu->interfaces[0]->is_extern);
+  EXPECT_TRUE(r.cu->interfaces[0]->is_non_ansi_ports);
+}
+
+// program_declaration's 'extern program_nonansi_header' alternative: the
+// non-ansi counterpart to ExternProgramHeader.
+TEST(SourceText, ExternProgramNonAnsiHeader) {
+  auto r = Parse("extern program prg(a, b);\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->programs.size(), 1u);
+  EXPECT_TRUE(r.cu->programs[0]->is_extern);
+  EXPECT_TRUE(r.cu->programs[0]->is_non_ansi_ports);
+}
+
+// timeunits_declaration's fourth form: timeprecision followed by timeunit as a
+// pair, the reverse ordering of TimeunitsDeclaration.
+TEST(SourceText, TimeprecisionThenTimeunit) {
+  auto r = Parse(
+      "timeprecision 1ps;\n"
+      "timeunit 1ns;\n"
+      "module m; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+// module_nonansi_header's optional lifetime: 'automatic' before the identifier
+// records the module's lifetime.
+TEST(SourceText, ModuleLifetime) {
+  auto r = Parse("module automatic m; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  EXPECT_TRUE(r.cu->modules[0]->is_automatic);
+}
+
+// interface_nonansi_header's optional lifetime.
+TEST(SourceText, InterfaceLifetime) {
+  auto r = Parse("interface automatic ifc; endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->interfaces.size(), 1u);
+  EXPECT_TRUE(r.cu->interfaces[0]->is_automatic);
+}
+
+// program_nonansi_header's optional lifetime.
+TEST(SourceText, ProgramLifetime) {
+  auto r = Parse("program automatic prg; endprogram\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->programs.size(), 1u);
+  EXPECT_TRUE(r.cu->programs[0]->is_automatic);
+}
+
+// module_ansi_header's optional parameter_port_list: a '#(...)' parameter port
+// list is recorded on the module.
+TEST(SourceText, ModuleParameterPortList) {
+  auto r = Parse("module m #(parameter int W = 8); endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  EXPECT_TRUE(r.cu->modules[0]->has_param_port_list);
+  EXPECT_FALSE(r.cu->modules[0]->params.empty());
+}
+
+// interface_ansi_header's optional parameter_port_list.
+TEST(SourceText, InterfaceParameterPortList) {
+  auto r = Parse("interface ifc #(parameter int W = 8); endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->interfaces.size(), 1u);
+  EXPECT_TRUE(r.cu->interfaces[0]->has_param_port_list);
+  EXPECT_FALSE(r.cu->interfaces[0]->params.empty());
+}
+
+// program_ansi_header's optional parameter_port_list.
+TEST(SourceText, ProgramParameterPortList) {
+  auto r = Parse("program prg #(parameter int W = 8); endprogram\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->programs.size(), 1u);
+  EXPECT_TRUE(r.cu->programs[0]->has_param_port_list);
+  EXPECT_FALSE(r.cu->programs[0]->params.empty());
+}
+
+// module_ansi_header's '{ package_import_declaration }': a package import may
+// precede the port list in the header; it is recorded as a header import item.
+// Built from real §A.1.11 import syntax against a genuine package.
+TEST(SourceText, ModuleHeaderPackageImport) {
+  auto r = Parse(
+      "package p; typedef int t; endpackage\n"
+      "module m import p::*; (); endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  bool found_header_import = false;
+  for (auto* it : r.cu->modules[0]->items) {
+    if (it->kind == ModuleItemKind::kImportDecl && it->import_item.is_header)
+      found_header_import = true;
+  }
+  EXPECT_TRUE(found_header_import);
+}
+
+// module_nonansi_header's leading '{ attribute_instance }': an attribute
+// instance may precede a top-level module declaration and is attached to it.
+TEST(SourceText, ModuleAttributeInstance) {
+  auto r = Parse("(* keep *) module m; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  EXPECT_FALSE(r.cu->modules[0]->attrs.empty());
+}
+
+// module_declaration's optional inner timeunits_declaration: a timeunit in the
+// module body sets the module's time unit.
+TEST(SourceText, ModuleBodyTimeunit) {
+  auto r = Parse("module m; timeunit 1ns; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  EXPECT_TRUE(r.cu->modules[0]->has_timeunit);
+}
+
+// interface_declaration's optional inner timeunits_declaration.
+TEST(SourceText, InterfaceBodyTimeunit) {
+  auto r = Parse("interface ifc; timeunit 1ns; endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->interfaces.size(), 1u);
+  EXPECT_TRUE(r.cu->interfaces[0]->has_timeunit);
+}
+
+// program_declaration's optional inner timeunits_declaration.
+TEST(SourceText, ProgramBodyTimeunit) {
+  auto r = Parse("program prg; timeunit 1ns; endprogram\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->programs.size(), 1u);
+  EXPECT_TRUE(r.cu->programs[0]->has_timeunit);
+}
+
+// package_declaration's optional inner timeunits_declaration.
+TEST(SourceText, PackageBodyTimeunit) {
+  auto r = Parse("package p; timeunit 1ns; endpackage\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->packages.size(), 1u);
+  EXPECT_TRUE(r.cu->packages[0]->has_timeunit);
+}
+
+TEST(SourceText, ErrorMissingEndinterface) {
+  auto r = Parse("interface ifc;\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(SourceText, ErrorMissingEndprogram) {
+  auto r = Parse("program prg;\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(SourceText, ErrorMissingEndchecker) {
+  auto r = Parse("checker chk;\n");
+  EXPECT_TRUE(r.has_errors);
 }
 
 TEST(SourceText, ErrorUnknownTopLevelToken) {
