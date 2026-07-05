@@ -156,6 +156,36 @@ TEST(ProceduralBlockSim, ProceduralReleaseOnNetRestoresDriver) {
             7u);
 }
 
+// blocking_assignment whose variable_lvalue is a concatenation (§A.8.5 real
+// syntax): a single right-hand side is split across the concatenated targets.
+// Built from source and run through the full pipeline so the observed values
+// come from the assignment executing, not a hand-built state.
+TEST(ProceduralBlockSim, BlockingAssignmentConcatLvalue) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [3:0] hi, lo;\n"
+      "  initial {hi, lo} = 8'hC3;\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"hi", 0xCu}, {"lo", 0x3u}});
+}
+
+// blocking_assignment alt 1: variable_lvalue = delay_or_event_control
+// expression. The intra-assignment delay is mandatory in this alternative;
+// running to quiescence observes the delayed assignment taking effect.
+TEST(ProceduralBlockSim, BlockingAssignmentIntraDelayRuns) {
+  EXPECT_EQ(RunAndGet("module t;\n"
+                      "  logic [7:0] a;\n"
+                      "  initial begin\n"
+                      "    a = 8'd0;\n"
+                      "    a = #5 8'd42;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "a"),
+            42u);
+}
+
 TEST(ProceduralBlockSim, AllAssignmentOperatorsInSequence) {
   SimFixture f;
   auto* design = ElaborateSrc(

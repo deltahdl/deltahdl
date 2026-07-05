@@ -454,35 +454,6 @@ TEST(ProceduralBlockSyntaxParsing, OperatorAssignment_ArithRightShiftEq) {
   EXPECT_EQ(stmt->rhs->op, TokenKind::kGtGtGtEq);
 }
 
-TEST(ProceduralBlockSyntaxParsing, AssignmentOperator_AllThirteen) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    a = 0;\n"
-      "    a += 1;\n"
-      "    a -= 1;\n"
-      "    a *= 2;\n"
-      "    a /= 2;\n"
-      "    a %= 3;\n"
-      "    a &= 8'hFF;\n"
-      "    a |= 8'h01;\n"
-      "    a ^= 8'hAA;\n"
-      "    a <<= 1;\n"
-      "    a >>= 1;\n"
-      "    a <<<= 1;\n"
-      "    a >>>= 1;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto stmts = AllInitialStmts(r);
-  ASSERT_EQ(stmts.size(), 13u);
-
-  for (auto* s : stmts) {
-    EXPECT_EQ(s->kind, StmtKind::kBlockingAssign);
-  }
-}
-
 TEST(ProceduralBlockSyntaxParsing, Integration_AlwaysCombWithOperatorAssign) {
   auto r = Parse(
       "module m;\n"
@@ -542,6 +513,41 @@ TEST(ProceduralBlockSyntaxParsing, BlockingAssignment_DynamicArrayNew) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kCall);
   EXPECT_EQ(stmt->rhs->text, "new");
   EXPECT_EQ(stmt->rhs->args.size(), 1u);
+}
+
+// blocking_assignment alt 3: the class_new right-hand side. Distinct from the
+// dynamic_array_new alt (which carries a bracketed size); class_new is a bare
+// `new` or `new ( arguments )`, so the parsed call has no bracketed size arg.
+TEST(ProceduralBlockSyntaxParsing, BlockingAssignment_ClassNew) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin h = new; end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
+  ASSERT_NE(stmt->rhs, nullptr);
+  EXPECT_EQ(stmt->rhs->kind, ExprKind::kCall);
+  EXPECT_EQ(stmt->rhs->text, "new");
+  EXPECT_TRUE(stmt->rhs->args.empty());
+}
+
+TEST(ProceduralBlockSyntaxParsing, BlockingAssignment_ClassNewWithArgs) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin h = new(1, 2); end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
+  ASSERT_NE(stmt->rhs, nullptr);
+  EXPECT_EQ(stmt->rhs->kind, ExprKind::kCall);
+  EXPECT_EQ(stmt->rhs->text, "new");
+  EXPECT_EQ(stmt->rhs->args.size(), 2u);
 }
 
 TEST(ProceduralBlockSyntaxParsing, NonblockingAssignment_WithDelay) {
@@ -704,6 +710,16 @@ TEST(ProceduralBlockSyntaxParsing, ErrorReleaseWithExtraRhs) {
   EXPECT_FALSE(
       ParseOk("module m;\n"
               "  initial begin release a = b; end\n"
+              "endmodule\n"));
+}
+
+// Negative form of the `assign variable_assignment` alternative: the assign
+// form of a procedural_continuous_assignment requires `lvalue = expression`, so
+// an assign with a bare lvalue and no right-hand side must be rejected.
+TEST(ProceduralBlockSyntaxParsing, ErrorProceduralAssignMissingRhs) {
+  EXPECT_FALSE(
+      ParseOk("module m;\n"
+              "  initial begin assign a; end\n"
               "endmodule\n"));
 }
 

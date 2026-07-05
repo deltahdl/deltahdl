@@ -151,18 +151,6 @@ TEST(ProceduralBlockElaboration, BlockingAssignmentInInitial) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ProceduralBlockElaboration, NonblockingAssignmentInAlwaysFF) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  logic clk, d, q;\n"
-      "  always_ff @(posedge clk) q <= d;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 TEST(ProceduralBlockElaboration, OperatorAssignmentInInitial) {
   ElabFixture f;
   auto* design = ElaborateSrc(

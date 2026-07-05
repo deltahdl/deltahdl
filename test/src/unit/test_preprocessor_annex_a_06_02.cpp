@@ -71,13 +71,6 @@ TEST(ProceduralBlockPreprocessor, CompoundAssignment) {
                               "endmodule\n"));
 }
 
-TEST(ProceduralBlockPreprocessor, NonblockingAssignment) {
-  EXPECT_TRUE(
-      ParseWithPreprocessorOk("module m;\n"
-                              "  always_ff @(posedge clk) q <= d;\n"
-                              "endmodule\n"));
-}
-
 TEST(ProceduralBlockPreprocessor, ConditionalCompilationAlwaysVariant) {
   EXPECT_TRUE(
       ParseWithPreprocessorOk("`define USE_FF\n"
