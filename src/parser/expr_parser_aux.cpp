@@ -63,6 +63,27 @@ Expr* Parser::ParseParenExpr() {
   Consume();
   auto* lhs = ParseExpr();
 
+  // §11.11: a min:typ:max triplet may be used wherever an expression can
+  // appear, so recognize the colon-separated form directly in the general
+  // parenthesized-primary path (not only in the delay positions that call
+  // ParseMinTypMaxExpr). This lets `(a:b:c)` serve as an operand, e.g.
+  // `(a:b:c) + (d:e:f)`.
+  if (Check(TokenKind::kColon)) {
+    Consume();
+    auto* typ = ParseExpr();
+    Expect(TokenKind::kColon);
+    auto* max = ParseExpr();
+    Expect(TokenKind::kRParen);
+    auto* mtm = arena_.Create<Expr>();
+    mtm->kind = ExprKind::kMinTypMax;
+    mtm->range.start = lhs->range.start;
+    mtm->lhs = lhs;
+    mtm->condition = typ;
+    mtm->rhs = max;
+    mtm->is_parenthesized = true;
+    return mtm;
+  }
+
   auto k = CurrentToken().kind;
   bool is_assign = k == TokenKind::kEq || k == TokenKind::kPlusEq ||
                    k == TokenKind::kMinusEq || k == TokenKind::kStarEq ||
