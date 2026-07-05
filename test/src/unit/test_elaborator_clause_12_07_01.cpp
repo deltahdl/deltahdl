@@ -51,20 +51,6 @@ TEST(LoopStatementElaboration, NestedLoops) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(LoopStatementElaboration, ForCompoundAssignStepElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  logic [7:0] x;\n"
-      "  initial begin\n"
-      "    for (int i = 0; i < 20; i += 2) x = i[7:0];\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 TEST(LoopStatementElaboration, ForCommaSeparatedTypedInitElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(

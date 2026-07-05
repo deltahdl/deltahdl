@@ -73,27 +73,6 @@ TEST(LoopStatementSim, ForAllEmptyWithBreak) {
   EXPECT_EQ(var->value.ToUint64(), 4u);
 }
 
-TEST(LoopStatementSim, ForStepIncrement) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial begin\n"
-      "    x = 8'd0;\n"
-      "    for (int i = 0; i < 3; i++)\n"
-      "      x = x + 8'd1;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 3u);
-}
-
 TEST(LoopStatementSim, ProcessWithLoop) {
   auto result = RunAndGet(
       "module t;\n"
@@ -273,6 +252,31 @@ TEST(LoopStatementSim, ForLaterLocalInitUsesEarlierLocal) {
       "endmodule\n",
       "result");
   EXPECT_EQ(val, 3u);
+}
+
+// §12.7.1 step c) admits a function call as a for_step form, alongside
+// assignment statements and increment/decrement expressions. Here the step is a
+// void function call that advances the loop-control variable through an inout
+// argument, so the loop runs while i < 4 and the body executes four times. This
+// observes the function-call step actually executing at run time, not merely
+// parsing.
+TEST(LoopStatementSim, ForFunctionCallStepAdvancesLoop) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  logic [7:0] i;\n"
+      "  logic [7:0] cnt;\n"
+      "  function void bump(inout logic [7:0] v);\n"
+      "    v = v + 8'd1;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    i = 8'd0;\n"
+      "    cnt = 8'd0;\n"
+      "    for (i = 0; i < 4; bump(i))\n"
+      "      cnt = cnt + 8'd1;\n"
+      "  end\n"
+      "endmodule\n",
+      "cnt");
+  EXPECT_EQ(val, 4u);
 }
 
 // The implicit block created by a for-loop's local declaration can be named
