@@ -130,6 +130,28 @@ static QueryDimBounds FixedUnpackedDimBounds(const ArrayInfo* arr) {
   return q;
 }
 
+// Bounds for the dim-th unpacked dimension of a multidimensional fixed array,
+// where dim is 1-based and dimension 1 is the slowest varying (outermost)
+// dimension. dim_los/dim_sizes are stored outermost-first, so index dim-1 names
+// dimension dim. Only the outermost dimension carries a tracked direction; the
+// inner dimensions' declared extents are recorded low-first, so
+// $size/$low/$high are exact for every dimension and $left/$right/$increment
+// follow the ascending order in which those inner extents are held.
+static QueryDimBounds MultiDimUnpackedDimBounds(const ArrayInfo* arr,
+                                                uint32_t dim) {
+  QueryDimBounds q;
+  int64_t lo = arr->dim_los[dim - 1];
+  int64_t hi = lo + static_cast<int64_t>(arr->dim_sizes[dim - 1]) - 1;
+  bool descending = (dim == 1) && arr->is_descending;
+  q.left = descending ? hi : lo;
+  q.right = descending ? lo : hi;
+  q.low = lo;
+  q.high = hi;
+  q.size = arr->dim_sizes[dim - 1];
+  q.increment = (q.left >= q.right) ? 1 : -1;
+  return q;
+}
+
 // Bounds for the packed element dimension [elem_width-1 : 0].
 static QueryDimBounds PackedElemDimBounds(uint32_t elem_width) {
   QueryDimBounds q;
@@ -142,24 +164,42 @@ static QueryDimBounds PackedElemDimBounds(uint32_t elem_width) {
   return q;
 }
 
-// Compute the bounds reported for the dimension being queried, given whether
-// the queried dimension is the outermost unpacked one.
+// The number of unpacked dimensions the first argument contributes. A fixed
+// multidimensional array carries every extent in dim_sizes; every other
+// unpacked container (single fixed dimension, queue, dynamic array, or
+// associative array) contributes exactly one.
+static uint32_t UnpackedDimCount(const QueryArgInfo& info) {
+  if (info.arr && info.arr->dim_sizes.size() >= 2)
+    return static_cast<uint32_t>(info.arr->dim_sizes.size());
+  return info.has_unpacked ? 1 : 0;
+}
+
+// Compute the bounds reported for the queried dimension. Dimensions are
+// numbered slowest-varying first: dimensions 1..unpacked_dims are the unpacked
+// dimensions (outermost first) and the packed element dimension, when present,
+// is the next (last) dimension.
 static QueryDimBounds ComputeQueryDimBounds(const QueryArgInfo& info,
-                                            bool query_unpacked) {
-  if (query_unpacked && info.assoc) return AssocDimBounds(info.assoc);
-  if (query_unpacked && info.dynamic_outer) return DynamicDimBounds(info);
-  if (query_unpacked && info.arr) return FixedUnpackedDimBounds(info.arr);
+                                            uint32_t dim,
+                                            uint32_t unpacked_dims) {
+  if (dim <= unpacked_dims) {
+    if (info.assoc) return AssocDimBounds(info.assoc);
+    if (info.dynamic_outer) return DynamicDimBounds(info);
+    if (info.arr && info.arr->dim_sizes.size() >= 2)
+      return MultiDimUnpackedDimBounds(info.arr, dim);
+    if (info.arr) return FixedUnpackedDimBounds(info.arr);
+  }
   return PackedElemDimBounds(info.elem_width);
 }
 
 // Count the packed and unpacked dimensions contributed by the first argument.
 // A simple bit-vector type (string included) contributes one packed dimension;
-// a real (or any other nonvector) type contributes none.
+// a real (or any other nonvector) type contributes none. An array contributes
+// one unpacked dimension per declared unpacked extent.
 static uint32_t CountTotalDims(const QueryArgInfo& info,
                                uint32_t& unpacked_dims) {
   uint32_t packed_dims =
       (info.is_string || (info.elem_width > 0 && !info.is_real)) ? 1 : 0;
-  unpacked_dims = info.has_unpacked ? 1 : 0;
+  unpacked_dims = UnpackedDimCount(info);
   return packed_dims + unpacked_dims;
 }
 
@@ -201,12 +241,10 @@ Logic4Vec EvalArrayQuerySysCall(const Expr* expr, SimContext& ctx, Arena& arena,
     dim = static_cast<uint32_t>(EvalExpr(expr->args[1], ctx, arena).ToUint64());
   if (dim < 1 || dim > total_dims) return MakeUnknownInt(arena, 32);
 
-  // Dimension 1 is the slowest varying. When an unpacked dimension is present
-  // it is dimension 1 and the packed element dimension (if any) is dimension 2;
-  // otherwise the packed dimension is dimension 1.
-  bool query_unpacked = info.has_unpacked && dim == 1;
-
-  QueryDimBounds q = ComputeQueryDimBounds(info, query_unpacked);
+  // Dimensions are numbered slowest-varying first: the unpacked dimensions
+  // (outermost = dimension 1) precede the packed element dimension, which is
+  // the last dimension when the element is a bit vector.
+  QueryDimBounds q = ComputeQueryDimBounds(info, dim, unpacked_dims);
   return SelectDimQueryResult(name, q, arena);
 }
 
