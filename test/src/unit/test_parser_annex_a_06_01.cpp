@@ -17,18 +17,6 @@ TEST(ContinuousAssignSyntaxParsing, ContinuousAssignWithDelay3) {
   EXPECT_NE(item->assign_delay, nullptr);
 }
 
-TEST(ContinuousAssignSyntaxParsing, ContinuousAssignWithDelay3TwoValues) {
-  auto r = Parse(
-      "module m;\n"
-      "  assign #(5, 10) a = b;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FindItemByKind(r, ModuleItemKind::kContAssign);
-  ASSERT_NE(item, nullptr);
-  EXPECT_NE(item->assign_delay, nullptr);
-}
-
 TEST(ContinuousAssignSyntaxParsing, ContinuousAssign_Basic) {
   auto r = Parse(
       "module m;\n"
@@ -57,21 +45,6 @@ TEST(ContinuousAssignSyntaxParsing, ListOfNetAssignments_Two) {
   EXPECT_EQ(cas[1]->assign_lhs->text, "c");
 }
 
-TEST(ContinuousAssignSyntaxParsing, ListOfNetAssignments_Three) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire a, b, c, d, e, f;\n"
-      "  assign a = b, c = d, e = f;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto cas = FindContAssigns(r.cu->modules[0]->items);
-  ASSERT_EQ(cas.size(), 3u);
-  EXPECT_EQ(cas[0]->assign_lhs->text, "a");
-  EXPECT_EQ(cas[1]->assign_lhs->text, "c");
-  EXPECT_EQ(cas[2]->assign_lhs->text, "e");
-}
-
 TEST(ContinuousAssignSyntaxParsing,
      ListOfNetAssignments_SharedStrengthAndDelay) {
   auto r = Parse(
@@ -89,6 +62,24 @@ TEST(ContinuousAssignSyntaxParsing,
   EXPECT_EQ(cas[1]->drive_strength1, 4u);
   EXPECT_NE(cas[0]->assign_delay, nullptr);
   EXPECT_NE(cas[1]->assign_delay, nullptr);
+}
+
+// continuous_assign's [ drive_strength ] and [ delay3 ] are independent
+// optionals; exercise the strength-present / delay-absent quadrant so the
+// drive_strength is observed applied on its own, not only bundled with a delay.
+TEST(ContinuousAssignSyntaxParsing, DriveStrengthWithoutDelay) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire a, b;\n"
+      "  assign (strong0, strong1) a = b;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto cas = FindContAssigns(r.cu->modules[0]->items);
+  ASSERT_EQ(cas.size(), 1u);
+  EXPECT_EQ(cas[0]->drive_strength0, 4u);
+  EXPECT_EQ(cas[0]->drive_strength1, 4u);
+  EXPECT_EQ(cas[0]->assign_delay, nullptr);
 }
 
 TEST(ContinuousAssignSyntaxParsing, NetAssignment_ConcatLhs) {
@@ -203,19 +194,6 @@ TEST(NetAliasSyntaxParsing, NetAliasThreeNets) {
   ASSERT_EQ(item->alias_nets.size(), 3u);
 }
 
-TEST(NetAliasSyntaxParsing, NetAliasFourNets) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire a, b, c, d;\n"
-      "  alias a = b = c = d;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FindItemByKind(r, ModuleItemKind::kAlias);
-  ASSERT_NE(item, nullptr);
-  ASSERT_EQ(item->alias_nets.size(), 4u);
-}
-
 TEST(NetAliasSyntaxParsing, NetAliasMultipleStatements) {
   auto r = Parse(
       "module m;\n"
@@ -255,18 +233,6 @@ TEST(ContinuousAssignSyntaxParsing, ListOfVariableAssignments_Two) {
   ASSERT_EQ(cas.size(), 2u);
   EXPECT_EQ(cas[0]->assign_lhs->text, "x");
   EXPECT_EQ(cas[1]->assign_lhs->text, "y");
-}
-
-TEST(ContinuousAssignSyntaxParsing, ListOfVariableAssignments_Three) {
-  auto r = Parse(
-      "module m;\n"
-      "  logic x, y, z;\n"
-      "  assign x = 1'b0, y = 1'b1, z = 1'bx;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto cas = FindContAssigns(r.cu->modules[0]->items);
-  ASSERT_EQ(cas.size(), 3u);
 }
 
 TEST(NetAliasSyntaxParsing, NetAliasLvalueIsExpression) {

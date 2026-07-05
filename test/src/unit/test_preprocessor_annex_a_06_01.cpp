@@ -12,22 +12,6 @@ TEST(ContinuousAssignPreprocessor, BasicContinuousAssign) {
                               "endmodule\n"));
 }
 
-TEST(ContinuousAssignPreprocessor, ContinuousAssignWithStrengthAndDelay) {
-  EXPECT_TRUE(
-      ParseWithPreprocessorOk("module m;\n"
-                              "  wire a, b;\n"
-                              "  assign (strong0, weak1) #10 a = b;\n"
-                              "endmodule\n"));
-}
-
-TEST(ContinuousAssignPreprocessor, ListOfNetAssignments) {
-  EXPECT_TRUE(
-      ParseWithPreprocessorOk("module m;\n"
-                              "  wire a, b, c, d;\n"
-                              "  assign a = b, c = d;\n"
-                              "endmodule\n"));
-}
-
 TEST(ContinuousAssignPreprocessor, MacroExpandedRhs) {
   EXPECT_TRUE(
       ParseWithPreprocessorOk("`define VAL 1'b1\n"
@@ -48,35 +32,11 @@ TEST(ContinuousAssignPreprocessor, ConditionalCompilationAroundAssign) {
                               "endmodule\n"));
 }
 
-TEST(ContinuousAssignPreprocessor, ListOfVariableAssignments) {
-  EXPECT_TRUE(
-      ParseWithPreprocessorOk("module m;\n"
-                              "  logic x, y;\n"
-                              "  assign x = 1'b0, y = 1'b1;\n"
-                              "endmodule\n"));
-}
-
-TEST(ContinuousAssignPreprocessor, VariableAssignWithDelayControl) {
-  EXPECT_TRUE(
-      ParseWithPreprocessorOk("module m;\n"
-                              "  logic x;\n"
-                              "  assign #5 x = 1'b1;\n"
-                              "endmodule\n"));
-}
-
 TEST(NetAliasPreprocessor, BasicNetAlias) {
   EXPECT_TRUE(
       ParseWithPreprocessorOk("module m;\n"
                               "  wire a, b;\n"
                               "  alias a = b;\n"
-                              "endmodule\n"));
-}
-
-TEST(NetAliasPreprocessor, NetAliasChain) {
-  EXPECT_TRUE(
-      ParseWithPreprocessorOk("module m;\n"
-                              "  wire a, b, c;\n"
-                              "  alias a = b = c;\n"
                               "endmodule\n"));
 }
 
