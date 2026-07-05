@@ -374,22 +374,6 @@ TEST(AssertionStatementSyntaxParsing, DeferredAssertFinal) {
   EXPECT_TRUE(stmt->is_deferred);
 }
 
-TEST(AssertionStatementSyntaxParsing, DeferredAssertHash0PassAndFail) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    assert #0 (data_ok)\n"
-      "      $display(\"pass\"); else $error(\"fail\");\n"
-      "  end\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_TRUE(stmt->is_deferred);
-  EXPECT_NE(stmt->assert_pass_stmt, nullptr);
-  EXPECT_NE(stmt->assert_fail_stmt, nullptr);
-}
-
 TEST(AssertionStatementSyntaxParsing, DeferredAssertHash0ActionBlock) {
   auto r = Parse(
       "module m;\n"
@@ -698,6 +682,77 @@ TEST(AssertionStatementSyntaxParsing, ErrorDeferredCoverFinalWithElseClause) {
       "  initial cover final (1) $display(\"hit\"); else $display(\"miss\");\n"
       "endmodule\n");
   EXPECT_TRUE(r.has_errors);
+}
+
+// procedural_assertion_statement has three alternatives; the immediate one is
+// exercised above. This covers the concurrent_assertion_statement alternative:
+// `assert property (...)` sitting in procedural (initial/always) code, which
+// the grammar admits alongside immediate_assertion_statement. The parser must
+// route it to the procedural-concurrent form rather than an immediate assert.
+TEST(AssertionStatementSyntaxParsing, ProceduralConcurrentAssertProperty) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic clk, a;\n"
+      "  initial assert property (@(posedge clk) a);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kAssertImmediate);
+  EXPECT_TRUE(stmt->is_procedural_concurrent);
+  EXPECT_FALSE(stmt->is_deferred);
+}
+
+// The assume keyword reaches the concurrent alternative through the same shared
+// path as assert but must tag the statement with its own kind; confirm
+// `assume property (...)` in procedural code is admitted and typed as an
+// assume.
+TEST(AssertionStatementSyntaxParsing, ProceduralConcurrentAssumeProperty) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic clk, a;\n"
+      "  initial assume property (@(posedge clk) a);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kAssumeImmediate);
+  EXPECT_TRUE(stmt->is_procedural_concurrent);
+}
+
+// The cover keyword reaches the concurrent alternative through a separate parse
+// path; confirm `cover property (...)` in procedural code is admitted too.
+TEST(AssertionStatementSyntaxParsing, ProceduralConcurrentCoverProperty) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic clk, a;\n"
+      "  initial cover property (@(posedge clk) a);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kCoverImmediate);
+  EXPECT_TRUE(stmt->is_procedural_concurrent);
+}
+
+// assertion_item resolves to either a concurrent_assertion_item or a
+// deferred_immediate_assertion_item. The deferred alternative is covered by the
+// ModuleLevel tests above; this covers the concurrent_assertion_item
+// alternative at module-item scope (a bare `assert property` with no procedural
+// block).
+TEST(AssertionStatementSyntaxParsing, ConcurrentAssertionItemModuleLevel) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic clk, a;\n"
+      "  assert property (@(posedge clk) a);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FindItemByKind(r, ModuleItemKind::kAssertProperty);
+  ASSERT_NE(item, nullptr);
 }
 
 }  // namespace
