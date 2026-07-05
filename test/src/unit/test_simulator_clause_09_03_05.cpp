@@ -202,6 +202,36 @@ TEST(StatementLabelSimulation, DisableLabeledForeachActsLikeBreak) {
   LowerRunAndCheck(f, design, {{"visited", 3u}, {"after", 1u}});
 }
 
+// §9.3.5 — a begin-end block is a statement, so a label before begin is
+// equivalent to a block name after it, and a labeled statement disables with
+// the same behavior as a named block (weave 9.6.2). Disabling the block by its
+// prefix label from inside terminates it, skipping the block's remaining
+// statements, and control resumes at the statement following the block. This
+// exercises the labeled begin-end disable path, distinct from the loop path.
+TEST(StatementLabelSimulation, DisableLabeledBeginBlockByPrefixLabel) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] got_here, not_reached, after;\n"
+      "  initial begin\n"
+      "    got_here = 8'd0;\n"
+      "    not_reached = 8'd0;\n"
+      "    after = 8'd0;\n"
+      "    blk: begin\n"
+      "      got_here = 8'd1;\n"
+      "      disable blk;\n"
+      "      not_reached = 8'd1;\n"
+      "    end\n"
+      "    after = 8'd1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  // The block runs up to the disable, then ends; not_reached stays 0 and after
+  // proves execution continued past the disabled block.
+  LowerRunAndCheck(f, design,
+                   {{"got_here", 1u}, {"not_reached", 0u}, {"after", 1u}});
+}
+
 TEST(StatementLabelSimulation, LabeledForkJoinExecutes) {
   // Labeling a fork-join block creates its named scope without disturbing
   // execution: the parent blocks on join and the spawned assignment lands.

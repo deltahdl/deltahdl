@@ -439,6 +439,42 @@ TEST(StatementLabelParsing, LabelBeforeJoinIsError) {
   EXPECT_TRUE(r.has_errors);
 }
 
+TEST(StatementLabelParsing, LabelBeforeDeclarationIsError) {
+  // A label binds only to a procedural (non-declaration) statement. A data
+  // declaration is not a statement, so a label placed before one is rejected:
+  // the label is taken, then the type keyword has no valid statement form.
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    lbl: int x;\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(StatementLabelParsing, LabelBeforeJoinAnyIsError) {
+  // join_any is one of the fork terminators a label may not precede: it does
+  // not form a statement for the label to bind to.
+  auto r = Parse(
+      "module m;\n"
+      "  initial fork\n"
+      "    a = 1;\n"
+      "    tail: join_any\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(StatementLabelParsing, LabelBeforeJoinNoneIsError) {
+  // The same holds for join_none, the remaining enumerated fork terminator.
+  auto r = Parse(
+      "module m;\n"
+      "  initial fork\n"
+      "    a = 1;\n"
+      "    tail: join_none\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
 TEST(StatementLabelParsing, MultipleLabelsInSequence) {
   auto r = Parse(
       "module m;\n"
