@@ -73,4 +73,24 @@ TEST(ConfigDesignStatement, RuleBeforeDesignRejected) {
   EXPECT_TRUE(r.has_errors);
 }
 
+TEST(ConfigDesignStatement, MultipleBareTopModulesInOneDesignStatement) {
+  // §33.4.1.1: several top-level modules may be listed in one design statement,
+  // and each may be named without a library qualifier. Both bare cell names are
+  // captured with an empty library for later resolution -- a different input
+  // form than the library-qualified multi-cell list.
+  auto r = Parse(
+      "config c;\n"
+      "  design top_a top_b;\n"
+      "endconfig\n");
+  ASSERT_FALSE(r.has_errors);
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->configs.size(), 1u);
+  const auto& cells = r.cu->configs[0]->design_cells;
+  ASSERT_EQ(cells.size(), 2u);
+  EXPECT_TRUE(cells[0].first.empty());
+  EXPECT_EQ(cells[0].second, "top_a");
+  EXPECT_TRUE(cells[1].first.empty());
+  EXPECT_EQ(cells[1].second, "top_b");
+}
+
 }  // namespace
