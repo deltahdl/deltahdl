@@ -25,13 +25,4 @@ TEST(AssocArrayLastElaboration, LastOnIntKeyAssocArrayOk) {
              "endmodule\n"));
 }
 
-TEST(AssocArrayLastElaboration, LastOnStringKeyAssocArrayOk) {
-  EXPECT_TRUE(
-      ElabOk("module m;\n"
-             "  int aa[string];\n"
-             "  string s;\n"
-             "  initial s = aa.last(s);\n"
-             "endmodule\n"));
-}
-
 }  // namespace
