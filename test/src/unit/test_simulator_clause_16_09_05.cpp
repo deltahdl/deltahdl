@@ -72,4 +72,11 @@ TEST(SvaEngine, AndEndTimeIsTheLaterOperandEndTime) {
   EXPECT_FALSE(EvalSequenceAndMatch(false, 10, true, 12).matched);
 }
 
+// §16.9.5: negative form of the both-match requirement for the match/end-time
+// variant. When neither operand matches there is no composite match, closing
+// the enumeration alongside the two single-operand-fail cases above.
+TEST(SvaEngine, AndFailsWhenNeitherOperandMatches) {
+  EXPECT_FALSE(EvalSequenceAndMatch(false, 10, false, 12).matched);
+}
+
 }  // namespace
