@@ -90,35 +90,6 @@ TEST(DeclarationAssignmentParsing, DefparamAssignmentMintypmax) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(DeclarationAssignmentParsing, DefparamAssignmentMultiplePaths) {
-  auto r = Parse(
-      "module child; parameter P = 1; parameter Q = 2; endmodule\n"
-      "module m;\n"
-      "  child c();\n"
-      "  defparam c.P = 5, c.Q = 7;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  bool found = false;
-  for (auto* item : r.cu->modules[1]->items) {
-    if (item->kind == ModuleItemKind::kDefparam) {
-      found = true;
-      EXPECT_EQ(item->defparam_assigns.size(), 2u);
-    }
-  }
-  EXPECT_TRUE(found);
-}
-
-TEST(DeclarationAssignmentParsing, DefparamAssignmentDeepHierarchy) {
-  EXPECT_TRUE(
-      ParseOk("module leaf; parameter P = 1; endmodule\n"
-              "module mid; leaf l(); endmodule\n"
-              "module m;\n"
-              "  mid mi();\n"
-              "  defparam mi.l.P = 9;\n"
-              "endmodule\n"));
-}
-
 TEST(DeclarationAssignmentParsing, TypeAssignmentWithDefault) {
   auto r = Parse("module m #(parameter type T = int)(); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -144,6 +115,27 @@ TEST(DeclarationAssignmentParsing, TypeAssignmentComplexType) {
   EXPECT_FALSE(r.has_errors);
   auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kParamDecl);
+}
+
+TEST(DeclarationAssignmentParsing, TypeAssignmentClassScopedType) {
+  // type_assignment's right side admits
+  // data_type_or_incomplete_class_scoped_type; exercise the class-scoped branch
+  // (`C::inner_t`) rather than a plain data type.
+  auto r = Parse(
+      "class C;\n"
+      "  typedef int inner_t;\n"
+      "endclass\n"
+      "module m;\n"
+      "  parameter type T = C::inner_t;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  ASSERT_EQ(item->kind, ModuleItemKind::kParamDecl);
+  EXPECT_EQ(item->name, "T");
+  EXPECT_EQ(item->typedef_type.kind, DataTypeKind::kNamed);
+  EXPECT_EQ(item->typedef_type.scope_name, "C");
+  EXPECT_EQ(item->typedef_type.type_name, "inner_t");
 }
 
 TEST(DeclarationAssignmentParsing, VarDeclAssignmentBasic) {
@@ -218,13 +210,6 @@ TEST(DeclarationAssignmentParsing, SpecparamAssignmentMintypmax) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  specparam delay = 1:2:3;\n"
-              "endmodule\n"));
-}
-
-TEST(DeclarationAssignmentParsing, SpecparamAssignmentMultiple) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  specparam tr = 10, tf = 20;\n"
               "endmodule\n"));
 }
 

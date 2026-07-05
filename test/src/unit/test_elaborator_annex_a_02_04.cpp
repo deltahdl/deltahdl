@@ -38,6 +38,32 @@ TEST(DeclarationAssignmentElaboration, ParamAssignmentResolvesConstant) {
   EXPECT_TRUE(found);
 }
 
+TEST(DeclarationAssignmentElaboration,
+     ParamAssignmentConstantExprReferencesParam) {
+  // param_assignment's right side is a constant_param_expression. A literal
+  // (covered above) and a reference to another parameter take different
+  // constant-evaluation code paths; here B's value is derived from A.
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module m;\n"
+      "  parameter A = 4;\n"
+      "  parameter B = A * 2;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  bool found = false;
+  for (auto& p : mod->params) {
+    if (p.name == "B") {
+      found = true;
+      EXPECT_TRUE(p.is_resolved);
+      EXPECT_EQ(p.resolved_value, 8);
+    }
+  }
+  EXPECT_TRUE(found);
+}
+
 TEST(DeclarationAssignmentElaboration, ParamAssignmentNoDefaultInPort) {
   EXPECT_TRUE(
       ElabOk("module child #(parameter int P = 1)(); endmodule\n"
@@ -140,6 +166,41 @@ TEST(DeclarationAssignmentElaboration, DefparamAssignmentOverridesChildParam) {
       EXPECT_TRUE(p.is_resolved);
       EXPECT_TRUE(p.from_override);
       EXPECT_EQ(p.resolved_value, 42);
+    }
+  }
+  EXPECT_TRUE(found);
+}
+
+TEST(DeclarationAssignmentElaboration,
+     DefparamAssignmentOverrideReferencesParam) {
+  // defparam_assignment's right side is a constant_mintypmax_expression. Beyond
+  // a literal override (covered above), the override value may reference a
+  // parameter visible in the enclosing scope; that reference resolves during
+  // elaboration to drive the child's parameter.
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module child;\n"
+      "  parameter P = 1;\n"
+      "endmodule\n"
+      "module m;\n"
+      "  parameter K = 55;\n"
+      "  child c();\n"
+      "  defparam c.P = K;\n"
+      "endmodule\n",
+      f, "m");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* top = design->top_modules[0];
+  ASSERT_FALSE(top->children.empty());
+  auto* inst = top->children[0].resolved;
+  ASSERT_NE(inst, nullptr);
+  bool found = false;
+  for (auto& p : inst->params) {
+    if (p.name == "P") {
+      found = true;
+      EXPECT_TRUE(p.is_resolved);
+      EXPECT_TRUE(p.from_override);
+      EXPECT_EQ(p.resolved_value, 55);
     }
   }
   EXPECT_TRUE(found);
