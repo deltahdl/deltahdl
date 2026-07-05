@@ -29,6 +29,12 @@ SemanticLeadingClock SequenceLeadingClockAfterAtC(
   return inner;
 }
 
+SemanticLeadingClock SequenceLeadingClockOfParenthesized(
+    const SemanticLeadingClock& inner) {
+  // §16.16.1: the semantic leading clock of (m) equals that of m.
+  return inner;
+}
+
 SemanticLeadingClock SequenceLeadingClockOfDelay(
     const SemanticLeadingClock& left, const SemanticLeadingClock& /*right*/) {
   // §16.16.1: m1 ##1 m2 and m1 ##0 m2 both keep m1's leading clock.

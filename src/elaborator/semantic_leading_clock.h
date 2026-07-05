@@ -22,10 +22,13 @@ using LeadingClockSet = std::set<std::string>;
 // §16.16.1 first defines the semantic leading clock of a multiclocked
 // sequence as a unique value. The inductive rules are: a bare sequence is
 // inherited; @(c) s replaces inherited with c (otherwise it inherits s's
-// clock); ##1 and ##0 keep the left operand's clock.
+// clock); a parenthesized (m) keeps m's clock; ##1 and ##0 keep the left
+// operand's clock.
 SemanticLeadingClock SequenceLeadingClockOfBareSequence();
 SemanticLeadingClock SequenceLeadingClockAfterAtC(
     std::string_view c, const SemanticLeadingClock& inner);
+SemanticLeadingClock SequenceLeadingClockOfParenthesized(
+    const SemanticLeadingClock& inner);
 SemanticLeadingClock SequenceLeadingClockOfDelay(
     const SemanticLeadingClock& left, const SemanticLeadingClock& /*right*/);
 
