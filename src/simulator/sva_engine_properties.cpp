@@ -47,6 +47,10 @@ PropertyResult EvalPropertyOr(PropertyResult a, PropertyResult b) {
 
 PropertyResult EvalPropertyIfElse(bool cond, PropertyResult then_result,
                                   bool has_else, PropertyResult else_result) {
+  // §16.12.6: the guard selects which branch supplies the verdict. A true guard
+  // yields the then-branch's result. A false guard yields the else-branch's
+  // result in the two-branch form; in the single-branch form there is nothing
+  // left to check, so the property holds vacuously.
   if (cond) return then_result;
   if (has_else) return else_result;
   return PropertyResult::kVacuousPass;
