@@ -26,6 +26,9 @@ PropertyResult EvalPropertyNot(PropertyResult inner) {
 }
 
 PropertyResult EvalPropertyAnd(PropertyResult a, PropertyResult b) {
+  // §16.12.5: the conjunction holds if, and only if, both operands hold. A
+  // failing operand on either side forces failure; otherwise (both holding,
+  // vacuously or not) the conjunction holds.
   if (a == PropertyResult::kFail || b == PropertyResult::kFail) {
     return PropertyResult::kFail;
   }

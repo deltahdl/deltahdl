@@ -25,6 +25,12 @@ PropertyResult EvalImplication(bool antecedent, bool consequent,
 // false, and a false one makes it true. Each attempt of the negation drives a
 // single attempt of the underlying property_expr.
 PropertyResult EvalPropertyNot(PropertyResult inner);
+
+// §16.12.5: a conjunction `property_expr1 and property_expr2` evaluates to true
+// if, and only if, both operand property expressions evaluate to true. A
+// failure on either side forces the conjunction to fail; a vacuous pass counts
+// as the operand holding, so both operands holding (vacuously or not) makes the
+// whole conjunction hold.
 PropertyResult EvalPropertyAnd(PropertyResult a, PropertyResult b);
 
 // §16.12.4: a disjunction `property_expr1 or property_expr2` evaluates to true
