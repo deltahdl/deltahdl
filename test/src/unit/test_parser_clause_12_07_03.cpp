@@ -4,21 +4,6 @@
 using namespace delta;
 namespace {
 
-TEST(LoopSyntaxParsing, ForeachLoop) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    foreach (arr[i]) $display(arr[i]);\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kForeach);
-  ASSERT_GE(stmt->foreach_vars.size(), 1u);
-}
-
 TEST(LoopSyntaxParsing, ForeachLoopInAlwaysComb) {
   auto r = Parse(
       "module m;\n"
@@ -218,6 +203,24 @@ TEST(LoopSyntaxParsing, ErrorForeachMissingCloseBracket) {
       "  end\n"
       "endmodule\n");
   EXPECT_TRUE(r.has_errors);
+}
+
+// §12.7.3 — the implicit block a foreach creates is unnamed by default but can
+// be named by prefixing the statement with a label; the label attaches to the
+// foreach statement itself.
+TEST(LoopSyntaxParsing, ForeachCanBeNamedByLabel) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    myloop: foreach (arr[i]) x = i;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kForeach);
+  EXPECT_EQ(stmt->label, "myloop");
 }
 
 // §12.7.3 — a loop-variable slot implicitly declares an index variable, so it

@@ -18,38 +18,6 @@ using namespace delta;
 
 namespace {
 
-TEST(StmtExec, ForeachIteratesOverArrayWidth) {
-  StmtFixture f;
-
-  auto* arr = f.ctx.CreateVariable("arr", 4);
-  arr->value = MakeLogic4VecVal(f.arena, 4, 0);
-
-  auto* sum = f.ctx.CreateVariable("sum", 32);
-  sum->value = MakeLogic4VecVal(f.arena, 32, 0);
-
-  auto* sum_id = MakeId(f.arena, "sum");
-  auto* one = MakeInt(f.arena, 1);
-  auto* add_expr = f.arena.Create<Expr>();
-  add_expr->kind = ExprKind::kBinary;
-  add_expr->op = TokenKind::kPlus;
-  add_expr->lhs = sum_id;
-  add_expr->rhs = one;
-
-  auto* body = f.arena.Create<Stmt>();
-  body->kind = StmtKind::kBlockingAssign;
-  body->lhs = MakeId(f.arena, "sum");
-  body->rhs = add_expr;
-
-  auto* stmt = f.arena.Create<Stmt>();
-  stmt->kind = StmtKind::kForeach;
-  stmt->expr = MakeId(f.arena, "arr");
-  stmt->foreach_vars.push_back("i");
-  stmt->body = body;
-
-  RunStmt(stmt, f.ctx, f.arena);
-  EXPECT_EQ(sum->value.ToUint64(), 4u);
-}
-
 TEST(StmtExec, ForeachEmptyArrayNoOp) {
   StmtFixture f;
 
@@ -97,44 +65,6 @@ TEST(StmtExec, ForeachNoVarsStillIterates) {
 
   RunStmt(stmt, f.ctx, f.arena);
   EXPECT_EQ(cnt->value.ToUint64(), 3u);
-}
-
-// §12.7.3 — the foreach-loop opens an implicit scope and its loop variable has
-// automatic lifetime local to that scope: during the loop the loop variable
-// shadows an outer variable of the same name, and the outer variable is left
-// untouched once the loop ends.
-TEST(StmtExec, ForeachLoopVarIsLocalToScope) {
-  StmtFixture f;
-  auto* arr = f.ctx.CreateVariable("scoped_arr", 4);
-  arr->value = MakeLogic4VecVal(f.arena, 4, 0);
-
-  // An outer variable that happens to share the loop variable's name.
-  auto* outer_i = f.ctx.CreateVariable("i", 32);
-  outer_i->value = MakeLogic4VecVal(f.arena, 32, 99);
-
-  // Records whatever "i" resolves to inside the loop body.
-  auto* seen = f.ctx.CreateVariable("seen", 32);
-  seen->value = MakeLogic4VecVal(f.arena, 32, 0);
-
-  auto* body = f.arena.Create<Stmt>();
-  body->kind = StmtKind::kBlockingAssign;
-  body->lhs = MakeId(f.arena, "seen");
-  body->rhs = MakeId(f.arena, "i");
-
-  auto* stmt = f.arena.Create<Stmt>();
-  stmt->kind = StmtKind::kForeach;
-  stmt->expr = MakeId(f.arena, "scoped_arr");
-  stmt->foreach_vars.push_back("i");
-  stmt->body = body;
-
-  RunStmt(stmt, f.ctx, f.arena);
-
-  // Inside the loop "i" was the local loop variable (last index 3), not 99.
-  EXPECT_EQ(seen->value.ToUint64(), 3u);
-  // The outer "i" survives the loop unchanged: the loop variable was local.
-  auto* after = f.ctx.FindVariable("i");
-  ASSERT_NE(after, nullptr);
-  EXPECT_EQ(after->value.ToUint64(), 99u);
 }
 
 TEST(LoopStatementSim, ForeachBasic) {
@@ -443,6 +373,125 @@ TEST(LoopStatementSim, ForeachLoopVarUsableAsIntInExpression) {
   auto* var = f.ctx.FindVariable("total");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 6u);
+}
+
+// §12.7.3 — the foreach-loop creates an implicit begin-end block whose loop
+// variable has automatic lifetime local to that scope. Driven from real source:
+// a module variable `i` is set to 99, then a foreach whose loop variable is
+// also named `i` runs. Inside the loop the local loop variable shadows the
+// outer one (last_seen records the final index 3), and after the loop the outer
+// `i` still holds 99 because the loop variable was a distinct, scope-local
+// declaration.
+TEST(LoopStatementSim, ForeachImplicitScopeShadowsOuterVar) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] arr [4];\n"
+      "  logic [7:0] i;\n"
+      "  logic [7:0] last_seen;\n"
+      "  initial begin\n"
+      "    i = 8'd99;\n"
+      "    last_seen = 8'd0;\n"
+      "    foreach (arr[i]) last_seen = i[7:0];\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* seen = f.ctx.FindVariable("last_seen");
+  auto* outer = f.ctx.FindVariable("i");
+  ASSERT_NE(seen, nullptr);
+  ASSERT_NE(outer, nullptr);
+  EXPECT_EQ(seen->value.ToUint64(), 3u);    // local loop var swept the indices
+  EXPECT_EQ(outer->value.ToUint64(), 99u);  // outer `i` untouched by the loop
+}
+
+// §12.7.3 — a foreach may iterate any packed OR unpacked array. A packed vector
+// is a packed array, so foreach runs once per bit position: for a [7:0] packed
+// value the loop body executes exactly eight times.
+TEST(LoopStatementSim, ForeachOverPackedArrayIteratesPerBit) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] pk;\n"
+      "  logic [7:0] cnt;\n"
+      "  initial begin\n"
+      "    cnt = 8'd0;\n"
+      "    foreach (pk[i]) cnt = cnt + 8'd1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("cnt");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 8u);
+}
+
+// §12.7.3 — a loop variable may be omitted to indicate no iteration over that
+// dimension. For a 2x3 array, naming only the first slot iterates just the
+// leading dimension (2 steps), and naming only the second slot iterates just
+// the trailing dimension (3 steps); the omitted dimension is not walked, so
+// neither loop runs the full 2*3 element count.
+TEST(LoopStatementSim, ForeachOmittedDimensionIsNotIterated) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] m [2][3];\n"
+      "  logic [7:0] outer_cnt;\n"
+      "  logic [7:0] inner_cnt;\n"
+      "  initial begin\n"
+      "    outer_cnt = 8'd0;\n"
+      "    inner_cnt = 8'd0;\n"
+      "    foreach (m[i, ]) outer_cnt = outer_cnt + 8'd1;\n"
+      "    foreach (m[, j]) inner_cnt = inner_cnt + 8'd1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* vo = f.ctx.FindVariable("outer_cnt");
+  auto* vi = f.ctx.FindVariable("inner_cnt");
+  ASSERT_NE(vo, nullptr);
+  ASSERT_NE(vi, nullptr);
+  EXPECT_EQ(vo->value.ToUint64(), 2u);  // only the leading dimension iterated
+  EXPECT_EQ(vi->value.ToUint64(), 3u);  // only the trailing dimension iterated
+}
+
+// §12.7.3 — the implicit block a foreach creates is unnamed by default but can
+// be named by prefixing the statement with a label; naming it makes the loop a
+// disable target. Driven end-to-end from real label (§9.3.5) and disable
+// (§9.6.2) source syntax: once the counter reaches 2 the body disables the
+// loop's own label, which ends the loop like a break, so the counter stops at 2
+// even though the array has five elements.
+TEST(LoopStatementSim, ForeachNamedByLabelIsDisableTarget) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] arr [5];\n"
+      "  logic [7:0] cnt;\n"
+      "  initial begin\n"
+      "    cnt = 8'd0;\n"
+      "    walk: foreach (arr[i]) begin\n"
+      "      cnt = cnt + 8'd1;\n"
+      "      if (cnt == 8'd2) disable walk;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("cnt");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 2u);
 }
 
 }  // namespace
