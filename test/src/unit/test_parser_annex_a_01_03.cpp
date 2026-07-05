@@ -284,6 +284,26 @@ TEST(ModuleParametersAndPorts, ParameterPortListEmpty) {
   EXPECT_TRUE(mod->params.empty());
 }
 
+// The first alternative of parameter_port_list leads with a
+// list_of_param_assignments: a bare "name = value" with no `parameter` keyword
+// and an implicit data type, distinct from the data_type-prefixed form.
+TEST(ModuleParametersAndPorts, ParameterPortListLeadingParamAssignment) {
+  auto r = Parse("module m #(W = 8) (); endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* mod = r.cu->modules[0];
+  EXPECT_TRUE(mod->has_param_port_list);
+  ASSERT_EQ(mod->params.size(), 1u);
+  EXPECT_EQ(mod->params[0].first, "W");
+  EXPECT_NE(mod->params[0].second, nullptr);
+  // Implicit type: no `parameter`/`localparam` keyword and no explicit data
+  // type.
+  ASSERT_EQ(mod->param_types.size(), 1u);
+  EXPECT_EQ(mod->param_types[0].kind, DataTypeKind::kImplicit);
+  EXPECT_EQ(mod->localparam_port_names.count("W"), 0u);
+  EXPECT_EQ(mod->type_param_names.count("W"), 0u);
+}
+
 // --- parameter_port_declaration (prod 2) ---
 
 // local_parameter_declaration alternative inside a parameter_port_list.
@@ -536,6 +556,71 @@ TEST(ModuleParametersAndPorts, NonAnsiPortDeclMissingSemicolon) {
 TEST(ModuleParametersAndPorts, AnsiExplicitlyNamedPortMissingParen) {
   auto r = Parse("module m (input .x a); endmodule");
   EXPECT_TRUE(r.has_errors);
+}
+
+// --- additional input forms ---
+
+// ansi_port_declaration's "= constant_expression" default is a constant
+// expression; besides a literal it may be a reference to a parameter. The
+// parameter is produced from real parameter_port_list syntax, and the default
+// takes the identifier-reference parse path rather than the literal path.
+TEST(ModuleParametersAndPorts, AnsiPortDefaultValueParameter) {
+  auto r = Parse(
+      "module m #(parameter int D = 5)(input int x = D);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* mod = r.cu->modules[0];
+  ASSERT_EQ(mod->params.size(), 1u);
+  EXPECT_EQ(mod->params[0].first, "D");
+  ASSERT_EQ(mod->ports.size(), 1u);
+  ASSERT_NE(mod->ports[0].default_value, nullptr);
+  EXPECT_EQ(mod->ports[0].default_value->kind, ExprKind::kIdentifier);
+  EXPECT_EQ(mod->ports[0].default_value->text, "D");
+}
+
+// port's ". port_identifier ( [ port_expression ] )" form has an optional
+// port_expression, so an empty ".name()" is a legal unconnected explicit port.
+TEST(ModuleParametersAndPorts, PortExplicitlyNamedEmpty) {
+  auto r = Parse("module m (.x()); endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* mod = r.cu->modules[0];
+  EXPECT_TRUE(mod->is_non_ansi_ports);
+  ASSERT_EQ(mod->ports.size(), 1u);
+  EXPECT_TRUE(mod->ports[0].is_explicit_named);
+  EXPECT_EQ(mod->ports[0].name, "x");
+  EXPECT_EQ(mod->ports[0].port_expr, nullptr);
+}
+
+// interface_port_header's "interface_identifier [ . modport_identifier ]"
+// alternative with the ". modport_identifier" part omitted: a plain named
+// interface-type port.
+TEST(ModuleParametersAndPorts, NamedInterfacePortNoModport) {
+  auto r = Parse("module m (bus_if bus); endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* mod = r.cu->modules[0];
+  ASSERT_EQ(mod->ports.size(), 1u);
+  EXPECT_TRUE(mod->ports[0].is_interface_port);
+  EXPECT_EQ(mod->ports[0].name, "bus");
+  EXPECT_EQ(mod->ports[0].data_type.type_name, "bus_if");
+  EXPECT_TRUE(mod->ports[0].data_type.modport_name.empty());
+}
+
+// port_declaration's ref_declaration alternative: a non-ANSI body port
+// declaration may carry the "ref" direction, binding it to a header name.
+TEST(ModuleParametersAndPorts, NonAnsiRefPortDeclaration) {
+  auto r = Parse(
+      "module m (r);\n"
+      "  ref logic r;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* mod = r.cu->modules[0];
+  EXPECT_TRUE(mod->is_non_ansi_ports);
+  ASSERT_EQ(mod->ports.size(), 1u);
+  EXPECT_EQ(mod->ports[0].direction, Direction::kRef);
 }
 
 }  // namespace
