@@ -620,4 +620,17 @@ TEST(TaskDeclParsing, TaskPrototypeMultiplePorts) {
   EXPECT_EQ(item->func_args[1].direction, Direction::kOutput);
 }
 
+TEST(TaskDeclParsing, ErrorTaskDeclDynOverrideInitialAndExtends) {
+  // dynamic_override_specifiers is [ initial_or_extends_specifier ]
+  // [ final_specifier ]: at most one initial_or_extends_specifier is allowed,
+  // so `:initial :extends' (two of them) is not in the grammar and must be
+  // rejected.
+  auto r = Parse(
+      "class c;\n"
+      "  virtual task :initial :extends my_task;\n"
+      "  endtask\n"
+      "endclass\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
 }  // namespace

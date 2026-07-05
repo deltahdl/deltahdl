@@ -131,4 +131,41 @@ TEST(TaskDeclElaboration, TaskVarPortElaborates) {
              "endmodule\n"));
 }
 
+TEST(TaskDeclElaboration, TaskLocalVarDeclInBodyElaborates) {
+  // task_body_declaration's { block_item_declaration } slot: a local variable
+  // declared inside the body (built from the §A.2.8 block_item_declaration
+  // dependency's real syntax) is consumed and survives elaboration end-to-end.
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  task automatic my_task(output int b);\n"
+             "    int tmp;\n"
+             "    tmp = 3;\n"
+             "    b = tmp + 1;\n"
+             "  endtask\n"
+             "endmodule\n"));
+}
+
+TEST(TaskDeclElaboration, TaskPortDefaultFromParameterElaborates) {
+  // tf_port_item's optional [ = expression ] default value, built from a
+  // §A.8.3 expression that references a §6.20 parameter (a distinct code path
+  // from a bare literal), is consumed and elaborates end-to-end.
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  parameter int P = 7;\n"
+             "  task my_task(input int x = P);\n"
+             "  endtask\n"
+             "endmodule\n"));
+}
+
+TEST(TaskDeclElaboration, TaskArrayPortElaborates) {
+  // tf_port_item's { variable_dimension } slot, built from the §A.2.5
+  // declaration-ranges dependency's real syntax (an unpacked dimension on the
+  // port), is consumed and elaborates end-to-end.
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  task my_task(input int data [4]);\n"
+             "  endtask\n"
+             "endmodule\n"));
+}
+
 }  // namespace
