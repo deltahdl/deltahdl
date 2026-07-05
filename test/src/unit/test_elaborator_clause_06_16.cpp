@@ -47,4 +47,14 @@ TEST(Elaboration, StringWithLiteralInitElaborates) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
+// §6.16, Table 6-9: a string replication multiplier shall be a non-negative,
+// non-x, non-z integral expression. A multiplier containing x is rejected.
+TEST(Elaboration, StringReplicationXZMultiplierRejected) {
+  EXPECT_FALSE(
+      ElabOk("module top;\n"
+             "  string s;\n"
+             "  initial s = {1'bx{\"ab\"}};\n"
+             "endmodule\n"));
+}
+
 }  // namespace

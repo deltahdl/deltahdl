@@ -140,4 +140,40 @@ TEST(LexicalConventionSim, UnpackedByteArrayLeftJustifiedPadding) {
   EXPECT_EQ(v->value.ToUint64(), 0u);
 }
 
+// §5.9: an escaped character sequence in a string literal is a single 8-bit
+// ASCII value. "\n" occupies exactly one byte (0x0A), so it fits an 8-bit
+// target unchanged (the bit [7:0] d = "\n" example).
+TEST(LexicalConventionSim, EscapedNewlineIsSingleByte) {
+  auto v = RunAndGet(
+      "module t;\n  bit [7:0] d;\n  initial d = \"\\n\";\nendmodule\n", "d");
+  EXPECT_EQ(v, 0x0Au);
+}
+
+// §5.9: a string literal can be cast to a packed array type, following the same
+// rules as assigning it. A width-16 cast of the two-character literal packs the
+// bytes exactly.
+TEST(LexicalConventionSim, CastStringLiteralToPackedArrayExactWidth) {
+  auto v = RunAndGet(
+      "module t;\n  bit [15:0] x;\n  initial x = 16'(\"AB\");\nendmodule\n",
+      "x");
+  EXPECT_EQ(v, 0x4142u);
+}
+
+// §5.9: casting a string literal to a narrower packed array right justifies and
+// truncates on the left, exactly as the assignment rules require.
+TEST(LexicalConventionSim, CastStringLiteralToPackedArrayTruncatesLeft) {
+  auto v = RunAndGet(
+      "module t;\n  bit [7:0] x;\n  initial x = 8'(\"AB\");\nendmodule\n", "x");
+  EXPECT_EQ(v, 0x42u);
+}
+
+// §5.9: casting a string literal to a wider packed array right justifies and
+// zero-fills on the left.
+TEST(LexicalConventionSim, CastStringLiteralToPackedArrayZeroFillsLeft) {
+  auto v = RunAndGet(
+      "module t;\n  bit [23:0] x;\n  initial x = 24'(\"AB\");\nendmodule\n",
+      "x");
+  EXPECT_EQ(v, 0x004142u);
+}
+
 }  // namespace
