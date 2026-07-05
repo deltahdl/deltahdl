@@ -88,6 +88,34 @@ TEST(ConfigLocalparamLiteral, RealLiteralLocalparamAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// An unbased-unsized literal ('0/'1/'x/'z) is a literal value, so a config
+// localparam set directly to one is accepted (§33.4.3).
+TEST(ConfigLocalparamLiteral, UnbasedUnsizedLiteralLocalparamAccepted) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top; endmodule\n"
+      "config c;\n"
+      "  localparam U = '1;\n"
+      "  design top;\n"
+      "endconfig\n",
+      f, "top");
+  EXPECT_FALSE(f.has_errors);
+}
+
+// A time literal (e.g. 5ns) is likewise a literal value and is accepted as a
+// config localparam initializer (§33.4.3).
+TEST(ConfigLocalparamLiteral, TimeLiteralLocalparamAccepted) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top; endmodule\n"
+      "config c;\n"
+      "  localparam T = 5ns;\n"
+      "  design top;\n"
+      "endconfig\n",
+      f, "top");
+  EXPECT_FALSE(f.has_errors);
+}
+
 TEST(ConfigParamOverride, HierIdentInExpressionRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -268,6 +296,37 @@ TEST(ConfigParamApply, OverrideSetsInstanceParameter) {
   ASSERT_NE(a1, nullptr);
   EXPECT_FALSE(f.has_errors);
   EXPECT_EQ(ResolvedParam(a1, "W"), 32);
+}
+
+// The override value may be a configuration localparam; it resolves against the
+// config's own localparam scope and its literal value reaches the bound
+// instance's parameter (§33.4.3).
+TEST(ConfigParamApply, OverrideUsingConfigLocalparamValue) {
+  ElabFixture f;
+  auto* a1 =
+      ConfigElabFirstChild(f,
+                           "module adder #(parameter W = 8) (); endmodule\n"
+                           "module top; adder a1(); endmodule\n"
+                           "config c; localparam V = 24; design top;\n"
+                           "  instance top.a1 use #(.W(V)); endconfig\n");
+  ASSERT_NE(a1, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(ResolvedParam(a1, "W"), 24);
+}
+
+// The override value may name a parameter of the instance's parent; §33.4.3
+// resolves parameter identifiers starting in that parent scope, so the parent's
+// value is what the bound instance receives.
+TEST(ConfigParamApply, OverrideUsingParentParameterValue) {
+  ElabFixture f;
+  auto* a1 = ConfigElabFirstChild(
+      f,
+      "module adder #(parameter W = 8) (); endmodule\n"
+      "module top; parameter P = 20; adder a1(); endmodule\n"
+      "config c; design top; instance top.a1 use #(.W(P)); endconfig\n");
+  ASSERT_NE(a1, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(ResolvedParam(a1, "W"), 20);
 }
 
 // An override with empty parentheses returns just that parameter to its module
