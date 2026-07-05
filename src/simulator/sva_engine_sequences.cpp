@@ -157,6 +157,25 @@ bool EvalSequenceIntersect(bool a_match, bool b_match, uint32_t a_len,
   return a_match && b_match && a_len == b_len;
 }
 
+std::vector<IntersectOperandMatch> EvalSequenceIntersectMatches(
+    const std::vector<IntersectOperandMatch>& a_matches,
+    const std::vector<IntersectOperandMatch>& b_matches) {
+  std::vector<IntersectOperandMatch> result;
+  // Pair each first-operand match with each second-operand match of the same
+  // length; every pair contributes one composite match. The operands co-start,
+  // so an equal-length pair also shares a match point, which the composite
+  // inherits.
+  for (const auto& a : a_matches) {
+    for (const auto& b : b_matches) {
+      if (a.length == b.length) {
+        result.push_back({a.length, a.match_point});
+      }
+    }
+  }
+  // No equal-length pair leaves the result empty: the composite has no match.
+  return result;
+}
+
 bool EvalThroughout(const std::function<bool(uint64_t)>& check,
                     const std::vector<uint64_t>& values) {
   return std::all_of(values.begin(), values.end(), check);

@@ -143,6 +143,30 @@ FirstMatchMatches EvalFirstMatch(
 
 bool EvalSequenceIntersect(bool a_match, bool b_match, uint32_t a_len,
                            uint32_t b_len);
+
+// §16.9.6: one match of an operand of `intersect`, as referenced by the
+// "computed as follows" bullets: the number of clock ticks the match spans (its
+// length) and the clock tick on which the match completes (its match point).
+// Because the two operands of an intersect begin their evaluation attempt on
+// the same clock tick, two operand matches of equal length necessarily complete
+// on the same tick.
+struct IntersectOperandMatch {
+  uint32_t length = 0;
+  uint32_t match_point = 0;
+};
+
+// §16.9.6: the possibly-many matches of `seq1 intersect seq2` are computed from
+// the match sets of its two operands. A match of the first operand and a match
+// of the second operand of the same length are paired; each such pair yields
+// one match of the composite sequence, whose length and match point equal the
+// shared length and match point of the paired operand matches. If no
+// equal-length pair exists, the composite has no match. This is the
+// multiple-match analogue of the single-pair decision reported by
+// EvalSequenceIntersect.
+std::vector<IntersectOperandMatch> EvalSequenceIntersectMatches(
+    const std::vector<IntersectOperandMatch>& a_matches,
+    const std::vector<IntersectOperandMatch>& b_matches);
+
 bool EvalThroughout(const std::function<bool(uint64_t)>& check,
                     const std::vector<uint64_t>& values);
 
