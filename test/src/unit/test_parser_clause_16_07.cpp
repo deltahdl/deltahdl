@@ -201,6 +201,21 @@ TEST(SequenceExpressionParsing, NegativeDelayRangeBoundIsError) {
   EXPECT_TRUE(r.has_errors);
 }
 
+TEST(SequenceExpressionParsing, NegativeUpperDelayRangeBoundIsError) {
+  // §16.7 S2: the >=0 rule applies to the upper bound as well as the lower
+  // one; a literal negative on the second expression of ##[lo:hi] is flagged
+  // at parse time, exercising the hi-negative arm alongside the lo-negative
+  // case above.
+  auto r = Parse(
+      "module m;\n"
+      "  sequence s;\n"
+      "    @(posedge clk) a ##[1:-1] b;\n"
+      "  endsequence\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_TRUE(r.has_errors);
+}
+
 TEST(SequenceExpressionParsing, EqualDelayRangeBoundsIsAccepted) {
   // §16.7 S6 boundary: the upper bound is permitted to equal the lower
   // bound (both inclusive).
@@ -208,6 +223,109 @@ TEST(SequenceExpressionParsing, EqualDelayRangeBoundsIsAccepted) {
       "module m;\n"
       "  sequence s;\n"
       "    @(posedge clk) a ##[3:3] b;\n"
+      "  endsequence\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(SequenceExpressionParsing, MinTypMaxCycleDelayValueIsError) {
+  // §16.7: a cycle_delay_range's constant_primary may not be a
+  // constant_mintypmax_expression (a min:typ:max triple) that is not also a
+  // plain constant_expression. `## (1:2:3)` builds the §11.11 triple in the
+  // delay position and must be rejected.
+  auto r = Parse(
+      "module m;\n"
+      "  sequence s;\n"
+      "    @(posedge clk) a ##(1:2:3) b;\n"
+      "  endsequence\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(SequenceExpressionParsing, ParenthesizedConditionalCycleDelayIsAccepted) {
+  // §16.7 negative-of-the-negative: a parenthesized constant_expression in the
+  // delay position is legal even when it contains the ':' of a `?:`
+  // conditional, which must not be mistaken for a min:typ:max separator.
+  auto r = Parse(
+      "module m;\n"
+      "  parameter SEL = 1;\n"
+      "  sequence s;\n"
+      "    @(posedge clk) a ##(SEL ? 1 : 2) b;\n"
+      "  endsequence\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(SequenceExpressionParsing, MinTypMaxCycleDelayWithParamOperandsIsError) {
+  // §16.7: the min:typ:max ban on a cycle_delay_range constant_primary is
+  // about the `a:b:c` shape, not the operand kind — so the §11.11 triple
+  // formed from named parameters (its canonical real-world spelling) is
+  // rejected just like a literal triple. This drives the §11.11 dependency's
+  // real source syntax into the delay position and observes the parser
+  // applying the rule.
+  auto r = Parse(
+      "module m;\n"
+      "  parameter MIN_D = 1, TYP_D = 2, MAX_D = 3;\n"
+      "  sequence s;\n"
+      "    @(posedge clk) a ##(MIN_D:TYP_D:MAX_D) b;\n"
+      "  endsequence\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(SequenceExpressionParsing, ParenthesizedParamCycleDelayIsAccepted) {
+  // §16.7 positive control for the parameter operand form: a single
+  // parenthesized parameter is an ordinary constant_expression delay, not a
+  // min:typ:max triple, so it must be accepted. This isolates the triple —
+  // not the parameter operand — as the cause of the rejection above.
+  auto r = Parse(
+      "module m;\n"
+      "  parameter DLY = 2;\n"
+      "  sequence s;\n"
+      "    @(posedge clk) a ##(DLY) b;\n"
+      "  endsequence\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(SequenceExpressionParsing, RealLiteralCycleDelayValueIsError) {
+  // §16.7 C1: the constant_primary of a `## delay` shall result in an integer
+  // value; a real literal never does and is rejected at parse time.
+  auto r = Parse(
+      "module m;\n"
+      "  sequence s;\n"
+      "    @(posedge clk) a ##2.5 b;\n"
+      "  endsequence\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(SequenceExpressionParsing, StringLiteralCycleDelayValueIsError) {
+  // §16.7 C1: a string literal is likewise not an integer value and is
+  // rejected as a cycle-delay operand.
+  auto r = Parse(
+      "module m;\n"
+      "  sequence s;\n"
+      "    @(posedge clk) a ##\"two\" b;\n"
+      "  endsequence\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(SequenceExpressionParsing, IntegerLiteralCycleDelayValueIsAccepted) {
+  // §16.7 C1 positive control: a plain integer literal delay is a legal
+  // constant_primary, so the integer-value check must not flag it.
+  auto r = Parse(
+      "module m;\n"
+      "  sequence s;\n"
+      "    @(posedge clk) a ##7 b;\n"
       "  endsequence\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);

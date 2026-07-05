@@ -494,6 +494,59 @@ void Parser::ValidateLiteralCycleDelayRange(SourceLoc range_loc) {
   }
 }
 
+void Parser::ValidateCycleDelayMinTypMax(SourceLoc range_loc) {
+  // §16.7: inside a cycle_delay_range, it is illegal for the constant_primary
+  // to be a constant_mintypmax_expression (a `min:typ:max` triple) that is not
+  // also a plain constant_expression. The triple always takes the parenthesized
+  // `( a : b : c )` shape, so a top-level ':' inside the leading parentheses
+  // that is not the ':' of a `?:` conditional marks the illegal form. A plain
+  // `( expr )` or a `( sel ? a : b )` conditional stays legal. Tokens are
+  // peeked under SavePos/RestorePos so the body harvest loop still sees them.
+  if (!Check(TokenKind::kLParen)) return;
+  auto saved = lexer_.SavePos();
+  Consume();           // '('
+  int nesting = 1;     // open ( [ { — the leading '(' is the first level.
+  int cond_depth = 0;  // '?' tokens still awaiting their matching ':'.
+  bool is_min_typ_max = false;
+  while (nesting > 0 && !Check(TokenKind::kEof)) {
+    TokenKind k = CurrentToken().kind;
+    if (k == TokenKind::kLParen || k == TokenKind::kLBracket ||
+        k == TokenKind::kLBrace) {
+      ++nesting;
+    } else if (k == TokenKind::kRParen || k == TokenKind::kRBracket ||
+               k == TokenKind::kRBrace) {
+      --nesting;
+    } else if (nesting == 1 && k == TokenKind::kQuestion) {
+      ++cond_depth;
+    } else if (nesting == 1 && k == TokenKind::kColon) {
+      if (cond_depth > 0) {
+        --cond_depth;  // the ':' of a conditional, not a min:typ:max separator.
+      } else {
+        is_min_typ_max = true;
+      }
+    }
+    Consume();
+  }
+  lexer_.RestorePos(saved);
+  if (is_min_typ_max) {
+    diag_.Error(range_loc,
+                "a min:typ:max expression may not be used as a cycle-delay "
+                "value (§16.7)");
+  }
+}
+
+void Parser::ValidateCycleDelayIntegerValue(SourceLoc range_loc) {
+  // §16.7: the constant_primary of a `## delay` is a constant_expression that
+  // shall result in an integer value. A real or string literal in that position
+  // can never yield an integer, so it is rejected here. This peeks the current
+  // token only (no Consume), so the body harvest loop still sees it afterwards.
+  // The bracketed-range and parenthesized-primary forms are handled by the
+  // sibling checks; this fires only on the bare `## <literal>` shape.
+  if (Check(TokenKind::kRealLiteral) || Check(TokenKind::kStringLiteral)) {
+    diag_.Error(range_loc, "cycle-delay value must be an integer (§16.7)");
+  }
+}
+
 // Consumes the var_data_type prefix of an assertion_variable_declaration: the
 // leading type keyword followed by any signing token and packed dimensions.
 static void SkipAssertVarTypePrefix(Lexer& lexer) {
@@ -877,6 +930,8 @@ ModuleItem* Parser::ParseSequenceDecl() {
       auto delay_loc = CurrentLoc();
       Consume();
       ValidateLiteralCycleDelayRange(delay_loc);
+      ValidateCycleDelayMinTypMax(delay_loc);
+      ValidateCycleDelayIntegerValue(delay_loc);
       continue;
     }
     if (Check(TokenKind::kIdentifier)) {

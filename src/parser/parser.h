@@ -405,6 +405,8 @@ class Parser {
   ModuleItem* ParsePropertyDecl();
   ModuleItem* ParseSequenceDecl();
   void ValidateLiteralCycleDelayRange(SourceLoc range_loc);
+  void ValidateCycleDelayMinTypMax(SourceLoc range_loc);
+  void ValidateCycleDelayIntegerValue(SourceLoc range_loc);
   void HarvestAssertionVariableDecl(ModuleItem* item);
 
   Expr* ParseExpr();
