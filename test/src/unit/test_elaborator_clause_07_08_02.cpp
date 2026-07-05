@@ -98,4 +98,19 @@ TEST(StringIndexAssocArrayElaboration, EmptyStringLiteralIndexNoError) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
+// §7.8.2: the illegal-index rule applies wherever the array is indexed, not
+// only when it is the assignment target. A non-string index in a read (an
+// index used as a source operand) is a type check error just the same.
+TEST(StringIndexAssocArrayElaboration, IntegerLiteralIndexInReadIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  int aa[string];\n"
+      "  int x;\n"
+      "  initial x = aa[7];\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
 }  // namespace
