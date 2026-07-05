@@ -143,6 +143,34 @@ TEST(LvalueSim, VarLvalueNestedConcatBlocking) {
                    {{"a", 0x3u}, {"b", 0x1u}, {"c", 0x2u}, {"d", 0x0u}});
 }
 
+TEST(LvalueSim, VarLvalueAssignmentPatternBlocking) {
+  // variable_lvalue alt (c): a positional assignment pattern as the procedural
+  // target unpacks the RHS across its elements just like a concatenation, so
+  // the high nibble lands in the first element. Built from real `'{...}` syntax
+  // and observed through the simulated variable values.
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [3:0] a, b;\n"
+      "  initial '{a, b} = 8'hAB;\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"a", 0xAu}, {"b", 0xBu}});
+}
+
+TEST(LvalueSim, NetLvalueAssignmentPatternContAssign) {
+  // net_lvalue alt (c): a positional assignment pattern drives its element nets
+  // through a continuous assignment, checked via the simulated net values.
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  wire [3:0] x, y;\n"
+      "  assign '{x, y} = 8'hAB;\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"x", 0xAu}, {"y", 0xBu}});
+}
+
 TEST(LvalueSim, VarLvalueNonblockingAssign) {
   SimFixture f;
   auto* design = ElaborateSrc(

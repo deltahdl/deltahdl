@@ -205,21 +205,6 @@ TEST(LvalueParsing, NonrangeVarLvalueSimple) {
   EXPECT_EQ(stmt->lhs->text, "x");
 }
 
-TEST(LvalueParsing, NonrangeVarLvalueMemberAccess) {
-  auto r = Parse(
-      "module m;\n"
-      "  typedef struct packed { logic [7:0] a; logic [7:0] b; } s_t;\n"
-      "  s_t s;\n"
-      "  initial s.a = 8'h12;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  ASSERT_NE(stmt->lhs, nullptr);
-  EXPECT_EQ(stmt->lhs->kind, ExprKind::kMemberAccess);
-}
-
 TEST(LvalueParsing, VarLvalueStreamingConcatRightShift) {
   auto r = Parse(
       "module m; logic [31:0] a, b;\n"
@@ -443,6 +428,41 @@ TEST(LvalueParsing, VarLvalueWithImplicitClassHandle) {
   EXPECT_FALSE(r.has_errors);
 }
 
+TEST(LvalueParsing, VarLvalueWithSuperHandle) {
+  // variable_lvalue's optional prefix is `implicit_class_handle .`, and
+  // implicit_class_handle admits `super` as well as `this`. Assigning through
+  // `super.` exercises the distinct super branch of the lvalue parse.
+  auto r = Parse(
+      "class B;\n"
+      "  int x;\n"
+      "endclass\n"
+      "class D extends B;\n"
+      "  function void set(int v);\n"
+      "    super.x = v;\n"
+      "  endfunction\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(LvalueParsing, VarLvalueWithThisSuperHandle) {
+  // implicit_class_handle also admits the `this.super` form; variable_lvalue
+  // may carry it as its optional prefix. Assigning through `this.super.`
+  // exercises that third handle alternative (distinct from bare `this` and bare
+  // `super`).
+  auto r = Parse(
+      "class B;\n"
+      "  int x;\n"
+      "endclass\n"
+      "class D extends B;\n"
+      "  function void set(int v);\n"
+      "    this.super.x = v;\n"
+      "  endfunction\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 TEST(LvalueParsing, VarLvalueWithPackageScope) {
   auto r = Parse(
       "class C;\n"
@@ -450,34 +470,6 @@ TEST(LvalueParsing, VarLvalueWithPackageScope) {
       "endclass\n"
       "module m;\n"
       "  initial C::count = 5;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  ASSERT_NE(stmt->lhs, nullptr);
-  EXPECT_EQ(stmt->lhs->kind, ExprKind::kMemberAccess);
-}
-
-TEST(LvalueParsing, NonrangeVarLvalueWithImplicitClassHandle) {
-  auto r = Parse(
-      "class C;\n"
-      "  int s;\n"
-      "  function void reset();\n"
-      "    this.s = 0;\n"
-      "  endfunction\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(LvalueParsing, NonrangeVarLvalueWithPackageScope) {
-  auto r = Parse(
-      "class C;\n"
-      "  static int s;\n"
-      "endclass\n"
-      "module m;\n"
-      "  initial C::s = 1;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);

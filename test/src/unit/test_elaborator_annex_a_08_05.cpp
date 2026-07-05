@@ -227,3 +227,31 @@ TEST(LvalueElaboration, VarLvalueSingleElementConcatProcedural) {
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
+
+TEST(LvalueElaboration, VarLvalueAssignmentPatternProcedural) {
+  // variable_lvalue's assignment_pattern_variable_lvalue alternative: the
+  // positional pattern `'{a, b}` stands as the procedural-assignment target.
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic [3:0] a, b;\n"
+      "  initial '{a, b} = 8'hAB;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(LvalueElaboration, NetLvalueAssignmentPatternContAssign) {
+  // net_lvalue's assignment_pattern_net_lvalue alternative: the pattern `'{x,
+  // y}` stands as a continuous-assignment target over nets.
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  wire [3:0] x, y;\n"
+      "  assign '{x, y} = 8'hAB;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
