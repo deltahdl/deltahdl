@@ -234,4 +234,53 @@ TEST(ConcatenationParsing, ModulePathMultipleConcatenation) {
               "endmodule\n"));
 }
 
+// Positive observation of the module_path_concatenation production. The
+// parallel '=>' form forbids a brace-grouped terminal list, but the full '*>'
+// connection accepts terminal lists, so the concatenation syntax is consumed
+// here rather than rejected.
+TEST(ConcatenationParsing, ModulePathConcatenationInFullPath) {
+  EXPECT_TRUE(
+      ParseOk("module m(input a, input b, output c, output d);\n"
+              "  specify\n"
+              "    ({a, b} *> {c, d}) = 5;\n"
+              "  endspecify\n"
+              "endmodule\n"));
+}
+
+// Positive observation of the module_path_multiple_concatenation production
+// ({ constant_expression module_path_concatenation }) in the same full '*>'
+// context that admits a terminal list.
+TEST(ConcatenationParsing, ModulePathMultipleConcatenationInFullPath) {
+  EXPECT_TRUE(
+      ParseOk("module m(input a, input b, output c);\n"
+              "  specify\n"
+              "    ({2{a, b}} *> c) = 5;\n"
+              "  endspecify\n"
+              "endmodule\n"));
+}
+
+// slice_size ::= simple_type | constant_expression. The constant_expression
+// alternative is exercised as a numeric literal by
+// StreamingConcatWithNumericSlice above; here it is a named parameter, the
+// other constant form admitted in this position. The parser accepts an
+// identifier ahead of the stream's inner brace.
+TEST(ConcatenationParsing, StreamingConcatWithParameterSliceSize) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  parameter W = 4;\n"
+              "  logic [7:0] a, b;\n"
+              "  initial x = {>> W {a, b}};\n"
+              "endmodule\n"));
+}
+
+// Negative form of stream_concatenation ::= { stream_expression
+// { , stream_expression } }: the inner brace list must hold at least one
+// stream_expression, so an empty stream body is rejected.
+TEST(ConcatenationParsing, StreamConcatenationEmptyRejected) {
+  EXPECT_FALSE(
+      ParseOk("module m;\n"
+              "  initial x = {>> {}};\n"
+              "endmodule\n"));
+}
+
 }  // namespace

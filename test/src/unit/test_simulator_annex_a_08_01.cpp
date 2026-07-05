@@ -119,12 +119,20 @@ TEST(ConcatenationSim, ConstantMultipleConcatenationSimulates) {
   EXPECT_EQ(var->value.ToUint64(), 0xFFFFu);
 }
 
-TEST(ConcatenationSim, ThreeElementConcatenationSimulates) {
+// End-to-end observation that a concatenation operand may be a full §A.8.3
+// expression, not just a leaf literal or identifier. The single element is a
+// runtime sum; the concatenation forwards its self-determined value, which the
+// assignment truncates into the 8-bit target.
+TEST(ConcatenationSim, ConcatenationOfExpressionSimulates) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
-      "  logic [11:0] x;\n"
-      "  initial x = {4'hA, 4'hB, 4'hC};\n"
+      "  logic [7:0] a, b, x;\n"
+      "  initial begin\n"
+      "    a = 8'h20;\n"
+      "    b = 8'h15;\n"
+      "    x = {a + b};\n"
+      "  end\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
@@ -133,7 +141,57 @@ TEST(ConcatenationSim, ThreeElementConcatenationSimulates) {
   f.scheduler.Run();
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 0xABCu);
+  EXPECT_EQ(var->value.ToUint64(), 0x35u);
+}
+
+// End-to-end observation of streaming_concatenation carrying a slice_size drawn
+// from the §A.2.2.1 simple_type 'byte'. The left-stream operator reorders the
+// stream in byte-sized slices, so the two source bytes 0xAB,0xCD are emitted
+// swapped as 0xCDAB — the slice width (8) is resolved from the type name and
+// drives the reordering.
+TEST(ConcatenationSim, StreamingConcatByteSliceSimulates) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a, b;\n"
+      "  logic [15:0] x;\n"
+      "  initial begin\n"
+      "    a = 8'hAB;\n"
+      "    b = 8'hCD;\n"
+      "    x = {<< byte {a, b}};\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0xCDABu);
+}
+
+// constant_multiple_concatenation's replication count is a constant_expression.
+// ConstantMultipleConcatenationSimulates covers a literal count; here the count
+// is a parameter, the other constant form, folded when the dependent parameter
+// is elaborated.
+TEST(ConcatenationSim, MultipleConcatenationParameterCountSimulates) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  parameter N = 4;\n"
+      "  parameter P = {N{4'hF}};\n"
+      "  logic [15:0] x;\n"
+      "  initial x = P;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0xFFFFu);
 }
 
 }  // namespace
