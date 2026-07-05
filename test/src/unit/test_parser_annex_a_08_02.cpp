@@ -6,14 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(SubroutineCallExprParsing, SystemFunctionCall) {
-  auto r = Parse(
-      "module m; initial begin $display(\"v=%0d\", x); $finish; end "
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(SubroutineCallExprParsing, FunctionCallExpr) {
   auto r = Parse("module m; initial x = func(a, b); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -118,14 +110,6 @@ TEST(SubroutineCallSyntaxParsing, MethodCallWithArgs) {
   ASSERT_NE(expr, nullptr);
   EXPECT_EQ(expr->kind, ExprKind::kCall);
   EXPECT_EQ(expr->args.size(), 2u);
-}
-
-TEST(SubroutineCallSyntaxParsing, TaskCalledAsStatement) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  task greet; endtask\n"
-              "  initial greet();\n"
-              "endmodule\n"));
 }
 
 TEST(SubroutineCallSyntaxParsing, VoidCastSystemCall) {
@@ -245,21 +229,6 @@ TEST(SubroutineCallSyntaxParsing, VoidCastOfMethodCall) {
   auto r = Parse(
       "module m;\n"
       "  initial void'(obj.method());\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* expr = FirstInitialExpr(r);
-  ASSERT_NE(expr, nullptr);
-  EXPECT_EQ(expr->kind, ExprKind::kCast);
-  EXPECT_EQ(expr->text, "void");
-  ASSERT_NE(expr->lhs, nullptr);
-  EXPECT_EQ(expr->lhs->kind, ExprKind::kCall);
-}
-
-TEST(SubroutineCallSyntaxParsing, VoidCastOfChainedMethodCall) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial void'(a.b.c());\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);

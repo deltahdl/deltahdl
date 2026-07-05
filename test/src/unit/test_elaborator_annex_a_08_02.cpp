@@ -185,4 +185,35 @@ TEST(SubroutineCallExprElaboration,
   EXPECT_FALSE(f.has_errors);
 }
 
+// constant_function_call folded in a constant-expression context where the
+// call's argument is itself a parameter (a distinct constant form from the
+// literal used in ConstantFunctionCallInParameterElaborates). The elaborator
+// must resolve the parameter before folding the call.
+TEST(SubroutineCallExprElaboration, ConstantFunctionCallWithParameterArg) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  parameter int B = 41;\n"
+      "  function int inc(int n); return n + 1; endfunction\n"
+      "  localparam int P = inc(B);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// constant_function_call folded where the argument is a localparam constant.
+TEST(SubroutineCallExprElaboration, ConstantFunctionCallWithLocalparamArg) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  localparam int B = 41;\n"
+      "  function int inc(int n); return n + 1; endfunction\n"
+      "  localparam int P = inc(B);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace
