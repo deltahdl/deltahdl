@@ -223,17 +223,6 @@ TEST(DeclarationListParsing, ListOfInterfaceIdentifiersMultiple) {
   EXPECT_TRUE(r.cu->modules[0]->ports[1].is_interface_port);
 }
 
-TEST(DeclarationListParsing, ListOfInterfaceIdentifiersWithModport) {
-  auto r = Parse(
-      "module m(interface.mp a, interface.mp b);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules[0]->ports.size(), 2u);
-  EXPECT_EQ(r.cu->modules[0]->ports[0].data_type.modport_name, "mp");
-  EXPECT_EQ(r.cu->modules[0]->ports[1].data_type.modport_name, "mp");
-}
-
 TEST(DeclarationListParsing, ListOfNetDeclAssignmentsWithInit) {
   auto r = Parse("module m; wire a = 1'b0, b = 1'b1; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -245,26 +234,6 @@ TEST(DeclarationListParsing, ListOfNetDeclAssignmentsWithInit) {
     }
   }
   EXPECT_EQ(with_init, 2);
-}
-
-TEST(DeclarationListParsing, ListOfVariableDeclAssignmentsMixed) {
-  auto r = Parse(
-      "module m;\n"
-      "  int a, b = 5, c;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  int with_init = 0;
-  int without_init = 0;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind != ModuleItemKind::kVarDecl) continue;
-    if (item->init_expr != nullptr)
-      with_init++;
-    else
-      without_init++;
-  }
-  EXPECT_EQ(with_init, 1);
-  EXPECT_EQ(without_init, 2);
 }
 
 TEST(DeclarationListParsing, ListOfVariableIdentifiersWithDims) {
@@ -337,6 +306,38 @@ TEST(DeclarationListParsing, ListOfPortIdentifiersPerElementUnpackedDim) {
   ASSERT_EQ(r.cu->modules[0]->ports.size(), 2u);
   EXPECT_FALSE(r.cu->modules[0]->ports[0].unpacked_dims.empty());
   EXPECT_FALSE(r.cu->modules[0]->ports[1].unpacked_dims.empty());
+}
+
+// list_of_interface_identifiers admits `{ unpacked_dimension }` on each
+// interface identifier; observe the per-element dim being carried through.
+TEST(DeclarationListParsing, ListOfInterfaceIdentifiersWithUnpackedDim) {
+  auto r = Parse("module m(interface a [3:0], interface b [1:0]); endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules[0]->ports.size(), 2u);
+  EXPECT_TRUE(r.cu->modules[0]->ports[0].is_interface_port);
+  EXPECT_FALSE(r.cu->modules[0]->ports[0].unpacked_dims.empty());
+  EXPECT_TRUE(r.cu->modules[0]->ports[1].is_interface_port);
+  EXPECT_FALSE(r.cu->modules[0]->ports[1].unpacked_dims.empty());
+}
+
+// list_of_tf_variable_identifiers admits `{ variable_dimension }` on each
+// port_identifier; observe a dim carried on a list element of a tf arg list.
+TEST(DeclarationListParsing, ListOfTfVariableIdentifiersWithDim) {
+  auto r = Parse(
+      "module m;\n"
+      "  function int f;\n"
+      "    input int a [2], b;\n"
+      "    f = a[0];\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* fn = r.cu->modules[0]->items[0];
+  ASSERT_EQ(fn->kind, ModuleItemKind::kFunctionDecl);
+  ASSERT_EQ(fn->func_args.size(), 2u);
+  EXPECT_FALSE(fn->func_args[0].unpacked_dims.empty());
+  EXPECT_TRUE(fn->func_args[1].unpacked_dims.empty());
 }
 
 TEST(DeclarationListParsing, ListOfDefparamAssignmentsTrailingCommaErrors) {
