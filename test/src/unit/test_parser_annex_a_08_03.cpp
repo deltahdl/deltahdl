@@ -215,6 +215,15 @@ TEST(ExpressionParsing, ConstantParamExpressionDollarWithBound) {
   EXPECT_FALSE(r.has_errors);
 }
 
+// §A.8.3 constant_param_expression ::= constant_mintypmax_expression |
+// data_type | $. The '$' alternative as a value-parameter default, built from
+// real parameter-declaration syntax (distinct from a queue dimension's '$').
+TEST(ExpressionParsing, ConstantParamExpressionDollarDefault) {
+  auto r = Parse("module m; parameter P = $; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 TEST(ExpressionParsing, ParamExpressionInOverride) {
   auto r = Parse(
       "module m;\n"
@@ -451,6 +460,74 @@ TEST(ExpressionParsing, ErrorBinaryOperatorMissingRhs) {
       ParseOk("module m;\n"
               "  initial x = a + ;\n"
               "endmodule\n"));
+}
+
+// §A.8.3 expression ::= unary_operator { attribute_instance } primary — the
+// optional attribute sits between the unary operator and its operand.
+TEST(ExpressionParsing, UnaryOperatorWithAttribute) {
+  auto r = Parse("module m; initial x = ~ (* keep *) a; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kUnary);
+}
+
+// §A.8.3 constant_expression ::= unary_operator { attribute_instance }
+// constant_primary — the attributed unary form in a constant context.
+TEST(ExpressionParsing, ConstantUnaryOperatorWithAttribute) {
+  auto r = Parse("module m; localparam Q = - (* keep *) 8'd1; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+// §A.8.3 inc_or_dec_expression ::= inc_or_dec_operator { attribute_instance }
+// variable_lvalue — prefix form with an intervening attribute.
+TEST(ExpressionParsing, PrefixIncrementWithAttribute) {
+  auto r = Parse("module m; initial begin ++ (* keep *) i; end endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+// §A.8.3 inc_or_dec_expression ::= variable_lvalue { attribute_instance }
+// inc_or_dec_operator — postfix form with an intervening attribute.
+TEST(ExpressionParsing, PostfixDecrementWithAttribute) {
+  auto r = Parse("module m; initial begin j (* keep *) --; end endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+// §A.8.3 module_path_conditional_expression ::= module_path_expression ?
+// { attribute_instance } module_path_expression : module_path_expression —
+// the ternary form as a state-dependent path condition.
+TEST(ExpressionParsing, ModulePathConditionalTernaryCondition) {
+  auto r = Parse(
+      "module m(input a, b, sel, output c);\n"
+      "  specify\n"
+      "    if (sel ? a : b) (a => c) = 1;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+// §A.8.3 inc_or_dec_expression requires a variable_lvalue operand; a prefix
+// ++/-- with no operand must be rejected.
+TEST(ExpressionParsing, ErrorPrefixIncrementMissingOperand) {
+  EXPECT_FALSE(ParseOk("module m; initial begin ++; end endmodule\n"));
+}
+
+// §A.8.3 indexed_range ::= expression +: constant_expression — the width after
+// '+:' is mandatory; omitting it must be rejected.
+TEST(ExpressionParsing, ErrorIndexedPartSelectMissingWidth) {
+  EXPECT_FALSE(ParseOk("module m; initial x = a[0+:]; endmodule\n"));
+}
+
+// §A.8.3 constant_range ::= constant_expression : constant_expression — both
+// bounds are mandatory; a packed dimension missing its right bound must be
+// rejected.
+TEST(ExpressionParsing, ErrorConstantRangeMissingBound) {
+  EXPECT_FALSE(ParseOk("module m; logic [7:] x; endmodule\n"));
 }
 
 TEST(ExpressionParsing, ConstantRangeReversedBounds) {

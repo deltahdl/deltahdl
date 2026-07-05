@@ -272,6 +272,9 @@ Expr* Parser::ParsePrefixExpr() {
 
   if (tok.kind == TokenKind::kPlusPlus || tok.kind == TokenKind::kMinusMinus) {
     auto op = Consume();
+    // §A.8.3 inc_or_dec_expression allows an attribute_instance between the
+    // prefix ++/-- operator and its variable_lvalue.
+    ParseAttributes();
     auto* operand = ParsePrimaryExpr();
     auto* unary = arena_.Create<Expr>();
     unary->kind = ExprKind::kUnary;
@@ -284,6 +287,9 @@ Expr* Parser::ParsePrefixExpr() {
   int bp = PrefixBp(tok.kind);
   if (bp >= 0) {
     auto op = Consume();
+    // §A.8.3 expression/constant_expression allow an attribute_instance between
+    // a unary_operator and its (constant_)primary.
+    ParseAttributes();
     auto* operand = ParseExprBp(bp);
     auto* unary = arena_.Create<Expr>();
     unary->kind = ExprKind::kUnary;

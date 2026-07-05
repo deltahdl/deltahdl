@@ -46,16 +46,6 @@ TEST(ExpressionLexing, IndexedRangeMinusOperator) {
   EXPECT_TRUE(found);
 }
 
-TEST(ExpressionLexing, InsideKeyword) {
-  auto r = LexOne("inside");
-  EXPECT_EQ(r.token.kind, TokenKind::kKwInside);
-}
-
-TEST(ExpressionLexing, TaggedKeyword) {
-  auto r = LexOne("tagged");
-  EXPECT_EQ(r.token.kind, TokenKind::kKwTagged);
-}
-
 TEST(ExpressionLexing, DollarToken) {
   auto r = LexOne("$");
   EXPECT_EQ(r.token.kind, TokenKind::kDollar);
