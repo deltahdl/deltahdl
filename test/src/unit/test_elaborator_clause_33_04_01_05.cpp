@@ -194,6 +194,25 @@ TEST(ConfigLiblistClause, SelectedListSkipsLibraryWithoutCell) {
   EXPECT_EQ(bound->library, "libB");
 }
 
+// §33.4.1.5: a library list selected by the default clause is searched in the
+// order the libraries are listed, exercising the default (global library-order)
+// resolution path rather than the cell/instance override path. `leaf` is
+// declared first in libB and second in libA, yet `default liblist libA libB`
+// lists libA first, so top.u binds the libA copy -- proving the list order, not
+// the declaration order, decides the winner on the default path.
+TEST(ConfigLiblistClause, DefaultSelectedListSearchedInOrder) {
+  SourceManager mgr;
+  Arena arena;
+  DiagEngine diag(mgr);
+  auto* bound = BindLeafUnderTop(
+      mgr, arena, diag,
+      BindLeafParams{
+          "config c; design top; default liblist libA libB; endconfig\n",
+          "libB", "libA", "libC"});
+  ASSERT_NE(bound, nullptr);
+  EXPECT_EQ(bound->library, "libA");
+}
+
 // §33.6.4: a liblist clause on an instance clause governs that instance's own
 // cell binding and is inherited by its whole subhierarchy ("all of the
 // descendants ... inherit its liblist from the instance selection clause"),

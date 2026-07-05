@@ -142,4 +142,132 @@ TEST(ConfigUseClause, UseToMissingTargetLeavesInstanceUnbound) {
   EXPECT_EQ(top->children[0].resolved, nullptr);
 }
 
+// §33.4.1.6: the optional ':config' suffix on a use clause selects a like-named
+// configuration explicitly, rather than a plain module of the same name. Here a
+// module 'bot' exists (in lib1) and a configuration 'bot' is also declared; the
+// outer config's clause 'use lib1.bot:config' must bind through the
+// configuration, so the configuration's own rules govern bot's subtree. Config
+// 'bot' pins its child leaf to libB via its default liblist, while the outer
+// config's default liblist is libA -- observing libB on the grandchild proves
+// the configuration (not the bare module) was the thing selected by ':config'.
+TEST(ConfigUseClause, ConfigSuffixSelectsConfigurationNotSameNamedModule) {
+  SourceManager mgr;
+  Arena arena;
+  DiagEngine diag(mgr);
+  auto fid = mgr.AddFile("<test>",
+                         "module leaf; endmodule\n"
+                         "module leaf; endmodule\n"
+                         "module bot; leaf lf(); endmodule\n"
+                         "module top; bot b(); endmodule\n"
+                         "config c;\n"
+                         "  design top;\n"
+                         "  default liblist libA;\n"
+                         "  instance top.b use lib1.bot:config;\n"
+                         "endconfig\n"
+                         "config bot;\n"
+                         "  design lib1.bot;\n"
+                         "  default liblist libB;\n"
+                         "endconfig\n");
+  Lexer lex(mgr.FileContent(fid), fid, diag);
+  Parser parser(lex, arena, diag);
+  auto* cu = parser.Parse();
+  ASSERT_FALSE(diag.HasErrors());
+  ASSERT_EQ(cu->modules.size(), 4u);
+  cu->modules[0]->library = "libA";    // leaf
+  cu->modules[1]->library = "libB";    // leaf
+  cu->modules[2]->library = "lib1";    // bot
+  cu->modules[3]->library = "libTop";  // top
+
+  // Elaborate the outer config `c` (configs[0]); its use clause delegates top.b
+  // to config `bot` (configs[1]) because of the :config suffix.
+  Elaborator elab(arena, diag, cu);
+  auto* design = elab.Elaborate(cu->configs[0]);
+  ASSERT_NE(design, nullptr);
+  ASSERT_FALSE(design->top_modules.empty());
+  auto* top = design->top_modules[0];
+  ASSERT_EQ(top->children.size(), 1u);
+
+  // top.b binds to the use target's cell, module lib1.bot.
+  auto* bot = top->children[0].resolved;
+  ASSERT_NE(bot, nullptr);
+  EXPECT_EQ(bot->name, "bot");
+  EXPECT_EQ(bot->library, "lib1");
+
+  // The selected configuration's default liblist (libB) governs bot's subtree,
+  // so its leaf binds from libB rather than the outer config's default libA --
+  // only reachable if `:config` selected config `bot` over the module `bot`.
+  ASSERT_EQ(bot->children.size(), 1u);
+  auto* leaf = bot->children[0].resolved;
+  ASSERT_NE(leaf, nullptr);
+  EXPECT_EQ(leaf->library, "libB");
+}
+
+// §33.4.1.6: a use clause on an instance selection binds that exact instance to
+// the named library.cell. Here `widget` exists in both libA and libB and the
+// parent `top` is in a third library, so ordinary resolution would take the
+// first-declared libA copy; the clause `instance top.u use libB.widget` instead
+// pins top.u to the libB copy.
+TEST(ConfigUseClause, InstanceUseClauseBindsExactLibraryAndCell) {
+  SourceManager mgr;
+  Arena arena;
+  DiagEngine diag(mgr);
+  auto fid = mgr.AddFile("<test>",
+                         "module widget; endmodule\n"
+                         "module widget; endmodule\n"
+                         "module top; widget u(); endmodule\n"
+                         "config c; design top;"
+                         " instance top.u use libB.widget; endconfig\n");
+  Lexer lex(mgr.FileContent(fid), fid, diag);
+  Parser parser(lex, arena, diag);
+  auto* cu = parser.Parse();
+  ASSERT_FALSE(diag.HasErrors());
+  cu->modules[0]->library = "libA";    // widget
+  cu->modules[1]->library = "libB";    // widget
+  cu->modules[2]->library = "libTop";  // top
+
+  Elaborator elab(arena, diag, cu);
+  auto* design = elab.Elaborate(cu->configs[0]);
+  ASSERT_NE(design, nullptr);
+  auto* top = design->top_modules[0];
+  ASSERT_EQ(top->children.size(), 1u);
+  auto* bound = top->children[0].resolved;
+  ASSERT_NE(bound, nullptr);
+  EXPECT_EQ(bound->name, "widget");
+  EXPECT_EQ(bound->library, "libB");
+}
+
+// §33.4.1.6: when the instance use clause omits the library, the library is
+// inherited from the parent cell. `top` (in libP) instantiates a `foo`, but the
+// clause `instance top.u use bar` rebinds it to `bar`; with no library named,
+// bar is sought in top's own library, libP -- and the rebinding makes the bound
+// cell name (bar) differ from the instance's declared name (foo).
+TEST(ConfigUseClause, InstanceUseWithoutLibraryInheritsParentLibrary) {
+  SourceManager mgr;
+  Arena arena;
+  DiagEngine diag(mgr);
+  auto fid = mgr.AddFile("<test>",
+                         "module bar; endmodule\n"
+                         "module foo; endmodule\n"
+                         "module top; foo u(); endmodule\n"
+                         "config c; design top;"
+                         " instance top.u use bar; endconfig\n");
+  Lexer lex(mgr.FileContent(fid), fid, diag);
+  Parser parser(lex, arena, diag);
+  auto* cu = parser.Parse();
+  ASSERT_FALSE(diag.HasErrors());
+  cu->modules[0]->library = "libP";  // bar
+  cu->modules[1]->library = "libP";  // foo
+  cu->modules[2]->library = "libP";  // top
+
+  Elaborator elab(arena, diag, cu);
+  auto* design = elab.Elaborate(cu->configs[0]);
+  ASSERT_NE(design, nullptr);
+  auto* top = design->top_modules[0];
+  ASSERT_EQ(top->children.size(), 1u);
+  auto* bound = top->children[0].resolved;
+  ASSERT_NE(bound, nullptr);
+  EXPECT_EQ(bound->name, "bar");
+  EXPECT_EQ(bound->library, "libP");
+}
+
 }  // namespace

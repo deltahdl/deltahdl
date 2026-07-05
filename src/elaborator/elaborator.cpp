@@ -562,6 +562,19 @@ RtlirDesign* Elaborator::Elaborate(const ConfigDecl* cfg) {
                                    instance_use_overrides_,
                                    instance_liblist_overrides_);
 
+  // §33.4.1.6: an instance clause carrying a plain use expansion (no :config)
+  // binds that specific instance to the exact library.cell named. Delegating
+  // uses (use ...:config) are expanded by CollectConfigDelegationOverrides
+  // above and so are skipped here.
+  for (auto* rule : cfg->rules) {
+    if (rule->kind != ConfigRuleKind::kInstance) continue;
+    if (rule->use_config) continue;
+    if (rule->use_cell.empty()) continue;
+    instance_bind_overrides_.emplace_back(std::string(rule->inst_path),
+                                          std::string(rule->use_lib),
+                                          std::string(rule->use_cell));
+  }
+
   return ElaborateTops(top_decls);
 }
 

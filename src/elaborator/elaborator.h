@@ -105,6 +105,14 @@ class Elaborator {
   std::optional<ModuleDecl*> ResolveCellUseOverride(
       std::string_view name) const;
 
+  // Applies an instance selection clause's plain use expansion to the instance
+  // currently being resolved (§33.4.1.6). The exact instance at the named path
+  // is bound to the specified library.cell, independent of the instance's
+  // declared cell name; an omitted library is inherited from the parent cell.
+  // Returns nullopt when no clause applies; a present value (possibly nullptr)
+  // is the bound cell, where nullptr means the named target does not exist.
+  std::optional<ModuleDecl*> ResolveInstanceBindOverride() const;
+
   ModuleDecl* FindModuleInScope(std::string_view name) const;
 
   RtlirModule* ElaborateModule(const ModuleDecl* decl, const ParamList& params);
@@ -836,6 +844,14 @@ class Elaborator {
 
   std::vector<std::tuple<std::string, std::string, std::string>>
       instance_use_overrides_;
+
+  // An instance selection clause paired with a plain use expansion clause
+  // (§33.4.1.6): the exact instance at inst_path is bound to use_lib.use_cell.
+  // Kept separate from instance_use_overrides_ (which carries the config
+  // delegation of a use ...:config clause) so delegation is unaffected. An
+  // empty use_lib means the target library is inherited from the parent cell.
+  std::vector<std::tuple<std::string, std::string, std::string>>
+      instance_bind_overrides_;
 
   // A configuration's parameter overrides for one instance path (§33.4.3).
   // reset_all marks an empty "#()" list that returns every parameter to its

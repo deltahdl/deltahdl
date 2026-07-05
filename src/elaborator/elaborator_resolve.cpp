@@ -430,6 +430,19 @@ std::optional<ModuleDecl*> Elaborator::ResolveCellUseOverride(
   return FindCellInLibrary(target_lib, ov.use_cell, unit_);
 }
 
+std::optional<ModuleDecl*> Elaborator::ResolveInstanceBindOverride() const {
+  if (current_inst_path_.empty()) return std::nullopt;
+  for (const auto& [path, ulib, ucell] : instance_bind_overrides_) {
+    if (path != current_inst_path_) continue;
+    // An omitted target library is inherited from the parent cell (§33.4.1.6).
+    std::string_view target_lib = ulib.empty()
+                                      ? std::string_view(current_library_)
+                                      : std::string_view(ulib);
+    return FindCellInLibrary(target_lib, ucell, unit_);
+  }
+  return std::nullopt;
+}
+
 // §33.4.1.4, §33.4.1.5: selects the library list that governs resolution of
 // `name`, preferring the most specific instance-scoped liblist rule and falling
 // back to a cell-clause liblist. Returns nullptr when no liblist clause
@@ -497,6 +510,12 @@ ModuleDecl* Elaborator::FindModule(std::string_view name) const {
   if (auto hit = FindInstanceUseOverride(current_inst_path_, name,
                                          instance_use_overrides_, unit_);
       hit.has_value()) {
+    return *hit;
+  }
+
+  // §33.4.1.6: an instance selection is more specific than a cell selection, so
+  // a plain instance use binding is applied before any cell-clause use.
+  if (auto hit = ResolveInstanceBindOverride(); hit.has_value()) {
     return *hit;
   }
 
