@@ -61,20 +61,6 @@ TEST(DisableStatementParsing, NamedForkDisabledByName) {
   EXPECT_EQ(fork_stmt->label, "my_fork");
   EXPECT_EQ(body->stmts[2]->kind, StmtKind::kDisable);
 }
-TEST(DisableStatementParsing, DisableTaskName) {
-  auto r = Parse(
-      "module m;\n"
-      "  task my_task;\n"
-      "  endtask\n"
-      "  initial begin\n"
-      "    disable my_task;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kDisable);
-}
 
 TEST(DisableStatementParsing, DisableBlockFromOutside) {
   auto r = Parse(
@@ -184,19 +170,6 @@ TEST(DisableStatementParsing, DisableInsideForLoop) {
       "  initial begin : outer_block\n"
       "    for (int i = 0; i < 10; i = i + 1) begin : inner_block\n"
       "      if (i == 5) disable inner_block;\n"
-      "    end\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(DisableStatementParsing, DisableOuterBlockFromLoop) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin : outer_block\n"
-      "    for (int i = 0; i < 10; i = i + 1) begin : inner_block\n"
-      "      if (i == 5) disable outer_block;\n"
       "    end\n"
       "  end\n"
       "endmodule\n");

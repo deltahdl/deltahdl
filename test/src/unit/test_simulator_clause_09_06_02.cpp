@@ -78,6 +78,28 @@ TEST(DisableStatementExecution, DisableBlockFromOtherProcess) {
   LowerRunAndCheck(f, design, {{"x", 0u}});
 }
 
+TEST(DisableStatementExecution, DisableNonExecutingBlockHasNoEffect) {
+  // §9.6.2: disabling a named block that is not currently executing has no
+  // effect. Here done_early completes at time 0; the later disable finds no
+  // active process for that scope, so it is a no-op and the disabling process
+  // continues normally to the following statement.
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x, y;\n"
+      "  initial begin : done_early\n"
+      "    x = 8'd5;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    #10;\n"
+      "    disable done_early;\n"
+      "    y = 8'd7;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"x", 5u}, {"y", 7u}});
+}
+
 TEST(DisableStatementExecution, DisableTerminatesTask) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -327,6 +349,56 @@ TEST(DisableStatementExecution, DisableTaskWithProceduralAssignDoesNotCrash) {
       "  logic [7:0] x;\n"
       "  task my_task;\n"
       "    assign x = 8'd42;\n"
+      "    #10;\n"
+      "  endtask\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      my_task;\n"
+      "    join_none\n"
+      "    #5;\n"
+      "    disable my_task;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+}
+
+TEST(DisableStatementExecution, DisableTaskWithInoutArgumentDoesNotCrash) {
+  // §9.6.2 lists inout arguments (alongside output arguments) among the
+  // activities whose results are unspecified once a task is disabled. Disabling
+  // a task with a pending inout write must remain well-behaved (no crash).
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  task my_task(inout logic [7:0] result);\n"
+      "    #10;\n"
+      "    result = 8'd42;\n"
+      "  endtask\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      my_task(x);\n"
+      "    join_none\n"
+      "    #5;\n"
+      "    disable my_task;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+}
+
+TEST(DisableStatementExecution, DisableTaskWithForceDoesNotCrash) {
+  // §9.6.2 lists procedural continuous assignments from both `assign` and
+  // `force` as activities whose results are unspecified when the task is
+  // disabled. Exercise the `force` form to keep disable robust for it too.
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  task my_task;\n"
+      "    force x = 8'd42;\n"
       "    #10;\n"
       "  endtask\n"
       "  initial begin\n"
