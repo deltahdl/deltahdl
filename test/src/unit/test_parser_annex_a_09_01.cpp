@@ -182,6 +182,12 @@ TEST(AttributeSyntaxParsing, ErrorMissingValueAfterEquals) {
   EXPECT_FALSE(ParseOk("(* depth = *) module m; endmodule\n"));
 }
 
+// attr_name must be an identifier; a numeric literal in the name position is
+// the closest non-identifier input the rule must reject.
+TEST(AttributeSyntaxParsing, ErrorNonIdentifierAttrName) {
+  EXPECT_FALSE(ParseOk("(* 5 = 1 *) module m; endmodule\n"));
+}
+
 TEST(AttributeSyntaxParsing, AttrNameUnderscoreStart) {
   auto r = Parse(
       "(* _internal = 1 *)\n"
@@ -198,6 +204,28 @@ TEST(AttributeSyntaxParsing, AttrOnPortDeclaration) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
+}
+
+// §8.3 class syntax supplies the syntactic position; the attribute_instance
+// production must be accepted prefixing a class member built from real class
+// syntax, exercising the class-scope position of ParseAttributes.
+TEST(AttributeSyntaxParsing, AttrOnClassMember) {
+  auto r = Parse(
+      "class c;\n"
+      "  (* rand_mode = 1 *) int x;\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+}
+
+// A malformed attribute_instance (no attr_spec) in the class-member position
+// must be rejected, confirming the production is genuinely applied there.
+TEST(AttributeSyntaxParsing, ErrorEmptyAttrOnClassMember) {
+  EXPECT_FALSE(
+      ParseOk("class c;\n"
+              "  (* *) int x;\n"
+              "endclass\n"));
 }
 
 TEST(AttributeSyntaxParsing, AttrInstanceCanBeRepeatedAcrossDeclarations) {

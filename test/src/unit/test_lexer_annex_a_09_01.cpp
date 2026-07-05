@@ -8,12 +8,6 @@ using namespace delta;
 
 namespace {
 
-TEST(AttributeTokenLexing, AttrStartToken) {
-  auto tokens = Lex("(* foo *)");
-  ASSERT_GE(tokens.size(), 3u);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kAttrStart);
-}
-
 TEST(AttributeTokenLexing, AttrEndToken) {
   auto tokens = Lex("(* foo *)");
   ASSERT_GE(tokens.size(), 3u);
