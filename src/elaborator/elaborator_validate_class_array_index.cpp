@@ -29,6 +29,10 @@ struct ClassIndexCtx {
   const std::unordered_map<std::string_view, std::string_view>& class_var_types;
   const std::unordered_set<std::string_view>& class_names;
   const std::unordered_map<std::string_view, const ClassDecl*>& local_classes;
+  // Type kind of every declared variable in scope. Used to reject a
+  // non-class-typed variable (e.g. an int or a string) used as a class index,
+  // which class_var_types alone cannot see because it holds only class handles.
+  const TypeMap& var_types;
   const CompilationUnit* unit;
   DiagEngine& diag;
 };
@@ -73,8 +77,16 @@ static bool IsIllegalClassIndex(const Expr* idx, std::string_view index_class,
   if (IsLiteralExpr(idx->kind)) return true;
   if (idx->kind == ExprKind::kIdentifier) {
     auto vt = ctx.class_var_types.find(idx->text);
-    if (vt != ctx.class_var_types.end() &&
-        !IsClassDerivedFromScoped(vt->second, index_class, ctx)) {
+    if (vt != ctx.class_var_types.end()) {
+      // A class handle is legal only when its class is the index class or a
+      // class derived from it; any other class is illegal.
+      return !IsClassDerivedFromScoped(vt->second, index_class, ctx);
+    }
+    // Not a class-typed variable. A declared variable of a concrete non-class
+    // type (an integral, string, real, etc. value, kind != kNamed) is "any
+    // other type" and is therefore an illegal class index.
+    auto gt = ctx.var_types.find(idx->text);
+    if (gt != ctx.var_types.end() && gt->second != DataTypeKind::kNamed) {
       return true;
     }
   }
@@ -166,9 +178,13 @@ void Elaborator::ValidateClassIndexSelect(const ModuleDecl* decl) {
   }
   if (!has_class_index) return;
   auto local_classes = CollectModuleLocalClasses(decl);
-  ClassIndexCtx ctx{var_array_info_, class_var_types_,
-                    class_names_,    local_classes,
-                    unit_,           diag_};
+  ClassIndexCtx ctx{var_array_info_,
+                    class_var_types_,
+                    class_names_,
+                    local_classes,
+                    var_types_,
+                    unit_,
+                    diag_};
   for (const auto* item : decl->items) {
     if (item->kind == ModuleItemKind::kContAssign) {
       CheckClassIndexSelectExpr(item->assign_lhs, ctx);

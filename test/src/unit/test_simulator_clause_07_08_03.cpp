@@ -98,4 +98,110 @@ TEST(ClassIndexAssocArraySimulation, ClassIndex_EmptySize) {
   EXPECT_EQ(aa->Size(), 0u);
 }
 
+// §7.8.3 end to end: a class handle produced by §8.4 'new' is used as an index
+// to store and then read back a value. Built from real source and run through
+// the full pipeline so the runtime store/read is keyed by the handle the
+// allocator actually produced, not by a hand-poked map entry.
+TEST(ClassIndexAssocArraySimulation, EndToEndObjectHandleKeyWriteRead) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  class Foo;\n"
+      "    int id;\n"
+      "  endclass\n"
+      "  int data[Foo];\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    Foo k;\n"
+      "    k = new;\n"
+      "    data[k] = 55;\n"
+      "    result = data[k];\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+  LowerAndRun(design, f);
+  EXPECT_EQ(f.ctx.FindVariable("result")->value.ToUint64(), 55u);
+}
+
+// §7.8.3 end to end: two objects from separate §8.4 'new' calls are distinct
+// keys, so a value stored under one handle does not disturb the other.
+TEST(ClassIndexAssocArraySimulation, EndToEndDistinctObjectKeys) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  class Foo;\n"
+      "    int id;\n"
+      "  endclass\n"
+      "  int data[Foo];\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    Foo a, b;\n"
+      "    a = new;\n"
+      "    b = new;\n"
+      "    data[a] = 10;\n"
+      "    data[b] = 20;\n"
+      "    result = data[a];\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+  LowerAndRun(design, f);
+  EXPECT_EQ(f.ctx.FindVariable("result")->value.ToUint64(), 10u);
+}
+
+// §7.8.3 end to end: a null index is valid. Store and read back through the
+// null handle key over the full lowering and evaluation path.
+TEST(ClassIndexAssocArraySimulation, EndToEndNullKeyWriteRead) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  class Foo;\n"
+      "    int id;\n"
+      "  endclass\n"
+      "  int data[Foo];\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    data[null] = 77;\n"
+      "    result = data[null];\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+  LowerAndRun(design, f);
+  EXPECT_EQ(f.ctx.FindVariable("result")->value.ToUint64(), 77u);
+}
+
+// §7.8.3 end to end: a handle of a §8.13 derived class is a valid index into an
+// array declared with the base class as index. The derived object built by
+// 'new' keys the store, and the value reads back through the same handle.
+TEST(ClassIndexAssocArraySimulation, EndToEndDerivedHandleKeyWriteRead) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  class Base;\n"
+      "    int id;\n"
+      "  endclass\n"
+      "  class Derived extends Base;\n"
+      "    int extra;\n"
+      "  endclass\n"
+      "  int data[Base];\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    Derived d;\n"
+      "    d = new;\n"
+      "    data[d] = 88;\n"
+      "    result = data[d];\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+  LowerAndRun(design, f);
+  EXPECT_EQ(f.ctx.FindVariable("result")->value.ToUint64(), 88u);
+}
+
 }  // namespace

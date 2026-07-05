@@ -163,6 +163,43 @@ TEST(ClassIndexAssocArrayElaboration, AssocArrayClassIndex_NullIndexNoError) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
+// §7.8.3: an index that is a declared variable of a non-class type (here an
+// int) is "any other type" and shall be a type check error, even though it is
+// neither a literal nor a wrong-class handle.
+TEST(ClassIndexAssocArrayElaboration,
+     AssocArrayClassIndex_IntVariableIndexIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  class Foo;\n"
+      "    int id;\n"
+      "  endclass\n"
+      "  int i;\n"
+      "  int data[Foo];\n"
+      "  initial data[i] = 1;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+// §7.8.3: a string variable is likewise a non-class type and an illegal class
+// index.
+TEST(ClassIndexAssocArrayElaboration,
+     AssocArrayClassIndex_StringVariableIndexIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  class Foo;\n"
+      "    int id;\n"
+      "  endclass\n"
+      "  string s;\n"
+      "  int data[Foo];\n"
+      "  initial data[s] = 1;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
 // A handle of a class derived from the index class is an accepted index.
 TEST(ClassIndexAssocArrayElaboration,
      AssocArrayClassIndex_DerivedHandleNoError) {
@@ -182,6 +219,28 @@ TEST(ClassIndexAssocArrayElaboration,
       f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.diag.HasErrors());
+}
+
+// §7.8.3: derivation is directional. A base-class handle is neither the
+// derived index class nor derived from it, so indexing a derived-index array
+// with a base handle is a type check error.
+TEST(ClassIndexAssocArrayElaboration,
+     AssocArrayClassIndex_BaseHandleForDerivedIndexIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  class Base;\n"
+      "    int id;\n"
+      "  endclass\n"
+      "  class Derived extends Base;\n"
+      "    int extra;\n"
+      "  endclass\n"
+      "  Base b;\n"
+      "  int data[Derived];\n"
+      "  initial data[b] = 1;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
 }
 
 }  // namespace
