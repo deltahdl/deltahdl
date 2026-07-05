@@ -62,4 +62,17 @@ TEST(AssocArrayElaboration, WholeAssocEqualityComparisonAccepted) {
              "endmodule\n"));
 }
 
+// §7.8 — the "select an element first" rule names two exceptions: copying and
+// comparing whole arrays. Comparison is covered above; this exercises the copy
+// exception: assigning one whole associative array to another (no element
+// selection) shall be legal.
+TEST(AssocArrayElaboration, WholeAssocCopyAssignmentAccepted) {
+  EXPECT_TRUE(
+      ElabOk("module t;\n"
+             "  int aa[int];\n"
+             "  int bb[int];\n"
+             "  initial bb = aa;\n"
+             "endmodule\n"));
+}
+
 }  // namespace
