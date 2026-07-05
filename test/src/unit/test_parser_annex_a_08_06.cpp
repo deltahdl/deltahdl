@@ -312,4 +312,129 @@ TEST(OperatorParsing, BinaryPowerMissingRhs) {
   EXPECT_TRUE(r.has_errors);
 }
 
+// -- Module-path operators (unary_module_path_operator /
+//    binary_module_path_operator). Their natural syntactic home is a module
+//    path condition, so exercise them through a specify state-dependent path.
+
+// Parse a specify block whose state-dependent path condition holds the given
+// module-path expression, expecting a clean parse.
+static ParseResult ParseModulePathCond(const std::string& cond) {
+  return Parse(
+      "module m;\n"
+      "  specify\n"
+      "    if (" +
+      cond +
+      ") (a => z) = 1;\n"
+      "  endspecify\n"
+      "endmodule\n");
+}
+
+TEST(OperatorParsing, UnaryModulePathLogicalNot) {
+  auto r = ParseModulePathCond("!a");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(OperatorParsing, UnaryModulePathBitwiseNot) {
+  auto r = ParseModulePathCond("~a");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(OperatorParsing, UnaryModulePathReductionAnd) {
+  auto r = ParseModulePathCond("&a");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(OperatorParsing, UnaryModulePathReductionNand) {
+  auto r = ParseModulePathCond("~&a");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(OperatorParsing, UnaryModulePathReductionOr) {
+  auto r = ParseModulePathCond("|a");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(OperatorParsing, UnaryModulePathReductionNor) {
+  auto r = ParseModulePathCond("~|a");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(OperatorParsing, UnaryModulePathReductionXor) {
+  auto r = ParseModulePathCond("^a");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(OperatorParsing, UnaryModulePathReductionXnorCaretTilde) {
+  auto r = ParseModulePathCond("^~a");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(OperatorParsing, UnaryModulePathReductionXnorTildeCaret) {
+  auto r = ParseModulePathCond("~^a");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(OperatorParsing, BinaryModulePathLogicalEquality) {
+  auto r = ParseModulePathCond("a == b");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(OperatorParsing, BinaryModulePathLogicalInequality) {
+  auto r = ParseModulePathCond("a != b");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(OperatorParsing, BinaryModulePathLogicalAnd) {
+  auto r = ParseModulePathCond("a && b");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(OperatorParsing, BinaryModulePathLogicalOr) {
+  auto r = ParseModulePathCond("a || b");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(OperatorParsing, BinaryModulePathBitwiseAnd) {
+  auto r = ParseModulePathCond("a & b");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(OperatorParsing, BinaryModulePathBitwiseOr) {
+  auto r = ParseModulePathCond("a | b");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(OperatorParsing, BinaryModulePathBitwiseXor) {
+  auto r = ParseModulePathCond("a ^ b");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(OperatorParsing, BinaryModulePathBitwiseXnorCaretTilde) {
+  auto r = ParseModulePathCond("a ^~ b");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(OperatorParsing, BinaryModulePathBitwiseXnorTildeCaret) {
+  auto r = ParseModulePathCond("a ~^ b");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
