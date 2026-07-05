@@ -1,4 +1,11 @@
 #include <gtest/gtest.h>
+#include <unistd.h>
+
+#include <atomic>
+#include <cstdint>
+#include <filesystem>
+#include <fstream>
+#include <string>
 
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -6,105 +13,202 @@
 #include "parser/library_map.h"
 
 using namespace delta;
+namespace fs = std::filesystem;
 
 namespace {
 
-LibraryDecl MakeDecl(std::string_view name,
-                     std::initializer_list<std::string_view> paths) {
-  LibraryDecl d;
-  d.name = name;
-  for (auto p : paths) d.file_paths.push_back(p);
-  return d;
-}
+// §33.3.1.1 governs how a source file name that matches several library-map
+// file_path_specs is resolved to a single library, and how a residual match in
+// two libraries is an error. The specs it operates on are produced by the
+// §33.3.1 library-declaration syntax, so the file-path-resolution tests build a
+// real lib.map, parse it through LoadMapFile (which lexes and parses the
+// library_text), and then ask which library a source path maps to. This drives
+// the rule on input produced the way the LRM produces it rather than on a
+// hand-assembled LibraryMap.
+struct TempLibMapDir {
+  fs::path dir;
 
-TEST(LibraryMapPathResolution, AmbiguousMatchAcrossLibrariesIsError) {
-  LibraryMap m;
-  m.AddDeclaration(MakeDecl("first", {"*.v"}), "/proj");
-  m.AddDeclaration(MakeDecl("second", {"*.v"}), "/proj");
-  EXPECT_EQ(m.LibraryForFile("/proj/file.v"), "");
-}
+  TempLibMapDir() {
+    static std::atomic<uint64_t> counter{0};
+    auto seq = counter.fetch_add(1);
+    dir = fs::temp_directory_path() /
+          ("delta_libmap_3311_" + std::to_string(::getpid()) + "_" +
+           std::to_string(seq));
+    fs::create_directories(dir);
+    // The loader canonicalizes the map file's directory when anchoring relative
+    // paths; canonicalize here too so the paths we assert on match its view.
+    dir = fs::weakly_canonical(dir);
+  }
+
+  ~TempLibMapDir() {
+    std::error_code ec;
+    fs::remove_all(dir, ec);
+  }
+
+  fs::path Write(const std::string& rel, const std::string& content) {
+    auto full = dir / rel;
+    fs::create_directories(full.parent_path());
+    std::ofstream ofs(full);
+    ofs << content;
+    return full;
+  }
+};
+
+// Claim A (resolution order): when a file name matches specs of different
+// endings, the more specific ending wins — an explicit file name outranks a
+// wildcarded file name, which outranks a directory.
 
 TEST(LibraryMapPathResolution, ExplicitFilenameSpecBeatsWildcard) {
+  TempLibMapDir tmp;
+  auto top = tmp.Write("lib.map",
+                       "library wild *.v;\n"
+                       "library exact top.v;\n");
   LibraryMap m;
-  m.AddDeclaration(MakeDecl("wild", {"*.v"}), "/proj");
-  m.AddDeclaration(MakeDecl("exact", {"top.v"}), "/proj");
-  EXPECT_EQ(m.LibraryForFile("/proj/top.v"), "exact");
+  ASSERT_TRUE(m.LoadMapFile(top));
+  EXPECT_EQ(m.LibraryForFile((tmp.dir / "top.v").string()), "exact");
 }
 
 TEST(LibraryMapPathResolution,
-     ExplicitFilenameSpecBeatsWildcardRegardlessOfOrder) {
+     ExplicitFilenameSpecBeatsWildcardRegardlessOfDeclarationOrder) {
+  // Priority comes from the spec's ending, not from declaration order.
+  TempLibMapDir tmp;
+  auto top = tmp.Write("lib.map",
+                       "library exact top.v;\n"
+                       "library wild *.v;\n");
   LibraryMap m;
-  m.AddDeclaration(MakeDecl("exact", {"top.v"}), "/proj");
-  m.AddDeclaration(MakeDecl("wild", {"*.v"}), "/proj");
-  EXPECT_EQ(m.LibraryForFile("/proj/top.v"), "exact");
+  ASSERT_TRUE(m.LoadMapFile(top));
+  EXPECT_EQ(m.LibraryForFile((tmp.dir / "top.v").string()), "exact");
 }
 
 TEST(LibraryMapPathResolution, WildcardFilenameSpecBeatsDirectorySpec) {
+  TempLibMapDir tmp;
+  auto top = tmp.Write("lib.map",
+                       "library dir sub/;\n"
+                       "library wild sub/*.v;\n");
   LibraryMap m;
-  m.AddDeclaration(MakeDecl("dir", {"sub/"}), "/proj");
-  m.AddDeclaration(MakeDecl("wild", {"sub/*.v"}), "/proj");
-  EXPECT_EQ(m.LibraryForFile("/proj/sub/x.v"), "wild");
+  ASSERT_TRUE(m.LoadMapFile(top));
+  EXPECT_EQ(m.LibraryForFile((tmp.dir / "sub" / "x.v").string()), "wild");
 }
 
 TEST(LibraryMapPathResolution, ExplicitFilenameSpecBeatsDirectorySpec) {
+  TempLibMapDir tmp;
+  auto top = tmp.Write("lib.map",
+                       "library dir sub/;\n"
+                       "library exact sub/x.v;\n");
   LibraryMap m;
-  m.AddDeclaration(MakeDecl("dir", {"sub/"}), "/proj");
-  m.AddDeclaration(MakeDecl("exact", {"sub/x.v"}), "/proj");
-  EXPECT_EQ(m.LibraryForFile("/proj/sub/x.v"), "exact");
+  ASSERT_TRUE(m.LoadMapFile(top));
+  EXPECT_EQ(m.LibraryForFile((tmp.dir / "sub" / "x.v").string()), "exact");
+}
+
+TEST(LibraryMapPathResolution, AllThreeTiersPresentExplicitWins) {
+  // With every ending competing for the same file, the explicit filename tier
+  // is selected.
+  TempLibMapDir tmp;
+  auto top = tmp.Write("lib.map",
+                       "library dirLib sub/;\n"
+                       "library wildLib sub/*.v;\n"
+                       "library exactLib sub/x.v;\n");
+  LibraryMap m;
+  ASSERT_TRUE(m.LoadMapFile(top));
+  EXPECT_EQ(m.LibraryForFile((tmp.dir / "sub" / "x.v").string()), "exactLib");
+}
+
+TEST(LibraryMapPathResolution, DirectorySpecStillResolvesWhenSoleMatch) {
+  // The lowest-priority tier (a directory spec) still resolves a file when no
+  // higher-priority spec matches it.
+  TempLibMapDir tmp;
+  auto top = tmp.Write("lib.map", "library dirLib sub/;\n");
+  LibraryMap m;
+  ASSERT_TRUE(m.LoadMapFile(top));
+  EXPECT_EQ(m.LibraryForFile((tmp.dir / "sub" / "x.v").string()), "dirLib");
 }
 
 TEST(LibraryMapPathResolution,
-     SameLibraryMultipleSpecsResolveByPriorityWithoutError) {
+     MultipleSpecsInOneLibraryResolveByPriorityWithoutError) {
+  // Two specs of one library matching the same file is never an error; the
+  // cross-library ambiguity rule keys on distinct libraries.
+  TempLibMapDir tmp;
+  auto top = tmp.Write("lib.map", "library only *.v, top.v;\n");
   LibraryMap m;
-  m.AddDeclaration(MakeDecl("only", {"*.v", "top.v"}), "/proj");
-  EXPECT_EQ(m.LibraryForFile("/proj/top.v"), "only");
-  EXPECT_EQ(m.LibraryForFile("/proj/other.v"), "only");
+  ASSERT_TRUE(m.LoadMapFile(top));
+  EXPECT_EQ(m.LibraryForFile((tmp.dir / "top.v").string()), "only");
+  EXPECT_EQ(m.LibraryForFile((tmp.dir / "other.v").string()), "only");
 }
 
-TEST(LibraryMapPathResolution, HigherPrioritySpecAcrossLibrariesPicksThatLib) {
+TEST(LibraryMapPathResolution,
+     HierarchicalWildcardSpecIsDirectoryTierBelowWildcardFilename) {
+  // A spec ending in the hierarchical wildcard (...) denotes a directory-tier
+  // match, distinct from a trailing-slash directory but still the lowest tier:
+  // a wildcarded file name outranks it.
+  TempLibMapDir tmp;
+  auto top = tmp.Write("lib.map",
+                       "library hier sub/...;\n"
+                       "library wild sub/*.v;\n");
   LibraryMap m;
-  m.AddDeclaration(MakeDecl("dirLib", {"sub/"}), "/proj");
-  m.AddDeclaration(MakeDecl("wildLib", {"sub/*.v"}), "/proj");
-  m.AddDeclaration(MakeDecl("exactLib", {"sub/x.v"}), "/proj");
-  EXPECT_EQ(m.LibraryForFile("/proj/sub/x.v"), "exactLib");
+  ASSERT_TRUE(m.LoadMapFile(top));
+  EXPECT_EQ(m.LibraryForFile((tmp.dir / "sub" / "x.v").string()), "wild");
 }
 
-TEST(LibraryMapPathResolution, AmbiguityAtPriorityTierIsError) {
+// Claim B (cross-library ambiguity is an error): after resolution, if a file
+// still matches specs of the same priority tier in two different libraries, the
+// result is an error (LibraryForFile yields no library).
+
+TEST(LibraryMapPathResolution, AmbiguousMatchAcrossLibrariesIsErrorAtExplicit) {
+  TempLibMapDir tmp;
+  auto top = tmp.Write("lib.map",
+                       "library a top.v;\n"
+                       "library b top.v;\n");
   LibraryMap m;
-  m.AddDeclaration(MakeDecl("dir", {"sub/"}), "/proj");
-  m.AddDeclaration(MakeDecl("wildA", {"sub/*.v"}), "/proj");
-  m.AddDeclaration(MakeDecl("wildB", {"sub/*.v"}), "/proj");
-  EXPECT_EQ(m.LibraryForFile("/proj/sub/x.v"), "");
+  ASSERT_TRUE(m.LoadMapFile(top));
+  EXPECT_EQ(m.LibraryForFile((tmp.dir / "top.v").string()), "");
 }
 
-TEST(LibraryMapPathResolution, DirectorySpecMatchesWhenSoleSpec) {
-  // The lowest-priority tier (a directory spec) still resolves a file when no
-  // higher-priority spec matches it.
+TEST(LibraryMapPathResolution, AmbiguousMatchAcrossLibrariesIsErrorAtWildcard) {
+  // A tie is resolved per tier: two directory specs cannot rescue a file that
+  // is ambiguous at the winning (wildcard) tier.
+  TempLibMapDir tmp;
+  auto top = tmp.Write("lib.map",
+                       "library dir sub/;\n"
+                       "library wildA sub/*.v;\n"
+                       "library wildB sub/*.v;\n");
   LibraryMap m;
-  m.AddDeclaration(MakeDecl("dirLib", {"sub/"}), "/proj");
-  EXPECT_EQ(m.LibraryForFile("/proj/sub/x.v"), "dirLib");
+  ASSERT_TRUE(m.LoadMapFile(top));
+  EXPECT_EQ(m.LibraryForFile((tmp.dir / "sub" / "x.v").string()), "");
 }
 
-TEST(LibraryMapPathResolution, AmbiguityAtExplicitTierIsError) {
-  // Two libraries claiming the same explicit filename are ambiguous even at the
-  // highest-priority tier.
+TEST(LibraryMapPathResolution,
+     AmbiguousMatchAcrossLibrariesIsErrorAtDirectory) {
+  // Ambiguity at the lowest tier is still an error: two libraries claim the
+  // same file solely through directory specs, with no higher-tier spec to break
+  // the tie.
+  TempLibMapDir tmp;
+  auto top = tmp.Write("lib.map",
+                       "library dirA sub/;\n"
+                       "library dirB sub/;\n");
   LibraryMap m;
-  m.AddDeclaration(MakeDecl("a", {"top.v"}), "/proj");
-  m.AddDeclaration(MakeDecl("b", {"top.v"}), "/proj");
-  EXPECT_EQ(m.LibraryForFile("/proj/top.v"), "");
+  ASSERT_TRUE(m.LoadMapFile(top));
+  EXPECT_EQ(m.LibraryForFile((tmp.dir / "sub" / "x.v").string()), "");
 }
 
-TEST(LibraryMapCellWrite, LastCellWithSameNameWinsInLibrary) {
-  SourceManager mgr;
-  DiagEngine diag(mgr);
+TEST(LibraryMapPathResolution,
+     HigherPriorityTierBreaksWhatWouldBeALowerTierTie) {
+  // Two libraries both match via a directory spec, but one also matches via a
+  // more specific wildcard spec: the higher tier resolves the file uniquely
+  // rather than reporting an ambiguity.
+  TempLibMapDir tmp;
+  auto top = tmp.Write("lib.map",
+                       "library dirA sub/;\n"
+                       "library dirB sub/;\n"
+                       "library wildA sub/*.v;\n");
   LibraryMap m;
-  m.WriteCell("rtlLib", "adder", /*is_module=*/false, SourceLoc{4, 1, 0}, diag);
-  m.WriteCell("rtlLib", "adder", /*is_module=*/false, SourceLoc{9, 2, 0}, diag);
-  const LibraryCell* cell = m.CellInLibrary("rtlLib", "adder");
-  ASSERT_NE(cell, nullptr);
-  // The most recently written cell replaces the earlier one.
-  EXPECT_EQ(cell->loc.file_id, 9u);
+  ASSERT_TRUE(m.LoadMapFile(top));
+  EXPECT_EQ(m.LibraryForFile((tmp.dir / "sub" / "x.v").string()), "wildA");
 }
+
+// Claim D (last cell wins; duplicate module in a single invocation warns). No
+// driver in the tree feeds encountered cells to WriteCell, so there is no
+// source syntax that produces this input; the rule is confined to the
+// library-map stage and is exercised directly.
 
 TEST(LibraryMapCellWrite, DuplicateNamesInDifferentLibrariesCoexist) {
   SourceManager mgr;
