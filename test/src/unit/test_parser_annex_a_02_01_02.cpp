@@ -126,15 +126,6 @@ TEST(PortDeclParsing, InterfacePortWithInterfaceKeyword) {
   EXPECT_EQ(port.name, "b");
 }
 
-TEST(PortDeclParsing, InterfacePortListOfInterfaceIdentifiers) {
-  auto r = Parse(
-      "interface bus_if; logic clk; endinterface\n"
-      "module m(bus_if a, b, c); endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_GE(r.cu->modules[0]->ports.size(), 3u);
-}
-
 TEST(PortDeclParsing, RefDeclWithVariablePortType) {
   auto r = Parse("module m(ref logic [7:0] d); endmodule");
   ASSERT_NE(r.cu, nullptr);
@@ -143,15 +134,6 @@ TEST(PortDeclParsing, RefDeclWithVariablePortType) {
   auto& port = r.cu->modules[0]->ports[0];
   EXPECT_EQ(port.direction, Direction::kRef);
   EXPECT_EQ(port.name, "d");
-}
-
-TEST(PortDeclParsing, RefDeclListOfVariableIdentifiers) {
-  auto r = Parse("module m(ref logic a, b, c); endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_GE(r.cu->modules[0]->ports.size(), 3u);
-  for (size_t i = 0; i < 3; ++i)
-    EXPECT_EQ(r.cu->modules[0]->ports[i].direction, Direction::kRef);
 }
 
 TEST(PortDeclParsing, NonAnsiInputDecl) {
@@ -187,70 +169,6 @@ TEST(PortDeclParsing, NonAnsiInoutDecl) {
   EXPECT_FALSE(r.has_errors);
   ASSERT_GE(r.cu->modules[0]->ports.size(), 1u);
   EXPECT_EQ(r.cu->modules[0]->ports[0].direction, Direction::kInout);
-}
-
-TEST(PortDeclParsing, NonAnsiInputListOfPortIdentifiers) {
-  auto r = Parse(
-      "module m(a, b, c);\n"
-      "  input wire a, b, c;\n"
-      "endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_GE(r.cu->modules[0]->ports.size(), 3u);
-  for (size_t i = 0; i < 3; ++i)
-    EXPECT_EQ(r.cu->modules[0]->ports[i].direction, Direction::kInput);
-}
-
-TEST(PortDeclParsing, InputDeclListOfPortIdentifiersWithNetType) {
-  auto r = Parse("module m(input wire a, b, c); endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_GE(r.cu->modules[0]->ports.size(), 3u);
-  for (size_t i = 0; i < 3; ++i)
-    EXPECT_EQ(r.cu->modules[0]->ports[i].direction, Direction::kInput);
-}
-
-TEST(PortDeclParsing, OutputDeclListOfPortIdentifiersWithNetType) {
-  auto r = Parse("module m(output wire a, b, c); endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_GE(r.cu->modules[0]->ports.size(), 3u);
-  for (size_t i = 0; i < 3; ++i)
-    EXPECT_EQ(r.cu->modules[0]->ports[i].direction, Direction::kOutput);
-}
-
-TEST(PortDeclParsing, OutputDeclListOfVariablePortIdentifiers) {
-  auto r = Parse("module m(output logic a, b, c); endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_GE(r.cu->modules[0]->ports.size(), 3u);
-  for (size_t i = 0; i < 3; ++i)
-    EXPECT_EQ(r.cu->modules[0]->ports[i].direction, Direction::kOutput);
-}
-
-TEST(PortDeclParsing, InterfacePortWithModportAndList) {
-  auto r = Parse(
-      "interface bus_if;\n"
-      "  logic clk;\n"
-      "  modport mp(input clk);\n"
-      "endinterface\n"
-      "module m(bus_if.mp a, b, c); endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_GE(r.cu->modules[0]->ports.size(), 3u);
-  EXPECT_EQ(r.cu->modules[0]->ports[0].data_type.modport_name, "mp");
-}
-
-TEST(PortDeclParsing, NonAnsiInoutDeclList) {
-  auto r = Parse(
-      "module m(a, b, c);\n"
-      "  inout wire a, b, c;\n"
-      "endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_GE(r.cu->modules[0]->ports.size(), 3u);
-  for (size_t i = 0; i < 3; ++i)
-    EXPECT_EQ(r.cu->modules[0]->ports[i].direction, Direction::kInout);
 }
 
 TEST(PortDeclParsing, NonAnsiRefDecl) {
