@@ -416,4 +416,20 @@ TEST(ConstraintInheritance, PrototypeExtendsMatchAccepted) {
              "endmodule\n"));
 }
 
+// 18.5.2: the parity requirement is symmetric. The other mismatch tests place a
+// specifier on the prototype and leave the external block plain; this covers
+// the opposite input form -- a plain prototype completed by an external block
+// that carries ':final' -- which must also be rejected as a one-sided
+// specifier.
+TEST(ConstraintInheritance, ExternalBlockSpecifierWithoutPrototypeRejected) {
+  EXPECT_FALSE(
+      ElabOk("class C;\n"
+             "  rand int x;\n"
+             "  constraint c;\n"
+             "endclass\n"
+             "constraint :final C::c { x > 0; }\n"
+             "module m;\n"
+             "endmodule\n"));
+}
+
 }  // namespace

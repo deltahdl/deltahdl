@@ -3,6 +3,7 @@
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include "common/arena.h"
@@ -278,16 +279,24 @@ void AddConstraintMember(const ClassMember* m, std::vector<RandInfo>& rands,
   solver.AddConstraintBlock(block);
 }
 
-// 18.5: build the constraint block(s) from the captured relations of every
-// constraint member on the object's class hierarchy.
+// 18.5/18.5.2: build the constraint block(s) from the captured relations of
+// every constraint member on the object's class hierarchy. Walking from the
+// dynamic type up to its base classes, the first constraint seen for a given
+// name is the most-derived one; 18.5.2 says a same-named constraint in a
+// derived class replaces the inherited one, so a base constraint of a name
+// already contributed by a more-derived level is skipped rather than added
+// alongside it. The name is recorded even for an empty (no-effect) derived
+// constraint so that it, too, replaces the inherited one.
 void CollectConstraintBlocks(const ClassTypeInfo* type,
                              std::vector<RandInfo>& rands, RandomizeCtx& rc,
                              ConstraintSolver& solver) {
+  std::unordered_set<std::string_view> replaced;
   for (const auto* lvl = type; lvl != nullptr; lvl = lvl->parent) {
     if (!lvl->decl) continue;
     for (const ClassMember* m : lvl->decl->members) {
-      if (m->kind == ClassMemberKind::kConstraint &&
-          (!m->constraint_exprs.empty() || !m->constraint_dist_refs.empty()))
+      if (m->kind != ClassMemberKind::kConstraint) continue;
+      if (!replaced.insert(m->name).second) continue;
+      if (!m->constraint_exprs.empty() || !m->constraint_dist_refs.empty())
         AddConstraintMember(m, rands, rc, solver);
     }
   }
