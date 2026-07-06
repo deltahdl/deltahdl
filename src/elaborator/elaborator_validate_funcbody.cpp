@@ -429,6 +429,48 @@ static void ValidateTaskBody(const ModuleItem* item, DiagEngine& diag) {
   }
 }
 
+// §3.13(f): flag a second variable declaration that reuses a name already
+// declared by a prior variable declaration in the SAME block name space. Only
+// the declarations that are direct members of one block are compared here.
+static void CheckBlockDeclDups(const std::vector<Stmt*>& block_stmts,
+                               DiagEngine& diag) {
+  std::unordered_set<std::string_view> names;
+  for (const auto* child : block_stmts) {
+    if (!child || child->kind != StmtKind::kVarDecl || child->var_name.empty())
+      continue;
+    if (!names.insert(child->var_name).second) {
+      diag.Error(child->range.start,
+                 std::format("redeclaration of '{}'", child->var_name));
+    }
+  }
+}
+
+// §3.13(f): the function and task constructs each introduce a block name space,
+// as does every named/unnamed begin-end nested inside the body, and it is
+// illegal to redeclare within a name space a name already declared by a prior
+// declaration. Walks the body so each nested begin-end block is compared
+// against itself; a name reused in a nested or sibling block is a distinct name
+// space, hence legal shadowing rather than a redeclaration. The body's own
+// top-level statement list is handled separately by the caller (it is a bare
+// statement list, not a kBlock node).
+static void CheckSubroutineBodyRedeclarations(const Stmt* s, DiagEngine& diag) {
+  if (!s) return;
+  if (s->kind == StmtKind::kBlock) CheckBlockDeclDups(s->stmts, diag);
+  for (const auto* sub : s->stmts) CheckSubroutineBodyRedeclarations(sub, diag);
+  for (const auto* sub : s->fork_stmts)
+    CheckSubroutineBodyRedeclarations(sub, diag);
+  CheckSubroutineBodyRedeclarations(s->then_branch, diag);
+  CheckSubroutineBodyRedeclarations(s->else_branch, diag);
+  CheckSubroutineBodyRedeclarations(s->body, diag);
+  CheckSubroutineBodyRedeclarations(s->for_body, diag);
+  for (const auto* fi : s->for_inits)
+    CheckSubroutineBodyRedeclarations(fi, diag);
+  for (const auto* fs : s->for_steps)
+    CheckSubroutineBodyRedeclarations(fs, diag);
+  for (const auto& ci : s->case_items)
+    CheckSubroutineBodyRedeclarations(ci.body, diag);
+}
+
 void Elaborator::ValidateFunctionBody(const ModuleItem* item) {
   ValidateRefLifetime(item, diag_);
 
@@ -437,6 +479,13 @@ void Elaborator::ValidateFunctionBody(const ModuleItem* item) {
   ValidateFunctionArgDecls(item, class_names_, diag_);
 
   ValidateRefArgsInForkBlocks(item, diag_);
+
+  // §3.13(f): the subroutine body is itself a block name space; its top-level
+  // variable declarations must be unique. Nested begin-end blocks are checked
+  // as their own separate name spaces during the walk below.
+  CheckBlockDeclDups(item->func_body_stmts, diag_);
+  for (auto* s : item->func_body_stmts)
+    CheckSubroutineBodyRedeclarations(s, diag_);
 
   if (item->kind == ModuleItemKind::kTaskDecl) {
     ValidateTaskBody(item, diag_);

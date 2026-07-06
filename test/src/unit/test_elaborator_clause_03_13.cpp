@@ -65,6 +65,15 @@ TEST(NameSpaceElaboration, DuplicatePackageDefinition) {
              "module m; endmodule\n"));
 }
 
+TEST(NameSpaceElaboration, DistinctPackagesOk) {
+  // §3.13(b): the package name space only forbids reusing a package name;
+  // distinctly named packages coexist.
+  EXPECT_TRUE(
+      ElabOk("package p1; endpackage\n"
+             "package p2; endpackage\n"
+             "module m; endmodule\n"));
+}
+
 TEST(NameSpaceElaboration, DuplicateUdpDefinition) {
   EXPECT_FALSE(
       ElabOk("primitive p(output y, input a);\n"
@@ -73,6 +82,34 @@ TEST(NameSpaceElaboration, DuplicateUdpDefinition) {
              "primitive p(output y, input a);\n"
              "  table 0 : 1 ; 1 : 0 ; endtable\n"
              "endprimitive\n"
+             "module m; endmodule\n"));
+}
+
+TEST(NameSpaceElaboration, ModuleAndPrimitiveSameName) {
+  // §3.13(a): the definitions name space unifies module AND primitive
+  // identifiers, so a UDP may not reuse a name already taken by a module.
+  EXPECT_FALSE(
+      ElabOk("module foo; endmodule\n"
+             "primitive foo(output y, input a);\n"
+             "  table 0 : 1 ; 1 : 0 ; endtable\n"
+             "endprimitive\n"));
+}
+
+TEST(NameSpaceElaboration, DuplicateInterfaceDefinition) {
+  // §3.13(a): interfaces share the single definitions name space, so an
+  // interface name may not be reused for another interface.
+  EXPECT_FALSE(
+      ElabOk("interface ifc; endinterface\n"
+             "interface ifc; endinterface\n"
+             "module m; endmodule\n"));
+}
+
+TEST(NameSpaceElaboration, DuplicateProgramDefinition) {
+  // §3.13(a): programs share the single definitions name space, so a program
+  // name may not be reused for another program.
+  EXPECT_FALSE(
+      ElabOk("program pr; endprogram\n"
+             "program pr; endprogram\n"
              "module m; endmodule\n"));
 }
 
@@ -136,6 +173,46 @@ TEST(NameSpaceElaboration, CheckerAndCuItemSameName) {
              "module m; endmodule\n"));
 }
 
+TEST(NameSpaceElaboration, DuplicateCuScopeTask) {
+  // §3.13(c): tasks are unified in the compilation-unit scope name space.
+  EXPECT_FALSE(
+      ElabOk("task t; endtask\n"
+             "task t; endtask\n"
+             "module m; endmodule\n"));
+}
+
+TEST(NameSpaceElaboration, DuplicateCuScopeVariable) {
+  // §3.13(c): variable declarations are unified in the compilation-unit scope.
+  EXPECT_FALSE(
+      ElabOk("int a;\n"
+             "int a;\n"
+             "module m; endmodule\n"));
+}
+
+TEST(NameSpaceElaboration, DuplicateCuScopeNet) {
+  // §3.13(c): net declarations are unified in the compilation-unit scope.
+  EXPECT_FALSE(
+      ElabOk("wire w;\n"
+             "wire w;\n"
+             "module m; endmodule\n"));
+}
+
+TEST(NameSpaceElaboration, DuplicateCuScopeNamedEvent) {
+  // §3.13(c): named events are unified in the compilation-unit scope.
+  EXPECT_FALSE(
+      ElabOk("event e;\n"
+             "event e;\n"
+             "module m; endmodule\n"));
+}
+
+TEST(NameSpaceElaboration, DuplicateCuScopeParameter) {
+  // §3.13(c): parameters are unified in the compilation-unit scope name space.
+  EXPECT_FALSE(
+      ElabOk("localparam int P = 1;\n"
+             "localparam int P = 2;\n"
+             "module m; endmodule\n"));
+}
+
 TEST(NameSpaceElaboration, ModuleAndCheckerSameNameOk) {
   EXPECT_TRUE(
       ElabOk("checker foo; endchecker\n"
@@ -177,6 +254,16 @@ TEST(NameSpaceElaboration, TaskSameNameAsVariableError) {
       ElabOk("module m;\n"
              "  logic foo;\n"
              "  task foo; endtask\n"
+             "endmodule\n"));
+}
+
+TEST(NameSpaceElaboration, NamedEventSameNameAsVariableError) {
+  // §3.13(e): named events are unified with variables in the module name space,
+  // so an event may not share a name with a variable in the same module.
+  EXPECT_FALSE(
+      ElabOk("module m;\n"
+             "  event e;\n"
+             "  logic e;\n"
              "endmodule\n"));
 }
 
@@ -229,11 +316,109 @@ TEST(NameSpaceElaboration, BlockNameSpaceDuplicateDeclarationError) {
              "endmodule\n"));
 }
 
+TEST(NameSpaceElaboration, DuplicateLocalInSameProceduralBlockError) {
+  EXPECT_FALSE(
+      ElabOk("module m;\n"
+             "  initial begin\n"
+             "    int x;\n"
+             "    int x;\n"
+             "  end\n"
+             "endmodule\n"));
+}
+
+TEST(NameSpaceElaboration, SameLocalNameInNestedBlockOk) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  initial begin\n"
+             "    int x;\n"
+             "    begin\n"
+             "      int x;\n"
+             "    end\n"
+             "  end\n"
+             "endmodule\n"));
+}
+
+TEST(NameSpaceElaboration, SameLocalNameInSiblingBlocksOk) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  initial begin\n"
+             "    begin\n"
+             "      int x;\n"
+             "    end\n"
+             "    begin\n"
+             "      int x;\n"
+             "    end\n"
+             "  end\n"
+             "endmodule\n"));
+}
+
+TEST(NameSpaceElaboration, FunctionBodyDuplicateLocalError) {
+  // §3.13(f): the function construct introduces a block name space, so a local
+  // may not be redeclared by another local in the same function body.
+  EXPECT_FALSE(
+      ElabOk("module m;\n"
+             "  function int f();\n"
+             "    int x;\n"
+             "    int x;\n"
+             "    return 0;\n"
+             "  endfunction\n"
+             "endmodule\n"));
+}
+
+TEST(NameSpaceElaboration, TaskBodyDuplicateLocalError) {
+  // §3.13(f): the task construct likewise introduces a block name space.
+  EXPECT_FALSE(
+      ElabOk("module m;\n"
+             "  task t();\n"
+             "    int y;\n"
+             "    int y;\n"
+             "  endtask\n"
+             "endmodule\n"));
+}
+
+TEST(NameSpaceElaboration, SameLocalNameInFunctionNestedBlockOk) {
+  // §3.13(f): a nested begin-end inside a function body is a distinct block
+  // name space, so reusing the name there is legal shadowing, not a
+  // redeclaration.
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  function int f();\n"
+             "    int x;\n"
+             "    begin\n"
+             "      int x;\n"
+             "    end\n"
+             "    return 0;\n"
+             "  endfunction\n"
+             "endmodule\n"));
+}
+
 TEST(NameSpaceElaboration, PortReintroducedAsVariableElaboratesOk) {
   EXPECT_TRUE(
       ElabOk("module m(data);\n"
              "  input data;\n"
              "  logic data;\n"
+             "endmodule\n"));
+}
+
+TEST(NameSpaceElaboration, PortReintroducedAsNetElaboratesOk) {
+  // §3.13(g): a port name may be reintroduced in the module name space by a
+  // variable OR a net declaration; here the net form is observed at
+  // elaboration.
+  EXPECT_TRUE(
+      ElabOk("module m(data);\n"
+             "  input data;\n"
+             "  wire data;\n"
+             "endmodule\n"));
+}
+
+TEST(NameSpaceElaboration, AttributeNameCoincidesWithVariableElaboratesOk) {
+  // §3.13(h): an attribute name (§5.12 real syntax `(* ... *)`) lives only in
+  // the attribute name space and never enters the module name space, so it may
+  // coincide with a variable name without a redeclaration error. Driven through
+  // the full pipeline so the attribute is really parsed and elaborated.
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  (* keep *) logic keep;\n"
              "endmodule\n"));
 }
 

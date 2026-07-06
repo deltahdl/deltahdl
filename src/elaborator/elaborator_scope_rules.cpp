@@ -78,6 +78,41 @@ void CollectScopeWalk(const Stmt* s, ScopeWalk& out) {
   out.active_loop_vars.resize(out.active_loop_vars.size() - pushed);
 }
 
+// §3.13: each begin/end block -- named or unnamed -- introduces its own block
+// name space, and it is illegal to redeclare within a name space a name already
+// declared by a prior declaration. Flags a second variable declaration that
+// shares a name with an earlier one in the SAME block. Only the declarations
+// that are direct children of a single block are compared: a nested begin/end
+// is a distinct block name space, so reusing a name there is legal shadowing
+// rather than a redeclaration. The walk then descends so every nested block is
+// checked against itself.
+void CheckBlockLocalRedeclarations(const Stmt* s, DiagEngine& diag) {
+  if (!s) return;
+  if (s->kind == StmtKind::kBlock) {
+    std::unordered_set<std::string_view> block_locals;
+    for (const auto* child : s->stmts) {
+      if (!child || child->kind != StmtKind::kVarDecl ||
+          child->var_name.empty())
+        continue;
+      if (!block_locals.insert(child->var_name).second) {
+        diag.Error(child->range.start,
+                   std::format("redeclaration of '{}'", child->var_name));
+      }
+    }
+  }
+  for (const auto* sub : s->stmts) CheckBlockLocalRedeclarations(sub, diag);
+  for (const auto* sub : s->fork_stmts)
+    CheckBlockLocalRedeclarations(sub, diag);
+  CheckBlockLocalRedeclarations(s->then_branch, diag);
+  CheckBlockLocalRedeclarations(s->else_branch, diag);
+  CheckBlockLocalRedeclarations(s->body, diag);
+  CheckBlockLocalRedeclarations(s->for_body, diag);
+  for (const auto* fi : s->for_inits) CheckBlockLocalRedeclarations(fi, diag);
+  for (const auto* fs : s->for_steps) CheckBlockLocalRedeclarations(fs, diag);
+  for (const auto& ci : s->case_items)
+    CheckBlockLocalRedeclarations(ci.body, diag);
+}
+
 bool IsProcBodyItem(ModuleItemKind k) {
   return k == ModuleItemKind::kInitialBlock ||
          k == ModuleItemKind::kFinalBlock ||
@@ -439,6 +474,7 @@ void Elaborator::ValidateScopeRules(const ModuleDecl* decl) {
     if (IsProcBodyItem(item->kind)) {
       CollectScopeWalk(item->body, walk);
       ValidateLocalWeakRefDecls(item->body, class_names_, diag_);
+      CheckBlockLocalRedeclarations(item->body, diag_);
     }
   }
   for (const auto& [label, loc] : walk.block_labels) {
