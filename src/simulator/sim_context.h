@@ -65,8 +65,12 @@ struct StructTypeInfo {
 // §7.2.1 / §23.6: resolve a (possibly dotted) member path within `info` to the
 // absolute bit offset and width within the base variable, descending through
 // nested struct/union fields. Returns false if any path segment is not a field.
+// When `out_kind` is non-null it receives the resolved member's declared type
+// kind, which the read path uses to apply §7.3.1's 4-state-to-2-state
+// conversion when a 2-state member of a packed union is read.
 bool ResolveStructFieldPath(const StructTypeInfo* info, std::string_view path,
-                            uint32_t* bit_offset, uint32_t* width);
+                            uint32_t* bit_offset, uint32_t* width,
+                            DataTypeKind* out_kind = nullptr);
 
 struct QueueObject {
   std::vector<Logic4Vec> elements;

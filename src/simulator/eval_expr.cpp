@@ -182,13 +182,39 @@ std::string StripRootPrefix(const std::string& name) {
   return name;
 }
 
+// §7.3.1: a packed union with any 4-state member has 4-state storage, so a
+// 2-state member aliases bits that may hold x/z. Reading such a member performs
+// an implicit 4-state-to-2-state conversion (x/z become 0). For 2-state storage
+// this is a no-op, so it is safe to apply to every 2-state member read.
+static bool IsTwoStateScalarKind(DataTypeKind kind) {
+  switch (kind) {
+    case DataTypeKind::kBit:
+    case DataTypeKind::kByte:
+    case DataTypeKind::kShortint:
+    case DataTypeKind::kInt:
+    case DataTypeKind::kLongint:
+      return true;
+    default:
+      return false;
+  }
+}
+
 static Logic4Vec ExtractStructField(Variable* base_var,
                                     const StructTypeInfo* info,
                                     std::string_view field, Arena& arena) {
   uint32_t bit_offset = 0;
   uint32_t width = 0;
-  if (ResolveStructFieldPath(info, field, &bit_offset, &width)) {
-    return ExtractBitField(arena, base_var->value, bit_offset, width);
+  DataTypeKind kind = DataTypeKind::kLogic;
+  if (ResolveStructFieldPath(info, field, &bit_offset, &width, &kind)) {
+    Logic4Vec slice =
+        ExtractBitField(arena, base_var->value, bit_offset, width);
+    if (IsTwoStateScalarKind(kind)) {
+      for (uint32_t i = 0; i < slice.nwords; ++i) {
+        slice.words[i].aval &= ~slice.words[i].bval;
+        slice.words[i].bval = 0;
+      }
+    }
+    return slice;
   }
   return MakeLogic4Vec(arena, 1);
 }

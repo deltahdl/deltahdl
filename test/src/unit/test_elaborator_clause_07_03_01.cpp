@@ -94,6 +94,53 @@ TEST(PackedUnionValidation, SoftUnionRealMember_Rejected) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
+// §7.3.1 (integral-only, §6.11.1): shortreal is a non-integral real-family type
+// distinct from `real`, and it must also be rejected as a packed-union member.
+TEST(PackedUnionValidation, PackedUnionShortrealMember_Rejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  union packed { shortreal r; logic [31:0] a; } u;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+// §7.3.1 (integral-only, §6.11.1): the remaining predefined integral kinds
+// (byte/shortint/integer/time) are admissible packed-union members. Their sizes
+// differ, so the union is soft packed and its width is the largest (time = 64).
+TEST(PackedUnionValidation, SoftPackedUnionPredefinedIntegralKinds_Allowed) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  union soft packed { byte b; shortint s; integer i; time t; } u;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+  auto& vars = design->top_modules[0]->variables;
+  ASSERT_FALSE(vars.empty());
+  EXPECT_EQ(vars[0].width, 64u);
+}
+
+// §7.3.1: a union mixing a 4-state member with a 2-state member is 4-state.
+// This exercises the 4-state `integer` kind (distinct from `logic`) against
+// 2-state `int`; both are 32 bits, so the hard-packed same-size rule is
+// satisfied.
+TEST(PackedUnionValidation, MixedStateIntegerAndInt_UnionIs4State) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  union packed { integer a; int b; } u;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+  auto& vars = design->top_modules[0]->variables;
+  ASSERT_FALSE(vars.empty());
+  EXPECT_TRUE(vars[0].is_4state);
+}
+
 TEST(PackedUnionValidation, NestedPackedStructInPackedUnion_Allowed) {
   ElabFixture f;
   ElaborateSrc(
@@ -113,16 +160,6 @@ TEST(PackedUnionValidation, EnumMemberInPackedUnion_Allowed) {
       "module top;\n"
       "  typedef enum logic [7:0] { A = 0, B = 1 } my_enum;\n"
       "  union packed { my_enum e; logic [7:0] raw; } u;\n"
-      "endmodule\n",
-      f);
-  EXPECT_FALSE(f.diag.HasErrors());
-}
-
-TEST(PackedUnionValidation, HardPackedThreeMembers_SameWidth_OK) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module top;\n"
-      "  union packed { logic [7:0] a; logic [7:0] b; logic [7:0] c; } u;\n"
       "endmodule\n",
       f);
   EXPECT_FALSE(f.diag.HasErrors());

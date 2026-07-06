@@ -642,7 +642,8 @@ static const StructFieldInfo* FindStructField(const StructTypeInfo* info,
 }
 
 bool ResolveStructFieldPath(const StructTypeInfo* info, std::string_view path,
-                            uint32_t* bit_offset, uint32_t* width) {
+                            uint32_t* bit_offset, uint32_t* width,
+                            DataTypeKind* out_kind) {
   uint32_t acc = 0;
   while (info) {
     auto dot = path.find('.');
@@ -653,6 +654,7 @@ bool ResolveStructFieldPath(const StructTypeInfo* info, std::string_view path,
     if (dot == std::string_view::npos) {
       *bit_offset = acc;
       *width = f->width;
+      if (out_kind) *out_kind = f->type_kind;
       return true;
     }
     info = f->nested;
