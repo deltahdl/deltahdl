@@ -86,6 +86,30 @@ bool DissimilarNetTypeRequiresWarning(NetType internal, NetType external) {
   return kWarnTable[ig][eg];
 }
 
+// §23.3.3.7 / Table 23-1: true when, for a dissimilar built-in net-type
+// connection, the internal (module-definition) net is the dominating net, so
+// the merged simulated net takes the internal type. False means the external
+// (instantiation) net type is used -- because it dominates or because neither
+// net dominates (in which case the external type is the default). Rows and
+// columns follow the same net-type grouping as the warning table above.
+bool DissimilarNetResultIsInternal(NetType internal, NetType external) {
+  static constexpr bool kInternalWinsTable[9][9] = {
+      {false, false, false, false, false, false, false, false, false},
+      {true, false, false, false, false, false, false, false, false},
+      {true, false, false, false, false, false, false, false, false},
+      {true, false, false, false, false, false, false, false, false},
+      {true, false, false, true, false, false, false, false, false},
+      {true, false, false, true, false, false, false, false, false},
+      {true, true, true, true, true, true, false, false, false},
+      {true, true, true, true, true, true, true, false, false},
+      {true, true, true, true, true, true, true, false, false},
+  };
+  int ig = NetTypeGroup(internal);
+  int eg = NetTypeGroup(external);
+  if (ig < 0 || eg < 0) return false;
+  return kInternalWinsTable[ig][eg];
+}
+
 Expr* MakePullExprIn(Arena& arena, NetType drive) {
   auto* expr = arena.Create<Expr>();
   expr->kind = ExprKind::kIntegerLiteral;
@@ -886,6 +910,49 @@ static void CheckMatchingNettypePorts(
   }
 }
 
+// §23.3.3.7 / Table 23-1: when a port connects two dissimilar built-in net
+// types and the internal (module-definition) net dominates, the two nets
+// collapse into one simulated net whose type is the dominating (internal) type.
+// Materialize that by retyping the instantiation-side net to the internal
+// port's net type; when the external net dominates (or neither does) the
+// instantiation-side declaration already carries the resulting type, so nothing
+// changes. Only bare net-to-net identifier connections collapse; a non-net
+// connection, a matching type, or an interconnect net (NetTypeGroup < 0,
+// governed by §23.3.3.7.1) is left untouched. Runs after the connectivity
+// checks, which read the original types.
+static void CollapseDissimilarNetTypes(RtlirModule* parent_mod,
+                                       const RtlirModuleInst& inst) {
+  if (!parent_mod || !inst.resolved) return;
+  const auto& child_ports = inst.resolved->ports;
+
+  for (const auto& binding : inst.port_bindings) {
+    const Expr* conn = binding.connection;
+    if (!conn || conn->kind != ExprKind::kIdentifier) continue;
+
+    const RtlirPort* port = nullptr;
+    for (const auto& p : child_ports) {
+      if (p.name == binding.port_name) {
+        port = &p;
+        break;
+      }
+    }
+    if (!port) continue;
+
+    NetType internal = PortNetType(port->type_kind);
+    NetType external = FindSignalNetType(conn->text, parent_mod);
+    if (internal == NetType::kNone || external == NetType::kNone) continue;
+    if (internal == external) continue;
+    if (!DissimilarNetResultIsInternal(internal, external)) continue;
+
+    for (auto& net : parent_mod->nets) {
+      if (net.name == conn->text) {
+        net.net_type = internal;
+        break;
+      }
+    }
+  }
+}
+
 void Elaborator::BindPorts(RtlirModuleInst& inst, const ModuleItem* item,
                            RtlirModule* parent_mod,
                            const ModuleDecl* child_decl) {
@@ -915,6 +982,11 @@ void Elaborator::BindPorts(RtlirModuleInst& inst, const ModuleItem* item,
   CheckNamedInterfaceTypePorts(kPortCtx, child_decl, inst, unit_);
   CheckMatchingNettypePorts(diag_, item, parent_mod, child_decl, inst,
                             nettype_canonical_);
+
+  // §23.3.3.7: retype the instantiation-side net where the internal port net is
+  // the dominating net, so the collapsed simulated net carries the dominating
+  // type. The connectivity checks above already ran against the original types.
+  CollapseDissimilarNetTypes(parent_mod, inst);
 }
 
 }  // namespace delta
