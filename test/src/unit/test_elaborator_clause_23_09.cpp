@@ -14,6 +14,17 @@ TEST(ScopeRulesElaboration, DuplicateIdentifierInSameScopeRejected) {
              "endmodule\n"));
 }
 
+// §23.9: the same rule applies to the construct the LRM names first — two
+// variable declarations sharing a name in one scope. This exercises the
+// variable declaration form rather than the net form above.
+TEST(ScopeRulesElaboration, DuplicateVariableDeclarationInSameScopeRejected) {
+  EXPECT_FALSE(
+      ElabOk("module m;\n"
+             "  int x;\n"
+             "  int x;\n"
+             "endmodule\n"));
+}
+
 // §23.9 also forbids naming a task the same as a variable in the same
 // module scope; the two declarations collide on one identifier.
 TEST(ScopeRulesElaboration, TaskNameMatchingVariableRejected) {
@@ -48,6 +59,20 @@ TEST(ScopeRulesElaboration, SameNameInSeparateModuleScopesAllowed) {
              "endmodule\n"));
 }
 
+// §23.9: a package is another of the listed constructs that opens its own
+// scope, so a name declared in a package does not collide with a like-named
+// declaration in a module. Covers a scope-creating construct kind other than
+// the module-vs-module case above.
+TEST(ScopeRulesElaboration, SameNameInPackageAndModuleScopesAllowed) {
+  EXPECT_TRUE(
+      ElabOk("package p;\n"
+             "  int x;\n"
+             "endpackage\n"
+             "module m;\n"
+             "  int x;\n"
+             "endmodule\n"));
+}
+
 TEST(ScopeRulesElaboration, ConditionalGenerateBlocksAllowSameIdentifier) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
@@ -79,6 +104,35 @@ TEST(ScopeRulesElaboration, InstanceNamePrecedenceOverModuleTypeName) {
              "module top;\n"
              "  foo foo();\n"
              "  initial foo.x = 5;\n"
+             "endmodule\n"));
+}
+
+// §23.9: a name referenced directly inside a named block that is not declared
+// locally triggers an upward search, which continues until the item is found in
+// an enclosing scope. Here the write inside block b resolves upward to the
+// module-level net, so elaboration succeeds. This is the accepting counterpart
+// of DirectVariableReferenceStopsAtModuleBoundary.
+TEST(ScopeRulesElaboration, DirectReferenceResolvesUpwardToEnclosingScope) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  logic sig;\n"
+             "  initial begin : b\n"
+             "    sig = 1;\n"
+             "  end\n"
+             "endmodule\n"));
+}
+
+// §23.9: a named begin-end block is one of the elements that occupies the
+// enclosing scope's namespace, so two blocks sharing a name in the same scope
+// declare one identifier twice and are illegal. This is the general rule whose
+// only exception is the conditional-generate case tested above.
+TEST(ScopeRulesElaboration, DuplicateNamedBlockLabelsInSameScopeRejected) {
+  EXPECT_FALSE(
+      ElabOk("module m;\n"
+             "  initial begin : b\n"
+             "  end\n"
+             "  initial begin : b\n"
+             "  end\n"
              "endmodule\n"));
 }
 
