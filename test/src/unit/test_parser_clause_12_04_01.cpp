@@ -1,11 +1,8 @@
 #include "fixture_parser.h"
-#include "helpers_if_else_chain.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
 namespace {
-
-TEST(ConditionalSyntaxParsing, IfElseIfElse) { VerifyIfElseIfElseChain(); }
 
 TEST(ConditionalSyntaxParsing, IfElseIfNoFinalElse) {
   auto r = Parse(
