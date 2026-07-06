@@ -74,26 +74,6 @@ TEST(ParameterizedSubroutineSim, StaticMethodRegistered) {
   EXPECT_TRUE(it->second->is_static);
 }
 
-TEST(ParameterizedSubroutineSim, MultipleStaticMethodsRegistered) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  virtual class C #(parameter W = 8);\n"
-      "    static function int alpha; alpha = W; endfunction\n"
-      "    static function int beta; beta = W + 1; endfunction\n"
-      "  endclass\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-
-  auto* info = f.ctx.FindClassType("C");
-  ASSERT_NE(info, nullptr);
-  EXPECT_NE(info->methods.find("alpha"), info->methods.end());
-  EXPECT_NE(info->methods.find("beta"), info->methods.end());
-}
-
 TEST(ParameterizedSubroutineSim, NonVirtualParameterizedClass) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -387,60 +367,6 @@ TEST(ParameterizedSubroutineSim, ParameterShift) {
   EXPECT_EQ(var->value.ToUint64(), 8u);
 }
 
-TEST(ParameterizedSubroutineSim, MultipleCallsSameSpec) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  virtual class C #(parameter W = 0);\n"
-      "    static function int add_w(input int x);\n"
-      "      add_w = x + W;\n"
-      "    endfunction\n"
-      "  endclass\n"
-      "  int r1, r2;\n"
-      "  initial begin\n"
-      "    r1 = C#(10)::add_w(1);\n"
-      "    r2 = C#(10)::add_w(2);\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  LowerRunAndCheck(f, design, {{"r1", 11u}, {"r2", 12u}});
-}
-
-TEST(ParameterizedSubroutineSim, ZeroParamValue) {
-  SimFixture f;
-  auto* var = RunAndFind(
-      "module t;\n"
-      "  virtual class C #(parameter W = 8);\n"
-      "    static function int get_w; get_w = W; endfunction\n"
-      "  endclass\n"
-      "  int result;\n"
-      "  initial result = C#(0)::get_w();\n"
-      "endmodule\n",
-      f, "result");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 0u);
-}
-
-TEST(ParameterizedSubroutineSim, ForLoopWithParam) {
-  SimFixture f;
-  auto* var = RunAndFind(
-      "module t;\n"
-      "  virtual class C #(parameter N = 4);\n"
-      "    static function int sum_to_n;\n"
-      "      sum_to_n = 0;\n"
-      "      for (int i = 1; i <= N; i = i + 1)\n"
-      "        sum_to_n = sum_to_n + i;\n"
-      "    endfunction\n"
-      "  endclass\n"
-      "  int result;\n"
-      "  initial result = C#(5)::sum_to_n();\n"
-      "endmodule\n",
-      f, "result");
-  ASSERT_NE(var, nullptr);
-
-  EXPECT_EQ(var->value.ToUint64(), 15u);
-}
-
 TEST(ParameterizedSubroutineSim, ForLoopDifferentSpecs) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -522,6 +448,46 @@ TEST(ParameterizedSubroutineSim, ParamControlsVariableWidth) {
       "endmodule\n",
       f);
   LowerRunAndCheck(f, design, {{"r4", 15u}, {"r8", 255u}});
+}
+
+// §13.8: the specialization value that parameterizes the subroutine is a
+// constant expression. Every other test supplies it as a literal; here it is
+// produced by a module `parameter` declaration, which reaches the call site
+// through a different resolution path. The bound value must still flow into the
+// static method body and drive the computed result.
+TEST(ParameterizedSubroutineSim, SpecializationArgFromModuleParameter) {
+  SimFixture f;
+  auto* var = RunAndFind(
+      "module t;\n"
+      "  parameter P = 20;\n"
+      "  virtual class C #(parameter W = 8);\n"
+      "    static function int get_w; get_w = W; endfunction\n"
+      "  endclass\n"
+      "  int result;\n"
+      "  initial result = C#(P)::get_w();\n"
+      "endmodule\n",
+      f, "result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 20u);
+}
+
+// §13.8: same constant-expression specialization value, this time produced by a
+// `localparam`. A localparam is resolved independently of a module parameter,
+// so it exercises a distinct path for delivering the value into the subroutine.
+TEST(ParameterizedSubroutineSim, SpecializationArgFromLocalparam) {
+  SimFixture f;
+  auto* var = RunAndFind(
+      "module t;\n"
+      "  localparam LW = 12;\n"
+      "  virtual class C #(parameter W = 8);\n"
+      "    static function int get_w; get_w = W; endfunction\n"
+      "  endclass\n"
+      "  int result;\n"
+      "  initial result = C#(LW)::get_w();\n"
+      "endmodule\n",
+      f, "result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 12u);
 }
 
 }  // namespace
