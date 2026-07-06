@@ -9,26 +9,6 @@ using namespace delta;
 
 namespace {
 
-TEST(QueueSizeSimulation, SizeReturnsCount) {
-  SimFixture f;
-  MakeQueue(f, "q", {10, 20, 30});
-  Logic4Vec out{};
-  auto* call = MakeMethodCall(f.arena, "q", "size", {});
-  bool ok = TryEvalQueueMethodCall(call, f.ctx, f.arena, out);
-  ASSERT_TRUE(ok);
-  EXPECT_EQ(out.ToUint64(), 3u);
-}
-
-TEST(QueueSizeSimulation, SizeReturnsZeroForEmpty) {
-  SimFixture f;
-  f.ctx.CreateQueue("q", 32);
-  Logic4Vec out{};
-  auto* call = MakeMethodCall(f.arena, "q", "size", {});
-  bool ok = TryEvalQueueMethodCall(call, f.ctx, f.arena, out);
-  ASSERT_TRUE(ok);
-  EXPECT_EQ(out.ToUint64(), 0u);
-}
-
 TEST(QueueSizeSimulation, ReturnsThirtyTwoBitInt) {
   SimFixture f;
   MakeQueue(f, "q", {10, 20});
@@ -37,15 +17,6 @@ TEST(QueueSizeSimulation, ReturnsThirtyTwoBitInt) {
   bool ok = TryEvalQueueMethodCall(call, f.ctx, f.arena, out);
   ASSERT_TRUE(ok);
   EXPECT_EQ(out.width, 32u);
-}
-
-TEST(QueueSizeSimulation, PropertyAccessReturnsCount) {
-  SimFixture f;
-  MakeQueue(f, "q", {10, 20, 30});
-  Logic4Vec out{};
-  bool ok = TryEvalQueueProperty("q", "size", f.ctx, f.arena, out);
-  ASSERT_TRUE(ok);
-  EXPECT_EQ(out.ToUint64(), 3u);
 }
 
 TEST(QueueSizeSimulation, PropertyAccessReturnsZeroForEmpty) {
@@ -96,6 +67,49 @@ TEST(QueueSizeSimulation, SizeInForLoopCondition) {
   lowerer.Lower(design);
   f.scheduler.Run();
   EXPECT_EQ(f.ctx.FindVariable("total")->value.ToUint64(), 60u);
+}
+
+// 7.10 allows a queue to be built from an unpacked array concatenation {a,b,c}
+// as well as from an assignment pattern '{a,b,c}; the two initializers take
+// different lowering paths. Confirm size() reports the element count of a queue
+// produced by the concatenation form, driven end to end from real source.
+TEST(QueueSizeSimulation, SizeCountsConcatenationInitializedQueue) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  int q [$] = {5, 15, 25, 35};\n"
+      "  int sz;\n"
+      "  initial sz = q.size();\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_EQ(f.ctx.FindVariable("sz")->value.ToUint64(), 4u);
+}
+
+// A queue declared without an initializer starts empty (7.10), so size() on it
+// shall report 0. Drive the empty-queue case end to end: overwrite a nonzero
+// seed with the query result so the observed 0 proves size() actually ran and
+// returned 0, rather than the variable merely retaining its default.
+TEST(QueueSizeSimulation, EmptyQueueSizeIsZeroFromSource) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  int q [$];\n"
+      "  int sz;\n"
+      "  initial begin\n"
+      "    sz = 99;\n"
+      "    sz = q.size();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_EQ(f.ctx.FindVariable("sz")->value.ToUint64(), 0u);
 }
 
 // size() is a live query: each call must report the queue's current element
