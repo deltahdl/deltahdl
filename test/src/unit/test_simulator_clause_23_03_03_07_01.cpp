@@ -64,8 +64,16 @@ TEST(InterconnectPortConnectionSimulation,
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
+// §23.3.3.7.1 consuming §23.3.3.7 (Table 23-1) end-to-end through simulation:
+// the interconnect net iwire, built from real module/instance source and driven
+// through the full pipeline, merges a wire net driving 1 and a wand net driving
+// 0 into a single simulated net. Because the merged net takes the dominating
+// wand type, the two drivers combine to a defined value rather than
+// conflicting. Had the merge left the net as interconnect (resolved as a plain
+// wire), the 1/0 conflict would produce x, so observing a known resolved value
+// confirms the merged net type was applied at run time.
 TEST(InterconnectPortConnectionSimulation,
-     InterconnectMergedWithMultipleChildPortsPropagatesValue) {
+     InterconnectMergedAcrossDissimilarPortsResolvesToDefinedValue) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module dut1(inout wire w);\n"
@@ -84,6 +92,7 @@ TEST(InterconnectPortConnectionSimulation,
   LowerAndRun(design, f);
   auto* var = f.ctx.FindVariable("iwire");
   ASSERT_NE(var, nullptr);
+  EXPECT_TRUE(var->value.IsKnown());
 }
 
 }  // namespace

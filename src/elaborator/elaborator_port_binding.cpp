@@ -953,6 +953,59 @@ static void CollapseDissimilarNetTypes(RtlirModule* parent_mod,
   }
 }
 
+// §23.3.3.7.1: a port connection involving an interconnect net merges the
+// interconnect net with the net on the other side of the port into a single
+// simulated net. An interconnect net has no net type of its own to contribute,
+// so when the other side is a built-in net type the merged net takes that
+// type. Materialize that by retyping the interconnect net (identified by the
+// declared interconnect names) to the child port's built-in net type. When one
+// interconnect net reaches several dissimilar built-in net types through
+// separate port connections, the single merged net resolves to the dominating
+// type among them, so each newly seen concrete type is folded into the type
+// accumulated so far using the same Table 23-1 dominance as the built-in
+// collapse. A net that only ever meets interconnect (or variable) ports keeps
+// its interconnect type; CheckInterconnectPortMerge then reports it as illegal
+// at the end of elaboration. Gating on the interconnect-name set keeps ordinary
+// nets (already handled by CollapseDissimilarNetTypes) untouched.
+static void CollapseInterconnectNetTypes(
+    RtlirModule* parent_mod, const RtlirModuleInst& inst,
+    const std::unordered_set<std::string_view>& interconnect_names) {
+  if (!parent_mod || !inst.resolved) return;
+  const auto& child_ports = inst.resolved->ports;
+
+  for (const auto& binding : inst.port_bindings) {
+    const Expr* conn = binding.connection;
+    if (!conn || conn->kind != ExprKind::kIdentifier) continue;
+    if (interconnect_names.count(conn->text) == 0) continue;
+
+    const RtlirPort* port = nullptr;
+    for (const auto& p : child_ports) {
+      if (p.name == binding.port_name) {
+        port = &p;
+        break;
+      }
+    }
+    if (!port) continue;
+
+    // Only a built-in net type on the child-port side contributes a type; an
+    // interconnect or variable port contributes nothing to the merged type.
+    NetType internal = PortNetType(port->type_kind);
+    if (internal == NetType::kNone) continue;
+
+    for (auto& net : parent_mod->nets) {
+      if (net.name != conn->text) continue;
+      if (net.net_type == NetType::kInterconnect) {
+        net.net_type = internal;
+      } else if (net.net_type != internal && NetTypeGroup(net.net_type) >= 0) {
+        net.net_type = DissimilarNetResultIsInternal(net.net_type, internal)
+                           ? net.net_type
+                           : internal;
+      }
+      break;
+    }
+  }
+}
+
 void Elaborator::BindPorts(RtlirModuleInst& inst, const ModuleItem* item,
                            RtlirModule* parent_mod,
                            const ModuleDecl* child_decl) {
@@ -987,6 +1040,12 @@ void Elaborator::BindPorts(RtlirModuleInst& inst, const ModuleItem* item,
   // the dominating net, so the collapsed simulated net carries the dominating
   // type. The connectivity checks above already ran against the original types.
   CollapseDissimilarNetTypes(parent_mod, inst);
+
+  // §23.3.3.7.1: retype an interconnect net to the built-in net type it merges
+  // with through this instance's port connections, so the merged simulated net
+  // carries that type. Runs after the built-in collapse and is gated on the
+  // declared interconnect names, so it only touches interconnect nets.
+  CollapseInterconnectNetTypes(parent_mod, inst, interconnect_names_);
 }
 
 }  // namespace delta
