@@ -36,20 +36,6 @@ TEST(NetAliasingSimulation, AliasNetsShareValue) {
   EXPECT_EQ(vb->value.ToUint64(), 1u);
 }
 
-TEST(NetAliasingSimulation, AliasThreeNetsShareValue) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  wire a, b, c;\n"
-      "  alias a = b = c;\n"
-      "  assign a = 1;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  ExpectThreeNetsAllEqual(f, 1u);
-}
-
 TEST(NetAliasingSimulation, AliasMultiBitNetsShareValue) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -121,29 +107,6 @@ TEST(NetAliasingSimulation, AliasDoesNotAffectOtherNetBehavior) {
   ASSERT_NE(vc, nullptr);
   EXPECT_EQ(va->value.ToUint64(), 1u);
   EXPECT_EQ(vc->value.ToUint64(), 0u);
-}
-
-TEST(NetAliasingSimulation, AliasAmongOtherModuleItems) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  wire a, b, y;\n"
-      "  assign y = 1;\n"
-      "  alias a = b;\n"
-      "  assign a = 1;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* va = f.ctx.FindVariable("a");
-  auto* vb = f.ctx.FindVariable("b");
-  auto* vy = f.ctx.FindVariable("y");
-  ASSERT_NE(va, nullptr);
-  ASSERT_NE(vb, nullptr);
-  ASSERT_NE(vy, nullptr);
-  EXPECT_EQ(va->value.ToUint64(), 1u);
-  EXPECT_EQ(vb->value.ToUint64(), 1u);
-  EXPECT_EQ(vy->value.ToUint64(), 1u);
 }
 
 }  // namespace

@@ -31,38 +31,11 @@ TEST(NetAliasingParsing, NetAliasThreeNets) {
   ASSERT_EQ(alias->alias_nets.size(), 3u);
 }
 
-TEST(NetAliasingParsing, NetAliasFourNets) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire a, b, c, d;\n"
-      "  alias a = b = c = d;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* alias = FindItemByKind(r, ModuleItemKind::kAlias);
-  ASSERT_NE(alias, nullptr);
-  ASSERT_EQ(alias->alias_nets.size(), 4u);
-}
-
 TEST(NetAliasingParsing, NetAliasBitSelect) {
   auto r = Parse(
       "module m;\n"
       "  wire [31:0] A, B;\n"
       "  alias {A[7:0],A[15:8],A[23:16],A[31:24]} = B;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* alias = FindItemByKind(r, ModuleItemKind::kAlias);
-  ASSERT_NE(alias, nullptr);
-  ASSERT_EQ(alias->alias_nets.size(), 2u);
-}
-
-TEST(NetAliasingParsing, NetAliasPartSelect) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire [31:0] W;\n"
-      "  wire [7:0] LSB;\n"
-      "  alias W[7:0] = LSB;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);

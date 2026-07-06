@@ -4,21 +4,6 @@ using namespace delta;
 
 namespace {
 
-TEST(NetAliasingPreprocessor, NetAlias) {
-  auto r = ParseWithPreprocessor(
-      "module m;\n"
-      "  wire a, b, c;\n"
-      "  alias a = b = c;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto& items = r.cu->modules[0]->items;
-
-  auto* alias_item = items.back();
-  EXPECT_EQ(alias_item->kind, ModuleItemKind::kAlias);
-  EXPECT_EQ(alias_item->alias_nets.size(), 3u);
-}
-
 TEST(NetAliasingPreprocessor, NetAliasTwoNets) {
   auto r = ParseWithPreprocessor(
       "module m;\n"

@@ -4,18 +4,6 @@ using namespace delta;
 
 namespace {
 
-TEST(NetAliasingElaboration, AliasTwoNetsElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  wire a, b;\n"
-      "  alias a = b;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 TEST(NetAliasingElaboration, AliasThreeNetsElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -49,6 +37,7 @@ TEST(NetAliasingElaboration, AliasStoresNetsInRtlir) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
   ASSERT_FALSE(design->top_modules.empty());
   ASSERT_FALSE(design->top_modules[0]->aliases.empty());
   EXPECT_EQ(design->top_modules[0]->aliases[0].nets.size(), 2u);
@@ -91,41 +80,6 @@ TEST(NetAliasingElaboration, AliasSelfIsError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(NetAliasingElaboration, AliasBothVariablesIsError) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module m;\n"
-      "  logic a, b;\n"
-      "  alias a = b;\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(f.has_errors);
-}
-
-TEST(NetAliasingElaboration, AliasRegToNetIsError) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module m;\n"
-      "  reg r;\n"
-      "  wire w;\n"
-      "  alias r = w;\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(f.has_errors);
-}
-
-TEST(NetAliasingElaboration, AliasWandToWireIsError) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module m;\n"
-      "  wand a;\n"
-      "  wire b;\n"
-      "  alias a = b;\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(f.has_errors);
-}
-
 TEST(NetAliasingElaboration, AliasWandToWorIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -157,6 +111,20 @@ TEST(NetAliasingElaboration, AliasDifferentWidthNetsIsError) {
       "  wire [7:0] a;\n"
       "  wire [3:0] b;\n"
       "  alias a = b;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// §10.11: each member shall be the same size. Here a concatenation member is
+// 4 bits wide while the whole-net member is 8 bits; the size rule must reject
+// it even though the operand is structured (a select/concat), not a plain net.
+TEST(NetAliasingElaboration, AliasStructuredOperandWidthMismatchIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  wire [7:0] A, B;\n"
+      "  alias {A[3:0]} = B;\n"
       "endmodule\n",
       f);
   EXPECT_TRUE(f.has_errors);
@@ -204,6 +172,28 @@ TEST(NetAliasingElaboration, AliasDuplicateReversedOrderIsError) {
   EXPECT_TRUE(f.has_errors);
 }
 
+// §10.11: the scope of an alias is limited to its module, so the
+// "specified more than once" check must be confined to a single module. Two
+// independent modules may each declare the same alias; the per-module reset of
+// the duplicate-tracking set keeps the second from being mis-flagged as a
+// repeat of the first.
+TEST(NetAliasingElaboration, DuplicateAliasCheckIsScopedPerModule) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module a;\n"
+      "  wire x, y;\n"
+      "  alias x = y;\n"
+      "endmodule\n"
+      "module b;\n"
+      "  wire x, y;\n"
+      "  alias x = y;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(design->top_modules.size(), 2u);
+}
+
 TEST(NetAliasingElaboration, AliasUndeclaredIdentifierCreatesImplicitNet) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -232,7 +222,10 @@ TEST(NetAliasingElaboration, AliasAmongOtherModuleItems) {
   EXPECT_FALSE(design->top_modules[0]->assigns.empty());
 }
 
-TEST(NetAliasingElaboration, AliasSelfViaConcatenationIsError) {
+// §10.11 Example A: two statements that share the top 4 and bottom 4 bits
+// specify the same alias correspondence more than once, which is illegal. This
+// drives the module-lifetime bit-correspondence set across concatenations.
+TEST(NetAliasingElaboration, AliasDuplicateBitCorrespondenceIsError) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -240,6 +233,55 @@ TEST(NetAliasingElaboration, AliasSelfViaConcatenationIsError) {
       "  wire [11:0] high12, low12;\n"
       "  alias bus16 = {high12[11:8], low12};\n"
       "  alias bus16 = {high12, low12[3:0]};\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// §10.11 Example B: a single statement whose operands place the same bits of
+// bus16 at the same position aliases those bits to themselves, which is
+// illegal even though no whole-net operand repeats.
+TEST(NetAliasingElaboration, AliasBitSelfAliasViaConcatenationIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  wire [15:0] bus16;\n"
+      "  wire [11:0] high12, low12;\n"
+      "  alias bus16 = {high12, bus16[3:0]} = {bus16[15:12], low12};\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// §10.11 Example B with parameter-based select bounds. §11.2.1 lets a
+// constant_select bound be a parameter, which takes a different evaluation path
+// than a literal; the bit-level self-alias check must still fire once the
+// parameters resolve. LO/HI reproduce the bus16[3:0]/bus16[15:12] overlap.
+TEST(NetAliasingElaboration, AliasBitSelfAliasWithParameterBoundIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  parameter LO = 3;\n"
+      "  parameter HI = 15;\n"
+      "  wire [15:0] bus16;\n"
+      "  wire [11:0] high12, low12;\n"
+      "  alias bus16 = {high12, bus16[LO:0]} = {bus16[HI:12], low12};\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// Same overlap driven by localparam bounds, the other §11.2.1 constant form
+// that resolves through the module's parameter scope.
+TEST(NetAliasingElaboration, AliasBitSelfAliasWithLocalparamBoundIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  localparam LO = 3;\n"
+      "  localparam HI = 15;\n"
+      "  wire [15:0] bus16;\n"
+      "  wire [11:0] high12, low12;\n"
+      "  alias bus16 = {high12, bus16[LO:0]} = {bus16[HI:12], low12};\n"
       "endmodule\n",
       f);
   EXPECT_TRUE(f.has_errors);

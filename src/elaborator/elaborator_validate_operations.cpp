@@ -885,19 +885,24 @@ std::optional<std::vector<AliasBitRef>> FlattenAliasIdentBits(
 // nullopt for a non-constant index, an indexed (+:/-:) select, or unknown net.
 template <typename WidthFn>
 std::optional<std::vector<AliasBitRef>> FlattenAliasSelectBits(
-    const Expr* e, WidthFn net_width) {
+    const Expr* e, WidthFn net_width, const ScopeMap& scope) {
   bool indexed = e->is_part_select_plus || e->is_part_select_minus;
   if (!e->base || e->base->kind != ExprKind::kIdentifier || indexed)
     return std::nullopt;
   if (net_width(e->base->text) == 0) return std::nullopt;
-  auto hi = ConstEvalInt(e->index);
+  // §11.2.1: a constant_select bound may be a literal or a
+  // parameter/localparam. Resolve against the module's parameter scope so a
+  // parameter-based index is flattened to the same bits a literal would be --
+  // otherwise the bit-level self/duplicate checks would silently skip a
+  // parameterized select.
+  auto hi = ConstEvalInt(e->index, scope);
   if (!hi) return std::nullopt;
   std::vector<AliasBitRef> bits;
   if (!e->index_end) {
     bits.emplace_back(e->base->text, static_cast<uint32_t>(*hi));
     return bits;
   }
-  auto lo = ConstEvalInt(e->index_end);
+  auto lo = ConstEvalInt(e->index_end, scope);
   if (!lo) return std::nullopt;
   int64_t a = *hi;
   int64_t b = *lo;
@@ -913,20 +918,39 @@ std::optional<std::vector<AliasBitRef>> FlattenAliasSelectBits(
 // caller skips the bit-level analysis rather than mis-reporting.
 template <typename WidthFn>
 std::optional<std::vector<AliasBitRef>> FlattenAliasOperandBits(
-    const Expr* e, WidthFn net_width) {
+    const Expr* e, WidthFn net_width, const ScopeMap& scope) {
   if (!e) return std::nullopt;
   if (e->kind == ExprKind::kIdentifier)
     return FlattenAliasIdentBits(e, net_width);
-  if (e->kind == ExprKind::kSelect) return FlattenAliasSelectBits(e, net_width);
+  if (e->kind == ExprKind::kSelect)
+    return FlattenAliasSelectBits(e, net_width, scope);
   if (e->kind != ExprKind::kConcatenation || e->repeat_count)
     return std::nullopt;
   std::vector<AliasBitRef> bits;
   for (auto* el : e->elements) {
-    auto sub = FlattenAliasOperandBits(el, net_width);
+    auto sub = FlattenAliasOperandBits(el, net_width, scope);
     if (!sub) return std::nullopt;
     bits.insert(bits.end(), sub->begin(), sub->end());
   }
   return bits;
+}
+
+// §10.11: an alias statement shall not alias a net bit to itself. When two
+// operands of one statement place the same physical net bit at the same
+// position, that bit is being aliased to itself (e.g.
+// alias bus16 = {high12, bus16[3:0]} = {bus16[15:12], low12}). The whole-net
+// form (alias a = a) is caught by CheckAliasSelfAlias; this covers the
+// bit-level form that only surfaces through selects and concatenations.
+bool AliasOperandsAliasBitToSelf(
+    const std::vector<std::vector<AliasBitRef>>& operands, size_t width) {
+  for (size_t i = 0; i < operands.size(); ++i) {
+    for (size_t j = i + 1; j < operands.size(); ++j) {
+      for (size_t p = 0; p < width; ++p) {
+        if (operands[i][p] == operands[j][p]) return true;
+      }
+    }
+  }
+  return false;
 }
 
 // Scans every pair of operands position-by-position, inserting each canonical
@@ -959,7 +983,8 @@ bool AliasHasStructuredOperand(const ModuleItem* item) {
 // operands disagree on width (the latter is reported elsewhere).
 template <typename ScopeFn>
 std::optional<std::vector<std::vector<AliasBitRef>>> BuildAliasOperandBits(
-    const ModuleItem* item, RtlirModule* mod, ScopeFn scope) {
+    const ModuleItem* item, RtlirModule* mod, ScopeFn scope,
+    const ScopeMap& param_scope) {
   if (!AliasHasStructuredOperand(item)) return std::nullopt;
 
   auto net_width = [&](std::string_view raw) -> uint32_t {
@@ -971,7 +996,7 @@ std::optional<std::vector<std::vector<AliasBitRef>>> BuildAliasOperandBits(
 
   std::vector<std::vector<AliasBitRef>> operands;
   for (auto* net : item->alias_nets) {
-    auto flat = FlattenAliasOperandBits(net, net_width);
+    auto flat = FlattenAliasOperandBits(net, net_width, param_scope);
     if (!flat) return std::nullopt;
     operands.push_back(std::move(*flat));
   }
@@ -980,6 +1005,36 @@ std::optional<std::vector<std::vector<AliasBitRef>>> BuildAliasOperandBits(
   for (const auto& op : operands)
     if (op.size() != width) return std::nullopt;
   return operands;
+}
+
+// §10.11: each member of an alias list shall be the same size. Whole-net pairs
+// are handled by CheckAliasNetWidthCompat; this covers the structured case,
+// where a select or concatenation operand can disagree in total width with the
+// other members. Only compared when every operand flattens to a known,
+// constant-bounded bit count -- an unknown net or non-constant select is left
+// to the checks that already skip it, so no false width error is raised.
+template <typename ScopeFn>
+void CheckAliasStructuredWidthCompat(const ModuleItem* item, DiagEngine& diag,
+                                     RtlirModule* mod, ScopeFn scope,
+                                     const ScopeMap& param_scope) {
+  if (!AliasHasStructuredOperand(item)) return;
+  auto net_width = [&](std::string_view raw) -> uint32_t {
+    auto scoped = scope(raw);
+    for (const auto& n : mod->nets)
+      if (n.name == scoped) return n.width;
+    return 0;
+  };
+  std::optional<size_t> common;
+  for (auto* net : item->alias_nets) {
+    auto flat = FlattenAliasOperandBits(net, net_width, param_scope);
+    if (!flat) return;
+    if (!common) {
+      common = flat->size();
+    } else if (*common != flat->size()) {
+      diag.Error(item->loc, "members of alias statement have different widths");
+      return;
+    }
+  }
 }
 
 // §10.11: "it is not allowed to ... specify a given alias more than once." When
@@ -991,10 +1046,15 @@ template <typename ScopeFn>
 void CheckAliasBitDuplicates(
     const ModuleItem* item, DiagEngine& diag,
     std::set<std::pair<AliasBitRef, AliasBitRef>>& seen, RtlirModule* mod,
-    ScopeFn scope) {
-  auto operands = BuildAliasOperandBits(item, mod, scope);
+    ScopeFn scope, const ScopeMap& param_scope) {
+  auto operands = BuildAliasOperandBits(item, mod, scope, param_scope);
   if (!operands) return;
-  if (AliasOperandsHaveDuplicateBit(*operands, (*operands)[0].size(), seen)) {
+  size_t width = (*operands)[0].size();
+  if (AliasOperandsAliasBitToSelf(*operands, width)) {
+    diag.Error(item->loc, "net bits aliased to themselves in alias statement");
+    return;
+  }
+  if (AliasOperandsHaveDuplicateBit(*operands, width, seen)) {
     diag.Error(item->loc, "alias bit correspondence specified more than once");
   }
 }
@@ -1025,12 +1085,13 @@ void Elaborator::ValidateAlias(const ModuleItem* item, RtlirModule* mod) {
   std::vector<std::string_view> ident_names =
       CollectAliasNetNames(item, net_names_);
   CheckAliasNetTypeCompat(item, diag_, var_types_, ident_names);
-  CheckAliasNetWidthCompat(
-      item, diag_, mod, ident_names,
-      [this](std::string_view n) { return ScopedName(n); });
+  auto scoped = [this](std::string_view n) { return ScopedName(n); };
+  CheckAliasNetWidthCompat(item, diag_, mod, ident_names, scoped);
+  ScopeMap param_scope = BuildParamScope(mod);
+  CheckAliasStructuredWidthCompat(item, diag_, mod, scoped, param_scope);
   CheckAliasDuplicatePairs(item, diag_, alias_pairs_, ident_names);
-  CheckAliasBitDuplicates(item, diag_, alias_bit_pairs_, mod,
-                          [this](std::string_view n) { return ScopedName(n); });
+  CheckAliasBitDuplicates(item, diag_, alias_bit_pairs_, mod, scoped,
+                          param_scope);
 }
 
 void Elaborator::CheckAssocConcatTargetInAssign(const Stmt* s) {
