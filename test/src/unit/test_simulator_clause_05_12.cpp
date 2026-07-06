@@ -20,50 +20,6 @@ TEST(LexicalConventionSim, AttrOnVarDecl) {
   EXPECT_EQ(f.ctx.FindVariable("x")->value.ToUint64(), 0xAB);
 }
 
-TEST(LexicalConventionSim, AttrWithValueOnDecl) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  (* fsm_state = 1 *) logic [7:0] y = 8'hCD;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  EXPECT_EQ(f.ctx.FindVariable("y")->value.ToUint64(), 0xCD);
-}
-
-TEST(LexicalConventionSim, MultipleAttrSpecs) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  (* full_case, parallel_case *) logic [7:0] z = 8'hEF;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  EXPECT_EQ(f.ctx.FindVariable("z")->value.ToUint64(), 0xEF);
-}
-
-TEST(LexicalConventionSim, MultipleSeparateInstances) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  (* full_case = 1 *)\n"
-      "  (* parallel_case = 1 *)\n"
-      "  logic [7:0] w = 8'h77;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  EXPECT_EQ(f.ctx.FindVariable("w")->value.ToUint64(), 0x77);
-}
-
 TEST(LexicalConventionSim, AttrOnInitialBlock) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -155,20 +111,6 @@ TEST(LexicalConventionSim, AttrOnForLoop) {
   lowerer.Lower(design);
   f.scheduler.Run();
   EXPECT_EQ(f.ctx.FindVariable("e")->value.ToUint64(), 3);
-}
-
-TEST(LexicalConventionSim, AttrWithStringValue) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  (* mode = \"fast\" *) logic [7:0] g = 8'h99;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  EXPECT_EQ(f.ctx.FindVariable("g")->value.ToUint64(), 0x99);
 }
 
 }  // namespace

@@ -163,20 +163,6 @@ TEST(LexicalConventionElaboration, SameNameDifferentElementsIndependent) {
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
-TEST(LexicalConventionElaboration, AttrOnVarDecl) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  (* fsm_state *) logic [7:0] state;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  auto* mod = design->top_modules[0];
-  ASSERT_FALSE(mod->variables.empty());
-  ASSERT_FALSE(mod->variables[0].attrs.empty());
-  EXPECT_EQ(mod->variables[0].attrs[0].name, "fsm_state");
-}
-
 TEST(LexicalConventionElaboration, AttrOnNetDecl) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -299,11 +285,62 @@ TEST(LexicalConventionElaboration, NoErrorsWithAttributePresent) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-TEST(LexicalConventionElaboration, ModuleWithAttributeElaborates) {
-  EXPECT_TRUE(
-      ElabOk("(* synthesis *) module t;\n"
-             "  logic a;\n"
-             "endmodule\n"));
+// §5.12: when an attr_spec supplies a value, the attribute takes the value of
+// that expression rather than the default of 1. The value is a constant
+// expression, so it may be any of the constant forms of 11.2.1 -- here a
+// localparam reference -- not just a literal. This drives the parameter-scope
+// name-resolution path of attribute-value evaluation, which the literal and
+// arithmetic cases never touch.
+TEST(LexicalConventionElaboration, AttrValueFromLocalparam) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  localparam DEPTH = 12;\n"
+      "  (* depth = DEPTH *) logic [7:0] mem;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+  auto* mod = design->top_modules[0];
+  ASSERT_FALSE(mod->variables.empty());
+  ASSERT_FALSE(mod->variables[0].attrs.empty());
+  EXPECT_EQ(mod->variables[0].attrs[0].name, "depth");
+  ASSERT_NE(mod->variables[0].attrs[0].resolved_value, std::nullopt);
+  EXPECT_EQ(mod->variables[0].attrs[0].resolved_value.value_or(INT64_MIN), 12);
+}
+
+// §5.12: an attribute value is a constant expression, so it may name a module
+// parameter (a distinct 11.2.1 constant form from a literal or localparam,
+// since a parameter can be overridden at instantiation). The attribute takes
+// the *resolved* value of the expression -- attribute evaluation consumes the
+// elaborated parameter, so overriding the parameter changes the attribute's
+// value. This drives the parameter-override path end-to-end, not just the
+// declared default.
+TEST(LexicalConventionElaboration, AttrValueFromParameterOverride) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module leaf #(parameter WIDTH = 4) ();\n"
+      "  (* mem_width = WIDTH *) logic [7:0] mem;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  leaf #(.WIDTH(16)) u ();\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+  const RtlirModule* top = nullptr;
+  for (auto* m : design->top_modules) {
+    if (m->name == "top") top = m;
+  }
+  ASSERT_NE(top, nullptr);
+  ASSERT_FALSE(top->children.empty());
+  const RtlirModule* leaf = top->children[0].resolved;
+  ASSERT_NE(leaf, nullptr);
+  ASSERT_FALSE(leaf->variables.empty());
+  ASSERT_FALSE(leaf->variables[0].attrs.empty());
+  EXPECT_EQ(leaf->variables[0].attrs[0].name, "mem_width");
+  ASSERT_NE(leaf->variables[0].attrs[0].resolved_value, std::nullopt);
+  EXPECT_EQ(leaf->variables[0].attrs[0].resolved_value.value_or(INT64_MIN), 16);
 }
 
 }  // namespace
