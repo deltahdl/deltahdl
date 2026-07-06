@@ -20,17 +20,6 @@ TEST(DataHidingParsing, ClassWithQualifiersLocalProtected) {
   EXPECT_TRUE(cls->members[1]->is_protected);
 }
 
-TEST(DataHidingParsing, ProtectedPropertyParses) {
-  auto r = Parse(
-      "class Packet;\n"
-      "  protected int payload;\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->classes.size(), 1u);
-  ASSERT_GE(r.cu->classes[0]->members.size(), 1u);
-  EXPECT_TRUE(r.cu->classes[0]->members[0]->is_protected);
-}
-
 TEST(DataHidingParsing, LocalAndProtectedError) {
   EXPECT_FALSE(
       ParseOk("class Packet;\n"
@@ -118,6 +107,22 @@ TEST(DataHidingParsing, ConstProtectedProperty) {
   auto r = Parse(
       "class C;\n"
       "  const protected int X = 10;\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* m = r.cu->classes[0]->members[0];
+  EXPECT_TRUE(m->is_const);
+  EXPECT_TRUE(m->is_protected);
+}
+
+// §8.18: there is no predefined ordering for member modifiers. This is the
+// reverse of ConstProtectedProperty — the access qualifier precedes const — and
+// must parse to the same combination of flags, exercising the qualifier loop in
+// the opposite order.
+TEST(DataHidingParsing, ProtectedConstProperty) {
+  auto r = Parse(
+      "class C;\n"
+      "  protected const int X = 10;\n"
       "endclass\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);

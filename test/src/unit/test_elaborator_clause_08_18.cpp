@@ -148,12 +148,50 @@ TEST(DataHidingElaboration, ProtectedAccessibleInSubclassMethod) {
              "endmodule\n"));
 }
 
+// §8.18: the visible-to-subclasses characteristic of a protected member applies
+// to methods as well as properties. A subclass method may call an inherited
+// protected method — the method form of the preceding property test.
+TEST(DataHidingElaboration, ProtectedMethodAccessibleInSubclassMethod) {
+  EXPECT_TRUE(
+      ElabOk("class Base;\n"
+             "  protected function int secret();\n"
+             "    return 7;\n"
+             "  endfunction\n"
+             "endclass\n"
+             "class Derived extends Base;\n"
+             "  function int reveal();\n"
+             "    return secret();\n"
+             "  endfunction\n"
+             "endclass\n"
+             "module m;\n"
+             "  Derived d;\n"
+             "endmodule\n"));
+}
+
 // §8.18: within a class, a local property of the same class may be
 // referenced even if it is in a different instance of the same class.
 TEST(DataHidingElaboration, SameClassInstanceLocalAccessOk) {
   EXPECT_TRUE(
       ElabOk("class Packet;\n"
              "  local int i;\n"
+             "  function int compare(Packet other);\n"
+             "    return (this.i == other.i);\n"
+             "  endfunction\n"
+             "endclass\n"
+             "module m;\n"
+             "  Packet p;\n"
+             "endmodule\n"));
+}
+
+// §8.18: a protected member has all the characteristics of a local member
+// (differing only in being inheritable). The same-class cross-instance
+// reference permitted for a local property is therefore equally permitted for a
+// protected one: a method may read a protected property of another instance of
+// its own class.
+TEST(DataHidingElaboration, SameClassInstanceProtectedAccessOk) {
+  EXPECT_TRUE(
+      ElabOk("class Packet;\n"
+             "  protected int i;\n"
              "  function int compare(Packet other);\n"
              "    return (this.i == other.i);\n"
              "  endfunction\n"
