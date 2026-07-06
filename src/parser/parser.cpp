@@ -355,20 +355,18 @@ void Parser::ParseOutOfBlockConstraint(CompilationUnit* unit) {
   Expect(TokenKind::kColonColon);
   std::string_view constraint_name = ExpectIdentifier().text;
   Expect(TokenKind::kLBrace);
-  int depth = 1;
-  while (depth > 0 && !AtEnd()) {
-    if (Match(TokenKind::kLBrace)) {
-      ++depth;
-    } else if (Match(TokenKind::kRBrace)) {
-      --depth;
-    } else {
-      Consume();
-    }
-  }
+  // 18.5.1: capture the block's relations so elaboration can complete the
+  // matching prototype with them. The body is scanned exactly like an in-class
+  // constraint block, using a scratch member to collect the relations.
+  auto* body = arena_.Create<ClassMember>();
+  body->kind = ClassMemberKind::kConstraint;
+  ScanConstraintBodyRelations(body);
   if (unit) {
-    unit->external_constraints.push_back({class_name, constraint_name, loc,
-                                          is_initial, is_extends, is_final,
-                                          is_static});
+    ExternalConstraintBlock ext{class_name, constraint_name, loc,
+                                is_initial, is_extends,      is_final,
+                                is_static};
+    ext.constraint_exprs = std::move(body->constraint_exprs);
+    unit->external_constraints.push_back(std::move(ext));
   }
 }
 

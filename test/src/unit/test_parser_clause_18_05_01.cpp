@@ -77,4 +77,20 @@ TEST(ExternalConstraintBlockParsing, ExternalBlockRecordsClassAndName) {
   EXPECT_EQ(r.cu->external_constraints.front().constraint_name, "proto2");
 }
 
+// 18.5.1: an external constraint block completes the prototype with the
+// relations in its body. The parser captures each top-level relation so that
+// elaboration can attach them to the prototype; a block with two relations
+// records two, not the discarded body of before.
+TEST(ExternalConstraintBlockParsing, ExternalBlockCapturesBodyRelations) {
+  auto r = Parse(
+      "class C;\n"
+      "  rand int x;\n"
+      "  extern constraint proto2;\n"
+      "endclass\n"
+      "constraint C::proto2 { x >= 0; x < 10; }\n");
+  ASSERT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->external_constraints.size(), 1u);
+  EXPECT_EQ(r.cu->external_constraints.front().constraint_exprs.size(), 2u);
+}
+
 }  // namespace

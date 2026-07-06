@@ -595,6 +595,7 @@ class Elaborator {
   // 18.5.1: external constraint blocks complete constraint prototypes.
   void ValidateExternalConstraints();
   void ValidateOneClassExternalConstraints(const ClassDecl* cls);
+  void CompleteExternalConstraints();
 
   // 18.5.2: constraint inheritance and override specifiers.
   void ValidateConstraintInheritance();

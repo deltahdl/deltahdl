@@ -113,6 +113,7 @@ class Parser {
                                const ClassMember* first, const DataType& dtype);
   ClassMember* ParseConstraintStub(ClassMember* member);
   bool ParseConstraintHeader(ClassMember* member);
+  void ScanConstraintBodyRelations(ClassMember* member);
   bool ScanConstraintBodyToken(ClassMember* member, int& depth, bool& in_soft,
                                bool carried_qualifier);
   void CaptureConstraintRelation(ClassMember* member);

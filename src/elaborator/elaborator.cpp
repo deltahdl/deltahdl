@@ -369,6 +369,10 @@ void Elaborator::RunPreElaborationValidations() {
 
   ValidateExternalConstraints();
 
+  // 18.5.1: once the external blocks are validated, complete each prototype by
+  // attaching its external block's relations so randomization applies them.
+  CompleteExternalConstraints();
+
   ValidateConstraintInheritance();
 
   ValidateForwardClassTypedefs();

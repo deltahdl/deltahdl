@@ -1008,4 +1008,27 @@ void Elaborator::ValidateExternalConstraints() {
   }
 }
 
+// 18.5.1: an external constraint block completes its constraint prototype. Copy
+// the block's captured relations onto the matching prototype member so that the
+// completed constraint takes effect at randomization exactly like an in-class
+// constraint block (18.5). A prototype left without a block keeps its empty
+// relation set and thus behaves as an empty constraint (no effect on
+// randomization, equivalent to a constraint block holding the constant 1).
+void Elaborator::CompleteExternalConstraints() {
+  for (const auto& ext : unit_->external_constraints) {
+    for (auto* cls : unit_->classes) {
+      if (cls->name != ext.class_name) continue;
+      for (auto* m : cls->members) {
+        if (m->kind == ClassMemberKind::kConstraint &&
+            m->is_constraint_prototype && m->name == ext.constraint_name) {
+          m->constraint_exprs.insert(m->constraint_exprs.end(),
+                                     ext.constraint_exprs.begin(),
+                                     ext.constraint_exprs.end());
+        }
+      }
+      break;
+    }
+  }
+}
+
 }  // namespace delta

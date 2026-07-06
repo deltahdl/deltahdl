@@ -750,12 +750,12 @@ void Parser::CaptureConstraintRelation(ClassMember* member) {
   if (ok && member) member->constraint_exprs.push_back(rel);
 }
 
-ClassMember* Parser::ParseConstraintStub(ClassMember* member) {
-  member->kind = ClassMemberKind::kConstraint;
-  Consume();
-
-  if (ParseConstraintHeader(member)) return member;
-
+// 18.5: scan a constraint block body from just past its opening '{' to the
+// matching '}', capturing each top-level relation on 'member' and applying the
+// body's structural and reference checks. Shared by an in-class constraint
+// block and an external constraint block (18.5.1), so an external block's
+// relations are captured the same way and its body receives the same checks.
+void Parser::ScanConstraintBodyRelations(ClassMember* member) {
   int depth = 1;
   // 18.5.11: track whether the token just before the current identifier was a
   // '.' or '::' qualifier, so a member/scope-qualified name (obj.f, pkg::f) is
@@ -783,6 +783,15 @@ ClassMember* Parser::ParseConstraintStub(ClassMember* member) {
     // The next iteration starts a fresh relation only after a ';' was consumed.
     at_relation_start = starts_with_semicolon;
   }
+}
+
+ClassMember* Parser::ParseConstraintStub(ClassMember* member) {
+  member->kind = ClassMemberKind::kConstraint;
+  Consume();
+
+  if (ParseConstraintHeader(member)) return member;
+
+  ScanConstraintBodyRelations(member);
   return member;
 }
 

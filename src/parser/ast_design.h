@@ -72,6 +72,12 @@ struct ExternalConstraintBlock {
   // 'static' qualification must match the completing prototype's, or be absent
   // on both.
   bool is_static = false;
+  // 18.5.1: the top-level relation expressions of the external block's body,
+  // captured so elaboration can complete the matching prototype with them. A
+  // prototype so completed then constrains randomization like an in-class
+  // constraint block; a prototype left without a block keeps an empty set and
+  // behaves as an empty constraint (equivalent to the constant expression 1).
+  std::vector<Expr*> constraint_exprs;
 };
 
 struct CompilationUnit {
