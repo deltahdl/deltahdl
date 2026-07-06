@@ -26,6 +26,30 @@ TEST(BindDirective, DesignwideInsertionAddsInstanceToEveryInstanceOfTarget) {
   EXPECT_TRUE(found);
 }
 
+// bind_target_scope may be an interface_identifier, and with no
+// bind_target_instance_list the instantiation is inserted designwide into every
+// instance of that interface. Distinct input form from the module-scope case:
+// the target is an interface and (per footnote 4) the bound thing is a checker.
+TEST(BindDirective, DesignwideInsertionIntoInterfaceScope) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "checker probe_chk; endchecker\n"
+      "interface ifc; endinterface\n"
+      "module top;\n"
+      "  ifc i();\n"
+      "endmodule\n"
+      "bind ifc probe_chk pc();\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto it = design->all_modules.find("ifc");
+  ASSERT_NE(it, design->all_modules.end());
+  bool found = false;
+  for (const auto& ch : it->second->children)
+    if (ch.inst_name == "pc" && ch.module_name == "probe_chk") found = true;
+  EXPECT_TRUE(found);
+}
+
 TEST(BindDirective, InstanceListRestrictsBindingToListedInstancesOnly) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -85,16 +109,6 @@ TEST(BindDirective, InterfaceTargetWithInterfaceInstantiationAllowed) {
              "  ifc i();\n"
              "endmodule\n"
              "bind ifc sub s();\n"));
-}
-
-TEST(BindDirective, InterfaceTargetWithCheckerInstantiationAllowed) {
-  EXPECT_TRUE(
-      ElabOk("checker chk; endchecker\n"
-             "interface ifc; endinterface\n"
-             "module top;\n"
-             "  ifc i();\n"
-             "endmodule\n"
-             "bind ifc chk c();\n"));
 }
 
 TEST(BindDirective, InterfaceTargetWithModuleInstantiationIsError) {
@@ -324,6 +338,55 @@ TEST(BindDirective, UnknownTargetScopeIsError) {
   EXPECT_TRUE(f.has_errors);
 }
 
+// §23.11: a bind_target_scope shall be a module or an interface. A program name
+// is not a legal target scope, so a bind naming a program as its scope denotes
+// nothing bindable and is an error even though the program is a known design
+// element that could otherwise be a bind_instantiation.
+TEST(BindDirective, ProgramNameAsTargetScopeIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "program prg; endprogram\n"
+      "module probe; endmodule\n"
+      "module top; endmodule\n"
+      "bind prg probe pb();\n",
+      f, "top");
+  EXPECT_TRUE(f.has_errors);
+}
+
+// §23.11 companion to the program case: a checker name is likewise not a legal
+// bind_target_scope, so binding into a checker scope is an error.
+TEST(BindDirective, CheckerNameAsTargetScopeIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "checker chk; endchecker\n"
+      "module probe; endmodule\n"
+      "module top; endmodule\n"
+      "bind chk probe pb();\n",
+      f, "top");
+  EXPECT_TRUE(f.has_errors);
+}
+
+// The scope-kind restriction narrows only programs and checkers: a plain module
+// name remains a valid bind_target_scope and still binds designwide, so this
+// accepting companion guards against over-rejecting.
+TEST(BindDirective, ModuleNameRemainsValidTargetScope) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module probe; endmodule\n"
+      "module cpu; endmodule\n"
+      "module top; cpu c(); endmodule\n"
+      "bind cpu probe pb();\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto it = design->all_modules.find("cpu");
+  ASSERT_NE(it, design->all_modules.end());
+  bool found = false;
+  for (const auto& ch : it->second->children)
+    if (ch.inst_name == "pb" && ch.module_name == "probe") found = true;
+  EXPECT_TRUE(found);
+}
+
 // A bind_target_instance must resolve to an instance; a hierarchical path that
 // matches no instance in the design is an error.
 TEST(BindDirective, SecondFormUnknownInstancePathIsError) {
@@ -333,6 +396,238 @@ TEST(BindDirective, SecondFormUnknownInstancePathIsError) {
       "module cpu; endmodule\n"
       "module top; cpu c(); endmodule\n"
       "bind top.nonexistent probe p();\n",
+      f, "top");
+  EXPECT_TRUE(f.has_errors);
+}
+
+// §23.11: a bind directive may be written inside a module scope (not only at
+// compilation-unit scope). Such a nested directive is still collected and still
+// binds designwide into its named target, so the bound instance appears in the
+// target regardless of where the directive was written.
+TEST(BindDirective, BindDeclaredInsideModuleAppliesToTarget) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module probe; endmodule\n"
+      "module cpu; endmodule\n"
+      "module top;\n"
+      "  cpu c();\n"
+      "  bind cpu probe p();\n"
+      "endmodule\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto it = design->all_modules.find("cpu");
+  ASSERT_NE(it, design->all_modules.end());
+  bool found = false;
+  for (const auto& ch : it->second->children)
+    if (ch.inst_name == "p" && ch.module_name == "probe") found = true;
+  EXPECT_TRUE(found);
+}
+
+// Companion placement: a bind directive written inside an interface scope is
+// likewise collected and applied to its target, exercising the interface-scope
+// collection path distinct from the module- and compilation-unit-scope ones.
+TEST(BindDirective, BindDeclaredInsideInterfaceAppliesToTarget) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module probe; endmodule\n"
+      "module cpu; endmodule\n"
+      "interface ifc;\n"
+      "  bind cpu probe p();\n"
+      "endinterface\n"
+      "module top;\n"
+      "  cpu c();\n"
+      "  ifc i();\n"
+      "endmodule\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto it = design->all_modules.find("cpu");
+  ASSERT_NE(it, design->all_modules.end());
+  bool found = false;
+  for (const auto& ch : it->second->children)
+    if (ch.inst_name == "p" && ch.module_name == "probe") found = true;
+  EXPECT_TRUE(found);
+}
+
+// §23.11: a bound instance's actual ports resolve against the target scope. A
+// prior test covers a variable actual; this covers a net (wire) declared in the
+// target, a distinct declaration form the resolution must admit.
+TEST(BindDirective, BoundInstancePortConnectsToTargetScopeNet) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module probe(input logic x); endmodule\n"
+      "module cpu;\n"
+      "  wire w;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  cpu c();\n"
+      "endmodule\n"
+      "bind cpu probe p(.x(w));\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §23.11: a bound instance's actual may name a port of the target scope, the
+// third declaration form (alongside variables and nets) the target-scope
+// resolution admits.
+TEST(BindDirective, BoundInstancePortConnectsToTargetScopePort) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module probe(input logic x); endmodule\n"
+      "module cpu(input logic pin); endmodule\n"
+      "module top;\n"
+      "  logic t;\n"
+      "  cpu c(.pin(t));\n"
+      "endmodule\n"
+      "bind cpu probe p(.x(pin));\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §23.11: port associations in a bind_instantiation may be positional, not only
+// named. The ordered actual binds by position and still resolves against the
+// target scope, exercising the ordered-connection path.
+TEST(BindDirective, BoundInstanceOrderedPortConnectionResolvesInTargetScope) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module probe(input logic x); endmodule\n"
+      "module cpu;\n"
+      "  logic internal_sig;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  cpu c();\n"
+      "endmodule\n"
+      "bind cpu probe p(internal_sig);\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §23.11 (via §3.13): the module name space of the target scope includes
+// instance names, so a bound instance whose name collides with an existing
+// child instance in the target is an error — distinct from a collision with a
+// variable, which a prior test covers.
+TEST(BindDirective, BoundInstanceNameClashWithChildInstanceIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module sub; endmodule\n"
+      "module probe; endmodule\n"
+      "module cpu;\n"
+      "  sub u1();\n"
+      "endmodule\n"
+      "module top; cpu c(); endmodule\n"
+      "bind cpu probe u1();\n",
+      f, "top");
+  EXPECT_TRUE(f.has_errors);
+}
+
+// Locate the bound child instance `inst_name` inside the elaborated target
+// module `target_name`, and return the resolved value of its parameter `param`.
+// Returns -1 when the instance, its resolution, or the parameter is missing so
+// a caller's positive expectation fails loudly rather than silently passing.
+int64_t BoundChildParamValue(RtlirDesign* design, std::string_view target_name,
+                             std::string_view inst_name,
+                             std::string_view param) {
+  auto it = design->all_modules.find(target_name);
+  if (it == design->all_modules.end()) return -1;
+  for (const auto& ch : it->second->children) {
+    if (ch.inst_name != inst_name || !ch.resolved) continue;
+    for (const auto& p : ch.resolved->params)
+      if (p.name == param) return p.resolved_value;
+  }
+  return -1;
+}
+
+// §23.11: parameter associations written on a bind_instantiation take effect. A
+// named override with a literal value must reach the bound instance's resolved
+// parameters, driven end-to-end through parse and elaborate.
+TEST(BindDirective, BindInstantiationNamedParameterOverrideTakesEffect) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module probe #(parameter int W = 1); endmodule\n"
+      "module cpu; endmodule\n"
+      "module top; cpu c(); endmodule\n"
+      "bind cpu probe #(.W(8)) p();\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(BoundChildParamValue(design, "cpu", "p", "W"), 8);
+}
+
+// Positional parameter overrides on a bind_instantiation follow a distinct
+// resolution path from named ones and must likewise take effect.
+TEST(BindDirective, BindInstantiationPositionalParameterOverrideTakesEffect) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module probe #(parameter int W = 1); endmodule\n"
+      "module cpu; endmodule\n"
+      "module top; cpu c(); endmodule\n"
+      "bind cpu probe #(8) p();\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(BoundChildParamValue(design, "cpu", "p", "W"), 8);
+}
+
+// §23.11: the bind actuals refer to objects from the viewpoint of the bind
+// target. A parameter override whose value is a parameter of the target scope
+// must resolve against the target's parameter environment (a constant-form
+// distinct from a literal).
+TEST(BindDirective, BindInstantiationOverrideResolvesTargetScopeParameter) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module probe #(parameter int W = 1); endmodule\n"
+      "module cpu #(parameter int TW = 5); endmodule\n"
+      "module top; cpu c(); endmodule\n"
+      "bind cpu probe #(.W(TW)) p();\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(BoundChildParamValue(design, "cpu", "p", "W"), 5);
+}
+
+// Companion constant-form: the override value may be a localparam of the target
+// scope, resolved the same way through the target's parameter environment.
+TEST(BindDirective, BindInstantiationOverrideResolvesTargetScopeLocalparam) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module probe #(parameter int W = 1); endmodule\n"
+      "module cpu;\n"
+      "  localparam int LW = 6;\n"
+      "endmodule\n"
+      "module top; cpu c(); endmodule\n"
+      "bind cpu probe #(.W(LW)) p();\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(BoundChildParamValue(design, "cpu", "p", "W"), 6);
+}
+
+// Negative form of the named override: naming a parameter the bound module does
+// not declare is an error, now reachable through the bind path.
+TEST(BindDirective, BindInstantiationOverrideOfUnknownParameterIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module probe #(parameter int W = 1); endmodule\n"
+      "module cpu; endmodule\n"
+      "module top; cpu c(); endmodule\n"
+      "bind cpu probe #(.NOPE(8)) p();\n",
+      f, "top");
+  EXPECT_TRUE(f.has_errors);
+}
+
+// Negative form of the positional override: supplying more positional overrides
+// than the bound module has overridable parameters is an error.
+TEST(BindDirective, BindInstantiationTooManyPositionalOverridesIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module probe; endmodule\n"
+      "module cpu; endmodule\n"
+      "module top; cpu c(); endmodule\n"
+      "bind cpu probe #(8) p();\n",
       f, "top");
   EXPECT_TRUE(f.has_errors);
 }

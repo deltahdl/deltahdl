@@ -8,6 +8,7 @@
 
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
+#include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
@@ -15,6 +16,19 @@
 
 namespace delta {
 
+// Defined in elaborator_module_inst.cpp: resolves an instantiation's own
+// parameter overrides (named or positional) against the child module's
+// overridable parameters, evaluating each override expression in `parent_scope`
+// and appending the results to `child_params`. The bind path reuses it so a
+// bind_instantiation's parameter associations take effect (§23.11).
+void ResolveInstParams(const ModuleItem* item, const ModuleDecl* child_decl,
+                       const ScopeMap& parent_scope,
+                       Elaborator::ParamList& child_params, DiagEngine& diag);
+
+// §23.11: a bind_target_scope shall be a module or an interface. A program or
+// checker name is not a legal target scope, so only module and interface names
+// are recognized here; anything else falls through to instance matching and, if
+// it names no instance either, is reported as an unbindable target.
 static bool IsBindTargetScope(std::string_view target,
                               const CompilationUnit* unit) {
   if (target.find('.') != std::string_view::npos) return false;
@@ -22,10 +36,6 @@ static bool IsBindTargetScope(std::string_view target,
     if (m->name == target) return true;
   for (auto* i : unit->interfaces)
     if (i->name == target) return true;
-  for (auto* c : unit->checkers)
-    if (c->name == target) return true;
-  for (auto* p : unit->programs)
-    if (p->name == target) return true;
   return false;
 }
 
@@ -237,8 +247,15 @@ void Elaborator::ApplyBindInstance(BindDirective* bd, RtlirModule* target) {
 
   if (!ValidateBindPortConnections(bd, item, target, diag_)) return;
 
-  ParamList empty_params;
-  auto* resolved = ElaborateModule(child_decl, empty_params);
+  // §23.11: a bind_instantiation admits the full range of instantiation syntax,
+  // so any parameter overrides written on it must take effect. Per the same
+  // subclause, the actuals refer to objects from the viewpoint of the bind
+  // target, so the override expressions are evaluated against the target
+  // scope's resolved parameter environment.
+  ParamList child_params;
+  ScopeMap target_scope = BuildParamScope(target);
+  ResolveInstParams(item, child_decl, target_scope, child_params, diag_);
+  auto* resolved = ElaborateModule(child_decl, child_params);
   RtlirModuleInst inst;
   inst.module_name = item->inst_module;
   inst.inst_name = item->inst_name;

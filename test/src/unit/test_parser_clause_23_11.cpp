@@ -85,4 +85,57 @@ TEST(BindDirective, TargetInstanceCarriesConstantBitSelect) {
   EXPECT_NE(r.cu->bind_directives[0]->target_instance_bit_selects[0], nullptr);
 }
 
+// The same bind_target_instance production also governs the second form's own
+// target: a hierarchical_identifier followed by a constant_bit_select. Here the
+// select rides on the directive target itself (not a list entry), so the parser
+// records it in target_bit_select while the instance list stays empty.
+TEST(BindDirective, SecondFormTargetCarriesConstantBitSelect) {
+  auto r = Parse(
+      "module probe; endmodule\n"
+      "module top; endmodule\n"
+      "bind top.c[1] probe p();\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->bind_directives.size(), 1u);
+  EXPECT_EQ(r.cu->bind_directives[0]->target, "top.c");
+  EXPECT_NE(r.cu->bind_directives[0]->target_bit_select, nullptr);
+  EXPECT_TRUE(r.cu->bind_directives[0]->target_instances.empty());
+}
+
+// §23.11 states the bind_instantiation admits the full range of instantiation
+// syntax, so parameter associations may ride on it. Named form: the override is
+// recorded on the instantiation's inst_params keyed by parameter name.
+TEST(BindDirective, BindInstantiationCarriesNamedParameterOverride) {
+  auto r = Parse(
+      "module cpu; endmodule\n"
+      "module m; endmodule\n"
+      "bind cpu m #(.P(4)) i(.*);\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->bind_directives.size(), 1u);
+  auto* inst = r.cu->bind_directives[0]->instantiation;
+  ASSERT_NE(inst, nullptr);
+  ASSERT_EQ(inst->inst_params.size(), 1u);
+  EXPECT_EQ(inst->inst_params[0].first, "P");
+  EXPECT_NE(inst->inst_params[0].second, nullptr);
+}
+
+// Companion positional form of a bind_instantiation parameter association: the
+// override has no parameter name and travels by position, a distinct parser
+// path from the named form above.
+TEST(BindDirective, BindInstantiationCarriesPositionalParameterOverride) {
+  auto r = Parse(
+      "module cpu; endmodule\n"
+      "module m; endmodule\n"
+      "bind cpu m #(4) i();\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->bind_directives.size(), 1u);
+  auto* inst = r.cu->bind_directives[0]->instantiation;
+  ASSERT_NE(inst, nullptr);
+  ASSERT_EQ(inst->inst_params.size(), 1u);
+  EXPECT_TRUE(inst->inst_params[0].first.empty());
+  EXPECT_NE(inst->inst_params[0].second, nullptr);
+}
+
 }  // namespace
