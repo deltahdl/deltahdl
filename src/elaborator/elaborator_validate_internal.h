@@ -44,6 +44,10 @@ void CheckInterconnectProcContAssign(
     const Stmt* s,
     const std::unordered_set<std::string_view>& interconnect_names,
     DiagEngine& diag);
+void CheckInterconnectProceduralRead(
+    const Stmt* s,
+    const std::unordered_set<std::string_view>& interconnect_names,
+    DiagEngine& diag);
 void CheckProceduralAssignLhs(const Stmt* s, DiagEngine& diag);
 void CheckForceLhs(
     const Stmt* s, const std::unordered_set<std::string_view>& net_names,

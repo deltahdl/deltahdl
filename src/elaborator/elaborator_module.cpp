@@ -919,6 +919,15 @@ void Elaborator::ElaboratePorts(const ModuleDecl* decl, RtlirModule* mod) {
   for (const auto& port : decl->ports) {
     if (RejectIllegalPortType(port, diag_)) continue;
 
+    // §6.6.8: an interconnect port is a typeless/generic net, exactly like a
+    // local interconnect declaration. Register its name so the assignment- and
+    // expression-use checks — which reject procedural/continuous/expression
+    // uses of an interconnect "net or port" — also fire for the port inside its
+    // own module. A non-ANSI interconnect port already registers via its body
+    // net declaration; this covers the ANSI `interconnect p` header form.
+    if (port.data_type.is_interconnect && !port.name.empty())
+      interconnect_names_.insert(port.name);
+
     RtlirPort rp = ElaborateOnePort(decl, port, ctx);
     FoldPortDefaultValue(arena_, param_scope, rp);
 

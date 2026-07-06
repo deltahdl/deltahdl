@@ -112,6 +112,7 @@ void Elaborator::ValidateItemConstraints(const ModuleItem* item,
     CollectProcTargets(item->body, proc_assign_targets_);
 
     CheckInterconnectProcContAssign(item->body, interconnect_names_, diag_);
+    CheckInterconnectProceduralRead(item->body, interconnect_names_, diag_);
     CheckProceduralAssignLhs(item->body, diag_);
 
     CheckForceLhs(item->body, net_names_, nettype_net_names_, diag_);

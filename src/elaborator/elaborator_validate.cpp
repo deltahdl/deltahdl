@@ -299,6 +299,46 @@ void CheckInterconnectProcContAssign(
     CheckInterconnectProcContAssign(ci.body, interconnect_names, diag);
 }
 
+// §6.6.8: an interconnect net is typeless/generic and shall not be used in any
+// procedural context, nor in any expression other than a net_lvalue whose nets
+// are all interconnect. Procedural-assignment targets are already rejected (by
+// the net-target rule and CheckInterconnectProcContAssign); this closes the
+// read side by flagging any interconnect net appearing in a procedural
+// statement's read expressions — an assignment RHS, an if/case/loop condition,
+// a case pattern, a delay, an assertion expression, or a call argument.
+void CheckInterconnectProceduralRead(
+    const Stmt* s,
+    const std::unordered_set<std::string_view>& interconnect_names,
+    DiagEngine& diag) {
+  if (!s) return;
+  const Expr* reads[] = {s->rhs,      s->condition,          s->for_cond,
+                         s->delay,    s->cycle_delay,        s->expr,
+                         s->var_init, s->repeat_event_count, s->assert_expr};
+  for (const Expr* e : reads) {
+    if (ExprUsesInterconnect(e, interconnect_names)) {
+      diag.Error(s->range.start,
+                 "interconnect net cannot be used in a procedural expression");
+      break;
+    }
+  }
+  for (auto& ci : s->case_items)
+    for (const auto* p : ci.patterns)
+      if (ExprUsesInterconnect(p, interconnect_names)) {
+        diag.Error(
+            s->range.start,
+            "interconnect net cannot be used in a procedural expression");
+        break;
+      }
+  for (auto* sub : s->stmts)
+    CheckInterconnectProceduralRead(sub, interconnect_names, diag);
+  CheckInterconnectProceduralRead(s->then_branch, interconnect_names, diag);
+  CheckInterconnectProceduralRead(s->else_branch, interconnect_names, diag);
+  CheckInterconnectProceduralRead(s->body, interconnect_names, diag);
+  CheckInterconnectProceduralRead(s->for_body, interconnect_names, diag);
+  for (auto& ci : s->case_items)
+    CheckInterconnectProceduralRead(ci.body, interconnect_names, diag);
+}
+
 void CheckProceduralAssignLhs(const Stmt* s, DiagEngine& diag) {
   if (!s) return;
   if (s->kind == StmtKind::kAssign && s->lhs &&
@@ -371,6 +411,10 @@ bool ExprUsesInterconnect(const Expr* e,
   if (ExprUsesInterconnect(e->true_expr, names)) return true;
   if (ExprUsesInterconnect(e->false_expr, names)) return true;
   if (ExprUsesInterconnect(e->base, names)) return true;
+  if (ExprUsesInterconnect(e->index, names)) return true;
+  if (ExprUsesInterconnect(e->index_end, names)) return true;
+  for (auto* a : e->args)
+    if (ExprUsesInterconnect(a, names)) return true;
   for (auto* el : e->elements)
     if (ExprUsesInterconnect(el, names)) return true;
   return false;
