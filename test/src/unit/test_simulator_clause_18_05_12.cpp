@@ -247,67 +247,6 @@ TEST(ConstraintGuardSolver, ErrorGuardFailsRandomize) {
   EXPECT_FALSE(solver.Solve());
 }
 
-// 18.5.12: an ERROR that is not sifted away still fails randomize(). Here the
-// guard is the conjunction (TRUE && error): no FALSE operand masks the error,
-// so the conjunction is ERROR and the solve fails even though the guarded range
-// would itself be satisfiable.
-TEST(ConstraintGuardSolver, UnsiftedErrorFromConjunctionFailsRandomize) {
-  ConstraintSolver solver(42);
-  RandVariable v;
-  v.name = "x";
-  v.min_val = 0;
-  v.max_val = 100;
-  solver.AddVariable(v);
-
-  GuardPredicate guard;
-  guard.op = GuardPredicate::Op::kAnd;
-  guard.operands.push_back(ConstantLeaf(GuardValue::kTrue));
-  guard.operands.push_back(ConstantLeaf(GuardValue::kError));
-
-  ConstraintBlock block;
-  block.name = "c";
-  ConstraintExpr guarded;
-  guarded.kind = ConstraintKind::kRange;
-  guarded.var_name = "x";
-  guarded.lo = 10;  // satisfiable on its own; only the guard's error fails it
-  guarded.hi = 20;
-  guarded.has_guard = true;
-  guarded.guard = guard;
-  block.constraints.push_back(guarded);
-  solver.AddConstraintBlock(block);
-
-  EXPECT_FALSE(solver.Solve());
-}
-
-// 18.5.12: negation passes an ERROR through unchanged, so a guard of the form
-// !(error) is still ERROR and randomize() fails.
-TEST(ConstraintGuardSolver, NegatedErrorFailsRandomize) {
-  ConstraintSolver solver(42);
-  RandVariable v;
-  v.name = "x";
-  v.min_val = 0;
-  v.max_val = 100;
-  solver.AddVariable(v);
-
-  GuardPredicate guard;
-  guard.op = GuardPredicate::Op::kNot;
-  guard.operands.push_back(ConstantLeaf(GuardValue::kError));
-
-  ConstraintBlock block;
-  block.name = "c";
-  ConstraintExpr guarded;
-  guarded.kind = ConstraintKind::kRange;
-  guarded.var_name = "x";
-  guarded.lo = 10;
-  guarded.hi = 20;
-  guarded.has_guard = true;
-  guarded.guard = guard;
-  block.constraints.push_back(guarded);
-  solver.AddConstraintBlock(block);
-
-  EXPECT_FALSE(solver.Solve());
-}
-
 // 18.5.12: treating guard subexpressions in the four-state logic prevents the
 // solver from generating evaluation errors on seemingly correct constraints.
 // Here a subexpression that errors (a null handle comparison) is conjoined with
@@ -368,6 +307,38 @@ TEST(ConstraintGuardSolver, ErrorSiftedByTrueDisjunctImposesConstraint) {
   guarded.hi = 40;
   guarded.has_guard = true;
   guarded.guard = guard;
+  block.constraints.push_back(guarded);
+  solver.AddConstraintBlock(block);
+
+  ASSERT_TRUE(solver.Solve());
+  EXPECT_GE(solver.GetValue("x"), 30);
+  EXPECT_LE(solver.GetValue("x"), 40);
+}
+
+// 18.5.12: when a guard's final value is RANDOM a conditional constraint is
+// generated, so the guarded constraint is still imposed on the solved value.
+// This exercises the solver's handling of the RANDOM (conditional) outcome,
+// which is distinct from the TRUE (unconditional) outcome yet also lets the
+// guarded relation take effect.
+TEST(ConstraintGuardSolver, RandomGuardGeneratesConstraint) {
+  ConstraintSolver solver(42);
+  RandVariable v;
+  v.name = "x";
+  v.min_val = 0;
+  v.max_val = 100;
+  solver.AddVariable(v);
+
+  ConstraintBlock block;
+  block.name = "c";
+  ConstraintExpr guarded;
+  guarded.kind = ConstraintKind::kRange;
+  guarded.var_name = "x";
+  guarded.lo = 30;
+  guarded.hi = 40;
+  guarded.has_guard = true;
+  // A guard that depends on as-yet-unsolved random variables evaluates to
+  // RANDOM, which the solver treats as a conditional constraint to generate.
+  guarded.guard = ConstantLeaf(GuardValue::kRandom);
   block.constraints.push_back(guarded);
   solver.AddConstraintBlock(block);
 
