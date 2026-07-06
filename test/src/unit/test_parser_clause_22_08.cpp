@@ -12,62 +12,11 @@ TEST(CompilerDirectiveParsing, DefaultNettypeTri) {
                               "endmodule\n"));
 }
 
-TEST(CompilerDirectiveParsing, DefaultNettypeWand) {
-  EXPECT_TRUE(
-      ParseWithPreprocessorOk("`default_nettype wand\n"
-                              "module t;\n"
-                              "endmodule\n"));
-}
-
-TEST(CompilerDirectiveParsing, DefaultNettypeWor) {
-  EXPECT_TRUE(
-      ParseWithPreprocessorOk("`default_nettype wor\n"
-                              "module t;\n"
-                              "endmodule\n"));
-}
-
-TEST(CompilerDirectiveParsing, DefaultNettypeTri0) {
-  EXPECT_TRUE(
-      ParseWithPreprocessorOk("`default_nettype tri0\n"
-                              "module t;\n"
-                              "endmodule\n"));
-}
-
-TEST(CompilerDirectiveParsing, DefaultNettypeTri1) {
-  EXPECT_TRUE(
-      ParseWithPreprocessorOk("`default_nettype tri1\n"
-                              "module t;\n"
-                              "endmodule\n"));
-}
-
-TEST(CompilerDirectiveParsing, DefaultNettypeTriand) {
-  EXPECT_TRUE(
-      ParseWithPreprocessorOk("`default_nettype triand\n"
-                              "module t;\n"
-                              "endmodule\n"));
-}
-
-TEST(CompilerDirectiveParsing, DefaultNettypeTrior) {
-  EXPECT_TRUE(
-      ParseWithPreprocessorOk("`default_nettype trior\n"
-                              "module t;\n"
-                              "endmodule\n"));
-}
-
-TEST(CompilerDirectiveParsing, DefaultNettypeTrireg) {
-  EXPECT_TRUE(
-      ParseWithPreprocessorOk("`default_nettype trireg\n"
-                              "module t;\n"
-                              "endmodule\n"));
-}
-
-TEST(CompilerDirectiveParsing, DefaultNettypeUwire) {
-  EXPECT_TRUE(
-      ParseWithPreprocessorOk("`default_nettype uwire\n"
-                              "module t;\n"
-                              "endmodule\n"));
-}
-
+// The 9 net-type keywords (tri/wand/wor/tri0/tri1/triand/trior/trireg/uwire)
+// are consumed by the preprocessor before the parser runs, so parser behavior
+// is identical for every value; DefaultNettypeTri above is the representative
+// acceptance case, and per-value NetType mapping is exercised in the
+// preprocessor's canonical tests.
 TEST(CompilerDirectiveParsing, DefaultNettypeBeforeAndAfterModule) {
   EXPECT_TRUE(
       ParseWithPreprocessorOk("`default_nettype none\n"

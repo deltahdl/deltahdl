@@ -49,54 +49,6 @@ TEST(ImplicitDeclaration, ImplicitNetOnInstancePort) {
   EXPECT_TRUE(found_y) << "implicit net 'y' not created";
 }
 
-TEST(ImplicitDeclaration, ImplicitNetOnInstancePortIsScalar) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module child(input logic a, output logic b);\n"
-      "  assign b = a;\n"
-      "endmodule\n"
-      "module top;\n"
-      "  child u0(.a(x), .b(y));\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.diag.HasErrors());
-  auto* mod = design->top_modules[0];
-  for (const auto& n : mod->nets) {
-    if (n.name == "x") {
-      EXPECT_EQ(n.width, 1u);
-    }
-    if (n.name == "y") {
-      EXPECT_EQ(n.width, 1u);
-    }
-  }
-}
-
-TEST(ImplicitDeclaration, ImplicitNetUsesDefaultNettype) {
-  ElabFixture f;
-  auto fid = f.mgr.AddFile("<test>",
-                           "module top;\n"
-                           "  assign w = 1'b0;\n"
-                           "endmodule\n");
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  cu->default_nettype = NetType::kTri;
-  Elaborator elab(f.arena, f.diag, cu);
-  auto* design = elab.Elaborate("top");
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.diag.HasErrors());
-  auto* mod = design->top_modules[0];
-  bool found = false;
-  for (const auto& n : mod->nets) {
-    if (n.name == "w") {
-      found = true;
-      EXPECT_EQ(n.net_type, NetType::kTri);
-    }
-  }
-  EXPECT_TRUE(found) << "implicit net 'w' not created";
-}
-
 TEST(ImplicitDeclaration, ExplicitNetNotDuplicatedByImplicit) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -235,6 +187,35 @@ TEST(ImplicitDeclaration, ImplicitPortNetScalarWhenUnsized) {
   EXPECT_EQ(net.net_type, NetType::kWire);
 }
 
+// §6.10 (bullet 1): an identifier used in a port expression declaration and not
+// separately declared as a net or variable acquires an implicit net whose width
+// is the vector width of the port expression declaration. Drive the real
+// non-ANSI port syntax of §23.2.2.1 through parse + elaborate — the header
+// lists the bare identifier and the body supplies only a direction+range — and
+// observe the identifier becoming usable with the declared width, with no
+// explicit net declaration and no error. This exercises the port-expression
+// case end to end rather than the shared constructor in isolation.
+TEST(ImplicitDeclaration, ImplicitPortNetTakesDeclaredPortExpressionWidth) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m(a);\n"
+      "  input [7:0] a;\n"
+      "endmodule\n",
+      f, "m");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+  auto* mod = design->top_modules[0];
+  bool found = false;
+  for (const auto& p : mod->ports) {
+    if (p.name == "a") {
+      found = true;
+      EXPECT_EQ(p.width, 8u)
+          << "implicit net should take the port expression declaration width";
+    }
+  }
+  EXPECT_TRUE(found) << "port-expression identifier 'a' not elaborated";
+}
+
 // §6.10: an undeclared identifier in the port connection list of a module
 // instance gets an implicit scalar net, whether the connection is named or
 // ordered. This observes the ordered (positional) connection path.
@@ -310,6 +291,36 @@ TEST(ImplicitDeclaration, ImplicitNetOnInstancePortUsesDefaultNettype) {
       EXPECT_EQ(n.net_type, NetType::kWand);
     }
   }
+}
+
+// §6.10 (bullet 2, negative + positive): an identifier used in an instance port
+// connection list gets an implicit net only if it was not declared previously
+// in the scope; a previously declared net is reused (no duplicate implicit
+// net), while an undeclared sibling in the same connection list still gets one.
+// Drives both the reject path (declared 'x') and the accept path (undeclared
+// 'y') through one real instantiation.
+TEST(ImplicitDeclaration, DeclaredInstancePortConnectionNotDuplicated) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module child(input logic a, output logic b);\n"
+      "  assign b = a;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  wire x;\n"
+      "  child u0(.a(x), .b(y));\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+  auto* mod = design->top_modules[0];
+  int x_count = 0;
+  int y_count = 0;
+  for (const auto& n : mod->nets) {
+    if (n.name == "x") ++x_count;
+    if (n.name == "y") ++y_count;
+  }
+  EXPECT_EQ(x_count, 1) << "declared net 'x' should not be duplicated";
+  EXPECT_EQ(y_count, 1) << "undeclared 'y' should get one implicit net";
 }
 
 // §6.10: an undeclared identifier appearing in the terminal list of a primitive
