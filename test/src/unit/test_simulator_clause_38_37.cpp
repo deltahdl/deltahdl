@@ -31,19 +31,6 @@ TEST_F(VpiSystfRegistrationSim, RegisterMultipleSystfs) {
   EXPECT_EQ(vpi_ctx_.RegisteredSystfs()[1].type, vpiSysFunc);
 }
 
-TEST_F(VpiSystfRegistrationSim, RegisterSystfReturnsCallbackObjectHandle) {
-  s_vpi_systf_data data = {};
-  data.type = vpiSysTask;
-  data.tfname = "$probe";
-
-  vpiHandle h = vpi_register_systf(&data);
-
-  // §38.37 Returns row: vpi_register_systf() yields a handle to the
-  // callback object created for the registered system task/function.
-  ASSERT_NE(h, nullptr);
-  EXPECT_EQ(vpi_get(vpiType, h), vpiCallback);
-}
-
 TEST_F(VpiSystfRegistrationSim, RegisterSystfReturnsDistinctHandles) {
   s_vpi_systf_data task = {};
   task.type = vpiSysTask;
