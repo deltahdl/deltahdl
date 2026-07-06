@@ -106,6 +106,42 @@ TEST(AssignmentPatternElaboration, ErrorNonConstantInConstantPattern) {
   EXPECT_TRUE(f.has_errors);
 }
 
+// §10.9 footnote 37: the members of a constant assignment pattern shall be
+// constant expressions. A named parameter is a constant expression (11.2.1) and
+// resolves through a different const-eval path than a literal token, so the
+// accepting path is exercised here with parameter members.
+TEST(AssignmentPatternElaboration, ConstantPatternWithParameterMembers) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  parameter int A = 10;\n"
+      "  parameter int B = 20;\n"
+      "  localparam int arr [2] = '{A, B};\n"
+      "  logic [7:0] x;\n"
+      "  initial x = 8'd0;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §10.9 footnote 37: a localparam is likewise a constant expression and is a
+// distinct constant form from both a literal and a parameter; the accepting
+// path is exercised here with localparam members.
+TEST(AssignmentPatternElaboration, ConstantPatternWithLocalparamMembers) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  localparam int A = 5;\n"
+      "  localparam int arr [2] = '{A, A};\n"
+      "  logic [7:0] x;\n"
+      "  initial x = 8'd0;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 TEST(AssignmentPatternElaboration, ExpressionUsableOutsideAssignmentSide) {
   SimFixture f;
   auto* design = ElaborateSrc(

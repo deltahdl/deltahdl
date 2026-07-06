@@ -119,6 +119,33 @@ TEST(AssignmentPatternSimulation, LhsPositionalUnpackingTwoElements) {
   EXPECT_EQ(vb->value.ToUint64(), 0xCDu);
 }
 
+// §10.9: an assignment pattern expression (a pattern with a data-type prefix)
+// is also legal as a left-hand target. With the required positional notation it
+// unpacks the right-hand value across its members MSB-first, exactly as the
+// bare pattern it wraps would. The type prefix only names the aggregate; it
+// does not alter the slicing. Here 16'hABCD splits into a=0xAB (high byte),
+// b=0xCD.
+TEST(AssignmentPatternSimulation, TypedLhsPatternUnpacks) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  typedef struct packed { logic [7:0] a; logic [7:0] b; } pair_t;\n"
+      "  logic [7:0] a, b;\n"
+      "  initial begin\n"
+      "    pair_t'{a, b} = 16'hABCD;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* va = f.ctx.FindVariable("a");
+  auto* vb = f.ctx.FindVariable("b");
+  ASSERT_NE(va, nullptr);
+  ASSERT_NE(vb, nullptr);
+  EXPECT_EQ(va->value.ToUint64(), 0xABu);
+  EXPECT_EQ(vb->value.ToUint64(), 0xCDu);
+}
+
 TEST(AssignmentPatternSimulation, ByteTypePrefixEvaluates) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -132,6 +159,74 @@ TEST(AssignmentPatternSimulation, ByteTypePrefixEvaluates) {
   ASSERT_NE(design, nullptr);
   LowerAndRun(design, f);
   auto* var = f.ctx.FindVariable("b");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 42u);
+}
+
+// §10.9: an assignment pattern expression whose prefix is a type reference
+// (type(x)'{...}) has the self-determined type of that reference and, used on
+// the right-hand side, yields the value a variable of it would hold. type(x) is
+// logic[15:0] here, so the two bytes pack MSB-first into 0x0102.
+TEST(AssignmentPatternSimulation, TypeReferencePrefixYieldsValue) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [15:0] x;\n"
+      "  initial begin\n"
+      "    x = type(x)'{8'd1, 8'd2};\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0x0102u);
+}
+
+// §10.9: an assignment pattern expression whose prefix is a named (ps_type)
+// aggregate type yields, on the right-hand side, the value a variable of that
+// type would hold if initialized with the pattern. A positional pair_t pattern
+// packs its members in declaration order: a=0x12 (high byte), b=0x34.
+TEST(AssignmentPatternSimulation, StructTypePrefixYieldsValue) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  typedef struct packed { logic [7:0] a; logic [7:0] b; } pair_t;\n"
+      "  pair_t p;\n"
+      "  initial begin\n"
+      "    p = pair_t'{8'h12, 8'h34};\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* var = f.ctx.FindVariable("p");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0x1234u);
+}
+
+// §10.9: an assignment pattern expression (a pattern carrying a data-type
+// prefix) has a self-determined data type, so unlike a bare assignment pattern
+// it is not restricted to being one whole side of an assignment-like context.
+// When it appears as an operand inside a larger right-hand expression it shall
+// yield the value a variable of that type would hold if initialized with the
+// pattern: int'{40} yields 40, so the sum is 42. The companion elaborator test
+// only confirms this composes without error; here the runtime value is
+// observed.
+TEST(AssignmentPatternSimulation, TypedPatternExpressionAsOperandYieldsValue) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int x;\n"
+      "  initial begin\n"
+      "    x = int'{40} + 2;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
@@ -151,24 +246,6 @@ TEST(AssignmentPatternSimulation, PositionalPatternYieldsCorrectValue) {
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xABCDu);
-}
-
-TEST(AssignmentPatternSimulation, PositionalPatternPacksMSBFirst) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [15:0] x;\n"
-      "  initial begin\n"
-      "    x = '{8'd1, 8'd2};\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-
-  EXPECT_EQ(var->value.ToUint64(), 258u);
 }
 
 TEST(AssignmentPatternSimulation, SingleElementPositionalPattern) {

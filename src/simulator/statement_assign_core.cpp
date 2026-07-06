@@ -799,9 +799,13 @@ static bool TryDispatchSpecialBlockingAssign(const Stmt* stmt, SimContext& ctx,
 // unpack, bit/part-select writes, array writes, and the scalar fallback.
 static void ApplyGenericBlockingAssign(const Stmt* stmt, Logic4Vec rhs_val,
                                        SimContext& ctx, Arena& arena) {
-  if (stmt->lhs->kind == ExprKind::kConcatenation ||
-      stmt->lhs->kind == ExprKind::kAssignmentPattern) {
-    UnpackConcatLhs(stmt->lhs, rhs_val, ctx, arena);
+  // §10.9: a typed assignment pattern expression (type'{...}) is also a valid
+  // left-hand target. Strip the type prefix so its members unpack the RHS
+  // exactly as a bare positional pattern does.
+  const Expr* lhs_pat = UnwrapTypedPattern(stmt->lhs);
+  if (lhs_pat->kind == ExprKind::kConcatenation ||
+      lhs_pat->kind == ExprKind::kAssignmentPattern) {
+    UnpackConcatLhs(lhs_pat, rhs_val, ctx, arena);
     return;
   }
   if (stmt->lhs->kind == ExprKind::kStreamingConcat) {
@@ -830,9 +834,12 @@ StmtResult ExecBlockingAssignImpl(const Stmt* stmt, SimContext& ctx,
 void PerformBlockingAssign(const Expr* lhs, const Logic4Vec& rhs_val,
                            SimContext& ctx, Arena& arena) {
   if (!lhs) return;
-  if (lhs->kind == ExprKind::kConcatenation ||
-      lhs->kind == ExprKind::kAssignmentPattern) {
-    UnpackConcatLhs(lhs, rhs_val, ctx, arena);
+  // §10.9: a typed assignment pattern expression on the left unpacks like the
+  // bare pattern it wraps.
+  const Expr* lhs_pat = UnwrapTypedPattern(lhs);
+  if (lhs_pat->kind == ExprKind::kConcatenation ||
+      lhs_pat->kind == ExprKind::kAssignmentPattern) {
+    UnpackConcatLhs(lhs_pat, rhs_val, ctx, arena);
     return;
   }
 
