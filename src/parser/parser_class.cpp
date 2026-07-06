@@ -743,11 +743,59 @@ void Parser::CaptureConstraintRelation(ClassMember* member) {
   }
   auto saved = lexer_.SavePos();
   diag_.PushSuppress();
-  Expr* rel = ParseExpr();
-  bool ok = rel != nullptr && Check(TokenKind::kSemicolon);
+  // 18.5.5: an implication whose consequent is an unnamed constraint set,
+  // "antecedent -> { c1; c2; ... }", is captured first; its RHS brace is not an
+  // expression, so the plain expression parse below would not recognize it.
+  bool captured = TryCaptureBracedImplication(member);
+  if (!captured) {
+    lexer_.RestorePos(saved);
+    Expr* rel = ParseExpr();
+    if (rel != nullptr && Check(TokenKind::kSemicolon) && member) {
+      member->constraint_exprs.push_back(rel);
+    }
+  }
   diag_.PopSuppress();
   lexer_.RestorePos(saved);
-  if (ok && member) member->constraint_exprs.push_back(rel);
+}
+
+// 18.5.5: capture an implication of the form "antecedent -> { c1; c2; ... }".
+// Because "A -> { c1; c2 }" is equivalent to (A -> c1) && (A -> c2), each
+// consequent relation is captured as its own implication expression "A -> ci",
+// an ordinary '->' expression the randomize() translation already enforces via
+// its Boolean equivalent (!A || ci). Returns true only when the full braced
+// form is recognized; on any mismatch it returns false and captures nothing, so
+// the caller falls back to the plain single-relation parse. Runs inside the
+// caller's suppressed, position-saved speculative scan.
+bool Parser::TryCaptureBracedImplication(ClassMember* member) {
+  // The implication operator '->' has the lowest infix binding power, so
+  // parsing at a binding power just above it consumes the whole antecedent
+  // expression and stops at the '->'.
+  Expr* antecedent = ParseExprBp(3);
+  if (antecedent == nullptr || !Check(TokenKind::kArrow)) return false;
+  Consume();  // '->'
+  if (!Check(TokenKind::kLBrace))
+    return false;  // only the braced-set form here
+  Consume();       // '{'
+  std::vector<Expr*> synthesized;
+  while (!Check(TokenKind::kRBrace)) {
+    if (AtEnd()) return false;
+    Expr* consequent = ParseExpr();
+    if (consequent == nullptr || !Check(TokenKind::kSemicolon)) return false;
+    Consume();  // ';'
+    Expr* impl = arena_.Create<Expr>();
+    impl->kind = ExprKind::kBinary;
+    impl->op = TokenKind::kArrow;
+    impl->lhs = antecedent;
+    impl->rhs = consequent;
+    impl->range.start = antecedent->range.start;
+    impl->range.end = consequent->range.end;
+    synthesized.push_back(impl);
+  }
+  Consume();  // '}'
+  if (member) {
+    for (Expr* impl : synthesized) member->constraint_exprs.push_back(impl);
+  }
+  return true;
 }
 
 // 18.5: scan a constraint block body from just past its opening '{' to the

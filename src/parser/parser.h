@@ -117,6 +117,7 @@ class Parser {
   bool ScanConstraintBodyToken(ClassMember* member, int& depth, bool& in_soft,
                                bool carried_qualifier);
   void CaptureConstraintRelation(ClassMember* member);
+  bool TryCaptureBracedImplication(ClassMember* member);
   void CaptureLinearSequenceBody(ModuleItem* item);
   bool ParseLinearSeqOperands(std::vector<Expr*>& operands);
   void CheckConstraintExprToken(const Token& tok);

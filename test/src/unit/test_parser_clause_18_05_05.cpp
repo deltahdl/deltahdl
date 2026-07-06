@@ -30,4 +30,17 @@ TEST(ConstraintImplicationParsing, BracedConstraintSetConsequentAccepted) {
   EXPECT_FALSE(r.has_errors);
 }
 
+// 18.5.5: the antecedent expression may be any integral or real expression. A
+// real-typed antecedent (a comparison of a rand real member) is a valid
+// implication antecedent and parses without error.
+TEST(ConstraintImplicationParsing, RealTypedAntecedentAccepted) {
+  auto r = Parse(
+      "class C;\n"
+      "  rand real r;\n"
+      "  rand bit [3:0] b;\n"
+      "  constraint c { (r < 1.5) -> b == 1; }\n"
+      "endclass\n");
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace

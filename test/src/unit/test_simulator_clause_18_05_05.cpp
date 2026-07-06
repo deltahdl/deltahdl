@@ -1,266 +1,273 @@
 #include <gtest/gtest.h>
 
-#include <algorithm>
 #include <cstdint>
 #include <string>
-#include <unordered_map>
-#include <unordered_set>
-#include <vector>
 
-#include "simulator/constraint_solver.h"
+#include "fixture_simulator.h"
+#include "helpers_scheduler.h"
 
 using namespace delta;
 
 namespace {
 
-TEST(Constraint, UniqueConstraint) {
-  ConstraintSolver solver(42);
-  for (int i = 0; i < 3; ++i) {
-    RandVariable v;
-    v.name = "u" + std::to_string(i);
-    v.min_val = 0;
-    v.max_val = 100;
-    solver.AddVariable(v);
-  }
+// These tests drive the implication constraint (18.5.5) end to end: each source
+// program declares a class with an "expression -> constraint_set" constraint,
+// calls randomize() from an initial block, and copies the solved members out to
+// module variables the harness can read. The implication is enforced by the
+// production randomize() path — the "->" operator is evaluated by the ordinary
+// expression evaluator, which computes the Boolean equivalent !a || b — so the
+// behavior observed here is that of real elaborated source, not a hand-built
+// solver state.
+//
+// The randomize() generate-and-test solver draws each variable over its whole
+// domain; only the relational (inequality) constraints tighten that domain.
+// Every pin below is therefore written as an inequality bound so the solved
+// value is deterministic: "v <= k" (with v's natural lower bound 0) fixes v to
+// [0, k], and a matching lower bound narrows it to a single value.
 
-  ConstraintBlock block;
-  block.name = "c_unique";
-  ConstraintExpr uc;
-  uc.kind = ConstraintKind::kUnique;
-  uc.unique_vars = {"u0", "u1", "u2"};
-  block.constraints.push_back(uc);
-  solver.AddConstraintBlock(block);
-
-  ASSERT_TRUE(solver.Solve());
-  int64_t v0 = solver.GetValue("u0");
-  int64_t v1 = solver.GetValue("u1");
-  int64_t v2 = solver.GetValue("u2");
-  EXPECT_NE(v0, v1);
-  EXPECT_NE(v1, v2);
-  EXPECT_NE(v0, v2);
+// 18.5.5: when the antecedent of "a -> b" holds, every constraint in the
+// consequent shall be satisfied. Member 'a' is bounded to 0, so the antecedent
+// (a == 0) always holds; 'b' ranges over {0, 1}, so the only draw the
+// implication accepts is the one obeying the consequent b == 1.
+TEST(ConstraintImplication, ConsequentEnforcedWhenAntecedentTrue) {
+  const char* src =
+      "class C;\n"
+      "  rand bit a;\n"
+      "  rand bit b;\n"
+      "  constraint fa { a <= 0; }\n"
+      "  constraint fb { b <= 1; }\n"
+      "  constraint impl { (a == 0) -> b == 1; }\n"
+      "endclass\n"
+      "module t;\n"
+      "  int ok;\n"
+      "  int rb;\n"
+      "  initial begin\n"
+      "    C o = new;\n"
+      "    ok = o.randomize();\n"
+      "    rb = o.b;\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "ok"), 1u);
+  EXPECT_EQ(RunAndGet(src, "rb"), 1u);
 }
 
-// Helper: a variable pinned to a single value lets a test fix the truth of an
-// antecedent or the satisfiability of a consequent deterministically.
-RandVariable Pinned(const std::string& name, int64_t value) {
-  RandVariable v;
-  v.name = name;
-  v.min_val = value;
-  v.max_val = value;
-  return v;
-}
-
-// Helper: a free variable ranging over [min_val, max_val].
-RandVariable Ranged(const std::string& name, int64_t min_val, int64_t max_val) {
-  RandVariable v;
-  v.name = name;
-  v.min_val = min_val;
-  v.max_val = max_val;
-  return v;
-}
-
-// Helper: build and register the standard "a == 0 -> b == 1" implication block.
-// Used by every test that exercises the equality-consequent form, varying only
-// in how a and b are pinned/ranged before the block is added.
-void AddAEqualsZeroImpliesBEqualsOne(ConstraintSolver& solver) {
-  ConstraintBlock block;
-  block.name = "c_impl";
-  ConstraintExpr impl;
-  impl.kind = ConstraintKind::kImplication;
-  impl.cond_var = "a";
-  impl.cond_value = 0;
-  ConstraintExpr cons;
-  cons.kind = ConstraintKind::kEqual;
-  cons.var_name = "b";
-  cons.lo = 1;
-  impl.sub_constraints.push_back(cons);
-  block.constraints.push_back(impl);
-  solver.AddConstraintBlock(block);
-}
-
-// Helper: build and register the general-predicate implication block
-// "(mode > 100) -> (len < 10)" used by the GeneralExpressionAntecedent tests.
-void AddModeGtImpliesLenLt(ConstraintSolver& solver) {
-  ConstraintBlock block;
-  block.name = "c_impl";
-  ConstraintExpr impl;
-  impl.kind = ConstraintKind::kImplication;
-  impl.cond_fn = [](const std::unordered_map<std::string, int64_t>& vals) {
-    auto it = vals.find("mode");
-    return it != vals.end() && it->second > 100;
-  };
-  ConstraintExpr cons;
-  cons.kind = ConstraintKind::kLessThan;
-  cons.var_name = "len";
-  cons.lo = 10;
-  impl.sub_constraints.push_back(cons);
-  block.constraints.push_back(impl);
-  solver.AddConstraintBlock(block);
-}
-
-// 18.5.5: when the antecedent of "a -> b" is true, every constraint in the
-// consequent shall be satisfied. With a pinned to 0 the antecedent (a == 0)
-// always holds, so the solved value of b must obey the consequent b == 1.
-TEST(ConstraintImplication, ConsequentSatisfiedWhenAntecedentTrue) {
-  ConstraintSolver solver(7);
-  solver.AddVariable(Pinned("a", 0));
-  solver.AddVariable(Ranged("b", 0, 1));
-
-  AddAEqualsZeroImpliesBEqualsOne(solver);
-
-  ASSERT_TRUE(solver.Solve());
-  EXPECT_EQ(solver.GetValue("b"), 1);
-}
-
-// 18.5.5: if the antecedent is false the generated values are unconstrained,
-// i.e. the consequent imposes nothing. Here a is pinned to 1 so (a == 0) is
-// false; b is pinned to 0, which would violate the consequent b == 1 were it
-// enforced. The solve must still succeed and leave b at 0.
+// 18.5.5: if the antecedent is false the generated values are unconstrained, so
+// the consequent imposes nothing. 'a' is bounded to 1, making (a == 0) false,
+// while 'b' is bounded to 0 — a value the consequent b == 1 would forbid were
+// it enforced. The solve still succeeds and leaves b at 0.
 TEST(ConstraintImplication, ConsequentIgnoredWhenAntecedentFalse) {
-  ConstraintSolver solver(7);
-  solver.AddVariable(Pinned("a", 1));
-  solver.AddVariable(Pinned("b", 0));
+  const char* src =
+      "class C;\n"
+      "  rand bit a;\n"
+      "  rand bit b;\n"
+      "  constraint fa { a >= 1; a <= 1; }\n"
+      "  constraint fb { b <= 0; }\n"
+      "  constraint impl { (a == 0) -> b == 1; }\n"
+      "endclass\n"
+      "module t;\n"
+      "  int ok;\n"
+      "  int rb;\n"
+      "  initial begin\n"
+      "    C o = new;\n"
+      "    ok = o.randomize();\n"
+      "    rb = o.b;\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "ok"), 1u);
+  EXPECT_EQ(RunAndGet(src, "rb"), 0u);
+}
 
-  AddAEqualsZeroImpliesBEqualsOne(solver);
+// 18.5.5: when the antecedent holds, *all* of the constraints in the consequent
+// shall be satisfied, not merely one. The consequent here is a conjunctive
+// constraint expression, so with 'a' bounded to 0 (antecedent true) the solved
+// values must obey both b == 1 and c == 1.
+TEST(ConstraintImplication, AllConsequentConditionsEnforced) {
+  const char* src =
+      "class C;\n"
+      "  rand bit a;\n"
+      "  rand bit b;\n"
+      "  rand bit c;\n"
+      "  constraint fa { a <= 0; }\n"
+      "  constraint fb { b <= 1; }\n"
+      "  constraint fc { c <= 1; }\n"
+      "  constraint impl { (a == 0) -> (b == 1 && c == 1); }\n"
+      "endclass\n"
+      "module t;\n"
+      "  int ok;\n"
+      "  int rb;\n"
+      "  int rc;\n"
+      "  initial begin\n"
+      "    C o = new;\n"
+      "    ok = o.randomize();\n"
+      "    rb = o.b;\n"
+      "    rc = o.c;\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "ok"), 1u);
+  EXPECT_EQ(RunAndGet(src, "rb"), 1u);
+  EXPECT_EQ(RunAndGet(src, "rc"), 1u);
+}
 
-  ASSERT_TRUE(solver.Solve());
-  EXPECT_EQ(solver.GetValue("b"), 0);
+// 18.5.5: the consequent may be an unnamed constraint set — a brace-enclosed
+// group of constraint expressions — and when the antecedent holds every
+// constraint in that set shall be satisfied. With 'a' bounded to 0 the
+// antecedent holds, so both members of the set "{ b == 1; c == 1; }" are
+// enforced. This drives the braced-set syntax through the full pipeline, so it
+// observes the parser capturing the set and the solver enforcing each member.
+TEST(ConstraintImplication, BracedConsequentSetEnforced) {
+  const char* src =
+      "class C;\n"
+      "  rand bit a;\n"
+      "  rand bit b;\n"
+      "  rand bit c;\n"
+      "  constraint fa { a <= 0; }\n"
+      "  constraint fb { b <= 1; }\n"
+      "  constraint fc { c <= 1; }\n"
+      "  constraint impl { (a == 0) -> { b == 1; c == 1; } }\n"
+      "endclass\n"
+      "module t;\n"
+      "  int ok;\n"
+      "  int rb;\n"
+      "  int rc;\n"
+      "  initial begin\n"
+      "    C o = new;\n"
+      "    ok = o.randomize();\n"
+      "    rb = o.b;\n"
+      "    rc = o.c;\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "ok"), 1u);
+  EXPECT_EQ(RunAndGet(src, "rb"), 1u);
+  EXPECT_EQ(RunAndGet(src, "rc"), 1u);
+}
+
+// 18.5.5: the consequent constraint_set may be any valid constraint, not only
+// an equality. Here the consequent is a relational (inequality) constraint:
+// with 'a' bounded to 0 the antecedent holds, so the solved 'b' must satisfy b
+// > 5.
+TEST(ConstraintImplication, ConsequentMayBeInequalityConstraint) {
+  const char* src =
+      "class C;\n"
+      "  rand bit a;\n"
+      "  rand bit [2:0] b;\n"
+      "  constraint fa { a <= 0; }\n"
+      "  constraint fb { b <= 7; }\n"
+      "  constraint impl { (a == 0) -> b > 5; }\n"
+      "endclass\n"
+      "module t;\n"
+      "  int ok;\n"
+      "  int rb;\n"
+      "  initial begin\n"
+      "    C o = new;\n"
+      "    ok = o.randomize();\n"
+      "    rb = o.b;\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "ok"), 1u);
+  EXPECT_GT(RunAndGet(src, "rb"), 5u);
+}
+
+// 18.5.5: the antecedent may be any integral expression, including a bare
+// variable taken for its truth value rather than a comparison. Member 'm' is
+// bounded to 2 (nonzero, so the antecedent is true), which drives the
+// consequent b == 1.
+TEST(ConstraintImplication, BareVariableAntecedent) {
+  const char* src =
+      "class C;\n"
+      "  rand bit [1:0] m;\n"
+      "  rand bit b;\n"
+      "  constraint fm { m >= 2; m <= 2; }\n"
+      "  constraint fb { b <= 1; }\n"
+      "  constraint impl { m -> b == 1; }\n"
+      "endclass\n"
+      "module t;\n"
+      "  int ok;\n"
+      "  int rb;\n"
+      "  initial begin\n"
+      "    C o = new;\n"
+      "    ok = o.randomize();\n"
+      "    rb = o.b;\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "ok"), 1u);
+  EXPECT_EQ(RunAndGet(src, "rb"), 1u);
 }
 
 // 18.5.5: a -> b is Boolean-equivalent to (!a || b), and the two sides are
-// interdependent. Pinning b to 0 makes the consequent b == 1 unsatisfiable, so
-// the only way to satisfy the implication is for the antecedent to be false.
-// The solver must therefore drive a away from 0 even though a is otherwise
-// free to range over {0, 1}. This exercises the contrapositive direction.
-TEST(ConstraintImplication, AntecedentConstrainedByUnsatisfiableConsequent) {
-  ConstraintSolver solver(7);
-  solver.AddVariable(Ranged("a", 0, 1));
-  solver.AddVariable(Pinned("b", 0));
-
-  AddAEqualsZeroImpliesBEqualsOne(solver);
-
-  ASSERT_TRUE(solver.Solve());
-  EXPECT_EQ(solver.GetValue("a"), 1);
+// interdependent — conversely, if the consequent cannot be satisfied then the
+// antecedent shall be false. 'b' is bounded to 0, making the consequent b == 1
+// unsatisfiable, so the only way to satisfy the implication is for (a == 0) to
+// be false; the solver must therefore drive 'a' (free over {0, 1}) to 1. This
+// exercises the contrapositive direction.
+TEST(ConstraintImplication, AntecedentDrivenFalseByUnsatisfiableConsequent) {
+  const char* src =
+      "class C;\n"
+      "  rand bit a;\n"
+      "  rand bit b;\n"
+      "  constraint fa { a <= 1; }\n"
+      "  constraint fb { b <= 0; }\n"
+      "  constraint impl { (a == 0) -> b == 1; }\n"
+      "endclass\n"
+      "module t;\n"
+      "  int ok;\n"
+      "  int ra;\n"
+      "  initial begin\n"
+      "    C o = new;\n"
+      "    ok = o.randomize();\n"
+      "    ra = o.a;\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "ok"), 1u);
+  EXPECT_EQ(RunAndGet(src, "ra"), 1u);
 }
 
-// 18.5.5: the constraint_set may be any valid constraint, not only an equality.
-// Here the consequent is a range constraint, and with the antecedent true the
-// solved value of b must fall inside [5, 10].
-TEST(ConstraintImplication, ConsequentMayBeARangeConstraint) {
-  ConstraintSolver solver(7);
-  solver.AddVariable(Pinned("a", 0));
-  RandVariable b;
-  b.name = "b";
-  b.min_val = 0;
-  b.max_val = 100;
-  solver.AddVariable(b);
-
-  ConstraintBlock block;
-  block.name = "c_impl";
-  ConstraintExpr impl;
-  impl.kind = ConstraintKind::kImplication;
-  impl.cond_var = "a";
-  impl.cond_value = 0;
-  ConstraintExpr cons;
-  cons.kind = ConstraintKind::kRange;
-  cons.var_name = "b";
-  cons.lo = 5;
-  cons.hi = 10;
-  impl.sub_constraints.push_back(cons);
-  block.constraints.push_back(impl);
-  solver.AddConstraintBlock(block);
-
-  ASSERT_TRUE(solver.Solve());
-  int64_t bv = solver.GetValue("b");
-  EXPECT_GE(bv, 5);
-  EXPECT_LE(bv, 10);
+// 18.5.5: the antecedent may be any integral expression, not only an equality.
+// A general predicate antecedent ("a > 1") drives the consequent: with 'a'
+// bounded to 2 the antecedent holds, so 'b' (free over 0..3) must equal 3.
+TEST(ConstraintImplication, GeneralIntegralAntecedent) {
+  const char* src =
+      "class C;\n"
+      "  rand bit [1:0] a;\n"
+      "  rand bit [1:0] b;\n"
+      "  constraint fa { a >= 2; a <= 2; }\n"
+      "  constraint fb { b <= 3; }\n"
+      "  constraint impl { (a > 1) -> b == 3; }\n"
+      "endclass\n"
+      "module t;\n"
+      "  int ok;\n"
+      "  int rb;\n"
+      "  initial begin\n"
+      "    C o = new;\n"
+      "    ok = o.randomize();\n"
+      "    rb = o.b;\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "ok"), 1u);
+  EXPECT_EQ(RunAndGet(src, "rb"), 3u);
 }
 
-// 18.5.5: the antecedent expression may be any integral expression, not just a
-// simple equality. A general predicate antecedent ("mode > 100") drives the
-// consequent: with mode pinned above 100 the antecedent holds, so len must be
-// less than 10.
-TEST(ConstraintImplication, GeneralExpressionAntecedentTrue) {
-  ConstraintSolver solver(7);
-  solver.AddVariable(Pinned("mode", 200));
-  solver.AddVariable(Ranged("len", 0, 100));
-
-  AddModeGtImpliesLenLt(solver);
-
-  ASSERT_TRUE(solver.Solve());
-  EXPECT_LT(solver.GetValue("len"), 10);
-}
-
-// 18.5.5: with a general predicate antecedent that evaluates false, the
-// consequent imposes nothing. mode is pinned to 50 so ("mode > 100") is false;
-// len is pinned to a value the consequent would forbid, yet the solve succeeds.
-TEST(ConstraintImplication, GeneralExpressionAntecedentFalse) {
-  ConstraintSolver solver(7);
-  solver.AddVariable(Pinned("mode", 50));
-  solver.AddVariable(Pinned("len", 999));
-
-  AddModeGtImpliesLenLt(solver);
-
-  ASSERT_TRUE(solver.Solve());
-  EXPECT_EQ(solver.GetValue("len"), 999);
-}
-
-// 18.5.5: when the antecedent holds, *every* constraint in the consequent must
-// be satisfied, not merely the first. The antecedent (a == 0) is forced true
-// and the consequent groups two constraints, so the solved values must satisfy
-// both b == 1 and c == 2.
-TEST(ConstraintImplication, AllConsequentConstraintsEnforced) {
-  ConstraintSolver solver(7);
-  solver.AddVariable(Pinned("a", 0));
-  RandVariable b;
-  b.name = "b";
-  b.min_val = 0;
-  b.max_val = 1;
-  solver.AddVariable(b);
-  RandVariable c;
-  c.name = "c";
-  c.min_val = 0;
-  c.max_val = 3;
-  solver.AddVariable(c);
-
-  ConstraintBlock block;
-  block.name = "c_impl";
-  ConstraintExpr impl;
-  impl.kind = ConstraintKind::kImplication;
-  impl.cond_var = "a";
-  impl.cond_value = 0;
-  ConstraintExpr c1;
-  c1.kind = ConstraintKind::kEqual;
-  c1.var_name = "b";
-  c1.lo = 1;
-  ConstraintExpr c2;
-  c2.kind = ConstraintKind::kEqual;
-  c2.var_name = "c";
-  c2.lo = 2;
-  impl.sub_constraints.push_back(c1);
-  impl.sub_constraints.push_back(c2);
-  block.constraints.push_back(impl);
-  solver.AddConstraintBlock(block);
-
-  ASSERT_TRUE(solver.Solve());
-  EXPECT_EQ(solver.GetValue("b"), 1);
-  EXPECT_EQ(solver.GetValue("c"), 2);
-}
-
-// 18.5.5: an implication is equivalent to (!a || b). When the antecedent is
-// forced true and the consequent cannot be met, the implication is
-// unsatisfiable, so randomization must report failure rather than hand back a
-// solution that breaks the rule. Here a is pinned to 0 (antecedent true) while
-// b is pinned to 0, so the consequent b == 1 can never hold.
-TEST(ConstraintImplication,
-     SolveFailsWhenForcedAntecedentHasImpossibleConsequent) {
-  ConstraintSolver solver(7);
-  solver.AddVariable(Pinned("a", 0));
-  solver.AddVariable(Pinned("b", 0));
-
-  AddAEqualsZeroImpliesBEqualsOne(solver);
-
-  EXPECT_FALSE(solver.Solve());
+// 18.5.5: because a -> b is equivalent to (!a || b), when the antecedent is
+// forced true and the consequent cannot be met the implication is
+// unsatisfiable, so randomize() shall fail rather than hand back a value that
+// breaks the rule. 'a' is bounded to 0 (antecedent true) while 'b' is bounded
+// to 0, so the consequent b == 1 can never hold.
+TEST(ConstraintImplication, RandomizeFailsWhenForcedAntecedentImpossible) {
+  const char* src =
+      "class C;\n"
+      "  rand bit a;\n"
+      "  rand bit b;\n"
+      "  constraint fa { a <= 0; }\n"
+      "  constraint fb { b <= 0; }\n"
+      "  constraint impl { (a == 0) -> b == 1; }\n"
+      "endclass\n"
+      "module t;\n"
+      "  int ok;\n"
+      "  initial begin\n"
+      "    C o = new;\n"
+      "    ok = o.randomize();\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "ok"), 0u);
 }
 
 }  // namespace
