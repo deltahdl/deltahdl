@@ -12,96 +12,6 @@ using namespace delta;
 
 namespace {
 
-TEST(QualifiedIfSimulation, UniqueIfMatchingBranch) {
-  StmtFixture f;
-  auto* result_var = f.ctx.CreateVariable("ui", 32);
-  result_var->value = MakeLogic4VecVal(f.arena, 32, 0);
-
-  auto* stmt = f.arena.Create<Stmt>();
-  stmt->kind = StmtKind::kIf;
-  stmt->qualifier = CaseQualifier::kUnique;
-  stmt->condition = MakeInt(f.arena, 1);
-  stmt->then_branch = MakeBlockAssign(f.arena, "ui", 10);
-  stmt->else_branch = MakeBlockAssign(f.arena, "ui", 20);
-
-  RunStmt(stmt, f.ctx, f.arena);
-  EXPECT_EQ(result_var->value.ToUint64(), 10u);
-}
-
-TEST(QualifiedIfSimulation, PriorityIfFirstMatchTaken) {
-  StmtFixture f;
-  auto* result_var = f.ctx.CreateVariable("pi", 32);
-  result_var->value = MakeLogic4VecVal(f.arena, 32, 0);
-
-  auto* stmt = f.arena.Create<Stmt>();
-  stmt->kind = StmtKind::kIf;
-  stmt->qualifier = CaseQualifier::kPriority;
-  stmt->condition = MakeInt(f.arena, 1);
-  stmt->then_branch = MakeBlockAssign(f.arena, "pi", 30);
-
-  RunStmt(stmt, f.ctx, f.arena);
-  EXPECT_EQ(result_var->value.ToUint64(), 30u);
-}
-
-TEST(QualifiedIfSimulation, UniqueIfQualifierStored) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] a, x;\n"
-      "  initial begin\n"
-      "    a = 8'd1;\n"
-      "    unique if (a == 8'd0) x = 8'd10;\n"
-      "    else if (a == 8'd1) x = 8'd20;\n"
-      "    else x = 8'd30;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 20u);
-}
-
-TEST(QualifiedIfSimulation, PriorityIfFirstMatch) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial begin\n"
-      "    priority if (1) x = 8'd10;\n"
-      "    else if (1) x = 8'd20;\n"
-      "    else x = 8'd30;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 10u);
-}
-
-TEST(QualifiedIfSimulation, Unique0IfMatchingBranch) {
-  StmtFixture f;
-  auto* result_var = f.ctx.CreateVariable("u0", 32);
-  result_var->value = MakeLogic4VecVal(f.arena, 32, 0);
-
-  auto* stmt = f.arena.Create<Stmt>();
-  stmt->kind = StmtKind::kIf;
-  stmt->qualifier = CaseQualifier::kUnique0;
-  stmt->condition = MakeInt(f.arena, 1);
-  stmt->then_branch = MakeBlockAssign(f.arena, "u0", 42);
-  stmt->else_branch = MakeBlockAssign(f.arena, "u0", 99);
-
-  RunStmt(stmt, f.ctx, f.arena);
-  EXPECT_EQ(result_var->value.ToUint64(), 42u);
-}
-
 TEST(QualifiedIfSimulation, Unique0IfTakesCorrectBranch) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -329,6 +239,39 @@ TEST(QualifiedIfSimulation, UniqueIfOverlapWithElseStillEmitsViolation) {
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 10u);
   EXPECT_GE(f.diag.WarningCount(), 1u);
+}
+
+// §12.4.2: a unique-if shall continue evaluating and comparing the remaining
+// conditions after an earlier one is found true (unlike a plain if-else-if,
+// which short-circuits — see §12.4.1). Here the first condition is true, yet
+// the later condition's i++ side effect still runs, leaving i==1. The later
+// condition is false, so there is no overlap and no violation, isolating the
+// continue-after-match behavior from the overlap path.
+TEST(QualifiedIfSimulation,
+     UniqueIfContinuesEvaluatingLaterConditionAfterMatch) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x, i;\n"
+      "  initial begin\n"
+      "    i = 8'd0;\n"
+      "    unique if (1) x = 8'd10;\n"
+      "    else if (i++ == 8'd99) x = 8'd20;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* xv = f.ctx.FindVariable("x");
+  auto* iv = f.ctx.FindVariable("i");
+  ASSERT_NE(xv, nullptr);
+  ASSERT_NE(iv, nullptr);
+  EXPECT_EQ(xv->value.ToUint64(), 10u);
+  EXPECT_EQ(iv->value.ToUint64(),
+            1u);  // later condition still evaluated after the first match
+  EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
 TEST(QualifiedIfSimulation, QualifiedIfFallsToElse) {

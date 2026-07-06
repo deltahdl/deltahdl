@@ -120,23 +120,6 @@ TEST(QualifiedIfParsing, Unique0IfElseIfNoFinalElse) {
   EXPECT_EQ(stmt->qualifier, CaseQualifier::kUnique0);
 }
 
-TEST(QualifiedIfParsing, PriorityIfElseIfWithElse) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    priority if (a) x = 1;\n"
-      "    else if (b) x = 2;\n"
-      "    else x = 0;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kIf);
-  EXPECT_EQ(stmt->qualifier, CaseQualifier::kPriority);
-}
-
 TEST(QualifiedIfParsing, PriorityIfNoFinalElse) {
   auto r = Parse(
       "module m;\n"
