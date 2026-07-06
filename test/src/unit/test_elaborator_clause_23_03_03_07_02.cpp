@@ -3,6 +3,15 @@
 
 using namespace delta;
 
+// §23.3.3.7.2: an interconnect net on a gate/UDP terminal is retyped to a plain
+// wire during elaboration. The rule draws no distinction between gate kinds,
+// instance naming, or whether a sibling terminal is a literal or a real net, so
+// one representative per rule-relevant input form is kept here: gate input,
+// gate output, a single-terminal source primitive, a gate carrying interconnect
+// on every terminal (exercising the terminal loop when no sibling is
+// non-interconnect), plus the corresponding UDP input/output/all-interconnect
+// cases (a distinct elaboration path from gate instances).
+
 namespace {
 
 TEST(InterconnectPrimitiveTerminalElaboration,
@@ -13,104 +22,6 @@ TEST(InterconnectPrimitiveTerminalElaboration,
       "  interconnect ic;\n"
       "  wire y;\n"
       "  and (y, ic, 1'b1);\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
-TEST(InterconnectPrimitiveTerminalElaboration,
-     InterconnectOnOrGateInputNoError) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module top;\n"
-      "  interconnect ic;\n"
-      "  wire y;\n"
-      "  or (y, ic, 1'b0);\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
-TEST(InterconnectPrimitiveTerminalElaboration,
-     InterconnectOnNandGateInputNoError) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module top;\n"
-      "  interconnect ic;\n"
-      "  wire y;\n"
-      "  nand (y, ic, 1'b1);\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
-TEST(InterconnectPrimitiveTerminalElaboration,
-     InterconnectOnNorGateInputNoError) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module top;\n"
-      "  interconnect ic;\n"
-      "  wire y;\n"
-      "  nor (y, ic, 1'b0);\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
-TEST(InterconnectPrimitiveTerminalElaboration,
-     InterconnectOnXorGateInputNoError) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module top;\n"
-      "  interconnect ic;\n"
-      "  wire y;\n"
-      "  xor (y, ic, 1'b0);\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
-TEST(InterconnectPrimitiveTerminalElaboration,
-     InterconnectOnXnorGateInputNoError) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module top;\n"
-      "  interconnect ic;\n"
-      "  wire y;\n"
-      "  xnor (y, ic, 1'b1);\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
-TEST(InterconnectPrimitiveTerminalElaboration,
-     InterconnectOnBufGateInputNoError) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module top;\n"
-      "  interconnect ic;\n"
-      "  wire y;\n"
-      "  buf (y, ic);\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
-TEST(InterconnectPrimitiveTerminalElaboration,
-     InterconnectOnNotGateInputNoError) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module top;\n"
-      "  interconnect ic;\n"
-      "  wire y;\n"
-      "  not (y, ic);\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
@@ -131,38 +42,12 @@ TEST(InterconnectPrimitiveTerminalElaboration,
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(InterconnectPrimitiveTerminalElaboration,
-     InterconnectOnBufGateOutputNoError) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module top;\n"
-      "  interconnect ic;\n"
-      "  wire a;\n"
-      "  buf (ic, a);\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 TEST(InterconnectPrimitiveTerminalElaboration, InterconnectOnPullupNoError) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module top;\n"
       "  interconnect ic;\n"
       "  pullup (ic);\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
-TEST(InterconnectPrimitiveTerminalElaboration, InterconnectOnPulldownNoError) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module top;\n"
-      "  interconnect ic;\n"
-      "  pulldown (ic);\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
@@ -176,34 +61,6 @@ TEST(InterconnectPrimitiveTerminalElaboration,
       "module top;\n"
       "  interconnect ic_a, ic_b, ic_y;\n"
       "  and (ic_y, ic_a, ic_b);\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
-TEST(InterconnectPrimitiveTerminalElaboration,
-     InterconnectMixedWithWireOnGateNoError) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module top;\n"
-      "  interconnect ic;\n"
-      "  wire a, y;\n"
-      "  and (y, ic, a);\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
-TEST(InterconnectPrimitiveTerminalElaboration,
-     NamedGateInstanceWithInterconnectNoError) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module top;\n"
-      "  interconnect ic;\n"
-      "  wire y;\n"
-      "  and g1 (y, ic, 1'b1);\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
