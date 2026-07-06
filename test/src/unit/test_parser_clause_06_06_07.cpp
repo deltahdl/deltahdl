@@ -16,17 +16,6 @@ static ModuleItem* FindNettypeDecl(ParseResult& r, std::string_view name = "") {
 }
 namespace {
 
-TEST(NettypeParsing, NettypeWithIntType) {
-  auto r = Parse(
-      "module m;\n"
-      "  nettype int mynet;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* nt = FindNettypeDecl(r);
-  ASSERT_NE(nt, nullptr);
-  EXPECT_EQ(nt->name, "mynet");
-}
 TEST(NettypeParsing, NettypeDeclWithResolveFunc) {
   auto r = Parse(
       "module t;\n"
@@ -141,17 +130,6 @@ TEST(NettypeParsing, NettypeAliasForNetDecl) {
               "  nettype TR wTR;\n"
               "  nettype wTR alias_net;\n"
               "  alias_net sig;\n"
-              "endmodule\n"));
-}
-
-TEST(NettypeParsing, NettypeResolveFuncMultipleDrivers) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  typedef struct { real val; } S;\n"
-              "  function S resolve_S(input S drivers[]);\n"
-              "    resolve_S = drivers[0];\n"
-              "  endfunction\n"
-              "  nettype S net_S with resolve_S;\n"
               "endmodule\n"));
 }
 

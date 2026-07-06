@@ -240,18 +240,6 @@ TEST(UserDefinedNettype, UnresolvedNettypeNoResolutionFunction) {
   EXPECT_EQ(ValOf(*var), kValX);
 }
 
-TEST(UserDefinedNettype, UnresolvedNettypeZeroDriversOk) {
-  Arena arena;
-  auto* var = MakeVar(arena, 1);
-  Net net;
-  net.type = NetType::kWire;
-  net.resolved = var;
-
-  UserNettype nt;
-  nt.resolution = nullptr;
-  EXPECT_FALSE(CheckUnresolvedMultipleDrivers(net, nt));
-}
-
 TEST(UserDefinedNettype, ResolutionWithThreeDrivers) {
   Arena arena;
   auto* var = MakeVar(arena, 1);

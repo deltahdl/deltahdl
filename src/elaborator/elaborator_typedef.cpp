@@ -259,7 +259,31 @@ void Elaborator::ElaborateTypedef(ModuleItem* item, RtlirModule* mod) {
       BuildEnumMembers(item, width, arena_, mod, enum_member_names_);
 }
 
+// §6.6.7: the data type of a user-defined nettype shall be a 4-state or 2-state
+// integral type, a real or shortreal type, or a fixed-size unpacked aggregate
+// of such types. The named-type forms (a typedef or an existing nettype named
+// in the alias form) resolve to one of those and are accepted here; only the
+// direct data types that can never be a legal nettype data type are rejected.
+static bool IsIllegalNettypeDataTypeKind(DataTypeKind kind) {
+  switch (kind) {
+    case DataTypeKind::kString:
+    case DataTypeKind::kChandle:
+    case DataTypeKind::kEvent:
+    case DataTypeKind::kVoid:
+    case DataTypeKind::kVirtualInterface:
+      return true;
+    default:
+      return false;
+  }
+}
+
 void Elaborator::ElaborateNettypeDecl(ModuleItem* item, RtlirModule*) {
+  if (IsIllegalNettypeDataTypeKind(item->typedef_type.kind)) {
+    diag_.Error(item->loc,
+                std::format("data type of user-defined nettype '{}' is not a "
+                            "legal nettype data type",
+                            item->name));
+  }
   typedefs_[item->name] = item->typedef_type;
   nettype_names_.insert(item->name);
   if (!item->nettype_resolve_func.empty()) {
@@ -277,6 +301,51 @@ void Elaborator::ElaborateNettypeDecl(ModuleItem* item, RtlirModule*) {
                                          : item->typedef_type.type_name;
   } else {
     nettype_canonical_[item->name] = item->name;
+  }
+
+  // §6.6.7: a named resolution function shall return the nettype's data type
+  // and take a single input argument that is a dynamic array (of that type).
+  // Only a function resolvable in the current module scope is checked. The
+  // structurally unambiguous facets -- exactly one argument, that argument not
+  // being a fixed-size array, and a return type that does not name a different
+  // type than the nettype -- are enforced through the shared signature
+  // predicate. The lifetime and class-static facets are left unasserted here so
+  // a conforming function is never rejected on a comparison this stage cannot
+  // make precisely.
+  if (!item->nettype_resolve_func.empty()) {
+    auto fit = func_decls_.find(item->nettype_resolve_func);
+    if (fit != func_decls_.end() && fit->second) {
+      const ModuleItem* fn = fit->second;
+      NettypeResolutionSig sig;
+      // When both the nettype data type and the function's return type are
+      // named types, a difference in the named type is a definite mismatch.
+      // Other combinations (integral/real, or a named type paired with a
+      // matching builtin) are left unasserted to avoid a false rejection.
+      const DataType& nettype_dt = item->typedef_type;
+      const DataType& return_dt = fn->return_type;
+      sig.return_type_matches_nettype =
+          !(nettype_dt.kind == DataTypeKind::kNamed &&
+            return_dt.kind == DataTypeKind::kNamed &&
+            nettype_dt.type_name != return_dt.type_name);
+      sig.is_automatic = true;
+      sig.is_class_method = false;
+      sig.is_static_method = false;
+      sig.single_input_argument = fn->func_args.size() == 1;
+      const bool arg_is_fixed_array =
+          sig.single_input_argument &&
+          !fn->func_args[0].unpacked_dims.empty() &&
+          fn->func_args[0].unpacked_dims[0] != nullptr;
+      sig.argument_is_dynamic_array_of_type =
+          sig.single_input_argument && !arg_is_fixed_array;
+      if (!ValidateNettypeResolutionFunction(sig)) {
+        diag_.Error(item->loc,
+                    std::format("resolution function '{}' of user-defined "
+                                "nettype '{}' shall return the nettype data "
+                                "type and take a single dynamic array input "
+                                "argument",
+                                item->nettype_resolve_func, item->name));
+      }
+    }
   }
 }
 
