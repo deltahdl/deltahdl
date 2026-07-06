@@ -107,6 +107,51 @@ TEST(PortConnectionRulesForNetsSimulation, OutputNetPortDrivesParentNet) {
 }
 
 TEST(PortConnectionRulesForNetsSimulation,
+     InputNetPortConnectedToParameterReceivesValue) {
+  // An input net port accepts any compatible expression, including a constant
+  // parameter reference. Built from a real parameter declaration and driven
+  // end-to-end, the elaborated constant reaches the port and its sink.
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module child(input wire [7:0] a, output logic [7:0] b);\n"
+      "  assign b = a;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  parameter logic [7:0] P = 8'h6D;\n"
+      "  logic [7:0] result;\n"
+      "  child u(.a(P), .b(result));\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* var = f.ctx.FindVariable("result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0x6Du);
+}
+
+TEST(PortConnectionRulesForNetsSimulation,
+     InputNetPortConnectedToLocalparamReceivesValue) {
+  // A localparam constant is likewise carried across an input net port
+  // connection to its sink when driven through the full pipeline.
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module child(input wire [7:0] a, output logic [7:0] b);\n"
+      "  assign b = a;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  localparam logic [7:0] L = 8'h2E;\n"
+      "  logic [7:0] result;\n"
+      "  child u(.a(L), .b(result));\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* var = f.ctx.FindVariable("result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0x2Eu);
+}
+
+TEST(PortConnectionRulesForNetsSimulation,
      InoutNetPortPropagatesValueToParent) {
   SimFixture f;
   auto* design = ElaborateSrc(

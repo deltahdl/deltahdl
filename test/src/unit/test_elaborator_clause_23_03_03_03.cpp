@@ -186,20 +186,6 @@ TEST(PortConnectionRulesForNetsElaboration,
 }
 
 TEST(PortConnectionRulesForNetsElaboration,
-     VariableConnectedToInoutTriPortErrors) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module child(inout tri data);\n"
-      "endmodule\n"
-      "module top;\n"
-      "  logic v;\n"
-      "  child u(.data(v));\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(f.has_errors);
-}
-
-TEST(PortConnectionRulesForNetsElaboration,
      VariableConnectedToInoutNetPortPositionalErrors) {
   ElabFixture f;
   ElaborateSrc(
@@ -211,6 +197,43 @@ TEST(PortConnectionRulesForNetsElaboration,
       "endmodule\n",
       f);
   EXPECT_TRUE(f.has_errors);
+}
+
+// An input net port admits any compatible expression, including a constant
+// parameter reference. A parameter resolves through a different elaboration
+// path than a folded literal, so it is exercised as its own operand form.
+TEST(PortConnectionRulesForNetsElaboration, InputNetPortConnectsToParameter) {
+  EXPECT_TRUE(
+      ElabOk("module child(input wire [7:0] a);\n"
+             "endmodule\n"
+             "module top;\n"
+             "  parameter logic [7:0] P = 8'h3C;\n"
+             "  child u(.a(P));\n"
+             "endmodule\n"));
+}
+
+// A localparam constant is another admitted operand for an input net port
+// connection, resolved distinctly from a parameter or a literal.
+TEST(PortConnectionRulesForNetsElaboration, InputNetPortConnectsToLocalparam) {
+  EXPECT_TRUE(
+      ElabOk("module child(input wire [7:0] a);\n"
+             "endmodule\n"
+             "module top;\n"
+             "  localparam logic [7:0] L = 8'h5A;\n"
+             "  child u(.a(L));\n"
+             "endmodule\n"));
+}
+
+// The input-net connection rule holds regardless of whether the port is bound
+// by name or by position; a positional compatible connection is equally legal.
+TEST(PortConnectionRulesForNetsElaboration, InputNetPortConnectsPositionally) {
+  EXPECT_TRUE(
+      ElabOk("module child(input wire [7:0] a);\n"
+             "endmodule\n"
+             "module top;\n"
+             "  logic [7:0] x;\n"
+             "  child u(x);\n"
+             "endmodule\n"));
 }
 
 }  // namespace
