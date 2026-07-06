@@ -820,6 +820,72 @@ static void CheckNamedInterfaceTypePorts(const PortBindCtx& ctx,
   }
 }
 
+// §23.3.3: the user-defined nettype name of a signal in the instantiating
+// module, or an empty view when the signal is not a user-defined nettype net.
+static std::string_view SignalNettypeName(std::string_view name,
+                                          const RtlirModule* mod) {
+  for (const auto& n : mod->nets) {
+    if (n.name == name) {
+      return n.is_user_nettype ? n.nettype_name : std::string_view{};
+    }
+  }
+  return {};
+}
+
+// §23.3.3: when both the internal port and the external connection are
+// user-defined nettypes, they shall be of matching nettypes so that the two
+// nets can merge into a single simulated net; a mismatch is an error. Matching
+// follows §6.22.6 -- a nettype matches itself and any renaming alias of it,
+// i.e. their canonical (source) nettype names are equal. Only this both-sided
+// case is checked here: a one-sided user-defined nettype is governed by the
+// mode/data-type rules elsewhere in §23.3.3, and differences between built-in
+// net types by the collapsing rules of §23.3.3.7.
+static void CheckMatchingNettypePorts(
+    DiagEngine& diag, const ModuleItem* item, const RtlirModule* parent_mod,
+    const ModuleDecl* child_decl, const RtlirModuleInst& inst,
+    const std::unordered_map<std::string_view, std::string_view>&
+        nettype_canonical) {
+  if (!child_decl) return;
+
+  auto canonical = [&](std::string_view n) {
+    auto it = nettype_canonical.find(n);
+    return it != nettype_canonical.end() ? it->second : n;
+  };
+
+  for (const auto& binding : inst.port_bindings) {
+    const Expr* conn = binding.connection;
+    if (!conn || conn->kind != ExprKind::kIdentifier) continue;
+
+    // Internal side: the child port is itself declared with a user-defined
+    // nettype (a named type registered in the canonical nettype map).
+    std::string_view internal_nettype;
+    for (const auto& port : child_decl->ports) {
+      if (port.name != binding.port_name) continue;
+      if (port.data_type.kind == DataTypeKind::kNamed &&
+          nettype_canonical.count(port.data_type.type_name)) {
+        internal_nettype = port.data_type.type_name;
+      }
+      break;
+    }
+    if (internal_nettype.empty()) continue;
+
+    // External side: the connected signal is a user-defined nettype net.
+    std::string_view external_nettype =
+        SignalNettypeName(conn->text, parent_mod);
+    if (external_nettype.empty()) continue;
+
+    if (internal_nettype != external_nettype &&
+        canonical(internal_nettype) != canonical(external_nettype)) {
+      diag.Error(
+          item->loc,
+          std::format("port '{}' connects user-defined nettype '{}' on the "
+                      "instance side to non-matching nettype '{}'; both sides "
+                      "shall be the same nettype",
+                      binding.port_name, internal_nettype, external_nettype));
+    }
+  }
+}
+
 void Elaborator::BindPorts(RtlirModuleInst& inst, const ModuleItem* item,
                            RtlirModule* parent_mod,
                            const ModuleDecl* child_decl) {
@@ -847,6 +913,8 @@ void Elaborator::BindPorts(RtlirModuleInst& inst, const ModuleItem* item,
   CheckRefPortsConnected(diag_, child_ports, inst, item);
   CheckInterfacePortsConnected(kPortCtx, child_ports, inst);
   CheckNamedInterfaceTypePorts(kPortCtx, child_decl, inst, unit_);
+  CheckMatchingNettypePorts(diag_, item, parent_mod, child_decl, inst,
+                            nettype_canonical_);
 }
 
 }  // namespace delta
