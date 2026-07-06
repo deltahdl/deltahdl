@@ -1,3 +1,6 @@
+#include <iostream>
+#include <sstream>
+
 #include "builders_ast.h"
 #include "fixture_simulator.h"
 #include "simulator/evaluation.h"
@@ -5,6 +8,19 @@
 using namespace delta;
 
 namespace {
+
+// Runs a single-module source through elaboration and simulation while
+// capturing everything the run writes to stdout.
+inline std::string RunCapture(const std::string& src, SimFixture& f) {
+  std::ostringstream captured;
+  std::streambuf* old_buf = std::cout.rdbuf(captured.rdbuf());
+  auto* design = ElaborateSrc(src, f);
+  if (design != nullptr) {
+    LowerAndRun(design, f);
+  }
+  std::cout.rdbuf(old_buf);
+  return captured.str();
+}
 
 inline std::string DecodeAsciiBytes(const Logic4Vec& vec) {
   uint32_t nbytes = vec.width / 8;
@@ -36,14 +52,6 @@ TEST(UtilitySystemTaskTest, TypenameDefaultSigningRemoved) {
   auto* expr = MakeSysCall(f.arena, "$typename", {MakeId(f.arena, "y")});
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(DecodeAsciiBytes(result), "int");
-}
-
-TEST(UtilitySystemTaskTest, TypenameVectorRangeIsUnsizedDecimal) {
-  SimFixture f;
-  f.ctx.CreateVariable("data", 8);
-  auto* expr = MakeSysCall(f.arena, "$typename", {MakeId(f.arena, "data")});
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(DecodeAsciiBytes(result), "logic[7:0]");
 }
 
 TEST(UtilitySystemTaskTest, TypenameSingleBitLogic) {
@@ -86,6 +94,79 @@ TEST(UtilitySystemTaskTest, TypenameNoArgsFallback) {
   auto* expr = MakeSysCall(f.arena, "$typename", {});
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(DecodeAsciiBytes(result), "logic");
+}
+
+// Syntax 20-6 second form: $typename ( data_type ). A built-in type keyword
+// resolves to itself. Parsed from real source so the identifier/keyword
+// argument arrives exactly as the parser produces it (kIdentifier "int").
+TEST(UtilitySystemTaskTest, TypenameDataTypeFormBuiltinKeyword) {
+  SimFixture f;
+  auto* expr = ParseExprFrom("$typename(int)", f);
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(DecodeAsciiBytes(result), "int");
+}
+
+// Syntax 20-6 second form with a packed dimension: $typename(logic [7:0])
+// resolves to the keyword with its range rendered as unsized decimal bounds
+// (step g). Parsed from real source so the range-select argument arrives as
+// the parser produces it (kSelect over the "logic" keyword).
+TEST(UtilitySystemTaskTest, TypenameDataTypeFormPackedVector) {
+  SimFixture f;
+  auto* expr = ParseExprFrom("$typename(logic [7:0])", f);
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(DecodeAsciiBytes(result), "logic[7:0]");
+}
+
+// Expression form driven end-to-end: the type name of a real vector
+// declaration is reported with its range as an unsized decimal (step g),
+// observed through the full parse/elaborate/lower/run pipeline via $display.
+TEST(UtilitySystemTaskTest, TypenameExpressionFormVectorEndToEnd) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  logic [7:0] data;\n"
+      "  initial $display(\"%s\", $typename(data));\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "logic[7:0]\n");
+}
+
+// The expression argument yields the self-determined type and is never
+// evaluated: the operand carries a runtime value, yet $typename reports the
+// declared 2-state type independent of that value. Driven end-to-end.
+TEST(UtilitySystemTaskTest, TypenameExpressionOperandNotEvaluated) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  bit [3:0] n;\n"
+      "  initial begin\n"
+      "    n = 4'hA;\n"
+      "    $display(\"%s\", $typename(n));\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "bit[3:0]\n");
+}
+
+// §20.6.1 notes that $typename produces a string usable for stricter type
+// comparison than a type reference (relating to the §6.22.1 type-matching
+// process). Built from real declarations: two vectors of the same type yield
+// identical strings, while a differently sized vector yields a distinct one.
+TEST(UtilitySystemTaskTest, TypenameDistinguishesTypesForStringComparison) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  logic [7:0] a;\n"
+      "  logic [7:0] b;\n"
+      "  logic [3:0] c;\n"
+      "  initial begin\n"
+      "    $display(\"%s\", $typename(a));\n"
+      "    $display(\"%s\", $typename(b));\n"
+      "    $display(\"%s\", $typename(c));\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "logic[7:0]\nlogic[7:0]\nlogic[3:0]\n");
 }
 
 }  // namespace

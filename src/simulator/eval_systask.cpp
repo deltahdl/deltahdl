@@ -339,6 +339,19 @@ static std::string TypenameForVariable(const Variable* var) {
   return base + "[" + std::to_string(w - 1) + ":0]";
 }
 
+// §20.6.1: the set of built-in data-type keywords. A bare keyword given to the
+// data_type form of $typename resolves to itself -- its default signing is
+// implicit and therefore omitted from the string (step b).
+static bool IsBuiltinTypeKeyword(std::string_view name) {
+  static constexpr std::string_view kBuiltins[] = {
+      "logic",   "bit",  "reg",  "byte",      "shortint", "int",    "longint",
+      "integer", "time", "real", "shortreal", "realtime", "string", "chandle"};
+  for (auto kw : kBuiltins) {
+    if (name == kw) return true;
+  }
+  return false;
+}
+
 static Logic4Vec EvalTypename(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (expr->args.empty()) {
     return StringToLogic4Vec(arena, "logic");
@@ -349,6 +362,30 @@ static Logic4Vec EvalTypename(const Expr* expr, SimContext& ctx, Arena& arena) {
     if (const auto* var = ctx.FindVariable(arg->text)) {
       return StringToLogic4Vec(arena, TypenameForVariable(var));
     }
+    // §20.6.1 Syntax 20-6 second form: $typename ( data_type ). A built-in
+    // type keyword parses as an identifier that names no variable; its
+    // resolved type name is the keyword itself.
+    if (IsBuiltinTypeKeyword(arg->text)) {
+      return StringToLogic4Vec(arena, std::string(arg->text));
+    }
+  }
+
+  // §20.6.1 Syntax 20-6 second form with a packed dimension, e.g.
+  // $typename(logic [7:0]). The parser yields a plain (msb:lsb) range select
+  // over the type keyword. When the base names a built-in type -- and not a
+  // variable, which would make this an expression-form part-select instead --
+  // render the keyword followed by its range as unsized decimal bounds (step
+  // g); the default signing stays implicit (step b).
+  if (arg->kind == ExprKind::kSelect && arg->base != nullptr &&
+      arg->base->kind == ExprKind::kIdentifier && arg->index != nullptr &&
+      arg->index_end != nullptr && !arg->is_part_select_plus &&
+      !arg->is_part_select_minus && IsBuiltinTypeKeyword(arg->base->text) &&
+      ctx.FindVariable(arg->base->text) == nullptr) {
+    uint64_t msb = EvalExpr(arg->index, ctx, arena).ToUint64();
+    uint64_t lsb = EvalExpr(arg->index_end, ctx, arena).ToUint64();
+    std::string s = std::string(arg->base->text) + "[" + std::to_string(msb) +
+                    ":" + std::to_string(lsb) + "]";
+    return StringToLogic4Vec(arena, s);
   }
   return StringToLogic4Vec(arena, "logic");
 }

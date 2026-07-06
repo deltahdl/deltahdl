@@ -18,6 +18,24 @@ TEST(SubroutineCallExprElaboration, TypenameRejectsHierarchicalRef) {
   EXPECT_TRUE(f.has_errors);
 }
 
+// The elaboration-time-constant restriction applies in a localparam
+// initializer just as in a parameter one: a hierarchical reference argument is
+// rejected. Covers the localparam declaration form of the constant context.
+TEST(SubroutineCallExprElaboration,
+     TypenameRejectsHierarchicalRefInLocalparam) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module sub;\n"
+      "  logic x;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  sub s();\n"
+      "  localparam integer T = $typename(s.x);\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_TRUE(f.has_errors);
+}
+
 TEST(SubroutineCallExprElaboration, TypenameAcceptsLocalReference) {
   ElabFixture f;
   ElaborateSrc(
