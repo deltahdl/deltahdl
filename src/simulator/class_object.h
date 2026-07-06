@@ -51,6 +51,12 @@ struct ClassTypeInfo {
     bool is_protected = false;
     bool is_const = false;
     Expr* init_expr = nullptr;
+    // §8.7: a property with no explicit default is initialized to its type's
+    // uninitialized value during construction — X for a 4-state type, 0 for a
+    // 2-state one. Recording the state-ness here lets the constructor pick the
+    // right fill. Defaults to 2-state so entries that never set it (e.g. class
+    // parameters) keep their prior zero-fill behavior.
+    bool is_4state = false;
   };
   std::vector<PropertyInfo> properties;
 

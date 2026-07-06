@@ -114,11 +114,30 @@ TEST(ClassConstructorElaboration, PropertyWithExplicitDefaultElaborates) {
              "endmodule\n"));
 }
 
-TEST(ClassConstructorElaboration, DerivedClassConstructorElaborates) {
+// §8.7: a constructor may be declared as a local method. The qualifier is
+// accepted (unlike static/virtual, which are rejected) and the class still
+// elaborates. Access control on the local `new` is §8.18 machinery.
+TEST(ClassConstructorElaboration, LocalConstructorElaborates) {
+  EXPECT_TRUE(
+      ElabOk("class C;\n"
+             "  int x;\n"
+             "  local function new();\n"
+             "    x = 1;\n"
+             "  endfunction\n"
+             "endclass\n"
+             "module m;\n"
+             "  C c;\n"
+             "endmodule\n"));
+}
+
+// §8.7: a constructor may be declared as a protected method. A protected
+// constructor is reachable from a subclass, so the derived class's super.new()
+// call elaborates cleanly against it.
+TEST(ClassConstructorElaboration, ProtectedConstructorAccessibleToSubclass) {
   EXPECT_TRUE(
       ElabOk("class Base;\n"
              "  int b;\n"
-             "  function new();\n"
+             "  protected function new();\n"
              "    b = 1;\n"
              "  endfunction\n"
              "endclass\n"
@@ -132,6 +151,37 @@ TEST(ClassConstructorElaboration, DerivedClassConstructorElaborates) {
              "module m;\n"
              "  Child ch;\n"
              "  initial ch = new;\n"
+             "endmodule\n"));
+}
+
+// §8.7: `new` is a function and shall be nonblocking. A time-controlling
+// statement in the constructor body is rejected exactly as in any function.
+TEST(ClassConstructorElaboration, ConstructorWithTimingControlError) {
+  EXPECT_FALSE(
+      ElabOk("class C;\n"
+             "  int x;\n"
+             "  function new();\n"
+             "    #5 x = 1;\n"
+             "  endfunction\n"
+             "endclass\n"
+             "module m;\n"
+             "  C c;\n"
+             "endmodule\n"));
+}
+
+// §8.7: the nonblocking requirement bars every kind of time control in the
+// constructor, not just delays. An event control is rejected too.
+TEST(ClassConstructorElaboration, ConstructorWithEventControlError) {
+  EXPECT_FALSE(
+      ElabOk("class C;\n"
+             "  int x;\n"
+             "  int y;\n"
+             "  function new();\n"
+             "    @(y) x = 1;\n"
+             "  endfunction\n"
+             "endclass\n"
+             "module m;\n"
+             "  C c;\n"
              "endmodule\n"));
 }
 

@@ -91,7 +91,8 @@ static void CollectClassMembers(ClassTypeInfo* info, const ClassDecl* cls) {
       if (w == 0) w = 32;
       info->properties.push_back({member->name, w, member->is_static,
                                   member->is_local, member->is_protected,
-                                  member->is_const, member->init_expr});
+                                  member->is_const, member->init_expr,
+                                  Is4stateType(member->data_type, {})});
     } else if (member->kind == ClassMemberKind::kMethod && member->method) {
       std::string name(member->method->name);
       info->methods[name] = member->method;
@@ -167,9 +168,9 @@ static void CollectNestedClassMembers(ClassTypeInfo* nested_info,
     if (m->kind == ClassMemberKind::kProperty) {
       uint32_t w = EvalTypeWidth(m->data_type, {});
       if (w == 0) w = 32;
-      nested_info->properties.push_back({m->name, w, m->is_static, m->is_local,
-                                         m->is_protected, m->is_const,
-                                         m->init_expr});
+      nested_info->properties.push_back(
+          {m->name, w, m->is_static, m->is_local, m->is_protected, m->is_const,
+           m->init_expr, Is4stateType(m->data_type, {})});
     } else if (m->kind == ClassMemberKind::kMethod && m->method) {
       nested_info->methods[std::string(m->method->name)] = m->method;
     }

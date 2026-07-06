@@ -28,8 +28,17 @@ static void InitClassPropertyDefaults(const ClassTypeInfo* info,
     // shared storage. Leave static properties out of the instance map so reads
     // and writes fall through to the type's shared static_properties.
     if (prop.is_static) continue;
-    Logic4Vec val = prop.init_expr ? EvalExpr(prop.init_expr, ctx, arena)
-                                   : MakeLogic4VecVal(arena, prop.width, 0);
+    // §8.7: a property is initialized to its explicit default if one is given,
+    // otherwise to its type's uninitialized value — X for a 4-state type, 0 for
+    // a 2-state one — rather than being forced to zero.
+    Logic4Vec val;
+    if (prop.init_expr) {
+      val = EvalExpr(prop.init_expr, ctx, arena);
+    } else if (prop.is_4state) {
+      val = MakeAllX(arena, prop.width);
+    } else {
+      val = MakeLogic4VecVal(arena, prop.width, 0);
+    }
     obj->properties[std::string(prop.name)] = val;
     std::string scoped =
         std::string(info->name) + "::" + std::string(prop.name);
