@@ -65,22 +65,6 @@ TEST(ConfigPackageBinding, UnreferencedPackageDoesNotTripProhibition) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// A library qualifier on the use clause target must not let a package binding
-// slip past the prohibition: a configuration cannot redirect to a package even
-// when the package is named with an explicit library (§33.4).
-TEST(ConfigPackageBinding, LibraryQualifiedUseClauseToPackageIsRejected) {
-  ElabFixture f;
-  ElaborateSrc(
-      "package pkg; endpackage\n"
-      "module top; endmodule\n"
-      "config c;\n"
-      "  design top;\n"
-      "  instance top.a use lib1.pkg;\n"
-      "endconfig\n",
-      f, "top");
-  EXPECT_TRUE(f.has_errors);
-}
-
 // The cell-clause path must not over-fire: selecting an ordinary module (not a
 // package) for reconfiguration is exactly what §33.4 permits, so it is
 // accepted.
@@ -92,6 +76,82 @@ TEST(ConfigPackageBinding, CellClauseSelectingModuleIsAccepted) {
       "config c;\n"
       "  design top;\n"
       "  cell sub use lib1.other;\n"
+      "endconfig\n",
+      f, "top");
+  EXPECT_FALSE(f.has_errors);
+}
+
+// The cell-clause companion to the unreferenced-package guard above: with a
+// package actually present in the design, a cell clause selecting an ordinary
+// module must still be accepted. This exercises the prohibition's cell-clause
+// discrimination against a live set of package names — the non-firing path when
+// the selected cell is not a package — rather than the trivial case where no
+// package exists at all (§33.4).
+TEST(ConfigPackageBinding,
+     CellClauseSelectingModuleWithPackageDeclaredIsAccepted) {
+  ElabFixture f;
+  ElaborateSrc(
+      "package pkg; endpackage\n"
+      "module sub; endmodule\n"
+      "module top; endmodule\n"
+      "config c;\n"
+      "  design top;\n"
+      "  cell sub use lib1.other;\n"
+      "endconfig\n",
+      f, "top");
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §33.4 admits four element kinds on the accept side of the rule — module,
+// primitive, interface, and program instances — and only excludes packages.
+// The module case is covered above; the remaining three admitted kinds must
+// also pass the prohibition when named by a use clause. Each target below is
+// declared with that kind's own real syntax so the accepted input is built,
+// not stubbed, and the prohibition is observed discriminating package from the
+// full set of instantiable design elements rather than from module alone.
+
+// A configuration may change the binding of an interface instance, so a use
+// clause naming an interface is accepted (§33.4).
+TEST(ConfigPackageBinding, UseClauseBindingInstanceToInterfaceIsAccepted) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface ifc; endinterface\n"
+      "module top; endmodule\n"
+      "config c;\n"
+      "  design top;\n"
+      "  instance top.a use ifc;\n"
+      "endconfig\n",
+      f, "top");
+  EXPECT_FALSE(f.has_errors);
+}
+
+// A configuration may change the binding of a program instance, so a use clause
+// naming a program is accepted (§33.4).
+TEST(ConfigPackageBinding, UseClauseBindingInstanceToProgramIsAccepted) {
+  ElabFixture f;
+  ElaborateSrc(
+      "program prog; endprogram\n"
+      "module top; endmodule\n"
+      "config c;\n"
+      "  design top;\n"
+      "  instance top.a use prog;\n"
+      "endconfig\n",
+      f, "top");
+  EXPECT_FALSE(f.has_errors);
+}
+
+// A configuration may change the binding of a primitive instance, so a use
+// clause naming a user-defined primitive is accepted (§33.4).
+TEST(ConfigPackageBinding, UseClauseBindingInstanceToPrimitiveIsAccepted) {
+  ElabFixture f;
+  ElaborateSrc(
+      "primitive prim(output out, input in);\n"
+      "  table 0 : 1; 1 : 0; endtable\n"
+      "endprimitive\n"
+      "module top; endmodule\n"
+      "config c;\n"
+      "  design top;\n"
+      "  instance top.a use prim;\n"
       "endconfig\n",
       f, "top");
   EXPECT_FALSE(f.has_errors);
