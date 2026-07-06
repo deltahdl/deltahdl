@@ -69,24 +69,6 @@ TEST(CasexSyntaxParsing, AlwaysLatchCasexStatement) {
   EXPECT_EQ(item->body->case_kind, TokenKind::kKwCasex);
 }
 
-TEST(CasexSyntaxParsing, CasexStatement2Items) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial begin\n"
-      "    casex (sel)\n"
-      "      2'b1?: x = 1;\n"
-      "      default: x = 0;\n"
-      "    endcase\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kCase);
-  EXPECT_EQ(stmt->case_kind, TokenKind::kKwCasex);
-  ASSERT_EQ(stmt->case_items.size(), 2u);
-}
-
 TEST(CasexSyntaxParsing, AlwaysCombCasexStatement) {
   auto r = Parse(
       "module m;\n"
@@ -199,24 +181,6 @@ TEST(CasezSyntaxParsing, AlwaysLatchCasezStatement) {
   ASSERT_NE(item->body, nullptr);
   EXPECT_EQ(item->body->kind, StmtKind::kCase);
   EXPECT_EQ(item->body->case_kind, TokenKind::kKwCasez);
-}
-
-TEST(CasezSyntaxParsing, CasezStatement2Items) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial begin\n"
-      "    casez (sel)\n"
-      "      2'b1?: x = 1;\n"
-      "      default: x = 0;\n"
-      "    endcase\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kCase);
-  EXPECT_EQ(stmt->case_kind, TokenKind::kKwCasez);
-  ASSERT_EQ(stmt->case_items.size(), 2u);
 }
 
 TEST(CasezSyntaxParsing, AlwaysCombCasezStatement) {

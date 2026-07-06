@@ -183,6 +183,15 @@ TEST(CasexStatementSim, CasexXInSelectorTreatedAsDontCare) {
 
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
+
+  // §12.5.1: for casex, x (and z) bits in either the case_expression or a
+  // case_item are do-not-cares and drop out of the comparison. Here the
+  // selector r ^ 8'b0x0x0x0x = 8'b0x1x0x1x carries x in every odd bit, and
+  // item 8'b001100xx carries x in its two low bits. Skipping all of those, the
+  // surviving known bits (bit7=0, bit5=1, bit3=0) equal item1, so it matches
+  // and x = 1. A non-zero result here would mean the x bits were still being
+  // compared instead of ignored.
+  EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
 TEST(CasexStatementSim, CasexZInItemTreatedAsDontCare) {
@@ -267,6 +276,37 @@ TEST(CasexStatementSim, CasexQuestionMarkDontCare) {
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
+}
+
+TEST(CasexStatementSim, CasexZInSelectorIsDontCare) {
+  SimFixture f;
+  // §12.5.1: casex treats BOTH x and z as do-not-cares. This exercises the z
+  // operand type (from a real z literal, not a ? and not an x): sel = 4'bz1z0
+  // carries z in bits 3 and 1. Under casex those bits drop out, so the known
+  // bits (bit2=1, bit0=0) match item 4'b0100 -> y = 10. Contrast the casez
+  // x-selector case, which does NOT match, and the casex x-selector case: here
+  // it is z (not x) that casex is ignoring, proving casex covers z as well.
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [3:0] sel;\n"
+      "  logic [7:0] y;\n"
+      "  initial begin\n"
+      "    sel = 4'bz1z0;\n"
+      "    casex (sel)\n"
+      "      4'b0100: y = 8'd10;\n"
+      "      4'b1100: y = 8'd20;\n"
+      "      default: y = 8'd99;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("y");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
 TEST(CasezStatementSim, CasezExactMatchWorks) {
@@ -427,6 +467,68 @@ TEST(CasezStatementSim, CasezZInSelectorIsDontCare) {
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
+TEST(CasezStatementSim, CasezXInSelectorStaysSignificant) {
+  SimFixture f;
+  // §12.5.1: casez treats only z (and ?) as do-not-care; x is a real value.
+  // sel = 4'bx1x0 differs from the z-selector case (4'bz1z0 matched 4'b0100)
+  // ONLY in that bits 3 and 1 are x instead of z. Because x is NOT dropped
+  // under casez, those bits are compared as ordinary values, no item's known
+  // bits can match an x, and control falls through to the default -> x = 99.
+  // A result of 10 here would mean x had been mistaken for a don't-care.
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [3:0] sel;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    sel = 4'bx1x0;\n"
+      "    casez (sel)\n"
+      "      4'b0100: x = 8'd10;\n"
+      "      4'b1100: x = 8'd20;\n"
+      "      default: x = 8'd99;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 99u);
+}
+
+TEST(CasezStatementSim, CasezXInItemStaysSignificant) {
+  SimFixture f;
+  // §12.5.1 (negative, item side): under casez an x bit is a real value, not a
+  // do-not-care, wherever it sits. Here the x lives in a case_item (4'b1x1x)
+  // rather than the selector. sel = 4'b1010: the item's known bits (bit3=1,
+  // bit1=1) agree, but bits 2 and 0 hold x, which casez compares as ordinary
+  // values against sel's 0s -> no match, so control falls to default -> x = 99.
+  // The companion CasezDontCareInItem test uses z in the same positions and
+  // DOES match, isolating the x-vs-z difference at the item.
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [3:0] sel;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    sel = 4'b1010;\n"
+      "    casez (sel)\n"
+      "      4'b1x1x: x = 8'd10;\n"
+      "      default: x = 8'd99;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 99u);
+}
+
 TEST(CasezStatementSim, CasezDontCareInPatternOnly) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -453,74 +555,42 @@ TEST(CasezStatementSim, CasezDontCareInPatternOnly) {
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
+TEST(CasezStatementSim, CasezDontCareInItem) {
+  SimFixture f;
+  // §12.5.1: a do-not-care in a case_item drops out just as one in the
+  // case_expression does. This drives the item-side rule from an explicit z
+  // literal (4'b1z1z), a distinct source form from the ? spelling exercised by
+  // CasezDontCareInPatternOnly. sel = 4'b1010: bits 2 and 0 of the item are z
+  // and are not considered, and the surviving bits (bit3=1, bit1=1) equal sel,
+  // so the first item matches -> x = 10. Pairs with
+  // CasezXInItemStaysSignificant (same positions, x instead of z) to show z is
+  // dropped where x is not.
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [3:0] sel;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    sel = 4'b1010;\n"
+      "    casez (sel)\n"
+      "      4'b1z1z: x = 8'd10;\n"
+      "      4'b1010: x = 8'd20;\n"
+      "      default: x = 8'd99;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 10u);
+}
+
 TEST(CasezStatementSim, CasezZInItemTreatedAsDontCare) {
   StmtFixture f;
   EXPECT_EQ(RunZInItemDontCare(f, TokenKind::kKwCasez), 77u);
-}
-
-TEST(CasezStatementSim, CasezXInSelectorIsNotDontCare) {
-  StmtFixture f;
-  auto* result_var = f.ctx.CreateVariable("cxnd", 32);
-  result_var->value = MakeLogic4VecVal(f.arena, 32, 0);
-
-  auto* sel_var = f.ctx.CreateVariable("sel_x", 4);
-  sel_var->value = MakeLogic4Vec(f.arena, 4);
-  sel_var->value.words[0].aval = 0x02;
-  sel_var->value.words[0].bval = 0x01;
-
-  auto* stmt = f.arena.Create<Stmt>();
-  stmt->kind = StmtKind::kCase;
-  stmt->case_kind = TokenKind::kKwCasez;
-  stmt->condition = MakeId(f.arena, "sel_x");
-
-  CaseItem item1;
-  item1.patterns.push_back(MakeInt(f.arena, 2));
-  item1.body = MakeBlockAssign(f.arena, "cxnd", 42);
-  stmt->case_items.push_back(item1);
-
-  CaseItem item2;
-  item2.patterns.push_back(MakeInt(f.arena, 3));
-  item2.body = MakeBlockAssign(f.arena, "cxnd", 99);
-  stmt->case_items.push_back(item2);
-
-  CaseItem def;
-  def.is_default = true;
-  def.body = MakeBlockAssign(f.arena, "cxnd", 0);
-  stmt->case_items.push_back(def);
-
-  RunStmt(stmt, f.ctx, f.arena);
-
-  EXPECT_EQ(result_var->value.ToUint64(), 42u);
-}
-
-TEST(CasezStatementSim, CasezXInItemIsNotDontCare) {
-  StmtFixture f;
-  auto* result_var = f.ctx.CreateVariable("cxni", 32);
-  result_var->value = MakeLogic4VecVal(f.arena, 32, 0);
-
-  auto* stmt = f.arena.Create<Stmt>();
-  stmt->kind = StmtKind::kCase;
-  stmt->case_kind = TokenKind::kKwCasez;
-  stmt->condition = MakeInt(f.arena, 2);
-
-  auto* pat_x = f.ctx.CreateVariable("pat_x", 4);
-  pat_x->value = MakeLogic4Vec(f.arena, 4);
-  pat_x->value.words[0].aval = 0x02;
-  pat_x->value.words[0].bval = 0x01;
-
-  CaseItem item1;
-  item1.patterns.push_back(MakeId(f.arena, "pat_x"));
-  item1.body = MakeBlockAssign(f.arena, "cxni", 55);
-  stmt->case_items.push_back(item1);
-
-  CaseItem def;
-  def.is_default = true;
-  def.body = MakeBlockAssign(f.arena, "cxni", 0);
-  stmt->case_items.push_back(def);
-
-  RunStmt(stmt, f.ctx, f.arena);
-
-  EXPECT_EQ(result_var->value.ToUint64(), 55u);
 }
 
 TEST(CasezStatementSim, CasezEmptyNoItems) {
