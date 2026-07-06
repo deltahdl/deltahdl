@@ -29,11 +29,16 @@ static void InferDynArraySize(const std::vector<Expr*>& dims, const Expr* init,
 }
 
 static bool TryParseQueueDim(const Expr* dim, RtlirVariable& var,
-                             DiagEngine& diag, SourceLoc loc) {
+                             DiagEngine& diag, SourceLoc loc,
+                             const ScopeMap& scope) {
   if (dim->kind != ExprKind::kIdentifier || dim->text != "$") return false;
   var.is_queue = true;
   if (dim->rhs) {
-    auto max_val = ConstEvalInt(dim->rhs);
+    // §7.10: the optional right bound is a constant_expression that shall
+    // evaluate to a positive integer. Per §11.2.1 that expression may name a
+    // parameter or localparam, so it is evaluated in the enclosing parameter
+    // scope — just like a range dimension's bounds.
+    auto max_val = ConstEvalInt(dim->rhs, scope);
     if (max_val) {
       if (*max_val <= 0) {
         diag.Error(loc, "queue bound must be a positive integer");
@@ -156,7 +161,7 @@ static void ComputeUnpackedDims(const std::vector<Expr*>& dims,
                                 SourceLoc loc, const ScopeMap& scope) {
   if (dims.empty() || !dims[0]) return;
   auto* dim = dims[0];
-  if (TryParseQueueDim(dim, var, diag, loc)) return;
+  if (TryParseQueueDim(dim, var, diag, loc, scope)) return;
   if (TryParseAssocDim(dim, var)) return;
   if (TryParseUserDefinedAssocDim(dim, var, types.typedefs, types.class_names))
     return;

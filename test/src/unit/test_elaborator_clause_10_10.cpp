@@ -214,4 +214,40 @@ TEST(UnpackedArrayConcatElaboration, NullItemAllowedForChandleElementType) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// The rule also lists class (and interface class) as element types for which a
+// null item is legal — a distinct acceptance branch from chandle, since a class
+// handle reaches the check as a named element type rather than a built-in
+// chandle. A queue of class handles initialized from a concatenation of null
+// items shall therefore elaborate cleanly.
+TEST(UnpackedArrayConcatElaboration, NullItemAllowedForClassElementType) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "class C;\n"
+      "endclass\n"
+      "module m;\n"
+      "  C q[$];\n"
+      "  initial q = {null, null};\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// `event` is the third element type the rule admits for a null item, and it
+// reaches the check through yet another branch (a built-in event element type,
+// neither chandle nor a named class). A queue of events initialized from a
+// concatenation of null items shall elaborate without errors, completing the
+// per-element-type coverage of the accept side of the rule.
+TEST(UnpackedArrayConcatElaboration, NullItemAllowedForEventElementType) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  event q[$];\n"
+      "  initial q = {null, null};\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace

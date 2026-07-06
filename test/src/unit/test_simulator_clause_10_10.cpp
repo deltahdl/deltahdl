@@ -121,23 +121,6 @@ TEST(UnpackedArrayConcatSim, ConcatToDynamicArray) {
   EXPECT_EQ(q->elements[2].ToUint64(), 30u);
 }
 
-TEST(UnpackedArrayConcatSim, FixedSizeMismatchEmitsError) {
-  SimFixture f;
-  ArrayInfo info;
-  info.lo = 0;
-  info.size = 3;
-  info.elem_width = 32;
-  info.is_descending = false;
-  f.ctx.RegisterArray("A", info);
-  for (uint32_t i = 0; i < 3; ++i)
-    f.ctx.CreateVariable("A[" + std::to_string(i) + "]", 32);
-  auto* rhs = MakeConcat(f.arena, {MakeInt(f.arena, 1), MakeInt(f.arena, 2),
-                                   MakeInt(f.arena, 3), MakeInt(f.arena, 4)});
-  auto* stmt = MakeAssign(f.arena, "A", rhs);
-  TryArrayBlockingAssign(stmt, f.ctx, f.arena);
-  EXPECT_TRUE(f.diag.HasErrors());
-}
-
 TEST(UnpackedArrayConcatSim, EmptyConcatToFixedSizeError) {
   SimFixture f;
   ArrayInfo info;
@@ -154,28 +137,54 @@ TEST(UnpackedArrayConcatSim, EmptyConcatToFixedSizeError) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-TEST(UnpackedArrayConcatSim, BoundedQueueOverflowTruncates) {
+// §10.10: "It shall be an error if the size of the resulting array differs from
+// the number of elements in a fixed-size target." The size-mismatch rule is a
+// runtime rule that fires only when the fixed-size target and the concatenation
+// meet in a procedural assignment, so it must be driven from real source (a
+// declaration + an initial-block assignment) rather than from a hand-built
+// ArrayInfo. Elaboration stays clean; the error appears when the assignment
+// runs.
+TEST(UnpackedArrayConcatSim, FixedSizeMismatchFromSourceErrorsAtRuntime) {
   SimFixture f;
-  auto* q = f.ctx.CreateQueue("q", 32, 3);
-  auto* rhs = MakeConcat(f.arena, {MakeInt(f.arena, 10), MakeInt(f.arena, 20),
-                                   MakeInt(f.arena, 30), MakeInt(f.arena, 40)});
-  auto* stmt = MakeAssign(f.arena, "q", rhs);
-  TryQueueBlockingAssign(stmt, f.ctx, f.arena);
-  ASSERT_EQ(q->elements.size(), 3u);
-  EXPECT_EQ(q->elements[0].ToUint64(), 10u);
-  EXPECT_EQ(q->elements[1].ToUint64(), 20u);
-  EXPECT_EQ(q->elements[2].ToUint64(), 30u);
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int A[3];\n"
+      "  initial A = {1, 2, 3, 4};\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_TRUE(f.diag.HasErrors());
 }
 
-TEST(UnpackedArrayConcatSim, BoundedQueueOverflowWarns) {
+// §10.10: "If the size exceeds the maximum number of elements of a bounded
+// queue, then elements beyond the upper bound of the target shall be ignored
+// and a warning shall be issued." The bound comes from the queue_dimension of
+// §7.10 (`[$:1]` → capacity 2), so this weaves §7.10's bounded-queue target
+// with §10.10's overflow rule and is driven end to end from source: the third
+// item is dropped and a warning is raised, leaving exactly two elements.
+TEST(UnpackedArrayConcatSim, BoundedQueueOverflowFromSourceTruncatesAndWarns) {
   SimFixture f;
-  f.ctx.CreateQueue("q", 32, 2);
-  auto before = f.diag.WarningCount();
-  auto* rhs = MakeConcat(f.arena, {MakeInt(f.arena, 10), MakeInt(f.arena, 20),
-                                   MakeInt(f.arena, 30)});
-  auto* stmt = MakeAssign(f.arena, "q", rhs);
-  TryQueueBlockingAssign(stmt, f.ctx, f.arena);
-  EXPECT_GT(f.diag.WarningCount(), before);
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int q[$:1];\n"
+      "  initial q = {10, 20, 30};\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  auto warnings_before = f.diag.WarningCount();
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* q = f.ctx.FindQueue("q");
+  ASSERT_NE(q, nullptr);
+  ASSERT_EQ(q->elements.size(), 2u);
+  EXPECT_EQ(q->elements[0].ToUint64(), 10u);
+  EXPECT_EQ(q->elements[1].ToUint64(), 20u);
+  EXPECT_GT(f.diag.WarningCount(), warnings_before);
 }
 
 }  // namespace

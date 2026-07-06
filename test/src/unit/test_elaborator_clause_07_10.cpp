@@ -40,4 +40,42 @@ TEST(QueueDeclarationElaboration, NonPositiveBoundEmitsError) {
   EXPECT_TRUE(f.has_errors);
 }
 
+// §7.10's bound is a constant_expression, which per §11.2.1 may name a
+// localparam. A localparam bound shall resolve to the queue's capacity exactly
+// as a literal bound does; here N == 7 yields size N+1 == 8.
+TEST(QueueDeclarationElaboration, LocalparamBoundRecordsCapacity) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module m;\n"
+      "  localparam int N = 7;\n"
+      "  bit b [$:N];\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  const RtlirVariable* q = nullptr;
+  for (auto& v : mod->variables)
+    if (v.name == "b") q = &v;
+  ASSERT_NE(q, nullptr);
+  EXPECT_TRUE(q->is_queue);
+  EXPECT_EQ(q->queue_max_size, 8);
+}
+
+// The same constant-expression path must still enforce "shall evaluate to a
+// positive integer": a parameter that evaluates non-positive trips the error,
+// proving the bound is genuinely evaluated in the parameter scope rather than
+// silently dropped (which would leave the queue unbounded with no diagnostic).
+TEST(QueueDeclarationElaboration, ParameterNonPositiveBoundEmitsError) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module m;\n"
+      "  parameter int N = 0;\n"
+      "  int q [$:N];\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_TRUE(f.has_errors);
+}
+
 }  // namespace
