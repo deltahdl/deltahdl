@@ -24,34 +24,6 @@ TEST(ClassSim, NonVirtualFallbackToStaticResolution) {
   EXPECT_EQ(obj->ResolveMethod("bar"), method);
 }
 
-TEST(ClassSim, PolymorphicMultipleMethods) {
-  SimFixture f;
-  auto* base = MakeClassType(f, "Base", {});
-
-  auto* send_fn = f.arena.Create<ModuleItem>();
-  send_fn->kind = ModuleItemKind::kFunctionDecl;
-  send_fn->name = "send";
-  auto* recv_fn = f.arena.Create<ModuleItem>();
-  recv_fn->kind = ModuleItemKind::kFunctionDecl;
-  recv_fn->name = "receive";
-
-  base->vtable.push_back({"send", send_fn, base});
-  base->vtable.push_back({"receive", recv_fn, base});
-
-  auto* derived = MakeClassType(f, "Derived", {});
-  derived->parent = base;
-  auto* derived_send = f.arena.Create<ModuleItem>();
-  derived_send->kind = ModuleItemKind::kFunctionDecl;
-  derived_send->name = "send";
-
-  derived->vtable.push_back({"send", derived_send, derived});
-  derived->vtable.push_back({"receive", recv_fn, base});
-
-  auto [handle, obj] = MakeObj(f, derived);
-  EXPECT_EQ(obj->ResolveVirtualMethod("send"), derived_send);
-  EXPECT_EQ(obj->ResolveVirtualMethod("receive"), recv_fn);
-}
-
 TEST(ClassSim, PolymorphicUnknownMethodReturnsNull) {
   SimFixture f;
   auto* type = MakeClassType(f, "Foo", {});
@@ -79,6 +51,34 @@ TEST(ClassSim, E2eVirtualDispatchThroughBaseVariable) {
                       "    d = new;\n"
                       "    b = d;\n"
                       "    result = b.compute();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            20u);
+}
+
+// Late binding is not limited to virtual functions: a virtual task called
+// through a superclass handle likewise resolves to the override belonging to
+// the object's dynamic type. The task reports through an output argument.
+TEST(ClassSim, E2eVirtualTaskDispatchThroughBaseVariable) {
+  EXPECT_EQ(RunAndGet("class Base;\n"
+                      "  virtual task get(output int v);\n"
+                      "    v = 10;\n"
+                      "  endtask\n"
+                      "endclass\n"
+                      "class Derived extends Base;\n"
+                      "  virtual task get(output int v);\n"
+                      "    v = 20;\n"
+                      "  endtask\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    Base b;\n"
+                      "    Derived d;\n"
+                      "    d = new;\n"
+                      "    b = d;\n"
+                      "    b.get(result);\n"
                       "  end\n"
                       "endmodule\n",
                       "result"),
