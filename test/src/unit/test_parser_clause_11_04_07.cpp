@@ -88,6 +88,22 @@ TEST(OperatorParsing, PrecedenceLogicalBelowEquality) {
   EXPECT_EQ(rhs->rhs->op, TokenKind::kBangEq);
 }
 
+TEST(OperatorParsing, PrecedenceLogicalBelowRelational) {
+  // 11.4.7 states the logical operators bind lower than the relational
+  // operators, so each unparenthesized relational comparison forms an operand
+  // of `&&` rather than the other way around.
+  auto r = Parse("module m; initial x = a < b && c > d; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->op, TokenKind::kAmpAmp);
+  ASSERT_NE(rhs->lhs, nullptr);
+  EXPECT_EQ(rhs->lhs->op, TokenKind::kLt);
+  ASSERT_NE(rhs->rhs, nullptr);
+  EXPECT_EQ(rhs->rhs->op, TokenKind::kGt);
+}
+
 TEST(OperatorParsing, ImplicationBelowOr) {
   auto r = Parse("module m; initial x = a || b -> c || d; endmodule\n");
   ASSERT_NE(r.cu, nullptr);

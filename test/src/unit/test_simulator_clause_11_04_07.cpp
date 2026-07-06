@@ -673,6 +673,98 @@ TEST(BlockingAssignSim, BlockingAssignUnaryLogicalNotAndMinus) {
   EXPECT_EQ(notv->value.ToUint64(), 0u);
 }
 
+TEST(OperatorSim, LogicalAndOfRelationalAndEqualityOperands) {
+  // Example 2 of 11.4.7: a logical-AND chain whose operands are a relational
+  // comparison (11.4.4) and two inequality comparisons (11.4.5). The &&
+  // operator consumes the 1-bit results of those comparisons; the run observes
+  // that the combined result is true only when every operand comparison is
+  // true. The second evaluation flips one operand (c) so that `b != c` becomes
+  // false, forcing the whole AND to 0 and proving the operands actually drive
+  // it.
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int a, size, b, c, index, lastone;\n"
+      "  logic y_all, y_one;\n"
+      "  initial begin\n"
+      "    a = 2; size = 5;\n"
+      "    b = 3; c = 4;\n"
+      "    index = 7; lastone = 9;\n"
+      "    y_all = (a < size-1) && (b != c) && (index != lastone);\n"
+      "    c = 3;\n"
+      "    y_one = (a < size-1) && (b != c) && (index != lastone);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* y_all = f.ctx.FindVariable("y_all");
+  auto* y_one = f.ctx.FindVariable("y_one");
+  ASSERT_NE(y_all, nullptr);
+  ASSERT_NE(y_one, nullptr);
+  EXPECT_EQ(y_all->value.ToUint64(), 1u);
+  EXPECT_EQ(y_all->value.words[0].bval, 0u);
+  EXPECT_EQ(y_one->value.ToUint64(), 0u);
+  EXPECT_EQ(y_one->value.words[0].bval, 0u);
+}
+
+TEST(OperatorSim, UnaryLogicalNotRealOperand) {
+  // 11.4.7: the unary logical negation admits a real operand. A nonzero real is
+  // a true value (negated to 0) and a zero real is a false value (negated to
+  // 1). The operands are declared `real` variables so the real data type flows
+  // through the whole pipeline rather than an integral one.
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  real r_nz, r_z;\n"
+      "  logic y_nz, y_z;\n"
+      "  initial begin\n"
+      "    r_nz = 2.5;\n"
+      "    r_z = 0.0;\n"
+      "    y_nz = !r_nz;\n"
+      "    y_z = !r_z;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* y_nz = f.ctx.FindVariable("y_nz");
+  auto* y_z = f.ctx.FindVariable("y_z");
+  ASSERT_NE(y_nz, nullptr);
+  ASSERT_NE(y_z, nullptr);
+  EXPECT_EQ(y_nz->value.ToUint64(), 0u);
+  EXPECT_EQ(y_z->value.ToUint64(), 1u);
+}
+
+TEST(OperatorSim, LogicalAndOrRealOperands) {
+  // 11.4.7: the binary logical operators admit real operands, treating a
+  // nonzero real as true and a zero real as false. Real variables supply the
+  // operands so the real data type is exercised end-to-end for both && and ||.
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  real a, b;\n"
+      "  logic y_and, y_or;\n"
+      "  initial begin\n"
+      "    a = 2.5;\n"
+      "    b = 0.0;\n"
+      "    y_and = a && b;\n"
+      "    y_or = a || b;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* y_and = f.ctx.FindVariable("y_and");
+  auto* y_or = f.ctx.FindVariable("y_or");
+  ASSERT_NE(y_and, nullptr);
+  ASSERT_NE(y_or, nullptr);
+  EXPECT_EQ(y_and->value.ToUint64(), 0u);
+  EXPECT_EQ(y_or->value.ToUint64(), 1u);
+}
+
 TEST(BlockingAssignSim, BlockingAssignLogicalOps) {
   SimFixture f;
   auto* design = ElaborateSrc(
