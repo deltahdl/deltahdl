@@ -29,26 +29,6 @@ TEST(FinalProcedureSimulation, FinalBlockExecutesAfterRun) {
   EXPECT_EQ(var->value.ToUint64(), 77u);
 }
 
-TEST(FinalProcedureSimulation, FinalBlockNotScheduledAtTimeZero) {
-  LowerFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [31:0] x;\n"
-      "  initial x = 10;\n"
-      "  final x = 77;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 10u);
-}
-
 TEST(FinalProcedureSimulation, FinalBlocksFIFOOrder) {
   LowerFixture f;
   auto* design = ElaborateSrc(
@@ -209,6 +189,34 @@ TEST(FinalProcedureSimulation, TriggeredByFinish) {
 
   f.ctx.RunFinalBlocks();
   EXPECT_EQ(var->value.ToUint64(), 100u);
+}
+
+TEST(FinalProcedureSimulation, FinalCallsUserFunction) {
+  // §9.2.3 end-to-end for the §13.4 dependency: a final procedure runs as a
+  // series of function calls, so a call to a user-defined function (built from
+  // real §13.4 declaration syntax) executes when the finals run. Observing the
+  // returned value confirms the function-legal statement was carried through
+  // the full pipeline and evaluated in the final procedure.
+  LowerFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  function int doubler(int a); return a * 2; endfunction\n"
+      "  int x;\n"
+      "  final x = doubler(21);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0u);
+
+  f.ctx.RunFinalBlocks();
+  EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
 TEST(FinalProcedureSimulation, FinishInsideFinalStopsRemainingFinals) {

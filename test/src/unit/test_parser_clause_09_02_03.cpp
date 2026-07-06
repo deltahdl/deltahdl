@@ -50,17 +50,6 @@ TEST(FinalProcedureParsing, ProgramWithFinalBlock) {
   EXPECT_EQ(r.cu->programs[0]->items[0]->kind, ModuleItemKind::kFinalBlock);
 }
 
-TEST(FinalProcedureParsing, SingleStatement) {
-  auto r = Parse(
-      "module m;\n"
-      "  final $display(\"done\");\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_GE(r.cu->modules[0]->items.size(), 1u);
-  EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kFinalBlock);
-}
-
 TEST(FinalProcedureParsing, BeginEndHasBody) {
   auto r = Parse(
       "module m;\n"

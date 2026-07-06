@@ -104,7 +104,14 @@ static bool MayInferLatch(const Stmt* stmt) {
   }
 }
 
-static bool StmtHasTimingControl(const Stmt* stmt) {
+// Detects statement-level timing controls (delay, event, wait, wait fork). When
+// `include_intra_assign` is set, an assignment carrying an intra-assignment
+// timing control (`x = #5 y;`, `x <= @(clk) y;`, `x = ##2 y;`, the repeat-event
+// form) also counts — a form legal for some always procedures (e.g. a
+// nonblocking delay in always_comb, §9.2.2.2) but not for a final procedure,
+// which is limited to the timing-free statements permitted in a function.
+static bool StmtHasTimingControl(const Stmt* stmt,
+                                 bool include_intra_assign = false) {
   if (!stmt) return false;
   switch (stmt->kind) {
     case StmtKind::kTimingControl:
@@ -113,24 +120,33 @@ static bool StmtHasTimingControl(const Stmt* stmt) {
     case StmtKind::kWait:
     case StmtKind::kWaitFork:
       return true;
+    case StmtKind::kBlockingAssign:
+    case StmtKind::kNonblockingAssign:
+      return include_intra_assign &&
+             (stmt->delay != nullptr || stmt->cycle_delay != nullptr ||
+              !stmt->events.empty());
     case StmtKind::kBlock:
       for (const auto* s : stmt->stmts)
-        if (StmtHasTimingControl(s)) return true;
+        if (StmtHasTimingControl(s, include_intra_assign)) return true;
       return false;
     case StmtKind::kIf:
-      return StmtHasTimingControl(stmt->then_branch) ||
-             StmtHasTimingControl(stmt->else_branch);
+      return StmtHasTimingControl(stmt->then_branch, include_intra_assign) ||
+             StmtHasTimingControl(stmt->else_branch, include_intra_assign);
     case StmtKind::kFor:
-      return StmtHasTimingControl(stmt->for_body);
+      return StmtHasTimingControl(stmt->for_body, include_intra_assign);
     case StmtKind::kWhile:
     case StmtKind::kDoWhile:
     case StmtKind::kForever:
     case StmtKind::kRepeat:
     case StmtKind::kForeach:
-      return StmtHasTimingControl(stmt->body);
+      return StmtHasTimingControl(stmt->body, include_intra_assign);
     case StmtKind::kFork:
       for (const auto* s : stmt->fork_stmts)
-        if (StmtHasTimingControl(s)) return true;
+        if (StmtHasTimingControl(s, include_intra_assign)) return true;
+      return false;
+    case StmtKind::kCase:
+      for (const auto& ci : stmt->case_items)
+        if (StmtHasTimingControl(ci.body, include_intra_assign)) return true;
       return false;
     default:
       return false;
@@ -199,7 +215,7 @@ static void ValidateAlwaysFFProcess(ModuleItem* item, const RtlirProcess& proc,
 
 static void ValidateFinalProcess(ModuleItem* item, const RtlirProcess& proc,
                                  DiagEngine& diag) {
-  if (StmtHasTimingControl(proc.body)) {
+  if (StmtHasTimingControl(proc.body, /*include_intra_assign=*/true)) {
     diag.Error(item->loc, "final procedure shall not contain timing controls");
   }
   if (StmtHasForkJoin(proc.body)) {
