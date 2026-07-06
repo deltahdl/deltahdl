@@ -576,22 +576,64 @@ static std::string DumpportsControlFileArg(const Expr* expr) {
   return std::string(text);
 }
 
+// §21.7.1.2: reduce a $dumpvars scope argument to the name under which the
+// selected object is registered. A plain identifier keeps its name and a string
+// literal loses its quotes. A hierarchical reference such as top.mod2.net1
+// parses as a chain of member accesses whose text is spread across the chain,
+// so rebuild it into the dotted downward path (e.g. c1.val) that matches the
+// key an instance's variable is registered under -- without this a
+// member-access argument would carry no text of its own and be dropped.
+static std::string DumpvarsScopePath(const Expr* arg) {
+  if (arg->kind == ExprKind::kMemberAccess) {
+    std::vector<std::string_view> parts;
+    const Expr* e = arg;
+    while (e != nullptr && e->kind == ExprKind::kMemberAccess) {
+      if (e->rhs != nullptr) parts.push_back(e->rhs->text);
+      e = e->lhs;
+    }
+    if (e != nullptr) parts.push_back(e->text);
+    std::string path;
+    for (auto it = parts.rbegin(); it != parts.rend(); ++it) {
+      if (!path.empty()) path.push_back('.');
+      path.append(*it);
+    }
+    return path;
+  }
+  std::string_view text = arg->text;
+  if (arg->kind == ExprKind::kStringLiteral && text.size() >= 2 &&
+      text.front() == '"') {
+    text = text.substr(1, text.size() - 2);
+  }
+  return std::string(text);
+}
+
 // §21.7.1.2: dump the variables named by a $dumpvars call. With no arguments
 // every variable in the model is dumped. When arguments are present the first
-// is the level count and the remaining arguments name the scopes (modules or
-// individual variables) to dump.
-static void ExecDumpvars(const Expr* expr, VcdWriter* vcd) {
+// is the level count -- how many levels of the hierarchy below each named
+// module instance to dump, with 0 meaning every level below -- and the
+// remaining arguments name the scopes (whole module instances or individual
+// variables) to dump. The level count never names a variable of its own and
+// does not apply to scope arguments that name an individual variable.
+static void ExecDumpvars(const Expr* expr, SimContext& ctx, Arena& arena,
+                         VcdWriter* vcd) {
   if (!vcd) return;
-  std::vector<std::string_view> scopes;
+  std::vector<std::string> scope_storage;
   for (size_t i = 1; i < expr->args.size(); ++i) {
-    auto scope = DumpvarsScopeName(expr->args[i]);
-    if (!scope.empty()) scopes.push_back(scope);
+    if (expr->args[i] == nullptr) continue;
+    auto scope = DumpvarsScopePath(expr->args[i]);
+    if (!scope.empty()) scope_storage.push_back(std::move(scope));
   }
-  if (scopes.empty()) {
+  if (scope_storage.empty()) {
     vcd->DumpAllValues();
-  } else {
-    vcd->DumpSelectedValues(scopes);
+    return;
   }
+  uint64_t level = 0;
+  if (!expr->args.empty() && expr->args[0] != nullptr) {
+    level = EvalExpr(expr->args[0], ctx, arena).ToUint64();
+  }
+  std::vector<std::string_view> scopes(scope_storage.begin(),
+                                       scope_storage.end());
+  vcd->DumpScopeSelectedValues(scopes, level);
 }
 
 // §21.7.3.1: gather the unique module scopes named in a $dumpports scope_list.
@@ -798,7 +840,7 @@ Logic4Vec EvalVcdSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
   if (name == "$dumpfile") {
     ctx.SetDumpFileName(ResolveDumpFileName(expr, ctx, arena));
   } else if (name == "$dumpvars") {
-    ExecDumpvars(expr, vcd);
+    ExecDumpvars(expr, ctx, arena, vcd);
   } else if (name == "$dumplimit") {
     // §21.7.1.5: the single argument bounds the VCD file size in bytes.
     ExecDumpLimit(expr, ctx, arena, vcd);

@@ -110,6 +110,13 @@ class VcdWriter {
   void WriteTimestamp(uint64_t time);
   void DumpAllValues();
   void DumpSelectedValues(const std::vector<std::string_view>& names);
+  // §21.7.1.2: dump the values selected by a $dumpvars scope list. A scope that
+  // exactly names a signal is an individual variable and is always dumped; a
+  // scope that names a module instance selects every signal beneath it, with
+  // `level` bounding how many levels of hierarchy below the module to descend
+  // (0 means every level below).
+  void DumpScopeSelectedValues(const std::vector<std::string_view>& names,
+                               uint64_t level);
   void DumpChangedValues(uint64_t prev_time);
 
   // Generate a checkpoint (§21.7.1.4): emit a $dumpall checkpoint recording the

@@ -11,14 +11,7 @@ TEST(IoSystemTaskParsing, DumpvarsNoArgs) {
               "endmodule\n"));
 }
 
-TEST(IoSystemTaskParsing, DumpvarsWithLevels) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  initial $dumpvars(1, t);\n"
-              "endmodule\n"));
-}
-
-TEST(IoSystemTaskParsing, DumpvarsAllLevels) {
+TEST(IoSystemTaskParsing, DumpvarsWithLevelAndScope) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  initial $dumpvars(0, t);\n"

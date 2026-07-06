@@ -389,6 +389,42 @@ void VcdWriter::DumpSelectedValues(const std::vector<std::string_view>& names) {
   ofs_ << "$end\n";
 }
 
+// §21.7.1.2: decide whether a $dumpvars scope list selects one signal. A scope
+// that exactly names the signal is an individual variable and is always dumped
+// -- the level count does not apply to individual variables. Otherwise the
+// scope names a module instance: a signal lies beneath it when its hierarchical
+// name begins with "scope.". The level count bounds how far below the module to
+// descend -- the module's own variables sit one level down, a sub-instance's
+// variables two, and so on -- with 0 meaning every level below.
+static bool ScopeSelectsSignal(std::string_view sig_name,
+                               const std::vector<std::string_view>& scopes,
+                               uint64_t level) {
+  for (std::string_view s : scopes) {
+    if (sig_name == s) return true;
+    if (sig_name.size() > s.size() + 1 && sig_name.substr(0, s.size()) == s &&
+        sig_name[s.size()] == '.') {
+      std::string_view rest = sig_name.substr(s.size() + 1);
+      uint64_t depth = 1;
+      for (char c : rest) {
+        if (c == '.') ++depth;
+      }
+      if (level == 0 || depth <= level) return true;
+    }
+  }
+  return false;
+}
+
+void VcdWriter::DumpScopeSelectedValues(
+    const std::vector<std::string_view>& names, uint64_t level) {
+  if (!ofs_.is_open() || !enabled_) return;
+  if (AtSizeLimit()) return;
+  ofs_ << "$dumpvars\n";
+  for (const auto& sig : signals_) {
+    if (ScopeSelectsSignal(sig.name, names, level)) WriteSignalChange(sig);
+  }
+  ofs_ << "$end\n";
+}
+
 void VcdWriter::DumpAll() {
   if (!ofs_.is_open() || !enabled_) return;
   if (AtSizeLimit()) return;
