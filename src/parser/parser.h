@@ -118,6 +118,13 @@ class Parser {
                                bool carried_qualifier);
   void CaptureConstraintRelation(ClassMember* member);
   bool TryCaptureBracedImplication(ClassMember* member);
+  bool TryCaptureIfElseConstraint(ClassMember* member);
+  bool CaptureGuardedIf(Expr* guard, std::vector<Expr*>& out);
+  bool CaptureGuardedConstraintSet(Expr* guard, std::vector<Expr*>& out);
+  bool CaptureGuardedConstraintItem(Expr* guard, std::vector<Expr*>& out);
+  Expr* MakeConstraintImplication(Expr* guard, Expr* consequent);
+  Expr* MakeConstraintAnd(Expr* lhs, Expr* rhs);
+  Expr* MakeConstraintNot(Expr* operand);
   void CaptureLinearSequenceBody(ModuleItem* item);
   bool ParseLinearSeqOperands(std::vector<Expr*>& operands);
   void CheckConstraintExprToken(const Token& tok);

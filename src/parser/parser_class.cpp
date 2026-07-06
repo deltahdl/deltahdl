@@ -743,10 +743,15 @@ void Parser::CaptureConstraintRelation(ClassMember* member) {
   }
   auto saved = lexer_.SavePos();
   diag_.PushSuppress();
+  // 18.5.6: an if-else constraint ("if ( expression ) constraint_set [ else
+  // constraint_set ]") begins with the 'if' keyword, which is not the start of
+  // an expression; capture it into equivalent implications before the plain
+  // parse below.
   // 18.5.5: an implication whose consequent is an unnamed constraint set,
-  // "antecedent -> { c1; c2; ... }", is captured first; its RHS brace is not an
+  // "antecedent -> { c1; c2; ... }", is captured next; its RHS brace is not an
   // expression, so the plain expression parse below would not recognize it.
-  bool captured = TryCaptureBracedImplication(member);
+  bool captured = k == TokenKind::kKwIf ? TryCaptureIfElseConstraint(member)
+                                        : TryCaptureBracedImplication(member);
   if (!captured) {
     lexer_.RestorePos(saved);
     Expr* rel = ParseExpr();
@@ -794,6 +799,117 @@ bool Parser::TryCaptureBracedImplication(ClassMember* member) {
   Consume();  // '}'
   if (member) {
     for (Expr* impl : synthesized) member->constraint_exprs.push_back(impl);
+  }
+  return true;
+}
+
+// 18.5.6: synthesize "guard -> consequent". The if-else form is defined to be
+// equivalent to implications, so each guarded relation becomes an ordinary '->'
+// expression the randomize() translation already enforces via its Boolean
+// equivalent (!guard || consequent). A null guard (no enclosing condition)
+// yields the consequent unchanged.
+Expr* Parser::MakeConstraintImplication(Expr* guard, Expr* consequent) {
+  if (guard == nullptr) return consequent;
+  Expr* impl = arena_.Create<Expr>();
+  impl->kind = ExprKind::kBinary;
+  impl->op = TokenKind::kArrow;
+  impl->lhs = guard;
+  impl->rhs = consequent;
+  impl->range.start = guard->range.start;
+  impl->range.end = consequent->range.end;
+  return impl;
+}
+
+// 18.5.6: build the conjunction "lhs && rhs" used to accumulate an else
+// branch's negated conditions with a nested if's own condition.
+Expr* Parser::MakeConstraintAnd(Expr* lhs, Expr* rhs) {
+  Expr* conj = arena_.Create<Expr>();
+  conj->kind = ExprKind::kBinary;
+  conj->op = TokenKind::kAmpAmp;
+  conj->lhs = lhs;
+  conj->rhs = rhs;
+  conj->range.start = lhs->range.start;
+  conj->range.end = rhs->range.end;
+  return conj;
+}
+
+// 18.5.6: build the logical negation "!operand", the guard an else branch runs
+// under (it applies exactly when the if condition is false).
+Expr* Parser::MakeConstraintNot(Expr* operand) {
+  Expr* neg = arena_.Create<Expr>();
+  neg->kind = ExprKind::kUnary;
+  neg->op = TokenKind::kBang;
+  neg->lhs = operand;
+  neg->range = operand->range;
+  return neg;
+}
+
+// 18.5.6: capture one constraint_expression inside a guarded branch. It is
+// either a nested if-else (handled recursively, so a dangling else binds to its
+// closest preceding if) or a single relation, which is recorded as
+// "guard -> relation". Returns false on any malformed input so the caller
+// captures nothing.
+bool Parser::CaptureGuardedConstraintItem(Expr* guard,
+                                          std::vector<Expr*>& out) {
+  if (Check(TokenKind::kKwIf)) return CaptureGuardedIf(guard, out);
+  Expr* rel = ParseExpr();
+  if (rel == nullptr || !Check(TokenKind::kSemicolon)) return false;
+  Consume();  // ';'
+  out.push_back(MakeConstraintImplication(guard, rel));
+  return true;
+}
+
+// 18.5.6: capture a constraint_set under a guard. The set is either an unnamed
+// brace-enclosed group of constraint_expressions or a single constraint
+// expression; every relation it contains is guarded by the same condition.
+bool Parser::CaptureGuardedConstraintSet(Expr* guard, std::vector<Expr*>& out) {
+  if (Check(TokenKind::kLBrace)) {
+    Consume();  // '{'
+    while (!Check(TokenKind::kRBrace)) {
+      if (AtEnd()) return false;
+      if (!CaptureGuardedConstraintItem(guard, out)) return false;
+    }
+    Consume();  // '}'
+    return true;
+  }
+  return CaptureGuardedConstraintItem(guard, out);
+}
+
+// 18.5.6: capture "if ( expression ) constraint_set [ else constraint_set ]".
+// When the condition holds every then-set relation must be satisfied; otherwise
+// every else-set relation must be satisfied. This is encoded as implications:
+// the then set runs under the condition and the else set under its negation.
+// An outer guard (from an enclosing branch) is conjoined so a nested "else if"
+// applies only when every preceding condition failed and its own holds. Assumes
+// the current token is 'if'; runs inside the caller's suppressed speculative
+// scan and records into 'out' only when the whole form parses.
+bool Parser::CaptureGuardedIf(Expr* guard, std::vector<Expr*>& out) {
+  Consume();  // 'if'
+  if (!Check(TokenKind::kLParen)) return false;
+  Consume();  // '('
+  Expr* cond = ParseExpr();
+  if (cond == nullptr || !Check(TokenKind::kRParen)) return false;
+  Consume();  // ')'
+  Expr* then_guard = guard ? MakeConstraintAnd(guard, cond) : cond;
+  if (!CaptureGuardedConstraintSet(then_guard, out)) return false;
+  if (Check(TokenKind::kKwElse)) {
+    Consume();  // 'else'
+    Expr* neg = MakeConstraintNot(cond);
+    Expr* else_guard = guard ? MakeConstraintAnd(guard, neg) : neg;
+    if (!CaptureGuardedConstraintSet(else_guard, out)) return false;
+  }
+  return true;
+}
+
+// 18.5.6: entry point for capturing a top-level if-else constraint. Builds the
+// synthesized implications into a scratch list and commits them to the member
+// only when the whole construct parses, so a malformed if leaves no partial
+// relations behind. Returns true when the form was recognized.
+bool Parser::TryCaptureIfElseConstraint(ClassMember* member) {
+  std::vector<Expr*> out;
+  if (!CaptureGuardedIf(/*guard=*/nullptr, out)) return false;
+  if (member) {
+    for (Expr* impl : out) member->constraint_exprs.push_back(impl);
   }
   return true;
 }
