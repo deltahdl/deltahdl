@@ -62,6 +62,29 @@ TEST(PassByValueSim, TaskInputArgNotVisibleOutside) {
   LowerRunAndCheck(f, design, {{"x", 7u}, {"y", 107u}});
 }
 
+// C1 in the task syntactic position: a task argument written with no direction
+// qualifier defaults to input and is therefore passed by value. The callee
+// mutates its local copy, yet the caller's variable is unchanged (x stays 4),
+// while the copied-in value reaches the callee (y == 54). Distinct from the
+// function no-qualifier case and from the explicit-input task case.
+TEST(PassByValueSim, TaskDefaultDirectionArgPassedByValue) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int x, y;\n"
+      "  task apply(int v);\n"
+      "    v = v + 50;\n"
+      "    y = v;\n"
+      "  endtask\n"
+      "  initial begin\n"
+      "    x = 4;\n"
+      "    apply(x);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"x", 4u}, {"y", 54u}});
+}
+
 TEST(PassByValueSim, MultipleArgsCopiedIndependently) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -117,6 +140,35 @@ TEST(PassByValueSim, SameSourceBoundToTwoFormalsCopiesIndependently) {
       "endmodule\n",
       f);
   LowerRunAndCheck(f, design, {{"x", 7u}, {"result", 63u}});
+}
+
+// §13.5.1 illustrates the copy with an unpacked array formal (byte packet[]).
+// Passing an array by value copies every element into the subroutine area: the
+// callee reads the copied-in values (sum == 7) yet its later writes to the
+// local copy leave the caller's array untouched, so the mutation is not visible
+// outside the call.
+TEST(PassByValueSim, UnpackedArrayArgumentCopiedElementwise) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  byte packet [0:1];\n"
+      "  int total;\n"
+      "  function int sum_then_clobber(byte p [0:1]);\n"
+      "    int s;\n"
+      "    s = p[0] + p[1];\n"
+      "    p[0] = 99;\n"
+      "    p[1] = 99;\n"
+      "    return s;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    packet[0] = 3;\n"
+      "    packet[1] = 4;\n"
+      "    total = sum_then_clobber(packet);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design,
+                   {{"packet[0]", 3u}, {"packet[1]", 4u}, {"total", 7u}});
 }
 
 }  // namespace
