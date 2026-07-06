@@ -161,6 +161,51 @@ TEST(PackageImport, LocalDeclShadowsWildcardImportedName) {
              "endmodule\n"));
 }
 
+// §26.3: an explicit import brings in only the symbol it names. Importing
+// pkg::A must not make the sibling declaration pkg::B visible unqualified.
+TEST(PackageImport, ExplicitImportDoesNotBringSiblingPackageSymbols) {
+  EXPECT_FALSE(
+      ElabOk("package pkg;\n"
+             "  parameter int A = 1;\n"
+             "  parameter int B = 2;\n"
+             "endpackage\n"
+             "module m;\n"
+             "  import pkg::A;\n"
+             "  logic [31:0] y;\n"
+             "  initial y = B;\n"
+             "endmodule\n"));
+}
+
+// §26.3: importing an enumeration type by explicit import imports the type name
+// only, not the enumeration literals declared inside it. A bare reference to a
+// literal of that enum must therefore fail to resolve.
+TEST(PackageImport, ExplicitImportOfEnumTypeDoesNotImportLiterals) {
+  EXPECT_FALSE(
+      ElabOk("package q;\n"
+             "  typedef enum { ORIGINAL, FALSE } teeth_t;\n"
+             "endpackage\n"
+             "module m;\n"
+             "  import q::teeth_t;\n"
+             "  teeth_t myteeth;\n"
+             "  initial myteeth = FALSE;\n"
+             "endmodule\n"));
+}
+
+// §26.3 (companion to the rule above): a wildcard import of the same package
+// does bring the enumeration literals into scope, so the bare reference now
+// resolves.
+TEST(PackageImport, WildcardImportOfEnumBringsLiteralsIntoScope) {
+  EXPECT_TRUE(
+      ElabOk("package q;\n"
+             "  typedef enum { ORIGINAL, FALSE } teeth_t;\n"
+             "endpackage\n"
+             "module m;\n"
+             "  import q::*;\n"
+             "  teeth_t myteeth;\n"
+             "  initial myteeth = FALSE;\n"
+             "endmodule\n"));
+}
+
 TEST(PackageScopeReference, PackageScopeParamResolution) {
   EXPECT_TRUE(
       ElabOk("package pkg;\n"
@@ -168,6 +213,20 @@ TEST(PackageScopeReference, PackageScopeParamResolution) {
              "endpackage\n"
              "module m;\n"
              "  logic [pkg::WIDTH-1:0] data;\n"
+             "endmodule\n"));
+}
+
+// §26.3: the package scope resolution operator names any constant member of a
+// package. A localparam is a distinct §11.2.1 constant form from a parameter
+// and folds through the compound-key path in const evaluation, so exercise it
+// in a constant-expression position (a packed range) separately.
+TEST(PackageScopeReference, PackageScopeLocalparamResolution) {
+  EXPECT_TRUE(
+      ElabOk("package pkg;\n"
+             "  localparam int W = 6;\n"
+             "endpackage\n"
+             "module m;\n"
+             "  logic [pkg::W-1:0] data;\n"
              "endmodule\n"));
 }
 

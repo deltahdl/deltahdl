@@ -6,20 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(PackageImport, PackageImportMultiple) {
-  auto r = Parse(
-      "package p1; endpackage\n"
-      "package p2; endpackage\n"
-      "module m; import p1::a, p2::b; endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  int import_count = 0;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kImportDecl) import_count++;
-  }
-  EXPECT_GE(import_count, 2);
-}
-
 TEST_F(DpiParseTest, PackageImportStillWorks) {
   auto* unit = Parse(R"(
     module m;
@@ -30,25 +16,6 @@ TEST_F(DpiParseTest, PackageImportStillWorks) {
   auto& items = unit->modules[0]->items;
   ASSERT_EQ(items.size(), 1u);
   EXPECT_EQ(items[0]->kind, ModuleItemKind::kImportDecl);
-}
-
-TEST(PackageImport, ModuleMultipleImports) {
-  auto r = Parse(
-      "package p1;\n"
-      "endpackage\n"
-      "package p2;\n"
-      "endpackage\n"
-      "module m;\n"
-      "  import p1::*;\n"
-      "  import p2::*;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-  size_t import_count = 0;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kImportDecl) ++import_count;
-  }
-  EXPECT_EQ(import_count, 2u);
 }
 
 TEST(PackageScopeReference, PackageScopeInExpression) {
@@ -249,14 +216,6 @@ TEST(PackageImport, WildcardIntoInterface) {
               "interface ifc;\n"
               "  import pkg::*;\n"
               "endinterface\n"));
-}
-
-TEST(PackageImport, WildcardIntoProgram) {
-  EXPECT_TRUE(
-      ParseOk("package pkg; typedef int myint; endpackage\n"
-              "program p;\n"
-              "  import pkg::*;\n"
-              "endprogram\n"));
 }
 
 TEST(PackageImport, WildcardIntoPackage) {

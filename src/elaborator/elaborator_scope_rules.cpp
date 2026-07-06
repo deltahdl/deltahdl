@@ -536,20 +536,24 @@ void CollectBareIdents(const Expr* e, std::vector<const Expr*>& out) {
   for (const auto* el : e->elements) CollectBareIdents(el, out);
 }
 
-// True when the module imports any name or contains a generate construct, in
-// which case a bare identifier may legally resolve to an imported name or a
-// generated/genvar name the elaborated module's symbol table does not list.
-// Skipping such modules keeps the unresolved-reference check free of false
-// positives.
+// True when the module contains a non-std wildcard import or a generate
+// construct, in which case a bare identifier may legally resolve to an imported
+// name or a generated/genvar name the elaborated module's symbol table does not
+// list. Skipping such modules keeps the unresolved-reference check free of
+// false positives.
 bool ModuleSkipsUnresolvedCheck(const ModuleDecl* decl,
                                 const RtlirModule* mod) {
-  // Every module carries an auto-injected `import std::*` (see
-  // elaborator_module.cpp); that implicit wildcard brings in only the small,
-  // known std package and must not disable the check. Any *other* import means
-  // a bare name may legally resolve to an imported package member the module
-  // symbol table does not list, so skip such modules to avoid false positives.
+  // A wildcard import can make ANY name declared in the imported package
+  // locally visible, and the module symbol table does not enumerate those
+  // names, so a bare read cannot be proven unresolved -- skip to avoid false
+  // positives. The auto-injected `import std::*` (see elaborator_module.cpp)
+  // brings in only the small, known std package and must not disable the check.
+  // An EXPLICIT import, by contrast, imports exactly the one named symbol
+  // (§26.3): the check can still run, consulting that finite set of names (see
+  // ValidateUnresolvedReferences), so a reference to a *sibling* package member
+  // that was not imported is correctly rejected.
   for (const auto& imp : mod->imports) {
-    if (imp.package_name != "std" || !imp.is_wildcard) return true;
+    if (imp.is_wildcard && imp.package_name != "std") return true;
   }
   for (const auto* item : decl->items) {
     if (item->kind == ModuleItemKind::kGenerateFor ||
@@ -816,8 +820,8 @@ void Elaborator::ValidateUnresolvedReferences(const ModuleDecl* decl,
 
   // §6.16/§6.22.5: string<->numeric procedural assignments are
   // type-incompatible independent of any package imports, so check them before
-  // the import-aware bare-name gate below (which skips modules with non-std
-  // imports).
+  // the import-aware bare-name gate below (which skips modules that carry a
+  // non-std wildcard import).
   for (const auto* item : decl->items) {
     if (IsProcBodyItem(item->kind)) {
       CheckStringNumericAssigns(item->body, var_types_, diag_);
@@ -826,21 +830,33 @@ void Elaborator::ValidateUnresolvedReferences(const ModuleDecl* decl,
 
   if (ModuleSkipsUnresolvedCheck(decl, mod)) return;
 
+  // §26.3: an explicit import makes exactly its named symbol visible without a
+  // package qualifier. Gather those names so a bare read of an explicitly
+  // imported symbol resolves, while a read of a package member that was NOT
+  // imported still falls through to the unresolved diagnostic below.
+  std::unordered_set<std::string_view> explicit_imported;
+  for (const auto& imp : mod->imports) {
+    if (!imp.is_wildcard && !imp.item_name.empty()) {
+      explicit_imported.insert(imp.item_name);
+    }
+  }
+  auto declared = [this, &explicit_imported](std::string_view n) {
+    return IsDeclaredNameForRhs(n) || explicit_imported.count(n) != 0;
+  };
+
   for (const auto* item : decl->items) {
     if (item->kind != ModuleItemKind::kContAssign) continue;
     std::vector<const Expr*> refs;
     CollectBareIdents(item->assign_rhs, refs);
     for (const auto* e : refs) {
-      if (IsDeclaredNameForRhs(e->text)) continue;
+      if (declared(e->text)) continue;
       diag_.Error(
           e->range.start,
           std::format("reference to unresolved identifier '{}'", e->text));
     }
   }
 
-  ReportProcUnresolved(
-      decl, [this](std::string_view n) { return IsDeclaredNameForRhs(n); },
-      diag_);
+  ReportProcUnresolved(decl, declared, diag_);
 
   // §26.3: a `pkg::x` scope prefix must name a known package (or a class/type
   // for static-member / type-scope access). cu_scope_names_ holds packages,
