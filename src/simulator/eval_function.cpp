@@ -22,6 +22,12 @@ static void InitClassPropertyDefaults(const ClassTypeInfo* info,
                                       ClassObject* obj, SimContext& ctx,
                                       Arena& arena) {
   for (const auto& prop : info->properties) {
+    // §8.9: a static property is one shared copy that lives on the class type,
+    // created and initialized once. Constructing an object must not give it a
+    // private per-instance copy, or instance-qualified access would shadow the
+    // shared storage. Leave static properties out of the instance map so reads
+    // and writes fall through to the type's shared static_properties.
+    if (prop.is_static) continue;
     Logic4Vec val = prop.init_expr ? EvalExpr(prop.init_expr, ctx, arena)
                                    : MakeLogic4VecVal(arena, prop.width, 0);
     obj->properties[std::string(prop.name)] = val;
