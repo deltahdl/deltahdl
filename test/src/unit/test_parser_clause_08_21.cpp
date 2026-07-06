@@ -138,4 +138,18 @@ TEST(AbstractClassParsing, MultiplePureVirtualMethods) {
   EXPECT_TRUE(r.cu->classes[0]->members[1]->is_pure_virtual);
 }
 
+// 8.21: a pure virtual method is indicated by the 'pure' keyword *together
+// with* not providing a method body. 'pure' forces the parser to accept only
+// the prototype, so a supplied body has no valid member position and is
+// rejected -- the negative form of the "no method body" requirement.
+TEST(PureVirtualMethodParsing, PureVirtualWithBodyRejected) {
+  auto r = Parse(
+      "virtual class Base;\n"
+      "  pure virtual function void display();\n"
+      "    return;\n"
+      "  endfunction\n"
+      "endclass\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
 }  // namespace

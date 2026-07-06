@@ -10,80 +10,30 @@ using namespace delta;
 
 namespace {
 
-TEST(AbstractClassSimulation, AbstractClassFlag) {
-  SimFixture f;
-  auto* abstract_type = MakeClassType(f, "AbstractBase", {});
-  abstract_type->is_abstract = true;
-
-  EXPECT_TRUE(abstract_type->is_abstract);
-}
-
-TEST(AbstractClassSimulation, PureVirtualMethodNullBody) {
-  SimFixture f;
-  auto* abstract_type = MakeClassType(f, "Shape", {});
-  abstract_type->is_abstract = true;
-
-  abstract_type->vtable.push_back({"area", nullptr, abstract_type});
-  EXPECT_EQ(abstract_type->vtable[0].method, nullptr);
-
-  auto* concrete = MakeClassType(f, "Circle", {"radius"});
-  concrete->parent = abstract_type;
-  auto* method = f.arena.Create<ModuleItem>();
-  method->kind = ModuleItemKind::kFunctionDecl;
-  method->name = "area";
-  method->func_body_stmts.push_back(MakeReturn(f.arena, MkInt(f.arena, 314)));
-  concrete->vtable.push_back({"area", method, concrete});
-
-  auto [handle, obj] = MakeObj(f, concrete);
-  auto* resolved = obj->ResolveVirtualMethod("area");
-  EXPECT_EQ(resolved, method);
-}
-
-TEST(AbstractClassSimulation, MultiplePureVirtualsOverridden) {
-  SimFixture f;
-  auto* abstract_type = MakeClassType(f, "Base", {});
-  abstract_type->is_abstract = true;
-  abstract_type->vtable.push_back({"area", nullptr, abstract_type});
-  abstract_type->vtable.push_back({"perimeter", nullptr, abstract_type});
-
-  auto* concrete = MakeClassType(f, "Rect", {"w", "h"});
-  concrete->parent = abstract_type;
-
-  auto* area_fn = f.arena.Create<ModuleItem>();
-  area_fn->kind = ModuleItemKind::kFunctionDecl;
-  area_fn->name = "area";
-  concrete->vtable.push_back({"area", area_fn, concrete});
-
-  auto* perim_fn = f.arena.Create<ModuleItem>();
-  perim_fn->kind = ModuleItemKind::kFunctionDecl;
-  perim_fn->name = "perimeter";
-  concrete->vtable.push_back({"perimeter", perim_fn, concrete});
-
-  auto [handle, obj] = MakeObj(f, concrete);
-  EXPECT_EQ(obj->ResolveVirtualMethod("area"), area_fn);
-  EXPECT_EQ(obj->ResolveVirtualMethod("perimeter"), perim_fn);
-}
-
+// 8.21: an abstract class may be extended into a further abstract class; its
+// pure virtual methods -- both the one inherited from the abstract base and the
+// one newly added -- remain unimplemented prototypes, which the lowerer records
+// as null vtable slots. Driven end-to-end so the lowerer, not the test, builds
+// the vtable.
 TEST(AbstractClassSimulation, AbstractExtendsAbstractVtable) {
   SimFixture f;
-  auto* base = MakeClassType(f, "Shape", {});
-  base->is_abstract = true;
-  base->vtable.push_back({"area", nullptr, base});
-
-  auto* mid = MakeClassType(f, "Shape2D", {});
-  mid->is_abstract = true;
-  mid->parent = base;
-  mid->vtable.push_back({"area", nullptr, base});
-  mid->vtable.push_back({"perimeter", nullptr, mid});
-
-  EXPECT_EQ(mid->vtable[0].method, nullptr);
-  EXPECT_EQ(mid->vtable[1].method, nullptr);
-}
-
-TEST(AbstractClassSimulation, ConcreteClassNotAbstract) {
-  SimFixture f;
-  auto* type = MakeClassType(f, "ConcreteClass", {"x"});
-  EXPECT_FALSE(type->is_abstract);
+  auto* design = ElaborateSrc(
+      "virtual class Shape;\n"
+      "  pure virtual function int area();\n"
+      "endclass\n"
+      "virtual class Shape2D extends Shape;\n"
+      "  pure virtual function int perimeter();\n"
+      "endclass\n"
+      "module t; endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  auto* info = f.ctx.FindClassType("Shape2D");
+  ASSERT_NE(info, nullptr);
+  ASSERT_EQ(info->vtable.size(), 2u);
+  EXPECT_EQ(info->vtable[0].method, nullptr);
+  EXPECT_EQ(info->vtable[1].method, nullptr);
 }
 
 TEST(AbstractClassSimulation, LoweredAbstractClassIsAbstract) {
@@ -138,6 +88,41 @@ TEST(AbstractClassSimulation, ConcreteSubclassOfAbstractBaseConstructed) {
                       "endmodule\n",
                       "result"),
             42u);
+}
+
+// 8.21: an abstract class's constructor is never invoked on its own -- it runs
+// only indirectly, reached by the constructor chain of an extended non-abstract
+// object. The abstract base here defines a real constructor that stores a
+// field; the concrete subclass reaches it with super.new (real 8.7/8.17
+// constructor and chaining syntax). The stored value surviving into the
+// constructed object shows the base constructor executed during the subclass's
+// indirect construction.
+TEST(AbstractClassSimulation, AbstractBaseConstructorRunsViaChaining) {
+  EXPECT_EQ(RunAndGet("virtual class Base;\n"
+                      "  int tag;\n"
+                      "  pure virtual function int get();\n"
+                      "  function new(int t);\n"
+                      "    tag = t;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "class Derived extends Base;\n"
+                      "  function new();\n"
+                      "    super.new(7);\n"
+                      "  endfunction\n"
+                      "  virtual function int get();\n"
+                      "    get = tag;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    Derived d;\n"
+                      "    d = new;\n"
+                      "    result = d.get();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            7u);
 }
 
 // 8.21: an object of an abstract class shall not be constructed directly.
