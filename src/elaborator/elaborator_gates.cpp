@@ -1,4 +1,6 @@
+#include <algorithm>
 #include <format>
+#include <vector>
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
@@ -455,7 +457,19 @@ static void ElaborateLogicOrOutputGate(ModuleItem* item, RtlirModule* mod,
   mod->assigns.push_back(ca);
 }
 
-void ElaborateGateInst(ModuleItem* item, RtlirModule* mod, Arena& arena) {
+// `base[idx]`: the 1-bit part-select through which one element of an instance
+// array connects to bit `idx` of a distributed terminal.
+static Expr* MakeBitSelect(Arena& arena, Expr* base, uint32_t idx) {
+  auto* e = arena.Create<Expr>();
+  e->kind = ExprKind::kSelect;
+  e->base = base;
+  e->index = MakeIntLiteral(arena, idx);
+  return e;
+}
+
+// Elaborates one scalar gate or switch from the terminal list currently held on
+// `item` (a single instance, or one element of an expanded instance array).
+static void ElaborateOneGate(ModuleItem* item, RtlirModule* mod, Arena& arena) {
   auto kind = item->gate_kind;
   auto& terms = item->gate_terminals;
   if (terms.empty()) return;
@@ -492,6 +506,44 @@ void ElaborateGateInst(ModuleItem* item, RtlirModule* mod, Arena& arena) {
   }
 
   ElaborateLogicOrOutputGate(item, mod, arena);
+}
+
+void ElaborateGateInst(ModuleItem* item, RtlirModule* mod, Arena& arena) {
+  // §28.3.6: an instance array whose terminals carry more than one bit is
+  // expanded into one scalar primitive per array element. A terminal whose
+  // width equals the array length is distributed — element p connects to its
+  // [p] bit-select, the LSB reaching the element at the right-hand index —
+  // while a single-bit terminal is broadcast to every element. Rebuilding each
+  // element from these bit-selects reproduces the per-element connection for
+  // every gate family, including the control-driven three-state and MOS
+  // switches whose vector control would otherwise collapse to one scalar
+  // condition shared across the whole array. The array length is taken from the
+  // widest terminal, which the terminal-width check has already confirmed
+  // equals the instance-array length for every distributed terminal.
+  if (item->inst_range_left && item->inst_range_right) {
+    uint32_t array_len = 0;
+    for (auto* t : item->gate_terminals) {
+      array_len = std::max(array_len, LookupLhsWidth(t, mod));
+    }
+    if (array_len > 1) {
+      std::vector<Expr*> saved = item->gate_terminals;
+      for (uint32_t p = 0; p < array_len; ++p) {
+        std::vector<Expr*> bit_terms;
+        bit_terms.reserve(saved.size());
+        for (auto* t : saved) {
+          bit_terms.push_back(LookupLhsWidth(t, mod) == array_len
+                                  ? MakeBitSelect(arena, t, p)
+                                  : t);
+        }
+        item->gate_terminals = bit_terms;
+        ElaborateOneGate(item, mod, arena);
+      }
+      item->gate_terminals = saved;
+      return;
+    }
+  }
+
+  ElaborateOneGate(item, mod, arena);
 }
 
 }  // namespace delta
