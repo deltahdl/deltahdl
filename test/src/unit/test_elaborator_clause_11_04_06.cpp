@@ -144,4 +144,42 @@ TEST(OperatorElaboration, WildcardNeqOnChandle) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §11.4.6: because ==? on class handles is equivalent to the logical equality
+// operator, it inherits ==' s legality rules -- comparing handles of unrelated
+// (non-assignment-compatible) class types is rejected, exactly as == would be.
+// This is the negative form of the class-handle equivalence rule.
+TEST(OperatorElaboration, WildcardEqIncompatibleClassHandlesRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  class C;\n"
+      "  endclass\n"
+      "  class D;\n"
+      "  endclass\n"
+      "  C a;\n"
+      "  D b;\n"
+      "  logic eq;\n"
+      "  initial eq = (a ==? b);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(OperatorElaboration, WildcardNeqIncompatibleClassHandlesRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  class C;\n"
+      "  endclass\n"
+      "  class D;\n"
+      "  endclass\n"
+      "  C a;\n"
+      "  D b;\n"
+      "  logic eq;\n"
+      "  initial eq = (a !=? b);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
 }  // namespace
