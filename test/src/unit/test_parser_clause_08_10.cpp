@@ -93,18 +93,26 @@ TEST(StaticMethodParsing, StaticFlagPropagatedToMethod) {
   EXPECT_FALSE(m->is_virtual);
 }
 
-TEST(StaticMethodParsing, StaticMethodWithArgs) {
+// §8.10 distinguishes 'static' used as a method qualifier (before the method
+// keyword) from 'static' used as a variable-lifetime qualifier (after it). The
+// latter form on a class method is the ILLEGAL case the subclause illustrates.
+TEST(StaticMethodParsing, StaticLifetimeFunctionRejected) {
   auto r = Parse(
       "class C;\n"
-      "  static function int add(int a, int b);\n"
-      "    return a + b;\n"
+      "  function static int f();\n"
+      "    return 0;\n"
       "  endfunction\n"
       "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* m = r.cu->classes[0]->members[0];
-  EXPECT_TRUE(m->is_static);
-  EXPECT_EQ(m->method->func_args.size(), 2u);
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(StaticMethodParsing, StaticLifetimeTaskRejected) {
+  auto r = Parse(
+      "class TwoTasks;\n"
+      "  task static t2();\n"
+      "  endtask\n"
+      "endclass\n");
+  EXPECT_TRUE(r.has_errors);
 }
 
 }  // namespace

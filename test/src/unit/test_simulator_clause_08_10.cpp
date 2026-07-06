@@ -1,64 +1,72 @@
-#include "builders_ast.h"
-#include "builders_systask.h"
 #include "fixture_simulator.h"
-#include "helpers_class_object.h"
 #include "helpers_scheduler.h"
-#include "parser/ast.h"
-#include "simulator/class_object.h"
-#include "simulator/evaluation.h"
 
 using namespace delta;
 
 namespace {
 
-TEST(StaticMethodSimulation, StaticMethodResolution) {
-  SimFixture f;
-  auto* type = MakeClassType(f, "Util", {});
-
-  auto* method = f.arena.Create<ModuleItem>();
-  method->kind = ModuleItemKind::kFunctionDecl;
-  method->name = "helper";
-  method->is_static = true;
-  method->func_body_stmts.push_back(MakeReturn(f.arena, MkInt(f.arena, 100)));
-  type->methods["helper"] = method;
-
-  auto it = type->methods.find("helper");
-  ASSERT_NE(it, type->methods.end());
-  EXPECT_TRUE(it->second->is_static);
+// §8.10: a static method behaves like a regular subroutine that can be called
+// with no class instantiation. Here no object of Util is ever constructed, yet
+// the scope-resolved call runs and yields a computed result.
+TEST(StaticMethodSimulation, StaticMethodCallableWithoutAnyInstance) {
+  EXPECT_EQ(RunAndGet("class Util;\n"
+                      "  static function int add(int a, int b);\n"
+                      "    return a + b;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    result = Util::add(30, 12);\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            42u);
 }
 
-TEST(StaticMethodSimulation, StaticMethodCallableWithoutInstance) {
-  SimFixture f;
-  auto* type = MakeClassType(f, "Counter", {});
-  type->properties.push_back({"count", 32, true});
-  type->static_properties["count"] = MakeLogic4VecVal(f.arena, 32, 0);
-
-  auto* method = f.arena.Create<ModuleItem>();
-  method->kind = ModuleItemKind::kFunctionDecl;
-  method->name = "get_count";
-  method->is_static = true;
-  method->func_body_stmts.push_back(MakeReturn(f.arena, MkInt(f.arena, 0)));
-  type->methods["get_count"] = method;
-
-  auto it = type->methods.find("get_count");
-  ASSERT_NE(it, type->methods.end());
-  EXPECT_TRUE(it->second->is_static);
+// §8.10: a static method may directly access static class properties. The
+// static property carries a §8.9 inline initializer, so the value observed
+// through the static method is the one produced by that declaration.
+TEST(StaticMethodSimulation, StaticMethodReadsInlineInitializedStaticProperty) {
+  EXPECT_EQ(RunAndGet("class id;\n"
+                      "  static int current = 100;\n"
+                      "  static function int next_id();\n"
+                      "    return current;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    result = id::next_id();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            100u);
 }
 
-TEST(StaticMethodSimulation, StaticMethodAccessesStaticProperty) {
-  SimFixture f;
-  auto* type = MakeClassType(f, "id", {});
-  type->properties.push_back({"current", 32, true});
-  type->static_properties["current"] = MakeLogic4VecVal(f.arena, 32, 42);
-
-  auto* method = f.arena.Create<ModuleItem>();
-  method->kind = ModuleItemKind::kFunctionDecl;
-  method->name = "next_id";
-  method->is_static = true;
-  type->methods["next_id"] = method;
-
-  ASSERT_NE(type->methods.count("next_id"), 0u);
-  EXPECT_EQ(type->static_properties["current"].ToUint64(), 42u);
+// §8.10: the static-method form applies to tasks as well as functions. A
+// static task, called without an instance, writes shared static state that a
+// static function then reads back.
+TEST(StaticMethodSimulation, StaticTaskModifiesStaticProperty) {
+  EXPECT_EQ(RunAndGet("class Counter;\n"
+                      "  static int count;\n"
+                      "  static task bump();\n"
+                      "    count = count + 5;\n"
+                      "  endtask\n"
+                      "  static function int get();\n"
+                      "    return count;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    Counter::bump();\n"
+                      "    Counter::bump();\n"
+                      "    result = Counter::get();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            10u);
 }
 
 TEST(StaticMethodSimulation, StaticMethodModifiesStaticProperty) {
