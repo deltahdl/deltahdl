@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -35,6 +36,11 @@ struct RandomizeCtx {
   ClassObject* obj;
   SimContext& ctx;
   Arena& arena;
+  // 18.5.13: stable storage for the inner relation of each soft constraint. A
+  // kSoft ConstraintExpr points to its inner relation through a raw pointer, so
+  // the inner must outlive the solve; owning it on the heap here keeps that
+  // address stable even as the solver copies the block holding the kSoft.
+  std::vector<std::unique_ptr<ConstraintExpr>> soft_inners;
 };
 
 RandInfo* FindRand(std::vector<RandInfo>& rands, std::string_view name) {
@@ -153,7 +159,8 @@ void FoldBound(RandInfo& ri, ConstraintKind kind, int64_t c) {
 // the typed solver constraint, folds the variable's domain, and returns true;
 // other relation shapes return false for the kCustom fallback.
 bool TryComparisonConstraint(const Expr* rel, std::vector<RandInfo>& rands,
-                             RandomizeCtx& rc, ConstraintExpr& out) {
+                             RandomizeCtx& rc, ConstraintExpr& out,
+                             bool fold = true) {
   if (!rel || rel->kind != ExprKind::kBinary || !rel->lhs || !rel->rhs)
     return false;
   ConstraintKind kind = ConstraintKind::kEqual;
@@ -179,7 +186,12 @@ bool TryComparisonConstraint(const Expr* rel, std::vector<RandInfo>& rands,
   out.var_name = std::string(var_side->text);
   out.lo = c;
   out.ref_vars.push_back(out.var_name);
-  if (auto* ri = FindRand(rands, var_side->text)) FoldBound(*ri, kind, c);
+  // 18.5.13: a soft relation must not tighten the variable's draw domain. If it
+  // did, a discarded soft preference would still constrain the variable,
+  // biasing the result and narrowing the values the hard constraints still
+  // allow.
+  if (fold)
+    if (auto* ri = FindRand(rands, var_side->text)) FoldBound(*ri, kind, c);
   return true;
 }
 
@@ -221,9 +233,9 @@ ConstraintExpr MakeCustomConstraint(const Expr* rel,
 // 18.5: translate one captured constraint relation into a solver
 // ConstraintExpr.
 ConstraintExpr TranslateRelation(const Expr* rel, std::vector<RandInfo>& rands,
-                                 RandomizeCtx& rc) {
+                                 RandomizeCtx& rc, bool fold = true) {
   ConstraintExpr ce;
-  if (TryComparisonConstraint(rel, rands, rc, ce)) return ce;
+  if (TryComparisonConstraint(rel, rands, rc, ce, fold)) return ce;
   return MakeCustomConstraint(rel, rands, rc);
 }
 
@@ -266,8 +278,9 @@ void AddConstraintMember(const ClassMember* m, std::vector<RandInfo>& rands,
                          RandomizeCtx& rc, ConstraintSolver& solver) {
   ConstraintBlock block;
   block.name = std::string(m->name);
-  block.constraints.reserve(m->constraint_exprs.size() +
-                            m->constraint_dist_refs.size());
+  block.constraints.reserve(
+      m->constraint_exprs.size() + m->constraint_dist_refs.size() +
+      m->constraint_soft_exprs.size() + m->constraint_soft_dist_refs.size());
   for (const Expr* rel : m->constraint_exprs) {
     block.constraints.push_back(TranslateRelation(rel, rands, rc));
   }
@@ -275,6 +288,40 @@ void AddConstraintMember(const ClassMember* m, std::vector<RandInfo>& rands,
   for (const auto& ref : m->constraint_dist_refs) {
     ConstraintExpr ce;
     if (BuildDistConstraint(ref, rc, ce)) block.constraints.push_back(ce);
+  }
+  // 18.5.13: build each captured soft constraint. The inner relation is
+  // translated exactly like a hard one but without folding the draw domain,
+  // then wrapped in a kSoft constraint. The solver seeds the inner so a
+  // satisfiable preference is honored, yet discards the soft (treating it as
+  // the value 1) and never fails the solve when the preference conflicts with
+  // the hard constraints. The inner is heap-owned in rc so the kSoft's raw
+  // pointer to it stays valid after the block is copied into the solver.
+  for (const Expr* rel : m->constraint_soft_exprs) {
+    auto inner = std::make_unique<ConstraintExpr>(
+        TranslateRelation(rel, rands, rc, /*fold=*/false));
+    ConstraintExpr sc;
+    sc.kind = ConstraintKind::kSoft;
+    sc.var_name = inner->var_name;
+    sc.ref_vars = inner->ref_vars;
+    sc.inner = inner.get();
+    rc.soft_inners.push_back(std::move(inner));
+    block.constraints.push_back(std::move(sc));
+  }
+  // 18.5.13: a 'soft'-prefixed distribution wraps the dist alternative of the
+  // soft operand. Build the inner as an ordinary weighted-value (kDist)
+  // constraint, then wrap it in a kSoft: the solver seeds the distribution when
+  // it is honored and discards it (leaving its variable free) when it conflicts
+  // with the hard constraints.
+  for (const auto& ref : m->constraint_soft_dist_refs) {
+    auto inner = std::make_unique<ConstraintExpr>();
+    if (!BuildDistConstraint(ref, rc, *inner)) continue;
+    ConstraintExpr sc;
+    sc.kind = ConstraintKind::kSoft;
+    sc.var_name = inner->var_name;
+    sc.ref_vars.push_back(inner->var_name);
+    sc.inner = inner.get();
+    rc.soft_inners.push_back(std::move(inner));
+    block.constraints.push_back(std::move(sc));
   }
   solver.AddConstraintBlock(block);
 }
@@ -296,7 +343,9 @@ void CollectConstraintBlocks(const ClassTypeInfo* type,
     for (const ClassMember* m : lvl->decl->members) {
       if (m->kind != ClassMemberKind::kConstraint) continue;
       if (!replaced.insert(m->name).second) continue;
-      if (!m->constraint_exprs.empty() || !m->constraint_dist_refs.empty())
+      if (!m->constraint_exprs.empty() || !m->constraint_dist_refs.empty() ||
+          !m->constraint_soft_exprs.empty() ||
+          !m->constraint_soft_dist_refs.empty())
         AddConstraintMember(m, rands, rc, solver);
     }
   }

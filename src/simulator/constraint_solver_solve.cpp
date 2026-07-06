@@ -273,7 +273,15 @@ void ConstraintSolver::ApplyDirectConstraints(
     // bias the result toward its preferred value.
     if (include_soft && c.kind == ConstraintKind::kSoft && c.inner &&
         !dropped_soft_.count(&c) && !disabled_soft_.count(&c)) {
-      apply(*c.inner);
+      // 18.5.13: a soft distribution is seeded by sampling it, exactly as a
+      // hard dist is; the seeded value is then left untouched by the general
+      // draw, so an honored soft dist steers its variable while a discarded one
+      // (not seeded here) leaves it free.
+      if (c.inner->kind == ConstraintKind::kDist) {
+        values_[c.inner->var_name] = SampleDist(*c.inner);
+      } else {
+        apply(*c.inner);
+      }
     } else {
       apply(c);
     }

@@ -735,10 +735,34 @@ bool Parser::ScanConstraintBodyToken(ClassMember* member, int& depth,
 // nor changes what the token scan reports; special forms/braces are left to it.
 void Parser::CaptureConstraintRelation(ClassMember* member) {
   TokenKind k = CurrentToken().kind;
+  // 18.5.13: a soft constraint is the inner expression_or_dist preceded by
+  // 'soft'. Capture the inner relation into constraint_soft_exprs so the
+  // simulator can build it as a discardable soft solver constraint. Handled
+  // before the bail list below (which drops 'soft') so the preference is not
+  // silently lost. The trial parse rewinds, leaving the outer token scan to
+  // consume 'soft' and the relation as it does for a hard one.
+  if (k == TokenKind::kKwSoft) {
+    auto saved = lexer_.SavePos();
+    diag_.PushSuppress();
+    Consume();  // 'soft'
+    // 18.5.13: the soft operand is an expression_or_dist. Try the dist form
+    // first — its dist set is not an expression, so a plain parse would stop at
+    // 'dist' and capture nothing — then fall back to a plain soft relation.
+    auto after_soft = lexer_.SavePos();
+    if (!TryCaptureDist(member, /*is_soft=*/true)) {
+      lexer_.RestorePos(after_soft);
+      Expr* rel = ParseExpr();
+      if (rel != nullptr && Check(TokenKind::kSemicolon) && member) {
+        member->constraint_soft_exprs.push_back(rel);
+      }
+    }
+    diag_.PopSuppress();
+    lexer_.RestorePos(saved);
+    return;
+  }
   if (k == TokenKind::kKwForeach || k == TokenKind::kKwSolve ||
-      k == TokenKind::kKwSoft || k == TokenKind::kKwDist ||
-      k == TokenKind::kLBrace || k == TokenKind::kRBrace ||
-      k == TokenKind::kSemicolon) {
+      k == TokenKind::kKwDist || k == TokenKind::kLBrace ||
+      k == TokenKind::kRBrace || k == TokenKind::kSemicolon) {
     return;
   }
   auto saved = lexer_.SavePos();
@@ -845,7 +869,7 @@ bool Parser::ParseDistWeight(ConstraintDistItem& item) {
 // and records nothing until the whole form is recognized. A range that carries
 // no explicit weight defaults to ':= 1' semantics, so per_element is set for
 // it. Runs inside the caller's suppressed, position-saved speculative scan.
-bool Parser::TryCaptureDist(ClassMember* member) {
+bool Parser::TryCaptureDist(ClassMember* member, bool is_soft) {
   Expr* target = ParseExpr();
   if (target == nullptr || !Check(TokenKind::kKwDist)) return false;
   Consume();  // 'dist'
@@ -876,7 +900,14 @@ bool Parser::TryCaptureDist(ClassMember* member) {
     if (!Check(TokenKind::kRBrace) && !Match(TokenKind::kComma)) return false;
   }
   Consume();  // '}'
-  if (member) member->constraint_dist_refs.push_back(ref);
+  // 18.5.13: a dist preceded by 'soft' is a discardable soft distribution; keep
+  // it apart from the hard distributions so the simulator lowers it as soft.
+  if (member) {
+    if (is_soft)
+      member->constraint_soft_dist_refs.push_back(ref);
+    else
+      member->constraint_dist_refs.push_back(ref);
+  }
   return true;
 }
 

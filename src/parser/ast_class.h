@@ -170,6 +170,20 @@ struct ClassMember {
   // constraint for the solver.
   std::vector<ConstraintDistRef> constraint_dist_refs;
 
+  // 18.5.13: the inner relation of each 'soft' constraint in this block's body,
+  // in source order (empty for non-constraint members). A soft constraint is an
+  // expression_or_dist preceded by 'soft'; its inner relation is captured apart
+  // from constraint_exprs so the simulator builds it as a discardable (soft)
+  // solver constraint rather than a hard one. Without this the relation would
+  // be dropped and the soft preference lost entirely.
+  std::vector<Expr*> constraint_soft_exprs;
+
+  // 18.5.13: the 'soft'-prefixed distributions of this block's body, i.e. the
+  // dist alternative of the soft operand's expression_or_dist. Captured apart
+  // from constraint_dist_refs (which are hard) so the simulator builds each as
+  // a discardable soft distribution rather than a hard one.
+  std::vector<ConstraintDistRef> constraint_soft_dist_refs;
+
   DataType data_type;
   std::string_view name;
   std::vector<Expr*> unpacked_dims;
