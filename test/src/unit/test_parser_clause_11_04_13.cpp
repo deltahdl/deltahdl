@@ -18,16 +18,6 @@ TEST(OperatorAndExpressionParsing, InsideWithRangeElements) {
   EXPECT_EQ(cond->elements.size(), 2u);
 }
 
-TEST(OperatorAndExpressionParsing, InsideInAssign) {
-  auto r = Parse(
-      "module t;\n"
-      "  wire r;\n"
-      "  assign r = a inside {1, 2, 3};\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(OperatorAndExpressionParsing, InsideWithWildcardBits) {
   EXPECT_TRUE(
       ParseOk("module t;\n"

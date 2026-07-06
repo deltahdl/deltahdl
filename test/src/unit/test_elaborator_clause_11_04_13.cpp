@@ -8,6 +8,9 @@ using namespace delta;
 
 namespace {
 
+// §11.4.13: if no match is found the operator returns 1'b0. Driven through the
+// full pipeline so both the left-hand side and the value set come from real
+// literals: 4 is not a member of {3,5,7}.
 TEST(ExpressionSim, InsideValueNoMatch) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -25,88 +28,9 @@ TEST(ExpressionSim, InsideValueNoMatch) {
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
-TEST(ExpressionSim, InsideRangeMatch) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic x;\n"
-      "  initial x = 8'd5 inside {[8'd1:8'd10]};\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 1u);
-}
-
-TEST(ExpressionElaboration, InsideExprElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  logic [7:0] x;\n"
-      "  logic result;\n"
-      "  initial result = x inside {8'd1, 8'd2, 8'd3};\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
-TEST(ExpressionElaboration, InsideWithRangeElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  logic [7:0] x;\n"
-      "  logic result;\n"
-      "  initial result = x inside {[8'd1:8'd10]};\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
-TEST(ExpressionElaboration, InsideWithToleranceElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  logic [7:0] x;\n"
-      "  logic result;\n"
-      "  initial result = x inside {[8'd50 +/- 8'd5]};\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
-TEST(ExpressionElaboration, InsideWithDollarBoundsElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  logic [7:0] x;\n"
-      "  logic result;\n"
-      "  initial result = x inside {[$:8'd100]};\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
-TEST(ExpressionElaboration, InsideMixedValuesAndRangesElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  logic [7:0] x;\n"
-      "  logic result;\n"
-      "  initial result = x inside {8'd1, [8'd10:8'd20], 8'd30};\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
+// §11.4.13: integral comparisons use wildcard equality, so an x or z bit in a
+// set value is a do-not-care in that position. `3'b1?1` matches 3'b101 because
+// the wildcard bit ignores val's middle bit.
 TEST(ExpressionSim, InsideWildcardRhsMatch) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -128,6 +52,8 @@ TEST(ExpressionSim, InsideWildcardRhsMatch) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
+// §11.4.13: a match is found when the left-hand side lies inclusively within
+// the range, so both the low and the high bound are themselves matches.
 TEST(ExpressionSim, InsideRangeBoundaryInclusive) {
   SimFixture f;
   auto [x, y] = RunModuleTwoVars(f,

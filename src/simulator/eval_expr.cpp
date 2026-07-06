@@ -904,11 +904,33 @@ static int InsideMatchValue(Logic4Vec lhs, const Expr* elem, SimContext& ctx,
   return CompareInsideValue(lhs, EvalExpr(elem, ctx, arena));
 }
 
+// §11.4.13: descends every unpacked dimension of a multidimensional array set
+// member, gathering the singular per-element leaf values named arr[i0][i1]...
+// in row-major order (matching how lowerer_var.cpp materialized them). A
+// missing leaf contributes a default value of the element width so the count of
+// scanned members is preserved.
+static void CollectMultiDimSetLeaves(const ArrayInfo& info, size_t d,
+                                     const std::string& prefix, SimContext& ctx,
+                                     std::vector<Logic4Vec>& out) {
+  if (d == info.dim_sizes.size()) {
+    auto* var = ctx.FindVariable(prefix);
+    out.push_back(var ? var->value
+                      : MakeLogic4Vec(ctx.GetArena(), info.elem_width));
+    return;
+  }
+  uint32_t lo = info.dim_los[d];
+  for (uint32_t i = 0; i < info.dim_sizes[d]; ++i) {
+    CollectMultiDimSetLeaves(
+        info, d + 1, prefix + "[" + std::to_string(lo + i) + "]", ctx, out);
+  }
+}
+
 // §11.4.13: a set member that names an unpacked array is not compared as an
 // aggregate. Instead its elements are traversed down to singular values, so the
 // membership test sees each element as if it had been listed individually.
 // Returns true (filling `out`) when `elem` named an unpacked array, covering
-// both queues/dynamic arrays and fixed-size unpacked arrays.
+// queues/dynamic arrays, single-dimension fixed arrays, and (by full descent
+// through every dimension) multidimensional fixed arrays.
 static bool CollectUnpackedSetMembers(const Expr* elem, SimContext& ctx,
                                       std::vector<Logic4Vec>& out) {
   if (elem->kind != ExprKind::kIdentifier) return false;
@@ -917,6 +939,10 @@ static bool CollectUnpackedSetMembers(const Expr* elem, SimContext& ctx,
     return true;
   }
   if (auto* info = ctx.FindArrayInfo(elem->text)) {
+    if (info->dim_sizes.size() >= 2) {
+      CollectMultiDimSetLeaves(*info, 0, std::string(elem->text), ctx, out);
+      return true;
+    }
     for (uint32_t i = 0; i < info->size; ++i) {
       std::string elem_name =
           std::string(elem->text) + "[" + std::to_string(info->lo + i) + "]";

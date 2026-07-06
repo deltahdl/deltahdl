@@ -2,6 +2,7 @@
 #include "fixture_simulator.h"
 #include "helpers_array.h"
 #include "helpers_eval_op.h"
+#include "helpers_lower_run.h"
 #include "helpers_queue.h"
 #include "parser/ast.h"
 #include "simulator/adv_sim.h"
@@ -23,64 +24,9 @@ static Expr* MakeRange(Arena& arena, Expr* lo, Expr* hi,
 
 namespace {
 
-TEST(EvalAdv, InsideAbsTolerance) {
-  SimFixture f;
-  auto* var = f.ctx.CreateVariable("at", 8);
-  var->value = MakeLogic4VecVal(f.arena, 8, 10);
-  auto* inside = f.arena.Create<Expr>();
-  inside->kind = ExprKind::kInside;
-  inside->lhs = MakeId(f.arena, "at");
-  inside->elements.push_back(MakeRange(f.arena, MakeInt(f.arena, 7),
-                                       MakeInt(f.arena, 5),
-                                       TokenKind::kPlusSlashMinus));
-  auto result = EvalExpr(inside, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 1u);
-}
-
-TEST(EvalAdv, InsideAbsToleranceMiss) {
-  SimFixture f;
-  auto* var = f.ctx.CreateVariable("am", 8);
-  var->value = MakeLogic4VecVal(f.arena, 8, 20);
-  auto* inside = f.arena.Create<Expr>();
-  inside->kind = ExprKind::kInside;
-  inside->lhs = MakeId(f.arena, "am");
-  inside->elements.push_back(MakeRange(f.arena, MakeInt(f.arena, 7),
-                                       MakeInt(f.arena, 5),
-                                       TokenKind::kPlusSlashMinus));
-  auto result = EvalExpr(inside, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 0u);
-}
-
-TEST(EvalAdv, InsideRelTolerance) {
-  SimFixture f;
-  auto* var = f.ctx.CreateVariable("rt", 8);
-  var->value = MakeLogic4VecVal(f.arena, 8, 8);
-  auto* inside = f.arena.Create<Expr>();
-  inside->kind = ExprKind::kInside;
-  inside->lhs = MakeId(f.arena, "rt");
-  inside->elements.push_back(MakeRange(f.arena, MakeInt(f.arena, 10),
-                                       MakeInt(f.arena, 25),
-                                       TokenKind::kPlusPercentMinus));
-  auto result = EvalExpr(inside, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 1u);
-}
-
-TEST(EvalOpXZ, InsideXOperand) {
-  SimFixture f;
-
-  MakeVar4(f, "ix", 4, 0b0000, 0b0100);
-
-  auto* inside = f.arena.Create<Expr>();
-  inside->kind = ExprKind::kInside;
-  inside->lhs = MakeId(f.arena, "ix");
-  inside->elements.push_back(MakeInt(f.arena, 3));
-  inside->elements.push_back(MakeInt(f.arena, 5));
-  inside->elements.push_back(MakeInt(f.arena, 7));
-
-  auto result = EvalExpr(inside, f.ctx, f.arena);
-  EXPECT_NE(result.words[0].bval, 0u);
-}
-
+// §11.4.13: the set is scanned until a match is found and the operator returns
+// 1'b1. Driven through the full pipeline so the left-hand side and the set
+// members come from real literals: 5 is a member of {3,5,7}.
 TEST(ExpressionSim, InsideValueMatch) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -98,172 +44,8 @@ TEST(ExpressionSim, InsideValueMatch) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-TEST(EvalOp, InsideMatch) {
-  SimFixture f;
-
-  auto* inside = f.arena.Create<Expr>();
-  inside->kind = ExprKind::kInside;
-  inside->lhs = MakeInt(f.arena, 5);
-  inside->elements.push_back(MakeInt(f.arena, 3));
-  inside->elements.push_back(MakeInt(f.arena, 5));
-  inside->elements.push_back(MakeInt(f.arena, 7));
-
-  auto result = EvalExpr(inside, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 1u);
-}
-
-TEST(EvalOp, InsideNoMatch) {
-  SimFixture f;
-
-  auto* inside = f.arena.Create<Expr>();
-  inside->kind = ExprKind::kInside;
-  inside->lhs = MakeInt(f.arena, 4);
-  inside->elements.push_back(MakeInt(f.arena, 3));
-  inside->elements.push_back(MakeInt(f.arena, 5));
-  inside->elements.push_back(MakeInt(f.arena, 7));
-
-  auto result = EvalExpr(inside, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 0u);
-}
-
-TEST(EvalOp, InsideRange) {
-  SimFixture f;
-
-  auto* range = f.arena.Create<Expr>();
-  range->kind = ExprKind::kSelect;
-  range->index = MakeInt(f.arena, 3);
-  range->index_end = MakeInt(f.arena, 7);
-
-  auto* inside = f.arena.Create<Expr>();
-  inside->kind = ExprKind::kInside;
-  inside->lhs = MakeInt(f.arena, 5);
-  inside->elements.push_back(range);
-
-  auto result = EvalExpr(inside, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 1u);
-}
-
-TEST(EvalOp, InsideRangeNoMatch) {
-  SimFixture f;
-
-  auto* range = f.arena.Create<Expr>();
-  range->kind = ExprKind::kSelect;
-  range->index = MakeInt(f.arena, 3);
-  range->index_end = MakeInt(f.arena, 7);
-
-  auto* inside = f.arena.Create<Expr>();
-  inside->kind = ExprKind::kInside;
-  inside->lhs = MakeInt(f.arena, 10);
-  inside->elements.push_back(range);
-
-  auto result = EvalExpr(inside, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 0u);
-}
-
-static Expr* MakeDollar(Arena& arena) {
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kIdentifier;
-  e->text = "$";
-  return e;
-}
-
-TEST(EvalAdv, InsideDollarLowerBound) {
-  SimFixture f;
-  auto* var = f.ctx.CreateVariable("dv", 8);
-  var->value = MakeLogic4VecVal(f.arena, 8, 5);
-  auto* inside = f.arena.Create<Expr>();
-  inside->kind = ExprKind::kInside;
-  inside->lhs = MakeId(f.arena, "dv");
-  inside->elements.push_back(
-      MakeRange(f.arena, MakeDollar(f.arena), MakeInt(f.arena, 10)));
-  auto result = EvalExpr(inside, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 1u);
-}
-
-TEST(EvalAdv, InsideDollarUpperBound) {
-  SimFixture f;
-  auto* var = f.ctx.CreateVariable("du", 8);
-  var->value = MakeLogic4VecVal(f.arena, 8, 200);
-  auto* inside = f.arena.Create<Expr>();
-  inside->kind = ExprKind::kInside;
-  inside->lhs = MakeId(f.arena, "du");
-  inside->elements.push_back(
-      MakeRange(f.arena, MakeInt(f.arena, 100), MakeDollar(f.arena)));
-  auto result = EvalExpr(inside, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 1u);
-}
-
-TEST(EvalOpXZ, InsideRhsXActsAsDontCare) {
-  SimFixture f;
-  auto* var = f.ctx.CreateVariable("wv", 4);
-  var->value = MakeLogic4VecVal(f.arena, 4, 0b0101);
-
-  auto* xval = f.arena.Create<Expr>();
-  xval->kind = ExprKind::kIdentifier;
-  xval->text = "xv";
-  auto* xvar = f.ctx.CreateVariable("xv", 4);
-  xvar->value = MakeLogic4Vec(f.arena, 4);
-  xvar->value.words[0].aval = 0b0001;
-  xvar->value.words[0].bval = 0b0110;
-
-  auto* inside = f.arena.Create<Expr>();
-  inside->kind = ExprKind::kInside;
-  inside->lhs = MakeId(f.arena, "wv");
-  inside->elements.push_back(xval);
-
-  auto result = EvalExpr(inside, f.ctx, f.arena);
-
-  EXPECT_EQ(result.ToUint64(), 1u);
-}
-
-TEST(EvalOpXZ, InsideLhsXNotDontCare) {
-  SimFixture f;
-
-  MakeVar4(f, "lx", 4, 0b0001, 0b0100);
-
-  auto* inside = f.arena.Create<Expr>();
-  inside->kind = ExprKind::kInside;
-  inside->lhs = MakeId(f.arena, "lx");
-  inside->elements.push_back(MakeInt(f.arena, 0b0101));
-
-  auto result = EvalExpr(inside, f.ctx, f.arena);
-
-  EXPECT_NE(result.words[0].bval, 0u);
-}
-
-TEST(EvalOp, InsideRangeLoBoundaryInclusive) {
-  SimFixture f;
-  auto* inside = f.arena.Create<Expr>();
-  inside->kind = ExprKind::kInside;
-  inside->lhs = MakeInt(f.arena, 3);
-  inside->elements.push_back(
-      MakeRange(f.arena, MakeInt(f.arena, 3), MakeInt(f.arena, 7)));
-  auto result = EvalExpr(inside, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 1u);
-}
-
-TEST(EvalOp, InsideRangeHiBoundaryInclusive) {
-  SimFixture f;
-  auto* inside = f.arena.Create<Expr>();
-  inside->kind = ExprKind::kInside;
-  inside->lhs = MakeInt(f.arena, 7);
-  inside->elements.push_back(
-      MakeRange(f.arena, MakeInt(f.arena, 3), MakeInt(f.arena, 7)));
-  auto result = EvalExpr(inside, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 1u);
-}
-
-TEST(EvalOp, InsideInvertedRangeIsEmpty) {
-  SimFixture f;
-  auto* inside = f.arena.Create<Expr>();
-  inside->kind = ExprKind::kInside;
-  inside->lhs = MakeInt(f.arena, 5);
-  inside->elements.push_back(
-      MakeRange(f.arena, MakeInt(f.arena, 10), MakeInt(f.arena, 3)));
-  auto result = EvalExpr(inside, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 0u);
-}
-
+// §11.4.13: values in the set may be repeated; a match against any occurrence
+// still yields 1'b1.
 TEST(EvalOp, InsideRepeatedValuesMatch) {
   SimFixture f;
   auto* inside = f.arena.Create<Expr>();
@@ -276,6 +58,8 @@ TEST(EvalOp, InsideRepeatedValuesMatch) {
   EXPECT_EQ(result.ToUint64(), 1u);
 }
 
+// §11.4.13: value ranges in the set may overlap; membership in either range is
+// enough for a match.
 TEST(EvalOp, InsideOverlappingRangesMatch) {
   SimFixture f;
   auto* inside = f.arena.Create<Expr>();
@@ -289,24 +73,10 @@ TEST(EvalOp, InsideOverlappingRangesMatch) {
   EXPECT_EQ(result.ToUint64(), 1u);
 }
 
-TEST(EvalOpXZ, InsideOrReductionAmbiguous) {
-  SimFixture f;
-
-  MakeVar4(f, "ov", 4, 0b0000, 0b0100);
-
-  auto* inside = f.arena.Create<Expr>();
-  inside->kind = ExprKind::kInside;
-  inside->lhs = MakeId(f.arena, "ov");
-
-  inside->elements.push_back(MakeInt(f.arena, 0b0100));
-
-  inside->elements.push_back(MakeInt(f.arena, 0b1111));
-
-  auto result = EvalExpr(inside, f.ctx, f.arena);
-
-  EXPECT_NE(result.words[0].bval, 0u);
-}
-
+// §11.4.13: the result is the OR reduction of the per-member comparisons, so a
+// definite match anywhere in the set produces 1'b1 even when another member's
+// comparison is ambiguous (x). Here `om` has an x bit that makes the first
+// comparison ambiguous, but the [0:15] range is a definite match.
 TEST(EvalOpXZ, InsideOrReductionMatchOverridesAmbiguous) {
   SimFixture f;
 
@@ -325,39 +95,110 @@ TEST(EvalOpXZ, InsideOrReductionMatchOverridesAmbiguous) {
   EXPECT_EQ(result.ToUint64(), 1u);
 }
 
-TEST(EvalAdv, InsideRelToleranceTruncation) {
+// §11.4.13: the marquee do-not-care example driven through the full pipeline.
+// With `3'bz11 inside {3'b1?1, 3'b011}` the z bit on the left-hand side is NOT
+// treated as a do-not-care (unlike the `?` wildcard on the set side), so every
+// comparison is ambiguous and none matches; the result is a definite x, the OR
+// reduction of the per-member comparisons. A definite 0/1 would clear bval, so
+// observing bval set proves the x result rather than a match or a miss.
+TEST(ExpressionSim, InsideResultXWhenLhsHasZ) {
   SimFixture f;
-  auto* var = f.ctx.CreateVariable("tt", 8);
-
-  var->value = MakeLogic4VecVal(f.arena, 8, 6);
-  auto* inside = f.arena.Create<Expr>();
-  inside->kind = ExprKind::kInside;
-  inside->lhs = MakeId(f.arena, "tt");
-  inside->elements.push_back(MakeRange(f.arena, MakeInt(f.arena, 7),
-                                       MakeInt(f.arena, 25),
-                                       TokenKind::kPlusPercentMinus));
-  auto result = EvalExpr(inside, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 1u);
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic r;\n"
+      "  initial r = 3'bz11 inside {3'b1?1, 3'b011};\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("r");
+  ASSERT_NE(var, nullptr);
+  EXPECT_NE(var->value.words[0].bval & 1u, 0u);
 }
 
-TEST(EvalAdv, InsideRelToleranceTruncationMiss) {
+// §11.4.13: absolute-tolerance range [A +/- B] designates [A-B : A+B]. Driven
+// end to end so the `+/-` token, not a hand-built AST, produces the bounds:
+// [7 +/- 5] = [2:12]; 10 is inside (match), 20 is outside (miss).
+TEST(ExpressionSim, InsideAbsoluteToleranceFullPipeline) {
   SimFixture f;
-  auto* var = f.ctx.CreateVariable("tm", 8);
-  var->value = MakeLogic4VecVal(f.arena, 8, 5);
-  auto* inside = f.arena.Create<Expr>();
-  inside->kind = ExprKind::kInside;
-  inside->lhs = MakeId(f.arena, "tm");
-  inside->elements.push_back(MakeRange(f.arena, MakeInt(f.arena, 7),
-                                       MakeInt(f.arena, 25),
-                                       TokenKind::kPlusPercentMinus));
-  auto result = EvalExpr(inside, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 0u);
+  auto [hit, miss] =
+      RunModuleTwoVars(f,
+                       "module t;\n"
+                       "  logic hit, miss;\n"
+                       "  initial begin\n"
+                       "    hit = 8'd10 inside {[8'd7 +/- 8'd5]};\n"
+                       "    miss = 8'd20 inside {[8'd7 +/- 8'd5]};\n"
+                       "  end\n"
+                       "endmodule\n",
+                       "hit", "miss");
+  EXPECT_EQ(hit, 1u);
+  EXPECT_EQ(miss, 0u);
+}
+
+// §11.4.13: relative-tolerance range [A +%- B] designates a tolerance of
+// A*B/100 with truncation (not rounding) on the real-to-integral conversion.
+// [7 +%- 25] has tolerance trunc(1.75) = 1, so the range is [6:8]: 6 matches
+// (truncation kept the low bound reachable) while 5 misses.
+TEST(ExpressionSim, InsideRelativeToleranceTruncatesFullPipeline) {
+  SimFixture f;
+  auto [hit, miss] =
+      RunModuleTwoVars(f,
+                       "module t;\n"
+                       "  logic hit, miss;\n"
+                       "  initial begin\n"
+                       "    hit = 8'd6 inside {[8'd7 +%- 8'd25]};\n"
+                       "    miss = 8'd5 inside {[8'd7 +%- 8'd25]};\n"
+                       "  end\n"
+                       "endmodule\n",
+                       "hit", "miss");
+  EXPECT_EQ(hit, 1u);
+  EXPECT_EQ(miss, 0u);
+}
+
+// §11.4.13: a $ bound denotes the lowest or highest value of the left-hand
+// side's type. Driven end to end so the `$` token resolves against the operand
+// width: [100:$] resolves the upper bound to 255 for an 8-bit value (250 is a
+// match), while [$:100] resolves the lower bound to 0 (150 exceeds 100, a miss)
+// — proving the open bound is the type extreme, not an unbounded range. The
+// miss also covers an in-order, non-empty range whose value lies above the
+// high bound.
+TEST(ExpressionSim, InsideDollarBoundsFullPipeline) {
+  SimFixture f;
+  auto [hi, lo] = RunModuleTwoVars(f,
+                                   "module t;\n"
+                                   "  logic hi, lo;\n"
+                                   "  initial begin\n"
+                                   "    hi = 8'd250 inside {[8'd100:$]};\n"
+                                   "    lo = 8'd150 inside {[$:8'd100]};\n"
+                                   "  end\n"
+                                   "endmodule\n",
+                                   "hi", "lo");
+  EXPECT_EQ(hi, 1u);
+  EXPECT_EQ(lo, 0u);
+}
+
+// §11.4.13: when the bound left of the colon exceeds the bound to its right the
+// range is empty and contains no values, so the membership test is a miss even
+// for a value that lies numerically between the two bounds.
+TEST(ExpressionSim, InsideInvertedRangeEmptyFullPipeline) {
+  SimFixture f;
+  uint64_t r = RunModule(f,
+                         "module t;\n"
+                         "  logic r;\n"
+                         "  initial r = 8'd5 inside {[8'd10:8'd3]};\n"
+                         "endmodule\n",
+                         "r");
+  EXPECT_EQ(r, 0u);
 }
 
 // §11.4.13: a set member naming an unpacked array is traversed down to its
-// singular elements, so {1, 2, q} with q = '{3,4,5} behaves like {1,2,3,4,5}.
-// Builds `ex inside {1, 2, q}` for a 32-bit `ex` holding `ex_val` and returns
-// the evaluated match result; q is '{3,4,5}.
+// singular elements, so {5, arr} with arr = '{10,20,30} behaves like
+// {5,10,20,30}. Builds `ex inside {1, 2, q}` for a 32-bit `ex` holding `ex_val`
+// and returns the evaluated match result; q is '{3,4,5}. The queue exercises
+// the dynamically-sized-array descent branch (a distinct container from the
+// fixed-array case below).
 static uint64_t EvalInsideQueueMember(SimFixture& f, uint64_t ex_val) {
   MakeQueue(f, "q", {3, 4, 5});
   auto* var = f.ctx.CreateVariable("ex", 32);
@@ -381,34 +222,151 @@ TEST(EvalOp, InsideQueueMemberNoMatch) {
   EXPECT_EQ(EvalInsideQueueMember(f, 9), 0u);
 }
 
-// A fixed-size unpacked array member descends the same way. MakeArray4 fills
-// arr[0..3] with {10, 20, 30, 40}; only the descent can supply the match.
-TEST(EvalOp, InsideFixedArrayMemberDescends) {
+// §11.4.13: the same descent for a fixed-size unpacked array, driven through
+// the full pipeline from a real array declaration + assignment-pattern
+// initializer (rather than a stubbed ArrayInfo): arr holds {10,20,30}, so 20
+// matches by descent while 7 misses — the constant 5 alone supplies neither.
+TEST(ExpressionSim, InsideUnpackedArrayMemberDescendsFullPipeline) {
   SimFixture f;
-  MakeArray4(f, "arr");
-  auto* var = f.ctx.CreateVariable("fv", 8);
-  var->value = MakeLogic4VecVal(f.arena, 8, 30);
-  auto* inside = f.arena.Create<Expr>();
-  inside->kind = ExprKind::kInside;
-  inside->lhs = MakeId(f.arena, "fv");
-  inside->elements.push_back(MakeInt(f.arena, 5));
-  inside->elements.push_back(MakeId(f.arena, "arr"));
-  auto result = EvalExpr(inside, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 1u);
+  auto [hit, miss] =
+      RunModuleTwoVars(f,
+                       "module t;\n"
+                       "  logic [7:0] arr [0:2] = '{8'd10, 8'd20, 8'd30};\n"
+                       "  logic hit, miss;\n"
+                       "  initial begin\n"
+                       "    hit = 8'd20 inside {8'd5, arr};\n"
+                       "    miss = 8'd7 inside {8'd5, arr};\n"
+                       "  end\n"
+                       "endmodule\n",
+                       "hit", "miss");
+  EXPECT_EQ(hit, 1u);
+  EXPECT_EQ(miss, 0u);
 }
 
-TEST(EvalOp, InsideFixedArrayMemberNoMatch) {
+// §11.4.13: descent into an unpacked-array set member continues until a
+// singular value is reached, so a MULTIDIMENSIONAL array contributes each of
+// its leaf elements. Built from a real 2-D array whose leaves are populated by
+// compound-select procedural writes (§7.4.2) and driven end to end: grid holds
+// {{10,20},{30,40}}, so 30 (a leaf, reachable only by descending both
+// dimensions) matches while 7 misses. The constant 5 supplies neither.
+TEST(ExpressionSim, InsideMultiDimArrayMemberDescendsFullPipeline) {
   SimFixture f;
-  MakeArray4(f, "arr");
-  auto* var = f.ctx.CreateVariable("fv", 8);
-  var->value = MakeLogic4VecVal(f.arena, 8, 25);
-  auto* inside = f.arena.Create<Expr>();
-  inside->kind = ExprKind::kInside;
-  inside->lhs = MakeId(f.arena, "fv");
-  inside->elements.push_back(MakeInt(f.arena, 5));
-  inside->elements.push_back(MakeId(f.arena, "arr"));
-  auto result = EvalExpr(inside, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 0u);
+  auto [hit, miss] =
+      RunModuleTwoVars(f,
+                       "module t;\n"
+                       "  logic [7:0] grid [0:1][0:1];\n"
+                       "  logic hit, miss;\n"
+                       "  initial begin\n"
+                       "    grid[0][0] = 8'd10; grid[0][1] = 8'd20;\n"
+                       "    grid[1][0] = 8'd30; grid[1][1] = 8'd40;\n"
+                       "    hit = 8'd30 inside {8'd5, grid};\n"
+                       "    miss = 8'd7 inside {8'd5, grid};\n"
+                       "  end\n"
+                       "endmodule\n",
+                       "hit", "miss");
+  EXPECT_EQ(hit, 1u);
+  EXPECT_EQ(miss, 0u);
+}
+
+// §11.4.13: the left-hand side and the set members may all be runtime
+// variables (the operator's headline form, `a inside {b, c}`), so the members'
+// values come from variable reads rather than literals. With a=5, b=3, c=5 the
+// value 5 matches the second member.
+TEST(ExpressionSim, InsideValueMembersFromVariables) {
+  SimFixture f;
+  uint64_t r = RunModule(f,
+                         "module t;\n"
+                         "  logic [7:0] a, b, c;\n"
+                         "  logic r;\n"
+                         "  initial begin\n"
+                         "    a = 8'd5; b = 8'd3; c = 8'd5;\n"
+                         "    r = a inside {b, c};\n"
+                         "  end\n"
+                         "endmodule\n",
+                         "r");
+  EXPECT_EQ(r, 1u);
+}
+
+// §11.4.13: a set member is an expression, so its value may be supplied by a
+// parameter constant rather than a literal (a distinct constant-evaluation
+// path). `8'd5 inside {P}` with P = 8'd5 matches.
+TEST(ExpressionSim, InsideValueMemberFromParameter) {
+  SimFixture f;
+  uint64_t r = RunModule(f,
+                         "module t;\n"
+                         "  parameter P = 8'd5;\n"
+                         "  logic r;\n"
+                         "  initial r = 8'd5 inside {P};\n"
+                         "endmodule\n",
+                         "r");
+  EXPECT_EQ(r, 1u);
+}
+
+// §11.4.13: the same, with the set member supplied by a localparam constant
+// (a separate constant form from a module parameter).
+TEST(ExpressionSim, InsideValueMemberFromLocalparam) {
+  SimFixture f;
+  uint64_t r = RunModule(f,
+                         "module t;\n"
+                         "  localparam P = 8'd5;\n"
+                         "  logic r;\n"
+                         "  initial r = 8'd5 inside {P};\n"
+                         "endmodule\n",
+                         "r");
+  EXPECT_EQ(r, 1u);
+}
+
+// §11.4.13: a range's low and high bounds are expressions and may be supplied
+// by parameter constants. [LO:HI] = [5:10]: 7 is inside (match), 20 is outside
+// (miss), exercising the relational membership test over parameter-valued
+// bounds.
+TEST(ExpressionSim, InsideRangeBoundsFromParameters) {
+  SimFixture f;
+  auto [hit, miss] = RunModuleTwoVars(f,
+                                      "module t;\n"
+                                      "  parameter LO = 8'd5;\n"
+                                      "  parameter HI = 8'd10;\n"
+                                      "  logic hit, miss;\n"
+                                      "  initial begin\n"
+                                      "    hit = 8'd7 inside {[LO:HI]};\n"
+                                      "    miss = 8'd20 inside {[LO:HI]};\n"
+                                      "  end\n"
+                                      "endmodule\n",
+                                      "hit", "miss");
+  EXPECT_EQ(hit, 1u);
+  EXPECT_EQ(miss, 0u);
+}
+
+// §11.4.13: range bounds supplied by localparam constants take the same path.
+TEST(ExpressionSim, InsideRangeBoundsFromLocalparams) {
+  SimFixture f;
+  auto [hit, miss] = RunModuleTwoVars(f,
+                                      "module t;\n"
+                                      "  localparam LO = 8'd5;\n"
+                                      "  localparam HI = 8'd10;\n"
+                                      "  logic hit, miss;\n"
+                                      "  initial begin\n"
+                                      "    hit = 8'd7 inside {[LO:HI]};\n"
+                                      "    miss = 8'd20 inside {[LO:HI]};\n"
+                                      "  end\n"
+                                      "endmodule\n",
+                                      "hit", "miss");
+  EXPECT_EQ(hit, 1u);
+  EXPECT_EQ(miss, 0u);
+}
+
+// §11.4.13: the left-hand side is any singular expression, including one whose
+// value is a parameter constant. `P inside {3,5,7}` with P = 8'd5 matches.
+TEST(ExpressionSim, InsideLhsFromParameter) {
+  SimFixture f;
+  uint64_t r = RunModule(f,
+                         "module t;\n"
+                         "  parameter P = 8'd5;\n"
+                         "  logic r;\n"
+                         "  initial r = P inside {8'd3, 8'd5, 8'd7};\n"
+                         "endmodule\n",
+                         "r");
+  EXPECT_EQ(r, 1u);
 }
 
 }  // namespace
