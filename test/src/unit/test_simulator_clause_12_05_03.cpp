@@ -138,8 +138,12 @@ TEST(CaseQualifierSim, UniqueOverlapRunsOnlyFirstMatch) {
   EXPECT_GE(f.diag.WarningCount(), 1u);
 }
 
-// §12.5.3 (N2): priority-case acts on the first match only. With no overlap
-// situation this should run cleanly and only the earliest matching item.
+// §12.5.3 (N2/N3): priority-case acts on the first match only and, unlike
+// unique/unique0, does NOT assert that the case_items are non-overlapping. Both
+// casez items here match the selector (an overlap), yet priority runs only the
+// earliest matching body and issues no uniqueness violation. Asserting zero
+// warnings observes that the priority path skips the overlap check that the
+// unique path performs.
 TEST(CaseQualifierSim, PriorityFirstMatchRunsExactlyOneBody) {
   SimFixture f;
   EXPECT_EQ(RunModule(f,
@@ -155,6 +159,7 @@ TEST(CaseQualifierSim, PriorityFirstMatchRunsExactlyOneBody) {
                       "endmodule\n",
                       "x"),
             11u);
+  EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
 // §12.5.3 (N9): when a single case_item holds multiple case_item_expressions,
@@ -168,6 +173,28 @@ TEST(CaseQualifierSim, UniqueSingleItemMultiplePatternsIsNotViolation) {
                       "  initial begin\n"
                       "    x = 8'd0;\n"
                       "    unique casez (8'b00000011)\n"
+                      "      8'b000000?1, 8'b0000001?: x = 8'd77;\n"
+                      "      8'b11111111: x = 8'd99;\n"
+                      "    endcase\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "x"),
+            77u);
+  EXPECT_EQ(f.diag.WarningCount(), 0u);
+}
+
+// §12.5.3 (N9 for unique0): the "multiple matching expressions in one item is
+// not a uniqueness violation" rule covers unique0-case as well as unique-case.
+// Both casez patterns in the single item match the selector, yet unique0 runs
+// the item once with no violation report.
+TEST(CaseQualifierSim, Unique0SingleItemMultiplePatternsIsNotViolation) {
+  SimFixture f;
+  EXPECT_EQ(RunModule(f,
+                      "module t;\n"
+                      "  logic [7:0] x;\n"
+                      "  initial begin\n"
+                      "    x = 8'd0;\n"
+                      "    unique0 casez (8'b00000011)\n"
                       "      8'b000000?1, 8'b0000001?: x = 8'd77;\n"
                       "      8'b11111111: x = 8'd99;\n"
                       "    endcase\n"
@@ -229,6 +256,56 @@ TEST(CaseQualifierSim, UniqueNoMatchIssuesViolation) {
                  "  end\n"
                  "endmodule\n");
   EXPECT_GE(f.diag.WarningCount(), 1u);
+}
+
+// §12.5.3 (N10, variable-selector input form): the LRM's own example models the
+// case_expression as a variable (bit [2:0] a) and lists a multi-expression item
+// (0,1). Driving the variable to a value no item covers (5) leaves no matching
+// case_item, so unique-case issues a violation. This exercises the no-match
+// rule on a runtime variable selector rather than a folded constant literal.
+TEST(CaseQualifierSim, UniqueVariableSelectorNoMatchIssuesViolation) {
+  SimFixture f;
+  RunModuleNoVar(f,
+                 "module t;\n"
+                 "  bit [2:0] a;\n"
+                 "  logic [7:0] x;\n"
+                 "  initial begin\n"
+                 "    x = 8'd0;\n"
+                 "    a = 3'd5;\n"
+                 "    unique case (a)\n"
+                 "      3'd0, 3'd1: x = 8'd11;\n"
+                 "      3'd2: x = 8'd22;\n"
+                 "      3'd4: x = 8'd44;\n"
+                 "    endcase\n"
+                 "  end\n"
+                 "endmodule\n");
+  EXPECT_GE(f.diag.WarningCount(), 1u);
+}
+
+// §12.5.3 (N9, variable-selector accepting path): companion to the reject case
+// above. Driving the same variable selector to 1 matches the multi-expression
+// item (0,1); the item runs exactly once with no violation, since a single item
+// covering the value is a clean unique match regardless of how many of its
+// expressions would match.
+TEST(CaseQualifierSim, UniqueVariableSelectorMatchesMultiExprItem) {
+  SimFixture f;
+  EXPECT_EQ(RunModule(f,
+                      "module t;\n"
+                      "  bit [2:0] a;\n"
+                      "  logic [7:0] x;\n"
+                      "  initial begin\n"
+                      "    x = 8'd0;\n"
+                      "    a = 3'd1;\n"
+                      "    unique case (a)\n"
+                      "      3'd0, 3'd1: x = 8'd11;\n"
+                      "      3'd2: x = 8'd22;\n"
+                      "      3'd4: x = 8'd44;\n"
+                      "    endcase\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "x"),
+            11u);
+  EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
 // §12.5.3 (N6/N7): a unique-case with a default-only fallback still suppresses

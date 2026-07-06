@@ -118,6 +118,60 @@ TEST(CaseQualifierParsing, Unique0AttachedToCasex) {
   EXPECT_EQ(stmt->qualifier, CaseQualifier::kUnique0);
 }
 
+TEST(CaseQualifierParsing, UniqueAttachedToCasex) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    unique casex (sel)\n"
+      "      2'b1x: a = 1;\n"
+      "      default: a = 0;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->case_kind, TokenKind::kKwCasex);
+  EXPECT_EQ(stmt->qualifier, CaseQualifier::kUnique);
+}
+
+TEST(CaseQualifierParsing, Unique0AttachedToCasez) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    unique0 casez (sel)\n"
+      "      2'b1?: a = 1;\n"
+      "      default: a = 0;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->case_kind, TokenKind::kKwCasez);
+  EXPECT_EQ(stmt->qualifier, CaseQualifier::kUnique0);
+}
+
+TEST(CaseQualifierParsing, PriorityAttachedToCasez) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    priority casez (sel)\n"
+      "      2'b1?: a = 1;\n"
+      "      default: a = 0;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->case_kind, TokenKind::kKwCasez);
+  EXPECT_EQ(stmt->qualifier, CaseQualifier::kPriority);
+}
+
 TEST(CaseQualifierParsing, UnqualifiedCaseHasNoneQualifier) {
   auto r = Parse(
       "module m;\n"
