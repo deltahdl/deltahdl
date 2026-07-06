@@ -83,6 +83,34 @@ struct ConstraintSoftVarRef {
   SourceLoc loc;
 };
 
+// 18.5.3: one dist_item of a captured distribution set. A plain item weights
+// the single 'value'; is_range weights the inclusive range [lo:hi]; is_default
+// marks the 'default :/ weight' item that stands for every domain value not
+// named by another item. 'weight' is the dist_weight expression, left null when
+// omitted (an absent weight means 1). per_element records that a range used the
+// ':=' operator — the weight is applied to each element of the range — as
+// opposed to
+// ':/' (or a single value), which applies the weight to the item as a whole; a
+// range with no explicit weight defaults to ':= 1', hence per_element.
+struct ConstraintDistItem {
+  Expr* value = nullptr;
+  Expr* lo = nullptr;
+  Expr* hi = nullptr;
+  Expr* weight = nullptr;
+  bool is_range = false;
+  bool per_element = false;
+  bool is_default = false;
+};
+
+// 18.5.3: a captured 'expression dist { dist_list }' constraint. 'target' is
+// the left-hand expression whose value the distribution weights; 'items' holds
+// the dist_list in source order. The parser records these so the simulator can
+// build a weighted-value solver constraint for a runtime randomize() call.
+struct ConstraintDistRef {
+  Expr* target = nullptr;
+  std::vector<ConstraintDistItem> items;
+};
+
 struct ClassMember {
   ClassMemberKind kind = ClassMemberKind::kProperty;
   SourceLoc loc;
@@ -135,6 +163,12 @@ struct ClassMember {
   // captures these so the simulator can translate them into the constraint
   // solver's inputs for a runtime randomize() call.
   std::vector<Expr*> constraint_exprs;
+
+  // 18.5.3: the 'expression dist { dist_list }' distributions found in this
+  // constraint block's body (empty for non-constraint members). The parser
+  // captures each so the simulator can build a weighted-value distribution
+  // constraint for the solver.
+  std::vector<ConstraintDistRef> constraint_dist_refs;
 
   DataType data_type;
   std::string_view name;

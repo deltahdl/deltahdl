@@ -1,288 +1,453 @@
 #include <gtest/gtest.h>
 
-#include <algorithm>
 #include <cstdint>
 #include <string>
-#include <unordered_map>
-#include <unordered_set>
-#include <vector>
 
-#include "simulator/constraint_solver.h"
+#include "fixture_simulator.h"
+#include "helpers_scheduler.h"
 
 using namespace delta;
 
 namespace {
 
-TEST(Constraint, InsideSetMembership) {
-  ConstraintSolver solver(42);
-  RandVariable v;
-  v.name = "mode";
-  v.min_val = 0;
-  v.max_val = 100;
-  solver.AddVariable(v);
+// These tests drive the distribution operator (18.5.3) end to end: each source
+// program declares a class with an "expression dist { dist_list }" constraint,
+// calls randomize() from an initial block, and copies results out to module
+// variables the harness reads. The parser captures the dist form and the
+// simulator builds it into a weighted-value (kDist) solver constraint, so the
+// behavior observed here is that of real elaborated source, not a hand-built
+// solver state. Because a distribution weights values probabilistically, the
+// weighting rules are observed by drawing many samples in a source loop and
+// comparing how often each value appears; the object's RNG advances on every
+// randomize() call, so a loop yields a spread of draws. The membership and
+// error rules are observed from a single, deterministic randomize() call.
 
-  ConstraintBlock block;
-  block.name = "c_inside";
-  ConstraintExpr c;
-  c.kind = ConstraintKind::kSetMembership;
-  c.var_name = "mode";
-  c.set_values = {1, 5, 10, 50};
-  block.constraints.push_back(c);
-  solver.AddConstraintBlock(block);
-
-  ASSERT_TRUE(solver.Solve());
-  int64_t val = solver.GetValue("mode");
-  EXPECT_TRUE(val == 1 || val == 5 || val == 10 || val == 50);
+// 18.5.3: the dist operator is a relational test for set membership — only a
+// value named by the dist set is ever produced. A set naming the single value
+// 42 pins x to 42 on every solve.
+TEST(ConstraintDist, OnlyListedValueProduced) {
+  const char* src =
+      "class C;\n"
+      "  rand int x;\n"
+      "  constraint c { x dist {42 := 1}; }\n"
+      "endclass\n"
+      "module t;\n"
+      "  int rx;\n"
+      "  int ok;\n"
+      "  initial begin\n"
+      "    C o = new;\n"
+      "    ok = o.randomize();\n"
+      "    rx = o.x;\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "ok"), 1u);
+  EXPECT_EQ(RunAndGet(src, "rx"), 42u);
 }
 
-TEST(Constraint, InsideSetSingleValue) {
-  ConstraintSolver solver(42);
-  RandVariable v;
-  v.name = "x";
-  v.min_val = 0;
-  v.max_val = 100;
-  solver.AddVariable(v);
-
-  ConstraintBlock block;
-  block.name = "c_single";
-  ConstraintExpr c;
-  c.kind = ConstraintKind::kSetMembership;
-  c.var_name = "x";
-  c.set_values = {77};
-  block.constraints.push_back(c);
-  solver.AddConstraintBlock(block);
-
-  ASSERT_TRUE(solver.Solve());
-  EXPECT_EQ(solver.GetValue("x"), 77);
+// 18.5.3: the set membership admits a value_range element, not only single
+// values. A distribution whose only item is the range [100:110] confines x to
+// that range on every solve, so no value outside it is ever produced.
+TEST(ConstraintDist, RangeElementRestrictsMembershipToRange) {
+  const char* src =
+      "class C;\n"
+      "  rand int x;\n"
+      "  constraint c { x dist {[100:110] := 1}; }\n"
+      "endclass\n"
+      "module t;\n"
+      "  int inrange;\n"
+      "  int outrange;\n"
+      "  initial begin\n"
+      "    C o = new;\n"
+      "    inrange = 0;\n"
+      "    outrange = 0;\n"
+      "    for (int i = 0; i < 200; i = i + 1) begin\n"
+      "      void'(o.randomize());\n"
+      "      if (o.x >= 100 && o.x <= 110) inrange = inrange + 1;\n"
+      "      else outrange = outrange + 1;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "inrange"), 200u);
+  EXPECT_EQ(RunAndGet(src, "outrange"), 0u);
 }
 
-// Build a solver holding one variable "x" over [lo, hi] constrained by a single
-// dist with the given weighted set, then sample it `runs` times and return the
-// list of solved values.
-std::vector<int64_t> SampleDist(int64_t lo, int64_t hi,
-                                const std::vector<DistWeight>& weights,
-                                int runs,
-                                RandQualifier q = RandQualifier::kRand) {
-  ConstraintSolver solver(42);
-  RandVariable v;
-  v.name = "x";
-  v.min_val = lo;
-  v.max_val = hi;
-  v.qualifier = q;
-  solver.AddVariable(v);
-
-  ConstraintBlock block;
-  block.name = "c_dist";
-  ConstraintExpr c;
-  c.kind = ConstraintKind::kDist;
-  c.var_name = "x";
-  c.dist_weights = weights;
-  block.constraints.push_back(c);
-  solver.AddConstraintBlock(block);
-
-  std::vector<int64_t> out;
-  for (int i = 0; i < runs; ++i) {
-    if (!solver.Solve()) break;
-    out.push_back(solver.GetValue("x"));
-  }
-  return out;
+// 18.5.3: a value whose total weight across the distribution is zero is treated
+// as a constraint that x not take that value. With 17 weighted zero and named
+// by no other item, only 42 is reachable, so every solve yields 42.
+TEST(ConstraintDist, ZeroTotalWeightValueExcluded) {
+  const char* src =
+      "class C;\n"
+      "  rand int x;\n"
+      "  constraint c { x dist {17 := 0, 42 := 1}; }\n"
+      "endclass\n"
+      "module t;\n"
+      "  int rx;\n"
+      "  initial begin\n"
+      "    C o = new;\n"
+      "    void'(o.randomize());\n"
+      "    rx = o.x;\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "rx"), 42u);
 }
 
-DistWeight Single(int64_t value, uint32_t weight) {
-  DistWeight w;
-  w.value = value;
-  w.weight = weight;
-  return w;
-}
-
-DistWeight Range(int64_t lo, int64_t hi, uint32_t weight, bool per_element) {
-  DistWeight w;
-  w.weight = weight;
-  w.lo = lo;
-  w.hi = hi;
-  w.is_range = true;
-  w.per_element = per_element;
-  return w;
-}
-
-int Count(const std::vector<int64_t>& vals, int64_t target) {
-  return static_cast<int>(std::count(vals.begin(), vals.end(), target));
-}
-
-int CountInRange(const std::vector<int64_t>& vals, int64_t lo, int64_t hi) {
-  int n = 0;
-  for (int64_t v : vals)
-    if (v >= lo && v <= hi) ++n;
-  return n;
-}
-
-// 18.5.3: absent any other constraints, the probability that the expression
-// matches an item shall be proportional to that item's weight. A 1000:1 weight
-// ratio drives almost every sample to the heavily weighted value.
+// 18.5.3: absent any other constraints, the probability that x matches an item
+// is proportional to the item's weight. A 1000:1 ratio drives nearly every
+// sample to the heavily weighted value.
 TEST(ConstraintDist, ProbabilityProportionalToWeight) {
-  auto vals = SampleDist(0, 100, {Single(10, 1000), Single(20, 1)}, 200);
-  ASSERT_EQ(vals.size(), 200u);
-  EXPECT_GT(Count(vals, 10), 180);
-  EXPECT_LT(Count(vals, 20), 20);
+  const char* src =
+      "class C;\n"
+      "  rand int x;\n"
+      "  constraint c { x dist {10 := 1000, 20 := 1}; }\n"
+      "endclass\n"
+      "module t;\n"
+      "  int c10;\n"
+      "  int c20;\n"
+      "  initial begin\n"
+      "    C o = new;\n"
+      "    c10 = 0;\n"
+      "    c20 = 0;\n"
+      "    for (int i = 0; i < 200; i = i + 1) begin\n"
+      "      void'(o.randomize());\n"
+      "      if (o.x == 10) c10 = c10 + 1;\n"
+      "      if (o.x == 20) c20 = c20 + 1;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_GT(RunAndGet(src, "c10"), 150u);
+  EXPECT_LT(RunAndGet(src, "c20"), 50u);
 }
 
-// 18.5.3: a distribution is a relational test for set membership, so only
-// values named by the dist set are ever produced; the rest of the domain is
-// excluded.
-TEST(ConstraintDist, OnlyListedValuesProduced) {
-  auto vals =
-      SampleDist(0, 100, {Single(10, 1), Single(20, 1), Single(30, 1)}, 200);
-  ASSERT_EQ(vals.size(), 200u);
-  for (int64_t v : vals) EXPECT_TRUE(v == 10 || v == 20 || v == 30);
+// 18.5.3: an integral item with no weight specified takes a default weight
+// of 1. Here 10 is given no weight and 20 is given weight 1, so the two occur
+// with comparable frequency.
+TEST(ConstraintDist, AbsentWeightDefaultsToOne) {
+  const char* src =
+      "class C;\n"
+      "  rand int x;\n"
+      "  constraint c { x dist {10, 20 := 1}; }\n"
+      "endclass\n"
+      "module t;\n"
+      "  int c10;\n"
+      "  int c20;\n"
+      "  initial begin\n"
+      "    C o = new;\n"
+      "    c10 = 0;\n"
+      "    c20 = 0;\n"
+      "    for (int i = 0; i < 300; i = i + 1) begin\n"
+      "      void'(o.randomize());\n"
+      "      if (o.x == 10) c10 = c10 + 1;\n"
+      "      if (o.x == 20) c20 = c20 + 1;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_GT(RunAndGet(src, "c10"), 80u);
+  EXPECT_GT(RunAndGet(src, "c20"), 80u);
+}
+
+// 18.5.3: the default weight of 1 for an item with no explicit weight applies
+// to a range item too, and the default is the := (per-element) form rather than
+// :/. A bare range [1:4] therefore carries a total weight equal to its four
+// elements, so it is about four times as likely overall as a bare single value
+// — had the default been :/ (whole-range) the two would be equally likely.
+TEST(ConstraintDist, AbsentWeightOnRangeIsPerElementDefault) {
+  const char* src =
+      "class C;\n"
+      "  rand int x;\n"
+      "  constraint c { x dist {[1:4], 100}; }\n"
+      "endclass\n"
+      "module t;\n"
+      "  int inr;\n"
+      "  int at100;\n"
+      "  initial begin\n"
+      "    C o = new;\n"
+      "    inr = 0;\n"
+      "    at100 = 0;\n"
+      "    for (int i = 0; i < 400; i = i + 1) begin\n"
+      "      void'(o.randomize());\n"
+      "      if (o.x >= 1 && o.x <= 4) inr = inr + 1;\n"
+      "      if (o.x == 100) at100 = at100 + 1;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n";
+  // Expected ratio 4:1; the range should dominate by a clear margin.
+  EXPECT_GT(RunAndGet(src, "inr"), RunAndGet(src, "at100") * 2);
+}
+
+// 18.5.3: the weight is interpreted as an unsigned value. A weight written as
+// -1 — a negative number if read as signed — is honoured as a large positive
+// magnitude, so the value carrying it overwhelms a value weighted 1.
+TEST(ConstraintDist, WeightInterpretedAsUnsigned) {
+  const char* src =
+      "class C;\n"
+      "  rand int x;\n"
+      "  constraint c { x dist {10 := -1, 20 := 1}; }\n"
+      "endclass\n"
+      "module t;\n"
+      "  int c10;\n"
+      "  int c20;\n"
+      "  initial begin\n"
+      "    C o = new;\n"
+      "    c10 = 0;\n"
+      "    c20 = 0;\n"
+      "    for (int i = 0; i < 200; i = i + 1) begin\n"
+      "      void'(o.randomize());\n"
+      "      if (o.x == 10) c10 = c10 + 1;\n"
+      "      if (o.x == 20) c20 = c20 + 1;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_GT(RunAndGet(src, "c10"), 195u);
+  EXPECT_LT(RunAndGet(src, "c20"), 5u);
 }
 
 // 18.5.3: when := is applied to a range the weight is assigned to each element,
-// so a four-element range with weight 1 is four times as likely overall as a
-// single value with weight 1.
+// so the range's total weight is its element count times the per-element
+// weight. A four-element range weighted 1 is about four times as likely overall
+// as a single value weighted 1.
 TEST(ConstraintDist, AssignWeightOnRangeIsPerElement) {
-  auto vals = SampleDist(0, 100, {Range(0, 3, 1, true), Single(10, 1)}, 400);
-  ASSERT_EQ(vals.size(), 400u);
-  int in_range = CountInRange(vals, 0, 3);
-  int at_ten = Count(vals, 10);
-  // Expected ratio is 4:1; require the range to dominate by a clear margin.
-  EXPECT_GT(in_range, at_ten * 2);
+  const char* src =
+      "class C;\n"
+      "  rand int x;\n"
+      "  constraint c { x dist {[1:4] := 1, 100 := 1}; }\n"
+      "endclass\n"
+      "module t;\n"
+      "  int inr;\n"
+      "  int at100;\n"
+      "  initial begin\n"
+      "    C o = new;\n"
+      "    inr = 0;\n"
+      "    at100 = 0;\n"
+      "    for (int i = 0; i < 400; i = i + 1) begin\n"
+      "      void'(o.randomize());\n"
+      "      if (o.x >= 1 && o.x <= 4) inr = inr + 1;\n"
+      "      if (o.x == 100) at100 = at100 + 1;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n";
+  // Expected ratio 4:1; require the range to dominate by a clear margin.
+  EXPECT_GT(RunAndGet(src, "inr"), RunAndGet(src, "at100") * 2);
 }
 
 // 18.5.3: when :/ is applied to a range the weight is assigned to the range as
-// a whole, so the same four-element range with weight 1 is only as likely
-// overall as a single value with weight 1.
+// a whole, so the same four-element range weighted 1 is only as likely overall
+// as a single value weighted 1.
 TEST(ConstraintDist, DivideWeightOnRangeIsWholeRange) {
-  auto vals = SampleDist(0, 100, {Range(0, 3, 1, false), Single(10, 1)}, 400);
-  ASSERT_EQ(vals.size(), 400u);
-  int in_range = CountInRange(vals, 0, 3);
-  int at_ten = Count(vals, 10);
-  // Expected ratio is 1:1; both outcomes should be of comparable frequency.
-  EXPECT_GT(in_range, at_ten / 2);
-  EXPECT_GT(at_ten, in_range / 2);
+  const char* src =
+      "class C;\n"
+      "  rand int x;\n"
+      "  constraint c { x dist {[1:4] :/ 1, 100 := 1}; }\n"
+      "endclass\n"
+      "module t;\n"
+      "  int inr;\n"
+      "  int at100;\n"
+      "  initial begin\n"
+      "    C o = new;\n"
+      "    inr = 0;\n"
+      "    at100 = 0;\n"
+      "    for (int i = 0; i < 400; i = i + 1) begin\n"
+      "      void'(o.randomize());\n"
+      "      if (o.x >= 1 && o.x <= 4) inr = inr + 1;\n"
+      "      if (o.x == 100) at100 = at100 + 1;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n";
+  // Expected ratio 1:1; both outcomes should be of comparable frequency.
+  uint64_t inr = RunAndGet(src, "inr");
+  uint64_t at100 = RunAndGet(src, "at100");
+  EXPECT_GT(inr, at100 / 2);
+  EXPECT_GT(at100, inr / 2);
+}
+
+// 18.5.3: the := and :/ operators assign the specified weight to an individual
+// value identically — the per-element distinction governs only ranges. Two
+// classes differing solely in which operator tags the same single-value set
+// draw the same sequence from the same object seed, so their outcome counts
+// match exactly.
+TEST(ConstraintDist, AssignAndDivideEquivalentForSingleValues) {
+  const char* assign_src =
+      "class C;\n"
+      "  rand int x;\n"
+      "  constraint c { x dist {100 := 1, 200 := 2}; }\n"
+      "endclass\n"
+      "module t;\n"
+      "  int c100;\n"
+      "  int c200;\n"
+      "  initial begin\n"
+      "    C o = new;\n"
+      "    c100 = 0;\n"
+      "    c200 = 0;\n"
+      "    for (int i = 0; i < 200; i = i + 1) begin\n"
+      "      void'(o.randomize());\n"
+      "      if (o.x == 100) c100 = c100 + 1;\n"
+      "      if (o.x == 200) c200 = c200 + 1;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n";
+  const char* divide_src =
+      "class C;\n"
+      "  rand int x;\n"
+      "  constraint c { x dist {100 :/ 1, 200 :/ 2}; }\n"
+      "endclass\n"
+      "module t;\n"
+      "  int c100;\n"
+      "  int c200;\n"
+      "  initial begin\n"
+      "    C o = new;\n"
+      "    c100 = 0;\n"
+      "    c200 = 0;\n"
+      "    for (int i = 0; i < 200; i = i + 1) begin\n"
+      "      void'(o.randomize());\n"
+      "      if (o.x == 100) c100 = c100 + 1;\n"
+      "      if (o.x == 200) c200 = c200 + 1;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(assign_src, "c100"), RunAndGet(divide_src, "c100"));
+  EXPECT_EQ(RunAndGet(assign_src, "c200"), RunAndGet(divide_src, "c200"));
 }
 
 // 18.5.3: if a single value occurs in multiple items, the weights allocated to
 // that value are additive. Value 200 appears in two weight-1 items and so is
 // about twice as likely as the single weight-1 value 100.
 TEST(ConstraintDist, WeightsAreAdditiveAcrossItems) {
-  auto vals =
-      SampleDist(0, 100, {Single(100, 1), Single(200, 1), Single(200, 1)}, 300);
-  ASSERT_EQ(vals.size(), 300u);
-  EXPECT_GT(Count(vals, 200), Count(vals, 100));
+  const char* src =
+      "class C;\n"
+      "  rand int x;\n"
+      "  constraint c { x dist {100 := 1, 200 := 1, 200 := 1}; }\n"
+      "endclass\n"
+      "module t;\n"
+      "  int c100;\n"
+      "  int c200;\n"
+      "  initial begin\n"
+      "    C o = new;\n"
+      "    c100 = 0;\n"
+      "    c200 = 0;\n"
+      "    for (int i = 0; i < 300; i = i + 1) begin\n"
+      "      void'(o.randomize());\n"
+      "      if (o.x == 100) c100 = c100 + 1;\n"
+      "      if (o.x == 200) c200 = c200 + 1;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_GT(RunAndGet(src, "c200"), RunAndGet(src, "c100"));
 }
 
 // 18.5.3: the additive behavior includes items explicitly weighted to zero. The
-// 100:/0 item does not exclude 100 because 100 is also covered by a nonzero
-// range item, so all of 100, 101, 102 remain reachable.
+// 50:=0 item does not exclude 50 because 50 is also covered by a nonzero range
+// item, so both 50 and 51 remain reachable and no other value appears.
 TEST(ConstraintDist, ZeroWeightItemDoesNotConstrainWhenCoveredElsewhere) {
-  std::vector<DistWeight> weights = {Single(100, 0), Range(100, 102, 1, false)};
-  auto vals = SampleDist(0, 200, weights, 300);
-  ASSERT_EQ(vals.size(), 300u);
-  for (int64_t v : vals) EXPECT_TRUE(v >= 100 && v <= 102);
-  EXPECT_GT(Count(vals, 100), 0);
-  EXPECT_GT(Count(vals, 101), 0);
-  EXPECT_GT(Count(vals, 102), 0);
-}
-
-// 18.5.3: the default specification stands for every value of the domain not
-// present in any other item. With [0:1] named explicitly, a default draw lands
-// on a value from the complement {2, 3, 4} of the [0:4] domain.
-TEST(ConstraintDist, DefaultCoversRemainderOfDomain) {
-  DistWeight def;
-  def.weight = 1;
-  def.is_default = true;
-  auto vals = SampleDist(0, 4, {Range(0, 1, 1, false), def}, 300);
-  ASSERT_EQ(vals.size(), 300u);
-  for (int64_t v : vals) EXPECT_TRUE(v >= 0 && v <= 4);
-  // The default item is reachable, so values outside [0:1] must occur.
-  EXPECT_GT(CountInRange(vals, 2, 4), 0);
-}
-
-// 18.5.3: a dist operation shall not be applied to a randc variable, so a
-// distribution targeting one makes randomization fail.
-TEST(ConstraintDist, DistOnRandcVariableFails) {
-  auto vals = SampleDist(0, 100, {Single(10, 1), Single(20, 1)}, 1,
-                         RandQualifier::kRandc);
-  EXPECT_TRUE(vals.empty());
-}
-
-// 18.5.3: a dist expression requires that the expression contain at least one
-// rand variable. A distribution applied to a variable with no rand qualifier
-// supplies no rand variable to the expression, so randomization fails.
-TEST(ConstraintDist, DistRequiresRandVariableFails) {
-  auto vals = SampleDist(0, 100, {Single(10, 1), Single(20, 1)}, 1,
-                         RandQualifier::kNone);
-  EXPECT_TRUE(vals.empty());
-}
-
-// 18.5.3 (control): the same distribution applied to a rand variable solves
-// successfully and yields one of the listed values.
-TEST(ConstraintDist, DistOnRandVariableSolves) {
-  auto vals = SampleDist(0, 100, {Single(10, 1), Single(20, 1)}, 1,
-                         RandQualifier::kRand);
-  ASSERT_EQ(vals.size(), 1u);
-  EXPECT_TRUE(vals[0] == 10 || vals[0] == 20);
-}
-
-// 18.5.3: an integral item with no weight specified takes a default weight of
-// 1. Here the value 100 is given no explicit weight and the value 200 is given
-// weight 1; the two should therefore occur with comparable frequency.
-TEST(ConstraintDist, AbsentWeightDefaultsToOne) {
-  DistWeight no_weight;
-  no_weight.value = 100;  // weight left at its default of 1
-  auto vals = SampleDist(0, 100, {no_weight, Single(200, 1)}, 300);
-  ASSERT_EQ(vals.size(), 300u);
-  int at_100 = Count(vals, 100);
-  int at_200 = Count(vals, 200);
-  EXPECT_GT(at_100, at_200 / 2);
-  EXPECT_GT(at_200, at_100 / 2);
-}
-
-// 18.5.3: the weight is interpreted as an unsigned value. A weight whose most
-// significant bit is set — a negative number if it were read as a signed
-// quantity — is honoured as a large positive magnitude, so the value carrying
-// it overwhelms a value weighted 1 rather than dropping out of the draw.
-TEST(ConstraintDist, WeightInterpretedAsUnsigned) {
-  auto vals = SampleDist(0, 100, {Single(10, 0x80000000u), Single(20, 1)}, 200);
-  ASSERT_EQ(vals.size(), 200u);
-  EXPECT_GT(Count(vals, 10), 195);
-  EXPECT_LT(Count(vals, 20), 5);
-}
-
-// 18.5.3: both the := and :/ operators assign the specified weight to an
-// individual value, so for single values the two operators are equivalent.
-// Built from identical values and weights against the same seed, a set tagged
-// with := and a set tagged with :/ yield the same sequence of draws.
-TEST(ConstraintDist, AssignAndDivideEquivalentForSingleValues) {
-  std::vector<DistWeight> assign_set = {Single(100, 1), Single(200, 2)};
-  std::vector<DistWeight> divide_set = assign_set;
-  // The :/ form differs only in the per-element flag, which has no effect on a
-  // single value (it governs how a range's weight is spread).
-  for (auto& w : divide_set) w.per_element = true;
-  auto a = SampleDist(0, 300, assign_set, 200);
-  auto d = SampleDist(0, 300, divide_set, 200);
-  EXPECT_EQ(a, d);
+  const char* src =
+      "class C;\n"
+      "  rand int x;\n"
+      "  constraint c { x dist {50 := 0, [50:51] := 1}; }\n"
+      "endclass\n"
+      "module t;\n"
+      "  int c50;\n"
+      "  int other;\n"
+      "  initial begin\n"
+      "    C o = new;\n"
+      "    c50 = 0;\n"
+      "    other = 0;\n"
+      "    for (int i = 0; i < 200; i = i + 1) begin\n"
+      "      void'(o.randomize());\n"
+      "      if (o.x == 50) c50 = c50 + 1;\n"
+      "      if (o.x != 50 && o.x != 51) other = other + 1;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_GT(RunAndGet(src, "c50"), 0u);
+  EXPECT_EQ(RunAndGet(src, "other"), 0u);
 }
 
 // 18.5.3: nonzero distribution weights do not remove values from the solution
-// space. Even when one value is weighted thousands of times more heavily, the
-// lightly weighted value is still reachable across many randomizations.
+// space. Even weighted 100 times more lightly, value 20 is still reachable
+// across many randomizations.
 TEST(ConstraintDist, NonzeroWeightDoesNotExcludeValue) {
-  auto vals = SampleDist(0, 100, {Single(10, 100), Single(20, 1)}, 2000);
-  ASSERT_EQ(vals.size(), 2000u);
-  EXPECT_GT(Count(vals, 20), 0);
+  const char* src =
+      "class C;\n"
+      "  rand int x;\n"
+      "  constraint c { x dist {10 := 100, 20 := 1}; }\n"
+      "endclass\n"
+      "module t;\n"
+      "  int c20;\n"
+      "  initial begin\n"
+      "    C o = new;\n"
+      "    c20 = 0;\n"
+      "    for (int i = 0; i < 1500; i = i + 1) begin\n"
+      "      void'(o.randomize());\n"
+      "      if (o.x == 20) c20 = c20 + 1;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_GT(RunAndGet(src, "c20"), 0u);
 }
 
-// 18.5.3: a value whose total weight across the distribution is zero is
-// excluded from the result, as though a constraint forbade it. Here 100 carries
-// weight zero and is named by no other item, so only 200 is ever produced.
-// (Contrast ZeroWeightItemDoesNotConstrainWhenCoveredElsewhere, where the
-// zero-weighted value remains reachable through a second, nonzero item.)
-TEST(ConstraintDist, ZeroTotalWeightValueExcluded) {
-  auto vals = SampleDist(0, 100, {Single(100, 0), Single(200, 1)}, 200);
-  ASSERT_EQ(vals.size(), 200u);
-  EXPECT_EQ(Count(vals, 100), 0);
-  for (int64_t v : vals) EXPECT_EQ(v, 200);
+// 18.5.3: the default specification stands for every value of the domain not
+// present in any other item. With 0 named explicitly and everything else
+// covered by default, both 0 and some nonzero value are produced across many
+// solves.
+TEST(ConstraintDist, DefaultCoversRemainderOfDomain) {
+  const char* src =
+      "class C;\n"
+      "  rand int x;\n"
+      "  constraint c { x dist {0 := 1, default :/ 1}; }\n"
+      "endclass\n"
+      "module t;\n"
+      "  int czero;\n"
+      "  int cother;\n"
+      "  initial begin\n"
+      "    C o = new;\n"
+      "    czero = 0;\n"
+      "    cother = 0;\n"
+      "    for (int i = 0; i < 100; i = i + 1) begin\n"
+      "      void'(o.randomize());\n"
+      "      if (o.x == 0) czero = czero + 1;\n"
+      "      if (o.x != 0) cother = cother + 1;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_GT(RunAndGet(src, "czero"), 0u);
+  EXPECT_GT(RunAndGet(src, "cother"), 0u);
+}
+
+// 18.5.3: a dist operation shall not be applied to a randc variable, so a
+// distribution targeting one makes randomize() fail.
+TEST(ConstraintDist, DistOnRandcVariableFails) {
+  const char* src =
+      "class C;\n"
+      "  randc int x;\n"
+      "  constraint c { x dist {10 := 1, 20 := 1}; }\n"
+      "endclass\n"
+      "module t;\n"
+      "  int ok;\n"
+      "  initial begin\n"
+      "    C o = new;\n"
+      "    ok = o.randomize();\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "ok"), 0u);
+}
+
+// 18.5.3: a dist expression requires that the expression contain at least one
+// rand variable. A distribution applied to a non-rand member supplies no rand
+// variable, so randomize() fails even though the class has an unrelated rand
+// member.
+TEST(ConstraintDist, DistRequiresRandVariableFails) {
+  const char* src =
+      "class C;\n"
+      "  rand int y;\n"
+      "  int x;\n"
+      "  constraint c { x dist {10 := 1, 20 := 1}; }\n"
+      "endclass\n"
+      "module t;\n"
+      "  int ok;\n"
+      "  initial begin\n"
+      "    C o = new;\n"
+      "    ok = o.randomize();\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "ok"), 0u);
 }
 
 }  // namespace

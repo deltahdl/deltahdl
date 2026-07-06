@@ -752,6 +752,14 @@ void Parser::CaptureConstraintRelation(ClassMember* member) {
   // expression, so the plain expression parse below would not recognize it.
   bool captured = k == TokenKind::kKwIf ? TryCaptureIfElseConstraint(member)
                                         : TryCaptureBracedImplication(member);
+  // 18.5.3: an "expression dist { dist_list }" distribution. Its dist set is
+  // not an expression, so the plain parse below would stop at 'dist' and
+  // capture nothing; recognize the whole form here after rewinding the
+  // implication probe's own speculative attempt.
+  if (!captured && k != TokenKind::kKwIf) {
+    lexer_.RestorePos(saved);
+    captured = TryCaptureDist(member);
+  }
   if (!captured) {
     lexer_.RestorePos(saved);
     Expr* rel = ParseExpr();
@@ -800,6 +808,75 @@ bool Parser::TryCaptureBracedImplication(ClassMember* member) {
   if (member) {
     for (Expr* impl : synthesized) member->constraint_exprs.push_back(impl);
   }
+  return true;
+}
+
+// 18.5.3: parse an optional dist_weight ( ':=' expression | ':/' expression )
+// onto 'item'. The ':=' operator applies the weight to each element of a range
+// (per_element); ':/' applies it to the item as a whole. Returns true when a
+// weight operator was consumed, false when none is present (leaving item.weight
+// null, which the simulator reads as the default weight of 1). Runs inside the
+// caller's suppressed, position-saved speculative scan.
+bool Parser::ParseDistWeight(ConstraintDistItem& item) {
+  if (MatchColonSlash()) {  // ':/'
+    item.per_element = false;
+    item.weight = ParseExpr();
+    return item.weight != nullptr;
+  }
+  if (Check(TokenKind::kColon)) {  // possible ':='
+    auto saved = lexer_.SavePos();
+    Consume();  // ':'
+    if (Check(TokenKind::kEq)) {
+      Consume();  // '='
+      item.per_element = true;
+      item.weight = ParseExpr();
+      return item.weight != nullptr;
+    }
+    lexer_.RestorePos(saved);
+  }
+  return false;
+}
+
+// 18.5.3: capture "expression dist { dist_list }". Parses the target
+// expression, then each dist_item — a single value, a '[lo:hi]' range, or the
+// 'default' item — with its optional dist_weight, recording them on the member
+// so the simulator can build a weighted-value distribution constraint. Returns
+// false on any structural mismatch (so the plain-relation fallback still runs)
+// and records nothing until the whole form is recognized. A range that carries
+// no explicit weight defaults to ':= 1' semantics, so per_element is set for
+// it. Runs inside the caller's suppressed, position-saved speculative scan.
+bool Parser::TryCaptureDist(ClassMember* member) {
+  Expr* target = ParseExpr();
+  if (target == nullptr || !Check(TokenKind::kKwDist)) return false;
+  Consume();  // 'dist'
+  if (!Check(TokenKind::kLBrace)) return false;
+  Consume();  // '{'
+  ConstraintDistRef ref;
+  ref.target = target;
+  while (!Check(TokenKind::kRBrace)) {
+    if (AtEnd()) return false;
+    ConstraintDistItem item;
+    if (Match(TokenKind::kKwDefault)) {
+      item.is_default = true;
+      if (!ParseDistWeight(item)) return false;  // 'default' requires ':/ expr'
+    } else if (Match(TokenKind::kLBracket)) {
+      item.is_range = true;
+      item.lo = ParseExpr();
+      if (item.lo == nullptr || !Match(TokenKind::kColon)) return false;
+      item.hi = ParseExpr();
+      if (item.hi == nullptr || !Match(TokenKind::kRBracket)) return false;
+      if (!ParseDistWeight(item))
+        item.per_element = true;  // bare range → ':= 1'
+    } else {
+      item.value = ParseExpr();
+      if (item.value == nullptr) return false;
+      ParseDistWeight(item);  // optional; absent → default weight 1
+    }
+    ref.items.push_back(item);
+    if (!Check(TokenKind::kRBrace) && !Match(TokenKind::kComma)) return false;
+  }
+  Consume();  // '}'
+  if (member) member->constraint_dist_refs.push_back(ref);
   return true;
 }
 

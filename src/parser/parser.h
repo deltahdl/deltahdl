@@ -118,6 +118,8 @@ class Parser {
                                bool carried_qualifier);
   void CaptureConstraintRelation(ClassMember* member);
   bool TryCaptureBracedImplication(ClassMember* member);
+  bool TryCaptureDist(ClassMember* member);
+  bool ParseDistWeight(ConstraintDistItem& item);
   bool TryCaptureIfElseConstraint(ClassMember* member);
   bool CaptureGuardedIf(Expr* guard, std::vector<Expr*>& out);
   bool CaptureGuardedConstraintSet(Expr* guard, std::vector<Expr*>& out);

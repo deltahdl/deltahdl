@@ -359,6 +359,8 @@ void Elaborator::RunPreElaborationValidations() {
 
   ValidateForeachConstraintDims();
 
+  ValidateDistConstraints();
+
   ValidateSolveBeforeConstraints();
 
   ValidateSoftConstraintVariables();

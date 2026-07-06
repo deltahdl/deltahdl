@@ -226,13 +226,54 @@ ConstraintExpr TranslateRelation(const Expr* rel, std::vector<RandInfo>& rands,
   return MakeCustomConstraint(rel, rands, rc);
 }
 
+// 18.5.3: translate a captured "expression dist { dist_list }" into a kDist
+// solver constraint. The distribution names the single variable it weights, so
+// the target must be a plain identifier; each item's value/range bounds and its
+// weight are constant expressions, folded to integers here. A range keeps its
+// per_element flag so the solver spreads a ':=' weight across the range, and an
+// item with no explicit weight keeps the DistWeight default weight of 1.
+// Returns false for a non-identifier target, leaving the distribution unbuilt.
+bool BuildDistConstraint(const ConstraintDistRef& ref, RandomizeCtx& rc,
+                         ConstraintExpr& out) {
+  if (ref.target == nullptr || ref.target->kind != ExprKind::kIdentifier)
+    return false;
+  out.kind = ConstraintKind::kDist;
+  out.var_name = std::string(ref.target->text);
+  for (const auto& item : ref.items) {
+    DistWeight w;
+    w.is_default = item.is_default;
+    w.is_range = item.is_range;
+    w.per_element = item.per_element;
+    if (item.weight != nullptr)
+      w.weight = static_cast<uint32_t>(
+          EvalExpr(item.weight, rc.ctx, rc.arena).ToUint64());
+    if (item.is_range) {
+      w.lo =
+          static_cast<int64_t>(EvalExpr(item.lo, rc.ctx, rc.arena).ToUint64());
+      w.hi =
+          static_cast<int64_t>(EvalExpr(item.hi, rc.ctx, rc.arena).ToUint64());
+    } else if (!item.is_default) {
+      w.value = static_cast<int64_t>(
+          EvalExpr(item.value, rc.ctx, rc.arena).ToUint64());
+    }
+    out.dist_weights.push_back(w);
+  }
+  return true;
+}
+
 void AddConstraintMember(const ClassMember* m, std::vector<RandInfo>& rands,
                          RandomizeCtx& rc, ConstraintSolver& solver) {
   ConstraintBlock block;
   block.name = std::string(m->name);
-  block.constraints.reserve(m->constraint_exprs.size());
+  block.constraints.reserve(m->constraint_exprs.size() +
+                            m->constraint_dist_refs.size());
   for (const Expr* rel : m->constraint_exprs) {
     block.constraints.push_back(TranslateRelation(rel, rands, rc));
+  }
+  // 18.5.3: build each captured distribution as a weighted-value constraint.
+  for (const auto& ref : m->constraint_dist_refs) {
+    ConstraintExpr ce;
+    if (BuildDistConstraint(ref, rc, ce)) block.constraints.push_back(ce);
   }
   solver.AddConstraintBlock(block);
 }
@@ -246,7 +287,7 @@ void CollectConstraintBlocks(const ClassTypeInfo* type,
     if (!lvl->decl) continue;
     for (const ClassMember* m : lvl->decl->members) {
       if (m->kind == ClassMemberKind::kConstraint &&
-          !m->constraint_exprs.empty())
+          (!m->constraint_exprs.empty() || !m->constraint_dist_refs.empty()))
         AddConstraintMember(m, rands, rc, solver);
     }
   }

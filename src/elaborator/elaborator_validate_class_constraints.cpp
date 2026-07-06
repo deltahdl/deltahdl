@@ -210,6 +210,50 @@ void Elaborator::ValidateForeachConstraintDims() {
     ValidateOneClassForeachConstraintDims(cls);
 }
 
+// 18.5.3: a range of real values in a distribution shall use the :/ operator
+// and shall specify a weight. When the distributed variable is real-typed,
+// every range item of its distribution is a real-valued range, so it may
+// neither use
+// := (which spreads the weight per element — meaningful only for an integral
+// range) nor omit its weight. The parser records both offending forms with
+// per_element set: an explicit := range, and a bare range that defaults to := 1
+// with no weight. A real range whose per_element flag is set therefore violates
+// the rule and is rejected; a :/ range (per_element clear, weight always
+// present) is accepted. The target is resolved against the class property map
+// so an inherited real member is recognized.
+static void CheckOneDistConstraintRef(
+    const ConstraintDistRef& ref,
+    const std::unordered_map<std::string_view, const ClassMember*>& properties,
+    DiagEngine& diag) {
+  if (ref.target == nullptr || ref.target->kind != ExprKind::kIdentifier)
+    return;
+  auto it = properties.find(ref.target->text);
+  if (it == properties.end()) return;
+  if (!IsRealDataType(it->second->data_type.kind)) return;
+  for (const auto& item : ref.items) {
+    if (!item.is_range || !item.per_element) continue;
+    SourceLoc loc =
+        item.lo != nullptr ? item.lo->range.start : ref.target->range.start;
+    diag.Error(loc,
+               "a real-valued range in a dist constraint requires the :/ "
+               "operator and an explicit weight");
+  }
+}
+
+void Elaborator::ValidateOneClassDistConstraints(const ClassDecl* cls) {
+  auto properties = BuildClassPropertyMap(cls, unit_);
+
+  for (const auto* m : cls->members) {
+    if (m->kind != ClassMemberKind::kConstraint) continue;
+    for (const auto& ref : m->constraint_dist_refs)
+      CheckOneDistConstraintRef(ref, properties, diag_);
+  }
+}
+
+void Elaborator::ValidateDistConstraints() {
+  for (const auto* cls : unit_->classes) ValidateOneClassDistConstraints(cls);
+}
+
 // 18.5.9: a variable named in a solve...before ordering shall be of integral or
 // real type. Reject the types that are plainly neither — strings, events,
 // chandles, virtual interfaces, void, and class handles. A typedef name is left

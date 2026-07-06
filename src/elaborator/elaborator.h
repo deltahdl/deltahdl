@@ -571,6 +571,11 @@ class Elaborator {
   void ValidateForeachConstraintDims();
   void ValidateOneClassForeachConstraintDims(const ClassDecl* cls);
 
+  // 18.5.3: a real-valued range in a distribution shall use the :/ operator and
+  // shall specify a weight.
+  void ValidateDistConstraints();
+  void ValidateOneClassDistConstraints(const ClassDecl* cls);
+
   // 18.5.9: a solve...before ordering constraint may name only rand variables
   // (never randc), each integral or real, with no circular dependency.
   void ValidateSolveBeforeConstraints();
