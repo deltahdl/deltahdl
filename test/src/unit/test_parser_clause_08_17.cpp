@@ -14,19 +14,6 @@ TEST(ChainedConstructorParsing, ExtendsWithArgs) {
   EXPECT_EQ(r.cu->classes[1]->base_class, "Base");
 }
 
-TEST(ChainedConstructorParsing, ExtendsArgsStored) {
-  auto r = Parse(
-      "class Base;\n"
-      "  function new(int x);\n"
-      "  endfunction\n"
-      "endclass\n"
-      "class EtherPacket extends Base(5);\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->classes.size(), 2u);
-  EXPECT_EQ(r.cu->classes[1]->extends_args.size(), 1u);
-}
-
 TEST(ChainedConstructorParsing, ThreeLevelChaining) {
   EXPECT_TRUE(
       ParseOk("class A;\n"

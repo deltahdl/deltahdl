@@ -112,6 +112,22 @@ static const Expr* SynthDefaultExtendsArgs(const ClassTypeInfo* base,
   return synth;
 }
 
+// §8.17: whether the child class's own 'new' constructor argument list uses the
+// 'default' keyword. When it does, the trailing actuals of the derived-most
+// new() call expand to the superclass constructor's argument list.
+static bool ChildNewUsesDefaultArg(const ClassDecl* child_decl) {
+  for (const auto* m : child_decl->members) {
+    if (m->kind == ClassMemberKind::kMethod && m->method &&
+        m->method->name == "new") {
+      for (const auto& a : m->method->func_args) {
+        if (a.is_default) return true;
+      }
+      return false;
+    }
+  }
+  return false;
+}
+
 static const Expr* ResolveConstructorArgsForLevel(
     const std::vector<const ClassTypeInfo*>& chain, size_t i,
     const Expr* new_expr, Arena& arena) {
@@ -125,7 +141,14 @@ static const Expr* ResolveConstructorArgsForLevel(
     synth->args = child_decl->extends_args;
     return synth;
   }
-  if (child_decl->extends_has_default && new_expr) {
+  // §8.17: 'default' expands to the superclass constructor arguments, whether
+  // it appears in the extends specifier (Base(default)) or in the subclass
+  // constructor's own argument list (new(..., default)). Either way the
+  // trailing actuals of the new() call are forwarded to this base level. This
+  // also realizes the compiler-inserted super.new(default) when the subclass
+  // body provides no explicit call.
+  if ((child_decl->extends_has_default || ChildNewUsesDefaultArg(child_decl)) &&
+      new_expr) {
     return SynthDefaultExtendsArgs(chain[i], child_decl, new_expr, arena);
   }
   return args;
@@ -331,6 +354,18 @@ static bool TryEvalSuperMethodCall(const Expr* expr, SimContext& ctx,
   MethodCallParts parts;
   if (!ExtractMethodCallParts(expr, parts)) return false;
   if (parts.var_name != "super") return false;
+  // §8.17: super.new(default) forwards the constructor's default-expanded
+  // arguments to the superclass. The flattened constructor chain already ran
+  // the superclass constructor once with those forwarded actuals (see
+  // ResolveConstructorArgsForLevel), so the explicit call here is satisfied
+  // without a second base-constructor invocation -- which would otherwise bind
+  // the literal 'default' token as an ordinary argument value.
+  if (parts.method_name == "new" && expr->args.size() == 1 && expr->args[0] &&
+      expr->args[0]->kind == ExprKind::kIdentifier &&
+      expr->args[0]->text == "default") {
+    out = MakeLogic4VecVal(arena, 1, 0);
+    return true;
+  }
   auto* self = ctx.CurrentThis();
   if (!self || !self->type) return false;
   // §8.15: `super` refers to the parent of the lexically enclosing class. Using

@@ -1,89 +1,9 @@
-#include "builders_ast.h"
-#include "builders_systask.h"
 #include "fixture_simulator.h"
-#include "helpers_class_object.h"
 #include "helpers_scheduler.h"
-#include "parser/ast.h"
-#include "simulator/class_object.h"
-#include "simulator/evaluation.h"
 
 using namespace delta;
 
 namespace {
-
-TEST(ChainedConstructorSimulation, SuperNewChaining) {
-  SimFixture f;
-  auto* base = MakeClassType(f, "Base", {"base_val"});
-  auto* derived = MakeClassType(f, "Derived", {"child_val"});
-  derived->parent = base;
-
-  auto [handle, obj] = MakeObj(f, derived);
-
-  obj->SetProperty("base_val", MakeLogic4VecVal(f.arena, 32, 10));
-
-  obj->SetProperty("child_val", MakeLogic4VecVal(f.arena, 32, 20));
-
-  EXPECT_EQ(obj->GetProperty("base_val", f.arena).ToUint64(), 10u);
-  EXPECT_EQ(obj->GetProperty("child_val", f.arena).ToUint64(), 20u);
-}
-
-TEST(ChainedConstructorSimulation, SuperNewWithArgs) {
-  SimFixture f;
-  auto* base = MakeClassType(f, "Vehicle", {"speed"});
-  auto* ctor = f.arena.Create<ModuleItem>();
-  ctor->kind = ModuleItemKind::kFunctionDecl;
-  ctor->name = "new";
-  ctor->return_type.kind = DataTypeKind::kVoid;
-  ctor->func_args = {
-      {Direction::kInput, false, false, false, {}, "s", nullptr, {}}};
-  ctor->func_body_stmts.push_back(
-      MakeAssign(f.arena, "speed", MkId(f.arena, "s")));
-  base->methods["new"] = ctor;
-
-  auto* derived = MakeClassType(f, "Car", {"doors"});
-  derived->parent = base;
-
-  auto it = derived->parent->methods.find("new");
-  ASSERT_NE(it, derived->parent->methods.end());
-  auto* base_ctor = it->second;
-  ASSERT_NE(base_ctor, nullptr);
-  EXPECT_EQ(base_ctor->func_args.size(), 1u);
-}
-
-TEST(ChainedConstructorSimulation, ThreeLevelConstructorChaining) {
-  SimFixture f;
-  auto* grand = MakeClassType(f, "Grand", {"g_val"});
-  auto* mid = MakeClassType(f, "Mid", {"m_val"});
-  mid->parent = grand;
-  auto* leaf = MakeClassType(f, "Leaf", {"l_val"});
-  leaf->parent = mid;
-
-  auto [handle, obj] = MakeObj(f, leaf);
-
-  obj->SetProperty("g_val", MakeLogic4VecVal(f.arena, 32, 1));
-  obj->SetProperty("m_val", MakeLogic4VecVal(f.arena, 32, 2));
-  obj->SetProperty("l_val", MakeLogic4VecVal(f.arena, 32, 3));
-
-  EXPECT_EQ(obj->GetProperty("g_val", f.arena).ToUint64(), 1u);
-  EXPECT_EQ(obj->GetProperty("m_val", f.arena).ToUint64(), 2u);
-  EXPECT_EQ(obj->GetProperty("l_val", f.arena).ToUint64(), 3u);
-}
-
-TEST(ChainedConstructorSimulation, BaseConstructorResolvable) {
-  SimFixture f;
-  auto* base = MakeClassType(f, "Base", {"x"});
-  auto* ctor = f.arena.Create<ModuleItem>();
-  ctor->kind = ModuleItemKind::kFunctionDecl;
-  ctor->name = "new";
-  base->methods["new"] = ctor;
-
-  auto* derived = MakeClassType(f, "Child", {"y"});
-  derived->parent = base;
-
-  auto [handle, obj] = MakeObj(f, derived);
-  auto* resolved = obj->ResolveMethod("new");
-  EXPECT_EQ(resolved, ctor);
-}
 
 TEST(ChainedConstructorSimulation, SuperNewWithArgsInitializesBase) {
   EXPECT_EQ(RunAndGet("class Base;\n"
@@ -207,6 +127,208 @@ TEST(ChainedConstructorSimulation, PropertyDefaultsInitializedDuringChaining) {
                       "endmodule\n",
                       "result"),
             75u);
+}
+
+// §8.17: the 'default' keyword in the extends specifier expands to the
+// superclass constructor's argument list, so a subclass with no explicit
+// constructor forwards the new() call's actuals straight to the base
+// constructor. Observed end-to-end: the value passed to new() reaches the base
+// property.
+TEST(ChainedConstructorSimulation, ExtendsDefaultForwardsToBaseConstructor) {
+  EXPECT_EQ(RunAndGet("class Base;\n"
+                      "  int bx;\n"
+                      "  function new(int nv); bx = nv; endfunction\n"
+                      "endclass\n"
+                      "class Der extends Base(default);\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    Der d = new(55);\n"
+                      "    result = d.bx;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            55u);
+}
+
+// §8.17: 'default' in a subclass constructor's own argument list expands to the
+// superclass constructor's arguments, and passing 'default' as the sole
+// argument to an explicit super.new() forwards them. The subclass's own
+// argument (size) binds from the leading actual; the trailing actual expands
+// through 'default' to the base constructor.
+TEST(ChainedConstructorSimulation, SuperNewDefaultForwardsExpandedArgs) {
+  EXPECT_EQ(RunAndGet("class Base;\n"
+                      "  int bx;\n"
+                      "  function new(int nv); bx = nv; endfunction\n"
+                      "endclass\n"
+                      "class Der extends Base;\n"
+                      "  int sz;\n"
+                      "  function new(int sz, default);\n"
+                      "    super.new(default);\n"
+                      "    this.sz = sz;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    Der d = new(7, 42);\n"
+                      "    result = d.bx + d.sz * 100;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            742u);
+}
+
+// §8.17: when a subclass constructor uses 'default' but provides no explicit
+// super.new() call, the compiler inserts super.new(default) automatically, so
+// the trailing actual still reaches the base constructor.
+TEST(ChainedConstructorSimulation,
+     ImplicitSuperNewDefaultForwardsExpandedArgs) {
+  EXPECT_EQ(RunAndGet("class Base;\n"
+                      "  int bx;\n"
+                      "  function new(int nv); bx = nv; endfunction\n"
+                      "endclass\n"
+                      "class Der extends Base;\n"
+                      "  int sz;\n"
+                      "  function new(int sz, default);\n"
+                      "    this.sz = sz;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    Der d = new(3, 99);\n"
+                      "    result = d.bx + d.sz * 100;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            399u);
+}
+
+// §8.17: a subclass whose extends specifier uses 'default' and that also
+// defines its own constructor (repeating 'default') forwards the trailing
+// actual to the base while binding its own leading argument locally.
+TEST(ChainedConstructorSimulation, ExtendsDefaultWithUserConstructorForwards) {
+  EXPECT_EQ(RunAndGet("class Base;\n"
+                      "  int bx;\n"
+                      "  function new(int nv); bx = nv; endfunction\n"
+                      "endclass\n"
+                      "class Der extends Base(default);\n"
+                      "  int sz;\n"
+                      "  function new(int sz, default);\n"
+                      "    this.sz = sz;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    Der d = new(4, 88);\n"
+                      "    result = d.bx + d.sz * 100;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            488u);
+}
+
+// §8.17: 'default' expands to the superclass constructor's argument list in the
+// same declaration order. With a two-argument base constructor, the trailing
+// actuals must reach the base arguments positionally (a before b), not swapped.
+TEST(ChainedConstructorSimulation, DefaultForwardsMultipleArgsInOrder) {
+  EXPECT_EQ(
+      RunAndGet("class Base;\n"
+                "  int ba;\n"
+                "  int bb;\n"
+                "  function new(int a, int b); ba = a; bb = b; endfunction\n"
+                "endclass\n"
+                "class Der extends Base;\n"
+                "  int sz;\n"
+                "  function new(int sz, default);\n"
+                "    super.new(default);\n"
+                "    this.sz = sz;\n"
+                "  endfunction\n"
+                "endclass\n"
+                "module t;\n"
+                "  int result;\n"
+                "  initial begin\n"
+                "    Der d = new(1, 30, 4);\n"
+                "    result = d.ba + d.bb * 10 + d.sz * 100;\n"
+                "  end\n"
+                "endmodule\n",
+                "result"),
+      170u);
+}
+
+// §8.17: 'default' expands to the superclass constructor's argument list with
+// the same DEFAULT VALUES. Here the subclass supplies only the first base
+// argument; the second base argument is omitted, so its declared default (30)
+// must be applied through the expansion. Observed via the base sum property.
+TEST(ChainedConstructorSimulation, ExtendsDefaultAppliesBaseArgDefault) {
+  EXPECT_EQ(
+      RunAndGet("class Base;\n"
+                "  int bx;\n"
+                "  function new(int a, int b = 30); bx = a + b; endfunction\n"
+                "endclass\n"
+                "class Der extends Base(default);\n"
+                "endclass\n"
+                "module t;\n"
+                "  int result;\n"
+                "  initial begin\n"
+                "    Der d = new(7);\n"
+                "    result = d.bx;\n"
+                "  end\n"
+                "endmodule\n",
+                "result"),
+      37u);
+}
+
+// §8.17: when the arguments are given in the extends specifier, the compiler
+// inserts the super.new() call automatically. Observed end-to-end: the literal
+// argument in 'extends Base(5)' reaches the base constructor at run time even
+// though the subclass declares no constructor.
+TEST(ChainedConstructorSimulation, ExtendsArgsForwardToBaseConstructor) {
+  EXPECT_EQ(RunAndGet("class Base;\n"
+                      "  int bx;\n"
+                      "  function new(int v); bx = v; endfunction\n"
+                      "endclass\n"
+                      "class Der extends Base(5);\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    Der d = new;\n"
+                      "    result = d.bx;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            5u);
+}
+
+// §8.17: the 'default' keyword may appear before the subclass's own added
+// arguments (the LRM class-C form: new(default, ...)). The leading actuals then
+// expand to the base constructor while the trailing actual binds the subclass's
+// own argument.
+TEST(ChainedConstructorSimulation, DefaultBeforeOwnArgForwards) {
+  EXPECT_EQ(RunAndGet("class Base;\n"
+                      "  int bx;\n"
+                      "  function new(int nv); bx = nv; endfunction\n"
+                      "endclass\n"
+                      "class Der extends Base;\n"
+                      "  bit en;\n"
+                      "  function new(default, bit enable);\n"
+                      "    super.new(default);\n"
+                      "    this.en = enable;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    Der d = new(20, 1);\n"
+                      "    result = d.bx + d.en * 1000;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            1020u);
 }
 
 }  // namespace

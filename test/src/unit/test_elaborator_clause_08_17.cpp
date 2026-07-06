@@ -265,4 +265,44 @@ TEST(ChainedConstructorElaboration, ExtendsDefaultUserCtorMissingDefaultError) {
              "endmodule\n"));
 }
 
+// §8.17: super.new() shall be the first executable statement. A call reached
+// only through a loop body is conditional on the loop running, so it can never
+// be the unconditional first statement -- rejected. (Distinct control-flow
+// position from the if-branch case.)
+TEST(ChainedConstructorElaboration, SuperNewInLoopBodyError) {
+  EXPECT_FALSE(
+      ElabOk("class Base;\n"
+             "  function new();\n"
+             "  endfunction\n"
+             "endclass\n"
+             "class Child extends Base;\n"
+             "  function new();\n"
+             "    for (int i = 0; i < 2; i++) super.new();\n"
+             "  endfunction\n"
+             "endclass\n"
+             "module m;\n"
+             "  Child c;\n"
+             "endmodule\n"));
+}
+
+// §8.17: a super.new() reached only through a case-item body is likewise
+// conditional and thus never the first executable statement -- rejected.
+TEST(ChainedConstructorElaboration, SuperNewInCaseItemError) {
+  EXPECT_FALSE(
+      ElabOk("class Base;\n"
+             "  function new();\n"
+             "  endfunction\n"
+             "endclass\n"
+             "class Child extends Base;\n"
+             "  function new(int sel);\n"
+             "    case (sel)\n"
+             "      0: super.new();\n"
+             "    endcase\n"
+             "  endfunction\n"
+             "endclass\n"
+             "module m;\n"
+             "  Child c;\n"
+             "endmodule\n"));
+}
+
 }  // namespace
