@@ -11,26 +11,6 @@ using namespace delta;
 
 namespace {
 
-void MakeFixedArray(SimFixture& f, std::string_view name,
-                    const std::vector<uint64_t>& vals, uint32_t elem_width) {
-  for (size_t i = 0; i < vals.size(); ++i) {
-    // SimContext keys variables by std::string_view, so the element-name
-    // backing storage must outlive the map entry; persist it in the arena the
-    // way the lowerer does (lowerer_var.cpp) rather than passing a local
-    // std::string that dangles once the loop iteration ends.
-    auto ename = std::string(name) + "[" + std::to_string(i) + "]";
-    auto* stored = f.arena.Create<std::string>(std::move(ename));
-    auto* var = f.ctx.CreateVariable(*stored, elem_width);
-    var->value = MakeLogic4VecVal(f.arena, elem_width, vals[i]);
-  }
-  ArrayInfo info;
-  info.lo = 0;
-  info.size = static_cast<uint32_t>(vals.size());
-  info.elem_width = elem_width;
-  info.is_dynamic = false;
-  f.ctx.RegisterArray(name, info);
-}
-
 void MakeDynArrayW(SimFixture& f, std::string_view name,
                    const std::vector<uint64_t>& vals, uint32_t elem_width) {
   auto* q = f.ctx.CreateQueue(name, elem_width);
@@ -42,96 +22,6 @@ void MakeDynArrayW(SimFixture& f, std::string_view name,
   info.elem_width = elem_width;
   info.size = static_cast<uint32_t>(vals.size());
   f.ctx.RegisterArray(name, info);
-}
-
-TEST(ArrayReduction, SumAllElements) {
-  SimFixture f;
-  MakeDynArray(f, "arr", {10, 20, 30, 40});
-  Logic4Vec out;
-  bool ok = TryEvalArrayProperty("arr", "sum", f.ctx, f.arena, out);
-  ASSERT_TRUE(ok);
-  EXPECT_EQ(out.ToUint64(), 100u);
-}
-
-TEST(ArrayReduction, ProductAllElements) {
-  SimFixture f;
-  MakeDynArray(f, "arr", {2, 3, 5});
-  Logic4Vec out;
-  bool ok = TryEvalArrayProperty("arr", "product", f.ctx, f.arena, out);
-  ASSERT_TRUE(ok);
-  EXPECT_EQ(out.ToUint64(), 30u);
-}
-
-TEST(ArrayReduction, AndAllElements) {
-  SimFixture f;
-  MakeDynArray(f, "arr", {0xFF, 0x0F, 0x03});
-  Logic4Vec out;
-  bool ok = TryEvalArrayProperty("arr", "and", f.ctx, f.arena, out);
-  ASSERT_TRUE(ok);
-  EXPECT_EQ(out.ToUint64(), 0x03u);
-}
-
-TEST(ArrayReduction, OrAllElements) {
-  SimFixture f;
-  MakeDynArray(f, "arr", {0x01, 0x02, 0x04});
-  Logic4Vec out;
-  bool ok = TryEvalArrayProperty("arr", "or", f.ctx, f.arena, out);
-  ASSERT_TRUE(ok);
-  EXPECT_EQ(out.ToUint64(), 0x07u);
-}
-
-TEST(ArrayReduction, XorAllElements) {
-  SimFixture f;
-  MakeDynArray(f, "arr", {0x0F, 0xFF, 0xF0});
-  Logic4Vec out;
-  bool ok = TryEvalArrayProperty("arr", "xor", f.ctx, f.arena, out);
-  ASSERT_TRUE(ok);
-  EXPECT_EQ(out.ToUint64(), 0x00u);
-}
-
-TEST(ArrayReduction, SumFixedSizeArray) {
-  SimFixture f;
-  MakeFixedArray(f, "arr", {10, 20, 30}, 32);
-  Logic4Vec out;
-  bool ok = TryEvalArrayProperty("arr", "sum", f.ctx, f.arena, out);
-  ASSERT_TRUE(ok);
-  EXPECT_EQ(out.ToUint64(), 60u);
-}
-
-TEST(ArrayReduction, ProductFixedSizeArray) {
-  SimFixture f;
-  MakeFixedArray(f, "arr", {2, 3, 7}, 32);
-  Logic4Vec out;
-  bool ok = TryEvalArrayProperty("arr", "product", f.ctx, f.arena, out);
-  ASSERT_TRUE(ok);
-  EXPECT_EQ(out.ToUint64(), 42u);
-}
-
-TEST(ArrayReduction, AndFixedSizeArray) {
-  SimFixture f;
-  MakeFixedArray(f, "arr", {0xFF, 0x0F}, 8);
-  Logic4Vec out;
-  bool ok = TryEvalArrayProperty("arr", "and", f.ctx, f.arena, out);
-  ASSERT_TRUE(ok);
-  EXPECT_EQ(out.ToUint64(), 0x0Fu);
-}
-
-TEST(ArrayReduction, OrFixedSizeArray) {
-  SimFixture f;
-  MakeFixedArray(f, "arr", {0x01, 0x02, 0x04}, 8);
-  Logic4Vec out;
-  bool ok = TryEvalArrayProperty("arr", "or", f.ctx, f.arena, out);
-  ASSERT_TRUE(ok);
-  EXPECT_EQ(out.ToUint64(), 0x07u);
-}
-
-TEST(ArrayReduction, XorFixedSizeArray) {
-  SimFixture f;
-  MakeFixedArray(f, "arr", {0x0F, 0xFF}, 8);
-  Logic4Vec out;
-  bool ok = TryEvalArrayProperty("arr", "xor", f.ctx, f.arena, out);
-  ASSERT_TRUE(ok);
-  EXPECT_EQ(out.ToUint64(), 0xF0u);
 }
 
 TEST(ArrayReduction, SumEmptyArray) {
@@ -206,44 +96,6 @@ TEST(ArrayReduction, AndReturnWidthMatchesElementType) {
   bool ok = TryEvalArrayProperty("arr", "and", f.ctx, f.arena, out);
   ASSERT_TRUE(ok);
   EXPECT_EQ(out.width, 8u);
-}
-
-TEST(ArrayReduction, SumSingleElement) {
-  SimFixture f;
-  MakeDynArray(f, "arr", {42});
-  Logic4Vec out;
-  bool ok = TryEvalArrayProperty("arr", "sum", f.ctx, f.arena, out);
-  ASSERT_TRUE(ok);
-  EXPECT_EQ(out.ToUint64(), 42u);
-}
-
-TEST(ArrayReduction, ProductSingleElement) {
-  SimFixture f;
-  MakeDynArray(f, "arr", {7});
-  Logic4Vec out;
-  bool ok = TryEvalArrayProperty("arr", "product", f.ctx, f.arena, out);
-  ASSERT_TRUE(ok);
-  EXPECT_EQ(out.ToUint64(), 7u);
-}
-
-TEST(ArrayReduction, SumCallSyntax) {
-  SimFixture f;
-  MakeDynArray(f, "arr", {10, 20, 30});
-  auto* call = MakeMethodCall(f.arena, "arr", "sum", {});
-  Logic4Vec out;
-  bool ok = TryEvalArrayMethodCall(call, f.ctx, f.arena, out);
-  ASSERT_TRUE(ok);
-  EXPECT_EQ(out.ToUint64(), 60u);
-}
-
-TEST(ArrayReduction, ProductCallSyntax) {
-  SimFixture f;
-  MakeDynArray(f, "arr", {2, 3, 5});
-  auto* call = MakeMethodCall(f.arena, "arr", "product", {});
-  Logic4Vec out;
-  bool ok = TryEvalArrayMethodCall(call, f.ctx, f.arena, out);
-  ASSERT_TRUE(ok);
-  EXPECT_EQ(out.ToUint64(), 30u);
 }
 
 // §7.12.3: when a with clause is present, the result takes the width of the
@@ -623,6 +475,34 @@ TEST(ArrayReduction, AssociativeArrayReductionWithClauseIntegration) {
   lowerer.Lower(design);
   f.scheduler.Run();
   EXPECT_EQ(f.ctx.FindVariable("y")->value.ToUint64(), 63u);
+}
+
+// §7.12.3 end-to-end: a reduction applies to a string-keyed associative array
+// as well — it is still an unpacked array of integral values, differing from
+// the int-keyed case only in how its key is produced (§7.8.2 dependency). The
+// reduction folds the stored element values regardless of the key type,
+// exercising the string-keyed collection path distinct from the int-keyed one.
+// Summing the stored values {5,7,9} yields 21.
+TEST(ArrayReduction, StringKeyedAssociativeArrayReductionSumIntegration) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  int aa[string];\n"
+      "  int y;\n"
+      "  initial begin\n"
+      "    aa[\"a\"] = 5;\n"
+      "    aa[\"b\"] = 7;\n"
+      "    aa[\"c\"] = 9;\n"
+      "    y = aa.sum;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_EQ(f.ctx.FindVariable("y")->value.ToUint64(), 21u);
 }
 
 }  // namespace

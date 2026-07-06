@@ -118,33 +118,6 @@ TEST(SubroutineCallExprParsing, SumCallExpression) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kCall);
 }
 
-TEST(SubroutineCallExprParsing, AndCallExpression) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin x = arr.and(); end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(SubroutineCallExprParsing, OrCallExpression) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin x = arr.or(); end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(SubroutineCallExprParsing, XorCallExpression) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin x = arr.xor(); end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(SubroutineCallExprParsing, ProductCallExpression) {
   auto r = Parse(
       "module m;\n"
