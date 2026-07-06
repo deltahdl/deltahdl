@@ -290,6 +290,50 @@ TEST(IoMonitorSim, MonitorAppliesDisplayStyleFormatEscape) {
   EXPECT_EQ(out, "a=5%\n");
 }
 
+// §21.2.3: $monitoron resumes the *most recent* $monitor, not a superseded
+// earlier one. After a second $monitor replaces the first, a $monitoroff /
+// $monitoron pair redisplays the second list at its current value.
+TEST(IoMonitorSim, MonitorOnResumesMostRecentMonitorAfterSupersede) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  reg [3:0] a, b;\n"
+      "  initial begin\n"
+      "    a = 4'h0; b = 4'h0;\n"
+      "    $monitor(\"first=%h\", a);\n"
+      "    $monitor(\"second=%h\", b);\n"
+      "    #10 b = 4'h4;\n"
+      "    #10 $monitoroff;\n"
+      "    #10 b = 4'h5;\n"
+      "    #10 $monitoron;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  // The superseded first list never appears. The initial display and the
+  // change to b=4 show the second list; the b=5 change while off is silent;
+  // $monitoron then resumes the second list at its current value of 5.
+  EXPECT_EQ(out, "second=0\nsecond=4\nsecond=5\n");
+  EXPECT_EQ(out.find("first="), std::string::npos);
+}
+
+// §21.2.3: $monitor arguments are handled exactly as $display arguments, which
+// includes backslash escape sequences for special characters (distinct from the
+// %-style format specifiers). The \t here is decoded by the shared display
+// machinery to a literal tab in the monitored line.
+TEST(IoMonitorSim, MonitorAppliesDisplayStyleCharacterEscape) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  reg [3:0] a;\n"
+      "  initial begin\n"
+      "    a = 4'ha;\n"
+      "    $monitor(\"x\\ty=%h\", a);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "x\ty=a\n");
+}
+
 // §21.2.3: $monitoron resumes the most recent $monitor. With no monitor ever
 // established it has nothing to display and must remain silent.
 TEST(IoMonitorSim, MonitorOnWithNoActiveMonitorIsSilent) {
