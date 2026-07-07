@@ -40,20 +40,31 @@ TEST(IoStrobeSim, AllStrobeTaskNamesDispatchToStrobeMachinery) {
   EXPECT_EQ(out, "a=2a\na=2a\na=2a\na=2a\n");
 }
 
-// §21.2.2 (Syntax 21-2): $strobe is one of the recognized strobed-monitoring
-// task names and produces its output exactly once.
-TEST(IoStrobeSim, StrobePrintsArgumentList) {
+// §21.2.2 (Syntax 21-2): the four strobe_task_name alternatives are genuinely
+// distinct dispatch targets, not aliases. Each carries its own default radix
+// for a bare (unformatted) expression argument -- decimal for $strobe, binary
+// for $strobeb, octal for $strobeo, hex for $strobeh -- exactly as the
+// same-named $display family does (§21.2.1). Driving one 8-bit value through
+// all four confirms each name renders the value in its own radix rather than a
+// shared one.
+TEST(IoStrobeSim, EachStrobeNameSelectsItsOwnDefaultRadix) {
   SimFixture f;
   std::string out = RunCapture(
       "module t;\n"
       "  reg [7:0] a;\n"
       "  initial begin\n"
-      "    a = 8'h2a;\n"
-      "    $strobe(\"a=%h\", a);\n"
+      "    a = 8'h2a;\n"  // 42 decimal / 00101010 binary / 052 octal / 2a hex
+      "    $strobe(a);\n"
+      "    $strobeb(a);\n"
+      "    $strobeo(a);\n"
+      "    $strobeh(a);\n"
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_EQ(out, "a=2a\n");
+  EXPECT_NE(out.find("42"), std::string::npos);      // $strobe  -> decimal
+  EXPECT_NE(out.find("101010"), std::string::npos);  // $strobeb -> binary
+  EXPECT_NE(out.find("052"), std::string::npos);     // $strobeo -> octal
+  EXPECT_NE(out.find("2a"), std::string::npos);      // $strobeh -> hex
 }
 
 // §21.2.2: the strobe action is deferred to the end of the current simulation
