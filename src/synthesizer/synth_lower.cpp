@@ -150,6 +150,7 @@ bool SynthLower::CheckSynthesizable(const RtlirModule* mod) {
 void SynthLower::MapPorts(const RtlirModule* mod, AigGraph& aig) {
   for (const auto& port : mod->ports) {
     signal_widths_[port.name] = port.width;
+    signal_signed_[port.name] = port.is_signed;
     auto& bits = signal_bits_[port.name];
     bits.resize(port.width, AigGraph::kConstFalse);
 
@@ -165,11 +166,13 @@ void SynthLower::MapPorts(const RtlirModule* mod, AigGraph& aig) {
   for (const auto& var : mod->variables) {
     if (signal_widths_.count(var.name)) continue;
     signal_widths_[var.name] = var.width;
+    signal_signed_[var.name] = var.is_signed;
     signal_bits_[var.name].resize(var.width, AigGraph::kConstFalse);
   }
   for (const auto& net : mod->nets) {
     if (signal_widths_.count(net.name)) continue;
     signal_widths_[net.name] = net.width;
+    signal_signed_[net.name] = net.is_signed;
     signal_bits_[net.name].resize(net.width, AigGraph::kConstFalse);
   }
 }
@@ -196,8 +199,28 @@ uint32_t SynthLower::SignalWidth(std::string_view name) {
   return it->second;
 }
 
+bool SynthLower::IsSignedSignal(std::string_view name) {
+  auto it = signal_signed_.find(name);
+  return it != signal_signed_.end() && it->second;
+}
+
 uint32_t SynthLower::LowerIdentBit(std::string_view name, uint32_t bit) {
   return GetSignalBit(name, bit);
+}
+
+uint32_t SynthLower::LowerAssignRhsBit(const Expr* rhs, AigGraph& aig,
+                                       uint32_t bit) {
+  // §10.7: a right-hand side narrower than the assignment target is extended to
+  // the target width. For a bare signed identifier, the bits beyond its own
+  // width replicate its most-significant (sign) bit; unsigned identifiers and
+  // all other expression forms fall through to the default zero-fill that
+  // LowerExprBit already provides for out-of-range bits.
+  if (rhs && rhs->kind == ExprKind::kIdentifier) {
+    uint32_t rhs_width = SignalWidth(rhs->text);
+    if (rhs_width > 0 && bit >= rhs_width && IsSignedSignal(rhs->text))
+      return GetSignalBit(rhs->text, rhs_width - 1);
+  }
+  return LowerExprBit(rhs, aig, bit);
 }
 
 uint32_t SynthLower::LowerUnaryBit(const Expr* expr, AigGraph& aig,
@@ -277,7 +300,7 @@ void SynthLower::LowerContAssign(const RtlirContAssign& assign, AigGraph& aig) {
   std::string_view name = assign.lhs->text;
   uint32_t width = assign.width > 0 ? assign.width : SignalWidth(name);
   for (uint32_t b = 0; b < width; ++b) {
-    SetSignalBit(name, b, LowerExprBit(assign.rhs, aig, b));
+    SetSignalBit(name, b, LowerAssignRhsBit(assign.rhs, aig, b));
   }
 }
 
@@ -523,7 +546,7 @@ void SynthLower::LowerAssignStmt(const Stmt* stmt, AigGraph& aig) {
   if (stmt->lhs->kind != ExprKind::kIdentifier) return;
   uint32_t w = SignalWidth(stmt->lhs->text);
   for (uint32_t b = 0; b < w; ++b) {
-    SetSignalBit(stmt->lhs->text, b, LowerExprBit(stmt->rhs, aig, b));
+    SetSignalBit(stmt->lhs->text, b, LowerAssignRhsBit(stmt->rhs, aig, b));
   }
 }
 
@@ -587,6 +610,7 @@ AigGraph* SynthLower::Lower(const RtlirModule* mod) {
   auto* aig = arena_.Create<AigGraph>();
   signal_bits_.clear();
   signal_widths_.clear();
+  signal_signed_.clear();
   output_ports_.clear();
 
   MapPorts(mod, *aig);

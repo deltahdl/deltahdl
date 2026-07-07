@@ -593,4 +593,96 @@ TEST(AssignmentExtensionTruncationSim, WideTruncationDiscardsHighWord) {
   EXPECT_EQ(var->value.ToUint64(), 0xAu);
 }
 
+// A variable declaration initializer is a procedural assignment, so §10.7's
+// width adjustment applies at that syntactic position too: an initializer wider
+// than the declared target has its excess high bits discarded. Distinct from
+// the blocking/nonblocking/continuous positions above because the initializer
+// flows through the variable-lowering path rather than a statement-execution
+// path.
+TEST(AssignmentExtensionTruncationSim, DeclarationInitializerTruncates) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [3:0] x = 8'hAB;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* x = f.ctx.FindVariable("x");
+  ASSERT_NE(x, nullptr);
+
+  EXPECT_EQ(x->value.width, 4u);
+  EXPECT_EQ(x->value.ToUint64(), 0xBu);
+}
+
+// The complementary direction at the initializer position: an unsigned
+// initializer narrower than the declared target is zero-padded up to the
+// declared width.
+TEST(AssignmentExtensionTruncationSim, DeclarationInitializerExtendsUnsigned) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] y = 4'hA;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* y = f.ctx.FindVariable("y");
+  ASSERT_NE(y, nullptr);
+
+  EXPECT_EQ(y->value.width, 8u);
+  EXPECT_EQ(y->value.ToUint64(), 0x0Au);
+}
+
+// §10.7 extends a narrower right-hand side by sign-extension when the RHS is
+// signed. Here the signedness is carried by the built-in type — byte and int
+// are signed by default (§6.11.1), with no explicit `signed` keyword — so a
+// negative byte widened into an int replicates its sign bit across the added
+// high bits.
+TEST(AssignmentExtensionTruncationSim, BuiltinSignedTypeSignExtends) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int wide;\n"
+      "  byte narrow;\n"
+      "  initial begin narrow = -8'sd3; wide = narrow; end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* wide = f.ctx.FindVariable("wide");
+  ASSERT_NE(wide, nullptr);
+
+  EXPECT_EQ(wide->value.ToUint64(), 0xFFFFFFFDu);
+}
+
+// §10.7 states an implementation may, but need not, warn on an assignment size
+// mismatch. This implementation takes the permissive path: a right-hand side
+// wider than the left-hand side is accepted without an error and silently
+// truncated, rather than being rejected during elaboration.
+TEST(AssignmentExtensionTruncationSim, SizeMismatchAcceptedNotRejected) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [3:0] narrow;\n"
+      "  initial narrow = 32'hABCD;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* narrow = f.ctx.FindVariable("narrow");
+  ASSERT_NE(narrow, nullptr);
+
+  EXPECT_EQ(narrow->value.ToUint64(), 0xDu);
+}
+
 }  // namespace

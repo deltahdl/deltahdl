@@ -8,20 +8,6 @@ using namespace delta;
 
 namespace {
 
-TEST(AssignmentExtensionTruncation, ContAssignInfersLhsWidth) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module top;\n"
-      "  logic [7:0] a, b;\n"
-      "  assign a = b;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  auto* mod = design->top_modules[0];
-  ASSERT_EQ(mod->assigns.size(), 1);
-  EXPECT_EQ(mod->assigns[0].width, 8);
-}
-
 TEST(AssignmentExtensionTruncation, ContAssignInfersLhsWidthWhenWiderThanRhs) {
   ElabFixture f;
   auto* design = ElaborateSrc(

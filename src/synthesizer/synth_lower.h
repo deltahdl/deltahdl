@@ -34,6 +34,11 @@ class SynthLower {
   uint32_t LowerBinaryBit(const Expr* expr, AigGraph& aig, uint32_t bit);
   uint32_t LowerUnaryBit(const Expr* expr, AigGraph& aig, uint32_t bit);
 
+  // §10.7: lower one bit of an assignment right-hand side in the context of the
+  // target width. Bits above the RHS's own width are extension bits: the RHS
+  // sign bit when the RHS is signed, otherwise zero.
+  uint32_t LowerAssignRhsBit(const Expr* rhs, AigGraph& aig, uint32_t bit);
+
   void LowerContAssign(const RtlirContAssign& assign, AigGraph& aig);
   void LowerAlwaysComb(const RtlirProcess& proc, AigGraph& aig);
   void LowerAlwaysFF(const RtlirProcess& proc, AigGraph& aig);
@@ -56,6 +61,7 @@ class SynthLower {
   void SetSignalBit(std::string_view name, uint32_t bit, uint32_t lit);
   uint32_t GetSignalBit(std::string_view name, uint32_t bit);
   uint32_t SignalWidth(std::string_view name);
+  bool IsSignedSignal(std::string_view name);
 
   void RegisterOutputs(AigGraph& aig);
 
@@ -65,6 +71,8 @@ class SynthLower {
   std::unordered_map<std::string_view, std::vector<uint32_t>> signal_bits_;
 
   std::unordered_map<std::string_view, uint32_t> signal_widths_;
+
+  std::unordered_map<std::string_view, bool> signal_signed_;
 
   std::vector<std::pair<std::string_view, uint32_t>> output_ports_;
 };
