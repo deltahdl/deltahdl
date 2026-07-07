@@ -19,11 +19,6 @@ TEST(ExpressionElaboration, TaggedUnionElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(TaggedUnion, TagDefaultEmpty) {
-  SimFixture f;
-  EXPECT_TRUE(f.ctx.GetVariableTag("nonexistent").empty());
-}
-
 TEST(ExpressionElaboration, TaggedUnionVoidMemberElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -68,6 +63,35 @@ TEST(ExpressionElaboration, TaggedUnionUnknownMemberRejected) {
       "  initial begin\n"
       "    u = tagged Bogus 7;\n"
       "  end\n"
+      "endmodule\n",
+      f);
+  (void)design;
+  EXPECT_TRUE(f.has_errors);
+}
+
+// §11.9: the member-name rule also governs a declaration initializer, whose
+// tagged expression type is known from the declared variable. A tag that is a
+// declared member is accepted.
+TEST(ExpressionElaboration, TaggedUnionInitializerKnownMemberAccepted) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  typedef union tagged { int A; int B; } U;\n"
+      "  U u = tagged A 7;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// The same rule rejects a declaration initializer whose tag is not a member of
+// the declared tagged union type.
+TEST(ExpressionElaboration, TaggedUnionInitializerUnknownMemberRejected) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  typedef union tagged { int A; int B; } U;\n"
+      "  U u = tagged Bogus 7;\n"
       "endmodule\n",
       f);
   (void)design;

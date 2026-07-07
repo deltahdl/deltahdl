@@ -287,6 +287,21 @@ Logic4Vec EvalRhsWithStructContext(const Stmt* stmt, SimContext& ctx,
   if (!stmt->rhs || stmt->lhs->kind != ExprKind::kIdentifier) {
     return EvalExpr(stmt->rhs, ctx, arena, ctx_width);
   }
+  // §11.9: the member value of a tagged expression may be a §10.9.2 structure
+  // assignment pattern (e.g. `i1 = tagged Add '{e1, 4, ed}`). Pack that pattern
+  // against the union member's own struct layout, not the union as a whole, so
+  // each field expression is coerced to its member's width instead of being
+  // concatenated at its self-determined width.
+  if (stmt->rhs->kind == ExprKind::kTagged && stmt->rhs->rhs &&
+      stmt->rhs->lhs && stmt->rhs->lhs->kind == ExprKind::kAssignmentPattern) {
+    if (const auto* sinfo = ctx.GetVariableStructType(stmt->lhs->text)) {
+      for (const auto& field : sinfo->fields) {
+        if (field.name == stmt->rhs->rhs->text && field.nested)
+          return EvalStructPatternValue(stmt->rhs->lhs, field.nested, ctx,
+                                        arena);
+      }
+    }
+  }
   auto* inner = UnwrapTypedPattern(stmt->rhs);
   // §10.9.2: both keyed and positional structure patterns are evaluated against
   // the target's member layout so each member expression is coerced to its

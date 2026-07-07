@@ -713,6 +713,7 @@ class Elaborator {
   void ValidateTaggedUnionMembers(const ModuleDecl* decl);
   void WalkStmtsForTaggedExpr(const Stmt* s);
   void CheckTaggedExprMember(const Expr* lhs, const Expr* rhs);
+  void CheckTaggedMemberName(std::string_view var_name, const Expr* rhs);
 
   void ValidateRealOperatorRestrictions(const ModuleDecl* decl);
   void WalkExprForRealOps(const Expr* expr);

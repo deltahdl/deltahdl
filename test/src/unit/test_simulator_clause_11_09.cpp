@@ -62,76 +62,6 @@ TEST(TaggedUnionEval, TaggedExprVoidMember) {
   EXPECT_EQ(result.ToUint64(), 0u);
 }
 
-TEST(TaggedUnionEval, MatchingMemberReadReturnsValue) {
-  SimFixture f;
-
-  StructTypeInfo uinfo;
-  uinfo.type_name = "u3";
-  uinfo.is_union = true;
-  uinfo.is_packed = true;
-  uinfo.total_width = 16;
-  uinfo.fields.push_back({"x", 0, 16, DataTypeKind::kLogic});
-  uinfo.fields.push_back({"y", 0, 16, DataTypeKind::kLogic});
-  uinfo.fields.push_back({"z", 0, 16, DataTypeKind::kLogic});
-  f.ctx.RegisterStructType("u3", uinfo);
-
-  MakeVar(f, "u", 16, 0xBEEF);
-  f.ctx.SetVariableStructType("u", "u3");
-  f.ctx.SetVariableTag("u", "y");
-
-  auto* access = f.arena.Create<Expr>();
-  access->kind = ExprKind::kMemberAccess;
-  access->lhs = MakeId(f.arena, "u");
-  access->rhs = MakeId(f.arena, "y");
-  auto result = EvalExpr(access, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 0xBEEFu);
-}
-
-TEST(TaggedUnionEval, MismatchedMemberReadThreeMemberUnion) {
-  SimFixture f;
-
-  StructTypeInfo uinfo;
-  uinfo.type_name = "u3";
-  uinfo.is_union = true;
-  uinfo.is_packed = true;
-  uinfo.total_width = 8;
-  uinfo.fields.push_back({"a", 0, 8, DataTypeKind::kLogic});
-  uinfo.fields.push_back({"b", 0, 8, DataTypeKind::kLogic});
-  uinfo.fields.push_back({"c", 0, 8, DataTypeKind::kLogic});
-  f.ctx.RegisterStructType("u3", uinfo);
-
-  MakeVar(f, "u", 8, 0x55);
-  f.ctx.SetVariableStructType("u", "u3");
-  f.ctx.SetVariableTag("u", "a");
-
-  auto* access_b = f.arena.Create<Expr>();
-  access_b->kind = ExprKind::kMemberAccess;
-  access_b->lhs = MakeId(f.arena, "u");
-  access_b->rhs = MakeId(f.arena, "b");
-  auto rb = EvalExpr(access_b, f.ctx, f.arena);
-  EXPECT_NE(rb.words[0].bval, 0u);
-
-  auto* access_c = f.arena.Create<Expr>();
-  access_c->kind = ExprKind::kMemberAccess;
-  access_c->lhs = MakeId(f.arena, "u");
-  access_c->rhs = MakeId(f.arena, "c");
-  auto rc = EvalExpr(access_c, f.ctx, f.arena);
-  EXPECT_NE(rc.words[0].bval, 0u);
-}
-
-TEST(TaggedUnionEval, TaggedExprWithSubExpr) {
-  SimFixture f;
-
-  auto* inner = MakeBinary(f.arena, TokenKind::kPlus, MakeInt(f.arena, 23),
-                           MakeInt(f.arena, 34));
-  auto* tagged = f.arena.Create<Expr>();
-  tagged->kind = ExprKind::kTagged;
-  tagged->rhs = MakeId(f.arena, "Valid");
-  tagged->lhs = inner;
-  auto result = EvalExpr(tagged, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 57u);
-}
-
 TEST(TaggedUnionEval, TaggedAssignSetsTag) {
   auto v = RunAndGet(
       "module t;\n"
@@ -161,34 +91,6 @@ TEST(TaggedUnionEval, TaggedAssignOverwriteAndRead) {
       "endmodule\n",
       "result");
   EXPECT_EQ(v, 200u);
-}
-
-// A read whose member name does not match the current tag must surface a
-// run-time error diagnostic, not just return X bits.
-TEST(TaggedUnionEval, MismatchedReadEmitsDiagnostic) {
-  SimFixture f;
-
-  StructTypeInfo uinfo;
-  uinfo.type_name = "u_diag_r";
-  uinfo.is_union = true;
-  uinfo.is_packed = true;
-  uinfo.total_width = 8;
-  uinfo.fields.push_back({"a", 0, 8, DataTypeKind::kLogic});
-  uinfo.fields.push_back({"b", 0, 8, DataTypeKind::kLogic});
-  f.ctx.RegisterStructType("u_diag_r", uinfo);
-
-  MakeVar(f, "u", 8, 0x11);
-  f.ctx.SetVariableStructType("u", "u_diag_r");
-  f.ctx.SetVariableTag("u", "a");
-
-  auto* access_b = f.arena.Create<Expr>();
-  access_b->kind = ExprKind::kMemberAccess;
-  access_b->lhs = MakeId(f.arena, "u");
-  access_b->rhs = MakeId(f.arena, "b");
-
-  EXPECT_FALSE(f.diag.HasErrors());
-  (void)EvalExpr(access_b, f.ctx, f.arena);
-  EXPECT_TRUE(f.diag.HasErrors());
 }
 
 // A write through dot notation whose member name matches the current tag
@@ -264,6 +166,144 @@ TEST(TaggedUnionEval, VoidMemberThenValueMember) {
       "endmodule\n",
       "result");
   EXPECT_EQ(v, 77u);
+}
+
+// §11.9: a variable of tagged union type can be initialized with a tagged union
+// expression whose member value is a legal initializer for the member type. The
+// declaration initializer (a syntactic position distinct from a procedural
+// assignment) establishes the member value, read back through dot notation.
+TEST(TaggedUnionEval, DeclarationInitializerHoldsMemberValue) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  typedef union tagged { int A; int B; } U;\n"
+      "  U u = tagged A 5;\n"
+      "  int result;\n"
+      "  initial result = u.A;\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 5u);
+}
+
+// §11.9: initializing a tagged-union variable with `tagged A ...` also
+// establishes its active tag (like a procedural `u = tagged A ...`), so a later
+// read of a different member is inconsistent with the current tag and must
+// raise a run-time error. Drives the initializer tag-set path end to end.
+TEST(TaggedUnionEval, DeclarationInitializerSetsTagForMemberCheck) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  typedef union tagged { int A; int B; } U;\n"
+      "  U u = tagged A 5;\n"
+      "  int result;\n"
+      "  initial result = u.B;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  LowerAndRun(design, f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+// §11.9: members of a tagged union are read using the usual dot notation and
+// the read shall be consistent with the current tag. After a real procedural
+// `u = tagged A ...` sets the tag, reading member B is inconsistent and raises
+// a run-time error (tag produced by real source, not a hand-set fixture tag).
+TEST(TaggedUnionEval, ProceduralAssignThenMismatchedReadErrors) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  typedef union tagged { int A; int B; } U;\n"
+      "  U u;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    u = tagged A 5;\n"
+      "    result = u.B;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  LowerAndRun(design, f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+// §11.9: an uninitialized variable of tagged union type is undefined, which
+// includes its tag bits — no member is current. Built from a real declaration
+// with no initializer and observed after a run: the variable exists but carries
+// no active tag.
+TEST(TaggedUnionEval, UninitializedTaggedUnionHasNoActiveTag) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  typedef union tagged { int A; int B; } U;\n"
+      "  U u;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  ASSERT_NE(f.ctx.FindVariable("u"), nullptr);
+  EXPECT_TRUE(f.ctx.GetVariableTag("u").empty());
+}
+
+// §11.9: the type of a tagged union expression may be supplied by a cast rather
+// than by an assignment target. `U'(tagged A ...)` names the union type, so the
+// tagged expression is evaluated in that context and yields its member value.
+TEST(TaggedUnionEval, CastContextTaggedExprEvaluates) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  typedef union tagged { int A; int B; } U;\n"
+      "  U u;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    u = U'(tagged A 9);\n"
+      "    result = u.A;\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 9u);
+}
+
+// §11.9 + dependency §10.9.2: the member value of a tagged expression may be a
+// structure assignment pattern. Built from real source (a struct-typed union
+// member assigned `tagged Add '{...}`) and driven end to end — the positional
+// pattern is packed against the member's own field layout, so reading a nested
+// field back yields the value placed there rather than a mis-concatenated bit
+// range.
+TEST(TaggedUnionEval, TaggedMemberValueFromStructAssignmentPattern) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  typedef struct packed { bit [4:0] reg1; bit [4:0] reg2;\n"
+      "                          bit [4:0] regd; } add_t;\n"
+      "  typedef union tagged { add_t Add; bit [14:0] Jmp; } Instr;\n"
+      "  Instr i1;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    i1 = tagged Add '{5, 9, 3};\n"
+      "    result = i1.Add.reg2;\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 9u);
+}
+
+// §11.9: a declaration initializer may use the void-member form of a tagged
+// expression (no member value primary). It still establishes the active tag, so
+// a later read of a different member is inconsistent with that tag and raises a
+// run-time error.
+TEST(TaggedUnionEval, VoidMemberDeclarationInitializerSetsTag) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  typedef union tagged { void None; int Some; } Opt;\n"
+      "  Opt o = tagged None;\n"
+      "  int result;\n"
+      "  initial result = o.Some;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  LowerAndRun(design, f);
+  EXPECT_TRUE(f.diag.HasErrors());
 }
 
 }  // namespace

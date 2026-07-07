@@ -512,6 +512,14 @@ void Lowerer::LowerVarInit(const RtlirVariable& var, Variable* v,
       !var.is_chandle)
     CoerceTo2State(val);
   v->value = val;
+
+  // §11.9: initializing a tagged-union variable with a tagged expression
+  // establishes the variable's active tag, exactly as the procedural
+  // `u = tagged Member value` assignment does. Without this the tag would stay
+  // undefined and a later member access would not be checked against the tag
+  // set by the initializer.
+  if (var.init_expr->kind == ExprKind::kTagged && var.init_expr->rhs)
+    ctx_.SetVariableTag(var.name, var.init_expr->rhs->text);
 }
 
 void Lowerer::RegisterEnumForCast(const RtlirVariable& var) {

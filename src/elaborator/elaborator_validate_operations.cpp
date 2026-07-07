@@ -408,16 +408,16 @@ void Elaborator::ValidateTypeRefArgs(const ModuleDecl* decl) {
 }
 
 // After the tagged keyword the BNF allows only a member identifier drawn from
-// the target tagged union type. When the LHS of an assignment resolves to a
-// variable whose typedef is a tagged union, reject a tag name that is not
-// declared in that union.
-void Elaborator::CheckTaggedExprMember(const Expr* lhs, const Expr* rhs) {
-  if (!lhs || !rhs) return;
-  if (rhs->kind != ExprKind::kTagged) return;
+// the target tagged union type. Given the name of a variable whose typedef is a
+// tagged union, reject a tag name that is not declared in that union. Shared by
+// the assignment-target and declaration-initializer positions, both of which
+// supply the expression type from the target variable's declared type.
+void Elaborator::CheckTaggedMemberName(std::string_view var_name,
+                                       const Expr* rhs) {
+  if (!rhs || rhs->kind != ExprKind::kTagged) return;
   if (!rhs->rhs || rhs->rhs->kind != ExprKind::kIdentifier) return;
-  if (lhs->kind != ExprKind::kIdentifier) return;
 
-  auto vit = var_named_types_.find(lhs->text);
+  auto vit = var_named_types_.find(var_name);
   if (vit == var_named_types_.end()) return;
 
   auto tit = typedefs_.find(vit->second);
@@ -434,6 +434,11 @@ void Elaborator::CheckTaggedExprMember(const Expr* lhs, const Expr* rhs) {
   diag_.Error(rhs->range.start,
               std::format("tagged union '{}' has no member named '{}'",
                           vit->second, tag_name));
+}
+
+void Elaborator::CheckTaggedExprMember(const Expr* lhs, const Expr* rhs) {
+  if (!lhs || lhs->kind != ExprKind::kIdentifier) return;
+  CheckTaggedMemberName(lhs->text, rhs);
 }
 
 void Elaborator::WalkStmtsForTaggedExpr(const Stmt* s) {
@@ -453,6 +458,12 @@ void Elaborator::WalkStmtsForTaggedExpr(const Stmt* s) {
 
 void Elaborator::ValidateTaggedUnionMembers(const ModuleDecl* decl) {
   for (const auto* item : decl->items) {
+    // §11.9: a declaration initializer is another position where the tagged
+    // expression's type is known (from the declared variable), so the member
+    // name after `tagged` must name a member of that union.
+    if (item->kind == ModuleItemKind::kVarDecl && item->init_expr) {
+      CheckTaggedMemberName(item->name, item->init_expr);
+    }
     bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
                    item->kind == ModuleItemKind::kInitialBlock;
     if (is_proc && item->body) {

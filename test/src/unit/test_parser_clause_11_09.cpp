@@ -82,4 +82,12 @@ TEST(TaggedUnionExprParsing, TaggedWithAssignmentPatternPrimary) {
   EXPECT_EQ(rhs->lhs->kind, ExprKind::kAssignmentPattern);
 }
 
+// The BNF requires a member identifier immediately after the tagged keyword;
+// supplying a primary with no member name (here a bare literal) is a syntax
+// error the parser must report.
+TEST(TaggedUnionExprParsing, TaggedWithoutMemberIdentifierRejected) {
+  auto r = Parse("module m; initial x = tagged 42; endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
 }  // namespace
