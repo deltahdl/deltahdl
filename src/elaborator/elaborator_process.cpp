@@ -271,24 +271,33 @@ void AddProcess(RtlirProcessKind kind, ModuleItem* item, RtlirModule* mod,
 }
 
 static void CollectStmtLhsPrefixes(const Stmt* stmt,
-                                   std::unordered_set<std::string>& out) {
+                                   std::unordered_set<std::string>& out,
+                                   const ScopeMap& scope) {
   if (!stmt) return;
   if (stmt->kind == StmtKind::kBlockingAssign ||
       stmt->kind == StmtKind::kNonblockingAssign) {
     if (stmt->lhs) {
-      std::string prefix = LongestStaticPrefix(stmt->lhs);
+      // §11.5.3: an indexing select stays inside the longest static prefix only
+      // when its index is a constant expression. The module parameter scope is
+      // threaded in so that a localparam/parameter index (a constant form of
+      // §11.2.1) resolves to a value and keeps the select in the prefix, rather
+      // than being mistaken for a run-time index and collapsing the prefix to
+      // the base identifier -- which would flag distinct constant-indexed
+      // elements as one over-driven target.
+      std::string prefix = LongestStaticPrefix(stmt->lhs, scope);
       if (!prefix.empty()) out.insert(std::move(prefix));
     }
   }
-  for (const auto* s : stmt->stmts) CollectStmtLhsPrefixes(s, out);
-  CollectStmtLhsPrefixes(stmt->then_branch, out);
-  CollectStmtLhsPrefixes(stmt->else_branch, out);
-  CollectStmtLhsPrefixes(stmt->body, out);
-  CollectStmtLhsPrefixes(stmt->for_body, out);
-  for (auto* fi : stmt->for_inits) CollectStmtLhsPrefixes(fi, out);
-  for (auto* fs : stmt->for_steps) CollectStmtLhsPrefixes(fs, out);
-  for (const auto& ci : stmt->case_items) CollectStmtLhsPrefixes(ci.body, out);
-  for (const auto* s : stmt->fork_stmts) CollectStmtLhsPrefixes(s, out);
+  for (const auto* s : stmt->stmts) CollectStmtLhsPrefixes(s, out, scope);
+  CollectStmtLhsPrefixes(stmt->then_branch, out, scope);
+  CollectStmtLhsPrefixes(stmt->else_branch, out, scope);
+  CollectStmtLhsPrefixes(stmt->body, out, scope);
+  CollectStmtLhsPrefixes(stmt->for_body, out, scope);
+  for (auto* fi : stmt->for_inits) CollectStmtLhsPrefixes(fi, out, scope);
+  for (auto* fs : stmt->for_steps) CollectStmtLhsPrefixes(fs, out, scope);
+  for (const auto& ci : stmt->case_items)
+    CollectStmtLhsPrefixes(ci.body, out, scope);
+  for (const auto* s : stmt->fork_stmts) CollectStmtLhsPrefixes(s, out, scope);
 }
 
 static void CollectCallNamesExpr(const Expr* expr,
@@ -326,7 +335,8 @@ static void CollectCallNamesStmt(const Stmt* stmt,
 }
 
 static void CollectFuncLhsPrefixes(const Stmt* body, const FuncMap& funcs,
-                                   std::unordered_set<std::string>& out) {
+                                   std::unordered_set<std::string>& out,
+                                   const ScopeMap& scope) {
   std::unordered_set<std::string_view> pending;
   CollectCallNamesStmt(body, pending);
   std::unordered_set<std::string_view> visited;
@@ -338,7 +348,7 @@ static void CollectFuncLhsPrefixes(const Stmt* body, const FuncMap& funcs,
       auto it = funcs.find(name);
       if (it == funcs.end()) continue;
       for (auto* s : it->second->func_body_stmts) {
-        CollectStmtLhsPrefixes(s, out);
+        CollectStmtLhsPrefixes(s, out, scope);
         CollectCallNamesStmt(s, next);
       }
     }
@@ -376,7 +386,8 @@ static const char* ProcessKindLabel(ModuleItemKind k) {
 
 static void CollectProcessLhsInfo(
     const ModuleDecl* decl, std::vector<ProcInfo>& procs,
-    std::unordered_set<std::string>& cont_assign_lhs, const FuncMap* func_map) {
+    std::unordered_set<std::string>& cont_assign_lhs, const FuncMap* func_map,
+    const ScopeMap& scope) {
   for (const auto* item : decl->items) {
     if (item->kind == ModuleItemKind::kAlwaysCombBlock ||
         item->kind == ModuleItemKind::kAlwaysLatchBlock ||
@@ -384,13 +395,13 @@ static void CollectProcessLhsInfo(
       ProcInfo info;
       info.loc = item->loc;
       info.kind = item->kind;
-      CollectStmtLhsPrefixes(item->body, info.lhs);
+      CollectStmtLhsPrefixes(item->body, info.lhs, scope);
       if (func_map && !func_map->empty())
-        CollectFuncLhsPrefixes(item->body, *func_map, info.lhs);
+        CollectFuncLhsPrefixes(item->body, *func_map, info.lhs, scope);
       procs.push_back(std::move(info));
     }
     if (item->kind == ModuleItemKind::kContAssign && item->assign_lhs) {
-      std::string prefix = LongestStaticPrefix(item->assign_lhs);
+      std::string prefix = LongestStaticPrefix(item->assign_lhs, scope);
       if (!prefix.empty()) cont_assign_lhs.insert(std::move(prefix));
     }
   }
@@ -438,10 +449,13 @@ static void CheckDriverConflicts(
 }
 
 void Elaborator::CheckAlwaysCombMultiDriver(const ModuleDecl* decl,
-                                            RtlirModule*) {
+                                            RtlirModule* mod) {
   std::vector<ProcInfo> procs;
   std::unordered_set<std::string> cont_assign_lhs;
-  CollectProcessLhsInfo(decl, procs, cont_assign_lhs, &func_decls_);
+  // The module parameter scope lets §11.5.3's longest-static-prefix analysis
+  // treat a localparam/parameter index as the constant expression it is.
+  ScopeMap scope = mod ? BuildParamScope(mod) : ScopeMap{};
+  CollectProcessLhsInfo(decl, procs, cont_assign_lhs, &func_decls_, scope);
   CheckDriverConflicts(procs, cont_assign_lhs, diag_);
 }
 
