@@ -454,7 +454,18 @@ static void ClearDeferredCallArgSnapshots(const Stmt* action, SimContext& ctx) {
   }
 }
 
+// §16.4.4: reports whether a pending deferred report has been individually
+// cancelled by a `disable <assertion_label>` statement in its process (see
+// Process::cancelled_deferred_labels). An unlabeled assertion cannot be named
+// by a disable, so an empty label is never cancelled.
+static bool DeferredReportCancelled(const Process* proc,
+                                    const std::string& label) {
+  return proc && !label.empty() &&
+         proc->cancelled_deferred_labels.count(label) != 0;
+}
+
 static void ScheduleDeferredAction(const Stmt* action, bool is_final_deferred,
+                                   std::string_view assertion_label,
                                    SimContext& ctx, Arena& arena) {
   if (!action) return;
 
@@ -466,9 +477,13 @@ static void ScheduleDeferredAction(const Stmt* action, bool is_final_deferred,
   // the same time step), the queued report has been flushed and is skipped.
   Process* proc = ctx.CurrentProcess();
   uint64_t gen = ctx.CurrentDeferredReportGeneration();
+  // §16.4.4: also remember which assertion queued this report, so a later
+  // `disable <that label>` in the same process can cancel just this report.
+  std::string label(assertion_label);
   auto* ev = ctx.GetScheduler().GetEventPool().Acquire();
-  ev->callback = [action, proc, gen, &ctx, &arena]() {
-    if (!proc || proc->deferred_report_generation == gen) {
+  ev->callback = [action, proc, gen, label, &ctx, &arena]() {
+    if ((!proc || proc->deferred_report_generation == gen) &&
+        !DeferredReportCancelled(proc, label)) {
       RunDeferredActionSync(action, ctx, arena);
     }
     ClearDeferredCallArgSnapshots(action, ctx);
@@ -483,15 +498,20 @@ static void ScheduleDeferredAction(const Stmt* action, bool is_final_deferred,
 // pending reports -- in the Reactive region for an observed (#0) deferred
 // assertion, or in the Postponed region for a final deferred assertion.
 static void ScheduleDeferredSeverityReport(bool is_final_deferred,
+                                           std::string_view assertion_label,
                                            SimContext& ctx) {
   Region region = is_final_deferred ? Region::kPostponed : Region::kReactive;
   // §16.4.2: the default $error is a pending report too, so it is flushed the
   // same way when the process reaches a flush point before its region runs.
   Process* proc = ctx.CurrentProcess();
   uint64_t gen = ctx.CurrentDeferredReportGeneration();
+  // §16.4.4: the default $error is cancellable by a specific-assertion disable
+  // just like an action-block report; carry the assertion's label to check.
+  std::string label(assertion_label);
   auto* ev = ctx.GetScheduler().GetEventPool().Acquire();
-  ev->callback = [proc, gen, &ctx]() {
+  ev->callback = [proc, gen, label, &ctx]() {
     if (proc && proc->deferred_report_generation != gen) return;
+    if (DeferredReportCancelled(proc, label)) return;
     EmitSeverityHeader(ctx, "ERROR", "Assertion failed.", std::cerr);
   };
   ctx.GetScheduler().ScheduleEvent(ctx.CurrentTime(), region, ev);
@@ -505,7 +525,8 @@ static bool TryScheduleDeferredAssertAction(const Stmt* action,
                                             const Stmt* stmt, SimContext& ctx,
                                             Arena& arena) {
   if (!stmt->is_deferred) return false;
-  ScheduleDeferredAction(action, stmt->is_final_deferred, ctx, arena);
+  ScheduleDeferredAction(action, stmt->is_final_deferred, stmt->label, ctx,
+                         arena);
   return true;
 }
 
@@ -589,7 +610,8 @@ static ExecTask ExecImmediateAssert(const Stmt* stmt, SimContext& ctx,
         // report, scheduled with the process's other deferred reports rather
         // than emitted here; a simple immediate assertion reports at once.
         if (stmt->is_deferred) {
-          ScheduleDeferredSeverityReport(stmt->is_final_deferred, ctx);
+          ScheduleDeferredSeverityReport(stmt->is_final_deferred, stmt->label,
+                                         ctx);
         } else {
           EmitSeverityHeader(ctx, "ERROR", "Assertion failed.", std::cerr);
         }
@@ -881,11 +903,34 @@ static StmtResult ExecDisableImpl(const Stmt* stmt, SimContext& ctx) {
     }
 
     proc->active = false;
+    // §16.4.4: applying a disable to the outermost scope of another procedure
+    // that has an active deferred assertion queue flushes that queue -- every
+    // pending (not-yet-matured) deferred immediate assertion report on it is
+    // cleared, in addition to the normal disable activities of §9.6.2. A
+    // pending report's scheduled Reactive/Postponed event is gated only on the
+    // process's deferred report generation (not on its active flag), so bumping
+    // that generation invalidates the reports this process queued earlier in
+    // the time step, mirroring FlushPendingDeferredReports for the disabled
+    // process (see §16.4.2). Reports that already matured have run and are
+    // unaffected.
+    proc->deferred_report_generation++;
   }
 
   if (self_disable) {
     ctx.SetDisableTarget(target);
     return StmtResult::kDisable;
+  }
+
+  // §16.4.4: a `disable <label>` that names no block, task, or process scope
+  // may instead name a specific deferred immediate assertion. Such a disable
+  // cancels only that assertion's still-pending reports and does not unwind the
+  // process (unlike disabling a scope). Record the label on the current
+  // process; each pending report queued by that assertion skips execution when
+  // its region runs (see ScheduleDeferredAction /
+  // ScheduleDeferredSeverityReport). Reports of other assertions, and any
+  // report that has already matured, are untouched.
+  if (procs.empty() && current) {
+    current->cancelled_deferred_labels.insert(std::string(target));
   }
 
   return StmtResult::kDone;

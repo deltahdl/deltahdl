@@ -256,7 +256,14 @@ void SimContext::FlushPendingDeferredReports() {
   // §16.4.2: bumping the generation invalidates every deferred report this
   // process has queued but not yet run this time step; those reports observe
   // the mismatch when their region fires and skip execution.
-  if (current_process_) current_process_->deferred_report_generation++;
+  if (current_process_) {
+    current_process_->deferred_report_generation++;
+    // §16.4.4: a flush point discards every pending report anyway, so any
+    // specific-assertion cancellations recorded during the just-ended
+    // activation are now moot; reset them so a later activation's reports are
+    // not mistaken for the cancelled ones.
+    current_process_->cancelled_deferred_labels.clear();
+  }
 }
 
 uint64_t SimContext::CurrentDeferredReportGeneration() const {

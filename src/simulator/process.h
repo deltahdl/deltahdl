@@ -7,6 +7,7 @@
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include "common/types.h"
@@ -149,6 +150,18 @@ struct Process {
   // has effectively matured and can no longer be flushed, which matches the
   // rule that all flush points occur before the report's region.
   uint64_t deferred_report_generation = 0;
+
+  // §16.4.4: labels of deferred immediate assertions in this process whose
+  // still-pending reports have been individually cancelled by a
+  // `disable <assertion_label>` statement. Unlike a whole-queue flush (which
+  // bumps deferred_report_generation), a specific-assertion disable clears only
+  // the named assertion's reports and leaves the process running, so it cannot
+  // use the generation counter. Each pending report captures its assertion
+  // label and skips execution when that label is present here. The set is
+  // cleared whenever the process reaches a deferred assertion flush point
+  // (which already discards every pending report), so a cancellation never
+  // leaks past the activation that issued the disable.
+  std::unordered_set<std::string> cancelled_deferred_labels;
 
   std::string inst_prefix;
 
