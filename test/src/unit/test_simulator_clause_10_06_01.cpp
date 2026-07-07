@@ -14,36 +14,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ProceduralAssignDeassignSim, ProceduralAssignSetsValue) {
-  StmtFixture f;
-  auto* var = f.ctx.CreateVariable("a", 32);
-  var->value = MakeLogic4VecVal(f.arena, 32, 0);
-
-  auto* stmt = f.arena.Create<Stmt>();
-  stmt->kind = StmtKind::kAssign;
-  stmt->lhs = MakeId(f.arena, "a");
-  stmt->rhs = MakeInt(f.arena, 77);
-
-  RunStmt(stmt, f.ctx, f.arena);
-  EXPECT_TRUE(var->is_forced);
-  EXPECT_EQ(var->value.ToUint64(), 77u);
-}
-
-TEST(ProceduralAssignDeassignSim, DeassignReleasesProceduralAssign) {
-  StmtFixture f;
-  auto* var = f.ctx.CreateVariable("b", 32);
-  var->value = MakeLogic4VecVal(f.arena, 32, 50);
-  var->is_forced = true;
-  var->forced_value = MakeLogic4VecVal(f.arena, 32, 50);
-
-  auto* stmt = f.arena.Create<Stmt>();
-  stmt->kind = StmtKind::kDeassign;
-  stmt->lhs = MakeId(f.arena, "b");
-
-  RunStmt(stmt, f.ctx, f.arena);
-  EXPECT_FALSE(var->is_forced);
-}
-
 TEST(ProceduralAssignDeassignSim, DeassignNullLhsNoOp) {
   StmtFixture f;
   auto* stmt = f.arena.Create<Stmt>();
@@ -52,30 +22,6 @@ TEST(ProceduralAssignDeassignSim, DeassignNullLhsNoOp) {
 
   auto result = RunStmt(stmt, f.ctx, f.arena);
   EXPECT_EQ(result, StmtResult::kDone);
-}
-
-TEST(ProceduralAssignDeassignSim, AssignDeassignBlockingAssign) {
-  StmtFixture f;
-  auto* var = f.ctx.CreateVariable("adb", 32);
-  var->value = MakeLogic4VecVal(f.arena, 32, 0);
-
-  auto* assign_stmt = f.arena.Create<Stmt>();
-  assign_stmt->kind = StmtKind::kAssign;
-  assign_stmt->lhs = MakeId(f.arena, "adb");
-  assign_stmt->rhs = MakeInt(f.arena, 33);
-  RunStmt(assign_stmt, f.ctx, f.arena);
-  EXPECT_EQ(var->value.ToUint64(), 33u);
-  EXPECT_TRUE(var->is_forced);
-
-  auto* deassign_stmt = f.arena.Create<Stmt>();
-  deassign_stmt->kind = StmtKind::kDeassign;
-  deassign_stmt->lhs = MakeId(f.arena, "adb");
-  RunStmt(deassign_stmt, f.ctx, f.arena);
-  EXPECT_FALSE(var->is_forced);
-
-  auto* blocking_stmt = MakeBlockAssign(f.arena, "adb", 44);
-  RunStmt(blocking_stmt, f.ctx, f.arena);
-  EXPECT_EQ(var->value.ToUint64(), 44u);
 }
 
 TEST(ProceduralContinuousAssignSim, AssignOverridesProceduralAssign) {
@@ -160,23 +106,6 @@ TEST(ProceduralContinuousAssignSim, AssignExpressionRhs) {
   auto* c = f.ctx.FindVariable("c");
   ASSERT_NE(c, nullptr);
   EXPECT_EQ(c->value.ToUint64(), 42u);
-}
-
-TEST(ProceduralAssignDeassignSim, AssignBlocksBlockingAssign) {
-  StmtFixture f;
-  auto* var = f.ctx.CreateVariable("q", 32);
-  var->value = MakeLogic4VecVal(f.arena, 32, 0);
-
-  auto* assign_stmt = f.arena.Create<Stmt>();
-  assign_stmt->kind = StmtKind::kAssign;
-  assign_stmt->lhs = MakeId(f.arena, "q");
-  assign_stmt->rhs = MakeInt(f.arena, 42);
-  RunStmt(assign_stmt, f.ctx, f.arena);
-  EXPECT_EQ(var->value.ToUint64(), 42u);
-
-  auto* blocking_stmt = MakeBlockAssign(f.arena, "q", 99);
-  RunStmt(blocking_stmt, f.ctx, f.arena);
-  EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
 TEST(ProceduralContinuousAssignSim, AssignBlocksBlockingAssignFullSim) {
@@ -288,6 +217,33 @@ TEST(ProceduralContinuousAssignSim,
   ASSERT_NE(q, nullptr);
   EXPECT_EQ(q->value.ToUint64(), 99u);
   EXPECT_TRUE(q->is_forced);
+}
+
+TEST(ProceduralContinuousAssignSim,
+     DeassignRetainsValueThenNonblockingOverwrites) {
+  // The held value also gives way to a nonblocking procedural assignment, which
+  // reaches the variable through a different scheduling path than a blocking
+  // one; once the deassign has cleared the forced state the nonblocking update
+  // must land.
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] q;\n"
+      "  initial begin\n"
+      "    assign q = 8'd50;\n"
+      "    deassign q;\n"
+      "    q <= 8'd88;\n"
+      "    #1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* q = f.ctx.FindVariable("q");
+  ASSERT_NE(q, nullptr);
+  EXPECT_EQ(q->value.ToUint64(), 88u);
 }
 
 TEST(ProceduralContinuousAssignSim, DFlipFlopClearPresetPattern) {

@@ -134,6 +134,72 @@ TEST(ProceduralAssignDeassignElaboration, AssignIndexedPartSelectLhsIsError) {
   EXPECT_TRUE(f.has_errors);
 }
 
+TEST(ProceduralAssignDeassignElaboration,
+     AssignConcatWithBitSelectElemIsError) {
+  // A concatenation LHS must be a concatenation *of variables*; a bit-select
+  // element makes it a bit-select of a variable, which §10.6.1 forbids.
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  reg [7:0] data;\n"
+      "  reg b;\n"
+      "  initial begin\n"
+      "    assign {data[0], b} = 2'b10;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(ProceduralAssignDeassignElaboration,
+     AssignConcatWithPartSelectElemIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  reg [7:0] data;\n"
+      "  reg [3:0] b;\n"
+      "  initial begin\n"
+      "    assign {data[3:0], b} = 8'hAB;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(ProceduralAssignDeassignElaboration, AssignNestedConcatOfVariablesLhs) {
+  // A concatenation of variables may itself contain a nested concatenation of
+  // variables; with no bit/part-select anywhere in the tree the assign LHS is
+  // still a concatenation of variables and elaborates cleanly.
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  reg a, b, c;\n"
+      "  initial begin\n"
+      "    assign {a, {b, c}} = 3'b101;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(ProceduralAssignDeassignElaboration, AssignNestedConcatWithSelectIsError) {
+  // The concatenation-of-variables rule reaches through nesting: a part-select
+  // buried inside an inner concatenation still makes the LHS a part-select of a
+  // variable and must be rejected.
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  reg [7:0] data;\n"
+      "  reg a;\n"
+      "  initial begin\n"
+      "    assign {a, {data[3:0]}} = 5'b10101;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
 TEST(ProceduralAssignDeassignElaboration, ReAssignSameVariableElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(

@@ -339,10 +339,25 @@ void CheckInterconnectProceduralRead(
     CheckInterconnectProceduralRead(ci.body, interconnect_names, diag);
 }
 
+// §10.6.1: the LHS of an assign statement shall be a singular variable
+// reference or a concatenation of variables, and shall not be a bit-select or a
+// part-select of a variable. Because the concatenation must be one *of
+// variables*, a bit-select or part-select element inside the concatenation is
+// equally illegal, so the check descends through concatenations rather than
+// only inspecting the top-level lvalue.
+static bool ProceduralAssignLhsHasSelect(const Expr* e) {
+  if (!e) return false;
+  if (e->kind == ExprKind::kSelect) return true;
+  if (e->kind == ExprKind::kConcatenation) {
+    for (const auto* elem : e->elements)
+      if (ProceduralAssignLhsHasSelect(elem)) return true;
+  }
+  return false;
+}
+
 void CheckProceduralAssignLhs(const Stmt* s, DiagEngine& diag) {
   if (!s) return;
-  if (s->kind == StmtKind::kAssign && s->lhs &&
-      s->lhs->kind == ExprKind::kSelect) {
+  if (s->kind == StmtKind::kAssign && ProceduralAssignLhsHasSelect(s->lhs)) {
     diag.Error(s->range.start,
                "bit-select or part-select in procedural assign LHS");
   }
