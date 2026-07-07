@@ -532,8 +532,16 @@ static bool TryPrecomputedArgSpec(char spec, FormatArgs& args,
 static void AppendValueArg(char spec, bool has_width, uint32_t width,
                            FormatArgs& args, std::string& out) {
   if (args.vi < args.vals.size()) {
-    if (spec == 't' && args.time_format != nullptr) {
-      out += FormatTimeUnderTimeformat(args.vals[args.vi++], *args.time_format);
+    // §20.4.3: %t renders time through the active $timeformat configuration.
+    // An explicitly threaded spec wins; otherwise the run-time context supplies
+    // the configuration installed by the most recent $timeformat call (or the
+    // Table 20-3 defaults when none has run yet). This is what makes a plain
+    // $display/$fmonitor with %t honor $timeformat "for all %t formats in the
+    // design until another $timeformat system task is invoked".
+    const TimeFormatSpec* tf = args.time_format;
+    if (tf == nullptr && args.ctx != nullptr) tf = &args.ctx->GetTimeFormat();
+    if (spec == 't' && tf != nullptr) {
+      out += FormatTimeUnderTimeformat(args.vals[args.vi++], *tf);
     } else {
       out += FormatArgWidth(args.vals[args.vi++], spec, has_width, width);
     }
