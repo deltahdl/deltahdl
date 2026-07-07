@@ -4,13 +4,6 @@ using namespace delta;
 
 namespace {
 
-TEST(CompilerDirectiveParsing, ResetallDirective) {
-  EXPECT_TRUE(
-      ParseWithPreprocessorOk("`resetall\n"
-                              "module t;\n"
-                              "endmodule\n"));
-}
-
 TEST(CompilerDirectiveParsing, ResetallBeforeMultipleModules) {
   EXPECT_TRUE(
       ParseWithPreprocessorOk("`resetall\n"

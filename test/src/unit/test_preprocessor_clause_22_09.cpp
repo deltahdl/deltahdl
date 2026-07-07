@@ -51,6 +51,17 @@ TEST(Preprocessor, UnconnectedDrive_InvalidArg) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
+// §22.9: `unconnected_drive requires one of the two arguments pull1 or pull0.
+// The closest rejected input to the accepting form is the directive with no
+// argument at all; the drive state stays at the default.
+TEST(Preprocessor, UnconnectedDrive_MissingArg) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  PreprocessWithPP("`unconnected_drive\n", f, pp);
+  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_EQ(pp.UnconnectedDrive(), NetType::kWire);
+}
+
 TEST(Preprocessor, Resetall_ClearsUnconnectedDrive) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
