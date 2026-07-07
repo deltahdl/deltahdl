@@ -75,4 +75,16 @@ TEST(ArrayLiteralParsing, IndexAndDefaultKeyParses) {
               "endmodule\n"));
 }
 
+// §5.11 — a type-prefixed array literal is a pattern expression and may appear
+// as an expression operand (here a subroutine argument), not only as an
+// assignment/declaration target; the explicit prefix supplies its type where no
+// assignment-like context is present.
+TEST(ArrayLiteralParsing, TypePrefixedLiteralAsExpressionOperand) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  typedef int triple [1:3];\n"
+              "  initial $display(triple'{0, 1, 2});\n"
+              "endmodule\n"));
+}
+
 }  // namespace
