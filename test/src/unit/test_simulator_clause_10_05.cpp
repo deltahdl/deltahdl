@@ -228,6 +228,56 @@ TEST(VariableInitSim, InitValuePersistsAcrossTime) {
   EXPECT_EQ(snap->value.ToUint64(), 7u);
 }
 
+// §10.5's own example: `logic v = consta & constb;` where consta and constb
+// are themselves variables carrying declaration initializers. Because static
+// initialization runs in declaration order and completes before any procedure,
+// v's initializer sees the already-initialized consta/constb and evaluates to
+// their bitwise-AND. This drives the exact example shape end-to-end, unlike the
+// literal-operand VarInitWithExpression case.
+TEST(VariableInitSim, VarInitFromOtherInitializedVariables) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] consta = 8'hFC;\n"
+      "  logic [7:0] constb = 8'h3F;\n"
+      "  logic [7:0] v = consta & constb;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* v = f.ctx.FindVariable("v");
+  ASSERT_NE(v, nullptr);
+  EXPECT_EQ(v->value.ToUint64(), 0x3Cu);
+}
+
+// A variable initializer may name a parameter as its operand. The parameter is
+// an elaboration-time constant resolved during static initialization (its
+// storage is created before the variables that read it), so v receives the
+// parameter's value. This exercises the param-resolution path, distinct from a
+// literal or a plain-variable operand.
+TEST(VariableInitSim, VarInitFromParameterOperand) {
+  EXPECT_EQ(RunAndGet("module t;\n"
+                      "  parameter [7:0] P = 8'h3C;\n"
+                      "  logic [7:0] v = P;\n"
+                      "endmodule\n",
+                      "v"),
+            0x3Cu);
+}
+
+// The initializer operand may also be a localparam, and may appear inside a
+// larger expression. Both the localparam resolution and the arithmetic happen
+// during static initialization, before any procedure runs.
+TEST(VariableInitSim, VarInitFromLocalparamInExpression) {
+  EXPECT_EQ(RunAndGet("module t;\n"
+                      "  localparam [7:0] L = 8'd20;\n"
+                      "  logic [7:0] v = L + 8'd3;\n"
+                      "endmodule\n",
+                      "v"),
+            23u);
+}
+
 // Static initialization completes before any procedure starts, so an
 // always_comb block evaluating at time 0 already sees the initialized value.
 TEST(VariableInitSim, VarInitBeforeAlwaysCombBlock) {
