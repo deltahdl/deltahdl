@@ -342,6 +342,99 @@ static std::optional<ConstVal> ConstEvalLiteral(const Expr* expr) {
   return ConstVal{v, w, s};
 }
 
+static int ConstHexDigitVal(char c) {
+  if (c >= '0' && c <= '9') return c - '0';
+  if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+  if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+  return -1;
+}
+
+// Decodes one backslash escape starting at text[i] (i points at the char after
+// the backslash) into a byte, advancing i past the consumed characters. Mirrors
+// the simulator's string-literal decoding so a literal folded here matches the
+// value produced at run time.
+static bool ConstDecodeEscape(std::string_view text, size_t& i, uint8_t& out) {
+  char c = text[i];
+  switch (c) {
+    case 'n':
+      out = '\n';
+      return true;
+    case 't':
+      out = '\t';
+      return true;
+    case '\\':
+      out = '\\';
+      return true;
+    case '"':
+      out = '"';
+      return true;
+    case 'v':
+      out = '\v';
+      return true;
+    case 'f':
+      out = '\f';
+      return true;
+    case 'a':
+      out = '\a';
+      return true;
+    default:
+      break;
+  }
+  if (c == '\n') return false;  // line continuation: emit nothing
+  if (c == 'x') {
+    uint8_t val = 0;
+    for (int j = 0; j < 2 && i + 1 < text.size(); ++j) {
+      int d = ConstHexDigitVal(text[i + 1]);
+      if (d < 0) break;
+      val = static_cast<uint8_t>(val * 16 + d);
+      ++i;
+    }
+    out = val;
+    return true;
+  }
+  if (c >= '0' && c <= '7') {
+    auto val = static_cast<uint8_t>(c - '0');
+    for (int j = 0; j < 2 && i + 1 < text.size() && text[i + 1] >= '0' &&
+                    text[i + 1] <= '7';
+         ++j) {
+      val = static_cast<uint8_t>(val * 8 + (text[++i] - '0'));
+    }
+    out = val;
+    return true;
+  }
+  out = static_cast<uint8_t>(c);
+  return true;
+}
+
+// §11.10: a string literal operand is a constant number formed from the 8-bit
+// ASCII code of each character, one byte per character, packed with the first
+// character in the most-significant position. This lets a string literal fold
+// in constant expressions (e.g. a parameter/localparam initializer). The folded
+// value keeps the low 64 bits, matching the low word of the equivalent vector.
+static std::optional<ConstVal> ConstEvalStringLiteral(const Expr* expr) {
+  std::string_view text = expr->text;
+  if (text.size() >= 6 && text.substr(0, 3) == "\"\"\"")
+    text = text.substr(3, text.size() - 6);
+  else if (text.size() >= 2 && text.front() == '"')
+    text = text.substr(1, text.size() - 2);
+
+  uint64_t value = 0;
+  uint32_t nbytes = 0;
+  for (size_t i = 0; i < text.size(); ++i) {
+    uint8_t byte = 0;
+    if (text[i] == '\\' && i + 1 < text.size()) {
+      ++i;
+      if (!ConstDecodeEscape(text, i, byte)) continue;  // line continuation
+    } else {
+      byte = static_cast<uint8_t>(text[i]);
+    }
+    value = (value << 8) | byte;
+    ++nbytes;
+  }
+  uint32_t width = nbytes == 0 ? 8u : nbytes * 8u;
+  return ConstVal{static_cast<int64_t>(value), width, false};
+}
+
 static std::optional<ConstVal> ConstEvalUnaryFull(const Expr* expr,
                                                   const ScopeMap& scope) {
   auto operand = ConstEvalFull(expr->lhs, scope);
@@ -473,6 +566,8 @@ static std::optional<ConstVal> ConstEvalFull(const Expr* expr,
   switch (expr->kind) {
     case ExprKind::kIntegerLiteral:
       return ConstEvalLiteral(expr);
+    case ExprKind::kStringLiteral:
+      return ConstEvalStringLiteral(expr);
     case ExprKind::kIdentifier: {
       // §3.12.1: a $unit:: prefix forces resolution to the compilation-unit
       // scope, bypassing any same-named local that would otherwise shadow it.
