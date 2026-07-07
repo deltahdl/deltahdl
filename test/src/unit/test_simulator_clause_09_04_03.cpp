@@ -78,21 +78,6 @@ TEST(LevelSensitiveEventSimulation, WaitXConditionBlocks) {
   EXPECT_EQ(val, 0u);
 }
 
-TEST(LevelSensitiveEventSimulation, WaitZConditionBlocks) {
-  auto val = RunAndGet(
-      "module t;\n"
-      "  logic cond;\n"
-      "  logic [7:0] x;\n"
-      "  initial begin\n"
-      "    cond = 1'bz;\n"
-      "    x = 8'd0;\n"
-      "    wait (cond) x = 8'd42;\n"
-      "  end\n"
-      "endmodule\n",
-      "x");
-  EXPECT_EQ(val, 0u);
-}
-
 TEST(LevelSensitiveEventSimulation, WaitConditionWithDelayInBody) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -186,6 +171,110 @@ TEST(LevelSensitiveEventSimulation, WaitVectorNonzeroConditionUnblocks) {
       "endmodule\n",
       "x");
   EXPECT_EQ(val, 123u);
+}
+
+// The clause requires that the statements *following* a wait remain blocked
+// until the condition holds. With a null body, the observable is the next
+// statement in the enclosing block. `tag` is latched to 77 one time step before
+// `ready` rises, so a process that correctly suspends copies 77; one that ran
+// at time 0 (never blocking) would have copied the initial 10. The distinct
+// final value is what proves the following statement was actually held off.
+TEST(LevelSensitiveEventSimulation, WaitNullBodyBlocksFollowingStatement) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  logic ready;\n"
+      "  logic [7:0] tag, x;\n"
+      "  initial begin\n"
+      "    ready = 0;\n"
+      "    tag = 8'd10;\n"
+      "    #5  tag = 8'd77;\n"
+      "    #5  ready = 1;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    x = 8'd0;\n"
+      "    wait (ready) ;\n"
+      "    x = tag;\n"
+      "  end\n"
+      "endmodule\n",
+      "x");
+  EXPECT_EQ(val, 77u);
+}
+
+// The blocking branch of the clause's example: `enable` is 1 on entry, so
+// wait(!enable) must suspend and only release once it clears. `b` is latched to
+// 55 a time step before that release, so the delayed body `#10 a = b`
+// copies 55. If the wait had failed to block, `a` would remain 0 because the
+// condition is false at time 0. Complements WaitConditionWithDelayInBody, which
+// exercises the already-true (no-block) branch of the same example.
+TEST(LevelSensitiveEventSimulation, WaitBlocksThenDelayedBodyExecutes) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  logic enable;\n"
+      "  logic [7:0] a, b;\n"
+      "  initial begin\n"
+      "    enable = 1;\n"
+      "    b = 8'd10;\n"
+      "    #5  b = 8'd55;\n"
+      "    #5  enable = 0;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    a = 8'd0;\n"
+      "    wait (!enable) #10 a = b;\n"
+      "  end\n"
+      "endmodule\n",
+      "a");
+  EXPECT_EQ(val, 55u);
+}
+
+// statement_or_null may be a begin-end block; after the wait releases, every
+// statement in the block must run. `src` is latched to 9 one time step before
+// `go` rises, so a correctly blocked process copies 9 into both members of the
+// block (the second assignment reads the first), proving the whole block body
+// executed post-release. A process that never blocked would have copied 1.
+TEST(LevelSensitiveEventSimulation, WaitBlockBodyExecutesAfterUnblock) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  logic go;\n"
+      "  logic [7:0] src, p, q;\n"
+      "  initial begin\n"
+      "    go = 0;\n"
+      "    src = 8'd1;\n"
+      "    #5  src = 8'd9;\n"
+      "    #5  go = 1;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    p = 8'd0;\n"
+      "    q = 8'd0;\n"
+      "    wait (go) begin\n"
+      "      p = src;\n"
+      "      q = p;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n",
+      "q");
+  EXPECT_EQ(val, 9u);
+}
+
+// The condition may be any integral expression, including a 2-state type. A
+// zero `int` is false and blocks; once it becomes nonzero the wait releases and
+// the following statement runs. This drives the §12.4 truth rule through a
+// 2-state operand rather than the 4-state `logic` used by the other tests.
+TEST(LevelSensitiveEventSimulation, WaitTwoStateIntConditionUnblocks) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  int count;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    count = 0;\n"
+      "    x = 8'd0;\n"
+      "    #5 count = 3;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    wait (count) x = 8'd42;\n"
+      "  end\n"
+      "endmodule\n",
+      "x");
+  EXPECT_EQ(val, 42u);
 }
 
 }  // namespace
