@@ -138,6 +138,18 @@ struct Process {
 
   std::vector<std::string> pending_violations;
 
+  // §16.4.2: a deferred immediate assertion's pass/fail action (or its default
+  // $error) is queued as a pending report and executed later in the current
+  // time step (see §16.4.1). Reaching a deferred assertion flush point clears
+  // this process's still-pending reports. Rather than track each queued report
+  // individually, every report captures the value of this counter when it is
+  // enqueued; flushing bumps the counter, so a report whose captured value no
+  // longer matches has been flushed and is skipped when its region is reached.
+  // A report scheduled but not yet run has not matured; once its region runs it
+  // has effectively matured and can no longer be flushed, which matches the
+  // rule that all flush points occur before the report's region.
+  uint64_t deferred_report_generation = 0;
+
   std::string inst_prefix;
 
   // §13.3.2: a task may be enabled more than once concurrently, and every

@@ -526,6 +526,19 @@ class SimContext {
   void FlushPendingViolations();
   void MaturePendingViolations();
 
+  // §16.4.2: reaching a deferred assertion flush point clears the current
+  // process's pending (not-yet-executed) deferred immediate assertion reports.
+  // Called at the three flush points defined by §16.4.2: a process resuming
+  // after suspending on an event control or wait, an always_comb/always_latch
+  // procedure resuming on a dependent-signal transition, and (via §16.4.4) the
+  // disabling of the process's outermost scope.
+  void FlushPendingDeferredReports();
+
+  // §16.4.2: the current process's deferred-report generation. A deferred
+  // report captures this when enqueued; if it differs when the report's region
+  // runs, a flush point cleared the report in between and it must not execute.
+  uint64_t CurrentDeferredReportGeneration() const;
+
   const std::unordered_map<std::string_view, Variable*>& GetVariables() const {
     return variables_;
   }

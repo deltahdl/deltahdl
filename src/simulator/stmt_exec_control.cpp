@@ -926,6 +926,9 @@ ExecTask ExecEventControl(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     // violation report flush point when it resumes; any unique/priority
     // reports accumulated before the suspension are discarded.
     ctx.FlushPendingViolations();
+    // §16.4.2: that resume is equally a deferred assertion flush point, so
+    // deferred reports pending from before the suspend are cleared as well.
+    ctx.FlushPendingDeferredReports();
   }
   if (stmt->body) {
     co_return co_await ExecStmt(stmt->body, ctx, arena);

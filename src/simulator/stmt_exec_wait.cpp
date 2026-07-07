@@ -110,7 +110,11 @@ ExecTask ExecWait(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   *finished = true;
   // §12.4.2.1: resuming after suspending on a wait statement is a violation
   // report flush point; drop any reports pending from before the wait.
-  if (suspended) ctx.FlushPendingViolations();
+  // §16.4.2: the same resume is a deferred assertion flush point.
+  if (suspended) {
+    ctx.FlushPendingViolations();
+    ctx.FlushPendingDeferredReports();
+  }
   if (stmt->body) {
     auto r = co_await ExecStmt(stmt->body, ctx, arena);
     if (labeled) ctx.PopStaticScope(stmt->label);

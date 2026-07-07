@@ -460,10 +460,17 @@ static void ScheduleDeferredAction(const Stmt* action, bool is_final_deferred,
 
   SnapshotDeferredCallArgs(action, ctx, arena);
   Region region = is_final_deferred ? Region::kPostponed : Region::kReactive;
+  // §16.4.2: the report is pending until its region runs. Capture the process
+  // and its report generation now; if a flush point bumps the generation before
+  // the region fires (e.g. the process resumes or an always_comb re-triggers in
+  // the same time step), the queued report has been flushed and is skipped.
+  Process* proc = ctx.CurrentProcess();
+  uint64_t gen = ctx.CurrentDeferredReportGeneration();
   auto* ev = ctx.GetScheduler().GetEventPool().Acquire();
-  ev->callback = [action, &ctx, &arena]() {
-    RunDeferredActionSync(action, ctx, arena);
-
+  ev->callback = [action, proc, gen, &ctx, &arena]() {
+    if (!proc || proc->deferred_report_generation == gen) {
+      RunDeferredActionSync(action, ctx, arena);
+    }
     ClearDeferredCallArgSnapshots(action, ctx);
   };
   ctx.GetScheduler().ScheduleEvent(ctx.CurrentTime(), region, ev);
@@ -478,8 +485,13 @@ static void ScheduleDeferredAction(const Stmt* action, bool is_final_deferred,
 static void ScheduleDeferredSeverityReport(bool is_final_deferred,
                                            SimContext& ctx) {
   Region region = is_final_deferred ? Region::kPostponed : Region::kReactive;
+  // §16.4.2: the default $error is a pending report too, so it is flushed the
+  // same way when the process reaches a flush point before its region runs.
+  Process* proc = ctx.CurrentProcess();
+  uint64_t gen = ctx.CurrentDeferredReportGeneration();
   auto* ev = ctx.GetScheduler().GetEventPool().Acquire();
-  ev->callback = [&ctx]() {
+  ev->callback = [proc, gen, &ctx]() {
+    if (proc && proc->deferred_report_generation != gen) return;
     EmitSeverityHeader(ctx, "ERROR", "Assertion failed.", std::cerr);
   };
   ctx.GetScheduler().ScheduleEvent(ctx.CurrentTime(), region, ev);

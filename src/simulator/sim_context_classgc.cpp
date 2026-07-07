@@ -252,4 +252,15 @@ void SimContext::MaturePendingViolations() {
   }
 }
 
+void SimContext::FlushPendingDeferredReports() {
+  // §16.4.2: bumping the generation invalidates every deferred report this
+  // process has queued but not yet run this time step; those reports observe
+  // the mismatch when their region fires and skip execution.
+  if (current_process_) current_process_->deferred_report_generation++;
+}
+
+uint64_t SimContext::CurrentDeferredReportGeneration() const {
+  return current_process_ ? current_process_->deferred_report_generation : 0;
+}
+
 }  // namespace delta

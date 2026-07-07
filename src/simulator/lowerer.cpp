@@ -53,6 +53,9 @@ static SimCoroutine MakeAlwaysSensCoroutine(const Stmt* body,
     co_await EventAwaiter{ctx, sens, arena};
 
     ctx.FlushPendingViolations();
+    // §16.4.2: resuming after suspending on this event control is a deferred
+    // assertion flush point; discard reports pending from before the suspend.
+    ctx.FlushPendingDeferredReports();
     auto result = co_await ExecStmt(body, ctx, arena);
     if (result != StmtResult::kDone) break;
   }
@@ -142,6 +145,10 @@ static SimCoroutine MakeAlwaysCombCoroutine(const Stmt* body,
     co_await AnyChangeAwaiter{ctx, read_vars};
 
     ctx.FlushPendingViolations();
+    // §16.4.2: an always_comb/always_latch procedure re-running because a
+    // dependent signal changed reaches a deferred assertion flush point on
+    // resume, clearing any report queued by the superseded evaluation.
+    ctx.FlushPendingDeferredReports();
   }
 }
 
