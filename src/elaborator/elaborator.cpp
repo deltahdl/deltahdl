@@ -11,6 +11,7 @@
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast.h"
+#include "parser/time_resolve.h"
 
 namespace delta {
 
@@ -278,6 +279,21 @@ void CopyDesignMetadata(RtlirDesign* design, const CompilationUnit* unit,
   design->last_elab_severity_msg = meta.last_severity_msg;
   design->last_elab_severity_scope = meta.last_severity_scope;
   design->last_elab_severity_loc = meta.last_severity_loc;
+
+  // §20.4.1: carry the compilation unit's timescale (reported by the $unit
+  // argument) and the simulation time unit (the smallest precision across the
+  // design, reported by $root; see §3.14.3) onto the finished design.
+  if (unit->has_cu_timeunit) {
+    design->cu_timescale.unit = unit->cu_time_unit;
+    design->cu_timescale.magnitude = unit->cu_time_unit_magnitude;
+  }
+  if (unit->has_cu_timeprecision) {
+    design->cu_timescale.precision = unit->cu_time_prec;
+    design->cu_timescale.prec_magnitude = unit->cu_time_prec_magnitude;
+  }
+  design->global_time_precision =
+      ComputeGlobalTimePrecision(unit, /*has_preproc_timescale=*/false,
+                                 /*preproc_global_precision=*/TimeUnit::kNs);
 }
 
 // Performs the order-independent data tail of elaboration: computing each

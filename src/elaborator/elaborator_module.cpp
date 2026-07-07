@@ -377,6 +377,25 @@ static void InitRtlirModuleHeader(RtlirModule* mod, const ModuleDecl* decl,
   mod->delay_mode = unit->delay_mode_directive;
   mod->attrs = ResolveAttributes(decl->attrs, diag);
 
+  // §20.4.1: capture the time unit/precision $timeunit/$timeprecision report
+  // for this element. A local timeunit/timeprecision declaration wins;
+  // otherwise the compilation unit's value applies, and absent both the 1 ns /
+  // 1 ns default of the TimeScale struct stands in.
+  if (decl->has_timeunit) {
+    mod->timescale.unit = decl->time_unit;
+    mod->timescale.magnitude = decl->time_unit_magnitude;
+  } else if (unit->has_cu_timeunit) {
+    mod->timescale.unit = unit->cu_time_unit;
+    mod->timescale.magnitude = unit->cu_time_unit_magnitude;
+  }
+  if (decl->has_timeprecision) {
+    mod->timescale.precision = decl->time_prec;
+    mod->timescale.prec_magnitude = decl->time_prec_magnitude;
+  } else if (unit->has_cu_timeprecision) {
+    mod->timescale.precision = unit->cu_time_prec;
+    mod->timescale.prec_magnitude = unit->cu_time_prec_magnitude;
+  }
+
   RtlirImport std_import;
   std_import.package_name = "std";
   std_import.is_wildcard = true;

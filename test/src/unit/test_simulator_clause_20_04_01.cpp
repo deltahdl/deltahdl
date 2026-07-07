@@ -1,103 +1,169 @@
-#include "builders_systask.h"
+// §20.4.1 Timescale retrieval system functions. $timeunit and $timeprecision
+// return the time unit and precision of a design element, encoded as the
+// Table 20-2 base-10 order (an integer in the range 2 to -15). The value each
+// function reports depends on which design element it names — the current
+// scope with no argument, a named element, the compilation unit ($unit), or
+// the simulation time unit ($root, see §3.14.3) — and on how that element's
+// timescale was produced by its `timeunit`/`timeprecision` declarations. These
+// tests therefore build the timescale from real source and drive it through the
+// full pipeline (parse -> elaborate -> lower -> run), reading the returned
+// order back through $display so the production selection and Table 20-2
+// encoding are observed end to end rather than from a hand-seeded context.
+#include <iostream>
+#include <sstream>
+
 #include "fixture_simulator.h"
-#include "parser/ast.h"
-#include "simulator/evaluation.h"
 
 using namespace delta;
 
 namespace {
 
-// The parser models a bare $root/$unit argument as an argument-less system
-// call, so reproduce that shape when driving the evaluator directly.
-Expr* MkScopeArg(Arena& arena, std::string_view name) {
-  return MkSysCall(arena, name, {});
+// Runs source through elaboration and simulation, capturing everything written
+// to stdout so a $display of the retrieved order can be inspected.
+std::string RunCapture(const std::string& src, SimFixture& f) {
+  std::ostringstream captured;
+  std::streambuf* old_buf = std::cout.rdbuf(captured.rdbuf());
+  auto* design = ElaborateSrc(src, f);
+  if (design != nullptr) {
+    LowerAndRun(design, f);
+  }
+  std::cout.rdbuf(old_buf);
+  return captured.str();
 }
 
-int32_t EvalOrder(SimFixture& f, Expr* call) {
-  auto result = EvalExpr(call, f.ctx, f.arena);
-  EXPECT_EQ(result.width, 32u);
-  EXPECT_TRUE(result.is_signed);
-  return static_cast<int32_t>(result.ToUint64());
+// With no argument, $timeunit reports the current scope's time unit and
+// $timeprecision its precision — here the top module's own `timeunit 1ms/1us`
+// declaration, encoded as -3 and -6 per Table 20-2.
+TEST(TimescaleSystemFunctions, NoArgumentReportsCurrentScopeUnitAndPrecision) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  timeunit 1ms / 1us;\n"
+      "  initial begin\n"
+      "    if ($timeunit == -3) $display(\"unit_ok\");\n"
+      "    if ($timeprecision == -6) $display(\"prec_ok\");\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "unit_ok\nprec_ok\n");
 }
 
-// No argument: $timeunit reports the time unit of the current scope, encoded
-// per Table 20-2 (10 ns -> -8).
-TEST(TimescaleSystemFunctions, TimeunitNoArgReturnsCurrentScopeUnit) {
-  SysTaskFixture f;
-  f.ctx.SetCurrentTimeScale(TimeScale{TimeUnit::kNs, 10, TimeUnit::kPs, 1});
-  EXPECT_EQ(EvalOrder(f, MkSysCall(f.arena, "$timeunit", {})), -8);
+// An argument that names a design element reports that element's timescale. The
+// top module names itself; its declared 100us/10ns maps to -4 and -8.
+TEST(TimescaleSystemFunctions, NamedElementArgumentReportsThatElement) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module dut;\n"
+      "  timeunit 100us / 10ns;\n"
+      "  initial begin\n"
+      "    if ($timeunit(dut) == -4) $display(\"unit_ok\");\n"
+      "    if ($timeprecision(dut) == -8) $display(\"prec_ok\");\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "unit_ok\nprec_ok\n");
 }
 
-// No argument: $timeprecision reports the precision of the current scope
-// (1 ps -> -12), distinct from the time unit.
-TEST(TimescaleSystemFunctions, TimeprecisionNoArgReturnsCurrentScopePrecision) {
-  SysTaskFixture f;
-  f.ctx.SetCurrentTimeScale(TimeScale{TimeUnit::kNs, 10, TimeUnit::kPs, 1});
-  EXPECT_EQ(EvalOrder(f, MkSysCall(f.arena, "$timeprecision", {})), -12);
+// A named argument resolves the *named* child instance, not the calling scope:
+// the parent runs at 1ns/1ns while the instance c1 declares 100ps/10fs, so
+// $timeunit(c1)/$timeprecision(c1) report the child's -10 and -14.
+TEST(TimescaleSystemFunctions, NamedInstanceArgumentReportsChildTimescale) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module child;\n"
+      "  timeunit 100ps / 10fs;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  child c1();\n"
+      "  initial begin\n"
+      "    if ($timeunit(c1) == -10) $display(\"unit_ok\");\n"
+      "    if ($timeprecision(c1) == -14) $display(\"prec_ok\");\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "unit_ok\nprec_ok\n");
 }
 
-// A named design-element argument reports that element's timescale
-// (100 us -> -4).
-TEST(TimescaleSystemFunctions, TimeunitNamedElementArgument) {
-  SysTaskFixture f;
-  f.ctx.SetScopeTimeScale("dut",
-                          TimeScale{TimeUnit::kUs, 100, TimeUnit::kNs, 1});
-  auto* call = MkSysCall(f.arena, "$timeunit", {MkId(f.arena, "dut")});
-  EXPECT_EQ(EvalOrder(f, call), -4);
-}
-
-// The $unit argument reports the compilation unit's timescale (1 s -> 0 unit,
-// 1 ms -> -3 precision).
+// The $unit argument reports the compilation unit's timescale, set here by a
+// compilation-unit-scope `timeunit 1s/1ms` declaration (order 0 and -3).
 TEST(TimescaleSystemFunctions, UnitArgumentReportsCompilationUnit) {
-  SysTaskFixture f;
-  f.ctx.SetCompUnitTimeScale(TimeScale{TimeUnit::kS, 1, TimeUnit::kMs, 1});
-  auto* unit = MkSysCall(f.arena, "$timeunit", {MkScopeArg(f.arena, "$unit")});
-  auto* prec =
-      MkSysCall(f.arena, "$timeprecision", {MkScopeArg(f.arena, "$unit")});
-  EXPECT_EQ(EvalOrder(f, unit), 0);
-  EXPECT_EQ(EvalOrder(f, prec), -3);
+  SimFixture f;
+  std::string out = RunCapture(
+      "timeunit 1s / 1ms;\n"
+      "module top;\n"
+      "  initial begin\n"
+      "    if ($timeunit($unit) == 0) $display(\"unit_ok\");\n"
+      "    if ($timeprecision($unit) == -3) $display(\"prec_ok\");\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "unit_ok\nprec_ok\n");
 }
 
-// The $root argument yields the simulation time unit for both functions.
-TEST(TimescaleSystemFunctions, RootArgumentReturnsSimulationTimeUnit) {
-  SysTaskFixture f;
-  f.ctx.SetGlobalPrecision(TimeUnit::kFs);
-  auto* unit = MkSysCall(f.arena, "$timeunit", {MkScopeArg(f.arena, "$root")});
-  auto* prec =
-      MkSysCall(f.arena, "$timeprecision", {MkScopeArg(f.arena, "$root")});
-  EXPECT_EQ(EvalOrder(f, unit), -15);
-  EXPECT_EQ(EvalOrder(f, prec), -15);
+// The $root argument yields the simulation time unit for both functions — the
+// smallest precision across the design (§3.14.3). With the module declaring a
+// 1ps precision, both report -12.
+TEST(TimescaleSystemFunctions, RootArgumentReportsSimulationTimeUnit) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module top;\n"
+      "  timeunit 1ns / 1ps;\n"
+      "  initial begin\n"
+      "    if ($timeunit($root) == -12) $display(\"unit_ok\");\n"
+      "    if ($timeprecision($root) == -12) $display(\"prec_ok\");\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "unit_ok\nprec_ok\n");
 }
 
-// Edge case: with no timescale configured the current scope defaults to 1 ns,
-// so both functions report -9.
-TEST(TimescaleSystemFunctions, DefaultCurrentScopeIsNanosecond) {
-  SysTaskFixture f;
-  EXPECT_EQ(EvalOrder(f, MkSysCall(f.arena, "$timeunit", {})), -9);
-  EXPECT_EQ(EvalOrder(f, MkSysCall(f.arena, "$timeprecision", {})), -9);
-}
-
-// Edge case: a magnitude of 10 or 100 raises the Table 20-2 order by one or
-// two, producing the off-decade values (10 s -> 1, 100 ns -> -7, 100 ms -> -1).
+// A magnitude of 10 or 100 shifts the Table 20-2 order up by one or two. Here
+// 10s -> 1 for the unit and 100ns -> -7 for the precision, exercising the
+// off-decade rows the plain 1-magnitude cases never reach.
 TEST(TimescaleSystemFunctions, MagnitudeMultiplierShiftsTableOrder) {
-  SysTaskFixture f;
-  f.ctx.SetCurrentTimeScale(TimeScale{TimeUnit::kS, 10, TimeUnit::kNs, 100});
-  EXPECT_EQ(EvalOrder(f, MkSysCall(f.arena, "$timeunit", {})), 1);
-  EXPECT_EQ(EvalOrder(f, MkSysCall(f.arena, "$timeprecision", {})), -7);
-  f.ctx.SetCurrentTimeScale(TimeScale{TimeUnit::kMs, 100, TimeUnit::kMs, 1});
-  EXPECT_EQ(EvalOrder(f, MkSysCall(f.arena, "$timeunit", {})), -1);
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  timeunit 10s / 100ns;\n"
+      "  initial begin\n"
+      "    if ($timeunit == 1) $display(\"unit_ok\");\n"
+      "    if ($timeprecision == -7) $display(\"prec_ok\");\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "unit_ok\nprec_ok\n");
 }
 
-// The return value is an integer within the Table 20-2 range of 2 to -15.
-TEST(TimescaleSystemFunctions, ReturnValueWithinTableRange) {
-  SysTaskFixture f;
-  f.ctx.SetCurrentTimeScale(TimeScale{TimeUnit::kS, 100, TimeUnit::kFs, 1});
-  int32_t unit = EvalOrder(f, MkSysCall(f.arena, "$timeunit", {}));
-  int32_t prec = EvalOrder(f, MkSysCall(f.arena, "$timeprecision", {}));
-  EXPECT_EQ(unit, 2);    // 100 s, the maximum
-  EXPECT_EQ(prec, -15);  // 1 fs, the minimum
-  EXPECT_LE(unit, 2);
-  EXPECT_GE(prec, -15);
+// With no timescale declared anywhere the current scope defaults to 1ns, so
+// both functions report -9.
+TEST(TimescaleSystemFunctions, DefaultCurrentScopeIsNanosecond) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  initial begin\n"
+      "    if ($timeunit == -9) $display(\"unit_ok\");\n"
+      "    if ($timeprecision == -9) $display(\"prec_ok\");\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "unit_ok\nprec_ok\n");
+}
+
+// The returned order stays within the Table 20-2 range of 2 to -15: the
+// coarsest unit (100s -> 2) and the finest precision (1fs -> -15) sit at the
+// two extremes.
+TEST(TimescaleSystemFunctions, ReturnValueSpansTableRange) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  timeunit 100s / 1fs;\n"
+      "  initial begin\n"
+      "    if ($timeunit == 2) $display(\"unit_ok\");\n"
+      "    if ($timeprecision == -15) $display(\"prec_ok\");\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "unit_ok\nprec_ok\n");
 }
 
 }  // namespace

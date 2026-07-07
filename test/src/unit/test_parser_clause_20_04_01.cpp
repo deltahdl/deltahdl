@@ -49,4 +49,17 @@ TEST(TimescaleSystemFunctions, TimeprecisionParsesRootArgument) {
   ASSERT_EQ(call->args.size(), 1u);
 }
 
+// The $unit compilation-unit-scope argument is the remaining special argument
+// form. A bare $unit parses as its own scope system call, so it appears as the
+// single argument node the call carries.
+TEST(TimescaleSystemFunctions, TimeunitParsesUnitArgument) {
+  auto r = Parse("module m; initial x = $timeunit($unit); endmodule");
+  const Expr* call = RhsOf(r);
+  ASSERT_EQ(call->kind, ExprKind::kSystemCall);
+  EXPECT_EQ(call->callee, "$timeunit");
+  ASSERT_EQ(call->args.size(), 1u);
+  ASSERT_EQ(call->args[0]->kind, ExprKind::kSystemCall);
+  EXPECT_EQ(call->args[0]->callee, "$unit");
+}
+
 }  // namespace

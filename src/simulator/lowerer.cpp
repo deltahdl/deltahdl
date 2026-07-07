@@ -876,6 +876,18 @@ static void InitPackageDataVariables(const RtlirDesign* design, SimContext& ctx,
   }
 }
 
+// §20.4.1: publish each design element's resolved timescale under its module
+// name and instance name so a $timeunit/$timeprecision argument that names the
+// element (e.g. $timeunit(dut)) reports that element's value.
+static void RegisterScopeTimescales(const RtlirModule* mod, SimContext& ctx) {
+  ctx.SetScopeTimeScale(mod->name, mod->timescale);
+  for (const auto& child : mod->children) {
+    if (!child.resolved) continue;
+    ctx.SetScopeTimeScale(child.inst_name, child.resolved->timescale);
+    RegisterScopeTimescales(child.resolved, ctx);
+  }
+}
+
 static void RegisterFreeCuFunctions(const RtlirDesign* design,
                                     SimContext& ctx) {
   for (auto* item : design->cu_function_decls) {
@@ -915,6 +927,20 @@ void Lowerer::Lower(const RtlirDesign* design) {
   // it.
   if (!design->top_modules.empty()) {
     ctx_.SetInteractiveScope(design->top_modules.front()->name);
+  }
+  // §20.4.1 / §3.14.3: seed the runtime timescale state read by
+  // $timeunit/$timeprecision. The simulation time unit and compilation-unit
+  // timescale come from the design; the top module is the initial current
+  // scope reported when those functions take no argument.
+  ctx_.SetGlobalPrecision(design->global_time_precision);
+  ctx_.SetCompUnitTimeScale(design->cu_timescale);
+  if (!design->top_modules.empty()) {
+    const RtlirModule* top = design->top_modules.front();
+    ctx_.SetCurrentTimeScale(top->timescale);
+    ctx_.SetCurrentScopeName(top->name);
+  }
+  for (auto* top : design->top_modules) {
+    RegisterScopeTimescales(top, ctx_);
   }
   RegisterDesignTypeWidths(design, ctx_);
   InitPackageDataVariables(design, ctx_, arena_);

@@ -211,6 +211,11 @@ struct RtlirModule {
   std::vector<ResolvedAttribute> attrs;
   DelayModeDirective delay_mode = DelayModeDirective::kNone;
 
+  // §20.4.1: the time unit and precision reported for this design element by
+  // $timeunit/$timeprecision. Resolved from the element's own timeunit/
+  // timeprecision declarations, falling back to the compilation unit's.
+  TimeScale timescale;
+
   std::vector<RtlirPort> ports;
   std::vector<RtlirNet> nets;
   std::vector<RtlirVariable> variables;
@@ -241,6 +246,14 @@ struct RtlirDesign {
   std::vector<PackageDecl*> packages;
 
   std::vector<ClassDecl*> cu_class_decls;
+
+  // §20.4.1: the compilation unit's time unit and precision, reported by
+  // $timeunit/$timeprecision when the $unit argument is supplied.
+  TimeScale cu_timescale;
+
+  // §3.14.3 / §20.4.1: the simulation time unit (the smallest time precision
+  // across the design), reported by $timeunit/$timeprecision with $root.
+  TimeUnit global_time_precision = TimeUnit::kNs;
 
   // §20.10.1: set when a $fatal or $error elaboration severity task is
   // executed. Simulation shall not be started against a design whose
