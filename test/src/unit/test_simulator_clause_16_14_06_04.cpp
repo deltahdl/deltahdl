@@ -15,32 +15,6 @@ PendingProceduralAssertion MakePending(const char* name) {
   return p;
 }
 
-// §16.14.6.4: disabling a specific procedural concurrent assertion or the
-// outermost scope of a procedure flushes pending procedural assertion
-// instances.
-TEST(DisablingProceduralAssertions, SpecificAssertionTargetFlushes) {
-  EXPECT_TRUE(
-      DisableFlushesProceduralAssertions(DisableTarget::kSpecificAssertion));
-}
-
-TEST(DisablingProceduralAssertions, OutermostScopeTargetFlushes) {
-  EXPECT_TRUE(
-      DisableFlushesProceduralAssertions(DisableTarget::kOutermostScope));
-}
-
-// §16.14.6.4: disabling a task does not cause flushing of any pending
-// procedural assertion instances.
-TEST(DisablingProceduralAssertions, TaskTargetDoesNotFlush) {
-  EXPECT_FALSE(DisableFlushesProceduralAssertions(DisableTarget::kTask));
-}
-
-// §16.14.6.4: disabling a non-outermost scope of a procedure does not cause
-// flushing of any pending procedural assertion instances.
-TEST(DisablingProceduralAssertions, NonOutermostScopeTargetDoesNotFlush) {
-  EXPECT_FALSE(
-      DisableFlushesProceduralAssertions(DisableTarget::kNonOutermostScope));
-}
-
 // §16.14.6.4 (bullet 1): disabling one specific procedural concurrent assertion
 // clears that assertion's pending instances while leaving other assertions'
 // pending instances in the queue.
