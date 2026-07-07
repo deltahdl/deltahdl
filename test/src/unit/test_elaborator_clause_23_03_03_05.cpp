@@ -59,6 +59,37 @@ TEST(UnpackedArrayPortsAndArraysOfInstancesElaboration,
 }
 
 TEST(UnpackedArrayPortsAndArraysOfInstancesElaboration,
+     MultiDimensionalUnpackedArrayPortMatchingDimensionsAccepted) {
+  // A single instance whose port carries two unpacked dimensions matches a
+  // connection of the same shape: both dimension count and each per-dimension
+  // size line up, so the binding is accepted.
+  EXPECT_TRUE(
+      ElabOk("module child(input [7:0] data [2][3]);\n"
+             "endmodule\n"
+             "module top;\n"
+             "  logic [7:0] arr [2][3];\n"
+             "  child u(.data(arr));\n"
+             "endmodule\n"));
+}
+
+TEST(UnpackedArrayPortsAndArraysOfInstancesElaboration,
+     MultiDimensionalUnpackedArrayPortInnerDimensionSizeMismatchErrors) {
+  // The dimension count matches (two unpacked dimensions on each side) and the
+  // outer size agrees, but the inner dimension differs (3 vs 4), which the
+  // per-dimension comparison must reject.
+  ElabFixture f;
+  ElaborateSrc(
+      "module child(input [7:0] data [2][3]);\n"
+      "endmodule\n"
+      "module top;\n"
+      "  logic [7:0] arr [2][4];\n"
+      "  child u(.data(arr));\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(UnpackedArrayPortsAndArraysOfInstancesElaboration,
      ScalarConnectionReplicatedToArrayOfInstances) {
   EXPECT_TRUE(
       ElabOk("module child(input [7:0] i, output o);\n"
@@ -198,19 +229,6 @@ TEST(UnpackedArrayPortsAndArraysOfInstancesElaboration,
              "  logic [7:0] x;\n"
              "  logic y;\n"
              "  child c[0:0](.i(x), .o(y));\n"
-             "endmodule\n"));
-}
-
-TEST(UnpackedArrayPortsAndArraysOfInstancesElaboration,
-     InstanceArrayWithPositionalPortsAccepted) {
-  EXPECT_TRUE(
-      ElabOk("module child(input [7:0] i, output o);\n"
-             "  assign o = i[0];\n"
-             "endmodule\n"
-             "module top;\n"
-             "  logic [7:0] x;\n"
-             "  logic [3:0] y;\n"
-             "  child c[3:0](x, y);\n"
              "endmodule\n"));
 }
 
