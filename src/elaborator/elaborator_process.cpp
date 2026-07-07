@@ -459,4 +459,79 @@ void Elaborator::CheckAlwaysCombMultiDriver(const ModuleDecl* decl,
   CheckDriverConflicts(procs, cont_assign_lhs, diag_);
 }
 
+// §6.5: the single-driver rule is stated per term of a variable's longest
+// static prefix, so distinct elements of an aggregate (a struct member or an
+// array/part-select element) are independent driver targets. The name-keyed
+// cross-checks (ValidateContAssignIdentLhs / ValidateMixedAssignments) collapse
+// every element to the base variable name and so can only police whole-variable
+// targets; CheckAlwaysCombMultiDriver covers element granularity but only for
+// always_comb/always_latch/always_ff processes. This pass closes the remaining
+// gap for a continuous assignment whose target is an aggregate element: it
+// flags a second continuous driver, or a general procedural (initial / always)
+// driver, whose longest static prefix overlaps. Prefixes that are bare
+// identifiers stay with the name-keyed checks, and always_comb/latch/ff
+// processes stay with CheckAlwaysCombMultiDriver, so no conflict is reported
+// twice.
+void Elaborator::CheckAggregateElementDrivers(const ModuleDecl* decl,
+                                              RtlirModule* mod) {
+  ScopeMap scope = mod ? BuildParamScope(mod) : ScopeMap{};
+
+  struct ContTarget {
+    std::string prefix;
+    bool aggregate;
+    SourceLoc loc;
+  };
+  std::vector<ContTarget> conts;
+  std::unordered_set<std::string> proc_prefixes;
+
+  for (const auto* item : decl->items) {
+    if (item->kind == ModuleItemKind::kContAssign && item->assign_lhs) {
+      std::string prefix = LongestStaticPrefix(item->assign_lhs, scope);
+      if (prefix.empty()) continue;
+      bool aggregate = prefix.find('.') != std::string::npos ||
+                       prefix.find('[') != std::string::npos;
+      conts.push_back({std::move(prefix), aggregate, item->loc});
+    }
+    // Only general initial/always blocks are gathered here; always_comb,
+    // always_latch, and always_ff are already handled by
+    // CheckAlwaysCombMultiDriver.
+    if (item->kind == ModuleItemKind::kInitialBlock ||
+        item->kind == ModuleItemKind::kAlwaysBlock) {
+      CollectStmtLhsPrefixes(item->body, proc_prefixes, scope);
+    }
+  }
+
+  // Multiple continuous assignments writing to overlapping element prefixes.
+  // Whole-identifier vs whole-identifier pairs are already diagnosed by
+  // ValidateContAssignIdentLhs, so at least one side of a reported pair must be
+  // an aggregate element.
+  for (size_t i = 0; i < conts.size(); ++i) {
+    for (size_t j = i + 1; j < conts.size(); ++j) {
+      if (!conts[i].aggregate && !conts[j].aggregate) continue;
+      if (PrefixesOverlap(conts[i].prefix, conts[j].prefix)) {
+        diag_.Error(conts[j].loc,
+                    std::format("multiple continuous assignments drive "
+                                "overlapping element '{}'",
+                                conts[j].prefix));
+      }
+    }
+  }
+
+  // A continuous assignment to an aggregate element mixed with a procedural
+  // driver of an overlapping prefix. The whole-identifier form is handled by
+  // ValidateMixedAssignments, so only aggregate continuous targets are checked.
+  for (const auto& ct : conts) {
+    if (!ct.aggregate) continue;
+    for (const auto& pp : proc_prefixes) {
+      if (PrefixesOverlap(ct.prefix, pp)) {
+        diag_.Error(ct.loc,
+                    std::format("element '{}' has both a continuous assignment "
+                                "and a procedural assignment",
+                                ct.prefix));
+        break;
+      }
+    }
+  }
+}
+
 }  // namespace delta

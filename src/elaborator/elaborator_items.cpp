@@ -958,6 +958,7 @@ void Elaborator::DefaultPackageTaskFuncLifetimes() {
 void Elaborator::RunPostItemValidations(const ModuleDecl* decl,
                                         RtlirModule* mod) {
   CheckAlwaysCombMultiDriver(decl, mod);
+  CheckAggregateElementDrivers(decl, mod);
   ValidateModuleConstraints(decl, mod);
   ValidateValueParams(decl, mod);
   ValidateLhsPatternWidths(decl, mod);

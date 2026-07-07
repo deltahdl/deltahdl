@@ -451,6 +451,8 @@ class Elaborator {
 
   void CheckAlwaysCombMultiDriver(const ModuleDecl* decl, RtlirModule* mod);
 
+  void CheckAggregateElementDrivers(const ModuleDecl* decl, RtlirModule* mod);
+
   void ValidateDisableTargets(const ModuleDecl* decl);
 
   void ValidateFunctionBody(const ModuleItem* item);
