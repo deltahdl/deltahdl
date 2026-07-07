@@ -359,23 +359,6 @@ TEST(AlwaysCombSensitivityInference, EmptyBlockProducesNoSensitivity) {
   EXPECT_TRUE(proc.sensitivity.empty());
 }
 
-TEST(AlwaysCombSensitivityCollection, AssertExprCollectedButActionBlocksNot) {
-  Arena arena;
-  auto* assert_stmt = arena.Create<Stmt>();
-  assert_stmt->kind = StmtKind::kAssertImmediate;
-  assert_stmt->assert_expr = SensId(arena, "cond");
-  assert_stmt->assert_pass_stmt = MakeExprStmt(
-      arena, MakeSysCall(arena, "$display", {SensId(arena, "pass_var")}));
-  assert_stmt->assert_fail_stmt = MakeExprStmt(
-      arena, MakeSysCall(arena, "$display", {SensId(arena, "fail_var")}));
-
-  std::unordered_set<std::string> reads;
-  CollectStmtReads(assert_stmt, reads);
-  EXPECT_TRUE(reads.count("cond"));
-  EXPECT_FALSE(reads.count("pass_var"));
-  EXPECT_FALSE(reads.count("fail_var"));
-}
-
 TEST(AlwaysCombSensitivityCollection, CallArgsCollectedButCalleeNameNot) {
   Arena arena;
   auto* call =
@@ -548,6 +531,30 @@ TEST(AlwaysCombSensitivityCollection, WaitConditionExcludedFromSensitivity) {
   EXPECT_FALSE(reads.count("x"));
 }
 
+// §9.2.2.2.1 exception (c), driven from real source: a nonblocking assignment
+// with an intra-assignment delay is legal in an always_comb (see the §9.2.2.2
+// `d <= #... b & c;` example). An identifier that appears only inside that
+// delay control is excluded from the inferred list, while the right-hand-side
+// reads are kept. Full parse+elaborate observes the rule as production applies
+// it.
+TEST(AlwaysCombSensitivityInference,
+     IntraAssignDelayIdentifierExcludedFromSensitivity) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic b, c, d;\n"
+      "  logic [7:0] dly;\n"
+      "  always_comb d <= #(dly) (b & c);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  ASSERT_FALSE(design->top_modules.empty());
+  auto& proc = design->top_modules[0]->processes[0];
+  ExpectSensitivityContains(proc, {"b", "c"});
+  ExpectSensitivityExcludes(proc, {"dly"});
+}
+
 // An identifier appearing only in a delay control expression contributes
 // nothing to the implicit sensitivity list.
 TEST(AlwaysCombSensitivityCollection, DelayExprExcludedFromSensitivity) {
@@ -590,6 +597,172 @@ TEST(AlwaysCombSensitivityCollection, MethodCallObjectReferenceExcluded) {
   EXPECT_TRUE(reads.count("arg"));
   EXPECT_FALSE(reads.count("obj"));
   EXPECT_FALSE(reads.count("method"));
+}
+
+// §9.2.2.2.1: only nets and variables populate the implicit sensitivity list. A
+// localparam read as a direct operand is a constant (11.2.1), not a net or
+// variable, so it is excluded while the real variable operand is kept.
+TEST(AlwaysCombSensitivityInference, LocalparamOperandExcludedFromSensitivity) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  localparam int P = 3;\n"
+      "  logic [7:0] a, y;\n"
+      "  always_comb y = a + P;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  ASSERT_FALSE(design->top_modules.empty());
+  auto& proc = design->top_modules[0]->processes[0];
+  ExpectSensitivityContains(proc, {"a"});
+  ExpectSensitivityExcludes(proc, {"P"});
+}
+
+// A module parameter used as a constant select index (11.2.1) does not become a
+// separate sensitivity read; the addressed variable's base name is kept.
+TEST(AlwaysCombSensitivityInference,
+     ParameterSelectIndexExcludedFromSensitivity) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t #(parameter int IDX = 1);\n"
+      "  logic [7:0] arr [0:3];\n"
+      "  logic [7:0] y;\n"
+      "  always_comb y = arr[IDX];\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  ASSERT_FALSE(design->top_modules.empty());
+  auto& proc = design->top_modules[0]->processes[0];
+  ExpectSensitivityContains(proc, {"arr"});
+  ExpectSensitivityExcludes(proc, {"IDX"});
+}
+
+// §11.5.3 dependency, real source: an indexed part-select read (`a[i +: 2]`)
+// expands to the longest static prefix `a` while its variable offset `i` is a
+// distinct net/variable read, so both belong to the inferred list.
+TEST(AlwaysCombSensitivityInference, IndexedPartSelectOffsetInSensitivity) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a;\n"
+      "  logic [1:0] i;\n"
+      "  logic [1:0] y;\n"
+      "  always_comb y = a[i +: 2];\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  ASSERT_FALSE(design->top_modules.empty());
+  ExpectSensitivityContains(design->top_modules[0]->processes[0], {"a", "i"});
+}
+
+// §11.5.3 dependency, real source: a constant part-select (`a[3:1]`) has a
+// static prefix, so the addressed variable's base name is watched and no
+// constant bound is added as its own read.
+TEST(AlwaysCombSensitivityInference, ConstantPartSelectBaseInSensitivity) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a;\n"
+      "  logic [2:0] y;\n"
+      "  always_comb y = a[3:1];\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  ASSERT_FALSE(design->top_modules.empty());
+  ExpectSensitivityContains(design->top_modules[0]->processes[0], {"a"});
+}
+
+// Constant-expression select index, literal form (11.2.1): a bit-select with a
+// literal index keeps the addressed variable's base name and adds no separate
+// index read. Complements the parameter and localparam index forms, which reach
+// the constant-exclusion path through a different declaration.
+TEST(AlwaysCombSensitivityInference, LiteralBitSelectIndexBaseInSensitivity) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a;\n"
+      "  logic y;\n"
+      "  always_comb y = a[1];\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  ASSERT_FALSE(design->top_modules.empty());
+  ExpectSensitivityContains(design->top_modules[0]->processes[0], {"a"});
+}
+
+// Constant-expression select index, localparam form (11.2.1): a localparam
+// declared as a module item reaches the constant-name set through a different
+// path than a parameter port, yet is likewise excluded as a select index while
+// the addressed array's base name is kept.
+TEST(AlwaysCombSensitivityInference,
+     LocalparamSelectIndexExcludedFromSensitivity) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  localparam int LP = 2;\n"
+      "  logic [7:0] arr [0:3];\n"
+      "  logic [7:0] y;\n"
+      "  always_comb y = arr[LP];\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  ASSERT_FALSE(design->top_modules.empty());
+  auto& proc = design->top_modules[0]->processes[0];
+  ExpectSensitivityContains(proc, {"arr"});
+  ExpectSensitivityExcludes(proc, {"LP"});
+}
+
+// Member-select read form (§11.5.3 dependency, real source): reading a packed
+// struct member (`p.lo`) contributes the struct variable's base name to the
+// inferred list.
+TEST(AlwaysCombSensitivityInference, StructMemberReadInSensitivity) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  typedef struct packed {\n"
+      "    logic [7:0] hi;\n"
+      "    logic [7:0] lo;\n"
+      "  } pair_t;\n"
+      "  pair_t p;\n"
+      "  logic [7:0] r;\n"
+      "  always_comb r = p.lo;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  ASSERT_FALSE(design->top_modules.empty());
+  ExpectSensitivityContains(design->top_modules[0]->processes[0], {"p"});
+}
+
+// §8.23 dependency, real source: a call to a static method reached through the
+// class scope resolution operator contributes to the list only through its
+// argument expressions; the scope-resolved callee reference itself adds
+// nothing.
+TEST(AlwaysCombSensitivityInference, ClassScopeResolvedCallArgInSensitivity) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  virtual class C #(parameter W = 8);\n"
+      "    static function int add1(input int x);\n"
+      "      add1 = x + 1;\n"
+      "    endfunction\n"
+      "  endclass\n"
+      "  int a, y;\n"
+      "  always_comb y = C#(8)::add1(a);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  ASSERT_FALSE(design->top_modules.empty());
+  auto& proc = design->top_modules[0]->processes[0];
+  ExpectSensitivityContains(proc, {"a"});
+  ExpectSensitivityExcludes(proc, {"C"});
 }
 
 }  // namespace

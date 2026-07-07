@@ -226,7 +226,8 @@ static void ValidateFinalProcess(ModuleItem* item, const RtlirProcess& proc,
 
 static RtlirProcess BuildProcessWithSensitivity(
     RtlirProcessKind kind, ModuleItem* item, Arena& arena,
-    const std::unordered_map<std::string_view, const ModuleItem*>* func_map) {
+    const std::unordered_map<std::string_view, const ModuleItem*>* func_map,
+    const std::unordered_set<std::string_view>* const_names) {
   RtlirProcess proc;
   proc.kind = kind;
   proc.body = item->body;
@@ -235,11 +236,13 @@ static RtlirProcess BuildProcessWithSensitivity(
   bool needs_infer = (kind == RtlirProcessKind::kAlwaysComb ||
                       kind == RtlirProcessKind::kAlwaysLatch);
   if (needs_infer && proc.sensitivity.empty()) {
-    proc.sensitivity = InferSensitivity(proc.body, arena, func_map);
+    proc.sensitivity =
+        InferSensitivity(proc.body, arena, func_map, true, const_names);
   }
   if (kind == RtlirProcessKind::kAlways && item->is_star_sensitivity &&
       proc.sensitivity.empty()) {
-    proc.sensitivity = InferSensitivity(proc.body, arena, nullptr, false);
+    proc.sensitivity =
+        InferSensitivity(proc.body, arena, nullptr, false, const_names);
   }
   return proc;
 }
@@ -263,8 +266,8 @@ static void ValidateProcess(RtlirProcessKind kind, ModuleItem* item,
 
 void AddProcess(RtlirProcessKind kind, ModuleItem* item, RtlirModule* mod,
                 const ProcessBuildEnv& env) {
-  RtlirProcess proc =
-      BuildProcessWithSensitivity(kind, item, env.arena, env.func_map);
+  RtlirProcess proc = BuildProcessWithSensitivity(
+      kind, item, env.arena, env.func_map, env.const_names);
   ValidateProcess(kind, item, proc, env.diag);
   proc.attrs = ResolveAttributes(item->attrs, env.diag);
   mod->processes.push_back(proc);

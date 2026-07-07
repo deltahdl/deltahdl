@@ -259,7 +259,7 @@ static std::vector<EventExpr> BuildSensitivityEvents(
     const std::unordered_set<std::string>& reads,
     const std::unordered_set<std::string>& locals,
     const std::unordered_set<std::string>& written, bool exclude_written,
-    Arena& arena) {
+    const std::unordered_set<std::string_view>* const_names, Arena& arena) {
   std::vector<EventExpr> events;
   events.reserve(reads.size());
   // The read names retain their longest static prefix for the locals/written
@@ -270,6 +270,11 @@ static std::vector<EventExpr> BuildSensitivityEvents(
     if (locals.count(name)) continue;
     if (exclude_written && written.count(name)) continue;
     std::string_view base = BaseSignalName(name);
+    // §9.2.2.2.1: only nets and variables populate the list. A read of a
+    // parameter/localparam/specparam (the base of the prefix, or a constant
+    // select index that survived as its own read) is dropped -- a constant
+    // never changes, so it cannot be part of a sensitivity list.
+    if (const_names && const_names->count(base)) continue;
     if (base.empty() || !emitted.insert(base).second) continue;
     auto* expr = arena.Create<Expr>();
     expr->kind = ExprKind::kIdentifier;
@@ -280,9 +285,9 @@ static std::vector<EventExpr> BuildSensitivityEvents(
   return events;
 }
 
-std::vector<EventExpr> InferSensitivity(const Stmt* body, Arena& arena,
-                                        const FuncMap* funcs,
-                                        bool exclude_written) {
+std::vector<EventExpr> InferSensitivity(
+    const Stmt* body, Arena& arena, const FuncMap* funcs, bool exclude_written,
+    const std::unordered_set<std::string_view>* const_names) {
   SignalSets sigs;
   CollectStmtReads(body, sigs.reads);
   CollectBlockLocalNames(body, sigs.locals);
@@ -295,7 +300,7 @@ std::vector<EventExpr> InferSensitivity(const Stmt* body, Arena& arena,
   }
 
   return BuildSensitivityEvents(sigs.reads, sigs.locals, sigs.written,
-                                exclude_written, arena);
+                                exclude_written, const_names, arena);
 }
 
 }  // namespace delta

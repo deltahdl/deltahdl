@@ -496,7 +496,7 @@ bool Elaborator::ElaborateDeclItem(ModuleItem* item, RtlirModule* mod) {
 // Processes, generates, subroutines, assertions, and remaining items (§9, §16,
 // §13, §27).
 bool Elaborator::ElaborateBehavioralItem(ModuleItem* item, RtlirModule* mod) {
-  const ProcessBuildEnv kEnv{arena_, diag_, &func_decls_};
+  const ProcessBuildEnv kEnv{arena_, diag_, &func_decls_, &const_names_};
   switch (item->kind) {
     case ModuleItemKind::kInitialBlock:
       AddProcess(RtlirProcessKind::kInitial, item, mod,
@@ -562,7 +562,7 @@ bool Elaborator::ElaborateBehavioralItem(ModuleItem* item, RtlirModule* mod) {
 }
 
 bool Elaborator::ElaborateAssertionItem(ModuleItem* item, RtlirModule* mod) {
-  const ProcessBuildEnv kEnv{arena_, diag_, &func_decls_};
+  const ProcessBuildEnv kEnv{arena_, diag_, &func_decls_, &const_names_};
   // §16.6: an expression appearing in a concurrent assertion shall not
   // reference a variable of chandle type. A concurrent assertion statement
   // (assert/assume/cover/restrict property) keeps its property_spec expression

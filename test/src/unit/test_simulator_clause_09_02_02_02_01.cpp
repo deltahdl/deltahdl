@@ -248,6 +248,95 @@ TEST(AlwaysCombSensitivitySim, FunctionCallBodyReadRetriggers) {
   EXPECT_EQ(var->value.ToUint64(), 25u);
 }
 
+// §11.5.3 dependency end-to-end: an indexed part-select `a[i +: 4]` reads both
+// the array base and the offset `i`. Changing only `i` must retrigger the block
+// (the offset is in the runtime sensitivity), so the selected slice updates.
+TEST(AlwaysCombSensitivitySim, IndexedPartSelectOffsetRetriggers) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a;\n"
+      "  logic [1:0] i;\n"
+      "  logic [3:0] y;\n"
+      "  always_comb y = a[i +: 4];\n"
+      "  initial begin\n"
+      "    a = 8'b1011_0100;\n"
+      "    i = 2'd0;\n"
+      "    #1 i = 2'd2;\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* y = f.ctx.FindVariable("y");
+  ASSERT_NE(y, nullptr);
+  // a[5:2] of 1011_0100 is 1101 == 13.
+  EXPECT_EQ(y->value.ToUint64(), 13u);
+}
+
+// §8.23 dependency end-to-end: a static method called through the class scope
+// resolution operator picks up its argument as a sensitivity contributor, so a
+// change to that argument retriggers the block and the result propagates.
+TEST(AlwaysCombSensitivitySim, ClassStaticMethodCallArgRetriggers) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  virtual class C #(parameter W = 8);\n"
+      "    static function int add1(input int x);\n"
+      "      add1 = x + 1;\n"
+      "    endfunction\n"
+      "  endclass\n"
+      "  int a, y;\n"
+      "  always_comb y = C#(8)::add1(a);\n"
+      "  initial begin\n"
+      "    a = 5;\n"
+      "    #1 a = 9;\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* y = f.ctx.FindVariable("y");
+  ASSERT_NE(y, nullptr);
+  EXPECT_EQ(y->value.ToUint64(), 10u);
+}
+
+// §11.5.3 dependency end-to-end: a packed-struct member read `p.lo` puts the
+// struct variable in the runtime sensitivity, so changing the struct retriggers
+// the block and the member value propagates.
+TEST(AlwaysCombSensitivitySim, StructMemberChangeRetriggers) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  typedef struct packed {\n"
+      "    logic [7:0] hi;\n"
+      "    logic [7:0] lo;\n"
+      "  } pair_t;\n"
+      "  pair_t p;\n"
+      "  logic [7:0] r;\n"
+      "  always_comb r = p.lo;\n"
+      "  initial begin\n"
+      "    p = 16'hAABB;\n"
+      "    #1 p = 16'hCCDD;\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* r = f.ctx.FindVariable("r");
+  ASSERT_NE(r, nullptr);
+  EXPECT_EQ(r->value.ToUint64(), 0xDDu);
+}
+
 TEST(AlwaysCombSensitivitySim, TaskCallInAlwaysCombExecutes) {
   SimFixture f;
   auto* design = ElaborateSrc(

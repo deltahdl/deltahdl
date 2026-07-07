@@ -4,6 +4,7 @@
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include "elaborator/const_eval.h"
@@ -36,6 +37,10 @@ struct ProcessBuildEnv {
   DiagEngine& diag;
   const std::unordered_map<std::string_view, const ModuleItem*>* func_map =
       nullptr;
+  // §9.2.2.2.1: names that are elaboration-time constants (parameters,
+  // localparams, specparams) so the inferred sensitivity list can drop them --
+  // only nets and variables belong in the list.
+  const std::unordered_set<std::string_view>* const_names = nullptr;
 };
 void AddProcess(RtlirProcessKind kind, ModuleItem* item, RtlirModule* mod,
                 const ProcessBuildEnv& env);
