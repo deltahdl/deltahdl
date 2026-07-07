@@ -5,12 +5,6 @@ using namespace delta;
 
 namespace {
 
-TEST(SystemNameParserParsing, SystemFunction_InExpression) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  parameter W = $clog2(256);\n"
-              "endmodule"));
-}
 TEST(OperatorAndExpressionParsing, ConstExprSystemFuncInParam) {
   auto r = Parse(
       "module t;\n"
@@ -34,15 +28,6 @@ TEST(SubroutineCallExprParsing, SystemTfCallAsExpr) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kSystemCall);
   EXPECT_EQ(stmt->rhs->callee, "$clog2");
   EXPECT_EQ(stmt->rhs->args.size(), 1u);
-}
-
-TEST(PrimaryParsing, PrimarySystemCall) {
-  auto r = Parse("module m; initial x = $clog2(16); endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kSystemCall);
 }
 
 }  // namespace

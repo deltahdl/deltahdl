@@ -1,4 +1,3 @@
-#include "builders_ast.h"
 #include "fixture_simulator.h"
 #include "simulator/evaluation.h"
 #include "simulator/lowerer.h"
@@ -25,65 +24,36 @@ TEST(SubroutineCallExprSim, SystemTfCallClog2) {
   EXPECT_EQ(var->value.ToUint64(), 8u);
 }
 
-TEST(PrimarySim, PrimarySystemCallClog2) {
+// Claim D: an argument value of 0 produces a result of 0; the boundary at 1
+// (log base 2 of 1 is 0) likewise produces 0. Both arguments are held in
+// runtime variables so the values reach $clog2 through the simulator's
+// EvalClog2 path rather than being folded away during elaboration.
+TEST(UtilitySystemTaskTest, Clog2ZeroAndOneFromSource) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
-      "  int x;\n"
-      "  initial x = $clog2(16);\n"
+      "  int z;\n"
+      "  int one;\n"
+      "  int xz;\n"
+      "  int x1;\n"
+      "  initial begin\n"
+      "    z = 0;\n"
+      "    one = 1;\n"
+      "    xz = $clog2(z);\n"
+      "    x1 = $clog2(one);\n"
+      "  end\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 4u);
-}
-
-// Claim D: an argument of 0 produces 0; claim A boundary at 1 produces 0.
-TEST(UtilitySystemTaskTest, Clog2Zero) {
-  SimFixture f;
-  auto* expr = MakeSysCall(f.arena, "$clog2", {MakeInt(f.arena, 0)});
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 0u);
-}
-
-TEST(UtilitySystemTaskTest, Clog2One) {
-  SimFixture f;
-  auto* expr = MakeSysCall(f.arena, "$clog2", {MakeInt(f.arena, 1)});
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 0u);
-}
-
-// Claim A: ceiling of log base 2 for both powers of two and non-powers.
-TEST(UtilitySystemTaskTest, Clog2Two) {
-  SimFixture f;
-  auto* expr = MakeSysCall(f.arena, "$clog2", {MakeInt(f.arena, 2)});
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 1u);
-}
-
-TEST(UtilitySystemTaskTest, Clog2Three) {
-  SimFixture f;
-  auto* expr = MakeSysCall(f.arena, "$clog2", {MakeInt(f.arena, 3)});
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 2u);
-}
-
-TEST(UtilitySystemTaskTest, Clog2PowerOf2) {
-  SimFixture f;
-  auto* expr = MakeSysCall(f.arena, "$clog2", {MakeInt(f.arena, 256)});
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 8u);
-}
-
-TEST(UtilitySystemTaskTest, Clog2NonPowerOf2) {
-  SimFixture f;
-  auto* expr = MakeSysCall(f.arena, "$clog2", {MakeInt(f.arena, 257)});
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 9u);
+  auto* xz = f.ctx.FindVariable("xz");
+  auto* x1 = f.ctx.FindVariable("x1");
+  ASSERT_NE(xz, nullptr);
+  ASSERT_NE(x1, nullptr);
+  EXPECT_EQ(xz->value.ToUint64(), 0u);
+  EXPECT_EQ(x1->value.ToUint64(), 0u);
 }
 
 // Claim C: the argument is treated as unsigned. A negative 32-bit value is

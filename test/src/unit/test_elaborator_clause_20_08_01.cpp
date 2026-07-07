@@ -53,15 +53,53 @@ TEST(SubroutineCallExprElaboration, SystemTfCallAsExprElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(PrimaryElaboration, PrimarySystemCallElaborates) {
+// §20.8 carry (usable in constant expressions, 11.2.1): the argument of $clog2
+// may itself be a constant form other than a literal. Here a localparam value
+// feeds the call, and the enclosing localparam folds to the ceiling-log2
+// result during elaboration rather than merely parsing. DEPTH is 300, which
+// sits between 2**8 and 2**9, so the address width resolves to 9.
+TEST(ConstExprElab, Clog2OfParameterArgumentFolds) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
-      "  parameter int W = $clog2(16);\n"
+      "  localparam int DEPTH = 300;\n"
+      "  localparam int AW = $clog2(DEPTH);\n"
       "endmodule\n",
-      f);
+      f, "m");
   ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
+  bool found = false;
+  for (auto& p : design->top_modules[0]->params) {
+    if (p.name == "AW") {
+      found = true;
+      EXPECT_TRUE(p.is_resolved);
+      EXPECT_EQ(p.resolved_value, 9);
+    }
+  }
+  EXPECT_TRUE(found);
+}
+
+// §20.8 carry (constant-expression usage, 11.2.1): the constant-form argument
+// may be a module parameter, which reaches constant evaluation through a
+// different declaration path than a localparam. A parameter feeding $clog2 to
+// size an address-width localparam folds during elaboration; DEPTH is 300, so
+// the width resolves to 9.
+TEST(ConstExprElab, Clog2OfPortParameterArgumentFolds) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m #(parameter int DEPTH = 300);\n"
+      "  localparam int AW = $clog2(DEPTH);\n"
+      "endmodule\n",
+      f, "m");
+  ASSERT_NE(design, nullptr);
+  bool found = false;
+  for (auto& p : design->top_modules[0]->params) {
+    if (p.name == "AW") {
+      found = true;
+      EXPECT_TRUE(p.is_resolved);
+      EXPECT_EQ(p.resolved_value, 9);
+    }
+  }
+  EXPECT_TRUE(found);
 }
 
 }  // namespace
