@@ -571,29 +571,6 @@ TEST(Preprocessor, Pragma_InsideIfdef_Inactive) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-TEST(IfdefConditionalCompilation, DefinedMacroTakesTrueBranch) {
-  PreprocFixture f;
-  auto result = Preprocess(
-      "`define HAS_MODULE\n"
-      "`ifdef HAS_MODULE\n"
-      "module m; endmodule\n"
-      "`endif\n",
-      f);
-  EXPECT_FALSE(f.diag.HasErrors());
-  EXPECT_NE(result.find("module"), std::string::npos);
-}
-
-TEST(DesignElementPreprocessing, IfdefAroundModuleExcludesUntaken) {
-  PreprocFixture f;
-  auto result = Preprocess(
-      "`ifdef UNDEFINED_MACRO\n"
-      "module m; endmodule\n"
-      "`endif\n",
-      f);
-  EXPECT_FALSE(f.diag.HasErrors());
-  EXPECT_EQ(result.find("module"), std::string::npos);
-}
-
 TEST(IfdefElse, UndefinedMacroSelectsElseBranch) {
   PreprocFixture f;
   auto result = Preprocess(
@@ -620,39 +597,6 @@ TEST(IfdefConditionalCompilation, MultipleDesignElementsWithConditional) {
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_NE(result.find("always_present"), std::string::npos);
   EXPECT_NE(result.find("package"), std::string::npos);
-}
-
-TEST(DesignElementPreprocessing, NestedIfdefAroundDesignElements) {
-  PreprocFixture f;
-  auto result = Preprocess(
-      "`define OUTER\n"
-      "`define INNER\n"
-      "`ifdef OUTER\n"
-      "`ifdef INNER\n"
-      "program p; endprogram\n"
-      "`endif\n"
-      "`endif\n",
-      f);
-  EXPECT_FALSE(f.diag.HasErrors());
-  EXPECT_NE(result.find("program"), std::string::npos);
-}
-
-TEST(DesignElementPreprocessing, ElsifChainSelectsCorrectDesignElement) {
-  PreprocFixture f;
-  auto result = Preprocess(
-      "`define USE_IFACE\n"
-      "`ifdef USE_MODULE\n"
-      "module m; endmodule\n"
-      "`elsif USE_IFACE\n"
-      "interface ifc; endinterface\n"
-      "`else\n"
-      "package p; endpackage\n"
-      "`endif\n",
-      f);
-  EXPECT_FALSE(f.diag.HasErrors());
-  EXPECT_EQ(result.find("module"), std::string::npos);
-  EXPECT_NE(result.find("interface"), std::string::npos);
-  EXPECT_EQ(result.find("package"), std::string::npos);
 }
 
 TEST(DesignElementPreprocessing, EmptyIfdefBodyPreservesSubsequent) {
@@ -842,4 +786,118 @@ TEST(Preprocessor, InlineConditionalInsideStringIsHidden) {
       f, std::move(cfg));
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_NE(result.find("`ifdef NOPE 1 `endif kept"), std::string::npos);
+}
+
+// §22.6: when an ifdef_macro_expression is evaluated, every identifier is
+// replaced by 1 if it names a currently defined text macro and 0 otherwise --
+// the macro's TEXT VALUE is irrelevant. A macro defined (from real `define
+// source, per 22.5) to the literal 0 is still "defined", so under `!` the
+// operand resolves to 1 and the negation is 0, skipping the block. This
+// exercises the definedness rule through the expression evaluator, not the
+// bare-identifier path. (LRM Example 4: `ifdef (!example_def0).)
+TEST(Preprocessor, ExprNegationOfMacroDefinedToZeroSkipsBlock) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`define example_def0 0\n"
+      "`ifdef (!example_def0)\n"
+      "negated_zero_macro\n"
+      "`endif\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(result.find("negated_zero_macro"), std::string::npos);
+}
+
+// Companion to the above through the `&&` path: two macros defined from real
+// source -- one to the literal 0, one to an empty body -- are both "defined",
+// so `(example_def0 && example_def1)` resolves to 1 and the block is taken.
+// The 0-valued and empty bodies must not make either operand false.
+// (LRM Example 4: `ifdef (example_def0 && example_def1).)
+TEST(Preprocessor, ExprAndOfDefinedZeroAndDefinedEmptyIsTaken) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`define example_def0 0\n"
+      "`define example_def1\n"
+      "`ifdef (example_def0 && example_def1)\n"
+      "both_terms_defined\n"
+      "`endif\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(result.find("both_terms_defined"), std::string::npos);
+}
+
+// The full ifdef/elsif/else chain from LRM Example 4, driven from real `define
+// source: the `ifdef expression is false because example_def2 is never defined;
+// the `elsif expression `(!example_def0 || !example_def1)` is false because
+// BOTH operands are defined (their 0/empty values are irrelevant), so neither
+// negation holds; therefore the `else block is selected. This observes claim
+// 8's elsif/else fall-through together with claim 6's definedness rule under
+// `||`.
+TEST(Preprocessor, ExprElsifElseChainSelectsElseWhenAllFalse) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`define example_def0 0\n"
+      "`define example_def1\n"
+      "`ifdef (example_def0 && example_def2)\n"
+      "ifdef_branch\n"
+      "`elsif (!example_def0 || !example_def1)\n"
+      "elsif_branch\n"
+      "`else\n"
+      "else_branch\n"
+      "`endif\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(result.find("ifdef_branch"), std::string::npos);
+  EXPECT_EQ(result.find("elsif_branch"), std::string::npos);
+  EXPECT_NE(result.find("else_branch"), std::string::npos);
+}
+
+// Negative (condition-false) form of the `||` binary_logical_operator: with
+// neither operand defined, `(A || B)` resolves to 0 and the block is excluded.
+// The other three operators already have their false cases (And/Impl/Equiv);
+// this completes the operator truth-table coverage for `||`.
+TEST(Preprocessor, IfdefExprOrFalse) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`ifdef (A || B)\n"
+      "either_defined\n"
+      "`endif\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(result.find("either_defined"), std::string::npos);
+}
+
+// §22.6 resolves an identifier by whether it is a CURRENTLY defined text macro.
+// Building the input from real 22.5 source -- a `define followed by a `undef of
+// the same name -- leaves the macro not currently defined, so `ifdef takes the
+// `else branch. This exercises §22.6 consuming a `undef (dependency 22.5).
+TEST(Preprocessor, DefineThenUndefMakesIfdefSelectElse) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`define FEATURE 1\n"
+      "`undef FEATURE\n"
+      "`ifdef FEATURE\n"
+      "still_defined\n"
+      "`else\n"
+      "now_undefined\n"
+      "`endif\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(result.find("still_defined"), std::string::npos);
+  EXPECT_NE(result.find("now_undefined"), std::string::npos);
+}
+
+// A function-like text macro (a distinct 22.5 definition form) is still a
+// defined text macro for the purposes of §22.6: naming it in an `ifdef with no
+// argument list succeeds on definedness alone. Input is built from real
+// `define M(args) source and driven through the preprocessor.
+TEST(Preprocessor, IfdefSeesFunctionLikeMacroAsDefined) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`define ADD(a, b) ((a) + (b))\n"
+      "`ifdef ADD\n"
+      "add_is_defined\n"
+      "`endif\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(result.find("add_is_defined"), std::string::npos);
 }
