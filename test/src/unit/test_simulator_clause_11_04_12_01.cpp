@@ -10,27 +10,6 @@ using namespace delta;
 
 namespace {
 
-// Builds a replication of a side-effecting post-increment operand on a fresh
-// 8-bit variable "i" (initialized to 0) with the given multiplier, evaluates
-// it, and returns the result. The post-increment lets callers observe that the
-// operand is evaluated exactly once regardless of the multiplier.
-Logic4Vec EvalPostIncReplication(SimFixture& f, uint64_t repeat_count) {
-  auto* counter = f.ctx.CreateVariable("i", 8);
-  counter->value = MakeLogic4VecVal(f.arena, 8, 0);
-
-  auto* inc = f.arena.Create<Expr>();
-  inc->kind = ExprKind::kPostfixUnary;
-  inc->op = TokenKind::kPlusPlus;
-  inc->lhs = MakeId(f.arena, "i");
-
-  auto* rep = f.arena.Create<Expr>();
-  rep->kind = ExprKind::kReplicate;
-  rep->repeat_count = MakeInt(f.arena, repeat_count);
-  rep->elements.push_back(inc);
-
-  return EvalExpr(rep, f.ctx, f.arena);
-}
-
 TEST(ReplicationSim, ReplicationBasic) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -82,6 +61,52 @@ TEST(ReplicationSim, ReplicationMultipleInner) {
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 0xA5A5u);
+}
+
+// §11.4.12.1: the multiplier is a constant expression. This exercises the
+// parameter form (§11.2.1) that the clause's own example uses — a localparam
+// drives the copy count — and observes through the full pipeline that the
+// elaborated constant produces exactly that many copies (three 4'hA nibbles).
+TEST(ReplicationSim, LocalparamMultiplierCopyCount) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  localparam N = 3;\n"
+      "  logic [11:0] result;\n"
+      "  initial result = {N{4'hA}};\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.width, 12u);
+  EXPECT_EQ(var->value.ToUint64(), 0xAAAu);
+}
+
+// §11.4.12.1: the multiplier is a constant expression. A module `parameter`
+// (§11.2.1) is a distinct constant form from a localparam and takes its own
+// declaration/override path; this drives one as the copy count through the
+// full pipeline and observes three copies of 4'hA (0xAAA).
+TEST(ReplicationSim, ParameterMultiplierCopyCount) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  parameter N = 3;\n"
+      "  logic [11:0] result;\n"
+      "  initial result = {N{4'hA}};\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.width, 12u);
+  EXPECT_EQ(var->value.ToUint64(), 0xAAAu);
 }
 
 TEST(ReplicationEval, ReplicationSingleCopy) {
@@ -187,27 +212,85 @@ TEST(ReplicationSim, ZeroReplicationIgnoredInConcat) {
   EXPECT_EQ(var->value.ToUint64(), 0xAu);
 }
 
-// §11.4.12.1: the operands of a replication are evaluated exactly once,
-// regardless of how many copies the multiplier requests. A side-effecting
-// operand (post-increment) lets us observe the evaluation count: the
-// variable advances by exactly one even though four copies are produced.
-TEST(ReplicationEval, OperandsEvaluatedOnce) {
+// §11.4.12.1: a zero multiplier yields size zero and is ignored inside a
+// concatenation — the same rule the clause frames as useful in parameterized
+// code. Here the zero comes from a `parameter` (§11.2.1) evaluated at
+// elaboration rather than a literal, exercising the constant-fold path, and
+// the run confirms the result is the positive-size operand alone (0xA5).
+TEST(ReplicationSim, ParameterZeroMultiplierIgnoredInConcat) {
   SimFixture f;
-
-  EvalPostIncReplication(f, 4);
-
-  EXPECT_EQ(f.ctx.FindVariable("i")->value.ToUint64(), 1u);
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  parameter P = 0;\n"
+      "  logic [7:0] a, b;\n"
+      "  logic [7:0] result;\n"
+      "  initial begin\n"
+      "    a = 8'hA5;\n"
+      "    b = 8'hFF;\n"
+      "    result = {a, {P{b}}};\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0xA5u);
 }
 
-// §11.4.12.1: a zero multiplier still evaluates the operands exactly once,
-// even though the replication itself contributes no bits.
-TEST(ReplicationEval, OperandsEvaluatedOnceWithZeroMultiplier) {
+// §11.4.12.1: the operands of a replication are evaluated exactly once,
+// regardless of how many copies the multiplier requests. Driving a
+// side-effecting operand (post-increment) through the full pipeline lets us
+// observe the count from real source: i advances by exactly one, and the four
+// copies all carry the single pre-increment value 5 (0x05050505) rather than
+// the 5,6,7,8 sequence a per-copy re-evaluation would produce.
+TEST(ReplicationSim, OperandsEvaluatedOnce) {
   SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] i;\n"
+      "  logic [31:0] result;\n"
+      "  initial begin\n"
+      "    i = 8'd5;\n"
+      "    result = {4{i++}};\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_EQ(f.ctx.FindVariable("i")->value.ToUint64(), 6u);
+  EXPECT_EQ(f.ctx.FindVariable("result")->value.ToUint64(), 0x05050505u);
+}
 
-  auto result = EvalPostIncReplication(f, 0);
-
-  EXPECT_EQ(result.width, 0u);
-  EXPECT_EQ(f.ctx.FindVariable("i")->value.ToUint64(), 1u);
+// §11.4.12.1: a zero multiplier still evaluates its operand exactly once even
+// though the replication contributes no bits. Placed inside a concatenation
+// with a positive-size operand (so the zero replication is legal), the
+// post-increment fires once (i advances to 6) and the result equals the
+// positive operand alone (0xA5).
+TEST(ReplicationSim, OperandsEvaluatedOnceWithZeroMultiplier) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] i;\n"
+      "  logic [7:0] a;\n"
+      "  logic [7:0] result;\n"
+      "  initial begin\n"
+      "    i = 8'd5;\n"
+      "    a = 8'hA5;\n"
+      "    result = {a, {0{i++}}};\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_EQ(f.ctx.FindVariable("i")->value.ToUint64(), 6u);
+  EXPECT_EQ(f.ctx.FindVariable("result")->value.ToUint64(), 0xA5u);
 }
 
 }  // namespace

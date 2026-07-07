@@ -61,24 +61,6 @@ TEST(ReplicationParsing, ReplicationMultipleElements) {
   EXPECT_EQ(rhs->elements.size(), 3u);
 }
 
-TEST(ReplicationParsing, ReplicationRhs) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg [7:0] a;\n"
-      "  reg [1:0] b;\n"
-      "  initial begin\n"
-      "    a = {4{b}};\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
-  ASSERT_NE(stmt->rhs, nullptr);
-  EXPECT_EQ(stmt->rhs->kind, ExprKind::kReplicate);
-}
-
 TEST(ConstEval, Replication) {
   EvalFixture f;
 

@@ -555,21 +555,20 @@ static bool RepeatCountHasXZ(const Expr* e) {
 
 namespace {
 // Validates the repeat count of a single replication: it must not contain x/z
-// and, when constant, must not be negative.
-void CheckReplicateRepeatCount(const Expr* replicate, DiagEngine& diag) {
+// and, when constant, must not be negative. The multiplier is a constant
+// expression, so it is evaluated in the module parameter scope — a parameter
+// or localparam multiplier resolves the same way a literal one does.
+void CheckReplicateRepeatCount(const Expr* replicate, const ScopeMap& scope,
+                               DiagEngine& diag) {
   const Expr* rc = replicate->repeat_count;
   if (RepeatCountHasXZ(rc)) {
     diag.Error(rc->range.start,
                "replication multiplier shall not contain x or z");
-  } else {
-    auto val = ConstEvalInt(rc);
-    if (val) {
-      if (*val < 0) {
-        diag.Error(rc->range.start,
-                   "replication multiplier shall not be negative");
-      } else if (*val == 0) {
-      }
-    }
+    return;
+  }
+  auto val = ConstEvalInt(rc, scope);
+  if (val && *val < 0) {
+    diag.Error(rc->range.start, "replication multiplier shall not be negative");
   }
 }
 }  // namespace
@@ -577,7 +576,7 @@ void CheckReplicateRepeatCount(const Expr* replicate, DiagEngine& diag) {
 void Elaborator::WalkExprForReplicateMultiplier(const Expr* expr) {
   if (!expr) return;
   if (expr->kind == ExprKind::kReplicate) {
-    CheckReplicateRepeatCount(expr, diag_);
+    CheckReplicateRepeatCount(expr, replicate_multiplier_scope_, diag_);
   }
   WalkExprForReplicateMultiplier(expr->lhs);
   WalkExprForReplicateMultiplier(expr->rhs);
@@ -588,20 +587,23 @@ void Elaborator::WalkExprForReplicateMultiplier(const Expr* expr) {
   for (auto* arg : expr->args) WalkExprForReplicateMultiplier(arg);
 }
 
-static bool IsZeroReplicate(const Expr* expr) {
+static bool IsZeroReplicate(const Expr* expr, const ScopeMap& scope) {
   if (!expr || expr->kind != ExprKind::kReplicate) return false;
-  auto val = ConstEvalInt(expr->repeat_count);
+  auto val = ConstEvalInt(expr->repeat_count, scope);
   return val && *val == 0;
 }
 
-static void CheckZeroReplicateStandalone(const Expr* expr, DiagEngine& diag);
+static void CheckZeroReplicateStandalone(const Expr* expr,
+                                         const ScopeMap& scope,
+                                         DiagEngine& diag);
 
 // True when a concatenation is non-empty and every operand is a zero
 // replication, which leaves no positive-size operand to host them.
-static bool ConcatIsAllZeroReplicate(const Expr* concat) {
+static bool ConcatIsAllZeroReplicate(const Expr* concat,
+                                     const ScopeMap& scope) {
   if (concat->elements.empty()) return false;
   for (const auto* elem : concat->elements) {
-    if (!IsZeroReplicate(elem)) return false;
+    if (!IsZeroReplicate(elem, scope)) return false;
   }
   return true;
 }
@@ -609,55 +611,62 @@ static bool ConcatIsAllZeroReplicate(const Expr* concat) {
 // Handles the concatenation arm of CheckZeroReplicateStandalone: a
 // concatenation built entirely of zero replications is illegal, and any
 // non-zero-replication operand is recursed into.
-static void CheckZeroReplicateInConcat(const Expr* concat, DiagEngine& diag) {
-  if (ConcatIsAllZeroReplicate(concat)) {
+static void CheckZeroReplicateInConcat(const Expr* concat,
+                                       const ScopeMap& scope,
+                                       DiagEngine& diag) {
+  if (ConcatIsAllZeroReplicate(concat, scope)) {
     diag.Error(concat->range.start,
                "zero replication shall appear only within a concatenation "
                "in which at least one operand has a positive size");
   }
   for (const auto* elem : concat->elements) {
-    if (!IsZeroReplicate(elem)) {
-      CheckZeroReplicateStandalone(elem, diag);
+    if (!IsZeroReplicate(elem, scope)) {
+      CheckZeroReplicateStandalone(elem, scope, diag);
     }
   }
 }
 
-static void CheckZeroReplicateStandalone(const Expr* expr, DiagEngine& diag) {
+static void CheckZeroReplicateStandalone(const Expr* expr,
+                                         const ScopeMap& scope,
+                                         DiagEngine& diag) {
   if (!expr) return;
-  if (IsZeroReplicate(expr)) {
+  if (IsZeroReplicate(expr, scope)) {
     diag.Error(expr->range.start,
                "zero replication shall appear only within a concatenation "
                "in which at least one operand has a positive size");
   }
   if (expr->kind == ExprKind::kConcatenation) {
-    CheckZeroReplicateInConcat(expr, diag);
+    CheckZeroReplicateInConcat(expr, scope, diag);
     return;
   }
-  CheckZeroReplicateStandalone(expr->lhs, diag);
-  CheckZeroReplicateStandalone(expr->rhs, diag);
-  CheckZeroReplicateStandalone(expr->condition, diag);
-  CheckZeroReplicateStandalone(expr->true_expr, diag);
-  CheckZeroReplicateStandalone(expr->false_expr, diag);
+  CheckZeroReplicateStandalone(expr->lhs, scope, diag);
+  CheckZeroReplicateStandalone(expr->rhs, scope, diag);
+  CheckZeroReplicateStandalone(expr->condition, scope, diag);
+  CheckZeroReplicateStandalone(expr->true_expr, scope, diag);
+  CheckZeroReplicateStandalone(expr->false_expr, scope, diag);
   for (const auto* elem : expr->elements)
-    CheckZeroReplicateStandalone(elem, diag);
-  for (const auto* arg : expr->args) CheckZeroReplicateStandalone(arg, diag);
+    CheckZeroReplicateStandalone(elem, scope, diag);
+  for (const auto* arg : expr->args)
+    CheckZeroReplicateStandalone(arg, scope, diag);
 }
 
 static void WalkStmtsForZeroReplicateStandalone(const Stmt* s,
+                                                const ScopeMap& scope,
                                                 DiagEngine& diag) {
   if (!s) return;
-  CheckZeroReplicateStandalone(s->rhs, diag);
-  CheckZeroReplicateStandalone(s->lhs, diag);
-  CheckZeroReplicateStandalone(s->expr, diag);
-  CheckZeroReplicateStandalone(s->condition, diag);
-  CheckZeroReplicateStandalone(s->assert_expr, diag);
-  for (auto* sub : s->stmts) WalkStmtsForZeroReplicateStandalone(sub, diag);
-  WalkStmtsForZeroReplicateStandalone(s->then_branch, diag);
-  WalkStmtsForZeroReplicateStandalone(s->else_branch, diag);
-  WalkStmtsForZeroReplicateStandalone(s->body, diag);
-  WalkStmtsForZeroReplicateStandalone(s->for_body, diag);
+  CheckZeroReplicateStandalone(s->rhs, scope, diag);
+  CheckZeroReplicateStandalone(s->lhs, scope, diag);
+  CheckZeroReplicateStandalone(s->expr, scope, diag);
+  CheckZeroReplicateStandalone(s->condition, scope, diag);
+  CheckZeroReplicateStandalone(s->assert_expr, scope, diag);
+  for (auto* sub : s->stmts)
+    WalkStmtsForZeroReplicateStandalone(sub, scope, diag);
+  WalkStmtsForZeroReplicateStandalone(s->then_branch, scope, diag);
+  WalkStmtsForZeroReplicateStandalone(s->else_branch, scope, diag);
+  WalkStmtsForZeroReplicateStandalone(s->body, scope, diag);
+  WalkStmtsForZeroReplicateStandalone(s->for_body, scope, diag);
   for (auto& ci : s->case_items)
-    WalkStmtsForZeroReplicateStandalone(ci.body, diag);
+    WalkStmtsForZeroReplicateStandalone(ci.body, scope, diag);
 }
 
 void Elaborator::WalkStmtsForReplicateMultiplier(const Stmt* s) {
@@ -676,6 +685,7 @@ void Elaborator::WalkStmtsForReplicateMultiplier(const Stmt* s) {
 }
 
 void Elaborator::ValidateReplicateMultiplier(const ModuleDecl* decl) {
+  const ScopeMap& scope = replicate_multiplier_scope_;
   for (const auto* item : decl->items) {
     bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
                    item->kind == ModuleItemKind::kAlwaysCombBlock ||
@@ -685,22 +695,22 @@ void Elaborator::ValidateReplicateMultiplier(const ModuleDecl* decl) {
                    item->kind == ModuleItemKind::kFinalBlock;
     if (is_proc && item->body) {
       WalkStmtsForReplicateMultiplier(item->body);
-      WalkStmtsForZeroReplicateStandalone(item->body, diag_);
+      WalkStmtsForZeroReplicateStandalone(item->body, scope, diag_);
     }
     if (item->kind == ModuleItemKind::kContAssign) {
       WalkExprForReplicateMultiplier(item->assign_lhs);
       WalkExprForReplicateMultiplier(item->assign_rhs);
-      CheckZeroReplicateStandalone(item->assign_lhs, diag_);
-      CheckZeroReplicateStandalone(item->assign_rhs, diag_);
+      CheckZeroReplicateStandalone(item->assign_lhs, scope, diag_);
+      CheckZeroReplicateStandalone(item->assign_rhs, scope, diag_);
     }
     if (item->init_expr) {
       WalkExprForReplicateMultiplier(item->init_expr);
-      CheckZeroReplicateStandalone(item->init_expr, diag_);
+      CheckZeroReplicateStandalone(item->init_expr, scope, diag_);
     }
   }
   for (const auto& p : decl->params) {
     WalkExprForReplicateMultiplier(p.second);
-    CheckZeroReplicateStandalone(p.second, diag_);
+    CheckZeroReplicateStandalone(p.second, scope, diag_);
   }
 }
 

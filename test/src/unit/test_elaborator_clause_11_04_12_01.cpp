@@ -203,4 +203,37 @@ TEST(ReplicationElaboration, NegativeMultiplierRejected) {
   EXPECT_TRUE(f.has_errors);
 }
 
+// §11.4.12.1: the multiplier is a constant expression, so the standalone-zero
+// rule applies to a parameter that evaluates to zero, not only a literal zero.
+// The zero here comes from a `parameter` (§11.2.1) resolved at elaboration, and
+// the replication stands alone (not inside a concatenation with a positive-size
+// operand), so it is rejected.
+TEST(ReplicationElaboration, ParameterZeroMultiplierStandaloneRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  parameter Z = 0;\n"
+      "  logic [3:0] a;\n"
+      "  logic [3:0] result;\n"
+      "  initial result = {Z{a}};\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// §11.4.12.1: a negative multiplier is illegal even when it comes from a
+// parameter (§11.2.1) rather than a literal; the constant-expression evaluation
+// resolves the parameter in the module scope and rejects the negative value.
+TEST(ReplicationElaboration, ParameterNegativeMultiplierRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  parameter Z = -1;\n"
+      "  logic [7:0] a;\n"
+      "  initial a = {Z{1'b0}};\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
 }  // namespace

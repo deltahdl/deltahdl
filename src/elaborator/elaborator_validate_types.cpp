@@ -46,6 +46,10 @@ void Elaborator::ValidateModuleConstraints(const ModuleDecl* decl,
   // may reference module parameters, so evaluate them in the module's parameter
   // scope rather than an empty one.
   ScopeMap scope = mod ? BuildParamScope(mod) : ScopeMap{};
+  // §11.4.12.1: expose the resolved module parameter scope to the replication-
+  // multiplier checks below so a parameter-valued multiplier is const-folded
+  // the same way a literal one is.
+  replicate_multiplier_scope_ = scope;
   for (const auto* item : decl->items) {
     ValidateItemConstraints(item, scope);
   }

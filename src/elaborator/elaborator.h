@@ -906,6 +906,13 @@ class Elaborator {
   std::unordered_set<std::string_view> cu_scope_names_;
   ScopeMap cu_param_scope_;
 
+  // §11.4.12.1: the replication-multiplier checks (non-negative, zero-only-
+  // within-a-concatenation) evaluate the multiplier as a constant expression.
+  // The clause's own examples use a parameter multiplier, so the checks must
+  // resolve parameters/localparams rather than only literals. This holds the
+  // parameter scope of the module currently under constraint validation.
+  ScopeMap replicate_multiplier_scope_;
+
   // Public so free helpers (e.g. FormalArrayInfo in
   // elaborator_validate_class_array_*.cpp) can name and build this type.
  public:
