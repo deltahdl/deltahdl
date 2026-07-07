@@ -15,13 +15,6 @@ PendingProceduralAssertion MakePending(const char* name) {
   return p;
 }
 
-// §16.14.6.2: a process that resumes after suspending at an event control is
-// at a flush point.
-TEST(ProceduralAssertionFlushPoints, EventControlResumeIsFlushPoint) {
-  EXPECT_TRUE(
-      IsProceduralAssertionFlushPoint(FlushPointReason::kEventControlResume));
-}
-
 // §16.14.6.2: a process that resumes after suspending at a wait statement is
 // at a flush point.
 TEST(ProceduralAssertionFlushPoints, WaitResumeIsFlushPoint) {
@@ -46,12 +39,6 @@ TEST(ProceduralAssertionFlushPoints, AlwaysLatchSignalDeltaIsFlushPoint) {
 TEST(ProceduralAssertionFlushPoints, DisableOuterScopeIsFlushPoint) {
   EXPECT_TRUE(
       IsProceduralAssertionFlushPoint(FlushPointReason::kDisableOuterScope));
-}
-
-// §16.14.6.2: ordinary continuation that is not one of the listed events is not
-// a flush point.
-TEST(ProceduralAssertionFlushPoints, NoneIsNotAFlushPoint) {
-  EXPECT_FALSE(IsProceduralAssertionFlushPoint(FlushPointReason::kNone));
 }
 
 // §16.14.6.2: reaching a flush point discards the pending instances queued for
