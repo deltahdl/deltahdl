@@ -544,8 +544,19 @@ struct PatternDist {
 // default-keyed element. Null when the pattern supplies none for this element.
 static const Expr* SelectDimElement(const Expr* pat, uint32_t idx,
                                     uint32_t pos) {
-  if (pat->pattern_keys.empty())
+  if (pat->pattern_keys.empty()) {
+    // §10.9.1: a replication in an array pattern stands for an entire single
+    // dimension. Expand its body positionally across this dimension so each of
+    // the N copies lands on successive elements (e.g. '{2{'{3{y}}}} fills a
+    // [_:_][_:_] array with y at every leaf) instead of leaking the replicate
+    // node out as one scalar.
+    if (pat->elements.size() == 1 &&
+        pat->elements[0]->kind == ExprKind::kReplicate) {
+      const auto& body = pat->elements[0]->elements;
+      return body.empty() ? nullptr : body[pos % body.size()];
+    }
     return pos < pat->elements.size() ? pat->elements[pos] : nullptr;
+  }
   size_t m = FindIndexKeyedElement(pat, idx);
   if (m >= pat->elements.size()) m = FindDefaultKeyedElement(pat);
   return m < pat->elements.size() ? pat->elements[m] : nullptr;

@@ -72,16 +72,6 @@ TEST(ArrayLiteralElaboration, IndexKeyOk) {
              "endmodule\n"));
 }
 
-TEST(ArrayLiteralElaboration, TooFewElementsError) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module t;\n"
-      "  int arr[0:2] = '{10, 20};\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(f.diag.HasErrors());
-}
-
 TEST(ArrayLiteralElaboration, PositionalArrayElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(

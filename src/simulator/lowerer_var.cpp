@@ -13,6 +13,7 @@
 #include "simulator/evaluation.h"
 #include "simulator/lowerer.h"
 #include "simulator/sim_context.h"
+#include "simulator/statement_assign.h"
 #include "simulator/statement_assign_internal.h"
 
 namespace delta {
@@ -82,7 +83,11 @@ static void InitArrayElement(const RtlirVariable& var, uint32_t elem_idx,
   }
   auto& elements = var.init_expr->elements;
   if (elem_idx < elements.size()) {
-    elem->value = EvalExpr(elements[elem_idx], ctx, arena);
+    // §10.9.1: each pattern item is evaluated in the assignment context of its
+    // element, so a value whose self-width differs is coerced to the element
+    // width (no-op when they already match).
+    elem->value = ResizeToWidth(EvalExpr(elements[elem_idx], ctx, arena),
+                                var.width, arena);
     return;
   }
   elem->value = MakeLogic4VecVal(arena, var.width, 0);
@@ -97,7 +102,11 @@ static void InitArrayFromReplicate(const RtlirVariable& var, uint32_t elem_idx,
     elem->value = MakeLogic4VecVal(arena, var.width, 0);
     return;
   }
-  elem->value = EvalExpr(rep->elements[elem_idx % inner_count], ctx, arena);
+  // §10.9.1: a replicated item is likewise evaluated in its element's
+  // assignment context.
+  elem->value =
+      ResizeToWidth(EvalExpr(rep->elements[elem_idx % inner_count], ctx, arena),
+                    var.width, arena);
 }
 
 static bool InitArrayFromIndexKey(const Expr* init, uint32_t idx,
@@ -146,9 +155,16 @@ static void InitArrayFromNamed(const RtlirVariable& var, uint32_t idx,
                                Variable* elem, SimContext& ctx, Arena& arena) {
   auto* init = var.init_expr;
 
-  if (InitArrayFromIndexKey(init, idx, elem, ctx, arena)) return;
-  if (InitArrayFromTypeKey(init, var.elem_type_kind, elem, ctx, arena)) return;
-  if (InitArrayFromDefaultKey(init, elem, ctx, arena)) return;
+  // §10.9.1: index, type, and default keys resolve a value that is then
+  // evaluated in the assignment context of the element, so coerce the chosen
+  // value to the element width (no-op when it already matches). An element
+  // covered by none of the keys keeps the zero default at the element width.
+  if (InitArrayFromIndexKey(init, idx, elem, ctx, arena) ||
+      InitArrayFromTypeKey(init, var.elem_type_kind, elem, ctx, arena) ||
+      InitArrayFromDefaultKey(init, elem, ctx, arena)) {
+    elem->value = ResizeToWidth(elem->value, var.width, arena);
+    return;
+  }
   elem->value = MakeLogic4VecVal(arena, var.width, 0);
 }
 
