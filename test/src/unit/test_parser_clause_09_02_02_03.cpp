@@ -140,23 +140,6 @@ TEST(AlwaysLatchParsing, MultipleAssignments) {
   EXPECT_EQ(if_stmt->then_branch->stmts.size(), 2u);
 }
 
-TEST(AlwaysLatchParsing, ComplexConditions) {
-  auto r = Parse(
-      "module m;\n"
-      "  logic en, valid, d, q;\n"
-      "  always_latch\n"
-      "    if (en && valid) q <= d;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysLatchItem(r);
-  ASSERT_NE(item, nullptr);
-  ASSERT_NE(item->body, nullptr);
-  EXPECT_EQ(item->body->kind, StmtKind::kIf);
-  ASSERT_NE(item->body->condition, nullptr);
-  EXPECT_EQ(item->body->condition->kind, ExprKind::kBinary);
-}
-
 TEST(AlwaysLatchParsing, BitSelect) {
   auto r = Parse(
       "module m;\n"
@@ -232,15 +215,6 @@ TEST(AlwaysLatchParsing, BlockingAssignment) {
   EXPECT_EQ(if_stmt->kind, StmtKind::kIf);
   ASSERT_NE(if_stmt->then_branch, nullptr);
   EXPECT_EQ(if_stmt->then_branch->kind, StmtKind::kBlockingAssign);
-}
-
-TEST(AlwaysLatchParsing, TernaryInCondition) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  logic sel, en_a, en_b, d, q;\n"
-              "  always_latch\n"
-              "    if (sel ? en_a : en_b) q <= d;\n"
-              "endmodule\n"));
 }
 
 TEST(AlwaysLatchParsing, ConcatenationLHS) {

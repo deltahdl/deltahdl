@@ -227,6 +227,51 @@ TEST(AlwaysLatchElaboration, WaitStatementInAlwaysLatchErrors) {
   EXPECT_TRUE(f.has_errors);
 }
 
+// §9.2.2.3 states that §9.2.2.2's rules apply to always_latch. §9.2.2.2's
+// single-driver rule forbids an always_latch output from also being assigned by
+// any other process, including a general-purpose always block.
+TEST(AlwaysLatchElaboration, AlwaysLatchAndGeneralAlwaysSameVarErrors) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic en, a, b, q;\n"
+      "  always_latch if (en) q = a;\n"
+      "  always @(b) q = b;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// The "any other process" in §9.2.2.2's single-driver rule, applied to
+// always_latch via §9.2.2.3, also covers an initial block driving the same
+// variable.
+TEST(AlwaysLatchElaboration, AlwaysLatchAndInitialSameVarErrors) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic en, a, q;\n"
+      "  initial q = 0;\n"
+      "  always_latch if (en) q = a;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// The single-driver conflict is keyed on overlapping targets: an always_latch
+// and a general always block driving distinct variables coexist without error.
+TEST(AlwaysLatchElaboration, AlwaysLatchAndGeneralAlwaysDifferentVarsNoError) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic en, a, b, q1, q2;\n"
+      "  always_latch if (en) q1 = a;\n"
+      "  always @(b) q2 = b;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 // The latch-inference check recurses into begin-end blocks: an incomplete if
 // nested inside a block still infers a latch, so no "does not represent latched
 // logic" warning is raised.
@@ -243,6 +288,109 @@ TEST(AlwaysLatchElaboration, BlockWrappingIncompleteIfNoWarning) {
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
   EXPECT_EQ(f.diag.WarningCount(), 0u);
+}
+
+// §9.2.2.3 applies §9.2.2.2's single-driver rule to always_latch. The forbidden
+// "other process" also includes an always_comb procedure driving the same
+// variable, a distinct process form from the latch/continuous/general cases.
+TEST(AlwaysLatchElaboration, MultiDriverAlwaysLatchAndAlwaysCombErrors) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic en, a, b, q;\n"
+      "  always_comb q = a;\n"
+      "  always_latch if (en) q = b;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// §9.2.2.2's single-driver rule is stated per term of the longest static prefix
+// (§11.5.3), so distinct elements of an unpacked array are independent driver
+// targets. Built from real array-element syntax and driven through elaboration,
+// this shows the rule — as applied to always_latch by §9.2.2.3 — treating two
+// literal-indexed elements as non-overlapping.
+TEST(AlwaysLatchElaboration, TwoAlwaysLatchIndependentArrayElementsNoError) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic en;\n"
+      "  logic [7:0] arr [0:1];\n"
+      "  always_latch if (en) arr[0] = 8'd1;\n"
+      "  always_latch if (en) arr[1] = 8'd2;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// The negative form of the element-granular single-driver rule: two
+// always_latch procedures writing the same literal-indexed element overlap and
+// are rejected.
+TEST(AlwaysLatchElaboration, TwoAlwaysLatchSameArrayElementErrors) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic en;\n"
+      "  logic [7:0] arr [0:1];\n"
+      "  always_latch if (en) arr[0] = 8'd1;\n"
+      "  always_latch if (en) arr[0] = 8'd2;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// §11.5.3 keeps an indexed select inside the longest static prefix only when
+// the index is a constant expression (§11.2.1). A module parameter is such a
+// constant, resolved via the parameter scope rather than as a literal, so two
+// distinct parameter indices name distinct elements and do not conflict.
+TEST(AlwaysLatchElaboration, IndependentArrayElementsParamIndexNoError) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m #(parameter int P0 = 0, parameter int P1 = 1);\n"
+      "  logic en;\n"
+      "  logic [7:0] arr [0:1];\n"
+      "  always_latch if (en) arr[P0] = 8'd1;\n"
+      "  always_latch if (en) arr[P1] = 8'd2;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// The parameter-index negative: the same parameter folds to the same element,
+// so the prefixes overlap and the two always_latch drivers are rejected. This
+// exercises the constant-resolution path, distinct from the literal-index form.
+TEST(AlwaysLatchElaboration, OverlappingArrayElementsParamIndexErrors) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m #(parameter int P = 0);\n"
+      "  logic en;\n"
+      "  logic [7:0] arr [0:1];\n"
+      "  always_latch if (en) arr[P] = 8'd1;\n"
+      "  always_latch if (en) arr[P] = 8'd2;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// A localparam is also a constant expression (§11.2.1) resolved through the
+// parameter scope, so two distinct localparam indices name distinct array
+// elements and the always_latch drivers coexist without error.
+TEST(AlwaysLatchElaboration, IndependentArrayElementsLocalparamIndexNoError) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  localparam int P0 = 0;\n"
+      "  localparam int P1 = 1;\n"
+      "  logic en;\n"
+      "  logic [7:0] arr [0:1];\n"
+      "  always_latch if (en) arr[P0] = 8'd1;\n"
+      "  always_latch if (en) arr[P1] = 8'd2;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
 }
 
 }  // namespace

@@ -450,24 +450,25 @@ static void CheckContAssignConflict(
 }
 
 // §9.2.2.2: report an always_comb LHS that is also assigned by a general
-// process (a plain always block or an initial block). This is restricted to
-// always_comb targets so the diagnostic stays within this subclause's rule;
-// the analogous single-driver rules for always_latch and always_ff belong to
-// §9.2.2.3 / §9.2.2.4. Element granularity comes for free from the longest
-// static prefix (§11.5.3): distinct array elements or struct fields do not
-// overlap and so are not reported.
+// process (a plain always block or an initial block). §9.2.2.3 states that all
+// of §9.2.2.2's rules apply to always_latch, so a latch target sharing a prefix
+// with a general procedural driver is flagged the same way. always_ff's
+// analogous single-driver rule is left to §9.2.2.4. Element granularity comes
+// for free from the longest static prefix (§11.5.3): distinct array elements or
+// struct fields do not overlap and so are not reported.
 static void CheckGeneralProcConflict(
     const std::vector<ProcInfo>& procs,
     const std::unordered_set<std::string>& general_proc_lhs, DiagEngine& diag) {
   for (const auto& proc : procs) {
-    if (proc.kind != ModuleItemKind::kAlwaysCombBlock) continue;
+    if (proc.kind != ModuleItemKind::kAlwaysCombBlock &&
+        proc.kind != ModuleItemKind::kAlwaysLatchBlock)
+      continue;
     for (const auto& var : proc.lhs) {
       for (const auto& other : general_proc_lhs) {
         if (PrefixesOverlap(var, other)) {
-          diag.Error(proc.loc,
-                     std::format("variable '{}' driven by always_comb and "
-                                 "another process",
-                                 var));
+          diag.Error(proc.loc, std::format("variable '{}' driven by {} and "
+                                           "another process",
+                                           var, ProcessKindLabel(proc.kind)));
           break;
         }
       }
