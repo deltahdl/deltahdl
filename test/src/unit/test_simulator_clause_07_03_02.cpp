@@ -1,72 +1,8 @@
-#include "builders_ast.h"
-#include "fixture_simulator.h"
 #include "helpers_scheduler.h"
-#include "parser/ast.h"
-#include "simulator/eval_array.h"
-#include "simulator/evaluation.h"
 
 using namespace delta;
 
 namespace {
-
-// Register a two-member tagged union type "vint" whose members both alias the
-// full 32-bit storage, mirroring the void/int VInt example.
-StructTypeInfo MakeVIntInfo() {
-  StructTypeInfo uinfo;
-  uinfo.type_name = "vint";
-  uinfo.is_union = true;
-  uinfo.is_packed = true;
-  uinfo.total_width = 32;
-  uinfo.fields.push_back({"Invalid", 0, 32, DataTypeKind::kLogic});
-  uinfo.fields.push_back({"Valid", 0, 32, DataTypeKind::kLogic});
-  return uinfo;
-}
-
-// A member may only be read through the name that matches the active tag, so
-// reading "Valid" while the tag is "Invalid" must not surrender the stored
-// bits as a valid integer; the result carries unknown bits.
-TEST(TaggedUnionReadTypeCheck, ReadMemberMismatchedWithTagIsUnknown) {
-  SimFixture f;
-  f.ctx.RegisterStructType("vint", MakeVIntInfo());
-  MakeVar(f, "u", 32, 7);
-  f.ctx.SetVariableStructType("u", "vint");
-  f.ctx.SetVariableTag("u", "Invalid");
-
-  auto* access = f.arena.Create<Expr>();
-  access->kind = ExprKind::kMemberAccess;
-  access->lhs = MakeId(f.arena, "u");
-  access->rhs = MakeId(f.arena, "Valid");
-  auto result = EvalExpr(access, f.ctx, f.arena);
-
-  ASSERT_NE(result.nwords, 0u);
-  EXPECT_NE(result.words[0].bval, 0u);
-}
-
-// Reading through the name that matches the active tag returns the stored
-// value unchanged.
-TEST(TaggedUnionReadTypeCheck, ReadMemberMatchingTagReturnsValue) {
-  SimFixture f;
-  f.ctx.RegisterStructType("vint", MakeVIntInfo());
-  MakeVar(f, "u", 32, 7);
-  f.ctx.SetVariableStructType("u", "vint");
-  f.ctx.SetVariableTag("u", "Valid");
-
-  auto* access = f.arena.Create<Expr>();
-  access->kind = ExprKind::kMemberAccess;
-  access->lhs = MakeId(f.arena, "u");
-  access->rhs = MakeId(f.arena, "Valid");
-  auto result = EvalExpr(access, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 7u);
-}
-
-TEST(TaggedUnionSimulation, ChangeTag) {
-  SimFixture f;
-  f.ctx.CreateVariable("u", 32);
-  f.ctx.SetVariableTag("u", "a");
-  EXPECT_EQ(f.ctx.GetVariableTag("u"), "a");
-  f.ctx.SetVariableTag("u", "b");
-  EXPECT_EQ(f.ctx.GetVariableTag("u"), "b");
-}
 
 TEST(TaggedUnionSimulation, TaggedAssignment_SetsTagAndValue) {
   auto v = RunAndGet(
@@ -113,6 +49,80 @@ TEST(TaggedUnionSimulation, VoidMemberTaggedAssignment) {
       "endmodule\n",
       "result");
   EXPECT_EQ(v, 99u);
+}
+
+// §7.3.2: a tagged union member may be read only through the name matching the
+// current tag. Driven end-to-end from real source: the tag is set by a real
+// `tagged` assignment (not a hand-set tag), then a read through the sibling
+// member that does not match the tag is not type-consistent and yields unknown
+// bits. This observes the read-consistency rule rather than the synthetic
+// hand-built-type path above.
+TEST(TaggedUnionSimulation, MismatchedMemberReadIsUnknownFromRealSource) {
+  auto unknown = RunAndGet(
+      "module t;\n"
+      "  typedef union tagged { int A; int B; } U;\n"
+      "  U u;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    u = tagged A 42;\n"
+      "    result = $isunknown(u.B);\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(unknown, 1u);
+}
+
+// The contrast to the mismatch case: reading through the member that does match
+// the active tag is type-consistent and returns known bits. Sharing the same
+// initialized value with the mismatch test shows the unknown result there comes
+// from the tag mismatch, not from uninitialized storage.
+TEST(TaggedUnionSimulation, MatchingMemberReadIsKnownFromRealSource) {
+  auto known = RunAndGet(
+      "module t;\n"
+      "  typedef union tagged { int A; int B; } U;\n"
+      "  U u;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    u = tagged A 42;\n"
+      "    result = $isunknown(u.A);\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(known, 0u);
+}
+
+// §7.3.2 packed representation, observed at run time end-to-end: the packed
+// size of a tagged union is the tag width plus the widest member. A two-arm
+// union whose widest arm is 32 bits needs one tag bit, so its bit count is 33.
+TEST(TaggedUnionSimulation, PackedTaggedUnionBitsIsTagPlusMaxMember) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  typedef union tagged packed { void Invalid; bit [31:0] Valid; } "
+      "VInt;\n"
+      "  VInt u;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    result = $bits(VInt);\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 33u);
+}
+
+// Without the packed qualifier the tag is not part of the in-vector layout, so
+// the same tagged union reports only its widest member's width at run time.
+TEST(TaggedUnionSimulation, UnpackedTaggedUnionBitsHasNoTagBits) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  typedef union tagged { void Invalid; bit [31:0] Valid; } VInt;\n"
+      "  VInt u;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    result = $bits(VInt);\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 32u);
 }
 
 }  // namespace

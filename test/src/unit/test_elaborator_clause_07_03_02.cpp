@@ -23,26 +23,11 @@ DataType MakePackedTaggedUnion(size_t count) {
   return dt;
 }
 
-// The packed representation size is the tag width plus the maximum member
-// size: two 32-bit members need a 1-bit tag, giving 33 bits.
-TEST(TaggedUnionPackedRepr, SizeIsTagPlusMaxMember) {
-  EXPECT_EQ(EvalTypeWidth(MakePackedTaggedUnion(2)), 33u);
-}
-
 // The tag size is the minimum number of bits needed to code all member
 // names; five members fall in the five-to-eight range that needs 3 tag
 // bits, so a five-member union of 32-bit members is 35 bits wide.
 TEST(TaggedUnionPackedRepr, TagWidthCoversAllMemberNames) {
   EXPECT_EQ(EvalTypeWidth(MakePackedTaggedUnion(5)), 35u);
-}
-
-// The tag bits are part of the packed representation only; an unpacked
-// tagged union carries no in-vector tag, so its width is just the widest
-// member.
-TEST(TaggedUnionPackedRepr, UnpackedTaggedUnionHasNoTagBits) {
-  DataType dt = MakePackedTaggedUnion(2);
-  dt.is_packed = false;
-  EXPECT_EQ(EvalTypeWidth(dt), 32u);
 }
 
 TEST(TaggedUnionValidation, ChandleInTaggedUnion_Allowed) {
@@ -171,23 +156,6 @@ TEST(TaggedUnionPackedRepr, VoidOnlyTaggedUnionHasOnlyTagBits) {
   EXPECT_EQ(EvalTypeWidth(dt), 1u);
 }
 
-// A void member next to a sized member contributes 0 to the member-width
-// maximum; only the sized member determines the value-bit count.
-TEST(TaggedUnionPackedRepr, VoidMemberContributesZeroBits) {
-  DataType dt;
-  dt.kind = DataTypeKind::kUnion;
-  dt.is_tagged = true;
-  dt.is_packed = true;
-  StructMember v;
-  v.type_kind = DataTypeKind::kVoid;
-  v.name = "Invalid";
-  StructMember i;
-  i.type_kind = DataTypeKind::kInt;
-  i.name = "Valid";
-  dt.struct_members = {v, i};
-  EXPECT_EQ(EvalTypeWidth(dt), 33u);
-}
-
 // Tag bits occupy the most-significant slot of the packed representation:
 // for a two-member 32-bit-int union the tag is one bit at position 32.
 TEST(TaggedUnionPackedRepr, TagBitsAreLeftJustified) {
@@ -254,6 +222,85 @@ TEST(TaggedUnionValidation, TaggedAssignmentInvalidMemberName_Rejected) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
+// A void member is legal in a packed tagged union: this is the packed VInt
+// example, where the void arm carries no value bits and only the tag is
+// significant. The packed-member-type check must not reject it.
+TEST(TaggedUnionValidation, PackedTaggedUnionVoidMember_Allowed) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  union tagged packed { void Invalid; bit [31:0] Valid; } u;\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+// The same void member is still barred in a packed untagged union, where no
+// tag exists to make a value-less arm meaningful.
+TEST(TaggedUnionValidation, PackedUntaggedUnionVoidMember_Rejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  union packed { void Invalid; bit [31:0] Valid; } u;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+// End-to-end representation check: a packed tagged union declared from real
+// source (the VInt shape, with a void arm) is elaborated to a type width of
+// tag bits + widest member = 1 + 32 = 33. This drives the size rule through
+// parse and elaboration rather than a hand-built type, and simultaneously
+// exercises the void-arm case (a void member contributes zero value bits).
+TEST(TaggedUnionPackedRepr, PackedTaggedUnionWidthFromRealSource) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  typedef union tagged packed { void Invalid; bit [31:0] Valid; } "
+      "VInt;\n"
+      "  VInt u;\n"
+      "endmodule\n",
+      f);
+  ASSERT_FALSE(f.has_errors);
+  auto it = design->type_widths.find("VInt");
+  ASSERT_NE(it, design->type_widths.end());
+  EXPECT_EQ(it->second, 33u);
+}
+
+// The tag bits belong to the packed representation only: the same tagged union
+// declared without the packed qualifier is elaborated to just the widest
+// member's width, with no in-vector tag. Observed end-to-end from real source.
+TEST(TaggedUnionPackedRepr, UnpackedTaggedUnionWidthFromRealSource) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  typedef union tagged { void Invalid; bit [31:0] Valid; } VInt;\n"
+      "  VInt u;\n"
+      "endmodule\n",
+      f);
+  ASSERT_FALSE(f.has_errors);
+  auto it = design->type_widths.find("VInt");
+  ASSERT_NE(it, design->type_widths.end());
+  EXPECT_EQ(it->second, 32u);
+}
+
+// Members of a packed tagged union need not be the same size: the value-bit
+// count follows the widest member. From real source, an 8-bit and a 32-bit arm
+// give a 33-bit representation (1 tag bit + max(8, 32)).
+TEST(TaggedUnionPackedRepr, PackedTaggedUnionWidestMemberFromRealSource) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  typedef union tagged packed { bit [7:0] N; bit [31:0] W; } U;\n"
+      "  U u;\n"
+      "endmodule\n",
+      f);
+  ASSERT_FALSE(f.has_errors);
+  auto it = design->type_widths.find("U");
+  ASSERT_NE(it, design->type_widths.end());
+  EXPECT_EQ(it->second, 33u);
+}
+
 // The packed representation rule applies recursively: an outer packed tagged
 // union whose member is itself a packed tagged union must account for the
 // inner union's full representation, including its own tag bits.
@@ -288,6 +335,110 @@ TEST(TaggedUnionPackedRepr, RecursiveRepresentationForNestedTaggedUnion) {
 
   EXPECT_EQ(EvalTypeWidth(inner, typedefs), 33u);
   EXPECT_EQ(EvalTypeWidth(outer, typedefs), 34u);
+}
+
+// A packed tagged union accepts 4-state packed members (logic), not just
+// 2-state ones. Driven from real source: two logic arms of differing widths
+// elaborate cleanly and the representation is tag + widest member = 1 + 16.
+TEST(TaggedUnionPackedRepr, PackedTaggedUnionLogicMembersFromRealSource) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  typedef union tagged packed { logic [7:0] A; logic [15:0] B; } U;\n"
+      "  U u;\n"
+      "endmodule\n",
+      f);
+  ASSERT_FALSE(f.has_errors);
+  auto it = design->type_widths.find("U");
+  ASSERT_NE(it, design->type_widths.end());
+  EXPECT_EQ(it->second, 17u);
+}
+
+// An enumeration type is a packed type, so it is an admissible member of a
+// packed tagged union. The type is produced by a real enum declaration and the
+// union member references it by name.
+TEST(TaggedUnionValidation, PackedTaggedUnionEnumMember_Allowed) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  typedef enum bit [3:0] { R, G, B } col_t;\n"
+      "  union tagged packed { col_t C; bit [7:0] V; } u;\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+// A packed structure is itself a packed type and may be a member of a packed
+// tagged union. The representation rule applies through the nested aggregate:
+// the widest member is the 16-bit arm, giving tag + 16 = 17 bits. Built from
+// real nested-struct source rather than a hand-assembled type.
+TEST(TaggedUnionPackedRepr, PackedTaggedUnionNestedStructMemberFromRealSource) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  typedef union tagged packed {\n"
+      "    struct packed { bit [3:0] x; bit [3:0] y; } P;\n"
+      "    bit [15:0] Q;\n"
+      "  } U;\n"
+      "  U u;\n"
+      "endmodule\n",
+      f);
+  ASSERT_FALSE(f.has_errors);
+  auto it = design->type_widths.find("U");
+  ASSERT_NE(it, design->type_widths.end());
+  EXPECT_EQ(it->second, 17u);
+}
+
+// A shortreal is not a packed type, so it cannot be a member of a packed
+// tagged union — the packed-member-type rule rejects it, just as it rejects a
+// real member.
+TEST(TaggedUnionValidation, PackedTaggedUnionShortrealMember_Rejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  union tagged packed { shortreal R; bit [31:0] B; } u;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+// An unpacked array is not a packed type. Even though its element type is
+// packed, the unpacked dimension makes the member itself unpacked, so it is
+// rejected as a member of a packed tagged union.
+TEST(TaggedUnionValidation, PackedTaggedUnionUnpackedArrayMember_Rejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  union tagged packed { bit [7:0] arr [0:3]; bit [31:0] B; } u;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+// A string member is legal in an unpacked tagged union (a string is a dynamic
+// type made type-safe by the tag), but a string is not a packed type, so the
+// same member is rejected once the union carries the packed qualifier.
+TEST(TaggedUnionValidation, PackedTaggedUnionStringMember_Rejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  union tagged packed { string S; bit [31:0] B; } u;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+// The negative form of the void-member rule at the other syntactic position:
+// an unpacked untagged union may not carry a void member, since without a tag
+// there is no way to know when the void arm is the active one.
+TEST(TaggedUnionValidation, UnpackedUntaggedUnionVoidMember_Rejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  union { void Invalid; int Valid; } u;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
 }
 
 }  // namespace

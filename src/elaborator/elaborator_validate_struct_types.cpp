@@ -301,7 +301,14 @@ void Elaborator::ValidatePackedStructMemberTypes(const DataType& dtype,
   const char* container = (dtype.kind == DataTypeKind::kStruct)
                               ? "packed structure"
                               : "packed union";
+  // §7.3.2: a void member is legal in a packed tagged union — it carries no
+  // value bits, and in that extreme case only the tag is significant while the
+  // remaining bits are undefined (the packed VInt example). A void member
+  // elsewhere is already barred by ValidateVoidMembers, so it need only be
+  // exempted from the packed-member-type check for the tagged-union case.
+  bool tagged_union = dtype.kind == DataTypeKind::kUnion && dtype.is_tagged;
   for (const auto& m : dtype.struct_members) {
+    if (m.type_kind == DataTypeKind::kVoid && tagged_union) continue;
     if (!IsLegalPackedMemberType(m.type_kind)) {
       diag_.Error(loc, std::format("type of member '{}' is not allowed in a {}",
                                    m.name, container));
