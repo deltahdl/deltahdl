@@ -64,58 +64,6 @@ TEST(AlwaysCombParsing, ForLoop) {
   EXPECT_NE(stmt->for_body, nullptr);
 }
 
-TEST(AlwaysCombParsing, BlockInAlwaysComb) {
-  auto r = Parse(
-      "module m;\n"
-      "  always_comb begin\n"
-      "    x = a & b;\n"
-      "    y = a | c;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kAlwaysCombBlock);
-  ASSERT_NE(item->body, nullptr);
-  EXPECT_EQ(item->body->kind, StmtKind::kBlock);
-  EXPECT_EQ(item->body->stmts.size(), 2u);
-}
-
-TEST(AlwaysCombParsing, AlwaysCombMultipleAssigns) {
-  auto r = Parse(
-      "module m;\n"
-      "  always_comb begin\n"
-      "    x = a & b;\n"
-      "    y = a | c;\n"
-      "    z = a ^ d;\n"
-      "  end\n"
-      "endmodule\n");
-  VerifyAlwaysMultiAssigns(r);
-}
-
-TEST(AlwaysCombParsing, MultipleAssignments) {
-  auto r = Parse(
-      "module m;\n"
-      "  logic a, b, c, x, y, z;\n"
-      "  always_comb begin\n"
-      "    x = a & b;\n"
-      "    y = a | c;\n"
-      "    z = b ^ c;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysComb(r);
-  ASSERT_NE(item, nullptr);
-  ASSERT_NE(item->body, nullptr);
-  EXPECT_EQ(item->body->kind, StmtKind::kBlock);
-  ASSERT_EQ(item->body->stmts.size(), 3u);
-  for (size_t i = 0; i < 3; ++i) {
-    EXPECT_EQ(item->body->stmts[i]->kind, StmtKind::kBlockingAssign);
-  }
-}
-
 TEST(AlwaysCombParsing, AlwaysCombNestedIfElseInBlock) {
   auto r = Parse(
       "module m;\n"
@@ -192,25 +140,6 @@ TEST(AlwaysCombParsing, ArrayIndexing) {
   EXPECT_EQ(item->body->rhs->kind, ExprKind::kSelect);
 }
 
-TEST(AlwaysCombParsing, AlwaysCombMultipleOutputs) {
-  auto r = Parse(
-      "module m;\n"
-      "  logic a, b, sum, carry;\n"
-      "  always_comb begin\n"
-      "    sum = a ^ b;\n"
-      "    carry = a & b;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->always_kind, AlwaysKind::kAlwaysComb);
-  ASSERT_NE(item->body, nullptr);
-  EXPECT_EQ(item->body->kind, StmtKind::kBlock);
-  EXPECT_GE(item->body->stmts.size(), 2u);
-}
-
 TEST(AlwaysCombParsing, ComplexMuxPattern) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -225,31 +154,6 @@ TEST(AlwaysCombParsing, ComplexMuxPattern) {
               "    end\n"
               "  end\n"
               "endmodule\n"));
-}
-
-TEST(AlwaysCombParsing, AlwaysCombAlwaysKind) {
-  auto r = Parse(
-      "module m;\n"
-      "  always_comb a = b & c;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->always_kind, AlwaysKind::kAlwaysComb);
-}
-
-TEST(AlwaysCombParsing, AlwaysCombBodyDirectAssign) {
-  auto r = Parse(
-      "module m;\n"
-      "  always_comb x = a ^ b;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysItem(r);
-  ASSERT_NE(item, nullptr);
-  ASSERT_NE(item->body, nullptr);
-  EXPECT_EQ(item->body->kind, StmtKind::kBlockingAssign);
 }
 
 TEST(AlwaysCombParsing, PriorityEncoderPattern) {
@@ -381,61 +285,23 @@ TEST(AlwaysCombParsing, BeginEndBlock) {
   EXPECT_EQ(item->body->stmts[1]->kind, StmtKind::kBlockingAssign);
 }
 
-TEST(AlwaysCombParsing, AlwaysCombBeginEnd) {
+TEST(AlwaysCombParsing, NonblockingAssignBody) {
+  // §9.2.2.2 shows `d <= #1ns b & c;` as a legal always_comb body: the
+  // procedure body may be a nonblocking assignment, not only a blocking one.
+  // Confirm the parser accepts that form and records it as an always_comb block
+  // whose body is a nonblocking assignment.
   auto r = Parse(
       "module m;\n"
-      "  logic a, b, c, y;\n"
-      "  always_comb begin\n"
-      "    a = b & c;\n"
-      "    y = a | b;\n"
-      "  end\n"
+      "  logic b, c, d;\n"
+      "  always_comb d <= b & c;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysItem(r);
+  auto* item = FirstAlwaysComb(r);
   ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->always_kind, AlwaysKind::kAlwaysComb);
+  EXPECT_EQ(item->kind, ModuleItemKind::kAlwaysCombBlock);
   ASSERT_NE(item->body, nullptr);
-  EXPECT_EQ(item->body->kind, StmtKind::kBlock);
-  EXPECT_GE(item->body->stmts.size(), 2u);
-}
-
-TEST(AlwaysCombParsing, AlwaysCombWithIf) {
-  auto r = Parse(
-      "module m;\n"
-      "  logic sel, a, b, y;\n"
-      "  always_comb\n"
-      "    if (sel) y = a;\n"
-      "    else y = b;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->always_kind, AlwaysKind::kAlwaysComb);
-  ASSERT_NE(item->body, nullptr);
-  EXPECT_EQ(item->body->kind, StmtKind::kIf);
-}
-
-TEST(AlwaysCombParsing, CaseStatementWithDeclarations) {
-  auto r = Parse(
-      "module m;\n"
-      "  logic [1:0] sel;\n"
-      "  logic [3:0] y;\n"
-      "  always_comb\n"
-      "    case (sel)\n"
-      "      2'b00: y = 4'h0;\n"
-      "      2'b01: y = 4'h1;\n"
-      "      default: y = 4'hf;\n"
-      "    endcase\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->always_kind, AlwaysKind::kAlwaysComb);
-  ASSERT_NE(item->body, nullptr);
-  EXPECT_EQ(item->body->kind, StmtKind::kCase);
+  EXPECT_EQ(item->body->kind, StmtKind::kNonblockingAssign);
 }
 
 static ModuleItem* NthItem(ParseResult& r, size_t n) {

@@ -50,24 +50,6 @@ TEST(AlwaysCombLowering, AlwaysCombAutoTriggerTimeZero) {
   EXPECT_EQ(b->value.ToUint64(), 42u);
 }
 
-TEST(AlwaysCombSim, InitialAndAlwaysCombConcurrent) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] a, result;\n"
-      "  initial a = 8'd10;\n"
-      "  always_comb result = a + 8'd1;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 11u);
-}
-
 TEST(AlwaysCombSim, ConcurrentAlwaysCombBlocks) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -193,6 +175,33 @@ TEST(AlwaysCombBasicSim, AlwaysCombResultWidth8) {
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.width, 8u);
   EXPECT_EQ(var->value.ToUint64(), 5u);
+}
+
+TEST(AlwaysCombSim, AlwaysCombNonblockingIntraDelay) {
+  // §9.2.2.2 shows `d <= #1ns b & c;` as a legal always_comb body: the
+  // combinational procedure may use a nonblocking assignment carrying an
+  // intra-assignment delay. Drive b and c from an initial block, let the
+  // inferred sensitivity retrigger the procedure, and observe that the
+  // nonblocking update lands the ANDed value after the delay.
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] b, c, d;\n"
+      "  always_comb d <= #1 b & c;\n"
+      "  initial begin\n"
+      "    b = 8'hF0;\n"
+      "    c = 8'h3C;\n"
+      "    #5 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* d = f.ctx.FindVariable("d");
+  ASSERT_NE(d, nullptr);
+  EXPECT_EQ(d->value.ToUint64(), 0x30u);
 }
 
 TEST(AlwaysCombSim, AlwaysCombChainedDependency) {

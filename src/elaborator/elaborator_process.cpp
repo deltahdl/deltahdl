@@ -386,7 +386,8 @@ static const char* ProcessKindLabel(ModuleItemKind k) {
 
 static void CollectProcessLhsInfo(
     const ModuleDecl* decl, std::vector<ProcInfo>& procs,
-    std::unordered_set<std::string>& cont_assign_lhs, const FuncMap* func_map,
+    std::unordered_set<std::string>& cont_assign_lhs,
+    std::unordered_set<std::string>& general_proc_lhs, const FuncMap* func_map,
     const ScopeMap& scope) {
   for (const auto* item : decl->items) {
     if (item->kind == ModuleItemKind::kAlwaysCombBlock ||
@@ -403,6 +404,14 @@ static void CollectProcessLhsInfo(
     if (item->kind == ModuleItemKind::kContAssign && item->assign_lhs) {
       std::string prefix = LongestStaticPrefix(item->assign_lhs, scope);
       if (!prefix.empty()) cont_assign_lhs.insert(std::move(prefix));
+    }
+    // §9.2.2.2: an always_comb LHS shall not be assigned by any other process,
+    // which includes a general-purpose always block or an initial block. Their
+    // assignment targets are gathered separately so an overlap with an
+    // always_comb prefix can be flagged.
+    if (item->kind == ModuleItemKind::kAlwaysBlock ||
+        item->kind == ModuleItemKind::kInitialBlock) {
+      CollectStmtLhsPrefixes(item->body, general_proc_lhs, scope);
     }
   }
 }
@@ -437,26 +446,56 @@ static void CheckContAssignConflict(
   }
 }
 
+// §9.2.2.2: report an always_comb LHS that is also assigned by a general
+// process (a plain always block or an initial block). This is restricted to
+// always_comb targets so the diagnostic stays within this subclause's rule;
+// the analogous single-driver rules for always_latch and always_ff belong to
+// §9.2.2.3 / §9.2.2.4. Element granularity comes for free from the longest
+// static prefix (§11.5.3): distinct array elements or struct fields do not
+// overlap and so are not reported.
+static void CheckGeneralProcConflict(
+    const std::vector<ProcInfo>& procs,
+    const std::unordered_set<std::string>& general_proc_lhs, DiagEngine& diag) {
+  for (const auto& proc : procs) {
+    if (proc.kind != ModuleItemKind::kAlwaysCombBlock) continue;
+    for (const auto& var : proc.lhs) {
+      for (const auto& other : general_proc_lhs) {
+        if (PrefixesOverlap(var, other)) {
+          diag.Error(proc.loc,
+                     std::format("variable '{}' driven by always_comb and "
+                                 "another process",
+                                 var));
+          break;
+        }
+      }
+    }
+  }
+}
+
 static void CheckDriverConflicts(
     const std::vector<ProcInfo>& procs,
-    const std::unordered_set<std::string>& cont_assign_lhs, DiagEngine& diag) {
+    const std::unordered_set<std::string>& cont_assign_lhs,
+    const std::unordered_set<std::string>& general_proc_lhs, DiagEngine& diag) {
   for (size_t i = 0; i < procs.size(); ++i) {
     for (const auto& var : procs[i].lhs) {
       CheckContAssignConflict(var, procs[i], cont_assign_lhs, diag);
       CheckMultiProcDriver(var, i, procs, diag);
     }
   }
+  CheckGeneralProcConflict(procs, general_proc_lhs, diag);
 }
 
 void Elaborator::CheckAlwaysCombMultiDriver(const ModuleDecl* decl,
                                             RtlirModule* mod) {
   std::vector<ProcInfo> procs;
   std::unordered_set<std::string> cont_assign_lhs;
+  std::unordered_set<std::string> general_proc_lhs;
   // The module parameter scope lets §11.5.3's longest-static-prefix analysis
   // treat a localparam/parameter index as the constant expression it is.
   ScopeMap scope = mod ? BuildParamScope(mod) : ScopeMap{};
-  CollectProcessLhsInfo(decl, procs, cont_assign_lhs, &func_decls_, scope);
-  CheckDriverConflicts(procs, cont_assign_lhs, diag_);
+  CollectProcessLhsInfo(decl, procs, cont_assign_lhs, general_proc_lhs,
+                        &func_decls_, scope);
+  CheckDriverConflicts(procs, cont_assign_lhs, general_proc_lhs, diag_);
 }
 
 // §6.5: the single-driver rule is stated per term of a variable's longest

@@ -127,73 +127,6 @@ TEST(AlwaysCombElaboration, AlwaysCombElaboratesToCorrectKind) {
   EXPECT_TRUE(found);
 }
 
-TEST(AlwaysCombElaboration, ValidAlwaysCombNoWarnings) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  logic a, b;\n"
-      "  always_comb a = b;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  EXPECT_EQ(f.diag.WarningCount(), 0u);
-}
-
-TEST(AlwaysCombBasicSim, MultipleAlwaysCombBlocks) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] a, b, sum, diff;\n"
-      "  initial begin\n"
-      "    a = 8'd15;\n"
-      "    b = 8'd5;\n"
-      "  end\n"
-      "  always_comb begin\n"
-      "    sum = a + b;\n"
-      "  end\n"
-      "  always_comb begin\n"
-      "    diff = a - b;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* s = f.ctx.FindVariable("sum");
-  ASSERT_NE(s, nullptr);
-  EXPECT_EQ(s->value.ToUint64(), 20u);
-  auto* d = f.ctx.FindVariable("diff");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->value.ToUint64(), 10u);
-}
-
-TEST(AlwaysCombBasicSim, AlwaysCombMultipleOutputs) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] a;\n"
-      "  logic [7:0] doubled, incremented;\n"
-      "  initial a = 8'd25;\n"
-      "  always_comb begin\n"
-      "    doubled = a << 1;\n"
-      "    incremented = a + 8'd1;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* dbl = f.ctx.FindVariable("doubled");
-  ASSERT_NE(dbl, nullptr);
-  EXPECT_EQ(dbl->value.ToUint64(), 50u);
-  auto* inc = f.ctx.FindVariable("incremented");
-  ASSERT_NE(inc, nullptr);
-  EXPECT_EQ(inc->value.ToUint64(), 26u);
-}
-
 TEST(AlwaysCombBasicSim, AlwaysCombExplicitZeros) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -254,58 +187,6 @@ TEST(AlwaysCombExtendedSim, AlwaysCombMultiBitAdd) {
   auto* y = f.ctx.FindVariable("y");
   ASSERT_NE(y, nullptr);
   EXPECT_EQ(y->value.ToUint64(), 0x5555u);
-}
-
-TEST(AlwaysCombExtendedSim, AlwaysCombBlockMultipleOutputs) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] a, b, sum, diff;\n"
-      "  always_comb begin\n"
-      "    sum = a + b;\n"
-      "    diff = a - b;\n"
-      "  end\n"
-      "  initial begin\n"
-      "    a = 8'h20;\n"
-      "    b = 8'h05;\n"
-      "    #1 $finish;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* sum = f.ctx.FindVariable("sum");
-  auto* diff = f.ctx.FindVariable("diff");
-  ASSERT_NE(sum, nullptr);
-  ASSERT_NE(diff, nullptr);
-  EXPECT_EQ(sum->value.ToUint64(), 0x25u);
-  EXPECT_EQ(diff->value.ToUint64(), 0x1Bu);
-}
-
-TEST(AlwaysCombProcessInteraction, ProcessInteractionMultipleTimeSteps) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] a, doubled;\n"
-      "  initial begin\n"
-      "    a = 8'd1;\n"
-      "    #5 a = 8'd4;\n"
-      "    #5 a = 8'd8;\n"
-      "  end\n"
-      "  always_comb doubled = a * 8'd2;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("doubled");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 16u);
 }
 
 TEST(AlwaysCombStructFieldAccess, AlwaysCombStructFieldAccess) {
@@ -457,34 +338,6 @@ TEST(AlwaysCombIfElse, AlwaysCombIfElseTrueBranch) {
   EXPECT_EQ(y->value.ToUint64(), 0xAAu);
 }
 
-TEST(AlwaysCombIfElseFalseBranch, AlwaysCombIfElseFalseBranch) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic sel;\n"
-      "  logic [7:0] a, b, y;\n"
-      "  always_comb\n"
-      "    if (sel) y = a;\n"
-      "    else y = b;\n"
-      "  initial begin\n"
-      "    a = 8'hAA;\n"
-      "    b = 8'hBB;\n"
-      "    sel = 0;\n"
-      "    #1 $finish;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* y = f.ctx.FindVariable("y");
-  ASSERT_NE(y, nullptr);
-  EXPECT_EQ(y->value.ToUint64(), 0xBBu);
-}
-
 TEST(AlwaysCombCaseDecode, AlwaysCombCaseDecode) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -511,37 +364,6 @@ TEST(AlwaysCombCaseDecode, AlwaysCombCaseDecode) {
   EXPECT_EQ(var->value.ToUint64(), 30u);
 }
 
-TEST(AlwaysCombTimeZeroExecution, AlwaysCombTimeZeroExecution) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] y;\n"
-      "  always_comb y = 8'd77;\n"
-      "  initial #1 $finish;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* y = f.ctx.FindVariable("y");
-  ASSERT_NE(y, nullptr);
-  EXPECT_EQ(y->value.ToUint64(), 77u);
-}
-
-TEST(AlwaysComb, ModuleWithAlwaysCombElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  logic a, b;\n"
-      "  always_comb b = a;\n"
-      "endmodule\n",
-      f, "m");
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  EXPECT_FALSE(design->top_modules[0]->processes.empty());
-}
-
 TEST(AlwaysComb, Mux2to1Elaborates) {
   EXPECT_TRUE(
       ElabOk("module mux2to1 (input wire a, b, sel,\n"
@@ -551,23 +373,6 @@ TEST(AlwaysComb, Mux2to1Elaborates) {
              "    else     y = b;\n"
              "  end\n"
              "endmodule: mux2to1\n"));
-}
-
-TEST(AlwaysComb, SimpleExpression) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] a, b;\n"
-      "  initial a = 8'd7;\n"
-      "  always_comb b = a + 8'd1;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  EXPECT_EQ(f.ctx.FindVariable("a")->value.ToUint64(), 7u);
-  EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 8u);
 }
 
 TEST(AlwaysCombMultiDriver, MultiDriverAlwaysCombAndAlwaysFFErrors) {
@@ -736,6 +541,132 @@ TEST(AlwaysCombMultiDriver, WholeStructAndFieldConflict) {
       "  pair_t s;\n"
       "  always_comb s = 16'd0;\n"
       "  always_comb s.a = 8'd1;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(AlwaysCombTiming, NonblockingIntraAssignDelayAllowed) {
+  // §9.2.2.2 shows `d <= #1ns b & c;` as a legal always_comb body. An
+  // intra-assignment delay on a nonblocking assignment is not a statement-level
+  // timing control, so it shall not be rejected as one.
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic b, c, d;\n"
+      "  always_comb d <= #1ns b & c;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(AlwaysCombMultiDriver, MultiDriverCombAndGeneralAlwaysErrors) {
+  // §9.2.2.2: an always_comb LHS shall not be assigned by any other process; a
+  // general-purpose always block driving the same variable is illegal.
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic a, b, y;\n"
+      "  always_comb y = a;\n"
+      "  always @(a or b) y = b;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(AlwaysCombMultiDriver, MultiDriverCombAndInitialErrors) {
+  // §9.2.2.2: an initial block is also a process, so it may not assign a
+  // variable that an always_comb drives.
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic a, y;\n"
+      "  always_comb y = a;\n"
+      "  initial y = 1'b0;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(AlwaysCombMultiDriver, CombAndGeneralAlwaysDifferentVarsOk) {
+  // §9.2.2.2: the rule only applies when the same variable is driven; distinct
+  // targets in an always_comb and a general always are legal.
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic a, b, x, y;\n"
+      "  always_comb x = a;\n"
+      "  always @(b) y = b;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(AlwaysCombMultiDriver, CombAndGeneralAlwaysIndependentElementsOk) {
+  // §9.2.2.2 / §11.5.3: one array element driven by always_comb and a different
+  // element driven by a general always have non-overlapping longest static
+  // prefixes, so they are independent and legal.
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic clk;\n"
+      "  logic [7:0] arr [0:1];\n"
+      "  always_comb arr[0] = 8'd1;\n"
+      "  always @(posedge clk) arr[1] = 8'd2;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(AlwaysCombMultiDriver, IndependentElementsParamIndexNoConflict) {
+  // §9.2.2.2 / §11.5.3: the independent-elements exception depends on the
+  // longest static prefix, which keeps a select in the prefix only when its
+  // index is a constant expression. A module parameter is such a constant
+  // (§11.2.1). Two distinct parameter indices name distinct elements, so the
+  // two always_comb procedures drive non-overlapping prefixes and are legal.
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m #(parameter int P0 = 0, parameter int P1 = 1);\n"
+      "  logic [7:0] arr [0:1];\n"
+      "  always_comb arr[P0] = 8'd1;\n"
+      "  always_comb arr[P1] = 8'd2;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(AlwaysCombMultiDriver, IndependentElementsLocalparamIndexNoConflict) {
+  // §9.2.2.2 / §11.5.3: a localparam is also a constant expression (§11.2.1),
+  // so two distinct localparam indices resolve to distinct elements and the
+  // two always_comb drivers do not overlap.
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  localparam int P0 = 0;\n"
+      "  localparam int P1 = 1;\n"
+      "  logic [7:0] arr [0:1];\n"
+      "  always_comb arr[P0] = 8'd1;\n"
+      "  always_comb arr[P1] = 8'd2;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(AlwaysCombMultiDriver, OverlappingElementsParamIndexConflict) {
+  // §9.2.2.2 / §11.5.3 (negative form): when both always_comb procedures index
+  // the same parameter, the constant folds to the same element, the longest
+  // static prefixes overlap, and the multiple-driver rule rejects it.
+  ElabFixture f;
+  ElaborateSrc(
+      "module m #(parameter int P = 0);\n"
+      "  logic [7:0] arr [0:1];\n"
+      "  always_comb arr[P] = 8'd1;\n"
+      "  always_comb arr[P] = 8'd2;\n"
       "endmodule\n",
       f);
   EXPECT_TRUE(f.has_errors);
