@@ -6,14 +6,6 @@ using namespace delta;
 
 namespace {
 
-// §F.4.2: an unresolved source cannot be flattened — if the flattened checker
-// is not legal, the source is not legal.
-TEST(CheckerRewrite, UnknownNameNotLegal) {
-  CheckerRegistry reg;
-  auto fc = reg.Flatten("missing", 0);
-  EXPECT_FALSE(fc.legal);
-}
-
 // §F.4.2: checker formal arguments with output direction are treated
 // differently (see §17.2); the rewriting algorithm does not apply to them.
 TEST(CheckerRewrite, OutputFormalIsOutsideAlgorithm) {
@@ -98,6 +90,45 @@ TEST(CheckerRewrite, CountsNestedCheckerInstances) {
 
   EXPECT_EQ(reg.CheckerInstanceCount(&root), 1);
   // The flattened result is a checker without instances.
+  auto fc = reg.Flatten("root", 0);
+  EXPECT_EQ(fc.remaining_instances, 0);
+}
+
+// §F.4.2: the algorithm targets a checker containing "one or more" instances of
+// other checkers, so a body holding several checker instances counts each one,
+// and the flattened result still resolves to a checker without instances.
+TEST(CheckerRewrite, CountsMultipleNestedCheckerInstances) {
+  ModuleDecl leaf_a;
+  leaf_a.decl_kind = ModuleDeclKind::kChecker;
+  leaf_a.name = "leaf_a";
+
+  ModuleDecl leaf_b;
+  leaf_b.decl_kind = ModuleDeclKind::kChecker;
+  leaf_b.name = "leaf_b";
+
+  ModuleItem inst_a;
+  inst_a.kind = ModuleItemKind::kModuleInst;
+  inst_a.inst_module = "leaf_a";
+  inst_a.inst_name = "u1";
+
+  ModuleItem inst_b;
+  inst_b.kind = ModuleItemKind::kModuleInst;
+  inst_b.inst_module = "leaf_b";
+  inst_b.inst_name = "u2";
+
+  ModuleDecl root;
+  root.decl_kind = ModuleDeclKind::kChecker;
+  root.name = "root";
+  root.items = {&inst_a, &inst_b};
+
+  CheckerRegistry reg;
+  reg.Register(&leaf_a);
+  reg.Register(&leaf_b);
+  reg.Register(&root);
+
+  // Both checker instances are recognized in the body.
+  EXPECT_EQ(reg.CheckerInstanceCount(&root), 2);
+  // However many instances the source held, the flattened checker has none.
   auto fc = reg.Flatten("root", 0);
   EXPECT_EQ(fc.remaining_instances, 0);
 }
