@@ -288,12 +288,14 @@ Logic4Vec EvalRhsWithStructContext(const Stmt* stmt, SimContext& ctx,
     return EvalExpr(stmt->rhs, ctx, arena, ctx_width);
   }
   auto* inner = UnwrapTypedPattern(stmt->rhs);
-  bool named = inner->kind == ExprKind::kAssignmentPattern &&
-               !inner->pattern_keys.empty();
-  if (!named) return EvalExpr(stmt->rhs, ctx, arena, ctx_width);
+  // §10.9.2: both keyed and positional structure patterns are evaluated against
+  // the target's member layout so each member expression is coerced to its
+  // member's type; only route when the target is actually a struct.
+  if (inner->kind != ExprKind::kAssignmentPattern)
+    return EvalExpr(stmt->rhs, ctx, arena, ctx_width);
   auto* sinfo = ctx.GetVariableStructType(stmt->lhs->text);
   if (!sinfo) return EvalExpr(stmt->rhs, ctx, arena, ctx_width);
-  return EvalStructPattern(inner, sinfo, ctx, arena);
+  return EvalStructPatternValue(inner, sinfo, ctx, arena);
 }
 
 static std::pair<uint32_t, uint32_t> ComputeSliceRange(const Expr* expr,

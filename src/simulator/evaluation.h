@@ -98,6 +98,12 @@ Logic4Vec EvalAssignmentPattern(const Expr* expr, SimContext& ctx,
 
 Logic4Vec EvalStructPattern(const Expr* expr, const StructTypeInfo* info,
                             SimContext& ctx, Arena& arena);
+// §10.9.2: evaluate a structure assignment pattern (keyed or positional)
+// against a known struct layout, coercing each member expression to the
+// corresponding member's type/width. Falls back to width-summing concatenation
+// for the replication form and for structs wider than a single word.
+Logic4Vec EvalStructPatternValue(const Expr* expr, const StructTypeInfo* info,
+                                 SimContext& ctx, Arena& arena);
 Logic4Vec EvalMatches(const Expr* expr, SimContext& ctx, Arena& arena);
 
 Logic4Vec EvalSystemCall(const Expr* expr, SimContext& ctx, Arena& arena);

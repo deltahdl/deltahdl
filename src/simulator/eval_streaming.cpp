@@ -407,6 +407,22 @@ static void PlaceFieldValue(Logic4Vec& result, const StructFieldInfo& f,
   result.words[0].aval |= bits;
 }
 
+// §10.9.2: when the default: key falls on an unmatched member that is itself a
+// structure, the value is applied recursively to each member of the
+// substructure rather than written flatly across the whole substructure field.
+// `base` accumulates the enclosing fields' offsets so a leaf member lands at
+// its absolute bit position within the packed result.
+static void PlaceDefaultValue(Logic4Vec& result, const StructFieldInfo& f,
+                              uint32_t base, uint64_t val) {
+  if (f.nested) {
+    for (const auto& sub : f.nested->fields)
+      PlaceDefaultValue(result, sub, base + f.bit_offset, val);
+    return;
+  }
+  uint64_t mask = (f.width >= 64) ? ~uint64_t{0} : (uint64_t{1} << f.width) - 1;
+  result.words[0].aval |= (val & mask) << (base + f.bit_offset);
+}
+
 static DataTypeKind TypeKeyToKind(std::string_view key) {
   if (key == "int") return DataTypeKind::kInt;
   if (key == "integer") return DataTypeKind::kInteger;
@@ -481,7 +497,7 @@ static void ApplyDefaultKey(const Expr* expr, const StructTypeInfo* info,
     auto val = EvalExpr(expr->elements[i], s.ctx, s.arena);
     for (size_t fi = 0; fi < info->fields.size(); ++fi) {
       if (s.assigned[fi]) continue;
-      PlaceFieldValue(s.result, info->fields[fi], val.ToUint64());
+      PlaceDefaultValue(s.result, info->fields[fi], 0, val.ToUint64());
     }
     return;
   }
@@ -496,6 +512,34 @@ Logic4Vec EvalStructPattern(const Expr* expr, const StructTypeInfo* info,
   ApplyTypeKeys(expr, info, state);
   ApplyDefaultKey(expr, info, state);
   return result;
+}
+
+Logic4Vec EvalStructPatternValue(const Expr* expr, const StructTypeInfo* info,
+                                 SimContext& ctx, Arena& arena) {
+  // Keyed form (member name / type / default keys): field-by-field placement.
+  if (!expr->pattern_keys.empty())
+    return EvalStructPattern(expr, info, ctx, arena);
+
+  // §10.9.2: positional form -- element i initializes member i in declaration
+  // order, each evaluated in the context of an assignment to that member's
+  // type. Coercing each element to its member's width (rather than
+  // concatenating at its self-determined width) is what keeps an over-wide
+  // element from spilling into the following members. The replication form and
+  // any struct too wide for a single word fall back to the width-summing
+  // concatenation path.
+  bool is_replication =
+      expr->repeat_count || (expr->elements.size() == 1 &&
+                             expr->elements[0]->kind == ExprKind::kReplicate);
+  if (!is_replication && info->total_width <= 64 &&
+      expr->elements.size() == info->fields.size()) {
+    auto result = MakeLogic4Vec(arena, info->total_width);
+    for (size_t i = 0; i < info->fields.size(); ++i) {
+      auto val = EvalExpr(expr->elements[i], ctx, arena);
+      PlaceFieldValue(result, info->fields[i], val.ToUint64());
+    }
+    return result;
+  }
+  return EvalAssignmentPattern(expr, ctx, arena);
 }
 
 Logic4Vec EvalMatches(const Expr* expr, SimContext& ctx, Arena& arena) {

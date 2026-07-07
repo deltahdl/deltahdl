@@ -458,10 +458,11 @@ void Lowerer::LowerVarInit(const RtlirVariable& var, Variable* v,
   if (init->kind == ExprKind::kCast && init->lhs &&
       init->lhs->kind == ExprKind::kAssignmentPattern)
     init = init->lhs;
-  bool named =
-      init->kind == ExprKind::kAssignmentPattern && !init->pattern_keys.empty();
-  if (named && sinfo) {
-    v->value = EvalStructPattern(init, sinfo, ctx_, arena_);
+  // §10.9.2: a struct-typed declaration initializer that is an assignment
+  // pattern (keyed or positional) is evaluated against the member layout, so
+  // each member expression is coerced to its member's type.
+  if (init->kind == ExprKind::kAssignmentPattern && sinfo) {
+    v->value = EvalStructPatternValue(init, sinfo, ctx_, arena_);
     return;
   }
   // §11.6: a declaration initializer is an assignment, so its target width is

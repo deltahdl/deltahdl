@@ -9,195 +9,6 @@ using namespace delta;
 
 namespace {
 
-TEST(StructPattern, NamedMemberTwoFields) {
-  SimFixture f;
-  StructTypeInfo info;
-  info.type_name = "point_t";
-  info.is_packed = true;
-  info.total_width = 16;
-  info.fields.push_back({"x", 8, 8, DataTypeKind::kLogic});
-  info.fields.push_back({"y", 0, 8, DataTypeKind::kLogic});
-
-  auto* pat = f.arena.Create<Expr>();
-  pat->kind = ExprKind::kAssignmentPattern;
-  pat->pattern_keys = {"x", "y"};
-  pat->elements = {MakeInt(f.arena, 5), MakeInt(f.arena, 10)};
-
-  auto result = EvalStructPattern(pat, &info, f.ctx, f.arena);
-  EXPECT_EQ(result.width, 16u);
-  EXPECT_EQ(result.ToUint64(), 0x050Au);
-}
-
-TEST(StructPattern, NamedMemberReversedOrder) {
-  SimFixture f;
-  StructTypeInfo info;
-  info.type_name = "point_t";
-  info.is_packed = true;
-  info.total_width = 16;
-  info.fields.push_back({"x", 8, 8, DataTypeKind::kLogic});
-  info.fields.push_back({"y", 0, 8, DataTypeKind::kLogic});
-
-  auto* pat = f.arena.Create<Expr>();
-  pat->kind = ExprKind::kAssignmentPattern;
-  pat->pattern_keys = {"y", "x"};
-  pat->elements = {MakeInt(f.arena, 10), MakeInt(f.arena, 5)};
-
-  auto result = EvalStructPattern(pat, &info, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 0x050Au);
-}
-
-TEST(StructPattern, NamedMemberThreeFields) {
-  SimFixture f;
-  StructTypeInfo info;
-  info.type_name = "rgb_t";
-  info.is_packed = true;
-  info.total_width = 24;
-  info.fields.push_back({"r", 16, 8, DataTypeKind::kLogic});
-  info.fields.push_back({"g", 8, 8, DataTypeKind::kLogic});
-  info.fields.push_back({"b", 0, 8, DataTypeKind::kLogic});
-
-  auto* pat = f.arena.Create<Expr>();
-  pat->kind = ExprKind::kAssignmentPattern;
-  pat->pattern_keys = {"r", "g", "b"};
-  pat->elements = {MakeInt(f.arena, 0xFF), MakeInt(f.arena, 0x80),
-                   MakeInt(f.arena, 0x00)};
-
-  auto result = EvalStructPattern(pat, &info, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 0xFF8000u);
-}
-
-TEST(StructPattern, DefaultAllFields) {
-  SimFixture f;
-  StructTypeInfo info;
-  info.type_name = "pair_t";
-  info.is_packed = true;
-  info.total_width = 16;
-  info.fields.push_back({"a", 8, 8, DataTypeKind::kLogic});
-  info.fields.push_back({"b", 0, 8, DataTypeKind::kLogic});
-
-  auto* pat = f.arena.Create<Expr>();
-  pat->kind = ExprKind::kAssignmentPattern;
-  pat->pattern_keys = {"default"};
-  pat->elements = {MakeInt(f.arena, 0xFF)};
-
-  auto result = EvalStructPattern(pat, &info, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 0xFFFFu);
-}
-
-TEST(StructPattern, DefaultWithNamedOverride) {
-  SimFixture f;
-  StructTypeInfo info;
-  info.type_name = "pair_t";
-  info.is_packed = true;
-  info.total_width = 16;
-  info.fields.push_back({"a", 8, 8, DataTypeKind::kLogic});
-  info.fields.push_back({"b", 0, 8, DataTypeKind::kLogic});
-
-  auto* pat = f.arena.Create<Expr>();
-  pat->kind = ExprKind::kAssignmentPattern;
-  pat->pattern_keys = {"a", "default"};
-  pat->elements = {MakeInt(f.arena, 1), MakeInt(f.arena, 0)};
-
-  auto result = EvalStructPattern(pat, &info, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 0x0100u);
-}
-
-TEST(StructPattern, TypeKeyedInt) {
-  SimFixture f;
-  StructTypeInfo info;
-  info.type_name = "mixed_t";
-  info.is_packed = true;
-  info.total_width = 40;
-  info.fields.push_back({"a", 8, 32, DataTypeKind::kInt});
-  info.fields.push_back({"b", 0, 8, DataTypeKind::kLogic});
-
-  auto* pat = f.arena.Create<Expr>();
-  pat->kind = ExprKind::kAssignmentPattern;
-  pat->pattern_keys = {"int"};
-  pat->elements = {MakeInt(f.arena, 42)};
-
-  auto result = EvalStructPattern(pat, &info, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), uint64_t{42} << 8);
-}
-
-TEST(StructPattern, MixedPrecedence) {
-  SimFixture f;
-  StructTypeInfo info;
-  info.type_name = "multi_t";
-  info.is_packed = true;
-  info.total_width = 24;
-  info.fields.push_back({"a", 16, 8, DataTypeKind::kByte});
-  info.fields.push_back({"b", 8, 8, DataTypeKind::kByte});
-  info.fields.push_back({"c", 0, 8, DataTypeKind::kLogic});
-
-  auto* pat = f.arena.Create<Expr>();
-  pat->kind = ExprKind::kAssignmentPattern;
-  pat->pattern_keys = {"a", "byte", "default"};
-  pat->elements = {MakeInt(f.arena, 1), MakeInt(f.arena, 2),
-                   MakeInt(f.arena, 3)};
-
-  auto result = EvalStructPattern(pat, &info, f.ctx, f.arena);
-  uint64_t expected = (uint64_t{1} << 16) | (uint64_t{2} << 8) | 3;
-  EXPECT_EQ(result.ToUint64(), expected);
-}
-
-TEST(StructPattern, TypeKeyMatchesMultipleFields) {
-  SimFixture f;
-  StructTypeInfo info;
-  info.type_name = "pair_t";
-  info.is_packed = true;
-  info.total_width = 16;
-  info.fields.push_back({"a", 8, 8, DataTypeKind::kByte});
-  info.fields.push_back({"b", 0, 8, DataTypeKind::kByte});
-
-  auto* pat = f.arena.Create<Expr>();
-  pat->kind = ExprKind::kAssignmentPattern;
-  pat->pattern_keys = {"byte"};
-  pat->elements = {MakeInt(f.arena, 0xAB)};
-
-  auto result = EvalStructPattern(pat, &info, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 0xABABu);
-}
-
-TEST(StructPattern, TypeKeyLastWins) {
-  SimFixture f;
-  StructTypeInfo info;
-  info.type_name = "pair_t";
-  info.is_packed = true;
-  info.total_width = 16;
-  info.fields.push_back({"a", 8, 8, DataTypeKind::kByte});
-  info.fields.push_back({"b", 0, 8, DataTypeKind::kByte});
-
-  auto* pat = f.arena.Create<Expr>();
-  pat->kind = ExprKind::kAssignmentPattern;
-  pat->pattern_keys = {"byte", "byte"};
-  pat->elements = {MakeInt(f.arena, 0x11), MakeInt(f.arena, 0x22)};
-
-  auto result = EvalStructPattern(pat, &info, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 0x2222u);
-}
-
-TEST(StructPattern, TypeKeyOverridesDefault) {
-  SimFixture f;
-  StructTypeInfo info;
-  info.type_name = "mixed_t";
-  info.is_packed = true;
-  info.total_width = 24;
-  info.fields.push_back({"a", 16, 8, DataTypeKind::kByte});
-  info.fields.push_back({"b", 8, 8, DataTypeKind::kByte});
-  info.fields.push_back({"c", 0, 8, DataTypeKind::kLogic});
-
-  auto* pat = f.arena.Create<Expr>();
-  pat->kind = ExprKind::kAssignmentPattern;
-  pat->pattern_keys = {"byte", "default"};
-  pat->elements = {MakeInt(f.arena, 0xAA), MakeInt(f.arena, 0xFF)};
-
-  auto result = EvalStructPattern(pat, &info, f.ctx, f.arena);
-
-  uint64_t expected = (uint64_t{0xAA} << 16) | (uint64_t{0xAA} << 8) | 0xFF;
-  EXPECT_EQ(result.ToUint64(), expected);
-}
-
 TEST(StructPatternSimulation, NamedStructPatternWithDefault) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -277,6 +88,74 @@ TEST(StructPatternSimulation, PositionalWithExpression) {
   EXPECT_EQ(var->value.ToUint64(), (uint64_t{1} << 32) | 3);
 }
 
+// §10.9.2: each member expression is evaluated in the context of an assignment
+// to the corresponding member's type, so a value wider than the member is
+// narrowed to the member's width -- observed here by truncating a 16-bit value
+// down to an 8-bit member.
+TEST(StructPatternSimulation, MemberValueCoercedToMemberWidth) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  typedef struct packed { logic [7:0] a; logic [7:0] b; } pair_t;\n"
+      "  pair_t p;\n"
+      "  initial begin\n"
+      "    p = pair_t'{a: 16'hABCD, b: 8'h5A};\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* var = f.ctx.FindVariable("p");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0xCD5Au);
+}
+
+// §10.9.2: a by-name member value is an arbitrary expression evaluated in the
+// context of an assignment to that member -- here a runtime `k + 1` is computed
+// through the named-key path and placed into member a.
+// §10.9.2: in a positional structure pattern each element is evaluated in the
+// context of an assignment to its corresponding member's type, so an element
+// wider than its member is narrowed to the member width -- it is not
+// concatenated at its self-determined width, which would spill into and corrupt
+// the following members.
+TEST(StructPatternSimulation, PositionalMemberValueCoercedToMemberWidth) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  typedef struct packed { logic [7:0] a; logic [7:0] b; } pair_t;\n"
+      "  pair_t p;\n"
+      "  initial begin\n"
+      "    p = pair_t'{16'h1234, 4'h5};\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* var = f.ctx.FindVariable("p");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0x3405u);
+}
+
+TEST(StructPatternSimulation, NamedMemberValueEvaluatesExpression) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  typedef struct packed { logic [7:0] a; logic [7:0] b; } pair_t;\n"
+      "  pair_t p;\n"
+      "  int k;\n"
+      "  initial begin\n"
+      "    k = 5;\n"
+      "    p = pair_t'{a: k + 1, b: 8'h02};\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* var = f.ctx.FindVariable("p");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0x0602u);
+}
+
 TEST(StructPatternSimulation, ThreeTierPrecedence) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -321,6 +200,72 @@ TEST(StructPatternSimulation, TypeKeyMultipleFieldsPipeline) {
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), (uint64_t{42} << 32) | 42);
+}
+
+// §10.9.2: a type key names a data type and sets every field whose type matches
+// it -- here the `logic` vector key covers both logic members (distinct from
+// the integer-atom key forms exercised elsewhere).
+TEST(StructPatternSimulation, LogicTypeKeyAppliesToVectorFields) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  typedef struct packed { logic [7:0] a; logic [7:0] b; } pair_t;\n"
+      "  pair_t p;\n"
+      "  initial begin\n"
+      "    p = pair_t'{logic: 8'hCD};\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* var = f.ctx.FindVariable("p");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0xCDCDu);
+}
+
+// §10.9.2: the default: key is applied recursively to each member of an
+// unmatched substructure, so every leaf of the nested struct receives the
+// default value -- not just the low bits of the substructure field.
+TEST(StructPatternSimulation, DefaultKeyRecursesIntoNestedStruct) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  typedef struct packed { logic [7:0] b; logic [7:0] c; } bc_t;\n"
+      "  typedef struct packed {\n"
+      "    logic [7:0] a;\n"
+      "    bc_t bc;\n"
+      "  } d_t;\n"
+      "  d_t d;\n"
+      "  initial begin\n"
+      "    d = '{default: 8'hAB};\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* var = f.ctx.FindVariable("d");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0xABABABu);
+}
+
+// §10.9.2: when the same type key appears more than once, the last value is
+// used -- and it is applied to every field of that type.
+TEST(StructPatternSimulation, TypeKeyLastValueWinsPipeline) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  typedef struct packed { byte a; byte b; } pair_t;\n"
+      "  pair_t p;\n"
+      "  initial begin\n"
+      "    p = pair_t'{byte: 8'h11, byte: 8'h22};\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* var = f.ctx.FindVariable("p");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0x2222u);
 }
 
 TEST(StructPatternSimulation, ReplicationInStructContext) {
