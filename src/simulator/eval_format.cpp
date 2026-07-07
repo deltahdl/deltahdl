@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 
+#include "common/diagnostic.h"
 #include "common/types.h"
 #include "parser/ast.h"
 #include "simulator/evaluation.h"
@@ -19,6 +20,10 @@ struct FormatArgs {
   const TimeFormatSpec* time_format = nullptr;
   const std::vector<std::string>& v_fmts;
   SimContext* ctx = nullptr;
+  // §21.2.1.1: per-argument flag, set when the value came from an unpacked
+  // aggregate; an integer format specifier consuming such an argument is
+  // rejected.
+  const std::vector<char>& agg_flags;
 };
 
 // §21.2.1.5: build the hierarchical name that %m expands to -- the name of the
@@ -93,6 +98,33 @@ static std::string FormatValueAsReal(const Logic4Vec& val, char spec) {
     std::snprintf(buf, sizeof(buf), "%g", d);
   } else {
     std::snprintf(buf, sizeof(buf), "%f", d);
+  }
+  return buf;
+}
+
+// §21.2.1.1: Table 21-2 real specifiers carry the full C-language field-width
+// and precision capability -- e.g. "%10.3g" is a minimum field width of 10 with
+// 3 fractional digits. Reconstruct the double and render it with the parsed
+// width/precision. A width of zero means "no minimum" and, when no precision
+// was written, the C default of 6 is used, matching the plain %e/%f/%g
+// rendering.
+static std::string FormatRealFormatted(const Logic4Vec& val, char spec,
+                                       bool has_width, uint32_t width,
+                                       bool has_prec, uint32_t prec) {
+  uint64_t bits = val.ToUint64();
+  double d = 0.0;
+  std::memcpy(&d, &bits, sizeof(double));
+  int w = has_width ? static_cast<int>(width) : 0;
+  int p = has_prec ? static_cast<int>(prec) : 6;
+  char buf[256];
+  // Literal format strings with variadic '*' width/precision keep the call
+  // clear of a runtime-built format template.
+  if (spec == 'e') {
+    std::snprintf(buf, sizeof(buf), "%*.*e", w, p, d);
+  } else if (spec == 'g') {
+    std::snprintf(buf, sizeof(buf), "%*.*g", w, p, d);
+  } else {
+    std::snprintf(buf, sizeof(buf), "%*.*f", w, p, d);
   }
   return buf;
 }
@@ -216,6 +248,61 @@ static std::string FormatDecimalXZ(const Logic4Vec& val) {
   return FormatDecimal(val);
 }
 
+// §21.2.1.1: mask for the valid low bits of the top 32-bit chunk of a value.
+// Bits at and above `width` are not part of the value; the fully populated
+// chunks below the top return an all-ones mask.
+static uint32_t ChunkMask(uint32_t width, uint32_t off) {
+  uint32_t valid = (width > off) ? (width - off) : 0;
+  if (valid >= 32) return 0xFFFFFFFFu;
+  return (uint32_t{1} << valid) - 1;
+}
+
+// §21.2.1.1: %u writes the value as raw, unformatted 2-value binary. Any
+// unknown (x) or high-impedance (z) bit shall be emitted as zero, so the
+// 2-value word is the aval bits with every bval-marked bit cleared. The value
+// is packed into 32-bit words, the word holding the LSB written first, each
+// word laid down in the machine's native (little-endian) byte order.
+static std::string FormatUnformatted2Value(const Logic4Vec& val) {
+  std::string out;
+  uint32_t nchunks = (val.width + 31) / 32;
+  if (nchunks == 0) nchunks = 1;
+  for (uint32_t k = 0; k < nchunks; ++k) {
+    uint32_t off = k * 32;
+    uint32_t w = off / 64;
+    uint64_t aval = (w < val.nwords) ? val.words[w].aval : 0;
+    uint64_t bval = (w < val.nwords) ? val.words[w].bval : 0;
+    uint32_t two = static_cast<uint32_t>((aval & ~bval) >> (off % 64));
+    two &= ChunkMask(val.width, off);
+    for (int b = 0; b < 4; ++b)
+      out += static_cast<char>((two >> (b * 8)) & 0xFF);
+  }
+  return out;
+}
+
+// §21.2.1.1: %z writes the value as raw, unformatted 4-value binary, preserving
+// x and z. Each 32-bit chunk is emitted as the (aval, bval) pair of the
+// s_vpi_vecval layout (Figure 38-8), whose per-bit encoding already matches
+// Logic4Vec's (a known bit clears bval; x is aval&bval, z is bval alone). The
+// chunk holding the LSB is written first, each 32-bit word native-endian.
+static std::string FormatUnformatted4Value(const Logic4Vec& val) {
+  std::string out;
+  uint32_t nchunks = (val.width + 31) / 32;
+  if (nchunks == 0) nchunks = 1;
+  auto emit32 = [&out](uint32_t x) {
+    for (int b = 0; b < 4; ++b) out += static_cast<char>((x >> (b * 8)) & 0xFF);
+  };
+  for (uint32_t k = 0; k < nchunks; ++k) {
+    uint32_t off = k * 32;
+    uint32_t w = off / 64;
+    uint64_t aval = (w < val.nwords) ? val.words[w].aval : 0;
+    uint64_t bval = (w < val.nwords) ? val.words[w].bval : 0;
+    uint32_t mask = ChunkMask(val.width, off);
+    emit32(static_cast<uint32_t>(aval >> (off % 64)) & mask);
+    emit32(static_cast<uint32_t>(bval >> (off % 64)) & mask);
+  }
+  return out;
+}
+
 // Apply the $timeformat configuration (20.4.3) to a raw time value. The
 // number is rendered with the configured decimal precision, padded with
 // leading spaces to the minimum field width, and tagged with the suffix
@@ -266,6 +353,12 @@ std::string FormatArg(const Logic4Vec& val, char spec) {
       return buf;
     case 's':
       return FormatValueAsString(val);
+    case 'u':
+      // §21.2.1.1: unformatted 2-value binary; x/z bits become zero.
+      return FormatUnformatted2Value(val);
+    case 'z':
+      // §21.2.1.1: unformatted 4-value binary; x and z are preserved.
+      return FormatUnformatted4Value(val);
     case 'e':
     case 'f':
     case 'g':
@@ -530,8 +623,31 @@ static bool TryPrecomputedArgSpec(char spec, FormatArgs& args,
 // Render the next value argument for an ordinary radix/real/time specifier,
 // advancing the argument cursor when a value is consumed.
 static void AppendValueArg(char spec, bool has_width, uint32_t width,
-                           FormatArgs& args, std::string& out) {
+                           bool has_prec, uint32_t prec, FormatArgs& args,
+                           std::string& out) {
   if (args.vi < args.vals.size()) {
+    char norm = spec;
+    if (norm >= 'A' && norm <= 'Z') norm = static_cast<char>(norm - 'A' + 'a');
+
+    // §21.2.1.1: the integer format specifiers may not be applied to an
+    // unpacked aggregate argument. When the caller flagged this positional
+    // argument as one, reject it and render nothing rather than emitting a
+    // bogus value.
+    bool is_integer_spec = norm == 'd' || norm == 'h' || norm == 'x' ||
+                           norm == 'o' || norm == 'b' || norm == 'c' ||
+                           norm == 'u' || norm == 'z';
+    if (is_integer_spec && args.vi < args.agg_flags.size() &&
+        args.agg_flags[args.vi] != 0) {
+      if (args.ctx != nullptr) {
+        args.ctx->GetDiag().Error(
+            {},
+            "an integer format specifier cannot be applied to an unpacked "
+            "aggregate argument");
+      }
+      ++args.vi;  // the argument is consumed even though nothing is rendered
+      return;
+    }
+
     // §20.4.3: %t renders time through the active $timeformat configuration.
     // An explicitly threaded spec wins; otherwise the run-time context supplies
     // the configuration installed by the most recent $timeformat call (or the
@@ -542,6 +658,11 @@ static void AppendValueArg(char spec, bool has_width, uint32_t width,
     if (tf == nullptr && args.ctx != nullptr) tf = &args.ctx->GetTimeFormat();
     if (spec == 't' && tf != nullptr) {
       out += FormatTimeUnderTimeformat(args.vals[args.vi++], *tf);
+    } else if ((norm == 'e' || norm == 'f' || norm == 'g') &&
+               (has_width || has_prec)) {
+      // §21.2.1.1: the C-style width.precision (e.g. %10.3g) applies to reals.
+      out += FormatRealFormatted(args.vals[args.vi++], norm, has_width, width,
+                                 has_prec, prec);
     } else {
       out += FormatArgWidth(args.vals[args.vi++], spec, has_width, width);
     }
@@ -560,6 +681,19 @@ static bool ProcessFormatSpec(const std::string& fmt, size_t& i,
   bool has_width = false;
   uint32_t width = 0;
   ParseFieldWidth(fmt, j, has_width, width);
+
+  // §21.2.1.1: a real specifier may carry a C-style ".precision" after the
+  // optional field width (e.g. "%10.3g"). Consume it here so the fractional-
+  // digit count reaches the real renderer and never leaks into the output as
+  // literal text. A lone '.' selects a precision of zero, as in C.
+  bool has_prec = false;
+  uint32_t prec = 0;
+  if (j < fmt.size() && fmt[j] == '.') {
+    ++j;
+    ParseFieldWidth(fmt, j, has_prec, prec);
+    has_prec = true;  // a lone '.' still means precision, defaulting to zero
+  }
+
   char spec = (j < fmt.size()) ? fmt[j] : 'd';
 
   // Table 21-1 and Table 21-2 give each specifier in both cases (e.g.
@@ -578,7 +712,7 @@ static bool ProcessFormatSpec(const std::string& fmt, size_t& i,
     return true;
   }
 
-  AppendValueArg(spec, has_width, width, args, out);
+  AppendValueArg(spec, has_width, width, has_prec, prec, args, out);
   i = j;
   return true;
 }
@@ -590,11 +724,15 @@ std::string FormatDisplay(const std::string& fmt,
   // §21.2.1.4 / §21.2.1: a null precomputed-string pointer means the calling
   // task supplied none, so bind the argument cursor to a shared empty list.
   static const std::vector<std::string> kEmpty;
+  static const std::vector<char> kEmptyFlags;
   const std::vector<std::string>& p_fmts =
       opts.p_fmts != nullptr ? *opts.p_fmts : kEmpty;
   const std::vector<std::string>& v_fmts =
       opts.v_fmts != nullptr ? *opts.v_fmts : kEmpty;
-  FormatArgs args{vals, 0, p_fmts, opts.time_format, v_fmts, opts.ctx};
+  const std::vector<char>& agg_flags =
+      opts.arg_unpacked_agg != nullptr ? *opts.arg_unpacked_agg : kEmptyFlags;
+  FormatArgs args{vals,   0,        p_fmts,   opts.time_format,
+                  v_fmts, opts.ctx, agg_flags};
   for (size_t i = 0; i < fmt.size(); ++i) {
     if (fmt[i] != '%' || i + 1 >= fmt.size()) {
       AppendLiteralChar(fmt, i, out);

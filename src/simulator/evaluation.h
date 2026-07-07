@@ -175,6 +175,11 @@ struct DisplayFormatOpts {
   const TimeFormatSpec* time_format = nullptr;
   const std::vector<std::string>* v_fmts = nullptr;
   SimContext* ctx = nullptr;
+  // §21.2.1.1: one flag per positional value argument marking it as an unpacked
+  // aggregate, so an integer format specifier that consumes such an argument
+  // can be rejected. A null pointer means the caller supplied no type
+  // information.
+  const std::vector<char>* arg_unpacked_agg = nullptr;
 };
 
 // §21.2.1.5: the %m specifier prints the hierarchical name of the scope that

@@ -268,6 +268,37 @@ static char DefaultRadixForDisplayWriteTask(std::string_view callee) {
   }
 }
 
+// §21.2.1.1: a bare argument (one with no governing format specifier) that is
+// an unpacked array of byte is displayed as the character string its element
+// bytes spell out, taken in index order. Each element's low byte contributes
+// one character; a zero byte carries no character, matching the way a string
+// value renders. The per-element variables are named "arr[idx]" by the lowerer,
+// the same layout the %p renderer walks.
+static std::string FormatUnpackedByteArrayAsString(std::string_view name,
+                                                   const ArrayInfo& ai,
+                                                   SimContext& ctx) {
+  std::string out;
+  for (uint32_t i = 0; i < ai.size; ++i) {
+    uint32_t idx = ai.lo + i;
+    std::string elem_name = std::string(name) + "[" + std::to_string(idx) + "]";
+    Variable* elem = ctx.FindVariable(elem_name);
+    if (elem == nullptr) continue;
+    char c = static_cast<char>(elem->value.ToUint64() & 0xFF);
+    if (c != 0) out += c;
+  }
+  return out;
+}
+
+// §21.2.1.1: whether a display/write argument names a fixed-size unpacked
+// aggregate (an unpacked array). The integer format specifiers may not be
+// applied to such an argument. Queues, dynamic, and associative arrays are
+// handled by their own machinery and are left out here.
+static bool ArgIsUnpackedAggregate(const Expr* arg, SimContext& ctx) {
+  if (arg == nullptr || arg->kind != ExprKind::kIdentifier) return false;
+  const ArrayInfo* ai = ctx.FindArrayInfo(arg->text);
+  return ai != nullptr && !ai->is_queue && !ai->is_dynamic;
+}
+
 void ExecDisplayWrite(const Expr* expr, SimContext& ctx, Arena& arena) {
   // The arguments are processed in the order they appear. A string literal
   // acts as a format template whose specifiers are filled by the expression
@@ -287,6 +318,7 @@ void ExecDisplayWrite(const Expr* expr, SimContext& ctx, Arena& arena) {
       std::vector<Logic4Vec> arg_vals;
       std::vector<std::string> p_fmts;
       std::vector<std::string> v_fmts;
+      std::vector<char> agg_flags;
       while (i + 1 < kN && expr->args[i + 1] != nullptr &&
              expr->args[i + 1]->kind != ExprKind::kStringLiteral) {
         const Expr* val_arg = expr->args[++i];
@@ -294,10 +326,33 @@ void ExecDisplayWrite(const Expr* expr, SimContext& ctx, Arena& arena) {
         arg_vals.push_back(v);
         p_fmts.push_back(BuildFormatP(val_arg, v, ctx));
         v_fmts.push_back(BuildFormatV(val_arg, ctx));
+        agg_flags.push_back(ArgIsUnpackedAggregate(val_arg, ctx) ? 1 : 0);
       }
-      output += FormatDisplay(
-          fmt, arg_vals, {.p_fmts = &p_fmts, .v_fmts = &v_fmts, .ctx = &ctx});
+      output += FormatDisplay(fmt, arg_vals,
+                              {.p_fmts = &p_fmts,
+                               .v_fmts = &v_fmts,
+                               .ctx = &ctx,
+                               .arg_unpacked_agg = &agg_flags});
       continue;
+    }
+    // §21.2.1.1: a bare argument that is a fixed-size unpacked array is handled
+    // by its element type. An unpacked array of byte prints as a character
+    // string; any other unpacked aggregate has no unformatted rendering and is
+    // illegal. (Queues, dynamic, and associative arrays are left to their own
+    // handling.)
+    if (arg->kind == ExprKind::kIdentifier) {
+      const ArrayInfo* ai = ctx.FindArrayInfo(arg->text);
+      if (ai != nullptr && !ai->is_queue && !ai->is_dynamic) {
+        if (ai->elem_type_kind == DataTypeKind::kByte) {
+          output += FormatUnpackedByteArrayAsString(arg->text, *ai, ctx);
+        } else {
+          ctx.GetDiag().Error(
+              {},
+              "unformatted unpacked-array argument to a display or write task "
+              "is illegal unless its elements are of type byte");
+        }
+        continue;
+      }
     }
     // A bare expression renders under the task's default radix; a value
     // carrying string-typed data is always rendered as its character
