@@ -1,32 +1,28 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
-#include <string>
 
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
-#include "common/types.h"
 #include "fixture_simulator.h"
-#include "simulator/lowerer.h"
-#include "simulator/scheduler.h"
-#include "simulator/sim_context.h"
-#include "simulator/sva_engine.h"
-#include "simulator/variable.h"
+
+// §16.4.1 "Deferred assertion reporting" governs the runtime handling of a
+// deferred immediate assertion's report: when the assertion passes or fails the
+// action block (or the default $error, when an assert/assume fails with no else
+// clause) is not executed where the assertion is processed. It becomes a
+// pending report and is executed later in the current time step -- in the
+// Reactive region for an observed (#0) deferred assertion and in the Postponed
+// region for a final deferred assertion. These tests drive real SystemVerilog
+// source through parse/elaborate/lower/run and observe the live simulator path
+// (stmt_exec.cpp) applying that rule, rather than poking an intermediate model.
 
 using namespace delta;
 
 namespace {
 
-struct DeferredFixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-  SvaEngine engine;
-};
-
+// §16.4.1: a passing observed (#0) deferred assertion's pass action is a
+// pending report -- deferred, not run inline -- so its effect still lands by
+// end of the time step. The assignment following the assert would clobber a
+// same-region write, so observing x==44 shows the pass action ran after the
+// process settled.
 TEST(AssertionStatementSim, DeferredAssertHash0) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -39,238 +35,181 @@ TEST(AssertionStatementSim, DeferredAssertHash0) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
+  LowerAndRun(design, f);
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 44u);
 }
 
-TEST(DeferredAssertionReporting, ActionNotExecutedImmediatelyOnQueue) {
-  DeferredFixture f;
-  int pass_calls = 0;
-
-  DeferredAssertion da;
-  da.condition_val = 1;
-  da.pass_action = [&pass_calls]() { ++pass_calls; };
-
-  f.engine.QueuePendingReport("p0", da, DeferralKind::kObserved);
-  EXPECT_EQ(pass_calls, 0);
-  EXPECT_EQ(f.engine.GetDeferredReportQueue("p0").Size(), 1u);
+// §16.4.1: an observed deferred assert that fails with no else clause reports
+// via $error, and that report is deferred (executed in the Reactive region),
+// not emitted at the point the assert is processed. The $error("later") that
+// follows runs immediately in the Active region, so if the deferred report were
+// emitted inline it would be overwritten by "later"; observing "Assertion
+// failed." as the last severity proves the default report was deferred past the
+// inline severity.
+TEST(DeferredAssertionReporting, ObservedDefaultErrorReportIsDeferred) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  initial begin\n"
+      "    assert #0 (0);\n"
+      "    $error(\"later\");\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  EXPECT_EQ(f.ctx.LastSeverity(), "ERROR");
+  EXPECT_EQ(f.ctx.LastSeverityMsg(), "Assertion failed.");
 }
 
-TEST(DeferredAssertionReporting, ObservedReportMaturesInObservedRegion) {
-  DeferredFixture f;
-  DeferredAssertion da;
-  da.condition_val = 1;
-  f.engine.QueuePendingReport("p0", da, DeferralKind::kObserved);
-
-  EXPECT_EQ(f.engine.GetDeferredReportQueue("p0").MaturedCount(), 0u);
-  f.engine.MatureObservedReports("p0");
-  EXPECT_EQ(f.engine.GetDeferredReportQueue("p0").MaturedCount(), 1u);
+// §16.4.1: a final deferred assert failing with no else clause defers its
+// default $error too, but to the Postponed region -- even later than an
+// observed report. Same probe as above: the inline $error("later") must not be
+// the last severity.
+TEST(DeferredAssertionReporting, FinalDefaultErrorReportIsDeferred) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  initial begin\n"
+      "    assert final (0);\n"
+      "    $error(\"later\");\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  EXPECT_EQ(f.ctx.LastSeverity(), "ERROR");
+  EXPECT_EQ(f.ctx.LastSeverityMsg(), "Assertion failed.");
 }
 
-TEST(DeferredAssertionReporting, MaturedObservedSchedulesInReactiveAndClears) {
-  DeferredFixture f;
-  int pass_calls = 0;
-
-  DeferredAssertion da;
-  da.condition_val = 1;
-  da.pass_action = [&pass_calls]() { ++pass_calls; };
-  f.engine.QueuePendingReport("p0", da, DeferralKind::kObserved);
-
-  f.engine.MatureObservedReports("p0");
-  uint32_t scheduled =
-      f.engine.ExecuteMaturedObservedInReactive("p0", f.scheduler, SimTime{0});
-  EXPECT_EQ(scheduled, 1u);
-  EXPECT_EQ(f.engine.GetDeferredReportQueue("p0").Size(), 0u);
-
-  f.scheduler.Run();
-  EXPECT_EQ(pass_calls, 1);
+// §16.4.1 lists "assert or assume" for the default $error report path, so a
+// failing observed deferred assume with no else clause defers its report the
+// same way an assert does.
+TEST(DeferredAssertionReporting, DeferredAssumeDefaultErrorReportIsDeferred) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  initial begin\n"
+      "    assume #0 (0);\n"
+      "    $error(\"later\");\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  EXPECT_EQ(f.ctx.LastSeverity(), "ERROR");
+  EXPECT_EQ(f.ctx.LastSeverityMsg(), "Assertion failed.");
 }
 
-TEST(DeferredAssertionReporting, MaturedReportSurvivesFlush) {
-  DeferredFixture f;
-  DeferredAssertion da;
-  da.condition_val = 1;
-  f.engine.QueuePendingReport("p0", da, DeferralKind::kObserved);
-
-  f.engine.MatureObservedReports("p0");
-  f.engine.OnDeferredFlushPoint("p0", FlushPointReason::kEventControlResume);
-  EXPECT_EQ(f.engine.GetDeferredReportQueue("p0").Size(), 1u);
+// §16.4.1: an observed deferred report is executed in the Reactive region while
+// a final deferred report is executed in the (later) Postponed region. The
+// final assert appears FIRST in source here, yet its else action runs LAST: r
+// ends at 2 because the observed report (r=1) matures in Reactive and the final
+// report (r=2) is scheduled into the subsequent Postponed region. If both
+// reports ran in the same region, source order would leave r==1.
+TEST(DeferredAssertionReporting, FinalReportRunsAfterObservedReport) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int r = 0;\n"
+      "  initial begin\n"
+      "    assert final (0) else r = 2;\n"
+      "    assert #0 (0) else r = 1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* var = f.ctx.FindVariable("r");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 2u);
 }
 
-TEST(DeferredAssertionReporting, FinalReportMaturesInPostponed) {
-  DeferredFixture f;
-  DeferredAssertion da;
-  da.condition_val = 0;
-  f.engine.QueuePendingReport("p0", da, DeferralKind::kFinal);
-
-  f.engine.MatureFinalReports("p0");
-  EXPECT_EQ(f.engine.GetDeferredReportQueue("p0").MaturedCount(), 1u);
+// §16.4.1: the pending-report rule applies to every deferred directive, not
+// just assert/assume. A deferred cover's action (its pass statement) is also a
+// pending report rather than run inline. cover #0 (1) matches, so `hits = hits
+// + 1` is deferred to the Reactive region; the inline `hits = 5` that follows
+// runs first, so the deferred increment observes 5 and leaves hits==6. Were the
+// cover action run inline it would set hits=1 and be clobbered to 5.
+TEST(DeferredAssertionReporting, DeferredCoverActionIsPendingReport) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int hits = 0;\n"
+      "  initial begin\n"
+      "    cover #0 (1) hits = hits + 1;\n"
+      "    hits = 5;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* var = f.ctx.FindVariable("hits");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 6u);
 }
 
-TEST(DeferredAssertionReporting,
-     FinalActionScheduledInPostponedRegionAndClears) {
-  DeferredFixture f;
-  int fail_calls = 0;
-
-  DeferredAssertion da;
-  da.condition_val = 0;
-  da.fail_action = [&fail_calls]() { ++fail_calls; };
-  f.engine.QueuePendingReport("p0", da, DeferralKind::kFinal);
-
-  f.engine.MatureFinalReports("p0");
-  uint32_t scheduled =
-      f.engine.ExecuteMaturedFinalInPostponed("p0", f.scheduler, SimTime{0});
-  EXPECT_EQ(scheduled, 1u);
-  EXPECT_EQ(f.engine.GetDeferredReportQueue("p0").Size(), 0u);
-
-  f.scheduler.Run();
-  EXPECT_EQ(fail_calls, 1);
+// §16.4.1: a final deferred assertion defers its PASS action too, into the
+// Postponed region. assert final (1) matches, so `r = 1` becomes a pending
+// report while the following `r = 5` runs inline in the Active region; the
+// Postponed action then overwrites it, leaving r==1. Run inline, the pass
+// action would set r=1 and be clobbered to 5.
+TEST(DeferredAssertionReporting, FinalPassActionDeferredToPostponed) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int r = 0;\n"
+      "  initial begin\n"
+      "    assert final (1) r = 1;\n"
+      "    r = 5;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* var = f.ctx.FindVariable("r");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-TEST(DeferredAssertionReporting, ObservedMaturationIgnoresFinalReports) {
-  DeferredFixture f;
-  DeferredAssertion da_obs;
-  DeferredAssertion da_fin;
-  da_obs.condition_val = 1;
-  da_fin.condition_val = 1;
-  f.engine.QueuePendingReport("p0", da_obs, DeferralKind::kObserved);
-  f.engine.QueuePendingReport("p0", da_fin, DeferralKind::kFinal);
-
-  f.engine.MatureObservedReports("p0");
-  EXPECT_EQ(f.engine.GetDeferredReportQueue("p0").MaturedCount(), 1u);
+// §16.4.1: the final deferral applies to the cover directive as well -- a
+// cover final action is scheduled into the Postponed region. cover final (1)
+// matches, so `hits = 1` is deferred past the inline `hits = 9`, leaving
+// hits==1.
+TEST(DeferredAssertionReporting, FinalCoverActionDeferredToPostponed) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int hits = 0;\n"
+      "  initial begin\n"
+      "    cover final (1) hits = 1;\n"
+      "    hits = 9;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* var = f.ctx.FindVariable("hits");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-TEST(DeferredAssertionReporting, PerProcessQueuesAreIsolated) {
-  DeferredFixture f;
-  DeferredAssertion da;
-  da.condition_val = 1;
-  f.engine.QueuePendingReport("alpha", da, DeferralKind::kObserved);
-  f.engine.QueuePendingReport("beta", da, DeferralKind::kObserved);
-
-  f.engine.OnDeferredFlushPoint("alpha", FlushPointReason::kEventControlResume);
-  EXPECT_EQ(f.engine.GetDeferredReportQueue("alpha").Size(), 0u);
-  EXPECT_EQ(f.engine.GetDeferredReportQueue("beta").Size(), 1u);
-}
-
-TEST(DeferredAssertionReporting, FailingAssertWithoutElseUsesErrorFallback) {
-  DeferredAssertion da;
-  da.condition_val = 0;
-  da.has_else_clause = false;
-  da.kind = AssertionKind::kAssert;
-  EXPECT_TRUE(UsesErrorSeverityFallback(da));
-}
-
-TEST(DeferredAssertionReporting, CoverDoesNotUseErrorFallback) {
-  DeferredAssertion da;
-  da.condition_val = 0;
-  da.has_else_clause = false;
-  da.kind = AssertionKind::kCover;
-  EXPECT_FALSE(UsesErrorSeverityFallback(da));
-}
-
-TEST(DeferredAssertionReporting, PassingAssertDoesNotUseErrorFallback) {
-  DeferredAssertion da;
-  da.condition_val = 1;
-  da.has_else_clause = false;
-  EXPECT_FALSE(UsesErrorSeverityFallback(da));
-}
-
-TEST(DeferredAssertionReporting, QueuedActionUsesArgValuesAtQueueTime) {
-  DeferredFixture f;
-  uint64_t live_arg = 7;
-  uint64_t captured = 0;
-
-  DeferredAssertion da;
-  da.condition_val = 1;
-  da.pass_action = [snapshot = live_arg, &captured]() { captured = snapshot; };
-  f.engine.QueuePendingReport("p0", da, DeferralKind::kObserved);
-
-  live_arg = 999;
-
-  f.engine.MatureObservedReports("p0");
-  f.engine.ExecuteMaturedObservedInReactive("p0", f.scheduler, SimTime{0});
-  f.scheduler.Run();
-  EXPECT_EQ(captured, 7u);
-}
-
-TEST(DeferredAssertionReporting, FlushedPendingReportIsClearedAndNotExecuted) {
-  DeferredFixture f;
-  int pass_calls = 0;
-
-  DeferredAssertion da;
-  da.condition_val = 1;
-  da.pass_action = [&pass_calls]() { ++pass_calls; };
-  f.engine.QueuePendingReport("p0", da, DeferralKind::kObserved);
-  ASSERT_EQ(f.engine.GetDeferredReportQueue("p0").Size(), 1u);
-
-  f.engine.OnDeferredFlushPoint("p0", FlushPointReason::kEventControlResume);
-  EXPECT_EQ(f.engine.GetDeferredReportQueue("p0").Size(), 0u);
-
-  f.engine.MatureObservedReports("p0");
-  uint32_t scheduled =
-      f.engine.ExecuteMaturedObservedInReactive("p0", f.scheduler, SimTime{0});
-  f.scheduler.Run();
-  EXPECT_EQ(scheduled, 0u);
-  EXPECT_EQ(pass_calls, 0);
-}
-
-TEST(DeferredAssertionReporting, UnmaturedObservedDoesNotScheduleInReactive) {
-  DeferredFixture f;
-  int pass_calls = 0;
-
-  DeferredAssertion da;
-  da.condition_val = 1;
-  da.pass_action = [&pass_calls]() { ++pass_calls; };
-  f.engine.QueuePendingReport("p0", da, DeferralKind::kObserved);
-
-  uint32_t scheduled =
-      f.engine.ExecuteMaturedObservedInReactive("p0", f.scheduler, SimTime{0});
-  f.scheduler.Run();
-  EXPECT_EQ(scheduled, 0u);
-  EXPECT_EQ(pass_calls, 0);
-  EXPECT_EQ(f.engine.GetDeferredReportQueue("p0").Size(), 1u);
-}
-
-TEST(DeferredAssertionReporting, UnmaturedFinalDoesNotScheduleInPostponed) {
-  DeferredFixture f;
-  int fail_calls = 0;
-
-  DeferredAssertion da;
-  da.condition_val = 0;
-  da.fail_action = [&fail_calls]() { ++fail_calls; };
-  f.engine.QueuePendingReport("p0", da, DeferralKind::kFinal);
-
-  uint32_t scheduled =
-      f.engine.ExecuteMaturedFinalInPostponed("p0", f.scheduler, SimTime{0});
-  f.scheduler.Run();
-  EXPECT_EQ(scheduled, 0u);
-  EXPECT_EQ(fail_calls, 0);
-  EXPECT_EQ(f.engine.GetDeferredReportQueue("p0").Size(), 1u);
-}
-
-TEST(DeferredAssertionReporting, FinalPendingReportIsClearedByFlushPoint) {
-  DeferredFixture f;
-  int fail_calls = 0;
-
-  DeferredAssertion da;
-  da.condition_val = 0;
-  da.fail_action = [&fail_calls]() { ++fail_calls; };
-  f.engine.QueuePendingReport("p0", da, DeferralKind::kFinal);
-  ASSERT_EQ(f.engine.GetDeferredReportQueue("p0").Size(), 1u);
-
-  f.engine.OnDeferredFlushPoint("p0", FlushPointReason::kEventControlResume);
-  EXPECT_EQ(f.engine.GetDeferredReportQueue("p0").Size(), 0u);
-
-  f.engine.MatureFinalReports("p0");
-  uint32_t scheduled =
-      f.engine.ExecuteMaturedFinalInPostponed("p0", f.scheduler, SimTime{0});
-  f.scheduler.Run();
-  EXPECT_EQ(scheduled, 0u);
-  EXPECT_EQ(fail_calls, 0);
+// §16.4.1 (negative form): a report is placed in the queue only when the
+// assertion passes or fails with an action to run. A passing observed deferred
+// assert with no pass statement queues nothing, so no report -- and no severity
+// -- is ever produced.
+TEST(DeferredAssertionReporting, PassingDeferredAssertProducesNoReport) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  initial assert #0 (1);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  EXPECT_EQ(f.ctx.LastSeverity(), "");
 }
 
 }  // namespace

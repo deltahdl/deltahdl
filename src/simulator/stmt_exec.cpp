@@ -469,6 +469,22 @@ static void ScheduleDeferredAction(const Stmt* action, bool is_final_deferred,
   ctx.GetScheduler().ScheduleEvent(ctx.CurrentTime(), region, ev);
 }
 
+// §16.4.1: when a deferred assertion fails with no else clause, its default
+// $error report is a pending assertion report rather than an immediate one.
+// Like the action-block subroutine call, it is not emitted where the assertion
+// is processed; it is deferred and executed with the rest of the process's
+// pending reports -- in the Reactive region for an observed (#0) deferred
+// assertion, or in the Postponed region for a final deferred assertion.
+static void ScheduleDeferredSeverityReport(bool is_final_deferred,
+                                           SimContext& ctx) {
+  Region region = is_final_deferred ? Region::kPostponed : Region::kReactive;
+  auto* ev = ctx.GetScheduler().GetEventPool().Acquire();
+  ev->callback = [&ctx]() {
+    EmitSeverityHeader(ctx, "ERROR", "Assertion failed.", std::cerr);
+  };
+  ctx.GetScheduler().ScheduleEvent(ctx.CurrentTime(), region, ev);
+}
+
 // If this assertion is deferred, schedules its pass/fail action in the
 // reactive/postponed region and reports true (the caller should return without
 // running the action inline); otherwise reports false so the caller executes
@@ -557,7 +573,14 @@ static ExecTask ExecImmediateAssert(const Stmt* stmt, SimContext& ctx,
       // $error, unless $assertcontrol FailOff ($assertfailoff) has suppressed
       // the fail action for this assertion's type and directive.
       if (ctx.AssertFailActionEnabled(type_bit, directive_bit)) {
-        EmitSeverityHeader(ctx, "ERROR", "Assertion failed.", std::cerr);
+        // §16.4.1: for a deferred assertion this default report is a pending
+        // report, scheduled with the process's other deferred reports rather
+        // than emitted here; a simple immediate assertion reports at once.
+        if (stmt->is_deferred) {
+          ScheduleDeferredSeverityReport(stmt->is_final_deferred, ctx);
+        } else {
+          EmitSeverityHeader(ctx, "ERROR", "Assertion failed.", std::cerr);
+        }
       }
     }
   }
