@@ -67,6 +67,18 @@ TEST(ArrayAddressingElaboration, PartSelectAfterAllDimensionsAddressed) {
              "endmodule\n"));
 }
 
+// §11.5.2 — the positive boundary for a three-dimensional array: once all three
+// dimensions are addressed the selected item is a vector, so a part-select of
+// it is legal. This is the accepting twin of the rejections below.
+TEST(ArrayAddressingElaboration, PartSelectAfterAllThreeDimensionsAddressed) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  logic [7:0] threed [0:3][0:3][0:7];\n"
+             "  logic [3:0] result;\n"
+             "  initial result = threed[2][1][0][3:0];\n"
+             "endmodule\n"));
+}
+
 // §11.5.2 — the part-select here reaches the third dimension before it has been
 // addressed (only two of the three dimensions are indexed), which is illegal.
 TEST(ArrayAddressingElaboration,
@@ -88,6 +100,19 @@ TEST(ArrayAddressingElaboration,
              "  logic [7:0] threed [0:3][0:3][0:7];\n"
              "  logic [3:0] result;\n"
              "  initial result = threed[2][1][0 +: 4];\n"
+             "endmodule\n"));
+}
+
+// §11.5.2 — the descending indexed part-select form (-:) is likewise rejected
+// when a dimension is left unaddressed; the rule covers every part-select shape
+// of 11.5.1, not just the range and ascending-indexed forms.
+TEST(ArrayAddressingElaboration,
+     DescendingIndexedPartSelectBeforeAllDimensionsAddressedIsIllegal) {
+  EXPECT_FALSE(
+      ElabOk("module m;\n"
+             "  logic [7:0] threed [0:3][0:3][0:7];\n"
+             "  logic [3:0] result;\n"
+             "  initial result = threed[2][1][3 -: 4];\n"
              "endmodule\n"));
 }
 

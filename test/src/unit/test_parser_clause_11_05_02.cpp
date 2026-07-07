@@ -18,19 +18,6 @@ TEST(ArrayAddressingParsing, ArrayElementSelect) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kSelect);
 }
 
-TEST(ArrayAddressingParsing, MultiDimSelect) {
-  auto r = Parse(
-      "module t;\n"
-      "  int arr[4][8];\n"
-      "  initial x = arr[2][5];\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  ASSERT_NE(stmt->rhs, nullptr);
-  EXPECT_EQ(stmt->rhs->kind, ExprKind::kSelect);
-}
-
 TEST(OperatorAndExpressionParsing, NestedBitSelects) {
   auto r = Parse(
       "module t;\n"

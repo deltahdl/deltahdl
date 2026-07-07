@@ -10,34 +10,29 @@ using namespace delta;
 
 namespace {
 
-TEST(ArrayAddressing, ArrayXZAddrReturnsX) {
+// §11.5.2 — the declared address bounds of the memory determine the effect of
+// the address expression; an address with one or more x or z bits is invalid
+// and the read yields x (as described in 7.4.5). Built from real declaration
+// and procedural-read syntax so the memory's declared bounds drive the outcome.
+TEST(ArrayAddressing, XZAddressReadReturnsX) {
   SimFixture f;
-
-  MakeVar(f, "arr4[0]", 8, 0x11);
-  MakeVar(f, "arr4[1]", 8, 0x22);
-  ArrayInfo info{};
-  info.lo = 0;
-  info.size = 2;
-  info.elem_width = 8;
-  f.ctx.RegisterArray("arr4", info);
-
-  auto* sel = f.arena.Create<Expr>();
-  sel->kind = ExprKind::kSelect;
-  sel->base = MakeId(f.arena, "arr4");
-
-  auto* idx = MakeInt(f.arena, 0);
-  sel->index = idx;
-
-  auto* xvar = f.ctx.CreateVariable("xidx", 8);
-  xvar->value = MakeLogic4Vec(f.arena, 8);
-  xvar->value.words[0].aval = 1;
-  xvar->value.words[0].bval = 1;
-  sel->index = MakeId(f.arena, "xidx");
-
-  auto result = EvalExpr(sel, f.ctx, f.arena);
-
-  EXPECT_NE(result.nwords, 0u);
-  EXPECT_NE(result.words[0].bval, 0u);
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] mem [0:3];\n"
+      "  logic [7:0] result;\n"
+      "  logic [1:0] idx;\n"
+      "  initial begin\n"
+      "    mem[1] = 8'h20;\n"
+      "    idx = 2'bx0;\n"
+      "    result = mem[idx];\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* var = f.ctx.FindVariable("result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_FALSE(var->value.IsKnown());
 }
 
 TEST(MemorySimulation, WordWriteAndReadByAddress) {
@@ -68,6 +63,42 @@ TEST(MultidimensionalArraySimulation, TwoDimElementAccess) {
       "endmodule\n",
       "result");
   EXPECT_EQ(v, 0xABu);
+}
+
+// §11.5.2 — access to a multidimensional array supplies one integer expression
+// per addressed dimension. For the three-dimensional form the LRM spells out
+// (threed_array[addr][addr][addr]), addressing all three dimensions selects the
+// whole element word and reads it back intact.
+TEST(MultidimensionalArraySimulation, ThreeDimElementAccess) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  logic [7:0] threed [0:3][0:3][0:7];\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    threed[1][2][3] = 8'hC7;\n"
+      "    result = threed[1][2][3];\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 0xC7u);
+}
+
+// §11.5.2 — the LRM also contrasts an array whose element is a whole vector
+// with one whose element is a single bit (three_array). Supplying an address
+// for every dimension of a single-bit-element array selects exactly that one
+// bit.
+TEST(MultidimensionalArraySimulation, SingleBitElementArrayAccess) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  logic bits [0:3][0:3][0:7];\n"
+      "  logic result;\n"
+      "  initial begin\n"
+      "    bits[1][2][3] = 1'b1;\n"
+      "    result = bits[1][2][3];\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 1u);
 }
 
 TEST(ArrayAddressing, MemoryIndirection) {
@@ -102,24 +133,64 @@ TEST(ArrayAddressing, ComputedIndexExpression) {
   EXPECT_EQ(v, 0xEFu);
 }
 
-TEST(ArrayAddressing, ArrayOOBReturnsX) {
+// §11.5.2 — the address expression may be any integer expression, which
+// includes a reference to a parameter. Built from real parameter-declaration
+// syntax so elaboration folds the constant that then drives the element
+// selection.
+TEST(ArrayAddressing, ParameterIndexReadsElement) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  parameter P = 5;\n"
+      "  logic [7:0] mem [0:7];\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    mem[5] = 8'h3C;\n"
+      "    result = mem[P];\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 0x3Cu);
+}
+
+// §11.5.2 — a localparam address operand takes the same "any integer
+// expression" path; it resolves to its constant value and addresses that word.
+TEST(ArrayAddressing, LocalparamIndexReadsElement) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  localparam L = 6;\n"
+      "  logic [7:0] mem [0:7];\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    mem[6] = 8'h9A;\n"
+      "    result = mem[L];\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 0x9Au);
+}
+
+// §11.5.2 — as with bit-selects, the memory's declared bounds govern the
+// address: an out-of-range address is invalid and a read of a 4-state memory
+// yields x (per 7.4.5). Driven through the full pipeline from real syntax
+// rather than a hand-registered array so the [0:3] declaration is what makes 10
+// invalid.
+TEST(ArrayAddressing, OutOfBoundsAddressReadReturnsX) {
   SimFixture f;
-
-  ArrayInfo info{};
-  info.lo = 0;
-  info.size = 4;
-  info.elem_width = 8;
-  info.is_4state = true;
-  f.ctx.RegisterArray("oob_arr", info);
-  for (uint32_t i = 0; i < 4; ++i) {
-    auto tmp = "oob_arr[" + std::to_string(i) + "]";
-    auto* s = f.arena.AllocString(tmp.c_str(), tmp.size());
-    auto* v = f.ctx.CreateVariable(std::string_view(s, tmp.size()), 8);
-    v->value = MakeLogic4VecVal(f.arena, 8, static_cast<uint64_t>(i + 1) * 10);
-  }
-
-  auto result = EvalExpr(MakeSelect(f.arena, "oob_arr", 10), f.ctx, f.arena);
-  EXPECT_NE(result.words[0].bval, 0u);
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] mem [0:3];\n"
+      "  logic [7:0] result;\n"
+      "  initial begin\n"
+      "    mem[1] = 8'h20;\n"
+      "    result = mem[10];\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* var = f.ctx.FindVariable("result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_FALSE(var->value.IsKnown());
 }
 
 TEST(ArrayAddressing, BitSelectAfterArrayElement) {
