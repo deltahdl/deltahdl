@@ -34,14 +34,22 @@ static bool TryQueueSelect(const Expr* expr, SimContext& ctx, Arena& arena,
   auto* q = ctx.FindQueue(expr->base->text);
   if (!q) return false;
 
+  // §7.10.1: an invalid queue index (an x/z 4-state expression, or a position
+  // outside 0..$) makes the read return the value appropriate for a nonexistent
+  // element of the queue's element type, per Table 7-1 in §7.4.5. That value is
+  // x for a 4-state element type but '0 for a 2-state one, so it must respect
+  // the queue's own state-ness rather than always yielding x.
+  auto nonexistent = [&] {
+    return q->is_4state ? MakeAllX(arena, q->elem_width)
+                        : MakeLogic4VecVal(arena, q->elem_width, 0);
+  };
   bool idx_xz = false;
   auto idx = ResolveQueueIdx(expr->index, q, ctx, arena, &idx_xz);
   if (idx_xz) {
-    out = MakeAllX(arena, q->elem_width);
+    out = nonexistent();
     return true;
   }
-  out = (idx < q->elements.size()) ? q->elements[idx]
-                                   : MakeAllX(arena, q->elem_width);
+  out = (idx < q->elements.size()) ? q->elements[idx] : nonexistent();
   return true;
 }
 
@@ -159,6 +167,44 @@ static bool TryArraySliceSelect(const Expr* expr, SimContext& ctx, Arena& arena,
   out = MakeLogic4Vec(arena, count * ew);
   for (uint32_t i = 0; i < count; ++i) {
     auto n = std::string(expr->base->text) + "[" + std::to_string(lo + i) + "]";
+    auto* v = ctx.FindVariable(n);
+    auto val = v ? v->value.ToUint64() : 0;
+    uint32_t bit_off = i * ew;
+    out.words[bit_off / 64].aval |= (val & ((1ULL << ew) - 1))
+                                    << (bit_off % 64);
+  }
+  return true;
+}
+
+// §7.4.5: a slice may apply to one dimension of a multidimensional unpacked
+// array while the other dimensions carry single index values, e.g. A[i][lo:hi].
+// The outer single-index selection (A[i]) names a subarray whose elements are
+// stored as leaf variables A[i][k]; this reads the addressed contiguous range
+// of those elements and concatenates them, mirroring the single-dimension slice
+// path but with a compound base prefix. A compound base whose prefix is itself
+// a stored packed element is not an array slice (there [hi:lo] is a bit
+// part-select), so those are declined and left to the packed part-select path.
+static bool TryCompoundArraySliceSelect(const Expr* expr, SimContext& ctx,
+                                        Arena& arena, Logic4Vec& out) {
+  if (!expr->index_end || !expr->base) return false;
+  if (expr->base->kind != ExprKind::kSelect) return false;
+  std::string prefix;
+  if (!BuildCompoundName(expr->base, ctx, arena, prefix)) return false;
+  if (ctx.FindVariable(prefix)) return false;
+  auto* info = FindRootArrayInfo(expr, ctx);
+  if (!info) return false;
+  auto hi_val = EvalExpr(expr->index, ctx, arena).ToUint64();
+  auto lo_val = EvalExpr(expr->index_end, ctx, arena).ToUint64();
+  auto lo = std::min(hi_val, lo_val);
+  auto hi = std::max(hi_val, lo_val);
+  // Only treat this as an unpacked slice when the addressed subarray elements
+  // actually exist as leaf variables; otherwise decline.
+  if (!ctx.FindVariable(prefix + "[" + std::to_string(lo) + "]")) return false;
+  auto count = static_cast<uint32_t>(hi - lo + 1);
+  uint32_t ew = info->elem_width;
+  out = MakeLogic4Vec(arena, count * ew);
+  for (uint32_t i = 0; i < count; ++i) {
+    auto n = prefix + "[" + std::to_string(lo + i) + "]";
     auto* v = ctx.FindVariable(n);
     auto val = v ? v->value.ToUint64() : 0;
     uint32_t bit_off = i * ew;
@@ -339,6 +385,7 @@ Logic4Vec EvalSelect(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (TryArrayElementSelect(expr, idx, ctx, arena, result)) return result;
   if (TryCompoundArraySelect(expr, ctx, arena, result)) return result;
   if (TryArraySliceSelect(expr, ctx, arena, result)) return result;
+  if (TryCompoundArraySliceSelect(expr, ctx, arena, result)) return result;
   auto base_val = EvalExpr(expr->base, ctx, arena);
 
   if (base_val.is_string && !expr->index_end)

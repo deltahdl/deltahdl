@@ -5,18 +5,6 @@ using namespace delta;
 
 namespace {
 
-TEST(QueueOpsParsing, SliceWithVariableBounds) {
-  auto r = Parse(
-      "module m;\n"
-      "  int q[$];\n"
-      "  int dst[$];\n"
-      "  int a, b;\n"
-      "  initial dst = {q[a:b]};\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(QueueOpsParsing, SliceWithExpressionBounds) {
   auto r = Parse(
       "module m;\n"

@@ -44,13 +44,6 @@ TEST(QueueOps, IndexReturnsElement) {
   EXPECT_EQ(result.ToUint64(), 20u);
 }
 
-TEST(QueueOps, OutOfBoundsReturnsX) {
-  SimFixture f;
-  MakeQueue(f, "q", {10, 20});
-  auto result = EvalExpr(MakeSelect(f.arena, "q", 5), f.ctx, f.arena);
-  EXPECT_FALSE(result.IsKnown());
-}
-
 TEST(QueueOps, EmptyQueueSizeZero) {
   SimFixture f;
   auto* q = f.ctx.CreateQueue("q", 32);
@@ -69,14 +62,6 @@ TEST(QueueOps, IndexLastElement) {
   MakeQueue(f, "q", {42, 99, 7});
   auto result = EvalExpr(MakeSelect(f.arena, "q", 2), f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 7u);
-}
-
-TEST(QueueOps, NegativeIndexReturnsX) {
-  SimFixture f;
-  MakeQueue(f, "q", {10, 20});
-
-  auto result = EvalExpr(MakeSelect(f.arena, "q", 0xFFFFFFFFu), f.ctx, f.arena);
-  EXPECT_FALSE(result.IsKnown());
 }
 
 TEST(QueueOps, IndexedWriteUpdatesElement) {
@@ -327,6 +312,179 @@ TEST(QueueOps, XZIndexReadReturnsX) {
       MakeSelectExpr(f.arena, MakeId(f.arena, "q"), MakeXLiteral(f.arena));
   auto result = EvalExpr(sel, f.ctx, f.arena);
   EXPECT_FALSE(result.IsKnown());
+}
+
+// §7.10.1: an invalid queue index causes the read to return the value
+// appropriate for a nonexistent element of the queue's element type, as
+// specified by Table 7-1 in §7.4.5. For a 2-state element type (int) that value
+// is a known '0, not x. The queue and its element type are built from real
+// source so the 2-state-ness that selects the Table 7-1 row is produced by the
+// declaration rather than hand-set.
+TEST(QueueOps, OutOfBoundsReadOfTwoStateQueueYieldsZero) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int q[$] = '{10, 20, 30};\n"
+      "  logic [31:0] res;\n"
+      "  initial res = q[5];\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+
+  auto* res = f.ctx.FindVariable("res");
+  ASSERT_NE(res, nullptr);
+  EXPECT_TRUE(res->value.IsKnown());
+  EXPECT_EQ(res->value.ToUint64(), 0u);
+}
+
+// The 4-state counterpart: an out-of-bounds read of a 4-state (logic) queue
+// yields x, the Table 7-1 value for a 4-state element type. Same source-built
+// setup as the 2-state case; only the declared element type differs, so the
+// difference in result must come from the queue's element-type state-ness.
+TEST(QueueOps, OutOfBoundsReadOfFourStateQueueYieldsX) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] q[$] = '{10, 20, 30};\n"
+      "  logic [7:0] res;\n"
+      "  initial res = q[5];\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+
+  auto* res = f.ctx.FindVariable("res");
+  ASSERT_NE(res, nullptr);
+  EXPECT_FALSE(res->value.IsKnown());
+}
+
+// An index expression carrying x/z bits is an invalid index just as an
+// out-of-bounds position is; on a 2-state queue the read still yields the
+// Table 7-1 value '0. Driven from source: the x index is produced by assigning
+// an x literal to a variable used to index the queue.
+TEST(QueueOps, UnknownIndexReadOfTwoStateQueueYieldsZero) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int q[$] = '{10, 20, 30};\n"
+      "  logic [31:0] idx;\n"
+      "  logic [31:0] res;\n"
+      "  initial begin\n"
+      "    idx = 32'bx;\n"
+      "    res = q[idx];\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+
+  auto* res = f.ctx.FindVariable("res");
+  ASSERT_NE(res, nullptr);
+  EXPECT_TRUE(res->value.IsKnown());
+  EXPECT_EQ(res->value.ToUint64(), 0u);
+}
+
+// §7.10.1: in a queue slice q[a:b], the bounds may be arbitrary integral
+// expressions and are NOT required to be constant — the distinguishing
+// relaxation of queues versus the fixed-size array slice/part-select of §7.4.5,
+// whose size must be constant. The slice bounds here are runtime variables
+// assigned at simulation time, and the whole flow (declare, initialize, slice,
+// observe) is driven from source so the non-constant-ness of the bounds is
+// genuinely produced rather than asserted.
+TEST(QueueOps, SliceBoundsMayBeRuntimeVariables) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int q[$] = '{10, 20, 30, 40, 50};\n"
+      "  int dst[$];\n"
+      "  int lo, hi;\n"
+      "  initial begin\n"
+      "    lo = 1;\n"
+      "    hi = 3;\n"
+      "    dst = q[lo:hi];\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+
+  auto* dst = f.ctx.FindQueue("dst");
+  ASSERT_NE(dst, nullptr);
+  ASSERT_EQ(dst->elements.size(), 3u);
+  EXPECT_EQ(dst->elements[0].ToUint64(), 20u);
+  EXPECT_EQ(dst->elements[1].ToUint64(), 30u);
+  EXPECT_EQ(dst->elements[2].ToUint64(), 40u);
+}
+
+// §7.10.1: a queue declared with a right bound (a bounded queue) shall be
+// limited so its size does not exceed N+1. Built from real source: the bound is
+// produced by the `[$:2]` declaration (N=2, so at most 3 elements), and an
+// assignment of five values through the full pipeline is truncated to the
+// limit.
+TEST(QueueOps, BoundedQueueFromSourceLimitsSize) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int q[$:2];\n"
+      "  initial q = {1, 2, 3, 4, 5};\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+
+  auto* q = f.ctx.FindQueue("q");
+  ASSERT_NE(q, nullptr);
+  EXPECT_EQ(q->elements.size(), 3u);
+}
+
+// End-to-end via the §10.9 dependency: a queue value may be written using an
+// assignment pattern. The queue is initialized from `'{...}` in real source and
+// the resulting elements are read back through indexed reads.
+TEST(QueueOps, QueueInitializedByAssignmentPattern) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int q[$] = '{11, 22, 33};\n"
+      "  int a, b, c;\n"
+      "  initial begin\n"
+      "    a = q[0];\n"
+      "    b = q[1];\n"
+      "    c = q[2];\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+
+  auto* q = f.ctx.FindQueue("q");
+  ASSERT_NE(q, nullptr);
+  ASSERT_EQ(q->elements.size(), 3u);
+  EXPECT_EQ(f.ctx.FindVariable("a")->value.ToUint64(), 11u);
+  EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 22u);
+  EXPECT_EQ(f.ctx.FindVariable("c")->value.ToUint64(), 33u);
+}
+
+// End-to-end via the §10.10 dependency: a queue value may be written using an
+// unpacked array concatenation. Assigning `{...}` in real source grows the
+// queue to hold the concatenated elements, which are then observed directly.
+TEST(QueueOps, QueueValueFromUnpackedArrayConcat) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int q[$];\n"
+      "  initial q = {44, 55, 66};\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+
+  auto* q = f.ctx.FindQueue("q");
+  ASSERT_NE(q, nullptr);
+  ASSERT_EQ(q->elements.size(), 3u);
+  EXPECT_EQ(q->elements[0].ToUint64(), 44u);
+  EXPECT_EQ(q->elements[1].ToUint64(), 55u);
+  EXPECT_EQ(q->elements[2].ToUint64(), 66u);
 }
 
 }  // namespace

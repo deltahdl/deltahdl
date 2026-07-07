@@ -62,26 +62,6 @@ TEST(ArrayIndexingAndSlicing, OutOfBoundsReturnsX) {
   EXPECT_FALSE(oob_result.IsKnown());
 }
 
-TEST(ArrayIndexingAndSlicing, TwoStateInvalidIndexReadsZero) {
-  // Table 7-1: an invalid index read of an unpacked array of a 2-state
-  // integral type yields '0 (a known value), in contrast to the 'x produced
-  // for a 4-state element type.
-  SimFixture f;
-
-  f.ctx.RegisterArray("barr",
-                      {0, 4, 8, false, false, false, /*is_4state=*/false});
-  for (uint32_t i = 0; i < 4; ++i) {
-    auto tmp = "barr[" + std::to_string(i) + "]";
-    auto* s = f.arena.AllocString(tmp.c_str(), tmp.size());
-    auto* v = f.ctx.CreateVariable(std::string_view(s, tmp.size()), 8);
-    v->value = MakeLogic4VecVal(f.arena, 8, static_cast<uint64_t>(i + 1) * 10);
-  }
-
-  auto oob = EvalExpr(MakeSelect(f.arena, "barr", 10), f.ctx, f.arena);
-  EXPECT_TRUE(oob.IsKnown());
-  EXPECT_EQ(oob.ToUint64(), 0u);
-}
-
 TEST(ArrayIndexingAndSlicing, UnknownIndexBitMakesIndexInvalid) {
   // An index expression with any x or z bit makes the index invalid, just as
   // an out-of-bounds index does; the read of the 4-state array then returns x.
@@ -131,21 +111,6 @@ TEST(ArrayIndexingAndSlicing, ReadSliceConcat) {
   EXPECT_EQ(result.width, 16u);
 
   EXPECT_EQ(result.ToUint64(), (30u << 8) | 20u);
-}
-
-TEST(ArrayIndexingAndSlicing, WriteOutOfBoundsIsNoop) {
-  SimFixture f;
-
-  MakeArray4(f, "arr");
-
-  auto before = EvalExpr(MakeSelect(f.arena, "arr", 1), f.ctx, f.arena);
-  EXPECT_EQ(before.ToUint64(), 20u);
-
-  auto* oob = f.ctx.FindVariable("arr[10]");
-  EXPECT_EQ(oob, nullptr);
-
-  auto after = EvalExpr(MakeSelect(f.arena, "arr", 1), f.ctx, f.arena);
-  EXPECT_EQ(after.ToUint64(), 20u);
 }
 
 TEST(ArrayIndexingAndSlicing, ExecutedOutOfBoundsWriteLeavesArrayUnchanged) {
@@ -199,6 +164,53 @@ TEST(ArrayIndexingAndSlicing, ExecutedUnknownIndexWriteIsNoop) {
   EXPECT_EQ(e1->value.ToUint64(), 20u);
 }
 
+TEST(ArrayIndexingAndSlicing, SourceTwoStateArrayInvalidReadYieldsZero) {
+  // Table 7-1: reading an unpacked array of a 2-state integral type through an
+  // invalid (out-of-bounds) index yields a known '0, whereas a 4-state element
+  // type yields x. Here the 2-state-ness that selects the Table 7-1 row is
+  // produced by the `byte` declaration rather than hand-set on the array, and
+  // the out-of-bounds read is driven through the full pipeline.
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  byte arr [0:3];\n"
+      "  logic [7:0] res;\n"
+      "  initial begin\n"
+      "    arr[0] = 8'd10;\n"
+      "    arr[1] = 8'd20;\n"
+      "    res = arr[10];\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+
+  auto* res = f.ctx.FindVariable("res");
+  ASSERT_NE(res, nullptr);
+  EXPECT_TRUE(res->value.IsKnown());
+  EXPECT_EQ(res->value.ToUint64(), 0u);
+}
+
+TEST(ArrayIndexingAndSlicing, SliceOfOneDimensionOfMultidimArray) {
+  // §7.4.5: a slice may apply to one dimension while other dimensions carry
+  // single index values. Here the outer dimension is indexed with a single
+  // value (A[1]) and the inner dimension is sliced ([0:1]); the result is the
+  // two addressed elements concatenated (element 0 in the low bits). The array
+  // is built from a real multidimensional declaration and driven end-to-end.
+  auto v = RunAndGet(
+      "module t;\n"
+      "  int A[2][3];\n"
+      "  logic [63:0] r;\n"
+      "  initial begin\n"
+      "    A[1][0] = 10;\n"
+      "    A[1][1] = 20;\n"
+      "    r = A[1][0:1];\n"
+      "  end\n"
+      "endmodule\n",
+      "r");
+  EXPECT_EQ(v, (static_cast<uint64_t>(20) << 32) | 10u);
+}
+
 TEST(ArrayIndexingAndSlicing, PartSelectOnPackedArray) {
   auto v = RunAndGet(
       "module t;\n"
@@ -223,6 +235,28 @@ TEST(ArrayIndexingAndSlicing, IndexedPartSelectPlus) {
       "    vec = 32'hAABBCCDD;\n"
       "    base = 8;\n"
       "    result = vec[base +: 8];\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 0xCCu);
+}
+
+TEST(ArrayIndexingAndSlicing, IndexedPartSelectWidthFromParameter) {
+  // §7.4.5: the part-select size is a constant expression, which §11.2.1 allows
+  // to be a parameter. Complementing the elaborator's acceptance of a parameter
+  // width, this drives the resolved width through the runtime part-select: the
+  // parameter W selects an 8-bit slice at the runtime position, yielding the
+  // same bits a literal 8 would.
+  auto v = RunAndGet(
+      "module t;\n"
+      "  parameter W = 8;\n"
+      "  logic [31:0] vec;\n"
+      "  logic [7:0] result;\n"
+      "  int base;\n"
+      "  initial begin\n"
+      "    vec = 32'hAABBCCDD;\n"
+      "    base = 8;\n"
+      "    result = vec[base +: W];\n"
       "  end\n"
       "endmodule\n",
       "result");
