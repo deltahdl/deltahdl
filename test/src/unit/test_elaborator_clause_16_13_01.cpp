@@ -131,6 +131,21 @@ TEST(MulticlockSequenceLegality, SameClockOtherJoinWithinMulticlockIsLegal) {
   EXPECT_FALSE(CheckMulticlockSequenceLegality(kSubsequences).has_value());
 }
 
+// R1 (§16.13.1): the empty-match restriction applies only once the
+// concatenation genuinely spans more than one clock. A chain of several
+// subsequences that all share one clock collapses to a singly clocked sequence,
+// so an empty-matching subsequence among them stays legal even though the same
+// subsequence would be rejected across a clock boundary. Contrasts with
+// EmptyMatchingInteriorSubsequenceIsIllegal, which differs only in the clocks.
+TEST(MulticlockSequenceLegality, SameClockChainWithEmptyMatchIsLegal) {
+  const std::vector<MulticlockSubsequence> kSubsequences = {
+      {/*clock=*/"clk", MulticlockJoin::kLeading, /*admits_empty=*/false},
+      {/*clock=*/"clk", MulticlockJoin::kSingleDelay, /*admits_empty=*/true},
+      {/*clock=*/"clk", MulticlockJoin::kSingleDelay, /*admits_empty=*/false},
+  };
+  EXPECT_FALSE(CheckMulticlockSequenceLegality(kSubsequences).has_value());
+}
+
 // R2 (§16.13.1): conversely, an operator other than `##1`/`##0` at a boundary
 // whose adjacent subsequences are differently clocked is illegal even when it
 // appears deeper in the chain.
