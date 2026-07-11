@@ -45,11 +45,15 @@ class VpiCallbackSim : public ::testing::Test {
   VpiContext vpi_ctx_;
 };
 
-TEST_F(VpiCallbackSim, RegisterCbReturnsHandle) {
+// §38.36 (Returns row): vpi_register_cb() returns a handle to the callback
+// object. A bare non-null check does not distinguish that object from any other
+// handle kind, so confirm the handle reports its type as a callback object.
+TEST_F(VpiCallbackSim, RegisterCbReturnsCallbackObjectHandle) {
   s_cb_data cb = {};
   cb.reason = cbEndOfSimulation;
   vpiHandle h = vpi_register_cb(&cb);
-  EXPECT_NE(h, nullptr);
+  ASSERT_NE(h, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, h), vpiCallback);
 }
 
 TEST_F(VpiCallbackSim, RegisterCbStmt) {
