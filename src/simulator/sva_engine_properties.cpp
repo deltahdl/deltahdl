@@ -7,14 +7,21 @@
 namespace delta {
 
 PropertyResult EvalImplication(bool antecedent, bool consequent,
-                               bool non_overlapping) {
+                               bool non_overlapping,
+                               bool antecedent_empty_match) {
   // §16.12.7: with no antecedent match the implication holds vacuously. For the
   // overlapped form (|->) the consequent is evaluated at the end point of the
   // match, so the verdict is the consequent's own. For the nonoverlapped form
-  // (|=>) the consequent starts one tick later, so the verdict is deferred and
-  // settled later by ResolveNonOverlapping.
+  // (|=>) the consequent normally starts one tick later, so the verdict is
+  // deferred and settled later by ResolveNonOverlapping. That deferral applies
+  // only to a nonempty match: when the antecedent matches empty, the consequent
+  // starts at the nearest clock tick from where the sequence begins, which for
+  // a singly clocked property is the current clock tick, so the verdict settles
+  // immediately from the consequent just as the overlapped form does.
   if (!antecedent) return PropertyResult::kVacuousPass;
-  if (non_overlapping) return PropertyResult::kPending;
+  if (non_overlapping && !antecedent_empty_match) {
+    return PropertyResult::kPending;
+  }
   return consequent ? PropertyResult::kPass : PropertyResult::kFail;
 }
 
@@ -84,6 +91,20 @@ PropertyResult ResolveNonOverlapping(bool consequent_matched) {
   // after the antecedent match, where the consequent is finally evaluated;
   // this realizes the equivalence of `seq |=> p` with `seq ##1 `true |-> p`.
   return consequent_matched ? PropertyResult::kPass : PropertyResult::kFail;
+}
+
+PropertyResult EvalImplicationOverMatches(
+    const std::vector<PropertyResult>& per_match_consequent) {
+  // §16.12.7: with no antecedent match from the start point there is nothing to
+  // check, so the implication holds vacuously. Otherwise the consequent was
+  // evaluated separately at each match end point, and the attempt holds only if
+  // every one of those evaluations holds; the first failing match forces
+  // overall failure, while a vacuous consequent counts as holding.
+  if (per_match_consequent.empty()) return PropertyResult::kVacuousPass;
+  for (PropertyResult consequent : per_match_consequent) {
+    if (consequent == PropertyResult::kFail) return PropertyResult::kFail;
+  }
+  return PropertyResult::kPass;
 }
 
 PropertyResult EvalPropertyImplies(PropertyResult antecedent,

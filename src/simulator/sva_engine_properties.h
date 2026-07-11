@@ -16,9 +16,15 @@ namespace delta {
 // evaluates the consequent at the end point of the match, so the result is the
 // consequent's verdict; the nonoverlapped form starts the consequent one clock
 // tick later, so its verdict is deferred (kPending) and settled by
-// ResolveNonOverlapping — capturing `seq |=> p` ≡ `seq ##1 `true |-> p`.
+// ResolveNonOverlapping — capturing `seq |=> p` ≡ `seq ##1 `true |-> p`. The
+// deferral of the nonoverlapped form applies only to a nonempty antecedent
+// match: when the antecedent matches empty, the consequent starts at the
+// nearest clock tick from where the sequence evaluation begins, which for a
+// singly clocked property is the current clock tick, so the verdict settles
+// immediately just as the overlapped form does.
 PropertyResult EvalImplication(bool antecedent, bool consequent,
-                               bool non_overlapping);
+                               bool non_overlapping,
+                               bool antecedent_empty_match = false);
 
 // §16.12.3: a negation `not property_expr` returns the opposite verdict of the
 // underlying property_expr — a true underlying evaluation makes the negation
@@ -73,6 +79,20 @@ PropertyResult EvalPropertyCase(const std::vector<PropertyCaseBranch>& branches,
 // reaches the tick after the antecedent match, where the consequent is finally
 // evaluated.
 PropertyResult ResolveNonOverlapping(bool consequent_matched);
+
+// §16.12.7: from a given start point the antecedent sequence_expr may have
+// zero, one, or more than one successful match, and the consequent
+// property_expr is evaluated separately for each match, beginning at that
+// match's end point. The implication from the start point succeeds if, and only
+// if, the consequent holds for every one of those matches; a single match whose
+// consequent fails fails the whole attempt. With no antecedent match at all
+// there is nothing to check and the implication holds vacuously.
+// `per_match_consequent` carries the consequent's verdict at each antecedent
+// match end point, in match order — a vacuous consequent verdict counts as the
+// consequent holding. This aggregates the multi-match semantics that the
+// single-match EvalImplication cannot express on its own.
+PropertyResult EvalImplicationOverMatches(
+    const std::vector<PropertyResult>& per_match_consequent);
 
 // §16.12.8: a property `property_expr1 implies property_expr2` evaluates to
 // true if, and only if, the antecedent fails to hold or the consequent holds —
