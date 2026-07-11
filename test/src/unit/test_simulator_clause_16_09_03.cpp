@@ -108,6 +108,77 @@ TEST(Assertion, FellFalseWhenNotFalling) {
   EXPECT_EQ(monitor.Evaluate("p_fell2", 0), AssertionResult::kFail);
 }
 
+// §16.9.3 ($rose negative form): a falling LSB is not a rise, so $rose returns
+// false when the LSB changes from 1 to 0.
+TEST(Assertion, RoseFalseWhenLsbFalls) {
+  AssertionMonitor monitor;
+  SvaProperty prop;
+  prop.name = "p_rose3";
+  prop.kind = SvaPropertyKind::kRose;
+  prop.signal_name = "sig";
+  monitor.AddProperty(prop);
+
+  monitor.Evaluate("p_rose3", 1);
+  auto* entry = const_cast<AssertionEntry*>(monitor.FindEntry("p_rose3"));
+  entry->cycle_count = 1;
+
+  EXPECT_EQ(monitor.Evaluate("p_rose3", 0), AssertionResult::kFail);
+}
+
+// §16.9.3 ($rose is LSB-only): $rose watches only the least significant bit. A
+// change confined to the higher bits (2'b00 -> 2'b10) does not raise the LSB,
+// so $rose is false even though the value changed. This is the distinction from
+// $changed, which observes the whole value.
+TEST(Assertion, RoseIgnoresHigherBitsWhenLsbUnchanged) {
+  AssertionMonitor monitor;
+  SvaProperty prop;
+  prop.name = "p_rose4";
+  prop.kind = SvaPropertyKind::kRose;
+  prop.signal_name = "sig";
+  monitor.AddProperty(prop);
+
+  monitor.Evaluate("p_rose4", 0);
+  auto* entry = const_cast<AssertionEntry*>(monitor.FindEntry("p_rose4"));
+  entry->cycle_count = 1;
+
+  EXPECT_EQ(monitor.Evaluate("p_rose4", 2), AssertionResult::kFail);
+}
+
+// §16.9.3 ($fell negative form): a rising LSB is not a fall, so $fell returns
+// false when the LSB changes from 0 to 1.
+TEST(Assertion, FellFalseWhenLsbRises) {
+  AssertionMonitor monitor;
+  SvaProperty prop;
+  prop.name = "p_fell3";
+  prop.kind = SvaPropertyKind::kFell;
+  prop.signal_name = "sig";
+  monitor.AddProperty(prop);
+
+  monitor.Evaluate("p_fell3", 0);
+  auto* entry = const_cast<AssertionEntry*>(monitor.FindEntry("p_fell3"));
+  entry->cycle_count = 1;
+
+  EXPECT_EQ(monitor.Evaluate("p_fell3", 1), AssertionResult::kFail);
+}
+
+// §16.9.3 ($fell is LSB-only): a change confined to the higher bits
+// (2'b01 -> 2'b11) leaves the LSB at 1, so $fell is false even though the value
+// changed — the counterpart of the $rose LSB-only case.
+TEST(Assertion, FellIgnoresHigherBitsWhenLsbUnchanged) {
+  AssertionMonitor monitor;
+  SvaProperty prop;
+  prop.name = "p_fell4";
+  prop.kind = SvaPropertyKind::kFell;
+  prop.signal_name = "sig";
+  monitor.AddProperty(prop);
+
+  monitor.Evaluate("p_fell4", 1);
+  auto* entry = const_cast<AssertionEntry*>(monitor.FindEntry("p_fell4"));
+  entry->cycle_count = 1;
+
+  EXPECT_EQ(monitor.Evaluate("p_fell4", 3), AssertionResult::kFail);
+}
+
 // §16.9.3: $stable returns true if the value of the expression did not change.
 TEST(Assertion, StableTrueWhenUnchanged) {
   AssertionMonitor monitor;

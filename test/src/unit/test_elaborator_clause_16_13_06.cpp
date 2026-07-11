@@ -194,4 +194,23 @@ TEST(SequenceMethods, MatchedInSampledValueFunctionIsError) {
       /*argument_uses_matched_method=*/false));
 }
 
+// §16.13.6 (weave with §16.9.3): a sequence on which a method is applied that
+// is not explicitly clocked, and whose clock is not fixed by a
+// §16.13.6-specific context (checker, module/interface/program port,
+// function/task argument, event expression), infers its clocking event using
+// the very same rules as §16.9.3 sampled value functions. Here we drive the
+// shared §16.9.3 inference model directly to confirm §16.13.6 defers to it:
+// outside an assertion it resolves to default clocking, and inside an assertion
+// it defers in turn to the §16.13.3 clock flow rules.
+TEST(SequenceMethods, GeneralClockInferenceReusesSampledValueRules) {
+  EXPECT_TRUE(SequenceMethodClockIsInferredFromContext(
+      SequenceMethodClockContext::kInferredFromSurroundingContext));
+  EXPECT_EQ(InferSampledValueClockingEvent(
+                SampledValueClockContext::kOutsideAssertion),
+            SampledValueClockInference::kFromDefaultClocking);
+  EXPECT_EQ(InferSampledValueClockingEvent(
+                SampledValueClockContext::kAssertionSequenceOrProperty),
+            SampledValueClockInference::kFromClockFlow);
+}
+
 }  // namespace

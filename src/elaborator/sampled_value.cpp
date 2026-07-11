@@ -86,4 +86,23 @@ bool PastArgumentMayReferenceAutomaticVariable(PastArgumentRole role) {
   return false;
 }
 
+SampledValueClockInference InferSampledValueClockingEvent(
+    SampledValueClockContext context) {
+  switch (context) {
+    case SampledValueClockContext::kAssertionSequenceOrProperty:
+      // The clock flow rules of §16.13.3 determine the clocking event.
+      return SampledValueClockInference::kFromClockFlow;
+    case SampledValueClockContext::kDisableConditionOrClockExpression:
+      // No inference here: the call shall be explicitly clocked.
+      return SampledValueClockInference::kRequiresExplicitClock;
+    case SampledValueClockContext::kActionBlock:
+      return SampledValueClockInference::kFromLeadingClock;
+    case SampledValueClockContext::kProcedure:
+      return SampledValueClockInference::kFromProceduralContext;
+    case SampledValueClockContext::kOutsideAssertion:
+      return SampledValueClockInference::kFromDefaultClocking;
+  }
+  return SampledValueClockInference::kRequiresExplicitClock;
+}
+
 }  // namespace delta

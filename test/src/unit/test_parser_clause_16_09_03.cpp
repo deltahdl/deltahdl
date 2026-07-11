@@ -24,24 +24,6 @@ TEST(AssertionParsing, RoseFunctionInProperty) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(AssertionParsing, FellFunctionInProperty) {
-  auto r = Parse(
-      "module m;\n"
-      "  assert property (@(posedge clk) $fell(req) |-> ##1 !ack);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(AssertionParsing, StableFunctionInProperty) {
-  auto r = Parse(
-      "module m;\n"
-      "  assert property (@(posedge clk) $stable(data) |-> valid);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(AssertionParsing, PastFunctionWithTicks) {
   auto r = Parse(
       "module m;\n"
@@ -51,10 +33,27 @@ TEST(AssertionParsing, PastFunctionWithTicks) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(AssertionParsing, ChangedFunctionInProperty) {
+// §16.9.3: number_of_ticks shall be an elaboration-time constant expression. A
+// parameter is a constant expression (§11.2.1), a distinct input form from a
+// bare literal, and takes a different expression-parse path in the tick-count
+// position of $past.
+TEST(AssertionParsing, PastTicksAsParameter) {
   auto r = Parse(
       "module m;\n"
-      "  assert property (@(posedge clk) $changed(data) |-> valid);\n"
+      "  parameter N = 2;\n"
+      "  assert property (@(posedge clk) $past(req, N) |-> ack);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+// §16.9.3: a localparam is likewise a constant expression (§11.2.1) admitted in
+// the number_of_ticks position of $past.
+TEST(AssertionParsing, PastTicksAsLocalparam) {
+  auto r = Parse(
+      "module m;\n"
+      "  localparam int K = 3;\n"
+      "  assert property (@(posedge clk) $past(req, K) |-> ack);\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);

@@ -80,4 +80,49 @@ enum class PastArgumentRole : uint8_t {
 // variables in clocking events and in expression2 of $past.
 bool PastArgumentMayReferenceAutomaticVariable(PastArgumentRole role);
 
+// §16.9.3: for a sampled value function other than $sampled, the clocking event
+// shall be specified explicitly as an argument or inferred from the code where
+// the function is called. These are the calling contexts that select which
+// inference rule applies.
+enum class SampledValueClockContext : uint8_t {
+  // Called in an assertion, sequence, or property: the appropriate clocking
+  // event is the one determined by the clock flow rules (§16.13.3).
+  kAssertionSequenceOrProperty,
+  // Called in a disable condition or a clock expression in an assertion,
+  // sequence, or property: it shall be explicitly clocked (no inference).
+  kDisableConditionOrClockExpression,
+  // Called in an action block of an assertion: the leading clock of the
+  // assertion is used.
+  kActionBlock,
+  // Called in a procedure: the inferred clock, if any, of the procedural
+  // context (§16.14.6) is used.
+  kProcedure,
+  // Called outside an assertion: default clocking (§14.12) is used.
+  kOutsideAssertion,
+};
+
+// §16.9.3: the source of the clocking event for a sampled value function (other
+// than $sampled) whose clocking event is not supplied as an argument.
+enum class SampledValueClockInference : uint8_t {
+  // Determined by the clock flow rules of §16.13.3.
+  kFromClockFlow,
+  // No inference applies; the call shall carry an explicit clocking event. This
+  // is the negative arm: a call in a disable condition or clock expression that
+  // lacks an explicit clock is illegal.
+  kRequiresExplicitClock,
+  // The leading clock of the enclosing assertion.
+  kFromLeadingClock,
+  // The inferred clock of the enclosing procedural context (§16.14.6).
+  kFromProceduralContext,
+  // The default clocking of the enclosing scope (§14.12).
+  kFromDefaultClocking,
+};
+
+// §16.9.3: apply the clocking-event inference rules for a sampled value
+// function (other than $sampled) whose clocking event is not given explicitly
+// as an argument. §16.13.6 reuses these very rules to clock a sequence to which
+// a method is applied when it is not explicitly clocked.
+SampledValueClockInference InferSampledValueClockingEvent(
+    SampledValueClockContext context);
+
 }  // namespace delta

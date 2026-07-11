@@ -127,4 +127,33 @@ TEST(SampledValueFunctions, AutomaticVariablesIllegalInClockAndGating) {
       PastArgumentRole::kClockingEvent));
 }
 
+// §16.9.3: for a sampled value function other than $sampled whose clock is not
+// given as an argument, the clocking event is inferred by the five rules keyed
+// on the calling context. Each context resolves to its own inference source;
+// bullet one defers to the §16.13.3 clock flow rules, and the last falls back
+// to default clocking.
+TEST(SampledValueFunctions, ClockInferenceFollowsCallingContext) {
+  EXPECT_EQ(InferSampledValueClockingEvent(
+                SampledValueClockContext::kAssertionSequenceOrProperty),
+            SampledValueClockInference::kFromClockFlow);
+  EXPECT_EQ(
+      InferSampledValueClockingEvent(SampledValueClockContext::kActionBlock),
+      SampledValueClockInference::kFromLeadingClock);
+  EXPECT_EQ(
+      InferSampledValueClockingEvent(SampledValueClockContext::kProcedure),
+      SampledValueClockInference::kFromProceduralContext);
+  EXPECT_EQ(InferSampledValueClockingEvent(
+                SampledValueClockContext::kOutsideAssertion),
+            SampledValueClockInference::kFromDefaultClocking);
+}
+
+// §16.9.3 (negative form): in a disable condition or a clock expression, no
+// clocking event is inferred — the sampled value function shall be explicitly
+// clocked. This is the closest input the rule must reject rather than resolve.
+TEST(SampledValueFunctions, DisableConditionAndClockExprRequireExplicitClock) {
+  EXPECT_EQ(InferSampledValueClockingEvent(
+                SampledValueClockContext::kDisableConditionOrClockExpression),
+            SampledValueClockInference::kRequiresExplicitClock);
+}
+
 }  // namespace
