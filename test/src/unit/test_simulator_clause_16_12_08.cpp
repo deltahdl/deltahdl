@@ -63,11 +63,20 @@ TEST(SvaEngine, PropertyIff) {
 }
 
 // §16.12.8: a vacuous pass counts as the operand holding, so it behaves like an
-// ordinary pass on either side of implies and iff.
+// ordinary pass on either side of implies and iff. The implies consequent is a
+// distinct, asymmetric operand: a consequent that holds vacuously (as an inner
+// vacuously passing property_expr does) still makes the implication hold, both
+// when the antecedent holds and when it fails to hold.
 TEST(SvaEngine, ImpliesIffTreatVacuousPassAsHolding) {
   EXPECT_EQ(
       EvalPropertyImplies(PropertyResult::kVacuousPass, PropertyResult::kFail),
       PropertyResult::kFail);
+  EXPECT_EQ(
+      EvalPropertyImplies(PropertyResult::kPass, PropertyResult::kVacuousPass),
+      PropertyResult::kPass);
+  EXPECT_EQ(
+      EvalPropertyImplies(PropertyResult::kFail, PropertyResult::kVacuousPass),
+      PropertyResult::kPass);
   EXPECT_EQ(
       EvalPropertyIff(PropertyResult::kVacuousPass, PropertyResult::kPass),
       PropertyResult::kPass);
