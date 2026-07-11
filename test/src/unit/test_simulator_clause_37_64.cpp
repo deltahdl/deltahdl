@@ -68,5 +68,20 @@ TEST_F(Assignment, AssignmentObjectReportsComputedOpTypeThroughDispatch) {
   EXPECT_EQ(vpi_get(vpiOpType, &compound), vpiAddOp);
 }
 
+// D1 default (negative) form: the rule recognizes exactly the normal "="/"<="
+// forms and the 11.4.1 compound operators. Its default branch documents that
+// any other spelling is still treated as an ordinary assignment and reports
+// vpiAssignmentOp. A comparison spelling such as "==" - never a valid
+// assignment operator - exercises that fall-through, and the computed value
+// surfaces unchanged through the public vpi_get(vpiOpType) dispatch.
+TEST_F(Assignment, UnrecognizedOperatorSpellingFallsBackToVpiAssignmentOp) {
+  EXPECT_EQ(VpiAssignmentOpType("=="), vpiAssignmentOp);
+
+  VpiObject fallback;
+  fallback.type = vpiAssignment;
+  fallback.op_type = VpiAssignmentOpType("==");
+  EXPECT_EQ(vpi_get(vpiOpType, &fallback), vpiAssignmentOp);
+}
+
 }  // namespace
 }  // namespace delta
