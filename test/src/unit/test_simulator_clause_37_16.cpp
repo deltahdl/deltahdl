@@ -73,6 +73,18 @@ TEST(NetModel, PackedArrayMemberReadsPackedArrayNetParent) {
   enum_elem.parent = &packed_array_net;
   EXPECT_TRUE(VpiNetIsPackedArrayMember(&enum_elem));
 
+  // A packed union net element and a nested packed array net element are the
+  // other two admitted member kinds under a packed array net.
+  VpiObject union_elem;
+  union_elem.type = vpiUnionNet;
+  union_elem.parent = &packed_array_net;
+  EXPECT_TRUE(VpiNetIsPackedArrayMember(&union_elem));
+
+  VpiObject packed_array_elem;
+  packed_array_elem.type = vpiPackedArrayNet;
+  packed_array_elem.parent = &packed_array_net;
+  EXPECT_TRUE(VpiNetIsPackedArrayMember(&packed_array_elem));
+
   // A plain logic net element does not qualify, even under a packed array net.
   VpiObject logic_elem;
   logic_elem.type = vpiNet;
@@ -158,6 +170,12 @@ TEST_F(NetContext, ImplicitNetDeclarationAndLineNumber) {
   implicit_net.implicit_decl = true;
   EXPECT_EQ(vpi_get(vpiImplicitDecl, &implicit_net), 1);
   EXPECT_EQ(VpiNetLineNo(true, 42), 0);
+
+  // An implicit net has no declaration line, but it still maps to source text:
+  // vpiFile reports the file where it is first referenced (the file recorded on
+  // the net), observed through the public vpi_get_str entry point.
+  implicit_net.file = "first_ref.sv";
+  EXPECT_EQ(std::string(vpi_get_str(vpiFile, &implicit_net)), "first_ref.sv");
 
   VpiObject explicit_net;
   explicit_net.type = vpiNet;
@@ -273,6 +291,25 @@ TEST(NetModel, SizeByNetKind) {
   q.bit_width = 32;
   EXPECT_EQ(VpiNetSize(q), 32);
 
+  // A plain packed logic vector net (e.g. `wire [7:0] w`) is of an integral
+  // data type, so vpiSize is its width in bits - the most common integral form,
+  // reached through the net-family head rather than the integer-net kind.
+  q = {};
+  q.net_type = vpiNet;
+  q.bit_width = 8;
+  EXPECT_EQ(VpiNetSize(q), 8);
+
+  // A bit net and an enum net are likewise sized in bits.
+  q = {};
+  q.net_type = vpiBitNet;
+  q.bit_width = 3;
+  EXPECT_EQ(VpiNetSize(q), 3);
+
+  q = {};
+  q.net_type = vpiEnumNet;
+  q.bit_width = 2;
+  EXPECT_EQ(VpiNetSize(q), 2);
+
   q = {};
   q.net_type = vpiNetBit;
   EXPECT_EQ(VpiNetSize(q), 1);
@@ -385,6 +422,16 @@ TEST(NetModel, ScalarAndVectorRules) {
   EXPECT_FALSE(VpiNetScalar(q));
   EXPECT_TRUE(VpiNetVector(q));
 
+  // A bit net follows the same packed-dimension rule as a logic net: scalar
+  // when it has no packed dimension, a vector once it does.
+  q = {};
+  q.net_type = vpiBitNet;
+  EXPECT_TRUE(VpiNetScalar(q));
+  EXPECT_FALSE(VpiNetVector(q));
+  q.has_packed_dimension = true;
+  EXPECT_FALSE(VpiNetScalar(q));
+  EXPECT_TRUE(VpiNetVector(q));
+
   // A net bit is a scalar.
   q = {};
   q.net_type = vpiNetBit;
@@ -397,19 +444,39 @@ TEST(NetModel, ScalarAndVectorRules) {
   EXPECT_FALSE(VpiNetScalar(q));
   EXPECT_TRUE(VpiNetVector(q));
 
-  // An enum net defers to its base typespec.
+  // An enum net defers to its base typespec: a vector base makes it a vector...
   q = {};
   q.net_type = vpiEnumNet;
   q.base_is_vector = true;
   EXPECT_TRUE(VpiNetVector(q));
   EXPECT_FALSE(VpiNetScalar(q));
+  // ...and a scalar base makes it a scalar.
+  q = {};
+  q.net_type = vpiEnumNet;
+  q.base_is_scalar = true;
+  EXPECT_TRUE(VpiNetScalar(q));
+  EXPECT_FALSE(VpiNetVector(q));
 
-  // An array net defers to an element.
+  // An array net defers to an element: a scalar element makes it a scalar...
   q = {};
   q.net_type = vpiNetArray;
   q.element_is_scalar = true;
   EXPECT_TRUE(VpiNetScalar(q));
   EXPECT_FALSE(VpiNetVector(q));
+  // ...and a vector element makes it a vector.
+  q = {};
+  q.net_type = vpiNetArray;
+  q.element_is_vector = true;
+  EXPECT_TRUE(VpiNetVector(q));
+  EXPECT_FALSE(VpiNetScalar(q));
+
+  // A packed struct net is a vector by the same integral rule as a packed union
+  // net (both flow through the struct/union arm).
+  q = {};
+  q.net_type = vpiStructNet;
+  q.packed = true;
+  EXPECT_TRUE(VpiNetVector(q));
+  EXPECT_FALSE(VpiNetScalar(q));
 
   // A packed struct/union net is integral, so it is a vector (not a scalar); an
   // unpacked one is neither.
@@ -438,6 +505,11 @@ TEST(NetModel, ValuePropertyAvailability) {
       VpiNetHasValueProperty(vpiStructNet, /*packed_struct_union=*/false));
   EXPECT_TRUE(
       VpiNetHasValueProperty(vpiStructNet, /*packed_struct_union=*/true));
+  // An unpacked union net likewise has no value property; a packed one does.
+  EXPECT_FALSE(
+      VpiNetHasValueProperty(vpiUnionNet, /*packed_struct_union=*/false));
+  EXPECT_TRUE(
+      VpiNetHasValueProperty(vpiUnionNet, /*packed_struct_union=*/true));
   EXPECT_TRUE(VpiNetHasValueProperty(vpiNet, false));
   EXPECT_TRUE(VpiNetHasValueProperty(vpiBitNet, false));
 }
@@ -526,6 +598,33 @@ TEST(NetModel, MemberNetNameForms) {
   EXPECT_EQ(VpiNetName(parts), "vec[5]");
   EXPECT_EQ(VpiNetDecompile(parts), "str1.vec[5]");
   EXPECT_EQ(VpiNetFullName(parts), "top.str1.vec[5]");
+
+  // A top-level indexed net has no member prefixes, so vpiName and vpiDecompile
+  // are the same indexed leaf; only vpiFullName carries the scope. (LRM's
+  // top.warr1[1][9] form.)
+  VpiVariableNameParts top_level;
+  top_level.top_scope = "top";
+  top_level.member = "warr1";
+  top_level.index_suffix = "[1][9]";
+  EXPECT_EQ(VpiNetName(top_level), "warr1[1][9]");
+  EXPECT_EQ(VpiNetDecompile(top_level), "warr1[1][9]");
+  EXPECT_EQ(VpiNetFullName(top_level), "top.warr1[1][9]");
+
+  // A net nested more than one struct deep carries every intermediate prefix in
+  // vpiDecompile/vpiFullName but never in vpiName. (LRM's top.str1.inner1.j1.)
+  VpiVariableNameParts nested;
+  nested.top_scope = "top";
+  nested.member_prefixes = {"str1", "inner1"};
+  nested.member = "j1";
+  EXPECT_EQ(VpiNetName(nested), "j1");
+  EXPECT_EQ(VpiNetDecompile(nested), "str1.inner1.j1");
+  EXPECT_EQ(VpiNetFullName(nested), "top.str1.inner1.j1");
+
+  // With no top-level scope, vpiFullName collapses to the vpiDecompile form.
+  VpiVariableNameParts no_scope;
+  no_scope.member = "w";
+  EXPECT_EQ(VpiNetFullName(no_scope), VpiNetDecompile(no_scope));
+  EXPECT_EQ(VpiNetFullName(no_scope), "w");
 }
 
 }  // namespace
