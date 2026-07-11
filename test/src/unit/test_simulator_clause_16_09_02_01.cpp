@@ -60,15 +60,6 @@ TEST(SvaEngine, EmptyConcatRightCollapsesDelayWithTrue) {
   EXPECT_TRUE(r.append_true);
 }
 
-// §16.9.2.1: matching the 0-tick empty case a[*0] runs one tick shorter than
-// the 1-tick case a[*1]; concatenating across a[*0] ##1 b collapses to ##0 b,
-// one fewer tick than a[*1] ##1 b would spend.
-TEST(SvaEngine, EmptyCaseExecutionOneTickShorter) {
-  EmptyConcatResult empty = ConcatEmptyMatch(EmptyConcatSide::kEmptyLeft, 1);
-  EXPECT_TRUE(empty.matchable);
-  EXPECT_EQ(empty.effective_delay, 0u);
-}
-
 // §16.9.2.1: a[*0] ##0 b can never match (empty at zero delay), whereas the
 // fusion `true ##0 b matches whenever b holds. The latter is an ordinary
 // zero-delay match of b.
@@ -116,6 +107,21 @@ TEST(SvaEngine, EmptyConcatRightMinimalDelayStillAppendsTrue) {
 TEST(SvaEngine, RangeAdmittingEmptyBothCasesMatch) {
   EXPECT_TRUE(MatchEmptyOrNonempty(0, /*empty_case_match=*/true,
                                    /*nonempty_case_match=*/true));
+}
+
+// §16.9.2.1 edge case for (empty ##n seq), n>0, the mirror of the right-side
+// minimal-delay case: at n=1 the carried delay collapses to 0, yet the left
+// rule reduces to (##0 seq) and — unlike (seq ##n empty) — appends no trailing
+// `true. This same collapse of a written ##1 down to an effective ##0 is why
+// matching the empty case a[*0] costs one clock tick less than the length-1
+// case a[*1] would. Pinning append_true==false at the boundary where the delay
+// vanishes keeps the (empty ##n seq)/(seq ##n empty) asymmetry from silently
+// degrading into the right-side form once effective_delay reaches its minimum.
+TEST(SvaEngine, EmptyConcatLeftMinimalDelayDoesNotAppendTrue) {
+  EmptyConcatResult r = ConcatEmptyMatch(EmptyConcatSide::kEmptyLeft, 1);
+  EXPECT_TRUE(r.matchable);
+  EXPECT_EQ(r.effective_delay, 0u);
+  EXPECT_FALSE(r.append_true);
 }
 
 }  // namespace
