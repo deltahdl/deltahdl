@@ -398,15 +398,35 @@ void WriteBackSolved(ClassObject* obj, std::vector<RandInfo>& rands,
   }
 }
 
-}  // namespace
+// 18.6.1: enumerate the rand/randc class-handle members visible on the object.
+// Each such member names a sub-object: because randomize() sets "all the random
+// variables and objects", every referenced object is randomized in turn. Walk
+// the inheritance chain so inherited random object handles are included.
+void CollectRandObjectMembers(const ClassTypeInfo* type, SimContext& ctx,
+                              std::vector<std::string>& out) {
+  for (const auto* lvl = type; lvl != nullptr; lvl = lvl->parent) {
+    if (!lvl->decl) continue;
+    for (const ClassMember* m : lvl->decl->members) {
+      if (m->kind == ClassMemberKind::kProperty &&
+          (m->is_rand || m->is_randc) && IsClassHandleMember(m, ctx))
+        out.push_back(std::string(m->name));
+    }
+  }
+}
 
-bool TryEvalRandomizeMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
-                                Logic4Vec& out) {
-  MethodCallParts parts;
-  if (!ExtractMethodCallParts(expr, parts)) return false;
-  if (parts.method_name != "randomize") return false;
-  ClassObject* obj = ResolveRandomizeTarget(ctx, parts);
-  if (!obj) return false;
+// 18.6.1: randomize() sets all of an object's active random variables AND the
+// random objects it references to valid values, succeeding only when every one
+// is solved. Solve this object's own random variables subject to its active
+// constraints and write the results back, then recurse into each non-null rand
+// object-handle member so its own random members are randomized as well; the
+// overall result fails if any sub-object solve fails. The visited set breaks
+// handle cycles so a self- or mutually-referential object graph terminates. A
+// null random object handle references nothing to randomize and is skipped.
+bool RandomizeObject(ClassObject* obj, SimContext& ctx, Arena& arena,
+                     const Expr* expr,
+                     std::unordered_set<const ClassObject*>& visited) {
+  if (!obj || !obj->type) return false;
+  if (!visited.insert(obj).second) return true;
 
   // 18.6.3: seed from the object's own RNG so randomize() draws a fresh result
   // each call while staying reproducible from the object's starting state.
@@ -425,6 +445,33 @@ bool TryEvalRandomizeMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
 
   bool solved = solver.SolveWith({});
   if (solved) WriteBackSolved(obj, rands, solver, arena);
+
+  std::vector<std::string> object_members;
+  CollectRandObjectMembers(obj->type, ctx, object_members);
+  for (const auto& name : object_members) {
+    auto it = obj->properties.find(name);
+    if (it == obj->properties.end()) continue;
+    uint64_t handle = it->second.ToUint64();
+    if (handle == kNullClassHandle) continue;
+    ClassObject* sub = ctx.GetClassObject(handle);
+    if (!sub) continue;
+    if (!RandomizeObject(sub, ctx, arena, expr, visited)) solved = false;
+  }
+  return solved;
+}
+
+}  // namespace
+
+bool TryEvalRandomizeMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
+                                Logic4Vec& out) {
+  MethodCallParts parts;
+  if (!ExtractMethodCallParts(expr, parts)) return false;
+  if (parts.method_name != "randomize") return false;
+  ClassObject* obj = ResolveRandomizeTarget(ctx, parts);
+  if (!obj) return false;
+
+  std::unordered_set<const ClassObject*> visited;
+  bool solved = RandomizeObject(obj, ctx, arena, expr, visited);
   out = MakeLogic4VecVal(arena, 32, solved ? 1 : 0);
   return true;
 }

@@ -1,137 +1,269 @@
-#include <gtest/gtest.h>
-
 #include <cstdint>
 
-#include "simulator/constraint_solver.h"
+#include "fixture_simulator.h"
+#include "helpers_scheduler.h"
 
 using namespace delta;
 
 namespace {
 
-// 18.6.1: randomize() returns 1 when it successfully sets every random variable
-// to a valid value. With a single active random variable and no conflicting
-// constraint the solve succeeds, and the assigned value lies inside the
-// variable's declared domain.
+// 18.6.1: randomize() returns 1 when it successfully sets every active random
+// variable to a valid value. A single random variable (declared with §18.4
+// rand) constrained (§18.5) to a domain is randomized through the real
+// randomize() method; the call reports 1 and the assigned value lies inside the
+// declared domain. Driven from source through the full pipeline so the return
+// value and the write-back both come from the production randomize() path.
 TEST(RandomizeMethod, ReturnsOneAndAssignsValidValue) {
-  ConstraintSolver solver(7);
-  RandVariable v;
-  v.name = "x";
-  v.min_val = 0;
-  v.max_val = 100;
-  solver.AddVariable(v);
-
-  EXPECT_TRUE(solver.Solve());
-  int64_t x = solver.GetValue("x");
-  EXPECT_GE(x, 0);
-  EXPECT_LE(x, 100);
+  const char* src =
+      "class C;\n"
+      "  rand int v;\n"
+      "  constraint rng { v >= 10; v <= 20; }\n"
+      "endclass\n"
+      "module t;\n"
+      "  int ok;\n"
+      "  int good;\n"
+      "  initial begin\n"
+      "    C c = new;\n"
+      "    ok = c.randomize();\n"
+      "    good = (ok == 1 && c.v >= 10 && c.v <= 20) ? 1 : 0;\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "good"), 1u);
 }
 
-// 18.6.1: randomize() generates random values for all the active random
-// variables subject to the active constraints. This mirrors the SimpleSum
-// example: three random variables x, y, z with the constraint z == x + y. A
-// successful solve shall leave the variables holding values that satisfy the
-// constraint and stay within their declared domains.
+// 18.6.1: randomize() generates the random variable's value subject to the
+// active constraints -- the constraint, not chance, dictates the result. A
+// single random variable pinned by an equality constraint is randomized through
+// the real randomize() method: the call returns 1 and the variable holds
+// exactly the value the active constraint requires, observed after driving real
+// new() and randomize() through the full pipeline.
 TEST(RandomizeMethod, RandomizesInstanceSubjectToConstraint) {
-  ConstraintSolver solver(11);
-  RandVariable x;
-  x.name = "x";
-  x.min_val = 0;
-  x.max_val = 7;
-  solver.AddVariable(x);
-  RandVariable y;
-  y.name = "y";
-  y.min_val = 0;
-  y.max_val = 7;
-  solver.AddVariable(y);
-  RandVariable z;
-  z.name = "z";
-  z.min_val = 0;
-  z.max_val = 15;
-  solver.AddVariable(z);
-
-  ConstraintBlock block;
-  block.name = "c";
-  ConstraintExpr sum;
-  sum.kind = ConstraintKind::kCustom;
-  sum.eval_fn = [](const std::unordered_map<std::string, int64_t>& vals) {
-    return vals.at("z") == vals.at("x") + vals.at("y");
-  };
-  block.constraints.push_back(sum);
-  solver.AddConstraintBlock(block);
-
-  EXPECT_TRUE(solver.Solve());
-  int64_t vx = solver.GetValue("x");
-  int64_t vy = solver.GetValue("y");
-  int64_t vz = solver.GetValue("z");
-  EXPECT_EQ(vz, vx + vy);
-  EXPECT_GE(vx, 0);
-  EXPECT_LE(vx, 7);
-  EXPECT_GE(vy, 0);
-  EXPECT_LE(vy, 7);
-  EXPECT_GE(vz, 0);
-  EXPECT_LE(vz, 15);
+  const char* src =
+      "class C;\n"
+      "  rand int v;\n"
+      "  constraint c { v == 42; }\n"
+      "endclass\n"
+      "module t;\n"
+      "  int ok;\n"
+      "  int good;\n"
+      "  initial begin\n"
+      "    C p = new;\n"
+      "    ok = p.randomize();\n"
+      "    good = (ok == 1 && p.v == 42) ? 1 : 0;\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "good"), 1u);
 }
 
 // 18.6.1: otherwise randomize() returns 0. When the active constraints cannot
-// all be satisfied — here a variable is pinned to two different values — the
-// solve fails and reports 0 (false).
+// all be satisfied -- here the same random variable is pinned to two different
+// values -- the solve fails and the method returns 0. Built from real source so
+// the returned status is the one produced by the production randomize() path.
 TEST(RandomizeMethod, ReturnsZeroWhenUnsatisfiable) {
-  ConstraintSolver solver(7);
-  RandVariable v;
-  v.name = "x";
-  v.min_val = 0;
-  v.max_val = 100;
-  solver.AddVariable(v);
-
-  ConstraintBlock block;
-  block.name = "c";
-  ConstraintExpr eq_lo;
-  eq_lo.kind = ConstraintKind::kEqual;
-  eq_lo.var_name = "x";
-  eq_lo.lo = 10;
-  block.constraints.push_back(eq_lo);
-  ConstraintExpr eq_hi;
-  eq_hi.kind = ConstraintKind::kEqual;
-  eq_hi.var_name = "x";
-  eq_hi.lo = 20;
-  block.constraints.push_back(eq_hi);
-  solver.AddConstraintBlock(block);
-
-  EXPECT_FALSE(solver.Solve());
+  const char* src =
+      "class C;\n"
+      "  rand int v;\n"
+      "  constraint bad { v == 10; v == 20; }\n"
+      "endclass\n"
+      "module t;\n"
+      "  int ok;\n"
+      "  initial begin\n"
+      "    C c = new;\n"
+      "    ok = c.randomize();\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "ok"), 0u);
 }
 
 // 18.6.1: randomize() generates values for ALL the active random variables in
-// the object, not merely those named by a constraint. With several active
-// variables and no constraints at all, a successful solve still assigns every
-// one of them a value inside its own declared domain.
+// the object, not merely the ones a single constraint happens to mention. Three
+// independent random variables are each constrained to a distinct disjoint
+// domain; a successful call returns 1 and every one of them lands inside its
+// own range, showing each active variable was randomized.
 TEST(RandomizeMethod, AssignsEveryActiveVariable) {
-  ConstraintSolver solver(3);
-  RandVariable a;
-  a.name = "a";
-  a.min_val = 0;
-  a.max_val = 5;
-  solver.AddVariable(a);
-  RandVariable b;
-  b.name = "b";
-  b.min_val = 10;
-  b.max_val = 20;
-  solver.AddVariable(b);
-  RandVariable c;
-  c.name = "c";
-  c.min_val = 100;
-  c.max_val = 110;
-  solver.AddVariable(c);
+  const char* src =
+      "class C;\n"
+      "  rand int a, b, c;\n"
+      "  constraint r {\n"
+      "    a >= 0; a <= 5;\n"
+      "    b >= 10; b <= 20;\n"
+      "    c >= 100; c <= 110;\n"
+      "  }\n"
+      "endclass\n"
+      "module t;\n"
+      "  int ok;\n"
+      "  int good;\n"
+      "  initial begin\n"
+      "    C o = new;\n"
+      "    ok = o.randomize();\n"
+      "    good = (ok == 1 &&\n"
+      "            o.a >= 0 && o.a <= 5 &&\n"
+      "            o.b >= 10 && o.b <= 20 &&\n"
+      "            o.c >= 100 && o.c <= 110) ? 1 : 0;\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "good"), 1u);
+}
 
-  EXPECT_TRUE(solver.Solve());
-  int64_t va = solver.GetValue("a");
-  int64_t vb = solver.GetValue("b");
-  int64_t vc = solver.GetValue("c");
-  EXPECT_GE(va, 0);
-  EXPECT_LE(va, 5);
-  EXPECT_GE(vb, 10);
-  EXPECT_LE(vb, 20);
-  EXPECT_GE(vc, 100);
-  EXPECT_LE(vc, 110);
+// 18.6.1: randomize() sets each active random variable to a value valid for its
+// declared type. A packed-vector random variable (a §18.4 rand member narrower
+// than the default word) is randomized with no constraint; the call returns 1
+// and the drawn value fits the declared 4-bit width, so it is valid for the
+// variable's type. Input form: a packed-vector rand member rather than a plain
+// int.
+TEST(RandomizeMethod, RandomizesPackedVectorMemberWithinType) {
+  const char* src =
+      "class C;\n"
+      "  rand bit [3:0] nib;\n"
+      "endclass\n"
+      "module t;\n"
+      "  int ok;\n"
+      "  int good;\n"
+      "  initial begin\n"
+      "    C o = new;\n"
+      "    ok = o.randomize();\n"
+      "    good = (ok == 1 && o.nib <= 15) ? 1 : 0;\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "good"), 1u);
+}
+
+// 18.6.1: the same obligation for the narrowest integral type -- a single-bit
+// random variable. Randomizing it returns 1 and leaves it holding a value valid
+// for a 1-bit type (0 or 1). Input form: a single-bit rand member.
+TEST(RandomizeMethod, RandomizesSingleBitMember) {
+  const char* src =
+      "class C;\n"
+      "  rand bit flag;\n"
+      "endclass\n"
+      "module t;\n"
+      "  int ok;\n"
+      "  int good;\n"
+      "  initial begin\n"
+      "    C o = new;\n"
+      "    ok = o.randomize();\n"
+      "    good = (ok == 1 && o.flag <= 1) ? 1 : 0;\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "good"), 1u);
+}
+
+// 18.6.1: an active random variable declared with the §18.4 randc
+// (random-cyclic) modifier is also randomized by randomize() subject to the
+// active constraints. Driving a real randc declaration through the full
+// pipeline, a constraint pins the variable to a single value; the call returns
+// 1 and the variable holds that value -- randomize() handles the randc form,
+// not just plain rand. Input form: a randc §18.4 declaration.
+TEST(RandomizeMethod, RandomizesRandcVariable) {
+  const char* src =
+      "class C;\n"
+      "  randc bit [3:0] v;\n"
+      "  constraint c { v == 5; }\n"
+      "endclass\n"
+      "module t;\n"
+      "  int ok;\n"
+      "  int good;\n"
+      "  initial begin\n"
+      "    C o = new;\n"
+      "    ok = o.randomize();\n"
+      "    good = (ok == 1 && o.v == 5) ? 1 : 0;\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "good"), 1u);
+}
+
+// 18.6.1: randomize() is a virtual method, so a call through a superclass
+// handle is dispatched to the dynamic object and randomizes that object's full
+// set of active random variables -- including a random variable declared only
+// in the derived class, which the static (base) type does not know. Both the
+// inherited base variable and the derived-only variable are set, confirming the
+// call bound to the dynamic type. Input form: the call resolved through a
+// base-class handle.
+TEST(RandomizeMethod, RandomizeIsVirtualDispatchedToDynamicType) {
+  const char* src =
+      "class Base;\n"
+      "  rand int b;\n"
+      "  constraint cb { b == 5; }\n"
+      "endclass\n"
+      "class Derived extends Base;\n"
+      "  rand int d;\n"
+      "  constraint cd { d == 9; }\n"
+      "endclass\n"
+      "module t;\n"
+      "  int ok;\n"
+      "  int good;\n"
+      "  initial begin\n"
+      "    Base bh;\n"
+      "    Derived dh;\n"
+      "    dh = new;\n"
+      "    bh = dh;\n"
+      "    ok = bh.randomize();\n"
+      "    good = (ok == 1 && dh.b == 5 && dh.d == 9) ? 1 : 0;\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "good"), 1u);
+}
+
+// 18.6.1: randomize() is a class method callable on the current object from
+// inside another method through the this handle. A class method invokes
+// this.randomize(); the returned status flows back as the method's int result
+// and the constrained variable is set. Input form: the call in this.-prefixed
+// position inside a class method rather than on an external handle.
+TEST(RandomizeMethod, RandomizeInvokedThroughThisInMethod) {
+  const char* src =
+      "class C;\n"
+      "  rand int v;\n"
+      "  constraint c { v == 7; }\n"
+      "  function int run();\n"
+      "    return this.randomize();\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  int ok;\n"
+      "  int good;\n"
+      "  initial begin\n"
+      "    C o = new;\n"
+      "    ok = o.run();\n"
+      "    good = (ok == 1 && o.v == 7) ? 1 : 0;\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "good"), 1u);
+}
+
+// 18.6.1: randomize() sets all the random variables AND objects to valid
+// values. A rand object-handle member names a sub-object whose own random
+// members must also be randomized by the enclosing call. The outer object
+// constructs its rand inner object in new(); randomizing the outer object
+// returns 1 and, without any separate call on the inner handle, the inner
+// object's constrained random member is set -- so randomize() recursed into the
+// referenced object. Input form: a rand class-handle member (a random
+// sub-object).
+TEST(RandomizeMethod, RandomizesReferencedRandObject) {
+  const char* src =
+      "class Inner;\n"
+      "  rand int x;\n"
+      "  constraint cx { x == 13; }\n"
+      "endclass\n"
+      "class Outer;\n"
+      "  rand Inner inner;\n"
+      "  function new();\n"
+      "    inner = new;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  int ok;\n"
+      "  int rx;\n"
+      "  int good;\n"
+      "  Inner ih;\n"
+      "  initial begin\n"
+      "    Outer o = new;\n"
+      "    ok = o.randomize();\n"
+      "    ih = o.inner;\n"
+      "    rx = ih.x;\n"
+      "    good = (ok == 1 && rx == 13) ? 1 : 0;\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "good"), 1u);
 }
 
 }  // namespace
