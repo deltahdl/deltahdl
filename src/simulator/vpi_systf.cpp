@@ -154,7 +154,13 @@ void VpiContext::GetTime(VpiHandle obj, VpiTime* time_p) {
   uint64_t ticks = 0;
   bool use_sim_time_unit = (obj == nullptr);
   if (obj != nullptr && obj->type == kVpiTimeQueue) {
-    ticks = scheduler_ ? scheduler_->NextEventTime().ticks : 0;
+    // §38.13: report the scheduled time of the future event. An object produced
+    // by the vpi_iterate(vpiTimeQueue, NULL) walk carries its own slot time, so
+    // each iterated slot reports its distinct scheduled time; the generic time
+    // queue placeholder instead reads the scheduler's next future event live.
+    ticks = obj->has_scheduled_time
+                ? obj->time_queue_time
+                : (scheduler_ ? scheduler_->NextEventTime().ticks : 0);
     use_sim_time_unit = true;
   } else {
     ticks = scheduler_ ? scheduler_->CurrentTime().ticks : 0;

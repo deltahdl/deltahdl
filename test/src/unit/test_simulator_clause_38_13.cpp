@@ -142,6 +142,34 @@ TEST_F(VpiGetTimeSim, TimeQueueUsesSimulationTimeUnit) {
   EXPECT_DOUBLE_EQ(out.real, 1000.0);
 }
 
+// §38.13 D2: each time queue object produced by the vpi_iterate(vpiTimeQueue,
+// NULL) walk (§37.81) reports the scheduled time of ITS OWN slot, not a single
+// shared next-event time. Two slots are seeded at 10 and 40 while an unrelated
+// event pends at 50 (so the scheduler's next-event time differs from either
+// slot); vpi_get_time() on each scanned slot reads back that slot's time.
+TEST_F(VpiGetTimeSim, IteratedSlotsReportTheirOwnScheduledTime) {
+  SchedulePendingAt(50);  // scheduler next-event time is 50, matching no slot
+  vpi_ctx_.SetTimeQueueSlots({{40, false, false}, {10, false, false}});
+
+  vpiHandle it = vpi_iterate(vpiTimeQueue, nullptr);
+  ASSERT_NE(it, nullptr);
+
+  vpiHandle first = vpi_scan(it);
+  vpiHandle second = vpi_scan(it);
+  ASSERT_NE(first, nullptr);
+  ASSERT_NE(second, nullptr);
+
+  s_vpi_time t0 = {};
+  t0.type = vpiSimTime;
+  vpi_get_time(first, &t0);
+  EXPECT_EQ(t0.low, 10u);
+
+  s_vpi_time t1 = {};
+  t1.type = vpiSimTime;
+  vpi_get_time(second, &t1);
+  EXPECT_EQ(t1.low, 40u);
+}
+
 // §38.13 shall #3: the destination memory belongs to the application. The
 // routine fills a caller-owned structure in place rather than allocating one,
 // so the caller's local keeps its address and receives the data.

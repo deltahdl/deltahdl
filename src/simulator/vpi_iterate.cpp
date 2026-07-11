@@ -545,6 +545,9 @@ void CollectTimeQueueSlots(
     all_objects.push_back(tq);
     tq->type = kVpiTimeQueue;
     tq->time_queue_time = slot.time;
+    // §38.13: this object stands for a concrete queue slot, so vpi_get_time()
+    // reports its recorded slot time rather than the scheduler's next event.
+    tq->has_scheduled_time = true;
     iter->children.push_back(tq);
   }
 }

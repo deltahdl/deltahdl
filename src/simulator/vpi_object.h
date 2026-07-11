@@ -100,6 +100,13 @@ struct VpiObject {
   // increasing order of this value (detail 1). Zero for any other object.
   uint64_t time_queue_time = 0;
 
+  // §38.13: distinguishes a time queue object that stands for one concrete slot
+  // of the iteration (its scheduled time is time_queue_time) from the generic
+  // time queue placeholder (vpi_get_time() reports the next future event read
+  // live from the scheduler). Set only by the vpi_iterate(vpiTimeQueue, NULL)
+  // walk, so a time-0 slot is not mistaken for the placeholder.
+  bool has_scheduled_time = false;
+
   std::string library_name;
   std::string cell_name;
   std::string config_name;
