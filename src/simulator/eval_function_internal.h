@@ -75,6 +75,13 @@ bool TryEvalEnclosingStaticCall(const Expr* expr, SimContext& ctx, Arena& arena,
 // Defined in eval_randomize.cpp.
 bool TryEvalRandomizeMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
                                 Logic4Vec& out);
+
+// §18.13.3: handle a built-in srandom(int seed) method call on a class handle,
+// seeding that object's RNG. Returns false when the call is not an srandom() on
+// a resolvable class object, so normal method dispatch proceeds. Defined in
+// eval_randomize.cpp.
+bool TryEvalObjectSrandom(const Expr* expr, SimContext& ctx, Arena& arena,
+                          Logic4Vec& out);
 void WritebackOutputArgs(const ModuleItem* func, const Expr* expr,
                          SimContext& ctx, Arena& arena);
 void ExecFunctionBody(const ModuleItem* func, Variable* ret_var,

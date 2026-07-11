@@ -429,4 +429,26 @@ bool TryEvalRandomizeMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
   return true;
 }
 
+bool TryEvalObjectSrandom(const Expr* expr, SimContext& ctx, Arena& arena,
+                          Logic4Vec& out) {
+  MethodCallParts parts;
+  if (!ExtractMethodCallParts(expr, parts)) return false;
+  if (parts.method_name != "srandom") return false;
+  ClassObject* obj = ResolveRandomizeTarget(ctx, parts);
+  if (!obj) return false;
+
+  // §18.13.3: srandom() seeds the object's own RNG with the given seed. The
+  // argument is an int, so evaluate it and narrow to the 32-bit seed. Resetting
+  // the object's stream here makes a following randomize() replay the sequence
+  // keyed by `seed` (§18.14 object stability).
+  uint32_t seed = 0;
+  if (!expr->args.empty()) {
+    seed =
+        static_cast<uint32_t>(EvalExpr(expr->args[0], ctx, arena).ToUint64());
+  }
+  ctx.SeedObjectRng(obj, seed);
+  out = MakeLogic4VecVal(arena, 1, 0);
+  return true;
+}
+
 }  // namespace delta
