@@ -124,5 +124,22 @@ TEST_F(VpiHandleByMultiIndexSim, ReferenceWithoutAccessByIndexReturnsNullptr) {
   EXPECT_EQ(vpi_handle_by_multi_index(param, 1, indices), nullptr);
 }
 
+// §38.20: the routine anchors on any reference object that carries the
+// access-by-index property, not on a module in particular. A net is
+// bit-indexable, so it can serve as the reference handle: the index list
+// descends its element then its trailing bit-select, resolving the same way it
+// does for a module. This exercises the access-by-index positive path on a
+// reference type other than kVpiModule.
+TEST_F(VpiHandleByMultiIndexSim, NetReferenceResolvesElementThenBitSelect) {
+  auto* net = vpi_ctx_.CreateNetObj("bus", /*net_ptr=*/nullptr, /*width=*/8);
+  auto* elem0 = vpi_ctx_.CreatePort("bus0", kVpiInput, net);     // element 0
+  vpi_ctx_.CreatePort("bus1", kVpiInput, net);                   // element 1
+  vpi_ctx_.CreatePort("bus0_0", kVpiInput, elem0);               // bit 0 of [0]
+  auto* bit1 = vpi_ctx_.CreatePort("bus0_1", kVpiInput, elem0);  // bit 1 of [0]
+
+  int indices[] = {0, 1};  // bus[0][1]
+  EXPECT_EQ(vpi_handle_by_multi_index(net, 2, indices), bit1);
+}
+
 }  // namespace
 }  // namespace delta
