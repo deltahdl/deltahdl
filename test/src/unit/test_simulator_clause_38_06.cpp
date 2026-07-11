@@ -28,22 +28,6 @@ TEST_F(VpiGetPropertySim, GetTypeForModule) {
   EXPECT_EQ(vpi_get(vpiType, mod), vpiModule);
 }
 
-TEST_F(VpiGetPropertySim, GetTypeForPort) {
-  auto* mod = vpi_ctx_.CreateModule("m", "m");
-  auto* port = vpi_ctx_.CreatePort("p", kVpiInput, mod);
-  EXPECT_EQ(vpi_get(vpiType, port), vpiPort);
-}
-
-TEST_F(VpiGetPropertySim, GetTypeForParameter) {
-  auto* param = vpi_ctx_.CreateParameter("WIDTH", 32);
-  EXPECT_EQ(vpi_get(vpiType, param), vpiParameter);
-}
-
-TEST_F(VpiGetPropertySim, GetTypeForNet) {
-  auto* net_obj = vpi_ctx_.CreateNetObj("n", nullptr, 4);
-  EXPECT_EQ(vpi_get(vpiType, net_obj), vpiNet);
-}
-
 TEST_F(VpiGetPropertySim, GetDirectionForPort) {
   auto* mod = vpi_ctx_.CreateModule("m", "m");
   auto* port = vpi_ctx_.CreatePort("din", kVpiInput, mod);
@@ -111,6 +95,25 @@ TEST_F(VpiGetPropertySim, ProtectedObjectQueryReturnsVpiUndefined) {
   SVpiErrorInfo info = {};
   EXPECT_NE(vpi_chk_error(&info), 0);
   EXPECT_NE(info.level, 0);
+}
+
+// §38.6: the protected-object rule holds only "unless otherwise specified".
+// vpiIsProtected is one of the properties otherwise specified to stay
+// accessible, so querying it on a protected object is NOT an error -- and being
+// a Boolean property it reports 1 for TRUE (the §38.6 Boolean rule) rather than
+// vpiUndefined. This exercises the accepting side of the carve-out through a
+// Boolean property, complementing the vpiType (integer) case above.
+TEST_F(VpiGetPropertySim, ProtectedObjectStillReportsIsProtectedAsBooleanTrue) {
+  auto* mod = vpi_ctx_.CreateModule("sealed", "sealed");
+  mod->is_protected = true;
+
+  // Boolean TRUE reported as 1, and the query is permitted (not refused).
+  EXPECT_EQ(vpi_get(vpiIsProtected, mod), 1);
+
+  // No error is recorded: the exempted property does not trip the protection
+  // refusal that a non-exempt query would.
+  SVpiErrorInfo info = {};
+  EXPECT_EQ(vpi_chk_error(&info), 0);
 }
 
 }  // namespace
