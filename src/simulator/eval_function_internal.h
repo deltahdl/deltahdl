@@ -92,6 +92,14 @@ bool TryEvalObjectGetRandState(const Expr* expr, SimContext& ctx, Arena& arena,
                                Logic4Vec& out);
 bool TryEvalObjectSetRandState(const Expr* expr, SimContext& ctx, Arena& arena,
                                Logic4Vec& out);
+
+// §18.9: handle a built-in constraint_mode() method call on a class handle,
+// setting a constraint block active/inactive (void form) or returning its
+// current active state (nonvoid form). Returns false when the call is not a
+// constraint_mode() on a resolvable class object, so normal method dispatch
+// proceeds. Defined in eval_randomize.cpp.
+bool TryEvalObjectConstraintMode(const Expr* expr, SimContext& ctx,
+                                 Arena& arena, Logic4Vec& out);
 void WritebackOutputArgs(const ModuleItem* func, const Expr* expr,
                          SimContext& ctx, Arena& arena);
 void ExecFunctionBody(const ModuleItem* func, Variable* ret_var,

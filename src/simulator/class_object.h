@@ -96,6 +96,13 @@ struct ClassObject {
   std::mt19937 rng;
   bool rng_initialized = false;
 
+  // §18.9: constraint_mode() turns a named constraint block active or inactive
+  // for this object. Every block is active when the object is created, so the
+  // default (an absent entry) means active; an explicit entry records the state
+  // a constraint_mode() call last set. A subsequent randomize() consults this
+  // to decide whether each block binds the solve.
+  std::unordered_map<std::string, bool> constraint_active;
+
   Logic4Vec GetProperty(std::string_view name, Arena& arena) const;
 
   void SetProperty(std::string_view name, const Logic4Vec& val);

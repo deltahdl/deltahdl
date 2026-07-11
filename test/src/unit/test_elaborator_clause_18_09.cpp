@@ -17,6 +17,21 @@ TEST(ConstraintModeBuiltin, OverrideRejected) {
              "module m; endmodule\n"));
 }
 
+// 18.9: the override prohibition is by method name, independent of signature.
+// Declaring constraint_mode with the nonvoid (int, no-argument) query
+// signature is just as illegal as the void form.
+TEST(ConstraintModeBuiltin, OverrideViaNonvoidSignatureRejected) {
+  EXPECT_FALSE(
+      ElabOk("class C;\n"
+             "  rand int x;\n"
+             "  constraint c { x > 0; }\n"
+             "  function int constraint_mode();\n"
+             "    return 1;\n"
+             "  endfunction\n"
+             "endclass\n"
+             "module m; endmodule\n"));
+}
+
 // A class that defines an ordinary method and leaves constraint_mode alone
 // elaborates cleanly.
 TEST(ConstraintModeBuiltin, NonOverridingClassAccepted) {
@@ -86,6 +101,29 @@ TEST(ConstraintModeNamedBlock, InheritedConstraintAccepted) {
              "endmodule\n"));
 }
 
+// 18.9: the existence check searches the whole class hierarchy, so a name that
+// appears in neither the derived class nor any of its base classes is the
+// error case. This exercises the multi-level walk returning "not found" across
+// two levels, distinct from the single-class rejection.
+TEST(ConstraintModeNamedBlock, MissingConstraintAcrossHierarchyRejected) {
+  EXPECT_FALSE(
+      ElabOk("class Base;\n"
+             "  rand int x;\n"
+             "  constraint base_c { x > 0; }\n"
+             "endclass\n"
+             "class Derived extends Base;\n"
+             "  rand int y;\n"
+             "  constraint deriv_c { y > 0; }\n"
+             "endclass\n"
+             "module m;\n"
+             "  Derived d;\n"
+             "  initial begin\n"
+             "    d = new;\n"
+             "    d.nonexistent.constraint_mode(0);\n"
+             "  end\n"
+             "endmodule\n"));
+}
+
 // 18.9: the no-name form applies to every constraint in the object and is
 // allowed only as a void call. Because it names no constraint block, the
 // existence check shall not fire: a call with no constraint identifier
@@ -101,6 +139,45 @@ TEST(ConstraintModeNamedBlock, UnnamedFormNotTreatedAsMissingBlock) {
              "  initial begin\n"
              "    p = new;\n"
              "    p.constraint_mode(0);\n"
+             "  end\n"
+             "endmodule\n"));
+}
+
+// 18.9: omitting the constraint name is allowed only in the void form, which
+// takes an on/off argument. A call that names no constraint and passes no
+// argument is neither a legal void call nor a legal nonvoid query (the query
+// form must name a block), so it is rejected.
+TEST(ConstraintModeNamedBlock, UnnamedNoArgQueryRejected) {
+  EXPECT_FALSE(
+      ElabOk("class Packet;\n"
+             "  rand int x;\n"
+             "  constraint filter1 { x > 0; }\n"
+             "endclass\n"
+             "module m;\n"
+             "  Packet p;\n"
+             "  int q;\n"
+             "  initial begin\n"
+             "    p = new;\n"
+             "    q = p.constraint_mode();\n"
+             "  end\n"
+             "endmodule\n"));
+}
+
+// 18.9: the nonvoid query form is legal when it names a constraint block. This
+// guards the no-name/no-argument rejection above from over-firing: a named,
+// argument-less constraint_mode() query still elaborates cleanly.
+TEST(ConstraintModeNamedBlock, NamedNoArgQueryAccepted) {
+  EXPECT_TRUE(
+      ElabOk("class Packet;\n"
+             "  rand int x;\n"
+             "  constraint filter1 { x > 0; }\n"
+             "endclass\n"
+             "module m;\n"
+             "  Packet p;\n"
+             "  int q;\n"
+             "  initial begin\n"
+             "    p = new;\n"
+             "    q = p.filter1.constraint_mode();\n"
              "  end\n"
              "endmodule\n"));
 }

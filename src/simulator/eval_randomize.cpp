@@ -274,6 +274,52 @@ bool BuildDistConstraint(const ConstraintDistRef& ref, RandomizeCtx& rc,
   return true;
 }
 
+// 18.9: report whether a constraint block is active on this object. Every block
+// is active when the object is created, so an absent entry means active.
+bool IsObjectConstraintActive(const ClassObject* obj, std::string_view name) {
+  auto it = obj->constraint_active.find(std::string(name));
+  return it == obj->constraint_active.end() ? true : it->second;
+}
+
+// 18.9 / Table 18-4: record a block's active (ON) or inactive (OFF) state for
+// this object, as set by a void-form constraint_mode() call.
+void SetObjectConstraintActive(ClassObject* obj, std::string_view name,
+                               bool active) {
+  obj->constraint_active[std::string(name)] = active;
+}
+
+// 18.9: match a constraint_mode() method call and pull out the object handle
+// name and, for the named form obj.constraint_id.constraint_mode(...), the
+// constraint block name. The no-name form obj.constraint_mode(...) leaves
+// constraint_name empty. Returns false for any other call so normal method
+// dispatch proceeds.
+bool ExtractConstraintModeParts(const Expr* expr, std::string_view& obj_name,
+                                std::string_view& constraint_name) {
+  if (!expr || expr->kind != ExprKind::kCall) return false;
+  const Expr* callee = expr->lhs;
+  if (!callee || callee->kind != ExprKind::kMemberAccess) return false;
+  if (!callee->rhs || callee->rhs->kind != ExprKind::kIdentifier) return false;
+  if (callee->rhs->text != "constraint_mode") return false;
+
+  const Expr* recv = callee->lhs;
+  if (!recv) return false;
+  // No-name form: the receiver is the object handle itself.
+  if (recv->kind == ExprKind::kIdentifier) {
+    obj_name = recv->text;
+    constraint_name = {};
+    return true;
+  }
+  // Named form: the receiver is object.constraint_id.
+  if (recv->kind == ExprKind::kMemberAccess && recv->lhs &&
+      recv->lhs->kind == ExprKind::kIdentifier && recv->rhs &&
+      recv->rhs->kind == ExprKind::kIdentifier) {
+    obj_name = recv->lhs->text;
+    constraint_name = recv->rhs->text;
+    return true;
+  }
+  return false;
+}
+
 void AddConstraintMember(const ClassMember* m, std::vector<RandInfo>& rands,
                          RandomizeCtx& rc, ConstraintSolver& solver) {
   ConstraintBlock block;
@@ -323,6 +369,9 @@ void AddConstraintMember(const ClassMember* m, std::vector<RandInfo>& rands,
     rc.soft_inners.push_back(std::move(inner));
     block.constraints.push_back(std::move(sc));
   }
+  // 18.9: a block turned inactive by constraint_mode() is not considered by
+  // randomize(); it is created active, so an unset block stays enabled.
+  block.enabled = IsObjectConstraintActive(rc.obj, m->name);
   solver.AddConstraintBlock(block);
 }
 
@@ -531,6 +580,46 @@ bool TryEvalObjectSetRandState(const Expr* expr, SimContext& ctx, Arena& arena,
     state = Logic4VecToString(EvalExpr(expr->args[0], ctx, arena));
   }
   ctx.SetRandState(obj, state);
+  out = MakeLogic4VecVal(arena, 1, 0);
+  return true;
+}
+
+bool TryEvalObjectConstraintMode(const Expr* expr, SimContext& ctx,
+                                 Arena& arena, Logic4Vec& out) {
+  std::string_view obj_name;
+  std::string_view constraint_name;
+  if (!ExtractConstraintModeParts(expr, obj_name, constraint_name))
+    return false;
+  MethodCallParts parts;
+  parts.var_name = obj_name;
+  ClassObject* obj = ResolveRandomizeTarget(ctx, parts);
+  if (!obj) return false;
+
+  // 18.9 nonvoid form: called with no argument, constraint_mode() returns the
+  // current active state of the named block -- 1 (ON) when active, 0 (OFF) when
+  // inactive.
+  if (expr->args.empty()) {
+    bool active = IsObjectConstraintActive(obj, constraint_name);
+    out = MakeLogic4VecVal(arena, 32, active ? 1 : 0);
+    return true;
+  }
+
+  // 18.9 / Table 18-4 void form: the argument selects ON (nonzero) or OFF
+  // (zero). A named call sets that one block; a call with no constraint
+  // identifier applies to every constraint block in the object's class
+  // hierarchy.
+  bool on = EvalExpr(expr->args[0], ctx, arena).ToUint64() != 0;
+  if (constraint_name.empty()) {
+    for (const auto* lvl = obj->type; lvl != nullptr; lvl = lvl->parent) {
+      if (!lvl->decl) continue;
+      for (const ClassMember* m : lvl->decl->members) {
+        if (m->kind == ClassMemberKind::kConstraint)
+          SetObjectConstraintActive(obj, m->name, on);
+      }
+    }
+  } else {
+    SetObjectConstraintActive(obj, constraint_name, on);
+  }
   out = MakeLogic4VecVal(arena, 1, 0);
   return true;
 }

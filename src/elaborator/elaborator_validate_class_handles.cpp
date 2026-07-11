@@ -302,6 +302,47 @@ static void CheckNamedConstraintModeExists(
                          constraint_name, it->second));
 }
 
+// 18.9: constraint_mode() has two forms -- a void form that takes an on/off
+// argument (the constraint name is optional and, when omitted, the operation
+// applies to all constraints) and a nonvoid form that takes no argument and
+// reports one named block's state. Omitting the constraint name is only
+// permitted in the void (argument-bearing) form, so a call that names no
+// constraint AND passes no argument matches neither form and is illegal. Detect
+// the no-name form -- the receiver of constraint_mode is the object handle
+// itself, not object.constraint_id -- with an empty argument list, on a handle
+// whose class type is known.
+static void CheckUnnamedConstraintModeHasArgument(
+    const Stmt* s,
+    const std::unordered_map<std::string_view, std::string_view>& var_types,
+    const CompilationUnit* unit, DiagEngine& diag) {
+  const Expr* call = ExtractCallFromStmt(s);
+  if (!call) return;
+  const Expr* callee = call->lhs;
+  if (!callee || callee->kind != ExprKind::kMemberAccess) return;
+  if (!callee->rhs || callee->rhs->kind != ExprKind::kIdentifier) return;
+  if (callee->rhs->text != "constraint_mode") return;
+
+  // The no-name form's receiver is the plain object handle; the named form's
+  // receiver is a member access (object.constraint_id) and is handled
+  // elsewhere.
+  const Expr* recv = callee->lhs;
+  if (!recv || recv->kind != ExprKind::kIdentifier) return;
+
+  // Only diagnose when the receiver is a known class handle, mirroring the
+  // named-form check: an unresolved receiver stays silent.
+  auto it = var_types.find(recv->text);
+  if (it == var_types.end()) return;
+  const auto* cls = FindClassDecl(it->second, unit);
+  if (!cls || cls->is_interface) return;
+
+  if (!call->args.empty()) return;
+
+  diag.Error(callee->rhs->range.start,
+             "constraint_mode() called with no constraint name requires an "
+             "on/off argument; the no-argument query form must name a "
+             "constraint block");
+}
+
 // Reject a 'new' constructor call assigned to a handle whose declared type
 // cannot be constructed: the built-in 'process' class and interface classes.
 static void CheckNewOnUnconstructibleHandle(
@@ -453,6 +494,8 @@ void Elaborator::WalkStmtsForClassHandleOps(const Stmt* s) {
   CheckInterfaceHandleRandConstraintMode(s, class_var_types_, unit_, diag_);
 
   CheckNamedConstraintModeExists(s, class_var_types_, unit_, diag_);
+
+  CheckUnnamedConstraintModeHasArgument(s, class_var_types_, unit_, diag_);
 
   CheckClassHandleExpr(s->rhs, class_var_names_, class_var_types_, unit_,
                        diag_);
