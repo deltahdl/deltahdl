@@ -207,4 +207,36 @@ TEST(GenerateSimulation, GenerateCaseMultiplePatternsPerItem) {
   EXPECT_EQ(var->value.ToUint64(), 11u);
 }
 
+TEST(GenerateSimulation, GenvarGatedConditionalDrivesValue) {
+  // §27.5 end-to-end over the §27.4 loop-generate dependency: a conditional
+  // generate nested in a loop generate is selected per iteration using the
+  // loop genvar as its constant. Only the i==2 iteration takes the (else-less)
+  // then-branch, so exactly one continuous assignment to the module-level
+  // result survives; the others select nothing. The input is built from real
+  // loop-generate syntax and driven through the full pipeline, and the selected
+  // block's assignment is observed by its simulated result.
+  LowerFixture f;
+  auto* design = ElaborateSrc(
+      "module t ();\n"
+      "  logic [31:0] r;\n"
+      "  generate\n"
+      "    for (genvar i = 0; i < 4; i = i + 1) begin : g\n"
+      "      if (i == 2) begin\n"
+      "        assign r = 77;\n"
+      "      end\n"
+      "    end\n"
+      "  endgenerate\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* var = f.ctx.FindVariable("r");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 77u);
+}
+
 }  // namespace

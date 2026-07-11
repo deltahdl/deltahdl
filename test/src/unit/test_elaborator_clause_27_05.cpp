@@ -180,6 +180,87 @@ TEST(GenerateElaboration, GenerateCaseMultiplePatternsPerItem) {
   EXPECT_FALSE(found_late);
 }
 
+TEST(GenerateElaboration, GenerateIfSelectsOnLocalparam) {
+  // §27.5: the selecting constant expression is evaluated during elaboration.
+  // A localparam is a valid constant form for it and resolves through a
+  // different path than a header parameter (its value is fixed by a body
+  // declaration), so the if-generate must select against the resolved
+  // localparam value.
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module top ();\n"
+      "  localparam MODE = 1;\n"
+      "  if (MODE == 1) begin\n"
+      "    logic sel_then;\n"
+      "  end else begin\n"
+      "    logic sel_else;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  auto* mod = design->top_modules[0];
+  bool found_then = false, found_else = false;
+  for (const auto& v : mod->variables) {
+    if (v.name == "sel_then") found_then = true;
+    if (v.name == "sel_else") found_else = true;
+  }
+  EXPECT_TRUE(found_then);
+  EXPECT_FALSE(found_else);
+}
+
+TEST(GenerateElaboration, GenerateCaseSelectsOnLocalparam) {
+  // §27.5: a case-generate selector may likewise be a localparam constant,
+  // selecting the matching item at elaboration.
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module top ();\n"
+      "  localparam SEL = 2;\n"
+      "  case (SEL)\n"
+      "    1: logic [7:0] one;\n"
+      "    2: logic [7:0] two;\n"
+      "    default: logic [7:0] def;\n"
+      "  endcase\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  auto* mod = design->top_modules[0];
+  bool found_two = false, found_one = false, found_def = false;
+  for (const auto& v : mod->variables) {
+    if (v.name == "one") found_one = true;
+    if (v.name == "two") found_two = true;
+    if (v.name == "def") found_def = true;
+  }
+  EXPECT_TRUE(found_two);
+  EXPECT_FALSE(found_one);
+  EXPECT_FALSE(found_def);
+}
+
+TEST(GenerateElaboration, GenerateCaseSelectsOnLiteralSelector) {
+  // §27.5: the case-generate selector may be a plain literal constant, chosen
+  // at elaboration with no parameter or localparam involved.
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module top ();\n"
+      "  case (3)\n"
+      "    1: logic [7:0] one;\n"
+      "    3: logic [7:0] three;\n"
+      "    default: logic [7:0] def;\n"
+      "  endcase\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  auto* mod = design->top_modules[0];
+  bool found_three = false, found_one = false, found_def = false;
+  for (const auto& v : mod->variables) {
+    if (v.name == "one") found_one = true;
+    if (v.name == "three") found_three = true;
+    if (v.name == "def") found_def = true;
+  }
+  EXPECT_TRUE(found_three);
+  EXPECT_FALSE(found_one);
+  EXPECT_FALSE(found_def);
+}
+
 TEST(GenerateElaboration, SameNamedBlocksAcrossAlternativesAllowed) {
   // §27.5: because at most one alternative of a conditional generate construct
   // is instantiated, more than one block within a single construct may carry
@@ -277,6 +358,57 @@ TEST(GenerateElaboration, CaseAndIfBlockNameCollideAcrossConstructsIsError) {
       "  case (P)\n"
       "    1: begin : shared logic b; end\n"
       "  endcase\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(GenerateElaboration, GenvarSelectsConditionalBranchPerIteration) {
+  // §27.5: the selecting constant expression of a conditional generate is
+  // evaluated during elaboration. When the conditional generate is nested in a
+  // loop generate (§27.4), the loop genvar is a valid constant form for that
+  // expression, so each iteration can select a different alternative. Here the
+  // first iteration takes the then-branch and the remaining iterations take the
+  // else-branch, proving selection is re-evaluated against the per-iteration
+  // genvar value rather than fixed once.
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module top ();\n"
+      "  for (genvar i = 0; i < 3; i = i + 1) begin : g\n"
+      "    if (i == 0) begin\n"
+      "      logic first_only;\n"
+      "    end else begin\n"
+      "      logic rest_block;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  int first_count = 0, rest_count = 0;
+  for (const auto& v : mod->variables) {
+    if (v.name.find("first_only") != std::string_view::npos) ++first_count;
+    if (v.name.find("rest_block") != std::string_view::npos) ++rest_count;
+  }
+  EXPECT_EQ(first_count, 1);  // only the i==0 iteration
+  EXPECT_EQ(rest_count, 2);   // the i==1 and i==2 iterations
+}
+
+TEST(GenerateElaboration, BlockNameCollidesWithLoopGenerateIsError) {
+  // §27.5: the prohibition on sharing a block name across generate constructs
+  // in the same scope covers loop generate constructs as well -- a conditional
+  // generate block may not reuse the array name of a loop generate construct,
+  // even though neither block is selected for instantiation together.
+  ElabFixture f;
+  Elaborate(
+      "module top #(parameter P = 1) ();\n"
+      "  if (P) begin : shared\n"
+      "    logic a;\n"
+      "  end\n"
+      "  for (genvar i = 0; i < 2; i = i + 1) begin : shared\n"
+      "    logic b;\n"
+      "  end\n"
       "endmodule\n",
       f);
   EXPECT_TRUE(f.has_errors);
