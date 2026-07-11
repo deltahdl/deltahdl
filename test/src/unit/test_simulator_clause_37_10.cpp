@@ -80,6 +80,43 @@ TEST(InstanceModel, InstanceOfReturnsImmediateEnclosingInstance) {
   EXPECT_EQ(VpiInstanceOf(&orphan), nullptr);
 }
 
+// D3 (end to end): the vpiInstance relation is reachable through the production
+// vpi_handle() entry point, which skips intervening non-instance scopes to
+// reach the immediate enclosing instance and reports none when nothing encloses
+// it.
+TEST(InstanceModel, HandleVpiInstanceReachesImmediateEnclosingInstance) {
+  VpiContext ctx;
+  SetGlobalVpiContext(&ctx);
+
+  VpiObject program;
+  program.type = vpiProgram;
+  VpiObject module;
+  module.type = vpiModule;
+  module.parent = &program;
+  VpiObject block;  // a non-instance scope between the object and its instance
+  block.type = vpiNamedBegin;
+  block.parent = &module;
+  VpiObject net;
+  net.type = vpiNet;
+  net.parent = &block;
+
+  EXPECT_EQ(vpi_handle(vpiInstance, &net), &module);
+
+  // The immediate instance need not be a module: an object directly inside an
+  // interface resolves to that interface through the same entry point.
+  VpiObject iface;
+  iface.type = vpiInterface;
+  VpiObject iface_net;
+  iface_net.type = vpiNet;
+  iface_net.parent = &iface;
+  EXPECT_EQ(vpi_handle(vpiInstance, &iface_net), &iface);
+
+  // With no enclosing instance the relation resolves to no handle.
+  VpiObject orphan;
+  orphan.type = vpiNet;
+  EXPECT_EQ(vpi_handle(vpiInstance, &orphan), nullptr);
+}
+
 // D2: vpiModule returns the nearest enclosing module, and null when the object
 // lives inside a non-module instance only.
 TEST(InstanceModel, ModuleOfReturnsEnclosingModuleOrNull) {
@@ -243,6 +280,26 @@ TEST(InstanceModel, InstanceOfReportsNonModuleInstance) {
   net.parent = &iface;
 
   EXPECT_EQ(VpiInstanceOf(&net), &iface);
+}
+
+// D3 edge: the four instance kinds all count as the immediate instance. The
+// module and interface forms are covered above; here an object directly inside
+// a package resolves to that package, and one directly inside a program
+// resolves to that program.
+TEST(InstanceModel, InstanceOfResolvesPackageAndProgramInstances) {
+  VpiObject package;
+  package.type = vpiPackage;
+  VpiObject const_in_package;
+  const_in_package.type = vpiReg;
+  const_in_package.parent = &package;
+  EXPECT_EQ(VpiInstanceOf(&const_in_package), &package);
+
+  VpiObject program;
+  program.type = vpiProgram;
+  VpiObject net_in_program;
+  net_in_program.type = vpiNet;
+  net_in_program.parent = &program;
+  EXPECT_EQ(VpiInstanceOf(&net_in_program), &program);
 }
 
 // D5 edge: an empty member path still produces a well-formed package boundary,

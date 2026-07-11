@@ -604,6 +604,22 @@ bool TryResolveTimingAndNettypeRelation(int type, VpiHandle ref,
   return TryResolveNettypeRelation(type, ref, out);
 }
 
+// §37.10 detail 3: vpi_handle(vpiInstance, obj) resolves to the immediate
+// enclosing instance - the nearest package, module, interface, or program the
+// object is instantiated in. The relation is not stored as a designated pointer
+// on the object; it is derived by walking outward through the scope chain, so
+// it is resolved here rather than by the generic single-level parent/child walk
+// below (which would miss any intervening non-instance scope such as a named
+// begin block). A null result is the correct answer when no instance encloses
+// the object, so this always claims the relation.
+bool TryResolveInstanceRelation(int type, VpiHandle ref, VpiHandle& out) {
+  if (type == vpiInstance) {
+    out = VpiInstanceOf(ref);
+    return true;
+  }
+  return false;
+}
+
 // Runs the designated-pointer relation groups in their original order, stopping
 // at the first group that resolves the relation. Returns true (with the result
 // in `out`) when one fired; false when none did, leaving the caller to fall
@@ -617,7 +633,8 @@ bool TryResolveDesignatedRelation(int type, VpiHandle ref, VpiHandle& out) {
          TryResolveAssignAndStmtRelation(type, ref, out) ||
          TryResolveIndexRelation(type, ref, out) ||
          TryResolvePrefixWithRelation(type, ref, out) ||
-         TryResolveTimingAndNettypeRelation(type, ref, out);
+         TryResolveTimingAndNettypeRelation(type, ref, out) ||
+         TryResolveInstanceRelation(type, ref, out);
 }
 
 }  // namespace
