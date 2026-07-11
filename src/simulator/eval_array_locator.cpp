@@ -571,13 +571,24 @@ bool TryCollectLocatorResult(const Expr* expr, SimContext& ctx, Arena& arena,
   }
 
   auto* info = ctx.FindArrayInfo(parts.var_name);
+  ArrayInfo queue_info;
   if (!info) {
     // Associative arrays are stored separately and honor index-type returns
     // and key ordering through a dedicated path.
     if (auto* aa = ctx.FindAssocArray(parts.var_name))
       return TryCollectAssocLocatorResult(LocatorEnv{expr, ctx, arena}, parts,
                                           *aa, out);
-    return false;
+    // §7.12.1 — locator methods operate on any unpacked array, which includes a
+    // queue (§7.10). A queue carries no ArrayInfo of its own, so describe it as
+    // a dynamic array; the element-collection path then reads its elements from
+    // the queue store keyed by the same name.
+    if (auto* q = ctx.FindQueue(parts.var_name)) {
+      queue_info.is_dynamic = true;
+      queue_info.elem_width = q->elem_width;
+      info = &queue_info;
+    } else {
+      return false;
+    }
   }
 
   auto elems = CollectVecElements(parts.var_name, *info, ctx, arena);

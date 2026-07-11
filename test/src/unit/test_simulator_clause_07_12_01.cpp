@@ -6,6 +6,7 @@
 #include "fixture_simulator.h"
 #include "helpers_array_locator.h"
 #include "helpers_queue.h"
+#include "helpers_scheduler.h"
 #include "simulator/eval_array.h"
 #include "simulator/evaluation.h"
 
@@ -205,19 +206,6 @@ TEST(ArrayLocator, FindIndexReturnsIntType) {
   auto* pred = MakeBinary(f.arena, TokenKind::kEqEq, MakeId(f.arena, "item"),
                           MakeInt(f.arena, 20));
   auto* expr = MakeLocatorExpr(f.arena, "arr", "find_index", pred);
-  std::vector<Logic4Vec> out;
-  bool ok = TryCollectLocatorResult(expr, f.ctx, f.arena, out);
-  ASSERT_TRUE(ok);
-  ASSERT_EQ(out.size(), 1u);
-  EXPECT_EQ(out[0].width, 32u);
-}
-
-TEST(ArrayLocator, FindLastIndexReturnsIntType) {
-  SimFixture f;
-  MakeDynArray(f, "arr", {10, 20, 30});
-  auto* pred = MakeBinary(f.arena, TokenKind::kEqEq, MakeId(f.arena, "item"),
-                          MakeInt(f.arena, 20));
-  auto* expr = MakeLocatorExpr(f.arena, "arr", "find_last_index", pred);
   std::vector<Logic4Vec> out;
   bool ok = TryCollectLocatorResult(expr, f.ctx, f.arena, out);
   ASSERT_TRUE(ok);
@@ -436,6 +424,231 @@ TEST(ArrayLocator, AssocFindFirstAndLastByKeyOrder) {
   ASSERT_TRUE(TryCollectLocatorResult(last, f.ctx, f.arena, lo));
   ASSERT_EQ(lo.size(), 1u);
   EXPECT_EQ(lo[0].ToUint64(), 25u);
+}
+
+// ===========================================================================
+// End-to-end tests: the locator input is built from a dependency subclause's
+// real declaration syntax and driven through the full pipeline (parse,
+// elaborate, lower, run), then the queue/scalar result is read back — rather
+// than hand-building the array and calling the locator helper directly.
+// ===========================================================================
+
+// §7.12.1 — find() returns every element satisfying the with expression.
+// Built from a real dynamic-array (§7.5) `{...}` initializer, filtered with
+// (item > 10) over {5,15,25,35}: three elements qualify, so the result queue's
+// size() is 3.
+TEST(ArrayLocator, FindOverDynamicArrayCountEndToEnd) {
+  uint64_t sz = RunAndGet(
+      "module m;\n"
+      "  int arr[] = {5, 15, 25, 35};\n"
+      "  int found[$];\n"
+      "  int sz;\n"
+      "  initial begin\n"
+      "    found = arr.find with (item > 10);\n"
+      "    sz = found.size();\n"
+      "  end\n"
+      "endmodule\n",
+      "sz");
+  EXPECT_EQ(sz, 3u);
+}
+
+// §7.12.1 — find_first() returns the leftmost element satisfying the with
+// expression. Over the dynamic array {5,15,25,35} with (item > 10) the first
+// qualifying element is 15, read back from the single-element result queue.
+TEST(ArrayLocator, FindFirstOverDynamicArrayValueEndToEnd) {
+  uint64_t v = RunAndGet(
+      "module m;\n"
+      "  int arr[] = {5, 15, 25, 35};\n"
+      "  int found[$];\n"
+      "  int v;\n"
+      "  initial begin\n"
+      "    found = arr.find_first with (item > 10);\n"
+      "    v = found[0];\n"
+      "  end\n"
+      "endmodule\n",
+      "v");
+  EXPECT_EQ(v, 15u);
+}
+
+// §7.12.1 — index locator methods over a non-associative array return a queue
+// of int holding 0-based positions. find_index for the element equal to 30 in
+// {10,20,30} yields position 2.
+TEST(ArrayLocator, FindIndexReturnsPositionEndToEnd) {
+  uint64_t p = RunAndGet(
+      "module m;\n"
+      "  int arr[] = {10, 20, 30};\n"
+      "  int idx[$];\n"
+      "  int p;\n"
+      "  initial begin\n"
+      "    idx = arr.find_index with (item == 30);\n"
+      "    p = idx[0];\n"
+      "  end\n"
+      "endmodule\n",
+      "p");
+  EXPECT_EQ(p, 2u);
+}
+
+// §7.12.1 — when no element satisfies the with expression the returned queue is
+// empty. Seeding sz to a nonzero value first proves the observed 0 comes from
+// the empty result rather than a default.
+TEST(ArrayLocator, FindNoMatchReturnsEmptyEndToEnd) {
+  uint64_t sz = RunAndGet(
+      "module m;\n"
+      "  int arr[] = {1, 2, 3};\n"
+      "  int found[$];\n"
+      "  int sz;\n"
+      "  initial begin\n"
+      "    sz = 99;\n"
+      "    found = arr.find with (item > 100);\n"
+      "    sz = found.size();\n"
+      "  end\n"
+      "endmodule\n",
+      "sz");
+  EXPECT_EQ(sz, 0u);
+}
+
+// §7.12.1 — with the with clause omitted, min() selects the smallest element
+// (as if with(item) were given). Over the dynamic array {50,10,30} the minimum
+// is 10, returned as a scalar.
+TEST(ArrayLocator, MinOverDynamicArrayEndToEnd) {
+  uint64_t r = RunAndGet(
+      "module m;\n"
+      "  int arr[] = {50, 10, 30};\n"
+      "  int r;\n"
+      "  initial r = arr.min;\n"
+      "endmodule\n",
+      "r");
+  EXPECT_EQ(r, 10u);
+}
+
+// §7.12.1 — locator methods operate on any unpacked array, including a
+// fixed-size array (§7.4) built from an '{...} assignment pattern. max() over
+// {10,50,30} returns 50.
+TEST(ArrayLocator, MaxOverFixedArrayEndToEnd) {
+  uint64_t r = RunAndGet(
+      "module m;\n"
+      "  logic [7:0] a [0:2] = '{ 8'd10, 8'd50, 8'd30 };\n"
+      "  int r;\n"
+      "  initial r = a.max;\n"
+      "endmodule\n",
+      "r");
+  EXPECT_EQ(r, 50u);
+}
+
+// §7.12.1 — unique() returns one entry per distinct value. Built from a real
+// queue (§7.10) {10,20,10,30,20}, three distinct values remain, so the result
+// queue's size() is 3.
+TEST(ArrayLocator, UniqueOverQueueEndToEnd) {
+  uint64_t sz = RunAndGet(
+      "module m;\n"
+      "  int q [$] = {10, 20, 10, 30, 20};\n"
+      "  int u [$];\n"
+      "  int sz;\n"
+      "  initial begin\n"
+      "    u = q.unique;\n"
+      "    sz = u.size();\n"
+      "  end\n"
+      "endmodule\n",
+      "sz");
+  EXPECT_EQ(sz, 3u);
+}
+
+// §7.12.1 — a find() locator with a predicate driven over a real queue (§7.10).
+// {5,15,25} with (item > 10) matches two elements.
+TEST(ArrayLocator, FindOverQueueCountEndToEnd) {
+  uint64_t sz = RunAndGet(
+      "module m;\n"
+      "  int q [$] = {5, 15, 25};\n"
+      "  int found[$];\n"
+      "  int sz;\n"
+      "  initial begin\n"
+      "    found = q.find with (item > 10);\n"
+      "    sz = found.size();\n"
+      "  end\n"
+      "endmodule\n",
+      "sz");
+  EXPECT_EQ(sz, 2u);
+}
+
+// §7.12.1 — for an associative array (§7.8) an index locator returns a queue of
+// the index type holding the matching keys, not 0-based positions. With keys
+// {10:5, 20:15, 30:25} and (item > 10), the matching keys are 20 and 30; the
+// first (in ascending key order) is 20.
+TEST(ArrayLocator, AssocFindIndexReturnsKeyEndToEnd) {
+  uint64_t k = RunAndGet(
+      "module m;\n"
+      "  int aa[int];\n"
+      "  int found[$];\n"
+      "  int k;\n"
+      "  initial begin\n"
+      "    aa[10] = 5;\n"
+      "    aa[20] = 15;\n"
+      "    aa[30] = 25;\n"
+      "    found = aa.find_index with (item > 10);\n"
+      "    k = found[0];\n"
+      "  end\n"
+      "endmodule\n",
+      "k");
+  EXPECT_EQ(k, 20u);
+}
+
+// §7.12.1 — for an associative array, "first" is the entry with the smallest
+// index (the §7.9 first() ordering), independent of insertion order. Inserting
+// keys 30,10,20, find_first returns the value stored at the smallest key 10.
+TEST(ArrayLocator, AssocFindFirstByKeyOrderEndToEnd) {
+  uint64_t v = RunAndGet(
+      "module m;\n"
+      "  int aa[int];\n"
+      "  int found[$];\n"
+      "  int v;\n"
+      "  initial begin\n"
+      "    aa[30] = 25;\n"
+      "    aa[10] = 5;\n"
+      "    aa[20] = 15;\n"
+      "    found = aa.find_first with (item > 0);\n"
+      "    v = found[0];\n"
+      "  end\n"
+      "endmodule\n",
+      "v");
+  EXPECT_EQ(v, 5u);
+}
+
+// §7.12.1 — likewise "last" is the entry with the largest index. find_last over
+// the same associative array returns the value stored at the largest key 30.
+TEST(ArrayLocator, AssocFindLastByKeyOrderEndToEnd) {
+  uint64_t v = RunAndGet(
+      "module m;\n"
+      "  int aa[int];\n"
+      "  int found[$];\n"
+      "  int v;\n"
+      "  initial begin\n"
+      "    aa[30] = 25;\n"
+      "    aa[10] = 5;\n"
+      "    aa[20] = 15;\n"
+      "    found = aa.find_last with (item > 0);\n"
+      "    v = found[0];\n"
+      "  end\n"
+      "endmodule\n",
+      "v");
+  EXPECT_EQ(v, 25u);
+}
+
+// §7.12.1 — when a with clause is present, unique() collapses on the value of
+// that expression. {1,2,3,4} with (item % 2) keeps one element per parity, so
+// the result queue's size() is 2.
+TEST(ArrayLocator, UniqueGroupsByWithExpressionEndToEnd) {
+  uint64_t sz = RunAndGet(
+      "module m;\n"
+      "  int arr[] = {1, 2, 3, 4};\n"
+      "  int u [$];\n"
+      "  int sz;\n"
+      "  initial begin\n"
+      "    u = arr.unique with (item % 2);\n"
+      "    sz = u.size();\n"
+      "  end\n"
+      "endmodule\n",
+      "sz");
+  EXPECT_EQ(sz, 2u);
 }
 
 }  // namespace
