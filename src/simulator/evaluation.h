@@ -93,6 +93,10 @@ Logic4Vec EvalMemberAccess(const Expr* expr, SimContext& ctx, Arena& arena);
 Logic4Vec EvalCast(const Expr* expr, SimContext& ctx, Arena& arena);
 Logic4Vec EvalInside(const Expr* expr, SimContext& ctx, Arena& arena);
 Logic4Vec EvalStreamingConcat(const Expr* expr, SimContext& ctx, Arena& arena);
+// §20.9: pack a bit-vector system function's expression operand into the packed
+// vector {>>{expression}} would produce (§11.4.14), so an aggregate bit-stream
+// argument contributes all of its bits when its ones/unknown bits are counted.
+Logic4Vec PackBitStreamOperand(const Expr* arg, SimContext& ctx, Arena& arena);
 Logic4Vec EvalAssignmentPattern(const Expr* expr, SimContext& ctx,
                                 Arena& arena);
 

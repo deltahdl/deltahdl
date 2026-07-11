@@ -385,6 +385,50 @@ Logic4Vec EvalStreamingConcat(const Expr* expr, SimContext& ctx, Arena& arena) {
   return StreamReorderSlices(concat, total_width, ss, arena);
 }
 
+// Assembles collected element parts into one packed vector, placing the first
+// part in the most-significant bits (the layout {>>{expression}} produces).
+static Logic4Vec AssembleBitStreamParts(const std::vector<Logic4Vec>& parts,
+                                        uint32_t total_width, Arena& arena) {
+  if (total_width == 0) return MakeLogic4Vec(arena, 1);
+  auto packed = MakeLogic4Vec(arena, total_width);
+  uint32_t bit_pos = 0;
+  for (auto it = parts.rbegin(); it != parts.rend(); ++it) {
+    PlaceSlice(packed, bit_pos, ExtractSlice(*it, 0, it->width), it->width);
+    bit_pos += it->width;
+  }
+  return packed;
+}
+
+// §20.9: the expression argument to $countbits (and the related $countones,
+// $onehot, $onehot0, and $isunknown) shall be of a bit-stream type, and for the
+// purpose of computing the result it is treated as a vector of equal size
+// assigned from {>>{expression}} (see §11.4.14). Pack an aggregate operand into
+// that vector: a queue and a dynamic array both keep their live elements in a
+// QueueObject (a dynamic array also registers a fixed-shape ArrayInfo whose
+// element variables are never materialized), so pack those straight from the
+// backing store; a fixed unpacked array, associative array, or packed/unpacked
+// struct is expanded through the shared streaming-concat machinery. A plain
+// vector operand has no aggregate to expand and is returned by ordinary
+// evaluation. Bit order is irrelevant to the callers, which only count matching
+// bits, but element 0 is kept in the most-significant bits for consistency with
+// {>>{expression}}.
+Logic4Vec PackBitStreamOperand(const Expr* arg, SimContext& ctx, Arena& arena) {
+  if (arg && arg->kind == ExprKind::kIdentifier) {
+    if (auto* q = ctx.FindQueue(arg->text)) {
+      std::vector<Logic4Vec> parts;
+      uint32_t total_width = 0;
+      ExpandQueueElements(q, parts, total_width, arena);
+      return AssembleBitStreamParts(parts, total_width, arena);
+    }
+    std::vector<Logic4Vec> parts;
+    uint32_t total_width = 0;
+    if (TryExpandAggregateElement(arg, ctx, arena, parts, total_width)) {
+      return AssembleBitStreamParts(parts, total_width, arena);
+    }
+  }
+  return EvalExpr(arg, ctx, arena);
+}
+
 Logic4Vec EvalAssignmentPattern(const Expr* expr, SimContext& ctx,
                                 Arena& arena) {
   if (expr->elements.empty()) return MakeLogic4Vec(arena, 0);

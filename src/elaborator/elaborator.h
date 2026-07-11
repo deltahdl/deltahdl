@@ -415,6 +415,7 @@ class Elaborator {
   void ValidateStringOutputTaskTargets(const ModuleDecl* decl);
   void ValidatePlaAscendingOrder(const ModuleDecl* decl);
   void ValidateBitsCallRestrictions(const ModuleDecl* decl);
+  void ValidateBitVectorFunctionArgs(const ModuleDecl* decl);
 
   void ValidateContAssignConstSelect(const ModuleDecl* decl);
   void ValidatePartSelectBounds(const ModuleDecl* decl);

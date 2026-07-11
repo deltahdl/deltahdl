@@ -70,20 +70,20 @@ static Logic4Vec EvalSignCast(const Expr* expr, SimContext& ctx, Arena& arena,
 static Logic4Vec EvalCountones(const Expr* expr, SimContext& ctx,
                                Arena& arena) {
   if (expr->args.empty()) return MakeLogic4VecVal(arena, 32, 0);
-  auto val = EvalExpr(expr->args[0], ctx, arena);
+  auto val = PackBitStreamOperand(expr->args[0], ctx, arena);
   return MakeLogic4VecVal(arena, 32, CountOnesInVec(val));
 }
 
 static Logic4Vec EvalOnehot(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (expr->args.empty()) return MakeLogic4VecVal(arena, 1, 0);
-  auto val = EvalExpr(expr->args[0], ctx, arena);
+  auto val = PackBitStreamOperand(expr->args[0], ctx, arena);
   uint64_t result = (CountOnesInVec(val) == 1) ? 1 : 0;
   return MakeLogic4VecVal(arena, 1, result);
 }
 
 static Logic4Vec EvalOnehot0(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (expr->args.empty()) return MakeLogic4VecVal(arena, 1, 1);
-  auto val = EvalExpr(expr->args[0], ctx, arena);
+  auto val = PackBitStreamOperand(expr->args[0], ctx, arena);
   uint64_t result = (CountOnesInVec(val) <= 1) ? 1 : 0;
   return MakeLogic4VecVal(arena, 1, result);
 }
@@ -91,7 +91,7 @@ static Logic4Vec EvalOnehot0(const Expr* expr, SimContext& ctx, Arena& arena) {
 static Logic4Vec EvalIsunknown(const Expr* expr, SimContext& ctx,
                                Arena& arena) {
   if (expr->args.empty()) return MakeLogic4VecVal(arena, 1, 0);
-  auto val = EvalExpr(expr->args[0], ctx, arena);
+  auto val = PackBitStreamOperand(expr->args[0], ctx, arena);
   return MakeLogic4VecVal(arena, 1, HasUnknownBits(val) ? 1 : 0);
 }
 
@@ -591,7 +591,7 @@ static uint32_t CountMatchingBits(const Logic4Vec& val, const bool match[4]) {
 static Logic4Vec EvalCountbits(const Expr* expr, SimContext& ctx,
                                Arena& arena) {
   if (expr->args.size() < 2) return MakeLogic4VecVal(arena, 32, 0);
-  auto val = EvalExpr(expr->args[0], ctx, arena);
+  auto val = PackBitStreamOperand(expr->args[0], ctx, arena);
   bool match[4] = {};
   for (size_t i = 1; i < expr->args.size(); ++i) {
     auto pat = EvalExpr(expr->args[i], ctx, arena);

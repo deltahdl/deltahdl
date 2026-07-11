@@ -62,6 +62,23 @@ TEST(OptionalSystemTaskExtendedParsing, CountbitsMultipleControlBits) {
   EXPECT_EQ(stmt->rhs->args.size(), 4u);
 }
 
+// list_of_control_bits ::= control_bit { , control_bit }
+// The single-entry base of the production: $countbits with exactly one
+// control_bit is the minimal legal form and must parse as a system call whose
+// argument list is the expression plus that one control_bit.
+TEST(OptionalSystemTaskExtendedParsing, CountbitsSingleControlBit) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial x = $countbits(data, 1'b1);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_NE(stmt->rhs, nullptr);
+  EXPECT_EQ(stmt->rhs->kind, ExprKind::kSystemCall);
+  EXPECT_EQ(stmt->rhs->args.size(), 2u);
+}
+
 // §20.9 explicitly states the control_bit arguments may be variables; the
 // parser must therefore accept identifier-shaped expressions for them.
 TEST(OptionalSystemTaskExtendedParsing, CountbitsVariableControlBit) {

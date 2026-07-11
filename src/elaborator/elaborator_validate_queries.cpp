@@ -181,6 +181,97 @@ void Elaborator::ValidateStringOutputTaskTargets(const ModuleDecl* decl) {
   }
 }
 
+namespace {
+
+// §20.9, Syntax 20-10: the five bit-vector system functions -- $countbits and
+// the derived $countones, $onehot, $onehot0, and $isunknown.
+bool IsBitVectorFunction(std::string_view callee) {
+  return callee == "$countbits" || callee == "$countones" ||
+         callee == "$onehot" || callee == "$onehot0" || callee == "$isunknown";
+}
+
+// §20.9: the expression argument to $countbits (and, by the same rule, to each
+// of the related functions) shall be of a bit-stream type. A real, event,
+// chandle, or virtual-interface operand is not a bit-stream type; when the
+// leading argument names such a variable, reject it. The control_bit arguments
+// to $countbits (args[1..]) are 1-bit logic values, not the expression operand,
+// so only the first argument carries this restriction.
+void CheckBitVectorFunctionArg(const Expr* call, const TypeMap& types,
+                               DiagEngine& diag) {
+  // §20.9, Syntax 20-10: list_of_control_bits is non-empty, so $countbits shall
+  // carry at least one control_bit after the expression argument. A call with
+  // only the expression (or none at all) does not match the grammar.
+  if (call->callee == "$countbits" && call->args.size() < 2) {
+    diag.Error(call->range.start,
+               "'$countbits' requires at least one control_bit argument");
+    return;
+  }
+  if (call->args.empty() || call->args[0] == nullptr) return;
+  auto base = LhsBaseName(call->args[0]);
+  if (base.empty()) return;
+  auto it = types.find(base);
+  if (it == types.end()) return;
+  auto k = it->second;
+  if (IsRealType(k) || k == DataTypeKind::kEvent ||
+      k == DataTypeKind::kChandle || k == DataTypeKind::kVirtualInterface) {
+    diag.Error(call->range.start,
+               std::format("the expression argument to '{}' shall be of a "
+                           "bit-stream type",
+                           call->callee));
+  }
+}
+
+void CheckBitVectorArgExpr(const Expr* e, const TypeMap& types,
+                           DiagEngine& diag) {
+  if (e == nullptr) return;
+  if (e->kind == ExprKind::kSystemCall && IsBitVectorFunction(e->callee))
+    CheckBitVectorFunctionArg(e, types, diag);
+  CheckBitVectorArgExpr(e->lhs, types, diag);
+  CheckBitVectorArgExpr(e->rhs, types, diag);
+  CheckBitVectorArgExpr(e->condition, types, diag);
+  CheckBitVectorArgExpr(e->true_expr, types, diag);
+  CheckBitVectorArgExpr(e->false_expr, types, diag);
+  CheckBitVectorArgExpr(e->base, types, diag);
+  CheckBitVectorArgExpr(e->index, types, diag);
+  for (auto* a : e->args) CheckBitVectorArgExpr(a, types, diag);
+  for (auto* el : e->elements) CheckBitVectorArgExpr(el, types, diag);
+}
+
+void CheckBitVectorArgStmt(const Stmt* s, const TypeMap& types,
+                           DiagEngine& diag) {
+  if (s == nullptr) return;
+  CheckBitVectorArgExpr(s->condition, types, diag);
+  CheckBitVectorArgExpr(s->lhs, types, diag);
+  CheckBitVectorArgExpr(s->rhs, types, diag);
+  CheckBitVectorArgExpr(s->expr, types, diag);
+  CheckBitVectorArgExpr(s->var_init, types, diag);
+  for (auto* sub : s->stmts) CheckBitVectorArgStmt(sub, types, diag);
+  for (auto* sub : s->fork_stmts) CheckBitVectorArgStmt(sub, types, diag);
+  CheckBitVectorArgStmt(s->then_branch, types, diag);
+  CheckBitVectorArgStmt(s->else_branch, types, diag);
+  CheckBitVectorArgStmt(s->body, types, diag);
+  CheckBitVectorArgStmt(s->for_body, types, diag);
+  for (auto* init : s->for_inits) CheckBitVectorArgStmt(init, types, diag);
+  for (auto& ci : s->case_items) CheckBitVectorArgStmt(ci.body, types, diag);
+}
+
+}  // namespace
+
+void Elaborator::ValidateBitVectorFunctionArgs(const ModuleDecl* decl) {
+  // §20.9: the expression argument to the bit-vector functions ($countbits,
+  // $countones, $onehot, $onehot0, $isunknown) shall be of a bit-stream type;
+  // reject a statically recognizable non-bit-stream operand (a real, event,
+  // chandle, or virtual interface).
+  for (const auto* item : decl->items) {
+    if (item->body) CheckBitVectorArgStmt(item->body, var_types_, diag_);
+    for (auto* s : item->func_body_stmts)
+      CheckBitVectorArgStmt(s, var_types_, diag_);
+    CheckBitVectorArgExpr(item->init_expr, var_types_, diag_);
+    // A continuous assignment is another place these functions may appear.
+    CheckBitVectorArgExpr(item->assign_rhs, var_types_, diag_);
+  }
+}
+
 void Elaborator::ValidatePlaOutputTerms(const ModuleDecl* decl) {
   // §20.16: the output terms of a PLA modeling system task shall be variables,
   // never nets. Input terms may be nets or variables, so only the output-terms
