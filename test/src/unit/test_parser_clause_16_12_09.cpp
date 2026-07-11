@@ -65,4 +65,34 @@ TEST(FollowedByPropertyParsing, FollowedByWithRangedAntecedent) {
   EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kAssertProperty));
 }
 
+// §16.12.9: the consequent operand is a property_expr, not merely a Boolean, so
+// a compound property on the right of #-# — here an `always` property, the
+// consequent shape the clause's own worked examples use — is accepted at the
+// property level. The lower precedence of `always` binds the whole followed-by
+// as `(seq) #-# (always ...)`.
+TEST(FollowedByPropertyParsing, OverlappedFollowedByWithPropertyConsequent) {
+  auto r = Parse(
+      "module m;\n"
+      "  assert property (@(posedge clk) ##[0:5] done #-# always !rst);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kAssertProperty));
+}
+
+// §16.12.9: the nonoverlapped operator likewise takes a property_expr
+// consequent — a compound `always` property after #=# is accepted at the
+// property level.
+TEST(FollowedByPropertyParsing, NonoverlappedFollowedByWithPropertyConsequent) {
+  auto r = Parse(
+      "module m;\n"
+      "  assert property (@(posedge clk) ##[0:5] done #=# always !rst);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kAssertProperty));
+}
+
 }  // namespace

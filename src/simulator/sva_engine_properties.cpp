@@ -130,17 +130,24 @@ PropertyResult EvalPropertyIff(PropertyResult a, PropertyResult b) {
 }
 
 PropertyResult EvalFollowedBy(bool antecedent, bool consequent,
-                              bool non_overlapping) {
+                              bool non_overlapping,
+                              bool antecedent_empty_match) {
   // §16.12.9: apply the duality with the implication operators directly —
   // `s #-# p` ≡ not (s |-> not p) and `s #=# p` ≡ not (s |=> not p). Negate the
   // consequent, evaluate the matching §16.12.7 implication, then negate the
   // verdict. A missing antecedent match makes the dual implication hold
   // vacuously, which negates to a definite fail — capturing the requirement
-  // that the antecedent shall have at least one successful match. A deferred
-  // (nonoverlapped) implication stays pending here and is settled later by
-  // ResolveFollowedByNonOverlapping.
-  PropertyResult implied =
-      EvalImplication(antecedent, !consequent, non_overlapping);
+  // that the antecedent shall have at least one successful match. For the
+  // nonoverlapped form the consequent normally starts one tick after the match
+  // end, so the dual implication defers and this verdict stays pending, settled
+  // later by ResolveFollowedByNonOverlapping. That deferral applies only to a
+  // nonempty antecedent match: on an empty match the consequent starts at the
+  // nearest clock tick from where the sequence begins — the current tick for a
+  // singly clocked property — so the dual implication settles immediately and
+  // the followed-by verdict is definite here. The empty-match flag is threaded
+  // into the §16.12.7 implication, which carries that same distinction.
+  PropertyResult implied = EvalImplication(
+      antecedent, !consequent, non_overlapping, antecedent_empty_match);
   if (implied == PropertyResult::kPending) return PropertyResult::kPending;
   return EvalPropertyNot(implied);
 }

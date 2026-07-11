@@ -54,6 +54,21 @@ TEST(SvaEngine, NonOverlappingFollowedByDefers) {
   EXPECT_EQ(EvalFollowedBy(true, false, true), PropertyResult::kPending);
 }
 
+// §16.12.9: the nonoverlapped followed-by (#=#) defers only for a nonempty
+// antecedent match. When the antecedent attains an empty match the consequent
+// starts at the nearest clock tick from where the sequence begins — the current
+// tick for a singly clocked property — so the verdict settles immediately
+// rather than staying pending, yielding the consequent's verdict directly.
+TEST(SvaEngine, NonOverlappingFollowedByEmptyMatchSettlesImmediately) {
+  EXPECT_EQ(EvalFollowedBy(true, true, true, /*antecedent_empty_match=*/true),
+            PropertyResult::kPass);
+  EXPECT_EQ(EvalFollowedBy(true, false, true, /*antecedent_empty_match=*/true),
+            PropertyResult::kFail);
+  // Contrast: with a nonempty match the same #=# verdict is still deferred.
+  EXPECT_EQ(EvalFollowedBy(true, true, true, /*antecedent_empty_match=*/false),
+            PropertyResult::kPending);
+}
+
 // §16.12.9: a deferred nonoverlapped followed-by is settled at the next tick;
 // when the consequent then holds, the overall followed-by passes.
 TEST(SvaEngine, NonOverlappingFollowedByResolvesPass) {

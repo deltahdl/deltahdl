@@ -122,9 +122,16 @@ PropertyResult EvalPropertyIff(PropertyResult a, PropertyResult b);
 // negating its verdict. The overlapped form evaluates the consequent at the end
 // point of the match so it settles immediately; the nonoverlapped form starts
 // the consequent one tick later, so the verdict is deferred (kPending) and
-// settled by ResolveFollowedByNonOverlapping.
+// settled by ResolveFollowedByNonOverlapping. That deferral of the
+// nonoverlapped form applies only to a nonempty antecedent match: when the
+// antecedent matches empty the consequent starts at the nearest clock tick from
+// where the sequence begins — the current tick for a singly clocked property —
+// so the verdict settles immediately just as the overlapped form does. Pass
+// `antecedent_empty_match` for that case; it is threaded into the §16.12.7 dual
+// implication, which carries the same distinction.
 PropertyResult EvalFollowedBy(bool antecedent, bool consequent,
-                              bool non_overlapping);
+                              bool non_overlapping,
+                              bool antecedent_empty_match = false);
 
 // §16.12.9: settles a deferred nonoverlapped followed-by (#=#) at the tick
 // after the antecedent match, where the consequent property_expr is finally
