@@ -682,10 +682,16 @@ static void WalkConstFuncStmt(const Stmt* s, ConstFuncBodyCheck& chk) {
 }
 
 // §13.4.3 — a constant function may not take output/inout/ref arguments, and
-// each default argument value must itself be a constant expression. Returns
-// false (after reporting) on the first violation.
-static bool ValidateConstFuncArgs(const ModuleItem* func, SourceLoc loc,
-                                  DiagEngine& diag) {
+// each default argument value must itself be a constant expression. The
+// enclosing scope's parameter/localparam names are made visible so that a
+// default value written as a parameter reference (a constant expression per
+// §11.2.1) is accepted rather than mistaken for a non-constant. Returns false
+// (after reporting) on the first violation.
+static bool ValidateConstFuncArgs(
+    const ModuleItem* func, SourceLoc loc,
+    const std::unordered_set<std::string_view>& param_names, DiagEngine& diag) {
+  ScopeMap default_scope;
+  for (auto p : param_names) default_scope[p] = 0;
   for (const auto& arg : func->func_args) {
     if (arg.direction == Direction::kOutput ||
         arg.direction == Direction::kInout ||
@@ -701,7 +707,8 @@ static bool ValidateConstFuncArgs(const ModuleItem* func, SourceLoc loc,
     }
     // §13.4.3 (k) — a default argument value, if supplied, must itself be a
     // constant expression per §11.2.1.
-    if (arg.default_value && !IsConstantExpr(arg.default_value)) {
+    if (arg.default_value &&
+        !IsConstantExpr(arg.default_value, default_scope)) {
       diag.Error(
           loc,
           std::format(
@@ -776,7 +783,8 @@ static bool ValidateConstantFunction(const ModuleItem* func, SourceLoc loc,
   if (scope.visited && !func->name.empty()) {
     if (!scope.visited->insert(func->name).second) return true;
   }
-  if (!ValidateConstFuncArgs(func, loc, scope.diag)) return false;
+  if (!ValidateConstFuncArgs(func, loc, scope.param_names, scope.diag))
+    return false;
   if (!ValidateConstFuncBodyContent(func, loc, scope.diag)) return false;
 
   std::unordered_set<std::string_view> local_names =

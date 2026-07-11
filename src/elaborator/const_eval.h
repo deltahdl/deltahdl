@@ -9,8 +9,28 @@
 namespace delta {
 
 struct Expr;
+struct ModuleItem;
 
 using ScopeMap = std::unordered_map<std::string_view, int64_t>;
+
+// §13.4.3: a constant function call is evaluated at elaboration time. The
+// constant-expression folder cannot see the enclosing scope's function
+// declarations on its own, so the elaborator installs the visible function map
+// for the duration of a scope guard. While the guard is live, ConstEvalInt /
+// ConstEvalReal fold a call to any registered user function (with all-constant
+// arguments) by interpreting its body. The pointer is borrowed; the guard
+// restores whatever registry was previously active on destruction.
+class ConstFuncRegistryGuard {
+ public:
+  explicit ConstFuncRegistryGuard(
+      const std::unordered_map<std::string_view, const ModuleItem*>* funcs);
+  ~ConstFuncRegistryGuard();
+  ConstFuncRegistryGuard(const ConstFuncRegistryGuard&) = delete;
+  ConstFuncRegistryGuard& operator=(const ConstFuncRegistryGuard&) = delete;
+
+ private:
+  const std::unordered_map<std::string_view, const ModuleItem*>* prev_;
+};
 
 std::optional<int64_t> ConstEvalInt(const Expr* expr);
 

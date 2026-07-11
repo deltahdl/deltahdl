@@ -596,6 +596,248 @@ static std::optional<ConstVal> ConstEvalMemberAccessFull(
   return std::nullopt;
 }
 
+// §13.4.3 constant-function-call evaluation ---------------------------------
+//
+// A constant function is a normal function evaluated at elaboration time so
+// that e.g. `localparam addr_width = clogb2(ram_depth)` folds to an integer.
+// The registry below is the set of user function declarations visible to the
+// design element whose parameters are currently being resolved; it is null
+// unless a ConstFuncRegistryGuard is live.
+static const std::unordered_map<std::string_view, const ModuleItem*>*
+    g_const_func_registry = nullptr;
+
+// Bounds against pathological or (mutually) recursive constant functions:
+// depth caps recursion, and each active call carries an iteration budget for
+// its loops. Exhausting either simply abandons the fold (returns nullopt),
+// leaving the parameter unresolved exactly as before this feature existed —
+// never an error and never a wrong value.
+static constexpr int kMaxConstFuncDepth = 64;
+static constexpr int64_t kMaxConstFuncIterations = 10'000'000;
+static int g_const_func_depth = 0;
+
+ConstFuncRegistryGuard::ConstFuncRegistryGuard(
+    const std::unordered_map<std::string_view, const ModuleItem*>* funcs)
+    : prev_(g_const_func_registry) {
+  g_const_func_registry = funcs;
+}
+
+ConstFuncRegistryGuard::~ConstFuncRegistryGuard() {
+  g_const_func_registry = prev_;
+}
+
+// Control-flow outcome of interpreting one constant-function statement.
+enum class ConstFuncFlow { kNormal, kReturn, kBreak, kContinue, kAbort };
+
+static ConstFuncFlow ExecConstFuncStmt(const Stmt* s, ScopeMap& locals,
+                                       std::string_view result_name,
+                                       int64_t& iter_budget);
+
+// A constant function may only assign to a simple (unindexed) local — its
+// arguments, body-declared variables, or the implicit result variable named
+// after the function. Anything else abandons the fold.
+static bool ConstFuncAssign(const Expr* lhs, int64_t value, ScopeMap& locals) {
+  if (!lhs || lhs->kind != ExprKind::kIdentifier || lhs->text.empty())
+    return false;
+  locals[lhs->text] = value;
+  return true;
+}
+
+static ConstFuncFlow ExecConstFuncStmts(const std::vector<Stmt*>& stmts,
+                                        ScopeMap& locals,
+                                        std::string_view result_name,
+                                        int64_t& iter_budget) {
+  for (auto* s : stmts) {
+    ConstFuncFlow flow = ExecConstFuncStmt(s, locals, result_name, iter_budget);
+    if (flow != ConstFuncFlow::kNormal) return flow;
+  }
+  return ConstFuncFlow::kNormal;
+}
+
+static ConstFuncFlow ExecConstFuncStmt(const Stmt* s, ScopeMap& locals,
+                                       std::string_view result_name,
+                                       int64_t& iter_budget) {
+  if (!s) return ConstFuncFlow::kNormal;
+  switch (s->kind) {
+    case StmtKind::kNull:
+      return ConstFuncFlow::kNormal;
+    case StmtKind::kBlock:
+      return ExecConstFuncStmts(s->stmts, locals, result_name, iter_budget);
+    case StmtKind::kVarDecl:
+    case StmtKind::kBlockItemDecl: {
+      // §13.4.3: body-local variables initialize as they would for normal
+      // simulation. Model that as a fresh binding, seeded from the initializer
+      // when one is present and 0 otherwise.
+      if (s->var_name.empty()) return ConstFuncFlow::kNormal;
+      int64_t init = 0;
+      if (s->var_init) {
+        auto v = ConstEvalFull(s->var_init, locals);
+        if (!v) return ConstFuncFlow::kAbort;
+        init = v->value;
+      }
+      locals[s->var_name] = init;
+      return ConstFuncFlow::kNormal;
+    }
+    case StmtKind::kBlockingAssign: {
+      if (!s->rhs) return ConstFuncFlow::kAbort;
+      auto v = ConstEvalFull(s->rhs, locals);
+      if (!v) return ConstFuncFlow::kAbort;
+      if (!ConstFuncAssign(s->lhs, v->value, locals))
+        return ConstFuncFlow::kAbort;
+      return ConstFuncFlow::kNormal;
+    }
+    case StmtKind::kIf: {
+      auto cond = ConstEvalFull(s->condition, locals);
+      if (!cond) return ConstFuncFlow::kAbort;
+      if (cond->value)
+        return ExecConstFuncStmt(s->then_branch, locals, result_name,
+                                 iter_budget);
+      return ExecConstFuncStmt(s->else_branch, locals, result_name,
+                               iter_budget);
+    }
+    case StmtKind::kFor: {
+      ConstFuncFlow init_flow =
+          ExecConstFuncStmts(s->for_inits, locals, result_name, iter_budget);
+      if (init_flow == ConstFuncFlow::kAbort) return ConstFuncFlow::kAbort;
+      while (true) {
+        if (--iter_budget < 0) return ConstFuncFlow::kAbort;
+        if (s->for_cond) {
+          auto cond = ConstEvalFull(s->for_cond, locals);
+          if (!cond) return ConstFuncFlow::kAbort;
+          if (!cond->value) break;
+        }
+        ConstFuncFlow body =
+            ExecConstFuncStmt(s->for_body, locals, result_name, iter_budget);
+        if (body == ConstFuncFlow::kReturn || body == ConstFuncFlow::kAbort)
+          return body;
+        if (body == ConstFuncFlow::kBreak) break;
+        ConstFuncFlow step =
+            ExecConstFuncStmts(s->for_steps, locals, result_name, iter_budget);
+        if (step == ConstFuncFlow::kAbort) return ConstFuncFlow::kAbort;
+      }
+      return ConstFuncFlow::kNormal;
+    }
+    case StmtKind::kWhile: {
+      while (true) {
+        if (--iter_budget < 0) return ConstFuncFlow::kAbort;
+        auto cond = ConstEvalFull(s->condition, locals);
+        if (!cond) return ConstFuncFlow::kAbort;
+        if (!cond->value) break;
+        ConstFuncFlow body =
+            ExecConstFuncStmt(s->body, locals, result_name, iter_budget);
+        if (body == ConstFuncFlow::kReturn || body == ConstFuncFlow::kAbort)
+          return body;
+        if (body == ConstFuncFlow::kBreak) break;
+      }
+      return ConstFuncFlow::kNormal;
+    }
+    case StmtKind::kDoWhile: {
+      while (true) {
+        if (--iter_budget < 0) return ConstFuncFlow::kAbort;
+        ConstFuncFlow body =
+            ExecConstFuncStmt(s->body, locals, result_name, iter_budget);
+        if (body == ConstFuncFlow::kReturn || body == ConstFuncFlow::kAbort)
+          return body;
+        if (body == ConstFuncFlow::kBreak) break;
+        auto cond = ConstEvalFull(s->condition, locals);
+        if (!cond) return ConstFuncFlow::kAbort;
+        if (!cond->value) break;
+      }
+      return ConstFuncFlow::kNormal;
+    }
+    case StmtKind::kRepeat: {
+      auto count = ConstEvalFull(s->condition, locals);
+      if (!count) return ConstFuncFlow::kAbort;
+      for (int64_t i = 0; i < count->value; ++i) {
+        if (--iter_budget < 0) return ConstFuncFlow::kAbort;
+        ConstFuncFlow body =
+            ExecConstFuncStmt(s->body, locals, result_name, iter_budget);
+        if (body == ConstFuncFlow::kReturn || body == ConstFuncFlow::kAbort)
+          return body;
+        if (body == ConstFuncFlow::kBreak) break;
+      }
+      return ConstFuncFlow::kNormal;
+    }
+    case StmtKind::kReturn: {
+      if (s->expr) {
+        auto v = ConstEvalFull(s->expr, locals);
+        if (!v) return ConstFuncFlow::kAbort;
+        if (!result_name.empty()) locals[result_name] = v->value;
+      }
+      return ConstFuncFlow::kReturn;
+    }
+    case StmtKind::kBreak:
+      return ConstFuncFlow::kBreak;
+    case StmtKind::kContinue:
+      return ConstFuncFlow::kContinue;
+    case StmtKind::kExprStmt: {
+      // §13.4.3: system task calls in a constant function are ignored (the
+      // elaboration severity tasks of §20.10.1 are handled elsewhere). Other
+      // bare expression statements — a pre/post increment on a local, say — are
+      // interpreted for their side effect; anything else abandons the fold.
+      const Expr* e = s->expr;
+      if (!e) return ConstFuncFlow::kNormal;
+      if (e->kind == ExprKind::kSystemCall) return ConstFuncFlow::kNormal;
+      if ((e->kind == ExprKind::kPostfixUnary || e->kind == ExprKind::kUnary) &&
+          e->lhs && e->lhs->kind == ExprKind::kIdentifier &&
+          (e->op == TokenKind::kPlusPlus || e->op == TokenKind::kMinusMinus)) {
+        auto cur = ConstEvalFull(e->lhs, locals);
+        if (!cur) return ConstFuncFlow::kAbort;
+        int64_t nv =
+            e->op == TokenKind::kPlusPlus ? cur->value + 1 : cur->value - 1;
+        locals[e->lhs->text] = nv;
+        return ConstFuncFlow::kNormal;
+      }
+      return ConstFuncFlow::kAbort;
+    }
+    default:
+      return ConstFuncFlow::kAbort;
+  }
+}
+
+// §13.4.3: fold a call to a user-defined constant function. Returns nullopt
+// (leaving the surrounding constant expression unresolved) whenever the callee
+// is not a registered user function, an argument is not itself constant, or the
+// body uses a construct the elaboration-time interpreter does not model.
+static std::optional<ConstVal> ConstEvalUserCall(const Expr* expr,
+                                                 const ScopeMap& scope) {
+  if (!g_const_func_registry || expr->callee.empty()) return std::nullopt;
+  auto it = g_const_func_registry->find(expr->callee);
+  if (it == g_const_func_registry->end() || it->second == nullptr)
+    return std::nullopt;
+  const ModuleItem* func = it->second;
+  if (func->kind != ModuleItemKind::kFunctionDecl) return std::nullopt;
+  if (g_const_func_depth >= kMaxConstFuncDepth) return std::nullopt;
+  ++g_const_func_depth;
+  struct DepthGuard {
+    ~DepthGuard() { --g_const_func_depth; }
+  } depth_guard;
+
+  // The body sees the caller's parameter scope (a constant function may
+  // reference module/package/$unit parameters, §13.4.3), overlaid with the
+  // argument bindings and the implicit result variable.
+  ScopeMap locals = scope;
+  for (size_t i = 0; i < func->func_args.size(); ++i) {
+    const FunctionArg& fa = func->func_args[i];
+    const Expr* arg_expr =
+        i < expr->args.size() ? expr->args[i] : fa.default_value;
+    if (!arg_expr) return std::nullopt;
+    auto v = ConstEvalFull(arg_expr, scope);
+    if (!v) return std::nullopt;
+    if (!fa.name.empty()) locals[fa.name] = v->value;
+  }
+  if (!func->name.empty()) locals[func->name] = 0;
+
+  int64_t iter_budget = kMaxConstFuncIterations;
+  for (auto* s : func->func_body_stmts) {
+    ConstFuncFlow flow = ExecConstFuncStmt(s, locals, func->name, iter_budget);
+    if (flow == ConstFuncFlow::kAbort) return std::nullopt;
+    if (flow == ConstFuncFlow::kReturn) break;
+  }
+  auto rit = locals.find(func->name);
+  if (rit == locals.end()) return std::nullopt;
+  return ConstVal{rit->second, 32, true};
+}
+
 static std::optional<ConstVal> ConstEvalFull(const Expr* expr,
                                              const ScopeMap& scope) {
   if (!expr) return std::nullopt;
@@ -648,6 +890,10 @@ static std::optional<ConstVal> ConstEvalFull(const Expr* expr,
       return ConstEvalSysCallFull(expr, scope);
     case ExprKind::kMemberAccess:
       return ConstEvalMemberAccessFull(expr, scope);
+    case ExprKind::kCall:
+      // §13.4.3: a call to a user-defined constant function folds at
+      // elaboration time.
+      return ConstEvalUserCall(expr, scope);
     default:
       return std::nullopt;
   }

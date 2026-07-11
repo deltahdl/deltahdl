@@ -1022,6 +1022,12 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
 
   BuildPropertyRegistry(decl, property_registry_);
 
+  // §13.4.3: make this scope's functions available to the constant-expression
+  // folder so a parameter/localparam initialized from a constant function call
+  // (e.g. `localparam addr_width = clogb2(ram_depth)`) is evaluated at
+  // elaboration time while its declaration item is elaborated below.
+  ConstFuncRegistryGuard const_func_guard(&func_decls_);
+
   for (auto* item : decl->items) {
     ElaborateItem(item, mod);
   }
