@@ -10,11 +10,4 @@ bool IsPropertyInstanceLegal(PropertyInstancePlacement /*placement*/,
   return body_substitutable_at_placement;
 }
 
-bool IsPropertyInstanceLegalAsBuildingOperatorOperand(
-    bool named_property_has_disable_iff) {
-  // §16.12.1: if the named property has a disable iff clause, no
-  // property-building operator may take its instance as an operand.
-  return !named_property_has_disable_iff;
-}
-
 }  // namespace delta

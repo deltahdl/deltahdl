@@ -607,6 +607,30 @@ bool Elaborator::ElaborateAssertionItem(ModuleItem* item, RtlirModule* mod) {
         diag_.Error(item->loc, "property \"" + std::string(item->name) +
                                    "\" nests disable iff clauses (§16.12)");
       }
+      // §16.12.1: an instance of a named property used as a property_expr
+      // operand of any property-building operator must, once substituted,
+      // yield a legal property_expr. A disable iff clause makes the flattened
+      // body a property_spec, which is not a legal operand — so such a property
+      // may not carry a disable iff clause when it appears as an operand. The
+      // parser records the instances that stand as the operand of a prefix or
+      // infix property operator (not, s_nexttime, s_eventually, s_always, and
+      // the right operand of s_until/s_until_with) in
+      // prop_negated_instance_refs.
+      for (auto operand_ref : item->prop_negated_instance_refs) {
+        const ModuleItem* callee = property_registry_.Find(operand_ref);
+        if (callee == nullptr ||
+            callee->kind != ModuleItemKind::kPropertyDecl) {
+          continue;
+        }
+        if (property_registry_.FlattenedDisableIffCount(callee) > 0) {
+          diag_.Error(
+              item->loc,
+              "property \"" + std::string(operand_ref) +
+                  "\" has a disable iff clause and cannot be used as an "
+                  "operand of a property operator in \"" +
+                  std::string(item->name) + "\" (§16.12.1)");
+        }
+      }
       // §16.10: a formal-argument name may not be redeclared as a body local.
       ValidateNoFormalShadowedByBodyLocal(item);
       // §16.12.17 / §F.7: enforce the restrictions on recursive properties.

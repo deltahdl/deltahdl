@@ -19,11 +19,12 @@ enum class PropertyInstancePlacement : uint8_t {
 bool IsPropertyInstanceLegal(PropertyInstancePlacement placement,
                              bool body_substitutable_at_placement);
 
-// §16.12.1: if an instance of a named property is used as a property_expr
-// operand of any property-building operator, then the named property may
-// not have a disable iff clause. This is the only extra constraint that
-// §16.12.1 adds to §16.12's general rules.
-bool IsPropertyInstanceLegalAsBuildingOperatorOperand(
-    bool named_property_has_disable_iff);
+// §16.12.1 adds one constraint beyond §16.12's general rules: if an instance of
+// a named property is used as a property_expr operand of any property-building
+// operator, then the named property may not have a disable iff clause. That
+// rule depends on how the instance is written in real source (which property is
+// declared with disable iff, and where its instance appears), so it is enforced
+// end to end in the elaborator (see Elaborator::ElaborateAssertionItem), not by
+// a pure predicate here.
 
 }  // namespace delta

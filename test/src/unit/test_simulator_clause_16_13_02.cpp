@@ -117,6 +117,17 @@ TEST(MulticlockedProperty, IfElseBranchTakesNearestNonStrictlySubsequentTick) {
             22u);
 }
 
+// §16.13.2: the else-branch's "non-strictly subsequent" reading admits a
+// branch-clock tick coincident with the condition check — just like the
+// then-branch's "possibly overlapping" reading — so a clock tick landing
+// exactly at the condition time locates the else-branch evaluation there rather
+// than at the following tick.
+TEST(MulticlockedProperty, IfElseBranchAdmitsCoincidentTick) {
+  const std::vector<uint64_t> kElseTicks = {15, 22, 33};
+  EXPECT_EQ(MulticlockedIfBranchEvalTick(/*condition_time=*/15, kElseTicks),
+            15u);
+}
+
 // §16.13.2: with the branch tick located, the if / if-else verdict is routed by
 // the condition through the ordinary §16.12.6 property if-else over the branch
 // results.
