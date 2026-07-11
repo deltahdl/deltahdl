@@ -209,6 +209,41 @@ TEST_F(ClassDefinition, DerivedClassesIterationReturnsDerivedClassDefns) {
   EXPECT_EQ(seen[1], &derived_b);
 }
 
+// D7: a class defn's vpiParameter iteration returns both the parameters of the
+// class's parameter port list and those declared as class items in the body,
+// and vpiLocalParam is TRUE only for the body-declared ones. The two parameters
+// are ordinary vpiParameter children, so the generic child walk reports both in
+// declaration order; the per-parameter local_param flag is what distinguishes
+// them, observed through vpi_get(vpiLocalParam). A non-parameter child (here a
+// constraint) is not a parameter and never appears.
+TEST_F(ClassDefinition, ParameterIterationReportsPortAndBodyWithLocalParam) {
+  VpiObject port_param;  // declared in the parameter port list
+  port_param.type = vpiParameter;
+  port_param.local_param = false;
+  VpiObject not_a_param;
+  not_a_param.type = vpiConstraint;
+  VpiObject body_param;  // declared as a class item in the body
+  body_param.type = vpiParameter;
+  body_param.local_param = true;
+
+  VpiObject class_defn;
+  class_defn.type = vpiClassDefn;
+  class_defn.children = {&port_param, &not_a_param, &body_param};
+
+  vpiHandle it = vpi_iterate(vpiParameter, &class_defn);
+  ASSERT_NE(it, nullptr);
+  std::vector<vpiHandle> seen = ScanAll(it);
+
+  ASSERT_EQ(seen.size(), 2u);
+  EXPECT_EQ(seen[0], &port_param);
+  EXPECT_EQ(seen[1], &body_param);
+
+  // vpiLocalParam is FALSE for the port-list parameter and TRUE for the
+  // body-declared one.
+  EXPECT_EQ(vpi_get(vpiLocalParam, &port_param), 0);
+  EXPECT_EQ(vpi_get(vpiLocalParam, &body_param), 1);
+}
+
 // D6: the vpiArgument iteration from an extends object returns the expressions
 // supplied for constructor chaining (8.17). The targets are expressions, so a
 // child of a non-expression kind (here a parameter) is not reported.
