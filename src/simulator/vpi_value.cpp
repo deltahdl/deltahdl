@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
+#include <cstring>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -23,11 +24,11 @@
 
 namespace delta {
 
-static void GetValueBinStr(VpiHandle obj, VpiValue* value,
+static void GetValueBinStr(const Logic4Vec& v, VpiValue* value,
                            std::vector<std::string>& pool) {
-  uint64_t aval = obj->var->value.words[0].aval;
-  uint64_t bval = obj->var->value.words[0].bval;
-  int width = static_cast<int>(obj->var->value.width);
+  uint64_t aval = v.words[0].aval;
+  uint64_t bval = v.words[0].bval;
+  int width = static_cast<int>(v.width);
   std::string result;
   result.reserve(width);
   for (int i = width - 1; i >= 0; --i) {
@@ -48,11 +49,29 @@ static char HexDigitFromBits(uint8_t nibble) {
   return static_cast<char>('a' + nibble - 10);
 }
 
-static void GetValueHexStr(VpiHandle obj, VpiValue* value,
+// §38.15, Table 38-3 (octal/hex rows): choose the character for a digit group
+// that contains at least one unknown bit. `mask` selects the group's valid bits
+// (the top group may be narrower than a full digit). A group with any x bit
+// prints lowercase 'x' only when every valid bit is x, otherwise uppercase 'X';
+// otherwise the unknown bits are all z, printing lowercase 'z' when every valid
+// bit is z, otherwise uppercase 'Z'. Canonical bit encoding: x=(a1,b1),
+// z=(a0,b1).
+static char UnknownGroupChar(uint8_t a_bits, uint8_t b_bits, uint8_t mask) {
+  uint8_t unknown = b_bits & mask;
+  uint8_t x_bits = a_bits & b_bits & mask;  // unknown bits that are x
+  if (x_bits != 0) {
+    bool all_x = unknown == mask && (a_bits & mask) == mask;
+    return all_x ? 'x' : 'X';
+  }
+  bool all_z = unknown == mask && (a_bits & mask) == 0;
+  return all_z ? 'z' : 'Z';
+}
+
+static void GetValueHexStr(const Logic4Vec& v, VpiValue* value,
                            std::vector<std::string>& pool) {
-  uint64_t aval = obj->var->value.words[0].aval;
-  uint64_t bval = obj->var->value.words[0].bval;
-  int width = static_cast<int>(obj->var->value.width);
+  uint64_t aval = v.words[0].aval;
+  uint64_t bval = v.words[0].bval;
+  int width = static_cast<int>(v.width);
   int hex_digits = (width + 3) / 4;
   std::string result;
   result.reserve(hex_digits);
@@ -60,9 +79,9 @@ static void GetValueHexStr(VpiHandle obj, VpiValue* value,
     uint8_t a_nibble = (aval >> (i * 4)) & 0xF;
     uint8_t b_nibble = (bval >> (i * 4)) & 0xF;
     if (b_nibble != 0) {
-      // §21.2.1.3 / Figure 38-8: a group whose unknown bits are all z (a=0,
-      // b=0xF) prints z; any other group containing an unknown bit prints x.
-      result += (b_nibble == 0xF && a_nibble == 0) ? 'z' : 'x';
+      int valid = std::min(4, width - i * 4);
+      result += UnknownGroupChar(a_nibble, b_nibble,
+                                 static_cast<uint8_t>((1u << valid) - 1));
     } else {
       result += HexDigitFromBits(a_nibble);
     }
@@ -71,11 +90,11 @@ static void GetValueHexStr(VpiHandle obj, VpiValue* value,
   value->value.str = pool.back().c_str();
 }
 
-static void GetValueOctStr(VpiHandle obj, VpiValue* value,
+static void GetValueOctStr(const Logic4Vec& v, VpiValue* value,
                            std::vector<std::string>& pool) {
-  uint64_t aval = obj->var->value.words[0].aval;
-  uint64_t bval = obj->var->value.words[0].bval;
-  int width = static_cast<int>(obj->var->value.width);
+  uint64_t aval = v.words[0].aval;
+  uint64_t bval = v.words[0].bval;
+  int width = static_cast<int>(v.width);
   int oct_digits = (width + 2) / 3;
   std::string result;
   result.reserve(oct_digits);
@@ -83,10 +102,9 @@ static void GetValueOctStr(VpiHandle obj, VpiValue* value,
     uint8_t a_bits = (aval >> (i * 3)) & 0x7;
     uint8_t b_bits = (bval >> (i * 3)) & 0x7;
     if (b_bits != 0) {
-      // §38.15, Table 38-3 (octal row) / §21.2.1.3: a group prints z only when
-      // its unknown bits are all z (a=0, b=0x7); any other group containing an
-      // unknown bit prints x (canonical encoding x=(1,1), z=(0,1)).
-      result += (b_bits == 0x7 && a_bits == 0) ? 'z' : 'x';
+      int valid = std::min(3, width - i * 3);
+      result += UnknownGroupChar(a_bits, b_bits,
+                                 static_cast<uint8_t>((1u << valid) - 1));
     } else {
       result += static_cast<char>('0' + a_bits);
     }
@@ -100,9 +118,8 @@ static int ScalarFromBits(uint64_t aval, uint64_t bval) {
   return aval ? kVpiX : kVpiZ;  // x=(1,1), z=(0,1)
 }
 
-static void GetValueVector(VpiHandle obj, VpiValue* value,
+static void GetValueVector(const Logic4Vec& v, VpiValue* value,
                            std::vector<std::vector<VpiVectorVal>>& pool) {
-  const auto& v = obj->var->value;
   int width = static_cast<int>(v.width);
   // §38.15: the vector value occupies an array of s_vpi_vecval whose size is
   // ((vector_size - 1) / 32 + 1), one element per 32 bits of the vector.
@@ -130,9 +147,8 @@ static void GetValueVector(VpiHandle obj, VpiValue* value,
   value->value.vector = pool.back().data();
 }
 
-static void GetValueStrength(VpiHandle obj, VpiValue* value,
+static void GetValueStrength(const Logic4Vec& v, VpiValue* value,
                              std::vector<std::vector<VpiStrengthVal>>& pool) {
-  const auto& v = obj->var->value;
   int width = static_cast<int>(v.width);
   if (width < 1) width = 1;
   // §38.15: the strength arm holds one descriptor per bit of the vector.
@@ -155,9 +171,9 @@ static void GetValueStrength(VpiHandle obj, VpiValue* value,
   value->value.strength = pool.back().data();
 }
 
-static void GetValueStringVal(VpiHandle obj, VpiValue* value,
+static void GetValueStringVal(const Logic4Vec& v, VpiValue* value,
                               std::vector<std::string>& pool) {
-  uint64_t val = obj->var->value.ToUint64();
+  uint64_t val = v.ToUint64();
   std::string s;
   for (int i = 56; i >= 0; i -= 8) {
     auto ch = static_cast<char>((val >> i) & 0xFF);
@@ -167,30 +183,38 @@ static void GetValueStringVal(VpiHandle obj, VpiValue* value,
   value->value.str = pool.back().c_str();
 }
 
-static void GetValueIntVal(VpiHandle obj, VpiValue* value) {
+static void GetValueIntVal(const Logic4Vec& v, VpiValue* value) {
   // §38.15, Table 38-3: any x or z bit of the object maps to a 0 in the
   // returned integer, so drop every unknown bit before handing it back.
-  uint64_t aval = obj->var->value.words[0].aval;
-  uint64_t bval = obj->var->value.words[0].bval;
+  uint64_t aval = v.words[0].aval;
+  uint64_t bval = v.words[0].bval;
   value->value.integer = static_cast<int>(aval & ~bval);
 }
 
-static void GetValueObjType(VpiHandle obj, VpiValue* value,
+// §38.15: unpack the IEEE-754 double that a real object stores in its
+// four-state word (§6.13 lays the double's bit pattern into the value bits).
+static double ObjectRealValue(const Logic4Vec& v) {
+  uint64_t bits = v.ToUint64();
+  double d = 0.0;
+  std::memcpy(&d, &bits, sizeof(double));
+  return d;
+}
+
+static void GetValueObjType(const Logic4Vec& v, VpiValue* value,
                             std::vector<std::vector<VpiVectorVal>>& pool) {
   // §38.15: fill in the value and rewrite the format field to the closest
   // format for the object's type. A real object reports vpiRealVal, a
   // single-bit object is a scalar, and anything wider is a vector.
-  const auto& v = obj->var->value;
   if (v.is_real) {
     value->format = kVpiRealVal;
-    value->value.real = static_cast<double>(v.ToUint64());
+    value->value.real = ObjectRealValue(v);
   } else if (v.width == 1) {
     value->format = kVpiScalarVal;
     value->value.scalar =
         ScalarFromBits(v.words[0].aval & 1, v.words[0].bval & 1);
   } else {
     value->format = kVpiVectorVal;
-    GetValueVector(obj, value, pool);
+    GetValueVector(v, value, pool);
   }
 }
 
@@ -294,8 +318,8 @@ static bool GetValueIsRefused(VpiHandle obj, VpiValue* value,
   return false;
 }
 
-static void DispatchGetValueByFormat(
-    VpiHandle obj, VpiValue* value, std::vector<std::string>& str_pool,
+static void DispatchIntegerFormat(
+    const Logic4Vec& v, VpiValue* value, std::vector<std::string>& str_pool,
     std::vector<std::vector<VpiVectorVal>>& vec_pool,
     std::vector<std::vector<VpiStrengthVal>>& strength_pool) {
   // §38.15, Table 38-3: fill the value buffer according to the requested
@@ -303,42 +327,84 @@ static void DispatchGetValueByFormat(
   // dedicated helper, while the scalar/real/time arms are short inline reads.
   switch (value->format) {
     case kVpiIntVal:
-      GetValueIntVal(obj, value);
+      GetValueIntVal(v, value);
       break;
     case kVpiRealVal:
-      value->value.real = static_cast<double>(obj->var->value.ToUint64());
+      value->value.real = static_cast<double>(v.ToUint64());
       break;
     case kVpiScalarVal:
-      value->value.scalar = ScalarFromBits(obj->var->value.words[0].aval & 1,
-                                           obj->var->value.words[0].bval & 1);
+      value->value.scalar =
+          ScalarFromBits(v.words[0].aval & 1, v.words[0].bval & 1);
       break;
     case kVpiBinStrVal:
-      GetValueBinStr(obj, value, str_pool);
+      GetValueBinStr(v, value, str_pool);
       break;
     case kVpiHexStrVal:
-      GetValueHexStr(obj, value, str_pool);
+      GetValueHexStr(v, value, str_pool);
       break;
     case kVpiOctStrVal:
-      GetValueOctStr(obj, value, str_pool);
+      GetValueOctStr(v, value, str_pool);
       break;
     case kVpiStringVal:
-      GetValueStringVal(obj, value, str_pool);
+      GetValueStringVal(v, value, str_pool);
       break;
     case kVpiTimeVal:
-      value->value.integer = static_cast<int>(obj->var->value.ToUint64());
+      value->value.integer = static_cast<int>(v.ToUint64());
       break;
     case kVpiVectorVal:
-      GetValueVector(obj, value, vec_pool);
+      GetValueVector(v, value, vec_pool);
       break;
     case kVpiStrengthVal:
-      GetValueStrength(obj, value, strength_pool);
+      GetValueStrength(v, value, strength_pool);
       break;
     case kVpiObjTypeVal:
-      GetValueObjType(obj, value, vec_pool);
+      GetValueObjType(v, value, vec_pool);
       break;
     default:
       break;
   }
+}
+
+static void DispatchGetValueByFormat(
+    VpiHandle obj, VpiValue* value, std::vector<std::string>& str_pool,
+    std::vector<std::vector<VpiVectorVal>>& vec_pool,
+    std::vector<std::vector<VpiStrengthVal>>& strength_pool) {
+  const Logic4Vec& v = obj->var->value;
+  if (v.is_real) {
+    // §38.15: a real object is read as its floating-point value only in the
+    // vpiRealVal and vpiStringVal formats. vpiObjTypeVal reduces to vpiRealVal
+    // for a real object. Every other format first converts the real to an
+    // integer using the rounding defined in §6.12.1 (round to nearest, ties
+    // away from zero) and then formats that integer.
+    if (value->format == kVpiObjTypeVal) {
+      GetValueObjType(v, value, vec_pool);
+      return;
+    }
+    double d = ObjectRealValue(v);
+    if (value->format == kVpiRealVal) {
+      value->value.real = d;
+      return;
+    }
+    if (value->format == kVpiStringVal) {
+      // §38.15: return a decimal-notation string of the floating-point number
+      // with at most 16 digits of precision.
+      char buf[64];
+      std::snprintf(buf, sizeof(buf), "%.16g", d);
+      str_pool.emplace_back(buf);
+      value->value.str = str_pool.back().c_str();
+      return;
+    }
+    // §6.12.1 rounding: nearest integer, ties away from zero.
+    auto rounded = static_cast<uint64_t>(std::llround(d));
+    Logic4Word iw{rounded, 0};
+    Logic4Vec int_view;
+    int_view.width = 64;
+    int_view.nwords = 1;
+    int_view.words = &iw;
+    DispatchIntegerFormat(int_view, value, str_pool, vec_pool, strength_pool);
+    return;
+  }
+  DispatchIntegerFormat(v, value, str_pool, vec_pool, strength_pool);
 }
 
 void VpiContext::GetValue(VpiHandle obj, VpiValue* value) {
