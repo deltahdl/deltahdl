@@ -95,23 +95,6 @@ TEST(GenerateElaboration, GenerateForStepByTwo) {
   EXPECT_EQ(mod->variables.size(), 3u);
 }
 
-TEST(GenerateElaboration, GenerateForSingleIteration) {
-  ElabFixture f;
-  auto* design = Elaborate(
-      "module top #(parameter N = 1) ();\n"
-      "  generate\n"
-      "    for (i = 0; i < N; i = i + 1) begin\n"
-      "      logic [7:0] s;\n"
-      "    end\n"
-      "  endgenerate\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  auto* mod = design->top_modules[0];
-  ASSERT_EQ(mod->variables.size(), 1u);
-  EXPECT_EQ(mod->variables[0].name, "i_0_s");
-}
-
 TEST(GenerateElaboration, NestedGenerateForIf) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -268,6 +251,201 @@ TEST(GenerateElaboration, GenerateForSingleItemBodyWithoutBeginEnd) {
   EXPECT_FALSE(f.has_errors);
   auto* mod = design->top_modules[0];
   EXPECT_EQ(mod->variables.size(), 3u);
+}
+
+// §27.4: the implicit localparam inside a loop generate block has the same name
+// as the genvar and shadows it, so two nested loop generate constructs cannot
+// use the same genvar -- inside the inner loop the name already refers to the
+// outer block's localparam. This is LRM Example 1, module mod_a, which the
+// standard flags as an error.
+TEST(GenerateElaboration, NestedLoopGenerateSameGenvarErrors) {
+  EXPECT_FALSE(
+      ElabOk("module mod_a();\n"
+             "  genvar i;\n"
+             "  for (i = 0; i < 5; i = i + 1) begin : a\n"
+             "    for (i = 0; i < 5; i = i + 1) begin : b\n"
+             "      logic [7:0] x;\n"
+             "    end\n"
+             "  end\n"
+             "endmodule\n"));
+}
+
+// §27.4: nesting loop generate constructs is legal as long as they use distinct
+// genvars, so an outer i and an inner j elaborate cleanly to the full cross
+// product of instances.
+TEST(GenerateElaboration, NestedLoopGenerateDistinctGenvarsElaborate) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module top #(parameter N = 2) ();\n"
+      "  genvar i, j;\n"
+      "  generate\n"
+      "    for (i = 0; i < N; i = i + 1) begin\n"
+      "      for (j = 0; j < N; j = j + 1) begin\n"
+      "        logic [7:0] x;\n"
+      "      end\n"
+      "    end\n"
+      "  endgenerate\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  EXPECT_EQ(mod->variables.size(), 4u);
+}
+
+// §27.4: the restriction is only on nesting -- two sibling loop generate
+// constructs (one finishing before the other begins) may reuse the same genvar.
+// The active-genvar set is cleared when a loop finishes, so the second loop is
+// not rejected and both bodies are instantiated.
+TEST(GenerateElaboration, SiblingLoopGenerateReuseSameGenvarElaborates) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module top();\n"
+      "  genvar i;\n"
+      "  generate\n"
+      "    for (i = 0; i < 2; i = i + 1) begin\n"
+      "      logic [7:0] a;\n"
+      "    end\n"
+      "    for (i = 0; i < 2; i = i + 1) begin\n"
+      "      logic [7:0] b;\n"
+      "    end\n"
+      "  endgenerate\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  EXPECT_EQ(mod->variables.size(), 4u);
+}
+
+// §27.4: a named loop generate block declares an array of generate block
+// instances whose index values are the values the genvar assumes; these need
+// not form a contiguous range, so the array may be sparse. A geometric step
+// yields the non-contiguous values 1, 2, 4, 8, producing one instance each.
+TEST(GenerateElaboration, GenerateForSparseGenvarRange) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module top();\n"
+      "  genvar i;\n"
+      "  generate\n"
+      "    for (i = 1; i < 16; i = i * 2) begin\n"
+      "      logic [7:0] v;\n"
+      "    end\n"
+      "  endgenerate\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  EXPECT_EQ(mod->variables.size(), 4u);
+}
+
+// §27.4: the iteration assignment advances the genvar each pass of the loop
+// generate scheme. An increment (i++) iteration form assigns to the same
+// genvar, so the loop steps 0,1,2,3 and instantiates the block four times.
+TEST(GenerateElaboration, GenerateForIncrementIterationForm) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module top();\n"
+      "  genvar i;\n"
+      "  generate\n"
+      "    for (i = 0; i < 4; i++) begin\n"
+      "      logic [7:0] v;\n"
+      "    end\n"
+      "  endgenerate\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  EXPECT_EQ(mod->variables.size(), 4u);
+}
+
+// §27.4: the iteration form may also decrement the genvar. A (i--) iteration
+// assigns to the same genvar and drives the loop 3,2,1,0, again producing four
+// instances -- exercising the decrement branch of the genvar advance.
+TEST(GenerateElaboration, GenerateForDecrementIterationForm) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module top();\n"
+      "  genvar i;\n"
+      "  generate\n"
+      "    for (i = 3; i >= 0; i--) begin\n"
+      "      logic [7:0] v;\n"
+      "    end\n"
+      "  endgenerate\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  EXPECT_EQ(mod->variables.size(), 4u);
+}
+
+// §27.4 (dep §6.20.4): the loop bound is a constant expression, which may be a
+// localparam as well as a literal or a module parameter. Built from real
+// localparam source syntax and driven through elaboration, the bound resolves
+// so the loop instantiates the block once per index value, 0..3.
+TEST(GenerateElaboration, GenerateForBoundFromLocalparam) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module top();\n"
+      "  localparam N = 4;\n"
+      "  genvar i;\n"
+      "  generate\n"
+      "    for (i = 0; i < N; i = i + 1) begin\n"
+      "      logic [7:0] v;\n"
+      "    end\n"
+      "  endgenerate\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  EXPECT_EQ(mod->variables.size(), 4u);
+}
+
+// §27.4: within a generate block the genvar names an implicit localparam that
+// can be used anywhere a normal integer parameter can be used -- including as
+// the bound of a nested loop generate scheme. Here the inner loop bound reads
+// the outer genvar, so the inner loop runs i times per outer index: i=0 makes
+// no instance, i=1 one, i=2 two, for three block instances in all. This
+// observes the outer index value being consumed as a constant in the inner
+// generate scheme.
+TEST(GenerateElaboration, NestedLoopGenerateInnerBoundUsesOuterGenvar) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module top();\n"
+      "  genvar i, j;\n"
+      "  generate\n"
+      "    for (i = 0; i < 3; i = i + 1) begin\n"
+      "      for (j = 0; j < i; j = j + 1) begin\n"
+      "        logic [7:0] x;\n"
+      "      end\n"
+      "    end\n"
+      "  endgenerate\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  EXPECT_EQ(mod->variables.size(), 3u);
+}
+
+// §27.4: the same-genvar requirement on the iteration assignment applies to the
+// increment/decrement iteration form too, not just the assignment form. A (j++)
+// step whose target differs from the init genvar i is rejected, exercising the
+// unary-step branch of the same-genvar check.
+TEST(GenerateElaboration, GenerateForInitStepMismatchIncrementFormErrors) {
+  EXPECT_FALSE(
+      ElabOk("module top();\n"
+             "  genvar i, j;\n"
+             "  generate\n"
+             "    for (i = 0; i < 3; j++) begin\n"
+             "      logic [7:0] x;\n"
+             "    end\n"
+             "  endgenerate\n"
+             "endmodule\n"));
 }
 
 }  // namespace

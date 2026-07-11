@@ -948,6 +948,11 @@ class Elaborator {
   bool has_pending_enclosing_scope_ = false;
 
   std::unordered_set<std::string_view> declared_names_;
+  // §27.4: genvar names of the loop generate constructs currently being
+  // elaborated. Used to reject a nested loop generate construct that reuses an
+  // enclosing loop's genvar, which is illegal because the inner reference names
+  // the outer block's implicit localparam rather than a genvar.
+  std::unordered_set<std::string_view> active_loop_genvars_;
   std::unordered_set<std::string_view> net_names_;
   std::unordered_map<std::string_view, SourceLoc> cont_assign_targets_;
   std::unordered_map<std::string_view, SourceLoc> proc_assign_targets_;

@@ -425,6 +425,20 @@ void Elaborator::ElaborateGenerateFor(ModuleItem* item, RtlirModule* mod,
   if (!genvar_name_opt) return;
   auto genvar_name = *genvar_name_opt;
 
+  // §27.4: within the generate block the genvar name denotes an implicit
+  // localparam that shadows the genvar itself, so it is not possible for a
+  // nested loop generate construct to reuse the genvar of an enclosing one --
+  // inside the inner loop that name already refers to the outer block's
+  // localparam, not to a genvar (LRM Example 1, mod_a). Sibling loops are fine:
+  // each genvar is removed from the active set once its loop finishes.
+  if (active_loop_genvars_.count(genvar_name)) {
+    diag_.Error(item->loc,
+                std::format("genvar '{}' is already in use by an enclosing "
+                            "loop generate construct",
+                            genvar_name));
+    return;
+  }
+
   if (!RegisterGenerateForArrayName(diag_, item, mod, declared_names_)) return;
 
   auto init_val = ConstEvalInt(item->gen_init->rhs, scope);
@@ -436,6 +450,7 @@ void Elaborator::ElaborateGenerateFor(ModuleItem* item, RtlirModule* mod,
   ScopeMap loop_scope = scope;
   loop_scope[genvar_name] = *init_val;
   std::string saved_prefix = gen_prefix_;
+  active_loop_genvars_.insert(genvar_name);
 
   std::unordered_set<int64_t> seen_values;
 
@@ -446,6 +461,7 @@ void Elaborator::ElaborateGenerateFor(ModuleItem* item, RtlirModule* mod,
     if (GenerateForGenvarRepeats(diag_, item, loop_scope[genvar_name],
                                  seen_values)) {
       gen_prefix_ = saved_prefix;
+      active_loop_genvars_.erase(genvar_name);
       return;
     }
 
@@ -458,6 +474,7 @@ void Elaborator::ElaborateGenerateFor(ModuleItem* item, RtlirModule* mod,
                   "generate-for genvar shall not have any bit set to x or z "
                   "during evaluation");
       gen_prefix_ = saved_prefix;
+      active_loop_genvars_.erase(genvar_name);
       return;
     }
 
@@ -471,6 +488,7 @@ void Elaborator::ElaborateGenerateFor(ModuleItem* item, RtlirModule* mod,
   }
 
   gen_prefix_ = saved_prefix;
+  active_loop_genvars_.erase(genvar_name);
 }
 
 }  // namespace delta
