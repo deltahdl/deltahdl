@@ -347,7 +347,8 @@ bool TryResolveClockingAndParentRelation(int type, VpiHandle ref,
 }
 
 // §37.28/§37.65/§37.68: type/value parameter typespecs, defaults, ranges, the
-// lhs of a param assign, and the guarded statement of event/delay controls.
+// lhs of a param assign, the guarded statement of event/delay controls, and the
+// delay expression a delay control reaches through vpiDelay.
 bool TryResolveParameterRelation(int type, VpiHandle ref, VpiHandle& out) {
   if (type == vpiTypespec && ref->type == vpiTypeParameter) {
     out = VpiTypeParameterTypespec(ref);
@@ -376,6 +377,10 @@ bool TryResolveParameterRelation(int type, VpiHandle ref, VpiHandle& out) {
   }
   if (type == vpiStmt && ref->type == vpiDelayControl) {
     out = VpiDelayControlStmt(ref);
+    return true;
+  }
+  if (type == vpiDelay && ref->type == vpiDelayControl) {
+    out = VpiDelayControlDelayExpr(ref);
     return true;
   }
   return false;

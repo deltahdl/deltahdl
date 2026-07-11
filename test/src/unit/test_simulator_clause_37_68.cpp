@@ -79,5 +79,95 @@ TEST_F(DelayControl, RuleAppliesThroughPublicVpiHandleDispatch) {
   EXPECT_EQ(vpi_handle(vpiStmt, &standalone), &guarded);
 }
 
+// vpiDelay: a delay control reaches its "#" delay expression through vpiDelay.
+// The delay operand is the delay control's expression child; the guarded
+// statement child (a vpiStmt) is skipped. Observed through the public
+// vpi_handle(vpiDelay, ...) dispatch that calls VpiDelayControlDelayExpr.
+TEST_F(DelayControl, DelayControlReachesItsDelayExpressionThroughVpiDelay) {
+  VpiObject delay_expr;
+  delay_expr.type = vpiConstant;  // e.g. the "5" in "#5 stmt;"
+
+  VpiObject guarded;
+  guarded.type = vpiStmt;
+
+  VpiObject delay_control;
+  delay_control.type = vpiDelayControl;
+  // The guarded statement precedes the delay operand in child order to prove
+  // the scan selects on expression kind, not on position.
+  delay_control.children = {&guarded, &delay_expr};
+
+  EXPECT_EQ(vpi_handle(vpiDelay, &delay_control), &delay_expr);
+  EXPECT_EQ(VpiDelayControlDelayExpr(&delay_control), &delay_expr);
+}
+
+// vpiDelay holds even for an intra-assignment delay control ("x = #5 y"): its
+// guarded statement is null (detail 1), yet the delay expression is still
+// reachable. A ref-obj operand ("#dly") stands in for the delay here.
+TEST_F(DelayControl, IntraAssignmentDelayStillReachesItsDelayExpression) {
+  VpiObject delay_expr;
+  delay_expr.type = vpiRefObj;  // e.g. the "dly" in "x = #dly y;"
+
+  VpiObject assignment;
+  assignment.type = vpiAssignment;
+
+  VpiObject on_assignment;
+  on_assignment.type = vpiDelayControl;
+  on_assignment.parent = &assignment;
+  on_assignment.children = {&delay_expr};
+
+  // Detail 1: no guarded statement for the assignment-associated delay control.
+  EXPECT_EQ(vpi_handle(vpiStmt, &on_assignment), nullptr);
+  // ... but the vpiDelay edge is unaffected by that carve-out.
+  EXPECT_EQ(vpi_handle(vpiDelay, &on_assignment), &delay_expr);
+}
+
+// vpiDelay edge cases: a null handle and a delay control with no expression
+// child both report no delay expression.
+TEST_F(DelayControl, NullAndDelaylessControlsReportNoDelayExpression) {
+  EXPECT_EQ(VpiDelayControlDelayExpr(nullptr), nullptr);
+
+  VpiObject only_stmt;
+  only_stmt.type = vpiDelayControl;
+  VpiObject guarded;
+  guarded.type = vpiStmt;
+  only_stmt.children = {&guarded};
+  EXPECT_EQ(VpiDelayControlDelayExpr(&only_stmt), nullptr);
+}
+
+// vpiDelay operand form: a computed delay ("#(a+b)") reaches its delay
+// expression just as a bare-constant delay does. The operand is an operation
+// object rather than a constant, so this covers the second admitted delay-
+// expression kind (the multiple/computed-delay form of §37.3.4) alongside the
+// bare-constant and reference forms exercised elsewhere.
+TEST_F(DelayControl, ComputedDelayExpressionReachedThroughVpiDelay) {
+  VpiObject delay_expr;
+  delay_expr.type = vpiOperation;  // e.g. the "a+b" in "#(a+b) stmt;"
+
+  VpiObject delay_control;
+  delay_control.type = vpiDelayControl;
+  delay_control.children = {&delay_expr};
+
+  EXPECT_EQ(vpi_handle(vpiDelay, &delay_control), &delay_expr);
+  EXPECT_EQ(VpiDelayControlDelayExpr(&delay_control), &delay_expr);
+}
+
+// vpiStmt negative/discriminator: the guarded-statement scan must not mistake
+// the delay operand for the guarded statement. A delay control that carries
+// only a delay expression (no statement child) reports a null statement,
+// proving the vpiStmt edge selects on the statement kind rather than returning
+// the first child. Mirror of the skip the vpiDelay scan performs on the
+// statement child.
+TEST_F(DelayControl, StatementScanSkipsDelayExpressionChild) {
+  VpiObject delay_expr;
+  delay_expr.type = vpiConstant;
+
+  VpiObject delay_control;
+  delay_control.type = vpiDelayControl;
+  delay_control.children = {&delay_expr};
+
+  EXPECT_EQ(vpi_handle(vpiStmt, &delay_control), nullptr);
+  EXPECT_EQ(VpiDelayControlStmt(&delay_control), nullptr);
+}
+
 }  // namespace
 }  // namespace delta

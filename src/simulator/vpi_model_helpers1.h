@@ -626,6 +626,17 @@ VpiHandle VpiEventControlConditionExpr(VpiHandle event_control);
 // attached. Backs the public vpi_handle(vpiStmt, delay_control) dispatch.
 VpiHandle VpiDelayControlStmt(VpiHandle delay_control);
 
+// §37.68 Delay control: the delay expression a delay control "#" reaches
+// through vpiDelay - the "#" operand. Unlike the guarded statement, this edge
+// is present even for an intra-assignment delay control (whose guarded
+// statement is null per detail 1), so no assignment-association carve-out
+// applies. The delay operand is the delay control's first child of an
+// expression kind, never the vpiDelay relation tag itself, so the generic
+// single-level child walk (keyed on the relation enum) cannot serve it. Null
+// when no delay operand is attached. Backs the public vpi_handle(vpiDelay,
+// delay_control) dispatch.
+VpiHandle VpiDelayControlDelayExpr(VpiHandle delay_control);
+
 // §37.66 While, repeat: whether an object kind is one of the two looping
 // statements the while/repeat diagram groups - a while statement or a repeat
 // statement. Both reach a condition expression and a body statement through the

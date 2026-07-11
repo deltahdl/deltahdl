@@ -386,6 +386,25 @@ VpiHandle VpiDelayControlStmt(VpiHandle delay_control) {
   return nullptr;
 }
 
+VpiHandle VpiDelayControlDelayExpr(VpiHandle delay_control) {
+  // §37.68: a delay control "#" reaches the expression giving its delay through
+  // the vpiDelay relation - the "#" operand ("#5", "#(a+b)", "#dly"). That edge
+  // holds whether or not the delay control is associated with an assignment: an
+  // intra-assignment delay ("x = #5 y") reports a null guarded statement
+  // (detail 1) yet still carries a delay expression, so this scan does not
+  // apply the assignment-association carve-out that VpiDelayControlStmt does.
+  // The delay operand is the delay control's first child whose own type is an
+  // expression kind (a constant, an operation, a reference, ...) - never the
+  // guarded statement child (a vpiStmt) and never the vpiDelay relation tag
+  // itself, which is why the generic child walk keyed on the relation enum
+  // cannot serve it. Null when no delay operand is attached.
+  if (!delay_control) return nullptr;
+  for (auto* child : delay_control->children) {
+    if (VpiIsExprType(child->type)) return child;
+  }
+  return nullptr;
+}
+
 // ===========================================================================
 // §37.12 Scope.
 // ===========================================================================
