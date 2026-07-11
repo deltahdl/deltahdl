@@ -191,5 +191,29 @@ TEST(AssertionModel, MissingFileReportsNull) {
   EXPECT_EQ(ctx.GetStr(vpiFile, &assertion), nullptr);
 }
 
+// E input form: the location and name property groups are drawn on the abstract
+// assertion class, so they apply to every grouped member kind - not only the
+// assert directive the other E tests use. An assertion registered as a property
+// instance through the real construction path reports the name it was created
+// with and the source span recorded on it just the same.
+TEST(AssertionModel, LocationAndNameApplyToAnyAssertionMemberKind) {
+  VpiContext ctx;
+  VpiHandle p = ctx.CreateAssertion("p_handshake", vpiPropertyInst);
+  ASSERT_NE(p, nullptr);
+  EXPECT_TRUE(VpiIsAssertionType(p->type));  // a property inst is an assertion
+  p->file = "checks.sv";
+  p->start_line = 40;
+  p->column = 3;
+  p->end_line = 42;
+  p->end_column = 7;
+
+  EXPECT_STREQ(ctx.GetStr(vpiName, p), "p_handshake");
+  EXPECT_STREQ(ctx.GetStr(vpiFile, p), "checks.sv");
+  EXPECT_EQ(ctx.Get(vpiStartLine, p), 40);
+  EXPECT_EQ(ctx.Get(vpiColumn, p), 3);
+  EXPECT_EQ(ctx.Get(vpiEndLine, p), 42);
+  EXPECT_EQ(ctx.Get(vpiEndColumn, p), 7);
+}
+
 }  // namespace
 }  // namespace delta
