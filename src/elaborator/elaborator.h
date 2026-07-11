@@ -816,6 +816,15 @@ class Elaborator {
   CompilationUnit* unit_;
   std::string gen_prefix_;
 
+  // §20.10.1: the constant bindings (genvars, and any localparams introduced
+  // by the enclosing generate blocks) in effect while a generate body is being
+  // elaborated. An elaboration severity task's argument list may reference a
+  // genvar (see §20.10.1 Example 2, `$info("i = %0d ...", i)`), which is a
+  // constant expression per §11.2.1 but is absent from BuildParamScope. This
+  // overlay makes those bindings visible to the constant-argument check. Empty
+  // outside any generate construct.
+  ScopeMap gen_const_scope_;
+
   // §20.10.1: any $fatal or $error elaboration severity task that survives
   // generate-construct expansion sets this to true. Propagated onto the
   // resulting RtlirDesign so the simulator can refuse to start.

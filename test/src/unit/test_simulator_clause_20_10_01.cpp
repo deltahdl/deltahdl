@@ -26,6 +26,27 @@ TEST(ElabSeverityTaskSim, FatalBlocksLowering) {
   EXPECT_EQ(f.ctx.FindVariable("x"), nullptr);
 }
 
+// §20.10.1 — $error at elaboration lets elaboration run to completion but
+// shall still prevent simulation from starting. The design is produced, yet
+// lowering must refuse to register its variables and the initial-block
+// assignment must never take effect.
+TEST(ElabSeverityTaskSim, ErrorBlocksLowering) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial x = 8'd5;\n"
+      "  $error(\"bad param\");\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  ASSERT_TRUE(design->simulation_blocked);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_EQ(f.ctx.FindVariable("x"), nullptr);
+}
+
 // §20.10.1 — $warning at elaboration shall not prevent simulation from
 // starting. Lowering must proceed and the initial-block assignment must
 // take effect.

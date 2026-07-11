@@ -572,6 +572,11 @@ void Elaborator::ValidateElabSystemTask(const ModuleItem* item,
   size_t arg_start = CheckFatalFinishNumber(expr, is_fatal, diag_);
 
   ScopeMap scope = mod ? BuildParamScope(mod) : ScopeMap{};
+  // §11.2.1: a genvar is a constant expression. When this task sits inside a
+  // generate body, overlay the active generate bindings (genvar values and any
+  // generate-block localparams) so a genvar argument — as in §20.10.1
+  // Example 2 — is recognized as constant rather than wrongly rejected.
+  for (const auto& [gname, gval] : gen_const_scope_) scope[gname] = gval;
   CheckElabTaskArgsConstant(expr, arg_start, name, scope, diag_);
 
   std::string scope_name = BuildElabTaskScopeName(mod, gen_prefix_);

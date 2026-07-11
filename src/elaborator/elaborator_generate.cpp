@@ -37,6 +37,12 @@ void Elaborator::ProcessPendingGenerate(ModuleItem* item, RtlirModule* mod) {
 void Elaborator::ElaborateGenerateItems(const std::vector<ModuleItem*>& items,
                                         RtlirModule* mod,
                                         const ScopeMap& scope) {
+  // §20.10.1: expose the genvar (and any generate-block localparam) bindings in
+  // effect for this body to the elaboration severity task's constant-argument
+  // check, which otherwise only sees module parameters. Saved/restored so the
+  // overlay is empty again once we leave the generate scope.
+  ScopeMap saved_gen_const_scope = gen_const_scope_;
+  gen_const_scope_ = scope;
   for (auto* item : items) {
     switch (item->kind) {
       case ModuleItemKind::kGenerateIf:
@@ -53,6 +59,7 @@ void Elaborator::ElaborateGenerateItems(const std::vector<ModuleItem*>& items,
         break;
     }
   }
+  gen_const_scope_ = saved_gen_const_scope;
 }
 
 void Elaborator::ElaborateGenerateIf(ModuleItem* item, RtlirModule* mod,

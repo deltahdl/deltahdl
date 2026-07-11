@@ -366,4 +366,144 @@ TEST(ElabSeverityTask, NonConstantArgInFatalRejected) {
   EXPECT_TRUE(ef.has_errors);
 }
 
+// §20.10.1 — a severity task called from inside a procedure becomes a
+// run-time severity task, so the elaborator must NOT treat it as an
+// elaboration severity task: an `initial $fatal` therefore leaves simulation
+// unblocked at elaboration (it would only fire if that process later runs).
+TEST(ElabSeverityTask, FatalInsideProcedureDoesNotBlockSimulation) {
+  ElabFixture ef;
+  auto* design = Elaborate(
+      "module m;\n"
+      "  initial $fatal(1, \"runtime\");\n"
+      "endmodule\n",
+      ef);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(ef.has_errors);
+  EXPECT_FALSE(design->simulation_blocked);
+  EXPECT_TRUE(design->last_elab_severity.empty());
+}
+
+// §20.10.1 claim 5 — a bare integer literal is a constant expression per
+// §11.2.1 and takes a distinct constant-check path from a named reference
+// (immediate literal vs. scope lookup). It must be accepted in the argument
+// list.
+TEST(ElabSeverityTask, LiteralArgumentAccepted) {
+  ElabFixture ef;
+  auto* design = Elaborate(
+      "module m;\n"
+      "  $info(\"v=%0d\", 42);\n"
+      "endmodule\n",
+      ef);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(ef.has_errors);
+  EXPECT_EQ(design->last_elab_severity, "INFO");
+}
+
+// §20.10.1 — activation may be controlled by a generate-case (a conditional
+// generate construct per §27.5). When the selector picks the branch holding
+// $fatal, that task executes and blocks simulation.
+TEST(ElabSeverityTask, GenerateCaseSelectedBranchExecutesFatal) {
+  ElabFixture ef;
+  auto* design = Elaborate(
+      "module m;\n"
+      "  parameter int SEL = 1;\n"
+      "  case (SEL)\n"
+      "    0: begin $info(\"zero\"); end\n"
+      "    1: begin $fatal(1, \"one\"); end\n"
+      "  endcase\n"
+      "endmodule\n",
+      ef);
+  ASSERT_NE(design, nullptr);
+  EXPECT_TRUE(design->simulation_blocked);
+  EXPECT_EQ(design->last_elab_severity, "FATAL");
+}
+
+// §20.10.1 — when the generate-case selector picks a branch that does not
+// hold $fatal, the $fatal in the unselected branch never executes and
+// simulation stays unblocked; only the taken branch's task runs.
+TEST(ElabSeverityTask, GenerateCaseUnselectedBranchSkipsTask) {
+  ElabFixture ef;
+  auto* design = Elaborate(
+      "module m;\n"
+      "  parameter int SEL = 0;\n"
+      "  case (SEL)\n"
+      "    1: begin $fatal(1, \"one\"); end\n"
+      "    default: begin $info(\"picked default\"); end\n"
+      "  endcase\n"
+      "endmodule\n",
+      ef);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(design->simulation_blocked);
+  EXPECT_EQ(design->last_elab_severity, "INFO");
+}
+
+// §20.10.1 claim 5 — a localparam is a constant expression per §11.2.1, so a
+// localparam reference is accepted in the argument list just like a
+// parameter.
+TEST(ElabSeverityTask, LocalparamArgumentAccepted) {
+  ElabFixture ef;
+  auto* design = Elaborate(
+      "module m;\n"
+      "  localparam int LP = 12;\n"
+      "  $info(\"lp=%0d\", LP);\n"
+      "endmodule\n",
+      ef);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(ef.has_errors);
+  EXPECT_EQ(design->last_elab_severity, "INFO");
+}
+
+// §20.10.1 claim 5 — a genvar is a constant expression per §11.2.1. The LRM's
+// own Example 2 passes the loop genvar to $info from inside a generate-for
+// (`$info("i = %0d branch generated", i)`). The genvar reference must be
+// accepted, not rejected as a non-constant, and the task must still execute.
+TEST(ElabSeverityTask, GenvarArgumentAcceptedInGenerateFor) {
+  ElabFixture ef;
+  auto* design = Elaborate(
+      "module m;\n"
+      "  for (genvar i = 0; i < 2; i++) begin\n"
+      "    $info(\"branch %0d generated\", i);\n"
+      "  end\n"
+      "endmodule\n",
+      ef);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(ef.has_errors);
+  EXPECT_EQ(design->last_elab_severity, "INFO");
+  EXPECT_FALSE(design->simulation_blocked);
+}
+
+// §20.10.1 claim 5 — the genvar remains usable inside a compound constant
+// expression in the argument list, and a $fatal that reaches it still blocks
+// simulation (proving the task executed rather than being rejected).
+TEST(ElabSeverityTask, GenvarInCompoundArgAcceptedAndFatalExecutes) {
+  ElabFixture ef;
+  auto* design = Elaborate(
+      "module m;\n"
+      "  for (genvar i = 0; i < 1; i++) begin\n"
+      "    $fatal(1, \"idx=%0d\", i + 1);\n"
+      "  end\n"
+      "endmodule\n",
+      ef);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(ef.has_errors);
+  EXPECT_TRUE(design->simulation_blocked);
+}
+
+// §20.10.1 claim 5 — the genvar overlay must not leak out of the generate
+// body: a bare identifier that is neither a parameter nor an in-scope genvar
+// is still rejected at plain module-item level after a generate-for closes.
+TEST(ElabSeverityTask, NonConstantStillRejectedAfterGenerateFor) {
+  ElabFixture ef;
+  Elaborate(
+      "module m;\n"
+      "  for (genvar i = 0; i < 1; i++) begin\n"
+      "    $info(\"ok %0d\", i);\n"
+      "  end\n"
+      "  logic [7:0] y;\n"
+      "  $error(\"y=%0d\", y);\n"
+      "endmodule\n",
+      ef);
+  EXPECT_TRUE(ef.has_errors);
+}
+
 }  // namespace
