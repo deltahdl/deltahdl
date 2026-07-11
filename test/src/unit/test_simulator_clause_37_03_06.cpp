@@ -127,6 +127,37 @@ TEST_F(VpiObjectProtection, GetStrIsProtectedIsPermittedOnProtectedObject) {
   EXPECT_EQ(vpi_chk_error(&info), 0);
 }
 
+// Claim (relationship half of the general rule): the protected-object guard
+// covers access to an object's *relationships*, not only its properties -
+// "access to relationships and properties of a protected object shall be an
+// error." Traversing a one-to-one relationship out of a protected reference
+// object records an error and yields no handle, whereas the identical traversal
+// from an ordinary object resolves normally. This confirms the guard keys off
+// the reference object's protection state rather than the traversal itself.
+TEST_F(VpiObjectProtection, RelationshipAccessOnProtectedObjectIsAnError) {
+  VpiObject child;
+  child.type = vpiNet;
+
+  VpiObject open_mod;
+  open_mod.type = vpiModule;
+  open_mod.children.push_back(&child);
+  // The contained-net relationship resolves from an unprotected reference.
+  EXPECT_EQ(vpi_handle(vpiNet, &open_mod), &child);
+  SVpiErrorInfo ok = {};
+  EXPECT_EQ(vpi_chk_error(&ok), 0);
+
+  VpiObject locked_mod;
+  locked_mod.type = vpiModule;
+  locked_mod.children.push_back(&child);
+  locked_mod.is_protected = true;
+  // ...but the same traversal is refused once the reference is protected.
+  EXPECT_EQ(vpi_handle(vpiNet, &locked_mod), nullptr);
+
+  SVpiErrorInfo info = {};
+  EXPECT_NE(vpi_chk_error(&info), 0);
+  EXPECT_NE(info.level, 0);
+}
+
 // Edge (boundary of the protected-object rule): the access error applies only
 // to protected objects. An ordinary object reports a non-exception property
 // such as vpiSize normally and records no error, confirming the guard keys off

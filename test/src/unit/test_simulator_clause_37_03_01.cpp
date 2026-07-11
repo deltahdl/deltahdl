@@ -46,19 +46,27 @@ TEST_F(VpiObjectAccess, GetDerivesIntegerPropertiesAsPliInt32) {
   EXPECT_EQ(vpi_get(vpiSize, &net), 8);
 }
 
-// Claim: for a Boolean property, a value of 1 shall represent TRUE and a value
-// of 0 shall represent FALSE. vpi_get() of any Boolean property yields exactly
-// one of those two values - never the raw stored object state.
-TEST_F(VpiObjectAccess, GetEncodesBooleanPropertiesAsOneOrZero) {
-  VpiObject active_thread;
-  active_thread.type = vpiThread;
-  active_thread.active = true;
-  EXPECT_EQ(vpi_get(vpiActive, &active_thread), 1);
+// Claim: the routine vpi_get64() returns 64-bit integer properties as type
+// PLI_INT64. The full-width path preserves the whole 64-bit value, whereas
+// vpi_get() must narrow the same property to its PLI_INT32 result - so a
+// property value that does not fit in 32 bits survives only through
+// vpi_get64().
+TEST_F(VpiObjectAccess, Get64DerivesSixtyFourBitPropertiesAsPliInt64) {
+  static_assert(std::is_same_v<decltype(vpi_get64(0, nullptr)), PLI_INT64>,
+                "vpi_get64 must return the 64-bit property type");
+  static_assert(std::is_same_v<PLI_INT64, std::int64_t>,
+                "64-bit properties are PLI_INT64");
 
-  VpiObject idle_thread;
-  idle_thread.type = vpiThread;
-  idle_thread.active = false;
-  EXPECT_EQ(vpi_get(vpiActive, &idle_thread), 0);
+  VpiObject obj;
+  obj.type = vpiClassObj;
+  // A class object's identifier is a genuinely 64-bit value; give it one whose
+  // low half is 7 but whose high half is set, so it cannot fit in 32 bits.
+  obj.obj_id = (std::int64_t{1} << 32) | 7;
+
+  // The full 64-bit width survives vpi_get64()...
+  EXPECT_EQ(vpi_get64(vpiObjId, &obj), (std::int64_t{1} << 32) | 7);
+  // ...while vpi_get() narrows the very same property to its 32-bit result.
+  EXPECT_EQ(vpi_get(vpiObjId, &obj), 7);
 }
 
 // Claim: string properties shall be accessed with vpi_get_str() and shall be of
@@ -125,11 +133,12 @@ TEST_F(VpiObjectAccess, IterateAndScanTraverseOneToManyRelationship) {
   EXPECT_EQ(vpi_scan(iter), nullptr);
 }
 
-// Edge of the Boolean-property rule: the 1/0 representation is general, not
-// tied to one property. It holds for a property derived by computation
-// (vpiExpanded, reported as the negation of the vectored flag) and for one read
-// straight from a stored flag (vpiExplicitScalared) - in every case vpi_get()
-// yields only 1 or 0.
+// Claim: for a Boolean property, a value of 1 shall represent TRUE and a value
+// of 0 shall represent FALSE. The 1/0 representation is general, not tied to
+// one property: it holds for a property derived by computation (vpiExpanded,
+// reported as the negation of the vectored flag) and for one read straight from
+// a stored flag (vpiExplicitScalared) - in every case vpi_get() yields only 1
+// or 0, never the raw stored object state.
 TEST_F(VpiObjectAccess, GetEncodesEveryBooleanPropertyAsOneOrZero) {
   VpiObject vectored_net;
   vectored_net.type = vpiNet;

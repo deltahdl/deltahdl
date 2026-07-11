@@ -79,5 +79,30 @@ TEST_F(VpiHandleByNameSim, HierarchicalThroughProtectedScopeIsError) {
   EXPECT_EQ(vpi_ctx_.LastError().level, kVpiError);
 }
 
+// §38.21 (negative of H1/H4): a well-formed name that matches no object is a
+// not-found result, not an error. The routine hands back a null handle and -
+// unlike the protected-scope cases above - records no error, distinguishing the
+// ordinary "no such name" outcome from the protected-access error outcome.
+TEST_F(VpiHandleByNameSim, NameMatchingNoObjectReturnsNull) {
+  vpi_ctx_.CreateModule("present", "present");
+
+  EXPECT_EQ(vpi_handle_by_name("absent", nullptr), nullptr);
+  EXPECT_EQ(vpi_ctx_.LastError().level, 0);
+}
+
+// §38.21 (H2 input form): the routine applies to any object carrying a full
+// name, including a variable in the simulation's live runtime state, not only
+// statically built module/port handles. A variable declared in the running
+// SimContext is exposed to VPI and then resolved by its simple name from the
+// top level of the design.
+TEST_F(VpiHandleByNameSim, HandleByNameFindsRuntimeVariable) {
+  sim_ctx_.CreateVariable("counter", 8);
+  vpi_ctx_.Attach(sim_ctx_);
+
+  vpiHandle h = vpi_handle_by_name("counter", nullptr);
+  ASSERT_NE(h, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, h), vpiReg);
+}
+
 }  // namespace
 }  // namespace delta
