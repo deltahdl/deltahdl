@@ -58,6 +58,22 @@ TEST_F(Parameter, LocalParamAndConnByNameProperties) {
   EXPECT_EQ(vpi_get(vpiConnByName, &by_position), 0);
 }
 
+// Figure input form: the vpiLocalParam property attaches to the whole
+// "parameters" group of the figure - both a value parameter and a type
+// parameter. A `localparam type` declaration yields a local type parameter, so
+// the same Boolean dispatch must report vpiLocalParam for a vpiTypeParameter,
+// not only for a vpiParameter.
+TEST_F(Parameter, LocalParamPropertyAppliesToTypeParameter) {
+  VpiObject local_type_param;
+  local_type_param.type = vpiTypeParameter;
+  local_type_param.local_param = true;  // e.g. `localparam type T = int;`
+  EXPECT_EQ(vpi_get(vpiLocalParam, &local_type_param), 1);
+
+  VpiObject plain_type_param;
+  plain_type_param.type = vpiTypeParameter;  // a non-local `parameter type`
+  EXPECT_EQ(vpi_get(vpiLocalParam, &plain_type_param), 0);
+}
+
 // D1: vpi_get_value() of a value parameter returns the value the parameter
 // holds. The reader is §38.34's; this observes it serving a vpiParameter
 // object.
