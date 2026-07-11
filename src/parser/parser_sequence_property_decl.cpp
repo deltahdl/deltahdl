@@ -294,10 +294,41 @@ static bool ScanCaseDefaultToken(Lexer& lexer, DiagEngine& diag,
   return false;
 }
 
+// §16.12.10: the indexed nexttime forms `nexttime [ constant_expression ]` and
+// `s_nexttime [ constant_expression ]` carry a bracketed tick count that shall
+// be a non-negative integer constant expression. Like the literal cycle-delay
+// range check (§16.7), only the literal `[ [-] INTLIT ]` form is diagnosed
+// here: a negative integer literal index violates the non-negative requirement
+// and is rejected, while a symbolic index (for example a parameter) needs full
+// constant folding and is deferred to later stages. The bracket tokens are only
+// peeked under SavePos, so the surrounding body scan still walks past them.
+// Called with the current token positioned on the opening '['.
+static void ValidateLiteralNexttimeIndex(Lexer& lexer, DiagEngine& diag) {
+  auto index_loc = lexer.Peek().loc;
+  auto saved = lexer.SavePos();
+  lexer.Next();  // [
+  bool negative = false;
+  if (LexerCheck(lexer, TokenKind::kMinus)) {
+    negative = true;
+    lexer.Next();
+  }
+  bool is_int_literal = LexerCheck(lexer, TokenKind::kIntLiteral);
+  lexer.RestorePos(saved);
+
+  // §16.12.10: a negative integer literal tick count is illegal. Non-literal
+  // (symbolic) indices are left for the constant-folding stages.
+  if (negative && is_int_literal) {
+    diag.Error(index_loc,
+               "nexttime index must be a non-negative integer constant "
+               "expression (§16.12.10)");
+  }
+}
+
 // §16.12.17 Restrictions 1 & 3: handles the prefix-negation operators and the
 // time-advancing operators that update the scan trackers. Returns true if the
 // current token was consumed here.
-static bool ScanOperatorToken(Lexer& lexer, PropertyBodyScanState& state) {
+static bool ScanOperatorToken(Lexer& lexer, DiagEngine& diag,
+                              PropertyBodyScanState& state) {
   // §16.12.17 Restriction 1: the prefix operators not, s_nexttime,
   // s_eventually, and s_always negate/strongly bind the property expression
   // that follows. s_until and s_until_with are infix; their right operand is
@@ -309,10 +340,16 @@ static bool ScanOperatorToken(Lexer& lexer, PropertyBodyScanState& state) {
       LexerCheck(lexer, TokenKind::kKwSAlways) ||
       LexerCheck(lexer, TokenKind::kKwSUntil) ||
       LexerCheck(lexer, TokenKind::kKwSUntilWith)) {
-    if (LexerCheck(lexer, TokenKind::kKwSNexttime))
-      state.saw_time_advance = true;
+    bool is_s_nexttime = LexerCheck(lexer, TokenKind::kKwSNexttime);
+    if (is_s_nexttime) state.saw_time_advance = true;
     state.expect_negated_operand = true;
     lexer.Next();
+    // §16.12.10: validate the strong indexed form `s_nexttime [ c ]`. The other
+    // operators in this group (s_eventually, s_always) also admit a bracket but
+    // it is a cycle-delay range governed by §16.12.11/§16.12.13, not a nexttime
+    // tick count, so the index check is restricted to s_nexttime.
+    if (is_s_nexttime && LexerCheck(lexer, TokenKind::kLBracket))
+      ValidateLiteralNexttimeIndex(lexer, diag);
     return true;
   }
   // §16.12.17 Restriction 3: ##, |=> (suffix non-overlapping implication),
@@ -320,8 +357,12 @@ static bool ScanOperatorToken(Lexer& lexer, PropertyBodyScanState& state) {
   if (LexerCheck(lexer, TokenKind::kHashHash) ||
       LexerCheck(lexer, TokenKind::kPipeEqGt) ||
       LexerCheck(lexer, TokenKind::kKwNexttime)) {
+    bool is_nexttime = LexerCheck(lexer, TokenKind::kKwNexttime);
     state.saw_time_advance = true;
     lexer.Next();
+    // §16.12.10: validate the weak indexed form `nexttime [ c ]`.
+    if (is_nexttime && LexerCheck(lexer, TokenKind::kLBracket))
+      ValidateLiteralNexttimeIndex(lexer, diag);
     return true;
   }
   return false;
@@ -366,7 +407,7 @@ static void ScanPropertyBodyToken(Lexer& lexer, DiagEngine& diag,
     return;
   }
   if (ScanCaseDefaultToken(lexer, diag, state)) return;
-  if (ScanOperatorToken(lexer, state)) return;
+  if (ScanOperatorToken(lexer, diag, state)) return;
   if (LexerCheck(lexer, TokenKind::kIdentifier)) {
     ScanIdentifierToken(lexer, item, state);
     return;

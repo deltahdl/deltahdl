@@ -115,4 +115,19 @@ TEST(SvaEngine, IndexedNexttimeComposesReachabilityWithStrength) {
             PropertyResult::kFail);
 }
 
+// §16.12.10: when the target tick is reachable the nexttime verdict is exactly
+// the property_expr's verdict at that tick — the weak/strong distinction only
+// governs the unreachable case. A property_expr can itself evaluate vacuously
+// (for example an inner implication whose antecedent does not match at the
+// target tick), and that vacuous pass must flow through the nexttime unchanged
+// under both readings rather than being reclassified as a plain pass.
+TEST(SvaEngine, ReachableNexttimePassesInnerVacuousVerdictThrough) {
+  EXPECT_EQ(EvalNexttime(/*strong=*/false, /*target_tick_reachable=*/true,
+                         PropertyResult::kVacuousPass),
+            PropertyResult::kVacuousPass);
+  EXPECT_EQ(EvalNexttime(/*strong=*/true, /*target_tick_reachable=*/true,
+                         PropertyResult::kVacuousPass),
+            PropertyResult::kVacuousPass);
+}
+
 }  // namespace
