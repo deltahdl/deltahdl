@@ -232,6 +232,33 @@ void VpiNormalizeCbStmtData(VpiCbData& data) {
   }
 }
 
+// §38.36.1: shape the s_cb_data fields that a simulation-event callback
+// delivers with a fixed value regardless of what was requested at registration.
+void VpiNormalizeSimEventCbData(VpiCbData& data) {
+  // Two reasons carry no simulation time to the routine. A cbReclaimObj
+  // callback has no relationship to simulation time, so its time field is
+  // delivered as NULL; and for both cbReclaimObj and cbEndOfObject the
+  // time->type supplied at registration is ignored because no time is passed.
+  // Drop the time pointer so the routine observes the absence of time rather
+  // than a stale request. Any other reason keeps whatever time was requested.
+  if (data.reason == cbReclaimObj || data.reason == cbEndOfObject) {
+    data.time = nullptr;
+  }
+
+  // A cbValueChange callback delivers a NULL value field when the watched
+  // object has no value that can be read through that field. An event
+  // statement has no value at all, and a class variable holds an opaque handle
+  // to a dynamic object whose value cannot be obtained this way (the object it
+  // refers to is identified through vpiObjId instead). In either case the
+  // routine sees value = NULL rather than the format requested at registration.
+  // A cbValueChange on an ordinary object keeps its value field.
+  if (data.reason == cbValueChange && data.obj != nullptr &&
+      (data.obj->type == vpiEventStmt || data.obj->type == vpiNamedEvent ||
+       data.obj->type == vpiClassVar)) {
+    data.value = nullptr;
+  }
+}
+
 // §38.36.1.3: report whether this delivery targets a module instance through a
 // cbStmt callback, which must fan out to every statement in the module rather
 // than fire once for the module as a whole.
@@ -258,6 +285,9 @@ int VpiContext::DispatchCallbacks(int reason, VpiHandle obj, void* user_data) {
     // §38.36.1.1: apply the fixed s_cb_data field contents a cbStmt callback
     // requires before the routine sees them.
     VpiNormalizeCbStmtData(data);
+    // §38.36.1: a cbReclaimObj or cbEndOfObject callback is passed no time, so
+    // clear the time pointer before the routine runs.
+    VpiNormalizeSimEventCbData(data);
     // §38.9: record the reason of the routine about to run so that a routine
     // gated on its callback reason (e.g. vpi_get_data, legal only under
     // cbStartOfRestart/cbEndOfRestart) can observe it. Restore the prior value
