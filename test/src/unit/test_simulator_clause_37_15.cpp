@@ -99,6 +99,26 @@ TEST_F(RefObjContext, GenericPropertyByReferenceKind) {
   EXPECT_EQ(vpi_get(vpiGeneric, &net_ref), vpiUndefined);
 }
 
+// D5 (input form): an interface array is one of the vpiActual kinds the ref obj
+// diagram admits, and a reference to it is still a reference to an interface,
+// so vpiGeneric reports its generic-ness rather than vpiUndefined.
+TEST_F(RefObjContext, GenericPropertyForInterfaceArrayActual) {
+  VpiObject generic_iface_array;
+  generic_iface_array.type = vpiInterfaceArray;
+  VpiObject generic_ref;
+  generic_ref.type = vpiRefObj;
+  generic_ref.actual = &generic_iface_array;
+  generic_ref.generic_interface = true;
+  EXPECT_EQ(vpi_get(vpiGeneric, &generic_ref), 1);
+
+  VpiObject plain_iface_array;
+  plain_iface_array.type = vpiInterfaceArray;
+  VpiObject plain_ref;
+  plain_ref.type = vpiRefObj;
+  plain_ref.actual = &plain_iface_array;
+  EXPECT_EQ(vpi_get(vpiGeneric, &plain_ref), 0);
+}
+
 // D6: vpiDefName for a ref obj whose actual is an interface or modport returns
 // that interface's definition name or the modport name; otherwise NULL.
 TEST_F(RefObjContext, DefNameForInterfaceAndModportActual) {
@@ -126,6 +146,19 @@ TEST_F(RefObjContext, DefNameForInterfaceAndModportActual) {
   net_ref.type = vpiRefObj;
   net_ref.actual = &net;
   EXPECT_EQ(vpi_get_str(vpiDefName, &net_ref), nullptr);
+}
+
+// D6 (input form): an interface array actual - the third interface-bearing
+// vpiActual kind in the ref obj diagram alongside the plain interface and the
+// modport - reports its interface definition name through vpiDefName.
+TEST_F(RefObjContext, DefNameForInterfaceArrayActual) {
+  VpiObject iface_array;
+  iface_array.type = vpiInterfaceArray;
+  iface_array.name = "simple";
+  VpiObject array_ref;
+  array_ref.type = vpiRefObj;
+  array_ref.actual = &iface_array;
+  EXPECT_STREQ(vpi_get_str(vpiDefName, &array_ref), "simple");
 }
 
 // D7: vpiTypespec returns NULL for a ref obj whose actual is not a net,
