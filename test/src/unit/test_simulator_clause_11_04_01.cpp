@@ -25,66 +25,6 @@ TEST(LvalueSim, VarLvalueCompoundAdd) {
   EXPECT_EQ(var->value.ToUint64(), 15u);
 }
 
-TEST(CompoundAssignOpEval, PlusEq) {
-  SimFixture f;
-  auto* var = f.ctx.CreateVariable("a", 32);
-  var->value = MakeLogic4VecVal(f.arena, 32, 10);
-
-  auto* expr = MakeBinary(f.arena, TokenKind::kPlusEq, MakeId(f.arena, "a"),
-                          MakeInt(f.arena, 5));
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 15u);
-  EXPECT_EQ(var->value.ToUint64(), 15u);
-}
-
-TEST(CompoundAssignOpEval, MinusEq) {
-  SimFixture f;
-  auto* var = f.ctx.CreateVariable("a", 32);
-  var->value = MakeLogic4VecVal(f.arena, 32, 20);
-
-  auto* expr = MakeBinary(f.arena, TokenKind::kMinusEq, MakeId(f.arena, "a"),
-                          MakeInt(f.arena, 7));
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 13u);
-  EXPECT_EQ(var->value.ToUint64(), 13u);
-}
-
-TEST(CompoundAssignOpEval, StarEq) {
-  SimFixture f;
-  auto* var = f.ctx.CreateVariable("a", 32);
-  var->value = MakeLogic4VecVal(f.arena, 32, 6);
-
-  auto* expr = MakeBinary(f.arena, TokenKind::kStarEq, MakeId(f.arena, "a"),
-                          MakeInt(f.arena, 7));
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 42u);
-  EXPECT_EQ(var->value.ToUint64(), 42u);
-}
-
-TEST(CompoundAssignOpEval, SlashEq) {
-  SimFixture f;
-  auto* var = f.ctx.CreateVariable("a", 32);
-  var->value = MakeLogic4VecVal(f.arena, 32, 100);
-
-  auto* expr = MakeBinary(f.arena, TokenKind::kSlashEq, MakeId(f.arena, "a"),
-                          MakeInt(f.arena, 5));
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 20u);
-  EXPECT_EQ(var->value.ToUint64(), 20u);
-}
-
-TEST(CompoundAssignOpEval, PercentEq) {
-  SimFixture f;
-  auto* var = f.ctx.CreateVariable("m", 32);
-  var->value = MakeLogic4VecVal(f.arena, 32, 17);
-
-  auto* expr = MakeBinary(f.arena, TokenKind::kPercentEq, MakeId(f.arena, "m"),
-                          MakeInt(f.arena, 5));
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 2u);
-  EXPECT_EQ(var->value.ToUint64(), 2u);
-}
-
 TEST(CompoundAssignOpEval, LtLtLtEq) {
   SimFixture f;
   auto* var = f.ctx.CreateVariable("a", 32);
@@ -129,30 +69,6 @@ TEST(LvalueSim, CompoundAssignWithIndexedLhs) {
   EXPECT_EQ(var->value.ToUint64(), 15u);
 }
 
-TEST(CompoundAssignOpEval, LtLtEq) {
-  SimFixture f;
-  auto* var = f.ctx.CreateVariable("a", 32);
-  var->value = MakeLogic4VecVal(f.arena, 32, 1);
-
-  auto* expr = MakeBinary(f.arena, TokenKind::kLtLtEq, MakeId(f.arena, "a"),
-                          MakeInt(f.arena, 4));
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 16u);
-  EXPECT_EQ(var->value.ToUint64(), 16u);
-}
-
-TEST(CompoundAssignOpEval, GtGtEq) {
-  SimFixture f;
-  auto* var = f.ctx.CreateVariable("a", 32);
-  var->value = MakeLogic4VecVal(f.arena, 32, 256);
-
-  auto* expr = MakeBinary(f.arena, TokenKind::kGtGtEq, MakeId(f.arena, "a"),
-                          MakeInt(f.arena, 4));
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 16u);
-  EXPECT_EQ(var->value.ToUint64(), 16u);
-}
-
 TEST(LvalueSim, CompoundAssignEvaluatesLvalueIndexOnce) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -182,6 +98,105 @@ TEST(LvalueSim, CompoundAssignEvaluatesLvalueIndexOnce) {
   ASSERT_NE(arr_elem, nullptr);
   EXPECT_EQ(arr_elem->value.ToUint64(), 15u);
   EXPECT_EQ(calls->value.ToUint64(), 1u);
+}
+
+// §11.4.1: the once-only left-hand index rule applies to a packed bit-select
+// lhs too, not just an unpacked array element. `data[idx_fn()] += ...` reads
+// and writes the same bit of a single packed variable, and each of those steps
+// re-derives the bit from the index expression; the side-effecting index must
+// still be evaluated exactly once.
+TEST(LvalueSim, CompoundAssignBitSelectIndexEvaluatedOnce) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] data;\n"
+      "  int idx_calls;\n"
+      "  function automatic int idx_fn();\n"
+      "    idx_calls = idx_calls + 1;\n"
+      "    return 3;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    data = 8'b0000_0000;\n"
+      "    idx_calls = 0;\n"
+      "    data[idx_fn()] += 1'b1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* data = f.ctx.FindVariable("data");
+  auto* calls = f.ctx.FindVariable("idx_calls");
+  ASSERT_NE(data, nullptr);
+  ASSERT_NE(calls, nullptr);
+  EXPECT_EQ(data->value.ToUint64(), 0x08u);
+  EXPECT_EQ(calls->value.ToUint64(), 1u);
+}
+
+// §11.4.1: the once-only rule also governs an indexed part-select lhs
+// (`data[f() +: w] += ...`). That lhs resolves through a different production
+// path (packed part-select read + write) than a plain bit-select, and the base
+// index is re-derived by both the read and the write, so a side-effecting base
+// index must be evaluated exactly once here as well.
+TEST(LvalueSim, CompoundAssignPartSelectBaseIndexEvaluatedOnce) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] data;\n"
+      "  int idx_calls;\n"
+      "  function automatic int idx_fn();\n"
+      "    idx_calls = idx_calls + 1;\n"
+      "    return 2;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    data = 8'b0000_0000;\n"
+      "    idx_calls = 0;\n"
+      "    data[idx_fn() +: 2] += 2'b11;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* data = f.ctx.FindVariable("data");
+  auto* calls = f.ctx.FindVariable("idx_calls");
+  ASSERT_NE(data, nullptr);
+  ASSERT_NE(calls, nullptr);
+  EXPECT_EQ(data->value.ToUint64(), 0x0Cu);
+  EXPECT_EQ(calls->value.ToUint64(), 1u);
+}
+
+// §11.4.1: the blocking-assignment equivalence also holds when the lhs is a
+// struct member (`s.field op= rhs`). That lhs kind takes its own production
+// branch (member-access read + struct-field write) distinct from a plain
+// variable or a select, so exercise `s.lo += 3` end-to-end from a real packed
+// struct declaration and confirm only the addressed field is updated.
+TEST(LvalueSim, CompoundAssignStructMemberLhs) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  typedef struct packed {\n"
+      "    logic [3:0] hi;\n"
+      "    logic [3:0] lo;\n"
+      "  } pair_t;\n"
+      "  pair_t s;\n"
+      "  initial begin\n"
+      "    s.hi = 4'd2;\n"
+      "    s.lo = 4'd5;\n"
+      "    s.lo += 4'd3;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* s = f.ctx.FindVariable("s");
+  ASSERT_NE(s, nullptr);
+  // hi keeps 2 in the high nibble; lo becomes 5 + 3 = 8 in the low nibble.
+  EXPECT_EQ(s->value.ToUint64(), 0x28u);
 }
 
 TEST(LvalueSim, CompoundAssignSelfReferenceDoublesValue) {

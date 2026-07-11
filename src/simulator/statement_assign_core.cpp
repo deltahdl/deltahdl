@@ -749,6 +749,33 @@ static bool TryEventVarAssign(const Stmt* stmt, SimContext& ctx) {
   return false;
 }
 
+// §11.4.1: a compound assignment evaluates any left-hand index expression only
+// once. The resolve/read/write helpers below each re-derive the target from
+// lhs->index (and index_end) by calling EvalExpr on those nodes, which would
+// invoke a side-effecting index (e.g. `data[f()] += 1`) several times. Evaluate
+// each index expression a single time up front and stash the result as a
+// per-expression snapshot; EvalExpr returns a stored snapshot ahead of any real
+// evaluation, so every later read of the same index node reuses this value.
+static void SnapshotSelectIndices(const Expr* lhs, SimContext& ctx,
+                                  Arena& arena) {
+  if (lhs == nullptr || lhs->kind != ExprKind::kSelect) return;
+  SnapshotSelectIndices(lhs->base, ctx, arena);
+  if (lhs->index != nullptr)
+    ctx.SetDeferredArgSnapshot(lhs->index, EvalExpr(lhs->index, ctx, arena));
+  if (lhs->index_end != nullptr)
+    ctx.SetDeferredArgSnapshot(lhs->index_end,
+                               EvalExpr(lhs->index_end, ctx, arena));
+}
+
+// Undoes SnapshotSelectIndices once the compound assignment has finished so the
+// snapshots do not leak into later statements that reuse the same index nodes.
+static void ClearSelectIndices(const Expr* lhs, SimContext& ctx) {
+  if (lhs == nullptr || lhs->kind != ExprKind::kSelect) return;
+  ClearSelectIndices(lhs->base, ctx);
+  if (lhs->index != nullptr) ctx.ClearDeferredArgSnapshot(lhs->index);
+  if (lhs->index_end != nullptr) ctx.ClearDeferredArgSnapshot(lhs->index_end);
+}
+
 // §11.4.1 compound assignment operators (`+=`, `<<=`, etc.): read-modify-write
 // the lhs through the appropriate target kind.
 static void ApplyCompoundAssignOp(const Stmt* stmt, SimContext& ctx,
@@ -763,6 +790,7 @@ static void ApplyCompoundAssignOp(const Stmt* stmt, SimContext& ctx,
       WriteVar(var, result, arena);
     }
   } else if (stmt->lhs->kind == ExprKind::kSelect) {
+    SnapshotSelectIndices(stmt->lhs, ctx, arena);
     if (auto* elem = TryResolveArrayElement(stmt->lhs, ctx)) {
       auto result = EvalBinaryOp(base_op, elem->value, actual_rhs, arena);
       WriteVar(elem, result, arena);
@@ -771,6 +799,7 @@ static void ApplyCompoundAssignOp(const Stmt* stmt, SimContext& ctx,
       auto result = EvalBinaryOp(base_op, lhs_val, actual_rhs, arena);
       TrySelectBlockingAssign(stmt->lhs, result, ctx, arena);
     }
+    ClearSelectIndices(stmt->lhs, ctx);
   } else if (stmt->lhs->kind == ExprKind::kMemberAccess) {
     auto lhs_val = EvalExpr(stmt->lhs, ctx, arena);
     auto result = EvalBinaryOp(base_op, lhs_val, actual_rhs, arena);
