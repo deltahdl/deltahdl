@@ -154,6 +154,20 @@ VpiHandle VpiClockingIODeclExpr(VpiHandle io_decl) {
   return nullptr;
 }
 
+VpiHandle VpiClockingBlockClockingEvent(VpiHandle block) {
+  // §37.48 (figure, clocking block -> event control via vpiClockingEvent): the
+  // clocking event that drives the block - its "@(posedge clk)" - modeled as an
+  // event-control child. The generic child walk cannot serve this transition:
+  // the vpiClockingEvent relation tag differs from the vpiEventControl object
+  // tag of the event the block reaches, so the relation is only found here. A
+  // block that carries no event control reports NULL.
+  if (!block || block->type != vpiClockingBlock) return nullptr;
+  for (auto* child : block->children) {
+    if (child->type == vpiEventControl) return child;
+  }
+  return nullptr;
+}
+
 // ===========================================================================
 // §37.13 IO declaration.
 // ===========================================================================

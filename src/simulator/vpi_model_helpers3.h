@@ -134,6 +134,13 @@ bool VpiIsClockingIODeclExprType(int type);
 // names nothing.
 VpiHandle VpiClockingIODeclExpr(VpiHandle io_decl);
 
+// §37.48 (figure, clocking block -> event control via vpiClockingEvent): the
+// clocking event that drives a clocking block, modeled as its event-control
+// child. The vpiClockingEvent relation tag differs from the event's
+// vpiEventControl object tag, so the generic child walk cannot serve it; NULL
+// when the block carries no event control.
+VpiHandle VpiClockingBlockClockingEvent(VpiHandle block);
+
 // ===========================================================================
 // §37.13 IO declaration. The VPI object model for an io decl (vpiIODecl): a
 // module/UDP/task/function port or argument declaration. The diagram's

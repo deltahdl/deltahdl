@@ -313,9 +313,9 @@ bool TryResolveClassAndActualRelation(int type, VpiHandle ref, VpiHandle& out) {
   return false;
 }
 
-// §37.48/§37.15/§37.14/§37.30/§37.83: a clocking block's prefix, a clocking io
-// decl's expr, a ref obj's typespec, and vpiParent of port bits, ref objs,
-// modport interface typespecs, and attributes.
+// §37.48/§37.15/§37.14/§37.30/§37.83: a clocking block's prefix and clocking
+// event, a clocking io decl's expr, a ref obj's typespec, and vpiParent of port
+// bits, ref objs, modport interface typespecs, and attributes.
 bool TryResolveClockingAndParentRelation(int type, VpiHandle ref,
                                          VpiHandle& out) {
   if (type == vpiPrefix && ref->type == vpiClockingBlock) {
@@ -324,6 +324,10 @@ bool TryResolveClockingAndParentRelation(int type, VpiHandle ref,
   }
   if (type == vpiExpr && ref->type == vpiClockingIODecl) {
     out = VpiClockingIODeclExpr(ref);
+    return true;
+  }
+  if (type == vpiClockingEvent && ref->type == vpiClockingBlock) {
+    out = VpiClockingBlockClockingEvent(ref);
     return true;
   }
   if (type == vpiTypespec && ref->type == vpiRefObj) {
