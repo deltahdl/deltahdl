@@ -145,6 +145,75 @@ TEST_F(VpiPutValueSim, DelayWithoutReturnEventReturnsNull) {
   EXPECT_EQ(ev, nullptr);
 }
 
+// §38.34 (input form): vpiPureTransportDelay is a named delay mode of its own
+// (transport delay that removes no events); a put using it applies the value to
+// an ordinary object just like the other scheduled delay modes.
+TEST_F(VpiPutValueSim, PutValuePureTransportDelay) {
+  auto* var = sim_ctx_.CreateVariable("dp", 32);
+  var->value = MakeLogic4VecVal(arena_, 32, 0);
+  vpi_ctx_.Attach(sim_ctx_);
+
+  vpiHandle h = vpi_handle_by_name("dp", nullptr);
+  s_vpi_value val = {};
+  val.format = vpiIntVal;
+  val.value.integer = 55;
+  s_vpi_time time = {};
+  time.type = vpiSimTime;
+  time.low = 12;
+  vpi_put_value(h, &val, &time, vpiPureTransportDelay);
+
+  EXPECT_EQ(var->value.ToUint64(), 55u);
+}
+
+// §38.34 (input form): vpiTransportDelay is the third named scheduled delay
+// mode (modified transport delay); like the other scheduled modes it applies
+// the passed value to an ordinary object. The companion
+// DelayWithoutReturnEventReturnsNull already checks its NULL return; this
+// checks the value is actually written.
+TEST_F(VpiPutValueSim, PutValueTransportDelay) {
+  auto* var = sim_ctx_.CreateVariable("dt", 32);
+  var->value = MakeLogic4VecVal(arena_, 32, 0);
+  vpi_ctx_.Attach(sim_ctx_);
+
+  vpiHandle h = vpi_handle_by_name("dt", nullptr);
+  s_vpi_value val = {};
+  val.format = vpiIntVal;
+  val.value.integer = 99;
+  s_vpi_time time = {};
+  time.type = vpiSimTime;
+  time.low = 8;
+  vpi_put_value(h, &val, &time, vpiTransportDelay);
+
+  EXPECT_EQ(var->value.ToUint64(), 99u);
+}
+
+// §38.34: putting a value to a vpiNet with one of the delay modes overrides the
+// net's resolved value. The override holds until a driver changes value, at
+// which point the net is reevaluated by the normal resolution algorithm. Here
+// the put overrides the resolved value, then a fresh driver plus a resolution
+// pass replaces it - the override is no longer in effect.
+TEST_F(VpiPutValueSim, NetPutOverridesResolvedValueUntilDriverChanges) {
+  Net* net = sim_ctx_.CreateNet("nw", NetType::kWire, 32);
+  ASSERT_NE(net, nullptr);
+  ASSERT_NE(net->resolved, nullptr);
+
+  vpiHandle h = vpi_ctx_.CreateNetObj("nw", net, 32);
+  ASSERT_NE(h, nullptr);
+
+  s_vpi_value val = {};
+  val.format = vpiIntVal;
+  val.value.integer = 123;
+  vpi_put_value(h, &val, nullptr, vpiNoDelay);
+  // The supplied value overrides the resolved value of the net.
+  EXPECT_EQ(net->resolved->value.ToUint64(), 123u);
+
+  // A driver changes value and the net is reevaluated: normal resolution wins
+  // and the override no longer stands.
+  net->drivers.push_back(MakeLogic4VecVal(arena_, 32, 5));
+  net->Resolve(arena_);
+  EXPECT_EQ(net->resolved->value.ToUint64(), 5u);
+}
+
 // §38.34: a scheduled event is cancelled by calling the routine with the
 // vpiSchedEvent handle and vpiCancelEvent; afterwards vpi_get(vpiScheduled)
 // reports it is no longer in the queue. value_p and time_p are not needed.
@@ -362,6 +431,58 @@ TEST_F(VpiPutValueSim, SequentialUdpRejectsDelayMode) {
   SVpiErrorInfo info = {};
   EXPECT_EQ(vpi_chk_error(&info), vpiError);
   // The rejected put left the object unchanged.
+  EXPECT_EQ(var->value.words[0].aval & 1, 0u);
+}
+
+// §38.34 (input form): the sequential-UDP delay restriction covers every
+// scheduled delay mode, not just vpiTransportDelay. Putting with
+// vpiPureTransportDelay - another of the "other delay modes" - is likewise an
+// error, and the UDP is left unchanged.
+TEST_F(VpiPutValueSim, SequentialUdpRejectsPureTransportDelay) {
+  auto* var = sim_ctx_.CreateVariable("uq", 1);
+  var->value = MakeLogic4VecVal(arena_, 1, 0);
+  vpi_ctx_.Attach(sim_ctx_);
+
+  vpiHandle h = vpi_handle_by_name("uq", nullptr);
+  ASSERT_NE(h, nullptr);
+  h->type = vpiSeqPrim;
+
+  s_vpi_value val = {};
+  val.format = vpiScalarVal;
+  val.value.scalar = vpi1;
+  s_vpi_time time = {};
+  time.type = vpiSimTime;
+  time.low = 3;
+  vpi_put_value(h, &val, &time, vpiPureTransportDelay);
+
+  SVpiErrorInfo info = {};
+  EXPECT_EQ(vpi_chk_error(&info), vpiError);
+  EXPECT_EQ(var->value.words[0].aval & 1, 0u);
+}
+
+// §38.34 (input form): the sequential-UDP restriction rejects vpiInertialDelay
+// as well - it is the last of the three scheduled delay modes, and none of them
+// is allowed on a sequential UDP, which accepts only vpiNoDelay. The put is an
+// error and the object is left unchanged.
+TEST_F(VpiPutValueSim, SequentialUdpRejectsInertialDelay) {
+  auto* var = sim_ctx_.CreateVariable("ui", 1);
+  var->value = MakeLogic4VecVal(arena_, 1, 0);
+  vpi_ctx_.Attach(sim_ctx_);
+
+  vpiHandle h = vpi_handle_by_name("ui", nullptr);
+  ASSERT_NE(h, nullptr);
+  h->type = vpiSeqPrim;
+
+  s_vpi_value val = {};
+  val.format = vpiScalarVal;
+  val.value.scalar = vpi1;
+  s_vpi_time time = {};
+  time.type = vpiSimTime;
+  time.low = 3;
+  vpi_put_value(h, &val, &time, vpiInertialDelay);
+
+  SVpiErrorInfo info = {};
+  EXPECT_EQ(vpi_chk_error(&info), vpiError);
   EXPECT_EQ(var->value.words[0].aval & 1, 0u);
 }
 
