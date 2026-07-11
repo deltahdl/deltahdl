@@ -96,4 +96,51 @@ TEST(OptionalResetFamilySim, ResetValueZeroWhenResetValueOmitted) {
             0u);
 }
 
+// Annex D.8: the reset_value operand is an ordinary integer expression, not a
+// literal-only slot. Supplied as a localparam (a constant form of 11.2.1), its
+// value is what $reset_value returns after the reset.
+TEST(OptionalResetFamilySim, ResetValueFromLocalparamArgument) {
+  EXPECT_EQ(RunAndGet("module t;\n"
+                      "  localparam integer RV = 55;\n"
+                      "  integer v;\n"
+                      "  initial begin\n"
+                      "    $reset(1, RV);\n"
+                      "    v = $reset_value;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "v"),
+            55u);
+}
+
+// Annex D.8: reset_value may also be produced by a variable initialized through
+// a declaration assignment (10.5). $reset_value returns that variable's value
+// as captured at the reset.
+TEST(OptionalResetFamilySim, ResetValueFromInitializedVariableArgument) {
+  EXPECT_EQ(RunAndGet("module t;\n"
+                      "  integer arg = 88;\n"
+                      "  integer v;\n"
+                      "  initial begin\n"
+                      "    $reset(1, arg);\n"
+                      "    v = $reset_value;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "v"),
+            88u);
+}
+
+// Annex D.8: reset_value supplied from a module parameter (a distinct constant
+// declaration from a localparam) resolves and is what $reset_value returns.
+TEST(OptionalResetFamilySim, ResetValueFromParameterArgument) {
+  EXPECT_EQ(RunAndGet("module t;\n"
+                      "  parameter integer RV = 33;\n"
+                      "  integer v;\n"
+                      "  initial begin\n"
+                      "    $reset(1, RV);\n"
+                      "    v = $reset_value;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "v"),
+            33u);
+}
+
 }  // namespace
