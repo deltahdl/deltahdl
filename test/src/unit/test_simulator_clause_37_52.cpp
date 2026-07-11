@@ -136,6 +136,22 @@ TEST(PropertySpecModel, AlwaysEventuallyOperandOrderAndRangeOmission) {
   auto unranged = VpiAlwaysEventuallyOperands(&prop, nullptr, nullptr);
   ASSERT_EQ(unranged.size(), 1u);
   EXPECT_EQ(unranged[0], &prop);
+
+  // One-sided range: only the present bound follows the property, and it keeps
+  // its position. A present left bound with an absent right bound yields
+  // [property, left].
+  auto left_only = VpiAlwaysEventuallyOperands(&prop, &lo, nullptr);
+  ASSERT_EQ(left_only.size(), 2u);
+  EXPECT_EQ(left_only[0], &prop);
+  EXPECT_EQ(left_only[1], &lo);
+
+  // A present right bound with an absent left bound yields [property, right] -
+  // the right bound occupies the immediately-following slot, since the omitted
+  // left bound is not represented by a placeholder.
+  auto right_only = VpiAlwaysEventuallyOperands(&prop, nullptr, &hi);
+  ASSERT_EQ(right_only.size(), 2u);
+  EXPECT_EQ(right_only[0], &prop);
+  EXPECT_EQ(right_only[1], &hi);
 }
 
 // Detail 3: vpiOpStrong is valid only for nexttime, always, eventually, until
@@ -213,6 +229,37 @@ TEST(PropertySpecModel, DefaultCaseItemHasNoConditionsAndIteratesToNull) {
   EXPECT_EQ(ctx.Scan(it), nullptr);  // drains and frees the iterator
 }
 
+// Diagram (case property -- vpiCondition --> expr): a case property selects on
+// a controlling expression reached through vpiCondition. The selecting
+// expression is the case property's expression child - distinct from the case
+// property items - and the relation resolves through the generic vpi_handle()
+// dispatch as well as the dedicated helper. A case property with no condition
+// reports none.
+TEST(PropertySpecModel, CasePropertySelectsOnItsConditionExpression) {
+  VpiContext ctx;
+  VpiObject case_prop;
+  case_prop.type = vpiCaseProperty;
+  VpiObject sel;
+  sel.type = vpiExpr;  // the expression the case selects on
+  VpiObject item;
+  item.type = vpiCasePropertyItem;  // a branch, not the selecting condition
+  case_prop.children = {&sel, &item};
+
+  EXPECT_EQ(VpiCasePropertyConditionExpr(&case_prop), &sel);
+  // The figure's vpiCondition edge is not served by the generic child walk
+  // (no child's type is vpiCondition); the wired relation resolves it.
+  EXPECT_EQ(ctx.Handle(vpiCondition, &case_prop), &sel);
+
+  VpiObject no_condition;
+  no_condition.type = vpiCaseProperty;
+  VpiObject only_item;
+  only_item.type = vpiCasePropertyItem;
+  no_condition.children = {&only_item};
+  EXPECT_EQ(VpiCasePropertyConditionExpr(&no_condition), nullptr);
+  EXPECT_EQ(ctx.Handle(vpiCondition, &no_condition), nullptr);
+  EXPECT_EQ(VpiCasePropertyConditionExpr(nullptr), nullptr);
+}
+
 // Diagram (property spec / clocked property -- vpiClockingEvent --> expr): a
 // property spec and a clocked property both traverse to their clocking event,
 // reporting none when no clocking event is attached. The relation is shared
@@ -251,6 +298,48 @@ TEST(PropertySpecModel, PropertySpecReachesItsPropertyExpr) {
   VpiObject empty;
   empty.type = vpiPropertySpec;
   EXPECT_EQ(VpiPropertyExprChild(&empty), nullptr);
+}
+
+// Diagram (clocked property -> property expr): a clocked property reaches its
+// property-expr child through the same "-> property expr" edge a property spec
+// uses; the relation is shared across the two member kinds. None when no
+// property expr is attached.
+TEST(PropertySpecModel, ClockedPropertyReachesItsPropertyExpr) {
+  VpiObject clocked;
+  clocked.type = vpiClockedProperty;
+  VpiObject pe;
+  pe.type = vpiOperation;  // a property-expr kind
+  clocked.children = {&pe};
+  EXPECT_EQ(VpiPropertyExprChild(&clocked), &pe);
+
+  VpiObject empty;
+  empty.type = vpiClockedProperty;
+  EXPECT_EQ(VpiPropertyExprChild(&empty), nullptr);
+}
+
+// Diagram (case property -> case property item): a case property iterates to
+// its case property items through vpi_iterate(vpiCasePropertyItem, ...), in
+// order. Its selecting condition expression (the vpiCondition edge) is not one
+// of the items.
+TEST(PropertySpecModel, CasePropertyIteratesToItsCasePropertyItems) {
+  VpiContext ctx;
+  VpiObject case_prop;
+  case_prop.type = vpiCaseProperty;
+  VpiObject sel;
+  sel.type = vpiExpr;  // the selecting condition, not an item
+  VpiObject item0;
+  item0.type = vpiCasePropertyItem;
+  VpiObject item1;
+  item1.type = vpiCasePropertyItem;
+  case_prop.children = {&sel, &item0, &item1};
+
+  VpiHandle it = ctx.Iterate(vpiCasePropertyItem, &case_prop);
+  ASSERT_NE(it, nullptr);
+  std::vector<VpiHandle> seen;
+  while (VpiHandle h = ctx.Scan(it)) seen.push_back(h);
+  ASSERT_EQ(seen.size(), 2u);
+  EXPECT_EQ(seen[0], &item0);
+  EXPECT_EQ(seen[1], &item1);
 }
 
 // Diagram (property spec -- vpiDisableCondition --> expr | distribution): a

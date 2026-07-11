@@ -502,6 +502,21 @@ std::vector<VpiHandle> VpiCaseItemConditions(VpiHandle case_item) {
   return conditions;
 }
 
+VpiHandle VpiCasePropertyConditionExpr(VpiHandle case_property) {
+  // §37.52: a case property reaches the expression it selects on through
+  // vpiCondition (the diagram's case property -> expr edge). Its other outgoing
+  // edge goes to the case property items (vpiCasePropertyItem); the selecting
+  // condition is therefore the first child that is an expression rather than an
+  // item. The generic child walk cannot serve this edge because no child's own
+  // type is vpiCondition. Null when no condition expression is attached.
+  if (!case_property) return nullptr;
+  for (auto* child : case_property->children) {
+    if (child->type == vpiCasePropertyItem) continue;
+    if (VpiIsExprType(child->type) || child->type == vpiExpr) return child;
+  }
+  return nullptr;
+}
+
 bool VpiIsDisableConditionType(int type) {
   // §37.52: a property specification's disable condition reaches a bare
   // expression or a distribution. A property instance's disable condition (see

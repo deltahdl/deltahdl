@@ -197,5 +197,28 @@ TEST(PropertyDeclModel, PropertyDeclReachesItsSpecification) {
   EXPECT_EQ(ctx.Handle(vpiPropertySpec, &decl), &spec);
 }
 
+// Diagram (property decl -> name: str vpiName, str vpiFullName; prop formal
+// decl
+// -> name: str vpiName): a property declaration reports both a simple name and
+// a full name through vpi_get_str(), and a property formal reports its simple
+// name. The full-name query falls back to the simple name when none is stored.
+TEST(PropertyDeclModel, PropertyDeclAndFormalReportTheirNames) {
+  VpiContext ctx;
+  VpiObject decl;
+  decl.type = vpiPropertyDecl;
+  decl.name = "chk";
+  decl.full_name = "top.chk";
+  EXPECT_STREQ(ctx.GetStr(vpiName, &decl), "chk");
+  EXPECT_STREQ(ctx.GetStr(vpiFullName, &decl), "top.chk");
+
+  VpiObject formal;
+  formal.type = vpiPropFormalDecl;
+  formal.name = "a";
+  EXPECT_STREQ(ctx.GetStr(vpiName, &formal), "a");
+  // No full name stored on the formal -> the full-name query falls back to the
+  // simple name.
+  EXPECT_STREQ(ctx.GetStr(vpiFullName, &formal), "a");
+}
+
 }  // namespace
 }  // namespace delta

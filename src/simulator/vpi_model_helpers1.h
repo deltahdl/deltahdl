@@ -327,6 +327,14 @@ VpiHandle VpiClockingEvent(VpiHandle obj);
 // object's first property-expr-kind child; null when none is present.
 VpiHandle VpiPropertyExprChild(VpiHandle obj);
 
+// §37.52: the controlling condition expression a case property selects on,
+// reached through vpiCondition (the diagram's case property -> expr edge). It
+// is the case property's expression child - the one that is not a case property
+// item - so the relation cannot be served by the generic child walk (whose
+// child type is never vpiCondition). Null when no condition expression is
+// attached.
+VpiHandle VpiCasePropertyConditionExpr(VpiHandle case_property);
+
 // §37.51 detail 1: the formals a property declaration declares as the
 // vpiPropFormalDecl iteration yields them - its vpiPropFormalDecl children in
 // declaration order. A null handle yields none.
