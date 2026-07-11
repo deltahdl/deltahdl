@@ -117,5 +117,29 @@ TEST_F(Modport, ModportWithoutEnclosingInterfaceReachesNone) {
   EXPECT_EQ(vpi_handle(vpiInterface, &modport), nullptr);
 }
 
+// Edge for C2 forward negative: an interface that groups no modports yields no
+// iterator through vpi_iterate(vpiModport, interface). This is the forward edge
+// of the interface<->modport relationship reported empty (a null handle rather
+// than an iterator that scans nothing) - a different reference object (an
+// interface) and relation than the empty io-decl walk observed above.
+TEST_F(Modport, InterfaceWithNoModportsIteratesToNone) {
+  VpiObject iface;
+  iface.type = vpiInterface;
+
+  EXPECT_EQ(vpi_iterate(vpiModport, &iface), nullptr);
+}
+
+// Edge for C3 reverse negative: an io decl with no enclosing modport reaches
+// none through vpi_handle(vpiModport, iodecl). This is the reverse edge of the
+// modport<->io-decl relationship reported empty - the parent lookup returns
+// NULL when no modport parent is recorded, a different reference object (an io
+// decl) and relation than the missing-interface case above.
+TEST_F(Modport, IoDeclWithoutEnclosingModportReachesNone) {
+  VpiObject io_decl;
+  io_decl.type = vpiIODecl;
+
+  EXPECT_EQ(vpi_handle(vpiModport, &io_decl), nullptr);
+}
+
 }  // namespace
 }  // namespace delta
