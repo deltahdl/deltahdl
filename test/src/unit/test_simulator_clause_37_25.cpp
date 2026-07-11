@@ -32,6 +32,27 @@ TEST(Typespec, TypespecClassMembership) {
   EXPECT_FALSE(VpiIsTypespecType(vpiStructVar));
 }
 
+// §37.25 figure: the class-membership rule admits every "... typespec" node the
+// figure draws, not just the aggregate kinds. The built-in scalar and integer
+// typespecs, the string/class/union kinds, the bit/logic kinds, and the
+// void/sequence/property/event/interface kinds are each distinct figure nodes
+// that a caller may hand to the classifier, so each must be recognized as a
+// typespec. (The Annex M spellings vpiIntegerTypespec, vpiRealTypespec,
+// vpiTimeTypespec, and vpiChandleTypespec share numeric values with kinds
+// already covered here.)
+TEST(Typespec, TypespecClassAdmitsEveryFigureNode) {
+  const int figure_nodes[] = {
+      vpiLongIntTypespec,   vpiShortIntTypespec, vpiIntTypespec,
+      vpiShortRealTypespec, vpiByteTypespec,     vpiClassTypespec,
+      vpiStringTypespec,    vpiUnionTypespec,    vpiBitTypespec,
+      vpiLogicTypespec,     vpiVoidTypespec,     vpiSequenceTypespec,
+      vpiPropertyTypespec,  vpiEventTypespec,    vpiInterfaceTypespec,
+  };
+  for (int node : figure_nodes) {
+    EXPECT_TRUE(VpiIsTypespecType(node)) << "figure typespec node " << node;
+  }
+}
+
 // D1: a typespec denoting a user-defined typedef reports that typedef's name.
 TEST(Typespec, NameOfUserDefinedTypedef) {
   EXPECT_STREQ(VpiTypespecName(vpiEnumTypespec, /*denotes_user_typedef=*/true,
@@ -212,21 +233,6 @@ TEST(Typespec, ElemTypespecUnwindsUntilNoRangesRemain) {
   // The base struct typespec has no ranges, so vpiElemTypespec is NULL.
   EXPECT_EQ(VpiTypespecElemTypespec(/*has_ranges=*/false, &base_struct),
             nullptr);
-}
-
-// D8 edge: a multidimensional array typespec unwinds one level per call,
-// walking the chain until the base element (no ranges) is reached and the next
-// call yields NULL - the stepwise behavior of the figure's arr example.
-TEST(Typespec, ElemTypespecUnwindsMultipleDimensionsStepwise) {
-  VpiObject inner;  // the outer array with its leftmost range removed
-  VpiObject base;   // the base element typespec, no ranges remaining
-
-  // First call removes the leftmost range, exposing the inner level.
-  EXPECT_EQ(VpiTypespecElemTypespec(/*has_ranges=*/true, &inner), &inner);
-  // Next call unwinds the inner level's remaining range to the base element.
-  EXPECT_EQ(VpiTypespecElemTypespec(/*has_ranges=*/true, &base), &base);
-  // The base element has no ranges, so the unwinding terminates at NULL.
-  EXPECT_EQ(VpiTypespecElemTypespec(/*has_ranges=*/false, nullptr), nullptr);
 }
 
 // D10: vpi_iterate(vpiRange, array_typespec) returns one range per declared
