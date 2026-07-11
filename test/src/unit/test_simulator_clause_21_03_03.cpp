@@ -1,226 +1,384 @@
+#include <sstream>
 #include <string>
 
-#include "builders_ast.h"
-#include "builders_systask.h"
 #include "fixture_simulator.h"
-#include "helpers_logic4vec_string.h"
-#include "helpers_parser_verify.h"
-#include "simulator/evaluation.h"
-#include "simulator/sim_context.h"
 
 using namespace delta;
+
 namespace {
 
-static std::string ReadString(const Variable* var) {
-  if (!var) return {};
-  return Logic4VecToPackedString(var->value);
+// Compiles and runs a full module, capturing everything the run writes to
+// stdout via $display. §21.3.3's behaviour depends on how the output variable
+// is declared (a string vs. a fixed-width integral), so every case is driven
+// from real declaration syntax through the whole pipeline rather than a
+// synthetic system-call node.
+std::string RunCapture(const std::string& src, SimFixture& f) {
+  std::ostringstream captured;
+  std::streambuf* old_buf = std::cout.rdbuf(captured.rdbuf());
+  auto* design = ElaborateSrc(src, f);
+  if (design != nullptr) LowerAndRun(design, f);
+  std::cout.rdbuf(old_buf);
+  return captured.str();
 }
 
-// §21.3.3 N17: $sformatf returns the formatted result as the function value.
-TEST(StringFormatTaskTest, SformatfReturnsFormattedString) {
+// §21.3.3: $swrite writes the formatted output into the variable named by its
+// first argument. A string destination holds the full result.
+TEST(StringFormatTaskSim, SwriteWritesToStringVariable) {
   SimFixture f;
-  auto* expr = MakeSysCall(f.arena, "$sformatf",
-                           {MkStr(f.arena, "val=%d"), MakeInt(f.arena, 42)});
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-
-  EXPECT_EQ(result.width, 48u);
-
-  std::string formatted = Logic4VecToPackedString(result);
-  EXPECT_EQ(formatted, "val=42");
+  std::string out = RunCapture(
+      "module t;\n"
+      "  string s;\n"
+      "  initial begin\n"
+      "    $swrite(s, \"x=%0d y=%0d\", 7, 11);\n"
+      "    $display(\"%s\", s);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "x=7 y=11\n");
 }
 
-// §21.3.3 N5, N6, N16: $swrite writes the formatted output into the variable
-// named by its first argument, using string literal assignment to variable
-// rules. The behaviour mirrors $fwrite but redirects to a variable instead of
-// a file descriptor.
-TEST(StringFormatTaskTest, SwriteWritesToOutputVariable) {
+// §21.3.3 (cross-ref §21.3.2): the b/h/o suffix selects the default radix for a
+// bare expression argument, exactly as $fwriteb/$fwriteh/$fwriteo do. Each
+// operand is sized so the rendered width is predictable.
+TEST(StringFormatTaskSim, SwriteSuffixSelectsRadix) {
   SimFixture f;
-  auto* dest = f.ctx.CreateVariable("dst", 256);
-  EvalExpr(MakeSysCall(f.arena, "$swrite",
-                       {MkId(f.arena, "dst"), MkStr(f.arena, "x=%d y=%d"),
-                        MakeInt(f.arena, 7), MakeInt(f.arena, 11)}),
-           f.ctx, f.arena);
-  EXPECT_EQ(ReadString(dest), "x=7 y=11");
+  std::string out = RunCapture(
+      "module t;\n"
+      "  string s;\n"
+      "  logic [7:0] h;\n"
+      "  logic [7:0] o;\n"
+      "  logic [3:0] b;\n"
+      "  initial begin\n"
+      "    h = 8'hab; o = 8'o17; b = 4'b1010;\n"
+      "    $swriteh(s, h); $display(\"%s\", s);\n"
+      "    $swriteo(s, o); $display(\"%s\", s);\n"
+      "    $swriteb(s, b); $display(\"%s\", s);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "ab\n017\n1010\n");
 }
 
-// §21.3.3 N5 (cross-ref to §21.3.2): $swriteb / $swriteh / $swriteo derive
-// their default radix from the task-name suffix when no format string is
-// supplied, exactly as $fwriteb / $fwriteh / $fwriteo do. Per §21.2.1.2 a
-// non-decimal radix without an explicit %0 field width keeps its leading zeros
-// padded to the operand width; the unsized integer literals are 32-bit
-// (§5.7.1), so hex pads to 8 digits, octal to 11, and binary to 32.
-TEST(StringFormatTaskTest, SwriteSuffixesUseRadix) {
+// §21.3.3: $sformat always treats its second argument as the format string and
+// writes the formatted result into the first-argument variable.
+TEST(StringFormatTaskSim, SformatUsesSecondArgAsFormat) {
   SimFixture f;
-  struct Case {
-    const char* task;
-    uint64_t value;
-    const char* expected;
-  };
-  const Case kCases[] = {
-      {"$swriteh", 0xab, "000000ab"},
-      {"$swriteo", 8, "00000000010"},
-      {"$swriteb", 5, "00000000000000000000000000000101"},
-  };
-  for (const auto& c : kCases) {
-    std::string name = std::string("v_") + c.task;
-    auto* dest = f.ctx.CreateVariable(name, 64);
-    EvalExpr(MakeSysCall(f.arena, c.task,
-                         {MkId(f.arena, name), MakeInt(f.arena, c.value)}),
-             f.ctx, f.arena);
-    EXPECT_EQ(ReadString(dest), c.expected) << "task=" << c.task;
-  }
+  std::string out = RunCapture(
+      "module t;\n"
+      "  string s;\n"
+      "  initial begin\n"
+      "    $sformat(s, \"data is %0d\", 123);\n"
+      "    $display(\"%s\", s);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "data is 123\n");
 }
 
-// §21.3.3 N9, N16: $sformat always treats its second argument as the format
-// string and writes the formatted result into the first argument variable.
-TEST(StringFormatTaskTest, SformatWritesUsingSecondArgAsFormat) {
+// §21.3.3: only the second argument of $sformat is a format string; a later
+// string argument is emitted verbatim through %s and never re-interpreted as
+// another format template.
+TEST(StringFormatTaskSim, SformatLaterStringArgIsNotFormat) {
   SimFixture f;
-  auto* dest = f.ctx.CreateVariable("out", 256);
-  EvalExpr(MakeSysCall(f.arena, "$sformat",
-                       {MkId(f.arena, "out"), MkStr(f.arena, "data is %d"),
-                        MakeInt(f.arena, 123)}),
-           f.ctx, f.arena);
-  EXPECT_EQ(ReadString(dest), "data is 123");
+  std::string out = RunCapture(
+      "module t;\n"
+      "  string s;\n"
+      "  initial begin\n"
+      "    $sformat(s, \"tag=%s\", \"raw %d nope\");\n"
+      "    $display(\"%s\", s);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "tag=raw %d nope\n");
 }
 
-// §21.3.3 N11: only the second argument of $sformat is treated as a format
-// string; later string arguments are emitted verbatim through %s, never
-// re-interpreted as another format template.
-TEST(StringFormatTaskTest, SformatLaterStringArgIsNotFormatString) {
+// §21.3.3: the format argument may itself be a string-typed expression whose
+// content is interpreted as the formatting string, not only a string literal.
+TEST(StringFormatTaskSim, SformatFormatArgFromStringVariable) {
   SimFixture f;
-  auto* dest = f.ctx.CreateVariable("out", 256);
-  EvalExpr(MakeSysCall(f.arena, "$sformat",
-                       {MkId(f.arena, "out"), MkStr(f.arena, "tag=%s"),
-                        MkStr(f.arena, "raw %d not interpreted")}),
-           f.ctx, f.arena);
-  EXPECT_EQ(ReadString(dest), "tag=raw %d not interpreted");
+  std::string out = RunCapture(
+      "module t;\n"
+      "  string fmt;\n"
+      "  string s;\n"
+      "  initial begin\n"
+      "    fmt = \"n=%0d\";\n"
+      "    $sformat(s, fmt, 9);\n"
+      "    $display(\"%s\", s);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "n=9\n");
 }
 
-// §21.3.3 N14: if not enough arguments are supplied for the format specifiers,
-// or too many are supplied, the application shall issue a warning and
-// continue execution.
-TEST(StringFormatTaskTest, SformatArgCountMismatchEmitsWarning) {
+// §21.3.3: $sformat supports every format specifier $display supports
+// (§21.2.1.1). %c, exercised here, confirms the engine linkage beyond the
+// %d/%s arms.
+TEST(StringFormatTaskSim, SformatSupportsCharacterSpecifier) {
   SimFixture f;
-  f.ctx.CreateVariable("out", 256);
-
-  uint32_t before = f.diag.WarningCount();
-  EvalExpr(MakeSysCall(f.arena, "$sformat",
-                       {MkId(f.arena, "out"), MkStr(f.arena, "a=%d b=%d"),
-                        MakeInt(f.arena, 1)}),
-           f.ctx, f.arena);
-  EXPECT_GT(f.diag.WarningCount(), before);
-
-  before = f.diag.WarningCount();
-  EvalExpr(MakeSysCall(
-               f.arena, "$sformat",
-               {MkId(f.arena, "out"), MkStr(f.arena, "only=%d"),
-                MakeInt(f.arena, 1), MakeInt(f.arena, 2), MakeInt(f.arena, 3)}),
-           f.ctx, f.arena);
-  EXPECT_GT(f.diag.WarningCount(), before);
+  std::string out = RunCapture(
+      "module t;\n"
+      "  string s;\n"
+      "  initial begin\n"
+      "    $sformat(s, \"ch=%c\", 65);\n"
+      "    $display(\"%s\", s);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "ch=A\n");
 }
 
-// §21.3.3 N10: the format argument of $sformatf can be an expression of
-// integral, unpacked array of byte, or string data types whose content is
-// interpreted as the formatting string (not only a string literal).
-TEST(StringFormatTaskTest, SformatfFormatStringFromStringVariable) {
+// §21.3.3: the remaining arguments fill the specifiers in call order. A
+// three-specifier format with mixed integer and string positions binds
+// 1, "two", 3 left to right.
+TEST(StringFormatTaskSim, SformatConsumesArgsInOrder) {
   SimFixture f;
-  auto* fmt_var = f.ctx.CreateVariable("fmt", 56);
-  fmt_var->value = StringToLogic4Vec(f.arena, "n=%0d");
-
-  auto result =
-      EvalExpr(MakeSysCall(f.arena, "$sformatf",
-                           {MkId(f.arena, "fmt"), MakeInt(f.arena, 9)}),
-               f.ctx, f.arena);
-  std::string formatted = Logic4VecToPackedString(result);
-  EXPECT_EQ(formatted, "n=9");
+  std::string out = RunCapture(
+      "module t;\n"
+      "  string s;\n"
+      "  initial begin\n"
+      "    $sformat(s, \"a=%0d, b=%s, c=%0d\", 1, \"two\", 3);\n"
+      "    $display(\"%s\", s);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "a=1, b=two, c=3\n");
 }
 
-// §21.3.3 N5: the unsuffixed $swrite inherits the bare-expression rendering
-// of $fwrite, which renders an unformatted integer in decimal. The b/h/o
-// suffixes are exercised separately; this case observes the default arm.
-TEST(StringFormatTaskTest, SwriteBareExpressionRendersDecimal) {
+// §21.3.3: $sformatf returns the formatted string as the function value rather
+// than placing it into a first argument, so it can be used where a string value
+// is valid -- here the right-hand side of an assignment.
+TEST(StringFormatTaskSim, SformatfReturnsFormattedResult) {
   SimFixture f;
-  auto* dest = f.ctx.CreateVariable("out", 64);
-  EvalExpr(MakeSysCall(f.arena, "$swrite",
-                       {MkId(f.arena, "out"), MakeInt(f.arena, 255)}),
-           f.ctx, f.arena);
-  EXPECT_EQ(ReadString(dest), "255");
+  std::string out = RunCapture(
+      "module t;\n"
+      "  string s;\n"
+      "  initial begin\n"
+      "    s = $sformatf(\"val=%0d\", 42);\n"
+      "    $display(\"%s\", s);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "val=42\n");
 }
 
-// §21.3.3 N10: the same prose that lets $sformatf accept a non-literal format
-// argument applies to $sformat. A string-typed variable supplied as the second
-// argument shall be decoded back into the formatting template.
-TEST(StringFormatTaskTest, SformatFormatArgFromStringVariable) {
+// §21.3.3: the output variable is assigned using the string-literal
+// assignment-to-variable rules (§5.9). Into a fixed-width integral variable of
+// exactly the string width, the leftmost character occupies the highest byte
+// (left bound to right bound): "ABCD" -> 0x41424344.
+TEST(StringFormatTaskSim, SwriteByteOrderingIntoExactWidthVector) {
   SimFixture f;
-  auto* dest = f.ctx.CreateVariable("out", 256);
-  auto* fmt_var = f.ctx.CreateVariable("fmt", 56);
-  fmt_var->value = StringToLogic4Vec(f.arena, "n=%0d");
-
-  EvalExpr(MakeSysCall(f.arena, "$sformat",
-                       {MkId(f.arena, "out"), MkId(f.arena, "fmt"),
-                        MakeInt(f.arena, 17)}),
-           f.ctx, f.arena);
-  EXPECT_EQ(ReadString(dest), "n=17");
+  std::string out = RunCapture(
+      "module t;\n"
+      "  logic [31:0] v;\n"
+      "  initial begin\n"
+      "    $swrite(v, \"ABCD\");\n"
+      "    $display(\"%h\", v);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "41424344\n");
 }
 
-// §21.3.3 N12: $sformat dispatches each specifier through the same format
-// engine that $display uses (§21.2.1.1). %c, an ASCII-character specifier not
-// otherwise observed by the %d/%s tests, confirms the linkage instead of
-// merely the integer arm.
-TEST(StringFormatTaskTest, SformatSupportsCharacterSpecifier) {
+// §21.3.3 / §5.9: a fixed-width integral destination narrower than the result
+// is truncated from the left (dropping the earliest characters), keeping the
+// low bits. "ABCD" (32 bits) into a 16-bit variable retains "CD" = 0x4344.
+TEST(StringFormatTaskSim, SwriteTruncatesNarrowerDestination) {
   SimFixture f;
-  auto* dest = f.ctx.CreateVariable("out", 256);
-  EvalExpr(MakeSysCall(f.arena, "$sformat",
-                       {MkId(f.arena, "out"), MkStr(f.arena, "ch=%c"),
-                        MakeInt(f.arena, 'A')}),
-           f.ctx, f.arena);
-  EXPECT_EQ(ReadString(dest), "ch=A");
+  std::string out = RunCapture(
+      "module t;\n"
+      "  logic [15:0] v;\n"
+      "  initial begin\n"
+      "    $swrite(v, \"ABCD\");\n"
+      "    $display(\"%h\", v);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "4344\n");
 }
 
-// §21.3.3 N13: the remaining arguments are consumed in call order against the
-// specifiers in the format string. A three-specifier call with mixed integer
-// and string positions binds 1, "two", 3 left-to-right.
-TEST(StringFormatTaskTest, SformatConsumesArgsInOrder) {
+// §21.3.3 / §5.9: a fixed-width integral destination wider than the result is
+// right-justified and zero-padded on the left. "AB" (16 bits) into a 32-bit
+// variable yields 0x00004142.
+TEST(StringFormatTaskSim, SformatRightJustifiesWiderDestination) {
   SimFixture f;
-  auto* dest = f.ctx.CreateVariable("out", 256);
-  EvalExpr(MakeSysCall(f.arena, "$sformat",
-                       {MkId(f.arena, "out"),
-                        MkStr(f.arena, "a=%d, b=%s, c=%d"), MakeInt(f.arena, 1),
-                        MkStr(f.arena, "two"), MakeInt(f.arena, 3)}),
-           f.ctx, f.arena);
-  EXPECT_EQ(ReadString(dest), "a=1, b=two, c=3");
+  std::string out = RunCapture(
+      "module t;\n"
+      "  logic [31:0] v;\n"
+      "  initial begin\n"
+      "    $sformat(v, \"AB\");\n"
+      "    $display(\"%h\", v);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "00004142\n");
 }
 
-// §21.3.3 N14 continuation: after issuing the count-mismatch warning, $sformat
-// shall still continue execution. With more values supplied than the format
-// string consumes, the extra value is dropped and the output variable receives
-// the partially-formatted result rather than being left untouched.
-TEST(StringFormatTaskTest, SformatContinuesAfterCountMismatchWarning) {
+// §21.3.3: if too few or too many arguments are supplied for the format
+// specifiers, the application shall issue a warning and continue execution.
+// The run still completes and writes the partially-formatted result.
+TEST(StringFormatTaskSim, SformatArgCountMismatchWarnsAndContinues) {
   SimFixture f;
-  auto* dest = f.ctx.CreateVariable("out", 256);
-  EvalExpr(MakeSysCall(f.arena, "$sformat",
-                       {MkId(f.arena, "out"), MkStr(f.arena, "v=%d"),
-                        MakeInt(f.arena, 9), MakeInt(f.arena, 99)}),
-           f.ctx, f.arena);
-  EXPECT_EQ(ReadString(dest), "v=9");
+  std::string out = RunCapture(
+      "module t;\n"
+      "  string s;\n"
+      "  initial begin\n"
+      "    $sformat(s, \"a=%0d b=%0d\", 1);\n"
+      "    $display(\"done %s\", s);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_GT(f.diag.WarningCount(), 0u);
+  // Execution continues: the $display after the warned call still runs.
+  EXPECT_NE(out.find("done "), std::string::npos);
 }
 
-// §21.3.3 N7: the resulting string is packed into the output variable with
-// the leftmost character at the high byte position (left bound to right
-// bound). With a four-character result "ABCD" in a 32-bit variable, byte 3
-// (high) shall be 'A' and byte 0 (low) shall be 'D'.
-TEST(StringFormatTaskTest, SwriteCharacterOrderingLeftToRight) {
+// §21.3.3: the output variable may be an unpacked array of byte. The resulting
+// string's characters are stored from the array's left bound to its right bound
+// -- for an ascending [0:3] range, character 0 ("A") lands in b[0] and the last
+// character ("D") in b[3]. Read back with bare $display, which renders an
+// unpacked byte array as its character string.
+TEST(StringFormatTaskSim, SwriteIntoUnpackedByteArrayLeftToRight) {
   SimFixture f;
-  auto* dest = f.ctx.CreateVariable("o", 32);
-  EvalExpr(MakeSysCall(f.arena, "$swrite",
-                       {MkId(f.arena, "o"), MkStr(f.arena, "ABCD")}),
-           f.ctx, f.arena);
+  std::string out = RunCapture(
+      "module t;\n"
+      "  byte b [0:3];\n"
+      "  initial begin\n"
+      "    $swrite(b, \"ABCD\");\n"
+      "    $display(b);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "ABCD\n");
+}
 
-  uint64_t bits = dest->value.words[0].aval;
-  EXPECT_EQ(static_cast<char>((bits >> 24) & 0xFF), 'A');
-  EXPECT_EQ(static_cast<char>((bits >> 16) & 0xFF), 'B');
-  EXPECT_EQ(static_cast<char>((bits >> 8) & 0xFF), 'C');
-  EXPECT_EQ(static_cast<char>(bits & 0xFF), 'D');
+// §21.3.3: $sformat likewise writes its formatted result into an unpacked
+// byte-array destination. A result shorter than the array leaves the trailing
+// elements cleared, so the rendered string is just the written characters.
+TEST(StringFormatTaskSim, SformatIntoUnpackedByteArrayPadsRemainder) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  byte b [0:3];\n"
+      "  initial begin\n"
+      "    $sformat(b, \"v%0d\", 7);\n"
+      "    $display(b);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "v7\n");
+}
+
+// §21.3.3 N1: the unsuffixed $swrite inherits the $fwrite rendering of a bare
+// expression argument (no embedded format string) -- an unformatted integer
+// renders in decimal. This is the default-radix arm, distinct from the b/h/o
+// suffix arms exercised above.
+TEST(StringFormatTaskSim, SwriteBareExpressionRendersDecimal) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  string s;\n"
+      "  logic [7:0] v;\n"
+      "  initial begin\n"
+      "    v = 8'd255;\n"
+      "    $swrite(s, v);\n"
+      "    $display(\"%s\", s);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "255\n");
+}
+
+// §21.3.3 N4: for a descending [3:0] byte-array declaration, left-bound to
+// right-bound ordering still places the leftmost character in the left-bound
+// (highest-index) element. So b[3]='A' and b[0]='D'; reading the elements in
+// ascending index order therefore yields "DCBA", distinguishing declared-order
+// distribution from naive index-order distribution.
+TEST(StringFormatTaskSim, SwriteIntoDescendingUnpackedByteArray) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  byte b [3:0];\n"
+      "  initial begin\n"
+      "    $swrite(b, \"ABCD\");\n"
+      "    $display(\"%c%c%c%c\", b[0], b[1], b[2], b[3]);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "DCBA\n");
+}
+
+// §21.3.3 N7: the format argument may be an expression of integral type whose
+// packed bytes encode the formatting string -- not only a string literal or a
+// string-typed variable. A logic vector holding the characters is decoded back
+// into the template and drives the specifiers.
+TEST(StringFormatTaskSim, SformatFormatArgFromIntegralExpression) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  logic [39:0] fmt;\n"
+      "  string s;\n"
+      "  initial begin\n"
+      "    fmt = \"n=%0d\";\n"
+      "    $sformat(s, fmt, 5);\n"
+      "    $display(\"%s\", s);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "n=5\n");
+}
+
+// §21.3.3 N7: the format argument may be an unpacked array of byte, whose
+// characters (left bound to right bound) are interpreted as the formatting
+// string. The array is built from real element assignments and consumed as the
+// second argument of $sformat; its reconstructed template "%0d!" then formats
+// the trailing value.
+TEST(StringFormatTaskSim, SformatFormatArgFromByteArray) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  byte fmt [0:3];\n"
+      "  string s;\n"
+      "  initial begin\n"
+      "    fmt[0] = \"%\"; fmt[1] = \"0\"; fmt[2] = \"d\"; fmt[3] = \"!\";\n"
+      "    $sformat(s, fmt, 5);\n"
+      "    $display(\"%s\", s);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "5!\n");
+}
+
+// §21.3.3 N9 (too-many branch): supplying more arguments than the format
+// specifiers consume is also a mismatch -- the application shall warn and
+// continue, writing the partially-formatted result. This is the opposite arm of
+// the too-few case above.
+TEST(StringFormatTaskSim, SformatTooManyArgsWarnsAndContinues) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  string s;\n"
+      "  initial begin\n"
+      "    $sformat(s, \"only=%0d\", 1, 2, 3);\n"
+      "    $display(\"done %s\", s);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_GT(f.diag.WarningCount(), 0u);
+  EXPECT_NE(out.find("done only=1"), std::string::npos);
+}
+
+// §21.3.3 N12: $sformatf yields the formatted string as its function value, so
+// it is valid anywhere a string value is -- including directly as an argument
+// expression, not only as an assignment right-hand side. Used inline as a %s
+// argument to $display, its result renders without an intermediate variable.
+TEST(StringFormatTaskSim, SformatfUsableAsExpressionArgument) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  initial $display(\"%s\", $sformatf(\"val=%0d\", 42));\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "val=42\n");
 }
 
 }  // namespace

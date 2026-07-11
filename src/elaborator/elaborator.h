@@ -412,6 +412,7 @@ class Elaborator {
   void ValidateArrayQueryOnVariableDim(const ModuleDecl* decl);
   void ValidateRandomSeedType(const ModuleDecl* decl);
   void ValidatePlaOutputTerms(const ModuleDecl* decl);
+  void ValidateStringOutputTaskTargets(const ModuleDecl* decl);
   void ValidatePlaAscendingOrder(const ModuleDecl* decl);
   void ValidateBitsCallRestrictions(const ModuleDecl* decl);
 

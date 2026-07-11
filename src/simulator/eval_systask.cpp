@@ -410,13 +410,45 @@ std::string EvalStringArg(const Expr* arg, SimContext& ctx, Arena& arena) {
   return result;
 }
 
-// §21.3.3 N10: a format argument may be supplied as a string literal or as
-// any expression whose packed-byte value encodes the formatting string.
-// Shared with eval_systask_io.cpp.
+// §21.3.3: a format argument may be an unpacked array of byte, whose characters
+// -- read from the array's left bound to its right bound -- form the formatting
+// string. Such an array is lowered to one element variable per index rather
+// than a single packed value, so EvalStringArg cannot decode it; reconstruct
+// the string from the element variables here. Returns false when the argument
+// is not a fixed unpacked byte array, leaving the packed-value path in charge.
+static bool TryFormatArgFromByteArray(const Expr* arg, SimContext& ctx,
+                                      std::string& out) {
+  if (arg == nullptr || arg->kind != ExprKind::kIdentifier) return false;
+  const ArrayInfo* ai = ctx.FindArrayInfo(arg->text);
+  if (ai == nullptr || ai->is_dynamic || ai->is_queue ||
+      ai->elem_type_kind != DataTypeKind::kByte) {
+    return false;
+  }
+  std::string s;
+  for (uint32_t i = 0; i < ai->size; ++i) {
+    uint32_t idx =
+        ai->is_descending ? (ai->lo + ai->size - 1 - i) : (ai->lo + i);
+    std::string ename =
+        std::string(arg->text) + "[" + std::to_string(idx) + "]";
+    Variable* elem = ctx.FindVariable(ename);
+    if (elem == nullptr) continue;
+    char c = static_cast<char>(elem->value.ToUint64() & 0xFF);
+    if (c != 0) s += c;
+  }
+  out = s;
+  return true;
+}
+
+// §21.3.3 N10: a format argument may be supplied as a string literal or as any
+// expression whose content encodes the formatting string -- an integral or
+// string value via its packed bytes, or an unpacked array of byte via its
+// elements. Shared with eval_systask_io.cpp.
 std::string ResolveFormatArg(const Expr* arg, SimContext& ctx, Arena& arena) {
   if (arg && arg->kind == ExprKind::kStringLiteral) {
     return ExtractFormatString(arg);
   }
+  std::string from_array;
+  if (TryFormatArgFromByteArray(arg, ctx, from_array)) return from_array;
   return EvalStringArg(arg, ctx, arena);
 }
 

@@ -8,9 +8,11 @@
 
 #include "common/arena.h"
 #include "parser/ast.h"
+#include "simulator/eval_string.h"
 #include "simulator/eval_systask_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
+#include "simulator/statement_assign.h"
 #include "simulator/variable.h"
 
 namespace delta {
@@ -47,6 +49,52 @@ static std::string BuildStringTaskOutput(const std::vector<Expr*>& args,
   return out;
 }
 
+// §21.3.3 N7 (and §5.9): store the formatted output into the destination
+// variable using the string-literal assignment-to-variable rules. A
+// `string`-typed destination is variable-width and holds exactly the packed
+// characters (leading NULs dropped, as any string assignment does). A
+// fixed-width integral destination is coerced to its declared width: the
+// leftmost character lands in the highest byte (left-bound to right-bound
+// ordering), so a wider destination is zero-padded on the left (right-
+// justified) and a narrower one is truncated from the left, discarding the
+// earliest characters. Previously the write ignored the destination width and
+// silently redefined it to the string length, violating §5.9 for fixed-width
+// targets.
+static void StoreStringResult(Variable* dst, std::string_view name,
+                              const std::string& output, SimContext& ctx,
+                              Arena& arena) {
+  if (dst != nullptr) {
+    Logic4Vec packed = StringToLogic4Vec(arena, output);
+    if (ctx.IsStringVariable(name)) {
+      dst->value = StripStringZeros(packed, arena);
+    } else {
+      dst->value = ResizeToWidth(packed, dst->value.width, arena);
+    }
+    return;
+  }
+  // §21.3.3: the destination may instead be an unpacked array of byte, which is
+  // lowered to one element variable per index rather than a single variable, so
+  // FindVariable does not resolve it. Distribute the formatted characters
+  // across the elements from the array's left bound to its right bound -- the
+  // leftmost character lands in the left-bound element. Elements beyond the end
+  // of the string are cleared, and characters beyond the end of the array are
+  // dropped.
+  const ArrayInfo* ai = ctx.FindArrayInfo(name);
+  if (ai == nullptr || ai->is_dynamic || ai->is_queue ||
+      ai->elem_type_kind != DataTypeKind::kByte) {
+    return;
+  }
+  for (uint32_t i = 0; i < ai->size; ++i) {
+    uint32_t idx =
+        ai->is_descending ? (ai->lo + ai->size - 1 - i) : (ai->lo + i);
+    std::string ename = std::string(name) + "[" + std::to_string(idx) + "]";
+    Variable* elem = ctx.FindVariable(ename);
+    if (elem == nullptr) continue;
+    uint8_t byte = i < output.size() ? static_cast<uint8_t>(output[i]) : 0;
+    elem->value = MakeLogic4VecVal(arena, ai->elem_width, byte);
+  }
+}
+
 // §21.3.3 N6: $swrite/$swriteb/$swriteh/$swriteo take an output variable as
 // the first argument and write the formatted result into it under string-
 // literal assignment-to-variable rules. The b/h/o suffix selects the default
@@ -55,8 +103,10 @@ static Logic4Vec EvalSwriteFamily(const Expr* expr, SimContext& ctx,
                                   Arena& arena, std::string_view name) {
   if (expr->args.empty()) return MakeLogic4VecVal(arena, 1, 0);
   Variable* dst = nullptr;
+  std::string_view dst_name;
   if (expr->args[0] && expr->args[0]->kind == ExprKind::kIdentifier) {
-    dst = ctx.FindVariable(expr->args[0]->text);
+    dst_name = expr->args[0]->text;
+    dst = ctx.FindVariable(dst_name);
   }
 
   // The suffix character ('\0' / b / h / o) becomes the default radix letter
@@ -69,12 +119,7 @@ static Logic4Vec EvalSwriteFamily(const Expr* expr, SimContext& ctx,
 
   std::vector<Expr*> rest(expr->args.begin() + 1, expr->args.end());
   std::string output = BuildStringTaskOutput(rest, default_radix, ctx, arena);
-  if (dst) {
-    // §5.9 / §21.3.3 N7: writing via StringToLogic4Vec packs the leftmost
-    // character at the high byte position, giving left-bound to right-bound
-    // ordering across the destination's bits.
-    dst->value = StringToLogic4Vec(arena, output);
-  }
+  StoreStringResult(dst, dst_name, output, ctx, arena);
   return MakeLogic4VecVal(arena, 1, 0);
 }
 
@@ -85,8 +130,10 @@ static Logic4Vec EvalSformatTask(const Expr* expr, SimContext& ctx,
                                  Arena& arena) {
   if (expr->args.size() < 2) return MakeLogic4VecVal(arena, 1, 0);
   Variable* dst = nullptr;
+  std::string_view dst_name;
   if (expr->args[0] && expr->args[0]->kind == ExprKind::kIdentifier) {
-    dst = ctx.FindVariable(expr->args[0]->text);
+    dst_name = expr->args[0]->text;
+    dst = ctx.FindVariable(dst_name);
   }
   std::string fmt = ResolveFormatArg(expr->args[1], ctx, arena);
   std::vector<Logic4Vec> vals;
@@ -95,7 +142,7 @@ static Logic4Vec EvalSformatTask(const Expr* expr, SimContext& ctx,
   }
   WarnIfArgCountMismatch(ctx, "$sformat", fmt, vals.size());
   std::string out = FormatDisplay(fmt, vals, {.ctx = &ctx});
-  if (dst) dst->value = StringToLogic4Vec(arena, out);
+  StoreStringResult(dst, dst_name, out, ctx, arena);
   return MakeLogic4VecVal(arena, 1, 0);
 }
 

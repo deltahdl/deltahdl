@@ -102,7 +102,84 @@ void CheckPlaOutputTermsStmt(
     CheckPlaOutputTermsStmt(ci.body, net_names, diag);
 }
 
+// §21.3.3, Syntax 21-6: the string-formatting output tasks whose first
+// argument is the variable receiving the formatted result. $sformatf is
+// deliberately excluded — it returns the result as its function value and
+// takes no output variable.
+bool IsStringOutputTask(std::string_view callee) {
+  return callee == "$swrite" || callee == "$swriteb" || callee == "$swriteh" ||
+         callee == "$swriteo" || callee == "$sformat";
+}
+
+// §21.3.3: "The first argument to $swrite shall be a variable of integral,
+// unpacked array of byte, or string data types." (The same output-variable
+// rule governs $sformat's first argument.) A real-valued destination has no
+// character representation, so it is the closest illegal form of that
+// requirement and is rejected here. Other declared kinds (vectors, byte, enum,
+// string, packed structs) are left alone to avoid false positives.
+void CheckStringOutputTarget(const Expr* e, const TypeMap& types,
+                             DiagEngine& diag) {
+  if (e == nullptr || e->args.empty() || e->args[0] == nullptr) return;
+  auto base = LhsBaseName(e->args[0]);
+  if (base.empty()) return;
+  auto it = types.find(base);
+  if (it != types.end() && IsRealType(it->second)) {
+    diag.Error(e->range.start,
+               "the output variable of $swrite/$sformat shall be of an "
+               "integral, unpacked array of byte, or string type, not real");
+  }
+}
+
+void CheckStringOutputTargetsExpr(const Expr* e, const TypeMap& types,
+                                  DiagEngine& diag) {
+  if (e == nullptr) return;
+  if (e->kind == ExprKind::kSystemCall && IsStringOutputTask(e->callee))
+    CheckStringOutputTarget(e, types, diag);
+  CheckStringOutputTargetsExpr(e->lhs, types, diag);
+  CheckStringOutputTargetsExpr(e->rhs, types, diag);
+  CheckStringOutputTargetsExpr(e->condition, types, diag);
+  CheckStringOutputTargetsExpr(e->true_expr, types, diag);
+  CheckStringOutputTargetsExpr(e->false_expr, types, diag);
+  CheckStringOutputTargetsExpr(e->base, types, diag);
+  CheckStringOutputTargetsExpr(e->index, types, diag);
+  for (auto* a : e->args) CheckStringOutputTargetsExpr(a, types, diag);
+  for (auto* el : e->elements) CheckStringOutputTargetsExpr(el, types, diag);
+}
+
+void CheckStringOutputTargetsStmt(const Stmt* s, const TypeMap& types,
+                                  DiagEngine& diag) {
+  if (s == nullptr) return;
+  CheckStringOutputTargetsExpr(s->condition, types, diag);
+  CheckStringOutputTargetsExpr(s->lhs, types, diag);
+  CheckStringOutputTargetsExpr(s->rhs, types, diag);
+  CheckStringOutputTargetsExpr(s->expr, types, diag);
+  CheckStringOutputTargetsExpr(s->var_init, types, diag);
+  for (auto* sub : s->stmts) CheckStringOutputTargetsStmt(sub, types, diag);
+  for (auto* sub : s->fork_stmts)
+    CheckStringOutputTargetsStmt(sub, types, diag);
+  CheckStringOutputTargetsStmt(s->then_branch, types, diag);
+  CheckStringOutputTargetsStmt(s->else_branch, types, diag);
+  CheckStringOutputTargetsStmt(s->body, types, diag);
+  CheckStringOutputTargetsStmt(s->for_body, types, diag);
+  for (auto* init : s->for_inits)
+    CheckStringOutputTargetsStmt(init, types, diag);
+  for (auto& ci : s->case_items)
+    CheckStringOutputTargetsStmt(ci.body, types, diag);
+}
+
 }  // namespace
+
+void Elaborator::ValidateStringOutputTaskTargets(const ModuleDecl* decl) {
+  // §21.3.3: the destination variable of $swrite/$swriteb/$swriteh/$swriteo and
+  // $sformat shall be an integral, unpacked-array-of-byte, or string type; a
+  // real destination is rejected.
+  for (const auto* item : decl->items) {
+    if (item->body) CheckStringOutputTargetsStmt(item->body, var_types_, diag_);
+    for (auto* s : item->func_body_stmts)
+      CheckStringOutputTargetsStmt(s, var_types_, diag_);
+    CheckStringOutputTargetsExpr(item->init_expr, var_types_, diag_);
+  }
+}
 
 void Elaborator::ValidatePlaOutputTerms(const ModuleDecl* decl) {
   // §20.16: the output terms of a PLA modeling system task shall be variables,
