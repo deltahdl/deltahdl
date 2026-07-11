@@ -139,6 +139,27 @@ TEST(AssertionCallback, PlaceRejectsReasonInvalidForHandle) {
             0u);
 }
 
+// §39.4.2 (handle-validity, first sentence): every assertion callback reason
+// may be placed on any concurrent OR immediate assertion statement — that is,
+// on an assert, assume, or cover, whether immediate or concurrent, not only on
+// the assert form the other tests exercise. Each admitted statement handle type
+// is a distinct accepting input; every one yields a valid (non-null) placement.
+TEST(AssertionCallback, PlacesOnEveryAssertionStatementHandleType) {
+  int handle_types[] = {vpiAssert,          vpiAssume,
+                        vpiCover,           vpiImmediateAssert,
+                        vpiImmediateAssume, vpiImmediateCover};
+  for (int handle_type : handle_types) {
+    AssertionApi api;
+    // A control-only reason (never valid on a sequence/property instance)
+    // confirms it is the statement-handle acceptance, not a start/success/
+    // failure carve-out, that admits the placement.
+    EXPECT_NE(api.PlaceAssertionCallback(cbAssertionKill, kA, handle_type,
+                                         noop_cb, nullptr),
+              0u);
+    EXPECT_EQ(api.PlacedCallbackCount(), 1u);
+  }
+}
+
 // §39.4.2: the callback is specific to the assertion it was placed on (events
 // on a different assertion do not trigger it), and it continues to be called
 // each time the event occurs until it is removed.
@@ -274,6 +295,39 @@ TEST(AssertionCallback, FailureDeliversFailExpr) {
 
   EXPECT_EQ(fail_expr, "a && b");
   EXPECT_EQ(attempt_start, 5u);
+}
+
+// §39.4.2 (handle-validity, second sentence): a failure callback placed on a
+// property instance — not only a concurrent/immediate assertion statement — is
+// a valid placement that actually fires and delivers its attempt information.
+// Every other delivery test uses an assertion-statement handle; this observes
+// that the property-instance placement branch yields a live, firing callback.
+TEST(AssertionCallback, FailureCallbackFiresWhenPlacedOnPropertyInstance) {
+  AssertionApi api;
+  int count = 0;
+  std::string fail_expr;
+  uint64_t attempt_start = 0;
+  AssertionCallbackHandle h = api.PlaceAssertionCallback(
+      cbAssertionFailure, kA, vpiProperty,
+      [&](const AssertionCallbackArgs& a) {
+        ++count;
+        if (a.info != nullptr) {
+          fail_expr = a.info->fail_expr;
+          attempt_start = a.info->attempt_start_time;
+        }
+      },
+      nullptr);
+  // The property-instance placement succeeds (non-null handle).
+  EXPECT_NE(h, 0u);
+
+  AssertionAttemptInfo info;
+  info.attempt_start_time = 8;
+  info.fail_expr = "req && !gnt";
+  EXPECT_EQ(api.DeliverAssertionEvent(kA, cbAssertionFailure, 8, info), 1u);
+
+  EXPECT_EQ(count, 1);
+  EXPECT_EQ(fail_expr, "req && !gnt");
+  EXPECT_EQ(attempt_start, 8u);
 }
 
 // §39.4.2: a placed step callback is invoked for both success and failure
