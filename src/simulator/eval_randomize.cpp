@@ -274,17 +274,49 @@ bool BuildDistConstraint(const ConstraintDistRef& ref, RandomizeCtx& rc,
   return true;
 }
 
+// 18.5.10: locate the constraint block named `name` in the object's class
+// hierarchy, walking from the dynamic type up to its base classes so the
+// most-derived block of a given name wins (matching CollectConstraintBlocks).
+// A block qualified 'static' shares one active/inactive state across every
+// instance of its declaring class, so its state lives on the ClassTypeInfo
+// rather than the object; this returns that declaring type when the block is
+// static, and nullptr otherwise.
+static const ClassTypeInfo* StaticConstraintOwner(const ClassObject* obj,
+                                                  std::string_view name) {
+  for (const auto* lvl = obj ? obj->type : nullptr; lvl != nullptr;
+       lvl = lvl->parent) {
+    if (!lvl->decl) continue;
+    for (const ClassMember* m : lvl->decl->members) {
+      if (m->kind == ClassMemberKind::kConstraint && m->name == name)
+        return m->is_static ? lvl : nullptr;
+    }
+  }
+  return nullptr;
+}
+
 // 18.9: report whether a constraint block is active on this object. Every block
 // is active when the object is created, so an absent entry means active.
+// 18.5.10: for a static block the state is the class-wide one shared by all
+// instances, kept on the declaring type rather than on this object.
 bool IsObjectConstraintActive(const ClassObject* obj, std::string_view name) {
+  if (const ClassTypeInfo* owner = StaticConstraintOwner(obj, name)) {
+    auto it = owner->static_constraint_active.find(std::string(name));
+    return it == owner->static_constraint_active.end() ? true : it->second;
+  }
   auto it = obj->constraint_active.find(std::string(name));
   return it == obj->constraint_active.end() ? true : it->second;
 }
 
 // 18.9 / Table 18-4: record a block's active (ON) or inactive (OFF) state for
 // this object, as set by a void-form constraint_mode() call.
+// 18.5.10: a static block's state is written to the class-wide map, so the
+// change takes effect for every instance of the declaring class.
 void SetObjectConstraintActive(ClassObject* obj, std::string_view name,
                                bool active) {
+  if (const ClassTypeInfo* owner = StaticConstraintOwner(obj, name)) {
+    owner->static_constraint_active[std::string(name)] = active;
+    return;
+  }
   obj->constraint_active[std::string(name)] = active;
 }
 

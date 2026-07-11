@@ -1,139 +1,155 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
-#include <memory>
-#include <string>
 
-#include "simulator/constraint_solver.h"
+#include "fixture_simulator.h"
+#include "helpers_scheduler.h"
 
 using namespace delta;
 
 namespace {
 
-// A plain integral rand variable over [lo, hi].
-RandVariable MakeVar(const std::string& name, int64_t lo, int64_t hi) {
-  RandVariable v;
-  v.name = name;
-  v.min_val = lo;
-  v.max_val = hi;
-  v.width = 8;
-  return v;
+// These tests drive 18.5.10's runtime rule end to end. Each program is parsed,
+// elaborated, and run; the outcome is copied into module variables the harness
+// reads, so the behavior observed is that of parse/elaborate/run applying the
+// rule -- not a hand-built solver state.
+//
+// The shared machinery is a class with two conflicting equality constraints on
+// one variable: while both blocks are active the randomize() solve is
+// unsatisfiable, and disabling one leaves the survivor pinning the variable so
+// the solve succeeds. When the pinning block is qualified 'static',
+// constraint_mode() on it through ONE instance must be observed by EVERY other
+// instance -- the flip of a second, untouched instance's solve is the visible
+// proof.
+
+// 18.5.10: constraint_mode() on a static block affects all instances of the
+// class. Disabling the static block through p1 turns it off for p2 as well:
+// p2's no-argument query reports it OFF, and p2's randomize() -- which was
+// unsatisfiable while the static block conflicted with c_lo -- now succeeds and
+// pins x to the surviving constraint's value.
+TEST(StaticConstraintMode, StaticModeDisableThroughOneInstanceAffectsAnother) {
+  const char* src =
+      "class P;\n"
+      "  rand bit [7:0] x;\n"
+      "  static constraint c_pin { x == 20; }\n"
+      "  constraint c_lo { x == 10; }\n"
+      "endclass\n"
+      "module t;\n"
+      "  int st_p2;\n"
+      "  int ok_p2;\n"
+      "  int rx2;\n"
+      "  initial begin\n"
+      "    P p1;\n"
+      "    P p2;\n"
+      "    p1 = new;\n"
+      "    p2 = new;\n"
+      "    p1.c_pin.constraint_mode(0);\n"
+      "    st_p2 = p2.c_pin.constraint_mode();\n"
+      "    ok_p2 = p2.randomize();\n"
+      "    rx2 = p2.x;\n"
+      "  end\n"
+      "endmodule\n";
+  // p2 never touched c_pin, yet it reads OFF because the state is class-wide.
+  EXPECT_EQ(RunAndGet(src, "st_p2"), 0u);
+  // With the static block disabled, only c_lo binds p2's solve, so it succeeds.
+  EXPECT_EQ(RunAndGet(src, "ok_p2"), 1u);
+  EXPECT_EQ(RunAndGet(src, "rx2"), 10u);
 }
 
-// A constraint 'x > 5', which is unsatisfiable for a variable confined to
-// [0, 3]: when the enclosing block is enabled the solve must fail, and when the
-// block is disabled the solve can succeed. This makes a block's on/off state
-// directly observable through the outcome of Solve().
-ConstraintExpr XGreaterThanFive() {
-  ConstraintExpr c;
-  c.kind = ConstraintKind::kGreaterThan;
-  c.var_name = "x";
-  c.lo = 5;
-  return c;
+// 18.5.10 (negative / contrast): a non-static block's mode is per-instance, so
+// disabling it through q1 does not reach q2. q2 still reports the block ON and
+// its solve stays unsatisfiable. This is the closest input the static rule must
+// distinguish: identical source but without the 'static' keyword.
+TEST(StaticConstraintMode, NonStaticModeDisableStaysPerInstance) {
+  const char* src =
+      "class Q;\n"
+      "  rand bit [7:0] x;\n"
+      "  constraint c_pin { x == 20; }\n"
+      "  constraint c_lo { x == 10; }\n"
+      "endclass\n"
+      "module t;\n"
+      "  int st_q2;\n"
+      "  int ok_q2;\n"
+      "  initial begin\n"
+      "    Q q1;\n"
+      "    Q q2;\n"
+      "    q1 = new;\n"
+      "    q2 = new;\n"
+      "    q1.c_pin.constraint_mode(0);\n"
+      "    st_q2 = q2.c_pin.constraint_mode();\n"
+      "    ok_q2 = q2.randomize();\n"
+      "  end\n"
+      "endmodule\n";
+  // q2's copy is untouched: still ON, and its solve still conflicts.
+  EXPECT_EQ(RunAndGet(src, "st_q2"), 1u);
+  EXPECT_EQ(RunAndGet(src, "ok_q2"), 0u);
 }
 
-// Build a solver holding x in [0, 3] and one constraint block 'c' carrying the
-// unsatisfiable 'x > 5'. When 'shared' is non-null the block is static and
-// binds its on/off state to that shared cell, modelling one instance of the
-// class.
-ConstraintSolver MakeInstance(uint32_t seed,
-                              const std::shared_ptr<bool>& shared) {
-  ConstraintSolver solver(seed);
-  solver.AddVariable(MakeVar("x", 0, 3));
-  ConstraintBlock blk;
-  blk.name = "c";
-  blk.constraints.push_back(XGreaterThanFive());
-  if (shared) {
-    blk.is_static = true;
-    blk.shared_enabled = shared;
-    blk.enabled = *shared;
-  }
-  solver.AddConstraintBlock(blk);
-  return solver;
+// 18.5.10: re-enabling the static block through one instance restores it for
+// every instance. After p1 turns c_pin off then on again, a second instance's
+// solve is freed and then re-bound -- unsatisfiable once more.
+TEST(StaticConstraintMode, StaticModeReenableThroughOneInstanceAffectsAnother) {
+  const char* src =
+      "class P;\n"
+      "  rand bit [7:0] x;\n"
+      "  static constraint c_pin { x == 20; }\n"
+      "  constraint c_lo { x == 10; }\n"
+      "endclass\n"
+      "module t;\n"
+      "  int ok_off;\n"
+      "  int ok_on;\n"
+      "  initial begin\n"
+      "    P p1;\n"
+      "    P p2;\n"
+      "    p1 = new;\n"
+      "    p2 = new;\n"
+      "    p1.c_pin.constraint_mode(0);\n"
+      "    ok_off = p2.randomize();\n"
+      "    p1.c_pin.constraint_mode(1);\n"
+      "    ok_on = p2.randomize();\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "ok_off"), 1u);
+  EXPECT_EQ(RunAndGet(src, "ok_on"), 0u);
 }
 
-// 18.5.10: a constraint_mode() call on a static constraint affects all
-// instances of the class. Model two instances whose static block 'c' shares one
-// on/off cell: turning the constraint off through one instance is observed by
-// the other — its enabled state, reported by constraint_mode() with no
-// argument, reads as off without any call of its own.
-TEST(StaticConstraintMode, StaticConstraintModeIsSharedAcrossInstances) {
-  auto shared = std::make_shared<bool>(true);
-  ConstraintSolver inst_a = MakeInstance(11, shared);
-  ConstraintSolver inst_b = MakeInstance(22, shared);
-
-  // Both start enabled: the unsatisfiable constraint blocks each instance.
-  EXPECT_TRUE(inst_a.GetConstraintMode("c"));
-  EXPECT_TRUE(inst_b.GetConstraintMode("c"));
-
-  // Disabling the static constraint through one instance turns it off for the
-  // other as well.
-  inst_a.SetConstraintMode("c", false);
-  EXPECT_FALSE(inst_b.GetConstraintMode("c"));
-}
-
-// 18.5.10: the shared on/off state governs solving, not just reporting. After
-// the constraint is turned off through one instance, the other instance solves
-// successfully because the (now disabled) unsatisfiable constraint no longer
-// applies to it.
-TEST(StaticConstraintMode, DisablingStaticConstraintFreesOtherInstanceSolve) {
-  auto shared = std::make_shared<bool>(true);
-  ConstraintSolver inst_a = MakeInstance(11, shared);
-  ConstraintSolver inst_b = MakeInstance(22, shared);
-
-  // While enabled, the unsatisfiable constraint makes the solve fail.
-  EXPECT_FALSE(inst_b.Solve());
-
-  // Turn it off through the first instance; the second now finds a value.
-  inst_a.SetConstraintMode("c", false);
-  EXPECT_TRUE(inst_b.Solve());
-}
-
-// 18.5.10: re-enabling the static constraint through one instance restores it
-// for every instance, so the previously freed solve fails again.
-TEST(StaticConstraintMode, ReenablingStaticConstraintAffectsOtherInstance) {
-  auto shared = std::make_shared<bool>(true);
-  ConstraintSolver inst_a = MakeInstance(11, shared);
-  ConstraintSolver inst_b = MakeInstance(22, shared);
-
-  inst_a.SetConstraintMode("c", false);
-  EXPECT_TRUE(inst_b.Solve());
-
-  inst_a.SetConstraintMode("c", true);
-  EXPECT_FALSE(inst_b.Solve());
-}
-
-// 18.5.10: the shared on/off state governs the no-argument checker as well as
-// generation. Pin x to a value the unsatisfiable constraint rejects: while the
-// static constraint is on, a check of another instance fails, and once it is
-// turned off through one instance the other instance's check passes because the
-// disabled constraint is no longer evaluated.
-TEST(StaticConstraintMode, DisablingStaticConstraintAffectsOtherInstanceCheck) {
-  auto shared = std::make_shared<bool>(true);
-  ConstraintSolver inst_a = MakeInstance(11, shared);
-  ConstraintSolver inst_b = MakeInstance(22, shared);
-
-  // x = 0 violates 'x > 5', so the check fails while the constraint is enabled.
-  inst_b.SetValue("x", 0);
-  EXPECT_FALSE(inst_b.Check());
-
-  // Turning the static constraint off through the first instance removes it
-  // from the second instance's evaluation, so the same values now check clean.
-  inst_a.SetConstraintMode("c", false);
-  EXPECT_TRUE(inst_b.Check());
-}
-
-// 18.5.10 (contrast): a non-static constraint's mode is per-instance. With no
-// shared state, turning the constraint off through one instance leaves the
-// other's copy enabled — it still reports on and its solve still fails.
-TEST(StaticConstraintMode, NonStaticConstraintModeIsIndependentPerInstance) {
-  ConstraintSolver inst_a = MakeInstance(11, nullptr);
-  ConstraintSolver inst_b = MakeInstance(22, nullptr);
-
-  inst_a.SetConstraintMode("c", false);
-
-  EXPECT_TRUE(inst_b.GetConstraintMode("c"));
-  EXPECT_FALSE(inst_b.Solve());
+// 18.5.10: "all instances of that particular class" reaches an inherited static
+// block. Here the static block c_pin is declared in a base class (18.5.2
+// inheritance) and the conflicting c_lo in the derived class; two derived
+// instances are randomized. Disabling c_pin through one derived instance is
+// observed by the other -- the shared state lives on the base class that
+// declares the block, so the untouched instance reads it OFF and its solve is
+// freed. This exercises the walk up the class hierarchy that locates the
+// declaring type, which the same-class tests above never reach.
+TEST(StaticConstraintMode, InheritedStaticBlockSharedAcrossDerivedInstances) {
+  const char* src =
+      "class B;\n"
+      "  rand bit [7:0] x;\n"
+      "  static constraint c_pin { x == 20; }\n"
+      "endclass\n"
+      "class D extends B;\n"
+      "  constraint c_lo { x == 10; }\n"
+      "endclass\n"
+      "module t;\n"
+      "  int st_d2;\n"
+      "  int ok_d2;\n"
+      "  int rx2;\n"
+      "  initial begin\n"
+      "    D d1;\n"
+      "    D d2;\n"
+      "    d1 = new;\n"
+      "    d2 = new;\n"
+      "    d1.c_pin.constraint_mode(0);\n"
+      "    st_d2 = d2.c_pin.constraint_mode();\n"
+      "    ok_d2 = d2.randomize();\n"
+      "    rx2 = d2.x;\n"
+      "  end\n"
+      "endmodule\n";
+  // The inherited static block reads OFF on d2 though only d1 touched it.
+  EXPECT_EQ(RunAndGet(src, "st_d2"), 0u);
+  // With the base's static block disabled, only the derived c_lo binds d2.
+  EXPECT_EQ(RunAndGet(src, "ok_d2"), 1u);
+  EXPECT_EQ(RunAndGet(src, "rx2"), 10u);
 }
 
 }  // namespace

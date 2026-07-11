@@ -69,6 +69,13 @@ struct ClassTypeInfo {
   // a const ClassTypeInfo* update the shared values.
   mutable std::unordered_map<std::string, Logic4Vec> static_properties;
 
+  // §18.5.10: a constraint block qualified 'static' has one active/inactive
+  // state shared by every instance of the declaring class, rather than a
+  // per-object state. constraint_mode() on such a block reads and writes this
+  // class-wide map; turning it OFF (or ON) is observed by all instances. Like
+  // static_properties it is mutable so a const ClassTypeInfo* can update it.
+  mutable std::unordered_map<std::string, bool> static_constraint_active;
+
   std::unordered_map<std::string, uint64_t> enum_members;
 
   // §37.32: the class specializations that name this class definition as their
