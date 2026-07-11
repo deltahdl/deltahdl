@@ -178,6 +178,17 @@ TEST(ExpressionModel, TypespecAvailabilityGuarantee) {
   EXPECT_FALSE(VpiTypespecAlwaysAvailable(vpiAddOp, false, false));
 }
 
+// Detail 5 (negative, second admitted operator): the type-prefix requirement
+// applies equally to a multiassignment-pattern operation. Without a data type
+// prefix on its braces the typespec relation is not guaranteed, mirroring the
+// plain assignment-pattern negative case for the distinct operator.
+TEST(ExpressionModel,
+     MultiAssignmentPatternTypespecNotGuaranteedWithoutPrefix) {
+  EXPECT_FALSE(
+      VpiTypespecAlwaysAvailable(vpiMultiAssignmentPatternOp, false,
+                                 /*assignment_pattern_has_type_prefix=*/false));
+}
+
 // Detail 9: vpiConstantSelect of a part-select or indexed part-select is TRUE
 // only when all three conditions hold, and FALSE if any one fails.
 TEST(ExpressionModel, PartSelectConstantSelectRequiresAllThreeConditions) {
