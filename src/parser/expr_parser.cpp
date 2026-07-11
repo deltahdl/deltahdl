@@ -903,7 +903,7 @@ Expr* Parser::ParseWithClause(Expr* expr) {
 
   if (Check(TokenKind::kLBrace)) {
     Consume();
-    SkipBraceBlock(lexer_);
+    expr->inline_constraint = CaptureInlineConstraintBlock();
     return expr;
   }
 
@@ -927,22 +927,47 @@ Expr* Parser::ParseWithClause(Expr* expr) {
   }
   Expect(TokenKind::kLParen);
   expr->with_has_parens = true;
+  std::vector<std::string_view> ids;
   if (!Check(TokenKind::kRParen)) {
     expr->with_expr = ParseExpr();
     // A.8.2 randomize_call's with-clause allows an identifier_list inside
     // the parentheses; array_manipulation_call's with-clause carries a
     // single expression. Tolerate either by consuming further entries.
+    if (expr->with_expr != nullptr &&
+        expr->with_expr->kind == ExprKind::kIdentifier)
+      ids.push_back(expr->with_expr->text);
     while (Match(TokenKind::kComma)) {
-      ParseExpr();
+      Expr* next_id = ParseExpr();
+      if (next_id != nullptr && next_id->kind == ExprKind::kIdentifier)
+        ids.push_back(next_id->text);
     }
   }
   Expect(TokenKind::kRParen);
 
   if (Check(TokenKind::kLBrace)) {
     Consume();
-    SkipBraceBlock(lexer_);
+    expr->inline_constraint = CaptureInlineConstraintBlock();
+    // 18.7: the parenthesized names are the identifier_list of a restricted
+    // constraint block; keep them so the simulator limits which names resolve
+    // as the object's random variables. Recorded only when a constraint block
+    // actually follows, leaving the shared array-method `with (expr)` form (no
+    // trailing block) untouched.
+    expr->with_restrict_ids = std::move(ids);
   }
   return expr;
+}
+
+// 18.7: capture a randomize() with { constraint_block } body, positioned just
+// past the opening '{'. The block's inline constraints follow the same rules
+// and take the same forms as an in-class constraint block, so the body is
+// scanned by the shared constraint-body scanner into a throwaway constraint
+// member; the simulator later applies its captured relations alongside the
+// object's own constraints. The scan consumes through the matching '}'.
+ClassMember* Parser::CaptureInlineConstraintBlock() {
+  auto* block = arena_.Create<ClassMember>();
+  block->kind = ClassMemberKind::kConstraint;
+  ScanConstraintBodyRelations(block);
+  return block;
 }
 
 Expr* Parser::ParseSelectExpr(Expr* base) {

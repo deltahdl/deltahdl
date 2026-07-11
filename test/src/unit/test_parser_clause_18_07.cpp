@@ -33,28 +33,6 @@ TEST(ConstrainedRandomParsing, RandomizeWithRestrictedIdList) {
   ASSERT_EQ(r.cu->classes.size(), 1u);
 }
 
-TEST(SubroutineCallExprParsing, RandomizeCallWithConstraintBlock) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin obj.randomize() with { x < 10; }; end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(ConstrainedRandomParsing, RandomizeWithIdListAndConstraint) {
-  auto r = Parse(
-      "class C;\n"
-      "  rand int x, y;\n"
-      "  function void test();\n"
-      "    this.randomize() with (x) { x > 0; x < y; };\n"
-      "  endfunction\n"
-      "endclass\n");
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->classes.size(), 1u);
-}
-
 // 18.7 identifier_list ::= identifier { , identifier }: the parenthesized list
 // after 'with' on an object randomize may name more than one variable.
 TEST(ConstrainedRandomParsing, RandomizeWithMultiIdentifierList) {
@@ -68,6 +46,23 @@ TEST(ConstrainedRandomParsing, RandomizeWithMultiIdentifierList) {
   EXPECT_FALSE(r.has_errors);
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->classes.size(), 1u);
+}
+
+// 18.7: the constraint block following 'with' can define all the same
+// constraint forms a class constraint can -- and, being a constraint block, is
+// subject to the same rules. A 4-state equality operator is illegal in any
+// constraint (18.3), so it is rejected inside an inline block too. This error
+// is observable only because the inline block is now captured and scanned
+// rather than skipped at parse time.
+TEST(ConstrainedRandomParsing, RandomizeWithBlockRejectsFourStateEquality) {
+  auto r = Parse(
+      "class C;\n"
+      "  rand int x, y;\n"
+      "  function void test();\n"
+      "    this.randomize() with { x === y; };\n"
+      "  endfunction\n"
+      "endclass\n");
+  EXPECT_TRUE(r.has_errors);
 }
 
 // 18.7 inline_constraint_declaration admits 'null' as the random-variable

@@ -504,7 +504,7 @@ void CollectRandObjectMembers(const ClassTypeInfo* type, SimContext& ctx,
 // handle cycles so a self- or mutually-referential object graph terminates. A
 // null random object handle references nothing to randomize and is skipped.
 bool RandomizeObject(ClassObject* obj, SimContext& ctx, Arena& arena,
-                     const Expr* expr,
+                     const Expr* expr, const ClassMember* inline_block,
                      std::unordered_set<const ClassObject*>& visited) {
   if (!obj || !obj->type) return false;
   if (!visited.insert(obj).second) return true;
@@ -518,6 +518,33 @@ bool RandomizeObject(ClassObject* obj, SimContext& ctx, Arena& arena,
   std::vector<RandInfo> rands;
   CollectRandVariables(obj->type, ctx, rands);
   CollectConstraintBlocks(obj->type, rands, rc, solver);
+  // 18.7: the inline constraint block from a randomize() with {...} call is
+  // applied along with the object's own constraints -- not in place of them. It
+  // is translated into an additional, always-active constraint block using the
+  // same machinery as an in-class block, so its relations (and
+  // dist/soft/if-else forms) narrow this object's solve exactly like a class
+  // constraint. It is applied only to the object named in the call, not to its
+  // rand sub-objects, so inline_block is passed as null on the recursive
+  // descent below.
+  if (inline_block != nullptr) {
+    // 18.7: a block preceded by a parenthesized identifier_list is restricted
+    // -- only the listed names resolve as the object's random variables; every
+    // other name resolves in the calling scope. Translating the block against a
+    // rand set filtered to the listed names realizes exactly that: an unlisted
+    // name is not found among the rand variables, so it is read from the caller
+    // as a constant instead of being treated as one of the object's randoms. An
+    // unrestricted block (no parentheses) sees the full rand set.
+    if (expr != nullptr && expr->with_has_parens) {
+      std::unordered_set<std::string_view> listed(
+          expr->with_restrict_ids.begin(), expr->with_restrict_ids.end());
+      std::vector<RandInfo> listed_rands;
+      for (const auto& ri : rands)
+        if (listed.count(ri.name) != 0) listed_rands.push_back(ri);
+      AddConstraintMember(inline_block, listed_rands, rc, solver);
+    } else {
+      AddConstraintMember(inline_block, rands, rc, solver);
+    }
+  }
   for (auto& ri : rands) {
     if (ri.var.min_val > ri.var.max_val) ri.var.max_val = ri.var.min_val;
     solver.AddVariable(ri.var);
@@ -536,7 +563,9 @@ bool RandomizeObject(ClassObject* obj, SimContext& ctx, Arena& arena,
     if (handle == kNullClassHandle) continue;
     ClassObject* sub = ctx.GetClassObject(handle);
     if (!sub) continue;
-    if (!RandomizeObject(sub, ctx, arena, expr, visited)) solved = false;
+    if (!RandomizeObject(sub, ctx, arena, expr, /*inline_block=*/nullptr,
+                         visited))
+      solved = false;
   }
   return solved;
 }
@@ -552,7 +581,8 @@ bool TryEvalRandomizeMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
   if (!obj) return false;
 
   std::unordered_set<const ClassObject*> visited;
-  bool solved = RandomizeObject(obj, ctx, arena, expr, visited);
+  bool solved =
+      RandomizeObject(obj, ctx, arena, expr, expr->inline_constraint, visited);
   out = MakeLogic4VecVal(arena, 32, solved ? 1 : 0);
   return true;
 }

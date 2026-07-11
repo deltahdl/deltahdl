@@ -19,6 +19,7 @@ struct ModuleItem;
 struct ModuleDecl;
 struct SpecifyItem;
 struct BindDirective;
+struct ClassMember;
 
 enum class ExprKind : uint8_t {
   kIntegerLiteral,
@@ -80,6 +81,22 @@ struct Expr {
 
   Expr* with_expr = nullptr;
   bool with_has_parens = false;
+
+  // 18.7: for a randomize() with { constraint_block } call, the captured inline
+  // constraint block. Its top-level relations (and dist/soft/if-else forms) are
+  // scanned into a throwaway constraint ClassMember exactly as an in-class
+  // constraint block is, so the simulator can apply them alongside the object's
+  // own constraints. Null for any other call, including a plain randomize().
+  ClassMember* inline_constraint = nullptr;
+
+  // 18.7: the identifier_list of a restricted inline constraint block -- the
+  // names inside the parentheses of `randomize() with ( a, b ) { ... }`. In a
+  // restricted block only these names resolve as the object's random variables;
+  // all others resolve in the calling scope. with_has_parens records that the
+  // parenthesized form was used (so an empty list still marks a restricted
+  // block); this vector holds the listed names. Empty for an unrestricted
+  // block.
+  std::vector<std::string_view> with_restrict_ids;
 
   std::vector<Expr*> elements;
   Expr* repeat_count = nullptr;
