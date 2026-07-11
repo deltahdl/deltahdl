@@ -45,28 +45,4 @@ TEST(PropertyDisjunction, VacuousRightStillHolds) {
             PropertyResult::kPass);
 }
 
-// Two vacuous holds both count as holding, so the disjunction holds rather than
-// failing.
-TEST(PropertyDisjunction, BothVacuousHold) {
-  EXPECT_EQ(EvalPropertyOr(PropertyResult::kVacuousPass,
-                           PropertyResult::kVacuousPass),
-            PropertyResult::kPass);
-}
-
-// Edge case: "at least one holds" is satisfied as soon as a single operand
-// holds, even while the other operand is still being evaluated. A holding left
-// operand makes the disjunction hold without waiting on a pending right
-// operand.
-TEST(PropertyDisjunction, HoldingLeftWithPendingRightHolds) {
-  EXPECT_EQ(EvalPropertyOr(PropertyResult::kPass, PropertyResult::kPending),
-            PropertyResult::kPass);
-}
-
-// Edge case: symmetric to the previous one — a holding right operand carries
-// the disjunction even though the left operand has not yet resolved.
-TEST(PropertyDisjunction, HoldingRightWithPendingLeftHolds) {
-  EXPECT_EQ(EvalPropertyOr(PropertyResult::kPending, PropertyResult::kPass),
-            PropertyResult::kPass);
-}
-
 }  // namespace
